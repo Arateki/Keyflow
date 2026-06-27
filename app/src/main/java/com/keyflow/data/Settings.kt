@@ -31,6 +31,9 @@ data class Settings(
     val groqToken: String = "",
     val groqModel: String = GROQ_MODEL,
     val groqLanguage: String? = null,
+    // Modos habilitados (gating das abas; cada modo libera sua aba — CFG-02)
+    val overlayModeEnabled: Boolean = false,
+    val keyboardModeEnabled: Boolean = false,
     // Modos de gravação por gatilho (C16; default TOGGLE)
     val overlayRecordingMode: RecordingMode = RecordingMode.TOGGLE,
     val keyboardRecordingMode: RecordingMode = RecordingMode.TOGGLE,

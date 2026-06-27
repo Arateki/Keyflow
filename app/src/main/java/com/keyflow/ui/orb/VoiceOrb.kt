@@ -8,6 +8,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -41,6 +42,13 @@ import kotlin.math.sin
  */
 enum class OrbState { Idle, Listening, Paused, Transcribing }
 
+/**
+ * Clock global opcional para o orbe. A [com.keyflow.ui.gallery.GalleryActivity] provê um valor
+ * constante para congelar **qualquer** orbe da árvore (header de config, onboarding, …) e tornar os
+ * screenshots determinísticos sem threadar o `timeProvider` por todas as telas. `null` = tempo real.
+ */
+val LocalOrbClock = staticCompositionLocalOf<(() -> Float)?> { null }
+
 /** Conteúdo desenhado no centro do orbe (ORB-04). */
 sealed interface OrbCenter {
     data object None : OrbCenter
@@ -67,8 +75,9 @@ fun VoiceOrb(
     center: OrbCenter = OrbCenter.None,
     timeProvider: (() -> Float)? = null,
 ) {
-    val animatedMs = rememberOrbClock(enabled = timeProvider == null)
-    val timeMs = timeProvider?.invoke() ?: animatedMs
+    val provided = timeProvider ?: LocalOrbClock.current
+    val animatedMs = rememberOrbClock(enabled = provided == null)
+    val timeMs = provided?.invoke() ?: animatedMs
 
     Box(modifier, contentAlignment = Alignment.Center) {
         Canvas(Modifier.matchParentSize()) { drawOrb(timeMs, state) }

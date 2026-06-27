@@ -3,29 +3,30 @@ package com.keyflow.ui
 import android.Manifest
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
-import androidx.test.core.app.ActivityScenario
-import androidx.test.espresso.Espresso.onView
-import androidx.test.espresso.action.ViewActions.click
-import androidx.test.espresso.action.ViewActions.closeSoftKeyboard
-import androidx.test.espresso.action.ViewActions.replaceText
-import androidx.test.espresso.action.ViewActions.scrollTo
-import androidx.test.espresso.assertion.ViewAssertions.matches
-import androidx.test.espresso.matcher.ViewMatchers.withId
-import androidx.test.espresso.matcher.ViewMatchers.withText
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
-import com.keyflow.R
 import com.keyflow.overlay.OverlayService
-import org.hamcrest.CoreMatchers.containsString
+import com.keyflow.ui.config.TOGGLE_OVERLAY_MODE_TAG
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
+/**
+ * Fiação real da [SetupActivity] em Compose (T10). Cobre a parte de produção que sobrou da conversão:
+ * o toggle de **Modo Overlay** inicia/encerra o [OverlayService] (FGS) — herdando a cobertura do antigo
+ * "Ativar botão flutuante".
+ */
 @RunWith(AndroidJUnit4::class)
 class SetupActivityTest {
+
+    @get:Rule
+    val compose = createAndroidComposeRule<SetupActivity>()
 
     @get:Rule
     val permissions: GrantPermissionRule = GrantPermissionRule.grant(
@@ -48,55 +49,19 @@ class SetupActivityTest {
     }
 
     @Test
-    fun savesConfigFromForm() {
-        ActivityScenario.launch(SetupActivity::class.java).use {
-            onView(withId(R.id.keyflow_endpoint_input))
-                .perform(scrollTo(), replaceText("https://example.test/v1/audio/transcriptions"), closeSoftKeyboard())
-            onView(withId(R.id.keyflow_auth_header_name_input))
-                .perform(scrollTo(), replaceText("X-API-Key"), closeSoftKeyboard())
-            onView(withId(R.id.keyflow_auth_header_value_input))
-                .perform(scrollTo(), replaceText("secret-token"), closeSoftKeyboard())
-            onView(withId(R.id.keyflow_model_input))
-                .perform(scrollTo(), replaceText("whisper-large-v3"), closeSoftKeyboard())
-            onView(withId(R.id.keyflow_language_input))
-                .perform(scrollTo(), replaceText("pt"), closeSoftKeyboard())
-            onView(withId(R.id.keyflow_push_to_talk_radio))
-                .perform(scrollTo(), click())
+    fun overlayModeToggleStartsAndStopsForegroundService() {
+        // O orbe do header anima infinitamente; sem isto o link Compose-Espresso nunca fica idle.
+        compose.mainClock.autoAdvance = false
 
-            onView(withId(R.id.keyflow_save_config_button))
-                .perform(scrollTo(), click())
+        compose.onNodeWithTag(TOGGLE_OVERLAY_MODE_TAG).performClick()
+        waitUntil { OverlayService.isRunningForUi }
 
-            onView(withId(R.id.keyflow_config_status))
-                .check(matches(withText("Configuração salva")))
-        }
-    }
+        // Deixa o round-trip do DataStore refletir o flag (checked=on) antes de desligar.
+        SystemClock.sleep(800)
+        compose.waitForIdle()
 
-    @Test
-    fun checklistReflectsGrantedPermissions() {
-        ActivityScenario.launch(SetupActivity::class.java).use {
-            onView(withId(R.id.keyflow_permission_microphone))
-                .check(matches(withText(containsString("concedido"))))
-            onView(withId(R.id.keyflow_permission_overlay))
-                .check(matches(withText(containsString("concedido"))))
-            onView(withId(R.id.keyflow_permission_keyboard))
-                .check(matches(withText(containsString("pendente"))))
-        }
-    }
-
-    @Test
-    fun overlayToggleStartsAndStopsForegroundService() {
-        ActivityScenario.launch(SetupActivity::class.java).use {
-            onView(withId(R.id.keyflow_overlay_toggle))
-                .perform(scrollTo(), click())
-            waitUntil { OverlayService.isRunningForUi }
-
-            onView(withId(R.id.keyflow_overlay_status))
-                .check(matches(withText("Overlay ativo")))
-
-            onView(withId(R.id.keyflow_overlay_toggle))
-                .perform(scrollTo(), click())
-            waitUntil { !OverlayService.isRunningForUi }
-        }
+        compose.onNodeWithTag(TOGGLE_OVERLAY_MODE_TAG).performClick()
+        waitUntil { !OverlayService.isRunningForUi }
     }
 
     private fun waitUntil(predicate: () -> Boolean) {

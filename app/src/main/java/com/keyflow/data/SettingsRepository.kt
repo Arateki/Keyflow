@@ -66,6 +66,8 @@ class SettingsRepository(
             groqToken = securePrefs.getString(GROQ_TOKEN, "").orEmpty(),
             groqModel = prefs[GROQ_MODEL] ?: Settings.GROQ_MODEL,
             groqLanguage = prefs[GROQ_LANGUAGE]?.takeIf { it.isNotBlank() },
+            overlayModeEnabled = prefs[OVERLAY_MODE_ENABLED] ?: false,
+            keyboardModeEnabled = prefs[KEYBOARD_MODE_ENABLED] ?: false,
             overlayRecordingMode = prefs[OVERLAY_RECORDING_MODE].toRecordingMode(),
             keyboardRecordingMode = prefs[KEYBOARD_RECORDING_MODE].toRecordingMode(),
             overlaySide = prefs[OVERLAY_SIDE].toOverlaySide(),
@@ -97,6 +99,8 @@ class SettingsRepository(
             settings.openaiLanguage.putOrRemove(prefs, OPENAI_LANGUAGE)
             prefs[GROQ_MODEL] = settings.groqModel
             settings.groqLanguage.putOrRemove(prefs, GROQ_LANGUAGE)
+            prefs[OVERLAY_MODE_ENABLED] = settings.overlayModeEnabled
+            prefs[KEYBOARD_MODE_ENABLED] = settings.keyboardModeEnabled
             prefs[OVERLAY_RECORDING_MODE] = settings.overlayRecordingMode.name
             prefs[KEYBOARD_RECORDING_MODE] = settings.keyboardRecordingMode.name
             prefs[OVERLAY_SIDE] = settings.overlaySide.name
@@ -179,6 +183,8 @@ class SettingsRepository(
         val OPENAI_LANGUAGE = stringPreferencesKey("openai_language")
         val GROQ_MODEL = stringPreferencesKey("groq_model")
         val GROQ_LANGUAGE = stringPreferencesKey("groq_language")
+        val OVERLAY_MODE_ENABLED = booleanPreferencesKey("overlay_mode_enabled")
+        val KEYBOARD_MODE_ENABLED = booleanPreferencesKey("keyboard_mode_enabled")
         val OVERLAY_RECORDING_MODE = stringPreferencesKey("overlay_recording_mode")
         val KEYBOARD_RECORDING_MODE = stringPreferencesKey("keyboard_recording_mode")
         val OVERLAY_SIDE = stringPreferencesKey("overlay_side")

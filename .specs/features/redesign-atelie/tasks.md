@@ -159,12 +159,12 @@ gatilho, `overlaySide`, `orbSize`, `onboardingDone` e `effectiveConfigFor(source
 **Where**: `ui/config/{ConfigScreen,TabBar}.kt`, `ui/SetupActivity.kt` (→ ComponentActivity), `ui/common/SaveToast.kt`
 **Depends on**: T4, T5 · **Reuses**: `PermissionsChecker`, `SettingsRepository` · **Requirement**: CFG-01..05, FND-04, I18N-01/02
 **Done when**:
-- [ ] Header + 5 abas; gating esmaece Teclado/Overlay quando o modo está off; toggle de tema persiste.
-- [ ] Auto-save: toggle/segmento imediato; texto no desfoque-se-mudou; toast discreto.
-- [ ] Idioma inerte (toca → "em breve").
-- [ ] instrumented (navegação/gating/auto-save) + screenshot (`config-*` base).
-- [ ] Gate: `full`. Test count: ≥4.
-**Tests**: instrumented · **Gate**: full · **Commit**: `feat(config): scaffold de abas + auto-save`
+- [x] Header + 5 abas; gating esmaece Teclado/Overlay quando o modo está off; toggle de tema persiste.
+- [x] Auto-save: toggle/segmento imediato; texto no desfoque-se-mudou; toast discreto.
+- [x] Idioma inerte (toca → "em breve").
+- [x] instrumented (navegação/gating/auto-save) + screenshot (`config-modo` claro/escuro).
+- [x] Gate: `full` → 24 instrumentados (20→24), 0 falhas; unit verde. Test count novo = 6 (`ConfigScreenTest`) + 1 (`SetupActivityTest`).
+**Tests**: instrumented · **Gate**: full · **Commit**: `feat(config): scaffold de abas + auto-save`  ✅
 
 ### T11: ModoPanel
 **What**: Aba Modo: mic (permissão geral), cards Overlay/Keyboard com toggle, chips de permissão, placeholder GIF, hint de pausa contextual.

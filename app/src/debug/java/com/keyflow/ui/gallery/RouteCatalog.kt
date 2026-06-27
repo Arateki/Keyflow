@@ -8,6 +8,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.keyflow.ui.PermissionStatus
+import com.keyflow.ui.common.SaveController
+import com.keyflow.ui.config.ConfigScreen
 import com.keyflow.ui.orb.OrbCenter
 import com.keyflow.ui.orb.OrbState
 import com.keyflow.ui.orb.VoiceOrb
@@ -30,6 +33,7 @@ object RouteCatalog {
         orbRoute("orb-listening", OrbState.Listening, OrbCenter.None),
         orbRoute("orb-paused", OrbState.Paused, OrbCenter.PauseGlyph),
         orbRoute("orb-transcribing", OrbState.Transcribing, OrbCenter.None),
+        Route("config-modo") { ConfigModoRoute() },
     )
 
     private val byKey: Map<String, Route> = routes.associateBy { it.key }
@@ -37,6 +41,25 @@ object RouteCatalog {
     fun route(key: String): Route? = byKey[key]
 
     val keys: List<String> get() = routes.map { it.key }
+
+    /** Aba Modo do scaffold de configuração (T10), com modos ligados para mostrar gating liberado. */
+    @Composable
+    private fun ConfigModoRoute() {
+        ConfigScreen(
+            settings = FakeSettings.settings.copy(overlayModeEnabled = true, keyboardModeEnabled = true),
+            permissions = PermissionStatus(
+                microphoneGranted = true,
+                overlayGranted = true,
+                keyboardEnabled = true,
+                notificationsGranted = true,
+            ),
+            saveController = SaveController(),
+            onOverlayModeChange = {},
+            onKeyboardModeChange = {},
+            onThemeChange = {},
+            onLanguageClick = {},
+        )
+    }
 
     private fun orbRoute(key: String, state: OrbState, center: OrbCenter): Route = Route(key) {
         Box(

@@ -7,10 +7,12 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import com.keyflow.ui.orb.LocalOrbClock
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.keyflow.ui.theme.KeyFlowTheme
@@ -50,19 +52,22 @@ class GalleryActivity : ComponentActivity() {
 
         val route = RouteCatalog.route(routeKey)
         setContent {
-            KeyFlowTheme(dark = dark) {
-                if (route != null) {
-                    route.content()
-                } else {
-                    Text(
-                        text = "rota desconhecida: $routeKey",
-                        modifier = Modifier.fillMaxSize().background(Color.Magenta),
-                    )
-                }
-                LaunchedEffect(routeKey, dark) {
-                    // Espera alguns frames para a 1ª composição/medição assentar e marca pronto.
-                    repeat(3) { withFrameNanos { } }
-                    writeReadyMarker(if (route != null) routeKey else "unknown:$routeKey")
+            // Congela TODO orbe da árvore (header de config, onboarding, …) para frames determinísticos.
+            CompositionLocalProvider(LocalOrbClock provides { GALLERY_ORB_TIME_MS }) {
+                KeyFlowTheme(dark = dark) {
+                    if (route != null) {
+                        route.content()
+                    } else {
+                        Text(
+                            text = "rota desconhecida: $routeKey",
+                            modifier = Modifier.fillMaxSize().background(Color.Magenta),
+                        )
+                    }
+                    LaunchedEffect(routeKey, dark) {
+                        // Espera alguns frames para a 1ª composição/medição assentar e marca pronto.
+                        repeat(3) { withFrameNanos { } }
+                        writeReadyMarker(if (route != null) routeKey else "unknown:$routeKey")
+                    }
                 }
             }
         }
