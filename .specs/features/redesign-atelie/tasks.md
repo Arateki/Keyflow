@@ -127,11 +127,11 @@ gatilho, `overlaySide`, `orbSize`, `onboardingDone` e `effectiveConfigFor(source
 **Where**: `ui/orb/VoiceOrb.kt`
 **Depends on**: T4 · **Reuses**: handoff `VoiceOrb.kt` + `reference/orb-algorithm.js` · **Requirement**: ORB-01..04, REC-05
 **Done when**:
-- [ ] 4 estados fiéis ao algoritmo; `Paused` = visual de escuta + glifo central; `timeProvider` injetável.
-- [ ] `Time` formata `m:ss` (Mono 700) no centro; `PauseGlyph` no centro.
-- [ ] Unit p/ formatação de tempo; verificação visual via galeria (T7).
-- [ ] Gate: `quick`. Test count: ≥2.
-**Tests**: unit · **Gate**: quick · **Commit**: `feat(orb): VoiceOrb com pausa, clock injetável e conteúdo central`
+- [x] 4 estados (`Idle/Listening/Paused/Transcribing`) fiéis ao algoritmo; `Paused` reusa params de `Listening` + `PauseGlyph`; `timeProvider` injetável (default `withFrameNanos`).
+- [x] `OrbCenter.Time` formata `m:ss` (Space Mono Bold) no centro; `OrbCenter.PauseGlyph` (2 barras) no centro.
+- [x] Unit p/ formatação de tempo + equivalência Paused↔Listening; verificação visual via galeria (T7).
+- [x] Gate: `quick` → `BUILD SUCCESSFUL`. Test count: 4 (`VoiceOrbTest`).
+**Tests**: unit · **Gate**: quick · **Commit**: `feat(orb): VoiceOrb com pausa, clock injetável e conteúdo central`  ✅
 
 ### T7: GalleryActivity + RouteCatalog (modo determinístico)
 **What**: Activity debug que renderiza uma rota isolada (fullscreen imersivo) com clock fixo e dados mock.
