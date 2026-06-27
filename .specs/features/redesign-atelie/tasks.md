@@ -104,11 +104,11 @@ Phase 8 — Integração final
 **Where**: `ui/theme/{KeyFlowTheme,Palette,Type}.kt`
 **Depends on**: T1, T3 · **Reuses**: tokens de `context.md`, handoff colors · **Requirement**: FND-03, FND-04
 **Done when**:
-- [ ] `LightPalette`/`DarkPalette` com todos os tokens; `LocalKeyFlowPalette`; `KeyFlowTheme(dark){}`.
-- [ ] Mapeamento de tema testado em unit (token correto por modo).
-- [ ] Gate: `quick`.
-- [ ] Test count: ≥3 testes (mapeamento claro/escuro/acentos).
-**Tests**: unit · **Gate**: quick · **Commit**: `feat(theme): paletas Ateliê claro/escuro + tipografia`
+- [x] `LightPalette`/`DarkPalette` com todos os tokens (+ acentos fixos + tokens de teclado); `LocalKeyFlowPalette`; `KeyFlowTheme(dark){}`; `KeyFlowTypography`.
+- [x] Mapeamento de tema testado em unit (`paletteFor`, tokens por modo, acentos fixos). Compose `Color` roda em JVM.
+- [x] Gate: `quick` → `BUILD SUCCESSFUL`.
+- [x] Test count: 4 (`PaletteTest`: claro/escuro/acentos-fixos/superfícies-diferem).
+**Tests**: unit · **Gate**: quick · **Commit**: `feat(theme): paletas Ateliê claro/escuro + tipografia`  ✅
 
 ### T5: SettingsRepository — fonte, tokens, tema, modos
 **What**: Estender Config/Settings com `source`, tokens por provedor, `themeDark`, modos de gravação por
