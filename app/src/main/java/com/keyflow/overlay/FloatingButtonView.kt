@@ -4,6 +4,8 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.os.Handler
+import android.os.Looper
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -33,6 +35,9 @@ class FloatingButtonView(
         textSize = 28f
         typeface = android.graphics.Typeface.DEFAULT_BOLD
     }
+
+    private val handler = Handler(Looper.getMainLooper())
+    private var pendingTap: Runnable? = null
 
     private var windowParams: WindowManager.LayoutParams? = null
     private var updateWindowLayout: ((WindowManager.LayoutParams) -> Unit)? = null
@@ -92,6 +97,7 @@ class FloatingButtonView(
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                cancelPendingTap()
                 parent?.requestDisallowInterceptTouchEvent(true)
                 startRawX = event.rawX
                 startRawY = event.rawY
@@ -115,10 +121,13 @@ class FloatingButtonView(
             MotionEvent.ACTION_UP -> {
                 val eventType = gestures.onUp()
                 when (eventType) {
-                    GestureEvent.TRIPLE_TAP -> onShowInputMethodPicker()
+                    GestureEvent.TRIPLE_TAP -> {
+                        cancelPendingTap()
+                        onShowInputMethodPicker()
+                    }
                     GestureEvent.HOLD -> onHoldAction()
                     GestureEvent.DRAG_END -> persistCurrentPosition()
-                    GestureEvent.TAP -> if (!dragging) onTapAction()
+                    GestureEvent.TAP -> if (!dragging) scheduleTap()
                     else -> Unit
                 }
                 dragging = false
@@ -133,6 +142,17 @@ class FloatingButtonView(
         }
 
         return super.onTouchEvent(event)
+    }
+
+    private fun scheduleTap() {
+        val r = Runnable { onTapAction() }
+        pendingTap = r
+        handler.postDelayed(r, TAP_DELAY_MS)
+    }
+
+    private fun cancelPendingTap() {
+        pendingTap?.let { handler.removeCallbacks(it) }
+        pendingTap = null
     }
 
     private fun moveTo(x: Int, y: Int) {
@@ -159,6 +179,7 @@ class FloatingButtonView(
 
     private companion object {
         const val BUTTON_SIZE_PX = 144
+        const val TAP_DELAY_MS = 250L
         val READY_COLOR = Color.rgb(46, 125, 50)
         val NO_FIELD_COLOR = Color.rgb(97, 97, 97)
         val RECORDING_COLOR = Color.rgb(198, 40, 40)

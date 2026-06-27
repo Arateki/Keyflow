@@ -37,7 +37,7 @@
                 android:resource="@xml/method_poc" />
         </service>
 
-        <!-- Production invisible IME -->
+        <!-- Production invisible IME (fallback, mantido para compatibilidade) -->
         <service
             android:name=".ime.InvisibleKeyboardService"
             android:exported="true"
@@ -48,6 +48,19 @@
             <meta-data
                 android:name="android.view.im"
                 android:resource="@xml/method" />
+        </service>
+
+        <!-- Teclado KeyFlow: QWERTY + botão de microfone integrado -->
+        <service
+            android:name=".ime.KeyFlowKeyboardService"
+            android:exported="true"
+            android:permission="android.permission.BIND_INPUT_METHOD">
+            <intent-filter>
+                <action android:name="android.view.InputMethod" />
+            </intent-filter>
+            <meta-data
+                android:name="android.view.im"
+                android:resource="@xml/method_keyboard" />
         </service>
 
         <!-- PoC-1: Tela de teste com EditText -->

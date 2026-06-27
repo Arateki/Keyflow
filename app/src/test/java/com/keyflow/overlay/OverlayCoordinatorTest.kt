@@ -5,8 +5,11 @@ import com.keyflow.core.ButtonState
 import com.keyflow.core.InsertOutcome
 import com.keyflow.core.TranscriptionResult
 import com.keyflow.data.Config
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
@@ -27,16 +30,11 @@ class OverlayCoordinatorTest {
         val renderedStates = mutableListOf<ButtonState>()
         val inserted = mutableListOf<String>()
 
-        val coordinator = OverlayCoordinator(
+        val coordinator = coordinator(
             scope = this,
-            configProvider = { completeConfig() },
             recorder = recorder,
             transcriber = transcriber,
-            insertOrHold = {
-                inserted += it
-                InsertOutcome.Inserted
-            },
-            flushPending = { false },
+            insertOrHold = { inserted += it; InsertOutcome.Inserted },
             targetAvailable = { true },
             render = { renderedStates += it },
         )
@@ -57,57 +55,48 @@ class OverlayCoordinatorTest {
     }
 
     @Test
-    fun `successful transcription without target renders pending paste`() = runTest {
+    fun `successful transcription without target copies to clipboard and returns to idle`() = runTest {
         val audio = temporaryFolder.newFile("audio.m4a").also { it.writeText("audio") }
         val renderedStates = mutableListOf<ButtonState>()
+        val clipped = mutableListOf<String>()
 
-        val coordinator = OverlayCoordinator(
+        val coordinator = coordinator(
             scope = this,
-            configProvider = { completeConfig() },
             recorder = FakeRecorder(audio),
-            transcriber = FakeTranscriber(TranscriptionResult.Success("held text")),
+            transcriber = FakeTranscriber(TranscriptionResult.Success("clipboard text")),
             insertOrHold = { InsertOutcome.Held },
-            flushPending = { false },
             targetAvailable = { false },
             render = { renderedStates += it },
+            onClipboard = { clipped += it },
         )
 
-        coordinator.onTargetChanged(true)
         coordinator.onTap()
         coordinator.onTap()
         advanceUntilIdle()
 
-        assertThat(renderedStates.last()).isEqualTo(ButtonState.PENDING_PASTE)
+        assertThat(clipped).containsExactly("clipboard text")
+        assertThat(renderedStates.last()).isEqualTo(ButtonState.IDLE_NO_FIELD)
     }
 
     @Test
-    fun `toggle tap without target still records and holds transcription as pending`() = runTest {
+    fun `clipboard is not called when insertion succeeds`() = runTest {
         val audio = temporaryFolder.newFile("audio.m4a").also { it.writeText("audio") }
-        val recorder = FakeRecorder(audio)
-        val renderedStates = mutableListOf<ButtonState>()
+        val clipped = mutableListOf<String>()
 
-        val coordinator = OverlayCoordinator(
+        val coordinator = coordinator(
             scope = this,
-            configProvider = { completeConfig() },
-            recorder = recorder,
-            transcriber = FakeTranscriber(TranscriptionResult.Success("pending text")),
-            insertOrHold = { InsertOutcome.Held },
-            flushPending = { false },
-            targetAvailable = { false },
-            render = { renderedStates += it },
+            recorder = FakeRecorder(audio),
+            transcriber = FakeTranscriber(TranscriptionResult.Success("inserted")),
+            insertOrHold = { InsertOutcome.Inserted },
+            targetAvailable = { true },
+            onClipboard = { clipped += it },
         )
 
         coordinator.onTap()
         coordinator.onTap()
         advanceUntilIdle()
 
-        assertThat(recorder.started).isEqualTo(1)
-        assertThat(recorder.stopped).isEqualTo(1)
-        assertThat(renderedStates).containsAtLeast(
-            ButtonState.RECORDING,
-            ButtonState.SENDING,
-            ButtonState.PENDING_PASTE,
-        ).inOrder()
+        assertThat(clipped).isEmpty()
     }
 
     @Test
@@ -115,15 +104,76 @@ class OverlayCoordinatorTest {
         val transcriber = FakeTranscriber(TranscriptionResult.Success("unused"))
         val renderedStates = mutableListOf<ButtonState>()
 
-        val coordinator = OverlayCoordinator(
+        val coordinator = coordinator(
             scope = this,
-            configProvider = { completeConfig() },
             recorder = FakeRecorder(audioFile = null),
             transcriber = transcriber,
-            insertOrHold = { InsertOutcome.Inserted },
-            flushPending = { false },
             targetAvailable = { true },
             render = { renderedStates += it },
+        )
+
+        coordinator.onTap()
+        coordinator.onTap()
+        runCurrent() // processa apenas coroutines imediatas, não avança além do delay de dismiss
+
+        assertThat(transcriber.audioFiles).isEmpty()
+        assertThat(renderedStates.last()).isEqualTo(ButtonState.ERROR)
+    }
+
+    @Test
+    fun `error auto-dismisses to idle after 3 seconds`() = runTest {
+        val renderedStates = mutableListOf<ButtonState>()
+
+        val coordinator = coordinator(
+            scope = this,
+            recorder = FakeRecorder(audioFile = null),
+            transcriber = FakeTranscriber(TranscriptionResult.Success("unused")),
+            targetAvailable = { false },
+            render = { renderedStates += it },
+        )
+
+        coordinator.onTap()
+        coordinator.onTap()
+        runCurrent()
+        assertThat(renderedStates.last()).isEqualTo(ButtonState.ERROR)
+
+        advanceTimeBy(3001)
+        assertThat(renderedStates.last()).isEqualTo(ButtonState.IDLE_NO_FIELD)
+    }
+
+    @Test
+    fun `error dismisses immediately on next tap`() = runTest {
+        val renderedStates = mutableListOf<ButtonState>()
+
+        val coordinator = coordinator(
+            scope = this,
+            recorder = FakeRecorder(audioFile = null),
+            targetAvailable = { true },
+            render = { renderedStates += it },
+        )
+
+        coordinator.onTap()
+        coordinator.onTap()
+        runCurrent()
+        assertThat(renderedStates.last()).isEqualTo(ButtonState.ERROR)
+
+        coordinator.onTap()
+        assertThat(renderedStates.last()).isEqualTo(ButtonState.IDLE_READY)
+    }
+
+    @Test
+    fun `brief recording is cancelled without error and without transcription`() = runTest {
+        val audio = temporaryFolder.newFile("audio.m4a").also { it.writeText("audio") }
+        val transcriber = FakeTranscriber(TranscriptionResult.Success("unused"))
+        val renderedStates = mutableListOf<ButtonState>()
+
+        val coordinator = coordinator(
+            scope = this,
+            recorder = FakeRecorder(audio),
+            transcriber = transcriber,
+            targetAvailable = { false },
+            render = { renderedStates += it },
+            recordingClockMs = { 0L },
         )
 
         coordinator.onTap()
@@ -131,8 +181,57 @@ class OverlayCoordinatorTest {
         advanceUntilIdle()
 
         assertThat(transcriber.audioFiles).isEmpty()
-        assertThat(renderedStates.last()).isEqualTo(ButtonState.ERROR)
+        assertThat(renderedStates).doesNotContain(ButtonState.ERROR)
+        assertThat(renderedStates.last()).isEqualTo(ButtonState.IDLE_NO_FIELD)
     }
+
+    @Test
+    fun `second tap in sending state does not trigger another transcription`() = runTest {
+        val audio = temporaryFolder.newFile("audio.m4a").also { it.writeText("audio") }
+        val transcriber = FakeTranscriber(TranscriptionResult.Success("once"))
+        val inserted = mutableListOf<String>()
+
+        val coordinator = coordinator(
+            scope = this,
+            recorder = FakeRecorder(audio),
+            transcriber = transcriber,
+            insertOrHold = { inserted += it; InsertOutcome.Inserted },
+            targetAvailable = { true },
+            recordingClockMs = longEnoughClock(),
+        )
+
+        coordinator.onTap() // IDLE → RECORDING
+        coordinator.onTap() // RECORDING → SENDING
+        coordinator.onTap() // SENDING → ignored (state unchanged)
+        advanceUntilIdle()
+
+        assertThat(transcriber.audioFiles).hasSize(1)
+        assertThat(inserted).containsExactly("once")
+    }
+
+    // ── helpers ──────────────────────────────────────────────────────────────
+
+    private fun coordinator(
+        scope: CoroutineScope,
+        recorder: OverlayAudioRecorder = FakeRecorder(null),
+        transcriber: OverlayTranscriber = FakeTranscriber(TranscriptionResult.Success("")),
+        insertOrHold: (String) -> InsertOutcome = { InsertOutcome.Inserted },
+        targetAvailable: () -> Boolean = { true },
+        render: (ButtonState) -> Unit = {},
+        onClipboard: (String) -> Unit = {},
+        recordingClockMs: () -> Long = longEnoughClock(),
+    ) = OverlayCoordinator(
+        scope = scope,
+        configProvider = { completeConfig() },
+        recorder = recorder,
+        transcriber = transcriber,
+        insertOrHold = insertOrHold,
+        flushPending = { false },
+        targetAvailable = targetAvailable,
+        render = render,
+        onClipboard = onClipboard,
+        recordingClockMs = recordingClockMs,
+    )
 
     private fun completeConfig(): Config = Config(
         endpointUrl = "https://example.test/v1/audio/transcriptions",
@@ -143,14 +242,8 @@ class OverlayCoordinatorTest {
         var started = 0
         var stopped = 0
 
-        override fun start() {
-            started++
-        }
-
-        override fun stop(): File? {
-            stopped++
-            return audioFile
-        }
+        override fun start() { started++ }
+        override fun stop(): File? { stopped++; return audioFile }
     }
 
     private class FakeTranscriber(private val result: TranscriptionResult) : OverlayTranscriber {
@@ -159,6 +252,13 @@ class OverlayCoordinatorTest {
         override suspend fun transcribe(audio: File, cfg: Config): TranscriptionResult {
             audioFiles += audio
             return result
+        }
+    }
+
+    private companion object {
+        fun longEnoughClock(): () -> Long {
+            var t = 0L
+            return { t.also { t += 500L } }
         }
     }
 }

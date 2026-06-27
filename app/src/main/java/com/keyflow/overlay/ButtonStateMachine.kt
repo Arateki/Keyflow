@@ -13,6 +13,9 @@ class ButtonStateMachine(
     fun onTargetChanged(available: Boolean) {
         state = when {
             state == ButtonState.RECORDING || state == ButtonState.SENDING -> state
+            // Mantém PENDING_PASTE: o auto-flush do Controller já tenta inserir —
+            // se falhar, o botão fica em PA para o usuário confirmar manualmente
+            state == ButtonState.PENDING_PASTE -> state
             available -> ButtonState.IDLE_READY
             else -> ButtonState.IDLE_NO_FIELD
         }
@@ -47,7 +50,7 @@ class ButtonStateMachine(
     }
 
     fun onTranscriptionSuccess(): ButtonState {
-        state = if (targetAvailable()) ButtonState.IDLE_READY else ButtonState.PENDING_PASTE
+        state = if (targetAvailable()) ButtonState.IDLE_READY else ButtonState.IDLE_NO_FIELD
         return state
     }
 

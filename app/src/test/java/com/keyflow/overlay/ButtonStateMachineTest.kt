@@ -50,14 +50,26 @@ class ButtonStateMachineTest {
     }
 
     @Test
-    fun `success moves to pending paste when target is unavailable`() {
+    fun `success returns to idle no field when target is unavailable`() {
         val machine = ButtonStateMachine(targetAvailable = { false })
         machine.onTargetChanged(true)
         machine.onTap()
         machine.onTap()
 
-        assertThat(machine.onTranscriptionSuccess()).isEqualTo(ButtonState.PENDING_PASTE)
-        assertThat(machine.onTap()).isEqualTo(ButtonState.IDLE_READY)
+        assertThat(machine.onTranscriptionSuccess()).isEqualTo(ButtonState.IDLE_NO_FIELD)
+    }
+
+    @Test
+    fun `target change does not override recording or sending state`() {
+        val machine = ButtonStateMachine()
+
+        machine.onTap() // RECORDING
+        machine.onTargetChanged(false)
+        assertThat(machine.state).isEqualTo(ButtonState.RECORDING)
+
+        machine.onTap() // SENDING
+        machine.onTargetChanged(false)
+        assertThat(machine.state).isEqualTo(ButtonState.SENDING)
     }
 
     @Test

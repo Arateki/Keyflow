@@ -1,11 +1,14 @@
 package com.keyflow.overlay
 
+import android.os.SystemClock
+import android.util.Log
 import com.keyflow.core.ButtonState
 import com.keyflow.core.ErrorKind
 import com.keyflow.core.InsertOutcome
 import com.keyflow.core.TranscriptionResult
 import com.keyflow.data.Config
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -27,8 +30,17 @@ class OverlayCoordinator(
     private val flushPending: () -> Boolean,
     targetAvailable: () -> Boolean,
     private val render: (ButtonState) -> Unit,
+    private val onClipboard: (String) -> Unit = {},
+    private val recordingClockMs: () -> Long = { SystemClock.elapsedRealtime() },
 ) {
     private val machine = ButtonStateMachine(targetAvailable = targetAvailable)
+    private var recordingStartMs = 0L
+
+    companion object {
+        private const val TAG = "KeyFlow.Coordinator"
+        private const val MIN_RECORDING_MS = 400L
+        private const val ERROR_AUTO_DISMISS_MS = 3000L
+    }
 
     init {
         render(machine.state)
@@ -46,7 +58,9 @@ class OverlayCoordinator(
             return
         }
 
-        handleState(machine.onTap())
+        val prev = machine.state
+        val next = if (prev == ButtonState.ERROR) machine.onErrorDismissed() else machine.onTap()
+        if (next != prev) handleState(next)
     }
 
     fun onHold() {
@@ -57,33 +71,45 @@ class OverlayCoordinator(
         handleState(machine.onRelease())
     }
 
-    fun onPendingChanged(pending: String?) {
-        if (pending != null && machine.state != ButtonState.RECORDING && machine.state != ButtonState.SENDING) {
-            render(ButtonState.PENDING_PASTE)
-        }
-    }
-
     private fun handleState(state: ButtonState) {
         render(state)
         when (state) {
             ButtonState.RECORDING -> startRecording()
             ButtonState.SENDING -> stopAndTranscribe()
-            ButtonState.ERROR -> Unit
+            ButtonState.ERROR -> scheduleErrorDismiss()
             ButtonState.IDLE_READY -> Unit
             ButtonState.IDLE_NO_FIELD -> Unit
             ButtonState.PENDING_PASTE -> Unit
         }
     }
 
+    private fun scheduleErrorDismiss() {
+        scope.launch {
+            delay(ERROR_AUTO_DISMISS_MS)
+            if (machine.state == ButtonState.ERROR) {
+                render(machine.onErrorDismissed())
+            }
+        }
+    }
+
     private fun startRecording() {
+        recordingStartMs = recordingClockMs()
         runCatching { recorder.start() }
-            .onFailure { render(machine.onTranscriptionError()) }
+            .onFailure { handleState(machine.onTranscriptionError()) }
     }
 
     private fun stopAndTranscribe() {
+        val duration = recordingClockMs() - recordingStartMs
+        if (duration < MIN_RECORDING_MS) {
+            Log.d(TAG, "recording too short (${duration}ms), cancelling")
+            runCatching { recorder.stop() }
+            render(machine.onErrorDismissed())
+            return
+        }
+
         val audio = runCatching { recorder.stop() }.getOrNull()
         if (audio == null) {
-            render(machine.onTranscriptionError())
+            handleState(machine.onTranscriptionError())
             return
         }
 
@@ -93,10 +119,13 @@ class OverlayCoordinator(
 
             when (result) {
                 is TranscriptionResult.Success -> {
-                    insertOrHold(result.text)
+                    if (insertOrHold(result.text) == InsertOutcome.Held) {
+                        Log.d(TAG, "transcription held → clipboard: '${result.text.take(30)}'")
+                        onClipboard(result.text)
+                    }
                     render(machine.onTranscriptionSuccess())
                 }
-                is TranscriptionResult.Error -> render(machine.onTranscriptionError())
+                is TranscriptionResult.Error -> handleState(machine.onTranscriptionError())
             }
         }
     }

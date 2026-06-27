@@ -20,7 +20,9 @@ data class OverlayWindowConfig(
 
             return OverlayWindowConfig(
                 type = type,
-                flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                // NOT_TOUCH_MODAL: toques fora do botão passam para a janela de baixo
+                flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                        WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
             )
         }
     }

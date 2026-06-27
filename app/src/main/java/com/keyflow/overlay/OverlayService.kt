@@ -4,6 +4,8 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
@@ -12,6 +14,7 @@ import android.os.Build
 import android.os.IBinder
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
+import android.widget.Toast
 import com.keyflow.audio.AudioRecorder
 import com.keyflow.core.KeyFlowController
 import com.keyflow.data.Config
@@ -76,7 +79,15 @@ class OverlayService : Service() {
             insertOrHold = KeyFlowController::insertOrHold,
             flushPending = KeyFlowController::flushPending,
             targetAvailable = { KeyFlowController.targetAvailable.value },
-            render = { state -> floatingButton?.render(state) },
+            render = { state ->
+                floatingButton?.render(state)
+                KeyFlowController.updateButtonState(state)
+            },
+            onClipboard = { text ->
+                val cm = getSystemService(ClipboardManager::class.java)
+                cm.setPrimaryClip(ClipData.newPlainText("KeyFlow", text))
+                Toast.makeText(this, "Copiado para a área de transferência", Toast.LENGTH_SHORT).show()
+            },
         )
     }
 
@@ -108,9 +119,7 @@ class OverlayService : Service() {
             }
         }
         serviceScope.launch {
-            KeyFlowController.pending.collect { pending ->
-                coordinator.onPendingChanged(pending)
-            }
+            KeyFlowController.tapRequest.collect { coordinator.onTap() }
         }
     }
 

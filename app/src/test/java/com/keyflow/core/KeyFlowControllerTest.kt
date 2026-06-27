@@ -47,17 +47,39 @@ class KeyFlowControllerTest {
     }
 
     @Test
-    fun `flushPending inserts and clears pending text when target is available`() {
+    fun `registerInserter auto-flushes pending text immediately`() {
         KeyFlowController.insertOrHold("pending")
+        val inserted = mutableListOf<String>()
+
+        KeyFlowController.registerInserter {
+            inserted += it
+            true
+        }
+
+        // Auto-flush happens inside registerInserter — flushPending finds nothing left
+        assertThat(inserted).containsExactly("pending")
+        assertThat(KeyFlowController.pending.value).isNull()
+        assertThat(KeyFlowController.flushPending()).isFalse()
+    }
+
+    @Test
+    fun `flushPending inserts and clears pending text when called explicitly`() {
+        KeyFlowController.insertOrHold("pending")
+        // Register with inserter that rejects first call (simulates auto-flush failing)
+        var callCount = 0
+        KeyFlowController.registerInserter {
+            callCount++
+            false // reject during registerInserter → auto-flush fails → pending stays
+        }
+        assertThat(KeyFlowController.pending.value).isEqualTo("pending")
+
+        // Now swap to an accepting inserter and flush manually
         val inserted = mutableListOf<String>()
         KeyFlowController.registerInserter {
             inserted += it
             true
         }
 
-        val flushed = KeyFlowController.flushPending()
-
-        assertThat(flushed).isTrue()
         assertThat(inserted).containsExactly("pending")
         assertThat(KeyFlowController.pending.value).isNull()
     }
