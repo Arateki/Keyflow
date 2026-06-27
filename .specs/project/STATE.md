@@ -91,9 +91,23 @@
 - Success Criteria verificados no emulador: SetupActivity funcional, 0 px teclado, overlay persiste na Home, sem crash. Critérios que requerem hardware real (ditar → inserir em ≤ 5 s, trocar URL e funcionar, gravar sem campo → colar): documentados como pendentes para validação em dispositivo físico com microfone e API real.
 - Triplo-toque → seletor de teclado: validado via gate instrumented (`tripleTapInvokesKeyboardPickerCallback` passou) e visualmente em T12; na Home sem campo focado o `showInputMethodPicker()` não aciona (comportamento esperado do Android).
 
+## Fase 2 — Redesign Ateliê (spec 2026-06-27)
+
+- Spec completa em `.specs/features/redesign-atelie/` (spec/design/tasks/context). Decisões do grill em `context.md` (C1–C24).
+- Destaques: **casca visual completa** (créditos/skins stubados), **Jetpack Compose** (novo no build), fontes **empacotadas** (.ttf OFL), config em **abas** com auto-save, presets de API, **dark mode**, **pausa de gravação** (estado novo do orbe + gestos por modo + anti-movimento), **minSdk 24** (pause nativo), e **harness de galeria determinística** de prints no emulador headless.
+- Teclado: usuário pediu para **descartar** o painel de escuta do mock (`A-kbd`); manter estrutura atual + reskin + timer dentro do botão de mic; overlay sincroniza o orbe.
+- Loja/billing/i18n real = **Milestone 3** (futuro).
+- Próximo passo: executar `tasks.md` (T1 fundação). 27 tasks; device serializa instrumented/screenshot.
+
+### Execução Fase 2 — Redesign Ateliê (2026-06-27)
+- **T1 concluída** (gate `build` → `BUILD SUCCESSFUL`). Descoberta decisiva: **AGP 9.2.0 embute KGP 2.2.10** (confirmado via `:app:dependencies` → `kotlin-stdlib:2.2.10`); o `org.jetbrains.kotlin.android version 2.0.21` no root era `apply false`/inútil. Logo o compilador Compose foi fixado em **2.2.10** (atrelado ao Kotlin real, não fabricado), via plugin `org.jetbrains.kotlin.plugin.compose`. Root atualizado para documentar 2.2.10.
+- Compose BOM **2024.09.03** (linha Compose 1.7.x, compatível com `compileSdk 34`; BOMs 2025+/1.8.x exigiriam compileSdk 35).
+- `minSdk` 21 → **24** (pause nativo, C21). Smoke `ComposeSmokeActivity` vive só no source set `debug` (será substituído por T7/T10).
+
 ## Pendências
 - ~~Usuário ainda não informou a versão de Android do aparelho-alvo~~ — PoC validado no Android 14 (emulador keyflow_api34).
 - Validação e2e completa (ditar → inserir, trocar API, gravar sem campo → colar) pendente em dispositivo físico com microfone e endpoint Whisper real.
+- Gesto exato de retomar pause no PTT + limiares de hold (toggle) a fechar na execução de T20/UAT.
 
 ## Ambiente (preparado 2026-06-26)
 - Toolchain pronta — ver `.specs/codebase/ENVIRONMENT.md`. Validada por smoke build (APK gerado) com **Gradle 9.6.1 + AGP 9.2.0 + JDK 17 + SDK** (build-tools 34, platform android-34).
