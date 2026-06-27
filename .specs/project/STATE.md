@@ -103,6 +103,8 @@
 - **T1 concluída** (gate `build` → `BUILD SUCCESSFUL`). Descoberta decisiva: **AGP 9.2.0 embute KGP 2.2.10** (confirmado via `:app:dependencies` → `kotlin-stdlib:2.2.10`); o `org.jetbrains.kotlin.android version 2.0.21` no root era `apply false`/inútil. Logo o compilador Compose foi fixado em **2.2.10** (atrelado ao Kotlin real, não fabricado), via plugin `org.jetbrains.kotlin.plugin.compose`. Root atualizado para documentar 2.2.10.
 - Compose BOM **2024.09.03** (linha Compose 1.7.x, compatível com `compileSdk 34`; BOMs 2025+/1.8.x exigiriam compileSdk 35).
 - `minSdk` 21 → **24** (pause nativo, C21). Smoke `ComposeSmokeActivity` vive só no source set `debug` (será substituído por T7/T10).
+- **T2 concluída** (gate `full` → `BUILD SUCCESSFUL`, 17 instrumentados, 0 falhas no `keyflow_api34`). Removidos `poc/` (5 arquivos), `res/xml/method_poc.xml` e as 4 entradas PoC do manifest (PocImeService/PocInputActivity/PocOverlayService/PocAudioService). Nenhum código de produção referenciava PoC; `ManifestWiringTest` segue verde. Baseline de testes = 17.
+- Nota de ambiente: há um **device físico** (`RX8T10DERKW`) conectado junto do emulador. Gates instrumentados são escopados ao emulador com `ANDROID_SERIAL=emulator-5554` para não instalar/rodar no aparelho do usuário.
 
 ## Pendências
 - ~~Usuário ainda não informou a versão de Android do aparelho-alvo~~ — PoC validado no Android 14 (emulador keyflow_api34).

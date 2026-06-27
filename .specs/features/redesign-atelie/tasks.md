@@ -83,11 +83,11 @@ Phase 8 — Integração final
 **Where**: `app/src/main/java/com/keyflow/poc/*` (delete), `AndroidManifest.xml`, `res/xml/method_poc.xml` (delete)
 **Depends on**: None · **Reuses**: — · **Requirement**: FND-01 (C14)
 **Done when**:
-- [ ] `poc/` removido; 4 `<service>`/`<activity>` PoC e `method_poc.xml` fora do manifest.
-- [ ] Nenhuma referência a `Poc*` no código/testes.
-- [ ] Gate: `full` (suíte atual permanece verde).
-- [ ] Test count: ≥ a contagem atual menos testes PoC (se houver), sem deleção silenciosa de testes de produção.
-**Tests**: none (remoção) · **Gate**: full · **Commit**: `chore: remover PoC do Gate 0`
+- [x] `poc/` removido; 4 `<service>`/`<activity>` PoC e `method_poc.xml` fora do manifest.
+- [x] Nenhuma referência a `Poc*` no código/testes (não havia testes PoC).
+- [x] Gate: `full` → `BUILD SUCCESSFUL`, 17 instrumentados, 0 falhas.
+- [x] Test count: 17 (= baseline; sem deleção de testes de produção).
+**Tests**: none (remoção) · **Gate**: full · **Commit**: `chore: remover PoC do Gate 0`  ✅
 
 ### T3: Empacotar fontes Space Grotesk/Mono
 **What**: Incluir os `.ttf` OFL e um `FontFamily` local; remover o provider Downloadable Fonts.
