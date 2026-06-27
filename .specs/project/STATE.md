@@ -105,6 +105,7 @@
 - `minSdk` 21 → **24** (pause nativo, C21). Smoke `ComposeSmokeActivity` vive só no source set `debug` (será substituído por T7/T10).
 - **T2 concluída** (gate `full` → `BUILD SUCCESSFUL`, 17 instrumentados, 0 falhas no `keyflow_api34`). Removidos `poc/` (5 arquivos), `res/xml/method_poc.xml` e as 4 entradas PoC do manifest (PocImeService/PocInputActivity/PocOverlayService/PocAudioService). Nenhum código de produção referenciava PoC; `ManifestWiringTest` segue verde. Baseline de testes = 17.
 - Nota de ambiente: há um **device físico** (`RX8T10DERKW`) conectado junto do emulador. Gates instrumentados são escopados ao emulador com `ANDROID_SERIAL=emulator-5554` para não instalar/rodar no aparelho do usuário.
+- **T3 concluída** (gate `build`). Fontes empacotadas em `res/font` (OFL, render offline/determinístico, sem Downloadable Fonts): Space Grotesk Light/Regular/Medium/Bold estáticos (repo floriankarsten, dir `fonts/ttf/static`); **SemiBold(600) não existe estático** → instanciado do variable font com `python3 -m fontTools.varLib.instancer wght=600` (fonttools 4.63 no host). Space Mono Regular/Bold do google/fonts. `ui/theme/Type.kt` define os `FontFamily`. Licenças OFL guardadas em `app/licenses/`.
 
 ## Pendências
 - ~~Usuário ainda não informou a versão de Android do aparelho-alvo~~ — PoC validado no Android 14 (emulador keyflow_api34).

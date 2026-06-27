@@ -94,10 +94,10 @@ Phase 8 — Integração final
 **Where**: `res/font/*`, `ui/theme/Type.kt`, `keyflow-android-handoff` (referência) → `ui/theme/KeyFlowTheme.kt`
 **Depends on**: T1 · **Reuses**: handoff `KeyFlowTheme.kt` · **Requirement**: FND-02
 **Done when**:
-- [ ] Pesos necessários de Grotesk (300–700) e Mono (400/700) em `res/font`.
-- [ ] `SpaceGrotesk`/`SpaceMono` `FontFamily` locais; `GoogleFont.Provider` removido.
-- [ ] Gate: `build`.
-**Tests**: none · **Gate**: build · **Commit**: `feat(theme): empacotar fontes Ateliê`
+- [x] Grotesk 300/400/500/700 (estáticos floriankarsten) + **600 instanciado** do variable font (google/fonts) e Mono 400/700 (google/fonts) em `res/font`. Licenças OFL em `app/licenses/`.
+- [x] `SpaceGrotesk`/`SpaceMono` `FontFamily` locais em `ui/theme/Type.kt`; sem `GoogleFont.Provider` (handoff portado sem Downloadable Fonts).
+- [x] Gate: `build` → `BUILD SUCCESSFUL`.
+**Tests**: none · **Gate**: build · **Commit**: `feat(theme): empacotar fontes Ateliê`  ✅
 
 ### T4: KeyFlowTheme (paletas claro/escuro + tipografia)
 **What**: Tema Compose com paletas Ateliê claro/escuro, acentos, tipografia e `CompositionLocal`.
