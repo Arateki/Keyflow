@@ -3,7 +3,10 @@ package com.keyflow.data
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.keyflow.core.OrbSize
+import com.keyflow.core.OverlaySide
 import com.keyflow.core.RecordingMode
+import com.keyflow.core.TranscriptionSource
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -36,6 +39,12 @@ class SettingsRepositoryTest {
         dataStoreFile.parentFile?.delete()
         context.deleteSharedPreferences(securePrefsName)
     }
+
+    private fun newRepository() = SettingsRepository(
+        context = context,
+        dataStoreFile = dataStoreFile,
+        securePrefsName = securePrefsName,
+    )
 
     @Test
     fun saveThenReadPreservesConfig() = runTest {
@@ -80,6 +89,71 @@ class SettingsRepositoryTest {
 
         assertFalse(dataStoreBytes.contains(secret))
         assertFalse(securePrefsXml.contains(secret))
+    }
+
+    @Test
+    fun saveThenReadSettingsPreservesAllFields() = runTest {
+        val repository = newRepository()
+        val saved = Settings(
+            source = TranscriptionSource.OPENAI,
+            customEndpoint = "https://self.host/v1/audio/transcriptions",
+            customHeaderName = "X-Api-Key",
+            customHeaderValue = "custom-secret",
+            customModel = "whisper-large-v3",
+            customLanguage = "es",
+            openaiToken = "sk-openai",
+            openaiModel = "whisper-1",
+            openaiLanguage = "pt",
+            groqToken = "gsk-groq",
+            groqModel = "whisper-large-v3",
+            groqLanguage = "en",
+            overlayRecordingMode = RecordingMode.PUSH_TO_TALK,
+            keyboardRecordingMode = RecordingMode.TOGGLE,
+            overlaySide = OverlaySide.LEFT,
+            orbSize = OrbSize.LARGE,
+            themeDark = true,
+            onboardingDone = true,
+        )
+
+        repository.saveSettings(saved)
+
+        assertEquals(saved, repository.settingsFlow().first())
+    }
+
+    @Test
+    fun switchingPresetPreservesEveryProviderToken() = runTest {
+        val repository = newRepository()
+        // Usuário configurou os 3 provedores e está com a origem OpenAI selecionada.
+        repository.saveSettings(
+            Settings(
+                source = TranscriptionSource.OPENAI,
+                customHeaderValue = "custom-key",
+                openaiToken = "sk-openai",
+                groqToken = "gsk-groq",
+            )
+        )
+
+        val restored = repository.settingsFlow().first()
+        assertEquals("sk-openai", restored.openaiToken)
+        assertEquals("gsk-groq", restored.groqToken)
+        assertEquals("custom-key", restored.customHeaderValue)
+    }
+
+    @Test
+    fun providerTokensAreNotStoredAsPlaintext() = runTest {
+        val repository = newRepository()
+        val openai = "sk-openai-must-not-appear"
+        val groq = "gsk-groq-must-not-appear"
+
+        repository.saveSettings(Settings(openaiToken = openai, groqToken = groq))
+
+        val dataStoreBytes = dataStoreFile.readBytes().toString(Charsets.ISO_8859_1)
+        val securePrefsXml =
+            File(context.applicationInfo.dataDir, "shared_prefs/$securePrefsName.xml").readText()
+        assertFalse(dataStoreBytes.contains(openai))
+        assertFalse(dataStoreBytes.contains(groq))
+        assertFalse(securePrefsXml.contains(openai))
+        assertFalse(securePrefsXml.contains(groq))
     }
 
     @Test

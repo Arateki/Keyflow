@@ -2,6 +2,18 @@ package com.keyflow.core
 
 enum class RecordingMode { TOGGLE, PUSH_TO_TALK }
 
+/** Origem da transcrição (aba Voz). CREDITS é stub inerte nesta fase (VOZ-01). */
+enum class TranscriptionSource { CREDITS, OPENAI, GROQ, CUSTOM }
+
+/** Lado inicial do overlay (OVL-05). */
+enum class OverlaySide { LEFT, RIGHT }
+
+/** Tamanho do orbe do overlay (OVL-05). */
+enum class OrbSize { SMALL, MEDIUM, LARGE }
+
+/** Modo de tema (FND-04). Persistido como booleano `themeDark`. */
+enum class ThemeMode { LIGHT, DARK }
+
 enum class ButtonState {
     IDLE_READY,      // campo focado, pronto para gravar
     IDLE_NO_FIELD,   // sem campo focado

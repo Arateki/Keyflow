@@ -5,6 +5,8 @@ import android.content.SharedPreferences
 import android.os.Build
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.MutablePreferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -12,7 +14,10 @@ import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.keyflow.core.OrbSize
+import com.keyflow.core.OverlaySide
 import com.keyflow.core.RecordingMode
+import com.keyflow.core.TranscriptionSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -41,6 +46,68 @@ class SettingsRepository(
             language = prefs[LANGUAGE]?.takeIf { it.isNotBlank() },
             recordingMode = prefs[RECORDING_MODE].toRecordingMode(),
         )
+    }
+
+    /**
+     * Estado completo de configuração (T5). Os campos `custom*` compartilham as chaves legadas;
+     * tokens de preset vêm do armazenamento criptografado e são preservados entre trocas de origem.
+     */
+    fun settingsFlow(): Flow<Settings> = dataStore.data.map { prefs ->
+        Settings(
+            source = prefs[SOURCE].toSource(),
+            customEndpoint = prefs[ENDPOINT_URL].orEmpty(),
+            customHeaderName = prefs[AUTH_HEADER_NAME] ?: "Authorization",
+            customHeaderValue = securePrefs.getString(AUTH_HEADER_VALUE, "").orEmpty(),
+            customModel = prefs[MODEL] ?: "whisper-1",
+            customLanguage = prefs[LANGUAGE]?.takeIf { it.isNotBlank() },
+            openaiToken = securePrefs.getString(OPENAI_TOKEN, "").orEmpty(),
+            openaiModel = prefs[OPENAI_MODEL] ?: Settings.OPENAI_MODEL,
+            openaiLanguage = prefs[OPENAI_LANGUAGE]?.takeIf { it.isNotBlank() },
+            groqToken = securePrefs.getString(GROQ_TOKEN, "").orEmpty(),
+            groqModel = prefs[GROQ_MODEL] ?: Settings.GROQ_MODEL,
+            groqLanguage = prefs[GROQ_LANGUAGE]?.takeIf { it.isNotBlank() },
+            overlayRecordingMode = prefs[OVERLAY_RECORDING_MODE].toRecordingMode(),
+            keyboardRecordingMode = prefs[KEYBOARD_RECORDING_MODE].toRecordingMode(),
+            overlaySide = prefs[OVERLAY_SIDE].toOverlaySide(),
+            orbSize = prefs[ORB_SIZE].toOrbSize(),
+            themeDark = prefs[THEME_DARK] ?: false,
+            onboardingDone = prefs[ONBOARDING_DONE] ?: false,
+        )
+    }
+
+    /**
+     * Persiste o estado completo (T5). Tokens criptografados; `null` em texto remove a chave do DataStore.
+     * Não apaga credenciais de outros provedores — todos os 3 tokens são reescritos a partir de [settings].
+     */
+    suspend fun saveSettings(settings: Settings) {
+        val committed = securePrefs.edit()
+            .putString(AUTH_HEADER_VALUE, settings.customHeaderValue)
+            .putString(OPENAI_TOKEN, settings.openaiToken)
+            .putString(GROQ_TOKEN, settings.groqToken)
+            .commit()
+        check(committed) { "Unable to persist provider tokens" }
+
+        dataStore.edit { prefs ->
+            prefs[SOURCE] = settings.source.name
+            prefs[ENDPOINT_URL] = settings.customEndpoint
+            prefs[AUTH_HEADER_NAME] = settings.customHeaderName
+            prefs[MODEL] = settings.customModel
+            settings.customLanguage.putOrRemove(prefs, LANGUAGE)
+            prefs[OPENAI_MODEL] = settings.openaiModel
+            settings.openaiLanguage.putOrRemove(prefs, OPENAI_LANGUAGE)
+            prefs[GROQ_MODEL] = settings.groqModel
+            settings.groqLanguage.putOrRemove(prefs, GROQ_LANGUAGE)
+            prefs[OVERLAY_RECORDING_MODE] = settings.overlayRecordingMode.name
+            prefs[KEYBOARD_RECORDING_MODE] = settings.keyboardRecordingMode.name
+            prefs[OVERLAY_SIDE] = settings.overlaySide.name
+            prefs[ORB_SIZE] = settings.orbSize.name
+            prefs[THEME_DARK] = settings.themeDark
+            prefs[ONBOARDING_DONE] = settings.onboardingDone
+        }
+    }
+
+    private fun String?.putOrRemove(prefs: MutablePreferences, key: Preferences.Key<String>) {
+        if (this.isNullOrBlank()) prefs.remove(key) else prefs[key] = this
     }
 
     fun overlayPositionFlow(): Flow<OverlayPosition> = dataStore.data.map { prefs ->
@@ -80,6 +147,18 @@ class SettingsRepository(
         ?.let { runCatching { RecordingMode.valueOf(it) }.getOrNull() }
         ?: RecordingMode.TOGGLE
 
+    private fun String?.toSource(): TranscriptionSource = this
+        ?.let { runCatching { TranscriptionSource.valueOf(it) }.getOrNull() }
+        ?: TranscriptionSource.CUSTOM
+
+    private fun String?.toOverlaySide(): OverlaySide = this
+        ?.let { runCatching { OverlaySide.valueOf(it) }.getOrNull() }
+        ?: OverlaySide.RIGHT
+
+    private fun String?.toOrbSize(): OrbSize = this
+        ?.let { runCatching { OrbSize.valueOf(it) }.getOrNull() }
+        ?: OrbSize.MEDIUM
+
     private companion object {
         const val DATASTORE_NAME = "keyflow_settings"
         const val SECURE_PREFS_NAME = "keyflow_secure"
@@ -93,6 +172,21 @@ class SettingsRepository(
         val OVERLAY_X = intPreferencesKey("overlay_x")
         val OVERLAY_Y = intPreferencesKey("overlay_y")
         const val AUTH_HEADER_VALUE = "auth_header_value"
+
+        // T5 — novas chaves
+        val SOURCE = stringPreferencesKey("transcription_source")
+        val OPENAI_MODEL = stringPreferencesKey("openai_model")
+        val OPENAI_LANGUAGE = stringPreferencesKey("openai_language")
+        val GROQ_MODEL = stringPreferencesKey("groq_model")
+        val GROQ_LANGUAGE = stringPreferencesKey("groq_language")
+        val OVERLAY_RECORDING_MODE = stringPreferencesKey("overlay_recording_mode")
+        val KEYBOARD_RECORDING_MODE = stringPreferencesKey("keyboard_recording_mode")
+        val OVERLAY_SIDE = stringPreferencesKey("overlay_side")
+        val ORB_SIZE = stringPreferencesKey("orb_size")
+        val THEME_DARK = booleanPreferencesKey("theme_dark")
+        val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
+        const val OPENAI_TOKEN = "openai_token"
+        const val GROQ_TOKEN = "groq_token"
 
         fun createSecurePrefs(context: Context, name: String): SharedPreferences {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {

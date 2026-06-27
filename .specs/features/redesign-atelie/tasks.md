@@ -116,11 +116,11 @@ gatilho, `overlaySide`, `orbSize`, `onboardingDone` e `effectiveConfigFor(source
 **Where**: `data/{Config,SettingsRepository}.kt`, `core/Models.kt` (enums)
 **Depends on**: None · **Reuses**: DataStore singleton + EncryptedSharedPreferences atuais · **Requirement**: VOZ-01..06, FND-04, OVL-05, REC (modos)
 **Done when**:
-- [ ] Enums `TranscriptionSource/OverlaySide/OrbSize/ThemeMode`; campos novos persistidos; tokens criptografados preservados ao trocar preset.
-- [ ] `effectiveConfigFor` resolve OpenAI/Groq/Custom; CREDITS → marcador indisponível.
-- [ ] Unit p/ `effectiveConfigFor`; instrumented p/ persistência (DataStore exige Context).
-- [ ] Gate: `full`. Test count: ≥6.
-**Tests**: instrumented · **Gate**: full · **Commit**: `feat(data): fonte de transcrição, tokens, tema e modos`
+- [x] Enums `TranscriptionSource/OverlaySide/OrbSize/ThemeMode` em `core/Models.kt`; `Settings` + `saveSettings/settingsFlow` com campos novos persistidos; tokens (openai/groq/custom) criptografados e preservados ao trocar preset. API legada `flow()`/`save(Config)` intacta (compartilha chaves custom).
+- [x] `effectiveConfigFor` resolve OpenAI/Groq/Custom (endpoints verificados nas docs); CREDITS → `EffectiveConfig.Unavailable`.
+- [x] Unit p/ `effectiveConfigFor` (6 testes); instrumented p/ persistência (3 testes: round-trip, preserva 3 tokens ao trocar preset, tokens não em texto puro).
+- [x] Gate: `full` → `BUILD SUCCESSFUL`, 20 instrumentados (17→20), 0 falhas. Test count novo = 9.
+**Tests**: instrumented · **Gate**: full · **Commit**: `feat(data): fonte de transcrição, tokens, tema e modos`  ✅
 
 ### T6: VoiceOrb Compose (estados + clock injetável + centro)
 **What**: Portar/evoluir o orbe: `OrbState{Idle,Listening,Paused,Transcribing}`, clock injetável, `centerContent` (None/Time/PauseGlyph).
