@@ -149,10 +149,10 @@ gatilho, `overlaySide`, `orbSize`, `onboardingDone` e `effectiveConfigFor(source
 **Where**: `scripts/verify-screens.sh`, `verification/` (saída)
 **Depends on**: T7 · **Reuses**: adb · **Requirement**: VERIFY-02
 **Done when**:
-- [ ] Para cada rota×tema: `am start` → aguarda idle → `screencap` → salva PNG.
-- [ ] Rodar 2× produz PNGs **bit-idênticos** para as rotas do orbe (determinismo).
-- [ ] Gate: `screenshot` (PNGs gerados).
-**Tests**: screenshot · **Gate**: screenshot · **Commit**: `feat(verify): script de captura no emulador headless`
+- [x] `scripts/verify-screens.sh`: lê rotas do `RouteCatalog` (modo `__list__`), e p/ cada rota×tema faz force-stop → `am start` → aguarda marcador → `screencap` → `verification/<rota>[-dark].png`. Congela animações via `settings put global *_animation_scale 0`.
+- [x] Rodar 2× → **8/8 PNGs bit-idênticos** (determinismo confirmado por `cmp`).
+- [x] Gate: `screenshot` → 8 PNGs gerados.
+**Tests**: screenshot · **Gate**: screenshot · **Commit**: `feat(verify): script de captura no emulador headless`  ✅
 
 ### T10: ConfigScreen scaffold (header + abas + auto-save + toast)
 **What**: Activity Compose com header (orbe, idioma inerte, toggle tema), `TabBar(5)` com gating e infra de auto-save + toast.

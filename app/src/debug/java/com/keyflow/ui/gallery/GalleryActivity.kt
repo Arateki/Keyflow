@@ -36,6 +36,15 @@ class GalleryActivity : ComponentActivity() {
         val routeKey = intent.getStringExtra(EXTRA_ROUTE).orEmpty()
         val dark = intent.getBooleanExtra(EXTRA_DARK, false)
 
+        // Modo lista: despeja as chaves do RouteCatalog (fonte única, VERIFY-05) e encerra.
+        if (routeKey == LIST_ROUTES) {
+            runCatching {
+                File(getExternalFilesDir(null), ROUTES_FILE).writeText(RouteCatalog.keys.joinToString("\n"))
+            }
+            finish()
+            return
+        }
+
         clearReadyMarker()
         enterImmersiveMode()
 
@@ -82,5 +91,7 @@ class GalleryActivity : ComponentActivity() {
         const val EXTRA_ROUTE = "route"
         const val EXTRA_DARK = "dark"
         const val READY_MARKER = "gallery_ready"
+        const val LIST_ROUTES = "__list__"
+        const val ROUTES_FILE = "gallery_routes"
     }
 }

@@ -1,3 +1,6 @@
 app/build/
 build/
 .gradle/
+
+# Saída regenerável do harness de verificação (o golden versionado vem em verification/golden/, T26)
+/verification/*.png
