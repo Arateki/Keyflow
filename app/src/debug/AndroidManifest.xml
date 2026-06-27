@@ -6,5 +6,11 @@
         <activity
             android:name=".ComposeSmokeActivity"
             android:exported="false" />
+
+        <!-- Harness de verificação (T7), só em debug. exported p/ `adb am start` via shell. -->
+        <activity
+            android:name=".ui.gallery.GalleryActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen" />
     </application>
 </manifest>

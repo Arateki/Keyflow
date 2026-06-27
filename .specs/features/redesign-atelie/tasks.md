@@ -138,11 +138,11 @@ gatilho, `overlaySide`, `orbSize`, `onboardingDone` e `effectiveConfigFor(source
 **Where**: `ui/gallery/{GalleryActivity,RouteCatalog,FakeSettings}.kt` (debug)
 **Depends on**: T4, T6 · **Reuses**: tema, orbe · **Requirement**: VERIFY-01, VERIFY-05
 **Done when**:
-- [ ] `--es route <key> --ez dark <b>` renderiza a rota; orbe com `timeProvider` constante; dados mock fixos; barras de sistema escondidas.
-- [ ] `RouteCatalog` é a única lista de rotas; rota `orb-*` já renderizável.
-- [ ] Sinal de "pronto p/ captura" (ex.: arquivo marcador) disponível.
-- [ ] Gate: `build`.
-**Tests**: screenshot · **Gate**: build · **Commit**: `feat(gallery): harness determinístico de telas`
+- [x] `--es route <key> --ez dark <b>` renderiza a rota; orbe com `timeProvider={GALLERY_ORB_TIME_MS}` constante; `FakeSettings` mock fixo; barras escondidas via `enableEdgeToEdge()` + `WindowInsetsControllerCompat.hide`.
+- [x] `RouteCatalog` é a única lista de rotas (orb-idle/listening/paused/transcribing renderizáveis).
+- [x] Marcador `gallery_ready` em `externalFilesDir` (apagado no onCreate, escrito após 3 frames) + `reportFullyDrawn()`.
+- [x] Gate: `build`. Validado visualmente no emulador (orb-paused claro + orb-listening escuro, edge-to-edge limpo).
+**Tests**: screenshot · **Gate**: build · **Commit**: `feat(gallery): harness determinístico de telas`  ✅
 
 ### T8: Script de captura de screenshots
 **What**: Script que itera o catálogo, lança cada rota×tema no emulador e salva `verification/<rota>.png`.
