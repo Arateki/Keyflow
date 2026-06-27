@@ -49,7 +49,7 @@ class SetupActivity : AppCompatActivity() {
         layout.addView(Button(this).apply {
             text = "2. Iniciar overlay PoC-1"
             setOnClickListener {
-                startForegroundService(Intent(this@SetupActivity, PocOverlayService::class.java))
+                startService(Intent(this@SetupActivity, PocOverlayService::class.java))
             }
         })
 

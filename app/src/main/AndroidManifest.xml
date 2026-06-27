@@ -35,11 +35,15 @@
                 android:resource="@xml/method_poc" />
         </service>
 
+        <!-- PoC-1: Tela de teste com EditText -->
+        <activity
+            android:name=".poc.PocInputActivity"
+            android:exported="true" />
+
         <!-- PoC-1: Overlay para disparar inserção -->
         <service
             android:name=".poc.PocOverlayService"
-            android:exported="false"
-            android:foregroundServiceType="connectedDevice" />
+            android:exported="false" />
 
         <!-- PoC-2: FGS microphone para validar R2 -->
         <service

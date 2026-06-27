@@ -1,8 +1,5 @@
 package com.keyflow.poc
 
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import android.graphics.PixelFormat
@@ -23,33 +20,7 @@ class PocOverlayService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        startForeground()
         showOverlay()
-    }
-
-    private fun startForeground() {
-        val channelId = "poc_overlay"
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                channelId,
-                "PoC Overlay",
-                NotificationManager.IMPORTANCE_LOW
-            )
-            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
-        }
-        val notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Notification.Builder(this, channelId)
-                .setContentTitle("KeyFlow PoC")
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
-                .build()
-        } else {
-            @Suppress("DEPRECATION")
-            Notification.Builder(this)
-                .setContentTitle("KeyFlow PoC")
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
-                .build()
-        }
-        startForeground(1, notification)
     }
 
     private fun showOverlay() {
@@ -58,6 +29,7 @@ class PocOverlayService : Service() {
         val button = Button(this).apply {
             text = "INSERT TEST"
             setOnClickListener {
+                android.util.Log.d("PocOverlay", "INSERT TEST clicked")
                 PocBridge.insertText()
             }
         }
