@@ -46,8 +46,54 @@
 ## Blockers
 - (nenhum)
 
+## Implementação Fase 2 — 2026-06-27
+
+- T7, T8 e T10 concluídas no working tree e validadas com gate unitário completo.
+- Comando validado para este ambiente restrito: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon testDebugUnitTest`.
+- Não usar o wrapper às cegas neste sandbox: ele pode tentar escrever em `~/.gradle` ou baixar distribuição. O Gradle 9.6.1 já existe em `~/.local/gradle/current`.
+- T8 usa parser mínimo para `{"text":"..."}` em vez de `org.json`, evitando nova dependência enquanto mantém o contrato coberto por MockWebServer.
+- T6, T9 e T11 concluídas no working tree e validadas no emulador `keyflow_api34`.
+- Gate full fresco: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon testDebugUnitTest connectedDebugAndroidTest` → `BUILD SUCCESSFUL`, 9 testes instrumentados no Android 14.
+- Screenshots inspecionados pós-gates: `/tmp/keyflow-t6-after.png`, `/tmp/keyflow-after-reboot-noaudio.png`, `/tmp/keyflow-t11-after.png`; em todos o emulador ficou responsivo na home.
+- Tentativa de direcionar microfone do host: o emulador aceita `-allow-host-audio`, mas `-audio pulse` falhou com `Could not init 'pa' audio driver` / `pulseaudio: Failed to initialize PA context`. Portanto T9 valida `MediaRecorder`/arquivo no emulador, não amplitude de fala real do host.
+- T12 concluída com validação visual no app real (`SetupActivity`): prints em `/tmp/keyflow-t12-fix-initial.png`, `/tmp/keyflow-t12-fix-after-triple-tap.png`, `/tmp/keyflow-t12-fix-poc-guard.png`.
+- Crash investigado em 2026-06-27: o logcat mostrou `BadTokenException` em `PocOverlayService.showOverlay()` quando o botão PoC-1 era acionado sem `SYSTEM_ALERT_WINDOW`; não era falha da `FloatingButtonView`. Corrigido com `OverlayPermission` + guarda no serviço e no botão PoC.
+- Triplo-toque na bola `KF` validado visualmente: abriu o seletor real "Choose input method" via `InputMethodManager.showInputMethodPicker()`. Logcat sem `FATAL EXCEPTION`/`BadTokenException` após a correção.
+- Gate full fresco após T12: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon testDebugUnitTest connectedDebugAndroidTest` → `BUILD SUCCESSFUL`, 13 testes instrumentados no `keyflow_api34`.
+- T13 concluída: `OverlayService` roda como FGS `microphone`, adiciona `FloatingButtonView` via `WindowManager` usando `TYPE_APPLICATION_OVERLAY` em API 26+ e `FLAG_NOT_FOCUSABLE`, observa `KeyFlowController`, persiste posição e orquestra gravação → transcrição → inserção/pendência.
+- `SetupActivity` recebeu botões mínimos para iniciar/parar o overlay de produção sem exportar o service; isso viabilizou o teste real no Android 14 mantendo o caminho seguro (`exported=false`).
+- Validação visual T13 no emulador headless:
+  - `/tmp/keyflow-t13-home-overlay.png` — overlay permanece visível na Home, fora da Activity.
+  - `/tmp/keyflow-t13-home-recording.png` — tap na bola sem campo focado muda para `REC`.
+  - `/tmp/keyflow-t13-home-after-stop.png` — segundo tap encerra gravação e mostra erro visual por config ausente, sem crash.
+- Logcat T13 filtrado sem `FATAL EXCEPTION`, `BadTokenException` ou `SecurityException`; Android registrou `Background started FGS: Allowed` para `com.keyflow/.overlay.OverlayService`.
+- Gate full fresco após T13: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon testDebugUnitTest connectedDebugAndroidTest` → `BUILD SUCCESSFUL`, 13 testes instrumentados no `keyflow_api34`.
+- T14 concluída: `SetupActivity` virou tela operacional com edição de URL/auth/modelo/idioma/modo, checklist de permissões, atalhos para permissões e toggle que inicia/para `OverlayService` em foreground.
+- `PermissionsChecker` trata Android 14/targetSdk 34: `Settings.Secure.ENABLED_INPUT_METHODS` pode lançar `SecurityException`; nesse caso o checklist marca teclado como pendente em vez de derrubar a Activity.
+- `SettingsRepository` passou a compartilhar um DataStore singleton por arquivo. Isso evita crash quando `SetupActivity` e `OverlayService` ficam ativos ao mesmo tempo e ambos precisam da config.
+- Validação visual T14 no emulador headless:
+  - `/tmp/keyflow-t14-setup-top.png` — formulário de config + checklist renderizados; microfone/overlay/notificações concedidos e teclado pendente.
+  - `/tmp/keyflow-t14-overlay-enabled.png` — toggle ligado, status "Overlay ativo" e bola flutuante visível sobre a tela.
+  - `/tmp/keyflow-t14-home-overlay.png` — overlay permanece visível na Home após sair da Activity.
+- Logcat T14 filtrado sem `FATAL EXCEPTION`, `BadTokenException` ou `SecurityException`; Android registrou `Background started FGS: Allowed` para `com.keyflow/.overlay.OverlayService`.
+- Gate full fresco após T14: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon testDebugUnitTest connectedDebugAndroidTest` → `BUILD SUCCESSFUL`, 17 testes instrumentados no `keyflow_api34`.
+
+## Implementação Fase 3 — T15 concluída (2026-06-27)
+
+- `PermissionsCheckerTest.snapshotReflectsGrantedMicrophoneAndOverlayAppOp` falhava em emulador fresh (Android 14): `GrantPermissionRule` não é confiável no API 34 sem estado prévio, e `shell()` fechava o `ParcelFileDescriptor` sem drenar o output (race condition em `appops set`). Corrigido: `pm grant` explícito no corpo do teste + `shell()` drena via `FileInputStream.readBytes()` antes de fechar.
+- Gate full fresco após T15: `testDebugUnitTest connectedDebugAndroidTest` → `BUILD SUCCESSFUL`, 17 testes instrumentados no `keyflow_api34`.
+- Validação visual T15 no emulador headless:
+  - `/tmp/keyflow-t15-setup2.png` — SetupActivity com todos os campos + checklist (Mic/Overlay/Notificações concedidos, Teclado pendente esperado no API 34).
+  - `/tmp/keyflow-t15-after-back.png` — IME invisível ativo com 0 px de teclado desenhado (tela branca com IME ativo confirmado pelo ícone de teclado na nav bar).
+  - `/tmp/keyflow-t15-overlay-on.png` — botão "KF" visível sobre a SetupActivity, toggle ON, status "Overlay ativo".
+  - `/tmp/keyflow-t15-home-overlay.png` — botão "KF" persiste na Home; ícone de microfone na status bar confirma FGS ativo.
+- Logcat T15 filtrado: sem `FATAL EXCEPTION`, `BadTokenException` ou `SecurityException`; `Background started FGS: Allowed` para `com.keyflow/.overlay.OverlayService`.
+- Success Criteria verificados no emulador: SetupActivity funcional, 0 px teclado, overlay persiste na Home, sem crash. Critérios que requerem hardware real (ditar → inserir em ≤ 5 s, trocar URL e funcionar, gravar sem campo → colar): documentados como pendentes para validação em dispositivo físico com microfone e API real.
+- Triplo-toque → seletor de teclado: validado via gate instrumented (`tripleTapInvokesKeyboardPickerCallback` passou) e visualmente em T12; na Home sem campo focado o `showInputMethodPicker()` não aciona (comportamento esperado do Android).
+
 ## Pendências
 - ~~Usuário ainda não informou a versão de Android do aparelho-alvo~~ — PoC validado no Android 14 (emulador keyflow_api34).
+- Validação e2e completa (ditar → inserir, trocar API, gravar sem campo → colar) pendente em dispositivo físico com microfone e endpoint Whisper real.
 
 ## Ambiente (preparado 2026-06-26)
 - Toolchain pronta — ver `.specs/codebase/ENVIRONMENT.md`. Validada por smoke build (APK gerado) com **Gradle 9.6.1 + AGP 9.2.0 + JDK 17 + SDK** (build-tools 34, platform android-34).

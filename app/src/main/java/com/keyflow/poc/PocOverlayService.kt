@@ -6,10 +6,9 @@ import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
 import android.view.Gravity
-import android.view.LayoutInflater
 import android.view.WindowManager
 import android.widget.Button
-import com.keyflow.R
+import com.keyflow.overlay.OverlayPermission
 
 class PocOverlayService : Service() {
 
@@ -20,6 +19,11 @@ class PocOverlayService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        if (!OverlayPermission.canDrawOverlays(this)) {
+            android.util.Log.w("PocOverlay", "Overlay permission missing; not showing PoC overlay")
+            stopSelf()
+            return
+        }
         showOverlay()
     }
 
