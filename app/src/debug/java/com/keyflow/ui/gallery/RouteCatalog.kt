@@ -13,6 +13,7 @@ import com.keyflow.ui.PermissionStatus
 import com.keyflow.ui.common.SaveController
 import com.keyflow.ui.config.ConfigScreen
 import com.keyflow.ui.config.ConfigTab
+import com.keyflow.ui.onboarding.OnboardingScreen
 import com.keyflow.ui.orb.OrbCenter
 import com.keyflow.ui.orb.OrbState
 import com.keyflow.ui.orb.VoiceOrb
@@ -43,6 +44,18 @@ object RouteCatalog {
         Route("config-overlay") { ConfigTabRoute(ConfigTab.OVERLAY, overlayEnabled = true) },
         Route("config-docs") { ConfigTabRoute(ConfigTab.DOCS) },
         Route("config-unlock") { ConfigTabRoute(ConfigTab.TECLADO, keyboardEnabled = true, unlockOpen = true) },
+        Route("onboarding") {
+            OnboardingScreen(
+                permissions = PermissionStatus(
+                    microphoneGranted = true,
+                    overlayGranted = true,
+                    keyboardEnabled = false, // espelha o mock (Teclado FALTA)
+                    notificationsGranted = true,
+                ),
+                onGrant = {},
+                onSkip = {},
+            )
+        },
     )
 
     private val byKey: Map<String, Route> = routes.associateBy { it.key }

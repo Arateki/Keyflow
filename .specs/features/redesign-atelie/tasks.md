@@ -233,10 +233,10 @@ gatilho, `overlaySide`, `orbSize`, `onboardingDone` e `effectiveConfigFor(source
 **Where**: `ui/onboarding/OnboardingScreen.kt`
 **Depends on**: T4, T6, T5 · **Reuses**: `PermissionsChecker` · **Requirement**: ONB-01..03
 **Done when**:
-- [ ] Orbe `Listening`; checklist reflete permissões; "Conceder" encaminha; "Pular" → config; marca `onboardingDone`.
-- [ ] instrumented + screenshot (`onboarding` claro/escuro).
-- [ ] Gate: `full`. Test count: ≥2.
-**Tests**: instrumented · **Gate**: full · **Commit**: `feat(onboarding): tela de boas-vindas Ateliê`
+- [x] Orbe `Listening`; checklist reflete permissões (mic/overlay/teclado/notif, ✓/○ + OK/FALTA); "Conceder"/"Pular" via callbacks (`onGrant`/`onSkip`). **Persistência de `onboardingDone` + rota inicial 1º-uso→onboarding ficam na T27** (integração), p/ não quebrar o `SetupActivityTest`/rota atual.
+- [x] instrumented (`OnboardingScreenTest`, 3) + screenshot (`onboarding` claro/escuro).
+- [x] Gate: `full` → 41 instrumentados (38→41), 0 falhas; unit verde.
+**Tests**: instrumented · **Gate**: full · **Commit**: `feat(onboarding): tela de boas-vindas Ateliê`  ✅
 
 ### T18: AudioRecorder pause/resume
 **What**: Adicionar `pause()/resume()` (MediaRecorder, API 24+) e estado interno.
