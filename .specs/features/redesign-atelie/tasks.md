@@ -318,9 +318,9 @@ gatilho, `overlaySide`, `orbSize`, `onboardingDone` e `effectiveConfigFor(source
 **Where**: `app/src/androidTest/.../verify/SystemSurfacesScreenshotTest.kt`
 **Depends on**: T22, T23, T24 · **Reuses**: UiAutomator (já no build) · **Requirement**: VERIFY-03
 **Done when**:
-- [ ] `sys-ime-over-field`, `sys-overlay-over-app`, `sys-notification` capturados em `verification/`.
-- [ ] Gate: `screenshot`.
-**Tests**: screenshot · **Gate**: screenshot · **Commit**: `test(verify): prints de superfícies de sistema`
+- [x] `SystemSurfacesScreenshotTest` (UiAutomator) captura `sys-ime-over-field` (IME real sobre `ImeProbeActivity` debug, via `ime set`), `sys-overlay-over-app` (`OverlayService` sobre a Home), `sys-notification` (notificação real na persiana via `openNotification`) em `externalFilesDir/verification/`. Cada teste é autocontido (monta + limpa: `ime reset`, `stopService`, `cancel`).
+- [x] Gate: `screenshot` → 3 PNGs capturados e inspecionados (IME papel completo sobre o campo; orbe teal sobre o launcher; notificação escura com chips Pausar/Parar). Pull via `am instrument` (o `connectedAndroidTest` desinstala e apaga o `files/`). **Convive com o gate `full`: 54 instrumentados (51→54), 0 falhas.**
+**Tests**: screenshot · **Gate**: screenshot · **Commit**: `test(verify): prints de superfícies de sistema`  ✅
 
 ### T26: Golden/diff de regressão
 **What**: Mecanismo de golden + diff por limiar para travar as rotas aprovadas.
