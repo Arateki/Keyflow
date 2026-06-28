@@ -1,5 +1,6 @@
 package com.keyflow.ui
 
+import android.Manifest
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -9,6 +10,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -17,6 +19,7 @@ import com.keyflow.data.SettingsRepository
 import com.keyflow.overlay.OverlayService
 import com.keyflow.ui.common.SaveController
 import com.keyflow.ui.config.ConfigScreen
+import com.keyflow.ui.onboarding.OnboardingScreen
 import com.keyflow.ui.theme.KeyFlowTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +39,14 @@ class SetupActivity : ComponentActivity() {
     private val permissionsChecker = PermissionsChecker()
     private lateinit var settingsRepository: SettingsRepository
     private val saveController = SaveController()
+
+    private val requestPermissions = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) {
+        // Independente do resultado, conclui o onboarding; permissões finas ficam na aba Modo.
+        permissions = permissionsChecker.snapshot(this)
+        markOnboardingDone()
+    }
 
     private var settings by mutableStateOf(Settings())
     private var permissions by mutableStateOf(
@@ -57,23 +68,48 @@ class SetupActivity : ComponentActivity() {
         }
 
         setContent {
+            // Tema Ateliê app-wide; rota inicial: 1º uso → onboarding, depois → config (T27).
             KeyFlowTheme(dark = settings.themeDark) {
-                ConfigScreen(
-                    settings = settings,
-                    permissions = permissions,
-                    saveController = saveController,
-                    onOverlayModeChange = ::onOverlayModeChange,
-                    onKeyboardModeChange = { enabled -> persist { it.copy(keyboardModeEnabled = enabled) } },
-                    onThemeChange = { dark -> persist { it.copy(themeDark = dark) } },
-                    onLanguageClick = {
-                        Toast.makeText(this, "Outros idiomas em breve", Toast.LENGTH_SHORT).show()
-                    },
-                    onRequestOverlayPermission = ::openOverlaySettings,
-                    onRequestKeyboardPermission = ::openKeyboardSettings,
-                    onSettingsChange = { updated -> persist { updated } },
-                )
+                if (settings.onboardingDone) {
+                    ConfigScreen(
+                        settings = settings,
+                        permissions = permissions,
+                        saveController = saveController,
+                        onOverlayModeChange = ::onOverlayModeChange,
+                        onKeyboardModeChange = { enabled -> persist { it.copy(keyboardModeEnabled = enabled) } },
+                        onThemeChange = { dark -> persist { it.copy(themeDark = dark) } },
+                        onLanguageClick = {
+                            Toast.makeText(this, "Outros idiomas em breve", Toast.LENGTH_SHORT).show()
+                        },
+                        onRequestOverlayPermission = ::openOverlaySettings,
+                        onRequestKeyboardPermission = ::openKeyboardSettings,
+                        onSettingsChange = { updated -> persist { updated } },
+                    )
+                } else {
+                    OnboardingScreen(
+                        permissions = permissions,
+                        onGrant = ::requestRuntimePermissions,
+                        onSkip = ::markOnboardingDone,
+                    )
+                }
             }
         }
+    }
+
+    /** Pede as permissões de runtime (mic + notificações); o resultado conclui o onboarding. */
+    private fun requestRuntimePermissions() {
+        val perms = buildList {
+            add(Manifest.permission.RECORD_AUDIO)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+        requestPermissions.launch(perms.toTypedArray())
+    }
+
+    /** Marca o onboarding como concluído (ONB-03) → a próxima composição vai para a config. */
+    private fun markOnboardingDone() {
+        persist { it.copy(onboardingDone = true) }
     }
 
     override fun onResume() {

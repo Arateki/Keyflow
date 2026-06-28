@@ -1,6 +1,7 @@
 package com.keyflow.ui
 
 import android.Manifest
+import android.content.Context
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -9,32 +10,41 @@ import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
+import com.keyflow.data.SettingsRepository
 import com.keyflow.overlay.OverlayService
 import com.keyflow.ui.config.TOGGLE_OVERLAY_MODE_TAG
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.RuleChain
 import org.junit.runner.RunWith
 
 /**
- * Fiação real da [SetupActivity] em Compose (T10). Cobre a parte de produção que sobrou da conversão:
- * o toggle de **Modo Overlay** inicia/encerra o [OverlayService] (FGS) — herdando a cobertura do antigo
- * "Ativar botão flutuante".
+ * Fiação real da [SetupActivity] em Compose (T10/T27). O toggle de **Modo Overlay** inicia/encerra o
+ * [OverlayService] (FGS). `onboardingDone=true` é semeado **antes** do launch (RuleChain) para a tela
+ * inicial já ser a config — assim o padrão `autoAdvance=false` + `performClick` interage sem esperar
+ * recomposição (o orbe do header anima infinitamente e quebraria `waitForIdle`).
  */
 @RunWith(AndroidJUnit4::class)
 class SetupActivityTest {
 
-    @get:Rule
-    val compose = createAndroidComposeRule<SetupActivity>()
+    private val compose = createAndroidComposeRule<SetupActivity>()
 
     @get:Rule
-    val permissions: GrantPermissionRule = GrantPermissionRule.grant(
-        Manifest.permission.RECORD_AUDIO,
-        Manifest.permission.POST_NOTIFICATIONS,
-    )
+    val chain: RuleChain = RuleChain
+        .outerRule(SeedOnboardingRule(done = true))
+        .around(
+            GrantPermissionRule.grant(
+                Manifest.permission.RECORD_AUDIO,
+                Manifest.permission.POST_NOTIFICATIONS,
+            ),
+        )
+        .around(compose)
 
-    private val context
+    private val context: Context
         get() = InstrumentationRegistry.getInstrumentation().targetContext
 
     @Before
@@ -58,8 +68,6 @@ class SetupActivityTest {
 
         // Deixa o round-trip do DataStore refletir o flag (checked=on) antes de desligar.
         SystemClock.sleep(800)
-        compose.waitForIdle()
-
         compose.onNodeWithTag(TOGGLE_OVERLAY_MODE_TAG).performClick()
         waitUntil { !OverlayService.isRunningForUi }
     }
@@ -79,5 +87,16 @@ class SetupActivityTest {
             .uiAutomation
             .executeShellCommand(command)
         fd.close()
+    }
+}
+
+/** Semeia `onboardingDone` no DataStore antes do launch da Activity (T27). */
+class SeedOnboardingRule(private val done: Boolean) : org.junit.rules.ExternalResource() {
+    override fun before() {
+        val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+        runBlocking {
+            val repo = SettingsRepository(ctx)
+            repo.saveSettings(repo.settingsFlow().first().copy(onboardingDone = done))
+        }
     }
 }

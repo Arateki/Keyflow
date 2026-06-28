@@ -11,10 +11,10 @@ agente de implementação. Monetização (créditos/skins) entra como **casca vi
 
 ## Goals
 
-- [ ] Todas as telas do app seguem a direção Ateliê (claro e escuro), batendo visualmente com os mocks.
-- [ ] Pausar/retomar a gravação de áudio com gestos por modo (toggle/PTT) e pela notificação.
-- [ ] Cada tela/estado é renderizável de forma determinística e verificada por screenshot vs. mock no emulador headless.
-- [ ] Nenhuma regressão funcional: ditar→inserir, presets de API, overlay, teclado e permissões seguem funcionando (gates unit+instrumented verdes).
+- [x] Todas as telas do app seguem a direção Ateliê (claro e escuro), batendo visualmente com os mocks.
+- [x] Pausar/retomar a gravação de áudio com gestos por modo (toggle/PTT) e pela notificação.
+- [x] Cada tela/estado é renderizável de forma determinística e verificada por screenshot vs. mock no emulador headless.
+- [x] Nenhuma regressão funcional: ditar→inserir, presets de API, overlay, teclado e permissões seguem funcionando (gates unit+instrumented verdes).
 
 ## Out of Scope
 
@@ -270,79 +270,79 @@ headless e capturar prints rotulados para comparar com os mocks e iterar.
 
 | ID | Story | Fase | Status |
 | --- | ----- | ---- | ------ |
-| FND-01 | P1 Fundação | Spec | Pending |
-| FND-02 | P1 Fundação | Spec | Pending |
-| FND-03 | P1 Fundação | Spec | Pending |
-| FND-04 | P1 Fundação (tema toggle) | Spec | Pending |
-| FND-05 | P1 Fundação (gates verdes) | Spec | Pending |
-| ORB-01 | P1 Orbe | Spec | Pending |
-| ORB-02 | P1 Orbe (paused) | Spec | Pending |
-| ORB-03 | P1 Orbe (clock injetável) | Spec | Pending |
-| ORB-04 | P1 Orbe (timer no centro) | Spec | Pending |
-| CFG-01 | P1 Config abas | Spec | Pending |
-| CFG-02 | P1 Config abas (gating) | Spec | Pending |
-| CFG-03 | P1 Config abas (navegação) | Spec | Pending |
-| CFG-04 | P1 Config abas (auto-save toggle) | Spec | Pending |
-| CFG-05 | P1 Config abas (auto-save texto/desfoque) | Spec | Pending |
-| CFG-06 | P1 Config abas (aba Modo) | Spec | Pending |
-| VOZ-01 | P1 Presets | Spec | Pending |
-| VOZ-02 | P1 Presets (OpenAI/Groq) | Spec | Pending |
-| VOZ-03 | P1 Presets (Custom) | Spec | Pending |
-| VOZ-04 | P1 Presets (Créditos stub) | Spec | Pending |
-| VOZ-05 | P1 Presets (Créditos bloqueia gravar) | Spec | Pending |
-| VOZ-06 | P1 Presets (BYO transcreve) | Spec | Pending |
-| KBD-01 | P1 Teclado | Spec | Pending |
-| KBD-02 | P1 Teclado (timer no mic) | Spec | Pending |
-| KBD-03 | P1 Teclado (estados) | Spec | Pending |
-| KBD-04 | P1 Teclado (encolher) | Spec | Pending |
-| OVL-01 | P1 Overlay (orbe) | Spec | Pending |
-| OVL-02 | P1 Overlay (tempo/pause centro) | Spec | Pending |
-| OVL-03 | P1 Overlay (anti-movimento) | Spec | Pending |
-| OVL-04 | P1 Overlay (PTT+mover grava) | Spec | Pending |
-| OVL-05 | P1 Overlay (posição/tamanho) | Spec | Pending |
-| OVL-06 | P1 Overlay (triplo-toque) | Spec | Pending |
-| REC-01 | P1 Pausa (pause) | Spec | Pending |
-| REC-02 | P1 Pausa (resume) | Spec | Pending |
-| REC-03 | P1 Pausa (gesto toggle) | Spec | Pending |
-| REC-04 | P1 Pausa (gesto PTT) | Spec | Pending |
-| REC-05 | P1 Pausa (glifo) | Spec | Pending |
-| REC-06 | P1 Pausa (encerrar de pausado) | Spec | Pending |
-| REC-07 | P1 Pausa (explicação por modo) | Spec | Pending |
-| NOTIF-01 | P1 Notificação | Spec | Pending |
-| NOTIF-02 | P1 Notificação (pausar/retomar) | Spec | Pending |
-| NOTIF-03 | P1 Notificação (parar e copiar) | Spec | Pending |
-| ONB-01 | P1 Onboarding | Spec | Pending |
-| ONB-02 | P1 Onboarding (checklist) | Spec | Pending |
-| ONB-03 | P1 Onboarding (conceder/pular) | Spec | Pending |
-| VERIFY-01 | P1 Harness (determinismo) | Spec | Pending |
-| VERIFY-02 | P1 Harness (1 PNG/rota) | Spec | Pending |
-| VERIFY-03 | P1 Harness (UiAutomator sistema) | Spec | Pending |
-| VERIFY-04 | P1 Harness (golden regressão) | Spec | Pending |
-| VERIFY-05 | P1 Harness (índice de rotas) | Spec | Pending |
-| SKIN-01 | P2 Skins | Spec | Pending |
-| SKIN-02 | P2 Skins (sheet) | Spec | Pending |
-| SKIN-03 | P2 Skins (inerte) | Spec | Pending |
-| MON-01 | P2 Docs/Créditos | Spec | Pending |
-| MON-02 | P2 Docs/Créditos (stub) | Spec | Pending |
-| I18N-01 | P2 Idioma | Spec | Pending |
-| I18N-02 | P2 Idioma (inerte) | Spec | Pending |
+| FND-01 | P1 Fundação | Execute | Verified |
+| FND-02 | P1 Fundação | Execute | Verified |
+| FND-03 | P1 Fundação | Execute | Verified |
+| FND-04 | P1 Fundação (tema toggle) | Execute | Verified |
+| FND-05 | P1 Fundação (gates verdes) | Execute | Verified |
+| ORB-01 | P1 Orbe | Execute | Verified |
+| ORB-02 | P1 Orbe (paused) | Execute | Verified |
+| ORB-03 | P1 Orbe (clock injetável) | Execute | Verified |
+| ORB-04 | P1 Orbe (timer no centro) | Execute | Verified |
+| CFG-01 | P1 Config abas | Execute | Verified |
+| CFG-02 | P1 Config abas (gating) | Execute | Verified |
+| CFG-03 | P1 Config abas (navegação) | Execute | Verified |
+| CFG-04 | P1 Config abas (auto-save toggle) | Execute | Verified |
+| CFG-05 | P1 Config abas (auto-save texto/desfoque) | Execute | Verified |
+| CFG-06 | P1 Config abas (aba Modo) | Execute | Verified |
+| VOZ-01 | P1 Presets | Execute | Verified |
+| VOZ-02 | P1 Presets (OpenAI/Groq) | Execute | Verified |
+| VOZ-03 | P1 Presets (Custom) | Execute | Verified |
+| VOZ-04 | P1 Presets (Créditos stub) | Execute | Verified |
+| VOZ-05 | P1 Presets (Créditos bloqueia gravar) | Execute | Verified |
+| VOZ-06 | P1 Presets (BYO transcreve) | Execute | Verified |
+| KBD-01 | P1 Teclado | Execute | Verified |
+| KBD-02 | P1 Teclado (timer no mic) | Execute | Verified |
+| KBD-03 | P1 Teclado (estados) | Execute | Verified |
+| KBD-04 | P1 Teclado (encolher) | Execute | Verified |
+| OVL-01 | P1 Overlay (orbe) | Execute | Verified |
+| OVL-02 | P1 Overlay (tempo/pause centro) | Execute | Verified |
+| OVL-03 | P1 Overlay (anti-movimento) | Execute | Verified |
+| OVL-04 | P1 Overlay (PTT+mover grava) | Execute | Verified |
+| OVL-05 | P1 Overlay (posição/tamanho) | Execute | Verified |
+| OVL-06 | P1 Overlay (triplo-toque) | Execute | Verified |
+| REC-01 | P1 Pausa (pause) | Execute | Verified |
+| REC-02 | P1 Pausa (resume) | Execute | Verified |
+| REC-03 | P1 Pausa (gesto toggle) | Execute | Verified |
+| REC-04 | P1 Pausa (gesto PTT) | Execute | Verified |
+| REC-05 | P1 Pausa (glifo) | Execute | Verified |
+| REC-06 | P1 Pausa (encerrar de pausado) | Execute | Verified |
+| REC-07 | P1 Pausa (explicação por modo) | Execute | Verified |
+| NOTIF-01 | P1 Notificação | Execute | Verified |
+| NOTIF-02 | P1 Notificação (pausar/retomar) | Execute | Verified |
+| NOTIF-03 | P1 Notificação (parar e copiar) | Execute | Verified |
+| ONB-01 | P1 Onboarding | Execute | Verified |
+| ONB-02 | P1 Onboarding (checklist) | Execute | Verified |
+| ONB-03 | P1 Onboarding (conceder/pular) | Execute | Verified |
+| VERIFY-01 | P1 Harness (determinismo) | Execute | Verified |
+| VERIFY-02 | P1 Harness (1 PNG/rota) | Execute | Verified |
+| VERIFY-03 | P1 Harness (UiAutomator sistema) | Execute | Verified |
+| VERIFY-04 | P1 Harness (golden regressão) | Execute | Verified |
+| VERIFY-05 | P1 Harness (índice de rotas) | Execute | Verified |
+| SKIN-01 | P2 Skins | Execute | Verified |
+| SKIN-02 | P2 Skins (sheet) | Execute | Verified |
+| SKIN-03 | P2 Skins (inerte) | Execute | Verified |
+| MON-01 | P2 Docs/Créditos | Execute | Verified |
+| MON-02 | P2 Docs/Créditos (stub) | Execute | Verified |
+| I18N-01 | P2 Idioma | Execute | Verified |
+| I18N-02 | P2 Idioma (inerte) | Execute | Verified |
 
 **ID format:** `[ÁREA]-[NÚMERO]` (FND=fundação, THEME via FND, ORB=orbe, CFG=config, VOZ=origem, KBD=teclado,
 OVL=overlay, REC=pausa/gravação, NOTIF=notificação, ONB=onboarding, VERIFY=harness, SKIN=skins, MON=créditos/docs, I18N=idioma)
 
 **Status values:** Pending → In Design → In Tasks → Implementing → Verified
 
-**Coverage:** 52 requisitos · mapeamento a tasks em `tasks.md` (após Design) · 0 órfãos esperados ✅
+**Coverage:** 52 requisitos · **todos Verified** (T1–T27) · 0 órfãos ✅
 
 ---
 
 ## Success Criteria
 
-- [ ] Todas as telas dos mocks (config 5 abas, onboarding, overlay, teclado, notificação, sheets) existem em Compose, claro e escuro, batendo com os mocks na galeria de verificação.
-- [ ] Pausar/retomar funciona por gesto (toggle e PTT) e pela notificação; o estado pausado mostra o glifo no centro.
-- [ ] Arrastar o overlay nunca inicia gravação; PTT segurando+movendo segue gravando.
-- [ ] Presets OpenAI/Groq/Custom transcrevem com a chave do usuário; Créditos avisa "em breve".
-- [ ] Config salva sozinha (toggle imediato, texto no desfoque) com toast discreto.
-- [ ] `verification/` populado com 1 PNG determinístico por rota; rodar 2× produz prints idênticos.
-- [ ] Gates `testDebugUnitTest` + `connectedDebugAndroidTest` verdes; nenhuma regressão funcional do MVP.
-- [ ] `poc/` removido; `minSdk 24`; fontes empacotadas; sem Downloadable Fonts.
+- [x] Todas as telas dos mocks (config 5 abas, onboarding, overlay, teclado, notificação, sheets) existem em Compose, claro e escuro, batendo com os mocks na galeria de verificação. *(T10–T17, T22–T24; golden T26)*
+- [x] Pausar/retomar funciona por gesto (toggle e PTT) e pela notificação; o estado pausado mostra o glifo no centro. *(T18–T20, T22, T24)*
+- [x] Arrastar o overlay nunca inicia gravação; PTT segurando+movendo segue gravando. *(T20 unit + T22 instrumented)*
+- [x] Presets OpenAI/Groq/Custom transcrevem com a chave do usuário; Créditos avisa "em breve". *(T5/T12 — lógica `effectiveConfigFor` + MockWebServer; **e2e com endpoint real pendente em device físico**, ver Pendências do STATE)*
+- [x] Config salva sozinha (toggle imediato, texto no desfoque) com toast discreto. *(T10/T12)*
+- [x] `verification/` populado com 1 PNG determinístico por rota; rodar 2× produz prints idênticos. *(T7/T8; golden T26)*
+- [x] Gates `testDebugUnitTest` + `connectedDebugAndroidTest` verdes; nenhuma regressão funcional do MVP. *(55 instrumentados, 0 falhas)*
+- [x] `poc/` removido; `minSdk 24`; fontes empacotadas; sem Downloadable Fonts. *(T1–T3)*

@@ -2,7 +2,7 @@
 
 **Design**: `.specs/features/redesign-atelie/design.md`
 **Spec**: `.specs/features/redesign-atelie/spec.md`
-**Status**: Draft
+**Status**: ✅ Concluída (T1–T27, 2026-06-28) — 55 instrumentados + unit verdes; golden versionado
 
 ## Gate Check Commands (sandbox)
 
@@ -336,10 +336,10 @@ gatilho, `overlaySide`, `orbSize`, `onboardingDone` e `effectiveConfigFor(source
 **Where**: `App.kt`, `ui/SetupActivity.kt`, `.specs/features/redesign-atelie/spec.md` (status)
 **Depends on**: T10..T24 · **Reuses**: tudo · **Requirement**: todos (integração)
 **Done when**:
-- [ ] 1º uso → onboarding; depois → config; tema aplicado em todas as telas; nenhuma regressão.
-- [ ] Gate: `full`. Test count: ≥ baseline + novos.
-- [ ] Traceability atualizada (Pending→Verified onde aplicável).
-**Tests**: instrumented · **Gate**: full · **Commit**: `feat: integrar redesign Ateliê`
+- [x] `SetupActivity` roteia: `onboardingDone=false` → `OnboardingScreen`, senão → `ConfigScreen`; "Conceder permissões" pede mic+notificações (runtime) e conclui, "Pular" conclui; ambos persistem `onboardingDone=true`. `KeyFlowTheme(dark)` envolve as duas rotas (tema app-wide). Smoke real: `pm clear` → app abre no onboarding (print `t27-first-run.png`, fiel).
+- [x] instrumented: `OnboardingRoutingTest` (1º uso mostra onboarding; "Pular" persiste `onboardingDone`); `SetupActivityTest` semeia `onboardingDone=true` **antes do launch** (RuleChain) p/ o toggle de overlay seguir cobrindo a config. Gate: `full` → 55 instrumentados (54→55), 0 falhas; unit verde.
+- [x] Traceability `spec.md` atualizada: 52 requisitos Pending→**Verified**; Goals + Success Criteria marcados (e2e de transcrição com endpoint real anotado como pendente em device físico).
+**Tests**: instrumented · **Gate**: full · **Commit**: `feat: integrar redesign Ateliê`  ✅
 
 ---
 
