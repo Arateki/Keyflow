@@ -5,6 +5,9 @@ import android.media.MediaRecorder
 import android.os.SystemClock
 import java.io.File
 
+/** Estado da gravação (REC-01/02). */
+enum class RecorderState { IDLE, RECORDING, PAUSED }
+
 class AudioRecorder(
     context: Context,
     private val outputDir: File = File(context.cacheDir, "keyflow-recordings"),
@@ -13,7 +16,13 @@ class AudioRecorder(
 ) {
     private var recorder: MediaRecorder? = null
     private var outputFile: File? = null
-    private var startedAtMs: Long = 0L
+
+    // Duração ativa = soma dos segmentos gravados (sem contar o tempo em pausa).
+    private var accumulatedMs: Long = 0L
+    private var segmentStartMs: Long = 0L
+
+    var state: RecorderState = RecorderState.IDLE
+        private set
 
     fun start() {
         check(recorder == null) { "Recording already started" }
@@ -33,13 +42,33 @@ class AudioRecorder(
 
         recorder = mediaRecorder
         outputFile = file
-        startedAtMs = clock()
+        accumulatedMs = 0L
+        segmentStartMs = clock()
+        state = RecorderState.RECORDING
+    }
+
+    /** Pausa a gravação (MediaRecorder.pause, API 24+). Sem efeito se não estiver gravando (REC-01). */
+    fun pause() {
+        val mediaRecorder = recorder ?: return
+        if (state != RecorderState.RECORDING) return
+        mediaRecorder.pause()
+        accumulatedMs += clock() - segmentStartMs
+        state = RecorderState.PAUSED
+    }
+
+    /** Retoma a gravação pausada (MediaRecorder.resume). Sem efeito se não estiver pausada (REC-02). */
+    fun resume() {
+        val mediaRecorder = recorder ?: return
+        if (state != RecorderState.PAUSED) return
+        mediaRecorder.resume()
+        segmentStartMs = clock()
+        state = RecorderState.RECORDING
     }
 
     fun stop(): File? {
         val mediaRecorder = recorder ?: return null
         val file = outputFile
-        val durationMs = clock() - startedAtMs
+        val durationMs = activeDurationMs()
 
         return try {
             mediaRecorder.stop()
@@ -60,10 +89,15 @@ class AudioRecorder(
         }
     }
 
+    private fun activeDurationMs(): Long =
+        accumulatedMs + if (state == RecorderState.RECORDING) clock() - segmentStartMs else 0L
+
     private fun clearState() {
         recorder = null
         outputFile = null
-        startedAtMs = 0L
+        accumulatedMs = 0L
+        segmentStartMs = 0L
+        state = RecorderState.IDLE
     }
 
     private companion object {

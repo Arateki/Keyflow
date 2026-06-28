@@ -243,10 +243,10 @@ gatilho, `overlaySide`, `orbSize`, `onboardingDone` e `effectiveConfigFor(source
 **Where**: `audio/AudioRecorder.kt`
 **Depends on**: None · **Reuses**: AudioRecorder atual · **Requirement**: REC-01, REC-02, REC-06
 **Done when**:
-- [ ] `pause/resume` funcionam; arquivo m4a final reproduzível após pausa(s) e encerramento.
-- [ ] instrumented (device) cobrindo gravar→pausar→retomar→parar.
-- [ ] Gate: `full`. Test count: ≥2.
-**Tests**: instrumented · **Gate**: full · **Commit**: `feat(audio): pausar/retomar gravação`
+- [x] `pause/resume` funcionam (estado `RecorderState` + duração acumulada que ignora o tempo em pausa); m4a final reproduzível (MediaMetadataRetriever → duração > 0).
+- [x] instrumented cobrindo gravar→pausar→retomar→parar + transições de estado (2 testes novos).
+- [x] Gate: `full` → 43 instrumentados (41→43), 0 falhas; unit verde.
+**Tests**: instrumented · **Gate**: full · **Commit**: `feat(audio): pausar/retomar gravação`  ✅
 
 ### T19: ButtonState PAUSED + KeyFlowController [P]
 **What**: Adicionar `PAUSED` a `ButtonState` e os caminhos de pause/resume no controller.
