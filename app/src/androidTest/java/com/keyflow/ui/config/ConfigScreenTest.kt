@@ -74,6 +74,8 @@ class ConfigScreenTest {
                         settings = settings.copy(themeDark = it)
                     },
                     onLanguageClick = { languageClicks++ },
+                    onRequestOverlayPermission = {},
+                    onRequestKeyboardPermission = {},
                     modifier = Modifier.fillMaxSize(),
                 )
                 }

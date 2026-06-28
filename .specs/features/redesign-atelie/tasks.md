@@ -171,11 +171,11 @@ gatilho, `overlaySide`, `orbSize`, `onboardingDone` e `effectiveConfigFor(source
 **Where**: `ui/config/ModoPanel.kt`
 **Depends on**: T10 · **Reuses**: `PermissionsChecker`, hint de pausa · **Requirement**: CFG-06, REC-07
 **Done when**:
-- [ ] Cards Overlay/Keyboard com toggle que liga/desliga o modo (afeta gating); chips CONCEDIDO/PENDENTE + "Ativar".
-- [ ] Placeholder GIF estático; hint de pausa do modo ativo.
-- [ ] instrumented + screenshot (`config-modo` claro/escuro).
-- [ ] Gate: `full`. Test count: ≥2.
-**Tests**: instrumented · **Gate**: full · **Commit**: `feat(config): aba Modo`
+- [x] Cards Overlay/Keyboard com toggle que liga/desliga o modo (afeta gating); chips CONCEDIDO/PENDENTE + "Ativar" (abre Settings de overlay/IME).
+- [x] Placeholder GIF estático; hint de pausa contextual (`pauseHintFor` por `RecordingMode`).
+- [x] instrumented (`ModoPanelTest`, 3) + screenshot (`config-modo` claro/escuro vs mock).
+- [x] Gate: `full` → 27 instrumentados (24→27), 0 falhas; unit verde.
+**Tests**: instrumented · **Gate**: full · **Commit**: `feat(config): aba Modo`  ✅
 
 ### T12: VozPanel (presets + stub Créditos)
 **What**: Aba Voz: segmented Créditos/OpenAI/Groq/Custom; campos por preset; cartão Créditos mock inerte; fiação ao `effectiveConfigFor`.

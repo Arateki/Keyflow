@@ -1,7 +1,10 @@
 package com.keyflow.ui
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings as AndroidSettings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -65,6 +68,8 @@ class SetupActivity : ComponentActivity() {
                     onLanguageClick = {
                         Toast.makeText(this, "Outros idiomas em breve", Toast.LENGTH_SHORT).show()
                     },
+                    onRequestOverlayPermission = ::openOverlaySettings,
+                    onRequestKeyboardPermission = ::openKeyboardSettings,
                 )
             }
         }
@@ -109,5 +114,22 @@ class SetupActivity : ComponentActivity() {
         } else {
             stopService(OverlayService.intent(this))
         }
+    }
+
+    /** Abre as configurações de "desenhar sobre outros apps" (permissão do overlay). */
+    private fun openOverlaySettings() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            startActivity(
+                Intent(
+                    AndroidSettings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:$packageName"),
+                ),
+            )
+        }
+    }
+
+    /** Abre as configurações de teclados do sistema para habilitar o IME do KeyFlow. */
+    private fun openKeyboardSettings() {
+        startActivity(Intent(AndroidSettings.ACTION_INPUT_METHOD_SETTINGS))
     }
 }

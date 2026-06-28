@@ -1,6 +1,5 @@
 package com.keyflow.ui.config
 
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -13,22 +12,18 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -62,8 +57,7 @@ const val TOGGLE_KEYBOARD_MODE_TAG = "toggle-keyboard-mode"
  * tema) + [TabBar] com gating + painel da aba ativa + [SaveToast]. A aba ativa é estado interno;
  * se o modo que libera a aba ativa for desligado, volta para [ConfigTab.MODO] (CFG-02).
  *
- * Os painéis reais de cada aba chegam em T11–T16; aqui a aba Modo já traz os 2 toggles de modo
- * (exercitando gating + auto-save) e as demais são placeholders.
+ * Aba Modo: [ModoPanel] (T11). Demais abas: placeholders até T12–T16.
  */
 @Composable
 fun ConfigScreen(
@@ -74,6 +68,8 @@ fun ConfigScreen(
     onKeyboardModeChange: (Boolean) -> Unit,
     onThemeChange: (Boolean) -> Unit,
     onLanguageClick: () -> Unit,
+    onRequestOverlayPermission: () -> Unit,
+    onRequestKeyboardPermission: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val palette = LocalKeyFlowPalette.current
@@ -114,11 +110,13 @@ fun ConfigScreen(
                     .testTag(panelTag(activeTab)),
             ) {
                 when (activeTab) {
-                    ConfigTab.MODO -> ModoScaffold(
+                    ConfigTab.MODO -> ModoPanel(
                         settings = settings,
-                        micGranted = permissions.microphoneGranted,
+                        permissions = permissions,
                         onOverlayModeChange = onOverlayModeChange,
                         onKeyboardModeChange = onKeyboardModeChange,
+                        onRequestOverlayPermission = onRequestOverlayPermission,
+                        onRequestKeyboardPermission = onRequestKeyboardPermission,
                     )
                     else -> PanelPlaceholder(activeTab)
                 }
@@ -130,7 +128,6 @@ fun ConfigScreen(
 
 @Composable
 private fun FakeStatusBar() {
-    val palette = LocalKeyFlowPalette.current
     Row(
         Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 13.dp, bottom = 2.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -206,122 +203,6 @@ private fun Header(
         ) {
             StrokeIcon(if (dark) SUN_PATHS else MOON_PATHS, palette.fg2, Modifier.size(14.dp))
         }
-    }
-}
-
-@Composable
-private fun ModoScaffold(
-    settings: Settings,
-    micGranted: Boolean,
-    onOverlayModeChange: (Boolean) -> Unit,
-    onKeyboardModeChange: (Boolean) -> Unit,
-) {
-    val palette = LocalKeyFlowPalette.current
-    Column(verticalArrangement = Arrangement.spacedBy(11.dp)) {
-        Row(
-            Modifier.fillMaxWidth().padding(vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "Microfone",
-                color = palette.fg2,
-                fontFamily = SpaceGrotesk,
-                fontSize = 12.5.sp,
-                modifier = Modifier.weight(1f),
-            )
-            PermissionChip(granted = micGranted)
-        }
-        ModeCard(
-            title = "Modo Overlay",
-            subtitle = "Orbe flutuante sobre qualquer app.",
-            checked = settings.overlayModeEnabled,
-            onCheckedChange = onOverlayModeChange,
-            toggleTag = TOGGLE_OVERLAY_MODE_TAG,
-        )
-        ModeCard(
-            title = "Modo Teclado",
-            subtitle = "Teclado do sistema com voz.",
-            checked = settings.keyboardModeEnabled,
-            onCheckedChange = onKeyboardModeChange,
-            toggleTag = TOGGLE_KEYBOARD_MODE_TAG,
-        )
-    }
-}
-
-@Composable
-private fun ModeCard(
-    title: String,
-    subtitle: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    toggleTag: String,
-) {
-    val palette = LocalKeyFlowPalette.current
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(6.dp))
-            .border(1.dp, palette.line, RoundedCornerShape(6.dp))
-            .background(palette.card)
-            .padding(horizontal = 12.dp, vertical = 11.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = title,
-                color = palette.fg,
-                fontFamily = SpaceGrotesk,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 14.5.sp,
-            )
-            Text(
-                text = subtitle,
-                color = palette.muted,
-                fontFamily = SpaceGrotesk,
-                fontSize = 11.sp,
-                modifier = Modifier.padding(top = 2.dp),
-            )
-        }
-        PillToggle(checked = checked, onCheckedChange = onCheckedChange, tag = toggleTag)
-    }
-}
-
-@Composable
-private fun PermissionChip(granted: Boolean) {
-    val palette = LocalKeyFlowPalette.current
-    Text(
-        text = if (granted) "CONCEDIDO" else "PENDENTE",
-        color = if (granted) palette.teal else palette.terracotta,
-        fontFamily = SpaceMono,
-        fontSize = 8.sp,
-        modifier = Modifier
-            .clip(RoundedCornerShape(2.dp))
-            .background((if (granted) palette.teal else palette.terracotta).copy(alpha = 0.14f))
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-    )
-}
-
-/** Pílula de toggle no estilo Ateliê (track preenchido quando ligado; knob `onFill`). */
-@Composable
-private fun PillToggle(checked: Boolean, onCheckedChange: (Boolean) -> Unit, tag: String) {
-    val palette = LocalKeyFlowPalette.current
-    val knobX by animateDpAsState(if (checked) 22.dp else 3.dp, label = "knobX")
-    Box(
-        Modifier
-            .size(width = 44.dp, height = 25.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(if (checked) palette.teal else palette.line)
-            .clickable { onCheckedChange(!checked) }
-            .testTag(tag),
-    ) {
-        Box(
-            Modifier
-                .offset(x = knobX, y = 3.dp)
-                .size(19.dp)
-                .clip(CircleShape)
-                .background(palette.onFill),
-        )
     }
 }
 

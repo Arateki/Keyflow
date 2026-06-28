@@ -50,7 +50,7 @@ object RouteCatalog {
             permissions = PermissionStatus(
                 microphoneGranted = true,
                 overlayGranted = true,
-                keyboardEnabled = true,
+                keyboardEnabled = false, // espelha o mock (teclado PENDENTE + "Ativar")
                 notificationsGranted = true,
             ),
             saveController = SaveController(),
@@ -58,6 +58,8 @@ object RouteCatalog {
             onKeyboardModeChange = {},
             onThemeChange = {},
             onLanguageClick = {},
+            onRequestOverlayPermission = {},
+            onRequestKeyboardPermission = {},
         )
     }
 
