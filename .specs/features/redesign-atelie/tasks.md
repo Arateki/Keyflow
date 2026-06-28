@@ -326,10 +326,10 @@ gatilho, `overlaySide`, `orbSize`, `onboardingDone` e `effectiveConfigFor(source
 **What**: Mecanismo de golden + diff por limiar para travar as rotas aprovadas.
 **Where**: `verification/golden/`, `scripts/diff-screens.*`
 **Depends on**: T8 + telas (T10–T24) · **Reuses**: PNGs de `verification/` · **Requirement**: VERIFY-04
-**Done when**:
-- [ ] PNGs aprovados copiados p/ `golden/`; diff acusa mudança acima do limiar e passa quando idêntico.
-- [ ] Gate: `screenshot`.
-**Tests**: screenshot · **Gate**: screenshot · **Commit**: `feat(verify): golden e diff de regressão`
+- [x] `scripts/diff-screens.sh`: compara cada `verification/golden/<n>.png` (versionado) com `verification/<n>.png` via ImageMagick `compare -metric AE -fuzz 5%`, falhando se a razão de pixels diferentes passar de `MAX_RATIO` (0,5%). `--approve` promove `verification/` → `golden/` (exclui `sys-*`, não determinísticos). 42 PNGs aprovados (galeria determinística).
+- [x] Diff passa idêntico (42/42, 0 px, exit 0); **detecção validada** (PNG corrompido → 30,9% > limiar, exit 1; restaurado → volta a 0). `verification/golden/` rastreável (fora do `/verification/*.png` do `.gitignore`).
+- [x] Gate: `screenshot` (verify-screens.sh + diff-screens.sh).
+**Tests**: screenshot · **Gate**: screenshot · **Commit**: `feat(verify): golden e diff de regressão`  ✅
 
 ### T27: Rota inicial + integração final
 **What**: Decidir rota inicial (onboarding vs config), aplicar tema app-wide, fechar wiring e rodar o gate full + atualizar traceability.
