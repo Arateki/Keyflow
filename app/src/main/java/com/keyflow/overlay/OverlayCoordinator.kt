@@ -79,6 +79,7 @@ class OverlayCoordinator(
             ButtonState.ERROR -> scheduleErrorDismiss()
             ButtonState.IDLE_READY -> Unit
             ButtonState.IDLE_NO_FIELD -> Unit
+            ButtonState.PAUSED -> Unit // orquestração de pausa chega na T22
             ButtonState.PENDING_PASTE -> Unit
         }
     }

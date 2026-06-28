@@ -12,7 +12,8 @@ class ButtonStateMachine(
 
     fun onTargetChanged(available: Boolean) {
         state = when {
-            state == ButtonState.RECORDING || state == ButtonState.SENDING -> state
+            state == ButtonState.RECORDING || state == ButtonState.PAUSED ||
+                state == ButtonState.SENDING -> state
             // Mantém PENDING_PASTE: o auto-flush do Controller já tenta inserir —
             // se falhar, o botão fica em PA para o usuário confirmar manualmente
             state == ButtonState.PENDING_PASTE -> state
@@ -45,6 +46,26 @@ class ButtonStateMachine(
         state = when (state) {
             ButtonState.RECORDING -> ButtonState.SENDING
             else -> state
+        }
+        return state
+    }
+
+    /** Pausa a gravação (RECORDING → PAUSED). No-op em qualquer outro estado (REC-01). */
+    fun onPause(): ButtonState {
+        if (state == ButtonState.RECORDING) state = ButtonState.PAUSED
+        return state
+    }
+
+    /** Retoma a gravação (PAUSED → RECORDING). No-op em qualquer outro estado (REC-02). */
+    fun onResume(): ButtonState {
+        if (state == ButtonState.PAUSED) state = ButtonState.RECORDING
+        return state
+    }
+
+    /** Encerra a gravação (RECORDING ou PAUSED → SENDING). */
+    fun onStop(): ButtonState {
+        if (state == ButtonState.RECORDING || state == ButtonState.PAUSED) {
+            state = ButtonState.SENDING
         }
         return state
     }

@@ -67,6 +67,7 @@ class FloatingButtonView(
             ButtonState.IDLE_READY -> READY_COLOR
             ButtonState.IDLE_NO_FIELD -> NO_FIELD_COLOR
             ButtonState.RECORDING -> RECORDING_COLOR
+            ButtonState.PAUSED -> PAUSED_COLOR
             ButtonState.SENDING -> SENDING_COLOR
             ButtonState.ERROR -> ERROR_COLOR
             ButtonState.PENDING_PASTE -> PENDING_COLOR
@@ -75,6 +76,7 @@ class FloatingButtonView(
             ButtonState.IDLE_READY -> "KeyFlow ready"
             ButtonState.IDLE_NO_FIELD -> "KeyFlow no field"
             ButtonState.RECORDING -> "KeyFlow recording"
+            ButtonState.PAUSED -> "KeyFlow paused"
             ButtonState.SENDING -> "KeyFlow sending"
             ButtonState.ERROR -> "KeyFlow error"
             ButtonState.PENDING_PASTE -> "KeyFlow pending paste"
@@ -172,6 +174,7 @@ class FloatingButtonView(
         ButtonState.IDLE_READY -> "KF"
         ButtonState.IDLE_NO_FIELD -> "..."
         ButtonState.RECORDING -> "REC"
+        ButtonState.PAUSED -> "II"
         ButtonState.SENDING -> "..."
         ButtonState.ERROR -> "!"
         ButtonState.PENDING_PASTE -> "PA"
@@ -183,6 +186,7 @@ class FloatingButtonView(
         val READY_COLOR = Color.rgb(46, 125, 50)
         val NO_FIELD_COLOR = Color.rgb(97, 97, 97)
         val RECORDING_COLOR = Color.rgb(198, 40, 40)
+        val PAUSED_COLOR = Color.rgb(255, 160, 0)
         val SENDING_COLOR = Color.rgb(21, 101, 192)
         val ERROR_COLOR = Color.rgb(230, 81, 0)
         val PENDING_COLOR = Color.rgb(106, 27, 154)

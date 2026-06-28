@@ -73,6 +73,55 @@ class ButtonStateMachineTest {
     }
 
     @Test
+    fun `pause moves recording to paused and resume returns to recording`() {
+        val machine = ButtonStateMachine(mode = RecordingMode.TOGGLE)
+
+        machine.onTap() // RECORDING
+        assertThat(machine.onPause()).isEqualTo(ButtonState.PAUSED)
+        assertThat(machine.onResume()).isEqualTo(ButtonState.RECORDING)
+    }
+
+    @Test
+    fun `stop from paused goes to sending`() {
+        val machine = ButtonStateMachine()
+
+        machine.onTap()   // RECORDING
+        machine.onPause() // PAUSED
+        assertThat(machine.onStop()).isEqualTo(ButtonState.SENDING)
+    }
+
+    @Test
+    fun `stop from recording goes to sending`() {
+        val machine = ButtonStateMachine()
+
+        machine.onTap() // RECORDING
+        assertThat(machine.onStop()).isEqualTo(ButtonState.SENDING)
+    }
+
+    @Test
+    fun `pause is a no-op outside recording and resume outside paused`() {
+        val machine = ButtonStateMachine()
+
+        // Idle: pause/resume do nothing
+        assertThat(machine.onPause()).isEqualTo(ButtonState.IDLE_READY)
+        assertThat(machine.onResume()).isEqualTo(ButtonState.IDLE_READY)
+
+        machine.onTap() // RECORDING
+        // Already recording: resume is a no-op
+        assertThat(machine.onResume()).isEqualTo(ButtonState.RECORDING)
+    }
+
+    @Test
+    fun `target change does not override paused state`() {
+        val machine = ButtonStateMachine()
+
+        machine.onTap()   // RECORDING
+        machine.onPause() // PAUSED
+        machine.onTargetChanged(false)
+        assertThat(machine.state).isEqualTo(ButtonState.PAUSED)
+    }
+
+    @Test
     fun `error and dismiss map back through current target availability`() {
         var targetAvailable = false
         val machine = ButtonStateMachine(targetAvailable = { targetAvailable })

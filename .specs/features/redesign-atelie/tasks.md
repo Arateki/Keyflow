@@ -250,13 +250,14 @@ gatilho, `overlaySide`, `orbSize`, `onboardingDone` e `effectiveConfigFor(source
 
 ### T19: ButtonState PAUSED + KeyFlowController [P]
 **What**: Adicionar `PAUSED` a `ButtonState` e os caminhos de pause/resume no controller.
-**Where**: `core/{Models,KeyFlowController}.kt`
-**Depends on**: None · **Reuses**: controller atual · **Requirement**: REC-01, REC-02
+**Where**: `core/Models.kt` + `overlay/ButtonStateMachine.kt` (SPEC_DEVIATION: transições no `ButtonStateMachine`, não no `KeyFlowController` — ver Done)
+**Depends on**: None · **Reuses**: `ButtonStateMachine` · **Requirement**: REC-01, REC-02
 **Done when**:
-- [ ] `PAUSED` no enum; transições recording⇄paused→sending no controller.
-- [ ] unit cobre as transições novas.
-- [ ] Gate: `quick`. Test count: ≥4.
-**Tests**: unit · **Gate**: quick · **Commit**: `feat(core): estado de pausa`
+- [x] `PAUSED` no enum `ButtonState`. Transições no `ButtonStateMachine`: `onPause()` (RECORDING→PAUSED), `onResume()` (PAUSED→RECORDING), `onStop()` (RECORDING|PAUSED→SENDING); `onTargetChanged` preserva PAUSED. **SPEC_DEVIATION**: o `Where` dizia `KeyFlowController`, mas este é só um holder de estado (`updateButtonState`) — o motor de transições é o `ButtonStateMachine`, que a T20 explicitamente reusa. Pôr as transições lá mantém a coerência e habilita a T20.
+- [x] unit cobre as transições novas (`ButtonStateMachineTest`: pause⇄resume, stop-de-paused, stop-de-recording, no-op fora de estado, preserva PAUSED no target-change) — 5 testes novos (7→12).
+- [x] `when` exaustivos sobre `ButtonState` atualizados p/ compilar: `OverlayCoordinator` (PAUSED=no-op, orquestração na T22), `FloatingButtonView` (cor âmbar + label "II" + a11y, reskin na T22) e `KeyFlowKeyboardView` (glifo ⏸, reskin na T23). Render real do PAUSED fica nas tasks de device.
+- [x] Gate: `quick` → `BUILD SUCCESSFUL`. Test count: 12 (`ButtonStateMachineTest`), 0 falhas.
+**Tests**: unit · **Gate**: quick · **Commit**: `feat(core): estado de pausa`  ✅
 
 ### T20: RecordingGestureController
 **What**: Lógica pura que mapeia eventos crus + modo → intents (Start/Stop/Pause/Resume/RepositionOnly/KeyboardPicker).

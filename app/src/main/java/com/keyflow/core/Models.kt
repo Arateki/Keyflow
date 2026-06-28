@@ -18,6 +18,7 @@ enum class ButtonState {
     IDLE_READY,      // campo focado, pronto para gravar
     IDLE_NO_FIELD,   // sem campo focado
     RECORDING,
+    PAUSED,          // gravação pausada (REC-01/REC-02); o tempo em pausa não conta (REC-06)
     SENDING,
     ERROR,
     PENDING_PASTE    // transcrição pendente esperando campo

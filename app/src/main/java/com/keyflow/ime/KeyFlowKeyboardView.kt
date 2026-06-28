@@ -192,6 +192,7 @@ class KeyFlowKeyboardView(
         ButtonState.IDLE_READY     -> "🎙" to COLOR_MIC_READY
         ButtonState.IDLE_NO_FIELD  -> "🎙" to COLOR_MIC_NO_FIELD
         ButtonState.RECORDING      -> "⏹ REC" to COLOR_REC
+        ButtonState.PAUSED         -> "⏸ II" to COLOR_REC
         ButtonState.SENDING        -> "···" to COLOR_SEND
         ButtonState.ERROR          -> "!" to COLOR_ERROR
         ButtonState.PENDING_PASTE  -> "📋 PA" to COLOR_PENDING
