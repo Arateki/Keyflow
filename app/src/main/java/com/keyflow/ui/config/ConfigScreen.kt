@@ -1,6 +1,5 @@
 package com.keyflow.ui.config
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -25,11 +24,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.scale
-import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -71,6 +65,7 @@ fun ConfigScreen(
     onRequestOverlayPermission: () -> Unit,
     onRequestKeyboardPermission: () -> Unit,
     onSettingsChange: (Settings) -> Unit,
+    onUnlockSkins: () -> Unit,
     modifier: Modifier = Modifier,
     initialTab: ConfigTab = ConfigTab.MODO,
 ) {
@@ -123,6 +118,12 @@ fun ConfigScreen(
                     ConfigTab.VOZ -> VozPanel(
                         settings = settings,
                         onSettingsChange = onSettingsChange,
+                    )
+                    ConfigTab.TECLADO -> TecladoPanel(
+                        settings = settings,
+                        onSettingsChange = onSettingsChange,
+                        onLanguageClick = onLanguageClick,
+                        onUnlockSkins = onUnlockSkins,
                     )
                     else -> PanelPlaceholder(activeTab)
                 }
@@ -230,21 +231,6 @@ private fun PanelPlaceholder(tab: ConfigTab) {
             fontFamily = SpaceGrotesk,
             fontSize = 12.sp,
         )
-    }
-}
-
-/** Ícone de stroke desenhado a partir de paths SVG (viewBox 24×24), como em [ConfigTab]. */
-@Composable
-private fun StrokeIcon(paths: List<String>, tint: Color, modifier: Modifier) {
-    Canvas(modifier) {
-        val s = size.minDimension / 24f
-        translate((size.width - 24f * s) / 2f, (size.height - 24f * s) / 2f) {
-            scale(s, s, pivot = androidx.compose.ui.geometry.Offset.Zero) {
-                paths.forEach { d ->
-                    drawPath(PathParser().parsePathString(d).toPath(), tint, style = Stroke(width = 1.6f))
-                }
-            }
-        }
     }
 }
 

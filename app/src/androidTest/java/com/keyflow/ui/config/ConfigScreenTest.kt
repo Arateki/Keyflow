@@ -77,6 +77,7 @@ class ConfigScreenTest {
                     onRequestOverlayPermission = {},
                     onRequestKeyboardPermission = {},
                     onSettingsChange = { settings = it },
+                    onUnlockSkins = {},
                     modifier = Modifier.fillMaxSize(),
                 )
                 }

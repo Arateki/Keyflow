@@ -100,6 +100,9 @@
 - Próximo passo: executar `tasks.md` (T1 fundação). 27 tasks; device serializa instrumented/screenshot.
 
 ### Execução Fase 2 — Redesign Ateliê (2026-06-27)
+- **T13 concluída** (gate `full`: 33 instrumentados, 30→33, 0 falhas; unit verde). Aba Teclado em `ui/config/TecladoPanel.kt`: "Colar automaticamente" (toggle → novo campo `keyboardAutoPaste: Boolean=true` em Settings/repo), "Idioma do teclado" (inerte → toast, consistente com i18n=futuro), segmented **Alternar/Push-to-talk** (persiste `keyboardRecordingMode`) + `pauseHintFor`, e `SkinsSection` bloqueada (chip BLOQUEADO + 4 swatches esmaecidos + "Desbloquear skins" — callback `onUnlockSkins`; a sheet real chega na T16, hoje mostra toast).
+  - **Dedup**: `PillToggle`, `StrokeIcon`/`FillIcon` e o novo `SkinsSection`/`recordingModeLabel` foram centralizados em `ui/config/ConfigFields.kt` (internal); `ModoPanel`/`ConfigScreen` deixaram de ter cópias privadas.
+  - `ConfigScreen` ganhou `onUnlockSkins` + branch `TECLADO`. Rota `config-teclado` (helper `ConfigTabRoute`, teclado habilitado) no `RouteCatalog`. Screenshot claro/escuro fiel ao `04-v2` (com o segmented de modo extra que a task pede além do HTML mock).
 - **T12 concluída** (gate `full`: 30 instrumentados, 27→30, 0 falhas; unit verde). Aba Voz em `ui/config/VozPanel.kt` + componentes reutilizáveis em `ui/config/ConfigFields.kt`:
   - `Segmented<T>` genérico (trilho `panel`, célula ativa `fg`/`onFill`) — servirá tb p/ modo de gravação (T13/T14) e posição/tamanho do overlay (T14).
   - `AutoSaveField` (BasicTextField mono + underline) com **auto-save no desfoque-se-mudou e no ImeAction Done** (CFG-05). `remember(value)` reseta o texto após o round-trip de persistência.

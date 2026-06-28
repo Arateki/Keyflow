@@ -39,6 +39,7 @@ object RouteCatalog {
         Route("config-voz-creditos") { ConfigVozRoute(TranscriptionSource.CREDITS) },
         Route("config-voz-openai") { ConfigVozRoute(TranscriptionSource.OPENAI) },
         Route("config-voz-custom") { ConfigVozRoute(TranscriptionSource.CUSTOM) },
+        Route("config-teclado") { ConfigTabRoute(ConfigTab.TECLADO, keyboardEnabled = true) },
     )
 
     private val byKey: Map<String, Route> = routes.associateBy { it.key }
@@ -66,6 +67,7 @@ object RouteCatalog {
             onRequestOverlayPermission = {},
             onRequestKeyboardPermission = {},
             onSettingsChange = {},
+            onUnlockSkins = {},
         )
     }
 
@@ -88,7 +90,35 @@ object RouteCatalog {
             onRequestOverlayPermission = {},
             onRequestKeyboardPermission = {},
             onSettingsChange = {},
+            onUnlockSkins = {},
             initialTab = ConfigTab.VOZ,
+        )
+    }
+
+    /** Abre uma aba arbitrária do config (modos ligados conforme necessário) p/ os mocks 04/05-v2. */
+    @Composable
+    private fun ConfigTabRoute(tab: ConfigTab, overlayEnabled: Boolean = false, keyboardEnabled: Boolean = false) {
+        ConfigScreen(
+            settings = FakeSettings.settings.copy(
+                overlayModeEnabled = overlayEnabled,
+                keyboardModeEnabled = keyboardEnabled,
+            ),
+            permissions = PermissionStatus(
+                microphoneGranted = true,
+                overlayGranted = true,
+                keyboardEnabled = keyboardEnabled,
+                notificationsGranted = true,
+            ),
+            saveController = SaveController(),
+            onOverlayModeChange = {},
+            onKeyboardModeChange = {},
+            onThemeChange = {},
+            onLanguageClick = {},
+            onRequestOverlayPermission = {},
+            onRequestKeyboardPermission = {},
+            onSettingsChange = {},
+            onUnlockSkins = {},
+            initialTab = tab,
         )
     }
 

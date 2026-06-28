@@ -1,7 +1,5 @@
 package com.keyflow.ui.config
 
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -10,7 +8,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -19,17 +16,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathFillType
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.scale
-import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -211,55 +200,6 @@ private fun PermissionChip(text: String, granted: Boolean) {
             .background(accent.copy(alpha = 0.16f))
             .padding(horizontal = 8.dp, vertical = 4.dp),
     )
-}
-
-/** Pílula de toggle no estilo Ateliê (track preenchido quando ligado; knob `onFill`). */
-@Composable
-private fun PillToggle(checked: Boolean, onCheckedChange: (Boolean) -> Unit, tag: String) {
-    val palette = LocalKeyFlowPalette.current
-    val knobX by animateDpAsState(if (checked) 22.dp else 3.dp, label = "knobX")
-    Box(
-        Modifier
-            .size(width = 44.dp, height = 25.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(if (checked) palette.teal else palette.line)
-            .clickable { onCheckedChange(!checked) }
-            .testTag(tag),
-    ) {
-        Box(
-            Modifier
-                .offset(x = knobX, y = 3.dp)
-                .size(19.dp)
-                .clip(CircleShape)
-                .background(palette.onFill),
-        )
-    }
-}
-
-@Composable
-private fun StrokeIcon(paths: List<String>, tint: Color, modifier: Modifier) {
-    Canvas(modifier) {
-        val s = size.minDimension / 24f
-        translate((size.width - 24f * s) / 2f, (size.height - 24f * s) / 2f) {
-            scale(s, s, pivot = Offset.Zero) {
-                paths.forEach { d ->
-                    drawPath(PathParser().parsePathString(d).toPath(), tint, style = Stroke(width = 1.6f))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun FillIcon(path: String, tint: Color, modifier: Modifier) {
-    Canvas(modifier) {
-        val s = size.minDimension / 24f
-        translate((size.width - 24f * s) / 2f, (size.height - 24f * s) / 2f) {
-            scale(s, s, pivot = Offset.Zero) {
-                drawPath(PathParser().parsePathString(path).toPath().apply { fillType = PathFillType.NonZero }, tint)
-            }
-        }
-    }
 }
 
 private val MIC_PATHS = listOf(

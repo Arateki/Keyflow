@@ -37,6 +37,8 @@ data class Settings(
     // Modos de gravação por gatilho (C16; default TOGGLE)
     val overlayRecordingMode: RecordingMode = RecordingMode.TOGGLE,
     val keyboardRecordingMode: RecordingMode = RecordingMode.TOGGLE,
+    // Teclado: colar automaticamente o texto transcrito (KBD config; default ligado)
+    val keyboardAutoPaste: Boolean = true,
     // Overlay
     val overlaySide: OverlaySide = OverlaySide.RIGHT,
     val orbSize: OrbSize = OrbSize.MEDIUM,

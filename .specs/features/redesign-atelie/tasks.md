@@ -193,10 +193,10 @@ gatilho, `overlaySide`, `orbSize`, `onboardingDone` e `effectiveConfigFor(source
 **Where**: `ui/config/TecladoPanel.kt`
 **Depends on**: T10 · **Reuses**: skins stub · **Requirement**: KBD (config), REC (modo), SKIN-01
 **Done when**:
-- [ ] Toggle colar-auto, idioma, segmented modo (toggle/PTT) com hint de pausa; Skins esmaecidas + "Desbloquear".
-- [ ] instrumented + screenshot (`config-teclado` claro/escuro).
-- [ ] Gate: `full`. Test count: ≥2.
-**Tests**: instrumented · **Gate**: full · **Commit**: `feat(config): aba Teclado`
+- [x] Toggle colar-auto (novo `keyboardAutoPaste`), idioma (inerte→toast nesta fase), segmented modo (Alternar/PTT) com hint de pausa; Skins esmaecidas + "Desbloquear" (callback; sheet real na T16).
+- [x] instrumented (`TecladoPanelTest`, 3) + screenshot (`config-teclado` claro/escuro vs 04-v2).
+- [x] Gate: `full` → 33 instrumentados (30→33), 0 falhas; unit verde.
+**Tests**: instrumented · **Gate**: full · **Commit**: `feat(config): aba Teclado`  ✅
 
 ### T14: OverlayPanel
 **What**: Aba Overlay: posição inicial (Esq/Dir), tamanho (P/M/G), modo de gravação do overlay, Skins (bloqueada).

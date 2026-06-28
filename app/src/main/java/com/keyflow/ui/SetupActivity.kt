@@ -71,6 +71,9 @@ class SetupActivity : ComponentActivity() {
                     onRequestOverlayPermission = ::openOverlaySettings,
                     onRequestKeyboardPermission = ::openKeyboardSettings,
                     onSettingsChange = { updated -> persist { updated } },
+                    onUnlockSkins = {
+                        Toast.makeText(this, "Desbloqueio de skins em breve", Toast.LENGTH_SHORT).show()
+                    },
                 )
             }
         }

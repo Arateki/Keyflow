@@ -70,6 +70,7 @@ class SettingsRepository(
             keyboardModeEnabled = prefs[KEYBOARD_MODE_ENABLED] ?: false,
             overlayRecordingMode = prefs[OVERLAY_RECORDING_MODE].toRecordingMode(),
             keyboardRecordingMode = prefs[KEYBOARD_RECORDING_MODE].toRecordingMode(),
+            keyboardAutoPaste = prefs[KEYBOARD_AUTO_PASTE] ?: true,
             overlaySide = prefs[OVERLAY_SIDE].toOverlaySide(),
             orbSize = prefs[ORB_SIZE].toOrbSize(),
             themeDark = prefs[THEME_DARK] ?: false,
@@ -103,6 +104,7 @@ class SettingsRepository(
             prefs[KEYBOARD_MODE_ENABLED] = settings.keyboardModeEnabled
             prefs[OVERLAY_RECORDING_MODE] = settings.overlayRecordingMode.name
             prefs[KEYBOARD_RECORDING_MODE] = settings.keyboardRecordingMode.name
+            prefs[KEYBOARD_AUTO_PASTE] = settings.keyboardAutoPaste
             prefs[OVERLAY_SIDE] = settings.overlaySide.name
             prefs[ORB_SIZE] = settings.orbSize.name
             prefs[THEME_DARK] = settings.themeDark
@@ -187,6 +189,7 @@ class SettingsRepository(
         val KEYBOARD_MODE_ENABLED = booleanPreferencesKey("keyboard_mode_enabled")
         val OVERLAY_RECORDING_MODE = stringPreferencesKey("overlay_recording_mode")
         val KEYBOARD_RECORDING_MODE = stringPreferencesKey("keyboard_recording_mode")
+        val KEYBOARD_AUTO_PASTE = booleanPreferencesKey("keyboard_auto_paste")
         val OVERLAY_SIDE = stringPreferencesKey("overlay_side")
         val ORB_SIZE = stringPreferencesKey("orb_size")
         val THEME_DARK = booleanPreferencesKey("theme_dark")
