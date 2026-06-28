@@ -125,6 +125,11 @@ fun ConfigScreen(
                         onLanguageClick = onLanguageClick,
                         onUnlockSkins = onUnlockSkins,
                     )
+                    ConfigTab.OVERLAY -> OverlayPanel(
+                        settings = settings,
+                        onSettingsChange = onSettingsChange,
+                        onUnlockSkins = onUnlockSkins,
+                    )
                     else -> PanelPlaceholder(activeTab)
                 }
             }

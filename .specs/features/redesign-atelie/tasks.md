@@ -203,10 +203,10 @@ gatilho, `overlaySide`, `orbSize`, `onboardingDone` e `effectiveConfigFor(source
 **Where**: `ui/config/OverlayPanel.kt`
 **Depends on**: T10 · **Reuses**: `SettingsRepository` · **Requirement**: OVL-05, REC (modo), SKIN-01
 **Done when**:
-- [ ] Segmentos posição/tamanho persistem; segmented modo com hint; Skins esmaecidas + "Desbloquear".
-- [ ] instrumented + screenshot (`config-overlay`).
-- [ ] Gate: `full`. Test count: ≥2.
-**Tests**: instrumented · **Gate**: full · **Commit**: `feat(config): aba Overlay`
+- [x] Segmentos posição (Esq/Dir)/tamanho (P/M/G) persistem; segmented modo (Alternar/PTT) com hint; Skins esmaecidas + "Desbloquear".
+- [x] instrumented (`OverlayPanelTest`, 3) + screenshot (`config-overlay` claro/escuro).
+- [x] Gate: `full` → 36 instrumentados (33→36), 0 falhas; unit verde.
+**Tests**: instrumented · **Gate**: full · **Commit**: `feat(config): aba Overlay`  ✅
 
 ### T15: DocsPanel
 **What**: Aba Docs: Como funciona (01/02/03), Modos, Privacidade, Créditos e explicação de pausa por modo.

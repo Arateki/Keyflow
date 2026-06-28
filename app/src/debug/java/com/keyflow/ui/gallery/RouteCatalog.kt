@@ -40,6 +40,7 @@ object RouteCatalog {
         Route("config-voz-openai") { ConfigVozRoute(TranscriptionSource.OPENAI) },
         Route("config-voz-custom") { ConfigVozRoute(TranscriptionSource.CUSTOM) },
         Route("config-teclado") { ConfigTabRoute(ConfigTab.TECLADO, keyboardEnabled = true) },
+        Route("config-overlay") { ConfigTabRoute(ConfigTab.OVERLAY, overlayEnabled = true) },
     )
 
     private val byKey: Map<String, Route> = routes.associateBy { it.key }
