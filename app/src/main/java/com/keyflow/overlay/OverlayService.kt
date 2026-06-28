@@ -1,6 +1,5 @@
 package com.keyflow.overlay
 
-import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
@@ -16,6 +15,7 @@ import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import com.keyflow.audio.AudioRecorder
+import com.keyflow.core.ButtonState
 import com.keyflow.core.KeyFlowController
 import com.keyflow.core.OverlaySide
 import com.keyflow.core.RecordingMode
@@ -42,6 +42,7 @@ class OverlayService : Service() {
     private lateinit var windowManager: WindowManager
     private lateinit var coordinator: OverlayCoordinator
     private lateinit var gestureController: RecordingGestureController
+    private lateinit var recordingNotification: RecordingNotification
 
     private var floatingButton: OrbButtonView? = null
     private var floatingButtonParams: WindowManager.LayoutParams? = null
@@ -57,6 +58,7 @@ class OverlayService : Service() {
         super.onCreate()
         settingsRepository = SettingsRepository(this)
         windowManager = getSystemService(WindowManager::class.java)
+        recordingNotification = RecordingNotification(this, NOTIFICATION_CHANNEL_ID)
 
         startForegroundWithMicType()
 
@@ -76,7 +78,35 @@ class OverlayService : Service() {
         isRunningForUi = true
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            RecordingNotification.ACTION_PAUSE_RESUME -> handlePauseResume()
+            RecordingNotification.ACTION_STOP_PASTE -> handleStopPaste()
+        }
+        return START_STICKY
+    }
+
+    private fun handlePauseResume() {
+        if (!::coordinator.isInitialized) return
+        when (coordinator.currentState()) {
+            ButtonState.RECORDING -> coordinator.onIntent(GestureIntent.PAUSE)
+            ButtonState.PAUSED -> coordinator.onIntent(GestureIntent.RESUME)
+            else -> Unit
+        }
+    }
+
+    private fun handleStopPaste() {
+        if (!::coordinator.isInitialized) return
+        val state = coordinator.currentState()
+        if (state == ButtonState.RECORDING || state == ButtonState.PAUSED) {
+            coordinator.onIntent(GestureIntent.STOP)
+        }
+    }
+
+    private fun postNotification(state: ButtonState) {
+        getSystemService(NotificationManager::class.java)
+            .notify(NOTIFICATION_ID, recordingNotification.build(state))
+    }
 
     override fun onDestroy() {
         isRunningForUi = false
@@ -97,6 +127,7 @@ class OverlayService : Service() {
             render = { state ->
                 floatingButton?.render(state)
                 KeyFlowController.updateButtonState(state)
+                postNotification(state)
             },
             onClipboard = { text ->
                 val cm = getSystemService(ClipboardManager::class.java)
@@ -222,28 +253,12 @@ class OverlayService : Service() {
             getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
 
-        val notification = buildNotification()
+        val notification = recordingNotification.build(ButtonState.IDLE_NO_FIELD)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
         } else {
             startForeground(NOTIFICATION_ID, notification)
         }
-    }
-
-    private fun buildNotification(): Notification {
-        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Notification.Builder(this, NOTIFICATION_CHANNEL_ID)
-        } else {
-            @Suppress("DEPRECATION")
-            Notification.Builder(this)
-        }
-
-        return builder
-            .setContentTitle("KeyFlow")
-            .setContentText("Botao flutuante ativo")
-            .setSmallIcon(android.R.drawable.ic_btn_speak_now)
-            .setOngoing(true)
-            .build()
     }
 
     private class AndroidOverlayAudioRecorder(

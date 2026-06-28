@@ -307,10 +307,11 @@ gatilho, `overlaySide`, `orbSize`, `onboardingDone` e `effectiveConfigFor(source
 **Where**: `overlay/RecordingNotification.kt`, `res/layout/notif_recording.xml`, `overlay/OverlayService.kt`
 **Depends on**: T18, T20 · **Reuses**: notificação FGS atual · **Requirement**: NOTIF-01..03
 **Done when**:
-- [ ] Notificação renderiza no estilo do mock; `ACTION_PAUSE_RESUME`/`ACTION_STOP_PASTE` via PendingIntent; rótulo atualiza em pausa.
-- [ ] instrumented + screenshot (`notification-recording/paused`).
-- [ ] Gate: `full`. Test count: ≥2.
-**Tests**: instrumented · **Gate**: full · **Commit**: `feat(notif): notificação Ateliê com pausa`
+- [x] `RecordingNotification` + `res/layout/notif_recording.xml` (RemoteViews escura Ateliê): ícone de mic teal, "● Gravando · m:ss" (Chronometer, exclui pausa via shift do `base`), waveform vetorial estática (`notif_waveform.xml`), chips **Pausar/Retomar** (teal) e **Parar** (terracota). `DecoratedCustomViewStyle`. Título/rótulo alternam por estado; itens ocultos quando idle.
+- [x] `ACTION_PAUSE_RESUME`/`ACTION_STOP_PASTE` via `PendingIntent.getService` → `OverlayService.onStartCommand` → `coordinator.onIntent(PAUSE/RESUME/STOP)` conforme `currentState()`. `render` re-posta a notificação a cada mudança de estado.
+- [x] instrumented (`RecordingNotificationTest`, 3: ongoing+custom view, inflate da galeria recording/paused, rótulos/título) + screenshot (`notification-recording/paused` claro/escuro via `AndroidView` inflando a RemoteViews).
+- [x] Gate: `full` → `BUILD SUCCESSFUL`, 51 instrumentados (48→51), 0 falhas; unit verde.
+**Tests**: instrumented · **Gate**: full · **Commit**: `feat(notif): notificação Ateliê com pausa`  ✅
 
 ### T25: Captura de superfícies de sistema (UiAutomator)
 **What**: Teste UiAutomator que monta IME-sobre-campo, overlay-sobre-app e notificação reais e captura prints.

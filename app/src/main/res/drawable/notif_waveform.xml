@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Waveform estática (barras Ateliê teal) para a notificação de gravação (NOTIF-02). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="24dp"
+    android:viewportWidth="96"
+    android:viewportHeight="24">
+    <path android:fillColor="#4E9683" android:pathData="M0,9h3v6h-3z" />
+    <path android:fillColor="#4E9683" android:pathData="M7,5h3v14h-3z" />
+    <path android:fillColor="#4E9683" android:pathData="M14,1h3v22h-3z" />
+    <path android:fillColor="#8FC3B3" android:pathData="M21,7h3v10h-3z" />
+    <path android:fillColor="#4E9683" android:pathData="M28,3h3v18h-3z" />
+    <path android:fillColor="#4E9683" android:pathData="M35,10h3v4h-3z" />
+    <path android:fillColor="#8FC3B3" android:pathData="M42,6h3v12h-3z" />
+    <path android:fillColor="#4E9683" android:pathData="M49,2h3v20h-3z" />
+    <path android:fillColor="#4E9683" android:pathData="M56,8h3v8h-3z" />
+    <path android:fillColor="#8FC3B3" android:pathData="M63,4h3v16h-3z" />
+    <path android:fillColor="#4E9683" android:pathData="M70,9h3v6h-3z" />
+    <path android:fillColor="#4E9683" android:pathData="M77,5h3v14h-3z" />
+    <path android:fillColor="#8FC3B3" android:pathData="M84,7h3v10h-3z" />
+    <path android:fillColor="#4E9683" android:pathData="M91,10h3v4h-3z" />
+</vector>

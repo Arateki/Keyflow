@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.ui.viewinterop.AndroidView
 import com.keyflow.core.ButtonState
 import com.keyflow.core.TranscriptionSource
+import android.widget.FrameLayout
 import com.keyflow.ime.KeyFlowKeyboardView
+import com.keyflow.overlay.RecordingNotification
 import com.keyflow.ui.PermissionStatus
 import com.keyflow.ui.common.SaveController
 import com.keyflow.ui.config.ConfigScreen
@@ -48,6 +50,9 @@ object RouteCatalog {
         keyboardRoute("keyboard-expanded", expanded = true, recording = false),
         keyboardRoute("keyboard-collapsed", expanded = false, recording = false),
         keyboardRoute("keyboard-recording", expanded = true, recording = true),
+        // Notificação Ateliê (T24): RemoteViews inflada via AndroidView.
+        notificationRoute("notification-recording", ButtonState.RECORDING),
+        notificationRoute("notification-paused", ButtonState.PAUSED),
         Route("config-modo") { ConfigModoRoute() },
         Route("config-voz-creditos") { ConfigVozRoute(TranscriptionSource.CREDITS) },
         Route("config-voz-openai") { ConfigVozRoute(TranscriptionSource.OPENAI) },
@@ -176,6 +181,25 @@ object RouteCatalog {
                         setExpanded(expanded)
                         if (recording) updateMicState(ButtonState.RECORDING)
                     }
+                },
+            )
+        }
+    }
+
+    /** Notificação de gravação (RemoteViews inflada) sobre uma "persiana" simulada (KBD screenshots). */
+    private fun notificationRoute(key: String, state: ButtonState): Route = Route(key) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(LocalKeyFlowPalette.current.bg),
+            contentAlignment = Alignment.TopCenter,
+        ) {
+            AndroidView(
+                modifier = Modifier.fillMaxSize().wrapContentHeight(Alignment.Top),
+                factory = { ctx ->
+                    RecordingNotification(ctx, "gallery")
+                        .galleryRemoteViews(state, frozenSeconds = 12)
+                        .apply(ctx, FrameLayout(ctx))
                 },
             )
         }

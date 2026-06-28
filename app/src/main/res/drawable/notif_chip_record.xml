@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Chip de ação "Parar e copiar" (NOTIF-03). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#D9694B" />
+    <corners android:radius="8dp" />
+</shape>
