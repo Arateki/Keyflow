@@ -264,11 +264,11 @@ gatilho, `overlaySide`, `orbSize`, `onboardingDone` e `effectiveConfigFor(source
 **Where**: `overlay/RecordingGestureController.kt`
 **Depends on**: T19 · **Reuses**: `GestureInterpreter`, `ButtonStateMachine` · **Requirement**: REC-03, REC-04, OVL-03, OVL-04
 **Done when**:
-- [ ] TOGGLE: tap start/stop, hold breve pausa/retoma; PTT: hold start, release stop salvo tap-rápido→pausa.
-- [ ] Anti-movimento: DRAG→RepositionOnly (nunca Start); PTT gravando+DRAG segue gravando.
-- [ ] unit com clock fake cobrindo gestos por modo + janelas.
-- [ ] Gate: `quick`. Test count: ≥8.
-**Tests**: unit · **Gate**: quick · **Commit**: `feat(overlay): gestos de gravação/pausa por modo`
+- [x] TOGGLE: TAP start/stop (e stop a partir de PAUSED), HOLD pausa/retoma; PTT: DOWN start, UP abre a janela `Wptt` (Stop só no `onReleaseTimeout`), DOWN dentro da janela→Pause, DOWN em PAUSED→Resume (segurar de novo, decisão Yan).
+- [x] Anti-movimento: DRAG_START→`REPOSITION_ONLY` (nunca Start); TAP no mesmo ciclo suprimido (TOGGLE); PTT gravando+DRAG segue RECORDING.
+- [x] unit com clock fake cobrindo gestos por modo + a janela `Wptt` (`RecordingGestureControllerTest`, 10 testes). Reusa `ButtonStateMachine` (transições T19); adicionado `onStart()` (IDLE→RECORDING) à máquina. Novo `GestureIntent` + `TouchSignal`. Fiação de produção (qual sinal por modo) fica na T22.
+- [x] Gate: `quick` → `BUILD SUCCESSFUL`. Test count: 10, 0 falhas.
+**Tests**: unit · **Gate**: quick · **Commit**: `feat(overlay): gestos de gravação/pausa por modo`  ✅
 
 ### T21: ComposeWindowHost
 **What**: Host reutilizável (Lifecycle/SavedStateRegistry/ViewModelStore owners) para ComposeView em janelas não-Activity.

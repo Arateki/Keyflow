@@ -50,6 +50,14 @@ class ButtonStateMachine(
         return state
     }
 
+    /** Inicia a gravação a partir de IDLE (independente do modo). No-op fora de IDLE. */
+    fun onStart(): ButtonState {
+        if (state == ButtonState.IDLE_READY || state == ButtonState.IDLE_NO_FIELD) {
+            state = ButtonState.RECORDING
+        }
+        return state
+    }
+
     /** Pausa a gravação (RECORDING → PAUSED). No-op em qualquer outro estado (REC-01). */
     fun onPause(): ButtonState {
         if (state == ButtonState.RECORDING) state = ButtonState.PAUSED
