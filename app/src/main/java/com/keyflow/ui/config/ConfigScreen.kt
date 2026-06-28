@@ -70,10 +70,12 @@ fun ConfigScreen(
     onLanguageClick: () -> Unit,
     onRequestOverlayPermission: () -> Unit,
     onRequestKeyboardPermission: () -> Unit,
+    onSettingsChange: (Settings) -> Unit,
     modifier: Modifier = Modifier,
+    initialTab: ConfigTab = ConfigTab.MODO,
 ) {
     val palette = LocalKeyFlowPalette.current
-    var activeTab by rememberSaveable { mutableStateOf(ConfigTab.MODO) }
+    var activeTab by rememberSaveable { mutableStateOf(initialTab) }
 
     val enabled: (ConfigTab) -> Boolean = { tab ->
         when (tab) {
@@ -117,6 +119,10 @@ fun ConfigScreen(
                         onKeyboardModeChange = onKeyboardModeChange,
                         onRequestOverlayPermission = onRequestOverlayPermission,
                         onRequestKeyboardPermission = onRequestKeyboardPermission,
+                    )
+                    ConfigTab.VOZ -> VozPanel(
+                        settings = settings,
+                        onSettingsChange = onSettingsChange,
                     )
                     else -> PanelPlaceholder(activeTab)
                 }

@@ -8,9 +8,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.keyflow.core.TranscriptionSource
 import com.keyflow.ui.PermissionStatus
 import com.keyflow.ui.common.SaveController
 import com.keyflow.ui.config.ConfigScreen
+import com.keyflow.ui.config.ConfigTab
 import com.keyflow.ui.orb.OrbCenter
 import com.keyflow.ui.orb.OrbState
 import com.keyflow.ui.orb.VoiceOrb
@@ -34,6 +36,9 @@ object RouteCatalog {
         orbRoute("orb-paused", OrbState.Paused, OrbCenter.PauseGlyph),
         orbRoute("orb-transcribing", OrbState.Transcribing, OrbCenter.None),
         Route("config-modo") { ConfigModoRoute() },
+        Route("config-voz-creditos") { ConfigVozRoute(TranscriptionSource.CREDITS) },
+        Route("config-voz-openai") { ConfigVozRoute(TranscriptionSource.OPENAI) },
+        Route("config-voz-custom") { ConfigVozRoute(TranscriptionSource.CUSTOM) },
     )
 
     private val byKey: Map<String, Route> = routes.associateBy { it.key }
@@ -60,6 +65,30 @@ object RouteCatalog {
             onLanguageClick = {},
             onRequestOverlayPermission = {},
             onRequestKeyboardPermission = {},
+            onSettingsChange = {},
+        )
+    }
+
+    /** Aba Voz por origem (Créditos/OpenAI/Custom) — espelha os mocks 02-v2/03-v2. */
+    @Composable
+    private fun ConfigVozRoute(source: TranscriptionSource) {
+        ConfigScreen(
+            settings = FakeSettings.settings.copy(source = source),
+            permissions = PermissionStatus(
+                microphoneGranted = true,
+                overlayGranted = true,
+                keyboardEnabled = true,
+                notificationsGranted = true,
+            ),
+            saveController = SaveController(),
+            onOverlayModeChange = {},
+            onKeyboardModeChange = {},
+            onThemeChange = {},
+            onLanguageClick = {},
+            onRequestOverlayPermission = {},
+            onRequestKeyboardPermission = {},
+            onSettingsChange = {},
+            initialTab = ConfigTab.VOZ,
         )
     }
 

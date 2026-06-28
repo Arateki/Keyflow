@@ -70,6 +70,7 @@ class SetupActivity : ComponentActivity() {
                     },
                     onRequestOverlayPermission = ::openOverlaySettings,
                     onRequestKeyboardPermission = ::openKeyboardSettings,
+                    onSettingsChange = { updated -> persist { updated } },
                 )
             }
         }

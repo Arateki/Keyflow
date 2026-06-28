@@ -76,6 +76,7 @@ class ConfigScreenTest {
                     onLanguageClick = { languageClicks++ },
                     onRequestOverlayPermission = {},
                     onRequestKeyboardPermission = {},
+                    onSettingsChange = { settings = it },
                     modifier = Modifier.fillMaxSize(),
                 )
                 }

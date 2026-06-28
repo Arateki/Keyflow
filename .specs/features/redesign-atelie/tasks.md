@@ -182,11 +182,11 @@ gatilho, `overlaySide`, `orbSize`, `onboardingDone` e `effectiveConfigFor(source
 **Where**: `ui/config/VozPanel.kt`
 **Depends on**: T10, T5 · **Reuses**: `SettingsRepository` · **Requirement**: VOZ-01..06, MON-02
 **Done when**:
-- [ ] OpenAI/Groq pré-preenchem endpoint/modelo e pedem token; Custom manual; Créditos = saldo mock + CTA inerte.
-- [ ] Selecionar fonte persiste; CREDITS marcado p/ bloquear gravação (consumido por overlay/teclado).
-- [ ] instrumented + screenshot (`config-voz-creditos/openai/custom`).
-- [ ] Gate: `full`. Test count: ≥3.
-**Tests**: instrumented · **Gate**: full · **Commit**: `feat(config): aba Voz com presets e Créditos stub`
+- [x] OpenAI/Groq pré-preenchem modelo e pedem token; Custom manual; Créditos = saldo mock + CTA inerte.
+- [x] Selecionar fonte persiste; CREDITS já resolvido como `EffectiveConfig.Unavailable` (T5) p/ bloquear gravação no consumidor (overlay/teclado, T22/T23).
+- [x] instrumented (`VozPanelTest`, 3) + screenshot (`config-voz-creditos/openai/custom` claro/escuro vs mock 02/03-v2).
+- [x] Gate: `full` → 30 instrumentados (27→30), 0 falhas; unit verde.
+**Tests**: instrumented · **Gate**: full · **Commit**: `feat(config): aba Voz com presets e Créditos stub`  ✅
 
 ### T13: TecladoPanel
 **What**: Aba Teclado: "Colar automaticamente", idioma do teclado, modo de gravação do teclado, seção Skins (bloqueada).
