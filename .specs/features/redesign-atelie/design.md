@@ -91,7 +91,7 @@ campos de texto persistem no `onFocusChanged`(perdeu foco)+mudou; toggles/segmen
 **Gestos por modo** — novo `RecordingGestureController` (lógica pura, testável) que recebe eventos crus do
 `GestureInterpreter` e o modo, e emite intents `{Start, Stop, Pause, Resume, RepositionOnly, KeyboardPicker}`:
 - **TOGGLE** (default): TAP em IDLE→Start; TAP em RECORDING/PAUSED→Stop; **HOLD breve** em RECORDING→Pause, em PAUSED→Resume (REC-03). TRIPLE_TAP→KeyboardPicker (cancela Start do 1º tap).
-- **PTT**: HOLD(down)→Start; release→Stop **a menos que** um TAP rápido siga dentro de `Wptt`→Pause (REC-04). Em PAUSED, próximo HOLD→Resume (proposta; fechar no design/UAT). 
+- **PTT**: HOLD(down)→Start; release→Stop **a menos que** um TAP rápido siga dentro de `Wptt`→Pause (REC-04). Em PAUSED, próximo **HOLD(down)→Resume** (DECIDIDO Yan 2026-06-27: retomar = segurar novamente; o release seguinte mantém PAUSED até um Stop explícito). 
 - **Anti-movimento** (OVL-03/04): se `GestureInterpreter` emitir DRAG_START antes de classificar tap, o controller emite `RepositionOnly` (nunca Start). Em PTT já gravando, DRAG não interrompe (segue RECORDING) — apenas reposiciona.
 - Limiares: `holdThresholdMs`, `Wptt` (janela do tap pós-release) parametrizáveis (testes com clock fake).
 
