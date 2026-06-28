@@ -213,10 +213,10 @@ gatilho, `overlaySide`, `orbSize`, `onboardingDone` e `effectiveConfigFor(source
 **Where**: `ui/config/DocsPanel.kt`
 **Depends on**: T10 · **Reuses**: hint de pausa · **Requirement**: MON-01, REC-07
 **Done when**:
-- [ ] Seções renderizadas incl. pausa (toggle e PTT).
-- [ ] screenshot (`config-docs`).
-- [ ] Gate: `full`.
-**Tests**: screenshot · **Gate**: full · **Commit**: `feat(config): aba Docs`
+- [x] Seções renderizadas (Como funciona 01/02/03, Modos, Privacidade, Créditos) incl. pausa (Alternar e PTT).
+- [x] screenshot (`config-docs` claro/escuro) + `DocsPanelTest` (render + seção pausa).
+- [x] Gate: `full` → 37 instrumentados (36→37), 0 falhas; unit verde.
+**Tests**: screenshot · **Gate**: full · **Commit**: `feat(config): aba Docs`  ✅
 
 ### T16: UnlockSheet (skins, inerte)
 **What**: Bottom-sheet "Desbloquear skins" (R$20 MELHOR / R$15 uma vez / Pagamento via Google Play), inerte.

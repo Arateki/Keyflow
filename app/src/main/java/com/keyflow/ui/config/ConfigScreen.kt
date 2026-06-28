@@ -7,10 +7,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -130,7 +128,7 @@ fun ConfigScreen(
                         onSettingsChange = onSettingsChange,
                         onUnlockSkins = onUnlockSkins,
                     )
-                    else -> PanelPlaceholder(activeTab)
+                    ConfigTab.DOCS -> DocsPanel()
                 }
             }
         }
@@ -215,27 +213,6 @@ private fun Header(
         ) {
             StrokeIcon(if (dark) SUN_PATHS else MOON_PATHS, palette.fg2, Modifier.size(14.dp))
         }
-    }
-}
-
-@Composable
-private fun PanelPlaceholder(tab: ConfigTab) {
-    val palette = LocalKeyFlowPalette.current
-    Column(Modifier.fillMaxSize().padding(top = 18.dp)) {
-        Text(
-            text = tab.label,
-            color = palette.fg,
-            fontFamily = SpaceGrotesk,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 16.sp,
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = "Em construção.",
-            color = palette.muted,
-            fontFamily = SpaceGrotesk,
-            fontSize = 12.sp,
-        )
     }
 }
 
