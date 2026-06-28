@@ -7,11 +7,14 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.inputmethodservice.InputMethodService
 import com.keyflow.core.KeyFlowController
+import com.keyflow.data.SettingsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 class KeyFlowKeyboardService : InputMethodService() {
 
@@ -36,6 +39,7 @@ class KeyFlowKeyboardService : InputMethodService() {
     override fun onEvaluateFullscreenMode() = false
 
     override fun onCreateInputView(): View {
+        val dark = runBlocking { SettingsRepository(this@KeyFlowKeyboardService).settingsFlow().first().themeDark }
         val view = KeyFlowKeyboardView(
             context = this,
             onKey = ::handleKey,
@@ -45,6 +49,7 @@ class KeyFlowKeyboardService : InputMethodService() {
                 keyboardView?.setExpanded(false)
             },
             onExpand = { preferExpanded = true },
+            dark = dark,
         )
         keyboardView = view
         return view

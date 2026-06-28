@@ -296,10 +296,11 @@ gatilho, `overlaySide`, `orbSize`, `onboardingDone` e `effectiveConfigFor(source
 **Where**: `ime/KeyFlowKeyboardView.kt` (modify), `ime/KeyFlowKeyboardService.kt`
 **Depends on**: T19, T5 · **Reuses**: KeyFlowKeyboardView atual · **Requirement**: KBD-01..04, REC-05
 **Done when**:
-- [ ] Teclas/ação na paleta Ateliê; encolher/expandir preservado; mic mostra `m:ss` ao gravar e estados na paleta.
-- [ ] instrumented + screenshot (`keyboard-expanded/collapsed/recording`).
-- [ ] Gate: `full`. Test count: ≥2.
-**Tests**: instrumented · **Gate**: full · **Commit**: `feat(ime): reskin Ateliê + timer no mic`
+- [x] Reskin do `KeyFlowKeyboardView` (View atual, opção (a)): paleta Ateliê "papel" (claro) / escura via param `dark` (resolvido de `settings.themeDark` no service); teclas creme + tinta escura, modificadores mais escuros, mic/acentos coloridos, borda sutil, shift destacado em teal. Encolher/expandir/shift/dígitos/símbolos preservados.
+- [x] Mic mostra `m:ss` ao gravar (KBD-02): ticker próprio acumula só em RECORDING ("● m:ss", âmbar), congela em PAUSED ("⏸ m:ss"); volta ao 🎙 ao idle. `frozenSeconds` p/ screenshot determinístico.
+- [x] instrumented (`KeyFlowKeyboardViewTest`, 3: encolher/expandir, timer grava+congela-na-pausa, volta ao glifo) + screenshot (`keyboard-expanded/collapsed/recording` claro/escuro via `AndroidView` na galeria).
+- [x] Gate: `full` → `BUILD SUCCESSFUL`, 48 instrumentados (45→48), 0 falhas; unit verde.
+**Tests**: instrumented · **Gate**: full · **Commit**: `feat(ime): reskin Ateliê + timer no mic`  ✅
 
 ### T24: Notificação reskin + ações
 **What**: Notificação Ateliê (RemoteViews escura: orbe/ícone, "● Gravando · m:ss", waveform, ações) com Pausar/Retomar e Parar e copiar.

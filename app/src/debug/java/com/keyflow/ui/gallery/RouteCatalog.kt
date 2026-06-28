@@ -8,7 +8,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.ui.viewinterop.AndroidView
+import com.keyflow.core.ButtonState
 import com.keyflow.core.TranscriptionSource
+import com.keyflow.ime.KeyFlowKeyboardView
 import com.keyflow.ui.PermissionStatus
 import com.keyflow.ui.common.SaveController
 import com.keyflow.ui.config.ConfigScreen
@@ -40,6 +44,10 @@ object RouteCatalog {
         orbRoute("overlay-idle", OrbState.Idle, OrbCenter.None),
         orbRoute("overlay-recording", OrbState.Listening, OrbCenter.Time(12)),
         orbRoute("overlay-paused", OrbState.Paused, OrbCenter.PauseGlyph),
+        // Teclado reskinado (T23): View hospedado via AndroidView, ancorado ao rodapé.
+        keyboardRoute("keyboard-expanded", expanded = true, recording = false),
+        keyboardRoute("keyboard-collapsed", expanded = false, recording = false),
+        keyboardRoute("keyboard-recording", expanded = true, recording = true),
         Route("config-modo") { ConfigModoRoute() },
         Route("config-voz-creditos") { ConfigVozRoute(TranscriptionSource.CREDITS) },
         Route("config-voz-openai") { ConfigVozRoute(TranscriptionSource.OPENAI) },
@@ -143,6 +151,34 @@ object RouteCatalog {
             initialTab = tab,
             initialUnlockOpen = unlockOpen,
         )
+    }
+
+    /** Hospeda o [KeyFlowKeyboardView] (View) numa rota Compose, ancorado ao rodapé (KBD screenshots). */
+    private fun keyboardRoute(key: String, expanded: Boolean, recording: Boolean): Route = Route(key) {
+        val dark = LocalKeyFlowPalette.current.isDark
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(LocalKeyFlowPalette.current.bg),
+            contentAlignment = Alignment.BottomCenter,
+        ) {
+            AndroidView(
+                modifier = Modifier.fillMaxSize().wrapContentHeight(Alignment.Bottom),
+                factory = { ctx ->
+                    KeyFlowKeyboardView(
+                        context = ctx,
+                        onKey = {},
+                        onMic = {},
+                        onHide = {},
+                        dark = dark,
+                        frozenSeconds = 12,
+                    ).apply {
+                        setExpanded(expanded)
+                        if (recording) updateMicState(ButtonState.RECORDING)
+                    }
+                },
+            )
+        }
     }
 
     private fun orbRoute(key: String, state: OrbState, center: OrbCenter): Route = Route(key) {
