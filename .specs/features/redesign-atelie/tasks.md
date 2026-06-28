@@ -285,11 +285,11 @@ gatilho, `overlaySide`, `orbSize`, `onboardingDone` e `effectiveConfigFor(source
 **Where**: `overlay/{FloatingButtonView,OverlayService}.kt`
 **Depends on**: T6, T20, T21, T5, T14 · **Reuses**: OverlayService/WindowManager atuais · **Requirement**: OVL-01..06, REC-05
 **Done when**:
-- [ ] Orbe reativo arrastável; tempo/glifo no centro; `overlaySide/orbSize` aplicados; triplo-toque abre seletor.
-- [ ] Arrastar não grava; PTT+mover segue gravando.
-- [ ] instrumented + screenshot (`overlay-*` galeria; `sys-overlay` em T25).
-- [ ] Gate: `full`. Test count: ≥3.
-**Tests**: instrumented · **Gate**: full · **Commit**: `feat(overlay): orbe reativo + gestos + ajustes`
+- [x] `FloatingButtonView`(Canvas) → `OrbButtonView` (FrameLayout + `ComposeView` com `VoiceOrb`), hospedado pelo `ComposeWindowHost` (T21). Centro mostra `m:ss` (ticker próprio, acumula só em RECORDING, congela em PAUSED) ou glifo de pause; `orbSize` define o tamanho (P/M/G); `overlaySide` define a posição inicial; triplo-toque → seletor de teclado.
+- [x] Gestos via `GestureInterpreter` + `RecordingGestureController` (refatorado p/ **stateless**, lê `coordinator.currentState()` — fim do risco de 2 máquinas). `OverlayCoordinator.onIntent` aplica START/STOP/PAUSE/RESUME/KEYBOARD_PICKER; recorder ganhou `pause()/resume()`. Anti-movimento: DRAG→reposição (nunca Start); PTT gravando+DRAG segue gravando; PTT release agenda `onReleaseTimeout` (janela `Wptt`).
+- [x] instrumented (`OrbButtonViewTest`, 4: render/desc, drag+persist sem gravar, triplo-toque→KEYBOARD_PICKER, PTT DOWN→START) + screenshot (`overlay-idle/recording/paused` claro/escuro na galeria; `sys-overlay` fica na T25). `OverlayService` real iniciado/encerrado no device via `SetupActivityTest` (smoke do wiring).
+- [x] Gate: `full` → `BUILD SUCCESSFUL`, 45 instrumentados (44→45; −3 FloatingButtonViewTest, +4 OrbButtonViewTest), 0 falhas; unit verde. **Legado removido** (`FloatingButtonView` + teste, autorizado).
+**Tests**: instrumented · **Gate**: full · **Commit**: `feat(overlay): orbe reativo + gestos + ajustes`  ✅
 
 ### T23: Teclado reskin + timer no mic
 **What**: Reskin Ateliê do `KeyFlowKeyboardView` mantendo estrutura/encolher-expandir; timer no botão de mic ao gravar.

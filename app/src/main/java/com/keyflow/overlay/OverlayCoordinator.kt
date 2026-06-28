@@ -15,6 +15,8 @@ import java.io.File
 interface OverlayAudioRecorder {
     fun start()
     fun stop(): File?
+    fun pause() {}
+    fun resume() {}
 }
 
 interface OverlayTranscriber {
@@ -31,10 +33,14 @@ class OverlayCoordinator(
     targetAvailable: () -> Boolean,
     private val render: (ButtonState) -> Unit,
     private val onClipboard: (String) -> Unit = {},
+    private val onShowKeyboardPicker: () -> Unit = {},
     private val recordingClockMs: () -> Long = { SystemClock.elapsedRealtime() },
 ) {
     private val machine = ButtonStateMachine(targetAvailable = targetAvailable)
     private var recordingStartMs = 0L
+
+    /** Estado atual da única [ButtonStateMachine] — lido pelo [RecordingGestureController]. */
+    fun currentState(): ButtonState = machine.state
 
     companion object {
         private const val TAG = "KeyFlow.Coordinator"
@@ -69,6 +75,24 @@ class OverlayCoordinator(
 
     fun onRelease() {
         handleState(machine.onRelease())
+    }
+
+    /** Aplica uma intenção do [RecordingGestureController] à máquina + efeitos (gravação/pausa). */
+    fun onIntent(intent: GestureIntent) {
+        when (intent) {
+            GestureIntent.START -> handleState(machine.onStart())   // → startRecording
+            GestureIntent.STOP -> handleState(machine.onStop())     // → stopAndTranscribe
+            GestureIntent.PAUSE -> {
+                runCatching { recorder.pause() }
+                render(machine.onPause())
+            }
+            GestureIntent.RESUME -> {
+                runCatching { recorder.resume() }
+                render(machine.onResume())
+            }
+            GestureIntent.KEYBOARD_PICKER -> onShowKeyboardPicker()
+            GestureIntent.REPOSITION_ONLY, GestureIntent.NONE -> Unit
+        }
     }
 
     private fun handleState(state: ButtonState) {

@@ -11,32 +11,30 @@ enum class GestureIntent { START, STOP, PAUSE, RESUME, REPOSITION_ONLY, KEYBOARD
  *
  * - `DOWN`/`UP` (crus) só importam no PUSH_TO_TALK, onde a gravação é gated pela pressão.
  * - `TAP`/`HOLD`/`TRIPLE_TAP`/`DRAG_*` vêm classificados do [GestureInterpreter] (modo TOGGLE).
- *
- * A fiação de produção (qual sinal alimentar por modo) fica na T22; aqui é só a lógica pura.
  */
 enum class TouchSignal { DOWN, UP, TAP, HOLD, TRIPLE_TAP, DRAG_START, DRAG_END }
 
 /**
- * Mapeia eventos de toque + modo de gravação para [GestureIntent], reusando o [ButtonStateMachine]
- * (transições de pausa adicionadas na T19) como fonte de verdade do estado do botão.
+ * Mapeia eventos de toque + modo de gravação para [GestureIntent].
  *
- * Lógica pura e determinística — o `clock` injetável cobre a janela do tap-rápido do PTT (`Wptt`).
+ * **Puramente decisório**: lê o estado atual via [currentState] (o `OverlayCoordinator` é o dono da
+ * única [ButtonStateMachine]) e devolve a intenção; o consumidor aplica a transição. Assim não há
+ * duas máquinas para sincronizar quando a transcrição termina de forma assíncrona.
+ *
+ * O único estado interno é do ciclo de gesto (janela `Wptt` do PTT e a marca de arrasto) — coberto
+ * por unit com `clock` injetável.
  */
 class RecordingGestureController(
     private val mode: () -> RecordingMode,
-    targetAvailable: () -> Boolean = { true },
+    private val currentState: () -> ButtonState,
     private val pttPauseWindowMs: Long = DEFAULT_PTT_PAUSE_WINDOW_MS,
     private val clock: () -> Long = { System.currentTimeMillis() },
 ) {
-    private val machine = ButtonStateMachine(targetAvailable = targetAvailable)
-
     /** Início do release PTT pendente (RECORDING aguardando Stop ou tap-rápido→Pause). */
     private var pendingReleaseAt: Long? = null
 
     /** Marca um ciclo de arrasto em curso p/ suprimir TAP/HOLD acidental (anti-movimento). */
     private var draggingThisCycle = false
-
-    val state: ButtonState get() = machine.state
 
     fun onSignal(signal: TouchSignal): GestureIntent = when (mode()) {
         RecordingMode.TOGGLE -> onToggle(signal)
@@ -45,21 +43,14 @@ class RecordingGestureController(
 
     /**
      * Decorrida a janela `Wptt` após um release PTT sem tap-rápido: encerra de fato (→ STOP).
-     * No-op se a janela já foi consumida (por um Pause) ou não houver release pendente.
+     * No-op se a janela ainda não passou, se já foi consumida (Pause) ou se não há release pendente.
      */
     fun onReleaseTimeout(): GestureIntent {
         val started = pendingReleaseAt ?: return GestureIntent.NONE
         if (clock() - started < pttPauseWindowMs) return GestureIntent.NONE
         pendingReleaseAt = null
-        machine.onStop()
-        return GestureIntent.STOP
+        return if (currentState() == ButtonState.RECORDING) GestureIntent.STOP else GestureIntent.NONE
     }
-
-    // Passagens p/ o consumidor (T22) manter o estado coerente após a transcrição.
-    fun onTargetChanged(available: Boolean) = machine.onTargetChanged(available)
-    fun onTranscriptionSuccess() = machine.onTranscriptionSuccess()
-    fun onTranscriptionError() = machine.onTranscriptionError()
-    fun onErrorDismissed() = machine.onErrorDismissed()
 
     private fun onToggle(signal: TouchSignal): GestureIntent = when (signal) {
         TouchSignal.DRAG_START -> {
@@ -73,14 +64,14 @@ class RecordingGestureController(
         TouchSignal.TRIPLE_TAP -> GestureIntent.KEYBOARD_PICKER
         TouchSignal.TAP -> when {
             draggingThisCycle -> GestureIntent.NONE
-            machine.state.isIdle -> start()
-            machine.state == ButtonState.RECORDING || machine.state == ButtonState.PAUSED -> stop()
+            currentState().isIdle -> GestureIntent.START
+            currentState().isRecordingOrPaused -> GestureIntent.STOP
             else -> GestureIntent.NONE
         }
         TouchSignal.HOLD -> when {
             draggingThisCycle -> GestureIntent.NONE
-            machine.state == ButtonState.RECORDING -> pause()
-            machine.state == ButtonState.PAUSED -> resume()
+            currentState() == ButtonState.RECORDING -> GestureIntent.PAUSE
+            currentState() == ButtonState.PAUSED -> GestureIntent.RESUME
             else -> GestureIntent.NONE
         }
         // DOWN/UP não são usados no TOGGLE (gestos chegam já classificados).
@@ -93,16 +84,14 @@ class RecordingGestureController(
         TouchSignal.TRIPLE_TAP -> GestureIntent.KEYBOARD_PICKER
         TouchSignal.DOWN -> when {
             // Tap-rápido dentro da janela pós-release → pausa em vez de parar (REC-04).
-            isWithinReleaseWindow() -> { pendingReleaseAt = null; pause() }
-            machine.state.isIdle -> start()
-            machine.state == ButtonState.PAUSED -> resume() // segurar de novo retoma (Yan 2026-06-27)
+            isWithinReleaseWindow() -> { pendingReleaseAt = null; GestureIntent.PAUSE }
+            currentState().isIdle -> GestureIntent.START
+            currentState() == ButtonState.PAUSED -> GestureIntent.RESUME // segurar de novo retoma (Yan)
             else -> GestureIntent.NONE
         }
         TouchSignal.UP -> {
-            if (machine.state == ButtonState.RECORDING) {
-                // Não decide já: abre a janela; Stop só no onReleaseTimeout.
-                pendingReleaseAt = clock()
-            }
+            // Não decide já: abre a janela; Stop só no onReleaseTimeout.
+            if (currentState() == ButtonState.RECORDING) pendingReleaseAt = clock()
             GestureIntent.NONE
         }
         // Classificados do GestureInterpreter não são usados no PTT (gating é por DOWN/UP).
@@ -111,27 +100,7 @@ class RecordingGestureController(
 
     private fun isWithinReleaseWindow(): Boolean {
         val started = pendingReleaseAt ?: return false
-        return clock() - started <= pttPauseWindowMs
-    }
-
-    private fun start(): GestureIntent {
-        machine.onStart()
-        return GestureIntent.START
-    }
-
-    private fun stop(): GestureIntent {
-        machine.onStop()
-        return GestureIntent.STOP
-    }
-
-    private fun pause(): GestureIntent {
-        machine.onPause()
-        return GestureIntent.PAUSE
-    }
-
-    private fun resume(): GestureIntent {
-        machine.onResume()
-        return GestureIntent.RESUME
+        return currentState() == ButtonState.RECORDING && clock() - started <= pttPauseWindowMs
     }
 
     private companion object {
@@ -141,3 +110,6 @@ class RecordingGestureController(
 
 private val ButtonState.isIdle: Boolean
     get() = this == ButtonState.IDLE_READY || this == ButtonState.IDLE_NO_FIELD
+
+private val ButtonState.isRecordingOrPaused: Boolean
+    get() = this == ButtonState.RECORDING || this == ButtonState.PAUSED

@@ -17,16 +17,21 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import com.keyflow.audio.AudioRecorder
 import com.keyflow.core.KeyFlowController
+import com.keyflow.core.OverlaySide
+import com.keyflow.core.RecordingMode
 import com.keyflow.data.Config
 import com.keyflow.data.OverlayPosition
+import com.keyflow.data.Settings
 import com.keyflow.data.SettingsRepository
 import com.keyflow.transcription.TranscriptionClient
+import com.keyflow.ui.common.ComposeWindowHost
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -36,9 +41,15 @@ class OverlayService : Service() {
     private lateinit var settingsRepository: SettingsRepository
     private lateinit var windowManager: WindowManager
     private lateinit var coordinator: OverlayCoordinator
+    private lateinit var gestureController: RecordingGestureController
 
-    private var floatingButton: FloatingButtonView? = null
+    private var floatingButton: OrbButtonView? = null
     private var floatingButtonParams: WindowManager.LayoutParams? = null
+    private var composeHost: ComposeWindowHost? = null
+
+    // Settings em cache: o modo de gravação é lido a cada gesto (pode mudar na config).
+    @Volatile
+    private var cachedSettings: Settings = Settings()
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -54,8 +65,12 @@ class OverlayService : Service() {
             return
         }
 
+        cachedSettings = runBlocking { settingsRepository.settingsFlow().first() }
+
         createCoordinator()
+        createGestureController()
         addFloatingButton()
+        observeSettings()
         observeControllerState()
         observeOverlayPosition()
         isRunningForUi = true
@@ -88,16 +103,31 @@ class OverlayService : Service() {
                 cm.setPrimaryClip(ClipData.newPlainText("KeyFlow", text))
                 Toast.makeText(this, "Copiado para a área de transferência", Toast.LENGTH_SHORT).show()
             },
+            onShowKeyboardPicker = { showInputMethodPicker() },
         )
     }
 
+    private fun createGestureController() {
+        gestureController = RecordingGestureController(
+            mode = { cachedSettings.overlayRecordingMode },
+            currentState = { coordinator.currentState() },
+        )
+    }
+
+    private fun observeSettings() {
+        serviceScope.launch {
+            settingsRepository.settingsFlow().collect { cachedSettings = it }
+        }
+    }
+
     private fun addFloatingButton() {
-        val params = createLayoutParams(OverlayPosition())
-        val button = FloatingButtonView(
+        val params = createLayoutParams(initialPosition())
+        val button = OrbButtonView(
             context = this,
-            onTapAction = { coordinator.onTap() },
-            onHoldAction = { coordinator.onHold() },
-            onShowInputMethodPicker = { showInputMethodPicker() },
+            controller = gestureController,
+            mode = { cachedSettings.overlayRecordingMode },
+            onIntent = { intent -> coordinator.onIntent(intent) },
+            orbSize = cachedSettings.orbSize,
             onPositionChanged = { position ->
                 serviceScope.launch { settingsRepository.saveOverlayPosition(position) }
             },
@@ -107,9 +137,24 @@ class OverlayService : Service() {
             windowManager.updateViewLayout(button, updatedParams)
         }
 
+        // O host provê os tree-owners do Compose (deve preceder o addView).
+        val host = ComposeWindowHost().also { it.attach(button) }
+        composeHost = host
+
         windowManager.addView(button, params)
         floatingButton = button
         floatingButtonParams = params
+    }
+
+    /** Posição inicial: aplica `overlaySide` (LEFT=encostado à esquerda, RIGHT=à direita). */
+    private fun initialPosition(): OverlayPosition {
+        val x = if (cachedSettings.overlaySide == OverlaySide.LEFT) {
+            0
+        } else {
+            val metrics = resources.displayMetrics
+            (metrics.widthPixels - (metrics.density * 220).toInt()).coerceAtLeast(0)
+        }
+        return OverlayPosition(x, (resources.displayMetrics.heightPixels * 0.35f).toInt())
     }
 
     private fun observeControllerState() {
@@ -161,6 +206,8 @@ class OverlayService : Service() {
         floatingButton?.let { button ->
             runCatching { windowManager.removeView(button) }
         }
+        composeHost?.detach()
+        composeHost = null
         floatingButton = null
         floatingButtonParams = null
     }
@@ -207,6 +254,14 @@ class OverlayService : Service() {
         }
 
         override fun stop(): File? = recorder.stop()
+
+        override fun pause() {
+            recorder.pause()
+        }
+
+        override fun resume() {
+            recorder.resume()
+        }
     }
 
     private class AndroidOverlayTranscriber(
