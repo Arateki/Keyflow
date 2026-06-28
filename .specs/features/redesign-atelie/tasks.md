@@ -275,10 +275,10 @@ gatilho, `overlaySide`, `orbSize`, `onboardingDone` e `effectiveConfigFor(source
 **Where**: `ui/common/ComposeWindowHost.kt`
 **Depends on**: T4 · **Reuses**: — · **Requirement**: OVL-01 (infra), KBD-01 (infra)
 **Done when**:
-- [ ] Attach provê os 3 tree-owners; lifecycle RESUMED no attach, DESTROYED no detach; sem leak.
-- [ ] instrumented de attach/detach renderizando um Composable simples numa janela `TYPE_APPLICATION_OVERLAY`.
-- [ ] Gate: `full`. Test count: ≥1.
-**Tests**: instrumented · **Gate**: full · **Commit**: `feat(ui): host de ComposeView para janelas`
+- [x] `attach(root)` liga os 3 tree-owners (Lifecycle/SavedStateRegistry/ViewModelStore), faz `performRestore(null)` e move o ciclo a RESUMED; `detach()` → DESTROYED + `viewModelStore.clear()` (sem leak). `isAttached` guarda re-attach.
+- [x] instrumented (`ComposeWindowHostTest`): attach antes de `addView` numa janela real `TYPE_APPLICATION_OVERLAY` (app-op via shell), confere os 3 owners via `findViewTree*Owner`, espera o `ComposeView` compor (SideEffect flag), depois detach → DESTROYED.
+- [x] Gate: `full` → `BUILD SUCCESSFUL`, 44 instrumentados (43→44), 0 falhas; unit verde.
+**Tests**: instrumented · **Gate**: full · **Commit**: `feat(ui): host de ComposeView para janelas`  ✅
 
 ### T22: Overlay reskin (orbe + gestos + tamanho/posição)
 **What**: `FloatingButtonView`→ComposeView com `VoiceOrb` (centro Time/Pause), tamanho/lado, e fiação do `RecordingGestureController` (anti-movimento, pausa).
