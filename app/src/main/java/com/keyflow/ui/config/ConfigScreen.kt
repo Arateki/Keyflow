@@ -63,12 +63,13 @@ fun ConfigScreen(
     onRequestOverlayPermission: () -> Unit,
     onRequestKeyboardPermission: () -> Unit,
     onSettingsChange: (Settings) -> Unit,
-    onUnlockSkins: () -> Unit,
     modifier: Modifier = Modifier,
     initialTab: ConfigTab = ConfigTab.MODO,
+    initialUnlockOpen: Boolean = false,
 ) {
     val palette = LocalKeyFlowPalette.current
     var activeTab by rememberSaveable { mutableStateOf(initialTab) }
+    var unlockOpen by rememberSaveable { mutableStateOf(initialUnlockOpen) }
 
     val enabled: (ConfigTab) -> Boolean = { tab ->
         when (tab) {
@@ -121,18 +122,19 @@ fun ConfigScreen(
                         settings = settings,
                         onSettingsChange = onSettingsChange,
                         onLanguageClick = onLanguageClick,
-                        onUnlockSkins = onUnlockSkins,
+                        onUnlockSkins = { unlockOpen = true },
                     )
                     ConfigTab.OVERLAY -> OverlayPanel(
                         settings = settings,
                         onSettingsChange = onSettingsChange,
-                        onUnlockSkins = onUnlockSkins,
+                        onUnlockSkins = { unlockOpen = true },
                     )
                     ConfigTab.DOCS -> DocsPanel()
                 }
             }
         }
         SaveToast(saveController, Modifier.fillMaxSize())
+        UnlockSheet(visible = unlockOpen, onDismiss = { unlockOpen = false })
     }
 }
 

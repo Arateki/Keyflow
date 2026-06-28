@@ -7,8 +7,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -77,7 +79,6 @@ class ConfigScreenTest {
                     onRequestOverlayPermission = {},
                     onRequestKeyboardPermission = {},
                     onSettingsChange = { settings = it },
-                    onUnlockSkins = {},
                     modifier = Modifier.fillMaxSize(),
                 )
                 }
@@ -157,5 +158,18 @@ class ConfigScreenTest {
 
         rule.onNodeWithTag(LANG_TOGGLE_TAG).performClick()
         rule.runOnIdle { assertTrue(h.languageClicks > 0) }
+    }
+
+    @Test
+    fun unlockSheetOpensAndCloses() {
+        val h = Harness().also { it.settings = Settings(keyboardModeEnabled = true) }
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(tabTag(ConfigTab.TECLADO)).performClick()
+        rule.onNodeWithTag(TECLADO_UNLOCK_TAG).performClick()
+        rule.onNodeWithTag(UNLOCK_SHEET_TAG).assertIsDisplayed()
+
+        rule.onNodeWithTag(UNLOCK_CLOSE_TAG).performClick()
+        rule.onAllNodesWithTag(UNLOCK_SHEET_TAG).assertCountEquals(0)
     }
 }

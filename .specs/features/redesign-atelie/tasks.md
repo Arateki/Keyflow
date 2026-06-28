@@ -223,10 +223,10 @@ gatilho, `overlaySide`, `orbSize`, `onboardingDone` e `effectiveConfigFor(source
 **Where**: `ui/config/UnlockSheet.kt`
 **Depends on**: T10 · **Reuses**: — · **Requirement**: SKIN-02, SKIN-03
 **Done when**:
-- [ ] Abre por "Desbloquear skins"; opções renderizadas; fechar não compra nada; tema ativo segue Ateliê.
-- [ ] instrumented (abre/fecha) + screenshot (`config-unlock`).
-- [ ] Gate: `full`. Test count: ≥1.
-**Tests**: instrumented · **Gate**: full · **Commit**: `feat(config): sheet de desbloqueio (stub)`
+- [x] Abre por "Desbloquear skins" (Teclado/Overlay); opções renderizadas (R$20 MELHOR / R$15 uma vez); fechar (scrim/X) não compra nada; tema Ateliê herdado.
+- [x] instrumented (abre/fecha em `ConfigScreenTest`) + screenshot (`config-unlock` claro/escuro).
+- [x] Gate: `full` → 38 instrumentados (37→38), 0 falhas; unit verde.
+**Tests**: instrumented · **Gate**: full · **Commit**: `feat(config): sheet de desbloqueio (stub)`  ✅
 
 ### T17: OnboardingScreen
 **What**: Tela de onboarding (orbe grande, headline, checklist de permissões, CTAs).

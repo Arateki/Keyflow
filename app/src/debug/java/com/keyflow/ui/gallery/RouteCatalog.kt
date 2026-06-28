@@ -42,6 +42,7 @@ object RouteCatalog {
         Route("config-teclado") { ConfigTabRoute(ConfigTab.TECLADO, keyboardEnabled = true) },
         Route("config-overlay") { ConfigTabRoute(ConfigTab.OVERLAY, overlayEnabled = true) },
         Route("config-docs") { ConfigTabRoute(ConfigTab.DOCS) },
+        Route("config-unlock") { ConfigTabRoute(ConfigTab.TECLADO, keyboardEnabled = true, unlockOpen = true) },
     )
 
     private val byKey: Map<String, Route> = routes.associateBy { it.key }
@@ -69,7 +70,6 @@ object RouteCatalog {
             onRequestOverlayPermission = {},
             onRequestKeyboardPermission = {},
             onSettingsChange = {},
-            onUnlockSkins = {},
         )
     }
 
@@ -92,14 +92,18 @@ object RouteCatalog {
             onRequestOverlayPermission = {},
             onRequestKeyboardPermission = {},
             onSettingsChange = {},
-            onUnlockSkins = {},
             initialTab = ConfigTab.VOZ,
         )
     }
 
     /** Abre uma aba arbitrária do config (modos ligados conforme necessário) p/ os mocks 04/05-v2. */
     @Composable
-    private fun ConfigTabRoute(tab: ConfigTab, overlayEnabled: Boolean = false, keyboardEnabled: Boolean = false) {
+    private fun ConfigTabRoute(
+        tab: ConfigTab,
+        overlayEnabled: Boolean = false,
+        keyboardEnabled: Boolean = false,
+        unlockOpen: Boolean = false,
+    ) {
         ConfigScreen(
             settings = FakeSettings.settings.copy(
                 overlayModeEnabled = overlayEnabled,
@@ -119,8 +123,8 @@ object RouteCatalog {
             onRequestOverlayPermission = {},
             onRequestKeyboardPermission = {},
             onSettingsChange = {},
-            onUnlockSkins = {},
             initialTab = tab,
+            initialUnlockOpen = unlockOpen,
         )
     }
 
