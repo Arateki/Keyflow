@@ -16,7 +16,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import com.keyflow.core.ButtonState
-import com.keyflow.core.OrbSize
 import com.keyflow.core.RecordingMode
 import com.keyflow.data.OverlayPosition
 import com.keyflow.ui.orb.OrbCenter
@@ -44,25 +43,36 @@ class OrbButtonView(
     private val onIntent: (GestureIntent) -> Unit,
     private val gestures: GestureInterpreter = GestureInterpreter(),
     private val onPositionChanged: (OverlayPosition) -> Unit = {},
-    orbSize: OrbSize = OrbSize.MEDIUM,
+    private val onErrorTap: () -> Unit = {},
+    orbSizePx: Int = 156,
     private val releaseWindowMs: Long = DEFAULT_RELEASE_WINDOW_MS,
+    // Janela máxima entre toques de uma "rajada" de atalho (threshold; futuro: configurável).
+    private val tapBurstWindowMs: Long = DEFAULT_TAP_BURST_WINDOW_MS,
     private val clock: () -> Long = { SystemClock.elapsedRealtime() },
 ) : FrameLayout(context) {
 
     var renderedState: ButtonState = ButtonState.IDLE_NO_FIELD
         private set
 
-    private val sizePx: Int = when (orbSize) {
-        OrbSize.SMALL -> 120
-        OrbSize.MEDIUM -> 156
-        OrbSize.LARGE -> 200
+    private var sizePx: Int = orbSizePx
+
+    /** Redimensiona a orbe ao vivo (slider da aba Sobrepor). A janela é WRAP_CONTENT → remede ao atualizar. */
+    fun setOrbSizePx(px: Int) {
+        if (px == sizePx || px <= 0) return
+        sizePx = px
+        requestLayout()
+        windowParams?.let { updateWindowLayout?.invoke(it) }
     }
 
     private var orbUi by mutableStateOf(OrbButtonUi(OrbState.Idle, OrbCenter.None))
 
     private val handler = Handler(Looper.getMainLooper())
-    private var pendingTap: Runnable? = null
     private var pendingReleaseTimeout: Runnable? = null
+
+    // Resolvedor de rajada de toques (TOGGLE): conta toques rápidos e só age quando a rajada "assenta".
+    // 1 → grava; ≥3 → seletor (cai no atalho mais próximo abaixo); 2 → nada. Rajada ≥2 nunca grava.
+    private var tapBurstCount = 0
+    private var tapBurstRunnable: Runnable? = null
     private val ticker = object : Runnable {
         override fun run() {
             if (renderedState == ButtonState.RECORDING) {
@@ -83,6 +93,13 @@ class OrbButtonView(
     private var startWindowX = 0
     private var startWindowY = 0
     private var dragging = false
+
+    // PTT: partida adiada a partir do ocioso. Distingue "segurar para gravar" de "arrastar para mover":
+    // só inicia a gravação se NÃO houver um arrasto brusco logo no começo do toque (REC-05).
+    private var pttStartArmed = false
+    private var pttStarted = false
+    private var pttSuppressedByDrag = false
+    private var pendingPttStart: Runnable? = null
 
     init {
         addView(ComposeView(context).apply {
@@ -142,7 +159,11 @@ class OrbButtonView(
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                cancelPendingTap()
+                if (renderedState == ButtonState.ERROR) {
+                    // No estado de erro só agimos se for resolvível na Voz; senão o toque é ignorado.
+                    if (com.keyflow.core.KeyFlowController.errorOpensVoz) onErrorTap()
+                    return true
+                }
                 cancelReleaseTimeout()
                 parent?.requestDisallowInterceptTouchEvent(true)
                 startRawX = event.rawX
@@ -151,7 +172,20 @@ class OrbButtonView(
                 startWindowY = windowParams?.y ?: 0
                 dragging = false
                 gestures.onDown()
-                if (mode() == RecordingMode.PUSH_TO_TALK) emit(TouchSignal.DOWN)
+                if (mode() == RecordingMode.PUSH_TO_TALK) {
+                    pttStarted = false
+                    pttSuppressedByDrag = false
+                    if (renderedState.isIdleState || renderedState == ButtonState.PAUSED) {
+                        // Ocioso ou pausado: adia a partida (START/RESUME) para distinguir "segurar"
+                        // de "arrastar p/ mover". Arrasto brusco move sem gravar / sem sair da pausa.
+                        pttStartArmed = true
+                        schedulePttStart()
+                    } else {
+                        // Janela de release (tap-rápido → pausa): resposta imediata.
+                        pttStartArmed = false
+                        emit(TouchSignal.DOWN)
+                    }
+                }
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
@@ -159,7 +193,14 @@ class OrbButtonView(
                 val dy = event.rawY - startRawY
                 if (gestures.onMove(dx, dy) == GestureEvent.DRAG_START) {
                     dragging = true
-                    emit(TouchSignal.DRAG_START)
+                    if (pttStartArmed && !pttStarted) {
+                        // Arrasto brusco antes da gravação começar: não grava neste gesto (só move).
+                        cancelPttStart()
+                        pttStartArmed = false
+                        pttSuppressedByDrag = true
+                    } else {
+                        emit(TouchSignal.DRAG_START) // já gravando (ou TOGGLE) → reposiciona mantendo
+                    }
                 }
                 if (dragging) moveTo(startWindowX + dx.roundToInt(), startWindowY + dy.roundToInt())
                 return true
@@ -174,6 +215,10 @@ class OrbButtonView(
             }
             MotionEvent.ACTION_CANCEL -> {
                 dragging = false
+                cancelPttStart()
+                pttStartArmed = false
+                pttStarted = false
+                pttSuppressedByDrag = false
                 parent?.requestDisallowInterceptTouchEvent(false)
                 return true
             }
@@ -183,21 +228,33 @@ class OrbButtonView(
 
     private fun onUpToggle(eventType: GestureEvent?) {
         when (eventType) {
-            GestureEvent.TRIPLE_TAP -> {
-                cancelPendingTap()
-                emit(TouchSignal.TRIPLE_TAP)
+            // Hold/drag não são toques de rajada: cancelam a rajada pendente e agem na hora.
+            GestureEvent.HOLD -> {
+                cancelTapBurst()
+                emit(TouchSignal.HOLD)
             }
-            GestureEvent.HOLD -> emit(TouchSignal.HOLD)
             GestureEvent.DRAG_END -> {
+                cancelTapBurst()
                 emit(TouchSignal.DRAG_END)
                 persistCurrentPosition()
             }
-            GestureEvent.TAP -> if (!dragging) scheduleTap()
+            // TAP e TRIPLE_TAP contam como toques da rajada; a ação só resolve quando ela assenta.
+            GestureEvent.TAP, GestureEvent.TRIPLE_TAP -> if (!dragging) registerBurstTap()
             else -> Unit
         }
     }
 
     private fun onUpPushToTalk(eventType: GestureEvent?) {
+        // Resolve a partida adiada: um toque rápido sem arrasto dispara o START que estava pendente;
+        // triplo-tap (e arrasto, já tratado no MOVE) não gravam.
+        if (pttStartArmed) {
+            cancelPttStart()
+            pttStartArmed = false
+            if (eventType != GestureEvent.TRIPLE_TAP) {
+                emit(TouchSignal.DOWN) // dispara o START adiado
+                pttStarted = true
+            }
+        }
         when (eventType) {
             GestureEvent.TRIPLE_TAP -> emit(TouchSignal.TRIPLE_TAP)
             GestureEvent.DRAG_END -> {
@@ -210,21 +267,60 @@ class OrbButtonView(
                 scheduleReleaseTimeout()
             }
         }
+        pttStarted = false
+        pttSuppressedByDrag = false
+    }
+
+    private fun schedulePttStart() {
+        cancelPttStart()
+        val r = Runnable {
+            if (pttStartArmed) {
+                pttStartArmed = false
+                pttStarted = true
+                emit(TouchSignal.DOWN) // dedo ficou parado → inicia a gravação
+            }
+        }
+        pendingPttStart = r
+        handler.postDelayed(r, PTT_START_CONFIRM_MS)
+    }
+
+    private fun cancelPttStart() {
+        pendingPttStart?.let { handler.removeCallbacks(it) }
+        pendingPttStart = null
     }
 
     private fun emit(signal: TouchSignal) {
         onIntent(controller.onSignal(signal))
     }
 
-    private fun scheduleTap() {
-        val r = Runnable { onIntent(controller.onSignal(TouchSignal.TAP)) }
-        pendingTap = r
-        handler.postDelayed(r, TAP_DELAY_MS)
+    /**
+     * Conta um toque da rajada (TOGGLE) e (re)agenda a resolução para daqui a [tapBurstWindowMs]. Cada novo
+     * toque dentro da janela estende a rajada; a ação só dispara quando ela assenta.
+     */
+    private fun registerBurstTap() {
+        tapBurstCount++
+        tapBurstRunnable?.let { handler.removeCallbacks(it) }
+        val r = Runnable { resolveTapBurst() }
+        tapBurstRunnable = r
+        handler.postDelayed(r, tapBurstWindowMs)
     }
 
-    private fun cancelPendingTap() {
-        pendingTap?.let { handler.removeCallbacks(it) }
-        pendingTap = null
+    /** Resolve a rajada assentada: 1 → grava; ≥3 → seletor (atalho mais próximo abaixo); 2 → nada. */
+    private fun resolveTapBurst() {
+        val count = tapBurstCount
+        tapBurstCount = 0
+        tapBurstRunnable = null
+        when {
+            count == 1 -> emit(TouchSignal.TAP)
+            count >= 3 -> emit(TouchSignal.TRIPLE_TAP)
+            else -> Unit // rajada ≥2 sem atalho exato (ex.: 2) não faz nada — e nunca grava
+        }
+    }
+
+    private fun cancelTapBurst() {
+        tapBurstRunnable?.let { handler.removeCallbacks(it) }
+        tapBurstRunnable = null
+        tapBurstCount = 0
     }
 
     private fun scheduleReleaseTimeout() {
@@ -276,6 +372,7 @@ class OrbButtonView(
     private fun orbCenterFor(state: ButtonState): OrbCenter = when (state) {
         ButtonState.RECORDING -> OrbCenter.Time(elapsedSeconds())
         ButtonState.PAUSED -> OrbCenter.PauseGlyph
+        ButtonState.ERROR -> OrbCenter.ErrorGlyph
         else -> OrbCenter.None
     }
 
@@ -291,9 +388,15 @@ class OrbButtonView(
 
     private data class OrbButtonUi(val state: OrbState, val center: OrbCenter)
 
+    private val ButtonState.isIdleState: Boolean
+        get() = this == ButtonState.IDLE_READY || this == ButtonState.IDLE_NO_FIELD
+
     private companion object {
-        const val TAP_DELAY_MS = 250L
         const val TICK_MS = 500L
         const val DEFAULT_RELEASE_WINDOW_MS = 350L
+        // Janela curta para distinguir "segurar para gravar" de "arrastar para mover" no PTT ocioso.
+        const val PTT_START_CONFIRM_MS = 130L
+        // Janela de rajada de toques (threshold padrão; futuro: configurável pelo usuário).
+        const val DEFAULT_TAP_BURST_WINDOW_MS = 300L
     }
 }

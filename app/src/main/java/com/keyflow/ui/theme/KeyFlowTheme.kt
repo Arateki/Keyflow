@@ -4,8 +4,10 @@ import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.sp
 
 /**
@@ -14,6 +16,12 @@ import androidx.compose.ui.unit.sp
 val LocalKeyFlowPalette = staticCompositionLocalOf<KeyFlowPalette> {
     error("LocalKeyFlowPalette acessado fora de KeyFlowTheme")
 }
+
+/**
+ * Multiplicador global da tipografia (UAT em device físico): sobra de tela mesmo em celulares
+ * menores, então escalamos todo texto `.sp` de uma vez via [Density.fontScale]. Ajuste fino aqui.
+ */
+const val KEYFLOW_FONT_SCALE = 1.30f
 
 /** Tipografia base Ateliê: Space Grotesk para UI; Space Mono fica nos componentes que pedem mono. */
 val KeyFlowTypography = Typography(
@@ -32,7 +40,12 @@ val KeyFlowTypography = Typography(
 @Composable
 fun KeyFlowTheme(dark: Boolean, content: @Composable () -> Unit) {
     val palette = paletteFor(dark)
-    CompositionLocalProvider(LocalKeyFlowPalette provides palette) {
+    val base = LocalDensity.current
+    val scaled = Density(density = base.density, fontScale = base.fontScale * KEYFLOW_FONT_SCALE)
+    CompositionLocalProvider(
+        LocalKeyFlowPalette provides palette,
+        LocalDensity provides scaled,
+    ) {
         androidx.compose.material3.MaterialTheme(
             typography = KeyFlowTypography,
             content = content,

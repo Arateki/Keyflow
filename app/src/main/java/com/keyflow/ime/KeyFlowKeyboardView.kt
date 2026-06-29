@@ -12,6 +12,7 @@ import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.keyflow.core.ButtonState
+import com.keyflow.core.KeyFlowController
 
 sealed interface KeyAction {
     data class Character(val char: String) : KeyAction
@@ -36,8 +37,11 @@ class KeyFlowKeyboardView(
     private val onMic: () -> Unit,
     private val onHide: () -> Unit,
     private val onExpand: () -> Unit = {},
+    private val onErrorTap: () -> Unit = {},
     dark: Boolean = false,
     private val frozenSeconds: Int? = null,
+    // Escala visual (1f = produção). A demo da aba Modo usa < 1 para um teclado menor, proporcional.
+    private val scale: Float = 1f,
     private val clock: () -> Long = { SystemClock.elapsedRealtime() },
 ) : LinearLayout(context) {
 
@@ -211,7 +215,14 @@ class KeyFlowKeyboardView(
 
     private fun micKey(weight: Float, height: Int): TextView =
         keyBase("🎙", weight, MIC_NO_FIELD, Color.WHITE, height).also { v ->
-            v.setOnClickListener { onMic() }
+            v.setOnClickListener {
+                if (micState == ButtonState.ERROR) {
+                    // No erro só age se for resolvível na Voz; senão ignora o toque.
+                    if (KeyFlowController.errorOpensVoz) onErrorTap()
+                } else {
+                    onMic()
+                }
+            }
         }
 
     private fun keyBase(
@@ -224,7 +235,7 @@ class KeyFlowKeyboardView(
         text = label
         gravity = Gravity.CENTER
         setTextColor(textColor)
-        textSize = 15f
+        textSize = 15f * scale
         background = rippleDrawable(bgColor, kbKeyBorder)
         isClickable = true
         isFocusable = false
@@ -264,7 +275,7 @@ class KeyFlowKeyboardView(
         ButtonState.RECORDING      -> "● ${formatTime(elapsedSeconds())}" to ACCENT_RECORD
         ButtonState.PAUSED         -> "⏸ ${formatTime(elapsedSeconds())}" to ACCENT_RECORD
         ButtonState.SENDING        -> "···" to ACCENT_TEAL
-        ButtonState.ERROR          -> "!" to ACCENT_TERRACOTTA
+        ButtonState.ERROR          -> "✖" to ACCENT_TERRACOTTA
         ButtonState.PENDING_PASTE  -> "📋 colar" to ACCENT_TERRACOTTA
     }
 
@@ -296,7 +307,7 @@ class KeyFlowKeyboardView(
         setPadding(dp(2), dp(3), dp(2), bottomPad)
     }
 
-    private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+    private fun dp(v: Int) = (v * resources.displayMetrics.density * scale).toInt()
 
     companion object {
         private const val TICK_MS = 500L

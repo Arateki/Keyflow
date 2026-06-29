@@ -50,15 +50,16 @@ fun UnlockSheet(visible: Boolean, onDismiss: () -> Unit, modifier: Modifier = Mo
             .fillMaxSize()
             .background(Color(0x751C1813))
             .clickable(interactionSource = noRipple, indication = null) { onDismiss() },
-        contentAlignment = Alignment.BottomCenter,
+        contentAlignment = Alignment.Center,
     ) {
         Column(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                .padding(horizontal = 24.dp)
+                .clip(RoundedCornerShape(20.dp))
                 .background(palette.bg)
                 .clickable(interactionSource = noRipple, indication = null) { /* consome o clique */ }
-                .padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 26.dp)
+                .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 22.dp)
                 .testTag(UNLOCK_SHEET_TAG),
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {

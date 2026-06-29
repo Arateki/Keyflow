@@ -19,12 +19,17 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,6 +48,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -141,9 +148,17 @@ internal fun AutoSaveField(
     val focusManager = LocalFocusManager.current
     var text by remember(value) { mutableStateOf(value) }
     var wasFocused by remember { mutableStateOf(false) }
+    // Sempre o valor mais recente para o commit no descarte (a troca de aba pode pular o focus-out).
+    val currentText by rememberUpdatedState(text)
+    val currentValue by rememberUpdatedState(value)
 
     fun commitIfChanged() {
         if (text != value) onCommit(text)
+    }
+
+    // Salva ao sair de cena (ex.: trocar de aba) se o valor mudou — rede de segurança do focus-out.
+    DisposableEffect(Unit) {
+        onDispose { if (currentText != currentValue) onCommit(currentText) }
     }
 
     Column(modifier.fillMaxWidth()) {
@@ -155,8 +170,19 @@ internal fun AutoSaveField(
         )
         BasicTextField(
             value = text,
-            onValueChange = { text = it },
+            onValueChange = { new ->
+                // Inserção em bloco (colar) salva na hora; digitação caractere a caractere só salva no
+                // desfoque/Done/descarte.
+                val pasted = new.length - text.length > 1
+                text = new
+                if (pasted) commitIfChanged()
+            },
             singleLine = true,
+            visualTransformation = if (keyboardType == KeyboardType.Password) {
+                PasswordVisualTransformation('*')
+            } else {
+                VisualTransformation.None
+            },
             textStyle = LocalTextStyle.current.copy(
                 color = palette.fg2,
                 fontFamily = SpaceMono,
@@ -177,6 +203,78 @@ internal fun AutoSaveField(
                     wasFocused = state.isFocused
                 },
         )
+        Box(Modifier.fillMaxWidth().height(1.dp).background(palette.line))
+    }
+}
+
+/**
+ * Campo de seleção (dropdown) no estilo Ateliê: [label] em mono + valor atual com chevron e underline.
+ * Abre um [DropdownMenu] com as [options]; [display] formata cada opção (ex.: código → nome do idioma).
+ * Usado na aba Voz para modelo e idioma com listas pré-definidas (padrão Whisper).
+ */
+@Composable
+internal fun Dropdown(
+    label: String,
+    options: List<String>,
+    selected: String,
+    onSelect: (String) -> Unit,
+    tag: String,
+    modifier: Modifier = Modifier,
+    display: (String) -> String = { it },
+) {
+    val palette = LocalKeyFlowPalette.current
+    var expanded by remember { mutableStateOf(false) }
+    Column(modifier.fillMaxWidth()) {
+        Text(
+            text = label.uppercase(),
+            color = palette.faint,
+            fontFamily = SpaceMono,
+            fontSize = 8.5.sp,
+        )
+        Box {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = true }
+                    .padding(top = 5.dp, bottom = 7.dp)
+                    .testTag(tag),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = display(selected),
+                    color = palette.fg2,
+                    fontFamily = SpaceMono,
+                    fontSize = 12.sp,
+                )
+                StrokeIcon(CHEVRON_DOWN, palette.muted, Modifier.size(14.dp), strokeWidth = 1.8f)
+            }
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                containerColor = palette.card,
+            ) {
+                options.forEach { option ->
+                    val isActive = option == selected
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = display(option),
+                                color = if (isActive) palette.teal else palette.fg,
+                                fontFamily = SpaceMono,
+                                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                                fontSize = 12.sp,
+                            )
+                        },
+                        onClick = {
+                            onSelect(option)
+                            expanded = false
+                        },
+                        colors = MenuDefaults.itemColors(),
+                    )
+                }
+            }
+        }
         Box(Modifier.fillMaxWidth().height(1.dp).background(palette.line))
     }
 }
@@ -280,3 +378,4 @@ internal fun FillIcon(path: String, tint: Color, modifier: Modifier) {
 
 private val LOCK_PATHS = listOf("M3 11 h18 v11 h-18 z", "M7 11V7a5 5 0 0 1 10 0v4")
 private val LOCK_OPEN_PATHS = listOf("M3 11 h18 v11 h-18 z", "M7 11V7a5 5 0 0 1 9.9-1")
+private val CHEVRON_DOWN = listOf("M6 9 12 15 18 9")

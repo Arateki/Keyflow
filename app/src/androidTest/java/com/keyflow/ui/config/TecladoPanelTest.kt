@@ -45,13 +45,23 @@ class TecladoPanelTest {
     }
 
     @Test
-    fun autoPasteTogglePersists() {
-        val h = Harness(Settings(keyboardAutoPaste = true))
+    fun autoPasteInFieldTogglePersists() {
+        val h = Harness(Settings(autoPasteInField = true))
         rule.setContent { h.Content() }
 
-        rule.onNodeWithTag(TECLADO_AUTO_PASTE_TAG).performClick()
+        rule.onNodeWithTag(TECLADO_AUTO_PASTE_IN_FIELD_TAG).performClick()
 
-        rule.runOnIdle { assertEquals(false, h.settings.keyboardAutoPaste) }
+        rule.runOnIdle { assertEquals(false, h.settings.autoPasteInField) }
+    }
+
+    @Test
+    fun autoPasteOnFocusTogglePersists() {
+        val h = Harness(Settings(autoPasteOnFocus = true))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(TECLADO_AUTO_PASTE_ON_FOCUS_TAG).performClick()
+
+        rule.runOnIdle { assertEquals(false, h.settings.autoPasteOnFocus) }
     }
 
     @Test

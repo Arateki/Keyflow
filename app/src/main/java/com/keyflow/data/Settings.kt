@@ -1,6 +1,5 @@
 package com.keyflow.data
 
-import com.keyflow.core.OrbSize
 import com.keyflow.core.OverlaySide
 import com.keyflow.core.RecordingMode
 import com.keyflow.core.TranscriptionSource
@@ -37,11 +36,16 @@ data class Settings(
     // Modos de gravação por gatilho (C16; default TOGGLE)
     val overlayRecordingMode: RecordingMode = RecordingMode.TOGGLE,
     val keyboardRecordingMode: RecordingMode = RecordingMode.TOGGLE,
-    // Teclado: colar automaticamente o texto transcrito (KBD config; default ligado)
-    val keyboardAutoPaste: Boolean = true,
+    // Colar automaticamente (só vale com o teclado KeyFlow ativo; no overlay com teclado nativo o
+    // texto vai para a área de transferência). Dois cenários independentes:
+    //  - inField: gravou com um campo já focado → cola direto quando a transcrição volta.
+    //  - onFocus: gravou fora de um campo → cola ao tocar no próximo campo.
+    val autoPasteInField: Boolean = true,
+    val autoPasteOnFocus: Boolean = true,
     // Overlay
     val overlaySide: OverlaySide = OverlaySide.RIGHT,
-    val orbSize: OrbSize = OrbSize.MEDIUM,
+    // Tamanho da orbe em px (slider contínuo na aba Sobrepor; aplicado ao vivo pelo OverlayService).
+    val orbSizePx: Int = 156,
     // Tema + onboarding
     val themeDark: Boolean = false,
     val onboardingDone: Boolean = false,

@@ -32,6 +32,35 @@ object KeyFlowController {
 
     private var inserter: ((String) -> Boolean)? = null
 
+    // Preferências de cola automática (definidas pelos serviços a partir das Settings).
+    //  - autoPasteInField: gravou com um campo focado → cola direto.
+    //  - autoPasteOnFocus: gravou fora de um campo → guarda e cola ao focar o próximo campo.
+    // Desligados, o texto só vai para a área de transferência (clipboard tratado pelo chamador).
+    @Volatile var autoPasteInField: Boolean = true
+    @Volatile var autoPasteOnFocus: Boolean = true
+
+    // Erro atual é "resolvível na aba Voz" (config/token)? Decide se tocar no X leva ao atalho da Voz.
+    // Erros não mapeados (rede, timeout, áudio curto…) ficam sem ação no toque.
+    @Volatile var errorOpensVoz: Boolean = false
+
+    // Marca que o usuário acabou de abrir o seletor de teclados pelo nosso atalho (3 toques) para trocar
+    // PARA o KeyFlow. O IME consome no 1º onStartInput dentro da janela e se exibe — assim só sobe nessa
+    // troca deliberada, e não a cada troca de app/ida para a home (que também ligam o IME).
+    @Volatile private var keyboardSwitchRequestedAtMs: Long = 0L
+
+    fun markKeyboardSwitchRequested() {
+        keyboardSwitchRequestedAtMs = System.currentTimeMillis()
+    }
+
+    fun consumeKeyboardSwitchRequest(windowMs: Long = 15_000L): Boolean {
+        val t = keyboardSwitchRequestedAtMs
+        if (t != 0L && System.currentTimeMillis() - t in 0..windowMs) {
+            keyboardSwitchRequestedAtMs = 0L
+            return true
+        }
+        return false
+    }
+
     fun requestTap() {
         _tapRequest.tryEmit(Unit)
         Log.d(TAG, "requestTap")
@@ -43,9 +72,9 @@ object KeyFlowController {
 
     fun registerInserter(fn: (String) -> Boolean) {
         inserter = fn
-        // Flush automático: se havia texto pendente, insere imediatamente
+        // Flush automático ao focar um campo: só cola o pendente se autoPasteOnFocus estiver ligado.
         val pendingText = _pending.value
-        if (pendingText != null && fn(pendingText)) {
+        if (pendingText != null && autoPasteOnFocus && fn(pendingText)) {
             Log.d(TAG, "registerInserter: auto-flushed pending '${pendingText.take(30)}'")
             _pending.value = null
         }
@@ -61,17 +90,29 @@ object KeyFlowController {
 
     fun insertOrHold(text: String): InsertOutcome {
         val insert = inserter
-        if (insert != null && insert(text)) {
-            Log.d(TAG, "insertOrHold: inserted '${text.take(30)}'")
-            return InsertOutcome.Inserted
+        if (insert != null) {
+            // Havia um campo focado na gravação = cenário "inField". Cola direto se permitido; caso
+            // contrário vai SÓ para a área de transferência. Nunca vira pendente — senão vazaria para o
+            // flush de "onFocus" ao reabrir o campo, colando um texto que não foi captado sem campo.
+            if (autoPasteInField && insert(text)) {
+                Log.d(TAG, "insertOrHold: inserted in-field '${text.take(30)}'")
+                return InsertOutcome.Inserted
+            }
+            Log.d(TAG, "insertOrHold: in-field → clipboard (inField=$autoPasteInField)")
+            return InsertOutcome.Held
         }
 
-        Log.d(TAG, "insertOrHold: held '${text.take(30)}' inserter=${insert != null}")
-        _pending.value = text
+        // Sem campo focado na gravação = cenário "onFocus": guarda para colar ao focar o próximo campo,
+        // se permitido; senão fica só na área de transferência.
+        if (autoPasteOnFocus) {
+            _pending.value = text
+        }
+        Log.d(TAG, "insertOrHold: no field, held '${text.take(30)}' onFocus=$autoPasteOnFocus")
         return InsertOutcome.Held
     }
 
     fun flushPending(): Boolean {
+        if (!autoPasteOnFocus) return false
         val text = _pending.value ?: return false
         val insert = inserter ?: return false
         if (!insert(text)) return false

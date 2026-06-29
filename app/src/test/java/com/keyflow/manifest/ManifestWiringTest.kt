@@ -32,9 +32,9 @@ class ManifestWiringTest {
         val application = manifest.elements("application").single()
         val services = application.elements("service")
 
-        val ime = services.single { it.androidAttr("name") == ".ime.InvisibleKeyboardService" }
+        val ime = services.single { it.androidAttr("name") == ".ime.KeyFlowKeyboardService" }
         assertThat(ime.androidAttr("permission")).isEqualTo("android.permission.BIND_INPUT_METHOD")
-        assertThat(ime.elements("meta-data").single().androidAttr("resource")).isEqualTo("@xml/method")
+        assertThat(ime.elements("meta-data").single().androidAttr("resource")).isEqualTo("@xml/method_keyboard")
 
         val overlay = services.single { it.androidAttr("name") == ".overlay.OverlayService" }
         assertThat(overlay.androidAttr("exported")).isEqualTo("false")

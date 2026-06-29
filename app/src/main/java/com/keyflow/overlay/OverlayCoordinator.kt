@@ -34,6 +34,8 @@ class OverlayCoordinator(
     private val render: (ButtonState) -> Unit,
     private val onClipboard: (String) -> Unit = {},
     private val onShowKeyboardPicker: () -> Unit = {},
+    // (mensagem, abreVoz): abreVoz = erro resolvível na aba Voz (config/token) → tocar no X leva lá.
+    private val onError: (String, Boolean) -> Unit = { _, _ -> },
     private val recordingClockMs: () -> Long = { SystemClock.elapsedRealtime() },
 ) {
     private val machine = ButtonStateMachine(targetAvailable = targetAvailable)
@@ -45,7 +47,7 @@ class OverlayCoordinator(
     companion object {
         private const val TAG = "KeyFlow.Coordinator"
         private const val MIN_RECORDING_MS = 400L
-        private const val ERROR_AUTO_DISMISS_MS = 3000L
+        private const val ERROR_AUTO_DISMISS_MS = 2000L
     }
 
     init {
@@ -120,7 +122,10 @@ class OverlayCoordinator(
     private fun startRecording() {
         recordingStartMs = recordingClockMs()
         runCatching { recorder.start() }
-            .onFailure { handleState(machine.onTranscriptionError()) }
+            .onFailure {
+                onError("Falha ao iniciar a gravação.", false)
+                handleState(machine.onTranscriptionError())
+            }
     }
 
     private fun stopAndTranscribe() {
@@ -128,12 +133,14 @@ class OverlayCoordinator(
         if (duration < MIN_RECORDING_MS) {
             Log.d(TAG, "recording too short (${duration}ms), cancelling")
             runCatching { recorder.stop() }
+            onError("Gravação muito curta.", false)
             render(machine.onErrorDismissed())
             return
         }
 
         val audio = runCatching { recorder.stop() }.getOrNull()
         if (audio == null) {
+            onError("Não foi possível gravar o áudio.", false)
             handleState(machine.onTranscriptionError())
             return
         }
@@ -150,9 +157,27 @@ class OverlayCoordinator(
                     }
                     render(machine.onTranscriptionSuccess())
                 }
-                is TranscriptionResult.Error -> handleState(machine.onTranscriptionError())
+                is TranscriptionResult.Error -> {
+                    Log.d(TAG, "transcription error: ${result.kind} ${result.message}")
+                    onError(errorMessage(result.kind), opensVoz(result.kind))
+                    handleState(machine.onTranscriptionError())
+                }
             }
         }
+    }
+
+    /** Erros resolvíveis na aba Voz (config/token) — só estes tornam o X clicável para o atalho. */
+    private fun opensVoz(kind: ErrorKind): Boolean =
+        kind == ErrorKind.CONFIG_MISSING || kind == ErrorKind.AUTH
+
+    private fun errorMessage(kind: ErrorKind): String = when (kind) {
+        ErrorKind.CONFIG_MISSING -> "Configure um provedor de voz na aba Voz."
+        ErrorKind.AUTH -> "Falha de autenticação — verifique o token."
+        ErrorKind.NETWORK -> "Sem conexão de rede."
+        ErrorKind.TIMEOUT -> "Tempo esgotado ao transcrever."
+        ErrorKind.TOO_LARGE -> "Áudio muito longo para transcrever."
+        ErrorKind.EMPTY_AUDIO -> "Nada foi captado pelo microfone."
+        ErrorKind.HTTP -> "Erro no servidor de transcrição."
     }
 
     private fun ButtonStateMachine.onTargetChangedAndReturn(available: Boolean): ButtonState {

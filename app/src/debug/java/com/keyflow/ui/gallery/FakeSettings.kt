@@ -1,6 +1,5 @@
 package com.keyflow.ui.gallery
 
-import com.keyflow.core.OrbSize
 import com.keyflow.core.OverlaySide
 import com.keyflow.core.TranscriptionSource
 import com.keyflow.data.Settings
@@ -26,6 +25,6 @@ object FakeSettings {
         openaiToken = "sk-fake-3b",
         customEndpoint = "https://self.host/v1/audio/transcriptions",
         overlaySide = OverlaySide.RIGHT,
-        orbSize = OrbSize.MEDIUM,
+        orbSizePx = 156,
     )
 }

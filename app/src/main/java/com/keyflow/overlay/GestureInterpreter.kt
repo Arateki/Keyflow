@@ -5,7 +5,7 @@ import kotlin.math.abs
 enum class GestureEvent { TAP, TRIPLE_TAP, HOLD, DRAG_START, DRAG_END }
 
 class GestureInterpreter(
-    private val tripleTapWindowMs: Long = 400L,
+    private val tripleTapWindowMs: Long = 300L,
     private val holdThresholdMs: Long = 500L,
     private val clock: () -> Long = { System.currentTimeMillis() },
 ) {

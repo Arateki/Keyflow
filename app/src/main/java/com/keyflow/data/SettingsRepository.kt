@@ -14,7 +14,6 @@ import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
-import com.keyflow.core.OrbSize
 import com.keyflow.core.OverlaySide
 import com.keyflow.core.RecordingMode
 import com.keyflow.core.TranscriptionSource
@@ -22,6 +21,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.io.File
 
@@ -37,15 +37,23 @@ class SettingsRepository(
         createSecurePrefs(appContext, securePrefsName)
     }
 
-    fun flow(): Flow<Config> = dataStore.data.map { prefs ->
-        Config(
-            endpointUrl = prefs[ENDPOINT_URL].orEmpty(),
-            authHeaderName = prefs[AUTH_HEADER_NAME] ?: "Authorization",
-            authHeaderValue = securePrefs.getString(AUTH_HEADER_VALUE, "").orEmpty(),
-            model = prefs[MODEL] ?: "whisper-1",
-            language = prefs[LANGUAGE]?.takeIf { it.isNotBlank() },
-            recordingMode = prefs[RECORDING_MODE].toRecordingMode(),
-        )
+    /**
+     * Config efetivo consumido pelo transcritor. Resolve pela **origem selecionada** ([Settings.source])
+     * via [Settings.effectiveConfigFor] — antes ignorava o source e usava só os campos legados do CUSTOM,
+     * o que dava `CONFIG_MISSING` ao escolher OpenAI/Groq. CREDITS (em breve) → Config incompleto.
+     */
+    /**
+     * Leitura leve só do tema, lendo **apenas o DataStore** — não inicializa o EncryptedSharedPreferences
+     * (cripto cara). Usada no caminho crítico do IME (`onCreateInputView`) para não travar a thread
+     * principal ao criar o teclado, o que atrasava a exibição na troca de IME.
+     */
+    suspend fun themeDarkOnce(): Boolean = dataStore.data.first()[THEME_DARK] ?: false
+
+    fun flow(): Flow<Config> = settingsFlow().map { settings ->
+        when (val eff = settings.effectiveConfigFor()) {
+            is EffectiveConfig.Ready -> eff.config
+            EffectiveConfig.Unavailable -> Config()
+        }
     }
 
     /**
@@ -70,9 +78,12 @@ class SettingsRepository(
             keyboardModeEnabled = prefs[KEYBOARD_MODE_ENABLED] ?: false,
             overlayRecordingMode = prefs[OVERLAY_RECORDING_MODE].toRecordingMode(),
             keyboardRecordingMode = prefs[KEYBOARD_RECORDING_MODE].toRecordingMode(),
-            keyboardAutoPaste = prefs[KEYBOARD_AUTO_PASTE] ?: true,
+            // Migra o antigo KEYBOARD_AUTO_PASTE único para os dois flags (mesmo valor) quando os novos
+            // ainda não existem.
+            autoPasteInField = prefs[AUTO_PASTE_IN_FIELD] ?: prefs[KEYBOARD_AUTO_PASTE] ?: true,
+            autoPasteOnFocus = prefs[AUTO_PASTE_ON_FOCUS] ?: prefs[KEYBOARD_AUTO_PASTE] ?: true,
             overlaySide = prefs[OVERLAY_SIDE].toOverlaySide(),
-            orbSize = prefs[ORB_SIZE].toOrbSize(),
+            orbSizePx = prefs[ORB_SIZE_PX] ?: 156,
             themeDark = prefs[THEME_DARK] ?: false,
             onboardingDone = prefs[ONBOARDING_DONE] ?: false,
         )
@@ -104,9 +115,10 @@ class SettingsRepository(
             prefs[KEYBOARD_MODE_ENABLED] = settings.keyboardModeEnabled
             prefs[OVERLAY_RECORDING_MODE] = settings.overlayRecordingMode.name
             prefs[KEYBOARD_RECORDING_MODE] = settings.keyboardRecordingMode.name
-            prefs[KEYBOARD_AUTO_PASTE] = settings.keyboardAutoPaste
+            prefs[AUTO_PASTE_IN_FIELD] = settings.autoPasteInField
+            prefs[AUTO_PASTE_ON_FOCUS] = settings.autoPasteOnFocus
             prefs[OVERLAY_SIDE] = settings.overlaySide.name
-            prefs[ORB_SIZE] = settings.orbSize.name
+            prefs[ORB_SIZE_PX] = settings.orbSizePx
             prefs[THEME_DARK] = settings.themeDark
             prefs[ONBOARDING_DONE] = settings.onboardingDone
         }
@@ -161,10 +173,6 @@ class SettingsRepository(
         ?.let { runCatching { OverlaySide.valueOf(it) }.getOrNull() }
         ?: OverlaySide.RIGHT
 
-    private fun String?.toOrbSize(): OrbSize = this
-        ?.let { runCatching { OrbSize.valueOf(it) }.getOrNull() }
-        ?: OrbSize.MEDIUM
-
     private companion object {
         const val DATASTORE_NAME = "keyflow_settings"
         const val SECURE_PREFS_NAME = "keyflow_secure"
@@ -189,9 +197,11 @@ class SettingsRepository(
         val KEYBOARD_MODE_ENABLED = booleanPreferencesKey("keyboard_mode_enabled")
         val OVERLAY_RECORDING_MODE = stringPreferencesKey("overlay_recording_mode")
         val KEYBOARD_RECORDING_MODE = stringPreferencesKey("keyboard_recording_mode")
-        val KEYBOARD_AUTO_PASTE = booleanPreferencesKey("keyboard_auto_paste")
+        val KEYBOARD_AUTO_PASTE = booleanPreferencesKey("keyboard_auto_paste") // legado (migração)
+        val AUTO_PASTE_IN_FIELD = booleanPreferencesKey("auto_paste_in_field")
+        val AUTO_PASTE_ON_FOCUS = booleanPreferencesKey("auto_paste_on_focus")
         val OVERLAY_SIDE = stringPreferencesKey("overlay_side")
-        val ORB_SIZE = stringPreferencesKey("orb_size")
+        val ORB_SIZE_PX = intPreferencesKey("orb_size_px")
         val THEME_DARK = booleanPreferencesKey("theme_dark")
         val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
         const val OPENAI_TOKEN = "openai_token"

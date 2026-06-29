@@ -99,6 +99,8 @@ object RouteCatalog {
             onLanguageClick = {},
             onRequestOverlayPermission = {},
             onRequestKeyboardPermission = {},
+            onRequestMicPermission = {},
+            onSwitchKeyboard = {},
             onSettingsChange = {},
         )
     }
@@ -121,6 +123,8 @@ object RouteCatalog {
             onLanguageClick = {},
             onRequestOverlayPermission = {},
             onRequestKeyboardPermission = {},
+            onRequestMicPermission = {},
+            onSwitchKeyboard = {},
             onSettingsChange = {},
             initialTab = ConfigTab.VOZ,
         )
@@ -152,6 +156,8 @@ object RouteCatalog {
             onLanguageClick = {},
             onRequestOverlayPermission = {},
             onRequestKeyboardPermission = {},
+            onRequestMicPermission = {},
+            onSwitchKeyboard = {},
             onSettingsChange = {},
             initialTab = tab,
             initialUnlockOpen = unlockOpen,

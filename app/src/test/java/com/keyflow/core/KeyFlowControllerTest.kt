@@ -8,6 +8,8 @@ class KeyFlowControllerTest {
 
     @Before
     fun resetController() {
+        KeyFlowController.autoPasteInField = true
+        KeyFlowController.autoPasteOnFocus = true
         KeyFlowController.registerInserter { true }
         KeyFlowController.flushPending()
         KeyFlowController.clearInserter()
@@ -37,13 +39,26 @@ class KeyFlowControllerTest {
     }
 
     @Test
-    fun `insertOrHold stores pending text when target rejects insertion`() {
-        KeyFlowController.registerInserter { false }
+    fun `in-field recording with inField paste off goes to clipboard without pending`() {
+        // Regressão: gravar com um campo focado e autoPasteInField desligado deve ir SÓ para a área de
+        // transferência — nunca virar pendente, senão vazaria para o flush de onFocus ao reabrir o campo.
+        KeyFlowController.autoPasteInField = false
+        KeyFlowController.registerInserter { true } // campo focado na gravação
 
-        val outcome = KeyFlowController.insertOrHold("retry")
+        val outcome = KeyFlowController.insertOrHold("typed-in-field")
 
         assertThat(outcome).isEqualTo(InsertOutcome.Held)
-        assertThat(KeyFlowController.pending.value).isEqualTo("retry")
+        assertThat(KeyFlowController.pending.value).isNull()
+    }
+
+    @Test
+    fun `in-field recording is not held as pending when insertion is rejected`() {
+        KeyFlowController.registerInserter { false } // campo focado, mas commit falha
+
+        val outcome = KeyFlowController.insertOrHold("typed-in-field")
+
+        assertThat(outcome).isEqualTo(InsertOutcome.Held)
+        assertThat(KeyFlowController.pending.value).isNull()
     }
 
     @Test

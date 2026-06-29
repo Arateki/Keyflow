@@ -21,7 +21,12 @@ enum class ConfigTab(val label: String, private val strokePaths: List<String>, p
     ),
     VOZ(
         "Voz",
-        listOf("M3.5 10c3 3 13.5 3 17 0", "M3.5 14c3-3 13.5-3 17 0"),
+        // Lábios: arco superior (cupido), lábio inferior e a linha de abertura da boca.
+        listOf(
+            "M4 12 C6.5 9 9.5 9.5 11 11 C11.5 11.5 12.5 11.5 13 11 C14.5 9.5 17.5 9 20 12",
+            "M4 12 C7 15.5 17 15.5 20 12",
+            "M6.5 12.3 C9.5 13.2 14.5 13.2 17.5 12.3",
+        ),
         emptyList(),
     ),
     TECLADO(
@@ -31,7 +36,7 @@ enum class ConfigTab(val label: String, private val strokePaths: List<String>, p
         emptyList(),
     ),
     OVERLAY(
-        "Overlay",
+        "Sobrepor",
         listOf("M3 4 h18 a2 2 0 0 1 2 2 v12 a2 2 0 0 1 -2 2 H3 a2 2 0 0 1 -2 -2 V6 a2 2 0 0 1 2 -2 z"),
         listOf("M16.5 15.5 m-2.6 0 a2.6 2.6 0 1 0 5.2 0 a2.6 2.6 0 1 0 -5.2 0"),
     ),

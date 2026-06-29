@@ -46,7 +46,15 @@ fun DocsPanel(modifier: Modifier = Modifier) {
 
         Section(
             "Modos",
-            "Overlay flutua sobre qualquer app. Keyboard é o teclado do sistema. Use um ou ambos.",
+            "Sobrepor flutua sobre qualquer app, com o teclado do sistema. Teclado é o teclado KeyFlow. Use um ou ambos.",
+        )
+        Section(
+            "Onde o texto aparece",
+            "No modo Sobrepor com o teclado do sistema, o texto transcrito vai para a área de transferência e você é avisado — é só colar. A cola automática só acontece com o teclado KeyFlow ativo (configurável na aba Teclado).",
+        )
+        Section(
+            "Atalhos por toques",
+            "Na orbe, um toque único grava; três toques abrem o seletor de teclado. Toques rápidos seguidos contam como um só atalho — então cliques a mais por engano (ex.: 4) caem no atalho mais próximo abaixo (abre o seletor) e nunca disparam uma gravação acidental. A gravação só começa em um toque único e deliberado.",
         )
         Section(
             "Privacidade",

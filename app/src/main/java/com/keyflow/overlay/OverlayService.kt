@@ -11,6 +11,8 @@ import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
+import android.view.Gravity
+import android.view.View
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
@@ -28,7 +30,9 @@ import com.keyflow.ui.common.ComposeWindowHost
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -48,6 +52,15 @@ class OverlayService : Service() {
     private var floatingButtonParams: WindowManager.LayoutParams? = null
     private var composeHost: ComposeWindowHost? = null
 
+    // Banner de erro clicável (substitui o toast nos erros resolvíveis na Voz).
+    private var errorBanner: View? = null
+    private var errorBannerJob: Job? = null
+
+    // Ciclo de vida desacoplado (Fase 1): a orbe mantém o serviço persistente; o teclado o sobe sob
+    // demanda (só durante a gravação). `overlayActive` = há orbe; `isForeground` = já em primeiro plano.
+    private var overlayActive = false
+    private var isForeground = false
+
     // Settings em cache: o modo de gravação é lido a cada gesto (pode mudar na config).
     @Volatile
     private var cachedSettings: Settings = Settings()
@@ -59,31 +72,77 @@ class OverlayService : Service() {
         settingsRepository = SettingsRepository(this)
         windowManager = getSystemService(WindowManager::class.java)
         recordingNotification = RecordingNotification(this, NOTIFICATION_CHANNEL_ID)
-
-        startForegroundWithMicType()
-
-        if (!OverlayPermission.canDrawOverlays(this)) {
-            stopSelf()
-            return
-        }
+        createNotificationChannel()
 
         cachedSettings = runBlocking { settingsRepository.settingsFlow().first() }
 
         createCoordinator()
         createGestureController()
-        addFloatingButton()
         observeSettings()
         observeControllerState()
         observeOverlayPosition()
-        isRunningForUi = true
+
+        // Se o Modo Sobrepor está ligado (inclui restart sticky), restaura a orbe + serviço persistente.
+        if (cachedSettings.overlayModeEnabled && OverlayPermission.canDrawOverlays(this)) {
+            startOverlay()
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
+            ACTION_START_OVERLAY -> startOverlay()
+            ACTION_KEYBOARD_MIC -> {
+                ensureForeground()
+                if (::coordinator.isInitialized) coordinator.onTap()
+            }
             RecordingNotification.ACTION_PAUSE_RESUME -> handlePauseResume()
             RecordingNotification.ACTION_STOP_PASTE -> handleStopPaste()
         }
         return START_STICKY
+    }
+
+    /** Modo Sobrepor: serviço persistente em primeiro plano + orbe flutuante (se houver permissão). */
+    private fun startOverlay() {
+        ensureForeground()
+        overlayActive = true
+        isRunningForUi = true
+        if (OverlayPermission.canDrawOverlays(this) && floatingButton == null) {
+            addFloatingButton()
+        }
+    }
+
+    /** Promove a primeiro plano (FGS de microfone) sob demanda. Idempotente. */
+    private fun ensureForeground() {
+        if (isForeground) return
+        val notification = recordingNotification.build(
+            if (::coordinator.isInitialized) coordinator.currentState() else ButtonState.IDLE_NO_FIELD,
+        )
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+            isForeground = true
+        } catch (e: Exception) {
+            // Restrição de FGS em background (Android 12+): encerra limpo em vez de crashar.
+            android.util.Log.e("KeyFlow.Overlay", "startForeground falhou: ${e.message}", e)
+            stopSelf()
+        }
+    }
+
+    /**
+     * Sessão sob demanda do teclado: quando a gravação termina (volta a ocioso) e não há orbe, encerra o
+     * serviço — assim não fica notificação de FGS quando ocioso no modo só-teclado.
+     */
+    private fun maybeStopWhenIdle(state: ButtonState) {
+        if (overlayActive || !isForeground) return
+        val idle = state == ButtonState.IDLE_READY || state == ButtonState.IDLE_NO_FIELD
+        if (idle) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            isForeground = false
+            stopSelf()
+        }
     }
 
     private fun handlePauseResume() {
@@ -110,6 +169,7 @@ class OverlayService : Service() {
 
     override fun onDestroy() {
         isRunningForUi = false
+        removeErrorBanner()
         removeFloatingButton()
         serviceScope.cancel()
         super.onDestroy()
@@ -127,14 +187,27 @@ class OverlayService : Service() {
             render = { state ->
                 floatingButton?.render(state)
                 KeyFlowController.updateButtonState(state)
-                postNotification(state)
+                if (isForeground) postNotification(state)
+                maybeStopWhenIdle(state)
             },
             onClipboard = { text ->
                 val cm = getSystemService(ClipboardManager::class.java)
                 cm.setPrimaryClip(ClipData.newPlainText("KeyFlow", text))
-                Toast.makeText(this, "Copiado para a área de transferência", Toast.LENGTH_SHORT).show()
+                // Android 13+ já mostra a própria confirmação de cópia do sistema — não duplicar.
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                    Toast.makeText(this, "Copiado para a área de transferência", Toast.LENGTH_SHORT).show()
+                }
             },
             onShowKeyboardPicker = { showInputMethodPicker() },
+            onError = { message, opensVoz ->
+                KeyFlowController.errorOpensVoz = opensVoz
+                // Erro resolvível + permissão de sobreposição → banner clicável (abre a Voz). Senão toast.
+                if (opensVoz && OverlayPermission.canDrawOverlays(this)) {
+                    showErrorBanner(message)
+                } else {
+                    Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+                }
+            },
         )
     }
 
@@ -147,8 +220,30 @@ class OverlayService : Service() {
 
     private fun observeSettings() {
         serviceScope.launch {
-            settingsRepository.settingsFlow().collect { cachedSettings = it }
+            settingsRepository.settingsFlow().collect {
+                val prevSizePx = cachedSettings.orbSizePx
+                val prevSide = cachedSettings.overlaySide
+                cachedSettings = it
+                KeyFlowController.autoPasteInField = it.autoPasteInField
+                KeyFlowController.autoPasteOnFocus = it.autoPasteOnFocus
+                // Tamanho da orbe ao vivo (slider da aba Sobrepor).
+                if (it.orbSizePx != prevSizePx) floatingButton?.setOrbSizePx(it.orbSizePx)
+                // Posição inicial (lado) ao vivo: encosta a orbe no lado escolhido.
+                if (it.overlaySide != prevSide) snapOrbToSide(it.overlaySide)
+            }
         }
+    }
+
+    /** Encosta a orbe no lado escolhido (posição inicial) e persiste como nova posição. */
+    private fun snapOrbToSide(side: OverlaySide) {
+        val button = floatingButton ?: return
+        val params = floatingButtonParams ?: return
+        val metrics = resources.displayMetrics
+        val orbW = button.width.takeIf { it > 0 } ?: cachedSettings.orbSizePx
+        params.gravity = Gravity.TOP or Gravity.START
+        params.x = if (side == OverlaySide.LEFT) 0 else (metrics.widthPixels - orbW).coerceAtLeast(0)
+        windowManager.updateViewLayout(button, params)
+        serviceScope.launch { settingsRepository.saveOverlayPosition(OverlayPosition(params.x, params.y)) }
     }
 
     private fun addFloatingButton() {
@@ -158,10 +253,11 @@ class OverlayService : Service() {
             controller = gestureController,
             mode = { cachedSettings.overlayRecordingMode },
             onIntent = { intent -> coordinator.onIntent(intent) },
-            orbSize = cachedSettings.orbSize,
+            orbSizePx = cachedSettings.orbSizePx,
             onPositionChanged = { position ->
                 serviceScope.launch { settingsRepository.saveOverlayPosition(position) }
             },
+            onErrorTap = ::openVoz,
         )
 
         button.bindWindowLayout(params) { updatedParams ->
@@ -228,9 +324,89 @@ class OverlayService : Service() {
         }
     }
 
+    /**
+     * Atalho de 3 toques. Se o KeyFlow é o teclado **ativo**, o `showInputMethodPicker()` direto do
+     * serviço é permitido (nosso UID == o do IME atual) e abre o seletor sem nenhuma tela. Senão, o
+     * sistema ignoraria a chamada de background, então caímos numa Activity transparente efêmera.
+     */
     private fun showInputMethodPicker() {
-        val imm = getSystemService(InputMethodManager::class.java)
-        imm.showInputMethodPicker()
+        if (isKeyFlowActiveIme()) {
+            getSystemService(InputMethodManager::class.java)?.showInputMethodPicker()
+        } else {
+            startActivity(
+                Intent(this, com.keyflow.ui.ImePickerActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }
+    }
+
+    private fun isKeyFlowActiveIme(): Boolean {
+        val current = runCatching {
+            android.provider.Settings.Secure.getString(
+                contentResolver,
+                android.provider.Settings.Secure.DEFAULT_INPUT_METHOD,
+            )
+        }.getOrNull().orEmpty()
+        return current.contains("KeyFlowKeyboardService")
+    }
+
+    /** Abre o app direto na aba Voz (clique no X da orbe / no banner de erro). */
+    private fun openVoz() {
+        startActivity(
+            com.keyflow.ui.SetupActivity.openAtVozIntent(this)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
+
+    /** Banner sobreposto, clicável, para erros resolvíveis na Voz. Some sozinho em 1,5 s. */
+    private fun showErrorBanner(message: String) {
+        removeErrorBanner()
+        val d = resources.displayMetrics.density
+        fun dp(v: Int) = (v * d).toInt()
+        // Fundo/letra seguem o tema do app; borda terracota nos dois.
+        val dark = cachedSettings.themeDark
+        val bg = if (dark) 0xFF2B2720.toInt() else 0xFFFBF6E6.toInt()
+        val ink = if (dark) 0xFFF1E7C9.toInt() else 0xFF2B2720.toInt()
+        val banner = android.widget.TextView(this).apply {
+            text = "⚠  $message  ·  toque"
+            setTextColor(ink)
+            textSize = 13f
+            setPadding(dp(18), dp(12), dp(18), dp(12))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                cornerRadius = dp(10).toFloat()
+                setColor(bg)
+                setStroke(dp(1), 0xFFD9694B.toInt())
+            }
+            setOnClickListener {
+                openVoz()
+                removeErrorBanner()
+            }
+        }
+        val config = OverlayWindowConfig.forSdk()
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            config.type,
+            // Tocável (sem NOT_TOUCHABLE), não-focável; toques fora do banner passam para trás.
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+            PixelFormat.TRANSLUCENT,
+        ).apply {
+            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            y = dp(90)
+        }
+        runCatching { windowManager.addView(banner, params) }
+        errorBanner = banner
+        errorBannerJob = serviceScope.launch {
+            delay(2000)
+            removeErrorBanner()
+        }
+    }
+
+    private fun removeErrorBanner() {
+        errorBannerJob?.cancel()
+        errorBannerJob = null
+        errorBanner?.let { runCatching { windowManager.removeView(it) } }
+        errorBanner = null
     }
 
     private fun removeFloatingButton() {
@@ -243,21 +419,14 @@ class OverlayService : Service() {
         floatingButtonParams = null
     }
 
-    private fun startForegroundWithMicType() {
+    private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 NOTIFICATION_CHANNEL_ID,
-                "KeyFlow overlay",
+                "KeyFlow",
                 NotificationManager.IMPORTANCE_LOW,
             )
             getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
-        }
-
-        val notification = recordingNotification.build(ButtonState.IDLE_NO_FIELD)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
         }
     }
 
@@ -291,10 +460,21 @@ class OverlayService : Service() {
         private const val NOTIFICATION_CHANNEL_ID = "keyflow_overlay"
         private const val NOTIFICATION_ID = 1001
 
+        const val ACTION_START_OVERLAY = "com.keyflow.overlay.START_OVERLAY"
+        const val ACTION_KEYBOARD_MIC = "com.keyflow.overlay.KEYBOARD_MIC"
+
         @Volatile
         var isRunningForUi: Boolean = false
             private set
 
         fun intent(context: Context): Intent = Intent(context, OverlayService::class.java)
+
+        /** Inicia/garante o Modo Sobrepor (serviço persistente + orbe). */
+        fun startOverlayIntent(context: Context): Intent =
+            intent(context).apply { action = ACTION_START_OVERLAY }
+
+        /** Sobe o serviço sob demanda para gravar via teclado (sem orbe). */
+        fun keyboardMicIntent(context: Context): Intent =
+            intent(context).apply { action = ACTION_KEYBOARD_MIC }
     }
 }

@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.keyflow.core.TranscriptionSource
@@ -79,6 +80,7 @@ fun VozPanel(
             TranscriptionSource.OPENAI -> KeyProviderFields(
                 provName = "OpenAI",
                 token = settings.openaiToken,
+                models = OPENAI_MODELS,
                 model = settings.openaiModel,
                 language = settings.openaiLanguage.orEmpty(),
                 onToken = { onSettingsChange(settings.copy(openaiToken = it)) },
@@ -88,6 +90,7 @@ fun VozPanel(
             TranscriptionSource.GROQ -> KeyProviderFields(
                 provName = "Groq",
                 token = settings.groqToken,
+                models = GROQ_MODELS,
                 model = settings.groqModel,
                 language = settings.groqLanguage.orEmpty(),
                 onToken = { onSettingsChange(settings.copy(groqToken = it)) },
@@ -104,6 +107,30 @@ private fun sourceLabel(source: TranscriptionSource): String = when (source) {
     TranscriptionSource.OPENAI -> "OpenAI"
     TranscriptionSource.GROQ -> "Groq"
     TranscriptionSource.CUSTOM -> "Custom"
+}
+
+// Modelos de transcrição por provedor (docs OpenAI/Groq, 2026). O 1º é o padrão (Whisper).
+private val OPENAI_MODELS = listOf("whisper-1", "gpt-4o-transcribe", "gpt-4o-mini-transcribe")
+private val GROQ_MODELS = listOf("whisper-large-v3", "whisper-large-v3-turbo", "distil-whisper-large-v3-en")
+private val CUSTOM_MODELS = listOf("whisper-1", "whisper-large-v3", "whisper-large-v3-turbo")
+
+// Idiomas (ISO-639-1) suportados pelo Whisper; "" = detecção automática (padrão).
+private val LANGUAGE_OPTIONS = listOf("", "pt", "en", "es", "fr", "de", "it", "nl", "ja", "zh", "ko", "ru")
+
+internal fun languageLabel(code: String): String = when (code) {
+    "" -> "Automático"
+    "pt" -> "Português"
+    "en" -> "English"
+    "es" -> "Español"
+    "fr" -> "Français"
+    "de" -> "Deutsch"
+    "it" -> "Italiano"
+    "nl" -> "Nederlands"
+    "ja" -> "日本語"
+    "zh" -> "中文"
+    "ko" -> "한국어"
+    "ru" -> "Русский"
+    else -> code
 }
 
 @Composable
@@ -157,6 +184,7 @@ private fun CreditsCard() {
             fontFamily = SpaceGrotesk,
             fontWeight = FontWeight.SemiBold,
             fontSize = 12.5.sp,
+            textAlign = TextAlign.Center,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 13.dp)
@@ -180,18 +208,18 @@ private fun CreditsCard() {
 private fun KeyProviderFields(
     provName: String,
     token: String,
+    models: List<String>,
     model: String,
     language: String,
     onToken: (String) -> Unit,
     onModel: (String) -> Unit,
     onLanguage: (String) -> Unit,
 ) {
-    val palette = LocalKeyFlowPalette.current
     Column(Modifier.padding(top = 16.dp)) {
         AutoSaveField("Token de acesso · $provName", token, onToken, VOZ_TOKEN_TAG, keyboardType = KeyboardType.Password)
         Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-            AutoSaveField("Modelo", model, onModel, VOZ_MODEL_TAG, Modifier.weight(1f))
-            AutoSaveField("Idioma", language, onLanguage, VOZ_LANGUAGE_TAG, Modifier.weight(1f))
+            Dropdown("Modelo", models, model, onModel, VOZ_MODEL_TAG, Modifier.weight(1f))
+            Dropdown("Idioma", LANGUAGE_OPTIONS, language, onLanguage, VOZ_LANGUAGE_TAG, Modifier.weight(1f), display = ::languageLabel)
         }
         HelperNote("A chave fica apenas neste dispositivo. O áudio é enviado direto ao provedor.")
     }
@@ -217,13 +245,14 @@ private fun CustomFields(settings: Settings, onSettingsChange: (Settings) -> Uni
             )
         }
         Row(Modifier.fillMaxWidth().padding(top = 13.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            AutoSaveField(
-                "Modelo", settings.customModel,
+            Dropdown(
+                "Modelo", CUSTOM_MODELS, settings.customModel,
                 { onSettingsChange(settings.copy(customModel = it)) }, VOZ_MODEL_TAG, Modifier.weight(1f),
             )
-            AutoSaveField(
-                "Idioma", settings.customLanguage.orEmpty(),
+            Dropdown(
+                "Idioma", LANGUAGE_OPTIONS, settings.customLanguage.orEmpty(),
                 { onSettingsChange(settings.copy(customLanguage = it.ifBlank { null })) }, VOZ_LANGUAGE_TAG, Modifier.weight(1f),
+                display = ::languageLabel,
             )
         }
         HelperNote("Padrão compatível com Whisper — modelo e idioma usam os valores esperados desse padrão.")

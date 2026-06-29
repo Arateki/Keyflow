@@ -17,6 +17,7 @@
         <!-- Launcher -->
         <activity
             android:name=".ui.SetupActivity"
+            android:launchMode="singleTop"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -24,22 +25,10 @@
             </intent-filter>
         </activity>
 
-        <!-- Production invisible IME (fallback, mantido para compatibilidade) -->
-        <service
-            android:name=".ime.InvisibleKeyboardService"
-            android:exported="true"
-            android:permission="android.permission.BIND_INPUT_METHOD">
-            <intent-filter>
-                <action android:name="android.view.InputMethod" />
-            </intent-filter>
-            <meta-data
-                android:name="android.view.im"
-                android:resource="@xml/method" />
-        </service>
-
         <!-- Teclado KeyFlow: QWERTY + botão de microfone integrado -->
         <service
             android:name=".ime.KeyFlowKeyboardService"
+            android:label="@string/ime_keyboard_label"
             android:exported="true"
             android:permission="android.permission.BIND_INPUT_METHOD">
             <intent-filter>
@@ -49,6 +38,14 @@
                 android:name="android.view.im"
                 android:resource="@xml/method_keyboard" />
         </service>
+
+        <!-- Activity transparente que abre o seletor de teclados (atalho de 3 toques da orbe) -->
+        <activity
+            android:name=".ui.ImePickerActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:taskAffinity=""
+            android:excludeFromRecents="true" />
 
         <!-- Production overlay + microphone foreground service -->
         <service

@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.keyflow.core.RecordingMode
@@ -24,7 +25,8 @@ import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
 import com.keyflow.ui.theme.SpaceMono
 
-const val TECLADO_AUTO_PASTE_TAG = "teclado-auto-paste"
+const val TECLADO_AUTO_PASTE_IN_FIELD_TAG = "teclado-auto-paste-in-field"
+const val TECLADO_AUTO_PASTE_ON_FOCUS_TAG = "teclado-auto-paste-on-focus"
 const val TECLADO_LANGUAGE_TAG = "teclado-language"
 const val TECLADO_UNLOCK_TAG = "teclado-unlock-skins"
 
@@ -49,21 +51,29 @@ fun TecladoPanel(
             .verticalScroll(rememberScrollState())
             .padding(top = 6.dp, bottom = 20.dp),
     ) {
-        Text("Teclado".uppercase(), color = palette.faint, fontFamily = SpaceMono, fontSize = 8.5.sp)
-
-        Row(
-            Modifier.fillMaxWidth().padding(vertical = 13.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text("Colar automaticamente", color = palette.fg, fontFamily = SpaceGrotesk, fontSize = 13.5.sp)
-            PillToggle(
-                checked = settings.keyboardAutoPaste,
-                onCheckedChange = { onSettingsChange(settings.copy(keyboardAutoPaste = it)) },
-                tag = TECLADO_AUTO_PASTE_TAG,
-            )
-        }
-        Box(Modifier.fillMaxWidth().height(1.dp).background(palette.line2))
+        Text("Colar transcrição automaticamente", color = palette.fg, fontFamily = SpaceGrotesk, fontSize = 13.5.sp)
+        Text(
+            "Quando você precisa que sua fala preencha os campos sem sua ação manual.",
+            color = palette.faint,
+            fontFamily = SpaceGrotesk,
+            fontSize = 11.sp,
+            modifier = Modifier.padding(top = 3.dp),
+        )
+        AutoPasteRow(
+            label = "Ao gravar com um campo de texto aberto",
+            sub = "Cola direto quando a transcrição volta.",
+            checked = settings.autoPasteInField,
+            onCheckedChange = { onSettingsChange(settings.copy(autoPasteInField = it)) },
+            tag = TECLADO_AUTO_PASTE_IN_FIELD_TAG,
+        )
+        AutoPasteRow(
+            label = "Ao tocar num campo depois de gravar fora",
+            sub = "Guarda o texto e cola quando você foca um campo.",
+            checked = settings.autoPasteOnFocus,
+            onCheckedChange = { onSettingsChange(settings.copy(autoPasteOnFocus = it)) },
+            tag = TECLADO_AUTO_PASTE_ON_FOCUS_TAG,
+        )
+        Box(Modifier.fillMaxWidth().padding(top = 13.dp).height(1.dp).background(palette.line2))
 
         // Idioma do teclado — inerte nesta fase (i18n real = futuro).
         Row(
@@ -104,5 +114,28 @@ fun TecladoPanel(
 
         Box(Modifier.fillMaxWidth().padding(top = 16.dp).height(1.dp).background(palette.line2))
         SkinsSection(onUnlock = onUnlockSkins, unlockTag = TECLADO_UNLOCK_TAG)
+    }
+}
+
+/** Linha de um cenário de cola automática: rótulo + descrição curta à esquerda, [PillToggle] à direita. */
+@Composable
+private fun AutoPasteRow(
+    label: String,
+    sub: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    tag: String,
+) {
+    val palette = LocalKeyFlowPalette.current
+    Row(
+        Modifier.fillMaxWidth().padding(top = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(label, color = palette.fg2, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Medium, fontSize = 11.5.sp)
+            Text(sub, color = palette.faint, fontFamily = SpaceGrotesk, fontSize = 10.sp, modifier = Modifier.padding(top = 1.dp))
+        }
+        PillToggle(checked = checked, onCheckedChange = onCheckedChange, tag = tag)
     }
 }

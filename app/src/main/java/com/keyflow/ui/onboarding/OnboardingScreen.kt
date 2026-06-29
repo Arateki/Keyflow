@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -52,18 +53,10 @@ fun OnboardingScreen(
         modifier
             .fillMaxSize()
             .background(palette.bg)
+            .systemBarsPadding()
             .padding(horizontal = 26.dp),
     ) {
-        // Status-bar falsa.
-        Row(
-            Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            StatusText("3:02")
-            StatusText("5G · 82%")
-        }
-
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(28.dp))
         VoiceOrb(state = OrbState.Listening, modifier = Modifier.size(98.dp).align(Alignment.CenterHorizontally))
 
         Text(
@@ -130,11 +123,6 @@ fun OnboardingScreen(
                 .padding(top = 12.dp, bottom = 18.dp),
         )
     }
-}
-
-@Composable
-private fun StatusText(text: String) {
-    Text(text, color = LocalKeyFlowPalette.current.faint, fontFamily = SpaceMono, fontSize = 11.sp)
 }
 
 @Composable

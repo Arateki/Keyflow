@@ -2,4 +2,5 @@
 <resources>
     <string name="app_name">KeyFlow</string>
     <string name="ime_subtype_label">KeyFlow</string>
+    <string name="ime_keyboard_label">KeyFlow Teclado</string>
 </resources>
