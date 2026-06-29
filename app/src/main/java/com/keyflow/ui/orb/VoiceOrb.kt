@@ -2,6 +2,7 @@ package com.keyflow.ui.orb
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -20,10 +21,10 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.layout.size
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.material3.Text
 import com.keyflow.ui.theme.SpaceMono
@@ -56,6 +57,8 @@ sealed interface OrbCenter {
     data class Time(val seconds: Int) : OrbCenter
     data object PauseGlyph : OrbCenter
     data object ErrorGlyph : OrbCenter
+    /** Descarte do áudio (cancelar). Glifo de lixeira — usado no estado de cancelamento (Fase 2). */
+    data object CancelGlyph : OrbCenter
 }
 
 private const val TAU = (PI * 2).toFloat()
@@ -70,6 +73,7 @@ private val CoreOuter = Color(0xFFBFE0D4)
 private val RingColor = Color(0xFF4E9683)
 private val CenterInk = Color(0xFF2B2720)
 private val ErrorRed = Color(0xFFD9694B)
+private val CancelAmber = Color(0xFFC9772F) // descarte: terracota/âmbar, distinto do X de erro
 
 @Composable
 fun VoiceOrb(
@@ -82,7 +86,13 @@ fun VoiceOrb(
     val animatedMs = rememberOrbClock(enabled = provided == null)
     val timeMs = provided?.invoke() ?: animatedMs
 
-    Box(modifier, contentAlignment = Alignment.Center) {
+    BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
+        // Lado útil do orbe em px: o conteúdo central (tempo/glifos) escala junto com o tamanho
+        // (slider da aba Sobrepor) em vez de ficar fixo, acompanhando o Canvas (ORB-04, OVL).
+        val sidePx = minOf(constraints.maxWidth, constraints.maxHeight)
+            .takeIf { it in 1..(Int.MAX_VALUE / 2) } ?: DEFAULT_ORB_SIDE_PX
+        val density = LocalDensity.current
+
         Canvas(Modifier.matchParentSize()) { drawOrb(timeMs, state) }
         when (center) {
             is OrbCenter.Time -> Text(
@@ -90,15 +100,22 @@ fun VoiceOrb(
                 color = CenterInk,
                 fontFamily = SpaceMono,
                 fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
+                fontSize = with(density) { (sidePx * TIME_FONT_FRACTION).toSp() },
                 textAlign = TextAlign.Center,
             )
-            OrbCenter.PauseGlyph -> PauseGlyph()
-            OrbCenter.ErrorGlyph -> ErrorGlyph()
+            OrbCenter.PauseGlyph -> PauseGlyph(with(density) { (sidePx * GLYPH_FRACTION).toDp() })
+            OrbCenter.ErrorGlyph -> ErrorGlyph(with(density) { (sidePx * GLYPH_FRACTION).toDp() })
+            OrbCenter.CancelGlyph -> CancelGlyph(with(density) { (sidePx * GLYPH_FRACTION).toDp() })
             OrbCenter.None -> Unit
         }
     }
 }
+
+// Calibrado para o tamanho padrão da orbe (≈156px): mantém o tempo/glifos no mesmo tamanho de antes
+// e os faz crescer/encolher proporcionalmente fora dele.
+private const val DEFAULT_ORB_SIDE_PX = 156
+private const val TIME_FONT_FRACTION = 0.235f
+private const val GLYPH_FRACTION = 0.30f
 
 /** Relógio do orbe em ms. Anima via `withFrameNanos` só quando [enabled] (modo tempo real). */
 @Composable
@@ -116,8 +133,8 @@ private fun rememberOrbClock(enabled: Boolean): Float {
 
 /** Glifo de pause (duas barras) desenhado no centro do orbe (ORB-02/REC-05). */
 @Composable
-private fun PauseGlyph() {
-    Canvas(Modifier.size(18.dp)) {
+private fun PauseGlyph(glyphSize: Dp) {
+    Canvas(Modifier.size(glyphSize)) {
         val barW = size.width * 0.30f
         val barH = size.height
         val gap = size.width * 0.16f
@@ -128,12 +145,40 @@ private fun PauseGlyph() {
 
 /** Glifo de erro (X vermelho) — exibido brevemente quando a transcrição falha. */
 @Composable
-private fun ErrorGlyph() {
-    Canvas(Modifier.size(18.dp)) {
+private fun ErrorGlyph(glyphSize: Dp) {
+    Canvas(Modifier.size(glyphSize)) {
         val pad = size.width * 0.16f
         val sw = size.width * 0.26f // traço mais pesado (como as barras largas do pause), sem aumentar o X
         drawLine(ErrorRed, Offset(pad, pad), Offset(size.width - pad, size.height - pad), strokeWidth = sw, cap = StrokeCap.Round)
         drawLine(ErrorRed, Offset(size.width - pad, pad), Offset(pad, size.height - pad), strokeWidth = sw, cap = StrokeCap.Round)
+    }
+}
+
+/** Glifo de lixeira (descarte do áudio) — exibido no estado de cancelamento (Fase 2). */
+@Composable
+private fun CancelGlyph(glyphSize: Dp) {
+    Canvas(Modifier.size(glyphSize)) {
+        val w = size.width
+        val h = size.height
+        val sw = w * 0.085f
+        val left = w * 0.24f
+        val right = w * 0.76f
+        val lidY = h * 0.28f
+        // Tampa + alça
+        drawLine(CancelAmber, Offset(left - w * 0.04f, lidY), Offset(right + w * 0.04f, lidY), strokeWidth = sw, cap = StrokeCap.Round)
+        drawLine(CancelAmber, Offset(w * 0.40f, lidY), Offset(w * 0.40f, h * 0.18f), strokeWidth = sw, cap = StrokeCap.Round)
+        drawLine(CancelAmber, Offset(w * 0.60f, lidY), Offset(w * 0.60f, h * 0.18f), strokeWidth = sw, cap = StrokeCap.Round)
+        drawLine(CancelAmber, Offset(w * 0.40f, h * 0.18f), Offset(w * 0.60f, h * 0.18f), strokeWidth = sw, cap = StrokeCap.Round)
+        // Corpo (balde) — laterais ligeiramente afuniladas + base
+        val bodyTop = lidY + h * 0.04f
+        val bodyBottom = h * 0.80f
+        drawLine(CancelAmber, Offset(left, bodyTop), Offset(left + w * 0.04f, bodyBottom), strokeWidth = sw, cap = StrokeCap.Round)
+        drawLine(CancelAmber, Offset(right, bodyTop), Offset(right - w * 0.04f, bodyBottom), strokeWidth = sw, cap = StrokeCap.Round)
+        drawLine(CancelAmber, Offset(left + w * 0.04f, bodyBottom), Offset(right - w * 0.04f, bodyBottom), strokeWidth = sw, cap = StrokeCap.Round)
+        // Ranhuras verticais
+        listOf(0.42f, 0.5f, 0.58f).forEach { fx ->
+            drawLine(CancelAmber, Offset(w * fx, bodyTop + h * 0.07f), Offset(w * fx, bodyBottom - h * 0.07f), strokeWidth = sw * 0.7f, cap = StrokeCap.Round)
+        }
     }
 }
 

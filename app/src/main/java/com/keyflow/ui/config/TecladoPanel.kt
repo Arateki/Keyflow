@@ -15,12 +15,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.keyflow.core.RecordingMode
 import com.keyflow.data.Settings
+import com.keyflow.ui.common.verticalScrollbar
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
 import com.keyflow.ui.theme.SpaceMono
@@ -42,13 +44,16 @@ fun TecladoPanel(
     onSettingsChange: (Settings) -> Unit,
     onLanguageClick: () -> Unit,
     onUnlockSkins: () -> Unit,
+    onOverlayRequired: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val palette = LocalKeyFlowPalette.current
+    val scroll = rememberScrollState()
     Column(
         modifier
             .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
+            .verticalScrollbar(scroll, palette.muted.copy(alpha = 0.35f), rightBleed = 9.dp)
+            .verticalScroll(scroll)
             .padding(top = 6.dp, bottom = 20.dp),
     ) {
         Text("Colar transcrição automaticamente", color = palette.fg, fontFamily = SpaceGrotesk, fontSize = 13.5.sp)
@@ -67,11 +72,15 @@ fun TecladoPanel(
             tag = TECLADO_AUTO_PASTE_IN_FIELD_TAG,
         )
         AutoPasteRow(
+            // "Gravar fora" (sem campo focado) só acontece pelo Modo Sobrepor; sem ele a opção não faz
+            // sentido e fica inerte (mesmo estilo de abas/menus inativos), explicando o porquê no toque.
             label = "Ao tocar num campo depois de gravar fora",
             sub = "Guarda o texto e cola quando você foca um campo.",
             checked = settings.autoPasteOnFocus,
             onCheckedChange = { onSettingsChange(settings.copy(autoPasteOnFocus = it)) },
             tag = TECLADO_AUTO_PASTE_ON_FOCUS_TAG,
+            enabled = settings.overlayModeEnabled,
+            onDisabledClick = onOverlayRequired,
         )
         Box(Modifier.fillMaxWidth().padding(top = 13.dp).height(1.dp).background(palette.line2))
 
@@ -117,7 +126,11 @@ fun TecladoPanel(
     }
 }
 
-/** Linha de um cenário de cola automática: rótulo + descrição curta à esquerda, [PillToggle] à direita. */
+/**
+ * Linha de um cenário de cola automática: rótulo + descrição curta à esquerda, [PillToggle] à direita.
+ * Quando [enabled] é falso a linha fica esmaecida (somente-leitura) e o toque chama [onDisabledClick]
+ * em vez de alternar — mesmo padrão das abas/menus inativos.
+ */
 @Composable
 private fun AutoPasteRow(
     label: String,
@@ -125,10 +138,16 @@ private fun AutoPasteRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     tag: String,
+    enabled: Boolean = true,
+    onDisabledClick: () -> Unit = {},
 ) {
     val palette = LocalKeyFlowPalette.current
     Row(
-        Modifier.fillMaxWidth().padding(top = 12.dp),
+        Modifier
+            .fillMaxWidth()
+            .then(if (enabled) Modifier else Modifier.clickable { onDisabledClick() })
+            .padding(top = 12.dp)
+            .then(if (enabled) Modifier else Modifier.alpha(0.45f)),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -136,6 +155,6 @@ private fun AutoPasteRow(
             Text(label, color = palette.fg2, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Medium, fontSize = 11.5.sp)
             Text(sub, color = palette.faint, fontFamily = SpaceGrotesk, fontSize = 10.sp, modifier = Modifier.padding(top = 1.dp))
         }
-        PillToggle(checked = checked, onCheckedChange = onCheckedChange, tag = tag)
+        PillToggle(checked = checked, onCheckedChange = onCheckedChange, tag = tag, enabled = enabled)
     }
 }

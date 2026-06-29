@@ -47,9 +47,28 @@ class KeyFlowKeyboardService : InputMethodService() {
                 KeyFlowController.autoPasteOnFocus = it.autoPasteOnFocus
             }
         }
+        // Atalho da orbe: alterna retrair/expandir, reusando o mesmo caminho do botão de ocultar.
+        serviceScope.launch {
+            KeyFlowController.toggleKeyboardExpand.collect {
+                val next = !preferExpanded
+                preferExpanded = next
+                keyboardView?.setExpanded(next)
+            }
+        }
+    }
+
+    override fun onWindowShown() {
+        super.onWindowShown()
+        KeyFlowController.setKeyboardVisible(true)
+    }
+
+    override fun onWindowHidden() {
+        super.onWindowHidden()
+        KeyFlowController.setKeyboardVisible(false)
     }
 
     override fun onDestroy() {
+        KeyFlowController.setKeyboardVisible(false)
         serviceScope.cancel()
         super.onDestroy()
     }

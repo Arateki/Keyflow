@@ -4,7 +4,11 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.os.Build
 import android.os.SystemClock
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.WindowManager
@@ -44,12 +48,23 @@ class OrbButtonView(
     private val gestures: GestureInterpreter = GestureInterpreter(),
     private val onPositionChanged: (OverlayPosition) -> Unit = {},
     private val onErrorTap: () -> Unit = {},
+    // Atalho de N toques (2/3) resolvido fora (OverlayService): mapeia para ação + gating idle/pause.
+    private val onShortcut: (Int) -> Unit = {},
+    // Retorno tátil (vibração) ao interagir com a orbe — lido das Settings pelo OverlayService.
+    private val hapticEnabled: () -> Boolean = { false },
     orbSizePx: Int = 156,
     private val releaseWindowMs: Long = DEFAULT_RELEASE_WINDOW_MS,
-    // Janela máxima entre toques de uma "rajada" de atalho (threshold; futuro: configurável).
-    private val tapBurstWindowMs: Long = DEFAULT_TAP_BURST_WINDOW_MS,
+    // Janela máxima entre toques de uma "rajada" de atalho (threshold configurável na aba Sobrepor).
+    tapBurstWindowMs: Long = DEFAULT_TAP_BURST_WINDOW_MS,
     private val clock: () -> Long = { SystemClock.elapsedRealtime() },
 ) : FrameLayout(context) {
+
+    // Threshold da rajada de toques, ajustável ao vivo pelo slider de Atalhos (aba Sobrepor).
+    private var tapBurstWindowMs: Long = tapBurstWindowMs
+
+    fun setTapBurstWindowMs(ms: Long) {
+        if (ms > 0) tapBurstWindowMs = ms
+    }
 
     var renderedState: ButtonState = ButtonState.IDLE_NO_FIELD
         private set
@@ -164,6 +179,7 @@ class OrbButtonView(
                     if (com.keyflow.core.KeyFlowController.errorOpensVoz) onErrorTap()
                     return true
                 }
+                if (hapticEnabled()) vibrateTick()
                 cancelReleaseTimeout()
                 parent?.requestDisallowInterceptTouchEvent(true)
                 startRawX = event.rawX
@@ -245,18 +261,19 @@ class OrbButtonView(
     }
 
     private fun onUpPushToTalk(eventType: GestureEvent?) {
-        // Resolve a partida adiada: um toque rápido sem arrasto dispara o START que estava pendente;
-        // triplo-tap (e arrasto, já tratado no MOVE) não gravam.
+        // Tap curto: o dedo soltou antes do hold confirmar (a gravação ainda não começou). Não grava
+        // já — conta como toque de rajada para que o atalho de 3 toques seja detectado (igual TOGGLE).
+        // A rajada assenta após o threshold: 1 → nada (PTT é segurar), ≥3 → seletor (Yan).
         if (pttStartArmed) {
             cancelPttStart()
             pttStartArmed = false
-            if (eventType != GestureEvent.TRIPLE_TAP) {
-                emit(TouchSignal.DOWN) // dispara o START adiado
-                pttStarted = true
-            }
+            if (!dragging) registerBurstTap()
+            pttStarted = false
+            pttSuppressedByDrag = false
+            return
         }
+        // Gravação já confirmada (hold) ou ciclo dentro da janela de release: fluxo PTT normal.
         when (eventType) {
-            GestureEvent.TRIPLE_TAP -> emit(TouchSignal.TRIPLE_TAP)
             GestureEvent.DRAG_END -> {
                 emit(TouchSignal.UP) // soltar encerra a fala; o arrasto só reposicionou
                 persistCurrentPosition()
@@ -277,11 +294,14 @@ class OrbButtonView(
             if (pttStartArmed) {
                 pttStartArmed = false
                 pttStarted = true
+                cancelTapBurst() // virou hold de gravação: descarta rajada de toques pendente
                 emit(TouchSignal.DOWN) // dedo ficou parado → inicia a gravação
             }
         }
         pendingPttStart = r
-        handler.postDelayed(r, PTT_START_CONFIRM_MS)
+        // Mesmo threshold da rajada do TOGGLE: adia a confirmação da gravação para que uma rajada de
+        // toques curtos (atalho de 3 toques) seja reconhecida antes de começar a gravar (Yan).
+        handler.postDelayed(r, tapBurstWindowMs)
     }
 
     private fun cancelPttStart() {
@@ -291,6 +311,26 @@ class OrbButtonView(
 
     private fun emit(signal: TouchSignal) {
         onIntent(controller.onSignal(signal))
+    }
+
+    private val vibrator: Vibrator? by lazy {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            context.getSystemService(VibratorManager::class.java)?.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            context.getSystemService(Vibrator::class.java)
+        }
+    }
+
+    /** Pulso tátil curto ao interagir com a orbe (retorno tátil configurável). */
+    private fun vibrateTick() {
+        val vib = vibrator?.takeIf { it.hasVibrator() } ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vib.vibrate(VibrationEffect.createOneShot(18L, VibrationEffect.DEFAULT_AMPLITUDE))
+        } else {
+            @Suppress("DEPRECATION")
+            vib.vibrate(18L)
+        }
     }
 
     /**
@@ -305,15 +345,17 @@ class OrbButtonView(
         handler.postDelayed(r, tapBurstWindowMs)
     }
 
-    /** Resolve a rajada assentada: 1 → grava; ≥3 → seletor (atalho mais próximo abaixo); 2 → nada. */
+    /**
+     * Resolve a rajada assentada: 1 toque segue o gesto do modo (grava/para/etc); 2 e 3 toques são
+     * atalhos configuráveis (resolvidos por [onShortcut], que aplica o gating idle/pause e o mapeamento).
+     */
     private fun resolveTapBurst() {
         val count = tapBurstCount
         tapBurstCount = 0
         tapBurstRunnable = null
         when {
             count == 1 -> emit(TouchSignal.TAP)
-            count >= 3 -> emit(TouchSignal.TRIPLE_TAP)
-            else -> Unit // rajada ≥2 sem atalho exato (ex.: 2) não faz nada — e nunca grava
+            count >= 2 -> onShortcut(count) // 2/3 = atalho; >3 cai na política de overflow (OverlayService)
         }
     }
 
@@ -394,9 +436,7 @@ class OrbButtonView(
     private companion object {
         const val TICK_MS = 500L
         const val DEFAULT_RELEASE_WINDOW_MS = 350L
-        // Janela curta para distinguir "segurar para gravar" de "arrastar para mover" no PTT ocioso.
-        const val PTT_START_CONFIRM_MS = 130L
         // Janela de rajada de toques (threshold padrão; futuro: configurável pelo usuário).
-        const val DEFAULT_TAP_BURST_WINDOW_MS = 300L
+        const val DEFAULT_TAP_BURST_WINDOW_MS = 250L
     }
 }

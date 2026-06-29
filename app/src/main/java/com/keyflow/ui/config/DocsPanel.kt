@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.keyflow.core.RecordingMode
+import com.keyflow.ui.common.verticalScrollbar
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
 import com.keyflow.ui.theme.SpaceMono
@@ -31,10 +32,12 @@ const val DOCS_PAUSE_TAG = "docs-pausa"
 @Composable
 fun DocsPanel(modifier: Modifier = Modifier) {
     val palette = LocalKeyFlowPalette.current
+    val scroll = rememberScrollState()
     Column(
         modifier
             .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
+            .verticalScrollbar(scroll, palette.muted.copy(alpha = 0.35f), rightBleed = 9.dp)
+            .verticalScroll(scroll)
             .padding(top = 6.dp, bottom = 24.dp),
     ) {
         Text("Como funciona".uppercase(), color = palette.faint, fontFamily = SpaceMono, fontSize = 8.5.sp)

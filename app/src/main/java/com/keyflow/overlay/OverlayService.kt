@@ -19,6 +19,7 @@ import android.widget.Toast
 import com.keyflow.audio.AudioRecorder
 import com.keyflow.core.ButtonState
 import com.keyflow.core.KeyFlowController
+import com.keyflow.core.OrbShortcutAction
 import com.keyflow.core.OverlaySide
 import com.keyflow.core.RecordingMode
 import com.keyflow.data.Config
@@ -223,11 +224,16 @@ class OverlayService : Service() {
             settingsRepository.settingsFlow().collect {
                 val prevSizePx = cachedSettings.orbSizePx
                 val prevSide = cachedSettings.overlaySide
+                val prevTapBurst = cachedSettings.tapBurstWindowMs
                 cachedSettings = it
                 KeyFlowController.autoPasteInField = it.autoPasteInField
                 KeyFlowController.autoPasteOnFocus = it.autoPasteOnFocus
                 // Tamanho da orbe ao vivo (slider da aba Sobrepor).
                 if (it.orbSizePx != prevSizePx) floatingButton?.setOrbSizePx(it.orbSizePx)
+                // Intervalo entre toques ao vivo (slider de Atalhos).
+                if (it.tapBurstWindowMs != prevTapBurst) {
+                    floatingButton?.setTapBurstWindowMs(it.tapBurstWindowMs.toLong())
+                }
                 // Posição inicial (lado) ao vivo: encosta a orbe no lado escolhido.
                 if (it.overlaySide != prevSide) snapOrbToSide(it.overlaySide)
             }
@@ -254,10 +260,13 @@ class OverlayService : Service() {
             mode = { cachedSettings.overlayRecordingMode },
             onIntent = { intent -> coordinator.onIntent(intent) },
             orbSizePx = cachedSettings.orbSizePx,
+            tapBurstWindowMs = cachedSettings.tapBurstWindowMs.toLong(),
             onPositionChanged = { position ->
                 serviceScope.launch { settingsRepository.saveOverlayPosition(position) }
             },
             onErrorTap = ::openVoz,
+            onShortcut = ::handleOrbShortcut,
+            hapticEnabled = { cachedSettings.hapticFeedback },
         )
 
         button.bindWindowLayout(params) { updatedParams ->
@@ -329,6 +338,27 @@ class OverlayService : Service() {
      * serviço é permitido (nosso UID == o do IME atual) e abre o seletor sem nenhuma tela. Senão, o
      * sistema ignoraria a chamada de background, então caímos numa Activity transparente efêmera.
      */
+    /**
+     * Atalho de N toques (2/3) da orbe. Só age em idle/pause (REC). Resolve a ação configurada e a
+     * executa reusando os mecanismos existentes; o "trocar teclado" mantém a técnica do showInputMethodPicker.
+     */
+    private fun handleOrbShortcut(count: Int) {
+        if (!::coordinator.isInitialized) return
+        val state = coordinator.currentState()
+        val idleOrPaused = state == ButtonState.IDLE_READY ||
+            state == ButtonState.IDLE_NO_FIELD ||
+            state == ButtonState.PAUSED
+        if (!idleOrPaused) return
+
+        when (cachedSettings.resolveShortcut(count)) {
+            OrbShortcutAction.NONE -> Unit
+            OrbShortcutAction.SWITCH_IME -> showInputMethodPicker()
+            // Só alterna se o teclado estiver realmente aberto na tela; senão não faz nada.
+            OrbShortcutAction.TOGGLE_KEYBOARD ->
+                if (KeyFlowController.keyboardVisible.value) KeyFlowController.requestToggleKeyboardExpand()
+        }
+    }
+
     private fun showInputMethodPicker() {
         if (isKeyFlowActiveIme()) {
             getSystemService(InputMethodManager::class.java)?.showInputMethodPicker()

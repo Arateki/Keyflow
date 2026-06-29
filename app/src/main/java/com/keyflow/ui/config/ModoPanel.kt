@@ -1,5 +1,6 @@
 package com.keyflow.ui.config
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -21,7 +22,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,6 +39,7 @@ import com.keyflow.core.RecordingMode
 import com.keyflow.data.Settings
 import com.keyflow.ime.KeyFlowKeyboardView
 import com.keyflow.ui.PermissionStatus
+import com.keyflow.ui.common.verticalScrollbar
 import com.keyflow.ui.orb.OrbCenter
 import com.keyflow.ui.orb.OrbState
 import com.keyflow.ui.orb.VoiceOrb
@@ -64,6 +68,8 @@ fun ModoPanel(
     onRequestMicPermission: () -> Unit,
     onSwitchKeyboard: () -> Unit,
     modifier: Modifier = Modifier,
+    overlayHighlightKey: Int = 0,
+    keyboardHighlightKey: Int = 0,
 ) {
     // Permissão de microfone, repetida e sincronizada nos dois cards (mesmo estado).
     val micPermission = CardPermission(
@@ -72,10 +78,13 @@ fun ModoPanel(
         onActivate = onRequestMicPermission,
         activateTag = ACTIVATE_MIC_TAG,
     )
+    val scroll = rememberScrollState()
+    val scrollbarColor = LocalKeyFlowPalette.current.muted.copy(alpha = 0.25f)
     Column(
         modifier
             .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
+            .verticalScrollbar(scroll, scrollbarColor, rightBleed = 9.dp)
+            .verticalScroll(scroll)
             .padding(top = 2.dp, bottom = 20.dp),
         verticalArrangement = Arrangement.spacedBy(11.dp),
     ) {
@@ -84,6 +93,7 @@ fun ModoPanel(
             checked = settings.overlayModeEnabled,
             onCheckedChange = onOverlayModeChange,
             toggleTag = TOGGLE_OVERLAY_MODE_TAG,
+            highlightKey = overlayHighlightKey,
             permissions = listOf(
                 micPermission,
                 CardPermission(
@@ -114,6 +124,7 @@ fun ModoPanel(
             checked = settings.keyboardModeEnabled,
             onCheckedChange = onKeyboardModeChange,
             toggleTag = TOGGLE_KEYBOARD_MODE_TAG,
+            highlightKey = keyboardHighlightKey,
             permissions = listOf(
                 micPermission,
                 CardPermission(
@@ -216,13 +227,30 @@ private fun ModeCard(
     features: List<String>,
     footer: (@Composable () -> Unit)? = null,
     demo: (@Composable () -> Unit)? = null,
+    highlightKey: Int = 0,
 ) {
     val palette = LocalKeyFlowPalette.current
+    // Insight visual discreto: ao chegar de um aviso, o card pulsa uma borda teal que esvai.
+    val highlight = remember { Animatable(0f) }
+    LaunchedEffect(highlightKey) {
+        if (highlightKey > 0) {
+            highlight.snapTo(1f)
+            highlight.animateTo(0f, animationSpec = tween(durationMillis = 1700))
+        }
+    }
+    val shape = RoundedCornerShape(6.dp)
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(6.dp))
-            .border(1.dp, palette.line, RoundedCornerShape(6.dp))
+            .clip(shape)
+            .border(1.dp, palette.line, shape)
+            .then(
+                if (highlight.value > 0f) {
+                    Modifier.border(2.dp, palette.teal.copy(alpha = highlight.value), shape)
+                } else {
+                    Modifier
+                },
+            )
             .background(palette.card)
             .padding(horizontal = 12.dp, vertical = 11.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),

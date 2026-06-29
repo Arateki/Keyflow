@@ -14,8 +14,10 @@ import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.keyflow.core.OrbShortcutAction
 import com.keyflow.core.OverlaySide
 import com.keyflow.core.RecordingMode
+import com.keyflow.core.ShortcutOverflow
 import com.keyflow.core.TranscriptionSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -83,7 +85,12 @@ class SettingsRepository(
             autoPasteInField = prefs[AUTO_PASTE_IN_FIELD] ?: prefs[KEYBOARD_AUTO_PASTE] ?: true,
             autoPasteOnFocus = prefs[AUTO_PASTE_ON_FOCUS] ?: prefs[KEYBOARD_AUTO_PASTE] ?: true,
             overlaySide = prefs[OVERLAY_SIDE].toOverlaySide(),
-            orbSizePx = prefs[ORB_SIZE_PX] ?: 156,
+            orbSizePx = prefs[ORB_SIZE_PX] ?: 195,
+            tapBurstWindowMs = prefs[TAP_BURST_WINDOW_MS] ?: 250,
+            shortcut2Tap = prefs[SHORTCUT_2_TAP].toShortcutAction(OrbShortcutAction.TOGGLE_KEYBOARD),
+            shortcut3Tap = prefs[SHORTCUT_3_TAP].toShortcutAction(OrbShortcutAction.SWITCH_IME),
+            shortcutOverflow = prefs[SHORTCUT_OVERFLOW].toShortcutOverflow(),
+            hapticFeedback = prefs[HAPTIC_FEEDBACK] ?: true,
             themeDark = prefs[THEME_DARK] ?: false,
             onboardingDone = prefs[ONBOARDING_DONE] ?: false,
         )
@@ -119,6 +126,11 @@ class SettingsRepository(
             prefs[AUTO_PASTE_ON_FOCUS] = settings.autoPasteOnFocus
             prefs[OVERLAY_SIDE] = settings.overlaySide.name
             prefs[ORB_SIZE_PX] = settings.orbSizePx
+            prefs[TAP_BURST_WINDOW_MS] = settings.tapBurstWindowMs
+            prefs[SHORTCUT_2_TAP] = settings.shortcut2Tap.name
+            prefs[SHORTCUT_3_TAP] = settings.shortcut3Tap.name
+            prefs[SHORTCUT_OVERFLOW] = settings.shortcutOverflow.name
+            prefs[HAPTIC_FEEDBACK] = settings.hapticFeedback
             prefs[THEME_DARK] = settings.themeDark
             prefs[ONBOARDING_DONE] = settings.onboardingDone
         }
@@ -173,6 +185,14 @@ class SettingsRepository(
         ?.let { runCatching { OverlaySide.valueOf(it) }.getOrNull() }
         ?: OverlaySide.RIGHT
 
+    private fun String?.toShortcutAction(default: OrbShortcutAction): OrbShortcutAction = this
+        ?.let { runCatching { OrbShortcutAction.valueOf(it) }.getOrNull() }
+        ?: default
+
+    private fun String?.toShortcutOverflow(): ShortcutOverflow = this
+        ?.let { runCatching { ShortcutOverflow.valueOf(it) }.getOrNull() }
+        ?: ShortcutOverflow.NEAREST_DOWN
+
     private companion object {
         const val DATASTORE_NAME = "keyflow_settings"
         const val SECURE_PREFS_NAME = "keyflow_secure"
@@ -202,6 +222,11 @@ class SettingsRepository(
         val AUTO_PASTE_ON_FOCUS = booleanPreferencesKey("auto_paste_on_focus")
         val OVERLAY_SIDE = stringPreferencesKey("overlay_side")
         val ORB_SIZE_PX = intPreferencesKey("orb_size_px")
+        val TAP_BURST_WINDOW_MS = intPreferencesKey("tap_burst_window_ms")
+        val SHORTCUT_2_TAP = stringPreferencesKey("shortcut_2_tap")
+        val SHORTCUT_3_TAP = stringPreferencesKey("shortcut_3_tap")
+        val SHORTCUT_OVERFLOW = stringPreferencesKey("shortcut_overflow")
+        val HAPTIC_FEEDBACK = booleanPreferencesKey("haptic_feedback")
         val THEME_DARK = booleanPreferencesKey("theme_dark")
         val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
         const val OPENAI_TOKEN = "openai_token"

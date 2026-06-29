@@ -32,6 +32,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.keyflow.core.OrbShortcutAction
 import com.keyflow.data.Settings
 import com.keyflow.ui.PermissionStatus
 import com.keyflow.ui.common.SaveController
@@ -80,6 +81,8 @@ fun ConfigScreen(
     val palette = LocalKeyFlowPalette.current
     var activeTab by rememberSaveable { mutableStateOf(initialTab) }
     var unlockOpen by rememberSaveable { mutableStateOf(initialUnlockOpen) }
+    // Atalho da orbe com o bottom sheet aberto (2 ou 3 toques); null = fechado.
+    var shortcutSheetTaps by remember { mutableStateOf<Int?>(null) }
 
     // Navegação externa (clique no erro → Voz). A chave dispara mesmo repetindo a mesma aba.
     LaunchedEffect(requestedTabKey) {
@@ -105,16 +108,39 @@ fun ConfigScreen(
     var toastMessage by remember { mutableStateOf<String?>(null) }
     var toastDuration by remember { mutableStateOf(1500L) }
     var toastGeneration by remember { mutableStateOf(0) }
+    // Ação opcional do toast: torna a mensagem clicável e leva à opção que resolve o aviso.
+    var toastAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    // Pulso de destaque discreto nos cards da aba Modo (insight visual ao navegar do aviso).
+    var overlayHighlightKey by remember { mutableStateOf(0) }
+    var keyboardHighlightKey by remember { mutableStateOf(0) }
     LaunchedEffect(toastGeneration) {
         if (toastMessage != null) {
             kotlinx.coroutines.delay(toastDuration)
             toastMessage = null
+            toastAction = null
         }
     }
-    fun showToast(text: String, durationMs: Long) {
+    fun showToast(text: String, durationMs: Long, action: (() -> Unit)? = null) {
         toastMessage = text
         toastDuration = durationMs
+        toastAction = action
         toastGeneration++
+    }
+
+    // Navegação do aviso → aba Modo, destacando o card do modo que resolve o bloqueio. Null = sem atalho.
+    fun navActionFor(tab: ConfigTab): (() -> Unit)? = when (tab) {
+        ConfigTab.OVERLAY -> {
+            { activeTab = ConfigTab.MODO; overlayHighlightKey++ }
+        }
+        ConfigTab.TECLADO -> {
+            { activeTab = ConfigTab.MODO; keyboardHighlightKey++ }
+        }
+        else -> null
+    }
+
+    // Aviso de opção que depende do Modo Sobrepor: clicar leva à aba Modo e destaca o card do modo.
+    val onOverlayRequired: () -> Unit = {
+        showToast("Disponível só com o Modo Sobrepor ligado.", 2500, action = navActionFor(ConfigTab.OVERLAY))
     }
     fun blockReason(tab: ConfigTab): String? = when (tab) {
         ConfigTab.TECLADO -> when {
@@ -158,7 +184,7 @@ fun ConfigScreen(
                 enabled = enabled,
                 onSelect = { tab ->
                     activeTab = tab
-                    if (!enabled(tab)) blockReason(tab)?.let { showToast(it, 1500) }
+                    if (!enabled(tab)) blockReason(tab)?.let { showToast(it, 2500, navActionFor(tab)) }
                 },
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
             )
@@ -182,6 +208,8 @@ fun ConfigScreen(
                             onRequestKeyboardPermission = onRequestKeyboardPermission,
                             onRequestMicPermission = onRequestMicPermission,
                             onSwitchKeyboard = onSwitchKeyboard,
+                            overlayHighlightKey = overlayHighlightKey,
+                            keyboardHighlightKey = keyboardHighlightKey,
                         )
                         ConfigTab.VOZ -> VozPanel(
                             settings = settings,
@@ -192,11 +220,14 @@ fun ConfigScreen(
                             onSettingsChange = onSettingsChange,
                             onLanguageClick = onLanguageClick,
                             onUnlockSkins = { unlockOpen = true },
+                            onOverlayRequired = onOverlayRequired,
                         )
                         ConfigTab.OVERLAY -> OverlayPanel(
                             settings = settings,
                             onSettingsChange = onSettingsChange,
                             onUnlockSkins = { unlockOpen = true },
+                            onOpenShortcutSheet = { shortcutSheetTaps = it },
+                            keyboardShortcutAvailable = permissions.keyboardActive,
                         )
                         ConfigTab.DOCS -> DocsPanel()
                     }
@@ -213,7 +244,7 @@ fun ConfigScreen(
                                     while (true) {
                                         val event = awaitPointerEvent()
                                         if (event.type == PointerEventType.Press) {
-                                            blockReason(activeTab)?.let { showToast(it, 1500) }
+                                            blockReason(activeTab)?.let { showToast(it, 2500, navActionFor(activeTab)) }
                                         }
                                         event.changes.forEach { it.consume() }
                                     }
@@ -224,17 +255,45 @@ fun ConfigScreen(
             }
         }
         SaveToast(saveController, Modifier.fillMaxSize().systemBarsPadding())
-        MessageToast(message = toastMessage, modifier = Modifier.fillMaxSize().systemBarsPadding())
+        MessageToast(
+            message = toastMessage,
+            onClick = toastAction?.let {
+                {
+                    it()
+                    toastMessage = null
+                    toastAction = null
+                }
+            },
+            modifier = Modifier.fillMaxSize().systemBarsPadding(),
+        )
         UnlockSheet(visible = unlockOpen, onDismiss = { unlockOpen = false })
+        ShortcutActionSheet(
+            taps = shortcutSheetTaps,
+            current = shortcutSheetTaps?.let { settings.shortcutForTaps(it) } ?: OrbShortcutAction.NONE,
+            keyboardAvailable = permissions.keyboardActive,
+            onSelect = { action ->
+                when (shortcutSheetTaps) {
+                    2 -> onSettingsChange(settings.copy(shortcut2Tap = action))
+                    3 -> onSettingsChange(settings.copy(shortcut3Tap = action))
+                }
+            },
+            onBlockedKeyboard = {
+                showToast("Ative o Modo Teclado para usar este atalho.", 2500, navActionFor(ConfigTab.TECLADO))
+            },
+            onDismiss = { shortcutSheetTaps = null },
+        )
     }
 }
 
 const val MESSAGE_TOAST_TAG = "message-toast"
 const val READONLY_SCRIM_TAG = "readonly-scrim"
 
-/** Toast discreto (aba travada, avisos de modo). Visível enquanto [message] não for nulo. */
+/**
+ * Toast discreto (aba travada, avisos de modo). Visível enquanto [message] não for nulo. Quando
+ * [onClick] é fornecido, a mensagem vira um atalho tocável que leva à opção que resolve o aviso.
+ */
 @Composable
-private fun MessageToast(message: String?, modifier: Modifier = Modifier) {
+private fun MessageToast(message: String?, onClick: (() -> Unit)? = null, modifier: Modifier = Modifier) {
     val palette = LocalKeyFlowPalette.current
     Box(modifier, contentAlignment = Alignment.BottomCenter) {
         if (message != null) {
@@ -248,6 +307,7 @@ private fun MessageToast(message: String?, modifier: Modifier = Modifier) {
                     .padding(bottom = 22.dp, start = 22.dp, end = 22.dp)
                     .clip(RoundedCornerShape(6.dp))
                     .background(palette.fg)
+                    .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
                     .padding(horizontal = 14.dp, vertical = 9.dp)
                     .testTag(MESSAGE_TOAST_TAG),
             )

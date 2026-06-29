@@ -26,9 +26,22 @@ object KeyFlowController {
     private val _buttonState = MutableStateFlow<ButtonState>(ButtonState.IDLE_NO_FIELD)
     val buttonState: StateFlow<ButtonState> = _buttonState.asStateFlow()
 
+    // Teclado KeyFlow visível na tela (janela do IME mostrada). Usado para gatear o atalho de
+    // retrair/expandir: a orbe não tenta alterar se o teclado não estiver aberto.
+    private val _keyboardVisible = MutableStateFlow(false)
+    val keyboardVisible: StateFlow<Boolean> = _keyboardVisible.asStateFlow()
+
+    fun setKeyboardVisible(visible: Boolean) {
+        _keyboardVisible.value = visible
+    }
+
     // Sinal de tap vindo do teclado → processado pelo OverlayService
     private val _tapRequest = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val tapRequest: SharedFlow<Unit> = _tapRequest.asSharedFlow()
+
+    // Atalho da orbe (overlay) → IME: alterna retrair/expandir o teclado KeyFlow.
+    private val _toggleKeyboardExpand = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val toggleKeyboardExpand: SharedFlow<Unit> = _toggleKeyboardExpand.asSharedFlow()
 
     private var inserter: ((String) -> Boolean)? = null
 
@@ -64,6 +77,12 @@ object KeyFlowController {
     fun requestTap() {
         _tapRequest.tryEmit(Unit)
         Log.d(TAG, "requestTap")
+    }
+
+    /** Pede ao IME para alternar retrair/expandir (atalho da orbe). No-op se o IME não estiver coletando. */
+    fun requestToggleKeyboardExpand() {
+        _toggleKeyboardExpand.tryEmit(Unit)
+        Log.d(TAG, "requestToggleKeyboardExpand")
     }
 
     fun updateButtonState(state: ButtonState) {

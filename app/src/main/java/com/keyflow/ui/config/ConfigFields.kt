@@ -109,7 +109,12 @@ internal fun <T> Segmented(
 
 /** Pílula de toggle no estilo Ateliê (track preenchido quando ligado; knob `onFill`). */
 @Composable
-internal fun PillToggle(checked: Boolean, onCheckedChange: (Boolean) -> Unit, tag: String) {
+internal fun PillToggle(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    tag: String,
+    enabled: Boolean = true,
+) {
     val palette = LocalKeyFlowPalette.current
     val knobX by animateDpAsState(if (checked) 22.dp else 3.dp, label = "knobX")
     Box(
@@ -117,7 +122,7 @@ internal fun PillToggle(checked: Boolean, onCheckedChange: (Boolean) -> Unit, ta
             .size(width = 44.dp, height = 25.dp)
             .clip(RoundedCornerShape(14.dp))
             .background(if (checked) palette.teal else palette.line)
-            .clickable { onCheckedChange(!checked) }
+            .clickable(enabled = enabled) { onCheckedChange(!checked) }
             .testTag(tag),
     ) {
         Box(
@@ -289,7 +294,7 @@ internal fun SkinsSection(onUnlock: () -> Unit, unlockTag: String, modifier: Mod
             .padding(top = 15.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Skins".uppercase(), color = palette.faint, fontFamily = SpaceMono, fontSize = 8.5.sp)
+            Text("Skins", color = palette.fg, fontFamily = SpaceGrotesk, fontSize = 13.5.sp)
             Row(
                 Modifier
                     .clip(RoundedCornerShape(2.dp))
