@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Notificação Ateliê de gravação (NOTIF-01..03). RemoteViews: só views suportadas. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/notif_root"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
@@ -38,6 +39,7 @@
                 android:layout_height="wrap_content"
                 android:text="● Gravando"
                 android:textColor="#F1E7C9"
+                android:fontFamily="@font/space_mono_bold"
                 android:textStyle="bold"
                 android:textSize="14sp" />
 
@@ -97,4 +99,15 @@
         android:background="@drawable/notif_chip_amber"
         android:padding="9dp"
         android:contentDescription="Cancelar" />
+
+    <ImageView
+        android:id="@+id/notif_config"
+        android:layout_width="38dp"
+        android:layout_height="38dp"
+        android:src="@drawable/ic_notif_config"
+        android:scaleType="centerInside"
+        android:background="@drawable/notif_chip_teal"
+        android:padding="9dp"
+        android:layout_marginStart="8dp"
+        android:contentDescription="Abrir KeyFlow" />
 </LinearLayout>
