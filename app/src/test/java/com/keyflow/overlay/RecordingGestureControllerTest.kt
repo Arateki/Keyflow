@@ -52,6 +52,24 @@ class RecordingGestureControllerTest {
     }
 
     @Test
+    fun `toggle tap during cancelling commits the cancel`() {
+        mode = RecordingMode.TOGGLE
+        val c = controller()
+        c.dispatch(TouchSignal.TAP) // RECORDING
+        machine.onCancel()          // CANCELLING
+        assertThat(c.onSignal(TouchSignal.TAP)).isEqualTo(GestureIntent.CANCEL_COMMIT)
+    }
+
+    @Test
+    fun `ptt tap during cancelling commits the cancel`() {
+        mode = RecordingMode.PUSH_TO_TALK
+        val c = controller()
+        machine.onStart()  // RECORDING
+        machine.onCancel() // CANCELLING
+        assertThat(c.onSignal(TouchSignal.TAP)).isEqualTo(GestureIntent.CANCEL_COMMIT)
+    }
+
+    @Test
     fun `toggle hold pauses and resumes recording`() {
         mode = RecordingMode.TOGGLE
         val c = controller()

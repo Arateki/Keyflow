@@ -79,7 +79,6 @@ class SettingsRepository(
             overlayModeEnabled = prefs[OVERLAY_MODE_ENABLED] ?: false,
             keyboardModeEnabled = prefs[KEYBOARD_MODE_ENABLED] ?: false,
             overlayRecordingMode = prefs[OVERLAY_RECORDING_MODE].toRecordingMode(),
-            keyboardRecordingMode = prefs[KEYBOARD_RECORDING_MODE].toRecordingMode(),
             // Migra o antigo KEYBOARD_AUTO_PASTE único para os dois flags (mesmo valor) quando os novos
             // ainda não existem.
             autoPasteInField = prefs[AUTO_PASTE_IN_FIELD] ?: prefs[KEYBOARD_AUTO_PASTE] ?: true,
@@ -121,7 +120,6 @@ class SettingsRepository(
             prefs[OVERLAY_MODE_ENABLED] = settings.overlayModeEnabled
             prefs[KEYBOARD_MODE_ENABLED] = settings.keyboardModeEnabled
             prefs[OVERLAY_RECORDING_MODE] = settings.overlayRecordingMode.name
-            prefs[KEYBOARD_RECORDING_MODE] = settings.keyboardRecordingMode.name
             prefs[AUTO_PASTE_IN_FIELD] = settings.autoPasteInField
             prefs[AUTO_PASTE_ON_FOCUS] = settings.autoPasteOnFocus
             prefs[OVERLAY_SIDE] = settings.overlaySide.name
@@ -216,7 +214,6 @@ class SettingsRepository(
         val OVERLAY_MODE_ENABLED = booleanPreferencesKey("overlay_mode_enabled")
         val KEYBOARD_MODE_ENABLED = booleanPreferencesKey("keyboard_mode_enabled")
         val OVERLAY_RECORDING_MODE = stringPreferencesKey("overlay_recording_mode")
-        val KEYBOARD_RECORDING_MODE = stringPreferencesKey("keyboard_recording_mode")
         val KEYBOARD_AUTO_PASTE = booleanPreferencesKey("keyboard_auto_paste") // legado (migração)
         val AUTO_PASTE_IN_FIELD = booleanPreferencesKey("auto_paste_in_field")
         val AUTO_PASTE_ON_FOCUS = booleanPreferencesKey("auto_paste_on_focus")

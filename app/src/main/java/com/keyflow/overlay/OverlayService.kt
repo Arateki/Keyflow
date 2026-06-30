@@ -57,6 +57,13 @@ class OverlayService : Service() {
     private var errorBanner: View? = null
     private var errorBannerJob: Job? = null
 
+    // Banner "cancelado · desfazer" durante a janela de descarte (Fase 2a). Mostra/some por callback do
+    // coordinator (não tem timer próprio: o coordinator decide quando expira/descarta).
+    private var cancelBanner: View? = null
+
+    // Duração da janela de desfazer: compartilhada entre o coordinator (descarte) e a barra do banner.
+    private val cancelWindowMs = 3000L
+
     // Ciclo de vida desacoplado (Fase 1): a orbe mantém o serviço persistente; o teclado o sobe sob
     // demanda (só durante a gravação). `overlayActive` = há orbe; `isForeground` = já em primeiro plano.
     private var overlayActive = false
@@ -94,10 +101,17 @@ class OverlayService : Service() {
             ACTION_START_OVERLAY -> startOverlay()
             ACTION_KEYBOARD_MIC -> {
                 ensureForeground()
-                if (::coordinator.isInitialized) coordinator.onTap()
+                if (::coordinator.isInitialized) handleKeyboardMicTap()
             }
             RecordingNotification.ACTION_PAUSE_RESUME -> handlePauseResume()
             RecordingNotification.ACTION_STOP_PASTE -> handleStopPaste()
+            RecordingNotification.ACTION_CANCEL -> handleCancel()
+            ACTION_UNDO_CANCEL -> { if (::coordinator.isInitialized) coordinator.onUndoCancel() }
+            ACTION_COMMIT_CANCEL -> { if (::coordinator.isInitialized) coordinator.onCommitCancel() }
+            ACTION_RECORD -> {
+                ensureForeground()
+                if (::coordinator.isInitialized) coordinator.onTap() // ocioso → inicia (inclui tela de bloqueio)
+            }
         }
         return START_STICKY
     }
@@ -163,6 +177,21 @@ class OverlayService : Service() {
         }
     }
 
+    /** Cancelar pela notificação: mesmo fluxo do gesto (retém áudio + janela de desfazer). */
+    private fun handleCancel() {
+        if (!::coordinator.isInitialized) return
+        coordinator.onCancel()
+    }
+
+    /** Tap do mic do teclado: ocioso inicia; gravando/pausado envia (o "modo" é só da orbe). */
+    private fun handleKeyboardMicTap() {
+        when (coordinator.currentState()) {
+            ButtonState.RECORDING, ButtonState.PAUSED -> coordinator.onIntent(GestureIntent.STOP)
+            ButtonState.CANCELLING -> coordinator.onCommitCancel() // toque conclui o cancelamento na hora
+            else -> coordinator.onTap() // idle inicia; pending_paste cola; erro dispensa
+        }
+    }
+
     private fun postNotification(state: ButtonState) {
         getSystemService(NotificationManager::class.java)
             .notify(NOTIFICATION_ID, recordingNotification.build(state))
@@ -171,6 +200,7 @@ class OverlayService : Service() {
     override fun onDestroy() {
         isRunningForUi = false
         removeErrorBanner()
+        removeCancelBanner()
         removeFloatingButton()
         serviceScope.cancel()
         super.onDestroy()
@@ -200,6 +230,9 @@ class OverlayService : Service() {
                 }
             },
             onShowKeyboardPicker = { showInputMethodPicker() },
+            onShowCancelUndo = { showCancelBanner() },
+            onHideCancelUndo = { removeCancelBanner() },
+            cancelWindowMs = cancelWindowMs,
             onError = { message, opensVoz ->
                 KeyFlowController.errorOpensVoz = opensVoz
                 // Erro resolvível + permissão de sobreposição → banner clicável (abre a Voz). Senão toast.
@@ -345,6 +378,13 @@ class OverlayService : Service() {
     private fun handleOrbShortcut(count: Int) {
         if (!::coordinator.isInitialized) return
         val state = coordinator.currentState()
+        // TEMP (Fase 2a): valida cancelar+desfazer sem mexer no gesto sensível. 2 toques durante a
+        // gravação cancelam (retém áudio + janela de desfazer). Hoje rajadas ≥2 em RECORDING são no-op
+        // (gate idle/pausa abaixo), então isto não afeta os atalhos de idle/pausa. Remover na Fase 2c.
+        if (state == ButtonState.RECORDING && count == 2) {
+            coordinator.onCancel()
+            return
+        }
         val idleOrPaused = state == ButtonState.IDLE_READY ||
             state == ButtonState.IDLE_NO_FIELD ||
             state == ButtonState.PAUSED
@@ -388,43 +428,14 @@ class OverlayService : Service() {
         )
     }
 
-    /** Banner sobreposto, clicável, para erros resolvíveis na Voz. Some sozinho em 1,5 s. */
+    /** Banner sobreposto, clicável, para erros resolvíveis na Voz. Some sozinho em 2 s. */
     private fun showErrorBanner(message: String) {
         removeErrorBanner()
-        val d = resources.displayMetrics.density
-        fun dp(v: Int) = (v * d).toInt()
-        // Fundo/letra seguem o tema do app; borda terracota nos dois.
-        val dark = cachedSettings.themeDark
-        val bg = if (dark) 0xFF2B2720.toInt() else 0xFFFBF6E6.toInt()
-        val ink = if (dark) 0xFFF1E7C9.toInt() else 0xFF2B2720.toInt()
-        val banner = android.widget.TextView(this).apply {
-            text = "⚠  $message  ·  toque"
-            setTextColor(ink)
-            textSize = 13f
-            setPadding(dp(18), dp(12), dp(18), dp(12))
-            background = android.graphics.drawable.GradientDrawable().apply {
-                cornerRadius = dp(10).toFloat()
-                setColor(bg)
-                setStroke(dp(1), 0xFFD9694B.toInt())
-            }
-            setOnClickListener {
-                openVoz()
-                removeErrorBanner()
-            }
+        val banner = bannerView("⚠  $message", 0xFFD9694B.toInt(), 2000L) {
+            openVoz()
+            removeErrorBanner()
         }
-        val config = OverlayWindowConfig.forSdk()
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            config.type,
-            // Tocável (sem NOT_TOUCHABLE), não-focável; toques fora do banner passam para trás.
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
-            PixelFormat.TRANSLUCENT,
-        ).apply {
-            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-            y = dp(90)
-        }
-        runCatching { windowManager.addView(banner, params) }
+        runCatching { windowManager.addView(banner, bannerParams()) }
         errorBanner = banner
         errorBannerJob = serviceScope.launch {
             delay(2000)
@@ -437,6 +448,85 @@ class OverlayService : Service() {
         errorBannerJob = null
         errorBanner?.let { runCatching { windowManager.removeView(it) } }
         errorBanner = null
+    }
+
+    /** Banner clicável "🗑 cancelado · desfazer" durante a janela de descarte (Fase 2a). */
+    private fun showCancelBanner() {
+        removeCancelBanner()
+        // mesmo terracota/âmbar do glifo de lixeira (CancelAmber)
+        val banner = bannerView("🗑  cancelado  ·  desfazer", 0xFFC9772F.toInt(), cancelWindowMs) {
+            if (::coordinator.isInitialized) coordinator.onUndoCancel()
+        }
+        runCatching { windowManager.addView(banner, bannerParams()) }
+        cancelBanner = banner
+    }
+
+    /**
+     * Banner de overlay clicável (texto + borda na cor [accent]) com uma barrinha de progresso discreta
+     * colada no contorno inferior que encolhe ao longo de [durationMs], indicando o tempo até sumir.
+     */
+    private fun bannerView(text: String, accent: Int, durationMs: Long, onClick: () -> Unit): View {
+        val d = resources.displayMetrics.density
+        fun dp(v: Int) = (v * d).toInt()
+        // Fundo/letra seguem o tema do app; borda na cor de acento.
+        val dark = cachedSettings.themeDark
+        val bg = if (dark) 0xFF2B2720.toInt() else 0xFFFBF6E6.toInt()
+        val ink = if (dark) 0xFFF1E7C9.toInt() else 0xFF2B2720.toInt()
+
+        val container = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            background = android.graphics.drawable.GradientDrawable().apply {
+                cornerRadius = dp(10).toFloat()
+                setColor(bg)
+                setStroke(dp(1), accent)
+            }
+            setOnClickListener { onClick() }
+        }
+        container.addView(android.widget.TextView(this).apply {
+            this.text = text
+            setTextColor(ink)
+            textSize = 13f
+            setPadding(dp(18), dp(12), dp(18), dp(9))
+        })
+        val bar = View(this).apply {
+            background = android.graphics.drawable.GradientDrawable().apply {
+                cornerRadius = dp(2).toFloat()
+                setColor((0xB3 shl 24) or (accent and 0xFFFFFF)) // acento translúcido (~70%), discreto
+            }
+            pivotX = 0f // encolhe da direita para a esquerda
+        }
+        container.addView(
+            bar,
+            android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT, dp(3),
+            ).apply { leftMargin = dp(10); rightMargin = dp(10); bottomMargin = dp(7) },
+        )
+        bar.animate()
+            .scaleX(0f)
+            .setDuration(durationMs)
+            .setInterpolator(android.view.animation.LinearInterpolator())
+            .start()
+        return container
+    }
+
+    private fun bannerParams(): WindowManager.LayoutParams {
+        val config = OverlayWindowConfig.forSdk()
+        return WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            config.type,
+            // Tocável (sem NOT_TOUCHABLE), não-focável; toques fora do banner passam para trás.
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+            PixelFormat.TRANSLUCENT,
+        ).apply {
+            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            y = (90 * resources.displayMetrics.density).toInt()
+        }
+    }
+
+    private fun removeCancelBanner() {
+        cancelBanner?.let { runCatching { windowManager.removeView(it) } }
+        cancelBanner = null
     }
 
     private fun removeFloatingButton() {
@@ -476,6 +566,10 @@ class OverlayService : Service() {
         override fun resume() {
             recorder.resume()
         }
+
+        override fun discard() {
+            recorder.discard()
+        }
     }
 
     private class AndroidOverlayTranscriber(
@@ -492,6 +586,9 @@ class OverlayService : Service() {
 
         const val ACTION_START_OVERLAY = "com.keyflow.overlay.START_OVERLAY"
         const val ACTION_KEYBOARD_MIC = "com.keyflow.overlay.KEYBOARD_MIC"
+        const val ACTION_UNDO_CANCEL = "com.keyflow.overlay.UNDO_CANCEL"
+        const val ACTION_COMMIT_CANCEL = "com.keyflow.overlay.COMMIT_CANCEL"
+        const val ACTION_RECORD = "com.keyflow.overlay.RECORD"
 
         @Volatile
         var isRunningForUi: Boolean = false
@@ -506,5 +603,9 @@ class OverlayService : Service() {
         /** Sobe o serviço sob demanda para gravar via teclado (sem orbe). */
         fun keyboardMicIntent(context: Context): Intent =
             intent(context).apply { action = ACTION_KEYBOARD_MIC }
+
+        /** Intent de uma ação do serviço (ex.: ações do seletor do teclado). */
+        fun actionIntent(context: Context, action: String): Intent =
+            intent(context).apply { this.action = action }
     }
 }

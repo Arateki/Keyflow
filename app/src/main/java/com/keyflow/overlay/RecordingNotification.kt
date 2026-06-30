@@ -33,6 +33,8 @@ class RecordingNotification(
             .setColor(ACCENT_TEAL)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
+            // Mostra os controles na tela de bloqueio (sujeito às configs de notificação do aparelho).
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setCustomContentView(contentView(state, frozenSeconds))
             .setCustomBigContentView(contentView(state, frozenSeconds))
@@ -45,25 +47,57 @@ class RecordingNotification(
     private fun contentView(state: ButtonState, frozenSeconds: Int?): RemoteViews {
         manageBase(state)
         val recording = state == ButtonState.RECORDING || state == ButtonState.PAUSED
+        val cancelling = state == ButtonState.CANCELLING
+        val idle = state == ButtonState.IDLE_READY || state == ButtonState.IDLE_NO_FIELD
         val rv = RemoteViews(context.packageName, R.layout.notif_recording)
 
         rv.setTextViewText(R.id.notif_title, titleFor(state))
 
-        val visible = if (recording) View.VISIBLE else View.GONE
-        listOf(R.id.notif_dot, R.id.notif_time, R.id.notif_wave, R.id.notif_pause, R.id.notif_stop)
-            .forEach { rv.setViewVisibility(it, visible) }
+        // Tempo/onda aparecem gravando e durante o cancelamento (tempo congelado).
+        val timeVisible = if (recording || cancelling) View.VISIBLE else View.GONE
+        listOf(R.id.notif_dot, R.id.notif_time, R.id.notif_wave)
+            .forEach { rv.setViewVisibility(it, timeVisible) }
+        // Ocioso: só o botão gravar (slot do pause). Gravando: pause + parar + cancelar.
+        // Cancelando: descartar-agora (🗑, slot do parar) + desfazer (↶, slot do cancelar).
+        rv.setViewVisibility(R.id.notif_pause, if (recording || idle) View.VISIBLE else View.GONE)
+        rv.setViewVisibility(R.id.notif_stop, if (recording || cancelling) View.VISIBLE else View.GONE)
+        rv.setViewVisibility(R.id.notif_cancel, if (recording || cancelling) View.VISIBLE else View.GONE)
 
         val now = SystemClock.elapsedRealtime()
         val chronoBase = when {
             frozenSeconds != null -> now - frozenSeconds * 1000L
             state == ButtonState.RECORDING -> base
-            else -> now - (pauseStart - base) // congela no tempo da pausa
+            else -> now - (pauseStart - base) // congela no tempo da pausa/cancelamento
         }
         rv.setChronometer(R.id.notif_time, chronoBase, null, state == ButtonState.RECORDING && frozenSeconds == null)
 
-        rv.setTextViewText(R.id.notif_pause, pauseLabel(state))
-        rv.setOnClickPendingIntent(R.id.notif_pause, pending(ACTION_PAUSE_RESUME, REQ_PAUSE))
-        rv.setOnClickPendingIntent(R.id.notif_stop, pending(ACTION_STOP_PASTE, REQ_STOP))
+        // Slot do pause: gravar (●) quando ocioso; play/pause quando gravando/pausado.
+        if (idle) {
+            rv.setImageViewResource(R.id.notif_pause, R.drawable.ic_notif_record)
+            rv.setOnClickPendingIntent(R.id.notif_pause, pending(OverlayService.ACTION_RECORD, REQ_PAUSE))
+        } else {
+            rv.setImageViewResource(
+                R.id.notif_pause,
+                if (state == ButtonState.PAUSED) R.drawable.ic_notif_play else R.drawable.ic_notif_pause,
+            )
+            rv.setOnClickPendingIntent(R.id.notif_pause, pending(ACTION_PAUSE_RESUME, REQ_PAUSE))
+        }
+        // Slot "parar": enviar enquanto grava; descartar-agora (🗑) durante o cancelamento.
+        if (cancelling) {
+            rv.setImageViewResource(R.id.notif_stop, R.drawable.ic_notif_trash)
+            rv.setOnClickPendingIntent(R.id.notif_stop, pending(OverlayService.ACTION_COMMIT_CANCEL, REQ_STOP))
+        } else {
+            rv.setImageViewResource(R.id.notif_stop, R.drawable.ic_notif_stop)
+            rv.setOnClickPendingIntent(R.id.notif_stop, pending(ACTION_STOP_PASTE, REQ_STOP))
+        }
+        // Slot "cancelar": cancelar enquanto grava; desfazer (↶) durante o cancelamento.
+        if (cancelling) {
+            rv.setImageViewResource(R.id.notif_cancel, R.drawable.ic_notif_undo)
+            rv.setOnClickPendingIntent(R.id.notif_cancel, pending(OverlayService.ACTION_UNDO_CANCEL, REQ_CANCEL))
+        } else {
+            rv.setImageViewResource(R.id.notif_cancel, R.drawable.ic_notif_cancel)
+            rv.setOnClickPendingIntent(R.id.notif_cancel, pending(ACTION_CANCEL, REQ_CANCEL))
+        }
         return rv
     }
 
@@ -74,7 +108,8 @@ class RecordingNotification(
                 base = now // início
             state == ButtonState.RECORDING && prevState == ButtonState.PAUSED ->
                 base += now - pauseStart // retomada: desconta a pausa
-            state == ButtonState.PAUSED && prevState == ButtonState.RECORDING ->
+            // PAUSED e CANCELLING congelam: marca o início da pausa p/ descontar na retomada (REC-06).
+            (state == ButtonState.PAUSED || state == ButtonState.CANCELLING) && prevState == ButtonState.RECORDING ->
                 pauseStart = now
         }
         prevState = state
@@ -93,9 +128,11 @@ class RecordingNotification(
     companion object {
         const val ACTION_PAUSE_RESUME = "com.keyflow.overlay.action.PAUSE_RESUME"
         const val ACTION_STOP_PASTE = "com.keyflow.overlay.action.STOP_PASTE"
+        const val ACTION_CANCEL = "com.keyflow.overlay.action.CANCEL"
 
         private const val REQ_PAUSE = 10
         private const val REQ_STOP = 11
+        private const val REQ_CANCEL = 12
         private val ACCENT_TEAL = 0xFF4E9683.toInt()
 
         /** Rótulo da ação de pausa conforme o estado (lógica pura, testável). */
@@ -108,6 +145,7 @@ class RecordingNotification(
         fun titleFor(state: ButtonState): String = when (state) {
             ButtonState.RECORDING -> "● Gravando"
             ButtonState.PAUSED -> "⏸ Pausado"
+            ButtonState.CANCELLING -> "🗑 Cancelado · desfazer"
             else -> "KeyFlow ativo"
         }
     }

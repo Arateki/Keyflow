@@ -209,6 +209,129 @@ class OverlayCoordinatorTest {
         assertThat(inserted).containsExactly("once")
     }
 
+    @Test
+    fun `cancel pauses recorder renders cancelling and shows undo`() = runTest {
+        val recorder = FakeRecorder(temporaryFolder.newFile("a.m4a").also { it.writeText("a") })
+        val renderedStates = mutableListOf<ButtonState>()
+        var shown = 0
+
+        val coordinator = coordinator(
+            scope = this,
+            recorder = recorder,
+            targetAvailable = { true },
+            render = { renderedStates += it },
+            onShowCancelUndo = { shown++ },
+        )
+
+        coordinator.onTap() // IDLE → RECORDING
+        coordinator.onCancel()
+        runCurrent()
+
+        assertThat(recorder.paused).isEqualTo(1)
+        assertThat(recorder.discarded).isEqualTo(0)
+        assertThat(renderedStates.last()).isEqualTo(ButtonState.CANCELLING)
+        assertThat(shown).isEqualTo(1)
+    }
+
+    @Test
+    fun `undo cancel returns to paused without discarding`() = runTest {
+        val recorder = FakeRecorder(temporaryFolder.newFile("a.m4a").also { it.writeText("a") })
+        val renderedStates = mutableListOf<ButtonState>()
+        var hidden = 0
+
+        val coordinator = coordinator(
+            scope = this,
+            recorder = recorder,
+            targetAvailable = { true },
+            render = { renderedStates += it },
+            onHideCancelUndo = { hidden++ },
+        )
+
+        coordinator.onTap() // RECORDING
+        coordinator.onCancel()
+        coordinator.onUndoCancel()
+        runCurrent()
+
+        assertThat(renderedStates.last()).isEqualTo(ButtonState.PAUSED)
+        assertThat(recorder.discarded).isEqualTo(0)
+        assertThat(hidden).isEqualTo(1)
+    }
+
+    @Test
+    fun `cancel window expiry discards recorder and returns to idle`() = runTest {
+        val recorder = FakeRecorder(temporaryFolder.newFile("a.m4a").also { it.writeText("a") })
+        val renderedStates = mutableListOf<ButtonState>()
+        var hidden = 0
+
+        val coordinator = coordinator(
+            scope = this,
+            recorder = recorder,
+            targetAvailable = { true },
+            render = { renderedStates += it },
+            onHideCancelUndo = { hidden++ },
+            cancelWindowMs = 3000L,
+        )
+
+        coordinator.onTap() // RECORDING
+        coordinator.onCancel()
+        advanceTimeBy(3001)
+
+        assertThat(recorder.discarded).isEqualTo(1)
+        assertThat(renderedStates.last()).isEqualTo(ButtonState.IDLE_READY)
+        assertThat(hidden).isEqualTo(1)
+    }
+
+    @Test
+    fun `commit cancel discards immediately and returns to idle`() = runTest {
+        val recorder = FakeRecorder(temporaryFolder.newFile("a.m4a").also { it.writeText("a") })
+        val renderedStates = mutableListOf<ButtonState>()
+        var hidden = 0
+
+        val coordinator = coordinator(
+            scope = this,
+            recorder = recorder,
+            targetAvailable = { true },
+            render = { renderedStates += it },
+            onHideCancelUndo = { hidden++ },
+            cancelWindowMs = 3000L,
+        )
+
+        coordinator.onTap() // RECORDING
+        coordinator.onCancel()
+        coordinator.onCommitCancel()
+        runCurrent()
+
+        assertThat(recorder.discarded).isEqualTo(1)
+        assertThat(renderedStates.last()).isEqualTo(ButtonState.IDLE_READY)
+        assertThat(hidden).isEqualTo(1)
+
+        // A janela não dispara um segundo descarte depois.
+        advanceTimeBy(3001)
+        assertThat(recorder.discarded).isEqualTo(1)
+    }
+
+    @Test
+    fun `undo cancels the pending discard timer`() = runTest {
+        val recorder = FakeRecorder(temporaryFolder.newFile("a.m4a").also { it.writeText("a") })
+        val renderedStates = mutableListOf<ButtonState>()
+
+        val coordinator = coordinator(
+            scope = this,
+            recorder = recorder,
+            targetAvailable = { true },
+            render = { renderedStates += it },
+            cancelWindowMs = 3000L,
+        )
+
+        coordinator.onTap() // RECORDING
+        coordinator.onCancel()
+        coordinator.onUndoCancel()
+        advanceTimeBy(3001)
+
+        assertThat(recorder.discarded).isEqualTo(0)
+        assertThat(renderedStates.last()).isEqualTo(ButtonState.PAUSED)
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private fun coordinator(
@@ -219,6 +342,9 @@ class OverlayCoordinatorTest {
         targetAvailable: () -> Boolean = { true },
         render: (ButtonState) -> Unit = {},
         onClipboard: (String) -> Unit = {},
+        onShowCancelUndo: () -> Unit = {},
+        onHideCancelUndo: () -> Unit = {},
+        cancelWindowMs: Long = 3000L,
         recordingClockMs: () -> Long = longEnoughClock(),
     ) = OverlayCoordinator(
         scope = scope,
@@ -230,6 +356,9 @@ class OverlayCoordinatorTest {
         targetAvailable = targetAvailable,
         render = render,
         onClipboard = onClipboard,
+        onShowCancelUndo = onShowCancelUndo,
+        onHideCancelUndo = onHideCancelUndo,
+        cancelWindowMs = cancelWindowMs,
         recordingClockMs = recordingClockMs,
     )
 
@@ -241,9 +370,13 @@ class OverlayCoordinatorTest {
     private class FakeRecorder(private val audioFile: File?) : OverlayAudioRecorder {
         var started = 0
         var stopped = 0
+        var paused = 0
+        var discarded = 0
 
         override fun start() { started++ }
         override fun stop(): File? { stopped++; return audioFile }
+        override fun pause() { paused++ }
+        override fun discard() { discarded++ }
     }
 
     private class FakeTranscriber(private val result: TranscriptionResult) : OverlayTranscriber {

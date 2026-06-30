@@ -65,16 +65,6 @@ class TecladoPanelTest {
     }
 
     @Test
-    fun selectingPushToTalkPersists() {
-        val h = Harness(Settings(keyboardRecordingMode = RecordingMode.TOGGLE))
-        rule.setContent { h.Content() }
-
-        rule.onNodeWithTag(tecladoModeTag(RecordingMode.PUSH_TO_TALK)).performClick()
-
-        rule.runOnIdle { assertEquals(RecordingMode.PUSH_TO_TALK, h.settings.keyboardRecordingMode) }
-    }
-
-    @Test
     fun unlockSkinsInvokesCallback() {
         val h = Harness(Settings())
         rule.setContent { h.Content() }

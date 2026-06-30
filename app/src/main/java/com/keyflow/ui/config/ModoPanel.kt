@@ -134,7 +134,7 @@ fun ModoPanel(
                     activateTag = ACTIVATE_KEYBOARD_TAG,
                 ),
             ),
-            pauseHint = pauseHintFor(settings.keyboardRecordingMode),
+            pauseHint = "Toque no mic para gravar/enviar; segure para pausar ou cancelar.",
             features = listOf(
                 "Cole a transcrição de voz automaticamente.",
                 "Personalize em estilo e funcionalidade.",

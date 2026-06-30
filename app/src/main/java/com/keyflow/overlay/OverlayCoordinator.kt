@@ -17,6 +17,8 @@ interface OverlayAudioRecorder {
     fun stop(): File?
     fun pause() {}
     fun resume() {}
+    /** Encerra e descarta a gravação sem devolver o arquivo (cancelar — Fase 2a). */
+    fun discard() {}
 }
 
 interface OverlayTranscriber {
@@ -34,12 +36,57 @@ class OverlayCoordinator(
     private val render: (ButtonState) -> Unit,
     private val onClipboard: (String) -> Unit = {},
     private val onShowKeyboardPicker: () -> Unit = {},
+    // Banner clicável "cancelado · desfazer" durante a janela de descarte (Fase 2a).
+    private val onShowCancelUndo: () -> Unit = {},
+    private val onHideCancelUndo: () -> Unit = {},
+    private val cancelWindowMs: Long = DEFAULT_CANCEL_WINDOW_MS,
     // (mensagem, abreVoz): abreVoz = erro resolvível na aba Voz (config/token) → tocar no X leva lá.
     private val onError: (String, Boolean) -> Unit = { _, _ -> },
     private val recordingClockMs: () -> Long = { SystemClock.elapsedRealtime() },
 ) {
     private val machine = ButtonStateMachine(targetAvailable = targetAvailable)
     private var recordingStartMs = 0L
+    private var cancelJob: kotlinx.coroutines.Job? = null
+
+    /**
+     * Cancela a gravação em curso retendo o áudio (pausa o recorder, não descarta na hora) e abre a
+     * janela de desfazer. Ao expirar sem desfazer, descarta de vez e volta ao idle (Fase 2a).
+     */
+    fun onCancel() {
+        val before = machine.state
+        val next = machine.onCancel()
+        if (next != ButtonState.CANCELLING || before == ButtonState.CANCELLING) return
+        runCatching { recorder.pause() }
+        render(next)
+        onShowCancelUndo()
+        cancelJob?.cancel()
+        cancelJob = scope.launch {
+            delay(cancelWindowMs)
+            finalizeCancel()
+        }
+    }
+
+    /** Desfaz o cancelamento dentro da janela (CANCELLING → PAUSED); o áudio segue retido/pausado. */
+    fun onUndoCancel() {
+        if (machine.state != ButtonState.CANCELLING) return
+        cancelJob?.cancel()
+        cancelJob = null
+        render(machine.onUndoCancel())
+        onHideCancelUndo()
+    }
+
+    /** Conclui o cancelamento na hora (toque na orbe/mic): descarta já e vai pra idle, sem esperar a janela. */
+    fun onCommitCancel() = finalizeCancel()
+
+    /** Descarta o áudio retido e volta ao idle. Chamado pela expiração da janela ou pelo "concluir agora". */
+    private fun finalizeCancel() {
+        if (machine.state != ButtonState.CANCELLING) return
+        cancelJob?.cancel()
+        cancelJob = null
+        runCatching { recorder.discard() }
+        render(machine.onCancelExpired())
+        onHideCancelUndo()
+    }
 
     /** Estado atual da única [ButtonStateMachine] — lido pelo [RecordingGestureController]. */
     fun currentState(): ButtonState = machine.state
@@ -48,6 +95,7 @@ class OverlayCoordinator(
         private const val TAG = "KeyFlow.Coordinator"
         private const val MIN_RECORDING_MS = 400L
         private const val ERROR_AUTO_DISMISS_MS = 2000L
+        private const val DEFAULT_CANCEL_WINDOW_MS = 3000L
     }
 
     init {
@@ -92,6 +140,7 @@ class OverlayCoordinator(
                 runCatching { recorder.resume() }
                 render(machine.onResume())
             }
+            GestureIntent.CANCEL_COMMIT -> onCommitCancel()
             GestureIntent.KEYBOARD_PICKER -> onShowKeyboardPicker()
             GestureIntent.REPOSITION_ONLY, GestureIntent.NONE -> Unit
         }
@@ -106,6 +155,7 @@ class OverlayCoordinator(
             ButtonState.IDLE_READY -> Unit
             ButtonState.IDLE_NO_FIELD -> Unit
             ButtonState.PAUSED -> Unit // orquestração de pausa chega na T22
+            ButtonState.CANCELLING -> Unit // efeitos de cancelar são orquestrados em onCancel/onUndoCancel
             ButtonState.PENDING_PASTE -> Unit
         }
     }

@@ -1,8 +1,10 @@
 package com.keyflow.ui.orb
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -22,6 +24,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -55,10 +58,11 @@ val LocalOrbClock = staticCompositionLocalOf<(() -> Float)?> { null }
 sealed interface OrbCenter {
     data object None : OrbCenter
     data class Time(val seconds: Int) : OrbCenter
-    data object PauseGlyph : OrbCenter
+    /** Pausa: glifo de pause + tempo congelado miúdo abaixo (REC-05). */
+    data class PauseGlyph(val seconds: Int) : OrbCenter
     data object ErrorGlyph : OrbCenter
-    /** Descarte do áudio (cancelar). Glifo de lixeira — usado no estado de cancelamento (Fase 2). */
-    data object CancelGlyph : OrbCenter
+    /** Descarte do áudio (cancelar): glifo de lixeira + tempo congelado miúdo abaixo (Fase 2). */
+    data class CancelGlyph(val seconds: Int) : OrbCenter
 }
 
 private const val TAU = (PI * 2).toFloat()
@@ -103,9 +107,9 @@ fun VoiceOrb(
                 fontSize = with(density) { (sidePx * TIME_FONT_FRACTION).toSp() },
                 textAlign = TextAlign.Center,
             )
-            OrbCenter.PauseGlyph -> PauseGlyph(with(density) { (sidePx * GLYPH_FRACTION).toDp() })
+            is OrbCenter.PauseGlyph -> GlyphWithTime(center.seconds, sidePx, density) { PauseGlyph(it) }
             OrbCenter.ErrorGlyph -> ErrorGlyph(with(density) { (sidePx * GLYPH_FRACTION).toDp() })
-            OrbCenter.CancelGlyph -> CancelGlyph(with(density) { (sidePx * GLYPH_FRACTION).toDp() })
+            is OrbCenter.CancelGlyph -> GlyphWithTime(center.seconds, sidePx, density) { CancelGlyph(it) }
             OrbCenter.None -> Unit
         }
     }
@@ -116,6 +120,28 @@ fun VoiceOrb(
 private const val DEFAULT_ORB_SIDE_PX = 156
 private const val TIME_FONT_FRACTION = 0.235f
 private const val GLYPH_FRACTION = 0.30f
+// Pausa/cancelamento: glifo encolhido + tempo congelado miúdo abaixo (cabe nos dois no centro da orbe).
+private const val PAUSED_GLYPH_FRACTION = 0.22f
+private const val SMALL_TIME_FONT_FRACTION = 0.135f
+
+/** Glifo (pause/lixeira) encolhido com o tempo congelado miúdo logo abaixo, empilhados no centro. */
+@Composable
+private fun GlyphWithTime(seconds: Int, sidePx: Int, density: Density, glyph: @Composable (Dp) -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(with(density) { (sidePx * 0.02f).toDp() }),
+    ) {
+        glyph(with(density) { (sidePx * PAUSED_GLYPH_FRACTION).toDp() })
+        Text(
+            text = formatOrbTime(seconds),
+            color = CenterInk,
+            fontFamily = SpaceMono,
+            fontWeight = FontWeight.Bold,
+            fontSize = with(density) { (sidePx * SMALL_TIME_FONT_FRACTION).toSp() },
+            textAlign = TextAlign.Center,
+        )
+    }
+}
 
 /** Relógio do orbe em ms. Anima via `withFrameNanos` só quando [enabled] (modo tempo real). */
 @Composable

@@ -66,32 +66,35 @@
             android:contentDescription="@null" />
     </LinearLayout>
 
-    <TextView
+    <ImageView
         android:id="@+id/notif_pause"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Pausar"
-        android:textColor="#F4ECCF"
-        android:textSize="13sp"
-        android:textStyle="bold"
+        android:layout_width="38dp"
+        android:layout_height="38dp"
+        android:src="@drawable/ic_notif_pause"
+        android:scaleType="centerInside"
         android:background="@drawable/notif_chip_teal"
-        android:paddingStart="14dp"
-        android:paddingEnd="14dp"
-        android:paddingTop="8dp"
-        android:paddingBottom="8dp"
-        android:layout_marginEnd="8dp" />
+        android:padding="9dp"
+        android:layout_marginEnd="8dp"
+        android:contentDescription="Pausar" />
 
-    <TextView
+    <ImageView
         android:id="@+id/notif_stop"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Parar"
-        android:textColor="#F4ECCF"
-        android:textSize="13sp"
-        android:textStyle="bold"
+        android:layout_width="38dp"
+        android:layout_height="38dp"
+        android:src="@drawable/ic_notif_stop"
+        android:scaleType="centerInside"
         android:background="@drawable/notif_chip_record"
-        android:paddingStart="14dp"
-        android:paddingEnd="14dp"
-        android:paddingTop="8dp"
-        android:paddingBottom="8dp" />
+        android:padding="9dp"
+        android:layout_marginEnd="8dp"
+        android:contentDescription="Parar e enviar" />
+
+    <ImageView
+        android:id="@+id/notif_cancel"
+        android:layout_width="38dp"
+        android:layout_height="38dp"
+        android:src="@drawable/ic_notif_cancel"
+        android:scaleType="centerInside"
+        android:background="@drawable/notif_chip_amber"
+        android:padding="9dp"
+        android:contentDescription="Cancelar" />
 </LinearLayout>

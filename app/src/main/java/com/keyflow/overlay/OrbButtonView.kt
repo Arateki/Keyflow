@@ -153,11 +153,12 @@ class OrbButtonView(
                 segmentStartMs = clock() // retomada
                 startTicker()
             }
-            state == ButtonState.PAUSED && prev == ButtonState.RECORDING -> {
+            // PAUSED e CANCELLING congelam o tempo (não zeram): ao retomar, continua de onde parou.
+            (state == ButtonState.PAUSED || state == ButtonState.CANCELLING) && prev == ButtonState.RECORDING -> {
                 accumulatedMs += clock() - segmentStartMs // congela o tempo
                 stopTicker()
             }
-            state != ButtonState.RECORDING && state != ButtonState.PAUSED -> {
+            state != ButtonState.RECORDING && state != ButtonState.PAUSED && state != ButtonState.CANCELLING -> {
                 accumulatedMs = 0L
                 stopTicker()
             }
@@ -407,13 +408,15 @@ class OrbButtonView(
     private fun orbStateFor(state: ButtonState): OrbState = when (state) {
         ButtonState.RECORDING -> OrbState.Listening
         ButtonState.PAUSED -> OrbState.Paused
+        ButtonState.CANCELLING -> OrbState.Paused // congelado durante a janela de desfazer
         ButtonState.SENDING -> OrbState.Transcribing
         else -> OrbState.Idle
     }
 
     private fun orbCenterFor(state: ButtonState): OrbCenter = when (state) {
         ButtonState.RECORDING -> OrbCenter.Time(elapsedSeconds())
-        ButtonState.PAUSED -> OrbCenter.PauseGlyph
+        ButtonState.PAUSED -> OrbCenter.PauseGlyph(elapsedSeconds())
+        ButtonState.CANCELLING -> OrbCenter.CancelGlyph(elapsedSeconds()) // lixeira + tempo congelado
         ButtonState.ERROR -> OrbCenter.ErrorGlyph
         else -> OrbCenter.None
     }
@@ -425,6 +428,7 @@ class OrbButtonView(
         ButtonState.PAUSED -> "KeyFlow paused"
         ButtonState.SENDING -> "KeyFlow sending"
         ButtonState.ERROR -> "KeyFlow error"
+        ButtonState.CANCELLING -> "KeyFlow cancelling"
         ButtonState.PENDING_PASTE -> "KeyFlow pending paste"
     }
 

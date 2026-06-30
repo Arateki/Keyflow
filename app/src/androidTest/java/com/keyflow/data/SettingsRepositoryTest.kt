@@ -108,7 +108,6 @@ class SettingsRepositoryTest {
             groqModel = "whisper-large-v3",
             groqLanguage = "en",
             overlayRecordingMode = RecordingMode.PUSH_TO_TALK,
-            keyboardRecordingMode = RecordingMode.TOGGLE,
             overlaySide = OverlaySide.LEFT,
             orbSize = OrbSize.LARGE,
             themeDark = true,

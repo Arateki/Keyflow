@@ -4,7 +4,7 @@ import com.keyflow.core.ButtonState
 import com.keyflow.core.RecordingMode
 
 /** Intenção de alto nível derivada de um gesto + modo (REC-03/04, OVL-03/04). */
-enum class GestureIntent { START, STOP, PAUSE, RESUME, REPOSITION_ONLY, KEYBOARD_PICKER, NONE }
+enum class GestureIntent { START, STOP, PAUSE, RESUME, CANCEL_COMMIT, REPOSITION_ONLY, KEYBOARD_PICKER, NONE }
 
 /**
  * Sinais de toque consumidos pelo [RecordingGestureController].
@@ -66,6 +66,8 @@ class RecordingGestureController(
             draggingThisCycle -> GestureIntent.NONE
             currentState().isIdle -> GestureIntent.START
             currentState().isRecordingOrPaused -> GestureIntent.STOP
+            // Toque durante o cancelamento conclui na hora (descarta), sem esperar a janela de desfazer.
+            currentState() == ButtonState.CANCELLING -> GestureIntent.CANCEL_COMMIT
             else -> GestureIntent.NONE
         }
         TouchSignal.HOLD -> when {
@@ -94,8 +96,10 @@ class RecordingGestureController(
             if (currentState() == ButtonState.RECORDING) pendingReleaseAt = clock()
             GestureIntent.NONE
         }
-        // Classificados do GestureInterpreter não são usados no PTT (gating é por DOWN/UP).
-        TouchSignal.TAP, TouchSignal.HOLD -> GestureIntent.NONE
+        // Toque durante o cancelamento conclui na hora, igual ao TOGGLE.
+        TouchSignal.TAP -> if (currentState() == ButtonState.CANCELLING) GestureIntent.CANCEL_COMMIT else GestureIntent.NONE
+        // Demais classificados do GestureInterpreter não são usados no PTT (gating é por DOWN/UP).
+        TouchSignal.HOLD -> GestureIntent.NONE
     }
 
     private fun isWithinReleaseWindow(): Boolean {

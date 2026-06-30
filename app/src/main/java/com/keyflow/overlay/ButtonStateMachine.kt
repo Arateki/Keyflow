@@ -78,6 +78,28 @@ class ButtonStateMachine(
         return state
     }
 
+    /** Cancela a gravação em curso (RECORDING/PAUSED → CANCELLING), abrindo a janela de desfazer. */
+    fun onCancel(): ButtonState {
+        if (state == ButtonState.RECORDING || state == ButtonState.PAUSED) {
+            state = ButtonState.CANCELLING
+        }
+        return state
+    }
+
+    /** Desfaz o cancelamento dentro da janela (CANCELLING → PAUSED). No-op fora de CANCELLING. */
+    fun onUndoCancel(): ButtonState {
+        if (state == ButtonState.CANCELLING) state = ButtonState.PAUSED
+        return state
+    }
+
+    /** Expira a janela de desfazer: descarta de vez (CANCELLING → idle). No-op fora de CANCELLING. */
+    fun onCancelExpired(): ButtonState {
+        if (state == ButtonState.CANCELLING) {
+            state = if (targetAvailable()) ButtonState.IDLE_READY else ButtonState.IDLE_NO_FIELD
+        }
+        return state
+    }
+
     fun onTranscriptionSuccess(): ButtonState {
         state = if (targetAvailable()) ButtonState.IDLE_READY else ButtonState.IDLE_NO_FIELD
         return state

@@ -122,6 +122,79 @@ class ButtonStateMachineTest {
     }
 
     @Test
+    fun `cancel moves recording to cancelling`() {
+        val machine = ButtonStateMachine()
+
+        machine.onTap() // RECORDING
+        assertThat(machine.onCancel()).isEqualTo(ButtonState.CANCELLING)
+    }
+
+    @Test
+    fun `cancel moves paused to cancelling`() {
+        val machine = ButtonStateMachine()
+
+        machine.onTap()   // RECORDING
+        machine.onPause() // PAUSED
+        assertThat(machine.onCancel()).isEqualTo(ButtonState.CANCELLING)
+    }
+
+    @Test
+    fun `cancel is a no-op outside recording or paused`() {
+        val machine = ButtonStateMachine()
+
+        // Idle
+        assertThat(machine.onCancel()).isEqualTo(ButtonState.IDLE_READY)
+
+        machine.onTap() // RECORDING
+        machine.onTap() // SENDING
+        assertThat(machine.onCancel()).isEqualTo(ButtonState.SENDING)
+    }
+
+    @Test
+    fun `undo cancel returns to paused`() {
+        val machine = ButtonStateMachine()
+
+        machine.onTap()    // RECORDING
+        machine.onCancel() // CANCELLING
+        assertThat(machine.onUndoCancel()).isEqualTo(ButtonState.PAUSED)
+    }
+
+    @Test
+    fun `undo cancel is a no-op outside cancelling`() {
+        val machine = ButtonStateMachine()
+
+        machine.onTap() // RECORDING
+        assertThat(machine.onUndoCancel()).isEqualTo(ButtonState.RECORDING)
+    }
+
+    @Test
+    fun `cancel expired returns to idle ready when target available`() {
+        val machine = ButtonStateMachine(targetAvailable = { true })
+
+        machine.onTap()    // RECORDING
+        machine.onCancel() // CANCELLING
+        assertThat(machine.onCancelExpired()).isEqualTo(ButtonState.IDLE_READY)
+    }
+
+    @Test
+    fun `cancel expired returns to idle no field when target unavailable`() {
+        val machine = ButtonStateMachine(targetAvailable = { false })
+
+        machine.onTargetChanged(true)
+        machine.onTap()    // RECORDING
+        machine.onCancel() // CANCELLING
+        assertThat(machine.onCancelExpired()).isEqualTo(ButtonState.IDLE_NO_FIELD)
+    }
+
+    @Test
+    fun `cancel expired is a no-op outside cancelling`() {
+        val machine = ButtonStateMachine()
+
+        machine.onTap() // RECORDING
+        assertThat(machine.onCancelExpired()).isEqualTo(ButtonState.RECORDING)
+    }
+
+    @Test
     fun `error and dismiss map back through current target availability`() {
         var targetAvailable = false
         val machine = ButtonStateMachine(targetAvailable = { targetAvailable })

@@ -11,6 +11,7 @@ import android.inputmethodservice.InputMethodService
 import com.keyflow.core.KeyFlowController
 import com.keyflow.data.SettingsRepository
 import com.keyflow.overlay.OverlayService
+import com.keyflow.overlay.RecordingNotification
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -81,6 +82,7 @@ class KeyFlowKeyboardService : InputMethodService() {
             context = this,
             onKey = ::handleKey,
             onMic = { startMicSession() },
+            onMicAction = { action -> sendMicAction(action) },
             onHide = {
                 preferExpanded = false
                 keyboardView?.setExpanded(false)
@@ -117,6 +119,20 @@ class KeyFlowKeyboardService : InputMethodService() {
             // Ex.: ForegroundServiceStartNotAllowedException se a isenção de FGS em background falhar.
             Log.e(TAG, "startMicSession falhou: ${e.message}", e)
         }
+    }
+
+    /**
+     * Ação secundária do mic (seletor por hold): pausar/retomar, cancelar ou desfazer. O serviço já está
+     * em foreground durante a gravação, então um startService basta para entregar a ação ao coordinator.
+     */
+    private fun sendMicAction(action: MicAction) {
+        val intentAction = when (action) {
+            MicAction.PAUSE_RESUME -> RecordingNotification.ACTION_PAUSE_RESUME
+            MicAction.CANCEL -> RecordingNotification.ACTION_CANCEL
+            MicAction.UNDO -> OverlayService.ACTION_UNDO_CANCEL
+        }
+        runCatching { startService(OverlayService.actionIntent(this, intentAction)) }
+            .onFailure { Log.e(TAG, "sendMicAction falhou: ${it.message}", it) }
     }
 
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {

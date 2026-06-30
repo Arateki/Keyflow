@@ -89,6 +89,16 @@ class AudioRecorder(
         }
     }
 
+    /** Descarta a gravação: encerra o recorder e apaga o arquivo, sem devolvê-lo (cancelar — Fase 2a). */
+    fun discard() {
+        val mediaRecorder = recorder ?: return
+        val file = outputFile
+        runCatching { mediaRecorder.stop() }
+        mediaRecorder.release()
+        clearState()
+        file?.delete()
+    }
+
     private fun activeDurationMs(): Long =
         accumulatedMs + if (state == RecorderState.RECORDING) clock() - segmentStartMs else 0L
 

@@ -20,7 +20,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.keyflow.core.RecordingMode
 import com.keyflow.data.Settings
 import com.keyflow.ui.common.verticalScrollbar
 import com.keyflow.ui.theme.LocalKeyFlowPalette
@@ -32,11 +31,9 @@ const val TECLADO_AUTO_PASTE_ON_FOCUS_TAG = "teclado-auto-paste-on-focus"
 const val TECLADO_LANGUAGE_TAG = "teclado-language"
 const val TECLADO_UNLOCK_TAG = "teclado-unlock-skins"
 
-fun tecladoModeTag(mode: RecordingMode): String = "teclado-mode-${mode.name.lowercase()}"
-
 /**
- * Aba Teclado (KBD config / REC modo / SKIN-01): colar automaticamente, idioma do teclado (inerte nesta
- * fase), modo de gravação (Alternar/Push-to-talk) com dica de pausa, e a seção de Skins bloqueada.
+ * Aba Teclado (KBD config / SKIN-01): colar automaticamente, idioma do teclado (inerte nesta
+ * fase) e a seção de Skins bloqueada. O teclado não tem modo de gravação (toque + seletor por hold no mic).
  */
 @Composable
 fun TecladoPanel(
@@ -97,29 +94,6 @@ fun TecladoPanel(
             Text("Idioma do teclado", color = palette.fg, fontFamily = SpaceGrotesk, fontSize = 13.5.sp)
             Text("pt-BR  ›", color = palette.muted, fontFamily = SpaceMono, fontSize = 12.sp)
         }
-
-        Text(
-            "Modo de gravação".uppercase(),
-            color = palette.faint,
-            fontFamily = SpaceMono,
-            fontSize = 8.5.sp,
-            modifier = Modifier.padding(top = 6.dp),
-        )
-        Segmented(
-            options = RecordingMode.entries,
-            selected = settings.keyboardRecordingMode,
-            label = ::recordingModeLabel,
-            tag = ::tecladoModeTag,
-            onSelect = { onSettingsChange(settings.copy(keyboardRecordingMode = it)) },
-            modifier = Modifier.padding(top = 9.dp),
-        )
-        Text(
-            pauseHintFor(settings.keyboardRecordingMode),
-            color = palette.faint,
-            fontFamily = SpaceMono,
-            fontSize = 8.5.sp,
-            modifier = Modifier.padding(top = 8.dp),
-        )
 
         Box(Modifier.fillMaxWidth().padding(top = 16.dp).height(1.dp).background(palette.line2))
         SkinsSection(onUnlock = onUnlockSkins, unlockTag = TECLADO_UNLOCK_TAG)

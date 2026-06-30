@@ -40,12 +40,12 @@ object RouteCatalog {
     val routes: List<Route> = listOf(
         orbRoute("orb-idle", OrbState.Idle, OrbCenter.None),
         orbRoute("orb-listening", OrbState.Listening, OrbCenter.None),
-        orbRoute("orb-paused", OrbState.Paused, OrbCenter.PauseGlyph),
+        orbRoute("orb-paused", OrbState.Paused, OrbCenter.PauseGlyph(8)),
         orbRoute("orb-transcribing", OrbState.Transcribing, OrbCenter.None),
         // Apresentação do orbe no botão flutuante do overlay (T22): tempo/glifo no centro.
         orbRoute("overlay-idle", OrbState.Idle, OrbCenter.None),
         orbRoute("overlay-recording", OrbState.Listening, OrbCenter.Time(12)),
-        orbRoute("overlay-paused", OrbState.Paused, OrbCenter.PauseGlyph),
+        orbRoute("overlay-paused", OrbState.Paused, OrbCenter.PauseGlyph(12)),
         // Teclado reskinado (T23): View hospedado via AndroidView, ancorado ao rodapé.
         keyboardRoute("keyboard-expanded", expanded = true, recording = false),
         keyboardRoute("keyboard-collapsed", expanded = false, recording = false),

@@ -35,6 +35,7 @@ enum class ButtonState {
     PAUSED,          // gravação pausada (REC-01/REC-02); o tempo em pausa não conta (REC-06)
     SENDING,
     ERROR,
+    CANCELLING,      // cancelamento com janela de desfazer: áudio retido, descartado ao expirar (Fase 2a)
     PENDING_PASTE    // transcrição pendente esperando campo
 }
 

@@ -35,9 +35,9 @@ data class Settings(
     // Modos habilitados (gating das abas; cada modo libera sua aba — CFG-02)
     val overlayModeEnabled: Boolean = false,
     val keyboardModeEnabled: Boolean = false,
-    // Modos de gravação por gatilho (C16; default TOGGLE)
+    // Modo de gravação da orbe/overlay (C16; default TOGGLE). O teclado não tem modo:
+    // é toque (começar/enviar) + seletor de ações ao segurar o mic.
     val overlayRecordingMode: RecordingMode = RecordingMode.TOGGLE,
-    val keyboardRecordingMode: RecordingMode = RecordingMode.TOGGLE,
     // Colar automaticamente (só vale com o teclado KeyFlow ativo; no overlay com teclado nativo o
     // texto vai para a área de transferência). Dois cenários independentes:
     //  - inField: gravou com um campo já focado → cola direto quando a transcrição volta.
