@@ -3,6 +3,9 @@ package com.keyflow.ui.config
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -257,6 +260,8 @@ fun ConfigScreen(
         SaveToast(saveController, Modifier.fillMaxSize().systemBarsPadding())
         MessageToast(
             message = toastMessage,
+            durationMs = toastDuration,
+            generation = toastGeneration,
             onClick = toastAction?.let {
                 {
                     it()
@@ -293,24 +298,54 @@ const val READONLY_SCRIM_TAG = "readonly-scrim"
  * [onClick] é fornecido, a mensagem vira um atalho tocável que leva à opção que resolve o aviso.
  */
 @Composable
-private fun MessageToast(message: String?, onClick: (() -> Unit)? = null, modifier: Modifier = Modifier) {
+private fun MessageToast(
+    message: String?,
+    durationMs: Long,
+    generation: Int,
+    onClick: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
     val palette = LocalKeyFlowPalette.current
     Box(modifier, contentAlignment = Alignment.BottomCenter) {
         if (message != null) {
-            Text(
-                text = message,
-                color = palette.onFill,
-                fontFamily = SpaceMono,
-                fontWeight = FontWeight.Medium,
-                fontSize = 10.5.sp,
+            Column(
                 modifier = Modifier
                     .padding(bottom = 22.dp, start = 22.dp, end = 22.dp)
                     .clip(RoundedCornerShape(6.dp))
                     .background(palette.fg)
                     .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
-                    .padding(horizontal = 14.dp, vertical = 9.dp)
                     .testTag(MESSAGE_TOAST_TAG),
-            )
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = message,
+                    color = palette.onFill,
+                    fontFamily = SpaceMono,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 10.5.sp,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+                )
+                // Barrinha de progresso discreta colada no contorno inferior: conta o tempo até sumir.
+                val progress = remember(generation) { Animatable(1f) }
+                LaunchedEffect(generation) {
+                    progress.snapTo(1f)
+                    progress.animateTo(0f, animationSpec = tween(durationMs.toInt(), easing = LinearEasing))
+                }
+                Box(
+                    Modifier
+                        .padding(horizontal = 6.dp, vertical = 4.dp)
+                        .fillMaxWidth()
+                        .height(2.dp),
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth(progress.value)
+                            .height(2.dp)
+                            .clip(RoundedCornerShape(1.dp))
+                            .background(palette.onFill.copy(alpha = 0.45f)),
+                    )
+                }
+            }
         }
     }
 }
