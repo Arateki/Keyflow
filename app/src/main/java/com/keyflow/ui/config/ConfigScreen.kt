@@ -31,7 +31,9 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import com.keyflow.overlay.Haptics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -116,6 +118,9 @@ fun ConfigScreen(
     // Pulso de destaque discreto nos cards da aba Modo (insight visual ao navegar do aviso).
     var overlayHighlightKey by remember { mutableStateOf(0) }
     var keyboardHighlightKey by remember { mutableStateOf(0) }
+    // Realce do seletor de Modo de gravação (aviso do atalho de 1 toque → leva à subárea responsável).
+    var recordingModeHighlightKey by remember { mutableStateOf(0) }
+    val hapticContext = LocalContext.current
     LaunchedEffect(toastGeneration) {
         if (toastMessage != null) {
             kotlinx.coroutines.delay(toastDuration)
@@ -230,6 +235,14 @@ fun ConfigScreen(
                             onSettingsChange = onSettingsChange,
                             onUnlockSkins = { unlockOpen = true },
                             onOpenShortcutSheet = { shortcutSheetTaps = it },
+                            onShortcut1Blocked = {
+                                showToast(
+                                    "O atalho de 1 toque vale apenas no modo Push-to-talk.",
+                                    2500,
+                                    action = { recordingModeHighlightKey++ },
+                                )
+                            },
+                            recordingModeHighlightKey = recordingModeHighlightKey,
                             keyboardShortcutAvailable = permissions.keyboardActive,
                         )
                         ConfigTab.DOCS -> DocsPanel()
@@ -264,6 +277,7 @@ fun ConfigScreen(
             generation = toastGeneration,
             onClick = toastAction?.let {
                 {
+                    Haptics.tick(hapticContext, settings.vibrationIntensity)
                     it()
                     toastMessage = null
                     toastAction = null
@@ -278,6 +292,7 @@ fun ConfigScreen(
             keyboardAvailable = permissions.keyboardActive,
             onSelect = { action ->
                 when (shortcutSheetTaps) {
+                    1 -> onSettingsChange(settings.copy(shortcut1Tap = action))
                     2 -> onSettingsChange(settings.copy(shortcut2Tap = action))
                     3 -> onSettingsChange(settings.copy(shortcut3Tap = action))
                 }

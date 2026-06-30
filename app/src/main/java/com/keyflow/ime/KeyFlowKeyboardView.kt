@@ -41,6 +41,8 @@ class KeyFlowKeyboardView(
     context: Context,
     private val onKey: (KeyAction) -> Unit,
     private val onMic: () -> Unit,
+    // Abre o app do KeyFlow (tecla ⚙ de config).
+    private val onConfig: () -> Unit = {},
     // Ação secundária escolhida no seletor por hold (pausar/retomar, cancelar, desfazer).
     private val onMicAction: (MicAction) -> Unit = {},
     private val onHide: () -> Unit,
@@ -69,8 +71,6 @@ class KeyFlowKeyboardView(
     // Estado/tempo do microfone (espelha AudioRecorder/OrbButtonView: conta só em RECORDING).
     private val handler = Handler(Looper.getMainLooper())
     private var micState: ButtonState = ButtonState.IDLE_NO_FIELD
-    private var accumulatedMs = 0L
-    private var segmentStartMs = 0L
     private val ticker = object : Runnable {
         override fun run() {
             if (micState == ButtonState.RECORDING) {
@@ -112,28 +112,10 @@ class KeyFlowKeyboardView(
     }
 
     fun updateMicState(state: ButtonState) {
-        val prev = micState
         micState = state
-        when {
-            state == ButtonState.RECORDING && prev != ButtonState.RECORDING && prev != ButtonState.PAUSED -> {
-                accumulatedMs = 0L
-                segmentStartMs = clock()
-                startTicker()
-            }
-            state == ButtonState.RECORDING && prev == ButtonState.PAUSED -> {
-                segmentStartMs = clock()
-                startTicker()
-            }
-            // PAUSED e CANCELLING congelam o tempo (não zeram): ao retomar/desfazer, continua de onde parou.
-            (state == ButtonState.PAUSED || state == ButtonState.CANCELLING) && prev == ButtonState.RECORDING -> {
-                accumulatedMs += clock() - segmentStartMs
-                stopTicker()
-            }
-            state != ButtonState.RECORDING && state != ButtonState.PAUSED && state != ButtonState.CANCELLING -> {
-                accumulatedMs = 0L
-                stopTicker()
-            }
-        }
+        // O tempo é lido ao vivo do KeyFlowController (autoritativo, vê todas as transições) em
+        // elapsedSeconds() — o teclado não rastreia o tempo sozinho, evitando dessincronia.
+        if (state == ButtonState.RECORDING) startTicker() else stopTicker()
         renderMic(state)
     }
 
@@ -157,8 +139,8 @@ class KeyFlowKeyboardView(
 
     private fun elapsedSeconds(): Int {
         frozenSeconds?.let { return it }
-        val active = if (micState == ButtonState.RECORDING) clock() - segmentStartMs else 0L
-        return ((accumulatedMs + active) / 1000L).toInt()
+        val active = if (micState == ButtonState.RECORDING) clock() - KeyFlowController.recordingSegmentStartMs else 0L
+        return ((KeyFlowController.recordingAccumulatedMs + active) / 1000L).toInt()
     }
 
     // ── builders ─────────────────────────────────────────────────────────────
@@ -175,8 +157,9 @@ class KeyFlowKeyboardView(
 
     private fun buildActionRow(): LinearLayout = row(bottomPad = dp(6)).apply {
         addView(micKey(1.5f, dp(44)).also { expandedMic = it })
+        addView(specialKey("⚙", 0.9f) { onConfig() })
         addView(specialKey(",", 0.8f) { onKey(KeyAction.Character(",")) })
-        addView(paperKey("espaço", 4f) { onKey(KeyAction.Space) })
+        addView(paperKey("espaço", 3.6f) { onKey(KeyAction.Space) })
         addView(specialKey(".", 0.8f) { onKey(KeyAction.Character(".")) })
         addView(specialKey("⏎", 1.5f) { onKey(KeyAction.Enter) })
         addView(specialKey("↓", 1f) { onHide() })
@@ -189,6 +172,7 @@ class KeyFlowKeyboardView(
         gravity = Gravity.CENTER_VERTICAL
 
         addView(micKey(1.5f, dp(40)).also { collapsedMic = it })
+        addView(specialKey("⚙", 0.8f, dp(40)) { onConfig() })
         addView(specialKey("colar", 1f, dp(40)) { onKey(KeyAction.Paste) })
         addView(specialKey("esc", 0.8f, dp(40)) { onKey(KeyAction.Escape) })
         addView(specialKey("⏎", 0.8f, dp(40)) { onKey(KeyAction.Enter) })

@@ -82,14 +82,18 @@ fun ShortcutActionSheet(
                 .testTag(SHORTCUT_SHEET_TAG),
         ) {
             Text(
-                "$taps toques",
+                if (taps == 1) "1 toque" else "$taps toques",
                 color = palette.fg,
                 fontFamily = SpaceGrotesk,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 18.sp,
             )
             Text(
-                "Escolha a ação ao tocar $taps vezes na orbe (em repouso ou pausada).",
+                if (taps == 1) {
+                    "Escolha a ação ao tocar 1 vez na orbe (apenas no modo Push-to-talk, onde o toque é livre)."
+                } else {
+                    "Escolha a ação ao tocar $taps vezes na orbe (em repouso ou pausada)."
+                },
                 color = palette.muted,
                 fontFamily = SpaceGrotesk,
                 fontSize = 12.sp,

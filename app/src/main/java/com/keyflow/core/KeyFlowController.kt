@@ -26,6 +26,18 @@ object KeyFlowController {
     private val _buttonState = MutableStateFlow<ButtonState>(ButtonState.IDLE_NO_FIELD)
     val buttonState: StateFlow<ButtonState> = _buttonState.asStateFlow()
 
+    // Tempo autoritativo de gravação (acumulado + início do segmento, em SystemClock.elapsedRealtime),
+    // publicado pelo OverlayCoordinator. O teclado lê daqui ao vivo p/ não dessincronizar com a orbe.
+    @Volatile var recordingAccumulatedMs: Long = 0L
+        private set
+    @Volatile var recordingSegmentStartMs: Long = 0L
+        private set
+
+    fun updateRecordingTime(accumulatedMs: Long, segmentStartMs: Long) {
+        recordingAccumulatedMs = accumulatedMs
+        recordingSegmentStartMs = segmentStartMs
+    }
+
     // Teclado KeyFlow visível na tela (janela do IME mostrada). Usado para gatear o atalho de
     // retrair/expandir: a orbe não tenta alterar se o teclado não estiver aberto.
     private val _keyboardVisible = MutableStateFlow(false)

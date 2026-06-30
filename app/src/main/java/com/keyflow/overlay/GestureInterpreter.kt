@@ -13,10 +13,14 @@ class GestureInterpreter(
     private var firstTapTime = 0L
     private var pressStartTime = 0L
     private var isDragging = false
+    private var isPressed = false
+    private var holdEmitted = false // HOLD já emitido em andamento → não repete no release
 
     fun onDown(): GestureEvent? {
         pressStartTime = clock()
         isDragging = false
+        isPressed = true
+        holdEmitted = false
         val now = pressStartTime
 
         if (tapCount == 0 || now - firstTapTime > tripleTapWindowMs) {
@@ -27,6 +31,15 @@ class GestureInterpreter(
         }
 
         return null
+    }
+
+    /** Detecta o HOLD enquanto ainda pressionado (para "segurar trava" entrar no modo-arrasto). */
+    fun onHoldElapsed(): GestureEvent? {
+        if (!isPressed || isDragging || holdEmitted) return null
+        if (clock() - pressStartTime < holdThresholdMs) return null
+        holdEmitted = true
+        tapCount = 0
+        return GestureEvent.HOLD
     }
 
     fun onMove(dx: Float, dy: Float): GestureEvent? {
@@ -40,6 +53,11 @@ class GestureInterpreter(
 
     fun onUp(): GestureEvent? {
         val heldMs = clock() - pressStartTime
+        isPressed = false
+        // HOLD já tratado em andamento (onHoldElapsed): o release não repete nada.
+        if (holdEmitted) {
+            return if (isDragging) { isDragging = false; GestureEvent.DRAG_END } else null
+        }
         return when {
             isDragging -> {
                 isDragging = false

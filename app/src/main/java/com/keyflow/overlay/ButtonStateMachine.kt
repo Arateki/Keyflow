@@ -14,6 +14,10 @@ class ButtonStateMachine(
         state = when {
             state == ButtonState.RECORDING || state == ButtonState.PAUSED ||
                 state == ButtonState.SENDING -> state
+            // CANCELLING é uma janela transitória de desfazer (3s) orquestrada por um job no coordinator:
+            // uma mudança de campo (ex.: abrir o teclado) NÃO pode tirar a máquina daqui, senão o job é
+            // orfanizado (recorder nunca descartado → gravar passa a dar erro). Expira só por onCancelExpired.
+            state == ButtonState.CANCELLING -> state
             // Mantém PENDING_PASTE: o auto-flush do Controller já tenta inserir —
             // se falhar, o botão fica em PA para o usuário confirmar manualmente
             state == ButtonState.PENDING_PASTE -> state

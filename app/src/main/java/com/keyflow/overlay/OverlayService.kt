@@ -27,7 +27,9 @@ import com.keyflow.data.OverlayPosition
 import com.keyflow.data.Settings
 import com.keyflow.data.SettingsRepository
 import com.keyflow.transcription.TranscriptionClient
+import androidx.compose.ui.graphics.toArgb
 import com.keyflow.ui.common.ComposeWindowHost
+import com.keyflow.ui.theme.paletteFor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -60,6 +62,9 @@ class OverlayService : Service() {
     // Banner "cancelado · desfazer" durante a janela de descarte (Fase 2a). Mostra/some por callback do
     // coordinator (não tem timer próprio: o coordinator decide quando expira/descarta).
     private var cancelBanner: View? = null
+
+    // Sobreposição não-tocável com as setas do modo-arrasto (separada da janela da orbe, p/ não deslocá-la).
+    private var dragArrowsView: DragArrowsView? = null
 
     // Duração da janela de desfazer: compartilhada entre o coordinator (descarte) e a barra do banner.
     private val cancelWindowMs = 3000L
@@ -112,6 +117,7 @@ class OverlayService : Service() {
                 ensureForeground()
                 if (::coordinator.isInitialized) coordinator.onTap() // ocioso → inicia (inclui tela de bloqueio)
             }
+            ACTION_OPEN_CONFIG -> openKeyFlowApp()
         }
         return START_STICKY
     }
@@ -131,6 +137,7 @@ class OverlayService : Service() {
         if (isForeground) return
         val notification = recordingNotification.build(
             if (::coordinator.isInitialized) coordinator.currentState() else ButtonState.IDLE_NO_FIELD,
+            dark = cachedSettings.themeDark,
         )
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -194,13 +201,14 @@ class OverlayService : Service() {
 
     private fun postNotification(state: ButtonState) {
         getSystemService(NotificationManager::class.java)
-            .notify(NOTIFICATION_ID, recordingNotification.build(state))
+            .notify(NOTIFICATION_ID, recordingNotification.build(state, dark = cachedSettings.themeDark))
     }
 
     override fun onDestroy() {
         isRunningForUi = false
         removeErrorBanner()
         removeCancelBanner()
+        removeDragArrows()
         removeFloatingButton()
         serviceScope.cancel()
         super.onDestroy()
@@ -233,6 +241,7 @@ class OverlayService : Service() {
             onShowCancelUndo = { showCancelBanner() },
             onHideCancelUndo = { removeCancelBanner() },
             cancelWindowMs = cancelWindowMs,
+            onRecordingTime = { acc, seg -> KeyFlowController.updateRecordingTime(acc, seg) },
             onError = { message, opensVoz ->
                 KeyFlowController.errorOpensVoz = opensVoz
                 // Erro resolvível + permissão de sobreposição → banner clicável (abre a Voz). Senão toast.
@@ -249,6 +258,8 @@ class OverlayService : Service() {
         gestureController = RecordingGestureController(
             mode = { cachedSettings.overlayRecordingMode },
             currentState = { coordinator.currentState() },
+            // Janela de re-segurar = "Tempo de reação" (mesmo limiar do toque, ajustável ao vivo).
+            pttReleaseWindowMs = { cachedSettings.tapBurstWindowMs.toLong() },
         )
     }
 
@@ -258,7 +269,15 @@ class OverlayService : Service() {
                 val prevSizePx = cachedSettings.orbSizePx
                 val prevSide = cachedSettings.overlaySide
                 val prevTapBurst = cachedSettings.tapBurstWindowMs
+                val prevThemeDark = cachedSettings.themeDark
                 cachedSettings = it
+                // Tema ao vivo (raro, disparado pelo usuário → barato): re-posta a notificação e recolore os
+                // banners de overlay visíveis, espelhando o que o toast in-app (Compose) já faz sozinho.
+                if (it.themeDark != prevThemeDark) {
+                    if (isForeground && ::coordinator.isInitialized) postNotification(coordinator.currentState())
+                    errorBanner?.let(::applyBannerTheme)
+                    cancelBanner?.let(::applyBannerTheme)
+                }
                 KeyFlowController.autoPasteInField = it.autoPasteInField
                 KeyFlowController.autoPasteOnFocus = it.autoPasteOnFocus
                 // Tamanho da orbe ao vivo (slider da aba Sobrepor).
@@ -291,6 +310,7 @@ class OverlayService : Service() {
             context = this,
             controller = gestureController,
             mode = { cachedSettings.overlayRecordingMode },
+            side = { cachedSettings.overlaySide },
             onIntent = { intent -> coordinator.onIntent(intent) },
             orbSizePx = cachedSettings.orbSizePx,
             tapBurstWindowMs = cachedSettings.tapBurstWindowMs.toLong(),
@@ -299,7 +319,9 @@ class OverlayService : Service() {
             },
             onErrorTap = ::openVoz,
             onShortcut = ::handleOrbShortcut,
-            hapticEnabled = { cachedSettings.hapticFeedback },
+            vibrationIntensity = { cachedSettings.vibrationIntensity },
+            onDragArrows = ::updateDragArrows,
+            onOpenConfig = ::openKeyFlowApp,
         )
 
         button.bindWindowLayout(params) { updatedParams ->
@@ -363,6 +385,7 @@ class OverlayService : Service() {
             gravity = config.gravity
             x = position.x
             y = position.y
+            windowAnimations = 0 // sem animação do sistema ao mover/redimensionar (modo-arrasto)
         }
     }
 
@@ -372,24 +395,13 @@ class OverlayService : Service() {
      * sistema ignoraria a chamada de background, então caímos numa Activity transparente efêmera.
      */
     /**
-     * Atalho de N toques (2/3) da orbe. Só age em idle/pause (REC). Resolve a ação configurada e a
-     * executa reusando os mecanismos existentes; o "trocar teclado" mantém a técnica do showInputMethodPicker.
+     * Atalho de N toques da orbe. A rajada já distingue 1 toque (gesto nativo do modo) de 2/3 (atalho), e
+     * os atalhos não mexem na gravação — então valem em QUALQUER estado, nos dois modos, sem gating. (O
+     * de 1 toque só chega aqui na janela de release do PTT, por decisão da OrbButtonView.) Reusa os
+     * mecanismos existentes (o "trocar teclado" mantém a técnica do showInputMethodPicker).
      */
     private fun handleOrbShortcut(count: Int) {
         if (!::coordinator.isInitialized) return
-        val state = coordinator.currentState()
-        // TEMP (Fase 2a): valida cancelar+desfazer sem mexer no gesto sensível. 2 toques durante a
-        // gravação cancelam (retém áudio + janela de desfazer). Hoje rajadas ≥2 em RECORDING são no-op
-        // (gate idle/pausa abaixo), então isto não afeta os atalhos de idle/pausa. Remover na Fase 2c.
-        if (state == ButtonState.RECORDING && count == 2) {
-            coordinator.onCancel()
-            return
-        }
-        val idleOrPaused = state == ButtonState.IDLE_READY ||
-            state == ButtonState.IDLE_NO_FIELD ||
-            state == ButtonState.PAUSED
-        if (!idleOrPaused) return
-
         when (cachedSettings.resolveShortcut(count)) {
             OrbShortcutAction.NONE -> Unit
             OrbShortcutAction.SWITCH_IME -> showInputMethodPicker()
@@ -431,7 +443,7 @@ class OverlayService : Service() {
     /** Banner sobreposto, clicável, para erros resolvíveis na Voz. Some sozinho em 2 s. */
     private fun showErrorBanner(message: String) {
         removeErrorBanner()
-        val banner = bannerView("⚠  $message", 0xFFD9694B.toInt(), 2000L) {
+        val banner = bannerView("⚠  $message", com.keyflow.ui.theme.OrbAccentArgb, 2000L) {
             openVoz()
             removeErrorBanner()
         }
@@ -453,8 +465,8 @@ class OverlayService : Service() {
     /** Banner clicável "🗑 cancelado · desfazer" durante a janela de descarte (Fase 2a). */
     private fun showCancelBanner() {
         removeCancelBanner()
-        // mesmo terracota/âmbar do glifo de lixeira (CancelAmber)
-        val banner = bannerView("🗑  cancelado  ·  desfazer", 0xFFC9772F.toInt(), cancelWindowMs) {
+        // Borda + barra de tempo na cor da orbe (token único; acompanha a futura skin).
+        val banner = bannerView("Cancelado, toque para desfazer", com.keyflow.ui.theme.OrbAccentArgb, cancelWindowMs) {
             if (::coordinator.isInitialized) coordinator.onUndoCancel()
         }
         runCatching { windowManager.addView(banner, bannerParams()) }
@@ -468,10 +480,10 @@ class OverlayService : Service() {
     private fun bannerView(text: String, accent: Int, durationMs: Long, onClick: () -> Unit): View {
         val d = resources.displayMetrics.density
         fun dp(v: Int) = (v * d).toInt()
-        // Fundo/letra seguem o tema do app; borda na cor de acento.
-        val dark = cachedSettings.themeDark
-        val bg = if (dark) 0xFF2B2720.toInt() else 0xFFFBF6E6.toInt()
-        val ink = if (dark) 0xFFF1E7C9.toInt() else 0xFF2B2720.toInt()
+        // Fundo/letra vêm da MESMA fonte do toast in-app (a paleta Ateliê); borda na cor de acento (orbe).
+        val palette = paletteFor(cachedSettings.themeDark)
+        val bg = palette.bg.toArgb()
+        val ink = palette.fg.toArgb()
 
         val container = android.widget.LinearLayout(this).apply {
             orientation = android.widget.LinearLayout.VERTICAL
@@ -480,12 +492,21 @@ class OverlayService : Service() {
                 setColor(bg)
                 setStroke(dp(1), accent)
             }
-            setOnClickListener { onClick() }
+            setOnClickListener {
+                Haptics.tick(this@OverlayService, cachedSettings.vibrationIntensity)
+                onClick()
+            }
         }
         container.addView(android.widget.TextView(this).apply {
             this.text = text
             setTextColor(ink)
             textSize = 13f
+            maxLines = 1
+            gravity = Gravity.CENTER_HORIZONTAL
+            // Mesma fonte do toast in-app (SpaceMono peso Medium resolve p/ space_mono_bold).
+            typeface = androidx.core.content.res.ResourcesCompat.getFont(
+                this@OverlayService, com.keyflow.R.font.space_mono_bold,
+            )
             setPadding(dp(18), dp(12), dp(18), dp(9))
         })
         val bar = View(this).apply {
@@ -527,6 +548,65 @@ class OverlayService : Service() {
     private fun removeCancelBanner() {
         cancelBanner?.let { runCatching { windowManager.removeView(it) } }
         cancelBanner = null
+    }
+
+    /**
+     * Recolore um banner já visível conforme o tema atual, no lugar (preserva a barrinha de tempo em
+     * andamento). Só fundo/letra mudam com o tema; a borda/barra de acento (orbe) é independente do tema.
+     */
+    private fun applyBannerTheme(banner: View) {
+        val palette = paletteFor(cachedSettings.themeDark)
+        (banner.background as? android.graphics.drawable.GradientDrawable)?.setColor(palette.bg.toArgb())
+        ((banner as? android.view.ViewGroup)?.getChildAt(0) as? android.widget.TextView)
+            ?.setTextColor(palette.fg.toArgb())
+    }
+
+    /**
+     * Mostra/atualiza/some com as setas do modo-arrasto numa janela SEPARADA (não-tocável), centrada na
+     * orbe. A janela da orbe não muda — então não há deslocamento/flick dela.
+     */
+    private fun updateDragArrows(state: DragArrowsState?) {
+        if (state == null) {
+            removeDragArrows()
+            return
+        }
+        val view = dragArrowsView ?: DragArrowsView(this).also { v ->
+            dragArrowsView = v
+            // Janela FULL-SCREEN, mesmos type/gravity da orbe (+ não-tocável) → as setas são desenhadas
+            // relativas ao centro da orbe e o sistema não recoloca a janela. NO_LIMITS p/ cobrir tudo.
+            val config = OverlayWindowConfig.forSdk()
+            val params = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+                config.type,
+                config.flags or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or // cobre a tela física inteira
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                PixelFormat.TRANSLUCENT,
+            ).apply {
+                gravity = config.gravity
+                x = 0
+                y = 0
+                windowAnimations = 0
+            }
+            runCatching { windowManager.addView(v, params) }
+        }
+        view.setArrows(state)
+    }
+
+    private fun removeDragArrows() {
+        dragArrowsView?.let { runCatching { windowManager.removeView(it) } }
+        dragArrowsView = null
+    }
+
+    /** Abre o app do KeyFlow (arrasto ↓ na orbe). No Toggle, o estado da orbe é mantido. */
+    private fun openKeyFlowApp() {
+        val intent = packageManager.getLaunchIntentForPackage(packageName)
+            ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            ?: return
+        runCatching { startActivity(intent) }
     }
 
     private fun removeFloatingButton() {
@@ -589,6 +669,7 @@ class OverlayService : Service() {
         const val ACTION_UNDO_CANCEL = "com.keyflow.overlay.UNDO_CANCEL"
         const val ACTION_COMMIT_CANCEL = "com.keyflow.overlay.COMMIT_CANCEL"
         const val ACTION_RECORD = "com.keyflow.overlay.RECORD"
+        const val ACTION_OPEN_CONFIG = "com.keyflow.overlay.OPEN_CONFIG"
 
         @Volatile
         var isRunningForUi: Boolean = false

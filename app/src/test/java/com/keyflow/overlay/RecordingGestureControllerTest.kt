@@ -16,7 +16,7 @@ class RecordingGestureControllerTest {
     private fun controller() = RecordingGestureController(
         mode = { mode },
         currentState = { machine.state },
-        pttPauseWindowMs = WINDOW,
+        pttReleaseWindowMs = { WINDOW },
         clock = { now },
     )
 
@@ -137,24 +137,22 @@ class RecordingGestureControllerTest {
     }
 
     @Test
-    fun `ptt quick tap after release pauses instead of stopping`() {
+    fun `ptt re-hold within window keeps recording without pausing`() {
+        // Novo modelo (Yan): pausar no PTT é SÓ arrastar ↑. Re-segurar/tocar na janela de release
+        // continua gravando sem costura — nunca pausa — e cancela o envio pendente.
         mode = RecordingMode.PUSH_TO_TALK
         val c = controller()
         c.dispatch(TouchSignal.DOWN) // RECORDING
         c.dispatch(TouchSignal.UP)   // janela aberta
 
         now += WINDOW / 2
-        assertThat(c.dispatch(TouchSignal.DOWN)).isEqualTo(GestureIntent.PAUSE)
-        assertThat(machine.state).isEqualTo(ButtonState.PAUSED)
+        assertThat(c.dispatch(TouchSignal.DOWN)).isEqualTo(GestureIntent.NONE)
+        assertThat(machine.state).isEqualTo(ButtonState.RECORDING)
 
-        // O release do tap-rápido mantém PAUSED (não é Stop)
-        assertThat(c.dispatch(TouchSignal.UP)).isEqualTo(GestureIntent.NONE)
-        assertThat(machine.state).isEqualTo(ButtonState.PAUSED)
-
-        // E o timeout já não dispara Stop (a janela foi consumida pelo pause)
+        // O envio pendente foi cancelado: o timeout já não dispara Stop.
         now += WINDOW
         assertThat(c.onReleaseTimeout()).isEqualTo(GestureIntent.NONE)
-        assertThat(machine.state).isEqualTo(ButtonState.PAUSED)
+        assertThat(machine.state).isEqualTo(ButtonState.RECORDING)
     }
 
     @Test
@@ -162,9 +160,9 @@ class RecordingGestureControllerTest {
         mode = RecordingMode.PUSH_TO_TALK
         val c = controller()
         c.dispatch(TouchSignal.DOWN) // RECORDING
-        c.dispatch(TouchSignal.UP)
-        c.dispatch(TouchSignal.DOWN) // PAUSE (dentro da janela)
-        c.dispatch(TouchSignal.UP)   // segue PAUSED
+        // Pausa via arrasto ↑ chega pelo onIntent(PAUSE) (fora do fluxo de sinais); simula a transição.
+        applyToMachine(GestureIntent.PAUSE)
+        assertThat(machine.state).isEqualTo(ButtonState.PAUSED)
 
         // Segurar de novo retoma (decisão Yan 2026-06-27)
         assertThat(c.dispatch(TouchSignal.DOWN)).isEqualTo(GestureIntent.RESUME)

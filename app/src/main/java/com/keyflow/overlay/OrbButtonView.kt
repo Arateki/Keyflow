@@ -6,9 +6,6 @@ import android.os.Handler
 import android.os.Looper
 import android.os.Build
 import android.os.SystemClock
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.WindowManager
@@ -20,9 +17,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import com.keyflow.core.ButtonState
+import com.keyflow.core.OverlaySide
 import com.keyflow.core.RecordingMode
 import com.keyflow.data.OverlayPosition
 import com.keyflow.ui.orb.OrbCenter
+import com.keyflow.ui.orb.OrbDragHint
+import com.keyflow.ui.orb.OrbDragKind
 import com.keyflow.ui.orb.OrbState
 import com.keyflow.ui.orb.VoiceOrb
 import kotlin.math.roundToInt
@@ -44,27 +44,57 @@ class OrbButtonView(
     context: Context,
     private val controller: RecordingGestureController,
     private val mode: () -> RecordingMode,
+    // Mão (canhoto/destro): define a direção do arrasto lateral de cancelar/retomar (sempre p/ o centro).
+    private val side: () -> OverlaySide = { OverlaySide.RIGHT },
     private val onIntent: (GestureIntent) -> Unit,
-    private val gestures: GestureInterpreter = GestureInterpreter(),
     private val onPositionChanged: (OverlayPosition) -> Unit = {},
     private val onErrorTap: () -> Unit = {},
     // Atalho de N toques (2/3) resolvido fora (OverlayService): mapeia para ação + gating idle/pause.
     private val onShortcut: (Int) -> Unit = {},
-    // Retorno tátil (vibração) ao interagir com a orbe — lido das Settings pelo OverlayService.
-    private val hapticEnabled: () -> Boolean = { false },
+    // Intensidade da vibração ao interagir com a orbe (0 = sem vibração; 1..100) — lida das Settings.
+    private val vibrationIntensity: () -> Int = { 0 },
+    // Setas do modo-arrasto numa sobreposição separada (null = some). Não mexe na janela da orbe.
+    private val onDragArrows: (DragArrowsState?) -> Unit = {},
+    // Arrastar ↓ abre o app do KeyFlow mantendo o estado atual da orbe (Toggle).
+    private val onOpenConfig: () -> Unit = {},
     orbSizePx: Int = 156,
-    private val releaseWindowMs: Long = DEFAULT_RELEASE_WINDOW_MS,
     // Janela máxima entre toques de uma "rajada" de atalho (threshold configurável na aba Sobrepor).
     tapBurstWindowMs: Long = DEFAULT_TAP_BURST_WINDOW_MS,
     private val clock: () -> Long = { SystemClock.elapsedRealtime() },
 ) : FrameLayout(context) {
 
-    // Threshold da rajada de toques, ajustável ao vivo pelo slider de Atalhos (aba Sobrepor).
+    // Threshold da rajada de toques ("Tempo de reação"), ajustável ao vivo pelo slider (aba Sobrepor).
     private var tapBurstWindowMs: Long = tapBurstWindowMs
 
+    // Limiar único: toque×segurada e janelas derivam do "Tempo de reação". Hold = janela + 150ms.
+    private var gestures = newGestures(this.tapBurstWindowMs)
+
+    private fun newGestures(window: Long) = GestureInterpreter(
+        tripleTapWindowMs = window,
+        holdThresholdMs = window + HOLD_OFFSET_MS,
+    )
+
     fun setTapBurstWindowMs(ms: Long) {
-        if (ms > 0) tapBurstWindowMs = ms
+        if (ms <= 0) return
+        tapBurstWindowMs = ms
+        gestures = newGestures(ms) // mantém o limiar do hold em sincronia (não no meio de um gesto)
     }
+
+    // Toque na orbe durante a janela de desfazer (CANCELLING): conclui o descarte JÁ, sem threshold, e
+    // engole o resto do gesto. Assim o descarte é imediato e os toques seguintes já fluem como atalhos.
+    private var cancelCommitGesture = false
+
+    // Modo-arrasto do Alternar (segurar trava): ↑ pausa, ← cancela, com feedback de proximidade.
+    private var dragLocked = false
+    private var dragHoldRunnable: Runnable? = null
+    private var dragKind: OrbDragKind? = null
+    private var dragProx = 0f
+    // Retorno tátil progressivo do arrasto: direção e maior degrau já "tocado" (p/ não repetir o mesmo).
+    private var dragHapticKind: OrbDragKind? = null
+    private var dragHapticStep = 0
+    private var dragCenterX = 0
+    private var dragCenterY = 0
+    private var dragActPx = 0f
 
     var renderedState: ButtonState = ButtonState.IDLE_NO_FIELD
         private set
@@ -91,7 +121,13 @@ class OrbButtonView(
     private val ticker = object : Runnable {
         override fun run() {
             if (renderedState == ButtonState.RECORDING) {
-                orbUi = orbUi.copy(center = OrbCenter.Time(elapsedSeconds()))
+                val secs = elapsedSeconds()
+                // Atualiza o tempo do centro E o do glifo do modo-arrasto (se travado), p/ correr mesmo
+                // sem mexer o dedo enquanto grava.
+                orbUi = orbUi.copy(
+                    center = OrbCenter.Time(secs),
+                    dragHint = orbUi.dragHint?.copy(seconds = secs),
+                )
                 handler.postDelayed(this, TICK_MS)
             }
         }
@@ -121,7 +157,12 @@ class OrbButtonView(
             // O ComposeView não trata toque — o gesto é todo do FrameLayout pai.
             setContent {
                 val ui = orbUi
-                VoiceOrb(state = ui.state, modifier = Modifier.fillMaxSize(), center = ui.center)
+                VoiceOrb(
+                    state = ui.state,
+                    modifier = Modifier.fillMaxSize(),
+                    center = ui.center,
+                    dragHint = ui.dragHint,
+                )
             }
         })
         isClickable = true
@@ -163,7 +204,8 @@ class OrbButtonView(
                 stopTicker()
             }
         }
-        orbUi = OrbButtonUi(orbStateFor(state), orbCenterFor(state))
+        // copy (não substitui): preserva dragHint/orbFraction se a orbe estiver no modo-arrasto.
+        orbUi = orbUi.copy(state = orbStateFor(state), center = orbCenterFor(state))
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -180,7 +222,16 @@ class OrbButtonView(
                     if (com.keyflow.core.KeyFlowController.errorOpensVoz) onErrorTap()
                     return true
                 }
-                if (hapticEnabled()) vibrateTick()
+                if (renderedState == ButtonState.CANCELLING) {
+                    // Descarta JÁ (sem esperar os 3s nem o threshold de rajada). Engole este gesto inteiro;
+                    // o que vier depois já é toque de ocioso (encadeia atalhos). Vale p/ TOGGLE e PTT.
+                    vibrateTick()
+                    cancelCommitGesture = true
+                    parent?.requestDisallowInterceptTouchEvent(true)
+                    onIntent(GestureIntent.CANCEL_COMMIT)
+                    return true
+                }
+                vibrateTick()
                 cancelReleaseTimeout()
                 parent?.requestDisallowInterceptTouchEvent(true)
                 startRawX = event.rawX
@@ -189,16 +240,24 @@ class OrbButtonView(
                 startWindowY = windowParams?.y ?: 0
                 dragging = false
                 gestures.onDown()
+                // Alternar gravando/pausado: ficar parado ~Tempo de reação+150ms trava no modo-arrasto.
+                if (mode() == RecordingMode.TOGGLE &&
+                    (renderedState == ButtonState.RECORDING || renderedState == ButtonState.PAUSED)
+                ) {
+                    scheduleDragHold()
+                }
                 if (mode() == RecordingMode.PUSH_TO_TALK) {
                     pttStarted = false
                     pttSuppressedByDrag = false
-                    if (renderedState.isIdleState || renderedState == ButtonState.PAUSED) {
-                        // Ocioso ou pausado: adia a partida (START/RESUME) para distinguir "segurar"
-                        // de "arrastar p/ mover". Arrasto brusco move sem gravar / sem sair da pausa.
+                    if (renderedState.isIdleState || renderedState == ButtonState.PAUSED ||
+                        renderedState == ButtonState.RECORDING
+                    ) {
+                        // Adia a decisão p/ distinguir "segurar" de "toque": segurar além do threshold
+                        // inicia/retoma/continua (re-grab + trava); toque rápido vira atalho de rajada.
+                        // Em RECORDING é a janela de release — hold continua sem costura, toques = atalhos.
                         pttStartArmed = true
                         schedulePttStart()
                     } else {
-                        // Janela de release (tap-rápido → pausa): resposta imediata.
                         pttStartArmed = false
                         emit(TouchSignal.DOWN)
                     }
@@ -206,10 +265,17 @@ class OrbButtonView(
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
+                if (cancelCommitGesture) return true // gesto do descarte: ignora movimento
                 val dx = event.rawX - startRawX
                 val dy = event.rawY - startRawY
+                // Modo-arrasto travado: o movimento vira ação (↑ pausa, ← cancela), não reposiciona.
+                if (dragLocked) {
+                    updateDragFeedback(dx, dy)
+                    return true
+                }
                 if (gestures.onMove(dx, dy) == GestureEvent.DRAG_START) {
                     dragging = true
+                    cancelDragHold() // arrastou antes de travar → é reposicionamento, não trava
                     if (pttStartArmed && !pttStarted) {
                         // Arrasto brusco antes da gravação começar: não grava neste gesto (só move).
                         cancelPttStart()
@@ -223,15 +289,37 @@ class OrbButtonView(
                 return true
             }
             MotionEvent.ACTION_UP -> {
+                if (cancelCommitGesture) {
+                    cancelCommitGesture = false // descarte já concluído no DOWN; encerra o gesto sem efeito
+                    parent?.requestDisallowInterceptTouchEvent(false)
+                    return true
+                }
+                cancelDragHold()
                 val eventType = gestures.onUp()
                 parent?.requestDisallowInterceptTouchEvent(false)
-                if (mode() == RecordingMode.PUSH_TO_TALK) onUpPushToTalk(eventType)
-                else onUpToggle(eventType)
+                when {
+                    dragLocked -> {
+                        vibrateTick() // soltar o hold confirma o release (quase sempre há mudança de estado)
+                        val acted = resolveDragOnUp()
+                        exitDragMode()
+                        // PTT: travado durante a gravação. Soltar SEM ação (não chegou a nenhuma zona) =
+                        // soltar parado → ENVIA (abre a janela de release, igual ao release normal do PTT).
+                        if (!acted && mode() == RecordingMode.PUSH_TO_TALK && !pttStartArmed) {
+                            emit(TouchSignal.UP)
+                            scheduleReleaseTimeout()
+                        }
+                    }
+                    mode() == RecordingMode.PUSH_TO_TALK -> onUpPushToTalk(eventType)
+                    else -> onUpToggle(eventType)
+                }
                 dragging = false
                 return true
             }
             MotionEvent.ACTION_CANCEL -> {
                 dragging = false
+                cancelCommitGesture = false
+                cancelDragHold()
+                exitDragMode()
                 cancelPttStart()
                 pttStartArmed = false
                 pttStarted = false
@@ -297,6 +385,9 @@ class OrbButtonView(
                 pttStarted = true
                 cancelTapBurst() // virou hold de gravação: descarta rajada de toques pendente
                 emit(TouchSignal.DOWN) // dedo ficou parado → inicia a gravação
+                // PTT estilo WhatsApp: com a gravação confirmada, trava o reposicionamento e mostra as setas.
+                // Arrastar ↑ pausa, ← cancela, ↓ envia+abre; soltar parado (sem zona) envia.
+                enterDragMode()
             }
         }
         pendingPttStart = r
@@ -314,25 +405,139 @@ class OrbButtonView(
         onIntent(controller.onSignal(signal))
     }
 
-    private val vibrator: Vibrator? by lazy {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            context.getSystemService(VibratorManager::class.java)?.defaultVibrator
-        } else {
-            @Suppress("DEPRECATION")
-            context.getSystemService(Vibrator::class.java)
+    // ── modo-arrasto (Alternar travado) ───────────────────────────────────────
+
+    private fun scheduleDragHold() {
+        cancelDragHold()
+        val r = Runnable {
+            if (gestures.onHoldElapsed() == GestureEvent.HOLD) enterDragMode()
         }
+        dragHoldRunnable = r
+        handler.postDelayed(r, tapBurstWindowMs + HOLD_OFFSET_MS)
     }
 
-    /** Pulso tátil curto ao interagir com a orbe (retorno tátil configurável). */
-    private fun vibrateTick() {
-        val vib = vibrator?.takeIf { it.hasVibrator() } ?: return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            vib.vibrate(VibrationEffect.createOneShot(18L, VibrationEffect.DEFAULT_AMPLITUDE))
-        } else {
-            @Suppress("DEPRECATION")
-            vib.vibrate(18L)
-        }
+    private fun cancelDragHold() {
+        dragHoldRunnable?.let { handler.removeCallbacks(it) }
+        dragHoldRunnable = null
     }
+
+    private fun enterDragMode() {
+        dragLocked = true
+        dragKind = null
+        dragProx = 0f
+        dragHapticKind = null
+        dragHapticStep = 0
+        // Centro da orbe em coords ABSOLUTAS de tela (a sobreposição das setas é LAYOUT_IN_SCREEN, cobre a
+        // tela física inteira) — assim casa em qualquer posição, inclusive nos cantos.
+        val loc = IntArray(2).also { getLocationOnScreen(it) }
+        dragCenterX = loc[0] + sizePx / 2
+        dragCenterY = loc[1] + sizePx / 2
+        dragActPx = sizePx * DRAG_ACTIVATION_FRACTION
+        vibrateTick() // sinaliza a trava
+        // Setas já aparecem opacas (guia + indicação de que travou) na sobreposição separada.
+        onDragArrows(dragArrows(upAlpha = 1f, lateralAlpha = 1f, downAlpha = 1f))
+        // Glifo central do alvo ainda invisível (aparece com a proximidade).
+        orbUi = orbUi.copy(dragHint = OrbDragHint(centerKind = null, centerAlpha = 0f, seconds = elapsedSeconds()))
+    }
+
+    private fun exitDragMode() {
+        if (!dragLocked) return
+        dragLocked = false
+        dragKind = null
+        dragProx = 0f
+        onDragArrows(null) // some com a sobreposição das setas
+        orbUi = orbUi.copy(dragHint = null)
+    }
+
+    private fun dragArrows(upAlpha: Float, lateralAlpha: Float, downAlpha: Float) = DragArrowsState(
+        centerXScreen = dragCenterX,
+        centerYScreen = dragCenterY,
+        activationPx = dragActPx,
+        upAlpha = upAlpha,
+        lateralAlpha = lateralAlpha,
+        downAlpha = downAlpha,
+        lateralLeft = side() == OverlaySide.RIGHT,
+    )
+
+    /**
+     * Atualiza o alvo central e a opacidade das setas durante o modo-arrasto. Gravando: ↑ pausa, ← cancela.
+     * Pausado (proposta do usuário): ↑ cancela, ← retoma. As setas começam opacas e somem ao aproximar.
+     */
+    private fun updateDragFeedback(dx: Float, dy: Float) {
+        val act = sizePx * DRAG_ACTIVATION_FRACTION
+        val destro = side() == OverlaySide.RIGHT
+        val upProx = (-dy / act).coerceIn(0f, 1f)
+        val downProx = (dy / act).coerceIn(0f, 1f)
+        // Lateral (cancelar/retomar) vai pro CENTRO: destro arrasta ←, canhoto arrasta → (longe da borda).
+        val lateralProx = ((if (destro) -dx else dx) / act).coerceIn(0f, 1f)
+        val paused = renderedState == ButtonState.PAUSED
+        // ↑ = alternar estado (pausa/retoma); lateral = cancelar; ↓ = abrir config (mantém o estado).
+        val (kind, prox) = when {
+            upProx <= 0f && lateralProx <= 0f && downProx <= 0f -> null to 0f
+            upProx >= lateralProx && upProx >= downProx -> (if (paused) OrbDragKind.RESUME else OrbDragKind.PAUSE) to upProx
+            downProx >= lateralProx && downProx >= upProx -> OrbDragKind.CONFIG to downProx
+            else -> OrbDragKind.CANCEL to lateralProx
+        }
+        dragKind = kind
+        dragProx = prox
+        applyDragHaptics(kind, prox)
+        // Setas (sobreposição separada): opacas→somem ao aproximar.
+        onDragArrows(dragArrows(upAlpha = 1f - upProx, lateralAlpha = 1f - lateralProx, downAlpha = 1f - downProx))
+        // Glifo central do alvo (orbe): transparente→opaco ao aproximar.
+        orbUi = orbUi.copy(dragHint = OrbDragHint(centerKind = kind, centerAlpha = prox, seconds = elapsedSeconds()))
+    }
+
+    /**
+     * Retorno tátil progressivo do arrasto travado: ticks leves que sobem de degrau conforme o dedo se
+     * aproxima da ação e um "click" firme ao **cruzar o limiar** (prox ≥ 1). Só toca ao subir de degrau
+     * (não repete) e reseta ao trocar de direção ou afastar — assim re-aproximar volta a dar o feedback.
+     */
+    private fun applyDragHaptics(kind: OrbDragKind?, prox: Float) {
+        val base = vibrationIntensity()
+        if (base <= 0 || kind == null) {
+            dragHapticKind = kind
+            dragHapticStep = 0
+            return
+        }
+        if (kind != dragHapticKind) {
+            dragHapticKind = kind
+            dragHapticStep = 0
+        }
+        val step = (prox * DRAG_HAPTIC_STEPS).toInt().coerceIn(0, DRAG_HAPTIC_STEPS)
+        if (step > dragHapticStep) {
+            if (step >= DRAG_HAPTIC_STEPS) {
+                Haptics.tick(context, maxOf(base, 80), minMs = 32L, maxMs = 50L) // click firme de ativação
+            } else {
+                Haptics.tick(context, (base * step / DRAG_HAPTIC_STEPS).coerceAtLeast(8), minMs = 10L, maxMs = 18L)
+            }
+        }
+        dragHapticStep = step
+    }
+
+    /** Resolve a ação do arrasto ao soltar. Retorna `true` se uma ação foi disparada (chegou à zona). */
+    private fun resolveDragOnUp(): Boolean {
+        if (dragProx < 1f) return false // só age se chegou à zona de ativação
+        when (dragKind) {
+            OrbDragKind.PAUSE -> onIntent(GestureIntent.PAUSE)
+            OrbDragKind.RESUME -> onIntent(GestureIntent.RESUME)
+            OrbDragKind.CANCEL -> onIntent(GestureIntent.CANCEL)
+            OrbDragKind.CONFIG ->
+                if (mode() == RecordingMode.PUSH_TO_TALK) {
+                    // PTT: abre o app e MANTÉM a gravação na janela de release — re-segurar antes do
+                    // threshold continua sem costura; estourar a janela envia. (Não envia na hora.)
+                    onOpenConfig()
+                    emit(TouchSignal.UP)
+                    scheduleReleaseTimeout()
+                } else {
+                    onOpenConfig() // Toggle: abre mantendo o estado (segue gravando)
+                }
+            null -> return false
+        }
+        return true
+    }
+
+    /** Pulso tátil ao interagir com a orbe, na intensidade configurada (ver [Haptics]). */
+    private fun vibrateTick() = Haptics.tick(context, vibrationIntensity())
 
     /**
      * Conta um toque da rajada (TOGGLE) e (re)agenda a resolução para daqui a [tapBurstWindowMs]. Cada novo
@@ -354,10 +559,18 @@ class OrbButtonView(
         val count = tapBurstCount
         tapBurstCount = 0
         tapBurstRunnable = null
+        // No PTT o toque único é gesto livre (a gravação começa no hold), então 1 toque é atalho em
+        // QUALQUER estado. No TOGGLE, 1 toque é o gesto nativo (parar/enviar), então só 2/3 viram atalho.
+        val ptt = mode() == RecordingMode.PUSH_TO_TALK
+        val pttWindow = ptt && renderedState == ButtonState.RECORDING
         when {
+            count == 1 && ptt -> onShortcut(1)
             count == 1 -> emit(TouchSignal.TAP)
             count >= 2 -> onShortcut(count) // 2/3 = atalho; >3 cai na política de overflow (OverlayService)
         }
+        // PTT: os atalhos na janela NÃO enviam — reabre a janela de envio (só o estouro sem toque, ou
+        // re-segurar, decide o destino da gravação).
+        if (pttWindow) scheduleReleaseTimeout()
     }
 
     private fun cancelTapBurst() {
@@ -370,7 +583,8 @@ class OrbButtonView(
         cancelReleaseTimeout()
         val r = Runnable { onIntent(controller.onReleaseTimeout()) }
         pendingReleaseTimeout = r
-        handler.postDelayed(r, releaseWindowMs)
+        // Janela de re-segurar = "Tempo de reação" (mesmo limiar do toque), e não um valor fixo solto.
+        handler.postDelayed(r, tapBurstWindowMs)
     }
 
     private fun cancelReleaseTimeout() {
@@ -432,15 +646,24 @@ class OrbButtonView(
         ButtonState.PENDING_PASTE -> "KeyFlow pending paste"
     }
 
-    private data class OrbButtonUi(val state: OrbState, val center: OrbCenter)
+    private data class OrbButtonUi(
+        val state: OrbState,
+        val center: OrbCenter,
+        val dragHint: OrbDragHint? = null,
+    )
 
     private val ButtonState.isIdleState: Boolean
         get() = this == ButtonState.IDLE_READY || this == ButtonState.IDLE_NO_FIELD
 
     private companion object {
         const val TICK_MS = 500L
-        const val DEFAULT_RELEASE_WINDOW_MS = 350L
         // Janela de rajada de toques (threshold padrão; futuro: configurável pelo usuário).
         const val DEFAULT_TAP_BURST_WINDOW_MS = 250L
+        // Degraus do retorno tátil progressivo do arrasto travado (último degrau = click de ativação).
+        const val DRAG_HAPTIC_STEPS = 4
+        // Offset do hold sobre o "Tempo de reação" (segurada = janela + 150ms).
+        const val HOLD_OFFSET_MS = 150L
+        // Distância (em frações do lado da orbe) para ativar o alvo do arrasto.
+        const val DRAG_ACTIVATION_FRACTION = 0.7f
     }
 }

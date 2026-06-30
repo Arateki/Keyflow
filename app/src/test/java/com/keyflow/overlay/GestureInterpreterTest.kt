@@ -58,6 +58,36 @@ class GestureInterpreterTest {
     }
 
     @Test
+    fun `hold in progress is detected while still pressed and not repeated on release`() {
+        val gestures = GestureInterpreter(holdThresholdMs = 500, clock = { now })
+
+        gestures.onDown()
+        now = 500
+        assertThat(gestures.onHoldElapsed()).isEqualTo(GestureEvent.HOLD)
+        // já emitido em andamento → soltar não repete o HOLD
+        assertThat(gestures.onUp()).isNull()
+    }
+
+    @Test
+    fun `hold in progress not detected before threshold`() {
+        val gestures = GestureInterpreter(holdThresholdMs = 500, clock = { now })
+
+        gestures.onDown()
+        now = 300
+        assertThat(gestures.onHoldElapsed()).isNull()
+    }
+
+    @Test
+    fun `hold in progress not detected while dragging`() {
+        val gestures = GestureInterpreter(holdThresholdMs = 500, clock = { now })
+
+        gestures.onDown()
+        gestures.onMove(dx = 20f, dy = 0f) // virou arrasto
+        now = 500
+        assertThat(gestures.onHoldElapsed()).isNull()
+    }
+
+    @Test
     fun `drag emits drag start once and drag end on release`() {
         val gestures = GestureInterpreter(clock = { now })
 

@@ -40,6 +40,9 @@ class OverlayCoordinator(
     private val onShowCancelUndo: () -> Unit = {},
     private val onHideCancelUndo: () -> Unit = {},
     private val cancelWindowMs: Long = DEFAULT_CANCEL_WINDOW_MS,
+    // Tempo autoritativo de gravação (acumulado, início do segmento) — superfícies leem daqui p/ não
+    // dessincronizar (ex.: teclado que sobe depois de transições já terem ocorrido).
+    private val onRecordingTime: (accumulatedMs: Long, segmentStartMs: Long) -> Unit = { _, _ -> },
     // (mensagem, abreVoz): abreVoz = erro resolvível na aba Voz (config/token) → tocar no X leva lá.
     private val onError: (String, Boolean) -> Unit = { _, _ -> },
     private val recordingClockMs: () -> Long = { SystemClock.elapsedRealtime() },
@@ -47,6 +50,15 @@ class OverlayCoordinator(
     private val machine = ButtonStateMachine(targetAvailable = targetAvailable)
     private var recordingStartMs = 0L
     private var cancelJob: kotlinx.coroutines.Job? = null
+
+    // Tempo de gravação (acumulado + início do segmento atual), publicado a cada transição.
+    private var timeAccumulatedMs = 0L
+    private var timeSegmentStartMs = 0L
+    private fun publishTime() = onRecordingTime(timeAccumulatedMs, timeSegmentStartMs)
+    private fun timeStart() { timeAccumulatedMs = 0L; timeSegmentStartMs = recordingClockMs(); publishTime() }
+    private fun timeResume() { timeSegmentStartMs = recordingClockMs(); publishTime() }
+    private fun timeFreeze() { timeAccumulatedMs += recordingClockMs() - timeSegmentStartMs; publishTime() }
+    private fun timeReset() { timeAccumulatedMs = 0L; timeSegmentStartMs = recordingClockMs(); publishTime() }
 
     /**
      * Cancela a gravação em curso retendo o áudio (pausa o recorder, não descarta na hora) e abre a
@@ -57,6 +69,7 @@ class OverlayCoordinator(
         val next = machine.onCancel()
         if (next != ButtonState.CANCELLING || before == ButtonState.CANCELLING) return
         runCatching { recorder.pause() }
+        if (before == ButtonState.RECORDING) timeFreeze() // congela; vindo de PAUSED já estava congelado
         render(next)
         onShowCancelUndo()
         cancelJob?.cancel()
@@ -84,6 +97,7 @@ class OverlayCoordinator(
         cancelJob?.cancel()
         cancelJob = null
         runCatching { recorder.discard() }
+        timeReset()
         render(machine.onCancelExpired())
         onHideCancelUndo()
     }
@@ -134,12 +148,15 @@ class OverlayCoordinator(
             GestureIntent.STOP -> handleState(machine.onStop())     // → stopAndTranscribe
             GestureIntent.PAUSE -> {
                 runCatching { recorder.pause() }
+                timeFreeze()
                 render(machine.onPause())
             }
             GestureIntent.RESUME -> {
                 runCatching { recorder.resume() }
+                timeResume()
                 render(machine.onResume())
             }
+            GestureIntent.CANCEL -> onCancel()
             GestureIntent.CANCEL_COMMIT -> onCommitCancel()
             GestureIntent.KEYBOARD_PICKER -> onShowKeyboardPicker()
             GestureIntent.REPOSITION_ONLY, GestureIntent.NONE -> Unit
@@ -171,6 +188,7 @@ class OverlayCoordinator(
 
     private fun startRecording() {
         recordingStartMs = recordingClockMs()
+        timeStart()
         runCatching { recorder.start() }
             .onFailure {
                 onError("Falha ao iniciar a gravação.", false)
@@ -179,6 +197,7 @@ class OverlayCoordinator(
     }
 
     private fun stopAndTranscribe() {
+        timeReset() // gravação encerrada: zera o tempo autoritativo
         val duration = recordingClockMs() - recordingStartMs
         if (duration < MIN_RECORDING_MS) {
             Log.d(TAG, "recording too short (${duration}ms), cancelling")

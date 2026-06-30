@@ -52,13 +52,16 @@ data class Settings(
     // Intervalo máximo (ms) entre toques para acionar os atalhos da orbe — também define o delay de
     // confirmação do comando de gravação (rajada de toques). Slider na aba Sobrepor → Atalhos.
     val tapBurstWindowMs: Int = 250,
-    // Atalhos de toque da orbe (acionados em idle/pause). 1 toque é reservado ao gesto do modo.
+    // Atalhos de toque da orbe. 1 toque só existe no PUSH_TO_TALK (na janela de release, mão livre);
+    // 2/3 toques agem em idle/pause. Fora do PTT o de 1 toque aparece na config mas fica desabilitado.
+    val shortcut1Tap: OrbShortcutAction = OrbShortcutAction.NONE,
     val shortcut2Tap: OrbShortcutAction = OrbShortcutAction.TOGGLE_KEYBOARD,
     val shortcut3Tap: OrbShortcutAction = OrbShortcutAction.SWITCH_IME,
     // Toques além do máximo (>3): cair no atalho anterior ou cancelar.
     val shortcutOverflow: ShortcutOverflow = ShortcutOverflow.NEAREST_DOWN,
-    // Retorno tátil: vibração leve ao interagir com a orbe.
-    val hapticFeedback: Boolean = true,
+    // Vibração ao interagir com a orbe: 0 = sem vibração; 1..100 = intensidade (mapeada p/ amplitude
+    // onde o aparelho suporta hasAmplitudeControl; senão vira liga/desliga).
+    val vibrationIntensity: Int = 60,
     // Tema + onboarding
     val themeDark: Boolean = false,
     val onboardingDone: Boolean = false,
@@ -98,8 +101,9 @@ data class Settings(
         )
     }
 
-    /** Ação mapeada para uma rajada de [count] toques (2 ou 3); demais contagens → [OrbShortcutAction.NONE]. */
+    /** Ação mapeada para uma rajada de [count] toques (1/2/3); demais contagens → [OrbShortcutAction.NONE]. */
     fun shortcutForTaps(count: Int): OrbShortcutAction = when (count) {
+        1 -> shortcut1Tap
         2 -> shortcut2Tap
         3 -> shortcut3Tap
         else -> OrbShortcutAction.NONE
@@ -111,7 +115,7 @@ data class Settings(
      * ([ShortcutOverflow.NEAREST_DOWN]).
      */
     fun resolveShortcut(count: Int): OrbShortcutAction {
-        if (count < 2) return OrbShortcutAction.NONE
+        if (count < 1) return OrbShortcutAction.NONE
         if (count <= 3) return shortcutForTaps(count)
         return when (shortcutOverflow) {
             ShortcutOverflow.CANCEL -> OrbShortcutAction.NONE

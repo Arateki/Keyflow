@@ -307,12 +307,13 @@ internal fun SkinsSection(onUnlock: () -> Unit, unlockTag: String, modifier: Mod
                 Text("BLOQUEADO", color = palette.faint, fontFamily = SpaceMono, fontSize = 8.sp)
             }
         }
+        // A cor em uso (teal/orbe) aparece SELECIONADA (anel + opaca); as demais ficam esmaecidas (locked).
         Row(
-            Modifier.fillMaxWidth().padding(top = 11.dp).alpha(0.4f),
+            Modifier.fillMaxWidth().padding(top = 11.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             SkinSwatch(palette.fg)
-            SkinSwatch(palette.teal)
+            SkinSwatch(palette.teal, selected = true)
             SkinSwatch(palette.terracotta)
             SkinSwatch(palette.bg, border = true)
         }
@@ -341,15 +342,28 @@ internal fun SkinsSection(onUnlock: () -> Unit, unlockTag: String, modifier: Mod
 }
 
 @Composable
-private fun androidx.compose.foundation.layout.RowScope.SkinSwatch(color: Color, border: Boolean = false) {
+private fun androidx.compose.foundation.layout.RowScope.SkinSwatch(
+    color: Color,
+    border: Boolean = false,
+    selected: Boolean = false,
+) {
     val palette = LocalKeyFlowPalette.current
     Box(
         Modifier
             .weight(1f)
             .height(40.dp)
+            // Não-selecionados esmaecidos (efeito "bloqueado"); o selecionado fica opaco.
+            .then(if (selected) Modifier else Modifier.alpha(0.4f))
             .clip(RoundedCornerShape(4.dp))
-            .then(if (border) Modifier.border(1.dp, palette.line, RoundedCornerShape(4.dp)) else Modifier)
-            .background(color),
+            .background(color)
+            // Anel de seleção (cor do texto, contrasta nos dois temas); senão, borda só p/ swatch claro.
+            .then(
+                when {
+                    selected -> Modifier.border(2.dp, palette.fg, RoundedCornerShape(4.dp))
+                    border -> Modifier.border(1.dp, palette.line, RoundedCornerShape(4.dp))
+                    else -> Modifier
+                },
+            ),
     )
 }
 

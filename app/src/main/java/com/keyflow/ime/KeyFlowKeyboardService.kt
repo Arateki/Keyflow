@@ -61,6 +61,8 @@ class KeyFlowKeyboardService : InputMethodService() {
     override fun onWindowShown() {
         super.onWindowShown()
         KeyFlowController.setKeyboardVisible(true)
+        // Sincroniza o estado a cada exibição (o onCreateInputView pode não re-rodar com a view reusada).
+        keyboardView?.updateMicState(KeyFlowController.buttonState.value)
     }
 
     override fun onWindowHidden() {
@@ -82,6 +84,7 @@ class KeyFlowKeyboardService : InputMethodService() {
             context = this,
             onKey = ::handleKey,
             onMic = { startMicSession() },
+            onConfig = { openKeyFlowApp() },
             onMicAction = { action -> sendMicAction(action) },
             onHide = {
                 preferExpanded = false
@@ -97,6 +100,10 @@ class KeyFlowKeyboardService : InputMethodService() {
             dark = dark,
         )
         keyboardView = view
+        // Sincroniza o estado atual na criação: o StateFlow só re-emite em mudança, então se a orbe já
+        // estava (ex.) pausada quando o teclado abriu, a view nasceria dessincronizada (ex.: trocar de
+        // teclado por atalho com o overlay pausado).
+        view.updateMicState(KeyFlowController.buttonState.value)
         return view
     }
 
@@ -125,6 +132,14 @@ class KeyFlowKeyboardService : InputMethodService() {
      * Ação secundária do mic (seletor por hold): pausar/retomar, cancelar ou desfazer. O serviço já está
      * em foreground durante a gravação, então um startService basta para entregar a ação ao coordinator.
      */
+    /** Abre o app do KeyFlow (tecla ⚙). */
+    private fun openKeyFlowApp() {
+        val intent = packageManager.getLaunchIntentForPackage(packageName)
+            ?.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            ?: return
+        runCatching { startActivity(intent) }
+    }
+
     private fun sendMicAction(action: MicAction) {
         val intentAction = when (action) {
             MicAction.PAUSE_RESUME -> RecordingNotification.ACTION_PAUSE_RESUME

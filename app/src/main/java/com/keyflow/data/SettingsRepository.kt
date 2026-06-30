@@ -86,10 +86,13 @@ class SettingsRepository(
             overlaySide = prefs[OVERLAY_SIDE].toOverlaySide(),
             orbSizePx = prefs[ORB_SIZE_PX] ?: 195,
             tapBurstWindowMs = prefs[TAP_BURST_WINDOW_MS] ?: 250,
+            shortcut1Tap = prefs[SHORTCUT_1_TAP].toShortcutAction(OrbShortcutAction.NONE),
             shortcut2Tap = prefs[SHORTCUT_2_TAP].toShortcutAction(OrbShortcutAction.TOGGLE_KEYBOARD),
             shortcut3Tap = prefs[SHORTCUT_3_TAP].toShortcutAction(OrbShortcutAction.SWITCH_IME),
             shortcutOverflow = prefs[SHORTCUT_OVERFLOW].toShortcutOverflow(),
-            hapticFeedback = prefs[HAPTIC_FEEDBACK] ?: true,
+            // Migração do antigo liga/desliga: haptic=false → 0; ausente/true → 60.
+            vibrationIntensity = prefs[VIBRATION_INTENSITY]
+                ?: (if (prefs[HAPTIC_FEEDBACK] == false) 0 else 60),
             themeDark = prefs[THEME_DARK] ?: false,
             onboardingDone = prefs[ONBOARDING_DONE] ?: false,
         )
@@ -125,10 +128,11 @@ class SettingsRepository(
             prefs[OVERLAY_SIDE] = settings.overlaySide.name
             prefs[ORB_SIZE_PX] = settings.orbSizePx
             prefs[TAP_BURST_WINDOW_MS] = settings.tapBurstWindowMs
+            prefs[SHORTCUT_1_TAP] = settings.shortcut1Tap.name
             prefs[SHORTCUT_2_TAP] = settings.shortcut2Tap.name
             prefs[SHORTCUT_3_TAP] = settings.shortcut3Tap.name
             prefs[SHORTCUT_OVERFLOW] = settings.shortcutOverflow.name
-            prefs[HAPTIC_FEEDBACK] = settings.hapticFeedback
+            prefs[VIBRATION_INTENSITY] = settings.vibrationIntensity
             prefs[THEME_DARK] = settings.themeDark
             prefs[ONBOARDING_DONE] = settings.onboardingDone
         }
@@ -220,10 +224,12 @@ class SettingsRepository(
         val OVERLAY_SIDE = stringPreferencesKey("overlay_side")
         val ORB_SIZE_PX = intPreferencesKey("orb_size_px")
         val TAP_BURST_WINDOW_MS = intPreferencesKey("tap_burst_window_ms")
+        val SHORTCUT_1_TAP = stringPreferencesKey("shortcut_1_tap")
         val SHORTCUT_2_TAP = stringPreferencesKey("shortcut_2_tap")
         val SHORTCUT_3_TAP = stringPreferencesKey("shortcut_3_tap")
         val SHORTCUT_OVERFLOW = stringPreferencesKey("shortcut_overflow")
-        val HAPTIC_FEEDBACK = booleanPreferencesKey("haptic_feedback")
+        val HAPTIC_FEEDBACK = booleanPreferencesKey("haptic_feedback") // legado (migração p/ vibration_intensity)
+        val VIBRATION_INTENSITY = intPreferencesKey("vibration_intensity")
         val THEME_DARK = booleanPreferencesKey("theme_dark")
         val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
         const val OPENAI_TOKEN = "openai_token"

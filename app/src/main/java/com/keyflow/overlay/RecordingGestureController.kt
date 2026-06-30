@@ -4,7 +4,7 @@ import com.keyflow.core.ButtonState
 import com.keyflow.core.RecordingMode
 
 /** Intenção de alto nível derivada de um gesto + modo (REC-03/04, OVL-03/04). */
-enum class GestureIntent { START, STOP, PAUSE, RESUME, CANCEL_COMMIT, REPOSITION_ONLY, KEYBOARD_PICKER, NONE }
+enum class GestureIntent { START, STOP, PAUSE, RESUME, CANCEL, CANCEL_COMMIT, REPOSITION_ONLY, KEYBOARD_PICKER, NONE }
 
 /**
  * Sinais de toque consumidos pelo [RecordingGestureController].
@@ -27,7 +27,8 @@ enum class TouchSignal { DOWN, UP, TAP, HOLD, TRIPLE_TAP, DRAG_START, DRAG_END }
 class RecordingGestureController(
     private val mode: () -> RecordingMode,
     private val currentState: () -> ButtonState,
-    private val pttPauseWindowMs: Long = DEFAULT_PTT_PAUSE_WINDOW_MS,
+    // Janela de re-segurar ao soltar (= "Tempo de reação", lido ao vivo). Lambda p/ acompanhar o slider.
+    private val pttReleaseWindowMs: () -> Long = { DEFAULT_PTT_PAUSE_WINDOW_MS },
     private val clock: () -> Long = { System.currentTimeMillis() },
 ) {
     /** Início do release PTT pendente (RECORDING aguardando Stop ou tap-rápido→Pause). */
@@ -47,7 +48,7 @@ class RecordingGestureController(
      */
     fun onReleaseTimeout(): GestureIntent {
         val started = pendingReleaseAt ?: return GestureIntent.NONE
-        if (clock() - started < pttPauseWindowMs) return GestureIntent.NONE
+        if (clock() - started < pttReleaseWindowMs()) return GestureIntent.NONE
         pendingReleaseAt = null
         return if (currentState() == ButtonState.RECORDING) GestureIntent.STOP else GestureIntent.NONE
     }
@@ -85,8 +86,9 @@ class RecordingGestureController(
         TouchSignal.DRAG_END -> GestureIntent.NONE
         TouchSignal.TRIPLE_TAP -> GestureIntent.KEYBOARD_PICKER
         TouchSignal.DOWN -> when {
-            // Tap-rápido dentro da janela pós-release → pausa em vez de parar (REC-04).
-            isWithinReleaseWindow() -> { pendingReleaseAt = null; GestureIntent.PAUSE }
+            // Re-segurar (hold) durante a gravação: CONTINUA sem costura e cancela o envio pendente da
+            // janela de release. Pausar no PTT é só arrastar ↑ (chega via onIntent(PAUSE), fora daqui).
+            currentState() == ButtonState.RECORDING -> { pendingReleaseAt = null; GestureIntent.NONE }
             currentState().isIdle -> GestureIntent.START
             currentState() == ButtonState.PAUSED -> GestureIntent.RESUME // segurar de novo retoma (Yan)
             else -> GestureIntent.NONE
@@ -100,11 +102,6 @@ class RecordingGestureController(
         TouchSignal.TAP -> if (currentState() == ButtonState.CANCELLING) GestureIntent.CANCEL_COMMIT else GestureIntent.NONE
         // Demais classificados do GestureInterpreter não são usados no PTT (gating é por DOWN/UP).
         TouchSignal.HOLD -> GestureIntent.NONE
-    }
-
-    private fun isWithinReleaseWindow(): Boolean {
-        val started = pendingReleaseAt ?: return false
-        return currentState() == ButtonState.RECORDING && clock() - started <= pttPauseWindowMs
     }
 
     private companion object {

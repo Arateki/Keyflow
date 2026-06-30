@@ -122,6 +122,20 @@ class ButtonStateMachineTest {
     }
 
     @Test
+    fun `target change does not override cancelling state`() {
+        // Regressão: abrir o teclado durante a janela de desfazer fazia um onTargetChanged sair de
+        // CANCELLING para idle, orfanizando o cancelJob (recorder nunca descartado → gravar dava erro).
+        val machine = ButtonStateMachine()
+
+        machine.onTap()    // RECORDING
+        machine.onCancel() // CANCELLING
+        machine.onTargetChanged(true)
+        assertThat(machine.state).isEqualTo(ButtonState.CANCELLING)
+        machine.onTargetChanged(false)
+        assertThat(machine.state).isEqualTo(ButtonState.CANCELLING)
+    }
+
+    @Test
     fun `cancel moves recording to cancelling`() {
         val machine = ButtonStateMachine()
 

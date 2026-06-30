@@ -14,6 +14,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -65,6 +66,20 @@ sealed interface OrbCenter {
     data class CancelGlyph(val seconds: Int) : OrbCenter
 }
 
+/** Alvo do modo-arrasto (orbe travada): glifo central conforme a direção/estado. */
+enum class OrbDragKind { PAUSE, CANCEL, RESUME, CONFIG }
+
+/**
+ * Dica de arrasto (orbe travada): o glifo central [centerKind] aparece ganhando opacidade por
+ * proximidade ([centerAlpha] 0→1), enquanto as setas ↑/← começam opacas e somem conforme o dedo
+ * se direciona a elas ([upAlpha]/[leftAlpha] 1→0).
+ */
+data class OrbDragHint(
+    val centerKind: OrbDragKind?,
+    val centerAlpha: Float,
+    val seconds: Int, // tempo mostrado abaixo/no glifo do alvo (igual pause/cancelamento)
+)
+
 private const val TAU = (PI * 2).toFloat()
 
 // Paleta Ateliê (paleta A do orbe)
@@ -84,6 +99,7 @@ fun VoiceOrb(
     state: OrbState,
     modifier: Modifier = Modifier,
     center: OrbCenter = OrbCenter.None,
+    dragHint: OrbDragHint? = null,
     timeProvider: (() -> Float)? = null,
 ) {
     val provided = timeProvider ?: LocalOrbClock.current
@@ -91,26 +107,39 @@ fun VoiceOrb(
     val timeMs = provided?.invoke() ?: animatedMs
 
     BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
-        // Lado útil do orbe em px: o conteúdo central (tempo/glifos) escala junto com o tamanho
-        // (slider da aba Sobrepor) em vez de ficar fixo, acompanhando o Canvas (ORB-04, OVL).
+        val density = LocalDensity.current
+        // Lado da orbe em px: o conteúdo central (tempo/glifos) escala com o tamanho (slider Sobrepor).
         val sidePx = minOf(constraints.maxWidth, constraints.maxHeight)
             .takeIf { it in 1..(Int.MAX_VALUE / 2) } ?: DEFAULT_ORB_SIDE_PX
-        val density = LocalDensity.current
 
         Canvas(Modifier.matchParentSize()) { drawOrb(timeMs, state) }
-        when (center) {
-            is OrbCenter.Time -> Text(
-                text = formatOrbTime(center.seconds),
-                color = CenterInk,
-                fontFamily = SpaceMono,
-                fontWeight = FontWeight.Bold,
-                fontSize = with(density) { (sidePx * TIME_FONT_FRACTION).toSp() },
-                textAlign = TextAlign.Center,
-            )
-            is OrbCenter.PauseGlyph -> GlyphWithTime(center.seconds, sidePx, density) { PauseGlyph(it) }
-            OrbCenter.ErrorGlyph -> ErrorGlyph(with(density) { (sidePx * GLYPH_FRACTION).toDp() })
-            is OrbCenter.CancelGlyph -> GlyphWithTime(center.seconds, sidePx, density) { CancelGlyph(it) }
-            OrbCenter.None -> Unit
+        // Centro do estado. No modo-arrasto ele some conforme o alvo aparece (crossfade), pra não
+        // sobrepor — os glifos têm o mesmo tamanho/área, então só o ativo da vez fica visível.
+        val baseAlpha = dragHint?.let { (1f - it.centerAlpha).coerceIn(0f, 1f) } ?: 1f
+        Box(Modifier.matchParentSize().alpha(baseAlpha), contentAlignment = Alignment.Center) {
+            when (center) {
+                is OrbCenter.Time -> OrbTimeText(center.seconds, sidePx, density)
+                is OrbCenter.PauseGlyph -> GlyphWithTime(center.seconds, sidePx, density) { PauseGlyph(it) }
+                OrbCenter.ErrorGlyph -> ErrorGlyph(with(density) { (sidePx * GLYPH_FRACTION).toDp() })
+                is OrbCenter.CancelGlyph -> GlyphWithTime(center.seconds, sidePx, density) { CancelGlyph(it) }
+                OrbCenter.None -> Unit
+            }
+        }
+        // Alvo do arrasto no centro (as setas ficam numa sobreposição separada, fora da janela da orbe).
+        dragHint?.centerKind?.let { kind ->
+            Box(
+                Modifier.matchParentSize().alpha(dragHint.centerAlpha.coerceIn(0f, 1f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                // Retomar = "estado ativo" → tempo grande (uniforme com gravando↔pause).
+                // Pausar/cancelar = glifo + tempo miúdo abaixo (mesmo formato do pause/cancelamento).
+                when (kind) {
+                    OrbDragKind.RESUME -> OrbTimeText(dragHint.seconds, sidePx, density)
+                    OrbDragKind.PAUSE -> GlyphWithTime(dragHint.seconds, sidePx, density) { PauseGlyph(it) }
+                    OrbDragKind.CANCEL -> GlyphWithTime(dragHint.seconds, sidePx, density) { CancelGlyph(it) }
+                    OrbDragKind.CONFIG -> GlyphWithTime(dragHint.seconds, sidePx, density) { GearGlyph(it) }
+                }
+            }
         }
     }
 }
@@ -123,6 +152,19 @@ private const val GLYPH_FRACTION = 0.30f
 // Pausa/cancelamento: glifo encolhido + tempo congelado miúdo abaixo (cabe nos dois no centro da orbe).
 private const val PAUSED_GLYPH_FRACTION = 0.22f
 private const val SMALL_TIME_FONT_FRACTION = 0.135f
+
+/** Tempo grande no centro (estado ativo de gravação). Reusado no centro e no alvo "retomar". */
+@Composable
+private fun OrbTimeText(seconds: Int, sidePx: Int, density: Density) {
+    Text(
+        text = formatOrbTime(seconds),
+        color = CenterInk,
+        fontFamily = SpaceMono,
+        fontWeight = FontWeight.Bold,
+        fontSize = with(density) { (sidePx * TIME_FONT_FRACTION).toSp() },
+        textAlign = TextAlign.Center,
+    )
+}
 
 /** Glifo (pause/lixeira) encolhido com o tempo congelado miúdo logo abaixo, empilhados no centro. */
 @Composable
@@ -157,17 +199,39 @@ private fun rememberOrbClock(enabled: Boolean): Float {
     return timeMs
 }
 
+/** Glifo de engrenagem (abrir config) — alvo ↓ do modo-arrasto, no estilo dos glifos da orbe. */
+@Composable
+private fun GearGlyph(glyphSize: Dp) {
+    Canvas(Modifier.size(glyphSize)) {
+        val c = Offset(size.width / 2f, size.height / 2f)
+        val rOuter = size.minDimension * 0.34f
+        val toothLen = size.minDimension * 0.13f
+        val sw = size.minDimension * 0.11f
+        drawCircle(CenterInk, radius = rOuter, center = c, style = Stroke(width = sw))
+        for (i in 0 until 8) {
+            val ang = (TAU / 8f) * i
+            val dir = Offset(cos(ang), sin(ang))
+            drawLine(CenterInk, c + dir * rOuter, c + dir * (rOuter + toothLen), strokeWidth = sw * 1.3f, cap = StrokeCap.Round)
+        }
+        drawCircle(CenterInk, radius = size.minDimension * 0.12f, center = c)
+    }
+}
+
 /** Glifo de pause (duas barras) desenhado no centro do orbe (ORB-02/REC-05). */
 @Composable
 private fun PauseGlyph(glyphSize: Dp) {
     Canvas(Modifier.size(glyphSize)) {
-        val barW = size.width * 0.30f
-        val barH = size.height
-        val gap = size.width * 0.16f
-        drawRect(CenterInk, topLeft = Offset(size.width / 2f - gap / 2f - barW, 0f), size = Size(barW, barH))
-        drawRect(CenterInk, topLeft = Offset(size.width / 2f + gap / 2f, 0f), size = Size(barW, barH))
+        // Folga vertical (0.16..0.84) para ocupar a mesma área de play/lixeira.
+        val barW = size.width * 0.26f
+        val gap = size.width * 0.18f
+        val top = size.height * 0.16f
+        val barH = size.height * 0.68f
+        drawRect(CenterInk, topLeft = Offset(size.width / 2f - gap / 2f - barW, top), size = Size(barW, barH))
+        drawRect(CenterInk, topLeft = Offset(size.width / 2f + gap / 2f, top), size = Size(barW, barH))
     }
 }
+
+
 
 /** Glifo de erro (X vermelho) — exibido brevemente quando a transcrição falha. */
 @Composable
