@@ -35,8 +35,17 @@ data class KeyFlowPalette(
     val isDark: Boolean,
 )
 
+/**
+ * Cor de acento da **orbe** — fonte única (hoje teal fixo; quando a skin da orbe existir, troca aqui e
+ * tudo que referencia [OrbAccent]/[OrbAccentArgb] acompanha: setas do modo-arrasto, banners de overlay).
+ */
+val OrbAccent = Color(0xFF4E9683)
+
+/** [OrbAccent] em ARGB `Int` para as views fora do Compose (banners do `OverlayService`). */
+val OrbAccentArgb: Int = 0xFF4E9683.toInt()
+
 // Acentos fixos compartilhados entre os dois temas (context.md).
-private val Teal = Color(0xFF4E9683)
+private val Teal = OrbAccent
 private val TealLight = Color(0xFF8FC3B3)
 private val Terracotta = Color(0xFFD9694B)
 private val Record = Color(0xFFC6873F)
