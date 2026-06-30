@@ -112,6 +112,72 @@ dentro de um `DemoFrame` (fundo `bg` + rótulo "PRÉVIA"); teclado mock acompanh
 
 ---
 
+# Fase 2 — gestos, cancelar/desfazer, controles (sessão 2026-06-29)
+
+> Sobre o trabalho commitado em `d8d245b` + ajustes seguintes (ainda não commitados ao escrever).
+> Device: Galaxy A32 (`RX8T10DERKW`).
+
+## 12. Cancelar com desfazer
+
+12.1 ✅ Cancelar **retém o áudio** e abre janela de **3s**; não descarta na hora.
+12.2 ✅ Desfazer dentro da janela → volta para **PAUSADO** (áudio preservado, dá pra retomar/enviar).
+12.3 ✅ **Concluir agora**: um toque durante o cancelamento descarta já e volta pra idle (sem esperar os 3s).
+12.4 🔧 Expirar a janela sem desfazer → descarta de vez.
+12.5 ✅ Ao retornar do cancelamento (desfazer→pausa), o **tempo continua de onde parou** (não zera) na orbe,
+teclado e notificação.
+12.6 🔧 Cancelar pela orbe = **arrasto lateral** (removido o gatilho TEMP de 2 toques durante a gravação).
+
+## 13. Notificação de gravação — controles
+
+13.1 ✅ Gravando: botões **⏸/▶ (pausa/retoma)**, **■ (parar e enviar)**, **✕ (cancelar)**.
+13.2 ✅ Pausar/retomar/parar/cancelar pela notificação refletem na orbe/teclado (estado único).
+13.3 ✅ Cancelando: a notificação mostra **🗑 descartar-agora** + **↶ desfazer** (resolve o desfazer sem overlay).
+13.4 🔧 Ocioso: botão **● gravar** inicia a gravação pela notificação (inclusive pela tela de bloqueio).
+13.5 ⚠️ `VISIBILITY_PUBLIC` — controles na tela de bloqueio **dependem da config do aparelho** (o Samsung pode
+ocultar notificações no bloqueio). Futura aba "Notificações" deve tornar isto configurável (ver TODO).
+13.6 (contexto) A notificação é **obrigatória** pelo Android durante o foreground service de microfone.
+
+## 14. Teclado — mic com toque + seletor por hold
+
+14.1 ✅ Removido o "Modo de gravação" do card Teclado (modo é só da orbe).
+14.2 ✅ **Toque** no mic: começa (ocioso) / envia (gravando ou pausado), **só ao soltar em cima**; arrastar
+pra fora e soltar **cancela** o toque.
+14.3 ✅ **Segurar** o mic abre um **seletor de ações** (estilo popup de acento): gravando → ⏸ pausar / ✕
+cancelar; pausado → ▶ retomar / ✕ cancelar; cancelando → ↶ desfazer.
+14.4 ✅ Deslizar até o chip e soltar aciona; voltar o dedo ao botão (nada destacado) → não faz nada.
+14.5 ✅ **Expandido**: seletor via popup acima do mic. **Retraído**: faixa in-view (sem fundo, centralizada
+sobre o mic, sem flick) — a janela curta não recebe toque a um popup acima dela.
+14.6 ⚠️ **Sync ao abrir/trocar pro teclado**: o **estado** sincroniza (onWindowShown); o **tempo** ainda
+diverge num cenário (pausar antes do teclado existir, alternar pausas e reabrir → mostra só o último
+segmento). Pendente: fonte de tempo compartilhada (KeyFlowController).
+
+## 15. Gestos da orbe — modo-arrasto (Alternar)
+
+15.1 ✅ **Gravando**: segurar parado ~**Tempo de reação + 150ms** trava a orbe (vibra) → **↑ pausa**,
+**lateral cancela**; soltar fora da zona → volta a gravar; arrastar de imediato (sem travar) → **reposiciona**.
+15.2 🔧 **Pausado**: segurar trava → **↑ retoma**, **lateral cancela**; soltar sem direção mantém a pausa.
+15.3 🔧 **Feedback**: ao travar aparecem **setas ↑/lateral opacas** que **somem** ao aproximar o dedo; o
+**glifo central do alvo** aparece (transparente→opaco), em crossfade com o glifo do estado (sem sobrepor),
+todos no mesmo tamanho.
+15.4 ⚠️ Pendente: posicionar as setas na **distância de ativação** (fora da orbe) — exige aumentar a janela
+só durante o arrasto (orbe não muda de tamanho visível, sem flick).
+
+## 16. Canhoto / Destro (Sobrepor)
+
+16.1 ✅ Config "Mão (canhoto/destro)" **encosta a orbe** no lado escolhido.
+16.2 🔧 Define a **direção do arrasto lateral** (cancelar/retomar), **sempre para o centro** (destro → ←,
+canhoto → →), evitando a orbe presa na borda. Trocar inverte a seta/direção.
+16.3 (semântica) A posição que persiste é a **última arrastada**; a config encosta no lado ao trocar.
+
+## 17. Avisos com barra de tempo + "Tempo de reação"
+
+17.1 ✅ Banners de overlay (cancelar/erro) e toasts in-app da config ganham uma **barra discreta** colada no
+contorno inferior que conta o tempo até sumir.
+17.2 Config "Intervalo entre toques" renomeada para **"Tempo de reação"** (governa toque×segurada e janelas;
+o hold = janela + 150ms).
+
+---
+
 ## Notas para automação
 - Permissões: `appops`/`pm grant` + (lição T15) drenar o fd do `shell()`.
 - IME: `adb shell ime enable/set/list`; troca de IME e foco precisam de UiAutomator.
