@@ -114,9 +114,9 @@ fun OverlayPanel(
 
         Box(Modifier.fillMaxWidth().padding(top = 18.dp).height(1.dp).background(palette.line2))
         SectionTitle("Atalhos", top = 16.dp)
-        FieldLabel("Intervalo entre toques", top = 12.dp)
+        FieldLabel("Tempo de reação", top = 12.dp)
         Text(
-            "Tempo máximo entre toques para acionar os atalhos da orbe. Também define o atraso até o início da captação de áudio.",
+            "Janela de reação da orbe: tempo entre toques para os atalhos e atraso até iniciar a captação. (No modelo final também separa toque de segurada.)",
             color = palette.faint,
             fontFamily = SpaceGrotesk,
             fontSize = 10.sp,
