@@ -56,7 +56,8 @@ class TecladoPanelTest {
 
     @Test
     fun autoPasteOnFocusTogglePersists() {
-        val h = Harness(Settings(autoPasteOnFocus = true))
+        // "Colar ao focar" só fica habilitado com o Modo Sobrepor ligado (senão "gravar fora" não existe).
+        val h = Harness(Settings(autoPasteOnFocus = true, overlayModeEnabled = true))
         rule.setContent { h.Content() }
 
         rule.onNodeWithTag(TECLADO_AUTO_PASTE_ON_FOCUS_TAG).performClick()

@@ -100,9 +100,13 @@ class KeyFlowKeyboardView(
         renderMic(ButtonState.IDLE_NO_FIELD)
     }
 
-    /** Acessores somente-leitura para testes instrumentados (KBD-01/02). */
+    /** Acessores somente-leitura para testes instrumentados (KBD-01/02; seletor do mic — KBDCTL-01..04). */
     val expandedForTest: Boolean get() = childCount > 0 && getChildAt(0) === expandedLayout
     val micLabelForTest: String? get() = (expandedMic ?: collapsedMic)?.text?.toString()
+    val micViewForTest: View? get() = expandedMic ?: collapsedMic
+    val selectorOpenForTest: Boolean get() = selectorOpen()
+    val popupActionsForTest: List<MicAction> get() = popupActions
+    val popupRectsForTest: List<android.graphics.Rect> get() = popupRects
 
     fun setExpanded(expanded: Boolean) {
         val target = if (expanded) expandedLayout else collapsedBar

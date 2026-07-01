@@ -72,6 +72,7 @@ class KeyFlowKeyboardService : InputMethodService() {
 
     override fun onDestroy() {
         KeyFlowController.setKeyboardVisible(false)
+        if (activeViewForTest === keyboardView) activeViewForTest = null
         serviceScope.cancel()
         super.onDestroy()
     }
@@ -100,6 +101,7 @@ class KeyFlowKeyboardService : InputMethodService() {
             dark = dark,
         )
         keyboardView = view
+        activeViewForTest = view
         // Sincroniza o estado atual na criação: o StateFlow só re-emite em mudança, então se a orbe já
         // estava (ex.) pausada quando o teclado abriu, a view nasceria dessincronizada (ex.: trocar de
         // teclado por atalho com o overlay pausado).
@@ -214,5 +216,15 @@ class KeyFlowKeyboardService : InputMethodService() {
     companion object {
         private const val TAG = "KeyFlow.Keyboard"
         private const val KEY_EXPANDED = "expanded"
+
+        /**
+         * Referência somente-leitura à instância ativa, para testes instrumentados (KBDCTL-01..04)
+         * lerem a geometria real dos chips do seletor (`popupRectsForTest`) sem precisar de UiAutomator
+         * no meio do gesto — consultar a hierarquia via acessibilidade enquanto o dedo sintético está
+         * "pressionado" interfere no foco do IME real.
+         */
+        @Volatile
+        var activeViewForTest: KeyFlowKeyboardView? = null
+            private set
     }
 }

@@ -159,6 +159,15 @@
 - Validação e2e completa (ditar → inserir, trocar API, gravar sem campo → colar) pendente em dispositivo físico com microfone e endpoint Whisper real.
 - ~~Gesto exato de retomar pause no PTT~~ — **DECIDIDO (Yan, 2026-06-27): no PTT, retomar = SEGURAR novamente** (em PAUSED, próximo HOLD/down → Resume; release volta a PAUSED enquanto não houver Stop). Implementar assim na T20.
 - Limiares de hold (toggle): `holdThresholdMs`/`Wptt` parametrizáveis com defaults razoáveis na T20; ajuste fino fica para UAT.
+- ~~DRAG-07 (setas nos 4 cantos)~~ — **CONFIRMADO RESOLVIDO (Yan, 2026-06-30)**: o fix de coordenadas
+  físicas→locais (`DragArrowsView.onDraw`, `uat-e2e-scenarios.md` 20.1) já está correto; entrou em Verified
+  no `orb-gestures/spec.md`.
+- **Ambiente deste sandbox**: o emulador headless (`swiftshader`, sob a carga atual do host) tem o Android
+  Keystore (`EncryptedSharedPreferences`) patologicamente lento, o que estoura o prazo de
+  `startForeground()` em testes que sobem o `OverlayService` logo na inicialização
+  (`SystemSurfacesScreenshotTest`). Confirmado não ser bug de código (3/3 no device físico). Se reaparecer
+  em outros testes novos, é a mesma causa — considerar pré-aquecer `SettingsRepository` no `@Before`
+  (mitiga mas não elimina) ou rodar esse teste específico no device físico do Yan.
 
 ## Ambiente (preparado 2026-06-26)
 - Toolchain pronta — ver `.specs/codebase/ENVIRONMENT.md`. Validada por smoke build (APK gerado) com **Gradle 9.6.1 + AGP 9.2.0 + JDK 17 + SDK** (build-tools 34, platform android-34).
@@ -166,3 +175,108 @@
 
 ## Preferências
 - Commits e PRs: não citar Claude Code nem adicionar trailers (preferência global do usuário).
+
+## Decisões do grill 2026-06-30 — SPEC: reconciliação + teclado Canvas
+
+Duas features novas planejadas via grill completo (gray areas resolvidas). **Ordem:** Trabalho 1
+(`orb-gestures`) fecha 100% (gate `full` verde + goldens) ANTES de iniciar o Trabalho 2
+(`keyboard-canvas`). e2e em device físico segue pendente como já estava.
+
+**Trabalho 1 — `orb-gestures` (reconciliação retroativa):**
+- Goldens (G2): aceitar o visual ATUAL como verdade, **sem** revisão prévia (bem testado no device); ao
+  final espelhar todos os PNGs numa pasta `/tmp` p/ o Yan conferir coerência.
+- Cobertura (G1): reparar os 4 `androidTest` quebrados (`orbSize`→`orbSizePx`; callbacks novos
+  `onRequestMicPermission`/`onSwitchKeyboard`) + gate `full` verde + regenerar goldens **+ instrumentados
+  novos** p/ cancelar/desfazer, atalhos e seletor do teclado.
+- Docs (G3): criar `.specs/features/orb-gestures/` (spec retroativa + IDs CANCEL/SHORTCUT/PTT/DRAG/HAPTIC/
+  KBDCTL/NOTIFCTL/CTRL); `gesture-interactions.md` vira o design; `redesign-atelie` continua Verified.
+- Bug ativo (setas nos 4 cantos): FORA da reconciliação — é correção funcional, não testes/docs.
+  Documentado como pendência.
+
+**Trabalho 2 — `keyboard-canvas` (teclado novo):**
+- Arquitetura (G4): **híbrido** — Canvas só na grade; mic + action row + barra retraída seguem Views
+  (intocados). Fronteira projetada p/ portar a barra a Canvas depois.
+- MVP (G5): Canvas + key preview + acentos (long-press) + repeat-on-hold **+ corretor do sistema**
+  (`SpellCheckerSession` + candidates view só no expandido). Glide e dicionário/sugestões próprias = futuro.
+- A11y (G6): básica no MVP (`AccessibilityNodeProvider` expõe as teclas ao TalkBack).
+- Layout: camada **?123** incluída; padrão visual **Gboard/Samsung**; **sem ABNT2** (é layout físico, não se
+  aplica a soft keyboard).
+- Idiomas: **PT + EN + ES** no MVP (mesma grade QWERTY + mapas de acento + `ñ`/`¿¡` no ES + subtypes/globo +
+  corretor no locale ativo). Dicionário por idioma = futuro.
+- Rollout (G7): grade Canvas isolada e testável (unit p/ layout/acentos/camadas) + **flag de DEBUG**
+  (antigo↔novo) + validação manual no Galaxy A32 + golden estático; aprovado → novo vira padrão, antigo sai.
+- **Extensibilidade (Yan, 2026-06-30):** o teclado será modificável EM BREVE — reduzir tamanho,
+  reposicionar teclas, teclas-macro. NÃO implementar agora, mas o modelo de layout DEVE nascer
+  **data-driven e serializável**: o rendering Canvas é função pura do modelo (linhas×teclas com
+  geometria+ação); ação de tecla é **sealed type extensível** (Macro entra como caso novo). Resize/
+  reposição/macro = editar dados, não refazer rendering.
+- Licença/monetização (contexto da decisão de NÃO adotar base GPL): app é open source mas com AdMob; AdMob é
+  proprietário e **conflita com GPL** → preferir **Apache** (AnySoftKeyboard) ou **código próprio** (o MVP é
+  código próprio). Backend de IA por créditos é server-side, não afetado por licença do cliente.
+
+## Execução Trabalho 1 — Reconciliação de gestos (Milestone 4, 2026-06-30) ✅ CONCLUÍDO
+
+- **OG-T1**: corrigidos os 4 `androidTest` quebrados (`orbSize`→`orbSizePx` em `SettingsRepositoryTest`/
+  `OverlayPanelTest` — o seletor de tamanho virou slider contínuo, `OrbSize` enum não existe mais;
+  `onRequestMicPermission`/`onSwitchKeyboard` adicionados em `ConfigScreenTest`/`ModoPanelTest`).
+  `compileDebugAndroidTestKotlin` voltou a compilar.
+- **OG-T2**: gate `full` fresco → **96 unit (0 falhas) + 60 instrumentados (58 verdes no emulador)**.
+  Além dos 4 arquivos do OG-T1, mais 5 testes pré-existentes estavam **desatualizados** (não eram bug de
+  produção, eram o teste testando comportamento já substituído pela própria Fase 2 de gestos) e foram
+  corrigidos: `ModoPanelTest` (faltava congelar `LocalOrbClock` do `VoiceOrb` novo no card demo — mesma
+  lição da T10 — e o teste de "esconder Ativar quando concedido" testava um design anterior; o chip agora
+  é sempre visível e dobra como botão, só muda o rótulo CONCEDIDO/PENDENTE); `ConfigScreenTest` (o gating
+  de abas mudou de "bloqueia o clique" para "navega mas fica somente-leitura sob `READONLY_SCRIM_TAG`";
+  faltava `keyboardActive=true` no harness p/ a aba Teclado ficar realmente liberada);
+  `SettingsRepositoryTest.saveThenReadPreservesConfig` (o campo `Config.recordingMode` ficou **vestigial**
+  após o T5: `effectiveConfigFor()` nunca o popula, e nada em produção mais lê `repository.flow()`/`save()`
+  para esse campo — removido da asserção, documentado no comentário); `OrbButtonViewTest` (`tripleTap...`
+  testava o mapeamento antigo p/ `GestureIntent.KEYBOARD_PICKER`; a rajada agora resolve via
+  `onShortcut(count)` — `OrbButtonView` não emite mais `TouchSignal.TRIPLE_TAP` p/ o controller; e
+  `pushToTalkDown...` não esperava o delay assíncrono do "start não otimista" do PTT, decisão registrada
+  no `orb-gestures/spec.md` PTT-01); `TecladoPanelTest.autoPasteOnFocusTogglePersists` (o toggle "colar ao
+  focar" é gateado por `overlayModeEnabled` — faltava ligar no harness).
+  **Achado de ambiente (não é bug)**: `SystemSurfacesScreenshotTest.sysOverlayOverApp/sysNotification`
+  falham de forma reproduzível no emulador **deste sandbox sob carga atual** com
+  `ForegroundServiceDidNotStartInTimeException` — o Android Keystore (`EncryptedSharedPreferences`) leva
+  tempo patológico para inicializar (confirmado via thread dump preso em `createSecurePrefs`), estourando
+  o prazo do SO p/ `startForeground()`. Confirmado via diagnóstico: rodando a MESMA classe, sem nenhuma
+  mudança de código, no device físico do Yan (Galaxy A32, Android 13) → **3/3 passou**. Mais RAM livre não
+  resolveu no emulador. Tratado como pendência ambiental, não como falha de teste/produção (decisão do Yan).
+- **OG-T3**: goldens regenerados (`scripts/verify-screens.sh` → 45 PNGs) e aprovados sem revisão prévia
+  (decisão G2 — estado visual já validado no device durante a fase de gestos); muita diferença vs. o golden
+  anterior (10–26% dos pixels em várias rotas), esperado pelo tanto que a UI mudou na fase de gestos.
+  `diff-screens.sh` → 42/42 dentro do limiar após aprovar. Todos os 45 PNGs (incl. `sys-*`) espelhados em
+  `/tmp/keyflow-prints/`.
+- **OG-T4**: `overlay/OverlayServiceCancelTest.kt` (novo, 5 testes) dirige o `OverlayService` real via
+  ações (`ACTION_RECORD`/`RecordingNotification.ACTION_CANCEL`/`ACTION_UNDO_CANCEL`/`ACTION_COMMIT_CANCEL`),
+  observando `KeyFlowController.buttonState` (o mesmo `StateFlow` público que o coordinator atualiza a cada
+  render — não precisou de nenhum hook novo). Cobre CANCEL-01..06 completos, incluindo o banner via
+  UiAutomator (`By.textContains("desfazer")`) e a preservação de `CANCELLING` em `onTargetChanged` via
+  `KeyFlowController.registerInserter`/`clearInserter` (os mesmos hooks que o IME real usa).
+- **OG-T5**: `data/SettingsShortcutTest.kt` (novo, unit) cobre `resolveShortcut`/`shortcutForTaps` puro
+  (SHORTCUT-01..03). `OrbButtonViewTest` ganhou `doubleTap.../tripleTapInvokesShortcutCallback` e
+  `shortcutDuringRecordingDoesNotEmitRecordingIntent` (SHORTCUT-02/04). SHORTCUT-05/06 (gating
+  `TOGGLE_KEYBOARD` por `keyboardVisible`; `SWITCH_IME` reusa `showInputMethodPicker`) ficam Implemented,
+  não instrumentados isoladamente (lógica trivial em `OverlayService` privado; reusa técnica já validada).
+- **OG-T6**: `ime/KeyFlowKeyboardSelectorTest.kt` (novo, 3 testes) no **IME real** (ime enable/set +
+  `ImeProbeActivity`), dirigindo toques sintéticos via `instrumentation.sendPointerSync` (sistema real, não
+  Espresso) no mic do teclado. Precisou de 3 acessores `*ForTest` novos em `KeyFlowKeyboardView`
+  (`micViewForTest`/`selectorOpenForTest`/`popupRectsForTest`/`popupActionsForTest`, mesmo padrão já
+  existente de `expandedForTest`/`micLabelForTest`) e uma referência estática `activeViewForTest` em
+  `KeyFlowKeyboardService` — **lição importante**: ler a geometria dos chips via UiAutomator
+  (`By.textContains`) **no meio do gesto** (dedo sintético ainda "pressionado") interfere no foco do IME
+  real e o derruba (`HIDE_RESET_SHELL_COMMAND` no logcat); a correção foi ler `popupRectsForTest`
+  diretamente do `View` (mesmo processo, self-instrumentado) em vez de UiAutomator. Mesmo com a geometria
+  certa (`highlightedIndexForTest` confirmado correto antes do UP), a entrega do toque real via
+  `sendPointerSync` ainda é intermitente sob a carga deste host (mesma classe de flakiness do FGS/Keystore)
+  — mitigado com retry do gesto (até 3 tentativas) no nível do teste. Também corrigido: `KeyFlowController`
+  é singleton de processo e não reseta entre métodos de teste — sem `tearDown` zerando
+  `buttonState`/`clearInserter()`, o teste seguinte herdava PAUSED/CANCELLING do anterior.
+- **OG-T7**: traceability do `orb-gestures/spec.md` atualizada (Implemented→Verified onde testado nesta
+  sessão); `uat-e2e-scenarios.md` 14.6/15.4 revisados (15.4 corrigia uma referência cruzada errada — "ver
+  18.1" devia ser "ver 20.1"). DRAG-07 (setas nos 4 cantos) **confirmado resolvido pelo Yan** — o fix de
+  coords físicas→locais em `DragArrowsView.onDraw` (também descrito em 20.1) está certo; DRAG-07 fechado
+  como Verified junto com DRAG-01..06.
+- Contagem final registrada: **96 unit + 60 instrumentados** (58 verdes no emulador + 2 conhecidos como
+  ambientais, confirmados 3/3 no device físico).

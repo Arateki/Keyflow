@@ -3,7 +3,6 @@ package com.keyflow.data
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.keyflow.core.OrbSize
 import com.keyflow.core.OverlaySide
 import com.keyflow.core.RecordingMode
 import com.keyflow.core.TranscriptionSource
@@ -53,13 +52,15 @@ class SettingsRepositoryTest {
             dataStoreFile = dataStoreFile,
             securePrefsName = securePrefsName,
         )
+        // recordingMode não entra aqui: desde o T5, Settings.effectiveConfigFor() sempre constrói o
+        // Config com o default (TOGGLE) — o campo virou vestigial nesta API legada (substituída por
+        // Settings.overlayRecordingMode, coberto em saveThenReadSettingsPreservesAllFields).
         val saved = Config(
             endpointUrl = "https://example.test/v1/audio/transcriptions",
             authHeaderName = "X-Api-Key",
             authHeaderValue = "Bearer keyflow-secret",
             model = "whisper-large-v3",
             language = "pt",
-            recordingMode = RecordingMode.PUSH_TO_TALK,
         )
 
         repository.save(saved)
@@ -109,7 +110,7 @@ class SettingsRepositoryTest {
             groqLanguage = "en",
             overlayRecordingMode = RecordingMode.PUSH_TO_TALK,
             overlaySide = OverlaySide.LEFT,
-            orbSize = OrbSize.LARGE,
+            orbSizePx = 250,
             themeDark = true,
             onboardingDone = true,
         )

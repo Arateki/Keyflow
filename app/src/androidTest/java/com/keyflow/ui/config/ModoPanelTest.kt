@@ -1,14 +1,15 @@
 package com.keyflow.ui.config
 
-import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.keyflow.data.Settings
 import com.keyflow.ui.PermissionStatus
+import com.keyflow.ui.orb.LocalOrbClock
 import com.keyflow.ui.theme.KeyFlowTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -16,8 +17,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Testes da aba Modo (T11 / CFG-06): "Ativar" só aparece quando a permissão está pendente e dispara
- * o callback; os toggles de modo ligam/desligam (auto-save via callback).
+ * Testes da aba Modo (T11 / CFG-06; chip redesenhado na Fase 2 de gestos): o chip de permissão é
+ * sempre visível (rótulo CONCEDIDO/PENDENTE) e também é o botão de ativar; os toggles de modo
+ * ligam/desligam (auto-save via callback).
  */
 @RunWith(AndroidJUnit4::class)
 class ModoPanelTest {
@@ -41,14 +43,18 @@ class ModoPanelTest {
         var activated = false
         rule.setContent {
             KeyFlowTheme(dark = false) {
-                ModoPanel(
-                    settings = Settings(keyboardModeEnabled = true),
-                    permissions = perms(keyboard = false),
-                    onOverlayModeChange = {},
-                    onKeyboardModeChange = {},
-                    onRequestOverlayPermission = {},
-                    onRequestKeyboardPermission = { activated = true },
-                )
+                CompositionLocalProvider(LocalOrbClock provides { 0f }) {
+                    ModoPanel(
+                        settings = Settings(keyboardModeEnabled = true),
+                        permissions = perms(keyboard = false),
+                        onOverlayModeChange = {},
+                        onKeyboardModeChange = {},
+                        onRequestOverlayPermission = {},
+                        onRequestKeyboardPermission = { activated = true },
+                        onRequestMicPermission = {},
+                        onSwitchKeyboard = {},
+                    )
+                }
             }
         }
 
@@ -57,21 +63,26 @@ class ModoPanelTest {
     }
 
     @Test
-    fun hidesActivateWhenOverlayPermissionGranted() {
+    fun chipShowsGrantedStateForOverlayPermission() {
         rule.setContent {
             KeyFlowTheme(dark = false) {
-                ModoPanel(
-                    settings = Settings(),
-                    permissions = perms(overlay = true),
-                    onOverlayModeChange = {},
-                    onKeyboardModeChange = {},
-                    onRequestOverlayPermission = {},
-                    onRequestKeyboardPermission = {},
-                )
+                CompositionLocalProvider(LocalOrbClock provides { 0f }) {
+                    ModoPanel(
+                        settings = Settings(),
+                        permissions = perms(overlay = true),
+                        onOverlayModeChange = {},
+                        onKeyboardModeChange = {},
+                        onRequestOverlayPermission = {},
+                        onRequestKeyboardPermission = {},
+                        onRequestMicPermission = {},
+                        onSwitchKeyboard = {},
+                    )
+                }
             }
         }
 
-        rule.onAllNodesWithTag(ACTIVATE_OVERLAY_TAG).assertCountEquals(0)
+        // O chip continua presente (também é o botão de ativar), mas mostra CONCEDIDO.
+        rule.onNodeWithTag(ACTIVATE_OVERLAY_TAG).assertIsDisplayed().assertTextContains("CONCEDIDO", substring = true)
     }
 
     @Test
@@ -80,14 +91,18 @@ class ModoPanelTest {
         var keyboardChange: Boolean? = null
         rule.setContent {
             KeyFlowTheme(dark = false) {
-                ModoPanel(
-                    settings = Settings(),
-                    permissions = perms(),
-                    onOverlayModeChange = { overlayChange = it },
-                    onKeyboardModeChange = { keyboardChange = it },
-                    onRequestOverlayPermission = {},
-                    onRequestKeyboardPermission = {},
-                )
+                CompositionLocalProvider(LocalOrbClock provides { 0f }) {
+                    ModoPanel(
+                        settings = Settings(),
+                        permissions = perms(),
+                        onOverlayModeChange = { overlayChange = it },
+                        onKeyboardModeChange = { keyboardChange = it },
+                        onRequestOverlayPermission = {},
+                        onRequestKeyboardPermission = {},
+                        onRequestMicPermission = {},
+                        onSwitchKeyboard = {},
+                    )
+                }
             }
         }
 

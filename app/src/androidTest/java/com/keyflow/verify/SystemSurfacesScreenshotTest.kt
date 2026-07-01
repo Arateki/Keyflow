@@ -15,7 +15,11 @@ import androidx.test.uiautomator.Until
 import com.keyflow.overlay.OverlayService
 import com.keyflow.overlay.RecordingNotification
 import com.keyflow.core.ButtonState
+import com.keyflow.data.SettingsRepository
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -41,6 +45,17 @@ class SystemSurfacesScreenshotTest {
 
     private val outDir: File by lazy {
         File(context.getExternalFilesDir(null), "verification").apply { mkdirs() }
+    }
+
+    /**
+     * Pré-aquece o DataStore + Android Keystore (EncryptedSharedPreferences) lendo as settings uma vez
+     * antes do teste, no mesmo arquivo/contexto que `OverlayService.onCreate()` vai usar (a inicialização
+     * do Keystore na 1ª leitura é cara e pode estourar a janela de `startForeground` em `sysOverlayOverApp`
+     * — ver `ForegroundServiceDidNotStartInTimeException`).
+     */
+    @Before
+    fun warmUpSettings() {
+        runBlocking { SettingsRepository(context).settingsFlow().first() }
     }
 
     @Test

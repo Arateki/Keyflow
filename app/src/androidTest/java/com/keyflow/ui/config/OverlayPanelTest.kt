@@ -4,11 +4,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.keyflow.core.OrbSize
 import com.keyflow.core.OverlaySide
 import com.keyflow.core.RecordingMode
 import com.keyflow.data.Settings
@@ -54,12 +55,13 @@ class OverlayPanelTest {
 
     @Test
     fun sizePersists() {
-        val h = Harness(Settings(orbSize = OrbSize.MEDIUM))
+        val h = Harness(Settings(orbSizePx = 150))
         rule.setContent { h.Content() }
 
-        rule.onNodeWithTag(orbSizeTag(OrbSize.LARGE)).performClick()
+        rule.onNodeWithTag(ORB_SIZE_SLIDER_TAG)
+            .performSemanticsAction(SemanticsActions.SetProgress) { it(220f) }
 
-        rule.runOnIdle { assertEquals(OrbSize.LARGE, h.settings.orbSize) }
+        rule.runOnIdle { assertEquals(220, h.settings.orbSizePx) }
     }
 
     @Test

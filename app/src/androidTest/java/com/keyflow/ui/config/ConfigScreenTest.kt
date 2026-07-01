@@ -26,9 +26,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Testes do scaffold de abas (T10 / CFG-01..05). Exercitam navegação, gating, reset da aba ativa,
- * auto-save (callbacks) e os toggles inertes/persistentes do header — sem DataStore, controlando o
- * estado direto no harness.
+ * Testes do scaffold de abas (T10 / CFG-01..05; gating redesenhado na Fase 2 de gestos). Exercitam
+ * navegação, gating somente-leitura (scrim, em vez de bloquear o clique), auto-save (callbacks) e os
+ * toggles inertes/persistentes do header — sem DataStore, controlando o estado direto no harness.
  */
 @RunWith(AndroidJUnit4::class)
 class ConfigScreenTest {
@@ -40,6 +40,7 @@ class ConfigScreenTest {
         microphoneGranted = true,
         overlayGranted = true,
         keyboardEnabled = true,
+        keyboardActive = true,
         notificationsGranted = true,
     )
 
@@ -78,6 +79,8 @@ class ConfigScreenTest {
                     onLanguageClick = { languageClicks++ },
                     onRequestOverlayPermission = {},
                     onRequestKeyboardPermission = {},
+                    onRequestMicPermission = {},
+                    onSwitchKeyboard = {},
                     onSettingsChange = { settings = it },
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -101,28 +104,31 @@ class ConfigScreenTest {
     }
 
     @Test
-    fun disabledTabDoesNotNavigate() {
+    fun disabledTabNavigatesReadOnly() {
         val h = Harness() // overlay/keyboard off por padrão
         rule.setContent { h.Content() }
 
         rule.onNodeWithTag(tabTag(ConfigTab.OVERLAY)).performClick()
 
-        // Continua na aba Modo (gating bloqueou o clique).
-        rule.onNodeWithTag(panelTag(ConfigTab.MODO)).assertIsDisplayed()
+        // A aba navega normalmente, mas fica somente-leitura sob o scrim (não bloqueia mais o clique).
+        rule.onNodeWithTag(panelTag(ConfigTab.OVERLAY)).assertIsDisplayed()
+        rule.onNodeWithTag(READONLY_SCRIM_TAG).assertIsDisplayed()
     }
 
     @Test
-    fun activeTabResetsWhenModeTurnsOff() {
+    fun activeTabBecomesReadOnlyWhenModeTurnsOff() {
         val h = Harness().also { it.settings = Settings(overlayModeEnabled = true) }
         rule.setContent { h.Content() }
 
         rule.onNodeWithTag(tabTag(ConfigTab.OVERLAY)).performClick()
         rule.onNodeWithTag(panelTag(ConfigTab.OVERLAY)).assertIsDisplayed()
+        rule.onAllNodesWithTag(READONLY_SCRIM_TAG).assertCountEquals(0)
 
         rule.runOnIdle { h.settings = h.settings.copy(overlayModeEnabled = false) }
 
-        // Modo desligado → volta para a aba Modo.
-        rule.onNodeWithTag(panelTag(ConfigTab.MODO)).assertIsDisplayed()
+        // Modo desligado → continua na aba Overlay, mas agora somente-leitura (scrim aparece).
+        rule.onNodeWithTag(panelTag(ConfigTab.OVERLAY)).assertIsDisplayed()
+        rule.onNodeWithTag(READONLY_SCRIM_TAG).assertIsDisplayed()
     }
 
     @Test

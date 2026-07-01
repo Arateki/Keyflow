@@ -47,6 +47,40 @@ funciona; gates verdes; `verification/` populado de forma determinística.
 - Publicação na Play Store (privacy policy, Data Safety, consent screen, targetSdk ≥ 35) — ver `PLAYSTORE_CHECKLIST.md`
 - i18n real (EN/ES)
 
+## Milestone 4 — Fase 2 de gestos + reconciliação (Trabalho 1) ✅ CONCLUÍDO (2026-06-30)
+
+A funcionalidade de gestos da orbe (cancelar/desfazer, atalhos por toque, push-to-talk, modo-arrasto
+travado com setas, retorno tátil, controles de teclado/notificação) já está no `master`, mas entrou sem
+requisitos rastreáveis, com `androidTest` quebrado e goldens desatualizados.
+
+Spec retroativa: `.specs/features/orb-gestures/` (`spec.md`, `context.md`, `tasks.md`; design = `gesture-interactions.md`).
+
+**Done:** `androidTest` compila; gate `full` verde (96 unit + 60 instrumentados, 2 falhas isoladas a
+`SystemSurfacesScreenshotTest` por lentidão do Keystore no emulador deste sandbox sob carga — confirmadas
+passando 3/3 no device físico); goldens regenerados/aprovados (42 PNGs, espelhados em `/tmp/keyflow-prints/`);
+instrumentados novos para cancelar/desfazer (`OverlayServiceCancelTest`), atalhos (`SettingsShortcutTest` +
+extensões no `OrbButtonViewTest`) e seletor do teclado (`KeyFlowKeyboardSelectorTest`); docs consistentes;
+gestos Verified (ver traceability no `orb-gestures/spec.md`). Bug das setas nos 4 cantos (DRAG-07)
+**confirmado resolvido pelo Yan** — sem pendências abertas.
+
+## Milestone 5 — Teclado Canvas fluido (Trabalho 2)
+
+Reescrever o miolo do teclado (grade QWERTY) de `LinearLayout`/`TextView` para **Canvas** em Kotlin —
+fluidez de teclado nativo com footprint mínimo (zero `.so`), sem quebrar o mic sincronizado.
+
+Spec: `.specs/features/keyboard-canvas/` (`spec.md`, `context.md`, `design.md`, `tasks.md`).
+
+Inclui: rendering Canvas data-driven, key preview, popup de acentos, repeat-on-hold, camada `?123`,
+PT/EN/ES, corretor do **sistema** (`SpellCheckerSession`), a11y (`AccessibilityNodeProvider`), híbrido
+(mic/barra preservados como Views), flag de rollout. Fundação **data-driven/serializável** preparada para a
+customização futura (resize/reposição/teclas-macro).
+
+**Done:** teclado novo é o padrão (após validação manual no device); mic/overlay/notificação intactos;
+goldens novos aprovados; gate `full` verde.
+
+**Futuro do teclado (pós-MVP):** customização (reduzir tamanho, reposicionar teclas, teclas-macro); glide
+typing; dicionário/sugestões próprias (possível porte do AnySoftKeyboard, Apache 2.0).
+
 ## Futuro (pós-v1, não priorizado)
 
 - ~~Teclado visível configurável (teclas reais)~~ — feito (commit 0331389)

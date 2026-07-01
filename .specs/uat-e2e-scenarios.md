@@ -147,9 +147,10 @@ cancelar; pausado → ▶ retomar / ✕ cancelar; cancelando → ↶ desfazer.
 14.4 ✅ Deslizar até o chip e soltar aciona; voltar o dedo ao botão (nada destacado) → não faz nada.
 14.5 ✅ **Expandido**: seletor via popup acima do mic. **Retraído**: faixa in-view (sem fundo, centralizada
 sobre o mic, sem flick) — a janela curta não recebe toque a um popup acima dela.
-14.6 ⚠️ **Sync ao abrir/trocar pro teclado**: o **estado** sincroniza (onWindowShown); o **tempo** ainda
-diverge num cenário (pausar antes do teclado existir, alternar pausas e reabrir → mostra só o último
-segmento). Pendente: fonte de tempo compartilhada (KeyFlowController).
+14.6 ✅ **Sync ao abrir/trocar pro teclado**: **estado** (onWindowShown) **e tempo** sincronizam. O tempo
+agora vem de uma **fonte compartilhada** (`KeyFlowController.recordingAccumulatedMs/SegmentStartMs`,
+publicada pelo `OverlayCoordinator`), então o teclado mostra o tempo acumulado correto mesmo subindo
+depois de transições/pausas já terem ocorrido.
 
 ## 15. Gestos da orbe — modo-arrasto (Alternar)
 
@@ -159,8 +160,9 @@ segmento). Pendente: fonte de tempo compartilhada (KeyFlowController).
 15.3 🔧 **Feedback**: ao travar aparecem **setas ↑/lateral opacas** que **somem** ao aproximar o dedo; o
 **glifo central do alvo** aparece (transparente→opaco), em crossfade com o glifo do estado (sem sobrepor),
 todos no mesmo tamanho.
-15.4 ⚠️ Pendente: posicionar as setas na **distância de ativação** (fora da orbe) — exige aumentar a janela
-só durante o arrasto (orbe não muda de tamanho visível, sem flick).
+15.4 ✅ Setas posicionadas na **distância de ativação** (fora da orbe), numa **janela separada não-tocável**
+(`DragArrowsView`), então a orbe não muda de tamanho nem dá flick. Funciona em qualquer posição, **inclusive
+nos 4 cantos** (ver 20.1; DRAG-07 no `orb-gestures/spec.md` confirmado resolvido pelo Yan em 2026-06-30).
 
 ## 16. Canhoto / Destro (Sobrepor)
 
@@ -175,6 +177,53 @@ canhoto → →), evitando a orbe presa na borda. Trocar inverte a seta/direçã
 contorno inferior que conta o tempo até sumir.
 17.2 Config "Intervalo entre toques" renomeada para **"Tempo de reação"** (governa toque×segurada e janelas;
 o hold = janela + 150ms).
+
+---
+
+# Fase 2 — continuação (sessão 2026-06-30)
+
+## 18. PTT (push-to-talk) — gestos
+
+18.1 ✅ **Segurar** inicia a gravação (após o "Tempo de reação"); **soltar parado** envia (ao estourar a
+janela de release). Start NÃO é otimista de propósito: abrir o mic no toque acenderia o indicador verde do
+sistema a cada atalho (decisão de privacidade).
+18.2 ✅ Gravando (travado): arrastar **↑ pausa**, **lateral cancela**, **↓ envia + abre o app**.
+18.3 ✅ **Re-segurar** dentro da janela de release continua gravando **sem costura**; **toques** na janela são
+**atalhos** (não enviam — a gravação segue e a janela reabre).
+18.4 ✅ Pausar no PTT é **só** por arrasto ↑ (re-segurar/tocar nunca pausa).
+18.5 ✅ Pausado → **segurar de novo retoma**.
+18.6 ✅ Hold = "Tempo de reação" + 150ms; janela de release = "Tempo de reação" (ligada ao slider).
+18.7 (decisão) **Trim** dos últimos ms ao enviar foi **descartado**: trim por tempo fixo arriscava cortar o
+fim da fala e a transcrição ignora silêncio final. Trim seguro (por silêncio) exigiria recorder em PCM.
+
+## 19. Atalhos da orbe (1/2/3 toques)
+
+19.1 ✅ **2 e 3 toques** disparam atalho em **qualquer estado** (Toggle e PTT), sem mexer na gravação.
+19.2 ✅ **1 toque** é atalho **só no PTT** (onde o toque é livre — a gravação começa ao segurar); no Toggle
+1 toque é o gesto nativo (gravar/enviar).
+19.3 ✅ Config: o card "1 toque" aparece sempre; **fora do PTT** fica **desabilitado** com toast que
+**redireciona** (rola + pulsa) o seletor de Modo de gravação.
+
+## 20. Bugs pegos em teste manual e corrigidos (regressões para o e2e)
+
+20.1 ✅ **Setas nos cantos**: no meio da tela alinhavam, mas **nos 4 cantos** saíam do eixo. Causa: offset da
+status bar entre a janela da orbe (sem `LAYOUT_IN_SCREEN`) e a das setas. Corrigido convertendo as coords
+físicas → locais da própria `DragArrowsView` (`getLocationOnScreen` dela). e2e: travar nos 4 cantos + centro.
+20.2 ✅ **Cancelar + abrir teclado travava a gravação** (Toggle e PTT): cancelar gravando e **abrir o teclado**
+com a notificação aberta fazia a notificação não sumir e gravar parar de funcionar (erro), exigindo reativar o
+overlay. Causa: `onTargetChanged` tirava a máquina de **CANCELLING** e orfanizava o `cancelJob` (recorder
+nunca descartado). Corrigido preservando CANCELLING. Cobertura: `ButtonStateMachineTest`.
+20.3 ✅ **⚙ da notificação não abria o app** (os outros botões funcionavam). Causa: iniciar Activity a partir do
+serviço em background é bloqueado no Android 10+. Corrigido com `PendingIntent.getActivity`.
+20.4 ✅ **PTT pausava sem querer**: re-tap/re-segurar na janela disparava pausa. Esperado: pausar **só** por
+arrasto ↑. Corrigido (re-segurar continua gravando).
+20.5 ✅ **Descarte do cancelamento não era imediato**: tinha que esperar os 3s. Esperado: tocar a orbe durante
+o CANCELLING **descarta na hora** (e encadeia atalhos). Corrigido (commit no DOWN, sem threshold).
+20.6 ✅ **Atalho de 1 toque não agia em idle/pausa no PTT** (só na janela). Esperado: vale em **qualquer estado
+do PTT**. Corrigido.
+20.7 ✅ **Vibração nunca funcionou**: pulso de 18ms imperceptível. Corrigido (duração ~22–75ms + amplitude com
+piso); 0 desliga; níveis distintos via duração (aparelhos sem `hasAmplitudeControl`). Ramp + **click** ao
+cruzar o limiar do arrasto; vibra ao **soltar o hold** e ao **clicar em banners/toasts**.
 
 ---
 
