@@ -899,3 +899,36 @@ já documentada em OG-T6). Sem regressão.
 
 Detalhe completo em `.specs/quick/001-limite-max-gravacao/TASK.md`. **Pendente [YAN]**: validar o banner
 "Enviar/Descartar" no Galaxy A32 (texto, toque, tema claro/escuro).
+
+## Q2 — Margem lateral dos menus de config (2026-07-02)
+
+Tarefa realmente quick (1 arquivo, sem decisão de design): `ConfigScreen.kt` — padding horizontal da
+`TabBar` (linha ~197) e do corpo do painel ativo (linha ~206, comentário já dizia "mesma largura que as
+abas ocupam") subiu de 12dp para 16dp (convenção Material de margem de tela). Sem mudança de
+comportamento, só espaçamento.
+
+**Gate:** `testDebugUnitTest` verde; instrumentado escopado a `com.keyflow.ui.config` → 28/28 verde
+(sem regressão funcional). Goldens: `assembleDebug installDebug` no emulador → `verify-screens.sh` →
+`diff-screens.sh`. Aprovei seletivamente (cópia manual, não `--approve` cego) só os 14 PNGs `config-*`
+afetados por esta mudança (modo/voz-creditos/voz-openai/voz-custom/overlay/docs/unlock, claro+escuro),
+após conferir visualmente 3 pares antes/depois (sem corte de texto, sem sobreposição).
+
+**NÃO aprovados** (ficam como diff pendente no `diff-screens.sh`, de propósito):
+- `config-teclado.png`/`-dark` — a task já dizia isso ia mudar visualmente; MAS o diff aqui mistura
+  minha mudança de margem com uma mudança visual **anterior e não relacionada** (dígitos/idioma da
+  fileira numérica do Milestone 5 "grade Canvas fluida", commit `6a2f45f`) que o `STATE.md` já registrou
+  como aguardando revisão do Yan. Não separei os dois porque a fonte é a mesma tela; fica para quando o
+  Yan revisar aquele lote.
+- **Achado novo, fora do escopo do Q2**: `keyboard-canvas-expanded-dark.png`, `keyboard-canvas-symbols-dark.png`
+  e `onboarding-dark.png` também aparecem com diff grande (~4,5–18,9%) no `diff-screens.sh` — MAS eu não
+  toquei em nenhum código dessas telas (só `ConfigScreen.kt`). Inspeção visual do `keyboard-canvas-
+  expanded-dark` mostrou a causa real: o app está renderizando em **inglês** com os **hints de dígito**
+  visíveis (feature do Milestone 5), enquanto o golden versionado ainda está em português sem hints —
+  ou seja, é a MESMA leva de mudanças não aprovadas do commit `6a2f45f`, só que vazando para rotas fora
+  da aba Teclado (provavelmente porque o `FakeSettings` padrão da galeria mudou de idioma junto). Não é
+  bug novo introduzido agora; é golden pendente que já existia antes desta sessão e só ficou visível
+  porque rodei `verify-screens.sh` pela primeira vez desde aquele commit. Não aprovado — fica para o Yan
+  revisar goldens do Milestone 5 como um todo.
+
+Prints (todas as 50 rotas + 3 `sys-*`, novos e antigos) espelhados em `/tmp/keyflow-prints/` a pedido do
+Yan.

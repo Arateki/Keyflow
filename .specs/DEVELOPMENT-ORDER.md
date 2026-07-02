@@ -73,8 +73,16 @@ Pequenas, sem spec própria; fazer em quick mode (TASK.md + SUMMARY.md + commit)
       (`KeyFlowKeyboardBarsTest.gridReleaseOutsideTheFrameCancelsWithoutEmitting`, passou 6/6 no rerun
       isolado — instabilidade de toque sintético sob carga, não regressão). Pendente **[YAN]**: validar
       o banner no Galaxy A32.
-- [ ] **Q2 — Margem lateral dos menus**: aumentar o padding lateral das abas de config (hoje
-      quase encosta na borda — item do `TODO`). Goldens afetados → regenerar/aprovar.
+- [x] **Q2 — Margem lateral dos menus**: CONCLUÍDA (2026-07-02). `ConfigScreen.kt` — padding
+      horizontal da `TabBar` e do corpo do painel 12dp → 16dp. Goldens `config-*` (exceto
+      `config-teclado`) regenerados e aprovados seletivamente (visual conferido, sem corte/
+      sobreposição). `config-teclado`/`config-teclado-dark` **não** aprovados aqui — já carregam
+      uma mudança visual anterior (dígitos/Milestone 5) pendente de revisão do Yan (ver STATE.md).
+      **Achado novo, fora do escopo desta task**: `keyboard-canvas-expanded-dark`/`-symbols-dark` e
+      `onboarding-dark` também aparecem com diff grande no `diff-screens.sh`, sem relação com esta
+      mudança (não tocamos nesses arquivos) — provavelmente a mesma leva de mudanças visuais não
+      aprovadas do Milestone 5. Não aprovados; registrado para o Yan decidir quando revisar aquele
+      lote. Prints espelhados em `/tmp/keyflow-prints/`.
 - [ ] **Q3 — Bug: atalhos não funcionam no Termius**: investigar `PhysicalKeyEmitter` no Termius
       (item do `TODO`: "nao ta funcionando no termius"). Diagnóstico primeiro (systematic
       debugging), fix depois; pode virar spec se for grande. Validação final **[YAN]**.

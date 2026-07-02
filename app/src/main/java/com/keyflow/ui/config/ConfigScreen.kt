@@ -194,7 +194,7 @@ fun ConfigScreen(
                     activeTab = tab
                     if (!enabled(tab)) blockReason(tab)?.let { showToast(it, 2500, navActionFor(tab)) }
                 },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
             )
             Box(Modifier.fillMaxSize()) {
                 Column(
@@ -202,8 +202,8 @@ fun ConfigScreen(
                         .fillMaxSize()
                         // Aba travada: conteúdo esmaecido (somente-leitura), sob a camada incolor abaixo.
                         .then(if (activeEnabled) Modifier else Modifier.alpha(0.45f))
-                        // Mesma largura que as abas ocupam (12dp), ganhando espaço horizontal no corpo.
-                        .padding(horizontal = 12.dp)
+                        // Mesma largura que as abas ocupam (16dp), ganhando espaço horizontal no corpo.
+                        .padding(horizontal = 16.dp)
                         .testTag(panelTag(activeTab)),
                 ) {
                     when (activeTab) {
