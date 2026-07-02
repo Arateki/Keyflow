@@ -270,7 +270,7 @@ então `[P]` real se houver dois agentes — senão seguir a ordem sequencial.
 
 ## Fase D — Conteúdo
 
-### API-T10 — `GET /v1/models` + `GET /v1/config` (ETag) `[P]`
+### API-T10 — `GET /v1/models` + `GET /v1/config` (ETag) `[P]` — ✅ Concluída (2026-07-02)
 - **What**: servir `documents` com ETag sha256 + `If-None-Match`/304 + `Cache-Control`; seeds de
   dev com o shape do design (products/ads/transcription/minAppVersion/killSwitch; manifest de
   modelos espelhando o `ModelCatalog` do app — ids/URLs/sha256 reais quando a native-voice-models
@@ -280,6 +280,19 @@ então `[P]` real se houver dois agentes — senão seguir a ordem sequencial.
 - **Done when**: integração — 200 com ETag; If-None-Match → 304; body bate com o seed; unit do
   cálculo de ETag.
 - **Tests**: integração + unit. **Gate**: `rust`.
+- **Nota de execução**: `migrations/0002_seed_documents.sql` semeia `config`/`models`; o shape do
+  `config` segue o design (`products`/`ads`/`transcription`/`minAppVersion`/`killSwitch`) —
+  **valores de `ads`/`transcription` e o manifest de `models` são placeholder explícito** (chave
+  `"note"` no próprio JSON), já que `native-voice-models` (Bloco 4 do
+  `DEVELOPMENT-ORDER.md`) ainda não colheu os modelos reais nem o Yan calibrou os caps de
+  anúncio. ETag: `serde_json::to_vec` do `Value` lido do Postgres vira **os mesmos bytes** do
+  corpo e a base do sha256 — garante que o header sempre bate com o que foi enviado (calculado
+  em request-time, não armazenado; simples o bastante pro alvo de latência do design, é 1 SELECT
+  de linha única). `If-None-Match` aceita `*` ou o valor exato (com aspas, formato padrão HTTP);
+  10 testes novos (5 unit de ETag/matching + 5 integração via HTTP real, incluindo ETag estável
+  entre duas requests). Rotas **sem Bearer** (conteúdo público, como o design já indicava
+  implicitamente ao não mencionar auth pra elas). Abre a **Fase E** (proxy) em paralelo — T10 era
+  a única dependência restante de T3 nessa frente.
 
 ## Fase E — Proxy
 

@@ -40,6 +40,9 @@ Módulo disjunto do app Android (`app/`): o Gradle não enxerga esta pasta e vic
   `{status: "credited"}` ou `{status: "pending"}`. Catálogo estático em `src/catalog.rs`
   (`credits_10/20/50`, `unlock_forever`; minutos são **placeholder** até o Yan calibrar — vira
   remoto na API-T10). Idempotente por `purchaseToken`; SKUs ≥ R$20 ligam `adsOff`+`skinsUnlocked`.
+- `GET /v1/config` / `GET /v1/models` — `documents.body` (seed em `migrations/
+  0002_seed_documents.sql`, editável só por SQL/migration no MVP). `ETag` = sha256 hex do corpo
+  entre aspas; `If-None-Match` (valor exato ou `*`) → `304` sem corpo; `Cache-Control: max-age=300`.
 
 ## Job em background
 

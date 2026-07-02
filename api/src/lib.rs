@@ -84,6 +84,8 @@ pub fn app(state: AppState) -> Router {
         .route("/v1/register", post(routes::register::register))
         .route("/v1/account", get(routes::account::get_account))
         .route("/v1/purchases/redeem", post(routes::redeem::redeem))
+        .route("/v1/config", get(routes::content::get_config))
+        .route("/v1/models", get(routes::content::get_models))
         .route_layer(
             TraceLayer::new_for_http().make_span_with(|request: &Request<_>| {
                 let matched_path = request
