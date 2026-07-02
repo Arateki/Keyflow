@@ -362,6 +362,158 @@ class OverlayCoordinatorTest {
         assertThat(renderedStates.last()).isEqualTo(ButtonState.PAUSED)
     }
 
+    @Test
+    fun `recording paused automatically when max duration is reached`() = runTest {
+        val recorder = FakeRecorder(temporaryFolder.newFile("a.m4a").also { it.writeText("a") })
+        val renderedStates = mutableListOf<ButtonState>()
+        var shown = 0
+
+        val coordinator = coordinator(
+            scope = this,
+            recorder = recorder,
+            targetAvailable = { true },
+            render = { renderedStates += it },
+            onShowLimitReached = { shown++ },
+            maxRecordingMs = { 5000L },
+            recordingClockMs = { testScheduler.currentTime },
+        )
+
+        coordinator.onTap() // IDLE → RECORDING
+        advanceTimeBy(5001)
+        runCurrent()
+
+        assertThat(recorder.paused).isEqualTo(1)
+        assertThat(renderedStates.last()).isEqualTo(ButtonState.PAUSED)
+        assertThat(shown).isEqualTo(1)
+    }
+
+    @Test
+    fun `limit disabled by default does not pause automatically`() = runTest {
+        val recorder = FakeRecorder(temporaryFolder.newFile("a.m4a").also { it.writeText("a") })
+        val renderedStates = mutableListOf<ButtonState>()
+
+        val coordinator = coordinator(
+            scope = this,
+            recorder = recorder,
+            targetAvailable = { true },
+            render = { renderedStates += it },
+            recordingClockMs = { testScheduler.currentTime },
+        )
+
+        coordinator.onTap() // IDLE → RECORDING
+        advanceTimeBy(600_000)
+        runCurrent()
+
+        assertThat(renderedStates.last()).isEqualTo(ButtonState.RECORDING)
+    }
+
+    @Test
+    fun `manual pause before the limit cancels the pending trigger`() = runTest {
+        val recorder = FakeRecorder(temporaryFolder.newFile("a.m4a").also { it.writeText("a") })
+        var shown = 0
+
+        val coordinator = coordinator(
+            scope = this,
+            recorder = recorder,
+            targetAvailable = { true },
+            onShowLimitReached = { shown++ },
+            maxRecordingMs = { 5000L },
+            recordingClockMs = { testScheduler.currentTime },
+        )
+
+        coordinator.onTap() // RECORDING
+        advanceTimeBy(2000)
+        coordinator.onIntent(GestureIntent.PAUSE)
+        advanceTimeBy(10_000)
+        runCurrent()
+
+        assertThat(shown).isEqualTo(0)
+    }
+
+    @Test
+    fun `resuming after the limit was reached does not trigger it again`() = runTest {
+        val recorder = FakeRecorder(temporaryFolder.newFile("a.m4a").also { it.writeText("a") })
+        var shown = 0
+
+        val coordinator = coordinator(
+            scope = this,
+            recorder = recorder,
+            targetAvailable = { true },
+            onShowLimitReached = { shown++ },
+            maxRecordingMs = { 5000L },
+            recordingClockMs = { testScheduler.currentTime },
+        )
+
+        coordinator.onTap() // RECORDING
+        advanceTimeBy(5001)
+        runCurrent()
+        assertThat(shown).isEqualTo(1)
+
+        coordinator.onIntent(GestureIntent.RESUME)
+        advanceTimeBy(10_000)
+        runCurrent()
+
+        assertThat(shown).isEqualTo(1)
+    }
+
+    @Test
+    fun `send from limit banner transcribes the retained audio and hides the banner`() = runTest {
+        val audio = temporaryFolder.newFile("a.m4a").also { it.writeText("a") }
+        val recorder = FakeRecorder(audio)
+        val transcriber = FakeTranscriber(TranscriptionResult.Success("done"))
+        val inserted = mutableListOf<String>()
+        var hidden = 0
+
+        val coordinator = coordinator(
+            scope = this,
+            recorder = recorder,
+            transcriber = transcriber,
+            insertOrHold = { inserted += it; InsertOutcome.Inserted },
+            targetAvailable = { true },
+            onHideLimitReached = { hidden++ },
+            maxRecordingMs = { 5000L },
+            recordingClockMs = { testScheduler.currentTime },
+        )
+
+        coordinator.onTap() // RECORDING
+        advanceTimeBy(5001)
+        runCurrent() // pausado pelo limite
+
+        coordinator.onLimitSend()
+        advanceUntilIdle()
+
+        assertThat(recorder.stopped).isEqualTo(1)
+        assertThat(inserted).containsExactly("done")
+        assertThat(hidden).isEqualTo(1)
+    }
+
+    @Test
+    fun `discard from limit banner discards the retained audio and returns to idle`() = runTest {
+        val recorder = FakeRecorder(temporaryFolder.newFile("a.m4a").also { it.writeText("a") })
+        val renderedStates = mutableListOf<ButtonState>()
+        var hidden = 0
+
+        val coordinator = coordinator(
+            scope = this,
+            recorder = recorder,
+            targetAvailable = { true },
+            render = { renderedStates += it },
+            onHideLimitReached = { hidden++ },
+            maxRecordingMs = { 5000L },
+            recordingClockMs = { testScheduler.currentTime },
+        )
+
+        coordinator.onTap() // RECORDING
+        advanceTimeBy(5001)
+        runCurrent() // pausado pelo limite
+
+        coordinator.onLimitDiscard()
+
+        assertThat(recorder.discarded).isEqualTo(1)
+        assertThat(renderedStates.last()).isEqualTo(ButtonState.IDLE_READY)
+        assertThat(hidden).isEqualTo(1)
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private fun coordinator(
@@ -374,6 +526,9 @@ class OverlayCoordinatorTest {
         onClipboard: (String) -> Unit = {},
         onShowCancelUndo: () -> Unit = {},
         onHideCancelUndo: () -> Unit = {},
+        onShowLimitReached: () -> Unit = {},
+        onHideLimitReached: () -> Unit = {},
+        maxRecordingMs: () -> Long = { 0L },
         onError: (String, Boolean) -> Unit = { _, _ -> },
         cancelWindowMs: Long = 3000L,
         recordingClockMs: () -> Long = longEnoughClock(),
@@ -390,6 +545,9 @@ class OverlayCoordinatorTest {
         onClipboard = onClipboard,
         onShowCancelUndo = onShowCancelUndo,
         onHideCancelUndo = onHideCancelUndo,
+        onShowLimitReached = onShowLimitReached,
+        onHideLimitReached = onHideLimitReached,
+        maxRecordingMs = maxRecordingMs,
         onError = onError,
         cancelWindowMs = cancelWindowMs,
         recordingClockMs = recordingClockMs,

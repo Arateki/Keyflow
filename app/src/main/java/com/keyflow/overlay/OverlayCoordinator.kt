@@ -42,6 +42,11 @@ class OverlayCoordinator(
     private val onShowCancelUndo: () -> Unit = {},
     private val onHideCancelUndo: () -> Unit = {},
     private val cancelWindowMs: Long = DEFAULT_CANCEL_WINDOW_MS,
+    // Aviso "enviar ou descartar" ao atingir Settings.maxRecordingSec (0 = desabilitado; lido ao vivo,
+    // como os demais ajustes editáveis durante o uso — ver tapBurstWindowMs no OverlayService).
+    private val onShowLimitReached: () -> Unit = {},
+    private val onHideLimitReached: () -> Unit = {},
+    private val maxRecordingMs: () -> Long = { 0L },
     // Tempo autoritativo de gravação (acumulado, início do segmento) — superfícies leem daqui p/ não
     // dessincronizar (ex.: teclado que sobe depois de transições já terem ocorrido).
     private val onRecordingTime: (accumulatedMs: Long, segmentStartMs: Long) -> Unit = { _, _ -> },
@@ -52,6 +57,8 @@ class OverlayCoordinator(
     private val machine = ButtonStateMachine(targetAvailable = targetAvailable)
     private var recordingStartMs = 0L
     private var cancelJob: kotlinx.coroutines.Job? = null
+    private var limitJob: kotlinx.coroutines.Job? = null
+    private var limitBannerVisible = false
 
     // Tempo de gravação (acumulado + início do segmento atual), publicado a cada transição.
     private var timeAccumulatedMs = 0L
@@ -63,6 +70,67 @@ class OverlayCoordinator(
     private fun timeReset() { timeAccumulatedMs = 0L; timeSegmentStartMs = recordingClockMs(); publishTime() }
 
     /**
+     * (Re)agenda o aviso de limite máximo de gravação para o tempo restante (maxRecordingMs -
+     * timeAccumulatedMs). Não reagenda se o limite já foi atingido (evita disparar de novo ao retomar
+     * uma gravação que já passou do limite).
+     */
+    private fun scheduleLimitJob() {
+        limitJob?.cancel()
+        limitJob = null
+        val max = maxRecordingMs()
+        if (max <= 0L) return
+        val remaining = max - timeAccumulatedMs
+        if (remaining <= 0L) return
+        limitJob = scope.launch {
+            delay(remaining)
+            onLimitReached()
+        }
+    }
+
+    private fun cancelLimitJob() {
+        limitJob?.cancel()
+        limitJob = null
+    }
+
+    private fun showLimitBanner() {
+        if (limitBannerVisible) return
+        limitBannerVisible = true
+        onShowLimitReached()
+    }
+
+    private fun hideLimitBanner() {
+        if (!limitBannerVisible) return
+        limitBannerVisible = false
+        onHideLimitReached()
+    }
+
+    /** Atingido o tempo configurado: pausa a gravação (retém o áudio) e avisa "enviar ou descartar". */
+    private fun onLimitReached() {
+        if (machine.state != ButtonState.RECORDING) return
+        runCatching { recorder.pause() }
+        timeFreeze()
+        render(machine.onPause())
+        showLimitBanner()
+    }
+
+    /** "Enviar" no aviso de limite: mesmo caminho de um STOP normal a partir de PAUSED. */
+    fun onLimitSend() {
+        if (machine.state != ButtonState.PAUSED) return
+        hideLimitBanner()
+        handleState(machine.onStop())
+    }
+
+    /** "Descartar" no aviso de limite: descarta na hora, sem a janela de desfazer do cancelar. */
+    fun onLimitDiscard() {
+        if (machine.state != ButtonState.PAUSED) return
+        hideLimitBanner()
+        cancelLimitJob()
+        runCatching { recorder.discard() }
+        timeReset()
+        render(machine.onDiscard())
+    }
+
+    /**
      * Cancela a gravação em curso retendo o áudio (pausa o recorder, não descarta na hora) e abre a
      * janela de desfazer. Ao expirar sem desfazer, descarta de vez e volta ao idle (Fase 2a).
      */
@@ -70,6 +138,8 @@ class OverlayCoordinator(
         val before = machine.state
         val next = machine.onCancel()
         if (next != ButtonState.CANCELLING || before == ButtonState.CANCELLING) return
+        hideLimitBanner()
+        cancelLimitJob()
         runCatching { recorder.pause() }
         if (before == ButtonState.RECORDING) timeFreeze() // congela; vindo de PAUSED já estava congelado
         render(next)
@@ -152,6 +222,7 @@ class OverlayCoordinator(
             GestureIntent.START -> handleState(machine.onStart())   // → startRecording
             GestureIntent.STOP -> handleState(machine.onStop())     // → stopAndTranscribe
             GestureIntent.PAUSE -> {
+                cancelLimitJob()
                 runCatching { recorder.pause() }
                 timeFreeze()
                 render(machine.onPause())
@@ -159,6 +230,7 @@ class OverlayCoordinator(
             GestureIntent.RESUME -> {
                 runCatching { recorder.resume() }
                 timeResume()
+                scheduleLimitJob()
                 render(machine.onResume())
             }
             GestureIntent.CANCEL -> onCancel()
@@ -194,6 +266,7 @@ class OverlayCoordinator(
     private fun startRecording() {
         recordingStartMs = recordingClockMs()
         timeStart()
+        scheduleLimitJob()
         runCatching { recorder.start() }
             .onFailure {
                 onError("Falha ao iniciar a gravação.", false)
@@ -202,6 +275,8 @@ class OverlayCoordinator(
     }
 
     private fun stopAndTranscribe() {
+        hideLimitBanner()
+        cancelLimitJob()
         timeReset() // gravação encerrada: zera o tempo autoritativo
         val duration = recordingClockMs() - recordingStartMs
         if (duration < MIN_RECORDING_MS) {

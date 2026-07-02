@@ -63,6 +63,10 @@ class OverlayService : Service() {
     // coordinator (não tem timer próprio: o coordinator decide quando expira/descarta).
     private var cancelBanner: View? = null
 
+    // Banner "enviar/descartar" ao atingir Settings.maxRecordingSec. Sem timer próprio (fica até o
+    // usuário decidir ou retomar a gravação manualmente).
+    private var limitBanner: View? = null
+
     // Sobreposição não-tocável com as setas do modo-arrasto (separada da janela da orbe, p/ não deslocá-la).
     private var dragArrowsView: DragArrowsView? = null
 
@@ -208,6 +212,7 @@ class OverlayService : Service() {
         isRunningForUi = false
         removeErrorBanner()
         removeCancelBanner()
+        removeLimitBanner()
         removeDragArrows()
         removeFloatingButton()
         serviceScope.cancel()
@@ -241,6 +246,9 @@ class OverlayService : Service() {
             onShowCancelUndo = { showCancelBanner() },
             onHideCancelUndo = { removeCancelBanner() },
             cancelWindowMs = cancelWindowMs,
+            onShowLimitReached = { showLimitBanner() },
+            onHideLimitReached = { removeLimitBanner() },
+            maxRecordingMs = { cachedSettings.maxRecordingSec * 1000L },
             onRecordingTime = { acc, seg -> KeyFlowController.updateRecordingTime(acc, seg) },
             onError = { message, opensVoz ->
                 KeyFlowController.errorOpensVoz = opensVoz
@@ -277,6 +285,7 @@ class OverlayService : Service() {
                     if (isForeground && ::coordinator.isInitialized) postNotification(coordinator.currentState())
                     errorBanner?.let(::applyBannerTheme)
                     cancelBanner?.let(::applyBannerTheme)
+                    limitBanner?.let(::applyBannerTheme)
                 }
                 KeyFlowController.autoPasteInField = it.autoPasteInField
                 KeyFlowController.autoPasteOnFocus = it.autoPasteOnFocus
@@ -548,6 +557,91 @@ class OverlayService : Service() {
     private fun removeCancelBanner() {
         cancelBanner?.let { runCatching { windowManager.removeView(it) } }
         cancelBanner = null
+    }
+
+    /**
+     * Banner "limite de gravação atingido" com duas ações (Enviar/Descartar). Sem timer próprio: fica
+     * visível até o usuário decidir ou retomar a gravação manualmente (RESUME esconde via coordinator).
+     */
+    private fun showLimitBanner() {
+        removeLimitBanner()
+        val banner = limitBannerView(
+            text = "Limite de gravação atingido",
+            sendLabel = "Enviar",
+            discardLabel = "Descartar",
+            onSend = { if (::coordinator.isInitialized) coordinator.onLimitSend() },
+            onDiscard = { if (::coordinator.isInitialized) coordinator.onLimitDiscard() },
+        )
+        runCatching { windowManager.addView(banner, bannerParams()) }
+        limitBanner = banner
+    }
+
+    private fun removeLimitBanner() {
+        limitBanner?.let { runCatching { windowManager.removeView(it) } }
+        limitBanner = null
+    }
+
+    /**
+     * Banner de overlay com duas ações lado a lado (texto + 2 rótulos clicáveis), para decisões
+     * binárias sem auto-dismiss — diferente do [bannerView], que sempre some sozinho após [durationMs].
+     */
+    private fun limitBannerView(
+        text: String,
+        sendLabel: String,
+        discardLabel: String,
+        onSend: () -> Unit,
+        onDiscard: () -> Unit,
+    ): View {
+        val d = resources.displayMetrics.density
+        fun dp(v: Int) = (v * d).toInt()
+        val palette = paletteFor(cachedSettings.themeDark)
+        val bg = palette.bg.toArgb()
+        val ink = palette.fg.toArgb()
+        val accent = com.keyflow.ui.theme.OrbAccentArgb
+
+        val container = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            background = android.graphics.drawable.GradientDrawable().apply {
+                cornerRadius = dp(10).toFloat()
+                setColor(bg)
+                setStroke(dp(1), accent)
+            }
+        }
+        container.addView(android.widget.TextView(this).apply {
+            this.text = text
+            setTextColor(ink)
+            textSize = 13f
+            maxLines = 1
+            gravity = Gravity.CENTER_HORIZONTAL
+            typeface = androidx.core.content.res.ResourcesCompat.getFont(
+                this@OverlayService, com.keyflow.R.font.space_mono_bold,
+            )
+            setPadding(dp(18), dp(12), dp(18), dp(6))
+        })
+
+        fun actionLabel(label: String, onClick: () -> Unit) = android.widget.TextView(this).apply {
+            this.text = label
+            setTextColor(accent)
+            textSize = 13f
+            gravity = Gravity.CENTER
+            typeface = androidx.core.content.res.ResourcesCompat.getFont(
+                this@OverlayService, com.keyflow.R.font.space_mono_bold,
+            )
+            setPadding(dp(18), dp(9), dp(18), dp(12))
+            setOnClickListener {
+                Haptics.tick(this@OverlayService, cachedSettings.vibrationIntensity)
+                onClick()
+            }
+        }
+
+        val row = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+        row.addView(actionLabel(discardLabel, onDiscard))
+        row.addView(actionLabel(sendLabel, onSend))
+        container.addView(row)
+        return container
     }
 
     /**

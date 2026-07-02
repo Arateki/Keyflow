@@ -220,7 +220,7 @@ private fun GeneralSection(settings: Settings, onSettingsChange: (Settings) -> U
             modifier = Modifier.padding(top = 18.dp),
         )
         Text(
-            text = "Em breve: ao atingir o limite, a gravação pausa e pergunta se quer enviar ou descartar.",
+            text = "Ao atingir o limite, a gravação pausa e pergunta se quer enviar ou descartar.",
             color = palette.faint,
             fontFamily = SpaceGrotesk,
             fontSize = 11.sp,

@@ -867,3 +867,35 @@ dedicada de números, refletido na prévia; (b) hint pequeno de dígito no canto
 
 Yan confirmou: item 4 funcionou e ficou bom, só pediu reduzir "muito pouco" mais. `PREVIEW_MARGIN_DP`
 10dp → 14dp. Gate `quick` (`TecladoPanelTest` 6/6). Build reinstalado no Galaxy A32.
+
+## Q1 — Limite máximo de gravação aplicado de verdade (2026-07-02)
+
+Início da fila do `DEVELOPMENT-ORDER.md` pela Frente A (Bloco 1). Exploração de código mostrou que a
+tarefa listada como "quick mode" tocava ~8 arquivos e tinha 2 decisões de design em aberto — não coube no
+guardrail de quick mode (máx. 3 arquivos, sem decisão de design). Decisões resolvidas com o Yan antes de
+implementar:
+- Estado ao atingir o limite: reusar `ButtonState.PAUSED` puro (sem estado novo).
+- Banner de aviso: 2 ações — "Enviar" (mesmo caminho de STOP a partir de PAUSED) e "Descartar" (novo
+  `ButtonStateMachine.onDiscard()`: descarte direto RECORDING/PAUSED → idle, sem a janela de desfazer de
+  3s do `onCancel`/CANCELLING — aviso de limite já é uma decisão explícita, não precisa de undo).
+
+Implementado via TDD (RED confirmado por erro de compilação nos testes antes do código de produção
+existir; GREEN depois). `OverlayCoordinator` ganhou `maxRecordingMs: () -> Long` (lambda, lido ao vivo de
+`cachedSettings.maxRecordingSec` — mesmo padrão do `tapBurstWindowMs`, não fixado na criação do
+coordinator) + `scheduleLimitJob()`/`cancelLimitJob()` (mesmo padrão do `cancelJob` já usado por
+CANCELLING) + `onLimitSend()`/`onLimitDiscard()` públicos. Reagenda com o tempo **restante** (`max -
+timeAccumulatedMs`) a cada START/RESUME; se já passou do limite, não reagenda — por isso resumir
+manualmente depois do aviso não dispara o aviso de novo na mesma sessão de gravação (sem flag extra,
+efeito colateral do próprio cálculo). `OverlayService` ganhou um banner de overlay com 2 rótulos
+clicáveis (`limitBannerView`, variante do `bannerView` existente sem timer de auto-dismiss).
+
+**Gate `full` (unit + instrumentado, emulador):** unit 100% verde (9 testes novos: 3 em
+`ButtonStateMachineTest`, 6 em `OverlayCoordinatorTest`, usando `testScheduler.currentTime` como relógio
+autoritativo do coordinator para sincronizar com o avanço de tempo virtual do `runTest`). Instrumentado:
+só as 2 falhas ambientais já conhecidas (`SystemSurfacesScreenshotTest` — Keystore lento) + 1 flake novo
+confirmado (`KeyFlowKeyboardBarsTest.gridReleaseOutsideTheFrameCancelsWithoutEmitting`, não relacionado a
+este código; rerodado isolado → 6/6 verde, mesma classe de instabilidade de `sendPointerSync` sob carga
+já documentada em OG-T6). Sem regressão.
+
+Detalhe completo em `.specs/quick/001-limite-max-gravacao/TASK.md`. **Pendente [YAN]**: validar o banner
+"Enviar/Descartar" no Galaxy A32 (texto, toque, tema claro/escuro).

@@ -104,6 +104,18 @@ class ButtonStateMachine(
         return state
     }
 
+    /**
+     * Descarta a gravação diretamente (RECORDING/PAUSED → idle), sem a janela de desfazer de 3s do
+     * [onCancel]. Usado quando o usuário já tomou a decisão explícita (ex.: "Descartar" no aviso de
+     * limite máximo de gravação).
+     */
+    fun onDiscard(): ButtonState {
+        if (state == ButtonState.RECORDING || state == ButtonState.PAUSED) {
+            state = if (targetAvailable()) ButtonState.IDLE_READY else ButtonState.IDLE_NO_FIELD
+        }
+        return state
+    }
+
     fun onTranscriptionSuccess(): ButtonState {
         state = if (targetAvailable()) ButtonState.IDLE_READY else ButtonState.IDLE_NO_FIELD
         return state
