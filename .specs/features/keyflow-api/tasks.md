@@ -55,7 +55,7 @@ então `[P]` real se houver dois agentes — senão seguir a ordem sequencial.
   confirmado estaticamente que `settings.gradle.kts` só inclui `:app`, então `api/` é invisível ao
   Gradle. Trabalho feito em worktree própria (`../keyflow-api-wt`, branch `feature/keyflow-api`).
 
-### API-T2 — Config por ambiente + tracing JSON
+### API-T2 — Config por ambiente + tracing JSON — ✅ Concluída (2026-07-02)
 - **What**: módulo `config` (envs tipadas: `DATABASE_URL`, paths de secrets, bind addr, flags de
   teste) com erro claro de env faltante; `tracing` + subscriber JSON + `TraceLayer` (latência por
   rota). Nenhum secret no repo (OPS-03).
@@ -64,6 +64,19 @@ então `[P]` real se houver dois agentes — senão seguir a ordem sequencial.
 - **Done when**: unit — env faltante falha com mensagem específica; logs saem em JSON com rota e
   latência (verificado em teste capturando o subscriber ou por inspeção documentada).
 - **Tests**: unit. **Gate**: `rust`.
+- **Nota de execução**: `Config::from_env()` tipa `DATABASE_URL` (obrigatória) e `BIND_ADDR`
+  (opcional, default `0.0.0.0:8080`) — 4 unit tests cobrindo falta/valor inválido/default.
+  `GOOGLE_SERVICE_ACCOUNT_JSON_PATH`/flags de relax (Integrity/AdMob SSV) ficaram para T4/T12,
+  quando o código que efetivamente os consome existir (evita superfície de config morta hoje).
+  Tracing: `tower_http::trace::TraceLayer` aplicado via **`route_layer`** (não `layer` — gotcha do
+  axum: `layer` envolve o roteamento inteiro e roda antes da extensão `MatchedPath` ser inserida,
+  então o span sairia sem rota). `RUST_LOG` default `info,tower_http=debug` deixa latência visível
+  sem configuração extra. **Rota + latência em JSON verificados por inspeção documentada** (não
+  por unit test): um teste que instala subscriber via `tracing::subscriber::set_default` ficou
+  flaky quando rodado em paralelo com as outras `#[tokio::test]` do binário — causa raiz é o cache
+  global de `Interest` por callsite do crate `tracing`, compartilhado entre threads de teste
+  (arquitetura do crate, não bug do código); alternativa prevista no próprio design. Evidência real
+  (via `cargo run`) documentada no README e no comentário de `src/main.rs`.
 
 ### API-T3 — Postgres + migrations do schema núcleo + helpers de tx
 - **What**: sqlx com pool + migrations do design §Schema (accounts, ledger, purchases, rewards,

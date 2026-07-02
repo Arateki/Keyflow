@@ -6,6 +6,9 @@ edition = "2024"
 [dependencies]
 axum = "0.8.9"
 tokio = { version = "1.52.3", features = ["rt-multi-thread", "macros", "net", "signal"] }
+tower-http = { version = "0.7.0", features = ["trace"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["json", "env-filter"] }
 
 [dev-dependencies]
 tower = { version = "0.5.3", features = ["util"] }

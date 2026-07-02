@@ -11,9 +11,22 @@ Módulo disjunto do app Android (`app/`): o Gradle não enxerga esta pasta e vic
 - Rust stable (edição 2024).
 - Postgres local para testes de integração: `docker compose up -d` (sobe na porta `5432`,
   usuário/senha/banco `keyflow`).
+- Variáveis de ambiente (ver `src/config.rs`):
+  - `DATABASE_URL` (obrigatória) — string de conexão Postgres. Ausente → erro claro no boot
+    (`missing required environment variable: DATABASE_URL`), sem stack trace genérico.
+  - `BIND_ADDR` (opcional, default `0.0.0.0:8080`) — endereço:porta do axum.
+  - `RUST_LOG` (opcional, default `info,tower_http=debug`) — diretivas do `tracing_subscriber`;
+    o default já deixa a latência por rota (`tower_http::trace`) visível sem precisar setar nada.
 
 ```bash
-cargo run        # sobe em 0.0.0.0:8080, GET /health
+DATABASE_URL=postgres://keyflow:keyflow@localhost/keyflow_api cargo run   # GET /health
+```
+
+Logs saem em **JSON estruturado** (um objeto por linha), com a rota casada (`matched_path`) e a
+latência da request no evento de resposta:
+
+```json
+{"timestamp":"...","level":"DEBUG","fields":{"message":"finished processing request","latency":"0 ms","status":200},"target":"tower_http::trace::on_response","span":{"matched_path":"/health","method":"GET","name":"http_request"}}
 ```
 
 ## Gate `rust`
