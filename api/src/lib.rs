@@ -1,27 +1,70 @@
+pub mod auth;
 pub mod config;
 pub mod db;
 pub mod google;
+pub mod routes;
+
+use std::sync::Arc;
 
 use axum::extract::{MatchedPath, State};
 use axum::http::{Request, StatusCode};
+use axum::routing::post;
 use axum::{Router, routing::get};
 use sqlx::PgPool;
 use tower_http::trace::TraceLayer;
 
-async fn health(State(pool): State<PgPool>) -> Result<&'static str, StatusCode> {
+use google::integrity::IntegrityClient;
+
+pub struct AppStateInner {
+    pub pool: PgPool,
+    pub integrity: IntegrityClient,
+    pub package_name: String,
+    pub integrity_relaxed: bool,
+}
+
+/// Estado compartilhado entre handlers — `Clone` barato (`Arc` por dentro; `PgPool` também já é
+/// `Arc` por dentro, mas o `IntegrityClient`/`TokenCache` não são `Clone`, daí o wrapper).
+#[derive(Clone)]
+pub struct AppState(Arc<AppStateInner>);
+
+impl AppState {
+    pub fn new(
+        pool: PgPool,
+        integrity: IntegrityClient,
+        package_name: String,
+        integrity_relaxed: bool,
+    ) -> Self {
+        Self(Arc::new(AppStateInner {
+            pool,
+            integrity,
+            package_name,
+            integrity_relaxed,
+        }))
+    }
+}
+
+impl std::ops::Deref for AppState {
+    type Target = AppStateInner;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+async fn health(State(state): State<AppState>) -> Result<&'static str, StatusCode> {
     sqlx::query("select 1")
-        .execute(&pool)
+        .execute(&state.pool)
         .await
         .map(|_| "ok")
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }
 
-pub fn app(pool: PgPool) -> Router {
+pub fn app(state: AppState) -> Router {
     // `route_layer` (não `layer`): só assim a extensão `MatchedPath` já está no request quando
     // `make_span_with` roda — `layer` envolve o roteamento inteiro e roda ANTES da extensão ser
     // inserida (gotcha documentado do axum).
     Router::new()
         .route("/health", get(health))
+        .route("/v1/register", post(routes::register::register))
         .route_layer(
             TraceLayer::new_for_http().make_span_with(|request: &Request<_>| {
                 let matched_path = request
@@ -36,7 +79,7 @@ pub fn app(pool: PgPool) -> Router {
                 )
             }),
         )
-        .with_state(pool)
+        .with_state(state)
 }
 
 pub fn init_tracing() {
@@ -55,6 +98,7 @@ mod tests {
     use super::*;
     use axum::body::Body;
     use axum::http::{Request, StatusCode};
+    use reqwest::Client;
     use tower::ServiceExt;
 
     async fn test_pool() -> PgPool {
@@ -71,11 +115,28 @@ mod tests {
         pool
     }
 
+    async fn test_state() -> AppState {
+        let pool = test_pool().await;
+        // Nenhum teste deste módulo bate de verdade no Google — a IntegrityClient aponta pra um
+        // endereço que nunca é chamado (health não usa integrity).
+        let integrity = IntegrityClient::new(
+            Client::new(),
+            "http://127.0.0.1:0".to_string(),
+            "com.keyflow".to_string(),
+            google::auth::ServiceAccountKey {
+                client_email: "unused@example.com".to_string(),
+                private_key: String::new(),
+                token_uri: "http://127.0.0.1:0/token".to_string(),
+            },
+        );
+        AppState::new(pool, integrity, "com.keyflow".to_string(), false)
+    }
+
     #[tokio::test]
     async fn health_returns_200_with_real_select_1() {
-        let pool = test_pool().await;
+        let state = test_state().await;
 
-        let response = app(pool)
+        let response = app(state)
             .oneshot(
                 Request::builder()
                     .uri("/health")

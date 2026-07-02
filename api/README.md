@@ -17,9 +17,21 @@ Módulo disjunto do app Android (`app/`): o Gradle não enxerga esta pasta e vic
   - `BIND_ADDR` (opcional, default `0.0.0.0:8080`) — endereço:porta do axum.
   - `RUST_LOG` (opcional, default `info,tower_http=debug`) — diretivas do `tracing_subscriber`;
     o default já deixa a latência por rota (`tower_http::trace`) visível sem precisar setar nada.
+  - `GOOGLE_SERVICE_ACCOUNT_JSON_PATH` (obrigatória) — caminho do JSON da service account do
+    Google (campos usados: `client_email`, `private_key`, `token_uri`); usada para assinar o JWT
+    do fluxo OAuth (Play Integrity). **Credencial real é do Yan** (API-T13); localmente, qualquer
+    JSON com esse shape e uma chave RSA válida serve para o processo subir (só falha de verdade
+    ao chamar o Google).
+  - `PACKAGE_NAME` (obrigatória) — package name do app Android (ex.: `com.keyflow`), conferido
+    contra `requestPackageName` do Play Integrity.
+  - `INTEGRITY_RELAXED` (opcional, default `false`; `true`/`1` liga) — relaxa só o
+    `appRecognitionVerdict` (builds de teste/interno); nunca relaxa pacote nem device.
 
 ```bash
-DATABASE_URL=postgres://keyflow:keyflow@localhost/keyflow_api cargo run   # GET /health
+DATABASE_URL=postgres://keyflow:keyflow@localhost/keyflow_api \
+GOOGLE_SERVICE_ACCOUNT_JSON_PATH=/path/to/service-account.json \
+PACKAGE_NAME=com.keyflow \
+cargo run   # GET /health, POST /v1/register
 ```
 
 Logs saem em **JSON estruturado** (um objeto por linha), com a rota casada (`matched_path`) e a

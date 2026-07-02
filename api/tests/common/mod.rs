@@ -16,6 +16,10 @@ pub async fn test_pool() -> PgPool {
 
 /// Cria uma conta de teste com `device_key`/`token_hash` únicos e o saldo inicial dado.
 /// `token_hash` não precisa ser um hash real aqui — os testes de ledger não validam auth.
+/// `tests/common/mod.rs` é compilado por cada binário de teste em `tests/` separadamente; nem
+/// todos usam todos os helpers — sem `allow`, o clippy (`-D warnings`) reclamaria de dead_code
+/// num binário específico mesmo com uso real em outro.
+#[allow(dead_code)]
 pub async fn create_test_account(pool: &PgPool, balance_seconds: i64) -> uuid::Uuid {
     let device_key = format!("test-{}", uuid::Uuid::new_v4());
     let token_hash = uuid::Uuid::new_v4().into_bytes().to_vec();
@@ -34,6 +38,7 @@ pub async fn create_test_account(pool: &PgPool, balance_seconds: i64) -> uuid::U
     id
 }
 
+#[allow(dead_code)]
 pub async fn balance_of(pool: &PgPool, account_id: uuid::Uuid) -> i64 {
     let (balance,): (i64,) = sqlx::query_as("select balance_seconds from accounts where id = $1")
         .bind(account_id)

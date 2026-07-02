@@ -140,7 +140,7 @@ então `[P]` real se houver dois agentes — senão seguir a ordem sequencial.
   (fica pra API-T5, quando `POST /v1/register` de fato constrói o `IntegrityClient` a partir do
   ambiente — evita campos de config nunca lidos até lá).
 
-### API-T5 — `POST /v1/register` + middleware Bearer
+### API-T5 — `POST /v1/register` + middleware Bearer — ✅ Concluída (2026-07-02)
 - **What**: registro do design (Integrity → conta por `deviceKey` novo/existente → token novo
   hasheado) + middleware que resolve `Bearer` → `Account` (401 sem/inválido). Re-registro
   rotaciona token e preserva saldo (fluxo de recuperação).
@@ -149,6 +149,28 @@ então `[P]` real se houver dois agentes — senão seguir a ordem sequencial.
 - **Done when**: integração — registro com Integrity válido → token funciona em rota protegida;
   inválido → 403; re-registro do mesmo `deviceKey` → mesma conta, token antigo morto; schema não
   guarda nada além do design (assert nas colunas).
+- **Nota de execução**: `AppState` (novo, `Arc` por dentro) substitui `PgPool` cru como estado do
+  axum — carrega `pool` + `IntegrityClient` + `package_name` + `integrity_relaxed`; `Config`
+  ganhou os 3 campos que isso consome de verdade agora (`GOOGLE_SERVICE_ACCOUNT_JSON_PATH`,
+  `PACKAGE_NAME`, `INTEGRITY_RELAXED`, deferidos da T4 até terem consumidor real). Middleware
+  Bearer→Account implementado como **extractor** (`impl FromRequestParts<AppState> for Account`,
+  não `tower::Layer`) — equivalente funcionalmente (401 sem/inválido) e mais idiomático em axum
+  0.8; qualquer handler que pedir `Account` como parâmetro já fica protegido. `access_token`: 32
+  bytes de `rand::fill` em base64url (43 chars), hash SHA-256 é o único valor persistido
+  (`db::accounts.token_hash`); vetor de teste SHA-256("") conferido contra valor bem conhecido
+  (não fabricado). Re-registro (`db::accounts::rotate_token`) preserva `id`/saldo/entitlements —
+  só troca `token_hash`, então o token antigo para de resolver e o saldo não se move. `GET
+  /v1/account` real (T7) ainda não existe, então o "rota protegida" do done-when foi provado
+  batendo o token novo direto em `db::accounts::find_by_token_hash` (equivalente ao que o
+  extractor faz) + um teste dedicado (`missing_bearer_is_rejected_with_401`) que monta um router
+  efêmero só com o extractor sobre o mesmo `AppState` real — nenhuma rota de produção nova além de
+  `/v1/register` foi criada aqui (T7 é dona da primeira rota de negócio protegida). **Achado
+  corrigido antes de virar flake em CI**: os testes de `db/accounts.rs` usavam `token_hash`
+  literais fixos (`vec![1u8;32]` etc.) — coerente na primeira execução, mas como o Postgres de
+  dev/CI acumula linhas entre rodadas (nada dá `TRUNCATE`) e `token_hash` não é `UNIQUE` no
+  schema, rodadas repetidas passaram a resolver a linha errada (`fetch_optional` sem `ORDER BY`
+  não garante qual "primeira" linha volta). Trocado por hash aleatório (`Uuid::new_v4()`) por
+  execução, mesmo padrão já usado em `tests/common/mod.rs`.
 - **Tests**: integração + unit (hash/parse do Bearer). **Gate**: `rust`.
 
 ### API-T6 — Rate limiting `[P]`

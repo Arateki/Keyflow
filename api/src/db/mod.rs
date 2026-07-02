@@ -1,3 +1,4 @@
+pub mod accounts;
 pub mod ledger;
 
 use sqlx::PgPool;
