@@ -17,6 +17,7 @@ import com.keyflow.core.KeyFlowController
 import com.keyflow.core.shortcuts.BarButton
 import com.keyflow.core.shortcuts.BarDef
 import com.keyflow.core.shortcuts.GridTriggerMode
+import com.keyflow.core.shortcuts.PhysicalKeyMap
 import com.keyflow.core.shortcuts.ShortcutGrid
 import com.keyflow.core.shortcuts.ShortcutKey
 import com.keyflow.ime.MicAction
@@ -121,6 +122,20 @@ class BarView(
             val session = gridSession ?: return
             handleGridSnapshot(session.snapshot(SystemClock.uptimeMillis()))
             handler.postDelayed(this, REVEAL_TICK_MS)
+        }
+    }
+
+    // Alavanca direcional (SB-T7/JOY-01..04): controller puro + tick agendado pelo vencimento do repeat.
+    private var joystick: JoystickController? = null
+    private var joystickCenterX = 0f
+    private var joystickCenterY = 0f
+    private var joystickDx = 0f
+    private var joystickDy = 0f
+    private val joystickTick = object : Runnable {
+        override fun run() {
+            val controller = joystick ?: return
+            controller.onTick(SystemClock.uptimeMillis()).forEach { fireJoystick(it) }
+            scheduleJoystickTick()
         }
     }
 
@@ -233,7 +248,7 @@ class BarView(
         canvas.drawRoundRect(bounds, cornerRadius, cornerRadius, borderPaint)
 
         if (button == BarButton.Joystick) {
-            drawJoystick(canvas, bounds, ink)
+            drawJoystick(canvas, bounds, ink, active = placed.index == pressedIndex && joystick != null)
             return
         }
         textPaint.color = ink
@@ -243,16 +258,24 @@ class BarView(
         textPaint.alpha = 255
     }
 
-    /** Manche de fliperama: base circular + bolinha central (deslocamento entra na SB-T7). */
-    private fun drawJoystick(canvas: Canvas, bounds: RectF, ink: Int) {
+    /** Manche de fliperama: base circular + bolinha deslocada na direção do puxão (JOY-01). */
+    private fun drawJoystick(canvas: Canvas, bounds: RectF, ink: Int, active: Boolean) {
         val cx = bounds.centerX()
         val cy = bounds.centerY()
         val baseRadius = minOf(bounds.width(), bounds.height()) / 2f - dp(4f)
         borderPaint.color = ink
         canvas.drawCircle(cx, cy, baseRadius, borderPaint)
         borderPaint.color = kbKeyBorder
-        fillPaint.color = ink
-        canvas.drawCircle(cx, cy, baseRadius * 0.42f, fillPaint)
+        val maxOffset = baseRadius * 0.55f
+        val length = kotlin.math.hypot(joystickDx, joystickDy)
+        val (ox, oy) = if (active && length > 0f) {
+            val clamped = minOf(length, maxOffset) / length
+            joystickDx * clamped to joystickDy * clamped
+        } else {
+            0f to 0f
+        }
+        fillPaint.color = if (active) MicVisuals.ACCENT_TEAL else ink
+        canvas.drawCircle(cx + ox, cy + oy, baseRadius * 0.42f, fillPaint)
     }
 
     private fun visualsFor(button: BarButton): Triple<String, Int, Int> = when (button) {
@@ -293,6 +316,7 @@ class BarView(
                 when (val button = placed?.button) {
                     BarButton.Mic -> scheduleHold(placed)
                     is BarButton.GridTrigger -> startGridSession(button, placed, event)
+                    BarButton.Joystick -> startJoystick(placed)
                     else -> Unit
                 }
                 invalidate()
@@ -307,6 +331,15 @@ class BarView(
                     lastRawX = event.rawX
                     lastRawY = event.rawY
                     handleGridSnapshot(session.onMove(event.rawX, event.rawY, SystemClock.uptimeMillis()))
+                    return true
+                }
+                joystick?.let { controller ->
+                    joystickDx = event.x - joystickCenterX
+                    joystickDy = event.y - joystickCenterY
+                    controller.onMove(joystickDx, joystickDy, SystemClock.uptimeMillis())
+                        .forEach { fireJoystick(it) }
+                    scheduleJoystickTick()
+                    invalidate()
                     return true
                 }
                 maybeStartScroll(event.x)
@@ -324,6 +357,8 @@ class BarView(
                     micSelector.release()?.let { callbacks.onMicAction(it) }
                 } else if (gridSession != null) {
                     finishGridSession(event.rawX, event.rawY)
+                } else if (joystick != null) {
+                    stopJoystick()
                 } else if (!scrolling) {
                     activeButton?.let { placed ->
                         if (placed.contains(event.x + scrollOffset)) perform(placed.button)
@@ -336,6 +371,7 @@ class BarView(
                 cancelHold()
                 micSelector.dismiss()
                 dismissGridSession()
+                stopJoystick()
                 endGesture()
                 return true
             }
@@ -451,6 +487,38 @@ class BarView(
         activeTrigger = null
     }
 
+    // ── alavanca direcional (SB-T7) ──────────────────────────────────────────
+
+    private fun startJoystick(placed: BarGeometry.PlacedButton) {
+        joystickCenterX = placed.left - scrollOffset + placed.width / 2f
+        joystickCenterY = height / 2f
+        joystickDx = 0f
+        joystickDy = 0f
+        joystick = JoystickController(thresholdPx = dp(JOYSTICK_THRESHOLD_DP))
+    }
+
+    /** Seta emitida (cruzou o limiar ou repeat vencido): tecla física + tique tátil (JOY-01/02). */
+    private fun fireJoystick(direction: JoystickController.Direction) {
+        callbacks.onShortcut(PhysicalKeyMap.key(direction.keyCode))
+        Haptics.tick(context, vibrationIntensity)
+    }
+
+    /** Agenda o próximo tick exatamente no vencimento do repeat (aceleração do RepeatSchedule). */
+    private fun scheduleJoystickTick() {
+        handler.removeCallbacks(joystickTick)
+        val due = joystick?.nextDueMs() ?: return
+        handler.postDelayed(joystickTick, (due - SystemClock.uptimeMillis()).coerceAtLeast(0L))
+    }
+
+    private fun stopJoystick() {
+        handler.removeCallbacks(joystickTick)
+        joystick?.onUp()
+        joystick = null
+        joystickDx = 0f
+        joystickDy = 0f
+        invalidate()
+    }
+
     private fun scheduleHold(placed: BarGeometry.PlacedButton) {
         val r = Runnable {
             micSelector.open(
@@ -485,6 +553,7 @@ class BarView(
         cancelHold()
         micSelector.dismiss()
         dismissGridSession()
+        stopJoystick()
         handler.removeCallbacks(ticker)
         super.onDetachedFromWindow()
     }
@@ -500,5 +569,7 @@ class BarView(
         private const val GRID_CELL_H_DP = 48f
         private const val GRID_ANCHOR_THRESHOLD_DP = 24f
         private const val REVEAL_TICK_MS = 120L
+        // Alavanca: raio-morto pequeno (o botão é compacto; o flick precisa ser curto).
+        private const val JOYSTICK_THRESHOLD_DP = 12f
     }
 }

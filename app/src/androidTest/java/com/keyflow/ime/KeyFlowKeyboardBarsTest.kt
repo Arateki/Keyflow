@@ -176,6 +176,43 @@ class KeyFlowKeyboardBarsTest {
         assertTrue("cancelamento emitiu \"$text\" no campo", !text.contains("c"))
     }
 
+    @Test
+    fun joystickPullFiresArrowAndHoldingRepeatsWithAcceleration() {
+        val config = BarsConfig(
+            mirrored = true,
+            collapsed = listOf(
+                BarDef(listOf(BarButton.Mic, BarButton.Joystick, BarButton.ToggleExpand))
+            ),
+            expanded = emptyList(),
+        )
+        runBlocking { SettingsRepository(context).saveBarsConfig(config) }
+        launchProbe(bars = true)
+        val bar = KeyFlowKeyboardService.activeViewForTest!!.barViewsForTest.first { it.isShown }
+        waitUntil("BarView ainda sem geometria medida") { bar.layoutForTest.buttons.isNotEmpty() }
+        val stick = bar.layoutForTest.buttons.first { it.button == BarButton.Joystick }
+        val rect = bar.buttonScreenRectForTest(stick.index)
+
+        // Puxa pra direita além do raio-morto e SEGURA: 1º disparo imediato (JOY-01) + repeats
+        // acelerando (JOY-02). O probe converte DPAD_RIGHT em "→" visível.
+        val downTime = SystemClock.uptimeMillis()
+        inject(MotionEvent.ACTION_DOWN, rect.centerX(), rect.centerY(), downTime, downTime)
+        inject(MotionEvent.ACTION_MOVE, rect.centerX() + 60, rect.centerY(), downTime)
+        Thread.sleep(900) // repeat: 1º em ~400ms, 2º em ~760ms (RepeatSchedule)
+        inject(MotionEvent.ACTION_UP, rect.centerX() + 60, rect.centerY(), downTime)
+
+        waitUntil("alavanca não emitiu setas repetidas") {
+            val text = device.findObject(By.desc("ime_probe_field"))?.text.orEmpty()
+            text.count { it == '→' } >= 2
+        }
+
+        // Soltar parou (JOY-04): a contagem congela.
+        Thread.sleep(600)
+        val frozen = device.findObject(By.desc("ime_probe_field"))?.text.orEmpty().count { it == '→' }
+        Thread.sleep(500)
+        val after = device.findObject(By.desc("ime_probe_field"))?.text.orEmpty().count { it == '→' }
+        assertEquals("repeat continuou após soltar", frozen, after)
+    }
+
     /** Sobe o probe com uma grade 1×2 (célula 0 = "c", célula 1 vazia) e um gatilho OPEN_ONLY na barra. */
     private fun launchWithTestGrid() {
         val grid = ShortcutGrid(
