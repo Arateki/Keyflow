@@ -18,6 +18,22 @@ defaults:
 jobs:
   rust:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: keyflow
+          POSTGRES_PASSWORD: keyflow
+          POSTGRES_DB: keyflow_api
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U keyflow -d keyflow_api"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 15
+    env:
+      DATABASE_URL: postgres://keyflow:keyflow@localhost:5432/keyflow_api
     steps:
       - uses: actions/checkout@v4
 

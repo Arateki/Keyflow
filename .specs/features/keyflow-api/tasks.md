@@ -78,7 +78,7 @@ então `[P]` real se houver dois agentes — senão seguir a ordem sequencial.
   (arquitetura do crate, não bug do código); alternativa prevista no próprio design. Evidência real
   (via `cargo run`) documentada no README e no comentário de `src/main.rs`.
 
-### API-T3 — Postgres + migrations do schema núcleo + helpers de tx
+### API-T3 — Postgres + migrations do schema núcleo + helpers de tx — ✅ Concluída (2026-07-02)
 - **What**: sqlx com pool + migrations do design §Schema (accounts, ledger, purchases, rewards,
   transcribe_requests, documents); helpers de mutação de saldo (crédito/débito com guarda e sem
   guarda) **sempre em tx** (ledger + update juntos); `/health` passa a fazer `SELECT 1`.
@@ -87,6 +87,24 @@ então `[P]` real se houver dois agentes — senão seguir a ordem sequencial.
 - **Done when**: integração — migrations aplicam do zero; débito concorrente do último saldo: só
   um passa (teste com 2 tx disputando); crédito+ledger atômicos (falha no meio → rollback).
 - **Tests**: integração (Postgres docker). **Gate**: `rust`.
+- **Nota de execução**: migration única `migrations/0001_core_schema.sql` com as 6 tabelas do
+  design (sem PII/áudio/texto — conferível por inspeção). `src/db/ledger.rs`: `credit`/
+  `debit_guarded`/`revoke`, genéricas sobre `sqlx::Acquire<'a, Database = Postgres>` (aceitam
+  `&PgPool` OU `&mut Transaction` — nesse caso abrem um **savepoint** aninhado, então compõem
+  naturalmente com uma tx maior do chamador, ex.: T8 vai inserir a purchase + creditar na mesma
+  tx). `debit_guarded` usa `UPDATE ... WHERE balance_seconds >= $delta RETURNING` — o lock de
+  linha do Postgres serializa débitos concorrentes na mesma conta (testado com `tokio::join!` de
+  2 chamadas reais, 7 testes de integração em `tests/db_ledger.rs` + helpers em
+  `tests/common/mod.rs`). **Refatoração necessária**: virou **lib+bin** (`src/lib.rs` expõe
+  `app`/`config`/`db`/`init_tracing`; `src/main.rs` ficou fino) — os testes de integração em
+  `tests/` só enxergam a API pública do crate, e a spec já previa "exercitar rotas reais" nesses
+  testes. **Achado corrigido antes de virar flake em CI**: os testes de `config.rs` mutavam
+  `std::env::set_var`/`remove_var` (estado global do processo) e corriam risco de colidir com
+  outros `#[test]`s tocando `DATABASE_URL` em paralelo no mesmo binário; `Config::from_env()`
+  virou wrapper fino sobre `Config::from_map(&HashMap)`, testado sem tocar env real. CI
+  (`.github/workflows/api.yml`) ganhou serviço Postgres efêmero com as credenciais do
+  `docker-compose.yml`. `postgres:18-alpine` real usado nos testes locais deste ambiente (Docker
+  funcionando no sandbox).
 
 ## Fase B — Identidade
 
