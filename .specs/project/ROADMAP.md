@@ -78,8 +78,29 @@ customização futura (resize/reposição/teclas-macro).
 **Done:** teclado novo é o padrão (após validação manual no device); mic/overlay/notificação intactos;
 goldens novos aprovados; gate `full` verde.
 
+**Status (2026-07-01):** KC-T1..T9 concluídas (fundação, geometria, view Canvas, preview/repeat/multitouch,
+acentos, integração híbrida atrás de flag debug, corretor do sistema, a11y, subtypes PT/EN/ES). KC-T10
+parcial: goldens novos gerados/aprovados, gate `full` verde (exceto 2 falhas ambientais já conhecidas, sem
+relação com o teclado). **Falta só o Yan**: validar fluidez no Galaxy A32 e decidir promover a grade nova a
+padrão (remover a flag `kbd_canvas`/teclado antigo) — ver `.specs/features/keyboard-canvas/tasks.md` KC-T10.
+
 **Futuro do teclado (pós-MVP):** customização (reduzir tamanho, reposicionar teclas, teclas-macro); glide
 typing; dicionário/sugestões próprias (possível porte do AnySoftKeyboard, Apache 2.0).
+
+## Milestone 6 — Barras personalizáveis + atalhos físicos (Trabalho 3)
+
+Transformar a barra do teclado num sistema de **barras personalizáveis** (`BarView` em Canvas) com botões
+que emitem **eventos de teclado físico** (`PhysicalKeyEmitter`: chords/sequências com Ctrl/Alt/Shift/Meta)
+para SSH/tmux/neovim: **teclas avulsas**, **alavanca direcional** (setas com repetição acelerada) e
+**grades de atalhos efêmeras** (press-drag-release, âncora pela direção do arrasto, lente + preview +
+modo aprendizado). Config em Compose na aba de teclados (editor WYSIWYG de barras, editor de grades,
+picker de teclado físico ANSI). Modo atalhos da **orbe** fica para feature futura.
+
+Spec: `.specs/features/shortcut-bars/` (`spec.md`, `context.md`, `design.md`, `tasks.md`).
+
+**Done:** success criteria da spec (tmux via SSH operável por grade/alavanca/teclas avulsas; barra de
+fábrica indistinguível da atual; barra custom montável só pela config); gate `full` verde; goldens
+aprovados.
 
 ## Futuro (pós-v1, não priorizado)
 
