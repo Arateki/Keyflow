@@ -57,6 +57,11 @@ class SettingsRepository(
     /** Mesma leitura leve de [themeDarkOnce], para o tamanho do teclado (também lido em `onCreateInputView`). */
     suspend fun keyboardScalePercentOnce(): Int = dataStore.data.first()[KEYBOARD_SCALE_PERCENT] ?: 100
 
+    /** Leitura leve da intensidade de vibração (háptica da grade efêmera/alavanca — GRD-03/JOY-02). */
+    suspend fun vibrationIntensityOnce(): Int = dataStore.data.first().let { prefs ->
+        prefs[VIBRATION_INTENSITY] ?: (if (prefs[HAPTIC_FEEDBACK] == false) 0 else 60)
+    }
+
     // ── Barras personalizáveis + teclados de atalhos (Trabalho 3 / SB-T5) ────
     // Strings JSON no DataStore (nada aqui é segredo — fora do EncryptedSharedPreferences); o codec cai
     // no DEFAULT/vazio em config malformada, então o IME nunca quebra por dado ruim.

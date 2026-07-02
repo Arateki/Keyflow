@@ -16,10 +16,13 @@ import com.keyflow.core.ButtonState
 import com.keyflow.core.KeyFlowController
 import com.keyflow.core.shortcuts.BarButton
 import com.keyflow.core.shortcuts.BarDef
+import com.keyflow.core.shortcuts.GridTriggerMode
 import com.keyflow.core.shortcuts.ShortcutGrid
 import com.keyflow.core.shortcuts.ShortcutKey
 import com.keyflow.ime.MicAction
 import com.keyflow.ime.keyboard.CandidatesView
+import com.keyflow.ime.keys.PhysicalKeyEmitter
+import com.keyflow.overlay.Haptics
 import kotlin.math.abs
 
 /** Callbacks da barra — a `BarView` não conhece service/emitter, só avisa (fronteira estilo `onKeyAction`). */
@@ -56,13 +59,16 @@ class BarView(
     private val callbacks: BarCallbacks = BarCallbacks(),
     private val scale: Float = 1f,
     private val frozenSeconds: Int? = null,
+    // Intensidade da vibração das Settings (0 = sem háptica) — tique da lente da grade (GRD-03).
+    private val vibrationIntensity: Int = 60,
     private val clock: () -> Long = { SystemClock.elapsedRealtime() },
 ) : ViewGroup(context) {
 
     // Candidates só existe no expandido (SYNC-04); no retraído o slot é filtrado fora.
     private val buttons: List<BarButton> =
         def.buttons.filter { expandedMode || it != BarButton.Candidates }
-    private val knownGridIds: Set<String> = grids.map { it.id }.toSet()
+    private val gridsById: Map<String, ShortcutGrid> = grids.associateBy { it.id }
+    private val knownGridIds: Set<String> = gridsById.keys
 
     // Paleta Ateliê (mesmos ints da grade Canvas/barra atual).
     private val kbTray = if (dark) 0xFF332E27.toInt() else 0xFFDCD0AC.toInt()
@@ -104,6 +110,20 @@ class BarView(
     private val micSelector = MicSelectorController(context, dark, scale)
     private var holdRunnable: Runnable? = null
 
+    // Grade efêmera (SB-T6/GRD-01..07): sessão pura + popup de lente; vivem só enquanto o dedo pressiona.
+    private var gridSession: GridSession? = null
+    private var gridPopup: GridOverlayPopup? = null
+    private var activeTrigger: BarButton.GridTrigger? = null
+    private var lastRawX = 0f
+    private var lastRawY = 0f
+    private val revealTick = object : Runnable {
+        override fun run() {
+            val session = gridSession ?: return
+            handleGridSnapshot(session.snapshot(SystemClock.uptimeMillis()))
+            handler.postDelayed(this, REVEAL_TICK_MS)
+        }
+    }
+
     // Gesto atual.
     private var activeButton: BarGeometry.PlacedButton? = null
     private var pressedIndex = -1
@@ -129,6 +149,9 @@ class BarView(
     val popupActionsForTest: List<MicAction> get() = micSelector.actionsForTest
     val popupRectsForTest: List<Rect> get() = micSelector.rectsForTest
     val candidatesViewForTest: CandidatesView? get() = candidatesView
+    val gridFrameForTest: GridFrame?
+        get() = (gridSession?.snapshot(SystemClock.uptimeMillis())?.state as? GridSession.State.Active)?.frame
+    val gridPopupShowingForTest: Boolean get() = gridPopup?.isShowing == true
 
     /** Retângulo (tela) de um botão — os instrumentados calculam onde tocar por aqui. */
     fun buttonScreenRectForTest(index: Int): Rect {
@@ -267,13 +290,23 @@ class BarView(
                 val placed = barLayout.buttonAt(event.x + scrollOffset)
                 activeButton = placed
                 pressedIndex = placed?.index ?: -1
-                if (placed?.button == BarButton.Mic) scheduleHold(placed)
+                when (val button = placed?.button) {
+                    BarButton.Mic -> scheduleHold(placed)
+                    is BarButton.GridTrigger -> startGridSession(button, placed, event)
+                    else -> Unit
+                }
                 invalidate()
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
                 if (micSelector.isOpen) {
                     micSelector.updateHighlight(event.rawX.toInt(), event.rawY.toInt(), micTopOnScreen())
+                    return true
+                }
+                gridSession?.let { session ->
+                    lastRawX = event.rawX
+                    lastRawY = event.rawY
+                    handleGridSnapshot(session.onMove(event.rawX, event.rawY, SystemClock.uptimeMillis()))
                     return true
                 }
                 maybeStartScroll(event.x)
@@ -289,6 +322,8 @@ class BarView(
                 cancelHold()
                 if (micSelector.isOpen) {
                     micSelector.release()?.let { callbacks.onMicAction(it) }
+                } else if (gridSession != null) {
+                    finishGridSession(event.rawX, event.rawY)
                 } else if (!scrolling) {
                     activeButton?.let { placed ->
                         if (placed.contains(event.x + scrollOffset)) perform(placed.button)
@@ -300,6 +335,7 @@ class BarView(
             MotionEvent.ACTION_CANCEL -> {
                 cancelHold()
                 micSelector.dismiss()
+                dismissGridSession()
                 endGesture()
                 return true
             }
@@ -338,6 +374,83 @@ class BarView(
         }
     }
 
+    // ── grade efêmera (SB-T6) ────────────────────────────────────────────────
+
+    /** DOWN num gatilho válido: nasce a sessão (Pending até o 1º arrasto ancorar). Órfão = inerte. */
+    private fun startGridSession(trigger: BarButton.GridTrigger, placed: BarGeometry.PlacedButton, event: MotionEvent) {
+        val grid = gridsById[trigger.gridId] ?: return
+        val metrics = resources.displayMetrics
+        val triggerRect = buttonScreenRectForTest(placed.index)
+        activeTrigger = trigger
+        lastRawX = event.rawX
+        lastRawY = event.rawY
+        gridSession = GridSession(
+            grid = grid,
+            cellWidthPx = dp(GRID_CELL_W_DP),
+            cellHeightPx = dp(GRID_CELL_H_DP),
+            screenWidthPx = metrics.widthPixels.toFloat(),
+            screenHeightPx = metrics.heightPixels.toFloat(),
+            originX = event.rawX,
+            originY = event.rawY,
+            triggerFrame = GridFrame(
+                triggerRect.left.toFloat(),
+                triggerRect.top.toFloat(),
+                triggerRect.width().toFloat(),
+                triggerRect.height().toFloat(),
+            ),
+            anchorThresholdPx = dp(GRID_ANCHOR_THRESHOLD_DP),
+        )
+        gridPopup = GridOverlayPopup(
+            context = context,
+            dark = dark,
+            grid = grid,
+            cellWidthPx = dp(GRID_CELL_W_DP),
+            cellHeightPx = dp(GRID_CELL_H_DP),
+            scale = scale,
+        )
+        handler.postDelayed(revealTick, REVEAL_TICK_MS)
+    }
+
+    private fun handleGridSnapshot(snapshot: GridSession.Snapshot) {
+        val state = snapshot.state as? GridSession.State.Active ?: return
+        gridPopup?.let { popup ->
+            if (!popup.isShowing) popup.show(anchor = this, frame = state.frame)
+            popup.update(state.frame, state.cell, state.revealed, lastRawX, lastRawY)
+        }
+        if (snapshot.cellChanged) Haptics.tick(context, vibrationIntensity)
+    }
+
+    /** UP: emite conforme o modo do binding (GRD-04) ou cancela (GRD-05/célula vazia). */
+    private fun finishGridSession(rawX: Float, rawY: Float) {
+        val session = gridSession ?: return
+        val trigger = activeTrigger
+        val result = session.onUp(rawX, rawY)
+        dismissGridSession()
+        if (result is GridSession.Result.Emit && trigger != null) {
+            val key = result.cell.key
+            when (trigger.mode) {
+                GridTriggerMode.OPEN_ONLY -> callbacks.onShortcut(key)
+                // Sequência = duas emissões separadas (prefixo como chord completo, depois a tecla) —
+                // exatamente o `PhysicalKeyEmitter.emitSequence` (caso tmux).
+                GridTriggerMode.SEQUENCE -> {
+                    trigger.prefix?.let { callbacks.onShortcut(it) }
+                    callbacks.onShortcut(key)
+                }
+                GridTriggerMode.CHORD -> callbacks.onShortcut(
+                    trigger.prefix?.let { PhysicalKeyEmitter.chordOf(it, key) } ?: key
+                )
+            }
+        }
+    }
+
+    private fun dismissGridSession() {
+        handler.removeCallbacks(revealTick)
+        gridPopup?.dismiss()
+        gridPopup = null
+        gridSession = null
+        activeTrigger = null
+    }
+
     private fun scheduleHold(placed: BarGeometry.PlacedButton) {
         val r = Runnable {
             micSelector.open(
@@ -371,6 +484,7 @@ class BarView(
     override fun onDetachedFromWindow() {
         cancelHold()
         micSelector.dismiss()
+        dismissGridSession()
         handler.removeCallbacks(ticker)
         super.onDetachedFromWindow()
     }
@@ -381,5 +495,10 @@ class BarView(
         private const val TICK_MS = 500L
         private const val HOLD_MS = 280L // mesmo limiar da barra antiga (tap abaixo, seletor acima)
         private const val MIN_UNIT_DP = 44f // alvo de toque de um botão de peso 1 (gatilho do overflow)
+        // Grade efêmera (SB-T6): células generosas pra navegação às cegas; tick re-avalia o reveal.
+        private const val GRID_CELL_W_DP = 64f
+        private const val GRID_CELL_H_DP = 48f
+        private const val GRID_ANCHOR_THRESHOLD_DP = 24f
+        private const val REVEAL_TICK_MS = 120L
     }
 }

@@ -141,6 +141,7 @@ class KeyFlowKeyboardService : InputMethodService() {
         val bars = useBars
         val barsConfig = if (bars) runBlocking { repo.barsConfigOnce() } else BarsConfig.DEFAULT
         val grids = if (bars) runBlocking { repo.shortcutGridsOnce() } else emptyList()
+        val vibration = if (bars) runBlocking { repo.vibrationIntensityOnce() } else 60
         appliedBarsConfig = barsConfig
         appliedGrids = grids
         val view = KeyFlowKeyboardView(
@@ -174,6 +175,7 @@ class KeyFlowKeyboardService : InputMethodService() {
             barsConfig = barsConfig,
             shortcutGrids = grids,
             onShortcut = ::emitShortcut,
+            vibrationIntensity = vibration,
         )
         keyboardView = view
         activeViewForTest = view

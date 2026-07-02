@@ -18,7 +18,10 @@ import com.keyflow.core.KeyFlowController
 import com.keyflow.core.shortcuts.BarButton
 import com.keyflow.core.shortcuts.BarDef
 import com.keyflow.core.shortcuts.BarsConfig
+import com.keyflow.core.shortcuts.GridCell
+import com.keyflow.core.shortcuts.GridTriggerMode
 import com.keyflow.core.shortcuts.PhysicalKeyMap
+import com.keyflow.core.shortcuts.ShortcutGrid
 import com.keyflow.data.SettingsRepository
 import android.view.KeyEvent
 import kotlinx.coroutines.runBlocking
@@ -49,7 +52,10 @@ class KeyFlowKeyboardBarsTest {
     @After
     fun tearDown() {
         uiPrefs.edit().remove(KEY_BARS).remove(KEY_CANVAS_GRID).apply()
-        runBlocking { SettingsRepository(context).saveBarsConfig(BarsConfig.DEFAULT) }
+        runBlocking {
+            SettingsRepository(context).saveBarsConfig(BarsConfig.DEFAULT)
+            SettingsRepository(context).saveShortcutGrids(emptyList())
+        }
         shell("ime reset")
         device.pressHome()
         KeyFlowController.clearInserter()
@@ -115,6 +121,90 @@ class KeyFlowKeyboardBarsTest {
         }
     }
 
+    @Test
+    fun gridTriggerDragAnchorsLensAndReleaseEmitsTheCellShortcut() {
+        launchWithTestGrid()
+        val bar = KeyFlowKeyboardService.activeViewForTest!!.barViewsForTest.first { it.isShown }
+        waitUntil("BarView ainda sem geometria medida") { bar.layoutForTest.buttons.isNotEmpty() }
+        val trigger = bar.layoutForTest.buttons.first { it.button is BarButton.GridTrigger }
+        val rect = bar.buttonScreenRectForTest(trigger.index)
+
+        // Press → arrasto pra BAIXO (ancora a grade abaixo do dedo, GRD-01) → lente visível (GRD-02).
+        // Pra baixo de propósito: eventos INJETADOS acima da janela do IME chegam grampeados no frame
+        // (mesmo desalinhamento que o KeyFlowKeyboardSelectorTest contorna com folga) — toque real não
+        // sofre disso (o seletor do mic acima da barra funciona no device); a âncora pra cima fica na
+        // validação manual (SB-T10). A grade pra baixo cai sobre a área do QWERTY, dentro da janela.
+        val downTime = SystemClock.uptimeMillis()
+        inject(MotionEvent.ACTION_DOWN, rect.centerX(), rect.centerY(), downTime, downTime)
+        inject(MotionEvent.ACTION_MOVE, rect.centerX(), rect.centerY() + 120, downTime)
+        waitUntil("grade não ancorou/abriu a lente") { bar.gridPopupShowingForTest }
+        val frame = bar.gridFrameForTest!!
+
+        // Desliza até o centro da célula 0 (linha 0, coluna 0 — atalho "c") e solta (GRD-04).
+        val cellX = (frame.left + frame.width / 4).toInt()
+        val cellY = (frame.top + frame.height / 2).toInt()
+        inject(MotionEvent.ACTION_MOVE, cellX, cellY, downTime)
+        inject(MotionEvent.ACTION_UP, cellX, cellY, downTime)
+
+        waitUntil("o campo não recebeu o atalho da célula (KeyEvent físico \"c\")") {
+            device.findObject(By.desc("ime_probe_field"))?.text?.contains("c") == true
+        }
+    }
+
+    @Test
+    fun gridReleaseOutsideTheFrameCancelsWithoutEmitting() {
+        launchWithTestGrid()
+        val bar = KeyFlowKeyboardService.activeViewForTest!!.barViewsForTest.first { it.isShown }
+        waitUntil("BarView ainda sem geometria medida") { bar.layoutForTest.buttons.isNotEmpty() }
+        val trigger = bar.layoutForTest.buttons.first { it.button is BarButton.GridTrigger }
+        val rect = bar.buttonScreenRectForTest(trigger.index)
+
+        val downTime = SystemClock.uptimeMillis()
+        inject(MotionEvent.ACTION_DOWN, rect.centerX(), rect.centerY(), downTime, downTime)
+        inject(MotionEvent.ACTION_MOVE, rect.centerX(), rect.centerY() + 120, downTime)
+        waitUntil("grade não ancorou") { bar.gridFrameForTest != null }
+        val frame = bar.gridFrameForTest!!
+
+        // Solta fora do retângulo da grade, ainda dentro da janela do IME (GRD-05): nada é emitido.
+        val outsideX = (frame.right + 60).toInt().coerceAtMost(context.resources.displayMetrics.widthPixels - 4)
+        val outsideY = (frame.top + 20).toInt()
+        inject(MotionEvent.ACTION_MOVE, outsideX, outsideY, downTime)
+        inject(MotionEvent.ACTION_UP, outsideX, outsideY, downTime)
+
+        Thread.sleep(600)
+        val text = device.findObject(By.desc("ime_probe_field"))?.text.orEmpty()
+        assertTrue("cancelamento emitiu \"$text\" no campo", !text.contains("c"))
+    }
+
+    /** Sobe o probe com uma grade 1×2 (célula 0 = "c", célula 1 vazia) e um gatilho OPEN_ONLY na barra. */
+    private fun launchWithTestGrid() {
+        val grid = ShortcutGrid(
+            id = "test",
+            name = "teste",
+            rows = 1,
+            cols = 2,
+            cells = mapOf(0 to GridCell(PhysicalKeyMap.key(KeyEvent.KEYCODE_C))),
+        )
+        val config = BarsConfig(
+            mirrored = true,
+            collapsed = listOf(
+                BarDef(
+                    listOf(
+                        BarButton.Mic,
+                        BarButton.GridTrigger(gridId = "test", mode = GridTriggerMode.OPEN_ONLY),
+                        BarButton.ToggleExpand,
+                    )
+                )
+            ),
+            expanded = emptyList(),
+        )
+        runBlocking {
+            SettingsRepository(context).saveShortcutGrids(listOf(grid))
+            SettingsRepository(context).saveBarsConfig(config)
+        }
+        launchProbe(bars = true)
+    }
+
     // ── ações de alto nível (mesmo harness do KeyFlowKeyboardCanvasGridTest) ──
 
     private fun launchProbe(bars: Boolean) {
@@ -139,8 +229,8 @@ class KeyFlowKeyboardBarsTest {
         }
     }
 
-    private fun inject(action: Int, x: Int, y: Int, time: Long) {
-        val event = MotionEvent.obtain(time, time, action, x.toFloat(), y.toFloat(), 0).apply {
+    private fun inject(action: Int, x: Int, y: Int, downTime: Long, eventTime: Long = SystemClock.uptimeMillis()) {
+        val event = MotionEvent.obtain(downTime, eventTime, action, x.toFloat(), y.toFloat(), 0).apply {
             source = InputDevice.SOURCE_TOUCHSCREEN
         }
         instrumentation.sendPointerSync(event)

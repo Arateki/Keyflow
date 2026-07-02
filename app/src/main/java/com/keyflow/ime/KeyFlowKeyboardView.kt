@@ -83,6 +83,8 @@ class KeyFlowKeyboardView(
     private val shortcutGrids: List<ShortcutGrid> = emptyList(),
     // Tecla avulsa/grade/alavanca emitem por aqui (service → PhysicalKeyEmitter).
     private val onShortcut: (ShortcutKey) -> Unit = {},
+    // Intensidade da vibração (Settings) — háptica da grade efêmera/alavanca nas BarViews.
+    private val vibrationIntensity: Int = 60,
     private val frozenSeconds: Int? = null,
     // Escala visual (1f = produção). A demo da aba Modo usa < 1 para um teclado menor, proporcional.
     private val scale: Float = 1f,
@@ -257,6 +259,7 @@ class KeyFlowKeyboardView(
                 callbacks = callbacks,
                 scale = scale,
                 frozenSeconds = frozenSeconds,
+                vibrationIntensity = vibrationIntensity,
                 clock = clock,
             ).also { barViews += it }
         }.reversed()
