@@ -26,6 +26,9 @@ Módulo disjunto do app Android (`app/`): o Gradle não enxerga esta pasta e vic
     contra `requestPackageName` do Play Integrity.
   - `INTEGRITY_RELAXED` (opcional, default `false`; `true`/`1` liga) — relaxa só o
     `appRecognitionVerdict` (builds de teste/interno); nunca relaxa pacote nem device.
+  - `REGISTER_RATE_LIMIT_PER_MINUTE` (opcional, default `5`) — limite de `POST /v1/register` por
+    IP (ID-04). `ACCOUNT_RATE_LIMIT_PER_MINUTE` (opcional, default `60`) — limite por conta nas
+    rotas autenticadas. Estouro → `429` + header `Retry-After` (segundos).
 
 ```bash
 DATABASE_URL=postgres://keyflow:keyflow@localhost/keyflow_api \

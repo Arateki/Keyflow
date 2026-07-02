@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 axum = "0.8.9"
 base64 = "0.22.1"
+governor = "0.10.4"
 jsonwebtoken = { version = "10.4.0", features = ["aws_lc_rs"] }
 rand = "0.10.2"
 reqwest = { version = "0.13.4", features = ["form", "json", "rustls"] }

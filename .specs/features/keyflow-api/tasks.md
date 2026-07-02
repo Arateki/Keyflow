@@ -173,7 +173,7 @@ então `[P]` real se houver dois agentes — senão seguir a ordem sequencial.
   execução, mesmo padrão já usado em `tests/common/mod.rs`.
 - **Tests**: integração + unit (hash/parse do Bearer). **Gate**: `rust`.
 
-### API-T6 — Rate limiting `[P]`
+### API-T6 — Rate limiting `[P]` — ✅ Concluída (2026-07-02)
 - **What**: limite por IP (register) e por conta (rotas autenticadas), parâmetros na config;
   estouro → 429 + `Retry-After`.
 - **Where**: `src/middleware/ratelimit.rs`.
@@ -181,6 +181,20 @@ então `[P]` real se houver dois agentes — senão seguir a ordem sequencial.
 - **Done when**: integração — flood no register (por IP) e no account (por conta) → 429 com
   header; abaixo do limite → passa.
 - **Tests**: integração. **Gate**: `rust`.
+- **Nota de execução**: `governor` 0.10.4 (`DefaultKeyedRateLimiter<K>`, algoritmo GCRA) — API
+  conferida em docs.rs, não fabricada. `RateLimiters` no `AppState` com dois limitadores keyed
+  independentes (`IpAddr` pro register, `Uuid` da conta pras autenticadas); `Retry-After`
+  calculado de `NotUntil::wait_time_from`, arredondado pra cima e nunca 0. `POST /v1/register`
+  ganhou `ConnectInfo<SocketAddr>` (produção liga via
+  `into_make_service_with_connect_info` no `main.rs`; testes injetam a extensão direto no
+  request). Limites configuráveis via `REGISTER_RATE_LIMIT_PER_MINUTE`/
+  `ACCOUNT_RATE_LIMIT_PER_MINUTE` (opcionais, defaults 5 e 60). **"Por conta" ainda não tem rota
+  de negócio real** (`GET /v1/account` é a API-T7) — testado em `tests/ratelimit.rs` com o mesmo
+  padrão já usado no Bearer (T5): router efêmero com o extractor `Account` real chamando
+  `check_account` sobre o `AppState` real, nenhuma rota de produção nova além do que já existia.
+  4 testes de integração via HTTP real (`tower::ServiceExt::oneshot`) cobrindo flood por IP →
+  429+header, IPs diferentes não se afetam, flood por conta → 429+header — mais 4 unit tests do
+  limitador isolado (`middleware::ratelimit`).
 
 ### API-T7 — `GET /v1/account` `[P]`
 - **What**: saldo (segundos) + entitlements (`adsOff`, `skinsUnlocked`) num payload único e barato.

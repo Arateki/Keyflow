@@ -2,8 +2,10 @@ pub mod auth;
 pub mod config;
 pub mod db;
 pub mod google;
+pub mod middleware;
 pub mod routes;
 
+use std::num::NonZeroU32;
 use std::sync::Arc;
 
 use axum::extract::{MatchedPath, State};
@@ -14,12 +16,14 @@ use sqlx::PgPool;
 use tower_http::trace::TraceLayer;
 
 use google::integrity::IntegrityClient;
+use middleware::ratelimit::RateLimiters;
 
 pub struct AppStateInner {
     pub pool: PgPool,
     pub integrity: IntegrityClient,
     pub package_name: String,
     pub integrity_relaxed: bool,
+    pub rate_limiters: RateLimiters,
 }
 
 /// Estado compartilhado entre handlers — `Clone` barato (`Arc` por dentro; `PgPool` também já é
@@ -28,17 +32,24 @@ pub struct AppStateInner {
 pub struct AppState(Arc<AppStateInner>);
 
 impl AppState {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         pool: PgPool,
         integrity: IntegrityClient,
         package_name: String,
         integrity_relaxed: bool,
+        register_rate_limit_per_minute: NonZeroU32,
+        account_rate_limit_per_minute: NonZeroU32,
     ) -> Self {
         Self(Arc::new(AppStateInner {
             pool,
             integrity,
             package_name,
             integrity_relaxed,
+            rate_limiters: RateLimiters::new(
+                register_rate_limit_per_minute,
+                account_rate_limit_per_minute,
+            ),
         }))
     }
 }
@@ -129,7 +140,14 @@ mod tests {
                 token_uri: "http://127.0.0.1:0/token".to_string(),
             },
         );
-        AppState::new(pool, integrity, "com.keyflow".to_string(), false)
+        AppState::new(
+            pool,
+            integrity,
+            "com.keyflow".to_string(),
+            false,
+            std::num::NonZeroU32::new(1000).unwrap(),
+            std::num::NonZeroU32::new(1000).unwrap(),
+        )
     }
 
     #[tokio::test]

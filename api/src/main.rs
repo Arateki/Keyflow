@@ -33,13 +33,18 @@ async fn main() {
         integrity,
         config.package_name,
         config.integrity_relaxed,
+        config.register_rate_limit_per_minute,
+        config.account_rate_limit_per_minute,
     );
 
     let listener = TcpListener::bind(config.bind_addr)
         .await
         .unwrap_or_else(|e| panic!("failed to bind {}: {e}", config.bind_addr));
     tracing::info!(addr = %config.bind_addr, "keyflow-api listening");
-    axum::serve(listener, app(state))
-        .await
-        .expect("server error");
+    axum::serve(
+        listener,
+        app(state).into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .await
+    .expect("server error");
 }

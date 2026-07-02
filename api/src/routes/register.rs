@@ -1,5 +1,7 @@
+use std::net::SocketAddr;
+
 use axum::Json;
-use axum::extract::State;
+use axum::extract::{ConnectInfo, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
@@ -8,6 +10,7 @@ use crate::AppState;
 use crate::auth::generate_token;
 use crate::db::accounts;
 use crate::google::integrity::verify_verdicts;
+use crate::middleware::ratelimit::RateLimitRejection;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,13 +26,21 @@ pub struct RegisterResponse {
 }
 
 pub enum RegisterError {
+    RateLimited(RateLimitRejection),
     Integrity,
     Internal,
+}
+
+impl From<RateLimitRejection> for RegisterError {
+    fn from(rejection: RateLimitRejection) -> Self {
+        RegisterError::RateLimited(rejection)
+    }
 }
 
 impl IntoResponse for RegisterError {
     fn into_response(self) -> Response {
         match self {
+            RegisterError::RateLimited(rejection) => rejection.into_response(),
             RegisterError::Integrity => (
                 StatusCode::FORBIDDEN,
                 Json(serde_json::json!({ "error": "integrity" })),
@@ -42,8 +53,11 @@ impl IntoResponse for RegisterError {
 
 pub async fn register(
     State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Json(body): Json<RegisterRequest>,
 ) -> Result<Json<RegisterResponse>, RegisterError> {
+    state.rate_limiters.check_register(addr.ip())?;
+
     let payload = state
         .integrity
         .decode(&body.integrity_token)

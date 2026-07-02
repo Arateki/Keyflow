@@ -1,8 +1,11 @@
 use std::collections::HashMap;
 use std::fmt;
 use std::net::SocketAddr;
+use std::num::NonZeroU32;
 
 const DEFAULT_BIND_ADDR: &str = "0.0.0.0:8080";
+const DEFAULT_REGISTER_RATE_LIMIT_PER_MINUTE: u32 = 5;
+const DEFAULT_ACCOUNT_RATE_LIMIT_PER_MINUTE: u32 = 60;
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -15,6 +18,10 @@ pub struct Config {
     /// Relaxa `appRecognitionVerdict` != PLAY_RECOGNIZED (builds de teste/interno, design
     /// §Identidade) — nunca relaxa pacote nem device.
     pub integrity_relaxed: bool,
+    /// Limite de `POST /v1/register` por IP (ID-04).
+    pub register_rate_limit_per_minute: NonZeroU32,
+    /// Limite das rotas autenticadas por conta (ID-04).
+    pub account_rate_limit_per_minute: NonZeroU32,
 }
 
 #[derive(Debug)]
@@ -84,14 +91,54 @@ impl Config {
             .map(|v| v == "true" || v == "1")
             .unwrap_or(false);
 
+        let register_rate_limit_per_minute = parse_nonzero_u32(
+            vars,
+            "REGISTER_RATE_LIMIT_PER_MINUTE",
+            DEFAULT_REGISTER_RATE_LIMIT_PER_MINUTE,
+        )?;
+        let account_rate_limit_per_minute = parse_nonzero_u32(
+            vars,
+            "ACCOUNT_RATE_LIMIT_PER_MINUTE",
+            DEFAULT_ACCOUNT_RATE_LIMIT_PER_MINUTE,
+        )?;
+
         Ok(Config {
             database_url,
             bind_addr,
             google_service_account_json_path,
             package_name,
             integrity_relaxed,
+            register_rate_limit_per_minute,
+            account_rate_limit_per_minute,
         })
     }
+}
+
+fn parse_nonzero_u32(
+    vars: &HashMap<String, String>,
+    var: &'static str,
+    default: u32,
+) -> Result<NonZeroU32, ConfigError> {
+    let raw = match vars.get(var) {
+        Some(value) => value,
+        None => {
+            return Ok(NonZeroU32::new(default).expect("default rate limit is non-zero"));
+        }
+    };
+
+    let parsed: u32 =
+        raw.parse()
+            .map_err(|e: std::num::ParseIntError| ConfigError::InvalidEnv {
+                var,
+                value: raw.clone(),
+                reason: e.to_string(),
+            })?;
+
+    NonZeroU32::new(parsed).ok_or(ConfigError::InvalidEnv {
+        var,
+        value: raw.clone(),
+        reason: "must be greater than zero".to_string(),
+    })
 }
 
 #[cfg(test)]
@@ -148,6 +195,44 @@ mod tests {
         );
         assert_eq!(config.package_name, "com.keyflow");
         assert!(!config.integrity_relaxed);
+        assert_eq!(
+            config.register_rate_limit_per_minute.get(),
+            DEFAULT_REGISTER_RATE_LIMIT_PER_MINUTE
+        );
+        assert_eq!(
+            config.account_rate_limit_per_minute.get(),
+            DEFAULT_ACCOUNT_RATE_LIMIT_PER_MINUTE
+        );
+    }
+
+    #[test]
+    fn rate_limits_are_configurable() {
+        let config = Config::from_map(&with_required(&[
+            ("REGISTER_RATE_LIMIT_PER_MINUTE", "10"),
+            ("ACCOUNT_RATE_LIMIT_PER_MINUTE", "120"),
+        ]))
+        .unwrap();
+
+        assert_eq!(config.register_rate_limit_per_minute.get(), 10);
+        assert_eq!(config.account_rate_limit_per_minute.get(), 120);
+    }
+
+    #[test]
+    fn zero_rate_limit_fails_with_specific_message() {
+        let err = Config::from_map(&with_required(&[("REGISTER_RATE_LIMIT_PER_MINUTE", "0")]))
+            .unwrap_err();
+
+        assert!(err.to_string().contains("REGISTER_RATE_LIMIT_PER_MINUTE"));
+        assert!(err.to_string().contains("greater than zero"));
+    }
+
+    #[test]
+    fn non_numeric_rate_limit_fails_with_specific_message() {
+        let err = Config::from_map(&with_required(&[("ACCOUNT_RATE_LIMIT_PER_MINUTE", "many")]))
+            .unwrap_err();
+
+        assert!(err.to_string().contains("ACCOUNT_RATE_LIMIT_PER_MINUTE"));
+        assert!(err.to_string().contains("many"));
     }
 
     #[test]

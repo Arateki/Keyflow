@@ -80,16 +80,27 @@ async fn state_with_google(google_uri: String, package_name: &str) -> AppState {
             token_uri: format!("{google_uri}/token"),
         },
     );
-    AppState::new(pool, integrity, package_name.to_string(), false)
+    // Limite generoso nos testes deste arquivo: o rate limit em si é coberto isoladamente em
+    // src/middleware/ratelimit.rs; aqui só não pode atrapalhar os cenários de negócio.
+    AppState::new(
+        pool,
+        integrity,
+        package_name.to_string(),
+        false,
+        std::num::NonZeroU32::new(1000).unwrap(),
+        std::num::NonZeroU32::new(1000).unwrap(),
+    )
 }
 
 async fn register_request(state: AppState, device_key: &str) -> (StatusCode, Value) {
+    let addr: std::net::SocketAddr = "127.0.0.1:0".parse().unwrap();
     let response = app(state)
         .oneshot(
             Request::builder()
                 .method("POST")
                 .uri("/v1/register")
                 .header(header::CONTENT_TYPE, "application/json")
+                .extension(axum::extract::ConnectInfo(addr))
                 .body(Body::from(
                     json!({ "deviceKey": device_key, "integrityToken": "fake-integrity-token" })
                         .to_string(),
