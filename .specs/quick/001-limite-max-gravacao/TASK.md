@@ -48,4 +48,4 @@ tratado como uma única tarefa/commit atômico, sem promover a uma feature separ
 
 ## Commit
 
-(a preencher após o commit)
+`77d6e2e` — feat(gravação): aplica o limite máximo de gravação (Q1)
