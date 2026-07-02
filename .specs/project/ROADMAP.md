@@ -119,6 +119,21 @@ Specs: `.specs/features/keyflow-api/` (migra p/ o repo Rust) e `.specs/features/
 **Done:** success criteria das duas specs (fluxo completo com compras de teste; zero ads no
 IME/overlay; app funciona com a API fora do ar).
 
+## Milestone 8 — Sistema de temas + aba Sistema
+
+Fundação de tokens (fonte única `(tema, claro/escuro) → paleta Compose + ARGB das views +
+efeitos`; fim das cores duplicadas no IME/overlay), catálogo extensível por dados (Ateliê
+pixel-igual ao atual + variantes de acento grátis + Vaporwave/Glitch/Cyberpunk/Rosa como skins da
+monetização), efeitos por superfície com orçamento de performance no IME e toggle "reduzir
+efeitos". Nova **aba Sistema**: seletor de temas, exportar/importar config (JSON, tokens opt-in)
+e restaurar de fábrica (apagar tokens opcional). Aplicação ao vivo em app/notificação/orbe/teclado.
+
+Spec: `.specs/features/theme-system/` (`spec.md` + `context.md`; 3 assunções ⚠️ a validar —
+gating das skins, recorte das "cores normais", efeitos no MVP). Cruza com o Milestone 7 (UNL).
+
+**Done:** success criteria da spec (troca ao vivo nas 3 superfícies; Ateliê bit-idêntico; tema
+novo = só dados; A32 sem jank; export→reset→import reproduz tudo).
+
 ## Futuro (pós-v1, não priorizado)
 
 - ~~Teclado visível configurável (teclas reais)~~ — feito (commit 0331389)
