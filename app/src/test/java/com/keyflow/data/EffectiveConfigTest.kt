@@ -78,4 +78,28 @@ class EffectiveConfigTest {
         val ready = settings.effectiveConfigFor(TranscriptionSource.GROQ) as EffectiveConfig.Ready
         assertThat(ready.config.endpointUrl).isEqualTo(Settings.GROQ_ENDPOINT)
     }
+
+    @Test
+    fun `transcriptionTimeoutMs is shared across providers, not per-preset`() {
+        val settings = Settings(
+            transcriptionTimeoutMs = 30_000,
+            openaiToken = "sk-abc",
+            groqToken = "gsk-1",
+            customEndpoint = "https://self.host/v1/audio/transcriptions",
+            customHeaderValue = "raw-key",
+        )
+        assertThat((settings.effectiveConfigFor(TranscriptionSource.OPENAI) as EffectiveConfig.Ready).config.timeoutMs)
+            .isEqualTo(30_000L)
+        assertThat((settings.effectiveConfigFor(TranscriptionSource.GROQ) as EffectiveConfig.Ready).config.timeoutMs)
+            .isEqualTo(30_000L)
+        assertThat((settings.effectiveConfigFor(TranscriptionSource.CUSTOM) as EffectiveConfig.Ready).config.timeoutMs)
+            .isEqualTo(30_000L)
+    }
+
+    @Test
+    fun `transcriptionTimeoutMs defaults to Config's default`() {
+        val settings = Settings(source = TranscriptionSource.OPENAI, openaiToken = "sk-abc")
+        val ready = settings.effectiveConfigFor() as EffectiveConfig.Ready
+        assertThat(ready.config.timeoutMs).isEqualTo(com.keyflow.data.Config.DEFAULT_TIMEOUT_MS)
+    }
 }

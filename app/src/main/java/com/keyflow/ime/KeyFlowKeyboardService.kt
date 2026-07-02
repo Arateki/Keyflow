@@ -7,8 +7,6 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
-import android.view.inputmethod.InputMethodManager
-import android.view.inputmethod.InputMethodSubtype
 import android.inputmethodservice.InputMethodService
 import com.keyflow.BuildConfig
 import com.keyflow.core.KeyFlowController
@@ -62,6 +60,17 @@ class KeyFlowKeyboardService : InputMethodService() {
     private var appliedBarsConfig: BarsConfig? = null
     private var appliedGrids: List<ShortcutGrid>? = null
 
+    // Tema/tamanho/idioma/fileira de números aplicados (pedido do Yan, 2026-07-03): mesmo padrão de
+    // appliedBarsConfig — reconstrói a view só quando um deles muda de verdade, sem exigir reabrir o
+    // teclado.
+    private data class LiveKeyboardConfig(
+        val dark: Boolean,
+        val scalePercent: Int,
+        val language: String,
+        val numberRowEnabled: Boolean,
+    )
+    private var appliedLiveConfig: LiveKeyboardConfig? = null
+
     // Corretor do sistema (KC-T7/SPL-01..03): só existe com a grade Canvas — a antiga nunca compõe.
     private val wordTracker = ComposingWordTracker()
     private var spellChecker: SystemSpellChecker? = null
@@ -103,6 +112,21 @@ class KeyFlowKeyboardService : InputMethodService() {
                     if (useBars && keyboardView != null && changed) setInputView(onCreateInputView())
                 }
         }
+        // Tema/tamanho/idioma ao vivo (pedido do Yan, 2026-07-03): antes só aplicava ao reabrir o
+        // teclado (trocar de campo/app) — igual o padrão acima, reconstrói na hora quando um dos 3 muda.
+        serviceScope.launch {
+            val repo = SettingsRepository(this@KeyFlowKeyboardService)
+            combine(
+                repo.themeDarkFlow(),
+                repo.keyboardScalePercentFlow(),
+                repo.keyboardLanguageFlow(),
+                repo.keyboardNumberRowEnabledFlow(),
+            ) { dark, scale, lang, numberRow -> LiveKeyboardConfig(dark, scale, lang, numberRow) }
+                .distinctUntilChanged()
+                .collect { config ->
+                    if (keyboardView != null && config != appliedLiveConfig) setInputView(onCreateInputView())
+                }
+        }
     }
 
     override fun onWindowShown() {
@@ -132,11 +156,17 @@ class KeyFlowKeyboardService : InputMethodService() {
         val dark = runBlocking { repo.themeDarkOnce() }
         // Tamanho do teclado (pedido do Yan, 2026-07-02): mesma leitura leve do tema — só DataStore, sem
         // inicializar o EncryptedSharedPreferences (cripto cara) no caminho crítico do IME.
-        val scale = runBlocking { repo.keyboardScalePercentOnce() } / 100f
+        val scalePercent = runBlocking { repo.keyboardScalePercentOnce() }
+        val scale = scalePercent / 100f
         val canvasGrid = useCanvasGrid
-        val locale = activeLocale()
+        // Idioma gerenciado pelo app (pedido do Yan, 2026-07-02) — não pelo subtype do sistema, mesma
+        // leitura leve do tema/tamanho.
+        val language = runBlocking { repo.keyboardLanguageOnce() }
+        // Fileira de números (NUMROW-01, pedido do Yan, 2026-07-03) — mesma leitura leve do tema/tamanho.
+        val numberRowEnabled = runBlocking { repo.keyboardNumberRowEnabledOnce() }
+        appliedLiveConfig = LiveKeyboardConfig(dark, scalePercent, language, numberRowEnabled)
         spellChecker?.close()
-        spellChecker = if (canvasGrid) SystemSpellChecker(this, locale) else null
+        spellChecker = if (canvasGrid) SystemSpellChecker(this, localeFor(language)) else null
         // Barras Canvas (SB-T5): leitura leve como o tema — só DataStore no caminho crítico do IME.
         val bars = useBars
         val barsConfig = if (bars) runBlocking { repo.barsConfigOnce() } else BarsConfig.DEFAULT
@@ -165,12 +195,13 @@ class KeyFlowKeyboardService : InputMethodService() {
             dark = dark,
             scale = scale,
             useCanvasGrid = canvasGrid,
-            locale = locale.language,
-            showLanguageKey = enabledSubtypeCount() > 1,
-            onLanguageSwitch = { switchToNextSubtype() },
+            locale = language,
+            showLanguageKey = true,
+            onLanguageSwitch = { cycleLanguage() },
             // NUM-01: currentInputEditorInfo já está setado aqui — onStartInput roda antes de
             // onCreateInputView na 1ª vez que a view é criada para uma sessão.
             initialNumeric = isNumericInputType(currentInputEditorInfo?.inputType ?: InputType.TYPE_NULL),
+            numberRowEnabled = numberRowEnabled,
             useBars = bars,
             barsConfig = barsConfig,
             shortcutGrids = grids,
@@ -188,45 +219,27 @@ class KeyFlowKeyboardService : InputMethodService() {
 
     override fun onCreateCandidatesView(): View? = null
 
+    /** `Locale` completo (pra `SystemSpellChecker`/`TextServicesManager`) a partir do código curto. */
+    private fun localeFor(language: String): Locale = when (language) {
+        "en" -> Locale("en", "US")
+        "es" -> Locale("es", "ES")
+        else -> Locale("pt", "BR")
+    }
+
     /**
-     * Locale do subtype ativo (globo PT/EN/ES — KC-T9/LAY-05); cai no locale do device se o subtype não
-     * tiver um bem-formado (ex.: nenhum subtype ainda selecionado explicitamente).
+     * Globo tocado: cicla pt→en→es→pt **dentro do app**, sem depender de subtype do sistema (pedido do
+     * Yan, 2026-07-02 — revertendo o KC-T9). Persiste e reconstrói a view com o novo locale (layout/
+     * acentos/corretor), mesmo caminho que a troca de subtype antiga usava.
      */
-    private fun activeLocale(): Locale {
-        val imm = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager
-        val subtype = imm?.currentInputMethodSubtype
-        val tag = subtype?.languageTag
-        if (!tag.isNullOrEmpty()) return Locale.forLanguageTag(tag)
-        val legacy = subtype?.locale // deprecated, mas os subtypes hoje só declaram imeSubtypeLocale
-        if (!legacy.isNullOrEmpty()) {
-            val parts = legacy.split("_")
-            return if (parts.size >= 2) Locale(parts[0], parts[1]) else Locale(parts[0])
+    private fun cycleLanguage() {
+        serviceScope.launch {
+            val repo = SettingsRepository(this@KeyFlowKeyboardService)
+            val current = repo.keyboardLanguageOnce()
+            val next = LANGUAGE_CYCLE.getOrElse(LANGUAGE_CYCLE.indexOf(current) + 1) { LANGUAGE_CYCLE.first() }
+            // Só persiste — a reconstrução da view é responsabilidade do observer combinado de
+            // tema/tamanho/idioma em onCreate() (mesmo caminho ao vivo pedido pelo Yan, 2026-07-03).
+            repo.saveKeyboardLanguageOnce(next)
         }
-        return resources.configuration.locales[0]
-    }
-
-    /** Só mostra o globo (KC-T9) quando há mais de 1 idioma do KeyFlow habilitado — 1 só não tem pra onde trocar. */
-    private fun enabledSubtypeCount(): Int {
-        val imm = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager ?: return 1
-        return runCatching { imm.getEnabledInputMethodSubtypeList(null, true).size }.getOrDefault(1)
-    }
-
-    /** Globo tocado (KC-T9): cicla só entre os subtypes do próprio KeyFlow (PT→EN→ES→PT…). */
-    private fun switchToNextSubtype() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            switchToNextInputMethod(true)
-        } else {
-            val imm = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager ?: return
-            val token = window?.window?.attributes?.token ?: return
-            runCatching { imm.switchToNextInputMethod(token, true) }
-        }
-    }
-
-    override fun onCurrentInputMethodSubtypeChanged(newSubtype: InputMethodSubtype?) {
-        super.onCurrentInputMethodSubtypeChanged(newSubtype)
-        // Globo (ou o seletor de idioma do sistema) trocou o subtype: reconstrói a view com o novo
-        // locale (layout/acentos/corretor) — mesmo caminho que onCreateInputView já usa.
-        if (keyboardView != null) setInputView(onCreateInputView())
     }
 
     /**
@@ -445,6 +458,7 @@ class KeyFlowKeyboardService : InputMethodService() {
         private const val KEY_EXPANDED = "expanded"
         private const val KEY_CANVAS_GRID = "kbd_canvas"
         private const val KEY_BARS = "kbd_bars"
+        private val LANGUAGE_CYCLE = listOf("pt", "en", "es")
 
         /**
          * Referência somente-leitura à instância ativa, para testes instrumentados (KBDCTL-01..04)

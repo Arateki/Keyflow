@@ -50,6 +50,11 @@ object RouteCatalog {
         keyboardRoute("keyboard-expanded", expanded = true, recording = false),
         keyboardRoute("keyboard-collapsed", expanded = false, recording = false),
         keyboardRoute("keyboard-recording", expanded = true, recording = true),
+        // Grade Canvas nova (Trabalho 2, KC-T10) — golden oficial do híbrido (mic/action row antigos + grade nova).
+        keyboardRoute("keyboard-canvas-expanded", expanded = true, recording = false, useCanvasGrid = true),
+        keyboardRoute("keyboard-canvas-collapsed", expanded = false, recording = false, useCanvasGrid = true),
+        keyboardCanvasSymbolsRoute("keyboard-canvas-symbols"),
+        keyboardCanvasCandidatesRoute("keyboard-canvas-candidates"),
         // Notificação Ateliê (T24): RemoteViews inflada via AndroidView.
         notificationRoute("notification-recording", ButtonState.RECORDING),
         notificationRoute("notification-paused", ButtonState.PAUSED),
@@ -165,7 +170,12 @@ object RouteCatalog {
     }
 
     /** Hospeda o [KeyFlowKeyboardView] (View) numa rota Compose, ancorado ao rodapé (KBD screenshots). */
-    private fun keyboardRoute(key: String, expanded: Boolean, recording: Boolean): Route = Route(key) {
+    private fun keyboardRoute(
+        key: String,
+        expanded: Boolean,
+        recording: Boolean,
+        useCanvasGrid: Boolean = false,
+    ): Route = Route(key) {
         val dark = LocalKeyFlowPalette.current.isDark
         Box(
             modifier = Modifier
@@ -182,6 +192,7 @@ object RouteCatalog {
                         onMic = {},
                         onHide = {},
                         dark = dark,
+                        useCanvasGrid = useCanvasGrid,
                         frozenSeconds = 12,
                     ).apply {
                         setExpanded(expanded)
@@ -190,6 +201,80 @@ object RouteCatalog {
                 },
             )
         }
+    }
+
+    /** Golden da camada `?123` (KC-T10): mesma grade híbrida, mas já trocada pra símbolos. */
+    private fun keyboardCanvasSymbolsRoute(key: String): Route = Route(key) {
+        val dark = LocalKeyFlowPalette.current.isDark
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(LocalKeyFlowPalette.current.bg),
+            contentAlignment = Alignment.BottomCenter,
+        ) {
+            AndroidView(
+                modifier = Modifier.fillMaxSize().wrapContentHeight(Alignment.Bottom),
+                factory = { ctx ->
+                    KeyFlowKeyboardView(
+                        context = ctx,
+                        onKey = {},
+                        onMic = {},
+                        onHide = {},
+                        dark = dark,
+                        useCanvasGrid = true,
+                        frozenSeconds = 12,
+                    ).apply {
+                        setExpanded(true)
+                        // Troca pra ?123 via toque sintético — a única forma de layer switch é o gesto real
+                        // (sem accessor de estado), então simulamos assim que a geometria estiver medida.
+                        canvasGridForTest?.post { tapLayerToggle(canvasGridForTest!!) }
+                    }
+                },
+            )
+        }
+    }
+
+    /** Golden da faixa de sugestões (KC-T10/SPL-01): candidatos fixos, sem depender do corretor real. */
+    private fun keyboardCanvasCandidatesRoute(key: String): Route = Route(key) {
+        val dark = LocalKeyFlowPalette.current.isDark
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(LocalKeyFlowPalette.current.bg),
+            contentAlignment = Alignment.BottomCenter,
+        ) {
+            AndroidView(
+                modifier = Modifier.fillMaxSize().wrapContentHeight(Alignment.Bottom),
+                factory = { ctx ->
+                    KeyFlowKeyboardView(
+                        context = ctx,
+                        onKey = {},
+                        onMic = {},
+                        onHide = {},
+                        dark = dark,
+                        useCanvasGrid = true,
+                        frozenSeconds = 12,
+                    ).apply {
+                        setExpanded(true)
+                        updateCandidates(listOf("olá", "olar", "olé"))
+                    }
+                },
+            )
+        }
+    }
+
+    /** Toca a tecla de troca de camada (?123/ABC) — sempre a primeira da 4ª fileira da grade Canvas. */
+    private fun tapLayerToggle(grid: com.keyflow.ime.keyboard.KeyboardGridView) {
+        val placed = grid.placedRowsForTest.lastOrNull()?.keys?.firstOrNull() ?: return
+        val cx = (placed.left + placed.right) / 2
+        val cy = (placed.top + placed.bottom) / 2
+        val time = android.os.SystemClock.uptimeMillis()
+        val down = android.view.MotionEvent.obtain(time, time, android.view.MotionEvent.ACTION_DOWN, cx, cy, 0)
+        val up = android.view.MotionEvent.obtain(time, time, android.view.MotionEvent.ACTION_UP, cx, cy, 0)
+        grid.dispatchTouchEvent(down)
+        grid.dispatchTouchEvent(up)
+        down.recycle()
+        up.recycle()
     }
 
     /** Notificação de gravação (RemoteViews inflada) sobre uma "persiana" simulada (KBD screenshots). */

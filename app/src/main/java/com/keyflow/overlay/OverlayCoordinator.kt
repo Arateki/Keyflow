@@ -8,8 +8,10 @@ import com.keyflow.core.InsertOutcome
 import com.keyflow.core.TranscriptionResult
 import com.keyflow.data.Config
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import java.io.File
 
 interface OverlayAudioRecorder {
@@ -110,6 +112,9 @@ class OverlayCoordinator(
         private const val MIN_RECORDING_MS = 400L
         private const val ERROR_AUTO_DISMISS_MS = 2000L
         private const val DEFAULT_CANCEL_WINDOW_MS = 3000L
+        // Margem acima de cfg.timeoutMs — dá tempo do callTimeout do OkHttp (a rede primária) surgir
+        // primeiro no caso comum; esta é só a última linha de defesa.
+        private const val TIMEOUT_SAFETY_MARGIN_MS = 2000L
     }
 
     init {
@@ -215,8 +220,19 @@ class OverlayCoordinator(
         }
 
         scope.launch {
-            val result = runCatching { transcriber.transcribe(audio, configProvider()) }
-                .getOrElse { TranscriptionResult.Error(ErrorKind.NETWORK, it.message.orEmpty()) }
+            val cfg = configProvider()
+            // Rede de segurança além do callTimeout do WhisperApi (Yan, 2026-07-01): garante que o
+            // coordinator sempre desiste dentro de cfg.timeoutMs + margem, mesmo se o transcriber travar
+            // por um caminho que o OkHttp não cobre (ex.: implementação customizada de OverlayTranscriber).
+            val result = runCatching {
+                withTimeout(cfg.timeoutMs + TIMEOUT_SAFETY_MARGIN_MS) { transcriber.transcribe(audio, cfg) }
+            }.getOrElse { e ->
+                if (e is TimeoutCancellationException) {
+                    TranscriptionResult.Error(ErrorKind.TIMEOUT, "client-side timeout after ${cfg.timeoutMs}ms")
+                } else {
+                    TranscriptionResult.Error(ErrorKind.NETWORK, e.message.orEmpty())
+                }
+            }
 
             when (result) {
                 is TranscriptionResult.Success -> {

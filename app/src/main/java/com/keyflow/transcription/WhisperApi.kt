@@ -28,7 +28,15 @@ class WhisperApi(private val client: OkHttpClient = defaultClient()) {
             .post(body)
             .build()
 
-        return client.newCall(request).execute()
+        // callTimeout envolve a chamada INTEIRA (DNS+conexão+escrita+leitura) — diferente de
+        // connectTimeout/readTimeout, que não cobrem DNS sem timeout no OkHttp/JVM (causa real do bug de
+        // travar "transcrevendo" pra sempre com rotas de rede ruins). newBuilder() reusa o pool de
+        // conexões/dispatcher do client base; só o timeout muda por [cfg], que pode variar em runtime
+        // (config do usuário), então não dá pra fixar isso na construção do client.
+        val callClient = client.newBuilder()
+            .callTimeout(cfg.timeoutMs, TimeUnit.MILLISECONDS)
+            .build()
+        return callClient.newCall(request).execute()
     }
 
     companion object {

@@ -75,6 +75,9 @@ class KeyFlowKeyboardView(
     // Campo numérico (NUM-01) já na criação da view — o service lê o EditorInfo antes de construir.
     // Só a grade Canvas trava em números; o teclado antigo (useCanvasGrid=false) fica intocado.
     private val initialNumeric: Boolean = false,
+    // Fileira dedicada de números acima do "qwertyuiop" (NUMROW-01, pedido do Yan, 2026-07-03) — só a
+    // camada de letras; a grade numérica travada (NUM-01) e a de símbolos ficam intocadas.
+    private val numberRowEnabled: Boolean = false,
     // Barras personalizáveis em Canvas (SB-T5/BAR-01..07), atrás da flag `kbd_bars` (debug — ROL-02).
     // Desligada: barra antiga intocada. Ligada: pilha de `BarView` conforme a config (retraído sempre;
     // expandido só com a grade Canvas — o teclado antigo de TextView fica fora do redesign de barras).
@@ -308,7 +311,11 @@ class KeyFlowKeyboardView(
 
     /** NUM-01: layout normal do idioma, ou a grade numérica travada (`?123`/idioma inexistentes nela). */
     private fun layoutFor(numeric: Boolean): KeyboardLayout =
-        if (numeric) Layouts.numberLayout() else Layouts.forLocale(locale).withLanguageKey(showLanguageKey)
+        if (numeric) {
+            Layouts.numberLayout()
+        } else {
+            Layouts.forLocale(locale, numberRowEnabled).withLanguageKey(showLanguageKey)
+        }
 
     private fun initialLayerFor(numeric: Boolean): LayerId = if (numeric) LayerId.NUMBER else LayerId.LETTERS
 

@@ -65,6 +65,29 @@ data class Settings(
     // Tema + onboarding
     val themeDark: Boolean = false,
     val onboardingDone: Boolean = false,
+    // Tempo limite de resposta da transcrição (ms) — compartilhado entre OpenAI/Groq/Custom, não é por
+    // preset (aba Voz → seção Geral). Bug real reportado pelo Yan: sem isto, uma rota de rede ruim
+    // trava "transcrevendo" pra sempre (OkHttp/JVM não tem timeout de DNS por padrão).
+    val transcriptionTimeoutMs: Int = Config.DEFAULT_TIMEOUT_MS.toInt(),
+    // Duração máxima de uma gravação (s), aba Voz → seção Geral (pedido do Yan, 2026-07-02). MOCKADO:
+    // o valor é persistido, mas nada ainda o aplica durante a gravação — o comportamento real (pausar
+    // ao atingir o limite + toast pra enviar/descartar) fica pendente, ver STATE.md.
+    val maxRecordingSec: Int = 300,
+    // Tamanho do teclado KeyFlow (%), aba Teclado (pedido do Yan, 2026-07-02) — reusa o `scale: Float`
+    // que já existe em KeyFlowKeyboardView/KeyboardGridView/CandidatesView (era só usado pela demo da
+    // aba Modo). 100 = tamanho padrão; a View multiplica cada dp por este fator/100.
+    val keyboardScalePercent: Int = 100,
+    // Idioma do teclado ("pt"/"en"/"es"), gerenciado 100% pelo app — NÃO pelos subtypes do sistema
+    // Android (pedido do Yan, 2026-07-02: declarar >1 subtype fazia o seletor "Trocar teclado" do
+    // sistema listar "KeyFlow" repetido, um por idioma, e a troca pelo globo dependia de habilitar
+    // manualmente cada um na tela de Idiomas do Android — experiência ruim, diferente do Gboard, que
+    // também gerencia idioma só dentro do próprio app). O globo cicla por aqui: pt→en→es→pt.
+    val keyboardLanguage: String = "pt",
+    // Fileira dedicada de números acima do "qwertyuiop" (estilo Gboard), aba Teclado (pedido do Yan,
+    // 2026-07-03). Desligada (padrão): números só via long-press na 1ª fileira (comportamento atual).
+    // Ligada: fileira nova SÓ na camada de letras (a de símbolos já tem números na 1ª fileira) — e o
+    // long-press de números na 1ª fileira de letras é desativado (redundante com a fileira nova).
+    val keyboardNumberRowEnabled: Boolean = false,
 ) {
     /**
      * Resolve a [Config] efetiva para uma origem (VOZ-02/03/06). CREDITS é stub: retorna
@@ -79,6 +102,7 @@ data class Settings(
                 authHeaderValue = bearer(openaiToken),
                 model = openaiModel,
                 language = openaiLanguage,
+                timeoutMs = transcriptionTimeoutMs.toLong(),
             )
         )
         TranscriptionSource.GROQ -> EffectiveConfig.Ready(
@@ -88,6 +112,7 @@ data class Settings(
                 authHeaderValue = bearer(groqToken),
                 model = groqModel,
                 language = groqLanguage,
+                timeoutMs = transcriptionTimeoutMs.toLong(),
             )
         )
         TranscriptionSource.CUSTOM -> EffectiveConfig.Ready(
@@ -97,6 +122,7 @@ data class Settings(
                 authHeaderValue = customHeaderValue,
                 model = customModel,
                 language = customLanguage,
+                timeoutMs = transcriptionTimeoutMs.toLong(),
             )
         )
     }

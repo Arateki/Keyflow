@@ -111,6 +111,22 @@ class TranscriptionClientTest {
     }
 
     @Test
+    fun `transcribe honors cfg timeoutMs as a call timeout even with a generous base client`() {
+        // Bug real (Yan, 2026-07-01): o client base tinha readTimeout generoso, mas nada limitava a
+        // chamada inteira (ex.: DNS sem timeout no OkHttp/JVM) — o cfg.timeoutMs precisa governar por
+        // requisição, sobrepondo o que o client base tiver configurado.
+        server.enqueue(
+            jsonResponse(200, """{"text":"slow"}""")
+                .setBodyDelay(300, TimeUnit.MILLISECONDS)
+        )
+        val generousClient = client(readTimeoutMs = 10_000) // não dispararia sozinho em 300ms
+
+        val result = generousClient.transcribe(audioFile(), config(timeoutMs = 50))
+
+        assertThat((result as TranscriptionResult.Error).kind).isEqualTo(ErrorKind.TIMEOUT)
+    }
+
+    @Test
     fun `transcribe maps incomplete config before network call`() {
         val result = client().transcribe(audioFile(), Config())
 
@@ -126,11 +142,12 @@ class TranscriptionClientTest {
         return TranscriptionClient(WhisperApi(okHttp))
     }
 
-    private fun config(language: String? = null) = Config(
+    private fun config(language: String? = null, timeoutMs: Long = Config.DEFAULT_TIMEOUT_MS) = Config(
         endpointUrl = server.url("/audio").toString(),
         authHeaderName = "X-Api-Key",
         authHeaderValue = "secret",
         language = language,
+        timeoutMs = timeoutMs,
     )
 
     private fun audioFile(): File = temp.newFile("sample.m4a").apply {

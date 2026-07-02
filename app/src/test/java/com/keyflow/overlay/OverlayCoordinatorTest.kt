@@ -186,6 +186,36 @@ class OverlayCoordinatorTest {
     }
 
     @Test
+    fun `transcription that hangs past the configured timeout resolves to a timeout error`() = runTest {
+        // Rede de segurança (Yan, 2026-07-01): mesmo que o transcriber trave por algum motivo fora do
+        // controle do WhisperApi (ex.: bug num transcriber customizado), o coordinator não pode ficar
+        // "transcrevendo" pra sempre — precisa desistir dentro do cfg.timeoutMs configurado.
+        val audio = temporaryFolder.newFile("audio.m4a").also { it.writeText("audio") }
+        val transcriber = HangingTranscriber()
+        val renderedStates = mutableListOf<ButtonState>()
+        val errors = mutableListOf<String>()
+
+        val coordinator = coordinator(
+            scope = this,
+            recorder = FakeRecorder(audio),
+            transcriber = transcriber,
+            targetAvailable = { true },
+            render = { renderedStates += it },
+            onError = { message, _ -> errors += message },
+            configTimeoutMs = 1_000L,
+        )
+
+        coordinator.onTap() // IDLE → RECORDING
+        coordinator.onTap() // RECORDING → SENDING
+        // advanceUntilIdle() também avança além do auto-dismiss do erro (2s) — verifica ERROR ter
+        // ocorrido, não ser o último estado (o próprio auto-dismiss é comportamento correto, não bug).
+        advanceUntilIdle()
+
+        assertThat(renderedStates).contains(ButtonState.ERROR)
+        assertThat(errors).containsExactly("Tempo esgotado ao transcrever.")
+    }
+
+    @Test
     fun `second tap in sending state does not trigger another transcription`() = runTest {
         val audio = temporaryFolder.newFile("audio.m4a").also { it.writeText("audio") }
         val transcriber = FakeTranscriber(TranscriptionResult.Success("once"))
@@ -344,11 +374,13 @@ class OverlayCoordinatorTest {
         onClipboard: (String) -> Unit = {},
         onShowCancelUndo: () -> Unit = {},
         onHideCancelUndo: () -> Unit = {},
+        onError: (String, Boolean) -> Unit = { _, _ -> },
         cancelWindowMs: Long = 3000L,
         recordingClockMs: () -> Long = longEnoughClock(),
+        configTimeoutMs: Long = Config.DEFAULT_TIMEOUT_MS,
     ) = OverlayCoordinator(
         scope = scope,
-        configProvider = { completeConfig() },
+        configProvider = { completeConfig(configTimeoutMs) },
         recorder = recorder,
         transcriber = transcriber,
         insertOrHold = insertOrHold,
@@ -358,13 +390,15 @@ class OverlayCoordinatorTest {
         onClipboard = onClipboard,
         onShowCancelUndo = onShowCancelUndo,
         onHideCancelUndo = onHideCancelUndo,
+        onError = onError,
         cancelWindowMs = cancelWindowMs,
         recordingClockMs = recordingClockMs,
     )
 
-    private fun completeConfig(): Config = Config(
+    private fun completeConfig(timeoutMs: Long = Config.DEFAULT_TIMEOUT_MS): Config = Config(
         endpointUrl = "https://example.test/v1/audio/transcriptions",
         authHeaderValue = "Bearer token",
+        timeoutMs = timeoutMs,
     )
 
     private class FakeRecorder(private val audioFile: File?) : OverlayAudioRecorder {
@@ -388,7 +422,17 @@ class OverlayCoordinatorTest {
         }
     }
 
+    /** Nunca completa dentro do tempo de teste — só a rede de segurança (withTimeout) resolve isto. */
+    private class HangingTranscriber : OverlayTranscriber {
+        override suspend fun transcribe(audio: File, cfg: Config): TranscriptionResult {
+            kotlinx.coroutines.delay(HANG_MS)
+            return TranscriptionResult.Success("never gets here")
+        }
+    }
+
     private companion object {
+        const val HANG_MS = 60_000_000L
+
         fun longEnoughClock(): () -> Long {
             var t = 0L
             return { t.also { t += 500L } }

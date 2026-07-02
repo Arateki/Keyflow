@@ -113,11 +113,81 @@ class SettingsRepositoryTest {
             orbSizePx = 250,
             themeDark = true,
             onboardingDone = true,
+            transcriptionTimeoutMs = 45_000,
+            maxRecordingSec = 600,
+            keyboardScalePercent = 85,
+            keyboardLanguage = "es",
         )
 
         repository.saveSettings(saved)
 
         assertEquals(saved, repository.settingsFlow().first())
+    }
+
+    @Test
+    fun transcriptionTimeoutMsDefaultsTo15SecondsWhenNeverSaved() = runTest {
+        val repository = newRepository()
+        assertEquals(15_000, repository.settingsFlow().first().transcriptionTimeoutMs)
+    }
+
+    @Test
+    fun maxRecordingSecDefaultsTo5MinutesWhenNeverSaved() = runTest {
+        val repository = newRepository()
+        assertEquals(300, repository.settingsFlow().first().maxRecordingSec)
+    }
+
+    @Test
+    fun keyboardScalePercentDefaultsTo100WhenNeverSaved() = runTest {
+        val repository = newRepository()
+        assertEquals(100, repository.settingsFlow().first().keyboardScalePercent)
+        assertEquals(100, repository.keyboardScalePercentOnce())
+    }
+
+    @Test
+    fun keyboardScalePercentOnceReadsWithoutTouchingSecurePrefs() = runTest {
+        val repository = newRepository()
+        repository.saveSettings(Settings(keyboardScalePercent = 85))
+
+        assertEquals(85, repository.keyboardScalePercentOnce())
+    }
+
+    @Test
+    fun keyboardLanguageDefaultsToPtWhenNeverSaved() = runTest {
+        val repository = newRepository()
+        assertEquals("pt", repository.settingsFlow().first().keyboardLanguage)
+        assertEquals("pt", repository.keyboardLanguageOnce())
+    }
+
+    @Test
+    fun saveKeyboardLanguageOnceWritesWithoutTouchingTheRestOfTheSettings() = runTest {
+        val repository = newRepository()
+        repository.saveSettings(Settings(themeDark = true, orbSizePx = 250))
+
+        repository.saveKeyboardLanguageOnce("es")
+
+        val settings = repository.settingsFlow().first()
+        assertEquals("es", settings.keyboardLanguage)
+        assertEquals("es", repository.keyboardLanguageOnce())
+        // O resto da config não foi mexido por uma escrita leve (mesmo padrão de tapBurstWindowMs etc.).
+        assertEquals(true, settings.themeDark)
+        assertEquals(250, settings.orbSizePx)
+    }
+
+    @Test
+    fun themeDarkScaleAndLanguageFlowsReflectLiveChanges() = runTest {
+        // Pedido do Yan, 2026-07-03: o teclado aberto precisa reagir sem precisar reabrir — a base disso
+        // é o Flow realmente emitir de novo quando o valor muda (mesmo padrão de barsConfigFlow/BAR-07).
+        val repository = newRepository()
+        assertEquals(false, repository.themeDarkFlow().first())
+        assertEquals(100, repository.keyboardScalePercentFlow().first())
+        assertEquals("pt", repository.keyboardLanguageFlow().first())
+
+        repository.saveSettings(Settings(themeDark = true, keyboardScalePercent = 85))
+        repository.saveKeyboardLanguageOnce("en")
+
+        assertEquals(true, repository.themeDarkFlow().first())
+        assertEquals(85, repository.keyboardScalePercentFlow().first())
+        assertEquals("en", repository.keyboardLanguageFlow().first())
     }
 
     @Test

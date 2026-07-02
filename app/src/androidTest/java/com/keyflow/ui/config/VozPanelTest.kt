@@ -71,4 +71,49 @@ class VozPanelTest {
 
         rule.runOnIdle { assertEquals("sk-new-token", h.settings.openaiToken) }
     }
+
+    @Test
+    fun timeoutDefaultsTo15SecondsSelected() {
+        val h = Harness(Settings(source = TranscriptionSource.OPENAI))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(timeoutTag(15_000)).assertIsDisplayed()
+    }
+
+    @Test
+    fun selectingTimeoutPersists() {
+        val h = Harness(Settings(source = TranscriptionSource.OPENAI))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(timeoutTag(30_000)).performClick()
+
+        rule.runOnIdle { assertEquals(30_000, h.settings.transcriptionTimeoutMs) }
+    }
+
+    @Test
+    fun timeoutSectionIsSharedAcrossEveryProvider() {
+        // Não é por preset (CREDITS ainda mostra Geral, mesmo sendo um card stub sem token).
+        val h = Harness(Settings(source = TranscriptionSource.CREDITS))
+        rule.setContent { h.Content() }
+
+        rule.onAllNodesWithTag(timeoutTag(15_000)).assertCountEquals(1)
+    }
+
+    @Test
+    fun maxRecordingDefaultsTo5MinutesSelected() {
+        val h = Harness(Settings(source = TranscriptionSource.OPENAI))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(maxRecordingTag(300)).assertIsDisplayed()
+    }
+
+    @Test
+    fun selectingMaxRecordingPersists() {
+        val h = Harness(Settings(source = TranscriptionSource.OPENAI))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(maxRecordingTag(600)).performClick()
+
+        rule.runOnIdle { assertEquals(600, h.settings.maxRecordingSec) }
+    }
 }

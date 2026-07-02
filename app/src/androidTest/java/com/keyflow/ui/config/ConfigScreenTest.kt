@@ -13,6 +13,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.keyflow.data.Settings
 import com.keyflow.ui.PermissionStatus
@@ -172,7 +173,9 @@ class ConfigScreenTest {
         rule.setContent { h.Content() }
 
         rule.onNodeWithTag(tabTag(ConfigTab.TECLADO)).performClick()
-        rule.onNodeWithTag(TECLADO_UNLOCK_TAG).performClick()
+        // A prévia ao vivo de tamanho do teclado (2026-07-02) empurrou "Desbloquear skins" pra fora do
+        // viewport padrão do teste — precisa rolar até o nó antes do clique (performClick é por coordenada).
+        rule.onNodeWithTag(TECLADO_UNLOCK_TAG).performScrollTo().performClick()
         rule.onNodeWithTag(UNLOCK_SHEET_TAG).assertIsDisplayed()
 
         rule.onNodeWithTag(UNLOCK_CLOSE_TAG).performClick()

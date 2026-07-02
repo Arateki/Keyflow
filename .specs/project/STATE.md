@@ -280,3 +280,590 @@ Duas features novas planejadas via grill completo (gray areas resolvidas). **Ord
   como Verified junto com DRAG-01..06.
 - Contagem final registrada: **96 unit + 60 instrumentados** (58 verdes no emulador + 2 conhecidos como
   ambientais, confirmados 3/3 no device físico).
+
+## Execução Trabalho 2 — Teclado Canvas fluido (Milestone 5, 2026-07-01)
+
+- **KC-T1..T5** (fundação/geometria/View Canvas/preview-repeat-multitouch/acentos): modelo data-driven em
+  `ime/keyboard/layout/` (`KeyAction`/`KeyDef`/`KeyRow`/`KeyboardLayer`/`KeyboardLayout`/`AccentMap`,
+  `Layouts` PT/EN/ES, `Geometry` por peso, `KeyboardGridState`, `RepeatSchedule`) + `KeyboardGridView`
+  (Canvas único, `onDraw`/`onTouchEvent` multitouch por `pointerId`, preview, repeat-on-hold acelerando,
+  popup de acentos long-press). 4ª fileira reduzida a só o toggle `?123`/`ABC` (decisão do Yan,
+  2026-07-01: números via long-press mesclados aos acentos, sem fileira numérica fixa — igual
+  Gboard/Samsung). Bug de layout do `CandidatesView` (ver KC-T7) descoberto e corrigido nesta reconciliação
+  de tarefas.
+- **KC-T6** (integração híbrida + flag): `KeyFlowKeyboardView.buildExpanded()` troca as `buildRow` antigas
+  pela `KeyboardGridView` quando `useCanvasGrid=true`; mic/action row/barra retraída **intocados**
+  (SYNC-01..04). Flag `BuildConfig.DEBUG && prefs("kbd_canvas")` — precisou habilitar
+  `buildFeatures.buildConfig = true` (AGP 9 não gera `BuildConfig` por padrão). 3 instrumentados
+  (`KeyFlowKeyboardCanvasGridTest`).
+- **KC-T7** (corretor do sistema): `ComposingWordTracker` (unit puro, rastreia a palavra em composição) +
+  `SystemSpellChecker` (wrapper fino do `TextServicesManager`/`SpellCheckerSession`, degrada pra lista
+  vazia sem corretor) + `CandidatesView`. **Bug pego e corrigido**: `CandidatesView` sem `onMeasure`
+  próprio herdava o comportamento padrão de `View.onMeasure`, que em modo `AT_MOST` ignora
+  `minimumHeight` e preenche o espaço disponível — a faixa de sugestões inchava bem além dos 34dp
+  pretendidos (visível só ao testar no emulador real, não nos unit tests). Corrigido com `onMeasure`
+  explícito fixando a altura. 4 instrumentados (`KeyFlowKeyboardSpellCheckerTest`); 1 flaky
+  (entrega de toque sob carga do host, mesma classe do FGS/Keystore) resolvido com retry (`performUntil`).
+- **KC-T8** (acessibilidade): `KeyboardAccessibilityHelper` (`inner class` do `KeyboardGridView`) via
+  `androidx.customview.widget.ExploreByTouchHelper` — precisou adicionar a dependência
+  `androidx.customview:customview:1.1.0` (não vinha transitiva). 2 instrumentados
+  (`KeyFlowKeyboardAccessibilityTest`) confirmam nó virtual + `ACTION_CLICK`.
+- **KC-T9** (subtypes/idioma): subtype `es_ES` adicionado a `method_keyboard.xml`
+  (`supportsSwitchingToNextInputMethod="true"`). `KeyboardLayout.withLanguageKey()` (unit, 4 testes)
+  prepende 🌐 na 4ª fileira só quando >1 idioma do KeyFlow habilitado — decisão do Yan (2026-07-01): globo
+  ao lado do `?123` na mesma fileira dedicada, não um botão extra na action row (que fica intocada) nem
+  popup no long-press. `KeyFlowKeyboardService.activeLocale()`/`switchToNextSubtype()`/
+  `onCurrentInputMethodSubtypeChanged` (reconstrói a view via `setInputView(onCreateInputView())`). 2
+  instrumentados (`KeyFlowKeyboardLanguageTest`) — o emulador só habilita 1 subtype por padrão (sem tela
+  de Idiomas do sistema aberta manualmente) e não há API seguro pra simular >1 habilitado num teste, então
+  a troca completa PT↔EN↔ES pelo globo fica **manual** no Galaxy A32.
+- **KC-T10** (parcial): rotas oficiais `keyboard-canvas-expanded/symbols/collapsed/candidates` substituíram
+  as temporárias da KC-T3/T6 no `RouteCatalog`. Camada `?123` forçada via toque sintético
+  (`dispatchTouchEvent` na geometria real, lida de `placedRowsForTest`); candidatos forçados via
+  `updateCandidates()` (sem depender do corretor real — determinístico). 8 PNGs novos (claro/escuro)
+  gerados, revisados visualmente e aprovados (`diff-screens.sh --approve` → 50/50 dentro do limiar; os 42
+  goldens pré-existentes ficaram **bit-idênticos**, 0 regressão). Espelhados em `/tmp/keyflow-prints/`.
+  Gate `full` (unit + instrumentado) verde, exceto 2 falhas ambientais já documentadas
+  (`SystemSurfacesScreenshotTest` — Keystore lento sob carga, ver `android-dev-environment.md`; confirmado
+  não-relacionado ao teclado). **Pendente, só o Yan**: validar fluidez no Galaxy A32 físico e decidir
+  promover a grade nova a padrão (remover a flag `kbd_canvas` e o teclado antigo) — enquanto isso não
+  acontece a flag continua desligada por padrão em release (rollback trivial preservado).
+
+## Ajustes pós-teste no device físico (Galaxy A32, 2026-07-01)
+
+Yan testou o teclado Canvas no Galaxy A32 (não no emulador) e reportou 3 achados reais:
+
+1. **Popup de preview/acento aparecia perto do rodapé, não acima da tecla.** Causa: `showAtLocation` com
+   coordenadas absolutas de tela (`getLocationOnScreen` + `PopupWindow.showAtLocation`) é conhecido por se
+   comportar de forma inconsistente em janelas de IME em alguns fabricantes (aqui, Samsung/One UI).
+   Corrigido trocando por `showAsDropDown(this, xoff, yoff)` — a mesma técnica (âncora-relativa) já usada
+   e validada no seletor de ações do mic (`KeyFlowKeyboardView.showActionSelector`), robusta entre
+   fabricantes porque delega ao próprio window manager em vez de matemática manual.
+2. **Teclado "pulava" ao trocar letras↔símbolos.** Causa raiz identificada pelo Yan: row2/row3 tinham
+   contagens de teclas diferentes entre as duas camadas (ex.: row2 símbolos tinha 10 teclas contra 9 de
+   row2 letras), então cada tecla ficava com largura diferente e a coluna inteira realocava. Corrigido
+   reestruturando `Layouts.symbolsLayer()` pra ter exatamente a mesma contagem/pesos por fileira que
+   `lettersLayer()` em cada locale (PT/EN movem `/` pra row3 como slot largo tipo shift; ES mantém `/` na
+   row2, que já tem 10 por causa do `ñ`, e usa `¿` como slot largo de row3, abrindo mão de `*` pra caber no
+   orçamento de 9 posições). Teste novo (`LayoutsTest`) trava a paridade de forma pra não regredir.
+3. **Reorganização do rodapé** (decisão do Yan, confirmada via pergunta explícita — "Sim, faz agora"):
+   mic/⚙/↓ saem da action row (que deixa de existir no modo Canvas) e sobem pra faixa que antes era só de
+   sugestões (`CandidatesView`), que ficava vazia a maior parte do tempo. A 4ª fileira da grade Canvas
+   ganha vírgula/espaço/ponto/enter junto do `?123`/`ABC` — igual Gboard. `updateCandidates()` agora
+   alterna a visibilidade entre a faixa de sugestões e a faixa mic/config/colapsar (`topStripToolbar`),
+   já que dividem o mesmo espaço; `CandidatesView` passou de 34dp pra 44dp de altura pra as duas casarem
+   exatamente. Isso significa que a action row antiga (`buildActionRow`) só é usada pelo teclado ANTIGO
+   agora — inalterada, continua existindo só nesse caminho (`useCanvasGrid=false`).
+
+Goldens `keyboard-canvas-expanded/symbols/candidates` regenerados/aprovados de novo (o visual mudou de
+propósito). `keyboard-canvas-collapsed` ficou bit-idêntico (não afetado). Gate completo (unit +
+instrumentado) verde, exceto as 2 falhas ambientais já conhecidas do `SystemSurfacesScreenshotTest`.
+
+## Segunda rodada de ajustes no device físico (Galaxy A32, 2026-07-01)
+
+Mais 3 achados do Yan testando a build anterior:
+
+1. **Preview só aparecia em toque lento.** Causa: `showPreview` criava uma `PopupWindow` nova a cada
+   toque; anexar uma janela nova ao WindowManager leva ≥1 frame, e num toque rápido o dedo soltava antes
+   disso — o preview nunca chegava a aparecer. Corrigido com um **pool de popups reaproveitados**
+   (`previewPool`/`activePreviews` em `KeyboardGridView`): a janela é criada uma vez e só reposicionada
+   (`PopupWindow.update`) nos usos seguintes. Isso introduziu 2 bugs novos, ambos corrigidos na sequência:
+   - `update(x, y, w, h)` (posição absoluta) foi chamado num popup aberto com `showAsDropDown` (posição
+     relativa à âncora) — misturar os dois sistemas de coordenada fazia o popup pular pro canto errado.
+     Corrigido usando o overload `update(ANCHOR, x, y, w, h)`.
+   - Esconder o popup "sem uso" movendo-o pra fora da tela não funciona no One UI: o gerenciador de
+     janelas do Samsung limita a posição pra dentro da tela, então ele ficava grudado num canto em vez de
+     sumir. Corrigido escondendo o **conteúdo** (`bubble.visibility = INVISIBLE`) em vez de mover a janela.
+2. **Corretor nunca sugeria nada** (testado com "lanpada", claramente errado). Diagnosticado com log
+   temporário: a sessão abre (locale `pt_BR`), o callback dispara certinho (`onGetSuggestions` chega em
+   ~30-50ms), mas a `SuggestionsInfo` sempre vem com 0 sugestões — pra qualquer entrada, até "naol"/
+   "lanpada". Conclusão: nosso código está correto (sessão/callback validados); o corretor configurado no
+   Samsung do Yan não tem dicionário PT-BR funcional. Trocamos `getSentenceSuggestions` (pensada pra
+   frases com pontuação) por `getSuggestions` (nível de palavra, mais compatível com o caso de uma palavra
+   isolada em composição) por precaução, mas o resultado (0 sugestões) não mudou — é limitação do device,
+   não bug. Log temporário removido depois do diagnóstico.
+3. **Bug real de dessincronia**: digitar na busca de apps do Samsung, apertar o "X" de limpar (que mexe no
+   `EditText` direto, sem passar pelo nosso `InputConnection`) e teclar de novo trazia de volta o texto
+   apagado grudado na tecla nova. Causa: `ComposingWordTracker` não tem como saber que o campo foi limpo
+   por fora. Corrigido com `KeyFlowKeyboardService.onUpdateSelection` — o sistema chama isso pra QUALQUER
+   mudança de texto/seleção (nossa ou externa); se não há região de composição ativa
+   (`candidatesStart/End < 0`) mas ainda achamos que temos uma palavra em curso, é sinal de edição externa
+   → reseta o tracker. Validado que não causa reset falso durante digitação normal (testes de composição
+   seguem verdes).
+
+Gate completo (unit + instrumentado) verde de novo após os 3 fixes.
+
+## Terceira rodada (Galaxy A32, 2026-07-01)
+
+- **Bug do "X" que limpa o campo**: o fix anterior (`candidatesStart/End < 0`) não pegava o caso real —
+  o campo de busca do Samsung provavelmente não reporta a região de composição de forma confiável.
+  Substituído por uma verificação direta: `onUpdateSelection` agora compara o texto REAL antes do cursor
+  (`InputConnection.getTextBeforeCursor`) com a palavra que o `ComposingWordTracker` acha que está em
+  composição; se não bater, é edição externa → reseta. Mais robusto que inferir por sinais indiretos,
+  já que não depende de nenhum app reportar corretamente a região de composição. Confirmado sem falso
+  positivo em digitação normal (testes de composição rodados 3x seguidas, sempre verdes).
+- **Faixa mic/config/colapsar e faixa de sugestões reduzidas** para ~2/3 da altura de uma tecla normal
+  (pedido do Yan: essa faixa não é digitação de verdade, não precisa da mesma altura de toque). Nova
+  constante `CandidatesView.HEIGHT_DP = 28` compartilhada com `KeyFlowKeyboardView.buildTopStrip()` pra
+  garantir que as duas SEMPRE tenham a mesma altura (evita o flicker já corrigido antes).
+
+Goldens `keyboard-canvas-expanded/symbols/candidates` regenerados/aprovados (altura menor). Gate completo
+verde.
+
+## Quarta rodada (Galaxy A32, 2026-07-01) — causa raiz do bug do X encontrada
+
+Log de diagnóstico (temporário, removido depois) revelou a causa real do bug do "X" que limpa o campo:
+
+```
+...digitou "teste"...
+onStartInput pkg=com.samsung.android.app.galaxyfinder restarting=true   ← isso é o "X"
+handleKey letra="a" wordTracker antes="teste"                            ← BUG
+handleKey setComposingText word="testea"
+```
+
+O "X" da busca do Samsung não dispara `onUpdateSelection` (por isso o fix anterior não pegava nada) — ele
+reinicia a sessão do `InputConnection` via `onStartInputView(restarting=true)`, sem passar por
+`onFinishInput()`. `wordTracker` só era resetado em `onFinishInput`, então a palavra da sessão anterior
+sobrevivia ao reinício e "colava" na próxima letra. Corrigido resetando `wordTracker`/`spellChecker`/
+`updateCandidates` também em `onStartInputView` (mantido o reforço em `onUpdateSelection` — comparar texto
+real antes do cursor — como rede de segurança pra outros apps que possam limpar de um jeito diferente).
+
+Também: barra retraída (`buildCollapsed`) reduzida pra mesma altura da faixa mic/config/sugestões
+(`CandidatesView.HEIGHT_DP`), por pedido do Yan — agora as 3 faixas compactas do teclado (topo expandido,
+sugestões, retraído) têm a mesma altura. Goldens `keyboard-collapsed`/`keyboard-canvas-collapsed`
+regenerados/aprovados. Gate completo verde.
+
+## Quinta rodada — conclusão do corretor + lição de processo (2026-07-01)
+
+- **Corretor**: confirmado definitivamente (log via `--pid`, não por tag — o filtro de tag do logcat não
+  estava funcionando por algum motivo nas capturas anteriores, o que gerou 3 rodadas de teste "sem
+  mudança nenhuma" que na real eram **APK desatualizado**, ver lição abaixo) que a sessão abre, o
+  callback dispara em ~15ms, mas o corretor selecionado no sistema do Yan (`HoneyBoardSpellCheckerService`
+  — do próprio Samsung) devolve 0 sugestões pra qualquer palavra em português, até óbvias como "nao".
+  `referToSpellCheckerLanguageSettings=false` não mudou nada. Conclusão: o teclado do Samsung mostra
+  sugestões ao digitar usando uma engine PRÓPRIA/interna, não exposta via `SpellCheckerSession` (a única
+  API pública que qualquer app/teclado pode consultar) — é limitação do serviço escolhido no aparelho, não
+  bug nosso. Caminho pra sugestões reais: trocar o "Verificador ortográfico" do sistema pra outro (ex.:
+  Gboard, se instalado).
+- **Lição de processo importante**: depois do fix do `referToSpellCheckerLanguageSettings`, rodei só
+  `gradle compileDebugKotlin` (compila mas NÃO empacota) antes de `adb install -r` no device físico —
+  isso reinstalou um APK **desatualizado** (de ~25 min antes) por 3 rodadas seguidas de teste, fazendo
+  parecer que os fixes não tinham efeito nenhum quando na real nunca tinham sido instalados. **Sempre usar
+  `gradle installDebug`/`assembleDebug` (nunca só `compileDebugKotlin`) antes de instalar no device físico
+  do Yan** — o comando de compilar sozinho não gera um APK novo.
+
+## Sexta rodada — seletor do mic, sugestões na barra, bug do Groq (Galaxy A32, 2026-07-01)
+
+- **Seletor de ações do mic (segurar → arrastar → soltar) não acionava no expandido**: diagnóstico longo
+  por log físico (`Log.d` temporário + `adb logcat --pid`, já removido). Passos até a causa real:
+  1. Suspeita inicial (`isClippingEnabled=false` no `PopupWindow`) — removida, não resolveu.
+  2. Tentativa de inserir o seletor como View real na hierarquia (`addView`, como já era feito no
+     retraído) — resolveu o toque, mas criou reflow (empurrava a grade Canvas pra baixo a cada hold).
+  3. Tentativa de `ViewGroupOverlay` (desenha por cima sem reflow) — o conteúdo ficava **invisível**
+     porque a Overlay recorta ao próprios limites do host, e o popup fica posicionado ACIMA dele (top
+     negativo). Revertido.
+  4. **Fix final**: voltou a usar `PopupWindow.showAsDropDown` (que sempre renderizou certo) nos dois
+     modos (retraído incluso — a preocupação original de que "a janela retraída é curta demais pra um
+     popup" não se aplica mais, já que `isTouchable=false` faz o toque depender só do próprio mic).
+  5. Achado à parte: o dedo do usuário sempre pousava ~15-20px abaixo do retângulo medido por
+     `getLocationOnScreen()`, consistente nas 3 técnicas — indício de desalinhamento de render da janela
+     do IME nesse aparelho especificamente, não bug de cálculo. Compensado com folga de toque (`chipHit`,
+     +40dp só pra baixo) **separada** do retângulo exposto (`chipRect`, sem folga) — inflar o retângulo
+     exposto quebrava o teste automatizado, que mira em `rect.centerY()` (achado rodando a suíte completa).
+  6. Adicionado cancelamento rápido: voltar o dedo pra cima do próprio mic sempre desgruda a seleção,
+     independente da folga de toque do chip (pedido do Yan: a folga generosa que ajuda a "grudar" no chip
+     não podia obrigar a descer o dedo muito além do mic pra cancelar).
+- **Barra de sugestões redesenhada**: a `CandidatesView` não ocupa mais a faixa inteira — agora é só mais
+  um "botão" dentro da faixa mic/config/colapsar, no espaço entre config e a seta (ideia do Yan: esse
+  espaço fica vazio a maior parte do tempo mesmo). `updateCandidates()` simplificado (não alterna mais
+  visibilidade entre duas faixas). Yan confirmou: "mais pra frente" quer configurar os itens dessa barra
+  nos dois estados (retraído/expandido) independentemente — **não implementado ainda**, só anotado.
+- **Bug do Groq investigado (não corrigido ainda)**: transcrição ficava presa em "transcrevendo" por muito
+  tempo com o provedor Groq, só resolvia ao desligar/ligar o Modo Sobrepor. Causa raiz encontrada (agente
+  de investigação, só leitura): `WhisperApi.defaultClient()` configura `connectTimeout`/`readTimeout` mas
+  **não `callTimeout`** — a resolução de DNS não tem timeout algum no OkHttp/JVM, então a chamada pode
+  travar pra sempre sem lançar exceção. Sem rede de segurança na camada de cima (`OverlayCoordinator`)
+  também. Desligar/ligar o overlay "resolve" só porque cancela o `SupervisorJob` (a chamada travada fica
+  órfã, não é resolvida de verdade). Não é bug específico do Groq no código (mesmo cliente atende
+  OpenAI/Groq/Custom) — provavelmente algo na rota de rede do Yan até `api.groq.com` expõe essa lacuna.
+  **Correção pendente** (Yan pediu, ainda não implementada): adicionar `callTimeout` no OkHttp +
+  `withTimeout` no `OverlayCoordinator`, expostos como configuração nova na aba Voz — nova seção "Geral"
+  abaixo do seletor de origem, com sub-área "Tempo limite de resposta" (descrição breve + botões em linha:
+  1s/5s/15s/30s/1m/2m, padrão 15s, estilo igual ao `Segmented` já usado no seletor de provedor). Mapeamento
+  já feito (não implementado): novo campo `Int` em `Settings`/`SettingsRepository` (padrão DataStore já
+  existente, ver `tapBurstWindowMs`), novo Composable na `VozPanel.kt` reusando `Segmented`.
+- **Pedido novo, anotado pra depois**: teclado numérico automático pra campos que pedem número (telefone,
+  PIN etc.), como o teclado do Samsung já faz — via `EditorInfo.inputType` (`TYPE_CLASS_NUMBER`/
+  `TYPE_CLASS_PHONE`). Não implementado ainda.
+- **Golden `keyboard-canvas-candidates`**: regenerado/aprovado (visual novo, sugestões dentro da faixa).
+  Também `keyboard-collapsed`/`keyboard-collapsed-dark` (altura já pendente de rodada anterior, nunca
+  tinha sido aprovada). ATENÇÃO: `/tmp/keyflow-prints/` pode ficar com PNGs **desatualizados** entre
+  sessões — a fonte de verdade pra golden é sempre `verification/golden/`, nunca o mirror em `/tmp`
+  (achado depois de perseguir um "bug" fantasma por confiar num PNG de 3h atrás no `/tmp`).
+- Gate completo (unit + instrumentado) verde, exceto os 2 já conhecidos e não-relacionados
+  (`SystemSurfacesScreenshotTest` — Keystore lento sob carga do host) e 1 flakiness pré-existente do
+  `KeyFlowKeyboardSelectorTest`/`KeyFlowKeyboardSpellCheckerTest` quando rodado em lote completo (sempre
+  passa isolado — mesma classe de instabilidade do host, não regressão de código).
+
+**Pendente pro próximo momento (nessa ordem sugerida pelo Yan)**:
+1. ~~Implementar o timeout configurável do Groq/transcrição (settings + fix de rede).~~ — **FEITO** (ver
+   seção abaixo).
+2. ~~Teclado numérico automático por tipo de campo.~~ — **FEITO** (ver seção NUM-01 abaixo).
+3. Testar troca de idioma pelo globo no Galaxy A32 — **arquitetura revertida** (idioma 100% app-managed,
+   ver seção "Idioma revertido pra 100% app-managed" abaixo); o bug do label duplicado (achado antes)
+   virou moot — não há mais múltiplos subtypes. Verificado no emulador (globo cicla + persiste + reflete
+   no layout), falta o Yan confirmar no aparelho físico.
+4. ~~Decidir sobre o slider de tamanho do teclado.~~ — **FEITO** (slider + prévia ao vivo, ver seção
+   "Idioma revertido..." abaixo — as duas coisas saíram juntas na mesma sessão).
+5. Promover a grade Canvas a padrão (remover a flag e o teclado antigo) — só depois de tudo acima.
+
+## Documentação de planejamento completada + ordem de desenvolvimento (2026-07-02)
+
+Sessão de spec (sem código): completadas as 3 specs que estavam sem Design/Tasks e criado o mapa
+único de execução até a loja.
+
+- **Criados**: `keyflow-api/design.md` + `tasks.md` (API-T1..T14 — repo Rust novo; débito por
+  bytes/CBR 64kbps, saldo via header `X-KeyFlow-Balance-Seconds`, Integrity só em register/redeem
+  p/ Google fora do ar não travar quem tem saldo); `monetization/design.md` + `tasks.md`
+  (MZ-T1..T15 — pacotes `data/monetization/` e `ads/`; `EntitlementsProvider` como interface p/ o
+  theme-system; UMP obrigatório; grep de imports de ads fora de `ads/` como gate ADS-01);
+  `theme-system/design.md` + `tasks.md` (TS-T1..T14 — `ThemeRegistry (themeId, dark) →
+  paleta+ARGB+efeitos`; migração TOK-02 por superfície com goldens bit-idênticos como gate;
+  checkpoints ⚠️ S3/S4/S5 marcados em TS-T6/T8/T9).
+- **Criado `.specs/DEVELOPMENT-ORDER.md`**: regras de ouro p/ o agente executor + fila em blocos:
+  [YAN gates] → Q1..Q4 (quick: maxRecordingSec real, margem lateral, bug Termius, promover
+  Canvas) → SB-T8..T10 → gesture-tour → native-voice-models → vision-capture → keyflow-api
+  (paralelizável) → monetization → theme-system → PS-1..PS-7 (Play Store). ROADMAP ganhou
+  Milestones 9–12 (tour, modelos nativos, visão, loja) + ponteiro pro arquivo de ordem.
+- **Pontos de atenção cruzados documentados**: regras de backup (identidade INCLUÍDA ×
+  `models/` EXCLUÍDO — MZ-T1 × NM-T12, quem chegar segundo reconcilia); hash do
+  `obfuscatedAccountId` idêntico nos dois repos; `X-Request-Id` p/ idempotência de débito.
+- **Aguardando o Yan**: revisão das 6 specs Draft; assunções ⚠️ do theme-system; portões do
+  Bloco 0 (globo/prévia/fluidez Canvas).
+- **Decisão do Yan (2026-07-02, na sequência): MONOREPO** — a API Rust vive em **`api/`** na
+  raiz deste repo (supersede o plano de repo próprio registrado acima). Docs atualizados
+  (spec/context/design/tasks da keyflow-api, DEVELOPMENT-ORDER, ROADMAP, memória): API-T1 agora
+  cria `api/` (a spec fica em `.specs/`), CI com path filter `api/**`, e a frente paralela da
+  API trabalha em **worktree** tocando só `api/` (nunca `app/`, goldens ou este STATE.md — o
+  progresso dela vai no Status do tasks.md da feature + `api/README.md`). Nenhuma migração de
+  pastas do Android foi necessária (Gradle segue na raiz; `api/` é invisível pra ele).
+
+## Timeout configurável do Groq/transcrição (2026-07-02)
+
+Item 1 da fila acima. Bug real diagnosticado numa sessão anterior: `WhisperApi.defaultClient()` configura
+`connectTimeout`/`readTimeout`, mas o OkHttp/JVM **não tem timeout de DNS por padrão** — uma rota de rede
+ruim (relatada pelo Yan com o Groq) trava a chamada pra sempre sem lançar exceção, e a UI fica presa em
+"transcrevendo".
+
+- `Config.timeoutMs: Long = 15_000L` (novo, `Config.DEFAULT_TIMEOUT_MS`) + `Settings.transcriptionTimeoutMs:
+  Int` (compartilhado entre OpenAI/Groq/Custom — não é por preset) mapeado em `effectiveConfigFor` pros 3
+  provedores. Persistido via `SettingsRepository` (chave `transcription_timeout_ms`, mesmo padrão do
+  `tapBurstWindowMs`).
+- **Correção primária**: `WhisperApi.post` agora usa `client.newBuilder().callTimeout(cfg.timeoutMs,
+  MILLISECONDS).build().newCall(request).execute()` em vez do client fixo. `callTimeout` do OkHttp envolve
+  a chamada INTEIRA (DNS+conexão+escrita+leitura) — ao contrário de `connectTimeout`/`readTimeout`, que não
+  cobrem a resolução de DNS. `newBuilder()` é barato (reusa pool de conexões/dispatcher do client base); só
+  o timeout muda por `Config`, que pode variar em runtime (config do usuário).
+  **Achado ao testar** (não óbvio): o `callTimeout` expirado do OkHttp lança `InterruptedIOException` **puro**
+  (não o subtipo `SocketTimeoutException` que `connectTimeout`/`readTimeout` lançam) — o `catch
+  (SocketTimeoutException)` original em `TranscriptionClient.transcribe` não pegava esse caso e caía no
+  `catch (IOException)` genérico → `ErrorKind.NETWORK` em vez de `TIMEOUT`. Corrigido trocando o catch pra
+  `InterruptedIOException` (superclasse — cobre os dois casos). Sem o teste que força `cfg.timeoutMs` curto
+  com um client base generoso, esse bug teria passado despercebido.
+- **Rede de segurança secundária**: `OverlayCoordinator.stopAndTranscribe()` envolve
+  `transcriber.transcribe(audio, cfg)` com `withTimeout(cfg.timeoutMs + 2000ms)`; `TimeoutCancellationException`
+  vira `TranscriptionResult.Error(TIMEOUT, ...)`. Protege contra qualquer implementação de
+  `OverlayTranscriber` que trave por um caminho que o OkHttp não cobre — a margem de 2s dá tempo do
+  `callTimeout` (defesa primária) surgir primeiro no caso comum.
+- UI: aba Voz ganhou seção **"Geral"** (abaixo do seletor de origem, acima dos campos por preset) com
+  "Tempo limite de resposta" + `Segmented` de 1s/5s/15s/30s/1m/2m (padrão 15s) — reusa o componente
+  `Segmented<T>` genérico já usado no seletor de provedor. Vale pra qualquer origem (inclusive Créditos,
+  card stub).
+- Gate completo fresco: **171 unit (0 falhas)** + **78 instrumentados, 2 falhas** — ambas
+  `SystemSurfacesScreenshotTest` (Keystore lento sob carga, ambiental, já documentado), nada novo quebrado.
+
+### Ajustes pós-teste (Yan, 2026-07-02)
+- "Tempo limite de resposta" movido pra **abaixo** do token/credenciais do preset ativo (`GeneralSection`
+  agora renderiza depois do `when(settings.source)`, não antes) — não compete por atenção no topo do
+  painel com a escolha de origem.
+- Novo seletor **"Duração máxima de gravação"** (10s/30s/1m/5m/10m/30m, padrão 5m) na mesma seção Geral —
+  **MOCKADO de propósito** (pedido explícito do Yan: "se for tarefa complexa, deixa mockado e registra a
+  pendência"): `Settings.maxRecordingSec` persiste de verdade, mas nada ainda aplica o limite durante a
+  gravação. Comportamento pretendido (não implementado): ao atingir o tempo configurado, pausar
+  automaticamente e mostrar um toast oferecendo enviar ou descartar — anotado no `TODO` (raiz) com detalhe
+  técnico (reusar o padrão CANCELLING/desfazer já existente no `OverlayCoordinator`).
+  **Viabilidade confirmada** (não fabricada — pesquisa web): Whisper/OpenAI e Groq (free tier) limitam
+  upload direto a 25MB; nosso `AudioRecorder` grava AAC a 64kbps (`AudioRecorder.AUDIO_BIT_RATE`), então
+  30min ≈ 14,4MB — todas as 6 opções cabem com folga.
+
+## Tamanho do teclado — item 4 da fila (2026-07-02)
+
+Yan não conseguiu testar a troca de idioma (item 3): o sistema só mostra PT disponível pro KeyFlow — a
+tela de Idiomas do Android está travada nisso. Pediu pra adiantar o item 4 (mais simples) primeiro.
+
+- `Settings.keyboardScalePercent: Int = 100` (70..130 na UI) — reusa o `scale: Float` que **já existia**
+  em `KeyFlowKeyboardView`/`KeyboardGridView`/`CandidatesView` (só era usado pela demo em miniatura da aba
+  Modo, `scale = 0.7f`). Persistido via `SettingsRepository` (chave `keyboard_scale_percent`) + leitura
+  leve `keyboardScalePercentOnce()` (só DataStore, mesmo padrão de `themeDarkOnce()` — não inicializa o
+  EncryptedSharedPreferences no caminho crítico do IME).
+  `KeyFlowKeyboardService.onCreateInputView()` lê os dois num único `repo` reusado e passa `scale =
+  scalePercent / 100f`; como o `dp()` interno já multiplicava por `scale` em toda a View (teclas antigas
+  E grade Canvas), a mudança foi só ler o valor real em vez do `1f` fixo — **nenhuma mudança de
+  rendering necessária**, o mecanismo já existia pronto.
+  Aplica na criação/reabertura do teclado (igual o tema escuro/claro já funciona) — não redimensiona ao
+  vivo enquanto o teclado está aberto (mesma limitação do tema, não é regressão nova).
+- UI: slider "Tamanho do teclado" na aba Teclado (70%–130%, mostra `NN%`), abaixo de "Idioma do teclado" e
+  acima da seção de Skins — mesmo estilo/`Slider` do "Tamanho da orbe" (Overlay).
+- Gate rodado fresco pra esta mudança: **197 unit (0 falhas)** + **84 instrumentados, 2 falhas** (ambas
+  `SystemSurfacesScreenshotTest`, ambiental, já documentado) — nada quebrado pelo tamanho do teclado.
+- **Pendente**: build gerado (`assembleDebug` verde) mas **não instalado** — o device físico
+  (`RX8T10DERKW`) não estava conectado no momento (só o emulador). Instalar quando reconectar:
+  `adb -s RX8T10DERKW install -r -d app/build/outputs/apk/debug/app-debug.apk`.
+
+## Bug real do item 3 encontrado e corrigido — subtypes com label compartilhado (2026-07-02)
+
+Enquanto o device físico estava desconectado, investiguei por código o motivo do sistema só mostrar PT
+disponível pro KeyFlow (o que travava o item 3 — testar o globo). **Achado**: os 3 `<subtype>` em
+`res/xml/method_keyboard.xml` (pt_BR/en_US/es_ES) declaravam o **mesmo** `android:label` literal
+(`@string/ime_subtype_label` = "KeyFlow") — isso é um erro clássico de configuração de IME: a tela de
+idiomas do sistema usa o label pra diferenciar subtypes, e com os 3 idênticos ela trata como duplicado,
+sobrando só o 1º (pt_BR) pra habilitar.
+
+**Correção**: removido `android:label` de cada `<subtype>` (e a string agora órfã `ime_subtype_label`).
+Sem o atributo, o framework **gera o nome certo por locale automaticamente** — é assim que o Gboard e o
+AOSP LatinIME declaram os deles; nunca fixam um label igual pra tudo.
+
+**Verificado empiricamente no emulador** (não só por leitura de código): instalei o APK, `ime enable` +
+`ime set`, abri a tela real do Android
+(`am start -n com.android.settings/.inputmethod.InputMethodAndSubtypeEnablerActivity -e
+input_method_id com.keyflow/.ime.KeyFlowKeyboardService`) e capturei prints:
+- **Antes** não foi capturado (a correção já tinha sido aplicada no código antes do 1º build), mas o
+  raciocínio bate com o sintoma relatado pelo Yan (só PT disponível = só o 1º subtype sobrevivendo à
+  deduplicação por label).
+- **Depois**: a tela mostra 3 itens distintos e corretos — "English (United States)", "Portuguese
+  (Brazil)", "Spanish (Spain)" — cada um com seu próprio toggle. Desliguei "Use system languages" e
+  liguei English + Portuguese simultaneamente, confirmando que dá pra habilitar mais de 1 (o que faltava
+  pro Yan testar o globo PT↔EN↔ES).
+- `ime reset` rodado depois pra devolver o emulador ao estado padrão dos outros testes.
+
+**Ressalva honesta**: verifiquei no emulador (Android stock/AOSP), não no Galaxy A32 (One UI) do Yan —
+a Samsung pode ter uma tela de idiomas própria com comportamento um pouco diferente. Mas a causa raiz
+(subtypes com label duplicado) é uma violação clara da própria documentação do Android
+(`android:label` de `<subtype>`: "se vazio, o framework gera usando o locale"), então a correção é
+correta independente de skin OEM — só falta a confirmação final do Yan no aparelho físico.
+Gate: `ManifestWiringTest` (unit) + `KeyFlowKeyboardLanguageTest` (2 instrumentados) verdes depois da
+mudança.
+
+## Idioma revertido pra 100% app-managed (reverte KC-T9) + prévia de tamanho + slider (2026-07-02)
+
+Depois do fix acima o Yan testou no Galaxy A32 e trouxe 3 achados novos:
+
+1. **O seletor "Trocar teclado" do sistema listava "KeyFlow" 3x** (um por idioma), enquanto o Samsung só
+   mostra 1 vez pro teclado dele — e **o globo no teclado não fazia nada** (`switchToNextInputMethod(true)`
+   não surtia efeito perceptível no aparelho, apesar de "correto" em teoria). Isso é comportamento
+   PADRÃO do Android quando um IME declara >1 subtype pro mesmo modo — não é bug do fix anterior, é uma
+   característica conhecida e chata do mecanismo de subtypes do sistema (o Gboard não sofre disso porque
+   **não usa subtypes do sistema pra multi-idioma**: gerencia tudo dentro do próprio app).
+2. **Slider de tamanho funcionando, mas só via ao reabrir o teclado** (mesma limitação do tema
+   claro/escuro) — pediu uma prévia ao vivo na própria tela de config.
+3. Confirmou que a única diferença perceptível entre idiomas até agora foi o `ñ` do ES (esperado — layout/
+   acentos/corretor mudam por idioma, só não é óbvio à primeira vista).
+
+**Decisão (confirmada pelo Yan, com timeout de 60s → segui a recomendação já alinhada com a preferência
+dele)**: reverter o KC-T9 na parte de subtypes do sistema. Idioma agora é **100% gerenciado pelo app**:
+
+- `res/xml/method_keyboard.xml` voltou a **1 subtype só** (`pt_BR`) — existe só pra declarar o modo
+  "keyboard" ao Android; elimina de vez a duplicata no seletor E a tela "Usar idiomas do sistema" pro
+  KeyFlow (que não faz mais sentido sem múltiplos subtypes).
+- `Settings.keyboardLanguage: String = "pt"` novo (pt/en/es), persistido + leitura/escrita leve
+  (`keyboardLanguageOnce()`/`saveKeyboardLanguageOnce()`, mesmo padrão de `themeDarkOnce()`/
+  `keyboardScalePercentOnce()` — só DataStore, sem tocar no EncryptedSharedPreferences no caminho
+  crítico do IME).
+- `KeyFlowKeyboardService`: removidos `activeLocale()`/`enabledSubtypeCount()`/`switchToNextSubtype()`/
+  `onCurrentInputMethodSubtypeChanged` (tudo dependia do subtype do sistema). `localeFor(lang)` novo
+  (mapeamento puro pt/en/es → `Locale`, só pro `SystemSpellChecker`). `showLanguageKey` agora é sempre
+  `true` (globo sempre visível — não depende mais de quantos subtypes o sistema tem habilitados).
+  `cycleLanguage()` novo: lê `keyboardLanguageOnce()`, avança pt→en→es→pt, persiste e reconstrói a view
+  (`setInputView(onCreateInputView())`, mesmo caminho que a troca de subtype antiga usava).
+- **Verificado de verdade no emulador** (não só por leitura de código): `KeyFlowKeyboardLanguageTest`
+  novo tocou o globo de verdade via `sendPointerSync` 2x seguidas (pt→en→es), confirmando a cada passo
+  que `Settings.keyboardLanguage` persistiu E que a grade nova tem `ñ` só depois de chegar em ES — cobre
+  exatamente o caminho que estava quebrado no device físico do Yan.
+- **Prévia ao vivo do tamanho** (pedido 2, `TecladoPanel.kt`): `KeyFlowKeyboardView` real (callbacks
+  no-op) abaixo do slider, reconstruída via `key(scalePercent, dark)` a cada mudança — como `scale` é
+  fixado no construtor da View (não é propriedade mutável), a única forma simples de refletir ao vivo é
+  recriar a instância a cada passo do arrasto (mesma técnica que o demo da aba Modo já usa pra tema:
+  `key(dark)`). Teste novo mede a altura real do preview (via um hook `keyboardSizePreviewForTest`,
+  mesmo padrão do `activeViewForTest` do service) e confirma que cresce de 70%→130%.
+  **Efeito colateral pego pelo gate**: a prévia empurrou "Desbloquear skins" pra fora do viewport padrão
+  do `ConfigScreenTest` — `performClick()` do Compose é por coordenada real, não por semantics puro,
+  então precisou de `.performScrollTo()` antes do clique (não existia esse padrão ainda no projeto).
+- Gate completo fresco: unit verde + **94 instrumentados, 2 falhas** (`SystemSurfacesScreenshotTest`,
+  ambiental, já documentado) — nada novo quebrado. Build instalado no Galaxy A32 do Yan.
+- **Pendente**: confirmação do Yan no device físico (globo ciclando de verdade, seletor do sistema só com
+  1 "KeyFlow", prévia de tamanho reagindo ao arrasto).
+
+## Teclado numérico automático por tipo de campo — NUM-01 (2026-07-01)
+
+Item 2 da fila acima, implementado via grill rápido de 3 decisões com o Yan antes de codar:
+**escopo só grade Canvas** (o teclado antigo já está a caminho de ser removido, item 5), **layout
+"discador" 3x4** (não faixa de dígitos estilo Gboard), **travado em números** (sem `?123`/`ABC` pra sair —
+igual comportamento nativo do Samsung/Gboard em campo de PIN/telefone).
+
+- `LayerId.NUMBER` novo + `Layouts.numberLayout()`: camada única (sem `Layer` nem `Shift` — é isso que
+  garante o travamento, não há tecla pra sair). **Ajustado após o 1º teste no device** (Yan comparou com o
+  teclado numérico nativo do Samsung, que tem uma 4ª coluna à direita): `1 2 3 + / 4 5 6 - / 7 8 9 . /
+  ⌫ 0 ⏎ ,` — discador 3x3 + as duas teclas em volta do 0 (`⌫`/`⏎`, já no design original) + uma 4ª coluna
+  com os símbolos mais comuns de telefone/valor como teclas visíveis (não mais escondidos em long-press).
+
+- `KeyboardGridState` ganhou `initialLayer` (default LETTERS) — sem isso o layout numérico (que só declara
+  a camada NUMBER) quebraria no primeiro acesso a `currentLayer`.
+- **Achado de arquitetura durante a implementação**: `KeyFlowKeyboardView`/`KeyboardGridView` são
+  REUSADAS entre campos — `onCreateInputView` não roda a cada troca de campo focado, só `onStartInputView`
+  (a view só é recriada de verdade na troca de idioma, via `setInputView` explícito da KC-T9). Então a
+  detecção não podia viver só na criação da view; `KeyboardGridView.setLayout(newLayout, initialLayer)`
+  novo reconfigura a grade em runtime (limpa qualquer preview/popup de acento em andamento via
+  `cancelFinger`) e `KeyFlowKeyboardView.updateInputType(numeric)` decide entre `Layouts.numberLayout()` e
+  `Layouts.forLocale(...)` — só ativo quando `useCanvasGrid`, no-op no teclado antigo.
+  `KeyFlowKeyboardService` fia isso em dois pontos: `onCreateInputView` (estado inicial, lendo
+  `currentInputEditorInfo` — já populado nesse ponto do ciclo de vida) e `onStartInputView` (toda troca de
+  campo subsequente na mesma view).
+- `isNumericInputType(inputType: Int)` novo (`ime/keyboard/InputTypeClassifier.kt`), função pura checando
+  `TYPE_MASK_CLASS` contra `TYPE_CLASS_NUMBER`/`TYPE_CLASS_PHONE`. Confirmado que `android.text.InputType`
+  é seguro de referenciar em unit test JVM puro (sem Robolectric) neste projeto — são constantes
+  `static final int`, inlined em bytecode, não uma chamada real à `android.jar` não mockado
+  (`isReturnDefaultValues=true` no `build.gradle.kts` cobriria mesmo se não fossem).
+- `ImeProbeActivity` (debug) ganhou extra opcional `EXTRA_INPUT_TYPE` (default `TYPE_CLASS_TEXT`, não
+  quebra nenhum teste existente) pro `KeyFlowKeyboardNumericFieldTest.kt` novo (3 instrumentados) simular
+  campo numérico/telefone/texto e confirmar a troca — incluindo o caso importante de voltar pra texto na
+  MESMA instância de view (não é só a criação inicial que funciona).
+- Gate completo (unit + instrumentado) rodado fresco no emulador: **168 unit (0 falhas)** + **74
+  instrumentados, 3 falhas** — todas as 3 já conhecidas e não-relacionadas (2×
+  `SystemSurfacesScreenshotTest`, Keystore lento sob carga; 1× `KeyFlowKeyboardSelectorTest`, toque
+  sintético intermitente em lote completo — ambas documentadas em rodadas anteriores desta mesma STATE.md).
+  `KeyFlowKeyboardNumericFieldTest` passou 3/3.
+- **Pendente**: validação manual no Galaxy A32 (sensação de trocar de campo de verdade, ex.: campo de
+  telefone de um formulário real) — mesma pendência de fluidez que o resto da grade Canvas (KC-T10).
+
+## Continuação pós-quota — 4 ajustes do Yan no teclado (2026-07-02/03)
+
+Sessão anterior caiu por limite de quota no meio de 4 ajustes pedidos pelo Yan (não documentados ainda no
+`STATE.md` na hora da queda). Ao retomar, achei os 4 já com código (não commitado) no working tree — os
+3 primeiros prontos, o 4º com o bug real ainda intocado:
+
+1. **Globo com a cor da tinta (ink), não azul** — feito. `KeyboardGridView.drawGlobeIcon()` desenha o
+   globo manualmente (círculo + meridianos) com `kbInk` em vez do emoji 🌐, que ignora `Paint.color` e
+   destoava da paleta monocromática das outras teclas.
+2. **Barra de espaço mostra o nome do idioma** (`Layouts.spaceLabel(locale)` → "Português"/"English"/
+   "Español") — feito, igual o Samsung: label permanente que já serve de feedback visual da troca pelo
+   globo (muda na hora que o idioma muda), não um flash temporário.
+3. **Teclado recompõe ao vivo (tema/tamanho) sem precisar reabrir** — feito.
+   `KeyFlowKeyboardService.onCreate()` ganhou um `combine(themeDarkFlow, keyboardScalePercentFlow,
+   keyboardLanguageFlow).distinctUntilChanged()` que chama `setInputView(onCreateInputView())` quando algo
+   muda de verdade — mesmo padrão de `appliedBarsConfig`/BAR-07; `appliedLiveConfig` é atualizado dentro de
+   `onCreateInputView()`, sem risco de loop.
+4. **Prévia do slider de tamanho não reproduzia proporção real** — bug real, corrigido nesta sessão. Causa:
+   `ConfigScreen.kt` aplica `padding(horizontal = 12.dp)` ao corpo de qualquer aba ativa (linha ~206), e a
+   `KeyboardSizePreview` (`TecladoPanel.kt`) ficava presa dentro desse padding — mais estreita que a
+   largura real de tela que o teclado usa em produção (edge-to-edge), então o `scale` não reproduzia a
+   proporção verdadeira. Corrigido com um modifier local `Modifier.bleedHorizontal(12.dp)` (mede com +24dp
+   de largura via `Modifier.layout {}` e posiciona com offset -12dp), "vazando" por cima do padding do
+   painel só nessa prévia. Teste novo `TecladoPanelTest.keyboardSizePreviewBleedsPastPanelPaddingToRealWidth`
+   reproduz o padding real do `ConfigScreen` (o `Harness` sozinho não tinha esse padding, por isso o bug
+   não aparecia na suíte existente) e confirma que a prévia ocupa a largura do root (tolerância de 1px —
+   Compose e a `View` legada arredondam dp→px de forma independente). Print conferido visualmente no
+   emulador (`config-teclado`, claro): a prévia agora vai de ponta a ponta da tela.
+   **Ressalva conhecida, não corrigida**: a prévia sempre usa a `KeyFlowKeyboardView` ANTIGA (não a grade
+   Canvas), então não reflete a 4ª fileira/label de idioma da grade nova — mesma limitação que já existia
+   antes desta sessão, fora do escopo do bug de proporção.
+- Gate completo fresco: **215 unit (0 falhas)** + **96 instrumentados, 3 falhas** — todas já conhecidas e
+  ambientais (2× `SystemSurfacesScreenshotTest`, Keystore lento sob carga; 1×
+  `KeyFlowKeyboardSelectorTest.holdWhileRecordingOpensSelectorWithPauseAndCancel`, toque sintético
+  intermitente em lote completo). Nada novo quebrado pelos 4 ajustes.
+- Golden `config-teclado`/`config-teclado-dark` regenerados/aprovados (a prévia maior e proporcional
+  empurra a seção Skins mais pra baixo — diferença esperada, conferida visualmente nos dois temas, sem
+  glitch de layout). **Lição repetida**: `connectedDebugAndroidTest` desinstala o app ao final (já
+  documentado antes) — precisou `installDebug` de novo antes de capturar os prints.
+- Build instalado no Galaxy A32 do Yan pra ele testar os 4 itens.
+
+### 2ª rodada — margem de segurança na prévia (2026-07-03)
+
+Yan testou no Galaxy A32: itens 1 (cor do globo) e 2 (idioma na barra de espaço) confirmados funcionando.
+Item 4 (prévia) melhorou mas ainda ficava um pouco MAIOR que o teclado real — o vazamento até a borda
+física da tela (bleed de 12dp completo) superestimava o tamanho verdadeiro. Causa provável: a janela do
+IME do sistema não é 100% edge-to-edge no device real (alguma margem que este app não controla), e a
+prévia (dentro de uma Activity comum) não tem essa mesma restrição. **Decisão do Yan**: preferir errar
+pra menor a errar pra maior, contanto que a variação seja pequena.
+
+- `PREVIEW_MARGIN_DP = 4.dp` (internal, `TecladoPanel.kt`): o bleed agora só cancela `12dp -
+  PREVIEW_MARGIN_DP` do padding do painel, deixando uma margem residual de 4dp de cada lado de propósito
+  (em vez de vazar os 12dp inteiros até a borda física).
+  Teste `keyboardSizePreviewBleedsPastPanelPaddingButKeepsASmallSafetyMargin` (renomeado do teste
+  anterior, que assumia largura exata) agora calcula a largura esperada via `LocalDensity` e confirma que
+  a prévia fica exatamente `2 × PREVIEW_MARGIN_DP` mais estreita que o root, não mais 100% full-bleed.
+- Golden `config-teclado`/`config-teclado-dark` regenerados/aprovados de novo (margem residual visível
+  nas laterais da prévia, sutil o bastante pra não distorcer a leitura de tamanho).
+- Build reinstalado no Galaxy A32 do Yan.
+- **Pendente**: confirmação final do Yan se a margem de 4dp ficou próxima o suficiente do tamanho real
+  (não há como validar por código — só ele pode comparar visual/tátil com o teclado de produção). Se
+  ainda achar grande/pequeno, é só ajustar `PREVIEW_MARGIN_DP`. Item 3 (recompor ao vivo) ainda não teve
+  feedback explícito do Yan nesta rodada — assumir pendente de confirmação também.
+
+### 3ª rodada — centralização real + fileira de números + hint Gboard (2026-07-03)
+
+Yan testou de novo: itens 1/2 (globo/idioma no espaço) confirmados OK. Item 4 (prévia) ainda maior que o
+real e **vazando pra um lado** ("centraliza no espaço que temos"). Mais 3 pedidos novos: (a) a prévia
+mostrava uma fileira de números que não existe no teclado real (Canvas) — pediu um **toggle** pra fileira
+dedicada de números, refletido na prévia; (b) hint pequeno de dígito no canto da tecla, estilo Gboard;
+(c) perguntou a viabilidade de emoji do sistema no long-press da vírgula.
+
+- **Causa raiz do vazamento**: o `Modifier.layout {}` manual (`bleedHorizontal`) reportava seu próprio
+  tamanho como a largura JÁ AUMENTADA, mas posicionava o conteúdo com offset negativo DENTRO desse
+  tamanho reportado — o conteúdo "vazava" pra fora do próprio retângulo que o node declarava ocupar, e o
+  pai (`Column`, alinhamento Start) posicionava o node vazado a partir de x=0, então a folga extra só
+  aparecia à direita. **Fix**: trocado por `Box(contentAlignment = Alignment.Center)` (mecanismo nativo
+  do Compose, testado) + `LocalConfiguration.current.screenWidthDp` pra largura alvo — centralização por
+  construção, sem cálculo de offset manual. `PREVIEW_MARGIN_DP` subiu de 4dp pra 10dp (4dp ainda ficava
+  visivelmente maior que o real). Teste novo
+  `keyboardSizePreviewIsCenteredUnderThePanelsRealPadding` reproduz o padding real do `ConfigScreen`
+  (12dp simétrico) e mede via semantics do Compose (não `View.getLocationOnScreen`, que carrega
+  deslocamento de janela do harness de teste sem relação com o bug).
+- **Prévia trocada pra `useCanvasGrid=true`**: a prévia usava a `KeyFlowKeyboardView` ANTIGA (não a grade
+  Canvas), por isso mostrava uma fileira de números que não existe na grade real — causa raiz do achado
+  (a) do Yan. Agora a prévia passa `useCanvasGrid=true`, `locale=settings.keyboardLanguage`,
+  `showLanguageKey=true`, `numberRowEnabled=settings.keyboardNumberRowEnabled`, refletindo exatamente o
+  que a grade Canvas renderiza em produção.
+- **NUMROW-01 (fileira de números)**: `Settings.keyboardNumberRowEnabled: Boolean` novo + persistência
+  (`SettingsRepository`, mesmo padrão DataStore de `keyboardScalePercent`) + `Flow`/`Once` +
+  incluído no `LiveKeyboardConfig`/`combine()` do `KeyFlowKeyboardService` (recompõe ao vivo, mesmo
+  mecanismo da 1ª rodada). `Layouts.forLocale(locale, numberRowEnabled)`: quando `true`, prepend uma
+  `KeyRow` de dígitos (1234567890) só na camada LETTERS (SYMBOLS já tem números na 1ª fileira — ganhar
+  outra seria redundante; aceito o pequeno "pulo" de altura ao trocar `?123`↔`ABC`, mesmo trade-off que o
+  próprio Gboard tem com a opção equivalente). Long-press de número na 1ª fileira (`qwertyuiop`) desliga
+  quando a fileira dedicada está ativa (redundante). Toggle novo em `TecladoPanel.kt` ("Fileira de
+  números"), acima de "Tamanho do teclado".
+- **Hint Gboard no canto da tecla**: `KeyAction.Char` ganhou `digitHint: String?` (dado puro, não afeta
+  toque) — `KeyboardGridView.drawKey()` desenha um número pequeno (9sp, alpha 150) no canto superior
+  direito quando presente. Só existe quando a fileira dedicada está OFF (senão seria redundante com ela
+  mesma). Mantém o princípio "rendering é função pura dos dados" do design original (EXT-02).
+- Gate: **229 unit (0 falhas)** + instrumentados relevantes verdes (`TecladoPanelTest` 6/6,
+  `KeyFlowKeyboardCanvasGridTest`/`LanguageTest`/`AccessibilityTest`/`NumericFieldTest`/`SelectorTest`
+  14/14) — as únicas falhas do lote completo foram as 3 já conhecidas/ambientais
+  (`SystemSurfacesScreenshotTest` ×2 + `KeyFlowKeyboardSpellCheckerTest` flaky sob carga, confirmado
+  passando 4/4 isolado). Golden `config-teclado`/`config-teclado-dark` NÃO regenerados nesta rodada
+  (mudou muito visualmente — toggle novo + grade Canvas na prévia — aguardando o Yan confirmar visual
+  antes de aprovar goldens definitivos).
+- **Emoji do sistema no long-press da vírgula (pergunta do Yan, não implementado)**: viável via
+  `androidx.emoji2:emoji2-emojipicker` (biblioteca oficial do Google, `EmojiPickerView` — grade com
+  categorias/skin-tone, verificado via mvnrepository.com, versão atual 1.6.0), MAS não é um popup pequeno
+  como o de acentos — na prática (Gboard/Samsung) o emoji picker troca a ÁREA INTEIRA do teclado (como um
+  "layer" novo), não cabe numa popup pequena acima da vírgula. Escopo real: nova dependência + um painel
+  cheio (RecyclerView com abas de categoria) substituindo a grade temporariamente + botão de volta.
+  Estimativa: tarefa própria, não um adendo de 5 minutos. Aguardando confirmação do Yan se entra na fila.
+- Build instalado no Galaxy A32 do Yan (emulador conferido visualmente: prévia real, centralizada, toggle
+  novo, hints de dígito, globo/espaço já validados antes).
+
+### 4ª rodada — ajuste fino da margem (2026-07-03)
+
+Yan confirmou: item 4 funcionou e ficou bom, só pediu reduzir "muito pouco" mais. `PREVIEW_MARGIN_DP`
+10dp → 14dp. Gate `quick` (`TecladoPanelTest` 6/6). Build reinstalado no Galaxy A32.

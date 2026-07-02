@@ -5,7 +5,7 @@ import com.keyflow.core.TranscriptionResult
 import com.keyflow.data.Config
 import java.io.File
 import java.io.IOException
-import java.net.SocketTimeoutException
+import java.io.InterruptedIOException
 
 class TranscriptionClient(private val api: WhisperApi = WhisperApi()) {
 
@@ -26,7 +26,10 @@ class TranscriptionClient(private val api: WhisperApi = WhisperApi()) {
                     else -> parseSuccess(response.body?.string().orEmpty())
                 }
             }
-        } catch (e: SocketTimeoutException) {
+        } catch (e: InterruptedIOException) {
+            // Cobre tanto SocketTimeoutException (subtipo — connect/readTimeout) quanto o
+            // InterruptedIOException "puro" que o OkHttp lança quando é o callTimeout (chamada inteira,
+            // não um socket específico) que expira — achado ao testar cfg.timeoutMs por requisição.
             TranscriptionResult.Error(ErrorKind.TIMEOUT, e.message ?: "timeout")
         } catch (e: IOException) {
             TranscriptionResult.Error(ErrorKind.NETWORK, e.message ?: "network error")

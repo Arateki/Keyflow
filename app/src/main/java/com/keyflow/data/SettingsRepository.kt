@@ -57,6 +57,32 @@ class SettingsRepository(
     /** Mesma leitura leve de [themeDarkOnce], para o tamanho do teclado (também lido em `onCreateInputView`). */
     suspend fun keyboardScalePercentOnce(): Int = dataStore.data.first()[KEYBOARD_SCALE_PERCENT] ?: 100
 
+    /**
+     * Observação ao vivo de tema/tamanho/idioma (pedido do Yan, 2026-07-03: aplicar sem precisar reabrir
+     * o teclado) — mesmo padrão de [barsConfigFlow]/[shortcutGridsFlow] (BAR-07).
+     */
+    fun themeDarkFlow(): Flow<Boolean> = dataStore.data.map { it[THEME_DARK] ?: false }
+    fun keyboardScalePercentFlow(): Flow<Int> = dataStore.data.map { it[KEYBOARD_SCALE_PERCENT] ?: 100 }
+    fun keyboardLanguageFlow(): Flow<String> = dataStore.data.map { it[KEYBOARD_LANGUAGE] ?: "pt" }
+    fun keyboardNumberRowEnabledFlow(): Flow<Boolean> =
+        dataStore.data.map { it[KEYBOARD_NUMBER_ROW_ENABLED] ?: false }
+
+    /** Mesma leitura leve de [themeDarkOnce], para a fileira de números (também lida em `onCreateInputView`). */
+    suspend fun keyboardNumberRowEnabledOnce(): Boolean =
+        dataStore.data.first()[KEYBOARD_NUMBER_ROW_ENABLED] ?: false
+
+    /**
+     * Idioma do teclado ("pt"/"en"/"es"), gerenciado pelo app (não pelos subtypes do sistema — ver
+     * [Settings.keyboardLanguage]). Leitura leve mesmo padrão de [themeDarkOnce]; escrita separada
+     * (não passa pelo round-trip completo de [saveSettings]) porque o globo troca isto sozinho, sem
+     * tocar no resto da config.
+     */
+    suspend fun keyboardLanguageOnce(): String = dataStore.data.first()[KEYBOARD_LANGUAGE] ?: "pt"
+
+    suspend fun saveKeyboardLanguageOnce(language: String) {
+        dataStore.edit { it[KEYBOARD_LANGUAGE] = language }
+    }
+
     /** Leitura leve da intensidade de vibração (háptica da grade efêmera/alavanca — GRD-03/JOY-02). */
     suspend fun vibrationIntensityOnce(): Int = dataStore.data.first().let { prefs ->
         prefs[VIBRATION_INTENSITY] ?: (if (prefs[HAPTIC_FEEDBACK] == false) 0 else 60)
@@ -135,6 +161,8 @@ class SettingsRepository(
             transcriptionTimeoutMs = prefs[TRANSCRIPTION_TIMEOUT_MS] ?: Config.DEFAULT_TIMEOUT_MS.toInt(),
             maxRecordingSec = prefs[MAX_RECORDING_SEC] ?: 300,
             keyboardScalePercent = prefs[KEYBOARD_SCALE_PERCENT] ?: 100,
+            keyboardLanguage = prefs[KEYBOARD_LANGUAGE] ?: "pt",
+            keyboardNumberRowEnabled = prefs[KEYBOARD_NUMBER_ROW_ENABLED] ?: false,
         )
     }
 
@@ -178,6 +206,8 @@ class SettingsRepository(
             prefs[TRANSCRIPTION_TIMEOUT_MS] = settings.transcriptionTimeoutMs
             prefs[MAX_RECORDING_SEC] = settings.maxRecordingSec
             prefs[KEYBOARD_SCALE_PERCENT] = settings.keyboardScalePercent
+            prefs[KEYBOARD_LANGUAGE] = settings.keyboardLanguage
+            prefs[KEYBOARD_NUMBER_ROW_ENABLED] = settings.keyboardNumberRowEnabled
         }
     }
 
@@ -278,6 +308,8 @@ class SettingsRepository(
         val TRANSCRIPTION_TIMEOUT_MS = intPreferencesKey("transcription_timeout_ms")
         val MAX_RECORDING_SEC = intPreferencesKey("max_recording_sec")
         val KEYBOARD_SCALE_PERCENT = intPreferencesKey("keyboard_scale_percent")
+        val KEYBOARD_LANGUAGE = stringPreferencesKey("keyboard_language")
+        val KEYBOARD_NUMBER_ROW_ENABLED = booleanPreferencesKey("keyboard_number_row_enabled")
         // Trabalho 3 (shortcut-bars): barras personalizáveis + teclados de atalhos, como JSON.
         val BARS_CONFIG_JSON = stringPreferencesKey("bars_config_json")
         val SHORTCUT_GRIDS_JSON = stringPreferencesKey("shortcut_grids_json")

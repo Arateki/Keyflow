@@ -32,6 +32,8 @@ import com.keyflow.ui.theme.SpaceGrotesk
 import com.keyflow.ui.theme.SpaceMono
 
 fun sourceTag(source: TranscriptionSource): String = "voz-source-${source.name.lowercase()}"
+fun timeoutTag(ms: Int): String = "voz-timeout-$ms"
+fun maxRecordingTag(sec: Int): String = "voz-max-recording-$sec"
 
 const val VOZ_CREDITS_CARD_TAG = "voz-credits-card"
 const val VOZ_RECHARGE_TAG = "voz-recharge"
@@ -102,6 +104,10 @@ fun VozPanel(
             )
             TranscriptionSource.CUSTOM -> CustomFields(settings, onSettingsChange)
         }
+
+        // Abaixo do token/credenciais do preset ativo (pedido do Yan, 2026-07-02) — não compete por
+        // atenção no topo do painel com a escolha de origem.
+        GeneralSection(settings, onSettingsChange)
     }
 }
 
@@ -134,6 +140,101 @@ internal fun languageLabel(code: String): String = when (code) {
     "ko" -> "한국어"
     "ru" -> "Русский"
     else -> code
+}
+
+// Tempo limite de resposta (ms) — compartilhado entre OpenAI/Groq/Custom, não é por preset. Bug real
+// (Yan, 2026-07-01): sem isto, uma rota de rede ruim trava "transcrevendo" pra sempre (OkHttp/JVM não
+// tem timeout de DNS por padrão). Padrão 15s.
+private val TIMEOUT_OPTIONS_MS = listOf(1_000, 5_000, 15_000, 30_000, 60_000, 120_000)
+
+private fun timeoutLabel(ms: Int): String = when (ms) {
+    1_000 -> "1s"
+    5_000 -> "5s"
+    15_000 -> "15s"
+    30_000 -> "30s"
+    60_000 -> "1m"
+    120_000 -> "2m"
+    else -> "${ms / 1000}s"
+}
+
+// Duração máxima de gravação (s) — pedido do Yan, 2026-07-02. MOCKADO (ver GeneralSection): o valor
+// persiste de verdade, mas nada ainda o aplica durante a gravação. Números viáveis pras APIs: nosso
+// AudioRecorder grava AAC a 64kbps (AudioRecorder.AUDIO_BIT_RATE) — 30min ≈ 14,4MB, bem abaixo do
+// limite de 25MB de upload direto do Whisper (OpenAI) e do Groq (free tier).
+private val MAX_RECORDING_OPTIONS_SEC = listOf(10, 30, 60, 300, 600, 1800)
+
+private fun maxRecordingLabel(sec: Int): String = when (sec) {
+    10 -> "10s"
+    30 -> "30s"
+    60 -> "1m"
+    300 -> "5m"
+    600 -> "10m"
+    1800 -> "30m"
+    else -> if (sec < 60) "${sec}s" else "${sec / 60}m"
+}
+
+/**
+ * Seção "Geral" (abaixo do token/credenciais do preset ativo — vale pra qualquer provedor, não é campo
+ * por preset).
+ */
+@Composable
+private fun GeneralSection(settings: Settings, onSettingsChange: (Settings) -> Unit) {
+    val palette = LocalKeyFlowPalette.current
+    Column(Modifier.padding(top = 20.dp)) {
+        Text(
+            text = "Geral".uppercase(),
+            color = palette.faint,
+            fontFamily = SpaceMono,
+            fontSize = 8.5.sp,
+        )
+        Text(
+            text = "Tempo limite de resposta",
+            color = palette.fg,
+            fontFamily = SpaceGrotesk,
+            fontWeight = FontWeight.Medium,
+            fontSize = 13.sp,
+            modifier = Modifier.padding(top = 10.dp),
+        )
+        Text(
+            text = "Tempo máximo de espera pela transcrição antes de mostrar erro.",
+            color = palette.faint,
+            fontFamily = SpaceGrotesk,
+            fontSize = 11.sp,
+            modifier = Modifier.padding(top = 3.dp),
+        )
+        Segmented(
+            options = TIMEOUT_OPTIONS_MS,
+            selected = settings.transcriptionTimeoutMs,
+            label = ::timeoutLabel,
+            tag = ::timeoutTag,
+            onSelect = { onSettingsChange(settings.copy(transcriptionTimeoutMs = it)) },
+            modifier = Modifier.padding(top = 9.dp),
+        )
+
+        Text(
+            text = "Duração máxima de gravação",
+            color = palette.fg,
+            fontFamily = SpaceGrotesk,
+            fontWeight = FontWeight.Medium,
+            fontSize = 13.sp,
+            modifier = Modifier.padding(top = 18.dp),
+        )
+        Text(
+            text = "Em breve: ao atingir o limite, a gravação pausa e pergunta se quer enviar ou descartar.",
+            color = palette.faint,
+            fontFamily = SpaceGrotesk,
+            fontSize = 11.sp,
+            modifier = Modifier.padding(top = 3.dp),
+        )
+        Segmented(
+            options = MAX_RECORDING_OPTIONS_SEC,
+            selected = settings.maxRecordingSec,
+            label = ::maxRecordingLabel,
+            tag = ::maxRecordingTag,
+            onSelect = { onSettingsChange(settings.copy(maxRecordingSec = it)) },
+            modifier = Modifier.padding(top = 9.dp),
+        )
+    }
 }
 
 @Composable
