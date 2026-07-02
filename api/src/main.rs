@@ -1,9 +1,11 @@
 use keyflow_api::google::auth::ServiceAccountKey;
 use keyflow_api::google::integrity::IntegrityClient;
+use keyflow_api::google::publisher::PublisherClient;
 use keyflow_api::{AppState, app, config::Config, db, init_tracing};
 use tokio::net::TcpListener;
 
 const PLAY_INTEGRITY_BASE_URL: &str = "https://playintegrity.googleapis.com";
+const ANDROID_PUBLISHER_BASE_URL: &str = "https://androidpublisher.googleapis.com";
 
 #[tokio::main]
 async fn main() {
@@ -26,11 +28,18 @@ async fn main() {
         reqwest::Client::new(),
         PLAY_INTEGRITY_BASE_URL.to_string(),
         config.package_name.clone(),
+        service_account.clone(),
+    );
+    let publisher = PublisherClient::new(
+        reqwest::Client::new(),
+        ANDROID_PUBLISHER_BASE_URL.to_string(),
+        config.package_name.clone(),
         service_account,
     );
     let state = AppState::new(
         pool,
         integrity,
+        publisher,
         config.package_name,
         config.integrity_relaxed,
         config.register_rate_limit_per_minute,

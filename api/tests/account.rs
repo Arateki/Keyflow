@@ -6,6 +6,7 @@ use common::test_pool;
 use keyflow_api::app;
 use keyflow_api::google::auth::ServiceAccountKey;
 use keyflow_api::google::integrity::IntegrityClient;
+use keyflow_api::google::publisher::PublisherClient;
 use keyflow_api::{AppState, auth::generate_token, db::accounts};
 use serde_json::Value;
 use tower::ServiceExt;
@@ -16,19 +17,27 @@ async fn test_state() -> AppState {
     let pool = test_pool().await;
     // Nenhum teste deste arquivo bate no Google (só GET /v1/account, autenticado por Bearer já
     // emitido direto no banco).
+    let unused_key = ServiceAccountKey {
+        client_email: "unused@example.com".to_string(),
+        private_key: String::new(),
+        token_uri: "http://127.0.0.1:0/token".to_string(),
+    };
     let integrity = IntegrityClient::new(
         reqwest::Client::new(),
         "http://127.0.0.1:0".to_string(),
         PACKAGE_NAME.to_string(),
-        ServiceAccountKey {
-            client_email: "unused@example.com".to_string(),
-            private_key: String::new(),
-            token_uri: "http://127.0.0.1:0/token".to_string(),
-        },
+        unused_key.clone(),
+    );
+    let publisher = PublisherClient::new(
+        reqwest::Client::new(),
+        "http://127.0.0.1:0".to_string(),
+        PACKAGE_NAME.to_string(),
+        unused_key,
     );
     AppState::new(
         pool,
         integrity,
+        publisher,
         PACKAGE_NAME.to_string(),
         false,
         std::num::NonZeroU32::new(1000).unwrap(),

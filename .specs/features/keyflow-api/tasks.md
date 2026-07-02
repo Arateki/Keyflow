@@ -213,7 +213,7 @@ então `[P]` real se houver dois agentes — senão seguir a ordem sequencial.
 
 ## Fase C — Compras
 
-### API-T8 — `POST /v1/purchases/redeem` (validação + idempotência + entitlements)
+### API-T8 — `POST /v1/purchases/redeem` (validação + idempotência + entitlements) — ✅ Concluída (2026-07-02)
 - **What**: fluxo do design §Compras: Integrity → `purchases.products.get` (wiremock) → PENDING
   sem crédito / PURCHASED → tx idempotente por `token_hash` → crédito (minutos do catálogo na
   config) + entitlements se SKU ≥ R$20 → acknowledge. `obfuscatedExternalAccountId` conferido
@@ -225,6 +225,22 @@ então `[P]` real se houver dois agentes — senão seguir a ordem sequencial.
   novo; produto/conta errados → rejeitado; PENDING → "pending" sem crédito; `credits_20` liga
   entitlements, `credits_10` não; acknowledge chamado no wiremock.
 - **Tests**: integração + unit (regra de entitlements/catálogo). **Gate**: `rust`.
+- **Nota de execução**: contrato de `purchases.products.get`/`...acknowledge` conferido na
+  discovery doc oficial (`androidpublisher.googleapis.com/$discovery/rest?version=v3`, schemas
+  `ProductPurchase`/`ProductPurchasesAcknowledgeRequest`) — `purchaseState` é **inteiro** (0
+  Purchased, 1 Canceled, 2 Pending), não string como a prosa do design sugeria; usei os valores
+  reais da API. `src/catalog.rs`: catálogo estático (`credits_10/20/50`, `unlock_forever`) —
+  **minutos são placeholder** explicitamente marcado no código (Yan calibra depois, sem release,
+  vira remoto na T10). Idempotência: `INSERT ... ON CONFLICT (token_hash) DO NOTHING RETURNING
+  granted_entitlements` na mesma tx do `credit()` (savepoint, T3) — `Some` = primeira vez (credita
+  + liga entitlements + `acknowledge` depois do commit); `None` = replay, sem crédito novo e sem
+  acknowledge de novo (testado com `wiremock` `.expect(1)`, provando que a 2ª chamada não bate no
+  Google). `device_key_account_id` (novo, `auth.rs`) implementa `sha256hex(deviceKey)`,
+  compartilhável com a `monetization` (mesma função, mesmo hash — risco documentado no design).
+  `db::accounts::Account` ganhou o campo `device_key` (precisava dele pra essa checagem). 10 testes
+  novos (4 unit de catálogo/publisher-client + 6 integração via HTTP real: compra válida+ack,
+  `credits_10` sem entitlements, replay sem crédito duplo, PENDING, conta errada, produto
+  desconhecido).
 
 ### API-T9 — Job de voided purchases
 - **What**: task tokio periódica (intervalo na config): `voidedpurchases.list` (wiremock) → p/

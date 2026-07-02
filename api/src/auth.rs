@@ -23,6 +23,20 @@ pub fn hash_token(token: &[u8]) -> Vec<u8> {
     Sha256::digest(token).to_vec()
 }
 
+/// `sha256hex(deviceKey)` — o elo compra↔identidade (design M2, §Compras): o app manda esse
+/// mesmo valor como `obfuscatedExternalAccountId` no Billing Library, e a API confere aqui contra
+/// o que o Play devolve. Digest de 32 bytes vira exatamente 64 chars hex — dentro do limite de 64
+/// chars do `obfuscatedAccountId` do Play sem precisar truncar de verdade.
+pub fn device_key_account_id(device_key: &str) -> String {
+    Sha256::digest(device_key.as_bytes())
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect::<String>()
+        .chars()
+        .take(64)
+        .collect()
+}
+
 #[derive(Debug)]
 pub enum AuthRejection {
     Missing,
@@ -100,5 +114,32 @@ mod tests {
             .filter_map(|i| s.get(i..i + 2))
             .map(|b| u8::from_str_radix(b, 16).unwrap())
             .collect()
+    }
+
+    #[test]
+    fn device_key_account_id_is_64_char_lowercase_hex_sha256() {
+        let id = device_key_account_id("");
+
+        assert_eq!(id.len(), 64);
+        assert_eq!(
+            id,
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+        assert!(
+            id.chars()
+                .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+        );
+    }
+
+    #[test]
+    fn device_key_account_id_is_deterministic() {
+        assert_eq!(
+            device_key_account_id("device-abc"),
+            device_key_account_id("device-abc")
+        );
+        assert_ne!(
+            device_key_account_id("device-abc"),
+            device_key_account_id("device-xyz")
+        );
     }
 }

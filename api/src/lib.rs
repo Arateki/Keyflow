@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod catalog;
 pub mod config;
 pub mod db;
 pub mod google;
@@ -16,11 +17,13 @@ use sqlx::PgPool;
 use tower_http::trace::TraceLayer;
 
 use google::integrity::IntegrityClient;
+use google::publisher::PublisherClient;
 use middleware::ratelimit::RateLimiters;
 
 pub struct AppStateInner {
     pub pool: PgPool,
     pub integrity: IntegrityClient,
+    pub publisher: PublisherClient,
     pub package_name: String,
     pub integrity_relaxed: bool,
     pub rate_limiters: RateLimiters,
@@ -36,6 +39,7 @@ impl AppState {
     pub fn new(
         pool: PgPool,
         integrity: IntegrityClient,
+        publisher: PublisherClient,
         package_name: String,
         integrity_relaxed: bool,
         register_rate_limit_per_minute: NonZeroU32,
@@ -44,6 +48,7 @@ impl AppState {
         Self(Arc::new(AppStateInner {
             pool,
             integrity,
+            publisher,
             package_name,
             integrity_relaxed,
             rate_limiters: RateLimiters::new(
@@ -77,6 +82,7 @@ pub fn app(state: AppState) -> Router {
         .route("/health", get(health))
         .route("/v1/register", post(routes::register::register))
         .route("/v1/account", get(routes::account::get_account))
+        .route("/v1/purchases/redeem", post(routes::redeem::redeem))
         .route_layer(
             TraceLayer::new_for_http().make_span_with(|request: &Request<_>| {
                 let matched_path = request
@@ -131,19 +137,27 @@ mod tests {
         let pool = test_pool().await;
         // Nenhum teste deste módulo bate de verdade no Google — a IntegrityClient aponta pra um
         // endereço que nunca é chamado (health não usa integrity).
+        let unused_key = google::auth::ServiceAccountKey {
+            client_email: "unused@example.com".to_string(),
+            private_key: String::new(),
+            token_uri: "http://127.0.0.1:0/token".to_string(),
+        };
         let integrity = IntegrityClient::new(
             Client::new(),
             "http://127.0.0.1:0".to_string(),
             "com.keyflow".to_string(),
-            google::auth::ServiceAccountKey {
-                client_email: "unused@example.com".to_string(),
-                private_key: String::new(),
-                token_uri: "http://127.0.0.1:0/token".to_string(),
-            },
+            unused_key.clone(),
+        );
+        let publisher = PublisherClient::new(
+            Client::new(),
+            "http://127.0.0.1:0".to_string(),
+            "com.keyflow".to_string(),
+            unused_key,
         );
         AppState::new(
             pool,
             integrity,
+            publisher,
             "com.keyflow".to_string(),
             false,
             std::num::NonZeroU32::new(1000).unwrap(),

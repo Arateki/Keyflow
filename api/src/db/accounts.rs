@@ -4,6 +4,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone, PartialEq, Eq, sqlx::FromRow)]
 pub struct Account {
     pub id: Uuid,
+    pub device_key: String,
     pub balance_seconds: i64,
     pub ads_off: bool,
     pub skins_unlocked: bool,
@@ -11,7 +12,8 @@ pub struct Account {
 
 pub async fn find_by_token_hash(pool: &PgPool, token_hash: &[u8]) -> sqlx::Result<Option<Account>> {
     sqlx::query_as(
-        "select id, balance_seconds, ads_off, skins_unlocked from accounts where token_hash = $1",
+        "select id, device_key, balance_seconds, ads_off, skins_unlocked from accounts \
+         where token_hash = $1",
     )
     .bind(token_hash)
     .fetch_optional(pool)
@@ -20,7 +22,8 @@ pub async fn find_by_token_hash(pool: &PgPool, token_hash: &[u8]) -> sqlx::Resul
 
 pub async fn find_by_device_key(pool: &PgPool, device_key: &str) -> sqlx::Result<Option<Account>> {
     sqlx::query_as(
-        "select id, balance_seconds, ads_off, skins_unlocked from accounts where device_key = $1",
+        "select id, device_key, balance_seconds, ads_off, skins_unlocked from accounts \
+         where device_key = $1",
     )
     .bind(device_key)
     .fetch_optional(pool)
@@ -30,7 +33,7 @@ pub async fn find_by_device_key(pool: &PgPool, device_key: &str) -> sqlx::Result
 pub async fn create(pool: &PgPool, device_key: &str, token_hash: &[u8]) -> sqlx::Result<Account> {
     sqlx::query_as(
         "insert into accounts (device_key, token_hash) values ($1, $2) \
-         returning id, balance_seconds, ads_off, skins_unlocked",
+         returning id, device_key, balance_seconds, ads_off, skins_unlocked",
     )
     .bind(device_key)
     .bind(token_hash)

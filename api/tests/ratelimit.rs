@@ -6,6 +6,7 @@ use common::test_pool;
 use keyflow_api::db::accounts::Account;
 use keyflow_api::google::auth::ServiceAccountKey;
 use keyflow_api::google::integrity::IntegrityClient;
+use keyflow_api::google::publisher::PublisherClient;
 use keyflow_api::{AppState, app};
 use serde_json::json;
 use std::net::SocketAddr;
@@ -49,19 +50,27 @@ async fn state_with_limits(
     account_per_minute: u32,
 ) -> AppState {
     let pool = test_pool().await;
+    let key = ServiceAccountKey {
+        client_email: "test@keyflow-test.iam.gserviceaccount.com".to_string(),
+        private_key: include_str!("fixtures/test_service_account_key.pem").to_string(),
+        token_uri: format!("{google_uri}/token"),
+    };
     let integrity = IntegrityClient::new(
         reqwest::Client::new(),
         google_uri.clone(),
         PACKAGE_NAME.to_string(),
-        ServiceAccountKey {
-            client_email: "test@keyflow-test.iam.gserviceaccount.com".to_string(),
-            private_key: include_str!("fixtures/test_service_account_key.pem").to_string(),
-            token_uri: format!("{google_uri}/token"),
-        },
+        key.clone(),
+    );
+    let publisher = PublisherClient::new(
+        reqwest::Client::new(),
+        google_uri,
+        PACKAGE_NAME.to_string(),
+        key,
     );
     AppState::new(
         pool,
         integrity,
+        publisher,
         PACKAGE_NAME.to_string(),
         false,
         std::num::NonZeroU32::new(register_per_minute).unwrap(),

@@ -30,6 +30,17 @@ Módulo disjunto do app Android (`app/`): o Gradle não enxerga esta pasta e vic
     IP (ID-04). `ACCOUNT_RATE_LIMIT_PER_MINUTE` (opcional, default `60`) — limite por conta nas
     rotas autenticadas. Estouro → `429` + header `Retry-After` (segundos).
 
+## Rotas
+
+- `GET /health` — `SELECT 1` no Postgres.
+- `POST /v1/register` — `{deviceKey, integrityToken}` → `{accessToken}` (403 `{"error":
+  "integrity"}` se o Play Integrity rejeitar). Re-registro do mesmo `deviceKey` rotaciona o token.
+- `GET /v1/account` (Bearer) — `{balanceSeconds, adsOff, skinsUnlocked}`.
+- `POST /v1/purchases/redeem` (Bearer) — `{productId, purchaseToken, integrityToken}` →
+  `{status: "credited"}` ou `{status: "pending"}`. Catálogo estático em `src/catalog.rs`
+  (`credits_10/20/50`, `unlock_forever`; minutos são **placeholder** até o Yan calibrar — vira
+  remoto na API-T10). Idempotente por `purchaseToken`; SKUs ≥ R$20 ligam `adsOff`+`skinsUnlocked`.
+
 ```bash
 DATABASE_URL=postgres://keyflow:keyflow@localhost/keyflow_api \
 GOOGLE_SERVICE_ACCOUNT_JSON_PATH=/path/to/service-account.json \

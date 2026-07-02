@@ -6,6 +6,7 @@ use common::test_pool;
 use keyflow_api::db::accounts::Account;
 use keyflow_api::google::auth::ServiceAccountKey;
 use keyflow_api::google::integrity::IntegrityClient;
+use keyflow_api::google::publisher::PublisherClient;
 use keyflow_api::{AppState, app};
 use serde_json::{Value, json};
 use tower::ServiceExt;
@@ -70,21 +71,29 @@ async fn mock_google_bad_device(package_name: &str) -> MockServer {
 
 async fn state_with_google(google_uri: String, package_name: &str) -> AppState {
     let pool = test_pool().await;
+    let key = ServiceAccountKey {
+        client_email: "test@keyflow-test.iam.gserviceaccount.com".to_string(),
+        private_key: include_str!("fixtures/test_service_account_key.pem").to_string(),
+        token_uri: format!("{google_uri}/token"),
+    };
     let integrity = IntegrityClient::new(
         reqwest::Client::new(),
         google_uri.clone(),
         package_name.to_string(),
-        ServiceAccountKey {
-            client_email: "test@keyflow-test.iam.gserviceaccount.com".to_string(),
-            private_key: include_str!("fixtures/test_service_account_key.pem").to_string(),
-            token_uri: format!("{google_uri}/token"),
-        },
+        key.clone(),
+    );
+    let publisher = PublisherClient::new(
+        reqwest::Client::new(),
+        google_uri,
+        package_name.to_string(),
+        key,
     );
     // Limite generoso nos testes deste arquivo: o rate limit em si é coberto isoladamente em
     // src/middleware/ratelimit.rs; aqui só não pode atrapalhar os cenários de negócio.
     AppState::new(
         pool,
         integrity,
+        publisher,
         package_name.to_string(),
         false,
         std::num::NonZeroU32::new(1000).unwrap(),
