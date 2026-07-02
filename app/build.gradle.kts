@@ -24,6 +24,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -44,6 +45,8 @@ dependencies {
     // UI
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
+    // ExploreByTouchHelper (KC-T8/A11Y-01..02): nós virtuais de acessibilidade na grade Canvas.
+    implementation("androidx.customview:customview:1.1.0")
 
     // Jetpack Compose (BOM 2024.09.03 → Compose 1.7.x, compatível com compileSdk 34)
     val composeBom = platform("androidx.compose:compose-bom:2024.09.03")
@@ -77,6 +80,9 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     testImplementation("com.google.truth:truth:1.4.4")
+    // org.json real p/ os unit tests JVM (o android.jar mockado lança em JSONObject/JSONArray); o app usa
+    // o org.json do próprio Android — zero dependência nova no APK (ShortcutCodec, SB-T1).
+    testImplementation("org.json:json:20240303")
 
     // Instrumented
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
