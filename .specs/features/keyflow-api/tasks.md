@@ -108,7 +108,7 @@ então `[P]` real se houver dois agentes — senão seguir a ordem sequencial.
 
 ## Fase B — Identidade
 
-### API-T4 — Google auth + Play Integrity decode client
+### API-T4 — Google auth + Play Integrity decode client — ✅ Concluída (2026-07-02)
 - **What**: módulo `google`: OAuth de service account (JWT assinado → access token, cache até
   expirar) + client do `decodeIntegrityToken`; validação de verdicts do design (§Identidade) com
   flag de config p/ relaxar em build de teste. **Formato conferido na doc oficial** e fixado em
@@ -118,6 +118,27 @@ então `[P]` real se houver dois agentes — senão seguir a ordem sequencial.
 - **Done when**: unit — verdicts aceitos/rejeitados por caso (pacote errado, device fora,
   UNRECOGNIZED com/sem flag); integração wiremock — token OAuth cacheado, decode ok/erro.
 - **Tests**: unit + integração (wiremock). **Gate**: `rust`.
+- **Nota de execução**: formato conferido nas fontes oficiais do Google (não fabricado) — fluxo
+  JWT Bearer de service account em
+  `developers.google.com/identity/protocols/oauth2/service-account` (header RS256, claim set
+  iss/scope/aud/exp/iat, POST `https://oauth2.googleapis.com/token` form-encoded,
+  `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer`) e o contrato exato do
+  `decodeIntegrityToken` (`POST /v1/{packageName}:decodeIntegrityToken`, schemas
+  `DecodeIntegrityTokenRequest`/`Response`/`TokenPayloadExternal`) direto da discovery doc
+  (`playintegrity.googleapis.com/$discovery/rest?version=v1`) + verdicts em
+  `developer.android.com/google/play/integrity/verdicts`. `google::auth::TokenCache` cacheia o
+  access token com margem de 30s antes de expirar (testado: reuso, renovação, erro do endpoint).
+  `google::integrity::verify_verdicts` é função pura (pacote/`appRecognitionVerdict`/
+  `deviceRecognitionVerdict`, com `relax_app_recognition` só bypassando o app-recognition — nunca
+  pacote ou device) — 6 unit tests cobrindo os casos do "Done when". `IntegrityClient` recebe
+  `base_url` explícito (não hardcoded) para apontar pro wiremock em teste e para produção via
+  config na T5. Chave RSA de teste descartável gerada com `openssl` em
+  `tests/fixtures/test_service_account_key.pem` (nunca uma credencial real — só para assinar JWT
+  contra o wiremock). `jsonwebtoken` precisou da feature `aws_lc_rs` explícita (crate não escolhe
+  provider de crypto sozinho desde a 10.x) — mesmo backend que o `reqwest`/`rustls` já usavam,
+  evita duas libs de crypto concorrentes no binário. Nada foi wireado em `Config`/rotas ainda
+  (fica pra API-T5, quando `POST /v1/register` de fato constrói o `IntegrityClient` a partir do
+  ambiente — evita campos de config nunca lidos até lá).
 
 ### API-T5 — `POST /v1/register` + middleware Bearer
 - **What**: registro do design (Integrity → conta por `deviceKey` novo/existente → token novo
