@@ -33,4 +33,4 @@ Padding lateral das abas de config (`ConfigScreen.kt`) quase encostava na borda 
 
 ## Commit
 
-(a preencher após o commit)
+`097c6d7` — feat(config): aumenta a margem lateral das abas de config (Q2)
