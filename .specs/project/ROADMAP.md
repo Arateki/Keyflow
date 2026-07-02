@@ -102,6 +102,23 @@ Spec: `.specs/features/shortcut-bars/` (`spec.md`, `context.md`, `design.md`, `t
 fábrica indistinguível da atual; barra custom montável só pela config); gate `full` verde; goldens
 aprovados.
 
+## Milestone 7 — Monetização + KeyFlow API
+
+Três frentes: **Créditos** (minutos de transcrição com config zero, botão da aba Voz; recarga
+≥ R$20 remove anúncios e libera skins para sempre), **desbloqueio único de R$15** (skins + sem
+anúncios, restaurável) e **anúncios não-chatos** (só no app de config: banner em Docs/Modo/
+Teclado + interstitial raro com backoff crescente + rewarded que dá minutos). Sem login:
+identidade anônima (UUID + Auto Backup/Block Store) validada server-side (purchaseToken via Play
+Developer API + Play Integrity). Fundação: **KeyFlow API em Rust** (axum/tokio + Postgres) —
+validação de compras, ledger, proxy de transcrição streaming, manifest de modelos, config remota
+(inclusive parâmetros dos ads), SSV de rewarded.
+
+Specs: `.specs/features/keyflow-api/` (migra p/ o repo Rust) e `.specs/features/monetization/`
+(`spec.md` + `context.md`; design/tasks após aprovação). Ordem: API primeiro.
+
+**Done:** success criteria das duas specs (fluxo completo com compras de teste; zero ads no
+IME/overlay; app funciona com a API fora do ar).
+
 ## Futuro (pós-v1, não priorizado)
 
 - ~~Teclado visível configurável (teclas reais)~~ — feito (commit 0331389)
