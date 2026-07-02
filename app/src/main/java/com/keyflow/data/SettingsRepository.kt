@@ -19,6 +19,9 @@ import com.keyflow.core.OverlaySide
 import com.keyflow.core.RecordingMode
 import com.keyflow.core.ShortcutOverflow
 import com.keyflow.core.TranscriptionSource
+import com.keyflow.core.shortcuts.BarsConfig
+import com.keyflow.core.shortcuts.ShortcutCodec
+import com.keyflow.core.shortcuts.ShortcutGrid
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -50,6 +53,35 @@ class SettingsRepository(
      * principal ao criar o teclado, o que atrasava a exibição na troca de IME.
      */
     suspend fun themeDarkOnce(): Boolean = dataStore.data.first()[THEME_DARK] ?: false
+
+    /** Mesma leitura leve de [themeDarkOnce], para o tamanho do teclado (também lido em `onCreateInputView`). */
+    suspend fun keyboardScalePercentOnce(): Int = dataStore.data.first()[KEYBOARD_SCALE_PERCENT] ?: 100
+
+    // ── Barras personalizáveis + teclados de atalhos (Trabalho 3 / SB-T5) ────
+    // Strings JSON no DataStore (nada aqui é segredo — fora do EncryptedSharedPreferences); o codec cai
+    // no DEFAULT/vazio em config malformada, então o IME nunca quebra por dado ruim.
+
+    /** Leitura leve para o `onCreateInputView` do IME (só DataStore, como [themeDarkOnce]). */
+    suspend fun barsConfigOnce(): BarsConfig =
+        ShortcutCodec.decodeBars(dataStore.data.first()[BARS_CONFIG_JSON])
+
+    suspend fun shortcutGridsOnce(): List<ShortcutGrid> =
+        ShortcutCodec.decodeGrids(dataStore.data.first()[SHORTCUT_GRIDS_JSON])
+
+    /** Observação ao vivo (BAR-07): o service recria a view do teclado quando a config muda. */
+    fun barsConfigFlow(): Flow<BarsConfig> =
+        dataStore.data.map { ShortcutCodec.decodeBars(it[BARS_CONFIG_JSON]) }
+
+    fun shortcutGridsFlow(): Flow<List<ShortcutGrid>> =
+        dataStore.data.map { ShortcutCodec.decodeGrids(it[SHORTCUT_GRIDS_JSON]) }
+
+    suspend fun saveBarsConfig(config: BarsConfig) {
+        dataStore.edit { it[BARS_CONFIG_JSON] = ShortcutCodec.encodeBars(config) }
+    }
+
+    suspend fun saveShortcutGrids(grids: List<ShortcutGrid>) {
+        dataStore.edit { it[SHORTCUT_GRIDS_JSON] = ShortcutCodec.encodeGrids(grids) }
+    }
 
     fun flow(): Flow<Config> = settingsFlow().map { settings ->
         when (val eff = settings.effectiveConfigFor()) {
@@ -95,6 +127,9 @@ class SettingsRepository(
                 ?: (if (prefs[HAPTIC_FEEDBACK] == false) 0 else 60),
             themeDark = prefs[THEME_DARK] ?: false,
             onboardingDone = prefs[ONBOARDING_DONE] ?: false,
+            transcriptionTimeoutMs = prefs[TRANSCRIPTION_TIMEOUT_MS] ?: Config.DEFAULT_TIMEOUT_MS.toInt(),
+            maxRecordingSec = prefs[MAX_RECORDING_SEC] ?: 300,
+            keyboardScalePercent = prefs[KEYBOARD_SCALE_PERCENT] ?: 100,
         )
     }
 
@@ -135,6 +170,9 @@ class SettingsRepository(
             prefs[VIBRATION_INTENSITY] = settings.vibrationIntensity
             prefs[THEME_DARK] = settings.themeDark
             prefs[ONBOARDING_DONE] = settings.onboardingDone
+            prefs[TRANSCRIPTION_TIMEOUT_MS] = settings.transcriptionTimeoutMs
+            prefs[MAX_RECORDING_SEC] = settings.maxRecordingSec
+            prefs[KEYBOARD_SCALE_PERCENT] = settings.keyboardScalePercent
         }
     }
 
@@ -232,6 +270,12 @@ class SettingsRepository(
         val VIBRATION_INTENSITY = intPreferencesKey("vibration_intensity")
         val THEME_DARK = booleanPreferencesKey("theme_dark")
         val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
+        val TRANSCRIPTION_TIMEOUT_MS = intPreferencesKey("transcription_timeout_ms")
+        val MAX_RECORDING_SEC = intPreferencesKey("max_recording_sec")
+        val KEYBOARD_SCALE_PERCENT = intPreferencesKey("keyboard_scale_percent")
+        // Trabalho 3 (shortcut-bars): barras personalizáveis + teclados de atalhos, como JSON.
+        val BARS_CONFIG_JSON = stringPreferencesKey("bars_config_json")
+        val SHORTCUT_GRIDS_JSON = stringPreferencesKey("shortcut_grids_json")
         const val OPENAI_TOKEN = "openai_token"
         const val GROQ_TOKEN = "groq_token"
 

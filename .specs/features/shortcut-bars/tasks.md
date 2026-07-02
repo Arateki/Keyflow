@@ -122,7 +122,7 @@
 | SB-T2 | **Done** — `PhysicalKeyEmitter` (plan puro + emit) + Enter/Esc migrados; 5 unit verdes |
 | SB-T3 | **Done** — `GridSession` (âncora/lente/reveal/cancel); 8 unit verdes |
 | SB-T4 | **Done** — `JoystickController` (RepeatSchedule reusado) + `PhysicalKeyMap`; 11 unit verdes |
-| SB-T5 | Pending |
+| SB-T5 | **Done** — `BarView` Canvas + geometria/overflow + flag `kbd_bars` + persistência DataStore; 6 unit + 3 instrumentados novos verdes, SYNC existentes intactos (6/6) |
 | SB-T6 | Pending |
 | SB-T7 | Pending |
 | SB-T8 | Pending |

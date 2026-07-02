@@ -12,6 +12,8 @@ import android.view.inputmethod.InputMethodSubtype
 import android.inputmethodservice.InputMethodService
 import com.keyflow.BuildConfig
 import com.keyflow.core.KeyFlowController
+import com.keyflow.core.shortcuts.BarsConfig
+import com.keyflow.core.shortcuts.ShortcutGrid
 import com.keyflow.core.shortcuts.ShortcutKey
 import com.keyflow.data.SettingsRepository
 import com.keyflow.ime.keyboard.ComposingWordTracker
@@ -25,6 +27,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -47,6 +51,16 @@ class KeyFlowKeyboardService : InputMethodService() {
     // release até a KC-T10 aprovar e remover esta flag (aí a nova vira a única).
     private val useCanvasGrid: Boolean
         get() = BuildConfig.DEBUG && uiPrefs.getBoolean(KEY_CANVAS_GRID, false)
+
+    // Flag de rollout das barras Canvas (SB-T5/ROL-02, mesmo padrão da kbd_canvas): desligada, a barra
+    // antiga fica intocada; ligada, a pilha de BarView renderiza a BarsConfig do DataStore.
+    private val useBars: Boolean
+        get() = BuildConfig.DEBUG && uiPrefs.getBoolean(KEY_BARS, false)
+
+    // Última config aplicada à view (BAR-07): o collect de barsConfigFlow/gridsFlow recria a view só em
+    // mudança real (o flow re-emite a cada write do DataStore, mesmo de chaves alheias).
+    private var appliedBarsConfig: BarsConfig? = null
+    private var appliedGrids: List<ShortcutGrid>? = null
 
     // Corretor do sistema (KC-T7/SPL-01..03): só existe com a grade Canvas — a antiga nunca compõe.
     private val wordTracker = ComposingWordTracker()
@@ -77,6 +91,17 @@ class KeyFlowKeyboardService : InputMethodService() {
                 preferExpanded = next
                 keyboardView?.setExpanded(next)
             }
+        }
+        // Barras/grades mudaram na config (BAR-07): recria a view do teclado ao vivo, no mesmo caminho
+        // da troca de subtype. Compara com a config aplicada — o DataStore re-emite em qualquer write.
+        serviceScope.launch {
+            val repo = SettingsRepository(this@KeyFlowKeyboardService)
+            combine(repo.barsConfigFlow(), repo.shortcutGridsFlow()) { bars, grids -> bars to grids }
+                .distinctUntilChanged()
+                .collect { (bars, grids) ->
+                    val changed = bars != appliedBarsConfig || grids != appliedGrids
+                    if (useBars && keyboardView != null && changed) setInputView(onCreateInputView())
+                }
         }
     }
 
@@ -112,6 +137,12 @@ class KeyFlowKeyboardService : InputMethodService() {
         val locale = activeLocale()
         spellChecker?.close()
         spellChecker = if (canvasGrid) SystemSpellChecker(this, locale) else null
+        // Barras Canvas (SB-T5): leitura leve como o tema — só DataStore no caminho crítico do IME.
+        val bars = useBars
+        val barsConfig = if (bars) runBlocking { repo.barsConfigOnce() } else BarsConfig.DEFAULT
+        val grids = if (bars) runBlocking { repo.shortcutGridsOnce() } else emptyList()
+        appliedBarsConfig = barsConfig
+        appliedGrids = grids
         val view = KeyFlowKeyboardView(
             context = this,
             onKey = ::handleKey,
@@ -139,6 +170,10 @@ class KeyFlowKeyboardService : InputMethodService() {
             // NUM-01: currentInputEditorInfo já está setado aqui — onStartInput roda antes de
             // onCreateInputView na 1ª vez que a view é criada para uma sessão.
             initialNumeric = isNumericInputType(currentInputEditorInfo?.inputType ?: InputType.TYPE_NULL),
+            useBars = bars,
+            barsConfig = barsConfig,
+            shortcutGrids = grids,
+            onShortcut = ::emitShortcut,
         )
         keyboardView = view
         activeViewForTest = view
@@ -366,6 +401,16 @@ class KeyFlowKeyboardService : InputMethodService() {
         }
     }
 
+    /**
+     * Tecla física de um botão das barras (tecla avulsa/grade/alavanca — SB-T5..T7): encerra a
+     * composição (um chord no meio de uma palavra não faz sentido) e emite pelo [keyEmitter].
+     */
+    private fun emitShortcut(key: ShortcutKey) {
+        val ic = getCurrentInputConnection() ?: return
+        finishComposing(ic)
+        keyEmitter.emit(ic, key)
+    }
+
     /** Encerra a palavra em composição (se houver) — pontuação/espaço/enter fecham a sugestão atual. */
     private fun finishComposing(ic: InputConnection) {
         if (!useCanvasGrid || wordTracker.currentWord.isEmpty()) return
@@ -397,6 +442,7 @@ class KeyFlowKeyboardService : InputMethodService() {
         private const val TAG = "KeyFlow.Keyboard"
         private const val KEY_EXPANDED = "expanded"
         private const val KEY_CANVAS_GRID = "kbd_canvas"
+        private const val KEY_BARS = "kbd_bars"
 
         /**
          * Referência somente-leitura à instância ativa, para testes instrumentados (KBDCTL-01..04)
