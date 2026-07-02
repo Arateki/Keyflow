@@ -6,8 +6,8 @@
 > manifest de modelos para download e config remota (preços, parâmetros de anúncios, kill-switch).
 > Decisões em `context.md` (M1–M6). A spec do app que consome isto é `.specs/features/monetization/`.
 >
-> *Nota do Yan (2026-07-02): esta spec será movida para o repositório da API (Rust) quando ele
-> existir — está aqui para nascer junto da spec de monetização que a consome.*
+> *Nota (2026-07-02, atualizada): o plano inicial era repo próprio, mas o Yan optou por
+> **monorepo** — o código vive em `api/` na raiz deste repositório e esta spec permanece aqui.*
 
 ## Problem Statement
 
@@ -173,8 +173,8 @@ sem saldo → 402; provedor derrubado → erro sem débito.
 | ADS-01 | Rewarded SSV | Pending |
 | OPS-01..04 | Operacional | Pending |
 
-**Coverage:** 22 total, 0 mapeados a tasks (fases Design/Tasks pendentes — e a spec migra para o
-repositório da API).
+**Coverage:** 22 total, mapeados em `tasks.md` (API-T1..T14 — código em `api/` no monorepo;
+implementação pendente).
 
 ---
 

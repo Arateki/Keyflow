@@ -5,3 +5,6 @@ build/
 
 # Saída regenerável do harness de verificação (o golden versionado vem em verification/golden/, T26)
 /verification/*.png
+
+# KeyFlow API (Rust, monorepo — api/)
+api/target/
