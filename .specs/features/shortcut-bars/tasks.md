@@ -119,7 +119,7 @@
 | Task | Status |
 | ---- | ------ |
 | SB-T1 | **Done** — `ShortcutModels`/`ShortcutCodec` + 12 unit verdes |
-| SB-T2 | Pending |
+| SB-T2 | **Done** — `PhysicalKeyEmitter` (plan puro + emit) + Enter/Esc migrados; 5 unit verdes |
 | SB-T3 | Pending |
 | SB-T4 | Pending |
 | SB-T5 | Pending |

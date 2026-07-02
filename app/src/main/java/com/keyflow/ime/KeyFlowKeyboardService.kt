@@ -1,17 +1,26 @@
 package com.keyflow.ime
 
 import android.os.Build
-import android.os.SystemClock
 import android.text.InputType
 import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputConnection
+import android.view.inputmethod.InputMethodManager
+import android.view.inputmethod.InputMethodSubtype
 import android.inputmethodservice.InputMethodService
+import com.keyflow.BuildConfig
 import com.keyflow.core.KeyFlowController
+import com.keyflow.core.shortcuts.ShortcutKey
 import com.keyflow.data.SettingsRepository
+import com.keyflow.ime.keyboard.ComposingWordTracker
+import com.keyflow.ime.keyboard.SystemSpellChecker
+import com.keyflow.ime.keyboard.isNumericInputType
+import com.keyflow.ime.keys.PhysicalKeyEmitter
 import com.keyflow.overlay.OverlayService
 import com.keyflow.overlay.RecordingNotification
+import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -33,6 +42,19 @@ class KeyFlowKeyboardService : InputMethodService() {
         set(value) {
             uiPrefs.edit().putBoolean(KEY_EXPANDED, value).apply()
         }
+
+    // Flag de rollout da grade Canvas nova (KC-T6/ROL-02): só alternável em debug, sempre desligada em
+    // release até a KC-T10 aprovar e remover esta flag (aí a nova vira a única).
+    private val useCanvasGrid: Boolean
+        get() = BuildConfig.DEBUG && uiPrefs.getBoolean(KEY_CANVAS_GRID, false)
+
+    // Corretor do sistema (KC-T7/SPL-01..03): só existe com a grade Canvas — a antiga nunca compõe.
+    private val wordTracker = ComposingWordTracker()
+    private var spellChecker: SystemSpellChecker? = null
+
+    // Camada única de emissão de teclas físicas (EMT-02..06): Enter/Esc e, adiante, teclas avulsas,
+    // grades de atalhos e alavanca (Trabalho 3 — shortcut-bars).
+    private val keyEmitter = PhysicalKeyEmitter()
 
     override fun onCreate() {
         super.onCreate()
@@ -73,6 +95,7 @@ class KeyFlowKeyboardService : InputMethodService() {
     override fun onDestroy() {
         KeyFlowController.setKeyboardVisible(false)
         if (activeViewForTest === keyboardView) activeViewForTest = null
+        spellChecker?.close()
         serviceScope.cancel()
         super.onDestroy()
     }
@@ -80,13 +103,22 @@ class KeyFlowKeyboardService : InputMethodService() {
     override fun onEvaluateFullscreenMode() = false
 
     override fun onCreateInputView(): View {
-        val dark = runBlocking { SettingsRepository(this@KeyFlowKeyboardService).themeDarkOnce() }
+        val repo = SettingsRepository(this@KeyFlowKeyboardService)
+        val dark = runBlocking { repo.themeDarkOnce() }
+        // Tamanho do teclado (pedido do Yan, 2026-07-02): mesma leitura leve do tema — só DataStore, sem
+        // inicializar o EncryptedSharedPreferences (cripto cara) no caminho crítico do IME.
+        val scale = runBlocking { repo.keyboardScalePercentOnce() } / 100f
+        val canvasGrid = useCanvasGrid
+        val locale = activeLocale()
+        spellChecker?.close()
+        spellChecker = if (canvasGrid) SystemSpellChecker(this, locale) else null
         val view = KeyFlowKeyboardView(
             context = this,
             onKey = ::handleKey,
             onMic = { startMicSession() },
             onConfig = { openKeyFlowApp() },
             onMicAction = { action -> sendMicAction(action) },
+            onCandidateTap = ::onCandidateTapped,
             onHide = {
                 preferExpanded = false
                 keyboardView?.setExpanded(false)
@@ -99,6 +131,14 @@ class KeyFlowKeyboardService : InputMethodService() {
                 )
             },
             dark = dark,
+            scale = scale,
+            useCanvasGrid = canvasGrid,
+            locale = locale.language,
+            showLanguageKey = enabledSubtypeCount() > 1,
+            onLanguageSwitch = { switchToNextSubtype() },
+            // NUM-01: currentInputEditorInfo já está setado aqui — onStartInput roda antes de
+            // onCreateInputView na 1ª vez que a view é criada para uma sessão.
+            initialNumeric = isNumericInputType(currentInputEditorInfo?.inputType ?: InputType.TYPE_NULL),
         )
         keyboardView = view
         activeViewForTest = view
@@ -110,6 +150,47 @@ class KeyFlowKeyboardService : InputMethodService() {
     }
 
     override fun onCreateCandidatesView(): View? = null
+
+    /**
+     * Locale do subtype ativo (globo PT/EN/ES — KC-T9/LAY-05); cai no locale do device se o subtype não
+     * tiver um bem-formado (ex.: nenhum subtype ainda selecionado explicitamente).
+     */
+    private fun activeLocale(): Locale {
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager
+        val subtype = imm?.currentInputMethodSubtype
+        val tag = subtype?.languageTag
+        if (!tag.isNullOrEmpty()) return Locale.forLanguageTag(tag)
+        val legacy = subtype?.locale // deprecated, mas os subtypes hoje só declaram imeSubtypeLocale
+        if (!legacy.isNullOrEmpty()) {
+            val parts = legacy.split("_")
+            return if (parts.size >= 2) Locale(parts[0], parts[1]) else Locale(parts[0])
+        }
+        return resources.configuration.locales[0]
+    }
+
+    /** Só mostra o globo (KC-T9) quando há mais de 1 idioma do KeyFlow habilitado — 1 só não tem pra onde trocar. */
+    private fun enabledSubtypeCount(): Int {
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager ?: return 1
+        return runCatching { imm.getEnabledInputMethodSubtypeList(null, true).size }.getOrDefault(1)
+    }
+
+    /** Globo tocado (KC-T9): cicla só entre os subtypes do próprio KeyFlow (PT→EN→ES→PT…). */
+    private fun switchToNextSubtype() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            switchToNextInputMethod(true)
+        } else {
+            val imm = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager ?: return
+            val token = window?.window?.attributes?.token ?: return
+            runCatching { imm.switchToNextInputMethod(token, true) }
+        }
+    }
+
+    override fun onCurrentInputMethodSubtypeChanged(newSubtype: InputMethodSubtype?) {
+        super.onCurrentInputMethodSubtypeChanged(newSubtype)
+        // Globo (ou o seletor de idioma do sistema) trocou o subtype: reconstrói a view com o novo
+        // locale (layout/acentos/corretor) — mesmo caminho que onCreateInputView já usa.
+        if (keyboardView != null) setInputView(onCreateInputView())
+    }
 
     /**
      * Mic do teclado: sobe o [OverlayService] sob demanda (FGS de microfone) e dispara o tap. Como o
@@ -175,47 +256,147 @@ class KeyFlowKeyboardService : InputMethodService() {
             getCurrentInputConnection()?.commitText(text, 1) == true
         }
         keyboardView?.setExpanded(preferExpanded)
+        // NUM-01: a view é reusada entre campos (não passa por onCreateInputView de novo aqui) — precisa
+        // reconfigurar a grade a cada troca de campo, não só na criação.
+        keyboardView?.updateInputType(isNumericInputType(info?.inputType ?: InputType.TYPE_NULL))
+        // Achado real (device físico, 2026-07-01): o "X" de limpar da busca do Samsung reinicia a sessão
+        // do InputConnection (chega aqui com restarting=true) SEM passar por onFinishInput — a palavra em
+        // composição da sessão anterior sobrevivia e "colava" na próxima letra. onUpdateSelection nem
+        // chega a disparar nesse caminho (não é uma mudança de seleção, é reinício de sessão), por isso o
+        // fix anterior (comparar texto real) não pegava esse caso — o reset tem que estar aqui.
+        wordTracker.reset()
+        spellChecker?.cancel()
+        keyboardView?.updateCandidates(emptyList())
     }
 
     override fun onFinishInput() {
         Log.d(TAG, "onFinishInput")
         KeyFlowController.clearInserter()
+        wordTracker.reset()
+        spellChecker?.cancel()
+        keyboardView?.updateCandidates(emptyList())
         super.onFinishInput()
+    }
+
+    /**
+     * Rede de segurança extra: o sistema chama isto sempre que o texto/seleção do campo muda — por NÓS
+     * (setComposingText) ou por fora. O caso real do "X" de limpar da busca do Samsung (device físico,
+     * 2026-07-01) acabou sendo um reinício de sessão (`onStartInputView`, ver lá o reset principal), não
+     * uma mudança de seleção — mas outros apps podem limpar o campo de um jeito que SÓ dispara
+     * `onUpdateSelection`, então mantemos esta verificação como reforço: comparamos o texto que
+     * REALMENTE está antes do cursor com a palavra que achamos estar em composição; se não bater,
+     * alguém mexeu no campo por fora e a composição não existe mais de verdade.
+     */
+    override fun onUpdateSelection(
+        oldSelStart: Int,
+        oldSelEnd: Int,
+        newSelStart: Int,
+        newSelEnd: Int,
+        candidatesStart: Int,
+        candidatesEnd: Int,
+    ) {
+        super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        val word = wordTracker.currentWord
+        if (!useCanvasGrid || word.isEmpty()) return
+        val actualBefore = getCurrentInputConnection()?.getTextBeforeCursor(word.length, 0)?.toString()
+        if (actualBefore != word) {
+            wordTracker.reset()
+            spellChecker?.cancel()
+            keyboardView?.updateCandidates(emptyList())
+        }
     }
 
     private fun handleKey(action: KeyAction) {
         val ic = getCurrentInputConnection() ?: return
         when (action) {
-            is KeyAction.Character -> ic.commitText(action.char, 1)
+            is KeyAction.Character -> {
+                if (useCanvasGrid && action.char.length == 1 && action.char[0].isLetter()) {
+                    val word = wordTracker.onLetter(action.char)
+                    ic.setComposingText(word, 1)
+                    requestSuggestions(word)
+                } else {
+                    finishComposing(ic)
+                    ic.commitText(action.char, 1)
+                }
+            }
             KeyAction.Backspace -> {
-                val sel = ic.getSelectedText(0)
-                if (sel.isNullOrEmpty()) ic.deleteSurroundingText(1, 0)
-                else ic.commitText("", 1)
+                val remaining = if (useCanvasGrid) wordTracker.onBackspace() else null
+                when {
+                    remaining == null -> {
+                        val sel = ic.getSelectedText(0)
+                        if (sel.isNullOrEmpty()) ic.deleteSurroundingText(1, 0)
+                        else ic.commitText("", 1)
+                    }
+                    remaining.isEmpty() -> {
+                        // Composição chegou a vazio: apaga a letra que sobrava sem tocar o texto ANTES
+                        // dela (um deleteSurroundingText aqui apagaria um caractere a mais).
+                        ic.setComposingText("", 1)
+                        ic.finishComposingText()
+                        spellChecker?.cancel()
+                        keyboardView?.updateCandidates(emptyList())
+                    }
+                    else -> {
+                        ic.setComposingText(remaining, 1)
+                        requestSuggestions(remaining)
+                    }
+                }
             }
             KeyAction.Enter -> {
+                finishComposing(ic)
                 val action = currentInputEditorInfo?.imeOptions
                     ?.and(EditorInfo.IME_MASK_ACTION) ?: EditorInfo.IME_ACTION_NONE
                 if (action != EditorInfo.IME_ACTION_NONE && action != EditorInfo.IME_ACTION_UNSPECIFIED) {
                     ic.performEditorAction(action)
                 } else {
-                    val t = SystemClock.uptimeMillis()
-                    ic.sendKeyEvent(KeyEvent(t, t, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0))
-                    ic.sendKeyEvent(KeyEvent(t, t, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER, 0))
+                    keyEmitter.emit(ic, ShortcutKey(KeyEvent.KEYCODE_ENTER, label = "⏎"))
                 }
             }
-            KeyAction.Space -> ic.commitText(" ", 1)
-            KeyAction.Paste -> ic.performContextMenuAction(android.R.id.paste)
+            KeyAction.Space -> {
+                finishComposing(ic)
+                ic.commitText(" ", 1)
+            }
+            KeyAction.Paste -> {
+                finishComposing(ic)
+                ic.performContextMenuAction(android.R.id.paste)
+            }
             KeyAction.Escape -> {
-                val t = SystemClock.uptimeMillis()
-                ic.sendKeyEvent(KeyEvent(t, t, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ESCAPE, 0))
-                ic.sendKeyEvent(KeyEvent(t, t, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ESCAPE, 0))
+                finishComposing(ic)
+                keyEmitter.emit(ic, ShortcutKey(KeyEvent.KEYCODE_ESCAPE, label = "esc"))
             }
         }
+    }
+
+    /** Encerra a palavra em composição (se houver) — pontuação/espaço/enter fecham a sugestão atual. */
+    private fun finishComposing(ic: InputConnection) {
+        if (!useCanvasGrid || wordTracker.currentWord.isEmpty()) return
+        ic.finishComposingText()
+        wordTracker.reset()
+        spellChecker?.cancel()
+        keyboardView?.updateCandidates(emptyList())
+    }
+
+    /** Pede sugestões pro corretor do sistema; ignora a resposta se a palavra já mudou entretanto. */
+    private fun requestSuggestions(word: String) {
+        val checker = spellChecker ?: return
+        checker.suggest(word) { suggestions ->
+            if (word == wordTracker.currentWord) keyboardView?.updateCandidates(suggestions)
+        }
+    }
+
+    /** Toque num candidato (SPL-02): substitui a composição pela palavra escolhida. */
+    private fun onCandidateTapped(candidate: String) {
+        val ic = getCurrentInputConnection() ?: return
+        ic.finishComposingText()
+        ic.commitText("$candidate ", 1)
+        wordTracker.reset()
+        spellChecker?.cancel()
+        keyboardView?.updateCandidates(emptyList())
     }
 
     companion object {
         private const val TAG = "KeyFlow.Keyboard"
         private const val KEY_EXPANDED = "expanded"
+        private const val KEY_CANVAS_GRID = "kbd_canvas"
 
         /**
          * Referência somente-leitura à instância ativa, para testes instrumentados (KBDCTL-01..04)
