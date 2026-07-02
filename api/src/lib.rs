@@ -3,6 +3,7 @@ pub mod catalog;
 pub mod config;
 pub mod db;
 pub mod google;
+pub mod jobs;
 pub mod middleware;
 pub mod routes;
 

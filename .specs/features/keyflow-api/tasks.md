@@ -242,7 +242,7 @@ então `[P]` real se houver dois agentes — senão seguir a ordem sequencial.
   `credits_10` sem entitlements, replay sem crédito duplo, PENDING, conta errada, produto
   desconhecido).
 
-### API-T9 — Job de voided purchases
+### API-T9 — Job de voided purchases — ✅ Concluída (2026-07-02)
 - **What**: task tokio periódica (intervalo na config): `voidedpurchases.list` (wiremock) → p/
   cada token conhecido, tx `revoke` (saldo pode negativar) + recomputa entitlements das compras
   restantes. Idempotente entre execuções (voided já revertido não reverte 2×).
@@ -251,6 +251,22 @@ então `[P]` real se houver dois agentes — senão seguir a ordem sequencial.
 - **Done when**: integração — reembolso reverte crédito e entitlements; saldo negativo bloqueia
   proxy (asserção junto com T11 ou via helper); rodar o job 2× não duplica reversão.
 - **Tests**: integração + unit (recomputação de entitlements). **Gate**: `rust`.
+- **Nota de execução**: contrato de `voidedpurchases.list` conferido na discovery doc oficial
+  (schemas `VoidedPurchasesListResponse`/`VoidedPurchase`); sem paginação — a janela seguinte do
+  job cobre o que ficar de fora (`startTime` default do Google já é "agora - 30 dias"). Idempotência
+  via `UPDATE purchases SET status='voided' WHERE token_hash=$1 AND status != 'voided' RETURNING
+  ...` (mesmo padrão do `debit_guarded` da T3: o `UPDATE` condicional detecta se já foi
+  processado). Entitlements recomputados **do zero** a cada void (`EXISTS` sobre as compras
+  restantes não-voided com `granted_entitlements=true`), não decrementados — evita drift quando
+  há mais de uma compra concedendo entitlements na mesma conta (testado). `run_periodically`
+  nunca para em erro (loga e segue pra próxima janela — reembolso é melhor-esforço, não bloqueia
+  request). `main.rs` sobe o job via `tokio::spawn` com uma `PublisherClient`/`TokenCache`
+  própria (separada da que atende requests). **"Saldo negativo bloqueia proxy"** do done-when
+  fica para a T11 de fato bloquear (o mecanismo — saldo pode ficar negativo e `debit_guarded`
+  rejeita nesse caso — já está testado desde a T3/aqui; só falta a rota do proxy existir). 5
+  testes novos (1 unit de `list_voided_purchases` + 4 integração: reembolso reverte crédito e
+  entitlements, saldo pode negativar, job 2× não duplica, entitlements sobrevivem se outra compra
+  ainda os concede). Fecha a **Fase C (Compras)** — API-T8/T9 completas.
 
 ## Fase D — Conteúdo
 

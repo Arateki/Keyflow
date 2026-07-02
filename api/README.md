@@ -41,6 +41,15 @@ Módulo disjunto do app Android (`app/`): o Gradle não enxerga esta pasta e vic
   (`credits_10/20/50`, `unlock_forever`; minutos são **placeholder** até o Yan calibrar — vira
   remoto na API-T10). Idempotente por `purchaseToken`; SKUs ≥ R$20 ligam `adsOff`+`skinsUnlocked`.
 
+## Job em background
+
+`jobs::voided::run_periodically` (disparado no `main.rs` via `tokio::spawn`) consulta
+`voidedpurchases.list` a cada `VOIDED_PURCHASES_JOB_INTERVAL_SECS` (opcional, default `3600`) e
+reverte compras canceladas/reembolsadas: debita o ledger (saldo pode negativar — sem guarda,
+igual a um reembolso de verdade) e recomputa `adsOff`/`skinsUnlocked` a partir das compras que
+restaram válidas. Idempotente (`purchases.status` vira `'voided'`, nunca reverte 2×); erro numa
+execução só loga e tenta de novo na próxima janela (não é caminho crítico de request).
+
 ```bash
 DATABASE_URL=postgres://keyflow:keyflow@localhost/keyflow_api \
 GOOGLE_SERVICE_ACCOUNT_JSON_PATH=/path/to/service-account.json \

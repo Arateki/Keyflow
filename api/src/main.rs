@@ -1,7 +1,8 @@
 use keyflow_api::google::auth::ServiceAccountKey;
 use keyflow_api::google::integrity::IntegrityClient;
 use keyflow_api::google::publisher::PublisherClient;
-use keyflow_api::{AppState, app, config::Config, db, init_tracing};
+use keyflow_api::{AppState, app, config::Config, db, init_tracing, jobs};
+use std::time::Duration;
 use tokio::net::TcpListener;
 
 const PLAY_INTEGRITY_BASE_URL: &str = "https://playintegrity.googleapis.com";
@@ -34,8 +35,22 @@ async fn main() {
         reqwest::Client::new(),
         ANDROID_PUBLISHER_BASE_URL.to_string(),
         config.package_name.clone(),
+        service_account.clone(),
+    );
+
+    // Cliente próprio pro job (TokenCache separada do que atende requests) — mesma credencial.
+    let job_publisher = PublisherClient::new(
+        reqwest::Client::new(),
+        ANDROID_PUBLISHER_BASE_URL.to_string(),
+        config.package_name.clone(),
         service_account,
     );
+    tokio::spawn(jobs::voided::run_periodically(
+        pool.clone(),
+        job_publisher,
+        Duration::from_secs(config.voided_purchases_job_interval_secs.get() as u64),
+    ));
+
     let state = AppState::new(
         pool,
         integrity,

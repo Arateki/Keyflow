@@ -19,6 +19,19 @@ pub struct ProductPurchase {
     pub obfuscated_external_account_id: Option<String>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VoidedPurchase {
+    pub purchase_token: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct VoidedPurchasesListResponse {
+    #[serde(default)]
+    pub voided_purchases: Vec<VoidedPurchase>,
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum PublisherError {
     #[error("failed to obtain access token: {0}")]
@@ -102,6 +115,25 @@ impl PublisherClient {
             return Err(PublisherError::RequestFailed(response.status().as_u16()));
         }
         Ok(())
+    }
+
+    /// `GET .../purchases/voidedpurchases` — compras canceladas/reembolsadas/chargeback (design
+    /// §Compras, job PAY-06). Sem paginação: o job roda periodicamente e a próxima janela cobre o
+    /// que ficou de fora (`startTime` default do Google já é "agora - 30 dias").
+    pub async fn list_voided_purchases(
+        &self,
+    ) -> Result<VoidedPurchasesListResponse, PublisherError> {
+        let access_token = self.access_token().await?;
+        let url = format!(
+            "{}/androidpublisher/v3/applications/{}/purchases/voidedpurchases",
+            self.base_url, self.package_name
+        );
+
+        let response = self.http.get(&url).bearer_auth(access_token).send().await?;
+        if !response.status().is_success() {
+            return Err(PublisherError::RequestFailed(response.status().as_u16()));
+        }
+        Ok(response.json().await?)
     }
 }
 
@@ -190,5 +222,35 @@ mod tests {
             .acknowledge_product_purchase("credits_20", "tok-1")
             .await
             .unwrap();
+    }
+
+    #[tokio::test]
+    async fn list_voided_purchases_parses_response() {
+        let google = MockServer::start().await;
+        mock_token(&google).await;
+        Mock::given(method("GET"))
+            .and(path(
+                "/androidpublisher/v3/applications/com.keyflow/purchases/voidedpurchases",
+            ))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "voidedPurchases": [
+                    { "purchaseToken": "voided-tok-1" },
+                    { "purchaseToken": "voided-tok-2" }
+                ]
+            })))
+            .mount(&google)
+            .await;
+
+        let client = PublisherClient::new(
+            reqwest::Client::new(),
+            google.uri(),
+            "com.keyflow".to_string(),
+            test_key(format!("{}/token", google.uri())),
+        );
+
+        let response = client.list_voided_purchases().await.unwrap();
+
+        assert_eq!(response.voided_purchases.len(), 2);
+        assert_eq!(response.voided_purchases[0].purchase_token, "voided-tok-1");
     }
 }

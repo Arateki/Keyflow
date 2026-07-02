@@ -6,6 +6,7 @@ use std::num::NonZeroU32;
 const DEFAULT_BIND_ADDR: &str = "0.0.0.0:8080";
 const DEFAULT_REGISTER_RATE_LIMIT_PER_MINUTE: u32 = 5;
 const DEFAULT_ACCOUNT_RATE_LIMIT_PER_MINUTE: u32 = 60;
+const DEFAULT_VOIDED_PURCHASES_JOB_INTERVAL_SECS: u32 = 3600;
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -22,6 +23,8 @@ pub struct Config {
     pub register_rate_limit_per_minute: NonZeroU32,
     /// Limite das rotas autenticadas por conta (ID-04).
     pub account_rate_limit_per_minute: NonZeroU32,
+    /// Intervalo do job de `voidedpurchases.list` (PAY-06).
+    pub voided_purchases_job_interval_secs: NonZeroU32,
 }
 
 #[derive(Debug)]
@@ -101,6 +104,11 @@ impl Config {
             "ACCOUNT_RATE_LIMIT_PER_MINUTE",
             DEFAULT_ACCOUNT_RATE_LIMIT_PER_MINUTE,
         )?;
+        let voided_purchases_job_interval_secs = parse_nonzero_u32(
+            vars,
+            "VOIDED_PURCHASES_JOB_INTERVAL_SECS",
+            DEFAULT_VOIDED_PURCHASES_JOB_INTERVAL_SECS,
+        )?;
 
         Ok(Config {
             database_url,
@@ -110,6 +118,7 @@ impl Config {
             integrity_relaxed,
             register_rate_limit_per_minute,
             account_rate_limit_per_minute,
+            voided_purchases_job_interval_secs,
         })
     }
 }
@@ -203,6 +212,21 @@ mod tests {
             config.account_rate_limit_per_minute.get(),
             DEFAULT_ACCOUNT_RATE_LIMIT_PER_MINUTE
         );
+        assert_eq!(
+            config.voided_purchases_job_interval_secs.get(),
+            DEFAULT_VOIDED_PURCHASES_JOB_INTERVAL_SECS
+        );
+    }
+
+    #[test]
+    fn voided_purchases_job_interval_is_configurable() {
+        let config = Config::from_map(&with_required(&[(
+            "VOIDED_PURCHASES_JOB_INTERVAL_SECS",
+            "60",
+        )]))
+        .unwrap();
+
+        assert_eq!(config.voided_purchases_job_interval_secs.get(), 60);
     }
 
     #[test]
