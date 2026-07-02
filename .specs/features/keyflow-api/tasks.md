@@ -196,13 +196,20 @@ então `[P]` real se houver dois agentes — senão seguir a ordem sequencial.
   429+header, IPs diferentes não se afetam, flood por conta → 429+header — mais 4 unit tests do
   limitador isolado (`middleware::ratelimit`).
 
-### API-T7 — `GET /v1/account` `[P]`
+### API-T7 — `GET /v1/account` `[P]` — ✅ Concluída (2026-07-02)
 - **What**: saldo (segundos) + entitlements (`adsOff`, `skinsUnlocked`) num payload único e barato.
 - **Where**: `src/routes/account.rs`.
 - **Depends on**: API-T5. **Covers**: PAY-05.
 - **Done when**: integração — conta nova → 0/false/false; após seeds de ledger/entitlements →
   valores certos; sem Bearer → 401.
 - **Tests**: integração. **Gate**: `rust`.
+- **Nota de execução**: handler trivial — o extractor `Account` (T5) já resolveu Bearer→conta
+  antes dele rodar, então só serializa `balance_seconds`/`ads_off`/`skins_unlocked` (camelCase) e
+  aplica `check_account` do rate limiter (T6, primeira rota de negócio real a usá-lo — os testes
+  da T6 tinham provado o mecanismo num router efêmero, agora há uma rota de produção de verdade).
+  4 testes de integração via HTTP real: conta nova zerada, valores refletindo um `UPDATE` direto
+  na tabela (equivalente ao que a T8 fará via `credit`/entitlements), 401 sem Bearer e com Bearer
+  inválido. Fecha a **Fase B (Identidade)** — API-T3..T7 completas.
 
 ## Fase C — Compras
 
