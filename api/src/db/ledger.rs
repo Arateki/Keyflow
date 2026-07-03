@@ -20,8 +20,10 @@ impl LedgerReason {
     }
 }
 
-/// Credita `delta_seconds` (> 0) na conta: `ledger` + `accounts.balance_seconds` na mesma tx
-/// (savepoint se `conn` já estiver dentro de uma transação do chamador — nunca parcial).
+/// Ajusta `balance_seconds` por `delta_seconds` (positivo credita, negativo debita **sem
+/// guarda** — usado pelo proxy de transcrição, TRX-02, onde o saldo pode negativar levemente numa
+/// corrida rara e o design aceita isso) + registra no `ledger`, na mesma tx (savepoint se `conn`
+/// já estiver dentro de uma transação do chamador — nunca parcial).
 pub async fn credit<'a, A>(
     conn: A,
     account_id: Uuid,

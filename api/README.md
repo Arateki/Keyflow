@@ -29,6 +29,14 @@ Módulo disjunto do app Android (`app/`): o Gradle não enxerga esta pasta e vic
   - `REGISTER_RATE_LIMIT_PER_MINUTE` (opcional, default `5`) — limite de `POST /v1/register` por
     IP (ID-04). `ACCOUNT_RATE_LIMIT_PER_MINUTE` (opcional, default `60`) — limite por conta nas
     rotas autenticadas. Estouro → `429` + header `Retry-After` (segundos).
+  - `TRANSCRIPTION_PROVIDERS_JSON` (obrigatória) — lista ordenada de provedores Whisper-compatible
+    (design §Proxy): `[{"name","url","authHeaderName","authValueEnv","model"}]`. `authValueEnv`
+    é o **nome de outra env var** que guarda o segredo de verdade (nunca inline no JSON — OPS-03).
+    Exemplo: `[{"name":"openai","url":"https://api.openai.com/v1/audio/transcriptions",
+    "authHeaderName":"Authorization","authValueEnv":"OPENAI_KEY","model":"whisper-1"}]` com
+    `OPENAI_KEY=Bearer sk-...` setada à parte.
+  - `TRANSCRIPTION_TIMEOUT_MS` (opcional, default `30000`), `TRANSCRIPTION_MAX_BYTES` (opcional,
+    default `26214400` = 25 MiB), `PROVIDER_UNHEALTHY_COOLDOWN_SECS` (opcional, default `60`).
 
 ## Rotas
 
@@ -43,6 +51,29 @@ Módulo disjunto do app Android (`app/`): o Gradle não enxerga esta pasta e vic
 - `GET /v1/config` / `GET /v1/models` — `documents.body` (seed em `migrations/
   0002_seed_documents.sql`, editável só por SQL/migration no MVP). `ETag` = sha256 hex do corpo
   entre aspas; `If-None-Match` (valor exato ou `*`) → `304` sem corpo; `Cache-Control: max-age=300`.
+- `POST /v1/transcribe` (Bearer, header `X-Request-Id` obrigatório) — corpo `multipart/form-data`
+  **repassado em streaming, byte a byte, pro provedor** (nunca bufferizado — TRX-04; ver
+  `src/routes/transcribe.rs`). Saldo ≤ 0 (e request nova) → `402 {"balanceSeconds"}` antes de
+  tocar o provedor; corpo > `TRANSCRIPTION_MAX_BYTES` → `413`; timeout → `504`; provedor caindo
+  (conexão/5xx) → `502` + marca o provedor indisponível por `PROVIDER_UNHEALTHY_COOLDOWN_SECS`
+  (fallback é **entre requests**, não dentro da mesma — ver nota de arquitetura abaixo). Sucesso:
+  repassa o JSON do provedor (`{"text":...}`) + header `X-KeyFlow-Balance-Seconds`; debita
+  `ceil(bytes/8000)` segundos numa tx atômica com o registro de idempotência
+  (`transcribe_requests`, chave `X-Request-Id`) — retry com o mesmo id re-executa o provedor mas
+  não debita 2×.
+
+### Arquitetura: por que o fallback de provedor é entre requests, não dentro da mesma
+
+O design pede "falha de conexão/5xx imediato → tenta o próximo" provedor. Isso é **incompatível**
+com TRX-04 ("nunca bufferizar"): uma vez que o corpo da request já foi parcialmente consumido e
+repassado como stream pro provedor 1, não há como "rebobinar" e reenviar pro provedor 2 sem
+materializar o corpo inteiro em memória — contradiria o próprio requisito que motiva a arquitetura
+de streaming. Decisão registrada em `.specs/features/keyflow-api/tasks.md` (API-T11): um provedor
+que falha fica marcado indisponível por um cooldown (`providers::ProviderHealth`, circuit
+breaker simples); a **próxima** request pula direto pro próximo da lista. Em regime permanente o
+efeito é equivalente ao fallback do design (toda request após a 1ª falha já usa o provedor
+saudável) — só a request que descobriu a falha não tem retry automático; ela recebe erro e cabe
+ao cliente decidir reenviar.
 
 ## Job em background
 
@@ -57,7 +88,9 @@ execução só loga e tenta de novo na próxima janela (não é caminho crítico
 DATABASE_URL=postgres://keyflow:keyflow@localhost/keyflow_api \
 GOOGLE_SERVICE_ACCOUNT_JSON_PATH=/path/to/service-account.json \
 PACKAGE_NAME=com.keyflow \
-cargo run   # GET /health, POST /v1/register
+TRANSCRIPTION_PROVIDERS_JSON='[{"name":"openai","url":"https://api.openai.com/v1/audio/transcriptions","authHeaderName":"Authorization","authValueEnv":"OPENAI_KEY","model":"whisper-1"}]' \
+OPENAI_KEY="Bearer sk-..." \
+cargo run
 ```
 
 Logs saem em **JSON estruturado** (um objeto por linha), com a rota casada (`matched_path`) e a

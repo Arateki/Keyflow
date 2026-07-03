@@ -296,7 +296,7 @@ então `[P]` real se houver dois agentes — senão seguir a ordem sequencial.
 
 ## Fase E — Proxy
 
-### API-T11 — `POST /v1/transcribe` (streaming + débito atômico + 402/413 + fallback)
+### API-T11 — `POST /v1/transcribe` (streaming + débito atômico + 402/413 + fallback) — ✅ Concluída (2026-07-03)
 - **What**: fluxo completo do design §Proxy: saldo ≤ 0 → 402 com saldo; stream axum→reqwest sem
   bufferizar (TRX-04) com contador de bytes → 413 no cap; débito `ceil(bytes/8000)` (tabela na
   config) **na mesma decisão da resposta de sucesso** (erro/timeout → não debita); idempotência
@@ -311,6 +311,41 @@ então `[P]` real se houver dois agentes — senão seguir a ordem sequencial.
   debita 2×; memória não cresce com upload grande (teste com body chunked grande + limite de
   alocação verificado por code review documentado — sem `to_vec()` do body no caminho).
 - **Tests**: integração + unit (duração por bytes/roundup). **Gate**: `rust`.
+- **SPEC_DEVIATION documentado (arquitetura do fallback)**: o design pede "falha de conexão/5xx
+  imediato → tenta o próximo [provedor]" — mas isso é **incompatível** com TRX-04 ("nunca
+  bufferizar") depois que o corpo já começou a ser streamado pro provedor 1: não existe como
+  "rebobinar" um `reqwest::Body::wrap_stream` consumido parcialmente e reenviar pro provedor 2 sem
+  materializar o corpo inteiro em memória, o que contradiria o próprio requisito que motiva a
+  arquitetura de streaming. Resolvido com um **circuit breaker entre requests**
+  (`providers::ProviderHealth`): provedor que falha (conexão/5xx) fica indisponível por
+  `PROVIDER_UNHEALTHY_COOLDOWN_SECS`; a *próxima* request pula pro próximo da lista. Em regime
+  permanente o efeito é equivalente ao fallback do design (toda request após a 1ª falha já usa o
+  saudável) — só a request que descobriu a falha não tem retry intra-request; recebe `502` e cabe
+  ao cliente decidir reenviar. Detalhe completo no `README.md` da API (§Arquitetura).
+  Testado (`provider_5xx_marks_unhealthy_and_next_request_falls_back`): 1ª request no provedor
+  caído → 502 sem débito; 2ª request (novo `X-Request-Id`) → vai direto pro fallback e sucede.
+- **Nota de execução**: `TRANSCRIPTION_PROVIDERS_JSON` (novo, obrigatório) tipa a "lista ordenada
+  `[{name,url,authHeaderName,authValueEnv,model}]`" do design literalmente — o segredo de cada
+  provedor mora em OUTRA env var (nome referenciado por `authValueEnv`), nunca inline (OPS-03);
+  parseado/resolvido em `src/providers.rs`. Corpo de entrada é passthrough puro — **não faz parse
+  de multipart** (não precisa: o design já pede "repassado em streaming", então contar bytes +
+  encaminhar os mesmos chunks pro provedor via `reqwest::Body::wrap_stream` preserva 100% a
+  estrutura multipart original sem tocar nela). Cap (413) detectado via um erro synthetic
+  (`StreamCapExceeded`) que o stream contador injeta e a handler reconhece andando pela cadeia
+  `source()` do `reqwest::Error` — distingue "corpo grande demais" de "provedor caiu". 402 usa o
+  saldo já resolvido pelo extractor `Account` (sem re-`SELECT`) — a corrida entre duas
+  transcrições simultâneas da mesma conta é aceita pelo próprio design ("saldo pode negativar
+  levemente; o próximo uso leva 402"). Idempotência: `INSERT INTO transcribe_requests ... ON
+  CONFLICT DO NOTHING` decide se debita, mas o provedor é **sempre** chamado de novo no retry
+  (não persistimos texto, ID-03). `credit()` (T3) passou a aceitar delta negativo pra esse débito
+  sem guarda — doc-comment atualizado, mecânica não mudou. **Teste de memória por RSS de processo
+  foi tentado e descartado**: cresceu ruidosamente mais que o esperado por confundir com
+  overhead do alocador/runtime/pool de conexões da própria execução do teste, não por buffer real
+  do corpo — mesma lição da API-T2 (teste flaky por causa de infraestrutura de teste, não bug);
+  TRX-04 é garantido por **inspeção de código** (nenhum `to_vec()`/`.bytes()` no caminho do corpo
+  de entrada, só `body.into_data_stream()` repassado direto), com um teste funcional (upload de
+  5 MB) provando que segue funcionando corretamente em maior escala. 9 testes de integração novos
+  + 1 unit (arredondamento bytes→segundos) + testes de `providers.rs` (parsing/circuit breaker).
 
 ## Fase F — Rewarded
 

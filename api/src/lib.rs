@@ -5,10 +5,12 @@ pub mod db;
 pub mod google;
 pub mod jobs;
 pub mod middleware;
+pub mod providers;
 pub mod routes;
 
 use std::num::NonZeroU32;
 use std::sync::Arc;
+use std::time::Duration;
 
 use axum::extract::{MatchedPath, State};
 use axum::http::{Request, StatusCode};
@@ -20,14 +22,30 @@ use tower_http::trace::TraceLayer;
 use google::integrity::IntegrityClient;
 use google::publisher::PublisherClient;
 use middleware::ratelimit::RateLimiters;
+use providers::{ProviderHealth, ResolvedProvider};
+
+/// Config do proxy de transcrição (design §Proxy, API-T11) — agrupado à parte pra não inchar
+/// ainda mais `AppState::new`.
+pub struct TranscriptionConfig {
+    pub providers: Vec<ResolvedProvider>,
+    pub timeout: Duration,
+    pub max_bytes: u64,
+    pub unhealthy_cooldown: Duration,
+}
 
 pub struct AppStateInner {
     pub pool: PgPool,
     pub integrity: IntegrityClient,
     pub publisher: PublisherClient,
+    pub http: reqwest::Client,
     pub package_name: String,
     pub integrity_relaxed: bool,
     pub rate_limiters: RateLimiters,
+    pub providers: Vec<ResolvedProvider>,
+    pub provider_health: ProviderHealth,
+    pub transcription_timeout: Duration,
+    pub transcription_max_bytes: u64,
+    pub provider_unhealthy_cooldown: Duration,
 }
 
 /// Estado compartilhado entre handlers — `Clone` barato (`Arc` por dentro; `PgPool` também já é
@@ -41,21 +59,30 @@ impl AppState {
         pool: PgPool,
         integrity: IntegrityClient,
         publisher: PublisherClient,
+        http: reqwest::Client,
         package_name: String,
         integrity_relaxed: bool,
         register_rate_limit_per_minute: NonZeroU32,
         account_rate_limit_per_minute: NonZeroU32,
+        transcription: TranscriptionConfig,
     ) -> Self {
+        let provider_health = ProviderHealth::new(transcription.providers.len());
         Self(Arc::new(AppStateInner {
             pool,
             integrity,
             publisher,
+            http,
             package_name,
             integrity_relaxed,
             rate_limiters: RateLimiters::new(
                 register_rate_limit_per_minute,
                 account_rate_limit_per_minute,
             ),
+            providers: transcription.providers,
+            provider_health,
+            transcription_timeout: transcription.timeout,
+            transcription_max_bytes: transcription.max_bytes,
+            provider_unhealthy_cooldown: transcription.unhealthy_cooldown,
         }))
     }
 }
@@ -86,6 +113,7 @@ pub fn app(state: AppState) -> Router {
         .route("/v1/purchases/redeem", post(routes::redeem::redeem))
         .route("/v1/config", get(routes::content::get_config))
         .route("/v1/models", get(routes::content::get_models))
+        .route("/v1/transcribe", post(routes::transcribe::transcribe))
         .route_layer(
             TraceLayer::new_for_http().make_span_with(|request: &Request<_>| {
                 let matched_path = request
@@ -161,11 +189,28 @@ mod tests {
             pool,
             integrity,
             publisher,
+            Client::new(),
             "com.keyflow".to_string(),
             false,
             std::num::NonZeroU32::new(1000).unwrap(),
             std::num::NonZeroU32::new(1000).unwrap(),
+            test_transcription_config(),
         )
+    }
+
+    fn test_transcription_config() -> TranscriptionConfig {
+        TranscriptionConfig {
+            providers: vec![ResolvedProvider {
+                name: "unused".to_string(),
+                url: "http://127.0.0.1:0".to_string(),
+                auth_header_name: "Authorization".to_string(),
+                auth_value: "unused".to_string(),
+                model: "unused".to_string(),
+            }],
+            timeout: Duration::from_secs(30),
+            max_bytes: 26_214_400,
+            unhealthy_cooldown: Duration::from_secs(60),
+        }
     }
 
     #[tokio::test]

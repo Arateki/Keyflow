@@ -2,7 +2,7 @@ mod common;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode, header};
-use common::test_pool;
+use common::{test_pool, unused_transcription_config};
 use keyflow_api::db::accounts::Account;
 use keyflow_api::google::auth::ServiceAccountKey;
 use keyflow_api::google::integrity::IntegrityClient;
@@ -94,10 +94,12 @@ async fn state_with_google(google_uri: String, package_name: &str) -> AppState {
         pool,
         integrity,
         publisher,
+        reqwest::Client::new(),
         package_name.to_string(),
         false,
         std::num::NonZeroU32::new(1000).unwrap(),
         std::num::NonZeroU32::new(1000).unwrap(),
+        unused_transcription_config(),
     )
 }
 

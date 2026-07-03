@@ -7,6 +7,9 @@ const DEFAULT_BIND_ADDR: &str = "0.0.0.0:8080";
 const DEFAULT_REGISTER_RATE_LIMIT_PER_MINUTE: u32 = 5;
 const DEFAULT_ACCOUNT_RATE_LIMIT_PER_MINUTE: u32 = 60;
 const DEFAULT_VOIDED_PURCHASES_JOB_INTERVAL_SECS: u32 = 3600;
+const DEFAULT_TRANSCRIPTION_TIMEOUT_MS: u32 = 30_000;
+const DEFAULT_TRANSCRIPTION_MAX_BYTES: u32 = 26_214_400; // 25 MiB — mesmo placeholder da T10.
+const DEFAULT_PROVIDER_UNHEALTHY_COOLDOWN_SECS: u32 = 60;
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -25,6 +28,12 @@ pub struct Config {
     pub account_rate_limit_per_minute: NonZeroU32,
     /// Intervalo do job de `voidedpurchases.list` (PAY-06).
     pub voided_purchases_job_interval_secs: NonZeroU32,
+    /// Provedores de transcrição, na ordem de tentativa (design §Proxy, TRX-05).
+    pub providers: Vec<crate::providers::ResolvedProvider>,
+    pub transcription_timeout_ms: NonZeroU32,
+    pub transcription_max_bytes: NonZeroU32,
+    /// Cooldown do circuit breaker entre requests (ver `providers::ProviderHealth`).
+    pub provider_unhealthy_cooldown_secs: NonZeroU32,
 }
 
 #[derive(Debug)]
@@ -110,6 +119,35 @@ impl Config {
             DEFAULT_VOIDED_PURCHASES_JOB_INTERVAL_SECS,
         )?;
 
+        let providers_json = vars
+            .get("TRANSCRIPTION_PROVIDERS_JSON")
+            .cloned()
+            .ok_or(ConfigError::MissingEnv("TRANSCRIPTION_PROVIDERS_JSON"))?;
+        let providers =
+            crate::providers::parse_and_resolve(&providers_json, vars).map_err(|reason| {
+                ConfigError::InvalidEnv {
+                    var: "TRANSCRIPTION_PROVIDERS_JSON",
+                    value: providers_json.clone(),
+                    reason,
+                }
+            })?;
+
+        let transcription_timeout_ms = parse_nonzero_u32(
+            vars,
+            "TRANSCRIPTION_TIMEOUT_MS",
+            DEFAULT_TRANSCRIPTION_TIMEOUT_MS,
+        )?;
+        let transcription_max_bytes = parse_nonzero_u32(
+            vars,
+            "TRANSCRIPTION_MAX_BYTES",
+            DEFAULT_TRANSCRIPTION_MAX_BYTES,
+        )?;
+        let provider_unhealthy_cooldown_secs = parse_nonzero_u32(
+            vars,
+            "PROVIDER_UNHEALTHY_COOLDOWN_SECS",
+            DEFAULT_PROVIDER_UNHEALTHY_COOLDOWN_SECS,
+        )?;
+
         Ok(Config {
             database_url,
             bind_addr,
@@ -119,6 +157,10 @@ impl Config {
             register_rate_limit_per_minute,
             account_rate_limit_per_minute,
             voided_purchases_job_interval_secs,
+            providers,
+            transcription_timeout_ms,
+            transcription_max_bytes,
+            provider_unhealthy_cooldown_secs,
         })
     }
 }
@@ -181,6 +223,11 @@ mod tests {
             "/secrets/google-sa.json",
         ),
         ("PACKAGE_NAME", "com.keyflow"),
+        (
+            "TRANSCRIPTION_PROVIDERS_JSON",
+            r#"[{"name":"primary","url":"https://p1.example/transcribe","authHeaderName":"Authorization","authValueEnv":"TEST_PROVIDER_KEY","model":"whisper-1"}]"#,
+        ),
+        ("TEST_PROVIDER_KEY", "test-secret"),
     ];
 
     fn with_required(extra: &[(&str, &str)]) -> HashMap<String, String> {
@@ -215,6 +262,17 @@ mod tests {
         assert_eq!(
             config.voided_purchases_job_interval_secs.get(),
             DEFAULT_VOIDED_PURCHASES_JOB_INTERVAL_SECS
+        );
+        assert_eq!(config.providers.len(), 1);
+        assert_eq!(config.providers[0].name, "primary");
+        assert_eq!(config.providers[0].auth_value, "test-secret");
+        assert_eq!(
+            config.transcription_timeout_ms.get(),
+            DEFAULT_TRANSCRIPTION_TIMEOUT_MS
+        );
+        assert_eq!(
+            config.transcription_max_bytes.get(),
+            DEFAULT_TRANSCRIPTION_MAX_BYTES
         );
     }
 
@@ -323,5 +381,50 @@ mod tests {
     fn integrity_relaxed_defaults_to_false() {
         let config = Config::from_map(&with_required(&[])).unwrap();
         assert!(!config.integrity_relaxed);
+    }
+
+    #[test]
+    fn missing_transcription_providers_json_fails_with_specific_message() {
+        let err = Config::from_map(&vars(&[
+            (
+                "DATABASE_URL",
+                "postgres://keyflow:keyflow@localhost/keyflow_api",
+            ),
+            (
+                "GOOGLE_SERVICE_ACCOUNT_JSON_PATH",
+                "/secrets/google-sa.json",
+            ),
+            ("PACKAGE_NAME", "com.keyflow"),
+        ]))
+        .unwrap_err();
+
+        assert_eq!(
+            err.to_string(),
+            "missing required environment variable: TRANSCRIPTION_PROVIDERS_JSON"
+        );
+    }
+
+    #[test]
+    fn invalid_providers_json_fails_with_specific_message() {
+        let mut map = with_required(&[]);
+        map.insert(
+            "TRANSCRIPTION_PROVIDERS_JSON".to_string(),
+            "not json".to_string(),
+        );
+        let err = Config::from_map(&map).unwrap_err();
+
+        assert!(err.to_string().contains("TRANSCRIPTION_PROVIDERS_JSON"));
+    }
+
+    #[test]
+    fn transcription_timeout_and_max_bytes_are_configurable() {
+        let config = Config::from_map(&with_required(&[
+            ("TRANSCRIPTION_TIMEOUT_MS", "5000"),
+            ("TRANSCRIPTION_MAX_BYTES", "1000"),
+        ]))
+        .unwrap();
+
+        assert_eq!(config.transcription_timeout_ms.get(), 5000);
+        assert_eq!(config.transcription_max_bytes.get(), 1000);
     }
 }

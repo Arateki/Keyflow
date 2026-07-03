@@ -55,10 +55,19 @@ async fn main() {
         pool,
         integrity,
         publisher,
+        reqwest::Client::new(),
         config.package_name,
         config.integrity_relaxed,
         config.register_rate_limit_per_minute,
         config.account_rate_limit_per_minute,
+        keyflow_api::TranscriptionConfig {
+            providers: config.providers,
+            timeout: Duration::from_millis(config.transcription_timeout_ms.get() as u64),
+            max_bytes: config.transcription_max_bytes.get() as u64,
+            unhealthy_cooldown: Duration::from_secs(
+                config.provider_unhealthy_cooldown_secs.get() as u64
+            ),
+        },
     );
 
     let listener = TcpListener::bind(config.bind_addr)

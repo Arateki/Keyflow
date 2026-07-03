@@ -1,4 +1,7 @@
+use keyflow_api::TranscriptionConfig;
+use keyflow_api::providers::ResolvedProvider;
 use sqlx::PgPool;
+use std::time::Duration;
 
 pub async fn test_pool() -> PgPool {
     let database_url = std::env::var("DATABASE_URL").expect(
@@ -46,4 +49,22 @@ pub async fn balance_of(pool: &PgPool, account_id: uuid::Uuid) -> i64 {
         .await
         .expect("conta de teste deveria existir");
     balance
+}
+
+/// `TranscriptionConfig` de placeholder pra testes que não exercitam `POST /v1/transcribe` (ver
+/// `tests/transcribe.rs` para os que exercitam de verdade, com wiremock no lugar do provedor).
+#[allow(dead_code)]
+pub fn unused_transcription_config() -> TranscriptionConfig {
+    TranscriptionConfig {
+        providers: vec![ResolvedProvider {
+            name: "unused".to_string(),
+            url: "http://127.0.0.1:0".to_string(),
+            auth_header_name: "Authorization".to_string(),
+            auth_value: "unused".to_string(),
+            model: "unused".to_string(),
+        }],
+        timeout: Duration::from_secs(30),
+        max_bytes: 26_214_400,
+        unhealthy_cooldown: Duration::from_secs(60),
+    }
 }
