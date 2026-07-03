@@ -932,3 +932,63 @@ após conferir visualmente 3 pares antes/depois (sem corte de texto, sem sobrepo
 
 Prints (todas as 50 rotas + 3 `sys-*`, novos e antigos) espelhados em `/tmp/keyflow-prints/` a pedido do
 Yan.
+
+## Q3 — Bug do Termius: diagnóstico + fix (2026-07-02)
+
+`DEVELOPMENT-ORDER.md` apontava investigar o `PhysicalKeyEmitter` (atalhos físicos). Systematic debugging
+(Fase 1) revelou que a causa raiz era outra, através de idas e vindas com o Yan:
+
+1. **Sintoma inicial relatado**: "atalhos não funcionam no Termius" → hipótese inicial: chords/atalhos
+   (`PhysicalKeyEmitter`) não chegam ao Termius.
+2. **Yan testou de novo e refinou**: "o teclado não funciona lá dentro, não envia as teclas" — sugeria
+   falha de envio total, não só atalhos.
+3. **Yan confirmou o Termius é renderizado em WebView** (selecionável + pinça de zoom, sinal clássico de
+   terminal em WebView, ex.: xterm.js).
+4. **Yan testou de novo e refinou de novo, decisivo**: "o texto não aparece ao escrever, mas ao dar Enter
+   ele envia o que eu escrevi" — ou seja, o DADO chega (Enter confirma), só a EXIBIÇÃO em tempo real que
+   falha.
+5. **Teste decisivo pedido ao Yan**: dígitos/símbolos aparecem na hora; letras não. Isso isola exatamente
+   o caminho de composição de palavra (corretor, grade Canvas) — `ic.setComposingText(word, 1)` por
+   letra — dos demais caminhos, que usam `ic.commitText(...)` direto (Enter/Esc via `keyEmitter`, dígitos/
+   símbolos, e o Enter que já finaliza a composição antes de agir).
+
+**Causa raiz confirmada**: campos `EditorInfo.inputType == TYPE_NULL` (padrão de terminais raw-input,
+Termux/Termius/JuiceSSH) não renderizam texto "compondo" (preedit) — só texto já comitado. O código já
+detectava `TYPE_NULL` (`hasRealInput` em `onStartInput`, usado só para decidir se auto-mostra o teclado),
+mas `handleKey()` nunca usava essa informação para a decisão compor-vs-comitar de cada letra.
+
+**Fix**: `isRawInputField` (instância, atualizado a cada `onStartInput`) + `shouldCompose(useCanvasGrid,
+rawInputField, char)` — função pura no companion, testada em unit (`KeyFlowKeyboardServiceTest`, 5 casos).
+Em campo raw, letras comitam direto (pulam corretor/composição); backspace também pula
+`wordTracker.onBackspace()` nesse caso (cai no `deleteSurroundingText` normal).
+
+**Verificação real feita**: como um `EditText` comum SEMPRE renderiza texto composto (a rota de
+composição funciona perfeitamente lá, então não reproduz a invisibilidade do Termius), a evidência real
+veio de reprodução manual no emulador via `adb shell input tap` + `screencap` num probe `TYPE_NULL`
+(`ImeProbeActivity`, ganhou `EXTRA_INPUT_TYPE`/forçar `showSoftInput` porque TYPE_NULL suprime o
+auto-show do teclado mesmo com `SOFT_INPUT_STATE_ALWAYS_VISIBLE`) — confirmando visualmente que o
+mecanismo de digitação funciona no campo real. **Lição de teste (retry + composição não são idempotentes
+juntos)**: uma primeira tentativa de instrumentado tentava confirmar via `fieldText()` (UiAutomator) +
+retry — mas cada retry TAPA A MESMA TECLA de novo, e como a composição ACUMULA (`wordTracker`), um retry
+"o" → "oo" → "ooo" nunca bate com o texto esperado; a checagem correta e estável acabou sendo direto no
+código puro (`shouldCompose`) + um teste instrumentado leve conferindo só a fiação real do `EditorInfo`
+(`isRawInputFieldForTest`), sem depender de digitar-e-ler-de-volta (que herda toda a instabilidade de
+`sendPointerSync`/UiAutomator sob carga, já documentada noutros testes deste host).
+
+**Gate**: unit verde (+5 testes `shouldCompose`); instrumentado (`KeyFlowKeyboardTerminalFieldTest`, 2
+testes) verde. Gate `full` teve as 2 falhas ambientais já conhecidas (`SystemSurfacesScreenshotTest`) +
+`KeyFlowKeyboardSelectorTest` flakeou (2 métodos numa rodada, 1 método noutra) — confirmado flake e não
+regressão: reruns isolados passaram (mesma classe de instabilidade de `sendPointerSync` sob carga do
+host, documentada desde OG-T6).
+
+**Pendente [YAN]**: validar de verdade no Termius no Galaxy A32 — a causa raiz foi inferida por reprodução
+análoga (`TYPE_NULL` + `EditText` de debug), não testada no app real, porque a exploração de UI ao vivo no
+device físico do Yan durante uma sessão em uso não é apropriada para o agente fazer sozinho.
+
+### Nota lateral: disco cheio durante a sessão
+
+`/home` chegou a 100% cheio (0 bytes livres) no meio da investigação, causando um `ENOSPC` numa edição.
+Resolvido com a aprovação do Yan: limpos `~/.npm` + `~/.cache` (caches, sempre seguros) e, por decisão
+explícita dele, `Projects/upscale-tests/frames_temp/` (16G) e `Projects/kokoro-tts2/venv/` (7,3G) — foram
+de 0 a 41G livres. Não mexi em mais nada fora do escopo (outros projetos, Downloads pessoais) sem
+confirmação explícita.

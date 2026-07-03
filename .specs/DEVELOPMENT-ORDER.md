@@ -83,9 +83,15 @@ Pequenas, sem spec própria; fazer em quick mode (TASK.md + SUMMARY.md + commit)
       mudança (não tocamos nesses arquivos) — provavelmente a mesma leva de mudanças visuais não
       aprovadas do Milestone 5. Não aprovados; registrado para o Yan decidir quando revisar aquele
       lote. Prints espelhados em `/tmp/keyflow-prints/`.
-- [ ] **Q3 — Bug: atalhos não funcionam no Termius**: investigar `PhysicalKeyEmitter` no Termius
-      (item do `TODO`: "nao ta funcionando no termius"). Diagnóstico primeiro (systematic
-      debugging), fix depois; pode virar spec se for grande. Validação final **[YAN]**.
+- [x] **Q3 — Bug do Termius**: DIAGNOSTICADO e CORRIGIDO (2026-07-02). Causa raiz: **não era o
+      `PhysicalKeyEmitter`/atalhos** — era a composição de texto do corretor (`setComposingText` por
+      letra, grade Canvas) invisível em campos `TYPE_NULL` (terminal/raw-input, ex.: Termux/Termius —
+      confirmado por Yan: texto selecionável + pinça de zoom, típico de terminal em WebView). O dado
+      chegava (Enter enviava o texto certo), só não aparecia enquanto digitava. Fix: `handleKey()` agora
+      comita cada letra direto (`commitText`) em campos `TYPE_NULL`, pulando a composição/corretor (função
+      pura `KeyFlowKeyboardService.shouldCompose`, testada em unit). Ver `.specs/quick/003-bug-termius/`.
+      **Pendente [YAN]**: confirmar no Termius de verdade (a causa raiz foi confirmada só por inferência
+      + reprodução manual num `EditText` de debug, não no app real).
 - [ ] **Q4 — Promover grade Canvas a padrão** (só após o Bloco 0): remover flag `kbd_canvas` +
       caminho antigo da `KeyFlowKeyboardView`; goldens `keyboard-*` antigos saem/regeneram;
       fecha KC-T10 no `keyboard-canvas/tasks.md`.

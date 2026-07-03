@@ -75,6 +75,16 @@ class KeyFlowKeyboardService : InputMethodService() {
     private val wordTracker = ComposingWordTracker()
     private var spellChecker: SystemSpellChecker? = null
 
+    // Q3 (2026-07-02): campos TYPE_NULL (terminal, ex.: Termux/Termius) sinalizam "só aceito o texto já
+    // comitado, sem preview de composição" — apps assim não renderizam setComposingText, então a palavra
+    // fica invisível até um delimitador finalizar a composição (o dado chega, só não aparece). Setado a
+    // cada onStartInput (inclui restarts) para refletir sempre o campo focado atual.
+    private var isRawInputField = false
+        set(value) {
+            field = value
+            isRawInputFieldForTest = value
+        }
+
     // Camada única de emissão de teclas físicas (EMT-02..06): Enter/Esc e, adiante, teclas avulsas,
     // grades de atalhos e alavanca (Trabalho 3 — shortcut-bars).
     private val keyEmitter = PhysicalKeyEmitter()
@@ -290,6 +300,7 @@ class KeyFlowKeyboardService : InputMethodService() {
         // subiria sem input ativo) e (b) o usuário acabou de trocar PARA o KeyFlow pelo nosso seletor
         // (3 toques). Assim não sobe em troca de app / ida para home, nem sem campo focado.
         val hasRealInput = (attribute?.inputType ?: InputType.TYPE_NULL) != InputType.TYPE_NULL
+        isRawInputField = !hasRealInput
         if (hasRealInput &&
             !restarting &&
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
@@ -360,7 +371,7 @@ class KeyFlowKeyboardService : InputMethodService() {
         val ic = getCurrentInputConnection() ?: return
         when (action) {
             is KeyAction.Character -> {
-                if (useCanvasGrid && action.char.length == 1 && action.char[0].isLetter()) {
+                if (shouldCompose(useCanvasGrid, isRawInputField, action.char)) {
                     val word = wordTracker.onLetter(action.char)
                     ic.setComposingText(word, 1)
                     requestSuggestions(word)
@@ -370,7 +381,7 @@ class KeyFlowKeyboardService : InputMethodService() {
                 }
             }
             KeyAction.Backspace -> {
-                val remaining = if (useCanvasGrid) wordTracker.onBackspace() else null
+                val remaining = if (useCanvasGrid && !isRawInputField) wordTracker.onBackspace() else null
                 when {
                     remaining == null -> {
                         val sel = ic.getSelectedText(0)
@@ -469,5 +480,19 @@ class KeyFlowKeyboardService : InputMethodService() {
         @Volatile
         var activeViewForTest: KeyFlowKeyboardView? = null
             private set
+
+        /** Espelha [isRawInputField] da instância ativa — testes instrumentados leem sem depender de UI. */
+        @Volatile
+        var isRawInputFieldForTest: Boolean = false
+            private set
+
+        /**
+         * Decide se uma letra entra na composição do corretor (`setComposingText`) ou comita direto
+         * (`commitText`). Puro/testável em JVM (Q3, 2026-07-02): campos [rawInputField] (`TYPE_NULL`,
+         * ex.: Termux/Termius) não renderizam texto "compondo" — comitar direto é o único jeito de o
+         * usuário ver a letra aparecer enquanto digita.
+         */
+        internal fun shouldCompose(useCanvasGrid: Boolean, rawInputField: Boolean, char: String): Boolean =
+            useCanvasGrid && !rawInputField && char.length == 1 && char[0].isLetter()
     }
 }

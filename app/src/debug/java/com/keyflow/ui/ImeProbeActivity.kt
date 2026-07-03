@@ -2,9 +2,12 @@ package com.keyflow.ui
 
 import android.app.Activity
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.text.InputType
 import android.view.Gravity
 import android.view.WindowManager
+import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.FrameLayout
 
@@ -13,6 +16,8 @@ import android.widget.FrameLayout
  * capturar o IME real sobre um campo. Exportada para `am start` via shell; não tem launcher.
  */
 class ImeProbeActivity : Activity() {
+
+    private var field: EditText? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -51,6 +56,26 @@ class ImeProbeActivity : Activity() {
         }
         setContentView(root)
         field.requestFocus()
+        this.field = field
+    }
+
+    // Campos TYPE_NULL (terminal, ex.: Termux/Termius) suprimem o auto-show do teclado mesmo com
+    // SOFT_INPUT_STATE_ALWAYS_VISIBLE. Mesmo depois do foco de janela, o `InputConnection` ainda pode
+    // não estar "served" (a ligação com o InputMethodManager acontece um pouco depois, de forma
+    // assíncrona) — em vez de um delay arbitrário, tenta em intervalos curtos até funcionar (condição,
+    // não tempo fixo).
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) retryShowSoftInput(attemptsLeft = 20)
+    }
+
+    private fun retryShowSoftInput(attemptsLeft: Int) {
+        if (attemptsLeft <= 0) return
+        val shown = getSystemService(InputMethodManager::class.java)
+            ?.showSoftInput(field, InputMethodManager.SHOW_FORCED) == true
+        if (!shown) {
+            Handler(Looper.getMainLooper()).postDelayed({ retryShowSoftInput(attemptsLeft - 1) }, 100)
+        }
     }
 
     companion object {
