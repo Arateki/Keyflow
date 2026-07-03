@@ -349,7 +349,7 @@ então `[P]` real se houver dois agentes — senão seguir a ordem sequencial.
 
 ## Fase F — Rewarded
 
-### API-T12 — `GET /v1/ssv/admob` (ECDSA + cap diário)
+### API-T12 — `GET /v1/ssv/admob` (ECDSA + cap diário) — ✅ Concluída (2026-07-03)
 - **What**: verificação ECDSA da query (chaves públicas do AdMob cacheadas, refresh por `key_id`
   desconhecido), `custom_data` → conta, crédito idempotente por `transaction_id` com **cap
   diário** da config. Inválido → 403.
@@ -360,6 +360,33 @@ então `[P]` real se houver dois agentes — senão seguir a ordem sequencial.
   integração — crédito 1× por transaction_id; cap diário corta; conta inexistente → 200 sem
   crédito (não vazar existência) com log.
 - **Tests**: unit + integração. **Gate**: `rust`.
+- **Nota de execução**: algoritmo e endpoint conferidos na doc oficial
+  (developers.google.com/admob/android/rewarded-video-ssv) — conteúdo assinado é a query string
+  crua **até** `&signature=` (nunca reordenar/reserializar), `signature`/`key_id` sempre por
+  último nessa ordem; ECDSA **P-256**/SHA-256, assinatura em **DER**; chaves em
+  `https://www.gstatic.com/admob/reward/verifier-keys.json` (confirmado via `curl` real durante a
+  task — `www.` importa, `gstatic.com` sem `www` dá 301). `p256` 0.13.2 (última estável; a 0.14 só
+  tem release candidates nesta data) — `Signature::from_der`/`VerifyingKey::from_public_key_pem`
+  funcionam com as features default do crate (`pkcs8` já traz `der` transitivamente). Cache
+  (`AdmobKeysCache`) refetch completo (não incremental) quando um `key_id` desconhecido aparece —
+  cobre rotação sem precisar de timer. `ADS_REWARD_SECONDS` é decisão nossa (config), não vem do
+  `reward_amount` do AdMob (que só reflete o valor configurado no console AdMob, sem relação com
+  segundos). `credit_reward` faz o cap diário com um `SELECT count(*)` antes do `INSERT ... ON
+  CONFLICT DO NOTHING` na mesma tx — pequena janela de corrida entre duas callbacks quase
+  simultâneas perto do limite é aceita (rewarded ads são baixa frequência; diferente do débito de
+  transcrição, o design não pede guarda atômica aqui). Sempre responde `200` (Google reenvia até
+  5× sem isso) exceto assinatura inválida (`403`, conforme a task). **Achado corrigido antes de
+  virar bug**: a 1ª versão só validava que `custom_data` era um UUID sintaticamente válido, sem
+  checar se a conta existia — um UUID bem-formado de conta inexistente estourava a FK do `ledger`
+  em 500 em vez do `200 sem crédito` esperado; adicionado `db::accounts::exists`. **Achado
+  corrigido (mesma classe do bug da T5)**: os testes usavam `transaction_id` literais fixos
+  ("tx-1", "tx-a"...) — coincidiam com o PK entre execuções no Postgres de dev (nunca truncado),
+  então rodadas repetidas paravam de creditar (idempotência "vazando" entre execuções de teste,
+  não da API); trocado por sufixo `Uuid::new_v4()`. Smoke real via `cargo run`: a chamada ao
+  `gstatic.com` de verdade (latência ~700ms, condizente com rede real) confirmou que o cache busca
+  as chaves reais do Google e rejeita corretamente uma assinatura forjada com `key_id`
+  inexistente. 6 testes de integração + 6 unit de `admob.rs` (assinatura válida/adulterada/chave
+  errada/`key_id` desconhecido/params ausentes). Fecha a **Fase F (Rewarded)**.
 
 ## Fase G — Deploy & e2e
 

@@ -7,6 +7,7 @@ use tokio::net::TcpListener;
 
 const PLAY_INTEGRITY_BASE_URL: &str = "https://playintegrity.googleapis.com";
 const ANDROID_PUBLISHER_BASE_URL: &str = "https://androidpublisher.googleapis.com";
+const ADMOB_VERIFIER_KEYS_URL: &str = "https://www.gstatic.com/admob/reward/verifier-keys.json";
 
 #[tokio::main]
 async fn main() {
@@ -67,6 +68,11 @@ async fn main() {
             unhealthy_cooldown: Duration::from_secs(
                 config.provider_unhealthy_cooldown_secs.get() as u64
             ),
+        },
+        keyflow_api::AdsConfig {
+            verifier_keys_url: ADMOB_VERIFIER_KEYS_URL.to_string(),
+            reward_seconds: config.ads_reward_seconds.get() as i64,
+            daily_cap: config.ads_daily_cap.get() as i64,
         },
     );
 

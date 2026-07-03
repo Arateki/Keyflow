@@ -10,6 +10,13 @@ pub struct Account {
     pub skins_unlocked: bool,
 }
 
+pub async fn exists(pool: &PgPool, account_id: Uuid) -> sqlx::Result<bool> {
+    sqlx::query_scalar("select exists(select 1 from accounts where id = $1)")
+        .bind(account_id)
+        .fetch_one(pool)
+        .await
+}
+
 pub async fn find_by_token_hash(pool: &PgPool, token_hash: &[u8]) -> sqlx::Result<Option<Account>> {
     sqlx::query_as(
         "select id, device_key, balance_seconds, ads_off, skins_unlocked from accounts \

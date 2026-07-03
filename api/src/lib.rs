@@ -19,6 +19,7 @@ use axum::{Router, routing::get};
 use sqlx::PgPool;
 use tower_http::trace::TraceLayer;
 
+use google::admob::AdmobKeysCache;
 use google::integrity::IntegrityClient;
 use google::publisher::PublisherClient;
 use middleware::ratelimit::RateLimiters;
@@ -31,6 +32,13 @@ pub struct TranscriptionConfig {
     pub timeout: Duration,
     pub max_bytes: u64,
     pub unhealthy_cooldown: Duration,
+}
+
+/// Config do rewarded SSV (design §Rewarded, API-T12).
+pub struct AdsConfig {
+    pub verifier_keys_url: String,
+    pub reward_seconds: i64,
+    pub daily_cap: i64,
 }
 
 pub struct AppStateInner {
@@ -46,6 +54,9 @@ pub struct AppStateInner {
     pub transcription_timeout: Duration,
     pub transcription_max_bytes: u64,
     pub provider_unhealthy_cooldown: Duration,
+    pub admob_keys: AdmobKeysCache,
+    pub ads_reward_seconds: i64,
+    pub ads_daily_cap: i64,
 }
 
 /// Estado compartilhado entre handlers — `Clone` barato (`Arc` por dentro; `PgPool` também já é
@@ -65,8 +76,10 @@ impl AppState {
         register_rate_limit_per_minute: NonZeroU32,
         account_rate_limit_per_minute: NonZeroU32,
         transcription: TranscriptionConfig,
+        ads: AdsConfig,
     ) -> Self {
         let provider_health = ProviderHealth::new(transcription.providers.len());
+        let admob_keys = AdmobKeysCache::new(reqwest::Client::new(), ads.verifier_keys_url);
         Self(Arc::new(AppStateInner {
             pool,
             integrity,
@@ -83,6 +96,9 @@ impl AppState {
             transcription_timeout: transcription.timeout,
             transcription_max_bytes: transcription.max_bytes,
             provider_unhealthy_cooldown: transcription.unhealthy_cooldown,
+            admob_keys,
+            ads_reward_seconds: ads.reward_seconds,
+            ads_daily_cap: ads.daily_cap,
         }))
     }
 }
@@ -114,6 +130,7 @@ pub fn app(state: AppState) -> Router {
         .route("/v1/config", get(routes::content::get_config))
         .route("/v1/models", get(routes::content::get_models))
         .route("/v1/transcribe", post(routes::transcribe::transcribe))
+        .route("/v1/ssv/admob", get(routes::ssv::ssv_admob))
         .route_layer(
             TraceLayer::new_for_http().make_span_with(|request: &Request<_>| {
                 let matched_path = request
@@ -195,6 +212,7 @@ mod tests {
             std::num::NonZeroU32::new(1000).unwrap(),
             std::num::NonZeroU32::new(1000).unwrap(),
             test_transcription_config(),
+            test_ads_config(),
         )
     }
 
@@ -210,6 +228,14 @@ mod tests {
             timeout: Duration::from_secs(30),
             max_bytes: 26_214_400,
             unhealthy_cooldown: Duration::from_secs(60),
+        }
+    }
+
+    fn test_ads_config() -> AdsConfig {
+        AdsConfig {
+            verifier_keys_url: "http://127.0.0.1:0".to_string(),
+            reward_seconds: 60,
+            daily_cap: 5,
         }
     }
 

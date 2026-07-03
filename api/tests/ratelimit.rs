@@ -2,7 +2,7 @@ mod common;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode, header};
-use common::{test_pool, unused_transcription_config};
+use common::{test_pool, unused_ads_config, unused_transcription_config};
 use keyflow_api::db::accounts::Account;
 use keyflow_api::google::auth::ServiceAccountKey;
 use keyflow_api::google::integrity::IntegrityClient;
@@ -77,6 +77,7 @@ async fn state_with_limits(
         std::num::NonZeroU32::new(register_per_minute).unwrap(),
         std::num::NonZeroU32::new(account_per_minute).unwrap(),
         unused_transcription_config(),
+        unused_ads_config(),
     )
 }
 

@@ -10,6 +10,8 @@ const DEFAULT_VOIDED_PURCHASES_JOB_INTERVAL_SECS: u32 = 3600;
 const DEFAULT_TRANSCRIPTION_TIMEOUT_MS: u32 = 30_000;
 const DEFAULT_TRANSCRIPTION_MAX_BYTES: u32 = 26_214_400; // 25 MiB — mesmo placeholder da T10.
 const DEFAULT_PROVIDER_UNHEALTHY_COOLDOWN_SECS: u32 = 60;
+const DEFAULT_ADS_REWARD_SECONDS: u32 = 60;
+const DEFAULT_ADS_DAILY_CAP: u32 = 5;
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -34,6 +36,11 @@ pub struct Config {
     pub transcription_max_bytes: NonZeroU32,
     /// Cooldown do circuit breaker entre requests (ver `providers::ProviderHealth`).
     pub provider_unhealthy_cooldown_secs: NonZeroU32,
+    /// Segundos creditados por rewarded ad verificado (design §Rewarded) — decisão nossa, não vem
+    /// do `reward_amount` do AdMob (que é só o valor configurado no console, sem unidade fixa).
+    pub ads_reward_seconds: NonZeroU32,
+    /// Cap diário de recompensas por conta (ADS-01).
+    pub ads_daily_cap: NonZeroU32,
 }
 
 #[derive(Debug)]
@@ -148,6 +155,10 @@ impl Config {
             DEFAULT_PROVIDER_UNHEALTHY_COOLDOWN_SECS,
         )?;
 
+        let ads_reward_seconds =
+            parse_nonzero_u32(vars, "ADS_REWARD_SECONDS", DEFAULT_ADS_REWARD_SECONDS)?;
+        let ads_daily_cap = parse_nonzero_u32(vars, "ADS_DAILY_CAP", DEFAULT_ADS_DAILY_CAP)?;
+
         Ok(Config {
             database_url,
             bind_addr,
@@ -161,6 +172,8 @@ impl Config {
             transcription_timeout_ms,
             transcription_max_bytes,
             provider_unhealthy_cooldown_secs,
+            ads_reward_seconds,
+            ads_daily_cap,
         })
     }
 }
@@ -274,6 +287,20 @@ mod tests {
             config.transcription_max_bytes.get(),
             DEFAULT_TRANSCRIPTION_MAX_BYTES
         );
+        assert_eq!(config.ads_reward_seconds.get(), DEFAULT_ADS_REWARD_SECONDS);
+        assert_eq!(config.ads_daily_cap.get(), DEFAULT_ADS_DAILY_CAP);
+    }
+
+    #[test]
+    fn ads_reward_and_cap_are_configurable() {
+        let config = Config::from_map(&with_required(&[
+            ("ADS_REWARD_SECONDS", "30"),
+            ("ADS_DAILY_CAP", "3"),
+        ]))
+        .unwrap();
+
+        assert_eq!(config.ads_reward_seconds.get(), 30);
+        assert_eq!(config.ads_daily_cap.get(), 3);
     }
 
     #[test]

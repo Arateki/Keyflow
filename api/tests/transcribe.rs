@@ -2,7 +2,7 @@ mod common;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode, header};
-use common::test_pool;
+use common::{test_pool, unused_ads_config};
 use keyflow_api::auth::generate_token;
 use keyflow_api::db::accounts;
 use keyflow_api::google::auth::ServiceAccountKey;
@@ -63,6 +63,7 @@ async fn state_with_providers(providers: Vec<ResolvedProvider>, max_bytes: u64) 
             max_bytes,
             unhealthy_cooldown: Duration::from_secs(60),
         },
+        unused_ads_config(),
     )
 }
 

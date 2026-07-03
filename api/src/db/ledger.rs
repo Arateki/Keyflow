@@ -6,7 +6,6 @@ use uuid::Uuid;
 pub enum LedgerReason {
     Purchase,
     Transcription,
-    #[allow(dead_code, reason = "consumido pela API-T12 (crédito de rewarded ad)")]
     Reward,
 }
 

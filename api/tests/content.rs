@@ -2,7 +2,7 @@ mod common;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode, header};
-use common::{test_pool, unused_transcription_config};
+use common::{test_pool, unused_ads_config, unused_transcription_config};
 use keyflow_api::AppState;
 use keyflow_api::app;
 use keyflow_api::google::auth::ServiceAccountKey;
@@ -41,6 +41,7 @@ async fn test_state() -> AppState {
         std::num::NonZeroU32::new(1000).unwrap(),
         std::num::NonZeroU32::new(1000).unwrap(),
         unused_transcription_config(),
+        unused_ads_config(),
     )
 }
 

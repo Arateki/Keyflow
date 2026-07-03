@@ -37,6 +37,9 @@ Módulo disjunto do app Android (`app/`): o Gradle não enxerga esta pasta e vic
     `OPENAI_KEY=Bearer sk-...` setada à parte.
   - `TRANSCRIPTION_TIMEOUT_MS` (opcional, default `30000`), `TRANSCRIPTION_MAX_BYTES` (opcional,
     default `26214400` = 25 MiB), `PROVIDER_UNHEALTHY_COOLDOWN_SECS` (opcional, default `60`).
+  - `ADS_REWARD_SECONDS` (opcional, default `60`) — segundos creditados por rewarded ad
+    verificado (decisão nossa, não vem do `reward_amount` do AdMob). `ADS_DAILY_CAP` (opcional,
+    default `5`) — máximo de recompensas por conta por dia (ADS-01).
 
 ## Rotas
 
@@ -61,6 +64,14 @@ Módulo disjunto do app Android (`app/`): o Gradle não enxerga esta pasta e vic
   `ceil(bytes/8000)` segundos numa tx atômica com o registro de idempotência
   (`transcribe_requests`, chave `X-Request-Id`) — retry com o mesmo id re-executa o provedor mas
   não debita 2×.
+- `GET /v1/ssv/admob` — callback de rewarded SSV do AdMob (design §Rewarded, ADS-01). Verifica
+  ECDSA P-256/SHA-256 (assinatura DER) contra a chave pública de `key_id`, buscada e cacheada de
+  `https://www.gstatic.com/admob/reward/verifier-keys.json` (refetch automático se `key_id` for
+  desconhecido). Assinatura inválida → `403`. Assinatura válida: `custom_data` é o `accountId`
+  (UUID); conta inexistente/`custom_data` inválido → `200` sem crédito, só loga (não vazar
+  existência). Crédito de `ADS_REWARD_SECONDS` idempotente por `transaction_id`, sujeito a
+  `ADS_DAILY_CAP` por conta/dia — sempre responde `200` mesmo quando o cap bloqueia (é assim que
+  o AdMob espera: sem `200`, ele reenvia a callback até 5×).
 
 ### Arquitetura: por que o fallback de provedor é entre requests, não dentro da mesma
 

@@ -1,5 +1,5 @@
-use keyflow_api::TranscriptionConfig;
 use keyflow_api::providers::ResolvedProvider;
+use keyflow_api::{AdsConfig, TranscriptionConfig};
 use sqlx::PgPool;
 use std::time::Duration;
 
@@ -66,5 +66,16 @@ pub fn unused_transcription_config() -> TranscriptionConfig {
         timeout: Duration::from_secs(30),
         max_bytes: 26_214_400,
         unhealthy_cooldown: Duration::from_secs(60),
+    }
+}
+
+/// `AdsConfig` de placeholder pra testes que não exercitam `GET /v1/ssv/admob` (ver
+/// `tests/ssv.rs` para os que exercitam de verdade, com chaves ECDSA reais geradas no teste).
+#[allow(dead_code)]
+pub fn unused_ads_config() -> AdsConfig {
+    AdsConfig {
+        verifier_keys_url: "http://127.0.0.1:0".to_string(),
+        reward_seconds: 60,
+        daily_cap: 5,
     }
 }
