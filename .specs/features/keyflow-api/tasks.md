@@ -390,7 +390,7 @@ então `[P]` real se houver dois agentes — senão seguir a ordem sequencial.
 
 ## Fase G — Deploy & e2e
 
-### API-T13 — Deploy (TLS/secrets/Postgres) + smoke em staging
+### API-T13 — Deploy (TLS/secrets/Postgres) + smoke em staging — 🟡 Parcial (2026-07-03) — **[YAN]**
 - **What**: Dockerfile de release; guia de deploy (reverse proxy com TLS, envs/secrets, Postgres
   gerenciado ou host, job ativo); subir staging; smoke: health/config/models/register (com
   Integrity **relaxado por flag** se a credencial ainda não existir — documentar o que ficou
@@ -401,6 +401,27 @@ então `[P]` real se houver dois agentes — senão seguir a ordem sequencial.
 - **Done when**: staging responde health/config/models via HTTPS; secrets só por ambiente;
   checklist de credenciais pendentes entregue ao Yan.
 - **Tests**: smoke manual documentado. **Gate**: `rust` + manual.
+- **Feito nesta sessão (sem depender de credencial)**: `api/Dockerfile` multi-stage
+  (`rust:1.96-slim-bookworm` → `debian:bookworm-slim`, tags conferidas no Docker Hub — não
+  fabricadas; migrations embutidas no binário via `sqlx::migrate!()`, sem comando separado no
+  boot; só `ca-certificates` no runtime, já que `rustls`/`sqlx-postgres` são puro-Rust e não
+  precisam de `libssl`/`libpq` do sistema — mas `rustls-platform-verifier` usa o trust store do
+  SO, daí `ca-certificates` continuar necessário). **Validado de verdade**: `docker build` local
+  (imagem final 101 MB) + `docker run` contra o Postgres do `docker-compose.yml` — `/health` e
+  `/v1/config` responderam `200` de ponta a ponta, migrations aplicaram no boot. `api/docs/
+  deploy.md`: guia completo (reverse proxy/TLS com exemplo de Caddyfile, tabela de env vars com
+  origem de cada uma, service account do Google — quais APIs habilitar e como vincular ao Play
+  Console, checklist de credenciais pendentes).
+- **Parou no gate [YAN]** (conforme `DEVELOPMENT-ORDER.md` — "credenciais reais... é do Yan"):
+  **não** subiu staging de verdade nem tentou nenhuma ação de infraestrutura real (domínio,
+  Postgres gerenciado, DNS, secrets em produção) — são ações com efeito fora deste
+  ambiente/sandbox, fora do escopo de algo que se prepara e valida sozinho. Pendências exatas no
+  checklist do fim de `api/docs/deploy.md`: Postgres de staging, domínio/DNS, service account do
+  Google (Play Integrity + Developer API habilitadas e vinculada ao app no Play Console),
+  provedor(es) de transcrição + chaves, unidade de anúncio rewarded no AdMob configurada, e o
+  smoke de `POST /v1/register` com device físico (só é testável com um `integrityToken` real, que
+  não dá pra fabricar fora do fluxo real do Play). **API-T14 seguirá bloqueada** até isso e até
+  MZ-T1..T8 no app (ver `DEVELOPMENT-ORDER.md`).
 
 ### API-T14 — e2e com o app + traceability
 - **What**: com a `monetization` (MZ) implementada no app: rodar o Independent Test de cada área

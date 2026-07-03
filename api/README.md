@@ -151,6 +151,13 @@ Postgres efêmero (mesmas credenciais do `docker-compose.yml`).
 - Nenhum dado pessoal, áudio ou texto transcrito é persistido — ver `design.md` §Princípio
   condutor.
 
+## Deploy
+
+`Dockerfile` (multi-stage, `rust:1.96-slim-bookworm` → `debian:bookworm-slim`) builda um binário
+de release com as migrations embutidas (`sqlx::migrate!()` — nada roda separado no boot além do
+próprio processo). Guia completo (reverse proxy/TLS, secrets, Postgres, checklist de credenciais
+pendentes do Yan) em [`docs/deploy.md`](docs/deploy.md).
+
 ## Status
 
 Ver o `Status` de cada task em `.specs/features/keyflow-api/tasks.md` (fonte da verdade de
