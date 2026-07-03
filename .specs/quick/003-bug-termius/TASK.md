@@ -43,4 +43,4 @@ lá, só não aparecia).
 
 ## Commit
 
-(a preencher após o commit)
+`18e99f9` — fix(teclado): comita letras direto em campos raw-input (Q3, bug Termius)
