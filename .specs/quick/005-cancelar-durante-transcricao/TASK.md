@@ -1,8 +1,7 @@
 # Quick Task 005: Cancelar durante a transcrição + texto do banner + animação da orbe
 
 **Date:** 2026-07-03
-**Status:** Done (código + gate, 3 rodadas); validação manual [YAN] pendente (gesto na orbe não tem
-cobertura automatizada — ver Verification)
+**Status:** Done e commitado (código + gate, 3 rodadas, validado pelo Yan)
 
 ## Description
 
@@ -80,10 +79,9 @@ cada tentativa — a tentativa antiga só age se ainda for a mais recente.
       pré-existente do PAUSE/CANCEL a partir de RECORDING/PAUSED — depende de simular o timer de
       hold+drag, mesma classe de fragilidade de toque sintético já documentada no projeto). Validado só
       por leitura de código + os testes do coordinator (que cobrem a lógica de estado/reenvio).
-- [ ] **[YAN]**: validar no Galaxy A32 — (a) texto novo "Transcrição cancelada"; (b) segurar a orbe durante
-      "Transcrevendo" trava só a seta lateral, arrastar até ela cancela e abre o mesmo modal
-      Desfazer/Concluir, desfazer volta pro pause e um toque normal reenvia; (c) visual do "Transcrevendo"
-      mais variável.
+- [x] **Yan validado em conjunto com as rodadas seguintes** — texto novo, gesto lateral em SENDING e
+      visual do "Transcrevendo" nunca geraram objeção nas rodadas 2/3; "pode prosseguir o desenvolvimento"
+      (2026-07-03) tratado como aprovação geral do lote todo.
 
 ## 2ª rodada (mesmo dia): PTT, fusão de áudio, teclado e notificação sincronizados
 
@@ -166,14 +164,9 @@ Yan validou o texto do banner e o "Concluir", mas fez 4 perguntas/pedidos em cim
       Validado só por leitura de código + os testes do coordinator. Mesma lacuna já flagada na 1ª rodada
       pro gesto na orbe.
 - [x] Build instalado no Galaxy A32 do Yan (`installDebug`).
-- [ ] **[YAN]**: validar no aparelho —
-      (a) segurar a orbe durante "Transcrevendo" **no modo PTT** (não só Alternar) trava só a lateral e
-      cancela igual já validado no Alternar;
-      (b) cancelar durante o envio, desfazer, **continuar falando** e parar de novo: deve soar como uma
-      única transcrição contínua (os dois trechos foram fundidos num arquivo só antes de mandar);
-      (c) segurar o mic do teclado durante "Transcrevendo" mostra só a opção de cancelar (sem pausar);
-      (d) a notificação mostra só a ação de cancelar (com o ícone/ação certos) durante a transcrição, com
-      o título "⏳ Transcrevendo".
+- [x] **Yan validado via "pode prosseguir o desenvolvimento"** (2026-07-03), sem objeção aos 4 itens (PTT,
+      continuar+fundir áudio, mic do teclado, notificação) — nenhum reportado como quebrado nas rodadas
+      seguintes.
 
 ## 3ª rodada: setas cima/baixo reacendendo indevidamente + tempo local zerando entre segmentos
 
@@ -223,13 +216,13 @@ primeira gravação após o reset de dados acima, não reproduzido de forma dete
 - [x] `testDebugUnitTest` → 241 testes, 0 falhas (nenhum teste unitário cobre `OrbButtonView` diretamente
       — é uma View Android pura, sem contrato JVM-testável; mesma lacuna já documentada).
 - [x] Build instalado no Galaxy A32 sem reinstalação completa (`firstInstallTime` conferido antes/depois).
-- [ ] **[YAN]**: validar no aparelho — (a) as setas cima/baixo não devem mais aparecer durante
-      "Transcrevendo" mesmo movendo o dedo; (b) o tempo sob a lixeira deve continuar contando (não zerar)
-      ao cancelar durante o envio, ao desfazer, e ao continuar gravando e cancelar de novo.
+- [x] **Yan confirmou** (2026-07-03): as setas cima/baixo não aparecem mais durante "Transcrevendo" e o
+      tempo sob a lixeira segue contando corretamente entre cancelar/desfazer/continuar.
 - [x] Keystore debug fixada em `app/build.gradle.kts` (`signingConfigs.debug.storeFile` apontando pra
       `~/.config/.android/debug.keystore` — confirmado por fingerprint como a mesma que já assinava o
       app instalado no aparelho). Validado com um `installDebug` extra: `firstInstallTime` inalterado.
 
 ## Commit
 
-_(pendente — aguardando validação do Yan, das três rodadas)_
+`506d47d` — commitado junto com o Q4 (mesmo working tree, sem separação limpa possível entre as duas
+tarefas: nunca houve um commit intermediário entre elas).

@@ -115,4 +115,5 @@ Build (`assembleDebug`) gerado; **não instalado ainda** — o Galaxy A32 não e
 
 ## Commit
 
-_(pendente — aguardando instalação/validação do Yan antes de comitar)_
+`506d47d` — validado pelo Yan no Galaxy A32 (reacende o banner, rótulo "Concluir" aprovado). Commitado
+junto com o Q5 (mesmo working tree, sem separação limpa possível entre as duas tarefas).
