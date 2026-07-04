@@ -1126,3 +1126,69 @@ Detalhe completo (decisões, arquivos, checklist) em
 gesto no PTT; (b) cancelar-durante-envio → desfazer → continuar falando → parar de novo deve soar como
 uma única transcrição; (c) segurar o mic do teclado durante "Transcrevendo" mostra só cancelar; (d) a
 notificação mostra só cancelar com o título novo. Commit pendente até essa validação (e as anteriores).
+
+## Setas reacendendo + tempo zerando na orbe — validado e Q4/Q5 comitados (2026-07-03)
+
+Yan validou os dois bugs visuais da rodada anterior (setas cima/baixo sumindo de vez durante
+"Transcrevendo"; tempo sob a lixeira preservado entre cancelar/desfazer/continuar) e mandou prosseguir.
+Commitado `506d47d` (Q4 + Q5, as 3 rodadas) + `23bfacc` (docs registrando hash/validação nos TASK.md).
+
+## Keystore debug fixada (2026-07-03)
+
+Confirmado por fingerprint: `installDebug` tinha feito uma reinstalação completa (não incremental) por
+causa de duas keystores debug diferentes nesta máquina (`~/.android/` vs `~/.config/.android/`), apagando
+a config de voz do Yan sem aviso. Fixado `signingConfigs.debug.storeFile` em `app/build.gradle.kts`
+apontando pra `~/.config/.android/debug.keystore` (a mesma que já assinava o app instalado — confirmado
+via fingerprint, não causou outro reset). Validado com um `installDebug` extra: `firstInstallTime`
+inalterado.
+
+## M5 — Grade Canvas promovida a padrão, teclado antigo removido (2026-07-04)
+
+Yan validou os 2 gates do Bloco 0 pendentes (globo PT→EN→ES + seletor único do sistema + prévia de
+tamanho; fluidez da grade Canvas) e confirmou que as specs Draft já foram validadas quando ele as criou.
+Mandou prosseguir. Removida a flag `kbd_canvas`/`useCanvasGrid` por completo — a grade Canvas (KC-T1..T9)
+vira a única, fechando KC-T10.
+
+**Arquivos**: `KeyFlowKeyboardService.kt` (propriedade da flag + condicionais em `spellChecker`/
+`shouldCompose`/`onUpdateSelection`/`finishComposing` removidos — tudo incondicional agora);
+`KeyFlowKeyboardView.kt` (construtor perde o parâmetro; teclado antigo inteiro deletado —
+`buildRow`/`buildActionRow`/`keyFor`/`paperKey`/`toggleShift`/`refreshShift`/`shiftSymbol`/`ROWS`/
+`isShifted`/`charKeys`/`shiftKey`; `buildExpanded()` e as funções da grade Canvas viram incondicionais);
+`TecladoPanel.kt`/`RouteCatalog.kt` (argumento/rotas do teclado antigo removidos, 3 rotas
+`keyboard-expanded/collapsed/recording` saem do catálogo). Testes: `KeyFlowKeyboardServiceTest.kt`
+(`shouldCompose` perde o parâmetro de flag); `KeyFlowKeyboardCanvasGridTest.kt` reescrito (perde o teste
+"flag off = antigo", os 2 restantes viram o comportamento padrão); mais 5 arquivos instrumentados
+limpos de referências à flag (mantendo `KEY_BARS`, flag separada, intocada).
+
+**Goldens**: 6 PNGs do teclado antigo removidos (`keyboard-expanded/collapsed/recording`, claro+escuro).
+`keyboard-canvas-*` regenerados (diff só jitter de antialiasing, dentro do limiar) e
+`config-modo[-dark]` reaprovados (efeito colateral esperado — o demo do `ModoPanel` renderiza a grade
+Canvas agora). `config-teclado[-dark]`/`config-docs`/`config-overlay`/`config-voz-*` (claro) seguem com
+diff grande **não aprovado** — mesmo lote de mudanças visuais pendentes do Milestone 5 já registrado
+antes (Q2), sem relação com esta mudança.
+
+**Achado sério no meio do caminho (bug de sincronização de relógio)**: rodando a suíte instrumentada do
+teclado, o Yan reparou a orbe mostrando um tempo pausado (4s) muito diferente do tempo mostrado no mic do
+teclado (10s) simultaneamente. Investigação: a `OrbButtonView` mantinha um relógio **próprio**, derivado só
+de observar as transições de `ButtonState` que chegavam nela; o teclado sempre leu um valor "autoritativo"
+publicado pelo `OverlayCoordinator` via `KeyFlowController`. Como a `OrbButtonView` é recriada de vez em
+quando (troca de tema/tamanho, restart do serviço — confirmado no log: 3 instâncias novas em 2 minutos
+durante os testes), o relógio local dela zerava a cada recriação enquanto o valor autoritativo (campo
+único, não preso ao ciclo de vida da view) seguia acumulando — descolando os dois. Corrigido: a orbe agora
+lê `KeyFlowController.recordingAccumulatedMs`/`recordingSegmentStartMs`, a mesma fonte que o teclado já
+lia, eliminando o relógio duplicado (e toda a máquina de estados `TIME_TRACKED_STATES` que eu tinha
+acabado de escrever pra tentar consertar o sintoma errado). Isso também é um bug real de uso normal, não
+só um artefato do teste automatizado.
+
+**Gate**: `testDebugUnitTest` → 241 testes, 0 falhas. `connectedDebugAndroidTest` no Galaxy A32:
+`com.keyflow.ime` 28/29 (1 falha ambiental conhecida — anexação do IME, sem relação); `OrbButtonViewTest`
+6/6 após o fix do relógio. Build instalado no Galaxy A32 (sem reinstalação completa).
+
+Detalhe completo em `.specs/features/keyboard-canvas/tasks.md` (KC-T10) e
+`.specs/DEVELOPMENT-ORDER.md` (Bloco 0 fechado, M5 concluído). Commit pendente.
+
+**Pendente**: Yan pediu, em seguida, testes instrumentados reais para os gestos de arrasto da orbe
+(pausar/retomar/cancelar/config, nos dois modos) usando injeção direta de `MotionEvent` (mesma técnica já
+usada em `OrbButtonViewTest`, mais confiável que a simulação de toque via sistema) + esperar o estado
+chegar (sem cronometrar), e golden screenshots/GIFs dessas interações para revisão visual. Ainda não
+iniciado nesta sessão.

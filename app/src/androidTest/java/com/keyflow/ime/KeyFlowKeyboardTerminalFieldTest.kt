@@ -37,11 +37,9 @@ class KeyFlowKeyboardTerminalFieldTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context: Context get() = instrumentation.targetContext
     private val device: UiDevice get() = UiDevice.getInstance(instrumentation)
-    private val uiPrefs get() = context.getSharedPreferences("keyflow_kb_ui", Context.MODE_PRIVATE)
 
     @After
     fun tearDown() {
-        uiPrefs.edit().remove(KEY_CANVAS_GRID).apply()
         shell("ime reset")
         device.pressHome()
         KeyFlowController.clearInserter()
@@ -63,7 +61,6 @@ class KeyFlowKeyboardTerminalFieldTest {
     // ── ações de alto nível ──────────────────────────────────────────────────
 
     private fun launchProbe(inputType: Int) {
-        uiPrefs.edit().putBoolean(KEY_CANVAS_GRID, true).apply()
         shell("pm grant ${context.packageName} ${Manifest.permission.RECORD_AUDIO}")
         shell("ime enable $IME")
         shell("ime set $IME")
@@ -100,6 +97,5 @@ class KeyFlowKeyboardTerminalFieldTest {
     private companion object {
         const val IME = "com.keyflow/.ime.KeyFlowKeyboardService"
         const val TIMEOUT = 5000L
-        const val KEY_CANVAS_GRID = "kbd_canvas"
     }
 }

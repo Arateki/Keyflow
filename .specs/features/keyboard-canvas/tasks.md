@@ -94,7 +94,7 @@
   habilitar >1 subtype na tela de Idiomas do sistema, impraticável neste emulador (só habilita 1 por
   padrão) e sem API para simular com segurança; fica **manual** no Galaxy A32.
 
-### KC-T10 — Golden + validação final + promover a padrão `[PARCIAL — falta Yan]`
+### KC-T10 — Golden + validação final + promover a padrão `[CONCLUÍDA]`
 - **What**: rotas de galeria `keyboard-canvas-expanded/symbols/collapsed/candidates` (claro/escuro); regenerar+aprovar golden; espelhar PNGs em `/tmp`; **validação manual de fluidez** no Galaxy A32; aprovado → novo vira **padrão** (remover flag/antigo).
 - **Where**: `RouteCatalog` (debug), `verification/golden/`, `KeyFlowKeyboardView`.
 - **Depends on**: KC-T6..T9.
@@ -113,9 +113,21 @@
   cancelamento rápido), sugestões redesenhadas pra caber na própria faixa mic/config/colapsar. Corretor
   ortográfico do sistema investigado a fundo: concluído que é limitação do serviço escolhido no device
   (Samsung), não bug nosso — ver `STATE.md` pra detalhe.
-  **Ainda pendente (só o Yan)**: testar troca de idioma pelo globo (precisa habilitar >1 idioma do KeyFlow
-  no sistema); decidir promover a grade nova a padrão (remover a flag e o teclado antigo). Sem isso o flag
-  continua desligado por padrão em release — rollback trivial preservado.
+  **Promovida a padrão (2026-07-04)**: Yan validou os 2 pontos pendentes — globo cicla PT→EN→ES
+  corretamente (seletor do sistema mostra só 1 "KeyFlow", prévia de tamanho reage ao arrasto) e a
+  fluidez da grade Canvas está ótima. Flag `kbd_canvas`/`useCanvasGrid` removida por completo:
+  `KeyFlowKeyboardService.kt` (propriedade + condicionais em `spellChecker`/`shouldCompose`/
+  `onUpdateSelection`/`finishComposing`), `KeyFlowKeyboardView.kt` (construtor + teclado antigo inteiro —
+  `buildRow`/`buildActionRow`/`keyFor`/`paperKey`/shift/`ROWS` — deletado, `buildExpanded()`/
+  `buildCanvasGrid()`/etc viraram incondicionais), `TecladoPanel.kt`/`RouteCatalog.kt` (argumento/rotas
+  do teclado antigo removidos). Goldens: 6 PNGs do teclado antigo removidos (`keyboard-expanded/
+  collapsed/recording`, claro+escuro); `keyboard-canvas-*` regenerados (diff só de jitter de
+  antialiasing, dentro do limiar) e `config-modo[-dark]` reaprovados (efeito colateral esperado — o
+  `ModoPanel` agora renderiza a grade Canvas na prévia). `config-teclado[-dark]`/`config-docs`/
+  `config-overlay`/`config-voz-*` (modo claro) continuam com diffs grandes **não aprovados** — são o
+  mesmo lote de mudanças visuais pendentes do Milestone 5 já registrado antes, sem relação com esta
+  task. Gate: 241 unit + instrumentado `com.keyflow.ime` 28/29 (1 falha ambiental conhecida, anexação
+  do IME) verdes.
   **Fora do escopo desta task, pedidos à parte do Yan durante a validação** (ver `STATE.md`, sexta
   rodada): timeout configurável do Groq/transcrição (settings + fix de rede), teclado numérico automático
   por tipo de campo, slider de tamanho do teclado (só perguntado, não decidido).

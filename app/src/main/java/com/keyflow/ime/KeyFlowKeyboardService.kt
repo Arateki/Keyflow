@@ -45,12 +45,7 @@ class KeyFlowKeyboardService : InputMethodService() {
             uiPrefs.edit().putBoolean(KEY_EXPANDED, value).apply()
         }
 
-    // Flag de rollout da grade Canvas nova (KC-T6/ROL-02): só alternável em debug, sempre desligada em
-    // release até a KC-T10 aprovar e remover esta flag (aí a nova vira a única).
-    private val useCanvasGrid: Boolean
-        get() = BuildConfig.DEBUG && uiPrefs.getBoolean(KEY_CANVAS_GRID, false)
-
-    // Flag de rollout das barras Canvas (SB-T5/ROL-02, mesmo padrão da kbd_canvas): desligada, a barra
+    // Flag de rollout das barras Canvas (SB-T5/ROL-02): desligada, a barra
     // antiga fica intocada; ligada, a pilha de BarView renderiza a BarsConfig do DataStore.
     private val useBars: Boolean
         get() = BuildConfig.DEBUG && uiPrefs.getBoolean(KEY_BARS, false)
@@ -71,7 +66,7 @@ class KeyFlowKeyboardService : InputMethodService() {
     )
     private var appliedLiveConfig: LiveKeyboardConfig? = null
 
-    // Corretor do sistema (KC-T7/SPL-01..03): só existe com a grade Canvas — a antiga nunca compõe.
+    // Corretor do sistema (KC-T7/SPL-01..03).
     private val wordTracker = ComposingWordTracker()
     private var spellChecker: SystemSpellChecker? = null
 
@@ -168,7 +163,6 @@ class KeyFlowKeyboardService : InputMethodService() {
         // inicializar o EncryptedSharedPreferences (cripto cara) no caminho crítico do IME.
         val scalePercent = runBlocking { repo.keyboardScalePercentOnce() }
         val scale = scalePercent / 100f
-        val canvasGrid = useCanvasGrid
         // Idioma gerenciado pelo app (pedido do Yan, 2026-07-02) — não pelo subtype do sistema, mesma
         // leitura leve do tema/tamanho.
         val language = runBlocking { repo.keyboardLanguageOnce() }
@@ -176,7 +170,7 @@ class KeyFlowKeyboardService : InputMethodService() {
         val numberRowEnabled = runBlocking { repo.keyboardNumberRowEnabledOnce() }
         appliedLiveConfig = LiveKeyboardConfig(dark, scalePercent, language, numberRowEnabled)
         spellChecker?.close()
-        spellChecker = if (canvasGrid) SystemSpellChecker(this, localeFor(language)) else null
+        spellChecker = SystemSpellChecker(this, localeFor(language))
         // Barras Canvas (SB-T5): leitura leve como o tema — só DataStore no caminho crítico do IME.
         val bars = useBars
         val barsConfig = if (bars) runBlocking { repo.barsConfigOnce() } else BarsConfig.DEFAULT
@@ -204,7 +198,6 @@ class KeyFlowKeyboardService : InputMethodService() {
             },
             dark = dark,
             scale = scale,
-            useCanvasGrid = canvasGrid,
             locale = language,
             showLanguageKey = true,
             onLanguageSwitch = { cycleLanguage() },
@@ -364,7 +357,7 @@ class KeyFlowKeyboardService : InputMethodService() {
     ) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
         val word = wordTracker.currentWord
-        if (!useCanvasGrid || word.isEmpty()) return
+        if (word.isEmpty()) return
         val actualBefore = getCurrentInputConnection()?.getTextBeforeCursor(word.length, 0)?.toString()
         if (actualBefore != word) {
             wordTracker.reset()
@@ -377,7 +370,7 @@ class KeyFlowKeyboardService : InputMethodService() {
         val ic = getCurrentInputConnection() ?: return
         when (action) {
             is KeyAction.Character -> {
-                if (shouldCompose(useCanvasGrid, isRawInputField, action.char)) {
+                if (shouldCompose(isRawInputField, action.char)) {
                     val word = wordTracker.onLetter(action.char)
                     ic.setComposingText(word, 1)
                     requestSuggestions(word)
@@ -387,7 +380,7 @@ class KeyFlowKeyboardService : InputMethodService() {
                 }
             }
             KeyAction.Backspace -> {
-                val remaining = if (useCanvasGrid && !isRawInputField) wordTracker.onBackspace() else null
+                val remaining = if (!isRawInputField) wordTracker.onBackspace() else null
                 when {
                     remaining == null -> {
                         val sel = ic.getSelectedText(0)
@@ -445,7 +438,7 @@ class KeyFlowKeyboardService : InputMethodService() {
 
     /** Encerra a palavra em composição (se houver) — pontuação/espaço/enter fecham a sugestão atual. */
     private fun finishComposing(ic: InputConnection) {
-        if (!useCanvasGrid || wordTracker.currentWord.isEmpty()) return
+        if (wordTracker.currentWord.isEmpty()) return
         ic.finishComposingText()
         wordTracker.reset()
         spellChecker?.cancel()
@@ -473,7 +466,6 @@ class KeyFlowKeyboardService : InputMethodService() {
     companion object {
         private const val TAG = "KeyFlow.Keyboard"
         private const val KEY_EXPANDED = "expanded"
-        private const val KEY_CANVAS_GRID = "kbd_canvas"
         private const val KEY_BARS = "kbd_bars"
         private val LANGUAGE_CYCLE = listOf("pt", "en", "es")
 
@@ -498,7 +490,7 @@ class KeyFlowKeyboardService : InputMethodService() {
          * ex.: Termux/Termius) não renderizam texto "compondo" — comitar direto é o único jeito de o
          * usuário ver a letra aparecer enquanto digita.
          */
-        internal fun shouldCompose(useCanvasGrid: Boolean, rawInputField: Boolean, char: String): Boolean =
-            useCanvasGrid && !rawInputField && char.length == 1 && char[0].isLetter()
+        internal fun shouldCompose(rawInputField: Boolean, char: String): Boolean =
+            !rawInputField && char.length == 1 && char[0].isLetter()
     }
 }

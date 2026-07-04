@@ -42,11 +42,9 @@ class KeyFlowKeyboardLanguageTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context: Context get() = instrumentation.targetContext
     private val device: UiDevice get() = UiDevice.getInstance(instrumentation)
-    private val uiPrefs get() = context.getSharedPreferences("keyflow_kb_ui", Context.MODE_PRIVATE)
 
     @After
     fun tearDown() {
-        uiPrefs.edit().remove(KEY_CANVAS_GRID).apply()
         // Devolve o idioma real do app ao padrão — este teste roda contra o DataStore de produção (é a
         // única forma de observar o que o KeyFlowKeyboardService real persistiu de verdade).
         runBlocking { SettingsRepository(context).saveKeyboardLanguageOnce("pt") }
@@ -95,7 +93,6 @@ class KeyFlowKeyboardLanguageTest {
     // ── ações de alto nível ──────────────────────────────────────────────────
 
     private fun launchProbeAndGetGrid(): KeyboardGridView {
-        uiPrefs.edit().putBoolean(KEY_CANVAS_GRID, true).apply()
         shell("pm grant ${context.packageName} ${Manifest.permission.RECORD_AUDIO}")
         shell("ime enable $IME")
         shell("ime set $IME")
@@ -169,6 +166,5 @@ class KeyFlowKeyboardLanguageTest {
     private companion object {
         const val IME = "com.keyflow/.ime.KeyFlowKeyboardService"
         const val TIMEOUT = 5000L
-        const val KEY_CANVAS_GRID = "kbd_canvas"
     }
 }

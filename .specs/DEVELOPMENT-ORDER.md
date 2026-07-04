@@ -38,7 +38,7 @@
 | --------- | ------- | ------ |
 | M0–M2 | PoC, MVP `voice-keyboard`, `redesign-atelie` | ✅ concluídos |
 | M4 | `orb-gestures` (reconciliação) | ✅ concluído |
-| M5 | `keyboard-canvas` | KC-T1..T9 ✅; KC-T10 **[YAN]** (fluidez + promover a padrão) |
+| M5 | `keyboard-canvas` | ✅ concluído (KC-T1..T10, grade Canvas promovida a padrão, teclado antigo removido) |
 | M6 | `shortcut-bars` | SB-T1..T7 ✅; **SB-T8..T10 pendentes** |
 | — | `gesture-tour` | spec/design/tasks prontos (Draft) — nada implementado |
 | — | `native-voice-models` | spec/design/tasks prontos (Draft) — nada implementado |
@@ -53,12 +53,12 @@
 
 Nada aqui é task de agente; são confirmações pendentes no Galaxy A32:
 
-- [ ] Globo cicla PT→EN→ES de verdade; seletor do sistema mostra só 1 "KeyFlow"; prévia de
-      tamanho reage ao arrasto (build já instalada).
-- [ ] Fluidez da grade Canvas → **decidir promover a padrão** (fecha KC-T10; a remoção da flag
-      `kbd_canvas` + teclado antigo vira uma quick task quando ele aprovar).
-- [ ] Revisar/aprovar as specs Draft (gesture-tour, native-voice-models, vision-capture,
-      keyflow-api, monetization, theme-system) — em especial **⚠️ S3/S4/S5** do theme-system.
+- [x] Globo cicla PT→EN→ES de verdade; seletor do sistema mostra só 1 "KeyFlow"; prévia de
+      tamanho reage ao arrasto. **Yan confirmou (2026-07-04)**.
+- [x] Fluidez da grade Canvas → **Yan aprovou promover a padrão (2026-07-04)** — feito, ver Bloco 1.
+- [x] Specs Draft (gesture-tour, native-voice-models, vision-capture, keyflow-api, monetization,
+      theme-system) — **Yan confirmou (2026-07-04)** que validou cada uma no momento em que as criou;
+      inclui as ⚠️ S3/S4/S5 do theme-system.
 
 ## Bloco 1 — Pendências rápidas (quick mode, `.specs/quick/`)
 
@@ -92,9 +92,12 @@ Pequenas, sem spec própria; fazer em quick mode (TASK.md + SUMMARY.md + commit)
       pura `KeyFlowKeyboardService.shouldCompose`, testada em unit). Ver `.specs/quick/003-bug-termius/`.
       **Pendente [YAN]**: confirmar no Termius de verdade (a causa raiz foi confirmada só por inferência
       + reprodução manual num `EditText` de debug, não no app real).
-- [ ] **Q4 — Promover grade Canvas a padrão** (só após o Bloco 0): remover flag `kbd_canvas` +
-      caminho antigo da `KeyFlowKeyboardView`; goldens `keyboard-*` antigos saem/regeneram;
-      fecha KC-T10 no `keyboard-canvas/tasks.md`.
+- [x] **Q4 — Promover grade Canvas a padrão**: CONCLUÍDA (2026-07-04). Flag `kbd_canvas`/
+      `useCanvasGrid` removida por completo (`KeyFlowKeyboardService.kt`, `KeyFlowKeyboardView.kt` —
+      teclado antigo inteiro deletado —, `TecladoPanel.kt`, `RouteCatalog.kt`). Goldens: 6 PNGs do
+      teclado antigo removidos; `keyboard-canvas-*` e `config-modo[-dark]` regenerados/aprovados.
+      Fecha KC-T10 no `keyboard-canvas/tasks.md`. Gate: 241 unit + instrumentado `ime` 28/29 (1 falha
+      ambiental conhecida).
 
 ## Bloco 2 — Fechar `shortcut-bars` (Milestone 6)
 

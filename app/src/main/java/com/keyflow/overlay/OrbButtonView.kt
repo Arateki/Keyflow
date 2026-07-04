@@ -17,6 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import com.keyflow.core.ButtonState
+import com.keyflow.core.KeyFlowController
 import com.keyflow.core.OverlaySide
 import com.keyflow.core.RecordingMode
 import com.keyflow.data.OverlayPosition
@@ -133,10 +134,6 @@ class OrbButtonView(
         }
     }
 
-    // Acúmulo de tempo (espelha AudioRecorder/T18): só conta enquanto RECORDING.
-    private var accumulatedMs = 0L
-    private var segmentStartMs = 0L
-
     private var windowParams: WindowManager.LayoutParams? = null
     private var updateWindowLayout: ((WindowManager.LayoutParams) -> Unit)? = null
     private var startRawX = 0f
@@ -178,42 +175,19 @@ class OrbButtonView(
         updateWindowLayout = updateLayout
     }
 
-    /** Atualiza orbe + timer a partir do [ButtonState] (chamado pelo render do coordinator). */
+    /**
+     * Atualiza orbe + timer a partir do [ButtonState] (chamado pelo render do coordinator). O tempo em
+     * si vem de [KeyFlowController.recordingAccumulatedMs]/`recordingSegmentStartMs` — o mesmo relógio
+     * autoritativo que o mic do teclado já lia (`KeyFlowKeyboardView.elapsedSeconds()`). Antes a orbe
+     * mantinha um relógio PRÓPRIO, derivado só de observar as transições de estado aqui — e como o
+     * `OrbButtonView` é recriado de vez em quando (troca de tema/tamanho, restart do serviço), esse
+     * relógio local perdia a referência e dessincronizava do teclado (achado pelo Yan, 2026-07-03: orbe
+     * mostrando 4s pausada enquanto o teclado mostrava 10s). Ler a mesma fonte elimina a duplicidade.
+     */
     fun render(state: ButtonState) {
-        val prev = renderedState
         renderedState = state
         contentDescription = describe(state)
-
-        when {
-            // Início de verdade (não é retomada nem continuação pós-SENDING): zera.
-            state == ButtonState.RECORDING && prev !in TIME_TRACKED_STATES -> {
-                accumulatedMs = 0L
-                segmentStartMs = clock()
-                startTicker()
-            }
-            // Retomada: cobre tanto o resume normal (de PAUSED) quanto continuar gravando depois de
-            // desfazer um cancelamento aberto durante SENDING — nos dois casos o tempo já acumulado
-            // segue de onde parou, sem zerar (Yan, 2026-07-03: o "tempo pequeno abaixo da lixeira"
-            // aparecia zerado ao desfazer/continuar porque essa continuidade não existia ainda).
-            state == ButtonState.RECORDING -> {
-                segmentStartMs = clock()
-                startTicker()
-            }
-            // Saiu de RECORDING pra pausa/envio/cancelamento: congela o que rodou neste segmento (soma,
-            // não zera) — cobre também o STOP direto de RECORDING pra SENDING (sem passar por PAUSED).
-            prev == ButtonState.RECORDING && state in TIME_TRACKED_STATES -> {
-                accumulatedMs += clock() - segmentStartMs
-                stopTicker()
-            }
-            // Transições entre PAUSED/SENDING/CANCELLING que não passam por RECORDING (ex.: cancelar
-            // durante o envio, ou desfazer esse cancelamento): o tempo já está congelado, só preserva.
-            state in TIME_TRACKED_STATES -> stopTicker()
-            // Saída de vez (sucesso, erro, idle...): zera.
-            else -> {
-                accumulatedMs = 0L
-                stopTicker()
-            }
-        }
+        if (state == ButtonState.RECORDING) startTicker() else stopTicker()
         // copy (não substitui): preserva dragHint/orbFraction se a orbe estiver no modo-arrasto.
         orbUi = orbUi.copy(state = orbStateFor(state), center = orbCenterFor(state))
     }
@@ -229,7 +203,7 @@ class OrbButtonView(
             MotionEvent.ACTION_DOWN -> {
                 if (renderedState == ButtonState.ERROR) {
                     // No estado de erro só agimos se for resolvível na Voz; senão o toque é ignorado.
-                    if (com.keyflow.core.KeyFlowController.errorOpensVoz) onErrorTap()
+                    if (KeyFlowController.errorOpensVoz) onErrorTap()
                     return true
                 }
                 if (renderedState == ButtonState.CANCELLING) {
@@ -625,8 +599,12 @@ class OrbButtonView(
     }
 
     private fun elapsedSeconds(): Int {
-        val active = if (renderedState == ButtonState.RECORDING) clock() - segmentStartMs else 0L
-        return ((accumulatedMs + active) / 1000L).toInt()
+        val active = if (renderedState == ButtonState.RECORDING) {
+            clock() - KeyFlowController.recordingSegmentStartMs
+        } else {
+            0L
+        }
+        return ((KeyFlowController.recordingAccumulatedMs + active) / 1000L).toInt()
     }
 
     private fun moveTo(x: Int, y: Int) {
@@ -688,9 +666,5 @@ class OrbButtonView(
         const val HOLD_OFFSET_MS = 150L
         // Distância (em frações do lado da orbe) para ativar o alvo do arrasto.
         const val DRAG_ACTIVATION_FRACTION = 0.7f
-        // Estados em que o tempo local (accumulatedMs) segue vivo/congelado — fora deles, zera de vez.
-        val TIME_TRACKED_STATES = setOf(
-            ButtonState.RECORDING, ButtonState.PAUSED, ButtonState.CANCELLING, ButtonState.SENDING,
-        )
     }
 }

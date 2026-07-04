@@ -178,10 +178,9 @@ fun TecladoPanel(
 
 /**
  * Prévia ao vivo do tamanho do teclado (pedido do Yan, 2026-07-02: "eu preciso mudar de teclado pra ver
- * diferença... o ideal seria ver o tamanho enquanto mexe no slide"). `KeyFlowKeyboardView` real, forçada
- * em `useCanvasGrid=true` (a grade Canvas é o que está de fato em teste/uso — mostrar a antiga aqui
- * confundia, ver [PREVIEW_MARGIN_DP]) e com `locale`/`numberRowEnabled` reais, não digita/grava
- * (callbacks no-op). Reconstruída a cada mudança relevante via `key()`: várias propriedades da View são
+ * diferença... o ideal seria ver o tamanho enquanto mexe no slide"). `KeyFlowKeyboardView` real, com
+ * `locale`/`numberRowEnabled` reais, não digita/grava (callbacks no-op). Reconstruída a cada mudança
+ * relevante via `key()`: várias propriedades da View são
  * fixadas no construtor (não mutáveis), então mudar qualquer uma troca a instância — leve o bastante
  * pra ser aceitável a cada passo do arrasto do slider (mesma técnica já usada pelo demo da aba Modo).
  *
@@ -217,7 +216,6 @@ private fun KeyboardSizePreview(scalePercent: Int, dark: Boolean, locale: String
                             onExpand = {},
                             dark = dark,
                             scale = scalePercent / 100f,
-                            useCanvasGrid = true,
                             locale = locale,
                             showLanguageKey = true,
                             numberRowEnabled = numberRowEnabled,

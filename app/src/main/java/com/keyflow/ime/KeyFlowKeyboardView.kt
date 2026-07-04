@@ -43,10 +43,11 @@ sealed interface KeyAction {
 enum class MicAction { PAUSE_RESUME, CANCEL, UNDO }
 
 /**
- * Teclado QWERTY do KeyFlow reskinado na direção Ateliê (KBD-01..04). Mantém a estrutura de
- * `LinearLayout`/`TextView` (encolher/expandir, shift, dígitos, fluxo já testado — opção (a) do design)
- * e aplica a paleta "papel" (claro) ou escura. O botão de microfone mostra `m:ss` ao gravar (KBD-02),
- * acumulando só enquanto RECORDING e congelando em PAUSED.
+ * Teclado do KeyFlow reskinado na direção Ateliê (KBD-01..04): grade Canvas (KC-T6..T10) com layout por
+ * idioma, camadas (letras/números/símbolos), preview de acento e corretor do sistema, dentro da faixa
+ * `LinearLayout`/`TextView` de mic/config/sugestões/colapsar que aplica a paleta "papel" (claro) ou
+ * escura. O botão de microfone mostra `m:ss` ao gravar (KBD-02), acumulando só enquanto RECORDING e
+ * congelando em PAUSED.
  *
  * [frozenSeconds] força um tempo fixo no mic (sem ticker) para screenshots determinísticos na galeria.
  */
@@ -58,14 +59,12 @@ class KeyFlowKeyboardView(
     private val onConfig: () -> Unit = {},
     // Ação secundária escolhida no seletor por hold (pausar/retomar, cancelar, desfazer).
     private val onMicAction: (MicAction) -> Unit = {},
-    // Toque num candidato do corretor do sistema (KC-T7; só existe com a grade Canvas — useCanvasGrid).
+    // Toque num candidato do corretor do sistema (KC-T7).
     private val onCandidateTap: (String) -> Unit = {},
     private val onHide: () -> Unit,
     private val onExpand: () -> Unit = {},
     private val onErrorTap: () -> Unit = {},
     private val dark: Boolean = false,
-    // Grade Canvas nova no lugar das `buildRow` (KC-T6); flag de rollout — ver KeyFlowKeyboardService.
-    private val useCanvasGrid: Boolean = false,
     // Idioma ativo (KC-T9): decide Layouts.forLocale(...) da grade Canvas. "en" cai no fallback do LAY-05.
     private val locale: String = "en",
     // Só true quando há mais de 1 idioma habilitado (globo perde sentido com um só) — KC-T9.
@@ -73,14 +72,13 @@ class KeyFlowKeyboardView(
     // Globo tocado (KC-T9): o service troca o subtype (PT→EN→ES→PT…) via switchToNextInputMethod.
     private val onLanguageSwitch: () -> Unit = {},
     // Campo numérico (NUM-01) já na criação da view — o service lê o EditorInfo antes de construir.
-    // Só a grade Canvas trava em números; o teclado antigo (useCanvasGrid=false) fica intocado.
     private val initialNumeric: Boolean = false,
     // Fileira dedicada de números acima do "qwertyuiop" (NUMROW-01, pedido do Yan, 2026-07-03) — só a
     // camada de letras; a grade numérica travada (NUM-01) e a de símbolos ficam intocadas.
     private val numberRowEnabled: Boolean = false,
     // Barras personalizáveis em Canvas (SB-T5/BAR-01..07), atrás da flag `kbd_bars` (debug — ROL-02).
-    // Desligada: barra antiga intocada. Ligada: pilha de `BarView` conforme a config (retraído sempre;
-    // expandido só com a grade Canvas — o teclado antigo de TextView fica fora do redesign de barras).
+    // Desligada: barra antiga (buildCollapsedLegacy) intocada. Ligada: pilha de `BarView` conforme a
+    // config, nos dois modos (retraído e expandido).
     private val useBars: Boolean = false,
     private val barsConfig: BarsConfig = BarsConfig.DEFAULT,
     private val shortcutGrids: List<ShortcutGrid> = emptyList(),
@@ -94,9 +92,6 @@ class KeyFlowKeyboardView(
     private val clock: () -> Long = { SystemClock.elapsedRealtime() },
 ) : LinearLayout(context) {
 
-    private var isShifted = false
-    private val charKeys = mutableListOf<TextView>()
-    private var shiftKey: TextView? = null
     private var expandedMic: TextView? = null
     private var collapsedMic: TextView? = null
     private var canvasGrid: KeyboardGridView? = null
@@ -111,7 +106,6 @@ class KeyFlowKeyboardView(
 
     // Paleta Ateliê resolvida por tema (ints Android; o View não usa Compose).
     private val kbTray = if (dark) 0xFF332E27.toInt() else 0xFFDCD0AC.toInt()
-    private val kbKey = if (dark) 0xFF3A332A.toInt() else 0xFFFBF6E6.toInt()
     private val kbKeyBorder = if (dark) 0xFF4A4234.toInt() else 0xFFD7C9A0.toInt()
     private val kbModifier = if (dark) 0xFF2B2720.toInt() else 0xFFCFC096.toInt()
     private val kbInk = if (dark) 0xFFF1E7C9.toInt() else 0xFF2B2720.toInt()
@@ -214,20 +208,15 @@ class KeyFlowKeyboardView(
     // ── builders ─────────────────────────────────────────────────────────────
 
     private fun buildExpanded(): LinearLayout = column().apply {
-        if (useCanvasGrid) {
-            // Sem action row de fora no modo Canvas: mic/config/colapsar sobem pra faixa de sugestões
-            // (buildTopStrip), e vírgula/espaço/ponto/enter entram na 4ª fileira da grade (Layouts.kt) —
-            // igual Gboard (decisão do Yan, 2026-07-01, testando no device físico).
-            if (useBars) {
-                buildBars(expandedMode = true).forEach { addView(it, barLayoutParams()) }
-            } else {
-                addView(buildTopStrip().also { topStripToolbar = it })
-            }
-            addView(buildCanvasGrid())
+        // Mic/config/colapsar sobem pra faixa de sugestões (buildTopStrip), e vírgula/espaço/ponto/enter
+        // entram na 4ª fileira da grade (Layouts.kt) — igual Gboard (decisão do Yan, 2026-07-01, testando
+        // no device físico).
+        if (useBars) {
+            buildBars(expandedMode = true).forEach { addView(it, barLayoutParams()) }
         } else {
-            ROWS.forEach { row -> addView(buildRow(row)) }
-            addView(buildActionRow())
+            addView(buildTopStrip().also { topStripToolbar = it })
         }
+        addView(buildCanvasGrid())
     }
 
     /**
@@ -320,18 +309,17 @@ class KeyFlowKeyboardView(
     private fun initialLayerFor(numeric: Boolean): LayerId = if (numeric) LayerId.NUMBER else LayerId.LETTERS
 
     /**
-     * NUM-01: campo focado mudou de classe (numérico ↔ texto) — só a grade Canvas trava em números; o
-     * teclado antigo (`useCanvasGrid=false`) não tem conceito de camada numérica e fica intocado. A
-     * `KeyFlowKeyboardView` é reusada entre campos (o service só recria a view inteira em troca de
-     * idioma), então isto reconfigura a grade existente em vez de esperar por uma recriação.
+     * NUM-01: campo focado mudou de classe (numérico ↔ texto). A `KeyFlowKeyboardView` é reusada entre
+     * campos (o service só recria a view inteira em troca de idioma), então isto reconfigura a grade
+     * existente em vez de esperar por uma recriação.
      */
     fun updateInputType(numeric: Boolean) {
-        if (!useCanvasGrid || numeric == numericField) return
+        if (numeric == numericField) return
         numericField = numeric
         canvasGrid?.setLayout(layoutFor(numeric), initialLayerFor(numeric))
     }
 
-    /** Traduz a ação da grade nova para a mesma [onKey] do teclado antigo (SYNC-04: um só `handleKey`). */
+    /** Traduz a ação da grade em [onKey] (SYNC-04: um só `handleKey` no service). */
     private fun forwardCanvasKeyAction(action: CanvasKeyAction) {
         when (action) {
             is CanvasKeyAction.Char -> onKey(KeyAction.Character(action.text))
@@ -342,21 +330,6 @@ class KeyFlowKeyboardView(
             // Shift/?123 são estado interno da grade — KeyboardGridState já não os emite pra fora.
             CanvasKeyAction.Shift, is CanvasKeyAction.Layer -> Unit
         }
-    }
-
-    private fun buildRow(keys: List<String>): LinearLayout = row().apply {
-        gravity = Gravity.CENTER_HORIZONTAL
-        keys.forEach { k -> addView(keyFor(k)) }
-    }
-
-    private fun buildActionRow(): LinearLayout = row(bottomPad = dp(6)).apply {
-        addView(micKey(1.5f, dp(44)).also { expandedMic = it })
-        addView(specialKey("⚙", 0.9f) { onConfig() })
-        addView(specialKey(",", 0.8f) { onKey(KeyAction.Character(",")) })
-        addView(paperKey("espaço", 3.6f) { onKey(KeyAction.Space) })
-        addView(specialKey(".", 0.8f) { onKey(KeyAction.Character(".")) })
-        addView(specialKey("⏎", 1.5f) { onKey(KeyAction.Enter) })
-        addView(specialKey("↓", 1f) { onHide() })
     }
 
     /** Mesma altura da faixa mic/config/sugestões (`CandidatesView.HEIGHT_DP`) — pedido do Yan, 2026-07-01. */
@@ -392,35 +365,6 @@ class KeyFlowKeyboardView(
     }
 
     // ── key factory ──────────────────────────────────────────────────────────
-
-    private fun keyFor(k: String): TextView = when (k) {
-        "⇧" -> keyBase(k, 1.5f, kbModifier, kbInk).also { v ->
-            shiftKey = v
-            v.setOnClickListener { toggleShift() }
-        }
-        "⌫" -> keyBase(k, 1.5f, kbModifier, kbInk).also { v ->
-            v.setOnClickListener { onKey(KeyAction.Backspace) }
-            v.setOnLongClickListener { onKey(KeyAction.Backspace); true }
-        }
-        else -> keyBase(k, 1f, kbKey, kbInk).also { v ->
-            v.tag = k
-            if (k[0].isLetter()) {
-                charKeys.add(v)
-                v.setOnClickListener {
-                    onKey(KeyAction.Character(if (isShifted) k.uppercase() else k))
-                    if (isShifted) { isShifted = false; refreshShift() }
-                }
-            } else {
-                // dígito — shift produz símbolo
-                v.setOnClickListener {
-                    onKey(KeyAction.Character(if (isShifted) shiftSymbol(k) else k))
-                }
-            }
-        }
-    }
-
-    private fun paperKey(label: String, weight: Float, onClick: () -> Unit): TextView =
-        keyBase(label, weight, kbKey, kbInk).also { it.setOnClickListener { onClick() } }
 
     private fun specialKey(label: String, weight: Float, height: Int = dp(44), onClick: () -> Unit): TextView =
         keyBase(label, weight, kbModifier, kbInk, height).also { it.setOnClickListener { onClick() } }
@@ -646,30 +590,7 @@ class KeyFlowKeyboardView(
         }
     }
 
-    // ── shift ────────────────────────────────────────────────────────────────
-
-    private fun toggleShift() {
-        isShifted = !isShifted
-        refreshShift()
-    }
-
-    private fun refreshShift() {
-        val shifted = isShifted
-        shiftKey?.background = rippleDrawable(if (shifted) ACCENT_TEAL else kbModifier, kbKeyBorder)
-        shiftKey?.setTextColor(if (shifted) Color.WHITE else kbInk)
-        charKeys.forEach { v ->
-            val base = v.tag as? String ?: return@forEach
-            v.text = if (shifted) base.uppercase() else base
-        }
-    }
-
     // ── utils ────────────────────────────────────────────────────────────────
-
-    private fun shiftSymbol(digit: String) = when (digit) {
-        "1" -> "!"; "2" -> "@"; "3" -> "#"; "4" -> "$"; "5" -> "%"
-        "6" -> "^"; "7" -> "&"; "8" -> "*"; "9" -> "("; "0" -> ")"
-        else -> digit
-    }
 
     private fun micVisuals(state: ButtonState): Pair<String, Int> = when (state) {
         ButtonState.IDLE_READY     -> "🎙" to MIC_READY
@@ -705,11 +626,6 @@ class KeyFlowKeyboardView(
         setBackgroundColor(kbTray)
     }
 
-    private fun row(bottomPad: Int = dp(3)): LinearLayout = LinearLayout(context).apply {
-        orientation = HORIZONTAL
-        setPadding(dp(2), dp(3), dp(2), bottomPad)
-    }
-
     private fun dp(v: Int) = (v * resources.displayMetrics.density * scale).toInt()
 
     companion object {
@@ -724,12 +640,5 @@ class KeyFlowKeyboardView(
         private val ACCENT_TERRACOTTA = 0xFFD9694B.toInt()
         private val MIC_READY = 0xFF4E9683.toInt()
         private val MIC_NO_FIELD = 0xFF9C9072.toInt()
-
-        val ROWS = listOf(
-            "1 2 3 4 5 6 7 8 9 0".split(" "),
-            "q w e r t y u i o p".split(" "),
-            "a s d f g h j k l".split(" "),
-            "⇧ z x c v b n m ⌫".split(" "),
-        )
     }
 }

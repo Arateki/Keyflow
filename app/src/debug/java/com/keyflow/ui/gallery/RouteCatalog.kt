@@ -46,13 +46,10 @@ object RouteCatalog {
         orbRoute("overlay-idle", OrbState.Idle, OrbCenter.None),
         orbRoute("overlay-recording", OrbState.Listening, OrbCenter.Time(12)),
         orbRoute("overlay-paused", OrbState.Paused, OrbCenter.PauseGlyph(12)),
-        // Teclado reskinado (T23): View hospedado via AndroidView, ancorado ao rodapé.
-        keyboardRoute("keyboard-expanded", expanded = true, recording = false),
-        keyboardRoute("keyboard-collapsed", expanded = false, recording = false),
-        keyboardRoute("keyboard-recording", expanded = true, recording = true),
-        // Grade Canvas nova (Trabalho 2, KC-T10) — golden oficial do híbrido (mic/action row antigos + grade nova).
-        keyboardRoute("keyboard-canvas-expanded", expanded = true, recording = false, useCanvasGrid = true),
-        keyboardRoute("keyboard-canvas-collapsed", expanded = false, recording = false, useCanvasGrid = true),
+        // Teclado reskinado (T23), grade Canvas (KC-T10, padrão único desde a promoção): View hospedado
+        // via AndroidView, ancorado ao rodapé.
+        keyboardRoute("keyboard-canvas-expanded", expanded = true, recording = false),
+        keyboardRoute("keyboard-canvas-collapsed", expanded = false, recording = false),
         keyboardCanvasSymbolsRoute("keyboard-canvas-symbols"),
         keyboardCanvasCandidatesRoute("keyboard-canvas-candidates"),
         // Notificação Ateliê (T24): RemoteViews inflada via AndroidView.
@@ -174,7 +171,6 @@ object RouteCatalog {
         key: String,
         expanded: Boolean,
         recording: Boolean,
-        useCanvasGrid: Boolean = false,
     ): Route = Route(key) {
         val dark = LocalKeyFlowPalette.current.isDark
         Box(
@@ -192,7 +188,6 @@ object RouteCatalog {
                         onMic = {},
                         onHide = {},
                         dark = dark,
-                        useCanvasGrid = useCanvasGrid,
                         frozenSeconds = 12,
                     ).apply {
                         setExpanded(expanded)
@@ -221,7 +216,6 @@ object RouteCatalog {
                         onMic = {},
                         onHide = {},
                         dark = dark,
-                        useCanvasGrid = true,
                         frozenSeconds = 12,
                     ).apply {
                         setExpanded(true)
@@ -252,7 +246,6 @@ object RouteCatalog {
                         onMic = {},
                         onHide = {},
                         dark = dark,
-                        useCanvasGrid = true,
                         frozenSeconds = 12,
                     ).apply {
                         setExpanded(true)

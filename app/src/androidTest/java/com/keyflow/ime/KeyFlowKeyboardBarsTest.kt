@@ -51,7 +51,7 @@ class KeyFlowKeyboardBarsTest {
 
     @After
     fun tearDown() {
-        uiPrefs.edit().remove(KEY_BARS).remove(KEY_CANVAS_GRID).apply()
+        uiPrefs.edit().remove(KEY_BARS).apply()
         runBlocking {
             SettingsRepository(context).saveBarsConfig(BarsConfig.DEFAULT)
             SettingsRepository(context).saveShortcutGrids(emptyList())
@@ -245,9 +245,7 @@ class KeyFlowKeyboardBarsTest {
     // ── ações de alto nível (mesmo harness do KeyFlowKeyboardCanvasGridTest) ──
 
     private fun launchProbe(bars: Boolean) {
-        // Canvas ligado junto: as barras no expandido só existem no modo Canvas (o teclado antigo de
-        // TextView fica fora do redesign — decisão de design da SB-T5).
-        uiPrefs.edit().putBoolean(KEY_CANVAS_GRID, true).putBoolean(KEY_BARS, bars).apply()
+        uiPrefs.edit().putBoolean(KEY_BARS, bars).apply()
         shell("pm grant ${context.packageName} ${Manifest.permission.RECORD_AUDIO}")
         shell("ime enable $IME")
         shell("ime set $IME")
@@ -295,7 +293,6 @@ class KeyFlowKeyboardBarsTest {
     private companion object {
         const val IME = "com.keyflow/.ime.KeyFlowKeyboardService"
         const val TIMEOUT = 5000L
-        const val KEY_CANVAS_GRID = "kbd_canvas"
         const val KEY_BARS = "kbd_bars"
     }
 }
