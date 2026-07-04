@@ -8,6 +8,20 @@ android {
     namespace = "com.keyflow"
     compileSdk = 34
 
+    // Fixa a keystore debug num arquivo só: esta máquina tem duas (~/.android/debug.keystore e
+    // ~/.config/.android/debug.keystore) com fingerprints diferentes, e o AGP resolve a "padrão" pelas
+    // variáveis de ambiente do momento — se o build pegar uma diferente da que assinou a versão já
+    // instalada, o Android exige desinstalar antes de instalar, apagando os dados do app (aconteceu de
+    // verdade, Yan 2026-07-03). Fixando aqui, todo `installDebug` sempre usa a mesma.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file(System.getProperty("user.home") + "/.config/.android/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     defaultConfig {
         applicationId = "com.keyflow"
         minSdk = 24

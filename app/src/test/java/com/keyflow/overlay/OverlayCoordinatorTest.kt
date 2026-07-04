@@ -431,14 +431,16 @@ class OverlayCoordinatorTest {
     }
 
     @Test
-    fun `resuming after the limit was reached does not trigger it again`() = runTest {
+    fun `resuming while the limit decision is pending retriggers the banner instead of resuming`() = runTest {
         val recorder = FakeRecorder(temporaryFolder.newFile("a.m4a").also { it.writeText("a") })
+        val renderedStates = mutableListOf<ButtonState>()
         var shown = 0
 
         val coordinator = coordinator(
             scope = this,
             recorder = recorder,
             targetAvailable = { true },
+            render = { renderedStates += it },
             onShowLimitReached = { shown++ },
             maxRecordingMs = { 5000L },
             recordingClockMs = { testScheduler.currentTime },
@@ -453,7 +455,81 @@ class OverlayCoordinatorTest {
         advanceTimeBy(10_000)
         runCurrent()
 
+        // reacende o banner (do zero) em vez de deixar a gravação continuar sem teto
+        assertThat(shown).isEqualTo(2)
+        assertThat(recorder.resumed).isEqualTo(0)
+        assertThat(renderedStates.last()).isEqualTo(ButtonState.PAUSED)
+    }
+
+    @Test
+    fun `limit banner auto-dismisses after limitBannerDismissMs but the decision stays pending`() = runTest {
+        val recorder = FakeRecorder(temporaryFolder.newFile("a.m4a").also { it.writeText("a") })
+        val renderedStates = mutableListOf<ButtonState>()
+        var shown = 0
+        var hidden = 0
+
+        val coordinator = coordinator(
+            scope = this,
+            recorder = recorder,
+            targetAvailable = { true },
+            render = { renderedStates += it },
+            onShowLimitReached = { shown++ },
+            onHideLimitReached = { hidden++ },
+            maxRecordingMs = { 5000L },
+            limitBannerDismissMs = 3000L,
+            recordingClockMs = { testScheduler.currentTime },
+        )
+
+        coordinator.onTap() // RECORDING
+        advanceTimeBy(5001)
+        runCurrent() // banner aparece
         assertThat(shown).isEqualTo(1)
+
+        advanceTimeBy(3001)
+        runCurrent() // some sozinho, sem decisão
+
+        assertThat(hidden).isEqualTo(1)
+
+        // "Descartar" ainda funciona depois do banner ter sumido sozinho — a decisão continuava pendente,
+        // e agora abre a janela de desfazer unificada (não descarta na hora).
+        coordinator.onLimitDiscard()
+        assertThat(renderedStates.last()).isEqualTo(ButtonState.CANCELLING)
+        assertThat(recorder.discarded).isEqualTo(0)
+    }
+
+    @Test
+    fun `retriggering the limit banner resets its dismiss timer`() = runTest {
+        val recorder = FakeRecorder(temporaryFolder.newFile("a.m4a").also { it.writeText("a") })
+        var shown = 0
+        var hidden = 0
+
+        val coordinator = coordinator(
+            scope = this,
+            recorder = recorder,
+            targetAvailable = { true },
+            onShowLimitReached = { shown++ },
+            onHideLimitReached = { hidden++ },
+            maxRecordingMs = { 5000L },
+            limitBannerDismissMs = 3000L,
+            recordingClockMs = { testScheduler.currentTime },
+        )
+
+        coordinator.onTap() // RECORDING
+        advanceTimeBy(5001)
+        runCurrent() // banner aparece (1)
+
+        advanceTimeBy(2000)
+        coordinator.onIntent(GestureIntent.RESUME) // reaciona antes dos 3s expirarem (2)
+        advanceTimeBy(2000)
+        runCurrent()
+
+        // se o timer não tivesse resetado, já teria sumido em t=3000; com o reset, ainda não sumiu em t=4000
+        assertThat(shown).isEqualTo(2)
+        assertThat(hidden).isEqualTo(0)
+
+        advanceTimeBy(1001)
+        runCurrent()
+        assertThat(hidden).isEqualTo(1)
     }
 
     @Test
@@ -488,10 +564,11 @@ class OverlayCoordinatorTest {
     }
 
     @Test
-    fun `discard from limit banner discards the retained audio and returns to idle`() = runTest {
+    fun `discard from limit banner opens the undo window instead of deleting immediately`() = runTest {
         val recorder = FakeRecorder(temporaryFolder.newFile("a.m4a").also { it.writeText("a") })
         val renderedStates = mutableListOf<ButtonState>()
         var hidden = 0
+        var cancelShown = 0
 
         val coordinator = coordinator(
             scope = this,
@@ -499,6 +576,7 @@ class OverlayCoordinatorTest {
             targetAvailable = { true },
             render = { renderedStates += it },
             onHideLimitReached = { hidden++ },
+            onShowCancelUndo = { cancelShown++ },
             maxRecordingMs = { 5000L },
             recordingClockMs = { testScheduler.currentTime },
         )
@@ -509,9 +587,246 @@ class OverlayCoordinatorTest {
 
         coordinator.onLimitDiscard()
 
+        // Unificado com o cancelar comum (pedido do Yan, 2026-07-03): não descarta na hora, abre a
+        // mesma janela de desfazer de 3s.
+        assertThat(recorder.discarded).isEqualTo(0)
+        assertThat(renderedStates.last()).isEqualTo(ButtonState.CANCELLING)
+        assertThat(cancelShown).isEqualTo(1)
+        assertThat(hidden).isEqualTo(1) // a VIEW do banner de limite some ao entrar em CANCELLING
+
+        coordinator.onCommitCancel()
+
         assertThat(recorder.discarded).isEqualTo(1)
         assertThat(renderedStates.last()).isEqualTo(ButtonState.IDLE_READY)
-        assertThat(hidden).isEqualTo(1)
+    }
+
+    @Test
+    fun `undoing a discard started from the limit banner still enforces the limit on resume`() = runTest {
+        val recorder = FakeRecorder(temporaryFolder.newFile("a.m4a").also { it.writeText("a") })
+        val renderedStates = mutableListOf<ButtonState>()
+        var shown = 0
+
+        val coordinator = coordinator(
+            scope = this,
+            recorder = recorder,
+            targetAvailable = { true },
+            render = { renderedStates += it },
+            onShowLimitReached = { shown++ },
+            maxRecordingMs = { 5000L },
+            recordingClockMs = { testScheduler.currentTime },
+        )
+
+        coordinator.onTap() // RECORDING
+        advanceTimeBy(5001)
+        runCurrent() // pausado pelo limite, banner mostrado
+        assertThat(shown).isEqualTo(1)
+
+        coordinator.onLimitDiscard() // "Descartar" → CANCELLING
+        coordinator.onUndoCancel() // "Desfazer" → volta a PAUSED, áudio preservado
+
+        coordinator.onIntent(GestureIntent.RESUME)
+
+        // Bug reportado pelo Yan (2026-07-03): antes desta correção, a decisão pendente era perdida no
+        // cancelar, e o RESUME aqui retomava a gravação sem teto algum (recorder.resumed==1).
+        assertThat(shown).isEqualTo(2)
+        assertThat(recorder.resumed).isEqualTo(0)
+        assertThat(renderedStates.last()).isEqualTo(ButtonState.PAUSED)
+    }
+
+    @Test
+    fun `cancel during sending aborts the in-flight request and ignores a stale late result`() = runTest {
+        val recorder = FakeRecorder(temporaryFolder.newFile("a.m4a").also { it.writeText("a") })
+        val transcriber = HangingTranscriber()
+        val renderedStates = mutableListOf<ButtonState>()
+        var cancelShown = 0
+
+        val coordinator = coordinator(
+            scope = this,
+            recorder = recorder,
+            transcriber = transcriber,
+            targetAvailable = { true },
+            render = { renderedStates += it },
+            onShowCancelUndo = { cancelShown++ },
+            recordingClockMs = { testScheduler.currentTime },
+        )
+
+        coordinator.onTap() // RECORDING
+        advanceTimeBy(500)
+        coordinator.onTap() // RECORDING → SENDING (dispara a transcrição, que fica pendurada)
+        runCurrent()
+        assertThat(renderedStates.last()).isEqualTo(ButtonState.SENDING)
+
+        coordinator.onCancel() // arrasto lateral durante o envio
+
+        assertThat(renderedStates.last()).isEqualTo(ButtonState.CANCELLING)
+        assertThat(cancelShown).isEqualTo(1)
+        assertThat(transcriber.cancelCalls).isEqualTo(1)
+
+        // Só processa o que já está agendado (sem avançar o relógio virtual, senão a própria janela de
+        // desfazer de 3s expiraria aqui e mascararia o que este teste quer provar).
+        runCurrent()
+        assertThat(renderedStates.last()).isEqualTo(ButtonState.CANCELLING)
+    }
+
+    @Test
+    fun `undoing a cancel started while sending resends the same retained audio without re-stopping the recorder`() =
+        runTest {
+            val audio = temporaryFolder.newFile("a.m4a").also { it.writeText("a") }
+            val recorder = FakeRecorder(audio)
+            val transcriber = CancelableTranscriber(TranscriptionResult.Success("done"))
+            val inserted = mutableListOf<String>()
+            val renderedStates = mutableListOf<ButtonState>()
+
+            val coordinator = coordinator(
+                scope = this,
+                recorder = recorder,
+                transcriber = transcriber,
+                insertOrHold = { inserted += it; InsertOutcome.Inserted },
+                targetAvailable = { true },
+                render = { renderedStates += it },
+                recordingClockMs = { testScheduler.currentTime },
+            )
+
+            coordinator.onTap() // RECORDING
+            advanceTimeBy(500)
+            coordinator.onTap() // RECORDING → SENDING (1ª chamada do fake, trava)
+            runCurrent()
+            assertThat(renderedStates.last()).isEqualTo(ButtonState.SENDING)
+
+            coordinator.onCancel() // cancela durante o envio
+            assertThat(renderedStates.last()).isEqualTo(ButtonState.CANCELLING)
+            assertThat(transcriber.cancelCalls).isEqualTo(1)
+            assertThat(recorder.stopped).isEqualTo(1)
+
+            coordinator.onUndoCancel()
+            assertThat(renderedStates.last()).isEqualTo(ButtonState.PAUSED)
+
+            // Toque normal a partir do pause SEM resegurar: reenvio puro do MESMO arquivo, sem iniciar
+            // uma sessão de gravação nova (ver teste de fusão abaixo pra quando o Yan resegura antes).
+            coordinator.onIntent(GestureIntent.STOP)
+            advanceUntilIdle()
+
+            assertThat(recorder.started).isEqualTo(1) // não iniciou sessão nova
+            assertThat(recorder.stopped).isEqualTo(1) // não chamou stop() de novo no gravador já liberado
+            assertThat(transcriber.audioFiles).containsExactly(audio, audio) // reenviou o MESMO arquivo
+            assertThat(inserted).containsExactly("done")
+            assertThat(renderedStates.last()).isEqualTo(ButtonState.IDLE_READY)
+        }
+
+    @Test
+    fun `resuming after undoing a cancel during sending continues recording and merges both segments on next stop`() =
+        runTest {
+            val segment1 = temporaryFolder.newFile("seg1.m4a").also { it.writeText("seg1") }
+            val segment2 = temporaryFolder.newFile("seg2.m4a").also { it.writeText("seg2") }
+            val merged = temporaryFolder.newFile("merged.m4a").also { it.writeText("merged") }
+            val recorder = FakeRecorder(listOf(segment1, segment2))
+            // A 1ª chamada (segmento 1, antes do cancelamento) precisa ficar pendurada — senão a
+            // transcrição já teria concluído (voltando a IDLE) antes de dar tempo de cancelar/desfazer.
+            val transcriber = CancelableTranscriber(TranscriptionResult.Success("done"))
+            val inserted = mutableListOf<String>()
+            val renderedStates = mutableListOf<ButtonState>()
+            var concatCalledWith: List<File>? = null
+
+            val coordinator = coordinator(
+                scope = this,
+                recorder = recorder,
+                transcriber = transcriber,
+                insertOrHold = { inserted += it; InsertOutcome.Inserted },
+                targetAvailable = { true },
+                render = { renderedStates += it },
+                recordingClockMs = { testScheduler.currentTime },
+                concatAudioSegments = { segments, _ -> concatCalledWith = segments; merged },
+            )
+
+            coordinator.onTap() // RECORDING
+            advanceTimeBy(500)
+            coordinator.onTap() // RECORDING → SENDING (segmento 1)
+            runCurrent()
+
+            coordinator.onCancel() // cancela durante o envio
+            coordinator.onUndoCancel() // volta pro PAUSED, segmento 1 retido
+
+            coordinator.onIntent(GestureIntent.RESUME) // continua gravando (segmento 2)
+            assertThat(renderedStates.last()).isEqualTo(ButtonState.RECORDING)
+            assertThat(recorder.started).isEqualTo(2)
+
+            advanceTimeBy(500)
+            coordinator.onIntent(GestureIntent.STOP) // funde os dois e envia
+            advanceUntilIdle()
+
+            assertThat(concatCalledWith).containsExactly(segment1, segment2).inOrder()
+            assertThat(transcriber.audioFiles.last()).isEqualTo(merged)
+            assertThat(inserted).containsExactly("done")
+            assertThat(segment1.exists()).isFalse() // originais apagados depois de fundidos
+            assertThat(segment2.exists()).isFalse()
+            assertThat(renderedStates.last()).isEqualTo(ButtonState.IDLE_READY)
+        }
+
+    @Test
+    fun `resuming after a cancel during sending re-shows the limit banner if the retained segment already reached the max`() =
+        runTest {
+            val audio = temporaryFolder.newFile("a.m4a").also { it.writeText("a") }
+            val recorder = FakeRecorder(audio)
+            val transcriber = HangingTranscriber()
+            val renderedStates = mutableListOf<ButtonState>()
+            var shown = 0
+
+            val coordinator = coordinator(
+                scope = this,
+                recorder = recorder,
+                transcriber = transcriber,
+                targetAvailable = { true },
+                render = { renderedStates += it },
+                onShowLimitReached = { shown++ },
+                maxRecordingMs = { 1000L },
+                recordingClockMs = { testScheduler.currentTime },
+            )
+
+            coordinator.onTap() // RECORDING
+            advanceTimeBy(1000) // já bate o teto configurado dentro deste único segmento
+            coordinator.onTap() // RECORDING → SENDING
+            runCurrent()
+
+            coordinator.onCancel()
+            coordinator.onUndoCancel()
+
+            coordinator.onIntent(GestureIntent.RESUME)
+
+            // Reabre a decisão "enviar ou descartar" em vez de deixar continuar gravando sem teto (o
+            // trecho já retido sozinho já esgotou o limite configurado).
+            assertThat(shown).isEqualTo(1)
+            assertThat(recorder.started).isEqualTo(1) // não iniciou uma sessão nova
+            assertThat(renderedStates.last()).isEqualTo(ButtonState.PAUSED)
+        }
+
+    @Test
+    fun `finalizing a cancel started while sending deletes the retained audio file`() = runTest {
+        val audio = temporaryFolder.newFile("a.m4a").also { it.writeText("a") }
+        val recorder = FakeRecorder(audio)
+        val transcriber = HangingTranscriber()
+        val renderedStates = mutableListOf<ButtonState>()
+
+        val coordinator = coordinator(
+            scope = this,
+            recorder = recorder,
+            transcriber = transcriber,
+            targetAvailable = { true },
+            render = { renderedStates += it },
+            recordingClockMs = { testScheduler.currentTime },
+        )
+
+        coordinator.onTap() // RECORDING
+        advanceTimeBy(500)
+        coordinator.onTap() // RECORDING → SENDING
+        runCurrent()
+
+        coordinator.onCancel() // CANCELLING
+        assertThat(audio.exists()).isTrue()
+
+        coordinator.onCommitCancel() // "Concluir": descarta na hora
+
+        assertThat(audio.exists()).isFalse()
+        assertThat(renderedStates.last()).isEqualTo(ButtonState.IDLE_READY)
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
@@ -531,8 +846,10 @@ class OverlayCoordinatorTest {
         maxRecordingMs: () -> Long = { 0L },
         onError: (String, Boolean) -> Unit = { _, _ -> },
         cancelWindowMs: Long = 3000L,
+        limitBannerDismissMs: Long = 3000L,
         recordingClockMs: () -> Long = longEnoughClock(),
         configTimeoutMs: Long = Config.DEFAULT_TIMEOUT_MS,
+        concatAudioSegments: (List<File>, File) -> File = { segments, _ -> segments.first() },
     ) = OverlayCoordinator(
         scope = scope,
         configProvider = { completeConfig(configTimeoutMs) },
@@ -548,9 +865,11 @@ class OverlayCoordinatorTest {
         onShowLimitReached = onShowLimitReached,
         onHideLimitReached = onHideLimitReached,
         maxRecordingMs = maxRecordingMs,
+        limitBannerDismissMs = limitBannerDismissMs,
         onError = onError,
         cancelWindowMs = cancelWindowMs,
         recordingClockMs = recordingClockMs,
+        concatAudioSegments = concatAudioSegments,
     )
 
     private fun completeConfig(timeoutMs: Long = Config.DEFAULT_TIMEOUT_MS): Config = Config(
@@ -559,15 +878,24 @@ class OverlayCoordinatorTest {
         timeoutMs = timeoutMs,
     )
 
-    private class FakeRecorder(private val audioFile: File?) : OverlayAudioRecorder {
+    /** [audioFiles] devolve um arquivo por ciclo start()/stop() (índices repetem o último se faltar). */
+    private class FakeRecorder(private val audioFiles: List<File?>) : OverlayAudioRecorder {
+        constructor(audioFile: File?) : this(listOf(audioFile))
+
         var started = 0
         var stopped = 0
         var paused = 0
+        var resumed = 0
         var discarded = 0
 
         override fun start() { started++ }
-        override fun stop(): File? { stopped++; return audioFile }
+        override fun stop(): File? {
+            val file = audioFiles.getOrNull(stopped) ?: audioFiles.lastOrNull()
+            stopped++
+            return file
+        }
         override fun pause() { paused++ }
+        override fun resume() { resumed++ }
         override fun discard() { discarded++ }
     }
 
@@ -582,10 +910,30 @@ class OverlayCoordinatorTest {
 
     /** Nunca completa dentro do tempo de teste — só a rede de segurança (withTimeout) resolve isto. */
     private class HangingTranscriber : OverlayTranscriber {
+        var cancelCalls = 0
+
         override suspend fun transcribe(audio: File, cfg: Config): TranscriptionResult {
             kotlinx.coroutines.delay(HANG_MS)
             return TranscriptionResult.Success("never gets here")
         }
+
+        override fun cancelInFlight() { cancelCalls++ }
+    }
+
+    /** A 1ª chamada "trava" (simula rede em andamento, cancelável); as seguintes retornam na hora. */
+    private class CancelableTranscriber(private val result: TranscriptionResult) : OverlayTranscriber {
+        var cancelCalls = 0
+        val audioFiles = mutableListOf<File>()
+        private var callCount = 0
+
+        override suspend fun transcribe(audio: File, cfg: Config): TranscriptionResult {
+            audioFiles += audio
+            callCount++
+            if (callCount == 1) kotlinx.coroutines.delay(HANG_MS)
+            return result
+        }
+
+        override fun cancelInFlight() { cancelCalls++ }
     }
 
     private companion object {

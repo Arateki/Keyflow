@@ -992,3 +992,137 @@ Resolvido com a aprovação do Yan: limpos `~/.npm` + `~/.cache` (caches, sempre
 explícita dele, `Projects/upscale-tests/frames_temp/` (16G) e `Projects/kokoro-tts2/venv/` (7,3G) — foram
 de 0 a 41G livres. Não mexi em mais nada fora do escopo (outros projetos, Downloads pessoais) sem
 confirmação explícita.
+
+## Q4 — Banner de limite de gravação: reentrada no resume + unificação do descarte (2026-07-03)
+
+Continuação de uma sessão anterior que caiu por quota no meio da correção (código já existia no working
+tree, não commitado, sem registro no `STATE.md`). Duas rodadas de bug real reportado pelo Yan testando no
+Galaxy A32, ambas do mesmo formato "bypass do limite máximo de gravação configurado":
+
+**1ª rodada**: segurar+arrastar pro play com o banner "Enviar/Descartar" na tela retomava a gravação sem
+teto (o Q1 decidira deliberadamente não rearmar o timer nesse caso) e o banner ficava órfão. Corrigido:
+`GestureIntent.RESUME` agora reacende o banner (`retriggerLimitBanner()`) em vez de retomar quando a
+decisão ainda está pendente; o banner ganhou timer de 3s + barrinha (some sozinho, decisão continua
+pendente). **Yan confirmou funcionando** (reacende corretamente durante o pause).
+
+**2ª rodada** (bypass pior, mesmo dia): descartar o áudio pelo banner de limite → desfazer esse descarte
+pelo gesto de cancelar da orbe (Toggle e PTT) → gravar de novo, voltava a gravar **sem teto nenhum de
+novo**. Causa raiz: `onLimitDiscard()` usava um descarte instantâneo à parte (`ButtonStateMachine.
+onDiscard()`, sem janela de desfazer), e o `onCancel()` (gesto de cancelar comum) limpava incondicionalmente
+a flag "decisão de limite pendente" para tirar o banner da tela — se o cancelamento fosse desfeito, a flag
+nunca era restaurada, perdendo o rastro de que o limite já tinha sido atingido.
+
+**Pedido do Yan, atendido junto com o fix**: unificar os dois descartes da UI num único padrão — "Descartar"
+no banner de limite passou a acionar o MESMO fluxo do cancelar comum (janela de desfazer), e esse banner
+(antes "toque em qualquer lugar para desfazer") virou de dois botões: **Desfazer** (esquerda) / **Concluir**
+(direita, confirma o descarte na hora). Posição deliberada: "Desfazer" ocupa a MESMA posição (esquerda) onde
+"Descartar" estava no banner anterior — um duplo-toque acidental no mesmo ponto da tela cai no lado seguro,
+não no de confirmar a exclusão; excluir rápido a partir do pause exige toque + mover o dedo + 2º toque.
+
+**Implementação:** `OverlayCoordinator.limitBannerVisible` virou `limitDecisionPending` (persiste mesmo com
+a VIEW escondida; só é limpa quando o áudio é de fato resolvido — enviado ou descartado pra valer, nunca só
+por entrar em `CANCELLING`); `onLimitDiscard()` delega para `onCancel()`. `ButtonStateMachine.onDiscard()`
+removido (ficou órfão). `OverlayService.limitBannerView()` generalizado para `twoActionBannerView(...)`,
+reusado pelos dois banners (limite e cancelar).
+
+**Gate:** `testDebugUnitTest` → 233 testes, 0 falhas (inclui a reprodução exata do bug de 2ª rodada:
+`undoing a discard started from the limit banner still enforces the limit on resume`, que falha sem o fix
+e passa com ele). `connectedDebugAndroidTest` escopado a `com.keyflow.overlay` no emulador → 14/14 verde
+(inclui `OverlayServiceCancelTest` com a asserção de texto ajustada pro rótulo novo "Desfazer").
+
+Detalhe completo (decisões + rótulo "Concluir" ainda ajustável) em
+`.specs/quick/004-banner-limite-reentrada/TASK.md`. Instalado no Galaxy A32 (`RX8T10DERKW`) na sessão
+seguinte — **Yan confirmou**: banner reacende certo durante o pause, rótulo "Concluir" aprovado.
+
+## Q5 — Cancelar durante a transcrição + texto do banner + animação da orbe (2026-07-03)
+
+Continuação direta do Q4, mesma sessão de feedback do Yan. Três pedidos:
+
+1. Texto do banner "Cancelado" → **"Transcrição cancelada"** (trivial).
+2. **Cancelar também durante `SENDING`** (transcrevendo): arrastar a orbe pro lado deve abortar a
+   requisição e abrir o mesmo modal Desfazer/Concluir; desfazer volta pro pause; segurar nesse estado trava
+   a orbe só na direção lateral (sem cima/baixo, diferente do modo-arrasto de RECORDING/PAUSED).
+3. Visual do "Transcrevendo" da orbe muito sutil/monótono (uma senoide só).
+
+Perguntei ao Yan sobre 2 decisões (cancelamento HTTP real vs. só ignorar resposta tardia; gesto só no
+Toggle ou também PTT) — sem resposta, segui as opções recomendadas: **cancelamento real** e **só Toggle**
+(o modo-arrasto travado hoje só existe lá).
+
+**Achado de arquitetura**: cancelar a partir de `SENDING` é fundamentalmente diferente de RECORDING/PAUSED
+— ali o recorder nunca é parado (só pausado, dá pra retomar a mesma sessão); em SENDING o `AudioRecorder.
+stop()` já rodou e o `MediaRecorder` já foi liberado, então `pause()/resume()/discard()` nele viram no-op
+silencioso depois disso. O coordinator passou a guardar o próprio arquivo retido (`pendingAudioFile`) pra
+reenviar/descartar sem tocar o recorder de novo. Achado também uma race sutil: se a tentativa cancelada só
+processa seu resultado tardio DEPOIS que um reenvio já está rodando, checar só `machine.state == SENDING`
+não distingue as duas (ambas veem o mesmo estado) — resolvido com um contador de tentativa (`sendAttempt`).
+
+**Implementação:** `ButtonStateMachine.onCancel()` aceita SENDING; `OverlayCoordinator` ganhou
+`transcribeJob`/`pendingAudioFile`/`sendAttempt`, `onCancel()` ramifica (SENDING aborta a requisição,
+RECORDING/PAUSED pausa o recorder como antes), `stopAndTranscribe()` reusa o áudio retido num reenvio,
+`RESUME` vira no-op quando há áudio retido pendente (não há sessão viva pra continuar). `WhisperApi.post()`
+ganhou um callback que entrega o `Call` antes do `execute()` bloquear; `TranscriptionClient.cancel()` usa
+isso pra abortar de verdade. `OrbButtonView`: modo-arrasto travado entra a partir de SENDING (Toggle),
+`updateDragFeedback()` pina cima/baixo em 0 nesse estado (só a lateral resolve). `VoiceOrb.orbLevel
+(Transcribing)` trocou a onda única por duas fora de fase, mais variável.
+
+**Gate:** `testDebugUnitTest` → 237 testes, 0 falhas (3 novos no coordinator cobrindo cancelar-durante-
+envio, reenviar sem re-parar o recorder, e apagar o arquivo retido ao concluir/expirar; 1 reescrito +1 novo
+no `ButtonStateMachineTest`). `connectedDebugAndroidTest` escopado a `overlay` no emulador → 14/14 verde.
+Instalado no Galaxy A32.
+
+**Sem cobertura automatizada pro gesto em si** (arrastar a orbe durante SENDING) — o modo-arrasto travado
+já não tinha nenhum teste instrumentado antes desta tarefa (mesma lacuna pré-existente do PAUSE/CANCEL a
+partir de RECORDING/PAUSED, mesma classe de fragilidade de toque sintético já documentada no projeto).
+
+Detalhe completo em `.specs/quick/005-cancelar-durante-transcricao/TASK.md`. **Pendente [YAN]**: validar no
+device — texto novo, o gesto lateral durante "Transcrevendo" (trava só a seta lateral, cancela e abre o
+modal, desfazer volta pro pause, toque normal reenvia), e o visual novo do "Transcrevendo". Commit pendente
+até essa validação (e a do Q4, ainda não commitado).
+
+### Q5, 2ª rodada — PTT, fusão de áudio ao continuar, teclado/notificação sincronizados (2026-07-03)
+
+Yan confirmou o texto/rótulo do Q5 e fez 4 pedidos em cima: (1) o gesto de cancelar-durante-SENDING vale
+só no Toggle — pediu pra valer no PTT também; (2) ao desfazer um cancelamento em SENDING, retomar deveria
+deixar continuar gravando e mandar os dois trechos como UMA transcrição só (escolheu, entre duas opções
+que dei, **remixar os áudios num arquivo** em vez de duas chamadas de API + concatenar texto); (3) pediu
+esclarecimento sobre o que era "cancelamento real" (respondido em texto — já funcionava do jeito que ele
+queria); (4) pediu que o mic do teclado e a notificação também suportem cancelar durante SENDING, no
+mesmo estilo já sincronizado entre as três superfícies.
+
+**PTT**: bastou ampliar o gatilho de `scheduleDragHold()` em `OrbButtonView.ACTION_DOWN` pra também valer
+no PTT quando `SENDING` — o resto do mecanismo de arrasto travado já era agnóstico de modo nesse estado.
+
+**Fusão de áudio**: novo `com.keyflow.audio.AudioConcatenator` (remux via `MediaExtractor`/`MediaMuxer`,
+copia amostras AAC já codificadas sem decodificar/recodificar, desloca os timestamps do 2º segmento pra
+colar depois do 1º). `OverlayCoordinator.GestureIntent.RESUME` com áudio retido agora inicia uma sessão
+NOVA de gravação (`continuingPendingAudio`) em vez de no-op; `stopAndTranscribe()` funde os dois arquivos
+via uma lambda injetável (`concatAudioSegments`, real aponta pro `AudioConcatenator`; testes usam fake,
+já que `MediaExtractor`/`MediaMuxer` não rodam em unit test puro). Achado importante: sem cuidado, o
+relógio do limite de gravação reiniciaria do zero a cada ciclo cancelar→desfazer→continuar, reabrindo uma
+variante do bug do Q4 — corrigido com `priorSegmentsMs` (soma cumulativa) e tornando `timeFreeze()`
+idempotente (reseta `timeSegmentStartMs` após acumular, senão chamar de novo enquanto já congelado conta
+o mesmo intervalo duas vezes). Se o trecho retido sozinho já bateu o teto, retomar reabre o banner de
+limite em vez de deixar gravar sem teto.
+
+**Teclado/notificação**: `KeyFlowKeyboardView.actionsFor()` e `MicSelectorController.actionsFor()` (as
+duas implementações, barra antiga e Canvas) ganharam `SENDING -> listOf(MicAction.CANCEL)`.
+`RecordingNotification`: `notif_cancel` visível também em SENDING (só ele) e título "⏳ Transcrevendo".
+
+**Gate:** `testDebugUnitTest` → 241 testes, 0 falhas. Instrumentados no Galaxy A32: `com.keyflow.audio`
+6/6 (remux real gravando pelo mic do aparelho), `com.keyflow.overlay` 15/15, `com.keyflow.ime` 29/29 (a
+1ª tentativa teve TODOS os testes de UI falhando por um anúncio de outro app roubando o foco da tela —
+`dumpsys window` confirmou `com.CodeBySonu.VoxSherpa/...AdActivity` em foco; nada a ver com o código,
+recuperado voltando pra home e rerodando). Um teste de acessibilidade sem nenhuma relação com esta rodada
+(`KeyFlowKeyboardAccessibilityTest`) ainda flakou uma vez — mesma classe de fragilidade de toque
+sintético já documentada. Build instalado no Galaxy A32.
+
+**Sem cobertura automatizada** pro gesto de cancelar-durante-SENDING no PTT nem pro "segurar o mic mostra
+cancelar" nesse estado — exigiria interceptar a chamada de rede real dentro do teste instrumentado do
+teclado, que hoje usa o `OverlayService` de verdade sem transcriber fake injetável de fora. Mesma lacuna
+já flagada na 1ª rodada do Q5 pro gesto na orbe.
+
+Detalhe completo (decisões, arquivos, checklist) em
+`.specs/quick/005-cancelar-durante-transcricao/TASK.md`. **Pendente [YAN]**: validar no device — (a) o
+gesto no PTT; (b) cancelar-durante-envio → desfazer → continuar falando → parar de novo deve soar como
+uma única transcrição; (c) segurar o mic do teclado durante "Transcrevendo" mostra só cancelar; (d) a
+notificação mostra só cancelar com o título novo. Commit pendente até essa validação (e as anteriores).

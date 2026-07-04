@@ -2,6 +2,7 @@ package com.keyflow.overlay
 
 import android.os.SystemClock
 import android.util.Log
+import com.keyflow.audio.AudioConcatenator
 import com.keyflow.core.ButtonState
 import com.keyflow.core.ErrorKind
 import com.keyflow.core.InsertOutcome
@@ -25,6 +26,9 @@ interface OverlayAudioRecorder {
 
 interface OverlayTranscriber {
     suspend fun transcribe(audio: File, cfg: Config): TranscriptionResult
+
+    /** Aborta a requisição em andamento (chamada ao cancelar a partir de SENDING). No-op se não houver. */
+    fun cancelInFlight() {}
 }
 
 class OverlayCoordinator(
@@ -47,18 +51,48 @@ class OverlayCoordinator(
     private val onShowLimitReached: () -> Unit = {},
     private val onHideLimitReached: () -> Unit = {},
     private val maxRecordingMs: () -> Long = { 0L },
+    // Tempo em tela do banner de limite antes de sumir sozinho (a decisão continua pendente — só a
+    // view some; ver retriggerLimitBanner()).
+    private val limitBannerDismissMs: Long = DEFAULT_LIMIT_BANNER_DISMISS_MS,
     // Tempo autoritativo de gravação (acumulado, início do segmento) — superfícies leem daqui p/ não
     // dessincronizar (ex.: teclado que sobe depois de transições já terem ocorrido).
     private val onRecordingTime: (accumulatedMs: Long, segmentStartMs: Long) -> Unit = { _, _ -> },
     // (mensagem, abreVoz): abreVoz = erro resolvível na aba Voz (config/token) → tocar no X leva lá.
     private val onError: (String, Boolean) -> Unit = { _, _ -> },
     private val recordingClockMs: () -> Long = { SystemClock.elapsedRealtime() },
+    // Funde os segmentos retidos num arquivo só antes de reenviar (ver stopAndTranscribe()). Injetável
+    // porque o real usa MediaExtractor/MediaMuxer (framework Android, não roda em unit test puro).
+    private val concatAudioSegments: (List<File>, File) -> File = { segments, dir -> AudioConcatenator.concat(segments, dir) },
 ) {
     private val machine = ButtonStateMachine(targetAvailable = targetAvailable)
     private var recordingStartMs = 0L
     private var cancelJob: kotlinx.coroutines.Job? = null
     private var limitJob: kotlinx.coroutines.Job? = null
-    private var limitBannerVisible = false
+    private var bannerDismissJob: kotlinx.coroutines.Job? = null
+    private var transcribeJob: kotlinx.coroutines.Job? = null
+    // Áudio já gravado e retido enquanto uma decisão está pendente após SENDING (cancelar durante a
+    // transcrição). Diferente do cancelar a partir de RECORDING/PAUSED: ali o recorder nunca foi parado
+    // (só pausado), então dá pra retomar a MESMA sessão; aqui o recorder já foi liberado em stop() — a
+    // retomada abre uma sessão NOVA e funde os dois trechos no próximo stop (ver [continuingPendingAudio]).
+    private var pendingAudioFile: File? = null
+    // true = a retomada após desfazer um cancelamento em SENDING iniciou uma NOVA sessão de gravação
+    // (continuação); o próximo stop precisa FUNDIR pendingAudioFile + o novo segmento (ver
+    // stopAndTranscribe()), em vez de só reenviar pendingAudioFile como está.
+    private var continuingPendingAudio = false
+    // Soma da duração de todos os segmentos já fundidos em pendingAudioFile (Yan, 2026-07-03: sem isso,
+    // o limite de gravação reiniciaria do zero a cada ciclo cancelar-durante-envio→desfazer→continuar,
+    // reabrindo uma variante do bug de burlar o teto já corrigido no Q4). Zerada quando o áudio é enviado
+    // de vez ou descartado.
+    private var priorSegmentsMs = 0L
+    // Incrementado a cada tentativa de envio (stopAndTranscribe) — distingue uma conclusão tardia de uma
+    // tentativa já cancelada de uma tentativa nova (reenvio), mesmo se ambas coincidirem em SENDING.
+    private var sendAttempt = 0
+    // true = a gravação já bateu o limite e a decisão "enviar ou descartar" ainda não foi resolvida.
+    // Persiste mesmo que a VIEW do banner já tenha sumido (sozinha, ou por entrar em CANCELLING) — só é
+    // limpa quando o áudio é de fato enviado ou descartado. Ver onCancel()/finalizeCancel() para o porquê:
+    // sem essa separação entre "decisão pendente" e "banner visível", cancelar+desfazer+retomar burlava o
+    // limite de vez (bug reportado pelo Yan, 2026-07-03).
+    private var limitDecisionPending = false
 
     // Tempo de gravação (acumulado + início do segmento atual), publicado a cada transição.
     private var timeAccumulatedMs = 0L
@@ -66,7 +100,14 @@ class OverlayCoordinator(
     private fun publishTime() = onRecordingTime(timeAccumulatedMs, timeSegmentStartMs)
     private fun timeStart() { timeAccumulatedMs = 0L; timeSegmentStartMs = recordingClockMs(); publishTime() }
     private fun timeResume() { timeSegmentStartMs = recordingClockMs(); publishTime() }
-    private fun timeFreeze() { timeAccumulatedMs += recordingClockMs() - timeSegmentStartMs; publishTime() }
+    // Idempotente (reseta timeSegmentStartMs após acumular): chamar de novo enquanto já congelado soma
+    // ~0 em vez de contar o mesmo intervalo duas vezes — permite chamar sem saber se já estava congelado
+    // (ver stopAndTranscribe(), que precisa do total tanto vindo de RECORDING quanto de PAUSED).
+    private fun timeFreeze() {
+        timeAccumulatedMs += recordingClockMs() - timeSegmentStartMs
+        timeSegmentStartMs = recordingClockMs()
+        publishTime()
+    }
     private fun timeReset() { timeAccumulatedMs = 0L; timeSegmentStartMs = recordingClockMs(); publishTime() }
 
     /**
@@ -79,7 +120,7 @@ class OverlayCoordinator(
         limitJob = null
         val max = maxRecordingMs()
         if (max <= 0L) return
-        val remaining = max - timeAccumulatedMs
+        val remaining = max - priorSegmentsMs - timeAccumulatedMs
         if (remaining <= 0L) return
         limitJob = scope.launch {
             delay(remaining)
@@ -93,15 +134,40 @@ class OverlayCoordinator(
     }
 
     private fun showLimitBanner() {
-        if (limitBannerVisible) return
-        limitBannerVisible = true
+        if (limitDecisionPending) return
+        limitDecisionPending = true
         onShowLimitReached()
+        scheduleBannerDismiss()
     }
 
-    private fun hideLimitBanner() {
-        if (!limitBannerVisible) return
-        limitBannerVisible = false
+    /**
+     * Esconde só a VIEW do banner de limite — não resolve a decisão pendente. Usado ao entrar em
+     * CANCELLING (o banner de cancelar substitui o de limite na tela, mas se o usuário desfizer o
+     * cancelamento, retomar ainda deve respeitar o limite). Quem resolve a decisão de fato
+     * (enviar/descartar para valer) limpa [limitDecisionPending] explicitamente.
+     */
+    private fun hideLimitBannerView() {
+        bannerDismissJob?.cancel()
+        bannerDismissJob = null
         onHideLimitReached()
+    }
+
+    /** Some sozinho após [limitBannerDismissMs]: só a view, a decisão pendente continua. */
+    private fun scheduleBannerDismiss() {
+        bannerDismissJob?.cancel()
+        bannerDismissJob = scope.launch {
+            delay(limitBannerDismissMs)
+            onHideLimitReached()
+        }
+    }
+
+    /**
+     * Reage a uma tentativa de retomar a gravação enquanto a decisão "enviar ou descartar" ainda está
+     * pendente: reacende o banner do zero (novos 3s) em vez de deixar a gravação continuar sem teto.
+     */
+    private fun retriggerLimitBanner() {
+        onShowLimitReached()
+        scheduleBannerDismiss()
     }
 
     /** Atingido o tempo configurado: pausa a gravação (retém o áudio) e avisa "enviar ou descartar". */
@@ -113,35 +179,47 @@ class OverlayCoordinator(
         showLimitBanner()
     }
 
-    /** "Enviar" no aviso de limite: mesmo caminho de um STOP normal a partir de PAUSED. */
+    /**
+     * "Enviar" no aviso de limite: mesmo caminho de um STOP normal a partir de PAUSED — o próprio
+     * [stopAndTranscribe] já limpa a decisão pendente e esconde o banner, sem duplicar aqui.
+     */
     fun onLimitSend() {
         if (machine.state != ButtonState.PAUSED) return
-        hideLimitBanner()
         handleState(machine.onStop())
     }
 
-    /** "Descartar" no aviso de limite: descarta na hora, sem a janela de desfazer do cancelar. */
+    /**
+     * "Descartar" no aviso de limite: reusa o mesmo fluxo do cancelar comum (retém o áudio e abre a
+     * janela de desfazer), em vez de um descarte instantâneo e separado — um único padrão de descarte
+     * em toda a UI (pedido do Yan, 2026-07-03).
+     */
     fun onLimitDiscard() {
         if (machine.state != ButtonState.PAUSED) return
-        hideLimitBanner()
-        cancelLimitJob()
-        runCatching { recorder.discard() }
-        timeReset()
-        render(machine.onDiscard())
+        onCancel()
     }
 
     /**
-     * Cancela a gravação em curso retendo o áudio (pausa o recorder, não descarta na hora) e abre a
-     * janela de desfazer. Ao expirar sem desfazer, descarta de vez e volta ao idle (Fase 2a).
+     * Cancela a gravação/envio em curso retendo o áudio (não descarta na hora) e abre a janela de
+     * desfazer. Ao expirar sem desfazer, descarta de vez e volta ao idle (Fase 2a). A partir de SENDING
+     * (pedido do Yan, 2026-07-03) aborta a requisição em vez de pausar o recorder — o áudio já tinha sido
+     * entregue ao transcriber, então não há recorder pra pausar.
      */
     fun onCancel() {
         val before = machine.state
         val next = machine.onCancel()
         if (next != ButtonState.CANCELLING || before == ButtonState.CANCELLING) return
-        hideLimitBanner()
+        // Só a VIEW do banner de limite some (se estava pendente); a decisão continua pendente até o
+        // cancelamento se concluir de fato — ver finalizeCancel().
+        if (limitDecisionPending) hideLimitBannerView()
         cancelLimitJob()
-        runCatching { recorder.pause() }
-        if (before == ButtonState.RECORDING) timeFreeze() // congela; vindo de PAUSED já estava congelado
+        if (before == ButtonState.SENDING) {
+            transcribeJob?.cancel()
+            transcribeJob = null
+            runCatching { transcriber.cancelInFlight() }
+        } else {
+            runCatching { recorder.pause() }
+            if (before == ButtonState.RECORDING) timeFreeze() // vindo de PAUSED já estava congelado
+        }
         render(next)
         onShowCancelUndo()
         cancelJob?.cancel()
@@ -168,7 +246,12 @@ class OverlayCoordinator(
         if (machine.state != ButtonState.CANCELLING) return
         cancelJob?.cancel()
         cancelJob = null
-        runCatching { recorder.discard() }
+        limitDecisionPending = false // áudio descartado de vez: não há mais nada a enviar/descartar
+        runCatching { recorder.discard() } // no-op se o recorder já tinha sido liberado (veio de SENDING)
+        pendingAudioFile?.delete()
+        pendingAudioFile = null
+        continuingPendingAudio = false
+        priorSegmentsMs = 0L
         timeReset()
         render(machine.onCancelExpired())
         onHideCancelUndo()
@@ -182,6 +265,7 @@ class OverlayCoordinator(
         private const val MIN_RECORDING_MS = 400L
         private const val ERROR_AUTO_DISMISS_MS = 2000L
         private const val DEFAULT_CANCEL_WINDOW_MS = 3000L
+        private const val DEFAULT_LIMIT_BANNER_DISMISS_MS = 3000L
         // Margem acima de cfg.timeoutMs — dá tempo do callTimeout do OkHttp (a rede primária) surgir
         // primeiro no caso comum; esta é só a última linha de defesa.
         private const val TIMEOUT_SAFETY_MARGIN_MS = 2000L
@@ -228,10 +312,29 @@ class OverlayCoordinator(
                 render(machine.onPause())
             }
             GestureIntent.RESUME -> {
-                runCatching { recorder.resume() }
-                timeResume()
-                scheduleLimitJob()
-                render(machine.onResume())
+                if (limitDecisionPending) {
+                    retriggerLimitBanner()
+                } else if (pendingAudioFile != null) {
+                    // Desfez um cancelamento que começou durante SENDING: não há sessão de gravação viva
+                    // pra continuar (o recorder já foi liberado no primeiro stop()), mas o Yan pode querer
+                    // seguir falando — abre uma NOVA sessão; ao parar de novo, stopAndTranscribe() funde
+                    // os dois trechos num arquivo só (AudioConcatenator). Se os trechos já retidos sozinhos
+                    // já batem o teto configurado, não deixa continuar sem limite — reabre a decisão.
+                    if (maxRecordingMs() > 0L && priorSegmentsMs >= maxRecordingMs()) {
+                        showLimitBanner()
+                    } else {
+                        continuingPendingAudio = true
+                        runCatching { recorder.start() }
+                        timeStart()
+                        scheduleLimitJob()
+                        render(machine.onResume())
+                    }
+                } else {
+                    runCatching { recorder.resume() }
+                    timeResume()
+                    scheduleLimitJob()
+                    render(machine.onResume())
+                }
             }
             GestureIntent.CANCEL -> onCancel()
             GestureIntent.CANCEL_COMMIT -> onCommitCancel()
@@ -275,26 +378,69 @@ class OverlayCoordinator(
     }
 
     private fun stopAndTranscribe() {
-        hideLimitBanner()
+        limitDecisionPending = false
+        hideLimitBannerView()
         cancelLimitJob()
-        timeReset() // gravação encerrada: zera o tempo autoritativo
-        val duration = recordingClockMs() - recordingStartMs
-        if (duration < MIN_RECORDING_MS) {
-            Log.d(TAG, "recording too short (${duration}ms), cancelling")
-            runCatching { recorder.stop() }
-            onError("Gravação muito curta.", false)
-            render(machine.onErrorDismissed())
-            return
-        }
 
-        val audio = runCatching { recorder.stop() }.getOrNull()
+        // Reenvio puro (cancelou durante SENDING, desfez e mandou de novo sem gravar mais nada): não houve
+        // sessão viva nesse meio-tempo, então NÃO soma o tempo ocioso da interação com o banner como se
+        // fosse gravação (timeFreeze() contaria isso errado — ver priorSegmentsMs).
+        val pureResend = pendingAudioFile != null && !continuingPendingAudio
+        if (!pureResend) timeFreeze() // captura o tempo desta gravação antes de zerar (idempotente)
+        val segmentMs = if (pureResend) 0L else timeAccumulatedMs
+        timeReset() // gravação encerrada: zera o tempo autoritativo
+
+        val audio: File? = when {
+            pendingAudioFile != null && continuingPendingAudio -> {
+                // Desfez um cancelamento em SENDING e continuou gravando: funde o trecho retido com o novo
+                // num arquivo só antes de mandar pra transcrição (pedido do Yan, 2026-07-03).
+                val previous = pendingAudioFile!!
+                continuingPendingAudio = false
+                val newSegment = runCatching { recorder.stop() }.getOrNull()
+                when (newSegment) {
+                    null -> previous // recorder falhou/trecho novo curto demais: manda só o que já tinha
+                    else -> {
+                        val merged = runCatching {
+                            concatAudioSegments(listOf(previous, newSegment), previous.parentFile!!)
+                        }.getOrNull()
+                        if (merged != null) {
+                            previous.delete()
+                            newSegment.delete()
+                            merged
+                        } else {
+                            // Fusão falhou: mantém o trecho novo isolado em vez de travar o envio — o Yan
+                            // perde só o pedaço anterior, não a sessão toda.
+                            previous.delete()
+                            newSegment
+                        }
+                    }
+                }
+            }
+            // Reenvio puro de um áudio já retido (cancelou durante SENDING e desfez, sem continuar
+            // gravando): reusa o MESMO arquivo — o recorder original já foi liberado no primeiro stop().
+            pendingAudioFile != null -> pendingAudioFile
+            else -> {
+                val duration = recordingClockMs() - recordingStartMs
+                if (duration < MIN_RECORDING_MS) {
+                    Log.d(TAG, "recording too short (${duration}ms), cancelling")
+                    runCatching { recorder.stop() }
+                    onError("Gravação muito curta.", false)
+                    render(machine.onErrorDismissed())
+                    return
+                }
+                runCatching { recorder.stop() }.getOrNull()
+            }
+        }
         if (audio == null) {
             onError("Não foi possível gravar o áudio.", false)
             handleState(machine.onTranscriptionError())
             return
         }
+        pendingAudioFile = audio
+        if (!pureResend) priorSegmentsMs += segmentMs
+        val attempt = ++sendAttempt
 
-        scope.launch {
+        transcribeJob = scope.launch {
             val cfg = configProvider()
             // Rede de segurança além do callTimeout do WhisperApi (Yan, 2026-07-01): garante que o
             // coordinator sempre desiste dentro de cfg.timeoutMs + margem, mesmo se o transcriber travar
@@ -308,6 +454,16 @@ class OverlayCoordinator(
                     TranscriptionResult.Error(ErrorKind.NETWORK, e.message.orEmpty())
                 }
             }
+
+            // Cancelado enquanto enviava (onCancel() já moveu a máquina pra CANCELLING/PAUSED/idle) — ou
+            // já superado por um reenvio mais novo (cancelar+desfazer+enviar de novo antes desta corrotina
+            // cancelada terminar de desenrolar): não processa um resultado tardio por cima de um estado
+            // que já foi resolvido de outra forma. O contador [sendAttempt] cobre o caso em que a tentativa
+            // antiga só resume DEPOIS que a nova já está em SENDING de novo (aí checar só o estado não
+            // seria suficiente pra distinguir as duas).
+            if (attempt != sendAttempt || machine.state != ButtonState.SENDING) return@launch
+            pendingAudioFile = null
+            priorSegmentsMs = 0L
 
             when (result) {
                 is TranscriptionResult.Success -> {

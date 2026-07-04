@@ -2,9 +2,11 @@ package com.keyflow.overlay
 
 import android.app.Notification
 import android.content.Context
+import android.view.View
 import android.widget.FrameLayout
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.keyflow.R
 import com.keyflow.core.ButtonState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -50,5 +52,17 @@ class RecordingNotificationTest {
         assertEquals("Retomar", RecordingNotification.pauseLabel(ButtonState.PAUSED))
         assertEquals("● Gravando", RecordingNotification.titleFor(ButtonState.RECORDING))
         assertEquals("⏸ Pausado", RecordingNotification.titleFor(ButtonState.PAUSED))
+        assertEquals("⏳ Transcrevendo", RecordingNotification.titleFor(ButtonState.SENDING))
+    }
+
+    @Test
+    fun sendingShowsOnlyTheCancelAction() {
+        val view = RecordingNotification(context, "gallery")
+            .galleryRemoteViews(ButtonState.SENDING, frozenSeconds = 0)
+            .apply(context, FrameLayout(context))
+
+        assertEquals(View.GONE, view.findViewById<View>(R.id.notif_pause).visibility)
+        assertEquals(View.GONE, view.findViewById<View>(R.id.notif_stop).visibility)
+        assertEquals(View.VISIBLE, view.findViewById<View>(R.id.notif_cancel).visibility)
     }
 }

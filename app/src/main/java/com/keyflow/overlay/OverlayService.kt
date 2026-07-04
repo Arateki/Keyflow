@@ -72,6 +72,7 @@ class OverlayService : Service() {
 
     // Duração da janela de desfazer: compartilhada entre o coordinator (descarte) e a barra do banner.
     private val cancelWindowMs = 3000L
+    private val limitBannerDismissMs = 3000L
 
     // Ciclo de vida desacoplado (Fase 1): a orbe mantém o serviço persistente; o teclado o sobe sob
     // demanda (só durante a gravação). `overlayActive` = há orbe; `isForeground` = já em primeiro plano.
@@ -249,6 +250,7 @@ class OverlayService : Service() {
             onShowLimitReached = { showLimitBanner() },
             onHideLimitReached = { removeLimitBanner() },
             maxRecordingMs = { cachedSettings.maxRecordingSec * 1000L },
+            limitBannerDismissMs = limitBannerDismissMs,
             onRecordingTime = { acc, seg -> KeyFlowController.updateRecordingTime(acc, seg) },
             onError = { message, opensVoz ->
                 KeyFlowController.errorOpensVoz = opensVoz
@@ -471,13 +473,22 @@ class OverlayService : Service() {
         errorBanner = null
     }
 
-    /** Banner clicável "🗑 cancelado · desfazer" durante a janela de descarte (Fase 2a). */
+    /**
+     * Banner "Cancelado" com duas ações (Desfazer/Concluir) durante a janela de descarte (Fase 2a,
+     * unificado com o descarte do aviso de limite — ver [showLimitBanner]). "Desfazer" fica à ESQUERDA
+     * de propósito: é a MESMA posição do "Descartar" no banner de limite, então um toque duplo acidental
+     * na mesma posição da tela cai no lado seguro (desfazer), não no de confirmar o descarte.
+     */
     private fun showCancelBanner() {
         removeCancelBanner()
-        // Borda + barra de tempo na cor da orbe (token único; acompanha a futura skin).
-        val banner = bannerView("Cancelado, toque para desfazer", com.keyflow.ui.theme.OrbAccentArgb, cancelWindowMs) {
-            if (::coordinator.isInitialized) coordinator.onUndoCancel()
-        }
+        val banner = twoActionBannerView(
+            text = "Transcrição cancelada",
+            leftLabel = "Desfazer",
+            leftAction = { if (::coordinator.isInitialized) coordinator.onUndoCancel() },
+            rightLabel = "Concluir",
+            rightAction = { if (::coordinator.isInitialized) coordinator.onCommitCancel() },
+            durationMs = cancelWindowMs,
+        )
         runCatching { windowManager.addView(banner, bannerParams()) }
         cancelBanner = banner
     }
@@ -518,6 +529,17 @@ class OverlayService : Service() {
             )
             setPadding(dp(18), dp(12), dp(18), dp(9))
         })
+        container.addView(dismissBar(accent, durationMs))
+        return container
+    }
+
+    /**
+     * Barrinha de progresso discreta (encolhe da direita pra esquerda ao longo de [durationMs]) usada
+     * no contorno inferior dos banners de overlay que somem sozinhos.
+     */
+    private fun dismissBar(accent: Int, durationMs: Long): View {
+        val d = resources.displayMetrics.density
+        fun dp(v: Int) = (v * d).toInt()
         val bar = View(this).apply {
             background = android.graphics.drawable.GradientDrawable().apply {
                 cornerRadius = dp(2).toFloat()
@@ -525,18 +547,15 @@ class OverlayService : Service() {
             }
             pivotX = 0f // encolhe da direita para a esquerda
         }
-        container.addView(
-            bar,
-            android.widget.LinearLayout.LayoutParams(
-                android.widget.LinearLayout.LayoutParams.MATCH_PARENT, dp(3),
-            ).apply { leftMargin = dp(10); rightMargin = dp(10); bottomMargin = dp(7) },
-        )
+        bar.layoutParams = android.widget.LinearLayout.LayoutParams(
+            android.widget.LinearLayout.LayoutParams.MATCH_PARENT, dp(3),
+        ).apply { leftMargin = dp(10); rightMargin = dp(10); bottomMargin = dp(7) }
         bar.animate()
             .scaleX(0f)
             .setDuration(durationMs)
             .setInterpolator(android.view.animation.LinearInterpolator())
             .start()
-        return container
+        return bar
     }
 
     private fun bannerParams(): WindowManager.LayoutParams {
@@ -560,17 +579,19 @@ class OverlayService : Service() {
     }
 
     /**
-     * Banner "limite de gravação atingido" com duas ações (Enviar/Descartar). Sem timer próprio: fica
-     * visível até o usuário decidir ou retomar a gravação manualmente (RESUME esconde via coordinator).
+     * Banner "limite de gravação atingido" com duas ações (Enviar/Descartar). Some sozinho após
+     * [limitBannerDismissMs] (barrinha), mas a decisão continua pendente no coordinator: tentar retomar
+     * a gravação enquanto isso reacende o banner do zero, em vez de deixar a gravação continuar sem teto.
      */
     private fun showLimitBanner() {
         removeLimitBanner()
-        val banner = limitBannerView(
+        val banner = twoActionBannerView(
             text = "Limite de gravação atingido",
-            sendLabel = "Enviar",
-            discardLabel = "Descartar",
-            onSend = { if (::coordinator.isInitialized) coordinator.onLimitSend() },
-            onDiscard = { if (::coordinator.isInitialized) coordinator.onLimitDiscard() },
+            leftLabel = "Descartar",
+            leftAction = { if (::coordinator.isInitialized) coordinator.onLimitDiscard() },
+            rightLabel = "Enviar",
+            rightAction = { if (::coordinator.isInitialized) coordinator.onLimitSend() },
+            durationMs = limitBannerDismissMs,
         )
         runCatching { windowManager.addView(banner, bannerParams()) }
         limitBanner = banner
@@ -582,15 +603,19 @@ class OverlayService : Service() {
     }
 
     /**
-     * Banner de overlay com duas ações lado a lado (texto + 2 rótulos clicáveis), para decisões
-     * binárias sem auto-dismiss — diferente do [bannerView], que sempre some sozinho após [durationMs].
+     * Banner de overlay com duas ações lado a lado (texto + 2 rótulos clicáveis, [leftLabel] à esquerda)
+     * e a mesma barrinha de progresso do [bannerView] — diferença é que sumir da tela não decide nada por
+     * conta própria (quem chama decide o que a expiração silenciosa significa). Reusado pelo banner de
+     * limite (Descartar/Enviar) e pelo de cancelar (Desfazer/Concluir) — um único padrão visual para as
+     * duas decisões de "manter ou descartar áudio" da app.
      */
-    private fun limitBannerView(
+    private fun twoActionBannerView(
         text: String,
-        sendLabel: String,
-        discardLabel: String,
-        onSend: () -> Unit,
-        onDiscard: () -> Unit,
+        leftLabel: String,
+        leftAction: () -> Unit,
+        rightLabel: String,
+        rightAction: () -> Unit,
+        durationMs: Long,
     ): View {
         val d = resources.displayMetrics.density
         fun dp(v: Int) = (v * d).toInt()
@@ -638,9 +663,10 @@ class OverlayService : Service() {
             orientation = android.widget.LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
         }
-        row.addView(actionLabel(discardLabel, onDiscard))
-        row.addView(actionLabel(sendLabel, onSend))
+        row.addView(actionLabel(leftLabel, leftAction))
+        row.addView(actionLabel(rightLabel, rightAction))
         container.addView(row)
+        container.addView(dismissBar(accent, durationMs))
         return container
     }
 
@@ -752,6 +778,8 @@ class OverlayService : Service() {
         override suspend fun transcribe(audio: File, cfg: Config) = withContext(Dispatchers.IO) {
             client.transcribe(audio, cfg)
         }
+
+        override fun cancelInFlight() = client.cancel()
     }
 
     companion object {

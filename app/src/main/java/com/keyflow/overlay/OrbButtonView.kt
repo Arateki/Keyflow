@@ -185,21 +185,31 @@ class OrbButtonView(
         contentDescription = describe(state)
 
         when {
-            state == ButtonState.RECORDING && prev != ButtonState.RECORDING && prev != ButtonState.PAUSED -> {
+            // Início de verdade (não é retomada nem continuação pós-SENDING): zera.
+            state == ButtonState.RECORDING && prev !in TIME_TRACKED_STATES -> {
                 accumulatedMs = 0L
                 segmentStartMs = clock()
                 startTicker()
             }
-            state == ButtonState.RECORDING && prev == ButtonState.PAUSED -> {
-                segmentStartMs = clock() // retomada
+            // Retomada: cobre tanto o resume normal (de PAUSED) quanto continuar gravando depois de
+            // desfazer um cancelamento aberto durante SENDING — nos dois casos o tempo já acumulado
+            // segue de onde parou, sem zerar (Yan, 2026-07-03: o "tempo pequeno abaixo da lixeira"
+            // aparecia zerado ao desfazer/continuar porque essa continuidade não existia ainda).
+            state == ButtonState.RECORDING -> {
+                segmentStartMs = clock()
                 startTicker()
             }
-            // PAUSED e CANCELLING congelam o tempo (não zeram): ao retomar, continua de onde parou.
-            (state == ButtonState.PAUSED || state == ButtonState.CANCELLING) && prev == ButtonState.RECORDING -> {
-                accumulatedMs += clock() - segmentStartMs // congela o tempo
+            // Saiu de RECORDING pra pausa/envio/cancelamento: congela o que rodou neste segmento (soma,
+            // não zera) — cobre também o STOP direto de RECORDING pra SENDING (sem passar por PAUSED).
+            prev == ButtonState.RECORDING && state in TIME_TRACKED_STATES -> {
+                accumulatedMs += clock() - segmentStartMs
                 stopTicker()
             }
-            state != ButtonState.RECORDING && state != ButtonState.PAUSED && state != ButtonState.CANCELLING -> {
+            // Transições entre PAUSED/SENDING/CANCELLING que não passam por RECORDING (ex.: cancelar
+            // durante o envio, ou desfazer esse cancelamento): o tempo já está congelado, só preserva.
+            state in TIME_TRACKED_STATES -> stopTicker()
+            // Saída de vez (sucesso, erro, idle...): zera.
+            else -> {
                 accumulatedMs = 0L
                 stopTicker()
             }
@@ -240,9 +250,14 @@ class OrbButtonView(
                 startWindowY = windowParams?.y ?: 0
                 dragging = false
                 gestures.onDown()
-                // Alternar gravando/pausado: ficar parado ~Tempo de reação+150ms trava no modo-arrasto.
-                if (mode() == RecordingMode.TOGGLE &&
-                    (renderedState == ButtonState.RECORDING || renderedState == ButtonState.PAUSED)
+                // Alternar gravando/pausado: ficar parado ~Tempo de reação+150ms trava no modo-arrasto
+                // (só no Alternar — no PTT a gravação já É o hold). SENDING entra aqui pra permitir
+                // cancelar a transcrição (única direção válida nesse estado é a lateral — ver
+                // updateDragFeedback) e vale nos DOIS modos, já que ali não há gravação ativa disputando
+                // o toque (pedido do Yan, 2026-07-03).
+                if (renderedState == ButtonState.SENDING ||
+                    (mode() == RecordingMode.TOGGLE &&
+                        (renderedState == ButtonState.RECORDING || renderedState == ButtonState.PAUSED))
                 ) {
                     scheduleDragHold()
                 }
@@ -434,8 +449,10 @@ class OrbButtonView(
         dragCenterY = loc[1] + sizePx / 2
         dragActPx = sizePx * DRAG_ACTIVATION_FRACTION
         vibrateTick() // sinaliza a trava
-        // Setas já aparecem opacas (guia + indicação de que travou) na sobreposição separada.
-        onDragArrows(dragArrows(upAlpha = 1f, lateralAlpha = 1f, downAlpha = 1f))
+        // Enviando: só a direção lateral (cancelar) é válida — não mostra as setas de cima/baixo, que não
+        // fazem nada nesse estado (não dá pra pausar/retomar/abrir config no meio do envio).
+        val sending = renderedState == ButtonState.SENDING
+        onDragArrows(dragArrows(upAlpha = if (sending) 0f else 1f, lateralAlpha = 1f, downAlpha = if (sending) 0f else 1f))
         // Glifo central do alvo ainda invisível (aparece com a proximidade).
         orbUi = orbUi.copy(dragHint = OrbDragHint(centerKind = null, centerAlpha = 0f, seconds = elapsedSeconds()))
     }
@@ -461,13 +478,15 @@ class OrbButtonView(
 
     /**
      * Atualiza o alvo central e a opacidade das setas durante o modo-arrasto. Gravando: ↑ pausa, ← cancela.
-     * Pausado (proposta do usuário): ↑ cancela, ← retoma. As setas começam opacas e somem ao aproximar.
+     * Pausado (proposta do usuário): ↑ cancela, ← retoma. Enviando: só ← cancela (↑/↓ ficam pinados em 0,
+     * não fazem nada nesse estado). As setas começam opacas e somem ao aproximar.
      */
     private fun updateDragFeedback(dx: Float, dy: Float) {
         val act = sizePx * DRAG_ACTIVATION_FRACTION
         val destro = side() == OverlaySide.RIGHT
-        val upProx = (-dy / act).coerceIn(0f, 1f)
-        val downProx = (dy / act).coerceIn(0f, 1f)
+        val sending = renderedState == ButtonState.SENDING
+        val upProx = if (sending) 0f else (-dy / act).coerceIn(0f, 1f)
+        val downProx = if (sending) 0f else (dy / act).coerceIn(0f, 1f)
         // Lateral (cancelar/retomar) vai pro CENTRO: destro arrasta ←, canhoto arrasta → (longe da borda).
         val lateralProx = ((if (destro) -dx else dx) / act).coerceIn(0f, 1f)
         val paused = renderedState == ButtonState.PAUSED
@@ -481,8 +500,12 @@ class OrbButtonView(
         dragKind = kind
         dragProx = prox
         applyDragHaptics(kind, prox)
-        // Setas (sobreposição separada): opacas→somem ao aproximar.
-        onDragArrows(dragArrows(upAlpha = 1f - upProx, lateralAlpha = 1f - lateralProx, downAlpha = 1f - downProx))
+        // Setas (sobreposição separada): opacas→somem ao aproximar. Enviando, cima/baixo ficam SEMPRE
+        // removidas (não só invisíveis) — sem isso, mover o dedo em qualquer direção reacendia essas duas
+        // com upProx/downProx pinados em 0 (1f - 0f = opaca de novo), mesmo não fazendo nada nesse estado.
+        val upAlpha = if (sending) 0f else 1f - upProx
+        val downAlpha = if (sending) 0f else 1f - downProx
+        onDragArrows(dragArrows(upAlpha = upAlpha, lateralAlpha = 1f - lateralProx, downAlpha = downAlpha))
         // Glifo central do alvo (orbe): transparente→opaco ao aproximar.
         orbUi = orbUi.copy(dragHint = OrbDragHint(centerKind = kind, centerAlpha = prox, seconds = elapsedSeconds()))
     }
@@ -665,5 +688,9 @@ class OrbButtonView(
         const val HOLD_OFFSET_MS = 150L
         // Distância (em frações do lado da orbe) para ativar o alvo do arrasto.
         const val DRAG_ACTIVATION_FRACTION = 0.7f
+        // Estados em que o tempo local (accumulatedMs) segue vivo/congelado — fora deles, zera de vez.
+        val TIME_TRACKED_STATES = setOf(
+            ButtonState.RECORDING, ButtonState.PAUSED, ButtonState.CANCELLING, ButtonState.SENDING,
+        )
     }
 }

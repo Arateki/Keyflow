@@ -295,12 +295,18 @@ class KeyFlowKeyboardService : InputMethodService() {
 
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         super.onStartInput(attribute, restarting)
-        Log.d(TAG, "onStartInput pkg=${attribute?.packageName} restarting=$restarting")
+        Log.d(
+            TAG,
+            "onStartInput pkg=${attribute?.packageName} restarting=$restarting " +
+                "inputType=0x${(attribute?.inputType ?: 0).toString(16)} " +
+                "imeOptions=0x${(attribute?.imeOptions ?: 0).toString(16)}",
+        )
         // Só pede para se exibir se: (a) há um campo de texto real focado (não um editor "nulo", senão
         // subiria sem input ativo) e (b) o usuário acabou de trocar PARA o KeyFlow pelo nosso seletor
         // (3 toques). Assim não sobe em troca de app / ida para home, nem sem campo focado.
         val hasRealInput = (attribute?.inputType ?: InputType.TYPE_NULL) != InputType.TYPE_NULL
         isRawInputField = !hasRealInput
+        Log.d(TAG, "onStartInput isRawInputField=$isRawInputField")
         if (hasRealInput &&
             !restarting &&
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&

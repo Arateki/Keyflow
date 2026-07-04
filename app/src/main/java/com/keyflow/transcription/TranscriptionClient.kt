@@ -9,13 +9,25 @@ import java.io.InterruptedIOException
 
 class TranscriptionClient(private val api: WhisperApi = WhisperApi()) {
 
+    // Chamada em andamento (se houver) — guardada pra permitir cancelar de outra thread (cancelar durante
+    // SENDING, Yan 2026-07-03). @Volatile: escrita no dispatcher IO (dentro de post()), leitura do
+    // cancel() a partir da coroutine no Main.
+    @Volatile
+    private var activeCall: okhttp3.Call? = null
+
+    /** Aborta a requisição em andamento, se houver. [transcribe] resolve com um erro de rede/IO — quem
+     * chama já sabe que cancelou e descarta esse resultado (ver [com.keyflow.overlay.OverlayCoordinator]). */
+    fun cancel() {
+        activeCall?.cancel()
+    }
+
     fun transcribe(audio: File, cfg: Config): TranscriptionResult {
         if (!cfg.isComplete()) {
             return TranscriptionResult.Error(ErrorKind.CONFIG_MISSING, "Config incomplete")
         }
 
         return try {
-            api.post(audio, cfg).use { response ->
+            api.post(audio, cfg) { call -> activeCall = call }.use { response ->
                 when {
                     response.code == 401 || response.code == 403 ->
                         TranscriptionResult.Error(ErrorKind.AUTH, "HTTP ${response.code}")
@@ -32,7 +44,11 @@ class TranscriptionClient(private val api: WhisperApi = WhisperApi()) {
             // não um socket específico) que expira — achado ao testar cfg.timeoutMs por requisição.
             TranscriptionResult.Error(ErrorKind.TIMEOUT, e.message ?: "timeout")
         } catch (e: IOException) {
+            // Cobre também o IOException("Canceled") do Call.cancel() — o coordinator já sabe que
+            // cancelou e ignora esse resultado, então não precisa de um ErrorKind dedicado aqui.
             TranscriptionResult.Error(ErrorKind.NETWORK, e.message ?: "network error")
+        } finally {
+            activeCall = null
         }
     }
 

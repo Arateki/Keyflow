@@ -82,9 +82,13 @@ class ButtonStateMachine(
         return state
     }
 
-    /** Cancela a gravação em curso (RECORDING/PAUSED → CANCELLING), abrindo a janela de desfazer. */
+    /**
+     * Cancela a gravação/envio em curso (RECORDING/PAUSED/SENDING → CANCELLING), abrindo a janela de
+     * desfazer. SENDING entra aqui pra permitir cancelar a transcrição em andamento (pedido do Yan,
+     * 2026-07-03) — o áudio já gravado é retido do mesmo jeito, só a requisição HTTP é abortada.
+     */
     fun onCancel(): ButtonState {
-        if (state == ButtonState.RECORDING || state == ButtonState.PAUSED) {
+        if (state == ButtonState.RECORDING || state == ButtonState.PAUSED || state == ButtonState.SENDING) {
             state = ButtonState.CANCELLING
         }
         return state
@@ -99,18 +103,6 @@ class ButtonStateMachine(
     /** Expira a janela de desfazer: descarta de vez (CANCELLING → idle). No-op fora de CANCELLING. */
     fun onCancelExpired(): ButtonState {
         if (state == ButtonState.CANCELLING) {
-            state = if (targetAvailable()) ButtonState.IDLE_READY else ButtonState.IDLE_NO_FIELD
-        }
-        return state
-    }
-
-    /**
-     * Descarta a gravação diretamente (RECORDING/PAUSED → idle), sem a janela de desfazer de 3s do
-     * [onCancel]. Usado quando o usuário já tomou a decisão explícita (ex.: "Descartar" no aviso de
-     * limite máximo de gravação).
-     */
-    fun onDiscard(): ButtonState {
-        if (state == ButtonState.RECORDING || state == ButtonState.PAUSED) {
             state = if (targetAvailable()) ButtonState.IDLE_READY else ButtonState.IDLE_NO_FIELD
         }
         return state

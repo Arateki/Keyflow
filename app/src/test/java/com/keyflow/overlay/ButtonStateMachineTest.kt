@@ -153,15 +153,20 @@ class ButtonStateMachineTest {
     }
 
     @Test
-    fun `cancel is a no-op outside recording or paused`() {
+    fun `cancel is a no-op outside recording, paused or sending`() {
         val machine = ButtonStateMachine()
 
         // Idle
         assertThat(machine.onCancel()).isEqualTo(ButtonState.IDLE_READY)
+    }
+
+    @Test
+    fun `cancel from sending opens the undo window too`() {
+        val machine = ButtonStateMachine()
 
         machine.onTap() // RECORDING
         machine.onTap() // SENDING
-        assertThat(machine.onCancel()).isEqualTo(ButtonState.SENDING)
+        assertThat(machine.onCancel()).isEqualTo(ButtonState.CANCELLING)
     }
 
     @Test
@@ -206,34 +211,6 @@ class ButtonStateMachineTest {
 
         machine.onTap() // RECORDING
         assertThat(machine.onCancelExpired()).isEqualTo(ButtonState.RECORDING)
-    }
-
-    @Test
-    fun `discard moves recording directly to idle without the undo window`() {
-        val machine = ButtonStateMachine(targetAvailable = { true })
-
-        machine.onTap() // RECORDING
-        assertThat(machine.onDiscard()).isEqualTo(ButtonState.IDLE_READY)
-    }
-
-    @Test
-    fun `discard moves paused directly to idle without the undo window`() {
-        val machine = ButtonStateMachine(targetAvailable = { false })
-
-        machine.onTap()    // RECORDING
-        machine.onPause()  // PAUSED
-        assertThat(machine.onDiscard()).isEqualTo(ButtonState.IDLE_NO_FIELD)
-    }
-
-    @Test
-    fun `discard is a no-op outside recording or paused`() {
-        val machine = ButtonStateMachine()
-
-        assertThat(machine.onDiscard()).isEqualTo(ButtonState.IDLE_READY)
-
-        machine.onTap() // RECORDING
-        machine.onTap() // SENDING
-        assertThat(machine.onDiscard()).isEqualTo(ButtonState.SENDING)
     }
 
     @Test

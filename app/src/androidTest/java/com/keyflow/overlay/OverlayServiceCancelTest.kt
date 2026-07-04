@@ -59,10 +59,10 @@ class OverlayServiceCancelTest {
         sendAction(RecordingNotification.ACTION_CANCEL)
         waitUntilState(ButtonState.CANCELLING)
 
-        // CANCEL-02: banner "cancelado · desfazer" visível na tela (overlay clicável).
+        // CANCEL-02: banner "Cancelado" com os botões Desfazer/Concluir visível na tela.
         assertTrue(
             "banner de desfazer não apareceu",
-            device.wait(Until.hasObject(By.textContains("desfazer")), TIMEOUT) != null,
+            device.wait(Until.hasObject(By.textContains("Desfazer")), TIMEOUT) != null,
         )
     }
 

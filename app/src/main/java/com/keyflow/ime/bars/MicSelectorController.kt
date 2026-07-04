@@ -47,6 +47,8 @@ class MicSelectorController(
     fun actionsFor(state: ButtonState): List<MicAction> = when (state) {
         ButtonState.RECORDING, ButtonState.PAUSED -> listOf(MicAction.PAUSE_RESUME, MicAction.CANCEL)
         ButtonState.CANCELLING -> listOf(MicAction.UNDO)
+        // Transcrevendo: só cancelar (não há o que pausar/retomar nesse estado); Yan, 2026-07-03.
+        ButtonState.SENDING -> listOf(MicAction.CANCEL)
         else -> emptyList()
     }
 
