@@ -125,6 +125,6 @@
 | SB-T5 | **Done** — `BarView` Canvas + geometria/overflow + flag `kbd_bars` + persistência DataStore; 6 unit + 3 instrumentados novos verdes, SYNC existentes intactos (6/6) |
 | SB-T6 | **Done** — grade efêmera fim-a-fim (lente/reveal/háptica/cancel); âncora p/ cima = manual no device (injeção grampeia acima da janela do IME) |
 | SB-T7 | **Done** — alavanca plugada (DPAD + tique tátil + repeat acelerado); 6/6 instrumentados verdes |
-| SB-T8 | Pending |
+| SB-T8 | **Done** — `PhysicalKeyPicker` (bottom sheet compartilhado, teclado ANSI + toggles Ctrl/Alt/Shift/Meta); 6/6 instrumentados verdes |
 | SB-T9 | Pending |
 | SB-T10 | Pending |
