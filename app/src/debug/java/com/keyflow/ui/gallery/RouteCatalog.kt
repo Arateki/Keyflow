@@ -12,15 +12,26 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.ui.viewinterop.AndroidView
 import com.keyflow.core.ButtonState
 import com.keyflow.core.TranscriptionSource
+import android.view.KeyEvent
 import android.widget.FrameLayout
+import com.keyflow.core.shortcuts.BarButton
+import com.keyflow.core.shortcuts.BarDef
+import com.keyflow.core.shortcuts.BarsConfig
+import com.keyflow.core.shortcuts.GridCell
+import com.keyflow.core.shortcuts.GridTriggerMode
+import com.keyflow.core.shortcuts.PhysicalKeyMap
+import com.keyflow.core.shortcuts.ShortcutGrid
 import com.keyflow.ime.KeyFlowKeyboardView
 import com.keyflow.overlay.RecordingNotification
 import com.keyflow.ui.PermissionStatus
 import com.keyflow.ui.common.SaveController
 import com.keyflow.ui.config.ConfigScreen
 import com.keyflow.ui.config.ConfigTab
+import com.keyflow.ui.config.PhysicalKeyPicker
 import com.keyflow.ui.onboarding.OnboardingScreen
 import com.keyflow.ui.orb.OrbCenter
+import com.keyflow.ui.orb.OrbDragHint
+import com.keyflow.ui.orb.OrbDragKind
 import com.keyflow.ui.orb.OrbState
 import com.keyflow.ui.orb.VoiceOrb
 import com.keyflow.ui.theme.LocalKeyFlowPalette
@@ -29,8 +40,12 @@ import com.keyflow.ui.theme.LocalKeyFlowPalette
  * Única fonte de verdade das rotas de verificação (VERIFY-05). Cada rota é uma tela/estado isolado,
  * renderizado deterministicamente pela [GalleryActivity]. Telas reais (config/onboarding/…) entram
  * aqui conforme as tasks T10–T24; nesta etapa só as amostras do orbe são renderizáveis.
+ *
+ * [minDelayMs] dá tempo extra antes do marcador `gallery_ready` (além dos 3 frames padrão) — só as
+ * rotas que dependem de um estado assíncrono real (ex.: reveal por tempo parado da grade efêmera, SB-T10)
+ * o usam; as demais mantêm o comportamento de sempre (0).
  */
-data class Route(val key: String, val content: @Composable () -> Unit)
+data class Route(val key: String, val minDelayMs: Long = 0L, val content: @Composable () -> Unit)
 
 /** Tempo fixo do orbe no modo galeria → frames determinísticos (VERIFY-01). */
 const val GALLERY_ORB_TIME_MS: Float = 1234f
@@ -42,6 +57,14 @@ object RouteCatalog {
         orbRoute("orb-listening", OrbState.Listening, OrbCenter.None),
         orbRoute("orb-paused", OrbState.Paused, OrbCenter.PauseGlyph(8)),
         orbRoute("orb-transcribing", OrbState.Transcribing, OrbCenter.None),
+        // Glifo-alvo do modo-arrasto travado (segurar+arrastar até a zona) — pedido do Yan, 2026-07-04:
+        // print de cada estado do gesto sem precisar simular o toque (VoiceOrb já aceita o dragHint como
+        // parâmetro puro do Compose).
+        orbDragRoute("orb-drag-pause", OrbState.Listening, OrbDragKind.PAUSE, seconds = 8),
+        orbDragRoute("orb-drag-resume", OrbState.Paused, OrbDragKind.RESUME, seconds = 8),
+        orbDragRoute("orb-drag-cancel-recording", OrbState.Listening, OrbDragKind.CANCEL, seconds = 8),
+        orbDragRoute("orb-drag-cancel-sending", OrbState.Transcribing, OrbDragKind.CANCEL, seconds = 8),
+        orbDragRoute("orb-drag-config", OrbState.Listening, OrbDragKind.CONFIG, seconds = 8),
         // Apresentação do orbe no botão flutuante do overlay (T22): tempo/glifo no centro.
         orbRoute("overlay-idle", OrbState.Idle, OrbCenter.None),
         orbRoute("overlay-recording", OrbState.Listening, OrbCenter.Time(12)),
@@ -52,6 +75,19 @@ object RouteCatalog {
         keyboardRoute("keyboard-canvas-collapsed", expanded = false, recording = false),
         keyboardCanvasSymbolsRoute("keyboard-canvas-symbols"),
         keyboardCanvasCandidatesRoute("keyboard-canvas-candidates"),
+        // Barras Canvas (SB-T10/ROL-03): paridade com a barra de fábrica + estados só alcançáveis por
+        // gesto (grade revelada/alavanca), simulados via toque sintético (mesma técnica de
+        // `tapLayerToggle`) já que a galeria não tem dedo de verdade.
+        barRoute("bar-default-collapsed", useBars = true, expanded = false),
+        barRoute("bar-default-expanded", useBars = true, expanded = true),
+        barCustomOverflowRoute("bar-custom-overflow"),
+        barGridRevealedRoute("bar-grid-revealed"),
+        barJoystickPulledRoute("bar-joystick-pulled"),
+        Route("shortcut-key-picker") {
+            Box(Modifier.fillMaxSize()) {
+                PhysicalKeyPicker(visible = true, onSelect = {}, onDismiss = {})
+            }
+        },
         // Notificação Ateliê (T24): RemoteViews inflada via AndroidView.
         notificationRoute("notification-recording", ButtonState.RECORDING),
         notificationRoute("notification-paused", ButtonState.PAUSED),
@@ -73,6 +109,10 @@ object RouteCatalog {
                 ),
                 onGrant = {},
                 onSkip = {},
+                onRequestMic = {},
+                onRequestOverlay = {},
+                onRequestKeyboard = {},
+                onRequestNotifications = {},
             )
         },
     )
@@ -102,6 +142,7 @@ object RouteCatalog {
             onRequestOverlayPermission = {},
             onRequestKeyboardPermission = {},
             onRequestMicPermission = {},
+            onRequestNotificationPermission = {},
             onSwitchKeyboard = {},
             onSettingsChange = {},
         )
@@ -126,6 +167,7 @@ object RouteCatalog {
             onRequestOverlayPermission = {},
             onRequestKeyboardPermission = {},
             onRequestMicPermission = {},
+            onRequestNotificationPermission = {},
             onSwitchKeyboard = {},
             onSettingsChange = {},
             initialTab = ConfigTab.VOZ,
@@ -159,6 +201,7 @@ object RouteCatalog {
             onRequestOverlayPermission = {},
             onRequestKeyboardPermission = {},
             onRequestMicPermission = {},
+            onRequestNotificationPermission = {},
             onSwitchKeyboard = {},
             onSettingsChange = {},
             initialTab = tab,
@@ -256,6 +299,202 @@ object RouteCatalog {
         }
     }
 
+    /** Barra Canvas (SB-T5..T10) via `useBars=true`: paridade com a barra de fábrica (ROL-03). */
+    private fun barRoute(key: String, useBars: Boolean, expanded: Boolean): Route = Route(key) {
+        val dark = LocalKeyFlowPalette.current.isDark
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(LocalKeyFlowPalette.current.bg),
+            contentAlignment = Alignment.BottomCenter,
+        ) {
+            AndroidView(
+                modifier = Modifier.fillMaxSize().wrapContentHeight(Alignment.Bottom),
+                factory = { ctx ->
+                    KeyFlowKeyboardView(
+                        context = ctx,
+                        onKey = {},
+                        onMic = {},
+                        onHide = {},
+                        dark = dark,
+                        useBars = useBars,
+                        frozenSeconds = 12,
+                    ).apply { setExpanded(expanded) }
+                },
+            )
+        }
+    }
+
+    /** Barra custom com mais teclas avulsas do que cabem na largura — golden do overflow com rolagem (BAR-06). */
+    private fun barCustomOverflowRoute(key: String): Route = Route(key) {
+        val dark = LocalKeyFlowPalette.current.isDark
+        val config = BarsConfig(
+            mirrored = true,
+            collapsed = listOf(
+                BarDef(
+                    listOf(BarButton.Mic) +
+                        (0..9).map { BarButton.SingleKey(PhysicalKeyMap.key(KeyEvent.KEYCODE_A + it)) } +
+                        listOf(BarButton.ToggleExpand),
+                )
+            ),
+            expanded = emptyList(),
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(LocalKeyFlowPalette.current.bg),
+            contentAlignment = Alignment.BottomCenter,
+        ) {
+            AndroidView(
+                modifier = Modifier.fillMaxSize().wrapContentHeight(Alignment.Bottom),
+                factory = { ctx ->
+                    KeyFlowKeyboardView(
+                        context = ctx,
+                        onKey = {},
+                        onMic = {},
+                        onHide = {},
+                        dark = dark,
+                        useBars = true,
+                        barsConfig = config,
+                        frozenSeconds = 12,
+                    ).apply { setExpanded(false) }
+                },
+            )
+        }
+    }
+
+    /**
+     * Grade efêmera revelada (modo aprendizado, GRD-06): sem dedo de verdade nem UiAutomator (a galeria
+     * roda no processo do app, não num teste instrumentado), simula DOWN+MOVE direto na `BarView` via
+     * [dispatchSynthetic] e dá tempo real (`minDelayMs`) pro tick de reveal da própria view rodar —
+     * mesma máquina de estados usada no toque real (SB-T6/GridSession), só o gatilho do gesto é sintético.
+     */
+    private fun barGridRevealedRoute(key: String): Route = Route(key, minDelayMs = 700L) {
+        val dark = LocalKeyFlowPalette.current.isDark
+        val grid = ShortcutGrid(
+            id = "gallery",
+            name = "galeria",
+            rows = 1,
+            cols = 3,
+            cells = mapOf(
+                0 to GridCell(PhysicalKeyMap.key(KeyEvent.KEYCODE_C), label = "copiar"),
+                1 to GridCell(PhysicalKeyMap.key(KeyEvent.KEYCODE_V), label = "colar"),
+                2 to GridCell(PhysicalKeyMap.key(KeyEvent.KEYCODE_X), label = "recortar"),
+            ),
+        )
+        val config = BarsConfig(
+            mirrored = true,
+            collapsed = listOf(
+                BarDef(
+                    listOf(
+                        BarButton.Mic,
+                        BarButton.GridTrigger(gridId = "gallery", mode = GridTriggerMode.OPEN_ONLY),
+                        BarButton.ToggleExpand,
+                    )
+                )
+            ),
+            expanded = emptyList(),
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(LocalKeyFlowPalette.current.bg),
+            contentAlignment = Alignment.BottomCenter,
+        ) {
+            AndroidView(
+                modifier = Modifier.fillMaxSize().wrapContentHeight(Alignment.Bottom),
+                factory = { ctx ->
+                    KeyFlowKeyboardView(
+                        context = ctx,
+                        onKey = {},
+                        onMic = {},
+                        onHide = {},
+                        dark = dark,
+                        useBars = true,
+                        barsConfig = config,
+                        shortcutGrids = listOf(grid),
+                        frozenSeconds = 12,
+                    ).apply {
+                        setExpanded(false)
+                        // `setExpanded(false)` reconstrói a pilha de barras (a barra expandida do
+                        // `init` fica órfã, sem jamais anexar à janela) — a barra retraída de verdade é
+                        // sempre a ÚLTIMA da lista após essa troca.
+                        val bar = barViewsForTest.lastOrNull()
+                        bar?.post { revealGridTrigger(bar) }
+                    }
+                },
+            )
+        }
+    }
+
+    /** DOWN no gatilho + MOVE pra baixo (âncora, GRD-01) e SEGURA — o parado é o que dispara o reveal. */
+    private fun revealGridTrigger(bar: com.keyflow.ime.bars.BarView) {
+        val placed = bar.layoutForTest.buttons.firstOrNull { it.button is BarButton.GridTrigger } ?: return
+        val rect = bar.buttonScreenRectForTest(placed.index)
+        val cx = rect.centerX().toFloat()
+        val cy = rect.centerY().toFloat()
+        val time = android.os.SystemClock.uptimeMillis()
+        dispatchSynthetic(bar, android.view.MotionEvent.ACTION_DOWN, cx, cy, time)
+        dispatchSynthetic(bar, android.view.MotionEvent.ACTION_MOVE, cx, cy + 220f, time)
+    }
+
+    /** Alavanca puxada (JOY-01): a bolinha desloca de forma síncrona ao MOVE, sem depender de tempo. */
+    private fun barJoystickPulledRoute(key: String): Route = Route(key) {
+        val dark = LocalKeyFlowPalette.current.isDark
+        val config = BarsConfig(
+            mirrored = true,
+            collapsed = listOf(BarDef(listOf(BarButton.Mic, BarButton.Joystick, BarButton.ToggleExpand))),
+            expanded = emptyList(),
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(LocalKeyFlowPalette.current.bg),
+            contentAlignment = Alignment.BottomCenter,
+        ) {
+            AndroidView(
+                modifier = Modifier.fillMaxSize().wrapContentHeight(Alignment.Bottom),
+                factory = { ctx ->
+                    KeyFlowKeyboardView(
+                        context = ctx,
+                        onKey = {},
+                        onMic = {},
+                        onHide = {},
+                        dark = dark,
+                        useBars = true,
+                        barsConfig = config,
+                        frozenSeconds = 12,
+                    ).apply {
+                        setExpanded(false)
+                        val bar = barViewsForTest.lastOrNull()
+                        bar?.post { pullJoystick(bar) }
+                    }
+                },
+            )
+        }
+    }
+
+    private fun pullJoystick(bar: com.keyflow.ime.bars.BarView) {
+        val placed = bar.layoutForTest.buttons.firstOrNull { it.button == BarButton.Joystick } ?: return
+        val cx = (placed.left + placed.right) / 2f
+        val cy = bar.height / 2f
+        val time = android.os.SystemClock.uptimeMillis()
+        dispatchSynthetic(bar, android.view.MotionEvent.ACTION_DOWN, cx, cy, time)
+        dispatchSynthetic(bar, android.view.MotionEvent.ACTION_MOVE, cx + 80f, cy, time)
+    }
+
+    /**
+     * Despacha direto na `BarView` (sem passar pela hierarquia do pai): `rawX/rawY` só mudam via
+     * `View.offsetLocation`, nunca por um `dispatchTouchEvent` direto — então saem iguais a x/y aqui, o
+     * que é exatamente o que a `GridSession` precisa (a barra ocupa a tela inteira a partir de x=0, então
+     * coordenada local == coordenada de tela).
+     */
+    private fun dispatchSynthetic(view: android.view.View, action: Int, x: Float, y: Float, downTime: Long) {
+        val event = android.view.MotionEvent.obtain(downTime, downTime, action, x, y, 0)
+        view.dispatchTouchEvent(event)
+        event.recycle()
+    }
+
     /** Toca a tecla de troca de camada (?123/ABC) — sempre a primeira da 4ª fileira da grade Canvas. */
     private fun tapLayerToggle(grid: com.keyflow.ime.keyboard.KeyboardGridView) {
         val placed = grid.placedRowsForTest.lastOrNull()?.keys?.firstOrNull() ?: return
@@ -300,6 +539,23 @@ object RouteCatalog {
                 state = state,
                 modifier = Modifier.size(160.dp),
                 center = center,
+                timeProvider = { GALLERY_ORB_TIME_MS },
+            )
+        }
+    }
+
+    /** Golden do glifo-alvo do modo-arrasto travado (segurar a orbe até a zona [kind] — proximidade 1). */
+    private fun orbDragRoute(key: String, state: OrbState, kind: OrbDragKind, seconds: Int): Route = Route(key) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(LocalKeyFlowPalette.current.bg),
+            contentAlignment = Alignment.Center,
+        ) {
+            VoiceOrb(
+                state = state,
+                modifier = Modifier.size(160.dp),
+                dragHint = OrbDragHint(centerKind = kind, centerAlpha = 1f, seconds = seconds),
                 timeProvider = { GALLERY_ORB_TIME_MS },
             )
         }

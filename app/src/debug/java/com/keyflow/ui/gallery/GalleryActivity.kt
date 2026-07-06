@@ -16,6 +16,7 @@ import com.keyflow.ui.orb.LocalOrbClock
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.keyflow.ui.theme.KeyFlowTheme
+import kotlinx.coroutines.delay
 import java.io.File
 
 /**
@@ -66,6 +67,9 @@ class GalleryActivity : ComponentActivity() {
                     LaunchedEffect(routeKey, dark) {
                         // Espera alguns frames para a 1ª composição/medição assentar e marca pronto.
                         repeat(3) { withFrameNanos { } }
+                        // Rotas com estado assíncrono real (ex.: reveal por tempo parado da grade
+                        // efêmera, SB-T10/GRD-06) pedem tempo extra além dos 3 frames padrão.
+                        route?.minDelayMs?.takeIf { it > 0 }?.let { delay(it) }
                         writeReadyMarker(if (route != null) routeKey else "unknown:$routeKey")
                     }
                 }
