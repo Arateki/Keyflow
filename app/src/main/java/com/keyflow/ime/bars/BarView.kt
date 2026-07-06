@@ -6,12 +6,17 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.view.MotionEvent
+import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
+import androidx.core.view.ViewCompat
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
+import androidx.customview.widget.ExploreByTouchHelper
 import com.keyflow.core.ButtonState
 import com.keyflow.core.KeyFlowController
 import com.keyflow.core.shortcuts.BarButton
@@ -147,13 +152,30 @@ class BarView(
     private var lastX = 0f
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
 
+    // Acessibilidade (SB-T10/A11Y-01..02): cada botão é um nó virtual (bounds + label); teclas avulsas
+    // aceitam ACTION_CLICK (mesma ação do toque), alavanca/gatilho de grade só anunciam a limitação.
+    private val accessibilityHelper = BarAccessibilityHelper(this)
+
     init {
         setWillNotDraw(false)
         if (buttons.contains(BarButton.Candidates)) {
             candidatesView = CandidatesView(context, dark, onTap = callbacks.onCandidateTap, scale = scale)
                 .also { addView(it) }
         }
+        ViewCompat.setAccessibilityDelegate(this, accessibilityHelper)
+        importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
     }
+
+    override fun dispatchHoverEvent(event: MotionEvent): Boolean =
+        accessibilityHelper.dispatchHoverEvent(event) || super.dispatchHoverEvent(event)
+
+    override fun onFocusChanged(gainFocus: Boolean, direction: Int, previouslyFocusedRect: Rect?) {
+        super.onFocusChanged(gainFocus, direction, previouslyFocusedRect)
+        accessibilityHelper.onFocusChanged(gainFocus, direction, previouslyFocusedRect)
+    }
+
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean =
+        accessibilityHelper.dispatchKeyEvent(event) || super.dispatchKeyEvent(event)
 
     // ── acessores de teste (mesmo espírito da barra antiga) ──────────────────
 
@@ -203,6 +225,7 @@ class BarView(
             )
         }
         setMeasuredDimension(width, height)
+        accessibilityHelper.invalidateRoot()
     }
 
     override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
@@ -295,6 +318,73 @@ class BarView(
     private fun isOrphanTrigger(button: BarButton): Boolean =
         button is BarButton.GridTrigger && button.gridId !in knownGridIds
 
+    // ── acessibilidade (ExploreByTouchHelper) ────────────────────────────────
+
+    /** Rótulo do nó virtual: o mesmo texto desenhado, com a limitação anunciada nos gestos contínuos (A11Y-02). */
+    private fun a11yLabel(button: BarButton): String = when (button) {
+        BarButton.Joystick -> "Alavanca (requer gesto deslizante)"
+        is BarButton.GridTrigger -> "${button.label} (requer gesto deslizante)"
+        else -> visualsFor(button).first
+    }
+
+    /** Alavanca e gatilho de grade são gestos contínuos — o toque simples já não faz nada neles (`perform`). */
+    private fun isA11yClickable(button: BarButton): Boolean = when (button) {
+        BarButton.Joystick, is BarButton.GridTrigger, BarButton.Candidates -> false
+        else -> true
+    }
+
+    /**
+     * Expõe cada botão visível (exceto `Candidates`, que já é `View` filha própria) como nó virtual:
+     * bounds + label + `ACTION_CLICK` (A11Y-01). Teclas avulsas emitem o atalho por duplo-toque do
+     * TalkBack — o caminho acessível para atalhos (A11Y-02); alavanca/gatilho de grade só anunciam a
+     * limitação, sem regredir o que a barra antiga já oferecia.
+     */
+    private inner class BarAccessibilityHelper(host: View) : ExploreByTouchHelper(host) {
+
+        private fun allButtons(): List<BarGeometry.PlacedButton> =
+            barLayout.buttons.filter { it.button != BarButton.Candidates }
+
+        override fun getVirtualViewAt(x: Float, y: Float): Int {
+            val index = allButtons().indexOfFirst { it.contains(x + scrollOffset) }
+            return if (index >= 0) index else HOST_ID
+        }
+
+        override fun getVisibleVirtualViews(virtualViewIds: MutableList<Int>) {
+            virtualViewIds.addAll(allButtons().indices)
+        }
+
+        override fun onPopulateNodeForVirtualView(virtualViewId: Int, node: AccessibilityNodeInfoCompat) {
+            val placed = allButtons().getOrNull(virtualViewId)
+            if (placed == null) {
+                // Nó "morto" (layout mudou entre o hover e a consulta) — vazio em vez de crashar.
+                node.contentDescription = ""
+                node.setBoundsInParent(Rect())
+                return
+            }
+            node.contentDescription = a11yLabel(placed.button)
+            node.setBoundsInParent(
+                Rect(
+                    (placed.left - scrollOffset).toInt(),
+                    0,
+                    (placed.right - scrollOffset).toInt(),
+                    height,
+                ),
+            )
+            node.className = android.widget.Button::class.java.name
+            val clickable = isA11yClickable(placed.button)
+            node.isClickable = clickable
+            if (clickable) node.addAction(AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_CLICK)
+        }
+
+        override fun onPerformActionForVirtualView(virtualViewId: Int, action: Int, arguments: Bundle?): Boolean {
+            if (action != AccessibilityNodeInfoCompat.ACTION_CLICK) return false
+            val placed = allButtons().getOrNull(virtualViewId) ?: return false
+            if (!isA11yClickable(placed.button)) return false
+            perform(placed.button)
+            return true
+        }
+    }
+
     private fun elapsedSeconds(): Int {
         frozenSeconds?.let { return it }
         val active =
@@ -304,6 +394,7 @@ class BarView(
 
     // ── toque ────────────────────────────────────────────────────────────────
 
+    @Suppress("ClickableViewAccessibility") // a11y própria (ExploreByTouchHelper, ver mais abaixo)
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
@@ -404,7 +495,7 @@ class BarView(
 
     private fun performMicTap() {
         if (micState == ButtonState.ERROR) {
-            if (KeyFlowController.errorOpensVoz) callbacks.onErrorTap()
+            if (KeyFlowController.errorNavTarget != com.keyflow.core.ErrorNavTarget.NONE) callbacks.onErrorTap()
         } else {
             callbacks.onMic()
         }
