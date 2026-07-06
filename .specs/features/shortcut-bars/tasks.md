@@ -126,5 +126,5 @@
 | SB-T6 | **Done** — grade efêmera fim-a-fim (lente/reveal/háptica/cancel); âncora p/ cima = manual no device (injeção grampeia acima da janela do IME) |
 | SB-T7 | **Done** — alavanca plugada (DPAD + tique tátil + repeat acelerado); 6/6 instrumentados verdes |
 | SB-T8 | **Done** — `PhysicalKeyPicker` (bottom sheet compartilhado, teclado ANSI + toggles Ctrl/Alt/Shift/Meta); 6/6 instrumentados verdes |
-| SB-T9 | Pending |
+| SB-T9 | **Done** — `GridsEditor` + `BarsEditor` (WYSIWYG, catálogo, drag-reorder, gatilho de grade) + seções no `TecladoPanel` + persistência real via `SettingsRepository` no `SetupActivity`; 6+10+1 instrumentados novos verdes (grades/barras/e2e), e2e monta barra completa (grade+alavanca+2 teclas avulsas) só pela UI e confirma no teclado real |
 | SB-T10 | Pending |

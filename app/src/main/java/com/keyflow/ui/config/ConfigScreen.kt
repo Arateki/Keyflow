@@ -38,6 +38,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.keyflow.core.OrbShortcutAction
+import com.keyflow.core.shortcuts.BarsConfig
+import com.keyflow.core.shortcuts.ShortcutGrid
 import com.keyflow.data.Settings
 import com.keyflow.ui.PermissionStatus
 import com.keyflow.ui.common.SaveController
@@ -55,6 +57,10 @@ const val LANG_TOGGLE_TAG = "lang-toggle"
 const val THEME_TOGGLE_TAG = "theme-toggle"
 const val TOGGLE_OVERLAY_MODE_TAG = "toggle-overlay-mode"
 const val TOGGLE_KEYBOARD_MODE_TAG = "toggle-keyboard-mode"
+
+// Atraso entre o toast de "permissões pendentes" subir e a tela/diálogo da permissão abrir sozinha —
+// só o suficiente pro usuário ler o aviso antes da navegação tomar a tela.
+private const val AUTO_PERMISSION_DELAY_MS = 400L
 
 /**
  * Scaffold da configuração em abas (CFG-01..05): header (orbe, idioma inerte,
@@ -75,8 +81,13 @@ fun ConfigScreen(
     onRequestOverlayPermission: () -> Unit,
     onRequestKeyboardPermission: () -> Unit,
     onRequestMicPermission: () -> Unit,
+    onRequestNotificationPermission: () -> Unit,
     onSwitchKeyboard: () -> Unit,
     onSettingsChange: (Settings) -> Unit,
+    barsConfig: BarsConfig = BarsConfig.DEFAULT,
+    onBarsConfigChange: (BarsConfig) -> Unit = {},
+    shortcutGrids: List<ShortcutGrid> = emptyList(),
+    onShortcutGridsChange: (List<ShortcutGrid>) -> Unit = {},
     modifier: Modifier = Modifier,
     initialTab: ConfigTab = ConfigTab.MODO,
     initialUnlockOpen: Boolean = false,
@@ -103,7 +114,7 @@ fun ConfigScreen(
             ConfigTab.TECLADO -> permissions.microphoneGranted &&
                 permissions.keyboardEnabled && permissions.keyboardActive
             ConfigTab.OVERLAY -> settings.overlayModeEnabled &&
-                permissions.microphoneGranted && permissions.overlayGranted
+                permissions.microphoneGranted && permissions.overlayGranted && permissions.notificationsGranted
             else -> true
         }
     }
@@ -135,6 +146,21 @@ fun ConfigScreen(
         toastGeneration++
     }
 
+    // Permissão pendente resolvida sozinha, pouco depois do toast subir (mesmo padrão dos dois cards:
+    // Sobrepor e Teclado): o usuário nem precisa achar o chip — a tela/diálogo do sistema já aparece.
+    var pendingPermissionRequest by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var pendingPermissionGeneration by remember { mutableStateOf(0) }
+    LaunchedEffect(pendingPermissionGeneration) {
+        val request = pendingPermissionRequest ?: return@LaunchedEffect
+        kotlinx.coroutines.delay(AUTO_PERMISSION_DELAY_MS)
+        pendingPermissionRequest = null
+        request()
+    }
+    fun requestPendingPermissionSoon(request: () -> Unit) {
+        pendingPermissionRequest = request
+        pendingPermissionGeneration++
+    }
+
     // Navegação do aviso → aba Modo, destacando o card do modo que resolve o bloqueio. Null = sem atalho.
     fun navActionFor(tab: ConfigTab): (() -> Unit)? = when (tab) {
         ConfigTab.OVERLAY -> {
@@ -164,17 +190,24 @@ fun ConfigScreen(
         else -> null
     }
 
-    // Ativar um modo com permissão pendente: avisa no mesmo estilo de toast (2 s). A flag ainda persiste.
+    // Ativar um modo com permissão pendente: avisa (2 s) e, pouco depois, abre a tela/diálogo da
+    // permissão que falta sozinho — o usuário não precisa procurar o chip. O microfone NUNCA bloqueia
+    // (mic é só pro botão de gravar; a orbe/teclado seguem úteis com atalhos/digitação sem ele) — falta
+    // permissão de mic só pulsa o chip correspondente (ver StatusChip.pulsing), nos dois cards.
     val handleOverlayMode: (Boolean) -> Unit = { on ->
         onOverlayModeChange(on)
-        if (on && (!permissions.microphoneGranted || !permissions.overlayGranted)) {
+        if (on && (!permissions.overlayGranted || !permissions.notificationsGranted)) {
             showToast("Permissões pendentes — conceda para usar o Modo Sobrepor.", 2000)
+            requestPendingPermissionSoon {
+                if (!permissions.overlayGranted) onRequestOverlayPermission() else onRequestNotificationPermission()
+            }
         }
     }
     val handleKeyboardMode: (Boolean) -> Unit = { on ->
         onKeyboardModeChange(on)
-        if (on && (!permissions.microphoneGranted || !permissions.keyboardEnabled)) {
+        if (on && !permissions.keyboardEnabled) {
             showToast("Permissões pendentes — conceda para usar o Modo Teclado.", 2000)
+            requestPendingPermissionSoon { onRequestKeyboardPermission() }
         }
     }
 
@@ -215,6 +248,7 @@ fun ConfigScreen(
                             onRequestOverlayPermission = onRequestOverlayPermission,
                             onRequestKeyboardPermission = onRequestKeyboardPermission,
                             onRequestMicPermission = onRequestMicPermission,
+                            onRequestNotificationPermission = onRequestNotificationPermission,
                             onSwitchKeyboard = onSwitchKeyboard,
                             overlayHighlightKey = overlayHighlightKey,
                             keyboardHighlightKey = keyboardHighlightKey,
@@ -229,6 +263,10 @@ fun ConfigScreen(
                             onLanguageClick = onLanguageClick,
                             onUnlockSkins = { unlockOpen = true },
                             onOverlayRequired = onOverlayRequired,
+                            barsConfig = barsConfig,
+                            onBarsConfigChange = onBarsConfigChange,
+                            shortcutGrids = shortcutGrids,
+                            onShortcutGridsChange = onShortcutGridsChange,
                         )
                         ConfigTab.OVERLAY -> OverlayPanel(
                             settings = settings,

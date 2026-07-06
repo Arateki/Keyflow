@@ -28,6 +28,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.keyflow.core.shortcuts.BarsConfig
+import com.keyflow.core.shortcuts.ShortcutGrid
 import com.keyflow.data.Settings
 import com.keyflow.ime.KeyFlowKeyboardView
 import com.keyflow.ui.common.verticalScrollbar
@@ -71,6 +73,10 @@ fun TecladoPanel(
     onLanguageClick: () -> Unit,
     onUnlockSkins: () -> Unit,
     onOverlayRequired: () -> Unit = {},
+    barsConfig: BarsConfig = BarsConfig.DEFAULT,
+    onBarsConfigChange: (BarsConfig) -> Unit = {},
+    shortcutGrids: List<ShortcutGrid> = emptyList(),
+    onShortcutGridsChange: (List<ShortcutGrid>) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val palette = LocalKeyFlowPalette.current
@@ -135,6 +141,42 @@ fun TecladoPanel(
             checked = settings.keyboardNumberRowEnabled,
             onCheckedChange = { onSettingsChange(settings.copy(keyboardNumberRowEnabled = it)) },
             tag = TECLADO_NUMBER_ROW_TAG,
+        )
+
+        Box(Modifier.fillMaxWidth().padding(top = 13.dp).height(1.dp).background(palette.line2))
+
+        // Layout do teclado (CFG-01/02/03/06): editor WYSIWYG das barras de atalhos.
+        Text("Layout do teclado", color = palette.fg, fontFamily = SpaceGrotesk, fontSize = 13.5.sp, modifier = Modifier.padding(top = 13.dp))
+        Text(
+            "Personalize os botões da barra do teclado — mic, atalhos, gatilhos de grade.",
+            color = palette.faint,
+            fontFamily = SpaceGrotesk,
+            fontSize = 11.sp,
+            modifier = Modifier.padding(top = 3.dp),
+        )
+        BarsEditor(
+            barsConfig = barsConfig,
+            onBarsConfigChange = onBarsConfigChange,
+            grids = shortcutGrids,
+            modifier = Modifier.padding(top = 10.dp),
+        )
+
+        Box(Modifier.fillMaxWidth().padding(top = 13.dp).height(1.dp).background(palette.line2))
+
+        // Teclados de atalhos (CFG-04): grades que os gatilhos da barra acima podem abrir.
+        Text("Teclados de atalhos", color = palette.fg, fontFamily = SpaceGrotesk, fontSize = 13.5.sp, modifier = Modifier.padding(top = 13.dp))
+        Text(
+            "Grades de atalhos que os gatilhos da barra podem abrir.",
+            color = palette.faint,
+            fontFamily = SpaceGrotesk,
+            fontSize = 11.sp,
+            modifier = Modifier.padding(top = 3.dp),
+        )
+        GridsEditor(
+            grids = shortcutGrids,
+            onGridsChange = onShortcutGridsChange,
+            referencedGridIds = barsConfig.referencedGridIds(),
+            modifier = Modifier.padding(top = 10.dp),
         )
 
         Box(Modifier.fillMaxWidth().padding(top = 13.dp).height(1.dp).background(palette.line2))

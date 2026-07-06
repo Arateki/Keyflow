@@ -136,6 +136,58 @@ internal fun PillToggle(
 }
 
 /**
+ * Stepper de inteiro (CFG-04, dimensões de grade): "−" / valor / "+", clampado em [range]. Os botões
+ * ficam esmaecidos e inertes na borda do intervalo (sem baixar de min nem subir de max).
+ */
+@Composable
+internal fun Stepper(
+    label: String,
+    value: Int,
+    range: IntRange,
+    onValueChange: (Int) -> Unit,
+    tag: String,
+    modifier: Modifier = Modifier,
+) {
+    val palette = LocalKeyFlowPalette.current
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            label,
+            color = palette.muted,
+            fontFamily = SpaceMono,
+            fontSize = 9.sp,
+            modifier = Modifier.weight(1f),
+        )
+        StepperButton("−", enabled = value > range.first, tag = "$tag-dec") { onValueChange(value - 1) }
+        Text(
+            value.toString(),
+            color = palette.fg,
+            fontFamily = SpaceGrotesk,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 14.sp,
+            modifier = Modifier.padding(horizontal = 12.dp).testTag(tag),
+        )
+        StepperButton("+", enabled = value < range.last, tag = "$tag-inc") { onValueChange(value + 1) }
+    }
+}
+
+@Composable
+private fun StepperButton(symbol: String, enabled: Boolean, tag: String, onClick: () -> Unit) {
+    val palette = LocalKeyFlowPalette.current
+    Box(
+        Modifier
+            .size(28.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .border(1.dp, palette.line, RoundedCornerShape(6.dp))
+            .clickable(enabled = enabled) { onClick() }
+            .alpha(if (enabled) 1f else 0.4f)
+            .testTag(tag),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(symbol, color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+    }
+}
+
+/**
  * Campo de texto com auto-save (CFG-05): [label] em mono + valor com underline; persiste via [onCommit]
  * **no desfoque (se mudou)** e também no ImeAction Done. O estado externo [value] reseta o texto após o
  * round-trip de persistência.

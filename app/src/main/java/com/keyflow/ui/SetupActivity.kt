@@ -20,6 +20,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.keyflow.ui.theme.LocalKeyFlowPalette
+import com.keyflow.core.shortcuts.BarsConfig
+import com.keyflow.core.shortcuts.ShortcutGrid
 import com.keyflow.data.Settings
 import com.keyflow.data.SettingsRepository
 import com.keyflow.overlay.OverlayService
@@ -74,6 +76,9 @@ class SetupActivity : ComponentActivity() {
     private var settings by mutableStateOf(Settings())
     // Evita piscar o onboarding antes do 1º valor do DataStore chegar (ONB-03).
     private var settingsLoaded by mutableStateOf(false)
+    // Barras/grades de atalhos do teclado (SB-T9) — chaves de DataStore próprias, fora de `Settings`.
+    private var barsConfig by mutableStateOf(BarsConfig.DEFAULT)
+    private var shortcutGrids by mutableStateOf<List<ShortcutGrid>>(emptyList())
     // Desligar o Modo Teclado abre o seletor; só efetiva se o KeyFlow deixar de ser o teclado ativo.
     private var pendingKeyboardDisable = false
     // Ativação pendente (Yan, 2026-07-04): o usuário só precisa tocar o toggle UMA vez — cada permissão
@@ -121,6 +126,12 @@ class SetupActivity : ComponentActivity() {
                 settingsLoaded = true
             }
         }
+        activityScope.launch {
+            settingsRepository.barsConfigFlow().collectLatest { barsConfig = it }
+        }
+        activityScope.launch {
+            settingsRepository.shortcutGridsFlow().collectLatest { shortcutGrids = it }
+        }
 
         setContent {
             // Tema Ateliê app-wide; rota inicial: 1º uso → onboarding, depois → config (T27).
@@ -145,6 +156,16 @@ class SetupActivity : ComponentActivity() {
                         onRequestNotificationPermission = ::onNotificationChipClicked,
                         onSwitchKeyboard = ::openKeyboardPicker,
                         onSettingsChange = { updated -> persist { updated } },
+                        barsConfig = barsConfig,
+                        onBarsConfigChange = { updated ->
+                            barsConfig = updated
+                            activityScope.launch { settingsRepository.saveBarsConfig(updated) }
+                        },
+                        shortcutGrids = shortcutGrids,
+                        onShortcutGridsChange = { updated ->
+                            shortcutGrids = updated
+                            activityScope.launch { settingsRepository.saveShortcutGrids(updated) }
+                        },
                         requestedTab = requestedTab,
                         requestedTabKey = requestedTabKey,
                     )

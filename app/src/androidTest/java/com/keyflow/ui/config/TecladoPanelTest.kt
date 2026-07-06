@@ -14,6 +14,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -79,7 +80,7 @@ class TecladoPanelTest {
         val h = Harness(Settings())
         rule.setContent { h.Content() }
 
-        rule.onNodeWithTag(TECLADO_UNLOCK_TAG).performClick()
+        rule.onNodeWithTag(TECLADO_UNLOCK_TAG).performScrollTo().performClick()
 
         rule.runOnIdle { assertTrue(h.unlockClicks > 0) }
     }
