@@ -139,8 +139,8 @@ físico, para o app remoto interpretar chords corretamente.
 | GRD-01..07 | Grade efêmera | Pending | unit (máquina de estados: âncora/lente/reveal/cancel) + instrumentado (emissão fim-a-fim) + manual no device (sensação do gesto) |
 | JOY-01..04 | Alavanca | Pending | unit (limiar/aceleração/troca de direção) + manual no device (háptica) |
 | CFG-01..06 | Config Compose | Pending | instrumentado (editores/picker) + golden |
-| A11Y-01..02 | TalkBack | Pending | instrumentado (nós virtuais + `ACTION_CLICK`); leitura em voz manual |
-| ROL-01..03 | Rollout | Pending | flag debug + goldens + gate `full` |
+| A11Y-01..02 | TalkBack | Implemented (SB-T10) — leitura em voz **[YAN]** manual pendente | instrumentado (nós virtuais + `ACTION_CLICK`, 2/2 verdes); leitura em voz manual |
+| ROL-01..03 | Rollout | Implemented (SB-T10) — golden de editores e promoção de `kbd_bars` **[YAN]** pendentes | flag debug + goldens (12 PNGs novos) + gate `full` |
 
 **Status values:** Pending → In Design → In Tasks → Implementing → Verified.
 **Coverage:** 39 requisitos, 0 mapeados a tasks (fase Tasks pendente).

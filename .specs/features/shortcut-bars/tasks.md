@@ -127,4 +127,4 @@
 | SB-T7 | **Done** — alavanca plugada (DPAD + tique tátil + repeat acelerado); 6/6 instrumentados verdes |
 | SB-T8 | **Done** — `PhysicalKeyPicker` (bottom sheet compartilhado, teclado ANSI + toggles Ctrl/Alt/Shift/Meta); 6/6 instrumentados verdes |
 | SB-T9 | **Done** — `GridsEditor` + `BarsEditor` (WYSIWYG, catálogo, drag-reorder, gatilho de grade) + seções no `TecladoPanel` + persistência real via `SettingsRepository` no `SetupActivity`; 6+10+1 instrumentados novos verdes (grades/barras/e2e), e2e monta barra completa (grade+alavanca+2 teclas avulsas) só pela UI e confirma no teclado real |
-| SB-T10 | Pending |
+| SB-T10 | **Parcial** — a11y (`ExploreByTouchHelper` na `BarView`) + goldens automatizáveis (padrão retraído/expandido × claro/escuro, custom overflow, grade revelada, alavanca, picker — 12 PNGs novos) + gate `full` das barras (21/21 instrumentado, unit verde). **Faltam [YAN]**: golden de "editores" (config-teclado já tinha diff pré-existente não aprovado — ver STATE.md — decidi não empilhar mais uma mudança visual em cima sem revisão), manual no Galaxy A32 (grade às cegas, alavanca, tmux via SSH) e a promoção de `kbd_bars` a padrão |

@@ -39,7 +39,7 @@
 | M0–M2 | PoC, MVP `voice-keyboard`, `redesign-atelie` | ✅ concluídos |
 | M4 | `orb-gestures` (reconciliação) | ✅ concluído |
 | M5 | `keyboard-canvas` | ✅ concluído (KC-T1..T10, grade Canvas promovida a padrão, teclado antigo removido) |
-| M6 | `shortcut-bars` | SB-T1..T7 ✅; **SB-T8..T10 pendentes** |
+| M6 | `shortcut-bars` | SB-T1..T9 ✅; **SB-T10 parcial** (a11y+goldens automatizáveis prontos; falta manual do Yan no A32 + promoção de `kbd_bars`) |
 | — | `gesture-tour` | spec/design/tasks prontos (Draft) — nada implementado |
 | — | `native-voice-models` | spec/design/tasks prontos (Draft) — nada implementado |
 | — | `vision-capture` | spec/design/tasks prontos (Draft) — nada implementado |

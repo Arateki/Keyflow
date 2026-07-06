@@ -1192,3 +1192,67 @@ Detalhe completo em `.specs/features/keyboard-canvas/tasks.md` (KC-T10) e
 usada em `OrbButtonViewTest`, mais confiável que a simulação de toque via sistema) + esperar o estado
 chegar (sem cronometrar), e golden screenshots/GIFs dessas interações para revisão visual. Ainda não
 iniciado nesta sessão.
+
+## Q6 — Artefatos visuais dos gestos da orbe via MotionEvent (2026-07-05)
+
+Implementada a pendência acima como infraestrutura de verificação/UAT, separada da feature
+`gesture-tour`. `OrbMotionArtifactTest` injeta `MotionEvent` diretamente em `OrbButtonView`, espera o
+estado observável (`dragLockedForTest`/`dragKindForTest`) chegar e captura frames PNG da tela inteira do
+emulador, com `DragArrowsView` full-screen sobre a orbe para mostrar também as setas. O relógio
+autoritativo da orbe (`KeyFlowController.updateRecordingTime`) fica congelado em 8s para evitar herdar
+estado de outras suítes.
+
+`scripts/verify-orb-motion-gifs.sh` instala `debug` + `debugAndroidTest`, roda o teste via
+`adb shell am instrument` (não `connectedDebugAndroidTest`, que desinstala o app e apaga
+`externalFilesDir` ao final), puxa os artefatos para `/tmp/keyflow-prints/motion-gifs` e monta GIFs com
+ImageMagick. A rodada validada no emulador `keyflow_api34` (Android 14/API 34) gerou 9 GIFs:
+`toggle-pause`, `toggle-resume`, `toggle-cancel`, `toggle-config`, `ptt-pause`, `ptt-resume`,
+`ptt-cancel`, `ptt-config`, `ptt-cancel-sending` (17 frames cada; GIF delay padrão 10cs, ajustável por
+`GIF_DELAY`). `metadata.json` registra OS/SDK/
+fingerprint/tela/densidade/escalas de animação/qemu/hardware; `host-run.txt` registra serial ADB e
+`getprop` básico.
+
+Decisão registrada: uma suite on-device por modelo/OEM faz sentido como camada opcional de aceitação para
+grandes mudanças, começando pelo A32, mas não como gate obrigatório. Preferir UiAutomator por texto/id e
+shell state (`pm`/`appops`/`ime`); coordenadas ficam como último recurso porque testam também a UI do
+fabricante.
+
+## SB-T10 — A11y + goldens da BarView (parcial, 2026-07-06)
+
+**Feito**: `ExploreByTouchHelper` na `BarView` (mesmo padrão do `KeyboardGridView`/KC-T8) — cada botão
+vira nó virtual; `SingleKey` clicável emite o atalho por `ACTION_CLICK`; `Joystick`/`GridTrigger` só
+anunciam "requer gesto deslizante" (gestos contínuos, sem regressão do que a barra antiga oferecia).
+Instrumentado dedicado (`BarViewAccessibilityTest`, 2/2 verde). 6 rotas novas no `RouteCatalog` (12 PNGs
+golden luz/escuro): barra padrão retraído/expandido (paridade com a fábrica), barra custom com overflow,
+grade revelada e alavanca puxada (via toque sintético) e o `PhysicalKeyPicker` isolado.
+
+**Lição de técnica — toque sintético na galeria (sem UiAutomator)**: a `GalleryActivity` roda no processo
+real do app (não é um teste instrumentado), então simular gestos pede `view.dispatchTouchEvent(event)`
+direto na `BarView`, sem passar pelo pai. Isso funciona porque `MotionEvent.getRawX/Y()` só mudam via
+`View.offsetLocation` (aplicado pelos `ViewGroup`s pais durante um dispatch em cascata) — nunca por uma
+chamada direta — então, dispatchando direto na view-alvo, raw == local. Como a barra ocupa a tela inteira
+a partir de x=0, a coordenada local do botão já é a coordenada de tela que a `GridSession` precisa pra
+ancorar a grade no lugar certo (confirmado visualmente: a lente/reveal aparece exatamente sobre o
+gatilho). Achado um bug de armadilha nessa técnica: `setExpanded(false)` **reconstrói** a pilha de
+`BarView` (a barra do `init()` fica órfã, nunca anexa à janela — `post{}` nela nunca dispara); a barra de
+verdade é sempre a **última** de `barViewsForTest` depois da troca, não a primeira. Route novo suporta
+`minDelayMs` (default 0, sem efeito nas rotas existentes) para dar tempo de parede real ao tick de reveal
+da grade (GRD-06, 400ms) antes do marcador `gallery_ready` — as demais rotas continuam com os 3 frames
+padrão.
+
+**Gate**: unit verde; instrumentado escopado das barras (`BarViewAccessibilityTest` +
+`KeyFlowKeyboardBarsTest` + `KeyFlowKeyboardAccessibilityTest` + `BarsEditorTest` +
+`ShortcutBarsConfigEndToEndTest`) 21/21 verde. Tentativa de rodar o `connectedDebugAndroidTest`
+**completo** (147 testes) travou o emulador por instabilidade sob carga prolongada (~38min) — caiu em
+70/147 com 4 falhas, todas em `overlay.OrbButtonViewTest`/`OrbGestureIntegrationTest`/`OrbMotionArtifactTest`
+("modo-arrasto não travou"), área não tocada nesta sessão. Não repeti a suíte completa — o escopo da
+SB-T10 (`ime.bars`) já tinha rodado limpo antes da queda.
+
+**Não fiz** (deliberado, não esquecimento): golden de "editores" (`config-teclado`) — o golden atual já
+tinha um diff grande **não aprovado** de antes desta sessão (Milestone 5/dígitos, registrado em Q2 mais
+acima); regenerar por cima empilharia uma mudança visual não relacionada sem o Yan ter revisado a
+anterior. Fica pra quando ele revisar aquele lote.
+
+**Pendente [YAN]**: validação manual no Galaxy A32 (grade às cegas — lente/háptica/preview, aceleração da
+alavanca, tmux via SSH pros success criteria) e, aprovada, promover `kbd_bars` a padrão (remover a barra
+antiga da `KeyFlowKeyboardView`, fechando ROL-02/M6).
