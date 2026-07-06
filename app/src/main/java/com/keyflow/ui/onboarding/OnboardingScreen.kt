@@ -35,17 +35,27 @@ import com.keyflow.ui.theme.SpaceMono
 
 const val ONBOARDING_GRANT_TAG = "onboarding-grant"
 const val ONBOARDING_SKIP_TAG = "onboarding-skip"
+const val ONBOARDING_ITEM_MIC_TAG = "onboarding-item-mic"
+const val ONBOARDING_ITEM_OVERLAY_TAG = "onboarding-item-overlay"
+const val ONBOARDING_ITEM_KEYBOARD_TAG = "onboarding-item-keyboard"
+const val ONBOARDING_ITEM_NOTIFICATIONS_TAG = "onboarding-item-notifications"
 
 /**
  * Tela de boas-vindas (ONB-01..03): orbe `Listening`, headline e um checklist que reflete o
- * [PermissionStatus]. "Conceder permissões" encaminha (host pede as permissões); "Pular por agora"
- * segue para a config. A persistência de `onboardingDone` e a decisão de rota inicial são da T27.
+ * [PermissionStatus]. Cada item do checklist é clicável e pede/abre só AQUELA permissão — dá pra
+ * conceder uma a uma, voltando pra esta tela entre uma e outra (Yan, 2026-07-05). "Conceder
+ * permissões" ainda pede tudo que falta de uma vez; "Pular por agora" segue para a config. A
+ * persistência de `onboardingDone` e a decisão de rota inicial são da T27.
  */
 @Composable
 fun OnboardingScreen(
     permissions: PermissionStatus,
     onGrant: () -> Unit,
     onSkip: () -> Unit,
+    onRequestMic: () -> Unit,
+    onRequestOverlay: () -> Unit,
+    onRequestKeyboard: () -> Unit,
+    onRequestNotifications: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val palette = LocalKeyFlowPalette.current
@@ -85,12 +95,41 @@ fun OnboardingScreen(
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
         )
+        Text(
+            "Recomendamos conceder todas agora, para conhecer tudo que o app oferece — depois você pode rever cada uma para refletir o seu uso.",
+            color = palette.faint,
+            fontFamily = SpaceGrotesk,
+            fontSize = 12.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        )
 
         Column(Modifier.fillMaxWidth().padding(top = 26.dp)) {
-            ChecklistRow("Microfone", permissions.microphoneGranted)
-            ChecklistRow("Sobreposição (overlay)", permissions.overlayGranted)
-            ChecklistRow("Teclado KeyFlow", permissions.keyboardEnabled)
-            ChecklistRow("Notificações", permissions.notificationsGranted, last = true)
+            ChecklistRow(
+                "Microfone",
+                permissions.microphoneGranted,
+                onClick = onRequestMic,
+                tag = ONBOARDING_ITEM_MIC_TAG,
+            )
+            ChecklistRow(
+                "Sobreposição (overlay)",
+                permissions.overlayGranted,
+                onClick = onRequestOverlay,
+                tag = ONBOARDING_ITEM_OVERLAY_TAG,
+            )
+            ChecklistRow(
+                "Teclado KeyFlow",
+                permissions.keyboardEnabled,
+                onClick = onRequestKeyboard,
+                tag = ONBOARDING_ITEM_KEYBOARD_TAG,
+            )
+            ChecklistRow(
+                "Notificações",
+                permissions.notificationsGranted,
+                onClick = onRequestNotifications,
+                tag = ONBOARDING_ITEM_NOTIFICATIONS_TAG,
+                last = true,
+            )
         }
 
         Spacer(Modifier.weight(1f))
@@ -126,10 +165,20 @@ fun OnboardingScreen(
 }
 
 @Composable
-private fun ChecklistRow(label: String, granted: Boolean, last: Boolean = false) {
+private fun ChecklistRow(
+    label: String,
+    granted: Boolean,
+    onClick: () -> Unit,
+    tag: String,
+    last: Boolean = false,
+) {
     val palette = LocalKeyFlowPalette.current
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 11.dp),
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .testTag(tag)
+            .padding(vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {

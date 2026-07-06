@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.provider.Settings as AndroidSettings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -49,13 +50,22 @@ class SetupActivity : ComponentActivity() {
     private val requestPermissions = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) {
-        // Independente do resultado, conclui o onboarding; permissões finas ficam na aba Modo.
+        // Independente do resultado, conclui o onboarding e encadeia sobrepor + teclado em seguida.
         permissions = permissionsChecker.snapshot(this)
         markOnboardingDone()
+        startOnboardingOverlayAndKeyboardChain()
     }
 
     // Pedido pontual do microfone na aba Modo — só atualiza o snapshot, não mexe no onboarding.
     private val requestMicPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) {
+        permissions = permissionsChecker.snapshot(this)
+    }
+
+    // Idem para notificações (aba Modo, card Sobrepor) — sem ela o Modo Sobrepor persiste o flag mas o
+    // OverlayService nunca sobe (ver onOverlayModeChange), e antes disso não havia chip nenhum avisando.
+    private val requestNotificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) {
         permissions = permissionsChecker.snapshot(this)
@@ -66,6 +76,27 @@ class SetupActivity : ComponentActivity() {
     private var settingsLoaded by mutableStateOf(false)
     // Desligar o Modo Teclado abre o seletor; só efetiva se o KeyFlow deixar de ser o teclado ativo.
     private var pendingKeyboardDisable = false
+    // Ativação pendente (Yan, 2026-07-04): o usuário só precisa tocar o toggle UMA vez — cada permissão
+    // concedida (sobrepor, depois notificações; ou o teclado habilitado) continua a ativação sozinha
+    // quando a janela reganha foco, sem exigir tocar o toggle de novo a cada permissão. MAS só UMA
+    // tentativa por pendência: se a janela reganha foco e a MESMA permissão ainda falta, cancela (não
+    // fica reabrindo a tela/diálogo sozinho a cada retomada) — só tenta de novo se o usuário tocar o
+    // toggle outra vez (Yan, 2026-07-04: sem isso, negar e voltar ficava preso reabrindo a mesma tela
+    // em loop, sem nem mostrar o app atrás).
+    private var pendingOverlayEnable = false
+    private var pendingKeyboardEnable = false
+    // Qual passo (permissão) já tentamos pra pendência atual — usado pra distinguir "1ª tentativa desse
+    // passo" (segue) de "voltou sem resolver O MESMO passo" (cancela). Nulo = nenhuma tentativa ainda.
+    private var lastOverlayBlockingStep: String? = null
+    private var keyboardStepAttempted = false
+    // Debounce entre a abertura de telas do sistema e os callbacks de foco/retomada que elas podem
+    // disparar durante a própria transição, além de evitar reprocessar o mesmo retorno em onResume e
+    // onWindowFocusChanged.
+    private val foregroundReturnGate = ForegroundReturnGate(debounceMs = 250)
+    // Banner inicial do onboarding (Yan, 2026-07-05): "Conceder permissões" pedia só mic/notificações e
+    // deixava sobrepor/teclado só pra aba Modo — agora encadeia os dois também, um de cada vez (só dá
+    // pra abrir uma tela de configs do sistema por vez), reaproveitando o mesmo mecanismo de pendência.
+    private var onboardingKeyboardChainPending = false
     // Navegação via intent (clique no erro → aba Voz). Consumido pela ConfigScreen.
     private var requestedTab by mutableStateOf<ConfigTab?>(null)
     private var requestedTabKey by mutableStateOf(0)
@@ -111,6 +142,7 @@ class SetupActivity : ComponentActivity() {
                         onRequestOverlayPermission = ::openOverlaySettings,
                         onRequestKeyboardPermission = ::openKeyboardSettings,
                         onRequestMicPermission = ::onMicChipClicked,
+                        onRequestNotificationPermission = ::onNotificationChipClicked,
                         onSwitchKeyboard = ::openKeyboardPicker,
                         onSettingsChange = { updated -> persist { updated } },
                         requestedTab = requestedTab,
@@ -120,7 +152,11 @@ class SetupActivity : ComponentActivity() {
                     OnboardingScreen(
                         permissions = permissions,
                         onGrant = ::requestRuntimePermissions,
-                        onSkip = ::markOnboardingDone,
+                        onSkip = ::skipOnboarding,
+                        onRequestMic = ::onMicChipClicked,
+                        onRequestOverlay = ::onOverlayChipClickedInOnboarding,
+                        onRequestKeyboard = ::onKeyboardChipClickedInOnboarding,
+                        onRequestNotifications = ::onNotificationChipClicked,
                     )
                 }
             }
@@ -138,9 +174,66 @@ class SetupActivity : ComponentActivity() {
         requestPermissions.launch(perms.toTypedArray())
     }
 
+    /**
+     * Continua o banner inicial pro Modo Sobrepor, na volta do popup de mic/notificações: reaproveita
+     * [onOverlayModeChange] pra marcar a pendência, mas como o onboarding não tem o wrapper da
+     * ConfigScreen (que abre a 1ª tela de configs sozinha), abre aqui manualmente. Só continua pro
+     * teclado depois que o sobrepor terminar (dá certo ou é cancelado) — só dá pra navegar pra uma tela
+     * de configs do sistema por vez.
+     */
+    private fun startOnboardingOverlayAndKeyboardChain() {
+        onboardingKeyboardChainPending = true
+        onOverlayModeChange(true)
+        when (lastOverlayBlockingStep) {
+            "overlay" -> openOverlaySettings()
+            "notifications" -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                requestOrOpenSettings(Manifest.permission.POST_NOTIFICATIONS, requestNotificationPermission)
+            }
+            null -> continueOnboardingKeyboardChainIfNeeded() // sobrepor já ativou de vez.
+        }
+    }
+
+    /** Dispara a pendência do Modo Teclado assim que o sobrepor (dar certo ou cancelar) libera a vez. */
+    private fun continueOnboardingKeyboardChainIfNeeded() {
+        if (!onboardingKeyboardChainPending) return
+        onboardingKeyboardChainPending = false
+        onKeyboardModeChange(true)
+        if (pendingKeyboardEnable && keyboardStepAttempted) {
+            openKeyboardSettings()
+        }
+    }
+
     /** Marca o onboarding como concluído (ONB-03) → a próxima composição vai para a config. */
     private fun markOnboardingDone() {
-        persist { it.copy(onboardingDone = true) }
+        persistOnboardingDone(true)
+    }
+
+    /**
+     * "Pular por agora": conclui o onboarding sem forçar mais nenhuma tela de permissão — mas ativa
+     * sozinho o que já estiver pronto (o usuário pode ter concedido alguns itens do checklist um a um
+     * antes de pular). Sem isso, a pessoa saía do onboarding com sobrepor/teclado já permitidos no
+     * sistema mas os toggles continuando desligados, precisando ligar tudo de novo manualmente na aba
+     * Modo (Yan, 2026-07-05).
+     */
+    private fun skipOnboarding() {
+        markOnboardingDone()
+        activateWhatIsAlreadyGranted()
+    }
+
+    /**
+     * Liga Sobrepor/Teclado se as permissões de cada um já estiverem concedidas — sem forçar nenhuma
+     * navegação para o que ainda falta (diferente de [startOnboardingOverlayAndKeyboardChain], que
+     * encadeia e força as telas que faltam). Chamada ao concluir o onboarding por qualquer caminho, pra
+     * refletir permissões que o usuário já tenha concedido pelos itens do checklist.
+     */
+    private fun activateWhatIsAlreadyGranted() {
+        val status = permissionsChecker.snapshot(this)
+        if (status.overlayGranted && status.notificationsGranted && !settings.overlayModeEnabled) {
+            activateOverlayNow()
+        }
+        if (status.keyboardEnabled && !status.keyboardActive) {
+            activateKeyboardNow()
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -149,18 +242,22 @@ class SetupActivity : ComponentActivity() {
         handleNavIntent(intent)
     }
 
-    /** Lê extras de navegação: pular para a aba Voz (clique no erro). */
+    /** Lê extras de navegação: pular para a aba Voz ou Modo (clique num erro clicável). */
     private fun handleNavIntent(intent: Intent?) {
-        if (intent?.getStringExtra(EXTRA_NAV) == NAV_TAB_VOZ) {
-            requestedTab = ConfigTab.VOZ
-            requestedTabKey++
-        }
+        val tab = when (intent?.getStringExtra(EXTRA_NAV)) {
+            NAV_TAB_VOZ -> ConfigTab.VOZ
+            NAV_TAB_MODO_MIC -> ConfigTab.MODO
+            else -> null
+        } ?: return
+        requestedTab = tab
+        requestedTabKey++
     }
 
     override fun onResume() {
         super.onResume()
         permissions = permissionsChecker.snapshot(this)
         syncKeyboardModeToActive()
+        onForegroundRegained()
     }
 
     /**
@@ -183,21 +280,97 @@ class SetupActivity : ComponentActivity() {
             }
         }
         syncKeyboardModeToActive()
+        onForegroundRegained()
+        // `tryActivateKeyboard` pode chamar `showInputMethodPicker()`, que só funciona com a janela
+        // REALMENTE com foco de entrada — `onResume()` dispara ANTES desse foco ser restabelecido (ao
+        // voltar de uma tela cheia como as configs do teclado), então chamar por lá faz o Android
+        // ignorar a chamada em silêncio, sem abrir nada e sem erro nenhum (Yan, 2026-07-04: o
+        // encadeamento "parecia" cancelar sozinho, mas na real o seletor nunca chegava a abrir). Por
+        // isso mora aqui — mas ainda precisa ignorar callbacks espúrios gerados pela própria abertura
+        // das telas do sistema, antes do usuário ter tempo de interagir.
+        if (foregroundReturnGate.shouldRunFocusSensitiveContinuation(SystemClock.elapsedRealtime())) {
+            tryActivateKeyboard()
+        }
     }
 
     /**
-     * Modo Teclado (KBD): o toggle reflete se o KeyFlow é o teclado ativo. Ativar abre o seletor (ou as
-     * configs de teclado se ainda não habilitado); desativar abre o seletor para trocar. A efetivação
-     * fica a cargo de [syncKeyboardModeToActive] quando a janela reganha foco.
+     * Roda a checagem de "voltou a primeiro plano" pro Modo Sobrepor (desativar se revogaram permissão,
+     * continuar ativação pendente): chamada tanto de [onResume] quanto de [onWindowFocusChanged] porque
+     * nenhum dos dois sozinho cobre TODOS os jeitos de voltar (telas de configs em tela cheia disparam
+     * onResume; alguns diálogos/painéis do sistema só mudam o foco da janela). Os dois disparam em
+     * sequência pra UM único evento real de "voltar" — sem o debounce abaixo, a 2ª chamada via o MESMO
+     * passo que a 1ª acabara de registrar como pendente e cancelava a ativação na hora, antes do usuário
+     * sequer ver a próxima tela abrir (Yan, 2026-07-04).
+     */
+    private fun onForegroundRegained() {
+        val now = SystemClock.elapsedRealtime()
+        if (!foregroundReturnGate.shouldProcessForegroundReturn(now)) return
+        deactivateOverlayIfPermissionsRevoked()
+        tryActivateOverlay()
+    }
+
+    /**
+     * Se o Modo Sobrepor já está ligado mas sobrepor/notificações foram revogadas nas configs do
+     * sistema (fora do app), desliga sozinho — sem isso o toggle ficava "ligado" visualmente mas a
+     * permissão já não valia mais (Yan, 2026-07-04: negar notificação com o modo já ativo não desligava
+     * nada, só devia desativar).
+     */
+    private fun deactivateOverlayIfPermissionsRevoked() {
+        if (!settingsLoaded || !settings.overlayModeEnabled) return
+        val status = permissionsChecker.snapshot(this)
+        if (!status.overlayGranted || !status.notificationsGranted) {
+            persistOverlayModeEnabled(false)
+            stopService(OverlayService.intent(this))
+        }
+    }
+
+    /**
+     * Modo Teclado (KBD): o toggle reflete se o KeyFlow é o teclado ativo. Ativar com o teclado já
+     * habilitado abre o seletor na hora; desativar abre o seletor para trocar. Se o teclado ainda não
+     * está habilitado, não faz nada aqui — a ConfigScreen mostra o toast e abre as configs do teclado
+     * sozinha logo em seguida (mesmo padrão do Modo Sobrepor). A efetivação do toggle em si fica a
+     * cargo de [syncKeyboardModeToActive] quando a janela reganha foco.
      */
     private fun onKeyboardModeChange(enabled: Boolean) {
         if (enabled) {
-            val status = permissionsChecker.snapshot(this)
-            if (!status.keyboardEnabled) openKeyboardSettings() else openKeyboardPicker()
+            pendingKeyboardEnable = true
+            keyboardStepAttempted = false
+            if (permissionsChecker.snapshot(this).keyboardEnabled) {
+                activateKeyboardNow()
+            } else {
+                // A ConfigScreen mostra o toast e abre as configs do teclado (1ª tentativa) sozinha —
+                // marca já de cara, pra saber que a próxima retomada de foco é O RETORNO dessa tentativa.
+                keyboardStepAttempted = true
+            }
         } else {
+            pendingKeyboardEnable = false
+            keyboardStepAttempted = false
             pendingKeyboardDisable = true
             openKeyboardPicker()
         }
+    }
+
+    /**
+     * Continua a ativação pendente do Modo Teclado: abre o seletor sozinho assim que o teclado for
+     * habilitado nas configs do sistema (sem exigir um 2º toque no toggle). Se voltou e o teclado ainda
+     * não foi habilitado, cancela em vez de reabrir as configs sozinho de novo (evita o loop).
+     */
+    private fun tryActivateKeyboard() {
+        if (!pendingKeyboardEnable) return
+        if (permissionsChecker.snapshot(this).keyboardEnabled) {
+            activateKeyboardNow()
+        } else if (keyboardStepAttempted) {
+            pendingKeyboardEnable = false
+            keyboardStepAttempted = false
+        }
+    }
+
+    /** Abre o seletor de teclados (pra selecionar o KeyFlow como ativo). O microfone NÃO é encadeado
+     * aqui — o usuário ativa quando quiser, tocando o chip dele (Yan, 2026-07-04). */
+    private fun activateKeyboardNow() {
+        pendingKeyboardEnable = false
+        keyboardStepAttempted = false
+        openKeyboardPicker()
     }
 
     /** Mantém `keyboardModeEnabled` em sincronia com o teclado realmente ativo (DEFAULT_INPUT_METHOD). */
@@ -206,7 +379,7 @@ class SetupActivity : ComponentActivity() {
         // sobrescreveria toda a config (token/endpoint/source) com valores vazios.
         if (!settingsLoaded) return
         if (settings.keyboardModeEnabled != permissions.keyboardActive) {
-            persist { it.copy(keyboardModeEnabled = permissions.keyboardActive) }
+            persistKeyboardModeEnabled(permissions.keyboardActive)
         }
     }
 
@@ -221,50 +394,194 @@ class SetupActivity : ComponentActivity() {
         // `copy` apagaria a config). Toda a UI só aparece após `settingsLoaded`, então isto não bloqueia
         // nenhuma escrita legítima do usuário.
         if (!settingsLoaded) return
+        val updated = transform(settings)
+        settings = updated
         activityScope.launch {
-            settingsRepository.saveSettings(transform(settings))
+            settingsRepository.saveSettings(updated)
+            saveController.notifySaved()
+        }
+    }
+
+    private fun persistOnboardingDone(done: Boolean) {
+        if (!settingsLoaded) return
+        settings = settings.copy(onboardingDone = done)
+        activityScope.launch {
+            settingsRepository.saveOnboardingDone(done)
+            saveController.notifySaved()
+        }
+    }
+
+    private fun persistOverlayModeEnabled(enabled: Boolean) {
+        if (!settingsLoaded) return
+        settings = settings.copy(overlayModeEnabled = enabled)
+        activityScope.launch {
+            settingsRepository.saveOverlayModeEnabled(enabled)
+            saveController.notifySaved()
+        }
+    }
+
+    private fun persistKeyboardModeEnabled(enabled: Boolean) {
+        if (!settingsLoaded) return
+        settings = settings.copy(keyboardModeEnabled = enabled)
+        activityScope.launch {
+            settingsRepository.saveKeyboardModeEnabled(enabled)
             saveController.notifySaved()
         }
     }
 
     /**
      * Liga/desliga o Modo Overlay: persiste o flag (gating da aba) e inicia/encerra o [OverlayService].
-     * Ao ligar sem permissões não inicia o serviço (o aviso ao usuário é o toast Compose da ConfigScreen;
-     * o flag ainda persiste para reconciliar quando as permissões chegarem).
+     * Ligar exige sobrepor + notificações concedidas — sem isso o toggle nem chega a marcar (o flag não
+     * persiste) e o aviso é o toast Compose da ConfigScreen, que também abre a permissão pendente sozinha
+     * logo em seguida. O microfone NÃO entra nessa trava: a orbe funciona mesmo sem mic (atalhos/gestos
+     * que não gravam) — falta só pulsar o chip de Microfone, igual já acontece no card do Teclado (Yan,
+     * 2026-07-04). Sem essa trava do sobrepor/notificações, o flag persistia mesmo sem permissão e o
+     * serviço nunca subia, sem nenhum retorno visual (a orbe simplesmente não aparecia).
+     *
+     * Se faltar mais de uma permissão, o usuário só toca o toggle UMA vez: essa função só marca a
+     * ativação como pendente (a ConfigScreen pede a 1ª que falta, pouco depois do toast) e
+     * [tryActivateOverlay] cuida do resto — pede a 2ª que falta e só então ativa de vez — quando a
+     * janela reganhar foco (Yan, 2026-07-04: antes era preciso tocar o toggle de novo a cada permissão).
      */
     private fun onOverlayModeChange(enabled: Boolean) {
-        persist { it.copy(overlayModeEnabled = enabled) }
         if (enabled) {
+            pendingOverlayEnable = true
             val status = permissionsChecker.snapshot(this)
-            if (!status.microphoneGranted || !status.overlayGranted || !status.notificationsGranted) {
-                return
-            }
-            val intent = OverlayService.startOverlayIntent(this)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(intent)
-            } else {
-                startService(intent)
+            when {
+                status.overlayGranted && status.notificationsGranted -> activateOverlayNow()
+                // A ConfigScreen já pede a 1ª pendente (sobrepor ou notificações) sozinha, pouco depois
+                // do toast — registra qual passo é esse, pra reconhecer o RETORNO dessa tentativa.
+                !status.overlayGranted -> lastOverlayBlockingStep = "overlay"
+                else -> lastOverlayBlockingStep = "notifications"
             }
         } else {
+            pendingOverlayEnable = false
+            lastOverlayBlockingStep = null
+            persistOverlayModeEnabled(false)
             stopService(OverlayService.intent(this))
         }
     }
 
     /**
-     * Chip do microfone (aba Modo): se ainda não concedido, pede em diálogo (1 toque); se já concedido,
-     * abre os detalhes do app para revisar/revogar — assim o chip "abre as configs" em qualquer estado.
+     * Continua a ativação pendente do Modo Sobrepor quando a janela reganha foco: pede a PRÓXIMA
+     * permissão que falta (sobrepor → notificações), ou ativa de vez se as duas já estiverem OK. Cada
+     * passo só é tentado UMA vez — se a janela reganha foco e ainda é O MESMO passo pendente, cancela
+     * (só retoma se o usuário tocar o toggle de novo); se o passo MUDOU (o anterior foi resolvido), faz
+     * a 1ª tentativa do novo.
+     */
+    private fun tryActivateOverlay() {
+        if (!pendingOverlayEnable) return
+        val status = permissionsChecker.snapshot(this)
+        val blockingStep = when {
+            !status.overlayGranted -> "overlay"
+            !status.notificationsGranted -> "notifications"
+            else -> null
+        }
+        if (blockingStep == null) {
+            activateOverlayNow()
+            return
+        }
+        if (blockingStep == lastOverlayBlockingStep) {
+            // Voltou sem resolver o MESMO passo: cancela, sem reabrir nada sozinho.
+            pendingOverlayEnable = false
+            lastOverlayBlockingStep = null
+            continueOnboardingKeyboardChainIfNeeded()
+            return
+        }
+        lastOverlayBlockingStep = blockingStep
+        // "overlay" já foi pedido pela ConfigScreen (configs do sistema); só "notifications" precisa de
+        // ação daqui. Mesma regra do clique manual no chip: tenta o popup se o sistema ainda mostrar: se
+        // já foi negada permanentemente (o Android simplesmente para de mostrar o diálogo — não é bug
+        // nosso), cai pras configs do app, senão o encadeamento nunca conseguiria terminar (Yan,
+        // 2026-07-04). Não trava: se a pessoa voltar sem liberar, o passo é cancelado no próximo retorno
+        // (ver o `if (blockingStep == lastOverlayBlockingStep)` acima).
+        if (blockingStep == "notifications" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            requestOrOpenSettings(Manifest.permission.POST_NOTIFICATIONS, requestNotificationPermission)
+        }
+    }
+
+    /** Sobe o serviço. O microfone NÃO é encadeado aqui — o usuário ativa quando quiser, tocando o chip
+     * dele (Yan, 2026-07-04). */
+    private fun activateOverlayNow() {
+        pendingOverlayEnable = false
+        lastOverlayBlockingStep = null
+        persistOverlayModeEnabled(true)
+        val intent = OverlayService.startOverlayIntent(this)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
+        continueOnboardingKeyboardChainIfNeeded()
+    }
+
+    /**
+     * Chip do microfone (aba Modo, nos dois cards): se ainda não concedido, pede em diálogo; se já
+     * concedido, abre os detalhes do app para revisar/revogar — assim o chip "abre as configs" em
+     * qualquer estado. Usa [requestOrOpenSettings] pra continuar funcionando mesmo negada antes.
      */
     private fun onMicChipClicked() {
         if (permissions.microphoneGranted) {
             openAppDetailsSettings()
         } else {
-            requestMicPermission.launch(Manifest.permission.RECORD_AUDIO)
+            requestOrOpenSettings(Manifest.permission.RECORD_AUDIO, requestMicPermission)
         }
+    }
+
+    /** Item "Sobreposição" do checklist do onboarding (clique individual, não é o botão de encadear tudo). */
+    private fun onOverlayChipClickedInOnboarding() {
+        openOverlaySettings()
+    }
+
+    /** Item "Teclado" do checklist do onboarding (clique individual, não é o botão de encadear tudo). */
+    private fun onKeyboardChipClickedInOnboarding() {
+        openKeyboardSettings()
+    }
+
+    /** Chip de notificações (aba Modo, card Sobrepor): mesmo padrão do [onMicChipClicked]. */
+    private fun onNotificationChipClicked() {
+        if (permissions.notificationsGranted) {
+            openAppDetailsSettings()
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            requestOrOpenSettings(Manifest.permission.POST_NOTIFICATIONS, requestNotificationPermission)
+        }
+    }
+
+    /**
+     * Pede a permissão de novo; se o sistema não for mais mostrar o diálogo (negada permanentemente —
+     * "não perguntar de novo" ou 2ª recusa), abre as configs do app em vez de falhar em silêncio. Sem
+     * isso, negar uma vez "travava" o chip/a retomada automática para sempre (Yan, 2026-07-04: nem
+     * clicar no chip fazia algo depois de negar) — o Sobrepor nunca tinha esse problema por ser configs
+     * do sistema (`ACTION_MANAGE_OVERLAY_PERMISSION`), sempre reabrível; agora mic/notificações também.
+     */
+    private fun requestOrOpenSettings(
+        permission: String,
+        launcher: androidx.activity.result.ActivityResultLauncher<String>,
+    ) {
+        if (shouldShowRequestPermissionRationale(permission)) {
+            launcher.launch(permission)
+        } else {
+            openAppDetailsSettings()
+        }
+    }
+
+    /**
+     * Marca a saída pra uma tela de configs do sistema como se já fosse o último "retorno ao
+     * primeiro plano" processado — alimenta o mesmo debounce de [onForegroundRegained]. Sem isso, um
+     * evento de foco espúrio que às vezes dispara logo após o `startActivity()` abaixo (durante a
+     * própria transição de tela, antes do usuário ver a tela nova) era lido como "voltou sem resolver
+     * a MESMA pendência" e cancelava a ativação na hora — visto ao vivo no device: abrir a tela de
+     * sobrepor e, 37ms depois, já pular pra tela de teclado sem o usuário ter feito nada (Yan,
+     * 2026-07-05, banner de onboarding).
+     */
+    private fun startSettingsScreen(intent: Intent) {
+        foregroundReturnGate.markExternalSurfaceOpened(SystemClock.elapsedRealtime())
+        startActivity(intent)
     }
 
     /** Abre a tela de detalhes/permissões do app no sistema. */
     private fun openAppDetailsSettings() {
-        startActivity(
+        startSettingsScreen(
             Intent(
                 AndroidSettings.ACTION_APPLICATION_DETAILS_SETTINGS,
                 Uri.parse("package:$packageName"),
@@ -275,7 +592,7 @@ class SetupActivity : ComponentActivity() {
     /** Abre as configurações de "desenhar sobre outros apps" (permissão do overlay). */
     private fun openOverlaySettings() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            startActivity(
+            startSettingsScreen(
                 Intent(
                     AndroidSettings.ACTION_MANAGE_OVERLAY_PERMISSION,
                     Uri.parse("package:$packageName"),
@@ -286,21 +603,34 @@ class SetupActivity : ComponentActivity() {
 
     /** Abre as configurações de teclados do sistema para habilitar o IME do KeyFlow. */
     private fun openKeyboardSettings() {
-        startActivity(Intent(AndroidSettings.ACTION_INPUT_METHOD_SETTINGS))
+        startSettingsScreen(Intent(AndroidSettings.ACTION_INPUT_METHOD_SETTINGS))
     }
 
     /** Abre o seletor de teclados do sistema para o usuário tornar o KeyFlow o teclado ativo. */
     private fun openKeyboardPicker() {
-        val imm = getSystemService(android.view.inputmethod.InputMethodManager::class.java)
-        imm?.showInputMethodPicker()
+        // Chamar showInputMethodPicker() direto de dentro de onWindowFocusChanged (via a cadeia
+        // tryActivateKeyboard -> activateKeyboardNow) é cedo demais: a Activity já sabe que tem foco
+        // (hasWindowFocus()==true), mas o InputMethodManagerService ainda não processou essa mudança de
+        // foco no lado dele (chega por Binder assíncrono) — o pedido do picker é descartado em silêncio,
+        // sem erro nem log. Adiar pro próximo laço do looper dá tempo desse foco propagar (Yan,
+        // 2026-07-05: confirmado ao vivo no device — hasWindowFocus=true no log, mas o seletor não abria).
+        window.decorView.post {
+            val imm = getSystemService(android.view.inputmethod.InputMethodManager::class.java)
+            imm?.showInputMethodPicker()
+        }
     }
 
     companion object {
         private const val EXTRA_NAV = "com.keyflow.nav"
         private const val NAV_TAB_VOZ = "tab_voz"
+        private const val NAV_TAB_MODO_MIC = "tab_modo_mic"
 
-        /** Abre o app já na aba Voz (clique no estado de erro). */
+        /** Abre o app já na aba Voz (clique no estado de erro resolvível lá — config/token). */
         fun openAtVozIntent(context: android.content.Context): Intent =
             Intent(context, SetupActivity::class.java).putExtra(EXTRA_NAV, NAV_TAB_VOZ)
+
+        /** Abre o app já na aba Modo (clique no erro de microfone pendente — orbe/teclado/notificação). */
+        fun openAtModoMicIntent(context: android.content.Context): Intent =
+            Intent(context, SetupActivity::class.java).putExtra(EXTRA_NAV, NAV_TAB_MODO_MIC)
     }
 }
