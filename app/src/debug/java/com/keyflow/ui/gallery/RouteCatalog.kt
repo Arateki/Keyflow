@@ -80,8 +80,8 @@ object RouteCatalog {
         // Barras Canvas (SB-T10/ROL-03): paridade com a barra de fábrica + estados só alcançáveis por
         // gesto (grade revelada/alavanca), simulados via toque sintético (mesma técnica de
         // `tapLayerToggle`) já que a galeria não tem dedo de verdade.
-        barRoute("bar-default-collapsed", useBars = true, expanded = false),
-        barRoute("bar-default-expanded", useBars = true, expanded = true),
+        barRoute("bar-default-collapsed", expanded = false),
+        barRoute("bar-default-expanded", expanded = true),
         barCustomOverflowRoute("bar-custom-overflow"),
         barGridRevealedRoute("bar-grid-revealed"),
         barJoystickPulledRoute("bar-joystick-pulled"),
@@ -349,7 +349,7 @@ object RouteCatalog {
     }
 
     /** Barra Canvas (SB-T5..T10) via `useBars=true`: paridade com a barra de fábrica (ROL-03). */
-    private fun barRoute(key: String, useBars: Boolean, expanded: Boolean): Route = Route(key) {
+    private fun barRoute(key: String, expanded: Boolean): Route = Route(key) {
         val dark = LocalKeyFlowPalette.current.isDark
         Box(
             modifier = Modifier
@@ -366,7 +366,6 @@ object RouteCatalog {
                         onMic = {},
                         onHide = {},
                         dark = dark,
-                        useBars = useBars,
                         frozenSeconds = 12,
                     ).apply { setExpanded(expanded) }
                 },
@@ -403,7 +402,6 @@ object RouteCatalog {
                         onMic = {},
                         onHide = {},
                         dark = dark,
-                        useBars = true,
                         barsConfig = config,
                         frozenSeconds = 12,
                     ).apply { setExpanded(false) }
@@ -459,7 +457,6 @@ object RouteCatalog {
                         onMic = {},
                         onHide = {},
                         dark = dark,
-                        useBars = true,
                         barsConfig = config,
                         shortcutGrids = listOf(grid),
                         frozenSeconds = 12,
@@ -510,7 +507,6 @@ object RouteCatalog {
                         onMic = {},
                         onHide = {},
                         dark = dark,
-                        useBars = true,
                         barsConfig = config,
                         frozenSeconds = 12,
                     ).apply {

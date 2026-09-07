@@ -68,13 +68,6 @@ class KeyFlowKeyboardBarsTest {
     }
 
     @Test
-    fun flagOffKeepsTheLegacyBar() {
-        launchProbe(bars = false)
-
-        assertTrue(KeyFlowKeyboardService.activeViewForTest!!.barViewsForTest.isEmpty())
-    }
-
-    @Test
     fun flagOnRendersBarViewsWithFactoryParityAndLiveMic() {
         launchProbe(bars = true)
         val view = KeyFlowKeyboardService.activeViewForTest!!

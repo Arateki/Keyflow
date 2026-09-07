@@ -21,15 +21,12 @@ class KeyFlowKeyboardViewTest {
         context = ApplicationProvider.getApplicationContext()
     }
 
-    // Cobre a barra ANTIGA (mic/⚙/colar como TextViews), que deixou de ser o padrão em 2026-09-07
-    // (ROL-02) — daí o `useBars = false` explícito. Migra para a BarView quando a antiga sair.
     private fun view(frozenSeconds: Int? = null) = KeyFlowKeyboardView(
         context = context,
         onKey = {},
         onMic = {},
         onHide = {},
         frozenSeconds = frozenSeconds,
-        useBars = false,
     )
 
     @Test

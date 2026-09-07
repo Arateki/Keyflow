@@ -192,12 +192,16 @@ class BarView(
 
     // ── acessores de teste (mesmo espírito da barra antiga) ──────────────────
 
-    val micLabelForTest: String? get() = micPlaced()?.let { MicVisuals.visuals(micState, elapsedSeconds()).first }
+    // Depende da CONFIG, não da geometria medida: uma view construída em teste e ainda não medida
+    // continua sabendo o rótulo do mic (a barra antiga expunha isso pelo texto do TextView).
+    val micLabelForTest: String?
+        get() = if (buttons.contains(BarButton.Mic)) MicVisuals.visuals(micState, elapsedSeconds()).first else null
     val layoutForTest: BarGeometry.BarLayout get() = barLayout
     val scrollOffsetForTest: Float get() = scrollOffset
     val selectorOpenForTest: Boolean get() = micSelector.isOpen
     val popupActionsForTest: List<MicAction> get() = micSelector.actionsForTest
     val popupRectsForTest: List<Rect> get() = micSelector.rectsForTest
+    val highlightedIndexForTest: Int get() = micSelector.highlightedIndexForTest
     val candidatesViewForTest: CandidatesView? get() = candidatesView
     val gridFrameForTest: GridFrame?
         get() = (gridSession?.snapshot(SystemClock.uptimeMillis())?.state as? GridSession.State.Active)?.frame

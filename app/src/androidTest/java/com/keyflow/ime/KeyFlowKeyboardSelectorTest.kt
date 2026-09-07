@@ -13,6 +13,9 @@ import androidx.test.rule.GrantPermissionRule
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
+import com.keyflow.core.shortcuts.BarButton
+import com.keyflow.ime.bars.BarView
+import android.graphics.Rect
 import com.keyflow.core.ButtonState
 import com.keyflow.core.KeyFlowController
 import org.junit.After
@@ -120,7 +123,8 @@ class KeyFlowKeyboardSelectorTest {
     // ── ações de alto nível ──────────────────────────────────────────────────
 
     private fun startRecordingByTappingMic() {
-        device.findObject(By.text("🎙"))?.click()
+        // O mic é desenhado pela BarView (ROL-02) — quem o expõe é o nó de acessibilidade.
+        (device.findObject(By.desc("🎙")) ?: device.findObject(By.text("🎙")))?.click()
         device.wait(Until.hasObject(By.textContains("●")), TIMEOUT)
         waitUntilButtonState(ButtonState.RECORDING)
     }
@@ -130,10 +134,9 @@ class KeyFlowKeyboardSelectorTest {
     private var gestureDownTime = 0L
 
     private fun holdMic() {
-        val mic = KeyFlowKeyboardService.activeViewForTest!!.micViewForTest!!
-        val loc = IntArray(2).also { mic.getLocationOnScreen(it) }
-        micDownX = loc[0] + mic.width / 2
-        micDownY = loc[1] + mic.height / 2
+        val mic = KeyFlowKeyboardService.activeViewForTest!!.micScreenRect()
+        micDownX = mic.centerX()
+        micDownY = mic.centerY()
         gestureDownTime = SystemClock.uptimeMillis()
         inject(MotionEvent.ACTION_DOWN, micDownX, micDownY, gestureDownTime)
         // HOLD_MS = 280ms na produção; folga para o host lento. Lê a geometria real do popup já aberto,
@@ -233,4 +236,29 @@ class KeyFlowKeyboardSelectorTest {
         const val IME = "com.keyflow/.ime.KeyFlowKeyboardService"
         const val TIMEOUT = 5000L
     }
+}
+
+// ── ponte para a BarView ────────────────────────────────────────────────────
+// O mic e o seletor deixaram de ser Views próprias quando as barras Canvas viraram o padrão (ROL-02):
+// hoje o mic é desenhado pela BarView e o seletor é o MicSelectorController. Os acessores abaixo mantêm
+// a leitura que estes testes já faziam, agora apontando para a barra ativa.
+
+/**
+ * A barra viva. `barViewsForTest` acumula as barras dos DOIS modos (o `init` constrói o expandido e o
+ * colapsado), e `setExpanded` ainda reconstrói a pilha — então quem vale é a que está de fato na tela;
+ * a última da lista serve só de rede quando nada foi anexado ainda (view fora de janela, em teste).
+ */
+private val KeyFlowKeyboardView.activeBar: BarView
+    get() = barViewsForTest.lastOrNull { it.isShown } ?: barViewsForTest.last()
+private val KeyFlowKeyboardView.selectorOpenForTest: Boolean get() = activeBar.selectorOpenForTest
+private val KeyFlowKeyboardView.popupActionsForTest: List<MicAction> get() = activeBar.popupActionsForTest
+private val KeyFlowKeyboardView.popupRectsForTest: List<Rect> get() = activeBar.popupRectsForTest
+private val KeyFlowKeyboardView.highlightedIndexForTest: Int get() = activeBar.highlightedIndexForTest
+
+/** Retângulo de tela do botão de mic dentro da barra ativa. */
+private fun KeyFlowKeyboardView.micScreenRect(): Rect {
+    val bar = activeBar
+    val index = bar.layoutForTest.buttons.indexOfFirst { it.button == BarButton.Mic }
+    check(index >= 0) { "a barra ativa não tem botão de mic: ${bar.layoutForTest.buttons.map { it.button }}" }
+    return bar.buttonScreenRectForTest(index)
 }

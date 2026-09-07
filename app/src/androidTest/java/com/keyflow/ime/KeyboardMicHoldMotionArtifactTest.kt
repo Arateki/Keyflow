@@ -15,6 +15,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
 import com.keyflow.ComposeSmokeActivity
+import com.keyflow.core.shortcuts.BarButton
+import com.keyflow.ime.bars.BarView
 import com.keyflow.core.ButtonState
 import org.junit.After
 import org.junit.Assert.assertTrue
@@ -81,7 +83,7 @@ class KeyboardMicHoldMotionArtifactTest {
             var frame = 0
             capture(dir, frame++, "initial")
 
-            val micRect = screenRect(view.micViewForTest!!)
+            val micRect = view.micScreenRect()
             val micX = micRect.centerX()
             val micY = micRect.centerY()
 
@@ -128,7 +130,7 @@ class KeyboardMicHoldMotionArtifactTest {
             var frame = 0
             capture(dir, frame++, "initial")
 
-            val micRect = screenRect(view.micViewForTest!!)
+            val micRect = view.micScreenRect()
             val micX = micRect.centerX()
             val micY = micRect.centerY()
 
@@ -207,10 +209,6 @@ class KeyboardMicHoldMotionArtifactTest {
                 onMicAction = onMicAction,
                 onHide = {},
                 frozenSeconds = FROZEN_SECONDS,
-                // Captura o hold do mic da barra ANTIGA (TextView + seletor por popup). Com as barras
-                // como padrão (ROL-02) o gesto equivalente vive no MicSelectorController da BarView —
-                // regravar os GIFs de lá é tarefa da remoção da barra antiga.
-                useBars = false,
             )
             activity.setContentView(
                 FrameLayout(activity).apply {
@@ -227,7 +225,9 @@ class KeyboardMicHoldMotionArtifactTest {
             )
             view.updateMicState(initialState)
         }
-        waitUntil("mic não foi medido") { view.micViewForTest?.let { it.width > 0 && it.height > 0 } == true }
+        waitUntil("barra do mic não foi medida") {
+            view.barViewsForTest.isNotEmpty() && view.activeBar.layoutForTest.buttons.isNotEmpty()
+        }
         block(view)
         launched.close()
         scenario = null
@@ -334,4 +334,29 @@ class KeyboardMicHoldMotionArtifactTest {
     private companion object {
         const val FROZEN_SECONDS = 8
     }
+}
+
+// ── ponte para a BarView ────────────────────────────────────────────────────
+// O mic e o seletor deixaram de ser Views próprias quando as barras Canvas viraram o padrão (ROL-02):
+// hoje o mic é desenhado pela BarView e o seletor é o MicSelectorController. Os acessores abaixo mantêm
+// a leitura que estes testes já faziam, agora apontando para a barra ativa.
+
+/**
+ * A barra viva. `barViewsForTest` acumula as barras dos DOIS modos (o `init` constrói o expandido e o
+ * colapsado), e `setExpanded` ainda reconstrói a pilha — então quem vale é a que está de fato na tela;
+ * a última da lista serve só de rede quando nada foi anexado ainda (view fora de janela, em teste).
+ */
+private val KeyFlowKeyboardView.activeBar: BarView
+    get() = barViewsForTest.lastOrNull { it.isShown } ?: barViewsForTest.last()
+private val KeyFlowKeyboardView.selectorOpenForTest: Boolean get() = activeBar.selectorOpenForTest
+private val KeyFlowKeyboardView.popupActionsForTest: List<MicAction> get() = activeBar.popupActionsForTest
+private val KeyFlowKeyboardView.popupRectsForTest: List<Rect> get() = activeBar.popupRectsForTest
+private val KeyFlowKeyboardView.highlightedIndexForTest: Int get() = activeBar.highlightedIndexForTest
+
+/** Retângulo de tela do botão de mic dentro da barra ativa. */
+private fun KeyFlowKeyboardView.micScreenRect(): Rect {
+    val bar = activeBar
+    val index = bar.layoutForTest.buttons.indexOfFirst { it.button == BarButton.Mic }
+    check(index >= 0) { "a barra ativa não tem botão de mic: ${bar.layoutForTest.buttons.map { it.button }}" }
+    return bar.buttonScreenRectForTest(index)
 }

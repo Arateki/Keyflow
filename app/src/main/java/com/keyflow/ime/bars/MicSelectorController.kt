@@ -42,6 +42,7 @@ class MicSelectorController(
     /** Acessores de teste — mesmos contratos da barra antiga (`popupActionsForTest`/`popupRectsForTest`). */
     val actionsForTest: List<MicAction> get() = actions
     val rectsForTest: List<Rect> get() = rects
+    val highlightedIndexForTest: Int get() = highlightedIndex
 
     /** Ações disponíveis por estado (vazio = hold não abre nada) — igual à barra antiga. */
     fun actionsFor(state: ButtonState): List<MicAction> = when (state) {

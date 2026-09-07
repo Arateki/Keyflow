@@ -77,11 +77,6 @@ class KeyFlowKeyboardView(
     // Fileira dedicada de números acima do "qwertyuiop" (NUMROW-01, pedido do Yan, 2026-07-03) — só a
     // camada de letras; a grade numérica travada (NUM-01) e a de símbolos ficam intocadas.
     private val numberRowEnabled: Boolean = false,
-    // Barras personalizáveis em Canvas (SB-T5/BAR-01..07) — o PADRÃO desde 2026-09-07 (ROL-02): pilha de
-    // `BarView` conforme a config, nos dois modos (retraído e expandido). Quem ainda quer a barra antiga
-    // (`buildCollapsedLegacy`) passa `false` explicitamente: os testes do caminho legado e o gerador de
-    // GIFs do hold do mic, até ela ser removida.
-    private val useBars: Boolean = true,
     private val barsConfig: BarsConfig = BarsConfig.DEFAULT,
     private val shortcutGrids: List<ShortcutGrid> = emptyList(),
     // Tecla avulsa/grade/alavanca emitem por aqui (service → PhysicalKeyEmitter).
@@ -94,14 +89,11 @@ class KeyFlowKeyboardView(
     private val clock: () -> Long = { SystemClock.elapsedRealtime() },
 ) : LinearLayout(context) {
 
-    private var expandedMic: TextView? = null
-    private var collapsedMic: TextView? = null
     private var canvasGrid: KeyboardGridView? = null
     // NUM-01: espelha o layout ativo na grade Canvas pra updateInputType() saber se já está no estado
     // pedido (evita reconstruir/perder shift à toa quando o campo não mudou de classe).
     private var numericField = initialNumeric
     private var candidatesView: CandidatesView? = null
-    private var topStripToolbar: LinearLayout? = null
 
     // Barras Canvas (SB-T5): criadas por buildBars() nos dois modos; mic/candidates roteiam pra cá.
     private val barViews = mutableListOf<BarView>()
@@ -114,7 +106,7 @@ class KeyFlowKeyboardView(
     // view) — a reserva assumia sempre 1 barra só; com 2+ subestimava o espaço real, deixando a grade
     // "roubar" espaço demais e escondendo a 1ª fileira do QWERTY (achado do Yan, 2026-07-07).
     private val barCount: Int =
-        if (useBars) maxOf(barsConfig.barsFor(true).size, barsConfig.barsFor(false).size).coerceAtLeast(1) else 1
+        maxOf(barsConfig.barsFor(true).size, barsConfig.barsFor(false).size).coerceAtLeast(1)
 
     // Overscan da janela do IME (SB-T10/GRD-08): a grade efêmera pode ancorar PRA CIMA e se estender bem
     // acima da barra; a janela do IME por padrão só é alta o bastante pro conteúdo visível, então o
@@ -130,7 +122,6 @@ class KeyFlowKeyboardView(
     // `TOUCHABLE_INSETS_CONTENT` pra isso amarra as duas coisas e faz a janela "crescer" pras outras apps
     // durante o arrasto — por isso o service usa `TOUCHABLE_INSETS_REGION` com os dois valores separados.
     val gridOverscanPx: Int = run {
-        if (!useBars) return@run 0
         val maxRows = shortcutGrids.maxOfOrNull { it.rows } ?: return@run 0
         val maxCols = shortcutGrids.maxOfOrNull { it.cols } ?: return@run 0
         val metrics = resources.displayMetrics
@@ -193,14 +184,6 @@ class KeyFlowKeyboardView(
     // Estado/tempo do microfone (espelha AudioRecorder/OrbButtonView: conta só em RECORDING).
     private val handler = Handler(Looper.getMainLooper())
     private var micState: ButtonState = ButtonState.IDLE_NO_FIELD
-    private val ticker = object : Runnable {
-        override fun run() {
-            if (micState == ButtonState.RECORDING) {
-                renderMic(ButtonState.RECORDING)
-                handler.postDelayed(this, TICK_MS)
-            }
-        }
-    }
 
     // Seletor de ações por hold no mic: PopupWindow flutuante acima do mic, nos dois modos.
     private var actionPopup: PopupWindow? = null
@@ -220,24 +203,16 @@ class KeyFlowKeyboardView(
         // do seletor (inserida acima da barra) só "tampa" onde estão os chips; o resto mostra o app atrás.
         gridOverscanSpacer?.let { addView(it) }
         addView(expandedLayout)
-        renderMic(ButtonState.IDLE_NO_FIELD)
     }
 
     /** Acessores somente-leitura para testes instrumentados (KBD-01/02; seletor do mic — KBDCTL-01..04). */
     val expandedForTest: Boolean get() = childCount > 0 && getChildAt(childCount - 1) === expandedLayout
-    val micLabelForTest: String? get() =
-        (expandedMic ?: collapsedMic)?.text?.toString() ?: barViews.firstNotNullOfOrNull { it.micLabelForTest }
+    val micLabelForTest: String? get() = barViews.firstNotNullOfOrNull { it.micLabelForTest }
     val barViewsForTest: List<BarView> get() = barViews.toList()
-    val micViewForTest: View? get() = expandedMic ?: collapsedMic
-    val selectorOpenForTest: Boolean get() = selectorOpen()
-    val popupActionsForTest: List<MicAction> get() = popupActions
-    val popupRectsForTest: List<android.graphics.Rect> get() = popupRects
-    val highlightedIndexForTest: Int get() = highlightedIndex
     val canvasGridForTest: KeyboardGridView? get() = canvasGrid
-    // Com as barras (padrão desde ROL-02), a faixa de sugestões vive DENTRO da BarView que tem o slot
-    // `Candidates` — o campo abaixo só é preenchido pelo caminho legado. Mesmo fallback de micLabelForTest.
+    /** A faixa de sugestões vive dentro da `BarView` que tem o slot `Candidates` (BAR-01). */
     val candidatesViewForTest: CandidatesView?
-        get() = candidatesView ?: barViews.firstNotNullOfOrNull { it.candidatesViewForTest }
+        get() = barViews.firstNotNullOfOrNull { it.candidatesViewForTest }
 
     /**
      * Atualiza a faixa de sugestões (KC-T7); sem grade Canvas (candidatesView nulo) é no-op. A
@@ -260,29 +235,9 @@ class KeyFlowKeyboardView(
 
     fun updateMicState(state: ButtonState) {
         micState = state
-        // O tempo é lido ao vivo do KeyFlowController (autoritativo, vê todas as transições) em
-        // elapsedSeconds() — o teclado não rastreia o tempo sozinho, evitando dessincronia.
-        if (state == ButtonState.RECORDING) startTicker() else stopTicker()
-        renderMic(state)
+        // Cada BarView roda o próprio tique de 1s enquanto grava (o tempo vem do KeyFlowController,
+        // autoritativo) — a view host só repassa o estado.
         barViews.forEach { it.updateMicState(state) }
-    }
-
-    private fun renderMic(state: ButtonState) {
-        val (label, color) = micVisuals(state)
-        listOf(expandedMic, collapsedMic).filterNotNull().forEach { v ->
-            v.text = label
-            v.background = rippleDrawable(color, color)
-            v.setTextColor(Color.WHITE)
-        }
-    }
-
-    private fun startTicker() {
-        handler.removeCallbacks(ticker)
-        handler.post(ticker)
-    }
-
-    private fun stopTicker() {
-        handler.removeCallbacks(ticker)
     }
 
     private fun elapsedSeconds(): Int {
@@ -297,11 +252,7 @@ class KeyFlowKeyboardView(
         // Mic/config/colapsar sobem pra faixa de sugestões (buildTopStrip), e vírgula/espaço/ponto/enter
         // entram na 4ª fileira da grade (Layouts.kt) — igual Gboard (decisão do Yan, 2026-07-01, testando
         // no device físico).
-        if (useBars) {
-            buildBars(expandedMode = true).forEach { addView(it, barLayoutParams()) }
-        } else {
-            addView(buildTopStrip().also { topStripToolbar = it })
-        }
+        buildBars(expandedMode = true).forEach { addView(it, barLayoutParams()) }
         addView(buildCanvasGrid())
     }
 
@@ -360,19 +311,6 @@ class KeyFlowKeyboardView(
      * mostra os chips quando o corretor responder. Mais baixa que uma tecla normal (pedido do Yan,
      * 2026-07-01): essa faixa não é digitação de verdade.
      */
-    private fun buildTopStrip(): LinearLayout = LinearLayout(context).apply {
-        val height = dp(CandidatesView.HEIGHT_DP)
-        orientation = LinearLayout.HORIZONTAL
-        layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, height)
-        setPadding(dp(2), 0, dp(2), 0)
-        // altura dos botões = altura da fileira menos as margens verticais de keyBase (2dp em cima/embaixo).
-        val buttonHeight = height - dp(4)
-        addView(micKey(1.5f, buttonHeight).also { expandedMic = it })
-        addView(specialKey("⚙", 0.9f, buttonHeight) { onConfig() })
-        addView(buildCandidatesView(weight = 4f))
-        addView(specialKey("↓", 1f, buttonHeight) { onHide() })
-    }
-
     /** Faixa de sugestões do corretor do sistema (KC-T7/SPL-01..03) — só existe com a grade Canvas. */
     private fun buildCandidatesView(weight: Float): CandidatesView =
         CandidatesView(context, dark, onTap = onCandidateTap, scale = scale).also {
@@ -427,261 +365,10 @@ class KeyFlowKeyboardView(
     }
 
     /** Mesma altura da faixa mic/config/sugestões (`CandidatesView.HEIGHT_DP`) — pedido do Yan, 2026-07-01. */
-    private fun buildCollapsed(): LinearLayout {
-        if (useBars) {
-            return LinearLayout(context).apply {
-                orientation = VERTICAL
-                layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
-                buildBars(expandedMode = false).forEach { addView(it, barLayoutParams()) }
-            }
-        }
-        return buildCollapsedLegacy()
-    }
-
-    private fun buildCollapsedLegacy(): LinearLayout = LinearLayout(context).apply {
-        val height = dp(CandidatesView.HEIGHT_DP)
-        val buttonHeight = height - dp(4) // menos as margens verticais de keyBase (2dp em cima/embaixo)
-        orientation = HORIZONTAL
-        setBackgroundColor(kbTray)
-        layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, height)
-        setPadding(dp(8), 0, dp(8), 0)
-        gravity = Gravity.CENTER_VERTICAL
-
-        addView(micKey(1.5f, buttonHeight).also { collapsedMic = it })
-        addView(specialKey("⚙", 0.8f, buttonHeight) { onConfig() })
-        addView(specialKey("colar", 1f, buttonHeight) { onKey(KeyAction.Paste) })
-        addView(specialKey("esc", 0.8f, buttonHeight) { onKey(KeyAction.Escape) })
-        addView(specialKey("⏎", 0.8f, buttonHeight) { onKey(KeyAction.Enter) })
-        addView(specialKey("⌃", 1f, buttonHeight) {
-            setExpanded(true)
-            onExpand()
-        })
-    }
-
-    // ── key factory ──────────────────────────────────────────────────────────
-
-    private fun specialKey(label: String, weight: Float, height: Int = dp(44), onClick: () -> Unit): TextView =
-        keyBase(label, weight, kbModifier, kbInk, height).also { it.setOnClickListener { onClick() } }
-
-    @android.annotation.SuppressLint("ClickableViewAccessibility")
-    private fun micKey(weight: Float, height: Int): TextView =
-        keyBase("🎙", weight, MIC_NO_FIELD, Color.WHITE, height).also { v ->
-            v.setOnTouchListener { _, e ->
-                when (e.actionMasked) {
-                    MotionEvent.ACTION_DOWN -> {
-                        // Agenda a abertura do seletor; se soltar antes, vira tap.
-                        val r = Runnable { showActionSelector(v) }
-                        holdRunnable = r
-                        handler.postDelayed(r, HOLD_MS)
-                        true
-                    }
-                    MotionEvent.ACTION_MOVE -> {
-                        if (selectorOpen()) updateHighlight(e.rawX.toInt(), e.rawY.toInt())
-                        true
-                    }
-                    MotionEvent.ACTION_UP -> {
-                        cancelHold()
-                        if (selectorOpen()) {
-                            // Seletor aberto: aciona só o chip destacado; voltar o dedo ao botão (nenhum
-                            // destacado) ou soltar fora não faz nada.
-                            val action = popupActions.getOrNull(highlightedIndex)
-                            Log.d(TAG, "ACTION_UP raw=(${e.rawX},${e.rawY}) highlightedIndex=$highlightedIndex rects=$popupRects action=$action")
-                            dismissActionSelector()
-                            if (action != null) onMicAction(action)
-                        } else if (isInsideView(v, e)) {
-                            // Tap: só aciona ao soltar AINDA em cima do botão (arrastar pra fora cancela).
-                            performMicTap()
-                        }
-                        true
-                    }
-                    MotionEvent.ACTION_CANCEL -> {
-                        cancelHold()
-                        dismissActionSelector()
-                        true
-                    }
-                    else -> false
-                }
-            }
-        }
-
-    private fun selectorOpen() = actionPopup != null
-
-    private fun isInsideView(v: View, e: MotionEvent): Boolean =
-        e.x >= 0f && e.x <= v.width && e.y >= 0f && e.y <= v.height
-
-    private fun performMicTap() {
-        if (micState == ButtonState.ERROR) {
-            // No erro só age se houver destino de navegação; senão ignora o toque.
-            if (KeyFlowController.errorNavTarget != com.keyflow.core.ErrorNavTarget.NONE) onErrorTap()
-        } else {
-            onMic()
-        }
-    }
-
-    private fun cancelHold() {
-        holdRunnable?.let { handler.removeCallbacks(it) }
-        holdRunnable = null
-    }
-
-    /** Ações disponíveis no seletor conforme o estado atual (vazio = hold não abre nada). */
-    private fun actionsFor(state: ButtonState): List<MicAction> = when (state) {
-        ButtonState.RECORDING -> listOf(MicAction.PAUSE_RESUME, MicAction.CANCEL)
-        ButtonState.PAUSED -> listOf(MicAction.PAUSE_RESUME, MicAction.CANCEL)
-        ButtonState.CANCELLING -> listOf(MicAction.UNDO)
-        // Transcrevendo: só cancelar (não há o que pausar/retomar nesse estado); Yan, 2026-07-03.
-        ButtonState.SENDING -> listOf(MicAction.CANCEL)
-        else -> emptyList()
-    }
-
-    private fun actionLabel(action: MicAction): String = when (action) {
-        MicAction.PAUSE_RESUME -> if (micState == ButtonState.PAUSED) "▶ retomar" else "⏸ pausar"
-        MicAction.CANCEL -> "✕ cancelar"
-        MicAction.UNDO -> "↶ desfazer"
-    }
-
-    private fun actionColor(action: MicAction): Int = when (action) {
-        MicAction.PAUSE_RESUME -> ACCENT_RECORD
-        MicAction.CANCEL -> ACCENT_TERRACOTTA
-        MicAction.UNDO -> ACCENT_TEAL
-    }
-
-    /** Abre o seletor de ações acima do mic (estilo popup de variações de acento). */
-    private fun showActionSelector(anchor: View) {
-        val actions = actionsFor(micState)
-        if (actions.isEmpty()) return
-
-        val chips = actions.map { action ->
-            TextView(context).apply {
-                text = actionLabel(action)
-                gravity = Gravity.CENTER
-                setTextColor(Color.WHITE)
-                textSize = 14f * scale
-                setPadding(dp(14), dp(10), dp(14), dp(10))
-                background = rippleDrawable(actionColor(action), kbKeyBorder)
-            }
-        }
-        // Chips "soltos" (cada um já tem seu fundo arredondado colorido); sem caixa em volta.
-        val content = LinearLayout(context).apply {
-            orientation = HORIZONTAL
-            chips.forEachIndexed { i, chip ->
-                addView(chip, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
-                    if (i > 0) marginStart = dp(4)
-                })
-            }
-        }
-
-        popupActions = actions
-        popupChips = chips
-        highlightedIndex = -1
-        selectorAnchor = anchor
-
-        // PopupWindow flutuante acima do mic, nos dois modos (retraído e expandido): renderiza
-        // corretamente e não afeta o layout dos vizinhos (sem flicker/reflow). Antes o retraído inseria o
-        // seletor como View real na hierarquia por receio de que um popup não renderizasse numa janela de
-        // IME curta — mas isTouchable=false já faz TODO o toque depender só do próprio mic, não do popup,
-        // então esse receio não se aplica mais; unificar eliminou o flicker que o addView causava no
-        // retraído (empurrava a barra pra baixo/reflow a cada hold, achado no device físico, 2026-07-01).
-        // A folga de toque de chipRect() compensa a pequena imprecisão de onde o dedo pousa.
-        val popup = PopupWindow(content, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
-            isTouchable = false // o gesto segue sendo do mic; o popup é só visual
-            isFocusable = false
-            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
-            elevation = dp(8).toFloat()
-        }
-        content.measure(
-            MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
-            MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
-        )
-        // showAsDropDown usa coords relativas à ÂNCORA: centraliza e sobe acima do mic.
-        val xoff = (anchor.width - content.measuredWidth) / 2
-        val yoff = -(anchor.height + content.measuredHeight + dp(8))
-        popup.showAsDropDown(anchor, xoff, yoff)
-        actionPopup = popup
-        // Mede o retângulo (tela) de cada chip após o layout, para o highlight por deslize (X e Y).
-        content.post {
-            popupRects = chips.map { chipRect(it) }
-        }
-    }
-
-    /**
-     * Retângulo (tela) REAL de um chip do seletor (sem folga) — é o que `popupRectsForTest` expõe, então
-     * `rect.centerX/Y()` (usado pelo instrumentado pra saber onde tocar) sempre cai bem no centro do chip
-     * visível. A folga de toque (ver [chipHit]) fica de fora daqui de propósito: inflar este retângulo
-     * pra baixo empurrava `rect.centerY()` pra perto (ou além) do limiar de cancelamento rápido perto do
-     * mic, fazendo o próprio teste automatizado "cancelar" por engano ao mirar no centro (achado ao rodar
-     * a suíte completa, 2026-07-01).
-     */
-    private fun chipRect(chip: TextView): android.graphics.Rect {
-        val loc = IntArray(2).also { chip.getLocationOnScreen(it) }
-        return android.graphics.Rect(loc[0], loc[1], loc[0] + chip.width, loc[1] + chip.height)
-    }
-
-    /**
-     * Se ([rawX],[rawY]) conta como "sobre" [rect], com folga generosa só pra BAIXO. Em vários testes no
-     * device físico (2026-07-01) o dedo do usuário sempre parava ~15-20px abaixo do retângulo medido por
-     * getLocationOnScreen(), de forma consistente em três técnicas de posicionamento diferentes — indício
-     * de um pequeno desalinhamento de render da janela do IME nesse aparelho, não de um cálculo errado.
-     * Como os chips não se sobrepõem no eixo X, a folga não cria ambiguidade entre eles.
-     */
-    private fun chipHit(rect: android.graphics.Rect, rawX: Int, rawY: Int): Boolean =
-        rawX >= rect.left && rawX <= rect.right && rawY >= rect.top && rawY <= rect.bottom + dp(40)
-
-    private fun updateHighlight(rawX: Int, rawY: Int) {
-        // Remede os retângulos a cada movimento em vez de confiar só na medição única de content.post:
-        // o popup pode assentar/reposicionar depois daquela 1ª medição (achado no device físico,
-        // 2026-07-01). getLocationOnScreen aqui sempre reflete a posição REAL no instante do toque.
-        popupRects = popupChips.map { chipRect(it) }
-        var idx = popupRects.indexOfFirst { chipHit(it, rawX, rawY) }
-        // Cancelamento rápido: voltar o dedo pra cima do próprio mic (ou abaixo dele) sempre desgruda,
-        // independente da folga de chipHit() — pedido do Yan (2026-07-01): a folga generosa que ajuda a
-        // "grudar" no chip não pode obrigar a descer o dedo muito além do botão de origem pra cancelar.
-        selectorAnchor?.let { mic ->
-            val micTop = IntArray(2).also { mic.getLocationOnScreen(it) }[1]
-            if (rawY >= micTop) idx = -1
-        }
-        if (idx == highlightedIndex) return
-        highlightedIndex = idx
-        popupChips.forEachIndexed { i, chip ->
-            val action = popupActions[i]
-            val on = i == idx
-            chip.background = rippleDrawable(actionColor(action), if (on) Color.WHITE else kbKeyBorder)
-            chip.alpha = if (idx == -1 || on) 1f else 0.5f
-        }
-    }
-
-    private fun dismissActionSelector() {
-        actionPopup?.let { runCatching { it.dismiss() } }
-        actionPopup = null
-        selectorAnchor = null
-        popupActions = emptyList()
-        popupChips = emptyList()
-        popupRects = emptyList()
-        highlightedIndex = -1
-    }
-
-    override fun onDetachedFromWindow() {
-        cancelHold()
-        dismissActionSelector()
-        super.onDetachedFromWindow()
-    }
-
-    private fun keyBase(
-        label: String,
-        weight: Float,
-        bgColor: Int,
-        textColor: Int,
-        height: Int = dp(44),
-    ): TextView = TextView(context).apply {
-        text = label
-        gravity = Gravity.CENTER
-        setTextColor(textColor)
-        textSize = 15f * scale
-        background = rippleDrawable(bgColor, kbKeyBorder)
-        isClickable = true
-        isFocusable = false
-        layoutParams = LayoutParams(0, height, weight).apply {
-            setMargins(dp(3), dp(2), dp(3), dp(2))
-        }
+    private fun buildCollapsed(): LinearLayout = LinearLayout(context).apply {
+        orientation = VERTICAL
+        layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+        buildBars(expandedMode = false).forEach { addView(it, barLayoutParams()) }
     }
 
     // ── utils ────────────────────────────────────────────────────────────────

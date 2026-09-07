@@ -45,15 +45,6 @@ class KeyFlowKeyboardService : InputMethodService() {
             uiPrefs.edit().putBoolean(KEY_EXPANDED, value).apply()
         }
 
-    // Barras Canvas são o PADRÃO desde 2026-09-07 (ROL-02): a pilha de BarView renderiza a BarsConfig
-    // do DataStore, em debug e em release. Enquanto era flag de rollout com default `false`, qualquer
-    // limpeza de dados devolvia o usuário à barra de fábrica sem nenhuma tela para religar — o Yan
-    // perdeu a configuração dele assim (as barras montadas sumiam do teclado sem explicação).
-    // A chave sobrevive só para os testes do caminho legado, que ainda não foram migrados, poderem
-    // forçá-lo com `false`; nada em produção escreve nela. Ela sai junto com a barra antiga.
-    private val useBars: Boolean
-        get() = uiPrefs.getBoolean(KEY_BARS, true)
-
     // Última config aplicada à view (BAR-07): o collect de barsConfigFlow/gridsFlow recria a view só em
     // mudança real (o flow re-emite a cada write do DataStore, mesmo de chaves alheias).
     private var appliedBarsConfig: BarsConfig? = null
@@ -118,7 +109,7 @@ class KeyFlowKeyboardService : InputMethodService() {
                 .distinctUntilChanged()
                 .collect { (bars, grids) ->
                     val changed = bars != appliedBarsConfig || grids != appliedGrids
-                    if (useBars && keyboardView != null && changed) setInputView(onCreateInputView())
+                    if (keyboardView != null && changed) setInputView(onCreateInputView())
                 }
         }
         // Tema/tamanho/idioma ao vivo (pedido do Yan, 2026-07-03): antes só aplicava ao reabrir o
@@ -210,10 +201,9 @@ class KeyFlowKeyboardService : InputMethodService() {
         spellChecker?.close()
         spellChecker = SystemSpellChecker(this, localeFor(language))
         // Barras Canvas (SB-T5): leitura leve como o tema — só DataStore no caminho crítico do IME.
-        val bars = useBars
-        val barsConfig = if (bars) runBlocking { repo.barsConfigOnce() } else BarsConfig.DEFAULT
-        val grids = if (bars) runBlocking { repo.shortcutGridsOnce() } else emptyList()
-        val vibration = if (bars) runBlocking { repo.vibrationIntensityOnce() } else 60
+        val barsConfig = runBlocking { repo.barsConfigOnce() }
+        val grids = runBlocking { repo.shortcutGridsOnce() }
+        val vibration = runBlocking { repo.vibrationIntensityOnce() }
         appliedBarsConfig = barsConfig
         appliedGrids = grids
         val view = KeyFlowKeyboardView(
@@ -247,7 +237,6 @@ class KeyFlowKeyboardService : InputMethodService() {
             // onCreateInputView na 1ª vez que a view é criada para uma sessão.
             initialNumeric = isNumericInputType(currentInputEditorInfo?.inputType ?: InputType.TYPE_NULL),
             numberRowEnabled = numberRowEnabled,
-            useBars = bars,
             barsConfig = barsConfig,
             shortcutGrids = grids,
             onShortcut = ::emitShortcut,
@@ -513,7 +502,6 @@ class KeyFlowKeyboardService : InputMethodService() {
     companion object {
         private const val TAG = "KeyFlow.Keyboard"
         private const val KEY_EXPANDED = "expanded"
-        private const val KEY_BARS = "kbd_bars"
         private val LANGUAGE_CYCLE = listOf("pt", "en", "es")
 
         /**
