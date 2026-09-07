@@ -336,8 +336,13 @@ class KeyFlowKeyboardService : InputMethodService() {
         // Só pede para se exibir se: (a) há um campo de texto real focado (não um editor "nulo", senão
         // subiria sem input ativo) e (b) o usuário acabou de trocar PARA o KeyFlow pelo nosso seletor
         // (3 toques). Assim não sobe em troca de app / ida para home, nem sem campo focado.
-        val hasRealInput = (attribute?.inputType ?: InputType.TYPE_NULL) != InputType.TYPE_NULL
-        isRawInputField = !hasRealInput
+        val inputType = attribute?.inputType ?: InputType.TYPE_NULL
+        val hasRealInput = inputType != InputType.TYPE_NULL
+        // Termius de verdade (device físico, 2026-07-06) não é TYPE_NULL — é TYPE_CLASS_TEXT com variação
+        // de SENHA (0x91 = classe texto + visible-password), truque comum de terminal pra desativar
+        // autocorreção. Campos assim TAMBÉM não renderizam composição visível (mesmo sintoma do TYPE_NULL,
+        // causa raiz diferente) — Q3 (2026-07-02) só cobria TYPE_NULL puro.
+        isRawInputField = !hasRealInput || isPasswordVariant(inputType)
         Log.d(TAG, "onStartInput isRawInputField=$isRawInputField")
         if (hasRealInput &&
             !restarting &&
@@ -531,5 +536,21 @@ class KeyFlowKeyboardService : InputMethodService() {
          */
         internal fun shouldCompose(rawInputField: Boolean, char: String): Boolean =
             !rawInputField && char.length == 1 && char[0].isLetter()
+
+        /**
+         * Campo de texto com variação de SENHA (`TYPE_TEXT_VARIATION_PASSWORD`/`VISIBLE_PASSWORD`/
+         * `WEB_PASSWORD`) — achado real no Termius via SSH (device físico, 2026-07-06, `inputType=0x91`):
+         * não é `TYPE_NULL`, mas também não renderiza composição visível (mesmo sintoma, causa raiz
+         * diferente — provavelmente terminais usam a variação de senha só pra desligar autocorreção).
+         */
+        internal fun isPasswordVariant(inputType: Int): Boolean {
+            if (inputType and InputType.TYPE_MASK_CLASS != InputType.TYPE_CLASS_TEXT) return false
+            return when (inputType and InputType.TYPE_MASK_VARIATION) {
+                InputType.TYPE_TEXT_VARIATION_PASSWORD,
+                InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD,
+                InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD -> true
+                else -> false
+            }
+        }
     }
 }
