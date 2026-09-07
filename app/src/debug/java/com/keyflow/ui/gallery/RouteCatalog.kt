@@ -25,6 +25,7 @@ import com.keyflow.ime.KeyFlowKeyboardView
 import com.keyflow.overlay.RecordingNotification
 import com.keyflow.ui.PermissionStatus
 import com.keyflow.ui.common.SaveController
+import com.keyflow.ui.config.BarsEditor
 import com.keyflow.ui.config.ConfigScreen
 import com.keyflow.ui.config.ConfigTab
 import com.keyflow.ui.config.GridsEditor
@@ -84,6 +85,30 @@ object RouteCatalog {
         barCustomOverflowRoute("bar-custom-overflow"),
         barGridRevealedRoute("bar-grid-revealed"),
         barJoystickPulledRoute("bar-joystick-pulled"),
+        // Editor de barras: a lista de chips com os controles à direita, e o catálogo (modal) por cima.
+        Route("bars-editor") {
+            Box(Modifier.fillMaxSize()) {
+                BarsEditor(
+                    barsConfig = BarsConfig(
+                        mirrored = true,
+                        expanded = emptyList(),
+                        collapsed = listOf(
+                            BarDef(
+                                listOf(
+                                    BarButton.Mic,
+                                    BarButton.ConfigBtn,
+                                    BarButton.Paste,
+                                    BarButton.SingleKey(PhysicalKeyMap.key(android.view.KeyEvent.KEYCODE_ESCAPE)),
+                                    BarButton.Joystick,
+                                ),
+                            ),
+                        ),
+                    ),
+                    onBarsConfigChange = {},
+                    grids = emptyList(),
+                )
+            }
+        },
         // Editor de grade no modal (Q8): grade grande o bastante pra exercitar o encolhimento de célula.
         Route("grids-editor-modal") {
             Box(Modifier.fillMaxSize()) {

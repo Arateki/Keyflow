@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -73,6 +74,10 @@ const val BARS_EDITOR_GRID_FORM_REMOVE_TAG = "bars-editor-grid-form-remove"
 
 /** Tag de teste de um chip de botão na prévia (linha `barIndex`, posição `buttonIndex`). */
 fun barChipTag(barIndex: Int, buttonIndex: Int) = "bars-editor-chip-$barIndex-$buttonIndex"
+
+const val BARS_EDITOR_CATALOG_CLOSE_TAG = "bars-editor-catalog-close"
+const val BARS_EDITOR_EDIT_CLOSE_TAG = "bars-editor-edit-close"
+const val BARS_EDITOR_GRID_FORM_CLOSE_TAG = "bars-editor-grid-form-close"
 
 /** Tag do "+" que abre o catálogo para a barra `barIndex`. */
 fun barAddButtonTag(barIndex: Int) = "bars-editor-add-button-$barIndex"
@@ -258,8 +263,9 @@ fun BarsEditor(
                                 },
                             )
                         }
-                        AddChip(barIndex = barIndex, onClick = { sheet = BarsEditorSheet.Catalog(barIndex) })
                     }
+                    ControlsDivider()
+                    AddChip(barIndex = barIndex, onClick = { sheet = BarsEditorSheet.Catalog(barIndex) })
                     Box(
                         Modifier
                             .padding(start = 8.dp)
@@ -453,26 +459,40 @@ private fun BarButtonChip(
     }
 }
 
+/**
+ * Separa os chips da barra (o que o usuário está montando) dos controles do editor (adicionar, remover)
+ * — sem essa divisa o "+" lia como se fosse mais um botão da própria barra.
+ */
+@Composable
+private fun ControlsDivider() {
+    val palette = LocalKeyFlowPalette.current
+    Box(
+        Modifier
+            .padding(horizontal = 8.dp)
+            .width(1.dp)
+            .height(24.dp)
+            .background(palette.line2),
+    )
+}
+
+/** Controle "adicionar botão" — fora da faixa rolável e em teal, como os demais "+" da tela. */
 @Composable
 private fun AddChip(barIndex: Int, onClick: () -> Unit) {
     val palette = LocalKeyFlowPalette.current
     Box(
         Modifier
-            .height(36.dp)
-            .widthIn(min = 36.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .border(1.dp, palette.line, RoundedCornerShape(8.dp))
+            .size(28.dp)
+            .clip(RoundedCornerShape(6.dp))
             .clickable { onClick() }
-            .testTag(barAddButtonTag(barIndex))
-            .padding(horizontal = 10.dp),
+            .testTag(barAddButtonTag(barIndex)),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             "+",
-            color = palette.fg,
+            color = palette.teal,
             fontFamily = SpaceGrotesk,
             fontWeight = FontWeight.SemiBold,
-            fontSize = 15.sp,
+            fontSize = 18.sp,
         )
     }
 }
@@ -485,31 +505,12 @@ private fun CatalogSheet(
     onAddSingleKey: () -> Unit,
     onAddGrid: () -> Unit,
 ) {
-    val palette = LocalKeyFlowPalette.current
-    val noRipple = remember { MutableInteractionSource() }
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(Color(0x751C1813))
-            .clickable(interactionSource = noRipple, indication = null) { onDismiss() },
-        contentAlignment = Alignment.BottomCenter,
+    ConfigModal(
+        title = "Adicionar botão",
+        onDismiss = onDismiss,
+        closeTag = BARS_EDITOR_CATALOG_CLOSE_TAG,
+        cardTag = BARS_EDITOR_CATALOG_TAG,
     ) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-                .background(palette.bg)
-                .clickable(interactionSource = noRipple, indication = null) { /* consome o clique */ }
-                .padding(horizontal = 16.dp, vertical = 16.dp)
-                .testTag(BARS_EDITOR_CATALOG_TAG),
-        ) {
-            Text(
-                "Adicionar botão",
-                color = palette.fg,
-                fontFamily = SpaceGrotesk,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 16.sp,
-            )
             SheetActionRow("Microfone", BARS_EDITOR_CATALOG_MIC_TAG) { onAddSimple(BarButton.Mic) }
             SheetActionRow("Config", BARS_EDITOR_CATALOG_CONFIG_TAG) { onAddSimple(BarButton.ConfigBtn) }
             SheetActionRow("Colapsar/expandir", BARS_EDITOR_CATALOG_TOGGLE_EXPAND_TAG) { onAddSimple(BarButton.ToggleExpand) }
@@ -521,7 +522,6 @@ private fun CatalogSheet(
             if (grids.isNotEmpty()) {
                 SheetActionRow("Grade", BARS_EDITOR_CATALOG_GRID_TAG) { onAddGrid() }
             }
-        }
     }
 }
 
@@ -532,36 +532,16 @@ private fun SimpleEditSheet(
     onChangeKey: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val palette = LocalKeyFlowPalette.current
-    val noRipple = remember { MutableInteractionSource() }
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(Color(0x751C1813))
-            .clickable(interactionSource = noRipple, indication = null) { onDismiss() },
-        contentAlignment = Alignment.BottomCenter,
+    ConfigModal(
+        title = barButtonGlyph(button),
+        onDismiss = onDismiss,
+        closeTag = BARS_EDITOR_EDIT_CLOSE_TAG,
+        cardTag = BARS_EDITOR_EDIT_SHEET_TAG,
     ) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-                .background(palette.bg)
-                .clickable(interactionSource = noRipple, indication = null) { /* consome o clique */ }
-                .padding(horizontal = 16.dp, vertical = 16.dp)
-                .testTag(BARS_EDITOR_EDIT_SHEET_TAG),
-        ) {
-            Text(
-                barButtonGlyph(button),
-                color = palette.fg,
-                fontFamily = SpaceGrotesk,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 16.sp,
-            )
             if (button is BarButton.SingleKey) {
                 SheetActionRow("Trocar tecla", BARS_EDITOR_EDIT_CHANGE_KEY_TAG) { onChangeKey() }
             }
             SheetActionRow("Remover", BARS_EDITOR_EDIT_REMOVE_TAG) { onRemove() }
-        }
     }
 }
 
@@ -578,30 +558,12 @@ private fun GridFormSheet(
     onDismiss: () -> Unit,
 ) {
     val palette = LocalKeyFlowPalette.current
-    val noRipple = remember { MutableInteractionSource() }
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(Color(0x751C1813))
-            .clickable(interactionSource = noRipple, indication = null) { onDismiss() },
-        contentAlignment = Alignment.BottomCenter,
+    ConfigModal(
+        title = "Gatilho de grade",
+        onDismiss = onDismiss,
+        closeTag = BARS_EDITOR_GRID_FORM_CLOSE_TAG,
+        cardTag = BARS_EDITOR_GRID_FORM_TAG,
     ) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-                .background(palette.bg)
-                .clickable(interactionSource = noRipple, indication = null) { /* consome o clique */ }
-                .padding(horizontal = 16.dp, vertical = 16.dp)
-                .testTag(BARS_EDITOR_GRID_FORM_TAG),
-        ) {
-            Text(
-                "Gatilho de grade",
-                color = palette.fg,
-                fontFamily = SpaceGrotesk,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 16.sp,
-            )
 
             if (grids.isNotEmpty()) {
                 Dropdown(
@@ -667,7 +629,6 @@ private fun GridFormSheet(
             if (onRemove != null) {
                 SheetActionRow("Remover", BARS_EDITOR_GRID_FORM_REMOVE_TAG, onRemove)
             }
-        }
     }
 }
 

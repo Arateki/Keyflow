@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -230,5 +231,31 @@ class BarsEditorTest {
         rule.onNodeWithTag(barAddButtonTag(0)).performClick()
 
         rule.onAllNodesWithTag(BARS_EDITOR_CATALOG_GRID_TAG).assertCountEquals(0)
+    }
+
+    @Test
+    fun addControlStaysReachableWithABarFullOfButtons() {
+        // O "+" ficava DENTRO da faixa rolável dos chips: numa barra cheia ele saía da vista junto com
+        // os botões e só voltava rolando até o fim. Agora vive na área de controles, fixo à direita.
+        val cheia = BarDef(
+            listOf(
+                BarButton.Mic, BarButton.ConfigBtn, BarButton.Paste, BarButton.ToggleExpand,
+                BarButton.Joystick, BarButton.Candidates,
+                BarButton.SingleKey(ShortcutKey(KeyEvent.KEYCODE_ESCAPE, label = "Esc")),
+                BarButton.SingleKey(ShortcutKey(KeyEvent.KEYCODE_ENTER, label = "\u23CE")),
+                BarButton.SingleKey(ShortcutKey(KeyEvent.KEYCODE_TAB, label = "Tab")),
+                BarButton.SingleKey(ShortcutKey(KeyEvent.KEYCODE_A, label = "a")),
+            ),
+        )
+        val h = Harness(BarsConfig(mirrored = true, collapsed = listOf(cheia), expanded = emptyList()))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(barAddButtonTag(0)).assertIsDisplayed()
+
+        // E continua abrindo o catálogo (que agora é um modal com ✕, não mais um sheet embutido).
+        rule.onNodeWithTag(barAddButtonTag(0)).performClick()
+        rule.onNodeWithTag(BARS_EDITOR_CATALOG_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(BARS_EDITOR_CATALOG_CLOSE_TAG).performClick()
+        rule.onAllNodesWithTag(BARS_EDITOR_CATALOG_TAG).assertCountEquals(0)
     }
 }
