@@ -24,6 +24,7 @@ import com.keyflow.ime.bars.BarCallbacks
 import com.keyflow.ime.bars.BarView
 import com.keyflow.ime.keyboard.CandidatesView
 import com.keyflow.ime.keyboard.KeyboardGridView
+import com.keyflow.ime.keyboard.usableScreenHeightPx
 import com.keyflow.ime.keyboard.layout.KeyboardLayout
 import com.keyflow.ime.keyboard.layout.LayerId
 import com.keyflow.ime.keyboard.layout.Layouts
@@ -104,6 +105,84 @@ class KeyFlowKeyboardView(
     // Barras Canvas (SB-T5): criadas por buildBars() nos dois modos; mic/candidates roteiam pra cá.
     private val barViews = mutableListOf<BarView>()
 
+    // Fileiras reais do QWERTY atual (Layouts.kt: 4 fixas + 1 opcional com a fileira de números) — usado
+    // só pra estimar quanto o resto do teclado reserva da tela ao dimensionar a grade efêmera.
+    private val qwertyRowCount: Int = if (numberRowEnabled) 5 else 4
+
+    // Pior caso de barras KeyFlow empilhadas (colapsado OU expandido — o modo troca sem reconstruir a
+    // view) — a reserva assumia sempre 1 barra só; com 2+ subestimava o espaço real, deixando a grade
+    // "roubar" espaço demais e escondendo a 1ª fileira do QWERTY (achado do Yan, 2026-07-07).
+    private val barCount: Int =
+        if (useBars) maxOf(barsConfig.barsFor(true).size, barsConfig.barsFor(false).size).coerceAtLeast(1) else 1
+
+    // Overscan da janela do IME (SB-T10/GRD-08): a grade efêmera pode ancorar PRA CIMA e se estender bem
+    // acima da barra; a janela do IME por padrão só é alta o bastante pro conteúdo visível, então o
+    // Android trava (grampeia) as coordenadas Y do toque real assim que o dedo passa da borda da janela
+    // (achado no device físico, 2026-07-06 — a suposição antiga de que só o toque INJETADO sofria disso
+    // estava errada). Fix: um espaçador invisível reserva altura extra pra maior grade configurada, e o
+    // service (`onComputeInsets`) só torna essa faixa tocável enquanto uma grade está ancorando/ativa —
+    // fora disso o app por trás continua recebendo toque ali normalmente.
+    // Lido pelo `KeyFlowKeyboardService.onComputeInsets`: SEMPRE reservado do `contentTopInsets`/
+    // `visibleTopInsets` (outras apps, ex. a barra de atalhos do Termux, nunca veem essa faixa como
+    // "altura do teclado" — ela é invisível de propósito) e só entra na REGIÃO TOCÁVEL durante um arrasto
+    // de grade ativo (ver `gridDragActiveForTest`). Achado no device físico, 2026-07-06: usar
+    // `TOUCHABLE_INSETS_CONTENT` pra isso amarra as duas coisas e faz a janela "crescer" pras outras apps
+    // durante o arrasto — por isso o service usa `TOUCHABLE_INSETS_REGION` com os dois valores separados.
+    val gridOverscanPx: Int = run {
+        if (!useBars) return@run 0
+        val maxRows = shortcutGrids.maxOfOrNull { it.rows } ?: return@run 0
+        val maxCols = shortcutGrids.maxOfOrNull { it.cols } ?: return@run 0
+        val metrics = resources.displayMetrics
+        // Tela ÚTIL (sem a status bar, ~24dp) — achado do Yan no device físico, 2026-07-07: usar
+        // `heightPixels` cru aqui deixava as duas contas (aqui e no BarView) errarem pela mesma folga.
+        val usableHeightPx = usableScreenHeightPx(metrics)
+        val previewPx = com.keyflow.ime.bars.GridSizing.previewSpacePx(metrics, scale)
+        val keyboardReservePx = com.keyflow.ime.bars.GridSizing.keyboardContentReservePx(
+            metrics = metrics,
+            usableHeightPx = usableHeightPx,
+            scale = scale,
+            qwertyRowCount = qwertyRowCount,
+            barCount = barCount,
+        )
+        val slackPx = com.keyflow.ime.bars.GridSizing.overscanSlackPx(metrics, scale)
+        // Mesma fórmula de encolhimento do BarView (GridSizing), com a MESMA reserva pro resto do
+        // teclado — sem isto, o overscan reservado aqui podia passar do que a grade de verdade usa (ou
+        // caber sozinho mas estourar somado à barra/QWERTY), estourando a janela do IME em paisagem
+        // (achado do Yan, 2026-07-06). O slack ENTRA no orçamento aqui (não é somado por fora depois) —
+        // antes ele escapava da conta e sobrava ~80px de estouro não contabilizado no scale máximo
+        // (achado do Yan, 2026-07-07).
+        // Mesmo amortecimento do BarView pro tamanho IDEAL da célula — senão o overscan reservado aqui
+        // seguia crescendo com o slider acima de 100% em paisagem, mesmo com o teclado já congelado no
+        // tamanho de 100% (achado do Yan, 2026-07-07).
+        val gridBudgetScale = com.keyflow.ime.keyboard.landscapeDampedScale(metrics, scale)
+        val (_, cellHeightPx) = com.keyflow.ime.bars.GridSizing.fittedCellPx(
+            rows = maxRows,
+            cols = maxCols,
+            idealCellWidthPx = com.keyflow.ime.bars.BarView.GRID_CELL_W_DP * metrics.density * gridBudgetScale,
+            idealCellHeightPx = com.keyflow.ime.bars.BarView.GRID_CELL_H_DP * metrics.density * gridBudgetScale,
+            screenWidthPx = metrics.widthPixels.toFloat(),
+            screenHeightPx = usableHeightPx,
+            reservedHeightPx = previewPx + keyboardReservePx + slackPx,
+        )
+        (maxRows * cellHeightPx + previewPx + slackPx).toInt().also {
+            android.util.Log.d(
+                "GRID_DEBUG",
+                "gridOverscanPx=$it maxRows=$maxRows maxCols=$maxCols cellHeightPx=$cellHeightPx " +
+                    "screen=${metrics.widthPixels}x${metrics.heightPixels}",
+            )
+        }
+    }
+    private var gridDragActive = false
+
+    /** Espaçador invisível (ver [gridOverscanPx]) — sempre o 1º filho quando > 0, sobrevive a [setExpanded]. */
+    private val gridOverscanSpacer: View? = if (gridOverscanPx > 0) {
+        View(context).apply { layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, gridOverscanPx) }
+    } else {
+        null
+    }
+
+    val gridDragActiveForTest: Boolean get() = gridDragActive
+
     // Paleta Ateliê resolvida por tema (ints Android; o View não usa Compose).
     private val kbTray = if (dark) 0xFF332E27.toInt() else 0xFFDCD0AC.toInt()
     private val kbKeyBorder = if (dark) 0xFF4A4234.toInt() else 0xFFD7C9A0.toInt()
@@ -138,12 +217,13 @@ class KeyFlowKeyboardView(
         orientation = VERTICAL
         // Raiz transparente de propósito: a barra/teclado expandido têm seu próprio fundo. Assim a faixa
         // do seletor (inserida acima da barra) só "tampa" onde estão os chips; o resto mostra o app atrás.
+        gridOverscanSpacer?.let { addView(it) }
         addView(expandedLayout)
         renderMic(ButtonState.IDLE_NO_FIELD)
     }
 
     /** Acessores somente-leitura para testes instrumentados (KBD-01/02; seletor do mic — KBDCTL-01..04). */
-    val expandedForTest: Boolean get() = childCount > 0 && getChildAt(0) === expandedLayout
+    val expandedForTest: Boolean get() = childCount > 0 && getChildAt(childCount - 1) === expandedLayout
     val micLabelForTest: String? get() =
         (expandedMic ?: collapsedMic)?.text?.toString() ?: barViews.firstNotNullOfOrNull { it.micLabelForTest }
     val barViewsForTest: List<BarView> get() = barViews.toList()
@@ -151,6 +231,7 @@ class KeyFlowKeyboardView(
     val selectorOpenForTest: Boolean get() = selectorOpen()
     val popupActionsForTest: List<MicAction> get() = popupActions
     val popupRectsForTest: List<android.graphics.Rect> get() = popupRects
+    val highlightedIndexForTest: Int get() = highlightedIndex
     val canvasGridForTest: KeyboardGridView? get() = canvasGrid
     val candidatesViewForTest: CandidatesView? get() = candidatesView
 
@@ -167,8 +248,9 @@ class KeyFlowKeyboardView(
 
     fun setExpanded(expanded: Boolean) {
         val target = if (expanded) expandedLayout else collapsedBar
-        if (childCount > 0 && getChildAt(0) === target) return
+        if (childCount > 0 && getChildAt(childCount - 1) === target) return
         removeAllViews()
+        gridOverscanSpacer?.let { addView(it) }
         addView(target)
     }
 
@@ -240,6 +322,12 @@ class KeyFlowKeyboardView(
             onPaste = { onKey(KeyAction.Paste) },
             onShortcut = onShortcut,
             onCandidateTap = onCandidateTap,
+            onGridDragActiveChanged = { active ->
+                gridDragActive = active
+                // Força uma passada de layout pra o service recalcular onComputeInsets AGORA — o próximo
+                // MOVE do mesmo gesto já precisa da janela tocável expandida/encolhida (SB-T10/GRD-08).
+                requestLayout()
+            },
         )
         return barsConfig.barsFor(expandedMode).map { def ->
             BarView(
@@ -253,6 +341,8 @@ class KeyFlowKeyboardView(
                 frozenSeconds = frozenSeconds,
                 vibrationIntensity = vibrationIntensity,
                 clock = clock,
+                qwertyRowCount = qwertyRowCount,
+                barCount = barCount,
             ).also { barViews += it }
         }.reversed()
     }
@@ -417,8 +507,8 @@ class KeyFlowKeyboardView(
 
     private fun performMicTap() {
         if (micState == ButtonState.ERROR) {
-            // No erro só age se for resolvível na Voz; senão ignora o toque.
-            if (KeyFlowController.errorOpensVoz) onErrorTap()
+            // No erro só age se houver destino de navegação; senão ignora o toque.
+            if (KeyFlowController.errorNavTarget != com.keyflow.core.ErrorNavTarget.NONE) onErrorTap()
         } else {
             onMic()
         }

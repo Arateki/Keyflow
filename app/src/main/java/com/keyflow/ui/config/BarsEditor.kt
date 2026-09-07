@@ -48,6 +48,7 @@ const val BARS_EDITOR_MODE_COLLAPSED_TAG = "bars-editor-mode-collapsed"
 const val BARS_EDITOR_MODE_EXPANDED_TAG = "bars-editor-mode-expanded"
 const val BARS_EDITOR_MIRROR_TOGGLE_TAG = "bars-editor-mirror-toggle"
 const val BARS_EDITOR_ADD_BAR_TAG = "bars-editor-add-bar"
+const val BARS_EDITOR_COUNT_WARNING_TAG = "bars-editor-count-warning"
 
 const val BARS_EDITOR_CATALOG_TAG = "bars-editor-catalog"
 const val BARS_EDITOR_CATALOG_MIC_TAG = "bars-editor-catalog-mic"
@@ -273,6 +274,22 @@ fun BarsEditor(
                         StrokeIcon(TRASH_PATHS, palette.faint, Modifier.size(16.dp), strokeWidth = 1.6f)
                     }
                 }
+            }
+
+            if (activeList.size >= 3) {
+                Text(
+                    "3+ barras + horizontal: o visual e a usabilidade do teclado podem ficar inconsistentes (pouco espaço vertical)",
+                    color = palette.muted,
+                    fontFamily = SpaceGrotesk,
+                    fontSize = 11.sp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .border(1.dp, palette.line, RoundedCornerShape(6.dp))
+                        .testTag(BARS_EDITOR_COUNT_WARNING_TAG)
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                )
             }
 
             Row(

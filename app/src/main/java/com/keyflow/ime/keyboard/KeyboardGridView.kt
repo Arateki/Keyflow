@@ -145,7 +145,31 @@ class KeyboardGridView(
         var highlightedIndex: Int = -1,
     )
 
-    val rowHeightPx: Int get() = dp(44).toInt()
+    /**
+     * Altura de fileira: o ideal (44dp) até o limite de [keyboardHeightFraction] da altura da tela pro
+     * teclado inteiro — sem isto, a grade mantinha a MESMA altura absoluta em paisagem (bem mais baixa),
+     * devorando proporcionalmente muito mais tela que em retrato (achado do Yan, 2026-07-06: "as teclas
+     * estão mais altas... justamente quando temos menos espaço vertical"). Nunca encolhe abaixo de
+     * [MIN_ROW_HEIGHT_DP], senão o texto da tecla (tamanho fixo, 15dp) vaza da própria tecla — achado do
+     * Yan, 2026-07-07, depois de reduzir a fração de paisagem: "a letra tá quase mais alta que o espaço".
+     */
+    val rowHeightPx: Int
+        get() {
+            val metrics = resources.displayMetrics
+            // O slider "Tamanho do teclado" amplifica MENOS em paisagem — sem isto, em telas curtas o
+            // teclado grande sozinho já não cabia com a grade efêmera (pedido do Yan, 2026-07-07: "como
+            // se o slide aumentasse menos quando no horizontal"). O PISO (abaixo) TAMBÉM usa a escala
+            // amortecida agora — usando a escala cheia ali, em 130% o piso sozinho já vencia a conta do
+            // `maxOf` e cancelava todo o efeito do amortecimento (achado do Yan, mesma data: "não parece
+            // ter feito efeito"). O texto (tamanho fixo, 15dp × escala CHEIA) segue cabendo com folga
+            // dentro do piso amortecido — MIN_ROW_HEIGHT_DP tem margem de sobra pra isso.
+            val budgetScale = landscapeDampedScale(metrics, scale)
+            val idealPx = 44f * metrics.density * budgetScale
+            val rowCount = state.currentLayer.rows.size.coerceAtLeast(1)
+            val maxBudgetPx = usableScreenHeightPx(metrics) * keyboardHeightFraction(metrics) * budgetScale
+            val shrunkPx = maxOf(maxBudgetPx / rowCount, MIN_ROW_HEIGHT_DP * metrics.density * budgetScale)
+            return minOf(idealPx, shrunkPx).toInt()
+        }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val width = MeasureSpec.getSize(widthMeasureSpec)
@@ -583,5 +607,50 @@ class KeyboardGridView(
     private companion object {
         val ACCENT_TEAL = 0xFF4E9683.toInt()
         const val ACCENT_HOLD_MS = 350L
+        // Piso pra rowHeightPx nunca ficar menor que o texto da tecla (15dp) + folga confortável.
+        const val MIN_ROW_HEIGHT_DP = 34f
     }
 }
+
+/**
+ * Fração máxima da altura da tela pro teclado QWERTY inteiro (todas as fileiras) em RETRATO — na prática
+ * nunca chega a ser o limitante lá (a tela sobra), então serve só de teto geral de segurança.
+ */
+internal const val KEYBOARD_MAX_HEIGHT_FRACTION = 0.3f
+
+/**
+ * Fração menor específica pra PAISAGEM (bem mais baixa) — reduz o quanto o teclado (barra+QWERTY) toma
+ * da tela ali, deixando mais espaço pra grade efêmera (pedido do Yan, 2026-07-07: "diminui um pouco o
+ * multiplicador de tamanho no horizontal pra que sobre mais espaço pra grade"). `internal`:
+ * `GridSizing`/`BarView` usam o MESMO valor (via [keyboardHeightFraction]) pra estimar quanto o resto do
+ * teclado reserva da tela ao dimensionar a grade — nunca ajuste um sem o outro.
+ */
+internal const val KEYBOARD_MAX_HEIGHT_FRACTION_LANDSCAPE = 0.2f
+
+/** [KEYBOARD_MAX_HEIGHT_FRACTION_LANDSCAPE] em paisagem (largura > altura), senão [KEYBOARD_MAX_HEIGHT_FRACTION]. */
+internal fun keyboardHeightFraction(metrics: android.util.DisplayMetrics): Float =
+    if (metrics.widthPixels > metrics.heightPixels) KEYBOARD_MAX_HEIGHT_FRACTION_LANDSCAPE else KEYBOARD_MAX_HEIGHT_FRACTION
+
+/**
+ * Quanto do slider "Tamanho do teclado" acima de 100% vira altura de verdade em paisagem — só metade
+ * (pedido do Yan, 2026-07-07: até 120% ficava usável, dali pra 130% piorava; "como se o slide aumentasse
+ * menos quando no horizontal pra caber"). Retrato usa o valor cheio (nunca foi o problema). Só afeta o
+ * teto "ideal" (o tamanho que o teclado MIRA); o piso de não-vazar-texto usa a escala real, sem
+ * amortecimento — ver `rowHeightPx`.
+ */
+internal fun landscapeDampedScale(metrics: android.util.DisplayMetrics, scale: Float): Float =
+    if (metrics.widthPixels > metrics.heightPixels) 1f + (scale - 1f) * LANDSCAPE_SCALE_DAMPING else scale
+
+private const val LANDSCAPE_SCALE_DAMPING = 0f
+
+/**
+ * `displayMetrics.heightPixels` é a tela CRUA — a janela do IME de verdade nunca recebe isso inteiro (a
+ * status bar como fica de fora, ~24dp, achado do Yan no device físico, 2026-07-07: o `Relayout` real
+ * media 1017px numa tela de 1080px "crus"). Sem descontar isso, as contas de encolhimento (aqui e em
+ * `GridSizing`) sempre erravam por essa mesma folga, cortando a 1ª fileira por pouco em paisagem — usa
+ * SEMPRE esta função em vez de `heightPixels` direto nas contas de orçamento de altura do teclado.
+ */
+internal fun usableScreenHeightPx(metrics: android.util.DisplayMetrics): Float =
+    (metrics.heightPixels - metrics.density * STATUS_BAR_MARGIN_DP).coerceAtLeast(0f)
+
+private const val STATUS_BAR_MARGIN_DP = 24f

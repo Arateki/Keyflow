@@ -49,6 +49,7 @@ class GridSession(
             val frame: GridFrame,
             /** Índice `row * cols + col` da célula sob o dedo, ou null fora da grade. */
             val cell: Int?,
+            /** Parado ≥ [revealDelayMs]: grade inteira revelada (modo aprendizado, GRD-06). */
             val revealed: Boolean,
         ) : State
     }

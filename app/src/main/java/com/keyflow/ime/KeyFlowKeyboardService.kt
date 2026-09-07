@@ -8,6 +8,7 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import android.inputmethodservice.InputMethodService
+import android.inputmethodservice.InputMethodService.Insets
 import com.keyflow.BuildConfig
 import com.keyflow.core.KeyFlowController
 import com.keyflow.core.shortcuts.BarsConfig
@@ -146,6 +147,28 @@ class KeyFlowKeyboardService : InputMethodService() {
         KeyFlowController.setKeyboardVisible(false)
     }
 
+    /**
+     * Região tocável da janela do IME (SB-T10/GRD-08). O `contentTopInsets`/`visibleTopInsets` ficam
+     * SEMPRE no tamanho do conteúdo real (sem o overscan) — outras apps (ex.: a barra de atalhos do
+     * Termux) nunca devem ver essa faixa invisível como "altura do teclado" e reposicionar a própria UI
+     * por causa dela (regressão encontrada no device físico, 2026-07-06, quando esses dois insets tinham
+     * sido amarrados ao mesmo valor de `TOUCHABLE_INSETS_CONTENT`). Só a REGIÃO TOCÁVEL muda: normalmente
+     * é só o conteúdo visível; enquanto uma grade efêmera está ancorando/ativa, expande pra janela
+     * inteira (incluindo o overscan), senão o Android trava as coordenadas do toque real na borda da
+     * janela assim que o dedo passa dela (achado original, mesma data).
+     */
+    override fun onComputeInsets(outInsets: Insets) {
+        super.onComputeInsets(outInsets)
+        val view = keyboardView ?: return
+        val overscan = view.gridOverscanPx
+        if (overscan <= 0) return
+        outInsets.contentTopInsets = overscan
+        outInsets.visibleTopInsets = overscan
+        outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_REGION
+        val touchableTop = if (view.gridDragActiveForTest) 0 else overscan
+        outInsets.touchableRegion.set(0, touchableTop, view.width, view.height)
+    }
+
     override fun onDestroy() {
         KeyFlowController.setKeyboardVisible(false)
         if (activeViewForTest === keyboardView) activeViewForTest = null
@@ -155,6 +178,18 @@ class KeyFlowKeyboardService : InputMethodService() {
     }
 
     override fun onEvaluateFullscreenMode() = false
+
+    /**
+     * Gira o device (retrato↔paisagem) muda a altura disponível de verdade — sem recriar a view, o
+     * overscan da grade (`gridOverscanPx`) calculado na orientação anterior sobrevivia com métricas
+     * erradas e podia estourar a janela do IME na paisagem, bem mais baixa (achado do Yan, device físico,
+     * 2026-07-06: teclado sumindo ao girar com uma grade grande configurada).
+     */
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        Log.d(TAG, "onConfigurationChanged orientation=${newConfig.orientation} keyboardView=$keyboardView")
+        if (keyboardView != null) setInputView(onCreateInputView())
+    }
 
     override fun onCreateInputView(): View {
         val repo = SettingsRepository(this@KeyFlowKeyboardService)

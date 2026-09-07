@@ -14,9 +14,10 @@ import com.keyflow.core.shortcuts.ShortcutGrid
 /**
  * Rendering da grade efêmera (GRD-02/06/07): `PopupWindow` **não-tocável** (o gesto pertence ao gatilho
  * na `BarView` — padrão provado pelo seletor do mic) cobrindo o retângulo da grade + uma faixa acima
- * para o preview do dedo. A grade em si é invisível: só a **lente** (célula atual + vizinhas imediatas)
- * e o **preview acima do ponto de toque**; com o dedo parado, o modo aprendizado revela tudo
- * semi-transparente.
+ * para o preview do dedo. A grade em si é invisível: só a **célula atual** e o **preview acima do ponto
+ * de toque**; com o dedo parado por [GridSession.REVEAL_DELAY_MS], o modo aprendizado revela tudo
+ * semi-transparente (decisão do Yan, 2026-07-06: um estágio intermediário de vizinhas foi tentado e
+ * descartado por não agregar).
  */
 class GridOverlayPopup(
     private val context: Context,
@@ -31,7 +32,7 @@ class GridOverlayPopup(
     private val kbInk = if (dark) 0xFFF1E7C9.toInt() else 0xFF2B2720.toInt()
     private val accent = MicVisuals.ACCENT_TEAL
 
-    private val previewSpacePx = dp(56f)
+    private val previewSpacePx = dp(PREVIEW_SPACE_DP)
     private var popup: PopupWindow? = null
     private val view = OverlayView()
 
@@ -91,6 +92,8 @@ class GridOverlayPopup(
             textAlign = Paint.Align.CENTER
             textSize = dp(13f)
         }
+        // Bolha de preview maior que o rótulo das células (mais legível — pedido do Yan, 2026-07-06).
+        private val previewTextPaint = Paint(textPaint).apply { textSize = dp(17f) }
         private val corner = dp(7f)
         private val cellMargin = dp(2f)
 
@@ -100,7 +103,6 @@ class GridOverlayPopup(
             if (revealed) {
                 for (index in 0 until grid.rows * grid.cols) drawCell(canvas, index, current, alpha = 210)
             } else if (current != null) {
-                neighborsOf(current).forEach { drawCell(canvas, it, current, alpha = 150) }
                 drawCell(canvas, current, current, alpha = 255)
             }
             if (current != null) drawPreview(canvas, f, current)
@@ -131,35 +133,29 @@ class GridOverlayPopup(
             canvas.drawText(label, rect.centerX(), y, textPaint)
         }
 
-        /** Vizinhas imediatas (8-conectadas) da célula — a "lente" ao redor do dedo (GRD-02). */
-        private fun neighborsOf(index: Int): List<Int> {
-            val row = index / grid.cols
-            val col = index % grid.cols
-            return buildList {
-                for (r in row - 1..row + 1) {
-                    for (c in col - 1..col + 1) {
-                        if (r == row && c == col) continue
-                        if (r in 0 until grid.rows && c in 0 until grid.cols) add(r * grid.cols + c)
-                    }
-                }
-            }
-        }
 
         /** Bolha acima do ponto de toque com o atalho da célula atual (o dedo não cobre — GRD-02). */
         private fun drawPreview(canvas: Canvas, f: GridFrame, current: Int) {
             val label = grid.cells[current]?.displayLabel ?: "·"
             val localX = (fingerX - f.left).coerceIn(0f, f.width)
             val localY = fingerY - f.top + previewSpacePx
-            textPaint.alpha = 255
-            val halfWidth = maxOf(textPaint.measureText(label) / 2 + dp(10f), dp(22f))
-            val bubbleBottom = localY - dp(28f)
-            val bubble = RectF(localX - halfWidth, bubbleBottom - dp(30f), localX + halfWidth, bubbleBottom)
+            previewTextPaint.alpha = 255
+            val halfWidth = maxOf(previewTextPaint.measureText(label) / 2 + dp(14f), dp(26f))
+            // Mais folga acima do dedo + bolha maior (pedido do Yan, 2026-07-06): antes 28/30dp.
+            val bubbleBottom = localY - dp(40f)
+            val bubble = RectF(localX - halfWidth, bubbleBottom - dp(38f), localX + halfWidth, bubbleBottom)
             fillPaint.color = kbInk
             fillPaint.alpha = 240
             canvas.drawRoundRect(bubble, corner, corner, fillPaint)
-            textPaint.color = if (kbInk == 0xFF2B2720.toInt()) Color.WHITE else Color.BLACK
-            val y = bubble.centerY() - (textPaint.descent() + textPaint.ascent()) / 2
-            canvas.drawText(label, bubble.centerX(), y, textPaint)
+            previewTextPaint.color = if (kbInk == 0xFF2B2720.toInt()) Color.WHITE else Color.BLACK
+            val y = bubble.centerY() - (previewTextPaint.descent() + previewTextPaint.ascent()) / 2
+            canvas.drawText(label, bubble.centerX(), y, previewTextPaint)
         }
+    }
+
+    companion object {
+        // internal: KeyFlowKeyboardView usa pra dimensionar o overscan da janela do IME (SB-T10/GRD-08).
+        // Bolha maior/mais alta (drawPreview) precisa de mais faixa reservada acima da grade — antes 56f.
+        internal const val PREVIEW_SPACE_DP = 90f
     }
 }
