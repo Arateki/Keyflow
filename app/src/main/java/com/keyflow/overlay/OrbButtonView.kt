@@ -101,6 +101,10 @@ class OrbButtonView(
     var renderedState: ButtonState = ButtonState.IDLE_NO_FIELD
         private set
 
+    /** Acessores somente-leitura para testes instrumentados do modo-arrasto travado. */
+    val dragLockedForTest: Boolean get() = dragLocked
+    val dragKindForTest: OrbDragKind? get() = dragKind
+
     private var sizePx: Int = orbSizePx
 
     /** Redimensiona a orbe ao vivo (slider da aba Sobrepor). A janela é WRAP_CONTENT → remede ao atualizar. */
