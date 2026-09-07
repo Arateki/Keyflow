@@ -1256,3 +1256,55 @@ anterior. Fica pra quando ele revisar aquele lote.
 **Pendente [YAN]**: validação manual no Galaxy A32 (grade às cegas — lente/háptica/preview, aceleração da
 alavanca, tmux via SSH pros success criteria) e, aprovada, promover `kbd_bars` a padrão (remover a barra
 antiga da `KeyFlowKeyboardView`, fechando ROL-02/M6).
+
+## Q8 — Modais dos editores e teclado sem rolagem (2026-09-07)
+
+**Contexto**: sequência dos ajustes que o Yan pediu usando o app no A32. Junto entrou o
+dimensionamento de grade/barras/QWERTY em paisagem (`GridSizing`) que estava em voo sem commit.
+
+**Achado central — "modal" que nunca foi modal**: `GridEditSheet`, `PhysicalKeyPicker` e os três
+sheets do `BarsEditor` desenhavam o scrim `fillMaxSize()` na árvore de quem os chamava. Como quem
+chama vive dentro de uma coluna rolável do painel, o scrim herdava as constraints DAQUELE `Box`: o
+"modal" abria espremido dentro da própria seção, com os cantos arredondados de bottom sheet
+aparecendo no meio da tela e sem faixa de scrim para fechar clicando fora. A correção foi mover o
+`ConfigModal` para uma **janela própria** (`Popup` com `focusable = true`, que também dá o botão
+Voltar do Android). Vale como regra geral neste app: overlay que precisa cobrir a tela **não pode**
+nascer dentro de conteúdo rolável — `fillMaxSize()` ali é o tamanho do pai, não o da tela.
+
+**Lição de técnica — medir texto, não estimar**: a primeira versão do teclado escalado calculava
+"largura do char ≈ 0.58 × fontSize" e cortava "Home"/"PgUp"/"End" no A32. A conta ignorava a métrica
+real da SpaceGrotesk e o `fontScale` do sistema. Trocado por `fittedFontSizeSp` (ConfigFields.kt),
+que mede com `rememberTextMeasurer` e desce o tamanho até caber. O Compose BOM do projeto
+(2024.09.03 / 1.7.x) não tem `BasicText(autoSize=)`, que resolveria isso nativamente — reavaliar
+quando o BOM subir para 1.8+.
+
+**Armadilha de ferramenta (custou dados do Yan)**: rodar `connectedDebugAndroidTest` do Gradle
+**desinstala o app ao terminar** — apagou as configurações e os tokens no A32 no meio da sessão. Os
+scripts `verify-*-gifs.sh` já usavam `am instrument` exatamente por isso; a regra vale para
+QUALQUER rodada instrumentada no device do Yan, não só as que geram artefatos.
+
+## Emenda do Q8 — crash em loop das prefs cifradas (2026-09-07)
+
+**Sintoma**: `AEADBadTagException` em toda leitura de settings, logo na inicialização → crash em
+loop que só saía com "limpar dados". Apareceu no A32 ao reinstalar o app por cima de dados
+restaurados (a reinstalação dos testes é que expôs, mas qualquer usuário com backup restaurado
+cairia nisso).
+
+**Causa**: o keyset do Tink mora num `shared_prefs` comum e entrava no Auto Backup / transferência
+D2D; a chave mestra mora no Keystore e **não é exportável**. Restore, troca de aparelho ou
+reinstalação sobre dados restaurados devolve um sem o outro. O manifest não declarava
+`allowBackup`/`dataExtractionRules` e pegava o padrão "faz backup de tudo".
+
+**Correção em duas frentes**: `backup_rules.xml` + `data_extraction_rules.xml` excluem
+`keyflow_secure.xml` (prevenção), e `SecurePrefs` descarta o par keyset+chave e recria vazio quando
+as prefs não abrem (recuperação para quem já está quebrado). A leitura de sanidade (`.all`) dentro
+do mesmo `try` cobre o caso do keyset válido com um valor individual ilegível, que passaria pela
+criação e só estouraria depois num `getString` solto.
+
+**Nota para NM-T12/MZ-T1**: as duas tasks também escrevem regras de backup. Quem chegar reconcilia
+com o que já está lá — identidade INCLUÍDA, `models/` EXCLUÍDO, e `keyflow_secure.xml` EXCLUÍDO
+(este último não é negociável: incluí-lo de volta reintroduz o crash).
+
+**Teste**: `SecurePrefsRecoveryTest` apaga a entrada do Keystore para reproduzir o restore. Usa um
+alias próprio (daí o parâmetro `keyAlias`) — com o alias de produção, rodar o teste destruiria as
+prefs reais do aparelho, recriando o bug que ele testa.

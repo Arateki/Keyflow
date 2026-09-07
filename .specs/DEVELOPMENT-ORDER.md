@@ -32,7 +32,7 @@
 9. **Portões do Yan**: itens marcados **[YAN]** são decisões/validações manuais dele (device
    físico, Play Console, aprovações). O agente prepara tudo, avisa, e **não** executa por ele.
 
-## Estado atual (2026-07-02)
+## Estado atual (2026-09-07)
 
 | Milestone | Feature | Status |
 | --------- | ------- | ------ |
@@ -40,6 +40,7 @@
 | M4 | `orb-gestures` (reconciliação) | ✅ concluído |
 | M5 | `keyboard-canvas` | ✅ concluído (KC-T1..T10, grade Canvas promovida a padrão, teclado antigo removido) |
 | M6 | `shortcut-bars` | SB-T1..T9 ✅; **SB-T10 parcial** (a11y+goldens automatizáveis prontos; falta manual do Yan no A32 + promoção de `kbd_bars`) |
+| — | Ajustes pós-uso no A32 (Q8 + emendas) | ✅ dimensionamento em paisagem, modais dos editores, crash das prefs cifradas — ver Bloco 1 |
 | — | `gesture-tour` | spec/design/tasks prontos (Draft) — nada implementado |
 | — | `native-voice-models` | spec/design/tasks prontos (Draft) — nada implementado |
 | — | `vision-capture` | spec/design/tasks prontos (Draft) — nada implementado |
@@ -99,14 +100,26 @@ Pequenas, sem spec própria; fazer em quick mode (TASK.md + SUMMARY.md + commit)
       Fecha KC-T10 no `keyboard-canvas/tasks.md`. Gate: 241 unit + instrumentado `ime` 28/29 (1 falha
       ambiental conhecida).
 
+### Q5..Q8 — ajustes pedidos pelo Yan usando o app no A32 (2026-07-06..09-07)
+
+- [x] **Q8 — Modal do editor de grade + picker sem rolagem** (`.specs/quick/008-modal-grade-picker/`).
+      Junto vieram: dimensionamento de grade/barras/QWERTY pelo espaço real em paisagem
+      (`GridSizing`), os modais do editor de barras e o `+` fora da faixa rolável.
+      **Emenda**: crash em loop das prefs cifradas depois de restore de backup (`SecurePrefs` +
+      regras de backup) — achado ao reinstalar o app durante os testes.
+      Pendente **[YAN]**: goldens das rotas novas (`grids-editor-modal`, `bars-editor`) não foram
+      gerados — dependem da revisão do lote de goldens abaixo.
+
 ## Bloco 2 — Fechar `shortcut-bars` (Milestone 6)
 
 Spec: `.specs/features/shortcut-bars/` — seguir o `tasks.md` de lá:
 
-- [ ] **SB-T8** — `PhysicalKeyPicker` (bottom sheet Compose, teclado ANSI)
-- [ ] **SB-T9** — Editores WYSIWYG de grades + barras no `TecladoPanel`
-- [ ] **SB-T10** — A11y + goldens + **[YAN]** manual (tmux via SSH no A32) → promover `kbd_bars`
-      a padrão
+- [x] **SB-T8** — `PhysicalKeyPicker` (commit `29983a2`). Deixou de ser bottom sheet no Q8: virou
+      `ConfigModal`, e o teclado ANSI escala por linha em vez de rolar.
+- [x] **SB-T9** — Editores WYSIWYG de grades + barras no `TecladoPanel` (commit `09487bf`).
+- [ ] **SB-T10** — a11y e goldens automatizáveis ✅ (commits `00846e0`/`1a1a339`); falta **[YAN]**
+      o manual no A32 (grade às cegas, alavanca, tmux via SSH) e, aprovado, promover `kbd_bars` a
+      padrão removendo a barra antiga da `KeyFlowKeyboardView`.
 
 ## Bloco 3 — `gesture-tour` (prévia de gestos + Docs + apresentação)
 
