@@ -27,6 +27,7 @@ import com.keyflow.ui.PermissionStatus
 import com.keyflow.ui.common.SaveController
 import com.keyflow.ui.config.ConfigScreen
 import com.keyflow.ui.config.ConfigTab
+import com.keyflow.ui.config.GridsEditor
 import com.keyflow.ui.config.PhysicalKeyPicker
 import com.keyflow.ui.onboarding.OnboardingScreen
 import com.keyflow.ui.orb.OrbCenter
@@ -83,6 +84,29 @@ object RouteCatalog {
         barCustomOverflowRoute("bar-custom-overflow"),
         barGridRevealedRoute("bar-grid-revealed"),
         barJoystickPulledRoute("bar-joystick-pulled"),
+        // Editor de grade no modal (Q8): grade grande o bastante pra exercitar o encolhimento de célula.
+        Route("grids-editor-modal") {
+            Box(Modifier.fillMaxSize()) {
+                GridsEditor(
+                    grids = listOf(
+                        ShortcutGrid(
+                            id = "g1",
+                            name = "tmux",
+                            rows = 5,
+                            cols = 6,
+                            cells = mapOf(
+                                0 to GridCell(PhysicalKeyMap.key(android.view.KeyEvent.KEYCODE_C)),
+                                1 to GridCell(PhysicalKeyMap.key(android.view.KeyEvent.KEYCODE_N)),
+                                7 to GridCell(PhysicalKeyMap.key(android.view.KeyEvent.KEYCODE_P, ctrl = true)),
+                            ),
+                        ),
+                    ),
+                    onGridsChange = {},
+                    referencedGridIds = emptySet(),
+                    initialEditingGridId = "g1",
+                )
+            }
+        },
         Route("shortcut-key-picker") {
             Box(Modifier.fillMaxSize()) {
                 PhysicalKeyPicker(visible = true, onSelect = {}, onDismiss = {})

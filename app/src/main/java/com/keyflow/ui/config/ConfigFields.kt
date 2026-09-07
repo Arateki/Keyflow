@@ -14,11 +14,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.LocalTextStyle
@@ -43,14 +43,20 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.vector.PathParser
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.keyflow.core.RecordingMode
@@ -450,3 +456,41 @@ internal fun FillIcon(path: String, tint: Color, modifier: Modifier) {
 private val LOCK_PATHS = listOf("M3 11 h18 v11 h-18 z", "M7 11V7a5 5 0 0 1 10 0v4")
 private val LOCK_OPEN_PATHS = listOf("M3 11 h18 v11 h-18 z", "M7 11V7a5 5 0 0 1 9.9-1")
 private val CHEVRON_DOWN = listOf("M6 9 12 15 18 9")
+
+/**
+ * Maior tamanho de fonte (em sp), de [maxSp] pra baixo, que faz todos os [labels] caberem em
+ * [maxTextWidth]. Mede de verdade com [rememberTextMeasurer] em vez de estimar largura de caractere: a
+ * primeira versão do teclado escalado do picker (Q8) chutava "largura do char ≈ 0.58 × fontSize" e cortava
+ * "Home"/"PgUp"/"End" na tela do A32 — a conta ignorava tanto a métrica real da SpaceGrotesk quanto o
+ * `fontScale` do sistema.
+ */
+@Composable
+internal fun fittedFontSizeSp(
+    labels: List<String>,
+    maxTextWidth: Dp,
+    maxSp: Float,
+    minSp: Float,
+    fontFamily: FontFamily,
+): Float {
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    // Só os rótulos mais compridos disputam o limite — medir os 14 da linha a cada passo é desperdício.
+    val longest = labels.filter { it.length == (labels.maxOfOrNull { l -> l.length } ?: 0) }.distinct()
+    return remember(longest, maxTextWidth, maxSp, minSp, density.density, density.fontScale, fontFamily) {
+        var sp = maxSp
+        while (sp > minSp) {
+            val fits = longest.all { label ->
+                val width = measurer.measure(
+                    AnnotatedString(label),
+                    style = TextStyle(fontFamily = fontFamily, fontSize = sp.sp),
+                ).size.width
+                with(density) { width.toDp() } <= maxTextWidth
+            }
+            if (fits) break
+            sp -= FONT_FIT_STEP_SP
+        }
+        sp.coerceAtLeast(minSp)
+    }
+}
+
+private const val FONT_FIT_STEP_SP = 0.5f

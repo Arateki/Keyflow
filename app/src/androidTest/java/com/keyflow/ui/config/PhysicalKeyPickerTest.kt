@@ -123,4 +123,20 @@ class PhysicalKeyPickerTest {
             assertNull(selected)
         }
     }
+
+    @Test
+    fun theWholeKeyboardFitsWithoutHorizontalScrolling() {
+        rule.setContent {
+            KeyFlowTheme(dark = false) {
+                PhysicalKeyPicker(visible = true, onSelect = {}, onDismiss = {})
+            }
+        }
+
+        // Q8: cada linha escala pra largura disponível, então as ÚLTIMAS teclas das linhas mais longas
+        // (que antes ficavam fora da viewport, atrás do horizontalScroll de cada linha) estão visíveis.
+        rule.onNodeWithTag(physicalKeyTag(KeyEvent.KEYCODE_F12)).assertIsDisplayed()
+        rule.onNodeWithTag(physicalKeyTag(KeyEvent.KEYCODE_BACKSLASH)).assertIsDisplayed()
+        rule.onNodeWithTag(physicalKeyTag(KeyEvent.KEYCODE_ENTER)).assertIsDisplayed()
+        rule.onNodeWithTag(physicalKeyTag(KeyEvent.KEYCODE_FORWARD_DEL)).assertIsDisplayed()
+    }
 }

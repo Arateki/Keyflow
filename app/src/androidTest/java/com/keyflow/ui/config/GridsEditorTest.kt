@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -170,5 +171,45 @@ class GridsEditorTest {
         rule.onNodeWithTag(gridDeleteConfirmTag("g1")).performClick()
 
         rule.runOnIdle { assertTrue(h.grids.isEmpty()) }
+    }
+
+    @Test
+    fun tappingACellSwapsTheSameModalForThePicker() {
+        val grid = ShortcutGrid(id = "g1", name = "Grade 1", rows = 2, cols = 2)
+        val h = Harness(listOf(grid))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(gridRowTag("g1")).performClick()
+        rule.onNodeWithTag(GRIDS_EDITOR_SHEET_TAG).assertIsDisplayed()
+
+        rule.onNodeWithTag(gridCellTag(0, 0)).performClick()
+
+        // Q8: um modal SÓ — o editor sai de cena e o picker toma o lugar dele (antes o picker era um
+        // segundo overlay full-screen empilhado por cima, com dois scrims sobrepostos).
+        rule.onAllNodesWithTag(GRIDS_EDITOR_SHEET_TAG).assertCountEquals(0)
+        rule.onNodeWithTag(PHYSICAL_KEY_PICKER_TAG).assertIsDisplayed()
+
+        rule.onNodeWithTag(GRIDS_EDITOR_PICKER_BACK_TAG).performClick()
+
+        rule.onNodeWithTag(GRIDS_EDITOR_SHEET_TAG).assertIsDisplayed()
+        rule.onAllNodesWithTag(PHYSICAL_KEY_PICKER_TAG).assertCountEquals(0)
+        rule.runOnIdle { assertTrue(h.grids.single().cells.isEmpty()) }
+    }
+
+    @Test
+    fun selectingAKeyReturnsToTheGridEditorInsteadOfClosingEverything() {
+        val grid = ShortcutGrid(id = "g1", name = "Grade 1", rows = 2, cols = 2)
+        val h = Harness(listOf(grid))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(gridRowTag("g1")).performClick()
+        rule.onNodeWithTag(gridCellTag(0, 1)).performClick()
+        rule.onNodeWithTag(physicalKeyTag(KeyEvent.KEYCODE_B)).performClick()
+
+        // Volta pro editor (dá pra emendar a próxima célula) em vez de fechar o modal inteiro.
+        rule.onNodeWithTag(GRIDS_EDITOR_SHEET_TAG).assertIsDisplayed()
+        rule.runOnIdle {
+            assertEquals(GridCell(ShortcutKey(KeyEvent.KEYCODE_B, label = "b")), h.grids.single().cells[1])
+        }
     }
 }
