@@ -1,12 +1,14 @@
 # KeyFlow API — Context (decisões da discussão, 2026-07-02)
 
 Gray areas resolvidas com o Yan no brainstorm de monetização. A spec do app consumidor é
-`.specs/features/monetization/`. **Esta spec migra para o repositório da API (Rust) quando ele
-existir** (decisão do Yan).
+`.specs/features/monetization/`. **Atualização 2026-07-02: monorepo** — o Yan optou por manter a
+API neste repositório (código em `api/` na raiz); esta spec permanece aqui. Supersede a decisão
+anterior de migrar para repo próprio.
 
 ## M1 — Duas specs, API primeiro
 A API é fundação (identidade, validação de compra, ledger, proxy, manifest, config remota); a
-monetização no app é consumidora. Specs separadas também facilitam mover esta para o repo Rust.
+monetização no app é consumidora. Specs separadas mantêm a fronteira clara (backend × app
+consumidor) — agora dentro do mesmo monorepo.
 
 ## M2 — Sem login, com segurança server-side (pergunta central do Yan)
 "Tem como ser seguro sem login?" — Sim, com o trio:
