@@ -69,8 +69,31 @@ no Galaxy A32:
   tela cheia, `✕` no topo direito, célula → picker no MESMO modal com `←`, `←` volta pro editor, clique
   fora fecha, teclado ANSI inteiro sem rolagem com todos os rótulos cabendo.
 
-## Pendente [YAN]
+## Emenda: crash das prefs cifradas (`SecurePrefs`)
 
+Bug de produto encontrado *por causa* desta sessão (a reinstalação do app durante os testes reproduziu o
+estado), corrigido a pedido do Yan:
+
+- **Sintoma**: `AEADBadTagException` em toda leitura de settings → crash em loop, só saía com "limpar
+  dados". Visto no A32 depois de reinstalar por cima de dados restaurados.
+- **Causa**: o keyset do Tink mora num `shared_prefs` comum (entra no Auto Backup / D2D), mas a chave
+  mestra mora no Keystore e **não é exportável**. Restore/troca de aparelho devolve um sem o outro.
+- **Correção em duas frentes**:
+  1. *Prevenção* — `res/xml/backup_rules.xml` + `res/xml/data_extraction_rules.xml` excluem
+     `keyflow_secure.xml` do backup e da transferência D2D (`AndroidManifest` passou a apontar pros dois;
+     antes não declarava nenhum e pegava o padrão "faz backup de tudo").
+  2. *Recuperação* — `SecurePrefs` (novo, extraído de `SettingsRepository.createSecurePrefs`) descarta o
+     par keyset+chave e recria as prefs vazias quando elas não abrem. Inclui uma leitura de sanidade
+     (`.all`) dentro do mesmo `try`, senão um valor individual ilegível só estouraria depois, num
+     `getString` solto.
+- **Perda aceita**: os tokens das APIs (irrecuperáveis — a chave que os decifra não existe mais); o
+  usuário reinsere. Nada fora dos segredos passa por aí (o resto mora no DataStore em claro).
+- **Teste**: `SecurePrefsRecoveryTest` (androidTest) reproduz o cenário de restore apagando a entrada do
+  Keystore com um alias próprio do teste — daí o parâmetro `keyAlias` novo, para não destruir a chave de
+  produção do aparelho ao rodar. Verificado que o teste PEGA o bug: com a recuperação desligada, ele
+  falha com o mesmo `AEADBadTagException` do device.
+
+## Pendente [YAN]
 
 - Golden das rotas novas não foi gerado (o golden `config-teclado` já tinha diff não aprovado de antes —
   mesma decisão registrada na SB-T10).

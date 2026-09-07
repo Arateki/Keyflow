@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Auto Backup (Android 11 e anteriores). As prefs cifradas (`keyflow_secure`) ficam FORA do backup: o
+  keyset do Tink mora nelas, mas a chave mestra que o decifra mora no Keystore e não é exportável — logo,
+  restaurar as prefs sem a chave só produz `AEADBadTagException` em toda leitura (crash em loop até
+  "limpar dados"; achado no Galaxy A32, 2026-09-07). Sem elas no backup, o app recomeça pedindo o token,
+  que é o comportamento correto. `SecurePrefs` ainda tem recuperação pra quem já está com o estado quebrado.
+-->
+<full-backup-content>
+    <exclude domain="sharedpref" path="keyflow_secure.xml" />
+</full-backup-content>

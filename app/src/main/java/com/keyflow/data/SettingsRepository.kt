@@ -12,7 +12,6 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
-import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.keyflow.core.OrbShortcutAction
 import com.keyflow.core.OverlaySide
@@ -316,23 +315,11 @@ class SettingsRepository(
         const val OPENAI_TOKEN = "openai_token"
         const val GROQ_TOKEN = "groq_token"
 
-        fun createSecurePrefs(context: Context, name: String): SharedPreferences {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-                return context.getSharedPreferences(name, Context.MODE_PRIVATE)
-            }
-
-            val masterKey = MasterKey.Builder(context)
-                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                .build()
-
-            return EncryptedSharedPreferences.create(
-                context,
-                name,
-                masterKey,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
-            )
-        }
+        fun createSecurePrefs(
+            context: Context,
+            name: String,
+            keyAlias: String = MasterKey.DEFAULT_MASTER_KEY_ALIAS,
+        ): SharedPreferences = SecurePrefs.create(context, name, keyAlias)
 
         fun dataStoreFor(
             file: File,

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+: backup na nuvem e transferência device-to-device. Mesma exclusão do `backup_rules.xml` —
+  ver o comentário de lá; a transferência D2D também não leva a chave do Keystore junto.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="keyflow_secure.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="keyflow_secure.xml" />
+    </device-transfer>
+</data-extraction-rules>
