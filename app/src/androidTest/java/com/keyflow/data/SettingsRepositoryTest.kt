@@ -174,6 +174,34 @@ class SettingsRepositoryTest {
     }
 
     @Test
+    fun saveModeFlagsWritesOnlyTheRequestedFlag() = runTest {
+        val repository = newRepository()
+        repository.saveSettings(Settings(themeDark = true, orbSizePx = 250))
+
+        repository.saveOverlayModeEnabled(true)
+        repository.saveKeyboardModeEnabled(true)
+
+        val settings = repository.settingsFlow().first()
+        assertEquals(true, settings.overlayModeEnabled)
+        assertEquals(true, settings.keyboardModeEnabled)
+        assertEquals(true, settings.themeDark)
+        assertEquals(250, settings.orbSizePx)
+    }
+
+    @Test
+    fun saveOnboardingDoneDoesNotOverwriteModeFlags() = runTest {
+        val repository = newRepository()
+        repository.saveSettings(Settings(overlayModeEnabled = true, keyboardModeEnabled = true))
+
+        repository.saveOnboardingDone(true)
+
+        val settings = repository.settingsFlow().first()
+        assertEquals(true, settings.onboardingDone)
+        assertEquals(true, settings.overlayModeEnabled)
+        assertEquals(true, settings.keyboardModeEnabled)
+    }
+
+    @Test
     fun themeDarkScaleAndLanguageFlowsReflectLiveChanges() = runTest {
         // Pedido do Yan, 2026-07-03: o teclado aberto precisa reagir sem precisar reabrir — a base disso
         // é o Flow realmente emitir de novo quando o valor muda (mesmo padrão de barsConfigFlow/BAR-07).

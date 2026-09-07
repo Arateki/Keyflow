@@ -82,6 +82,18 @@ class SettingsRepository(
         dataStore.edit { it[KEYBOARD_LANGUAGE] = language }
     }
 
+    suspend fun saveOnboardingDone(done: Boolean) {
+        dataStore.edit { it[ONBOARDING_DONE] = done }
+    }
+
+    suspend fun saveOverlayModeEnabled(enabled: Boolean) {
+        dataStore.edit { it[OVERLAY_MODE_ENABLED] = enabled }
+    }
+
+    suspend fun saveKeyboardModeEnabled(enabled: Boolean) {
+        dataStore.edit { it[KEYBOARD_MODE_ENABLED] = enabled }
+    }
+
     /** Leitura leve da intensidade de vibração (háptica da grade efêmera/alavanca — GRD-03/JOY-02). */
     suspend fun vibrationIntensityOnce(): Int = dataStore.data.first().let { prefs ->
         prefs[VIBRATION_INTENSITY] ?: (if (prefs[HAPTIC_FEEDBACK] == false) 0 else 60)
