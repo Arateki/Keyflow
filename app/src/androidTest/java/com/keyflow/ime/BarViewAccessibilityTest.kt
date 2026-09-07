@@ -22,6 +22,7 @@ import com.keyflow.data.SettingsRepository
 import com.keyflow.ime.bars.BarView
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Before
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -47,11 +48,18 @@ class BarViewAccessibilityTest {
     private val device: UiDevice get() = UiDevice.getInstance(instrumentation)
     private val uiPrefs get() = context.getSharedPreferences("keyflow_kb_ui", Context.MODE_PRIVATE)
 
+    // Preserva o que o dono do aparelho já tinha configurado — ver [UserSettingsGuard].
+    private val userSettings = UserSettingsGuard(context)
+
+    @Before
+    fun captureUserSettings() {
+        userSettings.capture()
+    }
+
     @After
     fun tearDown() {
         uiPrefs.edit().remove(KEY_BARS).apply()
-        runBlocking { SettingsRepository(context).saveBarsConfig(BarsConfig.DEFAULT) }
-        shell("ime reset")
+        userSettings.restore()
         device.pressHome()
         KeyFlowController.clearInserter()
         KeyFlowController.updateButtonState(ButtonState.IDLE_NO_FIELD)

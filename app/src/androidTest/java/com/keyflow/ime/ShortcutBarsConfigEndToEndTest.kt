@@ -40,6 +40,7 @@ import com.keyflow.ui.config.physicalKeyTag
 import com.keyflow.ui.theme.KeyFlowTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Before
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -65,14 +66,18 @@ class ShortcutBarsConfigEndToEndTest {
     private val device: UiDevice get() = UiDevice.getInstance(instrumentation)
     private val uiPrefs get() = context.getSharedPreferences("keyflow_kb_ui", Context.MODE_PRIVATE)
 
+    // Preserva o que o dono do aparelho já tinha configurado — ver [UserSettingsGuard].
+    private val userSettings = UserSettingsGuard(context)
+
+    @Before
+    fun captureUserSettings() {
+        userSettings.capture()
+    }
+
     @After
     fun tearDown() {
         uiPrefs.edit().remove(KEY_BARS).apply()
-        runBlocking {
-            SettingsRepository(context).saveBarsConfig(BarsConfig.DEFAULT)
-            SettingsRepository(context).saveShortcutGrids(emptyList())
-        }
-        shell("ime reset")
+        userSettings.restore()
         device.pressHome()
     }
 

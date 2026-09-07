@@ -43,8 +43,17 @@ class KeyFlowKeyboardSelectorTest {
     private val context: Context get() = instrumentation.targetContext
     private val device: UiDevice get() = UiDevice.getInstance(instrumentation)
 
+    // Preserva a config real de quem é dono do aparelho — ver [UserSettingsGuard].
+    private val userSettings = UserSettingsGuard(context)
+
     @Before
     fun setUp() {
+        userSettings.capture()
+        // Este teste cobre o SELETOR DA BARRA ANTIGA, que deixou de ser o padrão em 2026-09-07 (ROL-02).
+        // Enquanto esse caminho existir no código, o teste força a flag para exercitá-lo; quando a barra
+        // antiga sair, este arquivo migra para o seletor equivalente da BarView (MicSelectorController).
+        context.getSharedPreferences("keyflow_kb_ui", Context.MODE_PRIVATE)
+            .edit().putBoolean("kbd_bars", false).commit()
         shell("pm grant ${context.packageName} ${Manifest.permission.RECORD_AUDIO}")
         shell("ime enable $IME")
         shell("ime set $IME")
@@ -63,7 +72,8 @@ class KeyFlowKeyboardSelectorTest {
     @After
     fun tearDown() {
         runCatching { context.stopService(com.keyflow.overlay.OverlayService.intent(context)) }
-        shell("ime reset")
+        context.getSharedPreferences("keyflow_kb_ui", Context.MODE_PRIVATE).edit().remove("kbd_bars").commit()
+        userSettings.restore()
         device.pressHome()
         // KeyFlowController é um singleton de processo (sobrevive ao fim deste teste, dentro do mesmo
         // gate): sem isso, o próximo teste herdaria PAUSED/CANCELLING e o mic não mostraria "🎙" ocioso.
