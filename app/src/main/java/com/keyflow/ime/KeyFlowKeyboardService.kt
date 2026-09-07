@@ -9,7 +9,6 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import android.inputmethodservice.InputMethodService
 import android.inputmethodservice.InputMethodService.Insets
-import com.keyflow.BuildConfig
 import com.keyflow.core.KeyFlowController
 import com.keyflow.core.shortcuts.BarsConfig
 import com.keyflow.core.shortcuts.ShortcutGrid
@@ -46,10 +45,14 @@ class KeyFlowKeyboardService : InputMethodService() {
             uiPrefs.edit().putBoolean(KEY_EXPANDED, value).apply()
         }
 
-    // Flag de rollout das barras Canvas (SB-T5/ROL-02): desligada, a barra
-    // antiga fica intocada; ligada, a pilha de BarView renderiza a BarsConfig do DataStore.
+    // Barras Canvas são o PADRÃO desde 2026-09-07 (ROL-02): a pilha de BarView renderiza a BarsConfig
+    // do DataStore, em debug e em release. Enquanto era flag de rollout com default `false`, qualquer
+    // limpeza de dados devolvia o usuário à barra de fábrica sem nenhuma tela para religar — o Yan
+    // perdeu a configuração dele assim (as barras montadas sumiam do teclado sem explicação).
+    // A chave sobrevive só para os testes do caminho legado, que ainda não foram migrados, poderem
+    // forçá-lo com `false`; nada em produção escreve nela. Ela sai junto com a barra antiga.
     private val useBars: Boolean
-        get() = BuildConfig.DEBUG && uiPrefs.getBoolean(KEY_BARS, false)
+        get() = uiPrefs.getBoolean(KEY_BARS, true)
 
     // Última config aplicada à view (BAR-07): o collect de barsConfigFlow/gridsFlow recria a view só em
     // mudança real (o flow re-emite a cada write do DataStore, mesmo de chaves alheias).

@@ -207,6 +207,10 @@ class KeyboardMicHoldMotionArtifactTest {
                 onMicAction = onMicAction,
                 onHide = {},
                 frozenSeconds = FROZEN_SECONDS,
+                // Captura o hold do mic da barra ANTIGA (TextView + seletor por popup). Com as barras
+                // como padrão (ROL-02) o gesto equivalente vive no MicSelectorController da BarView —
+                // regravar os GIFs de lá é tarefa da remoção da barra antiga.
+                useBars = false,
             )
             activity.setContentView(
                 FrameLayout(activity).apply {

@@ -77,10 +77,11 @@ class KeyFlowKeyboardView(
     // Fileira dedicada de números acima do "qwertyuiop" (NUMROW-01, pedido do Yan, 2026-07-03) — só a
     // camada de letras; a grade numérica travada (NUM-01) e a de símbolos ficam intocadas.
     private val numberRowEnabled: Boolean = false,
-    // Barras personalizáveis em Canvas (SB-T5/BAR-01..07), atrás da flag `kbd_bars` (debug — ROL-02).
-    // Desligada: barra antiga (buildCollapsedLegacy) intocada. Ligada: pilha de `BarView` conforme a
-    // config, nos dois modos (retraído e expandido).
-    private val useBars: Boolean = false,
+    // Barras personalizáveis em Canvas (SB-T5/BAR-01..07) — o PADRÃO desde 2026-09-07 (ROL-02): pilha de
+    // `BarView` conforme a config, nos dois modos (retraído e expandido). Quem ainda quer a barra antiga
+    // (`buildCollapsedLegacy`) passa `false` explicitamente: os testes do caminho legado e o gerador de
+    // GIFs do hold do mic, até ela ser removida.
+    private val useBars: Boolean = true,
     private val barsConfig: BarsConfig = BarsConfig.DEFAULT,
     private val shortcutGrids: List<ShortcutGrid> = emptyList(),
     // Tecla avulsa/grade/alavanca emitem por aqui (service → PhysicalKeyEmitter).
@@ -233,7 +234,10 @@ class KeyFlowKeyboardView(
     val popupRectsForTest: List<android.graphics.Rect> get() = popupRects
     val highlightedIndexForTest: Int get() = highlightedIndex
     val canvasGridForTest: KeyboardGridView? get() = canvasGrid
-    val candidatesViewForTest: CandidatesView? get() = candidatesView
+    // Com as barras (padrão desde ROL-02), a faixa de sugestões vive DENTRO da BarView que tem o slot
+    // `Candidates` — o campo abaixo só é preenchido pelo caminho legado. Mesmo fallback de micLabelForTest.
+    val candidatesViewForTest: CandidatesView?
+        get() = candidatesView ?: barViews.firstNotNullOfOrNull { it.candidatesViewForTest }
 
     /**
      * Atualiza a faixa de sugestões (KC-T7); sem grade Canvas (candidatesView nulo) é no-op. A

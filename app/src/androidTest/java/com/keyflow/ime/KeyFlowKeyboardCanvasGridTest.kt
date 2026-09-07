@@ -62,8 +62,10 @@ class KeyFlowKeyboardCanvasGridTest {
     fun canvasGridDoesNotDisturbTheMicButton() {
         launchProbe()
 
-        // SYNC-01/02: mic continua a mesma View, tap ainda inicia gravação normalmente.
-        device.findObject(By.text("🎙"))?.click()
+        // SYNC-01/02: o tap no mic ainda inicia a gravação. Com as barras como padrão (ROL-02) o mic é
+        // desenhado em Canvas e não é mais um TextView, então é o nó de acessibilidade da BarView que o
+        // expõe — o `By.text` continua valendo enquanto a barra antiga existir.
+        (device.findObject(By.desc("🎙")) ?: device.findObject(By.text("🎙")))?.click()
         device.wait(Until.hasObject(By.textContains("●")), TIMEOUT)
         waitUntil("gravação não iniciou com a grade Canvas ativa") {
             KeyFlowController.buttonState.value == ButtonState.RECORDING
