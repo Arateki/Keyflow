@@ -47,3 +47,10 @@ sealed interface TranscriptionResult {
 enum class ErrorKind {
     NETWORK, AUTH, HTTP, TIMEOUT, EMPTY_AUDIO, TOO_LARGE, CONFIG_MISSING
 }
+
+/**
+ * Ação ao tocar num erro clicável (banner de overlay ou glifo ✖ do teclado/orbe): [NONE] não faz nada,
+ * [VOZ] abre a aba Voz (erro de config/token), [MODO_MIC] abre a aba Modo — o chip de Microfone já
+ * pulsa sozinho lá (StatusChip.pulsing), então só navegar até a aba já evidencia o card certo.
+ */
+enum class ErrorNavTarget { NONE, VOZ, MODO_MIC }

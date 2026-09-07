@@ -12,6 +12,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -50,6 +51,7 @@ import com.keyflow.ui.theme.SpaceMono
 const val ACTIVATE_OVERLAY_TAG = "activate-overlay"
 const val ACTIVATE_KEYBOARD_TAG = "activate-keyboard"
 const val ACTIVATE_MIC_TAG = "activate-mic"
+const val ACTIVATE_NOTIFICATION_TAG = "activate-notification"
 const val KEYBOARD_SWITCH_TAG = "keyboard-switch"
 
 /**
@@ -66,6 +68,7 @@ fun ModoPanel(
     onRequestOverlayPermission: () -> Unit,
     onRequestKeyboardPermission: () -> Unit,
     onRequestMicPermission: () -> Unit,
+    onRequestNotificationPermission: () -> Unit,
     onSwitchKeyboard: () -> Unit,
     modifier: Modifier = Modifier,
     overlayHighlightKey: Int = 0,
@@ -101,6 +104,12 @@ fun ModoPanel(
                     granted = permissions.overlayGranted,
                     onActivate = onRequestOverlayPermission,
                     activateTag = ACTIVATE_OVERLAY_TAG,
+                ),
+                CardPermission(
+                    label = "NOTIFICAÇÕES",
+                    granted = permissions.notificationsGranted,
+                    onActivate = onRequestNotificationPermission,
+                    activateTag = ACTIVATE_NOTIFICATION_TAG,
                 ),
             ),
             pauseHint = pauseHintFor(settings.overlayRecordingMode),
@@ -216,6 +225,7 @@ fun pauseHintFor(mode: RecordingMode): String = when (mode) {
     RecordingMode.PUSH_TO_TALK -> "Segure para gravar · solte para enviar · toque rápido após soltar para pausar."
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun ModeCard(
     title: String,
@@ -267,9 +277,9 @@ private fun ModeCard(
             PillToggle(checked = checked, onCheckedChange = onCheckedChange, tag = toggleTag)
         }
         FeatureList(features)
-        Row(
+        FlowRow(
             Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             permissions.forEach { perm ->

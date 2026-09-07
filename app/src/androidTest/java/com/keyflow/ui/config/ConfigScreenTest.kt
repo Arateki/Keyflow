@@ -48,10 +48,14 @@ class ConfigScreenTest {
     /** Harness: ConfigScreen com estado mutável; callbacks aplicam a mudança e registram efeitos. */
     private inner class Harness {
         var settings by mutableStateOf(Settings())
+        var permissions by mutableStateOf(allGranted)
         var lastOverlayChange: Boolean? = null
         var lastKeyboardChange: Boolean? = null
         var lastThemeChange: Boolean? = null
         var languageClicks = 0
+        var overlayPermissionRequests = 0
+        var notificationPermissionRequests = 0
+        var keyboardPermissionRequests = 0
         val saveController = SaveController()
 
         @Composable
@@ -61,7 +65,7 @@ class ConfigScreenTest {
                 CompositionLocalProvider(LocalOrbClock provides { 0f }) {
                 ConfigScreen(
                     settings = settings,
-                    permissions = allGranted,
+                    permissions = permissions,
                     saveController = saveController,
                     onOverlayModeChange = {
                         lastOverlayChange = it
@@ -78,9 +82,10 @@ class ConfigScreenTest {
                         settings = settings.copy(themeDark = it)
                     },
                     onLanguageClick = { languageClicks++ },
-                    onRequestOverlayPermission = {},
-                    onRequestKeyboardPermission = {},
+                    onRequestOverlayPermission = { overlayPermissionRequests++ },
+                    onRequestKeyboardPermission = { keyboardPermissionRequests++ },
                     onRequestMicPermission = {},
+                    onRequestNotificationPermission = { notificationPermissionRequests++ },
                     onSwitchKeyboard = {},
                     onSettingsChange = { settings = it },
                     modifier = Modifier.fillMaxSize(),
@@ -153,6 +158,56 @@ class ConfigScreenTest {
         rule.onNodeWithTag(TOGGLE_KEYBOARD_MODE_TAG).performClick()
 
         rule.runOnIdle { assertEquals(true, h.lastKeyboardChange) }
+    }
+
+    /**
+     * Ligar o Modo Sobrepor com sobrepor+notificações pendentes: o toast sobe, e pouco depois (sem
+     * precisar do usuário achar o chip) a tela/diálogo da permissão que falta abre sozinha — primeiro
+     * a de sobrepor (a que aparece primeiro nos chips), só depois a de notificações (Yan, 2026-07-04).
+     */
+    @Test
+    fun overlayModeTogglePendingPermissionsAutoOpenAfterToast() {
+        val h = Harness().also {
+            it.permissions = allGranted.copy(overlayGranted = false, notificationsGranted = false)
+        }
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(TOGGLE_OVERLAY_MODE_TAG).performClick()
+
+        // `runOnIdle` já resolve o delay do LaunchedEffect (o clock de teste do Compose avança sozinho
+        // até ficar ocioso) — então só dá pra provar a ORDEM: sobrepor primeiro, notificações ainda não.
+        rule.waitUntil(timeoutMillis = 2000) { h.overlayPermissionRequests == 1 }
+        assertEquals(0, h.notificationPermissionRequests)
+    }
+
+    /**
+     * Com só notificações pendentes, o encadeamento chama o MESMO [onRequestNotificationPermission] do
+     * clique manual no chip — ambos podem escalar pras configs do app se o Android já não mostrar mais
+     * o popup (negada permanentemente): sem essa igualdade, o encadeamento ficava sem conseguir
+     * terminar depois de uma negação (Yan, 2026-07-04).
+     */
+    @Test
+    fun overlayModeToggleAutoRequestsNotificationsViaSameHandlerAsChip() {
+        val h = Harness().also { it.permissions = allGranted.copy(notificationsGranted = false) }
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(TOGGLE_OVERLAY_MODE_TAG).performClick()
+
+        rule.waitUntil(timeoutMillis = 2000) { h.notificationPermissionRequests == 1 }
+    }
+
+    /** O microfone nunca bloqueia: com só ele pendente, o Modo Sobrepor liga sem abrir nada sozinho. */
+    @Test
+    fun overlayModeToggleIgnoresMissingMicrophone() {
+        val h = Harness().also { it.permissions = allGranted.copy(microphoneGranted = false) }
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(TOGGLE_OVERLAY_MODE_TAG).performClick()
+
+        rule.runOnIdle { assertEquals(true, h.lastOverlayChange) }
+        Thread.sleep(700) // tempo de sobra pro auto-request (não deveria disparar nada)
+        assertEquals(0, h.overlayPermissionRequests)
+        assertEquals(0, h.notificationPermissionRequests)
     }
 
     @Test

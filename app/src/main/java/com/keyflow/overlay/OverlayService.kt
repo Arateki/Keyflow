@@ -1,5 +1,6 @@
 package com.keyflow.overlay
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
@@ -7,6 +8,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
 import android.os.Build
@@ -16,8 +18,10 @@ import android.view.View
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import com.keyflow.audio.AudioRecorder
 import com.keyflow.core.ButtonState
+import com.keyflow.core.ErrorNavTarget
 import com.keyflow.core.KeyFlowController
 import com.keyflow.core.OrbShortcutAction
 import com.keyflow.core.OverlaySide
@@ -252,14 +256,18 @@ class OverlayService : Service() {
             maxRecordingMs = { cachedSettings.maxRecordingSec * 1000L },
             limitBannerDismissMs = limitBannerDismissMs,
             onRecordingTime = { acc, seg -> KeyFlowController.updateRecordingTime(acc, seg) },
-            onError = { message, opensVoz ->
-                KeyFlowController.errorOpensVoz = opensVoz
-                // Erro resolvível + permissão de sobreposição → banner clicável (abre a Voz). Senão toast.
-                if (opensVoz && OverlayPermission.canDrawOverlays(this)) {
-                    showErrorBanner(message)
+            onError = { message, target ->
+                KeyFlowController.errorNavTarget = target
+                // Erro clicável (Voz ou Modo) + permissão de sobreposição → banner clicável. Senão toast.
+                if (target != ErrorNavTarget.NONE && OverlayPermission.canDrawOverlays(this)) {
+                    showErrorBanner(message, onTap = if (target == ErrorNavTarget.VOZ) ::openVoz else ::openModoMic)
                 } else {
                     Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
                 }
+            },
+            microphoneGranted = {
+                ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
+                    PackageManager.PERMISSION_GRANTED
             },
         )
     }
@@ -328,7 +336,7 @@ class OverlayService : Service() {
             onPositionChanged = { position ->
                 serviceScope.launch { settingsRepository.saveOverlayPosition(position) }
             },
-            onErrorTap = ::openVoz,
+            onErrorTap = { if (KeyFlowController.errorNavTarget == ErrorNavTarget.MODO_MIC) openModoMic() else openVoz() },
             onShortcut = ::handleOrbShortcut,
             vibrationIntensity = { cachedSettings.vibrationIntensity },
             onDragArrows = ::updateDragArrows,
@@ -451,11 +459,19 @@ class OverlayService : Service() {
         )
     }
 
-    /** Banner sobreposto, clicável, para erros resolvíveis na Voz. Some sozinho em 2 s. */
-    private fun showErrorBanner(message: String) {
+    /** Abre o app direto na aba Modo (clique no X/banner de "falta permissão de microfone"). */
+    private fun openModoMic() {
+        startActivity(
+            com.keyflow.ui.SetupActivity.openAtModoMicIntent(this)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
+
+    /** Banner sobreposto, clicável, para erros com destino de navegação (Voz ou Modo). Some em 2 s. */
+    private fun showErrorBanner(message: String, onTap: () -> Unit) {
         removeErrorBanner()
         val banner = bannerView("⚠  $message", com.keyflow.ui.theme.OrbAccentArgb, 2000L) {
-            openVoz()
+            onTap()
             removeErrorBanner()
         }
         runCatching { windowManager.addView(banner, bannerParams()) }
@@ -521,7 +537,7 @@ class OverlayService : Service() {
             this.text = text
             setTextColor(ink)
             textSize = 13f
-            maxLines = 1
+            maxLines = 2
             gravity = Gravity.CENTER_HORIZONTAL
             // Mesma fonte do toast in-app (SpaceMono peso Medium resolve p/ space_mono_bold).
             typeface = androidx.core.content.res.ResourcesCompat.getFont(

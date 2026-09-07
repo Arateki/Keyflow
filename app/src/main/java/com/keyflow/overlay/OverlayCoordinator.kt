@@ -5,6 +5,7 @@ import android.util.Log
 import com.keyflow.audio.AudioConcatenator
 import com.keyflow.core.ButtonState
 import com.keyflow.core.ErrorKind
+import com.keyflow.core.ErrorNavTarget
 import com.keyflow.core.InsertOutcome
 import com.keyflow.core.TranscriptionResult
 import com.keyflow.data.Config
@@ -57,9 +58,14 @@ class OverlayCoordinator(
     // Tempo autoritativo de gravação (acumulado, início do segmento) — superfícies leem daqui p/ não
     // dessincronizar (ex.: teclado que sobe depois de transições já terem ocorrido).
     private val onRecordingTime: (accumulatedMs: Long, segmentStartMs: Long) -> Unit = { _, _ -> },
-    // (mensagem, abreVoz): abreVoz = erro resolvível na aba Voz (config/token) → tocar no X leva lá.
-    private val onError: (String, Boolean) -> Unit = { _, _ -> },
+    // (mensagem, ação): ver [ErrorNavTarget] — decide o que tocar no X/glifo ✖ faz.
+    private val onError: (String, ErrorNavTarget) -> Unit = { _, _ -> },
     private val recordingClockMs: () -> Long = { SystemClock.elapsedRealtime() },
+    // Checagem proativa antes de gravar (RECORD_AUDIO) — sem ela, só se descobre a falta na hora que o
+    // recorder nativo explode dentro do runCatching (Yan, 2026-07-04: as 3 superfícies de gravação —
+    // orbe, teclado, notificação — davam só um toast genérico "falha ao iniciar", sem dizer o motivo nem
+    // levar a lugar nenhum).
+    private val microphoneGranted: () -> Boolean = { true },
     // Funde os segmentos retidos num arquivo só antes de reenviar (ver stopAndTranscribe()). Injetável
     // porque o real usa MediaExtractor/MediaMuxer (framework Android, não roda em unit test puro).
     private val concatAudioSegments: (List<File>, File) -> File = { segments, dir -> AudioConcatenator.concat(segments, dir) },
@@ -367,12 +373,20 @@ class OverlayCoordinator(
     }
 
     private fun startRecording() {
+        if (!microphoneGranted()) {
+            onError("Conceda permissão de microfone para usar essa função.", ErrorNavTarget.MODO_MIC)
+            handleState(machine.onTranscriptionError())
+            return
+        }
         recordingStartMs = recordingClockMs()
         timeStart()
         scheduleLimitJob()
         runCatching { recorder.start() }
             .onFailure {
-                onError("Falha ao iniciar a gravação.", false)
+                // Rede de segurança: se a checagem proativa passou mas o recorder nativo ainda assim
+                // falhou por permissão (ex.: revogada bem no meio), não perde a mensagem certa.
+                val target = if (!microphoneGranted()) ErrorNavTarget.MODO_MIC else ErrorNavTarget.NONE
+                onError("Falha ao iniciar a gravação.", target)
                 handleState(machine.onTranscriptionError())
             }
     }
@@ -424,7 +438,7 @@ class OverlayCoordinator(
                 if (duration < MIN_RECORDING_MS) {
                     Log.d(TAG, "recording too short (${duration}ms), cancelling")
                     runCatching { recorder.stop() }
-                    onError("Gravação muito curta.", false)
+                    onError("Gravação muito curta.", ErrorNavTarget.NONE)
                     render(machine.onErrorDismissed())
                     return
                 }
@@ -432,7 +446,7 @@ class OverlayCoordinator(
             }
         }
         if (audio == null) {
-            onError("Não foi possível gravar o áudio.", false)
+            onError("Não foi possível gravar o áudio.", ErrorNavTarget.NONE)
             handleState(machine.onTranscriptionError())
             return
         }
@@ -475,16 +489,16 @@ class OverlayCoordinator(
                 }
                 is TranscriptionResult.Error -> {
                     Log.d(TAG, "transcription error: ${result.kind} ${result.message}")
-                    onError(errorMessage(result.kind), opensVoz(result.kind))
+                    onError(errorMessage(result.kind), errorNavTarget(result.kind))
                     handleState(machine.onTranscriptionError())
                 }
             }
         }
     }
 
-    /** Erros resolvíveis na aba Voz (config/token) — só estes tornam o X clicável para o atalho. */
-    private fun opensVoz(kind: ErrorKind): Boolean =
-        kind == ErrorKind.CONFIG_MISSING || kind == ErrorKind.AUTH
+    /** Erros de transcrição resolvíveis na aba Voz (config/token) — só estes tornam o X clicável. */
+    private fun errorNavTarget(kind: ErrorKind): ErrorNavTarget =
+        if (kind == ErrorKind.CONFIG_MISSING || kind == ErrorKind.AUTH) ErrorNavTarget.VOZ else ErrorNavTarget.NONE
 
     private fun errorMessage(kind: ErrorKind): String = when (kind) {
         ErrorKind.CONFIG_MISSING -> "Configure um provedor de voz na aba Voz."

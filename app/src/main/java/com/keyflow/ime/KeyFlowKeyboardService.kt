@@ -226,10 +226,14 @@ class KeyFlowKeyboardService : InputMethodService() {
             },
             onExpand = { preferExpanded = true },
             onErrorTap = {
-                startActivity(
+                val intent = if (com.keyflow.core.KeyFlowController.errorNavTarget ==
+                    com.keyflow.core.ErrorNavTarget.MODO_MIC
+                ) {
+                    com.keyflow.ui.SetupActivity.openAtModoMicIntent(this)
+                } else {
                     com.keyflow.ui.SetupActivity.openAtVozIntent(this)
-                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                )
+                }
+                startActivity(intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
             },
             dark = dark,
             scale = scale,

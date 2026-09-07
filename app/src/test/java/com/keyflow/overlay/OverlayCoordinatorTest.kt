@@ -54,6 +54,36 @@ class OverlayCoordinatorTest {
         ).inOrder()
     }
 
+    /**
+     * Checagem proativa (Yan, 2026-07-04): sem RECORD_AUDIO, nem tenta `recorder.start()` — vai direto
+     * pro erro certo, com [ErrorNavTarget.MODO_MIC] (antes só descobria a falta quando o recorder nativo
+     * já tinha explodido, com uma mensagem genérica sem destino de navegação nenhum).
+     */
+    @Test
+    fun `starting to record without microphone permission errors without touching the recorder`() = runTest {
+        val recorder = FakeRecorder(null)
+        val renderedStates = mutableListOf<ButtonState>()
+        var lastMessage: String? = null
+        var lastTarget: com.keyflow.core.ErrorNavTarget? = null
+
+        val coordinator = coordinator(
+            scope = this,
+            recorder = recorder,
+            targetAvailable = { true },
+            render = { renderedStates += it },
+            onError = { message, target -> lastMessage = message; lastTarget = target },
+            microphoneGranted = { false },
+        )
+
+        coordinator.onTap()
+        runCurrent()
+
+        assertThat(recorder.started).isEqualTo(0)
+        assertThat(renderedStates.last()).isEqualTo(ButtonState.ERROR)
+        assertThat(lastTarget).isEqualTo(com.keyflow.core.ErrorNavTarget.MODO_MIC)
+        assertThat(lastMessage).isEqualTo("Conceda permissão de microfone para usar essa função.")
+    }
+
     @Test
     fun `successful transcription without target copies to clipboard and returns to idle`() = runTest {
         val audio = temporaryFolder.newFile("audio.m4a").also { it.writeText("audio") }
@@ -844,12 +874,13 @@ class OverlayCoordinatorTest {
         onShowLimitReached: () -> Unit = {},
         onHideLimitReached: () -> Unit = {},
         maxRecordingMs: () -> Long = { 0L },
-        onError: (String, Boolean) -> Unit = { _, _ -> },
+        onError: (String, com.keyflow.core.ErrorNavTarget) -> Unit = { _, _ -> },
         cancelWindowMs: Long = 3000L,
         limitBannerDismissMs: Long = 3000L,
         recordingClockMs: () -> Long = longEnoughClock(),
         configTimeoutMs: Long = Config.DEFAULT_TIMEOUT_MS,
         concatAudioSegments: (List<File>, File) -> File = { segments, _ -> segments.first() },
+        microphoneGranted: () -> Boolean = { true },
     ) = OverlayCoordinator(
         scope = scope,
         configProvider = { completeConfig(configTimeoutMs) },
@@ -870,6 +901,7 @@ class OverlayCoordinatorTest {
         cancelWindowMs = cancelWindowMs,
         recordingClockMs = recordingClockMs,
         concatAudioSegments = concatAudioSegments,
+        microphoneGranted = microphoneGranted,
     )
 
     private fun completeConfig(timeoutMs: Long = Config.DEFAULT_TIMEOUT_MS): Config = Config(

@@ -17,6 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import com.keyflow.core.ButtonState
+import com.keyflow.core.ErrorNavTarget
 import com.keyflow.core.KeyFlowController
 import com.keyflow.core.OverlaySide
 import com.keyflow.core.RecordingMode
@@ -202,8 +203,8 @@ class OrbButtonView(
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 if (renderedState == ButtonState.ERROR) {
-                    // No estado de erro só agimos se for resolvível na Voz; senão o toque é ignorado.
-                    if (KeyFlowController.errorOpensVoz) onErrorTap()
+                    // No estado de erro só agimos se houver destino de navegação; senão o toque é ignorado.
+                    if (KeyFlowController.errorNavTarget != ErrorNavTarget.NONE) onErrorTap()
                     return true
                 }
                 if (renderedState == ButtonState.CANCELLING) {

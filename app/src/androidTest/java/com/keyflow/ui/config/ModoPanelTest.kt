@@ -4,6 +4,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -31,11 +32,12 @@ class ModoPanelTest {
         mic: Boolean = true,
         overlay: Boolean = true,
         keyboard: Boolean = true,
+        notifications: Boolean = true,
     ) = PermissionStatus(
         microphoneGranted = mic,
         overlayGranted = overlay,
         keyboardEnabled = keyboard,
-        notificationsGranted = true,
+        notificationsGranted = notifications,
     )
 
     @Test
@@ -52,6 +54,7 @@ class ModoPanelTest {
                         onRequestOverlayPermission = {},
                         onRequestKeyboardPermission = { activated = true },
                         onRequestMicPermission = {},
+                        onRequestNotificationPermission = {},
                         onSwitchKeyboard = {},
                     )
                 }
@@ -75,6 +78,7 @@ class ModoPanelTest {
                         onRequestOverlayPermission = {},
                         onRequestKeyboardPermission = {},
                         onRequestMicPermission = {},
+                        onRequestNotificationPermission = {},
                         onSwitchKeyboard = {},
                     )
                 }
@@ -83,6 +87,65 @@ class ModoPanelTest {
 
         // O chip continua presente (também é o botão de ativar), mas mostra CONCEDIDO.
         rule.onNodeWithTag(ACTIVATE_OVERLAY_TAG).assertIsDisplayed().assertTextContains("CONCEDIDO", substring = true)
+    }
+
+    @Test
+    fun showsActivateWhenNotificationPermissionPending() {
+        var activated = false
+        rule.setContent {
+            KeyFlowTheme(dark = false) {
+                CompositionLocalProvider(LocalOrbClock provides { 0f }) {
+                    ModoPanel(
+                        settings = Settings(),
+                        permissions = perms(notifications = false),
+                        onOverlayModeChange = {},
+                        onKeyboardModeChange = {},
+                        onRequestOverlayPermission = {},
+                        onRequestKeyboardPermission = {},
+                        onRequestMicPermission = {},
+                        onRequestNotificationPermission = { activated = true },
+                        onSwitchKeyboard = {},
+                    )
+                }
+            }
+        }
+
+        rule.onNodeWithTag(ACTIVATE_NOTIFICATION_TAG).assertIsDisplayed()
+            .assertTextContains("PENDENTE", substring = true)
+            .performClick()
+        rule.runOnIdle { assertEquals(true, activated) }
+    }
+
+    /**
+     * O microfone nunca bloqueia o Modo Sobrepor (a orbe segue útil sem gravar) — com o modo já ligado
+     * e o mic pendente, o chip continua mostrando PENDENTE (pulsando, ver [StatusChip.pulsing]) em vez
+     * de travar o card ou esconder o aviso (Yan, 2026-07-04).
+     */
+    @Test
+    fun micChipStaysPendingWithoutBlockingWhenOverlayModeIsOn() {
+        rule.setContent {
+            KeyFlowTheme(dark = false) {
+                CompositionLocalProvider(LocalOrbClock provides { 0f }) {
+                    ModoPanel(
+                        settings = Settings(overlayModeEnabled = true),
+                        permissions = perms(mic = false),
+                        onOverlayModeChange = {},
+                        onKeyboardModeChange = {},
+                        onRequestOverlayPermission = {},
+                        onRequestKeyboardPermission = {},
+                        onRequestMicPermission = {},
+                        onRequestNotificationPermission = {},
+                        onSwitchKeyboard = {},
+                    )
+                }
+            }
+        }
+
+        // O chip de mic é compartilhado pelos dois cards (Sobrepor e Teclado) — o 1º é o do Sobrepor.
+        rule.onAllNodesWithTag(ACTIVATE_MIC_TAG)[0].assertIsDisplayed()
+            .assertTextContains("PENDENTE", substring = true)
+        // Concedido/pendente da orbe seguem OK: mic não é o que trava o modo.
+        rule.onNodeWithTag(ACTIVATE_OVERLAY_TAG).assertTextContains("CONCEDIDO", substring = true)
     }
 
     @Test
@@ -100,6 +163,7 @@ class ModoPanelTest {
                         onRequestOverlayPermission = {},
                         onRequestKeyboardPermission = {},
                         onRequestMicPermission = {},
+                        onRequestNotificationPermission = {},
                         onSwitchKeyboard = {},
                     )
                 }
