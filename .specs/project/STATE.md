@@ -1308,3 +1308,40 @@ com o que já está lá — identidade INCLUÍDA, `models/` EXCLUÍDO, e `keyflo
 **Teste**: `SecurePrefsRecoveryTest` apaga a entrada do Keystore para reproduzir o restore. Usa um
 alias próprio (daí o parâmetro `keyAlias`) — com o alias de produção, rodar o teste destruiria as
 prefs reais do aparelho, recriando o bug que ele testa.
+
+## ROL-02 — barras Canvas promovidas e barra antiga removida (2026-09-07)
+
+**O que disparou**: o Yan relatou que o teclado tinha parado de mostrar o que ele configurava — o
+gatilho de grade não aparecia e o modo retraído ignorava o espelhamento, exibindo outra barra.
+
+**Causa raiz (não era regressão de código)**: `useBars` era
+`BuildConfig.DEBUG && uiPrefs.getBoolean("kbd_bars", false)`. Com a chave ausente, o serviço **nem
+lia** a `BarsConfig` do DataStore — passava `BarsConfig.DEFAULT` e renderizava a barra de fábrica, que
+não tem gatilho de grade e tem layouts fixos por modo. A configuração do usuário estava salva e
+correta o tempo todo (confirmado lendo o `preferences_pb` do aparelho: `mirrored:true`, gatilho de
+grade com prefixo `Ctrl+b`, grade 3×3). Nada em produção escrevia essa chave: só testes.
+
+**Como o aparelho chegou nesse estado — duas vias, ambas minhas**:
+1. o `pm clear` que usei para destravar o keyset apagou o `keyflow_kb_ui.xml`;
+2. o `tearDown` dos testes de barras fazia `remove(kbd_bars)` + `saveBarsConfig(DEFAULT)` +
+   `saveShortcutGrids(emptyList())` + `ime reset`. **Cada rodada apagava as barras, as grades e o
+   teclado padrão do dono do aparelho.** Corrigido com `UserSettingsGuard`, que captura o estado real
+   no `@Before` e devolve aquilo no `@After` — restaurar o default não é restaurar, é apagar. Vale
+   para qualquer teste novo que escreva em settings.
+
+**Decisão do Yan**: "a barra antiga não serve mais". As barras viraram o padrão (serviço e construtor
+da view), e a barra de fábrica saiu inteira: `buildTopStrip`, `buildCollapsedLegacy`,
+`micKey`/`specialKey`/`keyBase` e o seletor do mic por popup (~260 linhas), junto com a flag.
+
+**Achados da migração dos testes**:
+- `barViewsForTest` acumula as barras dos DOIS modos; a que vale é a **visível**. Ler a última da
+  lista fazia o gesto sintético cair fora do mic — foi o que quebrou os três testes do seletor na
+  primeira tentativa, com sintoma enganoso ("estado não chegou a PAUSED").
+- `micLabelForTest` dependia da geometria medida; passou a derivar da config, senão uma view
+  construída em teste e não medida responde `null` onde a antiga respondia pelo texto do TextView.
+- O limiar de 0,5% do `diff-screens.sh` **não pegou** a troca da barra inteira nas rotas do teclado
+  (0,13%): as duas silhuetas são parecidas demais. Golden aprovado à mão pelo Yan. Se um dia a
+  regressão visual precisar pegar troca de componente, o limiar global não basta.
+
+**Pendente [YAN]**: a validação manual que fecha a SB-T10 (grade às cegas, aceleração da alavanca,
+tmux via SSH). A promoção e a limpeza já estão feitas.

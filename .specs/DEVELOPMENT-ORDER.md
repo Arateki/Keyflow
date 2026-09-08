@@ -39,7 +39,7 @@
 | M0–M2 | PoC, MVP `voice-keyboard`, `redesign-atelie` | ✅ concluídos |
 | M4 | `orb-gestures` (reconciliação) | ✅ concluído |
 | M5 | `keyboard-canvas` | ✅ concluído (KC-T1..T10, grade Canvas promovida a padrão, teclado antigo removido) |
-| M6 | `shortcut-bars` | SB-T1..T9 ✅; **SB-T10 parcial** (a11y+goldens automatizáveis prontos; falta manual do Yan no A32 + promoção de `kbd_bars`) |
+| M6 | `shortcut-bars` | SB-T1..T9 ✅; **SB-T10 quase fechado** — a11y, goldens e a promoção das barras a padrão (barra antiga removida) prontos; falta só o manual do Yan no A32 |
 | — | Ajustes pós-uso no A32 (Q8 + emendas) | ✅ dimensionamento em paisagem, modais dos editores, crash das prefs cifradas — ver Bloco 1 |
 | — | `gesture-tour` | spec/design/tasks prontos (Draft) — nada implementado |
 | — | `native-voice-models` | spec/design/tasks prontos (Draft) — nada implementado |
@@ -117,9 +117,9 @@ Spec: `.specs/features/shortcut-bars/` — seguir o `tasks.md` de lá:
 - [x] **SB-T8** — `PhysicalKeyPicker` (commit `29983a2`). Deixou de ser bottom sheet no Q8: virou
       `ConfigModal`, e o teclado ANSI escala por linha em vez de rolar.
 - [x] **SB-T9** — Editores WYSIWYG de grades + barras no `TecladoPanel` (commit `09487bf`).
-- [ ] **SB-T10** — a11y e goldens automatizáveis ✅ (commits `00846e0`/`1a1a339`); falta **[YAN]**
-      o manual no A32 (grade às cegas, alavanca, tmux via SSH) e, aprovado, promover `kbd_bars` a
-      padrão removendo a barra antiga da `KeyFlowKeyboardView`.
+- [ ] **SB-T10** — a11y e goldens automatizáveis ✅ (commits `00846e0`/`1a1a339`); promoção a padrão
+      e **remoção da barra antiga** ✅ (2026-09-07, commits `b0afdcb`/`0cfbf9f` — a flag `kbd_bars`
+      não existe mais). Falta só **[YAN]**: o manual no A32 (grade às cegas, alavanca, tmux via SSH).
 
 ## Bloco 3 — `gesture-tour` (prévia de gestos + Docs + apresentação)
 
