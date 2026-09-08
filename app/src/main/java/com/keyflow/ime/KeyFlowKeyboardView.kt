@@ -93,10 +93,13 @@ class KeyFlowKeyboardView(
     // NUM-01: espelha o layout ativo na grade Canvas pra updateInputType() saber se já está no estado
     // pedido (evita reconstruir/perder shift à toa quando o campo não mudou de classe).
     private var numericField = initialNumeric
-    private var candidatesView: CandidatesView? = null
 
     // Barras Canvas (SB-T5): criadas por buildBars() nos dois modos; mic/candidates roteiam pra cá.
     private val barViews = mutableListOf<BarView>()
+
+    // Sugestões vigentes. `setExpanded` reconstrói a pilha de barras, e sem reaplicar isto uma palavra
+    // pela metade perdia as sugestões só por recolher o teclado (achado do Yan, 2026-09-07).
+    private var currentCandidates: List<String> = emptyList()
 
     // Fileiras reais do QWERTY atual (Layouts.kt: 4 fixas + 1 opcional com a fileira de números) — usado
     // só pra estimar quanto o resto do teclado reserva da tela ao dimensionar a grade efêmera.
@@ -215,13 +218,11 @@ class KeyFlowKeyboardView(
         get() = barViews.firstNotNullOfOrNull { it.candidatesViewForTest }
 
     /**
-     * Atualiza a faixa de sugestões (KC-T7); sem grade Canvas (candidatesView nulo) é no-op. A
-     * `CandidatesView` mora dentro da faixa mic/config/colapsar, no espaço entre config e colapsar (ideia
-     * do Yan, 2026-07-01) — fica visualmente vazia sem sugestão nenhuma, sem precisar esconder/trocar a
-     * faixa inteira.
+     * Atualiza a faixa de sugestões (KC-T7/SPL-01..03). A faixa vive dentro da `BarView` que declara o
+     * slot `Candidates`; guardamos a lista aqui porque `setExpanded` reconstrói a pilha de barras.
      */
     fun updateCandidates(candidates: List<String>) {
-        candidatesView?.update(candidates)
+        currentCandidates = candidates
         barViews.forEach { it.updateCandidates(candidates) }
     }
 
@@ -298,25 +299,17 @@ class KeyFlowKeyboardView(
                 clock = clock,
                 qwertyRowCount = qwertyRowCount,
                 barCount = barCount,
-            ).also { barViews += it }
+            ).also { bar ->
+                barViews += bar
+                // Barra recém-criada herda o estado vigente (mic e sugestões), senão recolher/expandir
+                // o teclado zera o que estava na tela.
+                bar.updateMicState(micState)
+                if (currentCandidates.isNotEmpty()) bar.updateCandidates(currentCandidates)
+            }
         }.reversed()
     }
 
     private fun barLayoutParams() = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
-
-    /**
-     * Mic/config/sugestões/colapsar, tudo na mesma faixa (ideia do Yan, 2026-07-01): a `CandidatesView`
-     * (KC-T7/SPL-01..03) não ocupa mais a faixa inteira — ela é só mais um "botão" no espaço entre config
-     * e colapsar, que fica visualmente vazio quando não há sugestão nenhuma (a maior parte do tempo) e
-     * mostra os chips quando o corretor responder. Mais baixa que uma tecla normal (pedido do Yan,
-     * 2026-07-01): essa faixa não é digitação de verdade.
-     */
-    /** Faixa de sugestões do corretor do sistema (KC-T7/SPL-01..03) — só existe com a grade Canvas. */
-    private fun buildCandidatesView(weight: Float): CandidatesView =
-        CandidatesView(context, dark, onTap = onCandidateTap, scale = scale).also {
-            it.layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, weight)
-            candidatesView = it
-        }
 
     /** Grade nova em Canvas (KC-T6) no lugar das `buildRow` — mic/action row abaixo continuam intocados. */
     private fun buildCanvasGrid(): KeyboardGridView {

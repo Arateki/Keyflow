@@ -2,38 +2,51 @@ package com.keyflow.ime.keyboard
 
 import android.content.Context
 import android.view.Gravity
-import android.view.View.MeasureSpec
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
 
 /**
- * Faixa horizontal de sugestões do corretor do sistema (SPL-01/02), acima da grade — só existe no
- * expandido (SPL-03; o retraído não a monta). Sem corretor/sem sugestões fica só sem chips, sem quebrar
- * a digitação (edge case do spec).
+ * Faixa horizontal de sugestões do corretor do sistema (SPL-01/02), acima da grade. Sem corretor/sem
+ * sugestões fica só sem chips, sem quebrar a digitação (edge case do spec).
+ *
+ * Rola na horizontal (pedido do Yan, 2026-09-07): o corretor devolve várias palavras e, na largura de
+ * uma barra, as últimas ficavam fora da tela sem nenhum jeito de alcançá-las.
+ *
+ * Deixou de ser exclusiva do expandido: com o teclado retraído a faixa continua aparecendo enquanto
+ * houver sugestões (ver `BarView`), porque a palavra pode estar pela metade — ou ter vindo por voz —
+ * quando o teclado recolhe.
  */
 class CandidatesView(
     context: Context,
     dark: Boolean,
     private val onTap: (String) -> Unit,
     private val scale: Float = 1f,
-) : LinearLayout(context) {
+) : HorizontalScrollView(context) {
 
     private val kbTray = if (dark) 0xFF332E27.toInt() else 0xFFDCD0AC.toInt()
     private val kbInk = if (dark) 0xFFF1E7C9.toInt() else 0xFF2B2720.toInt()
 
-    init {
-        orientation = HORIZONTAL
+    /** Os chips vivem nesta fileira; o scroll é o container. */
+    private val row = LinearLayout(context).apply {
+        orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
-        setBackgroundColor(kbTray)
-        setPadding(dp(6), dp(3), dp(6), dp(3))
+        layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT)
     }
 
-    // Sem isto, o `View.onMeasure` padrão preenche o que o pai der em modo AT_MOST (LinearLayout
-    // wrap_content em cascata) em vez de respeitar uma altura fixa — a faixa incharia bem além do
-    // previsto. HEIGHT_DP (não 44dp) pra casar exatamente com a faixa mic/config/colapsar que divide
-    // este espaço com ela (KeyFlowKeyboardView.buildTopStrip) — trocar de uma pra outra não pode mudar a
-    // altura do teclado. Mais baixa que as teclas normais por pedido do Yan (2026-07-01, device físico):
-    // essa faixa não é uma fileira de digitação, não precisa da mesma altura de toque.
+    init {
+        setBackgroundColor(kbTray)
+        setPadding(dp(6), dp(3), dp(6), dp(3))
+        isFillViewport = true
+        isHorizontalScrollBarEnabled = false
+        addView(row)
+    }
+
+    // Sem isto, o `onMeasure` padrão preenche o que o pai der em modo AT_MOST (wrap_content em cascata)
+    // em vez de respeitar uma altura fixa — a faixa incharia bem além do previsto. HEIGHT_DP (não 44dp)
+    // pra casar exatamente com a barra que divide este espaço com ela: trocar de uma pra outra não pode
+    // mudar a altura do teclado. Mais baixa que as teclas normais por pedido do Yan (2026-07-01, device
+    // físico): essa faixa não é uma fileira de digitação, não precisa da mesma altura de toque.
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(dp(HEIGHT_DP), MeasureSpec.EXACTLY))
         setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), dp(HEIGHT_DP))
@@ -41,12 +54,12 @@ class CandidatesView(
 
     /** Palavras hoje exibidas na faixa, só para o instrumentado (KC-T7). */
     val candidatesForTest: List<String>
-        get() = (0 until childCount).map { (getChildAt(it) as TextView).text.toString() }
+        get() = (0 until row.childCount).map { (row.getChildAt(it) as TextView).text.toString() }
 
     fun update(candidates: List<String>) {
-        removeAllViews()
+        row.removeAllViews()
         candidates.forEach { word ->
-            addView(
+            row.addView(
                 TextView(context).apply {
                     text = word
                     gravity = Gravity.CENTER
@@ -58,6 +71,8 @@ class CandidatesView(
                 },
             )
         }
+        // Palavra nova começa do início da lista, não onde o dedo tinha parado na anterior.
+        scrollX = 0
     }
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density * scale).toInt()

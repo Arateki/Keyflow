@@ -83,9 +83,24 @@ class BarView(
     private val barCount: Int = 1,
 ) : ViewGroup(context) {
 
-    // Candidates só existe no expandido (SYNC-04); no retraído o slot é filtrado fora.
-    private val buttons: List<BarButton> =
-        def.buttons.filter { expandedMode || it != BarButton.Candidates }
+    private val declaredButtons: List<BarButton> = def.buttons
+
+    // Há sugestões pra mostrar agora? Só importa no retraído, onde o slot aparece sob demanda.
+    private var hasCandidates = false
+
+    /**
+     * Botões efetivos. No expandido a barra é a config crua; no retraído o slot `Candidates` entra
+     * apenas enquanto existir sugestão (pedido do Yan, 2026-09-07).
+     *
+     * Antes ele era filtrado fora do retraído sempre, o que tinha dois problemas: com "espelhar
+     * colapsado/expandido" ligado as duas barras saíam visivelmente diferentes sem explicação, e uma
+     * palavra pela metade — ou vinda por voz — perdia as sugestões no instante em que o teclado
+     * recolhia. Mantê-lo sempre visível também não serve: sem sugestão ele vira um vão morto que
+     * espreme os outros botões.
+     */
+    private val buttons: List<BarButton>
+        get() = if (expandedMode || hasCandidates) declaredButtons
+        else declaredButtons.filter { it != BarButton.Candidates }
     private val gridsById: Map<String, ShortcutGrid> = grids.associateBy { it.id }
     private val knownGridIds: Set<String> = gridsById.keys
 
@@ -171,9 +186,13 @@ class BarView(
 
     init {
         setWillNotDraw(false)
-        if (buttons.contains(BarButton.Candidates)) {
+        if (declaredButtons.contains(BarButton.Candidates)) {
             candidatesView = CandidatesView(context, dark, onTap = callbacks.onCandidateTap, scale = scale)
-                .also { addView(it) }
+                .also {
+                    // No retraído nasce escondida: só entra quando houver sugestão (ver `buttons`).
+                    it.visibility = if (expandedMode) VISIBLE else GONE
+                    addView(it)
+                }
         }
         ViewCompat.setAccessibilityDelegate(this, accessibilityHelper)
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
@@ -226,6 +245,15 @@ class BarView(
 
     fun updateCandidates(candidates: List<String>) {
         candidatesView?.update(candidates)
+        val has = candidates.isNotEmpty()
+        if (has == hasCandidates) return
+        hasCandidates = has
+        // No retraído a presença do slot muda a geometria da barra inteira — remede e repinta.
+        if (!expandedMode) {
+            candidatesView?.visibility = if (has) VISIBLE else GONE
+            requestLayout()
+            invalidate()
+        }
     }
 
     // ── medida/layout ────────────────────────────────────────────────────────
