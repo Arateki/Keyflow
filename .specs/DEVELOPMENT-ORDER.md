@@ -110,6 +110,11 @@ Pequenas, sem spec própria; fazer em quick mode (TASK.md + SUMMARY.md + commit)
       Pendente **[YAN]**: goldens das rotas novas (`grids-editor-modal`, `bars-editor`) não foram
       gerados — dependem da revisão do lote de goldens abaixo.
 
+- [ ] **Q9 — Sugestões do corretor nunca funcionaram** (`.specs/quick/009-sugestoes-nao-funcionam/`).
+      A faixa está pronta e rolável; falta produzir sugestão: só a grade do KeyFlow alimenta o
+      corretor (teclado físico e voz não), e o `SystemSpellChecker` nunca foi visto respondendo no
+      A32. Registrado a pedido do Yan para depois.
+
 ## Bloco 2 — Fechar `shortcut-bars` (Milestone 6)
 
 Spec: `.specs/features/shortcut-bars/` — seguir o `tasks.md` de lá:
