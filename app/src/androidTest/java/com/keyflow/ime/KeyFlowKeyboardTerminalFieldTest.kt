@@ -15,6 +15,7 @@ import com.keyflow.core.ButtonState
 import com.keyflow.core.KeyFlowController
 import com.keyflow.ui.ImeProbeActivity
 import org.junit.After
+import org.junit.Before
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -38,9 +39,19 @@ class KeyFlowKeyboardTerminalFieldTest {
     private val context: Context get() = instrumentation.targetContext
     private val device: UiDevice get() = UiDevice.getInstance(instrumentation)
 
+    // Preserva o que o dono do aparelho já tinha configurado — ver [UserSettingsGuard].
+    private val userSettings = UserSettingsGuard(context)
+
+    @Before
+    fun captureUserSettings() {
+        userSettings.capture()
+        // A grade só entra na hierarquia (e só é medida) com o teclado expandido.
+        userSettings.forceExpanded()
+    }
+
     @After
     fun tearDown() {
-        shell("ime reset")
+        userSettings.restore()
         device.pressHome()
         KeyFlowController.clearInserter()
         KeyFlowController.updateButtonState(ButtonState.IDLE_NO_FIELD)

@@ -115,6 +115,17 @@ Pequenas, sem spec própria; fazer em quick mode (TASK.md + SUMMARY.md + commit)
       corretor (teclado físico e voz não), e o `SystemSpellChecker` nunca foi visto respondendo no
       A32. Registrado a pedido do Yan para depois.
 
+- [x] **Q10 — A suíte instrumentada no aparelho do Yan** (`.specs/quick/010-suite-no-aparelho/`).
+      As 12 falhas do A32 no gate de 07/09 não eram do IME "não grudar": `connectedAndroidTest`
+      desinstala o app no fim, e a grade Canvas não é medida com o teclado **recolhido** (estado que o
+      IME persiste). `UserSettingsGuard` passou a preservar também esse estado, e `ime reset` saiu dos
+      testes — era ele que devolvia o aparelho do Yan ao teclado da Samsung.
+      Pendente **[YAN]**: nenhuma barra da config dele declara o slot `Candidates`, então a faixa de
+      sugestões não tem onde aparecer — adicionar "Candidatos" (`abc`) em Config → Barras para ver.
+      Pendente: `SystemSurfacesScreenshotTest` derruba o processo de teste
+      (`ForegroundServiceDidNotStartInTimeException` no `OverlayService`), nos dois devices e também no
+      código anterior — falha própria, ainda por investigar.
+
 ## Bloco 2 — Fechar `shortcut-bars` (Milestone 6)
 
 Spec: `.specs/features/shortcut-bars/` — seguir o `tasks.md` de lá:

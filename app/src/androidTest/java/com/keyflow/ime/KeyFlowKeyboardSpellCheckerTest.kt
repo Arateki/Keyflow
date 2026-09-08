@@ -15,9 +15,15 @@ import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import com.keyflow.core.ButtonState
 import com.keyflow.core.KeyFlowController
+import com.keyflow.core.shortcuts.BarButton
+import com.keyflow.core.shortcuts.BarDef
+import com.keyflow.core.shortcuts.BarsConfig
+import com.keyflow.data.SettingsRepository
 import com.keyflow.ime.keyboard.KeyboardGridView
 import com.keyflow.ime.keyboard.layout.KeyAction as CanvasKeyAction
+import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Before
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -40,9 +46,19 @@ class KeyFlowKeyboardSpellCheckerTest {
     private val context: Context get() = instrumentation.targetContext
     private val device: UiDevice get() = UiDevice.getInstance(instrumentation)
 
+    // Preserva o que o dono do aparelho já tinha configurado — ver [UserSettingsGuard].
+    private val userSettings = UserSettingsGuard(context)
+
+    @Before
+    fun captureUserSettings() {
+        userSettings.capture()
+        // A grade só entra na hierarquia (e só é medida) com o teclado expandido.
+        userSettings.forceExpanded()
+    }
+
     @After
     fun tearDown() {
-        shell("ime reset")
+        userSettings.restore()
         device.pressHome()
         KeyFlowController.clearInserter()
         KeyFlowController.updateButtonState(ButtonState.IDLE_NO_FIELD)
@@ -81,9 +97,19 @@ class KeyFlowKeyboardSpellCheckerTest {
 
     @Test
     fun candidatesViewExistsAndDoesNotCrashWhenEmpty() {
+        // A faixa só existe se ALGUMA barra declarar o slot `Candidates` (BarView), e isso é config de
+        // quem usa: no A32 do Yan nenhuma barra o declarava e este teste caía sem haver defeito nenhum
+        // (2026-09-08). Monta a config que o teste realmente exige; o `UserSettingsGuard` devolve a dele.
+        val withCandidates = BarsConfig(
+            mirrored = true,
+            collapsed = listOf(BarDef(listOf(BarButton.Mic, BarButton.Candidates, BarButton.ToggleExpand))),
+            expanded = emptyList(),
+        )
+        runBlocking { SettingsRepository(context).saveBarsConfig(withCandidates) }
+
         launchProbe()
         val view = KeyFlowKeyboardService.activeViewForTest!!
-        assertNotNull("com useCanvasGrid a faixa de candidatos deveria existir", view.candidatesViewForTest)
+        assertNotNull("com o slot Candidates na barra a faixa deveria existir", view.candidatesViewForTest)
         assertTrue(view.candidatesViewForTest!!.candidatesForTest.isEmpty())
     }
 

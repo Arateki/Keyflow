@@ -20,6 +20,7 @@ import com.keyflow.ime.keyboard.KeyboardGridView
 import com.keyflow.ime.keyboard.layout.KeyAction as CanvasKeyAction
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Before
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -43,12 +44,22 @@ class KeyFlowKeyboardLanguageTest {
     private val context: Context get() = instrumentation.targetContext
     private val device: UiDevice get() = UiDevice.getInstance(instrumentation)
 
+    // Preserva o que o dono do aparelho já tinha configurado — ver [UserSettingsGuard].
+    private val userSettings = UserSettingsGuard(context)
+
+    @Before
+    fun captureUserSettings() {
+        userSettings.capture()
+        // A grade só entra na hierarquia (e só é medida) com o teclado expandido.
+        userSettings.forceExpanded()
+    }
+
     @After
     fun tearDown() {
         // Devolve o idioma real do app ao padrão — este teste roda contra o DataStore de produção (é a
         // única forma de observar o que o KeyFlowKeyboardService real persistiu de verdade).
         runBlocking { SettingsRepository(context).saveKeyboardLanguageOnce("pt") }
-        shell("ime reset")
+        userSettings.restore()
         device.pressHome()
         KeyFlowController.clearInserter()
         KeyFlowController.updateButtonState(ButtonState.IDLE_NO_FIELD)

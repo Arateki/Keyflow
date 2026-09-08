@@ -16,6 +16,7 @@ import com.keyflow.overlay.OverlayService
 import com.keyflow.overlay.RecordingNotification
 import com.keyflow.core.ButtonState
 import com.keyflow.data.SettingsRepository
+import com.keyflow.ime.UserSettingsGuard
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
@@ -43,6 +44,10 @@ class SystemSurfacesScreenshotTest {
     private val context: Context get() = instrumentation.targetContext
     private val device: UiDevice get() = UiDevice.getInstance(instrumentation)
 
+    // Preserva o que o dono do aparelho já tinha configurado — ver [UserSettingsGuard]. `ime reset`
+    // devolveria o teclado de fábrica, não o que a pessoa usava.
+    private val userSettings = UserSettingsGuard(context)
+
     private val outDir: File by lazy {
         File(context.getExternalFilesDir(null), "verification").apply { mkdirs() }
     }
@@ -55,6 +60,7 @@ class SystemSurfacesScreenshotTest {
      */
     @Before
     fun warmUpSettings() {
+        userSettings.capture()
         runBlocking { SettingsRepository(context).settingsFlow().first() }
     }
 
@@ -114,7 +120,7 @@ class SystemSurfacesScreenshotTest {
             Thread.sleep(600)
             capture("sys-ime-over-field")
         } finally {
-            shell("ime reset")
+            userSettings.restore()
             device.pressHome()
         }
     }

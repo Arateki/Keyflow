@@ -17,6 +17,7 @@ import com.keyflow.core.ButtonState
 import com.keyflow.core.KeyFlowController
 import com.keyflow.ime.keyboard.layout.KeyAction as CanvasKeyAction
 import org.junit.After
+import org.junit.Before
 import org.junit.Assert.assertNotNull
 import org.junit.Rule
 import org.junit.Test
@@ -36,9 +37,19 @@ class KeyFlowKeyboardCanvasGridTest {
     private val context: Context get() = instrumentation.targetContext
     private val device: UiDevice get() = UiDevice.getInstance(instrumentation)
 
+    // Preserva o que o dono do aparelho já tinha configurado — ver [UserSettingsGuard].
+    private val userSettings = UserSettingsGuard(context)
+
+    @Before
+    fun captureUserSettings() {
+        userSettings.capture()
+        // A grade só entra na hierarquia (e só é medida) com o teclado expandido.
+        userSettings.forceExpanded()
+    }
+
     @After
     fun tearDown() {
-        shell("ime reset")
+        userSettings.restore()
         device.pressHome()
         // KeyFlowController é singleton de processo (sobrevive ao fim deste teste, dentro do mesmo gate).
         KeyFlowController.clearInserter()

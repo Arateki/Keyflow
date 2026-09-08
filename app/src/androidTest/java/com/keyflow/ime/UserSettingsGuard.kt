@@ -17,6 +17,13 @@ import kotlinx.coroutines.runBlocking
  * os botões que havia configurado (2026-09-07). "Restaurar o default" não é restaurar: é apagar.
  *
  * O mesmo vale para o IME padrão: `ime reset` devolve ao teclado de fábrica, não ao que a pessoa usava.
+ *
+ * E vale para o estado expandido/recolhido do teclado (`keyflow_kb_ui.expanded`), que o IME PERSISTE
+ * entre sessões: recolhido, `setExpanded(false)` tira a grade da hierarquia, e ela nunca chega a ser
+ * medida — todo teste que depende da geometria da grade falha com "grade Canvas ainda sem geometria
+ * medida". Isso nunca aparece no emulador (pref virgem = expandido); apareceu no A32 do Yan porque ele
+ * tinha deixado o teclado recolhido (2026-09-08, 11 falhas). Quem depende da grade chama
+ * [forceExpanded] no `@Before`; [restore] devolve o estado que a pessoa deixou.
  */
 class UserSettingsGuard(
     private val context: Context = InstrumentationRegistry.getInstrumentation().targetContext,
@@ -32,6 +39,8 @@ class UserSettingsGuard(
     private var bars: BarsConfig? = null
     private var grids: List<ShortcutGrid>? = null
     private var defaultIme: String? = null
+    private var hadExpanded = false
+    private var expanded = true
 
     /** Chame no `@Before`, antes de qualquer escrita do teste. */
     fun capture() {
@@ -40,6 +49,17 @@ class UserSettingsGuard(
             grids = repo.shortcutGridsOnce()
         }
         defaultIme = shell("settings get secure default_input_method").trim().takeIf { it.isNotBlank() && it != "null" }
+        hadExpanded = uiPrefs.contains(KEY_EXPANDED)
+        expanded = uiPrefs.getBoolean(KEY_EXPANDED, true)
+    }
+
+    /**
+     * Abre o teclado expandido, para que a grade entre na hierarquia e seja medida. Sem [capture] antes,
+     * não faz nada — senão o `@After` não teria como devolver o estado real.
+     */
+    fun forceExpanded() {
+        if (!hasCaptured) return
+        uiPrefs.edit().putBoolean(KEY_EXPANDED, true).commit()
     }
 
     /** Chame no `@After`. Sem [capture] antes, não faz nada — melhor não escrever do que escrever errado. */
@@ -53,7 +73,10 @@ class UserSettingsGuard(
             }
         }
         defaultIme?.let { shell("ime set $it") }
+        if (hasCaptured) restoreUiPrefFlag(KEY_EXPANDED, hadExpanded, expanded)
     }
+
+    private val hasCaptured: Boolean get() = bars != null && grids != null
 
     /** Remove uma chave das prefs do IME apenas se ela não existia antes do teste. */
     fun restoreUiPrefFlag(key: String, hadItBefore: Boolean, previous: Boolean) {
@@ -62,5 +85,6 @@ class UserSettingsGuard(
 
     private companion object {
         const val UI_PREFS = "keyflow_kb_ui"
+        const val KEY_EXPANDED = "expanded"
     }
 }
