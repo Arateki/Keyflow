@@ -89,7 +89,13 @@ class SystemSurfacesScreenshotTest {
         shell("pm grant ${context.packageName} ${Manifest.permission.RECORD_AUDIO}")
         try {
             device.pressHome()
-            context.startForegroundService(OverlayService.intent(context))
+            // `intent()` (sem action) NÃO promove o serviço: `onStartCommand` casa por action, e a única
+            // outra via é `onCreate` — que só sobe a orbe se o Modo Sobrepor estiver ligado nas settings
+            // de quem usa. Com ele desligado o serviço nunca chamava `startForeground`, este teste caía
+            // em "OverlayService não subiu" e ~10s depois o sistema matava o PROCESSO com
+            // ForegroundServiceDidNotStartInTimeException, derrubando de carona o teste seguinte
+            // (2026-09-08). `startOverlayIntent` é o que o app usa de verdade e independe da setting.
+            context.startForegroundService(OverlayService.startOverlayIntent(context))
             waitUntil("OverlayService não subiu") { OverlayService.isRunningForUi }
             Thread.sleep(1200) // deixa o ComposeView do orbe compor
             capture("sys-overlay-over-app")
