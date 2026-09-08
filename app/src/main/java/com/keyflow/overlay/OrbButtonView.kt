@@ -83,7 +83,6 @@ class OrbButtonView(
     private fun newGestures(window: Long) = GestureInterpreter(
         tripleTapWindowMs = window,
         holdThresholdMs = window + HOLD_OFFSET_MS,
-        clock = { SystemClock.uptimeMillis() },
     )
 
     fun setTapBurstWindowMs(ms: Long) {

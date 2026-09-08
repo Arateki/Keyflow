@@ -1,5 +1,6 @@
 package com.keyflow.overlay
 
+import android.os.SystemClock
 import com.keyflow.core.ButtonState
 import com.keyflow.core.RecordingMode
 
@@ -29,7 +30,12 @@ class RecordingGestureController(
     private val currentState: () -> ButtonState,
     // Janela de re-segurar ao soltar (= "Tempo de reação", lido ao vivo). Lambda p/ acompanhar o slider.
     private val pttReleaseWindowMs: () -> Long = { DEFAULT_PTT_PAUSE_WINDOW_MS },
-    private val clock: () -> Long = { System.currentTimeMillis() },
+    // MONOTÔNICO por padrão: a janela do PTT é agendada com `handler.postDelayed` (uptimeMillis) e
+    // conferida aqui contra o MESMO limiar. Com o relógio de parede as duas medidas divergiam alguns
+    // milissegundos e o disparo às vezes caía um fio ANTES da janela — `onReleaseTimeout` devolvia NONE
+    // e, como nada reagenda, a gravação do push-to-talk simplesmente não era enviada. Mesmo defeito já
+    // medido no hold da orbe (ver OrbButtonView/GestureInterpreter, 2026-09-08).
+    private val clock: () -> Long = { SystemClock.uptimeMillis() },
 ) {
     /** Início do release PTT pendente (RECORDING aguardando Stop ou tap-rápido→Pause). */
     private var pendingReleaseAt: Long? = null
