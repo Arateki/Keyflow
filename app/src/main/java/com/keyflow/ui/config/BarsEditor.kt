@@ -51,6 +51,7 @@ const val BARS_EDITOR_MODE_EXPANDED_TAG = "bars-editor-mode-expanded"
 const val BARS_EDITOR_MIRROR_TOGGLE_TAG = "bars-editor-mirror-toggle"
 const val BARS_EDITOR_ADD_BAR_TAG = "bars-editor-add-bar"
 const val BARS_EDITOR_COUNT_WARNING_TAG = "bars-editor-count-warning"
+const val BARS_EDITOR_SCROLL_WARNING_TAG = "bars-editor-scroll-warning"
 
 const val BARS_EDITOR_CATALOG_TAG = "bars-editor-catalog"
 const val BARS_EDITOR_CATALOG_MIC_TAG = "bars-editor-catalog-mic"
@@ -89,6 +90,43 @@ fun barTrashTag(barIndex: Int) = "bars-editor-trash-$barIndex"
 /** Tag do segmento de [GridTriggerMode] no formulário de gatilho de grade. */
 fun gridModeTag(mode: GridTriggerMode) = "bars-editor-grid-form-mode-${mode.name.lowercase()}"
 
+/** Nome por extenso do botão, para as frases dos avisos (o glifo não se lê em texto corrido). */
+private fun barButtonName(button: BarButton): String = when (button) {
+    BarButton.Mic -> "microfone"
+    BarButton.ConfigBtn -> "config"
+    BarButton.ToggleExpand -> "colapsar/expandir"
+    BarButton.Paste -> "colar"
+    BarButton.Candidates -> "sugestões"
+    BarButton.Joystick -> "alavanca"
+    is BarButton.SingleKey -> button.key.label
+    is BarButton.GridTrigger -> button.label.ifBlank { "grade" }
+}
+
+/**
+ * Texto do aviso de rolagem, ou `null` quando não há o que avisar (barra curta o bastante para caber
+ * sempre). A barra só rola a partir de um botão de TOQUE — ver [BarGeometry.scrollAnchors] —, e quem
+ * monta a barra não tem como adivinhar isso olhando os chips (Yan, 2026-09-08).
+ */
+private fun scrollWarningFor(buttons: List<BarButton>): String? {
+    if (buttons.size < SCROLL_WARNING_MIN_BUTTONS) return null
+    val apoios = BarGeometry.scrollAnchors(buttons)
+    val motivos = "o microfone, a alavanca e a grade usam o arrasto nos próprios gestos, e a faixa de " +
+        "sugestões rola as palavras dela"
+    return if (apoios.isEmpty()) {
+        "Esta barra pode não caber na tela, e nenhum botão dela serve de apoio para rolar: $motivos. " +
+            "Se ela estourar a largura, o que ficar de fora não terá como ser alcançado — inclua um " +
+            "botão de toque (colar, Esc, Enter ou uma tecla avulsa)."
+    } else {
+        val nomes = apoios.map(::barButtonName).distinct()
+        val lista = when (nomes.size) {
+            1 -> nomes.first()
+            else -> nomes.dropLast(1).joinToString(", ") + " e " + nomes.last()
+        }
+        "Esta barra pode não caber na tela. Se isso acontecer, ela rola na horizontal, mas o arrasto só " +
+            "pega em $lista — $motivos."
+    }
+}
+
 /** Rótulo/glifo curto de cada botão de barra na prévia WYSIWYG (CFG-02). */
 private fun barButtonGlyph(button: BarButton): String = when (button) {
     BarButton.Mic -> "🎙"
@@ -117,6 +155,9 @@ fun reorderedButtons(buttons: List<BarButton>, fromIndex: Int, toIndex: Int): Li
 // Distância de arrasto (após o long-press) que precisa ser cruzada para trocar com o vizinho — valor
 // fixo simples (aprox. metade da largura mínima de um chip), sem medir a largura real do vizinho.
 /** Largura de UMA unidade de peso na prévia (o mic, peso 1,5, sai com 36dp). */
+/** A partir de quantos botões vale avisar sobre rolagem (abaixo disso a barra cabe com folga). */
+private const val SCROLL_WARNING_MIN_BUTTONS = 6
+
 private val CHIP_UNIT_DP = 24.dp
 
 /** Piso de largura do chip (alvo de toque), independente do peso. */
@@ -286,6 +327,22 @@ fun BarsEditor(
                     ) {
                         StrokeIcon(TRASH_PATHS, palette.faint, Modifier.size(16.dp), strokeWidth = 1.6f)
                     }
+                }
+
+                scrollWarningFor(barDef.buttons)?.let { aviso ->
+                    Text(
+                        aviso,
+                        color = palette.muted,
+                        fontFamily = SpaceGrotesk,
+                        fontSize = 11.sp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .border(1.dp, palette.line, RoundedCornerShape(6.dp))
+                            .testTag(BARS_EDITOR_SCROLL_WARNING_TAG)
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                    )
                 }
             }
 

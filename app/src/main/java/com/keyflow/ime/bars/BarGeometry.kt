@@ -57,6 +57,17 @@ object BarGeometry {
         return BarLayout(placed, contentWidth = x, viewWidth = viewWidthPx)
     }
 
+    /**
+     * Botões que servem de APOIO para rolar a barra: os de toque simples.
+     *
+     * Ficam de fora os arrastáveis (mic, alavanca, grade), que capturam o arrasto para os próprios
+     * gestos, e a faixa de sugestões, que é uma `View` filha com rolagem interna — o toque nela nunca
+     * chega à barra. Uma barra que não cabe e não tem nenhum apoio deixa o excedente inalcançável; é o
+     * que o aviso do editor de barras usa para explicar isso ANTES de a pessoa montar (Yan, 2026-09-08).
+     */
+    fun scrollAnchors(buttons: List<BarButton>): List<BarButton> =
+        buttons.filterNot { isDraggable(it) || it == BarButton.Candidates }
+
     /** Botões de gesto contínuo capturam o toque — a barra não rola a partir deles (BAR-05). */
     fun isDraggable(button: BarButton): Boolean = when (button) {
         BarButton.Joystick, is BarButton.GridTrigger, BarButton.Mic -> true

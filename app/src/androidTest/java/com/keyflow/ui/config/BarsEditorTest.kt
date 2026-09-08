@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.unit.width
@@ -236,6 +237,40 @@ class BarsEditorTest {
         rule.onNodeWithTag(barAddButtonTag(0)).performClick()
 
         rule.onAllNodesWithTag(BARS_EDITOR_CATALOG_GRID_TAG).assertCountEquals(0)
+    }
+
+    @Test
+    fun warnsWhichButtonsCanScrollTheBarAndWhichCannot() {
+        // A barra só rola a partir de um botão de TOQUE: mic/alavanca/grade capturam o arrasto e a faixa
+        // de sugestões tem rolagem interna. Quem monta a barra não tem como adivinhar isso olhando os
+        // chips, e uma barra sem apoio nenhum deixa o excedente inalcançável (Yan, 2026-09-08).
+        val semApoio = BarDef(
+            listOf(
+                BarButton.Mic, BarButton.Joystick, BarButton.Candidates,
+                BarButton.GridTrigger(gridId = "g"), BarButton.Mic, BarButton.Joystick,
+            ),
+        )
+        val h = Harness(BarsConfig(mirrored = true, collapsed = listOf(semApoio), expanded = emptyList()))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(BARS_EDITOR_SCROLL_WARNING_TAG)
+            .assertTextContains("nenhum botão dela serve de apoio para rolar", substring = true)
+    }
+
+    @Test
+    fun warningListsTheTouchButtonsThatDoScroll() {
+        val comApoio = BarDef(
+            listOf(
+                BarButton.Mic, BarButton.Candidates, BarButton.Paste, BarButton.Joystick,
+                BarButton.SingleKey(ShortcutKey(KeyEvent.KEYCODE_ESCAPE, label = "Esc")),
+                BarButton.ToggleExpand,
+            ),
+        )
+        val h = Harness(BarsConfig(mirrored = true, collapsed = listOf(comApoio), expanded = emptyList()))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(BARS_EDITOR_SCROLL_WARNING_TAG)
+            .assertTextContains("o arrasto só pega em colar, Esc e colapsar/expandir", substring = true)
     }
 
     @Test
