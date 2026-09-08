@@ -131,6 +131,11 @@ class KeyFlowKeyboardSpellCheckerTest {
         device.wait(Until.hasObject(By.text("🎙")), TIMEOUT)
         waitUntil("KeyFlowKeyboardView não anexou") { KeyFlowKeyboardService.activeViewForTest != null }
         waitUntil("grade Canvas não montou") { KeyFlowKeyboardService.activeViewForTest!!.canvasGridForTest != null }
+        // Montada não basta: a janela do IME precisa estar VISÍVEL, senão o toque cai em janela alheia
+        // e a plataforma recusa a injeção (ver [inject]).
+        waitUntil("janela do teclado não ficou visível") {
+            KeyFlowKeyboardService.activeViewForTest?.canvasGridForTest?.isShown == true
+        }
     }
 
     private fun tapKey(grid: KeyboardGridView, label: String) {
@@ -152,18 +157,38 @@ class KeyFlowKeyboardSpellCheckerTest {
         tapScreen(x, y)
     }
 
-    private fun tapScreen(x: Int, y: Int) {
+    /**
+     * Injeta um toque, devolvendo `false` se a plataforma RECUSAR a injeção:
+     *
+     * ```
+     * IllegalArgumentException: Targeted input event injection from pid N was not directed at a
+     * window owned by uid M
+     * ```
+     *
+     * `sendPointerSync` só entrega em janela do próprio app, e logo depois de reinstalar o APK a janela
+     * do IME ainda não assumiu aquela região da tela — o toque cai em janela alheia e a injeção é
+     * recusada. Medido em 2026-09-08: as DUAS primeiras rodadas após um `installDebug` falhavam assim,
+     * e as seguintes passavam. A exceção escapava do laço de [performUntil] e reprovava o teste na hora,
+     * em vez de contar como tentativa — que é justamente o que aquele laço existe para absorver.
+     */
+    private fun tapScreen(x: Int, y: Int): Boolean {
         val time = SystemClock.uptimeMillis()
-        inject(MotionEvent.ACTION_DOWN, x, y, time)
-        inject(MotionEvent.ACTION_UP, x, y, SystemClock.uptimeMillis())
+        return inject(MotionEvent.ACTION_DOWN, x, y, time) &&
+            inject(MotionEvent.ACTION_UP, x, y, SystemClock.uptimeMillis())
     }
 
-    private fun inject(action: Int, x: Int, y: Int, time: Long) {
+    private fun inject(action: Int, x: Int, y: Int, time: Long): Boolean {
         val event = MotionEvent.obtain(time, time, action, x.toFloat(), y.toFloat(), 0).apply {
             source = InputDevice.SOURCE_TOUCHSCREEN
         }
-        instrumentation.sendPointerSync(event)
-        event.recycle()
+        return try {
+            instrumentation.sendPointerSync(event)
+            true
+        } catch (e: IllegalArgumentException) {
+            false // janela alvo ainda não é do IME — quem chama repete
+        } finally {
+            event.recycle()
+        }
     }
 
     private fun waitUntil(message: String, timeoutMs: Long = TIMEOUT, condition: () -> Boolean) {

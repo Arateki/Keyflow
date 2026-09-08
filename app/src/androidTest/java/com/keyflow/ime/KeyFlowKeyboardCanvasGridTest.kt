@@ -114,12 +114,26 @@ class KeyFlowKeyboardCanvasGridTest {
         inject(MotionEvent.ACTION_UP, x, y, SystemClock.uptimeMillis())
     }
 
-    private fun inject(action: Int, x: Int, y: Int, time: Long) {
+    /**
+     * Injeta um toque, devolvendo `false` se a plataforma RECUSAR a injeção
+     * (`IllegalArgumentException: Targeted input event injection ... was not directed at a window owned
+     * by uid N`). `sendPointerSync` só entrega em janela do próprio app, e logo depois de reinstalar o
+     * APK a janela do IME ainda não assumiu aquela região da tela. Medido em 2026-09-08: as duas
+     * primeiras rodadas após um `installDebug` falhavam assim. Sem o `catch`, a exceção escapava dos
+     * laços de retry e reprovava o teste na hora.
+     */
+    private fun inject(action: Int, x: Int, y: Int, time: Long): Boolean {
         val event = MotionEvent.obtain(time, time, action, x.toFloat(), y.toFloat(), 0).apply {
             source = InputDevice.SOURCE_TOUCHSCREEN
         }
-        instrumentation.sendPointerSync(event)
-        event.recycle()
+        return try {
+            instrumentation.sendPointerSync(event)
+            true
+        } catch (e: IllegalArgumentException) {
+            false
+        } finally {
+            event.recycle()
+        }
     }
 
     private fun waitUntil(message: String, timeoutMs: Long = TIMEOUT, condition: () -> Boolean) {
