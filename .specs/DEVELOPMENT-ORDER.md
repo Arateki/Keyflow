@@ -127,6 +127,10 @@ Pequenas, sem spec própria; fazer em quick mode (TASK.md + SUMMARY.md + commit)
       14+ (agora lê pelo `InputMethodManager`); o `SystemSurfacesScreenshotTest` subia o `OverlayService`
       por uma intent sem action e derrubava o processo de teste; e mais dois testes que assumiam aparelho
       zerado (`PermissionsCheckerTest`, `DocsPanelTest`). Suíte completa: 156/156 no A32 e no emulador.
+      Criado um 3º gate — emulador **Android 17 (API 37, páginas de 16 KB)** — que revelou libs de
+      instrumentação velhas demais para a API 37 (atualizadas). Pendente **[YAN]**: no Android 17 a
+      plataforma não exibe a janela do IME em contexto instrumentado, então os 27 testes de teclado não
+      rodam lá (o app funciona; é harness). Pendente: subir o `targetSdk` (hoje 34) antes da Play Store.
 
 ## Bloco 2 — Fechar `shortcut-bars` (Milestone 6)
 
