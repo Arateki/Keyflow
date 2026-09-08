@@ -132,15 +132,35 @@ teste, lendo pela árvore de acessibilidade do UiAutomator, via o hint "Toque pa
 explícita da instância (o `onDestroy` da Activity velha corre DEPOIS do `onCreate` da nova, por causa do
 `CLEAR_TASK`, e apagava o texto em uso). Verificado: 15 rodadas / 60 testes sem falha.
 
-**C — ruído de MEDIÇÃO, não de teste.** Quando o processo do app já está vivo (o KeyFlow é o IME ativo),
+**C — injeção de toque recusada na primeira rodada após o install (corrigido em `755a2bb`).**
+`sendPointerSync` só entrega em janela do próprio app. Recém-reinstalado o APK, a janela do IME ainda não
+assumiu aquela região da tela e a plataforma recusa:
+`IllegalArgumentException: Targeted input event injection ... was not directed at a window owned by uid N`.
+Medido: as DUAS primeiras rodadas após um `installDebug` falhavam, as seguintes passavam. Pior, a exceção
+escapava do laço de retry e reprovava o teste na hora, sem acionar o mecanismo feito para absorver isso.
+Como TODO gate começa com um install, era a primeira rodada de cada sessão que tinha mais chance de falhar
+por nada. `inject()` passou a devolver `false` quando a injeção é recusada (SpellChecker, CanvasGrid,
+Language, Bars) e `launchProbe` espera a grade estar VISÍVEL, não só montada. Verificado: 4 rodadas da
+suíte de IME (140 testes) logo após reinstalar, sem falha.
+
+**C' — ruído de MEDIÇÃO, não de teste.**
+Quando o processo do app já está vivo (o KeyFlow é o IME ativo),
 o `am instrument` o mata ao subir (`stop com.keyflow due to start instr`) e imprime
 `shortMsg=Process crashed`, engolindo o resumo `OK (N tests)`. Os testes tinham passado: o logcat do
 `TestRunner` mostrava `run finished: 4 tests, 0 failed`. **Para medir, ler `run finished` do logcat, não
 o resumo do `am instrument`** — parte do que já foi chamado de flaky neste projeto pode ser isto.
 
-**D — espera curta sob carga (ainda NÃO medida).** `SetupActivityTest` e `BarViewAccessibilityTest`
-estouram esperas com o host ocupado e passam sozinhos. Só aqui a hipótese de ambiente segue de pé, e
-segue sem medição. Antes de repetir esse rótulo, medir.
+**D — "espera curta sob carga": MEDIDA E REFUTADA.** Experimento controlado com `SetupActivityTest` +
+`BarViewAccessibilityTest`: 6 rodadas com a máquina ociosa e 6 com os 8 núcleos saturados (load average
+13). **0 falhas nas duas condições** — carga de CPU não reproduz o sintoma. As falhas dessas classes
+observadas mais cedo eram consequência de A/B/C (a injeção recusada derruba o teste em curso; o "Process
+crashed" derrubava os seguintes em cascata), não uma causa própria.
+
+### Placar final
+
+628 testes instrumentados executados nos dois devices depois das correções (3 rodadas completas em cada,
+157 por rodada), com 1 única falha — atribuída pelo Yan a um toque físico na tela durante o teste de
+gestos, e reconferida em rodadas limpas. Antes, praticamente toda rodada tinha alguma falha.
 
 **Lição de método**: as explicações confortáveis ("o A32 não deixa o IME grudar", "toque intermitente",
 "é carga") tinham em comum nunca terem sido medidas. Duas escondiam bugs que afetavam quem usa o app.
