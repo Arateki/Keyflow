@@ -126,3 +126,46 @@ adb -s RX8T10DERKW shell am instrument -w -r -e package com.keyflow.ime \
 ```
 
 Se em algum momento o teclado sumir do seletor, `ime enable` antes do `ime set` o traz de volta.
+
+## Terceiro gate: emulador Android 17 (API 37)
+
+Criado a pedido do Yan (2026-09-08) para pegar restrições novas de plataforma — a classe de bug do
+`ENABLED_INPUT_METHODS` acima só apareceu porque o emulador era mais novo que o aparelho.
+
+- AVD `keyflow_api37`: `system-images;android-37.1;google_apis_playstore_ps16k;x86_64`, perfil **pixel_6**
+  (mesmo do `keyflow_api34`, para a versão do Android ser a única variável), páginas de **16 KB**.
+- Vive em `/mnt/steamos_sdcard/android-avd/` porque `/home` está com 96% de uso e o emulador exige
+  ~7,4 GB livres (impõe piso de 6 GB de userdata para essa imagem, ignorando valor menor no config).
+  O `.ini` em `~/.android/avd/keyflow_api37.ini` aponta para lá.
+- Subir: `emulator -avd keyflow_api37 -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -port 5556`.
+  Com pouca RAM (o host tem 14 GB), rodar UM emulador por vez — dois deixam ~1 GB livre e a suíte flakeia.
+
+### O app funciona no Android 17
+
+Verificado à mão: com o KeyFlow selecionado, o teclado sobe e aparece igual ao Gboard
+(`dumpsys input_method` → `mInputShown=true`, `mImeWindowVis=3`). Nenhum defeito de produto apareceu.
+
+### O que quebrou foi o ferramental
+
+1. **Libs de teste antigas não sobrevivem à API 37.** Espresso/UiAutomator chamavam por reflexão
+   `android.hardware.input.InputManager.getInstance()`, removido no Android 17 — `NoSuchMethodException`
+   derrubava o PROCESSO de teste inteiro, sem rodar teste nenhum. Atualizadas:
+   `espresso-core` 3.6.1→3.7.0, `uiautomator` 2.3.0→2.4.0, `test:core-ktx`/`rules` 1.6.1→1.7.0,
+   `test.ext:junit` 1.2.1→1.3.0. Depois disso o pacote `ui` voltou a rodar (69 testes) e `overlay` caiu
+   de 2 falhas para 1.
+2. **PENDENTE — a janela do IME não é exibida em contexto instrumentado no Android 17.** Os 27 testes de
+   teclado falham em "KeyFlowKeyboardView não anexou": o serviço sobe (`onStartInput` acontece), mas o
+   pedido de mostrar é recusado pela plataforma —
+   `ImeTracker: onFailed at PHASE_IME_ON_SHOW_SOFT_INPUT_TRUE` e
+   `onCancelled at PHASE_CLIENT_REPORT_REQUESTED_VISIBLE_TYPES` (inclusive com `fromUser true`, isto é,
+   com o clique sintético do UiAutomator). Sem janela, `onCreateInputView` nunca roda. Lançado à mão o
+   mesmo campo, o teclado aparece — então é harness, não produto. Atualizar as libs NÃO resolveu.
+   O gate de IME segue coberto pelo A32 e pelo API 34.
+
+### Flakiness conhecida (medida, não suposta)
+
+`OrbMotionArtifactTest` no A32 falha **2 de 3 vezes mesmo isolado e com as libs ANTIGAS** — instável por
+conta própria, anterior a tudo isto. `SetupActivityTest`, `KeyFlowKeyboardLanguageTest` e
+`OrbButtonViewTest` falham esporadicamente sob carga e passam sozinhos (`LanguageTest`: 5/5 isolado com
+as libs novas). Ao investigar uma falha destas, medir com várias rodadas ANTES de atribuir causa —
+duas vezes nesta sessão uma amostra de 2–3 rodadas levou a atribuição errada.
