@@ -486,12 +486,13 @@ private fun BarButtonChip(
     Box(
         Modifier
             .height(36.dp)
-            .widthIn(min = 36.dp)
             // Largura proporcional ao MESMO peso que a barra real usa (BarGeometry.weightFor): a prévia é
             // WYSIWYG, e a faixa de sugestões vale ~4 botões. Como chip pequeno ela mentia sobre o
             // resultado, e o aperto só aparecia ao usar o teclado (Yan, 2026-09-08).
-            // ...com piso no alvo de toque: os pesos baixos (tecla avulsa, 0,8) ficariam pequenos demais.
-            .width(maxOf(CHIP_MIN_DP, CHIP_UNIT_DP * BarGeometry.weightFor(button)))
+            // ...como MÍNIMO, não largura fixa: com `width` o rótulo era truncado ("colar" virava "c",
+            // "esc" virava "e") — regressão pega pelo golden config-teclado, 2026-09-08. O piso do alvo
+            // de toque continua valendo para os pesos baixos.
+            .widthIn(min = maxOf(CHIP_MIN_DP, CHIP_UNIT_DP * BarGeometry.weightFor(button)))
             .clip(RoundedCornerShape(8.dp))
             .background(palette.kbKey)
             .border(1.dp, palette.kbKeyBorder, RoundedCornerShape(8.dp))

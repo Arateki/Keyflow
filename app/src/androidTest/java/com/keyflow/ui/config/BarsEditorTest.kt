@@ -286,13 +286,11 @@ class BarsEditorTest {
         val mic = rule.onNodeWithTag(barChipTag(0, 0)).getUnclippedBoundsInRoot().width
         val slot = rule.onNodeWithTag(barChipTag(0, 1)).getUnclippedBoundsInRoot().width
 
-        // A prévia tem de guardar a MESMA proporção da barra real: peso 4 contra 1,5 do microfone.
-        val esperado = BarGeometry.weightFor(BarButton.Candidates) / BarGeometry.weightFor(BarButton.Mic)
-        val obtido = slot / mic
-        assertTrue(
-            "a faixa ($slot) deveria manter a proporção de peso com o mic ($mic): $obtido vs $esperado",
-            kotlin.math.abs(obtido - esperado) < 0.15f,
-        )
+        // O peso vira largura MÍNIMA, não fixa: com largura fixa o rótulo era truncado ("colar" virava
+        // "c"), então o conteúdo pode empurrar um chip além da proporção. O que a prévia precisa
+        // garantir é que a faixa reserve a área dela — 4 unidades — e apareça bem mais larga que um
+        // botão comum, para quem monta a barra prever o aperto.
+        assertTrue("a faixa ($slot) deveria ser bem mais larga que o mic ($mic)", slot > mic * 2)
         rule.onNodeWithTag(barChipTag(0, 1)).assertWidthIsAtLeast(90.dp)
     }
 
