@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.keyflow.ui.theme.KeyFlowTheme
 import org.junit.Rule
@@ -24,6 +25,8 @@ class DocsPanelTest {
         rule.onNodeWithText("Fale").assertIsDisplayed()
         rule.onNodeWithText("Transcreve").assertIsDisplayed()
         rule.onNodeWithText("Cola").assertIsDisplayed()
-        rule.onNodeWithTag(DOCS_PAUSE_TAG).assertIsDisplayed()
+        // O painel rola (`verticalScroll`): em tela menor que a do emulador a seção de pausa nasce fora
+        // da viewport e `assertIsDisplayed` falha sem haver defeito nenhum (A32 do Yan, 2026-09-08).
+        rule.onNodeWithTag(DOCS_PAUSE_TAG).performScrollTo().assertIsDisplayed()
     }
 }

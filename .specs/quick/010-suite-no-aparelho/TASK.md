@@ -60,6 +60,32 @@ Ou seja, a faixa de sugestões arrumada em `93c22a6` **não tem onde aparecer** 
 Config → Barras → adicionar **"Candidatos"** (aparece como `abc`) na barra. Isso é independente de Q9, que
 trata de quem *produz* as sugestões.
 
+## Bug de PRODUÇÃO encontrado por tabela: teclado "não habilitado" no Android 14+
+
+`PermissionsChecker.isKeyboardEnabled` lia `Settings.Secure.ENABLED_INPUT_METHODS`. No Android 14+ essa
+chave é bloqueada para apps com `targetSdk >= 34` (o do KeyFlow):
+
+```
+SecurityException: Settings key: <enabled_input_methods> is only readable to apps with
+                   targetSdkVersion lower than or equal to: 33
+```
+
+O `catch` engolia a exceção e devolvia `false`, então **em todo aparelho com Android 14+ o app dizia
+"teclado não habilitado" mesmo com o KeyFlow habilitado** — no onboarding e na tela de setup. Passou
+despercebido porque o A32 do Yan é Android 13 (API 33), onde a leitura ainda é permitida; só apareceu
+quando o teste corrigido rodou no emulador (API 34). Trocado por `InputMethodManager
+.getEnabledInputMethodList()`, que é API pública e não tem a restrição. `DEFAULT_INPUT_METHOD`
+(`isKeyboardActive`) continua legível — só esta leitura precisava mudar.
+
+## Outros dois testes que assumiam aparelho zerado
+
+- `PermissionsCheckerTest` fixava `assertFalse(keyboardEnabled)`, o que só vale onde o KeyFlow não é o
+  teclado. Agora o teste de mic/overlay testa o que o nome promete, e a cobertura de `keyboardEnabled`
+  virou um teste que CONTROLA o estado (habilita se preciso, confere, devolve como estava).
+- `DocsPanelTest` dava `assertIsDisplayed` na seção de pausa sem rolar até ela: o painel tem
+  `verticalScroll`, e na tela do A32 (densidade 450 contra 420 do emulador) ela nasce fora da viewport.
+  Agora rola antes de asserir.
+
 ## Pendência separada (não é regressão desta mudança)
 
 `SystemSurfacesScreenshotTest` derruba o processo de teste, no A32 **e** no emulador:
@@ -70,10 +96,23 @@ ForegroundServiceDidNotStartInTimeException:
   ServiceRecord{... com.keyflow/.overlay.OverlayService}   (sysOverlayOverApp, linha 92)
 ```
 
-Verificado com `git stash`: falha **igual com o código anterior**, nos dois devices. A exceção chega
-assíncrona e mata o processo durante o teste seguinte (`sysNotification`), o que também derruba de carona
-`SetupActivityTest.overlayModeToggleStaysOffWithoutOverlayPermission` — que passa quando roda sozinho.
-O `warmUpSettings` já existia para dar folga a essa janela; não basta mais. Falta investigar.
+**RESOLVIDO.** A falha primária não era o crash e sim `AssertionError: OverlayService não subiu`:
+`sysOverlayOverApp` subia o serviço com `OverlayService.intent()`, que **não tem action**.
+`onStartCommand` casa por action e não promovia nada; a única outra via é `onCreate`, que só sobe a orbe
+se o **Modo Sobrepor** estiver ligado nas settings de quem usa. Desligado, o serviço nunca chamava
+`startForeground`, e ~10s depois o sistema matava o processo — derrubando o teste seguinte
+(`sysNotification`) e, na suíte completa, o `SetupActivityTest` de carona. Trocado por
+`startOverlayIntent` (`ACTION_START_OVERLAY`), que é o que o app usa de verdade e independe da setting.
+Os call sites de produção já usavam intents com action, então o contrato do FGS lá estava correto.
+
+## Flakiness que sobra (ambiente, não código)
+
+Sob carga alta do host (duas suítes em paralelo, ou um download grande junto), esperas de 5s estouram e
+derrubam testes que passam sozinhos: `OrbButtonViewTest` (12/12 isolado), `BarViewAccessibilityTest`
+("KeyFlowKeyboardView não anexou") e `SetupActivityTest` (o toggle não aparece a tempo). Com a máquina
+ociosa, 10 rodadas seguidas do pacote `ui` e a suíte completa no A32 (156/156) passaram limpas. Ao
+diagnosticar uma falha destas, verificar SEMPRE se havia outra coisa pesada rodando antes de mudar
+código.
 
 ## Como rodar no aparelho sem estragá-lo
 

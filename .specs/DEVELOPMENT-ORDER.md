@@ -122,9 +122,11 @@ Pequenas, sem spec própria; fazer em quick mode (TASK.md + SUMMARY.md + commit)
       testes — era ele que devolvia o aparelho do Yan ao teclado da Samsung.
       Pendente **[YAN]**: nenhuma barra da config dele declara o slot `Candidates`, então a faixa de
       sugestões não tem onde aparecer — adicionar "Candidatos" (`abc`) em Config → Barras para ver.
-      Pendente: `SystemSurfacesScreenshotTest` derruba o processo de teste
-      (`ForegroundServiceDidNotStartInTimeException` no `OverlayService`), nos dois devices e também no
-      código anterior — falha própria, ainda por investigar.
+      Junto vieram: **bug de produção** — `PermissionsChecker` lia `ENABLED_INPUT_METHODS`, bloqueado
+      no Android 14+ para `targetSdk >= 34`, então o app dizia "teclado não habilitado" em TODO aparelho
+      14+ (agora lê pelo `InputMethodManager`); o `SystemSurfacesScreenshotTest` subia o `OverlayService`
+      por uma intent sem action e derrubava o processo de teste; e mais dois testes que assumiam aparelho
+      zerado (`PermissionsCheckerTest`, `DocsPanelTest`). Suíte completa: 156/156 no A32 e no emulador.
 
 ## Bloco 2 — Fechar `shortcut-bars` (Milestone 6)
 

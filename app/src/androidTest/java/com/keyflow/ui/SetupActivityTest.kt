@@ -5,8 +5,11 @@ import android.content.Context
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.printToString
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
@@ -64,6 +67,7 @@ class SetupActivityTest {
         // O orbe do header anima infinitamente; sem isto o link Compose-Espresso nunca fica idle.
         compose.mainClock.autoAdvance = false
 
+        awaitToggle()
         compose.onNodeWithTag(TOGGLE_OVERLAY_MODE_TAG).performClick()
         waitUntil { OverlayService.isRunningForUi }
 
@@ -83,6 +87,7 @@ class SetupActivityTest {
         compose.mainClock.autoAdvance = false
         shell("appops set ${context.packageName} SYSTEM_ALERT_WINDOW deny")
         try {
+            awaitToggle()
             compose.onNodeWithTag(TOGGLE_OVERLAY_MODE_TAG).performClick()
             SystemClock.sleep(500)
             assertFalse(OverlayService.isRunningForUi)
@@ -101,6 +106,23 @@ class SetupActivityTest {
     // app. Essa regra já é coberta sem matar processo em ModoPanelTest
     // (micChipStaysPendingWithoutBlockingWhenOverlayModeIsOn) e ConfigScreenTest
     // (overlayModeToggleIgnoresMissingMicrophone).
+
+    /**
+     * Com `autoAdvance = false` o relógio de composição congela onde estiver: se a primeira composição
+     * ainda não terminou, o toggle não existe na árvore e o clique falha com "could not find any node".
+     * `waitUntil` da regra Compose avança o relógio quadro a quadro, então é ele quem destrava isso.
+     * A folga é generosa de propósito: com o host sob carga (outra suíte num segundo device, um download
+     * grande), 5s estouravam aqui sem haver defeito nenhum (2026-09-08).
+     */
+    private fun awaitToggle() {
+        try {
+            compose.waitUntil(15_000) {
+                compose.onAllNodesWithTag(TOGGLE_OVERLAY_MODE_TAG).fetchSemanticsNodes().isNotEmpty()
+            }
+        } catch (e: Exception) {
+            throw AssertionError("toggle não apareceu; árvore:\n" + compose.onRoot().printToString(), e)
+        }
+    }
 
     private fun waitUntil(predicate: () -> Boolean) {
         val deadline = SystemClock.elapsedRealtime() + 5_000
