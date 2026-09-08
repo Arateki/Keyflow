@@ -7,6 +7,8 @@ enum class GestureEvent { TAP, TRIPLE_TAP, HOLD, DRAG_START, DRAG_END }
 class GestureInterpreter(
     private val tripleTapWindowMs: Long = 300L,
     private val holdThresholdMs: Long = 500L,
+    // Quem mede DURAÇÃO deve passar um relógio monotônico (ver OrbButtonView.newGestures): com o
+    // relógio de parede, a medida diverge do `Handler`, que agenda o hold em `uptimeMillis`.
     private val clock: () -> Long = { System.currentTimeMillis() },
 ) {
     private var tapCount = 0

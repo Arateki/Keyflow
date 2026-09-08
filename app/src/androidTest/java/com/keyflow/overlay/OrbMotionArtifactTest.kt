@@ -157,7 +157,10 @@ class OrbMotionArtifactTest {
 
             down(view)
             capture(dir, frame++, "pressed")
-            waitUntil("$slug não travou o modo-arrasto") { view.dragLockedForTest }
+            waitUntil(
+                "$slug não travou o modo-arrasto " +
+                    "(rendered=${view.renderedState} mode=$mode esperado=$initialState)",
+            ) { view.dragLockedForTest }
             capture(dir, frame++, "locked")
 
             for (step in 1..10) {

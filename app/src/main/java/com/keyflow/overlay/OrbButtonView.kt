@@ -71,9 +71,19 @@ class OrbButtonView(
     // Limiar único: toque×segurada e janelas derivam do "Tempo de reação". Hold = janela + 150ms.
     private var gestures = newGestures(this.tapBurstWindowMs)
 
+    /**
+     * Relógio MONOTÔNICO, de propósito: o hold é agendado com `handler.postDelayed`, que conta em
+     * `uptimeMillis`, e quem decide se virou hold é `onHoldElapsed`, que compara contra o MESMO limiar.
+     * Com réguas diferentes (o default do interpretador é o relógio de parede) as duas medidas
+     * divergiam alguns milissegundos e o disparo às vezes caía um fio ANTES do limiar — `onHoldElapsed`
+     * devolvia null e, como o runnable não se reagenda, o gesto perdia o modo-arrasto de vez.
+     * Medido no A32 em 2026-09-08: `elapsed=269 threshold=270 ev=null` contra 270..286 nos que travaram,
+     * ~1 gesto em 15. Não era falha de teste: acontecia na mão do usuário do mesmo jeito.
+     */
     private fun newGestures(window: Long) = GestureInterpreter(
         tripleTapWindowMs = window,
         holdThresholdMs = window + HOLD_OFFSET_MS,
+        clock = { SystemClock.uptimeMillis() },
     )
 
     fun setTapBurstWindowMs(ms: Long) {
