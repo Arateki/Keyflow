@@ -165,10 +165,14 @@ class KeyFlowKeyboardSelectorTest {
     }
 
     /**
-     * Hold → arrasta até [action] → solta, esperando o estado resultante. A entrega do toque real
-     * (`sendPointerSync`) é intermitente sob a carga deste host (mesma classe de flakiness já observada
-     * no FGS/keystore) mesmo com a geometria correta (`highlightedIndexForTest` confirmado certo antes do
-     * UP) — repete o gesto algumas vezes em vez de aceitar um falso negativo.
+     * Hold → arrasta até [action] → solta, esperando o estado resultante. O gesto às vezes não surte
+     * efeito mesmo com a geometria correta (`highlightedIndexForTest` confirmado certo antes do UP), daí
+     * as tentativas.
+     *
+     * A explicação antiga — "a entrega do toque via `sendPointerSync` é intermitente sob carga" — foi
+     * medida em `KeyFlowKeyboardSpellCheckerTest` (2026-09-08) e lá era FALSA: o toque chegava e o
+     * `InputConnection` aceitava o texto; a leitura pelo UiAutomator é que estava velha. Aqui a causa
+     * NÃO foi medida — se este teste voltar a incomodar, medir antes de repetir aquela explicação.
      */
     private fun selectChipAndWaitFor(action: MicAction, expected: ButtonState, attempts: Int = 3) {
         var lastError: Throwable? = null

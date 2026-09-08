@@ -4,7 +4,9 @@ import android.app.Activity
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.text.Editable
 import android.text.InputType
+import android.text.TextWatcher
 import android.view.Gravity
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
@@ -54,6 +56,22 @@ class ImeProbeActivity : Activity() {
                 Gravity.TOP,
             ))
         }
+        // Espelha o texto para os instrumentados lerem a FONTE DE VERDADE. Ler pela árvore de
+        // acessibilidade (uiautomator) devolvia o hint mesmo com o texto já escrito: medido em
+        // 2026-09-08, `setComposingText('o') -> true` e, no mesmo instante, o teste lia "Toque para
+        // ditar…" — ~1 rodada em 19. Não era o toque que se perdia (ele chegava e ativava a tecla
+        // certa): era a LEITURA que servia um snapshot velho. Um TextWatcher publica o texto num campo
+        // @Volatile, seguro de ler de qualquer thread e sem depender do snapshot.
+        field.addTextChangedListener(object : TextWatcher {
+            override fun afterTextChanged(s: Editable?) {
+                if (owner === this@ImeProbeActivity) liveText = s?.toString()
+            }
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+        })
+        owner = this
+        liveText = field.text?.toString().orEmpty()
+
         setContentView(root)
         field.requestFocus()
         this.field = field
@@ -78,8 +96,28 @@ class ImeProbeActivity : Activity() {
         }
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        // Só limpa se ESTA instância ainda é a dona: o teste relança o probe com CLEAR_TASK, e o
+        // onDestroy da instância velha corre DEPOIS do onCreate da nova — limpar sem checar apagava o
+        // texto da instância que estava em uso.
+        if (owner === this) {
+            owner = null
+            liveText = null
+        }
+    }
+
     companion object {
         const val FIELD_DESC = "ime_probe_field"
         const val EXTRA_INPUT_TYPE = "input_type"
+
+        /** Instância cujo campo está publicando em [liveText] (a última criada). */
+        @Volatile
+        private var owner: ImeProbeActivity? = null
+
+        /** Texto vivo do campo (inclui o que está em composição). Null enquanto não há probe na tela. */
+        @Volatile
+        var liveText: String? = null
+            private set
     }
 }

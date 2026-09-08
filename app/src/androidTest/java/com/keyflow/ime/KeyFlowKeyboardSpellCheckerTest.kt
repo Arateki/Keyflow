@@ -20,6 +20,7 @@ import com.keyflow.core.shortcuts.BarDef
 import com.keyflow.core.shortcuts.BarsConfig
 import com.keyflow.data.SettingsRepository
 import com.keyflow.ime.keyboard.KeyboardGridView
+import com.keyflow.ui.ImeProbeActivity
 import com.keyflow.ime.keyboard.layout.KeyAction as CanvasKeyAction
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -178,12 +179,19 @@ class KeyFlowKeyboardSpellCheckerTest {
         return false
     }
 
-    private fun fieldText(): String? = device.findObject(By.desc("ime_probe_field"))?.text?.toString()
+    /**
+     * Lê a FONTE DE VERDADE (o `EditText` do probe), não a árvore de acessibilidade. Medido em
+     * 2026-09-08: no instante em que este teste lia "Toque para ditar…" (o hint), o log do IME mostrava
+     * `setComposingText('o') -> true` — o texto já estava no campo e o snapshot do uiautomator é que
+     * estava velho. Era isso, e não "toque perdido", a causa da intermitência de ~1 em 19.
+     */
+    private fun fieldText(): String? = ImeProbeActivity.liveText
 
     /**
-     * Repete [action] até o campo mostrar [expectedText] (a entrega do toque real via
-     * `sendPointerSync` é intermitente sob a carga deste host — mesma classe de flakiness já observada
-     * no seletor de ações do mic) em vez de aceitar um falso negativo de uma tecla que não registrou.
+     * Repete [action] até o campo mostrar [expectedText]. A explicação antiga aqui — "a entrega do
+     * toque via `sendPointerSync` é intermitente" — foi MEDIDA e é falsa: o toque chega, resolve a
+     * tecla certa e o `setComposingText` devolve true (2026-09-08). A intermitência era da leitura,
+     * hoje corrigida em [fieldText]. As tentativas ficam como rede contra carga extrema do host.
      */
     private fun performUntil(expectedText: String, attempts: Int = 3, action: () -> Unit) {
         repeat(attempts) {

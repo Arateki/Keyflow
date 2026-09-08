@@ -105,14 +105,45 @@ se o **Modo Sobrepor** estiver ligado nas settings de quem usa. Desligado, o ser
 `startOverlayIntent` (`ACTION_START_OVERLAY`), que é o que o app usa de verdade e independe da setting.
 Os call sites de produção já usavam intents com action, então o contrato do FGS lá estava correto.
 
-## Flakiness que sobra (ambiente, não código)
+## A flakiness: quatro causas, e a explicação fácil estava errada em todas
 
-Sob carga alta do host (duas suítes em paralelo, ou um download grande junto), esperas de 5s estouram e
-derrubam testes que passam sozinhos: `OrbButtonViewTest` (12/12 isolado), `BarViewAccessibilityTest`
-("KeyFlowKeyboardView não anexou") e `SetupActivityTest` (o toggle não aparece a tempo). Com a máquina
-ociosa, 10 rodadas seguidas do pacote `ui` e a suíte completa no A32 (156/156) passaram limpas. Ao
-diagnosticar uma falha destas, verificar SEMPRE se havia outra coisa pesada rodando antes de mudar
-código.
+O rótulo "flakiness de ambiente" cobria coisas diferentes. Medindo uma a uma: DUAS eram defeitos de
+produção, uma era defeito de leitura no harness e uma era ruído de medição. Nenhuma era carga do host.
+
+**A — o mesmo limiar medido por duas réguas (BUG DE PRODUÇÃO, corrigido em `1c93ee7`).**
+O hold é agendado com `handler.postDelayed` (`uptimeMillis`) e conferido por `onHoldElapsed` com
+`System.currentTimeMillis()`, contra o MESMO limiar e sem margem. Sonda no A32:
+`elapsed=269 threshold=270 ev=null` contra 270..286 nos que travaram — faltou 1 ms, e nada reagenda.
+Na mão de quem usa: segurar a orbe não pegava, ~1 gesto em 15. Verificado: 30 gestos sem falha.
+
+**A' — a mesma armadilha na janela do PTT (BUG DE PRODUÇÃO, corrigido em `9a24429`).**
+`onReleaseTimeout` comparava relógio de parede contra `pttReleaseWindowMs`, que em produção é
+exatamente o `tapBurstWindowMs` do `postDelayed`. Falhando por um fio devolvia `NONE`: solta o botão do
+push-to-talk e **a gravação não é enviada**. Corrigido tornando MONOTÔNICO o default de
+`RecordingGestureController` e `GestureInterpreter` — quem mede duração pareada com `Handler` acerta por
+omissão, em vez de depender de alguém lembrar de passar o relógio certo. Verificado: 30 testes sem falha.
+
+**B — a leitura, não o toque (harness).** `KeyFlowKeyboardSpellCheckerTest` falhava ~1 em 19 com "campo
+não chegou a X". O código dizia há meses que "a entrega do toque via `sendPointerSync` é intermitente".
+Medido: no instante da falha o toque CHEGA (`down x=918 hit=o`), resolve a tecla certa
+(`activate Char(text=o)`), o `InputConnection` está vivo e `setComposingText('o')` devolve `true` — e o
+teste, lendo pela árvore de acessibilidade do UiAutomator, via o hint "Toque para ditar…". A
+`ImeProbeActivity` passou a publicar o texto vivo do campo (`TextWatcher` + `@Volatile`), com posse
+explícita da instância (o `onDestroy` da Activity velha corre DEPOIS do `onCreate` da nova, por causa do
+`CLEAR_TASK`, e apagava o texto em uso). Verificado: 15 rodadas / 60 testes sem falha.
+
+**C — ruído de MEDIÇÃO, não de teste.** Quando o processo do app já está vivo (o KeyFlow é o IME ativo),
+o `am instrument` o mata ao subir (`stop com.keyflow due to start instr`) e imprime
+`shortMsg=Process crashed`, engolindo o resumo `OK (N tests)`. Os testes tinham passado: o logcat do
+`TestRunner` mostrava `run finished: 4 tests, 0 failed`. **Para medir, ler `run finished` do logcat, não
+o resumo do `am instrument`** — parte do que já foi chamado de flaky neste projeto pode ser isto.
+
+**D — espera curta sob carga (ainda NÃO medida).** `SetupActivityTest` e `BarViewAccessibilityTest`
+estouram esperas com o host ocupado e passam sozinhos. Só aqui a hipótese de ambiente segue de pé, e
+segue sem medição. Antes de repetir esse rótulo, medir.
+
+**Lição de método**: as explicações confortáveis ("o A32 não deixa o IME grudar", "toque intermitente",
+"é carga") tinham em comum nunca terem sido medidas. Duas escondiam bugs que afetavam quem usa o app.
 
 ## Como rodar no aparelho sem estragá-lo
 

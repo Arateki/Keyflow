@@ -36,7 +36,7 @@ lá, só não aparecia).
 - [x] `testDebugUnitTest` verde (+5 novos).
 - [x] Instrumentado (`KeyFlowKeyboardTerminalFieldTest`, 2 testes) verde.
 - [x] Gate `full`: só as 2 falhas ambientais já conhecidas + 1 flake confirmado
-      (`KeyFlowKeyboardSelectorTest`, reruns isolados passaram — instabilidade de `sendPointerSync` sob
+      (`KeyFlowKeyboardSelectorTest`, reruns isolados passaram — na época atribuído a instabilidade de `sendPointerSync` sob
       carga, não regressão).
 - [ ] **[YAN]**: validar de verdade no Termius do Galaxy A32 — a causa raiz foi confirmada por reprodução
       análoga (`TYPE_NULL` num `EditText` de debug), não no app real.

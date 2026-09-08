@@ -157,6 +157,9 @@ Yan validou o texto do banner e o "Concluir", mas fez 4 perguntas/pedidos em cim
       (`KeyFlowKeyboardAccessibilityTest.actionClickOnAVirtualNodeActivatesTheSameBaseActionAsATap`) não
       tem nenhuma relação com as mudanças desta rodada (área de acessibilidade da grade antiga) — mesma
       classe de flakiness de toque sintético sob carga já documentada no projeto.
+      **Emenda 2026-09-08**: essa explicação foi medida em `KeyFlowKeyboardSpellCheckerTest` e lá era
+      falsa — o toque chega; quem falhava era a leitura pelo UiAutomator. Ver
+      `.specs/quick/010-suite-no-aparelho/`.
 - [ ] **Sem cobertura automatizada pro gesto de cancelar durante SENDING no PTT** nem pro "segurar o mic
       mostra cancelar durante SENDING": exigiria interceptar/controlar a chamada de rede real dentro do
       teste instrumentado pra manter o estado em SENDING tempo suficiente, o que a suíte atual não monta

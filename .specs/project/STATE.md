@@ -268,9 +268,15 @@ Duas features novas planejadas via grill completo (gray areas resolvidas). **Ord
   (`By.textContains`) **no meio do gesto** (dedo sintético ainda "pressionado") interfere no foco do IME
   real e o derruba (`HIDE_RESET_SHELL_COMMAND` no logcat); a correção foi ler `popupRectsForTest`
   diretamente do `View` (mesmo processo, self-instrumentado) em vez de UiAutomator. Mesmo com a geometria
-  certa (`highlightedIndexForTest` confirmado correto antes do UP), a entrega do toque real via
-  `sendPointerSync` ainda é intermitente sob a carga deste host (mesma classe de flakiness do FGS/Keystore)
-  — mitigado com retry do gesto (até 3 tentativas) no nível do teste. Também corrigido: `KeyFlowController`
+  certa (`highlightedIndexForTest` confirmado correto antes do UP), o gesto às vezes não surtia efeito
+  — mitigado com retry do gesto (até 3 tentativas) no nível do teste. **A explicação que estava aqui — "a
+  entrega do toque via `sendPointerSync` é intermitente sob carga" — foi MEDIDA em 2026-09-08 e é falsa**,
+  pelo menos onde deu para medir (`KeyFlowKeyboardSpellCheckerTest`): no instante da falha o toque chegava
+  à grade, resolvia a tecla certa e `setComposingText` devolvia `true`; quem estava desatualizada era a
+  LEITURA pela árvore de acessibilidade do UiAutomator, que servia o hint do campo em vez do texto já
+  escrito. É a mesma lição do parágrafo acima (não perguntar ao UiAutomator o que dá para ler do `View`),
+  agora aplicada também à verificação, e não só à geometria. Ver `.specs/quick/010-suite-no-aparelho/`.
+  O caso do seletor de mic NÃO foi medido — pode ter causa própria; medir antes de assumir. Também corrigido: `KeyFlowController`
   é singleton de processo e não reseta entre métodos de teste — sem `tearDown` zerando
   `buttonState`/`clearInserter()`, o teste seguinte herdava PAUSED/CANCELLING do anterior.
 - **OG-T7**: traceability do `orb-gestures/spec.md` atualizada (Implemented→Verified onde testado nesta
