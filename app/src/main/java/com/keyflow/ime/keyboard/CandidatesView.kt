@@ -1,6 +1,8 @@
 package com.keyflow.ime.keyboard
 
 import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Paint
 import android.view.Gravity
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
@@ -13,9 +15,9 @@ import android.widget.TextView
  * Rola na horizontal (pedido do Yan, 2026-09-07): o corretor devolve várias palavras e, na largura de
  * uma barra, as últimas ficavam fora da tela sem nenhum jeito de alcançá-las.
  *
- * Deixou de ser exclusiva do expandido: com o teclado retraído a faixa continua aparecendo enquanto
- * houver sugestões (ver `BarView`), porque a palavra pode estar pela metade — ou ter vindo por voz —
- * quando o teclado recolhe.
+ * A área é SEMPRE reservada, nos dois modos (Yan, 2026-09-08), para o layout não pular quando uma
+ * sugestão chega ou some e para a prévia do editor bater com o teclado. Vazia, ela se anuncia com uma
+ * marcação sutil ([drawEmptyHint]) — sem isso seria um vão sem explicação no meio da barra.
  */
 class CandidatesView(
     context: Context,
@@ -26,6 +28,16 @@ class CandidatesView(
 
     private val kbTray = if (dark) 0xFF332E27.toInt() else 0xFFDCD0AC.toInt()
     private val kbInk = if (dark) 0xFFF1E7C9.toInt() else 0xFF2B2720.toInt()
+    private val kbKeyBorder = if (dark) 0xFF4A4234.toInt() else 0xFFD7C9A0.toInt()
+
+    private val hintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = dp(1).toFloat()
+        color = kbKeyBorder
+    }
+
+    /** Está vazia agora? (a marcação da área vazia depende disto; exposto para o instrumentado) */
+    val isEmptyForTest: Boolean get() = row.childCount == 0
 
     /** Os chips vivem nesta fileira; o scroll é o container. */
     private val row = LinearLayout(context).apply {
@@ -50,6 +62,18 @@ class CandidatesView(
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(dp(HEIGHT_DP), MeasureSpec.EXACTLY))
         setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), dp(HEIGHT_DP))
+    }
+
+    /**
+     * Marcação sutil enquanto a faixa está vazia: só a linha de base, no tom da borda das teclas. Fica
+     * AQUI e não no `onDraw` da BarView porque esta view pinta o próprio fundo por cima do pai — a linha
+     * desenhada lá simplesmente sumia. Sem texto: viraria ruído no uso diário (escolha do Yan).
+     */
+    override fun dispatchDraw(canvas: Canvas) {
+        super.dispatchDraw(canvas)
+        if (row.childCount > 0) return
+        val y = height - paddingBottom.toFloat()
+        canvas.drawLine(paddingLeft.toFloat(), y, (width - paddingRight).toFloat(), y, hintPaint)
     }
 
     /** Palavras hoje exibidas na faixa, só para o instrumentado (KC-T7). */

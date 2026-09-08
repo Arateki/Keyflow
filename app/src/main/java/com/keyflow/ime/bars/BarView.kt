@@ -85,22 +85,21 @@ class BarView(
 
     private val declaredButtons: List<BarButton> = def.buttons
 
-    // Há sugestões pra mostrar agora? Só importa no retraído, onde o slot aparece sob demanda.
+    // Há sugestões pra mostrar agora? Governa só a marcação da área vazia — a área em si é fixa.
     private var hasCandidates = false
 
     /**
-     * Botões efetivos. No expandido a barra é a config crua; no retraído o slot `Candidates` entra
-     * apenas enquanto existir sugestão (pedido do Yan, 2026-09-07).
+     * Botões efetivos: a config crua, nos dois modos. A área do slot `Candidates` é **sempre reservada**
+     * (pedido do Yan, 2026-09-08: "a área da sugestão deve ser sempre visível em ambos os modos com sua
+     * rolagem própria de palavras internas"), para o layout não pular quando uma sugestão chega ou some
+     * e para o que se monta no editor ser o que aparece no teclado.
      *
-     * Antes ele era filtrado fora do retraído sempre, o que tinha dois problemas: com "espelhar
-     * colapsado/expandido" ligado as duas barras saíam visivelmente diferentes sem explicação, e uma
-     * palavra pela metade — ou vinda por voz — perdia as sugestões no instante em que o teclado
-     * recolhia. Mantê-lo sempre visível também não serve: sem sugestão ele vira um vão morto que
-     * espreme os outros botões.
+     * Antes o slot entrava sob demanda no retraído (2026-09-07) e, antes disso, era filtrado fora dele
+     * sempre — o que fazia as duas barras saírem diferentes com "espelhar" ligado e uma palavra pela
+     * metade perder as sugestões assim que o teclado recolhia.
      */
     private val buttons: List<BarButton>
-        get() = if (expandedMode || hasCandidates) declaredButtons
-        else declaredButtons.filter { it != BarButton.Candidates }
+        get() = declaredButtons
     private val gridsById: Map<String, ShortcutGrid> = grids.associateBy { it.id }
     private val knownGridIds: Set<String> = gridsById.keys
 
@@ -189,8 +188,8 @@ class BarView(
         if (declaredButtons.contains(BarButton.Candidates)) {
             candidatesView = CandidatesView(context, dark, onTap = callbacks.onCandidateTap, scale = scale)
                 .also {
-                    // No retraído nasce escondida: só entra quando houver sugestão (ver `buttons`).
-                    it.visibility = if (expandedMode) VISIBLE else GONE
+                    // A área é reservada nos dois modos; vazia, só a marcação sutil aparece (ver onDraw).
+                    it.visibility = VISIBLE
                     addView(it)
                 }
         }
@@ -248,12 +247,8 @@ class BarView(
         val has = candidates.isNotEmpty()
         if (has == hasCandidates) return
         hasCandidates = has
-        // No retraído a presença do slot muda a geometria da barra inteira — remede e repinta.
-        if (!expandedMode) {
-            candidatesView?.visibility = if (has) VISIBLE else GONE
-            requestLayout()
-            invalidate()
-        }
+        // A geometria não muda mais (a área é fixa) — só a marcação da área vazia aparece ou some.
+        invalidate()
     }
 
     // ── medida/layout ────────────────────────────────────────────────────────
@@ -301,10 +296,13 @@ class BarView(
         canvas.save()
         canvas.translate(-scrollOffset, 0f)
         barLayout.buttons.forEach { placed ->
+            // A faixa é uma View filha (CandidatesView) e pinta a si mesma, inclusive a marcação de
+            // área vazia — desenhar aqui seria coberto por ela.
             if (placed.button != BarButton.Candidates) drawButton(canvas, placed)
         }
         canvas.restore()
     }
+
 
     private fun drawButton(canvas: Canvas, placed: BarGeometry.PlacedButton) {
         val bounds = RectF(placed.left + marginH, marginV, placed.right - marginH, height - marginV)

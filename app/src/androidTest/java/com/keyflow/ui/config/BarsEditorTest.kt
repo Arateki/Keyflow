@@ -7,13 +7,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertWidthIsAtLeast
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.unit.width
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import com.keyflow.core.shortcuts.BarButton
+import com.keyflow.ime.bars.BarGeometry
 import com.keyflow.core.shortcuts.BarDef
 import com.keyflow.core.shortcuts.BarsConfig
 import com.keyflow.core.shortcuts.GridTriggerMode
@@ -231,6 +236,29 @@ class BarsEditorTest {
         rule.onNodeWithTag(barAddButtonTag(0)).performClick()
 
         rule.onAllNodesWithTag(BARS_EDITOR_CATALOG_GRID_TAG).assertCountEquals(0)
+    }
+
+    @Test
+    fun theCandidatesSlotIsPreviewedWithTheAreaItReallyTakes() {
+        // A prévia é WYSIWYG (CFG-02) e a faixa de sugestões ocupa ~4 botões no teclado. Desenhada como
+        // um chip pequeno "abc", ela mentia sobre o resultado — quem montava a barra só descobria o
+        // aperto ao usar (pedido do Yan, 2026-09-08: "essa área que ele ocupa deve representar a área
+        // real pro usuário saber como vai ficar").
+        val def = BarDef(listOf(BarButton.Mic, BarButton.Candidates, BarButton.ToggleExpand))
+        val h = Harness(BarsConfig(mirrored = true, collapsed = listOf(def), expanded = emptyList()))
+        rule.setContent { h.Content() }
+
+        val mic = rule.onNodeWithTag(barChipTag(0, 0)).getUnclippedBoundsInRoot().width
+        val slot = rule.onNodeWithTag(barChipTag(0, 1)).getUnclippedBoundsInRoot().width
+
+        // A prévia tem de guardar a MESMA proporção da barra real: peso 4 contra 1,5 do microfone.
+        val esperado = BarGeometry.weightFor(BarButton.Candidates) / BarGeometry.weightFor(BarButton.Mic)
+        val obtido = slot / mic
+        assertTrue(
+            "a faixa ($slot) deveria manter a proporção de peso com o mic ($mic): $obtido vs $esperado",
+            kotlin.math.abs(obtido - esperado) < 0.15f,
+        )
+        rule.onNodeWithTag(barChipTag(0, 1)).assertWidthIsAtLeast(90.dp)
     }
 
     @Test

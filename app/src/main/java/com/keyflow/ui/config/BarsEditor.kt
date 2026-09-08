@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.keyflow.core.shortcuts.BarButton
+import com.keyflow.ime.bars.BarGeometry
 import com.keyflow.core.shortcuts.BarDef
 import com.keyflow.core.shortcuts.BarsConfig
 import com.keyflow.core.shortcuts.GridTriggerMode
@@ -115,6 +116,12 @@ fun reorderedButtons(buttons: List<BarButton>, fromIndex: Int, toIndex: Int): Li
 
 // Distância de arrasto (após o long-press) que precisa ser cruzada para trocar com o vizinho — valor
 // fixo simples (aprox. metade da largura mínima de um chip), sem medir a largura real do vizinho.
+/** Largura de UMA unidade de peso na prévia (o mic, peso 1,5, sai com 36dp). */
+private val CHIP_UNIT_DP = 24.dp
+
+/** Piso de largura do chip (alvo de toque), independente do peso. */
+private val CHIP_MIN_DP = 36.dp
+
 private val REORDER_THRESHOLD_DP = 24.dp
 
 private sealed interface BarsEditorSheet {
@@ -423,6 +430,11 @@ private fun BarButtonChip(
         Modifier
             .height(36.dp)
             .widthIn(min = 36.dp)
+            // Largura proporcional ao MESMO peso que a barra real usa (BarGeometry.weightFor): a prévia é
+            // WYSIWYG, e a faixa de sugestões vale ~4 botões. Como chip pequeno ela mentia sobre o
+            // resultado, e o aperto só aparecia ao usar o teclado (Yan, 2026-09-08).
+            // ...com piso no alvo de toque: os pesos baixos (tecla avulsa, 0,8) ficariam pequenos demais.
+            .width(maxOf(CHIP_MIN_DP, CHIP_UNIT_DP * BarGeometry.weightFor(button)))
             .clip(RoundedCornerShape(8.dp))
             .background(palette.kbKey)
             .border(1.dp, palette.kbKeyBorder, RoundedCornerShape(8.dp))

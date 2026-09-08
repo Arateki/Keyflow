@@ -8,16 +8,19 @@ import com.keyflow.core.shortcuts.BarButton
 import com.keyflow.core.shortcuts.BarDef
 import com.keyflow.ime.bars.BarView
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * O slot `Candidates` no teclado RETRAÍDO (2026-09-07). Antes ele era filtrado fora do retraído sempre:
- * com "espelhar colapsado/expandido" ligado as duas barras saíam diferentes sem explicação, e uma
- * palavra pela metade — ou vinda por voz — perdia as sugestões assim que o teclado recolhia.
+ * O slot `Candidates` na barra. Histórico: era filtrado fora do retraído sempre (as duas barras saíam
+ * diferentes com "espelhar" ligado, e a palavra pela metade perdia as sugestões ao recolher); depois
+ * passou a entrar só enquanto houvesse sugestão (2026-09-07).
+ *
+ * Agora a área é **sempre reservada**, nos dois modos (pedido do Yan, 2026-09-08: "a área da sugestão
+ * deve ser sempre visível em ambos os modos com sua rolagem própria de palavras internas"). Assim o
+ * layout não pula quando uma sugestão chega ou some, e o que você monta no editor é o que aparece.
  */
 @RunWith(AndroidJUnit4::class)
 class BarCandidatesSlotTest {
@@ -47,10 +50,11 @@ class BarCandidatesSlotTest {
     private fun buttonsOf(view: BarView) = view.layoutForTest.buttons.map { it.button }
 
     @Test
-    fun collapsedHidesTheSlotWhileThereIsNothingToSuggest() {
+    fun collapsedReservesTheSlotEvenWithNothingToSuggest() {
         val bar = bar(expandedMode = false)
 
-        assertFalse("sem sugestão o slot não deve ocupar a barra", buttonsOf(bar).contains(BarButton.Candidates))
+        assertTrue("a área da faixa é reservada sempre", buttonsOf(bar).contains(BarButton.Candidates))
+        assertEquals(View.VISIBLE, bar.candidatesViewForTest?.visibility)
     }
 
     @Test
@@ -65,25 +69,32 @@ class BarCandidatesSlotTest {
     }
 
     @Test
-    fun collapsedDropsTheSlotAgainWhenTheSuggestionsAreCleared() {
+    fun theReservedWidthDoesNotChangeWhenSuggestionsComeAndGo() {
         val bar = bar(expandedMode = false)
-        bar.updateCandidates(listOf("você"))
+        val empty = slotWidth(bar)
+
+        bar.updateCandidates(listOf("você", "voce"))
         measure(bar)
+        val filled = slotWidth(bar)
 
         bar.updateCandidates(emptyList())
         measure(bar)
 
-        assertFalse(buttonsOf(bar).contains(BarButton.Candidates))
+        // O layout não pode "pular" quando a sugestão chega ou some.
+        assertEquals(empty, filled)
+        assertEquals(empty, slotWidth(bar))
     }
 
     @Test
     fun expandedAlwaysKeepsTheSlot() {
         val bar = bar(expandedMode = true)
 
-        // No expandido o slot é parte fixa da barra: some com sugestão nenhuma seria a barra "pulando".
         assertTrue(buttonsOf(bar).contains(BarButton.Candidates))
         bar.updateCandidates(emptyList())
         measure(bar)
         assertTrue(buttonsOf(bar).contains(BarButton.Candidates))
     }
+
+    private fun slotWidth(view: BarView): Float =
+        view.layoutForTest.buttons.first { it.button == BarButton.Candidates }.width
 }
