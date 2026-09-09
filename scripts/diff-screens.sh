@@ -8,14 +8,20 @@
 #   scripts/diff-screens.sh              # compara contra o golden → exit !=0 se regrediu
 #   scripts/diff-screens.sh --approve    # promove verification/ → golden/ (exceto sys-*)
 #
-# Requer ImageMagick (`compare`). Limiar: MAX_RATIO (default 0.005 = 0,5% dos pixels).
+# Requer ImageMagick (`compare`). Limiar: MAX_RATIO (default 0.0002 = 0,02% dos pixels).
+#
+# Por que tão apertado: a captura é determinística (duas rodadas do mesmo build dão PNGs bit-idênticos —
+# medido em 2026-09-08, ruído de 0 px na pior rota), então não há variação legítima a tolerar. O limiar
+# antigo (0,5%) deixava passar mudança real: um aviso NOVO de 7 linhas no `config-teclado` gerou 13.714 px
+# de diferença = 0,53%, e só não passou por 0,03 ponto. Texto fino gera poucos pixels, então a métrica AE
+# subestima muito mudanças textuais — com 0,02% (~520 px) aquele mesmo aviso teria acusado com folga de 26x.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VERIFY_DIR="$ROOT/verification"
 GOLDEN_DIR="$VERIFY_DIR/golden"
 FUZZ="${FUZZ:-5%}"
-MAX_RATIO="${MAX_RATIO:-0.005}"
+MAX_RATIO="${MAX_RATIO:-0.0002}"
 
 # sys-* vêm de device real (wallpaper/relógio variáveis) → não entram no golden.
 is_excluded() { [[ "$1" == sys-* ]]; }
