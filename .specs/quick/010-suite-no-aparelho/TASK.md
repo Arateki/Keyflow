@@ -191,10 +191,12 @@ Criado a pedido do Yan (2026-09-08) para pegar restrições novas de plataforma 
 - Subir: `emulator -avd keyflow_api37 -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -port 5556`.
   Com pouca RAM (o host tem 14 GB), rodar UM emulador por vez — dois deixam ~1 GB livre e a suíte flakeia.
 
-### O app funciona no Android 17
+### ~~O app funciona no Android 17~~ — REFUTADO em 2026-09-09
 
-Verificado à mão: com o KeyFlow selecionado, o teclado sobe e aparece igual ao Gboard
-(`dumpsys input_method` → `mInputShown=true`, `mImeWindowVis=3`). Nenhum defeito de produto apareceu.
+Esta seção dizia que, à mão, o teclado subia igual ao Gboard, com base em `dumpsys input_method` →
+`mInputShown=true`. **A medição não valia**: `mInputShown` é contabilidade do `InputMethodManagerService`,
+não pixel. Um `screencap` do MESMO lançamento manual mostra o campo e nenhum teclado. O app de fato NÃO
+abria o teclado nesse emulador — causa e correção no Q11.
 
 ### O que quebrou foi o ferramental
 
@@ -204,14 +206,13 @@ Verificado à mão: com o KeyFlow selecionado, o teclado sobe e aparece igual ao
    `espresso-core` 3.6.1→3.7.0, `uiautomator` 2.3.0→2.4.0, `test:core-ktx`/`rules` 1.6.1→1.7.0,
    `test.ext:junit` 1.2.1→1.3.0. Depois disso o pacote `ui` voltou a rodar (69 testes) e `overlay` caiu
    de 2 falhas para 1.
-2. **PENDENTE — a janela do IME não é exibida em contexto instrumentado no Android 17.** Os 27 testes de
-   teclado falham em "KeyFlowKeyboardView não anexou": o serviço sobe (`onStartInput` acontece), mas o
-   pedido de mostrar é recusado pela plataforma —
-   `ImeTracker: onFailed at PHASE_IME_ON_SHOW_SOFT_INPUT_TRUE` e
-   `onCancelled at PHASE_CLIENT_REPORT_REQUESTED_VISIBLE_TYPES` (inclusive com `fromUser true`, isto é,
-   com o clique sintético do UiAutomator). Sem janela, `onCreateInputView` nunca roda. Lançado à mão o
-   mesmo campo, o teclado aparece — então é harness, não produto. Atualizar as libs NÃO resolveu.
-   O gate de IME segue coberto pelo A32 e pelo API 34.
+2. **~~A janela do IME não é exibida em contexto instrumentado no Android 17~~ — RESOLVIDO em
+   2026-09-09, e o diagnóstico daqui estava errado.** Não era instrumentação: o emulador do A17 se
+   declara com teclado físico (`Configuration` = `qwerty/v/v`) e vem com
+   `show_ime_with_hard_keyboard = 0`, o que faz o `onEvaluateInputViewShown()` padrão do
+   `InputMethodService` recusar — manualmente também não abria. Os cancelamentos em
+   `PHASE_CLIENT_REPORT_REQUESTED_VISIBLE_TYPES` citados aqui são ruído: o Gboard os produz iguais e
+   aparece assim mesmo. Causa, evidência e correção (no `UserSettingsGuard`) no Q11.
 
 ### Flakiness conhecida (medida, não suposta)
 

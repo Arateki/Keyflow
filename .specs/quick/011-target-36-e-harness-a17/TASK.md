@@ -1,70 +1,100 @@
-# Q11 — targetSdk 36 e o harness de IME no Android 17 [EM ABERTO]
+# Q11 — targetSdk 36 e o teclado no Android 17 [RESOLVIDO 2026-09-09]
 
-## ⚠️ Estado do working tree ao pausar (2026-09-08)
+## O que era, e o que realmente foi
 
-`app/build.gradle.kts` está com **`compileSdk = 36` e `targetSdk = 36` NÃO COMMITADOS**. É um spike
-validado (ver abaixo); decidir entre commitar ou reverter (`git checkout app/build.gradle.kts`).
+Estavam registradas aqui 27 falhas de `KeyFlowKeyboardView não anexou` no emulador Android 17 (API 37),
+atribuídas a uma limitação do **harness sob instrumentação**. Isso estava **errado**, e a conclusão
+anterior se apoiava em duas medições ruins:
 
-## Por que subir o target: prazo VENCIDO
+1. **"O app funciona manualmente no A17"** — verificado só por `dumpsys input_method → mInputShown=true`.
+   Esse campo é contabilidade do `InputMethodManagerService`, não pixel. Um `screencap` do MESMO
+   lançamento manual mostra o campo de texto **e nenhum teclado**. O produto não funcionava manualmente.
+2. **`ImeTracker: onCancelled at PHASE_CLIENT_REPORT_REQUESTED_VISIBLE_TYPES`** tomado como causa. O
+   Gboard, no mesmo campo e emulador, produz **exatamente os mesmos cancelamentos** e aparece assim
+   mesmo — é ruído do laço de retry do probe, não a causa.
 
-Desde **31/08/2026** o Google Play exige `targetSdk >= 36` para publicar **e para atualizar**. O app está
-em 34. Extensão solicitável pelo Play Console até **01/11/2026**. Detalhes e os outros bloqueantes de
-loja em `PLAYSTORE_CHECKLIST.md` (corrigido em `438cc3f`).
+## Causa raiz
 
-Subir o target **não** mexe no `minSdk = 24` — suporte a Android 7 continua igual. Ficar em 34 é que
-encolhe o alcance: app com target antigo some para novos usuários em aparelhos mais novos que o target.
+O emulador do Android 17 **se declara com teclado físico**. A `Configuration` que chega ao serviço é:
 
-## O spike do target 36: validado
+```
+port finger qwerty/v/v -nav/h        # keyboard=QWERTY, hardKeyboardHidden=NO
+```
 
-Ferramental já estava pronto (AGP 9.2.0, Kotlin 2.2.10, Gradle 9.6.1); só faltava instalar
-`platforms;android-36`. Nenhuma alteração de código foi necessária.
+mesmo com `hw.keyboard = no` no `config.ini` do AVD. E a imagem vem com
+`Settings.Secure.show_ime_with_hard_keyboard = 0`.
 
-| ambiente | resultado |
+Nessa combinação, o `onEvaluateInputViewShown()` **padrão** do `InputMethodService` responde `false`:
+
+```java
+if (mSettingsObserver.shouldShowImeWithHardKeyboard()) return true;   // 0 → não
+return config.keyboard == KEYBOARD_NOKEYS                             // é QWERTY → não
+    || config.hardKeyboardHidden == HARDKEYBOARDHIDDEN_YES;           // é NO → não
+```
+
+Com `false`, `onShowInputRequested()` recusa o pedido, `mShowInputRequested` fica `false`,
+`onCreateInputView()` nunca roda e `activeViewForTest` nunca é preenchido. O teste dizia a verdade: não
+havia teclado.
+
+**Por que o Gboard aparecia:** ele sobrescreve `onEvaluateInputViewShown()`. O KeyFlow usa o padrão.
+
+**Por que o A32 e o emulador API 34 sempre passaram:** o A32 do Yan tem
+`show_ime_with_hard_keyboard = 1`, e o AVD da API 34 reporta `nokeys` de fato.
+
+**Nada disso tem a ver com o `targetSdk`.** As mesmas falhas ocorriam com 34 e com 36, porque a causa é
+uma propriedade do ambiente, não do target.
+
+### Evidência lado a lado (A17, mesmo probe, mesmo emulador)
+
+| | `mShowInputRequested` | `mIsInputViewShown` | screencap |
+|---|---|---|---|
+| KeyFlow, `show_ime_with_hard_keyboard=0` | false | false | 24 KB (sem teclado) |
+| Gboard, mesma chave em 0 | true | true | 93 KB (com teclado) |
+| KeyFlow, chave em 1 | true | true | 79 KB (com teclado) |
+
+Detalhe que atrapalhou a leitura: no dump, `mSettingsObserver{mShowImeWithHardKeyboard=N}` usa o enum
+interno `UNKNOWN=0, FALSE=1, TRUE=2`. O `1` que aparecia ali significa **desligado**, não ligado.
+
+## Correção
+
+`UserSettingsGuard.capture()` passou a forçar `show_ime_with_hard_keyboard = 1`, e `restore()` devolve
+exatamente o valor anterior (inclusive `settings delete` se a chave não existia). É o mesmo contrato do
+resto da classe: preservar o que era da pessoa. Os 11 arquivos que abrem o `ImeProbeActivity` já usam o
+guard, então nenhum outro arquivo precisou mudar.
+
+## Estado do target 36
+
+`compileSdk`/`targetSdk = 36`, validado: `assembleDebug` limpo, 250 unitários verdes, A32 (Android 13)
+159/159, emulador API 34 159/159.
+
+## Decisão de produto em aberto (não é teste)
+
+Hoje, com um **teclado Bluetooth/USB conectado**, o teclado do KeyFlow **não aparece** — é o
+comportamento padrão do `InputMethodService` para qualquer IME que não o sobrescreva, e a pessoa
+precisaria ligar "mostrar teclado virtual" nas Configurações. Isso pesa mais aqui do que num teclado
+comum por dois motivos: o produto é ditado por voz (o mic some junto) e as barras de atalho existem
+justamente para apps de terminal, onde teclado externo é comum.
+
+A saída é uma linha, `onEvaluateInputViewShown() = true` no serviço — é o que o Gboard faz. Não foi
+aplicada: muda comportamento de produto e é chamada do Yan.
+
+## Resultado no emulador Android 17 (duas rodadas completas, 2026-09-09)
+
+**159 testes, 2 falhas** nas duas — de 29 para 2. As 27 de teclado sumiram, e a chave volta ao valor
+original ao fim da suíte (medido: entra 0, sai 0).
+
+As 2 restantes não têm relação com teclado, são anteriores a isto (estavam dentro das 29) e **passam
+isoladas**:
+
+| falha | comportamento |
 |---|---|
-| `assembleDebug` | limpo, zero erros e zero avisos de depreciação |
-| unitários (250) | verdes |
-| A32 — Android 13 | **159/159** |
-| emulador API 34 | **159/159** |
-| emulador Android 17 (API 37) | as MESMAS 29 falhas que já ocorriam com target 34 (harness, abaixo) |
+| `OnboardingRoutingTest.firstRunShowsOnboardingAndSkipPersistsDone` | falha nas 2 rodadas, sempre igual: o nó `onboarding-skip` não existe |
+| `SetupActivityTest` (`awaitToggle`, linha 119) | falha **em método diferente a cada rodada** — o toggle nunca aparece |
 
-Ou seja: a subida não introduziu regressão detectável. **Ressalva**: a suíte quase não exercita os
-caminhos onde restrições novas costumam morder (permissão em runtime, FGS iniciado de background,
-notificações, retomada). O bug do `ENABLED_INPUT_METHODS` (`9c1622e`) passava em toda a suíte e só
-aparecia na tela real — então vale um passe manual no aparelho antes de confiar.
-
-## O bloqueio real: a janela do IME não abre sob instrumentação no Android 17
-
-27 instrumentados de teclado falham lá com `KeyFlowKeyboardView não anexou` (+2 de
-`Failed to inject touch input`, consequência). Sem janela, `onCreateInputView` não roda.
-
-**Não é o produto**: lançando `ImeProbeActivity` à mão no MESMO emulador e APK, o teclado aparece
-(`dumpsys input_method` → `mInputShown=true`), igual ao Gboard.
-
-Evidência do que acontece sob instrumentação:
-- a Activity SOBE (aparece no LifecycleMonitor), mas a task fica sem foco
-  (`FocusTransitionObserver: isFocusedGlobally=false`);
-- todo pedido de exibição morre em `ImeTracker: onCancelled at PHASE_CLIENT_REPORT_REQUESTED_VISIBLE_TYPES`,
-  sempre com `fromUser false`;
-- com target 34 o log ainda mostrava `onStartInput pkg=com.keyflow`; com 36 nem isso aparece — o IME não
-  chega a se ligar ao campo.
-
-### Hipóteses JÁ TESTADAS E REFUTADAS (não repetir)
-
-1. **`SHOW_FORCED` depreciado** (ignorado desde o Android 13). Trocado por
-   `WindowInsetsControllerCompat.show(ime())`: os pedidos passaram a sair como
-   `SHOW_SOFT_INPUT_BY_INSETS_API` e continuaram sendo cancelados na mesma fase.
-2. **Pedir pelo lado do IME**: `KeyFlowController.markKeyboardSwitchRequested()` antes de abrir o probe,
-   para o serviço chamar `requestShowSelf(0)` em `onStartInput` (o caminho real do "trocar de teclado").
-   27 falhas iguais.
-3. **`ActivityScenario.launch` no lugar de `context.startActivity`**: 2/2 falharam.
-
-Todas as três foram revertidas — não ficou código de tentativa no repositório.
-
-### Por onde seguir
-
-O fio é o **foco da janela**, não a forma de pedir o teclado: enquanto a task estiver
-`isFocusedGlobally=false`, qualquer pedido do cliente é descartado. Investigar como dar foco real à
-Activity de teste no A17 (o emulador roda headless com `-no-window`; vale testar com janela, e vale
-checar se o `am instrument` deixa alguma janela própria em foco).
-
-Até resolver, o gate de teclado segue coberto pelo A32 (Android 13) e pelo emulador API 34.
+**Pista, não conclusão:** as duas são a mesma coisa espelhada — a `SetupActivity` compõe a tela ERRADA.
+Uma espera onboarding e recebe config; a outra espera config e não acha o toggle. A `SetupActivity` é
+`android:launchMode="singleTop"` e o `ShortcutBarsConfigEndToEndTest` (pacote `ime`, roda ANTES de `ui`)
+a abre. Se sobrar uma instância viva no topo da task, o `ActivityScenario` do `createAndroidComposeRule`
+a reaproveita em vez de recriar, e a composição fica com o `onboardingDone` de antes — o
+`SeedOnboardingRule` grava o DataStore de forma síncrona, então o problema não é a semeadura. Falta
+medir: instrumentar se a Activity é recriada ou reaproveitada nessa transição.
