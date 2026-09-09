@@ -130,7 +130,14 @@ Pequenas, sem spec própria; fazer em quick mode (TASK.md + SUMMARY.md + commit)
       Criado um 3º gate — emulador **Android 17 (API 37, páginas de 16 KB)** — que revelou libs de
       instrumentação velhas demais para a API 37 (atualizadas). Pendente **[YAN]**: no Android 17 a
       plataforma não exibe a janela do IME em contexto instrumentado, então os 27 testes de teclado não
-      rodam lá (o app funciona; é harness). Pendente: subir o `targetSdk` (hoje 34) antes da Play Store.
+      rodam lá (o app funciona; é harness). Continua em `.specs/quick/011-target-36-e-harness-a17/`.
+
+- [ ] **Q11 — targetSdk 36 + harness de IME no Android 17** (`.specs/quick/011-target-36-e-harness-a17/`).
+      ⚠️ `app/build.gradle.kts` está com `compileSdk`/`targetSdk` **36 NÃO COMMITADOS** — spike validado
+      (A32 159/159, API 34 159/159, build limpo), decidir entre commitar ou reverter. O prazo da Play
+      VENCEU em 31/08/2026 (exige >= 36 para publicar e atualizar; extensão até 01/11). Bloqueio aberto:
+      sob instrumentação no Android 17 a janela do teclado não abre (task sem foco) — 3 hipóteses já
+      refutadas, documentadas lá para não se repetirem.
 
 ## Bloco 2 — Fechar `shortcut-bars` (Milestone 6)
 
@@ -205,7 +212,8 @@ TS-T1 → T2 → T3 → T4 → T5 → T6(⚠️) → T7 → T8(⚠️) → T9(�
 
 Base: `PLAYSTORE_CHECKLIST.md` (raiz). Executar como quick tasks / tasks avulsas:
 
-- [ ] **PS-1 — targetSdk 35**: subir target/compileSdk, revisar breaking changes (FGS, edge-to-
+- [ ] **PS-1 — targetSdk 36** (era 35; requisito real reconferido em 2026-09-08 — ver Q11): subir
+      target/compileSdk, revisar breaking changes (FGS, edge-to-
       edge, permissões), gate `full` + goldens verdes, validação no A32 **[YAN]**.
 - [ ] **PS-2 — Política de privacidade pública**: redigir (conteúdo mínimo do checklist: áudio
       sob demanda, endpoint do usuário/proxy, sem keystrokes; agora também: créditos/identidade
