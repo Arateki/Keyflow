@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.keyflow"
-    compileSdk = 34
+    compileSdk = 36
 
     // Fixa a keystore debug num arquivo só: esta máquina tem duas (~/.android/debug.keystore e
     // ~/.config/.android/debug.keystore) com fingerprints diferentes, e o AGP resolve a "padrão" pelas
@@ -25,7 +25,7 @@ android {
     defaultConfig {
         applicationId = "com.keyflow"
         minSdk = 24
-        targetSdk = 34
+        targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
