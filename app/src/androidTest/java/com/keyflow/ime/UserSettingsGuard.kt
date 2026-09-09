@@ -24,6 +24,9 @@ import kotlinx.coroutines.runBlocking
  * medida". Isso nunca aparece no emulador (pref virgem = expandido); apareceu no A32 do Yan porque ele
  * tinha deixado o teclado recolhido (2026-09-08, 11 falhas). Quem depende da grade chama
  * [forceExpanded] no `@Before`; [restore] devolve o estado que a pessoa deixou.
+ *
+ * E vale para `show_ime_with_hard_keyboard`, que [capture] força para 1 porque SEM ela não existe
+ * teclado nenhum para testar — ver o comentário no próprio [capture].
  */
 class UserSettingsGuard(
     private val context: Context = InstrumentationRegistry.getInstrumentation().targetContext,
@@ -41,6 +44,8 @@ class UserSettingsGuard(
     private var defaultIme: String? = null
     private var hadExpanded = false
     private var expanded = true
+    private var capturedImeWithHardKeyboard = false
+    private var imeWithHardKeyboard: String? = null
 
     /** Chame no `@Before`, antes de qualquer escrita do teste. */
     fun capture() {
@@ -51,6 +56,19 @@ class UserSettingsGuard(
         defaultIme = shell("settings get secure default_input_method").trim().takeIf { it.isNotBlank() && it != "null" }
         hadExpanded = uiPrefs.contains(KEY_EXPANDED)
         expanded = uiPrefs.getBoolean(KEY_EXPANDED, true)
+        // O emulador do Android 17 se declara COM teclado físico — a `Configuration` que chega ao
+        // serviço é `qwerty/v/v` mesmo com `hw.keyboard = no` no AVD — e a imagem vem com
+        // `show_ime_with_hard_keyboard = 0`. Nessa combinação o `onEvaluateInputViewShown()` padrão do
+        // `InputMethodService` responde `false`: o serviço nunca recebe o pedido de exibição
+        // (`mShowInputRequested=false`), `onCreateInputView` não roda e não há teclado na tela. Medido em
+        // 2026-09-09 comparando com o Gboard no MESMO campo e emulador: ele aparece porque sobrescreve
+        // aquele método; o KeyFlow usa o padrão. Era essa a causa das 27 falhas "KeyFlowKeyboardView não
+        // anexou" que estavam registradas como limitação do harness. O A32 do Yan já tem a chave em 1, e
+        // por isso o gate no aparelho nunca viu o problema.
+        imeWithHardKeyboard = shell("settings get secure show_ime_with_hard_keyboard")
+            .trim().takeIf { it.isNotBlank() && it != "null" }
+        capturedImeWithHardKeyboard = true
+        shell("settings put secure show_ime_with_hard_keyboard 1")
     }
 
     /**
@@ -73,6 +91,11 @@ class UserSettingsGuard(
             }
         }
         defaultIme?.let { shell("ime set $it") }
+        if (capturedImeWithHardKeyboard) {
+            val saved = imeWithHardKeyboard
+            if (saved != null) shell("settings put secure show_ime_with_hard_keyboard $saved")
+            else shell("settings delete secure show_ime_with_hard_keyboard")
+        }
         if (hasCaptured) restoreUiPrefFlag(KEY_EXPANDED, hadExpanded, expanded)
     }
 

@@ -19,6 +19,7 @@ import com.keyflow.data.SettingsRepository
 import com.keyflow.ime.UserSettingsGuard
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -62,6 +63,15 @@ class SystemSurfacesScreenshotTest {
     fun warmUpSettings() {
         userSettings.capture()
         runBlocking { SettingsRepository(context).settingsFlow().first() }
+    }
+
+    // Pareia com o `capture()` acima para TODOS os testes da classe. Antes o `restore()` morava só no
+    // `finally` de `sysImeOverField`, e os outros dois capturavam sem devolver — inócuo enquanto o
+    // capture só lia, virou vazamento quando ele passou a forçar `show_ime_with_hard_keyboard`
+    // (2026-09-09): a chave ficava em 1 no aparelho depois da suíte.
+    @After
+    fun restoreUserSettings() {
+        userSettings.restore()
     }
 
     @Test
@@ -126,7 +136,6 @@ class SystemSurfacesScreenshotTest {
             Thread.sleep(600)
             capture("sys-ime-over-field")
         } finally {
-            userSettings.restore()
             device.pressHome()
         }
     }
