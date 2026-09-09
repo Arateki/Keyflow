@@ -18,9 +18,12 @@
    `scripts/verify-screens.sh` → `scripts/diff-screens.sh` (`--approve` só com mudança visual
    intencional e revisada). Goldens pré-existentes devem ficar **bit-idênticos** salvo a task
    dizer o contrário.
-5. **2 falhas conhecidas e ambientais** no emulador deste sandbox: `SystemSurfacesScreenshotTest`
-   (Keystore lento sob carga — ver memória `android-dev-environment`). Não são regressão; não
-   tente "consertar".
+5. **Não existem mais "falhas conhecidas e ambientais".** Esta regra dizia para não tentar
+   consertar 2 falhas do `SystemSurfacesScreenshotTest` — e esse rótulo foi justamente o que
+   escondeu um defeito real por uma sessão inteira (Q11). Em 2026-09-09 a suíte fechou **163/163
+   no A32 e 163/163 no emulador A17**. Se um teste falhar, ele está dizendo alguma coisa: meça
+   antes de chamar de ambiental, e prefira `screencap`/`printToLog` a campos de `dumpsys` que
+   parecem confirmar o que você quer ouvir.
 6. **Ao terminar cada task**: atualizar o Status no `tasks.md` da feature, a traceability do
    `spec.md` (Pending→Implemented/Verified) e registrar lições/decisões no
    `.specs/project/STATE.md`. Commit atômico por task, mensagem em português, **sem citar Claude
@@ -32,7 +35,7 @@
 9. **Portões do Yan**: itens marcados **[YAN]** são decisões/validações manuais dele (device
    físico, Play Console, aprovações). O agente prepara tudo, avisa, e **não** executa por ele.
 
-## Estado atual (2026-09-07)
+## Estado atual (2026-09-09)
 
 | Milestone | Feature | Status |
 | --------- | ------- | ------ |
@@ -46,7 +49,7 @@
 | — | `vision-capture` | spec/design/tasks prontos (Draft) — nada implementado |
 | M7 | `keyflow-api` + `monetization` | specs/designs/tasks prontos (Draft) — nada implementado |
 | M8 | `theme-system` | spec/design/tasks prontos (Draft; ⚠️ S3/S4/S5 a validar) |
-| — | Play Store | `PLAYSTORE_CHECKLIST.md` (análise pronta; nada executado) |
+| — | Play Store | `PLAYSTORE_CHECKLIST.md`; **PS-1 (targetSdk 36) feito**, PS-2..PS-7 abertos |
 
 ---
 
@@ -212,9 +215,11 @@ TS-T1 → T2 → T3 → T4 → T5 → T6(⚠️) → T7 → T8(⚠️) → T9(�
 
 Base: `PLAYSTORE_CHECKLIST.md` (raiz). Executar como quick tasks / tasks avulsas:
 
-- [ ] **PS-1 — targetSdk 36** (era 35; requisito real reconferido em 2026-09-08 — ver Q11): subir
-      target/compileSdk, revisar breaking changes (FGS, edge-to-
-      edge, permissões), gate `full` + goldens verdes, validação no A32 **[YAN]**.
+- [x] **PS-1 — targetSdk 36**: FEITO em 2026-09-09 (`9bc8a96`). `compileSdk`/`targetSdk` 36, sem
+      mudança de código necessária; 252 unitários, 163/163 no A32 e 163/163 no emulador A17.
+      `PLAYSTORE_CHECKLIST.md` já marca o bloqueante 0 como resolvido. Falta só **[YAN]**: o passe
+      manual usando o app no A32 — a suíte verde não cobre restrição nova de plataforma que só
+      aparece na tela real (foi assim com o `ENABLED_INPUT_METHODS`).
 - [ ] **PS-2 — Política de privacidade pública**: redigir (conteúdo mínimo do checklist: áudio
       sob demanda, endpoint do usuário/proxy, sem keystrokes; agora também: créditos/identidade
       anônima [monetization], modelos locais [native-voice-models], captura de tela efêmera
