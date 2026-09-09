@@ -76,6 +76,16 @@ class TecladoPanelTest {
     }
 
     @Test
+    fun showWithHardKeyboardTogglePersists() {
+        val h = Harness(Settings(keyboardShowWithHardKeyboard = true))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(TECLADO_SHOW_WITH_HARD_KEYBOARD_TAG).performScrollTo().performClick()
+
+        rule.runOnIdle { assertEquals(false, h.settings.keyboardShowWithHardKeyboard) }
+    }
+
+    @Test
     fun unlockSkinsInvokesCallback() {
         val h = Harness(Settings())
         rule.setContent { h.Content() }

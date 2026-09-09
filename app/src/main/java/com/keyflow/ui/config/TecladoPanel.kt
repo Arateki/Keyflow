@@ -45,6 +45,7 @@ const val TECLADO_UNLOCK_TAG = "teclado-unlock-skins"
 const val TECLADO_SIZE_SLIDER_TAG = "teclado-size-slider"
 const val TECLADO_SIZE_PREVIEW_TAG = "teclado-size-preview"
 const val TECLADO_NUMBER_ROW_TAG = "teclado-number-row"
+const val TECLADO_SHOW_WITH_HARD_KEYBOARD_TAG = "teclado-show-with-hard-keyboard"
 
 /**
  * Margem lateral mantida de propósito na prévia de tamanho (ver [KeyboardSizePreview]) — erra pra menor
@@ -141,6 +142,16 @@ fun TecladoPanel(
             checked = settings.keyboardNumberRowEnabled,
             onCheckedChange = { onSettingsChange(settings.copy(keyboardNumberRowEnabled = it)) },
             tag = TECLADO_NUMBER_ROW_TAG,
+        )
+
+        // Sem isto o Android esconde o teclado virtual quando há teclado físico conectado — e some
+        // junto o mic, que é o produto. Ligado por padrão; desmarcar devolve o comportamento do sistema.
+        ToggleRow(
+            label = "Mostrar com teclado físico",
+            sub = "Mantém o teclado do KeyFlow na tela mesmo com um teclado Bluetooth ou USB conectado.",
+            checked = settings.keyboardShowWithHardKeyboard,
+            onCheckedChange = { onSettingsChange(settings.copy(keyboardShowWithHardKeyboard = it)) },
+            tag = TECLADO_SHOW_WITH_HARD_KEYBOARD_TAG,
         )
 
         Box(Modifier.fillMaxWidth().padding(top = 13.dp).height(1.dp).background(palette.line2))

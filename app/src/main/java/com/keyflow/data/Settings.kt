@@ -88,6 +88,11 @@ data class Settings(
     // Ligada: fileira nova SÓ na camada de letras (a de símbolos já tem números na 1ª fileira) — e o
     // long-press de números na 1ª fileira de letras é desativado (redundante com a fileira nova).
     val keyboardNumberRowEnabled: Boolean = false,
+    // Com um teclado físico conectado, o `onEvaluateInputViewShown()` padrão do `InputMethodService`
+    // esconde o teclado virtual — e some junto o mic, que é o produto. Ligado por padrão: hoje o
+    // KeyFlow simplesmente desaparece nessa situação, e o Gboard também mostra. Desmarcar devolve o
+    // comportamento do sistema.
+    val keyboardShowWithHardKeyboard: Boolean = true,
 ) {
     /**
      * Resolve a [Config] efetiva para uma origem (VOZ-02/03/06). CREDITS é stub: retorna

@@ -143,6 +143,18 @@ class SettingsRepositoryTest {
         assertEquals(100, repository.keyboardScalePercentOnce())
     }
 
+    /**
+     * Quem já tem o app instalado não passou por nenhuma tela nova: precisa receber a flag LIGADA sem
+     * tocar em nada, senão o teclado continua sumindo com teclado físico conectado. O default mora em
+     * dois lugares (o `Settings` e o `?:` da leitura) e é aí que ele costuma divergir.
+     */
+    @Test
+    fun showWithHardKeyboardDefaultsToOnWhenNeverSaved() = runTest {
+        val repository = newRepository()
+        assertEquals(true, repository.settingsFlow().first().keyboardShowWithHardKeyboard)
+        assertEquals(true, repository.keyboardShowWithHardKeyboardFlow().first())
+    }
+
     @Test
     fun keyboardScalePercentOnceReadsWithoutTouchingSecurePrefs() = runTest {
         val repository = newRepository()

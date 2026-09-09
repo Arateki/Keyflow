@@ -70,6 +70,9 @@ class SettingsRepository(
     suspend fun keyboardNumberRowEnabledOnce(): Boolean =
         dataStore.data.first()[KEYBOARD_NUMBER_ROW_ENABLED] ?: false
 
+    fun keyboardShowWithHardKeyboardFlow(): Flow<Boolean> =
+        dataStore.data.map { it[KEYBOARD_SHOW_WITH_HARD_KEYBOARD] ?: true }
+
     /**
      * Idioma do teclado ("pt"/"en"/"es"), gerenciado pelo app (não pelos subtypes do sistema — ver
      * [Settings.keyboardLanguage]). Leitura leve mesmo padrão de [themeDarkOnce]; escrita separada
@@ -174,6 +177,7 @@ class SettingsRepository(
             keyboardScalePercent = prefs[KEYBOARD_SCALE_PERCENT] ?: 100,
             keyboardLanguage = prefs[KEYBOARD_LANGUAGE] ?: "pt",
             keyboardNumberRowEnabled = prefs[KEYBOARD_NUMBER_ROW_ENABLED] ?: false,
+            keyboardShowWithHardKeyboard = prefs[KEYBOARD_SHOW_WITH_HARD_KEYBOARD] ?: true,
         )
     }
 
@@ -219,6 +223,7 @@ class SettingsRepository(
             prefs[KEYBOARD_SCALE_PERCENT] = settings.keyboardScalePercent
             prefs[KEYBOARD_LANGUAGE] = settings.keyboardLanguage
             prefs[KEYBOARD_NUMBER_ROW_ENABLED] = settings.keyboardNumberRowEnabled
+            prefs[KEYBOARD_SHOW_WITH_HARD_KEYBOARD] = settings.keyboardShowWithHardKeyboard
         }
     }
 
@@ -321,6 +326,7 @@ class SettingsRepository(
         val KEYBOARD_SCALE_PERCENT = intPreferencesKey("keyboard_scale_percent")
         val KEYBOARD_LANGUAGE = stringPreferencesKey("keyboard_language")
         val KEYBOARD_NUMBER_ROW_ENABLED = booleanPreferencesKey("keyboard_number_row_enabled")
+        val KEYBOARD_SHOW_WITH_HARD_KEYBOARD = booleanPreferencesKey("keyboard_show_with_hard_keyboard")
         // Trabalho 3 (shortcut-bars): barras personalizáveis + teclados de atalhos, como JSON.
         val BARS_CONFIG_JSON = stringPreferencesKey("bars_config_json")
         val SHORTCUT_GRIDS_JSON = stringPreferencesKey("shortcut_grids_json")

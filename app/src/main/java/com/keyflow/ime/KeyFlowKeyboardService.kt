@@ -79,6 +79,10 @@ class KeyFlowKeyboardService : InputMethodService() {
     // grades de atalhos e alavanca (Trabalho 3 — shortcut-bars).
     private val keyEmitter = PhysicalKeyEmitter()
 
+    /** Espelho local de `Settings.keyboardShowWithHardKeyboard`: `onEvaluateInputViewShown` é síncrono. */
+    @Volatile
+    private var showWithHardKeyboard = true
+
     override fun onCreate() {
         super.onCreate()
         serviceScope.launch {
@@ -92,6 +96,17 @@ class KeyFlowKeyboardService : InputMethodService() {
                 KeyFlowController.autoPasteInField = it.autoPasteInField
                 KeyFlowController.autoPasteOnFocus = it.autoPasteOnFocus
             }
+        }
+        // Mostrar (ou não) com teclado físico conectado. Precisa de `updateInputViewShown()` na troca:
+        // o framework só reavalia `onEvaluateInputViewShown()` quando é avisado, senão a mudança só
+        // valeria no próximo campo.
+        serviceScope.launch {
+            SettingsRepository(this@KeyFlowKeyboardService).keyboardShowWithHardKeyboardFlow()
+                .distinctUntilChanged()
+                .collect {
+                    showWithHardKeyboard = it
+                    updateInputViewShown()
+                }
         }
         // Atalho da orbe: alterna retrair/expandir, reusando o mesmo caminho do botão de ocultar.
         serviceScope.launch {
@@ -172,6 +187,14 @@ class KeyFlowKeyboardService : InputMethodService() {
     }
 
     override fun onEvaluateFullscreenMode() = false
+
+    /**
+     * Com teclado físico conectado, o padrão do `InputMethodService` esconde o teclado virtual (a menos
+     * que a pessoa ligue "mostrar teclado virtual" nas Configurações do Android). Para um teclado de
+     * ditado isso apaga o mic junto, então quem decide é o app — ligado por padrão, desmarcável na aba
+     * Teclado. Desmarcado, delega de volta ao comportamento do sistema.
+     */
+    override fun onEvaluateInputViewShown() = showWithHardKeyboard || super.onEvaluateInputViewShown()
 
     /**
      * Gira o device (retrato↔paisagem) muda a altura disponível de verdade — sem recriar a view, o
