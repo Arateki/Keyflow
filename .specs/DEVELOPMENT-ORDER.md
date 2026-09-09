@@ -42,7 +42,7 @@
 | M0–M2 | PoC, MVP `voice-keyboard`, `redesign-atelie` | ✅ concluídos |
 | M4 | `orb-gestures` (reconciliação) | ✅ concluído |
 | M5 | `keyboard-canvas` | ✅ concluído (KC-T1..T10, grade Canvas promovida a padrão, teclado antigo removido) |
-| M6 | `shortcut-bars` | SB-T1..T9 ✅; **SB-T10 quase fechado** — a11y, goldens e a promoção das barras a padrão (barra antiga removida) prontos; falta só o manual do Yan no A32 |
+| M6 | `shortcut-bars` | ✅ concluído (SB-T1..T10; manual do Yan no A32 confirmado em 2026-09-09) |
 | — | Ajustes pós-uso no A32 (Q8 + emendas) | ✅ dimensionamento em paisagem, modais dos editores, crash das prefs cifradas — ver Bloco 1 |
 | — | `gesture-tour` | spec/design/tasks prontos (Draft) — nada implementado |
 | — | `native-voice-models` | spec/design/tasks prontos (Draft) — nada implementado |
@@ -149,9 +149,9 @@ Spec: `.specs/features/shortcut-bars/` — seguir o `tasks.md` de lá:
 - [x] **SB-T8** — `PhysicalKeyPicker` (commit `29983a2`). Deixou de ser bottom sheet no Q8: virou
       `ConfigModal`, e o teclado ANSI escala por linha em vez de rolar.
 - [x] **SB-T9** — Editores WYSIWYG de grades + barras no `TecladoPanel` (commit `09487bf`).
-- [ ] **SB-T10** — a11y e goldens automatizáveis ✅ (commits `00846e0`/`1a1a339`); promoção a padrão
+- [x] **SB-T10** — a11y e goldens automatizáveis ✅ (commits `00846e0`/`1a1a339`); promoção a padrão
       e **remoção da barra antiga** ✅ (2026-09-07, commits `b0afdcb`/`0cfbf9f` — a flag `kbd_bars`
-      não existe mais). Falta só **[YAN]**: o manual no A32 (grade às cegas, alavanca, tmux via SSH).
+      não existe mais). Manual no A32 **confirmado pelo Yan em 2026-09-09**. Milestone 6 fechado.
 
 ## Bloco 3 — `gesture-tour` (prévia de gestos + Docs + apresentação)
 
@@ -218,8 +218,7 @@ Base: `PLAYSTORE_CHECKLIST.md` (raiz). Executar como quick tasks / tasks avulsas
 - [x] **PS-1 — targetSdk 36**: FEITO em 2026-09-09 (`9bc8a96`). `compileSdk`/`targetSdk` 36, sem
       mudança de código necessária; 252 unitários, 163/163 no A32 e 163/163 no emulador A17.
       `PLAYSTORE_CHECKLIST.md` já marca o bloqueante 0 como resolvido. Falta só **[YAN]**: o passe
-      manual usando o app no A32 — a suíte verde não cobre restrição nova de plataforma que só
-      aparece na tela real (foi assim com o `ENABLED_INPUT_METHODS`).
+      manual usando o app no A32 — **confirmado pelo Yan em 2026-09-09**, funcionando normal.
 - [ ] **PS-2 — Política de privacidade pública**: redigir (conteúdo mínimo do checklist: áudio
       sob demanda, endpoint do usuário/proxy, sem keystrokes; agora também: créditos/identidade
       anônima [monetization], modelos locais [native-voice-models], captura de tela efêmera
