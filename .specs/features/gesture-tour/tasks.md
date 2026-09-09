@@ -1,7 +1,7 @@
 # Gesture Tour — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (T1–T6)
-**Status**: Em execução — GT-T1 e GT-T2 concluídas (2026-09-09). Próxima: GT-T3.
+**Status**: Em execução — GT-T1..T3 concluídas (2026-09-09). Próxima: GT-T4 (cena ORB).
 
 > Gate no sandbox: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon <task>`
 > Instrumentado escopado: `ANDROID_SERIAL=emulator-5554`. Antes de instalar no device do Yan:
@@ -53,7 +53,7 @@ do motor; o resto serializa no device (TESTING.md).
   o Composable; render sanity numa rota provisória de galeria.
 - **Tests**: unit + build. **Gate**: `quick` + `build`.
 
-### GT-T3 — `GestureTourPlayer` + `GestureTourState`
+### GT-T3 — `GestureTourPlayer` + `GestureTourState` ✅ CONCLUÍDA (2026-09-09)
 - **What**: player isolado (TOUR-01): toca `List<GestureScript>` com autoplay em loop; `next()/
   prev()` com interrupção limpa + pausa de autoplay ~6 s (TOUR-04); estado exposto (índice/
   título/descrição); clock para ao sair de cena; a11y (contentDescription do passo; edge cases).

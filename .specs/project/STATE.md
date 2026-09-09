@@ -1393,3 +1393,20 @@ capturas, então rota sem golden é simplesmente ignorada até alguém aprovar.
 
 **Goldens pertencem ao emulador API 34.** Rodar o mesmo diff no A17 acusa 6 falsos positivos de
 posição (insets diferentes) com o conteúdo idêntico. Conferir o gate visual no 5554, não no 5556.
+
+## gesture-tour — GT-T3 (2026-09-09)
+
+`ui/tour/GestureTourPlayer.kt`: `GestureTourState` (índice/título/descrição, autoplay em loop, setas
+com pausa de 6s) + `GestureTourPlayer` com cena plugável por slot. TOUR-01/04/05 → Implemented.
+292 unitários (+12) e 170 instrumentados (+7), zero falhas.
+
+**Avanço do autoplay fora da composição.** `frameFor(now)` é leitura pura e `tick(now)` — que escreve
+o índice — roda num `SideEffect`. Escrever estado no meio da composição que a própria composição lê
+realimentaria a recomposição. Com o relógio congelado, o `tick` avança no máximo uma vez e estabiliza.
+
+**Seta recomeça o roteiro do zero** em vez de continuar de onde o tempo estava: entrar no meio de um
+gesto que a pessoa acabou de pedir para ver é pior do que esperar o começo dele.
+
+**Os instrumentados foram escritos depois do código** (os unitários do estado tiveram RED de verdade).
+Para não contar cobertura que não existe, foram validados por mutação: tirar a pausa do autoplay e
+encurtar o rótulo de acessibilidade derruba exatamente os dois testes correspondentes.
