@@ -39,7 +39,8 @@ fun shortcutActionLabel(action: OrbShortcutAction): String = when (action) {
     OrbShortcutAction.SWITCH_IME -> "Trocar teclado do sistema"
 }
 
-private fun shortcutActionSub(action: OrbShortcutAction): String = when (action) {
+/** Explicação da ação de atalho — reusada pelo tour de gestos (`ui/tour`) como descrição do roteiro. */
+fun shortcutActionSub(action: OrbShortcutAction): String = when (action) {
     OrbShortcutAction.NONE -> "Sem ação para este gesto."
     OrbShortcutAction.TOGGLE_KEYBOARD -> "Encolhe ou expande o teclado KeyFlow na tela."
     OrbShortcutAction.SWITCH_IME -> "Abre o seletor de teclados do sistema."

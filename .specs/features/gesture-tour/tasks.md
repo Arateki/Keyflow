@@ -1,7 +1,7 @@
 # Gesture Tour — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (T1–T6)
-**Status**: Draft (aguardando aprovação do Yan)
+**Status**: Em execução — GT-T1 concluída (2026-09-09). Próxima: GT-T2.
 
 > Gate no sandbox: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon <task>`
 > Instrumentado escopado: `ANDROID_SERIAL=emulator-5554`. Antes de instalar no device do Yan:
@@ -25,7 +25,7 @@ do motor; o resto serializa no device (TESTING.md).
 
 ## Fase A — Dados
 
-### GT-T1 — `GestureScript` + `GestureScriptCatalog` `[P]`
+### GT-T1 — `GestureScript` + `GestureScriptCatalog` `[P]` ✅ CONCLUÍDA (2026-09-09)
 - **What**: modelo declarativo (`TourScene`/`FingerAction`/`SceneReaction`/`GestureStep`/
   `GestureScript`) + catálogo puro: `buildOrbScripts(settings)` (TOGGLE/PTT básicos → pausa →
   cancelar/desfazer → reposicionar → atalhos reais de 1/2/3 toques, skip NONE, 1-toque só PTT,

@@ -204,12 +204,12 @@ o "?" da Sobreposição fecha a do Microfone e abre a dela; TalkBack lê o conte
 | TOUR-03 | P1-A | GT-T4, GT-T5 | In Tasks |
 | TOUR-04 | P1-A | GT-T3 | In Tasks |
 | TOUR-05 | P1-A | GT-T2, GT-T3 | In Tasks |
-| SCR-01 | P1-B | GT-T1 | In Tasks |
-| SCR-02 | P1-B | GT-T1 | In Tasks |
-| SCR-03 | P1-B | GT-T1 | In Tasks |
-| SCR-04 | P1-B | GT-T1 | In Tasks |
-| SCR-05 | P1-B | GT-T1 | In Tasks |
-| SCR-06 | P1-B | GT-T1 | In Tasks |
+| SCR-01 | P1-B | GT-T1 | Implemented |
+| SCR-02 | P1-B | GT-T1 | Implemented |
+| SCR-03 | P1-B | GT-T1 | Implemented |
+| SCR-04 | P1-B | GT-T1 | Implemented |
+| SCR-05 | P1-B | GT-T1 | Implemented |
+| SCR-06 | P1-B | GT-T1 | Implemented |
 | SCR-07 | P1-B | GT-T6 | In Tasks |
 | MODO-01 | P1-C | GT-T6 | In Tasks |
 | MODO-02 | P1-C | GT-T6 | In Tasks |

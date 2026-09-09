@@ -1351,3 +1351,22 @@ da view), e a barra de fábrica saiu inteira: `buildTopStrip`, `buildCollapsedLe
 
 **Pendente [YAN]**: a validação manual que fecha a SB-T10 (grade às cegas, aceleração da alavanca,
 tmux via SSH). A promoção e a limpeza já estão feitas.
+
+## gesture-tour — GT-T1 (2026-09-09)
+
+Modelo declarativo (`ui/tour/GestureScript.kt`) + catálogo puro (`ui/tour/GestureScriptCatalog.kt`).
+SCR-01..06 → Implemented. 266 unitários (+14), build limpo.
+
+**Decisão — fonte textual única, sem partir string.** A task pedia que as descrições "absorvessem"
+`pauseHintFor`. Em vez de fatiar a frase pronta (frágil), `pauseHintFor` passou a ser derivado de
+`recordingHintParts(mode)`, que devolve os pedaços já separados por gesto: a config e a Docs seguem
+mostrando a frase inteira, o tour usa um pedaço por roteiro. A string que a config renderiza é
+byte-a-byte a de antes e há teste fixando isso, porque a aba Modo tem golden. `shortcutActionSub`
+deixou de ser `private` pelo mesmo motivo — o tour descreve o atalho com o mesmo texto da config.
+
+**Regra do 1 toque** replicada do `OverlayPanel`: atalho de 1 toque só existe no Push-to-talk, e
+atalho em `NONE` não vira roteiro. Ficou coberto por unit, então se a regra mudar na config o tour
+não fica para trás em silêncio.
+
+**Geometria dos passos é relativa (0..1)** — o mesmo roteiro serve ao card da aba Modo e a qualquer
+miniatura futura. As posições concretas das cenas são responsabilidade da GT-T4/T5.

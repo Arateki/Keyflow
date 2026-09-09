@@ -220,9 +220,26 @@ private data class CardPermission(
 )
 
 /** Dica de pausa contextual ao modo de gravação (REC-07). Reusada pela aba Docs (T15). */
-fun pauseHintFor(mode: RecordingMode): String = when (mode) {
-    RecordingMode.TOGGLE -> "Toque para gravar ou parar · segure para pausar e retomar."
-    RecordingMode.PUSH_TO_TALK -> "Segure para gravar · solte para enviar · toque rápido após soltar para pausar."
+fun pauseHintFor(mode: RecordingMode): String = recordingHintParts(mode).joinToString(" · ") + "."
+
+/**
+ * A mesma frase de [pauseHintFor], em pedaços — um por gesto, na ordem em que se aprende.
+ *
+ * O tour de gestos (`ui/tour`) descreve um gesto por vez e precisa da frase partida; a config e a Docs
+ * mostram a frase inteira. Manter os dois lados lendo daqui evita o texto divergir com o tempo, que é o
+ * que aconteceu com as demos estáticas desta aba (GT/T1). `pauseHintFor` continua devolvendo exatamente
+ * a mesma string de antes — há teste fixando isso, porque a aba Modo tem golden.
+ */
+fun recordingHintParts(mode: RecordingMode): List<String> = when (mode) {
+    RecordingMode.TOGGLE -> listOf(
+        "Toque para gravar ou parar",
+        "segure para pausar e retomar",
+    )
+    RecordingMode.PUSH_TO_TALK -> listOf(
+        "Segure para gravar",
+        "solte para enviar",
+        "toque rápido após soltar para pausar",
+    )
 }
 
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
