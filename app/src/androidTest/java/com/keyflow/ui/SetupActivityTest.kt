@@ -110,17 +110,21 @@ class SetupActivityTest {
     /**
      * Com `autoAdvance = false` o relógio de composição congela onde estiver: se a primeira composição
      * ainda não terminou, o toggle não existe na árvore e o clique falha com "could not find any node".
-     * `waitUntil` da regra Compose avança o relógio quadro a quadro, então é ele quem destrava isso.
-     * A folga é generosa de propósito: com o host sob carga (outra suíte num segundo device, um download
-     * grande), 5s estouravam aqui sem haver defeito nenhum (2026-09-08).
+     * A `SetupActivity` compõe um placeholder vazio até o DataStore emitir (`settingsLoaded`), então com
+     * o relógio parado a recomposição que traria a config nunca gera quadro.
+     *
+     * `compose.waitUntil` NÃO resolve: com o relógio congelado ele só consulta a condição, sem produzir
+     * o quadro que falta — estourava os 15s (medido em 2026-09-09, com a árvore contendo só o nó raiz).
+     * Esperar por idle também não serve: a orbe do cabeçalho anima sem parar. Quem destrava é avançar o
+     * relógio à mão até a tela existir.
      */
     private fun awaitToggle() {
-        try {
-            compose.waitUntil(15_000) {
-                compose.onAllNodesWithTag(TOGGLE_OVERLAY_MODE_TAG).fetchSemanticsNodes().isNotEmpty()
+        var pumps = 0
+        while (compose.onAllNodesWithTag(TOGGLE_OVERLAY_MODE_TAG).fetchSemanticsNodes().isEmpty()) {
+            if (pumps++ >= 150) {
+                throw AssertionError("toggle não apareceu; árvore:\n" + compose.onRoot().printToString())
             }
-        } catch (e: Exception) {
-            throw AssertionError("toggle não apareceu; árvore:\n" + compose.onRoot().printToString(), e)
+            compose.mainClock.advanceTimeBy(100)
         }
     }
 
