@@ -41,6 +41,12 @@ enum class TourOverlayHint {
  */
 data class SceneReaction(
     val orbState: OrbState? = null,
+    /**
+     * Onde a orbe descansa na cena (0..1). Durante um [FingerAction.DRAG] ela acompanha o dedo — é o
+     * que o gesto significa — e este campo diz onde ela FICA quando o dedo solta: no lugar de origem
+     * (cancelar) ou no lugar novo (reposicionar).
+     */
+    val orbAt: Offset? = null,
     val micState: ButtonState? = null,
     val keyboardExpanded: Boolean? = null,
     val overlayHint: TourOverlayHint? = null,

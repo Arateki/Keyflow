@@ -1410,3 +1410,24 @@ gesto que a pessoa acabou de pedir para ver é pior do que esperar o começo del
 **Os instrumentados foram escritos depois do código** (os unitários do estado tiveram RED de verdade).
 Para não contar cobertura que não existe, foram validados por mutação: tirar a pausa do autoplay e
 encurtar o rótulo de acessibilidade derruba exatamente os dois testes correspondentes.
+
+## gesture-tour — GT-T4 (2026-09-09)
+
+`ui/tour/scenes/OrbScene.kt`: `VoiceOrb` real dirigido pelo passo + representações leves do alvo de
+cancelamento e do banner de desfazer. TOUR-03 parcial (falta o teclado, GT-T5). 292 unitários e 177
+instrumentados (+7), zero falhas.
+
+**Arrastar move a orbe, e o passo diz onde ela FICA.** `SceneReaction.orbAt` nasceu aqui: durante um
+DRAG a orbe acompanha o dedo (é o que o gesto significa), e ao soltar ela vai para o ponto declarado —
+de volta ao lugar no cancelar, no lugar novo no reposicionar. Sem isso, um dos dois gestos ficaria
+errado, e são gestos opostos.
+
+**O dedo opaco escondia o que o tour vinha ensinar.** Só apareceu ao montar uma TIRA DE FRAMES
+(`TourMotionArtifactTest`, técnica do Q6/Q7): em frame parado a sobreposição passa batida; na sequência
+fica claro que durante todo o toque só se vê o disco do dedo. Agora ele é translúcido, com o contorno
+dando a leitura da posição. **Lição de método**: revisar animação por captura única não serve — varrer
+o relógio e olhar a sequência achou em uma rodada o que 6 testes verdes não achariam.
+
+**`TourMotionArtifactTest` não é golden e não afirma nada** — é material de revisão humana enquanto o
+tour está sendo construído. Fluidez de verdade segue sendo o portão manual do Yan no A32 (GT-T8),
+porque o emulador daqui roda headless.

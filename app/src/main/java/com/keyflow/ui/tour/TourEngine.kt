@@ -104,17 +104,19 @@ fun tourFrameAt(script: GestureScript, timeMs: Int): TourFrame {
 /** Reação vigente: o último valor declarado para cada campo até [index], inclusive. */
 private fun reactionUpTo(steps: List<GestureStep>, index: Int): SceneReaction {
     var orbState: OrbState? = null
+    var orbAt: Offset? = null
     var micState: ButtonState? = null
     var keyboardExpanded: Boolean? = null
     var overlayHint: TourOverlayHint? = null
     for (i in 0..index) {
         val r = steps[i].reaction
         r.orbState?.let { orbState = it }
+        r.orbAt?.let { orbAt = it }
         r.micState?.let { micState = it }
         r.keyboardExpanded?.let { keyboardExpanded = it }
         r.overlayHint?.let { overlayHint = if (it == TourOverlayHint.NONE) null else it }
     }
-    return SceneReaction(orbState, micState, keyboardExpanded, overlayHint)
+    return SceneReaction(orbState, orbAt, micState, keyboardExpanded, overlayHint)
 }
 
 private fun lerp(from: Offset, to: Offset, t: Float) =

@@ -58,7 +58,7 @@ fun FingerPuppet(frame: TourFrame, modifier: Modifier = Modifier) {
         if (frame.stepIndex < 0) return@Canvas
 
         val center = Offset(frame.position.x * size.width, frame.position.y * size.height)
-        val tip = size.minDimension * 0.055f
+        val tip = size.minDimension * 0.05f
 
         drawTrail(frame, accent, tip)
 
@@ -73,14 +73,17 @@ fun FingerPuppet(frame: TourFrame, modifier: Modifier = Modifier) {
             else -> Unit
         }
 
-        // Ponta do dedo: disco cheio com halo, no estilo dos glifos da orbe.
-        drawCircle(color = ink.copy(alpha = 0.14f), radius = tip * 1.85f, center = center)
-        drawCircle(color = ink.copy(alpha = 0.82f), radius = tip, center = center)
+        // Ponta do dedo: TRANSLÚCIDA de propósito. Opaca, ela cobria a orbe inteira durante os toques
+        // e o tour escondia justamente o que veio ensinar (visto na tira de frames de 2026-09-09).
+        // O contorno é que dá a leitura da posição; o miolo só insinua o contato, como o "mostrar
+        // toques" do Android.
+        drawCircle(color = ink.copy(alpha = 0.10f), radius = tip * 1.85f, center = center)
+        drawCircle(color = ink.copy(alpha = 0.30f), radius = tip, center = center)
         drawCircle(
-            color = palette.onFill.copy(alpha = 0.55f),
+            color = ink.copy(alpha = 0.72f),
             radius = tip,
             center = center,
-            style = Stroke(width = tip * 0.18f),
+            style = Stroke(width = tip * 0.16f),
         )
     }
 }

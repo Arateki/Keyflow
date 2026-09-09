@@ -1,7 +1,7 @@
 # Gesture Tour — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (T1–T6)
-**Status**: Em execução — GT-T1..T3 concluídas (2026-09-09). Próxima: GT-T4 (cena ORB).
+**Status**: Em execução — GT-T1..T4 concluídas (2026-09-09). Próxima: GT-T5 (cena KEYBOARD).
 
 > Gate no sandbox: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon <task>`
 > Instrumentado escopado: `ANDROID_SERIAL=emulator-5554`. Antes de instalar no device do Yan:
@@ -68,7 +68,7 @@ do motor; o resto serializa no device (TESTING.md).
 
 ## Fase C — Cenas reais
 
-### GT-T4 — Cena ORB (`VoiceOrb` + hints de overlay)
+### GT-T4 — Cena ORB (`VoiceOrb` + hints de overlay) ✅ CONCLUÍDA (2026-09-09)
 - **What**: cena da orbe: `VoiceOrb` real dirigido por `SceneReaction.orbState`; representações
   leves de alvos de arrasto/banner de desfazer (`TourOverlayHint`, estilo Ateliê) p/ os roteiros
   de cancelar/reposicionar (TOUR-03 orbe).

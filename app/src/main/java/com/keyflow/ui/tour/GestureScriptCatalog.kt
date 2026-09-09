@@ -136,7 +136,12 @@ private fun cancelAndUndo() = GestureScript(
             at = ORB_CANCEL_TARGET,
             action = FingerAction.RELEASE,
             durationMs = BEAT,
-            reaction = SceneReaction(orbState = OrbState.Idle, overlayHint = TourOverlayHint.UNDO_BANNER),
+            reaction = SceneReaction(
+                orbState = OrbState.Idle,
+                // Cancelou: a orbe volta para o lugar dela, o banner é que fica.
+                orbAt = ORB_CENTER,
+                overlayHint = TourOverlayHint.UNDO_BANNER,
+            ),
         ),
         GestureStep(
             at = Offset(0.28f, 0.88f),
@@ -160,7 +165,8 @@ private fun reposition() = GestureScript(
             durationMs = HOLD,
             dragPath = listOf(ORB_CENTER, Offset(0.7f, 0.32f), ORB_PARKED),
         ),
-        GestureStep(ORB_PARKED, FingerAction.RELEASE, SHORT),
+        // Reposicionar é o contrário do cancelar: soltou, ficou onde a pessoa pôs.
+        GestureStep(ORB_PARKED, FingerAction.RELEASE, SHORT, SceneReaction(orbAt = ORB_PARKED)),
     ),
 )
 
