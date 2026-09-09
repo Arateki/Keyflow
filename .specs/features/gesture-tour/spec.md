@@ -210,11 +210,11 @@ o "?" da Sobreposição fecha a do Microfone e abre a dela; TalkBack lê o conte
 | SCR-04 | P1-B | GT-T1 | Implemented |
 | SCR-05 | P1-B | GT-T1 | Implemented |
 | SCR-06 | P1-B | GT-T1 | Implemented |
-| SCR-07 | P1-B | GT-T6 | In Tasks |
-| MODO-01 | P1-C | GT-T6 | In Tasks |
-| MODO-02 | P1-C | GT-T6 | In Tasks |
-| MODO-03 | P1-C | GT-T6 | In Tasks |
-| MODO-04 | P1-C | GT-T5, GT-T6 | In Tasks |
+| SCR-07 | P1-B | GT-T6 | Implemented |
+| MODO-01 | P1-C | GT-T6 | Implemented |
+| MODO-02 | P1-C | GT-T6 | Implemented |
+| MODO-03 | P1-C | GT-T6 | Implemented |
+| MODO-04 | P1-C | GT-T5, GT-T6 | Implemented |
 | MODO-05 | P1-C | GT-T8 | In Tasks |
 | DOC-01 | P2-D | GT-T7 | In Tasks |
 | DOC-02 | P2-D | GT-T9 | In Tasks |

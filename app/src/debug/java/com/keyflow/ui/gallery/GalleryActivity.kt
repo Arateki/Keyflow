@@ -13,6 +13,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import com.keyflow.ui.orb.LocalOrbClock
+import com.keyflow.ui.tour.LocalTourClock
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.keyflow.ui.theme.KeyFlowTheme
@@ -54,7 +55,12 @@ class GalleryActivity : ComponentActivity() {
         val route = RouteCatalog.route(routeKey)
         setContent {
             // Congela TODO orbe da árvore (header de config, onboarding, …) para frames determinísticos.
-            CompositionLocalProvider(LocalOrbClock provides { GALLERY_ORB_TIME_MS }) {
+            // O tour da aba Modo anima igual à orbe: sem congelar os DOIS, `config-modo` renderiza um
+            // frame diferente a cada captura e o golden vira ruído.
+            CompositionLocalProvider(
+                LocalOrbClock provides { GALLERY_ORB_TIME_MS },
+                LocalTourClock provides { GALLERY_ORB_TIME_MS },
+            ) {
                 KeyFlowTheme(dark = dark) {
                     if (route != null) {
                         route.content()

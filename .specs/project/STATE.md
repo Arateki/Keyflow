@@ -1453,3 +1453,22 @@ agora se referenciam explicitamente — mudou um, muda o outro.
 **As duas falhas acima passaram por 5 instrumentados verdes** e só apareceram na tira de frames. Pela
 segunda task seguida, a varredura de relógio achou o que asserção não acha: ela vê ONDE as coisas
 estão, e o teste vê apenas SE estão.
+
+## gesture-tour — GT-T6 (2026-09-09)
+
+Os dois cards da aba Modo passaram a tocar o tour: moldura PRÉVIA com a cena real, `‹ título ›` no
+rodapé e a descrição do gesto corrente à direita. MODO-01..04 e SCR-07 → Implemented. 292 unitários,
+189 instrumentados (+6), goldens `config-modo` regenerados (revisados lado a lado).
+
+**Um tour animando quebra TODO teste Compose da tela que o hospeda.** O relógio do tour roda por quadro
+como o da orbe, então `waitForIdle` nunca fecha: o `ModoPanelTest` inteiro caiu com `ComposeNotIdle` no
+instante em que o tour entrou. O contrato é o mesmo que já existia para a orbe — quem renderiza a tela
+em teste congela o relógio. `ModoPanelTest`, `ConfigScreenTest` e a `GalleryActivity` passaram a prover
+`LocalTourClock` junto com `LocalOrbClock`. **Qualquer tela nova que consumir o tour precisa disso.**
+
+**`assertTextContains` compara EXATO por padrão** — para trecho, `substring = true`. Um teste "falhou"
+mostrando no erro exatamente o texto esperado dentro do texto real.
+
+**Os textos estáticos dos cards foram removidos**, não só ignorados: com o tour descrevendo cada gesto,
+manter `pauseHint` no card seria a duplicação que o MODO-03 manda evitar. `pauseHintFor` segue vivo para
+a aba Sobrepor e a Docs.

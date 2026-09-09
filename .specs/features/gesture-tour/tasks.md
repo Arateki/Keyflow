@@ -1,7 +1,7 @@
 # Gesture Tour — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (T1–T6)
-**Status**: Em execução — GT-T1..T5 concluídas (2026-09-09). Próxima: GT-T6 (aba Modo).
+**Status**: Em execução — GT-T1..T6 concluídas (2026-09-09). Próxima: GT-T7 (aba Docs).
 
 > Gate no sandbox: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon <task>`
 > Instrumentado escopado: `ANDROID_SERIAL=emulator-5554`. Antes de instalar no device do Yan:
@@ -97,7 +97,7 @@ do motor; o resto serializa no device (TESTING.md).
 
 ## Fase D — Consumo
 
-### GT-T6 — Integração na aba Modo (+ regeneração por Settings)
+### GT-T6 — Integração na aba Modo (+ regeneração por Settings) ✅ CONCLUÍDA (2026-09-09)
 - **What**: `ModeCard.demo` dos 2 cards usa o player com os catálogos (T1); `DemoFrame` ganha o
   rodapé **‹ título ›** (MODO-02); área direita mostra a descrição sincronizada (substitui
   `pauseHint`/features estáticos durante o tour — MODO-03); roteiros em

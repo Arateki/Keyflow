@@ -31,6 +31,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.dp
@@ -47,12 +49,24 @@ import com.keyflow.ui.orb.VoiceOrb
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
 import com.keyflow.ui.theme.SpaceMono
+import com.keyflow.ui.tour.GestureScript
+import com.keyflow.ui.tour.GestureTourPlayer
+import com.keyflow.ui.tour.TourFrame
+import com.keyflow.ui.tour.buildKeyboardScripts
+import com.keyflow.ui.tour.buildOrbScripts
+import com.keyflow.ui.tour.rememberGestureTourState
+import com.keyflow.ui.tour.scenes.KeyboardScene
+import com.keyflow.ui.tour.scenes.OrbScene
 
 const val ACTIVATE_OVERLAY_TAG = "activate-overlay"
 const val ACTIVATE_KEYBOARD_TAG = "activate-keyboard"
 const val ACTIVATE_MIC_TAG = "activate-mic"
 const val ACTIVATE_NOTIFICATION_TAG = "activate-notification"
 const val KEYBOARD_SWITCH_TAG = "keyboard-switch"
+
+/** Tours dos cards. Título/descrição/setas derivam destas: `<tag>-title`, `-desc`, `-prev`, `-next`. */
+const val MODO_TOUR_OVERLAY_TAG = "modo-tour-overlay"
+const val MODO_TOUR_KEYBOARD_TAG = "modo-tour-keyboard"
 
 /**
  * Aba Modo (CFG-06 / REC-07): permissão geral do microfone + cards Overlay/Keyboard. Cada card liga/
@@ -112,20 +126,19 @@ fun ModoPanel(
                     activateTag = ACTIVATE_NOTIFICATION_TAG,
                 ),
             ),
-            pauseHint = pauseHintFor(settings.overlayRecordingMode),
             features = listOf(
                 "Transcreva voz para texto em qualquer situação para sua área de transferência.",
             ),
-            // Orbe demonstrativa (mock): só visual, em estado gravando — não dispara nada real.
-            demo = {
-                DemoFrame {
-                    VoiceOrb(
-                        state = OrbState.Listening,
-                        modifier = Modifier.size(70.dp),
-                        center = OrbCenter.Time(5),
-                    )
-                }
-            },
+            // Tour dos gestos da orbe (MODO-01). `remember` pelos campos que os roteiros consultam:
+            // mudou o modo ou um atalho, a lista se refaz e o tour recomeça já correto (SCR-07).
+            tourTag = MODO_TOUR_OVERLAY_TAG,
+            tourScripts = remember(
+                settings.overlayRecordingMode,
+                settings.shortcut1Tap,
+                settings.shortcut2Tap,
+                settings.shortcut3Tap,
+            ) { buildOrbScripts(settings) },
+            tourScene = { frame -> OrbScene(frame, Modifier.fillMaxWidth().height(112.dp)) },
         )
 
         ModeCard(
@@ -143,7 +156,6 @@ fun ModoPanel(
                     activateTag = ACTIVATE_KEYBOARD_TAG,
                 ),
             ),
-            pauseHint = "Toque no mic para gravar/enviar; segure para pausar ou cancelar.",
             features = listOf(
                 "Cole a transcrição de voz automaticamente.",
                 "Personalize em estilo e funcionalidade.",
@@ -159,38 +171,11 @@ fun ModoPanel(
             } else {
                 null
             },
-            // Teclado demonstrativo (mock): View real, em estado gravando, com callbacks no-op — não
-            // digita nem grava de verdade. O ticker é parado ao sair de cena (onRelease) para não vazar.
-            demo = {
-                DemoFrame {
-                    val dark = LocalKeyFlowPalette.current.isDark
-                    // key(dark): as cores do teclado são fixadas no init da View, então recriamos a
-                    // demo quando o tema muda.
-                    key(dark) {
-                        AndroidView(
-                            factory = { ctx ->
-                                KeyFlowKeyboardView(
-                                    context = ctx,
-                                    onKey = {},
-                                    onMic = {},
-                                    onHide = {},
-                                    onExpand = {},
-                                    dark = dark,
-                                    frozenSeconds = 5,
-                                    scale = 0.7f,
-                                ).apply {
-                                    setExpanded(true)
-                                    updateMicState(ButtonState.RECORDING)
-                                }
-                            },
-                            onRelease = { it.updateMicState(ButtonState.IDLE_NO_FIELD) },
-                            // Largura também a 72% (mesma proporção do scale das alturas/texto) → redução
-                            // uniforme em todas as direções, mantendo o espaçamento do dispositivo.
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                }
-            },
+            // Tour dos gestos do teclado (MODO-01/04): a cena usa a grade Canvas real, em vez da
+            // demo parada que ficou anos mostrando a grade antiga.
+            tourTag = MODO_TOUR_KEYBOARD_TAG,
+            tourScripts = remember { buildKeyboardScripts(settings) },
+            tourScene = { frame -> KeyboardScene(frame, Modifier.fillMaxWidth()) },
         )
     }
 }
@@ -250,10 +235,13 @@ private fun ModeCard(
     onCheckedChange: (Boolean) -> Unit,
     toggleTag: String,
     permissions: List<CardPermission>,
-    pauseHint: String,
     features: List<String>,
     footer: (@Composable () -> Unit)? = null,
-    demo: (@Composable () -> Unit)? = null,
+    /** Dica estática, para um card SEM tour. Com tour, quem descreve é o passo corrente (MODO-03). */
+    pauseHint: String? = null,
+    tourTag: String? = null,
+    tourScripts: List<GestureScript>? = null,
+    tourScene: (@Composable (TourFrame) -> Unit)? = null,
     highlightKey: Int = 0,
 ) {
     val palette = LocalKeyFlowPalette.current
@@ -312,20 +300,29 @@ private fun ModeCard(
             }
         }
         footer?.invoke()
-        if (demo != null) {
-            // Demo à esquerda; instruções de toque na área livre à direita.
+        if (tourTag != null && tourScripts != null && tourScene != null) {
+            // Tour à esquerda; a descrição do gesto corrente na área livre à direita (MODO-03).
+            val tour = rememberGestureTourState(tourScripts)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Box(Modifier.weight(0.7f)) { demo() }
+                Box(Modifier.weight(0.7f)) {
+                    DemoFrame(nav = { TourNav(tourTag, tour.title, tour::prev, tour::next) }) {
+                        GestureTourPlayer(
+                            scripts = tourScripts,
+                            state = tour,
+                            modifier = Modifier.fillMaxWidth().testTag(tourTag),
+                        ) { frame -> tourScene(frame) }
+                    }
+                }
                 Text(
-                    pauseHint,
+                    tour.description,
                     color = palette.faint,
                     fontFamily = SpaceMono,
                     fontSize = 8.5.sp,
                     lineHeight = 12.sp,
-                    modifier = Modifier.weight(0.3f),
+                    modifier = Modifier.weight(0.3f).testTag("$tourTag-desc"),
                 )
             }
-        } else {
+        } else if (pauseHint != null) {
             Text(pauseHint, color = palette.faint, fontFamily = SpaceMono, fontSize = 8.5.sp)
         }
     }
@@ -336,7 +333,7 @@ private fun ModeCard(
  * PRÉVIA, deixando claro que o conteúdo é uma **representação**, não a interface real.
  */
 @Composable
-private fun DemoFrame(content: @Composable () -> Unit) {
+private fun DemoFrame(nav: (@Composable () -> Unit)? = null, content: @Composable () -> Unit) {
     val palette = LocalKeyFlowPalette.current
     Column(
         Modifier
@@ -350,7 +347,51 @@ private fun DemoFrame(content: @Composable () -> Unit) {
     ) {
         Text("PRÉVIA", color = palette.faint, fontFamily = SpaceMono, fontSize = 7.5.sp)
         content()
+        nav?.invoke()
     }
+}
+
+/**
+ * Navegação do tour no rodapé da moldura (MODO-02): ‹ título ›. As setas existem para achar um gesto
+ * específico sem esperar o autoplay dar a volta.
+ */
+@Composable
+private fun TourNav(tag: String, title: String, onPrev: () -> Unit, onNext: () -> Unit) {
+    val palette = LocalKeyFlowPalette.current
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Arrow("‹", "gesto anterior", "$tag-prev", onPrev)
+        Text(
+            title,
+            color = palette.muted,
+            fontFamily = SpaceMono,
+            fontSize = 7.5.sp,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f).testTag("$tag-title"),
+        )
+        Arrow("›", "próximo gesto", "$tag-next", onNext)
+    }
+}
+
+@Composable
+private fun Arrow(glyph: String, label: String, tag: String, onClick: () -> Unit) {
+    val palette = LocalKeyFlowPalette.current
+    Text(
+        glyph,
+        color = palette.fg2,
+        fontFamily = SpaceMono,
+        fontSize = 12.sp,
+        modifier = Modifier
+            .clip(RoundedCornerShape(4.dp))
+            .clickable(onClickLabel = label, onClick = onClick)
+            .padding(horizontal = 6.dp, vertical = 1.dp)
+            .testTag(tag),
+    )
 }
 
 /**

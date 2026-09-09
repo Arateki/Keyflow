@@ -11,6 +11,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.keyflow.data.Settings
 import com.keyflow.ui.PermissionStatus
 import com.keyflow.ui.orb.LocalOrbClock
+import com.keyflow.ui.tour.LocalTourClock
 import com.keyflow.ui.theme.KeyFlowTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -45,7 +46,7 @@ class ModoPanelTest {
         var activated = false
         rule.setContent {
             KeyFlowTheme(dark = false) {
-                CompositionLocalProvider(LocalOrbClock provides { 0f }) {
+                CompositionLocalProvider(LocalOrbClock provides { 0f }, LocalTourClock provides { 0f }) {
                     ModoPanel(
                         settings = Settings(keyboardModeEnabled = true),
                         permissions = perms(keyboard = false),
@@ -69,7 +70,7 @@ class ModoPanelTest {
     fun chipShowsGrantedStateForOverlayPermission() {
         rule.setContent {
             KeyFlowTheme(dark = false) {
-                CompositionLocalProvider(LocalOrbClock provides { 0f }) {
+                CompositionLocalProvider(LocalOrbClock provides { 0f }, LocalTourClock provides { 0f }) {
                     ModoPanel(
                         settings = Settings(),
                         permissions = perms(overlay = true),
@@ -94,7 +95,7 @@ class ModoPanelTest {
         var activated = false
         rule.setContent {
             KeyFlowTheme(dark = false) {
-                CompositionLocalProvider(LocalOrbClock provides { 0f }) {
+                CompositionLocalProvider(LocalOrbClock provides { 0f }, LocalTourClock provides { 0f }) {
                     ModoPanel(
                         settings = Settings(),
                         permissions = perms(notifications = false),
@@ -125,7 +126,7 @@ class ModoPanelTest {
     fun micChipStaysPendingWithoutBlockingWhenOverlayModeIsOn() {
         rule.setContent {
             KeyFlowTheme(dark = false) {
-                CompositionLocalProvider(LocalOrbClock provides { 0f }) {
+                CompositionLocalProvider(LocalOrbClock provides { 0f }, LocalTourClock provides { 0f }) {
                     ModoPanel(
                         settings = Settings(overlayModeEnabled = true),
                         permissions = perms(mic = false),
@@ -154,7 +155,7 @@ class ModoPanelTest {
         var keyboardChange: Boolean? = null
         rule.setContent {
             KeyFlowTheme(dark = false) {
-                CompositionLocalProvider(LocalOrbClock provides { 0f }) {
+                CompositionLocalProvider(LocalOrbClock provides { 0f }, LocalTourClock provides { 0f }) {
                     ModoPanel(
                         settings = Settings(),
                         permissions = perms(),

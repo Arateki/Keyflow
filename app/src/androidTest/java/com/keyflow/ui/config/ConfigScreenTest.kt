@@ -19,6 +19,7 @@ import com.keyflow.data.Settings
 import com.keyflow.ui.PermissionStatus
 import com.keyflow.ui.common.SaveController
 import com.keyflow.ui.orb.LocalOrbClock
+import com.keyflow.ui.tour.LocalTourClock
 import com.keyflow.ui.theme.KeyFlowTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -62,7 +63,7 @@ class ConfigScreenTest {
         fun Content() {
             // Congela o orbe do header (senão a animação infinita nunca deixa a árvore "idle").
             KeyFlowTheme(dark = settings.themeDark) {
-                CompositionLocalProvider(LocalOrbClock provides { 0f }) {
+                CompositionLocalProvider(LocalOrbClock provides { 0f }, LocalTourClock provides { 0f }) {
                 ConfigScreen(
                     settings = settings,
                     permissions = permissions,
