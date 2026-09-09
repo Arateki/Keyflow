@@ -91,11 +91,11 @@ Ao criar o app listing, preencher a seção **"Data safety"** declarando:
 
 ---
 
-## Estado atual dos bloqueantes (conferido em 2026-09-08)
+## Estado atual dos bloqueantes (conferido em 2026-09-09)
 
 | item | estado |
 |---|---|
-| 0. `targetSdk >= 36` | ❌ está em 34 (`compileSdk` 34 também precisa subir) |
+| 0. `targetSdk >= 36` | ✅ subido em `9bc8a96` (`compileSdk` 36 junto); validado no A32, no API 34 e no A17 |
 | 1. Política de privacidade pública + link no app | ❌ ausente; existe só um parágrafo na aba Docs ("O áudio só é enviado à origem configurada em Voz. Tokens ficam apenas no aparelho.") |
 | 2. Prominent disclosure com aceite explícito | ❌ ausente; o onboarding só diz "Sua voz vira texto em qualquer campo." |
 | 3. Data Safety Form | ⏳ depende do Play Console, não do código |
