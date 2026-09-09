@@ -11,6 +11,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.ui.viewinterop.AndroidView
 import com.keyflow.core.ButtonState
+import com.keyflow.data.Settings
+import com.keyflow.ui.tour.FingerPuppet
+import com.keyflow.ui.tour.buildOrbScripts
+import com.keyflow.ui.tour.tourFrameAt
 import com.keyflow.core.TranscriptionSource
 import android.view.KeyEvent
 import android.widget.FrameLayout
@@ -67,6 +71,12 @@ object RouteCatalog {
         orbDragRoute("orb-drag-cancel-recording", OrbState.Listening, OrbDragKind.CANCEL, seconds = 8),
         orbDragRoute("orb-drag-cancel-sending", OrbState.Transcribing, OrbDragKind.CANCEL, seconds = 8),
         orbDragRoute("orb-drag-config", OrbState.Listening, OrbDragKind.CONFIG, seconds = 8),
+
+        // Sanity de render do dedo (GT-T2), num instante fixo do roteiro de cancelar/desfazer — o
+        // passo de arrasto, que exercita trilha + posição interpolada de uma vez. As rotas de tour
+        // de verdade (com as cenas reais) chegam na GT-T8.
+        fingerPuppetRoute("tour-finger-drag", scriptId = "orb-cancel-undo", atMs = 900),
+        fingerPuppetRoute("tour-finger-multitap", scriptId = "orb-shortcut-3tap", atMs = 700),
         // Apresentação do orbe no botão flutuante do overlay (T22): tempo/glifo no centro.
         orbRoute("overlay-idle", OrbState.Idle, OrbCenter.None),
         orbRoute("overlay-recording", OrbState.Listening, OrbCenter.Time(12)),
@@ -586,6 +596,22 @@ object RouteCatalog {
                 center = center,
                 timeProvider = { GALLERY_ORB_TIME_MS },
             )
+        }
+    }
+
+    /**
+     * Sanidade de render do [FingerPuppet] (GT-T2): frame congelado num instante fixo de um roteiro
+     * real do catálogo, sobre um fundo neutro. Não é o tour — a cena real entra na GT-T4/T5.
+     */
+    private fun fingerPuppetRoute(key: String, scriptId: String, atMs: Int): Route = Route(key) {
+        val settings = Settings(shortcut3Tap = com.keyflow.core.OrbShortcutAction.SWITCH_IME)
+        val script = buildOrbScripts(settings).first { it.id == scriptId }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(LocalKeyFlowPalette.current.bg),
+        ) {
+            FingerPuppet(frame = tourFrameAt(script, atMs), modifier = Modifier.fillMaxSize())
         }
     }
 

@@ -1,7 +1,7 @@
 # Gesture Tour — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (T1–T6)
-**Status**: Em execução — GT-T1 concluída (2026-09-09). Próxima: GT-T2.
+**Status**: Em execução — GT-T1 e GT-T2 concluídas (2026-09-09). Próxima: GT-T3.
 
 > Gate no sandbox: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon <task>`
 > Instrumentado escopado: `ANDROID_SERIAL=emulator-5554`. Antes de instalar no device do Yan:
@@ -41,7 +41,7 @@ do motor; o resto serializa no device (TESTING.md).
 
 ## Fase B — Motor
 
-### GT-T2 — `FingerPuppet` + interpolação `tourFrameAt`
+### GT-T2 — `FingerPuppet` + interpolação `tourFrameAt` ✅ CONCLUÍDA (2026-09-09)
 - **What**: interpolação pura keyframes→frame (`tourFrameAt(script, timeMs)`: posição, fase da
   ação, reação vigente, fim/loop) + Composable do dedo (disco/halo; ripple por tap com contagem;
   pressionado; trilha de arrasto) dirigido pelo frame; `rememberTourClock(enabled)` no padrão

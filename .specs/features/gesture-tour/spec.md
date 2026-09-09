@@ -200,10 +200,10 @@ o "?" da Sobreposição fecha a do Microfone e abre a dela; TalkBack lê o conte
 | Requirement | Story | Task | Status |
 | ----------- | ----- | ---- | ------ |
 | TOUR-01 | P1-A | GT-T3 | In Tasks |
-| TOUR-02 | P1-A | GT-T2 | In Tasks |
+| TOUR-02 | P1-A | GT-T2 | Implemented |
 | TOUR-03 | P1-A | GT-T4, GT-T5 | In Tasks |
 | TOUR-04 | P1-A | GT-T3 | In Tasks |
-| TOUR-05 | P1-A | GT-T2, GT-T3 | In Tasks |
+| TOUR-05 | P1-A | GT-T2, GT-T3 | In Tasks (clock pronto na T2; falta o player) |
 | SCR-01 | P1-B | GT-T1 | Implemented |
 | SCR-02 | P1-B | GT-T1 | Implemented |
 | SCR-03 | P1-B | GT-T1 | Implemented |

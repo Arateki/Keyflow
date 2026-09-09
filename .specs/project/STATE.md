@@ -1370,3 +1370,26 @@ não fica para trás em silêncio.
 
 **Geometria dos passos é relativa (0..1)** — o mesmo roteiro serve ao card da aba Modo e a qualquer
 miniatura futura. As posições concretas das cenas são responsabilidade da GT-T4/T5.
+
+## gesture-tour — GT-T2 (2026-09-09)
+
+`ui/tour/TourEngine.kt` (interpolação pura) + `ui/tour/FingerPuppet.kt` (dedo + `rememberTourClock`).
+TOUR-02 → Implemented. 280 unitários (+14), build limpo, sanidade de render nas rotas provisórias
+`tour-finger-drag`/`tour-finger-multitap`.
+
+**Furo do dado da T1 achado pela T2.** `SceneReaction` documentava "campo nulo = não mexe", mas o
+roteiro de cancelar usava `overlayHint = null` querendo APAGAR o banner de desfazer — com a reação
+acumulada, isso nunca apagaria. Resolvido com `TourOverlayHint.NONE` explícito (null = não mexe,
+NONE = apaga) e teste cobrindo os dois. Vale para quem escrever roteiro novo.
+
+**Reação é acumulada, não do passo.** Cada keyframe declara só o que muda; o frame devolve o último
+valor declarado de cada campo até ali. Sem isso a orbe voltaria ao estado inicial a cada passo.
+
+**Toque/segurar/soltar não interpolam posição** — só MOVE e DRAG movem o dedo. Interpolar num TAP dava
+a impressão de um gesto que não existe.
+
+**Rotas de galeria novas não quebram o gate**: o `diff-screens.sh` itera sobre os goldens, não sobre as
+capturas, então rota sem golden é simplesmente ignorada até alguém aprovar.
+
+**Goldens pertencem ao emulador API 34.** Rodar o mesmo diff no A17 acusa 6 falsos positivos de
+posição (insets diferentes) com o conteúdo idêntico. Conferir o gate visual no 5554, não no 5556.

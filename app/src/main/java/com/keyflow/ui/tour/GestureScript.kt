@@ -24,11 +24,20 @@ enum class FingerAction { MOVE, TAP, MULTI_TAP, PRESS, RELEASE, DRAG }
  * Elementos que a cena mostra além da orbe/teclado em si — representações, não as views reais: o alvo
  * de cancelamento e o banner de desfazer vivem no `OverlayService`, e o seletor do mic no IME.
  */
-enum class TourOverlayHint { CANCEL_TARGET, UNDO_BANNER, MIC_ACTION_SELECTOR }
+enum class TourOverlayHint {
+    CANCEL_TARGET,
+    UNDO_BANNER,
+    MIC_ACTION_SELECTOR,
+
+    /** Apaga o que estiver na tela. Existe porque `null` já significa "não mexe" (ver [SceneReaction]). */
+    NONE,
+}
 
 /**
  * Como a cena responde a partir deste passo. Campos nulos significam "não mexe" — o passo só declara o
- * que muda, e o player mantém o resto.
+ * que muda, e o player mantém o resto. Para **desfazer** algo que um passo anterior ligou, declare o
+ * valor de desligamento explicitamente: é o caso de [TourOverlayHint.NONE], que apaga o banner ou o
+ * seletor (`null` ali não apagaria nada).
  */
 data class SceneReaction(
     val orbState: OrbState? = null,

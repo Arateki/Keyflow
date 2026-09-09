@@ -142,7 +142,7 @@ private fun cancelAndUndo() = GestureScript(
             at = Offset(0.28f, 0.88f),
             action = FingerAction.TAP,
             durationMs = BEAT,
-            reaction = SceneReaction(orbState = OrbState.Paused, overlayHint = null),
+            reaction = SceneReaction(orbState = OrbState.Paused, overlayHint = TourOverlayHint.NONE),
         ),
     ),
 )
@@ -248,7 +248,7 @@ private fun micHold() = GestureScript(
             at = KBD_MIC_PAUSE_CHIP,
             action = FingerAction.RELEASE,
             durationMs = BEAT,
-            reaction = SceneReaction(micState = ButtonState.PAUSED, overlayHint = null),
+            reaction = SceneReaction(micState = ButtonState.PAUSED, overlayHint = TourOverlayHint.NONE),
         ),
     ),
 )
