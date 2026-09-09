@@ -201,7 +201,7 @@ o "?" da Sobreposição fecha a do Microfone e abre a dela; TalkBack lê o conte
 | ----------- | ----- | ---- | ------ |
 | TOUR-01 | P1-A | GT-T3 | Implemented |
 | TOUR-02 | P1-A | GT-T2 | Implemented |
-| TOUR-03 | P1-A | GT-T4, GT-T5 | In Tasks (orbe pronta na T4; falta o teclado) |
+| TOUR-03 | P1-A | GT-T4, GT-T5 | Implemented |
 | TOUR-04 | P1-A | GT-T3 | Implemented |
 | TOUR-05 | P1-A | GT-T2, GT-T3 | Implemented |
 | SCR-01 | P1-B | GT-T1 | Implemented |

@@ -29,7 +29,10 @@ private val ORB_PARKED = Offset(0.85f, 0.22f)
 // Na cena do teclado, o mic e o botão de retrair ficam na barra de cima (mesma posição da BarView).
 private val KBD_MIC = Offset(0.11f, 0.14f)
 private val KBD_COLLAPSE = Offset(0.92f, 0.14f)
-private val KBD_MIC_PAUSE_CHIP = Offset(0.34f, 0.14f)
+// Centro do chip "pausar" do seletor, que a cena ancora em `SELECTOR_START_FRACTION`. Apontar para o
+// lugar errado faria o tour soltar em "cancelar" enquanto o passo declara PAUSED — ensinando o gesto
+// trocado (visto na tira de frames de 2026-09-09).
+private val KBD_MIC_PAUSE_CHIP = Offset(0.27f, 0.13f)
 
 private const val SHORT = 420
 private const val BEAT = 700

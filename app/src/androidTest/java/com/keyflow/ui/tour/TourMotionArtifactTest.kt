@@ -1,7 +1,9 @@
 package com.keyflow.ui.tour
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -18,6 +20,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.keyflow.data.Settings
 import com.keyflow.ui.theme.KeyFlowTheme
 import com.keyflow.ui.theme.LocalKeyFlowPalette
+import com.keyflow.ui.tour.scenes.KeyboardScene
 import com.keyflow.ui.tour.scenes.OrbScene
 import org.junit.Rule
 import org.junit.Test
@@ -64,10 +67,37 @@ class TourMotionArtifactTest {
             }
         }
 
-        // Varre os dois primeiros roteiros (gravar/parar e pausar/retomar) e o de cancelar/desfazer,
-        // que é o que tem arrasto, alvo e banner — o mais difícil de acertar sem ver.
-        val total = scripts.take(3).sumOf { it.totalDurationMs }
-        val dir = File(outRoot, "tour-orb").apply { mkdirs() }
+        // Os três primeiros: gravar/parar, pausar/retomar e cancelar/desfazer — este último tem
+        // arrasto, alvo e banner, o mais difícil de acertar sem ver a sequência.
+        capture(scripts.take(3), "tour-orb")
+    }
+
+    @Test
+    fun captureKeyboardTourFrames() {
+        val scripts = buildKeyboardScripts(Settings())
+
+        rule.setContent {
+            KeyFlowTheme(dark = false) {
+                CompositionLocalProvider(LocalTourClock provides { now }) {
+                    val palette = LocalKeyFlowPalette.current
+                    GestureTourPlayer(
+                        scripts = scripts,
+                        modifier = Modifier
+                            .width(300.dp)
+                            .background(palette.bg)
+                            .testTag(SCENE),
+                    ) { frame -> KeyboardScene(frame, Modifier.fillMaxWidth()) }
+                }
+            }
+        }
+
+        capture(scripts, "tour-keyboard")
+    }
+
+    /** Varre o relógio dos [scripts] e salva um PNG por instante em `motion-gifs/[slug]`. */
+    private fun capture(scripts: List<GestureScript>, slug: String) {
+        val total = scripts.sumOf { it.totalDurationMs }
+        val dir = File(outRoot, slug).apply { mkdirs() }
         dir.listFiles()?.forEach { it.delete() }
 
         var index = 0
@@ -82,8 +112,8 @@ class TourMotionArtifactTest {
             t += STEP_MS
         }
         File(dir, "scenario.txt").writeText(
-            "roteiros: ${scripts.take(3).joinToString { it.id }}\n" +
-                "passo do relógio: ${STEP_MS}ms · frames: $index\n",
+            "roteiros: " + scripts.joinToString { it.id } +
+                " | passo do relógio: ${STEP_MS}ms | frames: " + index,
         )
     }
 

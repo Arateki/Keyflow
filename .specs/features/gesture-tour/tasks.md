@@ -1,7 +1,7 @@
 # Gesture Tour — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (T1–T6)
-**Status**: Em execução — GT-T1..T4 concluídas (2026-09-09). Próxima: GT-T5 (cena KEYBOARD).
+**Status**: Em execução — GT-T1..T5 concluídas (2026-09-09). Próxima: GT-T6 (aba Modo).
 
 > Gate no sandbox: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon <task>`
 > Instrumentado escopado: `ANDROID_SERIAL=emulator-5554`. Antes de instalar no device do Yan:
@@ -79,13 +79,16 @@ do motor; o resto serializa no device (TESTING.md).
   nos passos que os declaram; rota de galeria com clock congelado renderiza fiel.
 - **Tests**: instrumented. **Gate**: `full`.
 
-### GT-T5 — Cena KEYBOARD (grade Canvas nova em miniatura)
+### GT-T5 — Cena KEYBOARD (grade Canvas nova em miniatura) ✅ CONCLUÍDA (2026-09-09)
 - **What**: cena do teclado: `KeyFlowKeyboardView` real em miniatura (padrão da demo atual:
   `scale`, callbacks no-op, `key(dark)`, ticker parado no release) com a **grade Canvas nova
   forçada** (MODO-04 — expor à demo a seleção da grade independente do prefs de debug);
   `SceneReaction.micState`/`keyboardExpanded` dirigem `updateMicState`/`setExpanded`.
-- **Where**: `ui/tour/scenes/KeyboardScene.kt`, ajuste pontual em `ime/KeyFlowKeyboardView.kt`
-  (parâmetro p/ forçar a grade nova).
+- **Where**: `ui/tour/scenes/KeyboardScene.kt`. **SPEC_DEVIATION (2026-09-09)**: o ajuste previsto em
+  `ime/KeyFlowKeyboardView.kt` (parâmetro p/ forçar a grade nova) NÃO foi feito porque não é mais
+  necessário — a grade Canvas virou a única desde a KC-T10/SB-T10 e a antiga foi removida junto com a
+  flag `kbd_bars`. A task foi escrita antes dessas remoções. O instrumentado afirma a grade na tela
+  via `canvasGridForTest`, que é o que o "Done when" pedia.
 - **Depends on**: GT-T4 (sequência de device; código independente).
 - **Requirement**: TOUR-03, MODO-04 (parcial).
 - **Done when**: instrumented: reações dirigem mic/expansão; grade NOVA visível na demo

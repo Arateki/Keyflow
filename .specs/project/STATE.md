@@ -1431,3 +1431,25 @@ o relógio e olhar a sequência achou em uma rodada o que 6 testes verdes não a
 **`TourMotionArtifactTest` não é golden e não afirma nada** — é material de revisão humana enquanto o
 tour está sendo construído. Fluidez de verdade segue sendo o portão manual do Yan no A32 (GT-T8),
 porque o emulador daqui roda headless.
+
+## gesture-tour — GT-T5 (2026-09-09)
+
+`ui/tour/scenes/KeyboardScene.kt`: `KeyFlowKeyboardView` real em miniatura, com mic e expansão dirigidos
+pelo passo. TOUR-03 → Implemented. 292 unitários e 183 instrumentados (+6), 70/70 goldens.
+
+**SPEC_DEVIATION**: a task pedia um parâmetro em `KeyFlowKeyboardView` para "forçar a grade nova". Não
+existe mais o que forçar — a grade Canvas é a única desde a KC-T10/SB-T10, a antiga saiu junto com a
+flag `kbd_bars`. A task foi escrita antes disso. Registrado também no `tasks.md`.
+
+**A cena TEM de ser exatamente o teclado.** As coordenadas do roteiro são relativas à cena e o dedo é
+desenhado pelo player sobre a MESMA caixa; com a view ancorada embaixo e espaço vazio acima, o dedo
+tocava o ar. A cena passou a acompanhar a altura da view: o consumidor manda a largura, o teclado dita
+o resto. Vale para qualquer cena futura.
+
+**O tour chegou a ensinar o gesto trocado**: o arrasto do hold soltava em "cancelar" enquanto o passo
+declarava `PAUSED`. A fração `SELECTOR_START_FRACTION` da cena e o `KBD_MIC_PAUSE_CHIP` do catálogo
+agora se referenciam explicitamente — mudou um, muda o outro.
+
+**As duas falhas acima passaram por 5 instrumentados verdes** e só apareceram na tira de frames. Pela
+segunda task seguida, a varredura de relógio achou o que asserção não acha: ela vê ONDE as coisas
+estão, e o teste vê apenas SE estão.
