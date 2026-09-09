@@ -217,7 +217,8 @@ abria o teclado nesse emulador — causa e correção no Q11.
 ### Flakiness conhecida (medida, não suposta)
 
 `OrbMotionArtifactTest` no A32 falha **2 de 3 vezes mesmo isolado e com as libs ANTIGAS** — instável por
-conta própria, anterior a tudo isto. `SetupActivityTest`, `KeyFlowKeyboardLanguageTest` e
-`OrbButtonViewTest` falham esporadicamente sob carga e passam sozinhos (`LanguageTest`: 5/5 isolado com
+conta própria, anterior a tudo isto. ~~`SetupActivityTest`~~ **deixou de ser flakiness em 2026-09-09**:
+tinha causa e foi corrigido (relógio de composição congelado antes da primeira tela — Q11).
+`KeyFlowKeyboardLanguageTest` e `OrbButtonViewTest` falham esporadicamente sob carga e passam sozinhos (`LanguageTest`: 5/5 isolado com
 as libs novas). Ao investigar uma falha destas, medir com várias rodadas ANTES de atribuir causa —
 duas vezes nesta sessão uma amostra de 2–3 rodadas levou a atribuição errada.
