@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -34,6 +35,13 @@ fun tourOrbTag(state: OrbState): String = "tour-orb-${state.name}"
 const val TOUR_HINT_CANCEL_TARGET_TAG = "tour-hint-cancel-target"
 const val TOUR_HINT_UNDO_BANNER_TAG = "tour-hint-undo-banner"
 
+/**
+ * Altura reservada para QUALQUER cena do tour. Fixa de propósito: com a altura acompanhando o conteúdo,
+ * o card saltava de tamanho a cada troca de gesto — e o teclado, que encolhe ao retrair, saltava dentro
+ * do próprio roteiro (relatado pelo Yan usando no A32, 2026-09-09).
+ */
+val TOUR_SCENE_HEIGHT = 132.dp
+
 /** Onde a orbe mora quando nenhum passo diz o contrário — mesmo ponto de partida do catálogo. */
 private val DEFAULT_ORB_AT = Offset(0.5f, 0.45f)
 
@@ -61,7 +69,7 @@ fun OrbScene(frame: TourFrame, modifier: Modifier = Modifier) {
         frame.reaction.orbAt ?: DEFAULT_ORB_AT
     }
 
-    BoxWithConstraints(modifier) {
+    BoxWithConstraints(modifier.height(TOUR_SCENE_HEIGHT)) {
         val orbSide = maxWidth * 0.30f
 
         when (frame.reaction.overlayHint) {

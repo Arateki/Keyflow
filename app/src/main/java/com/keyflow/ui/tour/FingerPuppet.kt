@@ -24,6 +24,36 @@ import com.keyflow.ui.theme.LocalKeyFlowPalette
  */
 val LocalTourClock = staticCompositionLocalOf<(() -> Float)?> { null }
 
+/** Período do pulso da seta de avançar. Calmo de propósito: é um convite, não um alerta. */
+const val TOUR_ARROW_PULSE_PERIOD_MS = 1800
+
+/** Piso do pulso. Não desce mais que isto para a seta nunca parecer desabilitada. */
+const val TOUR_ARROW_PULSE_FLOOR = 0.55f
+
+/**
+ * Intensidade do pulso da seta de avançar (0,45..1) no instante [timeMs] — função pura, e não uma
+ * animação própria: uma `rememberInfiniteTransition` deixaria a tela eternamente não-ociosa (quebrando
+ * todo teste Compose que a renderiza) e tornaria o golden não-determinístico. Vindo do relógio do tour,
+ * congela junto com ele.
+ *
+ * Existe porque o tour deixou de avançar sozinho (2026-09-09): a seta virou o único caminho adiante e
+ * precisa se anunciar.
+ */
+fun tourArrowPulse(timeMs: Float): Float {
+    val phase = (timeMs % TOUR_ARROW_PULSE_PERIOD_MS) / TOUR_ARROW_PULSE_PERIOD_MS
+    // Meio cosseno: sobe e desce suave, sem canto no reinício do ciclo.
+    val wave = (1f - kotlin.math.cos(phase * 2f * Math.PI.toFloat())) / 2f
+    return TOUR_ARROW_PULSE_FLOOR + (1f - TOUR_ARROW_PULSE_FLOOR) * wave
+}
+
+/** Tempo corrente do tour: o injetado (galeria/teste) ou o relógio real. */
+@Composable
+fun rememberTourTimeMs(): Float {
+    val provided = LocalTourClock.current
+    val animated = rememberTourClock(enabled = provided == null)
+    return provided?.invoke() ?: animated
+}
+
 /** Milissegundos desde a primeira composição, avançando por quadro. Desligado, fica parado em 0. */
 @Composable
 fun rememberTourClock(enabled: Boolean): Float {

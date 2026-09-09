@@ -25,7 +25,7 @@ import androidx.compose.ui.semantics.semantics
  */
 class GestureTourState(
     scripts: List<GestureScript>,
-    private val autoplayPauseMs: Int = DEFAULT_AUTOPLAY_PAUSE_MS,
+    private val loopPauseMs: Int = DEFAULT_LOOP_PAUSE_MS,
 ) {
     var scripts: List<GestureScript> = scripts
         internal set
@@ -34,7 +34,6 @@ class GestureTourState(
         private set
 
     private var scriptStartMs by mutableStateOf(0f)
-    private var autoplayHeldUntilMs by mutableStateOf(0f)
     private var lastTickMs = 0f
 
     val script: GestureScript? get() = scripts.getOrNull(index)
@@ -48,23 +47,27 @@ class GestureTourState(
     }
 
     /**
-     * Frame em [nowMs], avançando o roteiro se ele acabou e o autoplay estiver livre. Chamado uma vez
-     * por quadro, fora da composição; com o relógio parado devolve sempre o mesmo frame.
+     * Frame em [nowMs], **repetindo o gesto corrente** quando ele acaba. Chamado uma vez por quadro,
+     * fora da composição; com o relógio parado devolve sempre o mesmo frame.
+     *
+     * O tour NÃO avança sozinho de um gesto para o outro (decisão do Yan, 2026-09-09, usando no A32:
+     * a troca automática dava pouco tempo para entender cada um). Quem troca é a seta.
      */
     fun tick(nowMs: Float): TourFrame {
         lastTickMs = nowMs
-        val frame = frameFor(nowMs)
-        if (!frame.finished || nowMs < autoplayHeldUntilMs || scripts.isEmpty()) return frame
+        val current = script ?: return EMPTY_FRAME
+        val elapsed = nowMs - scriptStartMs
+        if (elapsed < current.totalDurationMs + loopPauseMs) return frameFor(nowMs)
 
-        index = (index + 1) % scripts.size
+        // Fim do gesto + respiro: recomeça o MESMO, para a pessoa ver de novo sem perseguir a tela.
         scriptStartMs = nowMs
-        return tourFrameAt(scripts[index], 0)
+        return tourFrameAt(current, 0)
     }
 
-    /** Próximo roteiro. Interrompe a animação corrente e segura o autoplay por um tempo (TOUR-04). */
+    /** Próximo gesto. É o ÚNICO jeito de trocar de roteiro — o tour repete o corrente sozinho. */
     fun next() = jumpTo(index + 1)
 
-    /** Roteiro anterior, com a mesma interrupção do [next]. */
+    /** Gesto anterior. */
     fun prev() = jumpTo(index - 1)
 
     private fun jumpTo(target: Int) {
@@ -74,12 +77,11 @@ class GestureTourState(
         // Recomeça do zero: entrar no meio de um gesto que a pessoa pediu para ver é pior do que
         // esperar meio segundo pelo começo dele.
         scriptStartMs = lastTickMs
-        autoplayHeldUntilMs = lastTickMs + autoplayPauseMs
     }
 
     private companion object {
-        /** Tempo que o autoplay fica parado depois de uma seta, para dar tempo de ler (T4 do context). */
-        const val DEFAULT_AUTOPLAY_PAUSE_MS = 6_000
+        /** Respiro entre uma repetição e a próxima do mesmo gesto — sem ele, o loop parece um soluço. */
+        const val DEFAULT_LOOP_PAUSE_MS = 900
 
         val EMPTY_FRAME = TourFrame(
             stepIndex = -1,
@@ -112,9 +114,7 @@ fun GestureTourPlayer(
     state: GestureTourState = rememberGestureTourState(scripts),
     scene: @Composable (TourFrame) -> Unit,
 ) {
-    val provided = LocalTourClock.current
-    val animated = rememberTourClock(enabled = provided == null)
-    val nowMs = provided?.invoke() ?: animated
+    val nowMs = rememberTourTimeMs()
 
     // O frame é lido sem efeito colateral; o avanço do autoplay acontece DEPOIS da composição, senão
     // escrever o índice no meio dela realimentaria a recomposição.

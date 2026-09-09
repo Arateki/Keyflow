@@ -1477,3 +1477,23 @@ a aba Sobrepor e a Docs.
 "2 toques · Retrair / expa…". Só apareceu no aparelho do Yan, porque no golden o roteiro corrente é
 "Gravar e parar", que cabe. Passou a duas linhas. A árvore de acessibilidade sempre teve o texto
 inteiro, então nenhum instrumentado acusaria: era truncamento de PIXEL, não de dado.
+
+## gesture-tour — revisão do TOUR-04 (2026-09-09, feedback do Yan no A32)
+
+Três mudanças pedidas depois de usar no aparelho, todas contrariando o que a spec dizia — registradas
+como **mudança de decisão**, não como desvio:
+
+1. **O tour não avança sozinho.** O gesto corrente repete em loop (com um respiro de 900ms entre
+   repetições) e só a seta troca. O autoplay original dava pouco tempo para entender cada gesto.
+2. **Altura reservada igual para toda cena** (`TOUR_SCENE_HEIGHT`). O card saltava de tamanho a cada
+   troca, e o teclado saltava dentro do próprio roteiro ao retrair. A cena do teclado ancora no TOPO:
+   é onde ficam o mic e a seta, então retrair encolhe para baixo sem mover o que o dedo mira.
+3. **A seta de avançar pulsa.** Virou o único caminho adiante, então precisa se anunciar. Em teal (a
+   cor de ação do app) e com piso de 0.55 — mais apagada que a vizinha, leria como desabilitada.
+
+**O pulso é função pura do tempo (`tourArrowPulse`), não uma animação Compose.** Uma
+`rememberInfiniteTransition` deixaria a tela eternamente não-ociosa (quebrando todo teste que a
+renderiza) e tornaria o golden não-determinístico. Vindo do relógio do tour, congela junto. Vale para
+qualquer efeito contínuo que entrar nesta tela.
+
+Os testes que codificavam o autoplay foram reescritos para o contrato novo, não removidos.

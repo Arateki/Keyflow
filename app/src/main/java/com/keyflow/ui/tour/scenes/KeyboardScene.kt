@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -46,14 +47,14 @@ fun KeyboardScene(frame: TourFrame, modifier: Modifier = Modifier) {
     val expanded = frame.reaction.keyboardExpanded ?: true
     val micState = frame.reaction.micState ?: ButtonState.IDLE_READY
 
-    // A cena precisa ser EXATAMENTE o teclado: as coordenadas do roteiro são relativas à cena, e o dedo
-    // é desenhado pelo player sobre essa mesma caixa. Com espaço vazio sobrando, o dedo tocava o ar
-    // acima do teclado (visto na tira de frames de 2026-09-09). Por isso a altura acompanha a view: o
-    // consumidor manda a largura, o teclado dita o resto.
-    Box(modifier.wrapContentHeight(), contentAlignment = Alignment.BottomCenter) {
+    // Altura reservada e teclado ancorado no TOPO. As coordenadas do roteiro são relativas à cena, e a
+    // barra (mic, seta de retrair) fica no topo do teclado — ancorando ali, retrair encolhe o teclado
+    // para baixo sem mover o que o dedo mira. Ancorado embaixo, retrair puxaria a barra junto e o dedo
+    // erraria o alvo; com a altura acompanhando o conteúdo, o card ainda saltava de tamanho.
+    Box(modifier.height(TOUR_SCENE_HEIGHT), contentAlignment = Alignment.TopCenter) {
         key(dark) {
             AndroidView(
-                modifier = Modifier.fillMaxWidth().wrapContentHeight(),
+                modifier = Modifier.fillMaxWidth().wrapContentHeight(Alignment.Top),
                 factory = { ctx ->
                     KeyFlowKeyboardView(
                         context = ctx,

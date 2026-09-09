@@ -54,6 +54,8 @@ import com.keyflow.ui.tour.GestureTourPlayer
 import com.keyflow.ui.tour.TourFrame
 import com.keyflow.ui.tour.buildKeyboardScripts
 import com.keyflow.ui.tour.buildOrbScripts
+import com.keyflow.ui.tour.rememberTourTimeMs
+import com.keyflow.ui.tour.tourArrowPulse
 import com.keyflow.ui.tour.rememberGestureTourState
 import com.keyflow.ui.tour.scenes.KeyboardScene
 import com.keyflow.ui.tour.scenes.OrbScene
@@ -138,7 +140,7 @@ fun ModoPanel(
                 settings.shortcut2Tap,
                 settings.shortcut3Tap,
             ) { buildOrbScripts(settings) },
-            tourScene = { frame -> OrbScene(frame, Modifier.fillMaxWidth().height(112.dp)) },
+            tourScene = { frame -> OrbScene(frame, Modifier.fillMaxWidth()) },
         )
 
         ModeCard(
@@ -378,16 +380,25 @@ private fun TourNav(tag: String, title: String, onPrev: () -> Unit, onNext: () -
             lineHeight = 9.5.sp,
             modifier = Modifier.weight(1f).testTag("$tag-title"),
         )
-        Arrow("›", "próximo gesto", "$tag-next", onNext)
+        // Só a seta de AVANÇAR pulsa: o tour não anda sozinho, então ela é o caminho adiante e precisa
+        // se anunciar. A de voltar não pulsa — duas piscando viram ruído.
+        Arrow("›", "próximo gesto", "$tag-next", onNext, pulsing = true)
     }
 }
 
 @Composable
-private fun Arrow(glyph: String, label: String, tag: String, onClick: () -> Unit) {
+private fun Arrow(glyph: String, label: String, tag: String, onClick: () -> Unit, pulsing: Boolean = false) {
     val palette = LocalKeyFlowPalette.current
+    // Pulsando, a seta usa o teal — a cor de ação do app — para ler como convite, e não como um
+    // elemento apagando e acendendo. Parada, fica no cinza dos textos secundários.
+    val color = if (pulsing) {
+        palette.teal.copy(alpha = tourArrowPulse(rememberTourTimeMs()))
+    } else {
+        palette.fg2
+    }
     Text(
         glyph,
-        color = palette.fg2,
+        color = color,
         fontFamily = SpaceMono,
         fontSize = 12.sp,
         modifier = Modifier

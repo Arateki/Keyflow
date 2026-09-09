@@ -7,8 +7,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * TOUR-04: autoplay em loop, setas que interrompem sem deixar estado preso, e o índice/título/descrição
- * expostos para o consumidor posicionar o texto onde quiser.
+ * TOUR-04 (revisto em 2026-09-09): o gesto corrente REPETE sozinho e só a seta troca de gesto — o
+ * autoplay que avançava a lista dava pouco tempo para entender cada um (decisão do Yan usando no A32).
+ * O índice/título/descrição seguem expostos para o consumidor posicionar o texto onde quiser.
  *
  * A lógica mora fora do Composable de propósito — é o que permite testar a passagem de tempo sem
  * device, com o relógio na mão.
@@ -25,7 +26,7 @@ class GestureTourStateTest {
 
     private val scripts = listOf(script("a", 1000), script("b", 2000), script("c", 1000))
 
-    private fun state(pauseMs: Int = 6_000) = GestureTourState(scripts, autoplayPauseMs = pauseMs)
+    private fun state(pauseMs: Int = 900) = GestureTourState(scripts, loopPauseMs = pauseMs)
 
     @Test
     fun startsOnTheFirstScript() {
@@ -37,40 +38,36 @@ class GestureTourStateTest {
     }
 
     @Test
-    fun autoplayAdvancesWhenTheScriptEnds() {
+    fun theCurrentGestureRepeatsInsteadOfMovingOn() {
         val s = state()
 
         s.tick(0f)
-        assertEquals(0, s.index)
+        s.tick(5_000f)
 
-        s.tick(1000f)
-        assertEquals("terminou o 'a', deveria estar no 'b'", 1, s.index)
-    }
-
-    @Test
-    fun eachScriptGetsItsOwnDurationNotTheFirstOnes() {
-        val s = state()
-
-        s.tick(0f)
-        s.tick(1000f) // → b (dura 2000)
-        s.tick(2000f)
-        assertEquals("b ainda não acabou", 1, s.index)
-
-        s.tick(3000f)
-        assertEquals(2, s.index)
-    }
-
-    @Test
-    fun autoplayLoopsBackToTheStart() {
-        val s = state()
-
-        s.tick(0f)
-        s.tick(1000f) // b
-        s.tick(3000f) // c
-        s.tick(4000f) // volta pro a
-
-        assertEquals(0, s.index)
+        assertEquals("o tour não troca de gesto sozinho", 0, s.index)
         assertEquals("título a", s.title)
+    }
+
+    @Test
+    fun theRepeatWaitsABeatBeforeStartingOver() {
+        val s = state(pauseMs = 500)
+
+        s.tick(0f)
+        // "a" dura 1000ms: logo depois disso o gesto está terminado, mas ainda não recomeçou.
+        assertTrue(s.tick(1200f).finished)
+        // Passado o respiro, recomeça do zero.
+        val restarted = s.tick(1600f)
+        assertFalse(restarted.finished)
+        assertEquals(0f, restarted.actionProgress, 0.001f)
+    }
+
+    @Test
+    fun timePassingNeverChangesTheGestureOnItsOwn() {
+        val s = state()
+
+        repeat(20) { i -> s.tick(i * 1_000f) }
+
+        assertEquals(0, s.index)
     }
 
     @Test
@@ -89,18 +86,15 @@ class GestureTourStateTest {
     }
 
     @Test
-    fun usingTheArrowsPausesAutoplayForAWhile() {
-        val s = state(pauseMs = 6_000)
+    fun theArrowIsTheOnlyWayToChangeGesture() {
+        val s = state()
         s.tick(0f)
 
-        s.next() // vai pro b em t=0
-        // b dura 2000ms: sem a pausa, o autoplay já teria avançado aqui.
-        s.tick(2500f)
-        assertEquals("o autoplay deveria estar segurado", 1, s.index)
+        s.tick(9_000f)
+        assertEquals("tempo sozinho não troca", 0, s.index)
 
-        // Passada a janela, ele volta a andar sozinho.
-        s.tick(7000f)
-        assertEquals(2, s.index)
+        s.next()
+        assertEquals(1, s.index)
     }
 
     @Test
@@ -139,11 +133,11 @@ class GestureTourStateTest {
     }
 
     @Test
-    fun aSingleScriptLoopsOnItself() {
+    fun aSingleScriptKeepsRepeatingWithoutBlowingUp() {
         val s = GestureTourState(listOf(script("solo", 500)))
 
         s.tick(0f)
-        s.tick(500f)
+        s.tick(5_000f)
 
         assertEquals(0, s.index)
         assertEquals("título solo", s.title)

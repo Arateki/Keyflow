@@ -59,10 +59,14 @@ Modo hoje e em qualquer tela amanhã.
 3. **TOUR-03**: a cena SHALL reagir ao roteiro em sincronia (orbe muda de estado —
    Idle/Listening/Paused; mic do teclado muda; teclado expande/retrai) usando as superfícies
    **reais** (`VoiceOrb`; grade Canvas nova em miniatura), nunca mocks desenhados à parte.
-4. **TOUR-04**: SHALL haver **autoplay em loop** na ordem da lista; navegação **anterior/próximo**
-   pausa o autoplay por alguns segundos e retoma; o estado exposto
-   (`rememberGestureTourState`) SHALL incluir índice, título e descrição do passo corrente
+4. **TOUR-04** *(revisto em 2026-09-09 — decisão do Yan usando no A32)*: o gesto corrente SHALL
+   **repetir em loop**, e a troca de gesto SHALL acontecer **apenas** pela navegação
+   anterior/próximo; a seta de avançar SHALL ter indicação visual de que dá para seguir. O estado
+   exposto (`rememberGestureTourState`) SHALL incluir índice, título e descrição do passo corrente
    (p/ o consumidor posicionar a descrição onde quiser).
+   ~~Autoplay avançando a lista sozinho~~: implementado assim na GT-T3 e **revertido** — no
+   aparelho, a troca automática dava pouco tempo para entender cada gesto. Toda cena SHALL ocupar a
+   mesma altura reservada, para o card não saltar de tamanho a cada troca.
 5. **TOUR-05**: toda animação SHALL ser dirigida por **clock injetável** (padrão `LocalOrbClock`):
    com clock congelado, qualquer frame é determinístico (goldens/testes).
 

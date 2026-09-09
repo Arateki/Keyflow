@@ -84,41 +84,39 @@ class GestureTourPlayerTest {
     }
 
     @Test
-    fun autoplayWalksTheListInOrderAndLoopsBack() {
+    fun theGestureRepeatsAndTheTourNeverMovesOnByItself() {
         content()
         assertEquals("título a", state.title)
 
         advanceTo(1000f)
-        assertEquals("título b", state.title)
+        advanceTo(4000f)
+        advanceTo(9000f)
 
-        advanceTo(2000f)
-        assertEquals("título c", state.title)
-
-        advanceTo(3000f)
-        assertEquals("voltou pro começo", "título a", state.title)
+        assertEquals("só a seta troca de gesto", "título a", state.title)
     }
 
     @Test
     fun theExposedTextIsWhatTheConsumerRenders() {
         content()
 
-        advanceTo(1000f)
+        rule.onNodeWithTag(NEXT).performClick()
+        rule.waitForIdle()
 
         rule.onNodeWithTag(TITLE).assertTextEquals("título b")
         rule.onNodeWithTag(DESC).assertTextEquals("descrição b")
     }
 
     @Test
-    fun theArrowsNavigateAndHoldTheAutoplay() {
+    fun theArrowChangesTheGestureAndItStaysThere() {
         content()
 
         rule.onNodeWithTag(NEXT).performClick()
         rule.waitForIdle()
         assertEquals("título b", state.title)
 
-        // Sem a pausa, 1000ms depois o autoplay já teria pulado para o "c".
-        advanceTo(1500f)
-        assertEquals("o autoplay deveria estar segurado", "título b", state.title)
+        // E continua no "b" por mais tempo que a duração dele: quem troca é a seta.
+        advanceTo(6000f)
+        assertEquals("título b", state.title)
     }
 
     @Test
