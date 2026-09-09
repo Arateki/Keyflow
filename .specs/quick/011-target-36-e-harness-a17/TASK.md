@@ -118,5 +118,24 @@ medir: instrumentar se a Activity é recriada ou reaproveitada nessa transição
 | `ShortcutBarsConfigEndToEndTest` + `OnboardingRoutingTest` | passa — a hipótese da `SetupActivity` reaproveitada pelo teste das barras está REFUTADA |
 | pacotes `overlay` + `ui` (99 testes) | **reproduz as 2 falhas** |
 
-Ou seja, o polutor está no pacote `overlay`, não no `ime`. Próximo passo: bissecar as 5 classes de
-`overlay` contra `ui`.
+Bisseção continuada até o menor reprodutor: **`OverlayServiceCancelTest` + as duas vítimas** reproduz;
+`RecordingNotificationTest` + as vítimas não; uma classe trivial antes (`AudioConcatenatorTest`) também
+não — então não é "não ser o primeiro", é aquela classe.
+
+### Causa raiz: relógio de composição congelado antes da primeira composição
+
+A `SetupActivity` compõe um **placeholder vazio** enquanto o DataStore não emite (`settingsLoaded`), de
+propósito, para não piscar o onboarding. Os dois testes chamam `compose.mainClock.autoAdvance = false`
+logo na primeira linha, por causa da orbe que anima sem parar. Se a emissão chega DEPOIS disso, a
+recomposição que traria a tela nunca gera quadro e a árvore fica só com o nó raiz.
+
+Provado com `printToLog` na falha: árvore com **apenas o nó raiz**, e `onboardingDone=false` lido do
+DataStore no mesmo instante — ou seja, a semeadura estava certa; o que faltava era o quadro. Sozinhos os
+testes passam porque a emissão chega antes de congelar; depois do `OverlayServiceCancelTest` o processo
+está ocupado e ela chega depois. Isso também explica por que as duas falhas pareciam espelhadas: não era
+"a tela errada", era **nenhuma tela**.
+
+Duas saídas testadas e descartadas: esperar por idle (`fetchSemanticsNodes` espera idle e a orbe anima
+para sempre → `ComposeNotIdleException`) e `compose.waitUntil` com o relógio congelado (só consulta a
+condição, não produz o quadro → estoura os 15s). O que funciona é **avançar o relógio à mão** até a tela
+existir, que é o que os dois testes passaram a fazer.
