@@ -67,7 +67,7 @@ guard, então nenhum outro arquivo precisou mudar.
 `compileSdk`/`targetSdk = 36`, validado: `assembleDebug` limpo, 250 unitários verdes, A32 (Android 13)
 159/159, emulador API 34 159/159.
 
-## Decisão de produto em aberto (não é teste)
+## ~~Decisão de produto em aberto~~ — RESOLVIDA em 2026-09-09: virou opção na config
 
 Hoje, com um **teclado Bluetooth/USB conectado**, o teclado do KeyFlow **não aparece** — é o
 comportamento padrão do `InputMethodService` para qualquer IME que não o sobrescreva, e a pessoa
@@ -75,8 +75,20 @@ precisaria ligar "mostrar teclado virtual" nas Configurações. Isso pesa mais a
 comum por dois motivos: o produto é ditado por voz (o mic some junto) e as barras de atalho existem
 justamente para apps de terminal, onde teclado externo é comum.
 
-A saída é uma linha, `onEvaluateInputViewShown() = true` no serviço — é o que o Gboard faz. Não foi
-aplicada: muda comportamento de produto e é chamada do Yan.
+Decidido com o Yan: em vez de fixar o comportamento, virou um controle na aba **Teclado** —
+"Mostrar com teclado físico", **ligado por padrão** (hoje o app simplesmente some nessa situação, então
+ligado é estritamente melhor; é o que o Gboard faz). Desmarcado, o serviço delega de volta ao padrão do
+`InputMethodService`.
+
+`Settings.keyboardShowWithHardKeyboard` → `SettingsRepository.keyboardShowWithHardKeyboardFlow()` →
+espelho `@Volatile` no serviço, porque `onEvaluateInputViewShown()` é síncrono. A troca ao vivo chama
+`updateInputViewShown()`: sem isso o framework só reavaliaria no próximo campo.
+
+Coberto por `KeyFlowKeyboardHardKeyboardTest`, que **zera `show_ime_with_hard_keyboard` de propósito** —
+com a chave em 1 o sistema já mandaria mostrar e o teste passaria sem exercitar nada. Ele afirma pelo
+`mIsInputViewShown` da plataforma, não pelo `activeViewForTest`: o estático sobrevive ao teste anterior
+(o serviço não é destruído entre testes) e daria falso negativo ao afirmar ausência. Onde o aparelho
+declara `nokeys` (A32, API 34) o teste é PULADO, não passa vazio.
 
 ## Resultado no emulador Android 17 (duas rodadas completas, 2026-09-09)
 
@@ -98,3 +110,13 @@ a abre. Se sobrar uma instância viva no topo da task, o `ActivityScenario` do `
 a reaproveita em vez de recriar, e a composição fica com o `onboardingDone` de antes — o
 `SeedOnboardingRule` grava o DataStore de forma síncrona, então o problema não é a semeadura. Falta
 medir: instrumentar se a Activity é recriada ou reaproveitada nessa transição.
+
+**Medido em 2026-09-09**, bisseção por pacote:
+
+| rodada | resultado |
+|---|---|
+| `ShortcutBarsConfigEndToEndTest` + `OnboardingRoutingTest` | passa — a hipótese da `SetupActivity` reaproveitada pelo teste das barras está REFUTADA |
+| pacotes `overlay` + `ui` (99 testes) | **reproduz as 2 falhas** |
+
+Ou seja, o polutor está no pacote `overlay`, não no `ime`. Próximo passo: bissecar as 5 classes de
+`overlay` contra `ui`.
