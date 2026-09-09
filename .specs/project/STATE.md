@@ -1472,3 +1472,8 @@ mostrando no erro exatamente o texto esperado dentro do texto real.
 **Os textos estáticos dos cards foram removidos**, não só ignorados: com o tour descrevendo cada gesto,
 manter `pauseHint` no card seria a duplicação que o MODO-03 manda evitar. `pauseHintFor` segue vivo para
 a aba Sobrepor e a Docs.
+
+**Ajuste pós-A32 (mesmo dia)**: o título da barra de navegação cortava nos roteiros de atalho —
+"2 toques · Retrair / expa…". Só apareceu no aparelho do Yan, porque no golden o roteiro corrente é
+"Gravar e parar", que cabe. Passou a duas linhas. A árvore de acessibilidade sempre teve o texto
+inteiro, então nenhum instrumentado acusaria: era truncamento de PIXEL, não de dado.

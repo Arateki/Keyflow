@@ -370,8 +370,12 @@ private fun TourNav(tag: String, title: String, onPrev: () -> Unit, onNext: () -
             fontFamily = SpaceMono,
             fontSize = 7.5.sp,
             textAlign = TextAlign.Center,
-            maxLines = 1,
+            // Duas linhas: os títulos dos atalhos ("2 toques · Retrair / expandir teclado") não cabem
+            // em uma na largura do card, e cortados viram "Retrair / expa…" — o rótulo perde o sentido
+            // justamente nos gestos que a pessoa configurou (visto no A32 do Yan, 2026-09-09).
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
+            lineHeight = 9.5.sp,
             modifier = Modifier.weight(1f).testTag("$tag-title"),
         )
         Arrow("›", "próximo gesto", "$tag-next", onNext)
