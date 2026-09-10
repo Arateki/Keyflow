@@ -1,7 +1,7 @@
 # Gesture Tour — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (T1–T6)
-**Status**: Em execução — GT-T1..T6 concluídas (2026-09-09). Próxima: GT-T7 (aba Docs).
+**Status**: Em execução — GT-T1..T7 concluídas (2026-09-09). Próxima: GT-T9 (índice/detalhes/feedback na Docs) ou GT-T10 (onboarding, paralela).
 
 > Gate no sandbox: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon <task>`
 > Instrumentado escopado: `ANDROID_SERIAL=emulator-5554`. Antes de instalar no device do Yan:
@@ -110,7 +110,7 @@ do motor; o resto serializa no device (TESTING.md).
   `ModoPanel` verde (toggles/permissões intactos).
 - **Tests**: instrumented (camada `ui`) + unit (seleção de textos). **Gate**: `full`.
 
-### GT-T7 — Aba Docs atualizada `[P]`
+### GT-T7 — Aba Docs atualizada `[P]` ✅ CONCLUÍDA (2026-09-09)
 - **What**: revisar `DocsPanel` (Modos/Pausa): cancelar/desfazer, atalhos de rajada, PTT com
   janela de release, controles da notificação — alinhado às descrições dos roteiros (DOC-01).
 - **Where**: `ui/config/DocsPanel.kt`.

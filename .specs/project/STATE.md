@@ -1497,3 +1497,21 @@ renderiza) e tornaria o golden não-determinístico. Vindo do relógio do tour, 
 qualquer efeito contínuo que entrar nesta tela.
 
 Os testes que codificavam o autoplay foram reescritos para o contrato novo, não removidos.
+
+## gesture-tour — GT-T7 (2026-09-09)
+
+Aba Docs alinhada ao app que existe. DOC-01 → Implemented. 297 unitários, 191 instrumentados (+2),
+goldens `config-docs` regenerados.
+
+**O texto dos atalhos estava factualmente errado**, não apenas incompleto: dizia "um toque único grava;
+três toques abrem o seletor de teclado" e não mencionava os 2 toques. Os defaults reais são 1 sem atalho
+(e só existe no Push-to-talk), 2 = retrair/expandir, 3 = trocar de teclado, com política de excedente
+configurável. Reescrito a partir do código (`Settings`, `resolveShortcut`), não do texto antigo.
+
+Seções novas: **Cancelar e desfazer** (janela de 3s, desfazer devolve PAUSED) e **Notificação de
+gravação** (pausar/retomar, enviar, cancelar; durante o cancelamento viram concluir/desfazer). Números
+e comportamentos conferidos em `OverlayService.cancelWindowMs` e `RecordingNotification`.
+
+**`testTag` numa seção não funde o texto dos filhos** — `assertTextContains` no nó da seção falha mesmo
+com o texto na tela. A asserção de conteúdo vai no nó do texto (`onNodeWithText(..., substring = true)`);
+a tag serve para existência e rolagem.

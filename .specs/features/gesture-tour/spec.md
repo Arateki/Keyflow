@@ -220,7 +220,7 @@ o "?" da Sobreposição fecha a do Microfone e abre a dela; TalkBack lê o conte
 | MODO-03 | P1-C | GT-T6 | Implemented |
 | MODO-04 | P1-C | GT-T5, GT-T6 | Implemented |
 | MODO-05 | P1-C | GT-T8 | In Tasks |
-| DOC-01 | P2-D | GT-T7 | In Tasks |
+| DOC-01 | P2-D | GT-T7 | Implemented |
 | DOC-02 | P2-D | GT-T9 | In Tasks |
 | DOC-03 | P2-D | GT-T9 | In Tasks |
 | DOC-04 | P2-D | GT-T9 | In Tasks |

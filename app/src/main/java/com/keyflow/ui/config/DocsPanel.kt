@@ -24,6 +24,9 @@ import com.keyflow.ui.theme.SpaceGrotesk
 import com.keyflow.ui.theme.SpaceMono
 
 const val DOCS_PAUSE_TAG = "docs-pausa"
+const val DOCS_SHORTCUTS_TAG = "docs-atalhos"
+const val DOCS_CANCEL_TAG = "docs-cancelar"
+const val DOCS_NOTIFICATION_TAG = "docs-notificacao"
 
 /**
  * Aba Docs (MON-01 / REC-07): "Como funciona" (3 passos), e seções Modos, Privacidade, Créditos e
@@ -57,7 +60,18 @@ fun DocsPanel(modifier: Modifier = Modifier) {
         )
         Section(
             "Atalhos por toques",
-            "Na orbe, um toque único grava; três toques abrem o seletor de teclado. Toques rápidos seguidos contam como um só atalho — então cliques a mais por engano (ex.: 4) caem no atalho mais próximo abaixo (abre o seletor) e nunca disparam uma gravação acidental. A gravação só começa em um toque único e deliberado.",
+            "Tocar a orbe em rajada aciona atalhos que você escolhe na aba Sobrepor. De fábrica, 2 toques retraem ou expandem o teclado e 3 trocam o teclado do sistema. O atalho de 1 toque só existe no modo Push-to-talk — no modo Alternar o toque já é a própria gravação. Toques além do máximo caem no atalho ativo de menos toques mais próximo, ou não fazem nada, conforme sua escolha na mesma aba.",
+            tag = DOCS_SHORTCUTS_TAG,
+        )
+        Section(
+            "Cancelar e desfazer",
+            "Arraste a orbe até o alvo para cancelar a gravação. O áudio não é descartado na hora: fica guardado por 3 segundos, com um banner de Desfazer na tela — desfazer devolve a gravação pausada, de onde parou. Sem ação nesses 3 segundos, o áudio é descartado. Pela notificação, o mesmo cancelamento tem os botões de concluir agora ou desfazer.",
+            tag = DOCS_CANCEL_TAG,
+        )
+        Section(
+            "Notificação de gravação",
+            "Enquanto o Modo Sobrepor grava, a notificação traz três controles: pausar e retomar, enviar (encerra e entrega o texto) e cancelar. Durante os 3 segundos do cancelamento, eles viram concluir o descarte e desfazer.",
+            tag = DOCS_NOTIFICATION_TAG,
         )
         Section(
             "Privacidade",
