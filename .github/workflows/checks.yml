@@ -71,6 +71,15 @@ jobs:
             -keypass android -alias androiddebugkey -dname "CN=Android Debug,O=Android,C=US" \
             -keyalg RSA -keysize 2048 -validity 10000
       - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+      # O AVD pede ~7,2 GB livres só para a partição de dados, e o build roda depois disso no mesmo
+      # disco. Medido em 2026-09-24: 7,1 GB livres na imagem → emulador abortou antes do boot. Tira
+      # toolchains que o projeto não usa (o SDK Android fica); o `df` antes/depois fica no log.
+      - name: Free disk space
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/.ghcup /opt/ghc /opt/hostedtoolcache/CodeQL \
+            /usr/share/swift /usr/local/share/boost /usr/local/share/powershell /usr/local/julia*
+          df -h /
       # Sem KVM o emulador cai para emulação por software (TCG) e a suíte vira horas de timeouts —
       # medido no sandbox da nuvem em 2026-09-24. Aqui KVM é requisito: falta dele é falha.
       # ImageMagick: `compare` do diff-screens.sh.
