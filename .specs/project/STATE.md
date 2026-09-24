@@ -1668,3 +1668,21 @@ e interpolação linear ao aumentar). Gravação passou a **16 kHz** (`AudioReco
 - Contar cruzamentos por zero no áudio decodificado dava 564 Hz num tom de 440: o priming/padding do
   AAC tem um chiado baixo que cruza o zero várias vezes. O teste usa histerese (±0,1) e mede entre a
   primeira e a última virada — 440,0 Hz nas duas fixtures.
+
+## native-voice-models — NM-T6 (2026-09-24)
+
+`ModelDownloader` sobre o `DownloadManager`, atrás de `DownloadGateway` (interface fina; o
+`SystemDownloadGateway` traduz status/motivo de pausa do Android para enums próprios, e pedido que
+sumiu do sistema volta como FAILED). `start` faz as pré-checagens em `DownloadPolicy` (já instalado,
+1 por vez, espaço, rede medida exige `allowMetered`) e enfileira 1 pedido por arquivo em
+`externalFilesDir/model-tmp/<id>/`, gravando `downloads.json` com os ids — é ele que marca "download em
+curso" e sobrevive à morte do app. `progress(id)` é polling de 500 ms enquanto houver coletor;
+arquivo concluído conta inteiro, falha em qualquer um é falha do modelo. `cancel` remove os pedidos e
+apaga o tmp. Se um `enqueue` falha no meio, os já enfileirados são removidos.
+
+**SPEC_DEVIATION**: espaço exigido ×2,2 no mesmo volume (baixa no externo e copia para o interno),
+×1,2 em volumes separados — anotado na task.
+
+12 unitários (fakes de gateway e de volume); 2 instrumentados com MockWebServer no próprio device
+(`localhost`): arquivo pequeno chega a FILES_DONE no `model-tmp`; corpo com banda limitada cancelado no
+meio não deixa pedido nem parcial. Rodam no CI.

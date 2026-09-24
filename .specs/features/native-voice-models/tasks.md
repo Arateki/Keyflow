@@ -1,7 +1,7 @@
 # Native Voice Models — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (G1–G11)
-**Status**: Em execução — NM-T1..T5 escritas (2026-09-24); instrumentados/goldens de T2, T4 e T5 validados pelo CI. Próxima: NM-T6.
+**Status**: Em execução — NM-T1..T6 escritas (2026-09-24); instrumentados de T2/T4/T5/T6 e goldens `config-voz-*` aguardando a rodada do CI. Próxima: NM-T7.
 
 > Gate no sandbox: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon <task>`
 > Instrumentado escopado: `ANDROID_SERIAL=emulator-5554`. Antes de instalar no device do Yan:
@@ -105,7 +105,12 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
 
 ## Fase C — Download
 
-### NM-T6 — `ModelDownloader`: iniciar/progresso/cancelar + políticas
+### NM-T6 — `ModelDownloader`: iniciar/progresso/cancelar + políticas ✅ CONCLUÍDA (2026-09-24; instrumentado via CI)
+> **SPEC_DEVIATION (espaço, DLM-05)**: o DownloadManager só grava no armazenamento externo do app e o
+> modelo depois é **copiado** para o interno (NM-T4). No mesmo volume (quase todo aparelho: o externo
+> emulado é uma pasta de `/data`) o modelo existe duas vezes por um instante — a checagem exige
+> **×2,2** do tamanho, não ×1,2. Em volumes separados (SD adotado), ×1,2 em cada um. Mesmo volume ⇔
+> mesmo `totalSpace`.
 - **What**: wrapper do `DownloadManager` — `start(spec, allowMetered)` (pré-checagens: espaço
   ×1,2 DLM-05; 1 por vez DLM-06; metered exige flag do caller DLM-04) enfileirando 1 request por
   arquivo p/ `externalFilesDir/model-tmp/<id>/` + `downloads.json` (request-ids);

@@ -185,14 +185,14 @@ o texto completo com a edição preservada; buffer some.
 | CAT-01 | P1-B | NM-T3 | Implemented |
 | CAT-02 | P1-B | NM-T3 | Implemented |
 | CAT-03 | P1-B | NM-T10 | In Tasks |
-| DLM-01 | P1-B | NM-T6 | In Tasks |
+| DLM-01 | P1-B | NM-T6 | Implementing |
 | DLM-02 | P1-B | NM-T7 | In Tasks |
 | DLM-03 | P1-B | NM-T4 | Implemented |
-| DLM-04 | P1-B | NM-T6 | In Tasks |
-| DLM-05 | P1-B | NM-T6 | In Tasks |
-| DLM-06 | P1-B | NM-T6 | In Tasks |
+| DLM-04 | P1-B | NM-T6 | Implementing |
+| DLM-05 | P1-B | NM-T6 | Implementing |
+| DLM-06 | P1-B | NM-T6 | Implemented |
 | DLM-07 | P1-B | NM-T7 | In Tasks |
-| DLM-08 | P1-B | NM-T6 | In Tasks |
+| DLM-08 | P1-B | NM-T6 | Implementing |
 | MGR-01 | P1-C | NM-T2, NM-T10 | Implementing |
 | MGR-02 | P1-C | NM-T10 | In Tasks |
 | MGR-03 | P1-C | NM-T10 | In Tasks |

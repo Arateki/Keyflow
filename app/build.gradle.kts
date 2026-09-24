@@ -162,4 +162,6 @@ dependencies {
     androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
     androidTestImplementation("androidx.test.uiautomator:uiautomator:2.4.0")
     androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    // Servidor HTTP local para o DownloadManager real baixar no instrumentado (NM-T6/T7).
+    androidTestImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
 }
