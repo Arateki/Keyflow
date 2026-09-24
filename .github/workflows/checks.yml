@@ -1,0 +1,110 @@
+name: Checks
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  merge_group:
+  workflow_dispatch:
+permissions:
+  contents: read
+# Um push novo no mesmo PR cancela a rodada anterior: o job de device leva dezenas de minutos e o
+# repositório é privado (minutos contam).
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  unit:
+    name: Unit tests and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+      # gradle.properties fixa org.gradle.java.home no caminho da máquina do Yan; o runner aponta o
+      # mesmo caminho para o JDK 17 instalado acima em vez de mexer no arquivo versionado.
+      # app/build.gradle.kts assina o debug com a keystore de ~/.config/.android (caminho fixo).
+      - name: JDK path and debug keystore
+        run: |
+          sudo ln -sfn "$JAVA_HOME" /usr/lib/jvm/java-17-openjdk
+          mkdir -p ~/.config/.android
+          keytool -genkeypair -keystore ~/.config/.android/debug.keystore -storepass android \
+            -keypass android -alias androiddebugkey -dname "CN=Android Debug,O=Android,C=US" \
+            -keyalg RSA -keysize 2048 -validity 10000
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+      - name: Unit tests and APKs
+        run: ./gradlew --no-daemon testDebugUnitTest assembleDebug assembleDebugAndroidTest
+      - name: Unit test evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: unit-evidence
+          path: app/build/reports/tests/
+          if-no-files-found: warn
+          retention-days: 14
+
+  device:
+    name: Instrumented and screenshots (API 34)
+    needs: unit
+    runs-on: ubuntu-24.04
+    # Medido: nenhuma rodada ainda neste runner. Referência local (KVM): suíte ~30 min + galeria
+    # ~10 min. Folga para boot e para a 1ª rodada; ajustar depois de medir.
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: JDK path and debug keystore
+        run: |
+          sudo ln -sfn "$JAVA_HOME" /usr/lib/jvm/java-17-openjdk
+          mkdir -p ~/.config/.android
+          keytool -genkeypair -keystore ~/.config/.android/debug.keystore -storepass android \
+            -keypass android -alias androiddebugkey -dname "CN=Android Debug,O=Android,C=US" \
+            -keyalg RSA -keysize 2048 -validity 10000
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+      # Sem KVM o emulador cai para emulação por software (TCG) e a suíte vira horas de timeouts —
+      # medido no sandbox da nuvem em 2026-09-24. Aqui KVM é requisito: falta dele é falha.
+      # ImageMagick: `compare` do diff-screens.sh.
+      - name: KVM and screenshot tooling
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          test -c /dev/kvm
+          sudo apt-get update
+          sudo apt-get install -y imagemagick
+      # Mesmo AVD da referência local (Pixel 6, API 34, google_apis x86_64). Sem -noaudio: os testes
+      # de gravação (audio.*, OverlayServiceCancelTest, seletor do mic) precisam de microfone.
+      - name: Device gate on the emulator
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          cores: 2
+          ram-size: 4096M
+          disk-size: 6G
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-boot-anim -camera-back none
+          disable-animations: true
+          script: scripts/ci-device-gate.sh
+      - name: Device evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: device-evidence
+          path: |
+            app/build/ci-evidence/
+            app/build/reports/androidTests/
+            app/build/outputs/androidTest-results/
+          if-no-files-found: warn
+          retention-days: 14
