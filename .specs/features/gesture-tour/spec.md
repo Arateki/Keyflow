@@ -219,17 +219,17 @@ o "?" da Sobreposição fecha a do Microfone e abre a dela; TalkBack lê o conte
 | MODO-02 | P1-C | GT-T6 | Implemented |
 | MODO-03 | P1-C | GT-T6 | Implemented |
 | MODO-04 | P1-C | GT-T5, GT-T6 | Implemented |
-| MODO-05 | P1-C | GT-T8 | In Tasks |
+| MODO-05 | P1-C | GT-T8 | Implemented |
 | DOC-01 | P2-D | GT-T7 | Implemented |
-| DOC-02 | P2-D | GT-T9 | In Tasks |
-| DOC-03 | P2-D | GT-T9 | In Tasks |
-| DOC-04 | P2-D | GT-T9 | In Tasks |
-| DOC-05 | P2-D | GT-T9 | In Tasks |
-| DOC-06 | P2-D | GT-T9 | In Tasks |
-| PERM-01 | P2-E | GT-T10 | In Tasks |
-| PERM-02 | P2-E | GT-T10 | In Tasks |
-| PERM-03 | P2-E | GT-T10 | In Tasks |
-| PERM-04 | P2-E | GT-T10 | In Tasks |
+| DOC-02 | P2-D | GT-T9 | Implemented |
+| DOC-03 | P2-D | GT-T9 | Implemented |
+| DOC-04 | P2-D | GT-T9 | Implemented |
+| DOC-05 | P2-D | GT-T9 | Implemented |
+| DOC-06 | P2-D | GT-T9 | Implemented |
+| PERM-01 | P2-E | GT-T10 | Implemented |
+| PERM-02 | P2-E | GT-T10 | Implemented |
+| PERM-03 | P2-E | GT-T10 | Implemented |
+| PERM-04 | P2-E | GT-T10 | Implemented |
 
 **Coverage:** 27 total, 27 mapeados em tasks, 0 sem mapa.
 **Status values:** Pending → In Design → In Tasks → Implementing → Verified.
@@ -240,9 +240,9 @@ o "?" da Sobreposição fecha a do Microfone e abre a dela; TalkBack lê o conte
 
 - [ ] Abrir a aba Modo: os 2 cards rodam o tour em loop, fluido, no tema atual; setas e descrição sincronizadas.
 - [ ] Trocar TOGGLE→PTT e os atalhos de rajada: o tour reflete a nova config sem release.
-- [ ] Demo do teclado mostra a grade Canvas nova.
-- [ ] Reuso comprovado: uma rota de galeria toca um subconjunto de roteiros fora da aba Modo (prova do isolamento).
-- [ ] Goldens determinísticos (clock congelado) verdes em claro/escuro; suíte existente do ModoPanel verde.
+- [x] Demo do teclado mostra a grade Canvas nova (golden `tour-keyboard-mic`).
+- [x] Reuso comprovado: uma rota de galeria toca um subconjunto de roteiros fora da aba Modo (prova do isolamento) — rotas `tour-*` (GT-T8).
+- [x] Goldens determinísticos (clock congelado) verdes em claro/escuro; suíte existente do ModoPanel verde.
 - [ ] Fluidez validada no Galaxy A32 (sem jank perceptível com os 2 tours rodando).
-- [ ] Docs: índice leva a qualquer seção num toque; "Reportar bug" abre o e-mail com diagnóstico preenchido.
-- [ ] Apresentação: cada permissão explica o porquê ao tocar o "?"; onboarding existente segue verde.
+- [x] Docs: índice leva a qualquer seção num toque; "Reportar bug" abre o e-mail com diagnóstico preenchido (intent verificado; sem app de e-mail → aviso, visto no emulador).
+- [x] Apresentação: cada permissão explica o porquê ao tocar o "?"; onboarding existente segue verde.
