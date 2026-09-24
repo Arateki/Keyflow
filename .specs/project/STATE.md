@@ -1606,3 +1606,23 @@ que a máquina do Yan:
   GT-T6 cada quadro da aba Modo desenha dois tours, e 2 s de parede não chegavam a 25 quadros num
   runner de 2 núcleos (nem no sandbox). Correção: avançar o relógio de teste por
   `AUTO_PERMISSION_DELAY_MS` (agora `internal`) e afirmar em `runOnIdle` — igual em qualquer máquina.
+
+## native-voice-models — NM-T1 (2026-09-24)
+
+sherpa-onnx **1.13.8** no build. 306 unitários (+2: `SherpaOnnxLinkTest` monta as configs de Whisper e
+transducer — só classes Kotlin, sem carregar o nativo).
+
+- **Distribuição**: o único artefato Android oficial é o `sherpa-onnx-1.13.8.aar` anexado ao release
+  do GitHub (SHA256 `633c2432…bd96`, 50 MB, `minSdk 21`). O `com.github.k2-fsa:sherpa-onnx` do JitPack
+  é o jar Java de desktop, sem `.so` Android. O espelho `csukuangfj2/sherpa-onnx-libs` no HF tem
+  **outro SHA para o mesmo nome** — é regravado a cada push do upstream, não a cada tag. Não usar.
+- **SPEC_DEVIATION (rota)**: em vez de versionar 50 MB em `app/libs/`, o `app/build.gradle.kts` baixa o
+  AAR da versão fixada quando falta e confere o SHA256 (divergência derruba o build); `app/libs/*.aar`
+  no `.gitignore`. Roda na configuração porque o sync do Android Studio resolve o classpath antes das
+  tasks. No Kotlin DSL, `java.*` é sombreado pela extensão `java` do projeto — imports no topo.
+- **ABIs**: debug = arm64-v8a + armeabi-v7a + x86_64 (emulador); release = só ARM. O x86 de 32 bits do
+  AAR fica fora dos dois. Peso por ABI no APK: arm64 +30,5 MB, v7a +21,3 MB, x86_64 +34,5 MB. APK
+  release (2 ABIs ARM) = 61 MB; pela Play (AAB) cada aparelho leva só a sua.
+- **16 KB (adiantando a NM-T12)**: os 16 `.so` do AAR têm segmentos LOAD alinhados a 16384 e o APK
+  release passa `zipalign -c -P 16`. A task de loja formaliza o script.
+- "Unable to strip …" no build = sem NDK instalado; os `.so` do upstream já vêm sem símbolos.

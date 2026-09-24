@@ -45,7 +45,7 @@
 | M6 | `shortcut-bars` | ✅ concluído (SB-T1..T10; manual do Yan no A32 confirmado em 2026-09-09) |
 | — | Ajustes pós-uso no A32 (Q8 + emendas) | ✅ dimensionamento em paisagem, modais dos editores, crash das prefs cifradas — ver Bloco 1 |
 | — | `gesture-tour` | GT-T1..T10 feitos (2026-09-24); falta só o manual do GT-T8 no A32 **[YAN]** |
-| — | `native-voice-models` | spec/design/tasks prontos (Draft) — nada implementado |
+| — | `native-voice-models` | em execução — NM-T1 (AAR sherpa-onnx) feito (2026-09-24); próxima NM-T2 |
 | — | `vision-capture` | spec/design/tasks prontos (Draft) — nada implementado |
 | M7 | `keyflow-api` + `monetization` | specs/designs/tasks prontos (Draft) — nada implementado |
 | M8 | `theme-system` | spec/design/tasks prontos (Draft; ⚠️ S3/S4/S5 a validar) |

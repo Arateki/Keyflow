@@ -1,7 +1,7 @@
 # Native Voice Models — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (G1–G11)
-**Status**: Draft (aguardando aprovação do Yan)
+**Status**: Em execução — NM-T1 concluída (2026-09-24). Próxima: NM-T2.
 
 > Gate no sandbox: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon <task>`
 > Instrumentado escopado: `ANDROID_SERIAL=emulator-5554`. Antes de instalar no device do Yan:
@@ -32,7 +32,11 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
 
 ## Fase A — Fundação
 
-### NM-T1 — AAR sherpa-onnx no build
+### NM-T1 — AAR sherpa-onnx no build ✅ CONCLUÍDA (2026-09-24)
+> **SPEC_DEVIATION (rota)**: nem `libs/` versionado nem `mavenLocal`. O AAR (v1.13.8, 50 MB, só existe
+> como anexo do release do GitHub — o JitPack é o jar de desktop) é **baixado pelo próprio
+> `app/build.gradle.kts` quando falta em `app/libs/` e conferido contra o SHA256 fixado**; o binário fica
+> fora do git. Mesmo efeito do `files("libs/…")` do design, sem 50 MB por versão no histórico.
 - **What**: integrar o AAR oficial (≥1.13.x) no app module — rota `libs/` + `files(...)` ou
   `mavenLocal` (documentar a vencedora p/ AGP 9.2); conferir minSdk ≤ 24 e ABIs presentes
   (arm64-v8a, armeabi-v7a, x86_64); smoke de link (classe do sherpa referenciada compila e o APK

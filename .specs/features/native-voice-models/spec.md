@@ -201,7 +201,7 @@ o texto completo com a edição preservada; buffer some.
 | MGR-06 | P1-C | NM-T10 | In Tasks |
 | MGR-07 | P1-C | NM-T11 | In Tasks |
 | STO-01 | P2-D | NM-T12 | In Tasks |
-| STO-02 | P2-D | NM-T1, NM-T12 | In Tasks |
+| STO-02 | P2-D | NM-T1, NM-T12 | Implementing |
 | STO-03 | P2-D | NM-T12 | In Tasks |
 | PAR-01 | P2-E | NM-T14 | In Tasks |
 | PAR-02 | P2-E | NM-T15 | In Tasks |
