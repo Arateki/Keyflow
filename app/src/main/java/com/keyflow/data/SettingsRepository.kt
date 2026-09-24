@@ -131,6 +131,9 @@ class SettingsRepository(
     fun flow(): Flow<Config> = settingsFlow().map { settings ->
         when (val eff = settings.effectiveConfigFor()) {
             is EffectiveConfig.Ready -> eff.config
+            // O engine local ainda não está ligado ao fluxo de gravação (NM-T9): até lá a origem Local
+            // se comporta como incompleta — Config vazio → CONFIG_MISSING, nunca rede.
+            is EffectiveConfig.Local -> Config()
             EffectiveConfig.Unavailable -> Config()
         }
     }
@@ -153,6 +156,8 @@ class SettingsRepository(
             groqToken = securePrefs.getString(GROQ_TOKEN, "").orEmpty(),
             groqModel = prefs[GROQ_MODEL] ?: Settings.GROQ_MODEL,
             groqLanguage = prefs[GROQ_LANGUAGE]?.takeIf { it.isNotBlank() },
+            localModelId = prefs[LOCAL_MODEL_ID]?.takeIf { it.isNotBlank() },
+            localLanguage = prefs[LOCAL_LANGUAGE]?.takeIf { it.isNotBlank() },
             overlayModeEnabled = prefs[OVERLAY_MODE_ENABLED] ?: false,
             keyboardModeEnabled = prefs[KEYBOARD_MODE_ENABLED] ?: false,
             overlayRecordingMode = prefs[OVERLAY_RECORDING_MODE].toRecordingMode(),
@@ -203,6 +208,8 @@ class SettingsRepository(
             settings.openaiLanguage.putOrRemove(prefs, OPENAI_LANGUAGE)
             prefs[GROQ_MODEL] = settings.groqModel
             settings.groqLanguage.putOrRemove(prefs, GROQ_LANGUAGE)
+            settings.localModelId.putOrRemove(prefs, LOCAL_MODEL_ID)
+            settings.localLanguage.putOrRemove(prefs, LOCAL_LANGUAGE)
             prefs[OVERLAY_MODE_ENABLED] = settings.overlayModeEnabled
             prefs[KEYBOARD_MODE_ENABLED] = settings.keyboardModeEnabled
             prefs[OVERLAY_RECORDING_MODE] = settings.overlayRecordingMode.name
@@ -304,6 +311,8 @@ class SettingsRepository(
         val OPENAI_LANGUAGE = stringPreferencesKey("openai_language")
         val GROQ_MODEL = stringPreferencesKey("groq_model")
         val GROQ_LANGUAGE = stringPreferencesKey("groq_language")
+        val LOCAL_MODEL_ID = stringPreferencesKey("local_model_id")
+        val LOCAL_LANGUAGE = stringPreferencesKey("local_language")
         val OVERLAY_MODE_ENABLED = booleanPreferencesKey("overlay_mode_enabled")
         val KEYBOARD_MODE_ENABLED = booleanPreferencesKey("keyboard_mode_enabled")
         val OVERLAY_RECORDING_MODE = stringPreferencesKey("overlay_recording_mode")

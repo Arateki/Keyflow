@@ -52,6 +52,19 @@ class VozPanelTest {
         rule.runOnIdle { assertEquals(TranscriptionSource.OPENAI, h.settings.source) }
     }
 
+    /** MGR-01 (parcial, NM-T2): "Local" é a 5ª opção; escolhida, mostra o painel dela, sem campos de token. */
+    @Test
+    fun localIsTheFifthSourceAndShowsItsPanel() {
+        val h = Harness(Settings(source = TranscriptionSource.CREDITS))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(sourceTag(TranscriptionSource.LOCAL)).assertIsDisplayed().performClick()
+
+        rule.runOnIdle { assertEquals(TranscriptionSource.LOCAL, h.settings.source) }
+        rule.onNodeWithTag(VOZ_LOCAL_PLACEHOLDER_TAG).assertIsDisplayed()
+        rule.onAllNodesWithTag(VOZ_TOKEN_TAG).assertCountEquals(0)
+    }
+
     @Test
     fun creditsShowsBalanceCard() {
         val h = Harness(Settings(source = TranscriptionSource.CREDITS))

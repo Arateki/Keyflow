@@ -108,6 +108,8 @@ class SettingsRepositoryTest {
             groqToken = "gsk-groq",
             groqModel = "whisper-large-v3",
             groqLanguage = "en",
+            localModelId = "whisper-base",
+            localLanguage = "pt",
             overlayRecordingMode = RecordingMode.PUSH_TO_TALK,
             overlaySide = OverlaySide.LEFT,
             orbSizePx = 250,
@@ -122,6 +124,20 @@ class SettingsRepositoryTest {
         repository.saveSettings(saved)
 
         assertEquals(saved, repository.settingsFlow().first())
+    }
+
+    /** NM-T2: sem modelo escolhido, os campos da origem Local voltam nulos — não string vazia. */
+    @Test
+    fun localSourceWithoutModelRoundTripsAsNull() = runTest {
+        val repository = newRepository()
+
+        repository.saveSettings(Settings(source = TranscriptionSource.LOCAL, localModelId = "whisper-base"))
+        repository.saveSettings(repository.settingsFlow().first().copy(localModelId = null))
+
+        val read = repository.settingsFlow().first()
+        assertEquals(TranscriptionSource.LOCAL, read.source)
+        assertEquals(null, read.localModelId)
+        assertEquals(null, read.localLanguage)
     }
 
     @Test

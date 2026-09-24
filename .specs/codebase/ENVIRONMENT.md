@@ -114,3 +114,14 @@ echo "sdk.dir=/root/Android/Sdk" > local.properties   # (+ .git/info/exclude)
   GIF de fluxo = sequência de `screencap` depois de cada ação.
 - **Toques por `uiautomator dump`** (texto/content-desc → bounds), nunca coordenada fixa; `&` vem
   como `&amp;` no XML. Arrastar devagar na galeria (imersiva) pode abrir a gaveta de notificações.
+
+### A partir da NM-T1 (sherpa-onnx), o emulador do sandbox não instala mais o app
+
+O APK debug passou a ~100 MB (`.so` do sherpa-onnx para arm64/v7a/x86_64). Sob TCG, instalar esse APK
+derruba o `system_server` ("Lost network stack" / "Can't find service: package") — 2 de 2 tentativas
+em 2026-09-24. **Instrumentados e goldens passam a ser feitos pelo CI** (runner com KVM):
+
+1. push da branch e disparo manual do workflow `Checks` nela (`workflow_dispatch`, sem precisar de PR);
+2. baixar o artefato `device-evidence` (`ci-evidence/screens/*.png` = o que o `verify-screens.sh`
+   capturou) — o print do CI é **byte a byte igual** ao golden quando nada mudou;
+3. revisar os PNGs que mudaram de propósito, copiar para `verification/golden/` e subir de novo.
