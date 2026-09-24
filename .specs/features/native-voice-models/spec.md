@@ -174,7 +174,7 @@ o texto completo com a edição preservada; buffer some.
 | ----------- | ----- | ---- | ------ |
 | NAT-01 | P1-A | NM-T9 | In Tasks |
 | NAT-02 | P1-A | NM-T5 | In Tasks |
-| NAT-03 | P1-A | NM-T2, NM-T9 | In Tasks |
+| NAT-03 | P1-A | NM-T2, NM-T9 | Implementing |
 | NAT-04 | P1-A | NM-T8, NM-T9 | In Tasks |
 | NAT-05 | P1-A | NM-T8, NM-T9 | In Tasks |
 | NAT-06 | P1-A | NM-T8 | In Tasks |
@@ -182,8 +182,8 @@ o texto completo com a edição preservada; buffer some.
 | NAT-08 | P1-A | NM-T8 | In Tasks |
 | NAT-09 | P1-A | NM-T9 | In Tasks |
 | PRV-01 | P1-A | NM-T9 | In Tasks |
-| CAT-01 | P1-B | NM-T3 | In Tasks |
-| CAT-02 | P1-B | NM-T3 | In Tasks |
+| CAT-01 | P1-B | NM-T3 | Implemented |
+| CAT-02 | P1-B | NM-T3 | Implemented |
 | CAT-03 | P1-B | NM-T10 | In Tasks |
 | DLM-01 | P1-B | NM-T6 | In Tasks |
 | DLM-02 | P1-B | NM-T7 | In Tasks |
@@ -193,7 +193,7 @@ o texto completo com a edição preservada; buffer some.
 | DLM-06 | P1-B | NM-T6 | In Tasks |
 | DLM-07 | P1-B | NM-T7 | In Tasks |
 | DLM-08 | P1-B | NM-T6 | In Tasks |
-| MGR-01 | P1-C | NM-T2, NM-T10 | In Tasks |
+| MGR-01 | P1-C | NM-T2, NM-T10 | Implementing |
 | MGR-02 | P1-C | NM-T10 | In Tasks |
 | MGR-03 | P1-C | NM-T10 | In Tasks |
 | MGR-04 | P1-C | NM-T10 | In Tasks |

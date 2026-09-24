@@ -1,7 +1,7 @@
 # Native Voice Models — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (G1–G11)
-**Status**: Em execução — NM-T1 concluída (2026-09-24). Próxima: NM-T2.
+**Status**: Em execução — NM-T1, NM-T2 (instrumentados/goldens no CI) e NM-T3 concluídas (2026-09-24). Próxima: NM-T4.
 
 > Gate no sandbox: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon <task>`
 > Instrumentado escopado: `ANDROID_SERIAL=emulator-5554`. Antes de instalar no device do Yan:
@@ -47,7 +47,7 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
   documentada em comentário no gradle. Registro do tamanho adicionado por ABI.
 - **Tests**: none (integração de build; sem camada de código nova). **Gate**: `build`.
 
-### NM-T2 — `TranscriptionSource.LOCAL` + Settings + `EffectiveConfig.Local`
+### NM-T2 — `TranscriptionSource.LOCAL` + Settings + `EffectiveConfig.Local` ✅ CONCLUÍDA (2026-09-24; goldens `config-voz-*` via CI)
 - **What**: novo valor no enum; `Settings` += `localModelId: String?`/`localLanguage: String?`
   (persistidos no repo); `EffectiveConfig.Local(modelId, language)`; `effectiveConfigFor(LOCAL)`
   → `Local` quando há modelo, senão o caminho que produz `CONFIG_MISSING` (NAT-03). Branch
@@ -62,7 +62,11 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
   não quebra `when`s).
 - **Tests**: unit + instrumented (camada `data`). **Gate**: `full`.
 
-### NM-T3 — `ModelCatalog` embutido (3 modelos, dados reais) `[P]`
+### NM-T3 — `ModelCatalog` embutido (3 modelos, dados reais) `[P]` ✅ CONCLUÍDA (2026-09-24)
+> **SPEC_DEVIATION (pequenas, a favor do engine/downloader)**: `ModelFile` ganhou `role: FileRole`
+> (ENCODER/DECODER/JOINER/TOKENS — o engine monta a config por papel, não pelo nome do arquivo);
+> `languages` é o texto de exibição (`"99 idiomas"`), não lista; URLs fixadas no **commit** do repo HF
+> em vez de `main` (o SHA do catálogo continua valendo mesmo se o upstream mexer no arquivo — G5).
 - **What**: `EngineType`/`ModelFile`/`ModelSpec` + `Catalog.MODELS` com **Whisper base int8**,
   **Whisper small int8**, **Parakeet TDT 0.6B v3 int8** — URLs/SHA256/bytes **reais conferidos**
   nos repos HF upstream (csukuangfj; o HF expõe sha256 dos blobs LFS — não fabricar), summary,

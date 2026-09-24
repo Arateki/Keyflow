@@ -1626,3 +1626,19 @@ transducer — só classes Kotlin, sem carregar o nativo).
 - **16 KB (adiantando a NM-T12)**: os 16 `.so` do AAR têm segmentos LOAD alinhados a 16384 e o APK
   release passa `zipalign -c -P 16`. A task de loja formaliza o script.
 - "Unable to strip …" no build = sem NDK instalado; os `.so` do upstream já vêm sem símbolos.
+
+## native-voice-models — NM-T2 e NM-T3 (2026-09-24)
+
+**NM-T2**: `TranscriptionSource.LOCAL` (5ª opção da aba Voz), `Settings.localModelId/localLanguage`
+(nulos quando vazios), `EffectiveConfig.Local`. Sem modelo → `Unavailable` → `CONFIG_MISSING`
+(NAT-03). Com modelo, até a NM-T9 o `SettingsRepository.flow()` entrega `Config()` vazio: a origem
+se comporta como incompleta e **nunca toca a rede**. Painel provisório na aba Voz diz isso.
+Instrumentados (`SettingsRepositoryTest`, `VozPanelTest`) e goldens `config-voz-*` (seletor com 5
+opções) validados pelo CI — o emulador do sandbox não instala mais o APK de 100 MB.
+
+**NM-T3**: catálogo com os 3 modelos, dados **conferidos na API do HF** (tamanhos + `oid` do LFS =
+SHA256 — confirmado baixando o decoder do Parakeet; `tokens.txt` fora do LFS, SHA calculado
+baixando). Totais: Whisper base int8 160,6 MB · small int8 375,5 MB · Parakeet v3 int8 670,5 MB.
+URLs fixadas no commit do repo (não `main`) e todas respondem 206 a pedido de faixa (retomada do
+DownloadManager). Os dois Whisper multilíngues têm o mesmo `tokens.txt`. `recommendedRamMb`
+(512/1024/2048) é estimativa — medir no A32 na NM-T13. 9 unitários de integridade.
