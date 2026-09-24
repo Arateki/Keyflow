@@ -174,11 +174,13 @@ class ConfigScreenTest {
         rule.setContent { h.Content() }
 
         rule.onNodeWithTag(TOGGLE_OVERLAY_MODE_TAG).performClick()
+        advancePastAutoPermissionDelay()
 
-        // `runOnIdle` já resolve o delay do LaunchedEffect (o clock de teste do Compose avança sozinho
-        // até ficar ocioso) — então só dá pra provar a ORDEM: sobrepor primeiro, notificações ainda não.
-        rule.waitUntil(timeoutMillis = 2000) { h.overlayPermissionRequests == 1 }
-        assertEquals(0, h.notificationPermissionRequests)
+        // Só dá pra provar a ORDEM: sobrepor primeiro, notificações ainda não.
+        rule.runOnIdle {
+            assertEquals(1, h.overlayPermissionRequests)
+            assertEquals(0, h.notificationPermissionRequests)
+        }
     }
 
     /**
@@ -193,8 +195,19 @@ class ConfigScreenTest {
         rule.setContent { h.Content() }
 
         rule.onNodeWithTag(TOGGLE_OVERLAY_MODE_TAG).performClick()
+        advancePastAutoPermissionDelay()
 
-        rule.waitUntil(timeoutMillis = 2000) { h.notificationPermissionRequests == 1 }
+        rule.runOnIdle { assertEquals(1, h.notificationPermissionRequests) }
+    }
+
+    /**
+     * O pedido automático sai [AUTO_PERMISSION_DELAY_MS] depois do toggle, no relógio do Compose. Esperar
+     * isso em tempo real (`waitUntil(2000)`) dependia de quantos quadros a máquina desenha por segundo: a
+     * aba Modo passou a ter dois tours animados e, num runner de CI de 2 núcleos, 2 s de relógio de parede
+     * não chegavam a 400 ms de relógio de teste. Avançar o relógio de teste é igual em qualquer máquina.
+     */
+    private fun advancePastAutoPermissionDelay() {
+        rule.mainClock.advanceTimeBy(AUTO_PERMISSION_DELAY_MS + FRAME_MS)
     }
 
     /** O microfone nunca bloqueia: com só ele pendente, o Modo Sobrepor liga sem abrir nada sozinho. */
@@ -236,5 +249,10 @@ class ConfigScreenTest {
 
         rule.onNodeWithTag(UNLOCK_CLOSE_TAG).performClick()
         rule.onAllNodesWithTag(UNLOCK_SHEET_TAG).assertCountEquals(0)
+    }
+
+    private companion object {
+        /** Um quadro do relógio de teste do Compose — folga para o efeito rodar depois do atraso. */
+        const val FRAME_MS = 16L
     }
 }

@@ -1587,3 +1587,22 @@ por `am instrument` direto, em blocos, porque o `connectedDebugAndroidTest` inte
 - Nenhum desses toca código desta feature; a última suíte completa verde é a de 2026-09-09 (A32 e
   emulador KVM). **Rodar `ime`/`audio`/`overlay` no A32 ou num emulador com KVM** antes do próximo
   release.
+
+## CI — 1ª rodada do workflow Checks (PR #2, 2026-09-24)
+
+Runner `ubuntu-24.04` (x86_64, 2 núcleos) **com KVM**: emulador de pé em ~2 min, 201 instrumentados em
+27 min, galeria 78/78 com **0 px** — inclusive `shortcut-key-picker`/`grids-editor-modal`/
+`bar-grid-revealed`, que não batiam no sandbox sem KVM (lá a barra de status tinha outra altura; o
+AVD do runner reproduz o de referência). Unitários + APKs: 5m40s. Job de device inteiro: ~46 min.
+
+**198/201.** As 3 falhas eram de teste, não de app, e só aparecem em aparelho "frio" ou mais lento
+que a máquina do Yan:
+- `BarViewAccessibilityTest.singleKeyButton…`: é o **primeiro** teste da rodada que sobe o IME (27
+  testes antes, nenhum abre teclado); o seguinte, na mesma classe, passou. A 1ª subida do IME num
+  aparelho recém-ligado passou dos 5 s da espera "não anexou". Correção: essa espera (e só ela), nas
+  10 classes de teclado, usa `IME_COLD_ATTACH_TIMEOUT_MS` (30 s; retorna assim que anexa).
+- `ConfigScreenTest.overlayModeToggle*` (2): esperavam em **tempo real** (`waitUntil(2000)`) um efeito
+  que roda 400 ms depois no **relógio de teste**. Cada volta do `waitUntil` avança um quadro; desde a
+  GT-T6 cada quadro da aba Modo desenha dois tours, e 2 s de parede não chegavam a 25 quadros num
+  runner de 2 núcleos (nem no sandbox). Correção: avançar o relógio de teste por
+  `AUTO_PERMISSION_DELAY_MS` (agora `internal`) e afirmar em `runOnIdle` — igual em qualquer máquina.
