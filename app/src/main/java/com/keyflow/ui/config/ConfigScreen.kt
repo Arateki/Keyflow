@@ -59,8 +59,9 @@ const val TOGGLE_OVERLAY_MODE_TAG = "toggle-overlay-mode"
 const val TOGGLE_KEYBOARD_MODE_TAG = "toggle-keyboard-mode"
 
 // Atraso entre o toast de "permissões pendentes" subir e a tela/diálogo da permissão abrir sozinha —
-// só o suficiente pro usuário ler o aviso antes da navegação tomar a tela.
-private const val AUTO_PERMISSION_DELAY_MS = 400L
+// só o suficiente pro usuário ler o aviso antes da navegação tomar a tela. `internal`: o teste avança o
+// relógio do Compose exatamente por ele, em vez de esperar em tempo real.
+internal const val AUTO_PERMISSION_DELAY_MS = 400L
 
 /**
  * Scaffold da configuração em abas (CFG-01..05): header (orbe, idioma inerte,

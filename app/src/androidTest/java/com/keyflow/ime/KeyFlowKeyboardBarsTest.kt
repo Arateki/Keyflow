@@ -255,7 +255,7 @@ class KeyFlowKeyboardBarsTest {
 
         device.wait(Until.hasObject(By.desc("ime_probe_field")), TIMEOUT)
         device.findObject(By.desc("ime_probe_field"))?.click()
-        waitUntil("KeyFlowKeyboardView não anexou") { KeyFlowKeyboardService.activeViewForTest != null }
+        waitUntil("KeyFlowKeyboardView não anexou", IME_COLD_ATTACH_TIMEOUT_MS) { KeyFlowKeyboardService.activeViewForTest != null }
         // A view precisa estar de fato na tela antes de medirmos retângulos de botões.
         waitUntil("KeyFlowKeyboardView não ficou visível") {
             KeyFlowKeyboardService.activeViewForTest?.isShown == true
