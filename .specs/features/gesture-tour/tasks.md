@@ -1,7 +1,7 @@
 # Gesture Tour — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (T1–T6)
-**Status**: Em execução — GT-T1..T7 concluídas (2026-09-09). Próxima: GT-T9 (índice/detalhes/feedback na Docs) ou GT-T10 (onboarding, paralela).
+**Status**: Em execução — GT-T1..T7 e GT-T9 concluídas (2026-09-24). Próxima: GT-T10 ("?" por permissão no onboarding), depois GT-T8 (fecho).
 
 > Gate no sandbox: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon <task>`
 > Instrumentado escopado: `ANDROID_SERIAL=emulator-5554`. Antes de instalar no device do Yan:
@@ -120,7 +120,7 @@ do motor; o resto serializa no device (TESTING.md).
   rota docs regenerado.
 - **Tests**: instrumented existente + screenshot. **Gate**: `full` + `screenshot`.
 
-### GT-T9 — Docs: índice + seções de detalhes + feedback
+### GT-T9 — Docs: índice + seções de detalhes + feedback ✅ CONCLUÍDA (2026-09-24)
 - **What**: refatorar `DocsPanel` para renderizar de uma lista `docsSections` (fonte única);
   **índice** após "Como funciona" com rolagem por âncora medida (`onGloballyPositioned` →
   `animateScrollTo`) — DOC-02; **seções novas** de detalhes (Gestos da orbe · Teclado KeyFlow ·

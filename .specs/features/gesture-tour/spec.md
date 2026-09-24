@@ -221,11 +221,11 @@ o "?" da Sobreposição fecha a do Microfone e abre a dela; TalkBack lê o conte
 | MODO-04 | P1-C | GT-T5, GT-T6 | Implemented |
 | MODO-05 | P1-C | GT-T8 | In Tasks |
 | DOC-01 | P2-D | GT-T7 | Implemented |
-| DOC-02 | P2-D | GT-T9 | In Tasks |
-| DOC-03 | P2-D | GT-T9 | In Tasks |
-| DOC-04 | P2-D | GT-T9 | In Tasks |
-| DOC-05 | P2-D | GT-T9 | In Tasks |
-| DOC-06 | P2-D | GT-T9 | In Tasks |
+| DOC-02 | P2-D | GT-T9 | Implemented |
+| DOC-03 | P2-D | GT-T9 | Implemented |
+| DOC-04 | P2-D | GT-T9 | Implemented |
+| DOC-05 | P2-D | GT-T9 | Implemented |
+| DOC-06 | P2-D | GT-T9 | Implemented |
 | PERM-01 | P2-E | GT-T10 | In Tasks |
 | PERM-02 | P2-E | GT-T10 | In Tasks |
 | PERM-03 | P2-E | GT-T10 | In Tasks |

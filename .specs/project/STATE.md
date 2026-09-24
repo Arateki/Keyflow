@@ -1515,3 +1515,32 @@ e comportamentos conferidos em `OverlayService.cancelWindowMs` e `RecordingNotif
 **`testTag` numa seção não funde o texto dos filhos** — `assertTextContains` no nó da seção falha mesmo
 com o texto na tela. A asserção de conteúdo vai no nó do texto (`onNodeWithText(..., substring = true)`);
 a tag serve para existência e rolagem.
+
+## gesture-tour — GT-T9 (2026-09-24)
+
+Docs com índice, seções de detalhe e feedback. DOC-02..06 → Implemented. 304 unitários (+7),
+instrumentados da Docs 8/8 (+5), goldens `config-docs[-dark]` regenerados. Primeira task feita no
+**sandbox da nuvem** (emulador sem KVM — ver `.specs/codebase/ENVIRONMENT.md`).
+
+- **Conteúdo virou dado**: `docsSections` (`DocSection` + `DocBlock.Paragraph/Labeled`) desenha a aba
+  e o índice. Tags viram `docs-<id>`, e as 4 antigas (`pausa/atalhos/cancelar/notificacao`) seguem
+  iguais — há unit fixando isso.
+- **Índice rola até a posição medida**: `positionInWindow` da seção menos a do viewport, somado ao
+  `scroll.value` atual — funciona com a aba já rolada (teste desce até Erros e volta para Atalhos).
+- **Seções novas**: Gestos da orbe (frases por modo vêm literalmente de `pauseHintFor`), Teclado
+  KeyFlow, Erros & tempo limite; Notificação ganhou "quando aparece"; Pausa deixou de repetir as frases
+  dos gestos e passou a dizer o que a pausa faz. Fatos conferidos no código: erro some em 2 s
+  (`ERROR_AUTO_DISMISS_MS`) e **não reenvia** o áudio (`pendingAudioFile = null` antes do resultado);
+  timeout de fábrica 15 s (`Config.DEFAULT_TIMEOUT_MS`); numérico por `isNumericInputType`.
+- **Feedback**: `ACTION_SENDTO mailto:` com assunto/corpo na URI **e** nos extras (cliente lê um ou
+  outro). `DocsPanel(sendFeedback = …)` deixa o teste capturar o intent. Sem app de e-mail → aviso com
+  o endereço; conferido no emulador de verdade (Gmail desabilitado) — o aviso nascia abaixo da dobra,
+  por isso o `BringIntoViewRequester`. **[YAN]**: `FEEDBACK_EMAIL` ficou com o e-mail dos commits
+  (`xyan.lucasx@live.com`); trocar se o canal de suporte for outro.
+- "?123" quebrava em "?" / "123" no texto corrido — `?⁠123` (word joiner).
+
+**Goldens fora do escopo que não batem aqui (NÃO aprovados)**: `shortcut-key-picker`,
+`grids-editor-modal` e `bar-grid-revealed` (claro/escuro) diferem porque são janelas (diálogo/popup)
+posicionadas pelas barras do sistema, e o AVD do Yan tem status bar de 128 px contra 63 px do AVD
+daqui — nenhuma emulação de recorte (`hole`=136, `corner/tall/double`=171) reproduz 128. Os outros 60
+PNGs pré-existentes batem (59 com 0 px; `orb-idle-dark` com 2 px, dentro do limiar). Continuar tratando essas 3 como "não verificáveis neste sandbox".

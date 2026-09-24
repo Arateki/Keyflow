@@ -64,3 +64,36 @@ emulator -avd keyflow_api34
 - **Disco**: ~14 GB livres após o setup (partição em 91%). Atenção ao crescimento de `~/.gradle` e snapshots do emulador.
 - **adb duplicado**: há `/usr/bin/adb` (sistema) e o do SDK (`platform-tools/adb`, 36.0.2). Prefira o do SDK e evite servers concorrentes (`adb kill-server` se houver conflito).
 - **sudo** exige senha — nada foi instalado via pacman; se precisar de pacotes de sistema, peça ao usuário.
+
+## Sandbox na nuvem (Claude Code web) — montado em 2026-09-24
+
+Container Ubuntu efêmero, root, **sem `/dev/kvm`** (CPU sem vmx/svm). Tudo abaixo some quando o
+container é reciclado; refazer a cada sessão nova (~10 min + boot do emulador).
+
+```sh
+# JDK 17 (o gradle.properties aponta para /usr/lib/jvm/java-17-openjdk)
+apt-get install -y openjdk-17-jdk-headless
+ln -sfn /usr/lib/jvm/java-17-openjdk-amd64 /usr/lib/jvm/java-17-openjdk
+# SDK: cmdline-tools de dl.google.com em /root/Android/Sdk/cmdline-tools/latest, depois
+sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "emulator" \
+  "system-images;android-34;google_apis;x86_64"
+avdmanager create avd -n keyflow_api34 -k "system-images;android-34;google_apis;x86_64" -d pixel_6
+# libs do emulador + ImageMagick (diff-screens.sh)
+apt-get install -y libpulse0 libnss3 libxcomposite1 libxcursor1 libxdamage1 libxi6 libxtst6 \
+  libasound2t64 libgl1 libegl1 libxkbfile1 libdrm2 libgbm1 imagemagick
+# keystore debug no caminho fixado pelo app/build.gradle.kts
+keytool -genkeypair -keystore ~/.config/.android/debug.keystore -storepass android -keypass android \
+  -alias androiddebugkey -dname "CN=Android Debug,O=Android,C=US" -keyalg RSA -validity 10000
+echo "sdk.dir=/root/Android/Sdk" > local.properties   # (+ .git/info/exclude)
+```
+
+- **Maven Central pelo proxy do sandbox responde 429** o tempo todo. Um init script local
+  (`~/.gradle/init.d/central-mirror.gradle`, fora do repo) troca `repo.maven.apache.org` pelo espelho
+  do Google (`maven-central.storage-download.googleapis.com/maven2/`). Build limpo: ~3,5 min.
+- **Emulador sem aceleração** (`-accel off -gpu swiftshader_indirect -no-window`): funciona, mas é
+  lento — boot ~17 min, uma classe instrumentada ~18 min (install incluído), ~2 min por print da
+  galeria. A suíte completa não cabe numa sessão; rodar as classes da task.
+- **Goldens batem bit a bit** com os do emulador KVM (rota não tocada: 0 px de diferença), então os
+  prints daqui valem como golden.
+- Sob TCG o System UI dispara diálogos "isn't responding" que caem por cima dos prints:
+  `settings put global hide_error_dialogs 1` e checar `dumpsys window` antes do `screencap`.
