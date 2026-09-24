@@ -226,10 +226,10 @@ o "?" da Sobreposição fecha a do Microfone e abre a dela; TalkBack lê o conte
 | DOC-04 | P2-D | GT-T9 | Implemented |
 | DOC-05 | P2-D | GT-T9 | Implemented |
 | DOC-06 | P2-D | GT-T9 | Implemented |
-| PERM-01 | P2-E | GT-T10 | In Tasks |
-| PERM-02 | P2-E | GT-T10 | In Tasks |
-| PERM-03 | P2-E | GT-T10 | In Tasks |
-| PERM-04 | P2-E | GT-T10 | In Tasks |
+| PERM-01 | P2-E | GT-T10 | Implemented |
+| PERM-02 | P2-E | GT-T10 | Implemented |
+| PERM-03 | P2-E | GT-T10 | Implemented |
+| PERM-04 | P2-E | GT-T10 | Implemented |
 
 **Coverage:** 27 total, 27 mapeados em tasks, 0 sem mapa.
 **Status values:** Pending → In Design → In Tasks → Implementing → Verified.

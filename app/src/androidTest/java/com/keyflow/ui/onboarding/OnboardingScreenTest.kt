@@ -2,7 +2,11 @@ package com.keyflow.ui.onboarding
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -11,6 +15,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.keyflow.ui.PermissionStatus
 import com.keyflow.ui.orb.LocalOrbClock
 import com.keyflow.ui.theme.KeyFlowTheme
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -112,5 +117,66 @@ class OnboardingScreenTest {
             assertTrue(keyboard)
             assertTrue(notifications)
         }
+    }
+
+    // ── GT-T10: "?" por permissão (PERM-01..04) ────────────────────────────────
+
+    @Test
+    fun everyPermissionHasAWhyButton() {
+        rule.setContent { Screen(perms()) }
+        OnboardingPermission.entries.forEach { rule.onNodeWithTag(onboardingWhyTag(it)).assertIsDisplayed() }
+        OnboardingPermission.entries.forEach { rule.onNodeWithTag(onboardingWhyTextTag(it)).assertDoesNotExist() }
+    }
+
+    /** PERM-02: abre sob a linha; o "?" de outra linha troca; o mesmo "?" fecha. Uma aberta por vez. */
+    @Test
+    fun whyOpensSwapsAndClosesOneAtATime() {
+        rule.setContent { Screen(perms()) }
+        val mic = OnboardingPermission.MIC
+        val overlay = OnboardingPermission.OVERLAY
+
+        rule.onNodeWithTag(onboardingWhyTag(mic)).performClick()
+        rule.onNodeWithTag(onboardingWhyTextTag(mic)).assertIsDisplayed()
+
+        rule.onNodeWithTag(onboardingWhyTag(overlay)).performClick()
+        rule.onNodeWithTag(onboardingWhyTextTag(mic)).assertDoesNotExist()
+        rule.onNodeWithTag(onboardingWhyTextTag(overlay)).assertIsDisplayed()
+
+        rule.onNodeWithTag(onboardingWhyTag(overlay)).performClick()
+        OnboardingPermission.entries.forEach { rule.onNodeWithTag(onboardingWhyTextTag(it)).assertDoesNotExist() }
+    }
+
+    /** O "?" tem alvo próprio: tocar nele explica, não manda a pessoa para a tela do sistema. */
+    @Test
+    fun whyDoesNotRequestThePermission() {
+        var requested = false
+        rule.setContent { Screen(perms(mic = false), onRequestMic = { requested = true }) }
+
+        rule.onNodeWithTag(onboardingWhyTag(OnboardingPermission.MIC)).performClick()
+
+        rule.runOnIdle { assertFalse(requested) }
+    }
+
+    /** Edge case do spec: concedeu e voltou com a explicação aberta — o check muda, a explicação fica, uma só. */
+    @Test
+    fun statusChangeKeepsTheOpenExplanationWithoutDuplicating() {
+        val status = mutableStateOf(perms(mic = false))
+        rule.setContent { Screen(status.value) }
+
+        rule.onNodeWithTag(onboardingWhyTag(OnboardingPermission.MIC)).performClick()
+        rule.onAllNodesWithText("FALTA").assertCountEquals(1)
+
+        status.value = perms(mic = true)
+
+        rule.onAllNodesWithText("FALTA").assertCountEquals(0)
+        rule.onAllNodesWithTag(onboardingWhyTextTag(OnboardingPermission.MIC)).assertCountEquals(1)
+    }
+
+    /** PERM-04: TalkBack anuncia o destino do "?". */
+    @Test
+    fun whyButtonAnnouncesWhatItExplains() {
+        rule.setContent { Screen(perms()) }
+        rule.onNodeWithContentDescription("Por que pedimos Microfone").assertIsDisplayed()
+        rule.onNodeWithContentDescription("Por que pedimos Notificações").assertIsDisplayed()
     }
 }

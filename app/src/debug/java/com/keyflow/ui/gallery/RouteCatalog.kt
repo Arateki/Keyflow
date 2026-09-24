@@ -34,6 +34,7 @@ import com.keyflow.ui.config.ConfigScreen
 import com.keyflow.ui.config.ConfigTab
 import com.keyflow.ui.config.GridsEditor
 import com.keyflow.ui.config.PhysicalKeyPicker
+import com.keyflow.ui.onboarding.OnboardingPermission
 import com.keyflow.ui.onboarding.OnboardingScreen
 import com.keyflow.ui.orb.OrbCenter
 import com.keyflow.ui.orb.OrbDragHint
@@ -158,22 +159,9 @@ object RouteCatalog {
         Route("config-overlay") { ConfigTabRoute(ConfigTab.OVERLAY, overlayEnabled = true) },
         Route("config-docs") { ConfigTabRoute(ConfigTab.DOCS) },
         Route("config-unlock") { ConfigTabRoute(ConfigTab.TECLADO, keyboardEnabled = true, unlockOpen = true) },
-        Route("onboarding") {
-            OnboardingScreen(
-                permissions = PermissionStatus(
-                    microphoneGranted = true,
-                    overlayGranted = true,
-                    keyboardEnabled = false, // espelha o mock (Teclado FALTA)
-                    notificationsGranted = true,
-                ),
-                onGrant = {},
-                onSkip = {},
-                onRequestMic = {},
-                onRequestOverlay = {},
-                onRequestKeyboard = {},
-                onRequestNotifications = {},
-            )
-        },
+        Route("onboarding") { OnboardingRoute() },
+        // PERM-04: o porquê de uma permissão aberto sob a linha (a do Teclado, que é a que FALTA no mock).
+        Route("onboarding-why") { OnboardingRoute(explained = OnboardingPermission.KEYBOARD) },
     )
 
     private val byKey: Map<String, Route> = routes.associateBy { it.key }
@@ -630,5 +618,24 @@ object RouteCatalog {
                 timeProvider = { GALLERY_ORB_TIME_MS },
             )
         }
+    }
+
+    @Composable
+    private fun OnboardingRoute(explained: OnboardingPermission? = null) {
+        OnboardingScreen(
+            permissions = PermissionStatus(
+                microphoneGranted = true,
+                overlayGranted = true,
+                keyboardEnabled = false, // espelha o mock (Teclado FALTA)
+                notificationsGranted = true,
+            ),
+            onGrant = {},
+            onSkip = {},
+            onRequestMic = {},
+            onRequestOverlay = {},
+            onRequestKeyboard = {},
+            onRequestNotifications = {},
+            initiallyExplained = explained,
+        )
     }
 }

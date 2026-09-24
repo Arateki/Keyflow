@@ -1,5 +1,6 @@
 package com.keyflow.ui.onboarding
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,10 +19,18 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -41,11 +50,48 @@ const val ONBOARDING_ITEM_KEYBOARD_TAG = "onboarding-item-keyboard"
 const val ONBOARDING_ITEM_NOTIFICATIONS_TAG = "onboarding-item-notifications"
 
 /**
+ * As 4 permissões do checklist, com o porquê de cada uma (PERM-03). Os textos seguem a Privacidade da
+ * Docs e o `PLAYSTORE_CHECKLIST.md`: o áudio só sai quando a pessoa grava e só para a origem dela;
+ * nenhum texto digitado é transmitido.
+ */
+enum class OnboardingPermission(val key: String, val label: String, val why: String) {
+    MIC(
+        "mic",
+        "Microfone",
+        "Para gravar sua voz e transcrever. O microfone só é usado enquanto você grava, e o áudio vai apenas para a origem de voz configurada na aba Voz. Sem ele, não há ditado.",
+    ),
+    OVERLAY(
+        "overlay",
+        "Sobreposição (overlay)",
+        "Para desenhar a orbe flutuante por cima dos outros apps. Sem ela, não existe o modo Sobrepor — só o teclado KeyFlow.",
+    ),
+    KEYBOARD(
+        "keyboard",
+        "Teclado KeyFlow",
+        "Para o texto transcrito entrar direto no campo em que você está digitando. Sem ele, o texto vai para a área de transferência e você cola. Nenhum texto digitado é transmitido.",
+    ),
+    NOTIFICATIONS(
+        "notifications",
+        "Notificações",
+        "Para mostrar os controles da gravação — pausar, enviar, cancelar — com o app em segundo plano. Sem elas a gravação funciona, mas sem esses controles fora do app.",
+    ),
+}
+
+/** Tag do "?" da permissão (PERM-01). */
+fun onboardingWhyTag(permission: OnboardingPermission): String = "onboarding-why-${permission.key}"
+
+/** Tag da explicação expandida sob a linha (PERM-02). */
+fun onboardingWhyTextTag(permission: OnboardingPermission): String = "onboarding-why-${permission.key}-text"
+
+/**
  * Tela de boas-vindas (ONB-01..03): orbe `Listening`, headline e um checklist que reflete o
  * [PermissionStatus]. Cada item do checklist é clicável e pede/abre só AQUELA permissão — dá pra
  * conceder uma a uma, voltando pra esta tela entre uma e outra (Yan, 2026-07-05). "Conceder
  * permissões" ainda pede tudo que falta de uma vez; "Pular por agora" segue para a config. A
  * persistência de `onboardingDone` e a decisão de rota inicial são da T27.
+ *
+ * O "?" de cada linha (PERM-01..04) abre o porquê daquela permissão logo abaixo dela; no máximo uma
+ * explicação aberta por vez. [initiallyExplained] existe para a rota de galeria do estado expandido.
  */
 @Composable
 fun OnboardingScreen(
@@ -57,8 +103,12 @@ fun OnboardingScreen(
     onRequestKeyboard: () -> Unit,
     onRequestNotifications: () -> Unit,
     modifier: Modifier = Modifier,
+    initiallyExplained: OnboardingPermission? = null,
 ) {
     val palette = LocalKeyFlowPalette.current
+    // Salva só a chave: sobrevive à ida às telas do sistema (conceder) e volta com a mesma explicação.
+    var explainedKey by rememberSaveable { mutableStateOf(initiallyExplained?.key) }
+    val toggle: (OnboardingPermission) -> Unit = { p -> explainedKey = if (explainedKey == p.key) null else p.key }
     Column(
         modifier
             .fillMaxSize()
@@ -106,27 +156,35 @@ fun OnboardingScreen(
 
         Column(Modifier.fillMaxWidth().padding(top = 26.dp)) {
             ChecklistRow(
-                "Microfone",
+                OnboardingPermission.MIC,
                 permissions.microphoneGranted,
+                explained = explainedKey == OnboardingPermission.MIC.key,
                 onClick = onRequestMic,
+                onToggleWhy = toggle,
                 tag = ONBOARDING_ITEM_MIC_TAG,
             )
             ChecklistRow(
-                "Sobreposição (overlay)",
+                OnboardingPermission.OVERLAY,
                 permissions.overlayGranted,
+                explained = explainedKey == OnboardingPermission.OVERLAY.key,
                 onClick = onRequestOverlay,
+                onToggleWhy = toggle,
                 tag = ONBOARDING_ITEM_OVERLAY_TAG,
             )
             ChecklistRow(
-                "Teclado KeyFlow",
+                OnboardingPermission.KEYBOARD,
                 permissions.keyboardEnabled,
+                explained = explainedKey == OnboardingPermission.KEYBOARD.key,
                 onClick = onRequestKeyboard,
+                onToggleWhy = toggle,
                 tag = ONBOARDING_ITEM_KEYBOARD_TAG,
             )
             ChecklistRow(
-                "Notificações",
+                OnboardingPermission.NOTIFICATIONS,
                 permissions.notificationsGranted,
+                explained = explainedKey == OnboardingPermission.NOTIFICATIONS.key,
                 onClick = onRequestNotifications,
+                onToggleWhy = toggle,
                 tag = ONBOARDING_ITEM_NOTIFICATIONS_TAG,
                 last = true,
             )
@@ -166,9 +224,11 @@ fun OnboardingScreen(
 
 @Composable
 private fun ChecklistRow(
-    label: String,
+    permission: OnboardingPermission,
     granted: Boolean,
+    explained: Boolean,
     onClick: () -> Unit,
+    onToggleWhy: (OnboardingPermission) -> Unit,
     tag: String,
     last: Boolean = false,
 ) {
@@ -189,13 +249,56 @@ private fun ChecklistRow(
         } else {
             Box(Modifier.size(18.dp).clip(CircleShape).border(1.5.dp, palette.record, CircleShape))
         }
-        Text(label, color = palette.fg, fontFamily = SpaceGrotesk, fontSize = 13.5.sp, modifier = Modifier.weight(1f))
+        Text(permission.label, color = palette.fg, fontFamily = SpaceGrotesk, fontSize = 13.5.sp, modifier = Modifier.weight(1f))
         Text(
             if (granted) "OK" else "FALTA",
             color = if (granted) palette.faint else palette.recordSoft,
             fontFamily = SpaceMono,
             fontSize = 9.sp,
         )
+        WhyButton(permission, explained, onClick = { onToggleWhy(permission) })
+    }
+    AnimatedVisibility(visible = explained) {
+        Text(
+            permission.why,
+            color = palette.faint,
+            fontFamily = SpaceGrotesk,
+            fontSize = 12.sp,
+            lineHeight = 16.sp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 30.dp, bottom = 11.dp)
+                .testTag(onboardingWhyTextTag(permission)),
+        )
     }
     if (!last) Box(Modifier.fillMaxWidth().height(1.dp).background(palette.line2))
+}
+
+/**
+ * "?" da linha: alvo de toque próprio (o resto da linha pede a permissão). TalkBack anuncia "por que
+ * pedimos <permissão>" e se a explicação está aberta.
+ */
+@Composable
+private fun WhyButton(permission: OnboardingPermission, explained: Boolean, onClick: () -> Unit) {
+    val palette = LocalKeyFlowPalette.current
+    val accent = if (explained) palette.fg else palette.faint
+    Box(
+        Modifier
+            .size(28.dp)
+            .clip(CircleShape)
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics {
+                contentDescription = "Por que pedimos ${permission.label}"
+                stateDescription = if (explained) "explicação aberta" else "explicação fechada"
+            }
+            .testTag(onboardingWhyTag(permission)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier.size(18.dp).clip(CircleShape).border(1.dp, accent, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("?", color = accent, fontFamily = SpaceMono, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+        }
+    }
 }

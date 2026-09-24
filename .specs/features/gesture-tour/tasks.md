@@ -1,7 +1,7 @@
 # Gesture Tour — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (T1–T6)
-**Status**: Em execução — GT-T1..T7 e GT-T9 concluídas (2026-09-24). Próxima: GT-T10 ("?" por permissão no onboarding), depois GT-T8 (fecho).
+**Status**: Em execução — GT-T1..T7, T9 e T10 concluídas (2026-09-24). Próxima: GT-T8 (fecho: goldens do tour + validação no A32 [YAN]).
 
 > Gate no sandbox: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon <task>`
 > Instrumentado escopado: `ANDROID_SERIAL=emulator-5554`. Antes de instalar no device do Yan:
@@ -136,7 +136,7 @@ do motor; o resto serializa no device (TESTING.md).
   golden da Docs regenerado (claro/escuro).
 - **Tests**: instrumented + screenshot. **Gate**: `full` + `screenshot`.
 
-### GT-T10 — Apresentação: "?" por permissão `[P]`
+### GT-T10 — Apresentação: "?" por permissão `[P]` ✅ CONCLUÍDA (2026-09-24)
 - **What**: `ChecklistRow` do `OnboardingScreen` ganha "?" tocável; explicação expande inline
   (`AnimatedVisibility`), **uma aberta por vez** (tocar outro "?" troca; o mesmo fecha); textos
   por permissão (PERM-03, consistentes com a Privacidade da Docs); tags

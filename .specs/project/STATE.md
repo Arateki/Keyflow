@@ -1544,3 +1544,18 @@ instrumentados da Docs 8/8 (+5), goldens `config-docs[-dark]` regenerados. Prime
 posicionadas pelas barras do sistema, e o AVD do Yan tem status bar de 128 px contra 63 px do AVD
 daqui — nenhuma emulação de recorte (`hole`=136, `corner/tall/double`=171) reproduz 128. Os outros 60
 PNGs pré-existentes batem (59 com 0 px; `orb-idle-dark` com 2 px, dentro do limiar). Continuar tratando essas 3 como "não verificáveis neste sandbox".
+
+## gesture-tour — GT-T10 (2026-09-24)
+
+"?" por permissão na apresentação. PERM-01..04 → Implemented. OnboardingScreenTest 9/9 (+5) e
+OnboardingRoutingTest verdes no emulador; goldens `onboarding[-dark]` regenerados (as linhas
+ganharam o "?") e rota nova `onboarding-why[-dark]` (explicação do Teclado aberta).
+
+- `OnboardingPermission` (enum) guarda rótulo + porquê; textos seguem a Privacidade da Docs e o
+  `PLAYSTORE_CHECKLIST.md` ("nenhum texto digitado é transmitido").
+- Estado = só a **chave** da permissão explicada, em `rememberSaveable`: sobrevive à ida às telas do
+  sistema para conceder e não depende do `PermissionStatus` (edge case do spec: o check muda, a
+  explicação continua, uma só — há teste).
+- O "?" tem alvo de toque próprio (28dp) dentro da linha clicável: tocar nele explica, não pede a
+  permissão (teste). TalkBack: "Por que pedimos <permissão>" + estado aberta/fechada.
+- `initiallyExplained` existe só para a rota de galeria do estado expandido.
