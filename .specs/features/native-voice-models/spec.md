@@ -173,7 +173,7 @@ o texto completo com a edição preservada; buffer some.
 | Requirement | Story | Task | Status |
 | ----------- | ----- | ---- | ------ |
 | NAT-01 | P1-A | NM-T9 | In Tasks |
-| NAT-02 | P1-A | NM-T5 | In Tasks |
+| NAT-02 | P1-A | NM-T5 | Implemented |
 | NAT-03 | P1-A | NM-T2, NM-T9 | Implementing |
 | NAT-04 | P1-A | NM-T8, NM-T9 | In Tasks |
 | NAT-05 | P1-A | NM-T8, NM-T9 | In Tasks |

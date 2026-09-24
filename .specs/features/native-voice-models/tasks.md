@@ -1,7 +1,7 @@
 # Native Voice Models — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (G1–G11)
-**Status**: Em execução — NM-T1..T4 escritas (2026-09-24); instrumentados/goldens de T2 e T4 validados pelo CI. Próxima: NM-T5.
+**Status**: Em execução — NM-T1..T5 escritas (2026-09-24); instrumentados/goldens de T2, T4 e T5 validados pelo CI. Próxima: NM-T6.
 
 > Gate no sandbox: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon <task>`
 > Instrumentado escopado: `ANDROID_SERIAL=emulator-5554`. Antes de instalar no device do Yan:
@@ -91,7 +91,7 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
   = não instalado (meio-instalado não conta).
 - **Tests**: instrumented (files/Context — camada `data`). **Gate**: `full`.
 
-### NM-T5 — `AudioDecoder` (.m4a → PCM 16 kHz) + gravação 16 kHz
+### NM-T5 — `AudioDecoder` (.m4a → PCM 16 kHz) + gravação 16 kHz ✅ CONCLUÍDA (2026-09-24; instrumentado via CI)
 - **What**: `MediaExtractor`+`MediaCodec` → PCM 16-bit → float mono; resample defensivo p/ 16 kHz
   (função pura). Mudar `AudioRecorder.AUDIO_SAMPLE_RATE` 44100→16000 (NAT-02; AAC 16 kHz, arquivo
   menor, ASR só usa 16 kHz).

@@ -1653,3 +1653,18 @@ tamanho do manifest — meio-instalado, arquivo trocado depois ou sobra de insta
 contam. Não confere SHA: isso é do downloader (NM-T7). 9 unitários na JVM (`TemporaryFolder`) + 1
 instrumentado no `filesDir` real (pasta própria, nunca a `models/` de verdade), que confere o espaço
 voltando depois de apagar — roda no CI.
+
+## native-voice-models — NM-T5 (2026-09-24)
+
+`AudioDecoder` (MediaExtractor + MediaCodec → PCM 16-bit ou float, conforme o formato de saída do
+codec → mono → 16 kHz) e `PcmMath` puro (downmix por média; resample com média da janela ao reduzir
+e interpolação linear ao aumentar). Gravação passou a **16 kHz** (`AudioRecorder.AUDIO_SAMPLE_RATE`).
+7 unitários do `PcmMath`; `AudioDecoderTest` instrumentado com dois tons de 440 Hz em
+`androidTest/assets/audio/` (16 kHz mono e 44,1 kHz estéreo).
+
+**Dois tropeços pegos conferindo as fixtures com ffmpeg antes do CI:**
+- O `sine` do ffmpeg gera com amplitude 1/8: com `volume=0.5` o tom ficou em 0,06 de pico. Fixtures
+  refeitas com `aevalsrc=0.5*sin(2*PI*440*t)`.
+- Contar cruzamentos por zero no áudio decodificado dava 564 Hz num tom de 440: o priming/padding do
+  AAC tem um chiado baixo que cruza o zero várias vezes. O teste usa histerese (±0,1) e mede entre a
+  primeira e a última virada — 440,0 Hz nas duas fixtures.

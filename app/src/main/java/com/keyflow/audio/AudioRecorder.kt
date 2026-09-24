@@ -112,6 +112,8 @@ class AudioRecorder(
 
     private companion object {
         const val AUDIO_BIT_RATE = 64_000
-        const val AUDIO_SAMPLE_RATE = 44_100
+        // 16 kHz (NAT-02): é a taxa que os modelos de voz usam — o local e os da nuvem. Gravar a 44,1 kHz só
+        // aumentava o arquivo e obrigava a reamostrar antes da inferência local.
+        const val AUDIO_SAMPLE_RATE = 16_000
     }
 }
