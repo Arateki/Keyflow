@@ -1559,3 +1559,31 @@ ganharam o "?") e rota nova `onboarding-why[-dark]` (explicação do Teclado abe
 - O "?" tem alvo de toque próprio (28dp) dentro da linha clicável: tocar nele explica, não pede a
   permissão (teste). TalkBack: "Por que pedimos <permissão>" + estado aberta/fechada.
 - `initiallyExplained` existe só para a rota de galeria do estado expandido.
+
+## gesture-tour — GT-T8, parte do agente (2026-09-24)
+
+Rotas `tour-orb-basics` / `tour-orb-shortcuts` / `tour-keyboard-mic` (claro/escuro): player real + cena
+real + dedo, relógio do tour parado num instante escolhido de cada roteiro (770 / 980 / 1670 ms), com
+título e descrição **embaixo** da cena — cada rota toca só um subconjunto do catálogo, fora da aba
+Modo: é a prova de reuso do TOUR-01. Duas capturas deram 0 px de diferença; goldens aprovados.
+MODO-05 → Implemented. Falta **[YAN]**: fluidez dos 2 tours e TalkBack no A32 → Verified.
+
+**Gate no emulador sem KVM (recriado do zero nesta sessão)** — 304 unitários; instrumentados rodados
+por `am instrument` direto, em blocos, porque o `connectedDebugAndroidTest` inteiro aborta:
+- `data` + `overlay` (sem gravação) 34/34; `ui.*` 107/111 — Docs, Onboarding, ModoPanel,
+  ModoPanelTour, tour, ConfigScreen etc.
+- As 4 falhas de UI: 2 passam sozinhas (timeout de idle sob carga). As outras 2
+  (`ConfigScreenTest.overlayModeToggle*`, espera de 2000 ms) **falham igual com o código de antes da
+  GT-T9** (A/B medido) — o que mudou desde então só compõe na aba Docs e no onboarding.
+- `OnboardingRoutingTest` falha aqui **também sem o "?"** (A/B): o "Pular" grava
+  `onboarding_done=true` no DataStore (conferido no `.preferences_pb`), mas só ~5 s depois, no limite da
+  espera do teste. Latência do TCG.
+- `SetupActivityTest.overlayModeToggleStartsAndStopsForegroundService`: o serviço não chama
+  `startForeground` dentro dos 10 s do Android → processo cai. `OverlayServiceCancelTest`: a gravação
+  nunca chega a RECORDING — este AVD roda com `-no-audio` (sem microfone). Idem `audio.*`.
+- `ime.*`: a view do teclado não anexa dentro dos 5 s dos testes e o processo de teste leva ANR
+  (`keyDispatchingTimedOut`), abortando a rodada. Os 3 `*MotionArtifactTest` (geradores de GIF para
+  revisão, não asserção) levariam horas sob TCG — não rodados.
+- Nenhum desses toca código desta feature; a última suíte completa verde é a de 2026-09-09 (A32 e
+  emulador KVM). **Rodar `ime`/`audio`/`overlay` no A32 ou num emulador com KVM** antes do próximo
+  release.

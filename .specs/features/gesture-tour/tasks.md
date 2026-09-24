@@ -1,7 +1,7 @@
 # Gesture Tour — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (T1–T6)
-**Status**: Em execução — GT-T1..T7, T9 e T10 concluídas (2026-09-24). Próxima: GT-T8 (fecho: goldens do tour + validação no A32 [YAN]).
+**Status**: Tudo que cabe a agente está feito (GT-T1..T10, 2026-09-24). Resta só o manual do GT-T8 **[YAN]**: fluidez dos 2 tours e TalkBack no A32 → requisitos para Verified.
 
 > Gate no sandbox: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon <task>`
 > Instrumentado escopado: `ANDROID_SERIAL=emulator-5554`. Antes de instalar no device do Yan:
@@ -151,7 +151,7 @@ do motor; o resto serializa no device (TESTING.md).
 ## Fase E — Fechamento
 
 <!-- GT-T8 fecha DEPOIS de T9/T10 (goldens de Docs/onboarding entram no mesmo lote). -->
-### GT-T8 — Goldens + prova de reuso + validação no A32
+### GT-T8 — Goldens + prova de reuso + validação no A32 — ✅ parte do agente (2026-09-24); falta **[YAN]** A32
 - **What**: rotas de galeria `tour-orb-basics`/`tour-orb-shortcuts`/`tour-keyboard-mic` (clock
   congelado em t fixo, claro/escuro) + `config-modo` regenerada; **prova de isolamento**: uma
   rota toca um subconjunto de roteiros fora da aba Modo (success criteria de reuso); regenerar +

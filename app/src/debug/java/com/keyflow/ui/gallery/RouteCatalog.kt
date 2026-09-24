@@ -1,6 +1,11 @@
 package com.keyflow.ui.gallery
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -13,6 +18,12 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.keyflow.core.ButtonState
 import com.keyflow.data.Settings
 import com.keyflow.ui.tour.FingerPuppet
+import com.keyflow.ui.tour.GestureTourPlayer
+import com.keyflow.ui.tour.LocalTourClock
+import com.keyflow.ui.tour.TourScene
+import com.keyflow.ui.tour.buildKeyboardScripts
+import com.keyflow.ui.tour.scenes.KeyboardScene
+import com.keyflow.ui.tour.scenes.OrbScene
 import com.keyflow.ui.tour.buildOrbScripts
 import com.keyflow.ui.tour.tourFrameAt
 import com.keyflow.core.TranscriptionSource
@@ -78,6 +89,12 @@ object RouteCatalog {
         // de verdade (com as cenas reais) chegam na GT-T8.
         fingerPuppetRoute("tour-finger-drag", scriptId = "orb-cancel-undo", atMs = 900),
         fingerPuppetRoute("tour-finger-multitap", scriptId = "orb-shortcut-3tap", atMs = 700),
+        // GT-T8 / MODO-05: o tour de verdade (player + cena real + dedo) num instante fixo de cada roteiro.
+        // É também a prova de reuso do TOUR-01: fora da aba Modo, cada rota toca só um SUBCONJUNTO dos
+        // roteiros e põe título/descrição embaixo da cena, onde a aba Modo não põe.
+        tourRoute("tour-orb-basics", TourScene.ORB, listOf("orb-toggle-basics", "orb-toggle-pause"), atMs = 770),
+        tourRoute("tour-orb-shortcuts", TourScene.ORB, listOf("orb-shortcut-2tap", "orb-shortcut-3tap"), atMs = 980),
+        tourRoute("tour-keyboard-mic", TourScene.KEYBOARD, listOf("kbd-mic-hold", "kbd-mic-tap"), atMs = 1670),
         // Apresentação do orbe no botão flutuante do overlay (T22): tempo/glifo no centro.
         orbRoute("overlay-idle", OrbState.Idle, OrbCenter.None),
         orbRoute("overlay-recording", OrbState.Listening, OrbCenter.Time(12)),
@@ -637,5 +654,56 @@ object RouteCatalog {
             onRequestNotifications = {},
             initiallyExplained = explained,
         )
+    }
+
+    /**
+     * Tour real fora da aba Modo (GT-T8): toca [scriptIds] — nesta ordem, um subconjunto do catálogo das
+     * Settings de fábrica — com o relógio do tour parado em [atMs] do primeiro roteiro. O título e a
+     * descrição vêm do estado exposto pelo player, lidos pelo hospedeiro (TOUR-01).
+     */
+    private fun tourRoute(key: String, scene: TourScene, scriptIds: List<String>, atMs: Int): Route = Route(key) {
+        val settings = Settings()
+        val catalog = if (scene == TourScene.ORB) buildOrbScripts(settings) else buildKeyboardScripts(settings)
+        val scripts = scriptIds.map { id -> catalog.first { it.id == id } }
+        val state = com.keyflow.ui.tour.rememberGestureTourState(scripts)
+        val palette = LocalKeyFlowPalette.current
+        androidx.compose.runtime.CompositionLocalProvider(LocalTourClock provides { atMs.toFloat() }) {
+            androidx.compose.foundation.layout.Column(
+                Modifier
+                    .fillMaxSize()
+                    .background(palette.bg)
+                    .padding(horizontal = 16.dp, vertical = 24.dp),
+            ) {
+                GestureTourPlayer(
+                    scripts = scripts,
+                    state = state,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, palette.line2, RoundedCornerShape(8.dp))
+                        .padding(12.dp),
+                ) { frame ->
+                    if (scene == TourScene.ORB) {
+                        OrbScene(frame, Modifier.fillMaxWidth())
+                    } else {
+                        KeyboardScene(frame, Modifier.fillMaxWidth())
+                    }
+                }
+                androidx.compose.material3.Text(
+                    state.title,
+                    color = palette.fg,
+                    fontFamily = com.keyflow.ui.theme.SpaceGrotesk,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(top = 14.dp),
+                )
+                androidx.compose.material3.Text(
+                    state.description,
+                    color = palette.muted,
+                    fontFamily = com.keyflow.ui.theme.SpaceGrotesk,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+        }
     }
 }

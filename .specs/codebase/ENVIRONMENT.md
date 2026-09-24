@@ -97,3 +97,20 @@ echo "sdk.dir=/root/Android/Sdk" > local.properties   # (+ .git/info/exclude)
   prints daqui valem como golden.
 - Sob TCG o System UI dispara diálogos "isn't responding" que caem por cima dos prints:
   `settings put global hide_error_dialogs 1` e checar `dumpsys window` antes do `screencap`.
+
+### Lições da 2ª sessão no sandbox (2026-09-24)
+
+- **O disco sobrevive à reciclagem do container, o emulador não** — e o `/data` do AVD pode voltar
+  corrompido (zygote em loop com `NoClassDefFoundError` no boot class loader). Remédio: `-wipe-data`.
+- **Nunca `adb reboot`**: com a Play Store ligada, atualizações de módulos (APEX) entram no reboot e,
+  sob TCG, o boot image não se regenera → mesmo loop do zygote. Depois do boot limpo: desabilitar
+  `com.android.vending` e os apps pesados do Google, e salvar um snapshot
+  (`adb emu avd snapshot save keyflow_ready`; voltar com `-snapshot keyflow_ready`).
+- **Rodar `cmd package compile -m speed -f com.keyflow`** depois de instalar: sem AOT, a verificação de
+  bytecode na 1ª abertura estoura os 5 s de input e o app leva ANR (com `hide_error_dialogs` o sistema
+  o mata calado — parece crash, não é).
+- **A aba Modo ao vivo (2 tours animando) derruba o System UI por ANR sob TCG.** Prints do tour: só
+  pelas rotas da galeria (relógio congelado). `screenrecord` também não acompanha: o vídeo para no meio.
+  GIF de fluxo = sequência de `screencap` depois de cada ação.
+- **Toques por `uiautomator dump`** (texto/content-desc → bounds), nunca coordenada fixa; `&` vem
+  como `&amp;` no XML. Arrastar devagar na galeria (imersiva) pode abrir a gaveta de notificações.
