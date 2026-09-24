@@ -187,7 +187,7 @@ o texto completo com a edição preservada; buffer some.
 | CAT-03 | P1-B | NM-T10 | In Tasks |
 | DLM-01 | P1-B | NM-T6 | In Tasks |
 | DLM-02 | P1-B | NM-T7 | In Tasks |
-| DLM-03 | P1-B | NM-T4 | In Tasks |
+| DLM-03 | P1-B | NM-T4 | Implemented |
 | DLM-04 | P1-B | NM-T6 | In Tasks |
 | DLM-05 | P1-B | NM-T6 | In Tasks |
 | DLM-06 | P1-B | NM-T6 | In Tasks |

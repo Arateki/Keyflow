@@ -1642,3 +1642,14 @@ baixando). Totais: Whisper base int8 160,6 MB · small int8 375,5 MB · Parakeet
 URLs fixadas no commit do repo (não `main`) e todas respondem 206 a pedido de faixa (retomada do
 DownloadManager). Os dois Whisper multilíngues têm o mesmo `tokens.txt`. `recommendedRamMb`
 (512/1024/2048) é estimativa — medir no A32 na NM-T13. 9 unitários de integridade.
+
+## native-voice-models — NM-T4 (2026-09-24)
+
+`ModelStore` em `filesDir/models/<id>/`. Instalar = conferir que todo arquivo do catálogo existe com o
+tamanho certo → copiar para `.<id>.installing/` → escrever `manifest.json` → **renomear** o diretório
+para o definitivo (atômico no mesmo volume; a origem do DownloadManager fica em outro, onde só cópia
+serve). "Instalado" = manifest presente, com o id do diretório, e cada arquivo listado no disco com o
+tamanho do manifest — meio-instalado, arquivo trocado depois ou sobra de instalação interrompida não
+contam. Não confere SHA: isso é do downloader (NM-T7). 9 unitários na JVM (`TemporaryFolder`) + 1
+instrumentado no `filesDir` real (pasta própria, nunca a `models/` de verdade), que confere o espaço
+voltando depois de apagar — roda no CI.

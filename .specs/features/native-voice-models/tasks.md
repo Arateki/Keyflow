@@ -1,7 +1,7 @@
 # Native Voice Models — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (G1–G11)
-**Status**: Em execução — NM-T1, NM-T2 (instrumentados/goldens no CI) e NM-T3 concluídas (2026-09-24). Próxima: NM-T4.
+**Status**: Em execução — NM-T1..T4 escritas (2026-09-24); instrumentados/goldens de T2 e T4 validados pelo CI. Próxima: NM-T5.
 
 > Gate no sandbox: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon <task>`
 > Instrumentado escopado: `ANDROID_SERIAL=emulator-5554`. Antes de instalar no device do Yan:
@@ -81,7 +81,7 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
 
 ## Fase B — Disco & áudio
 
-### NM-T4 — `ModelStore` (instalação/deleção/manifest)
+### NM-T4 — `ModelStore` (instalação/deleção/manifest) ✅ CONCLUÍDA (2026-09-24; instrumentado via CI)
 - **What**: layout `filesDir/models/<id>/` + `manifest.json` pós-verificação (marcador de íntegro);
   `installedIds`/`dirFor`/`install` (move atômico do tmp)/`delete` (dir inteiro)/`freeBytes`.
 - **Where**: `data/models/ModelStore.kt`.
