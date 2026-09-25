@@ -184,7 +184,7 @@ o texto completo com a edição preservada; buffer some.
 | PRV-01 | P1-A | NM-T9 | Implemented |
 | CAT-01 | P1-B | NM-T3 | Implemented |
 | CAT-02 | P1-B | NM-T3 | Implemented |
-| CAT-03 | P1-B | NM-T10 | In Tasks |
+| CAT-03 | P1-B | NM-T10 | Implemented |
 | DLM-01 | P1-B | NM-T6 | Implemented |
 | DLM-02 | P1-B | NM-T7 | Implemented |
 | DLM-03 | P1-B | NM-T4 | Implemented |
