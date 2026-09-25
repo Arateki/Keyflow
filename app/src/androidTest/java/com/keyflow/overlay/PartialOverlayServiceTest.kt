@@ -78,6 +78,8 @@ class PartialOverlayServiceTest {
                     customHeaderValue = "Bearer teste",
                     partialOnPause = true,
                     partialViewEdit = true,
+                    // A entrega vai para o inserter do teste: não depende do que outro teste deixou salvo.
+                    autoPasteInField = true,
                 ),
             )
         }

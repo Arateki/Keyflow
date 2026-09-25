@@ -103,7 +103,8 @@ class LocalEngineEndToEndTest {
         try {
             val inFlight = async(kotlinx.coroutines.Dispatchers.IO) { transcriber.transcribe(selection, long) }
             val pid = waitForInferencePid()
-            delay(1_500)
+            // O encoder do Whisper numa janela de 28 s leva bem mais que isso: a morte cai no meio.
+            delay(500)
             android.os.Process.killProcess(pid)
 
             assertEquals(LocalErrors.error(LocalErrors.PROCESS_DIED), inFlight.await())
