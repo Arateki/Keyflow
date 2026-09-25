@@ -185,20 +185,20 @@ o texto completo com a edição preservada; buffer some.
 | CAT-01 | P1-B | NM-T3 | Implemented |
 | CAT-02 | P1-B | NM-T3 | Implemented |
 | CAT-03 | P1-B | NM-T10 | In Tasks |
-| DLM-01 | P1-B | NM-T6 | Implementing |
-| DLM-02 | P1-B | NM-T7 | Implementing |
+| DLM-01 | P1-B | NM-T6 | Implemented |
+| DLM-02 | P1-B | NM-T7 | Implemented |
 | DLM-03 | P1-B | NM-T4 | Implemented |
-| DLM-04 | P1-B | NM-T6 | Implementing |
-| DLM-05 | P1-B | NM-T6 | Implementing |
+| DLM-04 | P1-B | NM-T6 | Implemented |
+| DLM-05 | P1-B | NM-T6 | Implemented |
 | DLM-06 | P1-B | NM-T6 | Implemented |
-| DLM-07 | P1-B | NM-T7 | Implementing |
-| DLM-08 | P1-B | NM-T6 | Implementing |
-| MGR-01 | P1-C | NM-T2, NM-T10 | Implementing |
-| MGR-02 | P1-C | NM-T10 | In Tasks |
-| MGR-03 | P1-C | NM-T10 | In Tasks |
-| MGR-04 | P1-C | NM-T10 | In Tasks |
-| MGR-05 | P1-C | NM-T10 | In Tasks |
-| MGR-06 | P1-C | NM-T10 | In Tasks |
+| DLM-07 | P1-B | NM-T7 | Implemented |
+| DLM-08 | P1-B | NM-T6 | Implemented |
+| MGR-01 | P1-C | NM-T2, NM-T10 | Implemented |
+| MGR-02 | P1-C | NM-T10 | Implemented |
+| MGR-03 | P1-C | NM-T10 | Implemented |
+| MGR-04 | P1-C | NM-T10 | Implemented |
+| MGR-05 | P1-C | NM-T10 | Implemented |
+| MGR-06 | P1-C | NM-T10 | Implemented |
 | MGR-07 | P1-C | NM-T11 | In Tasks |
 | STO-01 | P2-D | NM-T12 | In Tasks |
 | STO-02 | P2-D | NM-T1, NM-T12 | Implementing |

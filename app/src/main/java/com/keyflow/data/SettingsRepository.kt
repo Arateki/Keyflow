@@ -120,6 +120,22 @@ class SettingsRepository(
     fun shortcutGridsFlow(): Flow<List<ShortcutGrid>> =
         dataStore.data.map { ShortcutCodec.decodeGrids(it[SHORTCUT_GRIDS_JSON]) }
 
+    /**
+     * MGR-03: um modelo acabou de instalar e nenhum está selecionado → seleciona. Escrita atômica só da
+     * chave do modelo: não disputa com o auto-save da tela (que regrava as Settings inteiras).
+     * @return true se selecionou.
+     */
+    suspend fun selectLocalModelIfNone(modelId: String): Boolean {
+        var selected = false
+        dataStore.edit { prefs ->
+            if (prefs[LOCAL_MODEL_ID].isNullOrBlank()) {
+                prefs[LOCAL_MODEL_ID] = modelId
+                selected = true
+            }
+        }
+        return selected
+    }
+
     suspend fun saveBarsConfig(config: BarsConfig) {
         dataStore.edit { it[BARS_CONFIG_JSON] = ShortcutCodec.encodeBars(config) }
     }

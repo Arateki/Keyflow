@@ -222,9 +222,12 @@ class ModelDownloaderTest {
 
     private val store by lazy { ModelStore(File(tmp.root, "models")) }
 
+    private val installedEvents = mutableListOf<String>()
+
     private fun realDownloader() = ModelDownloader(
         gateway, File(tmp.root, "model-tmp"), store, { false }, volumes,
         catalog = { if (it == real.id) real else null },
+        onInstalled = { installedEvents += it },
     )
 
     /** O que o DownloadManager faria: grava os arquivos no tmp e marca os pedidos como concluídos. */
@@ -250,6 +253,7 @@ class ModelDownloaderTest {
         assertThat(downloader.tmpDirFor("real")!!.exists()).isFalse()
         assertThat(downloader.activeModelId()).isNull()
         assertThat(downloader.failures.value).isEmpty()
+        assertThat(installedEvents).containsExactly("real")
     }
 
     @Test
@@ -264,6 +268,7 @@ class ModelDownloaderTest {
         assertThat(downloader.tmpDirFor("real")!!.exists()).isFalse()
         assertThat(gateway.removed).containsExactly(1L, 2L, 3L)
         assertThat(downloader.failures.value).containsExactly("real", DownloadFailure.CORRUPTED)
+        assertThat(installedEvents).isEmpty()
     }
 
     @Test

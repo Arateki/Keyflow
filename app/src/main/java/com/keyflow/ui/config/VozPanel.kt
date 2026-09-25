@@ -55,6 +55,8 @@ fun VozPanel(
     settings: Settings,
     onSettingsChange: (Settings) -> Unit,
     modifier: Modifier = Modifier,
+    localModels: LocalModelsUi = LocalModelsUi.EMPTY,
+    localActions: LocalModelActions = LocalModelActions.None,
 ) {
     val palette = LocalKeyFlowPalette.current
     val scroll = rememberScrollState()
@@ -103,7 +105,7 @@ fun VozPanel(
                 onLanguage = { onSettingsChange(settings.copy(groqLanguage = it.ifBlank { null })) },
             )
             TranscriptionSource.CUSTOM -> CustomFields(settings, onSettingsChange)
-            TranscriptionSource.LOCAL -> LocalPlaceholder()
+            TranscriptionSource.LOCAL -> LocalPanel(settings, onSettingsChange, localModels, localActions)
         }
 
         // Abaixo do token/credenciais do preset ativo (pedido do Yan, 2026-07-02) — não compete por
@@ -126,7 +128,7 @@ private val GROQ_MODELS = listOf("whisper-large-v3", "whisper-large-v3-turbo", "
 private val CUSTOM_MODELS = listOf("whisper-1", "whisper-large-v3", "whisper-large-v3-turbo")
 
 // Idiomas (ISO-639-1) suportados pelo Whisper; "" = detecção automática (padrão).
-private val LANGUAGE_OPTIONS = listOf("", "pt", "en", "es", "fr", "de", "it", "nl", "ja", "zh", "ko", "ru")
+internal val LANGUAGE_OPTIONS = listOf("", "pt", "en", "es", "fr", "de", "it", "nl", "ja", "zh", "ko", "ru")
 
 internal fun languageLabel(code: String): String = when (code) {
     "" -> "Automático"
@@ -237,24 +239,6 @@ private fun GeneralSection(settings: Settings, onSettingsChange: (Settings) -> U
             modifier = Modifier.padding(top = 9.dp),
         )
     }
-}
-
-const val VOZ_LOCAL_PLACEHOLDER_TAG = "voz-local-placeholder"
-
-/**
- * Painel da origem Local enquanto o gerenciador de modelos não existe (NM-T2 → NM-T10). Diz o que a
- * origem vai ser e que ainda não transcreve: escolhida agora, a gravação termina no erro de config.
- */
-@Composable
-private fun LocalPlaceholder() {
-    val palette = LocalKeyFlowPalette.current
-    Text(
-        "Transcrição no próprio aparelho, sem internet. O gerenciador de modelos de voz ainda está a caminho — por enquanto esta origem não transcreve.",
-        color = palette.faint,
-        fontFamily = SpaceGrotesk,
-        fontSize = 11.sp,
-        modifier = Modifier.padding(top = 16.dp).testTag(VOZ_LOCAL_PLACEHOLDER_TAG),
-    )
 }
 
 @Composable

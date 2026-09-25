@@ -167,6 +167,21 @@ class SettingsRepositoryTest {
         assertEquals(Config.LOCAL_MIN_TIMEOUT_MS, cfg.timeoutMs)
     }
 
+    /** MGR-03: instalou e não havia seleção → seleciona; havia → não troca; não mexe no resto. */
+    @Test
+    fun selectLocalModelIfNoneOnlyFillsAnEmptySelection() = runTest {
+        val repository = newRepository()
+        repository.saveSettings(Settings(source = TranscriptionSource.LOCAL, localLanguage = "pt", openaiToken = "sk-x"))
+
+        assertEquals(true, repository.selectLocalModelIfNone("whisper-base-int8"))
+        assertEquals(false, repository.selectLocalModelIfNone("whisper-small-int8"))
+
+        val read = repository.settingsFlow().first()
+        assertEquals("whisper-base-int8", read.localModelId)
+        assertEquals("pt", read.localLanguage)
+        assertEquals("sk-x", read.openaiToken)
+    }
+
     @Test
     fun transcriptionTimeoutMsDefaultsTo15SecondsWhenNeverSaved() = runTest {
         val repository = newRepository()

@@ -1754,3 +1754,25 @@ unitários verdes. Instrumentados: `LocalTranscriberDeviceTest` (binder real: MO
 erro local; mata o `:inference` e o próximo uso sobe outro processo; `release` solta o bind),
 `SettingsRepositoryTest` (Local não carrega credenciais mesmo com tokens salvos) e, no ponta a ponta,
 o `:inference` morto no meio de uma transcrição longa → erro para quem esperava, e a seguinte funciona.
+
+## native-voice-models — NM-T10 (2026-09-25)
+
+Gerenciador de modelos na aba Voz (origem Local). `LocalModelsUi.compose` (pura): catálogo ×
+instalados × download ativo × falhas × seleção × RAM → um card por modelo — disponível (Baixar,
+indisponível com outro download em curso), baixando (barra + % / "Aguardando rede" / "Verificando" +
+Cancelar), baixado (Apagar; tocar seleciona), selecionado (marcado, borda teal); aviso "Pode ser pesado
+neste aparelho" quando a RAM total < recomendada (CAT-03); falha do último download no card (DLM-02).
+Espaço insuficiente e armazenamento indisponível explicados no card (DLM-05). Dados móveis e apagar
+confirmam **no próprio card** (SPEC_DEVIATION registrado). Dropdown de idioma → `localLanguage`; nota
+de privacidade (MGR-06).
+
+`LocalModelsController` (real, na `SetupActivity`): só com a tela visível (onStart/onStop) —
+reconcilia ao abrir (DLM-07), polling de 500 ms e fecha o download que terminou sem depender do
+broadcast. Auto-seleção pós-download (MGR-03) no `ModelDownloader.onInstalled` →
+`SettingsRepository.selectLocalModelIfNone` (escrita atômica só da chave; não disputa com o
+auto-save da tela).
+
+9 unitários da composição/textos (391 no total, verdes); `LocalPanelTest` instrumentado com gerenciador
+fake (4 estados, seleção persiste, apagar com confirmação e limpando a seleção, dados móveis pede e
+baixa com a flag, espaço insuficiente, aviso de peso, idioma); `SettingsRepositoryTest` cobre a
+auto-seleção; `VozPanelTest` atualizado (o placeholder saiu).

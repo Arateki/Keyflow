@@ -2,6 +2,7 @@ package com.keyflow.data.models
 
 import android.content.Context
 import android.net.ConnectivityManager
+import com.keyflow.data.SettingsRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -11,6 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -151,6 +153,8 @@ class ModelDownloader(
     private val volumes: VolumeStats = VolumeStats.Files,
     private val catalog: (String) -> ModelSpec? = ModelCatalog::byId,
     private val pollMs: Long = 500,
+    /** Chamado depois de cada instalação concluída (auto-seleção, MGR-03). Na thread de quem fechou. */
+    private val onInstalled: (String) -> Unit = {},
 ) {
 
     private val _failures = MutableStateFlow<Map<String, DownloadFailure>>(emptyMap())
@@ -259,6 +263,7 @@ class ModelDownloader(
             return fail(modelId, DownloadFailure.INSTALL_FAILED)
         }
         discard(modelId)
+        onInstalled(modelId)
         return CompletionResult.Installed
     }
 
@@ -332,11 +337,14 @@ class ModelDownloader(
 
         fun create(context: Context, store: ModelStore): ModelDownloader {
             val connectivity = context.getSystemService(ConnectivityManager::class.java)
+            val settings = SettingsRepository(context)
             return ModelDownloader(
                 gateway = SystemDownloadGateway(context),
                 tmpRoot = context.getExternalFilesDir(null)?.let { File(it, TMP_DIR) },
                 store = store,
                 isMetered = { connectivity.isActiveNetworkMetered },
+                // Já fora da main thread (finish lê centenas de MB): a escrita curta no DataStore cabe aqui.
+                onInstalled = { id -> runBlocking { settings.selectLocalModelIfNone(id) } },
             )
         }
     }

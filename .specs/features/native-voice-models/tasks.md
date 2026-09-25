@@ -1,7 +1,7 @@
 # Native Voice Models — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (G1–G11)
-**Status**: Em execução — NM-T1..T9 escritas (2026-09-25); instrumentados de T2/T4..T9 e goldens `config-voz-*` aguardando a rodada do CI. Próxima: NM-T10.
+**Status**: Em execução — NM-T1..T10 escritas (2026-09-25); instrumentados de T2/T4..T10 e goldens `config-voz-*` aguardando a rodada do CI. Próxima: NM-T11.
 
 > Gate no sandbox: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon <task>`
 > Instrumentado escopado: `ANDROID_SERIAL=emulator-5554`. Antes de instalar no device do Yan:
@@ -197,7 +197,13 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
 
 ## Fase E — UI
 
-### NM-T10 — `LocalPanel` (gerenciador na aba Voz)
+### NM-T10 — `LocalPanel` (gerenciador na aba Voz) ✅ CONCLUÍDA (2026-09-25; instrumentado via CI)
+> **SPEC_DEVIATION (confirmações)**: dados móveis (DLM-04) e apagar (MGR-04) confirmam **dentro do
+> próprio card** ("Baixar ~639 MB por dados móveis?" / "Apagar Rápido? Libera ~153 MB." + Cancelar /
+> confirmar), não em janela modal — o app não tem diálogos no padrão Ateliê e o inline sai
+> determinístico nos goldens. Mesmo efeito: nada baixa por dados móveis nem apaga sem o segundo toque.
+> Auto-seleção (MGR-03) fica no `ModelDownloader` (`onInstalled` → `selectLocalModelIfNone`, escrita
+> atômica só da chave) — vale também para instalação feita pelo broadcast com o app fechado.
 - **What**: branch LOCAL real do `VozPanel`: lista do catálogo (nome/tamanho/idiomas/summary) com
   estados disponível/baixando(%+Cancelar)/baixado(+Deletar)/selecionado; diálogos (metered com
   tamanho DLM-04; confirmação de deleção MGR-04); auto-seleção pós-download (MGR-03); aviso de

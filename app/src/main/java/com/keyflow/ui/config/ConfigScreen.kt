@@ -94,6 +94,8 @@ fun ConfigScreen(
     initialUnlockOpen: Boolean = false,
     requestedTab: ConfigTab? = null,
     requestedTabKey: Int = 0,
+    localModels: LocalModelsUi = LocalModelsUi.EMPTY,
+    localActions: LocalModelActions = LocalModelActions.None,
 ) {
     val palette = LocalKeyFlowPalette.current
     var activeTab by rememberSaveable { mutableStateOf(initialTab) }
@@ -257,6 +259,8 @@ fun ConfigScreen(
                         ConfigTab.VOZ -> VozPanel(
                             settings = settings,
                             onSettingsChange = onSettingsChange,
+                            localModels = localModels,
+                            localActions = localActions,
                         )
                         ConfigTab.TECLADO -> TecladoPanel(
                             settings = settings,

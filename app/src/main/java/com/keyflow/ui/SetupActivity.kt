@@ -36,6 +36,10 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import com.keyflow.ui.config.LocalModelsUi
+import com.keyflow.ui.config.LocalModelsSnapshot
+import com.keyflow.ui.config.LocalModelsController
 
 /**
  * Tela de configuração em Compose (T10). Substitui o formulário XML legado pelo scaffold de abas
@@ -74,6 +78,11 @@ class SetupActivity : ComponentActivity() {
     }
 
     private var settings by mutableStateOf(Settings())
+
+    // Modelos de voz locais (native-voice-models, NM-T10).
+    private val localModels by lazy { LocalModelsController(this) }
+    private var localSnapshot by mutableStateOf(LocalModelsSnapshot.EMPTY)
+    private var localModelsJob: Job? = null
     // Evita piscar o onboarding antes do 1º valor do DataStore chegar (ONB-03).
     private var settingsLoaded by mutableStateOf(false)
     // Barras/grades de atalhos do teclado (SB-T9) — chaves de DataStore próprias, fora de `Settings`.
@@ -168,6 +177,14 @@ class SetupActivity : ComponentActivity() {
                         },
                         requestedTab = requestedTab,
                         requestedTabKey = requestedTabKey,
+                        localModels = LocalModelsUi.compose(
+                            installed = localSnapshot.installed,
+                            active = localSnapshot.active,
+                            failures = localSnapshot.failures,
+                            selectedId = settings.localModelId,
+                            deviceRamMb = localModels.deviceRamMb,
+                        ),
+                        localActions = localModels,
                     )
                 } else {
                     OnboardingScreen(
@@ -402,6 +419,18 @@ class SetupActivity : ComponentActivity() {
         if (settings.keyboardModeEnabled != permissions.keyboardActive) {
             persistKeyboardModeEnabled(permissions.keyboardActive)
         }
+    }
+
+    /** Gerenciador de modelos só acompanha disco/downloads com a tela visível (polling de 500 ms). */
+    override fun onStart() {
+        super.onStart()
+        localModelsJob = activityScope.launch { localModels.snapshots().collect { localSnapshot = it } }
+    }
+
+    override fun onStop() {
+        localModelsJob?.cancel()
+        localModelsJob = null
+        super.onStop()
     }
 
     override fun onDestroy() {
