@@ -1788,3 +1788,12 @@ NM-T14: `Settings.partialOnPause`/`partialViewEdit` (persistidos, padrão deslig
 (PAR-01). `ToggleRow` passou do `TecladoPanel` para o `ConfigFields`. A seção nova muda todos os
 `config-voz-*` de propósito. Testes: `VozPanelTest.partialToggles` e
 `SettingsRepositoryTest.partialTogglesPersistAndDefaultOff`.
+
+## native-voice-models — NM-T15 (2026-09-25)
+
+`AudioRecorder.start(segmented = true)` (PAR-02): cada pausa fecha o arquivo do trecho (stop real,
+MediaRecorder solto) e o devolve; retomar abre um arquivo novo; `stop()` devolve o trecho em curso
+(null se parou pausado); trecho abaixo do mínimo de 300 ms é descartado; `discard()` apaga todos.
+Duração ativa acumulada atravessa os trechos. Desligado, nada muda (os testes antigos do recorder
+seguem iguais). 4 instrumentados novos: 2 pausas → 3 arquivos reproduzíveis (`MediaMetadataRetriever`)
+e 1,8 s ativos com relógio controlado; parar pausado; trecho curto descartado; descartar apaga tudo.

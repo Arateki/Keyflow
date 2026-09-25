@@ -204,7 +204,7 @@ o texto completo com a edição preservada; buffer some.
 | STO-02 | P2-D | NM-T1, NM-T12 | Implementing |
 | STO-03 | P2-D | NM-T12 | In Tasks |
 | PAR-01 | P2-E | NM-T14 | Implemented |
-| PAR-02 | P2-E | NM-T15 | In Tasks |
+| PAR-02 | P2-E | NM-T15 | Implemented |
 | PAR-03 | P2-E | NM-T16 | In Tasks |
 | PAR-04 | P2-E | NM-T17 | In Tasks |
 | PAR-05 | P2-E | NM-T17 | In Tasks |

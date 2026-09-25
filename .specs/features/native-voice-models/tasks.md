@@ -1,7 +1,7 @@
 # Native Voice Models — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (G1–G11)
-**Status**: Em execução — NM-T1..T11 e T14 escritas (2026-09-25); instrumentados de T2/T4..T10 e T14 e goldens `config-voz-*` aguardando a rodada do CI. Próxima: NM-T15.
+**Status**: Em execução — NM-T1..T11, T14 e T15 escritas (2026-09-25); instrumentados de T2/T4..T10, T14 e T15 e goldens `config-voz-*` aguardando a rodada do CI. Próxima: NM-T16.
 
 > Gate no sandbox: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon <task>`
 > Instrumentado escopado: `ANDROID_SERIAL=emulator-5554`. Antes de instalar no device do Yan:
@@ -243,7 +243,10 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
   suíte existente verde.
 - **Tests**: unit + instrumented (camadas `data`/`ui`). **Gate**: `full`.
 
-### NM-T15 — `AudioRecorder` segmentado
+### NM-T15 — `AudioRecorder` segmentado ✅ CONCLUÍDA (2026-09-25; instrumentado via CI)
+> `pause()` passou a devolver `File?` (o trecho fechado no modo segmentado; null fora dele) — quem
+> ignora o retorno segue compilando igual. `segments` lista os trechos fechados; `activeDurationMs()`
+> ficou pública (REC-06 atravessa trechos).
 - **What**: modo segmentado opt-in (`segmented: Boolean` no start): `pause()` finaliza o arquivo
   do segmento (stop real) e o expõe; `resume()` inicia novo arquivo; duração ativa acumulada
   (REC-06) atravessa segmentos; API pública p/ o coordinator inalterada; `discard()` apaga todos
