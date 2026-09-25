@@ -1776,3 +1776,15 @@ auto-save da tela).
 fake (4 estados, seleção persiste, apagar com confirmação e limpando a seleção, dados móveis pede e
 baixa com a flag, espaço insuficiente, aviso de peso, idioma); `SettingsRepositoryTest` cobre a
 auto-seleção; `VozPanelTest` atualizado (o placeholder saiu).
+
+## native-voice-models — NM-T11 (rotas) e NM-T14 (2026-09-25)
+
+NM-T11: rotas `config-voz-local` (nada baixado), `config-voz-local-baixando` (Equilibrado em 42%,
+congelado) e `config-voz-local-pronto` (Rápido instalado e selecionado), com RAM fixa de 8 GB para o
+aviso de peso não depender do aparelho. Goldens saem das telas do CI, depois de revisadas.
+
+NM-T14: `Settings.partialOnPause`/`partialViewEdit` (persistidos, padrão desligado) e seção
+"Transcrição" no topo da aba Voz com os dois toggles — o 2º esmaecido e inerte com o 1º desligado
+(PAR-01). `ToggleRow` passou do `TecladoPanel` para o `ConfigFields`. A seção nova muda todos os
+`config-voz-*` de propósito. Testes: `VozPanelTest.partialToggles` e
+`SettingsRepositoryTest.partialTogglesPersistAndDefaultOff`.

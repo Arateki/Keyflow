@@ -97,6 +97,10 @@ data class Settings(
     // KeyFlow simplesmente desaparece nessa situação, e o Gboard também mostra. Desmarcar devolve o
     // comportamento do sistema.
     val keyboardShowWithHardKeyboard: Boolean = true,
+    // Transcrição parcial ao pausar (native-voice-models, G12 / PAR-01): cada pausa transcreve o trecho
+    // gravado até ali para um buffer da sessão; o 2º toggle só vale com o 1º ligado. Agnósticos à origem.
+    val partialOnPause: Boolean = false,
+    val partialViewEdit: Boolean = false,
 ) {
     /**
      * Resolve a [Config] efetiva para uma origem (VOZ-02/03/06). CREDITS é stub: retorna

@@ -43,6 +43,8 @@ const val VOZ_LANGUAGE_TAG = "voz-language"
 const val VOZ_ENDPOINT_TAG = "voz-endpoint"
 const val VOZ_HEADER_NAME_TAG = "voz-header-name"
 const val VOZ_HEADER_VALUE_TAG = "voz-header-value"
+const val VOZ_PARTIAL_ON_PAUSE_TAG = "voz-partial-on-pause"
+const val VOZ_PARTIAL_VIEW_EDIT_TAG = "voz-partial-view-edit"
 
 /**
  * Aba Voz (VOZ-01..06): origem da transcrição via [Segmented] + campos por preset com auto-save.
@@ -67,6 +69,7 @@ fun VozPanel(
             .verticalScroll(scroll)
             .padding(top = 6.dp, bottom = 20.dp),
     ) {
+        PartialSection(settings, onSettingsChange)
         Text(
             text = "Origem da transcrição".uppercase(),
             color = palette.faint,
@@ -175,6 +178,33 @@ private fun maxRecordingLabel(sec: Int): String = when (sec) {
     600 -> "10m"
     1800 -> "30m"
     else -> if (sec < 60) "${sec}s" else "${sec / 60}m"
+}
+
+/**
+ * Seção "Transcrição" (PAR-01, G12): acima da origem porque vale para qualquer uma. O 2º toggle só
+ * responde com o 1º ligado; desligar o 1º não apaga o 2º (volta como estava ao religar).
+ */
+@Composable
+private fun PartialSection(settings: Settings, onSettingsChange: (Settings) -> Unit) {
+    val palette = LocalKeyFlowPalette.current
+    Column(Modifier.padding(bottom = 20.dp)) {
+        Text(text = "Transcrição".uppercase(), color = palette.faint, fontFamily = SpaceMono, fontSize = 8.5.sp)
+        ToggleRow(
+            label = "Transcrever parcialmente ao pausar",
+            sub = "Cada pausa já transcreve o trecho gravado; o envio final fica quase instantâneo.",
+            checked = settings.partialOnPause,
+            onCheckedChange = { onSettingsChange(settings.copy(partialOnPause = it)) },
+            tag = VOZ_PARTIAL_ON_PAUSE_TAG,
+        )
+        ToggleRow(
+            label = "Visualizar e editar transcrição parcial",
+            sub = "Toque no aviso junto à orbe pausada para ver e corrigir o texto antes de enviar.",
+            checked = settings.partialViewEdit,
+            onCheckedChange = { onSettingsChange(settings.copy(partialViewEdit = it)) },
+            tag = VOZ_PARTIAL_VIEW_EDIT_TAG,
+            enabled = settings.partialOnPause,
+        )
+    }
 }
 
 /**

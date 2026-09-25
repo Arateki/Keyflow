@@ -167,6 +167,20 @@ class SettingsRepositoryTest {
         assertEquals(Config.LOCAL_MIN_TIMEOUT_MS, cfg.timeoutMs)
     }
 
+    /** PAR-01: os toggles do parcial persistem e o padrão é desligado. */
+    @Test
+    fun partialTogglesPersistAndDefaultOff() = runTest {
+        val repository = newRepository()
+        assertEquals(false, repository.settingsFlow().first().partialOnPause)
+        assertEquals(false, repository.settingsFlow().first().partialViewEdit)
+
+        repository.saveSettings(Settings(partialOnPause = true, partialViewEdit = true))
+
+        val read = repository.settingsFlow().first()
+        assertEquals(true, read.partialOnPause)
+        assertEquals(true, read.partialViewEdit)
+    }
+
     /** MGR-03: instalou e não havia seleção → seleciona; havia → não troca; não mexe no resto. */
     @Test
     fun selectLocalModelIfNoneOnlyFillsAnEmptySelection() = runTest {

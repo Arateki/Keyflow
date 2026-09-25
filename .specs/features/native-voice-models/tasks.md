@@ -1,7 +1,7 @@
 # Native Voice Models — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (G1–G11)
-**Status**: Em execução — NM-T1..T10 escritas (2026-09-25); instrumentados de T2/T4..T10 e goldens `config-voz-*` aguardando a rodada do CI. Próxima: NM-T11.
+**Status**: Em execução — NM-T1..T11 e T14 escritas (2026-09-25); instrumentados de T2/T4..T10 e T14 e goldens `config-voz-*` aguardando a rodada do CI. Próxima: NM-T15.
 
 > Gate no sandbox: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon <task>`
 > Instrumentado escopado: `ANDROID_SERIAL=emulator-5554`. Antes de instalar no device do Yan:
@@ -217,7 +217,7 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
   seleção persiste + confirmação de deleção + diálogo metered; suíte existente da config verde.
 - **Tests**: unit + instrumented (camada `ui`). **Gate**: `full`.
 
-### NM-T11 — Rotas de galeria + goldens
+### NM-T11 — Rotas de galeria + goldens ✅ ROTAS ESCRITAS (2026-09-25; goldens a aprovar pelas telas do CI)
 - **What**: rotas `config-voz-local` (vazio) / `config-voz-local-baixando` (progresso congelado) /
   `config-voz-local-pronto` (1 selecionado + 1 disponível) com fakes determinísticos; regenerar +
   aprovar goldens (claro/escuro); espelhar PNGs em `/tmp/keyflow-prints/`.
@@ -230,7 +230,9 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
 
 ## Fase F — Transcrição parcial ao pausar (G12)
 
-### NM-T14 — Toggles `partialOnPause`/`partialViewEdit` na aba Voz
+### NM-T14 — Toggles `partialOnPause`/`partialViewEdit` na aba Voz ✅ CONCLUÍDA (2026-09-25; instrumentado via CI)
+> `ToggleRow` saiu do `TecladoPanel` para o `ConfigFields` (reuso). A seção entra no topo da aba Voz:
+> **todos** os goldens `config-voz-*` mudam de propósito (aprovar pelas telas do CI).
 - **What**: `Settings` += `partialOnPause: Boolean = false`, `partialViewEdit: Boolean = false`
   (persistidos); seção "Transcrição" na aba Voz (acima do Segmented de origem) com os 2 toggles —
   o 2º desabilitado quando o 1º está off (PAR-01).

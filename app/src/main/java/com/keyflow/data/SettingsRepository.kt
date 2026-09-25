@@ -200,6 +200,8 @@ class SettingsRepository(
             keyboardScalePercent = prefs[KEYBOARD_SCALE_PERCENT] ?: 100,
             keyboardLanguage = prefs[KEYBOARD_LANGUAGE] ?: "pt",
             keyboardNumberRowEnabled = prefs[KEYBOARD_NUMBER_ROW_ENABLED] ?: false,
+            partialOnPause = prefs[PARTIAL_ON_PAUSE] ?: false,
+            partialViewEdit = prefs[PARTIAL_VIEW_EDIT] ?: false,
             keyboardShowWithHardKeyboard = prefs[KEYBOARD_SHOW_WITH_HARD_KEYBOARD] ?: true,
         )
     }
@@ -248,6 +250,8 @@ class SettingsRepository(
             prefs[KEYBOARD_SCALE_PERCENT] = settings.keyboardScalePercent
             prefs[KEYBOARD_LANGUAGE] = settings.keyboardLanguage
             prefs[KEYBOARD_NUMBER_ROW_ENABLED] = settings.keyboardNumberRowEnabled
+            prefs[PARTIAL_ON_PAUSE] = settings.partialOnPause
+            prefs[PARTIAL_VIEW_EDIT] = settings.partialViewEdit
             prefs[KEYBOARD_SHOW_WITH_HARD_KEYBOARD] = settings.keyboardShowWithHardKeyboard
         }
     }
@@ -353,6 +357,8 @@ class SettingsRepository(
         val KEYBOARD_SCALE_PERCENT = intPreferencesKey("keyboard_scale_percent")
         val KEYBOARD_LANGUAGE = stringPreferencesKey("keyboard_language")
         val KEYBOARD_NUMBER_ROW_ENABLED = booleanPreferencesKey("keyboard_number_row_enabled")
+        val PARTIAL_ON_PAUSE = booleanPreferencesKey("partial_on_pause")
+        val PARTIAL_VIEW_EDIT = booleanPreferencesKey("partial_view_edit")
         val KEYBOARD_SHOW_WITH_HARD_KEYBOARD = booleanPreferencesKey("keyboard_show_with_hard_keyboard")
         // Trabalho 3 (shortcut-bars): barras personalizáveis + teclados de atalhos, como JSON.
         val BARS_CONFIG_JSON = stringPreferencesKey("bars_config_json")
