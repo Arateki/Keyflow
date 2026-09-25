@@ -205,13 +205,13 @@ o texto completo com a edição preservada; buffer some.
 | STO-03 | P2-D | NM-T12 | In Tasks |
 | PAR-01 | P2-E | NM-T14 | Implemented |
 | PAR-02 | P2-E | NM-T15 | Implemented |
-| PAR-03 | P2-E | NM-T16 | In Tasks |
+| PAR-03 | P2-E | NM-T16 | Implementing |
 | PAR-04 | P2-E | NM-T17 | In Tasks |
 | PAR-05 | P2-E | NM-T17 | In Tasks |
-| PAR-06 | P2-E | NM-T16, NM-T17 | In Tasks |
-| PAR-07 | P2-E | NM-T18 | In Tasks |
-| PAR-08 | P2-E | NM-T18 | In Tasks |
-| PAR-09 | P2-E | NM-T16, NM-T18 | In Tasks |
+| PAR-06 | P2-E | NM-T16, NM-T17 | Implementing |
+| PAR-07 | P2-E | NM-T18 | Implementing |
+| PAR-08 | P2-E | NM-T18 | Implementing |
+| PAR-09 | P2-E | NM-T16, NM-T18 | Implementing |
 
 **Coverage:** 40 total, 40 mapeados em tasks, 0 sem mapa.
 **Status values:** Pending → In Design → In Tasks → Implementing → Verified.

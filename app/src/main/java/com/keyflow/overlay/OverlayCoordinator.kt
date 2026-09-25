@@ -9,6 +9,8 @@ import com.keyflow.core.ErrorNavTarget
 import com.keyflow.core.InsertOutcome
 import com.keyflow.core.TranscriptionResult
 import com.keyflow.data.Config
+import com.keyflow.transcription.partial.PartialSession
+import com.keyflow.transcription.partial.PartialSnapshot
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
@@ -23,6 +25,15 @@ interface OverlayAudioRecorder {
     fun resume() {}
     /** Encerra e descarta a gravação sem devolver o arquivo (cancelar — Fase 2a). */
     fun discard() {}
+
+    /** Inicia no modo segmentado (transcrição parcial ao pausar, PAR-02). Sem suporte: sessão comum. */
+    fun startSegmented() = start()
+
+    /** Pausa fechando o trecho (modo segmentado) e o devolve; sem suporte, só pausa. */
+    fun pauseSegment(): File? {
+        pause()
+        return null
+    }
 }
 
 interface OverlayTranscriber {
@@ -69,6 +80,10 @@ class OverlayCoordinator(
     // Funde os segmentos retidos num arquivo só antes de reenviar (ver stopAndTranscribe()). Injetável
     // porque o real usa MediaExtractor/MediaMuxer (framework Android, não roda em unit test puro).
     private val concatAudioSegments: (List<File>, File) -> File = { segments, dir -> AudioConcatenator.concat(segments, dir) },
+    // Transcrição parcial ao pausar (G12): lido no início de cada sessão — mudar no meio vale para a próxima.
+    private val partialOnPause: () -> Boolean = { false },
+    // Estado do parcial para a UI junto à orbe (PAR-04/05); null quando a sessão acaba.
+    private val onPartial: (PartialSnapshot?) -> Unit = {},
 ) {
     private val machine = ButtonStateMachine(targetAvailable = targetAvailable)
     private var recordingStartMs = 0L
@@ -99,6 +114,36 @@ class OverlayCoordinator(
     // sem essa separação entre "decisão pendente" e "banner visível", cancelar+desfazer+retomar burlava o
     // limite de vez (bug reportado pelo Yan, 2026-07-03).
     private var limitDecisionPending = false
+
+    // Sessão com transcrição parcial (G12): cada pausa fecha um trecho e o transcreve para o buffer.
+    // Vive da gravação até a entrega ou o cancelamento concluído — sobrevive ao "desfazer" (PAR-08).
+    private var partial: PartialSession? = null
+    // true = o recorder da sessão parcial foi encerrado (envio que foi cancelado e desfeito): retomar abre
+    // uma nova gravação segmentada, e os trechos continuam na mesma sessão.
+    private var partialRecorderStopped = false
+
+    /** Edição do texto parcial pelo usuário (PAR-06) — o que ele escreveu passa a ser o buffer. */
+    fun onPartialEdited(text: String) {
+        partial?.edit(text)
+    }
+
+    /** Pausa o recorder; na sessão parcial, o trecho fechado vai para a fila de transcrição (PAR-03). */
+    private fun pauseRecorder() {
+        val session = partial
+        if (session == null) {
+            runCatching { recorder.pause() }
+            return
+        }
+        if (partialRecorderStopped) return
+        runCatching { recorder.pauseSegment() }.getOrNull()?.let(session::enqueue)
+    }
+
+    private fun endPartial() {
+        partial?.discard()
+        partial = null
+        partialRecorderStopped = false
+        onPartial(null)
+    }
 
     // Tempo de gravação (acumulado + início do segmento atual), publicado a cada transição.
     private var timeAccumulatedMs = 0L
@@ -179,7 +224,7 @@ class OverlayCoordinator(
     /** Atingido o tempo configurado: pausa a gravação (retém o áudio) e avisa "enviar ou descartar". */
     private fun onLimitReached() {
         if (machine.state != ButtonState.RECORDING) return
-        runCatching { recorder.pause() }
+        pauseRecorder()
         timeFreeze()
         render(machine.onPause())
         showLimitBanner()
@@ -223,7 +268,7 @@ class OverlayCoordinator(
             transcribeJob = null
             runCatching { transcriber.cancelInFlight() }
         } else {
-            runCatching { recorder.pause() }
+            pauseRecorder()
             if (before == ButtonState.RECORDING) timeFreeze() // vindo de PAUSED já estava congelado
         }
         render(next)
@@ -254,6 +299,7 @@ class OverlayCoordinator(
         cancelJob = null
         limitDecisionPending = false // áudio descartado de vez: não há mais nada a enviar/descartar
         runCatching { recorder.discard() } // no-op se o recorder já tinha sido liberado (veio de SENDING)
+        endPartial() // PAR-08: o buffer vai junto com o áudio
         pendingAudioFile?.delete()
         pendingAudioFile = null
         continuingPendingAudio = false
@@ -313,13 +359,25 @@ class OverlayCoordinator(
             GestureIntent.STOP -> handleState(machine.onStop())     // → stopAndTranscribe
             GestureIntent.PAUSE -> {
                 cancelLimitJob()
-                runCatching { recorder.pause() }
+                pauseRecorder()
                 timeFreeze()
                 render(machine.onPause())
             }
             GestureIntent.RESUME -> {
                 if (limitDecisionPending) {
                     retriggerLimitBanner()
+                } else if (partial != null && partialRecorderStopped) {
+                    // Desfez um cancelamento feito durante o envio da sessão parcial: o recorder já tinha
+                    // sido encerrado — nova gravação segmentada, mesmos buffer e trechos.
+                    if (maxRecordingMs() > 0L && priorSegmentsMs >= maxRecordingMs()) {
+                        showLimitBanner()
+                    } else {
+                        partialRecorderStopped = false
+                        runCatching { recorder.startSegmented() }
+                        timeStart()
+                        scheduleLimitJob()
+                        render(machine.onResume())
+                    }
                 } else if (pendingAudioFile != null) {
                     // Desfez um cancelamento que começou durante SENDING: não há sessão de gravação viva
                     // pra continuar (o recorder já foi liberado no primeiro stop()), mas o Yan pode querer
@@ -381,8 +439,17 @@ class OverlayCoordinator(
         recordingStartMs = recordingClockMs()
         timeStart()
         scheduleLimitJob()
-        runCatching { recorder.start() }
+        endPartial()
+        if (partialOnPause()) {
+            partial = PartialSession(
+                scope = scope,
+                transcribe = { segment -> transcribeWithTimeout(segment) },
+                onChange = { onPartial(it) },
+            )
+        }
+        runCatching { if (partial != null) recorder.startSegmented() else recorder.start() }
             .onFailure {
+                endPartial()
                 // Rede de segurança: se a checagem proativa passou mas o recorder nativo ainda assim
                 // falhou por permissão (ex.: revogada bem no meio), não perde a mensagem certa.
                 val target = if (!microphoneGranted()) ErrorNavTarget.MODO_MIC else ErrorNavTarget.NONE
@@ -395,6 +462,10 @@ class OverlayCoordinator(
         limitDecisionPending = false
         hideLimitBannerView()
         cancelLimitJob()
+        partial?.let { session ->
+            stopPartialAndDeliver(session)
+            return
+        }
 
         // Reenvio puro (cancelou durante SENDING, desfez e mandou de novo sem gravar mais nada): não houve
         // sessão viva nesse meio-tempo, então NÃO soma o tempo ocioso da interação com o banner como se
@@ -455,19 +526,7 @@ class OverlayCoordinator(
         val attempt = ++sendAttempt
 
         transcribeJob = scope.launch {
-            val cfg = configProvider()
-            // Rede de segurança além do callTimeout do WhisperApi (Yan, 2026-07-01): garante que o
-            // coordinator sempre desiste dentro de cfg.timeoutMs + margem, mesmo se o transcriber travar
-            // por um caminho que o OkHttp não cobre (ex.: implementação customizada de OverlayTranscriber).
-            val result = runCatching {
-                withTimeout(cfg.timeoutMs + TIMEOUT_SAFETY_MARGIN_MS) { transcriber.transcribe(audio, cfg) }
-            }.getOrElse { e ->
-                if (e is TimeoutCancellationException) {
-                    TranscriptionResult.Error(ErrorKind.TIMEOUT, "client-side timeout after ${cfg.timeoutMs}ms")
-                } else {
-                    TranscriptionResult.Error(ErrorKind.NETWORK, e.message.orEmpty())
-                }
-            }
+            val result = transcribeWithTimeout(audio)
 
             // Cancelado enquanto enviava (onCancel() já moveu a máquina pra CANCELLING/PAUSED/idle) — ou
             // já superado por um reenvio mais novo (cancelar+desfazer+enviar de novo antes desta corrotina
@@ -478,21 +537,76 @@ class OverlayCoordinator(
             if (attempt != sendAttempt || machine.state != ButtonState.SENDING) return@launch
             pendingAudioFile = null
             priorSegmentsMs = 0L
+            deliver(result)
+        }
+    }
 
-            when (result) {
-                is TranscriptionResult.Success -> {
-                    if (insertOrHold(result.text) == InsertOutcome.Held) {
-                        Log.d(TAG, "transcription held → clipboard: '${result.text.take(30)}'")
-                        onClipboard(result.text)
-                    }
-                    render(machine.onTranscriptionSuccess())
-                }
-                is TranscriptionResult.Error -> {
-                    Log.d(TAG, "transcription error: ${result.kind} ${result.message}")
-                    onError(errorMessage(result), errorNavTarget(result.kind))
-                    handleState(machine.onTranscriptionError())
-                }
+    /**
+     * Transcreve um arquivo com a config do momento. Rede de segurança além do callTimeout do WhisperApi
+     * (Yan, 2026-07-01): garante que o coordinator sempre desiste dentro de cfg.timeoutMs + margem, mesmo
+     * se o transcriber travar por um caminho que o OkHttp não cobre (ex.: implementação customizada de
+     * OverlayTranscriber). Usado também por trecho da sessão parcial.
+     */
+    private suspend fun transcribeWithTimeout(audio: File): TranscriptionResult {
+        val cfg = configProvider()
+        return runCatching {
+            withTimeout(cfg.timeoutMs + TIMEOUT_SAFETY_MARGIN_MS) { transcriber.transcribe(audio, cfg) }
+        }.getOrElse { e ->
+            when (e) {
+                is TimeoutCancellationException ->
+                    TranscriptionResult.Error(ErrorKind.TIMEOUT, "client-side timeout after ${cfg.timeoutMs}ms")
+                // Cancelamento de quem chamou (cancelar durante o envio) não vira erro: propaga.
+                is kotlinx.coroutines.CancellationException -> throw e
+                else -> TranscriptionResult.Error(ErrorKind.NETWORK, e.message.orEmpty())
             }
+        }
+    }
+
+    /** Entrega o resultado final pelo fluxo de sempre: inserção/pendência/clipboard ou erro. */
+    private fun deliver(result: TranscriptionResult) {
+        when (result) {
+            is TranscriptionResult.Success -> {
+                if (insertOrHold(result.text) == InsertOutcome.Held) {
+                    Log.d(TAG, "transcription held → clipboard: '${result.text.take(30)}'")
+                    onClipboard(result.text)
+                }
+                render(machine.onTranscriptionSuccess())
+            }
+            is TranscriptionResult.Error -> {
+                Log.d(TAG, "transcription error: ${result.kind} ${result.message}")
+                onError(errorMessage(result), errorNavTarget(result.kind))
+                handleState(machine.onTranscriptionError())
+            }
+        }
+    }
+
+    /**
+     * Envio da sessão parcial (PAR-07/09): fecha o trecho em curso, espera a fila (refazendo os que
+     * falharam) e entrega o texto inteiro — buffer com as edições + último trecho — pelo fluxo de sempre.
+     * Cancelar durante o envio mantém a sessão (o desfazer volta a ela, PAR-08); a entrega a encerra.
+     */
+    private fun stopPartialAndDeliver(session: PartialSession) {
+        timeFreeze()
+        val segmentMs = timeAccumulatedMs
+        timeReset()
+        if (!partialRecorderStopped) {
+            runCatching { recorder.stop() }.getOrNull()?.let(session::enqueue)
+            partialRecorderStopped = true
+        }
+        if (session.isEmpty && recordingClockMs() - recordingStartMs < MIN_RECORDING_MS) {
+            endPartial()
+            onError("Gravação muito curta.", ErrorNavTarget.NONE)
+            render(machine.onErrorDismissed())
+            return
+        }
+        priorSegmentsMs += segmentMs
+        val attempt = ++sendAttempt
+        transcribeJob = scope.launch {
+            val result = session.finish()
+            if (attempt != sendAttempt || machine.state != ButtonState.SENDING) return@launch
+            priorSegmentsMs = 0L
+            endPartial()
+            deliver(result)
         }
     }
 

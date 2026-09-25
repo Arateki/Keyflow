@@ -236,6 +236,7 @@ class OverlayService : Service() {
         coordinator = OverlayCoordinator(
             scope = serviceScope,
             configProvider = { settingsRepository.flow().first() },
+            partialOnPause = { cachedSettings.partialOnPause },
             recorder = AndroidOverlayAudioRecorder(AudioRecorder(this)),
             transcriber = RoutingTranscriber(
                 http = AndroidOverlayTranscriber(TranscriptionClient()),
@@ -799,6 +800,12 @@ class OverlayService : Service() {
         override fun discard() {
             recorder.discard()
         }
+
+        override fun startSegmented() {
+            recorder.start(segmented = true)
+        }
+
+        override fun pauseSegment(): File? = recorder.pause()
     }
 
     private class AndroidOverlayTranscriber(

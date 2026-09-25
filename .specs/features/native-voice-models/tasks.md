@@ -1,7 +1,7 @@
 # Native Voice Models — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (G1–G11)
-**Status**: Em execução — NM-T1..T11, T14 e T15 escritas (2026-09-25); instrumentados de T2/T4..T10, T14 e T15 e goldens `config-voz-*` aguardando a rodada do CI. Próxima: NM-T16.
+**Status**: Em execução — NM-T1..T11 e T14..T16 escritas (2026-09-25), com o núcleo da T18; instrumentados de T2/T4..T10, T14 e T15 e goldens `config-voz-*` aguardando a rodada do CI. Próxima: NM-T17.
 
 > Gate no sandbox: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon <task>`
 > Instrumentado escopado: `ANDROID_SERIAL=emulator-5554`. Antes de instalar no device do Yan:
@@ -259,7 +259,15 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
   comportamento antigo (testes existentes verdes).
 - **Tests**: instrumented (camada `audio`). **Gate**: `full`.
 
-### NM-T16 — `PartialSession` (buffer + transcrição por segmento)
+### NM-T16 — `PartialSession` (buffer + transcrição por segmento) ✅ CONCLUÍDA (2026-09-25)
+> **Antecipado da NM-T18 (núcleo do envio/cancelar no coordinator)**: com o toggle já visível desde a
+> T14, ligar só a pausa deixaria o envio entregando **apenas o último trecho**. Então entram juntos:
+> envio = fecha o trecho em curso → `finish()` (refaz falhas, espera a fila) → entrega uma vez pelo
+> fluxo atual → sessão destruída (PAR-07); cancelar de vez apaga trechos e buffer; desfazer mantém a
+> sessão, inclusive após cancelar **durante o envio** (retomar abre nova gravação segmentada na
+> mesma sessão) — PAR-08. Fica para a T18: o `OverlayServiceCancelTest` estendido e o roteiro manual.
+> Ordem com falha: um trecho que falhou segura os seguintes (transcritos, mas não anexados) até ser
+> refeito na próxima pausa ou no envio — o texto nunca sai fora de ordem.
 - **What**: `transcription/partial/PartialSession.kt`: fila de segmentos com estados
   (PENDING/TRANSCRIBING/DONE/FAILED), transcrição pela origem ativa a cada pausa (serializada),
   append ao buffer **sempre ao final** (edições são a verdade — PAR-06), falha → mantém o áudio

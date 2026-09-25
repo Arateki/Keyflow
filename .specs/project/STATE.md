@@ -1797,3 +1797,25 @@ MediaRecorder solto) e o devolve; retomar abre um arquivo novo; `stop()` devolve
 Duração ativa acumulada atravessa os trechos. Desligado, nada muda (os testes antigos do recorder
 seguem iguais). 4 instrumentados novos: 2 pausas → 3 arquivos reproduzíveis (`MediaMetadataRetriever`)
 e 1,8 s ativos com relógio controlado; parar pausado; trecho curto descartado; descartar apaga tudo.
+
+## native-voice-models — NM-T16 (+ núcleo da T18) (2026-09-25)
+
+`PartialSession` (`transcription/partial/`): fila de trechos transcritos um por vez, na ordem, pela
+origem ativa (o mesmo `transcribeWithTimeout` do envio normal — Local ou nuvem); texto vai para o fim
+do buffer, edições do usuário são a verdade (PAR-06); trecho que falhou segura os seguintes até ser
+refeito (na próxima pausa ou no envio), então nada sai fora de ordem (PAR-09); `finish()` refaz as
+falhas, espera a fila e devolve o texto inteiro, o erro do trecho que continua falhando, ou
+EMPTY_AUDIO. Nunca toca clipboard/inserção (PAR-03).
+
+Coordinator: toggle lido no início de cada sessão; `startSegmented`/`pauseSegment` no
+`OverlayAudioRecorder` (padrões que caem no comportamento antigo); toda pausa (gesto, limite, cancelar)
+passa por `pauseRecorder()`, que enfileira o trecho fechado. **Envio e cancelar entraram já** (núcleo
+da T18) — sem eles, com o toggle visível desde a T14, o envio entregaria só o último trecho. Extraídos
+`transcribeWithTimeout` e `deliver` do envio normal (sem mudança de comportamento; cancelamento agora
+propaga em vez de virar erro de rede descartado). `onPartialEdited` e `onPartial` expostos para a UI
+da T17.
+
+Testes: 9 unitários do `PartialSession` + 7 do coordinator (`PartialCoordinatorTest`: pausar não
+entrega; envio junta buffer editado + último trecho e entrega uma vez; falha refeita no envio; cancelar
+e desfazer preserva; cancelar de vez apaga; cancelar durante o envio e desfazer retoma na mesma
+sessão; toggle desligado = fluxo antigo). 407 unitários verdes.
