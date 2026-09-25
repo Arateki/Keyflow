@@ -115,5 +115,16 @@ class ModelStore(private val root: File) {
         const val MODELS_DIR = "models"
         const val MANIFEST = "manifest.json"
         private const val STAGING_SUFFIX = ".installing"
+
+        @Volatile
+        private var instance: ModelStore? = null
+
+        /**
+         * A instância do processo: o downloader instala nela e o cliente local lê dela — um só
+         * `installedIds`, sem reler o disco. (O `:inference` não usa: recebe caminhos pelo AIDL.)
+         */
+        fun get(context: Context): ModelStore = instance ?: synchronized(this) {
+            instance ?: ModelStore(context.applicationContext).also { instance = it }
+        }
     }
 }

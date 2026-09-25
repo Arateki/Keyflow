@@ -1,7 +1,7 @@
 # Native Voice Models — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (G1–G11)
-**Status**: Em execução — NM-T1..T8 escritas (2026-09-25); instrumentados de T2/T4..T8 e goldens `config-voz-*` aguardando a rodada do CI. Próxima: NM-T9.
+**Status**: Em execução — NM-T1..T9 escritas (2026-09-25); instrumentados de T2/T4..T9 e goldens `config-voz-*` aguardando a rodada do CI. Próxima: NM-T10.
 
 > Gate no sandbox: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon <task>`
 > Instrumentado escopado: `ANDROID_SERIAL=emulator-5554`. Antes de instalar no device do Yan:
@@ -172,7 +172,15 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
   `/sdcard/keyflow-test-models/`); unit dos mapeamentos puros (config por tipo, kinds de erro).
 - **Tests**: instrumented + unit (camadas `overlay/service`-like + lógica). **Gate**: `full`.
 
-### NM-T9 — `LocalTranscriber` + fiação no fluxo (coordinator/IME) + preload
+### NM-T9 — `LocalTranscriber` + fiação no fluxo (coordinator/IME) + preload ✅ CONCLUÍDA (2026-09-25; instrumentado via CI)
+> Roteamento: `Config` ganhou `local: EffectiveConfig.Local?` (sem endpoint/token quando Local) e o
+> `RoutingTranscriber` manda para o `LocalTranscriber` ou para o HTTP intocado — o coordinator não mudou
+> de forma. Espera mínima de 180 s para Local (a 1ª inclui carregar o modelo). `ErrorKind.LOCAL` traz a
+> mensagem pronta (modelo sumiu / memória / áudio / engine / processo morto) e o X leva à aba Voz;
+> selecionado mas não baixado = `CONFIG_MISSING` (NAT-03). `LocalTranscriber` é único por processo
+> (overlay e teclado dividem bind e modelo residente); `sync()` pré-carrega ao ativar o modo (orbe,
+> sessão do mic, teclado aberto) e **solta o bind quando a origem deixa de ser Local** — a RAM do modelo
+> volta sem esperar o SO. Bind em uso só cai depois da última resposta.
 - **What**: client IPC (`suspend transcribe` com bind/callback→resultado, `DeathRecipient`→
   `Error(LOCAL)`, timeout generoso); `ErrorKind.LOCAL`; ramificação `EffectiveConfig.Local` no
   coordinator/IME (Ready→HTTP intocado); preload no start do modo com LOCAL+modelo (NAT-05);

@@ -131,9 +131,11 @@ class SettingsRepository(
     fun flow(): Flow<Config> = settingsFlow().map { settings ->
         when (val eff = settings.effectiveConfigFor()) {
             is EffectiveConfig.Ready -> eff.config
-            // O engine local ainda não está ligado ao fluxo de gravação (NM-T9): até lá a origem Local
-            // se comporta como incompleta — Config vazio → CONFIG_MISSING, nunca rede.
-            is EffectiveConfig.Local -> Config()
+            // Sem endpoint nem token: o RoutingTranscriber manda para o :inference (NM-T9, PRV-01).
+            is EffectiveConfig.Local -> Config(
+                timeoutMs = maxOf(settings.transcriptionTimeoutMs.toLong(), Config.LOCAL_MIN_TIMEOUT_MS),
+                local = eff,
+            )
             EffectiveConfig.Unavailable -> Config()
         }
     }

@@ -31,6 +31,7 @@ import com.keyflow.data.OverlayPosition
 import com.keyflow.data.Settings
 import com.keyflow.data.SettingsRepository
 import com.keyflow.transcription.TranscriptionClient
+import com.keyflow.transcription.local.LocalTranscriber
 import androidx.compose.ui.graphics.toArgb
 import com.keyflow.ui.common.ComposeWindowHost
 import com.keyflow.ui.theme.paletteFor
@@ -135,6 +136,7 @@ class OverlayService : Service() {
     private fun startOverlay() {
         ensureForeground()
         overlayActive = true
+        syncLocalEngine()
         isRunningForUi = true
         if (OverlayPermission.canDrawOverlays(this) && floatingButton == null) {
             addFloatingButton()
@@ -144,6 +146,7 @@ class OverlayService : Service() {
     /** Promove a primeiro plano (FGS de microfone) sob demanda. Idempotente. */
     private fun ensureForeground() {
         if (isForeground) return
+        syncLocalEngine()
         val notification = recordingNotification.build(
             if (::coordinator.isInitialized) coordinator.currentState() else ButtonState.IDLE_NO_FIELD,
             dark = cachedSettings.themeDark,
@@ -160,6 +163,11 @@ class OverlayService : Service() {
             android.util.Log.e("KeyFlow.Overlay", "startForeground falhou: ${e.message}", e)
             stopSelf()
         }
+    }
+
+    /** Modo ativo com origem Local → modelo pré-carregado no :inference (NAT-05); outra origem → solta. */
+    private fun syncLocalEngine() {
+        LocalTranscriber.get(this).sync(cachedSettings.effectiveConfigFor())
     }
 
     /**
@@ -229,7 +237,10 @@ class OverlayService : Service() {
             scope = serviceScope,
             configProvider = { settingsRepository.flow().first() },
             recorder = AndroidOverlayAudioRecorder(AudioRecorder(this)),
-            transcriber = AndroidOverlayTranscriber(TranscriptionClient()),
+            transcriber = RoutingTranscriber(
+                http = AndroidOverlayTranscriber(TranscriptionClient()),
+                local = LocalTranscriber.get(this),
+            ),
             insertOrHold = KeyFlowController::insertOrHold,
             flushPending = KeyFlowController::flushPending,
             targetAvailable = { KeyFlowController.targetAvailable.value },
@@ -299,6 +310,8 @@ class OverlayService : Service() {
                 }
                 KeyFlowController.autoPasteInField = it.autoPasteInField
                 KeyFlowController.autoPasteOnFocus = it.autoPasteOnFocus
+                // Origem/modelo local trocados com o modo ativo: carrega o novo ou solta a RAM (NAT-05/09).
+                if (overlayActive || isForeground) syncLocalEngine()
                 // Tamanho da orbe ao vivo (slider da aba Sobrepor).
                 if (it.orbSizePx != prevSizePx) floatingButton?.setOrbSizePx(it.orbSizePx)
                 // Intervalo entre toques ao vivo (slider de Atalhos).

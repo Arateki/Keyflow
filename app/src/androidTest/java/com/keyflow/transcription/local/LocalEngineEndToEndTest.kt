@@ -2,6 +2,9 @@ package com.keyflow.transcription.local
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import android.app.ActivityManager
+import com.keyflow.core.TranscriptionResult
+import com.keyflow.data.EffectiveConfig
 import com.keyflow.data.models.CompletionResult
 import com.keyflow.data.models.DownloadState
 import com.keyflow.data.models.ModelCatalog
@@ -16,6 +19,9 @@ import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import java.io.File
 
 /**
@@ -60,8 +66,7 @@ class LocalEngineEndToEndTest {
     }
 
     private fun transcribe(asset: String): String {
-        val audio = File(context.cacheDir, asset.substringAfterLast('/'))
-        instrumentation.context.assets.open(asset).use { input -> audio.outputStream().use { input.copyTo(it) } }
+        val audio = copyAsset(asset)
         val model = EngineModel.from(spec, ModelStore(storeDir(context)).dirFor(spec.id), "en")
         InferenceClient(context).use { client ->
             val reply = client.call(300) { engine, cb -> engine.transcribe(model.toParcel(), audio.absolutePath, cb) }
@@ -83,6 +88,48 @@ class LocalEngineEndToEndTest {
 
         assertEquals(text, 2, Regex("nightfall").findAll(text).count())
         assertEquals(text, 2, Regex("heaven").findAll(text).count())
+    }
+
+    /**
+     * NAT-04/05: o `:inference` morre no meio de uma transcrição (o SO matou por memória, crash nativo)
+     * → quem esperava recebe erro local, não fica pendurado; a próxima refaz bind e carga e funciona.
+     */
+    @Test
+    fun inferenceProcessDyingMidTranscriptionFailsThatCallAndTheNextOneWorks() = runBlocking {
+        val store = ModelStore(storeDir(context))
+        val transcriber = LocalTranscriber(context, LocalModelResolver(store))
+        val selection = EffectiveConfig.Local(spec.id, "en")
+        val long = copyAsset("audio/speech-en-long.m4a")
+        try {
+            val inFlight = async(kotlinx.coroutines.Dispatchers.IO) { transcriber.transcribe(selection, long) }
+            val pid = waitForInferencePid()
+            delay(1_500)
+            android.os.Process.killProcess(pid)
+
+            assertEquals(LocalErrors.error(LocalErrors.PROCESS_DIED), inFlight.await())
+
+            val again = transcriber.transcribe(selection, copyAsset("audio/speech-en-short.m4a"))
+            assertTrue(again.toString(), again is TranscriptionResult.Success && "nightfall" in again.text.lowercase())
+        } finally {
+            transcriber.release()
+        }
+    }
+
+    private fun copyAsset(asset: String): File {
+        val file = File(context.cacheDir, asset.substringAfterLast('/'))
+        instrumentation.context.assets.open(asset).use { input -> file.outputStream().use { input.copyTo(it) } }
+        return file
+    }
+
+    private fun waitForInferencePid(): Int {
+        val deadline = System.currentTimeMillis() + 30_000
+        while (true) {
+            context.getSystemService(ActivityManager::class.java).runningAppProcesses
+                ?.firstOrNull { it.processName == "${context.packageName}:inference" }
+                ?.let { return it.pid }
+            check(System.currentTimeMillis() < deadline) { ":inference não subiu em 30 s" }
+            Thread.sleep(100)
+        }
     }
 
     companion object {

@@ -48,7 +48,9 @@ sealed interface TranscriptionResult {
 }
 
 enum class ErrorKind {
-    NETWORK, AUTH, HTTP, TIMEOUT, EMPTY_AUDIO, TOO_LARGE, CONFIG_MISSING
+    NETWORK, AUTH, HTTP, TIMEOUT, EMPTY_AUDIO, TOO_LARGE, CONFIG_MISSING,
+    /** Transcrição no aparelho falhou (native-voice-models, NAT-04): a mensagem já vem pronta para o usuário. */
+    LOCAL,
 }
 
 /**

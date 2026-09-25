@@ -1731,3 +1731,26 @@ verdade, processo `:inference` separado, MODEL_MISSING no transcribe e no preloa
 `LocalEngineEndToEndTest` opt-in (`localModelE2E=true`, ligado no `ci-device-gate.sh`): baixa o Whisper
 base do catálogo pelo DownloadManager, confere SHA, instala e transcreve as fixtures de fala curta e
 longa. 374 unitários verdes.
+
+## native-voice-models — NM-T9 (2026-09-25)
+
+Origem Local ligada ao fluxo de gravação. `SettingsRepository.flow()` entrega, para Local com modelo,
+um `Config` **sem endpoint nem token** e com `local = EffectiveConfig.Local(...)` (espera ≥ 180 s).
+`RoutingTranscriber` (no lugar do transcriber do `OverlayService`) manda para o `LocalTranscriber` ou
+para o HTTP de sempre; falha local não cai para a rede (NAT-04). O teclado grava pelo mesmo
+`OverlayService`, então a fiação é uma só.
+
+`LocalTranscriber` (um por processo): bind ao `:inference` no primeiro uso, mantido (segura o modelo
+residente); `DeathRecipient` → quem esperava recebe "transcrição local interrompida" e o próximo uso
+refaz bind e carga. `sync()` pré-carrega quando um modo ativa (orbe, sessão do mic, teclado aberto) e
+solta o bind quando a origem deixa de ser Local — a RAM volta na hora. Bind em uso só cai depois da
+última resposta. Selecionado mas não baixado = `CONFIG_MISSING` (NAT-03), o mesmo das origens
+incompletas; os demais erros locais viram `ErrorKind.LOCAL` com a mensagem da causa e o X leva à aba Voz.
+
+Testes: `LocalRoutingTest` (coordinator de verdade: sucesso local insere; falha local mostra a mensagem
+e aponta a aba Voz; **o HTTP nunca é chamado com Local** (PRV-01); sem modelo → CONFIG_MISSING pelo
+cliente HTTP real, sem rede; origens remotas seguem no HTTP) + `LocalTranscriberLogicTest`. 382
+unitários verdes. Instrumentados: `LocalTranscriberDeviceTest` (binder real: MODEL_MISSING chega como
+erro local; mata o `:inference` e o próximo uso sobe outro processo; `release` solta o bind),
+`SettingsRepositoryTest` (Local não carrega credenciais mesmo com tokens salvos) e, no ponta a ponta,
+o `:inference` morto no meio de uma transcrição longa → erro para quem esperava, e a seguinte funciona.

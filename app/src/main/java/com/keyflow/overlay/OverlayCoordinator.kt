@@ -489,16 +489,25 @@ class OverlayCoordinator(
                 }
                 is TranscriptionResult.Error -> {
                     Log.d(TAG, "transcription error: ${result.kind} ${result.message}")
-                    onError(errorMessage(result.kind), errorNavTarget(result.kind))
+                    onError(errorMessage(result), errorNavTarget(result.kind))
                     handleState(machine.onTranscriptionError())
                 }
             }
         }
     }
 
-    /** Erros de transcrição resolvíveis na aba Voz (config/token) — só estes tornam o X clicável. */
-    private fun errorNavTarget(kind: ErrorKind): ErrorNavTarget =
-        if (kind == ErrorKind.CONFIG_MISSING || kind == ErrorKind.AUTH) ErrorNavTarget.VOZ else ErrorNavTarget.NONE
+    /**
+     * Erros de transcrição resolvíveis na aba Voz — só estes tornam o X clicável. LOCAL inclui: é lá que
+     * se baixa de novo o modelo ou se escolhe um menor.
+     */
+    private fun errorNavTarget(kind: ErrorKind): ErrorNavTarget = when (kind) {
+        ErrorKind.CONFIG_MISSING, ErrorKind.AUTH, ErrorKind.LOCAL -> ErrorNavTarget.VOZ
+        else -> ErrorNavTarget.NONE
+    }
+
+    /** O erro local já chega com a mensagem para o usuário (causa específica: modelo, memória…). */
+    private fun errorMessage(error: TranscriptionResult.Error): String =
+        if (error.kind == ErrorKind.LOCAL) error.message else errorMessage(error.kind)
 
     private fun errorMessage(kind: ErrorKind): String = when (kind) {
         ErrorKind.CONFIG_MISSING -> "Configure um provedor de voz na aba Voz."
@@ -508,6 +517,7 @@ class OverlayCoordinator(
         ErrorKind.TOO_LARGE -> "Áudio muito longo para transcrever."
         ErrorKind.EMPTY_AUDIO -> "Nada foi captado pelo microfone."
         ErrorKind.HTTP -> "Erro no servidor de transcrição."
+        ErrorKind.LOCAL -> "Falha na transcrição local."
     }
 
     private fun ButtonStateMachine.onTargetChangedAndReturn(available: Boolean): ButtonState {

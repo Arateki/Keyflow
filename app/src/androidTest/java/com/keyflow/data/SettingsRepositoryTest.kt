@@ -140,6 +140,33 @@ class SettingsRepositoryTest {
         assertEquals(null, read.localLanguage)
     }
 
+    /**
+     * NM-T9 / PRV-01: com a origem Local, o Config do fluxo de gravação aponta para o engine local e não
+     * carrega endpoint nem token — mesmo com tokens de provedores salvos. Espera generosa.
+     */
+    @Test
+    fun localSourceConfigCarriesTheModelAndNoNetworkCredentials() = runTest {
+        val repository = newRepository()
+        repository.saveSettings(
+            Settings(
+                source = TranscriptionSource.LOCAL,
+                localModelId = "whisper-base-int8",
+                localLanguage = "pt",
+                openaiToken = "sk-guardado",
+                customEndpoint = "https://example.test",
+                customHeaderValue = "Bearer guardado",
+            ),
+        )
+
+        val cfg = repository.flow().first()
+
+        assertEquals(EffectiveConfig.Local("whisper-base-int8", "pt"), cfg.local)
+        assertEquals("", cfg.endpointUrl)
+        assertEquals("", cfg.authHeaderValue)
+        assertFalse(cfg.isComplete())
+        assertEquals(Config.LOCAL_MIN_TIMEOUT_MS, cfg.timeoutMs)
+    }
+
     @Test
     fun transcriptionTimeoutMsDefaultsTo15SecondsWhenNeverSaved() = runTest {
         val repository = newRepository()

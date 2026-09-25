@@ -327,7 +327,7 @@ class ModelDownloader(
          * observa mudar quando o broadcast de conclusão instala.
          */
         fun get(context: Context): ModelDownloader = instance ?: synchronized(this) {
-            instance ?: create(context.applicationContext, ModelStore(context.applicationContext)).also { instance = it }
+            instance ?: create(context.applicationContext, ModelStore.get(context)).also { instance = it }
         }
 
         fun create(context: Context, store: ModelStore): ModelDownloader {
