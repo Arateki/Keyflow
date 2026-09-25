@@ -39,6 +39,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
       - name: Unit tests and APKs
         run: ./gradlew --no-daemon testDebugUnitTest assembleDebug assembleDebugAndroidTest
+      # STO-02: código nativo pronto para páginas de 16 KB (requisito do Play). Os .so do release são os
+      # mesmos do debug (só menos ABIs).
+      - name: 16 KB alignment of native libraries
+        run: python3 scripts/check-16kb-alignment.py app/build/outputs/apk/debug/app-debug.apk
       - name: Unit test evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

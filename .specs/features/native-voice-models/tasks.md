@@ -1,7 +1,7 @@
 # Native Voice Models — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (G1–G11)
-**Status**: Em execução — NM-T1..T11 e T14..T17 escritas (2026-09-25), com o núcleo da T18; instrumentados de T2/T4..T10, T14, T15 e T17 e goldens `config-voz-*` aguardando a rodada do CI. Próxima: NM-T18 (roteiro manual) → NM-T12.
+**Status**: Em execução — NM-T1..T12 e T14..T17 escritas (2026-09-25), com o núcleo da T18; instrumentados de T2/T4..T10, T14, T15 e T17 e goldens `config-voz-*` aguardando a rodada do CI. Próximas: CI (instrumentados + goldens), roteiros manuais da T18 e da T13 [YAN].
 
 > Gate no sandbox: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon <task>`
 > Instrumentado escopado: `ANDROID_SERIAL=emulator-5554`. Antes de instalar no device do Yan:
@@ -319,7 +319,15 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
 
 ## Fase G — Loja & validação
 
-### NM-T12 — Prontidão de loja: backup, 16 KB, licenças
+### NM-T12 — Prontidão de loja: backup, 16 KB, licenças ✅ CONCLUÍDA (2026-09-25)
+> Backup exclui `models` (interno) **e** `external/model-tmp` — o Auto Backup também leva o
+> `getExternalFilesDir`, onde o DownloadManager grava. `scripts/check-16kb-alignment.py` confere o
+> ELF (PT_LOAD ≥ 16 KB) e o offset no zip dos `.so` guardados sem compressão; roda no job de unit do CI
+> (18/18 `.so` do APK debug passam; teste negativo com um `.so` de 4 KB falha como deve). Licenças:
+> sherpa-onnx (Apache-2.0), **ONNX Runtime (MIT — vem dentro do AAR)**, Whisper (MIT no repositório
+> oficial; o card do HF diz Apache-2.0 — as duas citadas) e Parakeet v3 (CC BY 4.0) em `app/licenses/`
+> + seção "Licenças" na Docs. Docs também ganhou "Voz no aparelho", o parcial em "Pausa" e a origem
+> Local em "Privacidade" — os goldens da Docs mudam de propósito.
 - **What**: `dataExtractionRules` (API 31+) + `fullBackupContent` excluindo `models/` (STO-01);
   script/verificação de alinhamento 16 KB dos `.so` do APK release (STO-02; reprovado → subir
   versão do AAR); licenças sherpa-onnx (Apache-2.0) + dos modelos (conferir nos cards HF) em

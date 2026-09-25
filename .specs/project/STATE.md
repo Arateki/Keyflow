@@ -1837,3 +1837,13 @@ visualização → input; edita; retoma com o input aberto e pausa → trecho no
 volta ao indicador; envio entrega "Primeira parte, editada segunda parte" uma vez e as janelas somem;
 smoke do `ImeProbeActivity` depois do input focável; cancelar esconde e desfazer devolve o parcial;
 cancelar de vez encerra a sessão. Settings do app restauradas no fim de cada teste.
+
+## native-voice-models — NM-T12 (2026-09-25)
+
+STO-01: `backup_rules.xml` e `data_extraction_rules.xml` excluem `file/models` e `external/model-tmp`
+(conferido no manifest e nos XML empacotados do APK com `aapt2`). STO-02:
+`scripts/check-16kb-alignment.py` (ELF PT_LOAD ≥ 16384 + offset no zip dos `.so` sem compressão) —
+18/18 passam no APK debug; um `.so` de sistema com 4 KB reprova, como deve; novo passo no job de unit
+do CI. STO-03: licenças em `app/licenses/` (sherpa-onnx Apache-2.0, ONNX Runtime MIT, Whisper MIT,
+Parakeet CC BY 4.0, com README) e seção "Licenças" na Docs; Docs ganhou também "Voz no aparelho", o
+parcial em "Pausa" e a origem Local em "Privacidade". `DocsSectionsTest` cobre as atribuições.
