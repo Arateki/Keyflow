@@ -56,5 +56,15 @@
             android:exported="false"
             android:foregroundServiceType="microphone" />
 
+        <!-- Conclusão de download de modelo local (NM-T7). Só o DownloadProvider tem a permissão. -->
+        <receiver
+            android:name=".data.models.ModelDownloadReceiver"
+            android:exported="true"
+            android:permission="android.permission.SEND_DOWNLOAD_COMPLETED_INTENTS">
+            <intent-filter>
+                <action android:name="android.intent.action.DOWNLOAD_COMPLETE" />
+            </intent-filter>
+        </receiver>
+
     </application>
 </manifest>

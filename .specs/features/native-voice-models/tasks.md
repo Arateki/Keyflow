@@ -1,7 +1,7 @@
 # Native Voice Models — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (G1–G11)
-**Status**: Em execução — NM-T1..T6 escritas (2026-09-24); instrumentados de T2/T4/T5/T6 e goldens `config-voz-*` aguardando a rodada do CI. Próxima: NM-T7.
+**Status**: Em execução — NM-T1..T7 escritas (2026-09-25); instrumentados de T2/T4/T5/T6/T7 e goldens `config-voz-*` aguardando a rodada do CI. Próxima: NM-T8.
 
 > Gate no sandbox: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon <task>`
 > Instrumentado escopado: `ANDROID_SERIAL=emulator-5554`. Antes de instalar no device do Yan:
@@ -124,7 +124,13 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
   → progresso → cancel limpa.
 - **Tests**: unit + instrumented (camada `data`). **Gate**: `full`.
 
-### NM-T7 — `ModelDownloader`: conclusão, SHA256, instalação, reconciliação
+### NM-T7 — `ModelDownloader`: conclusão, SHA256, instalação, reconciliação ✅ CONCLUÍDA (2026-09-25; instrumentado via CI)
+> Receiver **no manifest**, com `android:permission="android.permission.SEND_DOWNLOAD_COMPLETED_INTENTS"`
+> — conferido no AOSP (DownloadProvider): o broadcast sai com `setPackage(<quem pediu>)` e a permissão é
+> de assinatura, declarada e usada só pelo DownloadProvider. O broadcast é só aviso: quem decide é
+> `reconcile()` (consulta o sistema); a UI (NM-T10) chama `reconcile()` ao abrir o gerenciador — é o
+> "init" da reconciliação. Janela do `goAsync` (60 s em segundo plano) p/ SHA + cópia de 640 MB: medir
+> no A32 na NM-T13; se estourar, o `downloads.json` fica e a próxima reconciliação refaz.
 - **What**: broadcast `ACTION_DOWNLOAD_COMPLETE` + varredura → todos `SUCCESSFUL` → SHA256 em
   streaming → `ModelStore.install` → limpar tmp; mismatch → descarte + erro (DLM-02).
   Reconciliação no init (DLM-07): casar `downloads.json` com a query (concluiu com app morto →

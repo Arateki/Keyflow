@@ -1686,3 +1686,22 @@ apaga o tmp. Se um `enqueue` falha no meio, os já enfileirados são removidos.
 12 unitários (fakes de gateway e de volume); 2 instrumentados com MockWebServer no próprio device
 (`localhost`): arquivo pequeno chega a FILES_DONE no `model-tmp`; corpo com banda limitada cancelado no
 meio não deixa pedido nem parcial. Rodam no CI.
+
+## native-voice-models — NM-T7 (2026-09-25)
+
+`ModelDownloader.finish(id)`: tudo SUCCESSFUL → tamanho e SHA256 em streaming (`Sha256`, blocos de
+1 MiB) → `ModelStore.install` → remove os pedidos do sistema e apaga o tmp. Falha do sistema, arquivo
+divergente, cópia que não completa ou modelo que saiu do catálogo → descarta e registra em `failures`
+(`DOWNLOAD_FAILED`/`CORRUPTED`/`INSTALL_FAILED`, em memória; novo `start` limpa). O `downloads.json` só
+some no fim, então morrer em qualquer passo deixa o download para a `reconcile()`, que também trata
+"instalou mas não limpou" e apaga sobra de início interrompido. Início/conclusão/reconciliação sob um
+lock do processo. `ModelDownloader.get(context)`: instância única do processo (um só `ModelStore`, para
+o `installedIds` que a UI observa).
+
+`ModelDownloadReceiver` no manifest para `ACTION_DOWNLOAD_COMPLETE`, exigindo
+`SEND_DOWNLOAD_COMPLETED_INTENTS` — conferido no código do DownloadProvider (AOSP): envio com
+`setPackage` e permissão de assinatura só dele. `goAsync` + thread → `reconcile()`.
+
+3 unitários do `Sha256` (vetores FIPS e arquivo maior que o bloco) + 11 de conclusão/reconciliação
+(com arquivos reais no `TemporaryFolder`); 3 instrumentados novos: download com SHA certo → instalado;
+SHA errado → descartado e pedido removido; receiver registrado com a permissão. 360 unitários verdes.

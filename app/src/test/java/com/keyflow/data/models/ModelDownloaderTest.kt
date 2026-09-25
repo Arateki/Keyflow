@@ -5,8 +5,9 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
+import java.security.MessageDigest
 
-/** NM-T6: pré-checagens, agregação de progresso e o ciclo início → progresso → cancelamento. */
+/** NM-T6/T7: pré-checagens, progresso, cancelamento e o fechamento (SHA, instalação, reconciliação). */
 class ModelDownloaderTest {
 
     @get:Rule
@@ -204,5 +205,159 @@ class ModelDownloaderTest {
 
         assertThat(gateway.removed).containsExactly(1L)
         assertThat(downloader.activeModelId()).isNull()
+    }
+
+    // ── conclusão e reconciliação (NM-T7) ────────────────────────────────────────
+
+    private val contents = mapOf("enc.onnx" to "encoder", "dec.onnx" to "decoder!", "tokens.txt" to "tok")
+
+    private fun sha(text: String) =
+        MessageDigest.getInstance("SHA-256").digest(text.toByteArray()).joinToString("") { "%02x".format(it) }
+
+    /** Catálogo com tamanhos e SHAs reais de [contents]. */
+    private val real = spec.copy(
+        id = "real",
+        files = spec.files.map { it.copy(sha256 = sha(contents.getValue(it.fileName)), bytes = contents.getValue(it.fileName).length.toLong()) },
+    )
+
+    private val store by lazy { ModelStore(File(tmp.root, "models")) }
+
+    private fun realDownloader() = ModelDownloader(
+        gateway, File(tmp.root, "model-tmp"), store, { false }, volumes,
+        catalog = { if (it == real.id) real else null },
+    )
+
+    /** O que o DownloadManager faria: grava os arquivos no tmp e marca os pedidos como concluídos. */
+    private fun deliver(downloader: ModelDownloader, override: Map<String, String> = emptyMap()) {
+        val dir = downloader.tmpDirFor(real.id)!!
+        downloader.readRecord(real.id)!!.forEach { (name, id) ->
+            File(dir, name).writeText(override[name] ?: contents.getValue(name))
+            gateway.rows[id] = DownloadRow(id, RowStatus.SUCCESSFUL, 0)
+        }
+    }
+
+    @Test
+    fun `finish installs verified files and cleans up`() {
+        val downloader = realDownloader()
+        downloader.start(real, allowMetered = false)
+        deliver(downloader)
+
+        assertThat(downloader.finish("real")).isEqualTo(CompletionResult.Installed)
+
+        assertThat(store.isInstalled("real")).isTrue()
+        assertThat(File(store.dirFor("real"), "dec.onnx").readText()).isEqualTo("decoder!")
+        assertThat(gateway.removed).containsExactly(1L, 2L, 3L)
+        assertThat(downloader.tmpDirFor("real")!!.exists()).isFalse()
+        assertThat(downloader.activeModelId()).isNull()
+        assertThat(downloader.failures.value).isEmpty()
+    }
+
+    @Test
+    fun `a file with the right size but another sha is discarded as corrupted`() {
+        val downloader = realDownloader()
+        downloader.start(real, allowMetered = false)
+        deliver(downloader, override = mapOf("dec.onnx" to "DECODER!"))
+
+        assertThat(downloader.finish("real")).isEqualTo(CompletionResult.Failed(DownloadFailure.CORRUPTED))
+
+        assertThat(store.isInstalled("real")).isFalse()
+        assertThat(downloader.tmpDirFor("real")!!.exists()).isFalse()
+        assertThat(gateway.removed).containsExactly(1L, 2L, 3L)
+        assertThat(downloader.failures.value).containsExactly("real", DownloadFailure.CORRUPTED)
+    }
+
+    @Test
+    fun `a truncated file is corrupted too`() {
+        val downloader = realDownloader()
+        downloader.start(real, allowMetered = false)
+        deliver(downloader, override = mapOf("enc.onnx" to "enc"))
+
+        assertThat(downloader.finish("real")).isEqualTo(CompletionResult.Failed(DownloadFailure.CORRUPTED))
+    }
+
+    @Test
+    fun `finish leaves a running download alone`() {
+        val downloader = realDownloader()
+        downloader.start(real, allowMetered = false)
+        gateway.rows[1] = DownloadRow(1, RowStatus.SUCCESSFUL, 7)
+
+        assertThat(downloader.finish("real")).isEqualTo(CompletionResult.InProgress)
+        assertThat(downloader.activeModelId()).isEqualTo("real")
+        assertThat(gateway.removed).isEmpty()
+    }
+
+    @Test
+    fun `a failed system request fails the model and frees the slot`() {
+        val downloader = realDownloader()
+        downloader.start(real, allowMetered = false)
+        gateway.rows[2] = DownloadRow(2, RowStatus.FAILED, 0)
+
+        assertThat(downloader.finish("real")).isEqualTo(CompletionResult.Failed(DownloadFailure.DOWNLOAD_FAILED))
+        assertThat(downloader.activeModelId()).isNull()
+        assertThat(downloader.failures.value).containsExactly("real", DownloadFailure.DOWNLOAD_FAILED)
+    }
+
+    @Test
+    fun `starting again clears the previous failure`() {
+        val downloader = realDownloader()
+        downloader.start(real, allowMetered = false)
+        gateway.rows[2] = DownloadRow(2, RowStatus.FAILED, 0)
+        downloader.finish("real")
+
+        downloader.start(real, allowMetered = false)
+
+        assertThat(downloader.failures.value).isEmpty()
+    }
+
+    @Test
+    fun `reconcile installs what finished while the app was dead`() {
+        realDownloader().apply {
+            start(real, allowMetered = false)
+            deliver(this)
+        }
+
+        // Processo novo: instância nova, estado só no disco e no sistema.
+        val results = realDownloader().reconcile()
+
+        assertThat(results).containsExactly("real", CompletionResult.Installed)
+        assertThat(store.isInstalled("real")).isTrue()
+    }
+
+    @Test
+    fun `reconcile after dying between install and cleanup only cleans up`() {
+        val downloader = realDownloader()
+        downloader.start(real, allowMetered = false)
+        deliver(downloader)
+        store.install(real, downloader.tmpDirFor("real")!!)
+
+        assertThat(realDownloader().reconcile()).containsExactly("real", CompletionResult.Installed)
+        assertThat(downloader.activeModelId()).isNull()
+        assertThat(gateway.removed).containsExactly(1L, 2L, 3L)
+    }
+
+    @Test
+    fun `reconcile drops leftovers of an interrupted start and keeps running downloads`() {
+        val downloader = realDownloader()
+        downloader.start(real, allowMetered = false)
+        val leftover = File(tmp.root, "model-tmp/half-started").apply { mkdirs() }
+        File(leftover, "enc.onnx").writeText("x")
+
+        assertThat(downloader.reconcile()).containsExactly("real", CompletionResult.InProgress)
+        assertThat(leftover.exists()).isFalse()
+    }
+
+    @Test
+    fun `a model gone from the catalog is discarded`() {
+        val downloader = realDownloader()
+        downloader.start(real, allowMetered = false)
+        val orphan = ModelDownloader(gateway, File(tmp.root, "model-tmp"), store, { false }, volumes, catalog = { null })
+
+        assertThat(orphan.finish("real")).isEqualTo(CompletionResult.Failed(DownloadFailure.DOWNLOAD_FAILED))
+        assertThat(orphan.activeModelId()).isNull()
+    }
+
+    @Test
+    fun `finish without a download in progress does nothing`() {
+        assertThat(realDownloader().finish("real")).isEqualTo(CompletionResult.NotActive)
     }
 }
