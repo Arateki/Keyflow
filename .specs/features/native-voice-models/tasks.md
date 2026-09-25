@@ -1,7 +1,7 @@
 # Native Voice Models — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (G1–G11)
-**Status**: Em execução — NM-T1..T11 e T14..T16 escritas (2026-09-25), com o núcleo da T18; instrumentados de T2/T4..T10, T14 e T15 e goldens `config-voz-*` aguardando a rodada do CI. Próxima: NM-T17.
+**Status**: Em execução — NM-T1..T11 e T14..T17 escritas (2026-09-25), com o núcleo da T18; instrumentados de T2/T4..T10, T14, T15 e T17 e goldens `config-voz-*` aguardando a rodada do CI. Próxima: NM-T18 (roteiro manual) → NM-T12.
 
 > Gate no sandbox: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon <task>`
 > Instrumentado escopado: `ANDROID_SERIAL=emulator-5554`. Antes de instalar no device do Yan:
@@ -281,7 +281,12 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
   verdes.
 - **Tests**: unit (lógica extraída) + instrumentados existentes. **Gate**: `full`.
 
-### NM-T17 — `PartialBadge` / `PartialViewer` / `PartialInput` (UI junto à orbe)
+### NM-T17 — `PartialBadge` / `PartialViewer` / `PartialInput` (UI junto à orbe) ✅ CONCLUÍDA (2026-09-25; instrumentado via CI)
+> As três janelas vivem num só `PartialOverlay` (Views, como os banners do serviço), com as regras puras
+> em `PartialUi`. Não havia `EphemeralInput` da vision-capture para reusar — o input focável daqui é o
+> primeiro; fica como base para ela. Visualização e input **seguem abertos** enquanto se grava e pausa
+> (PAR-05: o texto novo aparece junto) e **fecham ao enviar/cancelar** — a entrega precisa do foco de
+> volta no campo de origem. Sem orbe (sessão só do teclado), o indicador ancora no canto de cima.
 - **What**: badge sutil junto à orbe (só PAUSED com conteúdo — PAR-04; some no fim da sessão);
   com `partialViewEdit`: tap → viewer (leitura); tap de novo → input **focável** editável
   (janela própria efêmera — mesma técnica do `EphemeralInput` da `vision-capture`; extrair

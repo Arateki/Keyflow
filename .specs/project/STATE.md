@@ -1819,3 +1819,21 @@ Testes: 9 unitários do `PartialSession` + 7 do coordinator (`PartialCoordinator
 entrega; envio junta buffer editado + último trecho e entrega uma vez; falha refeita no envio; cancelar
 e desfazer preserva; cancelar de vez apaga; cancelar durante o envio e desfazer retoma na mesma
 sessão; toggle desligado = fluxo antigo). 407 unitários verdes.
+
+## native-voice-models — NM-T17 (2026-09-25)
+
+UI do parcial junto à orbe. `PartialUi` (puro): sem sessão → nada; enviando/cancelando → nada (e fecha
+o que estava aberto — a entrega precisa do foco de volta no campo de origem); visualização/edição
+abertas seguem abertas gravando e pausando (só com o 2º toggle); pausada com conteúdo (texto, trecho
+em curso ou falho) → indicador "parcial · N palavras [· … ] [· N trechos a refazer]".
+`PartialOverlay`: indicador logo abaixo da orbe (acima, se não couber), visualização e input no terço de
+cima (o teclado sobe por baixo); o input é a única janela focável (NOT_TOUCH_MODAL mantém orbe e app
+tocáveis); texto de fora só entra no input se mudou, preservando o cursor; cada tecla vira
+`onPartialEdited`. Fiação no `OverlayService` pelo `render` e pelo `onPartial` do coordinator.
+
+Testes: 6 unitários do `PartialUi` (413 no total, verdes). `PartialOverlayServiceTest` instrumentado
+com o serviço real e a origem Custom num MockWebServer em `localhost`: pausa → indicador; toque →
+visualização → input; edita; retoma com o input aberto e pausa → trecho novo depois da edição; fechar
+volta ao indicador; envio entrega "Primeira parte, editada segunda parte" uma vez e as janelas somem;
+smoke do `ImeProbeActivity` depois do input focável; cancelar esconde e desfazer devolve o parcial;
+cancelar de vez encerra a sessão. Settings do app restauradas no fim de cada teste.

@@ -206,8 +206,8 @@ o texto completo com a edição preservada; buffer some.
 | PAR-01 | P2-E | NM-T14 | Implemented |
 | PAR-02 | P2-E | NM-T15 | Implemented |
 | PAR-03 | P2-E | NM-T16 | Implementing |
-| PAR-04 | P2-E | NM-T17 | In Tasks |
-| PAR-05 | P2-E | NM-T17 | In Tasks |
+| PAR-04 | P2-E | NM-T17 | Implementing |
+| PAR-05 | P2-E | NM-T17 | Implementing |
 | PAR-06 | P2-E | NM-T16, NM-T17 | Implementing |
 | PAR-07 | P2-E | NM-T18 | Implementing |
 | PAR-08 | P2-E | NM-T18 | Implementing |
