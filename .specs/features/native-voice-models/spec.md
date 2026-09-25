@@ -175,11 +175,11 @@ o texto completo com a edição preservada; buffer some.
 | NAT-01 | P1-A | NM-T9 | In Tasks |
 | NAT-02 | P1-A | NM-T5 | Implemented |
 | NAT-03 | P1-A | NM-T2, NM-T9 | Implementing |
-| NAT-04 | P1-A | NM-T8, NM-T9 | In Tasks |
-| NAT-05 | P1-A | NM-T8, NM-T9 | In Tasks |
-| NAT-06 | P1-A | NM-T8 | In Tasks |
-| NAT-07 | P1-A | NM-T8 | In Tasks |
-| NAT-08 | P1-A | NM-T8 | In Tasks |
+| NAT-04 | P1-A | NM-T8, NM-T9 | Implementing |
+| NAT-05 | P1-A | NM-T8, NM-T9 | Implementing |
+| NAT-06 | P1-A | NM-T8 | Implemented |
+| NAT-07 | P1-A | NM-T8 | Implemented |
+| NAT-08 | P1-A | NM-T8 | Implemented |
 | NAT-09 | P1-A | NM-T9 | In Tasks |
 | PRV-01 | P1-A | NM-T9 | In Tasks |
 | CAT-01 | P1-B | NM-T3 | Implemented |

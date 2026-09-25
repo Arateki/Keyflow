@@ -3,7 +3,7 @@
 # android-emulator-runner. Mesmo gate `full` + `screenshot` do TESTING.md, na ordem em que um
 # contribuidor roda localmente:
 #
-#   1. suíte instrumentada inteira (connectedDebugAndroidTest);
+#   1. suíte instrumentada inteira (connectedDebugAndroidTest), com o ponta a ponta do modelo local;
 #   2. APK debug reinstalado — o connected* desinstala o app no fim, e a galeria precisa dele;
 #   3. verify-screens.sh + diff-screens.sh contra verification/golden/.
 #
@@ -31,7 +31,9 @@ step() {
   echo "::endgroup::"
 }
 
-step "Suíte instrumentada" ./gradlew --no-daemon connectedDebugAndroidTest
+# localModelE2E: liga o ponta a ponta do modelo local (baixa o Whisper base, ~160 MB, e transcreve).
+step "Suíte instrumentada" ./gradlew --no-daemon connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.localModelE2E=true
 step "Reinstala o APK debug" ./gradlew --no-daemon installDebug
 step "Captura das rotas da galeria" scripts/verify-screens.sh verification
 step "Diff contra os goldens" scripts/diff-screens.sh

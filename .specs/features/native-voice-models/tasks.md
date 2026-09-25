@@ -1,7 +1,7 @@
 # Native Voice Models — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (G1–G11)
-**Status**: Em execução — NM-T1..T7 escritas (2026-09-25); instrumentados de T2/T4/T5/T6/T7 e goldens `config-voz-*` aguardando a rodada do CI. Próxima: NM-T8.
+**Status**: Em execução — NM-T1..T8 escritas (2026-09-25); instrumentados de T2/T4..T8 e goldens `config-voz-*` aguardando a rodada do CI. Próxima: NM-T9.
 
 > Gate no sandbox: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon <task>`
 > Instrumentado escopado: `ANDROID_SERIAL=emulator-5554`. Antes de instalar no device do Yan:
@@ -145,7 +145,17 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
 
 ## Fase D — Inferência (processo `:inference`)
 
-### NM-T8 — AIDL + `InferenceService` + `SherpaEngine`
+### NM-T8 — AIDL + `InferenceService` + `SherpaEngine` ✅ CONCLUÍDA (2026-09-25; instrumentado via CI)
+> **SPEC_DEVIATION (janela do Whisper)**: o design não previa, mas o Whisper do sherpa-onnx processa só
+> os primeiros ~30 s de cada stream e **descarta o resto** (`offline-recognizer-whisper-impl.h`,
+> v1.13.8; medido no whisper-base com áudio de 49,7 s: a 2ª metade sumia). `WhisperChunker` corta em
+> janelas de até 28 s, no quadro mais silencioso dos últimos 4 s de cada janela; os textos são unidos
+> com espaço. Parakeet (transducer) recebe o áudio inteiro.
+> **SPEC_DEVIATION (smoke do engine real)**: em vez de `assume()` com arquivos em
+> `/sdcard/keyflow-test-models/` (o app não lê `/sdcard` sem permissão de armazenamento), o
+> `LocalEngineEndToEndTest` **baixa o Whisper base do catálogo** pelo próprio `ModelDownloader`
+> (SHA + instalação) e transcreve fala real (`test_wavs` do sherpa-onnx, LibriSpeech CC BY 4.0).
+> Opt-in por argumento de instrumentação `localModelE2E=true` — ligado no CI.
 - **What**: AIDL (`ITranscriptionEngine`/`IEngineCallback`/`LocalModelConfig` Parcelable);
   `InferenceService` em `android:process=":inference"` (`exported=false`): executor único,
   `preload` residente (G10), troca de modelo = reload (NAT-09, lado engine), guarda de RAM +

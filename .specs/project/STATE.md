@@ -1705,3 +1705,29 @@ o `installedIds` que a UI observa).
 3 unitários do `Sha256` (vetores FIPS e arquivo maior que o bloco) + 11 de conclusão/reconciliação
 (com arquivos reais no `TemporaryFolder`); 3 instrumentados novos: download com SHA certo → instalado;
 SHA errado → descartado e pedido removido; receiver registrado com a permissão. 360 unitários verdes.
+
+## native-voice-models — NM-T8 (2026-09-25)
+
+AIDL (`ITranscriptionEngine` oneway + `IEngineCallback`; `LocalModelConfig` como parcelable
+estruturado do AIDL, com caminhos absolutos, idioma e bytes) e `InferenceService` em
+`android:process=":inference"` (`exported=false`): executor único, modelo residente, troca de modelo
+**ou de idioma** = reload. Antes do load: arquivos no disco (senão MODEL_MISSING), guarda de RAM
+(`availMem` ≥ 1,5× o modelo, medida depois de soltar o anterior; senão OOM) e recusa do sherpa →
+ENGINE. `OutOfMemoryError` em qualquer ponto → unload + OOM. Falha ao decodificar → DECODE.
+
+`SherpaEngine`/`SherpaConfigs`: API conferida no bytecode do AAR e no `kotlin-api/OfflineRecognizer.kt`
+oficial da v1.13.8 — Whisper `modelType="whisper"`, idioma vazio = autodetecção; Parakeet
+`modelType="nemo_transducer"`; `numThreads` = núcleos limitados a 1..4.
+
+**Achado: a janela de 30 s do Whisper.** O sherpa-onnx corta o stream em 3000 quadros e descarta o
+resto só com um log. Medido com o pacote Python oficial 1.13.8 e o mesmo whisper-base int8 num áudio
+de 49,7 s: inteiro → o texto para no meio da 3ª frase; em janelas (`WhisperChunker`, corte no trecho
+mais silencioso dos últimos 4 s de cada janela de 28 s, caiu em 24,37 s, dentro da pausa) → texto
+completo. Registrado como SPEC_DEVIATION na task.
+
+Testes: 14 unitários novos (modelo do engine e ida/volta pelo parcelable, códigos de erro, guarda de
+RAM, configs por tipo, cortes do Whisper). Instrumentados: `InferenceServiceTest` (binder remoto de
+verdade, processo `:inference` separado, MODEL_MISSING no transcribe e no preload) e
+`LocalEngineEndToEndTest` opt-in (`localModelE2E=true`, ligado no `ci-device-gate.sh`): baixa o Whisper
+base do catálogo pelo DownloadManager, confere SHA, instala e transcreve as fixtures de fala curta e
+longa. 374 unitários verdes.

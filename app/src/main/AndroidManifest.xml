@@ -56,6 +56,13 @@
             android:exported="false"
             android:foregroundServiceType="microphone" />
 
+        <!-- Transcrição local (native-voice-models, NM-T8): processo próprio — pico de RAM do modelo e
+             crash nativo ficam longe do teclado e da orbe. -->
+        <service
+            android:name=".transcription.local.InferenceService"
+            android:process=":inference"
+            android:exported="false" />
+
         <!-- Conclusão de download de modelo local (NM-T7). Só o DownloadProvider tem a permissão. -->
         <receiver
             android:name=".data.models.ModelDownloadReceiver"

@@ -48,6 +48,8 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        // Fronteira com o processo :inference (native-voice-models, NM-T8).
+        aidl = true
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
