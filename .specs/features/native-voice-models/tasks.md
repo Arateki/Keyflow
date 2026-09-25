@@ -303,7 +303,7 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
   visível; smoke: `EditText` externo (`ImeProbeActivity`) segue funcional após o input focável.
 - **Tests**: instrumented + unit (estado do badge). **Gate**: `full`.
 
-### NM-T18 — Integração do envio/cancelar + roteiro parcial
+### NM-T18 — Integração do envio/cancelar + roteiro parcial 🟡 CÓDIGO PRONTO (2026-09-25; núcleo na T16, instrumentado na T17) — falta o roteiro manual no A32 [YAN] (`manual-validation.md`, seção D)
 - **What**: envio (stop): transcreve o último segmento + re-tenta FAILED → append → texto
   completo (com edições) segue a **entrega atual** → buffer/input destruídos (PAR-07); cancelar
   descarta o buffer; desfazer do cancelamento restaura o buffer (PAR-08 — integra com o fluxo
@@ -342,7 +342,7 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
 - **Tests**: none (config/manifest/script; validação por gate+inspeção). **Gate**: `build` +
   manual (script).
 
-### NM-T13 — Validação manual no Galaxy A32 + traceability
+### NM-T13 — Validação manual no Galaxy A32 + traceability [YAN] — roteiro em `manual-validation.md`
 - **What**: roteiro e2e no device: baixar "Rápido" em Wi-Fi (progresso/notificação); fechar o app
   no meio → retomada; **modo avião**: ditar frase técnica PT → texto colado; dados móveis →
   diálogo com tamanho; deletar selecionado → erro de config ao ditar; matar o processo

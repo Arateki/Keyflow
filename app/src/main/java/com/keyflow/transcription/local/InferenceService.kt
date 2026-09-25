@@ -5,6 +5,7 @@ import android.app.Service
 import android.content.Intent
 import android.os.IBinder
 import android.os.RemoteException
+import android.os.SystemClock
 import android.util.Log
 import java.io.File
 import java.util.concurrent.ExecutorService
@@ -30,7 +31,9 @@ class InferenceService : Service() {
         }
 
         override fun transcribe(config: LocalModelConfig, audioPath: String, cb: IEngineCallback) = submit(cb) {
-            ensureLoaded(EngineModel.fromParcel(config))
+            val model = EngineModel.fromParcel(config)
+            ensureLoaded(model)
+            val started = SystemClock.elapsedRealtime()
             val samples = try {
                 AudioDecoder.decodeToMono16k(File(audioPath))
             } catch (e: OutOfMemoryError) {
@@ -38,7 +41,15 @@ class InferenceService : Service() {
             } catch (e: Exception) {
                 throw EngineFailure(EngineErrorKind.DECODE, "não consegui ler o áudio: ${e.message}", e)
             }
-            engine.transcribe(samples)
+            val decoded = SystemClock.elapsedRealtime()
+            engine.transcribe(samples).also {
+                // Medição informativa do A32 (G11, NM-T13): `adb logcat -s InferenceService`.
+                Log.i(
+                    TAG,
+                    "${model.modelId}: ${samples.size * 1000L / AudioDecoder.TARGET_SAMPLE_RATE} ms de áudio → " +
+                        "decodificar ${decoded - started} ms + transcrever ${SystemClock.elapsedRealtime() - decoded} ms",
+                )
+            }
         }
     }
 
@@ -68,7 +79,9 @@ class InferenceService : Service() {
             )
         }
         try {
+            val started = SystemClock.elapsedRealtime()
             engine.load(model)
+            Log.i(TAG, "${model.modelId}: carregado em ${SystemClock.elapsedRealtime() - started} ms (${available shr 20} MB livres antes)")
         } catch (e: IllegalArgumentException) {
             throw EngineFailure(EngineErrorKind.ENGINE, "o engine recusou ${model.modelId}", e)
         }
