@@ -122,10 +122,11 @@ class LocalPanelTest {
         rule.setContent { h.Content() }
 
         rule.onNodeWithTag(localDeleteTag(base.id)).performScrollTo().performClick()
-        // A confirmação abre no fim do card, abaixo da dobra: rola até ela.
-        rule.onNodeWithTag(localConfirmTag(base.id)).performScrollTo().assertIsDisplayed()
+        // A confirmação abre no fim do card (abaixo da dobra) e, dentro do card selecionável, só existe
+        // na árvore não mesclada.
+        rule.onNodeWithTag(localConfirmTag(base.id), useUnmergedTree = true).performScrollTo().assertIsDisplayed()
         rule.onNodeWithTag(VOZ_LOCAL_CONFIRM_NO_TAG).performScrollTo().performClick()
-        rule.onNodeWithTag(localConfirmTag(base.id)).assertDoesNotExist()
+        rule.onNodeWithTag(localConfirmTag(base.id), useUnmergedTree = true).assertDoesNotExist()
         rule.runOnIdle { assertTrue(h.actions.deletes.isEmpty()) }
 
         rule.onNodeWithTag(localDeleteTag(base.id)).performScrollTo().performClick()

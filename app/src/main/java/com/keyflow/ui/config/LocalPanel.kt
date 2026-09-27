@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -221,7 +222,12 @@ private fun ModelCard(
         }
         item.progress?.let { progress ->
             Row(
-                Modifier.fillMaxWidth().padding(top = 10.dp).testTag(localProgressTag(spec.id)),
+                // Barra + rótulo lidos juntos pelo leitor de tela ("42%", "Aguardando rede").
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp)
+                    .semantics(mergeDescendants = true) {}
+                    .testTag(localProgressTag(spec.id)),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(

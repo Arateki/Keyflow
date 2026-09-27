@@ -1867,3 +1867,17 @@ mesclada) — o card instalado virou `selectable` com `Role.RadioButton` (leitor
 (teste rola até ela). Diff de telas: exatamente as 8 mudanças intencionais (`config-voz-*` pela seção
 Transcrição e pelo seletor de 5, `config-docs*` pelas seções novas); aprovadas junto com os 6
 `config-voz-local*`, depois de revisadas. `tour-finger-*` seguem sem golden (rotas provisórias da GT-T2).
+
+## CI — o diálogo de ANR do boot (2026-09-27)
+
+Rodada em 6117298: telas 100% verdes; 237/240. O `BarViewAccessibilityTest` falhou de novo mesmo com o
+re-toque — o logcat mostrou a causa de verdade nas duas rodadas: logo após o boot, sob a carga do build,
+o launcher (27/09) ou a systemui (25/09) estouram ANR e o sistema abre o diálogo "Application Not
+Responding", que fica **minutos** na tela segurando o foco (12:42:36 → 12:46:45). Sem foco, nenhum campo
+recebe IME. É a mesma lição do emulador do sandbox (ENVIRONMENT.md), que não tinha ido para o CI:
+`ci-device-gate.sh` agora liga `hide_error_dialogs` antes do build e fecha diálogos de sistema antes da
+suíte. O re-toque do `awaitKeyboardAttached` fica (cobre o toque perdido, caso diferente).
+
+`LocalPanelTest`: o `selectable` do card mescla os filhos — a confirmação de apagar só existe na árvore
+não mesclada (teste usa `useUnmergedTree`), e a linha de progresso ganhou `mergeDescendants` (leitor de
+tela lê barra e rótulo juntos; o teste lê o "50%" na própria tag).

@@ -16,6 +16,12 @@ EVIDENCE=app/build/ci-evidence
 mkdir -p "$EVIDENCE"
 ADB="${ANDROID_HOME:+$ANDROID_HOME/platform-tools/}adb"
 
+# Sem diálogo de "app não está respondendo" (a mesma lição do emulador do sandbox, ENVIRONMENT.md).
+# Medido no CI (2026-09-25 e 2026-09-27): logo após o boot, o launcher/systemui estouram ANR sob a carga
+# do build e o diálogo fica minutos na tela segurando o foco — nenhum campo recebe o IME e o 1º teste de
+# teclado falha. Tem que valer ANTES do build, quando os ANRs acontecem.
+"$ADB" shell settings put global hide_error_dialogs 1 || true
+
 "$ADB" logcat -c || true
 "$ADB" logcat -v threadtime > "$EVIDENCE/logcat.txt" 2>&1 &
 LOGCAT_PID=$!
@@ -32,6 +38,8 @@ step() {
 }
 
 # localModelE2E: liga o ponta a ponta do modelo local (baixa o Whisper base, ~160 MB, e transcreve).
+# Se um diálogo de sistema abriu antes do ajuste acima, fecha antes da suíte.
+"$ADB" shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1 || true
 step "Suíte instrumentada" ./gradlew --no-daemon connectedDebugAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.localModelE2E=true
 step "Reinstala o APK debug" ./gradlew --no-daemon installDebug
