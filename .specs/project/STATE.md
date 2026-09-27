@@ -1881,3 +1881,12 @@ suíte. O re-toque do `awaitKeyboardAttached` fica (cobre o toque perdido, caso 
 `LocalPanelTest`: o `selectable` do card mescla os filhos — a confirmação de apagar só existe na árvore
 não mesclada (teste usa `useUnmergedTree`), e a linha de progresso ganhou `mergeDescendants` (leitor de
 tela lê barra e rótulo juntos; o teste lê o "50%" na própria tag).
+
+## CI verde — native-voice-models (2026-09-27)
+
+Rodada em 5db6d75: **240/240 instrumentados, 0 pulados, telas 84/84** no limiar. Com o
+`hide_error_dialogs` no gate, o 1º teste de teclado passou. Estão validados no emulador: download real
+do Whisper base + SHA + instalação + transcrição curta e de 50 s + morte do `:inference` no meio; o
+cliente local contra o binder de verdade; o parcial no `OverlayService` real (indicador, visualização,
+edição, envio, cancelar/desfazer); o gerenciador de modelos; os de teclado. O que resta do bloco são os
+roteiros manuais da T18 e da T13 no A32 [YAN].

@@ -1,7 +1,7 @@
 # Native Voice Models — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (G1–G11)
-**Status**: Em execução — NM-T1..T12 e T14..T17 escritas, com o núcleo da T18 (2026-09-25). CI em be0cc6c: 238/240 instrumentados (incl. ponta a ponta do modelo local, `:inference`, parcial no serviço real); as 2 falhas eram do `LocalPanelTest` (corrigidas em 2026-09-27). Goldens `config-voz-*`, `config-docs*` e os 6 novos `config-voz-local*` aprovados das telas dessa rodada. Pendentes: rodada de confirmação do CI e os roteiros manuais T18/T13 [YAN].
+**Status**: Código completo e validado — NM-T1..T12 e T14..T17 (+ núcleo da T18). CI verde em 5db6d75 (2026-09-27): 240/240 instrumentados, 0 pulados (incl. ponta a ponta do modelo local, `:inference`, parcial no serviço real) e telas 84/84. Pendentes: roteiros manuais da T18 e da T13 no A32 [YAN] (`manual-validation.md`).
 
 > Gate no sandbox: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon <task>`
 > Instrumentado escopado: `ANDROID_SERIAL=emulator-5554`. Antes de instalar no device do Yan:
@@ -81,7 +81,7 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
 
 ## Fase B — Disco & áudio
 
-### NM-T4 — `ModelStore` (instalação/deleção/manifest) ✅ CONCLUÍDA (2026-09-24; instrumentado via CI)
+### NM-T4 — `ModelStore` (instalação/deleção/manifest) ✅ CONCLUÍDA (2026-09-24; instrumentado validado no CI 2026-09-27)
 - **What**: layout `filesDir/models/<id>/` + `manifest.json` pós-verificação (marcador de íntegro);
   `installedIds`/`dirFor`/`install` (move atômico do tmp)/`delete` (dir inteiro)/`freeBytes`.
 - **Where**: `data/models/ModelStore.kt`.
@@ -91,7 +91,7 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
   = não instalado (meio-instalado não conta).
 - **Tests**: instrumented (files/Context — camada `data`). **Gate**: `full`.
 
-### NM-T5 — `AudioDecoder` (.m4a → PCM 16 kHz) + gravação 16 kHz ✅ CONCLUÍDA (2026-09-24; instrumentado via CI)
+### NM-T5 — `AudioDecoder` (.m4a → PCM 16 kHz) + gravação 16 kHz ✅ CONCLUÍDA (2026-09-24; instrumentado validado no CI 2026-09-27)
 - **What**: `MediaExtractor`+`MediaCodec` → PCM 16-bit → float mono; resample defensivo p/ 16 kHz
   (função pura). Mudar `AudioRecorder.AUDIO_SAMPLE_RATE` 44100→16000 (NAT-02; AAC 16 kHz, arquivo
   menor, ASR só usa 16 kHz).
@@ -105,7 +105,7 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
 
 ## Fase C — Download
 
-### NM-T6 — `ModelDownloader`: iniciar/progresso/cancelar + políticas ✅ CONCLUÍDA (2026-09-24; instrumentado via CI)
+### NM-T6 — `ModelDownloader`: iniciar/progresso/cancelar + políticas ✅ CONCLUÍDA (2026-09-24; instrumentado validado no CI 2026-09-27)
 > **SPEC_DEVIATION (espaço, DLM-05)**: o DownloadManager só grava no armazenamento externo do app e o
 > modelo depois é **copiado** para o interno (NM-T4). No mesmo volume (quase todo aparelho: o externo
 > emulado é uma pasta de `/data`) o modelo existe duas vezes por um instante — a checagem exige
@@ -124,7 +124,7 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
   → progresso → cancel limpa.
 - **Tests**: unit + instrumented (camada `data`). **Gate**: `full`.
 
-### NM-T7 — `ModelDownloader`: conclusão, SHA256, instalação, reconciliação ✅ CONCLUÍDA (2026-09-25; instrumentado via CI)
+### NM-T7 — `ModelDownloader`: conclusão, SHA256, instalação, reconciliação ✅ CONCLUÍDA (2026-09-25; instrumentado validado no CI 2026-09-27)
 > Receiver **no manifest**, com `android:permission="android.permission.SEND_DOWNLOAD_COMPLETED_INTENTS"`
 > — conferido no AOSP (DownloadProvider): o broadcast sai com `setPackage(<quem pediu>)` e a permissão é
 > de assinatura, declarada e usada só pelo DownloadProvider. O broadcast é só aviso: quem decide é
@@ -145,7 +145,7 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
 
 ## Fase D — Inferência (processo `:inference`)
 
-### NM-T8 — AIDL + `InferenceService` + `SherpaEngine` ✅ CONCLUÍDA (2026-09-25; instrumentado via CI)
+### NM-T8 — AIDL + `InferenceService` + `SherpaEngine` ✅ CONCLUÍDA (2026-09-25; instrumentado validado no CI 2026-09-27)
 > **SPEC_DEVIATION (janela do Whisper)**: o design não previa, mas o Whisper do sherpa-onnx processa só
 > os primeiros ~30 s de cada stream e **descarta o resto** (`offline-recognizer-whisper-impl.h`,
 > v1.13.8; medido no whisper-base com áudio de 49,7 s: a 2ª metade sumia). `WhisperChunker` corta em
@@ -172,7 +172,7 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
   `/sdcard/keyflow-test-models/`); unit dos mapeamentos puros (config por tipo, kinds de erro).
 - **Tests**: instrumented + unit (camadas `overlay/service`-like + lógica). **Gate**: `full`.
 
-### NM-T9 — `LocalTranscriber` + fiação no fluxo (coordinator/IME) + preload ✅ CONCLUÍDA (2026-09-25; instrumentado via CI)
+### NM-T9 — `LocalTranscriber` + fiação no fluxo (coordinator/IME) + preload ✅ CONCLUÍDA (2026-09-25; instrumentado validado no CI 2026-09-27)
 > Roteamento: `Config` ganhou `local: EffectiveConfig.Local?` (sem endpoint/token quando Local) e o
 > `RoutingTranscriber` manda para o `LocalTranscriber` ou para o HTTP intocado — o coordinator não mudou
 > de forma. Espera mínima de 180 s para Local (a 1ª inclui carregar o modelo). `ErrorKind.LOCAL` traz a
@@ -197,7 +197,7 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
 
 ## Fase E — UI
 
-### NM-T10 — `LocalPanel` (gerenciador na aba Voz) ✅ CONCLUÍDA (2026-09-25; instrumentado via CI)
+### NM-T10 — `LocalPanel` (gerenciador na aba Voz) ✅ CONCLUÍDA (2026-09-25; instrumentado validado no CI 2026-09-27)
 > **SPEC_DEVIATION (confirmações)**: dados móveis (DLM-04) e apagar (MGR-04) confirmam **dentro do
 > próprio card** ("Baixar ~639 MB por dados móveis?" / "Apagar Rápido? Libera ~153 MB." + Cancelar /
 > confirmar), não em janela modal — o app não tem diálogos no padrão Ateliê e o inline sai
@@ -230,7 +230,7 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
 
 ## Fase F — Transcrição parcial ao pausar (G12)
 
-### NM-T14 — Toggles `partialOnPause`/`partialViewEdit` na aba Voz ✅ CONCLUÍDA (2026-09-25; instrumentado via CI)
+### NM-T14 — Toggles `partialOnPause`/`partialViewEdit` na aba Voz ✅ CONCLUÍDA (2026-09-25; instrumentado validado no CI 2026-09-27)
 > `ToggleRow` saiu do `TecladoPanel` para o `ConfigFields` (reuso). A seção entra no topo da aba Voz:
 > **todos** os goldens `config-voz-*` mudam de propósito (aprovar pelas telas do CI).
 - **What**: `Settings` += `partialOnPause: Boolean = false`, `partialViewEdit: Boolean = false`
@@ -243,7 +243,7 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
   suíte existente verde.
 - **Tests**: unit + instrumented (camadas `data`/`ui`). **Gate**: `full`.
 
-### NM-T15 — `AudioRecorder` segmentado ✅ CONCLUÍDA (2026-09-25; instrumentado via CI)
+### NM-T15 — `AudioRecorder` segmentado ✅ CONCLUÍDA (2026-09-25; instrumentado validado no CI 2026-09-27)
 > `pause()` passou a devolver `File?` (o trecho fechado no modo segmentado; null fora dele) — quem
 > ignora o retorno segue compilando igual. `segments` lista os trechos fechados; `activeDurationMs()`
 > ficou pública (REC-06 atravessa trechos).
@@ -281,7 +281,7 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
   verdes.
 - **Tests**: unit (lógica extraída) + instrumentados existentes. **Gate**: `full`.
 
-### NM-T17 — `PartialBadge` / `PartialViewer` / `PartialInput` (UI junto à orbe) ✅ CONCLUÍDA (2026-09-25; instrumentado via CI)
+### NM-T17 — `PartialBadge` / `PartialViewer` / `PartialInput` (UI junto à orbe) ✅ CONCLUÍDA (2026-09-25; instrumentado validado no CI 2026-09-27)
 > As três janelas vivem num só `PartialOverlay` (Views, como os banners do serviço), com as regras puras
 > em `PartialUi`. Não havia `EphemeralInput` da vision-capture para reusar — o input focável daqui é o
 > primeiro; fica como base para ela. Visualização e input **seguem abertos** enquanto se grava e pausa
