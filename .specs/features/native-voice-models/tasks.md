@@ -1,7 +1,7 @@
 # Native Voice Models — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (G1–G11)
-**Status**: Em execução — NM-T1..T12 e T14..T17 escritas (2026-09-25), com o núcleo da T18; instrumentados de T2/T4..T10, T14, T15 e T17 e goldens `config-voz-*` aguardando a rodada do CI. Próximas: CI (instrumentados + goldens), roteiros manuais da T18 e da T13 [YAN].
+**Status**: Em execução — NM-T1..T12 e T14..T17 escritas, com o núcleo da T18 (2026-09-25). CI em be0cc6c: 238/240 instrumentados (incl. ponta a ponta do modelo local, `:inference`, parcial no serviço real); as 2 falhas eram do `LocalPanelTest` (corrigidas em 2026-09-27). Goldens `config-voz-*`, `config-docs*` e os 6 novos `config-voz-local*` aprovados das telas dessa rodada. Pendentes: rodada de confirmação do CI e os roteiros manuais T18/T13 [YAN].
 
 > Gate no sandbox: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon <task>`
 > Instrumentado escopado: `ANDROID_SERIAL=emulator-5554`. Antes de instalar no device do Yan:
@@ -217,7 +217,7 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
   seleção persiste + confirmação de deleção + diálogo metered; suíte existente da config verde.
 - **Tests**: unit + instrumented (camada `ui`). **Gate**: `full`.
 
-### NM-T11 — Rotas de galeria + goldens ✅ ROTAS ESCRITAS (2026-09-25; goldens a aprovar pelas telas do CI)
+### NM-T11 — Rotas de galeria + goldens ✅ CONCLUÍDA (2026-09-27; goldens aprovados das telas do CI em be0cc6c)
 - **What**: rotas `config-voz-local` (vazio) / `config-voz-local-baixando` (progresso congelado) /
   `config-voz-local-pronto` (1 selecionado + 1 disponível) com fakes determinísticos; regenerar +
   aprovar goldens (claro/escuro); espelhar PNGs em `/tmp/keyflow-prints/`.

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -44,7 +46,6 @@ fun localCancelTag(id: String) = "voz-local-cancel-$id"
 fun localDeleteTag(id: String) = "voz-local-delete-$id"
 fun localProgressTag(id: String) = "voz-local-progress-$id"
 fun localHeavyTag(id: String) = "voz-local-heavy-$id"
-fun localSelectedTag(id: String) = "voz-local-selected-$id"
 fun localNoticeTag(id: String) = "voz-local-notice-$id"
 fun localConfirmTag(id: String) = "voz-local-confirm-$id"
 
@@ -166,13 +167,20 @@ private fun ModelCard(
             .clip(shape)
             .border(1.dp, if (item.selected) palette.teal else palette.line, shape)
             .background(palette.card)
-            .then(if (installed) Modifier.clickable(onClick = onSelect) else Modifier)
+            // Instalado = opção de rádio: o leitor de tela anuncia "selecionado" no card inteiro.
+            .then(
+                if (installed) {
+                    Modifier.selectable(selected = item.selected, onClick = onSelect, role = Role.RadioButton)
+                } else {
+                    Modifier
+                },
+            )
             .padding(14.dp)
             .testTag(localModelTag(spec.id)),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (installed) {
-                SelectionDot(item.selected, Modifier.padding(end = 10.dp).then(if (item.selected) Modifier.testTag(localSelectedTag(spec.id)) else Modifier))
+                SelectionDot(item.selected, Modifier.padding(end = 10.dp))
             }
             Column(Modifier.weight(1f)) {
                 Text(spec.displayName, color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Medium, fontSize = 13.sp)

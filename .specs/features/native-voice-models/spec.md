@@ -199,7 +199,7 @@ o texto completo com a edição preservada; buffer some.
 | MGR-04 | P1-C | NM-T10 | Implemented |
 | MGR-05 | P1-C | NM-T10 | Implemented |
 | MGR-06 | P1-C | NM-T10 | Implemented |
-| MGR-07 | P1-C | NM-T11 | In Tasks |
+| MGR-07 | P1-C | NM-T11 | Implemented |
 | STO-01 | P2-D | NM-T12 | Implemented |
 | STO-02 | P2-D | NM-T1, NM-T12 | Implemented |
 | STO-03 | P2-D | NM-T12 | Implemented |

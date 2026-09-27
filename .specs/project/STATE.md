@@ -1847,3 +1847,23 @@ STO-01: `backup_rules.xml` e `data_extraction_rules.xml` excluem `file/models` e
 do CI. STO-03: licenças em `app/licenses/` (sherpa-onnx Apache-2.0, ONNX Runtime MIT, Whisper MIT,
 Parakeet CC BY 4.0, com README) e seção "Licenças" na Docs; Docs ganhou também "Voz no aparelho", o
 parcial em "Pausa" e a origem Local em "Privacidade". `DocsSectionsTest` cobre as atribuições.
+
+## native-voice-models — CI e goldens (2026-09-27)
+
+Rodada em 3bef7e8 (T2..T5 + liberação de disco): disco livre 13 → 29 GB, emulador subiu; 206/208.
+As 2 falhas eram de teste, medidas no logcat da evidência:
+- `BarViewAccessibilityTest` (1º teste de teclado da rodada): o app do Google restaurou uma janela por
+  cima do probe logo após abrir; o toque único no campo se perdeu e nenhum IME recebeu o campo. Espera
+  compartilhada `awaitKeyboardAttached` nas 10 classes de teclado: re-traz o probe e toca de novo a
+  cada 6 s, dentro dos mesmos 30 s.
+- `joystickPull…`: soltava a alavanca num prazo fixo de 900 ms com a main thread do app tendo quadros de
+  1,8 s. Agora segura até as 2 setas saírem (até 5 s).
+
+Rodada em be0cc6c (T6..T17): 238/240 — passaram o ponta a ponta do Whisper base (download real, SHA,
+instalação, transcrição curta e de 50 s, morte do `:inference` no meio), o parcial no serviço real e os
+de teclado. Falhas só no `LocalPanelTest`: a marca de selecionado ficava dentro do card clicável (árvore
+mesclada) — o card instalado virou `selectable` com `Role.RadioButton` (leitor de tela anuncia
+"selecionado"; o teste afirma `isSelected` no card) — e a confirmação de apagar abre abaixo da dobra
+(teste rola até ela). Diff de telas: exatamente as 8 mudanças intencionais (`config-voz-*` pela seção
+Transcrição e pelo seletor de 5, `config-docs*` pelas seções novas); aprovadas junto com os 6
+`config-voz-local*`, depois de revisadas. `tour-finger-*` seguem sem golden (rotas provisórias da GT-T2).

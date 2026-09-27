@@ -5,6 +5,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -80,8 +82,8 @@ class LocalPanelTest {
         )
         rule.setContent { h.Content() }
 
-        // selecionado
-        rule.onNodeWithTag(localSelectedTag(base.id)).assertExists()
+        // selecionado (o card é a opção de rádio)
+        rule.onNodeWithTag(localModelTag(base.id)).assertIsSelected()
         rule.onNodeWithTag(localDeleteTag(base.id)).assertExists()
         // baixando
         rule.onNodeWithTag(localProgressTag(small.id)).performScrollTo().assertIsDisplayed()
@@ -89,7 +91,7 @@ class LocalPanelTest {
         rule.onNodeWithTag(localCancelTag(small.id)).assertExists()
         // baixado, não selecionado
         rule.onNodeWithTag(localDeleteTag(parakeet.id)).assertExists()
-        rule.onNodeWithTag(localSelectedTag(parakeet.id)).assertDoesNotExist()
+        rule.onNodeWithTag(localModelTag(parakeet.id)).assertIsNotSelected()
     }
 
     @Test
@@ -120,13 +122,14 @@ class LocalPanelTest {
         rule.setContent { h.Content() }
 
         rule.onNodeWithTag(localDeleteTag(base.id)).performScrollTo().performClick()
-        rule.onNodeWithTag(localConfirmTag(base.id)).assertIsDisplayed()
-        rule.onNodeWithTag(VOZ_LOCAL_CONFIRM_NO_TAG).performClick()
+        // A confirmação abre no fim do card, abaixo da dobra: rola até ela.
+        rule.onNodeWithTag(localConfirmTag(base.id)).performScrollTo().assertIsDisplayed()
+        rule.onNodeWithTag(VOZ_LOCAL_CONFIRM_NO_TAG).performScrollTo().performClick()
         rule.onNodeWithTag(localConfirmTag(base.id)).assertDoesNotExist()
         rule.runOnIdle { assertTrue(h.actions.deletes.isEmpty()) }
 
-        rule.onNodeWithTag(localDeleteTag(base.id)).performClick()
-        rule.onNodeWithTag(VOZ_LOCAL_CONFIRM_YES_TAG).performClick()
+        rule.onNodeWithTag(localDeleteTag(base.id)).performScrollTo().performClick()
+        rule.onNodeWithTag(VOZ_LOCAL_CONFIRM_YES_TAG).performScrollTo().performClick()
 
         rule.runOnIdle {
             assertEquals(listOf(base.id), h.actions.deletes)
