@@ -1,7 +1,7 @@
 # Gesture Tour — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (T1–T6)
-**Status**: Draft (aguardando aprovação do Yan)
+**Status**: Tudo que cabe a agente está feito (GT-T1..T10, 2026-09-24). Resta só o manual do GT-T8 **[YAN]**: fluidez dos 2 tours e TalkBack no A32 → requisitos para Verified.
 
 > Gate no sandbox: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon <task>`
 > Instrumentado escopado: `ANDROID_SERIAL=emulator-5554`. Antes de instalar no device do Yan:
@@ -25,7 +25,7 @@ do motor; o resto serializa no device (TESTING.md).
 
 ## Fase A — Dados
 
-### GT-T1 — `GestureScript` + `GestureScriptCatalog` `[P]`
+### GT-T1 — `GestureScript` + `GestureScriptCatalog` `[P]` ✅ CONCLUÍDA (2026-09-09)
 - **What**: modelo declarativo (`TourScene`/`FingerAction`/`SceneReaction`/`GestureStep`/
   `GestureScript`) + catálogo puro: `buildOrbScripts(settings)` (TOGGLE/PTT básicos → pausa →
   cancelar/desfazer → reposicionar → atalhos reais de 1/2/3 toques, skip NONE, 1-toque só PTT,
@@ -41,7 +41,7 @@ do motor; o resto serializa no device (TESTING.md).
 
 ## Fase B — Motor
 
-### GT-T2 — `FingerPuppet` + interpolação `tourFrameAt`
+### GT-T2 — `FingerPuppet` + interpolação `tourFrameAt` ✅ CONCLUÍDA (2026-09-09)
 - **What**: interpolação pura keyframes→frame (`tourFrameAt(script, timeMs)`: posição, fase da
   ação, reação vigente, fim/loop) + Composable do dedo (disco/halo; ripple por tap com contagem;
   pressionado; trilha de arrasto) dirigido pelo frame; `rememberTourClock(enabled)` no padrão
@@ -53,7 +53,7 @@ do motor; o resto serializa no device (TESTING.md).
   o Composable; render sanity numa rota provisória de galeria.
 - **Tests**: unit + build. **Gate**: `quick` + `build`.
 
-### GT-T3 — `GestureTourPlayer` + `GestureTourState`
+### GT-T3 — `GestureTourPlayer` + `GestureTourState` ✅ CONCLUÍDA (2026-09-09)
 - **What**: player isolado (TOUR-01): toca `List<GestureScript>` com autoplay em loop; `next()/
   prev()` com interrupção limpa + pausa de autoplay ~6 s (TOUR-04); estado exposto (índice/
   título/descrição); clock para ao sair de cena; a11y (contentDescription do passo; edge cases).
@@ -68,7 +68,7 @@ do motor; o resto serializa no device (TESTING.md).
 
 ## Fase C — Cenas reais
 
-### GT-T4 — Cena ORB (`VoiceOrb` + hints de overlay)
+### GT-T4 — Cena ORB (`VoiceOrb` + hints de overlay) ✅ CONCLUÍDA (2026-09-09)
 - **What**: cena da orbe: `VoiceOrb` real dirigido por `SceneReaction.orbState`; representações
   leves de alvos de arrasto/banner de desfazer (`TourOverlayHint`, estilo Ateliê) p/ os roteiros
   de cancelar/reposicionar (TOUR-03 orbe).
@@ -79,13 +79,16 @@ do motor; o resto serializa no device (TESTING.md).
   nos passos que os declaram; rota de galeria com clock congelado renderiza fiel.
 - **Tests**: instrumented. **Gate**: `full`.
 
-### GT-T5 — Cena KEYBOARD (grade Canvas nova em miniatura)
+### GT-T5 — Cena KEYBOARD (grade Canvas nova em miniatura) ✅ CONCLUÍDA (2026-09-09)
 - **What**: cena do teclado: `KeyFlowKeyboardView` real em miniatura (padrão da demo atual:
   `scale`, callbacks no-op, `key(dark)`, ticker parado no release) com a **grade Canvas nova
   forçada** (MODO-04 — expor à demo a seleção da grade independente do prefs de debug);
   `SceneReaction.micState`/`keyboardExpanded` dirigem `updateMicState`/`setExpanded`.
-- **Where**: `ui/tour/scenes/KeyboardScene.kt`, ajuste pontual em `ime/KeyFlowKeyboardView.kt`
-  (parâmetro p/ forçar a grade nova).
+- **Where**: `ui/tour/scenes/KeyboardScene.kt`. **SPEC_DEVIATION (2026-09-09)**: o ajuste previsto em
+  `ime/KeyFlowKeyboardView.kt` (parâmetro p/ forçar a grade nova) NÃO foi feito porque não é mais
+  necessário — a grade Canvas virou a única desde a KC-T10/SB-T10 e a antiga foi removida junto com a
+  flag `kbd_bars`. A task foi escrita antes dessas remoções. O instrumentado afirma a grade na tela
+  via `canvasGridForTest`, que é o que o "Done when" pedia.
 - **Depends on**: GT-T4 (sequência de device; código independente).
 - **Requirement**: TOUR-03, MODO-04 (parcial).
 - **Done when**: instrumented: reações dirigem mic/expansão; grade NOVA visível na demo
@@ -94,7 +97,7 @@ do motor; o resto serializa no device (TESTING.md).
 
 ## Fase D — Consumo
 
-### GT-T6 — Integração na aba Modo (+ regeneração por Settings)
+### GT-T6 — Integração na aba Modo (+ regeneração por Settings) ✅ CONCLUÍDA (2026-09-09)
 - **What**: `ModeCard.demo` dos 2 cards usa o player com os catálogos (T1); `DemoFrame` ganha o
   rodapé **‹ título ›** (MODO-02); área direita mostra a descrição sincronizada (substitui
   `pauseHint`/features estáticos durante o tour — MODO-03); roteiros em
@@ -107,7 +110,7 @@ do motor; o resto serializa no device (TESTING.md).
   `ModoPanel` verde (toggles/permissões intactos).
 - **Tests**: instrumented (camada `ui`) + unit (seleção de textos). **Gate**: `full`.
 
-### GT-T7 — Aba Docs atualizada `[P]`
+### GT-T7 — Aba Docs atualizada `[P]` ✅ CONCLUÍDA (2026-09-09)
 - **What**: revisar `DocsPanel` (Modos/Pausa): cancelar/desfazer, atalhos de rajada, PTT com
   janela de release, controles da notificação — alinhado às descrições dos roteiros (DOC-01).
 - **Where**: `ui/config/DocsPanel.kt`.
@@ -117,7 +120,7 @@ do motor; o resto serializa no device (TESTING.md).
   rota docs regenerado.
 - **Tests**: instrumented existente + screenshot. **Gate**: `full` + `screenshot`.
 
-### GT-T9 — Docs: índice + seções de detalhes + feedback
+### GT-T9 — Docs: índice + seções de detalhes + feedback ✅ CONCLUÍDA (2026-09-24)
 - **What**: refatorar `DocsPanel` para renderizar de uma lista `docsSections` (fonte única);
   **índice** após "Como funciona" com rolagem por âncora medida (`onGloballyPositioned` →
   `animateScrollTo`) — DOC-02; **seções novas** de detalhes (Gestos da orbe · Teclado KeyFlow ·
@@ -133,7 +136,7 @@ do motor; o resto serializa no device (TESTING.md).
   golden da Docs regenerado (claro/escuro).
 - **Tests**: instrumented + screenshot. **Gate**: `full` + `screenshot`.
 
-### GT-T10 — Apresentação: "?" por permissão `[P]`
+### GT-T10 — Apresentação: "?" por permissão `[P]` ✅ CONCLUÍDA (2026-09-24)
 - **What**: `ChecklistRow` do `OnboardingScreen` ganha "?" tocável; explicação expande inline
   (`AnimatedVisibility`), **uma aberta por vez** (tocar outro "?" troca; o mesmo fecha); textos
   por permissão (PERM-03, consistentes com a Privacidade da Docs); tags
@@ -148,7 +151,7 @@ do motor; o resto serializa no device (TESTING.md).
 ## Fase E — Fechamento
 
 <!-- GT-T8 fecha DEPOIS de T9/T10 (goldens de Docs/onboarding entram no mesmo lote). -->
-### GT-T8 — Goldens + prova de reuso + validação no A32
+### GT-T8 — Goldens + prova de reuso + validação no A32 — ✅ parte do agente (2026-09-24); falta **[YAN]** A32
 - **What**: rotas de galeria `tour-orb-basics`/`tour-orb-shortcuts`/`tour-keyboard-mic` (clock
   congelado em t fixo, claro/escuro) + `config-modo` regenerada; **prova de isolamento**: uma
   rota toca um subconjunto de roteiros fora da aba Modo (success criteria de reuso); regenerar +

@@ -1,5 +1,8 @@
 # KeyFlow — Roadmap
 
+> **Ordem de execução até a loja**: `.specs/DEVELOPMENT-ORDER.md` (mapa único para o agente
+> executor; os números de milestone aqui são identificadores, não a sequência).
+
 ## Milestone 0 — PoC do caminho crítico (de-risk)
 
 Antes de construir o produto, provar os dois pontos que podem inviabilizar a arquitetura:
@@ -113,8 +116,9 @@ Developer API + Play Integrity). Fundação: **KeyFlow API em Rust** (axum/tokio
 validação de compras, ledger, proxy de transcrição streaming, manifest de modelos, config remota
 (inclusive parâmetros dos ads), SSV de rewarded.
 
-Specs: `.specs/features/keyflow-api/` (migra p/ o repo Rust) e `.specs/features/monetization/`
-(`spec.md` + `context.md`; design/tasks após aprovação). Ordem: API primeiro.
+Specs: `.specs/features/keyflow-api/` (código em **`api/` no monorepo** — decisão do Yan,
+2026-07-02) e `.specs/features/monetization/` (`spec.md`/`context.md`/`design.md`/`tasks.md`
+completos, Draft aguardando aprovação). Ordem: API primeiro (API-T1..T14; MZ-T1..T15).
 
 **Done:** success criteria das duas specs (fluxo completo com compras de teste; zero ads no
 IME/overlay; app funciona com a API fora do ar).
@@ -128,11 +132,50 @@ monetização), efeitos por superfície com orçamento de performance no IME e t
 efeitos". Nova **aba Sistema**: seletor de temas, exportar/importar config (JSON, tokens opt-in)
 e restaurar de fábrica (apagar tokens opcional). Aplicação ao vivo em app/notificação/orbe/teclado.
 
-Spec: `.specs/features/theme-system/` (`spec.md` + `context.md`; 3 assunções ⚠️ a validar —
-gating das skins, recorte das "cores normais", efeitos no MVP). Cruza com o Milestone 7 (UNL).
+Spec: `.specs/features/theme-system/` (`spec.md`/`context.md`/`design.md`/`tasks.md` completos,
+Draft; 3 assunções ⚠️ a validar — gating das skins, recorte das "cores normais", efeitos no MVP —
+checkpoints marcados nas tasks TS-T6/T8/T9). Cruza com o Milestone 7 (UNL, via
+`EntitlementsProvider`). Tasks: TS-T1..T14.
 
 **Done:** success criteria da spec (troca ao vivo nas 3 superfícies; Ateliê bit-idêntico; tema
 novo = só dados; A32 sem jank; export→reset→import reproduz tudo).
+
+## Milestone 9 — Tour de gestos + Docs/Apresentação
+
+Prévia animada dos gestos reais (dedo animado sobre orbe/teclado) na aba Modo, Docs com índice/
+seções de detalhe/feedback por e-mail, e "?" explicando cada permissão no onboarding.
+
+Spec: `.specs/features/gesture-tour/` (completa, Draft). Tasks: GT-T1..T10.
+
+**Done:** success criteria da spec; goldens aprovados; validação no A32.
+
+## Milestone 10 — Modelos de voz nativos (STT offline) + transcrição parcial
+
+Origem "Local" na aba Voz: catálogo curado (Whisper base/small, Parakeet), download com
+verificação, inferência sherpa-onnx em processo isolado `:inference`, e transcrição parcial ao
+pausar (buffer visível/editável junto à orbe).
+
+Spec: `.specs/features/native-voice-models/` (completa, Draft). Tasks: NM-T1..T18.
+
+**Done:** ditar em modo avião funciona; parcial editável; prontidão de loja (backup/16 KB/licenças).
+
+## Milestone 11 — Visão (captura de tela pela orbe)
+
+Fluxo efêmero: atalho da orbe pausa a ditação, seleciona área da tela, e por gesto copia
+imagem/texto (OCR ML Kit) ou tradução on-device; estado sempre restaurado.
+
+Spec: `.specs/features/vision-capture/` (completa, Draft). Tasks: VC-T1..T14.
+
+**Done:** success criteria da spec; e2e no A32 (incl. modo avião).
+
+## Milestone 12 — Publicação na Play Store
+
+targetSdk 35, política de privacidade pública, prominent disclosure no onboarding, Data Safety
+Form, build de release assinado (AAB), listing e trilha de teste interna → produção.
+
+Base: `PLAYSTORE_CHECKLIST.md` + Bloco 9 do `.specs/DEVELOPMENT-ORDER.md` (PS-1..PS-7).
+
+**Done:** app aprovado e publicado; e2e de compras em faixa de teste verde.
 
 ## Futuro (pós-v1, não priorizado)
 

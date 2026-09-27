@@ -16,8 +16,10 @@ import com.keyflow.overlay.OverlayService
 import com.keyflow.overlay.RecordingNotification
 import com.keyflow.core.ButtonState
 import com.keyflow.data.SettingsRepository
+import com.keyflow.ime.UserSettingsGuard
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -43,6 +45,10 @@ class SystemSurfacesScreenshotTest {
     private val context: Context get() = instrumentation.targetContext
     private val device: UiDevice get() = UiDevice.getInstance(instrumentation)
 
+    // Preserva o que o dono do aparelho já tinha configurado — ver [UserSettingsGuard]. `ime reset`
+    // devolveria o teclado de fábrica, não o que a pessoa usava.
+    private val userSettings = UserSettingsGuard(context)
+
     private val outDir: File by lazy {
         File(context.getExternalFilesDir(null), "verification").apply { mkdirs() }
     }
@@ -55,7 +61,17 @@ class SystemSurfacesScreenshotTest {
      */
     @Before
     fun warmUpSettings() {
+        userSettings.capture()
         runBlocking { SettingsRepository(context).settingsFlow().first() }
+    }
+
+    // Pareia com o `capture()` acima para TODOS os testes da classe. Antes o `restore()` morava só no
+    // `finally` de `sysImeOverField`, e os outros dois capturavam sem devolver — inócuo enquanto o
+    // capture só lia, virou vazamento quando ele passou a forçar `show_ime_with_hard_keyboard`
+    // (2026-09-09): a chave ficava em 1 no aparelho depois da suíte.
+    @After
+    fun restoreUserSettings() {
+        userSettings.restore()
     }
 
     @Test
@@ -83,7 +99,13 @@ class SystemSurfacesScreenshotTest {
         shell("pm grant ${context.packageName} ${Manifest.permission.RECORD_AUDIO}")
         try {
             device.pressHome()
-            context.startForegroundService(OverlayService.intent(context))
+            // `intent()` (sem action) NÃO promove o serviço: `onStartCommand` casa por action, e a única
+            // outra via é `onCreate` — que só sobe a orbe se o Modo Sobrepor estiver ligado nas settings
+            // de quem usa. Com ele desligado o serviço nunca chamava `startForeground`, este teste caía
+            // em "OverlayService não subiu" e ~10s depois o sistema matava o PROCESSO com
+            // ForegroundServiceDidNotStartInTimeException, derrubando de carona o teste seguinte
+            // (2026-09-08). `startOverlayIntent` é o que o app usa de verdade e independe da setting.
+            context.startForegroundService(OverlayService.startOverlayIntent(context))
             waitUntil("OverlayService não subiu") { OverlayService.isRunningForUi }
             Thread.sleep(1200) // deixa o ComposeView do orbe compor
             capture("sys-overlay-over-app")
@@ -114,7 +136,6 @@ class SystemSurfacesScreenshotTest {
             Thread.sleep(600)
             capture("sys-ime-over-field")
         } finally {
-            shell("ime reset")
             device.pressHome()
         }
     }

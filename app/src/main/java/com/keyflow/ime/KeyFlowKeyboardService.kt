@@ -8,11 +8,12 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import android.inputmethodservice.InputMethodService
-import com.keyflow.BuildConfig
+import android.inputmethodservice.InputMethodService.Insets
 import com.keyflow.core.KeyFlowController
 import com.keyflow.core.shortcuts.BarsConfig
 import com.keyflow.core.shortcuts.ShortcutGrid
 import com.keyflow.core.shortcuts.ShortcutKey
+import com.keyflow.data.EffectiveConfig
 import com.keyflow.data.SettingsRepository
 import com.keyflow.ime.keyboard.ComposingWordTracker
 import com.keyflow.ime.keyboard.SystemSpellChecker
@@ -20,6 +21,7 @@ import com.keyflow.ime.keyboard.isNumericInputType
 import com.keyflow.ime.keys.PhysicalKeyEmitter
 import com.keyflow.overlay.OverlayService
 import com.keyflow.overlay.RecordingNotification
+import com.keyflow.transcription.local.LocalTranscriber
 import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -33,6 +35,10 @@ import kotlinx.coroutines.runBlocking
 
 class KeyFlowKeyboardService : InputMethodService() {
 
+    // Origem de voz atual, para pré-carregar o modelo local quando o teclado abre (NM-T9).
+    @Volatile
+    private var voiceSource: EffectiveConfig = EffectiveConfig.Unavailable
+
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var keyboardView: KeyFlowKeyboardView? = null
 
@@ -44,16 +50,6 @@ class KeyFlowKeyboardService : InputMethodService() {
         set(value) {
             uiPrefs.edit().putBoolean(KEY_EXPANDED, value).apply()
         }
-
-    // Flag de rollout da grade Canvas nova (KC-T6/ROL-02): só alternável em debug, sempre desligada em
-    // release até a KC-T10 aprovar e remover esta flag (aí a nova vira a única).
-    private val useCanvasGrid: Boolean
-        get() = BuildConfig.DEBUG && uiPrefs.getBoolean(KEY_CANVAS_GRID, false)
-
-    // Flag de rollout das barras Canvas (SB-T5/ROL-02, mesmo padrão da kbd_canvas): desligada, a barra
-    // antiga fica intocada; ligada, a pilha de BarView renderiza a BarsConfig do DataStore.
-    private val useBars: Boolean
-        get() = BuildConfig.DEBUG && uiPrefs.getBoolean(KEY_BARS, false)
 
     // Última config aplicada à view (BAR-07): o collect de barsConfigFlow/gridsFlow recria a view só em
     // mudança real (o flow re-emite a cada write do DataStore, mesmo de chaves alheias).
@@ -71,13 +67,27 @@ class KeyFlowKeyboardService : InputMethodService() {
     )
     private var appliedLiveConfig: LiveKeyboardConfig? = null
 
-    // Corretor do sistema (KC-T7/SPL-01..03): só existe com a grade Canvas — a antiga nunca compõe.
+    // Corretor do sistema (KC-T7/SPL-01..03).
     private val wordTracker = ComposingWordTracker()
     private var spellChecker: SystemSpellChecker? = null
+
+    // Q3 (2026-07-02): campos TYPE_NULL (terminal, ex.: Termux/Termius) sinalizam "só aceito o texto já
+    // comitado, sem preview de composição" — apps assim não renderizam setComposingText, então a palavra
+    // fica invisível até um delimitador finalizar a composição (o dado chega, só não aparece). Setado a
+    // cada onStartInput (inclui restarts) para refletir sempre o campo focado atual.
+    private var isRawInputField = false
+        set(value) {
+            field = value
+            isRawInputFieldForTest = value
+        }
 
     // Camada única de emissão de teclas físicas (EMT-02..06): Enter/Esc e, adiante, teclas avulsas,
     // grades de atalhos e alavanca (Trabalho 3 — shortcut-bars).
     private val keyEmitter = PhysicalKeyEmitter()
+
+    /** Espelho local de `Settings.keyboardShowWithHardKeyboard`: `onEvaluateInputViewShown` é síncrono. */
+    @Volatile
+    private var showWithHardKeyboard = true
 
     override fun onCreate() {
         super.onCreate()
@@ -91,7 +101,21 @@ class KeyFlowKeyboardService : InputMethodService() {
             SettingsRepository(this@KeyFlowKeyboardService).settingsFlow().collect {
                 KeyFlowController.autoPasteInField = it.autoPasteInField
                 KeyFlowController.autoPasteOnFocus = it.autoPasteOnFocus
+                voiceSource = it.effectiveConfigFor()
+                // Trocou origem/modelo com o teclado aberto: carrega o novo ou solta a RAM (NAT-05/09).
+                if (keyboardView?.isShown == true) LocalTranscriber.get(this@KeyFlowKeyboardService).sync(voiceSource)
             }
+        }
+        // Mostrar (ou não) com teclado físico conectado. Precisa de `updateInputViewShown()` na troca:
+        // o framework só reavalia `onEvaluateInputViewShown()` quando é avisado, senão a mudança só
+        // valeria no próximo campo.
+        serviceScope.launch {
+            SettingsRepository(this@KeyFlowKeyboardService).keyboardShowWithHardKeyboardFlow()
+                .distinctUntilChanged()
+                .collect {
+                    showWithHardKeyboard = it
+                    updateInputViewShown()
+                }
         }
         // Atalho da orbe: alterna retrair/expandir, reusando o mesmo caminho do botão de ocultar.
         serviceScope.launch {
@@ -109,7 +133,7 @@ class KeyFlowKeyboardService : InputMethodService() {
                 .distinctUntilChanged()
                 .collect { (bars, grids) ->
                     val changed = bars != appliedBarsConfig || grids != appliedGrids
-                    if (useBars && keyboardView != null && changed) setInputView(onCreateInputView())
+                    if (keyboardView != null && changed) setInputView(onCreateInputView())
                 }
         }
         // Tema/tamanho/idioma ao vivo (pedido do Yan, 2026-07-03): antes só aplicava ao reabrir o
@@ -141,6 +165,28 @@ class KeyFlowKeyboardService : InputMethodService() {
         KeyFlowController.setKeyboardVisible(false)
     }
 
+    /**
+     * Região tocável da janela do IME (SB-T10/GRD-08). O `contentTopInsets`/`visibleTopInsets` ficam
+     * SEMPRE no tamanho do conteúdo real (sem o overscan) — outras apps (ex.: a barra de atalhos do
+     * Termux) nunca devem ver essa faixa invisível como "altura do teclado" e reposicionar a própria UI
+     * por causa dela (regressão encontrada no device físico, 2026-07-06, quando esses dois insets tinham
+     * sido amarrados ao mesmo valor de `TOUCHABLE_INSETS_CONTENT`). Só a REGIÃO TOCÁVEL muda: normalmente
+     * é só o conteúdo visível; enquanto uma grade efêmera está ancorando/ativa, expande pra janela
+     * inteira (incluindo o overscan), senão o Android trava as coordenadas do toque real na borda da
+     * janela assim que o dedo passa dela (achado original, mesma data).
+     */
+    override fun onComputeInsets(outInsets: Insets) {
+        super.onComputeInsets(outInsets)
+        val view = keyboardView ?: return
+        val overscan = view.gridOverscanPx
+        if (overscan <= 0) return
+        outInsets.contentTopInsets = overscan
+        outInsets.visibleTopInsets = overscan
+        outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_REGION
+        val touchableTop = if (view.gridDragActiveForTest) 0 else overscan
+        outInsets.touchableRegion.set(0, touchableTop, view.width, view.height)
+    }
+
     override fun onDestroy() {
         KeyFlowController.setKeyboardVisible(false)
         if (activeViewForTest === keyboardView) activeViewForTest = null
@@ -151,6 +197,26 @@ class KeyFlowKeyboardService : InputMethodService() {
 
     override fun onEvaluateFullscreenMode() = false
 
+    /**
+     * Com teclado físico conectado, o padrão do `InputMethodService` esconde o teclado virtual (a menos
+     * que a pessoa ligue "mostrar teclado virtual" nas Configurações do Android). Para um teclado de
+     * ditado isso apaga o mic junto, então quem decide é o app — ligado por padrão, desmarcável na aba
+     * Teclado. Desmarcado, delega de volta ao comportamento do sistema.
+     */
+    override fun onEvaluateInputViewShown() = showWithHardKeyboard || super.onEvaluateInputViewShown()
+
+    /**
+     * Gira o device (retrato↔paisagem) muda a altura disponível de verdade — sem recriar a view, o
+     * overscan da grade (`gridOverscanPx`) calculado na orientação anterior sobrevivia com métricas
+     * erradas e podia estourar a janela do IME na paisagem, bem mais baixa (achado do Yan, device físico,
+     * 2026-07-06: teclado sumindo ao girar com uma grade grande configurada).
+     */
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        Log.d(TAG, "onConfigurationChanged orientation=${newConfig.orientation} keyboardView=$keyboardView")
+        if (keyboardView != null) setInputView(onCreateInputView())
+    }
+
     override fun onCreateInputView(): View {
         val repo = SettingsRepository(this@KeyFlowKeyboardService)
         val dark = runBlocking { repo.themeDarkOnce() }
@@ -158,7 +224,6 @@ class KeyFlowKeyboardService : InputMethodService() {
         // inicializar o EncryptedSharedPreferences (cripto cara) no caminho crítico do IME.
         val scalePercent = runBlocking { repo.keyboardScalePercentOnce() }
         val scale = scalePercent / 100f
-        val canvasGrid = useCanvasGrid
         // Idioma gerenciado pelo app (pedido do Yan, 2026-07-02) — não pelo subtype do sistema, mesma
         // leitura leve do tema/tamanho.
         val language = runBlocking { repo.keyboardLanguageOnce() }
@@ -166,12 +231,11 @@ class KeyFlowKeyboardService : InputMethodService() {
         val numberRowEnabled = runBlocking { repo.keyboardNumberRowEnabledOnce() }
         appliedLiveConfig = LiveKeyboardConfig(dark, scalePercent, language, numberRowEnabled)
         spellChecker?.close()
-        spellChecker = if (canvasGrid) SystemSpellChecker(this, localeFor(language)) else null
+        spellChecker = SystemSpellChecker(this, localeFor(language))
         // Barras Canvas (SB-T5): leitura leve como o tema — só DataStore no caminho crítico do IME.
-        val bars = useBars
-        val barsConfig = if (bars) runBlocking { repo.barsConfigOnce() } else BarsConfig.DEFAULT
-        val grids = if (bars) runBlocking { repo.shortcutGridsOnce() } else emptyList()
-        val vibration = if (bars) runBlocking { repo.vibrationIntensityOnce() } else 60
+        val barsConfig = runBlocking { repo.barsConfigOnce() }
+        val grids = runBlocking { repo.shortcutGridsOnce() }
+        val vibration = runBlocking { repo.vibrationIntensityOnce() }
         appliedBarsConfig = barsConfig
         appliedGrids = grids
         val view = KeyFlowKeyboardView(
@@ -187,14 +251,17 @@ class KeyFlowKeyboardService : InputMethodService() {
             },
             onExpand = { preferExpanded = true },
             onErrorTap = {
-                startActivity(
+                val intent = if (com.keyflow.core.KeyFlowController.errorNavTarget ==
+                    com.keyflow.core.ErrorNavTarget.MODO_MIC
+                ) {
+                    com.keyflow.ui.SetupActivity.openAtModoMicIntent(this)
+                } else {
                     com.keyflow.ui.SetupActivity.openAtVozIntent(this)
-                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                )
+                }
+                startActivity(intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
             },
             dark = dark,
             scale = scale,
-            useCanvasGrid = canvasGrid,
             locale = language,
             showLanguageKey = true,
             onLanguageSwitch = { cycleLanguage() },
@@ -202,7 +269,6 @@ class KeyFlowKeyboardService : InputMethodService() {
             // onCreateInputView na 1ª vez que a view é criada para uma sessão.
             initialNumeric = isNumericInputType(currentInputEditorInfo?.inputType ?: InputType.TYPE_NULL),
             numberRowEnabled = numberRowEnabled,
-            useBars = bars,
             barsConfig = barsConfig,
             shortcutGrids = grids,
             onShortcut = ::emitShortcut,
@@ -285,11 +351,23 @@ class KeyFlowKeyboardService : InputMethodService() {
 
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         super.onStartInput(attribute, restarting)
-        Log.d(TAG, "onStartInput pkg=${attribute?.packageName} restarting=$restarting")
+        Log.d(
+            TAG,
+            "onStartInput pkg=${attribute?.packageName} restarting=$restarting " +
+                "inputType=0x${(attribute?.inputType ?: 0).toString(16)} " +
+                "imeOptions=0x${(attribute?.imeOptions ?: 0).toString(16)}",
+        )
         // Só pede para se exibir se: (a) há um campo de texto real focado (não um editor "nulo", senão
         // subiria sem input ativo) e (b) o usuário acabou de trocar PARA o KeyFlow pelo nosso seletor
         // (3 toques). Assim não sobe em troca de app / ida para home, nem sem campo focado.
-        val hasRealInput = (attribute?.inputType ?: InputType.TYPE_NULL) != InputType.TYPE_NULL
+        val inputType = attribute?.inputType ?: InputType.TYPE_NULL
+        val hasRealInput = inputType != InputType.TYPE_NULL
+        // Termius de verdade (device físico, 2026-07-06) não é TYPE_NULL — é TYPE_CLASS_TEXT com variação
+        // de SENHA (0x91 = classe texto + visible-password), truque comum de terminal pra desativar
+        // autocorreção. Campos assim TAMBÉM não renderizam composição visível (mesmo sintoma do TYPE_NULL,
+        // causa raiz diferente) — Q3 (2026-07-02) só cobria TYPE_NULL puro.
+        isRawInputField = !hasRealInput || isPasswordVariant(inputType)
+        Log.d(TAG, "onStartInput isRawInputField=$isRawInputField")
         if (hasRealInput &&
             !restarting &&
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
@@ -302,6 +380,8 @@ class KeyFlowKeyboardService : InputMethodService() {
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         Log.d(TAG, "onStartInputView restarting=$restarting")
+        // Teclado aberto = modo ativo: com origem Local, o modelo já fica carregado para o mic (NAT-05).
+        LocalTranscriber.get(this).sync(voiceSource)
         KeyFlowController.registerInserter { text ->
             getCurrentInputConnection()?.commitText(text, 1) == true
         }
@@ -347,7 +427,7 @@ class KeyFlowKeyboardService : InputMethodService() {
     ) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
         val word = wordTracker.currentWord
-        if (!useCanvasGrid || word.isEmpty()) return
+        if (word.isEmpty()) return
         val actualBefore = getCurrentInputConnection()?.getTextBeforeCursor(word.length, 0)?.toString()
         if (actualBefore != word) {
             wordTracker.reset()
@@ -360,7 +440,7 @@ class KeyFlowKeyboardService : InputMethodService() {
         val ic = getCurrentInputConnection() ?: return
         when (action) {
             is KeyAction.Character -> {
-                if (useCanvasGrid && action.char.length == 1 && action.char[0].isLetter()) {
+                if (shouldCompose(isRawInputField, action.char)) {
                     val word = wordTracker.onLetter(action.char)
                     ic.setComposingText(word, 1)
                     requestSuggestions(word)
@@ -370,7 +450,7 @@ class KeyFlowKeyboardService : InputMethodService() {
                 }
             }
             KeyAction.Backspace -> {
-                val remaining = if (useCanvasGrid) wordTracker.onBackspace() else null
+                val remaining = if (!isRawInputField) wordTracker.onBackspace() else null
                 when {
                     remaining == null -> {
                         val sel = ic.getSelectedText(0)
@@ -428,7 +508,7 @@ class KeyFlowKeyboardService : InputMethodService() {
 
     /** Encerra a palavra em composição (se houver) — pontuação/espaço/enter fecham a sugestão atual. */
     private fun finishComposing(ic: InputConnection) {
-        if (!useCanvasGrid || wordTracker.currentWord.isEmpty()) return
+        if (wordTracker.currentWord.isEmpty()) return
         ic.finishComposingText()
         wordTracker.reset()
         spellChecker?.cancel()
@@ -456,8 +536,6 @@ class KeyFlowKeyboardService : InputMethodService() {
     companion object {
         private const val TAG = "KeyFlow.Keyboard"
         private const val KEY_EXPANDED = "expanded"
-        private const val KEY_CANVAS_GRID = "kbd_canvas"
-        private const val KEY_BARS = "kbd_bars"
         private val LANGUAGE_CYCLE = listOf("pt", "en", "es")
 
         /**
@@ -469,5 +547,35 @@ class KeyFlowKeyboardService : InputMethodService() {
         @Volatile
         var activeViewForTest: KeyFlowKeyboardView? = null
             private set
+
+        /** Espelha [isRawInputField] da instância ativa — testes instrumentados leem sem depender de UI. */
+        @Volatile
+        var isRawInputFieldForTest: Boolean = false
+            private set
+
+        /**
+         * Decide se uma letra entra na composição do corretor (`setComposingText`) ou comita direto
+         * (`commitText`). Puro/testável em JVM (Q3, 2026-07-02): campos [rawInputField] (`TYPE_NULL`,
+         * ex.: Termux/Termius) não renderizam texto "compondo" — comitar direto é o único jeito de o
+         * usuário ver a letra aparecer enquanto digita.
+         */
+        internal fun shouldCompose(rawInputField: Boolean, char: String): Boolean =
+            !rawInputField && char.length == 1 && char[0].isLetter()
+
+        /**
+         * Campo de texto com variação de SENHA (`TYPE_TEXT_VARIATION_PASSWORD`/`VISIBLE_PASSWORD`/
+         * `WEB_PASSWORD`) — achado real no Termius via SSH (device físico, 2026-07-06, `inputType=0x91`):
+         * não é `TYPE_NULL`, mas também não renderiza composição visível (mesmo sintoma, causa raiz
+         * diferente — provavelmente terminais usam a variação de senha só pra desligar autocorreção).
+         */
+        internal fun isPasswordVariant(inputType: Int): Boolean {
+            if (inputType and InputType.TYPE_MASK_CLASS != InputType.TYPE_CLASS_TEXT) return false
+            return when (inputType and InputType.TYPE_MASK_VARIATION) {
+                InputType.TYPE_TEXT_VARIATION_PASSWORD,
+                InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD,
+                InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD -> true
+                else -> false
+            }
+        }
     }
 }

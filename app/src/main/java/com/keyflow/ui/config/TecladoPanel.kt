@@ -28,6 +28,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.keyflow.core.shortcuts.BarsConfig
+import com.keyflow.core.shortcuts.ShortcutGrid
 import com.keyflow.data.Settings
 import com.keyflow.ime.KeyFlowKeyboardView
 import com.keyflow.ui.common.verticalScrollbar
@@ -43,6 +45,7 @@ const val TECLADO_UNLOCK_TAG = "teclado-unlock-skins"
 const val TECLADO_SIZE_SLIDER_TAG = "teclado-size-slider"
 const val TECLADO_SIZE_PREVIEW_TAG = "teclado-size-preview"
 const val TECLADO_NUMBER_ROW_TAG = "teclado-number-row"
+const val TECLADO_SHOW_WITH_HARD_KEYBOARD_TAG = "teclado-show-with-hard-keyboard"
 
 /**
  * Margem lateral mantida de propósito na prévia de tamanho (ver [KeyboardSizePreview]) — erra pra menor
@@ -71,6 +74,10 @@ fun TecladoPanel(
     onLanguageClick: () -> Unit,
     onUnlockSkins: () -> Unit,
     onOverlayRequired: () -> Unit = {},
+    barsConfig: BarsConfig = BarsConfig.DEFAULT,
+    onBarsConfigChange: (BarsConfig) -> Unit = {},
+    shortcutGrids: List<ShortcutGrid> = emptyList(),
+    onShortcutGridsChange: (List<ShortcutGrid>) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val palette = LocalKeyFlowPalette.current
@@ -137,6 +144,52 @@ fun TecladoPanel(
             tag = TECLADO_NUMBER_ROW_TAG,
         )
 
+        // Sem isto o Android esconde o teclado virtual quando há teclado físico conectado — e some
+        // junto o mic, que é o produto. Ligado por padrão; desmarcar devolve o comportamento do sistema.
+        ToggleRow(
+            label = "Mostrar com teclado físico",
+            sub = "Mantém o teclado do KeyFlow na tela mesmo com um teclado Bluetooth ou USB conectado.",
+            checked = settings.keyboardShowWithHardKeyboard,
+            onCheckedChange = { onSettingsChange(settings.copy(keyboardShowWithHardKeyboard = it)) },
+            tag = TECLADO_SHOW_WITH_HARD_KEYBOARD_TAG,
+        )
+
+        Box(Modifier.fillMaxWidth().padding(top = 13.dp).height(1.dp).background(palette.line2))
+
+        // Layout do teclado (CFG-01/02/03/06): editor WYSIWYG das barras de atalhos.
+        Text("Layout do teclado", color = palette.fg, fontFamily = SpaceGrotesk, fontSize = 13.5.sp, modifier = Modifier.padding(top = 13.dp))
+        Text(
+            "Personalize os botões da barra do teclado — mic, atalhos, gatilhos de grade.",
+            color = palette.faint,
+            fontFamily = SpaceGrotesk,
+            fontSize = 11.sp,
+            modifier = Modifier.padding(top = 3.dp),
+        )
+        BarsEditor(
+            barsConfig = barsConfig,
+            onBarsConfigChange = onBarsConfigChange,
+            grids = shortcutGrids,
+            modifier = Modifier.padding(top = 10.dp),
+        )
+
+        Box(Modifier.fillMaxWidth().padding(top = 13.dp).height(1.dp).background(palette.line2))
+
+        // Teclados de atalhos (CFG-04): grades que os gatilhos da barra acima podem abrir.
+        Text("Teclados de atalhos", color = palette.fg, fontFamily = SpaceGrotesk, fontSize = 13.5.sp, modifier = Modifier.padding(top = 13.dp))
+        Text(
+            "Grades de atalhos que os gatilhos da barra podem abrir.",
+            color = palette.faint,
+            fontFamily = SpaceGrotesk,
+            fontSize = 11.sp,
+            modifier = Modifier.padding(top = 3.dp),
+        )
+        GridsEditor(
+            grids = shortcutGrids,
+            onGridsChange = onShortcutGridsChange,
+            referencedGridIds = barsConfig.referencedGridIds(),
+            modifier = Modifier.padding(top = 10.dp),
+        )
+
         Box(Modifier.fillMaxWidth().padding(top = 13.dp).height(1.dp).background(palette.line2))
 
         Text("Tamanho do teclado", color = palette.fg, fontFamily = SpaceGrotesk, fontSize = 13.5.sp, modifier = Modifier.padding(top = 13.dp))
@@ -178,10 +231,9 @@ fun TecladoPanel(
 
 /**
  * Prévia ao vivo do tamanho do teclado (pedido do Yan, 2026-07-02: "eu preciso mudar de teclado pra ver
- * diferença... o ideal seria ver o tamanho enquanto mexe no slide"). `KeyFlowKeyboardView` real, forçada
- * em `useCanvasGrid=true` (a grade Canvas é o que está de fato em teste/uso — mostrar a antiga aqui
- * confundia, ver [PREVIEW_MARGIN_DP]) e com `locale`/`numberRowEnabled` reais, não digita/grava
- * (callbacks no-op). Reconstruída a cada mudança relevante via `key()`: várias propriedades da View são
+ * diferença... o ideal seria ver o tamanho enquanto mexe no slide"). `KeyFlowKeyboardView` real, com
+ * `locale`/`numberRowEnabled` reais, não digita/grava (callbacks no-op). Reconstruída a cada mudança
+ * relevante via `key()`: várias propriedades da View são
  * fixadas no construtor (não mutáveis), então mudar qualquer uma troca a instância — leve o bastante
  * pra ser aceitável a cada passo do arrasto do slider (mesma técnica já usada pelo demo da aba Modo).
  *
@@ -217,7 +269,6 @@ private fun KeyboardSizePreview(scalePercent: Int, dark: Boolean, locale: String
                             onExpand = {},
                             dark = dark,
                             scale = scalePercent / 100f,
-                            useCanvasGrid = true,
                             locale = locale,
                             showLanguageKey = true,
                             numberRowEnabled = numberRowEnabled,
@@ -236,35 +287,3 @@ private fun KeyboardSizePreview(scalePercent: Int, dark: Boolean, locale: String
     }
 }
 
-/**
- * Linha de um cenário de cola automática: rótulo + descrição curta à esquerda, [PillToggle] à direita.
- * Quando [enabled] é falso a linha fica esmaecida (somente-leitura) e o toque chama [onDisabledClick]
- * em vez de alternar — mesmo padrão das abas/menus inativos.
- */
-@Composable
-private fun ToggleRow(
-    label: String,
-    sub: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    tag: String,
-    enabled: Boolean = true,
-    onDisabledClick: () -> Unit = {},
-) {
-    val palette = LocalKeyFlowPalette.current
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .then(if (enabled) Modifier else Modifier.clickable { onDisabledClick() })
-            .padding(top = 12.dp)
-            .then(if (enabled) Modifier else Modifier.alpha(0.45f)),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(label, color = palette.fg2, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Medium, fontSize = 11.5.sp)
-            Text(sub, color = palette.faint, fontFamily = SpaceGrotesk, fontSize = 10.sp, modifier = Modifier.padding(top = 1.dp))
-        }
-        PillToggle(checked = checked, onCheckedChange = onCheckedChange, tag = tag, enabled = enabled)
-    }
-}

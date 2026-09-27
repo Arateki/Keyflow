@@ -44,3 +44,19 @@ Estratégia escolhida: **cobertura completa** (unit + instrumented). Greenfield 
 - Unit: JUnit4 + `kotlinx-coroutines-test` + `MockWebServer` (OkHttp) + Truth/AssertJ.
 - Instrumented: AndroidX Test (`androidx.test.ext:junit`, `core-ktx`) + Espresso (UI) + UiAutomator (interações de sistema, ex.: conceder overlay).
 - "Test count" em cada gate previne deleção silenciosa de testes.
+
+## CI (GitHub Actions) — `.github/workflows/checks.yml`
+
+Roda em PR para `main`, push em `main`, merge queue e manual (`workflow_dispatch`), no padrão do
+DeckLock (actions fixadas por SHA, `permissions: contents: read`, evidência enviada mesmo em falha):
+
+| Job | O quê | Gate equivalente |
+| --- | ----- | ---------------- |
+| `Unit tests and build` | `testDebugUnitTest assembleDebug assembleDebugAndroidTest` | `quick` + `build` |
+| `Instrumented and screenshots (API 34)` | emulador Pixel 6 · API 34 · x86_64 **com KVM** → `scripts/ci-device-gate.sh`: suíte instrumentada inteira, reinstala o APK, `verify-screens.sh` + `diff-screens.sh` | `full` + `screenshot` |
+
+- KVM é requisito do job de device (`test -c /dev/kvm`): sem ele a suíte não cabe — ver
+  `ENVIRONMENT.md`, sandbox sem KVM.
+- Artefatos: `unit-evidence` (relatórios JUnit) e `device-evidence` (relatórios instrumentados,
+  logcat da rodada, PNGs capturados), 14 dias.
+- O device físico (A32) e o emulador Android 17 seguem sendo gates manuais **[YAN]**.

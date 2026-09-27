@@ -2,7 +2,9 @@ package com.keyflow.ime.bars
 
 import com.google.common.truth.Truth.assertThat
 import com.keyflow.core.shortcuts.BarButton
+import android.view.KeyEvent
 import com.keyflow.core.shortcuts.BarsConfig
+import com.keyflow.core.shortcuts.PhysicalKeyMap
 import org.junit.Test
 
 /** Geometria/overflow das barras (SB-T5 / BAR-01/05 — parte pura). */
@@ -65,5 +67,36 @@ class BarGeometryTest {
     fun `empty input yields empty layout`() {
         assertThat(BarGeometry.layout(emptyList(), 500f, 44f)).isEqualTo(BarGeometry.BarLayout.EMPTY)
         assertThat(BarGeometry.layout(listOf(BarButton.Mic), 0f, 44f)).isEqualTo(BarGeometry.BarLayout.EMPTY)
+    }
+
+    @Test
+    fun `apoios de rolagem sao os botoes de toque, fora arrastaveis e a faixa`() {
+        // A barra só rola a partir de um botão de TAP: mic/alavanca/grade capturam o arrasto para os
+        // próprios gestos, e a faixa de sugestões tem rolagem interna (o toque nela nunca chega à barra).
+        // Sem nenhum apoio, uma barra que não cabe deixa o excedente inalcançável — daí o aviso no editor.
+        val buttons = listOf(
+            BarButton.Mic,
+            BarButton.Candidates,
+            BarButton.Joystick,
+            BarButton.GridTrigger(gridId = "g"),
+            BarButton.Paste,
+            BarButton.SingleKey(PhysicalKeyMap.key(KeyEvent.KEYCODE_ESCAPE)),
+        )
+
+        val apoios = BarGeometry.scrollAnchors(buttons)
+
+        assertThat(apoios).isEqualTo(
+            listOf(
+                BarButton.Paste,
+                BarButton.SingleKey(PhysicalKeyMap.key(KeyEvent.KEYCODE_ESCAPE)),
+            ),
+        )
+    }
+
+    @Test
+    fun `barra so de arrastaveis e faixa nao tem apoio nenhum`() {
+        val buttons = listOf(BarButton.Mic, BarButton.Joystick, BarButton.Candidates)
+
+        assertThat(BarGeometry.scrollAnchors(buttons)).isEmpty()
     }
 }

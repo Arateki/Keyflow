@@ -31,7 +31,13 @@ Rejeitados: Lottie (dependência + assets que dessincronizam do visual real a ca
 reflete config dinâmica); GIFs/vídeos (pesados, não-temáticos claro/escuro, regravar a cada
 mudança — era o placeholder original, superado).
 
-## T4 — Reprodução: autoplay em loop + setas ✅ (Yan)
+## T4 — Reprodução ✅ (Yan) — **revisto em 2026-09-09, usando no A32**
+
+**Decisão atual**: o gesto corrente repete sozinho e **só a seta troca de gesto**; a seta de avançar
+pulsa para se anunciar; todas as cenas ocupam a mesma altura reservada. Motivo, nas palavras do Yan:
+"a tela tá saltando de tamanho entre cada animação, e tá ficando pouco tempo em cada".
+
+**Decisão original (implementada e revertida)**, mantida aqui porque explica o código que existiu:
 Roda sozinha, gesto após gesto em ordem pedagógica (básicos → pausa → cancelar/desfazer →
 atalhos), em **loop**; as setas **‹ ›** na barra PRÉVIA pulam/voltam (com o título do gesto
 atual); interagir (seta) **pausa o autoplay por alguns segundos** antes de retomar. Descrição à

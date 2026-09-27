@@ -20,6 +20,7 @@ import com.keyflow.ime.keyboard.KeyboardGridView
 import com.keyflow.ime.keyboard.layout.KeyAction as CanvasKeyAction
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Before
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -42,15 +43,23 @@ class KeyFlowKeyboardLanguageTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context: Context get() = instrumentation.targetContext
     private val device: UiDevice get() = UiDevice.getInstance(instrumentation)
-    private val uiPrefs get() = context.getSharedPreferences("keyflow_kb_ui", Context.MODE_PRIVATE)
+
+    // Preserva o que o dono do aparelho já tinha configurado — ver [UserSettingsGuard].
+    private val userSettings = UserSettingsGuard(context)
+
+    @Before
+    fun captureUserSettings() {
+        userSettings.capture()
+        // A grade só entra na hierarquia (e só é medida) com o teclado expandido.
+        userSettings.forceExpanded()
+    }
 
     @After
     fun tearDown() {
-        uiPrefs.edit().remove(KEY_CANVAS_GRID).apply()
         // Devolve o idioma real do app ao padrão — este teste roda contra o DataStore de produção (é a
         // única forma de observar o que o KeyFlowKeyboardService real persistiu de verdade).
         runBlocking { SettingsRepository(context).saveKeyboardLanguageOnce("pt") }
-        shell("ime reset")
+        userSettings.restore()
         device.pressHome()
         KeyFlowController.clearInserter()
         KeyFlowController.updateButtonState(ButtonState.IDLE_NO_FIELD)
@@ -95,7 +104,6 @@ class KeyFlowKeyboardLanguageTest {
     // ── ações de alto nível ──────────────────────────────────────────────────
 
     private fun launchProbeAndGetGrid(): KeyboardGridView {
-        uiPrefs.edit().putBoolean(KEY_CANVAS_GRID, true).apply()
         shell("pm grant ${context.packageName} ${Manifest.permission.RECORD_AUDIO}")
         shell("ime enable $IME")
         shell("ime set $IME")
@@ -108,7 +116,7 @@ class KeyFlowKeyboardLanguageTest {
         device.wait(Until.hasObject(By.desc("ime_probe_field")), TIMEOUT)
         device.findObject(By.desc("ime_probe_field"))?.click()
         device.wait(Until.hasObject(By.text("🎙")), TIMEOUT)
-        waitUntil("KeyFlowKeyboardView não anexou") { KeyFlowKeyboardService.activeViewForTest != null }
+        awaitKeyboardAttached(device) { context.startActivity(intent) }
         waitUntil("grade Canvas não montou") { KeyFlowKeyboardService.activeViewForTest!!.canvasGridForTest != null }
         val grid = KeyFlowKeyboardService.activeViewForTest!!.canvasGridForTest!!
         waitUntil("grade Canvas ainda sem geometria medida") { grid.placedRowsForTest.isNotEmpty() }
@@ -140,12 +148,26 @@ class KeyFlowKeyboardLanguageTest {
         return grid
     }
 
-    private fun inject(action: Int, x: Int, y: Int, time: Long) {
+    /**
+     * Injeta um toque, devolvendo `false` se a plataforma RECUSAR a injeção
+     * (`IllegalArgumentException: Targeted input event injection ... was not directed at a window owned
+     * by uid N`). `sendPointerSync` só entrega em janela do próprio app, e logo depois de reinstalar o
+     * APK a janela do IME ainda não assumiu aquela região da tela. Medido em 2026-09-08: as duas
+     * primeiras rodadas após um `installDebug` falhavam assim. Sem o `catch`, a exceção escapava dos
+     * laços de retry e reprovava o teste na hora.
+     */
+    private fun inject(action: Int, x: Int, y: Int, time: Long): Boolean {
         val event = MotionEvent.obtain(time, time, action, x.toFloat(), y.toFloat(), 0).apply {
             source = InputDevice.SOURCE_TOUCHSCREEN
         }
-        instrumentation.sendPointerSync(event)
-        event.recycle()
+        return try {
+            instrumentation.sendPointerSync(event)
+            true
+        } catch (e: IllegalArgumentException) {
+            false
+        } finally {
+            event.recycle()
+        }
     }
 
     private fun waitUntil(message: String, timeoutMs: Long = TIMEOUT, condition: () -> Boolean) {
@@ -169,6 +191,5 @@ class KeyFlowKeyboardLanguageTest {
     private companion object {
         const val IME = "com.keyflow/.ime.KeyFlowKeyboardService"
         const val TIMEOUT = 5000L
-        const val KEY_CANVAS_GRID = "kbd_canvas"
     }
 }

@@ -12,7 +12,11 @@ import java.util.concurrent.TimeUnit
 
 class WhisperApi(private val client: OkHttpClient = defaultClient()) {
 
-    fun post(audioFile: File, cfg: Config): Response {
+    /**
+     * [onCall] entrega o [okhttp3.Call] antes do `execute()` bloquear — permite ao chamador guardar uma
+     * referência e cancelar a requisição em andamento (`Call.cancel()`) a partir de outra thread.
+     */
+    fun post(audioFile: File, cfg: Config, onCall: (okhttp3.Call) -> Unit = {}): Response {
         val body = MultipartBody.Builder()
             .setType(MultipartBody.FORM)
             .addFormDataPart("file", audioFile.name, audioFile.asRequestBody("audio/m4a".toMediaType()))
@@ -36,7 +40,9 @@ class WhisperApi(private val client: OkHttpClient = defaultClient()) {
         val callClient = client.newBuilder()
             .callTimeout(cfg.timeoutMs, TimeUnit.MILLISECONDS)
             .build()
-        return callClient.newCall(request).execute()
+        val call = callClient.newCall(request)
+        onCall(call)
+        return call.execute()
     }
 
     companion object {

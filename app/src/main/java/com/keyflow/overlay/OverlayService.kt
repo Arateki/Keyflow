@@ -1,5 +1,6 @@
 package com.keyflow.overlay
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
@@ -7,6 +8,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
 import android.os.Build
@@ -16,8 +18,10 @@ import android.view.View
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import com.keyflow.audio.AudioRecorder
 import com.keyflow.core.ButtonState
+import com.keyflow.core.ErrorNavTarget
 import com.keyflow.core.KeyFlowController
 import com.keyflow.core.OrbShortcutAction
 import com.keyflow.core.OverlaySide
@@ -27,6 +31,11 @@ import com.keyflow.data.OverlayPosition
 import com.keyflow.data.Settings
 import com.keyflow.data.SettingsRepository
 import com.keyflow.transcription.TranscriptionClient
+import com.keyflow.transcription.local.LocalTranscriber
+import com.keyflow.transcription.partial.PartialOverlay
+import com.keyflow.transcription.partial.PartialSnapshot
+import com.keyflow.transcription.partial.PartialUi
+import com.keyflow.transcription.partial.PartialUiMode
 import androidx.compose.ui.graphics.toArgb
 import com.keyflow.ui.common.ComposeWindowHost
 import com.keyflow.ui.theme.paletteFor
@@ -57,17 +66,28 @@ class OverlayService : Service() {
 
     // Banner de erro clicável (substitui o toast nos erros resolvíveis na Voz).
     private var errorBanner: View? = null
+
+    // Transcrição parcial (NM-T17): último estado da sessão, o que o usuário abriu e o estado da orbe.
+    private var partialSnapshot: PartialSnapshot? = null
+    private var partialOpened = PartialUiMode.HIDDEN
+    private var lastButtonState = ButtonState.IDLE_NO_FIELD
+    private var partialOverlay: PartialOverlay? = null
     private var errorBannerJob: Job? = null
 
     // Banner "cancelado · desfazer" durante a janela de descarte (Fase 2a). Mostra/some por callback do
     // coordinator (não tem timer próprio: o coordinator decide quando expira/descarta).
     private var cancelBanner: View? = null
 
+    // Banner "enviar/descartar" ao atingir Settings.maxRecordingSec. Sem timer próprio (fica até o
+    // usuário decidir ou retomar a gravação manualmente).
+    private var limitBanner: View? = null
+
     // Sobreposição não-tocável com as setas do modo-arrasto (separada da janela da orbe, p/ não deslocá-la).
     private var dragArrowsView: DragArrowsView? = null
 
     // Duração da janela de desfazer: compartilhada entre o coordinator (descarte) e a barra do banner.
     private val cancelWindowMs = 3000L
+    private val limitBannerDismissMs = 3000L
 
     // Ciclo de vida desacoplado (Fase 1): a orbe mantém o serviço persistente; o teclado o sobe sob
     // demanda (só durante a gravação). `overlayActive` = há orbe; `isForeground` = já em primeiro plano.
@@ -126,6 +146,7 @@ class OverlayService : Service() {
     private fun startOverlay() {
         ensureForeground()
         overlayActive = true
+        syncLocalEngine()
         isRunningForUi = true
         if (OverlayPermission.canDrawOverlays(this) && floatingButton == null) {
             addFloatingButton()
@@ -135,6 +156,7 @@ class OverlayService : Service() {
     /** Promove a primeiro plano (FGS de microfone) sob demanda. Idempotente. */
     private fun ensureForeground() {
         if (isForeground) return
+        syncLocalEngine()
         val notification = recordingNotification.build(
             if (::coordinator.isInitialized) coordinator.currentState() else ButtonState.IDLE_NO_FIELD,
             dark = cachedSettings.themeDark,
@@ -151,6 +173,48 @@ class OverlayService : Service() {
             android.util.Log.e("KeyFlow.Overlay", "startForeground falhou: ${e.message}", e)
             stopSelf()
         }
+    }
+
+    /**
+     * Indicador/visualização/edição do parcial junto à orbe (PAR-04/05). Sem orbe (sessão só do
+     * teclado), ancora no canto de cima — a notificação de gravação continua sendo o controle.
+     */
+    private fun refreshPartialUi() {
+        if (PartialUi.closesOpened(lastButtonState)) partialOpened = PartialUiMode.HIDDEN
+        val mode = PartialUi.resolve(partialOpened, lastButtonState, partialSnapshot, cachedSettings.partialViewEdit)
+        if (mode == PartialUiMode.HIDDEN && partialOverlay == null) return
+        val overlay = partialOverlay ?: PartialOverlay(
+            context = this,
+            windowManager = windowManager,
+            onBadgeTap = {
+                partialOpened = PartialUi.onBadgeTap(cachedSettings.partialViewEdit)
+                refreshPartialUi()
+            },
+            onViewerTap = {
+                partialOpened = PartialUiMode.INPUT
+                refreshPartialUi()
+            },
+            onClose = {
+                partialOpened = PartialUiMode.HIDDEN
+                refreshPartialUi()
+            },
+            onEdited = { text -> if (::coordinator.isInitialized) coordinator.onPartialEdited(text) },
+        ).also { partialOverlay = it }
+        val density = resources.displayMetrics.density
+        val params = floatingButtonParams
+        overlay.render(
+            mode = mode,
+            snapshot = partialSnapshot,
+            palette = paletteFor(cachedSettings.themeDark),
+            orbX = params?.x ?: (16 * density).toInt(),
+            orbY = params?.y ?: (72 * density).toInt(),
+            orbSize = floatingButton?.height?.takeIf { it > 0 } ?: cachedSettings.orbSizePx,
+        )
+    }
+
+    /** Modo ativo com origem Local → modelo pré-carregado no :inference (NAT-05); outra origem → solta. */
+    private fun syncLocalEngine() {
+        LocalTranscriber.get(this).sync(cachedSettings.effectiveConfigFor())
     }
 
     /**
@@ -206,8 +270,10 @@ class OverlayService : Service() {
 
     override fun onDestroy() {
         isRunningForUi = false
+        partialOverlay?.remove()
         removeErrorBanner()
         removeCancelBanner()
+        removeLimitBanner()
         removeDragArrows()
         removeFloatingButton()
         serviceScope.cancel()
@@ -218,8 +284,12 @@ class OverlayService : Service() {
         coordinator = OverlayCoordinator(
             scope = serviceScope,
             configProvider = { settingsRepository.flow().first() },
+            partialOnPause = { cachedSettings.partialOnPause },
             recorder = AndroidOverlayAudioRecorder(AudioRecorder(this)),
-            transcriber = AndroidOverlayTranscriber(TranscriptionClient()),
+            transcriber = RoutingTranscriber(
+                http = AndroidOverlayTranscriber(TranscriptionClient()),
+                local = LocalTranscriber.get(this),
+            ),
             insertOrHold = KeyFlowController::insertOrHold,
             flushPending = KeyFlowController::flushPending,
             targetAvailable = { KeyFlowController.targetAvailable.value },
@@ -227,7 +297,13 @@ class OverlayService : Service() {
                 floatingButton?.render(state)
                 KeyFlowController.updateButtonState(state)
                 if (isForeground) postNotification(state)
+                lastButtonState = state
+                refreshPartialUi()
                 maybeStopWhenIdle(state)
+            },
+            onPartial = { snapshot ->
+                partialSnapshot = snapshot
+                refreshPartialUi()
             },
             onClipboard = { text ->
                 val cm = getSystemService(ClipboardManager::class.java)
@@ -241,15 +317,23 @@ class OverlayService : Service() {
             onShowCancelUndo = { showCancelBanner() },
             onHideCancelUndo = { removeCancelBanner() },
             cancelWindowMs = cancelWindowMs,
+            onShowLimitReached = { showLimitBanner() },
+            onHideLimitReached = { removeLimitBanner() },
+            maxRecordingMs = { cachedSettings.maxRecordingSec * 1000L },
+            limitBannerDismissMs = limitBannerDismissMs,
             onRecordingTime = { acc, seg -> KeyFlowController.updateRecordingTime(acc, seg) },
-            onError = { message, opensVoz ->
-                KeyFlowController.errorOpensVoz = opensVoz
-                // Erro resolvível + permissão de sobreposição → banner clicável (abre a Voz). Senão toast.
-                if (opensVoz && OverlayPermission.canDrawOverlays(this)) {
-                    showErrorBanner(message)
+            onError = { message, target ->
+                KeyFlowController.errorNavTarget = target
+                // Erro clicável (Voz ou Modo) + permissão de sobreposição → banner clicável. Senão toast.
+                if (target != ErrorNavTarget.NONE && OverlayPermission.canDrawOverlays(this)) {
+                    showErrorBanner(message, onTap = if (target == ErrorNavTarget.VOZ) ::openVoz else ::openModoMic)
                 } else {
                     Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
                 }
+            },
+            microphoneGranted = {
+                ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
+                    PackageManager.PERMISSION_GRANTED
             },
         )
     }
@@ -277,9 +361,12 @@ class OverlayService : Service() {
                     if (isForeground && ::coordinator.isInitialized) postNotification(coordinator.currentState())
                     errorBanner?.let(::applyBannerTheme)
                     cancelBanner?.let(::applyBannerTheme)
+                    limitBanner?.let(::applyBannerTheme)
                 }
                 KeyFlowController.autoPasteInField = it.autoPasteInField
                 KeyFlowController.autoPasteOnFocus = it.autoPasteOnFocus
+                // Origem/modelo local trocados com o modo ativo: carrega o novo ou solta a RAM (NAT-05/09).
+                if (overlayActive || isForeground) syncLocalEngine()
                 // Tamanho da orbe ao vivo (slider da aba Sobrepor).
                 if (it.orbSizePx != prevSizePx) floatingButton?.setOrbSizePx(it.orbSizePx)
                 // Intervalo entre toques ao vivo (slider de Atalhos).
@@ -317,7 +404,7 @@ class OverlayService : Service() {
             onPositionChanged = { position ->
                 serviceScope.launch { settingsRepository.saveOverlayPosition(position) }
             },
-            onErrorTap = ::openVoz,
+            onErrorTap = { if (KeyFlowController.errorNavTarget == ErrorNavTarget.MODO_MIC) openModoMic() else openVoz() },
             onShortcut = ::handleOrbShortcut,
             vibrationIntensity = { cachedSettings.vibrationIntensity },
             onDragArrows = ::updateDragArrows,
@@ -440,11 +527,19 @@ class OverlayService : Service() {
         )
     }
 
-    /** Banner sobreposto, clicável, para erros resolvíveis na Voz. Some sozinho em 2 s. */
-    private fun showErrorBanner(message: String) {
+    /** Abre o app direto na aba Modo (clique no X/banner de "falta permissão de microfone"). */
+    private fun openModoMic() {
+        startActivity(
+            com.keyflow.ui.SetupActivity.openAtModoMicIntent(this)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
+
+    /** Banner sobreposto, clicável, para erros com destino de navegação (Voz ou Modo). Some em 2 s. */
+    private fun showErrorBanner(message: String, onTap: () -> Unit) {
         removeErrorBanner()
         val banner = bannerView("⚠  $message", com.keyflow.ui.theme.OrbAccentArgb, 2000L) {
-            openVoz()
+            onTap()
             removeErrorBanner()
         }
         runCatching { windowManager.addView(banner, bannerParams()) }
@@ -462,13 +557,22 @@ class OverlayService : Service() {
         errorBanner = null
     }
 
-    /** Banner clicável "🗑 cancelado · desfazer" durante a janela de descarte (Fase 2a). */
+    /**
+     * Banner "Cancelado" com duas ações (Desfazer/Concluir) durante a janela de descarte (Fase 2a,
+     * unificado com o descarte do aviso de limite — ver [showLimitBanner]). "Desfazer" fica à ESQUERDA
+     * de propósito: é a MESMA posição do "Descartar" no banner de limite, então um toque duplo acidental
+     * na mesma posição da tela cai no lado seguro (desfazer), não no de confirmar o descarte.
+     */
     private fun showCancelBanner() {
         removeCancelBanner()
-        // Borda + barra de tempo na cor da orbe (token único; acompanha a futura skin).
-        val banner = bannerView("Cancelado, toque para desfazer", com.keyflow.ui.theme.OrbAccentArgb, cancelWindowMs) {
-            if (::coordinator.isInitialized) coordinator.onUndoCancel()
-        }
+        val banner = twoActionBannerView(
+            text = "Transcrição cancelada",
+            leftLabel = "Desfazer",
+            leftAction = { if (::coordinator.isInitialized) coordinator.onUndoCancel() },
+            rightLabel = "Concluir",
+            rightAction = { if (::coordinator.isInitialized) coordinator.onCommitCancel() },
+            durationMs = cancelWindowMs,
+        )
         runCatching { windowManager.addView(banner, bannerParams()) }
         cancelBanner = banner
     }
@@ -501,7 +605,7 @@ class OverlayService : Service() {
             this.text = text
             setTextColor(ink)
             textSize = 13f
-            maxLines = 1
+            maxLines = 2
             gravity = Gravity.CENTER_HORIZONTAL
             // Mesma fonte do toast in-app (SpaceMono peso Medium resolve p/ space_mono_bold).
             typeface = androidx.core.content.res.ResourcesCompat.getFont(
@@ -509,6 +613,17 @@ class OverlayService : Service() {
             )
             setPadding(dp(18), dp(12), dp(18), dp(9))
         })
+        container.addView(dismissBar(accent, durationMs))
+        return container
+    }
+
+    /**
+     * Barrinha de progresso discreta (encolhe da direita pra esquerda ao longo de [durationMs]) usada
+     * no contorno inferior dos banners de overlay que somem sozinhos.
+     */
+    private fun dismissBar(accent: Int, durationMs: Long): View {
+        val d = resources.displayMetrics.density
+        fun dp(v: Int) = (v * d).toInt()
         val bar = View(this).apply {
             background = android.graphics.drawable.GradientDrawable().apply {
                 cornerRadius = dp(2).toFloat()
@@ -516,18 +631,15 @@ class OverlayService : Service() {
             }
             pivotX = 0f // encolhe da direita para a esquerda
         }
-        container.addView(
-            bar,
-            android.widget.LinearLayout.LayoutParams(
-                android.widget.LinearLayout.LayoutParams.MATCH_PARENT, dp(3),
-            ).apply { leftMargin = dp(10); rightMargin = dp(10); bottomMargin = dp(7) },
-        )
+        bar.layoutParams = android.widget.LinearLayout.LayoutParams(
+            android.widget.LinearLayout.LayoutParams.MATCH_PARENT, dp(3),
+        ).apply { leftMargin = dp(10); rightMargin = dp(10); bottomMargin = dp(7) }
         bar.animate()
             .scaleX(0f)
             .setDuration(durationMs)
             .setInterpolator(android.view.animation.LinearInterpolator())
             .start()
-        return container
+        return bar
     }
 
     private fun bannerParams(): WindowManager.LayoutParams {
@@ -548,6 +660,98 @@ class OverlayService : Service() {
     private fun removeCancelBanner() {
         cancelBanner?.let { runCatching { windowManager.removeView(it) } }
         cancelBanner = null
+    }
+
+    /**
+     * Banner "limite de gravação atingido" com duas ações (Enviar/Descartar). Some sozinho após
+     * [limitBannerDismissMs] (barrinha), mas a decisão continua pendente no coordinator: tentar retomar
+     * a gravação enquanto isso reacende o banner do zero, em vez de deixar a gravação continuar sem teto.
+     */
+    private fun showLimitBanner() {
+        removeLimitBanner()
+        val banner = twoActionBannerView(
+            text = "Limite de gravação atingido",
+            leftLabel = "Descartar",
+            leftAction = { if (::coordinator.isInitialized) coordinator.onLimitDiscard() },
+            rightLabel = "Enviar",
+            rightAction = { if (::coordinator.isInitialized) coordinator.onLimitSend() },
+            durationMs = limitBannerDismissMs,
+        )
+        runCatching { windowManager.addView(banner, bannerParams()) }
+        limitBanner = banner
+    }
+
+    private fun removeLimitBanner() {
+        limitBanner?.let { runCatching { windowManager.removeView(it) } }
+        limitBanner = null
+    }
+
+    /**
+     * Banner de overlay com duas ações lado a lado (texto + 2 rótulos clicáveis, [leftLabel] à esquerda)
+     * e a mesma barrinha de progresso do [bannerView] — diferença é que sumir da tela não decide nada por
+     * conta própria (quem chama decide o que a expiração silenciosa significa). Reusado pelo banner de
+     * limite (Descartar/Enviar) e pelo de cancelar (Desfazer/Concluir) — um único padrão visual para as
+     * duas decisões de "manter ou descartar áudio" da app.
+     */
+    private fun twoActionBannerView(
+        text: String,
+        leftLabel: String,
+        leftAction: () -> Unit,
+        rightLabel: String,
+        rightAction: () -> Unit,
+        durationMs: Long,
+    ): View {
+        val d = resources.displayMetrics.density
+        fun dp(v: Int) = (v * d).toInt()
+        val palette = paletteFor(cachedSettings.themeDark)
+        val bg = palette.bg.toArgb()
+        val ink = palette.fg.toArgb()
+        val accent = com.keyflow.ui.theme.OrbAccentArgb
+
+        val container = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            background = android.graphics.drawable.GradientDrawable().apply {
+                cornerRadius = dp(10).toFloat()
+                setColor(bg)
+                setStroke(dp(1), accent)
+            }
+        }
+        container.addView(android.widget.TextView(this).apply {
+            this.text = text
+            setTextColor(ink)
+            textSize = 13f
+            maxLines = 1
+            gravity = Gravity.CENTER_HORIZONTAL
+            typeface = androidx.core.content.res.ResourcesCompat.getFont(
+                this@OverlayService, com.keyflow.R.font.space_mono_bold,
+            )
+            setPadding(dp(18), dp(12), dp(18), dp(6))
+        })
+
+        fun actionLabel(label: String, onClick: () -> Unit) = android.widget.TextView(this).apply {
+            this.text = label
+            setTextColor(accent)
+            textSize = 13f
+            gravity = Gravity.CENTER
+            typeface = androidx.core.content.res.ResourcesCompat.getFont(
+                this@OverlayService, com.keyflow.R.font.space_mono_bold,
+            )
+            setPadding(dp(18), dp(9), dp(18), dp(12))
+            setOnClickListener {
+                Haptics.tick(this@OverlayService, cachedSettings.vibrationIntensity)
+                onClick()
+            }
+        }
+
+        val row = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+        row.addView(actionLabel(leftLabel, leftAction))
+        row.addView(actionLabel(rightLabel, rightAction))
+        container.addView(row)
+        container.addView(dismissBar(accent, durationMs))
+        return container
     }
 
     /**
@@ -650,6 +854,12 @@ class OverlayService : Service() {
         override fun discard() {
             recorder.discard()
         }
+
+        override fun startSegmented() {
+            recorder.start(segmented = true)
+        }
+
+        override fun pauseSegment(): File? = recorder.pause()
     }
 
     private class AndroidOverlayTranscriber(
@@ -658,6 +868,8 @@ class OverlayService : Service() {
         override suspend fun transcribe(audio: File, cfg: Config) = withContext(Dispatchers.IO) {
             client.transcribe(audio, cfg)
         }
+
+        override fun cancelInFlight() = client.cancel()
     }
 
     companion object {

@@ -64,9 +64,10 @@ object KeyFlowController {
     @Volatile var autoPasteInField: Boolean = true
     @Volatile var autoPasteOnFocus: Boolean = true
 
-    // Erro atual é "resolvível na aba Voz" (config/token)? Decide se tocar no X leva ao atalho da Voz.
-    // Erros não mapeados (rede, timeout, áudio curto…) ficam sem ação no toque.
-    @Volatile var errorOpensVoz: Boolean = false
+    // Ação do erro atual ao tocar no X/glifo ✖ (orbe, teclado, notificação): VOZ (config/token),
+    // MODO_MIC (falta permissão de microfone) ou NONE (erros não mapeados — rede, timeout, áudio
+    // curto… ficam sem ação no toque).
+    @Volatile var errorNavTarget: ErrorNavTarget = ErrorNavTarget.NONE
 
     // Marca que o usuário acabou de abrir o seletor de teclados pelo nosso atalho (3 toques) para trocar
     // PARA o KeyFlow. O IME consome no 1º onStartInput dentro da janela e se exibe — assim só sobe nessa

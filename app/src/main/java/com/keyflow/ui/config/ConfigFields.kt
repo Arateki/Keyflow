@@ -14,11 +14,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.LocalTextStyle
@@ -43,14 +43,20 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.vector.PathParser
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.keyflow.core.RecordingMode
@@ -132,6 +138,58 @@ internal fun PillToggle(
                 .clip(CircleShape)
                 .background(palette.onFill),
         )
+    }
+}
+
+/**
+ * Stepper de inteiro (CFG-04, dimensões de grade): "−" / valor / "+", clampado em [range]. Os botões
+ * ficam esmaecidos e inertes na borda do intervalo (sem baixar de min nem subir de max).
+ */
+@Composable
+internal fun Stepper(
+    label: String,
+    value: Int,
+    range: IntRange,
+    onValueChange: (Int) -> Unit,
+    tag: String,
+    modifier: Modifier = Modifier,
+) {
+    val palette = LocalKeyFlowPalette.current
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            label,
+            color = palette.muted,
+            fontFamily = SpaceMono,
+            fontSize = 9.sp,
+            modifier = Modifier.weight(1f),
+        )
+        StepperButton("−", enabled = value > range.first, tag = "$tag-dec") { onValueChange(value - 1) }
+        Text(
+            value.toString(),
+            color = palette.fg,
+            fontFamily = SpaceGrotesk,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 14.sp,
+            modifier = Modifier.padding(horizontal = 12.dp).testTag(tag),
+        )
+        StepperButton("+", enabled = value < range.last, tag = "$tag-inc") { onValueChange(value + 1) }
+    }
+}
+
+@Composable
+private fun StepperButton(symbol: String, enabled: Boolean, tag: String, onClick: () -> Unit) {
+    val palette = LocalKeyFlowPalette.current
+    Box(
+        Modifier
+            .size(28.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .border(1.dp, palette.line, RoundedCornerShape(6.dp))
+            .clickable(enabled = enabled) { onClick() }
+            .alpha(if (enabled) 1f else 0.4f)
+            .testTag(tag),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(symbol, color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
     }
 }
 
@@ -398,3 +456,74 @@ internal fun FillIcon(path: String, tint: Color, modifier: Modifier) {
 private val LOCK_PATHS = listOf("M3 11 h18 v11 h-18 z", "M7 11V7a5 5 0 0 1 10 0v4")
 private val LOCK_OPEN_PATHS = listOf("M3 11 h18 v11 h-18 z", "M7 11V7a5 5 0 0 1 9.9-1")
 private val CHEVRON_DOWN = listOf("M6 9 12 15 18 9")
+
+/**
+ * Maior tamanho de fonte (em sp), de [maxSp] pra baixo, que faz todos os [labels] caberem em
+ * [maxTextWidth]. Mede de verdade com [rememberTextMeasurer] em vez de estimar largura de caractere: a
+ * primeira versão do teclado escalado do picker (Q8) chutava "largura do char ≈ 0.58 × fontSize" e cortava
+ * "Home"/"PgUp"/"End" na tela do A32 — a conta ignorava tanto a métrica real da SpaceGrotesk quanto o
+ * `fontScale` do sistema.
+ */
+@Composable
+internal fun fittedFontSizeSp(
+    labels: List<String>,
+    maxTextWidth: Dp,
+    maxSp: Float,
+    minSp: Float,
+    fontFamily: FontFamily,
+): Float {
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    // Só os rótulos mais compridos disputam o limite — medir os 14 da linha a cada passo é desperdício.
+    val longest = labels.filter { it.length == (labels.maxOfOrNull { l -> l.length } ?: 0) }.distinct()
+    return remember(longest, maxTextWidth, maxSp, minSp, density.density, density.fontScale, fontFamily) {
+        var sp = maxSp
+        while (sp > minSp) {
+            val fits = longest.all { label ->
+                val width = measurer.measure(
+                    AnnotatedString(label),
+                    style = TextStyle(fontFamily = fontFamily, fontSize = sp.sp),
+                ).size.width
+                with(density) { width.toDp() } <= maxTextWidth
+            }
+            if (fits) break
+            sp -= FONT_FIT_STEP_SP
+        }
+        sp.coerceAtLeast(minSp)
+    }
+}
+
+private const val FONT_FIT_STEP_SP = 0.5f
+
+/**
+ * Linha de um cenário de cola automática: rótulo + descrição curta à esquerda, [PillToggle] à direita.
+ * Quando [enabled] é falso a linha fica esmaecida (somente-leitura) e o toque chama [onDisabledClick]
+ * em vez de alternar — mesmo padrão das abas/menus inativos.
+ */
+@Composable
+internal fun ToggleRow(
+    label: String,
+    sub: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    tag: String,
+    enabled: Boolean = true,
+    onDisabledClick: () -> Unit = {},
+) {
+    val palette = LocalKeyFlowPalette.current
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .then(if (enabled) Modifier else Modifier.clickable { onDisabledClick() })
+            .padding(top = 12.dp)
+            .then(if (enabled) Modifier else Modifier.alpha(0.45f)),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(label, color = palette.fg2, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Medium, fontSize = 11.5.sp)
+            Text(sub, color = palette.faint, fontFamily = SpaceGrotesk, fontSize = 10.sp, modifier = Modifier.padding(top = 1.dp))
+        }
+        PillToggle(checked = checked, onCheckedChange = onCheckedChange, tag = tag, enabled = enabled)
+    }
+}

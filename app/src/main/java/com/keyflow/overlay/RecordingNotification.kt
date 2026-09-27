@@ -48,6 +48,7 @@ class RecordingNotification(
         manageBase(state)
         val recording = state == ButtonState.RECORDING || state == ButtonState.PAUSED
         val cancelling = state == ButtonState.CANCELLING
+        val sending = state == ButtonState.SENDING
         val idle = state == ButtonState.IDLE_READY || state == ButtonState.IDLE_NO_FIELD
         val rv = RemoteViews(context.packageName, R.layout.notif_recording)
 
@@ -66,9 +67,10 @@ class RecordingNotification(
             .forEach { rv.setViewVisibility(it, timeVisible) }
         // Ocioso: só o botão gravar (slot do pause). Gravando: pause + parar + cancelar.
         // Cancelando: descartar-agora (🗑, slot do parar) + desfazer (↶, slot do cancelar).
+        // Transcrevendo: só cancelar — não há o que pausar/retomar nem "parar" (já parou pra enviar).
         rv.setViewVisibility(R.id.notif_pause, if (recording || idle) View.VISIBLE else View.GONE)
         rv.setViewVisibility(R.id.notif_stop, if (recording || cancelling) View.VISIBLE else View.GONE)
-        rv.setViewVisibility(R.id.notif_cancel, if (recording || cancelling) View.VISIBLE else View.GONE)
+        rv.setViewVisibility(R.id.notif_cancel, if (recording || cancelling || sending) View.VISIBLE else View.GONE)
 
         val now = SystemClock.elapsedRealtime()
         val chronoBase = when {
@@ -189,6 +191,7 @@ class RecordingNotification(
             ButtonState.RECORDING -> "● Gravando"
             ButtonState.PAUSED -> "⏸ Pausado"
             ButtonState.CANCELLING -> "🗑 Cancelado · desfazer"
+            ButtonState.SENDING -> "⏳ Transcrevendo"
             else -> "KeyFlow ativo"
         }
     }

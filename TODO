@@ -1,0 +1,49 @@
+Docs e tela de apresentação no mesmo do guia de uso
+
+Monetização + API
+
+Criação de alguns temas
+
+simular scroll de mouse
+
+
+adicionar em voz
+ - seletor de "Tanscrever parcialmente ao pausar"
+ - seletor que habilita ao selecionar o acima, esse diz "Visualizar e editar transcrição parcial"
+ - seletor e gerenciador de downloa de modelos nativos
+
+adicionar em Teclado
+ - Editor do teclado geral
+ - Editor do teclado encolhido
+ - Seletor de idioma do teclado funcionando
+ - Corretor ortografico 
+ - teclado numerico e outras funçoes nativas
+  
+adicionar em Docs.
+ - Indice depois do como funciona e mais detalhes de funcionamento com opção pra reportar bug e dar sugestões.
+ 
+ adicionar em Modo
+  - gif de dedo e setas na Previa, o gif simula as ações no overlay e teclado e na direita iforma qual ação é essa, ao passar as setas no titulo previa é possivel avançar ou voltar para ver como é feita cada ação.
+
+ Tela de apresentação.
+  - Interrogação em cada permissão que explica porque cada uma é pedida ao clicar.
+  
+adicionar aba Notificações (futuro)
+  - comportamento da notificação de gravação deve ser configurável: mostrar/ocultar quando ocioso,
+    botão de gravar pela notificação, visibilidade/controles na tela de bloqueio.
+  - (contexto: a notificação é obrigatória pelo Android durante o foreground service de microfone;
+    a config controla os extras, não a existência dela durante a gravação.)
+
+Orbe — modo de gestos "vim-like" (futuro)
+  - um atalho coloca a orbe temporariamente numa LAYER de gestos direcionais nova: combos de
+    direcional + toque (combinados ou isolados).
+  - o estado de gravação é PRESERVADO (continua como estava antes de entrar na layer).
+  - uma direção fixa específica retorna ao modo anterior (gravação). Pensar como modos do vim.
+  - reusar a maquinaria de arrasto travado (enterDragMode/updateDragFeedback/resolveDragOnUp +
+    DragArrowsView) e a rajada de toques; não tocar na ButtonStateMachine/Coordinator ao entrar/sair.
+
+Geral
+  - ve a necessiade do sistema de interrogação fora do onboarding e tbm de ancoras pra DOC na interface.
+  - Testar abas na vertical
+  - Sistema de monetização e anuncio
+  - Sistema da API

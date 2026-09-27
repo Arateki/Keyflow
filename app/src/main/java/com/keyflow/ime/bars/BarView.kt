@@ -6,12 +6,17 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.view.MotionEvent
+import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
+import androidx.core.view.ViewCompat
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
+import androidx.customview.widget.ExploreByTouchHelper
 import com.keyflow.core.ButtonState
 import com.keyflow.core.KeyFlowController
 import com.keyflow.core.shortcuts.BarButton
@@ -22,6 +27,8 @@ import com.keyflow.core.shortcuts.ShortcutGrid
 import com.keyflow.core.shortcuts.ShortcutKey
 import com.keyflow.ime.MicAction
 import com.keyflow.ime.keyboard.CandidatesView
+import com.keyflow.ime.keyboard.landscapeDampedScale
+import com.keyflow.ime.keyboard.usableScreenHeightPx
 import com.keyflow.ime.keys.PhysicalKeyEmitter
 import com.keyflow.overlay.Haptics
 import kotlin.math.abs
@@ -36,6 +43,9 @@ class BarCallbacks(
     val onPaste: () -> Unit = {},
     val onShortcut: (ShortcutKey) -> Unit = {},
     val onCandidateTap: (String) -> Unit = {},
+    // Grade efêmera ancorando/soltando (SB-T10/GRD-08): o host expande a região tocável da janela do IME
+    // só enquanto o arrasto está ativo (ver KeyFlowKeyboardService.onComputeInsets).
+    val onGridDragActiveChanged: (Boolean) -> Unit = {},
 )
 
 /**
@@ -63,11 +73,33 @@ class BarView(
     // Intensidade da vibração das Settings (0 = sem háptica) — tique da lente da grade (GRD-03).
     private val vibrationIntensity: Int = 60,
     private val clock: () -> Long = { SystemClock.elapsedRealtime() },
+    // Fileiras reais do QWERTY atual (4, ou 5 com a fileira de números) — usado só pra estimar quanto o
+    // resto do teclado reserva da tela ao dimensionar a grade efêmera (GridSizing). Um "pior caso" fixo
+    // (5) reservava demais pra layouts de 4 fileiras, zerando a grade sem necessidade (achado do Yan,
+    // 2026-07-07: "a grade não funciona de jeito nenhum" no scale máximo).
+    private val qwertyRowCount: Int = 5,
+    // Pior caso de barras KeyFlow empilhadas (colapsado OU expandido) — a reserva assumia sempre 1 barra
+    // só; com 2+ subestimava o espaço real e a grade "roubava" espaço do QWERTY (achado do Yan, 2026-07-07).
+    private val barCount: Int = 1,
 ) : ViewGroup(context) {
 
-    // Candidates só existe no expandido (SYNC-04); no retraído o slot é filtrado fora.
-    private val buttons: List<BarButton> =
-        def.buttons.filter { expandedMode || it != BarButton.Candidates }
+    private val declaredButtons: List<BarButton> = def.buttons
+
+    // Há sugestões pra mostrar agora? Governa só a marcação da área vazia — a área em si é fixa.
+    private var hasCandidates = false
+
+    /**
+     * Botões efetivos: a config crua, nos dois modos. A área do slot `Candidates` é **sempre reservada**
+     * (pedido do Yan, 2026-09-08: "a área da sugestão deve ser sempre visível em ambos os modos com sua
+     * rolagem própria de palavras internas"), para o layout não pular quando uma sugestão chega ou some
+     * e para o que se monta no editor ser o que aparece no teclado.
+     *
+     * Antes o slot entrava sob demanda no retraído (2026-09-07) e, antes disso, era filtrado fora dele
+     * sempre — o que fazia as duas barras saírem diferentes com "espelhar" ligado e uma palavra pela
+     * metade perder as sugestões assim que o teclado recolhia.
+     */
+    private val buttons: List<BarButton>
+        get() = declaredButtons
     private val gridsById: Map<String, ShortcutGrid> = grids.associateBy { it.id }
     private val knownGridIds: Set<String> = gridsById.keys
 
@@ -86,7 +118,7 @@ class BarView(
     }
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
-        textSize = dp(15f)
+        textSize = dp(TEXT_SIZE_DP)
     }
     private val cornerRadius = dp(7f)
     private val marginH = dp(3f)
@@ -147,22 +179,47 @@ class BarView(
     private var lastX = 0f
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
 
+    // Acessibilidade (SB-T10/A11Y-01..02): cada botão é um nó virtual (bounds + label); teclas avulsas
+    // aceitam ACTION_CLICK (mesma ação do toque), alavanca/gatilho de grade só anunciam a limitação.
+    private val accessibilityHelper = BarAccessibilityHelper(this)
+
     init {
         setWillNotDraw(false)
-        if (buttons.contains(BarButton.Candidates)) {
+        if (declaredButtons.contains(BarButton.Candidates)) {
             candidatesView = CandidatesView(context, dark, onTap = callbacks.onCandidateTap, scale = scale)
-                .also { addView(it) }
+                .also {
+                    // A área é reservada nos dois modos; vazia, só a marcação sutil aparece (ver onDraw).
+                    it.visibility = VISIBLE
+                    addView(it)
+                }
         }
+        ViewCompat.setAccessibilityDelegate(this, accessibilityHelper)
+        importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
     }
+
+    override fun dispatchHoverEvent(event: MotionEvent): Boolean =
+        accessibilityHelper.dispatchHoverEvent(event) || super.dispatchHoverEvent(event)
+
+    override fun onFocusChanged(gainFocus: Boolean, direction: Int, previouslyFocusedRect: Rect?) {
+        super.onFocusChanged(gainFocus, direction, previouslyFocusedRect)
+        accessibilityHelper.onFocusChanged(gainFocus, direction, previouslyFocusedRect)
+    }
+
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean =
+        accessibilityHelper.dispatchKeyEvent(event) || super.dispatchKeyEvent(event)
 
     // ── acessores de teste (mesmo espírito da barra antiga) ──────────────────
 
-    val micLabelForTest: String? get() = micPlaced()?.let { MicVisuals.visuals(micState, elapsedSeconds()).first }
+    // Depende da CONFIG, não da geometria medida: uma view construída em teste e ainda não medida
+    // continua sabendo o rótulo do mic (a barra antiga expunha isso pelo texto do TextView).
+    val micLabelForTest: String?
+        get() = if (buttons.contains(BarButton.Mic)) MicVisuals.visuals(micState, elapsedSeconds()).first else null
     val layoutForTest: BarGeometry.BarLayout get() = barLayout
     val scrollOffsetForTest: Float get() = scrollOffset
     val selectorOpenForTest: Boolean get() = micSelector.isOpen
     val popupActionsForTest: List<MicAction> get() = micSelector.actionsForTest
     val popupRectsForTest: List<Rect> get() = micSelector.rectsForTest
+    val highlightedIndexForTest: Int get() = micSelector.highlightedIndexForTest
     val candidatesViewForTest: CandidatesView? get() = candidatesView
     val gridFrameForTest: GridFrame?
         get() = (gridSession?.snapshot(SystemClock.uptimeMillis())?.state as? GridSession.State.Active)?.frame
@@ -187,6 +244,11 @@ class BarView(
 
     fun updateCandidates(candidates: List<String>) {
         candidatesView?.update(candidates)
+        val has = candidates.isNotEmpty()
+        if (has == hasCandidates) return
+        hasCandidates = has
+        // A geometria não muda mais (a área é fixa) — só a marcação da área vazia aparece ou some.
+        invalidate()
     }
 
     // ── medida/layout ────────────────────────────────────────────────────────
@@ -195,7 +257,11 @@ class BarView(
         val width = MeasureSpec.getSize(widthMeasureSpec)
         barLayout = BarGeometry.layout(buttons, width.toFloat(), minUnitPx = dp(MIN_UNIT_DP))
         scrollOffset = scrollOffset.coerceIn(0f, barLayout.maxScroll)
-        val height = dp(CandidatesView.HEIGHT_DP.toFloat()).toInt()
+        // Encolhe com 2+ barras empilhadas em paisagem (piso pra continuar tocável) — antes a altura era
+        // FIXA, então toda a pressão de "não cabe" caía inteira na grade efêmera, a única coisa flexível
+        // sem piso (pergunta do Yan, 2026-07-07: "por que a barra renderiza perfeita e a grade não?").
+        val metrics = resources.displayMetrics
+        val height = GridSizing.barHeightPx(metrics, usableScreenHeightPx(metrics), scale, barCount).toInt()
         candidatesPlaced()?.let { placed ->
             candidatesView?.measure(
                 MeasureSpec.makeMeasureSpec(placed.width.toInt(), MeasureSpec.EXACTLY),
@@ -203,6 +269,7 @@ class BarView(
             )
         }
         setMeasuredDimension(width, height)
+        accessibilityHelper.invalidateRoot()
     }
 
     override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
@@ -229,10 +296,13 @@ class BarView(
         canvas.save()
         canvas.translate(-scrollOffset, 0f)
         barLayout.buttons.forEach { placed ->
+            // A faixa é uma View filha (CandidatesView) e pinta a si mesma, inclusive a marcação de
+            // área vazia — desenhar aqui seria coberto por ela.
             if (placed.button != BarButton.Candidates) drawButton(canvas, placed)
         }
         canvas.restore()
     }
+
 
     private fun drawButton(canvas: Canvas, placed: BarGeometry.PlacedButton) {
         val bounds = RectF(placed.left + marginH, marginV, placed.right - marginH, height - marginV)
@@ -251,12 +321,33 @@ class BarView(
             drawJoystick(canvas, bounds, ink, active = placed.index == pressedIndex && joystick != null)
             return
         }
+        if (button == BarButton.Paste) {
+            drawPasteIcon(canvas, bounds, ink)
+            return
+        }
+        if (button is BarButton.GridTrigger) {
+            drawGridTriggerIcon(canvas, bounds, ink, alpha = if (isOrphanTrigger(button)) 100 else 255)
+            return
+        }
         textPaint.color = ink
         textPaint.alpha = if (isOrphanTrigger(button)) 100 else 255
+        textPaint.textSize = fittedTextSizePx(bounds)
         val textY = bounds.centerY() - (textPaint.descent() + textPaint.ascent()) / 2
         canvas.drawText(label, bounds.centerX(), textY, textPaint)
         textPaint.alpha = 255
     }
+
+    /**
+     * Rótulos em texto (mic, teclas avulsas como ESC/Enter, colapsar) usavam tamanho FIXO ([TEXT_SIZE_DP]
+     * na escala crua) — com 2+ barras empilhadas em paisagem a altura real do botão encolhe bem além disso
+     * ([GridSizing.barHeightPx]), então o glifo vazava do botão (achado do Yan, 2026-07-07). Alavanca/colar/
+     * gatilho de grade já desenham proporcionais a `bounds` (ver drawJoystick/drawPasteIcon/
+     * drawGridTriggerIcon); esta função dá o mesmo tratamento ao texto. [TEXT_HEIGHT_RATIO] reproduz a
+     * proporção de hoje (15dp de texto ÷ 24dp de `bounds.height()` no botão em tamanho ideal) — no caso
+     * normal (sem encolher) o resultado é idêntico ao tamanho fixo anterior; só encolhe abaixo disso.
+     */
+    private fun fittedTextSizePx(bounds: RectF): Float =
+        minOf(dp(TEXT_SIZE_DP), bounds.height() * TEXT_HEIGHT_RATIO)
 
     /** Manche de fliperama: base circular + bolinha deslocada na direção do puxão (JOY-01). */
     private fun drawJoystick(canvas: Canvas, bounds: RectF, ink: Int, active: Boolean) {
@@ -278,6 +369,51 @@ class BarView(
         canvas.drawCircle(cx + ox, cy + oy, baseRadius * 0.42f, fillPaint)
     }
 
+    /**
+     * Prancheta desenhada (não emoji, mesmo espírito do globo da grade Canvas — pedido do Yan, 2026-07-06).
+     * Centralizar a PRANCHETA em `bounds.centerY()` deixava o conjunto baixo demais (achado do Yan, 2
+     * rodadas) — desloca pra cima em [PASTE_ICON_LIFT_DP] até o conjunto ficar visualmente centralizado.
+     */
+    private fun drawPasteIcon(canvas: Canvas, bounds: RectF, ink: Int) {
+        borderPaint.color = ink
+        val w = minOf(bounds.width(), bounds.height()) * 0.5f
+        val h = w * 1.15f
+        val tabH = dp(4f)
+        val boardCenterY = bounds.centerY() - dp(PASTE_ICON_LIFT_DP)
+        val board = RectF(bounds.centerX() - w / 2, boardCenterY - h / 2, bounds.centerX() + w / 2, boardCenterY + h / 2)
+        canvas.drawRoundRect(board, dp(2f), dp(2f), borderPaint)
+        val tabW = w * 0.45f
+        val tab = RectF(bounds.centerX() - tabW / 2, board.top - tabH / 2, bounds.centerX() + tabW / 2, board.top + tabH / 2)
+        fillPaint.color = ink
+        canvas.drawRoundRect(tab, dp(1.5f), dp(1.5f), fillPaint)
+        val lineInset = w * 0.2f
+        val lineY1 = board.top + h * 0.4f
+        val lineY2 = board.top + h * 0.62f
+        canvas.drawLine(board.left + lineInset, lineY1, board.right - lineInset, lineY1, borderPaint)
+        canvas.drawLine(board.left + lineInset, lineY2, board.right - lineInset * 1.8f, lineY2, borderPaint)
+    }
+
+    /**
+     * Grade de 4 quadrados arredondados (estilo "apps"), não o `#`/jogo da velha do rótulo padrão
+     * (`⌗`) — pedido do Yan, 2026-07-06: o cruzamento de linhas finas lembrava jogo da velha demais.
+     */
+    private fun drawGridTriggerIcon(canvas: Canvas, bounds: RectF, ink: Int, alpha: Int) {
+        val side = minOf(bounds.width(), bounds.height()) * 0.62f
+        val cell = (side - dp(3f)) / 2f
+        val left = bounds.centerX() - side / 2f
+        val top = bounds.centerY() - side / 2f
+        fillPaint.color = ink
+        fillPaint.alpha = alpha
+        for (row in 0..1) {
+            for (col in 0..1) {
+                val l = left + col * (cell + dp(3f))
+                val t = top + row * (cell + dp(3f))
+                canvas.drawRoundRect(RectF(l, t, l + cell, t + cell), dp(1.5f), dp(1.5f), fillPaint)
+            }
+        }
+        fillPaint.alpha = 255
+    }
+
     private fun visualsFor(button: BarButton): Triple<String, Int, Int> = when (button) {
         BarButton.Mic -> {
             val (label, color) = MicVisuals.visuals(micState, elapsedSeconds())
@@ -285,7 +421,7 @@ class BarView(
         }
         BarButton.ConfigBtn -> Triple("⚙", kbModifier, kbInk)
         BarButton.ToggleExpand -> Triple(if (expandedMode) "↓" else "⌃", kbModifier, kbInk)
-        BarButton.Paste -> Triple("colar", kbModifier, kbInk)
+        BarButton.Paste -> Triple("", kbModifier, kbInk) // ícone desenhado, ver drawPasteIcon
         is BarButton.SingleKey -> Triple(button.key.label, kbModifier, kbInk)
         BarButton.Joystick -> Triple("", kbModifier, kbInk)
         is BarButton.GridTrigger -> Triple(button.label, kbModifier, kbInk)
@@ -294,6 +430,73 @@ class BarView(
 
     private fun isOrphanTrigger(button: BarButton): Boolean =
         button is BarButton.GridTrigger && button.gridId !in knownGridIds
+
+    // ── acessibilidade (ExploreByTouchHelper) ────────────────────────────────
+
+    /** Rótulo do nó virtual: o mesmo texto desenhado, com a limitação anunciada nos gestos contínuos (A11Y-02). */
+    private fun a11yLabel(button: BarButton): String = when (button) {
+        BarButton.Joystick -> "Alavanca (requer gesto deslizante)"
+        is BarButton.GridTrigger -> "${button.label} (requer gesto deslizante)"
+        else -> visualsFor(button).first
+    }
+
+    /** Alavanca e gatilho de grade são gestos contínuos — o toque simples já não faz nada neles (`perform`). */
+    private fun isA11yClickable(button: BarButton): Boolean = when (button) {
+        BarButton.Joystick, is BarButton.GridTrigger, BarButton.Candidates -> false
+        else -> true
+    }
+
+    /**
+     * Expõe cada botão visível (exceto `Candidates`, que já é `View` filha própria) como nó virtual:
+     * bounds + label + `ACTION_CLICK` (A11Y-01). Teclas avulsas emitem o atalho por duplo-toque do
+     * TalkBack — o caminho acessível para atalhos (A11Y-02); alavanca/gatilho de grade só anunciam a
+     * limitação, sem regredir o que a barra antiga já oferecia.
+     */
+    private inner class BarAccessibilityHelper(host: View) : ExploreByTouchHelper(host) {
+
+        private fun allButtons(): List<BarGeometry.PlacedButton> =
+            barLayout.buttons.filter { it.button != BarButton.Candidates }
+
+        override fun getVirtualViewAt(x: Float, y: Float): Int {
+            val index = allButtons().indexOfFirst { it.contains(x + scrollOffset) }
+            return if (index >= 0) index else HOST_ID
+        }
+
+        override fun getVisibleVirtualViews(virtualViewIds: MutableList<Int>) {
+            virtualViewIds.addAll(allButtons().indices)
+        }
+
+        override fun onPopulateNodeForVirtualView(virtualViewId: Int, node: AccessibilityNodeInfoCompat) {
+            val placed = allButtons().getOrNull(virtualViewId)
+            if (placed == null) {
+                // Nó "morto" (layout mudou entre o hover e a consulta) — vazio em vez de crashar.
+                node.contentDescription = ""
+                node.setBoundsInParent(Rect())
+                return
+            }
+            node.contentDescription = a11yLabel(placed.button)
+            node.setBoundsInParent(
+                Rect(
+                    (placed.left - scrollOffset).toInt(),
+                    0,
+                    (placed.right - scrollOffset).toInt(),
+                    height,
+                ),
+            )
+            node.className = android.widget.Button::class.java.name
+            val clickable = isA11yClickable(placed.button)
+            node.isClickable = clickable
+            if (clickable) node.addAction(AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_CLICK)
+        }
+
+        override fun onPerformActionForVirtualView(virtualViewId: Int, action: Int, arguments: Bundle?): Boolean {
+            if (action != AccessibilityNodeInfoCompat.ACTION_CLICK) return false
+            val placed = allButtons().getOrNull(virtualViewId) ?: return false
+            if (!isA11yClickable(placed.button)) return false
+            perform(placed.button)
+            return true
+        }
+    }
 
     private fun elapsedSeconds(): Int {
         frozenSeconds?.let { return it }
@@ -304,6 +507,7 @@ class BarView(
 
     // ── toque ────────────────────────────────────────────────────────────────
 
+    @Suppress("ClickableViewAccessibility") // a11y própria (ExploreByTouchHelper, ver mais abaixo)
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
@@ -404,7 +608,7 @@ class BarView(
 
     private fun performMicTap() {
         if (micState == ButtonState.ERROR) {
-            if (KeyFlowController.errorOpensVoz) callbacks.onErrorTap()
+            if (KeyFlowController.errorNavTarget != com.keyflow.core.ErrorNavTarget.NONE) callbacks.onErrorTap()
         } else {
             callbacks.onMic()
         }
@@ -417,15 +621,45 @@ class BarView(
         val grid = gridsById[trigger.gridId] ?: return
         val metrics = resources.displayMetrics
         val triggerRect = buttonScreenRectForTest(placed.index)
+        // A tela ÚTIL da janela do IME é menor que `heightPixels` cru (a status bar fica de fora, ~24dp
+        // — achado do Yan no device físico, 2026-07-07); sem descontar isso as contas sempre erravam por
+        // essa mesma folga, cortando a 1ª fileira do QWERTY por pouco em paisagem.
+        val usableHeightPx = usableScreenHeightPx(metrics)
+        // Encolhe a célula só o necessário pra grade inteira caber na tela (SB-T10) — sem isto, uma grade
+        // grande numa tela curta (paisagem) vazava e podia estourar a janela do IME. O tamanho IDEAL da
+        // célula usa a escala amortecida (não `dp()`, que é a escala crua) — sem isto, a grade continuava
+        // crescendo com o slider acima de 100% em paisagem mesmo com o teclado já congelado no tamanho de
+        // 100% (achado do Yan, 2026-07-07: "a diferença do tamanho da grade tá grande").
+        val budgetScale = landscapeDampedScale(metrics, scale)
+        val (cellWidthPx, cellHeightPx) = GridSizing.fittedCellPx(
+            rows = grid.rows,
+            cols = grid.cols,
+            idealCellWidthPx = GRID_CELL_W_DP * metrics.density * budgetScale,
+            idealCellHeightPx = GRID_CELL_H_DP * metrics.density * budgetScale,
+            screenWidthPx = metrics.widthPixels.toFloat(),
+            screenHeightPx = usableHeightPx,
+            // O slack e a faixa de preview entram no orçamento (não somados por fora) e usam a MESMA
+            // escala amortecida — precisa bater com o mesmo cálculo do overscan no KeyFlowKeyboardView,
+            // senão a grade desenha maior do que a janela reservou (ou continua encolhendo com o slider
+            // mesmo com o teclado já congelado — achado do Yan, 2026-07-07).
+            reservedHeightPx = GridSizing.previewSpacePx(metrics, scale) + GridSizing.keyboardContentReservePx(
+                metrics = metrics,
+                usableHeightPx = usableHeightPx,
+                scale = scale,
+                qwertyRowCount = qwertyRowCount,
+                barCount = barCount,
+            ) + GridSizing.overscanSlackPx(metrics, scale),
+        )
+        callbacks.onGridDragActiveChanged(true)
         activeTrigger = trigger
         lastRawX = event.rawX
         lastRawY = event.rawY
         gridSession = GridSession(
             grid = grid,
-            cellWidthPx = dp(GRID_CELL_W_DP),
-            cellHeightPx = dp(GRID_CELL_H_DP),
+            cellWidthPx = cellWidthPx,
+            cellHeightPx = cellHeightPx,
             screenWidthPx = metrics.widthPixels.toFloat(),
-            screenHeightPx = metrics.heightPixels.toFloat(),
+            screenHeightPx = usableHeightPx,
             originX = event.rawX,
             originY = event.rawY,
             triggerFrame = GridFrame(
@@ -440,8 +674,8 @@ class BarView(
             context = context,
             dark = dark,
             grid = grid,
-            cellWidthPx = dp(GRID_CELL_W_DP),
-            cellHeightPx = dp(GRID_CELL_H_DP),
+            cellWidthPx = cellWidthPx,
+            cellHeightPx = cellHeightPx,
             scale = scale,
         )
         handler.postDelayed(revealTick, REVEAL_TICK_MS)
@@ -480,6 +714,7 @@ class BarView(
     }
 
     private fun dismissGridSession() {
+        if (gridSession != null) callbacks.onGridDragActiveChanged(false)
         handler.removeCallbacks(revealTick)
         gridPopup?.dismiss()
         gridPopup = null
@@ -565,11 +800,19 @@ class BarView(
         private const val HOLD_MS = 280L // mesmo limiar da barra antiga (tap abaixo, seletor acima)
         private const val MIN_UNIT_DP = 44f // alvo de toque de um botão de peso 1 (gatilho do overflow)
         // Grade efêmera (SB-T6): células generosas pra navegação às cegas; tick re-avalia o reveal.
-        private const val GRID_CELL_W_DP = 64f
-        private const val GRID_CELL_H_DP = 48f
+        // internal: KeyFlowKeyboardView usa pra dimensionar o overscan da janela do IME (SB-T10/GRD-08).
+        internal const val GRID_CELL_W_DP = 64f
+        // internal: KeyFlowKeyboardView usa pra dimensionar o overscan da janela do IME (SB-T10/GRD-08).
+        internal const val GRID_CELL_H_DP = 48f
         private const val GRID_ANCHOR_THRESHOLD_DP = 24f
         private const val REVEAL_TICK_MS = 120L
         // Alavanca: raio-morto pequeno (o botão é compacto; o flick precisa ser curto).
         private const val JOYSTICK_THRESHOLD_DP = 12f
+        // Deslocamento pra cima do ícone de colar — ajustado 2x a pedido do Yan (2026-07-06).
+        private const val PASTE_ICON_LIFT_DP = 1f
+        // Tamanho de texto no tamanho ideal (barra sem encolher) — ver fittedTextSizePx.
+        private const val TEXT_SIZE_DP = 15f
+        // 15dp de texto ÷ 24dp de bounds.height() (28dp de barra ideal − 2×2dp de marginV) — ver fittedTextSizePx.
+        private const val TEXT_HEIGHT_RATIO = TEXT_SIZE_DP / 24f
     }
 }

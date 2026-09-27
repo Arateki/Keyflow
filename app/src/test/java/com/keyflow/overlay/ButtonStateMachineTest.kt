@@ -153,15 +153,20 @@ class ButtonStateMachineTest {
     }
 
     @Test
-    fun `cancel is a no-op outside recording or paused`() {
+    fun `cancel is a no-op outside recording, paused or sending`() {
         val machine = ButtonStateMachine()
 
         // Idle
         assertThat(machine.onCancel()).isEqualTo(ButtonState.IDLE_READY)
+    }
+
+    @Test
+    fun `cancel from sending opens the undo window too`() {
+        val machine = ButtonStateMachine()
 
         machine.onTap() // RECORDING
         machine.onTap() // SENDING
-        assertThat(machine.onCancel()).isEqualTo(ButtonState.SENDING)
+        assertThat(machine.onCancel()).isEqualTo(ButtonState.CANCELLING)
     }
 
     @Test

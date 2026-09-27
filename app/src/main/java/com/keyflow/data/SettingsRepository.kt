@@ -12,7 +12,6 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
-import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.keyflow.core.OrbShortcutAction
 import com.keyflow.core.OverlaySide
@@ -71,6 +70,9 @@ class SettingsRepository(
     suspend fun keyboardNumberRowEnabledOnce(): Boolean =
         dataStore.data.first()[KEYBOARD_NUMBER_ROW_ENABLED] ?: false
 
+    fun keyboardShowWithHardKeyboardFlow(): Flow<Boolean> =
+        dataStore.data.map { it[KEYBOARD_SHOW_WITH_HARD_KEYBOARD] ?: true }
+
     /**
      * Idioma do teclado ("pt"/"en"/"es"), gerenciado pelo app (não pelos subtypes do sistema — ver
      * [Settings.keyboardLanguage]). Leitura leve mesmo padrão de [themeDarkOnce]; escrita separada
@@ -81,6 +83,18 @@ class SettingsRepository(
 
     suspend fun saveKeyboardLanguageOnce(language: String) {
         dataStore.edit { it[KEYBOARD_LANGUAGE] = language }
+    }
+
+    suspend fun saveOnboardingDone(done: Boolean) {
+        dataStore.edit { it[ONBOARDING_DONE] = done }
+    }
+
+    suspend fun saveOverlayModeEnabled(enabled: Boolean) {
+        dataStore.edit { it[OVERLAY_MODE_ENABLED] = enabled }
+    }
+
+    suspend fun saveKeyboardModeEnabled(enabled: Boolean) {
+        dataStore.edit { it[KEYBOARD_MODE_ENABLED] = enabled }
     }
 
     /** Leitura leve da intensidade de vibração (háptica da grade efêmera/alavanca — GRD-03/JOY-02). */
@@ -106,6 +120,22 @@ class SettingsRepository(
     fun shortcutGridsFlow(): Flow<List<ShortcutGrid>> =
         dataStore.data.map { ShortcutCodec.decodeGrids(it[SHORTCUT_GRIDS_JSON]) }
 
+    /**
+     * MGR-03: um modelo acabou de instalar e nenhum está selecionado → seleciona. Escrita atômica só da
+     * chave do modelo: não disputa com o auto-save da tela (que regrava as Settings inteiras).
+     * @return true se selecionou.
+     */
+    suspend fun selectLocalModelIfNone(modelId: String): Boolean {
+        var selected = false
+        dataStore.edit { prefs ->
+            if (prefs[LOCAL_MODEL_ID].isNullOrBlank()) {
+                prefs[LOCAL_MODEL_ID] = modelId
+                selected = true
+            }
+        }
+        return selected
+    }
+
     suspend fun saveBarsConfig(config: BarsConfig) {
         dataStore.edit { it[BARS_CONFIG_JSON] = ShortcutCodec.encodeBars(config) }
     }
@@ -117,6 +147,11 @@ class SettingsRepository(
     fun flow(): Flow<Config> = settingsFlow().map { settings ->
         when (val eff = settings.effectiveConfigFor()) {
             is EffectiveConfig.Ready -> eff.config
+            // Sem endpoint nem token: o RoutingTranscriber manda para o :inference (NM-T9, PRV-01).
+            is EffectiveConfig.Local -> Config(
+                timeoutMs = maxOf(settings.transcriptionTimeoutMs.toLong(), Config.LOCAL_MIN_TIMEOUT_MS),
+                local = eff,
+            )
             EffectiveConfig.Unavailable -> Config()
         }
     }
@@ -139,6 +174,8 @@ class SettingsRepository(
             groqToken = securePrefs.getString(GROQ_TOKEN, "").orEmpty(),
             groqModel = prefs[GROQ_MODEL] ?: Settings.GROQ_MODEL,
             groqLanguage = prefs[GROQ_LANGUAGE]?.takeIf { it.isNotBlank() },
+            localModelId = prefs[LOCAL_MODEL_ID]?.takeIf { it.isNotBlank() },
+            localLanguage = prefs[LOCAL_LANGUAGE]?.takeIf { it.isNotBlank() },
             overlayModeEnabled = prefs[OVERLAY_MODE_ENABLED] ?: false,
             keyboardModeEnabled = prefs[KEYBOARD_MODE_ENABLED] ?: false,
             overlayRecordingMode = prefs[OVERLAY_RECORDING_MODE].toRecordingMode(),
@@ -163,6 +200,9 @@ class SettingsRepository(
             keyboardScalePercent = prefs[KEYBOARD_SCALE_PERCENT] ?: 100,
             keyboardLanguage = prefs[KEYBOARD_LANGUAGE] ?: "pt",
             keyboardNumberRowEnabled = prefs[KEYBOARD_NUMBER_ROW_ENABLED] ?: false,
+            partialOnPause = prefs[PARTIAL_ON_PAUSE] ?: false,
+            partialViewEdit = prefs[PARTIAL_VIEW_EDIT] ?: false,
+            keyboardShowWithHardKeyboard = prefs[KEYBOARD_SHOW_WITH_HARD_KEYBOARD] ?: true,
         )
     }
 
@@ -188,6 +228,8 @@ class SettingsRepository(
             settings.openaiLanguage.putOrRemove(prefs, OPENAI_LANGUAGE)
             prefs[GROQ_MODEL] = settings.groqModel
             settings.groqLanguage.putOrRemove(prefs, GROQ_LANGUAGE)
+            settings.localModelId.putOrRemove(prefs, LOCAL_MODEL_ID)
+            settings.localLanguage.putOrRemove(prefs, LOCAL_LANGUAGE)
             prefs[OVERLAY_MODE_ENABLED] = settings.overlayModeEnabled
             prefs[KEYBOARD_MODE_ENABLED] = settings.keyboardModeEnabled
             prefs[OVERLAY_RECORDING_MODE] = settings.overlayRecordingMode.name
@@ -208,6 +250,9 @@ class SettingsRepository(
             prefs[KEYBOARD_SCALE_PERCENT] = settings.keyboardScalePercent
             prefs[KEYBOARD_LANGUAGE] = settings.keyboardLanguage
             prefs[KEYBOARD_NUMBER_ROW_ENABLED] = settings.keyboardNumberRowEnabled
+            prefs[PARTIAL_ON_PAUSE] = settings.partialOnPause
+            prefs[PARTIAL_VIEW_EDIT] = settings.partialViewEdit
+            prefs[KEYBOARD_SHOW_WITH_HARD_KEYBOARD] = settings.keyboardShowWithHardKeyboard
         }
     }
 
@@ -288,6 +333,8 @@ class SettingsRepository(
         val OPENAI_LANGUAGE = stringPreferencesKey("openai_language")
         val GROQ_MODEL = stringPreferencesKey("groq_model")
         val GROQ_LANGUAGE = stringPreferencesKey("groq_language")
+        val LOCAL_MODEL_ID = stringPreferencesKey("local_model_id")
+        val LOCAL_LANGUAGE = stringPreferencesKey("local_language")
         val OVERLAY_MODE_ENABLED = booleanPreferencesKey("overlay_mode_enabled")
         val KEYBOARD_MODE_ENABLED = booleanPreferencesKey("keyboard_mode_enabled")
         val OVERLAY_RECORDING_MODE = stringPreferencesKey("overlay_recording_mode")
@@ -310,29 +357,20 @@ class SettingsRepository(
         val KEYBOARD_SCALE_PERCENT = intPreferencesKey("keyboard_scale_percent")
         val KEYBOARD_LANGUAGE = stringPreferencesKey("keyboard_language")
         val KEYBOARD_NUMBER_ROW_ENABLED = booleanPreferencesKey("keyboard_number_row_enabled")
+        val PARTIAL_ON_PAUSE = booleanPreferencesKey("partial_on_pause")
+        val PARTIAL_VIEW_EDIT = booleanPreferencesKey("partial_view_edit")
+        val KEYBOARD_SHOW_WITH_HARD_KEYBOARD = booleanPreferencesKey("keyboard_show_with_hard_keyboard")
         // Trabalho 3 (shortcut-bars): barras personalizáveis + teclados de atalhos, como JSON.
         val BARS_CONFIG_JSON = stringPreferencesKey("bars_config_json")
         val SHORTCUT_GRIDS_JSON = stringPreferencesKey("shortcut_grids_json")
         const val OPENAI_TOKEN = "openai_token"
         const val GROQ_TOKEN = "groq_token"
 
-        fun createSecurePrefs(context: Context, name: String): SharedPreferences {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-                return context.getSharedPreferences(name, Context.MODE_PRIVATE)
-            }
-
-            val masterKey = MasterKey.Builder(context)
-                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                .build()
-
-            return EncryptedSharedPreferences.create(
-                context,
-                name,
-                masterKey,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
-            )
-        }
+        fun createSecurePrefs(
+            context: Context,
+            name: String,
+            keyAlias: String = MasterKey.DEFAULT_MASTER_KEY_ALIAS,
+        ): SharedPreferences = SecurePrefs.create(context, name, keyAlias)
 
         fun dataStoreFor(
             file: File,

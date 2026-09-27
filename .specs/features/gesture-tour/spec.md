@@ -59,10 +59,14 @@ Modo hoje e em qualquer tela amanhã.
 3. **TOUR-03**: a cena SHALL reagir ao roteiro em sincronia (orbe muda de estado —
    Idle/Listening/Paused; mic do teclado muda; teclado expande/retrai) usando as superfícies
    **reais** (`VoiceOrb`; grade Canvas nova em miniatura), nunca mocks desenhados à parte.
-4. **TOUR-04**: SHALL haver **autoplay em loop** na ordem da lista; navegação **anterior/próximo**
-   pausa o autoplay por alguns segundos e retoma; o estado exposto
-   (`rememberGestureTourState`) SHALL incluir índice, título e descrição do passo corrente
+4. **TOUR-04** *(revisto em 2026-09-09 — decisão do Yan usando no A32)*: o gesto corrente SHALL
+   **repetir em loop**, e a troca de gesto SHALL acontecer **apenas** pela navegação
+   anterior/próximo; a seta de avançar SHALL ter indicação visual de que dá para seguir. O estado
+   exposto (`rememberGestureTourState`) SHALL incluir índice, título e descrição do passo corrente
    (p/ o consumidor posicionar a descrição onde quiser).
+   ~~Autoplay avançando a lista sozinho~~: implementado assim na GT-T3 e **revertido** — no
+   aparelho, a troca automática dava pouco tempo para entender cada gesto. Toda cena SHALL ocupar a
+   mesma altura reservada, para o card não saltar de tamanho a cada troca.
 5. **TOUR-05**: toda animação SHALL ser dirigida por **clock injetável** (padrão `LocalOrbClock`):
    com clock congelado, qualquer frame é determinístico (goldens/testes).
 
@@ -199,33 +203,33 @@ o "?" da Sobreposição fecha a do Microfone e abre a dela; TalkBack lê o conte
 
 | Requirement | Story | Task | Status |
 | ----------- | ----- | ---- | ------ |
-| TOUR-01 | P1-A | GT-T3 | In Tasks |
-| TOUR-02 | P1-A | GT-T2 | In Tasks |
-| TOUR-03 | P1-A | GT-T4, GT-T5 | In Tasks |
-| TOUR-04 | P1-A | GT-T3 | In Tasks |
-| TOUR-05 | P1-A | GT-T2, GT-T3 | In Tasks |
-| SCR-01 | P1-B | GT-T1 | In Tasks |
-| SCR-02 | P1-B | GT-T1 | In Tasks |
-| SCR-03 | P1-B | GT-T1 | In Tasks |
-| SCR-04 | P1-B | GT-T1 | In Tasks |
-| SCR-05 | P1-B | GT-T1 | In Tasks |
-| SCR-06 | P1-B | GT-T1 | In Tasks |
-| SCR-07 | P1-B | GT-T6 | In Tasks |
-| MODO-01 | P1-C | GT-T6 | In Tasks |
-| MODO-02 | P1-C | GT-T6 | In Tasks |
-| MODO-03 | P1-C | GT-T6 | In Tasks |
-| MODO-04 | P1-C | GT-T5, GT-T6 | In Tasks |
-| MODO-05 | P1-C | GT-T8 | In Tasks |
-| DOC-01 | P2-D | GT-T7 | In Tasks |
-| DOC-02 | P2-D | GT-T9 | In Tasks |
-| DOC-03 | P2-D | GT-T9 | In Tasks |
-| DOC-04 | P2-D | GT-T9 | In Tasks |
-| DOC-05 | P2-D | GT-T9 | In Tasks |
-| DOC-06 | P2-D | GT-T9 | In Tasks |
-| PERM-01 | P2-E | GT-T10 | In Tasks |
-| PERM-02 | P2-E | GT-T10 | In Tasks |
-| PERM-03 | P2-E | GT-T10 | In Tasks |
-| PERM-04 | P2-E | GT-T10 | In Tasks |
+| TOUR-01 | P1-A | GT-T3 | Implemented |
+| TOUR-02 | P1-A | GT-T2 | Implemented |
+| TOUR-03 | P1-A | GT-T4, GT-T5 | Implemented |
+| TOUR-04 | P1-A | GT-T3 | Implemented |
+| TOUR-05 | P1-A | GT-T2, GT-T3 | Implemented |
+| SCR-01 | P1-B | GT-T1 | Implemented |
+| SCR-02 | P1-B | GT-T1 | Implemented |
+| SCR-03 | P1-B | GT-T1 | Implemented |
+| SCR-04 | P1-B | GT-T1 | Implemented |
+| SCR-05 | P1-B | GT-T1 | Implemented |
+| SCR-06 | P1-B | GT-T1 | Implemented |
+| SCR-07 | P1-B | GT-T6 | Implemented |
+| MODO-01 | P1-C | GT-T6 | Implemented |
+| MODO-02 | P1-C | GT-T6 | Implemented |
+| MODO-03 | P1-C | GT-T6 | Implemented |
+| MODO-04 | P1-C | GT-T5, GT-T6 | Implemented |
+| MODO-05 | P1-C | GT-T8 | Implemented |
+| DOC-01 | P2-D | GT-T7 | Implemented |
+| DOC-02 | P2-D | GT-T9 | Implemented |
+| DOC-03 | P2-D | GT-T9 | Implemented |
+| DOC-04 | P2-D | GT-T9 | Implemented |
+| DOC-05 | P2-D | GT-T9 | Implemented |
+| DOC-06 | P2-D | GT-T9 | Implemented |
+| PERM-01 | P2-E | GT-T10 | Implemented |
+| PERM-02 | P2-E | GT-T10 | Implemented |
+| PERM-03 | P2-E | GT-T10 | Implemented |
+| PERM-04 | P2-E | GT-T10 | Implemented |
 
 **Coverage:** 27 total, 27 mapeados em tasks, 0 sem mapa.
 **Status values:** Pending → In Design → In Tasks → Implementing → Verified.
@@ -236,9 +240,9 @@ o "?" da Sobreposição fecha a do Microfone e abre a dela; TalkBack lê o conte
 
 - [ ] Abrir a aba Modo: os 2 cards rodam o tour em loop, fluido, no tema atual; setas e descrição sincronizadas.
 - [ ] Trocar TOGGLE→PTT e os atalhos de rajada: o tour reflete a nova config sem release.
-- [ ] Demo do teclado mostra a grade Canvas nova.
-- [ ] Reuso comprovado: uma rota de galeria toca um subconjunto de roteiros fora da aba Modo (prova do isolamento).
-- [ ] Goldens determinísticos (clock congelado) verdes em claro/escuro; suíte existente do ModoPanel verde.
+- [x] Demo do teclado mostra a grade Canvas nova (golden `tour-keyboard-mic`).
+- [x] Reuso comprovado: uma rota de galeria toca um subconjunto de roteiros fora da aba Modo (prova do isolamento) — rotas `tour-*` (GT-T8).
+- [x] Goldens determinísticos (clock congelado) verdes em claro/escuro; suíte existente do ModoPanel verde.
 - [ ] Fluidez validada no Galaxy A32 (sem jank perceptível com os 2 tours rodando).
-- [ ] Docs: índice leva a qualquer seção num toque; "Reportar bug" abre o e-mail com diagnóstico preenchido.
-- [ ] Apresentação: cada permissão explica o porquê ao tocar o "?"; onboarding existente segue verde.
+- [x] Docs: índice leva a qualquer seção num toque; "Reportar bug" abre o e-mail com diagnóstico preenchido (intent verificado; sem app de e-mail → aviso, visto no emulador).
+- [x] Apresentação: cada permissão explica o porquê ao tocar o "?"; onboarding existente segue verde.

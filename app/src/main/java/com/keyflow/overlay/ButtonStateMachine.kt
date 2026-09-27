@@ -82,9 +82,13 @@ class ButtonStateMachine(
         return state
     }
 
-    /** Cancela a gravação em curso (RECORDING/PAUSED → CANCELLING), abrindo a janela de desfazer. */
+    /**
+     * Cancela a gravação/envio em curso (RECORDING/PAUSED/SENDING → CANCELLING), abrindo a janela de
+     * desfazer. SENDING entra aqui pra permitir cancelar a transcrição em andamento (pedido do Yan,
+     * 2026-07-03) — o áudio já gravado é retido do mesmo jeito, só a requisição HTTP é abortada.
+     */
     fun onCancel(): ButtonState {
-        if (state == ButtonState.RECORDING || state == ButtonState.PAUSED) {
+        if (state == ButtonState.RECORDING || state == ButtonState.PAUSED || state == ButtonState.SENDING) {
             state = ButtonState.CANCELLING
         }
         return state

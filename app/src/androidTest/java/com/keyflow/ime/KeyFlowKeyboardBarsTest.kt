@@ -26,6 +26,7 @@ import com.keyflow.data.SettingsRepository
 import android.view.KeyEvent
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Before
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -49,24 +50,21 @@ class KeyFlowKeyboardBarsTest {
     private val device: UiDevice get() = UiDevice.getInstance(instrumentation)
     private val uiPrefs get() = context.getSharedPreferences("keyflow_kb_ui", Context.MODE_PRIVATE)
 
+    // Preserva o que o dono do aparelho já tinha configurado — ver [UserSettingsGuard].
+    private val userSettings = UserSettingsGuard(context)
+
+    @Before
+    fun captureUserSettings() {
+        userSettings.capture()
+    }
+
     @After
     fun tearDown() {
-        uiPrefs.edit().remove(KEY_BARS).remove(KEY_CANVAS_GRID).apply()
-        runBlocking {
-            SettingsRepository(context).saveBarsConfig(BarsConfig.DEFAULT)
-            SettingsRepository(context).saveShortcutGrids(emptyList())
-        }
-        shell("ime reset")
+        uiPrefs.edit().remove(KEY_BARS).apply()
+        userSettings.restore()
         device.pressHome()
         KeyFlowController.clearInserter()
         KeyFlowController.updateButtonState(ButtonState.IDLE_NO_FIELD)
-    }
-
-    @Test
-    fun flagOffKeepsTheLegacyBar() {
-        launchProbe(bars = false)
-
-        assertTrue(KeyFlowKeyboardService.activeViewForTest!!.barViewsForTest.isEmpty())
     }
 
     @Test
@@ -197,13 +195,14 @@ class KeyFlowKeyboardBarsTest {
         val downTime = SystemClock.uptimeMillis()
         inject(MotionEvent.ACTION_DOWN, rect.centerX(), rect.centerY(), downTime, downTime)
         inject(MotionEvent.ACTION_MOVE, rect.centerX() + 60, rect.centerY(), downTime)
-        Thread.sleep(900) // repeat: 1º em ~400ms, 2º em ~760ms (RepeatSchedule)
-        inject(MotionEvent.ACTION_UP, rect.centerX() + 60, rect.centerY(), downTime)
-
+        // Segura ATÉ o repeat aparecer (1º em ~400 ms pelo RepeatSchedule), em vez de soltar num prazo
+        // fixo: o repeat é agendado na main thread do app, e no CI (emulador sob carga, quadros de 1,8 s
+        // medidos em 2026-09-25) um aperto de 900 ms às vezes terminava antes do 1º repeat sair.
         waitUntil("alavanca não emitiu setas repetidas") {
             val text = device.findObject(By.desc("ime_probe_field"))?.text.orEmpty()
             text.count { it == '→' } >= 2
         }
+        inject(MotionEvent.ACTION_UP, rect.centerX() + 60, rect.centerY(), downTime)
 
         // Soltar parou (JOY-04): a contagem congela.
         Thread.sleep(600)
@@ -245,9 +244,7 @@ class KeyFlowKeyboardBarsTest {
     // ── ações de alto nível (mesmo harness do KeyFlowKeyboardCanvasGridTest) ──
 
     private fun launchProbe(bars: Boolean) {
-        // Canvas ligado junto: as barras no expandido só existem no modo Canvas (o teclado antigo de
-        // TextView fica fora do redesign — decisão de design da SB-T5).
-        uiPrefs.edit().putBoolean(KEY_CANVAS_GRID, true).putBoolean(KEY_BARS, bars).apply()
+        uiPrefs.edit().putBoolean(KEY_BARS, bars).apply()
         shell("pm grant ${context.packageName} ${Manifest.permission.RECORD_AUDIO}")
         shell("ime enable $IME")
         shell("ime set $IME")
@@ -259,19 +256,33 @@ class KeyFlowKeyboardBarsTest {
 
         device.wait(Until.hasObject(By.desc("ime_probe_field")), TIMEOUT)
         device.findObject(By.desc("ime_probe_field"))?.click()
-        waitUntil("KeyFlowKeyboardView não anexou") { KeyFlowKeyboardService.activeViewForTest != null }
+        awaitKeyboardAttached(device) { context.startActivity(intent) }
         // A view precisa estar de fato na tela antes de medirmos retângulos de botões.
         waitUntil("KeyFlowKeyboardView não ficou visível") {
             KeyFlowKeyboardService.activeViewForTest?.isShown == true
         }
     }
 
-    private fun inject(action: Int, x: Int, y: Int, downTime: Long, eventTime: Long = SystemClock.uptimeMillis()) {
+    /**
+     * Injeta um toque, devolvendo `false` se a plataforma RECUSAR a injeção
+     * (`IllegalArgumentException: Targeted input event injection ... was not directed at a window owned
+     * by uid N`). `sendPointerSync` só entrega em janela do próprio app, e logo depois de reinstalar o
+     * APK a janela do IME ainda não assumiu aquela região da tela. Medido em 2026-09-08: as duas
+     * primeiras rodadas após um `installDebug` falhavam assim. Sem o `catch`, a exceção escapava dos
+     * laços de retry e reprovava o teste na hora.
+     */
+    private fun inject(action: Int, x: Int, y: Int, downTime: Long, eventTime: Long = SystemClock.uptimeMillis()): Boolean {
         val event = MotionEvent.obtain(downTime, eventTime, action, x.toFloat(), y.toFloat(), 0).apply {
             source = InputDevice.SOURCE_TOUCHSCREEN
         }
-        instrumentation.sendPointerSync(event)
-        event.recycle()
+        return try {
+            instrumentation.sendPointerSync(event)
+            true
+        } catch (e: IllegalArgumentException) {
+            false
+        } finally {
+            event.recycle()
+        }
     }
 
     private fun waitUntil(message: String, timeoutMs: Long = TIMEOUT, condition: () -> Boolean) {
@@ -295,7 +306,6 @@ class KeyFlowKeyboardBarsTest {
     private companion object {
         const val IME = "com.keyflow/.ime.KeyFlowKeyboardService"
         const val TIMEOUT = 5000L
-        const val KEY_CANVAS_GRID = "kbd_canvas"
         const val KEY_BARS = "kbd_bars"
     }
 }

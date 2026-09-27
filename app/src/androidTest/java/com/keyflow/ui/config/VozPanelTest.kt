@@ -6,6 +6,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -50,6 +52,33 @@ class VozPanelTest {
         rule.onNodeWithTag(sourceTag(TranscriptionSource.OPENAI)).performClick()
 
         rule.runOnIdle { assertEquals(TranscriptionSource.OPENAI, h.settings.source) }
+    }
+
+    /** MGR-01: "Local" é a 5ª opção; escolhida, mostra o gerenciador de modelos, sem campos de token. */
+    @Test
+    fun localIsTheFifthSourceAndShowsItsPanel() {
+        val h = Harness(Settings(source = TranscriptionSource.CREDITS))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(sourceTag(TranscriptionSource.LOCAL)).assertIsDisplayed().performClick()
+
+        rule.runOnIdle { assertEquals(TranscriptionSource.LOCAL, h.settings.source) }
+        rule.onNodeWithTag(VOZ_LOCAL_PRIVACY_TAG).assertExists()
+        rule.onAllNodesWithTag(VOZ_TOKEN_TAG).assertCountEquals(0)
+    }
+
+    /** PAR-01: os dois toggles do parcial persistem; o 2º só responde com o 1º ligado. */
+    @Test
+    fun partialToggles() {
+        val h = Harness(Settings(source = TranscriptionSource.OPENAI))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(VOZ_PARTIAL_VIEW_EDIT_TAG).assertIsNotEnabled()
+        rule.onNodeWithTag(VOZ_PARTIAL_ON_PAUSE_TAG).performClick()
+        rule.runOnIdle { assertEquals(true, h.settings.partialOnPause) }
+
+        rule.onNodeWithTag(VOZ_PARTIAL_VIEW_EDIT_TAG).assertIsEnabled().performClick()
+        rule.runOnIdle { assertEquals(true, h.settings.partialViewEdit) }
     }
 
     @Test

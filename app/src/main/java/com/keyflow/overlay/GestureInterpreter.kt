@@ -1,5 +1,6 @@
 package com.keyflow.overlay
 
+import android.os.SystemClock
 import kotlin.math.abs
 
 enum class GestureEvent { TAP, TRIPLE_TAP, HOLD, DRAG_START, DRAG_END }
@@ -7,7 +8,10 @@ enum class GestureEvent { TAP, TRIPLE_TAP, HOLD, DRAG_START, DRAG_END }
 class GestureInterpreter(
     private val tripleTapWindowMs: Long = 300L,
     private val holdThresholdMs: Long = 500L,
-    private val clock: () -> Long = { System.currentTimeMillis() },
+    // MONOTÔNICO por padrão: o hold é agendado com `handler.postDelayed` (uptimeMillis) e conferido
+    // aqui contra o MESMO limiar. Com o relógio de parede as medidas divergiam e o gesto perdia o
+    // modo-arrasto (medido no A32: elapsed=269 contra threshold=270).
+    private val clock: () -> Long = { SystemClock.uptimeMillis() },
 ) {
     private var tapCount = 0
     private var firstTapTime = 0L

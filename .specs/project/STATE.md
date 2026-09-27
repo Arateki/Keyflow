@@ -268,9 +268,15 @@ Duas features novas planejadas via grill completo (gray areas resolvidas). **Ord
   (`By.textContains`) **no meio do gesto** (dedo sintético ainda "pressionado") interfere no foco do IME
   real e o derruba (`HIDE_RESET_SHELL_COMMAND` no logcat); a correção foi ler `popupRectsForTest`
   diretamente do `View` (mesmo processo, self-instrumentado) em vez de UiAutomator. Mesmo com a geometria
-  certa (`highlightedIndexForTest` confirmado correto antes do UP), a entrega do toque real via
-  `sendPointerSync` ainda é intermitente sob a carga deste host (mesma classe de flakiness do FGS/Keystore)
-  — mitigado com retry do gesto (até 3 tentativas) no nível do teste. Também corrigido: `KeyFlowController`
+  certa (`highlightedIndexForTest` confirmado correto antes do UP), o gesto às vezes não surtia efeito
+  — mitigado com retry do gesto (até 3 tentativas) no nível do teste. **A explicação que estava aqui — "a
+  entrega do toque via `sendPointerSync` é intermitente sob carga" — foi MEDIDA em 2026-09-08 e é falsa**,
+  pelo menos onde deu para medir (`KeyFlowKeyboardSpellCheckerTest`): no instante da falha o toque chegava
+  à grade, resolvia a tecla certa e `setComposingText` devolvia `true`; quem estava desatualizada era a
+  LEITURA pela árvore de acessibilidade do UiAutomator, que servia o hint do campo em vez do texto já
+  escrito. É a mesma lição do parágrafo acima (não perguntar ao UiAutomator o que dá para ler do `View`),
+  agora aplicada também à verificação, e não só à geometria. Ver `.specs/quick/010-suite-no-aparelho/`.
+  O caso do seletor de mic NÃO foi medido — pode ter causa própria; medir antes de assumir. Também corrigido: `KeyFlowController`
   é singleton de processo e não reseta entre métodos de teste — sem `tearDown` zerando
   `buttonState`/`clearInserter()`, o teste seguinte herdava PAUSED/CANCELLING do anterior.
 - **OG-T7**: traceability do `orb-gestures/spec.md` atualizada (Implemented→Verified onde testado nesta
@@ -867,3 +873,1020 @@ dedicada de números, refletido na prévia; (b) hint pequeno de dígito no canto
 
 Yan confirmou: item 4 funcionou e ficou bom, só pediu reduzir "muito pouco" mais. `PREVIEW_MARGIN_DP`
 10dp → 14dp. Gate `quick` (`TecladoPanelTest` 6/6). Build reinstalado no Galaxy A32.
+
+## Q1 — Limite máximo de gravação aplicado de verdade (2026-07-02)
+
+Início da fila do `DEVELOPMENT-ORDER.md` pela Frente A (Bloco 1). Exploração de código mostrou que a
+tarefa listada como "quick mode" tocava ~8 arquivos e tinha 2 decisões de design em aberto — não coube no
+guardrail de quick mode (máx. 3 arquivos, sem decisão de design). Decisões resolvidas com o Yan antes de
+implementar:
+- Estado ao atingir o limite: reusar `ButtonState.PAUSED` puro (sem estado novo).
+- Banner de aviso: 2 ações — "Enviar" (mesmo caminho de STOP a partir de PAUSED) e "Descartar" (novo
+  `ButtonStateMachine.onDiscard()`: descarte direto RECORDING/PAUSED → idle, sem a janela de desfazer de
+  3s do `onCancel`/CANCELLING — aviso de limite já é uma decisão explícita, não precisa de undo).
+
+Implementado via TDD (RED confirmado por erro de compilação nos testes antes do código de produção
+existir; GREEN depois). `OverlayCoordinator` ganhou `maxRecordingMs: () -> Long` (lambda, lido ao vivo de
+`cachedSettings.maxRecordingSec` — mesmo padrão do `tapBurstWindowMs`, não fixado na criação do
+coordinator) + `scheduleLimitJob()`/`cancelLimitJob()` (mesmo padrão do `cancelJob` já usado por
+CANCELLING) + `onLimitSend()`/`onLimitDiscard()` públicos. Reagenda com o tempo **restante** (`max -
+timeAccumulatedMs`) a cada START/RESUME; se já passou do limite, não reagenda — por isso resumir
+manualmente depois do aviso não dispara o aviso de novo na mesma sessão de gravação (sem flag extra,
+efeito colateral do próprio cálculo). `OverlayService` ganhou um banner de overlay com 2 rótulos
+clicáveis (`limitBannerView`, variante do `bannerView` existente sem timer de auto-dismiss).
+
+**Gate `full` (unit + instrumentado, emulador):** unit 100% verde (9 testes novos: 3 em
+`ButtonStateMachineTest`, 6 em `OverlayCoordinatorTest`, usando `testScheduler.currentTime` como relógio
+autoritativo do coordinator para sincronizar com o avanço de tempo virtual do `runTest`). Instrumentado:
+só as 2 falhas ambientais já conhecidas (`SystemSurfacesScreenshotTest` — Keystore lento) + 1 flake novo
+confirmado (`KeyFlowKeyboardBarsTest.gridReleaseOutsideTheFrameCancelsWithoutEmitting`, não relacionado a
+este código; rerodado isolado → 6/6 verde, mesma classe de instabilidade de `sendPointerSync` sob carga
+já documentada em OG-T6). Sem regressão.
+
+Detalhe completo em `.specs/quick/001-limite-max-gravacao/TASK.md`. **Pendente [YAN]**: validar o banner
+"Enviar/Descartar" no Galaxy A32 (texto, toque, tema claro/escuro).
+
+## Q2 — Margem lateral dos menus de config (2026-07-02)
+
+Tarefa realmente quick (1 arquivo, sem decisão de design): `ConfigScreen.kt` — padding horizontal da
+`TabBar` (linha ~197) e do corpo do painel ativo (linha ~206, comentário já dizia "mesma largura que as
+abas ocupam") subiu de 12dp para 16dp (convenção Material de margem de tela). Sem mudança de
+comportamento, só espaçamento.
+
+**Gate:** `testDebugUnitTest` verde; instrumentado escopado a `com.keyflow.ui.config` → 28/28 verde
+(sem regressão funcional). Goldens: `assembleDebug installDebug` no emulador → `verify-screens.sh` →
+`diff-screens.sh`. Aprovei seletivamente (cópia manual, não `--approve` cego) só os 14 PNGs `config-*`
+afetados por esta mudança (modo/voz-creditos/voz-openai/voz-custom/overlay/docs/unlock, claro+escuro),
+após conferir visualmente 3 pares antes/depois (sem corte de texto, sem sobreposição).
+
+**NÃO aprovados** (ficam como diff pendente no `diff-screens.sh`, de propósito):
+- `config-teclado.png`/`-dark` — a task já dizia isso ia mudar visualmente; MAS o diff aqui mistura
+  minha mudança de margem com uma mudança visual **anterior e não relacionada** (dígitos/idioma da
+  fileira numérica do Milestone 5 "grade Canvas fluida", commit `6a2f45f`) que o `STATE.md` já registrou
+  como aguardando revisão do Yan. Não separei os dois porque a fonte é a mesma tela; fica para quando o
+  Yan revisar aquele lote.
+- **Achado novo, fora do escopo do Q2**: `keyboard-canvas-expanded-dark.png`, `keyboard-canvas-symbols-dark.png`
+  e `onboarding-dark.png` também aparecem com diff grande (~4,5–18,9%) no `diff-screens.sh` — MAS eu não
+  toquei em nenhum código dessas telas (só `ConfigScreen.kt`). Inspeção visual do `keyboard-canvas-
+  expanded-dark` mostrou a causa real: o app está renderizando em **inglês** com os **hints de dígito**
+  visíveis (feature do Milestone 5), enquanto o golden versionado ainda está em português sem hints —
+  ou seja, é a MESMA leva de mudanças não aprovadas do commit `6a2f45f`, só que vazando para rotas fora
+  da aba Teclado (provavelmente porque o `FakeSettings` padrão da galeria mudou de idioma junto). Não é
+  bug novo introduzido agora; é golden pendente que já existia antes desta sessão e só ficou visível
+  porque rodei `verify-screens.sh` pela primeira vez desde aquele commit. Não aprovado — fica para o Yan
+  revisar goldens do Milestone 5 como um todo.
+
+Prints (todas as 50 rotas + 3 `sys-*`, novos e antigos) espelhados em `/tmp/keyflow-prints/` a pedido do
+Yan.
+
+## Q3 — Bug do Termius: diagnóstico + fix (2026-07-02)
+
+`DEVELOPMENT-ORDER.md` apontava investigar o `PhysicalKeyEmitter` (atalhos físicos). Systematic debugging
+(Fase 1) revelou que a causa raiz era outra, através de idas e vindas com o Yan:
+
+1. **Sintoma inicial relatado**: "atalhos não funcionam no Termius" → hipótese inicial: chords/atalhos
+   (`PhysicalKeyEmitter`) não chegam ao Termius.
+2. **Yan testou de novo e refinou**: "o teclado não funciona lá dentro, não envia as teclas" — sugeria
+   falha de envio total, não só atalhos.
+3. **Yan confirmou o Termius é renderizado em WebView** (selecionável + pinça de zoom, sinal clássico de
+   terminal em WebView, ex.: xterm.js).
+4. **Yan testou de novo e refinou de novo, decisivo**: "o texto não aparece ao escrever, mas ao dar Enter
+   ele envia o que eu escrevi" — ou seja, o DADO chega (Enter confirma), só a EXIBIÇÃO em tempo real que
+   falha.
+5. **Teste decisivo pedido ao Yan**: dígitos/símbolos aparecem na hora; letras não. Isso isola exatamente
+   o caminho de composição de palavra (corretor, grade Canvas) — `ic.setComposingText(word, 1)` por
+   letra — dos demais caminhos, que usam `ic.commitText(...)` direto (Enter/Esc via `keyEmitter`, dígitos/
+   símbolos, e o Enter que já finaliza a composição antes de agir).
+
+**Causa raiz confirmada**: campos `EditorInfo.inputType == TYPE_NULL` (padrão de terminais raw-input,
+Termux/Termius/JuiceSSH) não renderizam texto "compondo" (preedit) — só texto já comitado. O código já
+detectava `TYPE_NULL` (`hasRealInput` em `onStartInput`, usado só para decidir se auto-mostra o teclado),
+mas `handleKey()` nunca usava essa informação para a decisão compor-vs-comitar de cada letra.
+
+**Fix**: `isRawInputField` (instância, atualizado a cada `onStartInput`) + `shouldCompose(useCanvasGrid,
+rawInputField, char)` — função pura no companion, testada em unit (`KeyFlowKeyboardServiceTest`, 5 casos).
+Em campo raw, letras comitam direto (pulam corretor/composição); backspace também pula
+`wordTracker.onBackspace()` nesse caso (cai no `deleteSurroundingText` normal).
+
+**Verificação real feita**: como um `EditText` comum SEMPRE renderiza texto composto (a rota de
+composição funciona perfeitamente lá, então não reproduz a invisibilidade do Termius), a evidência real
+veio de reprodução manual no emulador via `adb shell input tap` + `screencap` num probe `TYPE_NULL`
+(`ImeProbeActivity`, ganhou `EXTRA_INPUT_TYPE`/forçar `showSoftInput` porque TYPE_NULL suprime o
+auto-show do teclado mesmo com `SOFT_INPUT_STATE_ALWAYS_VISIBLE`) — confirmando visualmente que o
+mecanismo de digitação funciona no campo real. **Lição de teste (retry + composição não são idempotentes
+juntos)**: uma primeira tentativa de instrumentado tentava confirmar via `fieldText()` (UiAutomator) +
+retry — mas cada retry TAPA A MESMA TECLA de novo, e como a composição ACUMULA (`wordTracker`), um retry
+"o" → "oo" → "ooo" nunca bate com o texto esperado; a checagem correta e estável acabou sendo direto no
+código puro (`shouldCompose`) + um teste instrumentado leve conferindo só a fiação real do `EditorInfo`
+(`isRawInputFieldForTest`), sem depender de digitar-e-ler-de-volta (que herda toda a instabilidade de
+`sendPointerSync`/UiAutomator sob carga, já documentada noutros testes deste host).
+
+**Gate**: unit verde (+5 testes `shouldCompose`); instrumentado (`KeyFlowKeyboardTerminalFieldTest`, 2
+testes) verde. Gate `full` teve as 2 falhas ambientais já conhecidas (`SystemSurfacesScreenshotTest`) +
+`KeyFlowKeyboardSelectorTest` flakeou (2 métodos numa rodada, 1 método noutra) — confirmado flake e não
+regressão: reruns isolados passaram (mesma classe de instabilidade de `sendPointerSync` sob carga do
+host, documentada desde OG-T6).
+
+**Pendente [YAN]**: validar de verdade no Termius no Galaxy A32 — a causa raiz foi inferida por reprodução
+análoga (`TYPE_NULL` + `EditText` de debug), não testada no app real, porque a exploração de UI ao vivo no
+device físico do Yan durante uma sessão em uso não é apropriada para o agente fazer sozinho.
+
+### Nota lateral: disco cheio durante a sessão
+
+`/home` chegou a 100% cheio (0 bytes livres) no meio da investigação, causando um `ENOSPC` numa edição.
+Resolvido com a aprovação do Yan: limpos `~/.npm` + `~/.cache` (caches, sempre seguros) e, por decisão
+explícita dele, `Projects/upscale-tests/frames_temp/` (16G) e `Projects/kokoro-tts2/venv/` (7,3G) — foram
+de 0 a 41G livres. Não mexi em mais nada fora do escopo (outros projetos, Downloads pessoais) sem
+confirmação explícita.
+
+## Q4 — Banner de limite de gravação: reentrada no resume + unificação do descarte (2026-07-03)
+
+Continuação de uma sessão anterior que caiu por quota no meio da correção (código já existia no working
+tree, não commitado, sem registro no `STATE.md`). Duas rodadas de bug real reportado pelo Yan testando no
+Galaxy A32, ambas do mesmo formato "bypass do limite máximo de gravação configurado":
+
+**1ª rodada**: segurar+arrastar pro play com o banner "Enviar/Descartar" na tela retomava a gravação sem
+teto (o Q1 decidira deliberadamente não rearmar o timer nesse caso) e o banner ficava órfão. Corrigido:
+`GestureIntent.RESUME` agora reacende o banner (`retriggerLimitBanner()`) em vez de retomar quando a
+decisão ainda está pendente; o banner ganhou timer de 3s + barrinha (some sozinho, decisão continua
+pendente). **Yan confirmou funcionando** (reacende corretamente durante o pause).
+
+**2ª rodada** (bypass pior, mesmo dia): descartar o áudio pelo banner de limite → desfazer esse descarte
+pelo gesto de cancelar da orbe (Toggle e PTT) → gravar de novo, voltava a gravar **sem teto nenhum de
+novo**. Causa raiz: `onLimitDiscard()` usava um descarte instantâneo à parte (`ButtonStateMachine.
+onDiscard()`, sem janela de desfazer), e o `onCancel()` (gesto de cancelar comum) limpava incondicionalmente
+a flag "decisão de limite pendente" para tirar o banner da tela — se o cancelamento fosse desfeito, a flag
+nunca era restaurada, perdendo o rastro de que o limite já tinha sido atingido.
+
+**Pedido do Yan, atendido junto com o fix**: unificar os dois descartes da UI num único padrão — "Descartar"
+no banner de limite passou a acionar o MESMO fluxo do cancelar comum (janela de desfazer), e esse banner
+(antes "toque em qualquer lugar para desfazer") virou de dois botões: **Desfazer** (esquerda) / **Concluir**
+(direita, confirma o descarte na hora). Posição deliberada: "Desfazer" ocupa a MESMA posição (esquerda) onde
+"Descartar" estava no banner anterior — um duplo-toque acidental no mesmo ponto da tela cai no lado seguro,
+não no de confirmar a exclusão; excluir rápido a partir do pause exige toque + mover o dedo + 2º toque.
+
+**Implementação:** `OverlayCoordinator.limitBannerVisible` virou `limitDecisionPending` (persiste mesmo com
+a VIEW escondida; só é limpa quando o áudio é de fato resolvido — enviado ou descartado pra valer, nunca só
+por entrar em `CANCELLING`); `onLimitDiscard()` delega para `onCancel()`. `ButtonStateMachine.onDiscard()`
+removido (ficou órfão). `OverlayService.limitBannerView()` generalizado para `twoActionBannerView(...)`,
+reusado pelos dois banners (limite e cancelar).
+
+**Gate:** `testDebugUnitTest` → 233 testes, 0 falhas (inclui a reprodução exata do bug de 2ª rodada:
+`undoing a discard started from the limit banner still enforces the limit on resume`, que falha sem o fix
+e passa com ele). `connectedDebugAndroidTest` escopado a `com.keyflow.overlay` no emulador → 14/14 verde
+(inclui `OverlayServiceCancelTest` com a asserção de texto ajustada pro rótulo novo "Desfazer").
+
+Detalhe completo (decisões + rótulo "Concluir" ainda ajustável) em
+`.specs/quick/004-banner-limite-reentrada/TASK.md`. Instalado no Galaxy A32 (`RX8T10DERKW`) na sessão
+seguinte — **Yan confirmou**: banner reacende certo durante o pause, rótulo "Concluir" aprovado.
+
+## Q5 — Cancelar durante a transcrição + texto do banner + animação da orbe (2026-07-03)
+
+Continuação direta do Q4, mesma sessão de feedback do Yan. Três pedidos:
+
+1. Texto do banner "Cancelado" → **"Transcrição cancelada"** (trivial).
+2. **Cancelar também durante `SENDING`** (transcrevendo): arrastar a orbe pro lado deve abortar a
+   requisição e abrir o mesmo modal Desfazer/Concluir; desfazer volta pro pause; segurar nesse estado trava
+   a orbe só na direção lateral (sem cima/baixo, diferente do modo-arrasto de RECORDING/PAUSED).
+3. Visual do "Transcrevendo" da orbe muito sutil/monótono (uma senoide só).
+
+Perguntei ao Yan sobre 2 decisões (cancelamento HTTP real vs. só ignorar resposta tardia; gesto só no
+Toggle ou também PTT) — sem resposta, segui as opções recomendadas: **cancelamento real** e **só Toggle**
+(o modo-arrasto travado hoje só existe lá).
+
+**Achado de arquitetura**: cancelar a partir de `SENDING` é fundamentalmente diferente de RECORDING/PAUSED
+— ali o recorder nunca é parado (só pausado, dá pra retomar a mesma sessão); em SENDING o `AudioRecorder.
+stop()` já rodou e o `MediaRecorder` já foi liberado, então `pause()/resume()/discard()` nele viram no-op
+silencioso depois disso. O coordinator passou a guardar o próprio arquivo retido (`pendingAudioFile`) pra
+reenviar/descartar sem tocar o recorder de novo. Achado também uma race sutil: se a tentativa cancelada só
+processa seu resultado tardio DEPOIS que um reenvio já está rodando, checar só `machine.state == SENDING`
+não distingue as duas (ambas veem o mesmo estado) — resolvido com um contador de tentativa (`sendAttempt`).
+
+**Implementação:** `ButtonStateMachine.onCancel()` aceita SENDING; `OverlayCoordinator` ganhou
+`transcribeJob`/`pendingAudioFile`/`sendAttempt`, `onCancel()` ramifica (SENDING aborta a requisição,
+RECORDING/PAUSED pausa o recorder como antes), `stopAndTranscribe()` reusa o áudio retido num reenvio,
+`RESUME` vira no-op quando há áudio retido pendente (não há sessão viva pra continuar). `WhisperApi.post()`
+ganhou um callback que entrega o `Call` antes do `execute()` bloquear; `TranscriptionClient.cancel()` usa
+isso pra abortar de verdade. `OrbButtonView`: modo-arrasto travado entra a partir de SENDING (Toggle),
+`updateDragFeedback()` pina cima/baixo em 0 nesse estado (só a lateral resolve). `VoiceOrb.orbLevel
+(Transcribing)` trocou a onda única por duas fora de fase, mais variável.
+
+**Gate:** `testDebugUnitTest` → 237 testes, 0 falhas (3 novos no coordinator cobrindo cancelar-durante-
+envio, reenviar sem re-parar o recorder, e apagar o arquivo retido ao concluir/expirar; 1 reescrito +1 novo
+no `ButtonStateMachineTest`). `connectedDebugAndroidTest` escopado a `overlay` no emulador → 14/14 verde.
+Instalado no Galaxy A32.
+
+**Sem cobertura automatizada pro gesto em si** (arrastar a orbe durante SENDING) — o modo-arrasto travado
+já não tinha nenhum teste instrumentado antes desta tarefa (mesma lacuna pré-existente do PAUSE/CANCEL a
+partir de RECORDING/PAUSED, mesma classe de fragilidade de toque sintético já documentada no projeto).
+
+Detalhe completo em `.specs/quick/005-cancelar-durante-transcricao/TASK.md`. **Pendente [YAN]**: validar no
+device — texto novo, o gesto lateral durante "Transcrevendo" (trava só a seta lateral, cancela e abre o
+modal, desfazer volta pro pause, toque normal reenvia), e o visual novo do "Transcrevendo". Commit pendente
+até essa validação (e a do Q4, ainda não commitado).
+
+### Q5, 2ª rodada — PTT, fusão de áudio ao continuar, teclado/notificação sincronizados (2026-07-03)
+
+Yan confirmou o texto/rótulo do Q5 e fez 4 pedidos em cima: (1) o gesto de cancelar-durante-SENDING vale
+só no Toggle — pediu pra valer no PTT também; (2) ao desfazer um cancelamento em SENDING, retomar deveria
+deixar continuar gravando e mandar os dois trechos como UMA transcrição só (escolheu, entre duas opções
+que dei, **remixar os áudios num arquivo** em vez de duas chamadas de API + concatenar texto); (3) pediu
+esclarecimento sobre o que era "cancelamento real" (respondido em texto — já funcionava do jeito que ele
+queria); (4) pediu que o mic do teclado e a notificação também suportem cancelar durante SENDING, no
+mesmo estilo já sincronizado entre as três superfícies.
+
+**PTT**: bastou ampliar o gatilho de `scheduleDragHold()` em `OrbButtonView.ACTION_DOWN` pra também valer
+no PTT quando `SENDING` — o resto do mecanismo de arrasto travado já era agnóstico de modo nesse estado.
+
+**Fusão de áudio**: novo `com.keyflow.audio.AudioConcatenator` (remux via `MediaExtractor`/`MediaMuxer`,
+copia amostras AAC já codificadas sem decodificar/recodificar, desloca os timestamps do 2º segmento pra
+colar depois do 1º). `OverlayCoordinator.GestureIntent.RESUME` com áudio retido agora inicia uma sessão
+NOVA de gravação (`continuingPendingAudio`) em vez de no-op; `stopAndTranscribe()` funde os dois arquivos
+via uma lambda injetável (`concatAudioSegments`, real aponta pro `AudioConcatenator`; testes usam fake,
+já que `MediaExtractor`/`MediaMuxer` não rodam em unit test puro). Achado importante: sem cuidado, o
+relógio do limite de gravação reiniciaria do zero a cada ciclo cancelar→desfazer→continuar, reabrindo uma
+variante do bug do Q4 — corrigido com `priorSegmentsMs` (soma cumulativa) e tornando `timeFreeze()`
+idempotente (reseta `timeSegmentStartMs` após acumular, senão chamar de novo enquanto já congelado conta
+o mesmo intervalo duas vezes). Se o trecho retido sozinho já bateu o teto, retomar reabre o banner de
+limite em vez de deixar gravar sem teto.
+
+**Teclado/notificação**: `KeyFlowKeyboardView.actionsFor()` e `MicSelectorController.actionsFor()` (as
+duas implementações, barra antiga e Canvas) ganharam `SENDING -> listOf(MicAction.CANCEL)`.
+`RecordingNotification`: `notif_cancel` visível também em SENDING (só ele) e título "⏳ Transcrevendo".
+
+**Gate:** `testDebugUnitTest` → 241 testes, 0 falhas. Instrumentados no Galaxy A32: `com.keyflow.audio`
+6/6 (remux real gravando pelo mic do aparelho), `com.keyflow.overlay` 15/15, `com.keyflow.ime` 29/29 (a
+1ª tentativa teve TODOS os testes de UI falhando por um anúncio de outro app roubando o foco da tela —
+`dumpsys window` confirmou `com.CodeBySonu.VoxSherpa/...AdActivity` em foco; nada a ver com o código,
+recuperado voltando pra home e rerodando). Um teste de acessibilidade sem nenhuma relação com esta rodada
+(`KeyFlowKeyboardAccessibilityTest`) ainda flakou uma vez — mesma classe de fragilidade de toque
+sintético já documentada. Build instalado no Galaxy A32.
+
+**Sem cobertura automatizada** pro gesto de cancelar-durante-SENDING no PTT nem pro "segurar o mic mostra
+cancelar" nesse estado — exigiria interceptar a chamada de rede real dentro do teste instrumentado do
+teclado, que hoje usa o `OverlayService` de verdade sem transcriber fake injetável de fora. Mesma lacuna
+já flagada na 1ª rodada do Q5 pro gesto na orbe.
+
+Detalhe completo (decisões, arquivos, checklist) em
+`.specs/quick/005-cancelar-durante-transcricao/TASK.md`. **Pendente [YAN]**: validar no device — (a) o
+gesto no PTT; (b) cancelar-durante-envio → desfazer → continuar falando → parar de novo deve soar como
+uma única transcrição; (c) segurar o mic do teclado durante "Transcrevendo" mostra só cancelar; (d) a
+notificação mostra só cancelar com o título novo. Commit pendente até essa validação (e as anteriores).
+
+## Setas reacendendo + tempo zerando na orbe — validado e Q4/Q5 comitados (2026-07-03)
+
+Yan validou os dois bugs visuais da rodada anterior (setas cima/baixo sumindo de vez durante
+"Transcrevendo"; tempo sob a lixeira preservado entre cancelar/desfazer/continuar) e mandou prosseguir.
+Commitado `506d47d` (Q4 + Q5, as 3 rodadas) + `23bfacc` (docs registrando hash/validação nos TASK.md).
+
+## Keystore debug fixada (2026-07-03)
+
+Confirmado por fingerprint: `installDebug` tinha feito uma reinstalação completa (não incremental) por
+causa de duas keystores debug diferentes nesta máquina (`~/.android/` vs `~/.config/.android/`), apagando
+a config de voz do Yan sem aviso. Fixado `signingConfigs.debug.storeFile` em `app/build.gradle.kts`
+apontando pra `~/.config/.android/debug.keystore` (a mesma que já assinava o app instalado — confirmado
+via fingerprint, não causou outro reset). Validado com um `installDebug` extra: `firstInstallTime`
+inalterado.
+
+## M5 — Grade Canvas promovida a padrão, teclado antigo removido (2026-07-04)
+
+Yan validou os 2 gates do Bloco 0 pendentes (globo PT→EN→ES + seletor único do sistema + prévia de
+tamanho; fluidez da grade Canvas) e confirmou que as specs Draft já foram validadas quando ele as criou.
+Mandou prosseguir. Removida a flag `kbd_canvas`/`useCanvasGrid` por completo — a grade Canvas (KC-T1..T9)
+vira a única, fechando KC-T10.
+
+**Arquivos**: `KeyFlowKeyboardService.kt` (propriedade da flag + condicionais em `spellChecker`/
+`shouldCompose`/`onUpdateSelection`/`finishComposing` removidos — tudo incondicional agora);
+`KeyFlowKeyboardView.kt` (construtor perde o parâmetro; teclado antigo inteiro deletado —
+`buildRow`/`buildActionRow`/`keyFor`/`paperKey`/`toggleShift`/`refreshShift`/`shiftSymbol`/`ROWS`/
+`isShifted`/`charKeys`/`shiftKey`; `buildExpanded()` e as funções da grade Canvas viram incondicionais);
+`TecladoPanel.kt`/`RouteCatalog.kt` (argumento/rotas do teclado antigo removidos, 3 rotas
+`keyboard-expanded/collapsed/recording` saem do catálogo). Testes: `KeyFlowKeyboardServiceTest.kt`
+(`shouldCompose` perde o parâmetro de flag); `KeyFlowKeyboardCanvasGridTest.kt` reescrito (perde o teste
+"flag off = antigo", os 2 restantes viram o comportamento padrão); mais 5 arquivos instrumentados
+limpos de referências à flag (mantendo `KEY_BARS`, flag separada, intocada).
+
+**Goldens**: 6 PNGs do teclado antigo removidos (`keyboard-expanded/collapsed/recording`, claro+escuro).
+`keyboard-canvas-*` regenerados (diff só jitter de antialiasing, dentro do limiar) e
+`config-modo[-dark]` reaprovados (efeito colateral esperado — o demo do `ModoPanel` renderiza a grade
+Canvas agora). `config-teclado[-dark]`/`config-docs`/`config-overlay`/`config-voz-*` (claro) seguem com
+diff grande **não aprovado** — mesmo lote de mudanças visuais pendentes do Milestone 5 já registrado
+antes (Q2), sem relação com esta mudança.
+
+**Achado sério no meio do caminho (bug de sincronização de relógio)**: rodando a suíte instrumentada do
+teclado, o Yan reparou a orbe mostrando um tempo pausado (4s) muito diferente do tempo mostrado no mic do
+teclado (10s) simultaneamente. Investigação: a `OrbButtonView` mantinha um relógio **próprio**, derivado só
+de observar as transições de `ButtonState` que chegavam nela; o teclado sempre leu um valor "autoritativo"
+publicado pelo `OverlayCoordinator` via `KeyFlowController`. Como a `OrbButtonView` é recriada de vez em
+quando (troca de tema/tamanho, restart do serviço — confirmado no log: 3 instâncias novas em 2 minutos
+durante os testes), o relógio local dela zerava a cada recriação enquanto o valor autoritativo (campo
+único, não preso ao ciclo de vida da view) seguia acumulando — descolando os dois. Corrigido: a orbe agora
+lê `KeyFlowController.recordingAccumulatedMs`/`recordingSegmentStartMs`, a mesma fonte que o teclado já
+lia, eliminando o relógio duplicado (e toda a máquina de estados `TIME_TRACKED_STATES` que eu tinha
+acabado de escrever pra tentar consertar o sintoma errado). Isso também é um bug real de uso normal, não
+só um artefato do teste automatizado.
+
+**Gate**: `testDebugUnitTest` → 241 testes, 0 falhas. `connectedDebugAndroidTest` no Galaxy A32:
+`com.keyflow.ime` 28/29 (1 falha ambiental conhecida — anexação do IME, sem relação); `OrbButtonViewTest`
+6/6 após o fix do relógio. Build instalado no Galaxy A32 (sem reinstalação completa).
+
+Detalhe completo em `.specs/features/keyboard-canvas/tasks.md` (KC-T10) e
+`.specs/DEVELOPMENT-ORDER.md` (Bloco 0 fechado, M5 concluído). Commit pendente.
+
+**Pendente**: Yan pediu, em seguida, testes instrumentados reais para os gestos de arrasto da orbe
+(pausar/retomar/cancelar/config, nos dois modos) usando injeção direta de `MotionEvent` (mesma técnica já
+usada em `OrbButtonViewTest`, mais confiável que a simulação de toque via sistema) + esperar o estado
+chegar (sem cronometrar), e golden screenshots/GIFs dessas interações para revisão visual. Ainda não
+iniciado nesta sessão.
+
+## Q6 — Artefatos visuais dos gestos da orbe via MotionEvent (2026-07-05)
+
+Implementada a pendência acima como infraestrutura de verificação/UAT, separada da feature
+`gesture-tour`. `OrbMotionArtifactTest` injeta `MotionEvent` diretamente em `OrbButtonView`, espera o
+estado observável (`dragLockedForTest`/`dragKindForTest`) chegar e captura frames PNG da tela inteira do
+emulador, com `DragArrowsView` full-screen sobre a orbe para mostrar também as setas. O relógio
+autoritativo da orbe (`KeyFlowController.updateRecordingTime`) fica congelado em 8s para evitar herdar
+estado de outras suítes.
+
+`scripts/verify-orb-motion-gifs.sh` instala `debug` + `debugAndroidTest`, roda o teste via
+`adb shell am instrument` (não `connectedDebugAndroidTest`, que desinstala o app e apaga
+`externalFilesDir` ao final), puxa os artefatos para `/tmp/keyflow-prints/motion-gifs` e monta GIFs com
+ImageMagick. A rodada validada no emulador `keyflow_api34` (Android 14/API 34) gerou 9 GIFs:
+`toggle-pause`, `toggle-resume`, `toggle-cancel`, `toggle-config`, `ptt-pause`, `ptt-resume`,
+`ptt-cancel`, `ptt-config`, `ptt-cancel-sending` (17 frames cada; GIF delay padrão 10cs, ajustável por
+`GIF_DELAY`). `metadata.json` registra OS/SDK/
+fingerprint/tela/densidade/escalas de animação/qemu/hardware; `host-run.txt` registra serial ADB e
+`getprop` básico.
+
+Decisão registrada: uma suite on-device por modelo/OEM faz sentido como camada opcional de aceitação para
+grandes mudanças, começando pelo A32, mas não como gate obrigatório. Preferir UiAutomator por texto/id e
+shell state (`pm`/`appops`/`ime`); coordenadas ficam como último recurso porque testam também a UI do
+fabricante.
+
+## SB-T10 — A11y + goldens da BarView (parcial, 2026-07-06)
+
+**Feito**: `ExploreByTouchHelper` na `BarView` (mesmo padrão do `KeyboardGridView`/KC-T8) — cada botão
+vira nó virtual; `SingleKey` clicável emite o atalho por `ACTION_CLICK`; `Joystick`/`GridTrigger` só
+anunciam "requer gesto deslizante" (gestos contínuos, sem regressão do que a barra antiga oferecia).
+Instrumentado dedicado (`BarViewAccessibilityTest`, 2/2 verde). 6 rotas novas no `RouteCatalog` (12 PNGs
+golden luz/escuro): barra padrão retraído/expandido (paridade com a fábrica), barra custom com overflow,
+grade revelada e alavanca puxada (via toque sintético) e o `PhysicalKeyPicker` isolado.
+
+**Lição de técnica — toque sintético na galeria (sem UiAutomator)**: a `GalleryActivity` roda no processo
+real do app (não é um teste instrumentado), então simular gestos pede `view.dispatchTouchEvent(event)`
+direto na `BarView`, sem passar pelo pai. Isso funciona porque `MotionEvent.getRawX/Y()` só mudam via
+`View.offsetLocation` (aplicado pelos `ViewGroup`s pais durante um dispatch em cascata) — nunca por uma
+chamada direta — então, dispatchando direto na view-alvo, raw == local. Como a barra ocupa a tela inteira
+a partir de x=0, a coordenada local do botão já é a coordenada de tela que a `GridSession` precisa pra
+ancorar a grade no lugar certo (confirmado visualmente: a lente/reveal aparece exatamente sobre o
+gatilho). Achado um bug de armadilha nessa técnica: `setExpanded(false)` **reconstrói** a pilha de
+`BarView` (a barra do `init()` fica órfã, nunca anexa à janela — `post{}` nela nunca dispara); a barra de
+verdade é sempre a **última** de `barViewsForTest` depois da troca, não a primeira. Route novo suporta
+`minDelayMs` (default 0, sem efeito nas rotas existentes) para dar tempo de parede real ao tick de reveal
+da grade (GRD-06, 400ms) antes do marcador `gallery_ready` — as demais rotas continuam com os 3 frames
+padrão.
+
+**Gate**: unit verde; instrumentado escopado das barras (`BarViewAccessibilityTest` +
+`KeyFlowKeyboardBarsTest` + `KeyFlowKeyboardAccessibilityTest` + `BarsEditorTest` +
+`ShortcutBarsConfigEndToEndTest`) 21/21 verde. Tentativa de rodar o `connectedDebugAndroidTest`
+**completo** (147 testes) travou o emulador por instabilidade sob carga prolongada (~38min) — caiu em
+70/147 com 4 falhas, todas em `overlay.OrbButtonViewTest`/`OrbGestureIntegrationTest`/`OrbMotionArtifactTest`
+("modo-arrasto não travou"), área não tocada nesta sessão. Não repeti a suíte completa — o escopo da
+SB-T10 (`ime.bars`) já tinha rodado limpo antes da queda.
+
+**Não fiz** (deliberado, não esquecimento): golden de "editores" (`config-teclado`) — o golden atual já
+tinha um diff grande **não aprovado** de antes desta sessão (Milestone 5/dígitos, registrado em Q2 mais
+acima); regenerar por cima empilharia uma mudança visual não relacionada sem o Yan ter revisado a
+anterior. Fica pra quando ele revisar aquele lote.
+
+**Pendente [YAN]**: validação manual no Galaxy A32 (grade às cegas — lente/háptica/preview, aceleração da
+alavanca, tmux via SSH pros success criteria) e, aprovada, promover `kbd_bars` a padrão (remover a barra
+antiga da `KeyFlowKeyboardView`, fechando ROL-02/M6).
+
+## Q8 — Modais dos editores e teclado sem rolagem (2026-09-07)
+
+**Contexto**: sequência dos ajustes que o Yan pediu usando o app no A32. Junto entrou o
+dimensionamento de grade/barras/QWERTY em paisagem (`GridSizing`) que estava em voo sem commit.
+
+**Achado central — "modal" que nunca foi modal**: `GridEditSheet`, `PhysicalKeyPicker` e os três
+sheets do `BarsEditor` desenhavam o scrim `fillMaxSize()` na árvore de quem os chamava. Como quem
+chama vive dentro de uma coluna rolável do painel, o scrim herdava as constraints DAQUELE `Box`: o
+"modal" abria espremido dentro da própria seção, com os cantos arredondados de bottom sheet
+aparecendo no meio da tela e sem faixa de scrim para fechar clicando fora. A correção foi mover o
+`ConfigModal` para uma **janela própria** (`Popup` com `focusable = true`, que também dá o botão
+Voltar do Android). Vale como regra geral neste app: overlay que precisa cobrir a tela **não pode**
+nascer dentro de conteúdo rolável — `fillMaxSize()` ali é o tamanho do pai, não o da tela.
+
+**Lição de técnica — medir texto, não estimar**: a primeira versão do teclado escalado calculava
+"largura do char ≈ 0.58 × fontSize" e cortava "Home"/"PgUp"/"End" no A32. A conta ignorava a métrica
+real da SpaceGrotesk e o `fontScale` do sistema. Trocado por `fittedFontSizeSp` (ConfigFields.kt),
+que mede com `rememberTextMeasurer` e desce o tamanho até caber. O Compose BOM do projeto
+(2024.09.03 / 1.7.x) não tem `BasicText(autoSize=)`, que resolveria isso nativamente — reavaliar
+quando o BOM subir para 1.8+.
+
+**Armadilha de ferramenta (custou dados do Yan)**: rodar `connectedDebugAndroidTest` do Gradle
+**desinstala o app ao terminar** — apagou as configurações e os tokens no A32 no meio da sessão. Os
+scripts `verify-*-gifs.sh` já usavam `am instrument` exatamente por isso; a regra vale para
+QUALQUER rodada instrumentada no device do Yan, não só as que geram artefatos.
+
+## Emenda do Q8 — crash em loop das prefs cifradas (2026-09-07)
+
+**Sintoma**: `AEADBadTagException` em toda leitura de settings, logo na inicialização → crash em
+loop que só saía com "limpar dados". Apareceu no A32 ao reinstalar o app por cima de dados
+restaurados (a reinstalação dos testes é que expôs, mas qualquer usuário com backup restaurado
+cairia nisso).
+
+**Causa**: o keyset do Tink mora num `shared_prefs` comum e entrava no Auto Backup / transferência
+D2D; a chave mestra mora no Keystore e **não é exportável**. Restore, troca de aparelho ou
+reinstalação sobre dados restaurados devolve um sem o outro. O manifest não declarava
+`allowBackup`/`dataExtractionRules` e pegava o padrão "faz backup de tudo".
+
+**Correção em duas frentes**: `backup_rules.xml` + `data_extraction_rules.xml` excluem
+`keyflow_secure.xml` (prevenção), e `SecurePrefs` descarta o par keyset+chave e recria vazio quando
+as prefs não abrem (recuperação para quem já está quebrado). A leitura de sanidade (`.all`) dentro
+do mesmo `try` cobre o caso do keyset válido com um valor individual ilegível, que passaria pela
+criação e só estouraria depois num `getString` solto.
+
+**Nota para NM-T12/MZ-T1**: as duas tasks também escrevem regras de backup. Quem chegar reconcilia
+com o que já está lá — identidade INCLUÍDA, `models/` EXCLUÍDO, e `keyflow_secure.xml` EXCLUÍDO
+(este último não é negociável: incluí-lo de volta reintroduz o crash).
+
+**Teste**: `SecurePrefsRecoveryTest` apaga a entrada do Keystore para reproduzir o restore. Usa um
+alias próprio (daí o parâmetro `keyAlias`) — com o alias de produção, rodar o teste destruiria as
+prefs reais do aparelho, recriando o bug que ele testa.
+
+## ROL-02 — barras Canvas promovidas e barra antiga removida (2026-09-07)
+
+**O que disparou**: o Yan relatou que o teclado tinha parado de mostrar o que ele configurava — o
+gatilho de grade não aparecia e o modo retraído ignorava o espelhamento, exibindo outra barra.
+
+**Causa raiz (não era regressão de código)**: `useBars` era
+`BuildConfig.DEBUG && uiPrefs.getBoolean("kbd_bars", false)`. Com a chave ausente, o serviço **nem
+lia** a `BarsConfig` do DataStore — passava `BarsConfig.DEFAULT` e renderizava a barra de fábrica, que
+não tem gatilho de grade e tem layouts fixos por modo. A configuração do usuário estava salva e
+correta o tempo todo (confirmado lendo o `preferences_pb` do aparelho: `mirrored:true`, gatilho de
+grade com prefixo `Ctrl+b`, grade 3×3). Nada em produção escrevia essa chave: só testes.
+
+**Como o aparelho chegou nesse estado — duas vias, ambas minhas**:
+1. o `pm clear` que usei para destravar o keyset apagou o `keyflow_kb_ui.xml`;
+2. o `tearDown` dos testes de barras fazia `remove(kbd_bars)` + `saveBarsConfig(DEFAULT)` +
+   `saveShortcutGrids(emptyList())` + `ime reset`. **Cada rodada apagava as barras, as grades e o
+   teclado padrão do dono do aparelho.** Corrigido com `UserSettingsGuard`, que captura o estado real
+   no `@Before` e devolve aquilo no `@After` — restaurar o default não é restaurar, é apagar. Vale
+   para qualquer teste novo que escreva em settings.
+
+**Decisão do Yan**: "a barra antiga não serve mais". As barras viraram o padrão (serviço e construtor
+da view), e a barra de fábrica saiu inteira: `buildTopStrip`, `buildCollapsedLegacy`,
+`micKey`/`specialKey`/`keyBase` e o seletor do mic por popup (~260 linhas), junto com a flag.
+
+**Achados da migração dos testes**:
+- `barViewsForTest` acumula as barras dos DOIS modos; a que vale é a **visível**. Ler a última da
+  lista fazia o gesto sintético cair fora do mic — foi o que quebrou os três testes do seletor na
+  primeira tentativa, com sintoma enganoso ("estado não chegou a PAUSED").
+- `micLabelForTest` dependia da geometria medida; passou a derivar da config, senão uma view
+  construída em teste e não medida responde `null` onde a antiga respondia pelo texto do TextView.
+- O limiar de 0,5% do `diff-screens.sh` **não pegou** a troca da barra inteira nas rotas do teclado
+  (0,13%): as duas silhuetas são parecidas demais. Golden aprovado à mão pelo Yan. Se um dia a
+  regressão visual precisar pegar troca de componente, o limiar global não basta.
+
+**Pendente [YAN]**: a validação manual que fecha a SB-T10 (grade às cegas, aceleração da alavanca,
+tmux via SSH). A promoção e a limpeza já estão feitas.
+
+## gesture-tour — GT-T1 (2026-09-09)
+
+Modelo declarativo (`ui/tour/GestureScript.kt`) + catálogo puro (`ui/tour/GestureScriptCatalog.kt`).
+SCR-01..06 → Implemented. 266 unitários (+14), build limpo.
+
+**Decisão — fonte textual única, sem partir string.** A task pedia que as descrições "absorvessem"
+`pauseHintFor`. Em vez de fatiar a frase pronta (frágil), `pauseHintFor` passou a ser derivado de
+`recordingHintParts(mode)`, que devolve os pedaços já separados por gesto: a config e a Docs seguem
+mostrando a frase inteira, o tour usa um pedaço por roteiro. A string que a config renderiza é
+byte-a-byte a de antes e há teste fixando isso, porque a aba Modo tem golden. `shortcutActionSub`
+deixou de ser `private` pelo mesmo motivo — o tour descreve o atalho com o mesmo texto da config.
+
+**Regra do 1 toque** replicada do `OverlayPanel`: atalho de 1 toque só existe no Push-to-talk, e
+atalho em `NONE` não vira roteiro. Ficou coberto por unit, então se a regra mudar na config o tour
+não fica para trás em silêncio.
+
+**Geometria dos passos é relativa (0..1)** — o mesmo roteiro serve ao card da aba Modo e a qualquer
+miniatura futura. As posições concretas das cenas são responsabilidade da GT-T4/T5.
+
+## gesture-tour — GT-T2 (2026-09-09)
+
+`ui/tour/TourEngine.kt` (interpolação pura) + `ui/tour/FingerPuppet.kt` (dedo + `rememberTourClock`).
+TOUR-02 → Implemented. 280 unitários (+14), build limpo, sanidade de render nas rotas provisórias
+`tour-finger-drag`/`tour-finger-multitap`.
+
+**Furo do dado da T1 achado pela T2.** `SceneReaction` documentava "campo nulo = não mexe", mas o
+roteiro de cancelar usava `overlayHint = null` querendo APAGAR o banner de desfazer — com a reação
+acumulada, isso nunca apagaria. Resolvido com `TourOverlayHint.NONE` explícito (null = não mexe,
+NONE = apaga) e teste cobrindo os dois. Vale para quem escrever roteiro novo.
+
+**Reação é acumulada, não do passo.** Cada keyframe declara só o que muda; o frame devolve o último
+valor declarado de cada campo até ali. Sem isso a orbe voltaria ao estado inicial a cada passo.
+
+**Toque/segurar/soltar não interpolam posição** — só MOVE e DRAG movem o dedo. Interpolar num TAP dava
+a impressão de um gesto que não existe.
+
+**Rotas de galeria novas não quebram o gate**: o `diff-screens.sh` itera sobre os goldens, não sobre as
+capturas, então rota sem golden é simplesmente ignorada até alguém aprovar.
+
+**Goldens pertencem ao emulador API 34.** Rodar o mesmo diff no A17 acusa 6 falsos positivos de
+posição (insets diferentes) com o conteúdo idêntico. Conferir o gate visual no 5554, não no 5556.
+
+## gesture-tour — GT-T3 (2026-09-09)
+
+`ui/tour/GestureTourPlayer.kt`: `GestureTourState` (índice/título/descrição, autoplay em loop, setas
+com pausa de 6s) + `GestureTourPlayer` com cena plugável por slot. TOUR-01/04/05 → Implemented.
+292 unitários (+12) e 170 instrumentados (+7), zero falhas.
+
+**Avanço do autoplay fora da composição.** `frameFor(now)` é leitura pura e `tick(now)` — que escreve
+o índice — roda num `SideEffect`. Escrever estado no meio da composição que a própria composição lê
+realimentaria a recomposição. Com o relógio congelado, o `tick` avança no máximo uma vez e estabiliza.
+
+**Seta recomeça o roteiro do zero** em vez de continuar de onde o tempo estava: entrar no meio de um
+gesto que a pessoa acabou de pedir para ver é pior do que esperar o começo dele.
+
+**Os instrumentados foram escritos depois do código** (os unitários do estado tiveram RED de verdade).
+Para não contar cobertura que não existe, foram validados por mutação: tirar a pausa do autoplay e
+encurtar o rótulo de acessibilidade derruba exatamente os dois testes correspondentes.
+
+## gesture-tour — GT-T4 (2026-09-09)
+
+`ui/tour/scenes/OrbScene.kt`: `VoiceOrb` real dirigido pelo passo + representações leves do alvo de
+cancelamento e do banner de desfazer. TOUR-03 parcial (falta o teclado, GT-T5). 292 unitários e 177
+instrumentados (+7), zero falhas.
+
+**Arrastar move a orbe, e o passo diz onde ela FICA.** `SceneReaction.orbAt` nasceu aqui: durante um
+DRAG a orbe acompanha o dedo (é o que o gesto significa), e ao soltar ela vai para o ponto declarado —
+de volta ao lugar no cancelar, no lugar novo no reposicionar. Sem isso, um dos dois gestos ficaria
+errado, e são gestos opostos.
+
+**O dedo opaco escondia o que o tour vinha ensinar.** Só apareceu ao montar uma TIRA DE FRAMES
+(`TourMotionArtifactTest`, técnica do Q6/Q7): em frame parado a sobreposição passa batida; na sequência
+fica claro que durante todo o toque só se vê o disco do dedo. Agora ele é translúcido, com o contorno
+dando a leitura da posição. **Lição de método**: revisar animação por captura única não serve — varrer
+o relógio e olhar a sequência achou em uma rodada o que 6 testes verdes não achariam.
+
+**`TourMotionArtifactTest` não é golden e não afirma nada** — é material de revisão humana enquanto o
+tour está sendo construído. Fluidez de verdade segue sendo o portão manual do Yan no A32 (GT-T8),
+porque o emulador daqui roda headless.
+
+## gesture-tour — GT-T5 (2026-09-09)
+
+`ui/tour/scenes/KeyboardScene.kt`: `KeyFlowKeyboardView` real em miniatura, com mic e expansão dirigidos
+pelo passo. TOUR-03 → Implemented. 292 unitários e 183 instrumentados (+6), 70/70 goldens.
+
+**SPEC_DEVIATION**: a task pedia um parâmetro em `KeyFlowKeyboardView` para "forçar a grade nova". Não
+existe mais o que forçar — a grade Canvas é a única desde a KC-T10/SB-T10, a antiga saiu junto com a
+flag `kbd_bars`. A task foi escrita antes disso. Registrado também no `tasks.md`.
+
+**A cena TEM de ser exatamente o teclado.** As coordenadas do roteiro são relativas à cena e o dedo é
+desenhado pelo player sobre a MESMA caixa; com a view ancorada embaixo e espaço vazio acima, o dedo
+tocava o ar. A cena passou a acompanhar a altura da view: o consumidor manda a largura, o teclado dita
+o resto. Vale para qualquer cena futura.
+
+**O tour chegou a ensinar o gesto trocado**: o arrasto do hold soltava em "cancelar" enquanto o passo
+declarava `PAUSED`. A fração `SELECTOR_START_FRACTION` da cena e o `KBD_MIC_PAUSE_CHIP` do catálogo
+agora se referenciam explicitamente — mudou um, muda o outro.
+
+**As duas falhas acima passaram por 5 instrumentados verdes** e só apareceram na tira de frames. Pela
+segunda task seguida, a varredura de relógio achou o que asserção não acha: ela vê ONDE as coisas
+estão, e o teste vê apenas SE estão.
+
+## gesture-tour — GT-T6 (2026-09-09)
+
+Os dois cards da aba Modo passaram a tocar o tour: moldura PRÉVIA com a cena real, `‹ título ›` no
+rodapé e a descrição do gesto corrente à direita. MODO-01..04 e SCR-07 → Implemented. 292 unitários,
+189 instrumentados (+6), goldens `config-modo` regenerados (revisados lado a lado).
+
+**Um tour animando quebra TODO teste Compose da tela que o hospeda.** O relógio do tour roda por quadro
+como o da orbe, então `waitForIdle` nunca fecha: o `ModoPanelTest` inteiro caiu com `ComposeNotIdle` no
+instante em que o tour entrou. O contrato é o mesmo que já existia para a orbe — quem renderiza a tela
+em teste congela o relógio. `ModoPanelTest`, `ConfigScreenTest` e a `GalleryActivity` passaram a prover
+`LocalTourClock` junto com `LocalOrbClock`. **Qualquer tela nova que consumir o tour precisa disso.**
+
+**`assertTextContains` compara EXATO por padrão** — para trecho, `substring = true`. Um teste "falhou"
+mostrando no erro exatamente o texto esperado dentro do texto real.
+
+**Os textos estáticos dos cards foram removidos**, não só ignorados: com o tour descrevendo cada gesto,
+manter `pauseHint` no card seria a duplicação que o MODO-03 manda evitar. `pauseHintFor` segue vivo para
+a aba Sobrepor e a Docs.
+
+**Ajuste pós-A32 (mesmo dia)**: o título da barra de navegação cortava nos roteiros de atalho —
+"2 toques · Retrair / expa…". Só apareceu no aparelho do Yan, porque no golden o roteiro corrente é
+"Gravar e parar", que cabe. Passou a duas linhas. A árvore de acessibilidade sempre teve o texto
+inteiro, então nenhum instrumentado acusaria: era truncamento de PIXEL, não de dado.
+
+## gesture-tour — revisão do TOUR-04 (2026-09-09, feedback do Yan no A32)
+
+Três mudanças pedidas depois de usar no aparelho, todas contrariando o que a spec dizia — registradas
+como **mudança de decisão**, não como desvio:
+
+1. **O tour não avança sozinho.** O gesto corrente repete em loop (com um respiro de 900ms entre
+   repetições) e só a seta troca. O autoplay original dava pouco tempo para entender cada gesto.
+2. **Altura reservada igual para toda cena** (`TOUR_SCENE_HEIGHT`). O card saltava de tamanho a cada
+   troca, e o teclado saltava dentro do próprio roteiro ao retrair. A cena do teclado ancora no TOPO:
+   é onde ficam o mic e a seta, então retrair encolhe para baixo sem mover o que o dedo mira.
+3. **A seta de avançar pulsa.** Virou o único caminho adiante, então precisa se anunciar. Em teal (a
+   cor de ação do app) e com piso de 0.55 — mais apagada que a vizinha, leria como desabilitada.
+
+**O pulso é função pura do tempo (`tourArrowPulse`), não uma animação Compose.** Uma
+`rememberInfiniteTransition` deixaria a tela eternamente não-ociosa (quebrando todo teste que a
+renderiza) e tornaria o golden não-determinístico. Vindo do relógio do tour, congela junto. Vale para
+qualquer efeito contínuo que entrar nesta tela.
+
+Os testes que codificavam o autoplay foram reescritos para o contrato novo, não removidos.
+
+## gesture-tour — GT-T7 (2026-09-09)
+
+Aba Docs alinhada ao app que existe. DOC-01 → Implemented. 297 unitários, 191 instrumentados (+2),
+goldens `config-docs` regenerados.
+
+**O texto dos atalhos estava factualmente errado**, não apenas incompleto: dizia "um toque único grava;
+três toques abrem o seletor de teclado" e não mencionava os 2 toques. Os defaults reais são 1 sem atalho
+(e só existe no Push-to-talk), 2 = retrair/expandir, 3 = trocar de teclado, com política de excedente
+configurável. Reescrito a partir do código (`Settings`, `resolveShortcut`), não do texto antigo.
+
+Seções novas: **Cancelar e desfazer** (janela de 3s, desfazer devolve PAUSED) e **Notificação de
+gravação** (pausar/retomar, enviar, cancelar; durante o cancelamento viram concluir/desfazer). Números
+e comportamentos conferidos em `OverlayService.cancelWindowMs` e `RecordingNotification`.
+
+**`testTag` numa seção não funde o texto dos filhos** — `assertTextContains` no nó da seção falha mesmo
+com o texto na tela. A asserção de conteúdo vai no nó do texto (`onNodeWithText(..., substring = true)`);
+a tag serve para existência e rolagem.
+
+## gesture-tour — GT-T9 (2026-09-24)
+
+Docs com índice, seções de detalhe e feedback. DOC-02..06 → Implemented. 304 unitários (+7),
+instrumentados da Docs 8/8 (+5), goldens `config-docs[-dark]` regenerados. Primeira task feita no
+**sandbox da nuvem** (emulador sem KVM — ver `.specs/codebase/ENVIRONMENT.md`).
+
+- **Conteúdo virou dado**: `docsSections` (`DocSection` + `DocBlock.Paragraph/Labeled`) desenha a aba
+  e o índice. Tags viram `docs-<id>`, e as 4 antigas (`pausa/atalhos/cancelar/notificacao`) seguem
+  iguais — há unit fixando isso.
+- **Índice rola até a posição medida**: `positionInWindow` da seção menos a do viewport, somado ao
+  `scroll.value` atual — funciona com a aba já rolada (teste desce até Erros e volta para Atalhos).
+- **Seções novas**: Gestos da orbe (frases por modo vêm literalmente de `pauseHintFor`), Teclado
+  KeyFlow, Erros & tempo limite; Notificação ganhou "quando aparece"; Pausa deixou de repetir as frases
+  dos gestos e passou a dizer o que a pausa faz. Fatos conferidos no código: erro some em 2 s
+  (`ERROR_AUTO_DISMISS_MS`) e **não reenvia** o áudio (`pendingAudioFile = null` antes do resultado);
+  timeout de fábrica 15 s (`Config.DEFAULT_TIMEOUT_MS`); numérico por `isNumericInputType`.
+- **Feedback**: `ACTION_SENDTO mailto:` com assunto/corpo na URI **e** nos extras (cliente lê um ou
+  outro). `DocsPanel(sendFeedback = …)` deixa o teste capturar o intent. Sem app de e-mail → aviso com
+  o endereço; conferido no emulador de verdade (Gmail desabilitado) — o aviso nascia abaixo da dobra,
+  por isso o `BringIntoViewRequester`. **[YAN]**: `FEEDBACK_EMAIL` ficou com o e-mail dos commits
+  (`xyan.lucasx@live.com`); trocar se o canal de suporte for outro.
+- "?123" quebrava em "?" / "123" no texto corrido — `?⁠123` (word joiner).
+
+**Goldens fora do escopo que não batem aqui (NÃO aprovados)**: `shortcut-key-picker`,
+`grids-editor-modal` e `bar-grid-revealed` (claro/escuro) diferem porque são janelas (diálogo/popup)
+posicionadas pelas barras do sistema, e o AVD do Yan tem status bar de 128 px contra 63 px do AVD
+daqui — nenhuma emulação de recorte (`hole`=136, `corner/tall/double`=171) reproduz 128. Os outros 60
+PNGs pré-existentes batem (59 com 0 px; `orb-idle-dark` com 2 px, dentro do limiar). Continuar tratando essas 3 como "não verificáveis neste sandbox".
+
+## gesture-tour — GT-T10 (2026-09-24)
+
+"?" por permissão na apresentação. PERM-01..04 → Implemented. OnboardingScreenTest 9/9 (+5) e
+OnboardingRoutingTest verdes no emulador; goldens `onboarding[-dark]` regenerados (as linhas
+ganharam o "?") e rota nova `onboarding-why[-dark]` (explicação do Teclado aberta).
+
+- `OnboardingPermission` (enum) guarda rótulo + porquê; textos seguem a Privacidade da Docs e o
+  `PLAYSTORE_CHECKLIST.md` ("nenhum texto digitado é transmitido").
+- Estado = só a **chave** da permissão explicada, em `rememberSaveable`: sobrevive à ida às telas do
+  sistema para conceder e não depende do `PermissionStatus` (edge case do spec: o check muda, a
+  explicação continua, uma só — há teste).
+- O "?" tem alvo de toque próprio (28dp) dentro da linha clicável: tocar nele explica, não pede a
+  permissão (teste). TalkBack: "Por que pedimos <permissão>" + estado aberta/fechada.
+- `initiallyExplained` existe só para a rota de galeria do estado expandido.
+
+## gesture-tour — GT-T8, parte do agente (2026-09-24)
+
+Rotas `tour-orb-basics` / `tour-orb-shortcuts` / `tour-keyboard-mic` (claro/escuro): player real + cena
+real + dedo, relógio do tour parado num instante escolhido de cada roteiro (770 / 980 / 1670 ms), com
+título e descrição **embaixo** da cena — cada rota toca só um subconjunto do catálogo, fora da aba
+Modo: é a prova de reuso do TOUR-01. Duas capturas deram 0 px de diferença; goldens aprovados.
+MODO-05 → Implemented. Falta **[YAN]**: fluidez dos 2 tours e TalkBack no A32 → Verified.
+
+**Gate no emulador sem KVM (recriado do zero nesta sessão)** — 304 unitários; instrumentados rodados
+por `am instrument` direto, em blocos, porque o `connectedDebugAndroidTest` inteiro aborta:
+- `data` + `overlay` (sem gravação) 34/34; `ui.*` 107/111 — Docs, Onboarding, ModoPanel,
+  ModoPanelTour, tour, ConfigScreen etc.
+- As 4 falhas de UI: 2 passam sozinhas (timeout de idle sob carga). As outras 2
+  (`ConfigScreenTest.overlayModeToggle*`, espera de 2000 ms) **falham igual com o código de antes da
+  GT-T9** (A/B medido) — o que mudou desde então só compõe na aba Docs e no onboarding.
+- `OnboardingRoutingTest` falha aqui **também sem o "?"** (A/B): o "Pular" grava
+  `onboarding_done=true` no DataStore (conferido no `.preferences_pb`), mas só ~5 s depois, no limite da
+  espera do teste. Latência do TCG.
+- `SetupActivityTest.overlayModeToggleStartsAndStopsForegroundService`: o serviço não chama
+  `startForeground` dentro dos 10 s do Android → processo cai. `OverlayServiceCancelTest`: a gravação
+  nunca chega a RECORDING — este AVD roda com `-no-audio` (sem microfone). Idem `audio.*`.
+- `ime.*`: a view do teclado não anexa dentro dos 5 s dos testes e o processo de teste leva ANR
+  (`keyDispatchingTimedOut`), abortando a rodada. Os 3 `*MotionArtifactTest` (geradores de GIF para
+  revisão, não asserção) levariam horas sob TCG — não rodados.
+- Nenhum desses toca código desta feature; a última suíte completa verde é a de 2026-09-09 (A32 e
+  emulador KVM). **Rodar `ime`/`audio`/`overlay` no A32 ou num emulador com KVM** antes do próximo
+  release.
+
+## CI — 1ª rodada do workflow Checks (PR #2, 2026-09-24)
+
+Runner `ubuntu-24.04` (x86_64, 2 núcleos) **com KVM**: emulador de pé em ~2 min, 201 instrumentados em
+27 min, galeria 78/78 com **0 px** — inclusive `shortcut-key-picker`/`grids-editor-modal`/
+`bar-grid-revealed`, que não batiam no sandbox sem KVM (lá a barra de status tinha outra altura; o
+AVD do runner reproduz o de referência). Unitários + APKs: 5m40s. Job de device inteiro: ~46 min.
+
+**198/201.** As 3 falhas eram de teste, não de app, e só aparecem em aparelho "frio" ou mais lento
+que a máquina do Yan:
+- `BarViewAccessibilityTest.singleKeyButton…`: é o **primeiro** teste da rodada que sobe o IME (27
+  testes antes, nenhum abre teclado); o seguinte, na mesma classe, passou. A 1ª subida do IME num
+  aparelho recém-ligado passou dos 5 s da espera "não anexou". Correção: essa espera (e só ela), nas
+  10 classes de teclado, usa `IME_COLD_ATTACH_TIMEOUT_MS` (30 s; retorna assim que anexa).
+- `ConfigScreenTest.overlayModeToggle*` (2): esperavam em **tempo real** (`waitUntil(2000)`) um efeito
+  que roda 400 ms depois no **relógio de teste**. Cada volta do `waitUntil` avança um quadro; desde a
+  GT-T6 cada quadro da aba Modo desenha dois tours, e 2 s de parede não chegavam a 25 quadros num
+  runner de 2 núcleos (nem no sandbox). Correção: avançar o relógio de teste por
+  `AUTO_PERMISSION_DELAY_MS` (agora `internal`) e afirmar em `runOnIdle` — igual em qualquer máquina.
+
+## native-voice-models — NM-T1 (2026-09-24)
+
+sherpa-onnx **1.13.8** no build. 306 unitários (+2: `SherpaOnnxLinkTest` monta as configs de Whisper e
+transducer — só classes Kotlin, sem carregar o nativo).
+
+- **Distribuição**: o único artefato Android oficial é o `sherpa-onnx-1.13.8.aar` anexado ao release
+  do GitHub (SHA256 `633c2432…bd96`, 50 MB, `minSdk 21`). O `com.github.k2-fsa:sherpa-onnx` do JitPack
+  é o jar Java de desktop, sem `.so` Android. O espelho `csukuangfj2/sherpa-onnx-libs` no HF tem
+  **outro SHA para o mesmo nome** — é regravado a cada push do upstream, não a cada tag. Não usar.
+- **SPEC_DEVIATION (rota)**: em vez de versionar 50 MB em `app/libs/`, o `app/build.gradle.kts` baixa o
+  AAR da versão fixada quando falta e confere o SHA256 (divergência derruba o build); `app/libs/*.aar`
+  no `.gitignore`. Roda na configuração porque o sync do Android Studio resolve o classpath antes das
+  tasks. No Kotlin DSL, `java.*` é sombreado pela extensão `java` do projeto — imports no topo.
+- **ABIs**: debug = arm64-v8a + armeabi-v7a + x86_64 (emulador); release = só ARM. O x86 de 32 bits do
+  AAR fica fora dos dois. Peso por ABI no APK: arm64 +30,5 MB, v7a +21,3 MB, x86_64 +34,5 MB. APK
+  release (2 ABIs ARM) = 61 MB; pela Play (AAB) cada aparelho leva só a sua.
+- **16 KB (adiantando a NM-T12)**: os 16 `.so` do AAR têm segmentos LOAD alinhados a 16384 e o APK
+  release passa `zipalign -c -P 16`. A task de loja formaliza o script.
+- "Unable to strip …" no build = sem NDK instalado; os `.so` do upstream já vêm sem símbolos.
+
+## native-voice-models — NM-T2 e NM-T3 (2026-09-24)
+
+**NM-T2**: `TranscriptionSource.LOCAL` (5ª opção da aba Voz), `Settings.localModelId/localLanguage`
+(nulos quando vazios), `EffectiveConfig.Local`. Sem modelo → `Unavailable` → `CONFIG_MISSING`
+(NAT-03). Com modelo, até a NM-T9 o `SettingsRepository.flow()` entrega `Config()` vazio: a origem
+se comporta como incompleta e **nunca toca a rede**. Painel provisório na aba Voz diz isso.
+Instrumentados (`SettingsRepositoryTest`, `VozPanelTest`) e goldens `config-voz-*` (seletor com 5
+opções) validados pelo CI — o emulador do sandbox não instala mais o APK de 100 MB.
+
+**NM-T3**: catálogo com os 3 modelos, dados **conferidos na API do HF** (tamanhos + `oid` do LFS =
+SHA256 — confirmado baixando o decoder do Parakeet; `tokens.txt` fora do LFS, SHA calculado
+baixando). Totais: Whisper base int8 160,6 MB · small int8 375,5 MB · Parakeet v3 int8 670,5 MB.
+URLs fixadas no commit do repo (não `main`) e todas respondem 206 a pedido de faixa (retomada do
+DownloadManager). Os dois Whisper multilíngues têm o mesmo `tokens.txt`. `recommendedRamMb`
+(512/1024/2048) é estimativa — medir no A32 na NM-T13. 9 unitários de integridade.
+
+## native-voice-models — NM-T4 (2026-09-24)
+
+`ModelStore` em `filesDir/models/<id>/`. Instalar = conferir que todo arquivo do catálogo existe com o
+tamanho certo → copiar para `.<id>.installing/` → escrever `manifest.json` → **renomear** o diretório
+para o definitivo (atômico no mesmo volume; a origem do DownloadManager fica em outro, onde só cópia
+serve). "Instalado" = manifest presente, com o id do diretório, e cada arquivo listado no disco com o
+tamanho do manifest — meio-instalado, arquivo trocado depois ou sobra de instalação interrompida não
+contam. Não confere SHA: isso é do downloader (NM-T7). 9 unitários na JVM (`TemporaryFolder`) + 1
+instrumentado no `filesDir` real (pasta própria, nunca a `models/` de verdade), que confere o espaço
+voltando depois de apagar — roda no CI.
+
+## native-voice-models — NM-T5 (2026-09-24)
+
+`AudioDecoder` (MediaExtractor + MediaCodec → PCM 16-bit ou float, conforme o formato de saída do
+codec → mono → 16 kHz) e `PcmMath` puro (downmix por média; resample com média da janela ao reduzir
+e interpolação linear ao aumentar). Gravação passou a **16 kHz** (`AudioRecorder.AUDIO_SAMPLE_RATE`).
+7 unitários do `PcmMath`; `AudioDecoderTest` instrumentado com dois tons de 440 Hz em
+`androidTest/assets/audio/` (16 kHz mono e 44,1 kHz estéreo).
+
+**Dois tropeços pegos conferindo as fixtures com ffmpeg antes do CI:**
+- O `sine` do ffmpeg gera com amplitude 1/8: com `volume=0.5` o tom ficou em 0,06 de pico. Fixtures
+  refeitas com `aevalsrc=0.5*sin(2*PI*440*t)`.
+- Contar cruzamentos por zero no áudio decodificado dava 564 Hz num tom de 440: o priming/padding do
+  AAC tem um chiado baixo que cruza o zero várias vezes. O teste usa histerese (±0,1) e mede entre a
+  primeira e a última virada — 440,0 Hz nas duas fixtures.
+
+## native-voice-models — NM-T6 (2026-09-24)
+
+`ModelDownloader` sobre o `DownloadManager`, atrás de `DownloadGateway` (interface fina; o
+`SystemDownloadGateway` traduz status/motivo de pausa do Android para enums próprios, e pedido que
+sumiu do sistema volta como FAILED). `start` faz as pré-checagens em `DownloadPolicy` (já instalado,
+1 por vez, espaço, rede medida exige `allowMetered`) e enfileira 1 pedido por arquivo em
+`externalFilesDir/model-tmp/<id>/`, gravando `downloads.json` com os ids — é ele que marca "download em
+curso" e sobrevive à morte do app. `progress(id)` é polling de 500 ms enquanto houver coletor;
+arquivo concluído conta inteiro, falha em qualquer um é falha do modelo. `cancel` remove os pedidos e
+apaga o tmp. Se um `enqueue` falha no meio, os já enfileirados são removidos.
+
+**SPEC_DEVIATION**: espaço exigido ×2,2 no mesmo volume (baixa no externo e copia para o interno),
+×1,2 em volumes separados — anotado na task.
+
+12 unitários (fakes de gateway e de volume); 2 instrumentados com MockWebServer no próprio device
+(`localhost`): arquivo pequeno chega a FILES_DONE no `model-tmp`; corpo com banda limitada cancelado no
+meio não deixa pedido nem parcial. Rodam no CI.
+
+## native-voice-models — NM-T7 (2026-09-25)
+
+`ModelDownloader.finish(id)`: tudo SUCCESSFUL → tamanho e SHA256 em streaming (`Sha256`, blocos de
+1 MiB) → `ModelStore.install` → remove os pedidos do sistema e apaga o tmp. Falha do sistema, arquivo
+divergente, cópia que não completa ou modelo que saiu do catálogo → descarta e registra em `failures`
+(`DOWNLOAD_FAILED`/`CORRUPTED`/`INSTALL_FAILED`, em memória; novo `start` limpa). O `downloads.json` só
+some no fim, então morrer em qualquer passo deixa o download para a `reconcile()`, que também trata
+"instalou mas não limpou" e apaga sobra de início interrompido. Início/conclusão/reconciliação sob um
+lock do processo. `ModelDownloader.get(context)`: instância única do processo (um só `ModelStore`, para
+o `installedIds` que a UI observa).
+
+`ModelDownloadReceiver` no manifest para `ACTION_DOWNLOAD_COMPLETE`, exigindo
+`SEND_DOWNLOAD_COMPLETED_INTENTS` — conferido no código do DownloadProvider (AOSP): envio com
+`setPackage` e permissão de assinatura só dele. `goAsync` + thread → `reconcile()`.
+
+3 unitários do `Sha256` (vetores FIPS e arquivo maior que o bloco) + 11 de conclusão/reconciliação
+(com arquivos reais no `TemporaryFolder`); 3 instrumentados novos: download com SHA certo → instalado;
+SHA errado → descartado e pedido removido; receiver registrado com a permissão. 360 unitários verdes.
+
+## native-voice-models — NM-T8 (2026-09-25)
+
+AIDL (`ITranscriptionEngine` oneway + `IEngineCallback`; `LocalModelConfig` como parcelable
+estruturado do AIDL, com caminhos absolutos, idioma e bytes) e `InferenceService` em
+`android:process=":inference"` (`exported=false`): executor único, modelo residente, troca de modelo
+**ou de idioma** = reload. Antes do load: arquivos no disco (senão MODEL_MISSING), guarda de RAM
+(`availMem` ≥ 1,5× o modelo, medida depois de soltar o anterior; senão OOM) e recusa do sherpa →
+ENGINE. `OutOfMemoryError` em qualquer ponto → unload + OOM. Falha ao decodificar → DECODE.
+
+`SherpaEngine`/`SherpaConfigs`: API conferida no bytecode do AAR e no `kotlin-api/OfflineRecognizer.kt`
+oficial da v1.13.8 — Whisper `modelType="whisper"`, idioma vazio = autodetecção; Parakeet
+`modelType="nemo_transducer"`; `numThreads` = núcleos limitados a 1..4.
+
+**Achado: a janela de 30 s do Whisper.** O sherpa-onnx corta o stream em 3000 quadros e descarta o
+resto só com um log. Medido com o pacote Python oficial 1.13.8 e o mesmo whisper-base int8 num áudio
+de 49,7 s: inteiro → o texto para no meio da 3ª frase; em janelas (`WhisperChunker`, corte no trecho
+mais silencioso dos últimos 4 s de cada janela de 28 s, caiu em 24,37 s, dentro da pausa) → texto
+completo. Registrado como SPEC_DEVIATION na task.
+
+Testes: 14 unitários novos (modelo do engine e ida/volta pelo parcelable, códigos de erro, guarda de
+RAM, configs por tipo, cortes do Whisper). Instrumentados: `InferenceServiceTest` (binder remoto de
+verdade, processo `:inference` separado, MODEL_MISSING no transcribe e no preload) e
+`LocalEngineEndToEndTest` opt-in (`localModelE2E=true`, ligado no `ci-device-gate.sh`): baixa o Whisper
+base do catálogo pelo DownloadManager, confere SHA, instala e transcreve as fixtures de fala curta e
+longa. 374 unitários verdes.
+
+## native-voice-models — NM-T9 (2026-09-25)
+
+Origem Local ligada ao fluxo de gravação. `SettingsRepository.flow()` entrega, para Local com modelo,
+um `Config` **sem endpoint nem token** e com `local = EffectiveConfig.Local(...)` (espera ≥ 180 s).
+`RoutingTranscriber` (no lugar do transcriber do `OverlayService`) manda para o `LocalTranscriber` ou
+para o HTTP de sempre; falha local não cai para a rede (NAT-04). O teclado grava pelo mesmo
+`OverlayService`, então a fiação é uma só.
+
+`LocalTranscriber` (um por processo): bind ao `:inference` no primeiro uso, mantido (segura o modelo
+residente); `DeathRecipient` → quem esperava recebe "transcrição local interrompida" e o próximo uso
+refaz bind e carga. `sync()` pré-carrega quando um modo ativa (orbe, sessão do mic, teclado aberto) e
+solta o bind quando a origem deixa de ser Local — a RAM volta na hora. Bind em uso só cai depois da
+última resposta. Selecionado mas não baixado = `CONFIG_MISSING` (NAT-03), o mesmo das origens
+incompletas; os demais erros locais viram `ErrorKind.LOCAL` com a mensagem da causa e o X leva à aba Voz.
+
+Testes: `LocalRoutingTest` (coordinator de verdade: sucesso local insere; falha local mostra a mensagem
+e aponta a aba Voz; **o HTTP nunca é chamado com Local** (PRV-01); sem modelo → CONFIG_MISSING pelo
+cliente HTTP real, sem rede; origens remotas seguem no HTTP) + `LocalTranscriberLogicTest`. 382
+unitários verdes. Instrumentados: `LocalTranscriberDeviceTest` (binder real: MODEL_MISSING chega como
+erro local; mata o `:inference` e o próximo uso sobe outro processo; `release` solta o bind),
+`SettingsRepositoryTest` (Local não carrega credenciais mesmo com tokens salvos) e, no ponta a ponta,
+o `:inference` morto no meio de uma transcrição longa → erro para quem esperava, e a seguinte funciona.
+
+## native-voice-models — NM-T10 (2026-09-25)
+
+Gerenciador de modelos na aba Voz (origem Local). `LocalModelsUi.compose` (pura): catálogo ×
+instalados × download ativo × falhas × seleção × RAM → um card por modelo — disponível (Baixar,
+indisponível com outro download em curso), baixando (barra + % / "Aguardando rede" / "Verificando" +
+Cancelar), baixado (Apagar; tocar seleciona), selecionado (marcado, borda teal); aviso "Pode ser pesado
+neste aparelho" quando a RAM total < recomendada (CAT-03); falha do último download no card (DLM-02).
+Espaço insuficiente e armazenamento indisponível explicados no card (DLM-05). Dados móveis e apagar
+confirmam **no próprio card** (SPEC_DEVIATION registrado). Dropdown de idioma → `localLanguage`; nota
+de privacidade (MGR-06).
+
+`LocalModelsController` (real, na `SetupActivity`): só com a tela visível (onStart/onStop) —
+reconcilia ao abrir (DLM-07), polling de 500 ms e fecha o download que terminou sem depender do
+broadcast. Auto-seleção pós-download (MGR-03) no `ModelDownloader.onInstalled` →
+`SettingsRepository.selectLocalModelIfNone` (escrita atômica só da chave; não disputa com o
+auto-save da tela).
+
+9 unitários da composição/textos (391 no total, verdes); `LocalPanelTest` instrumentado com gerenciador
+fake (4 estados, seleção persiste, apagar com confirmação e limpando a seleção, dados móveis pede e
+baixa com a flag, espaço insuficiente, aviso de peso, idioma); `SettingsRepositoryTest` cobre a
+auto-seleção; `VozPanelTest` atualizado (o placeholder saiu).
+
+## native-voice-models — NM-T11 (rotas) e NM-T14 (2026-09-25)
+
+NM-T11: rotas `config-voz-local` (nada baixado), `config-voz-local-baixando` (Equilibrado em 42%,
+congelado) e `config-voz-local-pronto` (Rápido instalado e selecionado), com RAM fixa de 8 GB para o
+aviso de peso não depender do aparelho. Goldens saem das telas do CI, depois de revisadas.
+
+NM-T14: `Settings.partialOnPause`/`partialViewEdit` (persistidos, padrão desligado) e seção
+"Transcrição" no topo da aba Voz com os dois toggles — o 2º esmaecido e inerte com o 1º desligado
+(PAR-01). `ToggleRow` passou do `TecladoPanel` para o `ConfigFields`. A seção nova muda todos os
+`config-voz-*` de propósito. Testes: `VozPanelTest.partialToggles` e
+`SettingsRepositoryTest.partialTogglesPersistAndDefaultOff`.
+
+## native-voice-models — NM-T15 (2026-09-25)
+
+`AudioRecorder.start(segmented = true)` (PAR-02): cada pausa fecha o arquivo do trecho (stop real,
+MediaRecorder solto) e o devolve; retomar abre um arquivo novo; `stop()` devolve o trecho em curso
+(null se parou pausado); trecho abaixo do mínimo de 300 ms é descartado; `discard()` apaga todos.
+Duração ativa acumulada atravessa os trechos. Desligado, nada muda (os testes antigos do recorder
+seguem iguais). 4 instrumentados novos: 2 pausas → 3 arquivos reproduzíveis (`MediaMetadataRetriever`)
+e 1,8 s ativos com relógio controlado; parar pausado; trecho curto descartado; descartar apaga tudo.
+
+## native-voice-models — NM-T16 (+ núcleo da T18) (2026-09-25)
+
+`PartialSession` (`transcription/partial/`): fila de trechos transcritos um por vez, na ordem, pela
+origem ativa (o mesmo `transcribeWithTimeout` do envio normal — Local ou nuvem); texto vai para o fim
+do buffer, edições do usuário são a verdade (PAR-06); trecho que falhou segura os seguintes até ser
+refeito (na próxima pausa ou no envio), então nada sai fora de ordem (PAR-09); `finish()` refaz as
+falhas, espera a fila e devolve o texto inteiro, o erro do trecho que continua falhando, ou
+EMPTY_AUDIO. Nunca toca clipboard/inserção (PAR-03).
+
+Coordinator: toggle lido no início de cada sessão; `startSegmented`/`pauseSegment` no
+`OverlayAudioRecorder` (padrões que caem no comportamento antigo); toda pausa (gesto, limite, cancelar)
+passa por `pauseRecorder()`, que enfileira o trecho fechado. **Envio e cancelar entraram já** (núcleo
+da T18) — sem eles, com o toggle visível desde a T14, o envio entregaria só o último trecho. Extraídos
+`transcribeWithTimeout` e `deliver` do envio normal (sem mudança de comportamento; cancelamento agora
+propaga em vez de virar erro de rede descartado). `onPartialEdited` e `onPartial` expostos para a UI
+da T17.
+
+Testes: 9 unitários do `PartialSession` + 7 do coordinator (`PartialCoordinatorTest`: pausar não
+entrega; envio junta buffer editado + último trecho e entrega uma vez; falha refeita no envio; cancelar
+e desfazer preserva; cancelar de vez apaga; cancelar durante o envio e desfazer retoma na mesma
+sessão; toggle desligado = fluxo antigo). 407 unitários verdes.
+
+## native-voice-models — NM-T17 (2026-09-25)
+
+UI do parcial junto à orbe. `PartialUi` (puro): sem sessão → nada; enviando/cancelando → nada (e fecha
+o que estava aberto — a entrega precisa do foco de volta no campo de origem); visualização/edição
+abertas seguem abertas gravando e pausando (só com o 2º toggle); pausada com conteúdo (texto, trecho
+em curso ou falho) → indicador "parcial · N palavras [· … ] [· N trechos a refazer]".
+`PartialOverlay`: indicador logo abaixo da orbe (acima, se não couber), visualização e input no terço de
+cima (o teclado sobe por baixo); o input é a única janela focável (NOT_TOUCH_MODAL mantém orbe e app
+tocáveis); texto de fora só entra no input se mudou, preservando o cursor; cada tecla vira
+`onPartialEdited`. Fiação no `OverlayService` pelo `render` e pelo `onPartial` do coordinator.
+
+Testes: 6 unitários do `PartialUi` (413 no total, verdes). `PartialOverlayServiceTest` instrumentado
+com o serviço real e a origem Custom num MockWebServer em `localhost`: pausa → indicador; toque →
+visualização → input; edita; retoma com o input aberto e pausa → trecho novo depois da edição; fechar
+volta ao indicador; envio entrega "Primeira parte, editada segunda parte" uma vez e as janelas somem;
+smoke do `ImeProbeActivity` depois do input focável; cancelar esconde e desfazer devolve o parcial;
+cancelar de vez encerra a sessão. Settings do app restauradas no fim de cada teste.
+
+## native-voice-models — NM-T12 (2026-09-25)
+
+STO-01: `backup_rules.xml` e `data_extraction_rules.xml` excluem `file/models` e `external/model-tmp`
+(conferido no manifest e nos XML empacotados do APK com `aapt2`). STO-02:
+`scripts/check-16kb-alignment.py` (ELF PT_LOAD ≥ 16384 + offset no zip dos `.so` sem compressão) —
+18/18 passam no APK debug; um `.so` de sistema com 4 KB reprova, como deve; novo passo no job de unit
+do CI. STO-03: licenças em `app/licenses/` (sherpa-onnx Apache-2.0, ONNX Runtime MIT, Whisper MIT,
+Parakeet CC BY 4.0, com README) e seção "Licenças" na Docs; Docs ganhou também "Voz no aparelho", o
+parcial em "Pausa" e a origem Local em "Privacidade". `DocsSectionsTest` cobre as atribuições.
+
+## native-voice-models — CI e goldens (2026-09-27)
+
+Rodada em 3bef7e8 (T2..T5 + liberação de disco): disco livre 13 → 29 GB, emulador subiu; 206/208.
+As 2 falhas eram de teste, medidas no logcat da evidência:
+- `BarViewAccessibilityTest` (1º teste de teclado da rodada): o app do Google restaurou uma janela por
+  cima do probe logo após abrir; o toque único no campo se perdeu e nenhum IME recebeu o campo. Espera
+  compartilhada `awaitKeyboardAttached` nas 10 classes de teclado: re-traz o probe e toca de novo a
+  cada 6 s, dentro dos mesmos 30 s.
+- `joystickPull…`: soltava a alavanca num prazo fixo de 900 ms com a main thread do app tendo quadros de
+  1,8 s. Agora segura até as 2 setas saírem (até 5 s).
+
+Rodada em be0cc6c (T6..T17): 238/240 — passaram o ponta a ponta do Whisper base (download real, SHA,
+instalação, transcrição curta e de 50 s, morte do `:inference` no meio), o parcial no serviço real e os
+de teclado. Falhas só no `LocalPanelTest`: a marca de selecionado ficava dentro do card clicável (árvore
+mesclada) — o card instalado virou `selectable` com `Role.RadioButton` (leitor de tela anuncia
+"selecionado"; o teste afirma `isSelected` no card) — e a confirmação de apagar abre abaixo da dobra
+(teste rola até ela). Diff de telas: exatamente as 8 mudanças intencionais (`config-voz-*` pela seção
+Transcrição e pelo seletor de 5, `config-docs*` pelas seções novas); aprovadas junto com os 6
+`config-voz-local*`, depois de revisadas. `tour-finger-*` seguem sem golden (rotas provisórias da GT-T2).
+
+## CI — o diálogo de ANR do boot (2026-09-27)
+
+Rodada em 6117298: telas 100% verdes; 237/240. O `BarViewAccessibilityTest` falhou de novo mesmo com o
+re-toque — o logcat mostrou a causa de verdade nas duas rodadas: logo após o boot, sob a carga do build,
+o launcher (27/09) ou a systemui (25/09) estouram ANR e o sistema abre o diálogo "Application Not
+Responding", que fica **minutos** na tela segurando o foco (12:42:36 → 12:46:45). Sem foco, nenhum campo
+recebe IME. É a mesma lição do emulador do sandbox (ENVIRONMENT.md), que não tinha ido para o CI:
+`ci-device-gate.sh` agora liga `hide_error_dialogs` antes do build e fecha diálogos de sistema antes da
+suíte. O re-toque do `awaitKeyboardAttached` fica (cobre o toque perdido, caso diferente).
+
+`LocalPanelTest`: o `selectable` do card mescla os filhos — a confirmação de apagar só existe na árvore
+não mesclada (teste usa `useUnmergedTree`), e a linha de progresso ganhou `mergeDescendants` (leitor de
+tela lê barra e rótulo juntos; o teste lê o "50%" na própria tag).
+
+## CI verde — native-voice-models (2026-09-27)
+
+Rodada em 5db6d75: **240/240 instrumentados, 0 pulados, telas 84/84** no limiar. Com o
+`hide_error_dialogs` no gate, o 1º teste de teclado passou. Estão validados no emulador: download real
+do Whisper base + SHA + instalação + transcrição curta e de 50 s + morte do `:inference` no meio; o
+cliente local contra o binder de verdade; o parcial no `OverlayService` real (indicador, visualização,
+edição, envio, cancelar/desfazer); o gerenciador de modelos; os de teclado. O que resta do bloco são os
+roteiros manuais da T18 e da T13 no A32 [YAN].

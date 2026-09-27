@@ -2,8 +2,11 @@ package com.keyflow.core
 
 enum class RecordingMode { TOGGLE, PUSH_TO_TALK }
 
-/** Origem da transcrição (aba Voz). CREDITS é stub inerte nesta fase (VOZ-01). */
-enum class TranscriptionSource { CREDITS, OPENAI, GROQ, CUSTOM }
+/**
+ * Origem da transcrição (aba Voz). CREDITS é stub inerte nesta fase (VOZ-01). LOCAL = modelo de voz
+ * rodando no aparelho (native-voice-models, MGR-01) — última da lista, é a 5ª opção do seletor.
+ */
+enum class TranscriptionSource { CREDITS, OPENAI, GROQ, CUSTOM, LOCAL }
 
 /** Lado inicial do overlay (OVL-05). */
 enum class OverlaySide { LEFT, RIGHT }
@@ -45,5 +48,14 @@ sealed interface TranscriptionResult {
 }
 
 enum class ErrorKind {
-    NETWORK, AUTH, HTTP, TIMEOUT, EMPTY_AUDIO, TOO_LARGE, CONFIG_MISSING
+    NETWORK, AUTH, HTTP, TIMEOUT, EMPTY_AUDIO, TOO_LARGE, CONFIG_MISSING,
+    /** Transcrição no aparelho falhou (native-voice-models, NAT-04): a mensagem já vem pronta para o usuário. */
+    LOCAL,
 }
+
+/**
+ * Ação ao tocar num erro clicável (banner de overlay ou glifo ✖ do teclado/orbe): [NONE] não faz nada,
+ * [VOZ] abre a aba Voz (erro de config/token), [MODO_MIC] abre a aba Modo — o chip de Microfone já
+ * pulsa sozinho lá (StatusChip.pulsing), então só navegar até a aba já evidencia o card certo.
+ */
+enum class ErrorNavTarget { NONE, VOZ, MODO_MIC }

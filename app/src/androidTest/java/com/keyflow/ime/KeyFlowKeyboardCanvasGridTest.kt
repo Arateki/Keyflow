@@ -17,18 +17,15 @@ import com.keyflow.core.ButtonState
 import com.keyflow.core.KeyFlowController
 import com.keyflow.ime.keyboard.layout.KeyAction as CanvasKeyAction
 import org.junit.After
+import org.junit.Before
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Instrumentado da integração híbrida da grade Canvas no IME **real** (KC-T6): com a flag `kbd_canvas`
- * ligada, `KeyFlowKeyboardView.buildExpanded()` troca as `buildRow` antigas por [com.keyflow.ime.keyboard.KeyboardGridView],
- * mas mic/action row continuam as mesmas Views (SYNC-01..04). Cobre: (a) a flag alterna antigo↔novo no
- * debug (ROL-02), (b) tocar a grade nova comita texto pelo mesmo `handleKey`, (c) o mic segue intacto.
+ * Instrumentado da grade Canvas no IME **real** (KC-T6/T10, padrão único desde a promoção): tocar a
+ * grade comita texto pelo mesmo `handleKey`, e o mic (SYNC-01..04) segue intacto.
  */
 @RunWith(AndroidJUnit4::class)
 class KeyFlowKeyboardCanvasGridTest {
@@ -39,12 +36,20 @@ class KeyFlowKeyboardCanvasGridTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context: Context get() = instrumentation.targetContext
     private val device: UiDevice get() = UiDevice.getInstance(instrumentation)
-    private val uiPrefs get() = context.getSharedPreferences("keyflow_kb_ui", Context.MODE_PRIVATE)
+
+    // Preserva o que o dono do aparelho já tinha configurado — ver [UserSettingsGuard].
+    private val userSettings = UserSettingsGuard(context)
+
+    @Before
+    fun captureUserSettings() {
+        userSettings.capture()
+        // A grade só entra na hierarquia (e só é medida) com o teclado expandido.
+        userSettings.forceExpanded()
+    }
 
     @After
     fun tearDown() {
-        uiPrefs.edit().remove(KEY_CANVAS_GRID).apply()
-        shell("ime reset")
+        userSettings.restore()
         device.pressHome()
         // KeyFlowController é singleton de processo (sobrevive ao fim deste teste, dentro do mesmo gate).
         KeyFlowController.clearInserter()
@@ -52,31 +57,26 @@ class KeyFlowKeyboardCanvasGridTest {
     }
 
     @Test
-    fun flagOffKeepsTheOldGridByDefault() {
-        launchProbe(canvasGrid = false)
-
-        assertNull(KeyFlowKeyboardService.activeViewForTest!!.canvasGridForTest)
-    }
-
-    @Test
-    fun flagOnSwapsInTheCanvasGridAndTypingCommitsTextThroughTheSameHandleKey() {
-        launchProbe(canvasGrid = true)
+    fun typingCommitsTextThroughTheSameHandleKey() {
+        launchProbe()
         val grid = KeyFlowKeyboardService.activeViewForTest!!.canvasGridForTest
-        assertNotNull("com a flag ligada a grade Canvas deveria substituir a antiga", grid)
+        assertNotNull("a grade Canvas deveria estar presente", grid)
 
         tapKey(grid!!, "q")
 
-        waitUntil("o campo não recebeu \"q\" digitado pela grade nova") {
+        waitUntil("o campo não recebeu \"q\" digitado pela grade") {
             device.findObject(By.desc("ime_probe_field"))?.text?.contains("q") == true
         }
     }
 
     @Test
     fun canvasGridDoesNotDisturbTheMicButton() {
-        launchProbe(canvasGrid = true)
+        launchProbe()
 
-        // SYNC-01/02: mic continua a mesma View, tap ainda inicia gravação normalmente.
-        device.findObject(By.text("🎙"))?.click()
+        // SYNC-01/02: o tap no mic ainda inicia a gravação. Com as barras como padrão (ROL-02) o mic é
+        // desenhado em Canvas e não é mais um TextView, então é o nó de acessibilidade da BarView que o
+        // expõe — o `By.text` continua valendo enquanto a barra antiga existir.
+        (device.findObject(By.desc("🎙")) ?: device.findObject(By.text("🎙")))?.click()
         device.wait(Until.hasObject(By.textContains("●")), TIMEOUT)
         waitUntil("gravação não iniciou com a grade Canvas ativa") {
             KeyFlowController.buttonState.value == ButtonState.RECORDING
@@ -85,8 +85,7 @@ class KeyFlowKeyboardCanvasGridTest {
 
     // ── ações de alto nível ──────────────────────────────────────────────────
 
-    private fun launchProbe(canvasGrid: Boolean) {
-        uiPrefs.edit().putBoolean(KEY_CANVAS_GRID, canvasGrid).apply()
+    private fun launchProbe() {
         shell("pm grant ${context.packageName} ${Manifest.permission.RECORD_AUDIO}")
         shell("ime enable $IME")
         shell("ime set $IME")
@@ -99,7 +98,7 @@ class KeyFlowKeyboardCanvasGridTest {
         device.wait(Until.hasObject(By.desc("ime_probe_field")), TIMEOUT)
         device.findObject(By.desc("ime_probe_field"))?.click()
         device.wait(Until.hasObject(By.text("🎙")), TIMEOUT)
-        waitUntil("KeyFlowKeyboardView não anexou") { KeyFlowKeyboardService.activeViewForTest != null }
+        awaitKeyboardAttached(device) { context.startActivity(intent) }
     }
 
     /** Acha a tecla [label] na camada de letras via geometria já computada e injeta um toque real nela. */
@@ -115,12 +114,26 @@ class KeyFlowKeyboardCanvasGridTest {
         inject(MotionEvent.ACTION_UP, x, y, SystemClock.uptimeMillis())
     }
 
-    private fun inject(action: Int, x: Int, y: Int, time: Long) {
+    /**
+     * Injeta um toque, devolvendo `false` se a plataforma RECUSAR a injeção
+     * (`IllegalArgumentException: Targeted input event injection ... was not directed at a window owned
+     * by uid N`). `sendPointerSync` só entrega em janela do próprio app, e logo depois de reinstalar o
+     * APK a janela do IME ainda não assumiu aquela região da tela. Medido em 2026-09-08: as duas
+     * primeiras rodadas após um `installDebug` falhavam assim. Sem o `catch`, a exceção escapava dos
+     * laços de retry e reprovava o teste na hora.
+     */
+    private fun inject(action: Int, x: Int, y: Int, time: Long): Boolean {
         val event = MotionEvent.obtain(time, time, action, x.toFloat(), y.toFloat(), 0).apply {
             source = InputDevice.SOURCE_TOUCHSCREEN
         }
-        instrumentation.sendPointerSync(event)
-        event.recycle()
+        return try {
+            instrumentation.sendPointerSync(event)
+            true
+        } catch (e: IllegalArgumentException) {
+            false
+        } finally {
+            event.recycle()
+        }
     }
 
     private fun waitUntil(message: String, timeoutMs: Long = TIMEOUT, condition: () -> Boolean) {
@@ -144,6 +157,5 @@ class KeyFlowKeyboardCanvasGridTest {
     private companion object {
         const val IME = "com.keyflow/.ime.KeyFlowKeyboardService"
         const val TIMEOUT = 5000L
-        const val KEY_CANVAS_GRID = "kbd_canvas"
     }
 }

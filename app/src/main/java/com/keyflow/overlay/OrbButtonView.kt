@@ -17,6 +17,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import com.keyflow.core.ButtonState
+import com.keyflow.core.ErrorNavTarget
+import com.keyflow.core.KeyFlowController
 import com.keyflow.core.OverlaySide
 import com.keyflow.core.RecordingMode
 import com.keyflow.data.OverlayPosition
@@ -69,6 +71,15 @@ class OrbButtonView(
     // Limiar único: toque×segurada e janelas derivam do "Tempo de reação". Hold = janela + 150ms.
     private var gestures = newGestures(this.tapBurstWindowMs)
 
+    /**
+     * Relógio MONOTÔNICO, de propósito: o hold é agendado com `handler.postDelayed`, que conta em
+     * `uptimeMillis`, e quem decide se virou hold é `onHoldElapsed`, que compara contra o MESMO limiar.
+     * Com réguas diferentes (o default do interpretador é o relógio de parede) as duas medidas
+     * divergiam alguns milissegundos e o disparo às vezes caía um fio ANTES do limiar — `onHoldElapsed`
+     * devolvia null e, como o runnable não se reagenda, o gesto perdia o modo-arrasto de vez.
+     * Medido no A32 em 2026-09-08: `elapsed=269 threshold=270 ev=null` contra 270..286 nos que travaram,
+     * ~1 gesto em 15. Não era falha de teste: acontecia na mão do usuário do mesmo jeito.
+     */
     private fun newGestures(window: Long) = GestureInterpreter(
         tripleTapWindowMs = window,
         holdThresholdMs = window + HOLD_OFFSET_MS,
@@ -98,6 +109,10 @@ class OrbButtonView(
 
     var renderedState: ButtonState = ButtonState.IDLE_NO_FIELD
         private set
+
+    /** Acessores somente-leitura para testes instrumentados do modo-arrasto travado. */
+    val dragLockedForTest: Boolean get() = dragLocked
+    val dragKindForTest: OrbDragKind? get() = dragKind
 
     private var sizePx: Int = orbSizePx
 
@@ -132,10 +147,6 @@ class OrbButtonView(
             }
         }
     }
-
-    // Acúmulo de tempo (espelha AudioRecorder/T18): só conta enquanto RECORDING.
-    private var accumulatedMs = 0L
-    private var segmentStartMs = 0L
 
     private var windowParams: WindowManager.LayoutParams? = null
     private var updateWindowLayout: ((WindowManager.LayoutParams) -> Unit)? = null
@@ -178,32 +189,19 @@ class OrbButtonView(
         updateWindowLayout = updateLayout
     }
 
-    /** Atualiza orbe + timer a partir do [ButtonState] (chamado pelo render do coordinator). */
+    /**
+     * Atualiza orbe + timer a partir do [ButtonState] (chamado pelo render do coordinator). O tempo em
+     * si vem de [KeyFlowController.recordingAccumulatedMs]/`recordingSegmentStartMs` — o mesmo relógio
+     * autoritativo que o mic do teclado já lia (`KeyFlowKeyboardView.elapsedSeconds()`). Antes a orbe
+     * mantinha um relógio PRÓPRIO, derivado só de observar as transições de estado aqui — e como o
+     * `OrbButtonView` é recriado de vez em quando (troca de tema/tamanho, restart do serviço), esse
+     * relógio local perdia a referência e dessincronizava do teclado (achado pelo Yan, 2026-07-03: orbe
+     * mostrando 4s pausada enquanto o teclado mostrava 10s). Ler a mesma fonte elimina a duplicidade.
+     */
     fun render(state: ButtonState) {
-        val prev = renderedState
         renderedState = state
         contentDescription = describe(state)
-
-        when {
-            state == ButtonState.RECORDING && prev != ButtonState.RECORDING && prev != ButtonState.PAUSED -> {
-                accumulatedMs = 0L
-                segmentStartMs = clock()
-                startTicker()
-            }
-            state == ButtonState.RECORDING && prev == ButtonState.PAUSED -> {
-                segmentStartMs = clock() // retomada
-                startTicker()
-            }
-            // PAUSED e CANCELLING congelam o tempo (não zeram): ao retomar, continua de onde parou.
-            (state == ButtonState.PAUSED || state == ButtonState.CANCELLING) && prev == ButtonState.RECORDING -> {
-                accumulatedMs += clock() - segmentStartMs // congela o tempo
-                stopTicker()
-            }
-            state != ButtonState.RECORDING && state != ButtonState.PAUSED && state != ButtonState.CANCELLING -> {
-                accumulatedMs = 0L
-                stopTicker()
-            }
-        }
+        if (state == ButtonState.RECORDING) startTicker() else stopTicker()
         // copy (não substitui): preserva dragHint/orbFraction se a orbe estiver no modo-arrasto.
         orbUi = orbUi.copy(state = orbStateFor(state), center = orbCenterFor(state))
     }
@@ -218,8 +216,8 @@ class OrbButtonView(
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 if (renderedState == ButtonState.ERROR) {
-                    // No estado de erro só agimos se for resolvível na Voz; senão o toque é ignorado.
-                    if (com.keyflow.core.KeyFlowController.errorOpensVoz) onErrorTap()
+                    // No estado de erro só agimos se houver destino de navegação; senão o toque é ignorado.
+                    if (KeyFlowController.errorNavTarget != ErrorNavTarget.NONE) onErrorTap()
                     return true
                 }
                 if (renderedState == ButtonState.CANCELLING) {
@@ -240,9 +238,14 @@ class OrbButtonView(
                 startWindowY = windowParams?.y ?: 0
                 dragging = false
                 gestures.onDown()
-                // Alternar gravando/pausado: ficar parado ~Tempo de reação+150ms trava no modo-arrasto.
-                if (mode() == RecordingMode.TOGGLE &&
-                    (renderedState == ButtonState.RECORDING || renderedState == ButtonState.PAUSED)
+                // Alternar gravando/pausado: ficar parado ~Tempo de reação+150ms trava no modo-arrasto
+                // (só no Alternar — no PTT a gravação já É o hold). SENDING entra aqui pra permitir
+                // cancelar a transcrição (única direção válida nesse estado é a lateral — ver
+                // updateDragFeedback) e vale nos DOIS modos, já que ali não há gravação ativa disputando
+                // o toque (pedido do Yan, 2026-07-03).
+                if (renderedState == ButtonState.SENDING ||
+                    (mode() == RecordingMode.TOGGLE &&
+                        (renderedState == ButtonState.RECORDING || renderedState == ButtonState.PAUSED))
                 ) {
                     scheduleDragHold()
                 }
@@ -434,8 +437,10 @@ class OrbButtonView(
         dragCenterY = loc[1] + sizePx / 2
         dragActPx = sizePx * DRAG_ACTIVATION_FRACTION
         vibrateTick() // sinaliza a trava
-        // Setas já aparecem opacas (guia + indicação de que travou) na sobreposição separada.
-        onDragArrows(dragArrows(upAlpha = 1f, lateralAlpha = 1f, downAlpha = 1f))
+        // Enviando: só a direção lateral (cancelar) é válida — não mostra as setas de cima/baixo, que não
+        // fazem nada nesse estado (não dá pra pausar/retomar/abrir config no meio do envio).
+        val sending = renderedState == ButtonState.SENDING
+        onDragArrows(dragArrows(upAlpha = if (sending) 0f else 1f, lateralAlpha = 1f, downAlpha = if (sending) 0f else 1f))
         // Glifo central do alvo ainda invisível (aparece com a proximidade).
         orbUi = orbUi.copy(dragHint = OrbDragHint(centerKind = null, centerAlpha = 0f, seconds = elapsedSeconds()))
     }
@@ -461,13 +466,15 @@ class OrbButtonView(
 
     /**
      * Atualiza o alvo central e a opacidade das setas durante o modo-arrasto. Gravando: ↑ pausa, ← cancela.
-     * Pausado (proposta do usuário): ↑ cancela, ← retoma. As setas começam opacas e somem ao aproximar.
+     * Pausado (proposta do usuário): ↑ cancela, ← retoma. Enviando: só ← cancela (↑/↓ ficam pinados em 0,
+     * não fazem nada nesse estado). As setas começam opacas e somem ao aproximar.
      */
     private fun updateDragFeedback(dx: Float, dy: Float) {
         val act = sizePx * DRAG_ACTIVATION_FRACTION
         val destro = side() == OverlaySide.RIGHT
-        val upProx = (-dy / act).coerceIn(0f, 1f)
-        val downProx = (dy / act).coerceIn(0f, 1f)
+        val sending = renderedState == ButtonState.SENDING
+        val upProx = if (sending) 0f else (-dy / act).coerceIn(0f, 1f)
+        val downProx = if (sending) 0f else (dy / act).coerceIn(0f, 1f)
         // Lateral (cancelar/retomar) vai pro CENTRO: destro arrasta ←, canhoto arrasta → (longe da borda).
         val lateralProx = ((if (destro) -dx else dx) / act).coerceIn(0f, 1f)
         val paused = renderedState == ButtonState.PAUSED
@@ -481,8 +488,12 @@ class OrbButtonView(
         dragKind = kind
         dragProx = prox
         applyDragHaptics(kind, prox)
-        // Setas (sobreposição separada): opacas→somem ao aproximar.
-        onDragArrows(dragArrows(upAlpha = 1f - upProx, lateralAlpha = 1f - lateralProx, downAlpha = 1f - downProx))
+        // Setas (sobreposição separada): opacas→somem ao aproximar. Enviando, cima/baixo ficam SEMPRE
+        // removidas (não só invisíveis) — sem isso, mover o dedo em qualquer direção reacendia essas duas
+        // com upProx/downProx pinados em 0 (1f - 0f = opaca de novo), mesmo não fazendo nada nesse estado.
+        val upAlpha = if (sending) 0f else 1f - upProx
+        val downAlpha = if (sending) 0f else 1f - downProx
+        onDragArrows(dragArrows(upAlpha = upAlpha, lateralAlpha = 1f - lateralProx, downAlpha = downAlpha))
         // Glifo central do alvo (orbe): transparente→opaco ao aproximar.
         orbUi = orbUi.copy(dragHint = OrbDragHint(centerKind = kind, centerAlpha = prox, seconds = elapsedSeconds()))
     }
@@ -602,8 +613,12 @@ class OrbButtonView(
     }
 
     private fun elapsedSeconds(): Int {
-        val active = if (renderedState == ButtonState.RECORDING) clock() - segmentStartMs else 0L
-        return ((accumulatedMs + active) / 1000L).toInt()
+        val active = if (renderedState == ButtonState.RECORDING) {
+            clock() - KeyFlowController.recordingSegmentStartMs
+        } else {
+            0L
+        }
+        return ((KeyFlowController.recordingAccumulatedMs + active) / 1000L).toInt()
     }
 
     private fun moveTo(x: Int, y: Int) {

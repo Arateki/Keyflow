@@ -352,7 +352,10 @@ internal fun orbBaseParams(state: OrbState): Pair<Float, Float> = when (state) {
 
 internal fun orbLevel(state: OrbState, t: Float): Float = when (state) {
     OrbState.Idle -> 0.55f + 0.08f * sin(t * 0.002f)
-    OrbState.Transcribing -> 0.78f + 0.07f * sin(t * 0.018f)
+    // Duas frequências fora de fase (em vez de uma onda única) — quebra o padrão monótono/óbvio de uma
+    // senoide só, dando um movimento mais "vivo" sem ficar tão exagerado quanto o de Listening (pedido do
+    // Yan, 2026-07-03: "transcrevendo" estava sutil demais e com padrão pouco variável).
+    OrbState.Transcribing -> 0.78f + 0.05f * sin(t * 0.014f) + 0.04f * sin(t * 0.033f + 0.9f)
     OrbState.Listening, OrbState.Paused ->
         0.60f + 0.40f * abs(0.7f * sin(t * 0.0024f) + 0.3f * sin(t * 0.0061f + 1.3f))
 }

@@ -14,6 +14,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -75,11 +76,21 @@ class TecladoPanelTest {
     }
 
     @Test
+    fun showWithHardKeyboardTogglePersists() {
+        val h = Harness(Settings(keyboardShowWithHardKeyboard = true))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(TECLADO_SHOW_WITH_HARD_KEYBOARD_TAG).performScrollTo().performClick()
+
+        rule.runOnIdle { assertEquals(false, h.settings.keyboardShowWithHardKeyboard) }
+    }
+
+    @Test
     fun unlockSkinsInvokesCallback() {
         val h = Harness(Settings())
         rule.setContent { h.Content() }
 
-        rule.onNodeWithTag(TECLADO_UNLOCK_TAG).performClick()
+        rule.onNodeWithTag(TECLADO_UNLOCK_TAG).performScrollTo().performClick()
 
         rule.runOnIdle { assertTrue(h.unlockClicks > 0) }
     }
