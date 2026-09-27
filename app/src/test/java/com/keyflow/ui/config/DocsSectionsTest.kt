@@ -34,6 +34,15 @@ class DocsSectionsTest {
         }
     }
 
+    /** STO-03: a Docs atribui o motor e cada modelo do catálogo. */
+    @Test
+    fun licensesNameTheEngineAndEveryCatalogModel() {
+        val labels = docsSections.single { it.id == "licencas" }.blocks.filterIsInstance<DocBlock.Labeled>().map { it.label }
+        listOf("sherpa-onnx", "ONNX Runtime", "Whisper", "Parakeet TDT 0.6B v3").forEach {
+            assertTrue("licença de $it ausente", it in labels)
+        }
+    }
+
     @Test
     fun feedbackIsTheLastSectionAndTheOnlyOneWithActions() {
         assertEquals("feedback", ids.last())

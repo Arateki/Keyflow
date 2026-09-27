@@ -43,6 +43,8 @@ const val VOZ_LANGUAGE_TAG = "voz-language"
 const val VOZ_ENDPOINT_TAG = "voz-endpoint"
 const val VOZ_HEADER_NAME_TAG = "voz-header-name"
 const val VOZ_HEADER_VALUE_TAG = "voz-header-value"
+const val VOZ_PARTIAL_ON_PAUSE_TAG = "voz-partial-on-pause"
+const val VOZ_PARTIAL_VIEW_EDIT_TAG = "voz-partial-view-edit"
 
 /**
  * Aba Voz (VOZ-01..06): origem da transcrição via [Segmented] + campos por preset com auto-save.
@@ -55,6 +57,8 @@ fun VozPanel(
     settings: Settings,
     onSettingsChange: (Settings) -> Unit,
     modifier: Modifier = Modifier,
+    localModels: LocalModelsUi = LocalModelsUi.EMPTY,
+    localActions: LocalModelActions = LocalModelActions.None,
 ) {
     val palette = LocalKeyFlowPalette.current
     val scroll = rememberScrollState()
@@ -65,6 +69,7 @@ fun VozPanel(
             .verticalScroll(scroll)
             .padding(top = 6.dp, bottom = 20.dp),
     ) {
+        PartialSection(settings, onSettingsChange)
         Text(
             text = "Origem da transcrição".uppercase(),
             color = palette.faint,
@@ -103,6 +108,7 @@ fun VozPanel(
                 onLanguage = { onSettingsChange(settings.copy(groqLanguage = it.ifBlank { null })) },
             )
             TranscriptionSource.CUSTOM -> CustomFields(settings, onSettingsChange)
+            TranscriptionSource.LOCAL -> LocalPanel(settings, onSettingsChange, localModels, localActions)
         }
 
         // Abaixo do token/credenciais do preset ativo (pedido do Yan, 2026-07-02) — não compete por
@@ -116,6 +122,7 @@ private fun sourceLabel(source: TranscriptionSource): String = when (source) {
     TranscriptionSource.OPENAI -> "OpenAI"
     TranscriptionSource.GROQ -> "Groq"
     TranscriptionSource.CUSTOM -> "Custom"
+    TranscriptionSource.LOCAL -> "Local"
 }
 
 // Modelos de transcrição por provedor (docs OpenAI/Groq, 2026). O 1º é o padrão (Whisper).
@@ -124,7 +131,7 @@ private val GROQ_MODELS = listOf("whisper-large-v3", "whisper-large-v3-turbo", "
 private val CUSTOM_MODELS = listOf("whisper-1", "whisper-large-v3", "whisper-large-v3-turbo")
 
 // Idiomas (ISO-639-1) suportados pelo Whisper; "" = detecção automática (padrão).
-private val LANGUAGE_OPTIONS = listOf("", "pt", "en", "es", "fr", "de", "it", "nl", "ja", "zh", "ko", "ru")
+internal val LANGUAGE_OPTIONS = listOf("", "pt", "en", "es", "fr", "de", "it", "nl", "ja", "zh", "ko", "ru")
 
 internal fun languageLabel(code: String): String = when (code) {
     "" -> "Automático"
@@ -171,6 +178,33 @@ private fun maxRecordingLabel(sec: Int): String = when (sec) {
     600 -> "10m"
     1800 -> "30m"
     else -> if (sec < 60) "${sec}s" else "${sec / 60}m"
+}
+
+/**
+ * Seção "Transcrição" (PAR-01, G12): acima da origem porque vale para qualquer uma. O 2º toggle só
+ * responde com o 1º ligado; desligar o 1º não apaga o 2º (volta como estava ao religar).
+ */
+@Composable
+private fun PartialSection(settings: Settings, onSettingsChange: (Settings) -> Unit) {
+    val palette = LocalKeyFlowPalette.current
+    Column(Modifier.padding(bottom = 20.dp)) {
+        Text(text = "Transcrição".uppercase(), color = palette.faint, fontFamily = SpaceMono, fontSize = 8.5.sp)
+        ToggleRow(
+            label = "Transcrever parcialmente ao pausar",
+            sub = "Cada pausa já transcreve o trecho gravado; o envio final fica quase instantâneo.",
+            checked = settings.partialOnPause,
+            onCheckedChange = { onSettingsChange(settings.copy(partialOnPause = it)) },
+            tag = VOZ_PARTIAL_ON_PAUSE_TAG,
+        )
+        ToggleRow(
+            label = "Visualizar e editar transcrição parcial",
+            sub = "Toque no aviso junto à orbe pausada para ver e corrigir o texto antes de enviar.",
+            checked = settings.partialViewEdit,
+            onCheckedChange = { onSettingsChange(settings.copy(partialViewEdit = it)) },
+            tag = VOZ_PARTIAL_VIEW_EDIT_TAG,
+            enabled = settings.partialOnPause,
+        )
+    }
 }
 
 /**

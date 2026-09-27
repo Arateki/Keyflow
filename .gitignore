@@ -5,3 +5,7 @@ build/
 
 # Saída regenerável do harness de verificação (o golden versionado vem em verification/golden/, T26)
 /verification/*.png
+
+# AAR do sherpa-onnx: baixado e conferido por SHA256 pelo app/build.gradle.kts (NM-T1)
+/app/libs/*.aar
+/app/libs/*.part

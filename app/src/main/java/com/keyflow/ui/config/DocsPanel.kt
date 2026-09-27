@@ -193,6 +193,10 @@ val docsSections: List<DocSection> = listOf(
             DocBlock.Paragraph(
                 "Ao atingir a duração máxima de gravação (aba Voz), a gravação pausa sozinha e pergunta se você quer enviar ou descartar.",
             ),
+            DocBlock.Labeled(
+                "Parcial",
+                "com \"Transcrever parcialmente ao pausar\" ligado (aba Voz), cada pausa já transcreve o trecho gravado e um aviso aparece junto à orbe. Com a visualização ligada, toque no aviso para ler e toque de novo para editar; o texto novo entra depois das suas edições, e o envio entrega tudo junto.",
+            ),
         ),
     ),
     DocSection(
@@ -245,14 +249,40 @@ val docsSections: List<DocSection> = listOf(
         ),
     ),
     DocSection(
+        "voz-local",
+        "Voz no aparelho",
+        listOf(
+            DocBlock.Paragraph(
+                "A origem Local transcreve sem internet: escolha um modelo na aba Voz, baixe uma vez e ele fica no aparelho. O Rápido é leve; o Equilibrado é mais preciso; o Máxima qualidade é o mais preciso e o mais pesado.",
+            ),
+            DocBlock.Labeled("Download", "em Wi-Fi começa direto; em dados móveis o app pergunta antes, mostrando o tamanho. Um modelo por vez."),
+            DocBlock.Labeled("Espaço", "apagar um modelo na aba Voz devolve o espaço na hora. Modelos não entram no backup e somem se o app for desinstalado."),
+        ),
+    ),
+    DocSection(
         "privacidade",
         "Privacidade",
-        listOf(DocBlock.Paragraph("O áudio só é enviado à origem configurada em Voz. Tokens ficam apenas no aparelho.")),
+        listOf(
+            DocBlock.Paragraph(
+                "O áudio só é enviado à origem configurada em Voz — com a origem Local, ele nunca sai do aparelho. Tokens ficam apenas no aparelho.",
+            ),
+        ),
     ),
     DocSection(
         "creditos",
         "Créditos",
         listOf(DocBlock.Paragraph("Sem provedor próprio? Use Créditos e pague por minuto via Google Play.")),
+    ),
+    DocSection(
+        "licencas",
+        "Licenças",
+        listOf(
+            DocBlock.Labeled("sherpa-onnx", "reconhecimento de voz no aparelho — Apache 2.0 (k2-fsa)."),
+            DocBlock.Labeled("ONNX Runtime", "motor de inferência dentro do sherpa-onnx — MIT (Microsoft)."),
+            DocBlock.Labeled("Whisper", "modelos Rápido e Equilibrado — MIT (OpenAI); os cards do Hugging Face declaram Apache 2.0."),
+            DocBlock.Labeled("Parakeet TDT 0.6B v3", "modelo Máxima qualidade — CC BY 4.0 (NVIDIA), convertido para ONNX int8 pelo sherpa-onnx."),
+            DocBlock.Labeled("Space Grotesk e Space Mono", "fontes — SIL Open Font License 1.1."),
+        ),
     ),
     DocSection(
         "feedback",

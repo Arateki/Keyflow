@@ -287,35 +287,3 @@ private fun KeyboardSizePreview(scalePercent: Int, dark: Boolean, locale: String
     }
 }
 
-/**
- * Linha de um cenário de cola automática: rótulo + descrição curta à esquerda, [PillToggle] à direita.
- * Quando [enabled] é falso a linha fica esmaecida (somente-leitura) e o toque chama [onDisabledClick]
- * em vez de alternar — mesmo padrão das abas/menus inativos.
- */
-@Composable
-private fun ToggleRow(
-    label: String,
-    sub: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    tag: String,
-    enabled: Boolean = true,
-    onDisabledClick: () -> Unit = {},
-) {
-    val palette = LocalKeyFlowPalette.current
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .then(if (enabled) Modifier else Modifier.clickable { onDisabledClick() })
-            .padding(top = 12.dp)
-            .then(if (enabled) Modifier else Modifier.alpha(0.45f)),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(label, color = palette.fg2, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Medium, fontSize = 11.5.sp)
-            Text(sub, color = palette.faint, fontFamily = SpaceGrotesk, fontSize = 10.sp, modifier = Modifier.padding(top = 1.dp))
-        }
-        PillToggle(checked = checked, onCheckedChange = onCheckedChange, tag = tag, enabled = enabled)
-    }
-}

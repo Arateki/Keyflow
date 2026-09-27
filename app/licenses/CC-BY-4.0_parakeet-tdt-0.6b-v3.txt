@@ -1,0 +1,9 @@
+Parakeet TDT 0.6B v3 — NVIDIA
+Licença: Creative Commons Attribution 4.0 International (CC BY 4.0)
+https://creativecommons.org/licenses/by/4.0/legalcode
+
+Modelo original: https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3
+Versão usada pelo KeyFlow: conversão ONNX int8 publicada pelo projeto sherpa-onnx
+(https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8), baixada sob demanda
+pelo app — não vem dentro do APK. Alterações em relação ao original: conversão para ONNX e
+quantização int8, feitas pelo sherpa-onnx.

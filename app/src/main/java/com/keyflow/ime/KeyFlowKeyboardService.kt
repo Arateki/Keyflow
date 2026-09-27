@@ -13,6 +13,7 @@ import com.keyflow.core.KeyFlowController
 import com.keyflow.core.shortcuts.BarsConfig
 import com.keyflow.core.shortcuts.ShortcutGrid
 import com.keyflow.core.shortcuts.ShortcutKey
+import com.keyflow.data.EffectiveConfig
 import com.keyflow.data.SettingsRepository
 import com.keyflow.ime.keyboard.ComposingWordTracker
 import com.keyflow.ime.keyboard.SystemSpellChecker
@@ -20,6 +21,7 @@ import com.keyflow.ime.keyboard.isNumericInputType
 import com.keyflow.ime.keys.PhysicalKeyEmitter
 import com.keyflow.overlay.OverlayService
 import com.keyflow.overlay.RecordingNotification
+import com.keyflow.transcription.local.LocalTranscriber
 import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -32,6 +34,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
 class KeyFlowKeyboardService : InputMethodService() {
+
+    // Origem de voz atual, para pré-carregar o modelo local quando o teclado abre (NM-T9).
+    @Volatile
+    private var voiceSource: EffectiveConfig = EffectiveConfig.Unavailable
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var keyboardView: KeyFlowKeyboardView? = null
@@ -95,6 +101,9 @@ class KeyFlowKeyboardService : InputMethodService() {
             SettingsRepository(this@KeyFlowKeyboardService).settingsFlow().collect {
                 KeyFlowController.autoPasteInField = it.autoPasteInField
                 KeyFlowController.autoPasteOnFocus = it.autoPasteOnFocus
+                voiceSource = it.effectiveConfigFor()
+                // Trocou origem/modelo com o teclado aberto: carrega o novo ou solta a RAM (NAT-05/09).
+                if (keyboardView?.isShown == true) LocalTranscriber.get(this@KeyFlowKeyboardService).sync(voiceSource)
             }
         }
         // Mostrar (ou não) com teclado físico conectado. Precisa de `updateInputViewShown()` na troca:
@@ -371,6 +380,8 @@ class KeyFlowKeyboardService : InputMethodService() {
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         Log.d(TAG, "onStartInputView restarting=$restarting")
+        // Teclado aberto = modo ativo: com origem Local, o modelo já fica carregado para o mic (NAT-05).
+        LocalTranscriber.get(this).sync(voiceSource)
         KeyFlowController.registerInserter { text ->
             getCurrentInputConnection()?.commitText(text, 1) == true
         }

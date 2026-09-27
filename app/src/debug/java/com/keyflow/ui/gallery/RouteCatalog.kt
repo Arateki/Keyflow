@@ -53,6 +53,10 @@ import com.keyflow.ui.orb.OrbDragKind
 import com.keyflow.ui.orb.OrbState
 import com.keyflow.ui.orb.VoiceOrb
 import com.keyflow.ui.theme.LocalKeyFlowPalette
+import com.keyflow.ui.config.LocalModelsUi
+import com.keyflow.data.models.ModelCatalog
+import com.keyflow.data.models.DownloadState
+import com.keyflow.data.models.DownloadProgress
 
 /**
  * Única fonte de verdade das rotas de verificação (VERIFY-05). Cada rota é uma tela/estado isolado,
@@ -172,6 +176,30 @@ object RouteCatalog {
         Route("config-voz-creditos") { ConfigVozRoute(TranscriptionSource.CREDITS) },
         Route("config-voz-openai") { ConfigVozRoute(TranscriptionSource.OPENAI) },
         Route("config-voz-custom") { ConfigVozRoute(TranscriptionSource.CUSTOM) },
+        // Gerenciador de modelos locais (MGR-07): nada baixado / baixando (progresso congelado) /
+        // um selecionado e os outros disponíveis.
+        Route("config-voz-local") { ConfigVozRoute(TranscriptionSource.LOCAL, localModels = LocalModelsUi.EMPTY) },
+        Route("config-voz-local-baixando") {
+            ConfigVozRoute(
+                TranscriptionSource.LOCAL,
+                localModels = galleryLocalModels(
+                    installed = emptySet(),
+                    active = DownloadProgress(
+                        ModelCatalog.WHISPER_SMALL.id,
+                        DownloadState.RUNNING,
+                        bytesDone = ModelCatalog.WHISPER_SMALL.totalBytes * 42 / 100,
+                        totalBytes = ModelCatalog.WHISPER_SMALL.totalBytes,
+                    ),
+                ),
+            )
+        },
+        Route("config-voz-local-pronto") {
+            ConfigVozRoute(
+                TranscriptionSource.LOCAL,
+                localModelId = ModelCatalog.WHISPER_BASE.id,
+                localModels = galleryLocalModels(installed = setOf(ModelCatalog.WHISPER_BASE.id), selected = ModelCatalog.WHISPER_BASE.id),
+            )
+        },
         Route("config-teclado") { ConfigTabRoute(ConfigTab.TECLADO, keyboardEnabled = true) },
         Route("config-overlay") { ConfigTabRoute(ConfigTab.OVERLAY, overlayEnabled = true) },
         Route("config-docs") { ConfigTabRoute(ConfigTab.DOCS) },
@@ -212,11 +240,20 @@ object RouteCatalog {
         )
     }
 
-    /** Aba Voz por origem (Créditos/OpenAI/Custom) — espelha os mocks 02-v2/03-v2. */
+    /** Estado fixo do painel Local: RAM de sobra (sem aviso de peso) para os goldens não dependerem do aparelho. */
+    private fun galleryLocalModels(installed: Set<String>, active: DownloadProgress? = null, selected: String? = null) =
+        LocalModelsUi.compose(installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_192)
+
+    /** Aba Voz por origem (Créditos/OpenAI/Custom/Local) — espelha os mocks 02-v2/03-v2. */
     @Composable
-    private fun ConfigVozRoute(source: TranscriptionSource) {
+    private fun ConfigVozRoute(
+        source: TranscriptionSource,
+        localModelId: String? = null,
+        localModels: LocalModelsUi = LocalModelsUi.EMPTY,
+    ) {
         ConfigScreen(
-            settings = FakeSettings.settings.copy(source = source),
+            settings = FakeSettings.settings.copy(source = source, localModelId = localModelId),
+            localModels = localModels,
             permissions = PermissionStatus(
                 microphoneGranted = true,
                 overlayGranted = true,

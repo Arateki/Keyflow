@@ -31,6 +31,11 @@ import com.keyflow.data.OverlayPosition
 import com.keyflow.data.Settings
 import com.keyflow.data.SettingsRepository
 import com.keyflow.transcription.TranscriptionClient
+import com.keyflow.transcription.local.LocalTranscriber
+import com.keyflow.transcription.partial.PartialOverlay
+import com.keyflow.transcription.partial.PartialSnapshot
+import com.keyflow.transcription.partial.PartialUi
+import com.keyflow.transcription.partial.PartialUiMode
 import androidx.compose.ui.graphics.toArgb
 import com.keyflow.ui.common.ComposeWindowHost
 import com.keyflow.ui.theme.paletteFor
@@ -61,6 +66,12 @@ class OverlayService : Service() {
 
     // Banner de erro clicável (substitui o toast nos erros resolvíveis na Voz).
     private var errorBanner: View? = null
+
+    // Transcrição parcial (NM-T17): último estado da sessão, o que o usuário abriu e o estado da orbe.
+    private var partialSnapshot: PartialSnapshot? = null
+    private var partialOpened = PartialUiMode.HIDDEN
+    private var lastButtonState = ButtonState.IDLE_NO_FIELD
+    private var partialOverlay: PartialOverlay? = null
     private var errorBannerJob: Job? = null
 
     // Banner "cancelado · desfazer" durante a janela de descarte (Fase 2a). Mostra/some por callback do
@@ -135,6 +146,7 @@ class OverlayService : Service() {
     private fun startOverlay() {
         ensureForeground()
         overlayActive = true
+        syncLocalEngine()
         isRunningForUi = true
         if (OverlayPermission.canDrawOverlays(this) && floatingButton == null) {
             addFloatingButton()
@@ -144,6 +156,7 @@ class OverlayService : Service() {
     /** Promove a primeiro plano (FGS de microfone) sob demanda. Idempotente. */
     private fun ensureForeground() {
         if (isForeground) return
+        syncLocalEngine()
         val notification = recordingNotification.build(
             if (::coordinator.isInitialized) coordinator.currentState() else ButtonState.IDLE_NO_FIELD,
             dark = cachedSettings.themeDark,
@@ -160,6 +173,48 @@ class OverlayService : Service() {
             android.util.Log.e("KeyFlow.Overlay", "startForeground falhou: ${e.message}", e)
             stopSelf()
         }
+    }
+
+    /**
+     * Indicador/visualização/edição do parcial junto à orbe (PAR-04/05). Sem orbe (sessão só do
+     * teclado), ancora no canto de cima — a notificação de gravação continua sendo o controle.
+     */
+    private fun refreshPartialUi() {
+        if (PartialUi.closesOpened(lastButtonState)) partialOpened = PartialUiMode.HIDDEN
+        val mode = PartialUi.resolve(partialOpened, lastButtonState, partialSnapshot, cachedSettings.partialViewEdit)
+        if (mode == PartialUiMode.HIDDEN && partialOverlay == null) return
+        val overlay = partialOverlay ?: PartialOverlay(
+            context = this,
+            windowManager = windowManager,
+            onBadgeTap = {
+                partialOpened = PartialUi.onBadgeTap(cachedSettings.partialViewEdit)
+                refreshPartialUi()
+            },
+            onViewerTap = {
+                partialOpened = PartialUiMode.INPUT
+                refreshPartialUi()
+            },
+            onClose = {
+                partialOpened = PartialUiMode.HIDDEN
+                refreshPartialUi()
+            },
+            onEdited = { text -> if (::coordinator.isInitialized) coordinator.onPartialEdited(text) },
+        ).also { partialOverlay = it }
+        val density = resources.displayMetrics.density
+        val params = floatingButtonParams
+        overlay.render(
+            mode = mode,
+            snapshot = partialSnapshot,
+            palette = paletteFor(cachedSettings.themeDark),
+            orbX = params?.x ?: (16 * density).toInt(),
+            orbY = params?.y ?: (72 * density).toInt(),
+            orbSize = floatingButton?.height?.takeIf { it > 0 } ?: cachedSettings.orbSizePx,
+        )
+    }
+
+    /** Modo ativo com origem Local → modelo pré-carregado no :inference (NAT-05); outra origem → solta. */
+    private fun syncLocalEngine() {
+        LocalTranscriber.get(this).sync(cachedSettings.effectiveConfigFor())
     }
 
     /**
@@ -215,6 +270,7 @@ class OverlayService : Service() {
 
     override fun onDestroy() {
         isRunningForUi = false
+        partialOverlay?.remove()
         removeErrorBanner()
         removeCancelBanner()
         removeLimitBanner()
@@ -228,8 +284,12 @@ class OverlayService : Service() {
         coordinator = OverlayCoordinator(
             scope = serviceScope,
             configProvider = { settingsRepository.flow().first() },
+            partialOnPause = { cachedSettings.partialOnPause },
             recorder = AndroidOverlayAudioRecorder(AudioRecorder(this)),
-            transcriber = AndroidOverlayTranscriber(TranscriptionClient()),
+            transcriber = RoutingTranscriber(
+                http = AndroidOverlayTranscriber(TranscriptionClient()),
+                local = LocalTranscriber.get(this),
+            ),
             insertOrHold = KeyFlowController::insertOrHold,
             flushPending = KeyFlowController::flushPending,
             targetAvailable = { KeyFlowController.targetAvailable.value },
@@ -237,7 +297,13 @@ class OverlayService : Service() {
                 floatingButton?.render(state)
                 KeyFlowController.updateButtonState(state)
                 if (isForeground) postNotification(state)
+                lastButtonState = state
+                refreshPartialUi()
                 maybeStopWhenIdle(state)
+            },
+            onPartial = { snapshot ->
+                partialSnapshot = snapshot
+                refreshPartialUi()
             },
             onClipboard = { text ->
                 val cm = getSystemService(ClipboardManager::class.java)
@@ -299,6 +365,8 @@ class OverlayService : Service() {
                 }
                 KeyFlowController.autoPasteInField = it.autoPasteInField
                 KeyFlowController.autoPasteOnFocus = it.autoPasteOnFocus
+                // Origem/modelo local trocados com o modo ativo: carrega o novo ou solta a RAM (NAT-05/09).
+                if (overlayActive || isForeground) syncLocalEngine()
                 // Tamanho da orbe ao vivo (slider da aba Sobrepor).
                 if (it.orbSizePx != prevSizePx) floatingButton?.setOrbSizePx(it.orbSizePx)
                 // Intervalo entre toques ao vivo (slider de Atalhos).
@@ -786,6 +854,12 @@ class OverlayService : Service() {
         override fun discard() {
             recorder.discard()
         }
+
+        override fun startSegmented() {
+            recorder.start(segmented = true)
+        }
+
+        override fun pauseSegment(): File? = recorder.pause()
     }
 
     private class AndroidOverlayTranscriber(

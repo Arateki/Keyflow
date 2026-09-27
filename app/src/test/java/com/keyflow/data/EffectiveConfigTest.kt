@@ -102,4 +102,36 @@ class EffectiveConfigTest {
         val ready = settings.effectiveConfigFor() as EffectiveConfig.Ready
         assertThat(ready.config.timeoutMs).isEqualTo(com.keyflow.data.Config.DEFAULT_TIMEOUT_MS)
     }
+
+    // ── NM-T2: origem Local ────────────────────────────────────────────────────
+
+    @Test
+    fun `local with a selected model resolves to the on-device engine with its language`() {
+        val settings = Settings(source = TranscriptionSource.LOCAL, localModelId = "whisper-base", localLanguage = "pt")
+
+        assertThat(settings.effectiveConfigFor()).isEqualTo(EffectiveConfig.Local(modelId = "whisper-base", language = "pt"))
+    }
+
+    @Test
+    fun `local without a language keeps it null for auto-detect`() {
+        val settings = Settings(source = TranscriptionSource.LOCAL, localModelId = "parakeet")
+
+        assertThat((settings.effectiveConfigFor() as EffectiveConfig.Local).language).isNull()
+    }
+
+    /** NAT-03: sem modelo, o mesmo caminho do Créditos — que termina em CONFIG_MISSING. */
+    @Test
+    fun `local without a model is unavailable`() {
+        val settings = Settings(source = TranscriptionSource.LOCAL, localLanguage = "pt")
+
+        assertThat(settings.effectiveConfigFor()).isEqualTo(EffectiveConfig.Unavailable)
+    }
+
+    @Test
+    fun `choosing another source keeps the local model for when the user comes back`() {
+        val settings = Settings(source = TranscriptionSource.OPENAI, openaiToken = "sk-abc", localModelId = "whisper-base")
+
+        assertThat(settings.effectiveConfigFor()).isInstanceOf(EffectiveConfig.Ready::class.java)
+        assertThat(settings.effectiveConfigFor(TranscriptionSource.LOCAL)).isInstanceOf(EffectiveConfig.Local::class.java)
+    }
 }

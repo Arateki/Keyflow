@@ -1,7 +1,7 @@
 # Native Voice Models — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (G1–G11)
-**Status**: Draft (aguardando aprovação do Yan)
+**Status**: Código completo e validado — NM-T1..T12 e T14..T17 (+ núcleo da T18). CI verde em 5db6d75 (2026-09-27): 240/240 instrumentados, 0 pulados (incl. ponta a ponta do modelo local, `:inference`, parcial no serviço real) e telas 84/84. Pendentes: roteiros manuais da T18 e da T13 no A32 [YAN] (`manual-validation.md`).
 
 > Gate no sandbox: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon <task>`
 > Instrumentado escopado: `ANDROID_SERIAL=emulator-5554`. Antes de instalar no device do Yan:
@@ -32,7 +32,11 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
 
 ## Fase A — Fundação
 
-### NM-T1 — AAR sherpa-onnx no build
+### NM-T1 — AAR sherpa-onnx no build ✅ CONCLUÍDA (2026-09-24)
+> **SPEC_DEVIATION (rota)**: nem `libs/` versionado nem `mavenLocal`. O AAR (v1.13.8, 50 MB, só existe
+> como anexo do release do GitHub — o JitPack é o jar de desktop) é **baixado pelo próprio
+> `app/build.gradle.kts` quando falta em `app/libs/` e conferido contra o SHA256 fixado**; o binário fica
+> fora do git. Mesmo efeito do `files("libs/…")` do design, sem 50 MB por versão no histórico.
 - **What**: integrar o AAR oficial (≥1.13.x) no app module — rota `libs/` + `files(...)` ou
   `mavenLocal` (documentar a vencedora p/ AGP 9.2); conferir minSdk ≤ 24 e ABIs presentes
   (arm64-v8a, armeabi-v7a, x86_64); smoke de link (classe do sherpa referenciada compila e o APK
@@ -43,7 +47,7 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
   documentada em comentário no gradle. Registro do tamanho adicionado por ABI.
 - **Tests**: none (integração de build; sem camada de código nova). **Gate**: `build`.
 
-### NM-T2 — `TranscriptionSource.LOCAL` + Settings + `EffectiveConfig.Local`
+### NM-T2 — `TranscriptionSource.LOCAL` + Settings + `EffectiveConfig.Local` ✅ CONCLUÍDA (2026-09-24; goldens `config-voz-*` via CI)
 - **What**: novo valor no enum; `Settings` += `localModelId: String?`/`localLanguage: String?`
   (persistidos no repo); `EffectiveConfig.Local(modelId, language)`; `effectiveConfigFor(LOCAL)`
   → `Local` quando há modelo, senão o caminho que produz `CONFIG_MISSING` (NAT-03). Branch
@@ -58,7 +62,11 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
   não quebra `when`s).
 - **Tests**: unit + instrumented (camada `data`). **Gate**: `full`.
 
-### NM-T3 — `ModelCatalog` embutido (3 modelos, dados reais) `[P]`
+### NM-T3 — `ModelCatalog` embutido (3 modelos, dados reais) `[P]` ✅ CONCLUÍDA (2026-09-24)
+> **SPEC_DEVIATION (pequenas, a favor do engine/downloader)**: `ModelFile` ganhou `role: FileRole`
+> (ENCODER/DECODER/JOINER/TOKENS — o engine monta a config por papel, não pelo nome do arquivo);
+> `languages` é o texto de exibição (`"99 idiomas"`), não lista; URLs fixadas no **commit** do repo HF
+> em vez de `main` (o SHA do catálogo continua valendo mesmo se o upstream mexer no arquivo — G5).
 - **What**: `EngineType`/`ModelFile`/`ModelSpec` + `Catalog.MODELS` com **Whisper base int8**,
   **Whisper small int8**, **Parakeet TDT 0.6B v3 int8** — URLs/SHA256/bytes **reais conferidos**
   nos repos HF upstream (csukuangfj; o HF expõe sha256 dos blobs LFS — não fabricar), summary,
@@ -73,7 +81,7 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
 
 ## Fase B — Disco & áudio
 
-### NM-T4 — `ModelStore` (instalação/deleção/manifest)
+### NM-T4 — `ModelStore` (instalação/deleção/manifest) ✅ CONCLUÍDA (2026-09-24; instrumentado validado no CI 2026-09-27)
 - **What**: layout `filesDir/models/<id>/` + `manifest.json` pós-verificação (marcador de íntegro);
   `installedIds`/`dirFor`/`install` (move atômico do tmp)/`delete` (dir inteiro)/`freeBytes`.
 - **Where**: `data/models/ModelStore.kt`.
@@ -83,7 +91,7 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
   = não instalado (meio-instalado não conta).
 - **Tests**: instrumented (files/Context — camada `data`). **Gate**: `full`.
 
-### NM-T5 — `AudioDecoder` (.m4a → PCM 16 kHz) + gravação 16 kHz
+### NM-T5 — `AudioDecoder` (.m4a → PCM 16 kHz) + gravação 16 kHz ✅ CONCLUÍDA (2026-09-24; instrumentado validado no CI 2026-09-27)
 - **What**: `MediaExtractor`+`MediaCodec` → PCM 16-bit → float mono; resample defensivo p/ 16 kHz
   (função pura). Mudar `AudioRecorder.AUDIO_SAMPLE_RATE` 44100→16000 (NAT-02; AAC 16 kHz, arquivo
   menor, ASR só usa 16 kHz).
@@ -97,7 +105,12 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
 
 ## Fase C — Download
 
-### NM-T6 — `ModelDownloader`: iniciar/progresso/cancelar + políticas
+### NM-T6 — `ModelDownloader`: iniciar/progresso/cancelar + políticas ✅ CONCLUÍDA (2026-09-24; instrumentado validado no CI 2026-09-27)
+> **SPEC_DEVIATION (espaço, DLM-05)**: o DownloadManager só grava no armazenamento externo do app e o
+> modelo depois é **copiado** para o interno (NM-T4). No mesmo volume (quase todo aparelho: o externo
+> emulado é uma pasta de `/data`) o modelo existe duas vezes por um instante — a checagem exige
+> **×2,2** do tamanho, não ×1,2. Em volumes separados (SD adotado), ×1,2 em cada um. Mesmo volume ⇔
+> mesmo `totalSpace`.
 - **What**: wrapper do `DownloadManager` — `start(spec, allowMetered)` (pré-checagens: espaço
   ×1,2 DLM-05; 1 por vez DLM-06; metered exige flag do caller DLM-04) enfileirando 1 request por
   arquivo p/ `externalFilesDir/model-tmp/<id>/` + `downloads.json` (request-ids);
@@ -111,7 +124,13 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
   → progresso → cancel limpa.
 - **Tests**: unit + instrumented (camada `data`). **Gate**: `full`.
 
-### NM-T7 — `ModelDownloader`: conclusão, SHA256, instalação, reconciliação
+### NM-T7 — `ModelDownloader`: conclusão, SHA256, instalação, reconciliação ✅ CONCLUÍDA (2026-09-25; instrumentado validado no CI 2026-09-27)
+> Receiver **no manifest**, com `android:permission="android.permission.SEND_DOWNLOAD_COMPLETED_INTENTS"`
+> — conferido no AOSP (DownloadProvider): o broadcast sai com `setPackage(<quem pediu>)` e a permissão é
+> de assinatura, declarada e usada só pelo DownloadProvider. O broadcast é só aviso: quem decide é
+> `reconcile()` (consulta o sistema); a UI (NM-T10) chama `reconcile()` ao abrir o gerenciador — é o
+> "init" da reconciliação. Janela do `goAsync` (60 s em segundo plano) p/ SHA + cópia de 640 MB: medir
+> no A32 na NM-T13; se estourar, o `downloads.json` fica e a próxima reconciliação refaz.
 - **What**: broadcast `ACTION_DOWNLOAD_COMPLETE` + varredura → todos `SUCCESSFUL` → SHA256 em
   streaming → `ModelStore.install` → limpar tmp; mismatch → descarte + erro (DLM-02).
   Reconciliação no init (DLM-07): casar `downloads.json` com a query (concluiu com app morto →
@@ -126,7 +145,17 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
 
 ## Fase D — Inferência (processo `:inference`)
 
-### NM-T8 — AIDL + `InferenceService` + `SherpaEngine`
+### NM-T8 — AIDL + `InferenceService` + `SherpaEngine` ✅ CONCLUÍDA (2026-09-25; instrumentado validado no CI 2026-09-27)
+> **SPEC_DEVIATION (janela do Whisper)**: o design não previa, mas o Whisper do sherpa-onnx processa só
+> os primeiros ~30 s de cada stream e **descarta o resto** (`offline-recognizer-whisper-impl.h`,
+> v1.13.8; medido no whisper-base com áudio de 49,7 s: a 2ª metade sumia). `WhisperChunker` corta em
+> janelas de até 28 s, no quadro mais silencioso dos últimos 4 s de cada janela; os textos são unidos
+> com espaço. Parakeet (transducer) recebe o áudio inteiro.
+> **SPEC_DEVIATION (smoke do engine real)**: em vez de `assume()` com arquivos em
+> `/sdcard/keyflow-test-models/` (o app não lê `/sdcard` sem permissão de armazenamento), o
+> `LocalEngineEndToEndTest` **baixa o Whisper base do catálogo** pelo próprio `ModelDownloader`
+> (SHA + instalação) e transcreve fala real (`test_wavs` do sherpa-onnx, LibriSpeech CC BY 4.0).
+> Opt-in por argumento de instrumentação `localModelE2E=true` — ligado no CI.
 - **What**: AIDL (`ITranscriptionEngine`/`IEngineCallback`/`LocalModelConfig` Parcelable);
   `InferenceService` em `android:process=":inference"` (`exported=false`): executor único,
   `preload` residente (G10), troca de modelo = reload (NAT-09, lado engine), guarda de RAM +
@@ -143,7 +172,15 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
   `/sdcard/keyflow-test-models/`); unit dos mapeamentos puros (config por tipo, kinds de erro).
 - **Tests**: instrumented + unit (camadas `overlay/service`-like + lógica). **Gate**: `full`.
 
-### NM-T9 — `LocalTranscriber` + fiação no fluxo (coordinator/IME) + preload
+### NM-T9 — `LocalTranscriber` + fiação no fluxo (coordinator/IME) + preload ✅ CONCLUÍDA (2026-09-25; instrumentado validado no CI 2026-09-27)
+> Roteamento: `Config` ganhou `local: EffectiveConfig.Local?` (sem endpoint/token quando Local) e o
+> `RoutingTranscriber` manda para o `LocalTranscriber` ou para o HTTP intocado — o coordinator não mudou
+> de forma. Espera mínima de 180 s para Local (a 1ª inclui carregar o modelo). `ErrorKind.LOCAL` traz a
+> mensagem pronta (modelo sumiu / memória / áudio / engine / processo morto) e o X leva à aba Voz;
+> selecionado mas não baixado = `CONFIG_MISSING` (NAT-03). `LocalTranscriber` é único por processo
+> (overlay e teclado dividem bind e modelo residente); `sync()` pré-carrega ao ativar o modo (orbe,
+> sessão do mic, teclado aberto) e **solta o bind quando a origem deixa de ser Local** — a RAM do modelo
+> volta sem esperar o SO. Bind em uso só cai depois da última resposta.
 - **What**: client IPC (`suspend transcribe` com bind/callback→resultado, `DeathRecipient`→
   `Error(LOCAL)`, timeout generoso); `ErrorKind.LOCAL`; ramificação `EffectiveConfig.Local` no
   coordinator/IME (Ready→HTTP intocado); preload no start do modo com LOCAL+modelo (NAT-05);
@@ -160,7 +197,13 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
 
 ## Fase E — UI
 
-### NM-T10 — `LocalPanel` (gerenciador na aba Voz)
+### NM-T10 — `LocalPanel` (gerenciador na aba Voz) ✅ CONCLUÍDA (2026-09-25; instrumentado validado no CI 2026-09-27)
+> **SPEC_DEVIATION (confirmações)**: dados móveis (DLM-04) e apagar (MGR-04) confirmam **dentro do
+> próprio card** ("Baixar ~639 MB por dados móveis?" / "Apagar Rápido? Libera ~153 MB." + Cancelar /
+> confirmar), não em janela modal — o app não tem diálogos no padrão Ateliê e o inline sai
+> determinístico nos goldens. Mesmo efeito: nada baixa por dados móveis nem apaga sem o segundo toque.
+> Auto-seleção (MGR-03) fica no `ModelDownloader` (`onInstalled` → `selectLocalModelIfNone`, escrita
+> atômica só da chave) — vale também para instalação feita pelo broadcast com o app fechado.
 - **What**: branch LOCAL real do `VozPanel`: lista do catálogo (nome/tamanho/idiomas/summary) com
   estados disponível/baixando(%+Cancelar)/baixado(+Deletar)/selecionado; diálogos (metered com
   tamanho DLM-04; confirmação de deleção MGR-04); auto-seleção pós-download (MGR-03); aviso de
@@ -174,7 +217,7 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
   seleção persiste + confirmação de deleção + diálogo metered; suíte existente da config verde.
 - **Tests**: unit + instrumented (camada `ui`). **Gate**: `full`.
 
-### NM-T11 — Rotas de galeria + goldens
+### NM-T11 — Rotas de galeria + goldens ✅ CONCLUÍDA (2026-09-27; goldens aprovados das telas do CI em be0cc6c)
 - **What**: rotas `config-voz-local` (vazio) / `config-voz-local-baixando` (progresso congelado) /
   `config-voz-local-pronto` (1 selecionado + 1 disponível) com fakes determinísticos; regenerar +
   aprovar goldens (claro/escuro); espelhar PNGs em `/tmp/keyflow-prints/`.
@@ -187,7 +230,9 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
 
 ## Fase F — Transcrição parcial ao pausar (G12)
 
-### NM-T14 — Toggles `partialOnPause`/`partialViewEdit` na aba Voz
+### NM-T14 — Toggles `partialOnPause`/`partialViewEdit` na aba Voz ✅ CONCLUÍDA (2026-09-25; instrumentado validado no CI 2026-09-27)
+> `ToggleRow` saiu do `TecladoPanel` para o `ConfigFields` (reuso). A seção entra no topo da aba Voz:
+> **todos** os goldens `config-voz-*` mudam de propósito (aprovar pelas telas do CI).
 - **What**: `Settings` += `partialOnPause: Boolean = false`, `partialViewEdit: Boolean = false`
   (persistidos); seção "Transcrição" na aba Voz (acima do Segmented de origem) com os 2 toggles —
   o 2º desabilitado quando o 1º está off (PAR-01).
@@ -198,7 +243,10 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
   suíte existente verde.
 - **Tests**: unit + instrumented (camadas `data`/`ui`). **Gate**: `full`.
 
-### NM-T15 — `AudioRecorder` segmentado
+### NM-T15 — `AudioRecorder` segmentado ✅ CONCLUÍDA (2026-09-25; instrumentado validado no CI 2026-09-27)
+> `pause()` passou a devolver `File?` (o trecho fechado no modo segmentado; null fora dele) — quem
+> ignora o retorno segue compilando igual. `segments` lista os trechos fechados; `activeDurationMs()`
+> ficou pública (REC-06 atravessa trechos).
 - **What**: modo segmentado opt-in (`segmented: Boolean` no start): `pause()` finaliza o arquivo
   do segmento (stop real) e o expõe; `resume()` inicia novo arquivo; duração ativa acumulada
   (REC-06) atravessa segmentos; API pública p/ o coordinator inalterada; `discard()` apaga todos
@@ -211,7 +259,15 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
   comportamento antigo (testes existentes verdes).
 - **Tests**: instrumented (camada `audio`). **Gate**: `full`.
 
-### NM-T16 — `PartialSession` (buffer + transcrição por segmento)
+### NM-T16 — `PartialSession` (buffer + transcrição por segmento) ✅ CONCLUÍDA (2026-09-25)
+> **Antecipado da NM-T18 (núcleo do envio/cancelar no coordinator)**: com o toggle já visível desde a
+> T14, ligar só a pausa deixaria o envio entregando **apenas o último trecho**. Então entram juntos:
+> envio = fecha o trecho em curso → `finish()` (refaz falhas, espera a fila) → entrega uma vez pelo
+> fluxo atual → sessão destruída (PAR-07); cancelar de vez apaga trechos e buffer; desfazer mantém a
+> sessão, inclusive após cancelar **durante o envio** (retomar abre nova gravação segmentada na
+> mesma sessão) — PAR-08. Fica para a T18: o `OverlayServiceCancelTest` estendido e o roteiro manual.
+> Ordem com falha: um trecho que falhou segura os seguintes (transcritos, mas não anexados) até ser
+> refeito na próxima pausa ou no envio — o texto nunca sai fora de ordem.
 - **What**: `transcription/partial/PartialSession.kt`: fila de segmentos com estados
   (PENDING/TRANSCRIBING/DONE/FAILED), transcrição pela origem ativa a cada pausa (serializada),
   append ao buffer **sempre ao final** (edições são a verdade — PAR-06), falha → mantém o áudio
@@ -225,7 +281,12 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
   verdes.
 - **Tests**: unit (lógica extraída) + instrumentados existentes. **Gate**: `full`.
 
-### NM-T17 — `PartialBadge` / `PartialViewer` / `PartialInput` (UI junto à orbe)
+### NM-T17 — `PartialBadge` / `PartialViewer` / `PartialInput` (UI junto à orbe) ✅ CONCLUÍDA (2026-09-25; instrumentado validado no CI 2026-09-27)
+> As três janelas vivem num só `PartialOverlay` (Views, como os banners do serviço), com as regras puras
+> em `PartialUi`. Não havia `EphemeralInput` da vision-capture para reusar — o input focável daqui é o
+> primeiro; fica como base para ela. Visualização e input **seguem abertos** enquanto se grava e pausa
+> (PAR-05: o texto novo aparece junto) e **fecham ao enviar/cancelar** — a entrega precisa do foco de
+> volta no campo de origem. Sem orbe (sessão só do teclado), o indicador ancora no canto de cima.
 - **What**: badge sutil junto à orbe (só PAUSED com conteúdo — PAR-04; some no fim da sessão);
   com `partialViewEdit`: tap → viewer (leitura); tap de novo → input **focável** editável
   (janela própria efêmera — mesma técnica do `EphemeralInput` da `vision-capture`; extrair
@@ -242,7 +303,7 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
   visível; smoke: `EditText` externo (`ImeProbeActivity`) segue funcional após o input focável.
 - **Tests**: instrumented + unit (estado do badge). **Gate**: `full`.
 
-### NM-T18 — Integração do envio/cancelar + roteiro parcial
+### NM-T18 — Integração do envio/cancelar + roteiro parcial 🟡 CÓDIGO PRONTO (2026-09-25; núcleo na T16, instrumentado na T17) — falta o roteiro manual no A32 [YAN] (`manual-validation.md`, seção D)
 - **What**: envio (stop): transcreve o último segmento + re-tenta FAILED → append → texto
   completo (com edições) segue a **entrega atual** → buffer/input destruídos (PAR-07); cancelar
   descarta o buffer; desfazer do cancelamento restaura o buffer (PAR-08 — integra com o fluxo
@@ -258,7 +319,15 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
 
 ## Fase G — Loja & validação
 
-### NM-T12 — Prontidão de loja: backup, 16 KB, licenças
+### NM-T12 — Prontidão de loja: backup, 16 KB, licenças ✅ CONCLUÍDA (2026-09-25)
+> Backup exclui `models` (interno) **e** `external/model-tmp` — o Auto Backup também leva o
+> `getExternalFilesDir`, onde o DownloadManager grava. `scripts/check-16kb-alignment.py` confere o
+> ELF (PT_LOAD ≥ 16 KB) e o offset no zip dos `.so` guardados sem compressão; roda no job de unit do CI
+> (18/18 `.so` do APK debug passam; teste negativo com um `.so` de 4 KB falha como deve). Licenças:
+> sherpa-onnx (Apache-2.0), **ONNX Runtime (MIT — vem dentro do AAR)**, Whisper (MIT no repositório
+> oficial; o card do HF diz Apache-2.0 — as duas citadas) e Parakeet v3 (CC BY 4.0) em `app/licenses/`
+> + seção "Licenças" na Docs. Docs também ganhou "Voz no aparelho", o parcial em "Pausa" e a origem
+> Local em "Privacidade" — os goldens da Docs mudam de propósito.
 - **What**: `dataExtractionRules` (API 31+) + `fullBackupContent` excluindo `models/` (STO-01);
   script/verificação de alinhamento 16 KB dos `.so` do APK release (STO-02; reprovado → subir
   versão do AAR); licenças sherpa-onnx (Apache-2.0) + dos modelos (conferir nos cards HF) em
@@ -273,7 +342,7 @@ C/D/E se desejado (depende só de T2/T5 no áudio e de T9 p/ integrar com a entr
 - **Tests**: none (config/manifest/script; validação por gate+inspeção). **Gate**: `build` +
   manual (script).
 
-### NM-T13 — Validação manual no Galaxy A32 + traceability
+### NM-T13 — Validação manual no Galaxy A32 + traceability [YAN] — roteiro em `manual-validation.md`
 - **What**: roteiro e2e no device: baixar "Rápido" em Wi-Fi (progresso/notificação); fechar o app
   no meio → retomada; **modo avião**: ditar frase técnica PT → texto colado; dados móveis →
   diálogo com tamanho; deletar selecionado → erro de config ao ditar; matar o processo

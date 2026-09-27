@@ -108,6 +108,8 @@ class SettingsRepositoryTest {
             groqToken = "gsk-groq",
             groqModel = "whisper-large-v3",
             groqLanguage = "en",
+            localModelId = "whisper-base",
+            localLanguage = "pt",
             overlayRecordingMode = RecordingMode.PUSH_TO_TALK,
             overlaySide = OverlaySide.LEFT,
             orbSizePx = 250,
@@ -122,6 +124,76 @@ class SettingsRepositoryTest {
         repository.saveSettings(saved)
 
         assertEquals(saved, repository.settingsFlow().first())
+    }
+
+    /** NM-T2: sem modelo escolhido, os campos da origem Local voltam nulos — não string vazia. */
+    @Test
+    fun localSourceWithoutModelRoundTripsAsNull() = runTest {
+        val repository = newRepository()
+
+        repository.saveSettings(Settings(source = TranscriptionSource.LOCAL, localModelId = "whisper-base"))
+        repository.saveSettings(repository.settingsFlow().first().copy(localModelId = null))
+
+        val read = repository.settingsFlow().first()
+        assertEquals(TranscriptionSource.LOCAL, read.source)
+        assertEquals(null, read.localModelId)
+        assertEquals(null, read.localLanguage)
+    }
+
+    /**
+     * NM-T9 / PRV-01: com a origem Local, o Config do fluxo de gravação aponta para o engine local e não
+     * carrega endpoint nem token — mesmo com tokens de provedores salvos. Espera generosa.
+     */
+    @Test
+    fun localSourceConfigCarriesTheModelAndNoNetworkCredentials() = runTest {
+        val repository = newRepository()
+        repository.saveSettings(
+            Settings(
+                source = TranscriptionSource.LOCAL,
+                localModelId = "whisper-base-int8",
+                localLanguage = "pt",
+                openaiToken = "sk-guardado",
+                customEndpoint = "https://example.test",
+                customHeaderValue = "Bearer guardado",
+            ),
+        )
+
+        val cfg = repository.flow().first()
+
+        assertEquals(EffectiveConfig.Local("whisper-base-int8", "pt"), cfg.local)
+        assertEquals("", cfg.endpointUrl)
+        assertEquals("", cfg.authHeaderValue)
+        assertFalse(cfg.isComplete())
+        assertEquals(Config.LOCAL_MIN_TIMEOUT_MS, cfg.timeoutMs)
+    }
+
+    /** PAR-01: os toggles do parcial persistem e o padrão é desligado. */
+    @Test
+    fun partialTogglesPersistAndDefaultOff() = runTest {
+        val repository = newRepository()
+        assertEquals(false, repository.settingsFlow().first().partialOnPause)
+        assertEquals(false, repository.settingsFlow().first().partialViewEdit)
+
+        repository.saveSettings(Settings(partialOnPause = true, partialViewEdit = true))
+
+        val read = repository.settingsFlow().first()
+        assertEquals(true, read.partialOnPause)
+        assertEquals(true, read.partialViewEdit)
+    }
+
+    /** MGR-03: instalou e não havia seleção → seleciona; havia → não troca; não mexe no resto. */
+    @Test
+    fun selectLocalModelIfNoneOnlyFillsAnEmptySelection() = runTest {
+        val repository = newRepository()
+        repository.saveSettings(Settings(source = TranscriptionSource.LOCAL, localLanguage = "pt", openaiToken = "sk-x"))
+
+        assertEquals(true, repository.selectLocalModelIfNone("whisper-base-int8"))
+        assertEquals(false, repository.selectLocalModelIfNone("whisper-small-int8"))
+
+        val read = repository.settingsFlow().first()
+        assertEquals("whisper-base-int8", read.localModelId)
+        assertEquals("pt", read.localLanguage)
+        assertEquals("sk-x", read.openaiToken)
     }
 
     @Test

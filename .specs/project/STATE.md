@@ -1606,3 +1606,287 @@ que a máquina do Yan:
   GT-T6 cada quadro da aba Modo desenha dois tours, e 2 s de parede não chegavam a 25 quadros num
   runner de 2 núcleos (nem no sandbox). Correção: avançar o relógio de teste por
   `AUTO_PERMISSION_DELAY_MS` (agora `internal`) e afirmar em `runOnIdle` — igual em qualquer máquina.
+
+## native-voice-models — NM-T1 (2026-09-24)
+
+sherpa-onnx **1.13.8** no build. 306 unitários (+2: `SherpaOnnxLinkTest` monta as configs de Whisper e
+transducer — só classes Kotlin, sem carregar o nativo).
+
+- **Distribuição**: o único artefato Android oficial é o `sherpa-onnx-1.13.8.aar` anexado ao release
+  do GitHub (SHA256 `633c2432…bd96`, 50 MB, `minSdk 21`). O `com.github.k2-fsa:sherpa-onnx` do JitPack
+  é o jar Java de desktop, sem `.so` Android. O espelho `csukuangfj2/sherpa-onnx-libs` no HF tem
+  **outro SHA para o mesmo nome** — é regravado a cada push do upstream, não a cada tag. Não usar.
+- **SPEC_DEVIATION (rota)**: em vez de versionar 50 MB em `app/libs/`, o `app/build.gradle.kts` baixa o
+  AAR da versão fixada quando falta e confere o SHA256 (divergência derruba o build); `app/libs/*.aar`
+  no `.gitignore`. Roda na configuração porque o sync do Android Studio resolve o classpath antes das
+  tasks. No Kotlin DSL, `java.*` é sombreado pela extensão `java` do projeto — imports no topo.
+- **ABIs**: debug = arm64-v8a + armeabi-v7a + x86_64 (emulador); release = só ARM. O x86 de 32 bits do
+  AAR fica fora dos dois. Peso por ABI no APK: arm64 +30,5 MB, v7a +21,3 MB, x86_64 +34,5 MB. APK
+  release (2 ABIs ARM) = 61 MB; pela Play (AAB) cada aparelho leva só a sua.
+- **16 KB (adiantando a NM-T12)**: os 16 `.so` do AAR têm segmentos LOAD alinhados a 16384 e o APK
+  release passa `zipalign -c -P 16`. A task de loja formaliza o script.
+- "Unable to strip …" no build = sem NDK instalado; os `.so` do upstream já vêm sem símbolos.
+
+## native-voice-models — NM-T2 e NM-T3 (2026-09-24)
+
+**NM-T2**: `TranscriptionSource.LOCAL` (5ª opção da aba Voz), `Settings.localModelId/localLanguage`
+(nulos quando vazios), `EffectiveConfig.Local`. Sem modelo → `Unavailable` → `CONFIG_MISSING`
+(NAT-03). Com modelo, até a NM-T9 o `SettingsRepository.flow()` entrega `Config()` vazio: a origem
+se comporta como incompleta e **nunca toca a rede**. Painel provisório na aba Voz diz isso.
+Instrumentados (`SettingsRepositoryTest`, `VozPanelTest`) e goldens `config-voz-*` (seletor com 5
+opções) validados pelo CI — o emulador do sandbox não instala mais o APK de 100 MB.
+
+**NM-T3**: catálogo com os 3 modelos, dados **conferidos na API do HF** (tamanhos + `oid` do LFS =
+SHA256 — confirmado baixando o decoder do Parakeet; `tokens.txt` fora do LFS, SHA calculado
+baixando). Totais: Whisper base int8 160,6 MB · small int8 375,5 MB · Parakeet v3 int8 670,5 MB.
+URLs fixadas no commit do repo (não `main`) e todas respondem 206 a pedido de faixa (retomada do
+DownloadManager). Os dois Whisper multilíngues têm o mesmo `tokens.txt`. `recommendedRamMb`
+(512/1024/2048) é estimativa — medir no A32 na NM-T13. 9 unitários de integridade.
+
+## native-voice-models — NM-T4 (2026-09-24)
+
+`ModelStore` em `filesDir/models/<id>/`. Instalar = conferir que todo arquivo do catálogo existe com o
+tamanho certo → copiar para `.<id>.installing/` → escrever `manifest.json` → **renomear** o diretório
+para o definitivo (atômico no mesmo volume; a origem do DownloadManager fica em outro, onde só cópia
+serve). "Instalado" = manifest presente, com o id do diretório, e cada arquivo listado no disco com o
+tamanho do manifest — meio-instalado, arquivo trocado depois ou sobra de instalação interrompida não
+contam. Não confere SHA: isso é do downloader (NM-T7). 9 unitários na JVM (`TemporaryFolder`) + 1
+instrumentado no `filesDir` real (pasta própria, nunca a `models/` de verdade), que confere o espaço
+voltando depois de apagar — roda no CI.
+
+## native-voice-models — NM-T5 (2026-09-24)
+
+`AudioDecoder` (MediaExtractor + MediaCodec → PCM 16-bit ou float, conforme o formato de saída do
+codec → mono → 16 kHz) e `PcmMath` puro (downmix por média; resample com média da janela ao reduzir
+e interpolação linear ao aumentar). Gravação passou a **16 kHz** (`AudioRecorder.AUDIO_SAMPLE_RATE`).
+7 unitários do `PcmMath`; `AudioDecoderTest` instrumentado com dois tons de 440 Hz em
+`androidTest/assets/audio/` (16 kHz mono e 44,1 kHz estéreo).
+
+**Dois tropeços pegos conferindo as fixtures com ffmpeg antes do CI:**
+- O `sine` do ffmpeg gera com amplitude 1/8: com `volume=0.5` o tom ficou em 0,06 de pico. Fixtures
+  refeitas com `aevalsrc=0.5*sin(2*PI*440*t)`.
+- Contar cruzamentos por zero no áudio decodificado dava 564 Hz num tom de 440: o priming/padding do
+  AAC tem um chiado baixo que cruza o zero várias vezes. O teste usa histerese (±0,1) e mede entre a
+  primeira e a última virada — 440,0 Hz nas duas fixtures.
+
+## native-voice-models — NM-T6 (2026-09-24)
+
+`ModelDownloader` sobre o `DownloadManager`, atrás de `DownloadGateway` (interface fina; o
+`SystemDownloadGateway` traduz status/motivo de pausa do Android para enums próprios, e pedido que
+sumiu do sistema volta como FAILED). `start` faz as pré-checagens em `DownloadPolicy` (já instalado,
+1 por vez, espaço, rede medida exige `allowMetered`) e enfileira 1 pedido por arquivo em
+`externalFilesDir/model-tmp/<id>/`, gravando `downloads.json` com os ids — é ele que marca "download em
+curso" e sobrevive à morte do app. `progress(id)` é polling de 500 ms enquanto houver coletor;
+arquivo concluído conta inteiro, falha em qualquer um é falha do modelo. `cancel` remove os pedidos e
+apaga o tmp. Se um `enqueue` falha no meio, os já enfileirados são removidos.
+
+**SPEC_DEVIATION**: espaço exigido ×2,2 no mesmo volume (baixa no externo e copia para o interno),
+×1,2 em volumes separados — anotado na task.
+
+12 unitários (fakes de gateway e de volume); 2 instrumentados com MockWebServer no próprio device
+(`localhost`): arquivo pequeno chega a FILES_DONE no `model-tmp`; corpo com banda limitada cancelado no
+meio não deixa pedido nem parcial. Rodam no CI.
+
+## native-voice-models — NM-T7 (2026-09-25)
+
+`ModelDownloader.finish(id)`: tudo SUCCESSFUL → tamanho e SHA256 em streaming (`Sha256`, blocos de
+1 MiB) → `ModelStore.install` → remove os pedidos do sistema e apaga o tmp. Falha do sistema, arquivo
+divergente, cópia que não completa ou modelo que saiu do catálogo → descarta e registra em `failures`
+(`DOWNLOAD_FAILED`/`CORRUPTED`/`INSTALL_FAILED`, em memória; novo `start` limpa). O `downloads.json` só
+some no fim, então morrer em qualquer passo deixa o download para a `reconcile()`, que também trata
+"instalou mas não limpou" e apaga sobra de início interrompido. Início/conclusão/reconciliação sob um
+lock do processo. `ModelDownloader.get(context)`: instância única do processo (um só `ModelStore`, para
+o `installedIds` que a UI observa).
+
+`ModelDownloadReceiver` no manifest para `ACTION_DOWNLOAD_COMPLETE`, exigindo
+`SEND_DOWNLOAD_COMPLETED_INTENTS` — conferido no código do DownloadProvider (AOSP): envio com
+`setPackage` e permissão de assinatura só dele. `goAsync` + thread → `reconcile()`.
+
+3 unitários do `Sha256` (vetores FIPS e arquivo maior que o bloco) + 11 de conclusão/reconciliação
+(com arquivos reais no `TemporaryFolder`); 3 instrumentados novos: download com SHA certo → instalado;
+SHA errado → descartado e pedido removido; receiver registrado com a permissão. 360 unitários verdes.
+
+## native-voice-models — NM-T8 (2026-09-25)
+
+AIDL (`ITranscriptionEngine` oneway + `IEngineCallback`; `LocalModelConfig` como parcelable
+estruturado do AIDL, com caminhos absolutos, idioma e bytes) e `InferenceService` em
+`android:process=":inference"` (`exported=false`): executor único, modelo residente, troca de modelo
+**ou de idioma** = reload. Antes do load: arquivos no disco (senão MODEL_MISSING), guarda de RAM
+(`availMem` ≥ 1,5× o modelo, medida depois de soltar o anterior; senão OOM) e recusa do sherpa →
+ENGINE. `OutOfMemoryError` em qualquer ponto → unload + OOM. Falha ao decodificar → DECODE.
+
+`SherpaEngine`/`SherpaConfigs`: API conferida no bytecode do AAR e no `kotlin-api/OfflineRecognizer.kt`
+oficial da v1.13.8 — Whisper `modelType="whisper"`, idioma vazio = autodetecção; Parakeet
+`modelType="nemo_transducer"`; `numThreads` = núcleos limitados a 1..4.
+
+**Achado: a janela de 30 s do Whisper.** O sherpa-onnx corta o stream em 3000 quadros e descarta o
+resto só com um log. Medido com o pacote Python oficial 1.13.8 e o mesmo whisper-base int8 num áudio
+de 49,7 s: inteiro → o texto para no meio da 3ª frase; em janelas (`WhisperChunker`, corte no trecho
+mais silencioso dos últimos 4 s de cada janela de 28 s, caiu em 24,37 s, dentro da pausa) → texto
+completo. Registrado como SPEC_DEVIATION na task.
+
+Testes: 14 unitários novos (modelo do engine e ida/volta pelo parcelable, códigos de erro, guarda de
+RAM, configs por tipo, cortes do Whisper). Instrumentados: `InferenceServiceTest` (binder remoto de
+verdade, processo `:inference` separado, MODEL_MISSING no transcribe e no preload) e
+`LocalEngineEndToEndTest` opt-in (`localModelE2E=true`, ligado no `ci-device-gate.sh`): baixa o Whisper
+base do catálogo pelo DownloadManager, confere SHA, instala e transcreve as fixtures de fala curta e
+longa. 374 unitários verdes.
+
+## native-voice-models — NM-T9 (2026-09-25)
+
+Origem Local ligada ao fluxo de gravação. `SettingsRepository.flow()` entrega, para Local com modelo,
+um `Config` **sem endpoint nem token** e com `local = EffectiveConfig.Local(...)` (espera ≥ 180 s).
+`RoutingTranscriber` (no lugar do transcriber do `OverlayService`) manda para o `LocalTranscriber` ou
+para o HTTP de sempre; falha local não cai para a rede (NAT-04). O teclado grava pelo mesmo
+`OverlayService`, então a fiação é uma só.
+
+`LocalTranscriber` (um por processo): bind ao `:inference` no primeiro uso, mantido (segura o modelo
+residente); `DeathRecipient` → quem esperava recebe "transcrição local interrompida" e o próximo uso
+refaz bind e carga. `sync()` pré-carrega quando um modo ativa (orbe, sessão do mic, teclado aberto) e
+solta o bind quando a origem deixa de ser Local — a RAM volta na hora. Bind em uso só cai depois da
+última resposta. Selecionado mas não baixado = `CONFIG_MISSING` (NAT-03), o mesmo das origens
+incompletas; os demais erros locais viram `ErrorKind.LOCAL` com a mensagem da causa e o X leva à aba Voz.
+
+Testes: `LocalRoutingTest` (coordinator de verdade: sucesso local insere; falha local mostra a mensagem
+e aponta a aba Voz; **o HTTP nunca é chamado com Local** (PRV-01); sem modelo → CONFIG_MISSING pelo
+cliente HTTP real, sem rede; origens remotas seguem no HTTP) + `LocalTranscriberLogicTest`. 382
+unitários verdes. Instrumentados: `LocalTranscriberDeviceTest` (binder real: MODEL_MISSING chega como
+erro local; mata o `:inference` e o próximo uso sobe outro processo; `release` solta o bind),
+`SettingsRepositoryTest` (Local não carrega credenciais mesmo com tokens salvos) e, no ponta a ponta,
+o `:inference` morto no meio de uma transcrição longa → erro para quem esperava, e a seguinte funciona.
+
+## native-voice-models — NM-T10 (2026-09-25)
+
+Gerenciador de modelos na aba Voz (origem Local). `LocalModelsUi.compose` (pura): catálogo ×
+instalados × download ativo × falhas × seleção × RAM → um card por modelo — disponível (Baixar,
+indisponível com outro download em curso), baixando (barra + % / "Aguardando rede" / "Verificando" +
+Cancelar), baixado (Apagar; tocar seleciona), selecionado (marcado, borda teal); aviso "Pode ser pesado
+neste aparelho" quando a RAM total < recomendada (CAT-03); falha do último download no card (DLM-02).
+Espaço insuficiente e armazenamento indisponível explicados no card (DLM-05). Dados móveis e apagar
+confirmam **no próprio card** (SPEC_DEVIATION registrado). Dropdown de idioma → `localLanguage`; nota
+de privacidade (MGR-06).
+
+`LocalModelsController` (real, na `SetupActivity`): só com a tela visível (onStart/onStop) —
+reconcilia ao abrir (DLM-07), polling de 500 ms e fecha o download que terminou sem depender do
+broadcast. Auto-seleção pós-download (MGR-03) no `ModelDownloader.onInstalled` →
+`SettingsRepository.selectLocalModelIfNone` (escrita atômica só da chave; não disputa com o
+auto-save da tela).
+
+9 unitários da composição/textos (391 no total, verdes); `LocalPanelTest` instrumentado com gerenciador
+fake (4 estados, seleção persiste, apagar com confirmação e limpando a seleção, dados móveis pede e
+baixa com a flag, espaço insuficiente, aviso de peso, idioma); `SettingsRepositoryTest` cobre a
+auto-seleção; `VozPanelTest` atualizado (o placeholder saiu).
+
+## native-voice-models — NM-T11 (rotas) e NM-T14 (2026-09-25)
+
+NM-T11: rotas `config-voz-local` (nada baixado), `config-voz-local-baixando` (Equilibrado em 42%,
+congelado) e `config-voz-local-pronto` (Rápido instalado e selecionado), com RAM fixa de 8 GB para o
+aviso de peso não depender do aparelho. Goldens saem das telas do CI, depois de revisadas.
+
+NM-T14: `Settings.partialOnPause`/`partialViewEdit` (persistidos, padrão desligado) e seção
+"Transcrição" no topo da aba Voz com os dois toggles — o 2º esmaecido e inerte com o 1º desligado
+(PAR-01). `ToggleRow` passou do `TecladoPanel` para o `ConfigFields`. A seção nova muda todos os
+`config-voz-*` de propósito. Testes: `VozPanelTest.partialToggles` e
+`SettingsRepositoryTest.partialTogglesPersistAndDefaultOff`.
+
+## native-voice-models — NM-T15 (2026-09-25)
+
+`AudioRecorder.start(segmented = true)` (PAR-02): cada pausa fecha o arquivo do trecho (stop real,
+MediaRecorder solto) e o devolve; retomar abre um arquivo novo; `stop()` devolve o trecho em curso
+(null se parou pausado); trecho abaixo do mínimo de 300 ms é descartado; `discard()` apaga todos.
+Duração ativa acumulada atravessa os trechos. Desligado, nada muda (os testes antigos do recorder
+seguem iguais). 4 instrumentados novos: 2 pausas → 3 arquivos reproduzíveis (`MediaMetadataRetriever`)
+e 1,8 s ativos com relógio controlado; parar pausado; trecho curto descartado; descartar apaga tudo.
+
+## native-voice-models — NM-T16 (+ núcleo da T18) (2026-09-25)
+
+`PartialSession` (`transcription/partial/`): fila de trechos transcritos um por vez, na ordem, pela
+origem ativa (o mesmo `transcribeWithTimeout` do envio normal — Local ou nuvem); texto vai para o fim
+do buffer, edições do usuário são a verdade (PAR-06); trecho que falhou segura os seguintes até ser
+refeito (na próxima pausa ou no envio), então nada sai fora de ordem (PAR-09); `finish()` refaz as
+falhas, espera a fila e devolve o texto inteiro, o erro do trecho que continua falhando, ou
+EMPTY_AUDIO. Nunca toca clipboard/inserção (PAR-03).
+
+Coordinator: toggle lido no início de cada sessão; `startSegmented`/`pauseSegment` no
+`OverlayAudioRecorder` (padrões que caem no comportamento antigo); toda pausa (gesto, limite, cancelar)
+passa por `pauseRecorder()`, que enfileira o trecho fechado. **Envio e cancelar entraram já** (núcleo
+da T18) — sem eles, com o toggle visível desde a T14, o envio entregaria só o último trecho. Extraídos
+`transcribeWithTimeout` e `deliver` do envio normal (sem mudança de comportamento; cancelamento agora
+propaga em vez de virar erro de rede descartado). `onPartialEdited` e `onPartial` expostos para a UI
+da T17.
+
+Testes: 9 unitários do `PartialSession` + 7 do coordinator (`PartialCoordinatorTest`: pausar não
+entrega; envio junta buffer editado + último trecho e entrega uma vez; falha refeita no envio; cancelar
+e desfazer preserva; cancelar de vez apaga; cancelar durante o envio e desfazer retoma na mesma
+sessão; toggle desligado = fluxo antigo). 407 unitários verdes.
+
+## native-voice-models — NM-T17 (2026-09-25)
+
+UI do parcial junto à orbe. `PartialUi` (puro): sem sessão → nada; enviando/cancelando → nada (e fecha
+o que estava aberto — a entrega precisa do foco de volta no campo de origem); visualização/edição
+abertas seguem abertas gravando e pausando (só com o 2º toggle); pausada com conteúdo (texto, trecho
+em curso ou falho) → indicador "parcial · N palavras [· … ] [· N trechos a refazer]".
+`PartialOverlay`: indicador logo abaixo da orbe (acima, se não couber), visualização e input no terço de
+cima (o teclado sobe por baixo); o input é a única janela focável (NOT_TOUCH_MODAL mantém orbe e app
+tocáveis); texto de fora só entra no input se mudou, preservando o cursor; cada tecla vira
+`onPartialEdited`. Fiação no `OverlayService` pelo `render` e pelo `onPartial` do coordinator.
+
+Testes: 6 unitários do `PartialUi` (413 no total, verdes). `PartialOverlayServiceTest` instrumentado
+com o serviço real e a origem Custom num MockWebServer em `localhost`: pausa → indicador; toque →
+visualização → input; edita; retoma com o input aberto e pausa → trecho novo depois da edição; fechar
+volta ao indicador; envio entrega "Primeira parte, editada segunda parte" uma vez e as janelas somem;
+smoke do `ImeProbeActivity` depois do input focável; cancelar esconde e desfazer devolve o parcial;
+cancelar de vez encerra a sessão. Settings do app restauradas no fim de cada teste.
+
+## native-voice-models — NM-T12 (2026-09-25)
+
+STO-01: `backup_rules.xml` e `data_extraction_rules.xml` excluem `file/models` e `external/model-tmp`
+(conferido no manifest e nos XML empacotados do APK com `aapt2`). STO-02:
+`scripts/check-16kb-alignment.py` (ELF PT_LOAD ≥ 16384 + offset no zip dos `.so` sem compressão) —
+18/18 passam no APK debug; um `.so` de sistema com 4 KB reprova, como deve; novo passo no job de unit
+do CI. STO-03: licenças em `app/licenses/` (sherpa-onnx Apache-2.0, ONNX Runtime MIT, Whisper MIT,
+Parakeet CC BY 4.0, com README) e seção "Licenças" na Docs; Docs ganhou também "Voz no aparelho", o
+parcial em "Pausa" e a origem Local em "Privacidade". `DocsSectionsTest` cobre as atribuições.
+
+## native-voice-models — CI e goldens (2026-09-27)
+
+Rodada em 3bef7e8 (T2..T5 + liberação de disco): disco livre 13 → 29 GB, emulador subiu; 206/208.
+As 2 falhas eram de teste, medidas no logcat da evidência:
+- `BarViewAccessibilityTest` (1º teste de teclado da rodada): o app do Google restaurou uma janela por
+  cima do probe logo após abrir; o toque único no campo se perdeu e nenhum IME recebeu o campo. Espera
+  compartilhada `awaitKeyboardAttached` nas 10 classes de teclado: re-traz o probe e toca de novo a
+  cada 6 s, dentro dos mesmos 30 s.
+- `joystickPull…`: soltava a alavanca num prazo fixo de 900 ms com a main thread do app tendo quadros de
+  1,8 s. Agora segura até as 2 setas saírem (até 5 s).
+
+Rodada em be0cc6c (T6..T17): 238/240 — passaram o ponta a ponta do Whisper base (download real, SHA,
+instalação, transcrição curta e de 50 s, morte do `:inference` no meio), o parcial no serviço real e os
+de teclado. Falhas só no `LocalPanelTest`: a marca de selecionado ficava dentro do card clicável (árvore
+mesclada) — o card instalado virou `selectable` com `Role.RadioButton` (leitor de tela anuncia
+"selecionado"; o teste afirma `isSelected` no card) — e a confirmação de apagar abre abaixo da dobra
+(teste rola até ela). Diff de telas: exatamente as 8 mudanças intencionais (`config-voz-*` pela seção
+Transcrição e pelo seletor de 5, `config-docs*` pelas seções novas); aprovadas junto com os 6
+`config-voz-local*`, depois de revisadas. `tour-finger-*` seguem sem golden (rotas provisórias da GT-T2).
+
+## CI — o diálogo de ANR do boot (2026-09-27)
+
+Rodada em 6117298: telas 100% verdes; 237/240. O `BarViewAccessibilityTest` falhou de novo mesmo com o
+re-toque — o logcat mostrou a causa de verdade nas duas rodadas: logo após o boot, sob a carga do build,
+o launcher (27/09) ou a systemui (25/09) estouram ANR e o sistema abre o diálogo "Application Not
+Responding", que fica **minutos** na tela segurando o foco (12:42:36 → 12:46:45). Sem foco, nenhum campo
+recebe IME. É a mesma lição do emulador do sandbox (ENVIRONMENT.md), que não tinha ido para o CI:
+`ci-device-gate.sh` agora liga `hide_error_dialogs` antes do build e fecha diálogos de sistema antes da
+suíte. O re-toque do `awaitKeyboardAttached` fica (cobre o toque perdido, caso diferente).
+
+`LocalPanelTest`: o `selectable` do card mescla os filhos — a confirmação de apagar só existe na árvore
+não mesclada (teste usa `useUnmergedTree`), e a linha de progresso ganhou `mergeDescendants` (leitor de
+tela lê barra e rótulo juntos; o teste lê o "50%" na própria tag).
+
+## CI verde — native-voice-models (2026-09-27)
+
+Rodada em 5db6d75: **240/240 instrumentados, 0 pulados, telas 84/84** no limiar. Com o
+`hide_error_dialogs` no gate, o 1º teste de teclado passou. Estão validados no emulador: download real
+do Whisper base + SHA + instalação + transcrição curta e de 50 s + morte do `:inference` no meio; o
+cliente local contra o binder de verdade; o parcial no `OverlayService` real (indicador, visualização,
+edição, envio, cancelar/desfazer); o gerenciador de modelos; os de teclado. O que resta do bloco são os
+roteiros manuais da T18 e da T13 no A32 [YAN].

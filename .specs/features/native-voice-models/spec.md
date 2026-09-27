@@ -172,46 +172,46 @@ o texto completo com a edição preservada; buffer some.
 
 | Requirement | Story | Task | Status |
 | ----------- | ----- | ---- | ------ |
-| NAT-01 | P1-A | NM-T9 | In Tasks |
-| NAT-02 | P1-A | NM-T5 | In Tasks |
-| NAT-03 | P1-A | NM-T2, NM-T9 | In Tasks |
-| NAT-04 | P1-A | NM-T8, NM-T9 | In Tasks |
-| NAT-05 | P1-A | NM-T8, NM-T9 | In Tasks |
-| NAT-06 | P1-A | NM-T8 | In Tasks |
-| NAT-07 | P1-A | NM-T8 | In Tasks |
-| NAT-08 | P1-A | NM-T8 | In Tasks |
-| NAT-09 | P1-A | NM-T9 | In Tasks |
-| PRV-01 | P1-A | NM-T9 | In Tasks |
-| CAT-01 | P1-B | NM-T3 | In Tasks |
-| CAT-02 | P1-B | NM-T3 | In Tasks |
-| CAT-03 | P1-B | NM-T10 | In Tasks |
-| DLM-01 | P1-B | NM-T6 | In Tasks |
-| DLM-02 | P1-B | NM-T7 | In Tasks |
-| DLM-03 | P1-B | NM-T4 | In Tasks |
-| DLM-04 | P1-B | NM-T6 | In Tasks |
-| DLM-05 | P1-B | NM-T6 | In Tasks |
-| DLM-06 | P1-B | NM-T6 | In Tasks |
-| DLM-07 | P1-B | NM-T7 | In Tasks |
-| DLM-08 | P1-B | NM-T6 | In Tasks |
-| MGR-01 | P1-C | NM-T2, NM-T10 | In Tasks |
-| MGR-02 | P1-C | NM-T10 | In Tasks |
-| MGR-03 | P1-C | NM-T10 | In Tasks |
-| MGR-04 | P1-C | NM-T10 | In Tasks |
-| MGR-05 | P1-C | NM-T10 | In Tasks |
-| MGR-06 | P1-C | NM-T10 | In Tasks |
-| MGR-07 | P1-C | NM-T11 | In Tasks |
-| STO-01 | P2-D | NM-T12 | In Tasks |
-| STO-02 | P2-D | NM-T1, NM-T12 | In Tasks |
-| STO-03 | P2-D | NM-T12 | In Tasks |
-| PAR-01 | P2-E | NM-T14 | In Tasks |
-| PAR-02 | P2-E | NM-T15 | In Tasks |
-| PAR-03 | P2-E | NM-T16 | In Tasks |
-| PAR-04 | P2-E | NM-T17 | In Tasks |
-| PAR-05 | P2-E | NM-T17 | In Tasks |
-| PAR-06 | P2-E | NM-T16, NM-T17 | In Tasks |
-| PAR-07 | P2-E | NM-T18 | In Tasks |
-| PAR-08 | P2-E | NM-T18 | In Tasks |
-| PAR-09 | P2-E | NM-T16, NM-T18 | In Tasks |
+| NAT-01 | P1-A | NM-T9 | Implemented |
+| NAT-02 | P1-A | NM-T5 | Implemented |
+| NAT-03 | P1-A | NM-T2, NM-T9 | Implemented |
+| NAT-04 | P1-A | NM-T8, NM-T9 | Implemented |
+| NAT-05 | P1-A | NM-T8, NM-T9 | Implemented |
+| NAT-06 | P1-A | NM-T8 | Implemented |
+| NAT-07 | P1-A | NM-T8 | Implemented |
+| NAT-08 | P1-A | NM-T8 | Implemented |
+| NAT-09 | P1-A | NM-T9 | Implemented |
+| PRV-01 | P1-A | NM-T9 | Implemented |
+| CAT-01 | P1-B | NM-T3 | Implemented |
+| CAT-02 | P1-B | NM-T3 | Implemented |
+| CAT-03 | P1-B | NM-T10 | Implemented |
+| DLM-01 | P1-B | NM-T6 | Implemented |
+| DLM-02 | P1-B | NM-T7 | Implemented |
+| DLM-03 | P1-B | NM-T4 | Implemented |
+| DLM-04 | P1-B | NM-T6 | Implemented |
+| DLM-05 | P1-B | NM-T6 | Implemented |
+| DLM-06 | P1-B | NM-T6 | Implemented |
+| DLM-07 | P1-B | NM-T7 | Implemented |
+| DLM-08 | P1-B | NM-T6 | Implemented |
+| MGR-01 | P1-C | NM-T2, NM-T10 | Implemented |
+| MGR-02 | P1-C | NM-T10 | Implemented |
+| MGR-03 | P1-C | NM-T10 | Implemented |
+| MGR-04 | P1-C | NM-T10 | Implemented |
+| MGR-05 | P1-C | NM-T10 | Implemented |
+| MGR-06 | P1-C | NM-T10 | Implemented |
+| MGR-07 | P1-C | NM-T11 | Implemented |
+| STO-01 | P2-D | NM-T12 | Implemented |
+| STO-02 | P2-D | NM-T1, NM-T12 | Implemented |
+| STO-03 | P2-D | NM-T12 | Implemented |
+| PAR-01 | P2-E | NM-T14 | Implemented |
+| PAR-02 | P2-E | NM-T15 | Implemented |
+| PAR-03 | P2-E | NM-T16 | Implementing |
+| PAR-04 | P2-E | NM-T17 | Implementing |
+| PAR-05 | P2-E | NM-T17 | Implementing |
+| PAR-06 | P2-E | NM-T16, NM-T17 | Implementing |
+| PAR-07 | P2-E | NM-T18 | Implementing |
+| PAR-08 | P2-E | NM-T18 | Implementing |
+| PAR-09 | P2-E | NM-T16, NM-T18 | Implementing |
 
 **Coverage:** 40 total, 40 mapeados em tasks, 0 sem mapa.
 **Status values:** Pending → In Design → In Tasks → Implementing → Verified.

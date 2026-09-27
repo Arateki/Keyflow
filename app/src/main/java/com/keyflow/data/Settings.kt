@@ -32,6 +32,10 @@ data class Settings(
     val groqToken: String = "",
     val groqModel: String = GROQ_MODEL,
     val groqLanguage: String? = null,
+    // Local (native-voice-models): modelo de voz do aparelho selecionado no gerenciador (id do
+    // catálogo) e idioma forçado — null = nenhum modelo / detecção automática (MGR-03/05).
+    val localModelId: String? = null,
+    val localLanguage: String? = null,
     // Modos habilitados (gating das abas; cada modo libera sua aba — CFG-02)
     val overlayModeEnabled: Boolean = false,
     val keyboardModeEnabled: Boolean = false,
@@ -93,10 +97,17 @@ data class Settings(
     // KeyFlow simplesmente desaparece nessa situação, e o Gboard também mostra. Desmarcar devolve o
     // comportamento do sistema.
     val keyboardShowWithHardKeyboard: Boolean = true,
+    // Transcrição parcial ao pausar (native-voice-models, G12 / PAR-01): cada pausa transcreve o trecho
+    // gravado até ali para um buffer da sessão; o 2º toggle só vale com o 1º ligado. Agnósticos à origem.
+    val partialOnPause: Boolean = false,
+    val partialViewEdit: Boolean = false,
 ) {
     /**
      * Resolve a [Config] efetiva para uma origem (VOZ-02/03/06). CREDITS é stub: retorna
      * [EffectiveConfig.Unavailable] para o consumidor avisar "em breve" e abortar (VOZ-05).
+     *
+     * LOCAL não tem [Config] HTTP: com modelo selecionado vira [EffectiveConfig.Local]; sem modelo cai
+     * em [EffectiveConfig.Unavailable], o mesmo caminho que já termina em `CONFIG_MISSING` (NAT-03).
      */
     fun effectiveConfigFor(source: TranscriptionSource = this.source): EffectiveConfig = when (source) {
         TranscriptionSource.CREDITS -> EffectiveConfig.Unavailable
@@ -120,6 +131,9 @@ data class Settings(
                 timeoutMs = transcriptionTimeoutMs.toLong(),
             )
         )
+        TranscriptionSource.LOCAL ->
+            localModelId?.let { EffectiveConfig.Local(modelId = it, language = localLanguage) }
+                ?: EffectiveConfig.Unavailable
         TranscriptionSource.CUSTOM -> EffectiveConfig.Ready(
             Config(
                 endpointUrl = customEndpoint,
@@ -170,6 +184,8 @@ data class Settings(
 /** Resultado de [Settings.effectiveConfigFor]. */
 sealed interface EffectiveConfig {
     data class Ready(val config: Config) : EffectiveConfig
-    /** Origem indisponível nesta fase (Créditos — "em breve"). */
+    /** Modelo do aparelho: sem rede, sem [Config] HTTP — quem transcreve é o engine local (NAT-01). */
+    data class Local(val modelId: String, val language: String?) : EffectiveConfig
+    /** Origem sem como transcrever: Créditos ("em breve") ou Local sem modelo selecionado (NAT-03). */
     data object Unavailable : EffectiveConfig
 }

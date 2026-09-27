@@ -101,7 +101,7 @@ class KeyFlowKeyboardAccessibilityTest {
         device.wait(Until.hasObject(By.desc("ime_probe_field")), TIMEOUT)
         device.findObject(By.desc("ime_probe_field"))?.click()
         device.wait(Until.hasObject(By.text("🎙")), TIMEOUT)
-        waitUntil("KeyFlowKeyboardView não anexou", IME_COLD_ATTACH_TIMEOUT_MS) { KeyFlowKeyboardService.activeViewForTest != null }
+        awaitKeyboardAttached(device) { context.startActivity(intent) }
         waitUntil("grade Canvas não montou") { KeyFlowKeyboardService.activeViewForTest!!.canvasGridForTest != null }
         val grid = KeyFlowKeyboardService.activeViewForTest!!.canvasGridForTest!!
         waitUntil("grade Canvas ainda sem geometria medida") { grid.placedRowsForTest.isNotEmpty() }

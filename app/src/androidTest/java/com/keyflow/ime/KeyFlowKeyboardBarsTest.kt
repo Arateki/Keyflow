@@ -195,13 +195,14 @@ class KeyFlowKeyboardBarsTest {
         val downTime = SystemClock.uptimeMillis()
         inject(MotionEvent.ACTION_DOWN, rect.centerX(), rect.centerY(), downTime, downTime)
         inject(MotionEvent.ACTION_MOVE, rect.centerX() + 60, rect.centerY(), downTime)
-        Thread.sleep(900) // repeat: 1º em ~400ms, 2º em ~760ms (RepeatSchedule)
-        inject(MotionEvent.ACTION_UP, rect.centerX() + 60, rect.centerY(), downTime)
-
+        // Segura ATÉ o repeat aparecer (1º em ~400 ms pelo RepeatSchedule), em vez de soltar num prazo
+        // fixo: o repeat é agendado na main thread do app, e no CI (emulador sob carga, quadros de 1,8 s
+        // medidos em 2026-09-25) um aperto de 900 ms às vezes terminava antes do 1º repeat sair.
         waitUntil("alavanca não emitiu setas repetidas") {
             val text = device.findObject(By.desc("ime_probe_field"))?.text.orEmpty()
             text.count { it == '→' } >= 2
         }
+        inject(MotionEvent.ACTION_UP, rect.centerX() + 60, rect.centerY(), downTime)
 
         // Soltar parou (JOY-04): a contagem congela.
         Thread.sleep(600)
@@ -255,7 +256,7 @@ class KeyFlowKeyboardBarsTest {
 
         device.wait(Until.hasObject(By.desc("ime_probe_field")), TIMEOUT)
         device.findObject(By.desc("ime_probe_field"))?.click()
-        waitUntil("KeyFlowKeyboardView não anexou", IME_COLD_ATTACH_TIMEOUT_MS) { KeyFlowKeyboardService.activeViewForTest != null }
+        awaitKeyboardAttached(device) { context.startActivity(intent) }
         // A view precisa estar de fato na tela antes de medirmos retângulos de botões.
         waitUntil("KeyFlowKeyboardView não ficou visível") {
             KeyFlowKeyboardService.activeViewForTest?.isShown == true

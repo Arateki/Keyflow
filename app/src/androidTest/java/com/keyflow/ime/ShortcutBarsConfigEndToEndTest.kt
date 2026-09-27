@@ -187,7 +187,7 @@ class ShortcutBarsConfigEndToEndTest {
 
         device.wait(Until.hasObject(By.desc("ime_probe_field")), TIMEOUT)
         device.findObject(By.desc("ime_probe_field"))?.click()
-        waitUntil("KeyFlowKeyboardView não anexou", IME_COLD_ATTACH_TIMEOUT_MS) { KeyFlowKeyboardService.activeViewForTest != null }
+        awaitKeyboardAttached(device) { context.startActivity(intent) }
         waitUntil("KeyFlowKeyboardView não ficou visível") {
             KeyFlowKeyboardService.activeViewForTest?.isShown == true
         }

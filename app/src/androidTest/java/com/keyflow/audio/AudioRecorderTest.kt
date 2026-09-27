@@ -106,4 +106,92 @@ class AudioRecorderTest {
 
         assertNull(file)
     }
+
+    // ── modo segmentado (PAR-02, NM-T15) ─────────────────────────────────────
+
+    private fun durationMs(file: File): Long {
+        val retriever = MediaMetadataRetriever()
+        try {
+            retriever.setDataSource(file.absolutePath)
+            return retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+        } finally {
+            retriever.release()
+        }
+    }
+
+    @Test
+    fun segmentedTwoPausesGiveThreePlayableFilesAndTheDurationAccumulates() {
+        var now = 0L
+        val recorder = AudioRecorder(context = context, outputDir = outputDir, clock = { now })
+
+        recorder.start(segmented = true)
+        Thread.sleep(600); now += 600
+        val first = recorder.pause()
+        assertEquals(RecorderState.PAUSED, recorder.state)
+        Thread.sleep(300); now += 300 // pausa não conta
+        recorder.resume()
+        Thread.sleep(600); now += 600
+        val second = recorder.pause()
+        recorder.resume()
+        Thread.sleep(600); now += 600
+        assertEquals(1_800L, recorder.activeDurationMs())
+        val third = recorder.stop()
+
+        val files = listOf(first, second, third)
+        files.forEach { assertNotNull(it) }
+        assertEquals(3, files.toSet().size)
+        files.forEach { file ->
+            assertTrue("${file!!.name} deveria ter áudio", durationMs(file) > 0)
+        }
+        assertEquals(RecorderState.IDLE, recorder.state)
+    }
+
+    @Test
+    fun segmentedStopWhilePausedReturnsNothingNewAndKeepsTheSegments() {
+        var now = 0L
+        val recorder = AudioRecorder(context = context, outputDir = outputDir, clock = { now })
+
+        recorder.start(segmented = true)
+        Thread.sleep(600); now += 600
+        val first = recorder.pause()
+        val segmentsBeforeStop = recorder.segments
+
+        assertNull(recorder.stop())
+        assertEquals(listOf(first), segmentsBeforeStop)
+        assertTrue(first!!.exists())
+    }
+
+    @Test
+    fun segmentedTooShortSegmentIsDropped() {
+        var now = 0L
+        val recorder = AudioRecorder(context = context, outputDir = outputDir, clock = { now })
+
+        recorder.start(segmented = true)
+        Thread.sleep(600); now += 600
+        recorder.pause()
+        recorder.resume()
+        Thread.sleep(100); now += 100 // abaixo do mínimo de 300 ms
+        assertNull(recorder.pause())
+
+        assertEquals(1, recorder.segments.size)
+        recorder.discard()
+    }
+
+    @Test
+    fun segmentedDiscardDeletesEverySegment() {
+        var now = 0L
+        val recorder = AudioRecorder(context = context, outputDir = outputDir, clock = { now })
+
+        recorder.start(segmented = true)
+        Thread.sleep(600); now += 600
+        val first = recorder.pause()
+        recorder.resume()
+        Thread.sleep(400); now += 400
+
+        recorder.discard()
+
+        assertTrue(first != null && !first.exists())
+        assertTrue(outputDir.listFiles().orEmpty().none { it.name.endsWith(".m4a") })
+        assertEquals(RecorderState.IDLE, recorder.state)
+    }
 }
