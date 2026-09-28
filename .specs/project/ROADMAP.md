@@ -47,7 +47,7 @@ funciona; gates verdes; `verification/` populado de forma determinística.
 
 - Backend gerenciado de créditos + Google Play Billing (origem "Créditos" real)
 - IAP de skins (desbloqueio real)
-- Publicação na Play Store (privacy policy, Data Safety, consent screen, targetSdk ≥ 35) — ver `PLAYSTORE_CHECKLIST.md`
+- Publicação na Play Store (privacy policy, Data Safety, consent screen, targetSdk ≥ 36) — ver `PLAYSTORE_CHECKLIST.md`
 - i18n real (EN/ES)
 
 ## Milestone 4 — Fase 2 de gestos + reconciliação (Trabalho 1) ✅ CONCLUÍDO (2026-06-30)
@@ -66,7 +66,7 @@ extensões no `OrbButtonViewTest`) e seletor do teclado (`KeyFlowKeyboardSelecto
 gestos Verified (ver traceability no `orb-gestures/spec.md`). Bug das setas nos 4 cantos (DRAG-07)
 **confirmado resolvido pelo Yan** — sem pendências abertas.
 
-## Milestone 5 — Teclado Canvas fluido (Trabalho 2)
+## Milestone 5 — Teclado Canvas fluido (Trabalho 2) ✅ CONCLUÍDO (2026-07-04)
 
 Reescrever o miolo do teclado (grade QWERTY) de `LinearLayout`/`TextView` para **Canvas** em Kotlin —
 fluidez de teclado nativo com footprint mínimo (zero `.so`), sem quebrar o mic sincronizado.
@@ -81,16 +81,13 @@ customização futura (resize/reposição/teclas-macro).
 **Done:** teclado novo é o padrão (após validação manual no device); mic/overlay/notificação intactos;
 goldens novos aprovados; gate `full` verde.
 
-**Status (2026-07-01):** KC-T1..T9 concluídas (fundação, geometria, view Canvas, preview/repeat/multitouch,
-acentos, integração híbrida atrás de flag debug, corretor do sistema, a11y, subtypes PT/EN/ES). KC-T10
-parcial: goldens novos gerados/aprovados, gate `full` verde (exceto 2 falhas ambientais já conhecidas, sem
-relação com o teclado). **Falta só o Yan**: validar fluidez no Galaxy A32 e decidir promover a grade nova a
-padrão (remover a flag `kbd_canvas`/teclado antigo) — ver `.specs/features/keyboard-canvas/tasks.md` KC-T10.
+**Status (2026-07-04):** KC-T1..T10 concluídas. O Yan aprovou a fluidez no Galaxy A32 e a grade Canvas
+virou o padrão: a flag `kbd_canvas` e o teclado antigo foram removidos (Q4 do `DEVELOPMENT-ORDER.md`).
 
 **Futuro do teclado (pós-MVP):** customização (reduzir tamanho, reposicionar teclas, teclas-macro); glide
 typing; dicionário/sugestões próprias (possível porte do AnySoftKeyboard, Apache 2.0).
 
-## Milestone 6 — Barras personalizáveis + atalhos físicos (Trabalho 3)
+## Milestone 6 — Barras personalizáveis + atalhos físicos (Trabalho 3) ✅ CONCLUÍDO (2026-09-09)
 
 Transformar a barra do teclado num sistema de **barras personalizáveis** (`BarView` em Canvas) com botões
 que emitem **eventos de teclado físico** (`PhysicalKeyEmitter`: chords/sequências com Ctrl/Alt/Shift/Meta)
@@ -105,6 +102,9 @@ Spec: `.specs/features/shortcut-bars/` (`spec.md`, `context.md`, `design.md`, `t
 fábrica indistinguível da atual; barra custom montável só pela config); gate `full` verde; goldens
 aprovados.
 
+**Status (2026-09-09):** SB-T1..T10 concluídas; barras Canvas promovidas a padrão e a barra antiga
+removida (flag `kbd_bars` não existe mais). Manual no A32 confirmado pelo Yan.
+
 ## Milestone 7 — Monetização + KeyFlow API
 
 Três frentes: **Créditos** (minutos de transcrição com config zero, botão da aba Voz; recarga
@@ -118,10 +118,13 @@ validação de compras, ledger, proxy de transcrição streaming, manifest de mo
 
 Specs: `.specs/features/keyflow-api/` (código em **`api/` no monorepo** — decisão do Yan,
 2026-07-02) e `.specs/features/monetization/` (`spec.md`/`context.md`/`design.md`/`tasks.md`
-completos, Draft aguardando aprovação). Ordem: API primeiro (API-T1..T14; MZ-T1..T15).
+completos, aprovados pelo Yan em 2026-07-04). Ordem: API primeiro (API-T1..T14; MZ-T1..T15).
 
 **Done:** success criteria das duas specs (fluxo completo com compras de teste; zero ads no
 IME/overlay; app funciona com a API fora do ar).
+
+**Status (2026-09-27):** API-T1..T12 feitas e T13 parcial (Dockerfile + guia de deploy) — PR #4,
+aguardando merge; a T13 parou nas credenciais/staging do Yan. Monetização (MZ) não iniciada.
 
 ## Milestone 8 — Sistema de temas + aba Sistema
 
@@ -133,49 +136,60 @@ efeitos". Nova **aba Sistema**: seletor de temas, exportar/importar config (JSON
 e restaurar de fábrica (apagar tokens opcional). Aplicação ao vivo em app/notificação/orbe/teclado.
 
 Spec: `.specs/features/theme-system/` (`spec.md`/`context.md`/`design.md`/`tasks.md` completos,
-Draft; 3 assunções ⚠️ a validar — gating das skins, recorte das "cores normais", efeitos no MVP —
+aprovados pelo Yan em 2026-07-04; 3 assunções ⚠️ a validar — gating das skins, recorte das "cores normais", efeitos no MVP —
 checkpoints marcados nas tasks TS-T6/T8/T9). Cruza com o Milestone 7 (UNL, via
 `EntitlementsProvider`). Tasks: TS-T1..T14.
 
 **Done:** success criteria da spec (troca ao vivo nas 3 superfícies; Ateliê bit-idêntico; tema
 novo = só dados; A32 sem jank; export→reset→import reproduz tudo).
 
-## Milestone 9 — Tour de gestos + Docs/Apresentação
+## Milestone 9 — Tour de gestos + Docs/Apresentação — código ✅ (2026-09-24), falta manual do Yan
 
 Prévia animada dos gestos reais (dedo animado sobre orbe/teclado) na aba Modo, Docs com índice/
 seções de detalhe/feedback por e-mail, e "?" explicando cada permissão no onboarding.
 
-Spec: `.specs/features/gesture-tour/` (completa, Draft). Tasks: GT-T1..T10.
+Spec: `.specs/features/gesture-tour/` (completa). Tasks: GT-T1..T10.
 
 **Done:** success criteria da spec; goldens aprovados; validação no A32.
 
-## Milestone 10 — Modelos de voz nativos (STT offline) + transcrição parcial
+**Status (2026-09-24):** GT-T1..T10 feitas (PR #1). Falta só o manual do GT-T8 no A32 (fluidez dos
+dois tours e TalkBack) para os requisitos virarem Verified.
+
+## Milestone 10 — Modelos de voz nativos (STT offline) + transcrição parcial — código ✅ (2026-09-27), falta manual do Yan
 
 Origem "Local" na aba Voz: catálogo curado (Whisper base/small, Parakeet), download com
 verificação, inferência sherpa-onnx em processo isolado `:inference`, e transcrição parcial ao
 pausar (buffer visível/editável junto à orbe).
 
-Spec: `.specs/features/native-voice-models/` (completa, Draft). Tasks: NM-T1..T18.
+Spec: `.specs/features/native-voice-models/` (completa). Tasks: NM-T1..T18.
 
 **Done:** ditar em modo avião funciona; parcial editável; prontidão de loja (backup/16 KB/licenças).
+
+**Status (2026-09-27):** código completo (NM-T1..T12, T14..T17 + núcleo da T18; PR #3). CI verde em
+`5db6d75`: 240/240 instrumentados e telas 84/84, incluindo o ponta a ponta do modelo local. Faltam os
+roteiros manuais da T13 e da T18 no A32 (`manual-validation.md`).
 
 ## Milestone 11 — Visão (captura de tela pela orbe)
 
 Fluxo efêmero: atalho da orbe pausa a ditação, seleciona área da tela, e por gesto copia
 imagem/texto (OCR ML Kit) ou tradução on-device; estado sempre restaurado.
 
-Spec: `.specs/features/vision-capture/` (completa, Draft). Tasks: VC-T1..T14.
+Spec: `.specs/features/vision-capture/` (completa). Tasks: VC-T1..T14.
 
 **Done:** success criteria da spec; e2e no A32 (incl. modo avião).
 
+**Status (2026-09-27):** nada implementado — próximo bloco da fila (VC-T1).
+
 ## Milestone 12 — Publicação na Play Store
 
-targetSdk 35, política de privacidade pública, prominent disclosure no onboarding, Data Safety
+targetSdk 36 (✅ feito em `9bc8a96` — PS-1), política de privacidade pública, prominent disclosure no onboarding, Data Safety
 Form, build de release assinado (AAB), listing e trilha de teste interna → produção.
 
 Base: `PLAYSTORE_CHECKLIST.md` + Bloco 9 do `.specs/DEVELOPMENT-ORDER.md` (PS-1..PS-7).
 
 **Done:** app aprovado e publicado; e2e de compras em faixa de teste verde.
+
+**Status (2026-09-27):** só o PS-1 feito; PS-2..PS-7 abertos.
 
 ## Futuro (pós-v1, não priorizado)
 
