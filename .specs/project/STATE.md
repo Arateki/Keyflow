@@ -1900,3 +1900,14 @@ A consulta virou `ModelDownloader.meteredProbe(context)` e ganhou teste de devic
 (`productionMeteredProbeRunsWithTheAppPermissions`), vermelho antes da permissão e verde depois.
 **Lição**: quando um teste injeta um colaborador falso, a versão de produção dele precisa de pelo menos
 um teste que a exercite com as permissões reais do app.
+
+## Suíte no A32: 239/240 e o teclado Samsung desfazendo o `ime set` (2026-09-27)
+
+Suíte completa no A32 (com o ponta a ponta do modelo local — primeira vez em ARM de verdade): 239/240.
+Whisper base int8 no A32: carga ~2,5 s; 6,7 s de áudio → 4,4 s para transcrever; 50 s → 32 s.
+A única falha (`KeyFlowKeyboardNumericFieldTest`, "KeyFlowKeyboardView não anexou") era corrida com o
+teclado Samsung: o `restore()` do teste anterior devolve o IME do Yan, o Samsung sobe a frio e no fim
+da inicialização regrava `default_input_method` com o valor lido antes. O `ime set` do teste seguinte
+caiu 2 ms antes dessa gravação e foi desfeito (1 em 47 trocas; 5/5 verdes ao repetir). Não é bug do
+KeyFlow. `awaitKeyboardAttached` agora confere o IME selecionado a cada nova tentativa e seleciona o
+KeyFlow de novo se o Samsung tiver voltado.
