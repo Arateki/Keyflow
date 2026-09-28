@@ -93,4 +93,32 @@ class KeyFlowKeyboardServiceTest {
         // Apagou de "abc" para "ab"; o aviso atrasado ainda mostra "abc".
         assertThat(KeyFlowKeyboardService.compositionLooksIntact(2, 13, 13, 10, 13)).isFalse()
     }
+
+    // ── onde a troca no espaço pode agir ─────────────────────────────────────
+
+    @Test
+    fun `plain text and messages get autocorrect`() {
+        assertThat(KeyFlowKeyboardService.autoCorrectAllowed(InputType.TYPE_CLASS_TEXT)).isTrue()
+        assertThat(
+            KeyFlowKeyboardService.autoCorrectAllowed(
+                InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_SHORT_MESSAGE,
+            ),
+        ).isTrue()
+    }
+
+    @Test
+    fun `addresses, emails, passwords and no-suggestion fields keep what was typed`() {
+        listOf(
+            InputType.TYPE_TEXT_VARIATION_URI,
+            InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS,
+            InputType.TYPE_TEXT_VARIATION_PASSWORD,
+            InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD,
+        ).forEach { variation ->
+            assertThat(KeyFlowKeyboardService.autoCorrectAllowed(InputType.TYPE_CLASS_TEXT or variation)).isFalse()
+        }
+        assertThat(
+            KeyFlowKeyboardService.autoCorrectAllowed(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS),
+        ).isFalse()
+        assertThat(KeyFlowKeyboardService.autoCorrectAllowed(InputType.TYPE_CLASS_NUMBER)).isFalse()
+    }
 }

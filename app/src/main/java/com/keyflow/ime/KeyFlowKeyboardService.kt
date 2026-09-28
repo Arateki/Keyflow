@@ -18,13 +18,17 @@ import com.keyflow.core.shortcuts.ShortcutKey
 import com.keyflow.data.EffectiveConfig
 import com.keyflow.data.SettingsRepository
 import com.keyflow.ime.keyboard.ComposingWordTracker
-import com.keyflow.ime.keyboard.SystemSpellChecker
+import com.keyflow.ime.keyboard.dictionary.Dictionaries
+import com.keyflow.ime.keyboard.dictionary.Suggester
+import com.keyflow.ime.keyboard.dictionary.Suggestions
 import com.keyflow.ime.keyboard.isNumericInputType
 import com.keyflow.ime.keys.PhysicalKeyEmitter
 import com.keyflow.overlay.OverlayService
 import com.keyflow.overlay.RecordingNotification
 import com.keyflow.transcription.local.LocalTranscriber
-import java.util.Locale
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -71,12 +75,21 @@ class KeyFlowKeyboardService : InputMethodService() {
 
     // Corretor do sistema (KC-T7/SPL-01..03).
     private val wordTracker = ComposingWordTracker()
-    private var spellChecker: SystemSpellChecker? = null
 
-    // O corretor é consultado quando a digitação pausa, não a cada letra: digitando rápido, cada pedido
-    // era descartado pela letra seguinte (e no A32 o corretor do sistema nunca devolve sugestão).
-    private val suggestHandler = Handler(Looper.getMainLooper())
-    private var pendingSuggest: Runnable? = null
+    // Corretor (Q9): o do sistema no A32 — o do teclado Samsung — responde "palavra certa, sem
+    // sugestões" para tudo, até "teclsdo" (medido em 2026-09-27), então o KeyFlow tem dicionário próprio
+    // ([Dictionaries]). As sugestões saem fora da main thread, uma por letra; vale a da palavra atual.
+    private var suggester: Suggester? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val suggestExecutor = Executors.newSingleThreadExecutor { Thread(it, "keyflow-suggest").apply { isDaemon = true } }
+    private var pendingSuggestion: Pair<String, Future<Suggestions>>? = null
+    private var lastSuggestions: Pair<String, Suggestions>? = null
+    private var suggestionsAllowed = false
+
+    // Troca no espaço/pontuação (autocorreção) e o desfazer pelo backspace logo em seguida.
+    private data class Correction(val original: String, val corrected: String, val separator: String)
+    private var lastCorrection: Correction? = null
+    private var autoCorrectAllowed = false
 
     // Seleção do campo como o próprio editor informou por último (onStartInputView/onUpdateSelection).
     // O backspace decide entre apagar a seleção ou 1 caractere por aqui, sem perguntar ao app.
@@ -203,7 +216,7 @@ class KeyFlowKeyboardService : InputMethodService() {
         KeyFlowController.setKeyboardVisible(false)
         if (activeViewForTest === keyboardView) activeViewForTest = null
         cancelSuggestions()
-        spellChecker?.close()
+        suggestExecutor.shutdownNow()
         serviceScope.cancel()
         super.onDestroy()
     }
@@ -243,8 +256,15 @@ class KeyFlowKeyboardService : InputMethodService() {
         // Fileira de números (NUMROW-01, pedido do Yan, 2026-07-03) — mesma leitura leve do tema/tamanho.
         val numberRowEnabled = runBlocking { repo.keyboardNumberRowEnabledOnce() }
         appliedLiveConfig = LiveKeyboardConfig(dark, scalePercent, language, numberRowEnabled)
-        spellChecker?.close()
-        spellChecker = SystemSpellChecker(this, localeFor(language))
+        suggester = null
+        suggesterReadyForTest = false
+        Dictionaries.suggesterFor(this, language).thenAccept { loaded ->
+            mainHandler.post {
+                if (appliedLiveConfig?.language != language) return@post // já trocou de idioma de novo
+                suggester = loaded
+                suggesterReadyForTest = loaded != null
+            }
+        }
         // Barras Canvas (SB-T5): leitura leve como o tema — só DataStore no caminho crítico do IME.
         val barsConfig = runBlocking { repo.barsConfigOnce() }
         val grids = runBlocking { repo.shortcutGridsOnce() }
@@ -297,13 +317,6 @@ class KeyFlowKeyboardService : InputMethodService() {
     }
 
     override fun onCreateCandidatesView(): View? = null
-
-    /** `Locale` completo (pra `SystemSpellChecker`/`TextServicesManager`) a partir do código curto. */
-    private fun localeFor(language: String): Locale = when (language) {
-        "en" -> Locale("en", "US")
-        "es" -> Locale("es", "ES")
-        else -> Locale("pt", "BR")
-    }
 
     /**
      * Globo tocado: cicla pt→en→es→pt **dentro do app**, sem depender de subtype do sistema (pedido do
@@ -412,6 +425,10 @@ class KeyFlowKeyboardService : InputMethodService() {
         keyboardView?.updateCandidates(emptyList())
         selectionStart = info?.initialSelStart ?: 0
         selectionEnd = info?.initialSelEnd ?: 0
+        lastCorrection = null
+        val inputType = info?.inputType ?: InputType.TYPE_NULL
+        suggestionsAllowed = inputType and InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS == 0
+        autoCorrectAllowed = autoCorrectAllowed(inputType)
     }
 
     override fun onFinishInput() {
@@ -461,9 +478,10 @@ class KeyFlowKeyboardService : InputMethodService() {
             // próxima letra (setComposingText) a substitui em vez de entrar no cursor (relato do Yan,
             // 2026-09-27: "as teclas saem do lugar que deveriam" ao corrigir no meio do texto).
             // Estado zerado ANTES de mexer no campo: com o editor no mesmo processo, o aviso de seleção
-            // pode chegar de volta aqui dentro da própria chamada.
+            // pode chegar de volta aqui dentro da própria chamada (ver [finishComposing]).
             wordTracker.reset()
             cancelSuggestions()
+            lastCorrection = null
             keyboardView?.updateCandidates(emptyList())
             ic.finishComposingText()
         }
@@ -471,6 +489,9 @@ class KeyFlowKeyboardService : InputMethodService() {
 
     private fun handleKey(action: KeyAction) {
         val ic = getCurrentInputConnection() ?: return
+        // Desfazer a troca só vale para o backspace IMEDIATAMENTE depois dela.
+        val undo = lastCorrection
+        lastCorrection = null
         when (action) {
             is KeyAction.Character -> {
                 if (shouldCompose(isRawInputField, action.char)) {
@@ -478,11 +499,12 @@ class KeyFlowKeyboardService : InputMethodService() {
                     ic.setComposingText(word, 1)
                     requestSuggestions(word)
                 } else {
-                    finishComposing(ic)
+                    finishComposing(ic, separator = action.char.takeIf { it in AUTOCORRECT_PUNCTUATION })
                     ic.commitText(action.char, 1)
                 }
             }
             KeyAction.Backspace -> {
+                if (undo != null && wordTracker.currentWord.isEmpty() && undoCorrection(ic, undo)) return
                 val remaining = if (!isRawInputField) wordTracker.onBackspace() else null
                 when {
                     remaining == null -> {
@@ -516,7 +538,7 @@ class KeyFlowKeyboardService : InputMethodService() {
                 }
             }
             KeyAction.Space -> {
-                finishComposing(ic)
+                finishComposing(ic, separator = " ")
                 ic.commitText(" ", 1)
             }
             KeyAction.Paste -> {
@@ -540,42 +562,93 @@ class KeyFlowKeyboardService : InputMethodService() {
         keyEmitter.emit(ic, key)
     }
 
-    /** Encerra a palavra em composição (se houver) — pontuação/espaço/enter fecham a sugestão atual. */
-    private fun finishComposing(ic: InputConnection) {
-        if (wordTracker.currentWord.isEmpty()) return
-        ic.finishComposingText()
+    /**
+     * Encerra a palavra em composição (se houver). Com [separator] (espaço ou pontuação que vem logo em
+     * seguida), é a hora da troca no espaço: se o corretor tem uma troca confiável, a palavra sai trocada
+     * e o backspace seguinte desfaz ([undoCorrection]).
+     */
+    private fun finishComposing(ic: InputConnection, separator: String? = null) {
+        val word = wordTracker.currentWord
+        if (word.isEmpty()) return
+        val correction = if (separator != null && autoCorrectAllowed) {
+            suggestionsFor(word)?.autoCorrect?.takeIf { it != word }
+        } else {
+            null
+        }
+        // Estado zerado ANTES de mexer no campo. Com o editor no mesmo processo e thread (os campos do
+        // próprio app, o probe dos testes), o Android entrega o `onUpdateSelection` de volta DENTRO da
+        // chamada ao campo: com a palavra ainda registrada, ele via "não" no campo contra "nao" aqui,
+        // achava que o texto tinha mudado por fora e apagava a troca recém-feita (medido em 2026-09-27).
         wordTracker.reset()
         cancelSuggestions()
         keyboardView?.updateCandidates(emptyList())
+        if (correction != null) ic.setComposingText(correction, 1)
+        ic.finishComposingText()
+        if (correction != null) lastCorrection = Correction(word, correction, separator!!)
     }
 
     /**
-     * Pede sugestões pro corretor do sistema depois de [SUGGEST_DEBOUNCE_MS] sem outra letra; ignora a
-     * resposta se a palavra já mudou entretanto.
+     * Backspace logo depois de uma troca: volta a palavra como foi digitada (sem o separador), como no
+     * Samsung/Gboard. Confere o texto antes de mexer — se o campo mudou por fora, é um backspace comum.
      */
+    private fun undoCorrection(ic: InputConnection, undo: Correction): Boolean {
+        val expected = undo.corrected + undo.separator
+        if (ic.getTextBeforeCursor(expected.length, 0)?.toString() != expected) return false
+        ic.beginBatchEdit()
+        ic.deleteSurroundingText(expected.length, 0)
+        ic.commitText(undo.original, 1)
+        ic.endBatchEdit()
+        return true
+    }
+
+    /** Calcula as sugestões de [word] fora da main thread e mostra se a palavra ainda for a atual. */
     private fun requestSuggestions(word: String) {
-        pendingSuggest?.let { suggestHandler.removeCallbacks(it) }
-        pendingSuggest = Runnable {
-            pendingSuggest = null
-            spellChecker?.suggest(word) { suggestions ->
-                if (word == wordTracker.currentWord) keyboardView?.updateCandidates(suggestions)
+        val current = suggester ?: return
+        if (!suggestionsAllowed) return
+        pendingSuggestion?.second?.cancel(false)
+        val future = suggestExecutor.submit<Suggestions> {
+            current.suggest(word).also { result ->
+                mainHandler.post {
+                    if (word != wordTracker.currentWord) return@post
+                    lastSuggestions = word to result
+                    keyboardView?.updateCandidates(result.words)
+                }
             }
-        }.also { suggestHandler.postDelayed(it, SUGGEST_DEBOUNCE_MS) }
+        }
+        pendingSuggestion = word to future
+    }
+
+    /**
+     * Sugestões de [word] na hora do espaço: a já calculada; senão espera a que está saindo, ou pede uma
+     * — sempre na thread das sugestões (o [Suggester] reaproveita buffers e não pode rodar em duas
+     * threads). Passou de [SUGGEST_WAIT_MS] (~15 ms no A32 com o JIT quente), segue sem trocar.
+     */
+    private fun suggestionsFor(word: String): Suggestions? {
+        lastSuggestions?.takeIf { it.first == word }?.let { return it.second }
+        val current = suggester ?: return null
+        val future = pendingSuggestion?.takeIf { it.first == word }?.second
+            ?: suggestExecutor.submit<Suggestions> { current.suggest(word) }
+        return runCatching { future.get(SUGGEST_WAIT_MS, TimeUnit.MILLISECONDS) }.getOrNull()
     }
 
     private fun cancelSuggestions() {
-        pendingSuggest?.let { suggestHandler.removeCallbacks(it) }
-        pendingSuggest = null
-        spellChecker?.cancel()
+        pendingSuggestion?.second?.cancel(false)
+        pendingSuggestion = null
+        lastSuggestions = null
     }
 
-    /** Toque num candidato (SPL-02): substitui a composição pela palavra escolhida. */
+    /**
+     * Toque num candidato (SPL-02): a palavra escolhida SUBSTITUI a composição — `commitText` troca a
+     * região em composição. Antes havia um `finishComposingText` na frente, que comitava a palavra
+     * digitada e colava a escolhida depois dela ("nao" + "não"); nunca apareceu porque o corretor do
+     * sistema nunca devolvia sugestão.
+     */
     private fun onCandidateTapped(candidate: String) {
         val ic = getCurrentInputConnection() ?: return
-        ic.finishComposingText()
         ic.commitText("$candidate ", 1)
         wordTracker.reset()
         cancelSuggestions()
+        lastCorrection = null
         keyboardView?.updateCandidates(emptyList())
     }
 
@@ -583,7 +656,34 @@ class KeyFlowKeyboardService : InputMethodService() {
         private const val TAG = "KeyFlow.Keyboard"
         private const val KEY_EXPANDED = "expanded"
         private val LANGUAGE_CYCLE = listOf("pt", "en", "es")
-        private const val SUGGEST_DEBOUNCE_MS = 150L
+        private const val SUGGEST_WAIT_MS = 150L
+
+        /** Pontuação que, como o espaço, fecha a palavra e aplica a troca do corretor. */
+        private val AUTOCORRECT_PUNCTUATION = setOf(".", ",", "!", "?", ";", ":")
+
+        /** Dicionário do idioma atual carregado — só para o instrumentado esperar antes de digitar. */
+        @Volatile
+        var suggesterReadyForTest: Boolean = false
+            private set
+
+        /**
+         * Campo onde trocar a palavra no espaço faz sentido: texto comum. Fora: pedido de "sem sugestões",
+         * endereço, e-mail, senha e filtros de busca de lista (terminal já nem compõe — [shouldCompose]).
+         */
+        internal fun autoCorrectAllowed(inputType: Int): Boolean {
+            if (inputType and InputType.TYPE_MASK_CLASS != InputType.TYPE_CLASS_TEXT) return false
+            if (inputType and InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS != 0) return false
+            return when (inputType and InputType.TYPE_MASK_VARIATION) {
+                InputType.TYPE_TEXT_VARIATION_URI,
+                InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS,
+                InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS,
+                InputType.TYPE_TEXT_VARIATION_PASSWORD,
+                InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD,
+                InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD,
+                InputType.TYPE_TEXT_VARIATION_FILTER -> false
+                else -> true
+            }
+        }
 
         /**
          * Referência somente-leitura à instância ativa, para testes instrumentados (KBDCTL-01..04)

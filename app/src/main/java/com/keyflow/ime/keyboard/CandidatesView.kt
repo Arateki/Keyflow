@@ -80,6 +80,10 @@ class CandidatesView(
     val candidatesForTest: List<String>
         get() = (0 until row.childCount).map { (row.getChildAt(it) as TextView).text.toString() }
 
+    /** Toca no chip de [word] como o dedo faria — só para o instrumentado. */
+    fun tapForTest(word: String): Boolean =
+        (0 until row.childCount).map { row.getChildAt(it) as TextView }.firstOrNull { it.text == word }?.performClick() ?: false
+
     fun update(candidates: List<String>) {
         row.removeAllViews()
         candidates.forEach { word ->

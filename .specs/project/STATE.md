@@ -1943,3 +1943,32 @@ Pedido do Yan depois de testar as 4 mudanças de fluidez ("parecem ter melhorado
 - `activateKey` só recalcula geometria/acessibilidade quando a camada ou o shift mudam; `onDraw` sem
   alocação por tecla; corretor consultado 150 ms depois da última letra.
 Testes: 434 unitários; `com.keyflow.ime` no A32 42/42; telas 84/84 (teclado bit-idêntico).
+
+## Corretor próprio com troca no espaço (Q9) e cursor no meio do texto (2026-09-27)
+
+**Corretor do sistema não serve no A32**: sondado pelas três APIs (`getSuggestions`, `getSentenceSuggestions`
+e a sessão com atributos do Android 12), o do teclado Samsung responde `IN_THE_DICTIONARY` com duas
+sugestões vazias para TODA palavra, até "teclsdo". Não há outro instalado. Decisões do Yan: sugerir **e
+trocar no espaço**; dicionário das listas do AOSP LatinIME (Apache 2.0 pelo projeto; espelho do
+CyanogenMod, commit `dded75c1`, porque o googlesource dava 503 — as listas não trazem licença própria).
+- `scripts/build-dictionaries.py` gera `assets/dict/{pt,en,es}.tsv` (100 mil palavras cada, SHA256 da fonte
+  conferido, em ordem alfabética da forma sem acento — o celular não ordena). **`.tsv` puro**: o AGP
+  descompacta `.gz` de assets e tira a extensão.
+- `WordList` em arrays contíguos + `Suggester` (Damerau–Levenshtein com tecla vizinha custando meia edição,
+  só entre palavras com a mesma 1ª letra, vizinha ou a 2ª). No A32: carga 1,2–1,9 s em segundo plano (era
+  7–10 s antes de tirar regex, listas de Integer e a ordenação); sugestão ~15 ms com JIT quente (era 80–100
+  ms: mapa + boxing na tecla vizinha e 3 vetores alocados por palavra comparada).
+- Troca no espaço/pontuação só com confiança alta (acento/maiúscula que faltou, 1 erro com folga; 2 só em
+  palavra longa e comum); backspace logo depois desfaz. Palavras marcadas "possivelmente ofensivas" valem
+  como palavra mas só voltam como acento/maiúscula ("criancas"→"crianças" — a lista marca "crianças").
+- Fora de senha, e-mail, URL, "sem sugestões" e terminal.
+- **Achado**: tocar numa sugestão colava a palavra depois da digitada (`finishComposingText` antes do
+  `commitText`) — nunca apareceu porque nenhuma sugestão chegava.
+- **Achado**: com o editor no mesmo processo (campos do app, probe dos testes) o `onUpdateSelection` chega
+  DENTRO da chamada ao campo. Estado do teclado tem que ser zerado antes de mexer no campo.
+
+**Cursor no meio do texto** (relato antigo do Yan): a região de composição ficava marcada no campo e a
+letra seguinte substituía a palavra lá atrás. Agora o teclado encerra a composição no campo quando o cursor
+sai dela. Teste de device reproduz ("oi" → cursor → "a" = "oai"), vermelho antes.
+
+Testes: 456 unitários; `com.keyflow.ime` no A32 45/45; telas 84/84.
