@@ -371,6 +371,8 @@ class KeyFlowKeyboardView(
     private fun buildCollapsed(): LinearLayout = LinearLayout(context).apply {
         orientation = VERTICAL
         layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+        // Com paisagem (Aero), as barras são transparentes: ela vai atrás delas também no retraído.
+        colors.backdrop?.let { background = it.drawable(resources.displayMetrics.density * scale) }
         buildBars(expandedMode = false).forEach { addView(it, barLayoutParams()) }
     }
 
@@ -405,9 +407,15 @@ class KeyFlowKeyboardView(
         )
     }
 
+    /** Barras + grade: fundo liso [kbTray], ou a paisagem inteira atrás das duas (Aero). */
     private fun column(): LinearLayout = LinearLayout(context).apply {
         orientation = VERTICAL
-        setBackgroundColor(kbTray)
+        val backdrop = colors.backdrop
+        if (backdrop != null) {
+            background = backdrop.drawable(resources.displayMetrics.density * scale)
+        } else {
+            setBackgroundColor(kbTray)
+        }
     }
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density * scale).toInt()

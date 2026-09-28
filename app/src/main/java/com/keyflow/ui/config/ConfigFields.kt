@@ -46,6 +46,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
@@ -876,6 +877,29 @@ internal fun SkinsSection(
                     tag = skinTag(KeyboardSkin.ATELIE.id),
                 ) {
                     Box(Modifier.fillMaxSize().background(palette.teal))
+                }
+                val aero = KeyboardColors.of(KeyboardSkin.AERO, palette.isDark)
+                SkinChoice(
+                    label = "Aero",
+                    selected = KeyboardSkin.of(selectedSkin) == KeyboardSkin.AERO,
+                    onClick = { onSkinSelected(KeyboardSkin.AERO.id) },
+                    tag = skinTag(KeyboardSkin.AERO.id),
+                ) {
+                    // Céu e colina da paisagem, com uma tecla de vidro por cima.
+                    val sky = if (palette.isDark) {
+                        listOf(Color(0xFF030A22), Color(0xFF0A4A70), Color(0xFF07303C))
+                    } else {
+                        listOf(Color(0xFF1C7BD6), Color(0xFFA5E0FB), Color(0xFF6CC75A))
+                    }
+                    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(sky)).padding(horizontal = 10.dp, vertical = 9.dp)) {
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(Color(aero.key))
+                                .border(1.dp, Color(aero.keyBorder), RoundedCornerShape(4.dp)),
+                        )
+                    }
                 }
             }
             SkinSwatch(palette.terracotta)

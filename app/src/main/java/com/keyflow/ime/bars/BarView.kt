@@ -1,6 +1,7 @@
 package com.keyflow.ime.bars
 
 import com.keyflow.i18n.tr
+import com.keyflow.ime.GlassPainter
 import com.keyflow.ime.KeyboardColors
 import com.keyflow.ime.KeyboardSkin
 import android.content.Context
@@ -120,6 +121,8 @@ class BarView(
     private val kbModifier = colors.modifier
     private val kbInk = colors.ink
     private val pressedOverlay = 0x33000000
+    // Aero: botões de vidro; o fundo da barra ([kbTray]) é transparente e a paisagem vem da view-mãe.
+    private val glass = if (colors.isGlass) GlassPainter(dp(1f), dark) else null
 
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -321,13 +324,17 @@ class BarView(
         val button = placed.button
         val (label, bg, ink) = visualsFor(button)
 
-        fillPaint.color = bg
-        canvas.drawRoundRect(bounds, cornerRadius, cornerRadius, fillPaint)
-        if (placed.index == pressedIndex) {
-            fillPaint.color = pressedOverlay
+        if (glass != null) {
+            glass.draw(canvas, bounds, cornerRadius, bg, pressed = placed.index == pressedIndex)
+        } else {
+            fillPaint.color = bg
             canvas.drawRoundRect(bounds, cornerRadius, cornerRadius, fillPaint)
+            if (placed.index == pressedIndex) {
+                fillPaint.color = pressedOverlay
+                canvas.drawRoundRect(bounds, cornerRadius, cornerRadius, fillPaint)
+            }
+            canvas.drawRoundRect(bounds, cornerRadius, cornerRadius, borderPaint)
         }
-        canvas.drawRoundRect(bounds, cornerRadius, cornerRadius, borderPaint)
 
         if (button == BarButton.Joystick) {
             drawJoystick(canvas, bounds, ink, active = placed.index == pressedIndex && joystick != null)
@@ -424,8 +431,9 @@ class BarView(
     private fun visualsFor(button: BarButton): Triple<String, Int, Int> = when (button) {
         BarButton.Mic -> {
             val (label, color) = MicVisuals.visuals(micState, elapsedSeconds())
-            // Sem campo, o mic "descansa": no Sistema, no cinza das teclas de função (o oliva é do Ateliê).
-            if (color == MicVisuals.MIC_NO_FIELD && skin == KeyboardSkin.SYSTEM) {
+            // Sem campo, o mic "descansa": no Sistema e no Aero, na cor das teclas de função (o oliva é do
+            // Ateliê).
+            if (color == MicVisuals.MIC_NO_FIELD && skin != KeyboardSkin.ATELIE) {
                 Triple(label, kbModifier, kbInk)
             } else {
                 Triple(label, color, Color.WHITE)

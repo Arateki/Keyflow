@@ -37,6 +37,7 @@ import com.keyflow.core.shortcuts.GridTriggerMode
 import com.keyflow.core.shortcuts.PhysicalKeyMap
 import com.keyflow.core.shortcuts.ShortcutGrid
 import com.keyflow.ime.KeyFlowKeyboardView
+import com.keyflow.ime.KeyboardSkin
 import com.keyflow.overlay.RecordingNotification
 import com.keyflow.ui.PermissionStatus
 import com.keyflow.ui.common.SaveController
@@ -109,6 +110,9 @@ object RouteCatalog {
         keyboardRoute("keyboard-canvas-collapsed", expanded = false, recording = false),
         keyboardCanvasSymbolsRoute("keyboard-canvas-symbols"),
         keyboardCanvasCandidatesRoute("keyboard-canvas-candidates"),
+        // Protótipo Aero (2026-09-28): paisagem própria + teclas de vidro, com sugestões na faixa.
+        keyboardCanvasCandidatesRoute("keyboard-aero-expanded", skin = KeyboardSkin.AERO),
+        keyboardRoute("keyboard-aero-collapsed", expanded = false, recording = false, skin = KeyboardSkin.AERO),
         // Barras Canvas (SB-T10/ROL-03): paridade com a barra de fábrica + estados só alcançáveis por
         // gesto (grade revelada/alavanca), simulados via toque sintético (mesma técnica de
         // `tapLayerToggle`) já que a galeria não tem dedo de verdade.
@@ -327,6 +331,7 @@ object RouteCatalog {
         key: String,
         expanded: Boolean,
         recording: Boolean,
+        skin: KeyboardSkin = KeyboardSkin.DEFAULT,
     ): Route = Route(key) {
         val dark = LocalKeyFlowPalette.current.isDark
         Box(
@@ -344,6 +349,7 @@ object RouteCatalog {
                         onMic = {},
                         onHide = {},
                         dark = dark,
+                        skin = skin,
                         frozenSeconds = 12,
                     ).apply {
                         setExpanded(expanded)
@@ -401,7 +407,7 @@ object RouteCatalog {
     }
 
     /** Golden da faixa de sugestões (KC-T10/SPL-01): candidatos fixos, sem depender do corretor real. */
-    private fun keyboardCanvasCandidatesRoute(key: String): Route = Route(key) {
+    private fun keyboardCanvasCandidatesRoute(key: String, skin: KeyboardSkin = KeyboardSkin.DEFAULT): Route = Route(key) {
         val dark = LocalKeyFlowPalette.current.isDark
         Box(
             modifier = Modifier
@@ -418,6 +424,7 @@ object RouteCatalog {
                         onMic = {},
                         onHide = {},
                         dark = dark,
+                        skin = skin,
                         frozenSeconds = 12,
                     ).apply {
                         setExpanded(true)

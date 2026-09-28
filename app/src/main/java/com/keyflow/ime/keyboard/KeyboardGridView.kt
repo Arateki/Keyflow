@@ -1,5 +1,6 @@
 package com.keyflow.ime.keyboard
 
+import com.keyflow.ime.GlassPainter
 import com.keyflow.ime.KeyboardColors
 import com.keyflow.ime.KeyboardSkin
 import android.content.Context
@@ -66,6 +67,8 @@ class KeyboardGridView(
     private val kbModifier = colors.modifier
     private val kbInk = colors.ink
     private val pressedOverlay = 0x33000000
+    // Aero: teclas de vidro sobre a paisagem que a view-mãe pinta (a grade não tem fundo próprio).
+    private val glass = if (colors.isGlass) GlassPainter(dp(1), dark) else null
 
     private val keyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -83,9 +86,10 @@ class KeyboardGridView(
         textAlign = Paint.Align.CENTER
         textSize = dp(15)
         color = kbInk
+        if (colors.inkShadow != 0) setShadowLayer(dp(1.2f), 0f, dp(0.8f), colors.inkShadow)
     }
     // Balões da prévia e da tira de acentos (ver [KeyBubble]).
-    private val bubbleFill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL; color = kbKey }
+    private val bubbleFill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL; color = colors.popup }
     private val bubbleStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = dp(1)
@@ -243,14 +247,18 @@ class KeyboardGridView(
             set(placed.left + keyMargin, placed.top + keyMargin, placed.right - keyMargin, placed.bottom - keyMargin)
         }
         val isModifier = placed.keyDef.action !is KeyAction.Char && placed.keyDef.action != KeyAction.Space
-        keyPaint.color = keyColorFor(placed)
-        canvas.drawRoundRect(bounds, cornerRadius, cornerRadius, keyPaint)
-        if (pressedKeys.containsValue(placed)) {
-            keyPaint.color = pressedOverlay
+        if (glass != null) {
+            glass.draw(canvas, bounds, cornerRadius, keyColorFor(placed), pressed = pressedKeys.containsValue(placed))
+        } else {
+            keyPaint.color = keyColorFor(placed)
             canvas.drawRoundRect(bounds, cornerRadius, cornerRadius, keyPaint)
+            if (pressedKeys.containsValue(placed)) {
+                keyPaint.color = pressedOverlay
+                canvas.drawRoundRect(bounds, cornerRadius, cornerRadius, keyPaint)
+            }
+            borderPaint.color = kbKeyBorder
+            canvas.drawRoundRect(bounds, cornerRadius, cornerRadius, borderPaint)
         }
-        borderPaint.color = kbKeyBorder
-        canvas.drawRoundRect(bounds, cornerRadius, cornerRadius, borderPaint)
 
         val color = textColorFor(placed, isModifier)
         if (placed.keyDef.action == KeyAction.Language) {

@@ -4,10 +4,16 @@ package com.keyflow.ime
  * Esquema de cores do teclado (IME). [SYSTEM] é o padrão desde 2026-09-28 (pedido do Yan: "semelhante à
  * cor da Samsung, aquela cor padrão do sistema"); [ATELIE] é o papel quente de antes, que segue como
  * opção. O app de config continua no Ateliê — isto vale só para teclado, barras e faixa de sugestões.
+ *
+ * [AERO] é protótipo (Yan, 2026-09-28): Frutiger Aero — o teclado pinta a própria paisagem
+ * ([KeyboardBackdrop]) e as teclas são de vidro por cima ([GlassPainter]). Transparência de verdade (ver o
+ * app por trás) foi descartada: atrás do teclado fica o que cada app desenha ali, quase sempre um fundo
+ * liso, e a leitura das letras ficaria ao acaso.
  */
 enum class KeyboardSkin(val id: String) {
     SYSTEM("system"),
     ATELIE("atelie"),
+    AERO("aero"),
     ;
 
     companion object {
@@ -33,7 +39,18 @@ data class KeyboardColors(
     val modifier: Int,
     /** Texto e ícones. */
     val ink: Int,
+    /** Balões que abrem por cima (prévia da tecla, acentos, grade de atalhos): sempre opacos. */
+    val popup: Int = key,
+    /**
+     * Paisagem pintada atrás de barras e grade; `null` = fundo liso [tray]. Com paisagem, [tray] é
+     * transparente e teclas e botões são de vidro ([isGlass]).
+     */
+    val backdrop: KeyboardBackdrop? = null,
+    /** Sombra do texto das teclas (0 = sem); no vidro, é o que segura a letra sobre a paisagem. */
+    val inkShadow: Int = 0,
 ) {
+    val isGlass: Boolean get() = backdrop != null
+
     /** Contorno das etiquetas de sugestão: a tinta bem suave, visível nos dois esquemas. */
     val chipOutline: Int get() = (ink and 0x00FFFFFF) or 0x40000000
 
@@ -68,9 +85,32 @@ data class KeyboardColors(
             ink = 0xFFF1E7C9.toInt(),
         )
 
+        // Aero: [key]/[modifier] são o tom do vidro (translúcidos); o brilho e o aro vêm do GlassPainter.
+        private val AERO_DAY = KeyboardColors(
+            tray = 0x00000000,
+            key = 0x6BFFFFFF.toInt(),
+            keyBorder = 0xE6FFFFFF.toInt(),
+            modifier = 0x7A4FB0E8.toInt(),
+            ink = 0xFF0B2B4C.toInt(),
+            popup = 0xFFF3FAFF.toInt(),
+            backdrop = KeyboardBackdrop.AERO_DAY,
+            inkShadow = 0xB3FFFFFF.toInt(),
+        )
+        private val AERO_NIGHT = KeyboardColors(
+            tray = 0x00000000,
+            key = 0x3396D8F5,
+            keyBorder = 0x8CBFEFFF.toInt(),
+            modifier = 0x592A9FD6,
+            ink = 0xFFF1FAFF.toInt(),
+            popup = 0xFF102C47.toInt(),
+            backdrop = KeyboardBackdrop.AERO_NIGHT,
+            inkShadow = 0x99001226.toInt(),
+        )
+
         fun of(skin: KeyboardSkin, dark: Boolean): KeyboardColors = when (skin) {
             KeyboardSkin.SYSTEM -> if (dark) SYSTEM_DARK else SYSTEM_LIGHT
             KeyboardSkin.ATELIE -> if (dark) ATELIE_DARK else ATELIE_LIGHT
+            KeyboardSkin.AERO -> if (dark) AERO_NIGHT else AERO_DAY
         }
     }
 }

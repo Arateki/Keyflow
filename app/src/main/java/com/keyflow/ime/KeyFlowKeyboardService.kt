@@ -320,6 +320,7 @@ class KeyFlowKeyboardService : InputMethodService() {
         )
         keyboardView = view
         activeViewForTest = view
+        applyNavigationBarColor(KeyboardColors.of(KeyboardSkin.of(skin), dark))
         // Sincroniza o estado atual na criação: o StateFlow só re-emite em mudança, então se a orbe já
         // estava (ex.) pausada quando o teclado abriu, a view nasceria dessincronizada (ex.: trocar de
         // teclado por atalho com o overlay pausado).
@@ -328,6 +329,21 @@ class KeyFlowKeyboardService : InputMethodService() {
     }
 
     override fun onCreateCandidatesView(): View? = null
+
+    // Cor que a faixa da barra de navegação tinha antes de o teclado mexer nela (a do sistema).
+    private var systemNavigationBarColor: Int? = null
+
+    /**
+     * Faixa da barra de navegação sob o teclado (navegação por gestos): com paisagem (Aero), pinta com o
+     * chão da cena — senão fica uma tira preta cortando a colina. Os outros esquemas mantêm a cor do
+     * sistema, como sempre foi.
+     */
+    @Suppress("DEPRECATION") // navigationBarColor: é o que o Android até o 14 usa na faixa do IME
+    private fun applyNavigationBarColor(colors: KeyboardColors) {
+        val w = window?.window ?: return
+        val systemColor = systemNavigationBarColor ?: w.navigationBarColor.also { systemNavigationBarColor = it }
+        w.navigationBarColor = colors.backdrop?.navigationBarColor ?: systemColor
+    }
 
     /**
      * Globo tocado: cicla pt→en→es→pt **dentro do app**, sem depender de subtype do sistema (pedido do
