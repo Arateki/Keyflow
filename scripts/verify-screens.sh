@@ -32,6 +32,9 @@ adbx shell settings put global animator_duration_scale 0 >/dev/null || true
 
 # Lista de rotas a partir da fonte única (RouteCatalog), via modo lista da galeria.
 adbx shell am force-stop "$PKG"
+# Sem apagar antes, a espera abaixo acha a lista de uma instalação anterior (emulador reaproveitado) e
+# as rotas novas ficam de fora da captura.
+adbx shell rm -f "$ROUTES_FILE"
 adbx shell am start -n "$ACT" --es route __list__ >/dev/null
 for _ in $(seq 1 20); do
   if adbx shell "test -f $ROUTES_FILE" 2>/dev/null; then break; fi
