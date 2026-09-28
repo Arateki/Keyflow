@@ -17,6 +17,9 @@ import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
 import com.keyflow.core.ButtonState
+import com.keyflow.ui.icons.KfIconDrawable
+import com.keyflow.ui.icons.KfIconSpec
+import com.keyflow.ui.icons.KfIcons
 import com.keyflow.ime.MicAction
 
 /**
@@ -73,6 +76,12 @@ class MicSelectorController(
                 textSize = 14f * scale
                 setPadding(dp(14), dp(10), dp(14), dp(10))
                 background = ripple(color(action), kbKeyBorder)
+                // Ícone do conjunto próprio à esquerda do rótulo (antes: glifo de fonte, que virava emoji).
+                val iconPx = (dp(16) * scale).toInt()
+                val icon = KfIconDrawable(icon(action, micState), Color.WHITE, iconPx, strokeWidth = 2f)
+                icon.setBounds(0, 0, iconPx, iconPx)
+                setCompoundDrawablesRelative(icon, null, null, null)
+                compoundDrawablePadding = dp(6)
             }
         }
         val content = LinearLayout(context).apply {
@@ -151,9 +160,15 @@ class MicSelectorController(
         rawX >= rect.left && rawX <= rect.right && rawY >= rect.top && rawY <= rect.bottom + dp(40)
 
     private fun label(action: MicAction, micState: ButtonState): String = when (action) {
-        MicAction.PAUSE_RESUME -> if (micState == ButtonState.PAUSED) "▶ retomar" else "⏸ pausar"
-        MicAction.CANCEL -> "✕ cancelar"
-        MicAction.UNDO -> "↶ desfazer"
+        MicAction.PAUSE_RESUME -> if (micState == ButtonState.PAUSED) "retomar" else "pausar"
+        MicAction.CANCEL -> "cancelar"
+        MicAction.UNDO -> "desfazer"
+    }
+
+    private fun icon(action: MicAction, micState: ButtonState): KfIconSpec = when (action) {
+        MicAction.PAUSE_RESUME -> if (micState == ButtonState.PAUSED) KfIcons.Play else KfIcons.Pause
+        MicAction.CANCEL -> KfIcons.Close
+        MicAction.UNDO -> KfIcons.Undo
     }
 
     private fun color(action: MicAction): Int = when (action) {

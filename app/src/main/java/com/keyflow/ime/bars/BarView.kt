@@ -33,6 +33,9 @@ import com.keyflow.ime.keyboard.landscapeDampedScale
 import com.keyflow.ime.keyboard.usableScreenHeightPx
 import com.keyflow.ime.keys.PhysicalKeyEmitter
 import com.keyflow.overlay.Haptics
+import com.keyflow.ui.icons.KfIconDrawer
+import com.keyflow.ui.icons.KfIconSpec
+import com.keyflow.ui.icons.KfIcons
 import kotlin.math.abs
 
 /** Callbacks da barra — a `BarView` não conhece service/emitter, só avisa (fronteira estilo `onKeyAction`). */
@@ -127,6 +130,7 @@ class BarView(
     private val cornerRadius = dp(7f)
     private val marginH = dp(3f)
     private val marginV = dp(2f)
+    private val iconDrawer = KfIconDrawer()
 
     private var barLayout = BarGeometry.BarLayout.EMPTY
     private var scrollOffset = 0f
@@ -325,16 +329,18 @@ class BarView(
             drawJoystick(canvas, bounds, ink, active = placed.index == pressedIndex && joystick != null)
             return
         }
-        if (button == BarButton.Paste) {
-            drawPasteIcon(canvas, bounds, ink)
+        val alpha = if (isOrphanTrigger(button)) 100 else 255
+        if (button == BarButton.Mic) {
+            drawMic(canvas, bounds, ink)
             return
         }
-        if (button is BarButton.GridTrigger) {
-            drawGridTriggerIcon(canvas, bounds, ink, alpha = if (isOrphanTrigger(button)) 100 else 255)
+        val icon = BarIcons.iconFor(button, expandedMode)
+        if (icon != null) {
+            drawIcon(canvas, icon, bounds.centerX(), bounds.centerY(), fittedIconSizePx(bounds), ink, alpha)
             return
         }
         textPaint.color = ink
-        textPaint.alpha = if (isOrphanTrigger(button)) 100 else 255
+        textPaint.alpha = alpha
         textPaint.textSize = fittedTextSizePx(bounds)
         val textY = bounds.centerY() - (textPaint.descent() + textPaint.ascent()) / 2
         canvas.drawText(label, bounds.centerX(), textY, textPaint)
@@ -342,24 +348,62 @@ class BarView(
     }
 
     /**
-     * Rótulos em texto (mic, teclas avulsas como ESC/Enter, colapsar) usavam tamanho FIXO ([TEXT_SIZE_DP]
+     * Rótulos em texto (teclas avulsas como ESC, cronômetro do mic) usavam tamanho FIXO ([TEXT_SIZE_DP]
      * na escala crua) — com 2+ barras empilhadas em paisagem a altura real do botão encolhe bem além disso
-     * ([GridSizing.barHeightPx]), então o glifo vazava do botão (achado do Yan, 2026-07-07). Alavanca/colar/
-     * gatilho de grade já desenham proporcionais a `bounds` (ver drawJoystick/drawPasteIcon/
-     * drawGridTriggerIcon); esta função dá o mesmo tratamento ao texto. [TEXT_HEIGHT_RATIO] reproduz a
-     * proporção de hoje (15dp de texto ÷ 24dp de `bounds.height()` no botão em tamanho ideal) — no caso
-     * normal (sem encolher) o resultado é idêntico ao tamanho fixo anterior; só encolhe abaixo disso.
+     * ([GridSizing.barHeightPx]), então o glifo vazava do botão (achado do Yan, 2026-07-07). Os ícones
+     * ([fittedIconSizePx]) seguem a mesma regra. [TEXT_HEIGHT_RATIO] reproduz a proporção de hoje (15dp de
+     * texto ÷ 24dp de `bounds.height()` no botão em tamanho ideal) — no caso normal (sem encolher) o
+     * resultado é idêntico ao tamanho fixo anterior; só encolhe abaixo disso.
      */
     private fun fittedTextSizePx(bounds: RectF): Float =
         minOf(dp(TEXT_SIZE_DP), bounds.height() * TEXT_HEIGHT_RATIO)
 
-    /** Manche de fliperama: base circular + bolinha deslocada na direção do puxão (JOY-01). */
+    /** Lado do quadrado do ícone (grid 24): mesma regra do texto — ideal fixo, encolhe com a barra. */
+    private fun fittedIconSizePx(bounds: RectF): Float =
+        minOf(dp(ICON_SIZE_DP), bounds.height() * ICON_HEIGHT_RATIO, bounds.width() * 0.8f)
+
+    private fun drawIcon(canvas: Canvas, icon: KfIconSpec, cx: Float, cy: Float, size: Float, ink: Int, alpha: Int = 255) =
+        iconDrawer.draw(canvas, icon, cx, cy, size, ink, alpha, strokeWidth = icon.strokeWidth * ICON_STROKE_BOOST)
+
+    /**
+     * Mic: o ícone do estado (cápsula, ponto de gravação, pausa…) e, quando o estado tem, o texto ao lado
+     * (cronômetro, "cancelado"). O conjunto é centralizado no botão como uma coisa só.
+     */
+    private fun drawMic(canvas: Canvas, bounds: RectF, ink: Int) {
+        val glyph = BarIcons.micGlyph(micState, elapsedSeconds())
+        val iconSize = fittedIconSizePx(bounds)
+        val text = glyph.text
+        if (text == null) {
+            drawIcon(canvas, glyph.icon, bounds.centerX(), bounds.centerY(), iconSize, ink)
+            return
+        }
+        textPaint.color = ink
+        textPaint.textSize = fittedTextSizePx(bounds) * MIC_TEXT_RATIO
+        val small = iconSize * MIC_TEXT_ICON_RATIO
+        val gap = small * 0.18f
+        val total = small + gap + textPaint.measureText(text)
+        val left = bounds.centerX() - total / 2f
+        drawIcon(canvas, glyph.icon, left + small / 2f, bounds.centerY(), small, ink)
+        textPaint.textAlign = Paint.Align.LEFT
+        val textY = bounds.centerY() - (textPaint.descent() + textPaint.ascent()) / 2
+        canvas.drawText(text, left + small + gap, textY, textPaint)
+        textPaint.textAlign = Paint.Align.CENTER
+    }
+
+    /**
+     * Manche de fliperama no traço dos ícones ([KfIcons.Joystick]): base circular + bola deslocada na
+     * direção do puxão (JOY-01).
+     */
     private fun drawJoystick(canvas: Canvas, bounds: RectF, ink: Int, active: Boolean) {
         val cx = bounds.centerX()
         val cy = bounds.centerY()
-        val baseRadius = minOf(bounds.width(), bounds.height()) / 2f - dp(4f)
+        val unit = fittedIconSizePx(bounds) / 24f
+        val baseRadius = 8f * unit
+        val stroke = borderPaint.strokeWidth
         borderPaint.color = ink
+        borderPaint.strokeWidth = KfIcons.Joystick.strokeWidth * ICON_STROKE_BOOST * unit
         canvas.drawCircle(cx, cy, baseRadius, borderPaint)
+        borderPaint.strokeWidth = stroke
         borderPaint.color = kbKeyBorder
         val maxOffset = baseRadius * 0.55f
         val length = kotlin.math.hypot(joystickDx, joystickDy)
@@ -370,52 +414,7 @@ class BarView(
             0f to 0f
         }
         fillPaint.color = if (active) MicVisuals.ACCENT_TEAL else ink
-        canvas.drawCircle(cx + ox, cy + oy, baseRadius * 0.42f, fillPaint)
-    }
-
-    /**
-     * Prancheta desenhada (não emoji, mesmo espírito do globo da grade Canvas — pedido do Yan, 2026-07-06).
-     * Centralizar a PRANCHETA em `bounds.centerY()` deixava o conjunto baixo demais (achado do Yan, 2
-     * rodadas) — desloca pra cima em [PASTE_ICON_LIFT_DP] até o conjunto ficar visualmente centralizado.
-     */
-    private fun drawPasteIcon(canvas: Canvas, bounds: RectF, ink: Int) {
-        borderPaint.color = ink
-        val w = minOf(bounds.width(), bounds.height()) * 0.5f
-        val h = w * 1.15f
-        val tabH = dp(4f)
-        val boardCenterY = bounds.centerY() - dp(PASTE_ICON_LIFT_DP)
-        val board = RectF(bounds.centerX() - w / 2, boardCenterY - h / 2, bounds.centerX() + w / 2, boardCenterY + h / 2)
-        canvas.drawRoundRect(board, dp(2f), dp(2f), borderPaint)
-        val tabW = w * 0.45f
-        val tab = RectF(bounds.centerX() - tabW / 2, board.top - tabH / 2, bounds.centerX() + tabW / 2, board.top + tabH / 2)
-        fillPaint.color = ink
-        canvas.drawRoundRect(tab, dp(1.5f), dp(1.5f), fillPaint)
-        val lineInset = w * 0.2f
-        val lineY1 = board.top + h * 0.4f
-        val lineY2 = board.top + h * 0.62f
-        canvas.drawLine(board.left + lineInset, lineY1, board.right - lineInset, lineY1, borderPaint)
-        canvas.drawLine(board.left + lineInset, lineY2, board.right - lineInset * 1.8f, lineY2, borderPaint)
-    }
-
-    /**
-     * Grade de 4 quadrados arredondados (estilo "apps"), não o `#`/jogo da velha do rótulo padrão
-     * (`⌗`) — pedido do Yan, 2026-07-06: o cruzamento de linhas finas lembrava jogo da velha demais.
-     */
-    private fun drawGridTriggerIcon(canvas: Canvas, bounds: RectF, ink: Int, alpha: Int) {
-        val side = minOf(bounds.width(), bounds.height()) * 0.62f
-        val cell = (side - dp(3f)) / 2f
-        val left = bounds.centerX() - side / 2f
-        val top = bounds.centerY() - side / 2f
-        fillPaint.color = ink
-        fillPaint.alpha = alpha
-        for (row in 0..1) {
-            for (col in 0..1) {
-                val l = left + col * (cell + dp(3f))
-                val t = top + row * (cell + dp(3f))
-                canvas.drawRoundRect(RectF(l, t, l + cell, t + cell), dp(1.5f), dp(1.5f), fillPaint)
-            }
-        }
-        fillPaint.alpha = 255
+        canvas.drawCircle(cx + ox, cy + oy, 3f * unit, fillPaint)
     }
 
     private fun visualsFor(button: BarButton): Triple<String, Int, Int> = when (button) {
@@ -430,7 +429,7 @@ class BarView(
         }
         BarButton.ConfigBtn -> Triple("⚙", kbModifier, kbInk)
         BarButton.ToggleExpand -> Triple(if (expandedMode) "↓" else "⌃", kbModifier, kbInk)
-        BarButton.Paste -> Triple("", kbModifier, kbInk) // ícone desenhado, ver drawPasteIcon
+        BarButton.Paste -> Triple("", kbModifier, kbInk) // ícone desenhado, ver BarIcons
         is BarButton.SingleKey -> Triple(button.key.label, kbModifier, kbInk)
         BarButton.Joystick -> Triple("", kbModifier, kbInk)
         is BarButton.GridTrigger -> Triple(button.label, kbModifier, kbInk)
@@ -818,11 +817,17 @@ class BarView(
         private const val REVEAL_TICK_MS = 120L
         // Alavanca: raio-morto pequeno (o botão é compacto; o flick precisa ser curto).
         private const val JOYSTICK_THRESHOLD_DP = 12f
-        // Deslocamento pra cima do ícone de colar — ajustado 2x a pedido do Yan (2026-07-06).
-        private const val PASTE_ICON_LIFT_DP = 1f
         // Tamanho de texto no tamanho ideal (barra sem encolher) — ver fittedTextSizePx.
         private const val TEXT_SIZE_DP = 15f
         // 15dp de texto ÷ 24dp de bounds.height() (28dp de barra ideal − 2×2dp de marginV) — ver fittedTextSizePx.
         private const val TEXT_HEIGHT_RATIO = TEXT_SIZE_DP / 24f
+        // Ícone no tamanho ideal (grid 24 → glifo de ~15dp, a altura do texto de antes).
+        private const val ICON_SIZE_DP = 21f
+        private const val ICON_HEIGHT_RATIO = ICON_SIZE_DP / 24f
+        // Traço um pouco mais cheio que no app: a barra é vista de relance, em cima de cor.
+        private const val ICON_STROKE_BOOST = 1.15f
+        // Mic com texto ao lado (cronômetro): texto e ícone menores para caber no botão de peso 1,5.
+        private const val MIC_TEXT_RATIO = 0.9f
+        private const val MIC_TEXT_ICON_RATIO = 0.62f
     }
 }
