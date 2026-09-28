@@ -32,7 +32,7 @@ object LocalErrors {
     const val UNAVAILABLE = "Não foi possível iniciar a transcrição local."
 
     fun message(kind: EngineErrorKind): String = when (kind) {
-        EngineErrorKind.MODEL_MISSING -> "Arquivos do modelo local sumiram — baixe de novo na aba Voz."
+        EngineErrorKind.MODEL_MISSING -> "Arquivos do modelo local sumiram — baixe de novo na aba Transcrição."
         EngineErrorKind.DECODE -> "Não foi possível ler o áudio gravado."
         EngineErrorKind.OOM -> "Memória insuficiente para o modelo local — feche outros apps ou escolha um modelo menor."
         EngineErrorKind.ENGINE -> "O modelo local falhou ao transcrever."

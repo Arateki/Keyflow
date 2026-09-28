@@ -13,7 +13,7 @@ import com.keyflow.ui.icons.KfIcons
  */
 enum class ConfigTab(val label: String, private val icon: KfIconSpec) {
     MODO("Modo", KfIcons.TabModo),
-    VOZ("Voz", KfIcons.TabVoz),
+    VOZ("Transcrição", KfIcons.TabVoz),
     TECLADO("Teclado", KfIcons.TabTeclado),
     OVERLAY("Sobrepor", KfIcons.TabSobrepor),
     DOCS("Docs", KfIcons.TabDocs);

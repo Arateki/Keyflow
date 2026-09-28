@@ -624,7 +624,7 @@ class OverlayCoordinator(
         if (error.kind == ErrorKind.LOCAL) error.message else errorMessage(error.kind)
 
     private fun errorMessage(kind: ErrorKind): String = when (kind) {
-        ErrorKind.CONFIG_MISSING -> "Configure um provedor de voz na aba Voz."
+        ErrorKind.CONFIG_MISSING -> "Configure um provedor de voz na aba Transcrição."
         ErrorKind.AUTH -> "Falha de autenticação — verifique o token."
         ErrorKind.NETWORK -> "Sem conexão de rede."
         ErrorKind.TIMEOUT -> "Tempo esgotado ao transcrever."

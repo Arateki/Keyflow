@@ -60,7 +60,7 @@ enum class OnboardingPermission(val key: String, val label: String, val why: Str
     MIC(
         "mic",
         "Microfone",
-        "Para gravar sua voz e transcrever. O microfone só é usado enquanto você grava, e o áudio vai apenas para a origem de voz configurada na aba Voz. Sem ele, não há ditado.",
+        "Para gravar sua voz e transcrever. O microfone só é usado enquanto você grava, e o áudio vai apenas para a origem de voz configurada na aba Transcrição. Sem ele, não há ditado.",
     ),
     OVERLAY(
         "overlay",

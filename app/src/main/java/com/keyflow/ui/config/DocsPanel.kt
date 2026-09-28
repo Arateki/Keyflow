@@ -194,11 +194,11 @@ val docsSections: List<DocSection> = listOf(
             DocBlock.Labeled("Teclado", "segure o mic durante a gravação e solte em pausar."),
             DocBlock.Labeled("Notificação", "botão pausar e retomar."),
             DocBlock.Paragraph(
-                "Ao atingir a duração máxima de gravação (aba Voz), a gravação pausa sozinha e pergunta se você quer enviar ou descartar.",
+                "Ao atingir a duração máxima de gravação (aba Transcrição), a gravação pausa sozinha e pergunta se você quer enviar ou descartar.",
             ),
             DocBlock.Labeled(
                 "Parcial",
-                "com \"Transcrever parcialmente ao pausar\" ligado (aba Voz), cada pausa já transcreve o trecho gravado e um aviso aparece junto à orbe. Com a visualização ligada, toque no aviso para ler e toque de novo para editar; o texto novo entra depois das suas edições, e o envio entrega tudo junto.",
+                "com \"Transcrever parcialmente ao pausar\" ligado (aba Transcrição), cada pausa já transcreve o trecho gravado e um aviso aparece junto à orbe. Com a visualização ligada, toque no aviso para ler e toque de novo para editar; o texto novo entra depois das suas edições, e o envio entrega tudo junto.",
             ),
         ),
     ),
@@ -242,13 +242,13 @@ val docsSections: List<DocSection> = listOf(
             DocBlock.Paragraph(
                 "Quando algo falha, a orbe e o mic do teclado mostram ✖ por 2 segundos, junto com o motivo. Aquela gravação não é reenviada — é só gravar de novo.",
             ),
-            DocBlock.Labeled("Token ou origem", "tocar no ✖ (ou no aviso) abre a aba Voz para corrigir."),
+            DocBlock.Labeled("Token ou origem", "tocar no ✖ (ou no aviso) abre a aba Transcrição para corrigir."),
             DocBlock.Labeled("Microfone", "tocar leva à aba Modo, onde a permissão pendente pisca."),
             DocBlock.Labeled(
                 "Tempo esgotado",
-                "a origem de voz não respondeu dentro do tempo limite de resposta (aba Voz, 15s de fábrica). Em rede lenta ou áudios longos, aumente o prazo.",
+                "a origem de voz não respondeu dentro do tempo limite de resposta (aba Transcrição, 15s de fábrica). Em rede lenta ou áudios longos, aumente o prazo.",
             ),
-            DocBlock.Labeled("Rede ou servidor", "tente de novo; se persistir, confira a URL e o token na aba Voz."),
+            DocBlock.Labeled("Rede ou servidor", "tente de novo; se persistir, confira a URL e o token na aba Transcrição."),
         ),
     ),
     DocSection(
@@ -256,10 +256,10 @@ val docsSections: List<DocSection> = listOf(
         "Voz no aparelho",
         listOf(
             DocBlock.Paragraph(
-                "A origem Local transcreve sem internet: escolha um modelo na aba Voz, baixe uma vez e ele fica no aparelho. O Rápido é leve; o Equilibrado é mais preciso; o Máxima qualidade é o mais preciso e o mais pesado.",
+                "A origem Local transcreve sem internet: escolha um modelo na aba Transcrição, baixe uma vez e ele fica no aparelho. O Rápido é leve; o Equilibrado é mais preciso; o Máxima qualidade é o mais preciso e o mais pesado.",
             ),
             DocBlock.Labeled("Download", "em Wi-Fi começa direto; em dados móveis o app pergunta antes, mostrando o tamanho. Um modelo por vez."),
-            DocBlock.Labeled("Espaço", "apagar um modelo na aba Voz devolve o espaço na hora. Modelos não entram no backup e somem se o app for desinstalado."),
+            DocBlock.Labeled("Espaço", "apagar um modelo na aba Transcrição devolve o espaço na hora. Modelos não entram no backup e somem se o app for desinstalado."),
         ),
     ),
     DocSection(
@@ -267,7 +267,7 @@ val docsSections: List<DocSection> = listOf(
         "Privacidade",
         listOf(
             DocBlock.Paragraph(
-                "O áudio só é enviado à origem configurada em Voz — com a origem Local, ele nunca sai do aparelho. Tokens ficam apenas no aparelho.",
+                "O áudio só é enviado à origem configurada em Transcrição — com a origem Local, ele nunca sai do aparelho. Tokens ficam apenas no aparelho.",
             ),
         ),
     ),
