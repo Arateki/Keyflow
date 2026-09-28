@@ -84,8 +84,8 @@ goldens novos aprovados; gate `full` verde.
 **Status (2026-07-04):** KC-T1..T10 concluídas. O Yan aprovou a fluidez no Galaxy A32 e a grade Canvas
 virou o padrão: a flag `kbd_canvas` e o teclado antigo foram removidos (Q4 do `DEVELOPMENT-ORDER.md`).
 
-**Futuro do teclado (pós-MVP):** customização (reduzir tamanho, reposicionar teclas, teclas-macro); glide
-typing; dicionário/sugestões próprias (possível porte do AnySoftKeyboard, Apache 2.0).
+**Futuro do teclado (pós-MVP):** customização (reposicionar teclas, teclas-macro); glide typing.
+Dicionário/sugestões próprias saíram em 2026-09-28 (PR #5: listas do AOSP LatinIME, troca no espaço).
 
 ## Milestone 6 — Barras personalizáveis + atalhos físicos (Trabalho 3) ✅ CONCLUÍDO (2026-09-09)
 
@@ -123,8 +123,8 @@ completos, aprovados pelo Yan em 2026-07-04). Ordem: API primeiro (API-T1..T14; 
 **Done:** success criteria das duas specs (fluxo completo com compras de teste; zero ads no
 IME/overlay; app funciona com a API fora do ar).
 
-**Status (2026-09-27):** API-T1..T12 feitas e T13 parcial (Dockerfile + guia de deploy) — PR #4,
-aguardando merge; a T13 parou nas credenciais/staging do Yan. Monetização (MZ) não iniciada.
+**Status (2026-09-28):** API-T1..T12 feitas e T13 parcial (Dockerfile + guia de deploy), na `main`
+desde 2026-09-28 (PR #4); a T13 parou nas credenciais/staging do Yan. Monetização (MZ) não iniciada.
 
 ## Milestone 8 — Sistema de temas + aba Sistema
 
