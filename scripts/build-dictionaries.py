@@ -1,16 +1,22 @@
 #!/usr/bin/env python3
-"""Gera os dicionários do corretor (app/src/main/assets/dict/*.tsv) a partir das listas de palavras do
-teclado do Android (AOSP LatinIME, Apache 2.0).
+"""Gera os dicionários do corretor a partir das listas de palavras do teclado do Android (AOSP LatinIME,
+Apache 2.0): `app/src/main/assets/dict/<idioma>.kfd` (binário que o app lê) e, para os testes JVM,
+`app/src/test/resources/dict/<idioma>.tsv` (o mesmo conteúdo em texto).
 
 Fonte: espelho do LatinIME no GitHub do CyanogenMod, branch cm-14.1, fixado no commit abaixo (o
 googlesource respondia 503 quando isto foi escrito). Cada arquivo baixado é conferido por SHA256 antes
 de ser usado — mudou lá, o script para em vez de gerar outro dicionário em silêncio.
 
-Formato gerado, uma palavra por linha: `palavra<TAB>freq[<TAB>o]`, com `freq` de 1 a 255 e `o` marcando
+Formato texto, uma palavra por linha: `palavra<TAB>freq[<TAB>o]`, com `freq` de 1 a 255 e `o` marcando
 as que a lista considera possivelmente ofensivas. Ficam de fora as de frequência 0 e as marcadas
 `not_a_word`; ficam só as MAX_WORDS mais frequentes de cada idioma. As linhas saem em ordem alfabética da
 forma "dobrada" (minúscula, sem acento — a mesma `WordList.fold` do app): assim o celular não precisa
 ordenar 100 mil palavras ao carregar.
+
+Formato binário (`WordList.readBinary`), big-endian: `KFD1`, n, bytes do texto, bytes das formas dobradas
+(u32 cada); texto e formas dobradas em Latin-1; tamanho de cada palavra e de cada forma dobrada (u8 × n);
+frequências (u8 × n); marca de ofensiva (bits, (n+7)/8 bytes). Ler 100 mil linhas de texto no celular
+levava de 1,2 a 6 s; isto é cópia de blocos.
 
     scripts/build-dictionaries.py [pasta-com-os-.gz-já-baixados]
 
@@ -21,6 +27,7 @@ import hashlib
 import io
 import pathlib
 import re
+import struct
 import sys
 import unicodedata
 import urllib.request
@@ -34,7 +41,9 @@ SOURCES = {
     "en": ("en_US_wordlist.combined.gz", "0f78dd455b532be169a23f233227b811fabced4b5bd7fc9c40cc05839793bcbd"),
 }
 MAX_WORDS = 100_000
-OUT = pathlib.Path(__file__).resolve().parent.parent / "app/src/main/assets/dict"
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+OUT = ROOT / "app/src/main/assets/dict"
+TEST_OUT = ROOT / "app/src/test/resources/dict"
 WORD = re.compile(r"^ word=([^,]+),f=(\d+)(.*)$")
 
 
@@ -64,6 +73,13 @@ def build(lang: str, name: str, sha256: str, local: pathlib.Path | None) -> None
         word, freq, rest = m.group(1), int(m.group(2)), m.group(3)
         if freq == 0 or "not_a_word=true" in rest or "\t" in word:
             continue
+        # O binário guarda Latin-1 e tamanhos em 1 byte: o que não cabe fica de fora (quase nada).
+        try:
+            word.encode("latin-1"), fold(word).encode("latin-1")
+        except UnicodeEncodeError:
+            continue
+        if len(word) > 255:
+            continue
         entries.append((word, freq, "possibly_offensive=true" in rest))
     entries.sort(key=lambda e: -e[1])
     entries = entries[:MAX_WORDS]
@@ -71,10 +87,31 @@ def build(lang: str, name: str, sha256: str, local: pathlib.Path | None) -> None
     body = io.StringIO()
     for word, freq, offensive in entries:
         body.write(f"{word}\t{freq}\to\n" if offensive else f"{word}\t{freq}\n")
+    TEST_OUT.mkdir(parents=True, exist_ok=True)
+    (TEST_OUT / f"{lang}.tsv").write_text(body.getvalue(), encoding="utf-8")
     OUT.mkdir(parents=True, exist_ok=True)
-    # Texto puro: o AGP descompacta `.gz` de assets e tira a extensão, e o APK já comprime os assets.
-    (OUT / f"{lang}.tsv").write_text(body.getvalue(), encoding="utf-8")
-    print(f"{lang}: {len(entries)} palavras → {OUT / f'{lang}.tsv'}")
+    (OUT / f"{lang}.kfd").write_bytes(binary(entries))
+    print(f"{lang}: {len(entries)} palavras → {OUT / f'{lang}.kfd'} ({(OUT / f'{lang}.kfd').stat().st_size} bytes)")
+
+
+def binary(entries: list) -> bytes:
+    text = "".join(w for w, _, _ in entries).encode("latin-1")
+    folded = "".join(fold(w) for w, _, _ in entries).encode("latin-1")
+    n = len(entries)
+    offensive = bytearray((n + 7) // 8)
+    for i, (_, _, o) in enumerate(entries):
+        if o:
+            offensive[i // 8] |= 1 << (i % 8)
+    return b"".join([
+        b"KFD1",
+        struct.pack(">III", n, len(text), len(folded)),
+        text,
+        folded,
+        bytes(len(w) for w, _, _ in entries),
+        bytes(len(fold(w)) for w, _, _ in entries),
+        bytes(f for _, f, _ in entries),
+        bytes(offensive),
+    ])
 
 
 if __name__ == "__main__":

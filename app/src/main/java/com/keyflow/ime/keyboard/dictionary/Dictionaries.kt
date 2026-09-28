@@ -6,7 +6,7 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Corretor por idioma do teclado (`pt`/`en`/`es`), com o dicionário de `assets/dict/<idioma>.tsv`
+ * Corretor por idioma do teclado (`pt`/`en`/`es`), com o dicionário de `assets/dict/<idioma>.kfd`
  * lido uma vez por processo, fora da main thread (~100 mil palavras). Trocar de idioma e voltar não lê
  * de novo; a view do teclado ser recriada também não.
  */
@@ -24,9 +24,7 @@ object Dictionaries {
 
     private fun load(context: Context, language: String): Suggester? = runCatching {
         val start = System.currentTimeMillis()
-        val words = context.assets.open("dict/$language.tsv").bufferedReader().useLines {
-            WordList.parse(it)
-        }
+        val words = context.assets.open("dict/$language.kfd").use { WordList.readBinary(it.readBytes()) }
         Log.i(TAG, "$language: ${words.size} palavras em ${System.currentTimeMillis() - start} ms")
         Suggester(words)
     }.onFailure { Log.w(TAG, "sem dicionário para $language: ${it.message}") }.getOrNull()

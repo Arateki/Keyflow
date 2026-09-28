@@ -5,13 +5,19 @@ import com.google.common.truth.Truth.assertWithMessage
 import org.junit.Test
 import java.io.File
 
-/** O dicionário de português que vai no app (`assets/dict/pt.tsv`), com erros de digitação de verdade. */
+/** Os dicionários que vão no app (`assets/dict/<idioma>.kfd`), com erros de digitação de verdade. */
 class RealDictionaryTest {
 
-    private val suggester by lazy {
-        val file = File("src/main/assets/dict/pt.tsv").takeIf { it.isFile } ?: File("app/src/main/assets/dict/pt.tsv")
-        Suggester(file.bufferedReader().useLines { WordList.parse(it.toList().asSequence()) })
+    private fun text(lang: String): WordList =
+        javaClass.getResourceAsStream("/dict/$lang.tsv")!!.bufferedReader().useLines { WordList.parse(it) }
+
+    private fun binary(lang: String): WordList {
+        val file = File("src/main/assets/dict/$lang.kfd").takeIf { it.isFile } ?: File("app/src/main/assets/dict/$lang.kfd")
+        return WordList.readBinary(file.readBytes())
     }
+
+    // O mesmo binário que o app carrega.
+    private val suggester by lazy { Suggester(binary("pt")) }
 
     @Test
     fun `common portuguese slips are fixed on space`() {
@@ -48,12 +54,19 @@ class RealDictionaryTest {
     }
 
     @Test
-    fun `the three dictionaries arrive already sorted, so the phone never sorts them`() {
+    fun `the binary the app loads holds exactly the words of the text list, already sorted`() {
         listOf("pt", "en", "es").forEach { lang ->
-            val file = File("src/main/assets/dict/$lang.tsv").takeIf { it.isFile } ?: File("app/src/main/assets/dict/$lang.tsv")
-            val words = file.bufferedReader().useLines { WordList.parse(it) }
-            assertWithMessage(lang).that(words.arrivedSorted).isTrue()
-            assertWithMessage(lang).that(words.size).isEqualTo(100_000)
+            val text = text(lang)
+            val bin = binary(lang)
+            assertWithMessage("$lang ordenado").that(text.arrivedSorted).isTrue()
+            assertWithMessage(lang).that(bin.size).isEqualTo(text.size)
+            for (i in 0 until text.size) {
+                if (text.word(i) != bin.word(i) || text.freq(i) != bin.freq(i) ||
+                    text.foldedWord(i) != bin.foldedWord(i) || text.isOffensive(i) != bin.isOffensive(i)
+                ) {
+                    throw AssertionError("$lang[$i]: '${text.word(i)}' ≠ '${bin.word(i)}'")
+                }
+            }
         }
     }
 }

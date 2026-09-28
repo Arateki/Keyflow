@@ -1,5 +1,6 @@
 package com.keyflow.ime.keyboard.dictionary
 
+import java.nio.ByteBuffer
 import java.text.Normalizer
 import java.util.BitSet
 
@@ -139,8 +140,58 @@ class WordList private constructor(
             }
             starts[count] = text.length
             foldedStarts[count] = foldedText.length
-            val folded = CharArray(foldedText.length).also { foldedText.getChars(0, foldedText.length, it, 0) }
-            val fStarts = foldedStarts.copyOf(count + 1)
+            return build(
+                text = CharArray(text.length).also { text.getChars(0, text.length, it, 0) },
+                starts = starts.copyOf(count + 1),
+                folded = CharArray(foldedText.length).also { foldedText.getChars(0, foldedText.length, it, 0) },
+                fStarts = foldedStarts.copyOf(count + 1),
+                freqs = freqs.copyOf(count),
+                offensive = offensive,
+                knownSorted = false,
+            )
+        }
+
+        /**
+         * Lê o `assets/dict/<idioma>.kfd` que o `scripts/build-dictionaries.py` gera: blocos contíguos
+         * (texto em Latin-1, tamanhos e frequências em bytes), já em ordem alfabética da forma dobrada.
+         * Copiar blocos no lugar de interpretar 100 mil linhas: a carga no A32 ia de 1,2 a 6 s.
+         */
+        fun readBinary(bytes: ByteArray): WordList {
+            require(bytes.size >= HEADER_BYTES && String(bytes, 0, 4, Charsets.US_ASCII) == MAGIC) { "não é um .kfd" }
+            val header = ByteBuffer.wrap(bytes, 4, 12)
+            val n = header.int
+            val textBytes = header.int
+            val foldedBytes = header.int
+            var pos = HEADER_BYTES
+            val text = String(bytes, pos, textBytes, Charsets.ISO_8859_1).toCharArray()
+            pos += textBytes
+            val folded = String(bytes, pos, foldedBytes, Charsets.ISO_8859_1).toCharArray()
+            pos += foldedBytes
+            val starts = IntArray(n + 1)
+            for (i in 0 until n) starts[i + 1] = starts[i] + (bytes[pos + i].toInt() and 0xFF)
+            pos += n
+            val fStarts = IntArray(n + 1)
+            for (i in 0 until n) fStarts[i + 1] = fStarts[i] + (bytes[pos + i].toInt() and 0xFF)
+            pos += n
+            val freqs = IntArray(n) { bytes[pos + it].toInt() and 0xFF }
+            pos += n
+            val offensive = BitSet.valueOf(bytes.copyOfRange(pos, pos + (n + 7) / 8))
+            return build(text, starts, folded, fStarts, freqs, offensive, knownSorted = true)
+        }
+
+        private const val MAGIC = "KFD1"
+        private const val HEADER_BYTES = 16
+
+        private fun build(
+            text: CharArray,
+            starts: IntArray,
+            folded: CharArray,
+            fStarts: IntArray,
+            freqs: IntArray,
+            offensive: BitSet,
+            knownSorted: Boolean,
+        ): WordList {
+            val count = freqs.size
 
             fun compare(a: Int, b: Int): Int {
                 val la = fStarts[a + 1] - fStarts[a]
@@ -151,7 +202,7 @@ class WordList private constructor(
                 }
                 return la - lb
             }
-            val alreadySorted = (1 until count).all { compare(it - 1, it) <= 0 }
+            val alreadySorted = knownSorted || (1 until count).all { compare(it - 1, it) <= 0 }
             val byFolded = if (alreadySorted) {
                 IntArray(count) { it }
             } else {
@@ -175,11 +226,11 @@ class WordList private constructor(
                 buckets[bucket][filled[bucket]++] = i
             }
             return WordList(
-                text = CharArray(text.length).also { text.getChars(0, text.length, it, 0) },
-                starts = starts.copyOf(count + 1),
+                text = text,
+                starts = starts,
                 folded = folded,
                 foldedStarts = fStarts,
-                freqs = freqs.copyOf(count),
+                freqs = freqs,
                 offensive = offensive,
                 byFolded = byFolded,
                 byLengthAndFirst = buckets,
