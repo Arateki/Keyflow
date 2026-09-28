@@ -1972,3 +1972,21 @@ letra seguinte substituía a palavra lá atrás. Agora o teclado encerra a compo
 sai dela. Teste de device reproduz ("oi" → cursor → "a" = "oai"), vermelho antes.
 
 Testes: 456 unitários; `com.keyflow.ime` no A32 45/45; telas 84/84.
+
+## Downloader próprio no lugar do DownloadManager — SPEC_DEVIATION da G6 (2026-09-28)
+
+"Baixar" ficava em 0% (relato do Yan). Medido: a rede dele tem **IPv6 quebrado** (endereço atribuído,
+nenhum pacote passa — também no PC da mesma rede); o DownloadManager tenta o IPv6 primeiro e espera cada
+tentativa estourar: 2,5 min em 0 bytes por arquivo antes de cair para o IPv4. Decisão do Yan: downloader
+próprio (em vez de só avisar "Conectando…").
+- `HttpFileFetcher` (JVM): OkHttp 4 com `Ipv4FirstDns` (o OkHttp 4 não corre IPv4 × IPv6; isso só no 5),
+  retomada por `Range`, descarta `.part` se o servidor retomar de outro ponto.
+- `HttpDownloadGateway` (JVM, mesmo contrato `DownloadGateway`): um arquivo por vez, fila em
+  `filesDir/model-downloads.json` (fora do backup), espera rede/Wi-Fi, tentativa que avançou não conta.
+- `ModelDownloadService` (`dataSync`): notificação com progresso e "Cancelar". Cada arquivo concluído
+  dispara `reconcile()` — substitui o `ModelDownloadReceiver`, que saiu com o `SystemDownloadGateway`.
+- No A32, na rede do Yan: Equilibrado (358 MB) com 1º byte em ~2 s e instalado em ~40 s.
+- De carona: o e2e `inferenceProcessDyingMidTranscription…` matava o `:inference` 500 ms depois de ele
+  SUBIR — no A32 de hoje, antes de o pedido chegar; o sistema recriava o serviço e a transcrição terminava
+  bem (4/4). Agora espera 3 s (a chamada dura ~33 s); 3/3.
+Testes: 472 unitários (8 do fetcher, 8 da fila); no A32, downloader/store/LocalPanel/e2e 17/18 — o que falhou é o e2e acima, 3/3 depois do ajuste.

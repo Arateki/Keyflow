@@ -11,7 +11,7 @@ import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.ModelDownloader
 import com.keyflow.data.models.ModelStore
 import com.keyflow.data.models.StartResult
-import com.keyflow.data.models.SystemDownloadGateway
+import com.keyflow.data.models.HttpDownloadGateway
 import org.junit.AfterClass
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -26,7 +26,7 @@ import java.io.File
 
 /**
  * Ponta a ponta com o modelo real (opt-in: argumento de instrumentação `localModelE2E=true`, ligado no
- * CI): baixa o Whisper base do catálogo pelo DownloadManager, confere SHA, instala e transcreve fala
+ * CI): baixa o Whisper base do catálogo pela fila de downloads do app, confere SHA, instala e transcreve fala
  * de verdade no `:inference`. Fixtures: `test_wavs` do sherpa-onnx (LibriSpeech, CC BY 4.0).
  *
  * O áudio longo (~50 s) repete as duas frases; sem o [WhisperChunker], o sherpa-onnx descartaria tudo
@@ -48,7 +48,7 @@ class LocalEngineEndToEndTest {
         val store = ModelStore(storeDir(context))
         if (store.isInstalled(spec.id)) return
         val downloader = ModelDownloader(
-            SystemDownloadGateway(context),
+            HttpDownloadGateway(File(context.filesDir, "model-downloads-e2e.json")),
             File(context.getExternalFilesDir(null), "model-tmp-e2e"),
             store,
             isMetered = { false },

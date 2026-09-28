@@ -43,7 +43,7 @@ data class ModelSpec(
  * Tamanhos e SHA256 conferidos na API do HF em 2026-09-24 (`/api/models/<repo>/tree/<commit>`: o `oid`
  * do LFS é o SHA256 do conteúdo — confirmado baixando o decoder do Parakeet). Os `tokens.txt` não
  * estão no LFS: SHA calculado baixando o arquivo. Todas as URLs responderam 206 a um pedido de faixa,
- * que é o que a retomada do DownloadManager usa.
+ * que é o que a retomada da fila de downloads usa (`Range`).
  *
  * As URLs apontam para o **commit** do repositório, não para `main`: se o upstream mexer num arquivo,
  * o app publicado continua baixando exatamente a versão cujo SHA conhece (mitiga o risco aceito na G5).

@@ -1,7 +1,5 @@
 package com.keyflow.data.models
 
-import android.app.DownloadManager
-import android.content.Intent
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import okhttp3.mockwebserver.MockResponse
@@ -19,9 +17,9 @@ import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
 /**
- * NM-T6/T7 com o DownloadManager de verdade, baixando de um servidor HTTP no próprio aparelho. O host é
- * `localhost` porque o network security config do app libera texto puro só para ele — e o
- * DownloadManager aplica a política de quem pediu o download.
+ * NM-T6/T7 com a fila de downloads do app ([HttpDownloadGateway]) de verdade, baixando de um servidor HTTP
+ * no próprio aparelho. O host é `localhost` porque o network security config do app libera texto puro só
+ * para ele.
  */
 @RunWith(AndroidJUnit4::class)
 class ModelDownloaderDeviceTest {
@@ -31,7 +29,8 @@ class ModelDownloaderDeviceTest {
     private val suffix = System.nanoTime()
     private val tmpRoot = File(context.getExternalFilesDir(null), "model-tmp-test-$suffix")
     private val store = ModelStore(File(context.filesDir, "models-test-$suffix"))
-    private val gateway = SystemDownloadGateway(context)
+    private val stateFile = File(context.filesDir, "model-downloads-test-$suffix.json")
+    private val gateway = HttpDownloadGateway(stateFile, waitMs = 200)
     private val downloader = ModelDownloader(gateway, tmpRoot, store, isMetered = { false }, catalog = { specFor(it) })
 
     private var specs = mutableMapOf<String, ModelSpec>()
@@ -50,6 +49,8 @@ class ModelDownloaderDeviceTest {
     @After
     fun cleanUp() {
         specs.keys.forEach { downloader.cancel(it) }
+        gateway.shutdownForTest()
+        stateFile.delete()
         tmpRoot.deleteRecursively()
         File(context.filesDir, "models-test-$suffix").deleteRecursively()
         server.shutdown()
@@ -144,15 +145,32 @@ class ModelDownloaderDeviceTest {
         assertEquals(RowStatus.FAILED, gateway.query(listOf(requestId)).getValue(requestId).status)
     }
 
-    /** O broadcast de conclusão chega ao receiver do manifest — é ele que instala com o app fechado. */
+    /**
+     * Com o app fechado ninguém chama `finish`: quem instala é a reconciliação que cada arquivo concluído
+     * dispara — no app, pelo `AppDownloads`; aqui, pela mesma chamada.
+     */
     @Test
-    fun downloadCompleteReachesTheManifestReceiver() {
-        val receivers = context.packageManager.queryBroadcastReceivers(
-            Intent(DownloadManager.ACTION_DOWNLOAD_COMPLETE).setPackage(context.packageName),
-            0,
+    fun aFinishedDownloadIsInstalledWithoutAnyoneCallingFinish() {
+        val body = ByteArray(8_192) { (it * 3).toByte() }
+        server.enqueue(MockResponse().setBody(Buffer().write(body)))
+        lateinit var installing: ModelDownloader
+        val selfInstalling = HttpDownloadGateway(
+            File(context.filesDir, "model-downloads-test-auto-$suffix.json"),
+            waitMs = 200,
+            listener = object : DownloadListener {
+                override fun onFileFinished(modelId: String) {
+                    installing.reconcile()
+                }
+            },
         )
+        installing = ModelDownloader(selfInstalling, tmpRoot, store, isMetered = { false }, catalog = { specFor(it) })
+        val spec = oneFileSpec("auto", body.size.toLong(), sha(body))
 
-        assertEquals(listOf(ModelDownloadReceiver::class.java.name), receivers.map { it.activityInfo.name })
-        assertEquals("android.permission.SEND_DOWNLOAD_COMPLETED_INTENTS", receivers.single().activityInfo.permission)
+        installing.start(spec, allowMetered = false)
+
+        waitFor(60_000, "instalar sozinho") { store.isInstalled("auto") }
+        assertNull(installing.activeModelId())
+        selfInstalling.shutdownForTest()
+        File(context.filesDir, "model-downloads-test-auto-$suffix.json").delete()
     }
 }

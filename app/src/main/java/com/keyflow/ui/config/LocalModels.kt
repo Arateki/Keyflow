@@ -68,7 +68,7 @@ data class LocalModelsUi(
 
 /** O que o painel pede ao gerenciador de modelos. Seleção e idioma vão pelas Settings, não por aqui. */
 interface LocalModelActions {
-    /** Pode ler disco e falar com o DownloadManager: chamar fora da main thread. */
+    /** Pode ler disco e falar com a fila de downloads: chamar fora da main thread. */
     suspend fun download(spec: ModelSpec, allowMetered: Boolean): StartResult
     fun cancel(modelId: String)
     fun delete(modelId: String)

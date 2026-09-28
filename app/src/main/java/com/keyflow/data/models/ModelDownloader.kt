@@ -28,13 +28,13 @@ sealed interface StartResult {
     data class NeedsMeteredConfirmation(val bytes: Long) : StartResult
     /** DLM-05. */
     data class NotEnoughSpace(val requiredBytes: Long, val freeBytes: Long) : StartResult
-    /** Armazenamento externo do app indisponível — o DownloadManager só grava lá. */
+    /** Armazenamento externo do app indisponível — é lá que os downloads ficam até a instalação. */
     data object StorageUnavailable : StartResult
 }
 
 /** Por que um download terminou sem instalar — a UI mostra e oferece tentar de novo. */
 enum class DownloadFailure {
-    /** O DownloadManager desistiu (erro HTTP, pedido removido pelo usuário, sem espaço no meio). */
+    /** O download desistiu (erro HTTP definitivo, tentativas esgotadas, pedido removido). */
     DOWNLOAD_FAILED,
     /** Tamanho ou SHA256 não bate com o catálogo (DLM-02): "download corrompido, tente novamente". */
     CORRUPTED,
@@ -85,7 +85,7 @@ interface VolumeStats {
 object DownloadPolicy {
 
     /**
-     * Espaço exigido para baixar um modelo de [totalBytes]. O DownloadManager só grava no armazenamento
+     * Espaço exigido para baixar um modelo de [totalBytes]. Os downloads ficam no armazenamento
      * externo do app e o modelo depois é **copiado** para o interno: no mesmo volume ele existe duas
      * vezes por um instante — daí 2,2×. Em volumes separados, 1,2× em cada um (DLM-05).
      */
@@ -136,7 +136,8 @@ object DownloadPolicy {
 }
 
 /**
- * Baixa modelos do catálogo pelo DownloadManager do sistema (G6): um pedido por arquivo para
+ * Baixa modelos do catálogo pela fila de downloads do app (G6; até 2026-09-27 era o DownloadManager —
+ * ver [HttpDownloadGateway]): um pedido por arquivo para
  * `externalFilesDir/model-tmp/<id>/`, com os ids dos pedidos em `downloads.json` — é esse arquivo que
  * sobrevive à morte do app e diz que há um download em curso (NM-T6). Quando tudo chega, [finish]
  * confere tamanho e SHA256, instala no [ModelStore] e apaga o tmp (NM-T7). Como o `downloads.json` só
@@ -216,7 +217,7 @@ class ModelDownloader(
         return DownloadPolicy.aggregate(spec, record.mapValues { (_, id) -> rows.getValue(id) })
     }
 
-    /** Polling do [snapshot] enquanto houver coletor (G6 — o DownloadManager não empurra progresso). */
+    /** Polling do [snapshot] enquanto houver coletor (G6 — a fila não empurra progresso). */
     fun progress(modelId: String): Flow<DownloadProgress?> = flow {
         while (true) {
             emit(snapshot(modelId))
@@ -338,7 +339,7 @@ class ModelDownloader(
         fun create(context: Context, store: ModelStore): ModelDownloader {
             val settings = SettingsRepository(context)
             return ModelDownloader(
-                gateway = SystemDownloadGateway(context),
+                gateway = AppDownloads.gateway(context),
                 tmpRoot = context.getExternalFilesDir(null)?.let { File(it, TMP_DIR) },
                 store = store,
                 isMetered = meteredProbe(context),

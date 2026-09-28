@@ -58,6 +58,16 @@ invalidação), `dirFor(id)`, `install(id, verifiedFiles)` (move atômico), `del
 `freeBytes()`. Sem dependência de UI/DownloadManager (testável isolado).
 
 ### 3. `ModelDownloader` (DLM-01/04/05/06/07/08)
+
+> **SPEC_DEVIATION (2026-09-28, decisão do Yan)**: o `DownloadManager` foi trocado por uma fila do
+> próprio app — `HttpDownloadGateway` (OkHttp com IPv4 primeiro, retomada por `Range`, fila em
+> `filesDir/model-downloads.json`) + `ModelDownloadService` (primeiro plano `dataSync`, notificação com
+> "Cancelar"). Motivo medido: em rede com IPv6 quebrado (a do Yan), o DownloadManager tenta o IPv6
+> primeiro e espera cada tentativa estourar — 2,5 min em 0 bytes antes de cair para o IPv4; com a fila
+> própria, o 1º byte chega em ~2 s. O contrato `DownloadGateway` ficou igual, então o resto desta seção
+> vale como está; o broadcast `ACTION_DOWNLOAD_COMPLETE` virou a reconciliação que a própria fila dispara
+> a cada arquivo concluído. O tmp segue em `externalFilesDir` (poderia ir para o interno agora).
+
 Wrapper fino sobre o **`DownloadManager`** do sistema (G6):
 - `start(spec)`: pré-checagens (espaço ≥ total×1,2 — DLM-05; nenhum download ativo — DLM-06;
   metered → o **caller/UI** decide após confirmação — DLM-04, via `allowMetered: Boolean`);

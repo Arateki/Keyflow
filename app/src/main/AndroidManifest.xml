@@ -8,6 +8,8 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <!-- Download dos modelos de voz em primeiro plano (ModelDownloadService). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
@@ -58,22 +60,18 @@
             android:exported="false"
             android:foregroundServiceType="microphone" />
 
+        <!-- Download dos modelos de voz: notificação de progresso e processo vivo com o app fechado. -->
+        <service
+            android:name=".data.models.ModelDownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
         <!-- Transcrição local (native-voice-models, NM-T8): processo próprio — pico de RAM do modelo e
              crash nativo ficam longe do teclado e da orbe. -->
         <service
             android:name=".transcription.local.InferenceService"
             android:process=":inference"
             android:exported="false" />
-
-        <!-- Conclusão de download de modelo local (NM-T7). Só o DownloadProvider tem a permissão. -->
-        <receiver
-            android:name=".data.models.ModelDownloadReceiver"
-            android:exported="true"
-            android:permission="android.permission.SEND_DOWNLOAD_COMPLETED_INTENTS">
-            <intent-filter>
-                <action android:name="android.intent.action.DOWNLOAD_COMPLETE" />
-            </intent-filter>
-        </receiver>
 
     </application>
 </manifest>
