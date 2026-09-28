@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+        A suíte roda sobre a config de fábrica do app e devolve a do dono do aparelho no fim
+        (FactorySettingsListener). Como meta-data do instrumentation, vale também para o
+        `am instrument` sem argumentos usado no A32.
+    -->
+    <instrumentation
+        android:name="androidx.test.runner.AndroidJUnitRunner"
+        android:targetPackage="com.keyflow">
+        <meta-data
+            android:name="listener"
+            android:value="com.keyflow.testing.FactorySettingsListener" />
+    </instrumentation>
+</manifest>

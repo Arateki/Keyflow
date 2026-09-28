@@ -143,6 +143,21 @@ class SettingsRepository(
         return selected
     }
 
+    /**
+     * O DataStore inteiro, chave por chave, como está gravado. Existe para o gate de instrumentados
+     * guardar a config de quem é dono do aparelho antes de rodar a suíte no estado de fábrica
+     * (`FactorySettingsListener`, androidTest) — nenhuma tela do app usa isto.
+     */
+    internal suspend fun rawPreferencesOnce(): Preferences = dataStore.data.first()
+
+    /** Troca o DataStore inteiro por [prefs]; vazio = estado de fábrica. Par de [rawPreferencesOnce]. */
+    internal suspend fun replaceRawPreferences(prefs: Preferences) {
+        dataStore.edit { current ->
+            current.clear()
+            current += prefs
+        }
+    }
+
     suspend fun saveBarsConfig(config: BarsConfig) {
         dataStore.edit { it[BARS_CONFIG_JSON] = ShortcutCodec.encodeBars(config) }
     }
