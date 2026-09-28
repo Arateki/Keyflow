@@ -37,11 +37,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.keyflow.core.shortcuts.BarButton
 import com.keyflow.ime.bars.BarGeometry
+import com.keyflow.ime.bars.BarIcons
 import com.keyflow.core.shortcuts.BarDef
 import com.keyflow.core.shortcuts.BarsConfig
 import com.keyflow.core.shortcuts.GridTriggerMode
 import com.keyflow.core.shortcuts.ShortcutGrid
 import com.keyflow.core.shortcuts.ShortcutKey
+import com.keyflow.ui.icons.KfIcon
+import com.keyflow.ui.icons.KfIcons
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
 
@@ -127,16 +130,14 @@ private fun scrollWarningFor(buttons: List<BarButton>): String? {
     }
 }
 
-/** Rótulo/glifo curto de cada botão de barra na prévia WYSIWYG (CFG-02). */
+/**
+ * Rótulo em texto do chip, para os botões que não têm ícone em [BarIcons] (teclas avulsas, a faixa de
+ * sugestões). Os demais desenham o mesmo ícone da barra do teclado.
+ */
 private fun barButtonGlyph(button: BarButton): String = when (button) {
-    BarButton.Mic -> "🎙"
-    BarButton.ConfigBtn -> "⚙"
-    BarButton.ToggleExpand -> "⌃"
-    BarButton.Paste -> "colar"
     BarButton.Candidates -> "abc"
-    BarButton.Joystick -> "🕹"
     is BarButton.SingleKey -> button.key.label
-    is BarButton.GridTrigger -> button.label
+    else -> barButtonName(button)
 }
 
 /**
@@ -250,16 +251,11 @@ fun BarsEditor(
             }
 
             Row(
-                Modifier.fillMaxWidth().padding(top = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    "Espelhar colapsado/expandido",
-                    color = palette.fg,
-                    fontFamily = SpaceGrotesk,
-                    fontSize = 13.sp,
-                )
+                SettingTitle("Espelhar colapsado/expandido", Modifier.weight(1f))
                 PillToggle(
                     checked = barsConfig.mirrored,
                     onCheckedChange = { turnOn ->
@@ -278,7 +274,7 @@ fun BarsEditor(
 
             activeList.forEachIndexed { barIndex, barDef ->
                 Row(
-                    Modifier.fillMaxWidth().padding(top = 12.dp),
+                    Modifier.fillMaxWidth().padding(top = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Row(
@@ -289,6 +285,7 @@ fun BarsEditor(
                         barDef.buttons.forEachIndexed { buttonIndex, button ->
                             BarButtonChip(
                                 button = button,
+                                expandedMode = viewingExpanded && !barsConfig.mirrored,
                                 barIndex = barIndex,
                                 buttonIndex = buttonIndex,
                                 totalButtons = barDef.buttons.size,
@@ -325,62 +322,30 @@ fun BarsEditor(
                             .testTag(barTrashTag(barIndex)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        StrokeIcon(TRASH_PATHS, palette.faint, Modifier.size(16.dp), strokeWidth = 1.6f)
+                        KfIcon(KfIcons.Trash, palette.faint, Modifier.size(18.dp))
                     }
                 }
 
                 scrollWarningFor(barDef.buttons)?.let { aviso ->
-                    Text(
-                        aviso,
-                        color = palette.muted,
-                        fontFamily = SpaceGrotesk,
-                        fontSize = 11.sp,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .border(1.dp, palette.line, RoundedCornerShape(6.dp))
-                            .testTag(BARS_EDITOR_SCROLL_WARNING_TAG)
-                            .padding(horizontal = 10.dp, vertical = 8.dp),
-                    )
+                    InfoNote(aviso, BARS_EDITOR_SCROLL_WARNING_TAG, Modifier.padding(top = 10.dp))
                 }
             }
 
             if (activeList.size >= 3) {
-                Text(
+                InfoNote(
                     "3+ barras + horizontal: o visual e a usabilidade do teclado podem ficar inconsistentes (pouco espaço vertical)",
-                    color = palette.muted,
-                    fontFamily = SpaceGrotesk,
-                    fontSize = 11.sp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 12.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .border(1.dp, palette.line, RoundedCornerShape(6.dp))
-                        .testTag(BARS_EDITOR_COUNT_WARNING_TAG)
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    BARS_EDITOR_COUNT_WARNING_TAG,
+                    Modifier.padding(top = 12.dp),
                 )
             }
 
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .border(1.dp, palette.line, RoundedCornerShape(6.dp))
-                    .clickable { updateActiveList(activeList + BarDef(emptyList())) }
-                    .testTag(BARS_EDITOR_ADD_BAR_TAG)
-                    .padding(vertical = 10.dp),
-                horizontalArrangement = Arrangement.Center,
-            ) {
-                Text(
-                    "+ barra",
-                    color = palette.fg,
-                    fontFamily = SpaceGrotesk,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 13.sp,
-                )
-            }
+            SecondaryButton(
+                "barra",
+                tag = BARS_EDITOR_ADD_BAR_TAG,
+                onClick = { updateActiveList(activeList + BarDef(emptyList())) },
+                modifier = Modifier.padding(top = 14.dp),
+                icon = KfIcons.Plus,
+            )
         }
 
         when (val current = sheet) {
@@ -471,6 +436,7 @@ fun BarsEditor(
 @Composable
 private fun BarButtonChip(
     button: BarButton,
+    expandedMode: Boolean,
     barIndex: Int,
     buttonIndex: Int,
     totalButtons: Int,
@@ -482,6 +448,9 @@ private fun BarButtonChip(
     val density = LocalDensity.current
     var dragOffsetX by remember { mutableStateOf(0f) }
     val thresholdPx = with(density) { REORDER_THRESHOLD_DP.toPx() }
+    val isMic = button == BarButton.Mic
+    // Mesmo ícone que a BarView desenha (BarIcons) — a prévia do Modo Teclado é o teclado real.
+    val icon = BarIcons.iconFor(button, expandedMode)
 
     Box(
         Modifier
@@ -493,9 +462,10 @@ private fun BarButtonChip(
             // "esc" virava "e") — regressão pega pelo golden config-teclado, 2026-09-08. O piso do alvo
             // de toque continua valendo para os pesos baixos.
             .widthIn(min = maxOf(CHIP_MIN_DP, CHIP_UNIT_DP * BarGeometry.weightFor(button)))
-            .clip(RoundedCornerShape(8.dp))
-            .background(palette.kbKey)
-            .border(1.dp, palette.kbKeyBorder, RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(10.dp))
+            // O mic sai na cor dele, como na barra de verdade — é a âncora da fileira.
+            .background(if (isMic) palette.teal else palette.kbKey)
+            .border(1.dp, if (isMic) palette.teal else palette.kbKeyBorder, RoundedCornerShape(10.dp))
             .pointerInput(barIndex, buttonIndex, totalButtons) {
                 detectDragGesturesAfterLongPress(
                     onDragStart = { dragOffsetX = 0f },
@@ -519,15 +489,22 @@ private fun BarButtonChip(
             .padding(horizontal = 10.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            barButtonGlyph(button),
-            color = palette.fg,
-            fontFamily = SpaceGrotesk,
-            fontSize = 13.sp,
-            maxLines = 1,
-        )
+        if (icon != null) {
+            KfIcon(icon, tint = if (isMic) MIC_INK else palette.fg, modifier = Modifier.size(20.dp))
+        } else {
+            Text(
+                barButtonGlyph(button),
+                color = palette.fg,
+                fontFamily = SpaceGrotesk,
+                fontSize = 13.sp,
+                maxLines = 1,
+            )
+        }
     }
 }
+
+/** Tinta do mic sobre o teal — o branco que a BarView usa (`MicVisuals`), igual nos dois temas. */
+private val MIC_INK = Color.White
 
 /**
  * Separa os chips da barra (o que o usuário está montando) dos controles do editor (adicionar, remover)
@@ -557,13 +534,7 @@ private fun AddChip(barIndex: Int, onClick: () -> Unit) {
             .testTag(barAddButtonTag(barIndex)),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            "+",
-            color = palette.teal,
-            fontFamily = SpaceGrotesk,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 18.sp,
-        )
+        KfIcon(KfIcons.Plus, palette.teal, Modifier.size(20.dp), strokeWidth = 1.9f)
     }
 }
 
@@ -603,7 +574,7 @@ private fun SimpleEditSheet(
     onDismiss: () -> Unit,
 ) {
     ConfigModal(
-        title = barButtonGlyph(button),
+        title = barButtonName(button).replaceFirstChar { it.uppercase() },
         onDismiss = onDismiss,
         closeTag = BARS_EDITOR_EDIT_CLOSE_TAG,
         cardTag = BARS_EDITOR_EDIT_SHEET_TAG,
@@ -676,25 +647,12 @@ private fun GridFormSheet(
                 modifier = Modifier.padding(top = 12.dp),
             )
 
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(top = 14.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(palette.fg)
-                    .clickable { onConfirm() }
-                    .testTag(BARS_EDITOR_GRID_FORM_CONFIRM_TAG)
-                    .padding(vertical = 12.dp),
-                horizontalArrangement = Arrangement.Center,
-            ) {
-                Text(
-                    "Confirmar",
-                    color = palette.onFill,
-                    fontFamily = SpaceGrotesk,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp,
-                )
-            }
+            PrimaryButton(
+                "Confirmar",
+                tag = BARS_EDITOR_GRID_FORM_CONFIRM_TAG,
+                onClick = onConfirm,
+                modifier = Modifier.padding(top = 16.dp),
+            )
 
             if (onRemove != null) {
                 SheetActionRow("Remover", BARS_EDITOR_GRID_FORM_REMOVE_TAG, onRemove)
@@ -711,20 +669,14 @@ private fun SheetActionRow(label: String, tag: String, onClick: () -> Unit) {
         Modifier
             .fillMaxWidth()
             .padding(top = 8.dp)
-            .clip(RoundedCornerShape(6.dp))
-            .border(1.dp, palette.line, RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(14.dp))
+            .border(1.dp, palette.line, RoundedCornerShape(14.dp))
             .clickable(interactionSource = noRipple, indication = null) { onClick() }
             .testTag(tag)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(start = 16.dp, end = 12.dp, top = 13.dp, bottom = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+        Text(label, color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Normal, fontSize = 13.sp, modifier = Modifier.weight(1f))
+        KfIcon(KfIcons.ChevronRight, palette.faint, Modifier.size(16.dp))
     }
 }
-
-private val TRASH_PATHS = listOf(
-    "M4 7h16",
-    "M9 7V4h6v3",
-    "M6 7l1 14h10l1-14",
-    "M10 11v6",
-    "M14 11v6",
-)

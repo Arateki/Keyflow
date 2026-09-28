@@ -2,12 +2,12 @@ package com.keyflow.ui.config
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -21,12 +21,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.keyflow.core.TranscriptionSource
 import com.keyflow.data.Settings
 import com.keyflow.ui.common.verticalScrollbar
+import com.keyflow.ui.icons.KfIcons
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
 import com.keyflow.ui.theme.SpaceMono
@@ -67,25 +67,21 @@ fun VozPanel(
             .fillMaxWidth()
             .verticalScrollbar(scroll, palette.muted.copy(alpha = 0.35f), rightBleed = 9.dp)
             .verticalScroll(scroll)
-            .padding(top = 6.dp, bottom = 20.dp),
+            .padding(top = 20.dp, bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(GROUP_GAP),
     ) {
         PartialSection(settings, onSettingsChange)
-        Text(
-            text = "Origem da transcrição".uppercase(),
-            color = palette.faint,
-            fontFamily = SpaceMono,
-            fontSize = 8.5.sp,
-        )
-        Segmented(
-            options = TranscriptionSource.entries,
-            selected = settings.source,
-            label = ::sourceLabel,
-            tag = ::sourceTag,
-            onSelect = { onSettingsChange(settings.copy(source = it)) },
-            modifier = Modifier.padding(top = 9.dp),
-        )
+        SettingsGroup("Origem da transcrição") {
+          Column(Modifier.padding(vertical = 16.dp)) {
+            Segmented(
+                options = TranscriptionSource.entries,
+                selected = settings.source,
+                label = ::sourceLabel,
+                tag = ::sourceTag,
+                onSelect = { onSettingsChange(settings.copy(source = it)) },
+            )
 
-        when (settings.source) {
+            when (settings.source) {
             TranscriptionSource.CREDITS -> CreditsCard()
             TranscriptionSource.OPENAI -> KeyProviderFields(
                 provName = "OpenAI",
@@ -109,6 +105,8 @@ fun VozPanel(
             )
             TranscriptionSource.CUSTOM -> CustomFields(settings, onSettingsChange)
             TranscriptionSource.LOCAL -> LocalPanel(settings, onSettingsChange, localModels, localActions)
+            }
+          }
         }
 
         // Abaixo do token/credenciais do preset ativo (pedido do Yan, 2026-07-02) — não compete por
@@ -186,9 +184,7 @@ private fun maxRecordingLabel(sec: Int): String = when (sec) {
  */
 @Composable
 private fun PartialSection(settings: Settings, onSettingsChange: (Settings) -> Unit) {
-    val palette = LocalKeyFlowPalette.current
-    Column(Modifier.padding(bottom = 20.dp)) {
-        Text(text = "Transcrição".uppercase(), color = palette.faint, fontFamily = SpaceMono, fontSize = 8.5.sp)
+    SettingsGroup("Transcrição") {
         ToggleRow(
             label = "Transcrever parcialmente ao pausar",
             sub = "Cada pausa já transcreve o trecho gravado; o envio final fica quase instantâneo.",
@@ -196,6 +192,7 @@ private fun PartialSection(settings: Settings, onSettingsChange: (Settings) -> U
             onCheckedChange = { onSettingsChange(settings.copy(partialOnPause = it)) },
             tag = VOZ_PARTIAL_ON_PAUSE_TAG,
         )
+        GroupDivider()
         ToggleRow(
             label = "Visualizar e editar transcrição parcial",
             sub = "Toque no aviso junto à orbe pausada para ver e corrigir o texto antes de enviar.",
@@ -213,131 +210,114 @@ private fun PartialSection(settings: Settings, onSettingsChange: (Settings) -> U
  */
 @Composable
 private fun GeneralSection(settings: Settings, onSettingsChange: (Settings) -> Unit) {
-    val palette = LocalKeyFlowPalette.current
-    Column(Modifier.padding(top = 20.dp)) {
-        Text(
-            text = "Geral".uppercase(),
-            color = palette.faint,
-            fontFamily = SpaceMono,
-            fontSize = 8.5.sp,
-        )
-        Text(
-            text = "Tempo limite de resposta",
-            color = palette.fg,
-            fontFamily = SpaceGrotesk,
-            fontWeight = FontWeight.Medium,
-            fontSize = 13.sp,
-            modifier = Modifier.padding(top = 10.dp),
-        )
-        Text(
-            text = "Tempo máximo de espera pela transcrição antes de mostrar erro.",
-            color = palette.faint,
-            fontFamily = SpaceGrotesk,
-            fontSize = 11.sp,
-            modifier = Modifier.padding(top = 3.dp),
-        )
-        Segmented(
-            options = TIMEOUT_OPTIONS_MS,
-            selected = settings.transcriptionTimeoutMs,
-            label = ::timeoutLabel,
-            tag = ::timeoutTag,
-            onSelect = { onSettingsChange(settings.copy(transcriptionTimeoutMs = it)) },
-            modifier = Modifier.padding(top = 9.dp),
-        )
-
-        Text(
-            text = "Duração máxima de gravação",
-            color = palette.fg,
-            fontFamily = SpaceGrotesk,
-            fontWeight = FontWeight.Medium,
-            fontSize = 13.sp,
-            modifier = Modifier.padding(top = 18.dp),
-        )
-        Text(
-            text = "Ao atingir o limite, a gravação pausa e pergunta se quer enviar ou descartar.",
-            color = palette.faint,
-            fontFamily = SpaceGrotesk,
-            fontSize = 11.sp,
-            modifier = Modifier.padding(top = 3.dp),
-        )
-        Segmented(
-            options = MAX_RECORDING_OPTIONS_SEC,
-            selected = settings.maxRecordingSec,
-            label = ::maxRecordingLabel,
-            tag = ::maxRecordingTag,
-            onSelect = { onSettingsChange(settings.copy(maxRecordingSec = it)) },
-            modifier = Modifier.padding(top = 9.dp),
-        )
+    SettingsGroup("Geral") {
+        GroupItem(
+            "Tempo limite de resposta",
+            "Tempo máximo de espera pela transcrição antes de mostrar erro.",
+        ) {
+            Segmented(
+                options = TIMEOUT_OPTIONS_MS,
+                selected = settings.transcriptionTimeoutMs,
+                label = ::timeoutLabel,
+                tag = ::timeoutTag,
+                onSelect = { onSettingsChange(settings.copy(transcriptionTimeoutMs = it)) },
+                modifier = Modifier.padding(top = 14.dp),
+            )
+        }
+        GroupDivider()
+        GroupItem(
+            "Duração máxima de gravação",
+            "Ao atingir o limite, a gravação pausa e pergunta se quer enviar ou descartar.",
+        ) {
+            Segmented(
+                options = MAX_RECORDING_OPTIONS_SEC,
+                selected = settings.maxRecordingSec,
+                label = ::maxRecordingLabel,
+                tag = ::maxRecordingTag,
+                onSelect = { onSettingsChange(settings.copy(maxRecordingSec = it)) },
+                modifier = Modifier.padding(top = 14.dp),
+            )
+        }
     }
 }
 
 @Composable
 private fun CreditsCard() {
     val palette = LocalKeyFlowPalette.current
-    Column(Modifier.padding(top = 16.dp)) {
+    Column(Modifier.padding(top = 20.dp)) {
+        // Já dentro do cartão do grupo "Origem": o saldo é um bloco recuado (papel do fundo), não outro
+        // cartão com contorno.
         Column(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(6.dp))
-                .border(1.dp, palette.line, RoundedCornerShape(6.dp))
-                .background(palette.card)
-                .padding(14.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(palette.bg)
+                .padding(horizontal = 16.dp, vertical = 14.dp)
                 .testTag(VOZ_CREDITS_CARD_TAG),
         ) {
-            Text("Saldo de créditos".uppercase(), color = palette.faint, fontFamily = SpaceMono, fontSize = 8.5.sp)
+            Eyebrow("Saldo de créditos")
             Row(
-                Modifier.fillMaxWidth().padding(top = 8.dp),
+                Modifier.fillMaxWidth().padding(top = 10.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Bottom,
             ) {
                 Row(verticalAlignment = Alignment.Bottom) {
-                    Text("128", color = palette.fg, fontFamily = SpaceMono, fontWeight = FontWeight.Bold, fontSize = 22.sp)
-                    Text(" / 500", color = palette.faint, fontFamily = SpaceMono, fontSize = 13.sp)
+                    Text(
+                        "128",
+                        color = palette.fg,
+                        fontFamily = SpaceGrotesk,
+                        fontWeight = FontWeight.Light,
+                        fontSize = 26.sp,
+                        letterSpacing = (-0.6).sp,
+                    )
+                    Text(
+                        " / 500",
+                        color = palette.faint,
+                        fontFamily = SpaceGrotesk,
+                        fontWeight = FontWeight.Light,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(bottom = 4.dp),
+                    )
                 }
-                Text("créditos", color = palette.faint, fontFamily = SpaceMono, fontSize = 10.sp)
+                Text(
+                    "créditos",
+                    color = palette.muted,
+                    fontFamily = SpaceGrotesk,
+                    fontWeight = FontWeight.Light,
+                    fontSize = 10.sp,
+                    modifier = Modifier.padding(bottom = 5.dp),
+                )
             }
-            // Barra de progresso (26% — mock).
+            // Barra de progresso (26% — mock): trilho fino, sem bloco.
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .padding(top = 9.dp)
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp))
+                    .padding(top = 12.dp)
+                    .height(3.dp)
+                    .clip(RoundedCornerShape(2.dp))
                     .background(palette.line2),
             ) {
-                Box(Modifier.fillMaxWidth(0.26f).height(8.dp).background(palette.teal))
+                Box(Modifier.fillMaxWidth(0.26f).height(3.dp).clip(RoundedCornerShape(2.dp)).background(palette.teal))
             }
             Row(
-                Modifier.fillMaxWidth().padding(top = 7.dp),
+                Modifier.fillMaxWidth().padding(top = 9.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text("≈ 42 min usados", color = palette.faint, fontFamily = SpaceMono, fontSize = 10.sp)
-                Text("165 min no total", color = palette.faint, fontFamily = SpaceMono, fontSize = 10.sp)
+                Text("≈ 42 min usados", color = palette.muted, fontFamily = SpaceMono, fontWeight = FontWeight.Light, fontSize = 9.5.sp)
+                Text("165 min no total", color = palette.muted, fontFamily = SpaceMono, fontWeight = FontWeight.Light, fontSize = 9.5.sp)
             }
         }
         // CTA inerte (MON-02): não compra nada.
-        Text(
-            text = "+  Recarregar créditos",
-            color = palette.onFill,
-            fontFamily = SpaceGrotesk,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 12.5.sp,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 13.dp)
-                .clip(RoundedCornerShape(3.dp))
-                .background(palette.fg)
-                .clickable { /* inerte nesta fase */ }
-                .testTag(VOZ_RECHARGE_TAG)
-                .padding(vertical = 13.dp),
+        PrimaryButton(
+            "Recarregar créditos",
+            tag = VOZ_RECHARGE_TAG,
+            onClick = { /* inerte nesta fase */ },
+            modifier = Modifier.padding(top = 14.dp),
+            icon = KfIcons.Plus,
         )
-        Text(
-            text = "Pagamento via Google Play".uppercase(),
-            color = palette.faint,
-            fontFamily = SpaceMono,
-            fontSize = 8.5.sp,
-            modifier = Modifier.fillMaxWidth().padding(top = 9.dp),
+        Eyebrow(
+            "Pagamento via Google Play",
+            Modifier.fillMaxWidth().padding(top = 10.dp).wrapContentWidth(Alignment.CenterHorizontally),
         )
     }
 }
@@ -353,9 +333,9 @@ private fun KeyProviderFields(
     onModel: (String) -> Unit,
     onLanguage: (String) -> Unit,
 ) {
-    Column(Modifier.padding(top = 16.dp)) {
+    Column(Modifier.padding(top = 20.dp)) {
         AutoSaveField("Token de acesso · $provName", token, onToken, VOZ_TOKEN_TAG, keyboardType = KeyboardType.Password)
-        Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+        Row(Modifier.fillMaxWidth().padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             Dropdown("Modelo", models, model, onModel, VOZ_MODEL_TAG, Modifier.weight(1f))
             Dropdown("Idioma", LANGUAGE_OPTIONS, language, onLanguage, VOZ_LANGUAGE_TAG, Modifier.weight(1f), display = ::languageLabel)
         }
@@ -365,7 +345,7 @@ private fun KeyProviderFields(
 
 @Composable
 private fun CustomFields(settings: Settings, onSettingsChange: (Settings) -> Unit) {
-    Column(Modifier.padding(top = 16.dp)) {
+    Column(Modifier.padding(top = 20.dp)) {
         AutoSaveField(
             "Endpoint", settings.customEndpoint,
             { onSettingsChange(settings.copy(customEndpoint = it)) }, VOZ_ENDPOINT_TAG,
@@ -399,12 +379,5 @@ private fun CustomFields(settings: Settings, onSettingsChange: (Settings) -> Uni
 
 @Composable
 private fun HelperNote(text: String) {
-    val palette = LocalKeyFlowPalette.current
-    Text(
-        text = text,
-        color = palette.faint,
-        fontFamily = SpaceGrotesk,
-        fontSize = 11.sp,
-        modifier = Modifier.padding(top = 16.dp),
-    )
+    SettingSub(text, Modifier.padding(top = 16.dp))
 }

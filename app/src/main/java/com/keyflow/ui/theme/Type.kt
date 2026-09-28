@@ -31,6 +31,9 @@ val SpaceGrotesk = FontFamily(
  * ponto só, sem mexer nos títulos (Grotesk). As entradas já Bold seguem Bold.
  */
 val SpaceMono = FontFamily(
+    // Light = o Regular de verdade, para valores técnicos em tamanho maior (tempo, saldo), onde o
+    // negrito pesava; os miúdos seguem no Bold pedido no UAT.
+    Font(R.font.space_mono_regular, FontWeight.Light),
     Font(R.font.space_mono_bold, FontWeight.Normal),
     Font(R.font.space_mono_bold, FontWeight.Bold),
 )

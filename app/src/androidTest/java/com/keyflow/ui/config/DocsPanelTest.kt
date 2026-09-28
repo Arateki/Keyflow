@@ -93,9 +93,10 @@ class DocsPanelTest {
         rule.onNodeWithTag(docsIndexItemTag("atalhos")).performScrollTo().performClick()
         rule.waitForIdle()
         val top = rule.onNodeWithTag(docsSectionTag("atalhos")).getUnclippedBoundsInRoot().top
-        // A tag fica depois do respiro de 13dp da seção; a âncora (antes dele) encosta no topo do painel.
+        // A tag fica depois do respiro da seção; a âncora (antes dele) encosta no topo do painel.
         val offset = top - panelTop
-        assertTrue("seção a $offset do topo", offset.value in 11f..15f)
+        val gap = DOCS_SECTION_GAP.value
+        assertTrue("seção a $offset do topo", offset.value in (gap - 2f)..(gap + 2f))
     }
 
     /** DOC-04: "Reportar bug" abre um mailto com destinatário, assunto do tipo e diagnóstico no corpo. */

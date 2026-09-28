@@ -66,6 +66,9 @@ const val DOCS_FEEDBACK_NO_APP_TAG = "docs-feedback-sem-email"
 /** Tag de uma seção — `docs-<id>`; mantém as tags que já existiam antes da lista (pausa/atalhos/…). */
 fun docsSectionTag(id: String): String = "docs-$id"
 
+/** Respiro antes de cada seção — o índice rola até a âncora, que fica acima dele. */
+internal val DOCS_SECTION_GAP = GROUP_GAP
+
 /** Tag do item do índice que leva à seção [id]. */
 fun docsIndexItemTag(id: String): String = "docs-indice-$id"
 
@@ -334,13 +337,14 @@ fun DocsPanel(
             .onGloballyPositioned { viewport[0] = it }
             .verticalScrollbar(scroll, palette.muted.copy(alpha = 0.35f), rightBleed = 9.dp)
             .verticalScroll(scroll)
-            .padding(top = 6.dp, bottom = 24.dp),
+            .padding(top = 20.dp, bottom = 32.dp),
     ) {
-        Text("Como funciona".uppercase(), color = palette.faint, fontFamily = SpaceMono, fontSize = 8.5.sp)
-        Column(Modifier.padding(top = 11.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
-            Step("01", "Fale", "Toque em Gravar no teclado, ou no orbe flutuante.")
-            Step("02", "Transcreve", "O áudio vai à origem de voz escolhida e volta como texto.")
-            Step("03", "Cola", "O texto entra direto no campo ativo do app.")
+        SettingsGroup("Como funciona") {
+            Column(Modifier.padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                Step("01", "Fale", "Toque em Gravar no teclado, ou no orbe flutuante.")
+                Step("02", "Transcreve", "O áudio vai à origem de voz escolhida e volta como texto.")
+                Step("03", "Cola", "O texto entra direto no campo ativo do app.")
+            }
         }
 
         DocsIndex(docsSections, onSelect = ::scrollTo)
@@ -375,28 +379,17 @@ private fun Context.startFeedbackActivity(intent: Intent) {
 /** Índice (DOC-02): numerado, na ordem da aba; cada item rola até a seção e anuncia o destino. */
 @Composable
 private fun DocsIndex(sections: List<DocSection>, onSelect: (String) -> Unit) {
-    val palette = LocalKeyFlowPalette.current
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(top = 18.dp)
-            .testTag(DOCS_INDEX_TAG),
-    ) {
-        Text("Índice".uppercase(), color = palette.faint, fontFamily = SpaceMono, fontSize = 8.5.sp)
-        Column(Modifier.padding(top = 6.dp)) {
-            // Duas colunas: 12 seções numa só empurrariam o conteúdo para baixo da primeira dobra.
-            sections.chunked(2).forEachIndexed { row, pair ->
-                Row(Modifier.fillMaxWidth()) {
-                    pair.forEachIndexed { col, section ->
-                        IndexItem(
-                            number = row * 2 + col + 1,
-                            section = section,
-                            onClick = { onSelect(section.id) },
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                    if (pair.size == 1) Spacer(Modifier.weight(1f))
-                }
+    SettingsGroup("Índice", Modifier.padding(top = GROUP_GAP).testTag(DOCS_INDEX_TAG)) {
+        // Uma coluna só: em duas, com a navegação lateral, os títulos quebravam e as linhas desalinhavam.
+        Column(Modifier.padding(vertical = 6.dp)) {
+            sections.forEachIndexed { i, section ->
+                if (i > 0) GroupDivider()
+                IndexItem(
+                    number = i + 1,
+                    section = section,
+                    onClick = { onSelect(section.id) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
     }
@@ -407,8 +400,8 @@ private fun IndexItem(number: Int, section: DocSection, onClick: () -> Unit, mod
     val palette = LocalKeyFlowPalette.current
     Row(
         modifier
-            .heightIn(min = 34.dp)
-            .clip(RoundedCornerShape(4.dp))
+            .heightIn(min = 46.dp)
+            .clip(RoundedCornerShape(8.dp))
             .clickable(onClickLabel = "ir para a seção ${section.title}", role = Role.Button, onClick = onClick)
             .testTag(docsIndexItemTag(section.id)),
         verticalAlignment = Alignment.CenterVertically,
@@ -417,22 +410,40 @@ private fun IndexItem(number: Int, section: DocSection, onClick: () -> Unit, mod
             "%02d".format(number),
             color = palette.teal,
             fontFamily = SpaceMono,
-            fontWeight = FontWeight.Bold,
-            fontSize = 10.sp,
+            fontWeight = FontWeight.Light,
+            fontSize = 9.5.sp,
         )
-        Spacer(Modifier.width(8.dp))
-        Text(section.title, color = palette.fg2, fontFamily = SpaceGrotesk, fontSize = 12.sp)
+        Spacer(Modifier.width(10.dp))
+        Text(section.title, color = palette.fg2, fontFamily = SpaceGrotesk, fontSize = 11.5.sp)
     }
 }
 
 @Composable
 private fun Step(number: String, title: String, body: String) {
     val palette = LocalKeyFlowPalette.current
-    Row(horizontalArrangement = Arrangement.spacedBy(11.dp)) {
-        Text(number, color = palette.teal, fontFamily = SpaceMono, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-        Column {
-            Text(title, color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-            Text(body, color = palette.muted, fontFamily = SpaceGrotesk, fontSize = 11.5.sp)
+    // Numeral grande e leve à esquerda, como numa página de catálogo.
+    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text(
+            number,
+            color = palette.teal,
+            fontFamily = SpaceGrotesk,
+            fontWeight = FontWeight.Light,
+            fontSize = 17.sp,
+            letterSpacing = (-0.3).sp,
+            // Largura fixa: os numerais têm larguras diferentes e desalinhavam os títulos ao lado.
+            modifier = Modifier.width(30.dp),
+        )
+        Column(Modifier.padding(top = 2.dp)) {
+            Text(title, color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Medium, fontSize = 13.sp)
+            Text(
+                body,
+                color = palette.muted,
+                fontFamily = SpaceGrotesk,
+                fontWeight = FontWeight.Light,
+                fontSize = 11.sp,
+                lineHeight = 16.sp,
+                modifier = Modifier.padding(top = 2.dp),
+            )
         }
     }
 }
@@ -447,35 +458,48 @@ private fun Section(
     Column(
         modifier
             .fillMaxWidth()
-            .padding(top = 13.dp)
+            .padding(top = DOCS_SECTION_GAP)
             .testTag(docsSectionTag(section.id)),
     ) {
-        Box(Modifier.fillMaxWidth().height(1.dp).background(palette.line2))
+        // Título fora, texto dentro do cartão — o mesmo desenho de área das outras abas.
         Text(
             section.title,
             color = palette.fg,
             fontFamily = SpaceGrotesk,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 12.5.sp,
-            modifier = Modifier.padding(top = 13.dp).semantics { heading() },
+            fontWeight = FontWeight.Normal,
+            fontSize = 15.sp,
+            letterSpacing = (-0.3).sp,
+            modifier = Modifier.padding(horizontal = 4.dp).semantics { heading() },
         )
-        section.blocks.forEach { block ->
-            when (block) {
-                is DocBlock.Paragraph ->
-                    Text(block.text, color = palette.muted, fontFamily = SpaceGrotesk, fontSize = 11.5.sp, modifier = Modifier.padding(top = 4.dp))
-                is DocBlock.Labeled -> LabeledLine(block.label, block.text)
+        SettingsGroup(null, Modifier.padding(top = 12.dp)) {
+            Column(Modifier.padding(top = 10.dp, bottom = 16.dp)) {
+                section.blocks.forEach { block ->
+                    when (block) {
+                        is DocBlock.Paragraph ->
+                            Text(
+                                block.text,
+                                color = palette.fg2,
+                                fontFamily = SpaceGrotesk,
+                                fontWeight = FontWeight.Light,
+                                fontSize = 11.sp,
+                                lineHeight = 17.sp,
+                                modifier = Modifier.padding(top = 6.dp),
+                            )
+                        is DocBlock.Labeled -> LabeledLine(block.label, block.text)
+                    }
+                }
+                extra()
             }
         }
-        extra()
     }
 }
 
 @Composable
 private fun LabeledLine(label: String, text: String) {
     val palette = LocalKeyFlowPalette.current
-    Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("$label —", color = palette.fg2, fontFamily = SpaceGrotesk, fontWeight = FontWeight.SemiBold, fontSize = 11.5.sp)
-        Text(text, color = palette.muted, fontFamily = SpaceGrotesk, fontSize = 11.5.sp)
+    Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("$label —", color = palette.fg2, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Medium, fontSize = 11.sp, lineHeight = 16.5.sp)
+        Text(text, color = palette.muted, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Light, fontSize = 11.sp, lineHeight = 16.5.sp)
     }
 }
 
@@ -484,21 +508,21 @@ private fun LabeledLine(label: String, text: String) {
 @Composable
 private fun FeedbackActions(noEmailApp: Boolean, onSend: (FeedbackKind) -> Unit) {
     val palette = LocalKeyFlowPalette.current
-    Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         FeedbackKind.entries.forEach { kind ->
             Text(
                 kind.label,
                 color = palette.fg,
                 fontFamily = SpaceGrotesk,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                fontSize = 11.5.sp,
                 modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .border(1.dp, palette.line, RoundedCornerShape(6.dp))
+                    .clip(RoundedCornerShape(50))
+                    .border(1.dp, palette.line, RoundedCornerShape(50))
                     .clickable(onClickLabel = "abrir o e-mail para ${kind.label.lowercase()}", role = Role.Button) {
                         onSend(kind)
                     }
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .padding(horizontal = 16.dp, vertical = 9.dp)
                     .testTag(kind.tag),
             )
         }

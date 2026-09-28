@@ -28,7 +28,6 @@ import androidx.compose.ui.unit.sp
 import com.keyflow.core.OrbShortcutAction
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
-import com.keyflow.ui.theme.SpaceMono
 
 const val SHORTCUT_SHEET_TAG = "shortcut-action-sheet"
 
@@ -76,18 +75,20 @@ fun ShortcutActionSheet(
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp)
-                .clip(RoundedCornerShape(20.dp))
+                .clip(RoundedCornerShape(24.dp))
                 .background(palette.bg)
+                .border(1.dp, palette.line2, RoundedCornerShape(24.dp))
                 .clickable(interactionSource = noRipple, indication = null) { /* consome o clique */ }
-                .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 22.dp)
+                .padding(start = 22.dp, end = 22.dp, top = 22.dp, bottom = 22.dp)
                 .testTag(SHORTCUT_SHEET_TAG),
         ) {
             Text(
                 if (taps == 1) "1 toque" else "$taps toques",
                 color = palette.fg,
                 fontFamily = SpaceGrotesk,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Normal,
                 fontSize = 18.sp,
+                letterSpacing = (-0.4).sp,
             )
             Text(
                 if (taps == 1) {
@@ -97,8 +98,10 @@ fun ShortcutActionSheet(
                 },
                 color = palette.muted,
                 fontFamily = SpaceGrotesk,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(top = 4.dp),
+                fontWeight = FontWeight.Light,
+                fontSize = 11.5.sp,
+                lineHeight = 16.5.sp,
+                modifier = Modifier.padding(top = 6.dp, bottom = 6.dp),
             )
 
             listOf(
@@ -135,44 +138,45 @@ private fun ActionRow(
 ) {
     val palette = LocalKeyFlowPalette.current
     val noRipple = remember { MutableInteractionSource() }
-    Column(
+    // Selecionada: aro teal e o radio cheio — o bloco preto invertido pesava mais que a escolha.
+    val shape = RoundedCornerShape(16.dp)
+    Row(
         Modifier
             .fillMaxWidth()
             .padding(top = 10.dp)
-            .clip(RoundedCornerShape(4.dp))
+            .clip(shape)
             .then(
-                if (selected) Modifier.background(palette.fg)
-                else Modifier.border(1.dp, palette.line, RoundedCornerShape(4.dp)),
+                if (selected) Modifier.background(raisedFill(palette)).border(1.dp, palette.teal, shape)
+                else Modifier.border(1.dp, palette.line, shape),
             )
             .clickable(interactionSource = noRipple, indication = null) { onClick() }
             .testTag("shortcut-action-${action.name.lowercase()}")
-            .padding(horizontal = 14.dp, vertical = 13.dp)
+            .padding(horizontal = 16.dp, vertical = 14.dp)
             .then(if (blocked) Modifier.alpha(0.45f) else Modifier),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                shortcutActionLabel(action),
-                color = if (selected) palette.onFill else palette.fg,
-                fontFamily = SpaceGrotesk,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp,
-                modifier = Modifier.weight(1f),
-            )
-            if (blocked) {
+        KfRadio(selected, Modifier.padding(top = 1.dp))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    "INDISPONÍVEL",
-                    color = palette.faint,
-                    fontFamily = SpaceMono,
-                    fontSize = 8.sp,
+                    shortcutActionLabel(action),
+                    color = palette.fg,
+                    fontFamily = SpaceGrotesk,
+                    fontWeight = FontWeight.Normal,
+                    fontSize = 13.sp,
+                    modifier = Modifier.weight(1f),
                 )
+                if (blocked) Eyebrow("Indisponível")
             }
+            Text(
+                shortcutActionSub(action),
+                color = palette.muted,
+                fontFamily = SpaceGrotesk,
+                fontWeight = FontWeight.Light,
+                fontSize = 10.5.sp,
+                lineHeight = 15.sp,
+                modifier = Modifier.padding(top = 2.dp),
+            )
         }
-        Text(
-            shortcutActionSub(action),
-            color = if (selected) palette.onFill.copy(alpha = 0.7f) else palette.muted,
-            fontFamily = SpaceGrotesk,
-            fontSize = 11.sp,
-            modifier = Modifier.padding(top = 3.dp),
-        )
     }
 }

@@ -4,8 +4,12 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,7 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.keyflow.ui.theme.LocalKeyFlowPalette
-import com.keyflow.ui.theme.SpaceMono
+import com.keyflow.ui.theme.SpaceGrotesk
 import kotlinx.coroutines.flow.MutableSharedFlow
 
 /**
@@ -41,7 +45,7 @@ class SaveController {
 
 const val SAVE_TOAST_TAG = "save-toast"
 
-/** Toast discreto "salvo" (Space Mono). Aparece ~1.4 s a cada evento de [controller]. */
+/** Toast discreto "salvo". Aparece ~1.4 s a cada evento de [controller]. */
 @Composable
 fun SaveToast(controller: SaveController, modifier: Modifier = Modifier) {
     val palette = LocalKeyFlowPalette.current
@@ -63,19 +67,27 @@ fun SaveToast(controller: SaveController, modifier: Modifier = Modifier) {
 
     Box(modifier, contentAlignment = Alignment.BottomCenter) {
         AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut()) {
-            Text(
-                text = "salvo",
-                color = palette.onFill,
-                fontFamily = SpaceMono,
-                fontWeight = FontWeight.Bold,
-                fontSize = 11.sp,
-                modifier = Modifier
-                    .padding(bottom = 22.dp)
-                    .clip(RoundedCornerShape(6.dp))
+            // Cápsula pequena de tinta, com o ponto teal do "feito" e o texto espaçado.
+            Row(
+                Modifier
+                    .padding(bottom = 24.dp)
+                    .clip(RoundedCornerShape(50))
                     .background(palette.fg)
-                    .padding(horizontal = 14.dp, vertical = 8.dp)
+                    .padding(start = 14.dp, end = 16.dp, top = 9.dp, bottom = 9.dp)
                     .testTag(SAVE_TOAST_TAG),
-            )
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Box(Modifier.size(6.dp).clip(CircleShape).background(palette.teal))
+                Text(
+                    text = "salvo",
+                    color = palette.onFill,
+                    fontFamily = SpaceGrotesk,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 10.5.sp,
+                    letterSpacing = 0.6.sp,
+                )
+            }
         }
     }
 }

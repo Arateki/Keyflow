@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -46,9 +47,11 @@ import com.keyflow.ui.common.verticalScrollbar
 import com.keyflow.ui.orb.OrbCenter
 import com.keyflow.ui.orb.OrbState
 import com.keyflow.ui.orb.VoiceOrb
+import com.keyflow.ui.icons.KfIcon
+import com.keyflow.ui.icons.KfIconSpec
+import com.keyflow.ui.icons.KfIcons
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
-import com.keyflow.ui.theme.SpaceMono
 import com.keyflow.ui.tour.GestureScript
 import com.keyflow.ui.tour.GestureTourPlayer
 import com.keyflow.ui.tour.TourFrame
@@ -92,7 +95,7 @@ fun ModoPanel(
 ) {
     // Permissão de microfone, repetida e sincronizada nos dois cards (mesmo estado).
     val micPermission = CardPermission(
-        label = "MICROFONE",
+        label = "Microfone",
         granted = permissions.microphoneGranted,
         onActivate = onRequestMicPermission,
         activateTag = ACTIVATE_MIC_TAG,
@@ -104,8 +107,8 @@ fun ModoPanel(
             .fillMaxWidth()
             .verticalScrollbar(scroll, scrollbarColor, rightBleed = 9.dp)
             .verticalScroll(scroll)
-            .padding(top = 2.dp, bottom = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(11.dp),
+            .padding(top = 10.dp, bottom = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         ModeCard(
             title = "Modo Sobrepor",
@@ -116,13 +119,13 @@ fun ModoPanel(
             permissions = listOf(
                 micPermission,
                 CardPermission(
-                    label = "SOBREPOR",
+                    label = "Sobrepor",
                     granted = permissions.overlayGranted,
                     onActivate = onRequestOverlayPermission,
                     activateTag = ACTIVATE_OVERLAY_TAG,
                 ),
                 CardPermission(
-                    label = "NOTIFICAÇÕES",
+                    label = "Notificações",
                     granted = permissions.notificationsGranted,
                     onActivate = onRequestNotificationPermission,
                     activateTag = ACTIVATE_NOTIFICATION_TAG,
@@ -152,7 +155,7 @@ fun ModoPanel(
             permissions = listOf(
                 micPermission,
                 CardPermission(
-                    label = "TECLADO",
+                    label = "Teclado",
                     granted = permissions.keyboardEnabled,
                     onActivate = onRequestKeyboardPermission,
                     activateTag = ACTIVATE_KEYBOARD_TAG,
@@ -190,7 +193,7 @@ fun ModoPanel(
 @Composable
 private fun KeyboardActiveLine(active: Boolean, modeOn: Boolean, onSwitch: () -> Unit) {
     StatusChip(
-        text = "TECLADO ATIVO · ${if (active) "SIM" else "NÃO"}",
+        text = "Teclado ativo · ${if (active) "sim" else "não"}",
         granted = active,
         pulsing = !active && modeOn,
         onClick = onSwitch,
@@ -255,30 +258,31 @@ private fun ModeCard(
             highlight.animateTo(0f, animationSpec = tween(durationMillis = 1700))
         }
     }
-    val shape = RoundedCornerShape(6.dp)
+    val shape = RoundedCornerShape(18.dp)
     Column(
         Modifier
             .fillMaxWidth()
             .clip(shape)
-            .border(1.dp, palette.line, shape)
+            .border(1.dp, palette.line2, shape)
             .then(
                 if (highlight.value > 0f) {
-                    Modifier.border(2.dp, palette.teal.copy(alpha = highlight.value), shape)
+                    Modifier.border(1.5.dp, palette.teal.copy(alpha = highlight.value), shape)
                 } else {
                     Modifier
                 },
             )
             .background(palette.card)
-            .padding(horizontal = 12.dp, vertical = 11.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+            .padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
                 title,
                 color = palette.fg,
                 fontFamily = SpaceGrotesk,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Medium,
                 fontSize = 14.5.sp,
+                letterSpacing = (-0.2).sp,
                 modifier = Modifier.weight(1f),
             )
             PillToggle(checked = checked, onCheckedChange = onCheckedChange, tag = toggleTag)
@@ -286,14 +290,14 @@ private fun ModeCard(
         FeatureList(features)
         FlowRow(
             Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             permissions.forEach { perm ->
                 // O próprio chip é o botão: abre as configs (concedido ou não) e pulsa quando o modo
                 // está ligado mas a permissão ainda falta.
                 StatusChip(
-                    text = "${perm.label} · ${if (perm.granted) "CONCEDIDO" else "PENDENTE"}",
+                    text = "${perm.label} · ${if (perm.granted) "concedido" else "pendente"}",
                     granted = perm.granted,
                     pulsing = !perm.granted && checked,
                     onClick = perm.onActivate,
@@ -305,7 +309,13 @@ private fun ModeCard(
         if (tourTag != null && tourScripts != null && tourScene != null) {
             // Tour à esquerda; a descrição do gesto corrente na área livre à direita (MODO-03).
             val tour = rememberGestureTourState(tourScripts)
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Altura FIXA: a prévia não pode crescer nem encolher com o gesto da vez (título de 1 ou 2
+            // linhas, descrição longa ao lado) — o card inteiro saltava a cada troca (Yan, 2026-09-28).
+            Row(
+                Modifier.fillMaxWidth().height(DEMO_FRAME_HEIGHT),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 Box(Modifier.weight(0.7f)) {
                     DemoFrame(nav = { TourNav(tourTag, tour.title, tour::prev, tour::next) }) {
                         GestureTourPlayer(
@@ -317,18 +327,23 @@ private fun ModeCard(
                 }
                 Text(
                     tour.description,
-                    color = palette.faint,
-                    fontFamily = SpaceMono,
-                    fontSize = 8.5.sp,
-                    lineHeight = 12.sp,
+                    color = palette.muted,
+                    fontFamily = SpaceGrotesk,
+                    fontWeight = FontWeight.Light,
+                    fontSize = 9.sp,
+                    lineHeight = 12.5.sp,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(0.3f).testTag("$tourTag-desc"),
                 )
             }
         } else if (pauseHint != null) {
-            Text(pauseHint, color = palette.faint, fontFamily = SpaceMono, fontSize = 8.5.sp)
+            Text(pauseHint, color = palette.muted, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Light, fontSize = 9.5.sp)
         }
     }
 }
+
+/** Altura fixa da moldura da prévia (rótulo + cena de [TOUR_SCENE_HEIGHT] + navegação de 2 linhas). */
+private val DEMO_FRAME_HEIGHT = 184.dp
 
 /**
  * Moldura de "prévia": fundo levemente variante (o `bg`, mais recuado que o card) + borda e o rótulo
@@ -340,15 +355,17 @@ private fun DemoFrame(nav: (@Composable () -> Unit)? = null, content: @Composabl
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
+            .height(DEMO_FRAME_HEIGHT)
+            .clip(RoundedCornerShape(12.dp))
             .background(palette.bg)
-            .border(1.dp, palette.line2, RoundedCornerShape(8.dp))
+            .border(1.dp, palette.line2, RoundedCornerShape(12.dp))
             .padding(horizontal = 6.dp, vertical = 7.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(5.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text("PRÉVIA", color = palette.faint, fontFamily = SpaceMono, fontSize = 7.5.sp)
-        content()
+        Eyebrow("Prévia", color = palette.faint.copy(alpha = 0.8f))
+        // A cena ocupa o que sobra entre o rótulo e a navegação — a moldura é que manda na altura.
+        Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) { content() }
         nav?.invoke()
     }
 }
@@ -365,29 +382,31 @@ private fun TourNav(tag: String, title: String, onPrev: () -> Unit, onNext: () -
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Arrow("‹", "gesto anterior", "$tag-prev", onPrev)
+        Arrow(KfIcons.ChevronLeft, "gesto anterior", "$tag-prev", onPrev)
         Text(
             title,
-            color = palette.muted,
-            fontFamily = SpaceMono,
-            fontSize = 7.5.sp,
+            color = palette.fg2,
+            fontFamily = SpaceGrotesk,
+            fontSize = 8.5.sp,
             textAlign = TextAlign.Center,
             // Duas linhas: os títulos dos atalhos ("2 toques · Retrair / expandir teclado") não cabem
             // em uma na largura do card, e cortados viram "Retrair / expa…" — o rótulo perde o sentido
             // justamente nos gestos que a pessoa configurou (visto no A32 do Yan, 2026-09-09).
+            // Sempre duas linhas reservadas: título curto ou longo, a moldura não muda de altura.
+            minLines = 2,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
-            lineHeight = 9.5.sp,
+            lineHeight = 11.sp,
             modifier = Modifier.weight(1f).testTag("$tag-title"),
         )
         // Só a seta de AVANÇAR pulsa: o tour não anda sozinho, então ela é o caminho adiante e precisa
         // se anunciar. A de voltar não pulsa — duas piscando viram ruído.
-        Arrow("›", "próximo gesto", "$tag-next", onNext, pulsing = true)
+        Arrow(KfIcons.ChevronRight, "próximo gesto", "$tag-next", onNext, pulsing = true)
     }
 }
 
 @Composable
-private fun Arrow(glyph: String, label: String, tag: String, onClick: () -> Unit, pulsing: Boolean = false) {
+private fun Arrow(glyph: KfIconSpec, label: String, tag: String, onClick: () -> Unit, pulsing: Boolean = false) {
     val palette = LocalKeyFlowPalette.current
     // Pulsando, a seta usa o teal — a cor de ação do app — para ler como convite, e não como um
     // elemento apagando e acendendo. Parada, fica no cinza dos textos secundários.
@@ -396,17 +415,15 @@ private fun Arrow(glyph: String, label: String, tag: String, onClick: () -> Unit
     } else {
         palette.fg2
     }
-    Text(
-        glyph,
-        color = color,
-        fontFamily = SpaceMono,
-        fontSize = 12.sp,
-        modifier = Modifier
-            .clip(RoundedCornerShape(4.dp))
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(50))
             .clickable(onClickLabel = label, onClick = onClick)
-            .padding(horizontal = 6.dp, vertical = 1.dp)
+            .padding(horizontal = 4.dp, vertical = 2.dp)
             .testTag(tag),
-    )
+    ) {
+        KfIcon(glyph, color, Modifier.size(15.dp), strokeWidth = 2f)
+    }
 }
 
 /**
@@ -416,34 +433,21 @@ private fun Arrow(glyph: String, label: String, tag: String, onClick: () -> Unit
 @Composable
 private fun FeatureList(features: List<String>) {
     val palette = LocalKeyFlowPalette.current
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(5.dp))
-            .background(palette.panel),
-    ) {
-        features.forEachIndexed { index, feature ->
-            if (index > 0) {
-                Box(Modifier.fillMaxWidth().height(1.dp).background(palette.line2))
-            }
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        features.forEach { feature ->
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp),
+                Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(9.dp),
             ) {
-                Text(
-                    "✓",
-                    color = palette.teal,
-                    fontFamily = SpaceMono,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 9.sp,
-                    modifier = Modifier.padding(top = 1.dp),
-                )
+                KfIcon(KfIcons.Check, palette.teal, Modifier.padding(top = 2.dp).size(13.dp), strokeWidth = 2f)
                 Text(
                     feature,
-                    color = palette.muted,
+                    color = palette.fg2,
                     fontFamily = SpaceGrotesk,
-                    fontSize = 10.5.sp,
+                    fontWeight = FontWeight.Light,
+                    fontSize = 10.sp,
+                    lineHeight = 14.sp,
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -476,17 +480,29 @@ private fun StatusChip(
     } else {
         1f
     }
-    Text(
-        text = text,
-        color = accent,
-        fontFamily = SpaceMono,
-        fontSize = 8.sp,
-        modifier = Modifier
+    // Cápsula de fio com um ponto de status: o chip deixa de ser um bloco colorido e vira etiqueta.
+    val shape = RoundedCornerShape(50)
+    // Compacta de propósito (Yan, 2026-09-28): em caixa-alta espaçada as etiquetas iam uma por linha e a
+    // aba Modo deixava de caber na tela sem rolar. Em caixa normal cabem duas por linha no A32.
+    Row(
+        Modifier
             .scale(scale)
-            .clip(RoundedCornerShape(2.dp))
-            .background(accent.copy(alpha = 0.16f))
+            .clip(shape)
+            .border(1.dp, accent.copy(alpha = 0.45f), shape)
             .clickable { onClick() }
             .testTag(tag)
-            .padding(horizontal = 8.dp, vertical = 5.dp),
-    )
+            .padding(start = 7.dp, end = 9.dp, top = 3.dp, bottom = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Box(Modifier.size(4.dp).clip(CircleShape).background(accent))
+        Text(
+            text = text,
+            color = accent,
+            fontFamily = SpaceGrotesk,
+            fontWeight = FontWeight.Medium,
+            fontSize = 7.2.sp,
+            maxLines = 1,
+        )
+    }
 }

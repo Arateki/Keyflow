@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.keyflow.core.shortcuts.GridCell
 import com.keyflow.core.shortcuts.ShortcutGrid
+import com.keyflow.ui.icons.KfIcon
+import com.keyflow.ui.icons.KfIcons
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
 import com.keyflow.ui.theme.SpaceMono
@@ -226,14 +229,15 @@ private fun GridListRow(
         Modifier
             .fillMaxWidth()
             .padding(vertical = 5.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(palette.panel)
+            .clip(RoundedCornerShape(14.dp))
+            .background(palette.card)
+            .border(1.dp, palette.line2, RoundedCornerShape(14.dp))
             .then(
                 if (pendingDelete) Modifier
                 else Modifier.clickable(interactionSource = noRipple, indication = null) { onTapRow() },
             )
             .testTag(gridRowTag(grid.id))
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(start = 16.dp, end = 10.dp, top = 13.dp, bottom = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (pendingDelete) {
@@ -260,23 +264,25 @@ private fun GridListRow(
             )
         } else {
             Column(Modifier.weight(1f)) {
-                Text(grid.name, color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                Text(grid.name, color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Normal, fontSize = 13.sp)
                 Text(
                     "${grid.rows}×${grid.cols}",
-                    color = palette.faint,
+                    color = palette.muted,
                     fontFamily = SpaceMono,
-                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Light,
+                    fontSize = 9.5.sp,
                     modifier = Modifier.padding(top = 2.dp),
                 )
             }
             Box(
                 Modifier
-                    .size(26.dp)
+                    .size(32.dp)
+                    .clip(CircleShape)
                     .clickable(interactionSource = noRipple, indication = null) { onTapDelete() }
                     .testTag(gridDeleteTag(grid.id)),
                 contentAlignment = Alignment.Center,
             ) {
-                StrokeIcon(TRASH_PATHS, palette.faint, Modifier.size(15.dp), strokeWidth = 1.6f)
+                KfIcon(KfIcons.Trash, palette.faint, Modifier.size(17.dp))
             }
         }
     }
@@ -284,21 +290,14 @@ private fun GridListRow(
 
 @Composable
 private fun AddGridRow(onClick: () -> Unit) {
-    val palette = LocalKeyFlowPalette.current
-    val noRipple = remember { MutableInteractionSource() }
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(top = 6.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .border(1.dp, palette.line, RoundedCornerShape(8.dp))
-            .clickable(interactionSource = noRipple, indication = null) { onClick() }
-            .testTag(GRIDS_EDITOR_ADD_TAG)
-            .padding(vertical = 12.dp),
-        horizontalArrangement = Arrangement.Center,
-    ) {
-        Text("+ grade", color = palette.teal, fontFamily = SpaceGrotesk, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-    }
+    SecondaryButton(
+        "grade",
+        tag = GRIDS_EDITOR_ADD_TAG,
+        onClick = onClick,
+        modifier = Modifier.padding(top = 6.dp),
+        icon = KfIcons.Plus,
+        accent = LocalKeyFlowPalette.current.teal,
+    )
 }
 
 /** Corpo do editor de grade dentro do [ConfigModal] — sem chrome (título/`✕` são do modal). */
@@ -438,9 +437,9 @@ private fun GridCellsBoard(
                             Modifier
                                 .width(cellSize)
                                 .height(cellSize)
-                                .clip(RoundedCornerShape(6.dp))
+                                .clip(RoundedCornerShape(9.dp))
                                 .background(palette.kbKey)
-                                .border(1.dp, palette.kbKeyBorder, RoundedCornerShape(6.dp))
+                                .border(1.dp, palette.kbKeyBorder, RoundedCornerShape(9.dp))
                                 .combinedClickable(
                                     onClick = { onCellTap(row, col) },
                                     onLongClick = { if (cell != null) onCellLongPress(row, col) },
@@ -450,7 +449,8 @@ private fun GridCellsBoard(
                         ) {
                             Text(
                                 cell?.displayLabel ?: "—",
-                                color = palette.fg,
+                                // Célula vazia recua: o traço só marca o lugar, não compete com as teclas.
+                                color = if (cell != null) palette.fg else palette.faint.copy(alpha = 0.6f),
                                 fontFamily = SpaceMono,
                                 fontSize = fontSize.sp,
                                 maxLines = 1,
@@ -473,9 +473,3 @@ private const val CELL_TEXT_PADDING_DP = 4f
 private const val CELL_FONT_RATIO = 0.32f
 private const val CELL_FONT_MIN_SP = 7f
 private const val CELL_FONT_MAX_SP = 11f
-
-private val TRASH_PATHS = listOf(
-    "M5 7h14l-1.2 13.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8L5 7Z",
-    "M9 7V4.8A1.8 1.8 0 0 1 10.8 3h2.4A1.8 1.8 0 0 1 15 4.8V7",
-    "M3 7h18",
-)

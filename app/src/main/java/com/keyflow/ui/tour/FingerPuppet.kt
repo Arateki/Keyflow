@@ -13,8 +13,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.vector.PathParser
+import com.keyflow.ui.icons.KfIcons
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 
 /**
@@ -69,8 +74,14 @@ fun rememberTourClock(enabled: Boolean): Float {
 }
 
 /**
- * O dedo do tour (TOUR-02): um vetor desenhado, nunca um asset — reskin do app não deixa o tour para
- * trás, e claro/escuro saem de graça da paleta.
+ * O dedo do tour (TOUR-02): uma mão apontando, desenhada em vetor ([KfIcons.Hand]) — nunca um asset,
+ * para reskin do app não deixar o tour para trás, e claro/escuro saem de graça da paleta. Antes era uma
+ * bolinha abstrata; a mão lê na hora como "toque aqui" (pedido do Yan, 2026-09-28).
+ *
+ * A PONTA do indicador fica exatamente na posição do frame: ondas de toque, anel de segurar e trilha
+ * saem dali, e a mão pende para baixo e para a direita, como a de quem segura o celular. A silhueta é
+ * de papel quase opaco com contorno de tinta — a mão fica por cima da cena, mas o ponto tocado (o que
+ * o tour veio ensinar) segue à vista em volta da ponta.
  *
  * Não anima por conta própria: recebe o [frame] já interpolado por [tourFrameAt] e só desenha. É o que
  * mantém a animação inteira determinística sob clock congelado.
@@ -82,7 +93,9 @@ fun rememberTourClock(enabled: Boolean): Float {
 fun FingerPuppet(frame: TourFrame, modifier: Modifier = Modifier) {
     val palette = LocalKeyFlowPalette.current
     val ink = palette.fg
+    val paper = palette.card
     val accent = palette.teal
+    val hand = remember { KfIcons.Hand.strokes.map { PathParser().parsePathString(it).toPath() } }
 
     Canvas(modifier) {
         if (frame.stepIndex < 0) return@Canvas
@@ -103,19 +116,35 @@ fun FingerPuppet(frame: TourFrame, modifier: Modifier = Modifier) {
             else -> Unit
         }
 
-        // Ponta do dedo: TRANSLÚCIDA de propósito. Opaca, ela cobria a orbe inteira durante os toques
-        // e o tour escondia justamente o que veio ensinar (visto na tira de frames de 2026-09-09).
-        // O contorno é que dá a leitura da posição; o miolo só insinua o contato, como o "mostrar
-        // toques" do Android.
-        drawCircle(color = ink.copy(alpha = 0.10f), radius = tip * 1.85f, center = center)
-        drawCircle(color = ink.copy(alpha = 0.30f), radius = tip, center = center)
-        drawCircle(
-            color = ink.copy(alpha = 0.72f),
-            radius = tip,
-            center = center,
-            style = Stroke(width = tip * 0.16f),
-        )
+        // A mão "afunda" um pouco enquanto encosta na tela (segurar, ou o instante de cada toque).
+        val pressed = when (frame.action) {
+            FingerAction.PRESS -> 1f
+            FingerAction.TAP, FingerAction.MULTI_TAP -> 1f - tapPhase(frame.actionProgress, frame.tapCount)
+            else -> 0f
+        }
+        val s = size.minDimension * HAND_SIZE_RATIO / 24f * (1f - HAND_PRESS_SHRINK * pressed)
+        translate(center.x - KfIcons.HAND_TIP_X * s, center.y - KfIcons.HAND_TIP_Y * s) {
+            scale(s, s, pivot = Offset.Zero) {
+                val outline = Stroke(width = 1.2f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                drawPath(hand.first(), paper.copy(alpha = 0.94f))
+                drawPath(hand.first(), ink.copy(alpha = 0.85f), style = outline)
+                hand.drop(1).forEach { drawPath(it, ink.copy(alpha = 0.55f), style = outline) }
+            }
+        }
     }
+}
+
+/** Lado do grid 24 da mão, em fração do menor lado da cena (a mão em si ocupa ~20 dos 24). */
+private const val HAND_SIZE_RATIO = 0.46f
+
+/** Quanto a mão encolhe no toque — sugere o "afundar" do dedo sem mudar de lugar a ponta. */
+private const val HAND_PRESS_SHRINK = 0.07f
+
+/** Fase (0..1) do pulso corrente de uma rajada de [tapCount] toques — mesma conta de [drawRipples]. */
+private fun tapPhase(progress: Float, tapCount: Int): Float {
+    val pulses = tapCount.coerceAtLeast(1)
+    val phase = (progress * pulses).coerceIn(0f, pulses.toFloat())
+    return (phase - phase.toInt().coerceAtMost(pulses - 1)).coerceIn(0f, 1f)
 }
 
 /** Trilha esmaecida do arrasto: mais apagada no começo do caminho, viva perto do dedo. */

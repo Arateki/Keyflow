@@ -173,6 +173,8 @@ object RouteCatalog {
         notificationRoute("notification-recording", ButtonState.RECORDING),
         notificationRoute("notification-paused", ButtonState.PAUSED),
         Route("config-modo") { ConfigModoRoute() },
+        // Navegação lateral aberta (ícones + nomes) — a posição normal é a recolhida, das demais rotas.
+        Route("config-menu-aberto") { ConfigModoRoute(railExpanded = true) },
         Route("config-voz-creditos") { ConfigVozRoute(TranscriptionSource.CREDITS) },
         Route("config-voz-openai") { ConfigVozRoute(TranscriptionSource.OPENAI) },
         Route("config-voz-custom") { ConfigVozRoute(TranscriptionSource.CUSTOM) },
@@ -217,7 +219,7 @@ object RouteCatalog {
 
     /** Aba Modo do scaffold de configuração (T10), com modos ligados para mostrar gating liberado. */
     @Composable
-    private fun ConfigModoRoute() {
+    private fun ConfigModoRoute(railExpanded: Boolean = false) {
         ConfigScreen(
             settings = FakeSettings.settings.copy(overlayModeEnabled = true, keyboardModeEnabled = true),
             permissions = PermissionStatus(
@@ -237,6 +239,7 @@ object RouteCatalog {
             onRequestNotificationPermission = {},
             onSwitchKeyboard = {},
             onSettingsChange = {},
+            initialRailExpanded = railExpanded,
         )
     }
 
@@ -292,6 +295,9 @@ object RouteCatalog {
                 microphoneGranted = true,
                 overlayGranted = true,
                 keyboardEnabled = keyboardEnabled,
+                // Sem isto a aba Teclado saía travada (somente-leitura) desde que o gating passou a exigir
+                // o KeyFlow como teclado ativo — o golden mostrava a aba esmaecida, não a tela de verdade.
+                keyboardActive = keyboardEnabled,
                 notificationsGranted = true,
             ),
             saveController = SaveController(),

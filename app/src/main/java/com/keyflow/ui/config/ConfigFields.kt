@@ -38,10 +38,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
@@ -49,6 +52,7 @@ import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -63,6 +67,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.keyflow.core.RecordingMode
+import com.keyflow.ui.icons.KfIcon
+import com.keyflow.ui.icons.KfIcons
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
 import com.keyflow.ui.theme.SpaceMono
@@ -88,35 +94,363 @@ internal fun <T> Segmented(
     modifier: Modifier = Modifier,
 ) {
     val palette = LocalKeyFlowPalette.current
+    val raised = raisedFill(palette)
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier.fillMaxWidth()) {
+    // Com muitas opções num painel estreito (origem da transcrição: 5), o rótulo encolhe até caber
+    // inteiro na célula em vez de ser cortado ("Crédito", "Custo").
+    val cellText = (maxWidth - SEGMENT_TRACK_PADDING * 2 - SEGMENT_GAP * (options.size - 1)) / options.size -
+        SEGMENT_TEXT_PADDING * 2
+    val fontSp = fittedFontSizeSp(
+        labels = options.map(label),
+        maxTextWidth = cellText.coerceAtLeast(1.dp),
+        maxSp = 12f,
+        minSp = 8.5f,
+        fontFamily = SpaceGrotesk,
+    )
     Row(
-        modifier
+        Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(5.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(palette.panel)
-            .padding(3.dp),
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
+            .padding(SEGMENT_TRACK_PADDING),
+        horizontalArrangement = Arrangement.spacedBy(SEGMENT_GAP),
     ) {
         options.forEach { option ->
             val isActive = option == selected
+            // A opção ativa "sobe" do trilho: superfície clara com fio, tinta cheia — em vez do bloco
+            // preto, que pesava mais que o conteúdo da tela.
             Text(
                 text = label(option),
-                color = if (isActive) palette.onFill else palette.muted,
+                color = if (isActive) palette.fg else palette.muted,
+                fontFamily = SpaceGrotesk,
                 fontWeight = if (isActive) FontWeight.Medium else FontWeight.Normal,
-                fontSize = 12.sp,
+                fontSize = fontSp.sp,
                 textAlign = TextAlign.Center,
+                maxLines = 1,
                 modifier = Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(3.dp))
-                    .then(if (isActive) Modifier.background(palette.fg) else Modifier)
+                    .clip(RoundedCornerShape(9.dp))
+                    .then(
+                        if (isActive) {
+                            Modifier
+                                .background(raised)
+                                .border(1.dp, palette.line, RoundedCornerShape(9.dp))
+                        } else {
+                            Modifier
+                        },
+                    )
                     .clickable(enabled = !isActive) { onSelect(option) }
-                    .padding(vertical = 9.dp)
+                    .padding(horizontal = SEGMENT_TEXT_PADDING, vertical = 10.dp)
                     .testTag(tag(option)),
             )
         }
     }
+    }
 }
 
-/** Pílula de toggle no estilo Ateliê (track preenchido quando ligado; knob `onFill`). */
+private val SEGMENT_TRACK_PADDING = 3.dp
+private val SEGMENT_GAP = 2.dp
+
+/** Folga lateral do rótulo dentro da célula — inclui a margem para o peso Medium da opção ativa. */
+private val SEGMENT_TEXT_PADDING = 4.dp
+
+/**
+ * Superfície "elevada" sobre o trilho `panel` (opção ativa do [Segmented], cartões em destaque): o papel
+ * mais claro no tema claro; no escuro, um degrau acima do trilho.
+ */
+internal fun raisedFill(palette: com.keyflow.ui.theme.KeyFlowPalette): Color =
+    if (palette.isDark) palette.line else palette.kbKey
+
+/** Papel quente do knob do interruptor e da tinta sobre acentos — igual nos dois temas. */
+internal val PaperWarm = Color(0xFFF4ECCF)
+
+/**
+ * Rótulo de seção (eyebrow): caixa-alta com espaçamento largo, na cor discreta. Substitui o mono em
+ * negrito, que lia como terminal ao lado da tipografia da tela.
+ */
+@Composable
+internal fun Eyebrow(
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = LocalKeyFlowPalette.current.faint,
+) {
+    Text(
+        text.uppercase(),
+        color = color,
+        fontFamily = SpaceGrotesk,
+        fontWeight = FontWeight.Medium,
+        fontSize = 8.5.sp,
+        letterSpacing = 1.4.sp,
+        modifier = modifier,
+    )
+}
+
+/** Título de um ajuste (a pergunta da linha): tinta cheia, peso de texto. */
+@Composable
+internal fun SettingTitle(text: String, modifier: Modifier = Modifier, color: Color = LocalKeyFlowPalette.current.fg) {
+    Text(
+        text,
+        color = color,
+        fontFamily = SpaceGrotesk,
+        fontWeight = FontWeight.Normal,
+        fontSize = 12.5.sp,
+        modifier = modifier,
+    )
+}
+
+/** Explicação sob o título do ajuste: mais leve e mais clara, com entrelinha folgada. */
+@Composable
+internal fun SettingSub(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        color = LocalKeyFlowPalette.current.muted,
+        fontFamily = SpaceGrotesk,
+        fontWeight = FontWeight.Light,
+        fontSize = 10.5.sp,
+        lineHeight = 15.sp,
+        modifier = modifier,
+    )
+}
+
+/**
+ * Botão principal (ação que conclui algo): bloco de tinta com cantos amplos e texto espaçado. [enabled]
+ * falso só esmaece — quem chama decide se o toque ainda faz algo.
+ */
+@Composable
+internal fun PrimaryButton(
+    text: String,
+    tag: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    icon: com.keyflow.ui.icons.KfIconSpec? = null,
+) {
+    val palette = LocalKeyFlowPalette.current
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(palette.fg)
+            .clickable { onClick() }
+            .testTag(tag)
+            .padding(vertical = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (icon != null) KfIcon(icon, palette.onFill, Modifier.size(15.dp), strokeWidth = 1.9f)
+        Text(
+            text,
+            color = palette.onFill,
+            fontFamily = SpaceGrotesk,
+            fontWeight = FontWeight.Medium,
+            fontSize = 12.5.sp,
+            letterSpacing = 0.3.sp,
+        )
+    }
+}
+
+/**
+ * Botão secundário (adicionar, ações de apoio): contorno fino de cantos amplos, ícone opcional e texto
+ * na tinta da tela — [accent] troca a cor quando a ação merece destaque (ex.: teal no "+ grade").
+ */
+@Composable
+internal fun SecondaryButton(
+    text: String,
+    tag: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    icon: com.keyflow.ui.icons.KfIconSpec? = null,
+    accent: Color = LocalKeyFlowPalette.current.fg,
+) {
+    val palette = LocalKeyFlowPalette.current
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .border(1.dp, palette.line, RoundedCornerShape(14.dp))
+            .clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) {
+                onClick()
+            }
+            .testTag(tag)
+            .padding(vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(7.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (icon != null) KfIcon(icon, accent, Modifier.size(15.dp), strokeWidth = 1.9f)
+        Text(text, color = accent, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Medium, fontSize = 12.sp, letterSpacing = 0.2.sp)
+    }
+}
+
+/** Nota de apoio (avisos brandos do editor): fundo `panel`, texto leve — sem caixa de contorno. */
+@Composable
+internal fun InfoNote(text: String, tag: String, modifier: Modifier = Modifier) {
+    val palette = LocalKeyFlowPalette.current
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(palette.panel)
+            // O texto é filho da linha: sem juntar a semântica, a tag apontava para um nó sem texto.
+            .semantics(mergeDescendants = true) {}
+            .testTag(tag)
+            .padding(start = 12.dp, end = 14.dp, top = 11.dp, bottom = 11.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(Modifier.padding(top = 5.dp).size(5.dp).clip(CircleShape).background(palette.muted))
+        Text(
+            text,
+            color = palette.fg2,
+            fontFamily = SpaceGrotesk,
+            fontWeight = FontWeight.Light,
+            fontSize = 10.5.sp,
+            lineHeight = 15.sp,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+/**
+ * Uma área da aba: título (e explicação opcional) FORA do cartão, e as opções DENTRO de um cartão de
+ * papel, separadas por [GroupDivider]. É o que separa visualmente um assunto do outro — pedido do Yan
+ * (2026-09-28): as abas liam como um bloco só de texto, sem distinção entre as áreas. Entre grupos,
+ * [GROUP_GAP] de respiro.
+ */
+@Composable
+internal fun SettingsGroup(
+    title: String?,
+    modifier: Modifier = Modifier,
+    description: String? = null,
+    trailing: (@Composable () -> Unit)? = null,
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
+) {
+    val palette = LocalKeyFlowPalette.current
+    Column(modifier.fillMaxWidth()) {
+        if (title != null) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                AreaTitle(title, Modifier.weight(1f))
+                trailing?.invoke()
+            }
+        }
+        if (description != null) SettingSub(description, Modifier.padding(start = 4.dp, end = 4.dp, top = 4.dp))
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(top = if (title != null || description != null) 12.dp else 0.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(palette.card)
+                .border(1.dp, palette.line2, RoundedCornerShape(18.dp))
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            content = content,
+        )
+    }
+}
+
+/** Respiro entre dois [SettingsGroup] — a separação entre assuntos vem daqui, não de fios grossos. */
+internal val GROUP_GAP = 32.dp
+
+/** Fio entre opções dentro de um [SettingsGroup]. */
+@Composable
+internal fun GroupDivider() {
+    Box(Modifier.fillMaxWidth().height(1.dp).background(LocalKeyFlowPalette.current.line2))
+}
+
+/**
+ * Uma opção dentro de um [SettingsGroup] com título, explicação e o controle embaixo (segmentado,
+ * slider…). Padding vertical generoso: cada opção é uma coisa só, com ar em volta.
+ */
+@Composable
+internal fun GroupItem(
+    title: String?,
+    sub: String? = null,
+    modifier: Modifier = Modifier,
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit = {},
+) {
+    Column(modifier.fillMaxWidth().padding(vertical = 16.dp)) {
+        if (title != null) SettingTitle(title)
+        if (sub != null) SettingSub(sub, Modifier.padding(top = 3.dp))
+        content()
+    }
+}
+
+/** Fio que separa blocos de ajustes dentro de uma aba. */
+@Composable
+internal fun HairlineDivider(modifier: Modifier = Modifier) {
+    Box(modifier.fillMaxWidth().height(1.dp).background(LocalKeyFlowPalette.current.line2))
+}
+
+/**
+ * Título de uma área da aba (Usabilidade, Atalhos, Layout do teclado): maior e leve, tracking fechado —
+ * é o que dá ritmo editorial à rolagem.
+ */
+@Composable
+internal fun AreaTitle(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        color = LocalKeyFlowPalette.current.fg,
+        fontFamily = SpaceGrotesk,
+        fontWeight = FontWeight.Normal,
+        fontSize = 16.sp,
+        letterSpacing = (-0.3).sp,
+        modifier = modifier,
+    )
+}
+
+/**
+ * Slider da config: trilho fino (3dp) com a parte percorrida em teal e um botão de papel com aro teal —
+ * no lugar do trilho grosso com cursor em barra do Material 3.
+ */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+internal fun KfSlider(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    valueRange: ClosedFloatingPointRange<Float>,
+    tag: String,
+    modifier: Modifier = Modifier,
+) {
+    val palette = LocalKeyFlowPalette.current
+    androidx.compose.material3.Slider(
+        value = value,
+        onValueChange = onValueChange,
+        valueRange = valueRange,
+        modifier = modifier.fillMaxWidth().testTag(tag),
+        thumb = {
+            Box(
+                Modifier
+                    .size(20.dp)
+                    .shadow(1.5.dp, CircleShape)
+                    .clip(CircleShape)
+                    .background(PaperWarm)
+                    .border(1.5.dp, palette.teal, CircleShape),
+            )
+        },
+        track = { state ->
+            val span = (valueRange.endInclusive - valueRange.start).takeIf { it > 0f } ?: 1f
+            val fraction = ((state.value - valueRange.start) / span).coerceIn(0f, 1f)
+            Canvas(Modifier.fillMaxWidth().height(3.dp)) {
+                val y = size.height / 2f
+                drawLine(palette.line, Offset(0f, y), Offset(size.width, y), strokeWidth = size.height, cap = StrokeCap.Round)
+                drawLine(palette.teal, Offset(0f, y), Offset(size.width * fraction, y), strokeWidth = size.height, cap = StrokeCap.Round)
+            }
+        },
+    )
+}
+
+/** Radio da config: aro fino; selecionado, aro teal com o miolo cheio. */
+@Composable
+internal fun KfRadio(selected: Boolean, modifier: Modifier = Modifier) {
+    val palette = LocalKeyFlowPalette.current
+    Box(
+        modifier
+            .size(18.dp)
+            .clip(CircleShape)
+            .border(if (selected) 1.5.dp else 1.dp, if (selected) palette.teal else palette.muted.copy(alpha = 0.6f), CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (selected) Box(Modifier.size(8.dp).clip(CircleShape).background(palette.teal))
+    }
+}
+
+/** Pílula de toggle no estilo Ateliê (track teal quando ligado; vazado com fio quando desligado). */
 @Composable
 internal fun PillToggle(
     checked: Boolean,
@@ -125,21 +459,23 @@ internal fun PillToggle(
     enabled: Boolean = true,
 ) {
     val palette = LocalKeyFlowPalette.current
-    val knobX by animateDpAsState(if (checked) 22.dp else 3.dp, label = "knobX")
+    val knobX by animateDpAsState(if (checked) 20.dp else 4.dp, label = "knobX")
+    val shape = RoundedCornerShape(50)
     Box(
         Modifier
-            .size(width = 44.dp, height = 25.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(if (checked) palette.teal else palette.line)
+            .size(width = 42.dp, height = 24.dp)
+            .clip(shape)
+            .background(if (checked) palette.teal else Color.Transparent)
+            .border(1.dp, if (checked) palette.teal else palette.line, shape)
             .clickable(enabled = enabled) { onCheckedChange(!checked) }
             .testTag(tag),
     ) {
         Box(
             Modifier
-                .offset(x = knobX, y = 3.dp)
-                .size(19.dp)
+                .offset(x = knobX, y = 4.dp)
+                .size(16.dp)
                 .clip(CircleShape)
-                .background(palette.onFill),
+                .background(if (checked) PaperWarm else palette.faint),
         )
     }
 }
@@ -159,13 +495,7 @@ internal fun Stepper(
 ) {
     val palette = LocalKeyFlowPalette.current
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            label,
-            color = palette.muted,
-            fontFamily = SpaceMono,
-            fontSize = 9.sp,
-            modifier = Modifier.weight(1f),
-        )
+        Eyebrow(label, Modifier.weight(1f), color = palette.muted)
         StepperButton("−", enabled = value > range.first, tag = "$tag-dec") { onValueChange(value - 1) }
         Text(
             value.toString(),
@@ -184,15 +514,15 @@ private fun StepperButton(symbol: String, enabled: Boolean, tag: String, onClick
     val palette = LocalKeyFlowPalette.current
     Box(
         Modifier
-            .size(28.dp)
-            .clip(RoundedCornerShape(6.dp))
-            .border(1.dp, palette.line, RoundedCornerShape(6.dp))
+            .size(30.dp)
+            .clip(CircleShape)
+            .border(1.dp, palette.line, CircleShape)
             .clickable(enabled = enabled) { onClick() }
             .alpha(if (enabled) 1f else 0.4f)
             .testTag(tag),
         contentAlignment = Alignment.Center,
     ) {
-        Text(symbol, color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+        Text(symbol, color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Normal, fontSize = 15.sp)
     }
 }
 
@@ -228,12 +558,7 @@ internal fun AutoSaveField(
     }
 
     Column(modifier.fillMaxWidth()) {
-        Text(
-            text = label.uppercase(),
-            color = palette.faint,
-            fontFamily = SpaceMono,
-            fontSize = 8.5.sp,
-        )
+        Eyebrow(label)
         BasicTextField(
             value = text,
             onValueChange = { new ->
@@ -245,13 +570,14 @@ internal fun AutoSaveField(
             },
             singleLine = true,
             visualTransformation = if (keyboardType == KeyboardType.Password) {
-                PasswordVisualTransformation('*')
+                PasswordVisualTransformation('•')
             } else {
                 VisualTransformation.None
             },
             textStyle = LocalTextStyle.current.copy(
-                color = palette.fg2,
+                color = palette.fg,
                 fontFamily = SpaceMono,
+                fontWeight = FontWeight.Light,
                 fontSize = 12.sp,
             ),
             cursorBrush = SolidColor(palette.teal),
@@ -262,7 +588,7 @@ internal fun AutoSaveField(
             }),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 5.dp, bottom = 7.dp)
+                .padding(top = 8.dp, bottom = 9.dp)
                 .testTag(tag)
                 .onFocusChanged { state ->
                     if (wasFocused && !state.isFocused) commitIfChanged()
@@ -291,29 +617,24 @@ internal fun Dropdown(
     val palette = LocalKeyFlowPalette.current
     var expanded by remember { mutableStateOf(false) }
     Column(modifier.fillMaxWidth()) {
-        Text(
-            text = label.uppercase(),
-            color = palette.faint,
-            fontFamily = SpaceMono,
-            fontSize = 8.5.sp,
-        )
+        Eyebrow(label)
         Box {
             Row(
                 Modifier
                     .fillMaxWidth()
                     .clickable { expanded = true }
-                    .padding(top = 5.dp, bottom = 7.dp)
+                    .padding(top = 8.dp, bottom = 9.dp)
                     .testTag(tag),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
                     text = display(selected),
-                    color = palette.fg2,
-                    fontFamily = SpaceMono,
-                    fontSize = 12.sp,
+                    color = palette.fg,
+                    fontFamily = SpaceGrotesk,
+                    fontSize = 13.sp,
                 )
-                StrokeIcon(CHEVRON_DOWN, palette.muted, Modifier.size(14.dp), strokeWidth = 1.8f)
+                KfIcon(KfIcons.ChevronDown, palette.muted, Modifier.size(16.dp))
             }
             DropdownMenu(
                 expanded = expanded,
@@ -327,9 +648,9 @@ internal fun Dropdown(
                             Text(
                                 text = display(option),
                                 color = if (isActive) palette.teal else palette.fg,
-                                fontFamily = SpaceMono,
-                                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
-                                fontSize = 12.sp,
+                                fontFamily = SpaceGrotesk,
+                                fontWeight = if (isActive) FontWeight.Medium else FontWeight.Normal,
+                                fontSize = 13.sp,
                             )
                         },
                         onClick = {
@@ -364,18 +685,18 @@ internal fun SkinsSection(
             .fillMaxWidth()
             .padding(top = 15.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Skins", color = palette.fg, fontFamily = SpaceGrotesk, fontSize = 13.5.sp)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Skins", color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Medium, fontSize = 13.5.sp)
             Row(
                 Modifier
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(palette.panel)
-                    .padding(horizontal = 7.dp, vertical = 3.dp),
+                    .clip(RoundedCornerShape(50))
+                    .border(1.dp, palette.line, RoundedCornerShape(50))
+                    .padding(start = 7.dp, end = 9.dp, top = 3.dp, bottom = 3.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                StrokeIcon(LOCK_PATHS, palette.faint, Modifier.size(9.dp), strokeWidth = 2f)
-                Text("BLOQUEADO", color = palette.faint, fontFamily = SpaceMono, fontSize = 8.sp)
+                KfIcon(KfIcons.Lock, palette.faint, Modifier.size(11.dp), strokeWidth = 2f)
+                Eyebrow("Bloqueado")
             }
         }
         // A cor em uso (teal/orbe) aparece SELECIONADA (anel + opaca); as demais ficam esmaecidas (locked).
@@ -396,7 +717,7 @@ internal fun SkinsSection(
                 ) {
                     // Fundo e tecla do próprio esquema, como uma tecla do Samsung.
                     Box(Modifier.fillMaxSize().background(Color(system.tray)).padding(horizontal = 10.dp, vertical = 9.dp)) {
-                        Box(Modifier.fillMaxSize().clip(RoundedCornerShape(3.dp)).background(Color(system.key)))
+                        Box(Modifier.fillMaxSize().clip(RoundedCornerShape(4.dp)).background(Color(system.key)))
                     }
                 }
                 SkinChoice(
@@ -414,22 +735,23 @@ internal fun SkinsSection(
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(top = 12.dp)
-                .clip(RoundedCornerShape(3.dp))
-                .border(1.5.dp, palette.terracotta, RoundedCornerShape(3.dp))
+                .padding(top = 14.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .border(1.dp, palette.terracotta.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
                 .clickable { onUnlock() }
                 .testTag(unlockTag)
-                .padding(vertical = 11.dp),
-            horizontalArrangement = Arrangement.Center,
+                .padding(vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            StrokeIcon(LOCK_OPEN_PATHS, palette.terracotta, Modifier.size(13.dp), strokeWidth = 1.8f)
+            KfIcon(KfIcons.LockOpen, palette.terracotta, Modifier.size(15.dp))
             Text(
-                "  Desbloquear skins",
+                "Desbloquear skins",
                 color = palette.terracotta,
                 fontFamily = SpaceGrotesk,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Medium,
                 fontSize = 12.sp,
+                letterSpacing = 0.2.sp,
             )
         }
     }
@@ -452,23 +774,24 @@ private fun androidx.compose.foundation.layout.RowScope.SkinChoice(
             Modifier
                 .fillMaxWidth()
                 .height(40.dp)
-                .clip(RoundedCornerShape(4.dp))
+                .clip(RoundedCornerShape(10.dp))
                 .clickable(onClick = onClick)
                 .testTag(tag)
                 .then(
                     if (selected) {
-                        Modifier.border(2.dp, palette.fg, RoundedCornerShape(4.dp))
+                        Modifier.border(1.5.dp, palette.fg, RoundedCornerShape(10.dp))
                     } else {
-                        Modifier.border(1.dp, palette.line, RoundedCornerShape(4.dp))
+                        Modifier.border(1.dp, palette.line, RoundedCornerShape(10.dp))
                     },
                 ),
         ) { swatch() }
         Text(
             label,
             color = if (selected) palette.fg else palette.muted,
-            fontFamily = SpaceMono,
+            fontFamily = SpaceGrotesk,
+            fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
             fontSize = 9.5.sp,
-            modifier = Modifier.padding(top = 4.dp),
+            modifier = Modifier.padding(top = 5.dp),
         )
     }
 }
@@ -486,13 +809,13 @@ private fun androidx.compose.foundation.layout.RowScope.SkinSwatch(
             .height(40.dp)
             // Não-selecionados esmaecidos (efeito "bloqueado"); o selecionado fica opaco.
             .then(if (selected) Modifier else Modifier.alpha(0.4f))
-            .clip(RoundedCornerShape(4.dp))
+            .clip(RoundedCornerShape(10.dp))
             .background(color)
             // Anel de seleção (cor do texto, contrasta nos dois temas); senão, borda só p/ swatch claro.
             .then(
                 when {
-                    selected -> Modifier.border(2.dp, palette.fg, RoundedCornerShape(4.dp))
-                    border -> Modifier.border(1.dp, palette.line, RoundedCornerShape(4.dp))
+                    selected -> Modifier.border(1.5.dp, palette.fg, RoundedCornerShape(10.dp))
+                    border -> Modifier.border(1.dp, palette.line, RoundedCornerShape(10.dp))
                     else -> Modifier
                 },
             ),
@@ -507,7 +830,11 @@ internal fun StrokeIcon(paths: List<String>, tint: Color, modifier: Modifier, st
         translate((size.width - 24f * s) / 2f, (size.height - 24f * s) / 2f) {
             scale(s, s, pivot = Offset.Zero) {
                 paths.forEach { d ->
-                    drawPath(PathParser().parsePathString(d).toPath(), tint, style = Stroke(width = strokeWidth))
+                    drawPath(
+                        PathParser().parsePathString(d).toPath(),
+                        tint,
+                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round),
+                    )
                 }
             }
         }
@@ -527,9 +854,6 @@ internal fun FillIcon(path: String, tint: Color, modifier: Modifier) {
     }
 }
 
-private val LOCK_PATHS = listOf("M3 11 h18 v11 h-18 z", "M7 11V7a5 5 0 0 1 10 0v4")
-private val LOCK_OPEN_PATHS = listOf("M3 11 h18 v11 h-18 z", "M7 11V7a5 5 0 0 1 9.9-1")
-private val CHEVRON_DOWN = listOf("M6 9 12 15 18 9")
 
 /**
  * Maior tamanho de fonte (em sp), de [maxSp] pra baixo, que faz todos os [labels] caberem em
@@ -589,14 +913,22 @@ internal fun ToggleRow(
         Modifier
             .fillMaxWidth()
             .then(if (enabled) Modifier else Modifier.clickable { onDisabledClick() })
-            .padding(top = 12.dp)
+            .padding(vertical = 16.dp)
             .then(if (enabled) Modifier else Modifier.alpha(0.45f)),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Column(Modifier.weight(1f)) {
-            Text(label, color = palette.fg2, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Medium, fontSize = 11.5.sp)
-            Text(sub, color = palette.faint, fontFamily = SpaceGrotesk, fontSize = 10.sp, modifier = Modifier.padding(top = 1.dp))
+            Text(label, color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Normal, fontSize = 11.5.sp)
+            Text(
+                sub,
+                color = palette.muted,
+                fontFamily = SpaceGrotesk,
+                fontWeight = FontWeight.Light,
+                fontSize = 10.5.sp,
+                lineHeight = 15.sp,
+                modifier = Modifier.padding(top = 3.dp),
+            )
         }
         PillToggle(checked = checked, onCheckedChange = onCheckedChange, tag = tag, enabled = enabled)
     }

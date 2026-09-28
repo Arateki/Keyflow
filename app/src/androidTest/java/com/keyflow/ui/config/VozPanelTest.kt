@@ -12,6 +12,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -133,7 +134,8 @@ class VozPanelTest {
         val h = Harness(Settings(source = TranscriptionSource.OPENAI))
         rule.setContent { h.Content() }
 
-        rule.onNodeWithTag(maxRecordingTag(300)).assertIsDisplayed()
+        // A aba ganhou respiro entre as áreas (2026-09-28): "Geral" fica abaixo da dobra — rola até lá.
+        rule.onNodeWithTag(maxRecordingTag(300)).performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -141,7 +143,7 @@ class VozPanelTest {
         val h = Harness(Settings(source = TranscriptionSource.OPENAI))
         rule.setContent { h.Content() }
 
-        rule.onNodeWithTag(maxRecordingTag(600)).performClick()
+        rule.onNodeWithTag(maxRecordingTag(600)).performScrollTo().performClick()
 
         rule.runOnIdle { assertEquals(600, h.settings.maxRecordingSec) }
     }

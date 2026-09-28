@@ -10,8 +10,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -91,8 +89,8 @@ internal fun LocalPanel(
         }
     }
 
-    Column(Modifier.padding(top = 16.dp)) {
-        Text("Modelos no aparelho".uppercase(), color = palette.faint, fontFamily = SpaceMono, fontSize = 8.5.sp)
+    Column(Modifier.padding(top = 20.dp)) {
+        Eyebrow("Modelos no aparelho")
         models.items.forEach { item ->
             ModelCard(
                 item = item,
@@ -127,19 +125,13 @@ internal fun LocalPanel(
             modifier = Modifier.padding(top = 18.dp),
             display = ::languageLabel,
         )
-        Text(
+        SettingSub(
             "Vale para os modelos Rápido e Equilibrado; o Máxima qualidade reconhece o idioma sozinho.",
-            color = palette.faint,
-            fontFamily = SpaceGrotesk,
-            fontSize = 11.sp,
-            modifier = Modifier.padding(top = 6.dp),
+            Modifier.padding(top = 8.dp),
         )
-        Text(
+        SettingSub(
             "Processado 100% neste aparelho — o áudio nunca sai do dispositivo. Os modelos são apagados se o app for desinstalado.",
-            color = palette.faint,
-            fontFamily = SpaceGrotesk,
-            fontSize = 11.sp,
-            modifier = Modifier.padding(top = 16.dp).testTag(VOZ_LOCAL_PRIVACY_TAG),
+            Modifier.padding(top = 16.dp).testTag(VOZ_LOCAL_PRIVACY_TAG),
         )
     }
 }
@@ -160,14 +152,15 @@ private fun ModelCard(
     val palette = LocalKeyFlowPalette.current
     val spec = item.spec
     val installed = item.status == LocalModelStatus.INSTALLED
-    val shape = RoundedCornerShape(6.dp)
+    val shape = RoundedCornerShape(16.dp)
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(top = 10.dp)
+            .padding(top = 12.dp)
             .clip(shape)
-            .border(1.dp, if (item.selected) palette.teal else palette.line, shape)
-            .background(palette.card)
+            .border(1.dp, if (item.selected) palette.teal else palette.line2, shape)
+            // Dentro do cartão do grupo "Origem": cada modelo é um bloco recuado (papel do fundo).
+            .background(palette.bg)
             // Instalado = opção de rádio: o leitor de tela anuncia "selecionado" no card inteiro.
             .then(
                 if (installed) {
@@ -176,23 +169,24 @@ private fun ModelCard(
                     Modifier
                 },
             )
-            .padding(14.dp)
+            .padding(start = 16.dp, end = 12.dp, top = 15.dp, bottom = 15.dp)
             .testTag(localModelTag(spec.id)),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (installed) {
-                SelectionDot(item.selected, Modifier.padding(end = 10.dp))
+                KfRadio(item.selected, Modifier.padding(end = 12.dp))
             }
             Column(Modifier.weight(1f)) {
-                Text(spec.displayName, color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Medium, fontSize = 13.sp)
+                Text(spec.displayName, color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Normal, fontSize = 13.sp)
                 if (spec.modelName.isNotBlank()) {
-                    Text(spec.modelName, color = palette.muted, fontFamily = SpaceMono, fontSize = 10.sp)
+                    Text(spec.modelName, color = palette.muted, fontFamily = SpaceMono, fontWeight = FontWeight.Light, fontSize = 9.5.sp)
                 }
                 Text(
                     "${formatModelSize(spec.totalBytes)} · ${spec.languages}",
                     color = palette.faint,
                     fontFamily = SpaceMono,
-                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Light,
+                    fontSize = 9.5.sp,
                     modifier = Modifier.padding(top = 2.dp),
                 )
             }
@@ -213,13 +207,13 @@ private fun ModelCard(
                 )
             }
         }
-        Text(spec.summary, color = palette.muted, fontFamily = SpaceGrotesk, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
+        SettingSub(spec.summary, Modifier.padding(top = 10.dp))
         if (item.heavy) {
             Text(
                 "Pode ser pesado neste aparelho.",
                 color = palette.terracotta,
-                fontFamily = SpaceMono,
-                fontSize = 10.sp,
+                fontFamily = SpaceGrotesk,
+                fontSize = 10.5.sp,
                 modifier = Modifier.padding(top = 6.dp).testTag(localHeavyTag(spec.id)),
             )
         }
@@ -236,17 +230,18 @@ private fun ModelCard(
                 Box(
                     Modifier
                         .weight(1f)
-                        .height(6.dp)
-                        .clip(RoundedCornerShape(3.dp))
+                        .height(3.dp)
+                        .clip(RoundedCornerShape(2.dp))
                         .background(palette.line2),
                 ) {
-                    Box(Modifier.fillMaxWidth(progress.fraction).height(6.dp).background(palette.teal))
+                    Box(Modifier.fillMaxWidth(progress.fraction).height(3.dp).clip(RoundedCornerShape(2.dp)).background(palette.teal))
                 }
                 Text(
                     downloadStateLabel(progress),
-                    color = palette.faint,
+                    color = palette.muted,
                     fontFamily = SpaceMono,
-                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Light,
+                    fontSize = 9.5.sp,
                     modifier = Modifier.padding(start = 10.dp),
                 )
             }
@@ -277,20 +272,6 @@ private fun ModelCard(
 }
 
 @Composable
-private fun SelectionDot(selected: Boolean, modifier: Modifier = Modifier) {
-    val palette = LocalKeyFlowPalette.current
-    Box(
-        modifier
-            .size(14.dp)
-            .clip(CircleShape)
-            .border(1.5.dp, if (selected) palette.teal else palette.muted, CircleShape),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (selected) Box(Modifier.size(7.dp).clip(CircleShape).background(palette.teal))
-    }
-}
-
-@Composable
 private fun CardAction(
     label: String,
     tag: String,
@@ -299,17 +280,20 @@ private fun CardAction(
     color: androidx.compose.ui.graphics.Color = LocalKeyFlowPalette.current.teal,
 ) {
     val palette = LocalKeyFlowPalette.current
+    val tint = if (enabled) color else palette.faint
     Text(
         label,
-        color = if (enabled) color else palette.faint,
+        color = tint,
         fontFamily = SpaceGrotesk,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 12.5.sp,
+        fontWeight = FontWeight.Medium,
+        fontSize = 11.sp,
+        letterSpacing = 0.2.sp,
         modifier = Modifier
-            .clip(RoundedCornerShape(3.dp))
+            .clip(RoundedCornerShape(50))
+            .border(1.dp, tint.copy(alpha = 0.45f), RoundedCornerShape(50))
             .clickable(enabled = enabled, onClick = onClick)
             .testTag(tag)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .padding(horizontal = 13.dp, vertical = 6.dp),
     )
 }
 
@@ -319,16 +303,16 @@ private fun ConfirmRow(question: String, confirm: String, tag: String, onConfirm
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(top = 10.dp)
-            .clip(RoundedCornerShape(4.dp))
+            .padding(top = 12.dp)
+            .clip(RoundedCornerShape(12.dp))
             .background(palette.panel)
-            .padding(12.dp)
+            .padding(14.dp)
             .testTag(tag),
     ) {
         Text(question, color = palette.fg, fontFamily = SpaceGrotesk, fontSize = 12.sp)
         Row(
-            Modifier.fillMaxWidth().padding(top = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End),
+            Modifier.fillMaxWidth().padding(top = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
         ) {
             CardAction("Cancelar", tag = VOZ_LOCAL_CONFIRM_NO_TAG, onClick = onDismiss, color = palette.muted)
             CardAction(confirm, tag = VOZ_LOCAL_CONFIRM_YES_TAG, onClick = onConfirm)

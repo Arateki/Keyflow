@@ -10,12 +10,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,9 +48,10 @@ import com.keyflow.ui.common.SaveController
 import com.keyflow.ui.common.SaveToast
 import com.keyflow.ui.orb.OrbState
 import com.keyflow.ui.orb.VoiceOrb
+import com.keyflow.ui.icons.KfIcon
+import com.keyflow.ui.icons.KfIcons
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
-import com.keyflow.ui.theme.SpaceMono
 
 /** testTag do painel renderizado para a aba [tab] (usado nos testes de navegação). */
 fun panelTag(tab: ConfigTab): String = "panel-${tab.name.lowercase()}"
@@ -65,7 +68,7 @@ internal const val AUTO_PERMISSION_DELAY_MS = 400L
 
 /**
  * Scaffold da configuração em abas (CFG-01..05): header (orbe, idioma inerte,
- * tema) + [TabBar] com gating + painel da aba ativa + [SaveToast]. A aba ativa é estado interno;
+ * tema) + [NavRail] lateral com gating + painel da aba ativa + [SaveToast]. A aba ativa é estado interno;
  * se o modo que libera a aba ativa for desligado, volta para [ConfigTab.MODO] (CFG-02).
  *
  * Aba Modo: [ModoPanel] (T11). Demais abas: placeholders até T12–T16.
@@ -92,6 +95,7 @@ fun ConfigScreen(
     modifier: Modifier = Modifier,
     initialTab: ConfigTab = ConfigTab.MODO,
     initialUnlockOpen: Boolean = false,
+    initialRailExpanded: Boolean = false,
     requestedTab: ConfigTab? = null,
     requestedTabKey: Int = 0,
     localModels: LocalModelsUi = LocalModelsUi.EMPTY,
@@ -100,6 +104,8 @@ fun ConfigScreen(
     val palette = LocalKeyFlowPalette.current
     var activeTab by rememberSaveable { mutableStateOf(initialTab) }
     var unlockOpen by rememberSaveable { mutableStateOf(initialUnlockOpen) }
+    // Barra lateral: recolhida (só ícones) é a posição normal; a setinha abre com os nomes.
+    var railExpanded by rememberSaveable { mutableStateOf(initialRailExpanded) }
     // Atalho da orbe com o bottom sheet aberto (2 ou 3 toques); null = fechado.
     var shortcutSheetTaps by remember { mutableStateOf<Int?>(null) }
 
@@ -223,23 +229,21 @@ fun ConfigScreen(
                 onLanguageClick = onLanguageClick,
                 onThemeClick = { onThemeChange(!settings.themeDark) },
             )
-            TabBar(
-                active = activeTab,
-                enabled = enabled,
-                onSelect = { tab ->
-                    activeTab = tab
-                    if (!enabled(tab)) blockReason(tab)?.let { showToast(it, 2500, navActionFor(tab)) }
-                },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-            )
             Box(Modifier.fillMaxSize()) {
+            // A barra lateral recolhida ocupa uma faixa fixa à esquerda; aberta, desenha por cima do
+            // painel (mais abaixo, fora desta Row) sem mudar a largura dele.
+            Row(Modifier.fillMaxSize()) {
+            Box(Modifier.width(NAV_RAIL_COLLAPSED_WIDTH).fillMaxHeight()) {
+                // Fio vertical separando a navegação do conteúdo.
+                Box(Modifier.align(Alignment.CenterEnd).width(1.dp).fillMaxHeight().background(palette.line2))
+            }
+            Box(Modifier.weight(1f).fillMaxHeight()) {
                 Column(
                     Modifier
                         .fillMaxSize()
                         // Aba travada: conteúdo esmaecido (somente-leitura), sob a camada incolor abaixo.
                         .then(if (activeEnabled) Modifier else Modifier.alpha(0.45f))
-                        // Mesma largura que as abas ocupam (16dp), ganhando espaço horizontal no corpo.
-                        .padding(horizontal = 16.dp)
+                        .padding(start = 16.dp, end = 16.dp)
                         .testTag(panelTag(activeTab)),
                 ) {
                     when (activeTab) {
@@ -312,6 +316,19 @@ fun ConfigScreen(
                     )
                 }
             }
+            }
+            if (railExpanded) NavRailScrim(onDismiss = { railExpanded = false }, modifier = Modifier.matchParentSize())
+            NavRail(
+                active = activeTab,
+                enabled = enabled,
+                onSelect = { tab ->
+                    activeTab = tab
+                    if (!enabled(tab)) blockReason(tab)?.let { showToast(it, 2500, navActionFor(tab)) }
+                },
+                expanded = railExpanded,
+                onExpandedChange = { railExpanded = it },
+            )
+            }
         }
         SaveToast(saveController, Modifier.fillMaxSize().systemBarsPadding())
         MessageToast(
@@ -368,8 +385,8 @@ private fun MessageToast(
         if (message != null) {
             Column(
                 modifier = Modifier
-                    .padding(bottom = 22.dp, start = 22.dp, end = 22.dp)
-                    .clip(RoundedCornerShape(6.dp))
+                    .padding(bottom = 24.dp, start = 20.dp, end = 20.dp)
+                    .clip(RoundedCornerShape(14.dp))
                     .background(palette.fg)
                     .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
                     .testTag(MESSAGE_TOAST_TAG),
@@ -378,10 +395,11 @@ private fun MessageToast(
                 Text(
                     text = message,
                     color = palette.onFill,
-                    fontFamily = SpaceMono,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 10.5.sp,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+                    fontFamily = SpaceGrotesk,
+                    fontWeight = FontWeight.Normal,
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp,
+                    modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 13.dp, bottom = 4.dp),
                 )
                 // Barrinha de progresso discreta colada no contorno inferior: conta o tempo até sumir.
                 val progress = remember(generation) { Animatable(1f) }
@@ -391,7 +409,7 @@ private fun MessageToast(
                 }
                 Box(
                     Modifier
-                        .padding(horizontal = 6.dp, vertical = 4.dp)
+                        .padding(start = 18.dp, end = 18.dp, top = 6.dp, bottom = 10.dp)
                         .fillMaxWidth()
                         .height(2.dp),
                 ) {
@@ -400,7 +418,7 @@ private fun MessageToast(
                             .fillMaxWidth(progress.value)
                             .height(2.dp)
                             .clip(RoundedCornerShape(1.dp))
-                            .background(palette.onFill.copy(alpha = 0.45f)),
+                            .background(palette.onFill.copy(alpha = 0.35f)),
                     )
                 }
             }
@@ -416,57 +434,60 @@ private fun Header(
 ) {
     val palette = LocalKeyFlowPalette.current
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 6.dp),
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(11.dp),
     ) {
-        VoiceOrb(state = OrbState.Idle, modifier = Modifier.size(30.dp))
+        VoiceOrb(state = OrbState.Idle, modifier = Modifier.size(28.dp))
         Text(
             text = "KeyFlow",
             color = palette.fg,
             fontFamily = SpaceGrotesk,
-            fontWeight = FontWeight.SemiBold,
+            fontWeight = FontWeight.Medium,
             fontSize = 19.sp,
-            modifier = Modifier.weight(1f),
+            letterSpacing = (-0.3).sp,
+            modifier = Modifier.padding(start = 9.dp).weight(1f),
         )
-        // Idioma — inerte nesta fase (toca → "em breve"); I18N-02.
+        // Idioma e tema numa só cápsula de linha fina, separados por um fio — menos caixas no topo.
+        val capsule = RoundedCornerShape(50)
         Row(
             Modifier
-                .height(30.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .border(1.dp, palette.line, RoundedCornerShape(6.dp))
-                .clickable { onLanguageClick() }
-                .testTag(LANG_TOGGLE_TAG)
-                .padding(horizontal = 8.dp),
+                .height(34.dp)
+                .clip(capsule)
+                .border(1.dp, palette.line, capsule),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
         ) {
-            StrokeIcon(GLOBE_PATHS, palette.fg2, Modifier.size(13.dp))
-            Text("PT", color = palette.fg2, fontFamily = SpaceMono, fontSize = 10.sp)
-        }
-        // Tema sol/lua — persiste themeDark (FND-04). Mesma altura do botão de idioma.
-        Box(
-            Modifier
-                .size(width = 32.dp, height = 30.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .border(1.dp, palette.line, RoundedCornerShape(6.dp))
-                .clickable { onThemeClick() }
-                .testTag(THEME_TOGGLE_TAG),
-            contentAlignment = Alignment.Center,
-        ) {
-            StrokeIcon(if (dark) SUN_PATHS else MOON_PATHS, palette.fg2, Modifier.size(14.dp))
+            // Idioma — inerte nesta fase (toca → "em breve"); I18N-02.
+            Row(
+                Modifier
+                    .fillMaxHeight()
+                    .clickable { onLanguageClick() }
+                    .testTag(LANG_TOGGLE_TAG)
+                    .padding(start = 12.dp, end = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                KfIcon(KfIcons.Globe, palette.fg2, Modifier.size(15.dp))
+                Text(
+                    "PT",
+                    color = palette.fg2,
+                    fontFamily = SpaceGrotesk,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 9.5.sp,
+                    letterSpacing = 1.sp,
+                )
+            }
+            Box(Modifier.width(1.dp).height(16.dp).background(palette.line))
+            // Tema sol/lua — persiste themeDark (FND-04).
+            Box(
+                Modifier
+                    .fillMaxHeight()
+                    .clickable { onThemeClick() }
+                    .testTag(THEME_TOGGLE_TAG)
+                    .padding(start = 10.dp, end = 12.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                KfIcon(if (dark) KfIcons.Sun else KfIcons.Moon, palette.fg2, Modifier.size(15.dp))
+            }
         }
     }
 }
-
-private val GLOBE_PATHS = listOf(
-    "M12 12 m-9 0 a9 9 0 1 0 18 0 a9 9 0 1 0 -18 0",
-    "M3 12h18",
-    "M12 3c3 4 3 14 0 18",
-    "M12 3c-3 4-3 14 0 18",
-)
-private val SUN_PATHS = listOf(
-    "M12 12 m-4 0 a4 4 0 1 0 8 0 a4 4 0 1 0 -8 0",
-    "M12 2v2M12 20v2M4 12H2M22 12h-2M5.6 5.6 4.2 4.2M19.8 19.8l-1.4-1.4M18.4 5.6l1.4-1.4M4.2 19.8l1.4-1.4",
-)
-private val MOON_PATHS = listOf("M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z")

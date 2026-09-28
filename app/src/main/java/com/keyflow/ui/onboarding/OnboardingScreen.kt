@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -38,9 +37,12 @@ import androidx.compose.ui.unit.sp
 import com.keyflow.ui.PermissionStatus
 import com.keyflow.ui.orb.OrbState
 import com.keyflow.ui.orb.VoiceOrb
+import com.keyflow.ui.config.PrimaryButton
+import com.keyflow.ui.config.PaperWarm
+import com.keyflow.ui.icons.KfIcon
+import com.keyflow.ui.icons.KfIcons
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
-import com.keyflow.ui.theme.SpaceMono
 
 const val ONBOARDING_GRANT_TAG = "onboarding-grant"
 const val ONBOARDING_SKIP_TAG = "onboarding-skip"
@@ -122,39 +124,46 @@ fun OnboardingScreen(
         Text(
             "Bem-vindo ao KeyFlow".uppercase(),
             color = palette.faint,
-            fontFamily = SpaceMono,
-            fontSize = 9.5.sp,
+            fontFamily = SpaceGrotesk,
+            fontWeight = FontWeight.Medium,
+            fontSize = 8.5.sp,
+            letterSpacing = 2.sp,
             textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(top = 18.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 22.dp),
         )
         Text(
             "Sua voz vira texto em qualquer campo.",
             color = palette.fg,
             fontFamily = SpaceGrotesk,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 27.sp,
-            lineHeight = 30.sp,
+            fontWeight = FontWeight.Normal,
+            fontSize = 26.sp,
+            lineHeight = 31.sp,
+            letterSpacing = (-0.8).sp,
             textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
         )
         Text(
             "Fale, e o KeyFlow cola a transcrição direto no app que você estiver usando. Para isso, ele precisa de algumas permissões.",
             color = palette.muted,
             fontFamily = SpaceGrotesk,
-            fontSize = 13.sp,
+            fontWeight = FontWeight.Light,
+            fontSize = 12.5.sp,
+            lineHeight = 18.sp,
             textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
         )
         Text(
             "Recomendamos conceder todas agora, para conhecer tudo que o app oferece — depois você pode rever cada uma para refletir o seu uso.",
             color = palette.faint,
             fontFamily = SpaceGrotesk,
-            fontSize = 12.sp,
+            fontWeight = FontWeight.Light,
+            fontSize = 11.sp,
+            lineHeight = 16.sp,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
         )
 
-        Column(Modifier.fillMaxWidth().padding(top = 26.dp)) {
+        Column(Modifier.fillMaxWidth().padding(top = 28.dp)) {
             ChecklistRow(
                 OnboardingPermission.MIC,
                 permissions.microphoneGranted,
@@ -192,25 +201,12 @@ fun OnboardingScreen(
 
         Spacer(Modifier.weight(1f))
 
-        Text(
-            "Conceder permissões",
-            color = palette.onFill,
-            fontFamily = SpaceGrotesk,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 13.sp,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(3.dp))
-                .background(palette.fg)
-                .clickable { onGrant() }
-                .testTag(ONBOARDING_GRANT_TAG)
-                .padding(vertical = 14.dp),
-        )
+        PrimaryButton("Conceder permissões", tag = ONBOARDING_GRANT_TAG, onClick = onGrant)
         Text(
             "Pular por agora",
-            color = palette.faint,
+            color = palette.muted,
             fontFamily = SpaceGrotesk,
+            fontWeight = FontWeight.Light,
             fontSize = 12.sp,
             textAlign = TextAlign.Center,
             modifier = Modifier
@@ -238,36 +234,39 @@ private fun ChecklistRow(
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .testTag(tag)
-            .padding(vertical = 11.dp),
+            .padding(vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         if (granted) {
-            Box(Modifier.size(18.dp).clip(CircleShape).background(palette.teal), contentAlignment = Alignment.Center) {
-                Text("✓", color = palette.onFill, fontFamily = SpaceGrotesk, fontSize = 11.sp)
+            Box(Modifier.size(20.dp).clip(CircleShape).background(palette.teal), contentAlignment = Alignment.Center) {
+                KfIcon(KfIcons.Check, PaperWarm, Modifier.size(12.dp), strokeWidth = 2.6f)
             }
         } else {
-            Box(Modifier.size(18.dp).clip(CircleShape).border(1.5.dp, palette.record, CircleShape))
+            Box(Modifier.size(20.dp).clip(CircleShape).border(1.dp, palette.record, CircleShape))
         }
-        Text(permission.label, color = palette.fg, fontFamily = SpaceGrotesk, fontSize = 13.5.sp, modifier = Modifier.weight(1f))
+        Text(permission.label, color = palette.fg, fontFamily = SpaceGrotesk, fontSize = 13.sp, modifier = Modifier.weight(1f))
         Text(
             if (granted) "OK" else "FALTA",
             color = if (granted) palette.faint else palette.recordSoft,
-            fontFamily = SpaceMono,
-            fontSize = 9.sp,
+            fontFamily = SpaceGrotesk,
+            fontWeight = FontWeight.Medium,
+            fontSize = 8.sp,
+            letterSpacing = 1.4.sp,
         )
         WhyButton(permission, explained, onClick = { onToggleWhy(permission) })
     }
     AnimatedVisibility(visible = explained) {
         Text(
             permission.why,
-            color = palette.faint,
+            color = palette.muted,
             fontFamily = SpaceGrotesk,
-            fontSize = 12.sp,
+            fontWeight = FontWeight.Light,
+            fontSize = 11.sp,
             lineHeight = 16.sp,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 30.dp, bottom = 11.dp)
+                .padding(start = 34.dp, bottom = 13.dp)
                 .testTag(onboardingWhyTextTag(permission)),
         )
     }
@@ -298,7 +297,7 @@ private fun WhyButton(permission: OnboardingPermission, explained: Boolean, onCl
             Modifier.size(18.dp).clip(CircleShape).border(1.dp, accent, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
-            Text("?", color = accent, fontFamily = SpaceMono, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+            Text("?", color = accent, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Medium, fontSize = 9.5.sp)
         }
     }
 }
