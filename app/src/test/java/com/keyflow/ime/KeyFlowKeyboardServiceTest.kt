@@ -59,4 +59,38 @@ class KeyFlowKeyboardServiceTest {
         val numberWithPasswordBits = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_TEXT_VARIATION_PASSWORD
         assertThat(KeyFlowKeyboardService.isPasswordVariant(numberWithPasswordBits)).isFalse()
     }
+
+    // ── composição sem consultar o app (onUpdateSelection) ──────────────────
+
+    @Test
+    fun `cursor at the end of a composing region as long as the word means the composition is ours`() {
+        assertThat(KeyFlowKeyboardService.compositionLooksIntact(3, 13, 13, 10, 13)).isTrue()
+    }
+
+    @Test
+    fun `a shorter composing region is the editor still catching up with fast typing`() {
+        // Digitou "abc" rápido; o aviso que chega ainda é do "ab".
+        assertThat(KeyFlowKeyboardService.compositionLooksIntact(3, 12, 12, 10, 12)).isTrue()
+    }
+
+    @Test
+    fun `no composing region means someone finished or cleared it`() {
+        assertThat(KeyFlowKeyboardService.compositionLooksIntact(3, 13, 13, -1, -1)).isFalse()
+    }
+
+    @Test
+    fun `cursor away from the composing region means the user moved it`() {
+        assertThat(KeyFlowKeyboardService.compositionLooksIntact(3, 4, 4, 10, 13)).isFalse()
+    }
+
+    @Test
+    fun `a selection over the text is not our composition`() {
+        assertThat(KeyFlowKeyboardService.compositionLooksIntact(3, 10, 13, 10, 13)).isFalse()
+    }
+
+    @Test
+    fun `a composing region longer than the word needs the real text to decide`() {
+        // Apagou de "abc" para "ab"; o aviso atrasado ainda mostra "abc".
+        assertThat(KeyFlowKeyboardService.compositionLooksIntact(2, 13, 13, 10, 13)).isFalse()
+    }
 }

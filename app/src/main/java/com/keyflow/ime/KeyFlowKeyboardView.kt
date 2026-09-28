@@ -320,6 +320,8 @@ class KeyFlowKeyboardView(
             onKeyAction = ::forwardCanvasKeyAction,
             scale = scale,
             initialLayer = initialLayerFor(numericField),
+            // Mesma chave da vibração da orbe/barras: 0 desliga também a das teclas.
+            hapticFeedback = vibrationIntensity > 0,
         ).also { canvasGrid = it }
     }
 

@@ -79,4 +79,45 @@ class GeometryTest {
         assertThat(Geometry.hitTest(placed, x = 150f, y = 500f)).isNull()
         assertThat(Geometry.hitTest(placed, x = -10f, y = 50f)).isNull()
     }
+
+    // ── dedo escorregando entre teclas (slideTarget) ─────────────────────────
+
+    private val twoRows = Geometry.placeLayer(
+        Layouts.forLocale("en").layers.getValue(LayerId.LETTERS).let { it.copy(rows = it.rows.take(2)) },
+        totalWidth = 1000f,
+        rowHeight = 100f,
+    )
+    private val q = twoRows[0].keys[0] // [0,100) × [0,100)
+    private val w = twoRows[0].keys[1] // [100,200)
+
+    @Test
+    fun `finger inside the pressed key stays on it`() {
+        assertThat(Geometry.slideTarget(q, twoRows, 50f, 50f, hysteresis = 25f)).isEqualTo(q)
+    }
+
+    @Test
+    fun `a small drift into the neighbor keeps the key the finger went down on`() {
+        assertThat(Geometry.slideTarget(q, twoRows, 110f, 50f, hysteresis = 25f)).isEqualTo(q)
+    }
+
+    @Test
+    fun `moving well into the neighbor slides to it`() {
+        assertThat(Geometry.slideTarget(q, twoRows, 150f, 50f, hysteresis = 25f)).isEqualTo(w)
+    }
+
+    @Test
+    fun `sliding down reaches the key of the next row`() {
+        val a = twoRows[1].keys[0]
+        assertThat(Geometry.slideTarget(q, twoRows, 30f, 160f, hysteresis = 25f)).isEqualTo(a)
+    }
+
+    @Test
+    fun `a small drift above the top row still counts as the pressed key`() {
+        assertThat(Geometry.slideTarget(q, twoRows, 50f, -10f, hysteresis = 25f)).isEqualTo(q)
+    }
+
+    @Test
+    fun `leaving the keyboard for real releases the key`() {
+        assertThat(Geometry.slideTarget(q, twoRows, 50f, -200f, hysteresis = 25f)).isNull()
+    }
 }

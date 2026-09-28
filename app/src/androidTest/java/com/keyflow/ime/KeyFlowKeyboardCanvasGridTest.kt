@@ -69,6 +69,56 @@ class KeyFlowKeyboardCanvasGridTest {
         }
     }
 
+    /** Num toque rápido o dedo escorrega uns pixels para a vizinha: a tecla não pode sumir por isso. */
+    @Test
+    fun aSmallDriftIntoTheNeighborStillTypesTheKeyTouched() {
+        launchProbe()
+        val grid = KeyFlowKeyboardService.activeViewForTest!!.canvasGridForTest!!
+        val q = keyOnScreen(grid, "q")
+
+        val down = SystemClock.uptimeMillis()
+        inject(MotionEvent.ACTION_DOWN, q.centerX, q.centerY, down)
+        inject(MotionEvent.ACTION_UP, q.right + q.width / 10, q.centerY, down)
+
+        waitUntil("o \"q\" tocado se perdeu com o dedo escorregando para o \"w\"") { fieldText() == "q" }
+    }
+
+    /** Arrastar até outra tecla antes de soltar digita a tecla onde o dedo saiu. */
+    @Test
+    fun slidingToAnotherKeyTypesTheKeyUnderTheFinger() {
+        launchProbe()
+        val grid = KeyFlowKeyboardService.activeViewForTest!!.canvasGridForTest!!
+        val q = keyOnScreen(grid, "q")
+        val e = keyOnScreen(grid, "e")
+
+        val down = SystemClock.uptimeMillis()
+        inject(MotionEvent.ACTION_DOWN, q.centerX, q.centerY, down)
+        inject(MotionEvent.ACTION_MOVE, e.centerX, e.centerY, down)
+        inject(MotionEvent.ACTION_UP, e.centerX, e.centerY, down)
+
+        waitUntil("arrastar do \"q\" até o \"e\" deveria digitar \"e\"") { fieldText() == "e" }
+    }
+
+    /**
+     * Dois polegares: o 2º dedo encosta antes de o 1º soltar e solta primeiro. As letras saem na ordem em
+     * que foram tocadas — a do 1º dedo sai quando o 2º encosta.
+     */
+    @Test
+    fun rolloverKeepsTheOrderTheKeysWereTouched() {
+        launchProbe()
+        val grid = KeyFlowKeyboardService.activeViewForTest!!.canvasGridForTest!!
+        val q = keyOnScreen(grid, "q")
+        val p = keyOnScreen(grid, "p")
+
+        val down = SystemClock.uptimeMillis()
+        injectPointers(MotionEvent.ACTION_DOWN, down, listOf(q.centerX to q.centerY))
+        injectPointers(pointerAction(MotionEvent.ACTION_POINTER_DOWN, 1), down, listOf(q.centerX to q.centerY, p.centerX to p.centerY))
+        injectPointers(pointerAction(MotionEvent.ACTION_POINTER_UP, 1), down, listOf(q.centerX to q.centerY, p.centerX to p.centerY))
+        injectPointers(MotionEvent.ACTION_UP, down, listOf(q.centerX to q.centerY))
+
+        waitUntil("dois dedos sobrepostos deveriam digitar \"qp\", na ordem do toque") { fieldText() == "qp" }
+    }
+
     @Test
     fun canvasGridDoesNotDisturbTheMicButton() {
         launchProbe()
@@ -112,6 +162,58 @@ class KeyFlowKeyboardCanvasGridTest {
         val time = SystemClock.uptimeMillis()
         inject(MotionEvent.ACTION_DOWN, x, y, time)
         inject(MotionEvent.ACTION_UP, x, y, SystemClock.uptimeMillis())
+    }
+
+    private class KeyOnScreen(val left: Int, val right: Int, val centerX: Int, val centerY: Int) {
+        val width: Int get() = right - left
+    }
+
+    private fun keyOnScreen(grid: com.keyflow.ime.keyboard.KeyboardGridView, label: String): KeyOnScreen {
+        waitUntil("grade Canvas ainda sem geometria medida") { grid.placedRowsForTest.isNotEmpty() }
+        val placed = grid.placedRowsForTest.flatMap { it.keys }
+            .first { (it.keyDef.action as? CanvasKeyAction.Char)?.text == label }
+        val loc = IntArray(2).also { grid.getLocationOnScreen(it) }
+        return KeyOnScreen(
+            left = (loc[0] + placed.left).toInt(),
+            right = (loc[0] + placed.right).toInt(),
+            centerX = (loc[0] + (placed.left + placed.right) / 2).toInt(),
+            centerY = (loc[1] + (placed.top + placed.bottom) / 2).toInt(),
+        )
+    }
+
+    private fun fieldText(): String? = device.findObject(By.desc("ime_probe_field"))?.text
+
+    private fun pointerAction(action: Int, pointerIndex: Int): Int =
+        action or (pointerIndex shl MotionEvent.ACTION_POINTER_INDEX_SHIFT)
+
+    /** Toque com vários dedos (ids 0, 1, … na ordem de [points]) — mesma recusa tratada que [inject]. */
+    private fun injectPointers(action: Int, downTime: Long, points: List<Pair<Int, Int>>): Boolean {
+        val properties = points.indices.map { i ->
+            MotionEvent.PointerProperties().apply {
+                id = i
+                toolType = MotionEvent.TOOL_TYPE_FINGER
+            }
+        }.toTypedArray()
+        val coords = points.map { (x, y) ->
+            MotionEvent.PointerCoords().apply {
+                this.x = x.toFloat()
+                this.y = y.toFloat()
+                pressure = 1f
+                size = 1f
+            }
+        }.toTypedArray()
+        val event = MotionEvent.obtain(
+            downTime, SystemClock.uptimeMillis(), action, points.size, properties, coords,
+            0, 0, 1f, 1f, 0, 0, InputDevice.SOURCE_TOUCHSCREEN, 0,
+        )
+        return try {
+            instrumentation.sendPointerSync(event)
+            true
+        } catch (e: IllegalArgumentException) {
+            false
+        } finally {
+            event.recycle()
+        }
     }
 
     /**

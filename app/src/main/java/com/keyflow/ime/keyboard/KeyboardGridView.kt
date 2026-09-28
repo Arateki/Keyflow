@@ -12,6 +12,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.View.MeasureSpec
@@ -39,6 +40,9 @@ import com.keyflow.ime.keyboard.layout.RepeatSchedule
  *
  * Multitouch por `pointerId` (RND-05): cada dedo tem sua própria tecla pressionada + preview, sem perder
  * o 2º toque. Repeat-on-hold (RND-04) só no backspace, acelerando via [RepeatSchedule].
+ *
+ * [hapticFeedback]: vibra ao ENCOSTAR na tecla, com o clique de teclado do sistema (curto e afinado
+ * pelo fabricante) — é o que dá a sensação de resposta imediata.
  */
 class KeyboardGridView(
     context: Context,
@@ -47,6 +51,7 @@ class KeyboardGridView(
     private val onKeyAction: (KeyAction) -> Unit,
     private val scale: Float = 1f,
     initialLayer: LayerId = LayerId.LETTERS,
+    private val hapticFeedback: Boolean = true,
 ) : View(context) {
 
     private var state = KeyboardGridState(layout, initialLayer = initialLayer)
@@ -286,6 +291,9 @@ class KeyboardGridView(
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                // 1º dedo de um gesto novo: sobra de um gesto que não terminou (UP perdido) é descartada,
+                // nunca digitada pelo rollover.
+                if (event.actionMasked == MotionEvent.ACTION_DOWN) resetTouchState()
                 val index = event.actionIndex
                 val pointerId = event.getPointerId(index)
                 onFingerDown(pointerId, event.getX(index), event.getY(index))
@@ -313,9 +321,17 @@ class KeyboardGridView(
     }
 
     private fun onFingerDown(pointerId: Int, x: Float, y: Float) {
+        // Antes do hit-test: a tecla do dedo anterior pode trocar a camada (⇧/?123), e este toque vale
+        // na camada que ficou — igual a ter soltado o outro dedo primeiro.
+        pressedKeys.keys.filter { it != pointerId }.forEach { releaseEarly(it) }
         val hit = Geometry.hitTestLayer(placedRows, x, y)
         val placed = hit?.let { def -> placedRows.flatMap { it.keys }.firstOrNull { it.keyDef === def } }
         if (placed == null) return
+        if (hapticFeedback) performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+        press(pointerId, placed)
+    }
+
+    private fun press(pointerId: Int, placed: PlacedKey) {
         pressedKeys[pointerId] = placed
         showPreview(pointerId, placed)
         val action = placed.keyDef.action
@@ -324,8 +340,32 @@ class KeyboardGridView(
         invalidate()
     }
 
+    /**
+     * Rollover (RND-05): outro dedo encostou enquanto este segurava uma tecla — ela sai agora, na ordem
+     * em que foi tocada. Sem isto, cada tecla saía só quando o SEU dedo soltava, e dois polegares
+     * sobrepostos trocavam a ordem das letras. Ficam de fora o backspace (a repetição segue enquanto o
+     * dedo segura) e quem está escolhendo um acento.
+     */
+    private fun releaseEarly(pointerId: Int) {
+        val pressed = pressedKeys[pointerId] ?: return
+        if (pressed.keyDef.action == KeyAction.Backspace) return
+        if (accentPopups.containsKey(pointerId)) return
+        pressedKeys.remove(pointerId)
+        dismissPreview(pointerId)
+        cancelAccentTimer(pointerId)
+        activateKey(pressed.keyDef)
+    }
+
+    /** Folga para o dedo escorregar sem trocar de tecla (ver [Geometry.slideTarget]). */
+    private fun slideHysteresis(key: PlacedKey): Float =
+        minOf(key.width, key.bottom - key.top) * SLIDE_HYSTERESIS_FRACTION
+
     private fun onFingerMove(pointerId: Int, x: Float, y: Float) {
-        val accent = accentPopups[pointerId] ?: return
+        val accent = accentPopups[pointerId]
+        if (accent == null) {
+            slideTo(pointerId, x, y)
+            return
+        }
         val screen = toScreen(x, y)
         val idx = accent.chipScreenRects.indexOfFirst { it.contains(screen.first, screen.second) }
         if (idx == accent.highlightedIndex) return
@@ -335,6 +375,20 @@ class KeyboardGridView(
             chip.setBackgroundColor(if (on) ACCENT_TEAL else kbKey)
             chip.setTextColor(if (on) Color.WHITE else kbInk)
         }
+    }
+
+    /**
+     * O dedo andou para outra tecla (além da folga): ela passa a ser a pressionada — destaque e prévia
+     * acompanham, e é ela que sai ao soltar. O backspace que já está repetindo não troca.
+     */
+    private fun slideTo(pointerId: Int, x: Float, y: Float) {
+        val current = pressedKeys[pointerId] ?: return
+        val target = Geometry.slideTarget(current, placedRows, x, y, slideHysteresis(current)) ?: return
+        if (target === current) return
+        if (repeats[pointerId]?.let { it.tick > 0 } == true) return
+        stopRepeat(pointerId)
+        cancelAccentTimer(pointerId)
+        press(pointerId, target)
     }
 
     private fun onFingerUp(pointerId: Int, x: Float, y: Float) {
@@ -355,8 +409,10 @@ class KeyboardGridView(
         }
 
         // Repeat já emitiu o backspace continuamente; soltar não emite mais um (senão apaga 1 a mais).
-        if (pressed != null && pressed.contains(x, y) && !wasRepeating) {
-            activateKey(pressed.keyDef)
+        // Soltar perto da tecla (dentro da folga) ainda a digita; fora do teclado de vez, nada.
+        val target = pressed?.let { Geometry.slideTarget(it, placedRows, x, y, slideHysteresis(it)) }
+        if (target != null && !wasRepeating) {
+            activateKey(target.keyDef)
         }
         invalidate()
     }
@@ -607,6 +663,9 @@ class KeyboardGridView(
     private companion object {
         val ACCENT_TEAL = 0xFF4E9683.toInt()
         const val ACCENT_HOLD_MS = 350L
+        // Quanto da tecla (menor lado) o dedo pode escorregar para fora sem trocar de tecla. A calibrar
+        // no A32: um toque rápido desliza ~1 mm, ~¼ de uma tecla em retrato.
+        const val SLIDE_HYSTERESIS_FRACTION = 0.25f
         // Piso pra rowHeightPx nunca ficar menor que o texto da tecla (15dp) + folga confortável.
         const val MIN_ROW_HEIGHT_DP = 34f
     }

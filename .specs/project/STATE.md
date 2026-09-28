@@ -1911,3 +1911,21 @@ da inicialização regrava `default_input_method` com o valor lido antes. O `ime
 caiu 2 ms antes dessa gravação e foi desfeito (1 em 47 trocas; 5/5 verdes ao repetir). Não é bug do
 KeyFlow. `awaitKeyboardAttached` agora confere o IME selecionado a cada nova tentativa e seleciona o
 KeyFlow de novo se o Samsung tiver voltado.
+
+## Teclado mais responsivo — 4 mudanças de fluidez (2026-09-27)
+
+Pedido do Yan ("o teclado da Samsung parece mais rápido"). Análise de código, sem medição ainda:
+1. `onUpdateSelection` fazia `getTextBeforeCursor` (chamada SÍNCRONA ao app) a cada letra, e o backspace
+   `getSelectedText` a cada toque/repetição — o teclado parava até o app responder (pior em WebView).
+   Agora a composição só é conferida no app quando o próprio aviso não bate
+   (`KeyFlowKeyboardService.compositionLooksIntact`), e a seleção vem do último aviso do editor.
+2. Soltar fora da tecla onde o dedo encostou descartava a letra. Agora há folga de ¼ da tecla
+   (`SLIDE_HYSTERESIS_FRACTION`, a calibrar no A32) e, passando dela, vale a tecla sob o dedo
+   (`Geometry.slideTarget`); destaque e prévia acompanham. Só saindo do teclado de vez nada é digitado.
+3. Letras vibram ao encostar (`HapticFeedbackConstants.KEYBOARD_TAP`: clique curto do sistema, segue a
+   vibração de toque do Android); intensidade 0 no app desliga.
+4. Rollover: o 2º dedo encostando solta a tecla do 1º (ordem do toque preservada), exceto backspace e
+   popup de acento.
+Testes: 426 unitários; pacote `com.keyflow.ime` no A32 40/40 (3 novos na `KeyFlowKeyboardCanvasGridTest`,
+vermelhos no código antigo). Suíte completa ainda não rodada. Falta medir antes/depois (toque → letra,
+quadros perdidos) contra o teclado Samsung; a prévia fora de `PopupWindow` (item 5) depende dessa medição.

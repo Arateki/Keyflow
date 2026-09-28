@@ -71,6 +71,11 @@ class KeyFlowKeyboardService : InputMethodService() {
     private val wordTracker = ComposingWordTracker()
     private var spellChecker: SystemSpellChecker? = null
 
+    // Seleção do campo como o próprio editor informou por último (onStartInputView/onUpdateSelection).
+    // O backspace decide entre apagar a seleção ou 1 caractere por aqui, sem perguntar ao app.
+    private var selectionStart = 0
+    private var selectionEnd = 0
+
     // Q3 (2026-07-02): campos TYPE_NULL (terminal, ex.: Termux/Termius) sinalizam "só aceito o texto já
     // comitado, sem preview de composição" — apps assim não renderizam setComposingText, então a palavra
     // fica invisível até um delimitador finalizar a composição (o dado chega, só não aparece). Setado a
@@ -397,6 +402,8 @@ class KeyFlowKeyboardService : InputMethodService() {
         wordTracker.reset()
         spellChecker?.cancel()
         keyboardView?.updateCandidates(emptyList())
+        selectionStart = info?.initialSelStart ?: 0
+        selectionEnd = info?.initialSelEnd ?: 0
     }
 
     override fun onFinishInput() {
@@ -416,6 +423,11 @@ class KeyFlowKeyboardService : InputMethodService() {
      * `onUpdateSelection`, então mantemos esta verificação como reforço: comparamos o texto que
      * REALMENTE está antes do cursor com a palavra que achamos estar em composição; se não bater,
      * alguém mexeu no campo por fora e a composição não existe mais de verdade.
+     *
+     * Essa leitura (`getTextBeforeCursor`) é uma chamada SÍNCRONA ao app: o teclado fica parado até ele
+     * responder — em navegador/WebView, depois de ele processar a letra anterior. Como isto roda a cada
+     * letra, só consulta quando o próprio aviso não bate com a nossa composição
+     * ([compositionLooksIntact]); no caminho normal da digitação, nenhuma chamada.
      */
     override fun onUpdateSelection(
         oldSelStart: Int,
@@ -426,8 +438,11 @@ class KeyFlowKeyboardService : InputMethodService() {
         candidatesEnd: Int,
     ) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        selectionStart = newSelStart
+        selectionEnd = newSelEnd
         val word = wordTracker.currentWord
         if (word.isEmpty()) return
+        if (compositionLooksIntact(word.length, newSelStart, newSelEnd, candidatesStart, candidatesEnd)) return
         val actualBefore = getCurrentInputConnection()?.getTextBeforeCursor(word.length, 0)?.toString()
         if (actualBefore != word) {
             wordTracker.reset()
@@ -453,8 +468,9 @@ class KeyFlowKeyboardService : InputMethodService() {
                 val remaining = if (!isRawInputField) wordTracker.onBackspace() else null
                 when {
                     remaining == null -> {
-                        val sel = ic.getSelectedText(0)
-                        if (sel.isNullOrEmpty()) ic.deleteSurroundingText(1, 0)
+                        // Seleção pelo último aviso do editor — `getSelectedText` era uma chamada
+                        // síncrona ao app a cada backspace (e a cada repetição ao segurar).
+                        if (selectionStart == selectionEnd) ic.deleteSurroundingText(1, 0)
                         else ic.commitText("", 1)
                     }
                     remaining.isEmpty() -> {
@@ -561,6 +577,23 @@ class KeyFlowKeyboardService : InputMethodService() {
          */
         internal fun shouldCompose(rawInputField: Boolean, char: String): Boolean =
             !rawInputField && char.length == 1 && char[0].isLetter()
+
+        /**
+         * O aviso de seleção é coerente com a palavra que estamos compondo: existe região de composição,
+         * o cursor está no fim dela, e ela não é maior que a palavra — menor é o editor ainda atrás da
+         * digitação rápida (os avisos chegam atrasados). Qualquer outra coisa pede a leitura real do campo.
+         */
+        internal fun compositionLooksIntact(
+            wordLength: Int,
+            newSelStart: Int,
+            newSelEnd: Int,
+            candidatesStart: Int,
+            candidatesEnd: Int,
+        ): Boolean {
+            if (candidatesStart < 0 || candidatesEnd <= candidatesStart) return false
+            if (newSelStart != newSelEnd || newSelEnd != candidatesEnd) return false
+            return candidatesEnd - candidatesStart <= wordLength
+        }
 
         /**
          * Campo de texto com variação de SENHA (`TYPE_TEXT_VARIATION_PASSWORD`/`VISIBLE_PASSWORD`/
