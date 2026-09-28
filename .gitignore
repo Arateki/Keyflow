@@ -9,3 +9,6 @@ build/
 # AAR do sherpa-onnx: baixado e conferido por SHA256 pelo app/build.gradle.kts (NM-T1)
 /app/libs/*.aar
 /app/libs/*.part
+
+# KeyFlow API (Rust, monorepo — api/)
+api/target/
