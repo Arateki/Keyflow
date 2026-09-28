@@ -55,6 +55,15 @@ class ModelDownloaderDeviceTest {
         server.shutdown()
     }
 
+    /**
+     * O `isMetered` de produção (o do [ModelDownloader.create]) — os outros testes injetam um falso e por
+     * isso nunca pegaram que ele exigia uma permissão fora do manifesto: o "Baixar" derrubava o app.
+     */
+    @Test
+    fun productionMeteredProbeRunsWithTheAppPermissions() {
+        ModelDownloader.meteredProbe(context)()
+    }
+
     private fun waitFor(timeoutMs: Long, what: String, condition: () -> Boolean) {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {

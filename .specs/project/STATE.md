@@ -1890,3 +1890,13 @@ do Whisper base + SHA + instalação + transcrição curta e de 50 s + morte do 
 cliente local contra o binder de verdade; o parcial no `OverlayService` real (indicador, visualização,
 edição, envio, cancelar/desfazer); o gerenciador de modelos; os de teclado. O que resta do bloco são os
 roteiros manuais da T18 e da T13 no A32 [YAN].
+
+## Download de modelos derrubava o app no aparelho (2026-09-27)
+
+No A32, "Baixar" em qualquer modelo fechava o KeyFlow: `SecurityException` do `ConnectivityService` em
+`isActiveNetworkMetered` — o manifesto não declarava `ACCESS_NETWORK_STATE`. O CI nunca viu porque TODO
+teste do downloader injeta `isMetered = { false }`; a consulta de produção só rodava no app de verdade.
+A consulta virou `ModelDownloader.meteredProbe(context)` e ganhou teste de device próprio
+(`productionMeteredProbeRunsWithTheAppPermissions`), vermelho antes da permissão e verde depois.
+**Lição**: quando um teste injeta um colaborador falso, a versão de produção dele precisa de pelo menos
+um teste que a exercite com as permissões reais do app.

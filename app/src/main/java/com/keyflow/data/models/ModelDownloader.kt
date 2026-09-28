@@ -336,16 +336,24 @@ class ModelDownloader(
         }
 
         fun create(context: Context, store: ModelStore): ModelDownloader {
-            val connectivity = context.getSystemService(ConnectivityManager::class.java)
             val settings = SettingsRepository(context)
             return ModelDownloader(
                 gateway = SystemDownloadGateway(context),
                 tmpRoot = context.getExternalFilesDir(null)?.let { File(it, TMP_DIR) },
                 store = store,
-                isMetered = { connectivity.isActiveNetworkMetered },
+                isMetered = meteredProbe(context),
                 // Já fora da main thread (finish lê centenas de MB): a escrita curta no DataStore cabe aqui.
                 onInstalled = { id -> runBlocking { settings.selectLocalModelIfNone(id) } },
             )
+        }
+
+        /**
+         * "A rede ativa é medida?" (DLM-04). O `ConnectivityService` exige `ACCESS_NETWORK_STATE` no
+         * manifesto — sem ela, o "Baixar" derrubava o app com `SecurityException` (A32, 2026-09-27).
+         */
+        internal fun meteredProbe(context: Context): () -> Boolean {
+            val connectivity = context.getSystemService(ConnectivityManager::class.java)
+            return { connectivity.isActiveNetworkMetered }
         }
     }
 }
