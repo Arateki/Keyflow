@@ -1,6 +1,8 @@
 package com.keyflow.ime
 
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.text.InputType
 import android.util.Log
 import android.view.KeyEvent
@@ -70,6 +72,11 @@ class KeyFlowKeyboardService : InputMethodService() {
     // Corretor do sistema (KC-T7/SPL-01..03).
     private val wordTracker = ComposingWordTracker()
     private var spellChecker: SystemSpellChecker? = null
+
+    // O corretor é consultado quando a digitação pausa, não a cada letra: digitando rápido, cada pedido
+    // era descartado pela letra seguinte (e no A32 o corretor do sistema nunca devolve sugestão).
+    private val suggestHandler = Handler(Looper.getMainLooper())
+    private var pendingSuggest: Runnable? = null
 
     // Seleção do campo como o próprio editor informou por último (onStartInputView/onUpdateSelection).
     // O backspace decide entre apagar a seleção ou 1 caractere por aqui, sem perguntar ao app.
@@ -195,6 +202,7 @@ class KeyFlowKeyboardService : InputMethodService() {
     override fun onDestroy() {
         KeyFlowController.setKeyboardVisible(false)
         if (activeViewForTest === keyboardView) activeViewForTest = null
+        cancelSuggestions()
         spellChecker?.close()
         serviceScope.cancel()
         super.onDestroy()
@@ -400,7 +408,7 @@ class KeyFlowKeyboardService : InputMethodService() {
         // chega a disparar nesse caminho (não é uma mudança de seleção, é reinício de sessão), por isso o
         // fix anterior (comparar texto real) não pegava esse caso — o reset tem que estar aqui.
         wordTracker.reset()
-        spellChecker?.cancel()
+        cancelSuggestions()
         keyboardView?.updateCandidates(emptyList())
         selectionStart = info?.initialSelStart ?: 0
         selectionEnd = info?.initialSelEnd ?: 0
@@ -410,7 +418,7 @@ class KeyFlowKeyboardService : InputMethodService() {
         Log.d(TAG, "onFinishInput")
         KeyFlowController.clearInserter()
         wordTracker.reset()
-        spellChecker?.cancel()
+        cancelSuggestions()
         keyboardView?.updateCandidates(emptyList())
         super.onFinishInput()
     }
@@ -446,7 +454,7 @@ class KeyFlowKeyboardService : InputMethodService() {
         val actualBefore = getCurrentInputConnection()?.getTextBeforeCursor(word.length, 0)?.toString()
         if (actualBefore != word) {
             wordTracker.reset()
-            spellChecker?.cancel()
+            cancelSuggestions()
             keyboardView?.updateCandidates(emptyList())
         }
     }
@@ -478,7 +486,7 @@ class KeyFlowKeyboardService : InputMethodService() {
                         // dela (um deleteSurroundingText aqui apagaria um caractere a mais).
                         ic.setComposingText("", 1)
                         ic.finishComposingText()
-                        spellChecker?.cancel()
+                        cancelSuggestions()
                         keyboardView?.updateCandidates(emptyList())
                     }
                     else -> {
@@ -527,16 +535,28 @@ class KeyFlowKeyboardService : InputMethodService() {
         if (wordTracker.currentWord.isEmpty()) return
         ic.finishComposingText()
         wordTracker.reset()
-        spellChecker?.cancel()
+        cancelSuggestions()
         keyboardView?.updateCandidates(emptyList())
     }
 
-    /** Pede sugestões pro corretor do sistema; ignora a resposta se a palavra já mudou entretanto. */
+    /**
+     * Pede sugestões pro corretor do sistema depois de [SUGGEST_DEBOUNCE_MS] sem outra letra; ignora a
+     * resposta se a palavra já mudou entretanto.
+     */
     private fun requestSuggestions(word: String) {
-        val checker = spellChecker ?: return
-        checker.suggest(word) { suggestions ->
-            if (word == wordTracker.currentWord) keyboardView?.updateCandidates(suggestions)
-        }
+        pendingSuggest?.let { suggestHandler.removeCallbacks(it) }
+        pendingSuggest = Runnable {
+            pendingSuggest = null
+            spellChecker?.suggest(word) { suggestions ->
+                if (word == wordTracker.currentWord) keyboardView?.updateCandidates(suggestions)
+            }
+        }.also { suggestHandler.postDelayed(it, SUGGEST_DEBOUNCE_MS) }
+    }
+
+    private fun cancelSuggestions() {
+        pendingSuggest?.let { suggestHandler.removeCallbacks(it) }
+        pendingSuggest = null
+        spellChecker?.cancel()
     }
 
     /** Toque num candidato (SPL-02): substitui a composição pela palavra escolhida. */
@@ -545,7 +565,7 @@ class KeyFlowKeyboardService : InputMethodService() {
         ic.finishComposingText()
         ic.commitText("$candidate ", 1)
         wordTracker.reset()
-        spellChecker?.cancel()
+        cancelSuggestions()
         keyboardView?.updateCandidates(emptyList())
     }
 
@@ -553,6 +573,7 @@ class KeyFlowKeyboardService : InputMethodService() {
         private const val TAG = "KeyFlow.Keyboard"
         private const val KEY_EXPANDED = "expanded"
         private val LANGUAGE_CYCLE = listOf("pt", "en", "es")
+        private const val SUGGEST_DEBOUNCE_MS = 150L
 
         /**
          * Referência somente-leitura à instância ativa, para testes instrumentados (KBDCTL-01..04)
