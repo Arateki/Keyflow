@@ -15,6 +15,7 @@ import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import com.keyflow.core.ButtonState
 import com.keyflow.core.KeyFlowController
+import com.keyflow.data.SettingsRepository
 import com.keyflow.ime.keyboard.layout.KeyAction as CanvasKeyAction
 import org.junit.After
 import org.junit.Before
@@ -22,6 +23,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import kotlinx.coroutines.runBlocking
 
 /**
  * Instrumentado da grade Canvas no IME **real** (KC-T6/T10, padrão único desde a promoção): tocar a
@@ -119,6 +121,43 @@ class KeyFlowKeyboardCanvasGridTest {
         waitUntil("dois dedos sobrepostos deveriam digitar \"qp\", na ordem do toque") { fieldText() == "qp" }
     }
 
+    /** Segurar uma tecla com acentos abre a tira com a 1ª variante já escolhida; soltar sem mexer insere ela. */
+    @Test
+    fun holdingAKeyAndReleasingInPlaceTypesTheFirstAccent() = withPortugueseKeyboard {
+        launchProbe()
+        val grid = KeyFlowKeyboardService.activeViewForTest!!.canvasGridForTest!!
+        val u = keyOnScreen(grid, "u")
+
+        val down = SystemClock.uptimeMillis()
+        inject(MotionEvent.ACTION_DOWN, u.centerX, u.centerY, down)
+        waitUntil("a tira de acentos do \"u\" não abriu") { grid.accentVariantsForTest != null }
+        val variants = grid.accentVariantsForTest!!
+        inject(MotionEvent.ACTION_UP, u.centerX, u.centerY, down)
+
+        waitUntil("soltar sem mexer deveria inserir \"${variants[0]}\"") { fieldText() == variants[0] }
+    }
+
+    /**
+     * Como no Samsung: com a tira aberta, andar para o lado na altura da própria tecla — sem subir até a
+     * tira — troca a escolha, e soltar insere a escolhida.
+     */
+    @Test
+    fun slidingSidewaysOnTheKeyPicksTheNextAccent() = withPortugueseKeyboard {
+        launchProbe()
+        val grid = KeyFlowKeyboardService.activeViewForTest!!.canvasGridForTest!!
+        val u = keyOnScreen(grid, "u")
+
+        val down = SystemClock.uptimeMillis()
+        inject(MotionEvent.ACTION_DOWN, u.centerX, u.centerY, down)
+        waitUntil("a tira de acentos do \"u\" não abriu") { grid.accentVariantsForTest != null }
+        val variants = grid.accentVariantsForTest!!
+        val nextX = u.centerX + grid.accentChipWidthForTest!!.toInt()
+        inject(MotionEvent.ACTION_MOVE, nextX, u.centerY, down)
+        inject(MotionEvent.ACTION_UP, nextX, u.centerY, down)
+
+        waitUntil("andar um chip para o lado deveria inserir \"${variants[1]}\"") { fieldText() == variants[1] }
+    }
+
     @Test
     fun canvasGridDoesNotDisturbTheMicButton() {
         launchProbe()
@@ -182,6 +221,18 @@ class KeyFlowKeyboardCanvasGridTest {
     }
 
     private fun fieldText(): String? = device.findObject(By.desc("ime_probe_field"))?.text
+
+    /** Acentos existem em pt (não em en): fixa pt durante [block] e devolve o idioma que o aparelho tinha. */
+    private fun withPortugueseKeyboard(block: () -> Unit) {
+        val repo = SettingsRepository(context)
+        val original = runBlocking { repo.keyboardLanguageOnce() }
+        runBlocking { repo.saveKeyboardLanguageOnce("pt") }
+        try {
+            block()
+        } finally {
+            runBlocking { repo.saveKeyboardLanguageOnce(original) }
+        }
+    }
 
     private fun pointerAction(action: Int, pointerIndex: Int): Int =
         action or (pointerIndex shl MotionEvent.ACTION_POINTER_INDEX_SHIFT)

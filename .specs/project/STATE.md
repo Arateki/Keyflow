@@ -1929,3 +1929,17 @@ Pedido do Yan ("o teclado da Samsung parece mais rápido"). Análise de código,
 Testes: 426 unitários; pacote `com.keyflow.ime` no A32 40/40 (3 novos na `KeyFlowKeyboardCanvasGridTest`,
 vermelhos no código antigo). Suíte completa ainda não rodada. Falta medir antes/depois (toque → letra,
 quadros perdidos) contra o teclado Samsung; a prévia fora de `PopupWindow` (item 5) depende dessa medição.
+
+## Acentos no jeito do Samsung + balões sem PopupWindow (2026-09-27)
+
+Pedido do Yan depois de testar as 4 mudanças de fluidez ("parecem ter melhorado de fato"):
+- A tira de acentos abre em 250 ms (era 350) com a 1ª variante sobre a tecla e já escolhida; andar
+  para os lados troca a escolha sem subir até a tira (`AccentStrip`: só o x do dedo conta), e soltar
+  insere a escolhida. **Decisão consciente**: não existe mais "soltar sem escolher = nada" — um
+  long-press acidental insere a 1ª variante, como no Samsung.
+- Prévia e tira deixaram de ser `PopupWindow` (cada toque reposicionava uma janela pelo WindowManager):
+  viraram um `Drawable` no overlay da raiz da janela do teclado. Limite: não passam do topo da janela do
+  IME (a prévia da 1ª fileira fica sobre as barras; sem espaço, encosta no topo).
+- `activateKey` só recalcula geometria/acessibilidade quando a camada ou o shift mudam; `onDraw` sem
+  alocação por tecla; corretor consultado 150 ms depois da última letra.
+Testes: 434 unitários; `com.keyflow.ime` no A32 42/42; telas 84/84 (teclado bit-idêntico).
