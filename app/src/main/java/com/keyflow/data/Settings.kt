@@ -97,6 +97,12 @@ data class Settings(
     // KeyFlow simplesmente desaparece nessa situação, e o Gboard também mostra. Desmarcar devolve o
     // comportamento do sistema.
     val keyboardShowWithHardKeyboard: Boolean = true,
+    // Correção automática (Q9, pedido do Yan, 2026-09-28): trocar a palavra no espaço/pontuação quando o
+    // corretor tem certeza. Desligada, as sugestões continuam na faixa — só a troca sozinha para.
+    val keyboardAutoCorrect: Boolean = true,
+    // Cores do teclado (id de `KeyboardSkin`): "system" (padrão desde 2026-09-28, como o Samsung) ou
+    // "atelie" (o papel quente de antes). Só o teclado; o app de config segue no Ateliê.
+    val keyboardSkin: String = "system",
     // Transcrição parcial ao pausar (native-voice-models, G12 / PAR-01): cada pausa transcreve o trecho
     // gravado até ali para um buffer da sessão; o 2º toggle só vale com o 1º ligado. Agnósticos à origem.
     val partialOnPause: Boolean = false,

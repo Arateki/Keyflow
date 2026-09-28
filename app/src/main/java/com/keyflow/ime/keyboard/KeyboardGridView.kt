@@ -1,5 +1,7 @@
 package com.keyflow.ime.keyboard
 
+import com.keyflow.ime.KeyboardColors
+import com.keyflow.ime.KeyboardSkin
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
@@ -49,17 +51,20 @@ class KeyboardGridView(
     private val scale: Float = 1f,
     initialLayer: LayerId = LayerId.LETTERS,
     private val hapticFeedback: Boolean = true,
+    skin: KeyboardSkin = KeyboardSkin.DEFAULT,
 ) : View(context) {
+
+    private val colors = KeyboardColors.of(skin, dark)
 
     private var state = KeyboardGridState(layout, initialLayer = initialLayer)
 
     /** Camada ativa exposta só para teste (NUM-01: confirmar que o campo numérico trocou de fato). */
     val currentLayerIdForTest: LayerId get() = state.currentLayerId
 
-    private val kbKey = if (dark) 0xFF3A332A.toInt() else 0xFFFBF6E6.toInt()
-    private val kbKeyBorder = if (dark) 0xFF4A4234.toInt() else 0xFFD7C9A0.toInt()
-    private val kbModifier = if (dark) 0xFF2B2720.toInt() else 0xFFCFC096.toInt()
-    private val kbInk = if (dark) 0xFFF1E7C9.toInt() else 0xFF2B2720.toInt()
+    private val kbKey = colors.key
+    private val kbKeyBorder = colors.keyBorder
+    private val kbModifier = colors.modifier
+    private val kbInk = colors.ink
     private val pressedOverlay = 0x33000000
 
     private val keyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }

@@ -70,6 +70,7 @@ class KeyFlowKeyboardService : InputMethodService() {
         val scalePercent: Int,
         val language: String,
         val numberRowEnabled: Boolean,
+        val skin: String,
     )
     private var appliedLiveConfig: LiveKeyboardConfig? = null
 
@@ -90,6 +91,10 @@ class KeyFlowKeyboardService : InputMethodService() {
     private data class Correction(val original: String, val corrected: String, val separator: String)
     private var lastCorrection: Correction? = null
     private var autoCorrectAllowed = false
+
+    /** Espelho de `Settings.keyboardAutoCorrect` (a troca no espaço lê isto a cada palavra). */
+    @Volatile
+    private var autoCorrectEnabled = true
 
     // Seleção do campo como o próprio editor informou por último (onStartInputView/onUpdateSelection).
     // O backspace decide entre apagar a seleção ou 1 caractere por aqui, sem perguntar ao app.
@@ -142,6 +147,9 @@ class KeyFlowKeyboardService : InputMethodService() {
                     updateInputViewShown()
                 }
         }
+        serviceScope.launch {
+            SettingsRepository(this@KeyFlowKeyboardService).keyboardAutoCorrectFlow().collect { autoCorrectEnabled = it }
+        }
         // Atalho da orbe: alterna retrair/expandir, reusando o mesmo caminho do botão de ocultar.
         serviceScope.launch {
             KeyFlowController.toggleKeyboardExpand.collect {
@@ -170,7 +178,8 @@ class KeyFlowKeyboardService : InputMethodService() {
                 repo.keyboardScalePercentFlow(),
                 repo.keyboardLanguageFlow(),
                 repo.keyboardNumberRowEnabledFlow(),
-            ) { dark, scale, lang, numberRow -> LiveKeyboardConfig(dark, scale, lang, numberRow) }
+                repo.keyboardSkinFlow(),
+            ) { dark, scale, lang, numberRow, skin -> LiveKeyboardConfig(dark, scale, lang, numberRow, skin) }
                 .distinctUntilChanged()
                 .collect { config ->
                     if (keyboardView != null && config != appliedLiveConfig) setInputView(onCreateInputView())
@@ -255,7 +264,8 @@ class KeyFlowKeyboardService : InputMethodService() {
         val language = runBlocking { repo.keyboardLanguageOnce() }
         // Fileira de números (NUMROW-01, pedido do Yan, 2026-07-03) — mesma leitura leve do tema/tamanho.
         val numberRowEnabled = runBlocking { repo.keyboardNumberRowEnabledOnce() }
-        appliedLiveConfig = LiveKeyboardConfig(dark, scalePercent, language, numberRowEnabled)
+        val skin = runBlocking { repo.keyboardSkinOnce() }
+        appliedLiveConfig = LiveKeyboardConfig(dark, scalePercent, language, numberRowEnabled, skin)
         suggester = null
         suggesterReadyForTest = false
         Dictionaries.suggesterFor(this, language).thenAccept { loaded ->
@@ -294,6 +304,7 @@ class KeyFlowKeyboardService : InputMethodService() {
                 startActivity(intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
             },
             dark = dark,
+            skin = KeyboardSkin.of(skin),
             scale = scale,
             locale = language,
             showLanguageKey = true,
@@ -427,7 +438,9 @@ class KeyFlowKeyboardService : InputMethodService() {
         selectionEnd = info?.initialSelEnd ?: 0
         lastCorrection = null
         val inputType = info?.inputType ?: InputType.TYPE_NULL
-        suggestionsAllowed = inputType and InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS == 0
+        // "Sem sugestões" (NO_SUGGESTIONS) não bloqueia: a busca do Google pede isso (mostra as próprias
+        // sugestões) e o Samsung e o Gboard sugerem e corrigem ali mesmo assim — pedido do Yan, 2026-09-28.
+        suggestionsAllowed = !isPasswordVariant(inputType)
         autoCorrectAllowed = autoCorrectAllowed(inputType)
     }
 
@@ -570,7 +583,7 @@ class KeyFlowKeyboardService : InputMethodService() {
     private fun finishComposing(ic: InputConnection, separator: String? = null) {
         val word = wordTracker.currentWord
         if (word.isEmpty()) return
-        val correction = if (separator != null && autoCorrectAllowed) {
+        val correction = if (separator != null && autoCorrectAllowed && autoCorrectEnabled) {
             suggestionsFor(word)?.autoCorrect?.takeIf { it != word }
         } else {
             null
@@ -667,12 +680,12 @@ class KeyFlowKeyboardService : InputMethodService() {
             private set
 
         /**
-         * Campo onde trocar a palavra no espaço faz sentido: texto comum. Fora: pedido de "sem sugestões",
-         * endereço, e-mail, senha e filtros de busca de lista (terminal já nem compõe — [shouldCompose]).
+         * Campo onde trocar a palavra no espaço faz sentido: texto comum, inclusive os marcados "sem
+         * sugestões" (a busca do Google marca, e os teclados de mercado corrigem ali). Fora: endereço,
+         * e-mail, senha e filtros de busca de lista (terminal já nem compõe — [shouldCompose]).
          */
         internal fun autoCorrectAllowed(inputType: Int): Boolean {
             if (inputType and InputType.TYPE_MASK_CLASS != InputType.TYPE_CLASS_TEXT) return false
-            if (inputType and InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS != 0) return false
             return when (inputType and InputType.TYPE_MASK_VARIATION) {
                 InputType.TYPE_TEXT_VARIATION_URI,
                 InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS,

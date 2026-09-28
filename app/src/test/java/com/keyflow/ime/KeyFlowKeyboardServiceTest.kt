@@ -97,6 +97,12 @@ class KeyFlowKeyboardServiceTest {
     // ── onde a troca no espaço pode agir ─────────────────────────────────────
 
     @Test
+    fun `the google search box, marked no-suggestions, still gets autocorrect like other keyboards do`() {
+        // inputType medido no A32 (2026-09-28): 0xa0001 = texto | MULTI_LINE | NO_SUGGESTIONS.
+        assertThat(KeyFlowKeyboardService.autoCorrectAllowed(0xa0001)).isTrue()
+    }
+
+    @Test
     fun `plain text and messages get autocorrect`() {
         assertThat(KeyFlowKeyboardService.autoCorrectAllowed(InputType.TYPE_CLASS_TEXT)).isTrue()
         assertThat(
@@ -107,7 +113,7 @@ class KeyFlowKeyboardServiceTest {
     }
 
     @Test
-    fun `addresses, emails, passwords and no-suggestion fields keep what was typed`() {
+    fun `addresses, emails and passwords keep what was typed`() {
         listOf(
             InputType.TYPE_TEXT_VARIATION_URI,
             InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS,
@@ -116,9 +122,6 @@ class KeyFlowKeyboardServiceTest {
         ).forEach { variation ->
             assertThat(KeyFlowKeyboardService.autoCorrectAllowed(InputType.TYPE_CLASS_TEXT or variation)).isFalse()
         }
-        assertThat(
-            KeyFlowKeyboardService.autoCorrectAllowed(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS),
-        ).isFalse()
         assertThat(KeyFlowKeyboardService.autoCorrectAllowed(InputType.TYPE_CLASS_NUMBER)).isFalse()
     }
 }

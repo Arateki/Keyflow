@@ -1,5 +1,7 @@
 package com.keyflow.ime.bars
 
+import com.keyflow.ime.KeyboardColors
+import com.keyflow.ime.KeyboardSkin
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
@@ -26,10 +28,12 @@ class GridOverlayPopup(
     private val cellWidthPx: Float,
     private val cellHeightPx: Float,
     private val scale: Float = 1f,
+    skin: KeyboardSkin = KeyboardSkin.DEFAULT,
 ) {
-    private val kbKey = if (dark) 0xFF3A332A.toInt() else 0xFFFBF6E6.toInt()
-    private val kbKeyBorder = if (dark) 0xFF4A4234.toInt() else 0xFFD7C9A0.toInt()
-    private val kbInk = if (dark) 0xFFF1E7C9.toInt() else 0xFF2B2720.toInt()
+    private val colors = KeyboardColors.of(skin, dark)
+    private val kbKey = colors.key
+    private val kbKeyBorder = colors.keyBorder
+    private val kbInk = colors.ink
     private val accent = MicVisuals.ACCENT_TEAL
 
     private val previewSpacePx = dp(PREVIEW_SPACE_DP)

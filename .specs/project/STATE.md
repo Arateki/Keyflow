@@ -1990,3 +1990,23 @@ próprio (em vez de só avisar "Conectando…").
   SUBIR — no A32 de hoje, antes de o pedido chegar; o sistema recriava o serviço e a transcrição terminava
   bem (4/4). Agora espera 3 s (a chamada dura ~33 s); 3/3.
 Testes: 472 unitários (8 do fetcher, 8 da fila); no A32, downloader/store/LocalPanel/e2e 17/18 — o que falhou é o e2e acima, 3/3 depois do ajuste.
+
+## Busca do Google, "Correção automática", etiquetas, cores "Sistema" e dicionário binário (2026-09-28)
+
+Pedidos do Yan depois de usar o corretor:
+- **Busca do Google sem sugestão**: o campo é `0xa0001` = texto | MULTI_LINE | **NO_SUGGESTIONS** (medido
+  no A32) — o app do Google pede isso porque mostra as próprias sugestões. O KeyFlow obedecia; o Samsung e
+  o Gboard sugerem e corrigem ali. NO_SUGGESTIONS deixou de bloquear (senha/e-mail/URL/terminal seguem fora).
+- **Interruptor "Correção automática"** na aba Teclado (`Settings.keyboardAutoCorrect`, ligado): desligado,
+  a faixa segue sugerindo, só a troca no espaço para.
+- **Sugestões cortadas** (WhatsApp): a faixa tinha 3dp de margem em cima/embaixo e cada palavra mais 4dp,
+  numa barra de 28dp — sobrava ~14dp para texto de 14sp. Agora a altura é toda da etiqueta (contorno
+  arredondado, "tag") e o texto se ajusta a ela.
+- **Cores "Sistema" como padrão do teclado** (`KeyboardColors`/`KeyboardSkin`; `Settings.keyboardSkin`):
+  medidas nos prints do Samsung no A32 (claro: fundo `#E6E6E6`, tecla `#FDFDFD`, função `#D1D1D1`, texto
+  `#252525`; escuro: `#0A0A0A`/`#2D2D2D`/`#171717`/`#FAFAFA`, sem contorno nas teclas). O Ateliê (a ciano
+  que vinha marcada) segue como opção na seção Skins; as outras amostras continuam bloqueadas. O app de
+  config não muda — só teclado, barras e faixa. As seis views que repetiam `if (dark) …` leem do mesmo lugar.
+- **Dicionário binário** (`.kfd`): a carga a frio no processo real era 6,2 s; agora 333–392 ms.
+Testes: 473 unitários; no A32 `ime` + `ui.config` 131/131; telas 84/84 depois de aprovar as 26 com
+teclado/barras/aba Teclado (revisadas).
