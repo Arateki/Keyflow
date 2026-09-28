@@ -451,11 +451,21 @@ class KeyFlowKeyboardService : InputMethodService() {
         val word = wordTracker.currentWord
         if (word.isEmpty()) return
         if (compositionLooksIntact(word.length, newSelStart, newSelEnd, candidatesStart, candidatesEnd)) return
-        val actualBefore = getCurrentInputConnection()?.getTextBeforeCursor(word.length, 0)?.toString()
-        if (actualBefore != word) {
+        val ic = getCurrentInputConnection() ?: return
+        // O editor ainda marca a composição, mas o cursor não está no fim dela: a pessoa tocou em outro
+        // ponto do texto. Sem ler nada, já se sabe que a palavra não está mais sendo digitada. (Cursor no
+        // fim de uma região MAIOR que a palavra é só aviso atrasado depois de um backspace: vai à leitura.)
+        val cursorLeftComposition = candidatesStart >= 0 && (newSelStart != newSelEnd || newSelEnd != candidatesEnd)
+        if (cursorLeftComposition || ic.getTextBeforeCursor(word.length, 0)?.toString() != word) {
+            // Encerra a composição NO CAMPO, não só aqui: senão a região continua marcada lá atrás e a
+            // próxima letra (setComposingText) a substitui em vez de entrar no cursor (relato do Yan,
+            // 2026-09-27: "as teclas saem do lugar que deveriam" ao corrigir no meio do texto).
+            // Estado zerado ANTES de mexer no campo: com o editor no mesmo processo, o aviso de seleção
+            // pode chegar de volta aqui dentro da própria chamada.
             wordTracker.reset()
             cancelSuggestions()
             keyboardView?.updateCandidates(emptyList())
+            ic.finishComposingText()
         }
     }
 

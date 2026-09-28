@@ -119,5 +119,11 @@ class ImeProbeActivity : Activity() {
         @Volatile
         var liveText: String? = null
             private set
+
+        /** Leva o cursor para [index], como o dedo tocando no meio do texto (só para os instrumentados). */
+        fun moveCursorForTest(index: Int) {
+            val activity = owner ?: return
+            activity.runOnUiThread { activity.field?.setSelection(index) }
+        }
     }
 }

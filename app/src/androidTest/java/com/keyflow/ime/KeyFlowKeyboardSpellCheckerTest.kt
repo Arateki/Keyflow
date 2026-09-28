@@ -96,6 +96,25 @@ class KeyFlowKeyboardSpellCheckerTest {
         performUntil("o,") { tapBackspaceOnGrid(grid) }
     }
 
+    /**
+     * Levar o cursor para o meio do texto e digitar: a letra entra onde o cursor está. Antes, a palavra
+     * que estava em composição seguia "do teclado" no campo, e a letra seguinte a SUBSTITUÍA lá atrás
+     * (relato do Yan, 2026-09-27: "as teclas saem do lugar que deveriam").
+     */
+    @Test
+    fun typingAfterMovingTheCursorInsertsWhereTheCursorIs() {
+        launchProbe()
+        val grid = KeyFlowKeyboardService.activeViewForTest!!.canvasGridForTest!!
+
+        performUntil("o") { tapKey(grid, "o") }
+        performUntil("oi") { tapKey(grid, "i") }
+        ImeProbeActivity.moveCursorForTest(1)
+        Thread.sleep(500) // o aviso de seleção chega ao teclado de forma assíncrona
+        tapKey(grid, "a")
+
+        waitUntil("a letra deveria entrar no cursor (\"oai\")") { fieldText() == "oai" }
+    }
+
     @Test
     fun candidatesViewExistsAndDoesNotCrashWhenEmpty() {
         // A faixa só existe se ALGUMA barra declarar o slot `Candidates` (BarView), e isso é config de
