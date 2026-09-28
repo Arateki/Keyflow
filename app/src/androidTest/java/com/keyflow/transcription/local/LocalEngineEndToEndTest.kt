@@ -103,8 +103,11 @@ class LocalEngineEndToEndTest {
         try {
             val inFlight = async(kotlinx.coroutines.Dispatchers.IO) { transcriber.transcribe(selection, long) }
             val pid = waitForInferencePid()
-            // O encoder do Whisper numa janela de 28 s leva bem mais que isso: a morte cai no meio.
-            delay(500)
+            // Conta a partir do processo SUBIR, não da chamada: medido no A32 (2026-09-28), 500 ms depois de
+            // subir o `:inference` ainda não tinha recebido o pedido — morria antes, o sistema recriava o
+            // serviço e a transcrição terminava bem no processo novo (4/4). A chamada longa dura ~33 s
+            // (carga 2,3 s + decodificação 3 s + transcrição 28 s): 3 s depois, a morte cai no meio dela.
+            delay(3_000)
             android.os.Process.killProcess(pid)
 
             assertEquals(LocalErrors.error(LocalErrors.PROCESS_DIED), inFlight.await())
