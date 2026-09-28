@@ -62,6 +62,12 @@ class ModelCatalogTest {
     }
 
     @Test
+    fun `each model names the upstream model it is, for the card subtitle`() {
+        assertThat(models.map { it.modelName })
+            .containsExactly("Whisper base", "Whisper small", "Parakeet TDT 0.6B v3").inOrder()
+    }
+
+    @Test
     fun `models are listed from lightest to heaviest`() {
         assertThat(models.map { it.totalBytes }).isInOrder()
         assertThat(models.map { it.recommendedRamMb }).isInOrder()
