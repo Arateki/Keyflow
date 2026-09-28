@@ -161,7 +161,7 @@ class KeyboardGridView(
     val accentChipWidthForTest: Float? get() = accentStrips.values.firstOrNull()?.chipWidth
 
     /**
-     * Altura de fileira: o ideal (44dp) até o limite de [keyboardHeightFraction] da altura da tela pro
+     * Altura de fileira: o ideal ([IDEAL_ROW_HEIGHT_DP]) até o limite de [keyboardHeightFraction] da altura da tela pro
      * teclado inteiro — sem isto, a grade mantinha a MESMA altura absoluta em paisagem (bem mais baixa),
      * devorando proporcionalmente muito mais tela que em retrato (achado do Yan, 2026-07-06: "as teclas
      * estão mais altas... justamente quando temos menos espaço vertical"). Nunca encolhe abaixo de
@@ -179,7 +179,7 @@ class KeyboardGridView(
             // ter feito efeito"). O texto (tamanho fixo, 15dp × escala CHEIA) segue cabendo com folga
             // dentro do piso amortecido — MIN_ROW_HEIGHT_DP tem margem de sobra pra isso.
             val budgetScale = landscapeDampedScale(metrics, scale)
-            val idealPx = 44f * metrics.density * budgetScale
+            val idealPx = IDEAL_ROW_HEIGHT_DP * metrics.density * budgetScale
             val rowCount = state.currentLayer.rows.size.coerceAtLeast(1)
             val maxBudgetPx = usableScreenHeightPx(metrics) * keyboardHeightFraction(metrics) * budgetScale
             val shrunkPx = maxOf(maxBudgetPx / rowCount, MIN_ROW_HEIGHT_DP * metrics.density * budgetScale)
@@ -199,7 +199,12 @@ class KeyboardGridView(
 
     private fun refreshGeometry(width: Float = this.width.toFloat()) {
         if (width <= 0f) return
-        placedRows = Geometry.placeLayer(state.currentLayer, totalWidth = width, rowHeight = rowHeightPx.toFloat())
+        val rowHeight = rowHeightPx.toFloat()
+        placedRows = Geometry.placeLayer(state.currentLayer, totalWidth = width, rowHeight = rowHeight)
+        // A letra acompanha a tecla (mesma proporção dos 15dp numa fileira de 44dp); nunca abaixo dos 15dp,
+        // que é o que cabe no piso de altura da paisagem.
+        textPaint.textSize = maxOf(dp(15), rowHeight * LABEL_TO_ROW)
+        hintPaint.textSize = textPaint.textSize * HINT_TO_LABEL
     }
 
     /**
@@ -650,6 +655,12 @@ class KeyboardGridView(
         const val SLIDE_HYSTERESIS_FRACTION = 0.25f
         // Piso pra rowHeightPx nunca ficar menor que o texto da tecla (15dp) + folga confortável.
         const val MIN_ROW_HEIGHT_DP = 34f
+        // Altura de fileira no tamanho 100%: a mesma do teclado Samsung no A32 do Yan (148 px a 420 dpi ≈
+        // 56dp; era 44dp, que o Yan achou "consideravelmente menor", 2026-09-27). Em paisagem quem manda
+        // continua sendo o teto de [keyboardHeightFraction].
+        const val IDEAL_ROW_HEIGHT_DP = 56f
+        const val LABEL_TO_ROW = 15f / 44f
+        const val HINT_TO_LABEL = 9f / 15f
     }
 }
 
