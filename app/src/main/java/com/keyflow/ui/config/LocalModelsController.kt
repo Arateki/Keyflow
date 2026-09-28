@@ -20,7 +20,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 
-/** O que o painel Local precisa saber do disco e do DownloadManager, num instante. */
+/** O que o painel Local precisa saber do disco e da fila de downloads, num instante. */
 data class LocalModelsSnapshot(
     val installed: Set<String>,
     val active: DownloadProgress?,

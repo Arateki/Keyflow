@@ -96,6 +96,66 @@ class KeyFlowKeyboardSpellCheckerTest {
         performUntil("o,") { tapBackspaceOnGrid(grid) }
     }
 
+    /**
+     * Levar o cursor para o meio do texto e digitar: a letra entra onde o cursor está. Antes, a palavra
+     * que estava em composição seguia "do teclado" no campo, e a letra seguinte a SUBSTITUÍA lá atrás
+     * (relato do Yan, 2026-09-27: "as teclas saem do lugar que deveriam").
+     */
+    @Test
+    fun typingAfterMovingTheCursorInsertsWhereTheCursorIs() {
+        launchProbe()
+        val grid = KeyFlowKeyboardService.activeViewForTest!!.canvasGridForTest!!
+
+        performUntil("o") { tapKey(grid, "o") }
+        performUntil("oi") { tapKey(grid, "i") }
+        ImeProbeActivity.moveCursorForTest(1)
+        Thread.sleep(500) // o aviso de seleção chega ao teclado de forma assíncrona
+        tapKey(grid, "a")
+
+        waitUntil("a letra deveria entrar no cursor (\"oai\")") { fieldText() == "oai" }
+    }
+
+    /** Q9: "nao" + espaço vira "não " pelo dicionário próprio; o backspace logo em seguida desfaz a troca. */
+    @Test
+    fun spaceAppliesTheCorrectionAndBackspaceRightAfterUndoesIt() = withPortugueseKeyboard {
+        launchProbe()
+        waitUntil("o dicionário de português não carregou") { KeyFlowKeyboardService.suggesterReadyForTest }
+        val grid = KeyFlowKeyboardService.activeViewForTest!!.canvasGridForTest!!
+
+        performUntil("n") { tapKey(grid, "n") }
+        performUntil("na") { tapKey(grid, "a") }
+        performUntil("nao") { tapKey(grid, "o") }
+        tapAction(grid, CanvasKeyAction.Space)
+        waitUntil("espaço deveria trocar \"nao\" por \"não\"") { fieldText() == "não " }
+
+        tapBackspaceOnGrid(grid)
+        waitUntil("backspace logo depois deveria voltar a \"nao\"") { fieldText() == "nao" }
+    }
+
+    /** Q9: a sugestão tocada SUBSTITUI a palavra em composição (antes era colada depois dela). */
+    @Test
+    fun tappingASuggestionReplacesTheWordBeingTyped() = withPortugueseKeyboard {
+        val withCandidates = BarsConfig(
+            mirrored = true,
+            collapsed = listOf(BarDef(listOf(BarButton.Mic, BarButton.Candidates, BarButton.ToggleExpand))),
+            expanded = listOf(BarDef(listOf(BarButton.Mic, BarButton.Candidates, BarButton.ToggleExpand))),
+        )
+        runBlocking { SettingsRepository(context).saveBarsConfig(withCandidates) }
+        launchProbe()
+        waitUntil("o dicionário de português não carregou") { KeyFlowKeyboardService.suggesterReadyForTest }
+        val view = KeyFlowKeyboardService.activeViewForTest!!
+        val grid = view.canvasGridForTest!!
+
+        performUntil("v") { tapKey(grid, "v") }
+        performUntil("vo") { tapKey(grid, "o") }
+        performUntil("voc") { tapKey(grid, "c") }
+        performUntil("voce") { tapKey(grid, "e") }
+        waitUntil("a faixa deveria sugerir \"você\"") { view.candidatesViewForTest?.candidatesForTest?.contains("você") == true }
+        instrumentation.runOnMainSync { view.candidatesViewForTest!!.tapForTest("você") }
+
+        waitUntil("tocar em \"você\" deveria deixar \"você \" no campo") { fieldText() == "você " }
+    }
+
     @Test
     fun candidatesViewExistsAndDoesNotCrashWhenEmpty() {
         // A faixa só existe se ALGUMA barra declarar o slot `Candidates` (BarView), e isso é config de
@@ -146,6 +206,24 @@ class KeyFlowKeyboardSpellCheckerTest {
         val x = (loc[0] + (placed.left + placed.right) / 2).toInt()
         val y = (loc[1] + (placed.top + placed.bottom) / 2).toInt()
         tapScreen(x, y)
+    }
+
+    private fun tapAction(grid: KeyboardGridView, action: CanvasKeyAction) {
+        val placed = grid.placedRowsForTest.flatMap { it.keys }.first { it.keyDef.action == action }
+        val loc = IntArray(2).also { grid.getLocationOnScreen(it) }
+        tapScreen((loc[0] + (placed.left + placed.right) / 2).toInt(), (loc[1] + (placed.top + placed.bottom) / 2).toInt())
+    }
+
+    /** O corretor e os acentos são do português: fixa pt durante [block] e devolve o idioma do aparelho. */
+    private fun withPortugueseKeyboard(block: () -> Unit) {
+        val repo = SettingsRepository(context)
+        val original = runBlocking { repo.keyboardLanguageOnce() }
+        runBlocking { repo.saveKeyboardLanguageOnce("pt") }
+        try {
+            block()
+        } finally {
+            runBlocking { repo.saveKeyboardLanguageOnce(original) }
+        }
     }
 
     private fun tapBackspaceOnGrid(grid: KeyboardGridView) {

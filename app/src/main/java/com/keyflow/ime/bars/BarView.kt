@@ -1,5 +1,7 @@
 package com.keyflow.ime.bars
 
+import com.keyflow.ime.KeyboardColors
+import com.keyflow.ime.KeyboardSkin
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
@@ -66,6 +68,7 @@ class BarView(
     def: BarDef,
     private val dark: Boolean,
     private val expandedMode: Boolean,
+    private val skin: KeyboardSkin = KeyboardSkin.DEFAULT,
     grids: List<ShortcutGrid> = emptyList(),
     private val callbacks: BarCallbacks = BarCallbacks(),
     private val scale: Float = 1f,
@@ -104,10 +107,11 @@ class BarView(
     private val knownGridIds: Set<String> = gridsById.keys
 
     // Paleta Ateliê (mesmos ints da grade Canvas/barra atual).
-    private val kbTray = if (dark) 0xFF332E27.toInt() else 0xFFDCD0AC.toInt()
-    private val kbKeyBorder = if (dark) 0xFF4A4234.toInt() else 0xFFD7C9A0.toInt()
-    private val kbModifier = if (dark) 0xFF2B2720.toInt() else 0xFFCFC096.toInt()
-    private val kbInk = if (dark) 0xFFF1E7C9.toInt() else 0xFF2B2720.toInt()
+    private val colors = KeyboardColors.of(skin, dark)
+    private val kbTray = colors.tray
+    private val kbKeyBorder = colors.keyBorder
+    private val kbModifier = colors.modifier
+    private val kbInk = colors.ink
     private val pressedOverlay = 0x33000000
 
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
@@ -140,7 +144,7 @@ class BarView(
             }
         }
     }
-    private val micSelector = MicSelectorController(context, dark, scale)
+    private val micSelector = MicSelectorController(context, dark, scale, skin)
     private var holdRunnable: Runnable? = null
 
     // Grade efêmera (SB-T6/GRD-01..07): sessão pura + popup de lente; vivem só enquanto o dedo pressiona.
@@ -186,7 +190,7 @@ class BarView(
     init {
         setWillNotDraw(false)
         if (declaredButtons.contains(BarButton.Candidates)) {
-            candidatesView = CandidatesView(context, dark, onTap = callbacks.onCandidateTap, scale = scale)
+            candidatesView = CandidatesView(context, dark, onTap = callbacks.onCandidateTap, scale = scale, skin = skin)
                 .also {
                     // A área é reservada nos dois modos; vazia, só a marcação sutil aparece (ver onDraw).
                     it.visibility = VISIBLE
@@ -417,7 +421,12 @@ class BarView(
     private fun visualsFor(button: BarButton): Triple<String, Int, Int> = when (button) {
         BarButton.Mic -> {
             val (label, color) = MicVisuals.visuals(micState, elapsedSeconds())
-            Triple(label, color, Color.WHITE)
+            // Sem campo, o mic "descansa": no Sistema, no cinza das teclas de função (o oliva é do Ateliê).
+            if (color == MicVisuals.MIC_NO_FIELD && skin == KeyboardSkin.SYSTEM) {
+                Triple(label, kbModifier, kbInk)
+            } else {
+                Triple(label, color, Color.WHITE)
+            }
         }
         BarButton.ConfigBtn -> Triple("⚙", kbModifier, kbInk)
         BarButton.ToggleExpand -> Triple(if (expandedMode) "↓" else "⌃", kbModifier, kbInk)
@@ -673,6 +682,7 @@ class BarView(
         gridPopup = GridOverlayPopup(
             context = context,
             dark = dark,
+            skin = skin,
             grid = grid,
             cellWidthPx = cellWidthPx,
             cellHeightPx = cellHeightPx,

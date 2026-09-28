@@ -73,6 +73,13 @@ class SettingsRepository(
     fun keyboardShowWithHardKeyboardFlow(): Flow<Boolean> =
         dataStore.data.map { it[KEYBOARD_SHOW_WITH_HARD_KEYBOARD] ?: true }
 
+    fun keyboardAutoCorrectFlow(): Flow<Boolean> = dataStore.data.map { it[KEYBOARD_AUTO_CORRECT] ?: true }
+
+    fun keyboardSkinFlow(): Flow<String> = dataStore.data.map { it[KEYBOARD_SKIN] ?: "system" }
+
+    /** Mesma leitura leve de [themeDarkOnce], para as cores do teclado em `onCreateInputView`. */
+    suspend fun keyboardSkinOnce(): String = dataStore.data.first()[KEYBOARD_SKIN] ?: "system"
+
     /**
      * Idioma do teclado ("pt"/"en"/"es"), gerenciado pelo app (não pelos subtypes do sistema — ver
      * [Settings.keyboardLanguage]). Leitura leve mesmo padrão de [themeDarkOnce]; escrita separada
@@ -203,6 +210,8 @@ class SettingsRepository(
             partialOnPause = prefs[PARTIAL_ON_PAUSE] ?: false,
             partialViewEdit = prefs[PARTIAL_VIEW_EDIT] ?: false,
             keyboardShowWithHardKeyboard = prefs[KEYBOARD_SHOW_WITH_HARD_KEYBOARD] ?: true,
+            keyboardAutoCorrect = prefs[KEYBOARD_AUTO_CORRECT] ?: true,
+            keyboardSkin = prefs[KEYBOARD_SKIN] ?: "system",
         )
     }
 
@@ -253,6 +262,8 @@ class SettingsRepository(
             prefs[PARTIAL_ON_PAUSE] = settings.partialOnPause
             prefs[PARTIAL_VIEW_EDIT] = settings.partialViewEdit
             prefs[KEYBOARD_SHOW_WITH_HARD_KEYBOARD] = settings.keyboardShowWithHardKeyboard
+            prefs[KEYBOARD_AUTO_CORRECT] = settings.keyboardAutoCorrect
+            prefs[KEYBOARD_SKIN] = settings.keyboardSkin
         }
     }
 
@@ -360,6 +371,8 @@ class SettingsRepository(
         val PARTIAL_ON_PAUSE = booleanPreferencesKey("partial_on_pause")
         val PARTIAL_VIEW_EDIT = booleanPreferencesKey("partial_view_edit")
         val KEYBOARD_SHOW_WITH_HARD_KEYBOARD = booleanPreferencesKey("keyboard_show_with_hard_keyboard")
+        val KEYBOARD_AUTO_CORRECT = booleanPreferencesKey("keyboard_auto_correct")
+        val KEYBOARD_SKIN = stringPreferencesKey("keyboard_skin")
         // Trabalho 3 (shortcut-bars): barras personalizáveis + teclados de atalhos, como JSON.
         val BARS_CONFIG_JSON = stringPreferencesKey("bars_config_json")
         val SHORTCUT_GRIDS_JSON = stringPreferencesKey("shortcut_grids_json")

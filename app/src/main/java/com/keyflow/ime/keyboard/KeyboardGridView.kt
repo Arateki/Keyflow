@@ -1,27 +1,27 @@
 package com.keyflow.ime.keyboard
 
+import com.keyflow.ime.KeyboardColors
+import com.keyflow.ime.KeyboardSkin
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.ColorFilter
 import android.graphics.Paint
+import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.graphics.RectF
-import android.graphics.drawable.ColorDrawable
-import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.view.Gravity
+import android.util.TypedValue
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
-import android.view.View.MeasureSpec
-import android.view.ViewGroup.LayoutParams
-import android.widget.LinearLayout
-import android.widget.PopupWindow
-import android.widget.TextView
 import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.customview.widget.ExploreByTouchHelper
+import com.keyflow.ime.keyboard.layout.AccentStrip
 import com.keyflow.ime.keyboard.layout.Geometry
 import com.keyflow.ime.keyboard.layout.KeyAction
 import com.keyflow.ime.keyboard.layout.KeyDef
@@ -39,6 +39,9 @@ import com.keyflow.ime.keyboard.layout.RepeatSchedule
  *
  * Multitouch por `pointerId` (RND-05): cada dedo tem sua própria tecla pressionada + preview, sem perder
  * o 2º toque. Repeat-on-hold (RND-04) só no backspace, acelerando via [RepeatSchedule].
+ *
+ * [hapticFeedback]: vibra ao ENCOSTAR na tecla, com o clique de teclado do sistema (curto e afinado
+ * pelo fabricante) — é o que dá a sensação de resposta imediata.
  */
 class KeyboardGridView(
     context: Context,
@@ -47,17 +50,21 @@ class KeyboardGridView(
     private val onKeyAction: (KeyAction) -> Unit,
     private val scale: Float = 1f,
     initialLayer: LayerId = LayerId.LETTERS,
+    private val hapticFeedback: Boolean = true,
+    skin: KeyboardSkin = KeyboardSkin.DEFAULT,
 ) : View(context) {
+
+    private val colors = KeyboardColors.of(skin, dark)
 
     private var state = KeyboardGridState(layout, initialLayer = initialLayer)
 
     /** Camada ativa exposta só para teste (NUM-01: confirmar que o campo numérico trocou de fato). */
     val currentLayerIdForTest: LayerId get() = state.currentLayerId
 
-    private val kbKey = if (dark) 0xFF3A332A.toInt() else 0xFFFBF6E6.toInt()
-    private val kbKeyBorder = if (dark) 0xFF4A4234.toInt() else 0xFFD7C9A0.toInt()
-    private val kbModifier = if (dark) 0xFF2B2720.toInt() else 0xFFCFC096.toInt()
-    private val kbInk = if (dark) 0xFFF1E7C9.toInt() else 0xFF2B2720.toInt()
+    private val kbKey = colors.key
+    private val kbKeyBorder = colors.keyBorder
+    private val kbModifier = colors.modifier
+    private val kbInk = colors.ink
     private val pressedOverlay = 0x33000000
 
     private val keyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
@@ -77,7 +84,16 @@ class KeyboardGridView(
         textSize = dp(15)
         color = kbInk
     }
-    private val previewTextPaint = Paint(textPaint)
+    // Balões da prévia e da tira de acentos (ver [KeyBubble]).
+    private val bubbleFill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL; color = kbKey }
+    private val bubbleStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = dp(1)
+        color = kbKeyBorder
+    }
+    private val bubbleHighlight = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL; color = ACCENT_TEAL }
+    private val bubbleText = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
+    private val keyBounds = RectF()
     // Hint pequeno de dígito no canto superior direito (estilo Gboard — NUMROW-01, pedido do Yan,
     // 2026-07-03), só desenhado quando `KeyAction.Char.digitHint` não é nulo (long-press ainda ativo).
     private val hintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -114,14 +130,13 @@ class KeyboardGridView(
     override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean =
         accessibilityHelper.dispatchKeyEvent(event) || super.dispatchKeyEvent(event)
 
-    // Multitouch: 1 tecla pressionada + 1 preview por dedo (pointerId). Os popups de preview são
-    // PRÉ-CRIADOS e reaproveitados (nunca desmontados em uso normal) — criar uma PopupWindow do zero a
-    // cada toque leva ao menos 1 frame pra a janela ser de fato anexada, e num toque rápido o dedo solta
-    // antes disso acontecer (preview nunca aparece — relatado pelo Yan no device físico, 2026-07-01).
+    // Multitouch: 1 tecla pressionada + 1 prévia por dedo (pointerId). A prévia e a tira de acentos são
+    // desenhadas no overlay da própria janela do teclado ([KeyBubble]) — antes eram PopupWindows, e cada
+    // toque reposicionava uma janela à parte pelo WindowManager: alguns ms na main thread e o balão
+    // chegando um quadro depois do destaque da tecla.
     private val pressedKeys = mutableMapOf<Int, PlacedKey>()
-    private val previewPool = mutableListOf<PreviewBubble>()
-    private val activePreviews = mutableMapOf<Int, PreviewBubble>()
-    private class PreviewBubble(val popup: PopupWindow, val bubble: TextView)
+    private val previews = mutableMapOf<Int, KeyBubble>()
+    private val lastX = mutableMapOf<Int, Float>()
 
     // Repeat-on-hold do backspace (1 por dedo, embora só um backspace exista na grade).
     private val repeatHandler = Handler(Looper.getMainLooper())
@@ -131,22 +146,27 @@ class KeyboardGridView(
         var runnable: Runnable? = null
     }
 
-    // Popup de acentos (long-press numa tecla com variantes — KC-T5). 1 por dedo.
+    // Tira de acentos (long-press numa tecla com variantes — KC-T5, no jeito do Samsung: ver
+    // [AccentStrip]). 1 por dedo.
     private val accentHandler = Handler(Looper.getMainLooper())
     private val accentTimers = mutableMapOf<Int, Runnable>()
-    private val accentPopups = mutableMapOf<Int, AccentPopupState>()
-    private class AccentPopupState(
-        val popup: PopupWindow,
+    private val accentStrips = mutableMapOf<Int, AccentState>()
+    private class AccentState(
         val variants: List<String>,
-        val chipViews: List<TextView>,
-        // Retângulos em coordenadas de TELA (a popup é uma janela separada) — mesma técnica do seletor
-        // de ações do mic (`KeyFlowKeyboardView.updateHighlight`).
-        val chipScreenRects: List<RectF>,
-        var highlightedIndex: Int = -1,
+        /** Esquerda de cada chip em coordenadas da grade — é com elas que o dedo escolhe. */
+        val lefts: List<Float>,
+        val chipWidth: Float,
+        val bubble: KeyBubble,
     )
 
+    /** Variantes da tira de acentos aberta (1º dedo), só para o instrumentado. */
+    val accentVariantsForTest: List<String>? get() = accentStrips.values.firstOrNull()?.variants
+
+    /** Largura de um chip da tira aberta, só para o instrumentado andar o dedo um chip para o lado. */
+    val accentChipWidthForTest: Float? get() = accentStrips.values.firstOrNull()?.chipWidth
+
     /**
-     * Altura de fileira: o ideal (44dp) até o limite de [keyboardHeightFraction] da altura da tela pro
+     * Altura de fileira: o ideal ([IDEAL_ROW_HEIGHT_DP]) até o limite de [keyboardHeightFraction] da altura da tela pro
      * teclado inteiro — sem isto, a grade mantinha a MESMA altura absoluta em paisagem (bem mais baixa),
      * devorando proporcionalmente muito mais tela que em retrato (achado do Yan, 2026-07-06: "as teclas
      * estão mais altas... justamente quando temos menos espaço vertical"). Nunca encolhe abaixo de
@@ -164,7 +184,7 @@ class KeyboardGridView(
             // ter feito efeito"). O texto (tamanho fixo, 15dp × escala CHEIA) segue cabendo com folga
             // dentro do piso amortecido — MIN_ROW_HEIGHT_DP tem margem de sobra pra isso.
             val budgetScale = landscapeDampedScale(metrics, scale)
-            val idealPx = 44f * metrics.density * budgetScale
+            val idealPx = IDEAL_ROW_HEIGHT_DP * metrics.density * budgetScale
             val rowCount = state.currentLayer.rows.size.coerceAtLeast(1)
             val maxBudgetPx = usableScreenHeightPx(metrics) * keyboardHeightFraction(metrics) * budgetScale
             val shrunkPx = maxOf(maxBudgetPx / rowCount, MIN_ROW_HEIGHT_DP * metrics.density * budgetScale)
@@ -184,7 +204,12 @@ class KeyboardGridView(
 
     private fun refreshGeometry(width: Float = this.width.toFloat()) {
         if (width <= 0f) return
-        placedRows = Geometry.placeLayer(state.currentLayer, totalWidth = width, rowHeight = rowHeightPx.toFloat())
+        val rowHeight = rowHeightPx.toFloat()
+        placedRows = Geometry.placeLayer(state.currentLayer, totalWidth = width, rowHeight = rowHeight)
+        // A letra acompanha a tecla (mesma proporção dos 15dp numa fileira de 44dp); nunca abaixo dos 15dp,
+        // que é o que cabe no piso de altura da paisagem.
+        textPaint.textSize = maxOf(dp(15), rowHeight * LABEL_TO_ROW)
+        hintPaint.textSize = textPaint.textSize * HINT_TO_LABEL
     }
 
     /**
@@ -214,12 +239,9 @@ class KeyboardGridView(
     }
 
     private fun drawKey(canvas: Canvas, placed: PlacedKey) {
-        val bounds = RectF(
-            placed.left + keyMargin,
-            placed.top + keyMargin,
-            placed.right - keyMargin,
-            placed.bottom - keyMargin,
-        )
+        val bounds = keyBounds.apply {
+            set(placed.left + keyMargin, placed.top + keyMargin, placed.right - keyMargin, placed.bottom - keyMargin)
+        }
         val isModifier = placed.keyDef.action !is KeyAction.Char && placed.keyDef.action != KeyAction.Space
         keyPaint.color = keyColorFor(placed)
         canvas.drawRoundRect(bounds, cornerRadius, cornerRadius, keyPaint)
@@ -286,6 +308,9 @@ class KeyboardGridView(
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                // 1º dedo de um gesto novo: sobra de um gesto que não terminou (UP perdido) é descartada,
+                // nunca digitada pelo rollover.
+                if (event.actionMasked == MotionEvent.ACTION_DOWN) resetTouchState()
                 val index = event.actionIndex
                 val pointerId = event.getPointerId(index)
                 onFingerDown(pointerId, event.getX(index), event.getY(index))
@@ -313,9 +338,16 @@ class KeyboardGridView(
     }
 
     private fun onFingerDown(pointerId: Int, x: Float, y: Float) {
-        val hit = Geometry.hitTestLayer(placedRows, x, y)
-        val placed = hit?.let { def -> placedRows.flatMap { it.keys }.firstOrNull { it.keyDef === def } }
-        if (placed == null) return
+        // Antes do hit-test: a tecla do dedo anterior pode trocar a camada (⇧/?123), e este toque vale
+        // na camada que ficou — igual a ter soltado o outro dedo primeiro.
+        pressedKeys.keys.filter { it != pointerId }.forEach { releaseEarly(it) }
+        lastX[pointerId] = x
+        val placed = Geometry.keyAt(placedRows, x, y) ?: return
+        if (hapticFeedback) performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+        press(pointerId, placed)
+    }
+
+    private fun press(pointerId: Int, placed: PlacedKey) {
         pressedKeys[pointerId] = placed
         showPreview(pointerId, placed)
         val action = placed.keyDef.action
@@ -324,17 +356,49 @@ class KeyboardGridView(
         invalidate()
     }
 
+    /**
+     * Rollover (RND-05): outro dedo encostou enquanto este segurava uma tecla — ela sai agora, na ordem
+     * em que foi tocada. Sem isto, cada tecla saía só quando o SEU dedo soltava, e dois polegares
+     * sobrepostos trocavam a ordem das letras. Ficam de fora o backspace (a repetição segue enquanto o
+     * dedo segura) e quem está escolhendo um acento.
+     */
+    private fun releaseEarly(pointerId: Int) {
+        val pressed = pressedKeys[pointerId] ?: return
+        if (pressed.keyDef.action == KeyAction.Backspace) return
+        if (accentStrips.containsKey(pointerId)) return
+        pressedKeys.remove(pointerId)
+        dismissPreview(pointerId)
+        cancelAccentTimer(pointerId)
+        activateKey(pressed.keyDef)
+    }
+
+    /** Folga para o dedo escorregar sem trocar de tecla (ver [Geometry.slideTarget]). */
+    private fun slideHysteresis(key: PlacedKey): Float =
+        minOf(key.width, key.bottom - key.top) * SLIDE_HYSTERESIS_FRACTION
+
     private fun onFingerMove(pointerId: Int, x: Float, y: Float) {
-        val accent = accentPopups[pointerId] ?: return
-        val screen = toScreen(x, y)
-        val idx = accent.chipScreenRects.indexOfFirst { it.contains(screen.first, screen.second) }
-        if (idx == accent.highlightedIndex) return
-        accent.highlightedIndex = idx
-        accent.chipViews.forEachIndexed { i, chip ->
-            val on = i == idx
-            chip.setBackgroundColor(if (on) ACCENT_TEAL else kbKey)
-            chip.setTextColor(if (on) Color.WHITE else kbInk)
+        lastX[pointerId] = x
+        val accent = accentStrips[pointerId]
+        if (accent == null) {
+            slideTo(pointerId, x, y)
+            return
         }
+        // Só o movimento lateral escolhe — o dedo não precisa subir até a tira.
+        accent.bubble.highlighted = AccentStrip.indexAt(x, accent.lefts, accent.chipWidth)
+    }
+
+    /**
+     * O dedo andou para outra tecla (além da folga): ela passa a ser a pressionada — destaque e prévia
+     * acompanham, e é ela que sai ao soltar. O backspace que já está repetindo não troca.
+     */
+    private fun slideTo(pointerId: Int, x: Float, y: Float) {
+        val current = pressedKeys[pointerId] ?: return
+        val target = Geometry.slideTarget(current, placedRows, x, y, slideHysteresis(current)) ?: return
+        if (target === current) return
+        if (repeats[pointerId]?.let { it.tick > 0 } == true) return
+        stopRepeat(pointerId)
+        cancelAccentTimer(pointerId)
+        press(pointerId, target)
     }
 
     private fun onFingerUp(pointerId: Int, x: Float, y: Float) {
@@ -343,20 +407,22 @@ class KeyboardGridView(
         dismissPreview(pointerId)
         cancelAccentTimer(pointerId)
 
-        val accent = accentPopups.remove(pointerId)
+        lastX.remove(pointerId)
+        val accent = accentStrips.remove(pointerId)
         if (accent != null) {
-            dismissAccentPopup(accent)
-            // Igual ao seletor de ações do mic: nenhum chip destacado (voltou pro botão ou soltou fora)
-            // = não insere nada — o long-press "compromete" a decidir uma variante.
-            val variant = accent.variants.getOrNull(accent.highlightedIndex)
+            removeBubble(accent.bubble)
+            // Sempre há uma escolhida (a 1ª já vem destacada ao abrir): soltar insere ela.
+            val variant = accent.variants.getOrNull(accent.bubble.highlighted)
             if (variant != null) onKeyAction(KeyAction.Char(state.consumeShiftFor(variant)))
             invalidate()
             return
         }
 
         // Repeat já emitiu o backspace continuamente; soltar não emite mais um (senão apaga 1 a mais).
-        if (pressed != null && pressed.contains(x, y) && !wasRepeating) {
-            activateKey(pressed.keyDef)
+        // Soltar perto da tecla (dentro da folga) ainda a digita; fora do teclado de vez, nada.
+        val target = pressed?.let { Geometry.slideTarget(it, placedRows, x, y, slideHysteresis(it)) }
+        if (target != null && !wasRepeating) {
+            activateKey(target.keyDef)
         }
         invalidate()
     }
@@ -366,9 +432,14 @@ class KeyboardGridView(
      * acessibilidade (A11Y-02: TalkBack sempre usa a ação base, o popup de acento é gesto tátil).
      */
     private fun activateKey(keyDef: KeyDef) {
+        val layerBefore = state.currentLayerId
+        val shiftBefore = state.shiftActive to state.capsLocked
         val emitted = state.onKeyTapped(keyDef.action)
-        refreshGeometry() // camada pode ter mudado (shift/?123)
-        accessibilityHelper.invalidateRoot() // o conjunto de teclas pode ter mudado de verdade
+        // Recalcula geometria e acessibilidade só quando algo mudou (?123/⇧) — antes era a cada letra.
+        if (state.currentLayerId != layerBefore) refreshGeometry()
+        if (state.currentLayerId != layerBefore || (state.shiftActive to state.capsLocked) != shiftBefore) {
+            accessibilityHelper.invalidateRoot()
+        }
         if (emitted != null) onKeyAction(emitted)
     }
 
@@ -377,84 +448,111 @@ class KeyboardGridView(
         stopRepeat(pointerId)
         dismissPreview(pointerId)
         cancelAccentTimer(pointerId)
-        accentPopups.remove(pointerId)?.let { dismissAccentPopup(it) }
+        accentStrips.remove(pointerId)?.let { removeBubble(it.bubble) }
+        lastX.remove(pointerId)
     }
 
-    /** Coordenada deste dedo (local à View) convertida pra TELA — sem exigir API 29 (`getRawX(index)`). */
-    private fun toScreen(localX: Float, localY: Float): Pair<Float, Float> {
-        val loc = IntArray(2).also { getLocationOnScreen(it) }
-        return (loc[0] + localX) to (loc[1] + localY)
+    // ── balões no overlay da janela (prévia e tira de acentos) ──────────────
+
+    /**
+     * Balão com um ou mais chips, desenhado no overlay da raiz da janela: por cima de tudo, podendo passar
+     * da borda da grade (a prévia da 1ª fileira fica sobre as barras), sem janela à parte. [originX]/
+     * [originY] levam as coordenadas da grade para as do host do overlay.
+     */
+    private inner class KeyBubble(
+        private val labels: List<String>,
+        private val lefts: List<Float>,
+        private val top: Float,
+        private val chipWidth: Float,
+        private val chipHeight: Float,
+        private val textSize: Float,
+        private val originX: Float,
+        private val originY: Float,
+    ) : Drawable() {
+        private val frame = RectF()
+        private val chip = RectF()
+
+        var highlighted = -1
+            set(value) {
+                if (field == value) return
+                field = value
+                invalidateSelf()
+            }
+
+        init {
+            val pad = dp(2)
+            setBounds(
+                (originX + lefts.min() - pad).toInt(),
+                (originY + top - pad).toInt(),
+                (originX + lefts.max() + chipWidth + pad).toInt(),
+                (originY + top + chipHeight + pad).toInt(),
+            )
+        }
+
+        override fun draw(canvas: Canvas) {
+            frame.set(originX + lefts.min(), originY + top, originX + lefts.max() + chipWidth, originY + top + chipHeight)
+            canvas.drawRoundRect(frame, cornerRadius, cornerRadius, bubbleFill)
+            canvas.drawRoundRect(frame, cornerRadius, cornerRadius, bubbleStroke)
+            bubbleText.textSize = textSize
+            val inset = dp(3)
+            labels.forEachIndexed { i, label ->
+                val left = originX + lefts[i]
+                if (i == highlighted) {
+                    chip.set(left + inset, frame.top + inset, left + chipWidth - inset, frame.bottom - inset)
+                    canvas.drawRoundRect(chip, cornerRadius, cornerRadius, bubbleHighlight)
+                }
+                bubbleText.color = if (i == highlighted) Color.WHITE else kbInk
+                val y = frame.centerY() - (bubbleText.descent() + bubbleText.ascent()) / 2
+                canvas.drawText(label, left + chipWidth / 2, y, bubbleText)
+            }
+        }
+
+        override fun setAlpha(alpha: Int) = Unit
+        override fun setColorFilter(colorFilter: ColorFilter?) = Unit
+        @Deprecated("Deprecated in Java")
+        override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
     }
 
-    // ── key preview ──────────────────────────────────────────────────────────
+    private val overlayHost: View get() = rootView
+    private val gridInWindow = IntArray(2)
+    private val hostInWindow = IntArray(2)
+
+    /** Balão acima de [placed], com [labels] lado a lado a partir de [lefts] (coordenadas da grade). */
+    private fun addBubble(placed: PlacedKey, labels: List<String>, lefts: List<Float>, chipWidth: Float, textSp: Float): KeyBubble {
+        getLocationInWindow(gridInWindow)
+        overlayHost.getLocationInWindow(hostInWindow)
+        val originX = (gridInWindow[0] - hostInWindow[0]).toFloat()
+        val originY = (gridInWindow[1] - hostInWindow[1]).toFloat()
+        val chipHeight = placed.bottom - placed.top
+        // Acima da tecla; sem espaço na janela, encosta no topo dela.
+        val top = maxOf(placed.top + keyMargin - chipHeight - dp(4), -originY)
+        val textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, textSp * scale, resources.displayMetrics)
+        return KeyBubble(labels, lefts, top, chipWidth, chipHeight, textSize, originX, originY)
+            .also { overlayHost.overlay.add(it) }
+    }
+
+    private fun removeBubble(bubble: KeyBubble) {
+        overlayHost.overlay.remove(bubble)
+    }
 
     private fun showPreview(pointerId: Int, placed: PlacedKey) {
         dismissPreview(pointerId)
         if (placed.keyDef.action !is KeyAction.Char) return // preview só faz sentido p/ caracteres
-        val slot = acquirePreviewBubble()
-        slot.bubble.text = labelFor(placed)
-        slot.bubble.measure(
-            MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
-            MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
-        )
-        // showAsDropDown (coords relativas à ÂNCORA) em vez de showAtLocation com tela absoluta: a mesma
-        // técnica já validada no seletor do mic — showAtLocation se mostrou pouco confiável em janelas de
-        // IME em alguns fabricantes (ex.: Samsung/One UI), aparecendo perto do rodapé em vez da tecla.
-        val xoff = ((placed.left + placed.right) / 2 - slot.bubble.measuredWidth / 2).toInt()
-        val yoff = (placed.top - height - slot.bubble.measuredHeight - dp(4)).toInt()
-        if (slot.popup.isShowing) {
-            // Janela já anexada: só reposiciona (instantâneo) — nada de recriar. Precisa do overload
-            // update(ANCHOR, x, y, w, h): o popup foi aberto com showAsDropDown (coords relativas à
-            // âncora); o overload update(x, y, w, h) trata x/y como tela ABSOLUTA — misturar os dois é
-            // o que fazia o popup "pular" pro canto errado e escorregar até uma posição errada.
-            runCatching { slot.popup.update(this, xoff, yoff, slot.bubble.measuredWidth, slot.bubble.measuredHeight) }
-        } else {
-            runCatching { slot.popup.showAsDropDown(this, xoff, yoff) }
-        }
-        slot.bubble.visibility = View.VISIBLE
-        activePreviews[pointerId] = slot
-    }
-
-    /** Reusa uma bolha do pool (sem toque nenhum usando-a agora) ou cria uma nova se todas ocupadas. */
-    private fun acquirePreviewBubble(): PreviewBubble {
-        previewPool.firstOrNull { it !in activePreviews.values }?.let { return it }
-        val bubble = TextView(context).apply {
-            gravity = Gravity.CENTER
-            setTextColor(kbInk)
-            textSize = 22f * scale
-            setPadding(dp(10).toInt(), dp(6).toInt(), dp(10).toInt(), dp(6).toInt())
-            background = GradientDrawable().apply {
-                cornerRadius = this@KeyboardGridView.cornerRadius
-                setColor(kbKey)
-                setStroke(dp(1).toInt(), kbKeyBorder)
-            }
-        }
-        val popup = PopupWindow(bubble, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, false).apply {
-            isTouchable = false // o gesto segue sendo da grade; o popup é só visual
-            isFocusable = false
-            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-            elevation = dp(8)
-        }
-        return PreviewBubble(popup, bubble).also { previewPool.add(it) }
+        val width = placed.width - 2 * keyMargin
+        previews[pointerId] = addBubble(placed, listOf(labelFor(placed)), listOf(placed.left + keyMargin), width, 22f)
     }
 
     private fun dismissPreview(pointerId: Int) {
-        val slot = activePreviews.remove(pointerId) ?: return
-        // NÃO desmonta a janela (popup.dismiss() destruiria e recriaria do zero no próximo toque) — só
-        // esconde o CONTEÚDO (a janela continua anexada, "quente", pro próximo showAsDropDown/update ser
-        // instantâneo). Mover a janela pra fora da tela (tentativa anterior) não funciona em todo
-        // fabricante: o One UI do Samsung limita a posição da popup pra dentro da tela, então ela ficava
-        // "grudada" num canto em vez de sumir (relatado pelo Yan no device físico, 2026-07-01).
-        slot.bubble.visibility = View.INVISIBLE
+        previews.remove(pointerId)?.let { removeBubble(it) }
     }
 
-    // ── popup de acentos (long-press) ────────────────────────────────────────
+    // ── tira de acentos (long-press) ─────────────────────────────────────────
 
     private fun scheduleAccentPopup(pointerId: Int, placed: PlacedKey) {
         val runnable = Runnable {
             accentTimers.remove(pointerId)
             // Só abre se o dedo ainda estiver na MESMA tecla (não soltou/arrastou pra outra antes do hold).
-            if (pressedKeys[pointerId] === placed) openAccentPopup(pointerId, placed)
+            if (pressedKeys[pointerId] === placed) openAccentStrip(pointerId, placed)
         }
         accentTimers[pointerId] = runnable
         accentHandler.postDelayed(runnable, ACCENT_HOLD_MS)
@@ -464,66 +562,18 @@ class KeyboardGridView(
         accentTimers.remove(pointerId)?.let { accentHandler.removeCallbacks(it) }
     }
 
-    private fun openAccentPopup(pointerId: Int, placed: PlacedKey) {
-        dismissPreview(pointerId) // o popup de acentos substitui o preview simples
+    /** Abre a tira com a 1ª variante sobre a tecla, já escolhida — soltar sem mexer insere ela. */
+    private fun openAccentStrip(pointerId: Int, placed: PlacedKey) {
+        dismissPreview(pointerId) // a tira substitui a prévia simples
         val action = placed.keyDef.action as? KeyAction.Char ?: return
-        val displayShifted = state.shiftActive
         val variants = action.variants
-        val chips = variants.map { variant ->
-            TextView(context).apply {
-                text = if (displayShifted) variant.uppercase() else variant
-                gravity = Gravity.CENTER
-                setTextColor(kbInk)
-                textSize = 18f * scale
-                setPadding(dp(12).toInt(), dp(8).toInt(), dp(12).toInt(), dp(8).toInt())
-                setBackgroundColor(kbKey)
-            }
-        }
-        val content = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(3).toInt(), dp(3).toInt(), dp(3).toInt(), dp(3).toInt())
-            background = GradientDrawable().apply {
-                cornerRadius = this@KeyboardGridView.cornerRadius
-                setColor(kbKey)
-                setStroke(dp(1).toInt(), kbKeyBorder)
-            }
-            chips.forEach { addView(it) }
-        }
-        val popup = PopupWindow(content, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, false).apply {
-            isTouchable = false // o gesto segue sendo da grade — igual ao seletor de ações do mic
-            isFocusable = false
-            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-            elevation = dp(8)
-        }
-        content.measure(
-            MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
-            MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
-        )
-        // showAsDropDown (coords relativas à ÂNCORA) — ver comentário equivalente em showPreview.
-        val xoff = ((placed.left + placed.right) / 2 - content.measuredWidth / 2).toInt()
-        val yoff = (placed.top - height - content.measuredHeight - dp(4)).toInt()
-        runCatching { popup.showAsDropDown(this, xoff, yoff) }
-
-        // Mede os retângulos (tela) de cada chip só depois do layout — mesma técnica do seletor do mic.
-        content.post {
-            val state = accentPopups[pointerId] ?: return@post
-            val rects = chips.map { chip ->
-                val chipLoc = IntArray(2).also { chip.getLocationOnScreen(it) }
-                RectF(
-                    chipLoc[0].toFloat(),
-                    chipLoc[1].toFloat(),
-                    (chipLoc[0] + chip.width).toFloat(),
-                    (chipLoc[1] + chip.height).toFloat(),
-                )
-            }
-            accentPopups[pointerId] = AccentPopupState(state.popup, state.variants, state.chipViews, rects)
-        }
-
-        accentPopups[pointerId] = AccentPopupState(popup, variants, chips, emptyList())
-    }
-
-    private fun dismissAccentPopup(state: AccentPopupState) {
-        runCatching { state.popup.dismiss() }
+        val labels = if (state.shiftActive) variants.map { it.uppercase() } else variants
+        val chipWidth = placed.width
+        val lefts = AccentStrip.place((placed.left + placed.right) / 2, variants.size, chipWidth, width.toFloat())
+        val bubble = addBubble(placed, labels, lefts, chipWidth, 20f)
+        bubble.highlighted = AccentStrip.indexAt(lastX[pointerId] ?: ((placed.left + placed.right) / 2), lefts, chipWidth)
+        accentStrips[pointerId] = AccentState(variants, lefts, chipWidth, bubble)
+        if (hapticFeedback) performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
     }
 
     // ── repeat-on-hold (backspace) ───────────────────────────────────────────
@@ -597,18 +647,25 @@ class KeyboardGridView(
     }
 
     override fun onDetachedFromWindow() {
-        // Desmonta de verdade só aqui (não a cada solta de dedo) — o pool inteiro morre junto com a View.
-        previewPool.forEach { runCatching { it.popup.dismiss() } }
-        previewPool.clear()
-        activePreviews.clear()
+        resetTouchState()
         super.onDetachedFromWindow()
     }
 
     private companion object {
         val ACCENT_TEAL = 0xFF4E9683.toInt()
-        const val ACCENT_HOLD_MS = 350L
+        // Segurar até a tira de acentos abrir (era 350 ms; o Yan achou lento perto do Samsung).
+        const val ACCENT_HOLD_MS = 250L
+        // Quanto da tecla (menor lado) o dedo pode escorregar para fora sem trocar de tecla. A calibrar
+        // no A32: um toque rápido desliza ~1 mm, ~¼ de uma tecla em retrato.
+        const val SLIDE_HYSTERESIS_FRACTION = 0.25f
         // Piso pra rowHeightPx nunca ficar menor que o texto da tecla (15dp) + folga confortável.
         const val MIN_ROW_HEIGHT_DP = 34f
+        // Altura de fileira no tamanho 100%: a mesma do teclado Samsung no A32 do Yan (148 px a 420 dpi ≈
+        // 56dp; era 44dp, que o Yan achou "consideravelmente menor", 2026-09-27). Em paisagem quem manda
+        // continua sendo o teto de [keyboardHeightFraction].
+        const val IDEAL_ROW_HEIGHT_DP = 56f
+        const val LABEL_TO_ROW = 15f / 44f
+        const val HINT_TO_LABEL = 9f / 15f
     }
 }
 

@@ -37,4 +37,20 @@ object Geometry {
 
     fun hitTestLayer(rows: List<PlacedRow>, x: Float, y: Float): KeyDef? =
         rows.firstNotNullOfOrNull { hitTest(it.keys, x, y) }
+
+    /** A tecla posicionada sob ([x], [y]), ou `null` fora de todas. */
+    fun keyAt(rows: List<PlacedRow>, x: Float, y: Float): PlacedKey? =
+        rows.firstNotNullOfOrNull { row -> row.keys.firstOrNull { it.contains(x, y) } }
+
+    /**
+     * Para qual tecla foi um dedo que pressiona [current]. Fica nela enquanto estiver dentro ou a menos
+     * de [hysteresis] da borda: num toque rápido o dedo escorrega uns pixels, e a tecla não pode trocar
+     * nem sumir por isso. Passou disso, vale a tecla sob o dedo; fora de todas (saiu do teclado), `null`.
+     */
+    fun slideTarget(current: PlacedKey, rows: List<PlacedRow>, x: Float, y: Float, hysteresis: Float): PlacedKey? {
+        val nearCurrent = x >= current.left - hysteresis && x < current.right + hysteresis &&
+            y >= current.top - hysteresis && y < current.bottom + hysteresis
+        if (nearCurrent) return current
+        return keyAt(rows, x, y)
+    }
 }

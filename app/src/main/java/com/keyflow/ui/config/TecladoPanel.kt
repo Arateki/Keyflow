@@ -1,5 +1,6 @@
 package com.keyflow.ui.config
 
+import com.keyflow.ime.KeyboardSkin
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -46,6 +47,7 @@ const val TECLADO_SIZE_SLIDER_TAG = "teclado-size-slider"
 const val TECLADO_SIZE_PREVIEW_TAG = "teclado-size-preview"
 const val TECLADO_NUMBER_ROW_TAG = "teclado-number-row"
 const val TECLADO_SHOW_WITH_HARD_KEYBOARD_TAG = "teclado-show-with-hard-keyboard"
+const val TECLADO_AUTO_CORRECT_TAG = "teclado-auto-correct"
 
 /**
  * Margem lateral mantida de propósito na prévia de tamanho (ver [KeyboardSizePreview]) — erra pra menor
@@ -132,6 +134,15 @@ fun TecladoPanel(
         }
 
         Box(Modifier.fillMaxWidth().padding(top = 16.dp).height(1.dp).background(palette.line2))
+
+        // Correção automática (Q9, pedido do Yan, 2026-09-28): desligada, a faixa segue sugerindo.
+        ToggleRow(
+            label = "Correção automática",
+            sub = "Troca a palavra no espaço quando o corretor tem certeza (\"nao\" → \"não\"). Apagar logo depois desfaz.",
+            checked = settings.keyboardAutoCorrect,
+            onCheckedChange = { onSettingsChange(settings.copy(keyboardAutoCorrect = it)) },
+            tag = TECLADO_AUTO_CORRECT_TAG,
+        )
 
         // Fileira de números (NUMROW-01, pedido do Yan, 2026-07-03): dedicada acima do "qwertyuiop",
         // estilo Gboard — reflete na prévia abaixo e desativa o long-press de número na 1ª fileira
@@ -222,10 +233,16 @@ fun TecladoPanel(
             dark = palette.isDark,
             locale = settings.keyboardLanguage,
             numberRowEnabled = settings.keyboardNumberRowEnabled,
+            skin = settings.keyboardSkin,
         )
 
         Box(Modifier.fillMaxWidth().padding(top = 13.dp).height(1.dp).background(palette.line2))
-        SkinsSection(onUnlock = onUnlockSkins, unlockTag = TECLADO_UNLOCK_TAG)
+        SkinsSection(
+            selectedSkin = settings.keyboardSkin,
+            onSkinSelected = { onSettingsChange(settings.copy(keyboardSkin = it)) },
+            onUnlock = onUnlockSkins,
+            unlockTag = TECLADO_UNLOCK_TAG,
+        )
     }
 }
 
@@ -243,7 +260,13 @@ fun TecladoPanel(
  * 1ª versão usava um `layout{}` próprio pra "vazar" o padding do pai e tinha um bug de assimetria).
  */
 @Composable
-private fun KeyboardSizePreview(scalePercent: Int, dark: Boolean, locale: String, numberRowEnabled: Boolean) {
+private fun KeyboardSizePreview(
+    scalePercent: Int,
+    dark: Boolean,
+    locale: String,
+    numberRowEnabled: Boolean,
+    skin: String = KeyboardSkin.DEFAULT.id,
+) {
     val palette = LocalKeyFlowPalette.current
     val screenWidthDp = LocalConfiguration.current.screenWidthDp.dp
     val previewWidth = (screenWidthDp - PREVIEW_MARGIN_DP * 2).coerceAtLeast(0.dp)
@@ -258,7 +281,7 @@ private fun KeyboardSizePreview(scalePercent: Int, dark: Boolean, locale: String
                 .background(palette.bg)
                 .testTag(TECLADO_SIZE_PREVIEW_TAG),
         ) {
-            key(scalePercent, dark, locale, numberRowEnabled) {
+            key(scalePercent, dark, locale, numberRowEnabled, skin) {
                 AndroidView(
                     factory = { ctx ->
                         KeyFlowKeyboardView(
@@ -268,6 +291,7 @@ private fun KeyboardSizePreview(scalePercent: Int, dark: Boolean, locale: String
                             onHide = {},
                             onExpand = {},
                             dark = dark,
+                            skin = KeyboardSkin.of(skin),
                             scale = scalePercent / 100f,
                             locale = locale,
                             showLanguageKey = true,

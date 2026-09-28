@@ -17,6 +17,8 @@ internal const val IME_COLD_ATTACH_TIMEOUT_MS = 30_000L
 /** De quanto em quanto tempo, sem a view anexada, o probe volta para a frente e o campo é tocado de novo. */
 private const val IME_ATTACH_NUDGE_MS = 6_000L
 
+private const val KEYFLOW_IME = "com.keyflow/.ime.KeyFlowKeyboardService"
+
 /**
  * Espera a view do teclado anexar ao campo do `ImeProbeActivity`. Enquanto não anexa, a cada
  * [IME_ATTACH_NUDGE_MS] traz o probe de volta ([relaunch]) e toca no campo de novo.
@@ -25,6 +27,12 @@ private const val IME_ATTACH_NUDGE_MS = 6_000L
  * probe logo depois de ele abrir; o único toque no campo caiu no vazio, nenhum IME recebeu o campo e o
  * teste esperou 30 s por um teclado que não tinha como aparecer. Tocar de novo reproduz o que o usuário
  * faria e não mascara falha do IME: se o teclado não anexa com o campo em foco, o prazo estoura igual.
+ *
+ * Antes de tocar de novo, confere se o KeyFlow ainda é o IME selecionado. Medido no A32 (2026-09-27,
+ * 1 em 47 trocas): o `UserSettingsGuard.restore()` do teste anterior devolve o teclado Samsung, que sobe
+ * a frio e, no fim da inicialização, regrava `default_input_method` com o valor que leu antes. O
+ * `ime set` deste teste caiu 2 ms antes dessa gravação, o sistema voltou para o Samsung e nenhum toque
+ * no campo trazia o KeyFlow de volta.
  */
 internal fun awaitKeyboardAttached(device: UiDevice, relaunch: () -> Unit) {
     val deadline = System.currentTimeMillis() + IME_COLD_ATTACH_TIMEOUT_MS
@@ -32,6 +40,9 @@ internal fun awaitKeyboardAttached(device: UiDevice, relaunch: () -> Unit) {
     while (System.currentTimeMillis() < deadline) {
         if (KeyFlowKeyboardService.activeViewForTest != null) return
         if (System.currentTimeMillis() >= nextNudge) {
+            if (device.executeShellCommand("settings get secure default_input_method").trim() != KEYFLOW_IME) {
+                device.executeShellCommand("ime set $KEYFLOW_IME")
+            }
             relaunch()
             device.wait(Until.hasObject(By.desc("ime_probe_field")), IME_ATTACH_NUDGE_MS)
             device.findObject(By.desc("ime_probe_field"))?.click()

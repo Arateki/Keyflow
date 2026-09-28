@@ -35,7 +35,7 @@
 9. **Portões do Yan**: itens marcados **[YAN]** são decisões/validações manuais dele (device
    físico, Play Console, aprovações). O agente prepara tudo, avisa, e **não** executa por ele.
 
-## Estado atual (2026-09-09)
+## Estado atual (2026-09-28)
 
 | Milestone | Feature | Status |
 | --------- | ------- | ------ |
@@ -45,10 +45,12 @@
 | M6 | `shortcut-bars` | ✅ concluído (SB-T1..T10; manual do Yan no A32 confirmado em 2026-09-09) |
 | — | Ajustes pós-uso no A32 (Q8 + emendas) | ✅ dimensionamento em paisagem, modais dos editores, crash das prefs cifradas — ver Bloco 1 |
 | — | `gesture-tour` | GT-T1..T10 feitos (2026-09-24); falta só o manual do GT-T8 no A32 **[YAN]** |
-| — | `native-voice-models` | em execução — NM-T1 (AAR sherpa-onnx) feito (2026-09-24); próxima NM-T2 |
-| — | `vision-capture` | spec/design/tasks prontos (Draft) — nada implementado |
-| M7 | `keyflow-api` + `monetization` | specs/designs/tasks prontos (Draft) — nada implementado |
-| M8 | `theme-system` | spec/design/tasks prontos (Draft; ⚠️ S3/S4/S5 a validar) |
+| — | `native-voice-models` | ✅ código completo (NM-T1..T12, T14..T17 + núcleo da T18; PR #3). CI verde em `5db6d75`: 240/240 instrumentados, telas 84/84. Desde o PR #5 o download é da fila do app (IPv4 primeiro), não do DownloadManager — desvio da G6 no design. Faltam os roteiros manuais T13/T18 no A32 **[YAN]** (`manual-validation.md`) |
+| — | Teclado pós-uso no A32 (PR #5) | ✅ fluidez (sem chamada síncrona por letra, escorregar, rollover, vibração, prévia na janela), acentos no jeito do Samsung, fileira de 56 dp, cores "Sistema" padrão, corretor próprio com troca no espaço (Q9), cursor no meio do texto |
+| — | `vision-capture` | spec/design/tasks prontos — nada implementado; **próximo bloco da Frente A (VC-T1)** |
+| M7 | `keyflow-api` | API-T1..T12 ✅ + T13 parcial (Dockerfile + `api/docs/deploy.md`), **na `main` desde 2026-09-28** (PR #4); T13 parou nas credenciais/staging **[YAN]** |
+| M7 | `monetization` | spec/design/tasks prontos — nada implementado (depende da API em staging; MZ-T1/T2/T5/T11 podem adiantar) |
+| M8 | `theme-system` | spec/design/tasks prontos — nada implementado (⚠️ S3/S4/S5 nos checkpoints das TS-T6/T8/T9) |
 | — | Play Store | `PLAYSTORE_CHECKLIST.md`; **PS-1 (targetSdk 36) feito**, PS-2..PS-7 abertos |
 
 ---
@@ -113,10 +115,11 @@ Pequenas, sem spec própria; fazer em quick mode (TASK.md + SUMMARY.md + commit)
       Pendente **[YAN]**: goldens das rotas novas (`grids-editor-modal`, `bars-editor`) não foram
       gerados — dependem da revisão do lote de goldens abaixo.
 
-- [ ] **Q9 — Sugestões do corretor nunca funcionaram** (`.specs/quick/009-sugestoes-nao-funcionam/`).
-      A faixa está pronta e rolável; falta produzir sugestão: só a grade do KeyFlow alimenta o
-      corretor (teclado físico e voz não), e o `SystemSpellChecker` nunca foi visto respondendo no
-      A32. Registrado a pedido do Yan para depois.
+- [x] **Q9 — Sugestões do corretor** (`.specs/quick/009-sugestoes-nao-funcionam/`): FEITA (2026-09-28,
+      PR #5). Sondado no A32: o corretor do sistema (o do Samsung) responde "palavra certa, sem
+      sugestões" para tudo — o `SystemSpellChecker` saiu. Dicionário próprio (listas do AOSP LatinIME,
+      `scripts/build-dictionaries.py`), sugestões em etiquetas, troca no espaço com interruptor na aba
+      Teclado e backspace que desfaz. Ainda fora: sugestões para o que entra por teclado físico e voz.
 
 - [x] **Q10 — A suíte instrumentada no aparelho do Yan** (`.specs/quick/010-suite-no-aparelho/`).
       As 12 falhas do A32 no gate de 07/09 não eram do IME "não grudar": `connectedAndroidTest`
@@ -133,14 +136,16 @@ Pequenas, sem spec própria; fazer em quick mode (TASK.md + SUMMARY.md + commit)
       Criado um 3º gate — emulador **Android 17 (API 37, páginas de 16 KB)** — que revelou libs de
       instrumentação velhas demais para a API 37 (atualizadas). Pendente **[YAN]**: no Android 17 a
       plataforma não exibe a janela do IME em contexto instrumentado, então os 27 testes de teclado não
-      rodam lá (o app funciona; é harness). Continua em `.specs/quick/011-target-36-e-harness-a17/`.
+      rodam lá (o app funciona; é harness) — **conclusão errada, corrigida na Q11**. Continua em
+      `.specs/quick/011-target-36-e-harness-a17/`.
 
-- [ ] **Q11 — targetSdk 36 + harness de IME no Android 17** (`.specs/quick/011-target-36-e-harness-a17/`).
-      ⚠️ `app/build.gradle.kts` está com `compileSdk`/`targetSdk` **36 NÃO COMMITADOS** — spike validado
-      (A32 159/159, API 34 159/159, build limpo), decidir entre commitar ou reverter. O prazo da Play
-      VENCEU em 31/08/2026 (exige >= 36 para publicar e atualizar; extensão até 01/11). Bloqueio aberto:
-      sob instrumentação no Android 17 a janela do teclado não abre (task sem foco) — 3 hipóteses já
-      refutadas, documentadas lá para não se repetirem.
+- [x] **Q11 — targetSdk 36 + teclado no Android 17** (`.specs/quick/011-target-36-e-harness-a17/`).
+      RESOLVIDA (2026-09-09). O target 36 foi commitado em `9bc8a96` (ver PS-1). As 27 falhas do
+      teclado no A17 não eram do harness: o emulador se declara com teclado físico e, com
+      `show_ime_with_hard_keyboard = 0`, o `InputMethodService` padrão nunca mostra o teclado — nem
+      manualmente (medido por `screencap`). O `UserSettingsGuard` passou a ligar a chave nos testes e
+      restaurar o valor da pessoa, e o produto ganhou a opção "Mostrar com teclado físico" na aba
+      Teclado (ligada por padrão). A17 fechou 163/163.
 
 ## Bloco 2 — Fechar `shortcut-bars` (Milestone 6)
 
@@ -158,6 +163,8 @@ Spec: `.specs/features/shortcut-bars/` — seguir o `tasks.md` de lá:
 Spec: `.specs/features/gesture-tour/`. Ordem sequencial do `tasks.md`:
 GT-T1 → T2 → T3 → T4 → T5 → T6 → T7 → T9 → T10 → T8 (fecho c/ goldens + **[YAN]** A32).
 
+**Status (2026-09-24)**: GT-T1..T10 feitas (PR #1); falta só o manual do GT-T8 no A32 **[YAN]**.
+
 - Cobre também os itens do `TODO`: índice/feedback na Docs, "?" por permissão na apresentação,
   gif de dedo na aba Modo.
 
@@ -167,6 +174,9 @@ Spec: `.specs/features/native-voice-models/`. Ordem sequencial do `tasks.md`:
 NM-T1 → T2 → T3 → T4 → T5 → T6 → T7 → T8 → T9 → T10 → T11 → T14 → T15 → T16 → T17 → T18 → T12 →
 T13 (**[YAN]** validação A32 + medições).
 
+**Status (2026-09-27)**: código completo (PR #3), CI verde em `5db6d75`. Faltam só os roteiros
+manuais da T18 e da T13 no A32 **[YAN]** — `.specs/features/native-voice-models/manual-validation.md`.
+
 - Atenção: NM-T12 escreve regras de backup que a monetization (MZ-T1) também toca — quem chegar
   segundo reconcilia (identidade INCLUÍDA, `models/` EXCLUÍDO).
 
@@ -175,10 +185,17 @@ T13 (**[YAN]** validação A32 + medições).
 Spec: `.specs/features/vision-capture/`. Ordem sequencial do `tasks.md`:
 VC-T1 → T2 → ... → T13 → T14 (**[YAN]** validação A32).
 
+**Status (2026-09-27)**: nada implementado — é o próximo bloco da Frente A.
+
 ## Bloco 6 — `keyflow-api` (Rust, pasta `api/` do monorepo) — Milestone 7, parte 1
 
 Spec: `.specs/features/keyflow-api/` (fica onde está; **API-T1 cria a pasta `api/`** na raiz).
 Ordem: API-T1 → T2 → T3 → T4 → T5 → T6 → T7 → T8 → T9 → T10 → T11 → T12 → T13.
+
+**Status (2026-09-27)**: API-T1..T12 feitas (2026-07-02/03) e T13 parcial (Dockerfile + guia
+`api/docs/deploy.md`), **na `main` desde 2026-09-28** (PR #4; a branch ficou só local até 27/09 —
+a regra "merge a cada task" não foi seguida). Gate `rust` verde no CI (111 testes). Parada no gate
+**[YAN]** da T13 (checklist no fim do `deploy.md`).
 
 - Gate próprio (rodar dentro de `api/`): `cargo fmt --check && cargo clippy --all-targets -- -D
   warnings && cargo test` (+ Postgres do `api/docker-compose.yml`). Sem device Android; **não
@@ -245,6 +262,10 @@ Base: `PLAYSTORE_CHECKLIST.md` (raiz). Executar como quick tasks / tasks avulsas
 [YAN gates] → Q1..Q4 → SB-T8..T10 → GT (tour/Docs) → NM (modelos locais+parcial) → VC (visão)
 → API (Rust, pode paralelizar) → MZ (monetização) → TS (temas, ⚠️ checkpoints) → PS-1..PS-7 (loja)
 ```
+
+**Posição atual (2026-09-28)**: GT e NM fechados (faltam só manuais **[YAN]**); ajustes do teclado
+pós-uso no A32 fechados (PR #5); a Frente A segue para **VC-T1**; a API está na `main` e a Frente B
+está parada no gate **[YAN]** da API-T13 (credenciais/staging).
 
 **Racional da ordem**: primeiro fechar o que está em voo (barras) e o que não depende de nada
 externo (tour/Docs — também é pré-requisito de conteúdo da loja); depois as features grandes de

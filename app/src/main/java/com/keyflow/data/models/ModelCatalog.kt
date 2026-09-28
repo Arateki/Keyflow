@@ -28,6 +28,8 @@ data class ModelSpec(
     /** Dirige o aviso "pode ser pesado neste aparelho" (CAT-03). Estimativa — revisar na NM-T13. */
     val recommendedRamMb: Int,
     val files: List<ModelFile>,
+    /** Qual modelo é de fato (ex.: "Whisper base") — subtexto do card, abaixo do nome amigável. */
+    val modelName: String = "",
 ) {
     val totalBytes: Long get() = files.sumOf { it.bytes }
 
@@ -41,7 +43,7 @@ data class ModelSpec(
  * Tamanhos e SHA256 conferidos na API do HF em 2026-09-24 (`/api/models/<repo>/tree/<commit>`: o `oid`
  * do LFS é o SHA256 do conteúdo — confirmado baixando o decoder do Parakeet). Os `tokens.txt` não
  * estão no LFS: SHA calculado baixando o arquivo. Todas as URLs responderam 206 a um pedido de faixa,
- * que é o que a retomada do DownloadManager usa.
+ * que é o que a retomada da fila de downloads usa (`Range`).
  *
  * As URLs apontam para o **commit** do repositório, não para `main`: se o upstream mexer num arquivo,
  * o app publicado continua baixando exatamente a versão cujo SHA conhece (mitiga o risco aceito na G5).
@@ -64,6 +66,7 @@ object ModelCatalog {
         engineType = EngineType.WHISPER,
         acceptsLanguageHint = true,
         recommendedRamMb = 512,
+        modelName = "Whisper base",
         files = listOf(
             ModelFile(
                 FileRole.ENCODER, "base-encoder.int8.onnx", "$WHISPER_BASE_REPO/base-encoder.int8.onnx",
@@ -88,6 +91,7 @@ object ModelCatalog {
         engineType = EngineType.WHISPER,
         acceptsLanguageHint = true,
         recommendedRamMb = 1024,
+        modelName = "Whisper small",
         files = listOf(
             ModelFile(
                 FileRole.ENCODER, "small-encoder.int8.onnx", "$WHISPER_SMALL_REPO/small-encoder.int8.onnx",
@@ -113,6 +117,7 @@ object ModelCatalog {
         // Detecta o idioma sozinho; o sherpa-onnx não recebe dica de idioma para transducer (NAT-06).
         acceptsLanguageHint = false,
         recommendedRamMb = 2048,
+        modelName = "Parakeet TDT 0.6B v3",
         files = listOf(
             ModelFile(
                 FileRole.ENCODER, "encoder.int8.onnx", "$PARAKEET_REPO/encoder.int8.onnx",

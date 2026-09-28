@@ -1890,3 +1890,123 @@ do Whisper base + SHA + instalação + transcrição curta e de 50 s + morte do 
 cliente local contra o binder de verdade; o parcial no `OverlayService` real (indicador, visualização,
 edição, envio, cancelar/desfazer); o gerenciador de modelos; os de teclado. O que resta do bloco são os
 roteiros manuais da T18 e da T13 no A32 [YAN].
+
+## Download de modelos derrubava o app no aparelho (2026-09-27)
+
+No A32, "Baixar" em qualquer modelo fechava o KeyFlow: `SecurityException` do `ConnectivityService` em
+`isActiveNetworkMetered` — o manifesto não declarava `ACCESS_NETWORK_STATE`. O CI nunca viu porque TODO
+teste do downloader injeta `isMetered = { false }`; a consulta de produção só rodava no app de verdade.
+A consulta virou `ModelDownloader.meteredProbe(context)` e ganhou teste de device próprio
+(`productionMeteredProbeRunsWithTheAppPermissions`), vermelho antes da permissão e verde depois.
+**Lição**: quando um teste injeta um colaborador falso, a versão de produção dele precisa de pelo menos
+um teste que a exercite com as permissões reais do app.
+
+## Suíte no A32: 239/240 e o teclado Samsung desfazendo o `ime set` (2026-09-27)
+
+Suíte completa no A32 (com o ponta a ponta do modelo local — primeira vez em ARM de verdade): 239/240.
+Whisper base int8 no A32: carga ~2,5 s; 6,7 s de áudio → 4,4 s para transcrever; 50 s → 32 s.
+A única falha (`KeyFlowKeyboardNumericFieldTest`, "KeyFlowKeyboardView não anexou") era corrida com o
+teclado Samsung: o `restore()` do teste anterior devolve o IME do Yan, o Samsung sobe a frio e no fim
+da inicialização regrava `default_input_method` com o valor lido antes. O `ime set` do teste seguinte
+caiu 2 ms antes dessa gravação e foi desfeito (1 em 47 trocas; 5/5 verdes ao repetir). Não é bug do
+KeyFlow. `awaitKeyboardAttached` agora confere o IME selecionado a cada nova tentativa e seleciona o
+KeyFlow de novo se o Samsung tiver voltado.
+
+## Teclado mais responsivo — 4 mudanças de fluidez (2026-09-27)
+
+Pedido do Yan ("o teclado da Samsung parece mais rápido"). Análise de código, sem medição ainda:
+1. `onUpdateSelection` fazia `getTextBeforeCursor` (chamada SÍNCRONA ao app) a cada letra, e o backspace
+   `getSelectedText` a cada toque/repetição — o teclado parava até o app responder (pior em WebView).
+   Agora a composição só é conferida no app quando o próprio aviso não bate
+   (`KeyFlowKeyboardService.compositionLooksIntact`), e a seleção vem do último aviso do editor.
+2. Soltar fora da tecla onde o dedo encostou descartava a letra. Agora há folga de ¼ da tecla
+   (`SLIDE_HYSTERESIS_FRACTION`, a calibrar no A32) e, passando dela, vale a tecla sob o dedo
+   (`Geometry.slideTarget`); destaque e prévia acompanham. Só saindo do teclado de vez nada é digitado.
+3. Letras vibram ao encostar (`HapticFeedbackConstants.KEYBOARD_TAP`: clique curto do sistema, segue a
+   vibração de toque do Android); intensidade 0 no app desliga.
+4. Rollover: o 2º dedo encostando solta a tecla do 1º (ordem do toque preservada), exceto backspace e
+   popup de acento.
+Testes: 426 unitários; pacote `com.keyflow.ime` no A32 40/40 (3 novos na `KeyFlowKeyboardCanvasGridTest`,
+vermelhos no código antigo). Suíte completa ainda não rodada. Falta medir antes/depois (toque → letra,
+quadros perdidos) contra o teclado Samsung; a prévia fora de `PopupWindow` (item 5) depende dessa medição.
+
+## Acentos no jeito do Samsung + balões sem PopupWindow (2026-09-27)
+
+Pedido do Yan depois de testar as 4 mudanças de fluidez ("parecem ter melhorado de fato"):
+- A tira de acentos abre em 250 ms (era 350) com a 1ª variante sobre a tecla e já escolhida; andar
+  para os lados troca a escolha sem subir até a tira (`AccentStrip`: só o x do dedo conta), e soltar
+  insere a escolhida. **Decisão consciente**: não existe mais "soltar sem escolher = nada" — um
+  long-press acidental insere a 1ª variante, como no Samsung.
+- Prévia e tira deixaram de ser `PopupWindow` (cada toque reposicionava uma janela pelo WindowManager):
+  viraram um `Drawable` no overlay da raiz da janela do teclado. Limite: não passam do topo da janela do
+  IME (a prévia da 1ª fileira fica sobre as barras; sem espaço, encosta no topo).
+- `activateKey` só recalcula geometria/acessibilidade quando a camada ou o shift mudam; `onDraw` sem
+  alocação por tecla; corretor consultado 150 ms depois da última letra.
+Testes: 434 unitários; `com.keyflow.ime` no A32 42/42; telas 84/84 (teclado bit-idêntico).
+
+## Corretor próprio com troca no espaço (Q9) e cursor no meio do texto (2026-09-27)
+
+**Corretor do sistema não serve no A32**: sondado pelas três APIs (`getSuggestions`, `getSentenceSuggestions`
+e a sessão com atributos do Android 12), o do teclado Samsung responde `IN_THE_DICTIONARY` com duas
+sugestões vazias para TODA palavra, até "teclsdo". Não há outro instalado. Decisões do Yan: sugerir **e
+trocar no espaço**; dicionário das listas do AOSP LatinIME (Apache 2.0 pelo projeto; espelho do
+CyanogenMod, commit `dded75c1`, porque o googlesource dava 503 — as listas não trazem licença própria).
+- `scripts/build-dictionaries.py` gera `assets/dict/{pt,en,es}.tsv` (100 mil palavras cada, SHA256 da fonte
+  conferido, em ordem alfabética da forma sem acento — o celular não ordena). **`.tsv` puro**: o AGP
+  descompacta `.gz` de assets e tira a extensão.
+- `WordList` em arrays contíguos + `Suggester` (Damerau–Levenshtein com tecla vizinha custando meia edição,
+  só entre palavras com a mesma 1ª letra, vizinha ou a 2ª). No A32: carga 1,2–1,9 s em segundo plano (era
+  7–10 s antes de tirar regex, listas de Integer e a ordenação); sugestão ~15 ms com JIT quente (era 80–100
+  ms: mapa + boxing na tecla vizinha e 3 vetores alocados por palavra comparada).
+- Troca no espaço/pontuação só com confiança alta (acento/maiúscula que faltou, 1 erro com folga; 2 só em
+  palavra longa e comum); backspace logo depois desfaz. Palavras marcadas "possivelmente ofensivas" valem
+  como palavra mas só voltam como acento/maiúscula ("criancas"→"crianças" — a lista marca "crianças").
+- Fora de senha, e-mail, URL, "sem sugestões" e terminal.
+- **Achado**: tocar numa sugestão colava a palavra depois da digitada (`finishComposingText` antes do
+  `commitText`) — nunca apareceu porque nenhuma sugestão chegava.
+- **Achado**: com o editor no mesmo processo (campos do app, probe dos testes) o `onUpdateSelection` chega
+  DENTRO da chamada ao campo. Estado do teclado tem que ser zerado antes de mexer no campo.
+
+**Cursor no meio do texto** (relato antigo do Yan): a região de composição ficava marcada no campo e a
+letra seguinte substituía a palavra lá atrás. Agora o teclado encerra a composição no campo quando o cursor
+sai dela. Teste de device reproduz ("oi" → cursor → "a" = "oai"), vermelho antes.
+
+Testes: 456 unitários; `com.keyflow.ime` no A32 45/45; telas 84/84.
+
+## Downloader próprio no lugar do DownloadManager — SPEC_DEVIATION da G6 (2026-09-28)
+
+"Baixar" ficava em 0% (relato do Yan). Medido: a rede dele tem **IPv6 quebrado** (endereço atribuído,
+nenhum pacote passa — também no PC da mesma rede); o DownloadManager tenta o IPv6 primeiro e espera cada
+tentativa estourar: 2,5 min em 0 bytes por arquivo antes de cair para o IPv4. Decisão do Yan: downloader
+próprio (em vez de só avisar "Conectando…").
+- `HttpFileFetcher` (JVM): OkHttp 4 com `Ipv4FirstDns` (o OkHttp 4 não corre IPv4 × IPv6; isso só no 5),
+  retomada por `Range`, descarta `.part` se o servidor retomar de outro ponto.
+- `HttpDownloadGateway` (JVM, mesmo contrato `DownloadGateway`): um arquivo por vez, fila em
+  `filesDir/model-downloads.json` (fora do backup), espera rede/Wi-Fi, tentativa que avançou não conta.
+- `ModelDownloadService` (`dataSync`): notificação com progresso e "Cancelar". Cada arquivo concluído
+  dispara `reconcile()` — substitui o `ModelDownloadReceiver`, que saiu com o `SystemDownloadGateway`.
+- No A32, na rede do Yan: Equilibrado (358 MB) com 1º byte em ~2 s e instalado em ~40 s.
+- De carona: o e2e `inferenceProcessDyingMidTranscription…` matava o `:inference` 500 ms depois de ele
+  SUBIR — no A32 de hoje, antes de o pedido chegar; o sistema recriava o serviço e a transcrição terminava
+  bem (4/4). Agora espera 3 s (a chamada dura ~33 s); 3/3.
+Testes: 472 unitários (8 do fetcher, 8 da fila); no A32, downloader/store/LocalPanel/e2e 17/18 — o que falhou é o e2e acima, 3/3 depois do ajuste.
+
+## Busca do Google, "Correção automática", etiquetas, cores "Sistema" e dicionário binário (2026-09-28)
+
+Pedidos do Yan depois de usar o corretor:
+- **Busca do Google sem sugestão**: o campo é `0xa0001` = texto | MULTI_LINE | **NO_SUGGESTIONS** (medido
+  no A32) — o app do Google pede isso porque mostra as próprias sugestões. O KeyFlow obedecia; o Samsung e
+  o Gboard sugerem e corrigem ali. NO_SUGGESTIONS deixou de bloquear (senha/e-mail/URL/terminal seguem fora).
+- **Interruptor "Correção automática"** na aba Teclado (`Settings.keyboardAutoCorrect`, ligado): desligado,
+  a faixa segue sugerindo, só a troca no espaço para.
+- **Sugestões cortadas** (WhatsApp): a faixa tinha 3dp de margem em cima/embaixo e cada palavra mais 4dp,
+  numa barra de 28dp — sobrava ~14dp para texto de 14sp. Agora a altura é toda da etiqueta (contorno
+  arredondado, "tag") e o texto se ajusta a ela.
+- **Cores "Sistema" como padrão do teclado** (`KeyboardColors`/`KeyboardSkin`; `Settings.keyboardSkin`):
+  medidas nos prints do Samsung no A32 (claro: fundo `#E6E6E6`, tecla `#FDFDFD`, função `#D1D1D1`, texto
+  `#252525`; escuro: `#0A0A0A`/`#2D2D2D`/`#171717`/`#FAFAFA`, sem contorno nas teclas). O Ateliê (a ciano
+  que vinha marcada) segue como opção na seção Skins; as outras amostras continuam bloqueadas. O app de
+  config não muda — só teclado, barras e faixa. As seis views que repetiam `if (dark) …` leem do mesmo lugar.
+- **Dicionário binário** (`.kfd`): a carga a frio no processo real era 6,2 s; agora 333–392 ms.
+Testes: 473 unitários; no A32 `ime` + `ui.config` 131/131; telas 84/84 depois de aprovar as 26 com
+teclado/barras/aba Teclado (revisadas).

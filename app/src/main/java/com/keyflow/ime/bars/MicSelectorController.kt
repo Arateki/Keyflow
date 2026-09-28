@@ -1,5 +1,7 @@
 package com.keyflow.ime.bars
 
+import com.keyflow.ime.KeyboardColors
+import com.keyflow.ime.KeyboardSkin
 import android.content.Context
 import android.graphics.Color
 import android.graphics.Rect
@@ -28,14 +30,16 @@ class MicSelectorController(
     private val context: Context,
     private val dark: Boolean,
     private val scale: Float,
+    skin: KeyboardSkin = KeyboardSkin.DEFAULT,
 ) {
+    private val colors = KeyboardColors.of(skin, dark)
     private var popup: PopupWindow? = null
     private var actions: List<MicAction> = emptyList()
     private var chips: List<TextView> = emptyList()
     private var rects: List<Rect> = emptyList()
     private var highlightedIndex = -1
 
-    private val kbKeyBorder = if (dark) 0xFF4A4234.toInt() else 0xFFD7C9A0.toInt()
+    private val kbKeyBorder = colors.keyBorder
 
     val isOpen: Boolean get() = popup != null
 

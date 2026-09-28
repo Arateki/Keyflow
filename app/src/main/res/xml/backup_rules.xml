@@ -10,8 +10,10 @@
     <exclude domain="sharedpref" path="keyflow_secure.xml" />
     <!--
       Modelos de voz locais (STO-01): centenas de MB, muito acima da cota do backup (~25 MB), e
-      re-baixáveis do catálogo. `model-tmp` é onde o DownloadManager grava antes da instalação.
+      re-baixáveis do catálogo. `model-tmp` é onde os downloads ficam antes da instalação, e
+      `model-downloads.json` é a fila deles: restaurada em outro aparelho, retomaria downloads sozinha.
     -->
     <exclude domain="file" path="models" />
+    <exclude domain="file" path="model-downloads.json" />
     <exclude domain="external" path="model-tmp" />
 </full-backup-content>

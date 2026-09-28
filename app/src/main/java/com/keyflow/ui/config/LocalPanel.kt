@@ -185,6 +185,9 @@ private fun ModelCard(
             }
             Column(Modifier.weight(1f)) {
                 Text(spec.displayName, color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Medium, fontSize = 13.sp)
+                if (spec.modelName.isNotBlank()) {
+                    Text(spec.modelName, color = palette.muted, fontFamily = SpaceMono, fontSize = 10.sp)
+                }
                 Text(
                     "${formatModelSize(spec.totalBytes)} · ${spec.languages}",
                     color = palette.faint,

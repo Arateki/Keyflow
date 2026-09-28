@@ -1,7 +1,9 @@
 # Monetization — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (M7–M10)
-**Status**: Draft (aguardando aprovação do Yan)
+**Status**: Aprovada pelo Yan em 2026-07-04 (Bloco 0 do `DEVELOPMENT-ORDER.md`) — nada implementado.
+A API está na `main` desde 2026-09-28 (PR #4: API-T1..T12 + T13 parcial), ainda sem staging (gate
+[YAN] da API-T13).
 
 > **Pré-requisito**: KeyFlow API em staging (API-T13). Até lá, MZ-T1 e a lógica pura podem andar,
 > mas o caminho feliz e2e não fecha.

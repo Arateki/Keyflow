@@ -11,7 +11,7 @@ import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.ModelDownloader
 import com.keyflow.data.models.ModelStore
 import com.keyflow.data.models.StartResult
-import com.keyflow.data.models.SystemDownloadGateway
+import com.keyflow.data.models.HttpDownloadGateway
 import org.junit.AfterClass
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -26,7 +26,7 @@ import java.io.File
 
 /**
  * Ponta a ponta com o modelo real (opt-in: argumento de instrumentação `localModelE2E=true`, ligado no
- * CI): baixa o Whisper base do catálogo pelo DownloadManager, confere SHA, instala e transcreve fala
+ * CI): baixa o Whisper base do catálogo pela fila de downloads do app, confere SHA, instala e transcreve fala
  * de verdade no `:inference`. Fixtures: `test_wavs` do sherpa-onnx (LibriSpeech, CC BY 4.0).
  *
  * O áudio longo (~50 s) repete as duas frases; sem o [WhisperChunker], o sherpa-onnx descartaria tudo
@@ -48,7 +48,7 @@ class LocalEngineEndToEndTest {
         val store = ModelStore(storeDir(context))
         if (store.isInstalled(spec.id)) return
         val downloader = ModelDownloader(
-            SystemDownloadGateway(context),
+            HttpDownloadGateway(File(context.filesDir, "model-downloads-e2e.json")),
             File(context.getExternalFilesDir(null), "model-tmp-e2e"),
             store,
             isMetered = { false },
@@ -103,8 +103,11 @@ class LocalEngineEndToEndTest {
         try {
             val inFlight = async(kotlinx.coroutines.Dispatchers.IO) { transcriber.transcribe(selection, long) }
             val pid = waitForInferencePid()
-            // O encoder do Whisper numa janela de 28 s leva bem mais que isso: a morte cai no meio.
-            delay(500)
+            // Conta a partir do processo SUBIR, não da chamada: medido no A32 (2026-09-28), 500 ms depois de
+            // subir o `:inference` ainda não tinha recebido o pedido — morria antes, o sistema recriava o
+            // serviço e a transcrição terminava bem no processo novo (4/4). A chamada longa dura ~33 s
+            // (carga 2,3 s + decodificação 3 s + transcrição 28 s): 3 s depois, a morte cai no meio dela.
+            delay(3_000)
             android.os.Process.killProcess(pid)
 
             assertEquals(LocalErrors.error(LocalErrors.PROCESS_DIED), inFlight.await())

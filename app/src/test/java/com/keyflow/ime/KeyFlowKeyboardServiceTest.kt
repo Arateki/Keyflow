@@ -59,4 +59,69 @@ class KeyFlowKeyboardServiceTest {
         val numberWithPasswordBits = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_TEXT_VARIATION_PASSWORD
         assertThat(KeyFlowKeyboardService.isPasswordVariant(numberWithPasswordBits)).isFalse()
     }
+
+    // ── composição sem consultar o app (onUpdateSelection) ──────────────────
+
+    @Test
+    fun `cursor at the end of a composing region as long as the word means the composition is ours`() {
+        assertThat(KeyFlowKeyboardService.compositionLooksIntact(3, 13, 13, 10, 13)).isTrue()
+    }
+
+    @Test
+    fun `a shorter composing region is the editor still catching up with fast typing`() {
+        // Digitou "abc" rápido; o aviso que chega ainda é do "ab".
+        assertThat(KeyFlowKeyboardService.compositionLooksIntact(3, 12, 12, 10, 12)).isTrue()
+    }
+
+    @Test
+    fun `no composing region means someone finished or cleared it`() {
+        assertThat(KeyFlowKeyboardService.compositionLooksIntact(3, 13, 13, -1, -1)).isFalse()
+    }
+
+    @Test
+    fun `cursor away from the composing region means the user moved it`() {
+        assertThat(KeyFlowKeyboardService.compositionLooksIntact(3, 4, 4, 10, 13)).isFalse()
+    }
+
+    @Test
+    fun `a selection over the text is not our composition`() {
+        assertThat(KeyFlowKeyboardService.compositionLooksIntact(3, 10, 13, 10, 13)).isFalse()
+    }
+
+    @Test
+    fun `a composing region longer than the word needs the real text to decide`() {
+        // Apagou de "abc" para "ab"; o aviso atrasado ainda mostra "abc".
+        assertThat(KeyFlowKeyboardService.compositionLooksIntact(2, 13, 13, 10, 13)).isFalse()
+    }
+
+    // ── onde a troca no espaço pode agir ─────────────────────────────────────
+
+    @Test
+    fun `the google search box, marked no-suggestions, still gets autocorrect like other keyboards do`() {
+        // inputType medido no A32 (2026-09-28): 0xa0001 = texto | MULTI_LINE | NO_SUGGESTIONS.
+        assertThat(KeyFlowKeyboardService.autoCorrectAllowed(0xa0001)).isTrue()
+    }
+
+    @Test
+    fun `plain text and messages get autocorrect`() {
+        assertThat(KeyFlowKeyboardService.autoCorrectAllowed(InputType.TYPE_CLASS_TEXT)).isTrue()
+        assertThat(
+            KeyFlowKeyboardService.autoCorrectAllowed(
+                InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_SHORT_MESSAGE,
+            ),
+        ).isTrue()
+    }
+
+    @Test
+    fun `addresses, emails and passwords keep what was typed`() {
+        listOf(
+            InputType.TYPE_TEXT_VARIATION_URI,
+            InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS,
+            InputType.TYPE_TEXT_VARIATION_PASSWORD,
+            InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD,
+        ).forEach { variation ->
+            assertThat(KeyFlowKeyboardService.autoCorrectAllowed(InputType.TYPE_CLASS_TEXT or variation)).isFalse()
+        }
+        assertThat(KeyFlowKeyboardService.autoCorrectAllowed(InputType.TYPE_CLASS_NUMBER)).isFalse()
+    }
 }

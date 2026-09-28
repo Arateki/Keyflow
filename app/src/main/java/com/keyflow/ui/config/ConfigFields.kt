@@ -1,5 +1,8 @@
 package com.keyflow.ui.config
 
+import androidx.compose.foundation.layout.fillMaxSize
+import com.keyflow.ime.KeyboardSkin
+import com.keyflow.ime.KeyboardColors
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -342,9 +345,19 @@ internal fun Dropdown(
     }
 }
 
-/** Seção "Skins" bloqueada (SKIN-01): chip BLOQUEADO, swatches esmaecidos e CTA "Desbloquear skins". */
+/**
+ * Seção "Skins" (SKIN-01): chip BLOQUEADO, swatches esmaecidos e CTA "Desbloquear skins". Com
+ * [onSkinSelected] (aba Teclado), as duas primeiras são as cores do teclado, livres: **Sistema** (padrão,
+ * como o Samsung — pedido do Yan, 2026-09-28) e **Ateliê** (a ciano que antes vinha marcada).
+ */
 @Composable
-internal fun SkinsSection(onUnlock: () -> Unit, unlockTag: String, modifier: Modifier = Modifier) {
+internal fun SkinsSection(
+    onUnlock: () -> Unit,
+    unlockTag: String,
+    modifier: Modifier = Modifier,
+    selectedSkin: String? = null,
+    onSkinSelected: ((String) -> Unit)? = null,
+) {
     val palette = LocalKeyFlowPalette.current
     Column(
         modifier
@@ -370,8 +383,31 @@ internal fun SkinsSection(onUnlock: () -> Unit, unlockTag: String, modifier: Mod
             Modifier.fillMaxWidth().padding(top = 11.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            SkinSwatch(palette.fg)
-            SkinSwatch(palette.teal, selected = true)
+            if (onSkinSelected == null) {
+                SkinSwatch(palette.fg)
+                SkinSwatch(palette.teal, selected = true)
+            } else {
+                val system = KeyboardColors.of(KeyboardSkin.SYSTEM, palette.isDark)
+                SkinChoice(
+                    label = "Sistema",
+                    selected = KeyboardSkin.of(selectedSkin) == KeyboardSkin.SYSTEM,
+                    onClick = { onSkinSelected(KeyboardSkin.SYSTEM.id) },
+                    tag = skinTag(KeyboardSkin.SYSTEM.id),
+                ) {
+                    // Fundo e tecla do próprio esquema, como uma tecla do Samsung.
+                    Box(Modifier.fillMaxSize().background(Color(system.tray)).padding(horizontal = 10.dp, vertical = 9.dp)) {
+                        Box(Modifier.fillMaxSize().clip(RoundedCornerShape(3.dp)).background(Color(system.key)))
+                    }
+                }
+                SkinChoice(
+                    label = "Ateliê",
+                    selected = KeyboardSkin.of(selectedSkin) == KeyboardSkin.ATELIE,
+                    onClick = { onSkinSelected(KeyboardSkin.ATELIE.id) },
+                    tag = skinTag(KeyboardSkin.ATELIE.id),
+                ) {
+                    Box(Modifier.fillMaxSize().background(palette.teal))
+                }
+            }
             SkinSwatch(palette.terracotta)
             SkinSwatch(palette.bg, border = true)
         }
@@ -396,6 +432,44 @@ internal fun SkinsSection(onUnlock: () -> Unit, unlockTag: String, modifier: Mod
                 fontSize = 12.sp,
             )
         }
+    }
+}
+
+fun skinTag(id: String) = "teclado-skin-$id"
+
+/** Cor do teclado que dá para escolher: swatch clicável com o nome embaixo e anel quando é a atual. */
+@Composable
+private fun androidx.compose.foundation.layout.RowScope.SkinChoice(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    tag: String,
+    swatch: @Composable () -> Unit,
+) {
+    val palette = LocalKeyFlowPalette.current
+    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(40.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .clickable(onClick = onClick)
+                .testTag(tag)
+                .then(
+                    if (selected) {
+                        Modifier.border(2.dp, palette.fg, RoundedCornerShape(4.dp))
+                    } else {
+                        Modifier.border(1.dp, palette.line, RoundedCornerShape(4.dp))
+                    },
+                ),
+        ) { swatch() }
+        Text(
+            label,
+            color = if (selected) palette.fg else palette.muted,
+            fontFamily = SpaceMono,
+            fontSize = 9.5.sp,
+            modifier = Modifier.padding(top = 4.dp),
+        )
     }
 }
 

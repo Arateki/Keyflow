@@ -1,16 +1,21 @@
 package com.keyflow.ime.keyboard
 
+import com.keyflow.ime.KeyboardColors
+import com.keyflow.ime.KeyboardSkin
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.drawable.GradientDrawable
+import android.util.TypedValue
 import android.view.Gravity
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
 
 /**
- * Faixa horizontal de sugestões do corretor do sistema (SPL-01/02), acima da grade. Sem corretor/sem
- * sugestões fica só sem chips, sem quebrar a digitação (edge case do spec).
+ * Faixa horizontal de sugestões do corretor (SPL-01/02, Q9), acima da grade. Sem sugestões fica só sem
+ * chips, sem quebrar a digitação (edge case do spec). Cada palavra é uma etiqueta com contorno e cantos
+ * arredondados (pedido do Yan, 2026-09-28), do tamanho que a barra dá.
  *
  * Rola na horizontal (pedido do Yan, 2026-09-07): o corretor devolve várias palavras e, na largura de
  * uma barra, as últimas ficavam fora da tela sem nenhum jeito de alcançá-las.
@@ -24,11 +29,16 @@ class CandidatesView(
     dark: Boolean,
     private val onTap: (String) -> Unit,
     private val scale: Float = 1f,
+    skin: KeyboardSkin = KeyboardSkin.DEFAULT,
 ) : HorizontalScrollView(context) {
 
-    private val kbTray = if (dark) 0xFF332E27.toInt() else 0xFFDCD0AC.toInt()
-    private val kbInk = if (dark) 0xFFF1E7C9.toInt() else 0xFF2B2720.toInt()
-    private val kbKeyBorder = if (dark) 0xFF4A4234.toInt() else 0xFFD7C9A0.toInt()
+    private val colors = KeyboardColors.of(skin, dark)
+    private val chipOutline = colors.chipOutline
+
+    private val kbTray = colors.tray
+    private val kbInk = colors.ink
+    private val kbKeyBorder = colors.keyBorder
+    private val kbKey = colors.key
 
     private val hintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -48,7 +58,10 @@ class CandidatesView(
 
     init {
         setBackgroundColor(kbTray)
-        setPadding(dp(6), dp(3), dp(6), dp(3))
+        // Sem margem vertical: com 3dp em cima e embaixo, mais 4dp em cada etiqueta, sobrava ~14dp de altura
+        // para um texto de 14sp numa barra de 28dp — a metade de baixo das palavras ficava cortada (achado do
+        // Yan no WhatsApp, 2026-09-28). A altura agora é toda da etiqueta, e o texto se ajusta a ela.
+        setPadding(dp(4), 0, dp(4), 0)
         isFillViewport = true
         isHorizontalScrollBarEnabled = false
         addView(row)
@@ -60,8 +73,38 @@ class CandidatesView(
     // mudar a altura do teclado. Mais baixa que as teclas normais por pedido do Yan (2026-07-01, device
     // físico): essa faixa não é uma fileira de digitação, não precisa da mesma altura de toque.
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(dp(HEIGHT_DP), MeasureSpec.EXACTLY))
-        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), dp(HEIGHT_DP))
+        // A barra passa a altura exata do seu espaço; fora dela (ex.: wrap_content), [HEIGHT_DP].
+        val height = if (MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.EXACTLY) {
+            MeasureSpec.getSize(heightMeasureSpec)
+        } else {
+            dp(HEIGHT_DP)
+        }
+        super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY))
+        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), height)
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        if (h != oldh) (0 until row.childCount).forEach { styleChip(row.getChildAt(it) as TextView) }
+    }
+
+    /** Etiqueta: contorno arredondado, margem em volta e texto que cabe na altura que sobrou. */
+    private fun styleChip(chip: TextView) {
+        val barHeight = if (height > 0) height else dp(HEIGHT_DP)
+        val marginV = maxOf(dp(2), barHeight / 8)
+        val chipHeight = barHeight - 2 * marginV
+        chip.layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, chipHeight).apply {
+            setMargins(dp(3), marginV, dp(3), marginV)
+        }
+        chip.setTextSize(
+            TypedValue.COMPLEX_UNIT_PX,
+            minOf(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 14f * scale, resources.displayMetrics), chipHeight * 0.55f),
+        )
+        chip.background = GradientDrawable().apply {
+            cornerRadius = chipHeight / 2f
+            setColor(kbKey)
+            setStroke(maxOf(1, dp(1)), chipOutline)
+        }
     }
 
     /**
@@ -80,6 +123,10 @@ class CandidatesView(
     val candidatesForTest: List<String>
         get() = (0 until row.childCount).map { (row.getChildAt(it) as TextView).text.toString() }
 
+    /** Toca no chip de [word] como o dedo faria — só para o instrumentado. */
+    fun tapForTest(word: String): Boolean =
+        (0 until row.childCount).map { row.getChildAt(it) as TextView }.firstOrNull { it.text == word }?.performClick() ?: false
+
     fun update(candidates: List<String>) {
         row.removeAllViews()
         candidates.forEach { word ->
@@ -87,11 +134,13 @@ class CandidatesView(
                 TextView(context).apply {
                     text = word
                     gravity = Gravity.CENTER
+                    includeFontPadding = false
+                    maxLines = 1
                     setTextColor(kbInk)
-                    textSize = 14f * scale
-                    setPadding(dp(10), dp(4), dp(10), dp(4))
+                    setPadding(dp(12), 0, dp(12), 0)
                     isClickable = true
                     setOnClickListener { onTap(word) }
+                    styleChip(this)
                 },
             )
         }

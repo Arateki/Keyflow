@@ -66,6 +66,7 @@ class KeyFlowKeyboardView(
     private val onExpand: () -> Unit = {},
     private val onErrorTap: () -> Unit = {},
     private val dark: Boolean = false,
+    private val skin: KeyboardSkin = KeyboardSkin.DEFAULT,
     // Idioma ativo (KC-T9): decide Layouts.forLocale(...) da grade Canvas. "en" cai no fallback do LAY-05.
     private val locale: String = "en",
     // Só true quando há mais de 1 idioma habilitado (globo perde sentido com um só) — KC-T9.
@@ -179,10 +180,11 @@ class KeyFlowKeyboardView(
     val gridDragActiveForTest: Boolean get() = gridDragActive
 
     // Paleta Ateliê resolvida por tema (ints Android; o View não usa Compose).
-    private val kbTray = if (dark) 0xFF332E27.toInt() else 0xFFDCD0AC.toInt()
-    private val kbKeyBorder = if (dark) 0xFF4A4234.toInt() else 0xFFD7C9A0.toInt()
-    private val kbModifier = if (dark) 0xFF2B2720.toInt() else 0xFFCFC096.toInt()
-    private val kbInk = if (dark) 0xFFF1E7C9.toInt() else 0xFF2B2720.toInt()
+    private val colors = KeyboardColors.of(skin, dark)
+    private val kbTray = colors.tray
+    private val kbKeyBorder = colors.keyBorder
+    private val kbModifier = colors.modifier
+    private val kbInk = colors.ink
 
     // Estado/tempo do microfone (espelha AudioRecorder/OrbButtonView: conta só em RECORDING).
     private val handler = Handler(Looper.getMainLooper())
@@ -290,6 +292,7 @@ class KeyFlowKeyboardView(
                 context = context,
                 def = def,
                 dark = dark,
+                skin = skin,
                 expandedMode = expandedMode,
                 grids = shortcutGrids,
                 callbacks = callbacks,
@@ -317,9 +320,12 @@ class KeyFlowKeyboardView(
             context = context,
             layout = layoutFor(numericField),
             dark = dark,
+            skin = skin,
             onKeyAction = ::forwardCanvasKeyAction,
             scale = scale,
             initialLayer = initialLayerFor(numericField),
+            // Mesma chave da vibração da orbe/barras: 0 desliga também a das teclas.
+            hapticFeedback = vibrationIntensity > 0,
         ).also { canvasGrid = it }
     }
 

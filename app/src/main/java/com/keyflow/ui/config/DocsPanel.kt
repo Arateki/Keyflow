@@ -281,6 +281,7 @@ val docsSections: List<DocSection> = listOf(
             DocBlock.Labeled("ONNX Runtime", "motor de inferência dentro do sherpa-onnx — MIT (Microsoft)."),
             DocBlock.Labeled("Whisper", "modelos Rápido e Equilibrado — MIT (OpenAI); os cards do Hugging Face declaram Apache 2.0."),
             DocBlock.Labeled("Parakeet TDT 0.6B v3", "modelo Máxima qualidade — CC BY 4.0 (NVIDIA), convertido para ONNX int8 pelo sherpa-onnx."),
+            DocBlock.Labeled("Dicionários do corretor", "listas de palavras do teclado do Android (AOSP LatinIME) para português, inglês e espanhol — Apache 2.0."),
             DocBlock.Labeled("Space Grotesk e Space Mono", "fontes — SIL Open Font License 1.1."),
         ),
     ),
