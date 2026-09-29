@@ -26,6 +26,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.keyflow.core.shortcuts.BarButton
+import com.keyflow.core.shortcuts.BarDef
 import com.keyflow.core.shortcuts.BarsConfig
 import com.keyflow.core.shortcuts.ShortcutGrid
 import com.keyflow.data.Settings
@@ -233,6 +235,14 @@ fun TecladoPanel(
  * prévia bater com o teclado real); com a navegação lateral, a largura da tela invadia o menu. A ALTURA
  * continua a real — é ela que o slider muda.
  */
+/**
+ * Barra da prévia de tamanho: a de fábrica sem a faixa de sugestões. Com ela, a barra passava da largura
+ * do painel e rolava dentro da prévia (Yan, 2026-09-28); a prévia é sobre o tamanho das teclas.
+ */
+private val SIZE_PREVIEW_BARS: BarsConfig = BarsConfig.DEFAULT.let { factory ->
+    factory.copy(expanded = factory.expanded.map { bar -> BarDef(bar.buttons.filterNot { it == BarButton.Candidates }) })
+}
+
 @Composable
 private fun KeyboardSizePreview(
     scalePercent: Int,
@@ -269,6 +279,7 @@ private fun KeyboardSizePreview(
                             locale = locale,
                             showLanguageKey = true,
                             numberRowEnabled = numberRowEnabled,
+                            barsConfig = SIZE_PREVIEW_BARS,
                         ).apply {
                             setExpanded(true)
                             keyboardSizePreviewForTest = this
