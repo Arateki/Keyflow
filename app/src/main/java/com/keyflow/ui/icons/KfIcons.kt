@@ -293,6 +293,19 @@ object KfIcons {
         ),
     )
 
+    /**
+     * Notificação: um sino — o corpo que alarga na base, o badalo embaixo e o pino em cima. O mesmo traço dos outros
+     * ícones de aba (1,6 no grid 24).
+     */
+    val TabNotificacao = KfIconSpec(
+        "tab-notificacao",
+        listOf(
+            "M6 16.5v-5.5a6 6 0 0 1 12 0v5.5l1.6 2H4.4z",
+            "M10 20.75a2.1 2.1 0 0 0 4 0",
+            "M12 3.25V5",
+        ),
+    )
+
     /** Todos os ícones — o teste de unidade confere nomes únicos e paths bem-formados. */
     /**
      * Sem limite ("∞" nos seletores de tempo da aba Transcrição): duas alças que se cruzam no centro. O
@@ -311,7 +324,7 @@ object KfIcons {
         Mic, Adjust, ChevronUp, ChevronDown, Return, Paste, Grid, Joystick,
         RecordDot, Pause, Play, Undo, Sending, Close, Trash, Hand,
         Check, Plus, ChevronRight, ChevronLeft, Lock, LockOpen, Globe, Moon, Sun,
-        TabModo, TabVoz, TabVisao, TabRaciocinio, TabBoca, TabTeclado, TabSobrepor, TabDocs, Infinity,
+        TabModo, TabVoz, TabVisao, TabRaciocinio, TabBoca, TabNotificacao, TabTeclado, TabSobrepor, TabDocs, Infinity,
     )
 }
 

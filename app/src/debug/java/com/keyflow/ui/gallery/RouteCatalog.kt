@@ -250,10 +250,11 @@ object RouteCatalog {
         // teclado, na Teclado — escolhas separadas (Yan, 2026-09-29), aqui com o Aero marcado nas duas.
         Route("config-overlay-skins") { SkinsRoute(orb = true) },
         Route("config-teclado-skins") { SkinsRoute(orb = false) },
-        // As abas novas (Visão, Raciocínio, Voz), ainda vazias: só o cabeçalho com o nome e o menu com os ícones.
+        // As abas novas (Notificação, Visão, Raciocínio, Voz), ainda vazias: só o cabeçalho com o nome e o menu com os ícones.
         Route("config-visao") { ConfigTabRoute(ConfigTab.VISAO) },
         Route("config-raciocinio") { ConfigTabRoute(ConfigTab.RACIOCINIO) },
         Route("config-fala") { ConfigTabRoute(ConfigTab.FALA) },
+        Route("config-notificacao") { ConfigTabRoute(ConfigTab.NOTIFICACAO) },
         Route("config-unlock") { ConfigTabRoute(ConfigTab.TECLADO, keyboardEnabled = true, unlockOpen = true) },
         // "?" do cabeçalho aberto: a seção da Docs da aba, com o atalho para a Docs.
         Route("config-ajuda-teclado") { ConfigTabRoute(ConfigTab.TECLADO, keyboardEnabled = true, tabHelpOpen = true) },

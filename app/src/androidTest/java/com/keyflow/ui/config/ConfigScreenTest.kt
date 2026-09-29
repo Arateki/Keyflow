@@ -14,6 +14,7 @@ import androidx.compose.ui.test.click
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -121,22 +122,55 @@ class ConfigScreenTest {
     }
 
     @Test
-    fun newTabsSitNextToTranscriptionAndStartEmpty() {
-        // Abas novas (Yan, 2026-09-29): Visão, Raciocínio e Voz, junto da Transcrição, com o nome no cabeçalho e
-        // ainda sem conteúdo. A Voz é a FALA por dentro: VOZ é, desde sempre, a aba Transcrição.
-        assertEquals(
-            listOf(ConfigTab.VOZ, ConfigTab.VISAO, ConfigTab.RACIOCINIO, ConfigTab.FALA),
-            ConfigTab.entries.take(4),
-        )
+    fun newTabsStartEmptyWithTheirNameInTheHeader() {
+        // Abas novas (Yan, 2026-09-29): Notificação, Visão, Raciocínio e Voz, com o nome no cabeçalho e ainda sem conteúdo.
+        // A Voz é a FALA por dentro: VOZ é, desde sempre, a aba Transcrição.
         val h = Harness()
         rule.setContent { h.Content() }
 
-        for ((tab, title) in listOf(ConfigTab.VISAO to "Visão", ConfigTab.RACIOCINIO to "Raciocínio", ConfigTab.FALA to "Voz")) {
+        val tabs = listOf(
+            ConfigTab.NOTIFICACAO to "Notificação",
+            ConfigTab.VISAO to "Visão",
+            ConfigTab.RACIOCINIO to "Raciocínio",
+            ConfigTab.FALA to "Voz",
+        )
+        for ((tab, title) in tabs) {
             rule.onNodeWithTag(tabTag(tab)).performClick()
             rule.onNodeWithTag(panelTag(tab)).assertIsDisplayed()
             rule.onNodeWithTag(HEADER_TAB_TITLE_TAG).assertTextEquals(title)
             rule.onAllNodesWithTag(HEADER_TAB_HELP_TAG).assertCountEquals(0)
         }
+    }
+
+    @Test
+    fun menuListsInterfacesThenCapabilitiesAndTheTitlesOnlyShowWhenExpanded() {
+        // Yan, 2026-09-29: Teclado, Sobrepor e Notificação são interfaces; Transcrição, Visão, Raciocínio e Voz, capacidades.
+        // Primeiro as interfaces. Recolhido, só uma linha separa os grupos; o título só aparece com o menu aberto.
+        val h = Harness()
+        rule.setContent { h.Content() }
+
+        val order = listOf(
+            ConfigTab.TECLADO, ConfigTab.OVERLAY, ConfigTab.NOTIFICACAO,
+            ConfigTab.VOZ, ConfigTab.VISAO, ConfigTab.RACIOCINIO, ConfigTab.FALA,
+            ConfigTab.DOCS,
+        )
+        assertEquals(order, ConfigTab.entries.toList())
+        fun tops() = order.map { rule.onNodeWithTag(tabTag(it)).getUnclippedBoundsInRoot().top }
+
+        val collapsed = tops()
+        assertEquals(collapsed.sorted(), collapsed) // de cima para baixo, na ordem do menu
+        for (group in listOf(TabGroup.INTERFACES, TabGroup.CAPACIDADES)) {
+            rule.onNodeWithTag(navGroupTag(group)).assertIsDisplayed()
+            rule.onAllNodesWithTag(navGroupTitleTag(group)).assertCountEquals(0)
+        }
+
+        rule.onNodeWithTag(NAV_RAIL_TOGGLE_TAG).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag(navGroupTitleTag(TabGroup.INTERFACES)).assertIsDisplayed().assertTextEquals("INTERFACES")
+        rule.onNodeWithTag(navGroupTitleTag(TabGroup.CAPACIDADES)).assertIsDisplayed().assertTextEquals("CAPACIDADES")
+
+        // O layout vertical é o mesmo aberto e recolhido: a altura do cabeçalho está sempre reservada.
+        assertEquals(collapsed, tops())
     }
 
     @Test

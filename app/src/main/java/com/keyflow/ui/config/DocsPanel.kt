@@ -613,8 +613,8 @@ fun docsSectionFor(tab: ConfigTab): DocSection? {
         ConfigTab.VOZ -> "aba-transcricao"
         ConfigTab.TECLADO -> "aba-teclado"
         ConfigTab.OVERLAY -> "aba-sobrepor"
-        // Visão, Raciocínio e Voz ainda não têm conteúdo para explicar.
-        ConfigTab.VISAO, ConfigTab.RACIOCINIO, ConfigTab.FALA, ConfigTab.DOCS -> return null
+        // Notificação, Visão, Raciocínio e Voz ainda não têm conteúdo para explicar.
+        ConfigTab.NOTIFICACAO, ConfigTab.VISAO, ConfigTab.RACIOCINIO, ConfigTab.FALA, ConfigTab.DOCS -> return null
     }
     return docsSections.first { it.id == id }
 }

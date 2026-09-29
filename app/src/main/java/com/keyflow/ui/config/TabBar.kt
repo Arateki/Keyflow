@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -46,8 +47,14 @@ import com.keyflow.ui.icons.KfIcon
 import com.keyflow.ui.icons.KfIcons
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
+import com.keyflow.ui.theme.SpaceMono
 
 fun tabTag(tab: ConfigTab): String = "tab-${tab.name.lowercase()}"
+
+fun navGroupTag(group: TabGroup): String = "nav-group-${group.name.lowercase()}"
+
+/** O título do grupo — só existe com o menu aberto. */
+fun navGroupTitleTag(group: TabGroup): String = "nav-group-title-${group.name.lowercase()}"
 
 const val NAV_RAIL_TAG = "nav-rail"
 const val NAV_RAIL_TOGGLE_TAG = "nav-rail-toggle"
@@ -113,16 +120,62 @@ fun NavRail(
                 .padding(top = 10.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            ConfigTab.entries.forEach { tab ->
-                RailItem(
-                    tab = tab,
-                    isActive = tab == active,
-                    isEnabled = enabled(tab),
-                    expanded = expanded,
-                    onClick = {
-                        onSelect(tab)
-                        if (expanded) onExpandedChange(false)
-                    },
+            // As abas em dois grupos (Interfaces, depois Capacidades) e a Docs no fim; cada grupo abre com um cabeçalho de
+            // altura fixa, então o layout vertical é o mesmo recolhido e aberto.
+            TabGroup.entries.forEachIndexed { index, group ->
+                RailGroupHeader(group = group, showLine = index > 0, expanded = expanded)
+                ConfigTab.entries.filter { it.group == group }.forEach { tab ->
+                    RailItem(
+                        tab = tab,
+                        isActive = tab == active,
+                        isEnabled = enabled(tab),
+                        expanded = expanded,
+                        onClick = {
+                            onSelect(tab)
+                            if (expanded) onExpandedChange(false)
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * O cabeçalho de um grupo de abas (Yan, 2026-09-29). Recolhido, é só uma **linha curta** que separa os grupos (o primeiro
+ * não tem linha: nada a separar); aberto, o **título** do grupo aparece ao lado da mesma linha. A altura é sempre a
+ * mesma ([RAIL_GROUP_HEADER_HEIGHT]) e a linha fica na faixa do ícone, então nada anda na vertical — nem na horizontal —
+ * ao abrir ou recolher o menu. O grupo sem título (Docs) só tem a linha.
+ */
+@Composable
+private fun RailGroupHeader(group: TabGroup, showLine: Boolean, expanded: Boolean) {
+    val palette = LocalKeyFlowPalette.current
+    val title = group.title
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = RAIL_ITEM_INSET)
+            .height(RAIL_GROUP_HEADER_HEIGHT)
+            .testTag(navGroupTag(group)),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.width(RAIL_ICON_SLOT), contentAlignment = Alignment.Center) {
+            if (showLine) Box(Modifier.width(RAIL_GROUP_LINE_WIDTH).height(1.dp).background(palette.line))
+        }
+        if (title != null) {
+            AnimatedVisibility(visible = expanded, enter = fadeIn(tween(200)), exit = fadeOut(tween(120))) {
+                Text(
+                    title.uppercase(),
+                    color = palette.faint,
+                    fontFamily = SpaceMono,
+                    fontSize = 8.5.sp,
+                    letterSpacing = 1.4.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Clip,
+                    modifier = Modifier
+                        .padding(start = 4.dp, end = 12.dp)
+                        .semantics { heading() }
+                        .testTag(navGroupTitleTag(group)),
                 )
             }
         }
@@ -213,6 +266,12 @@ private val RAIL_ICON_SLOT = 38.dp
 private val RAIL_ITEM_INSET = (NAV_RAIL_COLLAPSED_WIDTH - RAIL_ICON_SLOT) / 2
 
 private val RAIL_TOGGLE_SIZE = 32.dp
+
+/** Altura do cabeçalho de um grupo: a mesma com o menu recolhido (só a linha) e aberto (com o título). */
+private val RAIL_GROUP_HEADER_HEIGHT = 30.dp
+
+/** A linha curta que separa os grupos com o menu recolhido. */
+private val RAIL_GROUP_LINE_WIDTH = 18.dp
 
 /** Véu sobre o painel com a barra aberta: toque fora recolhe. Quase transparente — é só um alvo. */
 @Composable
