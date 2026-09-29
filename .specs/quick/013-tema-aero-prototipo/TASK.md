@@ -154,3 +154,19 @@ fundo" — e **água dentro do vidro** na orbe.
   Raciocínio, vazia como as outras duas. `KfIcons.TabBoca`: os lábios com o arco de cima e a linha da boca, no
   mesmo traço dos outros.
 
+## Rodada 6 (2026-09-29): o teclado Aero refeito
+
+O Yan: "a orbe ficou incrível, mas o teclado eu não gostei". Pediu: as mesmas cores no tema claro e no escuro
+("não precisa alterar, nesse tema em específico"), cores mais parecidas com vidro e transparente, e letra mais
+grossa e mais visível, "talvez preto para combinar com o transparente — vejam o que fica mais adequado".
+
+- **Uma aparência só**: sai a variação dia/noite (`KeyboardBackdrop.AERO`, `GlassPainter`/`GlassSheen` sem `night`;
+  `KeyboardColors.of` devolve o mesmo esquema nos dois temas; teste fixa isso).
+- **Vidro claro e quase transparente**: a lâmina é só um fio de azul-céu (α 12–22%) e o véu das teclas de letra é
+  bem menor que meio opaco (α ~32%; função ~40%). Nada de tinta escura nem azul carregado.
+- **Letras**: **pretas**, peso médio (`LabelWeight.MEDIUM`) e halo branco forte; ícones com traço 20% mais grosso.
+  Testei preto sobre app claro e sobre app escuro no IME real do emulador: sobre escuro o vidro fica fumê e a letra
+  segue legível pelo halo. Escolha: preto (o azul-marinho de antes dessaturava sobre o vidro claro).
+- Em aberto: sobre fundo escuro o vidro claro vira cinza-fumê (é o que vidro claro faz sobre preto, sem desfoque);
+  ver no A32 se agrada.
+
