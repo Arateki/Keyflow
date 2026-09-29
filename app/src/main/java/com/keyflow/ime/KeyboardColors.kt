@@ -72,8 +72,8 @@ data class KeyboardColors(
     /** A skin tem superfície própria (Aero, Glitch): teclas pintadas por um [KeySurface] sobre um [backdrop]. */
     val hasSurface: Boolean get() = backdrop != null
 
-    /** As teclas desta skin ([hasSurface]); `null` nas skins lisas. */
-    fun surface(density: Float): KeySurface? = backdrop?.surface(density)
+    /** As teclas desta skin ([hasSurface]); `null` nas skins lisas. [blurBehind]: o aparelho desfoca o que está atrás. */
+    fun surface(density: Float, blurBehind: Boolean): KeySurface? = backdrop?.surface(density, blurBehind)
 
     /**
      * Passa uma cor de acento compartilhada (o verde do mic pronto, o âmbar de gravando, o terracota de erro) para

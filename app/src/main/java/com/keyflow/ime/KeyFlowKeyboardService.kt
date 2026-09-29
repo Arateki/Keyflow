@@ -343,7 +343,7 @@ class KeyFlowKeyboardService : InputMethodService() {
     private fun applyGlassWindow(colors: KeyboardColors) {
         val w = window?.window ?: return
         val systemColor = systemNavigationBarColor ?: w.navigationBarColor.also { systemNavigationBarColor = it }
-        w.navigationBarColor = colors.backdrop?.navigationBarColor ?: systemColor
+        w.navigationBarColor = colors.backdrop?.navigationBarColor(windowBlurAvailable(this)) ?: systemColor
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val blurPx = if (colors.backdrop == KeyboardBackdrop.AERO && windowBlurAvailable(this)) (WINDOW_BLUR_DP * resources.displayMetrics.density).toInt() else 0
             w.setBackgroundBlurRadius(blurPx)

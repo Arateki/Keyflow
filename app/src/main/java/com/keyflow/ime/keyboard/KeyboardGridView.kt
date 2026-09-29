@@ -69,7 +69,7 @@ class KeyboardGridView(
     private val kbInk = colors.ink
     private val pressedOverlay = 0x33000000
     // Aero e Glitch: teclas com superfície própria sobre o fundo que a view-mãe pinta (a grade não tem fundo próprio).
-    private val surface: KeySurface? = colors.surface(dp(1))
+    private val surface: KeySurface? = colors.surface(dp(1), com.keyflow.ime.windowBlurAvailable(context))
     private val sheetLocator = GlassSheetLocator(this)
 
     private val keyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }

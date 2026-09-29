@@ -123,7 +123,7 @@ class BarView(
     private val kbInk = colors.ink
     private val pressedOverlay = 0x33000000
     // Aero e Glitch: botões com superfície própria; o fundo da barra ([kbTray]) é transparente e o fundo vem da view-mãe.
-    private val surface: KeySurface? = colors.surface(dp(1f))
+    private val surface: KeySurface? = colors.surface(dp(1f), com.keyflow.ime.windowBlurAvailable(context))
     private val sheetLocator = GlassSheetLocator(this)
 
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }

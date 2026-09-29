@@ -1,38 +1,44 @@
 package com.keyflow.ime
 
+import android.graphics.Bitmap
+import android.graphics.BitmapShader
+import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.LinearGradient
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
-import android.graphics.Region
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
+import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
+import kotlin.math.ceil
+import kotlin.math.roundToInt
 
 /**
- * Tecla de vidro do Aero ([KeyboardColors.isGlass]), usada pela grade e pelas barras, sobre a lâmina
- * translúcida do teclado ([KeyboardBackdrop]) — e, através dela, sobre o que o app desenha atrás. O que faz
- * parecer o vidro do Windows Vista/7, de baixo para cima:
+ * Tecla de vidro do Aero, usada pela grade e pelas barras, sobre a lâmina translúcida do teclado
+ * ([KeyboardBackdrop]) — e, através dela, sobre o que o app desenha atrás.
  *
- * - **Sombra** macia embaixo e fio escuro por fora: a tecla é uma peça de vidro sobre a lâmina.
- * - **Tinta** ([tint]) — vidro colorido —, e a luz que se junta na base.
- * - **O reflexo diagonal**: duas faixas de borda nítida que atravessam o teclado inteiro como uma só
- *   lâmina; cada tecla mostra o seu pedaço. É a assinatura do Aero ([useSheet] a posiciona).
- * - **O brilho** da metade de cima, discreto, com borda nítida, e o **aro** claro que fecha o gel.
+ * A face da tecla é desenhada **uma vez** num sprite ([SpriteCache]) e copiada a cada quadro; por isso pode ter o nível
+ * de detalhe da orbe de vidro, de baixo para cima:
+ * - **sombra** macia por fora (o interior é recortado: a tecla é translúcida e uma sombra por baixo daria cinza);
+ * - **o véu** da cor da tecla, em degradê;
+ * - **a borda de Fresnel**: o vidro é mais denso junto ao aro e mais claro no meio;
+ * - **a luz da base**, refratada, e um fio de luz junto à borda de baixo;
+ * - **o brilho**, um oval que sai da tecla (então o lado de baixo dele é curvo, como uma gota) e o clarão pontual;
+ * - **o aro duplo**: um fio claro por fora e outro mais fraco por dentro, que dão a espessura do vidro;
+ * - **o grão** do vidro fosco, só quando o aparelho não desfoca o que está atrás ([blurBehind] falso): ali o véu é
+ *   mais denso para o conteúdo de trás não atrapalhar as letras.
  *
- * Todos os objetos de desenho nascem aqui; por tecla só muda a matriz dos degradês (feitos em 0..1 e
- * esticados até a tecla), então [draw] não aloca nada no `onDraw`. O reflexo é um por view (a matriz muda a
- * cada quadro): não é compartilhado.
+ * O reflexo diagonal, único para o teclado inteiro, é o que sobra dinâmico: uma faixa por tecla, com um degradê só
+ * deslocado por view.
  */
-class GlassPainter(private val density: Float) : KeySurface {
+class GlassPainter(private val density: Float, private val blurBehind: Boolean = true) : KeySurface {
 
-    private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeWidth = density
-        color = 0x4D0B3A66
-    }
-    private val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val pad = ceil(SPRITE_PAD_DP * density).toInt()
+    private val sprites = SpriteCache()
+    private val blit = Paint(Paint.FILTER_BITMAP_FLAG)
 
     // O reflexo: um degradê diagonal com paradas duras, do tamanho da lâmina, deslocado como a tecla.
     private val sheenPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -40,28 +46,10 @@ class GlassPainter(private val density: Float) : KeySurface {
     private var sheenWidth = 0
     private var sheenHeight = 0
     private val sheenMatrix = Matrix()
-
-    private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        shader = unitGradient(intArrayOf(0x0080E6FF, 0x0080E6FF, 0x5280E6FF), floatArrayOf(0f, 0.5f, 1f))
-    }
-    private val glossPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        shader = unitGradient(intArrayOf(0x8CFFFFFF.toInt(), 0x14FFFFFF), null)
-    }
-    private val rimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeWidth = density
-        shader = unitGradient(intArrayOf(0xFFFFFFFF.toInt(), 0x66FFFFFF), null)
-    }
-    private val pressedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x6B18C4FF }
-    private val pressedRimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeWidth = density * 1.5f
-        color = 0xFF8AEBFF.toInt()
-    }
-
-    private val matrix = Matrix()
     private val rect = RectF()
-    private val keyShape = Path()
+
+    // O grão do vidro fosco: um azulejo de ruído repetido (uma vez só, compartilhado por todos os sprites).
+    private val grain: BitmapShader? = if (blurBehind) null else noiseShader()
 
     /**
      * Antes das teclas de uma view: a lâmina atrás dela e onde a origem do canvas está sobre a lâmina
@@ -84,52 +72,160 @@ class GlassPainter(private val density: Float) : KeySurface {
     }
 
     override fun draw(canvas: Canvas, bounds: RectF, radius: Float, tint: Int, pressed: Boolean) {
-        // Sombra macia (duas passadas) e o fio escuro em volta, SÓ FORA da tecla: ela é translúcida, então uma
-        // sombra por baixo dela escureceria o vidro e daria um cinza — o que não pode acontecer.
-        keyShape.rewind()
-        keyShape.addRoundRect(bounds, radius, radius, Path.Direction.CW)
+        val key = SpriteCache.Key(bounds.width().roundToInt(), bounds.height().roundToInt(), radius.roundToInt(), tint, pressed)
+        val sprite = sprites.get(key, pad) { render(it, key, radius) }
+        canvas.drawBitmap(sprite, bounds.left - pad, bounds.top - pad, blit)
+        if (sheenShader != null) canvas.drawRoundRect(bounds, radius, radius, sheenPaint)
+    }
+
+    /** A face inteira de uma tecla, desenhada uma vez. */
+    private fun render(bitmap: Bitmap, key: SpriteCache.Key, radius: Float) {
+        val canvas = Canvas(bitmap)
+        val d = density
+        val face = RectF(pad.toFloat(), pad.toFloat(), (pad + key.width).toFloat(), (pad + key.height).toFloat())
+        val r = radius
+        val w = face.width()
+        val h = face.height()
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        val shape = Path().apply { addRoundRect(face, r, r, Path.Direction.CW) }
+
+        // 1) Sombra macia por fora; o interior da tecla é recortado (vidro translúcido não tem sombra por baixo).
+        p.color = 0x4006264F
+        p.maskFilter = BlurMaskFilter(2.4f * d, BlurMaskFilter.Blur.NORMAL)
+        rect.set(face)
+        rect.offset(0f, 1.5f * d)
+        canvas.drawRoundRect(rect, r, r, p)
+        p.maskFilter = null
+        p.xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
+        canvas.drawRoundRect(face, r, r, p)
+        p.xfermode = null
+
+        // 2) O fio escuro por fora: separa a tecla de um fundo claro.
+        p.style = Paint.Style.STROKE
+        p.strokeWidth = d
+        p.color = 0x4D0B3A66
+        rect.set(face)
+        rect.inset(-0.5f * d, -0.5f * d)
+        canvas.drawRoundRect(rect, r + 0.5f * d, r + 0.5f * d, p)
+
         canvas.save()
-        @Suppress("DEPRECATION") // clipOutPath só existe no API 26; DIFFERENCE funciona no canvas acelerado antes disso
-        canvas.clipPath(keyShape, Region.Op.DIFFERENCE)
-        shadowPaint.color = 0x1806264F
-        rect.set(bounds.left - density * 0.5f, bounds.top, bounds.right + density * 0.5f, bounds.bottom + density * 2.6f)
-        canvas.drawRoundRect(rect, radius + density, radius + density, shadowPaint)
-        shadowPaint.color = 0x2606264F
-        rect.set(bounds.left, bounds.top + density, bounds.right, bounds.bottom + density * 1.5f)
-        canvas.drawRoundRect(rect, radius, radius, shadowPaint)
-        rect.set(bounds)
-        rect.inset(-density, -density)
-        canvas.drawRoundRect(rect, radius + density, radius + density, outlinePaint)
+        canvas.clipPath(shape)
+
+        // 3) O véu: a cor da tecla, mais leve em cima e mais denso embaixo. Sem desfoque do aparelho ele é mais denso.
+        val boost = if (blurBehind) 1f else FROST_BOOST
+        p.style = Paint.Style.FILL
+        p.shader = LinearGradient(0f, face.top, 0f, face.bottom, scaleAlpha(key.tint, 0.8f * boost), scaleAlpha(key.tint, 1.15f * boost), Shader.TileMode.CLAMP)
+        canvas.drawRect(face, p)
+        p.shader = null
+        if (grain != null) {
+            p.shader = grain
+            p.alpha = 26
+            canvas.drawRect(face, p)
+            p.shader = null
+            p.alpha = 255
+        }
+
+        // 4) A borda de Fresnel: o vidro é mais denso junto ao aro e mais claro no meio.
+        p.style = Paint.Style.STROKE
+        p.strokeWidth = 3.4f * d
+        p.color = 0x66FFFFFF
+        p.maskFilter = BlurMaskFilter(1.8f * d, BlurMaskFilter.Blur.NORMAL)
+        rect.set(face)
+        rect.inset(1.7f * d, 1.7f * d)
+        canvas.drawRoundRect(rect, r - 1.7f * d, r - 1.7f * d, p)
+        p.maskFilter = null
+
+        // 5) A luz da base: refratada, num oval achatado (o degradê radial escalado), e um fio junto à borda de baixo.
+        p.style = Paint.Style.FILL
+        val cx = face.centerX()
+        val cy = face.bottom - 0.06f * h
+        val glowRadius = 0.62f * w
+        canvas.save()
+        canvas.scale(1f, 0.5f, cx, cy)
+        p.shader = RadialGradient(cx, cy, glowRadius, 0x99CFF5FF.toInt(), 0x00CFF5FF, Shader.TileMode.CLAMP)
+        canvas.drawCircle(cx, cy, glowRadius, p)
+        p.shader = null
+        canvas.restore()
+        canvas.save()
+        canvas.clipRect(face.left, face.top + 0.68f * h, face.right, face.bottom)
+        p.style = Paint.Style.STROKE
+        p.strokeWidth = 1.2f * d
+        p.color = 0x99E6FBFF.toInt()
+        rect.set(face)
+        rect.inset(2.1f * d, 2.1f * d)
+        canvas.drawRoundRect(rect, r - 2.1f * d, r - 2.1f * d, p)
         canvas.restore()
 
-        bodyPaint.color = tint
-        canvas.drawRoundRect(bounds, radius, radius, bodyPaint)
-        stretch(glowPaint, bounds.top, bounds.height())
-        canvas.drawRoundRect(bounds, radius, radius, glowPaint)
-        if (sheenShader != null) canvas.drawRoundRect(bounds, radius, radius, sheenPaint)
-        if (pressed) canvas.drawRoundRect(bounds, radius, radius, pressedPaint)
+        // 6) O brilho: um oval que passa da tecla dos dois lados, então a borda de baixo dele é curva, como uma gota.
+        canvas.save()
+        rect.set(face)
+        rect.inset(1.3f * d, 1.3f * d)
+        canvas.clipPath(Path().apply { addRoundRect(rect, r - 1.3f * d, r - 1.3f * d, Path.Direction.CW) })
+        p.style = Paint.Style.FILL
+        rect.set(face.left - 0.14f * w, face.top - 0.64f * h, face.right + 0.14f * w, face.top + 0.47f * h)
+        p.shader = LinearGradient(0f, face.top, 0f, face.top + 0.47f * h, 0xB8FFFFFF.toInt(), 0x0FFFFFFF, Shader.TileMode.CLAMP)
+        canvas.drawOval(rect, p)
+        p.shader = null
+        canvas.restore()
 
-        // Brilho: a metade de cima, recuada do aro — a faixa clara, de borda nítida, do gel.
-        val inset = density * 1.5f
-        rect.set(bounds.left + inset, bounds.top + inset, bounds.right - inset, bounds.top + bounds.height() * 0.48f)
-        val glossRadius = (radius - inset).coerceAtLeast(0f)
-        stretch(glossPaint, rect.top, rect.height())
-        canvas.drawRoundRect(rect, glossRadius, glossRadius, glossPaint)
+        // 7) O clarão pontual do canto e um reflexo menor no lado oposto.
+        p.color = 0xE6FFFFFF.toInt()
+        rect.set(face.left + 0.10f * w, face.top + 0.07f * h, face.left + 0.30f * w, face.top + 0.15f * h)
+        canvas.drawOval(rect, p)
+        p.color = 0x8CFFFFFF.toInt()
+        canvas.drawCircle(face.right - 0.15f * w, face.bottom - 0.20f * h, maxOf(1.2f * d, 0.03f * h), p)
 
-        val rim = if (pressed) pressedRimPaint else rimPaint
-        val half = rim.strokeWidth / 2f
-        rect.set(bounds)
-        rect.inset(half, half)
-        stretch(rimPaint, bounds.top, bounds.height())
-        canvas.drawRoundRect(rect, radius - half, radius - half, rim)
+        if (key.pressed) {
+            p.color = 0x8018C4FF.toInt()
+            canvas.drawRect(face, p)
+        }
+        canvas.restore()
+
+        // 8) O aro duplo: um fio claro por fora (mais forte em cima) e outro mais fraco por dentro, a espessura do vidro.
+        p.style = Paint.Style.STROKE
+        p.strokeWidth = if (key.pressed) 1.5f * d else d
+        if (key.pressed) {
+            p.color = 0xFF8AEBFF.toInt()
+        } else {
+            p.shader = LinearGradient(0f, face.top, 0f, face.bottom, 0xFFFFFFFF.toInt(), 0x73FFFFFF, Shader.TileMode.CLAMP)
+        }
+        rect.set(face)
+        rect.inset(p.strokeWidth / 2f, p.strokeWidth / 2f)
+        canvas.drawRoundRect(rect, r - p.strokeWidth / 2f, r - p.strokeWidth / 2f, p)
+        p.shader = null
+        p.strokeWidth = 0.8f * d
+        p.color = 0x38FFFFFF
+        rect.set(face)
+        rect.inset(2.3f * d, 2.3f * d)
+        canvas.drawRoundRect(rect, r - 2.3f * d, r - 2.3f * d, p)
     }
 
-    private fun stretch(paint: Paint, top: Float, height: Float) {
-        matrix.setScale(1f, height.coerceAtLeast(1f))
-        matrix.postTranslate(0f, top)
-        paint.shader?.setLocalMatrix(matrix)
+    /** O grão do vidro fosco: pontos claros e escuros muito fracos, num azulejo de 48px que se repete. */
+    private fun noiseShader(): BitmapShader {
+        val size = 48
+        val pixels = IntArray(size * size)
+        var seed = 0x2F6E2B1
+        for (i in pixels.indices) {
+            seed = seed * 1103515245 + 12345
+            val v = (seed ushr 16) and 0xFF
+            val light = (seed ushr 8) and 1 == 0
+            val alpha = if (v < 60) v else 0
+            pixels[i] = (alpha shl 24) or if (light) 0x00FFFFFF else 0x00234466
+        }
+        val tile = Bitmap.createBitmap(pixels, size, size, Bitmap.Config.ARGB_8888)
+        return BitmapShader(tile, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT)
     }
 
-    private fun unitGradient(colors: IntArray, stops: FloatArray?): Shader =
-        LinearGradient(0f, 0f, 0f, 1f, colors, stops, Shader.TileMode.CLAMP)
+    private fun scaleAlpha(color: Int, factor: Float): Int {
+        val a = ((color ushr 24) * factor).roundToInt().coerceIn(0, 255)
+        return (a shl 24) or (color and 0x00FFFFFF)
+    }
+
+    private companion object {
+        /** Folga do sprite em volta da tecla, para a sombra macia caber. */
+        const val SPRITE_PAD_DP = 5f
+
+        /** Sem desfoque do aparelho, o véu das teclas é bem mais denso: o que está atrás não pode atrapalhar as letras. */
+        const val FROST_BOOST = 1.75f
+    }
 }

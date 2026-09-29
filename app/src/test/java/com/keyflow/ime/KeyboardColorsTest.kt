@@ -57,10 +57,15 @@ class KeyboardColorsTest {
 
     @Test
     fun `navigation bar strip under the keyboard follows its skin - translucent glass, or the glitch black`() {
-        // Aero: a mesma tinta translúcida da lâmina; Glitch: preto opaco, como o fundo dele.
-        assertThat(KeyboardBackdrop.AERO.navigationBarColor ushr 24).isGreaterThan(0)
-        assertThat(KeyboardBackdrop.AERO.navigationBarColor ushr 24).isLessThan(0xFF)
-        assertThat(KeyboardBackdrop.GLITCH.navigationBarColor).isEqualTo(0xFF000000.toInt())
+        // Aero: a mesma tinta translúcida da lâmina (mais densa quando o aparelho não desfoca); Glitch: o preto do fundo.
+        for (blur in listOf(true, false)) {
+            assertThat(KeyboardBackdrop.AERO.navigationBarColor(blur) ushr 24).isGreaterThan(0)
+            assertThat(KeyboardBackdrop.AERO.navigationBarColor(blur) ushr 24).isLessThan(0xFF)
+        }
+        assertThat(KeyboardBackdrop.AERO.navigationBarColor(false) ushr 24)
+            .isGreaterThan(KeyboardBackdrop.AERO.navigationBarColor(true) ushr 24)
+        assertThat(KeyboardBackdrop.GLITCH.navigationBarColor(true)).isEqualTo(KeyboardBackdrop.GLITCH.navigationBarColor(false))
+        assertThat(KeyboardBackdrop.GLITCH.navigationBarColor(true) ushr 24).isEqualTo(0xFF)
     }
 
     @Test

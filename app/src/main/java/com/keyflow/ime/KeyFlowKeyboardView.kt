@@ -372,7 +372,7 @@ class KeyFlowKeyboardView(
         orientation = VERTICAL
         layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
         // Com paisagem (Aero), as barras são transparentes: ela vai atrás delas também no retraído.
-        colors.backdrop?.let { background = it.drawable(resources.displayMetrics.density * scale) }
+        colors.backdrop?.let { background = it.drawable(resources.displayMetrics.density * scale, windowBlurAvailable(context)) }
         buildBars(expandedMode = false).forEach { addView(it, barLayoutParams()) }
     }
 
@@ -412,7 +412,7 @@ class KeyFlowKeyboardView(
         orientation = VERTICAL
         val backdrop = colors.backdrop
         if (backdrop != null) {
-            background = backdrop.drawable(resources.displayMetrics.density * scale)
+            background = backdrop.drawable(resources.displayMetrics.density * scale, windowBlurAvailable(context))
         } else {
             setBackgroundColor(kbTray)
         }

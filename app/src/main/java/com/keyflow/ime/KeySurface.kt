@@ -26,4 +26,10 @@ interface KeySurface {
 
     /** Cor da passada [pass] do rótulo; [ink] é a tinta normal da tecla. */
     fun labelColor(pass: Int, ink: Int, pressed: Boolean): Int = ink
+
+    /**
+     * Intensidade (0..1) de um efeito em andamento na skin — a falha do Glitch. Quem anima ([KeyboardMotion]) muda isto
+     * antes de cada quadro do evento e invalida a view; as skins sem efeito ignoram.
+     */
+    fun setEffect(amount: Float) = Unit
 }
