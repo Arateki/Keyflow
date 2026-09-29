@@ -125,3 +125,39 @@ emulador e iterar (decisão do Yan nesta sessão).
   modelo local) não é nome de aba e ficou.
 - Verificação: instrumentados `com.keyflow.ui` **121/121** no emulador; 24 goldens `config-*`
   regenerados; `diff-screens.sh` 86/86.
+
+## Rodada 4 (2026-09-28, pedidos do Yan)
+
+- **Gatilho de grade** (`BarsEditor`): sob cada modo (Só grade, Sequência, Chord) uma frase curta do que
+  ele envia; as três reservam 3 linhas, então trocar de modo não mexe no layout (`Segmented` ganhou o
+  parâmetro `hint`). O prefixo desceu para baixo das opções e só aparece em Sequência e Chord; confirmar
+  em "Só grade" não guarda um prefixo escondido. Rotas novas `bars-editor-grid-form[-sequencia]`.
+- **Faixa de sugestões 30% menor**: peso 4 → 2,8 (`BarGeometry`) — cabe mais um botão normal sem apertar
+  os outros. Ditado "Continua em 30%" entendido como "Diminua em 30%".
+- **Prévia de tamanho** (aba Teclado): barra de fábrica sem a faixa de sugestões — cabia só rolando.
+  Ditado "barra senha de sugestões" entendido como "barra sem a de sugestões".
+- **Nome da aba no cabeçalho**: linha fixa abaixo de "KeyFlow", centralizada e menor. No A32 a linha
+  custaria ~25dp (fonte do app ×1,3 e do sistema ×1,1 também a aumentam); as folgas de cima ficaram
+  menores e o acréscimo caiu para ~12dp. **Pendente**: conferir no A32 se a aba Modo ainda cabe sem
+  rolar. A simulação no emulador (densidade 450, fonte 1,1, 3 botões) não decide: nela a aba já passava
+  ~10dp antes da mudança, e no A32 cabia.
+- **Sem limite (∞)** no tempo de resposta e na duração máxima da gravação (0 = sem limite). O glifo "∞"
+  da fonte saía miúdo: virou ícone (`KfIcons.Infinity`), com "Sem limite" para o leitor de tela. Na
+  espera sem limite, saem o `callTimeout`, o `readTimeout` do client base, a rede de segurança do
+  coordinator e o piso de 180s da origem Local.
+
+### Verificação da rodada 4 (emulador `keyflow_api34`)
+
+- Instrumentados `com.keyflow.ui` **124/124**; `BarsEditorTest` 16/16 (2 novos), `ConfigScreenTest` 10/10,
+  `VozPanelTest` 11/11, `TecladoPanelTest` 7/7.
+- Unit: suíte inteira **486/486**. Arquivos tocados (`BarGeometryTest`, `OverlayCoordinatorTest` 30, `TranscriptionClientTest`
+  10, `EffectiveConfigTest` 13, `LocalRoutingTest` 5, `KfIconsTest`).
+- Goldens: 12 pela faixa menor (teclado, barra expandida, aba Modo, tour do mic), 24 telas de config pelo
+  cabeçalho, 2 da Transcrição pelo texto do ∞, 4 novos do formulário; `diff-screens.sh` **90/90**.
+
+### Achados
+
+- Com o cabeçalho mostrando o nome da aba, a Transcrição fica "Transcrição" (cabeçalho) logo acima da
+  seção "Transcrição" do painel — decidir com o Yan se a seção muda de nome.
+- O `readTimeout` fixo de 60s do client base já cortava a opção "2m" se o servidor ficasse calado mais de
+  60s; não mexido (só o ∞ tira o `readTimeout`).
