@@ -1020,8 +1020,9 @@ internal fun fittedFontSizeSp(
 ): Float {
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
-    // Só os rótulos mais compridos disputam o limite — medir os 14 da linha a cada passo é desperdício.
-    val longest = labels.filter { it.length == (labels.maxOfOrNull { l -> l.length } ?: 0) }.distinct()
+    // Todos os rótulos disputam o limite: o de mais letras nem sempre é o mais largo ("Custom" passa de
+    // "Credits" em pixels — em inglês ele saía cortado). São poucos por seletor, e o resultado fica guardado.
+    val longest = labels.distinct()
     return remember(longest, maxTextWidth, maxSp, minSp, density.density, density.fontScale, fontFamily) {
         var sp = maxSp
         while (sp > minSp) {
