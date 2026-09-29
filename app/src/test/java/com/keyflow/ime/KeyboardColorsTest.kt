@@ -54,4 +54,13 @@ class KeyboardColorsTest {
         assertThat(KeyboardSkin.of("aero")).isEqualTo(KeyboardSkin.AERO)
         assertThat(KeyboardSkin.of("vaporwave")).isEqualTo(KeyboardSkin.DEFAULT)
     }
+
+    @Test
+    fun `only the system keyboard skin is free — the rest is paid but still unlocked for testing`() {
+        // Decisão do Yan (2026-09-29). O bloqueio de verdade vem com a monetização (UNL-04); até lá `paid` só
+        // registra a decisão e nada esconde as skins.
+        assertThat(KeyboardSkin.entries.filter { !it.paid }).containsExactly(KeyboardSkin.SYSTEM)
+        assertThat(KeyboardSkin.AERO.paid).isTrue()
+        assertThat(KeyboardSkin.DEFAULT.paid).isFalse()
+    }
 }

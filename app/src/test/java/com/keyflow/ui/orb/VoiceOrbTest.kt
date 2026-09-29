@@ -76,4 +76,11 @@ class VoiceOrbTest {
         val listening = orbBaseParams(OrbState.Listening).first
         assertThat(aeroWaveHeight(listening, 1f)).isGreaterThan(aeroWaveHeight(idle, 0.55f) * 2f)
     }
+
+    @Test
+    fun `the default orb is free and the Aero orb is paid`() {
+        // Decisão do Yan (2026-09-29): o Aero é pago; liberado para teste até a monetização (UNL-04).
+        assertThat(OrbStyle.ATELIE.paid).isFalse()
+        assertThat(OrbStyle.AERO.paid).isTrue()
+    }
 }

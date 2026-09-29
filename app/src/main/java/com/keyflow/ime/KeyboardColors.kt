@@ -10,10 +10,18 @@ package com.keyflow.ime
  * translúcida e o que o app desenha atrás aparece através do vidro (com desfoque do compositor onde o
  * aparelho oferece). O Yan escolheu isso à paisagem pintada, mesmo dependendo do que cada app desenha ali.
  */
-enum class KeyboardSkin(val id: String) {
-    SYSTEM("system"),
-    ATELIE("atelie"),
-    AERO("aero"),
+enum class KeyboardSkin(
+    val id: String,
+    /**
+     * Skin paga. Decisão do Yan (2026-09-29): **só a Sistema é gratuita**; a Ateliê e a Aero são pagas. Por
+     * enquanto NADA é bloqueado — todas seguem liberadas para ele testar. Quando a monetização entrar (Milestone
+     * 7, UNL-04 / MZ-T9), as pagas ficam bloqueadas até `skinsUnlocked`.
+     */
+    val paid: Boolean,
+) {
+    SYSTEM("system", paid = false),
+    ATELIE("atelie", paid = true),
+    AERO("aero", paid = true),
     ;
 
     companion object {

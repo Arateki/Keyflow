@@ -63,9 +63,17 @@ val LocalOrbClock = staticCompositionLocalOf<(() -> Float)?> { null }
  * mas como uma bolha de vidro transparente — o que está atrás dela aparece pelo miolo, com aro, brilho e
  * luz na base, no espírito do Windows Vista/7. Escolhido na aba Sobrepor ([orbStyleFor]), à parte do teclado.
  */
-enum class OrbStyle(val id: String) {
-    ATELIE("atelie"),
-    AERO("aero"),
+enum class OrbStyle(
+    val id: String,
+    /**
+     * Skin paga. A orbe padrão (Ateliê) é a gratuita; a Aero é paga (Yan, 2026-09-29: o Aero é pago). Por
+     * enquanto liberada para teste; bloqueia junto com as skins do teclado quando a monetização entrar
+     * (Milestone 7, UNL-04 / MZ-T9).
+     */
+    val paid: Boolean,
+) {
+    ATELIE("atelie", paid = false),
+    AERO("aero", paid = true),
 }
 
 /** Estilo do orbe para a árvore abaixo — a overlay e as prévias das abas seguem a skin escolhida. */
