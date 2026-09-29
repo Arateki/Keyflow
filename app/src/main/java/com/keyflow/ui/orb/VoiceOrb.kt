@@ -367,8 +367,8 @@ private fun DrawScope.drawOrb(t: Float, state: OrbState, style: OrbStyle = OrbSt
 
 /**
  * Orbe Aero: o mesmo blob vivo de [drawOrb] (níveis e velocidades por estado), mas como uma **bolha de vidro
- * transparente**, não uma bola azul. O miolo quase não tem cor — o app por trás aparece —, e o corpo do vidro
- * vive na borda: tinta azul mais densa perto do aro (o "Fresnel" do vidro), fio marinho por fora (segura a
+ * transparente com água dentro** ([drawAeroWater]), não uma bola azul. Acima da água o vidro é limpo — o app por
+ * trás aparece —, e o corpo do vidro vive na borda: tinta azul mais densa perto do aro (o "Fresnel" do vidro), fio marinho por fora (segura a
  * bolha sobre fundo claro) e fio branco por dentro (sobre fundo escuro), brilho de gel na metade de cima e
  * a luz que atravessa o vidro e se junta na base. Tudo que é claro é recortado pela forma da bolha, que
  * ondula. [frosted] (há tempo ou glifo no centro) acrescenta um miolo leitoso para a leitura.
@@ -414,10 +414,13 @@ private fun DrawScope.drawAeroOrb(t: Float, state: OrbState, frosted: Boolean) {
         ),
     )
 
+    // A água dentro do vidro: fica dentro do fio branco do aro.
+    clipPath(inner) { drawAeroWater(cx, cy, r, t, amp, sp, lvl) }
+
     clipPath(body) {
         if (frosted) {
             drawCircle(
-                Brush.radialGradient(listOf(Color(0x66FFFFFF), Color(0x00FFFFFF)), center = Offset(cx, cy), radius = r * 0.8f),
+                Brush.radialGradient(listOf(Color(0x59FFFFFF), Color(0x00FFFFFF)), center = Offset(cx, cy), radius = r * 0.8f),
                 radius = r * 0.8f,
                 center = Offset(cx, cy),
             )
@@ -469,6 +472,78 @@ private fun DrawScope.drawAeroOrb(t: Float, state: OrbState, frosted: Boolean) {
     drawPath(body, AeroRim, style = Stroke(width = maxOf(1.2f, r * 0.028f)))
 }
 
+private const val WATER_STEPS = 28
+
+// Água em dois tons, como o miolo da orbe do Ateliê tem dois: ciano claro na superfície, azul fundo embaixo. Ambos
+// translúcidos — o app de trás se vê através da água, só que tingido.
+private val WaterTop = Color(0x8C5BE0F2)
+private val WaterBottom = Color(0xB81660D8)
+
+/**
+ * A água dentro do vidro (o chamador recorta pela forma interna da bolha). O nível sobe com a voz ([lvl]) e a
+ * superfície ondula: amplitude e velocidade vêm do estado ([amp]/[sp], as mesmas do blob), com uma inclinação
+ * lenta que faz a água rolar de um lado ao outro. Por baixo da superfície, um fio de luz (o menisco), cáusticas
+ * que ondulam devagar e bolhinhas que sobem — tudo função do tempo [t], então um relógio parado dá um quadro fixo.
+ */
+private fun DrawScope.drawAeroWater(cx: Float, cy: Float, r: Float, t: Float, amp: Float, sp: Float, lvl: Float) {
+    val fill = aeroWaterFill(lvl)
+    val surface = cy + r * 0.94f * (1f - 2f * fill)
+    val wave = r * aeroWaveHeight(amp, lvl)
+    val phase = t * 0.003f * sp
+    val tilt = r * 0.10f * sin(phase * 0.55f) * (0.4f + amp * 3f)
+    fun surfaceAt(x: Float): Float {
+        val u = (x - cx) / r
+        return surface + tilt * u + wave * (sin(2.3f * u + phase) + 0.45f * sin(3.9f * u - 1.3f * phase + 1.7f))
+    }
+
+    val left = cx - r * 1.2f
+    val right = cx + r * 1.2f
+    val line = Path()
+    for (i in 0..WATER_STEPS) {
+        val x = left + (right - left) * i / WATER_STEPS
+        if (i == 0) line.moveTo(x, surfaceAt(x)) else line.lineTo(x, surfaceAt(x))
+    }
+    val water = Path().apply {
+        addPath(line)
+        lineTo(right, cy + r * 1.2f)
+        lineTo(left, cy + r * 1.2f)
+        close()
+    }
+    drawPath(water, Brush.verticalGradient(0f to WaterTop, 1f to WaterBottom, startY = surface - wave, endY = cy + r * 0.94f))
+
+    // Cáusticas: fios de luz que atravessam a água e ondulam devagar.
+    for (k in 0 until 3) {
+        val y0 = surface + r * (0.20f + 0.20f * k)
+        if (y0 > cy + r * 0.8f) continue
+        val caustic = Path()
+        for (i in 0..16) {
+            val x = cx - r * 0.85f + r * 1.7f * i / 16f
+            val y = y0 + r * 0.035f * sin(x / r * 4f + phase * (0.8f + 0.3f * k) + k * 2f)
+            if (i == 0) caustic.moveTo(x, y) else caustic.lineTo(x, y)
+        }
+        drawPath(caustic, Color(0x38FFFFFF), style = Stroke(width = r * 0.04f, cap = StrokeCap.Round))
+    }
+
+    // Bolhinhas subindo até a superfície (poucas e lentas em repouso).
+    val bubbles = if (sp < 0.8f) 2 else 5
+    val bottom = cy + r * 0.8f
+    for (k in 0 until bubbles) {
+        val bx = cx + r * (-0.5f + 0.25f * k) + r * 0.04f * sin(t * 0.002f + k * 1.7f)
+        val rise = (t * 0.00012f * (0.6f + 0.5f * sp) * (0.7f + 0.15f * k) + k * 0.23f) % 1f
+        val top = surfaceAt(bx)
+        val br = r * (0.03f + 0.012f * (k % 3))
+        val by = bottom - rise * (bottom - top)
+        if (by < top + br) continue
+        drawCircle(Color(0x33FFFFFF), br, Offset(bx, by))
+        drawCircle(Color(0xB3FFFFFF), br, Offset(bx, by), style = Stroke(width = maxOf(1f, r * 0.012f)))
+        drawCircle(Color(0xF2FFFFFF), br * 0.28f, Offset(bx - br * 0.35f, by - br * 0.35f))
+    }
+
+    // O menisco: fio claro na superfície, com um halo mais largo e fraco por baixo.
+    drawPath(line, Color(0x40FFFFFF), style = Stroke(width = r * 0.09f, cap = StrokeCap.Round))
+    drawPath(line, Color(0xD9FFFFFF), style = Stroke(width = maxOf(1.2f, r * 0.03f), cap = StrokeCap.Round))
+}
+
 private fun DrawScope.drawLayer(
     cx: Float, cy: Float, r: Float, amp: Float, t: Float, sp: Float, seed: Float,
     c0: Color, c1: Color, alpha: Float,
@@ -503,6 +578,15 @@ private fun blobPath(cx: Float, cy: Float, r: Float, amp: Float, t: Float, sp: F
 }
 
 // --- Lógica pura (testável em unit) ---
+
+/**
+ * Fração da altura interna da bolha ocupada pela água: mais de um terço em repouso e até dois terços no pico da
+ * voz ([lvl] é o nível de [orbLevel], 0,55 em repouso a 1,0 no pico). Nunca esvazia nem transborda.
+ */
+internal fun aeroWaterFill(lvl: Float): Float = 0.34f + 0.34f * ((lvl - 0.55f) / 0.45f).coerceIn(0f, 1f)
+
+/** Altura das ondas da superfície, em fração do raio: uma marola em repouso, ondas altas quando o blob se agita. */
+internal fun aeroWaveHeight(amp: Float, lvl: Float): Float = 0.03f + 0.45f * amp * lvl
 
 /** Amplitude/velocidade base por estado. Paused herda o visual de Listening (REC-05). */
 internal fun orbBaseParams(state: OrbState): Pair<Float, Float> = when (state) {

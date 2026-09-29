@@ -53,4 +53,27 @@ class VoiceOrbTest {
         val settings = com.keyflow.data.Settings(keyboardSkin = "aero")
         assertThat(orbStyleFor(settings.orbSkin)).isEqualTo(OrbStyle.ATELIE)
     }
+
+    @Test
+    fun `the water inside the Aero orb rises with the voice and stays inside the glass`() {
+        val rest = aeroWaterFill(0.55f)
+        val peak = aeroWaterFill(1f)
+        assertThat(rest).isAtLeast(0.3f)
+        assertThat(peak).isGreaterThan(rest)
+        assertThat(peak).isAtMost(0.7f)
+        // Fora da faixa do nível a água não esvazia nem transborda.
+        assertThat(aeroWaterFill(0f)).isEqualTo(rest)
+        assertThat(aeroWaterFill(2f)).isEqualTo(peak)
+    }
+
+    @Test
+    fun `the water waves are calm at rest and taller while listening`() {
+        for (state in OrbState.entries) {
+            val (amp, _) = orbBaseParams(state)
+            assertThat(aeroWaveHeight(amp, orbLevel(state, 0f))).isGreaterThan(0f)
+        }
+        val idle = orbBaseParams(OrbState.Idle).first
+        val listening = orbBaseParams(OrbState.Listening).first
+        assertThat(aeroWaveHeight(listening, 1f)).isGreaterThan(aeroWaveHeight(idle, 0.55f) * 2f)
+    }
 }
