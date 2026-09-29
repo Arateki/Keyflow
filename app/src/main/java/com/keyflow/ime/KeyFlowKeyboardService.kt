@@ -320,7 +320,7 @@ class KeyFlowKeyboardService : InputMethodService() {
         )
         keyboardView = view
         activeViewForTest = view
-        applyNavigationBarColor(KeyboardColors.of(KeyboardSkin.of(skin), dark))
+        applyGlassWindow(KeyboardColors.of(KeyboardSkin.of(skin), dark))
         // Sincroniza o estado atual na criação: o StateFlow só re-emite em mudança, então se a orbe já
         // estava (ex.) pausada quando o teclado abriu, a view nasceria dessincronizada (ex.: trocar de
         // teclado por atalho com o overlay pausado).
@@ -334,15 +334,21 @@ class KeyFlowKeyboardService : InputMethodService() {
     private var systemNavigationBarColor: Int? = null
 
     /**
-     * Faixa da barra de navegação sob o teclado (navegação por gestos): com paisagem (Aero), pinta com o
-     * chão da cena — senão fica uma tira preta cortando a colina. Os outros esquemas mantêm a cor do
-     * sistema, como sempre foi.
+     * A janela do teclado no Aero (vidro de verdade): desfoca o que está atrás dela, quando o aparelho deixa
+     * ([windowBlurAvailable] — o A32 do Yan não deixa), e tinge a faixa da barra de navegação com a tinta do
+     * fundo da lâmina, para o vidro seguir até a borda em vez de uma tira preta. Os outros esquemas mantêm a
+     * cor do sistema e nenhum desfoque, como sempre foi.
      */
     @Suppress("DEPRECATION") // navigationBarColor: é o que o Android até o 14 usa na faixa do IME
-    private fun applyNavigationBarColor(colors: KeyboardColors) {
+    private fun applyGlassWindow(colors: KeyboardColors) {
         val w = window?.window ?: return
         val systemColor = systemNavigationBarColor ?: w.navigationBarColor.also { systemNavigationBarColor = it }
         w.navigationBarColor = colors.backdrop?.navigationBarColor ?: systemColor
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val blurPx = if (colors.isGlass && windowBlurAvailable(this)) (WINDOW_BLUR_DP * resources.displayMetrics.density).toInt() else 0
+            w.setBackgroundBlurRadius(blurPx)
+            Log.d(TAG, "vidro: desfoque da janela=${blurPx}px (disponível=${windowBlurAvailable(this)})")
+        }
     }
 
     /**
@@ -683,6 +689,9 @@ class KeyFlowKeyboardService : InputMethodService() {
 
     companion object {
         private const val TAG = "KeyFlow.Keyboard"
+
+        // Raio do desfoque atrás do vidro do Aero, em dp (quando o aparelho desfoca janelas).
+        private const val WINDOW_BLUR_DP = 24
         private const val KEY_EXPANDED = "expanded"
         private val LANGUAGE_CYCLE = listOf("pt", "en", "es")
         private const val SUGGEST_WAIT_MS = 150L

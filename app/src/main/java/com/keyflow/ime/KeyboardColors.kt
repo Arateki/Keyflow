@@ -5,10 +5,10 @@ package com.keyflow.ime
  * cor da Samsung, aquela cor padrão do sistema"); [ATELIE] é o papel quente de antes, que segue como
  * opção. O app de config continua no Ateliê — isto vale só para teclado, barras e faixa de sugestões.
  *
- * [AERO] é protótipo (Yan, 2026-09-28): Frutiger Aero — o teclado pinta a própria paisagem
- * ([KeyboardBackdrop]) e as teclas são de vidro por cima ([GlassPainter]). Transparência de verdade (ver o
- * app por trás) foi descartada: atrás do teclado fica o que cada app desenha ali, quase sempre um fundo
- * liso, e a leitura das letras ficaria ao acaso.
+ * [AERO] é protótipo (Yan, 2026-09-28): Frutiger Aero — teclas de vidro ([GlassPainter]) sobre uma lâmina
+ * translúcida ([KeyboardBackdrop]). Desde 2026-09-29 a transparência é **real**: a janela do teclado é
+ * translúcida e o que o app desenha atrás aparece através do vidro (com desfoque do compositor onde o
+ * aparelho oferece). O Yan escolheu isso à paisagem pintada, mesmo dependendo do que cada app desenha ali.
  */
 enum class KeyboardSkin(val id: String) {
     SYSTEM("system"),
@@ -42,8 +42,8 @@ data class KeyboardColors(
     /** Balões que abrem por cima (prévia da tecla, acentos, grade de atalhos): sempre opacos. */
     val popup: Int = key,
     /**
-     * Paisagem pintada atrás de barras e grade; `null` = fundo liso [tray]. Com paisagem, [tray] é
-     * transparente e teclas e botões são de vidro ([isGlass]).
+     * Lâmina de vidro atrás de barras e grade; `null` = fundo liso [tray]. Com lâmina, [tray] é transparente
+     * e teclas e botões são de vidro ([isGlass]).
      */
     val backdrop: KeyboardBackdrop? = null,
     /** Sombra do texto das teclas (0 = sem); no vidro, é o que segura a letra sobre a paisagem. */
@@ -85,13 +85,14 @@ data class KeyboardColors(
             ink = 0xFFF1E7C9.toInt(),
         )
 
-        // Aero: [key]/[modifier] são a tinta do vidro (azul, translúcida); o brilho, o reflexo e o aro vêm do
-        // GlassPainter. Tinta colorida, não véu branco: um véu branco sobre o céu é o que dava o "cinza".
+        // Aero: [key]/[modifier] são a tinta do vidro (translúcida, por cima da lâmina e do que o app desenha
+        // atrás); o brilho, o reflexo e o aro vêm do GlassPainter. Teclas de letra em vidro claro, teclas de
+        // função em azul mais fundo — o que separa as teclas da lâmina azul por baixo.
         private val AERO_DAY = KeyboardColors(
             tray = 0x00000000,
-            key = 0x6E1F8DE6,
+            key = 0x66EAF7FF,
             keyBorder = 0xE6FFFFFF.toInt(),
-            modifier = 0x960F73F0.toInt(),
+            modifier = 0x990F70F0.toInt(),
             ink = 0xFF06213F.toInt(),
             popup = 0xFFF3FAFF.toInt(),
             backdrop = KeyboardBackdrop.AERO_DAY,
@@ -100,9 +101,9 @@ data class KeyboardColors(
         )
         private val AERO_NIGHT = KeyboardColors(
             tray = 0x00000000,
-            key = 0x4048B4EA,
+            key = 0x4A5CC8FF,
             keyBorder = 0x8CBFEFFF.toInt(),
-            modifier = 0x661D6DC2,
+            modifier = 0x8C0A55D8.toInt(),
             ink = 0xFFF1FAFF.toInt(),
             popup = 0xFF102C47.toInt(),
             backdrop = KeyboardBackdrop.AERO_NIGHT,

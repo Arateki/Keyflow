@@ -358,6 +358,8 @@ object RouteCatalog {
                 .background(LocalKeyFlowPalette.current.bg),
             contentAlignment = Alignment.BottomCenter,
         ) {
+            // O vidro do Aero é translúcido de verdade: atrás dele, um "app" de mentira.
+            if (skin == KeyboardSkin.AERO) BehindKeyboardScene()
             AndroidView(
                 modifier = Modifier.fillMaxSize().wrapContentHeight(Alignment.Bottom),
                 factory = { ctx ->
@@ -433,6 +435,7 @@ object RouteCatalog {
                 .background(LocalKeyFlowPalette.current.bg),
             contentAlignment = Alignment.BottomCenter,
         ) {
+            if (skin == KeyboardSkin.AERO) BehindKeyboardScene()
             AndroidView(
                 modifier = Modifier.fillMaxSize().wrapContentHeight(Alignment.Bottom),
                 factory = { ctx ->
@@ -719,6 +722,29 @@ object RouteCatalog {
                         unlockTag = "gallery-unlock",
                         modifier = Modifier.padding(bottom = 16.dp),
                     )
+                }
+            }
+        }
+    }
+
+    /**
+     * Fundo de mentira atrás do teclado de vidro (que é translúcido de verdade): uma paisagem de cores vivas
+     * com linhas de texto por cima — o pior caso para a leitura das letras. A galeria não desfoca (o desfoque
+     * é do compositor, numa janela à parte): é o que o A32, que não desfoca janelas, mostra.
+     */
+    @Composable
+    private fun BehindKeyboardScene() {
+        val palette = LocalKeyFlowPalette.current
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Brush.verticalGradient(listOf(Color(0xFFF2994A), Color(0xFFD63A7B), Color(0xFF3B4FBF), Color(0xFF12A594)))),
+        ) {
+            Box(Modifier.align(Alignment.BottomStart).padding(start = 20.dp, bottom = 120.dp).size(150.dp).background(Color(0x66FFFFFF), RoundedCornerShape(75.dp)))
+            Box(Modifier.align(Alignment.BottomEnd).padding(end = 10.dp, bottom = 40.dp).size(110.dp).background(Color(0x55FFE9A8), RoundedCornerShape(55.dp)))
+            Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 96.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                repeat(28) { i ->
+                    Box(Modifier.fillMaxWidth(listOf(0.9f, 0.62f, 0.8f, 0.45f, 0.95f, 0.7f)[i % 6]).height(9.dp).background(palette.fg.copy(alpha = 0.5f)))
                 }
             }
         }

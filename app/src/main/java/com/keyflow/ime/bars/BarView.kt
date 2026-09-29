@@ -1,7 +1,7 @@
 package com.keyflow.ime.bars
 
 import com.keyflow.i18n.tr
-import com.keyflow.ime.FrostLocator
+import com.keyflow.ime.GlassSheetLocator
 import com.keyflow.ime.GlassPainter
 import com.keyflow.ime.KeyboardColors
 import com.keyflow.ime.KeyboardSkin
@@ -122,9 +122,9 @@ class BarView(
     private val kbModifier = colors.modifier
     private val kbInk = colors.ink
     private val pressedOverlay = 0x33000000
-    // Aero: botões de vidro; o fundo da barra ([kbTray]) é transparente e a paisagem vem da view-mãe.
+    // Aero: botões de vidro; o fundo da barra ([kbTray]) é transparente e a lâmina de vidro vem da view-mãe.
     private val glass = if (colors.isGlass) GlassPainter(dp(1f), dark) else null
-    private val frostLocator = FrostLocator(this)
+    private val sheetLocator = GlassSheetLocator(this)
 
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -310,8 +310,8 @@ class BarView(
 
     override fun onDraw(canvas: Canvas) {
         canvas.drawColor(kbTray)
-        // O canvas vai andar -scrollOffset: o fosco precisa andar junto para seguir a paisagem parada.
-        glass?.useFrost(frostLocator.locate(), frostLocator.dx - scrollOffset, frostLocator.dy)
+        // O canvas vai andar -scrollOffset: o reflexo precisa andar junto para seguir a lâmina parada.
+        glass?.useSheet(sheetLocator.locate(), sheetLocator.dx - scrollOffset, sheetLocator.dy)
         canvas.save()
         canvas.translate(-scrollOffset, 0f)
         barLayout.buttons.forEach { placed ->

@@ -23,16 +23,16 @@ class KeyboardColorsTest {
     }
 
     @Test
-    fun `aero paints its own backdrop behind glass keys in both modes`() {
+    fun `aero puts a translucent glass sheet behind glass keys in both modes`() {
         val day = KeyboardColors.of(KeyboardSkin.AERO, dark = false)
         val night = KeyboardColors.of(KeyboardSkin.AERO, dark = true)
         assertThat(day.backdrop).isEqualTo(KeyboardBackdrop.AERO_DAY)
         assertThat(night.backdrop).isEqualTo(KeyboardBackdrop.AERO_NIGHT)
         for (colors in listOf(day, night)) {
             assertThat(colors.isGlass).isTrue()
-            // Fundo das barras transparente: quem pinta é a paisagem atrás delas.
+            // Fundo das barras transparente: quem pinta é a lâmina de vidro atrás delas.
             assertThat(colors.tray ushr 24).isEqualTo(0)
-            // Vidro deixa a paisagem passar; balões e letras não.
+            // Vidro deixa o que está atrás passar; balões e letras não.
             assertThat(colors.key ushr 24).isLessThan(0xFF)
             assertThat(colors.modifier ushr 24).isLessThan(0xFF)
             assertThat(colors.popup ushr 24).isEqualTo(0xFF)
@@ -42,9 +42,10 @@ class KeyboardColorsTest {
     }
 
     @Test
-    fun `navigation bar strip under the keyboard is opaque ground`() {
+    fun `navigation bar strip under the keyboard carries the glass tint, translucent like the sheet`() {
         for (backdrop in KeyboardBackdrop.entries) {
-            assertThat(backdrop.navigationBarColor ushr 24).isEqualTo(0xFF)
+            assertThat(backdrop.navigationBarColor ushr 24).isGreaterThan(0)
+            assertThat(backdrop.navigationBarColor ushr 24).isLessThan(0xFF)
         }
     }
 
