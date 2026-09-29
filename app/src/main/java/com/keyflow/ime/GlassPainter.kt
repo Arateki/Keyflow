@@ -24,7 +24,7 @@ import android.graphics.Shader
  * esticados até a tecla), então [draw] não aloca nada no `onDraw`. O reflexo é um por view (a matriz muda a
  * cada quadro): não é compartilhado.
  */
-class GlassPainter(private val density: Float) {
+class GlassPainter(private val density: Float) : KeySurface {
 
     private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -67,7 +67,7 @@ class GlassPainter(private val density: Float) {
      * Antes das teclas de uma view: a lâmina atrás dela e onde a origem do canvas está sobre a lâmina
      * ([dx]/[dy], já descontada a rolagem). Sem lâmina (ou antes do 1º tamanho), o vidro fica sem reflexo.
      */
-    fun useSheet(sheet: GlassSheet?, dx: Float, dy: Float) {
+    override fun useSheet(sheet: GlassSheet?, dx: Float, dy: Float) {
         if (sheet == null || sheet.widthPx <= 0 || sheet.heightPx <= 0) {
             sheenShader = null
             return
@@ -83,7 +83,7 @@ class GlassPainter(private val density: Float) {
         sheenShader?.setLocalMatrix(sheenMatrix)
     }
 
-    fun draw(canvas: Canvas, bounds: RectF, radius: Float, tint: Int, pressed: Boolean) {
+    override fun draw(canvas: Canvas, bounds: RectF, radius: Float, tint: Int, pressed: Boolean) {
         // Sombra macia (duas passadas) e o fio escuro em volta, SÓ FORA da tecla: ela é translúcida, então uma
         // sombra por baixo dela escureceria o vidro e daria um cinza — o que não pode acontecer.
         keyShape.rewind()

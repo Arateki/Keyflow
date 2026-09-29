@@ -939,8 +939,22 @@ internal fun SkinsSection(
                         )
                     }
                 }
+                SkinChoice(
+                    label = "Glitch",
+                    selected = KeyboardSkin.of(selectedSkin) == KeyboardSkin.GLITCH,
+                    onClick = { onSkinSelected(KeyboardSkin.GLITCH.id) },
+                    tag = skinTag(KeyboardSkin.GLITCH.id),
+                ) {
+                    // Uma tecla preta com a borda em três canais: ciano à esquerda, vermelho à direita, branco no meio.
+                    Box(Modifier.fillMaxSize().background(Color(0xFF050505)).padding(horizontal = 10.dp, vertical = 9.dp)) {
+                        Box(Modifier.fillMaxSize().offset(x = (-1.5).dp).border(1.dp, Color(0xFF25F4EE), RoundedCornerShape(4.dp)))
+                        Box(Modifier.fillMaxSize().offset(x = 1.5.dp).border(1.dp, Color(0xFFFE2C55), RoundedCornerShape(4.dp)))
+                        Box(Modifier.fillMaxSize().background(Color(0xFF0B0B0B), RoundedCornerShape(4.dp)).border(1.dp, Color.White, RoundedCornerShape(4.dp)))
+                    }
+                }
             }
-            SkinSwatch(palette.terracotta)
+            // Amostras travadas (decorativas) para completar a fileira de cinco: o que sobra depois das escolhas.
+            if (onSkinSelected == null) SkinSwatch(palette.terracotta) // (a orbe tem 3 escolhas: sobram 2)
             SkinSwatch(palette.bg, border = true)
         }
         Row(

@@ -173,9 +173,9 @@ class MicSelectorController(
     }
 
     private fun color(action: MicAction): Int = when (action) {
-        MicAction.PAUSE_RESUME -> MicVisuals.ACCENT_RECORD
-        MicAction.CANCEL -> MicVisuals.ACCENT_TERRACOTTA
-        MicAction.UNDO -> MicVisuals.ACCENT_TEAL
+        MicAction.PAUSE_RESUME -> colors.tone(MicVisuals.ACCENT_RECORD)
+        MicAction.CANCEL -> colors.tone(MicVisuals.ACCENT_TERRACOTTA)
+        MicAction.UNDO -> colors.tone(MicVisuals.ACCENT_TEAL)
     }
 
     private fun ripple(bgColor: Int, borderColor: Int): RippleDrawable {

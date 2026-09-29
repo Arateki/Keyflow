@@ -1,7 +1,7 @@
 package com.keyflow.ime.keyboard
 
 import com.keyflow.ime.GlassSheetLocator
-import com.keyflow.ime.GlassPainter
+import com.keyflow.ime.KeySurface
 import com.keyflow.ime.KeyboardColors
 import com.keyflow.ime.KeyboardSkin
 import android.content.Context
@@ -68,8 +68,8 @@ class KeyboardGridView(
     private val kbModifier = colors.modifier
     private val kbInk = colors.ink
     private val pressedOverlay = 0x33000000
-    // Aero: teclas de vidro sobre a lâmina que a view-mãe pinta (a grade não tem fundo próprio).
-    private val glass = if (colors.isGlass) GlassPainter(dp(1)) else null
+    // Aero e Glitch: teclas com superfície própria sobre o fundo que a view-mãe pinta (a grade não tem fundo próprio).
+    private val surface: KeySurface? = colors.surface(dp(1))
     private val sheetLocator = GlassSheetLocator(this)
 
     private val keyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
@@ -98,7 +98,7 @@ class KeyboardGridView(
         strokeWidth = dp(1)
         color = kbKeyBorder
     }
-    private val bubbleHighlight = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL; color = ACCENT_TEAL }
+    private val bubbleHighlight = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL; color = colors.tone(ACCENT_TEAL) }
     private val bubbleText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
         colors.labelWeight.typeface()?.let { typeface = it }
@@ -243,7 +243,7 @@ class KeyboardGridView(
     }
 
     override fun onDraw(canvas: Canvas) {
-        glass?.useSheet(sheetLocator.locate(), sheetLocator.dx, sheetLocator.dy)
+        surface?.useSheet(sheetLocator.locate(), sheetLocator.dx, sheetLocator.dy)
         placedRows.forEach { row ->
             row.keys.forEach { placed -> drawKey(canvas, placed) }
         }
@@ -254,8 +254,9 @@ class KeyboardGridView(
             set(placed.left + keyMargin, placed.top + keyMargin, placed.right - keyMargin, placed.bottom - keyMargin)
         }
         val isModifier = placed.keyDef.action !is KeyAction.Char && placed.keyDef.action != KeyAction.Space
-        if (glass != null) {
-            glass.draw(canvas, bounds, cornerRadius, keyColorFor(placed), pressed = pressedKeys.containsValue(placed))
+        val pressed = pressedKeys.containsValue(placed)
+        if (surface != null) {
+            surface.draw(canvas, bounds, cornerRadius, keyColorFor(placed), pressed = pressed)
         } else {
             keyPaint.color = keyColorFor(placed)
             canvas.drawRoundRect(bounds, cornerRadius, cornerRadius, keyPaint)
@@ -268,13 +269,21 @@ class KeyboardGridView(
         }
 
         val color = textColorFor(placed, isModifier)
-        if (placed.keyDef.action == KeyAction.Language) {
-            drawGlobeIcon(canvas, bounds, color)
-        } else {
-            textPaint.color = color
-            val label = labelFor(placed)
-            val textY = bounds.centerY() - (textPaint.descent() + textPaint.ascent()) / 2
-            canvas.drawText(label, bounds.centerX(), textY, textPaint)
+        // O rótulo em uma passada, ou nas camadas de cor de uma skin (o Glitch desenha ciano, vermelho e a tinta).
+        val passes = surface?.labelPasses ?: 1
+        for (pass in 0 until passes) {
+            val passColor = surface?.labelColor(pass, color, pressed) ?: color
+            canvas.save()
+            canvas.translate(surface?.labelOffsetX(pass) ?: 0f, 0f)
+            if (placed.keyDef.action == KeyAction.Language) {
+                drawGlobeIcon(canvas, bounds, passColor)
+            } else {
+                textPaint.color = passColor
+                val label = labelFor(placed)
+                val textY = bounds.centerY() - (textPaint.descent() + textPaint.ascent()) / 2
+                canvas.drawText(label, bounds.centerX(), textY, textPaint)
+            }
+            canvas.restore()
         }
         val hint = (placed.keyDef.action as? KeyAction.Char)?.digitHint
         if (hint != null) drawDigitHint(canvas, bounds, hint)
@@ -299,8 +308,8 @@ class KeyboardGridView(
     }
 
     private fun keyColorFor(placed: PlacedKey): Int {
-        if (placed.keyDef.action == KeyAction.Shift && state.capsLocked) return ACCENT_TEAL
-        if (placed.keyDef.action == KeyAction.Shift && state.shiftActive) return ACCENT_TEAL
+        if (placed.keyDef.action == KeyAction.Shift && state.capsLocked) return colors.tone(ACCENT_TEAL)
+        if (placed.keyDef.action == KeyAction.Shift && state.shiftActive) return colors.tone(ACCENT_TEAL)
         val isModifier = placed.keyDef.action !is KeyAction.Char && placed.keyDef.action != KeyAction.Space
         return if (isModifier) kbModifier else kbKey
     }

@@ -11,6 +11,9 @@ import android.graphics.Typeface
  * translúcida ([KeyboardBackdrop]). Desde 2026-09-29 a transparência é **real**: a janela do teclado é
  * translúcida e o que o app desenha atrás aparece através do vidro (com desfoque do compositor onde o
  * aparelho oferece). Tem uma aparência só, no tema claro e no escuro: o vidro não muda de cor.
+ *
+ * [GLITCH] (Yan, 2026-09-29): o efeito de falha gráfica em preto, branco, vermelho e azul, como a logo do TikTok —
+ * ([GlitchPainter]) sobre um fundo preto com scanlines e rasgos. Também tem uma aparência só.
  */
 enum class KeyboardSkin(
     val id: String,
@@ -24,6 +27,9 @@ enum class KeyboardSkin(
     SYSTEM("system", paid = false),
     ATELIE("atelie", paid = true),
     AERO("aero", paid = true),
+
+    /** Falha gráfica em preto, branco, vermelho e azul (a logo do TikTok). Paga, como o Aero: só o Sistema é livre. */
+    GLITCH("glitch", paid = true),
     ;
 
     companion object {
@@ -63,12 +69,31 @@ data class KeyboardColors(
     /** Multiplica a espessura do traço dos ícones (1 = a de sempre). */
     val iconStrokeScale: Float = 1f,
 ) {
-    val isGlass: Boolean get() = backdrop != null
+    /** A skin tem superfície própria (Aero, Glitch): teclas pintadas por um [KeySurface] sobre um [backdrop]. */
+    val hasSurface: Boolean get() = backdrop != null
+
+    /** As teclas desta skin ([hasSurface]); `null` nas skins lisas. */
+    fun surface(density: Float): KeySurface? = backdrop?.surface(density)
+
+    /**
+     * Passa uma cor de acento compartilhada (o verde do mic pronto, o âmbar de gravando, o terracota de erro) para
+     * a paleta da skin. Só o Glitch troca: azul, vermelho e vermelho — não existe verde nem âmbar nele.
+     */
+    fun tone(color: Int): Int = if (backdrop != KeyboardBackdrop.GLITCH) color else when (color) {
+        ACCENT_TEAL_INT -> GlitchPainter.BLUE
+        ACCENT_RECORD_INT, ACCENT_TERRACOTTA_INT -> GlitchPainter.RED
+        else -> color
+    }
 
     /** Contorno das etiquetas de sugestão: a tinta bem suave, visível nos dois esquemas. */
     val chipOutline: Int get() = (ink and 0x00FFFFFF) or 0x40000000
 
     companion object {
+        // Os acentos compartilhados (ver MicVisuals): repetidos aqui para o Glitch trocá-los.
+        private const val ACCENT_TEAL_INT = 0xFF4E9683.toInt()
+        private const val ACCENT_RECORD_INT = 0xFFC6873F.toInt()
+        private const val ACCENT_TERRACOTTA_INT = 0xFFD9694B.toInt()
+
         // Medidas no teclado Samsung (One UI) do A32 do Yan, em prints de 2026-09-28.
         private val SYSTEM_LIGHT = KeyboardColors(
             tray = 0xFFE6E6E6.toInt(),
@@ -115,10 +140,25 @@ data class KeyboardColors(
             iconStrokeScale = 1.2f,
         )
 
+        // Glitch: faces pretas, teclas de função em azul fundo, letras brancas em três camadas (o GlitchPainter desenha
+        // o deslocamento ciano/vermelho) e nenhuma sombra: o halo do vidro não faz sentido aqui.
+        private val GLITCH = KeyboardColors(
+            tray = 0x00000000,
+            key = 0xFF0B0B0B.toInt(),
+            keyBorder = 0xFFFFFFFF.toInt(),
+            modifier = 0xFF10267A.toInt(),
+            ink = 0xFFFFFFFF.toInt(),
+            popup = 0xFF000000.toInt(),
+            backdrop = KeyboardBackdrop.GLITCH,
+            labelWeight = LabelWeight.BOLD,
+            iconStrokeScale = 1.15f,
+        )
+
         fun of(skin: KeyboardSkin, dark: Boolean): KeyboardColors = when (skin) {
             KeyboardSkin.SYSTEM -> if (dark) SYSTEM_DARK else SYSTEM_LIGHT
             KeyboardSkin.ATELIE -> if (dark) ATELIE_DARK else ATELIE_LIGHT
             KeyboardSkin.AERO -> AERO
+            KeyboardSkin.GLITCH -> GLITCH
         }
     }
 }

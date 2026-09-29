@@ -28,9 +28,21 @@ enum class KeyboardBackdrop(
 ) {
     /** Frutiger Aero: vidro claro, quase transparente. */
     AERO(AERO_BOTTOM),
+
+    /** Glitch: preto com scanlines e rasgos de ciano e vermelho — opaco, sem ver o app atrás. */
+    GLITCH(0xFF000000.toInt()),
     ;
 
-    fun drawable(density: Float): Drawable = AeroGlassSheet(density = density)
+    fun drawable(density: Float): Drawable = when (this) {
+        AERO -> AeroGlassSheet(density = density)
+        GLITCH -> GlitchSheet(density = density)
+    }
+
+    /** A superfície das teclas que combina com este fundo. */
+    fun surface(density: Float): KeySurface = when (this) {
+        AERO -> GlassPainter(density)
+        GLITCH -> GlitchPainter(density)
+    }
 }
 
 // Vidro claro e quase transparente: um fio de azul-céu, mais denso embaixo. Nada de tinta escura (sobre o branco do
@@ -133,6 +145,97 @@ private class AeroGlassSheet(
     private companion object {
         /** O reflexo da lâmina é mais discreto que o das teclas, que ficam por cima dele. */
         const val SHEET_SHEEN = 0.55f
+    }
+}
+
+/**
+ * O fundo do Glitch: preto, com scanlines (uma linha clara a cada poucos dp, em azulejo repetido) e rasgos
+ * horizontais de ciano e vermelho, cada um com um gêmeo deslocado e mais fraco. Posições fixas: nada animado, e o
+ * mesmo teclado dá o mesmo quadro. Só aparece nos vãos entre as teclas e nas barras — as teclas têm face própria.
+ */
+private class GlitchSheet(private val density: Float) : Drawable(), GlassSheet {
+
+    override val widthPx: Int get() = bounds.width()
+    override val heightPx: Int get() = bounds.height()
+
+    private val basePaint = Paint().apply { color = 0xFF050505.toInt() }
+    private val scanPaint = Paint()
+    private val barPaint = Paint()
+
+    init {
+        // Um pixel de largura, o período da scanline de altura: só a 1ª linha é clara.
+        val period = maxOf(3, (SCAN_PERIOD_DP * density).toInt())
+        val tile = android.graphics.Bitmap.createBitmap(1, period, android.graphics.Bitmap.Config.ARGB_8888)
+        tile.setPixel(0, 0, 0x14FFFFFF)
+        scanPaint.shader = android.graphics.BitmapShader(tile, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT)
+    }
+
+    override fun draw(canvas: Canvas) {
+        val b = bounds
+        if (b.isEmpty) return
+        val w = b.width().toFloat()
+        val h = b.height().toFloat()
+        canvas.drawRect(b, basePaint)
+        canvas.save()
+        canvas.translate(b.left.toFloat(), b.top.toFloat())
+        canvas.drawRect(0f, 0f, w, h, scanPaint)
+        for (tear in TEARS) {
+            val y = h * tear.y
+            val x = w * tear.x
+            val bw = w * tear.w
+            val bh = tear.h * density
+            barPaint.color = if (tear.cyan) CYAN_MAIN else RED_MAIN
+            canvas.drawRect(x, y, x + bw, y + bh, barPaint)
+            // O gêmeo: outra cor, mais fraco, deslocado para o lado e para baixo, como o canal que não alinhou.
+            barPaint.color = if (tear.cyan) RED_TWIN else CYAN_TWIN
+            canvas.drawRect(x + 3f * density, y + 1.6f * density, x + bw * 0.8f + 3f * density, y + 1.6f * density + bh, barPaint)
+            barPaint.color = WHITE_TICK
+            canvas.drawRect(x, y, x + bw * 0.12f, y + maxOf(1f, 0.8f * density), barPaint)
+        }
+        for (block in BLOCKS) {
+            barPaint.color = block.color
+            val bx = w * block.x
+            val by = h * block.y
+            canvas.drawRect(bx, by, bx + block.w * density, by + block.h * density, barPaint)
+        }
+        canvas.restore()
+    }
+
+    override fun setAlpha(alpha: Int) = Unit
+    override fun setColorFilter(colorFilter: ColorFilter?) = Unit
+
+    @Deprecated("Deprecated in Java")
+    override fun getOpacity(): Int = PixelFormat.OPAQUE
+
+    private class Tear(val y: Float, val h: Float, val x: Float, val w: Float, val cyan: Boolean)
+    private class Block(val x: Float, val y: Float, val w: Float, val h: Float, val color: Int)
+
+    private companion object {
+        const val SCAN_PERIOD_DP = 3f
+        const val CYAN_MAIN = 0x8C25F4EE.toInt()
+        const val RED_MAIN = 0x8CFE2C55.toInt()
+        const val CYAN_TWIN = 0x5925F4EE
+        const val RED_TWIN = 0x59FE2C55
+        const val WHITE_TICK = 0x8CFFFFFF.toInt()
+        val TEARS = listOf(
+            Tear(0.08f, 2.2f, 0.08f, 0.30f, true),
+            Tear(0.19f, 1.2f, 0.52f, 0.42f, false),
+            Tear(0.31f, 2.6f, 0.03f, 0.20f, false),
+            Tear(0.44f, 1.4f, 0.60f, 0.32f, true),
+            Tear(0.58f, 2.0f, 0.18f, 0.34f, false),
+            Tear(0.71f, 1.2f, 0.68f, 0.26f, true),
+            Tear(0.83f, 2.4f, 0.02f, 0.38f, true),
+            Tear(0.94f, 1.6f, 0.45f, 0.50f, false),
+        )
+        val BLOCKS = listOf(
+            Block(0.86f, 0.12f, 9f, 4f, 0x8C25F4EE.toInt()),
+            Block(0.30f, 0.27f, 6f, 3f, 0x8CFE2C55.toInt()),
+            Block(0.93f, 0.40f, 7f, 3f, 0x8CFFFFFF.toInt()),
+            Block(0.12f, 0.52f, 8f, 3f, 0x8C25F4EE.toInt()),
+            Block(0.74f, 0.66f, 6f, 4f, 0x8CFE2C55.toInt()),
+            Block(0.40f, 0.88f, 9f, 3f, 0x8C25F4EE.toInt()),
+            Block(0.97f, 0.79f, 5f, 3f, 0x8CFE2C55.toInt()),
+        )
     }
 }
 

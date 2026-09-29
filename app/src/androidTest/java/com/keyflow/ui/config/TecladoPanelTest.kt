@@ -110,6 +110,19 @@ class TecladoPanelTest {
     }
 
     @Test
+    fun keyboardSkinGlitchPersists() {
+        val h = Harness(Settings(keyboardSkin = "system", orbSkin = "atelie"))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(skinTag("glitch")).performScrollTo().performClick()
+
+        rule.runOnIdle {
+            assertEquals("glitch", h.settings.keyboardSkin)
+            assertEquals("atelie", h.settings.orbSkin)
+        }
+    }
+
+    @Test
     fun keyboardSizeSliderPersists() {
         val h = Harness(Settings(keyboardScalePercent = 100))
         rule.setContent { h.Content() }

@@ -124,6 +124,9 @@ object RouteCatalog {
         // Protótipo Aero (2026-09-28): paisagem própria + teclas de vidro, com sugestões na faixa.
         keyboardCanvasCandidatesRoute("keyboard-aero-expanded", skin = KeyboardSkin.AERO),
         keyboardRoute("keyboard-aero-collapsed", expanded = false, recording = false, skin = KeyboardSkin.AERO),
+        // Glitch (2026-09-29): faces pretas, borda em três canais, rótulos em camadas, fundo com rasgos.
+        keyboardCanvasCandidatesRoute("keyboard-glitch-expanded", skin = KeyboardSkin.GLITCH),
+        keyboardRoute("keyboard-glitch-collapsed", expanded = false, recording = false, skin = KeyboardSkin.GLITCH),
         // Barras Canvas (SB-T10/ROL-03): paridade com a barra de fábrica + estados só alcançáveis por
         // gesto (grade revelada/alavanca), simulados via toque sintético (mesma técnica de
         // `tapLayerToggle`) já que a galeria não tem dedo de verdade.

@@ -336,8 +336,8 @@ class KeyFlowKeyboardService : InputMethodService() {
     /**
      * A janela do teclado no Aero (vidro de verdade): desfoca o que está atrás dela, quando o aparelho deixa
      * ([windowBlurAvailable] — o A32 do Yan não deixa), e tinge a faixa da barra de navegação com a tinta do
-     * fundo da lâmina, para o vidro seguir até a borda em vez de uma tira preta. Os outros esquemas mantêm a
-     * cor do sistema e nenhum desfoque, como sempre foi.
+     * fundo (no Glitch, preta), para o teclado seguir até a borda em vez de uma tira preta destoando. Os outros
+     * esquemas mantêm a cor do sistema e nenhum desfoque, como sempre foi.
      */
     @Suppress("DEPRECATION") // navigationBarColor: é o que o Android até o 14 usa na faixa do IME
     private fun applyGlassWindow(colors: KeyboardColors) {
@@ -345,7 +345,7 @@ class KeyFlowKeyboardService : InputMethodService() {
         val systemColor = systemNavigationBarColor ?: w.navigationBarColor.also { systemNavigationBarColor = it }
         w.navigationBarColor = colors.backdrop?.navigationBarColor ?: systemColor
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val blurPx = if (colors.isGlass && windowBlurAvailable(this)) (WINDOW_BLUR_DP * resources.displayMetrics.density).toInt() else 0
+            val blurPx = if (colors.backdrop == KeyboardBackdrop.AERO && windowBlurAvailable(this)) (WINDOW_BLUR_DP * resources.displayMetrics.density).toInt() else 0
             w.setBackgroundBlurRadius(blurPx)
             Log.d(TAG, "vidro: desfoque da janela=${blurPx}px (disponível=${windowBlurAvailable(this)})")
         }

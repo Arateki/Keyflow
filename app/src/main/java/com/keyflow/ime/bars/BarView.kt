@@ -2,7 +2,7 @@ package com.keyflow.ime.bars
 
 import com.keyflow.i18n.tr
 import com.keyflow.ime.GlassSheetLocator
-import com.keyflow.ime.GlassPainter
+import com.keyflow.ime.KeySurface
 import com.keyflow.ime.KeyboardColors
 import com.keyflow.ime.KeyboardSkin
 import android.content.Context
@@ -122,8 +122,8 @@ class BarView(
     private val kbModifier = colors.modifier
     private val kbInk = colors.ink
     private val pressedOverlay = 0x33000000
-    // Aero: botões de vidro; o fundo da barra ([kbTray]) é transparente e a lâmina de vidro vem da view-mãe.
-    private val glass = if (colors.isGlass) GlassPainter(dp(1f)) else null
+    // Aero e Glitch: botões com superfície própria; o fundo da barra ([kbTray]) é transparente e o fundo vem da view-mãe.
+    private val surface: KeySurface? = colors.surface(dp(1f))
     private val sheetLocator = GlassSheetLocator(this)
 
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
@@ -313,7 +313,7 @@ class BarView(
     override fun onDraw(canvas: Canvas) {
         canvas.drawColor(kbTray)
         // O canvas vai andar -scrollOffset: o reflexo precisa andar junto para seguir a lâmina parada.
-        glass?.useSheet(sheetLocator.locate(), sheetLocator.dx - scrollOffset, sheetLocator.dy)
+        surface?.useSheet(sheetLocator.locate(), sheetLocator.dx - scrollOffset, sheetLocator.dy)
         canvas.save()
         canvas.translate(-scrollOffset, 0f)
         barLayout.buttons.forEach { placed ->
@@ -330,20 +330,33 @@ class BarView(
         val button = placed.button
         val (label, bg, ink) = visualsFor(button)
 
-        if (glass != null) {
-            glass.draw(canvas, bounds, cornerRadius, bg, pressed = placed.index == pressedIndex)
+        val pressed = placed.index == pressedIndex
+        if (surface != null) {
+            surface.draw(canvas, bounds, cornerRadius, bg, pressed = pressed)
         } else {
             fillPaint.color = bg
             canvas.drawRoundRect(bounds, cornerRadius, cornerRadius, fillPaint)
-            if (placed.index == pressedIndex) {
+            if (pressed) {
                 fillPaint.color = pressedOverlay
                 canvas.drawRoundRect(bounds, cornerRadius, cornerRadius, fillPaint)
             }
             canvas.drawRoundRect(bounds, cornerRadius, cornerRadius, borderPaint)
         }
 
+        // O conteúdo em uma passada, ou nas camadas de cor de uma skin (o Glitch: ciano, vermelho e a tinta).
+        val passes = surface?.labelPasses ?: 1
+        for (pass in 0 until passes) {
+            canvas.save()
+            canvas.translate(surface?.labelOffsetX(pass) ?: 0f, 0f)
+            drawContent(canvas, bounds, button, label, surface?.labelColor(pass, ink, pressed) ?: ink, joystickActive = pressed && joystick != null)
+            canvas.restore()
+        }
+    }
+
+    /** O ícone, o texto ou o desenho de um botão, na tinta [ink]. */
+    private fun drawContent(canvas: Canvas, bounds: RectF, button: BarButton, label: String, ink: Int, joystickActive: Boolean) {
         if (button == BarButton.Joystick) {
-            drawJoystick(canvas, bounds, ink, active = placed.index == pressedIndex && joystick != null)
+            drawJoystick(canvas, bounds, ink, active = joystickActive)
             return
         }
         val alpha = if (isOrphanTrigger(button)) 100 else 255
@@ -442,7 +455,7 @@ class BarView(
             if (color == MicVisuals.MIC_NO_FIELD && skin != KeyboardSkin.ATELIE) {
                 Triple(label, kbModifier, kbInk)
             } else {
-                Triple(label, color, Color.WHITE)
+                Triple(label, colors.tone(color), Color.WHITE)
             }
         }
         BarButton.ConfigBtn -> Triple("⚙", kbModifier, kbInk)
