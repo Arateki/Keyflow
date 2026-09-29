@@ -30,8 +30,8 @@ Branch `feature/tema-aero`, a partir de `feature/app-layout-refinado`.
   o service pinta a faixa com a cor do chão da cena (`KeyboardBackdrop.navigationBarColor`); nos outros
   esquemas devolve a cor que o sistema tinha.
 - **Mic sem campo** no Aero usa o tom das teclas de função, como no Sistema (o oliva é do Ateliê).
-- **Grátis no protótipo**: a pergunta "Aero pago ou grátis?" ficou sem resposta; a opção entra na seção
-  Skins da aba Teclado ao lado de Sistema e Ateliê, sem cadeado.
+- **Grátis no protótipo** *(respondido na rodada 5: o Aero é PAGO — ver lá)*: a opção entra na seção Skins da
+  aba Teclado ao lado de Sistema e Ateliê, sem cadeado.
 
 ## Verificação (emulador `keyflow_api34`)
 
@@ -142,4 +142,15 @@ fundo" — e **água dentro do vidro** na orbe.
   atrás do teclado (`BehindKeyboardScene`), sem desfoque — o que o A32 mostra.
 - Em aberto: ver no A32 como o vidro se comporta sobre os apps que o Yan usa (fundos lisos claros/escuros; nada
   de desfoque lá); o Aero pago ou grátis; as setas do arrasto seguem teal.
+
+## Rodada 5 (2026-09-29)
+
+- **O Aero é pago** (Yan): "o único gratuito é o de sistema". Registrado em `KeyboardSkin.paid` (Sistema livre;
+  Ateliê e Aero pagas) e `OrbStyle.paid` (orbe padrão livre; Aero paga), com teste, e em
+  `.specs/features/monetization` (UNL-05 e a nota da MZ-T9). **Por enquanto NADA é bloqueado** — o Yan pediu tudo
+  liberado para testar; o bloqueio de verdade entra com a monetização (Milestone 7, MZ-T9), nas abas Teclado e
+  Sobrepor. Interpretação minha: para a orbe não existe "Sistema", então a padrão (Ateliê) é a gratuita.
+- **Aba Voz** (ícone de boca): `ConfigTab.FALA` (rótulo "Voz"; `VOZ` já é a Transcrição por dentro), depois de
+  Raciocínio, vazia como as outras duas. `KfIcons.TabBoca`: os lábios com o arco de cima e a linha da boca, no
+  mesmo traço dos outros.
 
