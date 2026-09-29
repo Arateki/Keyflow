@@ -91,6 +91,10 @@ class KeyFlowKeyboardView(
     private val clock: () -> Long = { SystemClock.elapsedRealtime() },
     // Prévia de tamanho: barras divididas na largura que houver, sem rolar (ver BarView.fitWidth).
     private val barsFitWidth: Boolean = false,
+    // Movimento da skin (a falha do Glitch): só o teclado de verdade liga — prévias, galeria e testes não se mexem.
+    private val motionEnabled: Boolean = false,
+    // Galeria: desenha o quadro congelado neste instante do movimento, sem agendar nada.
+    private val motionTimeMs: Float? = null,
 ) : LinearLayout(context) {
 
     private var canvasGrid: KeyboardGridView? = null
@@ -189,6 +193,14 @@ class KeyFlowKeyboardView(
     private val kbModifier = colors.modifier
     private val kbInk = colors.ink
 
+    // O movimento da skin, se ela tem e se está ligado: eventos curtos, sem custo entre eles (ver [KeyboardMotion]).
+    private val motion: KeyboardMotion? =
+        if (colors.backdrop == KeyboardBackdrop.GLITCH && (motionEnabled || motionTimeMs != null)) {
+            GlitchMotion(this, resources.displayMetrics.density * scale, motionTimeMs, ::applyEffect)
+        } else {
+            null
+        }
+
     // Estado/tempo do microfone (espelha AudioRecorder/OrbButtonView: conta só em RECORDING).
     private val handler = Handler(Looper.getMainLooper())
     private var micState: ButtonState = ButtonState.IDLE_NO_FIELD
@@ -238,6 +250,43 @@ class KeyFlowKeyboardView(
         gridOverscanSpacer?.let { addView(it) }
         addView(target)
     }
+
+    /** A intensidade do efeito da skin, repassada à grade e às barras (elas se invalidam para redesenhar o rótulo). */
+    private fun applyEffect(amount: Float) {
+        canvasGrid?.setEffect(amount)
+        barViews.forEach { it.setEffect(amount) }
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        motion?.start()
+    }
+
+    override fun onDetachedFromWindow() {
+        motion?.stop()
+        super.onDetachedFromWindow()
+    }
+
+    override fun onWindowVisibilityChanged(visibility: Int) {
+        super.onWindowVisibilityChanged(visibility)
+        if (visibility == VISIBLE) motion?.start() else motion?.stop()
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN) motion?.onTouchDown()
+        return super.dispatchTouchEvent(ev)
+    }
+
+    override fun dispatchDraw(canvas: android.graphics.Canvas) {
+        val m = motion
+        if (m == null || !m.isActive) {
+            super.dispatchDraw(canvas)
+        } else {
+            m.draw(canvas, width, height, ::drawChildrenOnce)
+        }
+    }
+
+    private fun drawChildrenOnce(canvas: android.graphics.Canvas) = super.dispatchDraw(canvas)
 
     fun updateMicState(state: ButtonState) {
         micState = state

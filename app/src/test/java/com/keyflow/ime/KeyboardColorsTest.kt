@@ -69,28 +69,38 @@ class KeyboardColorsTest {
     }
 
     @Test
-    fun `glitch is black, white, red and blue on a backdrop of its own, the same in both themes`() {
+    fun `glitch is a discreet neutral dark, the same in both themes, with no blue fill`() {
         val colors = KeyboardColors.of(KeyboardSkin.GLITCH, dark = false)
         assertThat(KeyboardColors.of(KeyboardSkin.GLITCH, dark = true)).isEqualTo(colors)
         assertThat(colors.backdrop).isEqualTo(KeyboardBackdrop.GLITCH)
         assertThat(colors.hasSurface).isTrue()
-        // Faces opacas e escuras, letra branca; o fundo (preto) vem do backdrop, então a bandeja é transparente.
+        // A bandeja é transparente: o fundo (preto neutro) vem do backdrop.
         assertThat(colors.tray ushr 24).isEqualTo(0)
-        assertThat(colors.key ushr 24).isEqualTo(0xFF)
-        assertThat(colors.key and 0x00FFFFFF).isAtMost(0x101010)
-        assertThat(colors.ink).isEqualTo(0xFFFFFFFF.toInt())
+        // Faces opacas, cinza escuro e NEUTRO (r = g = b: nada de azul), e a função só um degrau mais clara.
+        for (face in listOf(colors.key, colors.modifier)) {
+            assertThat(face ushr 24).isEqualTo(0xFF)
+            assertThat((face shr 16) and 0xFF).isEqualTo(face and 0xFF)
+            assertThat((face shr 8) and 0xFF).isEqualTo(face and 0xFF)
+            assertThat(face and 0xFF).isAtMost(0x30)
+        }
+        assertThat(colors.modifier and 0xFF).isGreaterThan(colors.key and 0xFF)
+        // Letra clara mas não branca berrante; sem halo de vidro: o rótulo ganha as camadas de cor no lugar.
+        assertThat(colors.ink and 0xFF).isLessThan(0xFF)
         assertThat(colors.popup ushr 24).isEqualTo(0xFF)
-        // Sem halo de vidro: o rótulo ganha as camadas de cor no lugar.
         assertThat(colors.inkShadow).isEqualTo(0)
-        assertThat(colors.labelWeight).isEqualTo(LabelWeight.BOLD)
     }
 
     @Test
-    fun `glitch swaps the shared accents for its own red and blue and leaves the others alone`() {
+    fun `glitch swaps the shared accents for deep cyan and deep red, never neon`() {
         val glitch = KeyboardColors.of(KeyboardSkin.GLITCH, dark = false)
         val accents = listOf(0xFF4E9683.toInt(), 0xFFC6873F.toInt(), 0xFFD9694B.toInt())
-        // Nenhum verde nem âmbar sobrevive: só vermelho e azul.
-        assertThat(accents.map { glitch.tone(it) }.toSet()).containsExactly(0xFF2250FF.toInt(), 0xFFFE2C55.toInt())
+        // Nenhum verde nem âmbar sobrevive: só um ciano fundo e um vermelho fundo (fundos de botão, escuros).
+        val tones = accents.map { glitch.tone(it) }
+        assertThat(tones.toSet()).containsExactly(0xFF0F3E44.toInt(), 0xFF7A1029.toInt())
+        for (tone in tones) {
+            val brightest = maxOf((tone shr 16) and 0xFF, (tone shr 8) and 0xFF, tone and 0xFF)
+            assertThat(brightest).isAtMost(0x80)
+        }
         assertThat(glitch.tone(0xFF123456.toInt())).isEqualTo(0xFF123456.toInt())
         // As outras skins não mexem em nada.
         for (skin in listOf(KeyboardSkin.SYSTEM, KeyboardSkin.ATELIE, KeyboardSkin.AERO)) {

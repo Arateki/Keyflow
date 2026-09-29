@@ -317,6 +317,7 @@ class KeyFlowKeyboardService : InputMethodService() {
             shortcutGrids = grids,
             onShortcut = ::emitShortcut,
             vibrationIntensity = vibration,
+            motionEnabled = true,
         )
         keyboardView = view
         activeViewForTest = view

@@ -126,6 +126,12 @@ class BarView(
     private val surface: KeySurface? = colors.surface(dp(1f), com.keyflow.ime.windowBlurAvailable(context))
     private val sheetLocator = GlassSheetLocator(this)
 
+    /** A intensidade do efeito da skin (a falha do Glitch): os botões se redesenham com ela. */
+    fun setEffect(amount: Float) {
+        surface?.setEffect(amount)
+        invalidate()
+    }
+
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE

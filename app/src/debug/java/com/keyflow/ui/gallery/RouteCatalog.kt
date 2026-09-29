@@ -41,6 +41,7 @@ import com.keyflow.core.shortcuts.GridCell
 import com.keyflow.core.shortcuts.GridTriggerMode
 import com.keyflow.core.shortcuts.PhysicalKeyMap
 import com.keyflow.core.shortcuts.ShortcutGrid
+import com.keyflow.ime.GlitchTimeline
 import com.keyflow.ime.KeyFlowKeyboardView
 import com.keyflow.ime.KeyboardSkin
 import com.keyflow.overlay.RecordingNotification
@@ -134,6 +135,8 @@ object RouteCatalog {
         // Glitch (2026-09-29): faces pretas, borda em três canais, rótulos em camadas, fundo com rasgos.
         keyboardCanvasCandidatesRoute("keyboard-glitch-expanded", skin = KeyboardSkin.GLITCH),
         keyboardRoute("keyboard-glitch-collapsed", expanded = false, recording = false, skin = KeyboardSkin.GLITCH),
+        // O teclado Glitch congelado no pico de uma rajada de falha: faixas deslocadas, franjas e rótulos abertos.
+        keyboardCanvasCandidatesRoute("keyboard-glitch-burst", skin = KeyboardSkin.GLITCH, motionTimeMs = GlitchTimeline.peakOf(1)),
         // Barras Canvas (SB-T10/ROL-03): paridade com a barra de fábrica + estados só alcançáveis por
         // gesto (grade revelada/alavanca), simulados via toque sintético (mesma técnica de
         // `tapLayerToggle`) já que a galeria não tem dedo de verdade.
@@ -438,7 +441,11 @@ object RouteCatalog {
     }
 
     /** Golden da faixa de sugestões (KC-T10/SPL-01): candidatos fixos, sem depender do corretor real. */
-    private fun keyboardCanvasCandidatesRoute(key: String, skin: KeyboardSkin = KeyboardSkin.DEFAULT): Route = Route(key) {
+    private fun keyboardCanvasCandidatesRoute(
+        key: String,
+        skin: KeyboardSkin = KeyboardSkin.DEFAULT,
+        motionTimeMs: Float? = null,
+    ): Route = Route(key) {
         val dark = LocalKeyFlowPalette.current.isDark
         Box(
             modifier = Modifier
@@ -458,6 +465,7 @@ object RouteCatalog {
                         dark = dark,
                         skin = skin,
                         frozenSeconds = 12,
+                        motionTimeMs = motionTimeMs,
                     ).apply {
                         setExpanded(true)
                         updateCandidates(listOf("olá", "olar", "olé"))

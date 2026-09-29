@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -957,11 +958,17 @@ internal fun SkinsSection(
                     onClick = { onSkinSelected(KeyboardSkin.GLITCH.id) },
                     tag = skinTag(KeyboardSkin.GLITCH.id),
                 ) {
-                    // Uma tecla preta com a borda em três canais: ciano à esquerda, vermelho à direita, branco no meio.
-                    Box(Modifier.fillMaxSize().background(Color(0xFF050505)).padding(horizontal = 10.dp, vertical = 9.dp)) {
-                        Box(Modifier.fillMaxSize().offset(x = (-1.5).dp).border(1.dp, Color(0xFF25F4EE), RoundedCornerShape(4.dp)))
-                        Box(Modifier.fillMaxSize().offset(x = 1.5.dp).border(1.dp, Color(0xFFFE2C55), RoundedCornerShape(4.dp)))
-                        Box(Modifier.fillMaxSize().background(Color(0xFF0B0B0B), RoundedCornerShape(4.dp)).border(1.dp, Color.White, RoundedCornerShape(4.dp)))
+                    // Uma tecla cinza escuro sobre o fundo neutro, com as duas marcas de registro: ciano em cima à
+                    // esquerda, vermelho embaixo à direita (o efeito só em detalhes, como no teclado).
+                    Box(Modifier.fillMaxSize().background(Color(0xFF0B0B0C)).padding(horizontal = 10.dp, vertical = 9.dp)) {
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .background(Color(0xFF191919), RoundedCornerShape(4.dp))
+                                .border(1.dp, Color(0x2EFFFFFF), RoundedCornerShape(4.dp)),
+                        )
+                        Box(Modifier.align(Alignment.TopStart).padding(start = 5.dp).width(9.dp).height(1.5.dp).background(Color(0xFF25F4EE)))
+                        Box(Modifier.align(Alignment.BottomEnd).padding(end = 5.dp).width(9.dp).height(1.5.dp).background(Color(0xFFFE2C55)))
                     }
                 }
             }

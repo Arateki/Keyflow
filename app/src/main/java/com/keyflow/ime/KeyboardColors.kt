@@ -77,11 +77,12 @@ data class KeyboardColors(
 
     /**
      * Passa uma cor de acento compartilhada (o verde do mic pronto, o âmbar de gravando, o terracota de erro) para
-     * a paleta da skin. Só o Glitch troca: azul, vermelho e vermelho — não existe verde nem âmbar nele.
+     * a paleta da skin. Só o Glitch troca, por um ciano e um vermelho FUNDOS (fundos de botão, não os neons das
+     * falhas): não existe verde nem âmbar nele, e nada estoura.
      */
     fun tone(color: Int): Int = if (backdrop != KeyboardBackdrop.GLITCH) color else when (color) {
-        ACCENT_TEAL_INT -> GlitchPainter.BLUE
-        ACCENT_RECORD_INT, ACCENT_TERRACOTTA_INT -> GlitchPainter.RED
+        ACCENT_TEAL_INT -> GLITCH_DEEP_CYAN
+        ACCENT_RECORD_INT, ACCENT_TERRACOTTA_INT -> GLITCH_DEEP_RED
         else -> color
     }
 
@@ -93,6 +94,8 @@ data class KeyboardColors(
         private const val ACCENT_TEAL_INT = 0xFF4E9683.toInt()
         private const val ACCENT_RECORD_INT = 0xFFC6873F.toInt()
         private const val ACCENT_TERRACOTTA_INT = 0xFFD9694B.toInt()
+        private const val GLITCH_DEEP_CYAN = 0xFF0F3E44.toInt()
+        private const val GLITCH_DEEP_RED = 0xFF7A1029.toInt()
 
         // Medidas no teclado Samsung (One UI) do A32 do Yan, em prints de 2026-09-28.
         private val SYSTEM_LIGHT = KeyboardColors(
@@ -140,18 +143,19 @@ data class KeyboardColors(
             iconStrokeScale = 1.2f,
         )
 
-        // Glitch: faces pretas, teclas de função em azul fundo, letras brancas em três camadas (o GlitchPainter desenha
-        // o deslocamento ciano/vermelho) e nenhuma sombra: o halo do vidro não faz sentido aqui.
+        // Glitch: discreto. Faces em cinza escuro neutro e letras claras; as cores do efeito (ciano e vermelho) ficam só nos
+        // detalhes das teclas e nas falhas (GlitchPainter, KeyboardMotion). Sem azul, sem branco berrante: o Yan achou a
+        // versão anterior "estourando, como um tema de alto contraste".
         private val GLITCH = KeyboardColors(
             tray = 0x00000000,
-            key = 0xFF0B0B0B.toInt(),
-            keyBorder = 0xFFFFFFFF.toInt(),
-            modifier = 0xFF10267A.toInt(),
-            ink = 0xFFFFFFFF.toInt(),
-            popup = 0xFF000000.toInt(),
+            key = 0xFF191919.toInt(),
+            keyBorder = 0x40FFFFFF,
+            modifier = 0xFF262626.toInt(),
+            ink = 0xFFF0F0F0.toInt(),
+            popup = 0xFF141414.toInt(),
             backdrop = KeyboardBackdrop.GLITCH,
-            labelWeight = LabelWeight.BOLD,
-            iconStrokeScale = 1.15f,
+            labelWeight = LabelWeight.MEDIUM,
+            iconStrokeScale = 1.1f,
         )
 
         fun of(skin: KeyboardSkin, dark: Boolean): KeyboardColors = when (skin) {

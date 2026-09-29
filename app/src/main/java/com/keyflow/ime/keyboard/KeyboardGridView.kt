@@ -72,6 +72,12 @@ class KeyboardGridView(
     private val surface: KeySurface? = colors.surface(dp(1), com.keyflow.ime.windowBlurAvailable(context))
     private val sheetLocator = GlassSheetLocator(this)
 
+    /** A intensidade do efeito da skin (a falha do Glitch): as teclas se redesenham com ela. */
+    fun setEffect(amount: Float) {
+        surface?.setEffect(amount)
+        invalidate()
+    }
+
     private val keyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
