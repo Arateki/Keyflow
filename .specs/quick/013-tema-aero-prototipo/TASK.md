@@ -72,3 +72,45 @@ Branch `feature/tema-aero`, a partir de `feature/app-layout-refinado`.
   (`BarViewAccessibilityTest`, "view não anexou") passou 3/3 isolada; goldens **102/102** (novos
   `overlay-aero-idle/recording`).
 - Em aberto: as setas do arrasto da orbe (`DragArrowsView`) seguem teal no Aero.
+
+## Rodada 3 (2026-09-29, depois de o Yan ver a rodada 2 no A32)
+
+Três reclamações do Yan: a skin Aero do teclado mexia na orbe; a orbe era só azul-água, sem ver o fundo; e as
+teclas pareciam "cinzas semi-transparentes sobre um fundo temático", não o vidro do Vista.
+
+- **Skin da orbe própria**: `Settings.orbSkin` ("atelie" | "aero", padrão Ateliê), independente de
+  `keyboardSkin`. A escolha mora na seção Skins da aba **Sobrepor** (`SkinsSection(onOrbSkinSelected)`: duas
+  prévias com a orbe de verdade; a do Aero sobre um céu). A aba Teclado escolhe só as cores do teclado, e as
+  duas seções têm uma linha dizendo onde fica a outra escolha. `orbStyleFor` passou a receber o id da skin da
+  orbe (`OrbStyle.id`); `OverlayService` e as prévias das abas leem `orbSkin`. Quem tinha o Aero no teclado
+  volta a ver a orbe do Ateliê até escolher o Aero na Sobrepor.
+- **Orbe de vidro transparente** (`drawAeroOrb`): saiu o preenchimento opaco. Miolo quase limpo (o app de
+  trás aparece), tinta azul mais densa na borda (Fresnel), sombra macia por fora, fio marinho por fora e fio
+  branco por dentro do aro (some/brilha conforme o fundo), brilho de gel em cima, luz refratada na base e um
+  fio de luz junto ao aro — tudo recortado pela forma que ondula. Com tempo ou glifo no centro há um miolo
+  leitoso e o texto ganha halo branco. A galeria põe um "app" de mentira atrás (`BehindOrbScene`) para o
+  golden mostrar o que atravessa. Desfoque de verdade do que está atrás (`FLAG_BLUR_BEHIND`) foi descartado:
+  o desfoque cobre o retângulo da janela, não a bolha, e depende do fabricante.
+- **Teclas de vidro** (`GlassPainter`, `KeyboardBackdrop`): o "cinza" vinha do véu branco (24%) e do brilho de
+  78% sobre uma paisagem lisa, em que o desfoque não se distinguia do fundo nítido. Agora: tinta **azul**
+  saturada (não véu branco); **reflexo diagonal** de bordas duras (duas faixas) que atravessa o teclado
+  inteiro como uma só lâmina, cada tecla mostrando o seu pedaço (`FrostedBackdrop.widthPx/heightPx` + um
+  `LinearGradient` por view deslocado como o fosco); sombra macia embaixo e fio escuro por fora; brilho
+  menor (40%) com borda nítida; halo branco (não sombra dura) em volta das letras. A paisagem ganhou o que o
+  desfoque precisa apagar para o vidro aparecer: raios de sol de borda nítida, nuvens, faixas preenchidas
+  com fio de luz (as antigas eram traços largos) e, à noite, aurora e feixes de luar.
+- **Abas Visão e Raciocínio** (mesmo pedido): `ConfigTab.VISAO` (ícone de olho) e `RACIOCINIO` (cérebro),
+  logo depois da Transcrição, sem conteúdo e sem "?" (nada ainda a explicar).
+
+Verificação (emulador `keyflow_api34`): unit **501/501**; `com.keyflow.ui` **132/132** (inclui os testes novos:
+skin da orbe e do teclado independentes, abas novas); `com.keyflow.ime` **44/45** na rodada — a falha foi
+`BarViewAccessibilityTest` ("KeyFlowKeyboardView não anexou", a 1ª classe depois de instalar, a mesma da
+rodada 2) e passou **3/3** isolada. Galeria: rotas novas `config-overlay-skins`, `config-teclado-skins`,
+`config-visao`, `config-raciocinio`; 36 goldens mudaram por intenção (Aero, menu lateral com os 2 ícones,
+polegar da barra de rolagem) e foram aprovados seletivamente — 110/110 dentro do limiar.
+
+Aprendizado: uma orbe de prévia animada (`withFrameNanos` sem fim) deixa o Compose eternamente ocupado e
+derruba os testes de painel por "Idling resource timed out" — as prévias de skin usam relógio parado.
+
+Em aberto: as setas do arrasto (`DragArrowsView`) seguem teal no Aero; ver no A32 a legibilidade das letras
+sobre o reflexo ao sol e se a orbe de vidro se distingue em fundos muito claros.
