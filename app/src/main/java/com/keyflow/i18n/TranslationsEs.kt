@@ -130,6 +130,7 @@ internal val TranslationsEs: Map<String, String> = mapOf(
     "Sobrepor" to "Superposición",
     "Teclado" to "Teclado",
     "Visão" to "Visión",
+    "Voz" to "Voz",
     "Raciocínio" to "Razonamiento",
     "Transcrição" to "Transcripción",
     "A orbe flutuante, que grava por cima de qualquer app. No topo, o cartão do Modo Sobrepor liga a orbe e mostra as permissões (microfone, sobrepor e notificações); sem ele pronto, o resto da aba fica só para leitura." to "El orbe flotante, que graba sobre cualquier app. Arriba, la tarjeta del modo Superposición activa el orbe y muestra los permisos (micrófono, superposición y notificaciones); mientras no esté listo, el resto de la pestaña es de solo lectura.",

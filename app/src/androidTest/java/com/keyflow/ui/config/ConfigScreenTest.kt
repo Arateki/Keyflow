@@ -121,24 +121,22 @@ class ConfigScreenTest {
     }
 
     @Test
-    fun visionAndReasoningTabsSitNextToTranscriptionAndStartEmpty() {
-        // Abas novas (Yan, 2026-09-29): vizinhas da Transcrição, com o nome no cabeçalho e ainda sem conteúdo.
+    fun newTabsSitNextToTranscriptionAndStartEmpty() {
+        // Abas novas (Yan, 2026-09-29): Visão, Raciocínio e Voz, junto da Transcrição, com o nome no cabeçalho e
+        // ainda sem conteúdo. A Voz é a FALA por dentro: VOZ é, desde sempre, a aba Transcrição.
         assertEquals(
-            listOf(ConfigTab.VOZ, ConfigTab.VISAO, ConfigTab.RACIOCINIO),
-            ConfigTab.entries.take(3),
+            listOf(ConfigTab.VOZ, ConfigTab.VISAO, ConfigTab.RACIOCINIO, ConfigTab.FALA),
+            ConfigTab.entries.take(4),
         )
         val h = Harness()
         rule.setContent { h.Content() }
 
-        rule.onNodeWithTag(tabTag(ConfigTab.VISAO)).performClick()
-        rule.onNodeWithTag(panelTag(ConfigTab.VISAO)).assertIsDisplayed()
-        rule.onNodeWithTag(HEADER_TAB_TITLE_TAG).assertTextEquals("Visão")
-        rule.onAllNodesWithTag(HEADER_TAB_HELP_TAG).assertCountEquals(0)
-
-        rule.onNodeWithTag(tabTag(ConfigTab.RACIOCINIO)).performClick()
-        rule.onNodeWithTag(panelTag(ConfigTab.RACIOCINIO)).assertIsDisplayed()
-        rule.onNodeWithTag(HEADER_TAB_TITLE_TAG).assertTextEquals("Raciocínio")
-        rule.onAllNodesWithTag(HEADER_TAB_HELP_TAG).assertCountEquals(0)
+        for ((tab, title) in listOf(ConfigTab.VISAO to "Visão", ConfigTab.RACIOCINIO to "Raciocínio", ConfigTab.FALA to "Voz")) {
+            rule.onNodeWithTag(tabTag(tab)).performClick()
+            rule.onNodeWithTag(panelTag(tab)).assertIsDisplayed()
+            rule.onNodeWithTag(HEADER_TAB_TITLE_TAG).assertTextEquals(title)
+            rule.onAllNodesWithTag(HEADER_TAB_HELP_TAG).assertCountEquals(0)
+        }
     }
 
     @Test

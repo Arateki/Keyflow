@@ -278,6 +278,21 @@ object KfIcons {
         ),
     )
 
+    /**
+     * Voz: uma boca vista de frente — o contorno dos lábios, com o arco do lábio de cima e a linha entre os
+     * dois. (A aba Transcrição, cujo ícone é a onda, é quem ouve; a Voz é quem fala.)
+     */
+    val TabBoca = KfIconSpec(
+        "tab-boca",
+        listOf(
+            // Os lábios: canto esquerdo, o arco de cima com o vão no meio, canto direito, e a curva de baixo.
+            "M2.5 12C4.6 9.6 7 8 9.3 8.2C10.5 8.3 11.2 9.3 12 9.3C12.8 9.3 13.5 8.3 14.7 8.2C17 8 19.4 9.6 21.5 12" +
+                "C19.4 15.6 16 17.6 12 17.6C8 17.6 4.6 15.6 2.5 12z",
+            // A linha da boca, entre os lábios.
+            "M2.5 12C6 13 8.5 12.4 12 12.4C15.5 12.4 18 13 21.5 12",
+        ),
+    )
+
     /** Todos os ícones — o teste de unidade confere nomes únicos e paths bem-formados. */
     /**
      * Sem limite ("∞" nos seletores de tempo da aba Transcrição): duas alças que se cruzam no centro. O
@@ -296,7 +311,7 @@ object KfIcons {
         Mic, Adjust, ChevronUp, ChevronDown, Return, Paste, Grid, Joystick,
         RecordDot, Pause, Play, Undo, Sending, Close, Trash, Hand,
         Check, Plus, ChevronRight, ChevronLeft, Lock, LockOpen, Globe, Moon, Sun,
-        TabModo, TabVoz, TabVisao, TabRaciocinio, TabTeclado, TabSobrepor, TabDocs, Infinity,
+        TabModo, TabVoz, TabVisao, TabRaciocinio, TabBoca, TabTeclado, TabSobrepor, TabDocs, Infinity,
     )
 }
 

@@ -130,6 +130,7 @@ internal val TranslationsEn: Map<String, String> = mapOf(
     "Sobrepor" to "Overlay",
     "Teclado" to "Keyboard",
     "Visão" to "Vision",
+    "Voz" to "Voice",
     "Raciocínio" to "Reasoning",
     "Transcrição" to "Transcription",
     "A orbe flutuante, que grava por cima de qualquer app. No topo, o cartão do Modo Sobrepor liga a orbe e mostra as permissões (microfone, sobrepor e notificações); sem ele pronto, o resto da aba fica só para leitura." to "The floating orb, which records on top of any app. At the top, the Overlay mode card turns the orb on and shows the permissions (microphone, overlay and notifications); until it's ready, the rest of the tab is read-only.",

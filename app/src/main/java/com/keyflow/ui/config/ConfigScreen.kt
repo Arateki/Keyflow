@@ -338,7 +338,7 @@ fun ConfigScreen(
                             modeCardFocusKey = overlayHighlightKey,
                         )
                         // Ainda sem conteúdo: o painel fica vazio (o título da aba já aparece no cabeçalho).
-                        ConfigTab.VISAO, ConfigTab.RACIOCINIO -> Unit
+                        ConfigTab.VISAO, ConfigTab.RACIOCINIO, ConfigTab.FALA -> Unit
                         ConfigTab.DOCS -> DocsPanel(focusSectionId = docsFocusSection, focusKey = docsFocusKey)
                     }
                 }
