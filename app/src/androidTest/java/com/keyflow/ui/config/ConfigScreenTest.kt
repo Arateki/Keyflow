@@ -121,6 +121,24 @@ class ConfigScreenTest {
     }
 
     @Test
+    fun headerHelpShowsTheTabSectionAndJumpsToItInTheDocs() {
+        // "?" ao lado do nome da aba (Yan, 2026-09-28): a seção da Docs daquela aba, num modal, com atalho.
+        val h = Harness()
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(HEADER_TAB_HELP_TAG).performClick()
+        rule.onNodeWithTag(TAB_HELP_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(TAB_HELP_TAG).assertTextContains("Escolhe quem transforma sua voz em texto", substring = true)
+
+        rule.onNodeWithTag(TAB_HELP_DOCS_TAG).performClick()
+        rule.onAllNodesWithTag(TAB_HELP_TAG).assertCountEquals(0)
+        rule.onNodeWithTag(panelTag(ConfigTab.DOCS)).assertIsDisplayed()
+        rule.onNodeWithTag(docsSectionTag("aba-transcricao")).assertIsDisplayed()
+        // A própria Docs não tem "?".
+        rule.onAllNodesWithTag(HEADER_TAB_HELP_TAG).assertCountEquals(0)
+    }
+
+    @Test
     fun disabledTabNavigatesReadOnly() {
         val h = Harness() // overlay/keyboard off por padrão
         rule.setContent { h.Content() }

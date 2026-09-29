@@ -211,6 +211,8 @@ object RouteCatalog {
         Route("config-overlay-travado") { ConfigTabRoute(ConfigTab.OVERLAY) },
         Route("config-docs") { ConfigTabRoute(ConfigTab.DOCS) },
         Route("config-unlock") { ConfigTabRoute(ConfigTab.TECLADO, keyboardEnabled = true, unlockOpen = true) },
+        // "?" do cabeçalho aberto: a seção da Docs da aba, com o atalho para a Docs.
+        Route("config-ajuda-teclado") { ConfigTabRoute(ConfigTab.TECLADO, keyboardEnabled = true, tabHelpOpen = true) },
         Route("onboarding") { OnboardingRoute() },
         // PERM-04: o porquê de uma permissão aberto sob a linha (a do Teclado, que é a que FALTA no mock).
         Route("onboarding-why") { OnboardingRoute(explained = OnboardingPermission.KEYBOARD) },
@@ -290,6 +292,7 @@ object RouteCatalog {
         overlayEnabled: Boolean = false,
         keyboardEnabled: Boolean = false,
         unlockOpen: Boolean = false,
+        tabHelpOpen: Boolean = false,
     ) {
         ConfigScreen(
             settings = FakeSettings.settings.copy(
@@ -318,6 +321,7 @@ object RouteCatalog {
             onSettingsChange = {},
             initialTab = tab,
             initialUnlockOpen = unlockOpen,
+            initialTabHelpOpen = tabHelpOpen,
         )
     }
 

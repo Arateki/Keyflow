@@ -85,7 +85,8 @@ class DocsPanelTest {
         val panelTop = rule.onNodeWithTag(PANEL).getUnclippedBoundsInRoot().top
 
         rule.onNodeWithTag(docsSectionTag("erros")).assertIsNotDisplayed()
-        rule.onNodeWithTag(docsIndexItemTag("erros")).performClick()
+        // O índice ganhou as seções das abas (2026-09-28): o item pode estar abaixo da dobra.
+        rule.onNodeWithTag(docsIndexItemTag("erros")).performScrollTo().performClick()
         rule.waitForIdle()
         rule.onNodeWithTag(docsSectionTag("erros")).assertIsDisplayed()
 

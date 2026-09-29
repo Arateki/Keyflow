@@ -32,6 +32,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -141,6 +142,80 @@ val docsSections: List<DocSection> = listOf(
         listOf(
             DocBlock.Paragraph(
                 "Sobrepor flutua sobre qualquer app, com o teclado do sistema. Teclado é o teclado KeyFlow. Use um ou ambos.",
+            ),
+        ),
+    ),
+    // Uma seção por aba de configuração: é também o que o "?" do cabeçalho mostra ([docsSectionFor]).
+    DocSection(
+        "aba-transcricao",
+        "Aba Transcrição",
+        listOf(
+            DocBlock.Paragraph(
+                "Escolhe quem transforma sua voz em texto e como a gravação se comporta — vale para a orbe e para o teclado.",
+            ),
+            DocBlock.Labeled(
+                "Parcial",
+                "transcrever parcialmente ao pausar já adianta o texto a cada pausa; com a visualização ligada, dá para ler e corrigir antes de enviar.",
+            ),
+            DocBlock.Labeled(
+                "Origem",
+                "Créditos, OpenAI, Groq, Custom (qualquer serviço compatível) ou Local (modelo no aparelho, sem internet). Nas da nuvem, informe o token; modelo e idioma são opcionais.",
+            ),
+            DocBlock.Labeled(
+                "Tempo limite",
+                "quanto esperar pela transcrição antes de mostrar erro. No infinito, espera o quanto for preciso.",
+            ),
+            DocBlock.Labeled(
+                "Duração máxima",
+                "ao atingir o limite, a gravação pausa e pergunta se envia ou descarta. No infinito, grava até você parar.",
+            ),
+        ),
+    ),
+    DocSection(
+        "aba-teclado",
+        "Aba Teclado",
+        listOf(
+            DocBlock.Paragraph(
+                "Tudo do teclado KeyFlow. No topo, o cartão do Modo Teclado liga o KeyFlow como teclado e mostra as permissões; sem ele pronto, o resto da aba fica só para leitura.",
+            ),
+            DocBlock.Labeled(
+                "Colar",
+                "cola a transcrição direto no campo aberto, ou guarda e cola quando você tocar num campo depois de gravar fora dele (esta, só com o Modo Sobrepor).",
+            ),
+            DocBlock.Labeled(
+                "Digitação",
+                "idioma (o mesmo que o globo alterna), correção automática, fileira de números e manter o teclado com um teclado físico conectado.",
+            ),
+            DocBlock.Labeled(
+                "Layout",
+                "os botões da barra do teclado — mic, colar, alavanca, teclas avulsas, gatilhos de grade. O \"?\" de cada opção explica o que ela faz.",
+            ),
+            DocBlock.Labeled("Teclados de atalhos", "as grades que os gatilhos da barra abrem ao segurar e arrastar."),
+            DocBlock.Labeled(
+                "Tamanho e skins",
+                "o tamanho vale para teclas, barra e sugestões (a prévia mostra a altura real); as skins mudam a cara do teclado.",
+            ),
+        ),
+    ),
+    DocSection(
+        "aba-sobrepor",
+        "Aba Sobrepor",
+        listOf(
+            DocBlock.Paragraph(
+                "A orbe flutuante, que grava por cima de qualquer app. No topo, o cartão do Modo Sobrepor liga a orbe e mostra as permissões (microfone, sobrepor e notificações); sem ele pronto, o resto da aba fica só para leitura.",
+            ),
+            DocBlock.Labeled("Mão preferencial", "encosta a orbe no seu lado e define para onde arrastar para cancelar."),
+            DocBlock.Labeled(
+                "Modo de gravação",
+                "Alternar (o toque grava e para) ou Push-to-talk (segure para gravar, solte para enviar).",
+            ),
+            DocBlock.Labeled(
+                "Orbe",
+                "tamanho, tempo de reação entre toques de uma rajada e intensidade da vibração ao tocá-la.",
+            ),
+            DocBlock.Labeled(
+                "Atalhos",
+                "o que 1, 2 ou 3 toques em rajada fazem, e o que acontece quando você toca mais vezes.",
             ),
         ),
     ),
@@ -312,6 +387,9 @@ val docsSections: List<DocSection> = listOf(
 fun DocsPanel(
     modifier: Modifier = Modifier,
     sendFeedback: ((Intent) -> Unit)? = null,
+    // Chegando do "?" do cabeçalho ("Ver na Docs"): rola até esta seção assim que ela tiver posição.
+    focusSectionId: String? = null,
+    focusKey: Int = 0,
 ) {
     val palette = LocalKeyFlowPalette.current
     val context = LocalContext.current
@@ -329,6 +407,17 @@ fun DocsPanel(
         if (!target.isAttached || !container.isAttached) return
         val delta = target.positionInWindow().y - container.positionInWindow().y
         scope.launch { scroll.animateScrollTo((scroll.value + delta).toInt().coerceAtLeast(0)) }
+    }
+
+    LaunchedEffect(focusKey) {
+        val id = focusSectionId ?: return@LaunchedEffect
+        if (focusKey <= 0) return@LaunchedEffect
+        // As âncoras só existem depois do 1º layout da aba recém-aberta.
+        for (frame in 0 until 10) {
+            if (anchors[id]?.isAttached == true && viewport[0]?.isAttached == true) break
+            withFrameNanos { }
+        }
+        scrollTo(id)
     }
 
     Column(
@@ -473,25 +562,43 @@ private fun Section(
         )
         SettingsGroup(null, Modifier.padding(top = 12.dp)) {
             Column(Modifier.padding(top = 10.dp, bottom = 16.dp)) {
-                section.blocks.forEach { block ->
-                    when (block) {
-                        is DocBlock.Paragraph ->
-                            Text(
-                                block.text,
-                                color = palette.fg2,
-                                fontFamily = SpaceGrotesk,
-                                fontWeight = FontWeight.Light,
-                                fontSize = 11.sp,
-                                lineHeight = 17.sp,
-                                modifier = Modifier.padding(top = 6.dp),
-                            )
-                        is DocBlock.Labeled -> LabeledLine(block.label, block.text)
-                    }
-                }
+                DocBlocks(section.blocks)
                 extra()
             }
         }
     }
+}
+
+/** O texto de uma seção (parágrafos e linhas rotuladas) — na Docs e no "?" do cabeçalho. */
+@Composable
+internal fun DocBlocks(blocks: List<DocBlock>) {
+    val palette = LocalKeyFlowPalette.current
+    blocks.forEach { block ->
+        when (block) {
+            is DocBlock.Paragraph ->
+                Text(
+                    block.text,
+                    color = palette.fg2,
+                    fontFamily = SpaceGrotesk,
+                    fontWeight = FontWeight.Light,
+                    fontSize = 11.sp,
+                    lineHeight = 17.sp,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            is DocBlock.Labeled -> LabeledLine(block.label, block.text)
+        }
+    }
+}
+
+/** A seção da Docs que explica [tab] — o que o "?" do cabeçalho mostra. A própria Docs não tem. */
+fun docsSectionFor(tab: ConfigTab): DocSection? {
+    val id = when (tab) {
+        ConfigTab.VOZ -> "aba-transcricao"
+        ConfigTab.TECLADO -> "aba-teclado"
+        ConfigTab.OVERLAY -> "aba-sobrepor"
+        ConfigTab.DOCS -> return null
+    }
+    return docsSections.first { it.id == id }
 }
 
 @Composable

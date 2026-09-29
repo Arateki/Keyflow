@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
@@ -57,6 +58,10 @@ fun panelTag(tab: ConfigTab): String = "panel-${tab.name.lowercase()}"
 const val LANG_TOGGLE_TAG = "lang-toggle"
 const val THEME_TOGGLE_TAG = "theme-toggle"
 const val HEADER_TAB_TITLE_TAG = "header-tab-title"
+const val HEADER_TAB_HELP_TAG = "header-tab-help"
+const val TAB_HELP_TAG = "tab-help"
+const val TAB_HELP_CLOSE_TAG = "tab-help-close"
+const val TAB_HELP_DOCS_TAG = "tab-help-docs"
 const val TOGGLE_OVERLAY_MODE_TAG = "toggle-overlay-mode"
 const val TOGGLE_KEYBOARD_MODE_TAG = "toggle-keyboard-mode"
 
@@ -95,6 +100,7 @@ fun ConfigScreen(
     modifier: Modifier = Modifier,
     initialTab: ConfigTab = ConfigTab.VOZ,
     initialUnlockOpen: Boolean = false,
+    initialTabHelpOpen: Boolean = false,
     initialRailExpanded: Boolean = false,
     requestedTab: ConfigTab? = null,
     requestedTabKey: Int = 0,
@@ -106,6 +112,10 @@ fun ConfigScreen(
     var unlockOpen by rememberSaveable { mutableStateOf(initialUnlockOpen) }
     // Barra lateral: recolhida (só ícones) é a posição normal; a setinha abre com os nomes.
     var railExpanded by rememberSaveable { mutableStateOf(initialRailExpanded) }
+    // "?" do cabeçalho: a seção da Docs da aba aberta num modal; "Ver na Docs" rola até ela na aba Docs.
+    var tabHelpOpen by rememberSaveable { mutableStateOf(initialTabHelpOpen) }
+    var docsFocusSection by remember { mutableStateOf<String?>(null) }
+    var docsFocusKey by remember { mutableStateOf(0) }
     // Atalho da orbe com o bottom sheet aberto (2 ou 3 toques); null = fechado.
     var shortcutSheetTaps by remember { mutableStateOf<Int?>(null) }
 
@@ -228,6 +238,7 @@ fun ConfigScreen(
         Column(Modifier.fillMaxSize().systemBarsPadding()) {
             Header(
                 tabTitle = activeTab.label,
+                onTabHelp = if (docsSectionFor(activeTab) != null) ({ tabHelpOpen = true }) else null,
                 dark = palette.isDark,
                 onLanguageClick = onLanguageClick,
                 onThemeClick = { onThemeChange(!settings.themeDark) },
@@ -311,7 +322,7 @@ fun ConfigScreen(
                             onLockedTap = lockedTap(ConfigTab.OVERLAY),
                             modeCardFocusKey = overlayHighlightKey,
                         )
-                        ConfigTab.DOCS -> DocsPanel()
+                        ConfigTab.DOCS -> DocsPanel(focusSectionId = docsFocusSection, focusKey = docsFocusKey)
                     }
                 }
             }
@@ -325,6 +336,28 @@ fun ConfigScreen(
                 expanded = railExpanded,
                 onExpandedChange = { railExpanded = it },
             )
+            }
+        }
+        val helpSection = docsSectionFor(activeTab)
+        if (tabHelpOpen && helpSection != null) {
+            ConfigModal(
+                title = helpSection.title,
+                onDismiss = { tabHelpOpen = false },
+                closeTag = TAB_HELP_CLOSE_TAG,
+                cardTag = TAB_HELP_TAG,
+            ) {
+                DocBlocks(helpSection.blocks)
+                SecondaryButton(
+                    "Ver na Docs",
+                    tag = TAB_HELP_DOCS_TAG,
+                    onClick = {
+                        tabHelpOpen = false
+                        activeTab = ConfigTab.DOCS
+                        docsFocusSection = helpSection.id
+                        docsFocusKey++
+                    },
+                    modifier = Modifier.padding(top = 18.dp),
+                )
             }
         }
         SaveToast(saveController, Modifier.fillMaxSize().systemBarsPadding())
@@ -431,6 +464,7 @@ private fun MessageToast(
 @Composable
 private fun Header(
     tabTitle: String,
+    onTabHelp: (() -> Unit)?,
     dark: Boolean,
     onLanguageClick: () -> Unit,
     onThemeClick: () -> Unit,
@@ -496,17 +530,30 @@ private fun Header(
             }
         }
     }
-    Text(
-        text = tabTitle,
-        color = palette.fg2,
-        fontFamily = SpaceGrotesk,
-        fontWeight = FontWeight.Medium,
-        fontSize = 11.5.sp,
-        lineHeight = 13.sp,
-        letterSpacing = 0.2.sp,
-        textAlign = TextAlign.Center,
-        maxLines = 1,
-        modifier = Modifier.fillMaxWidth().testTag(HEADER_TAB_TITLE_TAG),
-    )
+    // Nome da aba centralizado; o "?" logo à direita abre a seção da Docs dela (Yan, 2026-09-28).
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // Contrapeso do "?" à esquerda: sem ele, o nome sairia do centro.
+            if (onTabHelp != null) Spacer(Modifier.width(HEADER_HELP_SIZE))
+            Text(
+                text = tabTitle,
+                color = palette.fg2,
+                fontFamily = SpaceGrotesk,
+                fontWeight = FontWeight.Medium,
+                fontSize = 11.5.sp,
+                lineHeight = 13.sp,
+                letterSpacing = 0.2.sp,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                modifier = Modifier.testTag(HEADER_TAB_TITLE_TAG),
+            )
+            if (onTabHelp != null) {
+                HelpButton("Sobre a aba $tabTitle", HEADER_TAB_HELP_TAG, onTabHelp, Modifier.size(HEADER_HELP_SIZE))
+            }
+        }
+    }
     }
 }
+
+/** Alvo do "?" ao lado do nome da aba — menor que os 28dp de sempre, para a linha não crescer muito. */
+private val HEADER_HELP_SIZE = 24.dp
