@@ -100,8 +100,8 @@ saldo cai; esgotar → 402 vira CTA de recarga.
    carregado (nem requests ao AdMob).
 
 5. **UNL-05** *(decisão do Yan, 2026-09-29)*: quais skins são pagas — `KeyboardSkin.paid` e `OrbStyle.paid`
-   registram no código. **Só a Sistema (teclado) e a orbe padrão (Ateliê) são gratuitas**; a Ateliê, a Aero e a
-   Glitch do teclado e a Aero e a Glitch da orbe são pagas e SHALL ficar bloqueadas até `skinsUnlocked`. **Até este item ser
+   registram no código. **Só a Sistema (teclado) e a orbe padrão (Ateliê) são gratuitas**; a Ateliê, a Aero, a
+   Glitch e a Rose Gold do teclado e a Aero, a Glitch e a Rose Gold da orbe são pagas e SHALL ficar bloqueadas até `skinsUnlocked`. **Até este item ser
    implementado (MZ-T9), todas seguem LIBERADAS** para o Yan testar (o protótipo do Aero, Q13, não tem cadeado).
 
 **Independent Test**: comprar R$15 de teste → skins destravam e banners somem na hora; reinstalar

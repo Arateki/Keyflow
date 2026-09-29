@@ -170,3 +170,18 @@ grossa e mais visível, "talvez preto para combinar com o transparente — vejam
 - Em aberto: sobre fundo escuro o vidro claro vira cinza-fumê (é o que vidro claro faz sobre preto, sem desfoque);
   ver no A32 se agrada.
 
+## Rodada 7 (2026-09-29): fosco onde não há desfoque, e vidro com mais detalhe
+
+O Yan: "desfoque o fundo para que as letras ou o conteúdo de trás não atrapalhem" e "um nível de detalhe maior nos botões para que
+pareça mais vidro, como na orbe, com brilho e outros níveis de translucidez".
+
+- **Desfoque**: o desfoque real é do compositor e o A32 não o tem (`mBlurEnabled=false`) — não há como desfocar o app de trás de
+  dentro do teclado. Onde o aparelho desfoca, segue `Window.setBackgroundBlurRadius` (24dp). Onde não, o vidro fica **fosco**:
+  o véu das teclas ~1,75× mais denso, a lâmina mais densa e um grão de ruído (`GlassPainter(blurBehind = false)`), e a faixa da barra
+  de navegação acompanha. Não é desfoque de verdade — esconde o conteúdo, mas não o borra.
+- **Detalhe por sprites**: `SpriteCache`/`LruMap` — a face de cada tecla é desenhada UMA vez num bitmap e copiada a cada quadro
+  (poucos tamanhos, cache pequeno). Isso permitiu camadas caras: sombra macia só por fora (interior recortado), véu em degradê, borda
+  de Fresnel, luz refratada na base + fio na borda de baixo, brilho oval que passa da tecla (borda curva, como gota), clarão pontual
+  + reflexo menor, aro duplo. Por tecla sobra só o reflexo diagonal (um degradê com a matriz da view).
+- Em aberto: sobre app claro o vidro é discreto (é o que vidro claro faz sobre branco); ver no A32 o modo fosco.
+
