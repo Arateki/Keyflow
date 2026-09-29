@@ -1,6 +1,7 @@
 package com.keyflow.ui.config
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -31,6 +33,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
+import com.keyflow.ui.icons.KfIcon
+import com.keyflow.ui.icons.KfIcons
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
 
@@ -83,10 +87,11 @@ fun ConfigModal(
                 .fillMaxWidth()
                 .widthIn(max = MAX_WIDTH_DP.dp)
                 .heightIn(max = maxHeight * MAX_HEIGHT_FRACTION)
-                .clip(RoundedCornerShape(20.dp))
+                .clip(RoundedCornerShape(24.dp))
                 .background(palette.bg)
+                .border(1.dp, palette.line2, RoundedCornerShape(24.dp))
                 .clickable(interactionSource = noRipple, indication = null) { /* consome o clique */ }
-                .padding(horizontal = 16.dp, vertical = 16.dp)
+                .padding(start = 20.dp, end = 16.dp, top = 18.dp, bottom = 20.dp)
                 .then(if (cardTag != null) Modifier.testTag(cardTag) else Modifier),
         ) {
             Row(
@@ -98,31 +103,36 @@ fun ConfigModal(
                     if (onBack != null) {
                         Box(
                             Modifier
-                                .size(26.dp)
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .border(1.dp, palette.line, CircleShape)
                                 .clickable(interactionSource = noRipple, indication = null) { onBack() }
                                 .then(if (backTag != null) Modifier.testTag(backTag) else Modifier),
                             contentAlignment = Alignment.Center,
                         ) {
-                            StrokeIcon(listOf(BACK_PATH), palette.faint, Modifier.size(16.dp), strokeWidth = 1.8f)
+                            KfIcon(KfIcons.ChevronLeft, palette.fg2, Modifier.size(16.dp), strokeWidth = 1.8f)
                         }
                     }
                     Text(
                         title,
                         color = palette.fg,
                         fontFamily = SpaceGrotesk,
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight = FontWeight.Normal,
                         fontSize = 16.sp,
-                        modifier = Modifier.padding(start = if (onBack != null) 6.dp else 0.dp),
+                        letterSpacing = (-0.3).sp,
+                        modifier = Modifier.padding(start = if (onBack != null) 10.dp else 0.dp),
                     )
                 }
                 Box(
                     Modifier
-                        .size(26.dp)
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .border(1.dp, palette.line, CircleShape)
                         .clickable(interactionSource = noRipple, indication = null) { onDismiss() }
                         .testTag(closeTag),
                     contentAlignment = Alignment.Center,
                 ) {
-                    StrokeIcon(listOf(CLOSE_PATH), palette.faint, Modifier.size(16.dp), strokeWidth = 1.8f)
+                    KfIcon(KfIcons.Close, palette.fg2, Modifier.size(15.dp), strokeWidth = 1.8f)
                 }
             }
 
@@ -148,5 +158,3 @@ private const val MAX_HEIGHT_FRACTION = 0.88f
 /** Teto de largura (tablet/paisagem): o card não vira uma faixa esticada de ponta a ponta. */
 private const val MAX_WIDTH_DP = 420
 
-private const val CLOSE_PATH = "M18 6 6 18M6 6l12 12"
-private const val BACK_PATH = "M15 5 8 12l7 7"

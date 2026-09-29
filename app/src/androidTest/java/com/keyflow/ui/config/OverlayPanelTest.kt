@@ -8,6 +8,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.keyflow.core.OverlaySide
@@ -73,4 +74,39 @@ class OverlayPanelTest {
 
         rule.runOnIdle { assertEquals(RecordingMode.PUSH_TO_TALK, h.settings.overlayRecordingMode) }
     }
+
+    @Test
+    fun orbSkinPersistsAndLeavesTheKeyboardSkinAlone() {
+        // A skin da orbe é escolha própria da aba Sobrepor (Yan, 2026-09-29): não depende da do teclado.
+        val h = Harness(Settings(keyboardSkin = "system", orbSkin = "atelie"))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(orbSkinTag("aero")).performScrollTo().performClick()
+
+        rule.runOnIdle {
+            assertEquals("aero", h.settings.orbSkin)
+            assertEquals("system", h.settings.keyboardSkin)
+        }
+    }
+
+    @Test
+    fun orbSkinGlitchPersists() {
+        val h = Harness(Settings(orbSkin = "atelie"))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(orbSkinTag("glitch")).performScrollTo().performClick()
+
+        rule.runOnIdle { assertEquals("glitch", h.settings.orbSkin) }
+    }
+
+    @Test
+    fun orbSkinRoseGoldPersists() {
+        val h = Harness(Settings(orbSkin = "atelie"))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(orbSkinTag("rosegold")).performScrollTo().performClick()
+
+        rule.runOnIdle { assertEquals("rosegold", h.settings.orbSkin) }
+    }
 }
+

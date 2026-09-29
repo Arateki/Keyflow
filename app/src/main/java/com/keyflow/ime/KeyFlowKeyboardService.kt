@@ -295,9 +295,9 @@ class KeyFlowKeyboardService : InputMethodService() {
             onExpand = { preferExpanded = true },
             onErrorTap = {
                 val intent = if (com.keyflow.core.KeyFlowController.errorNavTarget ==
-                    com.keyflow.core.ErrorNavTarget.MODO_MIC
+                    com.keyflow.core.ErrorNavTarget.MIC
                 ) {
-                    com.keyflow.ui.SetupActivity.openAtModoMicIntent(this)
+                    com.keyflow.ui.SetupActivity.openAtMicIntent(this, com.keyflow.ui.config.ConfigTab.TECLADO)
                 } else {
                     com.keyflow.ui.SetupActivity.openAtVozIntent(this)
                 }
@@ -317,9 +317,11 @@ class KeyFlowKeyboardService : InputMethodService() {
             shortcutGrids = grids,
             onShortcut = ::emitShortcut,
             vibrationIntensity = vibration,
+            motionEnabled = true,
         )
         keyboardView = view
         activeViewForTest = view
+        applyGlassWindow(KeyboardColors.of(KeyboardSkin.of(skin), dark))
         // Sincroniza o estado atual na criação: o StateFlow só re-emite em mudança, então se a orbe já
         // estava (ex.) pausada quando o teclado abriu, a view nasceria dessincronizada (ex.: trocar de
         // teclado por atalho com o overlay pausado).
@@ -328,6 +330,27 @@ class KeyFlowKeyboardService : InputMethodService() {
     }
 
     override fun onCreateCandidatesView(): View? = null
+
+    // Cor que a faixa da barra de navegação tinha antes de o teclado mexer nela (a do sistema).
+    private var systemNavigationBarColor: Int? = null
+
+    /**
+     * A janela do teclado no Aero (vidro de verdade): desfoca o que está atrás dela, quando o aparelho deixa
+     * ([windowBlurAvailable] — o A32 do Yan não deixa), e tinge a faixa da barra de navegação com a tinta do
+     * fundo (no Glitch, preta), para o teclado seguir até a borda em vez de uma tira preta destoando. Os outros
+     * esquemas mantêm a cor do sistema e nenhum desfoque, como sempre foi.
+     */
+    @Suppress("DEPRECATION") // navigationBarColor: é o que o Android até o 14 usa na faixa do IME
+    private fun applyGlassWindow(colors: KeyboardColors) {
+        val w = window?.window ?: return
+        val systemColor = systemNavigationBarColor ?: w.navigationBarColor.also { systemNavigationBarColor = it }
+        w.navigationBarColor = colors.backdrop?.navigationBarColor(windowBlurAvailable(this)) ?: systemColor
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val blurPx = if (colors.backdrop == KeyboardBackdrop.AERO && windowBlurAvailable(this)) (WINDOW_BLUR_DP * resources.displayMetrics.density).toInt() else 0
+            w.setBackgroundBlurRadius(blurPx)
+            Log.d(TAG, "vidro: desfoque da janela=${blurPx}px (disponível=${windowBlurAvailable(this)})")
+        }
+    }
 
     /**
      * Globo tocado: cicla pt→en→es→pt **dentro do app**, sem depender de subtype do sistema (pedido do
@@ -667,6 +690,9 @@ class KeyFlowKeyboardService : InputMethodService() {
 
     companion object {
         private const val TAG = "KeyFlow.Keyboard"
+
+        // Raio do desfoque atrás do vidro do Aero, em dp (quando o aparelho desfoca janelas).
+        private const val WINDOW_BLUR_DP = 24
         private const val KEY_EXPANDED = "expanded"
         private val LANGUAGE_CYCLE = listOf("pt", "en", "es")
         private const val SUGGEST_WAIT_MS = 150L

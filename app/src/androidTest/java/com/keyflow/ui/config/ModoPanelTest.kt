@@ -19,7 +19,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Testes da aba Modo (T11 / CFG-06; chip redesenhado na Fase 2 de gestos): o chip de permissão é
+ * Testes dos cartões de modo (antiga aba Modo, T11 / CFG-06; chip redesenhado na Fase 2 de gestos): o chip de permissão é
  * sempre visível (rótulo CONCEDIDO/PENDENTE) e também é o botão de ativar; os toggles de modo
  * ligam/desligam (auto-save via callback).
  */
@@ -47,7 +47,7 @@ class ModoPanelTest {
         rule.setContent {
             KeyFlowTheme(dark = false) {
                 CompositionLocalProvider(LocalOrbClock provides { 0f }, LocalTourClock provides { 0f }) {
-                    ModoPanel(
+                    ModeCards(
                         settings = Settings(keyboardModeEnabled = true),
                         permissions = perms(keyboard = false),
                         onOverlayModeChange = {},
@@ -71,7 +71,7 @@ class ModoPanelTest {
         rule.setContent {
             KeyFlowTheme(dark = false) {
                 CompositionLocalProvider(LocalOrbClock provides { 0f }, LocalTourClock provides { 0f }) {
-                    ModoPanel(
+                    ModeCards(
                         settings = Settings(),
                         permissions = perms(overlay = true),
                         onOverlayModeChange = {},
@@ -87,7 +87,7 @@ class ModoPanelTest {
         }
 
         // O chip continua presente (também é o botão de ativar), mas mostra CONCEDIDO.
-        rule.onNodeWithTag(ACTIVATE_OVERLAY_TAG).assertIsDisplayed().assertTextContains("CONCEDIDO", substring = true)
+        rule.onNodeWithTag(ACTIVATE_OVERLAY_TAG).assertIsDisplayed().assertTextContains("concedido", substring = true, ignoreCase = true)
     }
 
     @Test
@@ -96,7 +96,7 @@ class ModoPanelTest {
         rule.setContent {
             KeyFlowTheme(dark = false) {
                 CompositionLocalProvider(LocalOrbClock provides { 0f }, LocalTourClock provides { 0f }) {
-                    ModoPanel(
+                    ModeCards(
                         settings = Settings(),
                         permissions = perms(notifications = false),
                         onOverlayModeChange = {},
@@ -112,7 +112,7 @@ class ModoPanelTest {
         }
 
         rule.onNodeWithTag(ACTIVATE_NOTIFICATION_TAG).assertIsDisplayed()
-            .assertTextContains("PENDENTE", substring = true)
+            .assertTextContains("pendente", substring = true, ignoreCase = true)
             .performClick()
         rule.runOnIdle { assertEquals(true, activated) }
     }
@@ -127,7 +127,7 @@ class ModoPanelTest {
         rule.setContent {
             KeyFlowTheme(dark = false) {
                 CompositionLocalProvider(LocalOrbClock provides { 0f }, LocalTourClock provides { 0f }) {
-                    ModoPanel(
+                    ModeCards(
                         settings = Settings(overlayModeEnabled = true),
                         permissions = perms(mic = false),
                         onOverlayModeChange = {},
@@ -144,9 +144,9 @@ class ModoPanelTest {
 
         // O chip de mic é compartilhado pelos dois cards (Sobrepor e Teclado) — o 1º é o do Sobrepor.
         rule.onAllNodesWithTag(ACTIVATE_MIC_TAG)[0].assertIsDisplayed()
-            .assertTextContains("PENDENTE", substring = true)
+            .assertTextContains("pendente", substring = true, ignoreCase = true)
         // Concedido/pendente da orbe seguem OK: mic não é o que trava o modo.
-        rule.onNodeWithTag(ACTIVATE_OVERLAY_TAG).assertTextContains("CONCEDIDO", substring = true)
+        rule.onNodeWithTag(ACTIVATE_OVERLAY_TAG).assertTextContains("concedido", substring = true, ignoreCase = true)
     }
 
     @Test
@@ -156,7 +156,7 @@ class ModoPanelTest {
         rule.setContent {
             KeyFlowTheme(dark = false) {
                 CompositionLocalProvider(LocalOrbClock provides { 0f }, LocalTourClock provides { 0f }) {
-                    ModoPanel(
+                    ModeCards(
                         settings = Settings(),
                         permissions = perms(),
                         onOverlayModeChange = { overlayChange = it },

@@ -77,6 +77,9 @@ class SettingsRepository(
 
     fun keyboardSkinFlow(): Flow<String> = dataStore.data.map { it[KEYBOARD_SKIN] ?: "system" }
 
+    /** Idioma da interface, leve (só DataStore): o [com.keyflow.App] aplica no processo inteiro. */
+    fun appLanguageFlow(): Flow<String> = dataStore.data.map { it[APP_LANGUAGE] ?: "" }
+
     /** Mesma leitura leve de [themeDarkOnce], para as cores do teclado em `onCreateInputView`. */
     suspend fun keyboardSkinOnce(): String = dataStore.data.first()[KEYBOARD_SKIN] ?: "system"
 
@@ -143,6 +146,21 @@ class SettingsRepository(
         return selected
     }
 
+    /**
+     * O DataStore inteiro, chave por chave, como está gravado. Existe para o gate de instrumentados
+     * guardar a config de quem é dono do aparelho antes de rodar a suíte no estado de fábrica
+     * (`FactorySettingsListener`, androidTest) — nenhuma tela do app usa isto.
+     */
+    internal suspend fun rawPreferencesOnce(): Preferences = dataStore.data.first()
+
+    /** Troca o DataStore inteiro por [prefs]; vazio = estado de fábrica. Par de [rawPreferencesOnce]. */
+    internal suspend fun replaceRawPreferences(prefs: Preferences) {
+        dataStore.edit { current ->
+            current.clear()
+            current += prefs
+        }
+    }
+
     suspend fun saveBarsConfig(config: BarsConfig) {
         dataStore.edit { it[BARS_CONFIG_JSON] = ShortcutCodec.encodeBars(config) }
     }
@@ -156,7 +174,7 @@ class SettingsRepository(
             is EffectiveConfig.Ready -> eff.config
             // Sem endpoint nem token: o RoutingTranscriber manda para o :inference (NM-T9, PRV-01).
             is EffectiveConfig.Local -> Config(
-                timeoutMs = maxOf(settings.transcriptionTimeoutMs.toLong(), Config.LOCAL_MIN_TIMEOUT_MS),
+                timeoutMs = Config.localTimeoutMs(settings.transcriptionTimeoutMs.toLong()),
                 local = eff,
             )
             EffectiveConfig.Unavailable -> Config()
@@ -212,6 +230,8 @@ class SettingsRepository(
             keyboardShowWithHardKeyboard = prefs[KEYBOARD_SHOW_WITH_HARD_KEYBOARD] ?: true,
             keyboardAutoCorrect = prefs[KEYBOARD_AUTO_CORRECT] ?: true,
             keyboardSkin = prefs[KEYBOARD_SKIN] ?: "system",
+            orbSkin = prefs[ORB_SKIN] ?: "atelie",
+            appLanguage = prefs[APP_LANGUAGE] ?: "",
         )
     }
 
@@ -264,6 +284,8 @@ class SettingsRepository(
             prefs[KEYBOARD_SHOW_WITH_HARD_KEYBOARD] = settings.keyboardShowWithHardKeyboard
             prefs[KEYBOARD_AUTO_CORRECT] = settings.keyboardAutoCorrect
             prefs[KEYBOARD_SKIN] = settings.keyboardSkin
+            prefs[ORB_SKIN] = settings.orbSkin
+            prefs[APP_LANGUAGE] = settings.appLanguage
         }
     }
 
@@ -373,6 +395,8 @@ class SettingsRepository(
         val KEYBOARD_SHOW_WITH_HARD_KEYBOARD = booleanPreferencesKey("keyboard_show_with_hard_keyboard")
         val KEYBOARD_AUTO_CORRECT = booleanPreferencesKey("keyboard_auto_correct")
         val KEYBOARD_SKIN = stringPreferencesKey("keyboard_skin")
+        val ORB_SKIN = stringPreferencesKey("orb_skin")
+        val APP_LANGUAGE = stringPreferencesKey("app_language")
         // Trabalho 3 (shortcut-bars): barras personalizáveis + teclados de atalhos, como JSON.
         val BARS_CONFIG_JSON = stringPreferencesKey("bars_config_json")
         val SHORTCUT_GRIDS_JSON = stringPreferencesKey("shortcut_grids_json")

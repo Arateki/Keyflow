@@ -1,5 +1,6 @@
 package com.keyflow.ui.config
 
+import com.keyflow.i18n.tr
 import com.keyflow.ime.KeyboardSkin
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -8,22 +9,20 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -34,28 +33,35 @@ import com.keyflow.core.shortcuts.ShortcutGrid
 import com.keyflow.data.Settings
 import com.keyflow.ime.KeyFlowKeyboardView
 import com.keyflow.ui.common.verticalScrollbar
+import com.keyflow.ui.icons.KfIcon
+import com.keyflow.ui.icons.KfIcons
 import com.keyflow.ui.theme.LocalKeyFlowPalette
-import com.keyflow.ui.theme.SpaceGrotesk
 import com.keyflow.ui.theme.SpaceMono
 import kotlin.math.roundToInt
 
 const val TECLADO_AUTO_PASTE_IN_FIELD_TAG = "teclado-auto-paste-in-field"
 const val TECLADO_AUTO_PASTE_ON_FOCUS_TAG = "teclado-auto-paste-on-focus"
 const val TECLADO_LANGUAGE_TAG = "teclado-language"
+
+/** Idiomas do teclado, na ordem do globo (`KeyFlowKeyboardService.LANGUAGE_CYCLE`). */
+private val KEYBOARD_LANGUAGES = listOf("pt", "en", "es")
+
+fun keyboardLanguageTag(language: String) = "teclado-language-$language"
+
+/** Nome do idioma no próprio idioma — o mesmo que aparece na barra de espaço. */
+private fun keyboardLanguageLabel(language: String): String = when (language) {
+    "pt" -> "Português"
+    "en" -> "English"
+    "es" -> "Español"
+    else -> language
+}
 const val TECLADO_UNLOCK_TAG = "teclado-unlock-skins"
+const val TECLADO_SIZE_PREVIEW_NOTE_TAG = "teclado-size-preview-note"
 const val TECLADO_SIZE_SLIDER_TAG = "teclado-size-slider"
 const val TECLADO_SIZE_PREVIEW_TAG = "teclado-size-preview"
 const val TECLADO_NUMBER_ROW_TAG = "teclado-number-row"
 const val TECLADO_SHOW_WITH_HARD_KEYBOARD_TAG = "teclado-show-with-hard-keyboard"
 const val TECLADO_AUTO_CORRECT_TAG = "teclado-auto-correct"
-
-/**
- * Margem lateral mantida de propósito na prévia de tamanho (ver [KeyboardSizePreview]) — erra pra menor
- * em vez de vazar até a borda física da tela, por pedido do Yan (2026-07-03). Histórico: 4dp (ainda
- * visivelmente maior que o real) → 10dp (centralização corrigida via `Box`/`Alignment.Center` +
- * `LocalConfiguration`, mas "falta reduzir muito pouco" — 3ª rodada) → 14dp.
- */
-internal val PREVIEW_MARGIN_DP = 14.dp
 
 /**
  * Referência somente-leitura à `KeyFlowKeyboardView` da prévia de tamanho, para instrumentado medir a
@@ -66,14 +72,13 @@ var keyboardSizePreviewForTest: KeyFlowKeyboardView? = null
     private set
 
 /**
- * Aba Teclado (KBD config / SKIN-01): colar automaticamente, idioma do teclado (inerte nesta
- * fase) e a seção de Skins bloqueada. O teclado não tem modo de gravação (toque + seletor por hold no mic).
+ * Aba Teclado (KBD config / SKIN-01): colar automaticamente, idioma do teclado (o mesmo do globo) e a
+ * seção de Skins bloqueada. O teclado não tem modo de gravação (toque + seletor por hold no mic).
  */
 @Composable
 fun TecladoPanel(
     settings: Settings,
     onSettingsChange: (Settings) -> Unit,
-    onLanguageClick: () -> Unit,
     onUnlockSkins: () -> Unit,
     onOverlayRequired: () -> Unit = {},
     barsConfig: BarsConfig = BarsConfig.DEFAULT,
@@ -81,168 +86,162 @@ fun TecladoPanel(
     shortcutGrids: List<ShortcutGrid> = emptyList(),
     onShortcutGridsChange: (List<ShortcutGrid>) -> Unit = {},
     modifier: Modifier = Modifier,
+    // Cartão do Modo Teclado, sempre no topo e sempre tocável (a aba Modo saiu — Yan, 2026-09-28).
+    modeCard: (@Composable () -> Unit)? = null,
+    locked: Boolean = false,
+    onLockedTap: () -> Unit = {},
+    // Muda ao chegar de um aviso: a aba sobe até o cartão do modo (que pisca por conta própria).
+    modeCardFocusKey: Int = 0,
 ) {
     val palette = LocalKeyFlowPalette.current
     val scroll = rememberScrollState()
+    LaunchedEffect(modeCardFocusKey) { if (modeCardFocusKey > 0) scroll.animateScrollTo(0) }
     Column(
         modifier
             .fillMaxWidth()
             .verticalScrollbar(scroll, palette.muted.copy(alpha = 0.35f), rightBleed = 9.dp)
             .verticalScroll(scroll)
-            .padding(top = 6.dp, bottom = 20.dp),
+            .padding(top = 20.dp, bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(GROUP_GAP),
     ) {
-        Text("Colar transcrição automaticamente", color = palette.fg, fontFamily = SpaceGrotesk, fontSize = 13.5.sp)
-        Text(
-            "Quando você precisa que sua fala preencha os campos sem sua ação manual.",
-            color = palette.faint,
-            fontFamily = SpaceGrotesk,
-            fontSize = 11.sp,
-            modifier = Modifier.padding(top = 3.dp),
-        )
-        ToggleRow(
-            label = "Ao gravar com um campo de texto aberto",
-            sub = "Cola direto quando a transcrição volta.",
-            checked = settings.autoPasteInField,
-            onCheckedChange = { onSettingsChange(settings.copy(autoPasteInField = it)) },
-            tag = TECLADO_AUTO_PASTE_IN_FIELD_TAG,
-        )
-        ToggleRow(
-            // "Gravar fora" (sem campo focado) só acontece pelo Modo Sobrepor; sem ele a opção não faz
-            // sentido e fica inerte (mesmo estilo de abas/menus inativos), explicando o porquê no toque.
-            label = "Ao tocar num campo depois de gravar fora",
-            sub = "Guarda o texto e cola quando você foca um campo.",
-            checked = settings.autoPasteOnFocus,
-            onCheckedChange = { onSettingsChange(settings.copy(autoPasteOnFocus = it)) },
-            tag = TECLADO_AUTO_PASTE_ON_FOCUS_TAG,
-            enabled = settings.overlayModeEnabled,
-            onDisabledClick = onOverlayRequired,
-        )
-        Box(Modifier.fillMaxWidth().padding(top = 13.dp).height(1.dp).background(palette.line2))
+        modeCard?.invoke()
+        // Sem o modo pronto (ligado, permissões, KeyFlow como teclado ativo), o resto da aba só se lê.
+        LockedSection(locked = locked, onLockedTap = onLockedTap) {
+            SettingsGroup(
+                tr("Colar transcrição automaticamente"),
+                description = tr("Quando você precisa que sua fala preencha os campos sem sua ação manual."),
+            ) {
+                ToggleRow(
+                    label = tr("Ao gravar com um campo de texto aberto"),
+                    sub = tr("Cola direto quando a transcrição volta."),
+                    checked = settings.autoPasteInField,
+                    onCheckedChange = { onSettingsChange(settings.copy(autoPasteInField = it)) },
+                    tag = TECLADO_AUTO_PASTE_IN_FIELD_TAG,
+                )
+                GroupDivider()
+                ToggleRow(
+                    // "Gravar fora" (sem campo focado) só acontece pelo Modo Sobrepor; sem ele a opção não faz
+                    // sentido e fica inerte (mesmo estilo de abas/menus inativos), explicando o porquê no toque.
+                    label = tr("Ao tocar num campo depois de gravar fora"),
+                    sub = tr("Guarda o texto e cola quando você foca um campo."),
+                    checked = settings.autoPasteOnFocus,
+                    onCheckedChange = { onSettingsChange(settings.copy(autoPasteOnFocus = it)) },
+                    tag = TECLADO_AUTO_PASTE_ON_FOCUS_TAG,
+                    enabled = settings.overlayModeEnabled,
+                    onDisabledClick = onOverlayRequired,
+                )
+            }
 
-        // Idioma do teclado — inerte nesta fase (i18n real = futuro).
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .clickable { onLanguageClick() }
-                .testTag(TECLADO_LANGUAGE_TAG)
-                .padding(vertical = 13.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text("Idioma do teclado", color = palette.fg, fontFamily = SpaceGrotesk, fontSize = 13.5.sp)
-            Text("pt-BR  ›", color = palette.muted, fontFamily = SpaceMono, fontSize = 12.sp)
+            SettingsGroup(tr("Digitação")) {
+                // Idioma do teclado: a mesma escolha que o globo alterna (layout, acentos e corretor). A linha era
+                // um "pt-BR" fixo de antes de o teclado ter inglês e espanhol (achado do Yan, 2026-09-28).
+                GroupItem(tr("Idioma do teclado"), tr("O mesmo que o globo do teclado alterna: letras, acentos e corretor.")) {
+                    Segmented(
+                        options = KEYBOARD_LANGUAGES,
+                        selected = settings.keyboardLanguage,
+                        label = ::keyboardLanguageLabel,
+                        tag = ::keyboardLanguageTag,
+                        onSelect = { onSettingsChange(settings.copy(keyboardLanguage = it)) },
+                        modifier = Modifier.padding(top = 14.dp).testTag(TECLADO_LANGUAGE_TAG),
+                    )
+                }
+                GroupDivider()
+                // Correção automática (Q9, pedido do Yan, 2026-09-28): desligada, a faixa segue sugerindo.
+                ToggleRow(
+                    label = tr("Correção automática"),
+                    sub = tr("Troca a palavra no espaço quando o corretor tem certeza (\"nao\" → \"não\"). Apagar logo depois desfaz."),
+                    checked = settings.keyboardAutoCorrect,
+                    onCheckedChange = { onSettingsChange(settings.copy(keyboardAutoCorrect = it)) },
+                    tag = TECLADO_AUTO_CORRECT_TAG,
+                )
+                GroupDivider()
+                // Fileira de números (NUMROW-01, pedido do Yan, 2026-07-03): dedicada acima do "qwertyuiop",
+                // estilo Gboard — reflete na prévia abaixo e desativa o long-press de número na 1ª fileira
+                // (redundante com a fileira nova).
+                ToggleRow(
+                    label = tr("Fileira de números"),
+                    sub = tr("Linha dedicada de dígitos acima do teclado, como no Gboard."),
+                    checked = settings.keyboardNumberRowEnabled,
+                    onCheckedChange = { onSettingsChange(settings.copy(keyboardNumberRowEnabled = it)) },
+                    tag = TECLADO_NUMBER_ROW_TAG,
+                )
+                GroupDivider()
+                // Sem isto o Android esconde o teclado virtual quando há teclado físico conectado — e some
+                // junto o mic, que é o produto. Ligado por padrão; desmarcar devolve o comportamento do sistema.
+                ToggleRow(
+                    label = tr("Mostrar com teclado físico"),
+                    sub = tr("Mantém o teclado do KeyFlow na tela mesmo com um teclado Bluetooth ou USB conectado."),
+                    checked = settings.keyboardShowWithHardKeyboard,
+                    onCheckedChange = { onSettingsChange(settings.copy(keyboardShowWithHardKeyboard = it)) },
+                    tag = TECLADO_SHOW_WITH_HARD_KEYBOARD_TAG,
+                )
+            }
+
+            // Layout do teclado (CFG-01/02/03/06): editor WYSIWYG das barras de atalhos.
+            SettingsGroup(
+                tr("Layout do teclado"),
+                description = tr("Personalize os botões da barra do teclado — mic, atalhos, gatilhos de grade."),
+            ) {
+                BarsEditor(
+                    barsConfig = barsConfig,
+                    onBarsConfigChange = onBarsConfigChange,
+                    grids = shortcutGrids,
+                    modifier = Modifier.padding(top = 8.dp, bottom = 16.dp),
+                )
+            }
+
+            // Teclados de atalhos (CFG-04): grades que os gatilhos da barra acima podem abrir.
+            SettingsGroup(
+                tr("Teclados de atalhos"),
+                description = tr("Grades de atalhos que os gatilhos da barra podem abrir."),
+            ) {
+                GridsEditor(
+                    grids = shortcutGrids,
+                    onGridsChange = onShortcutGridsChange,
+                    referencedGridIds = barsConfig.referencedGridIds(),
+                    modifier = Modifier.padding(top = 10.dp, bottom = 16.dp),
+                )
+            }
+
+            SettingsGroup(
+                tr("Tamanho do teclado"),
+                description = tr("Encolhe ou aumenta o teclado inteiro — teclas, faixa de sugestões e barra retraída."),
+                trailing = {
+                    Text(
+                        "${settings.keyboardScalePercent}%",
+                        color = palette.fg2,
+                        fontFamily = SpaceMono,
+                        fontWeight = FontWeight.Light,
+                        fontSize = 11.sp,
+                    )
+                },
+            ) {
+                KfSlider(
+                    value = settings.keyboardScalePercent.toFloat(),
+                    onValueChange = { onSettingsChange(settings.copy(keyboardScalePercent = it.roundToInt())) },
+                    valueRange = 70f..130f,
+                    tag = TECLADO_SIZE_SLIDER_TAG,
+                    modifier = Modifier.padding(top = 10.dp),
+                )
+                KeyboardSizePreview(
+                    scalePercent = settings.keyboardScalePercent,
+                    dark = palette.isDark,
+                    locale = settings.keyboardLanguage,
+                    numberRowEnabled = settings.keyboardNumberRowEnabled,
+                    skin = settings.keyboardSkin,
+                )
+            }
+
+            SettingsGroup(null) {
+                SkinsSection(
+                    selectedSkin = settings.keyboardSkin,
+                    onSkinSelected = { onSettingsChange(settings.copy(keyboardSkin = it)) },
+                    onUnlock = onUnlockSkins,
+                    unlockTag = TECLADO_UNLOCK_TAG,
+                    modifier = Modifier.padding(bottom = 16.dp),
+                )
+            }
         }
-
-        Box(Modifier.fillMaxWidth().padding(top = 16.dp).height(1.dp).background(palette.line2))
-
-        // Correção automática (Q9, pedido do Yan, 2026-09-28): desligada, a faixa segue sugerindo.
-        ToggleRow(
-            label = "Correção automática",
-            sub = "Troca a palavra no espaço quando o corretor tem certeza (\"nao\" → \"não\"). Apagar logo depois desfaz.",
-            checked = settings.keyboardAutoCorrect,
-            onCheckedChange = { onSettingsChange(settings.copy(keyboardAutoCorrect = it)) },
-            tag = TECLADO_AUTO_CORRECT_TAG,
-        )
-
-        // Fileira de números (NUMROW-01, pedido do Yan, 2026-07-03): dedicada acima do "qwertyuiop",
-        // estilo Gboard — reflete na prévia abaixo e desativa o long-press de número na 1ª fileira
-        // (redundante com a fileira nova).
-        ToggleRow(
-            label = "Fileira de números",
-            sub = "Linha dedicada de dígitos acima do teclado, como no Gboard.",
-            checked = settings.keyboardNumberRowEnabled,
-            onCheckedChange = { onSettingsChange(settings.copy(keyboardNumberRowEnabled = it)) },
-            tag = TECLADO_NUMBER_ROW_TAG,
-        )
-
-        // Sem isto o Android esconde o teclado virtual quando há teclado físico conectado — e some
-        // junto o mic, que é o produto. Ligado por padrão; desmarcar devolve o comportamento do sistema.
-        ToggleRow(
-            label = "Mostrar com teclado físico",
-            sub = "Mantém o teclado do KeyFlow na tela mesmo com um teclado Bluetooth ou USB conectado.",
-            checked = settings.keyboardShowWithHardKeyboard,
-            onCheckedChange = { onSettingsChange(settings.copy(keyboardShowWithHardKeyboard = it)) },
-            tag = TECLADO_SHOW_WITH_HARD_KEYBOARD_TAG,
-        )
-
-        Box(Modifier.fillMaxWidth().padding(top = 13.dp).height(1.dp).background(palette.line2))
-
-        // Layout do teclado (CFG-01/02/03/06): editor WYSIWYG das barras de atalhos.
-        Text("Layout do teclado", color = palette.fg, fontFamily = SpaceGrotesk, fontSize = 13.5.sp, modifier = Modifier.padding(top = 13.dp))
-        Text(
-            "Personalize os botões da barra do teclado — mic, atalhos, gatilhos de grade.",
-            color = palette.faint,
-            fontFamily = SpaceGrotesk,
-            fontSize = 11.sp,
-            modifier = Modifier.padding(top = 3.dp),
-        )
-        BarsEditor(
-            barsConfig = barsConfig,
-            onBarsConfigChange = onBarsConfigChange,
-            grids = shortcutGrids,
-            modifier = Modifier.padding(top = 10.dp),
-        )
-
-        Box(Modifier.fillMaxWidth().padding(top = 13.dp).height(1.dp).background(palette.line2))
-
-        // Teclados de atalhos (CFG-04): grades que os gatilhos da barra acima podem abrir.
-        Text("Teclados de atalhos", color = palette.fg, fontFamily = SpaceGrotesk, fontSize = 13.5.sp, modifier = Modifier.padding(top = 13.dp))
-        Text(
-            "Grades de atalhos que os gatilhos da barra podem abrir.",
-            color = palette.faint,
-            fontFamily = SpaceGrotesk,
-            fontSize = 11.sp,
-            modifier = Modifier.padding(top = 3.dp),
-        )
-        GridsEditor(
-            grids = shortcutGrids,
-            onGridsChange = onShortcutGridsChange,
-            referencedGridIds = barsConfig.referencedGridIds(),
-            modifier = Modifier.padding(top = 10.dp),
-        )
-
-        Box(Modifier.fillMaxWidth().padding(top = 13.dp).height(1.dp).background(palette.line2))
-
-        Text("Tamanho do teclado", color = palette.fg, fontFamily = SpaceGrotesk, fontSize = 13.5.sp, modifier = Modifier.padding(top = 13.dp))
-        Text(
-            "Encolhe ou aumenta o teclado inteiro — teclas, faixa de sugestões e barra retraída.",
-            color = palette.faint,
-            fontFamily = SpaceGrotesk,
-            fontSize = 11.sp,
-            modifier = Modifier.padding(top = 3.dp),
-        )
-        Slider(
-            value = settings.keyboardScalePercent.toFloat(),
-            onValueChange = { onSettingsChange(settings.copy(keyboardScalePercent = it.roundToInt())) },
-            valueRange = 70f..130f,
-            colors = SliderDefaults.colors(
-                thumbColor = palette.teal,
-                activeTrackColor = palette.teal,
-                inactiveTrackColor = palette.line,
-            ),
-            modifier = Modifier.fillMaxWidth().padding(top = 6.dp).testTag(TECLADO_SIZE_SLIDER_TAG),
-        )
-        Text(
-            "${settings.keyboardScalePercent}%",
-            color = palette.muted,
-            fontFamily = SpaceMono,
-            fontSize = 11.sp,
-        )
-        KeyboardSizePreview(
-            scalePercent = settings.keyboardScalePercent,
-            dark = palette.isDark,
-            locale = settings.keyboardLanguage,
-            numberRowEnabled = settings.keyboardNumberRowEnabled,
-            skin = settings.keyboardSkin,
-        )
-
-        Box(Modifier.fillMaxWidth().padding(top = 13.dp).height(1.dp).background(palette.line2))
-        SkinsSection(
-            selectedSkin = settings.keyboardSkin,
-            onSkinSelected = { onSettingsChange(settings.copy(keyboardSkin = it)) },
-            onUnlock = onUnlockSkins,
-            unlockTag = TECLADO_UNLOCK_TAG,
-        )
     }
 }
 
@@ -254,10 +253,9 @@ fun TecladoPanel(
  * fixadas no construtor (não mutáveis), então mudar qualquer uma troca a instância — leve o bastante
  * pra ser aceitável a cada passo do arrasto do slider (mesma técnica já usada pelo demo da aba Modo).
  *
- * Largura via `LocalConfiguration.screenWidthDp` (não a largura disponível dentro do painel, que já vem
- * reduzida pelo padding do `ConfigScreen`) + `Box(contentAlignment = Alignment.Center)`: centraliza a
- * prévia mesmo sendo mais larga que o espaço herdado do painel, sem precisar calcular offset manual (a
- * 1ª versão usava um `layout{}` próprio pra "vazar" o padding do pai e tinha um bug de assimetria).
+ * Largura = a do painel. Até 2026-09-28 era a da TELA menos uma margem (pedido do Yan, 2026-07-03, para a
+ * prévia bater com o teclado real); com a navegação lateral, a largura da tela invadia o menu. A ALTURA
+ * continua a real — é ela que o slider muda.
  */
 @Composable
 private fun KeyboardSizePreview(
@@ -268,16 +266,15 @@ private fun KeyboardSizePreview(
     skin: String = KeyboardSkin.DEFAULT.id,
 ) {
     val palette = LocalKeyFlowPalette.current
-    val screenWidthDp = LocalConfiguration.current.screenWidthDp.dp
-    val previewWidth = (screenWidthDp - PREVIEW_MARGIN_DP * 2).coerceAtLeast(0.dp)
-    Box(
-        Modifier.fillMaxWidth().padding(top = 10.dp),
-        contentAlignment = Alignment.Center,
+    // Largura do PAINEL (não da tela): com a navegação lateral, a largura da tela invadia o menu.
+    Column(
+        Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Column(
             Modifier
-                .width(previewWidth)
-                .clip(RoundedCornerShape(8.dp))
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
                 .background(palette.bg)
                 .testTag(TECLADO_SIZE_PREVIEW_TAG),
         ) {
@@ -296,6 +293,9 @@ private fun KeyboardSizePreview(
                             locale = locale,
                             showLanguageKey = true,
                             numberRowEnabled = numberRowEnabled,
+                            // A barra de fábrica, com a área das sugestões vazia: mic, ajustes e recolher na
+                            // proporção real (sem ela o mic esticava para o cartão todo — Yan, 2026-09-28).
+                            barsFitWidth = true,
                         ).apply {
                             setExpanded(true)
                             keyboardSizePreviewForTest = this
@@ -308,6 +308,11 @@ private fun KeyboardSizePreview(
                 )
             }
         }
+        // O cartão é mais estreito que a tela: a prévia acerta a altura, não a largura (Yan, 2026-09-28).
+        SettingSub(
+            tr("A prévia mostra a altura real do teclado. A largura foi estreitada para caber aqui — no uso, ele ocupa a tela toda."),
+            Modifier.fillMaxWidth().padding(top = 10.dp).testTag(TECLADO_SIZE_PREVIEW_NOTE_TAG),
+        )
     }
 }
 

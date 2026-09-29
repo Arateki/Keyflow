@@ -56,7 +56,7 @@ class OverlayCoordinatorTest {
 
     /**
      * Checagem proativa (Yan, 2026-07-04): sem RECORD_AUDIO, nem tenta `recorder.start()` — vai direto
-     * pro erro certo, com [ErrorNavTarget.MODO_MIC] (antes só descobria a falta quando o recorder nativo
+     * pro erro certo, com [ErrorNavTarget.MIC] (antes só descobria a falta quando o recorder nativo
      * já tinha explodido, com uma mensagem genérica sem destino de navegação nenhum).
      */
     @Test
@@ -80,7 +80,7 @@ class OverlayCoordinatorTest {
 
         assertThat(recorder.started).isEqualTo(0)
         assertThat(renderedStates.last()).isEqualTo(ButtonState.ERROR)
-        assertThat(lastTarget).isEqualTo(com.keyflow.core.ErrorNavTarget.MODO_MIC)
+        assertThat(lastTarget).isEqualTo(com.keyflow.core.ErrorNavTarget.MIC)
         assertThat(lastMessage).isEqualTo("Conceda permissão de microfone para usar essa função.")
     }
 
@@ -243,6 +243,39 @@ class OverlayCoordinatorTest {
 
         assertThat(renderedStates).contains(ButtonState.ERROR)
         assertThat(errors).containsExactly("Tempo esgotado ao transcrever.")
+    }
+
+    @Test
+    fun `with no time limit a slow transcription is waited for instead of timing out`() = runTest {
+        // "∞" na aba Transcrição (Yan, 2026-09-28): a rede de segurança do coordinator não pode cortar
+        // uma transcrição que demora além de qualquer prazo — a pessoa escolheu esperar.
+        val audio = temporaryFolder.newFile("audio.m4a").also { it.writeText("audio") }
+        val slow = object : OverlayTranscriber {
+            override suspend fun transcribe(audio: File, cfg: Config): TranscriptionResult {
+                kotlinx.coroutines.delay(30 * 60_000L)
+                return TranscriptionResult.Success("demorou")
+            }
+        }
+        val inserted = mutableListOf<String>()
+        val errors = mutableListOf<String>()
+
+        val coordinator = coordinator(
+            scope = this,
+            recorder = FakeRecorder(audio),
+            transcriber = slow,
+            insertOrHold = { inserted += it; InsertOutcome.Inserted },
+            targetAvailable = { true },
+            onError = { message, _ -> errors += message },
+            recordingClockMs = longEnoughClock(),
+            configTimeoutMs = Config.NO_TIMEOUT,
+        )
+
+        coordinator.onTap() // IDLE → RECORDING
+        coordinator.onTap() // RECORDING → SENDING
+        advanceUntilIdle()
+
+        assertThat(errors).isEmpty()
+        assertThat(inserted).containsExactly("demorou")
     }
 
     @Test

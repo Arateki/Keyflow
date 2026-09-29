@@ -1,5 +1,6 @@
 package com.keyflow.ui.config
 
+import com.keyflow.i18n.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -10,8 +11,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,12 +25,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.keyflow.ui.icons.KfIcon
+import com.keyflow.ui.icons.KfIcons
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
-import com.keyflow.ui.theme.SpaceMono
 
 const val UNLOCK_SHEET_TAG = "unlock-sheet"
 const val UNLOCK_CLOSE_TAG = "unlock-close"
@@ -56,31 +59,43 @@ fun UnlockSheet(visible: Boolean, onDismiss: () -> Unit, modifier: Modifier = Mo
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp)
-                .clip(RoundedCornerShape(20.dp))
+                .clip(RoundedCornerShape(24.dp))
                 .background(palette.bg)
+                .border(1.dp, palette.line2, RoundedCornerShape(24.dp))
                 .clickable(interactionSource = noRipple, indication = null) { /* consome o clique */ }
-                .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 22.dp)
+                .padding(start = 22.dp, end = 18.dp, top = 20.dp, bottom = 22.dp)
                 .testTag(UNLOCK_SHEET_TAG),
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f)) {
-                    Text("Desbloquear skins", color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
                     Text(
-                        "Personalize o teclado e o overlay com temas. Escolha como liberar — para sempre.",
+                        tr("Desbloquear skins"),
+                        color = palette.fg,
+                        fontFamily = SpaceGrotesk,
+                        fontWeight = FontWeight.Normal,
+                        fontSize = 18.sp,
+                        letterSpacing = (-0.4).sp,
+                    )
+                    Text(
+                        tr("Personalize o teclado e o overlay com temas. Escolha como liberar — para sempre."),
                         color = palette.muted,
                         fontFamily = SpaceGrotesk,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(top = 4.dp),
+                        fontWeight = FontWeight.Light,
+                        fontSize = 11.5.sp,
+                        lineHeight = 16.5.sp,
+                        modifier = Modifier.padding(top = 6.dp),
                     )
                 }
                 Box(
                     Modifier
-                        .size(26.dp)
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .border(1.dp, palette.line, CircleShape)
                         .clickable(interactionSource = noRipple, indication = null) { onDismiss() }
                         .testTag(UNLOCK_CLOSE_TAG),
                     contentAlignment = Alignment.Center,
                 ) {
-                    StrokeIcon(listOf(CLOSE_PATH), palette.faint, Modifier.size(16.dp), strokeWidth = 1.8f)
+                    KfIcon(KfIcons.Close, palette.fg2, Modifier.size(15.dp), strokeWidth = 1.8f)
                 }
             }
 
@@ -88,34 +103,38 @@ fun UnlockSheet(visible: Boolean, onDismiss: () -> Unit, modifier: Modifier = Mo
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(top = 16.dp)
-                    .clip(RoundedCornerShape(4.dp))
+                    .padding(top = 20.dp)
+                    .clip(RoundedCornerShape(16.dp))
                     .background(palette.fg)
                     .clickable(interactionSource = noRipple, indication = null) { /* inerte */ }
                     .testTag(UNLOCK_RECHARGE_TAG)
-                    .padding(horizontal = 14.dp, vertical = 13.dp),
+                    .padding(horizontal = 16.dp, vertical = 15.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text("Recarregar R$ 20 em créditos", color = palette.onFill, fontFamily = SpaceGrotesk, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Text(tr("Recarregar R$ 20 em créditos"), color = palette.onFill, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Medium, fontSize = 13.5.sp)
                     Text(
-                        "Vira saldo de transcrição e libera todas as skins para sempre.",
-                        color = palette.onFill.copy(alpha = 0.7f),
+                        tr("Vira saldo de transcrição e libera todas as skins para sempre."),
+                        color = palette.onFill.copy(alpha = 0.68f),
                         fontFamily = SpaceGrotesk,
-                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Light,
+                        fontSize = 10.5.sp,
+                        lineHeight = 15.sp,
                         modifier = Modifier.padding(top = 3.dp),
                     )
                 }
                 Text(
                     "MELHOR",
-                    color = Color.White,
-                    fontFamily = SpaceMono,
-                    fontSize = 9.sp,
+                    color = PaperWarm,
+                    fontFamily = SpaceGrotesk,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 7.5.sp,
+                    letterSpacing = 1.2.sp,
                     modifier = Modifier
-                        .clip(RoundedCornerShape(2.dp))
+                        .clip(RoundedCornerShape(50))
                         .background(palette.teal)
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                        .padding(horizontal = 9.dp, vertical = 4.dp),
                 )
             }
 
@@ -124,32 +143,29 @@ fun UnlockSheet(visible: Boolean, onDismiss: () -> Unit, modifier: Modifier = Mo
                 Modifier
                     .fillMaxWidth()
                     .padding(top = 10.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .border(1.dp, palette.line, RoundedCornerShape(4.dp))
+                    .clip(RoundedCornerShape(16.dp))
+                    .border(1.dp, palette.line, RoundedCornerShape(16.dp))
                     .clickable(interactionSource = noRipple, indication = null) { /* inerte */ }
                     .testTag(UNLOCK_ONCE_TAG)
-                    .padding(horizontal = 14.dp, vertical = 13.dp),
+                    .padding(horizontal = 16.dp, vertical = 15.dp),
             ) {
-                Text("Pagar R$ 15 — uma vez", color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                Text(tr("Pagar R$ 15 — uma vez"), color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Medium, fontSize = 13.5.sp)
                 Text(
-                    "Pagamento único, sem virar crédito. Libera apenas as skins, para sempre.",
+                    tr("Pagamento único, sem virar crédito. Libera apenas as skins, para sempre."),
                     color = palette.muted,
                     fontFamily = SpaceGrotesk,
-                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Light,
+                    fontSize = 10.5.sp,
+                    lineHeight = 15.sp,
                     modifier = Modifier.padding(top = 3.dp),
                 )
             }
 
-            Text(
-                "Pagamento via Google Play".uppercase(),
-                color = palette.faint,
-                fontFamily = SpaceMono,
-                fontSize = 8.5.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+            Eyebrow(
+                tr("Pagamento via Google Play"),
+                Modifier.fillMaxWidth().padding(top = 16.dp).wrapContentWidth(Alignment.CenterHorizontally),
             )
         }
     }
 }
 
-private const val CLOSE_PATH = "M18 6 6 18M6 6l12 12"

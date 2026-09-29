@@ -37,8 +37,11 @@ class WhisperApi(private val client: OkHttpClient = defaultClient()) {
         // travar "transcrevendo" pra sempre com rotas de rede ruins). newBuilder() reusa o pool de
         // conexões/dispatcher do client base; só o timeout muda por [cfg], que pode variar em runtime
         // (config do usuário), então não dá pra fixar isso na construção do client.
+        // Sem limite ("∞"): callTimeout 0 já não corta a chamada, e o readTimeout do client base também
+        // sai — senão um servidor que fica calado processando um áudio longo cairia nele.
         val callClient = client.newBuilder()
             .callTimeout(cfg.timeoutMs, TimeUnit.MILLISECONDS)
+            .apply { if (cfg.waitsForever) readTimeout(0, TimeUnit.MILLISECONDS) }
             .build()
         val call = callClient.newCall(request)
         onCall(call)

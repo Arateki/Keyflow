@@ -127,6 +127,20 @@ class TranscriptionClientTest {
     }
 
     @Test
+    fun `with no time limit the call outlasts the base read timeout`() {
+        // "∞" (Yan, 2026-09-28): nem o callTimeout nem o readTimeout do client base derrubam a espera.
+        server.enqueue(
+            jsonResponse(200, """{"text":"sem pressa"}""")
+                .setBodyDelay(300, TimeUnit.MILLISECONDS)
+        )
+        val impatientClient = client(readTimeoutMs = 50) // sozinho, derrubaria a chamada em 50ms
+
+        val result = impatientClient.transcribe(audioFile(), config(timeoutMs = Config.NO_TIMEOUT))
+
+        assertThat(result).isEqualTo(TranscriptionResult.Success("sem pressa"))
+    }
+
+    @Test
     fun `transcribe maps incomplete config before network call`() {
         val result = client().transcribe(audioFile(), Config())
 

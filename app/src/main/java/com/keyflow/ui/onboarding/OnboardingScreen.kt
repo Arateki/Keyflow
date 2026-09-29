@@ -1,5 +1,7 @@
 package com.keyflow.ui.onboarding
 
+import com.keyflow.i18n.tr
+import com.keyflow.i18n.trKey
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -16,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -38,9 +39,12 @@ import androidx.compose.ui.unit.sp
 import com.keyflow.ui.PermissionStatus
 import com.keyflow.ui.orb.OrbState
 import com.keyflow.ui.orb.VoiceOrb
+import com.keyflow.ui.config.PrimaryButton
+import com.keyflow.ui.config.PaperWarm
+import com.keyflow.ui.icons.KfIcon
+import com.keyflow.ui.icons.KfIcons
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
-import com.keyflow.ui.theme.SpaceMono
 
 const val ONBOARDING_GRANT_TAG = "onboarding-grant"
 const val ONBOARDING_SKIP_TAG = "onboarding-skip"
@@ -54,27 +58,31 @@ const val ONBOARDING_ITEM_NOTIFICATIONS_TAG = "onboarding-item-notifications"
  * Docs e o `PLAYSTORE_CHECKLIST.md`: o áudio só sai quando a pessoa grava e só para a origem dela;
  * nenhum texto digitado é transmitido.
  */
-enum class OnboardingPermission(val key: String, val label: String, val why: String) {
+enum class OnboardingPermission(val key: String, private val labelPt: String, private val whyPt: String) {
     MIC(
         "mic",
-        "Microfone",
-        "Para gravar sua voz e transcrever. O microfone só é usado enquanto você grava, e o áudio vai apenas para a origem de voz configurada na aba Voz. Sem ele, não há ditado.",
+        trKey("Microfone"),
+        trKey("Para gravar sua voz e transcrever. O microfone só é usado enquanto você grava, e o áudio vai apenas para a origem de voz configurada na aba Transcrição. Sem ele, não há ditado."),
     ),
     OVERLAY(
         "overlay",
-        "Sobreposição (overlay)",
-        "Para desenhar a orbe flutuante por cima dos outros apps. Sem ela, não existe o modo Sobrepor — só o teclado KeyFlow.",
+        trKey("Sobreposição (overlay)"),
+        trKey("Para desenhar a orbe flutuante por cima dos outros apps. Sem ela, não existe o modo Sobrepor — só o teclado KeyFlow."),
     ),
     KEYBOARD(
         "keyboard",
-        "Teclado KeyFlow",
-        "Para o texto transcrito entrar direto no campo em que você está digitando. Sem ele, o texto vai para a área de transferência e você cola. Nenhum texto digitado é transmitido.",
+        trKey("Teclado KeyFlow"),
+        trKey("Para o texto transcrito entrar direto no campo em que você está digitando. Sem ele, o texto vai para a área de transferência e você cola. Nenhum texto digitado é transmitido."),
     ),
     NOTIFICATIONS(
         "notifications",
-        "Notificações",
-        "Para mostrar os controles da gravação — pausar, enviar, cancelar — com o app em segundo plano. Sem elas a gravação funciona, mas sem esses controles fora do app.",
+        trKey("Notificações"),
+        trKey("Para mostrar os controles da gravação — pausar, enviar, cancelar — com o app em segundo plano. Sem elas a gravação funciona, mas sem esses controles fora do app."),
     ),
+    ;
+
+    val label: String get() = tr(labelPt)
+    val why: String get() = tr(whyPt)
 }
 
 /** Tag do "?" da permissão (PERM-01). */
@@ -120,41 +128,48 @@ fun OnboardingScreen(
         VoiceOrb(state = OrbState.Listening, modifier = Modifier.size(98.dp).align(Alignment.CenterHorizontally))
 
         Text(
-            "Bem-vindo ao KeyFlow".uppercase(),
+            tr("Bem-vindo ao KeyFlow").uppercase(),
             color = palette.faint,
-            fontFamily = SpaceMono,
-            fontSize = 9.5.sp,
+            fontFamily = SpaceGrotesk,
+            fontWeight = FontWeight.Medium,
+            fontSize = 8.5.sp,
+            letterSpacing = 2.sp,
             textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(top = 18.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 22.dp),
         )
         Text(
-            "Sua voz vira texto em qualquer campo.",
+            tr("Sua voz vira texto em qualquer campo."),
             color = palette.fg,
             fontFamily = SpaceGrotesk,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 27.sp,
-            lineHeight = 30.sp,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
-        )
-        Text(
-            "Fale, e o KeyFlow cola a transcrição direto no app que você estiver usando. Para isso, ele precisa de algumas permissões.",
-            color = palette.muted,
-            fontFamily = SpaceGrotesk,
-            fontSize = 13.sp,
+            fontWeight = FontWeight.Normal,
+            fontSize = 26.sp,
+            lineHeight = 31.sp,
+            letterSpacing = (-0.8).sp,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
         )
         Text(
-            "Recomendamos conceder todas agora, para conhecer tudo que o app oferece — depois você pode rever cada uma para refletir o seu uso.",
+            tr("Fale, e o KeyFlow cola a transcrição direto no app que você estiver usando. Para isso, ele precisa de algumas permissões."),
+            color = palette.muted,
+            fontFamily = SpaceGrotesk,
+            fontWeight = FontWeight.Light,
+            fontSize = 12.5.sp,
+            lineHeight = 18.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+        )
+        Text(
+            tr("Recomendamos conceder todas agora, para conhecer tudo que o app oferece — depois você pode rever cada uma para refletir o seu uso."),
             color = palette.faint,
             fontFamily = SpaceGrotesk,
-            fontSize = 12.sp,
+            fontWeight = FontWeight.Light,
+            fontSize = 11.sp,
+            lineHeight = 16.sp,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
         )
 
-        Column(Modifier.fillMaxWidth().padding(top = 26.dp)) {
+        Column(Modifier.fillMaxWidth().padding(top = 28.dp)) {
             ChecklistRow(
                 OnboardingPermission.MIC,
                 permissions.microphoneGranted,
@@ -192,25 +207,12 @@ fun OnboardingScreen(
 
         Spacer(Modifier.weight(1f))
 
+        PrimaryButton(tr("Conceder permissões"), tag = ONBOARDING_GRANT_TAG, onClick = onGrant)
         Text(
-            "Conceder permissões",
-            color = palette.onFill,
+            tr("Pular por agora"),
+            color = palette.muted,
             fontFamily = SpaceGrotesk,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 13.sp,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(3.dp))
-                .background(palette.fg)
-                .clickable { onGrant() }
-                .testTag(ONBOARDING_GRANT_TAG)
-                .padding(vertical = 14.dp),
-        )
-        Text(
-            "Pular por agora",
-            color = palette.faint,
-            fontFamily = SpaceGrotesk,
+            fontWeight = FontWeight.Light,
             fontSize = 12.sp,
             textAlign = TextAlign.Center,
             modifier = Modifier
@@ -238,36 +240,39 @@ private fun ChecklistRow(
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .testTag(tag)
-            .padding(vertical = 11.dp),
+            .padding(vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         if (granted) {
-            Box(Modifier.size(18.dp).clip(CircleShape).background(palette.teal), contentAlignment = Alignment.Center) {
-                Text("✓", color = palette.onFill, fontFamily = SpaceGrotesk, fontSize = 11.sp)
+            Box(Modifier.size(20.dp).clip(CircleShape).background(palette.teal), contentAlignment = Alignment.Center) {
+                KfIcon(KfIcons.Check, PaperWarm, Modifier.size(12.dp), strokeWidth = 2.6f)
             }
         } else {
-            Box(Modifier.size(18.dp).clip(CircleShape).border(1.5.dp, palette.record, CircleShape))
+            Box(Modifier.size(20.dp).clip(CircleShape).border(1.dp, palette.record, CircleShape))
         }
-        Text(permission.label, color = palette.fg, fontFamily = SpaceGrotesk, fontSize = 13.5.sp, modifier = Modifier.weight(1f))
+        Text(permission.label, color = palette.fg, fontFamily = SpaceGrotesk, fontSize = 13.sp, modifier = Modifier.weight(1f))
         Text(
-            if (granted) "OK" else "FALTA",
+            if (granted) "OK" else tr("FALTA"),
             color = if (granted) palette.faint else palette.recordSoft,
-            fontFamily = SpaceMono,
-            fontSize = 9.sp,
+            fontFamily = SpaceGrotesk,
+            fontWeight = FontWeight.Medium,
+            fontSize = 8.sp,
+            letterSpacing = 1.4.sp,
         )
         WhyButton(permission, explained, onClick = { onToggleWhy(permission) })
     }
     AnimatedVisibility(visible = explained) {
         Text(
             permission.why,
-            color = palette.faint,
+            color = palette.muted,
             fontFamily = SpaceGrotesk,
-            fontSize = 12.sp,
+            fontWeight = FontWeight.Light,
+            fontSize = 11.sp,
             lineHeight = 16.sp,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 30.dp, bottom = 11.dp)
+                .padding(start = 34.dp, bottom = 13.dp)
                 .testTag(onboardingWhyTextTag(permission)),
         )
     }
@@ -288,8 +293,8 @@ private fun WhyButton(permission: OnboardingPermission, explained: Boolean, onCl
             .clip(CircleShape)
             .clickable(role = Role.Button, onClick = onClick)
             .semantics {
-                contentDescription = "Por que pedimos ${permission.label}"
-                stateDescription = if (explained) "explicação aberta" else "explicação fechada"
+                contentDescription = tr("Por que pedimos %s", permission.label)
+                stateDescription = if (explained) tr("explicação aberta") else tr("explicação fechada")
             }
             .testTag(onboardingWhyTag(permission)),
         contentAlignment = Alignment.Center,
@@ -298,7 +303,7 @@ private fun WhyButton(permission: OnboardingPermission, explained: Boolean, onCl
             Modifier.size(18.dp).clip(CircleShape).border(1.dp, accent, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
-            Text("?", color = accent, fontFamily = SpaceMono, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+            Text("?", color = accent, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Medium, fontSize = 9.5.sp)
         }
     }
 }

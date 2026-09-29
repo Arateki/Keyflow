@@ -72,10 +72,12 @@ data class Settings(
     // Tempo limite de resposta da transcrição (ms) — compartilhado entre OpenAI/Groq/Custom, não é por
     // preset (aba Voz → seção Geral). Bug real reportado pelo Yan: sem isto, uma rota de rede ruim
     // trava "transcrevendo" pra sempre (OkHttp/JVM não tem timeout de DNS por padrão).
+    // 0 = sem limite ("∞", pedido do Yan, 2026-09-28).
     val transcriptionTimeoutMs: Int = Config.DEFAULT_TIMEOUT_MS.toInt(),
     // Duração máxima de uma gravação (s), aba Voz → seção Geral (pedido do Yan, 2026-07-02). MOCKADO:
     // o valor é persistido, mas nada ainda o aplica durante a gravação — o comportamento real (pausar
     // ao atingir o limite + toast pra enviar/descartar) fica pendente, ver STATE.md.
+    // 0 = sem limite ("∞", pedido do Yan, 2026-09-28) — o coordinator já tratava 0 como desligado.
     val maxRecordingSec: Int = 300,
     // Tamanho do teclado KeyFlow (%), aba Teclado (pedido do Yan, 2026-07-02) — reusa o `scale: Float`
     // que já existe em KeyFlowKeyboardView/KeyboardGridView/CandidatesView (era só usado pela demo da
@@ -103,6 +105,12 @@ data class Settings(
     // Cores do teclado (id de `KeyboardSkin`): "system" (padrão desde 2026-09-28, como o Samsung) ou
     // "atelie" (o papel quente de antes). Só o teclado; o app de config segue no Ateliê.
     val keyboardSkin: String = "system",
+    // Skin da orbe do overlay ("atelie" ou "aero"), escolhida na aba Sobrepor e independente da do teclado
+    // (Yan, 2026-09-29: o Aero no teclado não deve mexer na orbe).
+    val orbSkin: String = "atelie",
+    // Idioma da interface (código de `AppLanguage`: "pt"/"en"/"es"). Vazio = ainda não escolhido: vale o
+    // português, e a SetupActivity grava o idioma do aparelho na primeira abertura (Yan, 2026-09-28).
+    val appLanguage: String = "",
     // Transcrição parcial ao pausar (native-voice-models, G12 / PAR-01): cada pausa transcreve o trecho
     // gravado até ali para um buffer da sessão; o 2º toggle só vale com o 1º ligado. Agnósticos à origem.
     val partialOnPause: Boolean = false,

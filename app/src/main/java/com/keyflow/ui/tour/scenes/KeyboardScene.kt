@@ -1,5 +1,6 @@
 package com.keyflow.ui.tour.scenes
 
+import com.keyflow.i18n.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -23,6 +25,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.keyflow.core.ButtonState
 import com.keyflow.ime.KeyFlowKeyboardView
+import com.keyflow.ui.icons.KfIcon
+import com.keyflow.ui.icons.KfIconSpec
+import com.keyflow.ui.icons.KfIcons
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
 import com.keyflow.ui.tour.TourFrame
@@ -102,24 +107,30 @@ private fun MicActionSelector(modifier: Modifier = Modifier) {
             .padding(horizontal = 6.dp, vertical = 3.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Chip("⏸ pausar")
-        Chip("✕ cancelar")
+        Chip(KfIcons.Pause, tr("pausar"))
+        Chip(KfIcons.Close, tr("cancelar"))
     }
 }
 
 @Composable
-private fun Chip(label: String) {
+private fun Chip(icon: KfIconSpec, label: String) {
     val palette = LocalKeyFlowPalette.current
-    Text(
-        label,
-        color = palette.fg2,
-        fontFamily = SpaceGrotesk,
-        fontWeight = FontWeight.Medium,
-        fontSize = 8.sp,
-        modifier = Modifier
+    Row(
+        Modifier
             .background(palette.panel, RoundedCornerShape(50))
             .padding(horizontal = 6.dp, vertical = 2.dp),
-    )
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        KfIcon(icon, palette.fg2, Modifier.size(9.dp), strokeWidth = 2.2f)
+        Text(
+            label,
+            color = palette.fg2,
+            fontFamily = SpaceGrotesk,
+            fontWeight = FontWeight.Medium,
+            fontSize = 8.sp,
+        )
+    }
 }
 
 /**

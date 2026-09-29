@@ -50,8 +50,8 @@ class BarGeometryTest {
     @Test
     fun `default expanded bar keeps current strip proportions`() {
         val buttons = BarsConfig.DEFAULT.barsFor(expandedMode = true).single().buttons
-        // mic 1.5 / ⚙ 0.9 / candidates 4 / ↓ 1 — os mesmos pesos da faixa atual (buildTopStrip).
-        assertThat(buttons.map(BarGeometry::weightFor)).containsExactly(1.5f, 0.9f, 4f, 1f).inOrder()
+        // mic 1.5 / ⚙ 0.9 / candidates 2.8 / ↓ 1 — a faixa de sugestões 30% menor que os 4 de antes.
+        assertThat(buttons.map(BarGeometry::weightFor)).containsExactly(1.5f, 0.9f, 2.8f, 1f).inOrder()
     }
 
     @Test

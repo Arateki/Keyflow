@@ -1,65 +1,56 @@
 package com.keyflow.ui.config
 
-import androidx.compose.foundation.Canvas
+import com.keyflow.i18n.tr
+import com.keyflow.i18n.trKey
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.scale
-import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.vector.PathParser
+import com.keyflow.ui.icons.KfIcon
+import com.keyflow.ui.icons.KfIconSpec
+import com.keyflow.ui.icons.KfIcons
 
 /**
- * As 5 abas da configuração (CFG-01). Os ícones reproduzem os paths SVG (viewBox 24×24) dos mocks
- * `Config Abas` via [PathParser], desenhados deterministicamente (sem dep de material-icons-extended).
+ * O grupo de uma aba no menu lateral (Yan, 2026-09-29): as **interfaces** são por onde se usa o KeyFlow (o teclado, a orbe
+ * sobreposta, a notificação); as **capacidades** são o que ele sabe fazer (transcrever, ver, raciocinar, falar). A Docs
+ * não é de nenhum dos dois.
  */
-enum class ConfigTab(val label: String, private val strokePaths: List<String>, private val fillPaths: List<String>) {
-    MODO(
-        "Modo",
-        listOf("M2 6 h20 a6 6 0 0 1 0 12 H2 a6 6 0 0 1 0 -12 z", "M16 12 m-2.5 0 a2.5 2.5 0 1 0 5 0 a2.5 2.5 0 1 0 -5 0"),
-        emptyList(),
-    ),
-    VOZ(
-        "Voz",
-        // Lábios: arco superior (cupido), lábio inferior e a linha de abertura da boca.
-        listOf(
-            "M4 12 C6.5 9 9.5 9.5 11 11 C11.5 11.5 12.5 11.5 13 11 C14.5 9.5 17.5 9 20 12",
-            "M4 12 C7 15.5 17 15.5 20 12",
-            "M6.5 12.3 C9.5 13.2 14.5 13.2 17.5 12.3",
-        ),
-        emptyList(),
-    ),
-    TECLADO(
-        "Teclado",
-        listOf("M2 6 h20 a2 2 0 0 1 2 2 v8 a2 2 0 0 1 -2 2 H2 a2 2 0 0 1 -2 -2 v-8 a2 2 0 0 1 2 -2 z",
-            "M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"),
-        emptyList(),
-    ),
-    OVERLAY(
-        "Sobrepor",
-        listOf("M3 4 h18 a2 2 0 0 1 2 2 v12 a2 2 0 0 1 -2 2 H3 a2 2 0 0 1 -2 -2 V6 a2 2 0 0 1 2 -2 z"),
-        listOf("M16.5 15.5 m-2.6 0 a2.6 2.6 0 1 0 5.2 0 a2.6 2.6 0 1 0 -5.2 0"),
-    ),
-    DOCS(
-        "Docs",
-        listOf("M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z", "M14 3v5h5", "M9 13h6M9 17h6"),
-        emptyList(),
-    );
+enum class TabGroup(private val titlePt: String?) {
+    INTERFACES(trKey("Interfaces")),
+    CAPACIDADES(trKey("Capacidades")),
+    OUTROS(null),
+    ;
+
+    /** O título do grupo no idioma da interface (só aparece com o menu aberto); `null` = grupo sem título. */
+    val title: String? get() = titlePt?.let { tr(it) }
+}
+
+/**
+ * As abas da configuração (CFG-01), na ordem do menu lateral: primeiro as **interfaces** (Teclado, Sobrepor,
+ * Notificação), depois as **capacidades** (Transcrição, Visão, Raciocínio, Voz) e a Docs. Os ícones são do conjunto
+ * próprio ([KfIcons]) — o mesmo traço dos botões da barra do teclado. Notificação, Visão, Raciocínio e Voz ainda não
+ * têm conteúdo. A aba Modo saiu (Yan, 2026-09-28): o cartão de cada modo abre a aba da própria interface.
+ */
+enum class ConfigTab(private val labelPt: String, private val icon: KfIconSpec, val group: TabGroup) {
+    // ── Interfaces
+    TECLADO(trKey("Teclado"), KfIcons.TabTeclado, TabGroup.INTERFACES),
+    OVERLAY(trKey("Sobrepor"), KfIcons.TabSobrepor, TabGroup.INTERFACES),
+    NOTIFICACAO(trKey("Notificação"), KfIcons.TabNotificacao, TabGroup.INTERFACES),
+
+    // ── Capacidades. O nome interno [VOZ] é, desde o começo, a aba Transcrição; a aba "Voz" (boca) é a FALA — renomear
+    // a primeira mexeria em intents, tags e testes sem ganho.
+    VOZ(trKey("Transcrição"), KfIcons.TabVoz, TabGroup.CAPACIDADES),
+    VISAO(trKey("Visão"), KfIcons.TabVisao, TabGroup.CAPACIDADES),
+    RACIOCINIO(trKey("Raciocínio"), KfIcons.TabRaciocinio, TabGroup.CAPACIDADES),
+    FALA(trKey("Voz"), KfIcons.TabBoca, TabGroup.CAPACIDADES),
+
+    DOCS("Docs", KfIcons.TabDocs, TabGroup.OUTROS),
+    ;
+
+    /** Nome da aba no idioma da interface. */
+    val label: String get() = tr(labelPt)
 
     @Composable
     fun Icon(tint: Color, modifier: Modifier = Modifier) {
-        Canvas(modifier) {
-            val s = size.minDimension / 24f
-            translate((size.width - 24f * s) / 2f, (size.height - 24f * s) / 2f) {
-                scale(s, s, pivot = androidx.compose.ui.geometry.Offset.Zero) {
-                    strokePaths.forEach { d ->
-                        drawPath(PathParser().parsePathString(d).toPath(), tint, style = Stroke(width = 1.7f))
-                    }
-                    fillPaths.forEach { d ->
-                        drawPath(PathParser().parsePathString(d).toPath(), tint)
-                    }
-                }
-            }
-        }
+        KfIcon(icon, tint, modifier)
     }
 }

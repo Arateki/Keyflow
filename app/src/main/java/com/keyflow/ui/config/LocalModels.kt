@@ -1,5 +1,6 @@
 package com.keyflow.ui.config
 
+import com.keyflow.i18n.tr
 import com.keyflow.data.models.DownloadFailure
 import com.keyflow.data.models.DownloadProgress
 import com.keyflow.data.models.DownloadState
@@ -87,22 +88,22 @@ fun formatModelSize(bytes: Long): String = "~${(bytes / 1_048_576.0).roundToInt(
 /** Mensagem de uma pré-checagem que impediu o download (DLM-05/06); null quando não há o que dizer. */
 fun startProblem(result: StartResult): String? = when (result) {
     is StartResult.NotEnoughSpace ->
-        "Espaço insuficiente: precisa de ${formatModelSize(result.requiredBytes)} livres, há ${formatModelSize(result.freeBytes)}."
-    is StartResult.AnotherDownloadActive -> "Espere o download em andamento terminar."
-    StartResult.StorageUnavailable -> "Armazenamento indisponível para baixar agora."
+        tr("Espaço insuficiente: precisa de %s livres, há %s.", formatModelSize(result.requiredBytes), formatModelSize(result.freeBytes))
+    is StartResult.AnotherDownloadActive -> tr("Espere o download em andamento terminar.")
+    StartResult.StorageUnavailable -> tr("Armazenamento indisponível para baixar agora.")
     StartResult.Started, StartResult.AlreadyInstalled, is StartResult.NeedsMeteredConfirmation -> null
 }
 
 fun failureMessage(failure: DownloadFailure): String = when (failure) {
-    DownloadFailure.DOWNLOAD_FAILED -> "O download falhou — tente novamente."
-    DownloadFailure.CORRUPTED -> "Download corrompido — tente novamente."
-    DownloadFailure.INSTALL_FAILED -> "Não foi possível instalar — verifique o espaço e tente novamente."
+    DownloadFailure.DOWNLOAD_FAILED -> tr("O download falhou — tente novamente.")
+    DownloadFailure.CORRUPTED -> tr("Download corrompido — tente novamente.")
+    DownloadFailure.INSTALL_FAILED -> tr("Não foi possível instalar — verifique o espaço e tente novamente.")
 }
 
 fun downloadStateLabel(progress: DownloadProgress): String = when (progress.state) {
-    DownloadState.QUEUED -> "Na fila"
-    DownloadState.WAITING_FOR_NETWORK -> "Aguardando rede"
-    DownloadState.WAITING_FOR_WIFI -> "Aguardando Wi-Fi"
-    DownloadState.FILES_DONE -> "Verificando"
+    DownloadState.QUEUED -> tr("Na fila")
+    DownloadState.WAITING_FOR_NETWORK -> tr("Aguardando rede")
+    DownloadState.WAITING_FOR_WIFI -> tr("Aguardando Wi-Fi")
+    DownloadState.FILES_DONE -> tr("Verificando")
     DownloadState.RUNNING, DownloadState.FAILED -> "${(progress.fraction * 100).toInt()}%"
 }

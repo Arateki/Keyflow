@@ -38,7 +38,7 @@ class ModoPanelTourTest {
                     LocalOrbClock provides { 0f },
                     LocalTourClock provides { 0f },
                 ) {
-                    ModoPanel(
+                    ModeCards(
                         settings = settings,
                         permissions = PermissionStatus(
                             microphoneGranted = true,

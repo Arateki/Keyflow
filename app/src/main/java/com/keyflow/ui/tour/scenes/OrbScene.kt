@@ -1,5 +1,6 @@
 package com.keyflow.ui.tour.scenes
 
+import com.keyflow.i18n.tr
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -40,7 +41,7 @@ const val TOUR_HINT_UNDO_BANNER_TAG = "tour-hint-undo-banner"
  * o card saltava de tamanho a cada troca de gesto — e o teclado, que encolhe ao retrair, saltava dentro
  * do próprio roteiro (relatado pelo Yan usando no A32, 2026-09-09).
  */
-val TOUR_SCENE_HEIGHT = 132.dp
+val TOUR_SCENE_HEIGHT = 116.dp
 
 /** Onde a orbe mora quando nenhum passo diz o contrário — mesmo ponto de partida do catálogo. */
 private val DEFAULT_ORB_AT = Offset(0.5f, 0.45f)
@@ -134,7 +135,7 @@ private fun UndoBanner(modifier: Modifier = Modifier) {
             .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
         Text(
-            "Cancelado · Desfazer",
+            tr("Cancelado · Desfazer"),
             color = palette.fg,
             fontFamily = SpaceGrotesk,
             fontWeight = FontWeight.Medium,

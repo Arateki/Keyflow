@@ -1,5 +1,6 @@
 package com.keyflow.overlay
 
+import com.keyflow.i18n.tr
 import android.os.SystemClock
 import android.util.Log
 import com.keyflow.audio.AudioConcatenator
@@ -432,7 +433,7 @@ class OverlayCoordinator(
 
     private fun startRecording() {
         if (!microphoneGranted()) {
-            onError("Conceda permissão de microfone para usar essa função.", ErrorNavTarget.MODO_MIC)
+            onError(tr("Conceda permissão de microfone para usar essa função."), ErrorNavTarget.MIC)
             handleState(machine.onTranscriptionError())
             return
         }
@@ -452,8 +453,8 @@ class OverlayCoordinator(
                 endPartial()
                 // Rede de segurança: se a checagem proativa passou mas o recorder nativo ainda assim
                 // falhou por permissão (ex.: revogada bem no meio), não perde a mensagem certa.
-                val target = if (!microphoneGranted()) ErrorNavTarget.MODO_MIC else ErrorNavTarget.NONE
-                onError("Falha ao iniciar a gravação.", target)
+                val target = if (!microphoneGranted()) ErrorNavTarget.MIC else ErrorNavTarget.NONE
+                onError(tr("Falha ao iniciar a gravação."), target)
                 handleState(machine.onTranscriptionError())
             }
     }
@@ -509,7 +510,7 @@ class OverlayCoordinator(
                 if (duration < MIN_RECORDING_MS) {
                     Log.d(TAG, "recording too short (${duration}ms), cancelling")
                     runCatching { recorder.stop() }
-                    onError("Gravação muito curta.", ErrorNavTarget.NONE)
+                    onError(tr("Gravação muito curta."), ErrorNavTarget.NONE)
                     render(machine.onErrorDismissed())
                     return
                 }
@@ -517,7 +518,7 @@ class OverlayCoordinator(
             }
         }
         if (audio == null) {
-            onError("Não foi possível gravar o áudio.", ErrorNavTarget.NONE)
+            onError(tr("Não foi possível gravar o áudio."), ErrorNavTarget.NONE)
             handleState(machine.onTranscriptionError())
             return
         }
@@ -550,7 +551,12 @@ class OverlayCoordinator(
     private suspend fun transcribeWithTimeout(audio: File): TranscriptionResult {
         val cfg = configProvider()
         return runCatching {
-            withTimeout(cfg.timeoutMs + TIMEOUT_SAFETY_MARGIN_MS) { transcriber.transcribe(audio, cfg) }
+            // "∞": a pessoa escolheu esperar o quanto for preciso — cancelar durante o envio segue valendo.
+            if (cfg.waitsForever) {
+                transcriber.transcribe(audio, cfg)
+            } else {
+                withTimeout(cfg.timeoutMs + TIMEOUT_SAFETY_MARGIN_MS) { transcriber.transcribe(audio, cfg) }
+            }
         }.getOrElse { e ->
             when (e) {
                 is TimeoutCancellationException ->
@@ -595,7 +601,7 @@ class OverlayCoordinator(
         }
         if (session.isEmpty && recordingClockMs() - recordingStartMs < MIN_RECORDING_MS) {
             endPartial()
-            onError("Gravação muito curta.", ErrorNavTarget.NONE)
+            onError(tr("Gravação muito curta."), ErrorNavTarget.NONE)
             render(machine.onErrorDismissed())
             return
         }
@@ -624,14 +630,14 @@ class OverlayCoordinator(
         if (error.kind == ErrorKind.LOCAL) error.message else errorMessage(error.kind)
 
     private fun errorMessage(kind: ErrorKind): String = when (kind) {
-        ErrorKind.CONFIG_MISSING -> "Configure um provedor de voz na aba Voz."
-        ErrorKind.AUTH -> "Falha de autenticação — verifique o token."
-        ErrorKind.NETWORK -> "Sem conexão de rede."
-        ErrorKind.TIMEOUT -> "Tempo esgotado ao transcrever."
-        ErrorKind.TOO_LARGE -> "Áudio muito longo para transcrever."
-        ErrorKind.EMPTY_AUDIO -> "Nada foi captado pelo microfone."
-        ErrorKind.HTTP -> "Erro no servidor de transcrição."
-        ErrorKind.LOCAL -> "Falha na transcrição local."
+        ErrorKind.CONFIG_MISSING -> tr("Configure um provedor de voz na aba Transcrição.")
+        ErrorKind.AUTH -> tr("Falha de autenticação — verifique o token.")
+        ErrorKind.NETWORK -> tr("Sem conexão de rede.")
+        ErrorKind.TIMEOUT -> tr("Tempo esgotado ao transcrever.")
+        ErrorKind.TOO_LARGE -> tr("Áudio muito longo para transcrever.")
+        ErrorKind.EMPTY_AUDIO -> tr("Nada foi captado pelo microfone.")
+        ErrorKind.HTTP -> tr("Erro no servidor de transcrição.")
+        ErrorKind.LOCAL -> tr("Falha na transcrição local.")
     }
 
     private fun ButtonStateMachine.onTargetChangedAndReturn(available: Boolean): ButtonState {

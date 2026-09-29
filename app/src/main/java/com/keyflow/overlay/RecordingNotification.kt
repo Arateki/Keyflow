@@ -1,5 +1,6 @@
 package com.keyflow.overlay
 
+import com.keyflow.i18n.tr
 import android.app.Notification
 import android.app.PendingIntent
 import android.content.Context
@@ -182,17 +183,17 @@ class RecordingNotification(
 
         /** Rótulo da ação de pausa conforme o estado (lógica pura, testável). */
         fun pauseLabel(state: ButtonState): String = when (state) {
-            ButtonState.PAUSED -> "Retomar"
-            else -> "Pausar"
+            ButtonState.PAUSED -> tr("Retomar")
+            else -> tr("Pausar")
         }
 
         /** Título da notificação conforme o estado. */
         fun titleFor(state: ButtonState): String = when (state) {
-            ButtonState.RECORDING -> "● Gravando"
-            ButtonState.PAUSED -> "⏸ Pausado"
-            ButtonState.CANCELLING -> "🗑 Cancelado · desfazer"
-            ButtonState.SENDING -> "⏳ Transcrevendo"
-            else -> "KeyFlow ativo"
+            ButtonState.RECORDING -> tr("● Gravando")
+            ButtonState.PAUSED -> tr("⏸ Pausado")
+            ButtonState.CANCELLING -> tr("🗑 Cancelado · desfazer")
+            ButtonState.SENDING -> tr("⏳ Transcrevendo")
+            else -> tr("KeyFlow ativo")
         }
     }
 }

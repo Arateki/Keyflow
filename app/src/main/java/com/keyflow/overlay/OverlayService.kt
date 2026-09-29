@@ -1,5 +1,6 @@
 package com.keyflow.overlay
 
+import com.keyflow.i18n.tr
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -310,7 +311,7 @@ class OverlayService : Service() {
                 cm.setPrimaryClip(ClipData.newPlainText("KeyFlow", text))
                 // Android 13+ já mostra a própria confirmação de cópia do sistema — não duplicar.
                 if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-                    Toast.makeText(this, "Copiado para a área de transferência", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, tr("Copiado para a área de transferência"), Toast.LENGTH_SHORT).show()
                 }
             },
             onShowKeyboardPicker = { showInputMethodPicker() },
@@ -324,9 +325,9 @@ class OverlayService : Service() {
             onRecordingTime = { acc, seg -> KeyFlowController.updateRecordingTime(acc, seg) },
             onError = { message, target ->
                 KeyFlowController.errorNavTarget = target
-                // Erro clicável (Voz ou Modo) + permissão de sobreposição → banner clicável. Senão toast.
+                // Erro clicável (Transcrição ou Sobrepor) + permissão de sobreposição → banner clicável. Senão toast.
                 if (target != ErrorNavTarget.NONE && OverlayPermission.canDrawOverlays(this)) {
-                    showErrorBanner(message, onTap = if (target == ErrorNavTarget.VOZ) ::openVoz else ::openModoMic)
+                    showErrorBanner(message, onTap = if (target == ErrorNavTarget.VOZ) ::openVoz else ::openOverlayMic)
                 } else {
                     Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
                 }
@@ -354,7 +355,15 @@ class OverlayService : Service() {
                 val prevSide = cachedSettings.overlaySide
                 val prevTapBurst = cachedSettings.tapBurstWindowMs
                 val prevThemeDark = cachedSettings.themeDark
+                val prevLanguage = cachedSettings.appLanguage
+                val prevOrbSkin = cachedSettings.orbSkin
                 cachedSettings = it
+                // Idioma ao vivo: a notificação é texto — re-posta no idioma novo (o App já trocou o AppLocale).
+                if (it.appLanguage != prevLanguage && isForeground && ::coordinator.isInitialized) {
+                    postNotification(coordinator.currentState())
+                }
+                // Skin da orbe ao vivo (aba Sobrepor → Skins).
+                if (it.orbSkin != prevOrbSkin) floatingButton?.setOrbStyle(com.keyflow.ui.orb.orbStyleFor(it.orbSkin))
                 // Tema ao vivo (raro, disparado pelo usuário → barato): re-posta a notificação e recolore os
                 // banners de overlay visíveis, espelhando o que o toast in-app (Compose) já faz sozinho.
                 if (it.themeDark != prevThemeDark) {
@@ -400,11 +409,12 @@ class OverlayService : Service() {
             side = { cachedSettings.overlaySide },
             onIntent = { intent -> coordinator.onIntent(intent) },
             orbSizePx = cachedSettings.orbSizePx,
+            orbStyle = com.keyflow.ui.orb.orbStyleFor(cachedSettings.orbSkin),
             tapBurstWindowMs = cachedSettings.tapBurstWindowMs.toLong(),
             onPositionChanged = { position ->
                 serviceScope.launch { settingsRepository.saveOverlayPosition(position) }
             },
-            onErrorTap = { if (KeyFlowController.errorNavTarget == ErrorNavTarget.MODO_MIC) openModoMic() else openVoz() },
+            onErrorTap = { if (KeyFlowController.errorNavTarget == ErrorNavTarget.MIC) openOverlayMic() else openVoz() },
             onShortcut = ::handleOrbShortcut,
             vibrationIntensity = { cachedSettings.vibrationIntensity },
             onDragArrows = ::updateDragArrows,
@@ -527,15 +537,15 @@ class OverlayService : Service() {
         )
     }
 
-    /** Abre o app direto na aba Modo (clique no X/banner de "falta permissão de microfone"). */
-    private fun openModoMic() {
+    /** Abre o app na aba Sobrepor, no cartão do modo (clique no X/banner de "falta permissão de microfone"). */
+    private fun openOverlayMic() {
         startActivity(
-            com.keyflow.ui.SetupActivity.openAtModoMicIntent(this)
+            com.keyflow.ui.SetupActivity.openAtMicIntent(this, com.keyflow.ui.config.ConfigTab.OVERLAY)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
     }
 
-    /** Banner sobreposto, clicável, para erros com destino de navegação (Voz ou Modo). Some em 2 s. */
+    /** Banner sobreposto, clicável, para erros com destino de navegação (Transcrição ou Sobrepor). Some em 2 s. */
     private fun showErrorBanner(message: String, onTap: () -> Unit) {
         removeErrorBanner()
         val banner = bannerView("⚠  $message", com.keyflow.ui.theme.OrbAccentArgb, 2000L) {
@@ -566,10 +576,10 @@ class OverlayService : Service() {
     private fun showCancelBanner() {
         removeCancelBanner()
         val banner = twoActionBannerView(
-            text = "Transcrição cancelada",
-            leftLabel = "Desfazer",
+            text = tr("Transcrição cancelada"),
+            leftLabel = tr("Desfazer"),
             leftAction = { if (::coordinator.isInitialized) coordinator.onUndoCancel() },
-            rightLabel = "Concluir",
+            rightLabel = tr("Concluir"),
             rightAction = { if (::coordinator.isInitialized) coordinator.onCommitCancel() },
             durationMs = cancelWindowMs,
         )
@@ -670,10 +680,10 @@ class OverlayService : Service() {
     private fun showLimitBanner() {
         removeLimitBanner()
         val banner = twoActionBannerView(
-            text = "Limite de gravação atingido",
-            leftLabel = "Descartar",
+            text = tr("Limite de gravação atingido"),
+            leftLabel = tr("Descartar"),
             leftAction = { if (::coordinator.isInitialized) coordinator.onLimitDiscard() },
-            rightLabel = "Enviar",
+            rightLabel = tr("Enviar"),
             rightAction = { if (::coordinator.isInitialized) coordinator.onLimitSend() },
             durationMs = limitBannerDismissMs,
         )

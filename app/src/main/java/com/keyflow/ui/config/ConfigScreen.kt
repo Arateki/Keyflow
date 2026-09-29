@@ -1,5 +1,6 @@
 package com.keyflow.ui.config
 
+import com.keyflow.i18n.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -10,13 +11,18 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -27,14 +33,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import com.keyflow.i18n.AppLanguage
+import com.keyflow.i18n.AppLocale
 import com.keyflow.overlay.Haptics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.keyflow.core.OrbShortcutAction
@@ -46,15 +52,24 @@ import com.keyflow.ui.common.SaveController
 import com.keyflow.ui.common.SaveToast
 import com.keyflow.ui.orb.OrbState
 import com.keyflow.ui.orb.VoiceOrb
+import com.keyflow.ui.icons.KfIcon
+import com.keyflow.ui.icons.KfIcons
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
-import com.keyflow.ui.theme.SpaceMono
 
 /** testTag do painel renderizado para a aba [tab] (usado nos testes de navegação). */
 fun panelTag(tab: ConfigTab): String = "panel-${tab.name.lowercase()}"
 
 const val LANG_TOGGLE_TAG = "lang-toggle"
+
+/** Opção do menu de idioma do cabeçalho. */
+fun languageOptionTag(language: AppLanguage) = "lang-option-${language.code}"
 const val THEME_TOGGLE_TAG = "theme-toggle"
+const val HEADER_TAB_TITLE_TAG = "header-tab-title"
+const val HEADER_TAB_HELP_TAG = "header-tab-help"
+const val TAB_HELP_TAG = "tab-help"
+const val TAB_HELP_CLOSE_TAG = "tab-help-close"
+const val TAB_HELP_DOCS_TAG = "tab-help-docs"
 const val TOGGLE_OVERLAY_MODE_TAG = "toggle-overlay-mode"
 const val TOGGLE_KEYBOARD_MODE_TAG = "toggle-keyboard-mode"
 
@@ -65,10 +80,11 @@ internal const val AUTO_PERMISSION_DELAY_MS = 400L
 
 /**
  * Scaffold da configuração em abas (CFG-01..05): header (orbe, idioma inerte,
- * tema) + [TabBar] com gating + painel da aba ativa + [SaveToast]. A aba ativa é estado interno;
- * se o modo que libera a aba ativa for desligado, volta para [ConfigTab.MODO] (CFG-02).
+ * tema) + [NavRail] lateral + painel da aba ativa + [SaveToast]. A aba ativa é estado interno.
  *
- * Aba Modo: [ModoPanel] (T11). Demais abas: placeholders até T12–T16.
+ * Teclado e Sobrepor abrem com o cartão do próprio modo no topo ([KeyboardModeCard]/[OverlayModeCard] —
+ * a aba Modo saiu, Yan, 2026-09-28); sem o modo pronto, o resto da aba fica só para leitura
+ * ([LockedSection]) e o toque explica por quê.
  */
 @Composable
 fun ConfigScreen(
@@ -78,7 +94,8 @@ fun ConfigScreen(
     onOverlayModeChange: (Boolean) -> Unit,
     onKeyboardModeChange: (Boolean) -> Unit,
     onThemeChange: (Boolean) -> Unit,
-    onLanguageClick: () -> Unit,
+    // Idioma da interface escolhido no cabeçalho (PT/EN/ES). Vale na hora: ver AppLocale.
+    onAppLanguageChange: (AppLanguage) -> Unit = {},
     onRequestOverlayPermission: () -> Unit,
     onRequestKeyboardPermission: () -> Unit,
     onRequestMicPermission: () -> Unit,
@@ -90,8 +107,10 @@ fun ConfigScreen(
     shortcutGrids: List<ShortcutGrid> = emptyList(),
     onShortcutGridsChange: (List<ShortcutGrid>) -> Unit = {},
     modifier: Modifier = Modifier,
-    initialTab: ConfigTab = ConfigTab.MODO,
+    initialTab: ConfigTab = ConfigTab.VOZ,
     initialUnlockOpen: Boolean = false,
+    initialTabHelpOpen: Boolean = false,
+    initialRailExpanded: Boolean = false,
     requestedTab: ConfigTab? = null,
     requestedTabKey: Int = 0,
     localModels: LocalModelsUi = LocalModelsUi.EMPTY,
@@ -100,17 +119,18 @@ fun ConfigScreen(
     val palette = LocalKeyFlowPalette.current
     var activeTab by rememberSaveable { mutableStateOf(initialTab) }
     var unlockOpen by rememberSaveable { mutableStateOf(initialUnlockOpen) }
+    // Barra lateral: recolhida (só ícones) é a posição normal; a setinha abre com os nomes.
+    var railExpanded by rememberSaveable { mutableStateOf(initialRailExpanded) }
+    // "?" do cabeçalho: a seção da Docs da aba aberta num modal; "Ver na Docs" rola até ela na aba Docs.
+    var tabHelpOpen by rememberSaveable { mutableStateOf(initialTabHelpOpen) }
+    var docsFocusSection by remember { mutableStateOf<String?>(null) }
+    var docsFocusKey by remember { mutableStateOf(0) }
     // Atalho da orbe com o bottom sheet aberto (2 ou 3 toques); null = fechado.
     var shortcutSheetTaps by remember { mutableStateOf<Int?>(null) }
 
-    // Navegação externa (clique no erro → Voz). A chave dispara mesmo repetindo a mesma aba.
-    LaunchedEffect(requestedTabKey) {
-        if (requestedTabKey > 0) requestedTab?.let { activeTab = it }
-    }
-
     // A aba de um modo só fica "liberada" com o modo ligado E tudo pronto: permissões concedidas (mic +
-    // a específica) e, para o Teclado, o KeyFlow sendo o teclado ativo. Sem isso a aba abre, mas em
-    // modo somente-leitura (camada por cima) — ver o scrim mais abaixo.
+    // a específica) e, para o Teclado, o KeyFlow sendo o teclado ativo. Sem isso o cartão do modo segue
+    // tocável no topo e o resto da aba fica só para leitura (LockedSection).
     val enabled: (ConfigTab) -> Boolean = { tab ->
         when (tab) {
             // O Modo Teclado espelha o teclado ativo (keyboardActive), então gateamos por ele direto.
@@ -121,7 +141,6 @@ fun ConfigScreen(
             else -> true
         }
     }
-    val activeEnabled = enabled(activeTab)
 
     // Toast discreto em Compose com duração configurável (aba travada = 1,5 s; aviso de modo = 2 s).
     var toastMessage by remember { mutableStateOf<String?>(null) }
@@ -129,7 +148,8 @@ fun ConfigScreen(
     var toastGeneration by remember { mutableStateOf(0) }
     // Ação opcional do toast: torna a mensagem clicável e leva à opção que resolve o aviso.
     var toastAction by remember { mutableStateOf<(() -> Unit)?>(null) }
-    // Pulso de destaque discreto nos cards da aba Modo (insight visual ao navegar do aviso).
+    // Pulso de destaque discreto no cartão do modo (insight visual ao chegar de um aviso); a aba também
+    // sobe até ele.
     var overlayHighlightKey by remember { mutableStateOf(0) }
     var keyboardHighlightKey by remember { mutableStateOf(0) }
     // Realce do seletor de Modo de gravação (aviso do atalho de 1 toque → leva à subárea responsável).
@@ -164,31 +184,38 @@ fun ConfigScreen(
         pendingPermissionGeneration++
     }
 
-    // Navegação do aviso → aba Modo, destacando o card do modo que resolve o bloqueio. Null = sem atalho.
+    // Navegação do aviso → aba da interface, no topo, destacando o cartão do modo que resolve o bloqueio.
+    // Null = sem atalho.
     fun navActionFor(tab: ConfigTab): (() -> Unit)? = when (tab) {
         ConfigTab.OVERLAY -> {
-            { activeTab = ConfigTab.MODO; overlayHighlightKey++ }
+            { activeTab = ConfigTab.OVERLAY; overlayHighlightKey++ }
         }
         ConfigTab.TECLADO -> {
-            { activeTab = ConfigTab.MODO; keyboardHighlightKey++ }
+            { activeTab = ConfigTab.TECLADO; keyboardHighlightKey++ }
         }
         else -> null
     }
 
-    // Aviso de opção que depende do Modo Sobrepor: clicar leva à aba Modo e destaca o card do modo.
+    // Navegação externa (clique no erro → Transcrição, ou falta de microfone → aba da interface que avisou,
+    // já no cartão do modo). A chave dispara mesmo repetindo a mesma aba.
+    LaunchedEffect(requestedTabKey) {
+        if (requestedTabKey > 0) requestedTab?.let { tab -> navActionFor(tab)?.invoke() ?: run { activeTab = tab } }
+    }
+
+    // Aviso de opção que depende do Modo Sobrepor: clicar leva à aba Sobrepor e destaca o cartão do modo.
     val onOverlayRequired: () -> Unit = {
-        showToast("Disponível só com o Modo Sobrepor ligado.", 2500, action = navActionFor(ConfigTab.OVERLAY))
+        showToast(tr("Disponível só com o Modo Sobrepor ligado."), 2500, action = navActionFor(ConfigTab.OVERLAY))
     }
     fun blockReason(tab: ConfigTab): String? = when (tab) {
         ConfigTab.TECLADO -> when {
             !permissions.microphoneGranted || !permissions.keyboardEnabled ->
-                "Conceda as permissões do Modo Teclado para editar esta aba."
-            !permissions.keyboardActive -> "Ative o KeyFlow como teclado (ligue o Modo Teclado) para editar esta aba."
+                tr("Conceda as permissões do Modo Teclado, no topo, para editar o resto da aba.")
+            !permissions.keyboardActive -> tr("Ative o KeyFlow como teclado (ligue o Modo Teclado, no topo) para editar o resto da aba.")
             else -> null
         }
         ConfigTab.OVERLAY -> when {
-            !settings.overlayModeEnabled -> "Ligue o Modo Sobrepor para editar esta aba."
-            else -> "Conceda as permissões do Modo Sobrepor para editar esta aba."
+            !settings.overlayModeEnabled -> tr("Ligue o Modo Sobrepor, no topo, para editar o resto da aba.")
+            else -> tr("Conceda as permissões do Modo Sobrepor, no topo, para editar o resto da aba.")
         }
         else -> null
     }
@@ -200,7 +227,7 @@ fun ConfigScreen(
     val handleOverlayMode: (Boolean) -> Unit = { on ->
         onOverlayModeChange(on)
         if (on && (!permissions.overlayGranted || !permissions.notificationsGranted)) {
-            showToast("Permissões pendentes — conceda para usar o Modo Sobrepor.", 2000)
+            showToast(tr("Permissões pendentes — conceda para usar o Modo Sobrepor."), 2000)
             requestPendingPermissionSoon {
                 if (!permissions.overlayGranted) onRequestOverlayPermission() else onRequestNotificationPermission()
             }
@@ -209,7 +236,7 @@ fun ConfigScreen(
     val handleKeyboardMode: (Boolean) -> Unit = { on ->
         onKeyboardModeChange(on)
         if (on && !permissions.keyboardEnabled) {
-            showToast("Permissões pendentes — conceda para usar o Modo Teclado.", 2000)
+            showToast(tr("Permissões pendentes — conceda para usar o Modo Teclado."), 2000)
             requestPendingPermissionSoon { onRequestKeyboardPermission() }
         }
     }
@@ -219,43 +246,38 @@ fun ConfigScreen(
         // sistema (status no topo, navegação embaixo) para não ser cortado/ocultado.
         Column(Modifier.fillMaxSize().systemBarsPadding()) {
             Header(
+                tabTitle = activeTab.label,
+                onTabHelp = if (docsSectionFor(activeTab) != null) ({ tabHelpOpen = true }) else null,
                 dark = palette.isDark,
-                onLanguageClick = onLanguageClick,
+                language = AppLocale.current,
+                onLanguageChange = onAppLanguageChange,
                 onThemeClick = { onThemeChange(!settings.themeDark) },
             )
-            TabBar(
-                active = activeTab,
-                enabled = enabled,
-                onSelect = { tab ->
-                    activeTab = tab
-                    if (!enabled(tab)) blockReason(tab)?.let { showToast(it, 2500, navActionFor(tab)) }
-                },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-            )
             Box(Modifier.fillMaxSize()) {
+            // A barra lateral recolhida ocupa uma faixa fixa à esquerda; aberta, desenha por cima do
+            // painel (mais abaixo, fora desta Row) sem mudar a largura dele.
+            Row(Modifier.fillMaxSize()) {
+            Box(Modifier.width(NAV_RAIL_COLLAPSED_WIDTH).fillMaxHeight()) {
+                // Fio vertical separando a navegação do conteúdo.
+                Box(Modifier.align(Alignment.CenterEnd).width(1.dp).fillMaxHeight().background(palette.line2))
+            }
+            Box(Modifier.weight(1f).fillMaxHeight()) {
+                // As prévias das abas (tour da orbe nos cartões) seguem a skin da orbe escolhida na aba
+                // Sobrepor, como a orbe de verdade; o orbe do cabeçalho é a marca do app e fica como está.
+                androidx.compose.runtime.CompositionLocalProvider(
+                    com.keyflow.ui.orb.LocalOrbStyle provides com.keyflow.ui.orb.orbStyleFor(settings.orbSkin),
+                ) {
                 Column(
                     Modifier
                         .fillMaxSize()
-                        // Aba travada: conteúdo esmaecido (somente-leitura), sob a camada incolor abaixo.
-                        .then(if (activeEnabled) Modifier else Modifier.alpha(0.45f))
-                        // Mesma largura que as abas ocupam (16dp), ganhando espaço horizontal no corpo.
-                        .padding(horizontal = 16.dp)
+                        .padding(start = 16.dp, end = 16.dp)
                         .testTag(panelTag(activeTab)),
                 ) {
+                    // Toque no que está travado: explica e leva ao cartão do modo, no topo da mesma aba.
+                    fun lockedTap(tab: ConfigTab): () -> Unit = {
+                        blockReason(tab)?.let { showToast(it, 2500, navActionFor(tab)) }
+                    }
                     when (activeTab) {
-                        ConfigTab.MODO -> ModoPanel(
-                            settings = settings,
-                            permissions = permissions,
-                            onOverlayModeChange = handleOverlayMode,
-                            onKeyboardModeChange = handleKeyboardMode,
-                            onRequestOverlayPermission = onRequestOverlayPermission,
-                            onRequestKeyboardPermission = onRequestKeyboardPermission,
-                            onRequestMicPermission = onRequestMicPermission,
-                            onRequestNotificationPermission = onRequestNotificationPermission,
-                            onSwitchKeyboard = onSwitchKeyboard,
-                            overlayHighlightKey = overlayHighlightKey,
-                            keyboardHighlightKey = keyboardHighlightKey,
-                        )
                         ConfigTab.VOZ -> VozPanel(
                             settings = settings,
                             onSettingsChange = onSettingsChange,
@@ -265,13 +287,26 @@ fun ConfigScreen(
                         ConfigTab.TECLADO -> TecladoPanel(
                             settings = settings,
                             onSettingsChange = onSettingsChange,
-                            onLanguageClick = onLanguageClick,
                             onUnlockSkins = { unlockOpen = true },
                             onOverlayRequired = onOverlayRequired,
                             barsConfig = barsConfig,
                             onBarsConfigChange = onBarsConfigChange,
                             shortcutGrids = shortcutGrids,
                             onShortcutGridsChange = onShortcutGridsChange,
+                            modeCard = {
+                                KeyboardModeCard(
+                                    settings = settings,
+                                    permissions = permissions,
+                                    onKeyboardModeChange = handleKeyboardMode,
+                                    onRequestKeyboardPermission = onRequestKeyboardPermission,
+                                    onRequestMicPermission = onRequestMicPermission,
+                                    onSwitchKeyboard = onSwitchKeyboard,
+                                    highlightKey = keyboardHighlightKey,
+                                )
+                            },
+                            locked = !enabled(ConfigTab.TECLADO),
+                            onLockedTap = lockedTap(ConfigTab.TECLADO),
+                            modeCardFocusKey = keyboardHighlightKey,
                         )
                         ConfigTab.OVERLAY -> OverlayPanel(
                             settings = settings,
@@ -280,37 +315,67 @@ fun ConfigScreen(
                             onOpenShortcutSheet = { shortcutSheetTaps = it },
                             onShortcut1Blocked = {
                                 showToast(
-                                    "O atalho de 1 toque vale apenas no modo Push-to-talk.",
+                                    tr("O atalho de 1 toque vale apenas no modo Push-to-talk."),
                                     2500,
                                     action = { recordingModeHighlightKey++ },
                                 )
                             },
                             recordingModeHighlightKey = recordingModeHighlightKey,
                             keyboardShortcutAvailable = permissions.keyboardActive,
+                            modeCard = {
+                                OverlayModeCard(
+                                    settings = settings,
+                                    permissions = permissions,
+                                    onOverlayModeChange = handleOverlayMode,
+                                    onRequestOverlayPermission = onRequestOverlayPermission,
+                                    onRequestMicPermission = onRequestMicPermission,
+                                    onRequestNotificationPermission = onRequestNotificationPermission,
+                                    highlightKey = overlayHighlightKey,
+                                )
+                            },
+                            locked = !enabled(ConfigTab.OVERLAY),
+                            onLockedTap = lockedTap(ConfigTab.OVERLAY),
+                            modeCardFocusKey = overlayHighlightKey,
                         )
-                        ConfigTab.DOCS -> DocsPanel()
+                        // Ainda sem conteúdo: o painel fica vazio (o título da aba já aparece no cabeçalho).
+                        ConfigTab.NOTIFICACAO, ConfigTab.VISAO, ConfigTab.RACIOCINIO, ConfigTab.FALA -> Unit
+                        ConfigTab.DOCS -> DocsPanel(focusSectionId = docsFocusSection, focusKey = docsFocusKey)
                     }
                 }
-                if (!activeEnabled) {
-                    // Camada incolor sobre a aba travada: intercepta os toques (somente-leitura) e
-                    // reexibe o motivo no toast a cada toque.
-                    Box(
-                        Modifier
-                            .matchParentSize()
-                            .testTag(READONLY_SCRIM_TAG)
-                            .pointerInput(activeTab) {
-                                awaitPointerEventScope {
-                                    while (true) {
-                                        val event = awaitPointerEvent()
-                                        if (event.type == PointerEventType.Press) {
-                                            blockReason(activeTab)?.let { showToast(it, 2500, navActionFor(activeTab)) }
-                                        }
-                                        event.changes.forEach { it.consume() }
-                                    }
-                                }
-                            },
-                    )
                 }
+            }
+            }
+            if (railExpanded) NavRailScrim(onDismiss = { railExpanded = false }, modifier = Modifier.matchParentSize())
+            NavRail(
+                active = activeTab,
+                // Nenhuma aba fica esmaecida no menu: a de uma interface desligada é justamente onde ligá-la.
+                enabled = { true },
+                onSelect = { tab -> activeTab = tab },
+                expanded = railExpanded,
+                onExpandedChange = { railExpanded = it },
+            )
+            }
+        }
+        val helpSection = docsSectionFor(activeTab)
+        if (tabHelpOpen && helpSection != null) {
+            ConfigModal(
+                title = helpSection.title,
+                onDismiss = { tabHelpOpen = false },
+                closeTag = TAB_HELP_CLOSE_TAG,
+                cardTag = TAB_HELP_TAG,
+            ) {
+                DocBlocks(helpSection.blocks)
+                SecondaryButton(
+                    tr("Ver na Docs"),
+                    tag = TAB_HELP_DOCS_TAG,
+                    onClick = {
+                        tabHelpOpen = false
+                        activeTab = ConfigTab.DOCS
+                        docsFocusSection = helpSection.id
+                        docsFocusKey++
+                    },
+                    modifier = Modifier.padding(top = 18.dp),
+                )
             }
         }
         SaveToast(saveController, Modifier.fillMaxSize().systemBarsPadding())
@@ -341,7 +406,7 @@ fun ConfigScreen(
                 }
             },
             onBlockedKeyboard = {
-                showToast("Ative o Modo Teclado para usar este atalho.", 2500, navActionFor(ConfigTab.TECLADO))
+                showToast(tr("Ative o Modo Teclado para usar este atalho."), 2500, navActionFor(ConfigTab.TECLADO))
             },
             onDismiss = { shortcutSheetTaps = null },
         )
@@ -368,8 +433,8 @@ private fun MessageToast(
         if (message != null) {
             Column(
                 modifier = Modifier
-                    .padding(bottom = 22.dp, start = 22.dp, end = 22.dp)
-                    .clip(RoundedCornerShape(6.dp))
+                    .padding(bottom = 24.dp, start = 20.dp, end = 20.dp)
+                    .clip(RoundedCornerShape(14.dp))
                     .background(palette.fg)
                     .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
                     .testTag(MESSAGE_TOAST_TAG),
@@ -378,10 +443,11 @@ private fun MessageToast(
                 Text(
                     text = message,
                     color = palette.onFill,
-                    fontFamily = SpaceMono,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 10.5.sp,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+                    fontFamily = SpaceGrotesk,
+                    fontWeight = FontWeight.Normal,
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp,
+                    modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 13.dp, bottom = 4.dp),
                 )
                 // Barrinha de progresso discreta colada no contorno inferior: conta o tempo até sumir.
                 val progress = remember(generation) { Animatable(1f) }
@@ -391,7 +457,7 @@ private fun MessageToast(
                 }
                 Box(
                     Modifier
-                        .padding(horizontal = 6.dp, vertical = 4.dp)
+                        .padding(start = 18.dp, end = 18.dp, top = 6.dp, bottom = 10.dp)
                         .fillMaxWidth()
                         .height(2.dp),
                 ) {
@@ -400,7 +466,7 @@ private fun MessageToast(
                             .fillMaxWidth(progress.value)
                             .height(2.dp)
                             .clip(RoundedCornerShape(1.dp))
-                            .background(palette.onFill.copy(alpha = 0.45f)),
+                            .background(palette.onFill.copy(alpha = 0.35f)),
                     )
                 }
             }
@@ -408,65 +474,133 @@ private fun MessageToast(
     }
 }
 
+/**
+ * Cabeçalho fixo: orbe + "KeyFlow" e a cápsula idioma/tema; na linha de baixo, centralizado e menor, o
+ * nome da aba aberta (pedido do Yan, 2026-09-28 — com o menu recolhido só em ícones, era o único jeito de
+ * saber onde se está sem abrir o menu). Fica fora da rolagem, como o resto do cabeçalho.
+ */
 @Composable
 private fun Header(
+    tabTitle: String,
+    onTabHelp: (() -> Unit)?,
     dark: Boolean,
-    onLanguageClick: () -> Unit,
+    language: AppLanguage,
+    onLanguageChange: (AppLanguage) -> Unit,
     onThemeClick: () -> Unit,
 ) {
     val palette = LocalKeyFlowPalette.current
+    // Compacto de propósito: a linha do nome da aba custaria ~25dp no A32 (a fonte do app e a do sistema
+    // também a aumentam) — as folgas da linha de cima devolvem parte disso.
+    Column(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 6.dp),
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(11.dp),
     ) {
-        VoiceOrb(state = OrbState.Idle, modifier = Modifier.size(30.dp))
+        VoiceOrb(state = OrbState.Idle, modifier = Modifier.size(28.dp))
         Text(
             text = "KeyFlow",
             color = palette.fg,
             fontFamily = SpaceGrotesk,
-            fontWeight = FontWeight.SemiBold,
+            fontWeight = FontWeight.Medium,
             fontSize = 19.sp,
-            modifier = Modifier.weight(1f),
+            letterSpacing = (-0.3).sp,
+            modifier = Modifier.padding(start = 9.dp).weight(1f),
         )
-        // Idioma — inerte nesta fase (toca → "em breve"); I18N-02.
+        // Idioma e tema numa só cápsula de linha fina, separados por um fio — menos caixas no topo.
+        val capsule = RoundedCornerShape(50)
         Row(
             Modifier
-                .height(30.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .border(1.dp, palette.line, RoundedCornerShape(6.dp))
-                .clickable { onLanguageClick() }
-                .testTag(LANG_TOGGLE_TAG)
-                .padding(horizontal = 8.dp),
+                .height(34.dp)
+                .clip(capsule)
+                .border(1.dp, palette.line, capsule),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
         ) {
-            StrokeIcon(GLOBE_PATHS, palette.fg2, Modifier.size(13.dp))
-            Text("PT", color = palette.fg2, fontFamily = SpaceMono, fontSize = 10.sp)
+            // Idioma da interface: o toque abre os três (cada um no próprio idioma) e a troca vale na hora.
+            var languageMenu by remember { mutableStateOf(false) }
+            Box {
+                Row(
+                    Modifier
+                        .fillMaxHeight()
+                        .clickable { languageMenu = true }
+                        .testTag(LANG_TOGGLE_TAG)
+                        .padding(start = 12.dp, end = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    KfIcon(KfIcons.Globe, palette.fg2, Modifier.size(15.dp))
+                    Text(
+                        language.short,
+                        color = palette.fg2,
+                        fontFamily = SpaceGrotesk,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 9.5.sp,
+                        letterSpacing = 1.sp,
+                    )
+                }
+                DropdownMenu(
+                    expanded = languageMenu,
+                    onDismissRequest = { languageMenu = false },
+                    containerColor = palette.card,
+                ) {
+                    AppLanguage.entries.forEach { option ->
+                        val isActive = option == language
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    option.nativeName,
+                                    color = if (isActive) palette.fg else palette.muted,
+                                    fontFamily = SpaceGrotesk,
+                                    fontWeight = if (isActive) FontWeight.Medium else FontWeight.Normal,
+                                    fontSize = 13.sp,
+                                )
+                            },
+                            onClick = {
+                                languageMenu = false
+                                if (!isActive) onLanguageChange(option)
+                            },
+                            modifier = Modifier.testTag(languageOptionTag(option)),
+                        )
+                    }
+                }
+            }
+            Box(Modifier.width(1.dp).height(16.dp).background(palette.line))
+            // Tema sol/lua — persiste themeDark (FND-04).
+            Box(
+                Modifier
+                    .fillMaxHeight()
+                    .clickable { onThemeClick() }
+                    .testTag(THEME_TOGGLE_TAG)
+                    .padding(start = 10.dp, end = 12.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                KfIcon(if (dark) KfIcons.Sun else KfIcons.Moon, palette.fg2, Modifier.size(15.dp))
+            }
         }
-        // Tema sol/lua — persiste themeDark (FND-04). Mesma altura do botão de idioma.
-        Box(
-            Modifier
-                .size(width = 32.dp, height = 30.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .border(1.dp, palette.line, RoundedCornerShape(6.dp))
-                .clickable { onThemeClick() }
-                .testTag(THEME_TOGGLE_TAG),
-            contentAlignment = Alignment.Center,
-        ) {
-            StrokeIcon(if (dark) SUN_PATHS else MOON_PATHS, palette.fg2, Modifier.size(14.dp))
+    }
+    // Nome da aba centralizado; o "?" logo à direita abre a seção da Docs dela (Yan, 2026-09-28).
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // Contrapeso do "?" à esquerda: sem ele, o nome sairia do centro.
+            if (onTabHelp != null) Spacer(Modifier.width(HEADER_HELP_SIZE))
+            Text(
+                text = tabTitle,
+                color = palette.fg2,
+                fontFamily = SpaceGrotesk,
+                fontWeight = FontWeight.Medium,
+                fontSize = 11.5.sp,
+                lineHeight = 13.sp,
+                letterSpacing = 0.2.sp,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                modifier = Modifier.testTag(HEADER_TAB_TITLE_TAG),
+            )
+            if (onTabHelp != null) {
+                HelpButton(tr("Sobre a aba %s", tabTitle), HEADER_TAB_HELP_TAG, onTabHelp, Modifier.size(HEADER_HELP_SIZE))
+            }
         }
+    }
     }
 }
 
-private val GLOBE_PATHS = listOf(
-    "M12 12 m-9 0 a9 9 0 1 0 18 0 a9 9 0 1 0 -18 0",
-    "M3 12h18",
-    "M12 3c3 4 3 14 0 18",
-    "M12 3c-3 4-3 14 0 18",
-)
-private val SUN_PATHS = listOf(
-    "M12 12 m-4 0 a4 4 0 1 0 8 0 a4 4 0 1 0 -8 0",
-    "M12 2v2M12 20v2M4 12H2M22 12h-2M5.6 5.6 4.2 4.2M19.8 19.8l-1.4-1.4M18.4 5.6l1.4-1.4M4.2 19.8l1.4-1.4",
-)
-private val MOON_PATHS = listOf("M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z")
+/** Alvo do "?" ao lado do nome da aba — menor que os 28dp de sempre, para a linha não crescer muito. */
+private val HEADER_HELP_SIZE = 24.dp

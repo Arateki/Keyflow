@@ -3,7 +3,12 @@ package com.keyflow.ui.gallery
 import androidx.compose.foundation.background
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -36,7 +41,10 @@ import com.keyflow.core.shortcuts.GridCell
 import com.keyflow.core.shortcuts.GridTriggerMode
 import com.keyflow.core.shortcuts.PhysicalKeyMap
 import com.keyflow.core.shortcuts.ShortcutGrid
+import com.keyflow.ime.GlitchTimeline
+import com.keyflow.ime.ShimmerTimeline
 import com.keyflow.ime.KeyFlowKeyboardView
+import com.keyflow.ime.KeyboardSkin
 import com.keyflow.overlay.RecordingNotification
 import com.keyflow.ui.PermissionStatus
 import com.keyflow.ui.common.SaveController
@@ -45,12 +53,16 @@ import com.keyflow.ui.config.ConfigScreen
 import com.keyflow.ui.config.ConfigTab
 import com.keyflow.ui.config.GridsEditor
 import com.keyflow.ui.config.PhysicalKeyPicker
+import com.keyflow.ui.config.SettingsGroup
+import com.keyflow.ui.config.SkinsSection
 import com.keyflow.ui.onboarding.OnboardingPermission
 import com.keyflow.ui.onboarding.OnboardingScreen
 import com.keyflow.ui.orb.OrbCenter
 import com.keyflow.ui.orb.OrbDragHint
 import com.keyflow.ui.orb.OrbDragKind
 import com.keyflow.ui.orb.OrbState
+import com.keyflow.ui.orb.OrbStyle
+import com.keyflow.ui.orb.glitchBurstMidMs
 import com.keyflow.ui.orb.VoiceOrb
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.config.LocalModelsUi
@@ -103,12 +115,36 @@ object RouteCatalog {
         orbRoute("overlay-idle", OrbState.Idle, OrbCenter.None),
         orbRoute("overlay-recording", OrbState.Listening, OrbCenter.Time(12)),
         orbRoute("overlay-paused", OrbState.Paused, OrbCenter.PauseGlyph(12)),
+        // Protótipo Aero: a orbe de vidro, parada e gravando.
+        orbRoute("overlay-aero-idle", OrbState.Idle, OrbCenter.None, OrbStyle.AERO),
+        orbRoute("overlay-aero-recording", OrbState.Listening, OrbCenter.Time(12), OrbStyle.AERO),
+        // Glitch (2026-09-29): a orbe preta com franjas ciano e vermelha, congelada no pico de uma rajada de falha.
+        orbRoute("overlay-glitch-idle", OrbState.Idle, OrbCenter.None, OrbStyle.GLITCH),
+        // O mesmo repouso entre rajadas (t = 200 ms): só as franjas de sempre, sem faixas deslocadas.
+        orbRoute("overlay-glitch-idle-calm", OrbState.Idle, OrbCenter.None, OrbStyle.GLITCH, timeMs = 200f),
+        orbRoute("overlay-glitch-recording", OrbState.Listening, OrbCenter.Time(12), OrbStyle.GLITCH),
+        orbRoute("overlay-glitch-transcribing", OrbState.Transcribing, OrbCenter.None, OrbStyle.GLITCH),
+        // Rose Gold (2026-09-29): a esfera de metal rosé, parada e gravando.
+        orbRoute("overlay-rosegold-idle", OrbState.Idle, OrbCenter.None, OrbStyle.ROSE_GOLD),
+        orbRoute("overlay-rosegold-recording", OrbState.Listening, OrbCenter.Time(12), OrbStyle.ROSE_GOLD),
         // Teclado reskinado (T23), grade Canvas (KC-T10, padrão único desde a promoção): View hospedado
         // via AndroidView, ancorado ao rodapé.
         keyboardRoute("keyboard-canvas-expanded", expanded = true, recording = false),
         keyboardRoute("keyboard-canvas-collapsed", expanded = false, recording = false),
         keyboardCanvasSymbolsRoute("keyboard-canvas-symbols"),
         keyboardCanvasCandidatesRoute("keyboard-canvas-candidates"),
+        // Protótipo Aero (2026-09-28): paisagem própria + teclas de vidro, com sugestões na faixa.
+        keyboardCanvasCandidatesRoute("keyboard-aero-expanded", skin = KeyboardSkin.AERO),
+        keyboardRoute("keyboard-aero-collapsed", expanded = false, recording = false, skin = KeyboardSkin.AERO),
+        // Glitch (2026-09-29): faces pretas, borda em três canais, rótulos em camadas, fundo com rasgos.
+        keyboardCanvasCandidatesRoute("keyboard-glitch-expanded", skin = KeyboardSkin.GLITCH),
+        keyboardRoute("keyboard-glitch-collapsed", expanded = false, recording = false, skin = KeyboardSkin.GLITCH),
+        // O teclado Glitch congelado no pico de uma rajada de falha: faixas deslocadas, franjas e rótulos abertos.
+        keyboardCanvasCandidatesRoute("keyboard-glitch-burst", skin = KeyboardSkin.GLITCH, motionTimeMs = GlitchTimeline.peakOf(1)),
+        // Rose Gold (2026-09-29): cetim rosé com bisel metálico; e o mesmo teclado no meio do brilho que o atravessa.
+        keyboardCanvasCandidatesRoute("keyboard-rosegold-expanded", skin = KeyboardSkin.ROSE_GOLD),
+        keyboardRoute("keyboard-rosegold-collapsed", expanded = false, recording = false, skin = KeyboardSkin.ROSE_GOLD),
+        keyboardCanvasCandidatesRoute("keyboard-rosegold-shimmer", skin = KeyboardSkin.ROSE_GOLD, motionTimeMs = ShimmerTimeline.peakOf(1)),
         // Barras Canvas (SB-T10/ROL-03): paridade com a barra de fábrica + estados só alcançáveis por
         // gesto (grade revelada/alavanca), simulados via toque sintético (mesma técnica de
         // `tapLayerToggle`) já que a galeria não tem dedo de verdade.
@@ -142,6 +178,9 @@ object RouteCatalog {
             }
         },
         // Editor de grade no modal (Q8): grade grande o bastante pra exercitar o encolhimento de célula.
+        // Formulário de gatilho de grade: a explicação sob cada modo, e o prefixo só fora do "Só grade".
+        barsEditorGridFormRoute("bars-editor-grid-form", GridTriggerMode.OPEN_ONLY),
+        barsEditorGridFormRoute("bars-editor-grid-form-sequencia", GridTriggerMode.SEQUENCE),
         Route("grids-editor-modal") {
             Box(Modifier.fillMaxSize()) {
                 GridsEditor(
@@ -172,7 +211,8 @@ object RouteCatalog {
         // Notificação Ateliê (T24): RemoteViews inflada via AndroidView.
         notificationRoute("notification-recording", ButtonState.RECORDING),
         notificationRoute("notification-paused", ButtonState.PAUSED),
-        Route("config-modo") { ConfigModoRoute() },
+        // Navegação lateral aberta (ícones + nomes) — a posição normal é a recolhida, das demais rotas.
+        Route("config-menu-aberto") { ConfigMenuRoute(railExpanded = true) },
         Route("config-voz-creditos") { ConfigVozRoute(TranscriptionSource.CREDITS) },
         Route("config-voz-openai") { ConfigVozRoute(TranscriptionSource.OPENAI) },
         Route("config-voz-custom") { ConfigVozRoute(TranscriptionSource.CUSTOM) },
@@ -202,8 +242,22 @@ object RouteCatalog {
         },
         Route("config-teclado") { ConfigTabRoute(ConfigTab.TECLADO, keyboardEnabled = true) },
         Route("config-overlay") { ConfigTabRoute(ConfigTab.OVERLAY, overlayEnabled = true) },
+        // Interface desligada: o cartão do modo no topo segue tocável; o resto da aba, esmaecido.
+        Route("config-teclado-travado") { ConfigTabRoute(ConfigTab.TECLADO) },
+        Route("config-overlay-travado") { ConfigTabRoute(ConfigTab.OVERLAY) },
         Route("config-docs") { ConfigTabRoute(ConfigTab.DOCS) },
+        // A seção Skins das duas abas (fica abaixo da dobra nas telas acima): a da orbe, na Sobrepor, e a do
+        // teclado, na Teclado — escolhas separadas (Yan, 2026-09-29), aqui com o Aero marcado nas duas.
+        Route("config-overlay-skins") { SkinsRoute(orb = true) },
+        Route("config-teclado-skins") { SkinsRoute(orb = false) },
+        // As abas novas (Notificação, Visão, Raciocínio, Voz), ainda vazias: só o cabeçalho com o nome e o menu com os ícones.
+        Route("config-visao") { ConfigTabRoute(ConfigTab.VISAO) },
+        Route("config-raciocinio") { ConfigTabRoute(ConfigTab.RACIOCINIO) },
+        Route("config-fala") { ConfigTabRoute(ConfigTab.FALA) },
+        Route("config-notificacao") { ConfigTabRoute(ConfigTab.NOTIFICACAO) },
         Route("config-unlock") { ConfigTabRoute(ConfigTab.TECLADO, keyboardEnabled = true, unlockOpen = true) },
+        // "?" do cabeçalho aberto: a seção da Docs da aba, com o atalho para a Docs.
+        Route("config-ajuda-teclado") { ConfigTabRoute(ConfigTab.TECLADO, keyboardEnabled = true, tabHelpOpen = true) },
         Route("onboarding") { OnboardingRoute() },
         // PERM-04: o porquê de uma permissão aberto sob a linha (a do Teclado, que é a que FALTA no mock).
         Route("onboarding-why") { OnboardingRoute(explained = OnboardingPermission.KEYBOARD) },
@@ -215,9 +269,9 @@ object RouteCatalog {
 
     val keys: List<String> get() = routes.map { it.key }
 
-    /** Aba Modo do scaffold de configuração (T10), com modos ligados para mostrar gating liberado. */
+    /** Scaffold de configuração na aba padrão (Transcrição), com modos ligados — base do menu aberto. */
     @Composable
-    private fun ConfigModoRoute() {
+    private fun ConfigMenuRoute(railExpanded: Boolean = false) {
         ConfigScreen(
             settings = FakeSettings.settings.copy(overlayModeEnabled = true, keyboardModeEnabled = true),
             permissions = PermissionStatus(
@@ -230,13 +284,13 @@ object RouteCatalog {
             onOverlayModeChange = {},
             onKeyboardModeChange = {},
             onThemeChange = {},
-            onLanguageClick = {},
             onRequestOverlayPermission = {},
             onRequestKeyboardPermission = {},
             onRequestMicPermission = {},
             onRequestNotificationPermission = {},
             onSwitchKeyboard = {},
             onSettingsChange = {},
+            initialRailExpanded = railExpanded,
         )
     }
 
@@ -264,7 +318,6 @@ object RouteCatalog {
             onOverlayModeChange = {},
             onKeyboardModeChange = {},
             onThemeChange = {},
-            onLanguageClick = {},
             onRequestOverlayPermission = {},
             onRequestKeyboardPermission = {},
             onRequestMicPermission = {},
@@ -282,6 +335,7 @@ object RouteCatalog {
         overlayEnabled: Boolean = false,
         keyboardEnabled: Boolean = false,
         unlockOpen: Boolean = false,
+        tabHelpOpen: Boolean = false,
     ) {
         ConfigScreen(
             settings = FakeSettings.settings.copy(
@@ -292,13 +346,15 @@ object RouteCatalog {
                 microphoneGranted = true,
                 overlayGranted = true,
                 keyboardEnabled = keyboardEnabled,
+                // Sem isto a aba Teclado saía travada (somente-leitura) desde que o gating passou a exigir
+                // o KeyFlow como teclado ativo — o golden mostrava a aba esmaecida, não a tela de verdade.
+                keyboardActive = keyboardEnabled,
                 notificationsGranted = true,
             ),
             saveController = SaveController(),
             onOverlayModeChange = {},
             onKeyboardModeChange = {},
             onThemeChange = {},
-            onLanguageClick = {},
             onRequestOverlayPermission = {},
             onRequestKeyboardPermission = {},
             onRequestMicPermission = {},
@@ -307,6 +363,7 @@ object RouteCatalog {
             onSettingsChange = {},
             initialTab = tab,
             initialUnlockOpen = unlockOpen,
+            initialTabHelpOpen = tabHelpOpen,
         )
     }
 
@@ -315,6 +372,7 @@ object RouteCatalog {
         key: String,
         expanded: Boolean,
         recording: Boolean,
+        skin: KeyboardSkin = KeyboardSkin.DEFAULT,
     ): Route = Route(key) {
         val dark = LocalKeyFlowPalette.current.isDark
         Box(
@@ -323,6 +381,8 @@ object RouteCatalog {
                 .background(LocalKeyFlowPalette.current.bg),
             contentAlignment = Alignment.BottomCenter,
         ) {
+            // O vidro do Aero é translúcido de verdade: atrás dele, um "app" de mentira.
+            if (skin == KeyboardSkin.AERO) BehindKeyboardScene()
             AndroidView(
                 modifier = Modifier.fillMaxSize().wrapContentHeight(Alignment.Bottom),
                 factory = { ctx ->
@@ -332,12 +392,29 @@ object RouteCatalog {
                         onMic = {},
                         onHide = {},
                         dark = dark,
+                        skin = skin,
                         frozenSeconds = 12,
                     ).apply {
                         setExpanded(expanded)
                         if (recording) updateMicState(ButtonState.RECORDING)
                     }
                 },
+            )
+        }
+    }
+
+    private fun barsEditorGridFormRoute(key: String, mode: GridTriggerMode): Route = Route(key) {
+        val tmux = ShortcutGrid(id = "g1", name = "tmux", rows = 2, cols = 3, cells = emptyMap())
+        Box(Modifier.fillMaxSize()) {
+            BarsEditor(
+                barsConfig = BarsConfig(mirrored = true, expanded = emptyList(), collapsed = listOf(BarDef(listOf(BarButton.Mic)))),
+                onBarsConfigChange = {},
+                grids = listOf(tmux),
+                initialGridForm = BarButton.GridTrigger(
+                    gridId = tmux.id,
+                    prefix = if (mode == GridTriggerMode.OPEN_ONLY) null else PhysicalKeyMap.key(android.view.KeyEvent.KEYCODE_B, ctrl = true),
+                    mode = mode,
+                ),
             )
         }
     }
@@ -373,7 +450,11 @@ object RouteCatalog {
     }
 
     /** Golden da faixa de sugestões (KC-T10/SPL-01): candidatos fixos, sem depender do corretor real. */
-    private fun keyboardCanvasCandidatesRoute(key: String): Route = Route(key) {
+    private fun keyboardCanvasCandidatesRoute(
+        key: String,
+        skin: KeyboardSkin = KeyboardSkin.DEFAULT,
+        motionTimeMs: Float? = null,
+    ): Route = Route(key) {
         val dark = LocalKeyFlowPalette.current.isDark
         Box(
             modifier = Modifier
@@ -381,6 +462,7 @@ object RouteCatalog {
                 .background(LocalKeyFlowPalette.current.bg),
             contentAlignment = Alignment.BottomCenter,
         ) {
+            if (skin == KeyboardSkin.AERO) BehindKeyboardScene()
             AndroidView(
                 modifier = Modifier.fillMaxSize().wrapContentHeight(Alignment.Bottom),
                 factory = { ctx ->
@@ -390,7 +472,9 @@ object RouteCatalog {
                         onMic = {},
                         onHide = {},
                         dark = dark,
+                        skin = skin,
                         frozenSeconds = 12,
+                        motionTimeMs = motionTimeMs,
                     ).apply {
                         setExpanded(true)
                         updateCandidates(listOf("olá", "olar", "olé"))
@@ -625,19 +709,99 @@ object RouteCatalog {
         }
     }
 
-    private fun orbRoute(key: String, state: OrbState, center: OrbCenter): Route = Route(key) {
+    private fun orbRoute(
+        key: String,
+        state: OrbState,
+        center: OrbCenter,
+        style: OrbStyle = OrbStyle.ATELIE,
+        timeMs: Float? = null,
+    ): Route = Route(key) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(LocalKeyFlowPalette.current.bg),
             contentAlignment = Alignment.Center,
         ) {
+            // O vidro do Aero é transparente: atrás dele, um "app" de mentira (texto e uma faixa colorida)
+            // para a captura mostrar o que atravessa a orbe.
+            if (style == OrbStyle.AERO) BehindOrbScene()
             VoiceOrb(
                 state = state,
                 modifier = Modifier.size(160.dp),
                 center = center,
-                timeProvider = { GALLERY_ORB_TIME_MS },
+                // O Glitch congela no pico de uma rajada (senão 1234 ms cairia fora dela e não haveria falha).
+                timeProvider = { timeMs ?: if (style == OrbStyle.GLITCH) glitchBurstMidMs(state) else GALLERY_ORB_TIME_MS },
+                style = style,
             )
+        }
+    }
+
+    /** A seção Skins de uma aba, sozinha num cartão: [orb] = a da Sobrepor (orbe), senão a do Teclado. */
+    @Composable
+    private fun SkinsRoute(orb: Boolean) {
+        Box(Modifier.fillMaxSize().background(LocalKeyFlowPalette.current.bg).padding(16.dp)) {
+            SettingsGroup(null) {
+                if (orb) {
+                    SkinsSection(
+                        selectedOrbSkin = "aero",
+                        onOrbSkinSelected = {},
+                        onUnlock = {},
+                        unlockTag = "gallery-unlock",
+                        modifier = Modifier.padding(bottom = 16.dp),
+                    )
+                } else {
+                    SkinsSection(
+                        selectedSkin = "aero",
+                        onSkinSelected = {},
+                        onUnlock = {},
+                        unlockTag = "gallery-unlock",
+                        modifier = Modifier.padding(bottom = 16.dp),
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Fundo de mentira atrás do teclado de vidro (que é translúcido de verdade): uma paisagem de cores vivas
+     * com linhas de texto por cima — o pior caso para a leitura das letras. A galeria não desfoca (o desfoque
+     * é do compositor, numa janela à parte): é o que o A32, que não desfoca janelas, mostra.
+     */
+    @Composable
+    private fun BehindKeyboardScene() {
+        val palette = LocalKeyFlowPalette.current
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Brush.verticalGradient(listOf(Color(0xFFF2994A), Color(0xFFD63A7B), Color(0xFF3B4FBF), Color(0xFF12A594)))),
+        ) {
+            Box(Modifier.align(Alignment.BottomStart).padding(start = 20.dp, bottom = 120.dp).size(150.dp).background(Color(0x66FFFFFF), RoundedCornerShape(75.dp)))
+            Box(Modifier.align(Alignment.BottomEnd).padding(end = 10.dp, bottom = 40.dp).size(110.dp).background(Color(0x55FFE9A8), RoundedCornerShape(55.dp)))
+            Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 96.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                repeat(28) { i ->
+                    Box(Modifier.fillMaxWidth(listOf(0.9f, 0.62f, 0.8f, 0.45f, 0.95f, 0.7f)[i % 6]).height(9.dp).background(palette.fg.copy(alpha = 0.5f)))
+                }
+            }
+        }
+    }
+
+    /** Fundo de mentira atrás da orbe de vidro: linhas de texto e uma faixa de cor por baixo do centro. */
+    @Composable
+    private fun BehindOrbScene() {
+        val palette = LocalKeyFlowPalette.current
+        Box(Modifier.fillMaxSize()) {
+            Box(
+                Modifier
+                    .align(Alignment.Center)
+                    .fillMaxWidth()
+                    .height(46.dp)
+                    .background(Brush.horizontalGradient(listOf(Color(0xFFE8743B), Color(0xFFC13584), Color(0xFF3B5BDB)))),
+            )
+            Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 96.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                listOf(0.9f, 0.7f, 0.95f, 0.5f, 0.85f, 0.6f, 0.92f, 0.75f, 0.4f, 0.88f, 0.66f, 0.8f, 0.55f, 0.9f, 0.7f, 0.85f).forEach { w ->
+                    Box(Modifier.fillMaxWidth(w).height(9.dp).background(palette.fg.copy(alpha = 0.55f)))
+                }
+            }
         }
     }
 

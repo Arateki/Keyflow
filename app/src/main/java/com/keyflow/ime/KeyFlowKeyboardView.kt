@@ -1,5 +1,6 @@
 package com.keyflow.ime
 
+import com.keyflow.i18n.tr
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
@@ -88,6 +89,12 @@ class KeyFlowKeyboardView(
     // Escala visual (1f = produção). A demo da aba Modo usa < 1 para um teclado menor, proporcional.
     private val scale: Float = 1f,
     private val clock: () -> Long = { SystemClock.elapsedRealtime() },
+    // Prévia de tamanho: barras divididas na largura que houver, sem rolar (ver BarView.fitWidth).
+    private val barsFitWidth: Boolean = false,
+    // Movimento da skin (a falha do Glitch): só o teclado de verdade liga — prévias, galeria e testes não se mexem.
+    private val motionEnabled: Boolean = false,
+    // Galeria: desenha o quadro congelado neste instante do movimento, sem agendar nada.
+    private val motionTimeMs: Float? = null,
 ) : LinearLayout(context) {
 
     private var canvasGrid: KeyboardGridView? = null
@@ -186,6 +193,16 @@ class KeyFlowKeyboardView(
     private val kbModifier = colors.modifier
     private val kbInk = colors.ink
 
+    // O movimento da skin, se ela tem e se está ligado: eventos curtos, sem custo entre eles (ver [KeyboardMotion]).
+    private val motion: KeyboardMotion? = when {
+        !(motionEnabled || motionTimeMs != null) -> null
+        colors.backdrop == KeyboardBackdrop.GLITCH ->
+            GlitchMotion(this, resources.displayMetrics.density * scale, motionTimeMs, ::applyEffect)
+        colors.backdrop == KeyboardBackdrop.ROSE_GOLD ->
+            ShimmerMotion(this, resources.displayMetrics.density * scale, motionTimeMs)
+        else -> null
+    }
+
     // Estado/tempo do microfone (espelha AudioRecorder/OrbButtonView: conta só em RECORDING).
     private val handler = Handler(Looper.getMainLooper())
     private var micState: ButtonState = ButtonState.IDLE_NO_FIELD
@@ -235,6 +252,43 @@ class KeyFlowKeyboardView(
         gridOverscanSpacer?.let { addView(it) }
         addView(target)
     }
+
+    /** A intensidade do efeito da skin, repassada à grade e às barras (elas se invalidam para redesenhar o rótulo). */
+    private fun applyEffect(amount: Float) {
+        canvasGrid?.setEffect(amount)
+        barViews.forEach { it.setEffect(amount) }
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        motion?.start()
+    }
+
+    override fun onDetachedFromWindow() {
+        motion?.stop()
+        super.onDetachedFromWindow()
+    }
+
+    override fun onWindowVisibilityChanged(visibility: Int) {
+        super.onWindowVisibilityChanged(visibility)
+        if (visibility == VISIBLE) motion?.start() else motion?.stop()
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN) motion?.onTouchDown()
+        return super.dispatchTouchEvent(ev)
+    }
+
+    override fun dispatchDraw(canvas: android.graphics.Canvas) {
+        val m = motion
+        if (m == null || !m.isActive) {
+            super.dispatchDraw(canvas)
+        } else {
+            m.draw(canvas, width, height, ::drawChildrenOnce)
+        }
+    }
+
+    private fun drawChildrenOnce(canvas: android.graphics.Canvas) = super.dispatchDraw(canvas)
 
     fun updateMicState(state: ButtonState) {
         micState = state
@@ -302,6 +356,7 @@ class KeyFlowKeyboardView(
                 clock = clock,
                 qwertyRowCount = qwertyRowCount,
                 barCount = barCount,
+                fitWidth = barsFitWidth,
             ).also { bar ->
                 barViews += bar
                 // Barra recém-criada herda o estado vigente (mic e sugestões), senão recolher/expandir
@@ -367,6 +422,8 @@ class KeyFlowKeyboardView(
     private fun buildCollapsed(): LinearLayout = LinearLayout(context).apply {
         orientation = VERTICAL
         layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+        // Com paisagem (Aero), as barras são transparentes: ela vai atrás delas também no retraído.
+        colors.backdrop?.let { background = it.drawable(resources.displayMetrics.density * scale, windowBlurAvailable(context)) }
         buildBars(expandedMode = false).forEach { addView(it, barLayoutParams()) }
     }
 
@@ -379,8 +436,8 @@ class KeyFlowKeyboardView(
         ButtonState.PAUSED         -> "⏸ ${formatTime(elapsedSeconds())}" to ACCENT_RECORD
         ButtonState.SENDING        -> "···" to ACCENT_TEAL
         ButtonState.ERROR          -> "✖" to ACCENT_TERRACOTTA
-        ButtonState.CANCELLING     -> "🗑 cancelado" to ACCENT_TERRACOTTA
-        ButtonState.PENDING_PASTE  -> "📋 colar" to ACCENT_TERRACOTTA
+        ButtonState.CANCELLING     -> tr("🗑 cancelado") to ACCENT_TERRACOTTA
+        ButtonState.PENDING_PASTE  -> tr("📋 colar") to ACCENT_TERRACOTTA
     }
 
     private fun formatTime(totalSeconds: Int): String {
@@ -401,9 +458,15 @@ class KeyFlowKeyboardView(
         )
     }
 
+    /** Barras + grade: fundo liso [kbTray], ou a paisagem inteira atrás das duas (Aero). */
     private fun column(): LinearLayout = LinearLayout(context).apply {
         orientation = VERTICAL
-        setBackgroundColor(kbTray)
+        val backdrop = colors.backdrop
+        if (backdrop != null) {
+            background = backdrop.drawable(resources.displayMetrics.density * scale, windowBlurAvailable(context))
+        } else {
+            setBackgroundColor(kbTray)
+        }
     }
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density * scale).toInt()

@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
 import com.keyflow.core.shortcuts.BarButton
 import com.keyflow.ime.bars.BarGeometry
@@ -107,6 +108,78 @@ class BarsEditorTest {
             val button = h.barsConfig.collapsed[0].buttons.single()
             assertTrue(button is BarButton.GridTrigger)
             assertEquals("g1", (button as BarButton.GridTrigger).gridId)
+        }
+    }
+
+    @Test
+    fun catalogHelpExplainsAnOptionWithoutAddingItAndCanAddFromThere() {
+        // "?" em cada linha do catálogo (Yan, 2026-09-28): explica no mesmo modal; tocar nele não adiciona.
+        val h = Harness(BarsConfig(mirrored = false, collapsed = listOf(BarDef(emptyList())), expanded = listOf(BarDef(emptyList()))))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(barAddButtonTag(0)).performClick()
+        rule.onNodeWithTag(catalogHelpTag(BARS_EDITOR_CATALOG_JOYSTICK_TAG)).performScrollTo().performClick()
+        rule.onNodeWithTag(BARS_EDITOR_CATALOG_HELP_TAG).assertIsDisplayed()
+        rule.runOnIdle { assertEquals(emptyList<BarButton>(), h.barsConfig.collapsed[0].buttons) }
+
+        rule.onNodeWithTag(BARS_EDITOR_CATALOG_HELP_BACK_TAG).performClick()
+        rule.onNodeWithTag(BARS_EDITOR_CATALOG_TAG).assertIsDisplayed()
+
+        rule.onNodeWithTag(catalogHelpTag(BARS_EDITOR_CATALOG_JOYSTICK_TAG)).performScrollTo().performClick()
+        rule.onNodeWithTag(BARS_EDITOR_CATALOG_HELP_ADD_TAG).performClick()
+        rule.runOnIdle { assertEquals(listOf(BarButton.Joystick), h.barsConfig.collapsed[0].buttons) }
+    }
+
+    @Test
+    fun gridFormExplainsEachModeAndShowsPrefixOnlyWhereItCounts() {
+        val h = Harness(
+            BarsConfig(mirrored = false, collapsed = listOf(BarDef(emptyList())), expanded = listOf(BarDef(emptyList()))),
+            grids = listOf(grid1),
+        )
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(barAddButtonTag(0)).performClick()
+        rule.onNodeWithTag(BARS_EDITOR_CATALOG_GRID_TAG).performClick()
+
+        // Uma explicação sob cada modo, todas da mesma altura (trocar de modo não mexe no layout).
+        val hintHeights = GridTriggerMode.entries.map { mode ->
+            rule.onNodeWithTag("${gridModeTag(mode)}-hint", useUnmergedTree = true).assertTextContains(gridModeHint(mode))
+                .getUnclippedBoundsInRoot().let { it.bottom - it.top }
+        }
+        assertEquals(1, hintHeights.distinct().size)
+
+        // "Só grade" (padrão) não usa prefixo: o seletor não aparece.
+        rule.onAllNodesWithTag(BARS_EDITOR_GRID_FORM_PREFIX_SET_TAG).assertCountEquals(0)
+        rule.onNodeWithTag(gridModeTag(GridTriggerMode.SEQUENCE)).performClick()
+        rule.onNodeWithTag(BARS_EDITOR_GRID_FORM_PREFIX_SET_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(gridModeTag(GridTriggerMode.CHORD)).performClick()
+        rule.onNodeWithTag(BARS_EDITOR_GRID_FORM_PREFIX_SET_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(gridModeTag(GridTriggerMode.OPEN_ONLY)).performClick()
+        rule.onAllNodesWithTag(BARS_EDITOR_GRID_FORM_PREFIX_SET_TAG).assertCountEquals(0)
+    }
+
+    @Test
+    fun switchingToOpenOnlyDoesNotKeepAHiddenPrefix() {
+        val ctrlB = ShortcutKey(KeyEvent.KEYCODE_B, ctrl = true, label = "Ctrl+B")
+        val h = Harness(
+            BarsConfig(
+                mirrored = false,
+                collapsed = listOf(BarDef(listOf(BarButton.GridTrigger("g1", ctrlB, GridTriggerMode.SEQUENCE)))),
+                expanded = listOf(BarDef(emptyList())),
+            ),
+            grids = listOf(grid1),
+        )
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(barChipTag(0, 0)).performClick()
+        rule.onNodeWithTag(BARS_EDITOR_GRID_FORM_PREFIX_REMOVE_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(gridModeTag(GridTriggerMode.OPEN_ONLY)).performClick()
+        rule.onNodeWithTag(BARS_EDITOR_GRID_FORM_CONFIRM_TAG).performClick()
+
+        rule.runOnIdle {
+            val button = h.barsConfig.collapsed[0].buttons.single() as BarButton.GridTrigger
+            assertEquals(GridTriggerMode.OPEN_ONLY, button.mode)
+            assertEquals(null, button.prefix)
         }
     }
 
@@ -275,7 +348,7 @@ class BarsEditorTest {
 
     @Test
     fun theCandidatesSlotIsPreviewedWithTheAreaItReallyTakes() {
-        // A prévia é WYSIWYG (CFG-02) e a faixa de sugestões ocupa ~4 botões no teclado. Desenhada como
+        // A prévia é WYSIWYG (CFG-02) e a faixa de sugestões ocupa ~3 botões no teclado. Desenhada como
         // um chip pequeno "abc", ela mentia sobre o resultado — quem montava a barra só descobria o
         // aperto ao usar (pedido do Yan, 2026-09-08: "essa área que ele ocupa deve representar a área
         // real pro usuário saber como vai ficar").
@@ -288,10 +361,10 @@ class BarsEditorTest {
 
         // O peso vira largura MÍNIMA, não fixa: com largura fixa o rótulo era truncado ("colar" virava
         // "c"), então o conteúdo pode empurrar um chip além da proporção. O que a prévia precisa
-        // garantir é que a faixa reserve a área dela — 4 unidades — e apareça bem mais larga que um
-        // botão comum, para quem monta a barra prever o aperto.
-        assertTrue("a faixa ($slot) deveria ser bem mais larga que o mic ($mic)", slot > mic * 2)
-        rule.onNodeWithTag(barChipTag(0, 1)).assertWidthIsAtLeast(90.dp)
+        // garantir é que a faixa reserve a área dela — 2,8 unidades desde que ficou 30% menor (Yan,
+        // 2026-09-28) — e apareça bem mais larga que um botão comum, para quem monta a barra prever o aperto.
+        assertTrue("a faixa ($slot) deveria ser bem mais larga que o mic ($mic)", slot > mic * 1.5f)
+        rule.onNodeWithTag(barChipTag(0, 1)).assertWidthIsAtLeast(66.dp)
     }
 
     @Test

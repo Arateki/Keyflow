@@ -65,7 +65,7 @@ object KeyFlowController {
     @Volatile var autoPasteOnFocus: Boolean = true
 
     // Ação do erro atual ao tocar no X/glifo ✖ (orbe, teclado, notificação): VOZ (config/token),
-    // MODO_MIC (falta permissão de microfone) ou NONE (erros não mapeados — rede, timeout, áudio
+    // MIC (falta permissão de microfone) ou NONE (erros não mapeados — rede, timeout, áudio
     // curto… ficam sem ação no toque).
     @Volatile var errorNavTarget: ErrorNavTarget = ErrorNavTarget.NONE
 

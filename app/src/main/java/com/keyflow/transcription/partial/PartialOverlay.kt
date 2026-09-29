@@ -1,5 +1,6 @@
 package com.keyflow.transcription.partial
 
+import com.keyflow.i18n.tr
 import android.content.Context
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
@@ -103,7 +104,7 @@ class PartialOverlay(
         textSize = 11f
         typeface = font(R.font.space_mono_regular)
         setPadding(dp(10), dp(5), dp(10), dp(5))
-        contentDescription = "Transcrição parcial"
+        contentDescription = tr("Transcrição parcial")
         setOnClickListener { onBadgeTap() }
         label = this
     }
@@ -122,12 +123,12 @@ class PartialOverlay(
         )
         addView(
             TextView(context).apply {
-                text = "Fechar"
+                text = tr("Fechar")
                 setTextColor(palette.teal.toArgb())
                 textSize = 12f
                 typeface = font(R.font.space_grotesk_semibold)
                 setPadding(dp(8), dp(4), 0, dp(4))
-                contentDescription = "Fechar transcrição parcial"
+                contentDescription = tr("Fechar transcrição parcial")
                 setOnClickListener { onClose() }
             },
         )
@@ -137,7 +138,7 @@ class PartialOverlay(
         orientation = LinearLayout.VERTICAL
         background = card(palette, 10)
         setPadding(dp(14), dp(10), dp(14), dp(12))
-        addView(header(palette, "Parcial · toque no texto para editar"))
+        addView(header(palette, tr("Parcial · toque no texto para editar")))
         addView(
             ScrollView(context).apply {
                 addView(
@@ -159,12 +160,12 @@ class PartialOverlay(
         orientation = LinearLayout.VERTICAL
         background = card(palette, 10)
         setPadding(dp(14), dp(10), dp(14), dp(12))
-        addView(header(palette, "Parcial · editando"))
+        addView(header(palette, tr("Parcial · editando")))
         addView(
             EditText(context).apply {
                 setTextColor(palette.fg.toArgb())
                 setHintTextColor(palette.faint.toArgb())
-                hint = "Texto parcial"
+                hint = tr("Texto parcial")
                 textSize = 14f
                 typeface = font(R.font.space_grotesk_regular)
                 minLines = 2

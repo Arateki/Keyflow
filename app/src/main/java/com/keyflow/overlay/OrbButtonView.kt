@@ -26,6 +26,7 @@ import com.keyflow.ui.orb.OrbCenter
 import com.keyflow.ui.orb.OrbDragHint
 import com.keyflow.ui.orb.OrbDragKind
 import com.keyflow.ui.orb.OrbState
+import com.keyflow.ui.orb.OrbStyle
 import com.keyflow.ui.orb.VoiceOrb
 import kotlin.math.roundToInt
 
@@ -60,6 +61,8 @@ class OrbButtonView(
     // Arrastar ↓ abre o app do KeyFlow mantendo o estado atual da orbe (Toggle).
     private val onOpenConfig: () -> Unit = {},
     orbSizePx: Int = 156,
+    // Estilo do orbe (skin da orbe, aba Sobrepor; o Aero é uma bolha de vidro). Troca ao vivo: [setOrbStyle].
+    orbStyle: OrbStyle = OrbStyle.ATELIE,
     // Janela máxima entre toques de uma "rajada" de atalho (threshold configurável na aba Sobrepor).
     tapBurstWindowMs: Long = DEFAULT_TAP_BURST_WINDOW_MS,
     private val clock: () -> Long = { SystemClock.elapsedRealtime() },
@@ -125,6 +128,12 @@ class OrbButtonView(
     }
 
     private var orbUi by mutableStateOf(OrbButtonUi(OrbState.Idle, OrbCenter.None))
+    private var currentOrbStyle by mutableStateOf(orbStyle)
+
+    /** Skin da orbe trocada com ela na tela (aba Sobrepor → Skins): redesenha sem recriar a janela. */
+    fun setOrbStyle(style: OrbStyle) {
+        currentOrbStyle = style
+    }
 
     private val handler = Handler(Looper.getMainLooper())
     private var pendingReleaseTimeout: Runnable? = null
@@ -173,6 +182,7 @@ class OrbButtonView(
                     modifier = Modifier.fillMaxSize(),
                     center = ui.center,
                     dragHint = ui.dragHint,
+                    style = currentOrbStyle,
                 )
             }
         })

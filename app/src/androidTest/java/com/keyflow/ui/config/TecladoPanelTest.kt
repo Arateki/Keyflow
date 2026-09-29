@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.onRoot
@@ -47,7 +48,6 @@ class TecladoPanelTest {
                 TecladoPanel(
                     settings = settings,
                     onSettingsChange = { settings = it },
-                    onLanguageClick = {},
                     onUnlockSkins = { unlockClicks++ },
                 )
             }
@@ -96,6 +96,46 @@ class TecladoPanelTest {
     }
 
     @Test
+    fun keyboardSkinLeavesTheOrbSkinAlone() {
+        // O Aero no teclado vale só para o teclado; a orbe tem a skin dela na aba Sobrepor (Yan, 2026-09-29).
+        val h = Harness(Settings(keyboardSkin = "system", orbSkin = "atelie"))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(skinTag("aero")).performScrollTo().performClick()
+
+        rule.runOnIdle {
+            assertEquals("aero", h.settings.keyboardSkin)
+            assertEquals("atelie", h.settings.orbSkin)
+        }
+    }
+
+    @Test
+    fun keyboardSkinGlitchPersists() {
+        val h = Harness(Settings(keyboardSkin = "system", orbSkin = "atelie"))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(skinTag("glitch")).performScrollTo().performClick()
+
+        rule.runOnIdle {
+            assertEquals("glitch", h.settings.keyboardSkin)
+            assertEquals("atelie", h.settings.orbSkin)
+        }
+    }
+
+    @Test
+    fun keyboardSkinRoseGoldPersists() {
+        val h = Harness(Settings(keyboardSkin = "system", orbSkin = "atelie"))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(skinTag("rosegold")).performScrollTo().performClick()
+
+        rule.runOnIdle {
+            assertEquals("rosegold", h.settings.keyboardSkin)
+            assertEquals("atelie", h.settings.orbSkin)
+        }
+    }
+
+    @Test
     fun keyboardSizeSliderPersists() {
         val h = Harness(Settings(keyboardScalePercent = 100))
         rule.setContent { h.Content() }
@@ -125,19 +165,15 @@ class TecladoPanelTest {
     }
 
     @Test
-    fun keyboardSizePreviewIsCenteredUnderThePanelsRealPadding() {
-        // Pedido do Yan (2026-07-03, 2ª rodada): a 1ª versão (um `layout{}` manual "vazando" o padding
-        // do painel) tinha um bug de assimetria — a prévia ficava encostada na borda esquerda com folga
-        // só do lado direito, mesmo sob o padding SIMÉTRICO real do `ConfigScreen` (12dp dos dois lados,
-        // reproduzido aqui — o Harness sozinho não tem esse padding, por isso o bug não aparecia nesta
-        // suíte). `Box(contentAlignment = Alignment.Center)` centraliza corretamente sob um ancestral
-        // simétrico (o caso real); um ancestral assimétrico deslocaria o centro local — cenário que não
-        // ocorre no `ConfigScreen` de produção, então não é o que este teste protege.
-        var marginPx = 0
+    fun keyboardSizePreviewStaysInsideThePanel() {
+        // A prévia ocupava a largura da TELA (menos 14dp) e vazava pelo padding do painel — de propósito,
+        // para bater com o teclado real (Yan, 2026-07-03). Com a navegação lateral (2026-09-28), vazar
+        // passou a invadir o menu: agora ela ocupa exatamente a largura do painel, simétrica.
+        var paddingPx = 0
         val h = Harness(Settings(keyboardScalePercent = 100))
         rule.setContent {
             KeyFlowTheme(dark = false) {
-                marginPx = with(LocalDensity.current) { PREVIEW_MARGIN_DP.roundToPx() }
+                paddingPx = with(LocalDensity.current) { 12.dp.roundToPx() }
                 Box(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
                     h.Content()
                 }
@@ -145,28 +181,49 @@ class TecladoPanelTest {
         }
         rule.waitForIdle()
 
-        // Posição/tamanho via semantics do Compose (relativos ao ROOT), não `View.getLocationOnScreen`
-        // (posição FÍSICA de tela, que pode carregar deslocamento fixo do harness de teste sem relação
-        // com o bug reportado).
         val rootWidthPx = rule.onRoot().fetchSemanticsNode().size.width
         val previewNode = rule.onNodeWithTag(TECLADO_SIZE_PREVIEW_TAG).fetchSemanticsNode()
         val leftPx = previewNode.positionInRoot.x
-        val widthPx = previewNode.size.width
-        val rightPx = rootWidthPx - (leftPx + widthPx)
+        val rightPx = rootWidthPx - (leftPx + previewNode.size.width)
 
+        assertTrue("prévia vazou do painel à esquerda (esquerda=$leftPx px)", leftPx >= paddingPx - 1)
+        assertTrue("prévia vazou do painel à direita (direita=$rightPx px)", rightPx >= paddingPx - 1)
         assertTrue(
-            "prévia deveria ficar centralizada na tela, não vazada pra um lado " +
-                "(esquerda=$leftPx px, direita=$rightPx px)",
+            "prévia deveria ficar centralizada no painel (esquerda=$leftPx px, direita=$rightPx px)",
             kotlin.math.abs(leftPx - rightPx) <= 1,
         )
-        // Tolerância maior aqui (8px) que na simetria acima (1px): `LocalConfiguration.screenWidthDp` é
-        // um Int arredondado pelo sistema e não bate ao pixel exato com a medida do Compose — o que
-        // importa pro bug do Yan é a SIMETRIA (checada acima com tolerância apertada), não o valor
-        // absoluto exato da margem.
+    }
+
+    @Test
+    fun keyboardLanguagePersistsAndDrivesThePreview() {
+        // A linha era um "pt-BR" fixo; o teclado já tinha inglês e espanhol pelo globo (Yan, 2026-09-28).
+        val h = Harness(Settings(keyboardLanguage = "pt"))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(keyboardLanguageTag("es")).performScrollTo().performClick()
+
+        rule.runOnIdle { assertEquals("es", h.settings.keyboardLanguage) }
+    }
+
+    @Test
+    fun keyboardSizePreviewKeepsTheRealBarProportionsWithoutScrolling() {
+        // O cartão é mais estreito que a tela (Yan, 2026-09-28): sem a área das sugestões, o mic esticava
+        // para o cartão todo; com ela e o mínimo de toque, a barra rolava. Agora é a barra de fábrica
+        // dividida na largura que houver — e um aviso explica que a prévia acerta a altura, não a largura.
+        val h = Harness(Settings(keyboardScalePercent = 100))
+        rule.setContent { h.Content() }
+        rule.waitForIdle()
+
+        // A view monta as barras dos dois modos; a da prévia (expandida) é a que está na tela.
+        val bar = keyboardSizePreviewForTest?.barViewsForTest?.single { it.isAttachedToWindow } ?: error("prévia não montou")
+        val layout = bar.layoutForTest
+        assertTrue("a barra da prévia não deveria rolar", !layout.scrollable)
         assertTrue(
-            "margem deveria bater aproximadamente com PREVIEW_MARGIN_DP dos dois lados " +
-                "(esquerda=$leftPx px, esperado≈$marginPx px)",
-            kotlin.math.abs(leftPx - marginPx) <= 8,
+            "a barra da prévia deveria ter a área das sugestões",
+            layout.buttons.any { it.button == com.keyflow.core.shortcuts.BarButton.Candidates },
         )
+        val mic = layout.buttons.first { it.button == com.keyflow.core.shortcuts.BarButton.Mic }
+        assertTrue("o mic não deveria passar de 1/3 da barra (${mic.width} de ${layout.viewWidth})", mic.width < layout.viewWidth / 3f)
+        rule.onNodeWithTag(TECLADO_SIZE_PREVIEW_NOTE_TAG).performScrollTo().assertIsDisplayed()
     }
 }

@@ -55,7 +55,8 @@ enum class ErrorKind {
 
 /**
  * Ação ao tocar num erro clicável (banner de overlay ou glifo ✖ do teclado/orbe): [NONE] não faz nada,
- * [VOZ] abre a aba Voz (erro de config/token), [MODO_MIC] abre a aba Modo — o chip de Microfone já
- * pulsa sozinho lá (StatusChip.pulsing), então só navegar até a aba já evidencia o card certo.
+ * [VOZ] abre a aba Transcrição (erro de config/token), [MIC] abre a aba da interface que avisou (Sobrepor
+ * pela orbe, Teclado pelo teclado) já no cartão do modo — o chip de Microfone pulsa sozinho lá
+ * (StatusChip.pulsing).
  */
-enum class ErrorNavTarget { NONE, VOZ, MODO_MIC }
+enum class ErrorNavTarget { NONE, VOZ, MIC }

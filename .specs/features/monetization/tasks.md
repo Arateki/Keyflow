@@ -134,6 +134,9 @@ no device (TESTING.md).
   (UNL-01); `queryPurchases` na abertura restaura sem botão (UNL-02); `skinsUnlocked` destrava a
   seção Skins da aba Teclado (sai o cadeado/estado bloqueado — a escolha real de skin chega com o
   theme-system); `adsOff` → `AdsController` nem inicializa (asserção na T10).
+- **Nota (2026-09-29, Yan)**: o bloqueio segue `KeyboardSkin.paid`/`OrbStyle.paid` (UNL-05) — só a Sistema e a
+  orbe padrão são gratuitas; Ateliê, Aero, Glitch e Rose Gold (teclado) e Aero, Glitch e Rose Gold (orbe) travam sem `skinsUnlocked`. Hoje estão
+  todas liberadas para teste; esta task é onde passam a ficar bloqueadas (nas duas abas: Teclado e Sobrepor).
 - **Where**: `ui/config/UnlockSheet.kt`, `ui/config/TecladoPanel.kt`, fiação `SetupActivity`.
 - **Depends on**: MZ-T3, MZ-T4. **Covers**: UNL-01, UNL-02, UNL-04 (parcial — skins full no
   theme-system).
