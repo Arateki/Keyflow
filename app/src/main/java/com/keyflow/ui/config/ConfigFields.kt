@@ -83,6 +83,9 @@ internal fun recordingModeLabel(mode: RecordingMode): String = when (mode) {
  * Controle segmentado no estilo Ateliê (trilho `panel`, célula ativa preenchida `fg`/`onFill`).
  * Genérico — reusado por origem da transcrição (Voz), modo de gravação (Teclado/Overlay), posição e
  * tamanho do overlay.
+ *
+ * [hint]: explicação curta sob cada opção, alinhada à célula. Todas reservam [hintLines] linhas, para a
+ * altura não mudar com o texto de cada uma (gatilho de grade, pedido do Yan, 2026-09-28).
  */
 @Composable
 internal fun <T> Segmented(
@@ -92,6 +95,8 @@ internal fun <T> Segmented(
     tag: (T) -> String,
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
+    hint: ((T) -> String)? = null,
+    hintLines: Int = 3,
 ) {
     val palette = LocalKeyFlowPalette.current
     val raised = raisedFill(palette)
@@ -107,6 +112,7 @@ internal fun <T> Segmented(
         minSp = 8.5f,
         fontFamily = SpaceGrotesk,
     )
+    Column(Modifier.fillMaxWidth()) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -144,6 +150,34 @@ internal fun <T> Segmented(
                     .testTag(tag(option)),
             )
         }
+    }
+    if (hint != null) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(start = SEGMENT_TRACK_PADDING, end = SEGMENT_TRACK_PADDING, top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(SEGMENT_GAP),
+        ) {
+            options.forEach { option ->
+                val isActive = option == selected
+                Text(
+                    text = hint(option),
+                    color = if (isActive) palette.muted else palette.faint,
+                    fontFamily = SpaceGrotesk,
+                    fontWeight = FontWeight.Light,
+                    fontSize = 10.5.sp,
+                    lineHeight = 14.sp,
+                    textAlign = TextAlign.Center,
+                    minLines = hintLines,
+                    maxLines = hintLines,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = SEGMENT_TEXT_PADDING)
+                        .testTag("${tag(option)}-hint"),
+                )
+            }
+        }
+    }
     }
     }
 }

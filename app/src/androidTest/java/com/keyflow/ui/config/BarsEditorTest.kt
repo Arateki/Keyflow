@@ -111,6 +111,59 @@ class BarsEditorTest {
     }
 
     @Test
+    fun gridFormExplainsEachModeAndShowsPrefixOnlyWhereItCounts() {
+        val h = Harness(
+            BarsConfig(mirrored = false, collapsed = listOf(BarDef(emptyList())), expanded = listOf(BarDef(emptyList()))),
+            grids = listOf(grid1),
+        )
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(barAddButtonTag(0)).performClick()
+        rule.onNodeWithTag(BARS_EDITOR_CATALOG_GRID_TAG).performClick()
+
+        // Uma explicação sob cada modo, todas da mesma altura (trocar de modo não mexe no layout).
+        val hintHeights = GridTriggerMode.entries.map { mode ->
+            rule.onNodeWithTag("${gridModeTag(mode)}-hint", useUnmergedTree = true).assertTextContains(gridModeHint(mode))
+                .getUnclippedBoundsInRoot().let { it.bottom - it.top }
+        }
+        assertEquals(1, hintHeights.distinct().size)
+
+        // "Só grade" (padrão) não usa prefixo: o seletor não aparece.
+        rule.onAllNodesWithTag(BARS_EDITOR_GRID_FORM_PREFIX_SET_TAG).assertCountEquals(0)
+        rule.onNodeWithTag(gridModeTag(GridTriggerMode.SEQUENCE)).performClick()
+        rule.onNodeWithTag(BARS_EDITOR_GRID_FORM_PREFIX_SET_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(gridModeTag(GridTriggerMode.CHORD)).performClick()
+        rule.onNodeWithTag(BARS_EDITOR_GRID_FORM_PREFIX_SET_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(gridModeTag(GridTriggerMode.OPEN_ONLY)).performClick()
+        rule.onAllNodesWithTag(BARS_EDITOR_GRID_FORM_PREFIX_SET_TAG).assertCountEquals(0)
+    }
+
+    @Test
+    fun switchingToOpenOnlyDoesNotKeepAHiddenPrefix() {
+        val ctrlB = ShortcutKey(KeyEvent.KEYCODE_B, ctrl = true, label = "Ctrl+B")
+        val h = Harness(
+            BarsConfig(
+                mirrored = false,
+                collapsed = listOf(BarDef(listOf(BarButton.GridTrigger("g1", ctrlB, GridTriggerMode.SEQUENCE)))),
+                expanded = listOf(BarDef(emptyList())),
+            ),
+            grids = listOf(grid1),
+        )
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(barChipTag(0, 0)).performClick()
+        rule.onNodeWithTag(BARS_EDITOR_GRID_FORM_PREFIX_REMOVE_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(gridModeTag(GridTriggerMode.OPEN_ONLY)).performClick()
+        rule.onNodeWithTag(BARS_EDITOR_GRID_FORM_CONFIRM_TAG).performClick()
+
+        rule.runOnIdle {
+            val button = h.barsConfig.collapsed[0].buttons.single() as BarButton.GridTrigger
+            assertEquals(GridTriggerMode.OPEN_ONLY, button.mode)
+            assertEquals(null, button.prefix)
+        }
+    }
+
+    @Test
     fun removingButtonViaEditSheetRemovesIt() {
         val h = Harness(
             BarsConfig(

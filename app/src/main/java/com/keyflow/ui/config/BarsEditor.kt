@@ -93,6 +93,13 @@ fun barTrashTag(barIndex: Int) = "bars-editor-trash-$barIndex"
 /** Tag do segmento de [GridTriggerMode] no formulário de gatilho de grade. */
 fun gridModeTag(mode: GridTriggerMode) = "bars-editor-grid-form-mode-${mode.name.lowercase()}"
 
+/** O que cada modo faz, em uma frase curta — aparece sob a opção no formulário de gatilho de grade. */
+fun gridModeHint(mode: GridTriggerMode): String = when (mode) {
+    GridTriggerMode.OPEN_ONLY -> "Envia só a tecla escolhida na grade."
+    GridTriggerMode.SEQUENCE -> "Envia o prefixo e, depois, a tecla (como no tmux)."
+    GridTriggerMode.CHORD -> "Envia prefixo e tecla juntos, como Ctrl+X."
+}
+
 /** Nome por extenso do botão, para as frases dos avisos (o glifo não se lê em texto corrido). */
 private fun barButtonName(button: BarButton): String = when (button) {
     BarButton.Mic -> "microfone"
@@ -197,10 +204,18 @@ fun BarsEditor(
     onBarsConfigChange: (BarsConfig) -> Unit,
     grids: List<ShortcutGrid>,
     modifier: Modifier = Modifier,
+    // Galeria: já abre no formulário de gatilho de grade, com este gatilho como botão novo da barra 0.
+    initialGridForm: BarButton.GridTrigger? = null,
 ) {
     val palette = LocalKeyFlowPalette.current
     var viewingExpanded by remember { mutableStateOf(false) }
-    var sheet by remember { mutableStateOf<BarsEditorSheet?>(null) }
+    var sheet by remember {
+        mutableStateOf<BarsEditorSheet?>(
+            initialGridForm?.let {
+                BarsEditorSheet.GridForm(barIndex = 0, buttonIndex = null, it.gridId, it.prefix, it.mode, it.label)
+            },
+        )
+    }
     var keyPickerPurpose by remember { mutableStateOf<KeyPickerPurpose?>(null) }
 
     val activeList = when {
@@ -392,7 +407,9 @@ fun BarsEditor(
                 onRemovePrefix = { sheet = current.copy(prefix = null) },
                 onConfirm = confirm@{
                     val gridId = current.gridId ?: return@confirm
-                    val button = BarButton.GridTrigger(gridId, current.prefix, current.mode, current.label)
+                    // "Só grade" não usa prefixo: não guarda um que ficou escondido no formulário.
+                    val prefix = current.prefix.takeIf { current.mode != GridTriggerMode.OPEN_ONLY }
+                    val button = BarButton.GridTrigger(gridId, prefix, current.mode, current.label)
                     if (current.buttonIndex != null) {
                         replaceButtonAt(current.barIndex, current.buttonIndex, button)
                     } else {
@@ -618,20 +635,6 @@ private fun GridFormSheet(
                 )
             }
 
-            Column(Modifier.fillMaxWidth().padding(top = 10.dp)) {
-                Text(
-                    if (form.prefix != null) "Prefixo: ${form.prefix.label}" else "Sem prefixo",
-                    color = palette.muted,
-                    fontFamily = SpaceGrotesk,
-                    fontSize = 12.sp,
-                )
-                if (form.prefix != null) {
-                    SheetActionRow("Remover prefixo", BARS_EDITOR_GRID_FORM_PREFIX_REMOVE_TAG) { onRemovePrefix() }
-                } else {
-                    SheetActionRow("Definir prefixo", BARS_EDITOR_GRID_FORM_PREFIX_SET_TAG) { onSetPrefix() }
-                }
-            }
-
             Segmented(
                 options = listOf(GridTriggerMode.OPEN_ONLY, GridTriggerMode.SEQUENCE, GridTriggerMode.CHORD),
                 selected = form.mode,
@@ -645,7 +648,26 @@ private fun GridFormSheet(
                 tag = ::gridModeTag,
                 onSelect = onModeSelect,
                 modifier = Modifier.padding(top = 12.dp),
+                hint = ::gridModeHint,
             )
+
+            // O prefixo só existe para Sequência e Chord; em "Só grade" ele não entra em nada, então some
+            // (fica abaixo das opções para elas não pularem quando ele aparece).
+            if (form.mode != GridTriggerMode.OPEN_ONLY) {
+                Column(Modifier.fillMaxWidth().padding(top = 10.dp)) {
+                    Text(
+                        if (form.prefix != null) "Prefixo: ${form.prefix.label}" else "Sem prefixo",
+                        color = palette.muted,
+                        fontFamily = SpaceGrotesk,
+                        fontSize = 12.sp,
+                    )
+                    if (form.prefix != null) {
+                        SheetActionRow("Remover prefixo", BARS_EDITOR_GRID_FORM_PREFIX_REMOVE_TAG) { onRemovePrefix() }
+                    } else {
+                        SheetActionRow("Definir prefixo", BARS_EDITOR_GRID_FORM_PREFIX_SET_TAG) { onSetPrefix() }
+                    }
+                }
+            }
 
             PrimaryButton(
                 "Confirmar",

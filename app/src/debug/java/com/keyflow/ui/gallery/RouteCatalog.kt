@@ -142,6 +142,9 @@ object RouteCatalog {
             }
         },
         // Editor de grade no modal (Q8): grade grande o bastante pra exercitar o encolhimento de célula.
+        // Formulário de gatilho de grade: a explicação sob cada modo, e o prefixo só fora do "Só grade".
+        barsEditorGridFormRoute("bars-editor-grid-form", GridTriggerMode.OPEN_ONLY),
+        barsEditorGridFormRoute("bars-editor-grid-form-sequencia", GridTriggerMode.SEQUENCE),
         Route("grids-editor-modal") {
             Box(Modifier.fillMaxSize()) {
                 GridsEditor(
@@ -344,6 +347,22 @@ object RouteCatalog {
                         if (recording) updateMicState(ButtonState.RECORDING)
                     }
                 },
+            )
+        }
+    }
+
+    private fun barsEditorGridFormRoute(key: String, mode: GridTriggerMode): Route = Route(key) {
+        val tmux = ShortcutGrid(id = "g1", name = "tmux", rows = 2, cols = 3, cells = emptyMap())
+        Box(Modifier.fillMaxSize()) {
+            BarsEditor(
+                barsConfig = BarsConfig(mirrored = true, expanded = emptyList(), collapsed = listOf(BarDef(listOf(BarButton.Mic)))),
+                onBarsConfigChange = {},
+                grids = listOf(tmux),
+                initialGridForm = BarButton.GridTrigger(
+                    gridId = tmux.id,
+                    prefix = if (mode == GridTriggerMode.OPEN_ONLY) null else PhysicalKeyMap.key(android.view.KeyEvent.KEYCODE_B, ctrl = true),
+                    mode = mode,
+                ),
             )
         }
     }
