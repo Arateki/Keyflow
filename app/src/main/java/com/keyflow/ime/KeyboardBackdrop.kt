@@ -49,6 +49,10 @@ interface FrostedBackdrop {
     /** A paisagem desfocada, reduzida ([frostDownscale] px da view por px do bitmap); null sem tamanho. */
     val frost: Bitmap?
     val frostDownscale: Float
+
+    /** Tamanho da paisagem em px (0 sem tamanho): o reflexo do vidro ([GlassPainter]) se estende por ela toda. */
+    val widthPx: Int
+    val heightPx: Int
 }
 
 /**
@@ -88,13 +92,18 @@ private class AeroBackdropDrawable(
     override var frost: Bitmap? = null
         private set
     override val frostDownscale: Float = FROST_DOWNSCALE
+    override val widthPx: Int get() = bounds.width()
+    override val heightPx: Int get() = bounds.height()
 
     private val skyPaint = Paint()
     private val sunPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val ribbonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val swooshFillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val swooshEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
     }
+    private val rayPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val cloudPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val farHillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val hillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val hillRimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
@@ -102,7 +111,12 @@ private class AeroBackdropDrawable(
     private val bubbleRimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val bubbleShinePaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
-    private val ribbons = listOf(Path(), Path())
+    // As faixas: a fita preenchida e o fio de luz da borda de cima. Os raios saem do sol.
+    private val swooshes = listOf(Path(), Path())
+    private val swooshEdges = listOf(Path(), Path())
+    private var swooshShaders: List<Shader> = emptyList()
+    private val rays = List(RAY_COUNT) { Path() }
+    private var cloudShaders: List<Shader> = emptyList()
     private val farHill = Path()
     private val hill = Path()
     private val hillRim = Path()
@@ -128,23 +142,91 @@ private class AeroBackdropDrawable(
             Shader.TileMode.CLAMP,
         )
         sunPaint.shader = RadialGradient(
-            left + w * 0.84f, top + h * 0.06f, w * 0.55f,
+            left + w * SUN_X, top + h * SUN_Y, w * 0.55f,
             if (night) intArrayOf(0x3345D8FF, 0x0045D8FF) else intArrayOf(0xB3FFFFFF.toInt(), 0x00FFFFFF),
             null,
             Shader.TileMode.CLAMP,
         )
 
-        // Faixas de luz (dia) ou aurora (noite): curvas que atravessam o teclado na diagonal.
-        ribbons[0].apply {
-            reset()
-            moveTo(left - w * 0.1f, top + h * 0.62f)
-            cubicTo(left + w * 0.25f, top + h * 0.30f, left + w * 0.6f, top + h * 0.62f, left + w * 1.1f, top + h * 0.18f)
+        // Raios do sol (dia) ou feixes de luar (noite): cunhas de borda nítida que saem do canto de cima e
+        // cruzam o teclado. As bordas duras são o que o desfoque das teclas apaga — e o que faz o vidro aparecer.
+        val sunX = left + w * SUN_X
+        val sunY = top + h * SUN_Y
+        val reach = maxOf(w, h) * 1.7f
+        rays.forEachIndexed { i, path ->
+            val angle = Math.toRadians(RAY_ANGLES[i].toDouble())
+            val half = Math.toRadians(RAY_HALF_WIDTHS[i].toDouble())
+            path.apply {
+                reset()
+                moveTo(sunX, sunY)
+                lineTo(sunX + (Math.cos(angle - half) * reach).toFloat(), sunY + (Math.sin(angle - half) * reach).toFloat())
+                lineTo(sunX + (Math.cos(angle + half) * reach).toFloat(), sunY + (Math.sin(angle + half) * reach).toFloat())
+                close()
+            }
         }
-        ribbons[1].apply {
-            reset()
-            moveTo(left - w * 0.1f, top + h * 0.38f)
-            cubicTo(left + w * 0.35f, top + h * 0.12f, left + w * 0.7f, top + h * 0.48f, left + w * 1.1f, top + h * 0.36f)
+        rayPaint.shader = RadialGradient(
+            sunX, sunY, reach * 0.75f,
+            if (night) intArrayOf(0x4045D8FF, 0x0045D8FF) else intArrayOf(0x66FFFFFF, 0x00FFFFFF),
+            null,
+            Shader.TileMode.CLAMP,
+        )
+
+        // Nuvens: círculos macios sobrepostos, brancos no dia e só um vapor azul à noite.
+        cloudShaders = CLOUDS.flatMap { cloud ->
+            cloud.puffs.map { (_, _, rDp) ->
+                RadialGradient(
+                    0f, 0f, rDp * density,
+                    if (night) intArrayOf(0x2645D8FF, 0x0045D8FF) else intArrayOf(0xE6FFFFFF.toInt(), 0x00FFFFFF),
+                    null,
+                    Shader.TileMode.CLAMP,
+                )
+            }
         }
+
+        // As faixas do Windows 7 (dia) ou a aurora do Vista (noite): fitas que afinam nas pontas, com um fio de
+        // luz na borda de cima.
+        swooshes[0].apply {
+            reset()
+            moveTo(left - w * 0.1f, top + h * 0.72f)
+            cubicTo(left + w * 0.25f, top + h * 0.42f, left + w * 0.55f, top + h * 0.72f, left + w * 1.1f, top + h * 0.20f)
+            lineTo(left + w * 1.1f, top + h * 0.32f)
+            cubicTo(left + w * 0.6f, top + h * 0.90f, left + w * 0.28f, top + h * 0.60f, left - w * 0.1f, top + h * 0.92f)
+            close()
+        }
+        swooshEdges[0].apply {
+            reset()
+            moveTo(left - w * 0.1f, top + h * 0.72f)
+            cubicTo(left + w * 0.25f, top + h * 0.42f, left + w * 0.55f, top + h * 0.72f, left + w * 1.1f, top + h * 0.20f)
+        }
+        swooshes[1].apply {
+            reset()
+            moveTo(left - w * 0.1f, top + h * 0.34f)
+            cubicTo(left + w * 0.3f, top + h * 0.04f, left + w * 0.65f, top + h * 0.42f, left + w * 1.1f, top + h * 0.08f)
+            lineTo(left + w * 1.1f, top + h * 0.15f)
+            cubicTo(left + w * 0.68f, top + h * 0.52f, left + w * 0.32f, top + h * 0.15f, left - w * 0.1f, top + h * 0.44f)
+            close()
+        }
+        swooshEdges[1].apply {
+            reset()
+            moveTo(left - w * 0.1f, top + h * 0.34f)
+            cubicTo(left + w * 0.3f, top + h * 0.04f, left + w * 0.65f, top + h * 0.42f, left + w * 1.1f, top + h * 0.08f)
+        }
+        swooshShaders = listOf(
+            LinearGradient(
+                left, 0f, left + w, 0f,
+                if (night) intArrayOf(0x264DFFB8, 0x594DFFB8, 0x1F4DFFB8) else intArrayOf(0x40C8F1FF, 0x80FFFFFF.toInt(), 0x33C8F1FF),
+                null,
+                Shader.TileMode.CLAMP,
+            ),
+            LinearGradient(
+                left, 0f, left + w, 0f,
+                if (night) intArrayOf(0x2645D8FF, 0x5945D8FF, 0x1F45D8FF) else intArrayOf(0x33FFFFFF, 0x66E4F8FF, 0x33FFFFFF),
+                null,
+                Shader.TileMode.CLAMP,
+            ),
+        )
+        swooshEdgePaint.strokeWidth = density * 1.4f
+        swooshEdgePaint.color = if (night) 0x8CAAFFEE.toInt() else 0xCCFFFFFF.toInt()
 
         // Colina ao fundo, mais clara, e a da frente com o brilho na crista.
         farHill.apply {
@@ -211,7 +293,9 @@ private class AeroBackdropDrawable(
 
         canvas.drawRect(b, skyPaint)
         canvas.drawRect(b, sunPaint)
-        drawRibbons(canvas)
+        rays.forEach { canvas.drawPath(it, rayPaint) }
+        if (!compact) drawClouds(canvas, left, top, w, h)
+        drawSwooshes(canvas)
         if (compact) return
         canvas.drawPath(farHill, farHillPaint)
         canvas.drawPath(hill, hillPaint)
@@ -249,19 +333,27 @@ private class AeroBackdropDrawable(
         return bitmap
     }
 
-    /** Cada faixa são três traços sobrepostos, do largo e fraco ao fino e forte: borda macia sem blur. */
-    private fun drawRibbons(canvas: Canvas) {
-        ribbons.forEachIndexed { i, path ->
-            val color = when {
-                !night -> 0x00FFFFFF
-                i == 0 -> 0x004DFFB8
-                else -> 0x0045D8FF
+    private fun drawClouds(canvas: Canvas, left: Float, top: Float, w: Float, h: Float) {
+        var shaderIndex = 0
+        CLOUDS.forEach { cloud ->
+            cloud.puffs.forEach { (dxDp, dyDp, rDp) ->
+                val shader = cloudShaders.getOrNull(shaderIndex++) ?: return@forEach
+                val cx = left + w * cloud.x + dxDp * density
+                val cy = top + h * cloud.y + dyDp * density
+                canvas.save()
+                canvas.translate(cx, cy)
+                cloudPaint.shader = shader
+                canvas.drawCircle(0f, 0f, rDp * density, cloudPaint)
+                canvas.restore()
             }
-            RIBBON_LAYERS.forEach { (widthDp, alpha) ->
-                ribbonPaint.strokeWidth = widthDp * density
-                ribbonPaint.color = color or (alpha shl 24)
-                canvas.drawPath(path, ribbonPaint)
-            }
+        }
+    }
+
+    private fun drawSwooshes(canvas: Canvas) {
+        swooshes.forEachIndexed { i, path ->
+            swooshFillPaint.shader = swooshShaders.getOrNull(i)
+            canvas.drawPath(path, swooshFillPaint)
+            canvas.drawPath(swooshEdges[i], swooshEdgePaint)
         }
     }
 
@@ -280,8 +372,23 @@ private class AeroBackdropDrawable(
         val DAY_SKY = intArrayOf(0xFF1C7BD6.toInt(), 0xFF48B0F0.toInt(), 0xFFA5E0FB.toInt(), 0xFFDDF6FF.toInt())
         val NIGHT_SKY = intArrayOf(0xFF030A22.toInt(), 0xFF062652.toInt(), 0xFF0A4A70.toInt(), 0xFF0B6474.toInt())
 
-        /** (largura em dp, alfa) de cada camada de uma faixa. */
-        val RIBBON_LAYERS = listOf(44f to 0x10, 24f to 0x1C, 9f to 0x30)
+        /** O sol (ou a lua): canto de cima à direita, de onde saem os raios. */
+        const val SUN_X = 0.84f
+        const val SUN_Y = 0.06f
+
+        /** Raios: direção (graus, 0 = direita, 90 = para baixo) e meia abertura de cada cunha. */
+        const val RAY_COUNT = 5
+        val RAY_ANGLES = floatArrayOf(112f, 132f, 152f, 171f, 190f)
+        val RAY_HALF_WIDTHS = floatArrayOf(4.5f, 3f, 5.5f, 3.2f, 4f)
+
+        /** Nuvem: centro (fração do teclado) e os círculos (dx e dy em dp, raio em dp) que a formam. */
+        class Cloud(val x: Float, val y: Float, val puffs: List<Triple<Float, Float, Float>>)
+
+        val CLOUDS = listOf(
+            Cloud(0.20f, 0.30f, listOf(Triple(-26f, 4f, 22f), Triple(0f, -6f, 30f), Triple(28f, 2f, 24f), Triple(6f, 10f, 26f))),
+            Cloud(0.58f, 0.14f, listOf(Triple(-20f, 2f, 18f), Triple(2f, -6f, 24f), Triple(24f, 4f, 20f))),
+            Cloud(0.93f, 0.52f, listOf(Triple(-18f, 0f, 20f), Triple(6f, -8f, 26f), Triple(24f, 6f, 20f))),
+        )
 
         /** (x e y como fração do teclado, raio em dp) — posições fixas, a cena não sorteia nada. */
         val BUBBLES = listOf(

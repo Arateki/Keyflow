@@ -88,7 +88,7 @@ class KeyboardGridView(
         textAlign = Paint.Align.CENTER
         textSize = dp(15)
         color = kbInk
-        if (colors.inkShadow != 0) setShadowLayer(dp(1.2f), 0f, dp(0.8f), colors.inkShadow)
+        if (colors.inkShadow != 0) setShadowLayer(dp(2.6f), 0f, 0f, colors.inkShadow)
     }
     // Balões da prévia e da tira de acentos (ver [KeyBubble]).
     private val bubbleFill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL; color = colors.popup }

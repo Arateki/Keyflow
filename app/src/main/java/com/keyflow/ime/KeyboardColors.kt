@@ -85,27 +85,28 @@ data class KeyboardColors(
             ink = 0xFFF1E7C9.toInt(),
         )
 
-        // Aero: [key]/[modifier] são o tom do vidro (translúcidos); o brilho e o aro vêm do GlassPainter.
+        // Aero: [key]/[modifier] são a tinta do vidro (azul, translúcida); o brilho, o reflexo e o aro vêm do
+        // GlassPainter. Tinta colorida, não véu branco: um véu branco sobre o céu é o que dava o "cinza".
         private val AERO_DAY = KeyboardColors(
             tray = 0x00000000,
-            // Véus leves: quem dá o corpo é a paisagem desfocada por trás (GlassPainter.useFrost).
-            key = 0x3DFFFFFF,
+            key = 0x6E1F8DE6,
             keyBorder = 0xE6FFFFFF.toInt(),
-            modifier = 0x523C9EE0,
-            ink = 0xFF0B2B4C.toInt(),
+            modifier = 0x960F73F0.toInt(),
+            ink = 0xFF06213F.toInt(),
             popup = 0xFFF3FAFF.toInt(),
             backdrop = KeyboardBackdrop.AERO_DAY,
-            inkShadow = 0xB3FFFFFF.toInt(),
+            // Halo branco em volta da letra (sombra sem deslocamento), como o texto sobre o vidro do Windows 7.
+            inkShadow = 0xE6FFFFFF.toInt(),
         )
         private val AERO_NIGHT = KeyboardColors(
             tray = 0x00000000,
-            key = 0x2496D8F5,
+            key = 0x4048B4EA,
             keyBorder = 0x8CBFEFFF.toInt(),
-            modifier = 0x472A9FD6,
+            modifier = 0x661D6DC2,
             ink = 0xFFF1FAFF.toInt(),
             popup = 0xFF102C47.toInt(),
             backdrop = KeyboardBackdrop.AERO_NIGHT,
-            inkShadow = 0x99001226.toInt(),
+            inkShadow = 0xB3001226.toInt(),
         )
 
         fun of(skin: KeyboardSkin, dark: Boolean): KeyboardColors = when (skin) {
