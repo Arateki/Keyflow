@@ -1,5 +1,6 @@
 package com.keyflow.ime
 
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.ColorFilter
 import android.graphics.LinearGradient
@@ -11,6 +12,8 @@ import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.drawable.Drawable
+import android.view.View
+import kotlin.math.ceil
 
 /**
  * Paisagem que o próprio teclado pinta atrás de barras e grade, para as teclas de vidro terem o que
@@ -38,7 +41,53 @@ private const val NIGHT_GROUND = 0xFF021A22.toInt()
  * Os degradês dependem do tamanho, então são montados em [onBoundsChange] (só quando o teclado muda de
  * tamanho); [draw] só pinta. A cena é fixa — nenhuma animação, nada de relógio.
  */
-private class AeroBackdropDrawable(private val night: Boolean, private val density: Float) : Drawable() {
+/**
+ * Paisagem que também oferece uma cópia desfocada de si — o "fosco" que o vidro das teclas mostra por
+ * trás ([GlassPainter.useFrost]), como o vidro do Windows Vista/7 desfoca o que está atrás dele.
+ */
+interface FrostedBackdrop {
+    /** A paisagem desfocada, reduzida ([frostDownscale] px da view por px do bitmap); null sem tamanho. */
+    val frost: Bitmap?
+    val frostDownscale: Float
+}
+
+/**
+ * Acha a paisagem atrás de [view] (o fundo de um ancestral) e onde [view] está sobre ela — em cada
+ * `onDraw`, sem alocar.
+ */
+internal class FrostLocator(private val view: View) {
+    private val viewInWindow = IntArray(2)
+    private val hostInWindow = IntArray(2)
+    var dx = 0f
+        private set
+    var dy = 0f
+        private set
+
+    fun locate(): FrostedBackdrop? {
+        var parent = view.parent
+        while (parent is View) {
+            val backdrop = parent.background
+            if (backdrop is FrostedBackdrop) {
+                view.getLocationInWindow(viewInWindow)
+                parent.getLocationInWindow(hostInWindow)
+                dx = (viewInWindow[0] - hostInWindow[0]).toFloat()
+                dy = (viewInWindow[1] - hostInWindow[1]).toFloat()
+                return backdrop
+            }
+            parent = parent.parent
+        }
+        return null
+    }
+}
+
+private class AeroBackdropDrawable(
+    private val night: Boolean,
+    private val density: Float,
+) : Drawable(), FrostedBackdrop {
+
+    override var frost: Bitmap? = null
+        private set
+    override val frostDownscale: Float = FROST_DOWNSCALE
 
     private val skyPaint = Paint()
     private val sunPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -149,6 +198,7 @@ private class AeroBackdropDrawable(private val night: Boolean, private val densi
         bubbleRimPaint.color = if (night) 0x5945D8FF else 0x8CFFFFFF.toInt()
         bubbleShinePaint.color = if (night) 0x73D8F6FF else 0xA6FFFFFF.toInt()
         compact = h < COMPACT_HEIGHT_DP * density
+        frost = buildFrost(bounds)
     }
 
     override fun draw(canvas: Canvas) {
@@ -178,6 +228,27 @@ private class AeroBackdropDrawable(private val night: Boolean, private val densi
         }
     }
 
+    /**
+     * A cena desenhada em 1/[FROST_DOWNSCALE] e desfocada (caixa em 2 passadas, que já lembra gaussiana).
+     * Pequena de propósito: ampliada pelo filtro bilinear na hora de desenhar, o desfoque fica macio e o
+     * bitmap custa alguns KB. Só roda quando o teclado muda de tamanho.
+     */
+    private fun buildFrost(bounds: Rect): Bitmap {
+        val w = ceil(bounds.width() / FROST_DOWNSCALE).toInt().coerceAtLeast(1)
+        val h = ceil(bounds.height() / FROST_DOWNSCALE).toInt().coerceAtLeast(1)
+        val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        Canvas(bitmap).apply {
+            scale(1f / FROST_DOWNSCALE, 1f / FROST_DOWNSCALE)
+            translate(-bounds.left.toFloat(), -bounds.top.toFloat())
+            draw(this)
+        }
+        val pixels = IntArray(w * h)
+        bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
+        repeat(FROST_PASSES) { boxBlur(pixels, w, h, FROST_RADIUS) }
+        bitmap.setPixels(pixels, 0, w, 0, 0, w, h)
+        return bitmap
+    }
+
     /** Cada faixa são três traços sobrepostos, do largo e fraco ao fino e forte: borda macia sem blur. */
     private fun drawRibbons(canvas: Canvas) {
         ribbons.forEachIndexed { i, path ->
@@ -202,6 +273,9 @@ private class AeroBackdropDrawable(private val night: Boolean, private val densi
 
     private companion object {
         const val COMPACT_HEIGHT_DP = 140f
+        const val FROST_DOWNSCALE = 8f
+        const val FROST_RADIUS = 2
+        const val FROST_PASSES = 2
         val SKY_STOPS = floatArrayOf(0f, 0.38f, 0.72f, 1f)
         val DAY_SKY = intArrayOf(0xFF1C7BD6.toInt(), 0xFF48B0F0.toInt(), 0xFFA5E0FB.toInt(), 0xFFDDF6FF.toInt())
         val NIGHT_SKY = intArrayOf(0xFF030A22.toInt(), 0xFF062652.toInt(), 0xFF0A4A70.toInt(), 0xFF0B6474.toInt())
@@ -218,5 +292,39 @@ private class AeroBackdropDrawable(private val night: Boolean, private val densi
             Triple(0.90f, 0.28f, 13f),
             Triple(0.42f, 0.88f, 8f),
         )
+    }
+}
+
+/** Desfoque de caixa separável (horizontal, depois vertical) sobre ARGB empacotado, com as bordas repetidas. */
+private fun boxBlur(pixels: IntArray, w: Int, h: Int, radius: Int) {
+    val tmp = IntArray(pixels.size)
+    blurLine(pixels, tmp, w, h, radius, horizontal = true)
+    blurLine(tmp, pixels, w, h, radius, horizontal = false)
+}
+
+private fun blurLine(src: IntArray, dst: IntArray, w: Int, h: Int, radius: Int, horizontal: Boolean) {
+    val lines = if (horizontal) h else w
+    val length = if (horizontal) w else h
+    val window = radius * 2 + 1
+    for (line in 0 until lines) {
+        fun at(i: Int): Int {
+            val c = i.coerceIn(0, length - 1)
+            return if (horizontal) src[line * w + c] else src[c * w + line]
+        }
+        var a = 0; var r = 0; var g = 0; var b = 0
+        for (i in -radius..radius) {
+            val p = at(i)
+            a += p ushr 24; r += (p shr 16) and 0xFF; g += (p shr 8) and 0xFF; b += p and 0xFF
+        }
+        for (i in 0 until length) {
+            val out = ((a / window) shl 24) or ((r / window) shl 16) or ((g / window) shl 8) or (b / window)
+            if (horizontal) dst[line * w + i] = out else dst[i * w + line] = out
+            val add = at(i + radius + 1)
+            val drop = at(i - radius)
+            a += (add ushr 24) - (drop ushr 24)
+            r += ((add shr 16) and 0xFF) - ((drop shr 16) and 0xFF)
+            g += ((add shr 8) and 0xFF) - ((drop shr 8) and 0xFF)
+            b += (add and 0xFF) - (drop and 0xFF)
+        }
     }
 }

@@ -88,9 +88,10 @@ data class KeyboardColors(
         // Aero: [key]/[modifier] são o tom do vidro (translúcidos); o brilho e o aro vêm do GlassPainter.
         private val AERO_DAY = KeyboardColors(
             tray = 0x00000000,
-            key = 0x6BFFFFFF.toInt(),
+            // Véus leves: quem dá o corpo é a paisagem desfocada por trás (GlassPainter.useFrost).
+            key = 0x3DFFFFFF,
             keyBorder = 0xE6FFFFFF.toInt(),
-            modifier = 0x7A4FB0E8.toInt(),
+            modifier = 0x523C9EE0,
             ink = 0xFF0B2B4C.toInt(),
             popup = 0xFFF3FAFF.toInt(),
             backdrop = KeyboardBackdrop.AERO_DAY,
@@ -98,9 +99,9 @@ data class KeyboardColors(
         )
         private val AERO_NIGHT = KeyboardColors(
             tray = 0x00000000,
-            key = 0x3396D8F5,
+            key = 0x2496D8F5,
             keyBorder = 0x8CBFEFFF.toInt(),
-            modifier = 0x592A9FD6,
+            modifier = 0x472A9FD6,
             ink = 0xFFF1FAFF.toInt(),
             popup = 0xFF102C47.toInt(),
             backdrop = KeyboardBackdrop.AERO_NIGHT,

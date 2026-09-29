@@ -1,5 +1,6 @@
 package com.keyflow.ime.keyboard
 
+import com.keyflow.ime.FrostLocator
 import com.keyflow.ime.GlassPainter
 import com.keyflow.ime.KeyboardColors
 import com.keyflow.ime.KeyboardSkin
@@ -69,6 +70,7 @@ class KeyboardGridView(
     private val pressedOverlay = 0x33000000
     // Aero: teclas de vidro sobre a paisagem que a view-mãe pinta (a grade não tem fundo próprio).
     private val glass = if (colors.isGlass) GlassPainter(dp(1), dark) else null
+    private val frostLocator = FrostLocator(this)
 
     private val keyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -237,6 +239,7 @@ class KeyboardGridView(
     }
 
     override fun onDraw(canvas: Canvas) {
+        glass?.useFrost(frostLocator.locate(), frostLocator.dx, frostLocator.dy)
         placedRows.forEach { row ->
             row.keys.forEach { placed -> drawKey(canvas, placed) }
         }
