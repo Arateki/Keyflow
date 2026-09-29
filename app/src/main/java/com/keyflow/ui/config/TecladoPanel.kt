@@ -26,8 +26,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.keyflow.core.shortcuts.BarButton
-import com.keyflow.core.shortcuts.BarDef
 import com.keyflow.core.shortcuts.BarsConfig
 import com.keyflow.core.shortcuts.ShortcutGrid
 import com.keyflow.data.Settings
@@ -43,6 +41,7 @@ const val TECLADO_AUTO_PASTE_IN_FIELD_TAG = "teclado-auto-paste-in-field"
 const val TECLADO_AUTO_PASTE_ON_FOCUS_TAG = "teclado-auto-paste-on-focus"
 const val TECLADO_LANGUAGE_TAG = "teclado-language"
 const val TECLADO_UNLOCK_TAG = "teclado-unlock-skins"
+const val TECLADO_SIZE_PREVIEW_NOTE_TAG = "teclado-size-preview-note"
 const val TECLADO_SIZE_SLIDER_TAG = "teclado-size-slider"
 const val TECLADO_SIZE_PREVIEW_TAG = "teclado-size-preview"
 const val TECLADO_NUMBER_ROW_TAG = "teclado-number-row"
@@ -235,14 +234,6 @@ fun TecladoPanel(
  * prévia bater com o teclado real); com a navegação lateral, a largura da tela invadia o menu. A ALTURA
  * continua a real — é ela que o slider muda.
  */
-/**
- * Barra da prévia de tamanho: a de fábrica sem a faixa de sugestões. Com ela, a barra passava da largura
- * do painel e rolava dentro da prévia (Yan, 2026-09-28); a prévia é sobre o tamanho das teclas.
- */
-private val SIZE_PREVIEW_BARS: BarsConfig = BarsConfig.DEFAULT.let { factory ->
-    factory.copy(expanded = factory.expanded.map { bar -> BarDef(bar.buttons.filterNot { it == BarButton.Candidates }) })
-}
-
 @Composable
 private fun KeyboardSizePreview(
     scalePercent: Int,
@@ -253,9 +244,9 @@ private fun KeyboardSizePreview(
 ) {
     val palette = LocalKeyFlowPalette.current
     // Largura do PAINEL (não da tela): com a navegação lateral, a largura da tela invadia o menu.
-    Box(
+    Column(
         Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 16.dp),
-        contentAlignment = Alignment.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Column(
             Modifier
@@ -279,7 +270,9 @@ private fun KeyboardSizePreview(
                             locale = locale,
                             showLanguageKey = true,
                             numberRowEnabled = numberRowEnabled,
-                            barsConfig = SIZE_PREVIEW_BARS,
+                            // A barra de fábrica, com a área das sugestões vazia: mic, ajustes e recolher na
+                            // proporção real (sem ela o mic esticava para o cartão todo — Yan, 2026-09-28).
+                            barsFitWidth = true,
                         ).apply {
                             setExpanded(true)
                             keyboardSizePreviewForTest = this
@@ -292,6 +285,11 @@ private fun KeyboardSizePreview(
                 )
             }
         }
+        // O cartão é mais estreito que a tela: a prévia acerta a altura, não a largura (Yan, 2026-09-28).
+        SettingSub(
+            "A prévia mostra a altura real do teclado. A largura foi estreitada para caber aqui — no uso, ele ocupa a tela toda.",
+            Modifier.fillMaxWidth().padding(top = 10.dp).testTag(TECLADO_SIZE_PREVIEW_NOTE_TAG),
+        )
     }
 }
 

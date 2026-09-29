@@ -87,6 +87,9 @@ class BarView(
     // Pior caso de barras KeyFlow empilhadas (colapsado OU expandido) — a reserva assumia sempre 1 barra
     // só; com 2+ subestimava o espaço real e a grade "roubava" espaço do QWERTY (achado do Yan, 2026-07-07).
     private val barCount: Int = 1,
+    // Prévia de tamanho (aba Teclado): os botões dividem a largura que houver, sem o mínimo de toque que
+    // faria a barra rolar num cartão mais estreito que a tela — as proporções ficam as do teclado real.
+    private val fitWidth: Boolean = false,
 ) : ViewGroup(context) {
 
     private val declaredButtons: List<BarButton> = def.buttons
@@ -263,7 +266,7 @@ class BarView(
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val width = MeasureSpec.getSize(widthMeasureSpec)
-        barLayout = BarGeometry.layout(buttons, width.toFloat(), minUnitPx = dp(MIN_UNIT_DP))
+        barLayout = BarGeometry.layout(buttons, width.toFloat(), minUnitPx = if (fitWidth) 0f else dp(MIN_UNIT_DP))
         scrollOffset = scrollOffset.coerceIn(0f, barLayout.maxScroll)
         // Encolhe com 2+ barras empilhadas em paisagem (piso pra continuar tocável) — antes a altura era
         // FIXA, então toda a pressão de "não cabe" caía inteira na grade efêmera, a única coisa flexível

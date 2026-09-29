@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.onRoot
@@ -152,5 +153,27 @@ class TecladoPanelTest {
             "prévia deveria ficar centralizada no painel (esquerda=$leftPx px, direita=$rightPx px)",
             kotlin.math.abs(leftPx - rightPx) <= 1,
         )
+    }
+
+    @Test
+    fun keyboardSizePreviewKeepsTheRealBarProportionsWithoutScrolling() {
+        // O cartão é mais estreito que a tela (Yan, 2026-09-28): sem a área das sugestões, o mic esticava
+        // para o cartão todo; com ela e o mínimo de toque, a barra rolava. Agora é a barra de fábrica
+        // dividida na largura que houver — e um aviso explica que a prévia acerta a altura, não a largura.
+        val h = Harness(Settings(keyboardScalePercent = 100))
+        rule.setContent { h.Content() }
+        rule.waitForIdle()
+
+        // A view monta as barras dos dois modos; a da prévia (expandida) é a que está na tela.
+        val bar = keyboardSizePreviewForTest?.barViewsForTest?.single { it.isAttachedToWindow } ?: error("prévia não montou")
+        val layout = bar.layoutForTest
+        assertTrue("a barra da prévia não deveria rolar", !layout.scrollable)
+        assertTrue(
+            "a barra da prévia deveria ter a área das sugestões",
+            layout.buttons.any { it.button == com.keyflow.core.shortcuts.BarButton.Candidates },
+        )
+        val mic = layout.buttons.first { it.button == com.keyflow.core.shortcuts.BarButton.Mic }
+        assertTrue("o mic não deveria passar de 1/3 da barra (${mic.width} de ${layout.viewWidth})", mic.width < layout.viewWidth / 3f)
+        rule.onNodeWithTag(TECLADO_SIZE_PREVIEW_NOTE_TAG).performScrollTo().assertIsDisplayed()
     }
 }

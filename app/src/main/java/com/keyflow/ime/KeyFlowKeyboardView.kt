@@ -88,6 +88,8 @@ class KeyFlowKeyboardView(
     // Escala visual (1f = produção). A demo da aba Modo usa < 1 para um teclado menor, proporcional.
     private val scale: Float = 1f,
     private val clock: () -> Long = { SystemClock.elapsedRealtime() },
+    // Prévia de tamanho: barras divididas na largura que houver, sem rolar (ver BarView.fitWidth).
+    private val barsFitWidth: Boolean = false,
 ) : LinearLayout(context) {
 
     private var canvasGrid: KeyboardGridView? = null
@@ -302,6 +304,7 @@ class KeyFlowKeyboardView(
                 clock = clock,
                 qwertyRowCount = qwertyRowCount,
                 barCount = barCount,
+                fitWidth = barsFitWidth,
             ).also { bar ->
                 barViews += bar
                 // Barra recém-criada herda o estado vigente (mic e sugestões), senão recolher/expandir
