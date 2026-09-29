@@ -1,5 +1,6 @@
 package com.keyflow.transcription.local
 
+import com.keyflow.i18n.tr
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -28,14 +29,15 @@ import kotlin.coroutines.resume
 
 /** Mensagens dos erros locais, já para o usuário (NAT-04/07). */
 object LocalErrors {
-    const val PROCESS_DIED = "A transcrição local foi interrompida — tente de novo."
-    const val UNAVAILABLE = "Não foi possível iniciar a transcrição local."
+    // Getters, não constantes: a mensagem sai no idioma da interface na hora do erro.
+    val PROCESS_DIED: String get() = tr("A transcrição local foi interrompida — tente de novo.")
+    val UNAVAILABLE: String get() = tr("Não foi possível iniciar a transcrição local.")
 
     fun message(kind: EngineErrorKind): String = when (kind) {
-        EngineErrorKind.MODEL_MISSING -> "Arquivos do modelo local sumiram — baixe de novo na aba Transcrição."
-        EngineErrorKind.DECODE -> "Não foi possível ler o áudio gravado."
-        EngineErrorKind.OOM -> "Memória insuficiente para o modelo local — feche outros apps ou escolha um modelo menor."
-        EngineErrorKind.ENGINE -> "O modelo local falhou ao transcrever."
+        EngineErrorKind.MODEL_MISSING -> tr("Arquivos do modelo local sumiram — baixe de novo na aba Transcrição.")
+        EngineErrorKind.DECODE -> tr("Não foi possível ler o áudio gravado.")
+        EngineErrorKind.OOM -> tr("Memória insuficiente para o modelo local — feche outros apps ou escolha um modelo menor.")
+        EngineErrorKind.ENGINE -> tr("O modelo local falhou ao transcrever.")
     }
 
     fun error(message: String) = TranscriptionResult.Error(ErrorKind.LOCAL, message)

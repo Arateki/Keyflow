@@ -1,5 +1,6 @@
 package com.keyflow.ime.bars
 
+import com.keyflow.i18n.tr
 import com.keyflow.core.ButtonState
 
 /**
@@ -21,8 +22,8 @@ object MicVisuals {
         ButtonState.PAUSED -> "⏸ ${formatTime(elapsedSeconds)}" to ACCENT_RECORD
         ButtonState.SENDING -> "···" to ACCENT_TEAL
         ButtonState.ERROR -> "✖" to ACCENT_TERRACOTTA
-        ButtonState.CANCELLING -> "🗑 cancelado" to ACCENT_TERRACOTTA
-        ButtonState.PENDING_PASTE -> "📋 colar" to ACCENT_TERRACOTTA
+        ButtonState.CANCELLING -> tr("🗑 cancelado") to ACCENT_TERRACOTTA
+        ButtonState.PENDING_PASTE -> tr("📋 colar") to ACCENT_TERRACOTTA
     }
 
     fun formatTime(totalSeconds: Int): String {

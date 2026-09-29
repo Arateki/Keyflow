@@ -1,5 +1,6 @@
 package com.keyflow.ui.config
 
+import com.keyflow.i18n.tr
 import com.keyflow.ime.KeyboardSkin
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -107,12 +108,12 @@ fun TecladoPanel(
         // Sem o modo pronto (ligado, permissões, KeyFlow como teclado ativo), o resto da aba só se lê.
         LockedSection(locked = locked, onLockedTap = onLockedTap) {
             SettingsGroup(
-                "Colar transcrição automaticamente",
-                description = "Quando você precisa que sua fala preencha os campos sem sua ação manual.",
+                tr("Colar transcrição automaticamente"),
+                description = tr("Quando você precisa que sua fala preencha os campos sem sua ação manual."),
             ) {
                 ToggleRow(
-                    label = "Ao gravar com um campo de texto aberto",
-                    sub = "Cola direto quando a transcrição volta.",
+                    label = tr("Ao gravar com um campo de texto aberto"),
+                    sub = tr("Cola direto quando a transcrição volta."),
                     checked = settings.autoPasteInField,
                     onCheckedChange = { onSettingsChange(settings.copy(autoPasteInField = it)) },
                     tag = TECLADO_AUTO_PASTE_IN_FIELD_TAG,
@@ -121,8 +122,8 @@ fun TecladoPanel(
                 ToggleRow(
                     // "Gravar fora" (sem campo focado) só acontece pelo Modo Sobrepor; sem ele a opção não faz
                     // sentido e fica inerte (mesmo estilo de abas/menus inativos), explicando o porquê no toque.
-                    label = "Ao tocar num campo depois de gravar fora",
-                    sub = "Guarda o texto e cola quando você foca um campo.",
+                    label = tr("Ao tocar num campo depois de gravar fora"),
+                    sub = tr("Guarda o texto e cola quando você foca um campo."),
                     checked = settings.autoPasteOnFocus,
                     onCheckedChange = { onSettingsChange(settings.copy(autoPasteOnFocus = it)) },
                     tag = TECLADO_AUTO_PASTE_ON_FOCUS_TAG,
@@ -131,10 +132,10 @@ fun TecladoPanel(
                 )
             }
 
-            SettingsGroup("Digitação") {
+            SettingsGroup(tr("Digitação")) {
                 // Idioma do teclado: a mesma escolha que o globo alterna (layout, acentos e corretor). A linha era
                 // um "pt-BR" fixo de antes de o teclado ter inglês e espanhol (achado do Yan, 2026-09-28).
-                GroupItem("Idioma do teclado", "O mesmo que o globo do teclado alterna: letras, acentos e corretor.") {
+                GroupItem(tr("Idioma do teclado"), tr("O mesmo que o globo do teclado alterna: letras, acentos e corretor.")) {
                     Segmented(
                         options = KEYBOARD_LANGUAGES,
                         selected = settings.keyboardLanguage,
@@ -147,8 +148,8 @@ fun TecladoPanel(
                 GroupDivider()
                 // Correção automática (Q9, pedido do Yan, 2026-09-28): desligada, a faixa segue sugerindo.
                 ToggleRow(
-                    label = "Correção automática",
-                    sub = "Troca a palavra no espaço quando o corretor tem certeza (\"nao\" → \"não\"). Apagar logo depois desfaz.",
+                    label = tr("Correção automática"),
+                    sub = tr("Troca a palavra no espaço quando o corretor tem certeza (\"nao\" → \"não\"). Apagar logo depois desfaz."),
                     checked = settings.keyboardAutoCorrect,
                     onCheckedChange = { onSettingsChange(settings.copy(keyboardAutoCorrect = it)) },
                     tag = TECLADO_AUTO_CORRECT_TAG,
@@ -158,8 +159,8 @@ fun TecladoPanel(
                 // estilo Gboard — reflete na prévia abaixo e desativa o long-press de número na 1ª fileira
                 // (redundante com a fileira nova).
                 ToggleRow(
-                    label = "Fileira de números",
-                    sub = "Linha dedicada de dígitos acima do teclado, como no Gboard.",
+                    label = tr("Fileira de números"),
+                    sub = tr("Linha dedicada de dígitos acima do teclado, como no Gboard."),
                     checked = settings.keyboardNumberRowEnabled,
                     onCheckedChange = { onSettingsChange(settings.copy(keyboardNumberRowEnabled = it)) },
                     tag = TECLADO_NUMBER_ROW_TAG,
@@ -168,8 +169,8 @@ fun TecladoPanel(
                 // Sem isto o Android esconde o teclado virtual quando há teclado físico conectado — e some
                 // junto o mic, que é o produto. Ligado por padrão; desmarcar devolve o comportamento do sistema.
                 ToggleRow(
-                    label = "Mostrar com teclado físico",
-                    sub = "Mantém o teclado do KeyFlow na tela mesmo com um teclado Bluetooth ou USB conectado.",
+                    label = tr("Mostrar com teclado físico"),
+                    sub = tr("Mantém o teclado do KeyFlow na tela mesmo com um teclado Bluetooth ou USB conectado."),
                     checked = settings.keyboardShowWithHardKeyboard,
                     onCheckedChange = { onSettingsChange(settings.copy(keyboardShowWithHardKeyboard = it)) },
                     tag = TECLADO_SHOW_WITH_HARD_KEYBOARD_TAG,
@@ -178,8 +179,8 @@ fun TecladoPanel(
 
             // Layout do teclado (CFG-01/02/03/06): editor WYSIWYG das barras de atalhos.
             SettingsGroup(
-                "Layout do teclado",
-                description = "Personalize os botões da barra do teclado — mic, atalhos, gatilhos de grade.",
+                tr("Layout do teclado"),
+                description = tr("Personalize os botões da barra do teclado — mic, atalhos, gatilhos de grade."),
             ) {
                 BarsEditor(
                     barsConfig = barsConfig,
@@ -191,8 +192,8 @@ fun TecladoPanel(
 
             // Teclados de atalhos (CFG-04): grades que os gatilhos da barra acima podem abrir.
             SettingsGroup(
-                "Teclados de atalhos",
-                description = "Grades de atalhos que os gatilhos da barra podem abrir.",
+                tr("Teclados de atalhos"),
+                description = tr("Grades de atalhos que os gatilhos da barra podem abrir."),
             ) {
                 GridsEditor(
                     grids = shortcutGrids,
@@ -203,8 +204,8 @@ fun TecladoPanel(
             }
 
             SettingsGroup(
-                "Tamanho do teclado",
-                description = "Encolhe ou aumenta o teclado inteiro — teclas, faixa de sugestões e barra retraída.",
+                tr("Tamanho do teclado"),
+                description = tr("Encolhe ou aumenta o teclado inteiro — teclas, faixa de sugestões e barra retraída."),
                 trailing = {
                     Text(
                         "${settings.keyboardScalePercent}%",
@@ -309,7 +310,7 @@ private fun KeyboardSizePreview(
         }
         // O cartão é mais estreito que a tela: a prévia acerta a altura, não a largura (Yan, 2026-09-28).
         SettingSub(
-            "A prévia mostra a altura real do teclado. A largura foi estreitada para caber aqui — no uso, ele ocupa a tela toda.",
+            tr("A prévia mostra a altura real do teclado. A largura foi estreitada para caber aqui — no uso, ele ocupa a tela toda."),
             Modifier.fillMaxWidth().padding(top = 10.dp).testTag(TECLADO_SIZE_PREVIEW_NOTE_TAG),
         )
     }

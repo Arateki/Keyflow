@@ -1,5 +1,6 @@
 package com.keyflow.ui.config
 
+import com.keyflow.i18n.tr
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -144,7 +145,7 @@ fun GridsEditor(
             AddGridRow {
                 val newGrid = ShortcutGrid(
                     id = "grid-${System.currentTimeMillis()}-${grids.size}",
-                    name = "Grade ${grids.size + 1}",
+                    name = tr("Grade %d", grids.size + 1),
                     rows = 3,
                     cols = 3,
                 )
@@ -156,7 +157,7 @@ fun GridsEditor(
         if (editing != null) {
             val picking = pickerCell
             ConfigModal(
-                title = if (picking != null) "Escolher tecla física" else "Editar grade",
+                title = if (picking != null) tr("Escolher tecla física") else tr("Editar grade"),
                 onDismiss = { closeSheet() },
                 closeTag = if (picking != null) PHYSICAL_KEY_PICKER_CLOSE_TAG else GRIDS_EDITOR_SHEET_CLOSE_TAG,
                 cardTag = if (picking != null) PHYSICAL_KEY_PICKER_TAG else GRIDS_EDITOR_SHEET_TAG,
@@ -242,7 +243,7 @@ private fun GridListRow(
     ) {
         if (pendingDelete) {
             Text(
-                "Grade em uso por um atalho — toque de novo pra remover mesmo assim",
+                tr("Grade em uso por um atalho — toque de novo pra remover mesmo assim"),
                 color = palette.terracotta,
                 fontFamily = SpaceGrotesk,
                 fontSize = 12.sp,
@@ -252,7 +253,7 @@ private fun GridListRow(
                     .testTag(gridDeleteConfirmTag(grid.id)),
             )
             Text(
-                "Cancelar",
+                tr("Cancelar"),
                 color = palette.muted,
                 fontFamily = SpaceGrotesk,
                 fontWeight = FontWeight.SemiBold,
@@ -316,7 +317,7 @@ private fun GridEditContent(
     val noRipple = remember { MutableInteractionSource() }
 
     AutoSaveField(
-        label = "Nome",
+        label = tr("Nome"),
         value = grid.name,
         onCommit = { onUpdate(grid.copy(name = it)) },
         tag = GRIDS_EDITOR_NAME_FIELD_TAG,
@@ -328,7 +329,7 @@ private fun GridEditContent(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Stepper(
-            label = "Linhas",
+            label = tr("Linhas"),
             value = grid.rows,
             range = 1..GRID_MAX_DIMENSION,
             onValueChange = { onUpdate(remapGrid(grid, newRows = it, newCols = grid.cols)) },
@@ -336,7 +337,7 @@ private fun GridEditContent(
             modifier = Modifier.weight(1f),
         )
         Stepper(
-            label = "Colunas",
+            label = tr("Colunas"),
             value = grid.cols,
             range = 1..GRID_MAX_DIMENSION,
             onValueChange = { onUpdate(remapGrid(grid, newRows = grid.rows, newCols = it)) },
@@ -360,7 +361,7 @@ private fun GridEditContent(
         ) {
             if (labelEditing == cellMenu && cell != null) {
                 AutoSaveField(
-                    label = "Rótulo",
+                    label = tr("Rótulo"),
                     value = cell.label ?: "",
                     onCommit = { newLabel ->
                         onUpdate(grid.copy(cells = grid.cells + (idx to cell.copy(label = newLabel.ifBlank { null }))))
@@ -370,7 +371,7 @@ private fun GridEditContent(
                 )
             } else {
                 Text(
-                    "Limpar",
+                    tr("Limpar"),
                     color = palette.terracotta,
                     fontFamily = SpaceGrotesk,
                     fontWeight = FontWeight.SemiBold,
@@ -384,7 +385,7 @@ private fun GridEditContent(
                         .padding(8.dp),
                 )
                 Text(
-                    "Rótulo custom",
+                    tr("Rótulo custom"),
                     color = palette.muted,
                     fontFamily = SpaceGrotesk,
                     fontWeight = FontWeight.SemiBold,

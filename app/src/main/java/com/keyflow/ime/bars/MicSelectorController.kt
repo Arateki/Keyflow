@@ -1,5 +1,6 @@
 package com.keyflow.ime.bars
 
+import com.keyflow.i18n.tr
 import com.keyflow.ime.KeyboardColors
 import com.keyflow.ime.KeyboardSkin
 import android.content.Context
@@ -160,9 +161,9 @@ class MicSelectorController(
         rawX >= rect.left && rawX <= rect.right && rawY >= rect.top && rawY <= rect.bottom + dp(40)
 
     private fun label(action: MicAction, micState: ButtonState): String = when (action) {
-        MicAction.PAUSE_RESUME -> if (micState == ButtonState.PAUSED) "retomar" else "pausar"
-        MicAction.CANCEL -> "cancelar"
-        MicAction.UNDO -> "desfazer"
+        MicAction.PAUSE_RESUME -> if (micState == ButtonState.PAUSED) tr("retomar") else tr("pausar")
+        MicAction.CANCEL -> tr("cancelar")
+        MicAction.UNDO -> tr("desfazer")
     }
 
     private fun icon(action: MicAction, micState: ButtonState): KfIconSpec = when (action) {

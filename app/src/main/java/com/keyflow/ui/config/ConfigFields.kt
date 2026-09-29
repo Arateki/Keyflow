@@ -1,5 +1,6 @@
 package com.keyflow.ui.config
 
+import com.keyflow.i18n.tr
 import androidx.compose.foundation.layout.fillMaxSize
 import com.keyflow.ime.KeyboardSkin
 import com.keyflow.ime.KeyboardColors
@@ -83,7 +84,7 @@ import com.keyflow.ui.theme.SpaceMono
 
 /** Rótulo curto de [RecordingMode] para o [Segmented] (Teclado/Overlay). */
 internal fun recordingModeLabel(mode: RecordingMode): String = when (mode) {
-    RecordingMode.TOGGLE -> "Alternar"
+    RecordingMode.TOGGLE -> tr("Alternar")
     RecordingMode.PUSH_TO_TALK -> "Push-to-talk"
 }
 
@@ -834,7 +835,7 @@ internal fun SkinsSection(
             .padding(top = 15.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Skins", color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Medium, fontSize = 13.5.sp)
+            Text(tr("Skins"), color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Medium, fontSize = 13.5.sp)
             Row(
                 Modifier
                     .clip(RoundedCornerShape(50))
@@ -844,7 +845,7 @@ internal fun SkinsSection(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 KfIcon(KfIcons.Lock, palette.faint, Modifier.size(11.dp), strokeWidth = 2f)
-                Eyebrow("Bloqueado")
+                Eyebrow(tr("Bloqueado"))
             }
         }
         // A cor em uso (teal/orbe) aparece SELECIONADA (anel + opaca); as demais ficam esmaecidas (locked).
@@ -858,7 +859,7 @@ internal fun SkinsSection(
             } else {
                 val system = KeyboardColors.of(KeyboardSkin.SYSTEM, palette.isDark)
                 SkinChoice(
-                    label = "Sistema",
+                    label = tr("Sistema"),
                     selected = KeyboardSkin.of(selectedSkin) == KeyboardSkin.SYSTEM,
                     onClick = { onSkinSelected(KeyboardSkin.SYSTEM.id) },
                     tag = skinTag(KeyboardSkin.SYSTEM.id),
@@ -869,7 +870,7 @@ internal fun SkinsSection(
                     }
                 }
                 SkinChoice(
-                    label = "Ateliê",
+                    label = tr("Ateliê"),
                     selected = KeyboardSkin.of(selectedSkin) == KeyboardSkin.ATELIE,
                     onClick = { onSkinSelected(KeyboardSkin.ATELIE.id) },
                     tag = skinTag(KeyboardSkin.ATELIE.id),
@@ -894,7 +895,7 @@ internal fun SkinsSection(
         ) {
             KfIcon(KfIcons.LockOpen, palette.terracotta, Modifier.size(15.dp))
             Text(
-                "Desbloquear skins",
+                tr("Desbloquear skins"),
                 color = palette.terracotta,
                 fontFamily = SpaceGrotesk,
                 fontWeight = FontWeight.Medium,

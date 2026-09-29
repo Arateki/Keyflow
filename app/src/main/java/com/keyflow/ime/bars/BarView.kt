@@ -1,5 +1,6 @@
 package com.keyflow.ime.bars
 
+import com.keyflow.i18n.tr
 import com.keyflow.ime.KeyboardColors
 import com.keyflow.ime.KeyboardSkin
 import android.content.Context
@@ -446,8 +447,8 @@ class BarView(
 
     /** Rótulo do nó virtual: o mesmo texto desenhado, com a limitação anunciada nos gestos contínuos (A11Y-02). */
     private fun a11yLabel(button: BarButton): String = when (button) {
-        BarButton.Joystick -> "Alavanca (requer gesto deslizante)"
-        is BarButton.GridTrigger -> "${button.label} (requer gesto deslizante)"
+        BarButton.Joystick -> tr("Alavanca (requer gesto deslizante)")
+        is BarButton.GridTrigger -> tr("%s (requer gesto deslizante)", button.label)
         else -> visualsFor(button).first
     }
 

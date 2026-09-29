@@ -1,5 +1,7 @@
 package com.keyflow.ui.config
 
+import com.keyflow.i18n.AppLocale
+import com.keyflow.i18n.tr
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -72,7 +74,7 @@ const val MODO_TOUR_KEYBOARD_TAG = "modo-tour-keyboard"
 
 /** Permissão de microfone: a mesma nos dois cartões (sincronizada, estado único). */
 private fun micPermission(permissions: PermissionStatus, onRequestMicPermission: () -> Unit) = CardPermission(
-    label = "Microfone",
+    label = tr("Microfone"),
     granted = permissions.microphoneGranted,
     onActivate = onRequestMicPermission,
     activateTag = ACTIVATE_MIC_TAG,
@@ -94,7 +96,7 @@ fun OverlayModeCard(
     highlightKey: Int = 0,
 ) {
     ModeCard(
-        title = "Modo Sobrepor",
+        title = tr("Modo Sobrepor"),
         checked = settings.overlayModeEnabled,
         onCheckedChange = onOverlayModeChange,
         toggleTag = TOGGLE_OVERLAY_MODE_TAG,
@@ -102,20 +104,20 @@ fun OverlayModeCard(
         permissions = listOf(
             micPermission(permissions, onRequestMicPermission),
             CardPermission(
-                label = "Sobrepor",
+                label = tr("Sobrepor"),
                 granted = permissions.overlayGranted,
                 onActivate = onRequestOverlayPermission,
                 activateTag = ACTIVATE_OVERLAY_TAG,
             ),
             CardPermission(
-                label = "Notificações",
+                label = tr("Notificações"),
                 granted = permissions.notificationsGranted,
                 onActivate = onRequestNotificationPermission,
                 activateTag = ACTIVATE_NOTIFICATION_TAG,
             ),
         ),
         features = listOf(
-            "Transcreva voz para texto em qualquer situação para sua área de transferência.",
+            tr("Transcreva voz para texto em qualquer situação para sua área de transferência."),
         ),
         // Tour dos gestos da orbe (MODO-01). `remember` pelos campos que os roteiros consultam:
         // mudou o modo ou um atalho, a lista se refaz e o tour recomeça já correto (SCR-07).
@@ -125,6 +127,7 @@ fun OverlayModeCard(
             settings.shortcut1Tap,
             settings.shortcut2Tap,
             settings.shortcut3Tap,
+            AppLocale.current, // os títulos dos gestos são texto traduzido
         ) { buildOrbScripts(settings) },
         tourScene = { frame -> OrbScene(frame, Modifier.fillMaxWidth()) },
     )
@@ -145,7 +148,7 @@ fun KeyboardModeCard(
     highlightKey: Int = 0,
 ) {
     ModeCard(
-        title = "Modo Teclado",
+        title = tr("Modo Teclado"),
         checked = settings.keyboardModeEnabled,
         onCheckedChange = onKeyboardModeChange,
         toggleTag = TOGGLE_KEYBOARD_MODE_TAG,
@@ -153,15 +156,15 @@ fun KeyboardModeCard(
         permissions = listOf(
             micPermission(permissions, onRequestMicPermission),
             CardPermission(
-                label = "Teclado",
+                label = tr("Teclado"),
                 granted = permissions.keyboardEnabled,
                 onActivate = onRequestKeyboardPermission,
                 activateTag = ACTIVATE_KEYBOARD_TAG,
             ),
         ),
         features = listOf(
-            "Cole a transcrição de voz automaticamente.",
-            "Personalize em estilo e funcionalidade.",
+            tr("Cole a transcrição de voz automaticamente."),
+            tr("Personalize em estilo e funcionalidade."),
         ),
         footer = if (permissions.keyboardEnabled) {
             {
@@ -177,7 +180,7 @@ fun KeyboardModeCard(
         // Tour dos gestos do teclado (MODO-01/04): a cena usa a grade Canvas real, em vez da
         // demo parada que ficou anos mostrando a grade antiga.
         tourTag = MODO_TOUR_KEYBOARD_TAG,
-        tourScripts = remember { buildKeyboardScripts(settings) },
+        tourScripts = remember(AppLocale.current) { buildKeyboardScripts(settings) },
         tourScene = { frame -> KeyboardScene(frame, Modifier.fillMaxWidth()) },
     )
 }
@@ -190,7 +193,7 @@ fun KeyboardModeCard(
 @Composable
 private fun KeyboardActiveLine(active: Boolean, modeOn: Boolean, onSwitch: () -> Unit) {
     StatusChip(
-        text = "Teclado ativo · ${if (active) "sim" else "não"}",
+        text = tr("Teclado ativo · %s", if (active) tr("sim") else tr("não")),
         granted = active,
         pulsing = !active && modeOn,
         onClick = onSwitch,
@@ -219,13 +222,13 @@ fun pauseHintFor(mode: RecordingMode): String = recordingHintParts(mode).joinToS
  */
 fun recordingHintParts(mode: RecordingMode): List<String> = when (mode) {
     RecordingMode.TOGGLE -> listOf(
-        "Toque para gravar ou parar",
-        "segure para pausar e retomar",
+        tr("Toque para gravar ou parar"),
+        tr("segure para pausar e retomar"),
     )
     RecordingMode.PUSH_TO_TALK -> listOf(
-        "Segure para gravar",
-        "solte para enviar",
-        "toque rápido após soltar para pausar",
+        tr("Segure para gravar"),
+        tr("solte para enviar"),
+        tr("toque rápido após soltar para pausar"),
     )
 }
 
@@ -294,7 +297,7 @@ private fun ModeCard(
                 // O próprio chip é o botão: abre as configs (concedido ou não) e pulsa quando o modo
                 // está ligado mas a permissão ainda falta.
                 StatusChip(
-                    text = "${perm.label} · ${if (perm.granted) "concedido" else "pendente"}",
+                    text = "${perm.label} · ${if (perm.granted) tr("concedido") else tr("pendente")}",
                     granted = perm.granted,
                     pulsing = !perm.granted && checked,
                     onClick = perm.onActivate,
@@ -360,7 +363,7 @@ private fun DemoFrame(nav: (@Composable () -> Unit)? = null, content: @Composabl
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Eyebrow("Prévia", color = palette.faint.copy(alpha = 0.8f))
+        Eyebrow(tr("Prévia"), color = palette.faint.copy(alpha = 0.8f))
         // A cena ocupa o que sobra entre o rótulo e a navegação — a moldura é que manda na altura.
         Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) { content() }
         nav?.invoke()
@@ -379,7 +382,7 @@ private fun TourNav(tag: String, title: String, onPrev: () -> Unit, onNext: () -
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Arrow(KfIcons.ChevronLeft, "gesto anterior", "$tag-prev", onPrev)
+        Arrow(KfIcons.ChevronLeft, tr("gesto anterior"), "$tag-prev", onPrev)
         Text(
             title,
             color = palette.fg2,
@@ -398,7 +401,7 @@ private fun TourNav(tag: String, title: String, onPrev: () -> Unit, onNext: () -
         )
         // Só a seta de AVANÇAR pulsa: o tour não anda sozinho, então ela é o caminho adiante e precisa
         // se anunciar. A de voltar não pulsa — duas piscando viram ruído.
-        Arrow(KfIcons.ChevronRight, "próximo gesto", "$tag-next", onNext, pulsing = true)
+        Arrow(KfIcons.ChevronRight, tr("próximo gesto"), "$tag-next", onNext, pulsing = true)
     }
 }
 

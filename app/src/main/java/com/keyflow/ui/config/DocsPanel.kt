@@ -1,5 +1,7 @@
 package com.keyflow.ui.config
 
+import com.keyflow.i18n.tr
+import com.keyflow.i18n.trKey
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -93,9 +95,19 @@ data class DocSection(
     val feedbackActions: Boolean = false,
 )
 
-enum class FeedbackKind(val label: String, val subject: String, val prompt: String, val tag: String) {
-    BUG("Reportar bug", "KeyFlow — bug", "Conte o que aconteceu e o que você esperava:", "docs-feedback-bug"),
-    SUGGESTION("Dar sugestão", "KeyFlow — sugestão", "Conte sua ideia:", "docs-feedback-sugestao"),
+enum class FeedbackKind(
+    private val labelPt: String,
+    private val subjectPt: String,
+    private val promptPt: String,
+    val tag: String,
+) {
+    BUG(trKey("Reportar bug"), trKey("KeyFlow — bug"), trKey("Conte o que aconteceu e o que você esperava:"), "docs-feedback-bug"),
+    SUGGESTION(trKey("Dar sugestão"), trKey("KeyFlow — sugestão"), trKey("Conte sua ideia:"), "docs-feedback-sugestao"),
+    ;
+
+    val label: String get() = tr(labelPt)
+    val subject: String get() = tr(subjectPt)
+    val prompt: String get() = tr(promptPt)
 }
 
 /** O que vai no rodapé do e-mail de feedback — o suficiente para reproduzir, nada pessoal. */
@@ -115,7 +127,7 @@ fun feedbackBody(kind: FeedbackKind, diagnostics: FeedbackDiagnostics): String =
         "—\n" +
         "KeyFlow ${diagnostics.appVersion}\n" +
         "Android ${diagnostics.android}\n" +
-        "Aparelho: ${diagnostics.device}\n"
+        tr("Aparelho: %s", diagnostics.device) + "\n"
 
 /**
  * `ACTION_SENDTO` com `mailto:` — só apps de e-mail respondem. Assunto e corpo vão na própria URI e
@@ -135,240 +147,241 @@ fun feedbackIntent(kind: FeedbackKind, diagnostics: FeedbackDiagnostics): Intent
  * item no índice sozinha. Os textos de gesto repetem as descrições do tour da aba Modo onde elas se
  * sobrepõem — as frases por modo vêm literalmente de [pauseHintFor].
  */
-val docsSections: List<DocSection> = listOf(
+// Getter, não valor guardado: os textos saem no idioma da hora em que a Docs é aberta.
+val docsSections: List<DocSection> get() = listOf(
     DocSection(
         "modos",
-        "Modos",
+        tr("Modos"),
         listOf(
             DocBlock.Paragraph(
-                "Sobrepor flutua sobre qualquer app, com o teclado do sistema. Teclado é o teclado KeyFlow. Use um ou ambos.",
+                tr("Sobrepor flutua sobre qualquer app, com o teclado do sistema. Teclado é o teclado KeyFlow. Use um ou ambos."),
             ),
         ),
     ),
     // Uma seção por aba de configuração: é também o que o "?" do cabeçalho mostra ([docsSectionFor]).
     DocSection(
         "aba-transcricao",
-        "Aba Transcrição",
+        tr("Aba Transcrição"),
         listOf(
             DocBlock.Paragraph(
-                "Escolhe quem transforma sua voz em texto e como a gravação se comporta — vale para a orbe e para o teclado.",
+                tr("Escolhe quem transforma sua voz em texto e como a gravação se comporta — vale para a orbe e para o teclado."),
             ),
             DocBlock.Labeled(
-                "Parcial",
-                "transcrever parcialmente ao pausar já adianta o texto a cada pausa; com a visualização ligada, dá para ler e corrigir antes de enviar.",
+                tr("Parcial"),
+                tr("transcrever parcialmente ao pausar já adianta o texto a cada pausa; com a visualização ligada, dá para ler e corrigir antes de enviar."),
             ),
             DocBlock.Labeled(
-                "Origem",
-                "Créditos, OpenAI, Groq, Custom (qualquer serviço compatível) ou Local (modelo no aparelho, sem internet). Nas da nuvem, informe o token; modelo e idioma são opcionais.",
+                tr("Origem"),
+                tr("Créditos, OpenAI, Groq, Custom (qualquer serviço compatível) ou Local (modelo no aparelho, sem internet). Nas da nuvem, informe o token; modelo e idioma são opcionais."),
             ),
             DocBlock.Labeled(
-                "Tempo limite",
-                "quanto esperar pela transcrição antes de mostrar erro. No infinito, espera o quanto for preciso.",
+                tr("Tempo limite"),
+                tr("quanto esperar pela transcrição antes de mostrar erro. No infinito, espera o quanto for preciso."),
             ),
             DocBlock.Labeled(
-                "Duração máxima",
-                "ao atingir o limite, a gravação pausa e pergunta se envia ou descarta. No infinito, grava até você parar.",
+                tr("Duração máxima"),
+                tr("ao atingir o limite, a gravação pausa e pergunta se envia ou descarta. No infinito, grava até você parar."),
             ),
         ),
     ),
     DocSection(
         "aba-teclado",
-        "Aba Teclado",
+        tr("Aba Teclado"),
         listOf(
             DocBlock.Paragraph(
-                "Tudo do teclado KeyFlow. No topo, o cartão do Modo Teclado liga o KeyFlow como teclado e mostra as permissões; sem ele pronto, o resto da aba fica só para leitura.",
+                tr("Tudo do teclado KeyFlow. No topo, o cartão do Modo Teclado liga o KeyFlow como teclado e mostra as permissões; sem ele pronto, o resto da aba fica só para leitura."),
             ),
             DocBlock.Labeled(
-                "Colar",
-                "cola a transcrição direto no campo aberto, ou guarda e cola quando você tocar num campo depois de gravar fora dele (esta, só com o Modo Sobrepor).",
+                tr("Colar"),
+                tr("cola a transcrição direto no campo aberto, ou guarda e cola quando você tocar num campo depois de gravar fora dele (esta, só com o Modo Sobrepor)."),
             ),
             DocBlock.Labeled(
-                "Digitação",
-                "idioma (o mesmo que o globo alterna), correção automática, fileira de números e manter o teclado com um teclado físico conectado.",
+                tr("Digitação"),
+                tr("idioma (o mesmo que o globo alterna), correção automática, fileira de números e manter o teclado com um teclado físico conectado."),
             ),
             DocBlock.Labeled(
-                "Layout",
-                "os botões da barra do teclado — mic, colar, alavanca, teclas avulsas, gatilhos de grade. O \"?\" de cada opção explica o que ela faz.",
+                tr("Layout"),
+                tr("os botões da barra do teclado — mic, colar, alavanca, teclas avulsas, gatilhos de grade. O \"?\" de cada opção explica o que ela faz."),
             ),
-            DocBlock.Labeled("Teclados de atalhos", "as grades que os gatilhos da barra abrem ao segurar e arrastar."),
+            DocBlock.Labeled(tr("Teclados de atalhos"), tr("as grades que os gatilhos da barra abrem ao segurar e arrastar.")),
             DocBlock.Labeled(
-                "Tamanho e skins",
-                "o tamanho vale para teclas, barra e sugestões (a prévia mostra a altura real); as skins mudam a cara do teclado.",
+                tr("Tamanho e skins"),
+                tr("o tamanho vale para teclas, barra e sugestões (a prévia mostra a altura real); as skins mudam a cara do teclado."),
             ),
         ),
     ),
     DocSection(
         "aba-sobrepor",
-        "Aba Sobrepor",
+        tr("Aba Sobrepor"),
         listOf(
             DocBlock.Paragraph(
-                "A orbe flutuante, que grava por cima de qualquer app. No topo, o cartão do Modo Sobrepor liga a orbe e mostra as permissões (microfone, sobrepor e notificações); sem ele pronto, o resto da aba fica só para leitura.",
+                tr("A orbe flutuante, que grava por cima de qualquer app. No topo, o cartão do Modo Sobrepor liga a orbe e mostra as permissões (microfone, sobrepor e notificações); sem ele pronto, o resto da aba fica só para leitura."),
             ),
-            DocBlock.Labeled("Mão preferencial", "encosta a orbe no seu lado e define para onde arrastar para cancelar."),
+            DocBlock.Labeled(tr("Mão preferencial"), tr("encosta a orbe no seu lado e define para onde arrastar para cancelar.")),
             DocBlock.Labeled(
-                "Modo de gravação",
-                "Alternar (o toque grava e para) ou Push-to-talk (segure para gravar, solte para enviar).",
-            ),
-            DocBlock.Labeled(
-                "Orbe",
-                "tamanho, tempo de reação entre toques de uma rajada e intensidade da vibração ao tocá-la.",
+                tr("Modo de gravação"),
+                tr("Alternar (o toque grava e para) ou Push-to-talk (segure para gravar, solte para enviar)."),
             ),
             DocBlock.Labeled(
-                "Atalhos",
-                "o que 1, 2 ou 3 toques em rajada fazem, e o que acontece quando você toca mais vezes.",
+                tr("Orbe"),
+                tr("tamanho, tempo de reação entre toques de uma rajada e intensidade da vibração ao tocá-la."),
+            ),
+            DocBlock.Labeled(
+                tr("Atalhos"),
+                tr("o que 1, 2 ou 3 toques em rajada fazem, e o que acontece quando você toca mais vezes."),
             ),
         ),
     ),
     DocSection(
         "texto",
-        "Onde o texto aparece",
+        tr("Onde o texto aparece"),
         listOf(
             DocBlock.Paragraph(
-                "No modo Sobrepor com o teclado do sistema, o texto transcrito vai para a área de transferência e você é avisado — é só colar. A cola automática só acontece com o teclado KeyFlow ativo (configurável na aba Teclado).",
+                tr("No modo Sobrepor com o teclado do sistema, o texto transcrito vai para a área de transferência e você é avisado — é só colar. A cola automática só acontece com o teclado KeyFlow ativo (configurável na aba Teclado)."),
             ),
         ),
     ),
     DocSection(
         "gestos",
-        "Gestos da orbe",
+        tr("Gestos da orbe"),
         listOf(
-            DocBlock.Paragraph("O toque na orbe depende do modo de gravação escolhido na aba Sobrepor:"),
-            DocBlock.Labeled("Alternar", pauseHintFor(RecordingMode.TOGGLE)),
+            DocBlock.Paragraph(tr("O toque na orbe depende do modo de gravação escolhido na aba Sobrepor:")),
+            DocBlock.Labeled(tr("Alternar"), pauseHintFor(RecordingMode.TOGGLE)),
             DocBlock.Labeled("Push-to-talk", pauseHintFor(RecordingMode.PUSH_TO_TALK)),
             DocBlock.Paragraph(
-                "Arraste a orbe para onde ela não atrapalhar — ela gruda na lateral mais próxima. Arrastar até o alvo cancela a gravação, e tocar em rajada aciona atalhos: as duas seções a seguir explicam.",
+                tr("Arraste a orbe para onde ela não atrapalhar — ela gruda na lateral mais próxima. Arrastar até o alvo cancela a gravação, e tocar em rajada aciona atalhos: as duas seções a seguir explicam."),
             ),
         ),
     ),
     DocSection(
         "atalhos",
-        "Atalhos por toques",
+        tr("Atalhos por toques"),
         listOf(
             DocBlock.Paragraph(
-                "Tocar a orbe em rajada aciona atalhos que você escolhe na aba Sobrepor. De fábrica, 2 toques retraem ou expandem o teclado e 3 trocam o teclado do sistema. O atalho de 1 toque só existe no modo Push-to-talk — no modo Alternar o toque já é a própria gravação. Toques além do máximo caem no atalho ativo de menos toques mais próximo, ou não fazem nada, conforme sua escolha na mesma aba.",
+                tr("Tocar a orbe em rajada aciona atalhos que você escolhe na aba Sobrepor. De fábrica, 2 toques retraem ou expandem o teclado e 3 trocam o teclado do sistema. O atalho de 1 toque só existe no modo Push-to-talk — no modo Alternar o toque já é a própria gravação. Toques além do máximo caem no atalho ativo de menos toques mais próximo, ou não fazem nada, conforme sua escolha na mesma aba."),
             ),
         ),
     ),
     DocSection(
         "cancelar",
-        "Cancelar e desfazer",
+        tr("Cancelar e desfazer"),
         listOf(
             DocBlock.Paragraph(
-                "Arraste a orbe até o alvo para cancelar a gravação. O áudio não é descartado na hora: fica guardado por 3 segundos, com um banner de Desfazer na tela — desfazer devolve a gravação pausada, de onde parou. Sem ação nesses 3 segundos, o áudio é descartado. Pela notificação, o mesmo cancelamento tem os botões de concluir agora ou desfazer.",
+                tr("Arraste a orbe até o alvo para cancelar a gravação. O áudio não é descartado na hora: fica guardado por 3 segundos, com um banner de Desfazer na tela — desfazer devolve a gravação pausada, de onde parou. Sem ação nesses 3 segundos, o áudio é descartado. Pela notificação, o mesmo cancelamento tem os botões de concluir agora ou desfazer."),
             ),
         ),
     ),
     DocSection(
         "pausa",
-        "Pausa",
+        tr("Pausa"),
         listOf(
             DocBlock.Paragraph(
-                "Pausar congela o cronômetro e guarda o que já foi gravado; retomar continua a mesma gravação, e o envio sai num texto só.",
+                tr("Pausar congela o cronômetro e guarda o que já foi gravado; retomar continua a mesma gravação, e o envio sai num texto só."),
             ),
-            DocBlock.Labeled("Orbe", "segure (Alternar) ou toque rápido logo após soltar (Push-to-talk)."),
-            DocBlock.Labeled("Teclado", "segure o mic durante a gravação e solte em pausar."),
-            DocBlock.Labeled("Notificação", "botão pausar e retomar."),
+            DocBlock.Labeled(tr("Orbe"), tr("segure (Alternar) ou toque rápido logo após soltar (Push-to-talk).")),
+            DocBlock.Labeled(tr("Teclado"), tr("segure o mic durante a gravação e solte em pausar.")),
+            DocBlock.Labeled(tr("Notificação"), tr("botão pausar e retomar.")),
             DocBlock.Paragraph(
-                "Ao atingir a duração máxima de gravação (aba Transcrição), a gravação pausa sozinha e pergunta se você quer enviar ou descartar.",
+                tr("Ao atingir a duração máxima de gravação (aba Transcrição), a gravação pausa sozinha e pergunta se você quer enviar ou descartar."),
             ),
             DocBlock.Labeled(
-                "Parcial",
-                "com \"Transcrever parcialmente ao pausar\" ligado (aba Transcrição), cada pausa já transcreve o trecho gravado e um aviso aparece junto à orbe. Com a visualização ligada, toque no aviso para ler e toque de novo para editar; o texto novo entra depois das suas edições, e o envio entrega tudo junto.",
+                tr("Parcial"),
+                tr("com \"Transcrever parcialmente ao pausar\" ligado (aba Transcrição), cada pausa já transcreve o trecho gravado e um aviso aparece junto à orbe. Com a visualização ligada, toque no aviso para ler e toque de novo para editar; o texto novo entra depois das suas edições, e o envio entrega tudo junto."),
             ),
         ),
     ),
     DocSection(
         "teclado",
-        "Teclado KeyFlow",
+        tr("Teclado KeyFlow"),
         listOf(
-            DocBlock.Labeled("Retrair", "a seta encolhe o teclado até a barra; tocar de novo traz as teclas de volta."),
+            DocBlock.Labeled(tr("Retrair"), tr("a seta encolhe o teclado até a barra; tocar de novo traz as teclas de volta.")),
             DocBlock.Labeled(
-                "Mic",
-                "toque para gravar e de novo para enviar. Segure durante a gravação para abrir o seletor — arraste até pausar ou cancelar e solte.",
+                tr("Mic"),
+                tr("toque para gravar e de novo para enviar. Segure durante a gravação para abrir o seletor — arraste até pausar ou cancelar e solte."),
             ),
-            DocBlock.Labeled("Acentos", "segure uma letra para ver as variantes (á, ã, ç…) e deslize até a que quiser."),
-            DocBlock.Labeled("Idioma", "o globo alterna layout, acentos e corretor entre português, inglês e espanhol."),
+            DocBlock.Labeled(tr("Acentos"), tr("segure uma letra para ver as variantes (á, ã, ç…) e deslize até a que quiser.")),
+            DocBlock.Labeled(tr("Idioma"), tr("o globo alterna layout, acentos e corretor entre português, inglês e espanhol.")),
             DocBlock.Labeled(
-                "Números",
-                "campos numéricos e de telefone já abrem na grade numérica; nos outros, ?\u2060123 troca para números e símbolos.",
+                tr("Números"),
+                tr("campos numéricos e de telefone já abrem na grade numérica; nos outros, ?\u2060123 troca para números e símbolos."),
             ),
             DocBlock.Labeled(
-                "Sugestões",
-                "vêm do corretor ortográfico do aparelho e aparecem na faixa Candidatos — adicione-a a uma barra na aba Teclado.",
+                tr("Sugestões"),
+                tr("vêm do corretor ortográfico do aparelho e aparecem na faixa Candidatos — adicione-a a uma barra na aba Teclado."),
             ),
         ),
     ),
     DocSection(
         "notificacao",
-        "Notificação de gravação",
+        tr("Notificação de gravação"),
         listOf(
             DocBlock.Paragraph(
-                "Fica visível enquanto o modo Sobrepor está ligado — o Android exige uma notificação para o app poder usar o microfone por cima de outros apps. Parada, ela oferece gravar e ⚙ para abrir o KeyFlow.",
+                tr("Fica visível enquanto o modo Sobrepor está ligado — o Android exige uma notificação para o app poder usar o microfone por cima de outros apps. Parada, ela oferece gravar e ⚙ para abrir o KeyFlow."),
             ),
             DocBlock.Paragraph(
-                "Enquanto o Modo Sobrepor grava, a notificação traz três controles: pausar e retomar, enviar (encerra e entrega o texto) e cancelar. Durante os 3 segundos do cancelamento, eles viram concluir o descarte e desfazer.",
+                tr("Enquanto o Modo Sobrepor grava, a notificação traz três controles: pausar e retomar, enviar (encerra e entrega o texto) e cancelar. Durante os 3 segundos do cancelamento, eles viram concluir o descarte e desfazer."),
             ),
         ),
     ),
     DocSection(
         "erros",
-        "Erros & tempo limite",
+        tr("Erros & tempo limite"),
         listOf(
             DocBlock.Paragraph(
-                "Quando algo falha, a orbe e o mic do teclado mostram ✖ por 2 segundos, junto com o motivo. Aquela gravação não é reenviada — é só gravar de novo.",
+                tr("Quando algo falha, a orbe e o mic do teclado mostram ✖ por 2 segundos, junto com o motivo. Aquela gravação não é reenviada — é só gravar de novo."),
             ),
-            DocBlock.Labeled("Token ou origem", "tocar no ✖ (ou no aviso) abre a aba Transcrição para corrigir."),
-            DocBlock.Labeled("Microfone", "tocar leva à aba da interface que avisou (Sobrepor ou Teclado), onde a permissão pendente pisca no cartão do modo."),
+            DocBlock.Labeled(tr("Token ou origem"), tr("tocar no ✖ (ou no aviso) abre a aba Transcrição para corrigir.")),
+            DocBlock.Labeled(tr("Microfone"), tr("tocar leva à aba da interface que avisou (Sobrepor ou Teclado), onde a permissão pendente pisca no cartão do modo.")),
             DocBlock.Labeled(
-                "Tempo esgotado",
-                "a origem de voz não respondeu dentro do tempo limite de resposta (aba Transcrição, 15s de fábrica). Em rede lenta ou áudios longos, aumente o prazo.",
+                tr("Tempo esgotado"),
+                tr("a origem de voz não respondeu dentro do tempo limite de resposta (aba Transcrição, 15s de fábrica). Em rede lenta ou áudios longos, aumente o prazo."),
             ),
-            DocBlock.Labeled("Rede ou servidor", "tente de novo; se persistir, confira a URL e o token na aba Transcrição."),
+            DocBlock.Labeled(tr("Rede ou servidor"), tr("tente de novo; se persistir, confira a URL e o token na aba Transcrição.")),
         ),
     ),
     DocSection(
         "voz-local",
-        "Voz no aparelho",
+        tr("Voz no aparelho"),
         listOf(
             DocBlock.Paragraph(
-                "A origem Local transcreve sem internet: escolha um modelo na aba Transcrição, baixe uma vez e ele fica no aparelho. O Rápido é leve; o Equilibrado é mais preciso; o Máxima qualidade é o mais preciso e o mais pesado.",
+                tr("A origem Local transcreve sem internet: escolha um modelo na aba Transcrição, baixe uma vez e ele fica no aparelho. O Rápido é leve; o Equilibrado é mais preciso; o Máxima qualidade é o mais preciso e o mais pesado."),
             ),
-            DocBlock.Labeled("Download", "em Wi-Fi começa direto; em dados móveis o app pergunta antes, mostrando o tamanho. Um modelo por vez."),
-            DocBlock.Labeled("Espaço", "apagar um modelo na aba Transcrição devolve o espaço na hora. Modelos não entram no backup e somem se o app for desinstalado."),
+            DocBlock.Labeled(tr("Download"), tr("em Wi-Fi começa direto; em dados móveis o app pergunta antes, mostrando o tamanho. Um modelo por vez.")),
+            DocBlock.Labeled(tr("Espaço"), tr("apagar um modelo na aba Transcrição devolve o espaço na hora. Modelos não entram no backup e somem se o app for desinstalado.")),
         ),
     ),
     DocSection(
         "privacidade",
-        "Privacidade",
+        tr("Privacidade"),
         listOf(
             DocBlock.Paragraph(
-                "O áudio só é enviado à origem configurada em Transcrição — com a origem Local, ele nunca sai do aparelho. Tokens ficam apenas no aparelho.",
+                tr("O áudio só é enviado à origem configurada em Transcrição — com a origem Local, ele nunca sai do aparelho. Tokens ficam apenas no aparelho."),
             ),
         ),
     ),
     DocSection(
         "creditos",
-        "Créditos",
-        listOf(DocBlock.Paragraph("Sem provedor próprio? Use Créditos e pague por minuto via Google Play.")),
+        tr("Créditos"),
+        listOf(DocBlock.Paragraph(tr("Sem provedor próprio? Use Créditos e pague por minuto via Google Play."))),
     ),
     DocSection(
         "licencas",
-        "Licenças",
+        tr("Licenças"),
         listOf(
-            DocBlock.Labeled("sherpa-onnx", "reconhecimento de voz no aparelho — Apache 2.0 (k2-fsa)."),
-            DocBlock.Labeled("ONNX Runtime", "motor de inferência dentro do sherpa-onnx — MIT (Microsoft)."),
-            DocBlock.Labeled("Whisper", "modelos Rápido e Equilibrado — MIT (OpenAI); os cards do Hugging Face declaram Apache 2.0."),
-            DocBlock.Labeled("Parakeet TDT 0.6B v3", "modelo Máxima qualidade — CC BY 4.0 (NVIDIA), convertido para ONNX int8 pelo sherpa-onnx."),
-            DocBlock.Labeled("Dicionários do corretor", "listas de palavras do teclado do Android (AOSP LatinIME) para português, inglês e espanhol — Apache 2.0."),
-            DocBlock.Labeled("Space Grotesk e Space Mono", "fontes — SIL Open Font License 1.1."),
+            DocBlock.Labeled("sherpa-onnx", tr("reconhecimento de voz no aparelho — Apache 2.0 (k2-fsa).")),
+            DocBlock.Labeled("ONNX Runtime", tr("motor de inferência dentro do sherpa-onnx — MIT (Microsoft).")),
+            DocBlock.Labeled("Whisper", tr("modelos Rápido e Equilibrado — MIT (OpenAI); os cards do Hugging Face declaram Apache 2.0.")),
+            DocBlock.Labeled("Parakeet TDT 0.6B v3", tr("modelo Máxima qualidade — CC BY 4.0 (NVIDIA), convertido para ONNX int8 pelo sherpa-onnx.")),
+            DocBlock.Labeled(tr("Dicionários do corretor"), tr("listas de palavras do teclado do Android (AOSP LatinIME) para português, inglês e espanhol — Apache 2.0.")),
+            DocBlock.Labeled(tr("Space Grotesk e Space Mono"), tr("fontes — SIL Open Font License 1.1.")),
         ),
     ),
     DocSection(
         "feedback",
-        "Feedback",
+        tr("Feedback"),
         listOf(
             DocBlock.Paragraph(
-                "Achou um problema ou tem uma ideia? Os botões abrem seu app de e-mail com a versão do app, do Android e o modelo do aparelho já preenchidos — é só contar o que aconteceu.",
+                tr("Achou um problema ou tem uma ideia? Os botões abrem seu app de e-mail com a versão do app, do Android e o modelo do aparelho já preenchidos — é só contar o que aconteceu."),
             ),
         ),
         feedbackActions = true,
@@ -428,11 +441,11 @@ fun DocsPanel(
             .verticalScroll(scroll)
             .padding(top = 20.dp, bottom = 32.dp),
     ) {
-        SettingsGroup("Como funciona") {
+        SettingsGroup(tr("Como funciona")) {
             Column(Modifier.padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-                Step("01", "Fale", "Toque em Gravar no teclado, ou no orbe flutuante.")
-                Step("02", "Transcreve", "O áudio vai à origem de voz escolhida e volta como texto.")
-                Step("03", "Cola", "O texto entra direto no campo ativo do app.")
+                Step("01", tr("Fale"), tr("Toque em Gravar no teclado, ou no orbe flutuante."))
+                Step("02", tr("Transcreve"), tr("O áudio vai à origem de voz escolhida e volta como texto."))
+                Step("03", tr("Cola"), tr("O texto entra direto no campo ativo do app."))
             }
         }
 
@@ -468,7 +481,7 @@ private fun Context.startFeedbackActivity(intent: Intent) {
 /** Índice (DOC-02): numerado, na ordem da aba; cada item rola até a seção e anuncia o destino. */
 @Composable
 private fun DocsIndex(sections: List<DocSection>, onSelect: (String) -> Unit) {
-    SettingsGroup("Índice", Modifier.padding(top = GROUP_GAP).testTag(DOCS_INDEX_TAG)) {
+    SettingsGroup(tr("Índice"), Modifier.padding(top = GROUP_GAP).testTag(DOCS_INDEX_TAG)) {
         // Uma coluna só: em duas, com a navegação lateral, os títulos quebravam e as linhas desalinhavam.
         Column(Modifier.padding(vertical = 6.dp)) {
             sections.forEachIndexed { i, section ->
@@ -491,7 +504,7 @@ private fun IndexItem(number: Int, section: DocSection, onClick: () -> Unit, mod
         modifier
             .heightIn(min = 46.dp)
             .clip(RoundedCornerShape(8.dp))
-            .clickable(onClickLabel = "ir para a seção ${section.title}", role = Role.Button, onClick = onClick)
+            .clickable(onClickLabel = tr("ir para a seção %s", section.title), role = Role.Button, onClick = onClick)
             .testTag(docsIndexItemTag(section.id)),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -626,7 +639,7 @@ private fun FeedbackActions(noEmailApp: Boolean, onSend: (FeedbackKind) -> Unit)
                 modifier = Modifier
                     .clip(RoundedCornerShape(50))
                     .border(1.dp, palette.line, RoundedCornerShape(50))
-                    .clickable(onClickLabel = "abrir o e-mail para ${kind.label.lowercase()}", role = Role.Button) {
+                    .clickable(onClickLabel = tr("abrir o e-mail para %s", kind.label.lowercase()), role = Role.Button) {
                         onSend(kind)
                     }
                     .padding(horizontal = 16.dp, vertical = 9.dp)
@@ -639,7 +652,7 @@ private fun FeedbackActions(noEmailApp: Boolean, onSend: (FeedbackKind) -> Unit)
         val bring = remember { BringIntoViewRequester() }
         LaunchedEffect(Unit) { bring.bringIntoView() }
         Text(
-            "Nenhum app de e-mail encontrado. Escreva para $FEEDBACK_EMAIL.",
+            tr("Nenhum app de e-mail encontrado. Escreva para %s.", FEEDBACK_EMAIL),
             color = palette.terracotta,
             fontFamily = SpaceGrotesk,
             fontSize = 11.5.sp,

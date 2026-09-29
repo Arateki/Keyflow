@@ -1,5 +1,6 @@
 package com.keyflow.ui.config
 
+import com.keyflow.i18n.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -33,16 +34,16 @@ const val SHORTCUT_SHEET_TAG = "shortcut-action-sheet"
 
 /** Rótulo da ação de atalho (lista da aba Sobrepor e bottom sheet). */
 fun shortcutActionLabel(action: OrbShortcutAction): String = when (action) {
-    OrbShortcutAction.NONE -> "Nenhuma"
-    OrbShortcutAction.TOGGLE_KEYBOARD -> "Retrair / expandir teclado"
-    OrbShortcutAction.SWITCH_IME -> "Trocar teclado do sistema"
+    OrbShortcutAction.NONE -> tr("Nenhuma")
+    OrbShortcutAction.TOGGLE_KEYBOARD -> tr("Retrair / expandir teclado")
+    OrbShortcutAction.SWITCH_IME -> tr("Trocar teclado do sistema")
 }
 
 /** Explicação da ação de atalho — reusada pelo tour de gestos (`ui/tour`) como descrição do roteiro. */
 fun shortcutActionSub(action: OrbShortcutAction): String = when (action) {
-    OrbShortcutAction.NONE -> "Sem ação para este gesto."
-    OrbShortcutAction.TOGGLE_KEYBOARD -> "Encolhe ou expande o teclado KeyFlow na tela."
-    OrbShortcutAction.SWITCH_IME -> "Abre o seletor de teclados do sistema."
+    OrbShortcutAction.NONE -> tr("Sem ação para este gesto.")
+    OrbShortcutAction.TOGGLE_KEYBOARD -> tr("Encolhe ou expande o teclado KeyFlow na tela.")
+    OrbShortcutAction.SWITCH_IME -> tr("Abre o seletor de teclados do sistema.")
 }
 
 /**
@@ -83,7 +84,7 @@ fun ShortcutActionSheet(
                 .testTag(SHORTCUT_SHEET_TAG),
         ) {
             Text(
-                if (taps == 1) "1 toque" else "$taps toques",
+                if (taps == 1) tr("1 toque") else tr("%d toques", taps),
                 color = palette.fg,
                 fontFamily = SpaceGrotesk,
                 fontWeight = FontWeight.Normal,
@@ -92,9 +93,9 @@ fun ShortcutActionSheet(
             )
             Text(
                 if (taps == 1) {
-                    "Escolha a ação ao tocar 1 vez na orbe (apenas no modo Push-to-talk, onde o toque é livre)."
+                    tr("Escolha a ação ao tocar 1 vez na orbe (apenas no modo Push-to-talk, onde o toque é livre).")
                 } else {
-                    "Escolha a ação ao tocar $taps vezes na orbe (em repouso ou pausada)."
+                    tr("Escolha a ação ao tocar %d vezes na orbe (em repouso ou pausada).", taps)
                 },
                 color = palette.muted,
                 fontFamily = SpaceGrotesk,
@@ -166,7 +167,7 @@ private fun ActionRow(
                     fontSize = 13.sp,
                     modifier = Modifier.weight(1f),
                 )
-                if (blocked) Eyebrow("Indisponível")
+                if (blocked) Eyebrow(tr("Indisponível"))
             }
             Text(
                 shortcutActionSub(action),

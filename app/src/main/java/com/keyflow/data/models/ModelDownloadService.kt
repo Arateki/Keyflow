@@ -1,5 +1,6 @@
 package com.keyflow.data.models
 
+import com.keyflow.i18n.tr
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -136,14 +137,14 @@ class ModelDownloadService : Service() {
         ): Notification {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.getSystemService(NotificationManager::class.java).createNotificationChannel(
-                    NotificationChannel(CHANNEL_ID, "Download de modelos de voz", NotificationManager.IMPORTANCE_LOW),
+                    NotificationChannel(CHANNEL_ID, tr("Download de modelos de voz"), NotificationManager.IMPORTANCE_LOW),
                 )
             }
             val text = when (waiting) {
-                PauseReason.WAITING_FOR_NETWORK -> "Aguardando rede"
-                PauseReason.WAITING_FOR_WIFI -> "Aguardando Wi-Fi"
-                PauseReason.WAITING_TO_RETRY -> "Tentando de novo"
-                else -> if (total > 0) "${done * 100 / total}%" else "Conectando…"
+                PauseReason.WAITING_FOR_NETWORK -> tr("Aguardando rede")
+                PauseReason.WAITING_FOR_WIFI -> tr("Aguardando Wi-Fi")
+                PauseReason.WAITING_TO_RETRY -> tr("Tentando de novo")
+                else -> if (total > 0) "${done * 100 / total}%" else tr("Conectando…")
             }
             val cancel = PendingIntent.getService(
                 context,
@@ -158,7 +159,7 @@ class ModelDownloadService : Service() {
                 .setOnlyAlertOnce(true)
                 .setOngoing(true)
                 .setProgress(if (total > 0) 100 else 0, if (total > 0) (done * 100 / total).toInt() else 0, total <= 0 && waiting == null)
-                .apply { if (modelId.isNotEmpty()) addAction(0, "Cancelar", cancel) }
+                .apply { if (modelId.isNotEmpty()) addAction(0, tr("Cancelar"), cancel) }
                 .build()
         }
     }

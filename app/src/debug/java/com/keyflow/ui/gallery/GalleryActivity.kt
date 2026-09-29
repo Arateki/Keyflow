@@ -26,6 +26,8 @@ import java.io.File
  *
  *   adb shell am start -n com.keyflow/.ui.gallery.GalleryActivity --es route orb-idle --ez dark false
  *
+ * Sai em português, qualquer que seja o idioma do aparelho; `--es lang en` (ou `es`) mostra a tradução.
+ *
  * Após o primeiro frame desenhado, grava um marcador `gallery_ready` em `externalFilesDir` contendo a
  * chave renderizada, para o script de captura saber que pode tirar o screenshot.
  *
@@ -39,6 +41,8 @@ class GalleryActivity : ComponentActivity() {
 
         val routeKey = intent.getStringExtra(EXTRA_ROUTE).orEmpty()
         val dark = intent.getBooleanExtra(EXTRA_DARK, false)
+        // Prints em português por padrão, qualquer que seja o idioma do aparelho; `--es lang en` para revisar.
+        com.keyflow.i18n.AppLocale.pinned = com.keyflow.i18n.AppLanguage.of(intent.getStringExtra("lang"))
 
         // Modo lista: despeja as chaves do RouteCatalog (fonte única, VERIFY-05) e encerra.
         if (routeKey == LIST_ROUTES) {

@@ -1,5 +1,6 @@
 package com.keyflow.ui.config
 
+import com.keyflow.i18n.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -72,7 +73,7 @@ fun VozPanel(
         verticalArrangement = Arrangement.spacedBy(GROUP_GAP),
     ) {
         PartialSection(settings, onSettingsChange)
-        SettingsGroup("Origem da transcrição") {
+        SettingsGroup(tr("Origem da transcrição")) {
           Column(Modifier.padding(vertical = 16.dp)) {
             Segmented(
                 options = TranscriptionSource.entries,
@@ -117,7 +118,7 @@ fun VozPanel(
 }
 
 private fun sourceLabel(source: TranscriptionSource): String = when (source) {
-    TranscriptionSource.CREDITS -> "Créditos"
+    TranscriptionSource.CREDITS -> tr("Créditos")
     TranscriptionSource.OPENAI -> "OpenAI"
     TranscriptionSource.GROQ -> "Groq"
     TranscriptionSource.CUSTOM -> "Custom"
@@ -133,7 +134,7 @@ private val CUSTOM_MODELS = listOf("whisper-1", "whisper-large-v3", "whisper-lar
 internal val LANGUAGE_OPTIONS = listOf("", "pt", "en", "es", "fr", "de", "it", "nl", "ja", "zh", "ko", "ru")
 
 internal fun languageLabel(code: String): String = when (code) {
-    "" -> "Automático"
+    "" -> tr("Automático")
     "pt" -> "Português"
     "en" -> "English"
     "es" -> "Español"
@@ -174,7 +175,7 @@ private fun timeoutLabel(ms: Int): String = when (ms) {
 private val MAX_RECORDING_OPTIONS_SEC = listOf(10, 30, 60, 300, 600, 1800, 0)
 
 /** Nome acessível da opção sem limite, desenhada como ∞ ([KfIcons.Infinity]) nos dois seletores. */
-private const val NO_LIMIT_LABEL = "Sem limite"
+private val NO_LIMIT_LABEL: String get() = tr("Sem limite")
 
 private fun <T> noLimitIcon(value: T): KfIconSpec? = if (value == 0) KfIcons.Infinity else null
 
@@ -195,18 +196,18 @@ private fun maxRecordingLabel(sec: Int): String = when (sec) {
  */
 @Composable
 private fun PartialSection(settings: Settings, onSettingsChange: (Settings) -> Unit) {
-    SettingsGroup("Transcrição") {
+    SettingsGroup(tr("Transcrição")) {
         ToggleRow(
-            label = "Transcrever parcialmente ao pausar",
-            sub = "Cada pausa já transcreve o trecho gravado; o envio final fica quase instantâneo.",
+            label = tr("Transcrever parcialmente ao pausar"),
+            sub = tr("Cada pausa já transcreve o trecho gravado; o envio final fica quase instantâneo."),
             checked = settings.partialOnPause,
             onCheckedChange = { onSettingsChange(settings.copy(partialOnPause = it)) },
             tag = VOZ_PARTIAL_ON_PAUSE_TAG,
         )
         GroupDivider()
         ToggleRow(
-            label = "Visualizar e editar transcrição parcial",
-            sub = "Toque no aviso junto à orbe pausada para ver e corrigir o texto antes de enviar.",
+            label = tr("Visualizar e editar transcrição parcial"),
+            sub = tr("Toque no aviso junto à orbe pausada para ver e corrigir o texto antes de enviar."),
             checked = settings.partialViewEdit,
             onCheckedChange = { onSettingsChange(settings.copy(partialViewEdit = it)) },
             tag = VOZ_PARTIAL_VIEW_EDIT_TAG,
@@ -221,10 +222,10 @@ private fun PartialSection(settings: Settings, onSettingsChange: (Settings) -> U
  */
 @Composable
 private fun GeneralSection(settings: Settings, onSettingsChange: (Settings) -> Unit) {
-    SettingsGroup("Geral") {
+    SettingsGroup(tr("Geral")) {
         GroupItem(
-            "Tempo limite de resposta",
-            "Tempo máximo de espera pela transcrição antes de mostrar erro. No infinito, espera o quanto for preciso.",
+            tr("Tempo limite de resposta"),
+            tr("Tempo máximo de espera pela transcrição antes de mostrar erro. No infinito, espera o quanto for preciso."),
         ) {
             Segmented(
                 options = TIMEOUT_OPTIONS_MS,
@@ -238,8 +239,8 @@ private fun GeneralSection(settings: Settings, onSettingsChange: (Settings) -> U
         }
         GroupDivider()
         GroupItem(
-            "Duração máxima de gravação",
-            "Ao atingir o limite, a gravação pausa e pergunta se quer enviar ou descartar. No infinito, grava sem limite.",
+            tr("Duração máxima de gravação"),
+            tr("Ao atingir o limite, a gravação pausa e pergunta se quer enviar ou descartar. No infinito, grava sem limite."),
         ) {
             Segmented(
                 options = MAX_RECORDING_OPTIONS_SEC,
@@ -268,7 +269,7 @@ private fun CreditsCard() {
                 .padding(horizontal = 16.dp, vertical = 14.dp)
                 .testTag(VOZ_CREDITS_CARD_TAG),
         ) {
-            Eyebrow("Saldo de créditos")
+            Eyebrow(tr("Saldo de créditos"))
             Row(
                 Modifier.fillMaxWidth().padding(top = 10.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -293,7 +294,7 @@ private fun CreditsCard() {
                     )
                 }
                 Text(
-                    "créditos",
+                    tr("créditos"),
                     color = palette.muted,
                     fontFamily = SpaceGrotesk,
                     fontWeight = FontWeight.Light,
@@ -316,20 +317,20 @@ private fun CreditsCard() {
                 Modifier.fillMaxWidth().padding(top = 9.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text("≈ 42 min usados", color = palette.muted, fontFamily = SpaceMono, fontWeight = FontWeight.Light, fontSize = 9.5.sp)
-                Text("165 min no total", color = palette.muted, fontFamily = SpaceMono, fontWeight = FontWeight.Light, fontSize = 9.5.sp)
+                Text(tr("≈ 42 min usados"), color = palette.muted, fontFamily = SpaceMono, fontWeight = FontWeight.Light, fontSize = 9.5.sp)
+                Text(tr("165 min no total"), color = palette.muted, fontFamily = SpaceMono, fontWeight = FontWeight.Light, fontSize = 9.5.sp)
             }
         }
         // CTA inerte (MON-02): não compra nada.
         PrimaryButton(
-            "Recarregar créditos",
+            tr("Recarregar créditos"),
             tag = VOZ_RECHARGE_TAG,
             onClick = { /* inerte nesta fase */ },
             modifier = Modifier.padding(top = 14.dp),
             icon = KfIcons.Plus,
         )
         Eyebrow(
-            "Pagamento via Google Play",
+            tr("Pagamento via Google Play"),
             Modifier.fillMaxWidth().padding(top = 10.dp).wrapContentWidth(Alignment.CenterHorizontally),
         )
     }
@@ -347,12 +348,12 @@ private fun KeyProviderFields(
     onLanguage: (String) -> Unit,
 ) {
     Column(Modifier.padding(top = 20.dp)) {
-        AutoSaveField("Token de acesso · $provName", token, onToken, VOZ_TOKEN_TAG, keyboardType = KeyboardType.Password)
+        AutoSaveField(tr("Token de acesso · %s", provName), token, onToken, VOZ_TOKEN_TAG, keyboardType = KeyboardType.Password)
         Row(Modifier.fillMaxWidth().padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-            Dropdown("Modelo", models, model, onModel, VOZ_MODEL_TAG, Modifier.weight(1f))
-            Dropdown("Idioma", LANGUAGE_OPTIONS, language, onLanguage, VOZ_LANGUAGE_TAG, Modifier.weight(1f), display = ::languageLabel)
+            Dropdown(tr("Modelo"), models, model, onModel, VOZ_MODEL_TAG, Modifier.weight(1f))
+            Dropdown(tr("Idioma"), LANGUAGE_OPTIONS, language, onLanguage, VOZ_LANGUAGE_TAG, Modifier.weight(1f), display = ::languageLabel)
         }
-        HelperNote("A chave fica apenas neste dispositivo. O áudio é enviado direto ao provedor.")
+        HelperNote(tr("A chave fica apenas neste dispositivo. O áudio é enviado direto ao provedor."))
     }
 }
 
@@ -360,33 +361,33 @@ private fun KeyProviderFields(
 private fun CustomFields(settings: Settings, onSettingsChange: (Settings) -> Unit) {
     Column(Modifier.padding(top = 20.dp)) {
         AutoSaveField(
-            "Endpoint", settings.customEndpoint,
+            tr("Endpoint"), settings.customEndpoint,
             { onSettingsChange(settings.copy(customEndpoint = it)) }, VOZ_ENDPOINT_TAG,
             keyboardType = KeyboardType.Uri,
         )
         Row(Modifier.fillMaxWidth().padding(top = 13.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             AutoSaveField(
-                "Header", settings.customHeaderName,
+                tr("Header"), settings.customHeaderName,
                 { onSettingsChange(settings.copy(customHeaderName = it)) }, VOZ_HEADER_NAME_TAG, Modifier.weight(1f),
             )
             AutoSaveField(
-                "Valor", settings.customHeaderValue,
+                tr("Valor"), settings.customHeaderValue,
                 { onSettingsChange(settings.copy(customHeaderValue = it)) }, VOZ_HEADER_VALUE_TAG, Modifier.weight(1.3f),
                 keyboardType = KeyboardType.Password,
             )
         }
         Row(Modifier.fillMaxWidth().padding(top = 13.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Dropdown(
-                "Modelo", CUSTOM_MODELS, settings.customModel,
+                tr("Modelo"), CUSTOM_MODELS, settings.customModel,
                 { onSettingsChange(settings.copy(customModel = it)) }, VOZ_MODEL_TAG, Modifier.weight(1f),
             )
             Dropdown(
-                "Idioma", LANGUAGE_OPTIONS, settings.customLanguage.orEmpty(),
+                tr("Idioma"), LANGUAGE_OPTIONS, settings.customLanguage.orEmpty(),
                 { onSettingsChange(settings.copy(customLanguage = it.ifBlank { null })) }, VOZ_LANGUAGE_TAG, Modifier.weight(1f),
                 display = ::languageLabel,
             )
         }
-        HelperNote("Padrão compatível com Whisper — modelo e idioma usam os valores esperados desse padrão.")
+        HelperNote(tr("Padrão compatível com Whisper — modelo e idioma usam os valores esperados desse padrão."))
     }
 }
 

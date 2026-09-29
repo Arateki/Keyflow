@@ -1,5 +1,6 @@
 package com.keyflow.ui.config
 
+import com.keyflow.i18n.tr
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -113,10 +114,10 @@ fun OverlayPanel(
         // Sem o modo pronto (ligado e com as permissões), o resto da aba só se lê.
         LockedSection(locked = locked, onLockedTap = onLockedTap) {
             // ── ÁREA 1 · USABILIDADE ───────────────────────────────────────────
-            SettingsGroup("Usabilidade") {
+            SettingsGroup(tr("Usabilidade")) {
                 GroupItem(
-                    "Mão preferencial",
-                    "Encosta a orbe no seu lado e define a direção do arrasto de cancelar, sempre para o centro, longe da borda.",
+                    tr("Mão preferencial"),
+                    tr("Encosta a orbe no seu lado e define a direção do arrasto de cancelar, sempre para o centro, longe da borda."),
                 ) {
                     Segmented(
                         options = OverlaySide.entries,
@@ -137,7 +138,7 @@ fun OverlayPanel(
                         .background(palette.teal.copy(alpha = modeHighlight.value * 0.14f)),
                 ) {
                     // Descrição acima do seletor (como as outras), mas dinâmica: segue o modo selecionado.
-                    GroupItem("Modo de gravação", pauseHintFor(settings.overlayRecordingMode)) {
+                    GroupItem(tr("Modo de gravação"), pauseHintFor(settings.overlayRecordingMode)) {
                         Segmented(
                             options = RecordingMode.entries,
                             selected = settings.overlayRecordingMode,
@@ -150,7 +151,7 @@ fun OverlayPanel(
                 }
                 GroupDivider()
                 // Slider contínuo (px) — a orbe na tela redimensiona em tempo real (OVL-05).
-                GroupItem("Tamanho da orbe") {
+                GroupItem(tr("Tamanho da orbe")) {
                     KfSlider(
                         value = settings.orbSizePx.toFloat(),
                         onValueChange = { onSettingsChange(settings.copy(orbSizePx = it.roundToInt())) },
@@ -161,8 +162,8 @@ fun OverlayPanel(
                 }
                 GroupDivider()
                 GroupItem(
-                    "Tempo de reação",
-                    "Janela de reação da orbe: tempo entre toques para os atalhos e atraso até iniciar a captação.",
+                    tr("Tempo de reação"),
+                    tr("Janela de reação da orbe: tempo entre toques para os atalhos e atraso até iniciar a captação."),
                 ) {
                     // Slider em ms (passos de 10) — define a janela de rajada de toques (atalhos + delay de start).
                     KfSlider(
@@ -176,14 +177,14 @@ fun OverlayPanel(
                     )
                     // Dois limiares derivados: toque (valor) e segurar (valor + 150ms, espelha HOLD_OFFSET_MS).
                     Text(
-                        "toque ${settings.tapBurstWindowMs} ms  ·  segurar ${settings.tapBurstWindowMs + HOLD_OFFSET_MS} ms",
+                        tr("toque %d ms  ·  segurar %d ms", settings.tapBurstWindowMs, settings.tapBurstWindowMs + HOLD_OFFSET_MS),
                         color = palette.fg2,
                         fontFamily = SpaceMono,
                         fontWeight = FontWeight.Light,
                         fontSize = 10.5.sp,
                     )
                     Text(
-                        "ms = milissegundos",
+                        tr("ms = milissegundos"),
                         color = palette.faint,
                         fontFamily = SpaceGrotesk,
                         fontWeight = FontWeight.Light,
@@ -192,7 +193,7 @@ fun OverlayPanel(
                     )
                 }
                 GroupDivider()
-                GroupItem("Vibração", "Intensidade da vibração ao interagir com a orbe. No zero, sem vibração.") {
+                GroupItem(tr("Vibração"), tr("Intensidade da vibração ao interagir com a orbe. No zero, sem vibração.")) {
                     KfSlider(
                         value = settings.vibrationIntensity.toFloat(),
                         onValueChange = {
@@ -219,10 +220,10 @@ fun OverlayPanel(
             }
 
             // ── ÁREA 3 · ATALHOS ───────────────────────────────────────────────
-            SettingsGroup("Atalhos") {
+            SettingsGroup(tr("Atalhos")) {
                 GroupItem(
-                    "Ações por toque",
-                    "Toque a orbe para acionar. 2 e 3 toques valem nos dois modos; 1 toque apenas no modo Push-to-talk (onde o toque é livre — a gravação começa ao segurar).",
+                    tr("Ações por toque"),
+                    tr("Toque a orbe para acionar. 2 e 3 toques valem nos dois modos; 1 toque apenas no modo Push-to-talk (onde o toque é livre — a gravação começa ao segurar)."),
                 ) {
                     val pttMode = settings.overlayRecordingMode == RecordingMode.PUSH_TO_TALK
                     Column(Modifier.padding(top = 8.dp)) {
@@ -231,24 +232,24 @@ fun OverlayPanel(
                             action = settings.shortcut1Tap,
                             keyboardAvailable = keyboardShortcutAvailable,
                             enabled = pttMode,
-                            disabledNote = "Disponível apenas no modo Push-to-talk",
+                            disabledNote = tr("Disponível apenas no modo Push-to-talk"),
                         ) { if (pttMode) onOpenShortcutSheet(1) else onShortcut1Blocked() }
                         ShortcutRow(2, settings.shortcut2Tap, keyboardShortcutAvailable) { onOpenShortcutSheet(2) }
                         ShortcutRow(3, settings.shortcut3Tap, keyboardShortcutAvailable) { onOpenShortcutSheet(3) }
                     }
                 }
                 GroupDivider()
-                GroupItem("Ao tocar mais de 3 vezes") {
+                GroupItem(tr("Ao tocar mais de 3 vezes")) {
                     OverflowOption(
                         selected = settings.shortcutOverflow == ShortcutOverflow.NEAREST_DOWN,
-                        title = "Usar o atalho anterior",
-                        sub = "Cai no atalho ativo de menos toques mais próximo (ex.: 4 toques aciona o de 3).",
+                        title = tr("Usar o atalho anterior"),
+                        sub = tr("Cai no atalho ativo de menos toques mais próximo (ex.: 4 toques aciona o de 3)."),
                         onSelect = { onSettingsChange(settings.copy(shortcutOverflow = ShortcutOverflow.NEAREST_DOWN)) },
                     )
                     OverflowOption(
                         selected = settings.shortcutOverflow == ShortcutOverflow.CANCEL,
-                        title = "Não fazer nada",
-                        sub = "Ignora os toques extras; o gesto é cancelado.",
+                        title = tr("Não fazer nada"),
+                        sub = tr("Ignora os toques extras; o gesto é cancelado."),
                         onSelect = { onSettingsChange(settings.copy(shortcutOverflow = ShortcutOverflow.CANCEL)) },
                     )
                 }
@@ -308,7 +309,7 @@ private fun ShortcutRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Eyebrow(if (taps == 1) "1 toque" else "$taps toques", color = palette.muted)
+            Eyebrow(if (taps == 1) tr("1 toque") else tr("%d toques", taps), color = palette.muted)
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 3.dp)) {
                 Text(
                     if (enabled) shortcutActionLabel(action) else (disabledNote ?: shortcutActionLabel(action)),
@@ -318,7 +319,7 @@ private fun ShortcutRow(
                 )
                 if (unavailable) {
                     Text(
-                        " / indisponível",
+                        tr(" / indisponível"),
                         color = palette.terracotta,
                         fontFamily = SpaceGrotesk,
                         fontWeight = FontWeight.Light,
@@ -333,6 +334,6 @@ private fun ShortcutRow(
 }
 
 private fun overlaySideLabel(side: OverlaySide): String = when (side) {
-    OverlaySide.LEFT -> "Canhoto"
-    OverlaySide.RIGHT -> "Destro"
+    OverlaySide.LEFT -> tr("Canhoto")
+    OverlaySide.RIGHT -> tr("Destro")
 }

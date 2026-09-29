@@ -1,5 +1,6 @@
 package com.keyflow.ui.config
 
+import com.keyflow.i18n.tr
 import android.view.KeyEvent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -61,7 +62,7 @@ fun PhysicalKeyPicker(
 ) {
     if (!visible) return
     ConfigModal(
-        title = "Escolher tecla física",
+        title = tr("Escolher tecla física"),
         onDismiss = onDismiss,
         closeTag = PHYSICAL_KEY_PICKER_CLOSE_TAG,
         modifier = modifier,

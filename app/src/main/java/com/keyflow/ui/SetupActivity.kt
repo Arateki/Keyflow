@@ -1,5 +1,6 @@
 package com.keyflow.ui
 
+import com.keyflow.i18n.tr
 import android.Manifest
 import android.content.Intent
 import android.net.Uri
@@ -26,6 +27,7 @@ import com.keyflow.data.Settings
 import com.keyflow.data.SettingsRepository
 import com.keyflow.overlay.OverlayService
 import com.keyflow.ui.common.SaveController
+import com.keyflow.i18n.AppLanguage
 import com.keyflow.ui.config.ConfigScreen
 import com.keyflow.ui.config.ConfigTab
 import com.keyflow.ui.onboarding.OnboardingScreen
@@ -133,6 +135,9 @@ class SetupActivity : ComponentActivity() {
             settingsRepository.settingsFlow().collectLatest {
                 settings = it
                 settingsLoaded = true
+                // Primeira abertura: a interface assume o idioma do aparelho (PT/EN/ES; outros → inglês).
+                // Depois disso, quem manda é o botão de idioma do cabeçalho.
+                if (it.appLanguage.isBlank()) persist { s -> s.copy(appLanguage = AppLanguage.fromSystem().code) }
             }
         }
         activityScope.launch {
@@ -156,9 +161,7 @@ class SetupActivity : ComponentActivity() {
                         onOverlayModeChange = ::onOverlayModeChange,
                         onKeyboardModeChange = ::onKeyboardModeChange,
                         onThemeChange = { dark -> persist { it.copy(themeDark = dark) } },
-                        onLanguageClick = {
-                            Toast.makeText(this, "Outros idiomas em breve", Toast.LENGTH_SHORT).show()
-                        },
+                        onAppLanguageChange = { language -> persist { it.copy(appLanguage = language.code) } },
                         onRequestOverlayPermission = ::openOverlaySettings,
                         onRequestKeyboardPermission = ::openKeyboardSettings,
                         onRequestMicPermission = ::onMicChipClicked,
@@ -313,7 +316,7 @@ class SetupActivity : ComponentActivity() {
             if (permissions.keyboardActive) {
                 Toast.makeText(
                     this,
-                    "KeyFlow ainda é o teclado ativo — troque para desativar.",
+                    tr("KeyFlow ainda é o teclado ativo — troque para desativar."),
                     Toast.LENGTH_SHORT,
                 ).show()
             }

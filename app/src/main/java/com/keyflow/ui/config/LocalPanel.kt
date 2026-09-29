@@ -1,5 +1,6 @@
 package com.keyflow.ui.config
 
+import com.keyflow.i18n.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -90,7 +91,7 @@ internal fun LocalPanel(
     }
 
     Column(Modifier.padding(top = 20.dp)) {
-        Eyebrow("Modelos no aparelho")
+        Eyebrow(tr("Modelos no aparelho"))
         models.items.forEach { item ->
             ModelCard(
                 item = item,
@@ -117,7 +118,7 @@ internal fun LocalPanel(
             )
         }
         Dropdown(
-            label = "Idioma",
+            label = tr("Idioma"),
             options = LANGUAGE_OPTIONS,
             selected = settings.localLanguage.orEmpty(),
             onSelect = { onSettingsChange(settings.copy(localLanguage = it.ifBlank { null })) },
@@ -126,11 +127,11 @@ internal fun LocalPanel(
             display = ::languageLabel,
         )
         SettingSub(
-            "Vale para os modelos Rápido e Equilibrado; o Máxima qualidade reconhece o idioma sozinho.",
+            tr("Vale para os modelos Rápido e Equilibrado; o Máxima qualidade reconhece o idioma sozinho."),
             Modifier.padding(top = 8.dp),
         )
         SettingSub(
-            "Processado 100% neste aparelho — o áudio nunca sai do dispositivo. Os modelos são apagados se o app for desinstalado.",
+            tr("Processado 100% neste aparelho — o áudio nunca sai do dispositivo. Os modelos são apagados se o app for desinstalado."),
             Modifier.padding(top = 16.dp).testTag(VOZ_LOCAL_PRIVACY_TAG),
         )
     }
@@ -177,12 +178,12 @@ private fun ModelCard(
                 KfRadio(item.selected, Modifier.padding(end = 12.dp))
             }
             Column(Modifier.weight(1f)) {
-                Text(spec.displayName, color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Normal, fontSize = 13.sp)
+                Text(tr(spec.displayName), color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Normal, fontSize = 13.sp)
                 if (spec.modelName.isNotBlank()) {
                     Text(spec.modelName, color = palette.muted, fontFamily = SpaceMono, fontWeight = FontWeight.Light, fontSize = 9.5.sp)
                 }
                 Text(
-                    "${formatModelSize(spec.totalBytes)} · ${spec.languages}",
+                    "${formatModelSize(spec.totalBytes)} · ${tr(spec.languages)}",
                     color = palette.faint,
                     fontFamily = SpaceMono,
                     fontWeight = FontWeight.Light,
@@ -192,14 +193,14 @@ private fun ModelCard(
             }
             when (item.status) {
                 LocalModelStatus.AVAILABLE -> CardAction(
-                    "Baixar",
+                    tr("Baixar"),
                     enabled = !downloadBlocked && pending == null,
                     tag = localDownloadTag(spec.id),
                     onClick = onDownload,
                 )
-                LocalModelStatus.DOWNLOADING -> CardAction("Cancelar", tag = localCancelTag(spec.id), onClick = onCancel)
+                LocalModelStatus.DOWNLOADING -> CardAction(tr("Cancelar"), tag = localCancelTag(spec.id), onClick = onCancel)
                 LocalModelStatus.INSTALLED -> CardAction(
-                    "Apagar",
+                    tr("Apagar"),
                     enabled = pending == null,
                     tag = localDeleteTag(spec.id),
                     onClick = onDelete,
@@ -207,10 +208,10 @@ private fun ModelCard(
                 )
             }
         }
-        SettingSub(spec.summary, Modifier.padding(top = 10.dp))
+        SettingSub(tr(spec.summary), Modifier.padding(top = 10.dp))
         if (item.heavy) {
             Text(
-                "Pode ser pesado neste aparelho.",
+                tr("Pode ser pesado neste aparelho."),
                 color = palette.terracotta,
                 fontFamily = SpaceGrotesk,
                 fontSize = 10.5.sp,
@@ -259,10 +260,10 @@ private fun ModelCard(
         if (pending != null) {
             ConfirmRow(
                 question = when (pending) {
-                    is Pending.Metered -> "Baixar ${formatModelSize(pending.bytes)} por dados móveis?"
-                    is Pending.Delete -> "Apagar ${spec.displayName}? Libera ${formatModelSize(spec.totalBytes)}."
+                    is Pending.Metered -> tr("Baixar %s por dados móveis?", formatModelSize(pending.bytes))
+                    is Pending.Delete -> tr("Apagar %s? Libera %s.", tr(spec.displayName), formatModelSize(spec.totalBytes))
                 },
-                confirm = if (pending is Pending.Metered) "Baixar" else "Apagar",
+                confirm = if (pending is Pending.Metered) tr("Baixar") else tr("Apagar"),
                 tag = localConfirmTag(spec.id),
                 onConfirm = onConfirm,
                 onDismiss = onDismiss,
@@ -314,7 +315,7 @@ private fun ConfirmRow(question: String, confirm: String, tag: String, onConfirm
             Modifier.fillMaxWidth().padding(top = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
         ) {
-            CardAction("Cancelar", tag = VOZ_LOCAL_CONFIRM_NO_TAG, onClick = onDismiss, color = palette.muted)
+            CardAction(tr("Cancelar"), tag = VOZ_LOCAL_CONFIRM_NO_TAG, onClick = onDismiss, color = palette.muted)
             CardAction(confirm, tag = VOZ_LOCAL_CONFIRM_YES_TAG, onClick = onConfirm)
         }
     }

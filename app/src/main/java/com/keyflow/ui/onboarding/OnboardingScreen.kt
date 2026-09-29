@@ -1,5 +1,7 @@
 package com.keyflow.ui.onboarding
 
+import com.keyflow.i18n.tr
+import com.keyflow.i18n.trKey
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -56,27 +58,31 @@ const val ONBOARDING_ITEM_NOTIFICATIONS_TAG = "onboarding-item-notifications"
  * Docs e o `PLAYSTORE_CHECKLIST.md`: o áudio só sai quando a pessoa grava e só para a origem dela;
  * nenhum texto digitado é transmitido.
  */
-enum class OnboardingPermission(val key: String, val label: String, val why: String) {
+enum class OnboardingPermission(val key: String, private val labelPt: String, private val whyPt: String) {
     MIC(
         "mic",
-        "Microfone",
-        "Para gravar sua voz e transcrever. O microfone só é usado enquanto você grava, e o áudio vai apenas para a origem de voz configurada na aba Transcrição. Sem ele, não há ditado.",
+        trKey("Microfone"),
+        trKey("Para gravar sua voz e transcrever. O microfone só é usado enquanto você grava, e o áudio vai apenas para a origem de voz configurada na aba Transcrição. Sem ele, não há ditado."),
     ),
     OVERLAY(
         "overlay",
-        "Sobreposição (overlay)",
-        "Para desenhar a orbe flutuante por cima dos outros apps. Sem ela, não existe o modo Sobrepor — só o teclado KeyFlow.",
+        trKey("Sobreposição (overlay)"),
+        trKey("Para desenhar a orbe flutuante por cima dos outros apps. Sem ela, não existe o modo Sobrepor — só o teclado KeyFlow."),
     ),
     KEYBOARD(
         "keyboard",
-        "Teclado KeyFlow",
-        "Para o texto transcrito entrar direto no campo em que você está digitando. Sem ele, o texto vai para a área de transferência e você cola. Nenhum texto digitado é transmitido.",
+        trKey("Teclado KeyFlow"),
+        trKey("Para o texto transcrito entrar direto no campo em que você está digitando. Sem ele, o texto vai para a área de transferência e você cola. Nenhum texto digitado é transmitido."),
     ),
     NOTIFICATIONS(
         "notifications",
-        "Notificações",
-        "Para mostrar os controles da gravação — pausar, enviar, cancelar — com o app em segundo plano. Sem elas a gravação funciona, mas sem esses controles fora do app.",
+        trKey("Notificações"),
+        trKey("Para mostrar os controles da gravação — pausar, enviar, cancelar — com o app em segundo plano. Sem elas a gravação funciona, mas sem esses controles fora do app."),
     ),
+    ;
+
+    val label: String get() = tr(labelPt)
+    val why: String get() = tr(whyPt)
 }
 
 /** Tag do "?" da permissão (PERM-01). */
@@ -122,7 +128,7 @@ fun OnboardingScreen(
         VoiceOrb(state = OrbState.Listening, modifier = Modifier.size(98.dp).align(Alignment.CenterHorizontally))
 
         Text(
-            "Bem-vindo ao KeyFlow".uppercase(),
+            tr("Bem-vindo ao KeyFlow").uppercase(),
             color = palette.faint,
             fontFamily = SpaceGrotesk,
             fontWeight = FontWeight.Medium,
@@ -132,7 +138,7 @@ fun OnboardingScreen(
             modifier = Modifier.fillMaxWidth().padding(top = 22.dp),
         )
         Text(
-            "Sua voz vira texto em qualquer campo.",
+            tr("Sua voz vira texto em qualquer campo."),
             color = palette.fg,
             fontFamily = SpaceGrotesk,
             fontWeight = FontWeight.Normal,
@@ -143,7 +149,7 @@ fun OnboardingScreen(
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
         )
         Text(
-            "Fale, e o KeyFlow cola a transcrição direto no app que você estiver usando. Para isso, ele precisa de algumas permissões.",
+            tr("Fale, e o KeyFlow cola a transcrição direto no app que você estiver usando. Para isso, ele precisa de algumas permissões."),
             color = palette.muted,
             fontFamily = SpaceGrotesk,
             fontWeight = FontWeight.Light,
@@ -153,7 +159,7 @@ fun OnboardingScreen(
             modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
         )
         Text(
-            "Recomendamos conceder todas agora, para conhecer tudo que o app oferece — depois você pode rever cada uma para refletir o seu uso.",
+            tr("Recomendamos conceder todas agora, para conhecer tudo que o app oferece — depois você pode rever cada uma para refletir o seu uso."),
             color = palette.faint,
             fontFamily = SpaceGrotesk,
             fontWeight = FontWeight.Light,
@@ -201,9 +207,9 @@ fun OnboardingScreen(
 
         Spacer(Modifier.weight(1f))
 
-        PrimaryButton("Conceder permissões", tag = ONBOARDING_GRANT_TAG, onClick = onGrant)
+        PrimaryButton(tr("Conceder permissões"), tag = ONBOARDING_GRANT_TAG, onClick = onGrant)
         Text(
-            "Pular por agora",
+            tr("Pular por agora"),
             color = palette.muted,
             fontFamily = SpaceGrotesk,
             fontWeight = FontWeight.Light,
@@ -247,7 +253,7 @@ private fun ChecklistRow(
         }
         Text(permission.label, color = palette.fg, fontFamily = SpaceGrotesk, fontSize = 13.sp, modifier = Modifier.weight(1f))
         Text(
-            if (granted) "OK" else "FALTA",
+            if (granted) "OK" else tr("FALTA"),
             color = if (granted) palette.faint else palette.recordSoft,
             fontFamily = SpaceGrotesk,
             fontWeight = FontWeight.Medium,
@@ -287,8 +293,8 @@ private fun WhyButton(permission: OnboardingPermission, explained: Boolean, onCl
             .clip(CircleShape)
             .clickable(role = Role.Button, onClick = onClick)
             .semantics {
-                contentDescription = "Por que pedimos ${permission.label}"
-                stateDescription = if (explained) "explicação aberta" else "explicação fechada"
+                contentDescription = tr("Por que pedimos %s", permission.label)
+                stateDescription = if (explained) tr("explicação aberta") else tr("explicação fechada")
             }
             .testTag(onboardingWhyTag(permission)),
         contentAlignment = Alignment.Center,

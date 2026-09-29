@@ -1,5 +1,6 @@
 package com.keyflow.ui.config
 
+import com.keyflow.i18n.tr
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
@@ -139,7 +140,7 @@ private fun RailToggle(expanded: Boolean, onClick: () -> Unit) {
             .border(1.dp, palette.line, CircleShape)
             .clickable(role = Role.Button, onClick = onClick)
             .semantics {
-                contentDescription = if (expanded) "Recolher menu" else "Mostrar nomes do menu"
+                contentDescription = if (expanded) tr("Recolher menu") else tr("Mostrar nomes do menu")
                 stateDescription = if (expanded) "aberto" else "recolhido"
             }
             .testTag(NAV_RAIL_TOGGLE_TAG),

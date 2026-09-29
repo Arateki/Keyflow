@@ -1,5 +1,7 @@
 package com.keyflow.data.models
 
+import com.keyflow.i18n.trKey
+
 /** Como o engine monta o `OfflineRecognizer` do sherpa-onnx para o modelo (NM-T8). */
 enum class EngineType { WHISPER, TRANSDUCER }
 
@@ -60,9 +62,9 @@ object ModelCatalog {
 
     val WHISPER_BASE = ModelSpec(
         id = "whisper-base-int8",
-        displayName = "Rápido",
-        summary = "Leve e ágil; bom para frases curtas e ditado do dia a dia.",
-        languages = "99 idiomas",
+        displayName = trKey("Rápido"),
+        summary = trKey("Leve e ágil; bom para frases curtas e ditado do dia a dia."),
+        languages = trKey("99 idiomas"),
         engineType = EngineType.WHISPER,
         acceptsLanguageHint = true,
         recommendedRamMb = 512,
@@ -85,9 +87,9 @@ object ModelCatalog {
 
     val WHISPER_SMALL = ModelSpec(
         id = "whisper-small-int8",
-        displayName = "Equilibrado",
-        summary = "Mais preciso que o Rápido, ainda razoável em celulares medianos.",
-        languages = "99 idiomas",
+        displayName = trKey("Equilibrado"),
+        summary = trKey("Mais preciso que o Rápido, ainda razoável em celulares medianos."),
+        languages = trKey("99 idiomas"),
         engineType = EngineType.WHISPER,
         acceptsLanguageHint = true,
         recommendedRamMb = 1024,
@@ -110,9 +112,9 @@ object ModelCatalog {
 
     val PARAKEET_V3 = ModelSpec(
         id = "parakeet-tdt-0.6b-v3-int8",
-        displayName = "Máxima qualidade",
-        summary = "O mais preciso, com português nativo; pesado — melhor em aparelhos com bastante memória.",
-        languages = "25 idiomas europeus",
+        displayName = trKey("Máxima qualidade"),
+        summary = trKey("O mais preciso, com português nativo; pesado — melhor em aparelhos com bastante memória."),
+        languages = trKey("25 idiomas europeus"),
         engineType = EngineType.TRANSDUCER,
         // Detecta o idioma sozinho; o sherpa-onnx não recebe dica de idioma para transducer (NAT-06).
         acceptsLanguageHint = false,

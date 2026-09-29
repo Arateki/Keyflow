@@ -4,11 +4,13 @@ import android.content.SharedPreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.doublePreferencesKey
-import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.mutablePreferencesOf
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.mutablePreferencesOf
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.keyflow.data.SettingsRepository
@@ -61,7 +63,13 @@ class DeviceSettingsSnapshot(
             check(tmp.renameTo(file)) { "não consegui gravar a config do dono em $file" }
         }
         if (currentIme() == ownImeId) otherEnabledIme()?.let { shell("ime set $it") }
-        runBlocking { repo.replaceRawPreferences(emptyPreferences()) }
+        // Fábrica, mas em português: os testes conferem os textos de origem, e sem isto a 1ª abertura da
+        // SetupActivity gravaria o idioma do aparelho (o emulador está em inglês) no meio da rodada.
+        runBlocking {
+            repo.replaceRawPreferences(
+                mutablePreferencesOf(stringPreferencesKey("app_language") to com.keyflow.i18n.AppLanguage.PT.code),
+            )
+        }
         uiPrefs.edit().clear().commit()
     }
 

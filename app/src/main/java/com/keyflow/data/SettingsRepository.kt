@@ -77,6 +77,9 @@ class SettingsRepository(
 
     fun keyboardSkinFlow(): Flow<String> = dataStore.data.map { it[KEYBOARD_SKIN] ?: "system" }
 
+    /** Idioma da interface, leve (só DataStore): o [com.keyflow.App] aplica no processo inteiro. */
+    fun appLanguageFlow(): Flow<String> = dataStore.data.map { it[APP_LANGUAGE] ?: "" }
+
     /** Mesma leitura leve de [themeDarkOnce], para as cores do teclado em `onCreateInputView`. */
     suspend fun keyboardSkinOnce(): String = dataStore.data.first()[KEYBOARD_SKIN] ?: "system"
 
@@ -227,6 +230,7 @@ class SettingsRepository(
             keyboardShowWithHardKeyboard = prefs[KEYBOARD_SHOW_WITH_HARD_KEYBOARD] ?: true,
             keyboardAutoCorrect = prefs[KEYBOARD_AUTO_CORRECT] ?: true,
             keyboardSkin = prefs[KEYBOARD_SKIN] ?: "system",
+            appLanguage = prefs[APP_LANGUAGE] ?: "",
         )
     }
 
@@ -279,6 +283,7 @@ class SettingsRepository(
             prefs[KEYBOARD_SHOW_WITH_HARD_KEYBOARD] = settings.keyboardShowWithHardKeyboard
             prefs[KEYBOARD_AUTO_CORRECT] = settings.keyboardAutoCorrect
             prefs[KEYBOARD_SKIN] = settings.keyboardSkin
+            prefs[APP_LANGUAGE] = settings.appLanguage
         }
     }
 
@@ -388,6 +393,7 @@ class SettingsRepository(
         val KEYBOARD_SHOW_WITH_HARD_KEYBOARD = booleanPreferencesKey("keyboard_show_with_hard_keyboard")
         val KEYBOARD_AUTO_CORRECT = booleanPreferencesKey("keyboard_auto_correct")
         val KEYBOARD_SKIN = stringPreferencesKey("keyboard_skin")
+        val APP_LANGUAGE = stringPreferencesKey("app_language")
         // Trabalho 3 (shortcut-bars): barras personalizáveis + teclados de atalhos, como JSON.
         val BARS_CONFIG_JSON = stringPreferencesKey("bars_config_json")
         val SHORTCUT_GRIDS_JSON = stringPreferencesKey("shortcut_grids_json")

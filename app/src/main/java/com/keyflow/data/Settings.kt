@@ -105,6 +105,9 @@ data class Settings(
     // Cores do teclado (id de `KeyboardSkin`): "system" (padrão desde 2026-09-28, como o Samsung) ou
     // "atelie" (o papel quente de antes). Só o teclado; o app de config segue no Ateliê.
     val keyboardSkin: String = "system",
+    // Idioma da interface (código de `AppLanguage`: "pt"/"en"/"es"). Vazio = ainda não escolhido: vale o
+    // português, e a SetupActivity grava o idioma do aparelho na primeira abertura (Yan, 2026-09-28).
+    val appLanguage: String = "",
     // Transcrição parcial ao pausar (native-voice-models, G12 / PAR-01): cada pausa transcreve o trecho
     // gravado até ali para um buffer da sessão; o 2º toggle só vale com o 1º ligado. Agnósticos à origem.
     val partialOnPause: Boolean = false,

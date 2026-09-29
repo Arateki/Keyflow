@@ -1,5 +1,7 @@
 package com.keyflow.ui.config
 
+import com.keyflow.i18n.tr
+import com.keyflow.i18n.trKey
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -12,11 +14,14 @@ import com.keyflow.ui.icons.KfIcons
  * botões da barra do teclado. A aba Modo saiu (Yan, 2026-09-28): o cartão de cada modo abre a aba da
  * própria interface (Teclado, Sobrepor).
  */
-enum class ConfigTab(val label: String, private val icon: KfIconSpec) {
-    VOZ("Transcrição", KfIcons.TabVoz),
-    TECLADO("Teclado", KfIcons.TabTeclado),
-    OVERLAY("Sobrepor", KfIcons.TabSobrepor),
+enum class ConfigTab(private val labelPt: String, private val icon: KfIconSpec) {
+    VOZ(trKey("Transcrição"), KfIcons.TabVoz),
+    TECLADO(trKey("Teclado"), KfIcons.TabTeclado),
+    OVERLAY(trKey("Sobrepor"), KfIcons.TabSobrepor),
     DOCS("Docs", KfIcons.TabDocs);
+
+    /** Nome da aba no idioma da interface. */
+    val label: String get() = tr(labelPt)
 
     @Composable
     fun Icon(tint: Color, modifier: Modifier = Modifier) {

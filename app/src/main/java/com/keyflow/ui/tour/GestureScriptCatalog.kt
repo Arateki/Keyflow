@@ -1,5 +1,6 @@
 package com.keyflow.ui.tour
 
+import com.keyflow.i18n.tr
 import androidx.compose.ui.geometry.Offset
 import com.keyflow.core.ButtonState
 import com.keyflow.core.OrbShortcutAction
@@ -69,7 +70,7 @@ fun buildKeyboardScripts(@Suppress("UNUSED_PARAMETER") settings: Settings): List
 
 private fun toggleBasics(parts: List<String>) = GestureScript(
     id = "orb-toggle-basics",
-    title = "Gravar e parar",
+    title = tr("Gravar e parar"),
     description = sentence(parts[0]),
     scene = TourScene.ORB,
     steps = listOf(
@@ -81,7 +82,7 @@ private fun toggleBasics(parts: List<String>) = GestureScript(
 
 private fun togglePause(parts: List<String>) = GestureScript(
     id = "orb-toggle-pause",
-    title = "Pausar e retomar",
+    title = tr("Pausar e retomar"),
     description = sentence(parts[1]),
     scene = TourScene.ORB,
     steps = listOf(
@@ -95,7 +96,7 @@ private fun togglePause(parts: List<String>) = GestureScript(
 
 private fun pushToTalkBasics(parts: List<String>) = GestureScript(
     id = "orb-ptt-basics",
-    title = "Falar e enviar",
+    title = tr("Falar e enviar"),
     description = sentence(parts[0] + " · " + parts[1]),
     scene = TourScene.ORB,
     steps = listOf(
@@ -107,7 +108,7 @@ private fun pushToTalkBasics(parts: List<String>) = GestureScript(
 
 private fun pushToTalkPause(parts: List<String>) = GestureScript(
     id = "orb-ptt-pause",
-    title = "Pausar depois de soltar",
+    title = tr("Pausar depois de soltar"),
     description = sentence(parts[2]),
     scene = TourScene.ORB,
     steps = listOf(
@@ -122,9 +123,8 @@ private fun pushToTalkPause(parts: List<String>) = GestureScript(
 
 private fun cancelAndUndo() = GestureScript(
     id = "orb-cancel-undo",
-    title = "Cancelar e desfazer",
-    description = "Arraste a orbe até o alvo para cancelar · o áudio fica guardado enquanto o banner " +
-        "estiver na tela, e Desfazer devolve a gravação pausada.",
+    title = tr("Cancelar e desfazer"),
+    description = tr("Arraste a orbe até o alvo para cancelar · o áudio fica guardado enquanto o banner estiver na tela, e Desfazer devolve a gravação pausada."),
     scene = TourScene.ORB,
     steps = listOf(
         GestureStep(ORB_CENTER, FingerAction.MOVE, SHORT, SceneReaction(orbState = OrbState.Listening)),
@@ -157,8 +157,8 @@ private fun cancelAndUndo() = GestureScript(
 
 private fun reposition() = GestureScript(
     id = "orb-reposition",
-    title = "Reposicionar a orbe",
-    description = "Arraste a orbe para onde ela não atrapalhar · ela gruda na lateral mais próxima.",
+    title = tr("Reposicionar a orbe"),
+    description = tr("Arraste a orbe para onde ela não atrapalhar · ela gruda na lateral mais próxima."),
     scene = TourScene.ORB,
     steps = listOf(
         GestureStep(ORB_CENTER, FingerAction.MOVE, SHORT, SceneReaction(orbState = OrbState.Idle)),
@@ -190,7 +190,7 @@ private fun shortcutScripts(settings: Settings, pushToTalk: Boolean): List<Gestu
 
 private fun shortcutScript(taps: Int, action: OrbShortcutAction) = GestureScript(
     id = "orb-shortcut-${taps}tap",
-    title = "${taps} ${if (taps == 1) "toque" else "toques"} · ${shortcutActionLabel(action)}",
+    title = "${if (taps == 1) tr("1 toque") else tr("%d toques", taps)} · ${shortcutActionLabel(action)}",
     description = shortcutActionSub(action),
     scene = TourScene.ORB,
     steps = listOf(
@@ -208,9 +208,8 @@ private fun shortcutScript(taps: Int, action: OrbShortcutAction) = GestureScript
 
 private fun collapseAndExpand() = GestureScript(
     id = "kbd-collapse-expand",
-    title = "Retrair e expandir",
-    description = "Toque na seta para encolher o teclado até a barra · toque de novo para trazer as " +
-        "teclas de volta.",
+    title = tr("Retrair e expandir"),
+    description = tr("Toque na seta para encolher o teclado até a barra · toque de novo para trazer as teclas de volta."),
     scene = TourScene.KEYBOARD,
     steps = listOf(
         GestureStep(KBD_COLLAPSE, FingerAction.MOVE, SHORT, SceneReaction(keyboardExpanded = true)),
@@ -221,9 +220,8 @@ private fun collapseAndExpand() = GestureScript(
 
 private fun micTap() = GestureScript(
     id = "kbd-mic-tap",
-    title = "Mic: gravar e enviar",
-    description = "Toque no mic para começar a gravar · toque de novo para enviar e o texto cai no " +
-        "campo.",
+    title = tr("Mic: gravar e enviar"),
+    description = tr("Toque no mic para começar a gravar · toque de novo para enviar e o texto cai no campo."),
     scene = TourScene.KEYBOARD,
     steps = listOf(
         GestureStep(KBD_MIC, FingerAction.MOVE, SHORT, SceneReaction(micState = ButtonState.IDLE_READY)),
@@ -234,9 +232,8 @@ private fun micTap() = GestureScript(
 
 private fun micHold() = GestureScript(
     id = "kbd-mic-hold",
-    title = "Mic: seletor de ações",
-    description = "Segure o mic durante a gravação para abrir o seletor · arraste até pausar ou " +
-        "cancelar e solte.",
+    title = tr("Mic: seletor de ações"),
+    description = tr("Segure o mic durante a gravação para abrir o seletor · arraste até pausar ou cancelar e solte."),
     scene = TourScene.KEYBOARD,
     steps = listOf(
         GestureStep(KBD_MIC, FingerAction.MOVE, SHORT, SceneReaction(micState = ButtonState.RECORDING)),

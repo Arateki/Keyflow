@@ -1,5 +1,6 @@
 package com.keyflow.ui.common
 
+import com.keyflow.i18n.tr
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -80,7 +81,7 @@ fun SaveToast(controller: SaveController, modifier: Modifier = Modifier) {
             ) {
                 Box(Modifier.size(6.dp).clip(CircleShape).background(palette.teal))
                 Text(
-                    text = "salvo",
+                    text = tr("salvo"),
                     color = palette.onFill,
                     fontFamily = SpaceGrotesk,
                     fontWeight = FontWeight.Medium,

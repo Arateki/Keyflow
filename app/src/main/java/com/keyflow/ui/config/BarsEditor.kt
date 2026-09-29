@@ -1,5 +1,7 @@
 package com.keyflow.ui.config
 
+import com.keyflow.i18n.tr
+import com.keyflow.i18n.trKey
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -101,9 +103,9 @@ fun gridModeTag(mode: GridTriggerMode) = "bars-editor-grid-form-mode-${mode.name
 
 /** O que cada modo faz, em uma frase curta — aparece sob a opção no formulário de gatilho de grade. */
 fun gridModeHint(mode: GridTriggerMode): String = when (mode) {
-    GridTriggerMode.OPEN_ONLY -> "Envia só a tecla escolhida na grade."
-    GridTriggerMode.SEQUENCE -> "Envia o prefixo e, depois, a tecla (como no tmux)."
-    GridTriggerMode.CHORD -> "Envia prefixo e tecla juntos, como Ctrl+X."
+    GridTriggerMode.OPEN_ONLY -> tr("Envia só a tecla escolhida na grade.")
+    GridTriggerMode.SEQUENCE -> tr("Envia o prefixo e, depois, a tecla (como no tmux).")
+    GridTriggerMode.CHORD -> tr("Envia prefixo e tecla juntos, como Ctrl+X.")
 }
 
 /** Nome por extenso do botão, para as frases dos avisos (o glifo não se lê em texto corrido). */
@@ -112,10 +114,10 @@ private fun barButtonName(button: BarButton): String = when (button) {
     BarButton.ConfigBtn -> "config"
     BarButton.ToggleExpand -> "colapsar/expandir"
     BarButton.Paste -> "colar"
-    BarButton.Candidates -> "sugestões"
+    BarButton.Candidates -> tr("sugestões")
     BarButton.Joystick -> "alavanca"
     is BarButton.SingleKey -> button.key.label
-    is BarButton.GridTrigger -> button.label.ifBlank { "grade" }
+    is BarButton.GridTrigger -> button.label.ifBlank { tr("grade") }
 }
 
 /**
@@ -126,20 +128,19 @@ private fun barButtonName(button: BarButton): String = when (button) {
 private fun scrollWarningFor(buttons: List<BarButton>): String? {
     if (buttons.size < SCROLL_WARNING_MIN_BUTTONS) return null
     val apoios = BarGeometry.scrollAnchors(buttons)
-    val motivos = "o microfone, a alavanca e a grade usam o arrasto nos próprios gestos, e a faixa de " +
-        "sugestões rola as palavras dela"
+    val motivos = tr("o microfone, a alavanca e a grade usam o arrasto nos próprios gestos, e a faixa de sugestões rola as palavras dela")
     return if (apoios.isEmpty()) {
-        "Esta barra pode não caber na tela, e nenhum botão dela serve de apoio para rolar: $motivos. " +
-            "Se ela estourar a largura, o que ficar de fora não terá como ser alcançado — inclua um " +
-            "botão de toque (colar, Esc, Enter ou uma tecla avulsa)."
+        tr(
+            "Esta barra pode não caber na tela, e nenhum botão dela serve de apoio para rolar: %s. Se ela estourar a largura, o que ficar de fora não terá como ser alcançado — inclua um botão de toque (colar, Esc, Enter ou uma tecla avulsa).",
+            motivos,
+        )
     } else {
         val nomes = apoios.map(::barButtonName).distinct()
         val lista = when (nomes.size) {
             1 -> nomes.first()
-            else -> nomes.dropLast(1).joinToString(", ") + " e " + nomes.last()
+            else -> nomes.dropLast(1).joinToString(", ") + tr(" e ") + nomes.last()
         }
-        "Esta barra pode não caber na tela. Se isso acontecer, ela rola na horizontal, mas o arrasto só " +
-            "pega em $lista — $motivos."
+        tr("Esta barra pode não caber na tela. Se isso acontecer, ela rola na horizontal, mas o arrasto só pega em %s — %s.", lista, motivos)
     }
 }
 
@@ -264,7 +265,7 @@ fun BarsEditor(
                 Segmented(
                     options = listOf(false, true),
                     selected = viewingExpanded,
-                    label = { if (it) "Expandido" else "Retraído" },
+                    label = { if (it) tr("Expandido") else tr("Retraído") },
                     tag = { if (it) BARS_EDITOR_MODE_EXPANDED_TAG else BARS_EDITOR_MODE_COLLAPSED_TAG },
                     onSelect = { viewingExpanded = it },
                     modifier = Modifier.padding(top = 8.dp),
@@ -276,7 +277,7 @@ fun BarsEditor(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                SettingTitle("Espelhar colapsado/expandido", Modifier.weight(1f))
+                SettingTitle(tr("Espelhar colapsado/expandido"), Modifier.weight(1f))
                 PillToggle(
                     checked = barsConfig.mirrored,
                     onCheckedChange = { turnOn ->
@@ -354,7 +355,7 @@ fun BarsEditor(
 
             if (activeList.size >= 3) {
                 InfoNote(
-                    "3+ barras + horizontal: o visual e a usabilidade do teclado podem ficar inconsistentes (pouco espaço vertical)",
+                    tr("3+ barras + horizontal: o visual e a usabilidade do teclado podem ficar inconsistentes (pouco espaço vertical)"),
                     BARS_EDITOR_COUNT_WARNING_TAG,
                     Modifier.padding(top = 12.dp),
                 )
@@ -570,16 +571,16 @@ private fun CatalogSheet(
     onAddGrid: () -> Unit,
 ) {
     val options = buildList {
-        add(CatalogOption("Microfone", BARS_EDITOR_CATALOG_MIC_TAG, "Grava sua voz e cola a transcrição. Toque para gravar e parar; segure para pausar, retomar ou cancelar.") { onAddSimple(BarButton.Mic) })
-        add(CatalogOption("Config", BARS_EDITOR_CATALOG_CONFIG_TAG, "Abre as configurações do KeyFlow.") { onAddSimple(BarButton.ConfigBtn) })
-        add(CatalogOption("Colapsar/expandir", BARS_EDITOR_CATALOG_TOGGLE_EXPAND_TAG, "Recolhe o teclado até a barra, ou traz as teclas de volta.") { onAddSimple(BarButton.ToggleExpand) })
-        add(CatalogOption("Colar", BARS_EDITOR_CATALOG_PASTE_TAG, "Cola o que está na área de transferência.") { onAddSimple(BarButton.Paste) })
-        add(CatalogOption("Candidatos", BARS_EDITOR_CATALOG_CANDIDATES_TAG, "A faixa de sugestões do corretor: enquanto você digita, mostra palavras para tocar e completar. A área fica reservada mesmo vazia.") { onAddSimple(BarButton.Candidates) })
-        add(CatalogOption("Alavanca", BARS_EDITOR_CATALOG_JOYSTICK_TAG, "Arraste a partir dela para mover o cursor, como as setas do teclado; quanto mais longe o dedo, mais rápido.") { onAddSimple(BarButton.Joystick) })
-        add(CatalogOption("Tecla avulsa", BARS_EDITOR_CATALOG_SINGLE_KEY_TAG, "Um botão que envia a tecla ou o atalho que você escolher, como Esc, Tab ou Ctrl+C.") { onAddSingleKey() })
+        add(CatalogOption(trKey("Microfone"), BARS_EDITOR_CATALOG_MIC_TAG, tr("Grava sua voz e cola a transcrição. Toque para gravar e parar; segure para pausar, retomar ou cancelar.")) { onAddSimple(BarButton.Mic) })
+        add(CatalogOption(trKey("Config"), BARS_EDITOR_CATALOG_CONFIG_TAG, tr("Abre as configurações do KeyFlow.")) { onAddSimple(BarButton.ConfigBtn) })
+        add(CatalogOption(trKey("Colapsar/expandir"), BARS_EDITOR_CATALOG_TOGGLE_EXPAND_TAG, tr("Recolhe o teclado até a barra, ou traz as teclas de volta.")) { onAddSimple(BarButton.ToggleExpand) })
+        add(CatalogOption(trKey("Colar"), BARS_EDITOR_CATALOG_PASTE_TAG, tr("Cola o que está na área de transferência.")) { onAddSimple(BarButton.Paste) })
+        add(CatalogOption(trKey("Candidatos"), BARS_EDITOR_CATALOG_CANDIDATES_TAG, tr("A faixa de sugestões do corretor: enquanto você digita, mostra palavras para tocar e completar. A área fica reservada mesmo vazia.")) { onAddSimple(BarButton.Candidates) })
+        add(CatalogOption(trKey("Alavanca"), BARS_EDITOR_CATALOG_JOYSTICK_TAG, tr("Arraste a partir dela para mover o cursor, como as setas do teclado; quanto mais longe o dedo, mais rápido.")) { onAddSimple(BarButton.Joystick) })
+        add(CatalogOption(trKey("Tecla avulsa"), BARS_EDITOR_CATALOG_SINGLE_KEY_TAG, tr("Um botão que envia a tecla ou o atalho que você escolher, como Esc, Tab ou Ctrl+C.")) { onAddSingleKey() })
         // Grade: escondida quando não há grades cadastradas (nada pra referenciar).
         if (grids.isNotEmpty()) {
-            add(CatalogOption("Grade", BARS_EDITOR_CATALOG_GRID_TAG, "Segure e arraste para abrir uma grade de atalhos; solte sobre uma célula para enviar o atalho dela.") { onAddGrid() })
+            add(CatalogOption(trKey("Grade"), BARS_EDITOR_CATALOG_GRID_TAG, tr("Segure e arraste para abrir uma grade de atalhos; solte sobre uma célula para enviar o atalho dela.")) { onAddGrid() })
         }
     }
     // "?" de uma linha: o mesmo modal troca para a explicação (seta ← volta ao catálogo) — padrão do
@@ -588,7 +589,7 @@ private fun CatalogSheet(
     val help = options.firstOrNull { it.tag == helpFor }
     if (help != null) {
         ConfigModal(
-            title = help.label,
+            title = tr(help.label),
             onDismiss = onDismiss,
             closeTag = BARS_EDITOR_CATALOG_CLOSE_TAG,
             cardTag = BARS_EDITOR_CATALOG_HELP_TAG,
@@ -606,7 +607,7 @@ private fun CatalogSheet(
                 modifier = Modifier.padding(top = 4.dp),
             )
             PrimaryButton(
-                "Adicionar",
+                tr("Adicionar"),
                 tag = BARS_EDITOR_CATALOG_HELP_ADD_TAG,
                 onClick = help.onAdd,
                 modifier = Modifier.padding(top = 18.dp),
@@ -615,13 +616,13 @@ private fun CatalogSheet(
         return
     }
     ConfigModal(
-        title = "Adicionar botão",
+        title = tr("Adicionar botão"),
         onDismiss = onDismiss,
         closeTag = BARS_EDITOR_CATALOG_CLOSE_TAG,
         cardTag = BARS_EDITOR_CATALOG_TAG,
     ) {
         options.forEach { option ->
-            SheetActionRow(option.label, option.tag, onHelp = { helpFor = option.tag }, onClick = option.onAdd)
+            SheetActionRow(tr(option.label), option.tag, onHelp = { helpFor = option.tag }, onClick = option.onAdd)
         }
     }
 }
@@ -643,9 +644,9 @@ private fun SimpleEditSheet(
         cardTag = BARS_EDITOR_EDIT_SHEET_TAG,
     ) {
             if (button is BarButton.SingleKey) {
-                SheetActionRow("Trocar tecla", BARS_EDITOR_EDIT_CHANGE_KEY_TAG) { onChangeKey() }
+                SheetActionRow(tr("Trocar tecla"), BARS_EDITOR_EDIT_CHANGE_KEY_TAG) { onChangeKey() }
             }
-            SheetActionRow("Remover", BARS_EDITOR_EDIT_REMOVE_TAG) { onRemove() }
+            SheetActionRow(tr("Remover"), BARS_EDITOR_EDIT_REMOVE_TAG) { onRemove() }
     }
 }
 
@@ -663,7 +664,7 @@ private fun GridFormSheet(
 ) {
     val palette = LocalKeyFlowPalette.current
     ConfigModal(
-        title = "Gatilho de grade",
+        title = tr("Gatilho de grade"),
         onDismiss = onDismiss,
         closeTag = BARS_EDITOR_GRID_FORM_CLOSE_TAG,
         cardTag = BARS_EDITOR_GRID_FORM_TAG,
@@ -671,7 +672,7 @@ private fun GridFormSheet(
 
             if (grids.isNotEmpty()) {
                 Dropdown(
-                    label = "Grade alvo",
+                    label = tr("Grade alvo"),
                     options = grids.map { it.id },
                     selected = form.gridId ?: grids.first().id,
                     onSelect = onGridSelect,
@@ -686,8 +687,8 @@ private fun GridFormSheet(
                 selected = form.mode,
                 label = { mode ->
                     when (mode) {
-                        GridTriggerMode.OPEN_ONLY -> "Só grade"
-                        GridTriggerMode.SEQUENCE -> "Sequência"
+                        GridTriggerMode.OPEN_ONLY -> tr("Só grade")
+                        GridTriggerMode.SEQUENCE -> tr("Sequência")
                         GridTriggerMode.CHORD -> "Chord"
                     }
                 },
@@ -702,28 +703,28 @@ private fun GridFormSheet(
             if (form.mode != GridTriggerMode.OPEN_ONLY) {
                 Column(Modifier.fillMaxWidth().padding(top = 10.dp)) {
                     Text(
-                        if (form.prefix != null) "Prefixo: ${form.prefix.label}" else "Sem prefixo",
+                        if (form.prefix != null) tr("Prefixo: %s", form.prefix.label) else tr("Sem prefixo"),
                         color = palette.muted,
                         fontFamily = SpaceGrotesk,
                         fontSize = 12.sp,
                     )
                     if (form.prefix != null) {
-                        SheetActionRow("Remover prefixo", BARS_EDITOR_GRID_FORM_PREFIX_REMOVE_TAG) { onRemovePrefix() }
+                        SheetActionRow(tr("Remover prefixo"), BARS_EDITOR_GRID_FORM_PREFIX_REMOVE_TAG) { onRemovePrefix() }
                     } else {
-                        SheetActionRow("Definir prefixo", BARS_EDITOR_GRID_FORM_PREFIX_SET_TAG) { onSetPrefix() }
+                        SheetActionRow(tr("Definir prefixo"), BARS_EDITOR_GRID_FORM_PREFIX_SET_TAG) { onSetPrefix() }
                     }
                 }
             }
 
             PrimaryButton(
-                "Confirmar",
+                tr("Confirmar"),
                 tag = BARS_EDITOR_GRID_FORM_CONFIRM_TAG,
                 onClick = onConfirm,
                 modifier = Modifier.padding(top = 16.dp),
             )
 
             if (onRemove != null) {
-                SheetActionRow("Remover", BARS_EDITOR_GRID_FORM_REMOVE_TAG, onClick = onRemove)
+                SheetActionRow(tr("Remover"), BARS_EDITOR_GRID_FORM_REMOVE_TAG, onClick = onRemove)
             }
     }
 }
@@ -747,7 +748,7 @@ private fun SheetActionRow(label: String, tag: String, onHelp: (() -> Unit)? = n
         Text(label, color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Normal, fontSize = 13.sp, modifier = Modifier.weight(1f))
         if (onHelp != null) {
             // Alvo próprio: tocar no "?" explica; o resto da linha adiciona.
-            HelpButton("O que é $label", catalogHelpTag(tag), onHelp, Modifier.padding(end = 6.dp))
+            HelpButton(tr("O que é %s", label), catalogHelpTag(tag), onHelp, Modifier.padding(end = 6.dp))
         }
         KfIcon(KfIcons.ChevronRight, palette.faint, Modifier.size(16.dp))
     }

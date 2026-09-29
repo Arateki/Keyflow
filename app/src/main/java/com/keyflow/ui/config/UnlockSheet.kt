@@ -1,5 +1,6 @@
 package com.keyflow.ui.config
 
+import com.keyflow.i18n.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -68,7 +69,7 @@ fun UnlockSheet(visible: Boolean, onDismiss: () -> Unit, modifier: Modifier = Mo
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        "Desbloquear skins",
+                        tr("Desbloquear skins"),
                         color = palette.fg,
                         fontFamily = SpaceGrotesk,
                         fontWeight = FontWeight.Normal,
@@ -76,7 +77,7 @@ fun UnlockSheet(visible: Boolean, onDismiss: () -> Unit, modifier: Modifier = Mo
                         letterSpacing = (-0.4).sp,
                     )
                     Text(
-                        "Personalize o teclado e o overlay com temas. Escolha como liberar — para sempre.",
+                        tr("Personalize o teclado e o overlay com temas. Escolha como liberar — para sempre."),
                         color = palette.muted,
                         fontFamily = SpaceGrotesk,
                         fontWeight = FontWeight.Light,
@@ -112,9 +113,9 @@ fun UnlockSheet(visible: Boolean, onDismiss: () -> Unit, modifier: Modifier = Mo
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text("Recarregar R$ 20 em créditos", color = palette.onFill, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Medium, fontSize = 13.5.sp)
+                    Text(tr("Recarregar R$ 20 em créditos"), color = palette.onFill, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Medium, fontSize = 13.5.sp)
                     Text(
-                        "Vira saldo de transcrição e libera todas as skins para sempre.",
+                        tr("Vira saldo de transcrição e libera todas as skins para sempre."),
                         color = palette.onFill.copy(alpha = 0.68f),
                         fontFamily = SpaceGrotesk,
                         fontWeight = FontWeight.Light,
@@ -148,9 +149,9 @@ fun UnlockSheet(visible: Boolean, onDismiss: () -> Unit, modifier: Modifier = Mo
                     .testTag(UNLOCK_ONCE_TAG)
                     .padding(horizontal = 16.dp, vertical = 15.dp),
             ) {
-                Text("Pagar R$ 15 — uma vez", color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Medium, fontSize = 13.5.sp)
+                Text(tr("Pagar R$ 15 — uma vez"), color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Medium, fontSize = 13.5.sp)
                 Text(
-                    "Pagamento único, sem virar crédito. Libera apenas as skins, para sempre.",
+                    tr("Pagamento único, sem virar crédito. Libera apenas as skins, para sempre."),
                     color = palette.muted,
                     fontFamily = SpaceGrotesk,
                     fontWeight = FontWeight.Light,
@@ -161,7 +162,7 @@ fun UnlockSheet(visible: Boolean, onDismiss: () -> Unit, modifier: Modifier = Mo
             }
 
             Eyebrow(
-                "Pagamento via Google Play",
+                tr("Pagamento via Google Play"),
                 Modifier.fillMaxWidth().padding(top = 16.dp).wrapContentWidth(Alignment.CenterHorizontally),
             )
         }

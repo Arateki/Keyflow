@@ -1,5 +1,6 @@
 package com.keyflow.ui.tour.scenes
 
+import com.keyflow.i18n.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -106,8 +107,8 @@ private fun MicActionSelector(modifier: Modifier = Modifier) {
             .padding(horizontal = 6.dp, vertical = 3.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Chip(KfIcons.Pause, "pausar")
-        Chip(KfIcons.Close, "cancelar")
+        Chip(KfIcons.Pause, tr("pausar"))
+        Chip(KfIcons.Close, tr("cancelar"))
     }
 }
 

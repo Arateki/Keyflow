@@ -1,5 +1,6 @@
 package com.keyflow.ui.tour.scenes
 
+import com.keyflow.i18n.tr
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -134,7 +135,7 @@ private fun UndoBanner(modifier: Modifier = Modifier) {
             .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
         Text(
-            "Cancelado · Desfazer",
+            tr("Cancelado · Desfazer"),
             color = palette.fg,
             fontFamily = SpaceGrotesk,
             fontWeight = FontWeight.Medium,

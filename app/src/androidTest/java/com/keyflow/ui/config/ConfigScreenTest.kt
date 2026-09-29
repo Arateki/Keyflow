@@ -58,7 +58,7 @@ class ConfigScreenTest {
         var lastOverlayChange: Boolean? = null
         var lastKeyboardChange: Boolean? = null
         var lastThemeChange: Boolean? = null
-        var languageClicks = 0
+        val languageChanges = mutableListOf<com.keyflow.i18n.AppLanguage>()
         var overlayPermissionRequests = 0
         var notificationPermissionRequests = 0
         var keyboardPermissionRequests = 0
@@ -87,7 +87,7 @@ class ConfigScreenTest {
                         lastThemeChange = it
                         settings = settings.copy(themeDark = it)
                     },
-                    onLanguageClick = { languageClicks++ },
+                    onAppLanguageChange = { languageChanges += it },
                     onRequestOverlayPermission = { overlayPermissionRequests++ },
                     onRequestKeyboardPermission = { keyboardPermissionRequests++ },
                     onRequestMicPermission = {},
@@ -279,15 +279,17 @@ class ConfigScreenTest {
     }
 
     @Test
-    fun themeTogglePersistsAndLanguageIsInert() {
+    fun themeTogglePersistsAndLanguageMenuOffersTheThreeLanguages() {
         val h = Harness()
         rule.setContent { h.Content() }
 
         rule.onNodeWithTag(THEME_TOGGLE_TAG).performClick()
         rule.runOnIdle { assertEquals(true, h.lastThemeChange) }
 
+        // O botão de idioma abre português, inglês e espanhol; escolher avisa quem salva (Yan, 2026-09-28).
         rule.onNodeWithTag(LANG_TOGGLE_TAG).performClick()
-        rule.runOnIdle { assertTrue(h.languageClicks > 0) }
+        rule.onNodeWithTag(languageOptionTag(com.keyflow.i18n.AppLanguage.ES)).performClick()
+        rule.runOnIdle { assertEquals(listOf(com.keyflow.i18n.AppLanguage.ES), h.languageChanges) }
     }
 
     @Test
