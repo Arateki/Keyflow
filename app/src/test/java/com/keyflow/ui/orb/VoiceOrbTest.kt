@@ -115,4 +115,13 @@ class VoiceOrbTest {
             assertThat(glitchIntensity(1234f, state)).isEqualTo(glitchIntensity(1234f, state))
         }
     }
+
+    @Test
+    fun `rose gold is a paid orb style that orbStyleFor finds by id`() {
+        assertThat(orbStyleFor("rosegold")).isEqualTo(OrbStyle.ROSE_GOLD)
+        assertThat(OrbStyle.ROSE_GOLD.paid).isTrue()
+        // Todo id de estilo volta ao próprio estilo (e um id desconhecido é o Ateliê).
+        for (style in OrbStyle.entries) assertThat(orbStyleFor(style.id)).isEqualTo(style)
+        assertThat(orbStyleFor("nao-existe")).isEqualTo(OrbStyle.ATELIE)
+    }
 }

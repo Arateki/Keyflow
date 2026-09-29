@@ -110,9 +110,46 @@ class KeyboardColorsTest {
     }
 
     @Test
+    fun `rose gold is one warm opaque palette, the same in both themes, with wine letters`() {
+        val colors = KeyboardColors.of(KeyboardSkin.ROSE_GOLD, dark = false)
+        assertThat(KeyboardColors.of(KeyboardSkin.ROSE_GOLD, dark = true)).isEqualTo(colors)
+        assertThat(colors.backdrop).isEqualTo(KeyboardBackdrop.ROSE_GOLD)
+        assertThat(colors.hasSurface).isTrue()
+        assertThat(colors.tray ushr 24).isEqualTo(0)
+        // Faces opacas e quentes (r > g > b): blush nas letras e um rosé mais fundo nas de função.
+        for (face in listOf(colors.key, colors.modifier)) {
+            assertThat(face ushr 24).isEqualTo(0xFF)
+            assertThat((face shr 16) and 0xFF).isGreaterThan((face shr 8) and 0xFF)
+            assertThat((face shr 8) and 0xFF).isAtLeast(face and 0xFF)
+        }
+        assertThat(colors.modifier and 0xFF).isLessThan(colors.key and 0xFF)
+        // Letra vinho (escura, avermelhada) e balão opaco; sem halo de vidro.
+        assertThat((colors.ink shr 16) and 0xFF).isAtMost(0x70)
+        assertThat((colors.ink shr 16) and 0xFF).isAtLeast((colors.ink and 0xFF) + 0x10)
+        assertThat(colors.popup ushr 24).isEqualTo(0xFF)
+        assertThat(colors.inkShadow).isEqualTo(0)
+    }
+
+    @Test
+    fun `rose gold swaps the shared accents for dusty rose and raspberry - no green, no amber`() {
+        val rose = KeyboardColors.of(KeyboardSkin.ROSE_GOLD, dark = false)
+        val teal = 0xFF4E9683.toInt()
+        val amber = 0xFFC6873F.toInt()
+        val terracotta = 0xFFD9694B.toInt()
+        for (color in listOf(teal, amber, terracotta)) {
+            val tone = rose.tone(color)
+            assertThat(tone).isNotEqualTo(color)
+            // Nunca esverdeado: o vermelho manda.
+            assertThat((tone shr 16) and 0xFF).isGreaterThan((tone shr 8) and 0xFF)
+        }
+        assertThat(rose.tone(0xFF123456.toInt())).isEqualTo(0xFF123456.toInt())
+    }
+
+    @Test
     fun `aero id round-trips and unknown ids fall back to the default`() {
         assertThat(KeyboardSkin.of("aero")).isEqualTo(KeyboardSkin.AERO)
         assertThat(KeyboardSkin.of("glitch")).isEqualTo(KeyboardSkin.GLITCH)
+        assertThat(KeyboardSkin.of("rosegold")).isEqualTo(KeyboardSkin.ROSE_GOLD)
         assertThat(KeyboardSkin.of("vaporwave")).isEqualTo(KeyboardSkin.DEFAULT)
     }
 
@@ -123,6 +160,7 @@ class KeyboardColorsTest {
         assertThat(KeyboardSkin.entries.filter { !it.paid }).containsExactly(KeyboardSkin.SYSTEM)
         assertThat(KeyboardSkin.AERO.paid).isTrue()
         assertThat(KeyboardSkin.GLITCH.paid).isTrue()
+        assertThat(KeyboardSkin.ROSE_GOLD.paid).isTrue()
         assertThat(KeyboardSkin.DEFAULT.paid).isFalse()
     }
 }

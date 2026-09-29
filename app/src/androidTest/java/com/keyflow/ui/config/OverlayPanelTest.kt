@@ -98,5 +98,15 @@ class OverlayPanelTest {
 
         rule.runOnIdle { assertEquals("glitch", h.settings.orbSkin) }
     }
+
+    @Test
+    fun orbSkinRoseGoldPersists() {
+        val h = Harness(Settings(orbSkin = "atelie"))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(orbSkinTag("rosegold")).performScrollTo().performClick()
+
+        rule.runOnIdle { assertEquals("rosegold", h.settings.orbSkin) }
+    }
 }
 

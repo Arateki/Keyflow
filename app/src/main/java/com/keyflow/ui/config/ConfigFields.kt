@@ -910,6 +910,16 @@ internal fun SkinsSection(
                         VoiceOrb(OrbState.Idle, Modifier.requiredSize(ORB_CHOICE_SIDE), timeProvider = ORB_GLITCH_CHOICE_CLOCK, style = OrbStyle.GLITCH)
                     }
                 }
+                SkinChoice(
+                    label = "Rose Gold",
+                    selected = orbSelected == OrbStyle.ROSE_GOLD,
+                    onClick = { onOrbSkinSelected(OrbStyle.ROSE_GOLD.id) },
+                    tag = orbSkinTag(OrbStyle.ROSE_GOLD.id),
+                ) {
+                    Box(Modifier.fillMaxSize().background(palette.bg), contentAlignment = Alignment.Center) {
+                        VoiceOrb(OrbState.Idle, Modifier.requiredSize(ORB_CHOICE_SIDE), timeProvider = ORB_CHOICE_CLOCK, style = OrbStyle.ROSE_GOLD)
+                    }
+                }
             } else if (onSkinSelected == null) {
                 SkinSwatch(palette.fg)
                 SkinSwatch(palette.teal, selected = true)
@@ -971,10 +981,27 @@ internal fun SkinsSection(
                         Box(Modifier.align(Alignment.BottomEnd).padding(end = 5.dp).width(9.dp).height(1.5.dp).background(Color(0xFFFE2C55)))
                     }
                 }
+                SkinChoice(
+                    label = "Rose Gold",
+                    selected = KeyboardSkin.of(selectedSkin) == KeyboardSkin.ROSE_GOLD,
+                    onClick = { onSkinSelected(KeyboardSkin.ROSE_GOLD.id) },
+                    tag = skinTag(KeyboardSkin.ROSE_GOLD.id),
+                ) {
+                    // Fundo blush e uma tecla de cetim rosé com o bisel de metal.
+                    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFFF8E7E2), Color(0xFFEECFC8)))).padding(horizontal = 10.dp, vertical = 9.dp)) {
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .background(Brush.verticalGradient(listOf(Color(0xFFFFF0EB), Color(0xFFEBC3BA))), RoundedCornerShape(4.dp))
+                                .border(1.dp, Brush.verticalGradient(listOf(Color(0xFFFFF7EE), Color(0xFFB97A75))), RoundedCornerShape(4.dp)),
+                        )
+                    }
+                }
             }
-            // Amostras travadas (decorativas) para completar a fileira de cinco: o que sobra depois das escolhas.
-            if (onSkinSelected == null) SkinSwatch(palette.terracotta) // (a orbe tem 3 escolhas: sobram 2)
-            SkinSwatch(palette.bg, border = true)
+            // Amostras travadas (decorativas) para completar a fileira de cinco: o teclado tem 5 escolhas (nenhuma sobra) e
+            // a orbe 4 (sobra 1).
+            if (onSkinSelected == null && onOrbSkinSelected == null) SkinSwatch(palette.terracotta)
+            if (onSkinSelected == null) SkinSwatch(palette.bg, border = true)
         }
         Row(
             Modifier

@@ -28,6 +28,9 @@ enum class KeyboardBackdrop {
 
     /** Glitch: preto neutro; a falha vem das teclas e do movimento ([KeyboardMotion]), não do fundo. */
     GLITCH,
+
+    /** Rose Gold: um fundo blush em degradê, com um fio de champanhe em cima e um brilho de seda. */
+    ROSE_GOLD,
     ;
 
     /**
@@ -37,17 +40,20 @@ enum class KeyboardBackdrop {
     fun navigationBarColor(blurBehind: Boolean): Int = when (this) {
         AERO -> if (blurBehind) AERO_BOTTOM else AERO_FROSTED_BOTTOM
         GLITCH -> GLITCH_BASE
+        ROSE_GOLD -> ROSE_BOTTOM
     }
 
     fun drawable(density: Float, blurBehind: Boolean): Drawable = when (this) {
         AERO -> AeroGlassSheet(density = density, blurBehind = blurBehind)
         GLITCH -> GlitchSheet()
+        ROSE_GOLD -> RoseGoldSheet(density)
     }
 
     /** A superfície das teclas que combina com este fundo. */
     fun surface(density: Float, blurBehind: Boolean): KeySurface = when (this) {
         AERO -> GlassPainter(density, blurBehind)
         GLITCH -> GlitchPainter(density)
+        ROSE_GOLD -> RoseGoldPainter(density)
     }
 }
 
@@ -62,6 +68,9 @@ private const val AERO_FROSTED_TOP = 0x47D8EFFF
 private const val AERO_FROSTED_BOTTOM = 0x665CB8FF
 
 private const val GLITCH_BASE = 0xFF0B0B0C.toInt()
+
+private const val ROSE_TOP = 0xFFF8E7E2.toInt()
+private const val ROSE_BOTTOM = 0xFFEECFC8.toInt()
 
 /**
  * A lâmina de vidro que as teclas conhecem: o tamanho dela é o que estende o reflexo diagonal por todo o
@@ -176,6 +185,50 @@ private class GlitchSheet : Drawable(), GlassSheet {
 
     override fun draw(canvas: Canvas) {
         if (!bounds.isEmpty) canvas.drawRect(bounds, basePaint)
+    }
+
+    override fun setAlpha(alpha: Int) = Unit
+    override fun setColorFilter(colorFilter: ColorFilter?) = Unit
+
+    @Deprecated("Deprecated in Java")
+    override fun getOpacity(): Int = PixelFormat.OPAQUE
+}
+
+/**
+ * O fundo do Rose Gold: um blush em degradê (mais claro em cima), um fio de champanhe na borda de cima e uma faixa de
+ * seda — um brilho largo e suave na diagonal, sem borda dura (o reflexo duro é coisa de vidro). Opaco e parado; o
+ * brilho que se move é o [ShimmerMotion].
+ */
+private class RoseGoldSheet(private val density: Float) : Drawable(), GlassSheet {
+
+    override val widthPx: Int get() = bounds.width()
+    override val heightPx: Int get() = bounds.height()
+
+    private val basePaint = Paint()
+    private val silkPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val edgePaint = Paint().apply { color = 0xE6FFF4EC.toInt() }
+
+    override fun onBoundsChange(bounds: Rect) {
+        super.onBoundsChange(bounds)
+        if (bounds.isEmpty) return
+        basePaint.shader = LinearGradient(0f, bounds.top.toFloat(), 0f, bounds.bottom.toFloat(), ROSE_TOP, ROSE_BOTTOM, Shader.TileMode.CLAMP)
+        val w = bounds.width().toFloat()
+        val h = bounds.height().toFloat()
+        // A seda: um pico suave e largo na diagonal, do canto de cima à esquerda ao de baixo à direita.
+        silkPaint.shader = LinearGradient(
+            bounds.left.toFloat(), bounds.top.toFloat(), bounds.left + w * 0.9f, bounds.top + h * 1.4f,
+            intArrayOf(0x00FFFFFF, 0x38FFFFFF, 0x00FFFFFF, 0x24FFFFFF, 0x00FFFFFF),
+            floatArrayOf(0f, 0.28f, 0.5f, 0.74f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+    }
+
+    override fun draw(canvas: Canvas) {
+        val b = bounds
+        if (b.isEmpty) return
+        canvas.drawRect(b, basePaint)
+        canvas.drawRect(b, silkPaint)
+        canvas.drawRect(b.left.toFloat(), b.top.toFloat(), b.right.toFloat(), b.top + density, edgePaint)
     }
 
     override fun setAlpha(alpha: Int) = Unit

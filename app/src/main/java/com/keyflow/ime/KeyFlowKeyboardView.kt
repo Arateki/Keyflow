@@ -194,12 +194,14 @@ class KeyFlowKeyboardView(
     private val kbInk = colors.ink
 
     // O movimento da skin, se ela tem e se está ligado: eventos curtos, sem custo entre eles (ver [KeyboardMotion]).
-    private val motion: KeyboardMotion? =
-        if (colors.backdrop == KeyboardBackdrop.GLITCH && (motionEnabled || motionTimeMs != null)) {
+    private val motion: KeyboardMotion? = when {
+        !(motionEnabled || motionTimeMs != null) -> null
+        colors.backdrop == KeyboardBackdrop.GLITCH ->
             GlitchMotion(this, resources.displayMetrics.density * scale, motionTimeMs, ::applyEffect)
-        } else {
-            null
-        }
+        colors.backdrop == KeyboardBackdrop.ROSE_GOLD ->
+            ShimmerMotion(this, resources.displayMetrics.density * scale, motionTimeMs)
+        else -> null
+    }
 
     // Estado/tempo do microfone (espelha AudioRecorder/OrbButtonView: conta só em RECORDING).
     private val handler = Handler(Looper.getMainLooper())

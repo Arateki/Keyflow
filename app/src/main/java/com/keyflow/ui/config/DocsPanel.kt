@@ -228,7 +228,7 @@ val docsSections: List<DocSection> get() = listOf(
             ),
             DocBlock.Labeled(
                 tr("Skins"),
-                tr("a aparência da orbe: Ateliê, Aero (uma bolha de vidro com água) ou Glitch (falha gráfica em preto, vermelho e azul). É uma escolha à parte da skin do teclado."),
+                tr("a aparência da orbe: Ateliê, Aero (uma bolha de vidro com água), Glitch (falha gráfica em preto, vermelho e azul) ou Rose Gold (metal rosé). É uma escolha à parte da skin do teclado."),
             ),
             DocBlock.Labeled(
                 tr("Atalhos"),

@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.layout.offset
@@ -90,6 +91,12 @@ enum class OrbStyle(
      * uma rajada de falha desloca faixas horizontais — em repouso e nos outros estados. Paga, como o Aero.
      */
     GLITCH("glitch", paid = true),
+
+    /**
+     * Rose Gold (Yan, 2026-09-29): uma esfera metálica rosé, com faixa de cetim que varre devagar, um halo rosado e faíscas
+     * que cintilam. Feminina e elegante; paga, como as outras. A tinta do centro é vinho.
+     */
+    ROSE_GOLD("rosegold", paid = true),
 }
 
 /** Estilo do orbe para a árvore abaixo — a overlay e as prévias das abas seguem a skin escolhida. */
@@ -154,6 +161,14 @@ private val AeroInkGlow = Color(0xF2FFFFFF)
 // Paleta Glitch: preto, branco e os dois canais deslocados (ciano e vermelho, como a logo do TikTok).
 private val GlitchCyan = Color(0xFF25F4EE)
 private val GlitchRed = Color(0xFFFE2C55)
+
+// Paleta Rose Gold: champanhe no brilho, rosé no corpo, rosé fundo na borda; tinta vinho no centro.
+private val RoseInk = Color(0xFF5B2A35)
+private val RoseHighlight = Color(0xFFFFF1E6)
+private val RoseMid = Color(0xFFE8ADA3)
+private val RoseEdge = Color(0xFFB56E6E)
+private val RoseHaloInner = Color(0x40F4B8B8)
+private val RoseHaloOuter = Color(0x00F4B8B8)
 private val CancelAmber = Color(0xFFC9772F) // descarte: terracota/âmbar, distinto do X de erro
 
 @Composable
@@ -174,6 +189,7 @@ fun VoiceOrb(
         LocalCenterInk provides when (style) {
             OrbStyle.AERO -> AeroInk
             OrbStyle.GLITCH -> Color.White
+            OrbStyle.ROSE_GOLD -> RoseInk
             OrbStyle.ATELIE -> CenterInk
         },
         LocalCenterGlow provides if (style == OrbStyle.AERO) AeroInkGlow else null,
@@ -394,6 +410,10 @@ private fun DrawScope.drawOrb(t: Float, state: OrbState, style: OrbStyle = OrbSt
     }
     if (style == OrbStyle.GLITCH) {
         drawGlitchOrb(t, state)
+        return
+    }
+    if (style == OrbStyle.ROSE_GOLD) {
+        drawRoseGoldOrb(t, state)
         return
     }
     val w = size.width
@@ -723,6 +743,104 @@ private fun glitchBands(t: Float, state: OrbState, g: Float, cy: Float, r: Float
 private fun glitchRandom(a: Int, b: Int): Float {
     val x = sin(a * 12.9898f + b * 78.233f) * 43758.547f
     return x - floor(x)
+}
+
+/**
+ * Orbe Rose Gold: o mesmo blob vivo como uma esfera de metal rosé. O corpo é um degradê radial com o brilho de champanhe
+ * deslocado para cima e à esquerda; por cima, uma faixa de cetim (clara, oblíqua) varre a esfera devagar, um oval
+ * de brilho e a luz rosada refletida na base; o aro vai de champanhe em cima a rosé fundo embaixo (metal polido). Três
+ * faíscas de quatro pontas cintilam em sequência ao redor. Tudo é função do tempo [t]: relógio parado, quadro fixo.
+ */
+private fun DrawScope.drawRoseGoldOrb(t: Float, state: OrbState) {
+    val cx = size.width / 2f
+    val cy = size.height / 2f
+    val (amp, sp) = orbBaseParams(state)
+    val lvl = orbLevel(state, t)
+    val r = min(size.width, size.height) * 0.30f * (0.84f + 0.20f * lvl)
+
+    if (state == OrbState.Listening || state == OrbState.Paused) {
+        for (k in 0 until 3) {
+            val fr = ((t * 0.0006f) + (k / 3f)) % 1f
+            drawCircle(
+                color = Color(0xFFE79AA6),
+                radius = r * (1.05f + fr * 0.95f),
+                center = Offset(cx, cy),
+                alpha = 0.35f * (1f - fr),
+                style = Stroke(width = 1.6f),
+            )
+        }
+    }
+
+    drawLayer(cx, cy, r * 1.14f, amp * 0.7f, t, sp * 0.8f, 5.0f, RoseHaloInner, RoseHaloOuter, 1f)
+    val body = blobPath(cx, cy, r, amp * lvl, t, sp, 2.0f)
+    drawPath(
+        body,
+        Brush.radialGradient(
+            0f to RoseHighlight,
+            0.45f to RoseMid,
+            1f to RoseEdge,
+            center = Offset(cx - r * 0.28f, cy - r * 0.34f),
+            radius = r * 1.35f,
+        ),
+    )
+    clipPath(body) {
+        // A faixa de cetim: clara, oblíqua, varrendo a esfera de ponta a ponta (um ciclo a cada ~4,5 s).
+        val sweep = (t * 0.00022f) % 1f
+        val bandX = cx - r * 1.6f + sweep * r * 3.2f
+        rotate(-25f, pivot = Offset(cx, cy)) {
+            drawRect(
+                Brush.horizontalGradient(
+                    listOf(Color(0x00FFF4EC), Color(0x59FFF4EC), Color(0x00FFF4EC)),
+                    startX = bandX - r * 0.28f,
+                    endX = bandX + r * 0.28f,
+                ),
+                topLeft = Offset(bandX - r * 0.28f, cy - r * 1.7f),
+                size = Size(r * 0.56f, r * 3.4f),
+            )
+        }
+        // O brilho: um oval suave em cima à esquerda.
+        drawOval(
+            Brush.verticalGradient(listOf(Color(0xCCFFFFFF), Color(0x10FFFFFF)), startY = cy - r * 0.95f, endY = cy - r * 0.2f),
+            topLeft = Offset(cx - r * 0.62f, cy - r * 0.92f),
+            size = Size(r * 0.9f, r * 0.62f),
+        )
+        // A luz rosada que o metal reflete na base.
+        drawCircle(
+            Brush.radialGradient(listOf(Color(0x99FFC9C0), Color(0x00FFC9C0)), center = Offset(cx + r * 0.1f, cy + r * 0.75f), radius = r * 0.6f),
+            radius = r * 0.6f,
+            center = Offset(cx + r * 0.1f, cy + r * 0.75f),
+        )
+    }
+    // O aro: metal polido, champanhe em cima e rosé fundo embaixo.
+    drawPath(
+        body,
+        Brush.verticalGradient(listOf(Color(0xFFFFF7EE), Color(0xCCB56E6E)), startY = cy - r, endY = cy + r),
+        style = Stroke(width = maxOf(1.4f, r * 0.04f)),
+    )
+    // As faíscas: cintilam uma de cada vez (o brilho de cada uma sobe e desce com o tempo).
+    for (i in 0 until 3) {
+        val angle = i * 2.1f + 0.7f
+        val dist = r * (0.72f + 0.42f * (i % 2))
+        val alpha = sin(t * 0.002f + i * 2.1f - 0.9f).coerceAtLeast(0f).let { it * it * it * it * it * it }
+        if (alpha > 0.02f) drawSparkle(Offset(cx + cos(angle) * dist, cy + sin(angle) * dist), r * (0.11f + 0.04f * i), alpha)
+    }
+}
+
+/** Uma faísca de quatro pontas: um losango fino em cruz, branco, com um halo champanhe atrás. */
+private fun DrawScope.drawSparkle(center: Offset, size: Float, alpha: Float) {
+    drawCircle(Color(0xFFFFD9C7), radius = size * 0.75f, center = center, alpha = alpha * 0.5f)
+    val star = Path().apply {
+        moveTo(center.x, center.y - size)
+        lineTo(center.x + size * 0.16f, center.y - size * 0.16f)
+        lineTo(center.x + size, center.y)
+        lineTo(center.x + size * 0.16f, center.y + size * 0.16f)
+        lineTo(center.x, center.y + size)
+        lineTo(center.x - size * 0.16f, center.y + size * 0.16f)
+        lineTo(center.x - size, center.y)
+        lineTo(center.x - size * 0.16f, center.y - size * 0.16f)
+        close()
+    }
+    drawPath(star, Color.White, alpha = alpha)
 }
 
 private fun DrawScope.drawLayer(

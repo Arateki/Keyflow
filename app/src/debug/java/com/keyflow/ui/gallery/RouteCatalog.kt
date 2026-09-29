@@ -42,6 +42,7 @@ import com.keyflow.core.shortcuts.GridTriggerMode
 import com.keyflow.core.shortcuts.PhysicalKeyMap
 import com.keyflow.core.shortcuts.ShortcutGrid
 import com.keyflow.ime.GlitchTimeline
+import com.keyflow.ime.ShimmerTimeline
 import com.keyflow.ime.KeyFlowKeyboardView
 import com.keyflow.ime.KeyboardSkin
 import com.keyflow.overlay.RecordingNotification
@@ -123,6 +124,9 @@ object RouteCatalog {
         orbRoute("overlay-glitch-idle-calm", OrbState.Idle, OrbCenter.None, OrbStyle.GLITCH, timeMs = 200f),
         orbRoute("overlay-glitch-recording", OrbState.Listening, OrbCenter.Time(12), OrbStyle.GLITCH),
         orbRoute("overlay-glitch-transcribing", OrbState.Transcribing, OrbCenter.None, OrbStyle.GLITCH),
+        // Rose Gold (2026-09-29): a esfera de metal rosé, parada e gravando.
+        orbRoute("overlay-rosegold-idle", OrbState.Idle, OrbCenter.None, OrbStyle.ROSE_GOLD),
+        orbRoute("overlay-rosegold-recording", OrbState.Listening, OrbCenter.Time(12), OrbStyle.ROSE_GOLD),
         // Teclado reskinado (T23), grade Canvas (KC-T10, padrão único desde a promoção): View hospedado
         // via AndroidView, ancorado ao rodapé.
         keyboardRoute("keyboard-canvas-expanded", expanded = true, recording = false),
@@ -137,6 +141,10 @@ object RouteCatalog {
         keyboardRoute("keyboard-glitch-collapsed", expanded = false, recording = false, skin = KeyboardSkin.GLITCH),
         // O teclado Glitch congelado no pico de uma rajada de falha: faixas deslocadas, franjas e rótulos abertos.
         keyboardCanvasCandidatesRoute("keyboard-glitch-burst", skin = KeyboardSkin.GLITCH, motionTimeMs = GlitchTimeline.peakOf(1)),
+        // Rose Gold (2026-09-29): cetim rosé com bisel metálico; e o mesmo teclado no meio do brilho que o atravessa.
+        keyboardCanvasCandidatesRoute("keyboard-rosegold-expanded", skin = KeyboardSkin.ROSE_GOLD),
+        keyboardRoute("keyboard-rosegold-collapsed", expanded = false, recording = false, skin = KeyboardSkin.ROSE_GOLD),
+        keyboardCanvasCandidatesRoute("keyboard-rosegold-shimmer", skin = KeyboardSkin.ROSE_GOLD, motionTimeMs = ShimmerTimeline.peakOf(1)),
         // Barras Canvas (SB-T10/ROL-03): paridade com a barra de fábrica + estados só alcançáveis por
         // gesto (grade revelada/alavanca), simulados via toque sintético (mesma técnica de
         // `tapLayerToggle`) já que a galeria não tem dedo de verdade.

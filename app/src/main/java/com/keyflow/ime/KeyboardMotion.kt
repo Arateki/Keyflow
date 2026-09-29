@@ -2,7 +2,10 @@ package com.keyflow.ime
 
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.Shader
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
@@ -275,3 +278,175 @@ internal class GlitchMotion(
         const val BASE = 0xFF0B0B0C.toInt()
     }
 }
+
+/**
+ * O calendário do brilho do Rose Gold, função pura do tempo: um evento por período, num ponto que varia, de ~1,2 s. O
+ * [progress] vai de 0 (a faixa de luz entra pela esquerda) a 1 (sai pela direita).
+ */
+internal object ShimmerTimeline {
+    const val PERIOD_MS = 6500f
+    const val LENGTH_MS = 1200f
+
+    fun eventIndex(t: Float): Int = floor(t / PERIOD_MS).toInt()
+
+    fun eventStart(k: Int): Float = k * PERIOD_MS + PERIOD_MS * (0.25f + 0.45f * GlitchTimeline.random(k, 0))
+
+    /** Onde o brilho está no instante [t]: 0..1 durante o evento, `-1` fora dele. */
+    fun progress(t: Float): Float {
+        val u = (t - eventStart(eventIndex(t))) / LENGTH_MS
+        return if (u in 0f..1f) u else -1f
+    }
+
+    fun nextEventStart(t: Float): Float {
+        val k = eventIndex(t)
+        val start = eventStart(k)
+        return if (start > t) start else eventStart(k + 1)
+    }
+
+    /** O meio do evento [k] — a galeria congela o teclado aqui. */
+    fun peakOf(k: Int): Float = eventStart(k) + LENGTH_MS / 2f
+
+    /** Onde (frações da largura e da altura) ficam as faíscas do evento [k]. */
+    fun sparkle(k: Int, i: Int): Pair<Float, Float> =
+        (0.12f + 0.76f * GlitchTimeline.random(k, i + 3)) to (0.18f + 0.62f * GlitchTimeline.random(k, i + 11))
+
+    const val SPARKLES = 4
+}
+
+/**
+ * O brilho do teclado Rose Gold ao vivo: de tempos em tempos uma faixa de luz suave atravessa o teclado na diagonal,
+ * acendendo umas faíscas quando passa por elas — como a luz num metal polido. Mesma regra do [GlitchMotion]: o evento é
+ * curto, nada invalida a view fora dele, e cada quadro só desenha os filhos (listas já gravadas) e a faixa por cima.
+ * Com [fixedTimeMs] desenha o quadro congelado (galeria).
+ */
+internal class ShimmerMotion(
+    private val view: View,
+    private val density: Float,
+    private val fixedTimeMs: Float?,
+) : KeyboardMotion {
+
+    private val handler = Handler(Looper.getMainLooper())
+    private val bandPaint = Paint()
+    private val sparklePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val star = Path()
+    private var bandShader: LinearGradient? = null
+    private var bandWidth = 0f
+    private var running = false
+    private var epoch = 0L
+    private var activeUntil = 0L
+    private var progress = -1f
+    private var eventIndex = 0
+
+    override var isActive: Boolean = false
+        private set
+
+    private val begin = Runnable {
+        eventIndex = ShimmerTimeline.eventIndex(nowT())
+        activeUntil = uptime() + ShimmerTimeline.LENGTH_MS.toLong() + FRAME_MS
+        isActive = true
+        onTick()
+    }
+    private val tick = Runnable { onTick() }
+
+    private fun uptime() = SystemClock.uptimeMillis()
+
+    private fun nowT(): Float = (uptime() - epoch).toFloat()
+
+    override fun start() {
+        if (fixedTimeMs != null) {
+            eventIndex = ShimmerTimeline.eventIndex(fixedTimeMs)
+            progress = ShimmerTimeline.progress(fixedTimeMs)
+            isActive = progress >= 0f
+            return
+        }
+        if (running || !MotionPolicy.allowed(view.context)) return
+        running = true
+        epoch = uptime()
+        scheduleNext()
+    }
+
+    override fun stop() {
+        running = false
+        handler.removeCallbacks(begin)
+        handler.removeCallbacks(tick)
+        if (isActive) {
+            isActive = false
+            progress = -1f
+        }
+    }
+
+    // O brilho não responde ao toque.
+    override fun onTouchDown() = Unit
+
+    private fun scheduleNext() {
+        val t = nowT()
+        handler.removeCallbacks(begin)
+        handler.postDelayed(begin, (ShimmerTimeline.nextEventStart(t) - t).toLong().coerceAtLeast(0L))
+    }
+
+    private fun onTick() {
+        if (!running) return
+        val now = uptime()
+        progress = ShimmerTimeline.progress(nowT())
+        if (now >= activeUntil && progress < 0f) {
+            isActive = false
+            view.invalidate()
+            scheduleNext()
+            return
+        }
+        view.invalidate()
+        handler.postDelayed(tick, FRAME_MS)
+    }
+
+    override fun draw(canvas: Canvas, width: Int, height: Int, drawChildren: (Canvas) -> Unit) {
+        drawChildren(canvas)
+        val p = progress
+        if (!isActive || p < 0f) return
+        val w = width.toFloat()
+        val h = height.toFloat()
+        // A faixa: um degradê horizontal suave (branco quente no meio), girado uns 18° e levado da esquerda para a direita.
+        val bw = w * 0.30f
+        if (bandShader == null || bandWidth != bw) {
+            bandWidth = bw
+            bandShader = LinearGradient(-bw / 2f, 0f, bw / 2f, 0f, intArrayOf(0x00FFF4EC, 0x47FFF4EC, 0x00FFF4EC), null, Shader.TileMode.CLAMP)
+            bandPaint.shader = bandShader
+        }
+        val centerX = -0.2f * w + p * 1.4f * w
+        canvas.save()
+        canvas.translate(centerX, h / 2f)
+        canvas.rotate(-18f)
+        canvas.drawRect(-bw / 2f, -h * 1.2f, bw / 2f, h * 1.2f, bandPaint)
+        canvas.restore()
+        // As faíscas: acendem quando a faixa passa por elas e se apagam logo depois.
+        val bandFraction = centerX / w
+        for (i in 0 until ShimmerTimeline.SPARKLES) {
+            val (fx, fy) = ShimmerTimeline.sparkle(eventIndex, i)
+            val near = 1f - kotlin.math.abs(bandFraction - fx) / 0.16f
+            if (near <= 0f) continue
+            drawSparkle(canvas, fx * w, fy * h, (4f + 5f * GlitchTimeline.random(eventIndex, i + 21)) * density, near * near)
+        }
+    }
+
+    /** Uma faísca de quatro pontas: um losango fino em cruz, branco com um halo champanhe. */
+    private fun drawSparkle(canvas: Canvas, cx: Float, cy: Float, size: Float, alpha: Float) {
+        star.rewind()
+        star.moveTo(cx, cy - size)
+        star.lineTo(cx + size * 0.16f, cy - size * 0.16f)
+        star.lineTo(cx + size, cy)
+        star.lineTo(cx + size * 0.16f, cy + size * 0.16f)
+        star.lineTo(cx, cy + size)
+        star.lineTo(cx - size * 0.16f, cy + size * 0.16f)
+        star.lineTo(cx - size, cy)
+        star.lineTo(cx - size * 0.16f, cy - size * 0.16f)
+        star.close()
+        sparklePaint.color = ((alpha * 0.55f * 255f).toInt() shl 24) or 0x00FFD9C7
+        canvas.drawCircle(cx, cy, size * 0.75f, sparklePaint)
+        sparklePaint.color = ((alpha * 255f).toInt() shl 24) or 0x00FFFFFF
+        canvas.drawPath(star, sparklePaint)
+    }
+
+    private companion object {
+        const val FRAME_MS = 32L
+    }
+}
+

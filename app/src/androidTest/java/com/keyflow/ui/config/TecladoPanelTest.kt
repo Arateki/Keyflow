@@ -123,6 +123,19 @@ class TecladoPanelTest {
     }
 
     @Test
+    fun keyboardSkinRoseGoldPersists() {
+        val h = Harness(Settings(keyboardSkin = "system", orbSkin = "atelie"))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(skinTag("rosegold")).performScrollTo().performClick()
+
+        rule.runOnIdle {
+            assertEquals("rosegold", h.settings.keyboardSkin)
+            assertEquals("atelie", h.settings.orbSkin)
+        }
+    }
+
+    @Test
     fun keyboardSizeSliderPersists() {
         val h = Harness(Settings(keyboardScalePercent = 100))
         rule.setContent { h.Content() }

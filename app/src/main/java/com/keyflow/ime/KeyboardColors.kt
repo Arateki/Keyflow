@@ -12,6 +12,9 @@ import android.graphics.Typeface
  * translúcida e o que o app desenha atrás aparece através do vidro (com desfoque do compositor onde o
  * aparelho oferece). Tem uma aparência só, no tema claro e no escuro: o vidro não muda de cor.
  *
+ * [ROSE_GOLD] (Yan, 2026-09-29): um tema feminino em cetim rosé metálico ([RoseGoldPainter]) sobre um fundo blush; um
+ * brilho atravessa o teclado de vez em quando ([ShimmerMotion]). Uma aparência só nos dois temas.
+ *
  * [GLITCH] (Yan, 2026-09-29): o efeito de falha gráfica em preto, branco, vermelho e azul, como a logo do TikTok —
  * ([GlitchPainter]) sobre um fundo preto com scanlines e rasgos. Também tem uma aparência só.
  */
@@ -30,6 +33,9 @@ enum class KeyboardSkin(
 
     /** Falha gráfica em preto, branco, vermelho e azul (a logo do TikTok). Paga, como o Aero: só o Sistema é livre. */
     GLITCH("glitch", paid = true),
+
+    /** Rose Gold: cetim rosé metálico, feminino e elegante (Yan, 2026-09-29). Paga, como as outras. */
+    ROSE_GOLD("rosegold", paid = true),
     ;
 
     companion object {
@@ -80,9 +86,19 @@ data class KeyboardColors(
      * a paleta da skin. Só o Glitch troca, por um ciano e um vermelho FUNDOS (fundos de botão, não os neons das
      * falhas): não existe verde nem âmbar nele, e nada estoura.
      */
-    fun tone(color: Int): Int = if (backdrop != KeyboardBackdrop.GLITCH) color else when (color) {
-        ACCENT_TEAL_INT -> GLITCH_DEEP_CYAN
-        ACCENT_RECORD_INT, ACCENT_TERRACOTTA_INT -> GLITCH_DEEP_RED
+    fun tone(color: Int): Int = when (backdrop) {
+        KeyboardBackdrop.GLITCH -> when (color) {
+            ACCENT_TEAL_INT -> GLITCH_DEEP_CYAN
+            ACCENT_RECORD_INT, ACCENT_TERRACOTTA_INT -> GLITCH_DEEP_RED
+            else -> color
+        }
+        // Rose Gold: o verde vira rosa-poeira, o âmbar e o terracota viram framboesa (sem verde nem âmbar no tema).
+        KeyboardBackdrop.ROSE_GOLD -> when (color) {
+            ACCENT_TEAL_INT -> ROSE_DUSTY
+            ACCENT_RECORD_INT -> ROSE_RASPBERRY
+            ACCENT_TERRACOTTA_INT -> ROSE_DEEP_RASPBERRY
+            else -> color
+        }
         else -> color
     }
 
@@ -96,6 +112,9 @@ data class KeyboardColors(
         private const val ACCENT_TERRACOTTA_INT = 0xFFD9694B.toInt()
         private const val GLITCH_DEEP_CYAN = 0xFF0F3E44.toInt()
         private const val GLITCH_DEEP_RED = 0xFF7A1029.toInt()
+        private const val ROSE_DUSTY = 0xFFB8707B.toInt()
+        private const val ROSE_RASPBERRY = 0xFF9E3A55.toInt()
+        private const val ROSE_DEEP_RASPBERRY = 0xFF8A2D45.toInt()
 
         // Medidas no teclado Samsung (One UI) do A32 do Yan, em prints de 2026-09-28.
         private val SYSTEM_LIGHT = KeyboardColors(
@@ -158,11 +177,27 @@ data class KeyboardColors(
             iconStrokeScale = 1.1f,
         )
 
+        // Rose Gold: cetim rosé. [key] é a face das teclas de letra (blush) e [modifier] a das de função (rosé mais fundo); o
+        // RoseGoldPainter faz o cetim, o bisel metálico e o brilho por cima. Letras em vinho, que lê bem nos dois tons.
+        // Uma paleta só, no claro e no escuro, como o Aero e o Glitch.
+        private val ROSE_GOLD = KeyboardColors(
+            tray = 0x00000000,
+            key = 0xFFF6DDD6.toInt(),
+            keyBorder = 0xFFC98B85.toInt(),
+            modifier = 0xFFE3B3AA.toInt(),
+            ink = 0xFF5B2A35.toInt(),
+            popup = 0xFFFFF3EF.toInt(),
+            backdrop = KeyboardBackdrop.ROSE_GOLD,
+            labelWeight = LabelWeight.MEDIUM,
+            iconStrokeScale = 1.1f,
+        )
+
         fun of(skin: KeyboardSkin, dark: Boolean): KeyboardColors = when (skin) {
             KeyboardSkin.SYSTEM -> if (dark) SYSTEM_DARK else SYSTEM_LIGHT
             KeyboardSkin.ATELIE -> if (dark) ATELIE_DARK else ATELIE_LIGHT
             KeyboardSkin.AERO -> AERO
             KeyboardSkin.GLITCH -> GLITCH
+            KeyboardSkin.ROSE_GOLD -> ROSE_GOLD
         }
     }
 }
