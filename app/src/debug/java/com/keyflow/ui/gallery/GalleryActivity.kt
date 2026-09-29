@@ -37,6 +37,8 @@ class GalleryActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
+        // O vidro do Aero muda com o desfoque de janela do aparelho; a galeria fixa o valor (sem depender do emulador).
+        com.keyflow.ime.windowBlurOverrideForTest = true
         super.onCreate(savedInstanceState)
 
         val routeKey = intent.getStringExtra(EXTRA_ROUTE).orEmpty()

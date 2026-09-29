@@ -115,8 +115,17 @@ internal class GlassSheetLocator(private val view: View) {
  * vidro fica claro, sem fosco — o app aparece nítido através dele. O A32 do Yan (One UI 5.1) não desfoca.
  */
 fun windowBlurAvailable(context: Context): Boolean =
-    Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-        (context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager)?.isCrossWindowBlurEnabled == true
+    windowBlurOverrideForTest ?: (
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            (context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager)?.isCrossWindowBlurEnabled == true
+        )
+
+/**
+ * Só a galeria de verificação mexe: fixa a resposta de [windowBlurAvailable] para que o quadro do vidro (claro com desfoque,
+ * fosco sem) não dependa de o emulador que roda a captura desfocar janelas — o golden é o mesmo no aparelho e no CI.
+ */
+@Volatile
+internal var windowBlurOverrideForTest: Boolean? = null
 
 /**
  * A lâmina: tinta clara em degradê (mais densa embaixo), fio de luz na borda de cima e o reflexo diagonal, mais
