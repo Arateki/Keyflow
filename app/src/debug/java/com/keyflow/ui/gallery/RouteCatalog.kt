@@ -3,7 +3,12 @@ package com.keyflow.ui.gallery
 import androidx.compose.foundation.background
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -677,6 +682,9 @@ object RouteCatalog {
                 .background(LocalKeyFlowPalette.current.bg),
             contentAlignment = Alignment.Center,
         ) {
+            // O vidro do Aero é transparente: atrás dele, um "app" de mentira (texto e uma faixa colorida)
+            // para a captura mostrar o que atravessa a orbe.
+            if (style == OrbStyle.AERO) BehindOrbScene()
             VoiceOrb(
                 state = state,
                 modifier = Modifier.size(160.dp),
@@ -708,6 +716,26 @@ object RouteCatalog {
                         unlockTag = "gallery-unlock",
                         modifier = Modifier.padding(bottom = 16.dp),
                     )
+                }
+            }
+        }
+    }
+
+    /** Fundo de mentira atrás da orbe de vidro: linhas de texto e uma faixa de cor por baixo do centro. */
+    @Composable
+    private fun BehindOrbScene() {
+        val palette = LocalKeyFlowPalette.current
+        Box(Modifier.fillMaxSize()) {
+            Box(
+                Modifier
+                    .align(Alignment.Center)
+                    .fillMaxWidth()
+                    .height(46.dp)
+                    .background(Brush.horizontalGradient(listOf(Color(0xFFE8743B), Color(0xFFC13584), Color(0xFF3B5BDB)))),
+            )
+            Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 96.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                listOf(0.9f, 0.7f, 0.95f, 0.5f, 0.85f, 0.6f, 0.92f, 0.75f, 0.4f, 0.88f, 0.66f, 0.8f, 0.55f, 0.9f, 0.7f, 0.85f).forEach { w ->
+                    Box(Modifier.fillMaxWidth(w).height(9.dp).background(palette.fg.copy(alpha = 0.55f)))
                 }
             }
         }

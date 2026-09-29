@@ -21,12 +21,15 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.runtime.withFrameNanos
@@ -57,8 +60,8 @@ val LocalOrbClock = staticCompositionLocalOf<(() -> Float)?> { null }
 
 /**
  * Estilo do orbe: [ATELIE] (o blob teal de sempre) ou [AERO] (protótipo, 2026-09-28): a mesma forma viva,
- * mas como uma esfera de vidro azul — brilho na metade de cima, luz na base e aro fino, no espírito do
- * Windows Vista/7. Escolhido na aba Sobrepor ([orbStyleFor]), à parte da skin do teclado.
+ * mas como uma bolha de vidro transparente — o que está atrás dela aparece pelo miolo, com aro, brilho e
+ * luz na base, no espírito do Windows Vista/7. Escolhido na aba Sobrepor ([orbStyleFor]), à parte do teclado.
  */
 enum class OrbStyle(val id: String) {
     ATELIE("atelie"),
@@ -110,18 +113,20 @@ private val CenterInk = Color(0xFF2B2720)
 
 /** Tinta do tempo e dos glifos no centro — a do estilo do orbe ([VoiceOrb] define). */
 private val LocalCenterInk = staticCompositionLocalOf { CenterInk }
+
+/** Cor do halo do tempo (null = sem halo; só o vidro do Aero usa). */
+private val LocalCenterGlow = staticCompositionLocalOf<Color?> { null }
 private val ErrorRed = Color(0xFFD9694B)
 
-// Paleta Aero: vidro azul com miolo de luz; tinta marinho no centro.
-private val AeroGlowInner = Color(0x7345C8F5)
+// Paleta Aero: bolha de vidro. Nada aqui é opaco além dos fios do aro — o miolo deixa o app de trás passar.
+// Os degradês mantêm o mesmo matiz de ponta a ponta (só o alfa muda), para não sujar de cinza ao sumir.
+private val AeroGlowInner = Color(0x3345C8F5)
 private val AeroGlowOuter = Color(0x0045C8F5)
-private val AeroMainInner = Color(0xFFBFF0FF)
-private val AeroMainOuter = Color(0xFF1C6FCF)
-private val AeroCoreInner = Color(0xFFF4FDFF)
-private val AeroCoreOuter = Color(0xFF7AD6FF)
 private val AeroRing = Color(0xFF45C8F5)
-private val AeroRim = Color(0x80062A5C)
+private val AeroRim = Color(0x99063A78)
 private val AeroInk = Color(0xFF0B2B4C)
+/** Halo de texto sobre o vidro: a letra marinho ganha uma luz branca ao redor, legível em fundo claro ou escuro. */
+private val AeroInkGlow = Color(0xF2FFFFFF)
 private val CancelAmber = Color(0xFFC9772F) // descarte: terracota/âmbar, distinto do X de erro
 
 @Composable
@@ -140,6 +145,7 @@ fun VoiceOrb(
     // Tempo e glifos do centro na tinta do estilo (marrom no Ateliê, marinho no vidro do Aero).
     androidx.compose.runtime.CompositionLocalProvider(
         LocalCenterInk provides if (style == OrbStyle.AERO) AeroInk else CenterInk,
+        LocalCenterGlow provides if (style == OrbStyle.AERO) AeroInkGlow else null,
     ) {
         BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
             val density = LocalDensity.current
@@ -147,7 +153,9 @@ fun VoiceOrb(
             val sidePx = minOf(constraints.maxWidth, constraints.maxHeight)
                 .takeIf { it in 1..(Int.MAX_VALUE / 2) } ?: DEFAULT_ORB_SIDE_PX
 
-            Canvas(Modifier.matchParentSize()) { drawOrb(timeMs, state, style) }
+            // Com algo escrito no centro, o vidro ganha um miolo leitoso por baixo (tempo e glifos leem sobre qualquer fundo).
+            val hasCenter = center != OrbCenter.None || dragHint?.centerKind != null
+            Canvas(Modifier.matchParentSize()) { drawOrb(timeMs, state, style, hasCenter) }
             // Centro do estado. No modo-arrasto ele some conforme o alvo aparece (crossfade), pra não
             // sobrepor — os glifos têm o mesmo tamanho/área, então só o ativo da vez fica visível.
             val baseAlpha = dragHint?.let { (1f - it.centerAlpha).coerceIn(0f, 1f) } ?: 1f
@@ -199,8 +207,14 @@ private fun OrbTimeText(seconds: Int, sidePx: Int, density: Density) {
         fontWeight = FontWeight.Bold,
         fontSize = with(density) { (sidePx * TIME_FONT_FRACTION).toSp() },
         textAlign = TextAlign.Center,
+        style = centerGlowStyle(sidePx),
     )
 }
+
+/** Halo do tempo no vidro do Aero (o Ateliê não usa): sombra sem deslocamento, do tamanho da orbe. */
+@Composable
+private fun centerGlowStyle(sidePx: Int): TextStyle =
+    LocalCenterGlow.current?.let { TextStyle(shadow = Shadow(it, Offset.Zero, sidePx * 0.07f)) } ?: TextStyle.Default
 
 /** Glifo (pause/lixeira) encolhido com o tempo congelado miúdo logo abaixo, empilhados no centro. */
 @Composable
@@ -217,6 +231,7 @@ private fun GlyphWithTime(seconds: Int, sidePx: Int, density: Density, glyph: @C
             fontWeight = FontWeight.Bold,
             fontSize = with(density) { (sidePx * SMALL_TIME_FONT_FRACTION).toSp() },
             textAlign = TextAlign.Center,
+            style = centerGlowStyle(sidePx),
         )
     }
 }
@@ -310,9 +325,9 @@ private fun CancelGlyph(glyphSize: Dp) {
     }
 }
 
-private fun DrawScope.drawOrb(t: Float, state: OrbState, style: OrbStyle = OrbStyle.ATELIE) {
+private fun DrawScope.drawOrb(t: Float, state: OrbState, style: OrbStyle = OrbStyle.ATELIE, hasCenter: Boolean = false) {
     if (style == OrbStyle.AERO) {
-        drawAeroOrb(t, state)
+        drawAeroOrb(t, state, hasCenter)
         return
     }
     val w = size.width
@@ -351,10 +366,14 @@ private fun DrawScope.drawOrb(t: Float, state: OrbState, style: OrbStyle = OrbSt
 }
 
 /**
- * Orbe Aero: o mesmo blob vivo de [drawOrb] (níveis e velocidades por estado), pintado como vidro — halo
- * ciano, esfera azul com miolo claro, aro escuro fino, brilho elíptico na metade de cima e luz na base.
+ * Orbe Aero: o mesmo blob vivo de [drawOrb] (níveis e velocidades por estado), mas como uma **bolha de vidro
+ * transparente**, não uma bola azul. O miolo quase não tem cor — o app por trás aparece —, e o corpo do vidro
+ * vive na borda: tinta azul mais densa perto do aro (o "Fresnel" do vidro), fio marinho por fora (segura a
+ * bolha sobre fundo claro) e fio branco por dentro (sobre fundo escuro), brilho de gel na metade de cima e
+ * a luz que atravessa o vidro e se junta na base. Tudo que é claro é recortado pela forma da bolha, que
+ * ondula. [frosted] (há tempo ou glifo no centro) acrescenta um miolo leitoso para a leitura.
  */
-private fun DrawScope.drawAeroOrb(t: Float, state: OrbState) {
+private fun DrawScope.drawAeroOrb(t: Float, state: OrbState, frosted: Boolean) {
     val cx = size.width / 2f
     val cy = size.height / 2f
     val (amp, sp) = orbBaseParams(state)
@@ -376,32 +395,78 @@ private fun DrawScope.drawAeroOrb(t: Float, state: OrbState) {
 
     drawLayer(cx, cy, r * 1.14f, amp * 0.7f, t, sp * 0.8f, 5.0f, AeroGlowInner, AeroGlowOuter, 1f)
     val body = blobPath(cx, cy, r, amp * lvl, t, sp, 2.0f)
+    val inner = blobPath(cx, cy, r * 0.94f, amp * lvl, t, sp, 2.0f)
+
+    // Sombra macia ao redor: separa a bolha de um fundo claro sem pintar o miolo.
+    drawPath(body, Color(0x0D0A2A55), style = Stroke(width = r * 0.34f))
+    drawPath(body, Color(0x140A2A55), style = Stroke(width = r * 0.16f))
+
+    // Corpo do vidro: quase limpo no meio, azul mais denso na borda.
     drawPath(
         body,
-        Brush.radialGradient(listOf(AeroMainInner, AeroMainOuter), center = Offset(cx - r * 0.2f, cy - r * 0.35f), radius = r * 1.3f),
-    )
-    drawLayer(cx, cy, r * 0.62f, amp * 0.7f, t, sp * 1.35f, 9.0f, AeroCoreInner, AeroCoreOuter, 0.85f)
-    // Luz que atravessa o vidro e acende a base.
-    drawOval(
         Brush.radialGradient(
-            listOf(Color(0x80D8FBFF), Color(0x00D8FBFF)),
-            center = Offset(cx, cy + r * 0.62f),
-            radius = r * 0.7f,
+            0f to Color(0x2256C8F8),
+            0.55f to Color(0x3052B4F0),
+            0.82f to Color(0x5C2E86E0),
+            1f to Color(0x99165EC0),
+            center = Offset(cx, cy - r * 0.05f),
+            radius = r * 1.08f,
         ),
-        topLeft = Offset(cx - r * 0.62f, cy + r * 0.38f),
-        size = Size(r * 1.24f, r * 0.48f),
     )
-    drawPath(body, AeroRim, style = Stroke(width = maxOf(1.2f, r * 0.03f)))
-    // O brilho do Aero: elipse clara na metade de cima, sumindo para baixo.
-    drawOval(
-        Brush.verticalGradient(
-            listOf(Color(0xD9FFFFFF), Color(0x1AFFFFFF)),
-            startY = cy - r * 0.92f,
-            endY = cy - r * 0.05f,
-        ),
-        topLeft = Offset(cx - r * 0.66f, cy - r * 0.92f),
-        size = Size(r * 1.32f, r * 0.84f),
+
+    clipPath(body) {
+        if (frosted) {
+            drawCircle(
+                Brush.radialGradient(listOf(Color(0x66FFFFFF), Color(0x00FFFFFF)), center = Offset(cx, cy), radius = r * 0.8f),
+                radius = r * 0.8f,
+                center = Offset(cx, cy),
+            )
+        }
+        // A luz que atravessa o vidro e se junta na base (círculo cujo degradê zera na própria borda).
+        drawCircle(
+            Brush.radialGradient(
+                listOf(Color(0xB3D2F7FF), Color(0x00D2F7FF)),
+                center = Offset(cx, cy + r * 0.78f),
+                radius = r * 0.62f,
+            ),
+            radius = r * 0.62f,
+            center = Offset(cx, cy + r * 0.78f),
+        )
+        // Fio de luz junto ao aro, mais forte embaixo.
+        drawPath(
+            inner,
+            Brush.verticalGradient(
+                0f to Color(0x00E6FBFF),
+                0.5f to Color(0x00E6FBFF),
+                1f to Color(0xB3E6FBFF),
+                startY = cy - r,
+                endY = cy + r,
+            ),
+            style = Stroke(width = r * 0.10f),
+        )
+        // Brilho de gel na metade de cima, e o clarão pequeno do canto.
+        drawOval(
+            Brush.verticalGradient(
+                listOf(Color(0xCCFFFFFF), Color(0x0FFFFFFF)),
+                startY = cy - r * 0.94f,
+                endY = cy - r * 0.32f,
+            ),
+            topLeft = Offset(cx - r * 0.60f, cy - r * 0.94f),
+            size = Size(r * 1.20f, r * 0.62f),
+        )
+        drawOval(
+            Color(0xF2FFFFFF),
+            topLeft = Offset(cx - r * 0.50f, cy - r * 0.76f),
+            size = Size(r * 0.20f, r * 0.11f),
+        )
+    }
+    // Fio branco por dentro do aro (some do fundo claro, brilha no escuro) e fio marinho por fora.
+    drawPath(
+        inner,
+        Brush.verticalGradient(listOf(Color(0xF2FFFFFF), Color(0x59FFFFFF)), startY = cy - r, endY = cy + r),
+        style = Stroke(width = maxOf(1.2f, r * 0.035f)),
     )
+    drawPath(body, AeroRim, style = Stroke(width = maxOf(1.2f, r * 0.028f)))
 }
 
 private fun DrawScope.drawLayer(
