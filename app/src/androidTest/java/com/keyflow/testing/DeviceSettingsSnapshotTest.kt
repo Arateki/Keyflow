@@ -64,7 +64,9 @@ class DeviceSettingsSnapshotTest {
 
         snapshot().enterFactoryState()
         runBlocking {
-            assertTrue(repo.rawPreferencesOnce().asMap().isEmpty())
+            // Fábrica, mas em português: `enterFactoryState` grava só o idioma da interface (senão a 1ª abertura da
+            // SetupActivity gravaria o do aparelho, e os testes conferem os textos de origem). Nada além disso.
+            assertEquals(mapOf("app_language" to "pt"), repo.rawPreferencesOnce().asMap().mapKeys { it.key.name })
             assertEquals(BarsConfig.DEFAULT, repo.barsConfigOnce())
             assertEquals("pt", repo.keyboardLanguageOnce())
         }
