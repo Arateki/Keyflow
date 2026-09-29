@@ -29,13 +29,17 @@ object BarGeometry {
         }
     }
 
-    /** Pesos padrão por tipo (paridade aproximada com as barras atuais; Candidates é o slot flexível). */
+    /**
+     * Pesos padrão por tipo (paridade aproximada com as barras atuais; Candidates é o slot flexível). A
+     * faixa de sugestões era 4 e ficou 30% menor (Yan, 2026-09-28): sobra lugar para mais um botão sem
+     * apertar os outros.
+     */
     fun weightFor(button: BarButton): Float = when (button) {
         BarButton.Mic -> 1.5f
         BarButton.ConfigBtn -> 0.9f
         BarButton.ToggleExpand -> 1f
         BarButton.Paste -> 1f
-        BarButton.Candidates -> 4f
+        BarButton.Candidates -> 2.8f
         is BarButton.SingleKey -> 0.8f
         BarButton.Joystick -> 1.2f
         is BarButton.GridTrigger -> 1f

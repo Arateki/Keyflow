@@ -328,7 +328,7 @@ class BarsEditorTest {
 
     @Test
     fun theCandidatesSlotIsPreviewedWithTheAreaItReallyTakes() {
-        // A prévia é WYSIWYG (CFG-02) e a faixa de sugestões ocupa ~4 botões no teclado. Desenhada como
+        // A prévia é WYSIWYG (CFG-02) e a faixa de sugestões ocupa ~3 botões no teclado. Desenhada como
         // um chip pequeno "abc", ela mentia sobre o resultado — quem montava a barra só descobria o
         // aperto ao usar (pedido do Yan, 2026-09-08: "essa área que ele ocupa deve representar a área
         // real pro usuário saber como vai ficar").
@@ -341,10 +341,10 @@ class BarsEditorTest {
 
         // O peso vira largura MÍNIMA, não fixa: com largura fixa o rótulo era truncado ("colar" virava
         // "c"), então o conteúdo pode empurrar um chip além da proporção. O que a prévia precisa
-        // garantir é que a faixa reserve a área dela — 4 unidades — e apareça bem mais larga que um
-        // botão comum, para quem monta a barra prever o aperto.
-        assertTrue("a faixa ($slot) deveria ser bem mais larga que o mic ($mic)", slot > mic * 2)
-        rule.onNodeWithTag(barChipTag(0, 1)).assertWidthIsAtLeast(90.dp)
+        // garantir é que a faixa reserve a área dela — 2,8 unidades desde que ficou 30% menor (Yan,
+        // 2026-09-28) — e apareça bem mais larga que um botão comum, para quem monta a barra prever o aperto.
+        assertTrue("a faixa ($slot) deveria ser bem mais larga que o mic ($mic)", slot > mic * 1.5f)
+        rule.onNodeWithTag(barChipTag(0, 1)).assertWidthIsAtLeast(66.dp)
     }
 
     @Test
