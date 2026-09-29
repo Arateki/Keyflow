@@ -113,7 +113,7 @@ internal val TranslationsEn: Map<String, String> = mapOf(
     "Desbloquear skins" to "Unlock skins",
     "Sistema" to "System",
     "Skins" to "Skins",
-    "a aparência da orbe: Ateliê ou Aero (uma bolha de vidro). É uma escolha à parte da skin do teclado." to "the orb's look: Atelier or Aero (a glass bubble). It is a separate choice from the keyboard skin.",
+    "a aparência da orbe: Ateliê, Aero (uma bolha de vidro com água) ou Glitch (falha gráfica em preto, vermelho e azul). É uma escolha à parte da skin do teclado." to "the orb's look: Atelier, Aero (a glass bubble with water) or Glitch (a graphic glitch in black, red and blue). It is a separate choice from the keyboard skin.",
     "A skin da orbe flutuante. O teclado tem a dele, na aba Teclado." to "The floating orb's skin. The keyboard has its own, in the Keyboard tab.",
     "As cores do teclado. A orbe flutuante tem a skin dela, na aba Sobrepor." to "The keyboard colors. The floating orb has its own skin, in the Overlay tab.",
     "Ative o KeyFlow como teclado (ligue o Modo Teclado, no topo) para editar o resto da aba." to "Set KeyFlow as your keyboard (turn on Keyboard mode, at the top) to edit the rest of the tab.",

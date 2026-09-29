@@ -83,4 +83,36 @@ class VoiceOrbTest {
         assertThat(OrbStyle.ATELIE.paid).isFalse()
         assertThat(OrbStyle.AERO.paid).isTrue()
     }
+
+    @Test
+    fun `glitch is a paid orb style that orbStyleFor finds by id`() {
+        assertThat(orbStyleFor("glitch")).isEqualTo(OrbStyle.GLITCH)
+        assertThat(OrbStyle.GLITCH.paid).isTrue()
+    }
+
+    @Test
+    fun `every state has glitch bursts that peak at 1 and calm down between them`() {
+        for (state in OrbState.entries) {
+            // O instante do pico (2º ciclo) é o máximo da rajada.
+            assertThat(glitchIntensity(glitchBurstMidMs(state), state)).isWithin(0.001f).of(1f)
+            // Fora da rajada e das micro-rajadas há calma: o início do ciclo (t = período) não tem falha.
+            assertThat(glitchIntensity(glitchPeriodMs(state) * 2f + 5f, state)).isAtMost(0.45f)
+            // Sempre entre 0 e 1.
+            for (t in 0..6000 step 37) assertThat(glitchIntensity(t.toFloat(), state)).isIn(com.google.common.collect.Range.closed(0f, 1f))
+        }
+    }
+
+    @Test
+    fun `glitch is calmer at rest and busier while transcribing`() {
+        assertThat(glitchPeriodMs(OrbState.Idle)).isGreaterThan(glitchPeriodMs(OrbState.Listening))
+        assertThat(glitchPeriodMs(OrbState.Listening)).isGreaterThan(glitchPeriodMs(OrbState.Transcribing))
+        assertThat(glitchPeriodMs(OrbState.Paused)).isEqualTo(glitchPeriodMs(OrbState.Listening))
+    }
+
+    @Test
+    fun `glitch is deterministic in time so a frozen clock gives a fixed frame`() {
+        for (state in OrbState.entries) {
+            assertThat(glitchIntensity(1234f, state)).isEqualTo(glitchIntensity(1234f, state))
+        }
+    }
 }

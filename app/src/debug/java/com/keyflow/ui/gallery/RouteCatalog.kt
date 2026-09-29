@@ -60,6 +60,7 @@ import com.keyflow.ui.orb.OrbDragHint
 import com.keyflow.ui.orb.OrbDragKind
 import com.keyflow.ui.orb.OrbState
 import com.keyflow.ui.orb.OrbStyle
+import com.keyflow.ui.orb.glitchBurstMidMs
 import com.keyflow.ui.orb.VoiceOrb
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.config.LocalModelsUi
@@ -115,6 +116,12 @@ object RouteCatalog {
         // Protótipo Aero: a orbe de vidro, parada e gravando.
         orbRoute("overlay-aero-idle", OrbState.Idle, OrbCenter.None, OrbStyle.AERO),
         orbRoute("overlay-aero-recording", OrbState.Listening, OrbCenter.Time(12), OrbStyle.AERO),
+        // Glitch (2026-09-29): a orbe preta com franjas ciano e vermelha, congelada no pico de uma rajada de falha.
+        orbRoute("overlay-glitch-idle", OrbState.Idle, OrbCenter.None, OrbStyle.GLITCH),
+        // O mesmo repouso entre rajadas (t = 200 ms): só as franjas de sempre, sem faixas deslocadas.
+        orbRoute("overlay-glitch-idle-calm", OrbState.Idle, OrbCenter.None, OrbStyle.GLITCH, timeMs = 200f),
+        orbRoute("overlay-glitch-recording", OrbState.Listening, OrbCenter.Time(12), OrbStyle.GLITCH),
+        orbRoute("overlay-glitch-transcribing", OrbState.Transcribing, OrbCenter.None, OrbStyle.GLITCH),
         // Teclado reskinado (T23), grade Canvas (KC-T10, padrão único desde a promoção): View hospedado
         // via AndroidView, ancorado ao rodapé.
         keyboardRoute("keyboard-canvas-expanded", expanded = true, recording = false),
@@ -685,7 +692,13 @@ object RouteCatalog {
         }
     }
 
-    private fun orbRoute(key: String, state: OrbState, center: OrbCenter, style: OrbStyle = OrbStyle.ATELIE): Route = Route(key) {
+    private fun orbRoute(
+        key: String,
+        state: OrbState,
+        center: OrbCenter,
+        style: OrbStyle = OrbStyle.ATELIE,
+        timeMs: Float? = null,
+    ): Route = Route(key) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -699,7 +712,8 @@ object RouteCatalog {
                 state = state,
                 modifier = Modifier.size(160.dp),
                 center = center,
-                timeProvider = { GALLERY_ORB_TIME_MS },
+                // O Glitch congela no pico de uma rajada (senão 1234 ms cairia fora dela e não haveria falha).
+                timeProvider = { timeMs ?: if (style == OrbStyle.GLITCH) glitchBurstMidMs(state) else GALLERY_ORB_TIME_MS },
                 style = style,
             )
         }

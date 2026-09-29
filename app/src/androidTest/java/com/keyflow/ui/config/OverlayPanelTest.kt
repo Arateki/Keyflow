@@ -88,4 +88,15 @@ class OverlayPanelTest {
             assertEquals("system", h.settings.keyboardSkin)
         }
     }
+
+    @Test
+    fun orbSkinGlitchPersists() {
+        val h = Harness(Settings(orbSkin = "atelie"))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(orbSkinTag("glitch")).performScrollTo().performClick()
+
+        rule.runOnIdle { assertEquals("glitch", h.settings.orbSkin) }
+    }
 }
+

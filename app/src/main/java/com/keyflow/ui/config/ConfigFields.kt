@@ -6,6 +6,7 @@ import com.keyflow.ime.KeyboardSkin
 import com.keyflow.ui.orb.OrbState
 import com.keyflow.ui.orb.OrbStyle
 import com.keyflow.ui.orb.VoiceOrb
+import com.keyflow.ui.orb.glitchBurstMidMs
 import com.keyflow.ui.orb.orbStyleFor
 import com.keyflow.ime.KeyboardColors
 import androidx.compose.animation.core.animateDpAsState
@@ -897,6 +898,17 @@ internal fun SkinsSection(
                         VoiceOrb(OrbState.Idle, Modifier.requiredSize(ORB_CHOICE_SIDE), timeProvider = ORB_CHOICE_CLOCK, style = OrbStyle.AERO)
                     }
                 }
+                SkinChoice(
+                    label = "Glitch",
+                    selected = orbSelected == OrbStyle.GLITCH,
+                    onClick = { onOrbSkinSelected(OrbStyle.GLITCH.id) },
+                    tag = orbSkinTag(OrbStyle.GLITCH.id),
+                ) {
+                    // Congelada no pico de uma rajada, para a amostra mostrar a falha e não só as franjas.
+                    Box(Modifier.fillMaxSize().background(palette.bg), contentAlignment = Alignment.Center) {
+                        VoiceOrb(OrbState.Idle, Modifier.requiredSize(ORB_CHOICE_SIDE), timeProvider = ORB_GLITCH_CHOICE_CLOCK, style = OrbStyle.GLITCH)
+                    }
+                }
             } else if (onSkinSelected == null) {
                 SkinSwatch(palette.fg)
                 SkinSwatch(palette.teal, selected = true)
@@ -991,6 +1003,9 @@ fun orbSkinTag(id: String) = "overlay-orb-skin-$id"
  * (os testes nunca ficam ociosos) e gasta bateria à toa numa amostra de 40dp.
  */
 private val ORB_CHOICE_CLOCK: () -> Float = { 1234f }
+
+/** O relógio parado da amostra do Glitch: o pico de uma rajada de falha em repouso. */
+private val ORB_GLITCH_CHOICE_CLOCK: () -> Float = { glitchBurstMidMs(OrbState.Idle) }
 
 /** Lado da orbe de prévia (maior que o cartão de 40dp: o cartão recorta o excesso, e o miolo cabe). */
 private val ORB_CHOICE_SIDE = 60.dp

@@ -17,15 +17,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -38,7 +45,9 @@ import com.keyflow.ui.theme.SpaceMono
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.floor
 import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /**
@@ -74,13 +83,20 @@ enum class OrbStyle(
 ) {
     ATELIE("atelie", paid = false),
     AERO("aero", paid = true),
+
+    /**
+     * Falha gráfica em preto, branco, vermelho e azul, como a logo do TikTok (Yan, 2026-09-29): a orbe é preta, com o
+     * aro branco e as franjas ciano e vermelha deslocadas (somam em branco onde se cruzam); de tempos em tempos
+     * uma rajada de falha desloca faixas horizontais — em repouso e nos outros estados. Paga, como o Aero.
+     */
+    GLITCH("glitch", paid = true),
 }
 
 /** Estilo do orbe para a árvore abaixo — a overlay e as prévias das abas seguem a skin escolhida. */
 val LocalOrbStyle = staticCompositionLocalOf { OrbStyle.ATELIE }
 
-/** Id de skin da orbe ([com.keyflow.data.Settings.orbSkin]) → estilo; o que não for "aero" é o Ateliê. */
-fun orbStyleFor(orbSkinId: String): OrbStyle = if (orbSkinId == OrbStyle.AERO.id) OrbStyle.AERO else OrbStyle.ATELIE
+/** Id de skin da orbe ([com.keyflow.data.Settings.orbSkin]) → estilo; um id que não existe é o Ateliê. */
+fun orbStyleFor(orbSkinId: String): OrbStyle = OrbStyle.entries.firstOrNull { it.id == orbSkinId } ?: OrbStyle.ATELIE
 
 /** Conteúdo desenhado no centro do orbe (ORB-04). */
 sealed interface OrbCenter {
@@ -135,6 +151,9 @@ private val AeroRim = Color(0x99063A78)
 private val AeroInk = Color(0xFF0B2B4C)
 /** Halo de texto sobre o vidro: a letra marinho ganha uma luz branca ao redor, legível em fundo claro ou escuro. */
 private val AeroInkGlow = Color(0xF2FFFFFF)
+// Paleta Glitch: preto, branco e os dois canais deslocados (ciano e vermelho, como a logo do TikTok).
+private val GlitchCyan = Color(0xFF25F4EE)
+private val GlitchRed = Color(0xFFFE2C55)
 private val CancelAmber = Color(0xFFC9772F) // descarte: terracota/âmbar, distinto do X de erro
 
 @Composable
@@ -152,7 +171,11 @@ fun VoiceOrb(
 
     // Tempo e glifos do centro na tinta do estilo (marrom no Ateliê, marinho no vidro do Aero).
     androidx.compose.runtime.CompositionLocalProvider(
-        LocalCenterInk provides if (style == OrbStyle.AERO) AeroInk else CenterInk,
+        LocalCenterInk provides when (style) {
+            OrbStyle.AERO -> AeroInk
+            OrbStyle.GLITCH -> Color.White
+            OrbStyle.ATELIE -> CenterInk
+        },
         LocalCenterGlow provides if (style == OrbStyle.AERO) AeroInkGlow else null,
     ) {
         BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
@@ -163,17 +186,24 @@ fun VoiceOrb(
 
             // Com algo escrito no centro, o vidro ganha um miolo leitoso por baixo (tempo e glifos leem sobre qualquer fundo).
             val hasCenter = center != OrbCenter.None || dragHint?.centerKind != null
-            Canvas(Modifier.matchParentSize()) { drawOrb(timeMs, state, style, hasCenter) }
+            // O Glitch soma as franjas (BlendMode.Plus): numa camada própria elas somam só entre si, não com o que está atrás
+            // (sobre um fundo claro, ciano e vermelho viravam branco).
+            val layer = if (style == OrbStyle.GLITCH) Modifier.graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen) else Modifier
+            Canvas(Modifier.matchParentSize().then(layer)) { drawOrb(timeMs, state, style, hasCenter) }
             // Centro do estado. No modo-arrasto ele some conforme o alvo aparece (crossfade), pra não
             // sobrepor — os glifos têm o mesmo tamanho/área, então só o ativo da vez fica visível.
             val baseAlpha = dragHint?.let { (1f - it.centerAlpha).coerceIn(0f, 1f) } ?: 1f
+            // O Glitch escreve o centro em três camadas (ciano, vermelho e a tinta), deslocadas como as franjas da orbe.
+            val glitchSplit = if (style == OrbStyle.GLITCH) (sidePx * (0.012f + 0.03f * glitchIntensity(timeMs, state))).roundToInt() else 0
             Box(Modifier.matchParentSize().alpha(baseAlpha), contentAlignment = Alignment.Center) {
-                when (center) {
-                    is OrbCenter.Time -> OrbTimeText(center.seconds, sidePx, density)
-                    is OrbCenter.PauseGlyph -> GlyphWithTime(center.seconds, sidePx, density) { PauseGlyph(it) }
-                    OrbCenter.ErrorGlyph -> ErrorGlyph(with(density) { (sidePx * GLYPH_FRACTION).toDp() })
-                    is OrbCenter.CancelGlyph -> GlyphWithTime(center.seconds, sidePx, density) { CancelGlyph(it) }
-                    OrbCenter.None -> Unit
+                GlitchLayers(glitchSplit) {
+                    when (center) {
+                        is OrbCenter.Time -> OrbTimeText(center.seconds, sidePx, density)
+                        is OrbCenter.PauseGlyph -> GlyphWithTime(center.seconds, sidePx, density) { PauseGlyph(it) }
+                        OrbCenter.ErrorGlyph -> ErrorGlyph(with(density) { (sidePx * GLYPH_FRACTION).toDp() })
+                        is OrbCenter.CancelGlyph -> GlyphWithTime(center.seconds, sidePx, density) { CancelGlyph(it) }
+                        OrbCenter.None -> Unit
+                    }
                 }
             }
             // Alvo do arrasto no centro (as setas ficam numa sobreposição separada, fora da janela da orbe).
@@ -184,15 +214,39 @@ fun VoiceOrb(
                 ) {
                     // Retomar = "estado ativo" → tempo grande (uniforme com gravando↔pause).
                     // Pausar/cancelar = glifo + tempo miúdo abaixo (mesmo formato do pause/cancelamento).
-                    when (kind) {
-                        OrbDragKind.RESUME -> OrbTimeText(dragHint.seconds, sidePx, density)
-                        OrbDragKind.PAUSE -> GlyphWithTime(dragHint.seconds, sidePx, density) { PauseGlyph(it) }
-                        OrbDragKind.CANCEL -> GlyphWithTime(dragHint.seconds, sidePx, density) { CancelGlyph(it) }
-                        OrbDragKind.CONFIG -> GlyphWithTime(dragHint.seconds, sidePx, density) { GearGlyph(it) }
+                    GlitchLayers(glitchSplit) {
+                        when (kind) {
+                            OrbDragKind.RESUME -> OrbTimeText(dragHint.seconds, sidePx, density)
+                            OrbDragKind.PAUSE -> GlyphWithTime(dragHint.seconds, sidePx, density) { PauseGlyph(it) }
+                            OrbDragKind.CANCEL -> GlyphWithTime(dragHint.seconds, sidePx, density) { CancelGlyph(it) }
+                            OrbDragKind.CONFIG -> GlyphWithTime(dragHint.seconds, sidePx, density) { GearGlyph(it) }
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+/**
+ * O conteúdo do centro no Glitch: três cópias empilhadas — ciano deslocado para a esquerda, vermelho para a direita
+ * e a tinta normal (branca) por cima —, a aberração cromática da logo do TikTok. Com [offsetPx] zero (os outros
+ * estilos) só desenha o conteúdo, uma vez. Os glifos que têm cor própria (lixeira, X de erro) mantêm a deles.
+ */
+@Composable
+private fun GlitchLayers(offsetPx: Int, content: @Composable () -> Unit) {
+    if (offsetPx == 0) {
+        content()
+        return
+    }
+    Box(contentAlignment = Alignment.Center) {
+        Box(Modifier.offset { IntOffset(-offsetPx, 0) }) {
+            androidx.compose.runtime.CompositionLocalProvider(LocalCenterInk provides GlitchCyan) { content() }
+        }
+        Box(Modifier.offset { IntOffset(offsetPx, 0) }) {
+            androidx.compose.runtime.CompositionLocalProvider(LocalCenterInk provides GlitchRed) { content() }
+        }
+        content()
     }
 }
 
@@ -336,6 +390,10 @@ private fun CancelGlyph(glyphSize: Dp) {
 private fun DrawScope.drawOrb(t: Float, state: OrbState, style: OrbStyle = OrbStyle.ATELIE, hasCenter: Boolean = false) {
     if (style == OrbStyle.AERO) {
         drawAeroOrb(t, state, hasCenter)
+        return
+    }
+    if (style == OrbStyle.GLITCH) {
+        drawGlitchOrb(t, state)
         return
     }
     val w = size.width
@@ -552,6 +610,121 @@ private fun DrawScope.drawAeroWater(cx: Float, cy: Float, r: Float, t: Float, am
     drawPath(line, Color(0xD9FFFFFF), style = Stroke(width = maxOf(1.2f, r * 0.03f), cap = StrokeCap.Round))
 }
 
+/**
+ * Orbe Glitch: o mesmo blob vivo, mas como a logo do TikTok com defeito. Um miolo preto de aro branco e, por baixo,
+ * o mesmo formato em ciano (deslocado para a esquerda) e em vermelho (para a direita), somados (BlendMode.Plus): só
+ * as franjas aparecem, e onde se cruzam viram branco. Scanlines e um anel interno dão a textura de tela de tubo.
+ * De tempos em tempos ([glitchIntensity]) vem uma rajada: as franjas se afastam e algumas faixas horizontais da
+ * orbe deslizam de lado — em repouso e nos outros estados, cada um no seu ritmo. Transcrevendo, uma faixa de luz
+ * varre o miolo de cima para baixo.
+ */
+private fun DrawScope.drawGlitchOrb(t: Float, state: OrbState) {
+    val cx = size.width / 2f
+    val cy = size.height / 2f
+    val (amp, sp) = orbBaseParams(state)
+    val lvl = orbLevel(state, t)
+    val r = min(size.width, size.height) * 0.30f * (0.84f + 0.20f * lvl)
+    val g = glitchIntensity(t, state)
+    val split = r * (0.045f + 0.13f * g)
+
+    if (state == OrbState.Listening || state == OrbState.Paused) {
+        for (k in 0 until 3) {
+            val fr = ((t * 0.0006f) + (k / 3f)) % 1f
+            drawCircle(
+                color = if (k % 2 == 0) GlitchCyan else GlitchRed,
+                radius = r * (1.05f + fr * 0.95f),
+                center = Offset(cx, cy),
+                alpha = 0.40f * (1f - fr),
+                style = Stroke(width = 1.6f),
+            )
+        }
+    }
+
+    val body = blobPath(cx, cy, r, amp * lvl, t, sp, 2.0f)
+    val core = blobPath(cx, cy, r * 0.90f, amp * lvl, t, sp, 2.0f)
+    val inner = blobPath(cx, cy, r * 0.52f, amp * 0.7f, t, sp * 1.35f, 9.0f)
+
+    val bands = glitchBands(t, state, g, cy, r)
+    if (bands.isEmpty()) {
+        drawGlitchStack(cx, cy, r, body, core, inner, split, t, state)
+        return
+    }
+    // Com faixas: a orbe inteira é desenhada em fatias horizontais; as das faixas deslizam de lado.
+    fun segment(top: Float, bottom: Float, dx: Float) {
+        clipRect(0f, top, size.width, bottom) {
+            translate(dx, 0f) { drawGlitchStack(cx, cy, r, body, core, inner, split, t, state) }
+        }
+    }
+    var y = 0f
+    for (band in bands) {
+        if (band.y0 > y) segment(y, band.y0, 0f)
+        segment(band.y0, band.y1, band.dx)
+        y = band.y1
+    }
+    segment(y, size.height, 0f)
+}
+
+/** Uma vez a orbe Glitch: as duas franjas, o miolo preto com textura e o aro branco. */
+private fun DrawScope.drawGlitchStack(
+    cx: Float, cy: Float, r: Float, body: Path, core: Path, inner: Path, split: Float, t: Float, state: OrbState,
+) {
+    translate(-split, split * 0.25f) { drawPath(body, GlitchCyan, alpha = 0.95f, blendMode = BlendMode.Plus) }
+    translate(split, -split * 0.25f) { drawPath(body, GlitchRed, alpha = 0.95f, blendMode = BlendMode.Plus) }
+    drawPath(core, Color(0xF2000000))
+    clipPath(core) {
+        // Scanlines: uma linha clara fina a cada poucos px, como numa tela de tubo.
+        val step = r * 0.09f
+        val lineH = maxOf(1f, r * 0.012f)
+        var y = cy - r
+        while (y < cy + r) {
+            drawRect(Color(0x14FFFFFF), Offset(cx - r, y), Size(r * 2f, lineH))
+            y += step
+        }
+        drawPath(inner, Color(0x66FFFFFF), style = Stroke(width = maxOf(1f, r * 0.02f)))
+        if (state == OrbState.Transcribing) {
+            // A faixa de luz que varre o miolo enquanto transcreve.
+            val sy = cy - r + ((t * 0.0009f) % 1f) * 2f * r
+            drawRect(Color(0x40FFFFFF), Offset(cx - r, sy), Size(r * 2f, r * 0.08f))
+            drawRect(GlitchCyan, Offset(cx - r, sy + r * 0.08f), Size(r * 2f, maxOf(1f, r * 0.015f)), alpha = 0.6f)
+        }
+    }
+    drawPath(core, Color.White, style = Stroke(width = maxOf(1.5f, r * 0.035f)))
+}
+
+/** Uma faixa horizontal da orbe que desliza [dx] px de lado durante uma rajada de falha. */
+private class GlitchBand(val y0: Float, val y1: Float, val dx: Float)
+
+/**
+ * As faixas de uma rajada (nenhuma fora dela): de 1 a 4 conforme a intensidade [g], em posições e larguras que vêm do
+ * número da rajada — o mesmo tempo dá sempre as mesmas faixas —, sem se sobrepor e de cima para baixo.
+ */
+private fun glitchBands(t: Float, state: OrbState, g: Float, cy: Float, r: Float): List<GlitchBand> {
+    if (g <= 0.02f) return emptyList()
+    val burst = floor(t / glitchPeriodMs(state)).toInt()
+    val raw = (0 until 1 + (g * 3f).toInt()).map { i ->
+        val mid = cy + r * (glitchRandom(burst, i) * 2f - 1f) * 0.95f
+        val half = r * (0.03f + 0.07f * glitchRandom(burst, i + 7))
+        val dx = r * (0.10f + 0.28f * g) * (if (glitchRandom(burst, i + 13) > 0.5f) 1f else -1f)
+        GlitchBand(mid - half, mid + half, dx)
+    }.sortedBy { it.y0 }
+    val out = ArrayList<GlitchBand>(raw.size)
+    var edge = -Float.MAX_VALUE
+    for (band in raw) {
+        val y0 = maxOf(band.y0, edge)
+        if (band.y1 > y0) {
+            out.add(GlitchBand(y0, band.y1, band.dx))
+            edge = band.y1
+        }
+    }
+    return out
+}
+
+/** Número pseudo-aleatório estável em 0..1 a partir de dois inteiros (o mesmo par dá sempre o mesmo valor). */
+private fun glitchRandom(a: Int, b: Int): Float {
+    val x = sin(a * 12.9898f + b * 78.233f) * 43758.547f
+    return x - floor(x)
+}
+
 private fun DrawScope.drawLayer(
     cx: Float, cy: Float, r: Float, amp: Float, t: Float, sp: Float, seed: Float,
     c0: Color, c1: Color, alpha: Float,
@@ -612,6 +785,47 @@ internal fun orbLevel(state: OrbState, t: Float): Float = when (state) {
     OrbState.Listening, OrbState.Paused ->
         0.60f + 0.40f * abs(0.7f * sin(t * 0.0024f) + 0.3f * sin(t * 0.0061f + 1.3f))
 }
+
+/** De quanto em quanto tempo o Glitch tem uma rajada de falha: devagar em repouso, rápido transcrevendo. */
+internal fun glitchPeriodMs(state: OrbState): Float = when (state) {
+    OrbState.Idle -> 1900f
+    OrbState.Transcribing -> 650f
+    OrbState.Listening, OrbState.Paused -> 1100f
+}
+
+private fun glitchBurstStartMs(state: OrbState): Float = glitchPeriodMs(state) * when (state) {
+    OrbState.Idle -> 0.60f
+    OrbState.Transcribing -> 0.50f
+    OrbState.Listening, OrbState.Paused -> 0.35f
+}
+
+private fun glitchBurstLengthMs(state: OrbState): Float = when (state) {
+    OrbState.Idle -> 240f
+    OrbState.Transcribing -> 200f
+    OrbState.Listening, OrbState.Paused -> 220f
+}
+
+/**
+ * Intensidade da falha do Glitch no instante [t] (ms), de 0 (nada) a 1 (o pico de uma rajada): cada período tem uma
+ * rajada que sobe e desce em triângulo, e uma micro-rajada fraca (até 0,45) num ritmo à parte para a falha não parecer
+ * metrônomo. Função pura do tempo: um relógio parado dá um quadro fixo.
+ */
+internal fun glitchIntensity(t: Float, state: OrbState): Float {
+    val period = glitchPeriodMs(state)
+    val phase = ((t % period) + period) % period
+    val u = (phase - glitchBurstStartMs(state)) / glitchBurstLengthMs(state)
+    val main = if (u in 0f..1f) 1f - abs(2f * u - 1f) else 0f
+    val microPeriod = period * 1.37f
+    val micro = (((t + 400f) % microPeriod) + microPeriod) % microPeriod
+    val microG = if (micro < MICRO_BURST_MS) 0.45f * (1f - abs(2f * micro / MICRO_BURST_MS - 1f)) else 0f
+    return maxOf(main, microG)
+}
+
+private const val MICRO_BURST_MS = 70f
+
+/** Um instante no pico de uma rajada do estado [state] (2º ciclo): a galeria e as prévias congelam a orbe aqui. */
+internal fun glitchBurstMidMs(state: OrbState): Float =
+    glitchPeriodMs(state) + glitchBurstStartMs(state) + glitchBurstLengthMs(state) / 2f
 
 /** Formata segundos como `m:ss` (Space Mono 700 no centro do orbe). */
 internal fun formatOrbTime(totalSeconds: Int): String {
