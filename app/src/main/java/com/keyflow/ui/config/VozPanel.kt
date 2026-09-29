@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import com.keyflow.core.TranscriptionSource
 import com.keyflow.data.Settings
 import com.keyflow.ui.common.verticalScrollbar
+import com.keyflow.ui.icons.KfIconSpec
 import com.keyflow.ui.icons.KfIcons
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
@@ -150,9 +151,11 @@ internal fun languageLabel(code: String): String = when (code) {
 // Tempo limite de resposta (ms) — compartilhado entre OpenAI/Groq/Custom, não é por preset. Bug real
 // (Yan, 2026-07-01): sem isto, uma rota de rede ruim trava "transcrevendo" pra sempre (OkHttp/JVM não
 // tem timeout de DNS por padrão). Padrão 15s.
-private val TIMEOUT_OPTIONS_MS = listOf(1_000, 5_000, 15_000, 30_000, 60_000, 120_000)
+// 0 = "∞", sem limite (Yan, 2026-09-28) — por último, depois do maior prazo.
+private val TIMEOUT_OPTIONS_MS = listOf(1_000, 5_000, 15_000, 30_000, 60_000, 120_000, 0)
 
 private fun timeoutLabel(ms: Int): String = when (ms) {
+    0 -> NO_LIMIT_LABEL
     1_000 -> "1s"
     5_000 -> "5s"
     15_000 -> "15s"
@@ -166,9 +169,17 @@ private fun timeoutLabel(ms: Int): String = when (ms) {
 // persiste de verdade, mas nada ainda o aplica durante a gravação. Números viáveis pras APIs: nosso
 // AudioRecorder grava AAC a 64kbps (AudioRecorder.AUDIO_BIT_RATE) — 30min ≈ 14,4MB, bem abaixo do
 // limite de 25MB de upload direto do Whisper (OpenAI) e do Groq (free tier).
-private val MAX_RECORDING_OPTIONS_SEC = listOf(10, 30, 60, 300, 600, 1800)
+// 0 = "∞", sem limite (Yan, 2026-09-28): a nuvem ainda recusa arquivo grande (25MB ≈ 50min), e aí o
+// erro é o de áudio grande demais, não o aviso de limite.
+private val MAX_RECORDING_OPTIONS_SEC = listOf(10, 30, 60, 300, 600, 1800, 0)
+
+/** Nome acessível da opção sem limite, desenhada como ∞ ([KfIcons.Infinity]) nos dois seletores. */
+private const val NO_LIMIT_LABEL = "Sem limite"
+
+private fun <T> noLimitIcon(value: T): KfIconSpec? = if (value == 0) KfIcons.Infinity else null
 
 private fun maxRecordingLabel(sec: Int): String = when (sec) {
+    0 -> NO_LIMIT_LABEL
     10 -> "10s"
     30 -> "30s"
     60 -> "1m"
@@ -213,7 +224,7 @@ private fun GeneralSection(settings: Settings, onSettingsChange: (Settings) -> U
     SettingsGroup("Geral") {
         GroupItem(
             "Tempo limite de resposta",
-            "Tempo máximo de espera pela transcrição antes de mostrar erro.",
+            "Tempo máximo de espera pela transcrição antes de mostrar erro. No infinito, espera o quanto for preciso.",
         ) {
             Segmented(
                 options = TIMEOUT_OPTIONS_MS,
@@ -222,12 +233,13 @@ private fun GeneralSection(settings: Settings, onSettingsChange: (Settings) -> U
                 tag = ::timeoutTag,
                 onSelect = { onSettingsChange(settings.copy(transcriptionTimeoutMs = it)) },
                 modifier = Modifier.padding(top = 14.dp),
+                icon = ::noLimitIcon,
             )
         }
         GroupDivider()
         GroupItem(
             "Duração máxima de gravação",
-            "Ao atingir o limite, a gravação pausa e pergunta se quer enviar ou descartar.",
+            "Ao atingir o limite, a gravação pausa e pergunta se quer enviar ou descartar. No infinito, grava sem limite.",
         ) {
             Segmented(
                 options = MAX_RECORDING_OPTIONS_SEC,
@@ -236,6 +248,7 @@ private fun GeneralSection(settings: Settings, onSettingsChange: (Settings) -> U
                 tag = ::maxRecordingTag,
                 onSelect = { onSettingsChange(settings.copy(maxRecordingSec = it)) },
                 modifier = Modifier.padding(top = 14.dp),
+                icon = ::noLimitIcon,
             )
         }
     }

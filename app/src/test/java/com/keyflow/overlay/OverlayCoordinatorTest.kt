@@ -246,6 +246,39 @@ class OverlayCoordinatorTest {
     }
 
     @Test
+    fun `with no time limit a slow transcription is waited for instead of timing out`() = runTest {
+        // "∞" na aba Transcrição (Yan, 2026-09-28): a rede de segurança do coordinator não pode cortar
+        // uma transcrição que demora além de qualquer prazo — a pessoa escolheu esperar.
+        val audio = temporaryFolder.newFile("audio.m4a").also { it.writeText("audio") }
+        val slow = object : OverlayTranscriber {
+            override suspend fun transcribe(audio: File, cfg: Config): TranscriptionResult {
+                kotlinx.coroutines.delay(30 * 60_000L)
+                return TranscriptionResult.Success("demorou")
+            }
+        }
+        val inserted = mutableListOf<String>()
+        val errors = mutableListOf<String>()
+
+        val coordinator = coordinator(
+            scope = this,
+            recorder = FakeRecorder(audio),
+            transcriber = slow,
+            insertOrHold = { inserted += it; InsertOutcome.Inserted },
+            targetAvailable = { true },
+            onError = { message, _ -> errors += message },
+            recordingClockMs = longEnoughClock(),
+            configTimeoutMs = Config.NO_TIMEOUT,
+        )
+
+        coordinator.onTap() // IDLE → RECORDING
+        coordinator.onTap() // RECORDING → SENDING
+        advanceUntilIdle()
+
+        assertThat(errors).isEmpty()
+        assertThat(inserted).containsExactly("demorou")
+    }
+
+    @Test
     fun `second tap in sending state does not trigger another transcription`() = runTest {
         val audio = temporaryFolder.newFile("audio.m4a").also { it.writeText("audio") }
         val transcriber = FakeTranscriber(TranscriptionResult.Success("once"))

@@ -97,6 +97,15 @@ class EffectiveConfigTest {
     }
 
     @Test
+    fun `local source keeps its floor but an unlimited choice stays unlimited`() {
+        assertThat(Config.localTimeoutMs(15_000L)).isEqualTo(Config.LOCAL_MIN_TIMEOUT_MS)
+        assertThat(Config.localTimeoutMs(600_000L)).isEqualTo(600_000L)
+        assertThat(Config.localTimeoutMs(Config.NO_TIMEOUT)).isEqualTo(Config.NO_TIMEOUT)
+        assertThat(Config(timeoutMs = Config.NO_TIMEOUT).waitsForever).isTrue()
+        assertThat(Config().waitsForever).isFalse()
+    }
+
+    @Test
     fun `transcriptionTimeoutMs defaults to Config's default`() {
         val settings = Settings(source = TranscriptionSource.OPENAI, openaiToken = "sk-abc")
         val ready = settings.effectiveConfigFor() as EffectiveConfig.Ready

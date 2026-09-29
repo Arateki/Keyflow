@@ -13,6 +13,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -146,5 +147,21 @@ class VozPanelTest {
         rule.onNodeWithTag(maxRecordingTag(600)).performScrollTo().performClick()
 
         rule.runOnIdle { assertEquals(600, h.settings.maxRecordingSec) }
+    }
+
+    @Test
+    fun infinityOptionTurnsBothLimitsOff() {
+        // "∞" (Yan, 2026-09-28): 0 = sem limite, nos dois seletores da seção Geral. Desenhado como ícone;
+        // o leitor de tela ouve "Sem limite".
+        val h = Harness(Settings(source = TranscriptionSource.OPENAI))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(timeoutTag(0)).performScrollTo().assertContentDescriptionEquals("Sem limite").performClick()
+        rule.onNodeWithTag(maxRecordingTag(0)).performScrollTo().assertContentDescriptionEquals("Sem limite").performClick()
+
+        rule.runOnIdle {
+            assertEquals(0, h.settings.transcriptionTimeoutMs)
+            assertEquals(0, h.settings.maxRecordingSec)
+        }
     }
 }

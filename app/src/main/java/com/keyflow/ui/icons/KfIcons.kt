@@ -242,11 +242,24 @@ object KfIcons {
     )
 
     /** Todos os ícones — o teste de unidade confere nomes únicos e paths bem-formados. */
+    /**
+     * Sem limite ("∞" nos seletores de tempo da aba Transcrição): duas alças que se cruzam no centro. O
+     * glifo de fonte saía miúdo ao lado de "15s"/"5m".
+     */
+    val Infinity = KfIconSpec(
+        "infinity",
+        listOf(
+            "M12 12C10 9.5 8.6 8.25 6.75 8.25a3.75 3.75 0 0 0 0 7.5C8.6 15.75 10 14.5 12 12z",
+            "M12 12C14 14.5 15.4 15.75 17.25 15.75a3.75 3.75 0 0 0 0 -7.5C15.4 8.25 14 9.5 12 12z",
+        ),
+        strokeWidth = 1.8f,
+    )
+
     val all: List<KfIconSpec> = listOf(
         Mic, Adjust, ChevronUp, ChevronDown, Return, Paste, Grid, Joystick,
         RecordDot, Pause, Play, Undo, Sending, Close, Trash, Hand,
         Check, Plus, ChevronRight, ChevronLeft, Lock, LockOpen, Globe, Moon, Sun,
-        TabModo, TabVoz, TabTeclado, TabSobrepor, TabDocs,
+        TabModo, TabVoz, TabTeclado, TabSobrepor, TabDocs, Infinity,
     )
 }
 

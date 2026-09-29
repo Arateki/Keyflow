@@ -550,7 +550,12 @@ class OverlayCoordinator(
     private suspend fun transcribeWithTimeout(audio: File): TranscriptionResult {
         val cfg = configProvider()
         return runCatching {
-            withTimeout(cfg.timeoutMs + TIMEOUT_SAFETY_MARGIN_MS) { transcriber.transcribe(audio, cfg) }
+            // "∞": a pessoa escolheu esperar o quanto for preciso — cancelar durante o envio segue valendo.
+            if (cfg.waitsForever) {
+                transcriber.transcribe(audio, cfg)
+            } else {
+                withTimeout(cfg.timeoutMs + TIMEOUT_SAFETY_MARGIN_MS) { transcriber.transcribe(audio, cfg) }
+            }
         }.getOrElse { e ->
             when (e) {
                 is TimeoutCancellationException ->

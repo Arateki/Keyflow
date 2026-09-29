@@ -72,10 +72,12 @@ data class Settings(
     // Tempo limite de resposta da transcrição (ms) — compartilhado entre OpenAI/Groq/Custom, não é por
     // preset (aba Voz → seção Geral). Bug real reportado pelo Yan: sem isto, uma rota de rede ruim
     // trava "transcrevendo" pra sempre (OkHttp/JVM não tem timeout de DNS por padrão).
+    // 0 = sem limite ("∞", pedido do Yan, 2026-09-28).
     val transcriptionTimeoutMs: Int = Config.DEFAULT_TIMEOUT_MS.toInt(),
     // Duração máxima de uma gravação (s), aba Voz → seção Geral (pedido do Yan, 2026-07-02). MOCKADO:
     // o valor é persistido, mas nada ainda o aplica durante a gravação — o comportamento real (pausar
     // ao atingir o limite + toast pra enviar/descartar) fica pendente, ver STATE.md.
+    // 0 = sem limite ("∞", pedido do Yan, 2026-09-28) — o coordinator já tratava 0 como desligado.
     val maxRecordingSec: Int = 300,
     // Tamanho do teclado KeyFlow (%), aba Teclado (pedido do Yan, 2026-07-02) — reusa o `scale: Float`
     // que já existe em KeyFlowKeyboardView/KeyboardGridView/CandidatesView (era só usado pela demo da

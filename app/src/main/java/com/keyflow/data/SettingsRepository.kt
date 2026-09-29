@@ -171,7 +171,7 @@ class SettingsRepository(
             is EffectiveConfig.Ready -> eff.config
             // Sem endpoint nem token: o RoutingTranscriber manda para o :inference (NM-T9, PRV-01).
             is EffectiveConfig.Local -> Config(
-                timeoutMs = maxOf(settings.transcriptionTimeoutMs.toLong(), Config.LOCAL_MIN_TIMEOUT_MS),
+                timeoutMs = Config.localTimeoutMs(settings.transcriptionTimeoutMs.toLong()),
                 local = eff,
             )
             EffectiveConfig.Unavailable -> Config()

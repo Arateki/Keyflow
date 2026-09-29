@@ -11,7 +11,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -52,6 +54,7 @@ import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
@@ -68,6 +71,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.keyflow.core.RecordingMode
 import com.keyflow.ui.icons.KfIcon
+import com.keyflow.ui.icons.KfIconSpec
 import com.keyflow.ui.icons.KfIcons
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
@@ -97,6 +101,8 @@ internal fun <T> Segmented(
     modifier: Modifier = Modifier,
     hint: ((T) -> String)? = null,
     hintLines: Int = 3,
+    // Opção desenhada como ícone (ex.: ∞ = sem limite); o [label] dela vira o nome acessível.
+    icon: ((T) -> KfIconSpec?)? = null,
 ) {
     val palette = LocalKeyFlowPalette.current
     val raised = raisedFill(palette)
@@ -106,7 +112,7 @@ internal fun <T> Segmented(
     val cellText = (maxWidth - SEGMENT_TRACK_PADDING * 2 - SEGMENT_GAP * (options.size - 1)) / options.size -
         SEGMENT_TEXT_PADDING * 2
     val fontSp = fittedFontSizeSp(
-        labels = options.map(label),
+        labels = options.filter { icon?.invoke(it) == null }.map(label),
         maxTextWidth = cellText.coerceAtLeast(1.dp),
         maxSp = 12f,
         minSp = 8.5f,
@@ -116,6 +122,7 @@ internal fun <T> Segmented(
     Row(
         Modifier
             .fillMaxWidth()
+            .height(IntrinsicSize.Min)
             .clip(RoundedCornerShape(12.dp))
             .background(palette.panel)
             .padding(SEGMENT_TRACK_PADDING),
@@ -123,6 +130,18 @@ internal fun <T> Segmented(
     ) {
         options.forEach { option ->
             val isActive = option == selected
+            val optionIcon = icon?.invoke(option)
+            if (optionIcon != null) {
+                SegmentIcon(
+                    icon = optionIcon,
+                    description = label(option),
+                    isActive = isActive,
+                    sizeSp = fontSp * 1.5f,
+                    onClick = { onSelect(option) },
+                    tag = tag(option),
+                )
+                return@forEach
+            }
             // A opção ativa "sobe" do trilho: superfície clara com fio, tinta cheia — em vez do bloco
             // preto, que pesava mais que o conteúdo da tela.
             Text(
@@ -179,6 +198,41 @@ internal fun <T> Segmented(
         }
     }
     }
+    }
+}
+
+/** Célula do [Segmented] desenhada como ícone: mesma altura das de texto, fundo "que sobe" quando ativa. */
+@Composable
+private fun androidx.compose.foundation.layout.RowScope.SegmentIcon(
+    icon: KfIconSpec,
+    description: String,
+    isActive: Boolean,
+    sizeSp: Float,
+    onClick: () -> Unit,
+    tag: String,
+) {
+    val palette = LocalKeyFlowPalette.current
+    val iconSize = with(androidx.compose.ui.platform.LocalDensity.current) { sizeSp.sp.toDp() }
+    Box(
+        Modifier
+            .weight(1f)
+            .fillMaxHeight()
+            .clip(RoundedCornerShape(9.dp))
+            .then(
+                if (isActive) {
+                    Modifier
+                        .background(raisedFill(palette))
+                        .border(1.dp, palette.line, RoundedCornerShape(9.dp))
+                } else {
+                    Modifier
+                },
+            )
+            .clickable(enabled = !isActive, onClick = onClick)
+            .semantics { contentDescription = description }
+            .testTag(tag),
+        contentAlignment = Alignment.Center,
+    ) {
+        KfIcon(icon, if (isActive) palette.fg else palette.muted, Modifier.size(iconSize))
     }
 }
 
