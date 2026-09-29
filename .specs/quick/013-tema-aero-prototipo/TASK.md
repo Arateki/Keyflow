@@ -56,3 +56,19 @@ Branch `feature/tema-aero`, a partir de `feature/app-layout-refinado`.
   atrapalham.
 - Decidir com o Yan: pago/grátis, e se vira tema do sistema de temas (M8) com efeitos (bolhas subindo
   devagar, desligáveis por "reduzir efeitos").
+
+## Rodada 2 (2026-09-28, depois de o Yan ver no A32)
+
+- **Vidro fosco**: "parece um cinza translúcido" — era um véu branco sobre o céu. A paisagem agora guarda
+  uma cópia de si em 1/8, desfocada (caixa, 2 passadas, só quando muda de tamanho), e cada tecla desenha o
+  pedaço exato que está atrás dela (`FrostedBackdrop`/`FrostLocator`, `GlassPainter.useFrost`), com
+  saturação ×1,35 e um pouco de luz, antes do véu/brilho/aro. Véus mais leves. As bolhas atrás ficam
+  macias e param de competir com as letras.
+- **Orbe Aero** (`OrbStyle.AERO` no `VoiceOrb`): o mesmo blob vivo como vidro azul — halo ciano, miolo de
+  luz, aro fino, brilho elíptico em cima, luz na base, tinta marinho no centro. Segue a skin do teclado
+  (`orbStyleFor`); a overlay troca ao vivo (`OrbButtonView.setOrbStyle`), as prévias dos cartões de modo
+  também; o orbe do cabeçalho fica o do Ateliê (marca).
+- Verificação: `com.keyflow.ui` **129/129**; `com.keyflow.ime` 44/45 na rodada, a falha
+  (`BarViewAccessibilityTest`, "view não anexou") passou 3/3 isolada; goldens **102/102** (novos
+  `overlay-aero-idle/recording`).
+- Em aberto: as setas do arrasto da orbe (`DragArrowsView`) seguem teal no Aero.
