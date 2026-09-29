@@ -123,7 +123,7 @@ class BarView(
     private val kbInk = colors.ink
     private val pressedOverlay = 0x33000000
     // Aero: botões de vidro; o fundo da barra ([kbTray]) é transparente e a lâmina de vidro vem da view-mãe.
-    private val glass = if (colors.isGlass) GlassPainter(dp(1f), dark) else null
+    private val glass = if (colors.isGlass) GlassPainter(dp(1f)) else null
     private val sheetLocator = GlassSheetLocator(this)
 
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
@@ -135,6 +135,8 @@ class BarView(
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
         textSize = dp(TEXT_SIZE_DP)
+        colors.labelWeight.typeface()?.let { typeface = it }
+        if (colors.inkShadow != 0) setShadowLayer(dp(2.6f), 0f, 0f, colors.inkShadow)
     }
     private val cornerRadius = dp(7f)
     private val marginH = dp(3f)
@@ -378,7 +380,7 @@ class BarView(
         minOf(dp(ICON_SIZE_DP), bounds.height() * ICON_HEIGHT_RATIO, bounds.width() * 0.8f)
 
     private fun drawIcon(canvas: Canvas, icon: KfIconSpec, cx: Float, cy: Float, size: Float, ink: Int, alpha: Int = 255) =
-        iconDrawer.draw(canvas, icon, cx, cy, size, ink, alpha, strokeWidth = icon.strokeWidth * ICON_STROKE_BOOST)
+        iconDrawer.draw(canvas, icon, cx, cy, size, ink, alpha, strokeWidth = icon.strokeWidth * ICON_STROKE_BOOST * colors.iconStrokeScale)
 
     /**
      * Mic: o ícone do estado (cápsula, ponto de gravação, pausa…) e, quando o estado tem, o texto ao lado
@@ -416,7 +418,7 @@ class BarView(
         val baseRadius = 8f * unit
         val stroke = borderPaint.strokeWidth
         borderPaint.color = ink
-        borderPaint.strokeWidth = KfIcons.Joystick.strokeWidth * ICON_STROKE_BOOST * unit
+        borderPaint.strokeWidth = KfIcons.Joystick.strokeWidth * ICON_STROKE_BOOST * colors.iconStrokeScale * unit
         canvas.drawCircle(cx, cy, baseRadius, borderPaint)
         borderPaint.strokeWidth = stroke
         borderPaint.color = kbKeyBorder

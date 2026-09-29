@@ -24,13 +24,13 @@ import android.graphics.Shader
  * esticados até a tecla), então [draw] não aloca nada no `onDraw`. O reflexo é um por view (a matriz muda a
  * cada quadro): não é compartilhado.
  */
-class GlassPainter(private val density: Float, private val night: Boolean) {
+class GlassPainter(private val density: Float) {
 
     private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = density
-        color = if (night) 0x99000A1A.toInt() else 0x520B3A66
+        color = 0x4D0B3A66
     }
     private val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
@@ -42,24 +42,15 @@ class GlassPainter(private val density: Float, private val night: Boolean) {
     private val sheenMatrix = Matrix()
 
     private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        shader = unitGradient(
-            if (night) intArrayOf(0x0045D8FF, 0x0045D8FF, 0x5245D8FF) else intArrayOf(0x0080E6FF, 0x0080E6FF, 0x6680E6FF),
-            floatArrayOf(0f, 0.5f, 1f),
-        )
+        shader = unitGradient(intArrayOf(0x0080E6FF, 0x0080E6FF, 0x5280E6FF), floatArrayOf(0f, 0.5f, 1f))
     }
     private val glossPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        shader = unitGradient(
-            if (night) intArrayOf(0x4DFFFFFF, 0x0DFFFFFF) else intArrayOf(0x8CFFFFFF.toInt(), 0x14FFFFFF),
-            null,
-        )
+        shader = unitGradient(intArrayOf(0x8CFFFFFF.toInt(), 0x14FFFFFF), null)
     }
     private val rimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = density
-        shader = unitGradient(
-            if (night) intArrayOf(0xB3D8F6FF.toInt(), 0x33D8F6FF) else intArrayOf(0xFFFFFFFF.toInt(), 0x66FFFFFF),
-            null,
-        )
+        shader = unitGradient(intArrayOf(0xFFFFFFFF.toInt(), 0x66FFFFFF), null)
     }
     private val pressedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x6B18C4FF }
     private val pressedRimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -85,7 +76,7 @@ class GlassPainter(private val density: Float, private val night: Boolean) {
             sheenWidth = sheet.widthPx
             sheenHeight = sheet.heightPx
             // Um shader por view (não compartilhado): a matriz de cada uma muda a cada quadro.
-            sheenShader = GlassSheen.shader(sheenWidth, sheenHeight, night)
+            sheenShader = GlassSheen.shader(sheenWidth, sheenHeight)
             sheenPaint.shader = sheenShader
         }
         sheenMatrix.setTranslate(-dx, -dy)
@@ -100,10 +91,10 @@ class GlassPainter(private val density: Float, private val night: Boolean) {
         canvas.save()
         @Suppress("DEPRECATION") // clipOutPath só existe no API 26; DIFFERENCE funciona no canvas acelerado antes disso
         canvas.clipPath(keyShape, Region.Op.DIFFERENCE)
-        shadowPaint.color = if (night) 0x33000814 else 0x1F06264F
+        shadowPaint.color = 0x1806264F
         rect.set(bounds.left - density * 0.5f, bounds.top, bounds.right + density * 0.5f, bounds.bottom + density * 2.6f)
         canvas.drawRoundRect(rect, radius + density, radius + density, shadowPaint)
-        shadowPaint.color = if (night) 0x4D000814 else 0x2E06264F
+        shadowPaint.color = 0x2606264F
         rect.set(bounds.left, bounds.top + density, bounds.right, bounds.bottom + density * 1.5f)
         canvas.drawRoundRect(rect, radius, radius, shadowPaint)
         rect.set(bounds)

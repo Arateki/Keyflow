@@ -15,31 +15,28 @@ import android.view.View
 import android.view.WindowManager
 
 /**
- * A lâmina de vidro do Aero atrás de barras e grade ([KeyboardColors.backdrop]). Não pinta paisagem: o
- * teclado é **translúcido de verdade** e o que o app desenha atrás dele aparece através do vidro (Yan,
- * 2026-09-29: "prefiro o efeito de vidro real ao que está ao fundo"). A lâmina só carrega a cor do vidro —
- * uma tinta azul em degradê —, o fio de luz da borda de cima e o reflexo diagonal; o fosco é do compositor
- * ([windowBlurAvailable]), onde o aparelho oferece.
+ * O que o teclado pinta atrás de barras e grade numa skin com superfície própria ([KeyboardColors.backdrop]).
+ *
+ * [AERO] é uma lâmina de vidro **translúcida de verdade**: o que o app desenha atrás dele aparece através
+ * (Yan, 2026-09-29: "prefiro o efeito de vidro real ao que está ao fundo"). Ela só carrega a cor do vidro — uma
+ * tinta clara em degradê —, o fio de luz da borda de cima e o reflexo diagonal; o fosco é do compositor
+ * ([windowBlurAvailable]), onde o aparelho oferece. Uma aparência só, no tema claro e no escuro (pedido do Yan).
  */
 enum class KeyboardBackdrop(
-    /** Faixa da barra de navegação sob o teclado: a tinta do fundo do vidro, para a lâmina seguir até a borda. */
+    /** Faixa da barra de navegação sob o teclado: a tinta do fundo, para o teclado seguir até a borda. */
     val navigationBarColor: Int,
 ) {
-    /** Frutiger Aero de dia: vidro azul-céu claro. */
-    AERO_DAY(DAY_BOTTOM),
-
-    /** Frutiger Aero à noite: vidro marinho, fumê. */
-    AERO_NIGHT(NIGHT_BOTTOM),
+    /** Frutiger Aero: vidro claro, quase transparente. */
+    AERO(AERO_BOTTOM),
     ;
 
-    fun drawable(density: Float): Drawable = AeroGlassSheet(night = this == AERO_NIGHT, density = density)
+    fun drawable(density: Float): Drawable = AeroGlassSheet(density = density)
 }
 
-// Azuis vivos, não marinho: tinta escura misturada com o branco do app de trás vira cinza-azulado.
-private const val DAY_TOP = 0x596EC8FF
-private const val DAY_BOTTOM = 0x751E8CFF
-private const val NIGHT_TOP = 0x522878FF
-private const val NIGHT_BOTTOM = 0x700A50DC
+// Vidro claro e quase transparente: um fio de azul-céu, mais denso embaixo. Nada de tinta escura (sobre o branco do
+// app ela vira cinza) nem de azul carregado (esconde o app de trás).
+private const val AERO_TOP = 0x1FBFE6FF
+private const val AERO_BOTTOM = 0x385CB8FF
 
 /**
  * A lâmina de vidro que as teclas conhecem: o tamanho dela é o que estende o reflexo diagonal por todo o
@@ -88,12 +85,11 @@ fun windowBlurAvailable(context: Context): Boolean =
         (context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager)?.isCrossWindowBlurEnabled == true
 
 /**
- * A lâmina: tinta em degradê (mais densa embaixo), fio de luz na borda de cima e o reflexo diagonal, mais
+ * A lâmina: tinta clara em degradê (mais densa embaixo), fio de luz na borda de cima e o reflexo diagonal, mais
  * fraco que o das teclas. Os degradês dependem do tamanho, então são montados em [onBoundsChange]; [draw]
  * só pinta. Nada animado.
  */
 private class AeroGlassSheet(
-    private val night: Boolean,
     private val density: Float,
 ) : Drawable(), GlassSheet {
 
@@ -102,7 +98,7 @@ private class AeroGlassSheet(
 
     private val tintPaint = Paint()
     private val sheenPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val edgePaint = Paint().apply { color = if (night) 0x8CBFEFFF.toInt() else 0xD9FFFFFF.toInt() }
+    private val edgePaint = Paint().apply { color = 0xBFFFFFFF.toInt() }
     private val sheenMatrix = Matrix()
 
     override fun onBoundsChange(bounds: Rect) {
@@ -110,11 +106,11 @@ private class AeroGlassSheet(
         if (bounds.isEmpty) return
         tintPaint.shader = LinearGradient(
             0f, bounds.top.toFloat(), 0f, bounds.bottom.toFloat(),
-            if (night) NIGHT_TOP else DAY_TOP,
-            if (night) NIGHT_BOTTOM else DAY_BOTTOM,
+            AERO_TOP,
+            AERO_BOTTOM,
             Shader.TileMode.CLAMP,
         )
-        val sheen = GlassSheen.shader(bounds.width(), bounds.height(), night, strength = SHEET_SHEEN)
+        val sheen = GlassSheen.shader(bounds.width(), bounds.height(), strength = SHEET_SHEEN)
         sheen?.setLocalMatrix(sheenMatrix.apply { setTranslate(bounds.left.toFloat(), bounds.top.toFloat()) })
         sheenPaint.shader = sheen
     }
@@ -149,12 +145,12 @@ private class AeroGlassSheet(
 internal object GlassSheen {
     private const val SLOPE = 1.6f
 
-    fun shader(width: Int, height: Int, night: Boolean, strength: Float = 1f): LinearGradient? {
+    fun shader(width: Int, height: Int, strength: Float = 1f): LinearGradient? {
         if (width <= 0 || height <= 0) return null
         // Direção do degradê (1, SLOPE): t = 1 exatamente no canto de baixo à direita.
         val lambda = (width + SLOPE * height) / (1f + SLOPE * SLOPE)
-        val wide = withAlpha(if (night) 0x2E else 0x59, strength)
-        val thin = withAlpha(if (night) 0x1A else 0x38, strength)
+        val wide = withAlpha(0x47, strength)
+        val thin = withAlpha(0x2B, strength)
         val colors = intArrayOf(0, 0, wide, wide, 0, 0, thin, thin, 0, 0)
         val stops = floatArrayOf(0f, 0.13f, 0.136f, 0.30f, 0.306f, 0.335f, 0.341f, 0.38f, 0.386f, 1f)
         return LinearGradient(0f, 0f, lambda, lambda * SLOPE, colors, stops, Shader.TileMode.CLAMP)

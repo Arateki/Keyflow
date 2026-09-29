@@ -23,22 +23,36 @@ class KeyboardColorsTest {
     }
 
     @Test
-    fun `aero puts a translucent glass sheet behind glass keys in both modes`() {
-        val day = KeyboardColors.of(KeyboardSkin.AERO, dark = false)
-        val night = KeyboardColors.of(KeyboardSkin.AERO, dark = true)
-        assertThat(day.backdrop).isEqualTo(KeyboardBackdrop.AERO_DAY)
-        assertThat(night.backdrop).isEqualTo(KeyboardBackdrop.AERO_NIGHT)
-        for (colors in listOf(day, night)) {
-            assertThat(colors.isGlass).isTrue()
-            // Fundo das barras transparente: quem pinta é a lâmina de vidro atrás delas.
-            assertThat(colors.tray ushr 24).isEqualTo(0)
-            // Vidro deixa o que está atrás passar; balões e letras não.
-            assertThat(colors.key ushr 24).isLessThan(0xFF)
-            assertThat(colors.modifier ushr 24).isLessThan(0xFF)
-            assertThat(colors.popup ushr 24).isEqualTo(0xFF)
-            assertThat(colors.ink ushr 24).isEqualTo(0xFF)
-            assertThat(colors.inkShadow).isNotEqualTo(0)
-        }
+    fun `aero puts a translucent glass sheet behind glass keys`() {
+        val colors = KeyboardColors.of(KeyboardSkin.AERO, dark = false)
+        assertThat(colors.backdrop).isEqualTo(KeyboardBackdrop.AERO)
+        assertThat(colors.isGlass).isTrue()
+        // Fundo das barras transparente: quem pinta é a lâmina de vidro atrás delas.
+        assertThat(colors.tray ushr 24).isEqualTo(0)
+        // Vidro deixa o que está atrás passar; balões e letras não.
+        assertThat(colors.key ushr 24).isLessThan(0xFF)
+        assertThat(colors.modifier ushr 24).isLessThan(0xFF)
+        assertThat(colors.popup ushr 24).isEqualTo(0xFF)
+        assertThat(colors.ink ushr 24).isEqualTo(0xFF)
+        assertThat(colors.inkShadow).isNotEqualTo(0)
+    }
+
+    @Test
+    fun `aero looks the same in the light and the dark theme`() {
+        // Pedido do Yan (2026-09-29): o vidro não muda de cor com o tema.
+        assertThat(KeyboardColors.of(KeyboardSkin.AERO, dark = true)).isEqualTo(KeyboardColors.of(KeyboardSkin.AERO, dark = false))
+    }
+
+    @Test
+    fun `aero glass is clear and its letters are black, heavier and haloed`() {
+        val colors = KeyboardColors.of(KeyboardSkin.AERO, dark = false)
+        // Vidro claro e quase transparente: o véu das teclas é bem menor que meio opaco.
+        assertThat(colors.key ushr 24).isLessThan(0x80)
+        assertThat(colors.modifier ushr 24).isLessThan(0x80)
+        // Letra preta, mais grossa que o normal, com halo branco.
+        assertThat(colors.ink and 0x00FFFFFF).isEqualTo(0)
+        assertThat(colors.labelWeight).isNotEqualTo(LabelWeight.NORMAL)
+        assertThat(colors.inkShadow and 0x00FFFFFF).isEqualTo(0x00FFFFFF)
     }
 
     @Test

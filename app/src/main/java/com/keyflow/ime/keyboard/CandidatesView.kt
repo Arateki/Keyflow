@@ -137,6 +137,8 @@ class CandidatesView(
                     includeFontPadding = false
                     maxLines = 1
                     setTextColor(kbInk)
+                    colors.labelWeight.typeface()?.let { typeface = it }
+                    if (colors.inkShadow != 0) setShadowLayer(dp(2).toFloat(), 0f, 0f, colors.inkShadow)
                     setPadding(dp(12), 0, dp(12), 0)
                     isClickable = true
                     setOnClickListener { onTap(word) }

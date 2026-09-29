@@ -69,7 +69,7 @@ class KeyboardGridView(
     private val kbInk = colors.ink
     private val pressedOverlay = 0x33000000
     // Aero: teclas de vidro sobre a lâmina que a view-mãe pinta (a grade não tem fundo próprio).
-    private val glass = if (colors.isGlass) GlassPainter(dp(1), dark) else null
+    private val glass = if (colors.isGlass) GlassPainter(dp(1)) else null
     private val sheetLocator = GlassSheetLocator(this)
 
     private val keyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
@@ -82,12 +82,13 @@ class KeyboardGridView(
     // paleta monocromática das outras teclas; pedido do Yan, 2026-07-03).
     private val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        strokeWidth = dp(1.4f)
+        strokeWidth = dp(1.4f) * colors.iconStrokeScale
     }
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
         textSize = dp(15)
         color = kbInk
+        colors.labelWeight.typeface()?.let { typeface = it }
         if (colors.inkShadow != 0) setShadowLayer(dp(2.6f), 0f, 0f, colors.inkShadow)
     }
     // Balões da prévia e da tira de acentos (ver [KeyBubble]).
@@ -98,7 +99,10 @@ class KeyboardGridView(
         color = kbKeyBorder
     }
     private val bubbleHighlight = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL; color = ACCENT_TEAL }
-    private val bubbleText = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
+    private val bubbleText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.CENTER
+        colors.labelWeight.typeface()?.let { typeface = it }
+    }
     private val keyBounds = RectF()
     // Hint pequeno de dígito no canto superior direito (estilo Gboard — NUMROW-01, pedido do Yan,
     // 2026-07-03), só desenhado quando `KeyAction.Char.digitHint` não é nulo (long-press ainda ativo).

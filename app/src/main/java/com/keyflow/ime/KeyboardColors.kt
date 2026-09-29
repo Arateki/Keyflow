@@ -1,5 +1,7 @@
 package com.keyflow.ime
 
+import android.graphics.Typeface
+
 /**
  * Esquema de cores do teclado (IME). [SYSTEM] é o padrão desde 2026-09-28 (pedido do Yan: "semelhante à
  * cor da Samsung, aquela cor padrão do sistema"); [ATELIE] é o papel quente de antes, que segue como
@@ -8,7 +10,7 @@ package com.keyflow.ime
  * [AERO] é protótipo (Yan, 2026-09-28): Frutiger Aero — teclas de vidro ([GlassPainter]) sobre uma lâmina
  * translúcida ([KeyboardBackdrop]). Desde 2026-09-29 a transparência é **real**: a janela do teclado é
  * translúcida e o que o app desenha atrás aparece através do vidro (com desfoque do compositor onde o
- * aparelho oferece). O Yan escolheu isso à paisagem pintada, mesmo dependendo do que cada app desenha ali.
+ * aparelho oferece). Tem uma aparência só, no tema claro e no escuro: o vidro não muda de cor.
  */
 enum class KeyboardSkin(
     val id: String,
@@ -54,8 +56,12 @@ data class KeyboardColors(
      * e teclas e botões são de vidro ([isGlass]).
      */
     val backdrop: KeyboardBackdrop? = null,
-    /** Sombra do texto das teclas (0 = sem); no vidro, é o que segura a letra sobre a paisagem. */
+    /** Halo do texto das teclas (0 = sem); no vidro, é o que segura a letra sobre o que o app desenha atrás. */
     val inkShadow: Int = 0,
+    /** Peso das letras: o vidro pede letra mais grossa, para ler sobre qualquer fundo. */
+    val labelWeight: LabelWeight = LabelWeight.NORMAL,
+    /** Multiplica a espessura do traço dos ícones (1 = a de sempre). */
+    val iconStrokeScale: Float = 1f,
 ) {
     val isGlass: Boolean get() = backdrop != null
 
@@ -93,35 +99,41 @@ data class KeyboardColors(
             ink = 0xFFF1E7C9.toInt(),
         )
 
-        // Aero: [key]/[modifier] são a tinta do vidro (translúcida, por cima da lâmina e do que o app desenha
-        // atrás); o brilho, o reflexo e o aro vêm do GlassPainter. Teclas de letra em vidro claro, teclas de
-        // função em azul mais fundo — o que separa as teclas da lâmina azul por baixo.
-        private val AERO_DAY = KeyboardColors(
+        // Aero: [key]/[modifier] são a tinta do vidro — clara e translúcida, por cima da lâmina e do que o app
+        // desenha atrás; o brilho, o reflexo e o aro vêm do GlassPainter. Letras em preto com um halo branco forte
+        // e peso médio: o vidro é claro e o fundo pode ser qualquer coisa. É a mesma paleta no claro e no escuro.
+        private val AERO = KeyboardColors(
             tray = 0x00000000,
-            key = 0x66EAF7FF,
+            key = 0x52F2FBFF,
             keyBorder = 0xE6FFFFFF.toInt(),
-            modifier = 0x990F70F0.toInt(),
-            ink = 0xFF06213F.toInt(),
+            modifier = 0x66A6DCFF,
+            ink = 0xFF000000.toInt(),
             popup = 0xFFF3FAFF.toInt(),
-            backdrop = KeyboardBackdrop.AERO_DAY,
-            // Halo branco em volta da letra (sombra sem deslocamento), como o texto sobre o vidro do Windows 7.
-            inkShadow = 0xE6FFFFFF.toInt(),
-        )
-        private val AERO_NIGHT = KeyboardColors(
-            tray = 0x00000000,
-            key = 0x4A5CC8FF,
-            keyBorder = 0x8CBFEFFF.toInt(),
-            modifier = 0x8C0A55D8.toInt(),
-            ink = 0xFFF1FAFF.toInt(),
-            popup = 0xFF102C47.toInt(),
-            backdrop = KeyboardBackdrop.AERO_NIGHT,
-            inkShadow = 0xB3001226.toInt(),
+            backdrop = KeyboardBackdrop.AERO,
+            inkShadow = 0xF2FFFFFF.toInt(),
+            labelWeight = LabelWeight.MEDIUM,
+            iconStrokeScale = 1.2f,
         )
 
         fun of(skin: KeyboardSkin, dark: Boolean): KeyboardColors = when (skin) {
             KeyboardSkin.SYSTEM -> if (dark) SYSTEM_DARK else SYSTEM_LIGHT
             KeyboardSkin.ATELIE -> if (dark) ATELIE_DARK else ATELIE_LIGHT
-            KeyboardSkin.AERO -> if (dark) AERO_NIGHT else AERO_DAY
+            KeyboardSkin.AERO -> AERO
         }
+    }
+}
+
+/** Peso das letras de uma skin. */
+enum class LabelWeight {
+    NORMAL,
+    MEDIUM,
+    BOLD,
+    ;
+
+    /** A fonte com este peso; `null` = a que a view já usa. */
+    fun typeface(): Typeface? = when (this) {
+        NORMAL -> null
+        MEDIUM -> Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        BOLD -> Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
     }
 }
