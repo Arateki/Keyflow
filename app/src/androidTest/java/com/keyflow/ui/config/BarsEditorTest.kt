@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
 import com.keyflow.core.shortcuts.BarButton
 import com.keyflow.ime.bars.BarGeometry
@@ -108,6 +109,25 @@ class BarsEditorTest {
             assertTrue(button is BarButton.GridTrigger)
             assertEquals("g1", (button as BarButton.GridTrigger).gridId)
         }
+    }
+
+    @Test
+    fun catalogHelpExplainsAnOptionWithoutAddingItAndCanAddFromThere() {
+        // "?" em cada linha do catálogo (Yan, 2026-09-28): explica no mesmo modal; tocar nele não adiciona.
+        val h = Harness(BarsConfig(mirrored = false, collapsed = listOf(BarDef(emptyList())), expanded = listOf(BarDef(emptyList()))))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(barAddButtonTag(0)).performClick()
+        rule.onNodeWithTag(catalogHelpTag(BARS_EDITOR_CATALOG_JOYSTICK_TAG)).performScrollTo().performClick()
+        rule.onNodeWithTag(BARS_EDITOR_CATALOG_HELP_TAG).assertIsDisplayed()
+        rule.runOnIdle { assertEquals(emptyList<BarButton>(), h.barsConfig.collapsed[0].buttons) }
+
+        rule.onNodeWithTag(BARS_EDITOR_CATALOG_HELP_BACK_TAG).performClick()
+        rule.onNodeWithTag(BARS_EDITOR_CATALOG_TAG).assertIsDisplayed()
+
+        rule.onNodeWithTag(catalogHelpTag(BARS_EDITOR_CATALOG_JOYSTICK_TAG)).performScrollTo().performClick()
+        rule.onNodeWithTag(BARS_EDITOR_CATALOG_HELP_ADD_TAG).performClick()
+        rule.runOnIdle { assertEquals(listOf(BarButton.Joystick), h.barsConfig.collapsed[0].buttons) }
     }
 
     @Test

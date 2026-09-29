@@ -81,6 +81,12 @@ const val BARS_EDITOR_GRID_FORM_REMOVE_TAG = "bars-editor-grid-form-remove"
 fun barChipTag(barIndex: Int, buttonIndex: Int) = "bars-editor-chip-$barIndex-$buttonIndex"
 
 const val BARS_EDITOR_CATALOG_CLOSE_TAG = "bars-editor-catalog-close"
+const val BARS_EDITOR_CATALOG_HELP_TAG = "bars-editor-catalog-help"
+const val BARS_EDITOR_CATALOG_HELP_ADD_TAG = "bars-editor-catalog-help-add"
+const val BARS_EDITOR_CATALOG_HELP_BACK_TAG = "bars-editor-catalog-help-back"
+
+/** "?" da linha do catálogo cuja linha tem a tag [rowTag]. */
+fun catalogHelpTag(rowTag: String) = "$rowTag-help"
 const val BARS_EDITOR_EDIT_CLOSE_TAG = "bars-editor-edit-close"
 const val BARS_EDITOR_GRID_FORM_CLOSE_TAG = "bars-editor-grid-form-close"
 
@@ -563,25 +569,65 @@ private fun CatalogSheet(
     onAddSingleKey: () -> Unit,
     onAddGrid: () -> Unit,
 ) {
+    val options = buildList {
+        add(CatalogOption("Microfone", BARS_EDITOR_CATALOG_MIC_TAG, "Grava sua voz e cola a transcrição. Toque para gravar e parar; segure para pausar, retomar ou cancelar.") { onAddSimple(BarButton.Mic) })
+        add(CatalogOption("Config", BARS_EDITOR_CATALOG_CONFIG_TAG, "Abre as configurações do KeyFlow.") { onAddSimple(BarButton.ConfigBtn) })
+        add(CatalogOption("Colapsar/expandir", BARS_EDITOR_CATALOG_TOGGLE_EXPAND_TAG, "Recolhe o teclado até a barra, ou traz as teclas de volta.") { onAddSimple(BarButton.ToggleExpand) })
+        add(CatalogOption("Colar", BARS_EDITOR_CATALOG_PASTE_TAG, "Cola o que está na área de transferência.") { onAddSimple(BarButton.Paste) })
+        add(CatalogOption("Candidatos", BARS_EDITOR_CATALOG_CANDIDATES_TAG, "A faixa de sugestões do corretor: enquanto você digita, mostra palavras para tocar e completar. A área fica reservada mesmo vazia.") { onAddSimple(BarButton.Candidates) })
+        add(CatalogOption("Alavanca", BARS_EDITOR_CATALOG_JOYSTICK_TAG, "Arraste a partir dela para mover o cursor, como as setas do teclado; quanto mais longe o dedo, mais rápido.") { onAddSimple(BarButton.Joystick) })
+        add(CatalogOption("Tecla avulsa", BARS_EDITOR_CATALOG_SINGLE_KEY_TAG, "Um botão que envia a tecla ou o atalho que você escolher, como Esc, Tab ou Ctrl+C.") { onAddSingleKey() })
+        // Grade: escondida quando não há grades cadastradas (nada pra referenciar).
+        if (grids.isNotEmpty()) {
+            add(CatalogOption("Grade", BARS_EDITOR_CATALOG_GRID_TAG, "Segure e arraste para abrir uma grade de atalhos; solte sobre uma célula para enviar o atalho dela.") { onAddGrid() })
+        }
+    }
+    // "?" de uma linha: o mesmo modal troca para a explicação (seta ← volta ao catálogo) — padrão do
+    // ConfigModal para não empilhar um segundo overlay (Yan, 2026-09-28).
+    var helpFor by remember { mutableStateOf<String?>(null) }
+    val help = options.firstOrNull { it.tag == helpFor }
+    if (help != null) {
+        ConfigModal(
+            title = help.label,
+            onDismiss = onDismiss,
+            closeTag = BARS_EDITOR_CATALOG_CLOSE_TAG,
+            cardTag = BARS_EDITOR_CATALOG_HELP_TAG,
+            onBack = { helpFor = null },
+            backTag = BARS_EDITOR_CATALOG_HELP_BACK_TAG,
+        ) {
+            // O texto é o assunto do modal: um degrau acima da legenda (SettingSub) para ler com folga.
+            Text(
+                help.help,
+                color = LocalKeyFlowPalette.current.fg2,
+                fontFamily = SpaceGrotesk,
+                fontWeight = FontWeight.Light,
+                fontSize = 12.5.sp,
+                lineHeight = 18.sp,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            PrimaryButton(
+                "Adicionar",
+                tag = BARS_EDITOR_CATALOG_HELP_ADD_TAG,
+                onClick = help.onAdd,
+                modifier = Modifier.padding(top = 18.dp),
+            )
+        }
+        return
+    }
     ConfigModal(
         title = "Adicionar botão",
         onDismiss = onDismiss,
         closeTag = BARS_EDITOR_CATALOG_CLOSE_TAG,
         cardTag = BARS_EDITOR_CATALOG_TAG,
     ) {
-            SheetActionRow("Microfone", BARS_EDITOR_CATALOG_MIC_TAG) { onAddSimple(BarButton.Mic) }
-            SheetActionRow("Config", BARS_EDITOR_CATALOG_CONFIG_TAG) { onAddSimple(BarButton.ConfigBtn) }
-            SheetActionRow("Colapsar/expandir", BARS_EDITOR_CATALOG_TOGGLE_EXPAND_TAG) { onAddSimple(BarButton.ToggleExpand) }
-            SheetActionRow("Colar", BARS_EDITOR_CATALOG_PASTE_TAG) { onAddSimple(BarButton.Paste) }
-            SheetActionRow("Candidatos", BARS_EDITOR_CATALOG_CANDIDATES_TAG) { onAddSimple(BarButton.Candidates) }
-            SheetActionRow("Alavanca", BARS_EDITOR_CATALOG_JOYSTICK_TAG) { onAddSimple(BarButton.Joystick) }
-            SheetActionRow("Tecla avulsa", BARS_EDITOR_CATALOG_SINGLE_KEY_TAG) { onAddSingleKey() }
-            // Grade: escondida quando não há grades cadastradas (nada pra referenciar).
-            if (grids.isNotEmpty()) {
-                SheetActionRow("Grade", BARS_EDITOR_CATALOG_GRID_TAG) { onAddGrid() }
-            }
+        options.forEach { option ->
+            SheetActionRow(option.label, option.tag, onHelp = { helpFor = option.tag }, onClick = option.onAdd)
+        }
     }
 }
+
+/** Uma linha do catálogo "Adicionar botão": o nome, o que ela faz (o "?") e como adiciona. */
+private class CatalogOption(val label: String, val tag: String, val help: String, val onAdd: () -> Unit)
 
 @Composable
 private fun SimpleEditSheet(
@@ -677,14 +723,14 @@ private fun GridFormSheet(
             )
 
             if (onRemove != null) {
-                SheetActionRow("Remover", BARS_EDITOR_GRID_FORM_REMOVE_TAG, onRemove)
+                SheetActionRow("Remover", BARS_EDITOR_GRID_FORM_REMOVE_TAG, onClick = onRemove)
             }
     }
 }
 
 /** Linha de ação genérica dos sheets deste arquivo (catálogo/edição/formulário de grade). */
 @Composable
-private fun SheetActionRow(label: String, tag: String, onClick: () -> Unit) {
+private fun SheetActionRow(label: String, tag: String, onHelp: (() -> Unit)? = null, onClick: () -> Unit) {
     val palette = LocalKeyFlowPalette.current
     val noRipple = remember { MutableInteractionSource() }
     Row(
@@ -699,6 +745,10 @@ private fun SheetActionRow(label: String, tag: String, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(label, color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Normal, fontSize = 13.sp, modifier = Modifier.weight(1f))
+        if (onHelp != null) {
+            // Alvo próprio: tocar no "?" explica; o resto da linha adiciona.
+            HelpButton("O que é $label", catalogHelpTag(tag), onHelp, Modifier.padding(end = 6.dp))
+        }
         KfIcon(KfIcons.ChevronRight, palette.faint, Modifier.size(16.dp))
     }
 }

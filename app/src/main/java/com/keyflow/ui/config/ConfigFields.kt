@@ -54,6 +54,7 @@ import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
@@ -248,6 +249,31 @@ private val SEGMENT_TEXT_PADDING = 4.dp
  */
 internal fun raisedFill(palette: com.keyflow.ui.theme.KeyFlowPalette): Color =
     if (palette.isDark) palette.line else palette.kbKey
+
+/**
+ * "?" de ajuda: círculo fino com o ponto de interrogação, alvo de toque próprio de 28dp — o mesmo desenho
+ * do "?" das permissões no onboarding. [description] é o que o leitor de tela anuncia.
+ */
+@Composable
+internal fun HelpButton(description: String, tag: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val palette = LocalKeyFlowPalette.current
+    Box(
+        modifier
+            .size(28.dp)
+            .clip(CircleShape)
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = description }
+            .testTag(tag),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier.size(18.dp).clip(CircleShape).border(1.dp, palette.faint, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("?", color = palette.faint, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Medium, fontSize = 9.5.sp)
+        }
+    }
+}
 
 /** Papel quente do knob do interruptor e da tinta sobre acentos — igual nos dois temas. */
 internal val PaperWarm = Color(0xFFF4ECCF)
