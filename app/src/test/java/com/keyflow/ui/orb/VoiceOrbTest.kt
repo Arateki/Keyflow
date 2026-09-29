@@ -33,4 +33,12 @@ class VoiceOrbTest {
         val transcribing = orbBaseParams(OrbState.Transcribing)
         assertThat(setOf(idle, listening, transcribing)).hasSize(3)
     }
+
+    @Test
+    fun `only the Aero keyboard skin gives the orb its glass style`() {
+        assertThat(orbStyleFor("aero")).isEqualTo(OrbStyle.AERO)
+        assertThat(orbStyleFor("system")).isEqualTo(OrbStyle.ATELIE)
+        assertThat(orbStyleFor("atelie")).isEqualTo(OrbStyle.ATELIE)
+        assertThat(orbStyleFor("desconhecida")).isEqualTo(OrbStyle.ATELIE)
+    }
 }

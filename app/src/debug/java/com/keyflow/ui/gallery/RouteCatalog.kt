@@ -52,6 +52,7 @@ import com.keyflow.ui.orb.OrbCenter
 import com.keyflow.ui.orb.OrbDragHint
 import com.keyflow.ui.orb.OrbDragKind
 import com.keyflow.ui.orb.OrbState
+import com.keyflow.ui.orb.OrbStyle
 import com.keyflow.ui.orb.VoiceOrb
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.config.LocalModelsUi
@@ -104,6 +105,9 @@ object RouteCatalog {
         orbRoute("overlay-idle", OrbState.Idle, OrbCenter.None),
         orbRoute("overlay-recording", OrbState.Listening, OrbCenter.Time(12)),
         orbRoute("overlay-paused", OrbState.Paused, OrbCenter.PauseGlyph(12)),
+        // Protótipo Aero: a orbe de vidro, parada e gravando.
+        orbRoute("overlay-aero-idle", OrbState.Idle, OrbCenter.None, OrbStyle.AERO),
+        orbRoute("overlay-aero-recording", OrbState.Listening, OrbCenter.Time(12), OrbStyle.AERO),
         // Teclado reskinado (T23), grade Canvas (KC-T10, padrão único desde a promoção): View hospedado
         // via AndroidView, ancorado ao rodapé.
         keyboardRoute("keyboard-canvas-expanded", expanded = true, recording = false),
@@ -660,7 +664,7 @@ object RouteCatalog {
         }
     }
 
-    private fun orbRoute(key: String, state: OrbState, center: OrbCenter): Route = Route(key) {
+    private fun orbRoute(key: String, state: OrbState, center: OrbCenter, style: OrbStyle = OrbStyle.ATELIE): Route = Route(key) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -672,6 +676,7 @@ object RouteCatalog {
                 modifier = Modifier.size(160.dp),
                 center = center,
                 timeProvider = { GALLERY_ORB_TIME_MS },
+                style = style,
             )
         }
     }

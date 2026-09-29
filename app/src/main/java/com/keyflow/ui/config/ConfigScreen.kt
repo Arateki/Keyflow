@@ -262,6 +262,11 @@ fun ConfigScreen(
                 Box(Modifier.align(Alignment.CenterEnd).width(1.dp).fillMaxHeight().background(palette.line2))
             }
             Box(Modifier.weight(1f).fillMaxHeight()) {
+                // As prévias das abas (tour da orbe nos cartões) seguem a skin escolhida, como a orbe de
+                // verdade; o orbe do cabeçalho é a marca do app e fica como está.
+                androidx.compose.runtime.CompositionLocalProvider(
+                    com.keyflow.ui.orb.LocalOrbStyle provides com.keyflow.ui.orb.orbStyleFor(settings.keyboardSkin),
+                ) {
                 Column(
                     Modifier
                         .fillMaxSize()
@@ -334,6 +339,7 @@ fun ConfigScreen(
                         )
                         ConfigTab.DOCS -> DocsPanel(focusSectionId = docsFocusSection, focusKey = docsFocusKey)
                     }
+                }
                 }
             }
             }

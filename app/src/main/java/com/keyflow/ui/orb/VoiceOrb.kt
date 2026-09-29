@@ -55,6 +55,20 @@ enum class OrbState { Idle, Listening, Paused, Transcribing }
  */
 val LocalOrbClock = staticCompositionLocalOf<(() -> Float)?> { null }
 
+/**
+ * Estilo do orbe: [ATELIE] (o blob teal de sempre) ou [AERO] (protótipo, 2026-09-28): a mesma forma viva,
+ * mas como uma esfera de vidro azul — brilho na metade de cima, luz na base e aro fino, no espírito do
+ * Windows Vista/7. Segue a skin do teclado ([orbStyleFor]).
+ */
+enum class OrbStyle { ATELIE, AERO }
+
+/** Estilo do orbe para a árvore abaixo — a overlay e as prévias das abas seguem a skin escolhida. */
+val LocalOrbStyle = staticCompositionLocalOf { OrbStyle.ATELIE }
+
+/** A orbe acompanha a skin do teclado: só o Aero tem orbe própria; as outras seguem com a do Ateliê. */
+fun orbStyleFor(keyboardSkinId: String): OrbStyle =
+    if (com.keyflow.ime.KeyboardSkin.of(keyboardSkinId) == com.keyflow.ime.KeyboardSkin.AERO) OrbStyle.AERO else OrbStyle.ATELIE
+
 /** Conteúdo desenhado no centro do orbe (ORB-04). */
 sealed interface OrbCenter {
     data object None : OrbCenter
@@ -91,7 +105,21 @@ private val CoreInner = Color(0xFFF4ECCF)
 private val CoreOuter = Color(0xFFBFE0D4)
 private val RingColor = Color(0xFF4E9683)
 private val CenterInk = Color(0xFF2B2720)
+
+/** Tinta do tempo e dos glifos no centro — a do estilo do orbe ([VoiceOrb] define). */
+private val LocalCenterInk = staticCompositionLocalOf { CenterInk }
 private val ErrorRed = Color(0xFFD9694B)
+
+// Paleta Aero: vidro azul com miolo de luz; tinta marinho no centro.
+private val AeroGlowInner = Color(0x7345C8F5)
+private val AeroGlowOuter = Color(0x0045C8F5)
+private val AeroMainInner = Color(0xFFBFF0FF)
+private val AeroMainOuter = Color(0xFF1C6FCF)
+private val AeroCoreInner = Color(0xFFF4FDFF)
+private val AeroCoreOuter = Color(0xFF7AD6FF)
+private val AeroRing = Color(0xFF45C8F5)
+private val AeroRim = Color(0x80062A5C)
+private val AeroInk = Color(0xFF0B2B4C)
 private val CancelAmber = Color(0xFFC9772F) // descarte: terracota/âmbar, distinto do X de erro
 
 @Composable
@@ -101,43 +129,49 @@ fun VoiceOrb(
     center: OrbCenter = OrbCenter.None,
     dragHint: OrbDragHint? = null,
     timeProvider: (() -> Float)? = null,
+    style: OrbStyle = LocalOrbStyle.current,
 ) {
     val provided = timeProvider ?: LocalOrbClock.current
     val animatedMs = rememberOrbClock(enabled = provided == null)
     val timeMs = provided?.invoke() ?: animatedMs
 
-    BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
-        val density = LocalDensity.current
-        // Lado da orbe em px: o conteúdo central (tempo/glifos) escala com o tamanho (slider Sobrepor).
-        val sidePx = minOf(constraints.maxWidth, constraints.maxHeight)
-            .takeIf { it in 1..(Int.MAX_VALUE / 2) } ?: DEFAULT_ORB_SIDE_PX
+    // Tempo e glifos do centro na tinta do estilo (marrom no Ateliê, marinho no vidro do Aero).
+    androidx.compose.runtime.CompositionLocalProvider(
+        LocalCenterInk provides if (style == OrbStyle.AERO) AeroInk else CenterInk,
+    ) {
+        BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
+            val density = LocalDensity.current
+            // Lado da orbe em px: o conteúdo central (tempo/glifos) escala com o tamanho (slider Sobrepor).
+            val sidePx = minOf(constraints.maxWidth, constraints.maxHeight)
+                .takeIf { it in 1..(Int.MAX_VALUE / 2) } ?: DEFAULT_ORB_SIDE_PX
 
-        Canvas(Modifier.matchParentSize()) { drawOrb(timeMs, state) }
-        // Centro do estado. No modo-arrasto ele some conforme o alvo aparece (crossfade), pra não
-        // sobrepor — os glifos têm o mesmo tamanho/área, então só o ativo da vez fica visível.
-        val baseAlpha = dragHint?.let { (1f - it.centerAlpha).coerceIn(0f, 1f) } ?: 1f
-        Box(Modifier.matchParentSize().alpha(baseAlpha), contentAlignment = Alignment.Center) {
-            when (center) {
-                is OrbCenter.Time -> OrbTimeText(center.seconds, sidePx, density)
-                is OrbCenter.PauseGlyph -> GlyphWithTime(center.seconds, sidePx, density) { PauseGlyph(it) }
-                OrbCenter.ErrorGlyph -> ErrorGlyph(with(density) { (sidePx * GLYPH_FRACTION).toDp() })
-                is OrbCenter.CancelGlyph -> GlyphWithTime(center.seconds, sidePx, density) { CancelGlyph(it) }
-                OrbCenter.None -> Unit
+            Canvas(Modifier.matchParentSize()) { drawOrb(timeMs, state, style) }
+            // Centro do estado. No modo-arrasto ele some conforme o alvo aparece (crossfade), pra não
+            // sobrepor — os glifos têm o mesmo tamanho/área, então só o ativo da vez fica visível.
+            val baseAlpha = dragHint?.let { (1f - it.centerAlpha).coerceIn(0f, 1f) } ?: 1f
+            Box(Modifier.matchParentSize().alpha(baseAlpha), contentAlignment = Alignment.Center) {
+                when (center) {
+                    is OrbCenter.Time -> OrbTimeText(center.seconds, sidePx, density)
+                    is OrbCenter.PauseGlyph -> GlyphWithTime(center.seconds, sidePx, density) { PauseGlyph(it) }
+                    OrbCenter.ErrorGlyph -> ErrorGlyph(with(density) { (sidePx * GLYPH_FRACTION).toDp() })
+                    is OrbCenter.CancelGlyph -> GlyphWithTime(center.seconds, sidePx, density) { CancelGlyph(it) }
+                    OrbCenter.None -> Unit
+                }
             }
-        }
-        // Alvo do arrasto no centro (as setas ficam numa sobreposição separada, fora da janela da orbe).
-        dragHint?.centerKind?.let { kind ->
-            Box(
-                Modifier.matchParentSize().alpha(dragHint.centerAlpha.coerceIn(0f, 1f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                // Retomar = "estado ativo" → tempo grande (uniforme com gravando↔pause).
-                // Pausar/cancelar = glifo + tempo miúdo abaixo (mesmo formato do pause/cancelamento).
-                when (kind) {
-                    OrbDragKind.RESUME -> OrbTimeText(dragHint.seconds, sidePx, density)
-                    OrbDragKind.PAUSE -> GlyphWithTime(dragHint.seconds, sidePx, density) { PauseGlyph(it) }
-                    OrbDragKind.CANCEL -> GlyphWithTime(dragHint.seconds, sidePx, density) { CancelGlyph(it) }
-                    OrbDragKind.CONFIG -> GlyphWithTime(dragHint.seconds, sidePx, density) { GearGlyph(it) }
+            // Alvo do arrasto no centro (as setas ficam numa sobreposição separada, fora da janela da orbe).
+            dragHint?.centerKind?.let { kind ->
+                Box(
+                    Modifier.matchParentSize().alpha(dragHint.centerAlpha.coerceIn(0f, 1f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    // Retomar = "estado ativo" → tempo grande (uniforme com gravando↔pause).
+                    // Pausar/cancelar = glifo + tempo miúdo abaixo (mesmo formato do pause/cancelamento).
+                    when (kind) {
+                        OrbDragKind.RESUME -> OrbTimeText(dragHint.seconds, sidePx, density)
+                        OrbDragKind.PAUSE -> GlyphWithTime(dragHint.seconds, sidePx, density) { PauseGlyph(it) }
+                        OrbDragKind.CANCEL -> GlyphWithTime(dragHint.seconds, sidePx, density) { CancelGlyph(it) }
+                        OrbDragKind.CONFIG -> GlyphWithTime(dragHint.seconds, sidePx, density) { GearGlyph(it) }
+                    }
                 }
             }
         }
@@ -158,7 +192,7 @@ private const val SMALL_TIME_FONT_FRACTION = 0.135f
 private fun OrbTimeText(seconds: Int, sidePx: Int, density: Density) {
     Text(
         text = formatOrbTime(seconds),
-        color = CenterInk,
+        color = LocalCenterInk.current,
         fontFamily = SpaceMono,
         fontWeight = FontWeight.Bold,
         fontSize = with(density) { (sidePx * TIME_FONT_FRACTION).toSp() },
@@ -176,7 +210,7 @@ private fun GlyphWithTime(seconds: Int, sidePx: Int, density: Density, glyph: @C
         glyph(with(density) { (sidePx * PAUSED_GLYPH_FRACTION).toDp() })
         Text(
             text = formatOrbTime(seconds),
-            color = CenterInk,
+            color = LocalCenterInk.current,
             fontFamily = SpaceMono,
             fontWeight = FontWeight.Bold,
             fontSize = with(density) { (sidePx * SMALL_TIME_FONT_FRACTION).toSp() },
@@ -202,32 +236,34 @@ private fun rememberOrbClock(enabled: Boolean): Float {
 /** Glifo de engrenagem (abrir config) — alvo ↓ do modo-arrasto, no estilo dos glifos da orbe. */
 @Composable
 private fun GearGlyph(glyphSize: Dp) {
+    val ink = LocalCenterInk.current
     Canvas(Modifier.size(glyphSize)) {
         val c = Offset(size.width / 2f, size.height / 2f)
         val rOuter = size.minDimension * 0.34f
         val toothLen = size.minDimension * 0.13f
         val sw = size.minDimension * 0.11f
-        drawCircle(CenterInk, radius = rOuter, center = c, style = Stroke(width = sw))
+        drawCircle(ink, radius = rOuter, center = c, style = Stroke(width = sw))
         for (i in 0 until 8) {
             val ang = (TAU / 8f) * i
             val dir = Offset(cos(ang), sin(ang))
-            drawLine(CenterInk, c + dir * rOuter, c + dir * (rOuter + toothLen), strokeWidth = sw * 1.3f, cap = StrokeCap.Round)
+            drawLine(ink, c + dir * rOuter, c + dir * (rOuter + toothLen), strokeWidth = sw * 1.3f, cap = StrokeCap.Round)
         }
-        drawCircle(CenterInk, radius = size.minDimension * 0.12f, center = c)
+        drawCircle(ink, radius = size.minDimension * 0.12f, center = c)
     }
 }
 
 /** Glifo de pause (duas barras) desenhado no centro do orbe (ORB-02/REC-05). */
 @Composable
 private fun PauseGlyph(glyphSize: Dp) {
+    val ink = LocalCenterInk.current
     Canvas(Modifier.size(glyphSize)) {
         // Folga vertical (0.16..0.84) para ocupar a mesma área de play/lixeira.
         val barW = size.width * 0.26f
         val gap = size.width * 0.18f
         val top = size.height * 0.16f
         val barH = size.height * 0.68f
-        drawRect(CenterInk, topLeft = Offset(size.width / 2f - gap / 2f - barW, top), size = Size(barW, barH))
-        drawRect(CenterInk, topLeft = Offset(size.width / 2f + gap / 2f, top), size = Size(barW, barH))
+        drawRect(ink, topLeft = Offset(size.width / 2f - gap / 2f - barW, top), size = Size(barW, barH))
+        drawRect(ink, topLeft = Offset(size.width / 2f + gap / 2f, top), size = Size(barW, barH))
     }
 }
 
@@ -272,7 +308,11 @@ private fun CancelGlyph(glyphSize: Dp) {
     }
 }
 
-private fun DrawScope.drawOrb(t: Float, state: OrbState) {
+private fun DrawScope.drawOrb(t: Float, state: OrbState, style: OrbStyle = OrbStyle.ATELIE) {
+    if (style == OrbStyle.AERO) {
+        drawAeroOrb(t, state)
+        return
+    }
     val w = size.width
     val h = size.height
     val cx = w / 2f
@@ -305,6 +345,60 @@ private fun DrawScope.drawOrb(t: Float, state: OrbState) {
         radius = r * 0.16f,
         center = Offset(cx - r * 0.28f, cy - r * 0.32f),
         alpha = 0.30f,
+    )
+}
+
+/**
+ * Orbe Aero: o mesmo blob vivo de [drawOrb] (níveis e velocidades por estado), pintado como vidro — halo
+ * ciano, esfera azul com miolo claro, aro escuro fino, brilho elíptico na metade de cima e luz na base.
+ */
+private fun DrawScope.drawAeroOrb(t: Float, state: OrbState) {
+    val cx = size.width / 2f
+    val cy = size.height / 2f
+    val (amp, sp) = orbBaseParams(state)
+    val lvl = orbLevel(state, t)
+    val r = min(size.width, size.height) * 0.30f * (0.84f + 0.20f * lvl)
+
+    if (state == OrbState.Listening || state == OrbState.Paused) {
+        for (k in 0 until 3) {
+            val fr = ((t * 0.0006f) + (k / 3f)) % 1f
+            drawCircle(
+                color = AeroRing,
+                radius = r * (1.05f + fr * 0.95f),
+                center = Offset(cx, cy),
+                alpha = 0.30f * (1f - fr),
+                style = Stroke(width = 1.6f),
+            )
+        }
+    }
+
+    drawLayer(cx, cy, r * 1.14f, amp * 0.7f, t, sp * 0.8f, 5.0f, AeroGlowInner, AeroGlowOuter, 1f)
+    val body = blobPath(cx, cy, r, amp * lvl, t, sp, 2.0f)
+    drawPath(
+        body,
+        Brush.radialGradient(listOf(AeroMainInner, AeroMainOuter), center = Offset(cx - r * 0.2f, cy - r * 0.35f), radius = r * 1.3f),
+    )
+    drawLayer(cx, cy, r * 0.62f, amp * 0.7f, t, sp * 1.35f, 9.0f, AeroCoreInner, AeroCoreOuter, 0.85f)
+    // Luz que atravessa o vidro e acende a base.
+    drawOval(
+        Brush.radialGradient(
+            listOf(Color(0x80D8FBFF), Color(0x00D8FBFF)),
+            center = Offset(cx, cy + r * 0.62f),
+            radius = r * 0.7f,
+        ),
+        topLeft = Offset(cx - r * 0.62f, cy + r * 0.38f),
+        size = Size(r * 1.24f, r * 0.48f),
+    )
+    drawPath(body, AeroRim, style = Stroke(width = maxOf(1.2f, r * 0.03f)))
+    // O brilho do Aero: elipse clara na metade de cima, sumindo para baixo.
+    drawOval(
+        Brush.verticalGradient(
+            listOf(Color(0xD9FFFFFF), Color(0x1AFFFFFF)),
+            startY = cy - r * 0.92f,
+            endY = cy - r * 0.05f,
+        ),
+        topLeft = Offset(cx - r * 0.66f, cy - r * 0.92f),
+        size = Size(r * 1.32f, r * 0.84f),
     )
 }
 
