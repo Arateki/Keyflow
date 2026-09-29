@@ -9,6 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -102,12 +103,16 @@ class ConfigScreenTest {
         rule.setContent { h.Content() }
 
         rule.onNodeWithTag(panelTag(ConfigTab.MODO)).assertIsDisplayed()
+        // O cabeçalho fixo diz em que aba se está (o menu recolhido só mostra ícones).
+        rule.onNodeWithTag(HEADER_TAB_TITLE_TAG).assertTextEquals("Modo")
 
         rule.onNodeWithTag(tabTag(ConfigTab.VOZ)).performClick()
         rule.onNodeWithTag(panelTag(ConfigTab.VOZ)).assertIsDisplayed()
+        rule.onNodeWithTag(HEADER_TAB_TITLE_TAG).assertTextEquals("Transcrição")
 
         rule.onNodeWithTag(tabTag(ConfigTab.OVERLAY)).performClick()
         rule.onNodeWithTag(panelTag(ConfigTab.OVERLAY)).assertIsDisplayed()
+        rule.onNodeWithTag(HEADER_TAB_TITLE_TAG).assertTextEquals("Sobrepor")
     }
 
     @Test

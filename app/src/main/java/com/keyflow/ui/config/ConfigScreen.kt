@@ -37,6 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import com.keyflow.overlay.Haptics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.keyflow.core.OrbShortcutAction
@@ -58,6 +59,7 @@ fun panelTag(tab: ConfigTab): String = "panel-${tab.name.lowercase()}"
 
 const val LANG_TOGGLE_TAG = "lang-toggle"
 const val THEME_TOGGLE_TAG = "theme-toggle"
+const val HEADER_TAB_TITLE_TAG = "header-tab-title"
 const val TOGGLE_OVERLAY_MODE_TAG = "toggle-overlay-mode"
 const val TOGGLE_KEYBOARD_MODE_TAG = "toggle-keyboard-mode"
 
@@ -225,6 +227,7 @@ fun ConfigScreen(
         // sistema (status no topo, navegação embaixo) para não ser cortado/ocultado.
         Column(Modifier.fillMaxSize().systemBarsPadding()) {
             Header(
+                tabTitle = activeTab.label,
                 dark = palette.isDark,
                 onLanguageClick = onLanguageClick,
                 onThemeClick = { onThemeChange(!settings.themeDark) },
@@ -426,15 +429,25 @@ private fun MessageToast(
     }
 }
 
+/**
+ * Cabeçalho fixo: orbe + "KeyFlow" e a cápsula idioma/tema; na linha de baixo, centralizado e menor, o
+ * nome da aba aberta (pedido do Yan, 2026-09-28 — com o menu recolhido só em ícones, era o único jeito de
+ * saber onde se está sem abrir o menu). Fica fora da rolagem, como o resto do cabeçalho.
+ */
 @Composable
 private fun Header(
+    tabTitle: String,
     dark: Boolean,
     onLanguageClick: () -> Unit,
     onThemeClick: () -> Unit,
 ) {
     val palette = LocalKeyFlowPalette.current
+    // Compacto de propósito: a aba Modo precisa caber sem rolar no A32, e a linha do nome da aba
+    // custaria ~25dp lá (a fonte do app e a do sistema também a aumentam) — as folgas da linha de cima
+    // devolvem parte disso.
+    Column(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
     Row(
-        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 8.dp),
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         VoiceOrb(state = OrbState.Idle, modifier = Modifier.size(28.dp))
@@ -489,5 +502,18 @@ private fun Header(
                 KfIcon(if (dark) KfIcons.Sun else KfIcons.Moon, palette.fg2, Modifier.size(15.dp))
             }
         }
+    }
+    Text(
+        text = tabTitle,
+        color = palette.fg2,
+        fontFamily = SpaceGrotesk,
+        fontWeight = FontWeight.Medium,
+        fontSize = 11.5.sp,
+        lineHeight = 13.sp,
+        letterSpacing = 0.2.sp,
+        textAlign = TextAlign.Center,
+        maxLines = 1,
+        modifier = Modifier.fillMaxWidth().testTag(HEADER_TAB_TITLE_TAG),
+    )
     }
 }
