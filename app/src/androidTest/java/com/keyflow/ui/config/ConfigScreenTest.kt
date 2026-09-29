@@ -121,6 +121,27 @@ class ConfigScreenTest {
     }
 
     @Test
+    fun visionAndReasoningTabsSitNextToTranscriptionAndStartEmpty() {
+        // Abas novas (Yan, 2026-09-29): vizinhas da Transcrição, com o nome no cabeçalho e ainda sem conteúdo.
+        assertEquals(
+            listOf(ConfigTab.VOZ, ConfigTab.VISAO, ConfigTab.RACIOCINIO),
+            ConfigTab.entries.take(3),
+        )
+        val h = Harness()
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(tabTag(ConfigTab.VISAO)).performClick()
+        rule.onNodeWithTag(panelTag(ConfigTab.VISAO)).assertIsDisplayed()
+        rule.onNodeWithTag(HEADER_TAB_TITLE_TAG).assertTextEquals("Visão")
+        rule.onAllNodesWithTag(HEADER_TAB_HELP_TAG).assertCountEquals(0)
+
+        rule.onNodeWithTag(tabTag(ConfigTab.RACIOCINIO)).performClick()
+        rule.onNodeWithTag(panelTag(ConfigTab.RACIOCINIO)).assertIsDisplayed()
+        rule.onNodeWithTag(HEADER_TAB_TITLE_TAG).assertTextEquals("Raciocínio")
+        rule.onAllNodesWithTag(HEADER_TAB_HELP_TAG).assertCountEquals(0)
+    }
+
+    @Test
     fun headerHelpShowsTheTabSectionAndJumpsToItInTheDocs() {
         // "?" ao lado do nome da aba (Yan, 2026-09-28): a seção da Docs daquela aba, num modal, com atalho.
         val h = Harness()

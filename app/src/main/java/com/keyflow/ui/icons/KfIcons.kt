@@ -241,6 +241,43 @@ object KfIcons {
         ),
     )
 
+    /**
+     * Visão: um olho — o contorno em amêndoa, a íris e a pupila. A curva sobe e desce suave, como os
+     * outros ícones de aba (traço 1,6 no grid 24).
+     */
+    val TabVisao = KfIconSpec(
+        "tab-visao",
+        listOf(
+            "M2 12C4.4 8 7.9 5.75 12 5.75C16.1 5.75 19.6 8 22 12C19.6 16 16.1 18.25 12 18.25C7.9 18.25 4.4 16 2 12z",
+            circle(12f, 12f, 3.25f),
+        ),
+        fills = listOf(circle(12f, 12f, 1.25f)),
+    )
+
+    /**
+     * Raciocínio: um cérebro visto de cima — os dois hemisférios (contornos ondulados), a fissura no meio e
+     * as dobras de cada lado, espelhadas.
+     */
+    val TabRaciocinio = KfIconSpec(
+        "tab-raciocinio",
+        listOf(
+            // Hemisfério esquerdo e o direito, espelhado.
+            "M12 4.75C10.9 3.6 9 3.5 7.9 4.6C6.2 4.4 4.9 5.8 5 7.4C3.7 8 3.2 9.6 3.9 10.9C3.2 12.1 3.4 13.6 4.4 14.5" +
+                "C4.3 16.1 5.5 17.4 7 17.4C7.6 18.7 9.2 19.4 10.6 18.8C11.1 18.6 11.6 18.2 12 17.7",
+            "M12 4.75C13.1 3.6 15 3.5 16.1 4.6C17.8 4.4 19.1 5.8 19 7.4C20.3 8 20.8 9.6 20.1 10.9C20.8 12.1 20.6 13.6 19.6 14.5" +
+                "C19.7 16.1 18.5 17.4 17 17.4C16.4 18.7 14.8 19.4 13.4 18.8C12.9 18.6 12.4 18.2 12 17.7",
+            // A fissura entre os dois.
+            "M12 4.75V17.7",
+            // Dobras, um par de cada lado.
+            "M5 7.4C6.4 7.6 7.4 8.4 7.6 9.6",
+            "M3.9 10.9C5.2 11 6.4 11.8 6.7 13",
+            "M10.8 9.5C9.5 9.7 8.6 10.6 8.5 11.8",
+            "M19 7.4C17.6 7.6 16.6 8.4 16.4 9.6",
+            "M20.1 10.9C18.8 11 17.6 11.8 17.3 13",
+            "M13.2 9.5C14.5 9.7 15.4 10.6 15.5 11.8",
+        ),
+    )
+
     /** Todos os ícones — o teste de unidade confere nomes únicos e paths bem-formados. */
     /**
      * Sem limite ("∞" nos seletores de tempo da aba Transcrição): duas alças que se cruzam no centro. O
@@ -259,7 +296,7 @@ object KfIcons {
         Mic, Adjust, ChevronUp, ChevronDown, Return, Paste, Grid, Joystick,
         RecordDot, Pause, Play, Undo, Sending, Close, Trash, Hand,
         Check, Plus, ChevronRight, ChevronLeft, Lock, LockOpen, Globe, Moon, Sun,
-        TabModo, TabVoz, TabTeclado, TabSobrepor, TabDocs, Infinity,
+        TabModo, TabVoz, TabVisao, TabRaciocinio, TabTeclado, TabSobrepor, TabDocs, Infinity,
     )
 }
 
