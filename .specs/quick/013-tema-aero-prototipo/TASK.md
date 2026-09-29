@@ -9,7 +9,7 @@ Branch `feature/tema-aero`, a partir de `feature/app-layout-refinado`.
 
 ## Decisões
 
-- **O teclado pinta a própria paisagem; nada de ver o app por trás.** Atrás da janela do IME fica o que
+- **(Revertido na rodada 4: o teclado passou a ser translúcido de verdade.) O teclado pinta a própria paisagem; nada de ver o app por trás.** Atrás da janela do IME fica o que
   cada app desenha ali (quase sempre um fundo liso, às vezes texto cortado): pareceria defeito e a leitura
   das letras ficaria ao acaso. O desfoque entre janelas (Android 12+) depende do fabricante e, sobre um
   fundo branco, só dá cinza. Com paisagem própria, o resultado é igual em qualquer app e aparelho.
@@ -114,3 +114,32 @@ derruba os testes de painel por "Idling resource timed out" — as prévias de s
 
 Em aberto: as setas do arrasto (`DragArrowsView`) seguem teal no Aero; ver no A32 a legibilidade das letras
 sobre o reflexo ao sol e se a orbe de vidro se distingue em fundos muito claros.
+
+## Rodada 4 (2026-09-29, depois de o Yan ver a rodada 3 no A32)
+
+O Yan: a orbe Aero "ficou muito bom", mas "o teclado ainda está zoado". Pediu **transparência real**, "mesmo
+que isso nos faça arcar com o que o aplicativo desenha atrás" — "prefiro o efeito de vidro real ao que está ao
+fundo" — e **água dentro do vidro** na orbe.
+
+- **Reverte a decisão da rodada 1** ("nada de ver o app por trás"): a paisagem pintada (céu, sol, colinas,
+  bolhas, raios, nuvens, faixas, o bitmap desfocado) saiu. `KeyboardBackdrop` agora é uma **lâmina de vidro**
+  translúcida (`AeroGlassSheet`): tinta azul viva em degradê (mais densa embaixo), fio de luz na borda de cima e
+  o reflexo diagonal (`GlassSheen`, o mesmo das teclas, mais fraco). `FrostedBackdrop`/`FrostLocator` viraram
+  `GlassSheet`/`GlassSheetLocator`; `GlassPainter.useFrost` virou `useSheet` (só posiciona o reflexo).
+- **A janela do IME**: `Window.setBackgroundBlurRadius` (24dp) quando `windowBlurAvailable` — desfoque do
+  compositor, Android 12+ e só onde o fabricante liga. **O A32 (SM-A325M, One UI 5.1) tem
+  `mBlurEnabled=false`**: lá o app aparece nítido através do vidro, sem fosco. Por isso o vidro carrega cor
+  própria (azuis vivos: tinta escura sobre o branco do app dá cinza-azulado) e as teclas têm véu e halo nas
+  letras. A faixa da barra de navegação leva a tinta do fundo da lâmina (translúcida).
+- **Teclas**: a sombra por baixo escurecia o vidro agora translúcido (dava justamente o cinza): passou a ser
+  desenhada só **fora** da tecla (`clipPath` DIFFERENCE). Letras em vidro claro; teclas de função em azul mais
+  fundo; à noite, letras em ciano.
+- **Orbe: água dentro do vidro** (`drawAeroWater`): miolo líquido em dois tons (ciano na superfície, azul fundo
+  embaixo, ambos translúcidos), superfície ondulada que sobe com a voz (`aeroWaterFill`/`aeroWaveHeight`) e
+  rola de lado a lado, menisco claro, cáusticas e bolhinhas. Só a orbe Aero; a do Ateliê fica como estava.
+- **Verificação**: emulador `keyflow_api34` com o IME de verdade sobre o editor de contatos, app claro e escuro,
+  com e sem desfoque (`settings put global disable_window_blurs`); a galeria põe uma cena colorida de mentira
+  atrás do teclado (`BehindKeyboardScene`), sem desfoque — o que o A32 mostra.
+- Em aberto: ver no A32 como o vidro se comporta sobre os apps que o Yan usa (fundos lisos claros/escuros; nada
+  de desfoque lá); o Aero pago ou grátis; as setas do arrasto seguem teal.
+
