@@ -48,7 +48,6 @@ class TecladoPanelTest {
                 TecladoPanel(
                     settings = settings,
                     onSettingsChange = { settings = it },
-                    onLanguageClick = {},
                     onUnlockSkins = { unlockClicks++ },
                 )
             }
@@ -153,6 +152,17 @@ class TecladoPanelTest {
             "prévia deveria ficar centralizada no painel (esquerda=$leftPx px, direita=$rightPx px)",
             kotlin.math.abs(leftPx - rightPx) <= 1,
         )
+    }
+
+    @Test
+    fun keyboardLanguagePersistsAndDrivesThePreview() {
+        // A linha era um "pt-BR" fixo; o teclado já tinha inglês e espanhol pelo globo (Yan, 2026-09-28).
+        val h = Harness(Settings(keyboardLanguage = "pt"))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(keyboardLanguageTag("es")).performScrollTo().performClick()
+
+        rule.runOnIdle { assertEquals("es", h.settings.keyboardLanguage) }
     }
 
     @Test

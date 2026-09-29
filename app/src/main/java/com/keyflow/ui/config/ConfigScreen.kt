@@ -272,7 +272,6 @@ fun ConfigScreen(
                         ConfigTab.TECLADO -> TecladoPanel(
                             settings = settings,
                             onSettingsChange = onSettingsChange,
-                            onLanguageClick = onLanguageClick,
                             onUnlockSkins = { unlockOpen = true },
                             onOverlayRequired = onOverlayRequired,
                             barsConfig = barsConfig,

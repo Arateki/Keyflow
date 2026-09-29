@@ -40,6 +40,19 @@ import kotlin.math.roundToInt
 const val TECLADO_AUTO_PASTE_IN_FIELD_TAG = "teclado-auto-paste-in-field"
 const val TECLADO_AUTO_PASTE_ON_FOCUS_TAG = "teclado-auto-paste-on-focus"
 const val TECLADO_LANGUAGE_TAG = "teclado-language"
+
+/** Idiomas do teclado, na ordem do globo (`KeyFlowKeyboardService.LANGUAGE_CYCLE`). */
+private val KEYBOARD_LANGUAGES = listOf("pt", "en", "es")
+
+fun keyboardLanguageTag(language: String) = "teclado-language-$language"
+
+/** Nome do idioma no próprio idioma — o mesmo que aparece na barra de espaço. */
+private fun keyboardLanguageLabel(language: String): String = when (language) {
+    "pt" -> "Português"
+    "en" -> "English"
+    "es" -> "Español"
+    else -> language
+}
 const val TECLADO_UNLOCK_TAG = "teclado-unlock-skins"
 const val TECLADO_SIZE_PREVIEW_NOTE_TAG = "teclado-size-preview-note"
 const val TECLADO_SIZE_SLIDER_TAG = "teclado-size-slider"
@@ -57,14 +70,13 @@ var keyboardSizePreviewForTest: KeyFlowKeyboardView? = null
     private set
 
 /**
- * Aba Teclado (KBD config / SKIN-01): colar automaticamente, idioma do teclado (inerte nesta
- * fase) e a seção de Skins bloqueada. O teclado não tem modo de gravação (toque + seletor por hold no mic).
+ * Aba Teclado (KBD config / SKIN-01): colar automaticamente, idioma do teclado (o mesmo do globo) e a
+ * seção de Skins bloqueada. O teclado não tem modo de gravação (toque + seletor por hold no mic).
  */
 @Composable
 fun TecladoPanel(
     settings: Settings,
     onSettingsChange: (Settings) -> Unit,
-    onLanguageClick: () -> Unit,
     onUnlockSkins: () -> Unit,
     onOverlayRequired: () -> Unit = {},
     barsConfig: BarsConfig = BarsConfig.DEFAULT,
@@ -109,19 +121,17 @@ fun TecladoPanel(
         }
 
         SettingsGroup("Digitação") {
-            // Idioma do teclado — inerte nesta fase (i18n real = futuro).
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clickable { onLanguageClick() }
-                    .testTag(TECLADO_LANGUAGE_TAG)
-                    .padding(vertical = 18.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                SettingTitle("Idioma do teclado", Modifier.weight(1f))
-                Text("pt-BR", color = palette.muted, fontFamily = SpaceMono, fontWeight = FontWeight.Light, fontSize = 11.sp)
-                KfIcon(KfIcons.ChevronRight, palette.faint, Modifier.size(16.dp))
+            // Idioma do teclado: a mesma escolha que o globo alterna (layout, acentos e corretor). A linha era
+            // um "pt-BR" fixo de antes de o teclado ter inglês e espanhol (achado do Yan, 2026-09-28).
+            GroupItem("Idioma do teclado", "O mesmo que o globo do teclado alterna: letras, acentos e corretor.") {
+                Segmented(
+                    options = KEYBOARD_LANGUAGES,
+                    selected = settings.keyboardLanguage,
+                    label = ::keyboardLanguageLabel,
+                    tag = ::keyboardLanguageTag,
+                    onSelect = { onSettingsChange(settings.copy(keyboardLanguage = it)) },
+                    modifier = Modifier.padding(top = 14.dp).testTag(TECLADO_LANGUAGE_TAG),
+                )
             }
             GroupDivider()
             // Correção automática (Q9, pedido do Yan, 2026-09-28): desligada, a faixa segue sugerindo.
