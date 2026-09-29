@@ -9,6 +9,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.click
+import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -102,13 +106,14 @@ class ConfigScreenTest {
         val h = Harness().also { it.settings = Settings(overlayModeEnabled = true, keyboardModeEnabled = true) }
         rule.setContent { h.Content() }
 
-        rule.onNodeWithTag(panelTag(ConfigTab.MODO)).assertIsDisplayed()
-        // O cabeçalho fixo diz em que aba se está (o menu recolhido só mostra ícones).
-        rule.onNodeWithTag(HEADER_TAB_TITLE_TAG).assertTextEquals("Modo")
-
-        rule.onNodeWithTag(tabTag(ConfigTab.VOZ)).performClick()
+        // Sem a aba Modo (2026-09-28), a configuração abre na Transcrição.
         rule.onNodeWithTag(panelTag(ConfigTab.VOZ)).assertIsDisplayed()
+        // O cabeçalho fixo diz em que aba se está (o menu recolhido só mostra ícones).
         rule.onNodeWithTag(HEADER_TAB_TITLE_TAG).assertTextEquals("Transcrição")
+
+        rule.onNodeWithTag(tabTag(ConfigTab.TECLADO)).performClick()
+        rule.onNodeWithTag(panelTag(ConfigTab.TECLADO)).assertIsDisplayed()
+        rule.onNodeWithTag(HEADER_TAB_TITLE_TAG).assertTextEquals("Teclado")
 
         rule.onNodeWithTag(tabTag(ConfigTab.OVERLAY)).performClick()
         rule.onNodeWithTag(panelTag(ConfigTab.OVERLAY)).assertIsDisplayed()
@@ -122,9 +127,31 @@ class ConfigScreenTest {
 
         rule.onNodeWithTag(tabTag(ConfigTab.OVERLAY)).performClick()
 
-        // A aba navega normalmente, mas fica somente-leitura sob o scrim (não bloqueia mais o clique).
+        // A aba abre com o cartão do modo no topo, tocável; só o resto fica somente-leitura sob a camada.
         rule.onNodeWithTag(panelTag(ConfigTab.OVERLAY)).assertIsDisplayed()
-        rule.onNodeWithTag(READONLY_SCRIM_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(TOGGLE_OVERLAY_MODE_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(READONLY_SCRIM_TAG).assertExists()
+
+        rule.onNodeWithTag(TOGGLE_OVERLAY_MODE_TAG).performClick()
+        rule.runOnIdle { assertEquals(true, h.lastOverlayChange) }
+        rule.onAllNodesWithTag(READONLY_SCRIM_TAG).assertCountEquals(0)
+    }
+
+    @Test
+    fun tappingTheLockedRestExplainsAndPointsToTheModeCard() {
+        val h = Harness() // overlay desligado
+        rule.setContent { h.Content() }
+        rule.onNodeWithTag(tabTag(ConfigTab.OVERLAY)).performClick()
+
+        // Logo abaixo do cartão do modo começa a parte travada: o toque não mexe em nada, só explica. O
+        // relógio fica parado: andando sozinho, ele passaria dos 2,5 s do aviso antes da checagem.
+        rule.waitForIdle()
+        rule.mainClock.autoAdvance = false
+        rule.onNodeWithTag(READONLY_SCRIM_TAG).performTouchInput { click(Offset(width / 2f, 8f)) }
+        rule.mainClock.advanceTimeBy(FRAME_MS * 4)
+
+        rule.onNodeWithTag(MESSAGE_TOAST_TAG)
+            .assertTextContains("Ligue o Modo Sobrepor, no topo", substring = true)
     }
 
     @Test
@@ -138,28 +165,29 @@ class ConfigScreenTest {
 
         rule.runOnIdle { h.settings = h.settings.copy(overlayModeEnabled = false) }
 
-        // Modo desligado → continua na aba Overlay, mas agora somente-leitura (scrim aparece).
+        // Modo desligado → continua na aba Sobrepor; o resto (abaixo do cartão) fica somente-leitura.
         rule.onNodeWithTag(panelTag(ConfigTab.OVERLAY)).assertIsDisplayed()
-        rule.onNodeWithTag(READONLY_SCRIM_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(READONLY_SCRIM_TAG).assertExists()
     }
 
     @Test
     fun overlayModeToggleInvokesAutoSave() {
         val h = Harness()
         rule.setContent { h.Content() }
+        rule.onNodeWithTag(tabTag(ConfigTab.OVERLAY)).performClick()
 
         rule.onNodeWithTag(TOGGLE_OVERLAY_MODE_TAG).performClick()
 
         rule.runOnIdle { assertEquals(true, h.lastOverlayChange) }
-        // Aba Overlay agora liberada e selecionável.
-        rule.onNodeWithTag(tabTag(ConfigTab.OVERLAY)).performClick()
-        rule.onNodeWithTag(panelTag(ConfigTab.OVERLAY)).assertIsDisplayed()
+        // Aba Sobrepor agora liberada: nada mais sob a camada de somente-leitura.
+        rule.onAllNodesWithTag(READONLY_SCRIM_TAG).assertCountEquals(0)
     }
 
     @Test
     fun keyboardModeToggleInvokesAutoSave() {
         val h = Harness()
         rule.setContent { h.Content() }
+        rule.onNodeWithTag(tabTag(ConfigTab.TECLADO)).performClick()
 
         rule.onNodeWithTag(TOGGLE_KEYBOARD_MODE_TAG).performClick()
 
@@ -177,6 +205,7 @@ class ConfigScreenTest {
             it.permissions = allGranted.copy(overlayGranted = false, notificationsGranted = false)
         }
         rule.setContent { h.Content() }
+        rule.onNodeWithTag(tabTag(ConfigTab.OVERLAY)).performClick()
 
         rule.onNodeWithTag(TOGGLE_OVERLAY_MODE_TAG).performClick()
         advancePastAutoPermissionDelay()
@@ -198,6 +227,7 @@ class ConfigScreenTest {
     fun overlayModeToggleAutoRequestsNotificationsViaSameHandlerAsChip() {
         val h = Harness().also { it.permissions = allGranted.copy(notificationsGranted = false) }
         rule.setContent { h.Content() }
+        rule.onNodeWithTag(tabTag(ConfigTab.OVERLAY)).performClick()
 
         rule.onNodeWithTag(TOGGLE_OVERLAY_MODE_TAG).performClick()
         advancePastAutoPermissionDelay()
@@ -208,7 +238,7 @@ class ConfigScreenTest {
     /**
      * O pedido automático sai [AUTO_PERMISSION_DELAY_MS] depois do toggle, no relógio do Compose. Esperar
      * isso em tempo real (`waitUntil(2000)`) dependia de quantos quadros a máquina desenha por segundo: a
-     * aba Modo passou a ter dois tours animados e, num runner de CI de 2 núcleos, 2 s de relógio de parede
+     * aba Modo (hoje o cartão no topo de Sobrepor/Teclado) passou a ter tours animados e, num runner de CI de 2 núcleos, 2 s de relógio de parede
      * não chegavam a 400 ms de relógio de teste. Avançar o relógio de teste é igual em qualquer máquina.
      */
     private fun advancePastAutoPermissionDelay() {
@@ -220,6 +250,7 @@ class ConfigScreenTest {
     fun overlayModeToggleIgnoresMissingMicrophone() {
         val h = Harness().also { it.permissions = allGranted.copy(microphoneGranted = false) }
         rule.setContent { h.Content() }
+        rule.onNodeWithTag(tabTag(ConfigTab.OVERLAY)).performClick()
 
         rule.onNodeWithTag(TOGGLE_OVERLAY_MODE_TAG).performClick()
 

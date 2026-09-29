@@ -18,10 +18,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -43,7 +41,6 @@ import com.keyflow.core.RecordingMode
 import com.keyflow.data.Settings
 import com.keyflow.ime.KeyFlowKeyboardView
 import com.keyflow.ui.PermissionStatus
-import com.keyflow.ui.common.verticalScrollbar
 import com.keyflow.ui.orb.OrbCenter
 import com.keyflow.ui.orb.OrbState
 import com.keyflow.ui.orb.VoiceOrb
@@ -73,116 +70,116 @@ const val KEYBOARD_SWITCH_TAG = "keyboard-switch"
 const val MODO_TOUR_OVERLAY_TAG = "modo-tour-overlay"
 const val MODO_TOUR_KEYBOARD_TAG = "modo-tour-keyboard"
 
+/** Permissão de microfone: a mesma nos dois cartões (sincronizada, estado único). */
+private fun micPermission(permissions: PermissionStatus, onRequestMicPermission: () -> Unit) = CardPermission(
+    label = "Microfone",
+    granted = permissions.microphoneGranted,
+    onActivate = onRequestMicPermission,
+    activateTag = ACTIVATE_MIC_TAG,
+)
+
 /**
- * Aba Modo (CFG-06 / REC-07): permissão geral do microfone + cards Overlay/Keyboard. Cada card liga/
- * desliga o modo (afetando o gating das abas), mostra o chip da permissão específica (com "Ativar"
- * quando pendente), um placeholder de GIF estático e a dica de pausa contextual ao modo de gravação.
+ * Cartão do Modo Sobrepor (CFG-06 / REC-07): liga/desliga a orbe flutuante, mostra as permissões que ela
+ * precisa (com "Ativar" quando pendente) e o tour dos gestos. Primeiro cartão da aba Sobrepor desde que a
+ * aba Modo saiu (Yan, 2026-09-28) — é ele que destrava o resto da aba.
  */
 @Composable
-fun ModoPanel(
+fun OverlayModeCard(
     settings: Settings,
     permissions: PermissionStatus,
     onOverlayModeChange: (Boolean) -> Unit,
-    onKeyboardModeChange: (Boolean) -> Unit,
     onRequestOverlayPermission: () -> Unit,
-    onRequestKeyboardPermission: () -> Unit,
     onRequestMicPermission: () -> Unit,
     onRequestNotificationPermission: () -> Unit,
-    onSwitchKeyboard: () -> Unit,
-    modifier: Modifier = Modifier,
-    overlayHighlightKey: Int = 0,
-    keyboardHighlightKey: Int = 0,
+    highlightKey: Int = 0,
 ) {
-    // Permissão de microfone, repetida e sincronizada nos dois cards (mesmo estado).
-    val micPermission = CardPermission(
-        label = "Microfone",
-        granted = permissions.microphoneGranted,
-        onActivate = onRequestMicPermission,
-        activateTag = ACTIVATE_MIC_TAG,
+    ModeCard(
+        title = "Modo Sobrepor",
+        checked = settings.overlayModeEnabled,
+        onCheckedChange = onOverlayModeChange,
+        toggleTag = TOGGLE_OVERLAY_MODE_TAG,
+        highlightKey = highlightKey,
+        permissions = listOf(
+            micPermission(permissions, onRequestMicPermission),
+            CardPermission(
+                label = "Sobrepor",
+                granted = permissions.overlayGranted,
+                onActivate = onRequestOverlayPermission,
+                activateTag = ACTIVATE_OVERLAY_TAG,
+            ),
+            CardPermission(
+                label = "Notificações",
+                granted = permissions.notificationsGranted,
+                onActivate = onRequestNotificationPermission,
+                activateTag = ACTIVATE_NOTIFICATION_TAG,
+            ),
+        ),
+        features = listOf(
+            "Transcreva voz para texto em qualquer situação para sua área de transferência.",
+        ),
+        // Tour dos gestos da orbe (MODO-01). `remember` pelos campos que os roteiros consultam:
+        // mudou o modo ou um atalho, a lista se refaz e o tour recomeça já correto (SCR-07).
+        tourTag = MODO_TOUR_OVERLAY_TAG,
+        tourScripts = remember(
+            settings.overlayRecordingMode,
+            settings.shortcut1Tap,
+            settings.shortcut2Tap,
+            settings.shortcut3Tap,
+        ) { buildOrbScripts(settings) },
+        tourScene = { frame -> OrbScene(frame, Modifier.fillMaxWidth()) },
     )
-    val scroll = rememberScrollState()
-    val scrollbarColor = LocalKeyFlowPalette.current.muted.copy(alpha = 0.25f)
-    Column(
-        modifier
-            .fillMaxWidth()
-            .verticalScrollbar(scroll, scrollbarColor, rightBleed = 9.dp)
-            .verticalScroll(scroll)
-            .padding(top = 10.dp, bottom = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        ModeCard(
-            title = "Modo Sobrepor",
-            checked = settings.overlayModeEnabled,
-            onCheckedChange = onOverlayModeChange,
-            toggleTag = TOGGLE_OVERLAY_MODE_TAG,
-            highlightKey = overlayHighlightKey,
-            permissions = listOf(
-                micPermission,
-                CardPermission(
-                    label = "Sobrepor",
-                    granted = permissions.overlayGranted,
-                    onActivate = onRequestOverlayPermission,
-                    activateTag = ACTIVATE_OVERLAY_TAG,
-                ),
-                CardPermission(
-                    label = "Notificações",
-                    granted = permissions.notificationsGranted,
-                    onActivate = onRequestNotificationPermission,
-                    activateTag = ACTIVATE_NOTIFICATION_TAG,
-                ),
-            ),
-            features = listOf(
-                "Transcreva voz para texto em qualquer situação para sua área de transferência.",
-            ),
-            // Tour dos gestos da orbe (MODO-01). `remember` pelos campos que os roteiros consultam:
-            // mudou o modo ou um atalho, a lista se refaz e o tour recomeça já correto (SCR-07).
-            tourTag = MODO_TOUR_OVERLAY_TAG,
-            tourScripts = remember(
-                settings.overlayRecordingMode,
-                settings.shortcut1Tap,
-                settings.shortcut2Tap,
-                settings.shortcut3Tap,
-            ) { buildOrbScripts(settings) },
-            tourScene = { frame -> OrbScene(frame, Modifier.fillMaxWidth()) },
-        )
+}
 
-        ModeCard(
-            title = "Modo Teclado",
-            checked = settings.keyboardModeEnabled,
-            onCheckedChange = onKeyboardModeChange,
-            toggleTag = TOGGLE_KEYBOARD_MODE_TAG,
-            highlightKey = keyboardHighlightKey,
-            permissions = listOf(
-                micPermission,
-                CardPermission(
-                    label = "Teclado",
-                    granted = permissions.keyboardEnabled,
-                    onActivate = onRequestKeyboardPermission,
-                    activateTag = ACTIVATE_KEYBOARD_TAG,
-                ),
+/**
+ * Cartão do Modo Teclado: liga/desliga o KeyFlow como teclado, mostra as permissões, se ele é o teclado
+ * ativo e o tour dos gestos. Primeiro cartão da aba Teclado desde que a aba Modo saiu (Yan, 2026-09-28).
+ */
+@Composable
+fun KeyboardModeCard(
+    settings: Settings,
+    permissions: PermissionStatus,
+    onKeyboardModeChange: (Boolean) -> Unit,
+    onRequestKeyboardPermission: () -> Unit,
+    onRequestMicPermission: () -> Unit,
+    onSwitchKeyboard: () -> Unit,
+    highlightKey: Int = 0,
+) {
+    ModeCard(
+        title = "Modo Teclado",
+        checked = settings.keyboardModeEnabled,
+        onCheckedChange = onKeyboardModeChange,
+        toggleTag = TOGGLE_KEYBOARD_MODE_TAG,
+        highlightKey = highlightKey,
+        permissions = listOf(
+            micPermission(permissions, onRequestMicPermission),
+            CardPermission(
+                label = "Teclado",
+                granted = permissions.keyboardEnabled,
+                onActivate = onRequestKeyboardPermission,
+                activateTag = ACTIVATE_KEYBOARD_TAG,
             ),
-            features = listOf(
-                "Cole a transcrição de voz automaticamente.",
-                "Personalize em estilo e funcionalidade.",
-            ),
-            footer = if (permissions.keyboardEnabled) {
-                {
-                    KeyboardActiveLine(
-                        active = permissions.keyboardActive,
-                        modeOn = settings.keyboardModeEnabled,
-                        onSwitch = onSwitchKeyboard,
-                    )
-                }
-            } else {
-                null
-            },
-            // Tour dos gestos do teclado (MODO-01/04): a cena usa a grade Canvas real, em vez da
-            // demo parada que ficou anos mostrando a grade antiga.
-            tourTag = MODO_TOUR_KEYBOARD_TAG,
-            tourScripts = remember { buildKeyboardScripts(settings) },
-            tourScene = { frame -> KeyboardScene(frame, Modifier.fillMaxWidth()) },
-        )
-    }
+        ),
+        features = listOf(
+            "Cole a transcrição de voz automaticamente.",
+            "Personalize em estilo e funcionalidade.",
+        ),
+        footer = if (permissions.keyboardEnabled) {
+            {
+                KeyboardActiveLine(
+                    active = permissions.keyboardActive,
+                    modeOn = settings.keyboardModeEnabled,
+                    onSwitch = onSwitchKeyboard,
+                )
+            }
+        } else {
+            null
+        },
+        // Tour dos gestos do teclado (MODO-01/04): a cena usa a grade Canvas real, em vez da
+        // demo parada que ficou anos mostrando a grade antiga.
+        tourTag = MODO_TOUR_KEYBOARD_TAG,
+        tourScripts = remember { buildKeyboardScripts(settings) },
+        tourScene = { frame -> KeyboardScene(frame, Modifier.fillMaxWidth()) },
+    )
 }
 
 /**

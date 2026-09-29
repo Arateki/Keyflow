@@ -432,7 +432,7 @@ class OverlayCoordinator(
 
     private fun startRecording() {
         if (!microphoneGranted()) {
-            onError("Conceda permissão de microfone para usar essa função.", ErrorNavTarget.MODO_MIC)
+            onError("Conceda permissão de microfone para usar essa função.", ErrorNavTarget.MIC)
             handleState(machine.onTranscriptionError())
             return
         }
@@ -452,7 +452,7 @@ class OverlayCoordinator(
                 endPartial()
                 // Rede de segurança: se a checagem proativa passou mas o recorder nativo ainda assim
                 // falhou por permissão (ex.: revogada bem no meio), não perde a mensagem certa.
-                val target = if (!microphoneGranted()) ErrorNavTarget.MODO_MIC else ErrorNavTarget.NONE
+                val target = if (!microphoneGranted()) ErrorNavTarget.MIC else ErrorNavTarget.NONE
                 onError("Falha ao iniciar a gravação.", target)
                 handleState(machine.onTranscriptionError())
             }

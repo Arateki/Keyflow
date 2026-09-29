@@ -16,6 +16,8 @@ import androidx.test.rule.GrantPermissionRule
 import com.keyflow.data.SettingsRepository
 import com.keyflow.overlay.OverlayService
 import com.keyflow.ui.config.TOGGLE_OVERLAY_MODE_TAG
+import com.keyflow.ui.config.tabTag
+import com.keyflow.ui.config.ConfigTab
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -120,9 +122,15 @@ class SetupActivityTest {
      */
     private fun awaitToggle() {
         var pumps = 0
+        var tabOpened = false
         while (compose.onAllNodesWithTag(TOGGLE_OVERLAY_MODE_TAG).fetchSemanticsNodes().isEmpty()) {
             if (pumps++ >= 150) {
                 throw AssertionError("toggle não apareceu; árvore:\n" + compose.onRoot().printToString())
+            }
+            // O interruptor mora no topo da aba Sobrepor desde que a aba Modo saiu (2026-09-28).
+            if (!tabOpened && compose.onAllNodesWithTag(tabTag(ConfigTab.OVERLAY)).fetchSemanticsNodes().isNotEmpty()) {
+                compose.onNodeWithTag(tabTag(ConfigTab.OVERLAY)).performClick()
+                tabOpened = true
             }
             compose.mainClock.advanceTimeBy(100)
         }

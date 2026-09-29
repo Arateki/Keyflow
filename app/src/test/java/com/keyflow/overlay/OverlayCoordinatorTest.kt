@@ -56,7 +56,7 @@ class OverlayCoordinatorTest {
 
     /**
      * Checagem proativa (Yan, 2026-07-04): sem RECORD_AUDIO, nem tenta `recorder.start()` — vai direto
-     * pro erro certo, com [ErrorNavTarget.MODO_MIC] (antes só descobria a falta quando o recorder nativo
+     * pro erro certo, com [ErrorNavTarget.MIC] (antes só descobria a falta quando o recorder nativo
      * já tinha explodido, com uma mensagem genérica sem destino de navegação nenhum).
      */
     @Test
@@ -80,7 +80,7 @@ class OverlayCoordinatorTest {
 
         assertThat(recorder.started).isEqualTo(0)
         assertThat(renderedStates.last()).isEqualTo(ButtonState.ERROR)
-        assertThat(lastTarget).isEqualTo(com.keyflow.core.ErrorNavTarget.MODO_MIC)
+        assertThat(lastTarget).isEqualTo(com.keyflow.core.ErrorNavTarget.MIC)
         assertThat(lastMessage).isEqualTo("Conceda permissão de microfone para usar essa função.")
     }
 

@@ -295,9 +295,9 @@ class KeyFlowKeyboardService : InputMethodService() {
             onExpand = { preferExpanded = true },
             onErrorTap = {
                 val intent = if (com.keyflow.core.KeyFlowController.errorNavTarget ==
-                    com.keyflow.core.ErrorNavTarget.MODO_MIC
+                    com.keyflow.core.ErrorNavTarget.MIC
                 ) {
-                    com.keyflow.ui.SetupActivity.openAtModoMicIntent(this)
+                    com.keyflow.ui.SetupActivity.openAtMicIntent(this, com.keyflow.ui.config.ConfigTab.TECLADO)
                 } else {
                     com.keyflow.ui.SetupActivity.openAtVozIntent(this)
                 }

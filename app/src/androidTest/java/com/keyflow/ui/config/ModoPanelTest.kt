@@ -19,7 +19,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Testes da aba Modo (T11 / CFG-06; chip redesenhado na Fase 2 de gestos): o chip de permissão é
+ * Testes dos cartões de modo (antiga aba Modo, T11 / CFG-06; chip redesenhado na Fase 2 de gestos): o chip de permissão é
  * sempre visível (rótulo CONCEDIDO/PENDENTE) e também é o botão de ativar; os toggles de modo
  * ligam/desligam (auto-save via callback).
  */
@@ -47,7 +47,7 @@ class ModoPanelTest {
         rule.setContent {
             KeyFlowTheme(dark = false) {
                 CompositionLocalProvider(LocalOrbClock provides { 0f }, LocalTourClock provides { 0f }) {
-                    ModoPanel(
+                    ModeCards(
                         settings = Settings(keyboardModeEnabled = true),
                         permissions = perms(keyboard = false),
                         onOverlayModeChange = {},
@@ -71,7 +71,7 @@ class ModoPanelTest {
         rule.setContent {
             KeyFlowTheme(dark = false) {
                 CompositionLocalProvider(LocalOrbClock provides { 0f }, LocalTourClock provides { 0f }) {
-                    ModoPanel(
+                    ModeCards(
                         settings = Settings(),
                         permissions = perms(overlay = true),
                         onOverlayModeChange = {},
@@ -96,7 +96,7 @@ class ModoPanelTest {
         rule.setContent {
             KeyFlowTheme(dark = false) {
                 CompositionLocalProvider(LocalOrbClock provides { 0f }, LocalTourClock provides { 0f }) {
-                    ModoPanel(
+                    ModeCards(
                         settings = Settings(),
                         permissions = perms(notifications = false),
                         onOverlayModeChange = {},
@@ -127,7 +127,7 @@ class ModoPanelTest {
         rule.setContent {
             KeyFlowTheme(dark = false) {
                 CompositionLocalProvider(LocalOrbClock provides { 0f }, LocalTourClock provides { 0f }) {
-                    ModoPanel(
+                    ModeCards(
                         settings = Settings(overlayModeEnabled = true),
                         permissions = perms(mic = false),
                         onOverlayModeChange = {},
@@ -156,7 +156,7 @@ class ModoPanelTest {
         rule.setContent {
             KeyFlowTheme(dark = false) {
                 CompositionLocalProvider(LocalOrbClock provides { 0f }, LocalTourClock provides { 0f }) {
-                    ModoPanel(
+                    ModeCards(
                         settings = Settings(),
                         permissions = perms(),
                         onOverlayModeChange = { overlayChange = it },

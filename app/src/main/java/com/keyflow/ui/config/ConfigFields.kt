@@ -8,9 +8,11 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -51,6 +53,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.vector.PathParser
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
@@ -274,6 +277,37 @@ internal fun HelpButton(description: String, tag: String, onClick: () -> Unit, m
         }
     }
 }
+
+/**
+ * O resto de uma aba de interface (Teclado/Sobrepor) abaixo do cartão do modo: travado, fica esmaecido e
+ * uma camada por cima barra os controles — o toque avisa por quê ([onLockedTap]), e arrastar continua
+ * rolando a aba (o toque não é consumido pela camada, só o dos controles embaixo dela).
+ */
+@Composable
+internal fun LockedSection(
+    locked: Boolean,
+    onLockedTap: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Box(Modifier.fillMaxWidth()) {
+        Column(
+            Modifier.fillMaxWidth().then(if (locked) Modifier.alpha(LOCKED_ALPHA) else Modifier),
+            verticalArrangement = Arrangement.spacedBy(GROUP_GAP),
+            content = content,
+        )
+        if (locked) {
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .testTag(READONLY_SCRIM_TAG)
+                    .pointerInput(onLockedTap) { detectTapGestures(onTap = { onLockedTap() }) },
+            )
+        }
+    }
+}
+
+/** Esmaecido do conteúdo travado — o mesmo que a aba inteira usava antes. */
+private const val LOCKED_ALPHA = 0.45f
 
 /** Papel quente do knob do interruptor e da tinta sobre acentos — igual nos dois temas. */
 internal val PaperWarm = Color(0xFFF4ECCF)

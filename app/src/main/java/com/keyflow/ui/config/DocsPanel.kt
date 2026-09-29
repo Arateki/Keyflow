@@ -157,7 +157,7 @@ val docsSections: List<DocSection> = listOf(
         "gestos",
         "Gestos da orbe",
         listOf(
-            DocBlock.Paragraph("O toque na orbe depende do modo de gravação escolhido na aba Modo:"),
+            DocBlock.Paragraph("O toque na orbe depende do modo de gravação escolhido na aba Sobrepor:"),
             DocBlock.Labeled("Alternar", pauseHintFor(RecordingMode.TOGGLE)),
             DocBlock.Labeled("Push-to-talk", pauseHintFor(RecordingMode.PUSH_TO_TALK)),
             DocBlock.Paragraph(
@@ -243,7 +243,7 @@ val docsSections: List<DocSection> = listOf(
                 "Quando algo falha, a orbe e o mic do teclado mostram ✖ por 2 segundos, junto com o motivo. Aquela gravação não é reenviada — é só gravar de novo.",
             ),
             DocBlock.Labeled("Token ou origem", "tocar no ✖ (ou no aviso) abre a aba Transcrição para corrigir."),
-            DocBlock.Labeled("Microfone", "tocar leva à aba Modo, onde a permissão pendente pisca."),
+            DocBlock.Labeled("Microfone", "tocar leva à aba da interface que avisou (Sobrepor ou Teclado), onde a permissão pendente pisca no cartão do modo."),
             DocBlock.Labeled(
                 "Tempo esgotado",
                 "a origem de voz não respondeu dentro do tempo limite de resposta (aba Transcrição, 15s de fábrica). Em rede lenta ou áudios longos, aumente o prazo.",

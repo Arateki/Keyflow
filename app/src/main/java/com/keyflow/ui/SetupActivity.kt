@@ -280,11 +280,12 @@ class SetupActivity : ComponentActivity() {
         handleNavIntent(intent)
     }
 
-    /** Lê extras de navegação: pular para a aba Voz ou Modo (clique num erro clicável). */
+    /** Lê extras de navegação: pular para a aba Transcrição, Sobrepor ou Teclado (clique num erro clicável). */
     private fun handleNavIntent(intent: Intent?) {
         val tab = when (intent?.getStringExtra(EXTRA_NAV)) {
             NAV_TAB_VOZ -> ConfigTab.VOZ
-            NAV_TAB_MODO_MIC -> ConfigTab.MODO
+            NAV_TAB_OVERLAY_MIC -> ConfigTab.OVERLAY
+            NAV_TAB_KEYBOARD_MIC -> ConfigTab.TECLADO
             else -> null
         } ?: return
         requestedTab = tab
@@ -673,14 +674,21 @@ class SetupActivity : ComponentActivity() {
     companion object {
         private const val EXTRA_NAV = "com.keyflow.nav"
         private const val NAV_TAB_VOZ = "tab_voz"
-        private const val NAV_TAB_MODO_MIC = "tab_modo_mic"
+        private const val NAV_TAB_OVERLAY_MIC = "tab_overlay_mic"
+        private const val NAV_TAB_KEYBOARD_MIC = "tab_keyboard_mic"
 
         /** Abre o app já na aba Voz (clique no estado de erro resolvível lá — config/token). */
         fun openAtVozIntent(context: android.content.Context): Intent =
             Intent(context, SetupActivity::class.java).putExtra(EXTRA_NAV, NAV_TAB_VOZ)
 
-        /** Abre o app já na aba Modo (clique no erro de microfone pendente — orbe/teclado/notificação). */
-        fun openAtModoMicIntent(context: android.content.Context): Intent =
-            Intent(context, SetupActivity::class.java).putExtra(EXTRA_NAV, NAV_TAB_MODO_MIC)
+        /**
+         * Abre o app na aba da interface que avisou da falta de microfone ([ConfigTab.OVERLAY] pela orbe,
+         * [ConfigTab.TECLADO] pelo teclado), já no cartão do modo, onde o chip do microfone pulsa.
+         */
+        fun openAtMicIntent(context: android.content.Context, tab: ConfigTab): Intent =
+            Intent(context, SetupActivity::class.java).putExtra(
+                EXTRA_NAV,
+                if (tab == ConfigTab.TECLADO) NAV_TAB_KEYBOARD_MIC else NAV_TAB_OVERLAY_MIC,
+            )
     }
 }

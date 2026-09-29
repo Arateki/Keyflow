@@ -29,10 +29,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import com.keyflow.overlay.Haptics
@@ -70,10 +67,11 @@ internal const val AUTO_PERMISSION_DELAY_MS = 400L
 
 /**
  * Scaffold da configuração em abas (CFG-01..05): header (orbe, idioma inerte,
- * tema) + [NavRail] lateral com gating + painel da aba ativa + [SaveToast]. A aba ativa é estado interno;
- * se o modo que libera a aba ativa for desligado, volta para [ConfigTab.MODO] (CFG-02).
+ * tema) + [NavRail] lateral + painel da aba ativa + [SaveToast]. A aba ativa é estado interno.
  *
- * Aba Modo: [ModoPanel] (T11). Demais abas: placeholders até T12–T16.
+ * Teclado e Sobrepor abrem com o cartão do próprio modo no topo ([KeyboardModeCard]/[OverlayModeCard] —
+ * a aba Modo saiu, Yan, 2026-09-28); sem o modo pronto, o resto da aba fica só para leitura
+ * ([LockedSection]) e o toque explica por quê.
  */
 @Composable
 fun ConfigScreen(
@@ -95,7 +93,7 @@ fun ConfigScreen(
     shortcutGrids: List<ShortcutGrid> = emptyList(),
     onShortcutGridsChange: (List<ShortcutGrid>) -> Unit = {},
     modifier: Modifier = Modifier,
-    initialTab: ConfigTab = ConfigTab.MODO,
+    initialTab: ConfigTab = ConfigTab.VOZ,
     initialUnlockOpen: Boolean = false,
     initialRailExpanded: Boolean = false,
     requestedTab: ConfigTab? = null,
@@ -111,14 +109,9 @@ fun ConfigScreen(
     // Atalho da orbe com o bottom sheet aberto (2 ou 3 toques); null = fechado.
     var shortcutSheetTaps by remember { mutableStateOf<Int?>(null) }
 
-    // Navegação externa (clique no erro → Voz). A chave dispara mesmo repetindo a mesma aba.
-    LaunchedEffect(requestedTabKey) {
-        if (requestedTabKey > 0) requestedTab?.let { activeTab = it }
-    }
-
     // A aba de um modo só fica "liberada" com o modo ligado E tudo pronto: permissões concedidas (mic +
-    // a específica) e, para o Teclado, o KeyFlow sendo o teclado ativo. Sem isso a aba abre, mas em
-    // modo somente-leitura (camada por cima) — ver o scrim mais abaixo.
+    // a específica) e, para o Teclado, o KeyFlow sendo o teclado ativo. Sem isso o cartão do modo segue
+    // tocável no topo e o resto da aba fica só para leitura (LockedSection).
     val enabled: (ConfigTab) -> Boolean = { tab ->
         when (tab) {
             // O Modo Teclado espelha o teclado ativo (keyboardActive), então gateamos por ele direto.
@@ -129,7 +122,6 @@ fun ConfigScreen(
             else -> true
         }
     }
-    val activeEnabled = enabled(activeTab)
 
     // Toast discreto em Compose com duração configurável (aba travada = 1,5 s; aviso de modo = 2 s).
     var toastMessage by remember { mutableStateOf<String?>(null) }
@@ -137,7 +129,8 @@ fun ConfigScreen(
     var toastGeneration by remember { mutableStateOf(0) }
     // Ação opcional do toast: torna a mensagem clicável e leva à opção que resolve o aviso.
     var toastAction by remember { mutableStateOf<(() -> Unit)?>(null) }
-    // Pulso de destaque discreto nos cards da aba Modo (insight visual ao navegar do aviso).
+    // Pulso de destaque discreto no cartão do modo (insight visual ao chegar de um aviso); a aba também
+    // sobe até ele.
     var overlayHighlightKey by remember { mutableStateOf(0) }
     var keyboardHighlightKey by remember { mutableStateOf(0) }
     // Realce do seletor de Modo de gravação (aviso do atalho de 1 toque → leva à subárea responsável).
@@ -172,31 +165,38 @@ fun ConfigScreen(
         pendingPermissionGeneration++
     }
 
-    // Navegação do aviso → aba Modo, destacando o card do modo que resolve o bloqueio. Null = sem atalho.
+    // Navegação do aviso → aba da interface, no topo, destacando o cartão do modo que resolve o bloqueio.
+    // Null = sem atalho.
     fun navActionFor(tab: ConfigTab): (() -> Unit)? = when (tab) {
         ConfigTab.OVERLAY -> {
-            { activeTab = ConfigTab.MODO; overlayHighlightKey++ }
+            { activeTab = ConfigTab.OVERLAY; overlayHighlightKey++ }
         }
         ConfigTab.TECLADO -> {
-            { activeTab = ConfigTab.MODO; keyboardHighlightKey++ }
+            { activeTab = ConfigTab.TECLADO; keyboardHighlightKey++ }
         }
         else -> null
     }
 
-    // Aviso de opção que depende do Modo Sobrepor: clicar leva à aba Modo e destaca o card do modo.
+    // Navegação externa (clique no erro → Transcrição, ou falta de microfone → aba da interface que avisou,
+    // já no cartão do modo). A chave dispara mesmo repetindo a mesma aba.
+    LaunchedEffect(requestedTabKey) {
+        if (requestedTabKey > 0) requestedTab?.let { tab -> navActionFor(tab)?.invoke() ?: run { activeTab = tab } }
+    }
+
+    // Aviso de opção que depende do Modo Sobrepor: clicar leva à aba Sobrepor e destaca o cartão do modo.
     val onOverlayRequired: () -> Unit = {
         showToast("Disponível só com o Modo Sobrepor ligado.", 2500, action = navActionFor(ConfigTab.OVERLAY))
     }
     fun blockReason(tab: ConfigTab): String? = when (tab) {
         ConfigTab.TECLADO -> when {
             !permissions.microphoneGranted || !permissions.keyboardEnabled ->
-                "Conceda as permissões do Modo Teclado para editar esta aba."
-            !permissions.keyboardActive -> "Ative o KeyFlow como teclado (ligue o Modo Teclado) para editar esta aba."
+                "Conceda as permissões do Modo Teclado, no topo, para editar o resto da aba."
+            !permissions.keyboardActive -> "Ative o KeyFlow como teclado (ligue o Modo Teclado, no topo) para editar o resto da aba."
             else -> null
         }
         ConfigTab.OVERLAY -> when {
-            !settings.overlayModeEnabled -> "Ligue o Modo Sobrepor para editar esta aba."
-            else -> "Conceda as permissões do Modo Sobrepor para editar esta aba."
+            !settings.overlayModeEnabled -> "Ligue o Modo Sobrepor, no topo, para editar o resto da aba."
+            else -> "Conceda as permissões do Modo Sobrepor, no topo, para editar o resto da aba."
         }
         else -> null
     }
@@ -244,25 +244,14 @@ fun ConfigScreen(
                 Column(
                     Modifier
                         .fillMaxSize()
-                        // Aba travada: conteúdo esmaecido (somente-leitura), sob a camada incolor abaixo.
-                        .then(if (activeEnabled) Modifier else Modifier.alpha(0.45f))
                         .padding(start = 16.dp, end = 16.dp)
                         .testTag(panelTag(activeTab)),
                 ) {
+                    // Toque no que está travado: explica e leva ao cartão do modo, no topo da mesma aba.
+                    fun lockedTap(tab: ConfigTab): () -> Unit = {
+                        blockReason(tab)?.let { showToast(it, 2500, navActionFor(tab)) }
+                    }
                     when (activeTab) {
-                        ConfigTab.MODO -> ModoPanel(
-                            settings = settings,
-                            permissions = permissions,
-                            onOverlayModeChange = handleOverlayMode,
-                            onKeyboardModeChange = handleKeyboardMode,
-                            onRequestOverlayPermission = onRequestOverlayPermission,
-                            onRequestKeyboardPermission = onRequestKeyboardPermission,
-                            onRequestMicPermission = onRequestMicPermission,
-                            onRequestNotificationPermission = onRequestNotificationPermission,
-                            onSwitchKeyboard = onSwitchKeyboard,
-                            overlayHighlightKey = overlayHighlightKey,
-                            keyboardHighlightKey = keyboardHighlightKey,
-                        )
                         ConfigTab.VOZ -> VozPanel(
                             settings = settings,
                             onSettingsChange = onSettingsChange,
@@ -278,6 +267,20 @@ fun ConfigScreen(
                             onBarsConfigChange = onBarsConfigChange,
                             shortcutGrids = shortcutGrids,
                             onShortcutGridsChange = onShortcutGridsChange,
+                            modeCard = {
+                                KeyboardModeCard(
+                                    settings = settings,
+                                    permissions = permissions,
+                                    onKeyboardModeChange = handleKeyboardMode,
+                                    onRequestKeyboardPermission = onRequestKeyboardPermission,
+                                    onRequestMicPermission = onRequestMicPermission,
+                                    onSwitchKeyboard = onSwitchKeyboard,
+                                    highlightKey = keyboardHighlightKey,
+                                )
+                            },
+                            locked = !enabled(ConfigTab.TECLADO),
+                            onLockedTap = lockedTap(ConfigTab.TECLADO),
+                            modeCardFocusKey = keyboardHighlightKey,
                         )
                         ConfigTab.OVERLAY -> OverlayPanel(
                             settings = settings,
@@ -293,40 +296,32 @@ fun ConfigScreen(
                             },
                             recordingModeHighlightKey = recordingModeHighlightKey,
                             keyboardShortcutAvailable = permissions.keyboardActive,
+                            modeCard = {
+                                OverlayModeCard(
+                                    settings = settings,
+                                    permissions = permissions,
+                                    onOverlayModeChange = handleOverlayMode,
+                                    onRequestOverlayPermission = onRequestOverlayPermission,
+                                    onRequestMicPermission = onRequestMicPermission,
+                                    onRequestNotificationPermission = onRequestNotificationPermission,
+                                    highlightKey = overlayHighlightKey,
+                                )
+                            },
+                            locked = !enabled(ConfigTab.OVERLAY),
+                            onLockedTap = lockedTap(ConfigTab.OVERLAY),
+                            modeCardFocusKey = overlayHighlightKey,
                         )
                         ConfigTab.DOCS -> DocsPanel()
                     }
-                }
-                if (!activeEnabled) {
-                    // Camada incolor sobre a aba travada: intercepta os toques (somente-leitura) e
-                    // reexibe o motivo no toast a cada toque.
-                    Box(
-                        Modifier
-                            .matchParentSize()
-                            .testTag(READONLY_SCRIM_TAG)
-                            .pointerInput(activeTab) {
-                                awaitPointerEventScope {
-                                    while (true) {
-                                        val event = awaitPointerEvent()
-                                        if (event.type == PointerEventType.Press) {
-                                            blockReason(activeTab)?.let { showToast(it, 2500, navActionFor(activeTab)) }
-                                        }
-                                        event.changes.forEach { it.consume() }
-                                    }
-                                }
-                            },
-                    )
                 }
             }
             }
             if (railExpanded) NavRailScrim(onDismiss = { railExpanded = false }, modifier = Modifier.matchParentSize())
             NavRail(
                 active = activeTab,
-                enabled = enabled,
-                onSelect = { tab ->
-                    activeTab = tab
-                    if (!enabled(tab)) blockReason(tab)?.let { showToast(it, 2500, navActionFor(tab)) }
-                },
+                // Nenhuma aba fica esmaecida no menu: a de uma interface desligada é justamente onde ligá-la.
+                enabled = { true },
+                onSelect = { tab -> activeTab = tab },
                 expanded = railExpanded,
                 onExpandedChange = { railExpanded = it },
             )
@@ -441,9 +436,8 @@ private fun Header(
     onThemeClick: () -> Unit,
 ) {
     val palette = LocalKeyFlowPalette.current
-    // Compacto de propósito: a aba Modo precisa caber sem rolar no A32, e a linha do nome da aba
-    // custaria ~25dp lá (a fonte do app e a do sistema também a aumentam) — as folgas da linha de cima
-    // devolvem parte disso.
+    // Compacto de propósito: a linha do nome da aba custaria ~25dp no A32 (a fonte do app e a do sistema
+    // também a aumentam) — as folgas da linha de cima devolvem parte disso.
     Column(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
     Row(
         Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 5.dp),

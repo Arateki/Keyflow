@@ -175,9 +175,8 @@ object RouteCatalog {
         // Notificação Ateliê (T24): RemoteViews inflada via AndroidView.
         notificationRoute("notification-recording", ButtonState.RECORDING),
         notificationRoute("notification-paused", ButtonState.PAUSED),
-        Route("config-modo") { ConfigModoRoute() },
         // Navegação lateral aberta (ícones + nomes) — a posição normal é a recolhida, das demais rotas.
-        Route("config-menu-aberto") { ConfigModoRoute(railExpanded = true) },
+        Route("config-menu-aberto") { ConfigMenuRoute(railExpanded = true) },
         Route("config-voz-creditos") { ConfigVozRoute(TranscriptionSource.CREDITS) },
         Route("config-voz-openai") { ConfigVozRoute(TranscriptionSource.OPENAI) },
         Route("config-voz-custom") { ConfigVozRoute(TranscriptionSource.CUSTOM) },
@@ -207,6 +206,9 @@ object RouteCatalog {
         },
         Route("config-teclado") { ConfigTabRoute(ConfigTab.TECLADO, keyboardEnabled = true) },
         Route("config-overlay") { ConfigTabRoute(ConfigTab.OVERLAY, overlayEnabled = true) },
+        // Interface desligada: o cartão do modo no topo segue tocável; o resto da aba, esmaecido.
+        Route("config-teclado-travado") { ConfigTabRoute(ConfigTab.TECLADO) },
+        Route("config-overlay-travado") { ConfigTabRoute(ConfigTab.OVERLAY) },
         Route("config-docs") { ConfigTabRoute(ConfigTab.DOCS) },
         Route("config-unlock") { ConfigTabRoute(ConfigTab.TECLADO, keyboardEnabled = true, unlockOpen = true) },
         Route("onboarding") { OnboardingRoute() },
@@ -220,9 +222,9 @@ object RouteCatalog {
 
     val keys: List<String> get() = routes.map { it.key }
 
-    /** Aba Modo do scaffold de configuração (T10), com modos ligados para mostrar gating liberado. */
+    /** Scaffold de configuração na aba padrão (Transcrição), com modos ligados — base do menu aberto. */
     @Composable
-    private fun ConfigModoRoute(railExpanded: Boolean = false) {
+    private fun ConfigMenuRoute(railExpanded: Boolean = false) {
         ConfigScreen(
             settings = FakeSettings.settings.copy(overlayModeEnabled = true, keyboardModeEnabled = true),
             permissions = PermissionStatus(

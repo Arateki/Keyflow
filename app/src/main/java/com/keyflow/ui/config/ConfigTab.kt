@@ -8,11 +8,11 @@ import com.keyflow.ui.icons.KfIconSpec
 import com.keyflow.ui.icons.KfIcons
 
 /**
- * As 5 abas da configuração (CFG-01). Os ícones são do conjunto próprio ([KfIcons]) — o mesmo traço dos
- * botões da barra do teclado.
+ * As abas da configuração (CFG-01). Os ícones são do conjunto próprio ([KfIcons]) — o mesmo traço dos
+ * botões da barra do teclado. A aba Modo saiu (Yan, 2026-09-28): o cartão de cada modo abre a aba da
+ * própria interface (Teclado, Sobrepor).
  */
 enum class ConfigTab(val label: String, private val icon: KfIconSpec) {
-    MODO("Modo", KfIcons.TabModo),
     VOZ("Transcrição", KfIcons.TabVoz),
     TECLADO("Teclado", KfIcons.TabTeclado),
     OVERLAY("Sobrepor", KfIcons.TabSobrepor),

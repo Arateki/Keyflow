@@ -324,9 +324,9 @@ class OverlayService : Service() {
             onRecordingTime = { acc, seg -> KeyFlowController.updateRecordingTime(acc, seg) },
             onError = { message, target ->
                 KeyFlowController.errorNavTarget = target
-                // Erro clicável (Voz ou Modo) + permissão de sobreposição → banner clicável. Senão toast.
+                // Erro clicável (Transcrição ou Sobrepor) + permissão de sobreposição → banner clicável. Senão toast.
                 if (target != ErrorNavTarget.NONE && OverlayPermission.canDrawOverlays(this)) {
-                    showErrorBanner(message, onTap = if (target == ErrorNavTarget.VOZ) ::openVoz else ::openModoMic)
+                    showErrorBanner(message, onTap = if (target == ErrorNavTarget.VOZ) ::openVoz else ::openOverlayMic)
                 } else {
                     Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
                 }
@@ -404,7 +404,7 @@ class OverlayService : Service() {
             onPositionChanged = { position ->
                 serviceScope.launch { settingsRepository.saveOverlayPosition(position) }
             },
-            onErrorTap = { if (KeyFlowController.errorNavTarget == ErrorNavTarget.MODO_MIC) openModoMic() else openVoz() },
+            onErrorTap = { if (KeyFlowController.errorNavTarget == ErrorNavTarget.MIC) openOverlayMic() else openVoz() },
             onShortcut = ::handleOrbShortcut,
             vibrationIntensity = { cachedSettings.vibrationIntensity },
             onDragArrows = ::updateDragArrows,
@@ -527,15 +527,15 @@ class OverlayService : Service() {
         )
     }
 
-    /** Abre o app direto na aba Modo (clique no X/banner de "falta permissão de microfone"). */
-    private fun openModoMic() {
+    /** Abre o app na aba Sobrepor, no cartão do modo (clique no X/banner de "falta permissão de microfone"). */
+    private fun openOverlayMic() {
         startActivity(
-            com.keyflow.ui.SetupActivity.openAtModoMicIntent(this)
+            com.keyflow.ui.SetupActivity.openAtMicIntent(this, com.keyflow.ui.config.ConfigTab.OVERLAY)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
     }
 
-    /** Banner sobreposto, clicável, para erros com destino de navegação (Voz ou Modo). Some em 2 s. */
+    /** Banner sobreposto, clicável, para erros com destino de navegação (Transcrição ou Sobrepor). Some em 2 s. */
     private fun showErrorBanner(message: String, onTap: () -> Unit) {
         removeErrorBanner()
         val banner = bannerView("⚠  $message", com.keyflow.ui.theme.OrbAccentArgb, 2000L) {
