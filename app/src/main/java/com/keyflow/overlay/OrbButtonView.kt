@@ -61,7 +61,7 @@ class OrbButtonView(
     // Arrastar ↓ abre o app do KeyFlow mantendo o estado atual da orbe (Toggle).
     private val onOpenConfig: () -> Unit = {},
     orbSizePx: Int = 156,
-    // Estilo do orbe (segue a skin do teclado; o Aero tem orbe de vidro). Troca ao vivo: [setOrbStyle].
+    // Estilo do orbe (skin da orbe, aba Sobrepor; o Aero é uma bolha de vidro). Troca ao vivo: [setOrbStyle].
     orbStyle: OrbStyle = OrbStyle.ATELIE,
     // Janela máxima entre toques de uma "rajada" de atalho (threshold configurável na aba Sobrepor).
     tapBurstWindowMs: Long = DEFAULT_TAP_BURST_WINDOW_MS,
@@ -130,7 +130,7 @@ class OrbButtonView(
     private var orbUi by mutableStateOf(OrbButtonUi(OrbState.Idle, OrbCenter.None))
     private var currentOrbStyle by mutableStateOf(orbStyle)
 
-    /** Skin trocada com a orbe na tela (aba Teclado → Skins): redesenha sem recriar a janela. */
+    /** Skin da orbe trocada com ela na tela (aba Sobrepor → Skins): redesenha sem recriar a janela. */
     fun setOrbStyle(style: OrbStyle) {
         currentOrbStyle = style
     }

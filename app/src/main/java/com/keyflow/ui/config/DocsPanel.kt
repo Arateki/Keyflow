@@ -227,6 +227,10 @@ val docsSections: List<DocSection> get() = listOf(
                 tr("tamanho, tempo de reação entre toques de uma rajada e intensidade da vibração ao tocá-la."),
             ),
             DocBlock.Labeled(
+                tr("Skins"),
+                tr("a aparência da orbe: Ateliê ou Aero (uma bolha de vidro). É uma escolha à parte da skin do teclado."),
+            ),
+            DocBlock.Labeled(
                 tr("Atalhos"),
                 tr("o que 1, 2 ou 3 toques em rajada fazem, e o que acontece quando você toca mais vezes."),
             ),

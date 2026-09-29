@@ -3,6 +3,10 @@ package com.keyflow.ui.config
 import com.keyflow.i18n.tr
 import androidx.compose.foundation.layout.fillMaxSize
 import com.keyflow.ime.KeyboardSkin
+import com.keyflow.ui.orb.OrbState
+import com.keyflow.ui.orb.OrbStyle
+import com.keyflow.ui.orb.VoiceOrb
+import com.keyflow.ui.orb.orbStyleFor
 import com.keyflow.ime.KeyboardColors
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Canvas
@@ -21,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -818,8 +823,10 @@ internal fun Dropdown(
 
 /**
  * Seção "Skins" (SKIN-01): chip BLOQUEADO, swatches esmaecidos e CTA "Desbloquear skins". Com
- * [onSkinSelected] (aba Teclado), as duas primeiras são as cores do teclado, livres: **Sistema** (padrão,
- * como o Samsung — pedido do Yan, 2026-09-28) e **Ateliê** (a ciano que antes vinha marcada).
+ * [onSkinSelected] (aba Teclado), as primeiras são as cores do teclado, livres: **Sistema** (padrão,
+ * como o Samsung — pedido do Yan, 2026-09-28), **Ateliê** (a ciano que antes vinha marcada) e **Aero**.
+ * Com [onOrbSkinSelected] (aba Sobrepor), são as skins da orbe — **Ateliê** e **Aero**, cada uma com a
+ * própria orbe de prévia —, que é uma escolha à parte da do teclado (Yan, 2026-09-29).
  */
 @Composable
 internal fun SkinsSection(
@@ -828,6 +835,8 @@ internal fun SkinsSection(
     modifier: Modifier = Modifier,
     selectedSkin: String? = null,
     onSkinSelected: ((String) -> Unit)? = null,
+    selectedOrbSkin: String? = null,
+    onOrbSkinSelected: ((String) -> Unit)? = null,
 ) {
     val palette = LocalKeyFlowPalette.current
     Column(
@@ -849,12 +858,46 @@ internal fun SkinsSection(
                 Eyebrow(tr("Bloqueado"))
             }
         }
+        if (onOrbSkinSelected != null) {
+            SettingSub(
+                tr("A skin da orbe flutuante. O teclado tem a dele, na aba Teclado."),
+                Modifier.padding(top = 6.dp),
+            )
+        } else if (onSkinSelected != null) {
+            SettingSub(
+                tr("As cores do teclado. A orbe flutuante tem a skin dela, na aba Sobrepor."),
+                Modifier.padding(top = 6.dp),
+            )
+        }
         // A cor em uso (teal/orbe) aparece SELECIONADA (anel + opaca); as demais ficam esmaecidas (locked).
         Row(
             Modifier.fillMaxWidth().padding(top = 11.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            if (onSkinSelected == null) {
+            if (onOrbSkinSelected != null) {
+                val orbSelected = orbStyleFor(selectedOrbSkin ?: OrbStyle.ATELIE.id)
+                SkinChoice(
+                    label = tr("Ateliê"),
+                    selected = orbSelected == OrbStyle.ATELIE,
+                    onClick = { onOrbSkinSelected(OrbStyle.ATELIE.id) },
+                    tag = orbSkinTag(OrbStyle.ATELIE.id),
+                ) {
+                    Box(Modifier.fillMaxSize().background(palette.bg), contentAlignment = Alignment.Center) {
+                        VoiceOrb(OrbState.Idle, Modifier.requiredSize(ORB_CHOICE_SIDE), timeProvider = ORB_CHOICE_CLOCK, style = OrbStyle.ATELIE)
+                    }
+                }
+                SkinChoice(
+                    label = "Aero",
+                    selected = orbSelected == OrbStyle.AERO,
+                    onClick = { onOrbSkinSelected(OrbStyle.AERO.id) },
+                    tag = orbSkinTag(OrbStyle.AERO.id),
+                ) {
+                    // O céu por trás, para a bolha de vidro mostrar o que atravessa.
+                    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(aeroSkyColors(palette.isDark))), contentAlignment = Alignment.Center) {
+                        VoiceOrb(OrbState.Idle, Modifier.requiredSize(ORB_CHOICE_SIDE), timeProvider = ORB_CHOICE_CLOCK, style = OrbStyle.AERO)
+                    }
+                }
+            } else if (onSkinSelected == null) {
                 SkinSwatch(palette.fg)
                 SkinSwatch(palette.teal, selected = true)
             } else {
@@ -886,12 +929,7 @@ internal fun SkinsSection(
                     tag = skinTag(KeyboardSkin.AERO.id),
                 ) {
                     // Céu e colina da paisagem, com uma tecla de vidro por cima.
-                    val sky = if (palette.isDark) {
-                        listOf(Color(0xFF030A22), Color(0xFF0A4A70), Color(0xFF07303C))
-                    } else {
-                        listOf(Color(0xFF1C7BD6), Color(0xFFA5E0FB), Color(0xFF6CC75A))
-                    }
-                    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(sky)).padding(horizontal = 10.dp, vertical = 9.dp)) {
+                    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(aeroSkyColors(palette.isDark))).padding(horizontal = 10.dp, vertical = 9.dp)) {
                         Box(
                             Modifier
                                 .fillMaxSize()
@@ -931,6 +969,24 @@ internal fun SkinsSection(
 }
 
 fun skinTag(id: String) = "teclado-skin-$id"
+
+fun orbSkinTag(id: String) = "overlay-orb-skin-$id"
+
+/**
+ * Relógio parado das orbes de prévia: a forma não se mexe. Uma orbe animada mantém o Compose sempre ocupado
+ * (os testes nunca ficam ociosos) e gasta bateria à toa numa amostra de 40dp.
+ */
+private val ORB_CHOICE_CLOCK: () -> Float = { 1234f }
+
+/** Lado da orbe de prévia (maior que o cartão de 40dp: o cartão recorta o excesso, e o miolo cabe). */
+private val ORB_CHOICE_SIDE = 60.dp
+
+/** Céu e colina da paisagem Aero, de cima para baixo — o fundo das prévias do Aero (teclado e orbe). */
+private fun aeroSkyColors(dark: Boolean): List<Color> = if (dark) {
+    listOf(Color(0xFF030A22), Color(0xFF0A4A70), Color(0xFF07303C))
+} else {
+    listOf(Color(0xFF1C7BD6), Color(0xFFA5E0FB), Color(0xFF6CC75A))
+}
 
 /** Cor do teclado que dá para escolher: swatch clicável com o nome embaixo e anel quando é a atual. */
 @Composable

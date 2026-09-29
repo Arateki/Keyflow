@@ -46,6 +46,8 @@ import com.keyflow.ui.config.ConfigScreen
 import com.keyflow.ui.config.ConfigTab
 import com.keyflow.ui.config.GridsEditor
 import com.keyflow.ui.config.PhysicalKeyPicker
+import com.keyflow.ui.config.SettingsGroup
+import com.keyflow.ui.config.SkinsSection
 import com.keyflow.ui.onboarding.OnboardingPermission
 import com.keyflow.ui.onboarding.OnboardingScreen
 import com.keyflow.ui.orb.OrbCenter
@@ -218,6 +220,10 @@ object RouteCatalog {
         Route("config-teclado-travado") { ConfigTabRoute(ConfigTab.TECLADO) },
         Route("config-overlay-travado") { ConfigTabRoute(ConfigTab.OVERLAY) },
         Route("config-docs") { ConfigTabRoute(ConfigTab.DOCS) },
+        // A seção Skins das duas abas (fica abaixo da dobra nas telas acima): a da orbe, na Sobrepor, e a do
+        // teclado, na Teclado — escolhas separadas (Yan, 2026-09-29), aqui com o Aero marcado nas duas.
+        Route("config-overlay-skins") { SkinsRoute(orb = true) },
+        Route("config-teclado-skins") { SkinsRoute(orb = false) },
         Route("config-unlock") { ConfigTabRoute(ConfigTab.TECLADO, keyboardEnabled = true, unlockOpen = true) },
         // "?" do cabeçalho aberto: a seção da Docs da aba, com o atalho para a Docs.
         Route("config-ajuda-teclado") { ConfigTabRoute(ConfigTab.TECLADO, keyboardEnabled = true, tabHelpOpen = true) },
@@ -678,6 +684,32 @@ object RouteCatalog {
                 timeProvider = { GALLERY_ORB_TIME_MS },
                 style = style,
             )
+        }
+    }
+
+    /** A seção Skins de uma aba, sozinha num cartão: [orb] = a da Sobrepor (orbe), senão a do Teclado. */
+    @Composable
+    private fun SkinsRoute(orb: Boolean) {
+        Box(Modifier.fillMaxSize().background(LocalKeyFlowPalette.current.bg).padding(16.dp)) {
+            SettingsGroup(null) {
+                if (orb) {
+                    SkinsSection(
+                        selectedOrbSkin = "aero",
+                        onOrbSkinSelected = {},
+                        onUnlock = {},
+                        unlockTag = "gallery-unlock",
+                        modifier = Modifier.padding(bottom = 16.dp),
+                    )
+                } else {
+                    SkinsSection(
+                        selectedSkin = "aero",
+                        onSkinSelected = {},
+                        onUnlock = {},
+                        unlockTag = "gallery-unlock",
+                        modifier = Modifier.padding(bottom = 16.dp),
+                    )
+                }
+            }
         }
     }
 

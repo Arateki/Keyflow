@@ -96,6 +96,20 @@ class TecladoPanelTest {
     }
 
     @Test
+    fun keyboardSkinLeavesTheOrbSkinAlone() {
+        // O Aero no teclado vale só para o teclado; a orbe tem a skin dela na aba Sobrepor (Yan, 2026-09-29).
+        val h = Harness(Settings(keyboardSkin = "system", orbSkin = "atelie"))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(skinTag("aero")).performScrollTo().performClick()
+
+        rule.runOnIdle {
+            assertEquals("aero", h.settings.keyboardSkin)
+            assertEquals("atelie", h.settings.orbSkin)
+        }
+    }
+
+    @Test
     fun keyboardSizeSliderPersists() {
         val h = Harness(Settings(keyboardScalePercent = 100))
         rule.setContent { h.Content() }

@@ -58,16 +58,18 @@ val LocalOrbClock = staticCompositionLocalOf<(() -> Float)?> { null }
 /**
  * Estilo do orbe: [ATELIE] (o blob teal de sempre) ou [AERO] (protótipo, 2026-09-28): a mesma forma viva,
  * mas como uma esfera de vidro azul — brilho na metade de cima, luz na base e aro fino, no espírito do
- * Windows Vista/7. Segue a skin do teclado ([orbStyleFor]).
+ * Windows Vista/7. Escolhido na aba Sobrepor ([orbStyleFor]), à parte da skin do teclado.
  */
-enum class OrbStyle { ATELIE, AERO }
+enum class OrbStyle(val id: String) {
+    ATELIE("atelie"),
+    AERO("aero"),
+}
 
 /** Estilo do orbe para a árvore abaixo — a overlay e as prévias das abas seguem a skin escolhida. */
 val LocalOrbStyle = staticCompositionLocalOf { OrbStyle.ATELIE }
 
-/** A orbe acompanha a skin do teclado: só o Aero tem orbe própria; as outras seguem com a do Ateliê. */
-fun orbStyleFor(keyboardSkinId: String): OrbStyle =
-    if (com.keyflow.ime.KeyboardSkin.of(keyboardSkinId) == com.keyflow.ime.KeyboardSkin.AERO) OrbStyle.AERO else OrbStyle.ATELIE
+/** Id de skin da orbe ([com.keyflow.data.Settings.orbSkin]) → estilo; o que não for "aero" é o Ateliê. */
+fun orbStyleFor(orbSkinId: String): OrbStyle = if (orbSkinId == OrbStyle.AERO.id) OrbStyle.AERO else OrbStyle.ATELIE
 
 /** Conteúdo desenhado no centro do orbe (ORB-04). */
 sealed interface OrbCenter {

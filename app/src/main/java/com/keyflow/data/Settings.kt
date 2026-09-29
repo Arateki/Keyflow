@@ -105,6 +105,9 @@ data class Settings(
     // Cores do teclado (id de `KeyboardSkin`): "system" (padrão desde 2026-09-28, como o Samsung) ou
     // "atelie" (o papel quente de antes). Só o teclado; o app de config segue no Ateliê.
     val keyboardSkin: String = "system",
+    // Skin da orbe do overlay ("atelie" ou "aero"), escolhida na aba Sobrepor e independente da do teclado
+    // (Yan, 2026-09-29: o Aero no teclado não deve mexer na orbe).
+    val orbSkin: String = "atelie",
     // Idioma da interface (código de `AppLanguage`: "pt"/"en"/"es"). Vazio = ainda não escolhido: vale o
     // português, e a SetupActivity grava o idioma do aparelho na primeira abertura (Yan, 2026-09-28).
     val appLanguage: String = "",

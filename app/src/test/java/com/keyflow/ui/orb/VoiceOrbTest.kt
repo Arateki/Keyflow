@@ -35,10 +35,22 @@ class VoiceOrbTest {
     }
 
     @Test
-    fun `only the Aero keyboard skin gives the orb its glass style`() {
+    fun `the orb skin id picks the style and anything else is the Atelie orb`() {
         assertThat(orbStyleFor("aero")).isEqualTo(OrbStyle.AERO)
-        assertThat(orbStyleFor("system")).isEqualTo(OrbStyle.ATELIE)
         assertThat(orbStyleFor("atelie")).isEqualTo(OrbStyle.ATELIE)
+        assertThat(orbStyleFor("system")).isEqualTo(OrbStyle.ATELIE)
         assertThat(orbStyleFor("desconhecida")).isEqualTo(OrbStyle.ATELIE)
+    }
+
+    @Test
+    fun `every orb style id round-trips through orbStyleFor`() {
+        for (style in OrbStyle.entries) assertThat(orbStyleFor(style.id)).isEqualTo(style)
+    }
+
+    @Test
+    fun `a new install keeps the Atelie orb even with the Aero keyboard`() {
+        // As duas escolhas são independentes: o Aero no teclado não vira orbe de vidro (Yan, 2026-09-29).
+        val settings = com.keyflow.data.Settings(keyboardSkin = "aero")
+        assertThat(orbStyleFor(settings.orbSkin)).isEqualTo(OrbStyle.ATELIE)
     }
 }

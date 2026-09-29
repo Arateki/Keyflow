@@ -356,14 +356,14 @@ class OverlayService : Service() {
                 val prevTapBurst = cachedSettings.tapBurstWindowMs
                 val prevThemeDark = cachedSettings.themeDark
                 val prevLanguage = cachedSettings.appLanguage
-                val prevSkin = cachedSettings.keyboardSkin
+                val prevOrbSkin = cachedSettings.orbSkin
                 cachedSettings = it
                 // Idioma ao vivo: a notificação é texto — re-posta no idioma novo (o App já trocou o AppLocale).
                 if (it.appLanguage != prevLanguage && isForeground && ::coordinator.isInitialized) {
                     postNotification(coordinator.currentState())
                 }
-                // Skin ao vivo: a orbe acompanha (o Aero tem orbe de vidro).
-                if (it.keyboardSkin != prevSkin) floatingButton?.setOrbStyle(com.keyflow.ui.orb.orbStyleFor(it.keyboardSkin))
+                // Skin da orbe ao vivo (aba Sobrepor → Skins).
+                if (it.orbSkin != prevOrbSkin) floatingButton?.setOrbStyle(com.keyflow.ui.orb.orbStyleFor(it.orbSkin))
                 // Tema ao vivo (raro, disparado pelo usuário → barato): re-posta a notificação e recolore os
                 // banners de overlay visíveis, espelhando o que o toast in-app (Compose) já faz sozinho.
                 if (it.themeDark != prevThemeDark) {
@@ -409,7 +409,7 @@ class OverlayService : Service() {
             side = { cachedSettings.overlaySide },
             onIntent = { intent -> coordinator.onIntent(intent) },
             orbSizePx = cachedSettings.orbSizePx,
-            orbStyle = com.keyflow.ui.orb.orbStyleFor(cachedSettings.keyboardSkin),
+            orbStyle = com.keyflow.ui.orb.orbStyleFor(cachedSettings.orbSkin),
             tapBurstWindowMs = cachedSettings.tapBurstWindowMs.toLong(),
             onPositionChanged = { position ->
                 serviceScope.launch { settingsRepository.saveOverlayPosition(position) }

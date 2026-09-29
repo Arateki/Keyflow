@@ -65,7 +65,7 @@ fun overlayModeTag(mode: RecordingMode): String = "overlay-mode-${mode.name.lowe
 /**
  * Aba Sobrepor reorganizada em 3 áreas principais (divisórias grossas) com subseções (divisórias finas):
  * - **Usabilidade**: Mão (canhoto/destro), Tamanho da orbe, Modo de gravação, Tempo de reação, Retorno tátil.
- * - **Skins**: seção bloqueada (SKIN-01).
+ * - **Skins**: a skin da orbe (Ateliê ou Aero) e o resto bloqueado (SKIN-01).
  * - **Atalhos**: ações por toque (2/3) e política de overflow.
  */
 @OptIn(ExperimentalFoundationApi::class)
@@ -216,7 +216,13 @@ fun OverlayPanel(
 
             // ── ÁREA 2 · SKINS ─────────────────────────────────────────────────
             SettingsGroup(null) {
-                SkinsSection(onUnlock = onUnlockSkins, unlockTag = OVERLAY_UNLOCK_TAG, modifier = Modifier.padding(bottom = 16.dp))
+                SkinsSection(
+                    selectedOrbSkin = settings.orbSkin,
+                    onOrbSkinSelected = { onSettingsChange(settings.copy(orbSkin = it)) },
+                    onUnlock = onUnlockSkins,
+                    unlockTag = OVERLAY_UNLOCK_TAG,
+                    modifier = Modifier.padding(bottom = 16.dp),
+                )
             }
 
             // ── ÁREA 3 · ATALHOS ───────────────────────────────────────────────
