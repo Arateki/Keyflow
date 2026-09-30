@@ -116,5 +116,6 @@ class OpenAiPartsTest {
 
         assertThat(openai.displayName).isEqualTo("OpenAI")
         assertThat(openai.flows.map { it.method }).containsExactly(AuthMethod.API_KEY, AuthMethod.OAUTH).inOrder()
+        assertThat(openai.usageUrl).isEqualTo(OpenAiAuthConfig.usageUrl) // o "Manage usage" da tela vem do registro
     }
 }

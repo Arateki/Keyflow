@@ -35,6 +35,7 @@ internal object OpenAiProvider {
             displayName = "OpenAI",
             flows = listOf(OpenAiApiKeyFlow(), login),
             planUsage = ::planUsage,
+            usageUrl = OpenAiAuthConfig.usageUrl,
             headersFor = ::headersFor,
         )
     }

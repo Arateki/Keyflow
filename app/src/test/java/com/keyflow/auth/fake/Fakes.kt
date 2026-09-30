@@ -80,11 +80,13 @@ class FakeOAuthFlow(
     var completeResult: Credential.OAuth = oauth()
     var completeError: AuthException? = null
     var beginCalls = 0
+    var lastForceConsent: Boolean? = null
     val revoked = mutableListOf<Credential>()
     var revokeError: Throwable? = null
 
-    override suspend fun begin(): AuthStart {
+    override suspend fun begin(forceConsent: Boolean): AuthStart {
         beginCalls++
+        lastForceConsent = forceConsent
         receiver = FakeReceiver()
         return AuthStart("https://fake.test/authorize", receiver)
     }

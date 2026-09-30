@@ -7,9 +7,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.keyflow.auth.ConnectionState
 import com.keyflow.core.ReasoningSource
 import com.keyflow.data.Settings
 import com.keyflow.i18n.tr
@@ -25,8 +29,9 @@ const val RACIOCINIO_OPENAI_PRIVACY_TAG = "raciocinio-openai-privacy"
 
 /**
  * Aba Raciocínio (RSC-01..06): a origem do modelo de linguagem — **Local** (modelo de texto no aparelho, lista de
- * download no mesmo molde da Transcrição) ou **OpenAI** (nuvem; o conteúdo vem na RSN-T16). Independe da origem da
- * transcrição e nunca lista os modelos de fala. [models] já vem composto com o catálogo de TEXTO.
+ * download no mesmo molde da Transcrição) ou **OpenAI** (nuvem: login, chave e modelo da conta). Independe da origem da
+ * transcrição e nunca lista os modelos de fala. [models] já vem composto com o catálogo de TEXTO; [auth] é a porta para o
+ * módulo de autenticação (sem ele, a origem OpenAI não tem o que conectar).
  */
 @Composable
 fun ReasoningPanel(
@@ -37,9 +42,15 @@ fun ReasoningPanel(
     actions: LocalModelActions = LocalModelActions.None,
     // Qual motor responde com estas Settings — ou por que nenhum. Sem fiação (galeria, testes), nenhum.
     resolve: (Settings) -> ReasoningResolution = { ReasoningResolution.Unavailable(UnavailableReason.NO_LOCAL_MODEL) },
+    auth: AuthActions = AuthActions.None,
 ) {
     val palette = LocalKeyFlowPalette.current
     val scroll = rememberScrollState()
+    // Lido AQUI, no corpo do painel: quando a conexão muda, tudo abaixo — inclusive o "pronto para testar" — recompõe.
+    val connection by remember(auth) { auth.state() }.collectAsState(ConnectionState.Disconnected)
+    val openAi = openAiPanelState(connection, auth.flows)
+    // O motor pronto (ou o motivo de não haver) depende das Settings, da conexão e dos modelos instalados.
+    val resolution = remember(settings, connection, models, resolve) { resolve(settings) }
     Column(
         modifier
             .fillMaxWidth()
@@ -59,13 +70,15 @@ fun ReasoningPanel(
                 )
                 when (settings.reasoningSource) {
                     ReasoningSource.LOCAL -> ReasoningLocal(settings, onSettingsChange, models, actions)
-                    ReasoningSource.OPENAI -> ReasoningOpenAi()
+                    ReasoningSource.OPENAI -> OpenAiPanel(settings, onSettingsChange, auth, openAi, connection)
                 }
             }
         }
         SettingsGroup(tr("Testar")) {
             Column(Modifier.padding(vertical = 16.dp)) {
-                ReasoningTestArea(resolve(settings))
+                // "Manage usage" só faz sentido quando quem responde é o PLANO do ChatGPT (não a chave de API).
+                val manageUsage = auth.usageUrl?.takeIf { settings.reasoningSource == ReasoningSource.OPENAI && openAi.status == OpenAiStatus.CONNECTED_LOGIN }
+                ReasoningTestArea(resolution, onManageUsage = manageUsage?.let { url -> { auth.openUrl(url) } })
             }
         }
     }
@@ -97,18 +110,6 @@ private fun ReasoningLocal(
         SettingSub(
             tr("Processado 100% neste aparelho — nada do que você escrever sai do dispositivo. Os modelos são apagados se o app for desinstalado."),
             Modifier.padding(top = 16.dp).testTag(RACIOCINIO_LOCAL_PRIVACY_TAG),
-        )
-    }
-}
-
-/** Provisório até a RSN-T16 (login ChatGPT, chave de API e modelo da conta). */
-@Composable
-private fun ReasoningOpenAi() {
-    Column(Modifier.padding(top = 20.dp)) {
-        SettingSub(tr("Em breve: entrar com a conta do ChatGPT ou usar uma chave de API."))
-        SettingSub(
-            tr("O texto do teste é enviado à OpenAI; as credenciais ficam só neste aparelho."),
-            Modifier.padding(top = 16.dp).testTag(RACIOCINIO_OPENAI_PRIVACY_TAG),
         )
     }
 }

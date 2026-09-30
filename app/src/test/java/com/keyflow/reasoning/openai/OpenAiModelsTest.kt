@@ -24,6 +24,12 @@ class OpenAiModelsTest {
     private fun json(body: JSONObject) = MockResponse().setHeader("Content-Type", "application/json").setBody(body.toString())
 
     @Test
+    fun `the client tries IPv4 first and bounds the whole call`() {
+        assertThat(models.http.dns).isInstanceOf(com.keyflow.data.models.Ipv4FirstDns::class.java)
+        assertThat(models.http.callTimeoutMillis).isGreaterThan(0)
+    }
+
+    @Test
     fun `the plan format keeps only visibility list, in the server's order, showing the display name`() {
         server.enqueue(
             json(

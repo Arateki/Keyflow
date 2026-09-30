@@ -113,6 +113,18 @@ class OpenAiChatGptFlowTest {
         assertThat(second).isEqualTo(first)
     }
 
+    /** A doc: repetir o OAuth com o conjunto COMPLETO de escopos e `prompt=consent` para reabilitar o uso do plano. */
+    @Test
+    fun `forcing consent adds prompt consent to the authorization url and only then`() {
+        val ordinary = runBlocking { flow().begin() }.url.toHttpUrl()
+        assertThat(ordinary.queryParameter("prompt")).isNull()
+
+        receiver = FakeReceiver(redirect)
+        val forced = runBlocking { flow().begin(forceConsent = true) }.url.toHttpUrl()
+        assertThat(forced.queryParameter("prompt")).isEqualTo("consent")
+        assertThat(forced.queryParameter("scope")!!.split(' ')).contains("chatgpt.tokens.use.direct") // o conjunto completo
+    }
+
     @Test
     fun `a disabled provider is unavailable with its reason`() {
         assertThat(flow(enabled = false).availability).isEqualTo(Availability.Unavailable(UnavailableAuthReason.PROVIDER_DISABLED))

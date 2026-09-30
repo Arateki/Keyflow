@@ -31,8 +31,11 @@ interface AuthFlow {
 interface ApiKeyFlow : AuthFlow
 
 interface OAuthFlow : AuthFlow {
-    /** Sobe o receptor, gera PKCE/state/nonce e monta a URL de autorização. */
-    suspend fun begin(): AuthStart
+    /**
+     * Sobe o receptor, gera PKCE/state/nonce e monta a URL de autorização. [forceConsent] pede ao provedor que mostre de novo
+     * a tela de consentimento — o que reabilita uma permissão que o usuário recusou antes (ex.: o uso do plano na OpenAI).
+     */
+    suspend fun begin(forceConsent: Boolean = false): AuthStart
 
     /** Valida o retorno (state, nonce, assinatura), troca o código e devolve a credencial — sem gravá-la. */
     suspend fun complete(redirect: URI): Credential.OAuth
@@ -51,11 +54,13 @@ interface BrowserLauncher {
 /**
  * Tudo que o app precisa saber de um provedor. [headersFor] — o formato dos cabeçalhos é do PROVEDOR, não do módulo
  * genérico. [planUsage] diz se um login dá direito a usar o plano do usuário (a OpenAI exige um escopo; os outros, sempre).
+ * [usageUrl] é a página onde o usuário vê e gerencia o uso desse plano (null = o provedor não tem uma).
  */
 class ProviderAuth(
     val id: ProviderId,
     val displayName: String,
     val flows: List<AuthFlow>,
     val planUsage: (Credential.OAuth) -> Boolean = { true },
+    val usageUrl: String? = null,
     val headersFor: (Credential) -> Map<String, String>,
 )

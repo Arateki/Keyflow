@@ -41,14 +41,21 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.ModelStore
-import com.keyflow.reasoning.ReasoningEngine
 import com.keyflow.reasoning.ReasoningEngines
-import com.keyflow.reasoning.ReasoningError
-import com.keyflow.reasoning.ReasoningEvent
-import com.keyflow.reasoning.ReasoningRequest
 import com.keyflow.reasoning.local.LocalReasoningEngine
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOf
+import com.keyflow.auth.AndroidBrowserLauncher
+import com.keyflow.auth.AuthController
+import com.keyflow.auth.AuthDependencies
+import com.keyflow.auth.AuthProviders
+import com.keyflow.auth.Credential
+import com.keyflow.auth.DefaultAuthorizationProvider
+import com.keyflow.auth.ProviderIds
+import com.keyflow.auth.SecureCredentialStore
+import com.keyflow.ui.config.AccountModel
+import com.keyflow.ui.config.ControllerAuthActions
+import okhttp3.OkHttpClient
+import com.keyflow.reasoning.openai.OpenAiModels
+import com.keyflow.reasoning.openai.OpenAiReasoningEngine
 import com.keyflow.ui.config.LocalModelsUi
 import com.keyflow.ui.config.LocalModelsSnapshot
 import com.keyflow.ui.config.LocalModelsController
@@ -94,13 +101,30 @@ class SetupActivity : ComponentActivity() {
     // Modelos de voz locais (native-voice-models, NM-T10).
     private val localModels by lazy { LocalModelsController(this) }
 
-    // O motor do Raciocínio: local pelo :reasoning; a OpenAI ainda não está ligada (RSN-T16), então sem credencial.
+    // Autenticação dos provedores de nuvem (módulo `auth/`): cofre próprio, registro, controlador da tela e quem entrega os
+    // cabeçalhos ao motor. A UI só conhece o registro e o `AuthController` — nada de provedor concreto.
+    private val authHttp by lazy { OkHttpClient() }
+    private val authStore by lazy { SecureCredentialStore(this) }
+    private val authRegistry by lazy { AuthProviders.create(AuthDependencies(authStore, http = authHttp)) }
+    private val authorization by lazy { DefaultAuthorizationProvider(authRegistry, authStore, System::currentTimeMillis) }
+    private val browser by lazy { AndroidBrowserLauncher(this) }
+    private val authController by lazy { AuthController(authRegistry, authStore, browser, activityScope, System::currentTimeMillis) }
+    private val openAiAuth by lazy {
+        val models = OpenAiModels(authHttp)
+        ControllerAuthActions(authRegistry.first { it.id == ProviderIds.OPENAI }, authController, browser) {
+            val headers = runCatching { authorization.headers(ProviderIds.OPENAI) }.getOrNull()
+            if (headers == null) emptyList() else models.list(headers).map { AccountModel(it.id, it.displayName) }
+        }
+    }
+
+    // O motor do Raciocínio: local pelo :reasoning; OpenAI pela Responses API com a credencial do cofre.
     private val reasoningEngines by lazy {
         ReasoningEngines(
             isModelInstalled = { ModelStore.get(this).isInstalled(it) },
-            hasOpenAiCredential = { false },
+            // Um login sem tokens (o "esqueleto" da renovação que falhou) não é credencial: pede entrar de novo.
+            hasOpenAiCredential = { authStore.get(ProviderIds.OPENAI)?.let { it !is Credential.OAuth || !it.isSkeleton } == true },
             local = { LocalReasoningEngine.create(this, it) },
-            openAi = { OpenAiNotReadyEngine },
+            openAi = { OpenAiReasoningEngine(authorization, authHttp, it) },
         )
     }
     private var localSnapshot by mutableStateOf(LocalModelsSnapshot.EMPTY)
@@ -216,6 +240,7 @@ class SetupActivity : ComponentActivity() {
                             deviceRamMb = localModels.deviceRamMb,
                         ),
                         resolveReasoning = reasoningEngines::resolve,
+                        reasoningAuth = openAiAuth,
                         localActions = localModels,
                     )
                 } else {
@@ -723,10 +748,4 @@ class SetupActivity : ComponentActivity() {
                 if (tab == ConfigTab.TECLADO) NAV_TAB_KEYBOARD_MIC else NAV_TAB_OVERLAY_MIC,
             )
     }
-}
-
-/** Provisório até a RSN-T16: a origem OpenAI existe no seletor mas ainda não responde. */
-private object OpenAiNotReadyEngine : ReasoningEngine {
-    override fun generate(request: ReasoningRequest): Flow<ReasoningEvent> =
-        flowOf(ReasoningEvent.Error(ReasoningError.ENGINE, "a OpenAI ainda não está ligada neste build"))
 }

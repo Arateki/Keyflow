@@ -28,7 +28,7 @@ object FakeProvider {
     }
 
     fun auth(vararg flows: AuthFlow, planUsage: (Credential.OAuth) -> Boolean = { true }) =
-        ProviderAuth(id, "Fake", flows.toList(), planUsage, ::headers)
+        ProviderAuth(id, "Fake", flows.toList(), planUsage, headersFor = ::headers)
 }
 
 /** O motor "de eco" do provedor fake: pede os cabeçalhos ao [AuthorizationProvider] e devolve o que recebeu junto com o pedido. */

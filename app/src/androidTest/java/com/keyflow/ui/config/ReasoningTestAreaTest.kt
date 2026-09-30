@@ -159,4 +159,48 @@ class ReasoningTestAreaTest {
         rule.onNodeWithTag(REASONING_TEST_BUTTON_TAG).performClick()
         rule.waitUntil(5_000) { engine.requests == 2 }
     }
+
+    // ── "Manage usage" no limite de uso (diretriz da OpenAI) ──────────────────────────────
+
+    private fun showWithManageUsage(engine: ControlledEngine, onManageUsage: (() -> Unit)?) {
+        rule.setContent { KeyFlowTheme(dark = false) { ReasoningTestArea(ReasoningResolution.Ready(engine), onManageUsage = onManageUsage) } }
+    }
+
+    @Test
+    fun aRateLimitOffersManageUsageAsThePrimaryAction() {
+        val engine = ControlledEngine()
+        var opened = 0
+        showWithManageUsage(engine) { opened++ }
+
+        rule.onNodeWithTag(REASONING_TEST_BUTTON_TAG).performClick()
+        engine.events.trySend(ReasoningEvent.Error(ReasoningError.RATE_LIMIT, "limite"))
+
+        waitForText(REASONING_TEST_ERROR_TAG, ReasoningTestMessages.error(ReasoningError.RATE_LIMIT))
+        rule.onNodeWithTag(REASONING_TEST_MANAGE_USAGE_TAG).assertTextEquals("Manage usage").performClick()
+        assertTrue(opened == 1)
+    }
+
+    @Test
+    fun otherErrorsAndTheAbsenceOfAPlanDoNotOfferManageUsage() {
+        val engine = ControlledEngine()
+        showWithManageUsage(engine) { }
+
+        rule.onNodeWithTag(REASONING_TEST_BUTTON_TAG).performClick()
+        engine.events.trySend(ReasoningEvent.Error(ReasoningError.NETWORK, "rede"))
+
+        waitForText(REASONING_TEST_ERROR_TAG, ReasoningTestMessages.error(ReasoningError.NETWORK))
+        rule.onAllNodesWithTag(REASONING_TEST_MANAGE_USAGE_TAG).assertCountEquals(0)
+    }
+
+    @Test
+    fun aRateLimitWithoutAPlanUsageLinkShowsNoButton() {
+        val engine = ControlledEngine()
+        showWithManageUsage(engine, null)
+
+        rule.onNodeWithTag(REASONING_TEST_BUTTON_TAG).performClick()
+        engine.events.trySend(ReasoningEvent.Error(ReasoningError.RATE_LIMIT, "limite"))
+
+        waitForText(REASONING_TEST_ERROR_TAG, ReasoningTestMessages.error(ReasoningError.RATE_LIMIT))
+        rule.onAllNodesWithTag(REASONING_TEST_MANAGE_USAGE_TAG).assertCountEquals(0)
+    }
 }

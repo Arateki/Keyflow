@@ -68,6 +68,15 @@ class OpenAiReasoningEngineTest {
 
     private fun requestJson() = JSONObject(server.takeRequest(5, TimeUnit.SECONDS)!!.body.readUtf8())
 
+    /** A rede do Yan tem IPv6 quebrado: o motor tenta o IPv4 antes; e uma resposta longa não pode ser cortada por prazo total. */
+    @Test
+    fun `the engine's client tries IPv4 first and has no call deadline but keeps a read timeout`() {
+        val c = engine().client
+        assertThat(c.dns).isInstanceOf(com.keyflow.data.models.Ipv4FirstDns::class.java)
+        assertThat(c.callTimeoutMillis).isEqualTo(0)
+        assertThat(c.readTimeoutMillis).isGreaterThan(0)
+    }
+
     // ── o pedido ──────────────────────────────────────────────────────────────────────────
 
     @Test

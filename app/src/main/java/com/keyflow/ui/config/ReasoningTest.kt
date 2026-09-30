@@ -40,6 +40,7 @@ const val REASONING_TEST_REASON_TAG = "raciocinio-testar-motivo"
 const val REASONING_TEST_RESPONSE_TAG = "raciocinio-resposta"
 const val REASONING_TEST_TIMES_TAG = "raciocinio-tempos"
 const val REASONING_TEST_ERROR_TAG = "raciocinio-erro"
+const val REASONING_TEST_MANAGE_USAGE_TAG = "raciocinio-gerenciar-uso"
 
 /**
  * O que a área do Testar mostra num instante. [firstDeltaMs] é o tempo até o 1º trecho e [totalMs] a duração toda —
@@ -131,10 +132,11 @@ internal fun formatTestDuration(ms: Long): String =
 
 /**
  * O botão Testar (RTS-01..04): manda uma frase à origem ativa, mostra a resposta chegando, vira "Parar" enquanto gera e,
- * no fim, os tempos. Sem motor pronto o botão fica desabilitado com o motivo escrito ao lado.
+ * no fim, os tempos. Sem motor pronto o botão fica desabilitado com o motivo escrito ao lado. [onManageUsage] não nulo faz do
+ * limite de uso atingido um botão principal "Manage usage" (a doc da OpenAI: é a ação que resolve o limite do plano).
  */
 @Composable
-fun ReasoningTestArea(resolution: ReasoningResolution, modifier: Modifier = Modifier) {
+fun ReasoningTestArea(resolution: ReasoningResolution, modifier: Modifier = Modifier, onManageUsage: (() -> Unit)? = null) {
     val palette = LocalKeyFlowPalette.current
     val scope = rememberCoroutineScope()
     val runner = remember { TestRunner(scope) }
@@ -183,6 +185,10 @@ fun ReasoningTestArea(resolution: ReasoningResolution, modifier: Modifier = Modi
                 fontSize = 11.sp,
                 modifier = Modifier.padding(top = 8.dp).testTag(REASONING_TEST_ERROR_TAG),
             )
+            if (kind == ReasoningError.RATE_LIMIT && onManageUsage != null) {
+                // Texto aprovado pela OpenAI: igual em todos os idiomas.
+                PrimaryButton("Manage usage", REASONING_TEST_MANAGE_USAGE_TAG, onManageUsage, Modifier.padding(top = 12.dp))
+            }
         }
     }
 }

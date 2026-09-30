@@ -5,6 +5,7 @@ import com.keyflow.auth.AuthException
 import com.keyflow.auth.AuthorizationProvider
 import com.keyflow.auth.ProviderIds
 import com.keyflow.auth.providers.openai.OpenAiAuthConfig
+import com.keyflow.data.models.Ipv4FirstDns
 import com.keyflow.reasoning.ReasoningEngine
 import com.keyflow.reasoning.ReasoningError
 import com.keyflow.reasoning.ReasoningEvent
@@ -49,8 +50,12 @@ class OpenAiReasoningEngine(
     private val pauseMs: suspend (Long) -> Unit = { delay(it) },
 ) : ReasoningEngine {
 
-    /** Resposta longa não pode ser cortada por um prazo da chamada inteira; a leitura ociosa segue limitada. */
-    private val client: OkHttpClient = http.newBuilder()
+    /**
+     * Resposta longa não pode ser cortada por um prazo da chamada inteira; a leitura ociosa segue limitada. IPv4 antes do IPv6:
+     * a rede do Yan tem IPv6 quebrado (2026-09-27) e quem tenta o IPv6 primeiro espera minutos pela conexão.
+     */
+    internal val client: OkHttpClient = http.newBuilder()
+        .dns(Ipv4FirstDns())
         .callTimeout(0, TimeUnit.MILLISECONDS)
         .readTimeout(READ_TIMEOUT_S, TimeUnit.SECONDS)
         .build()

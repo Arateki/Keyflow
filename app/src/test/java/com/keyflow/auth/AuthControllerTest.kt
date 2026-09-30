@@ -79,6 +79,37 @@ class AuthControllerTest {
     }
 
     @Test
+    fun `connect asks the flow to force consent only when told to`() = runTest {
+        val c = controller()
+        c.connect(provider, AuthMethod.OAUTH); runCurrent()
+        assertThat(oauthFlow.lastForceConsent).isFalse()
+        c.cancel(provider)
+
+        c.connect(provider, AuthMethod.OAUTH, forceConsent = true); runCurrent()
+        assertThat(oauthFlow.lastForceConsent).isTrue()
+    }
+
+    @Test
+    fun `the stored api key can be read back to fill the masked field, and only for an api key credential`() = runTest {
+        val c = controller()
+        assertThat(c.apiKey(provider)).isNull()
+        c.saveApiKey(provider, "sk-teste")
+        assertThat(c.apiKey(provider)).isEqualTo("sk-teste")
+        store.put(provider, oauth())
+        assertThat(c.apiKey(provider)).isNull() // um login não devolve token nenhum
+    }
+
+    @Test
+    fun `a one time notice is granted once per provider and key, and survives a disconnect`() = runTest {
+        val c = controller()
+        assertThat(c.consumeNotice(provider, "plan_welcome")).isTrue()
+        assertThat(c.consumeNotice(provider, "plan_welcome")).isFalse()
+        assertThat(c.consumeNotice(provider, "outro_aviso")).isTrue()
+        c.disconnect(provider); runCurrent()
+        assertThat(c.consumeNotice(provider, "plan_welcome")).isFalse()
+    }
+
+    @Test
     fun `cancelling while waiting closes the receiver and goes back to disconnected`() = runTest {
         val c = controller()
         c.connect(provider, AuthMethod.OAUTH)

@@ -52,7 +52,7 @@ internal class OpenAiChatGptFlow(
 
     @Volatile private var attempt: Attempt? = null
 
-    override suspend fun begin(): AuthStart {
+    override suspend fun begin(forceConsent: Boolean): AuthStart {
         val existing = store.get(ProviderIds.OPENAI) as? Credential.OAuth
         val issued = existing?.clientId
         val reauth = issued != null
@@ -80,6 +80,8 @@ internal class OpenAiChatGptFlow(
             addQueryParameter("nonce", nonce)
             addQueryParameter("code_challenge_method", "S256")
             addQueryParameter("code_challenge", Pkce.challengeS256(verifierValue))
+            // Reabilitar uma permissão recusada: a doc manda repetir o OAuth com o conjunto completo de escopos e `prompt=consent`.
+            if (forceConsent) addQueryParameter("prompt", "consent")
         }.build()
         return AuthStart(url.toString(), receiver)
     }

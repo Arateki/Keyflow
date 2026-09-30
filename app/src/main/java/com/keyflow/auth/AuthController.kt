@@ -44,8 +44,8 @@ class AuthController(
             else ConnectionState.Connected(credential.account, AuthMethod.OAUTH, entry(provider).planUsage(credential))
     }
 
-    /** Login por navegador. Chave de API não passa por aqui — ver [saveApiKey]. */
-    fun connect(provider: ProviderId, method: AuthMethod) {
+    /** Login por navegador. Chave de API não passa por aqui — ver [saveApiKey]. [forceConsent]: ver [OAuthFlow.begin]. */
+    fun connect(provider: ProviderId, method: AuthMethod, forceConsent: Boolean = false) {
         val flow = entry(provider).flows.firstOrNull { it.method == method } as? OAuthFlow ?: return
         errors.update { it - provider }
         if (flow.availability is Availability.Unavailable) {
@@ -57,7 +57,7 @@ class AuthController(
         jobs[provider] = scope.launch {
             var start: AuthStart? = null
             try {
-                start = flow.begin()
+                start = flow.begin(forceConsent)
                 receivers[provider] = start.redirect
                 browser.open(start.url)
                 val redirect = start.redirect.await(REDIRECT_TIMEOUT_MS)
@@ -81,6 +81,23 @@ class AuthController(
         errors.update { it - provider }
         val trimmed = key.trim()
         if (trimmed.isEmpty()) store.clear(provider) else store.put(provider, Credential.ApiKey(trimmed))
+    }
+
+    /**
+     * A chave de API guardada, para preencher o campo (mascarado) da tela. Só devolve chave de API — um login nunca entrega token
+     * nenhum por aqui (AUTH-04).
+     */
+    fun apiKey(provider: ProviderId): String? = (store.get(provider) as? Credential.ApiKey)?.value
+
+    /**
+     * Um aviso que se mostra UMA vez por provedor e chave (ex.: "você está usando o seu plano"). Devolve `true` na 1ª chamada e
+     * `false` nas seguintes; o marcador é do `meta` do cofre, então sobrevive ao Desconectar.
+     */
+    fun consumeNotice(provider: ProviderId, key: String): Boolean {
+        val marker = "notice.$key"
+        if (store.meta(provider, marker) != null) return false
+        store.putMeta(provider, marker, "1")
+        return true
     }
 
     /** Desiste do login em andamento: fecha o receptor e volta a "desconectado". */

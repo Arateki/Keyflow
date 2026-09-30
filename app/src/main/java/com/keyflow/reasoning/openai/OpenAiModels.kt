@@ -2,6 +2,8 @@ package com.keyflow.reasoning.openai
 
 import com.keyflow.auth.providers.openai.OpenAiAuthConfig
 import com.keyflow.auth.providers.openai.await
+import com.keyflow.data.models.Ipv4FirstDns
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -14,9 +16,12 @@ import org.json.JSONObject
  * usuário já tinha escolhido e oferece "Atualizar".
  */
 class OpenAiModels(
-    private val http: OkHttpClient,
+    http: OkHttpClient,
     private val apiBaseUrl: String = OpenAiAuthConfig.apiBaseUrl,
 ) {
+    /** IPv4 antes do IPv6 (rede com IPv6 quebrado) e um prazo para a chamada inteira: o dropdown não pode ficar pendurado. */
+    internal val http: OkHttpClient = http.newBuilder().dns(Ipv4FirstDns()).callTimeout(30, TimeUnit.SECONDS).build()
+
     data class Model(val id: String, val displayName: String)
 
     suspend fun list(headers: Map<String, String>): List<Model> = try {

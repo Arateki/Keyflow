@@ -121,6 +121,7 @@ fun ConfigScreen(
     // O motor que responde na aba Raciocínio, para a área do Testar (RSN-T10).
     resolveReasoning: (Settings) -> ReasoningResolution = { ReasoningResolution.Unavailable(UnavailableReason.NO_LOCAL_MODEL) },
     localActions: LocalModelActions = LocalModelActions.None,
+    reasoningAuth: AuthActions = AuthActions.None,
 ) {
     val palette = LocalKeyFlowPalette.current
     var activeTab by rememberSaveable { mutableStateOf(initialTab) }
@@ -349,6 +350,7 @@ fun ConfigScreen(
                             models = reasoningModels,
                             actions = localActions,
                             resolve = resolveReasoning,
+                            auth = reasoningAuth,
                         )
                         // Ainda sem conteúdo: o painel fica vazio (o título da aba já aparece no cabeçalho).
                         ConfigTab.NOTIFICACAO, ConfigTab.VISAO, ConfigTab.FALA -> Unit
