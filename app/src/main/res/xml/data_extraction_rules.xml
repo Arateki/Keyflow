@@ -6,6 +6,7 @@
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="sharedpref" path="keyflow_secure.xml" />
+        <exclude domain="sharedpref" path="keyflow_auth.xml" />
         <!-- Modelos de voz locais (STO-01): grandes e re-baixáveis — ver o backup_rules.xml. -->
         <exclude domain="file" path="models" />
         <exclude domain="file" path="model-downloads.json" />
@@ -13,6 +14,7 @@
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="keyflow_secure.xml" />
+        <exclude domain="sharedpref" path="keyflow_auth.xml" />
         <exclude domain="file" path="models" />
         <exclude domain="file" path="model-downloads.json" />
         <exclude domain="external" path="model-tmp" />

@@ -8,6 +8,8 @@
 -->
 <full-backup-content>
     <exclude domain="sharedpref" path="keyflow_secure.xml" />
+    <!-- O cofre das credenciais de IA (auth/): mesma razão, chave de Keystore própria — ver SecureCredentialStore. -->
+    <exclude domain="sharedpref" path="keyflow_auth.xml" />
     <!--
       Modelos de voz locais (STO-01): centenas de MB, muito acima da cota do backup (~25 MB), e
       re-baixáveis do catálogo. `model-tmp` é onde os downloads ficam antes da instalação, e
