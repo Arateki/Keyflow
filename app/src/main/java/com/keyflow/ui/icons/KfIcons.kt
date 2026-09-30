@@ -255,26 +255,25 @@ object KfIcons {
     )
 
     /**
-     * Raciocínio: um cérebro visto de cima — os dois hemisférios (contornos ondulados), a fissura no meio e
-     * as dobras de cada lado, espelhadas.
+     * Raciocínio: um cérebro visto de lado, virado para a esquerda — o contorno ondulado do cérebro com o
+     * lóbulo temporal embaixo, três dobras e o tronco descendo. De perfil ele lê melhor no tamanho pequeno da
+     * barra lateral do que visto de cima (Yan, 2026-09-29). Sem cerebelo e com poucas dobras de propósito: com
+     * traço 1,6 qualquer vão menor que ~2 unidades fecha e vira mancha.
      */
     val TabRaciocinio = KfIconSpec(
         "tab-raciocinio",
         listOf(
-            // Hemisfério esquerdo e o direito, espelhado.
-            "M12 4.75C10.9 3.6 9 3.5 7.9 4.6C6.2 4.4 4.9 5.8 5 7.4C3.7 8 3.2 9.6 3.9 10.9C3.2 12.1 3.4 13.6 4.4 14.5" +
-                "C4.3 16.1 5.5 17.4 7 17.4C7.6 18.7 9.2 19.4 10.6 18.8C11.1 18.6 11.6 18.2 12 17.7",
-            "M12 4.75C13.1 3.6 15 3.5 16.1 4.6C17.8 4.4 19.1 5.8 19 7.4C20.3 8 20.8 9.6 20.1 10.9C20.8 12.1 20.6 13.6 19.6 14.5" +
-                "C19.7 16.1 18.5 17.4 17 17.4C16.4 18.7 14.8 19.4 13.4 18.8C12.9 18.6 12.4 18.2 12 17.7",
-            // A fissura entre os dois.
-            "M12 4.75V17.7",
-            // Dobras, um par de cada lado.
-            "M5 7.4C6.4 7.6 7.4 8.4 7.6 9.6",
-            "M3.9 10.9C5.2 11 6.4 11.8 6.7 13",
-            "M10.8 9.5C9.5 9.7 8.6 10.6 8.5 11.8",
-            "M19 7.4C17.6 7.6 16.6 8.4 16.4 9.6",
-            "M20.1 10.9C18.8 11 17.6 11.8 17.3 13",
-            "M13.2 9.5C14.5 9.7 15.4 10.6 15.5 11.8",
+            // O contorno: testa, as ondas de cima, a nuca e o lóbulo temporal por baixo.
+            "M7.4 15.1C5 14.8 3.5 12.8 3.8 10.6C4 8.8 5 7.6 6.4 7.1C6.5 5.2 8.3 4 10 4.5C11 3.2 13 3.2 14 4.2" +
+                "C15.6 3.8 17.4 4.4 18 6C19.8 6.6 20.7 8.6 20.2 10.5C20.7 11.7 20.3 13 19.4 13.8" +
+                "C18.6 14.5 17.4 14.7 16.4 14.4C15 14.5 14 15.2 13.4 16C12.2 17.1 9.8 17.1 8.9 16C8.5 15.6 8 15.3 7.4 15.1z",
+            // A fissura lateral, que separa o temporal.
+            "M8.8 12C10.4 12.4 12.2 11.6 13.4 10.2",
+            // Duas dobras: uma na testa e uma no alto.
+            "M6.4 7.1C7.6 7.6 8.2 8.6 8.2 9.6",
+            "M14 4.2C13.8 5.6 14.4 6.8 15.6 7.2",
+            // O tronco encefálico.
+            "M12.6 16.8C12.6 18.2 12.9 19.5 13.3 20.6",
         ),
     )
 
