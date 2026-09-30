@@ -2038,3 +2038,35 @@ Aba Raciocínio na branch `feature/raciocinio-modelos` (spec/design/plano em `.s
   uma rodada sem erro no log — resultado parcial não conta, refazer. Nunca `pkill -f` com texto da própria linha de comando.
 Testes até aqui: 610 unitários; instrumentados no emulador: `ui.config` 124/124, `SettingsRepositoryTest` 27/27,
 `LocalReasoningEngineTest` 6/6, `LiteRtBackendSmokeTest` 2/2 (opt-in `llmModelE2E=true`, modelo real).
+
+## reasoning-models — login isolado, OpenAI e painel (RSN-T11..T19) (2026-09-30)
+- **`auth/` é isolado e trocável** (pedido do Yan: "esses métodos mudam com frequência"). O núcleo (`AuthController`,
+  `AuthFlow`/`ApiKeyFlow`/`OAuthFlow`, `SecureCredentialStore`, `DefaultAuthorizationProvider`, PKCE, receptor loopback) não
+  conhece UI, `Settings`, `reasoning/` nem provedor; cada provedor é uma pasta em `auth/providers/` mais uma linha em
+  `AuthProviders`. **Provado por `AuthIsolationTest`**, que lê os imports de todo `.kt` — e por um provedor fake que percorre o
+  ciclo inteiro (login, renovação, revogação) sem tocar em nada do núcleo. Segunda conta/provedor = uma pasta + uma linha.
+- **Cofre próprio**: alias Keystore `keyflow_auth_master`, prefs `keyflow_auth.xml`, **fora das 3 listas de backup** (o crash em
+  loop do A32 nas prefs cifradas veio de reusar alias/backup). Credencial nunca em `Settings`, log, estado de UI nem backup.
+- **Login da OpenAI** (`auth/providers/openai/`, RSN-T14), literal da doc: registro dinâmico (`dynamic_agent_client` só na 1ª
+  vez; depois o `oaiapp_…` emitido), PKCE S256, `state` e `nonce`, redirect `http://127.0.0.1:<porta>/auth/callback`, troca sem
+  `client_secret`, **ID token verificado por JWKS (RS256) + emissor + audiência + nonce**, refresh rotativo (Mutex por provedor,
+  credencial nova gravada ANTES de usar, falha temporária nunca apaga), revogação com repetição. `enabled = BuildConfig.DEBUG`
+  só vale para o **login**; a **chave de API funciona sempre**. Validado por mutação (assinatura, nonce, alg, client_id do
+  refresh, erro-antes-do-state).
+- **Motor OpenAI** (RSN-T15): Responses API, corpo enxuto (`store:false`, `stream:true`, `instructions` para o system), SSE
+  lido linha a linha, **sucesso só em `response.completed`**, erros mapeados sem trocar de cobrança, 5xx com nova tentativa
+  limitada, cancelar o coletor cancela a chamada. IPv4 antes do IPv6 (rede do Yan). Lista de modelos: formato do plano e da
+  chave; **falha = lista vazia, nunca id inventado**.
+- **Painel** (RSN-T16): estado decidido por uma função pura (`openAiPanelState`), botões vindos do **registro** (sem
+  `if (openai)`), diretrizes da OpenAI ("Continue with ChatGPT", "Using ChatGPT plan" + "Manage usage", aviso só no 1º login,
+  limite de uso com "Manage usage" como ação principal), reautorização com `prompt=consent` sem o escopo do plano. Fluxo por
+  **chave** provado de ponta a ponta no emulador (cofre real + registro + motor + lista, contra servidor local).
+- **Achado de teste**: um teste do modelo escolhido passava mesmo sem a lógica (o rótulo do dropdown mostra o id de qualquer
+  jeito) — a mutação achou; o teste agora abre o menu.
+- **Pendências [YAN]** (nada disto um teste daqui prova): (1) **tornar o repositório público**; (2) **decidir a elegibilidade
+  da OpenAI** (RPRV-04, `PLAYSTORE_CHECKLIST.md` §1c) — o KeyFlow planeja créditos/skins/anúncios, e a OpenAI manda apps
+  "pagos ou hospedados remotamente" para um formulário; **não publicar com o login ligado** até decidir; (3) rodar
+  `.specs/features/reasoning-models/manual-validation.md` no A32 — a aceitação REAL do registro dinâmico, o callback com o app em
+  segundo plano e o LLM no aparelho (tempo/RAM; `recommendedRamMb` e `IDLE_UNLOAD_MS` são estimativas até lá).
+- **Deferido (menor)**: aviso de "revogação não confirmada" ao Desconectar; `hasOpenAiCredential`/`apiKey()` leem o cofre na
+  main thread (medir no A32); com login sem o escopo do plano o Testar segue habilitado (a tela já avisa).
