@@ -311,7 +311,8 @@ object RouteCatalog {
                 test = TestState(text = "Olá! Tudo bem por aí? Espero que o seu dia", running = true, firstDeltaMs = 820),
             )
         },
-        // Limite do plano atingido no meio da resposta: o texto parcial fica e "Manage usage" vira a ação principal.
+        // Limite do plano atingido: "Manage usage" vira a ação principal (sem o texto parcial, para o botão caber na tela; o parcial
+        // que permanece tem teste próprio).
         Route("config-raciocinio-openai-limite") {
             ConfigReasoningRoute(
                 source = ReasoningSource.OPENAI,
@@ -321,7 +322,7 @@ object RouteCatalog {
                     models = listOf(AccountModel("modelo-a", "Modelo A")),
                 ),
                 ready = true,
-                test = TestState(text = "Olá! Tudo", firstDeltaMs = 640, totalMs = 2_100, error = ReasoningError.RATE_LIMIT),
+                test = TestState(totalMs = 2_100, error = ReasoningError.RATE_LIMIT),
             )
         },
         Route("config-fala") { ConfigTabRoute(ConfigTab.FALA) },
