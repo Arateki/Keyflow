@@ -24,7 +24,7 @@ class ReasoningService : Service() {
 
     private val core by lazy {
         ReasoningServiceCore(
-            backendFor = ReasoningBackends::create,
+            backendFor = { model -> ReasoningBackends.create(model, cacheDir.path) },
             fileExists = { File(it).isFile },
             availableMb = ::availableMemoryMb,
             scheduler = object : IdleScheduler {

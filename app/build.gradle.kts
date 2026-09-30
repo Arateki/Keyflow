@@ -147,6 +147,19 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
+    // Raciocínio local (reasoning-models, RSN-T7): LiteRT-LM, o motor de LLM do Google (Kotlin + JNI), só dentro do
+    // processo `:reasoning`. Conferido em 2026-09-30 no próprio AAR (`dl.google.com/dl/android/maven2`):
+    //  - minSdk 24 (igual ao do app); ABIs publicadas: SÓ arm64-v8a e x86_64 (liblitertlm_jni.so ~21,5 MB e ~25,6 MB).
+    //    NÃO há armeabi-v7a: num aparelho ARM de 32 bits o load falha com UnsatisfiedLinkError, que o LiteRtBackend
+    //    traduz numa mensagem clara. O x86_64 só entra no debug (emulador), como o do sherpa-onnx.
+    //  - FIXADO em 0.16.1: as 0.17.x foram compiladas com Kotlin 2.4 (metadados 2.4.0 + kotlin-reflect 2.4.0 e
+    //    coroutines 1.11.0 nas dependências) e o projeto usa o Kotlin 2.2.10 embutido no AGP 9.2; a 0.16.1 tem metadados
+    //    2.3.0 (o compilador lê até +1) e dependências 2.2.21/1.9.0. Subir de versão = conferir isto de novo.
+    //  - API usada (Kotlin, conferida no classes.jar): Engine(EngineConfig(modelPath, backend, cacheDir)).initialize(),
+    //    Engine.createConversation(ConversationConfig(systemInstruction)), Conversation.sendMessageAsync(texto,
+    //    MessageCallback{onMessage,onDone,onError}), Conversation.cancelProcess(), Message.toString() = o texto.
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.16.1")
+
     // --- Testes ---
     // Unit
     testImplementation("junit:junit:4.13.2")

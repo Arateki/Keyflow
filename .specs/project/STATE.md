@@ -2010,3 +2010,31 @@ Pedidos do Yan depois de usar o corretor:
 - **Dicionário binário** (`.kfd`): a carga a frio no processo real era 6,2 s; agora 333–392 ms.
 Testes: 473 unitários; no A32 `ime` + `ui.config` 131/131; telas 84/84 depois de aprovar as 26 com
 teclado/barras/aba Teclado (revisadas).
+
+## reasoning-models — RSN-T1..T10 e o motor LiteRT-LM (RSN-T7) (2026-09-30)
+Aba Raciocínio na branch `feature/raciocinio-modelos` (spec/design/plano em `.specs/features/reasoning-models/`).
+- **Login da OpenAI** (RSN-T1, texto literal em `openai-siwc-notes.md`): o caminho open-source **não tem client ID a
+  pedir** — é registro dinâmico + redirect por loopback `127.0.0.1` + ID token verificado por JWKS (RS256). Elegibilidade
+  do app (créditos/anúncios planejados) é decisão do Yan antes de publicar com o login ligado (RPRV-04).
+- **Catálogo de texto** (RSN-T3): só entra modelo baixável **sem login**. Gemma 3 1B é *gated* (401 anônimo) e ficou de fora;
+  leve = **Qwen3 0.6B** (586 MB, Apache 2.0), equilibrado = **Gemma 4 E2B** (2,59 GB, Apache 2.0). Tamanhos/SHA-256 lidos da
+  API do HF e **confirmados baixando pelo app** no emulador (o SHA bateu).
+- **LiteRT-LM fixado em 0.16.1** (RSN-T7): as 0.17.x foram compiladas com Kotlin 2.4 (metadados 2.4.0) e o projeto usa o
+  Kotlin 2.2.10 do AGP 9.2; a 0.16.1 tem metadados 2.3.0 e compila. `minSdk` 24; **ABIs só arm64-v8a e x86_64** (sem
+  armeabi-v7a → aparelho ARM de 32 bits cai no `UnsatisfiedLinkError`, traduzido em mensagem). Classes são bytecode Java 21:
+  não carregam no JDK 17 dos unitários (por isso `LiteRtBackend.textOf` recebe `Any?`).
+- **16 KB**: `scripts/check-16kb-alignment.py` no APK debug → `liblitertlm_jni.so` com `PT_LOAD` 16384, guardado sem compressão (OK).
+- **Tamanho do APK**: a `liblitertlm_jni.so` custa **+20,5 MB em arm64-v8a** (release) e **+24,5 MB em x86_64** (só debug);
+  APK debug com tudo: 156,4 MB. Licenças em `app/licenses/` (o aviso de terceiros do AAR tem 2 MB).
+- **Motor real medido** (emulador x86_64, CPU, Qwen3 0.6B): com o *thinking* ligado — o padrão da biblioteca — "Diga olá"
+  virou 335 trechos de `<think>…` e 69 s. Desligado (`extraContext enable_thinking=false` + `ThinkingConfig(budget 0)` +
+  canal `thought`) responde "Olá!" em <1 s **depois** da carga. Carga a frio ~67 s (constrói o cache do LiteRT no emulador);
+  com o cache quente ~2 s. **A32 ainda não medido** (RSN-T19 **[YAN]**) — inclusive se vale mostrar "carregando o modelo…".
+- **Risco evitado** (RSN-T9): o gancho de instalação do downloader selecionava QUALQUER modelo como modelo de transcrição;
+  com o catálogo de texto isso faria a Transcrição usar um LLM. Agora a seleção é por tipo (4 testes instrumentados).
+- **Lições de teste**: `advanceUntilIdle()` não roda tarefas do `backgroundScope`; `assertTextContains` do Compose sem
+  `substring=true` exige o texto inteiro; teste de cancelamento só prova algo com o bind mantido (achado por **mutação**).
+- **Ambiente**: emulador API 34 subido com `setsid nohup emulator … -no-snapshot-save` (28–32 s); uma vez morreu no meio de
+  uma rodada sem erro no log — resultado parcial não conta, refazer. Nunca `pkill -f` com texto da própria linha de comando.
+Testes até aqui: 610 unitários; instrumentados no emulador: `ui.config` 124/124, `SettingsRepositoryTest` 27/27,
+`LocalReasoningEngineTest` 6/6, `LiteRtBackendSmokeTest` 2/2 (opt-in `llmModelE2E=true`, modelo real).
