@@ -123,7 +123,7 @@ class ConfigScreenTest {
 
     @Test
     fun newTabsStartEmptyWithTheirNameInTheHeader() {
-        // Abas novas (Yan, 2026-09-29): Notificação, Visão, Raciocínio e Voz, com o nome no cabeçalho e ainda sem conteúdo.
+        // Abas novas (Yan, 2026-09-29): Notificação, Visão e Voz, com o nome no cabeçalho e ainda sem conteúdo (o Raciocínio já tem).
         // A Voz é a FALA por dentro: VOZ é, desde sempre, a aba Transcrição.
         val h = Harness()
         rule.setContent { h.Content() }
@@ -131,7 +131,6 @@ class ConfigScreenTest {
         val tabs = listOf(
             ConfigTab.NOTIFICACAO to "Notificação",
             ConfigTab.VISAO to "Visão",
-            ConfigTab.RACIOCINIO to "Raciocínio",
             ConfigTab.FALA to "Voz",
         )
         for ((tab, title) in tabs) {
@@ -140,6 +139,22 @@ class ConfigScreenTest {
             rule.onNodeWithTag(HEADER_TAB_TITLE_TAG).assertTextEquals(title)
             rule.onAllNodesWithTag(HEADER_TAB_HELP_TAG).assertCountEquals(0)
         }
+    }
+
+    @Test
+    fun theReasoningTabIsAlwaysEnabledAndHasItsHelp() {
+        // Não depende de modo teclado/sobrepor nem de permissão (RSC-05): abre com os modos desligados e tem o "?".
+        val h = Harness()
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(tabTag(ConfigTab.RACIOCINIO)).performClick()
+        rule.onNodeWithTag(panelTag(ConfigTab.RACIOCINIO)).assertIsDisplayed()
+        rule.onNodeWithTag(HEADER_TAB_TITLE_TAG).assertTextEquals("Raciocínio")
+        rule.onAllNodesWithTag(HEADER_TAB_HELP_TAG).assertCountEquals(1)
+        rule.onNodeWithTag(reasoningSourceTag(com.keyflow.core.ReasoningSource.LOCAL)).assertIsDisplayed()
+
+        rule.onNodeWithTag(HEADER_TAB_HELP_TAG).performClick()
+        rule.onNodeWithTag(TAB_HELP_TAG).assertTextContains("Conecta um modelo de linguagem", substring = true)
     }
 
     @Test

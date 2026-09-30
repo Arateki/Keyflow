@@ -237,6 +237,23 @@ val docsSections: List<DocSection> get() = listOf(
         ),
     ),
     DocSection(
+        "aba-raciocinio",
+        tr("Aba Raciocínio"),
+        listOf(
+            DocBlock.Paragraph(
+                tr("Conecta um modelo de linguagem — no aparelho ou na nuvem — e deixa você testar se ele responde. O ditado e os comandos ainda não o usam: isso vem depois."),
+            ),
+            DocBlock.Labeled(
+                tr("Origem"),
+                tr("Local (um modelo pequeno rodando no aparelho, sem internet) ou OpenAI (na nuvem, com a sua conta ou a sua chave)."),
+            ),
+            DocBlock.Labeled(
+                tr("Testar"),
+                tr("manda uma frase ao modelo e mostra a resposta chegando, com o tempo até o primeiro trecho."),
+            ),
+        ),
+    ),
+    DocSection(
         "texto",
         tr("Onde o texto aparece"),
         listOf(
@@ -613,8 +630,9 @@ fun docsSectionFor(tab: ConfigTab): DocSection? {
         ConfigTab.VOZ -> "aba-transcricao"
         ConfigTab.TECLADO -> "aba-teclado"
         ConfigTab.OVERLAY -> "aba-sobrepor"
-        // Notificação, Visão, Raciocínio e Voz ainda não têm conteúdo para explicar.
-        ConfigTab.NOTIFICACAO, ConfigTab.VISAO, ConfigTab.RACIOCINIO, ConfigTab.FALA, ConfigTab.DOCS -> return null
+        ConfigTab.RACIOCINIO -> "aba-raciocinio"
+        // Notificação, Visão e Voz ainda não têm conteúdo para explicar.
+        ConfigTab.NOTIFICACAO, ConfigTab.VISAO, ConfigTab.FALA, ConfigTab.DOCS -> return null
     }
     return docsSections.first { it.id == id }
 }

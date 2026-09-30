@@ -39,6 +39,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
+import com.keyflow.data.models.ModelCatalog
 import com.keyflow.ui.config.LocalModelsUi
 import com.keyflow.ui.config.LocalModelsSnapshot
 import com.keyflow.ui.config.LocalModelsController
@@ -185,6 +186,14 @@ class SetupActivity : ComponentActivity() {
                             active = localSnapshot.active,
                             failures = localSnapshot.failures,
                             selectedId = settings.localModelId,
+                            deviceRamMb = localModels.deviceRamMb,
+                        ),
+                        reasoningModels = LocalModelsUi.compose(
+                            catalog = ModelCatalog.TEXT,
+                            installed = localSnapshot.installed,
+                            active = localSnapshot.active,
+                            failures = localSnapshot.failures,
+                            selectedId = settings.reasoningLocalModelId,
                             deviceRamMb = localModels.deviceRamMb,
                         ),
                         localActions = localModels,

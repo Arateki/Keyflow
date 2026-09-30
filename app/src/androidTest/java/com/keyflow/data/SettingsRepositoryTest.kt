@@ -8,6 +8,7 @@ import com.keyflow.core.OverlaySide
 import com.keyflow.core.ReasoningSource
 import com.keyflow.core.RecordingMode
 import com.keyflow.core.TranscriptionSource
+import com.keyflow.data.models.ModelKind
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -176,6 +177,55 @@ class SettingsRepositoryTest {
         }
         repository.replaceRawPreferences(corrupted)
         assertEquals(ReasoningSource.LOCAL, repository.settingsFlow().first().reasoningSource)
+    }
+
+    /** MGR-03 e o análogo do Raciocínio: quando um modelo instala e nenhum daquele tipo está escolhido, ele é escolhido. */
+    @Test
+    fun installingATextModelSelectsItForReasoningAndNeverAsTheSpeechModel() = runTest {
+        val repository = newRepository()
+
+        assertEquals(true, repository.selectInstalledModelIfNone("qwen3-0.6b-litertlm", ModelKind.TEXT))
+
+        val read = repository.settingsFlow().first()
+        assertEquals("qwen3-0.6b-litertlm", read.reasoningLocalModelId)
+        assertEquals(null, read.localModelId) // o modelo de texto NUNCA vira o modelo de transcrição
+    }
+
+    @Test
+    fun installingASpeechModelSelectsItForTranscriptionOnly() = runTest {
+        val repository = newRepository()
+
+        assertEquals(true, repository.selectInstalledModelIfNone("whisper-base-int8", ModelKind.SPEECH))
+
+        val read = repository.settingsFlow().first()
+        assertEquals("whisper-base-int8", read.localModelId)
+        assertEquals(null, read.reasoningLocalModelId)
+    }
+
+    @Test
+    fun anExistingChoiceOfTheSameKindIsNeverOverwrittenByAnInstall() = runTest {
+        val repository = newRepository()
+        repository.saveSettings(Settings(reasoningLocalModelId = "gemma-4-e2b-litertlm", localModelId = "whisper-small-int8"))
+
+        assertEquals(false, repository.selectInstalledModelIfNone("qwen3-0.6b-litertlm", ModelKind.TEXT))
+        assertEquals(false, repository.selectInstalledModelIfNone("whisper-base-int8", ModelKind.SPEECH))
+
+        val read = repository.settingsFlow().first()
+        assertEquals("gemma-4-e2b-litertlm", read.reasoningLocalModelId)
+        assertEquals("whisper-small-int8", read.localModelId)
+    }
+
+    /** O gancho do downloader escolhe o tipo pelo catálogo; id que o catálogo não conhece não seleciona nada. */
+    @Test
+    fun selectOnInstallRoutesByTheCatalogKindAndIgnoresUnknownIds() = runTest {
+        val repository = newRepository()
+
+        repository.selectOnInstall("qwen3-0.6b-litertlm")
+        repository.selectOnInstall("id-que-nao-existe")
+
+        val read = repository.settingsFlow().first()
+        assertEquals("qwen3-0.6b-litertlm", read.reasoningLocalModelId)
+        assertEquals(null, read.localModelId)
     }
 
     /** NM-T2: sem modelo escolhido, os campos da origem Local voltam nulos — não string vazia. */

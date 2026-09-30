@@ -114,6 +114,8 @@ fun ConfigScreen(
     requestedTab: ConfigTab? = null,
     requestedTabKey: Int = 0,
     localModels: LocalModelsUi = LocalModelsUi.EMPTY,
+    // Os modelos de TEXTO da aba Raciocínio (a lista de cima é a dos de fala, da Transcrição).
+    reasoningModels: LocalModelsUi = LocalModelsUi.EMPTY_TEXT,
     localActions: LocalModelActions = LocalModelActions.None,
 ) {
     val palette = LocalKeyFlowPalette.current
@@ -337,8 +339,14 @@ fun ConfigScreen(
                             onLockedTap = lockedTap(ConfigTab.OVERLAY),
                             modeCardFocusKey = overlayHighlightKey,
                         )
+                        ConfigTab.RACIOCINIO -> ReasoningPanel(
+                            settings = settings,
+                            onSettingsChange = onSettingsChange,
+                            models = reasoningModels,
+                            actions = localActions,
+                        )
                         // Ainda sem conteúdo: o painel fica vazio (o título da aba já aparece no cabeçalho).
-                        ConfigTab.NOTIFICACAO, ConfigTab.VISAO, ConfigTab.RACIOCINIO, ConfigTab.FALA -> Unit
+                        ConfigTab.NOTIFICACAO, ConfigTab.VISAO, ConfigTab.FALA -> Unit
                         ConfigTab.DOCS -> DocsPanel(focusSectionId = docsFocusSection, focusKey = docsFocusKey)
                     }
                 }

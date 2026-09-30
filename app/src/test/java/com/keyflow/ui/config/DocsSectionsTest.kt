@@ -74,4 +74,16 @@ class DocsSectionsTest {
         assertTrue(body.contains("samsung SM-A325M"))
         assertTrue(body.indexOf(FeedbackKind.BUG.prompt) < body.indexOf("KeyFlow 0.1.0"))
     }
+
+    /** RSC-05: a aba Raciocínio ganhou conteúdo, então ganhou o "?" e a seção da Docs; as abas ainda vazias seguem sem. */
+    @Test
+    fun theReasoningTabHasItsOwnHelpSectionAndTheEmptyOnesStillHaveNone() {
+        val section = docsSectionFor(ConfigTab.RACIOCINIO)
+        assertTrue("Raciocínio sem seção", section != null)
+        assertEquals("aba-raciocinio", section!!.id)
+        assertTrue(section.blocks.isNotEmpty())
+        listOf(ConfigTab.VISAO, ConfigTab.NOTIFICACAO, ConfigTab.FALA, ConfigTab.DOCS).forEach {
+            assertEquals("$it não deveria ter seção ainda", null, docsSectionFor(it))
+        }
+    }
 }

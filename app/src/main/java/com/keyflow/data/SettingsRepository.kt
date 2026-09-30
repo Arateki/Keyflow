@@ -22,6 +22,8 @@ import com.keyflow.core.TranscriptionSource
 import com.keyflow.core.shortcuts.BarsConfig
 import com.keyflow.core.shortcuts.ShortcutCodec
 import com.keyflow.core.shortcuts.ShortcutGrid
+import com.keyflow.data.models.ModelCatalog
+import com.keyflow.data.models.ModelKind
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -136,15 +138,29 @@ class SettingsRepository(
      * chave do modelo: não disputa com o auto-save da tela (que regrava as Settings inteiras).
      * @return true se selecionou.
      */
-    suspend fun selectLocalModelIfNone(modelId: String): Boolean {
+    suspend fun selectLocalModelIfNone(modelId: String): Boolean = selectInstalledModelIfNone(modelId, ModelKind.SPEECH)
+
+    /**
+     * O mesmo para os dois tipos de modelo: a chave é a do tipo — fala escolhe o modelo da Transcrição, texto escolhe o
+     * do Raciocínio. Um modelo de texto **nunca** vira o modelo de transcrição (senão baixar o Qwen com a Transcrição
+     * sem modelo faria o ditado tentar transcrever com um LLM).
+     */
+    suspend fun selectInstalledModelIfNone(modelId: String, kind: ModelKind): Boolean {
+        val key = if (kind == ModelKind.TEXT) REASONING_LOCAL_MODEL_ID else LOCAL_MODEL_ID
         var selected = false
         dataStore.edit { prefs ->
-            if (prefs[LOCAL_MODEL_ID].isNullOrBlank()) {
-                prefs[LOCAL_MODEL_ID] = modelId
+            if (prefs[key].isNullOrBlank()) {
+                prefs[key] = modelId
                 selected = true
             }
         }
         return selected
+    }
+
+    /** Gancho do downloader ao instalar: o tipo vem do catálogo; id que o catálogo não conhece não seleciona nada. */
+    internal suspend fun selectOnInstall(modelId: String) {
+        val spec = ModelCatalog.byId(modelId) ?: return
+        selectInstalledModelIfNone(spec.id, spec.kind)
     }
 
     /**

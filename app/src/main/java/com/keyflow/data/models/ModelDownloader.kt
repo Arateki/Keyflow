@@ -344,7 +344,7 @@ class ModelDownloader(
                 store = store,
                 isMetered = meteredProbe(context),
                 // Já fora da main thread (finish lê centenas de MB): a escrita curta no DataStore cabe aqui.
-                onInstalled = { id -> runBlocking { settings.selectLocalModelIfNone(id) } },
+                onInstalled = { id -> runBlocking { settings.selectOnInstall(id) } },
             )
         }
 

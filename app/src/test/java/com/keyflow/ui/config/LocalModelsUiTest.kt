@@ -108,4 +108,66 @@ class LocalModelsUiTest {
         assertThat(downloadStateLabel(DownloadProgress(base, DownloadState.FILES_DONE, 4, 4))).isEqualTo("Verificando")
         DownloadFailure.entries.forEach { assertThat(failureMessage(it)).isNotEmpty() }
     }
+
+    // ── o catálogo de texto (aba Raciocínio): a mesma composição, outra lista ────────────────────────────────────
+
+    private val qwen = ModelCatalog.QWEN3_0_6B.id
+    private val gemma = ModelCatalog.GEMMA_4_E2B.id
+
+    private fun textUi(
+        installed: Set<String> = emptySet(),
+        active: DownloadProgress? = null,
+        selected: String? = null,
+        ramMb: Long = 8_000,
+    ) = LocalModelsUi.compose(
+        catalog = ModelCatalog.TEXT, installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = ramMb,
+    )
+
+    @Test
+    fun `the text catalog lists only text models, lightest first`() {
+        assertThat(textUi().items.map { it.spec.id }).containsExactly(qwen, gemma).inOrder()
+        assertThat(textUi().items.map { it.spec.id }).containsNoneOf(base, small, parakeet)
+    }
+
+    @Test
+    fun `an installed text model shows installed and only an installed one can be selected`() {
+        val ui = textUi(installed = setOf(qwen), selected = gemma) // gemma está "selecionado" mas não instalado
+        assertThat(ui.item(qwen).status).isEqualTo(LocalModelStatus.INSTALLED)
+        assertThat(ui.item(gemma).status).isEqualTo(LocalModelStatus.AVAILABLE)
+        assertThat(ui.item(gemma).selected).isFalse()
+        assertThat(textUi(installed = setOf(qwen), selected = qwen).item(qwen).selected).isTrue()
+    }
+
+    @Test
+    fun `a text download in progress shows progress and blocks the other downloads`() {
+        val progress = DownloadProgress(gemma, DownloadState.RUNNING, 50, 100)
+        val ui = textUi(active = progress)
+        assertThat(ui.item(gemma).status).isEqualTo(LocalModelStatus.DOWNLOADING)
+        assertThat(ui.item(gemma).progress).isEqualTo(progress)
+        assertThat(ui.item(qwen).status).isEqualTo(LocalModelStatus.AVAILABLE)
+        assertThat(ui.downloadActive).isTrue()
+    }
+
+    @Test
+    fun `the heavy warning follows each text model's recommended RAM`() {
+        val ui = textUi(ramMb = 2_000) // entre a recomendação do Qwen (1024) e a do Gemma (4096)
+        assertThat(ui.item(qwen).heavy).isFalse()
+        assertThat(ui.item(gemma).heavy).isTrue()
+        assertThat(textUi(ramMb = 8_000).items.none { it.heavy }).isTrue()
+    }
+
+    @Test
+    fun `a deleted selected text model reads as available and not selected`() {
+        val ui = textUi(installed = emptySet(), selected = qwen)
+        assertThat(ui.item(qwen).status).isEqualTo(LocalModelStatus.AVAILABLE)
+        assertThat(ui.item(qwen).selected).isFalse()
+    }
+
+    /** O vazio do Raciocínio nunca pode listar os modelos de fala (o `EMPTY` da Transcrição lista). */
+    @Test
+    fun `EMPTY_TEXT lists the text catalog and never the speech one`() {
+        assertThat(LocalModelsUi.EMPTY_TEXT.items.map { it.spec.id }).containsExactly(qwen, gemma).inOrder()
+        assertThat(LocalModelsUi.EMPTY_TEXT).isEqualTo(textUi(ramMb = 0))
+        assertThat(LocalModelsUi.EMPTY.items.map { it.spec.id }).containsNoneOf(qwen, gemma)
+    }
 }

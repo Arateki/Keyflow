@@ -64,6 +64,11 @@ data class LocalModelsUi(
         )
 
         val EMPTY: LocalModelsUi = compose(installed = emptySet(), active = null, failures = emptyMap(), selectedId = null, deviceRamMb = 0)
+
+        /** O vazio do Raciocínio: lista os modelos de TEXTO. O [EMPTY] acima é o da Transcrição (fala). */
+        val EMPTY_TEXT: LocalModelsUi = compose(
+            catalog = ModelCatalog.TEXT, installed = emptySet(), active = null, failures = emptyMap(), selectedId = null, deviceRamMb = 0,
+        )
     }
 }
 
