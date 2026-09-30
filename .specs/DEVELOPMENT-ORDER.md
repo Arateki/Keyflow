@@ -52,6 +52,7 @@
 | M7 | `monetization` | spec/design/tasks prontos — nada implementado (depende da API em staging; MZ-T1/T2/T5/T11 podem adiantar) |
 | M8 | `theme-system` | spec/design/tasks prontos — nada implementado (⚠️ S3/S4/S5 nos checkpoints das TS-T6/T8/T9) |
 | — | Play Store | `PLAYSTORE_CHECKLIST.md`; **PS-1 (targetSdk 36) feito**, PS-2..PS-7 abertos |
+| — | `reasoning-models` (aba Raciocínio) | pedida pelo Yan em 2026-09-29, na branch `feature/raciocinio-modelos`: RSN-T0..T17 feitos (ícone de perfil, modelos locais Gemma/Qwen pelo LiteRT-LM em processo próprio, módulo `auth/` isolado, OpenAI por chave e por login ChatGPT); faltam RSN-T18 (privacidade/licenças), RSN-T19 (roteiro no A32 **[YAN]**) e a revisão final — ver Bloco 10 |
 
 ---
 
@@ -254,6 +255,27 @@ Base: `PLAYSTORE_CHECKLIST.md` (raiz). Executar como quick tasks / tasks avulsas
 - [ ] **PS-7 — Internal testing → produção**: subir AAB na trilha interna, rodar o e2e completo
       de compras/ads em faixa de teste, corrigir o que a revisão apontar, promover **[YAN]**.
 
+## Bloco 10 — `reasoning-models` (aba Raciocínio) — fora da fila original
+
+Spec: `.specs/features/reasoning-models/` (`spec.md` 45 requisitos, `design.md`, `tasks.md`, e `openai-siwc-notes.md` com o
+texto literal da doc da OpenAI). Ordem: RSN-T0 → T1 → … → T19 (uma por vez, um commit por task).
+
+- **Escopo**: só CONECTAR modelos de linguagem + botão Testar. Quem consome o raciocínio (limpar ditado, comandos, resumo)
+  é feature futura. Origens: **Local** (Qwen3 0.6B e Gemma 4 E2B pelo LiteRT-LM, processo `:reasoning`) e **OpenAI**
+  (chave de API ou login "Continue with ChatGPT"). Anthropic fica de fora: a política dela proíbe o login com assinatura em
+  produto de terceiros — entra depois **só por chave de API**.
+- **O login mora em `auth/`** e é trocável: o núcleo não conhece UI, `Settings` nem provedor; cada provedor é uma pasta em
+  `auth/providers/` mais uma linha no registro (`AuthProviders`). O `AuthIsolationTest` confere isso lendo os imports.
+- **Independe dos outros blocos** (só reusa o downloader/`ModelStore` do Bloco 4). Entra no build de release da PS-5: se o
+  login da OpenAI for ligado, a decisão de elegibilidade abaixo precisa estar tomada antes.
+- **[YAN]**: (1) tornar o repositório público — o caminho aberto da OpenAI (registro dinâmico, sem client ID a pedir) parte
+  dessa premissa; (2) **decidir a elegibilidade** (RPRV-04): o KeyFlow é open source e local, mas planeja créditos, skins
+  pagas e anúncios — `OpenAiAuthConfig.enabled = BuildConfig.DEBUG` mantém o login desligado no release até lá (a chave de
+  API funciona sempre); (3) rodar o roteiro `manual-validation.md` no A32 (login real com uma conta de plano, o Gemma/Qwen no
+  aparelho e o consumo de RAM).
+- **Não faz parte do bloco**: a aceitação REAL do registro dinâmico pela OpenAI não é provada por teste nenhum daqui — só a conta
+  de plano no aparelho prova (RSN-T19).
+
 ---
 
 ## Resumo da fila (visão de uma linha)
@@ -261,6 +283,7 @@ Base: `PLAYSTORE_CHECKLIST.md` (raiz). Executar como quick tasks / tasks avulsas
 ```
 [YAN gates] → Q1..Q4 → SB-T8..T10 → GT (tour/Docs) → NM (modelos locais+parcial) → VC (visão)
 → API (Rust, pode paralelizar) → MZ (monetização) → TS (temas, ⚠️ checkpoints) → PS-1..PS-7 (loja)
+(fora da fila, independente: RSN — aba Raciocínio, Bloco 10)
 ```
 
 **Posição atual (2026-09-28)**: GT e NM fechados (faltam só manuais **[YAN]**); ajustes do teclado
