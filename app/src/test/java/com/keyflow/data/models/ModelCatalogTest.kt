@@ -121,4 +121,56 @@ class ModelCatalogTest {
         assertThat(ModelCatalog.SPEECH.map { it.kind }).doesNotContain(ModelKind.TEXT)
         assertThat(ModelCatalog.TEXT.map { it.kind }).doesNotContain(ModelKind.SPEECH)
     }
+
+    // ── RCAT-02/03: catálogo de texto (LiteRT-LM) ──────────────────────────────────────────────
+
+    @Test
+    fun `text catalog has the light and the balanced model, lightest first`() {
+        assertThat(ModelCatalog.TEXT.map { it.id })
+            .containsExactly("qwen3-0.6b-litertlm", "gemma-4-e2b-litertlm")
+            .inOrder()
+        assertThat(ModelCatalog.TEXT.map { it.totalBytes }).isInOrder()
+        assertThat(ModelCatalog.TEXT.map { it.recommendedRamMb }).isInOrder()
+    }
+
+    @Test
+    fun `text specs are one litertlm file each, with a real sha256 and size`() {
+        ModelCatalog.TEXT.forEach { model ->
+            assertThat(model.kind).isEqualTo(ModelKind.TEXT)
+            assertThat(model.engineType).isEqualTo(EngineType.LITERT_LM)
+            val file = model.files.single()
+            assertThat(file.role).isEqualTo(FileRole.MODEL)
+            assertThat(file.fileName).endsWith(".litertlm")
+            assertThat(file.sha256).matches("[0-9a-f]{64}")
+            assertThat(file.bytes).isGreaterThan(0L)
+            assertThat(model.recommendedRamMb).isGreaterThan(0)
+            assertThat(model.acceptsLanguageHint).isFalse()
+            assertThat(model.modelName).isNotEmpty()
+        }
+    }
+
+    /** RCAT-03: só baixável sem login, e fixado no commit — o SHA do catálogo tem de continuar valendo. */
+    @Test
+    fun `text urls point to a pinned huggingface commit and end with the file name`() {
+        ModelCatalog.TEXT.flatMap { it.files }.forEach { file ->
+            assertThat(file.url).matches("https://huggingface\\.co/litert-community/[^/]+/resolve/[0-9a-f]{40}/.+")
+            assertThat(file.url).endsWith("/${file.fileName}")
+        }
+    }
+
+    /** Números lidos da API do Hugging Face em 2026-09-29 (`/api/models/<repo>/tree/<commit>`). */
+    @Test
+    fun `text sizes and hashes match the upstream files`() {
+        assertThat(ModelCatalog.QWEN3_0_6B.totalBytes).isEqualTo(614_236_160L)
+        assertThat(ModelCatalog.QWEN3_0_6B.files.single().sha256)
+            .isEqualTo("555579ff2f4fd13379abe69c1c3ab5200f7338bc92471557f1d6614a6e5ab0b4")
+        assertThat(ModelCatalog.GEMMA_4_E2B.totalBytes).isEqualTo(2_588_147_712L)
+        assertThat(ModelCatalog.GEMMA_4_E2B.files.single().sha256)
+            .isEqualTo("181938105e0eefd105961417e8da75903eacda102c4fce9ce90f50b97139a63c")
+    }
+
+    @Test
+    fun `ids are unique across all kinds`() {
+        assertThat(ModelCatalog.MODELS.map { it.id }).containsNoDuplicates()
+    }
 }

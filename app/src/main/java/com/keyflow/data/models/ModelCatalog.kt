@@ -151,11 +151,57 @@ object ModelCatalog {
         ),
     )
 
+    // ── Modelos de texto (reasoning-models) ─────────────────────────────────────────────────────────────
+    // Rodam no LiteRT-LM (`:reasoning`). Só entra aqui modelo baixável SEM login (RCAT-03): o downloader não tem
+    // token do Hugging Face. Por isso o Gemma 3 1B (`litert-community/Gemma3-1B-IT`, `gated: auto`, 401 anônimo,
+    // licença Gemma) ficou de fora e o leve é o Qwen3 0.6B. Tamanhos e SHA256 lidos da API do HF em 2026-09-29
+    // (`/api/models/<repo>/tree/<commit>`: `lfs.oid` = SHA256, `lfs.size`); as duas URLs responderam 206 a um pedido
+    // de faixa, sem token. URLs no COMMIT do repositório, como na fala.
+    private const val GEMMA_4_REPO = "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/b3ca0d2f076785a8f4b2219ddbd2bdb99954eae1"
+    private const val QWEN3_REPO = "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/a3c5d805ae362dff7f580bc25f2dfb9a5a7eaa76"
+
+    /** Qwen3 0.6B (Alibaba), INT8 dinâmico, contexto de 4096. Licença Apache 2.0. */
+    val QWEN3_0_6B = ModelSpec(
+        id = "qwen3-0.6b-litertlm",
+        displayName = trKey("Leve"),
+        summary = trKey("Pequeno e ágil; bom para ajustes rápidos de texto em qualquer aparelho."),
+        languages = trKey("Multilíngue"),
+        engineType = EngineType.LITERT_LM,
+        acceptsLanguageHint = false,
+        // Estimativa: arquivo de ~586 MB. Revisar com a medição no A32 (RSN-T19).
+        recommendedRamMb = 1024,
+        modelName = "Qwen3 0.6B",
+        kind = ModelKind.TEXT,
+        files = listOf(
+            ModelFile(FileRole.MODEL, "Qwen3-0.6B.litertlm", "$QWEN3_REPO/Qwen3-0.6B.litertlm", "555579ff2f4fd13379abe69c1c3ab5200f7338bc92471557f1d6614a6e5ab0b4", 614_236_160L),
+        ),
+    )
+
+    /**
+     * Gemma 4 E2B (Google), arquivo genérico (CPU/GPU) — não as variantes de NPU de fornecedor. Licença Apache 2.0.
+     * O README do repositório mede ~1,4–1,7 GB de memória de CPU num S26 Ultra; o A32 é bem mais modesto.
+     */
+    val GEMMA_4_E2B = ModelSpec(
+        id = "gemma-4-e2b-litertlm",
+        displayName = trKey("Equilibrado"),
+        summary = trKey("Mais capaz que o Leve; pesado — melhor em aparelhos com bastante memória."),
+        languages = trKey("Multilíngue"),
+        engineType = EngineType.LITERT_LM,
+        acceptsLanguageHint = false,
+        // Estimativa (memória de CPU ~1,7 GB no README, num aparelho topo de linha). Revisar na RSN-T19.
+        recommendedRamMb = 4096,
+        modelName = "Gemma 4 E2B",
+        kind = ModelKind.TEXT,
+        files = listOf(
+            ModelFile(FileRole.MODEL, "gemma-4-E2B-it.litertlm", "$GEMMA_4_REPO/gemma-4-E2B-it.litertlm", "181938105e0eefd105961417e8da75903eacda102c4fce9ce90f50b97139a63c", 2_588_147_712L),
+        ),
+    )
+
     /** Modelos de fala, na ordem em que a aba Transcrição lista: do mais leve ao mais pesado. */
     val SPEECH: List<ModelSpec> = listOf(WHISPER_BASE, WHISPER_SMALL, PARAKEET_V3)
 
-    /** Modelos de texto (aba Raciocínio). Preenchidos na RSN-T3, com dados conferidos na fonte. */
-    val TEXT: List<ModelSpec> = emptyList()
+    /** Modelos de texto (aba Raciocínio), do mais leve ao mais pesado. */
+    val TEXT: List<ModelSpec> = listOf(QWEN3_0_6B, GEMMA_4_E2B)
 
     /** Todos, para quem só resolve por id ([byId]) — o downloader e o store não sabem de tipo. */
     val MODELS: List<ModelSpec> = SPEECH + TEXT
