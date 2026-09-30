@@ -73,5 +73,12 @@
             android:process=":inference"
             android:exported="false" />
 
+        <!-- Raciocínio local (reasoning-models, RSN-T5): processo próprio, separado do :inference — o modelo de fala fica
+             residente para o ditado e um LLM de GB lá dentro derrubaria a transcrição por falta de memória. -->
+        <service
+            android:name=".reasoning.local.ReasoningService"
+            android:process=":reasoning"
+            android:exported="false" />
+
     </application>
 </manifest>
