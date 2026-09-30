@@ -54,17 +54,22 @@ do emulador Android 17 (`.specs/quick/010-suite-no-aparelho/`) existe para achar
   (`:reasoning`); o texto não sai do dispositivo. Os arquivos são baixados sob demanda do Hugging Face (o app só faz o pedido
   de download) e somem se o app for desinstalado. Licenças: Apache 2.0 (`app/licenses/`, aba Docs → Licenças).
 - **OpenAI (nuvem — só quando o usuário escolhe essa origem)**: o texto que o usuário manda gerar (hoje, a frase do botão
-  Testar) é enviado à OpenAI em `api.openai.com/v1/responses`, com `store: false` (a OpenAI não o guarda para o app).
+  Testar) é enviado à OpenAI em `api.openai.com/v1/responses`, com `store: false` (a resposta não fica guardada para consulta
+  posterior pelo app — **isso não é "a OpenAI não guarda"**: ela ainda pode reter o conteúdo pelo prazo da política dela, e no
+  login do plano o texto passa a valer nas regras de dados da conta ChatGPT do usuário; a política de privacidade deve dizer isso
+  e apontar para a da OpenAI).
   Há dois jeitos de autenticar, ambos com as credenciais **só no aparelho** — cifradas no Keystore, fora do backup:
   - a **chave de API** que o próprio usuário cola;
   - o login **"Continue with ChatGPT"** (OAuth 2.0 + OpenID Connect com PKCE e registro dinâmico do cliente): o app é
     cliente **público** — **não existe `client_secret` no APK** — e guarda access/refresh token e o e-mail da conta (vem do ID
     token) **apenas no aparelho**, nunca em servidor do KeyFlow.
-- **O desenvolvedor não coleta**: o texto enviado, as respostas, as credenciais nem o e-mail — nada disso passa por servidor
-  do KeyFlow.
-- **Data Safety (rascunho)**: acrescentar "User content → texto enviado à OpenAI a pedido do usuário" (compartilhado com o
-  provedor que o usuário escolheu, opcional, criptografado em trânsito, **não coletado** pelo desenvolvedor); "Personal info →
-  e-mail": **não coletado** (fica no aparelho).
+- **Nada disso passa por servidor do KeyFlow** (texto enviado, respostas, credenciais, e-mail) — mas, **para o Play Console, dado
+  que sai do aparelho conta como coletado/compartilhado**, mesmo sem servidor do desenvolvedor no meio.
+- **Data Safety (rascunho)**: acrescentar "User content → texto enviado à OpenAI a pedido do usuário" declarado como **coletado e
+  compartilhado** (com o provedor que o usuário escolheu, opcional, criptografado em trânsito), do mesmo jeito que o áudio na
+  seção 3. **Não marcar "não coletado"** sem antes conferir no formulário se alguma exceção se aplica (ex.: processamento
+  efêmero) — decisão do Yan no Play Console. "Personal info → e-mail": o e-mail vem do ID token e fica só no aparelho (o login em
+  si é entre o usuário e a OpenAI); conferir o mesmo critério.
 
 #### 1c. Login ChatGPT — elegibilidade (RPRV-04) — **[YAN] decidir antes de publicar com ele ligado**
 
