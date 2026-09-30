@@ -1,6 +1,7 @@
 package com.keyflow
 
 import android.app.Application
+import com.keyflow.auth.AuthServices
 import com.keyflow.data.SettingsRepository
 import com.keyflow.i18n.AppLanguage
 import com.keyflow.i18n.AppLocale
@@ -13,6 +14,9 @@ import kotlinx.coroutines.launch
 class App : Application() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    /** A autenticação dos provedores de nuvem: um grafo só para o processo (ver [AuthServices]); nada é criado até alguém pedir. */
+    val authServices: AuthServices by lazy { AuthServices(this) }
 
     override fun onCreate() {
         super.onCreate()

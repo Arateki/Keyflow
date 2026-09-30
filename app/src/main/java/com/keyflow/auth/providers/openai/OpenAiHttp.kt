@@ -7,7 +7,10 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.FormBody
@@ -32,13 +35,29 @@ internal object OpenAiHttp {
         .build()
 }
 
-/** Uma chamada OkHttp que suspende e cancela junto com a corrotina (nada de thread presa esperando a rede). */
-internal suspend fun Call.await(): Response = suspendCancellableCoroutine { cont ->
-    cont.invokeOnCancellation { cancel() }
-    enqueue(object : Callback {
-        override fun onResponse(call: Call, response: Response) = cont.resume(response)
-        override fun onFailure(call: Call, e: IOException) = cont.resumeWithException(e)
-    })
+/**
+ * Uma chamada OkHttp que suspende e cancela junto com a corrotina (nada de thread presa esperando a rede).
+ *
+ * O corpo é lido AQUI, em `Dispatchers.IO`, e a [Response] volta com ele já em memória: a corrotina retoma na thread de quem
+ * chamou (a main, no login e na renovação), e ler o corpo ali bloquearia a interface — e em HTTP/1.1 lançaria
+ * `NetworkOnMainThreadException` sob StrictMode. Um cancelamento fecha a resposta em vez de vazá-la.
+ */
+@OptIn(ExperimentalCoroutinesApi::class)
+internal suspend fun Call.await(): Response {
+    val response = suspendCancellableCoroutine { cont ->
+        cont.invokeOnCancellation { cancel() }
+        enqueue(object : Callback {
+            override fun onResponse(call: Call, response: Response) = cont.resume(response) { _, _, _ -> response.close() }
+            override fun onFailure(call: Call, e: IOException) = cont.resumeWithException(e)
+        })
+    }
+    try {
+        withContext(Dispatchers.IO) { response.body?.source()?.request(Long.MAX_VALUE) }
+    } catch (e: Throwable) {
+        response.close()
+        throw e
+    }
+    return response
 }
 
 /** `POST` de formulário (`application/x-www-form-urlencoded`), como o token endpoint e a revogação esperam. */

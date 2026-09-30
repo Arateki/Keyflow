@@ -1,8 +1,10 @@
 package com.keyflow.auth
 
 import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /**
  * Quem entrega os cabeçalhos de credencial a um cliente de API (AUTH-04). O cliente pede [headers] e nunca vê a renovação
@@ -14,6 +16,13 @@ interface AuthorizationProvider {
      * `NEEDS_RECONNECT` (a renovação deixou de valer — só o login de novo resolve) ou o tipo temporário (`NETWORK`…).
      */
     suspend fun headers(provider: ProviderId): Map<String, String>
+
+    /**
+     * O servidor recusou a credencial como inválida para SEMPRE (ex.: 401 `subscription_sharing_invalid_user`): um login vira
+     * "esqueleto" e a conexão passa a pedir login de novo; uma chave de API não é tocada (corrigi-la é do usuário). Sem efeito
+     * quando não há nada guardado.
+     */
+    fun invalidate(provider: ProviderId) {}
 }
 
 /**
@@ -31,13 +40,24 @@ class DefaultAuthorizationProvider(
 
     private val locks = ConcurrentHashMap<ProviderId, Mutex>()
 
+    override fun invalidate(provider: ProviderId) {
+        val current = store.get(provider) as? Credential.OAuth ?: return
+        if (!current.isSkeleton) store.put(provider, skeletonOf(current))
+    }
+
+    /** Sem tokens; o REGISTRO (client_id, id_token, conta) fica, e o próximo login o reaproveita. */
+    private fun skeletonOf(current: Credential.OAuth) =
+        current.copy(accessToken = "", refreshToken = null, expiresAtMs = 0, earliestRefreshAtMs = null, scopes = emptySet())
+
     override suspend fun headers(provider: ProviderId): Map<String, String> {
         val entry = requireNotNull(registry.firstOrNull { it.id == provider }) { "provedor não registrado: ${provider.value}" }
         var credential = store.get(provider) ?: throw AuthException(AuthErrorKind.NOT_CONNECTED, "sem credencial guardada")
         if (credential is Credential.OAuth && needsRefresh(credential)) {
             credential = locks.getOrPut(provider) { Mutex() }.withLock {
                 val current = store.get(provider) ?: throw AuthException(AuthErrorKind.NOT_CONNECTED, "a credencial sumiu")
-                if (current is Credential.OAuth && needsRefresh(current)) refresh(entry, current) else current
+                // A renovação TROCA o refresh token no servidor: se quem chamou for cancelado no meio, o novo ainda precisa ser
+                // gravado — senão o cofre fica com o velho, que a próxima renovação vê como reusado e força um login novo.
+                if (current is Credential.OAuth && needsRefresh(current)) withContext(NonCancellable) { refresh(entry, current) } else current
             }
         }
         return entry.headersFor(credential)
@@ -62,7 +82,7 @@ class DefaultAuthorizationProvider(
             when (e.kind) {
                 // O refresh deixou de valer: os tokens somem, o REGISTRO (client_id, id_token) fica, e o próximo login o reaproveita.
                 AuthErrorKind.INVALID_GRANT -> {
-                    store.put(entry.id, current.copy(accessToken = "", refreshToken = null, expiresAtMs = 0, earliestRefreshAtMs = null, scopes = emptySet()))
+                    store.put(entry.id, skeletonOf(current))
                     throw AuthException(AuthErrorKind.NEEDS_RECONNECT, "a renovação não vale mais", e)
                 }
                 // Falha temporária: nada é apagado; se o token ainda vale, ele segue valendo.

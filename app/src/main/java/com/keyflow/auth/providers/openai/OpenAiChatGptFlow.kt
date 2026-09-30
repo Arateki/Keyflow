@@ -88,7 +88,8 @@ internal class OpenAiChatGptFlow(
 
     override suspend fun complete(redirect: URI): Credential.OAuth {
         val params = queryOf(redirect)
-        // O `state` primeiro, sempre: um callback forjado (mesmo dizendo "access_denied") não pode cancelar o login legítimo.
+        // O `state` primeiro, sempre: um callback forjado (mesmo dizendo "access_denied") não é tratado como recusa do usuário nem toca
+        // nas credenciais. (Ele ainda encerra a espera no receptor de loopback — ver PendingAuth.)
         val state = params["state"] ?: throw AuthException(AuthErrorKind.INVALID_RESPONSE, "callback sem state")
         val current = pending.consume(state) ?: throw AuthException(AuthErrorKind.INVALID_RESPONSE, "callback sem tentativa pendente")
         val started = attempt ?: throw AuthException(AuthErrorKind.INVALID_RESPONSE, "tentativa desconhecida")
@@ -184,12 +185,28 @@ internal class OpenAiChatGptFlow(
 
     /** O erro do token endpoint: só os CÓDIGOS documentados importam; o corpo não vai para a mensagem. */
     private fun errorFor(status: Int, body: String): AuthException {
-        val code = runCatching { JSONObject(body).optString("error") }.getOrDefault("")
+        val code = errorCodeOf(body)
         return when {
             code in UNUSABLE_GRANT_CODES -> AuthException(AuthErrorKind.INVALID_GRANT, "o token endpoint recusou ($code)")
             code == "invalid_client" -> AuthException(AuthErrorKind.DENIED, "o cliente foi recusado (invalid_client)")
+            // As credenciais da renovação foram rejeitadas, com um código que a doc não lista: pedir login em vez de repetir para sempre.
+            status == 401 -> AuthException(AuthErrorKind.INVALID_GRANT, "o token endpoint rejeitou as credenciais (HTTP 401)")
             status >= 500 || status == 429 -> AuthException(AuthErrorKind.NETWORK, "o token endpoint respondeu HTTP $status")
             else -> AuthException(AuthErrorKind.INVALID_RESPONSE, "o token endpoint recusou (HTTP $status $code)")
+        }
+    }
+
+    /**
+     * A doc não define a forma do corpo de erro do token endpoint (openai-siwc-notes.md): aceita `{"error":"código"}`,
+     * `{"error":{"code":"código"}}` e `{"code":"código"}`. O texto do corpo nunca vai para a mensagem.
+     */
+    private fun errorCodeOf(body: String): String {
+        val json = runCatching { JSONObject(body) }.getOrNull() ?: return ""
+        val error = json.opt("error")
+        return when {
+            error is String -> error
+            error is JSONObject -> error.optString("code").ifEmpty { error.optString("error") }
+            else -> json.optString("code")
         }
     }
 

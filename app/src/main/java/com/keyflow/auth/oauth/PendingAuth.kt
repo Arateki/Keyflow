@@ -8,7 +8,9 @@ class PendingAuth(val state: String, val nonce: String, val verifier: String, va
 /**
  * A tentativa pendente (AUTH-08, Review Focus 1): **uma por vez**, só em memória, que **expira** e só vale **uma vez**, com o
  * `state` certo. Se o app morrer durante o login, o callback chega sem tentativa e é descartado — o usuário toca "Entrar" de
- * novo. Um `state` errado é recusado e NÃO derruba a tentativa legítima (um callback forjado não pode cancelar o login).
+ * novo. Um `state` errado é recusado e NÃO toca na tentativa pendente nem nas credenciais. Atenção: o receptor de loopback entrega o
+ * PRIMEIRO GET válido no caminho, então um callback forjado ainda encerra a ESPERA do login em andamento (negação de serviço — o PKCE
+ * protege as credenciais); manter a escuta até chegar um `state` certo está na lista de menores adiados da revisão final.
  */
 class PendingAuthHolder(private val clock: () -> Long, private val ttlMs: Long = 600_000) {
     private var pending: PendingAuth? = null

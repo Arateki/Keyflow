@@ -78,6 +78,38 @@ class AuthControllerTest {
         assertThat(oauthFlow.receiver.closed).isTrue() // o socket de loopback não fica aberto
     }
 
+    /** Review, Important 1: um espaço de largura zero ou uma quebra de linha no meio da chave quebraria o cabeçalho HTTP. */
+    /**
+     * Review Focus 1 (Minor 4): Cancelar → Continuar, ou um toque duplo. Quem foi cancelado por um novo `connect()` limpa por
+     * último — e essa limpeza não pode apagar o receptor nem o "conectando" do login novo.
+     */
+    @Test
+    fun `starting a second login cannot be undone by the cleanup of the first`() = runTest {
+        val c = controller()
+        c.connect(provider, AuthMethod.OAUTH); runCurrent()
+        val first = oauthFlow.receiver
+
+        c.connect(provider, AuthMethod.OAUTH); runCurrent() // cancela o 1º; a limpeza dele roda AGORA
+        val second = oauthFlow.receiver
+
+        assertThat(second).isNotSameInstanceAs(first)
+        assertThat(first.closed).isTrue()
+        assertThat(second.closed).isFalse()                              // o receptor do login novo segue aberto
+        assertThat(c.current()).isEqualTo(ConnectionState.Connecting)    // e a tela ainda mostra "conectando"
+        c.cancel(provider)
+        assertThat(second.closed).isTrue()                               // e Cancelar ainda o alcança
+    }
+
+    @Test
+    fun `a pasted key keeps only printable ascii`() = runTest {
+        val c = controller()
+        c.saveApiKey(provider, "  sk-abc\u200B-123\n456\t ")
+        assertThat(store.get(provider)).isEqualTo(Credential.ApiKey("sk-abc-123456"))
+
+        c.saveApiKey(provider, "\u200B \n")
+        assertThat(store.get(provider)).isNull() // só lixo invisível = em branco = apagar
+    }
+
     @Test
     fun `connect asks the flow to force consent only when told to`() = runTest {
         val c = controller()

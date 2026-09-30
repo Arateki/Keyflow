@@ -108,6 +108,13 @@ class FakeOpenAi(val signer: TestSigner = TestSigner()) {
 
     fun tokenError(status: Int, error: String): MockResponse =
         MockResponse().setResponseCode(status).setHeader("Content-Type", "application/json").setBody(JSONObject().put("error", error).toString())
+
+    /** A doc não define a forma do corpo de erro do token endpoint: além de `{"error":"código"}`, aparece `{"error":{"code":…}}`. */
+    fun tokenErrorObject(status: Int, code: String): MockResponse = MockResponse().setResponseCode(status).setHeader("Content-Type", "application/json")
+        .setBody(JSONObject().put("error", JSONObject().put("code", code).put("message", "detalhe interno")).toString())
+
+    fun tokenErrorTopLevelCode(status: Int, code: String): MockResponse = MockResponse().setResponseCode(status).setHeader("Content-Type", "application/json")
+        .setBody(JSONObject().put("code", code).toString())
 }
 
 /** O corpo de um POST de formulário como mapa (o token endpoint e a revogação recebem `application/x-www-form-urlencoded`). */

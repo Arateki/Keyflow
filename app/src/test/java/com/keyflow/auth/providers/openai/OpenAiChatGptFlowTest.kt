@@ -355,6 +355,40 @@ class OpenAiChatGptFlowTest {
         }
     }
 
+    /**
+     * Review, Important 3: a doc não define a forma do corpo de erro. Um código inutilizável dentro de `{"error":{"code":…}}` ou solto
+     * em `{"code":…}` também vale — senão a conexão fica "Conectada" e morta, repetindo uma renovação que nunca vai passar.
+     */
+    @Test
+    fun `an unusable code is recognised in an error object and in a top level code`() {
+        listOf("invalid_grant", "refresh_token_expired", "refresh_token_invalidated", "refresh_token_reused").forEach { code ->
+            openai.tokenResponses += openai.tokenErrorObject(400, code)
+            assertThat(failure { flow().refresh(current) }.kind).isEqualTo(AuthErrorKind.INVALID_GRANT)
+            openai.tokenResponses += openai.tokenErrorTopLevelCode(400, code)
+            assertThat(failure { flow().refresh(current) }.kind).isEqualTo(AuthErrorKind.INVALID_GRANT)
+        }
+    }
+
+    @Test
+    fun `an invalid client in an error object is still a configuration error`() {
+        openai.tokenResponses += openai.tokenErrorObject(401, "invalid_client")
+        assertThat(failure { flow().refresh(current) }.kind).isEqualTo(AuthErrorKind.DENIED)
+    }
+
+    /** Um 401 da renovação com um código que ninguém conhece: as credenciais foram rejeitadas — pedir login, não repetir para sempre. */
+    @Test
+    fun `a 401 on refresh with an unknown code means the credentials were rejected`() {
+        openai.tokenResponses += openai.tokenError(401, "algo_novo")
+        assertThat(failure { flow().refresh(current) }.kind).isEqualTo(AuthErrorKind.INVALID_GRANT)
+    }
+
+    /** …mas um 400 desconhecido pode ser um pedido nosso malformado: não se apaga o login por isso. */
+    @Test
+    fun `a 400 with an unknown code is an invalid response and never erases the login`() {
+        openai.tokenResponses += openai.tokenError(400, "algo_novo")
+        assertThat(failure { flow().refresh(current) }.kind).isEqualTo(AuthErrorKind.INVALID_RESPONSE)
+    }
+
     @Test
     fun `an invalid client is a configuration error, not a reason to erase the login`() {
         openai.tokenResponses += openai.tokenError(401, "invalid_client")

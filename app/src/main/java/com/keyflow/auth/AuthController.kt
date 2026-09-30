@@ -1,6 +1,7 @@
 package com.keyflow.auth
 
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -26,6 +27,15 @@ class AuthController(
     private val errors = MutableStateFlow<Map<ProviderId, AuthErrorKind>>(emptyMap())
     private val jobs = ConcurrentHashMap<ProviderId, Job>()
     private val receivers = ConcurrentHashMap<ProviderId, RedirectReceiver>()
+
+    /**
+     * Qual tentativa de login é a atual. Quem foi cancelado por um `connect()` novo (ou por [cancel]) termina DEPOIS, e a limpeza
+     * dele não pode apagar o receptor nem o "conectando" da tentativa nova — só a atual limpa.
+     */
+    private val attempts = ConcurrentHashMap<ProviderId, AtomicLong>()
+
+    private fun newAttempt(provider: ProviderId): Long = attempts.getOrPut(provider) { AtomicLong() }.incrementAndGet()
+    private fun isCurrent(provider: ProviderId, attempt: Long) = attempts[provider]?.get() == attempt
 
     fun state(provider: ProviderId): Flow<ConnectionState> =
         combine(store.changes(provider), connecting, errors) { credential, waiting, failed ->
@@ -53,6 +63,7 @@ class AuthController(
             return
         }
         jobs.remove(provider)?.cancel()
+        val attempt = newAttempt(provider)
         connecting.update { it + provider }
         jobs[provider] = scope.launch {
             var start: AuthStart? = null
@@ -70,16 +81,21 @@ class AuthController(
                 errors.update { it + (provider to AuthErrorKind.UNKNOWN) }
             } finally {
                 start?.redirect?.close()
-                receivers.remove(provider)
-                connecting.update { it - provider }
+                if (isCurrent(provider, attempt)) {
+                    receivers.remove(provider)
+                    connecting.update { it - provider }
+                }
             }
         }
     }
 
-    /** A chave é guardada sem os espaços que o colar traz; em branco = apagar. */
+    /**
+     * A chave é guardada só com ASCII imprimível: o colar traz espaços, quebras de linha e caracteres de largura zero que nenhuma
+     * chave tem — e que o OkHttp recusa no cabeçalho, derrubando a chamada. Em branco (ou só lixo invisível) = apagar.
+     */
     fun saveApiKey(provider: ProviderId, key: String) {
         errors.update { it - provider }
-        val trimmed = key.trim()
+        val trimmed = key.filter { it.code in 0x21..0x7E }
         if (trimmed.isEmpty()) store.clear(provider) else store.put(provider, Credential.ApiKey(trimmed))
     }
 
@@ -102,6 +118,7 @@ class AuthController(
 
     /** Desiste do login em andamento: fecha o receptor e volta a "desconectado". */
     fun cancel(provider: ProviderId) {
+        newAttempt(provider) // a limpeza de quem foi cancelado não vale mais: esta função já limpou tudo
         jobs.remove(provider)?.cancel()
         receivers.remove(provider)?.close()
         connecting.update { it - provider }

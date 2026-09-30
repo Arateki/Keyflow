@@ -7,6 +7,7 @@ import com.keyflow.auth.fake.oauth
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.currentTime
@@ -35,6 +36,55 @@ class DefaultAuthorizationProviderTest {
         clock = { currentTime },
         marginMs = margin,
     )
+
+    /**
+     * Review, Important 2: o refresh token é rotativo — se quem chamou for cancelado (Parar, girar a tela, o efeito da lista de
+     * modelos recomeçando) DEPOIS de o servidor já ter trocado o token, o novo tem de ser gravado do mesmo jeito; senão o cofre
+     * fica com o velho, que a próxima renovação vê como reusado.
+     */
+    @Test
+    fun `cancelling the caller during a refresh still persists the rotated credential`() = runTest {
+        store.put(provider, oauth(expiresAtMs = 30_000))
+        flow.refreshDelayMs = 100
+        flow.refreshResult = { it.copy(accessToken = "access2", refreshToken = "refresh2", expiresAtMs = 4_000_000) }
+        val authorization = authorization()
+
+        val caller = launch { runCatching { authorization.headers(provider) } }
+        runCurrent() // entra na renovação (dorme 100 ms)
+        caller.cancel()
+        advanceTimeBy(200); runCurrent()
+
+        val saved = store.get(provider) as Credential.OAuth
+        assertThat(saved.refreshToken).isEqualTo("refresh2")
+        assertThat(saved.accessToken).isEqualTo("access2")
+    }
+
+    /** RCL-03: o servidor disse 401 invalid_user → o login vira "esqueleto" (o registro fica) e o próximo pedido pede login de novo. */
+    @Test
+    fun `invalidating a login leaves the skeleton and the next call asks to reconnect`() = runTest {
+        store.put(provider, oauth(expiresAtMs = 3_600_000))
+        val authorization = authorization()
+
+        authorization.invalidate(provider)
+
+        val saved = store.get(provider) as Credential.OAuth
+        assertThat(saved.isSkeleton).isTrue()
+        assertThat(saved.clientId).isEqualTo("oaiapp_1") // o registro não se perde
+        val failure = runCatching { authorization.headers(provider) }.exceptionOrNull() as AuthException
+        assertThat(failure.kind).isEqualTo(AuthErrorKind.NEEDS_RECONNECT)
+    }
+
+    /** A chave de API recusada é do usuário para corrigir; apagá-la em silêncio seria pior. */
+    @Test
+    fun `invalidating an api key or nothing changes nothing`() = runTest {
+        val authorization = authorization()
+        authorization.invalidate(provider) // nada guardado: sem exceção
+        assertThat(store.get(provider)).isNull()
+
+        store.put(provider, Credential.ApiKey("sk-x"))
+        authorization.invalidate(provider)
+        assertThat(store.get(provider)).isEqualTo(Credential.ApiKey("sk-x"))
+    }
 
     @Test
     fun `a valid token is not refreshed`() = runTest {
