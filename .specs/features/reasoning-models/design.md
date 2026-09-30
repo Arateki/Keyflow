@@ -116,7 +116,7 @@ religa no próximo uso. Sem preload (R8) — diferente do `LocalTranscriber`.
 ```
 auth/
   Credential.kt            sealed: ApiKey(value) | OAuth(access, refresh?, expiresAtMs, earliestRefreshAtMs?, scopes,
-                           idToken?, clientId?, account?)   ← clientId = o EMITIDO no registro dinâmico (AUTH-10)
+                           idToken?, clientId?, subject?, account?)   ← clientId = o EMITIDO no registro dinâmico (AUTH-10)
   CredentialStore.kt       interface + SecureCredentialStore (SecurePrefs, alias próprio)
   ConnectionState.kt       Disconnected | Connecting | Connected(account?, method) | NeedsReconnect | Error(kind)
   AuthFlow.kt              interface por método
@@ -141,6 +141,8 @@ interface CredentialStore {
     fun put(provider: ProviderId, credential: Credential)
     fun clear(provider: ProviderId)
     fun changes(provider: ProviderId): Flow<Credential?>
+    fun meta(provider: ProviderId, key: String): String?             // dado NÃO secreto do provedor que SOBREVIVE ao clear (ex.: id do host)
+    fun putMeta(provider: ProviderId, key: String, value: String)
 }
 
 interface RedirectReceiver {                     // implementações: LoopbackRedirectReceiver (OpenAI); esquema/app link no futuro
@@ -179,39 +181,49 @@ interface AuthorizationProvider {
   montado por uma função do **provedor** (`ProviderAuth.headersFor(credential)`), não pelo módulo genérico.
 
 ### 8. Fluxo OAuth (AUTH-08..11) — o caso da OpenAI
-Valores conferidos em 2026-09-29 na documentação oficial (fontes em §10); os marcados ⚠ ainda precisam ser
-descobertos/reconferidos na task de verificação.
+Todos os valores vêm do **texto literal** da documentação, conferido em 2026-09-29 — ver `openai-siwc-notes.md`.
 ```
-UI "Entrar com ChatGPT"
+UI "Continue with ChatGPT"
   → AuthFlow.begin()
-      • sobe o LoopbackRedirectReceiver em 127.0.0.1:<porta livre> (aceita 1 requisição em /callback)
+      • sobe o LoopbackRedirectReceiver em 127.0.0.1:<porta livre> (aceita 1 requisição em /auth/callback)
       • gera code_verifier/challenge (S256), state e nonce; guarda PendingAuth (1 por vez, expira)
-      • monta a URL de autorização: client_id (provisório `dynamic_agent_client` no 1º login; o EMITIDO nos
-        seguintes), response_type=code, redirect_uri=http://127.0.0.1:<porta>/callback, scope, resource,
-        state, nonce, code_challenge + code_challenge_method=S256, ext_agent_host_id e, só no registro
-        novo, agent_name_hint
+      • monta a URL de autorização (valores com URL-encode): registro novo → client_id=dynamic_agent_client +
+        agent_name_hint; reautorização → client_id EMITIDO + id_token_hint (ID token retido) + login_hint (e-mail),
+        SEM agent_name_hint; sempre: response_type=code, redirect_uri=http://127.0.0.1:<porta>/auth/callback,
+        scope, resource, state, nonce, code_challenge + code_challenge_method=S256, ext_agent_host_id
   → abre o navegador do sistema na URL (`ACTION_VIEW`; nunca WebView)
   → usuário autentica na OpenAI; o navegador é redirecionado a
-        http://127.0.0.1:<porta>/callback?code=…&state=…[&client_id=oaiapp_…]
-  → o receptor entrega a Uri, responde uma página curta ("Pronto — volte ao KeyFlow") e fecha o socket
-  → AuthFlow.complete(uri): confere o state; guarda o client_id emitido (registro novo); troca code+verifier
-        no token endpoint (sem client_secret); valida o ID token (iss, aud, nonce, exp); lê os escopos
-        concedidos → sem `chatgpt.tokens.use.direct` ⇒ conectado "sem uso do plano" (RCL-07)
+        http://127.0.0.1:<porta>/auth/callback?code=…&state=…[&client_id=oaiapp_…][&scope=…]
+  → o receptor entrega a URI, responde uma página curta ("Pronto — volte ao KeyFlow") e fecha o socket
+  → AuthFlow.complete(uri):
+        `error=access_denied` → valida o state e PARA (sem trocar código); confere o state;
+        registro novo sem client_id no callback = registro incompleto (erro); na reautorização, client_id
+        diferente do retido → rejeita; POST form ao token endpoint (grant_type=authorization_code, client_id
+        emitido, code, code_verifier, MESMA redirect_uri, resource; sem client_secret); `invalid_grant` → descarta
+        o código e recomeça; valida o ID token (assinatura RS256 pelo JWKS do documento de descoberta; iss;
+        aud == client_id emitido; exp; nonce), usa `sub` como identidade; lê os escopos concedidos →
+        sem `chatgpt.tokens.use.direct` ⇒ conectado "sem uso do plano" (RCL-07), sem inferir
   → CredentialStore.put(...) ⇒ ConnectionState = Connected(conta, método)
-Renovação (AUTH-11): AuthorizationProvider.headers() vê expiresAt − margem (sem passar de
-  earliest_refresh_at) → AuthFlow.refresh() sob Mutex → substitui access, expiração, escopos e refresh
-  rotativo JUNTOS e grava no cofre ANTES de devolver o cabeçalho; falhou (invalid_grant, token_expired,
-  refresh_token_invalidated) ⇒ apaga os tokens, MANTÉM o client_id emitido e vira NeedsReconnect (repetir o
-  OAuth com o mesmo client_id). ⚠ parâmetros exatos do refresh: seção "Refreshing tokens" da página sign-in.
-Sair: revoga o refresh token (refresh_token + token_type_hint=refresh_token + client_id; HTTP 200 vazio =
-  sucesso) e limpa tudo. ⚠ URL do endpoint de revogação a descobrir.
+Renovação (AUTH-11): headers() vê expiresAt − margem → refresh sob Mutex: POST form ao token endpoint com
+  grant_type=refresh_token, client_id emitido, refresh_token e resource (SEM scope) → substitui access, expiração,
+  escopos e refresh rotativo JUNTOS e grava no cofre ANTES de devolver o cabeçalho. Códigos que inutilizam o refresh
+  (invalid_grant, invalid_refresh_token, token_expired, refresh_token_expired, refresh_token_invalidated,
+  refresh_token_reused) ⇒ apaga os tokens, MANTÉM client_id e ID token e vira NeedsReconnect (repetir o OAuth com o
+  mesmo client_id). `invalid_client` ⇒ erro de configuração. Falha de rede/5xx NÃO apaga nada.
+Sair: POST form ao `revocation_endpoint` do documento de descoberta (token, token_type_hint=refresh_token, client_id;
+  HTTP 200 vazio = sucesso); rede/5xx → repete com espera; sem confirmação → limpa local e avisa "revogação remota
+  não confirmada". Depois limpa as credenciais (o ID do host permanece).
 ```
 - **Access token** vale 1 h; **refresh token** vale 30 dias e **rota a cada uso** — por isso a gravação atômica
   e o `Mutex` (uma renovação concorrente perderia o refresh e derrubaria a conexão).
+- **`earliest_refresh_at`**: a documentação só o lista como campo; **semântica e formato não são documentados**. Regra
+  do código: ler como segundos-época ou ISO-8601 (ignorar se ilegível) e não renovar antes dele enquanto o access token
+  ainda vale; a regra primária é a padrão da doc ("standard OAuth refresh near access-token expiry").
 - **Loopback no Android:** `ServerSocket` ligado só a `127.0.0.1` (porta 0 → livre), uma conexão, caminho e
   método exatos, fecha ao receber ou por tempo. O navegador é outro processo **do mesmo aparelho**, então
   alcança o socket. Outro app local poderia tentar conectar-se à porta, mas sem o `code_verifier` não troca o
-  `code` — `state` + PKCE cobrem. O redirect é `http://127.0.0.1` (nunca `localhost`), porta variável.
+  `code` — `state` + PKCE cobrem. O redirect é `http://127.0.0.1` (nunca `localhost`), porta variável, **caminho
+  fixo `/auth/callback`** (a doc exige o mesmo caminho depois do registro).
 - **O app precisa estar vivo enquanto o navegador está aberto.** Se o SO matar o processo, o navegador mostra
   "conexão recusada" e o usuário toca "Entrar" de novo. Risco medido no A32; se for frequente, o receptor sobe
   num serviço em primeiro plano (a task decide com a medição).
@@ -220,10 +232,14 @@ Sair: revoga o refresh token (refresh_token + token_type_hint=refresh_token + cl
   o `ext_agent_host_id`; o fluxo cabe atrás do `AuthFlow` e a **PKCE é testada contra o vetor do RFC 7636 (Apêndice B)**.
 - `PendingAuth` vive só em memória: se o app morrer durante o login, o redirect chega sem tentativa pendente,
   é descartado e o usuário toca "Entrar" de novo (o `state` órfão nunca é aceito).
-- **Registros separados (AUTH-10):** o `client_id` emitido é guardado **com a identidade do ID token**; duas contas
-  = dois registros, nunca misturados. O `ext_agent_host_id` é derivado de uma chave EC gerada no Android
-  Keystore desta instalação (impressão digital JWK no formato do RFC 9278 — ⚠ formato exato a conferir), opaco e
-  estável entre logins.
+- **Registros (AUTH-10), v1 = uma conta por provedor:** o `client_id` emitido é guardado **com a identidade do ID token**
+  (`sub`, e-mail) na credencial. **Desconectar limpa tudo, inclusive o `client_id`**: o próximo login registra um cliente
+  novo (custo: clientes órfãos na lista de apps do ChatGPT do usuário; a doc prefere reter o registro — melhoria futura,
+  junto com a troca de contas). **NeedsReconnect** (refresh inútil) mantém `client_id` e ID token e reautoriza sobre o
+  mesmo registro.
+- **`ext_agent_host_id` = `urn:uuid:<UUIDv4>`** gerado uma vez e guardado como **meta do cofre** (sobrevive ao Desconectar
+  e ao NeedsReconnect). A doc aceita `urn:uuid:` e diz que o formato por chave pública é "only an identifier" (a OpenAI não
+  verifica a posse da chave) — sem ganho em usar o Keystore.
 
 ### 9. `CredentialStore` seguro (AUTH-02)
 - `SecurePrefs.create(context, name = "keyflow_auth", keyAlias = "keyflow_auth_master")` — **alias próprio**:
@@ -240,23 +256,23 @@ Sair: revoga o refresh token (refresh_token + token_type_hint=refresh_token + cl
 // auth/providers/openai/OpenAiAuthConfig.kt — SÓ dados. É o único arquivo a editar quando a OpenAI mudar algo.
 internal object OpenAiAuthConfig {
     val enabled = BuildConfig.DEBUG                          // RPRV-04: só builds de dev até o Yan decidir a elegibilidade
+    const val discoveryUrl = "https://auth.openai.com/.well-known/openid-configuration"   // jwks_uri e revocation_endpoint saem daqui
+    const val issuer = "https://auth.openai.com"
     const val authorizationUrl = "https://auth.openai.com/api/accounts/authorize"
     const val tokenUrl = "https://auth.openai.com/api/accounts/oauth/token"
     const val provisionalClientId = "dynamic_agent_client"   // só no 1º login; depois vale o `oaiapp_…` emitido
     val scopes = listOf("openid", "profile", "email", "offline_access", "resource.invoke", "chatgpt.tokens.use.direct")
+    const val planScope = "chatgpt.tokens.use.direct"
     const val resource = "https://api.openai.com/v1"
-    const val redirectPath = "/callback"                     // host 127.0.0.1 fixo, porta variável
+    const val redirectPath = "/auth/callback"                // escolhido no 1º registro; NUNCA mudar (a doc exige o mesmo caminho depois)
     const val agentNameHint = "KeyFlow"
     const val apiBaseUrl = "https://api.openai.com/v1"       // mesma base para chave e para o token de plano
-    // ⚠ A descobrir/reconferir na task de verificação (RCL-04): parâmetros da renovação, URL de revogação,
-    //   formato do ext_agent_host_id. Não entram por suposição.
+    const val usageUrl = "https://chatgpt.com/settings/usage"
     const val docsSource = "https://developers.openai.com/siwc/token-sharing-open-source"
 }
 ```
-Fontes de cada valor (`developers.openai.com/siwc/token-sharing-open-source/…`): `sign-in` (endpoints, escopos,
-`resource`, loopback, `client_id` provisório), `token-reference` (validade dos tokens, resposta),
-`models-and-inference` (endpoint e corpo), `errors-and-recovery` (códigos), `profiles-and-sessions` (registro,
-host id, revogação). **As páginas foram lidas por um resumidor automático; a 1ª task relê o texto literal.**
+Fonte de cada valor: `.specs/features/reasoning-models/openai-siwc-notes.md` (texto literal, 2026-09-29). O que a doc **não**
+define está listado no fim desse arquivo e não entra por suposição.
 
 ### 11. Provedor fake e a prova de isolamento (AUTH-06)
 `FakeProvider` (só no source set de teste) implementa `AuthFlow` + um `ReasoningEngine` de eco e entra no
@@ -269,7 +285,8 @@ para acomodar um provedor novo, o isolamento quebrou.
 ### 12. `OpenAiReasoningEngine` (RCL-02/03/05/06)
 - `POST {apiBaseUrl}/responses`, cabeçalhos de `AuthorizationProvider.headers(OPENAI)` (`Authorization: Bearer …`,
   `Content-Type: application/json`), corpo **enxuto** que serve a chave e o login:
-  `{"model": …, "input": [{"role": …, "content": …}], "store": false, "stream": true}` — **sem**
+  `{"model": …, "input": [{"role": "user", "content": …}], "store": false, "stream": true}` e, **só quando há system,** o campo
+  de topo `"instructions": …` (item `{role:"system"}` em `input` é **rejeitado** pelo fluxo de plano) — **sem**
   `max_output_tokens`, `temperature`, `top_p`, `user`, `metadata` e demais parâmetros que o fluxo de plano rejeita.
 - Lê o corpo SSE **linha a linha** direto do `BufferedSource` do OkHttp (**sem nova dependência**):
   `response.output_text.delta` → `Delta`; **`response.completed`** → `Done` (só aqui é sucesso);
@@ -278,7 +295,8 @@ para acomodar um provedor novo, o isolamento quebrou.
   login → `NeedsReconnect`; chave → "chave inválida"); 403 `…_user_not_eligible` → `UNAUTHORIZED` sem repetir;
   429 `…_usage_limit_exceeded` → `RATE_LIMIT`; 400 `…_unsupported_capability` → `ENGINE` sem repetir o corpo;
   503 → repetição com espera limitada; `IOException` → `NETWORK`. Nunca cai em outra forma de cobrança sozinho.
-- `OpenAiModels.list(headers)` faz `GET {apiBaseUrl}/models` (RCL-06); falhou → mantém o modelo já escolhido e a UI oferece "Atualizar" (nunca inventa ids).
+- `OpenAiModels.list(headers)` faz `GET {apiBaseUrl}/models` (RCL-06) e entende **os dois formatos**: o do plano (`models[]` com
+  `slug`/`display_name`/`visibility`, exibir só `"list"`, ordem do servidor) e o da chave de API (`data[].id`); falhou → mantém o modelo já escolhido e a UI oferece "Atualizar" (nunca inventa ids).
 - Um único engine atende chave e login (RCL-05); qualquer diferença por tipo de credencial fica em
   `OpenAiAuthConfig`/`headersFor`.
 - **Fixtures do `MockWebServer`** reproduzem os eventos e os códigos **da documentação**; a aceitação real do corpo é

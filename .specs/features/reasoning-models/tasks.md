@@ -74,7 +74,7 @@ Fase A/B (o device é o gargalo: instrumentado serializa).
 
 ## Fase 0 — Verificação e catálogo
 
-### RSN-T1 — Verificação literal da documentação da OpenAI `[P]`
+### RSN-T1 — Verificação literal da documentação da OpenAI `[P]` ✅ CONCLUÍDA (2026-09-29; `openai-siwc-notes.md`)
 - **What**: trocar o resumo automático pelo **texto literal** das páginas. Salvar
   `.specs/features/reasoning-models/openai-siwc-notes.md` com trechos entre aspas, URL e data de cada página de
   `developers.openai.com/siwc/token-sharing-open-source/{sign-in,token-reference,models-and-inference,errors-and-recovery,profiles-and-sessions,preview-limitations}`.
@@ -308,13 +308,15 @@ Fase A/B (o device é o gargalo: instrumentado serializa).
   sealed interface Credential {
       data class ApiKey(val value: String) : Credential
       data class OAuth(val accessToken: String, val refreshToken: String?, val expiresAtMs: Long, val earliestRefreshAtMs: Long?,
-                       val scopes: Set<String>, val idToken: String?, val clientId: String?, val account: String?) : Credential
+                       val scopes: Set<String>, val idToken: String?, val clientId: String?, val subject: String?, val account: String?) : Credential
   }
   interface CredentialStore {
       fun get(provider: ProviderId): Credential?
       fun put(provider: ProviderId, credential: Credential)
       fun clear(provider: ProviderId)
       fun changes(provider: ProviderId): Flow<Credential?>
+      fun meta(provider: ProviderId, key: String): String?          // dado NÃO secreto do provedor; SOBREVIVE ao clear (ex.: id do host)
+      fun putMeta(provider: ProviderId, key: String, value: String)
   }
   sealed interface ConnectionState {
       data object Disconnected : ConnectionState
@@ -355,7 +357,7 @@ Fase A/B (o device é o gargalo: instrumentado serializa).
   `validTokenIsNotRefreshed` · `nearExpiryRefreshesOnce_andPersistsAllFieldsBeforeReturning` ·
   **`fiveConcurrentHeadersCallsTriggerExactlyOneRefresh`** (Review Focus 2) · `honorsEarliestRefreshAt` · `apiKeyReturnsHeaderWithoutRefresh` ·
   **`refreshFailureInvalidGrantClearsTokensKeepsClientIdAndSignalsNeedsReconnect`** · `storeWriteFailureAfterRefreshIsNotSwallowed` (o novo access não é usado se não gravou).
-  `AuthProvidersTest`: ids únicos. `AuthControllerTest`: `saveApiKeyStoresAndEmitsConnected` · `connectOAuthRunsBeginBrowserAwaitCompleteThenStores` · `cancelClosesTheReceiverAndReturnsToDisconnected` · `redirectTimeoutEmitsErrorTIMEOUTAndStoresNothing` · `completeFailureEmitsErrorAndStoresNothing`. `BackupRulesTest`: lê os dois XMLs e afirma que **todo** arquivo cifrado conhecido (`keyflow_secure.xml`, `keyflow_auth.xml`) está excluído em `full-backup-content`, `cloud-backup` e `device-transfer`.
+  `metaSurvivesClear` (fake + `SecureCredentialStoreTest`) · `AuthProvidersTest`: ids únicos. `AuthControllerTest`: `saveApiKeyStoresAndEmitsConnected` · `connectOAuthRunsBeginBrowserAwaitCompleteThenStores` · `cancelClosesTheReceiverAndReturnsToDisconnected` · `redirectTimeoutEmitsErrorTIMEOUTAndStoresNothing` · `completeFailureEmitsErrorAndStoresNothing`. `BackupRulesTest`: lê os dois XMLs e afirma que **todo** arquivo cifrado conhecido (`keyflow_secure.xml`, `keyflow_auth.xml`) está excluído em `full-backup-content`, `cloud-backup` e `device-transfer`.
   Instrumentado `SecureCredentialStoreTest`: put/get/clear/`changes`; **cofre corrompido** (escrever lixo no arquivo/keyset) → `get` devolve `null` sem exceção e o cofre volta a funcionar (Review Focus 5).
 - **Depends on**: —. **Requirement**: AUTH-01, AUTH-02, AUTH-03, AUTH-04, AUTH-07 (estado), AUTH-11.
 - **Done when**: testes verdes; `auth/` (fora de `providers/`) não importa `ui/`, `data.Settings` nem provedor concreto (garantido pela RSN-T13).
@@ -398,29 +400,41 @@ Fase A/B (o device é o gargalo: instrumentado serializa).
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `test(auth): provedor fake percorre o ciclo inteiro e o isolamento é conferido`.
 
 ### RSN-T14 — Provedor OpenAI: config, chave, login ChatGPT
-- **What**: `auth/providers/openai/`: `OpenAiAuthConfig` (design §10 — valores conferidos na RSN-T1), `OpenAiApiKeyFlow`, `OpenAiChatGptFlow : OAuthFlow` (registro dinâmico, loopback `/callback`, `state`+`nonce`,
-  troca de código sem `client_secret`, validação do ID token, escopos concedidos, renovação, revogação), `OpenAiHostIdentity` (`ext_agent_host_id` de chave EC do Android Keystore, formato da RSN-T1),
-  `OpenAiProvider` (`ProviderAuth` + `headersFor`), linha no `AuthProviders`. **Nada de valor "a verificar" entra por suposição** — só o que a `openai-siwc-notes.md` tem.
-- **Where**: `auth/providers/openai/*.kt`, `auth/AuthProviders.kt`; testes `test/.../auth/providers/openai/*` (MockWebServer + relógio virtual + Keystore falso).
+- **What**: `auth/providers/openai/` — regras e valores **literais** em `openai-siwc-notes.md` (nada entra por suposição):
+  `OpenAiAuthConfig` (design §10) · `OpenAiDiscovery` (lê e guarda em memória `revocation_endpoint` e `jwks_uri` do documento de descoberta) ·
+  `IdTokenVerifier` (JWT **RS256**: `kid` → chave RSA do JWKS (`n`,`e`) → `SHA256withRSA`; confere `iss`, `aud == client_id emitido`, `exp`, `nonce`; devolve `sub` e `email`) ·
+  `OpenAiHostId` (`urn:uuid:<UUIDv4>` gerado uma vez e guardado por `CredentialStore.putMeta`; sobrevive ao Desconectar) · `OpenAiApiKeyFlow : ApiKeyFlow` ·
+  `OpenAiChatGptFlow : OAuthFlow` (registro dinâmico e reautorização com `id_token_hint`/`login_hint`, loopback `/auth/callback`, troca sem `client_secret`, escopos concedidos, refresh, revoke;
+  `earliest_refresh_at` lido como segundos-época **ou** ISO-8601, ignorado se ilegível) · `OpenAiProvider` (`ProviderAuth` + `headersFor`) e a linha no `AuthProviders`.
+  JSON: com a biblioteca que o app já usa; se for `org.json`, a JVM de teste precisa de `testImplementation("org.json:json:<versão>")` — só de teste, registrar `Ruling`.
+- **Where**: `auth/providers/openai/*.kt`, `auth/AuthProviders.kt`; testes `test/.../auth/providers/openai/*` (MockWebServer + relógio virtual + par RSA gerado no teste).
 - **Tests first**: `OpenAiChatGptFlowTest`:
-  `beginBuildsAuthorizationUrlWithAllRequiredParams` (assert query: `response_type=code`, `redirect_uri=http://127.0.0.1:<porta>/callback`, os 6 escopos, `resource`, `code_challenge_method=S256`, `state`, `nonce`, `ext_agent_host_id`) ·
-  `firstLoginUsesProvisionalClientIdAndAgentNameHint` · `returningAccountUsesIssuedClientIdAndOmitsAgentNameHint` ·
-  `completeWithWrongStateThrowsAndTouchesNoCredential` (Review Focus 1) · `tokenExchangeBodyHasCodeVerifierRedirectUriResourceAndNoClientSecret` ·
-  `savesTheIssuedClientIdWithTheValidatedIdTokenIdentity` · `idTokenWithWrongIssuerOrNonceOrExpiredIsRejected` · `missingPlanScopeYieldsCredentialWithoutPlanUsage` (RCL-07) ·
-  `refreshReplacesAccessExpiryScopesAndRefreshTogether` · `refreshInvalidGrantMapsToNeedsReconnect` · `revokePostsRefreshTokenHintAndClientId`. `OpenAiApiKeyFlowTest`: `headersForApiKeyIsBearer` · `whenDisabledIsUnavailableWithReason` (AUTH-09).
-  `OpenAiHostIdentityTest`: `isStableAcrossCalls` · `hasTheDocumentedFormat`. `OpenAiAuthConfigTest`: sem `"…"`/`TODO` nos valores; URLs `https`; `redirectPath` começa com `/`.
+  `beginBuildsAuthorizationUrlWithAllRequiredParams` (assert: `response_type=code`, `redirect_uri=http://127.0.0.1:<porta>/auth/callback`, os 6 escopos, `resource`, `code_challenge_method=S256`, `state`, `nonce`, `ext_agent_host_id`, valores URL-encoded) ·
+  `firstLoginUsesProvisionalClientIdAndAgentNameHint` · `reauthorizationUsesIssuedClientIdIdTokenHintAndLoginHintAndOmitsAgentNameHint` ·
+  `completeWithWrongStateThrowsAndTouchesNoCredential` (Review Focus 1) · `accessDeniedStopsWithoutExchangingCode` · `newRegistrationWithoutIssuedClientIdIsIncomplete` ·
+  `reauthorizationCallbackWithDifferentClientIdIsRejected` · `tokenExchangeIsFormEncodedWithGrantCodeVerifierSameRedirectUriResourceAndNoClientSecret` · `invalidGrantOnExchangeDiscardsTheCode` ·
+  `savesIssuedClientIdWithVerifiedSubjectAndEmail` · `missingPlanScopeYieldsCredentialWithoutPlanUsage` (RCL-07) ·
+  `refreshPostsGrantTypeIssuedClientIdRefreshTokenAndResourceWithoutScope` · `refreshReplacesAccessExpiryScopesAndRefreshTogether` · `refreshUnusableCodesMapToNeedsReconnectKeepingClientIdAndIdToken` (as 6 causas) ·
+  `refreshNetworkOr5xxDoesNotEraseAnything` · `earliestRefreshAtParsesEpochSecondsAndIso8601AndIgnoresGarbage` ·
+  `revokePostsTokenHintAndClientIdToDiscoveredEndpoint` · `revokeNetworkFailureStillClearsLocallyAndReportsUnconfirmed`.
+  `IdTokenVerifierTest` (par RSA + JWKS no MockWebServer): `acceptsValidToken` · `rejectsInvalidSignature` · `rejectsWrongIssuer` · `rejectsWrongAudience` · `rejectsExpired` · `rejectsWrongNonce` · `rejectsUnknownKid` · `rejectsNonRs256Alg`.
+  `OpenAiHostIdTest`: `isUrnUuidV4` · `isStableAcrossCallsAndSurvivesClear`. `OpenAiApiKeyFlowTest`: `headersForApiKeyIsBearer` · `whenDisabledIsUnavailableWithReason` (AUTH-09).
+  `OpenAiAuthConfigTest`: sem `"…"`/`TODO` nos valores; URLs `https`; **`redirectPath == "/auth/callback"`** (guarda contra mudança acidental — quebraria os registros existentes).
 - **Depends on**: RSN-T1, RSN-T11, RSN-T12, RSN-T13. **Requirement**: AUTH-05, AUTH-08 (uso), AUTH-09, AUTH-10, RCL-01 (chave), RCL-04, RCL-07.
 - **Done when**: testes verdes; `AuthIsolationTest` continua verde; a `OpenAiAuthConfig` lista a fonte de cada valor. **Login real com conta de plano** só na RSN-T19 **[YAN]** (é o único jeito de provar a aceitação do registro dinâmico).
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(auth): provedor OpenAI com chave de API e login ChatGPT por registro dinâmico`.
 
 ### RSN-T15 — `OpenAiReasoningEngine`, lista de modelos e mapa de erros
-- **What**: `reasoning/openai/OpenAiReasoningEngine.kt` (design §12), `OpenAiModels.list`. **Sem** modelo fallback inventado: se a lista falha, mantém o modelo já escolhido (RCL-06).
+- **What**: `reasoning/openai/OpenAiReasoningEngine.kt` (design §12) e `OpenAiModels`. **Sem** modelo de reserva inventado: se a lista falha, mantém o modelo já escolhido (RCL-06).
+  `system` vai no campo de topo **`instructions`** (item `{role:"system"}` em `input` é rejeitado); `input` = `[{role:"user", content}]`. `OpenAiModels.list` entende `models[]` (`slug`/`display_name`/`visibility=="list"`) **e** `data[].id`.
+  Erros preservam status, `error.code` e (quando houver) o `{"detail":…}` do pré-stream; `subscription_sharing_usage_unavailable` também pode vir em `response.failed` **no meio** do stream.
 - **Where**: `reasoning/openai/*.kt`; testes `test/.../reasoning/openai/*` (MockWebServer).
 - **Tests first** (`OpenAiReasoningEngineTest`): `requestBodyHasExactlyModelInputStoreStream` (chaves `{model,input,store,stream}`, `store=false`, `stream=true`, **nenhuma** de `max_output_tokens/temperature/top_p/user/metadata`) ·
-  `sendsBearerAndJsonHeaders` · `streamsOutputTextDeltasThenDoneOnCompleted` · **`streamWithoutCompletedIsAnErrorAndKeepsPartial`** (Review Focus 3) · `invalidDataLineIsAnErrorNotACrash` ·
-  `responseFailedWithUsageLimitCodeMapsToRateLimit` · `responseIncompleteMapsToError` · `status401MapsToUnauthorized` · `status403NotEligibleMapsToUnauthorizedWithoutRetry` · `status429MapsToRateLimit` ·
-  `status400UnsupportedCapabilityDoesNotRetryTheSameBody` · `status503RetriesBoundedThenErrors` · `ioExceptionMapsToNetwork` · `cancellingTheCollectorCancelsTheHttpCall` · `neverFallsBackToAnotherBillingPathOnError`.
-  `OpenAiModelsTest`: `parsesModelIds` · `failureReturnsEmptyAndKeepsSavedModel`.
+  `systemGoesInInstructionsNeverAsAnInputItem` · `sendsBearerAndJsonHeaders` · `streamsOutputTextDeltasThenDoneOnCompleted` · **`streamWithoutCompletedIsAnErrorAndKeepsPartial`** (Review Focus 3) · `invalidDataLineIsAnErrorNotACrash` ·
+  `responseFailedWithUsageLimitCodeMapsToRateLimit` · `responseFailedUsageUnavailableMidStreamMapsToNetworkWithoutErasingCredentials` · `responseIncompleteMapsToError` · `status401MapsToUnauthorized` ·
+  `status403NotEligibleMapsToUnauthorizedWithoutRetry` · `status403RouteNotSupportedAndChatpassV2MapToEngineWithoutRetry` · `status429MapsToRateLimit` · `status400UnsupportedCapabilityDoesNotRetryTheSameBody` ·
+  `status503RetriesBoundedThenErrors` · `detailBodyBeforeStreamIsKeptAsDiagnosticText` · `ioExceptionMapsToNetwork` · `cancellingTheCollectorCancelsTheHttpCall` · `neverFallsBackToAnotherBillingPathOnError`.
+  `OpenAiModelsTest`: `parsesPlanFormatKeepingOnlyVisibilityList` · `parsesApiKeyFormat` · `failureReturnsEmptyAndKeepsSavedModel`.
 - **Depends on**: RSN-T4, RSN-T14. **Requirement**: RCL-02, RCL-03, RCL-05, RCL-06, RRUN-01.
 - **Done when**: testes verdes; **aceitação real do corpo** conferida com uma **chave de API de verdade** no A32 (RSN-T19).
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(raciocínio): motor OpenAI pela Responses API com fluxo e erros mapeados`.
@@ -430,9 +444,9 @@ Fase A/B (o device é o gargalo: instrumentado serializa).
 ## Fase D — UI da nuvem
 
 ### RSN-T16 — Painel OpenAI
-- **What**: preencher o branch **OpenAI** do `ReasoningPanel`: cabeçalho de conexão (`ConnectionState` do `AuthController`), controles **montados do registro** (`AuthProviders.all` → `flows`): botão **Entrar com ChatGPT**
+- **What**: preencher o branch **OpenAI** do `ReasoningPanel`: cabeçalho de conexão (`ConnectionState` do `AuthController`), controles **montados do registro** (`AuthProviders.all` → `flows`): botão **"Continue with ChatGPT"** (rótulo aprovado pela OpenAI, igual em todos os idiomas)
   (desabilitado com o motivo quando `Unavailable`; "Cancelar" enquanto `Connecting`; abre o navegador por `BrowserLauncher`), campo **Chave de API** (`AutoSaveField` com máscara),
-  **Desconectar**, `NeedsReconnect` → "Entrar de novo", `planUsage=false` → aviso + sugestão da chave (RCL-07), dropdown **Modelo** (lista da conta, RCL-06, com "Atualizar"), nota de privacidade da OpenAI. Nenhum `if (provedor == openai)`.
+  **Desconectar**, `NeedsReconnect` → "Entrar de novo", `planUsage=false` → aviso + sugestão da chave (RCL-07), dropdown **Modelo** (lista da conta, RCL-06, com "Atualizar"), nota de privacidade da OpenAI. **Diretrizes de UI da OpenAI (`openai-siwc-notes.md`)**: enquanto o plano está em uso, mostrar **"Using ChatGPT plan"** com o link **"Manage usage"** (`OpenAiAuthConfig.usageUrl`); modal só no **1º login** com o plano (**"You're using your ChatGPT plan"** / **"Got it"**); em `RATE_LIMIT`, **"Manage usage"** é a ação primária; distinguir o uso do plano das cobranças do próprio app; sem o escopo do plano, oferecer **reautorizar com `prompt=consent`** ou usar a chave. Nenhum `if (provedor == openai)`.
   Fiação: `ReasoningEngines(local = LocalReasoningEngine…, openAi = OpenAiReasoningEngine…)` no lugar dos placeholders da T9/T10.
 - **Where**: `ui/config/ReasoningPanel.kt`, `ui/config/OpenAiPanel.kt`, `auth/AndroidBrowserLauncher.kt` (impl do `BrowserLauncher` da RSN-T11 com `Intent.ACTION_VIEW` + `FLAG_ACTIVITY_NEW_TASK`), i18n; testes `test/.../ui/config/OpenAiPanelStateTest.kt`, `androidTest/.../ui/config/OpenAiPanelTest.kt`.
 - **Tests first**: unit `OpenAiPanelState` (função pura de `ConnectionState` + registro → o que mostrar): `disconnectedListsBothMethods` · `unavailableOAuthIsDisabledWithReason` · `connectedShowsAccountAndDisconnect` ·
