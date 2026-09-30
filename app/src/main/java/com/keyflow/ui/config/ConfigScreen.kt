@@ -47,6 +47,8 @@ import com.keyflow.core.OrbShortcutAction
 import com.keyflow.core.shortcuts.BarsConfig
 import com.keyflow.core.shortcuts.ShortcutGrid
 import com.keyflow.data.Settings
+import com.keyflow.reasoning.ReasoningResolution
+import com.keyflow.reasoning.UnavailableReason
 import com.keyflow.ui.PermissionStatus
 import com.keyflow.ui.common.SaveController
 import com.keyflow.ui.common.SaveToast
@@ -116,6 +118,8 @@ fun ConfigScreen(
     localModels: LocalModelsUi = LocalModelsUi.EMPTY,
     // Os modelos de TEXTO da aba Raciocínio (a lista de cima é a dos de fala, da Transcrição).
     reasoningModels: LocalModelsUi = LocalModelsUi.EMPTY_TEXT,
+    // O motor que responde na aba Raciocínio, para a área do Testar (RSN-T10).
+    resolveReasoning: (Settings) -> ReasoningResolution = { ReasoningResolution.Unavailable(UnavailableReason.NO_LOCAL_MODEL) },
     localActions: LocalModelActions = LocalModelActions.None,
 ) {
     val palette = LocalKeyFlowPalette.current
@@ -344,6 +348,7 @@ fun ConfigScreen(
                             onSettingsChange = onSettingsChange,
                             models = reasoningModels,
                             actions = localActions,
+                            resolve = resolveReasoning,
                         )
                         // Ainda sem conteúdo: o painel fica vazio (o título da aba já aparece no cabeçalho).
                         ConfigTab.NOTIFICACAO, ConfigTab.VISAO, ConfigTab.FALA -> Unit

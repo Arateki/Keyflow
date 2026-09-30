@@ -13,6 +13,8 @@ import androidx.compose.ui.unit.dp
 import com.keyflow.core.ReasoningSource
 import com.keyflow.data.Settings
 import com.keyflow.i18n.tr
+import com.keyflow.reasoning.ReasoningResolution
+import com.keyflow.reasoning.UnavailableReason
 import com.keyflow.ui.common.verticalScrollbar
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 
@@ -33,6 +35,8 @@ fun ReasoningPanel(
     modifier: Modifier = Modifier,
     models: LocalModelsUi = LocalModelsUi.EMPTY_TEXT,
     actions: LocalModelActions = LocalModelActions.None,
+    // Qual motor responde com estas Settings — ou por que nenhum. Sem fiação (galeria, testes), nenhum.
+    resolve: (Settings) -> ReasoningResolution = { ReasoningResolution.Unavailable(UnavailableReason.NO_LOCAL_MODEL) },
 ) {
     val palette = LocalKeyFlowPalette.current
     val scroll = rememberScrollState()
@@ -57,6 +61,11 @@ fun ReasoningPanel(
                     ReasoningSource.LOCAL -> ReasoningLocal(settings, onSettingsChange, models, actions)
                     ReasoningSource.OPENAI -> ReasoningOpenAi()
                 }
+            }
+        }
+        SettingsGroup(tr("Testar")) {
+            Column(Modifier.padding(vertical = 16.dp)) {
+                ReasoningTestArea(resolve(settings))
             }
         }
     }

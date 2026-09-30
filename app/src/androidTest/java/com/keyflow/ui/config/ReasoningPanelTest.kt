@@ -5,6 +5,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -16,6 +18,8 @@ import com.keyflow.data.Settings
 import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.ModelSpec
 import com.keyflow.data.models.StartResult
+import com.keyflow.reasoning.ReasoningResolution
+import com.keyflow.reasoning.UnavailableReason
 import com.keyflow.ui.theme.KeyFlowTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -40,13 +44,18 @@ class ReasoningPanelTest {
         override fun delete(modelId: String) { deletes += modelId }
     }
 
-    private inner class Harness(initial: Settings, val models: LocalModelsUi, val actions: FakeActions = FakeActions()) {
+    private inner class Harness(
+        initial: Settings,
+        val models: LocalModelsUi,
+        val actions: FakeActions = FakeActions(),
+        val resolve: (Settings) -> ReasoningResolution = { ReasoningResolution.Unavailable(UnavailableReason.NO_LOCAL_MODEL) },
+    ) {
         var settings by mutableStateOf(initial)
 
         @Composable
         fun Content() {
             KeyFlowTheme(dark = false) {
-                ReasoningPanel(settings = settings, onSettingsChange = { settings = it }, models = models, actions = actions)
+                ReasoningPanel(settings = settings, onSettingsChange = { settings = it }, models = models, actions = actions, resolve = resolve)
             }
         }
     }
@@ -135,6 +144,37 @@ class ReasoningPanelTest {
             assertEquals(listOf(qwen.id), h.actions.deletes)
             assertEquals(gemma.id, h.settings.reasoningLocalModelId)
         }
+    }
+
+    @Test
+    fun theTestAreaSitsInThePanelAndTheButtonIsDisabledWithoutAModel() {
+        val h = Harness(Settings(), textUi())
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(REASONING_TEST_BUTTON_TAG).performScrollTo().assertIsNotEnabled()
+        rule.onNodeWithTag(REASONING_TEST_REASON_TAG).performScrollTo()
+            .assertTextEquals(ReasoningTestMessages.unavailable(UnavailableReason.NO_LOCAL_MODEL))
+    }
+
+    /** O Testar pergunta ao resolvedor com as Settings ATUAIS: trocar a origem troca o motivo mostrado. */
+    @Test
+    fun theTestAreaFollowsTheResolverOfTheCurrentSettings() {
+        val h = Harness(
+            Settings(), textUi(),
+            resolve = { s ->
+                ReasoningResolution.Unavailable(
+                    if (s.reasoningSource == ReasoningSource.OPENAI) UnavailableReason.NOT_CONNECTED else UnavailableReason.NO_LOCAL_MODEL,
+                )
+            },
+        )
+        rule.setContent { h.Content() }
+        rule.onNodeWithTag(REASONING_TEST_REASON_TAG).performScrollTo()
+            .assertTextEquals(ReasoningTestMessages.unavailable(UnavailableReason.NO_LOCAL_MODEL))
+
+        rule.onNodeWithTag(reasoningSourceTag(ReasoningSource.OPENAI)).performClick()
+
+        rule.onNodeWithTag(REASONING_TEST_REASON_TAG).performScrollTo()
+            .assertTextEquals(ReasoningTestMessages.unavailable(UnavailableReason.NOT_CONNECTED))
     }
 
     /** RSC-06: e a lista da Transcrição, por sua vez, nunca mostra Gemma nem Qwen. */

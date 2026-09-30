@@ -40,6 +40,15 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import com.keyflow.data.models.ModelCatalog
+import com.keyflow.data.models.ModelStore
+import com.keyflow.reasoning.ReasoningEngine
+import com.keyflow.reasoning.ReasoningEngines
+import com.keyflow.reasoning.ReasoningError
+import com.keyflow.reasoning.ReasoningEvent
+import com.keyflow.reasoning.ReasoningRequest
+import com.keyflow.reasoning.local.LocalReasoningEngine
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import com.keyflow.ui.config.LocalModelsUi
 import com.keyflow.ui.config.LocalModelsSnapshot
 import com.keyflow.ui.config.LocalModelsController
@@ -84,6 +93,16 @@ class SetupActivity : ComponentActivity() {
 
     // Modelos de voz locais (native-voice-models, NM-T10).
     private val localModels by lazy { LocalModelsController(this) }
+
+    // O motor do Raciocínio: local pelo :reasoning; a OpenAI ainda não está ligada (RSN-T16), então sem credencial.
+    private val reasoningEngines by lazy {
+        ReasoningEngines(
+            isModelInstalled = { ModelStore.get(this).isInstalled(it) },
+            hasOpenAiCredential = { false },
+            local = { LocalReasoningEngine.create(this, it) },
+            openAi = { OpenAiNotReadyEngine },
+        )
+    }
     private var localSnapshot by mutableStateOf(LocalModelsSnapshot.EMPTY)
     private var localModelsJob: Job? = null
     // Evita piscar o onboarding antes do 1º valor do DataStore chegar (ONB-03).
@@ -196,6 +215,7 @@ class SetupActivity : ComponentActivity() {
                             selectedId = settings.reasoningLocalModelId,
                             deviceRamMb = localModels.deviceRamMb,
                         ),
+                        resolveReasoning = reasoningEngines::resolve,
                         localActions = localModels,
                     )
                 } else {
@@ -703,4 +723,10 @@ class SetupActivity : ComponentActivity() {
                 if (tab == ConfigTab.TECLADO) NAV_TAB_KEYBOARD_MIC else NAV_TAB_OVERLAY_MIC,
             )
     }
+}
+
+/** Provisório até a RSN-T16: a origem OpenAI existe no seletor mas ainda não responde. */
+private object OpenAiNotReadyEngine : ReasoningEngine {
+    override fun generate(request: ReasoningRequest): Flow<ReasoningEvent> =
+        flowOf(ReasoningEvent.Error(ReasoningError.ENGINE, "a OpenAI ainda não está ligada neste build"))
 }

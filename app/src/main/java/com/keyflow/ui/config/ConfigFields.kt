@@ -380,23 +380,25 @@ internal fun PrimaryButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     icon: com.keyflow.ui.icons.KfIconSpec? = null,
+    enabled: Boolean = true,
 ) {
     val palette = LocalKeyFlowPalette.current
     Row(
         modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(palette.fg)
-            .clickable { onClick() }
+            .background(if (enabled) palette.fg else palette.line2)
+            .clickable(enabled = enabled) { onClick() }
             .testTag(tag)
             .padding(vertical = 14.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (icon != null) KfIcon(icon, palette.onFill, Modifier.size(15.dp), strokeWidth = 1.9f)
+        val ink = if (enabled) palette.onFill else palette.faint
+        if (icon != null) KfIcon(icon, ink, Modifier.size(15.dp), strokeWidth = 1.9f)
         Text(
             text,
-            color = palette.onFill,
+            color = ink,
             fontFamily = SpaceGrotesk,
             fontWeight = FontWeight.Medium,
             fontSize = 12.5.sp,
