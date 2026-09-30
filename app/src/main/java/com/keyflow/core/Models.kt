@@ -8,6 +8,13 @@ enum class RecordingMode { TOGGLE, PUSH_TO_TALK }
  */
 enum class TranscriptionSource { CREDITS, OPENAI, GROQ, CUSTOM, LOCAL }
 
+/**
+ * Origem do raciocínio (aba Raciocínio, reasoning-models). LOCAL = modelo de texto rodando no aparelho
+ * (LiteRT-LM, processo `:reasoning`); OPENAI = nuvem, por login ChatGPT ou chave de API. Independente da
+ * origem da transcrição: uma não muda a outra.
+ */
+enum class ReasoningSource { LOCAL, OPENAI }
+
 /** Lado inicial do overlay (OVL-05). */
 enum class OverlaySide { LEFT, RIGHT }
 

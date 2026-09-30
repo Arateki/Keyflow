@@ -2,6 +2,7 @@ package com.keyflow.data
 
 import com.keyflow.core.OrbShortcutAction
 import com.keyflow.core.OverlaySide
+import com.keyflow.core.ReasoningSource
 import com.keyflow.core.RecordingMode
 import com.keyflow.core.ShortcutOverflow
 import com.keyflow.core.TranscriptionSource
@@ -36,6 +37,12 @@ data class Settings(
     // catálogo) e idioma forçado — null = nenhum modelo / detecção automática (MGR-03/05).
     val localModelId: String? = null,
     val localLanguage: String? = null,
+    // Raciocínio (reasoning-models): a origem, o modelo de texto local escolhido (id do catálogo `TEXT`; null =
+    // nenhum) e o modelo da OpenAI ("" = ainda não escolhido — vem da lista da conta, nunca de um id fixo).
+    // Nenhuma credencial aqui: ficam no cofre de `auth/` (AUTH-02).
+    val reasoningSource: ReasoningSource = ReasoningSource.LOCAL,
+    val reasoningLocalModelId: String? = null,
+    val reasoningOpenAiModel: String = "",
     // Modos habilitados (gating das abas; cada modo libera sua aba — CFG-02)
     val overlayModeEnabled: Boolean = false,
     val keyboardModeEnabled: Boolean = false,

@@ -15,6 +15,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.security.crypto.MasterKey
 import com.keyflow.core.OrbShortcutAction
 import com.keyflow.core.OverlaySide
+import com.keyflow.core.ReasoningSource
 import com.keyflow.core.RecordingMode
 import com.keyflow.core.ShortcutOverflow
 import com.keyflow.core.TranscriptionSource
@@ -201,6 +202,9 @@ class SettingsRepository(
             groqLanguage = prefs[GROQ_LANGUAGE]?.takeIf { it.isNotBlank() },
             localModelId = prefs[LOCAL_MODEL_ID]?.takeIf { it.isNotBlank() },
             localLanguage = prefs[LOCAL_LANGUAGE]?.takeIf { it.isNotBlank() },
+            reasoningSource = prefs[REASONING_SOURCE].toReasoningSource(),
+            reasoningLocalModelId = prefs[REASONING_LOCAL_MODEL_ID]?.takeIf { it.isNotBlank() },
+            reasoningOpenAiModel = prefs[REASONING_OPENAI_MODEL].orEmpty(),
             overlayModeEnabled = prefs[OVERLAY_MODE_ENABLED] ?: false,
             keyboardModeEnabled = prefs[KEYBOARD_MODE_ENABLED] ?: false,
             overlayRecordingMode = prefs[OVERLAY_RECORDING_MODE].toRecordingMode(),
@@ -259,6 +263,9 @@ class SettingsRepository(
             settings.groqLanguage.putOrRemove(prefs, GROQ_LANGUAGE)
             settings.localModelId.putOrRemove(prefs, LOCAL_MODEL_ID)
             settings.localLanguage.putOrRemove(prefs, LOCAL_LANGUAGE)
+            prefs[REASONING_SOURCE] = settings.reasoningSource.name
+            settings.reasoningLocalModelId.putOrRemove(prefs, REASONING_LOCAL_MODEL_ID)
+            settings.reasoningOpenAiModel.putOrRemove(prefs, REASONING_OPENAI_MODEL)
             prefs[OVERLAY_MODE_ENABLED] = settings.overlayModeEnabled
             prefs[KEYBOARD_MODE_ENABLED] = settings.keyboardModeEnabled
             prefs[OVERLAY_RECORDING_MODE] = settings.overlayRecordingMode.name
@@ -334,6 +341,11 @@ class SettingsRepository(
         ?.let { runCatching { TranscriptionSource.valueOf(it) }.getOrNull() }
         ?: TranscriptionSource.CUSTOM
 
+    /** Valor ausente ou desconhecido (versão futura, dado corrompido) cai no Local — nunca derruba a leitura. */
+    private fun String?.toReasoningSource(): ReasoningSource = this
+        ?.let { runCatching { ReasoningSource.valueOf(it) }.getOrNull() }
+        ?: ReasoningSource.LOCAL
+
     private fun String?.toOverlaySide(): OverlaySide = this
         ?.let { runCatching { OverlaySide.valueOf(it) }.getOrNull() }
         ?: OverlaySide.RIGHT
@@ -368,6 +380,9 @@ class SettingsRepository(
         val GROQ_LANGUAGE = stringPreferencesKey("groq_language")
         val LOCAL_MODEL_ID = stringPreferencesKey("local_model_id")
         val LOCAL_LANGUAGE = stringPreferencesKey("local_language")
+        val REASONING_SOURCE = stringPreferencesKey("reasoning_source")
+        val REASONING_LOCAL_MODEL_ID = stringPreferencesKey("reasoning_local_model_id")
+        val REASONING_OPENAI_MODEL = stringPreferencesKey("reasoning_openai_model")
         val OVERLAY_MODE_ENABLED = booleanPreferencesKey("overlay_mode_enabled")
         val KEYBOARD_MODE_ENABLED = booleanPreferencesKey("keyboard_mode_enabled")
         val OVERLAY_RECORDING_MODE = stringPreferencesKey("overlay_recording_mode")

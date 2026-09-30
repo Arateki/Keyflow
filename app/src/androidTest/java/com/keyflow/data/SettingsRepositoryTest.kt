@@ -1,9 +1,11 @@
 package com.keyflow.data
 
 import android.content.Context
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.keyflow.core.OverlaySide
+import com.keyflow.core.ReasoningSource
 import com.keyflow.core.RecordingMode
 import com.keyflow.core.TranscriptionSource
 import kotlinx.coroutines.flow.first
@@ -110,6 +112,9 @@ class SettingsRepositoryTest {
             groqLanguage = "en",
             localModelId = "whisper-base",
             localLanguage = "pt",
+            reasoningSource = ReasoningSource.OPENAI,
+            reasoningLocalModelId = "qwen3-0.6b-litertlm",
+            reasoningOpenAiModel = "algum-modelo",
             overlayRecordingMode = RecordingMode.PUSH_TO_TALK,
             overlaySide = OverlaySide.LEFT,
             orbSizePx = 250,
@@ -124,6 +129,53 @@ class SettingsRepositoryTest {
         repository.saveSettings(saved)
 
         assertEquals(saved, repository.settingsFlow().first())
+    }
+
+    /** RSC-01/02: o Raciocínio guarda a própria origem e o próprio modelo, sem tocar nos da Transcrição. */
+    @Test
+    fun reasoningFieldsAreIndependentOfTheTranscriptionOnes() = runTest {
+        val repository = newRepository()
+
+        repository.saveSettings(
+            Settings(
+                source = TranscriptionSource.OPENAI,
+                localModelId = "whisper-base-int8",
+                reasoningSource = ReasoningSource.LOCAL,
+                reasoningLocalModelId = "gemma-4-e2b-litertlm",
+            ),
+        )
+
+        val read = repository.settingsFlow().first()
+        assertEquals(TranscriptionSource.OPENAI, read.source)
+        assertEquals("whisper-base-int8", read.localModelId)
+        assertEquals(ReasoningSource.LOCAL, read.reasoningSource)
+        assertEquals("gemma-4-e2b-litertlm", read.reasoningLocalModelId)
+    }
+
+    /** Sem nada salvo, o Raciocínio abre no Local, sem modelo — e limpar o modelo volta a nulo, não a "". */
+    @Test
+    fun reasoningDefaultsAndClearingTheModelReadBackAsNull() = runTest {
+        val repository = newRepository()
+        val fresh = repository.settingsFlow().first()
+        assertEquals(ReasoningSource.LOCAL, fresh.reasoningSource)
+        assertEquals(null, fresh.reasoningLocalModelId)
+        assertEquals("", fresh.reasoningOpenAiModel)
+
+        repository.saveSettings(fresh.copy(reasoningLocalModelId = "qwen3-0.6b-litertlm"))
+        repository.saveSettings(repository.settingsFlow().first().copy(reasoningLocalModelId = null))
+        assertEquals(null, repository.settingsFlow().first().reasoningLocalModelId)
+    }
+
+    /** Valor gravado de uma versão futura/corrompida não derruba a leitura: cai no Local. */
+    @Test
+    fun unknownReasoningSourceFallsBackToLocal() = runTest {
+        val repository = newRepository()
+        repository.saveSettings(Settings(reasoningSource = ReasoningSource.OPENAI))
+        val corrupted = repository.rawPreferencesOnce().toMutablePreferences().also {
+            it[stringPreferencesKey("reasoning_source")] = "GEMINI"
+        }
+        repository.replaceRawPreferences(corrupted)
+        assertEquals(ReasoningSource.LOCAL, repository.settingsFlow().first().reasoningSource)
     }
 
     /** NM-T2: sem modelo escolhido, os campos da origem Local voltam nulos — não string vazia. */
