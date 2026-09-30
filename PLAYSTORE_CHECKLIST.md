@@ -48,6 +48,34 @@ do emulador Android 17 (`.specs/quick/010-suite-no-aparelho/`) existe para achar
   - Não são coletados: keystrokes, texto digitado, dados de localização
   - Contato do desenvolvedor
 
+#### 1b. Aba Raciocínio — o que a política e o Data Safety também precisam cobrir (RPRV-01)
+
+- **Modelos de texto locais** (Qwen3 0.6B e Gemma 4 E2B, pelo LiteRT-LM): rodam **100% no aparelho**, em processo próprio
+  (`:reasoning`); o texto não sai do dispositivo. Os arquivos são baixados sob demanda do Hugging Face (o app só faz o pedido
+  de download) e somem se o app for desinstalado. Licenças: Apache 2.0 (`app/licenses/`, aba Docs → Licenças).
+- **OpenAI (nuvem — só quando o usuário escolhe essa origem)**: o texto que o usuário manda gerar (hoje, a frase do botão
+  Testar) é enviado à OpenAI em `api.openai.com/v1/responses`, com `store: false` (a OpenAI não o guarda para o app).
+  Há dois jeitos de autenticar, ambos com as credenciais **só no aparelho** — cifradas no Keystore, fora do backup:
+  - a **chave de API** que o próprio usuário cola;
+  - o login **"Continue with ChatGPT"** (OAuth 2.0 + OpenID Connect com PKCE e registro dinâmico do cliente): o app é
+    cliente **público** — **não existe `client_secret` no APK** — e guarda access/refresh token e o e-mail da conta (vem do ID
+    token) **apenas no aparelho**, nunca em servidor do KeyFlow.
+- **O desenvolvedor não coleta**: o texto enviado, as respostas, as credenciais nem o e-mail — nada disso passa por servidor
+  do KeyFlow.
+- **Data Safety (rascunho)**: acrescentar "User content → texto enviado à OpenAI a pedido do usuário" (compartilhado com o
+  provedor que o usuário escolheu, opcional, criptografado em trânsito, **não coletado** pelo desenvolvedor); "Personal info →
+  e-mail": **não coletado** (fica no aparelho).
+
+#### 1c. Login ChatGPT — elegibilidade (RPRV-04) — **[YAN] decidir antes de publicar com ele ligado**
+
+A OpenAI libera o uso do plano do usuário para "apps open-source e hospedados localmente" e manda "apps pagos ou hospedados
+remotamente" para um formulário de interesse. O KeyFlow é open source (quando o repositório ficar público **[YAN]**) e roda no
+aparelho, mas planeja créditos, skins pagas e anúncios. **A decisão de enquadramento é do Yan** e, quando vier, fica registrada
+aqui (data + escolha: seguir como open source / enviar o formulário / deixar só a chave de API).
+
+**Até lá: NÃO publicar com o login ligado.** `OpenAiAuthConfig.enabled = BuildConfig.DEBUG` mantém o botão "Continue with
+ChatGPT" desabilitado (com o motivo escrito) em build de release; a **chave de API** da OpenAI funciona em qualquer build.
+
 ### 2. Tela de consentimento (Prominent Disclosure)
 
 A política exige divulgação **dentro do app**, visível no uso normal — não basta estar só na privacy policy.
@@ -99,6 +127,8 @@ Ao criar o app listing, preencher a seção **"Data safety"** declarando:
 | 1. Política de privacidade pública + link no app | ❌ ausente; existe só um parágrafo na aba Docs ("O áudio só é enviado à origem configurada em Voz. Tokens ficam apenas no aparelho.") |
 | 2. Prominent disclosure com aceite explícito | ❌ ausente; o onboarding só diz "Sua voz vira texto em qualquer campo." |
 | 3. Data Safety Form | ⏳ depende do Play Console, não do código |
+| 4. Política e Data Safety cobrem a aba Raciocínio (seção 1b) | ⏳ texto pronto (2026-09-30); entra junto com PS-2/PS-4 |
+| 5. Login ChatGPT (seção 1c) | ⏸ desligado no release (`enabled = BuildConfig.DEBUG`) — **[YAN] decidir a elegibilidade; NÃO publicar ligado** |
 
 ## Estado atual do código relevante
 

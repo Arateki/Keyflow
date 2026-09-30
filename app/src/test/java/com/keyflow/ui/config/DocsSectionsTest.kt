@@ -43,6 +43,16 @@ class DocsSectionsTest {
         }
     }
 
+    /** RPRV-02: o motor dos modelos de texto e cada um deles (RSN) também são atribuídos na Docs — o texto vem do catálogo, sem lista paralela. */
+    @Test
+    fun licensesAlsoNameTheReasoningEngineAndEveryTextModel() {
+        val labels = docsSections.single { it.id == "licencas" }.blocks.filterIsInstance<DocBlock.Labeled>().map { it.label }
+        assertTrue("licença do LiteRT-LM ausente", "LiteRT-LM" in labels)
+        com.keyflow.data.models.ModelCatalog.TEXT.forEach { spec ->
+            assertTrue("licença de ${spec.modelName} ausente", labels.any { it.contains(spec.modelName) })
+        }
+    }
+
     @Test
     fun feedbackIsTheLastSectionAndTheOnlyOneWithActions() {
         assertEquals("feedback", ids.last())
