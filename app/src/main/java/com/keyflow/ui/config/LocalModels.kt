@@ -38,7 +38,7 @@ data class LocalModelsUi(
          * NM-T10). A seleção só vale para modelo instalado: selecionado e apagado aparece como disponível.
          */
         fun compose(
-            catalog: List<ModelSpec> = ModelCatalog.MODELS,
+            catalog: List<ModelSpec> = ModelCatalog.SPEECH,
             installed: Set<String>,
             active: DownloadProgress?,
             failures: Map<String, DownloadFailure>,

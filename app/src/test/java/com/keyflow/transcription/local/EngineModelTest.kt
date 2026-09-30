@@ -50,7 +50,7 @@ class EngineModelTest {
 
     @Test
     fun `round trip through the AIDL parcelable`() {
-        ModelCatalog.MODELS.forEach { spec ->
+        ModelCatalog.SPEECH.forEach { spec ->
             val model = EngineModel.from(spec, dir, "pt")
             assertThat(EngineModel.fromParcel(model.toParcel())).isEqualTo(model)
         }

@@ -2,11 +2,20 @@ package com.keyflow.data.models
 
 import com.keyflow.i18n.trKey
 
-/** Como o engine monta o `OfflineRecognizer` do sherpa-onnx para o modelo (NM-T8). */
-enum class EngineType { WHISPER, TRANSDUCER }
+/** Para que serve o modelo: fala (sherpa-onnx, aba Transcrição) ou texto (LLM local, aba Raciocínio). */
+enum class ModelKind { SPEECH, TEXT }
 
-/** Papel de cada arquivo no modelo — o engine monta a config por papel, não pelo nome do arquivo. */
-enum class FileRole { ENCODER, DECODER, JOINER, TOKENS }
+/**
+ * Como o engine roda o modelo: [WHISPER]/[TRANSDUCER] montam o `OfflineRecognizer` do sherpa-onnx (NM-T8);
+ * [LITERT_LM] é um LLM do Google rodado pelo LiteRT-LM no processo `:reasoning` (reasoning-models).
+ */
+enum class EngineType { WHISPER, TRANSDUCER, LITERT_LM }
+
+/**
+ * Papel de cada arquivo no modelo — o engine monta a config por papel, não pelo nome do arquivo.
+ * [MODEL] é o arquivo único `.litertlm` dos modelos de texto.
+ */
+enum class FileRole { ENCODER, DECODER, JOINER, TOKENS, MODEL }
 
 data class ModelFile(
     val role: FileRole,
@@ -32,6 +41,8 @@ data class ModelSpec(
     val files: List<ModelFile>,
     /** Qual modelo é de fato (ex.: "Whisper base") — subtexto do card, abaixo do nome amigável. */
     val modelName: String = "",
+    /** Default [ModelKind.SPEECH]: nenhum construtor da fala muda (RCAT-01). */
+    val kind: ModelKind = ModelKind.SPEECH,
 ) {
     val totalBytes: Long get() = files.sumOf { it.bytes }
 
@@ -140,8 +151,14 @@ object ModelCatalog {
         ),
     )
 
-    /** Na ordem em que a aba Voz lista: do mais leve ao mais pesado. */
-    val MODELS: List<ModelSpec> = listOf(WHISPER_BASE, WHISPER_SMALL, PARAKEET_V3)
+    /** Modelos de fala, na ordem em que a aba Transcrição lista: do mais leve ao mais pesado. */
+    val SPEECH: List<ModelSpec> = listOf(WHISPER_BASE, WHISPER_SMALL, PARAKEET_V3)
+
+    /** Modelos de texto (aba Raciocínio). Preenchidos na RSN-T3, com dados conferidos na fonte. */
+    val TEXT: List<ModelSpec> = emptyList()
+
+    /** Todos, para quem só resolve por id ([byId]) — o downloader e o store não sabem de tipo. */
+    val MODELS: List<ModelSpec> = SPEECH + TEXT
 
     fun byId(id: String?): ModelSpec? = MODELS.firstOrNull { it.id == id }
 }

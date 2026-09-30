@@ -6,7 +6,8 @@ import org.junit.Test
 /** CAT-01/02: integridade do catálogo embutido — o que o downloader e o engine assumem dele. */
 class ModelCatalogTest {
 
-    private val models = ModelCatalog.MODELS
+    // Estas checagens são do catálogo de FALA (papéis do sherpa-onnx, repositórios csukuangfj); o de texto tem as suas.
+    private val models = ModelCatalog.SPEECH
 
     @Test
     fun `catalog has the three curated models with unique ids`() {
@@ -40,6 +41,7 @@ class ModelCatalogTest {
             val expected = when (model.engineType) {
                 EngineType.WHISPER -> setOf(FileRole.ENCODER, FileRole.DECODER, FileRole.TOKENS)
                 EngineType.TRANSDUCER -> setOf(FileRole.ENCODER, FileRole.DECODER, FileRole.JOINER, FileRole.TOKENS)
+                EngineType.LITERT_LM -> error("${model.id}: motor de texto no catálogo de fala")
             }
             assertThat(roles).isEqualTo(expected)
         }
@@ -87,5 +89,36 @@ class ModelCatalogTest {
         assertThat(ModelCatalog.byId(null)).isNull()
         assertThat(ModelCatalog.PARAKEET_V3.file(FileRole.JOINER)?.fileName).isEqualTo("joiner.int8.onnx")
         assertThat(ModelCatalog.WHISPER_BASE.file(FileRole.JOINER)).isNull()
+    }
+
+    // ── RCAT-01/05: o catálogo separa fala e texto ─────────────────────────────────────────────
+
+    @Test
+    fun `speech catalog is exactly the three existing models`() {
+        assertThat(ModelCatalog.SPEECH)
+            .containsExactly(ModelCatalog.WHISPER_BASE, ModelCatalog.WHISPER_SMALL, ModelCatalog.PARAKEET_V3)
+            .inOrder()
+    }
+
+    @Test
+    fun `every existing spec defaults to speech`() {
+        assertThat(ModelCatalog.SPEECH.map { it.kind }.toSet()).containsExactly(ModelKind.SPEECH)
+    }
+
+    @Test
+    fun `models is speech plus text`() {
+        assertThat(ModelCatalog.MODELS).isEqualTo(ModelCatalog.SPEECH + ModelCatalog.TEXT)
+    }
+
+    @Test
+    fun `byId resolves any kind`() {
+        assertThat(ModelCatalog.byId(ModelCatalog.SPEECH.first().id)).isNotNull()
+        ModelCatalog.TEXT.forEach { assertThat(ModelCatalog.byId(it.id)).isSameInstanceAs(it) }
+    }
+
+    @Test
+    fun `text specs never leak into the speech list and vice versa`() {
+        assertThat(ModelCatalog.SPEECH.map { it.kind }).doesNotContain(ModelKind.TEXT)
+        assertThat(ModelCatalog.TEXT.map { it.kind }).doesNotContain(ModelKind.SPEECH)
     }
 }

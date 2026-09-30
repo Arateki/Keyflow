@@ -38,6 +38,8 @@ object SherpaConfigs {
                 modelType = "nemo_transducer",
                 numThreads = numThreads,
             )
+            // Modelo de texto não passa por aqui: a fala só recebe o que sai de `ModelCatalog.SPEECH`.
+            EngineType.LITERT_LM -> error("${model.modelId}: motor de texto (LiteRT-LM) não roda no sherpa-onnx")
         }
         return OfflineRecognizerConfig(modelConfig = modelConfig)
     }
