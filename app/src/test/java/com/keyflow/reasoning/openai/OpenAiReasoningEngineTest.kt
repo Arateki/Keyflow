@@ -5,6 +5,7 @@ import com.keyflow.auth.AuthErrorKind
 import com.keyflow.auth.AuthException
 import com.keyflow.auth.AuthorizationProvider
 import com.keyflow.auth.ProviderId
+import com.keyflow.auth.ProviderIds
 import com.keyflow.reasoning.ReasoningError
 import com.keyflow.reasoning.ReasoningEvent
 import com.keyflow.reasoning.ReasoningRequest
@@ -45,6 +46,13 @@ class OpenAiReasoningEngineTest {
         OpenAiReasoningEngine(auth, client, model, apiBaseUrl = server.url("/v1").toString().trimEnd('/'), pauseMs = { pauses += it })
 
     @After fun tearDown() = server.shutdown()
+
+    /** Anota quem pediu para invalidar o login (RCL-03). */
+    private class RecordingAuth : AuthorizationProvider {
+        val invalidated = mutableListOf<ProviderId>()
+        override suspend fun headers(provider: ProviderId) = mapOf("Authorization" to "Bearer tok-123")
+        override fun invalidate(provider: ProviderId) { invalidated += provider }
+    }
 
     private fun events(request: ReasoningRequest = ReasoningRequest(user = "oi"), e: OpenAiReasoningEngine = engine()): List<ReasoningEvent> =
         runBlocking { withTimeout(20_000) { e.generate(request).toList() } }
@@ -200,11 +208,61 @@ class OpenAiReasoningEngineTest {
         assertThat(server.requestCount).isEqualTo(1)
     }
 
+    /** RCL-03: 403 not_eligible → explicar (não "entre de novo": entrar de novo não resolve) e NÃO repetir. */
     @Test
-    fun `403 not eligible maps to unauthorized and is never retried`() {
+    fun `403 not eligible is its own error, is never retried and never invalidates the login`() {
         server.enqueue(status(403, errorBody("subscription_sharing_user_not_eligible")))
-        assertThat((events().single() as ReasoningEvent.Error).kind).isEqualTo(ReasoningError.UNAUTHORIZED)
+        val recording = RecordingAuth()
+        assertThat((events(e = engine(recording)).single() as ReasoningEvent.Error).kind).isEqualTo(ReasoningError.NOT_ELIGIBLE)
         assertThat(server.requestCount).isEqualTo(1)
+        assertThat(recording.invalidated).isEmpty()
+    }
+
+    @Test
+    fun `response failed with not eligible in the middle of the stream is the same error`() {
+        server.enqueue(sse(delta("x"), failed("subscription_sharing_user_not_eligible")))
+        assertThat((events().last() as ReasoningEvent.Error).kind).isEqualTo(ReasoningError.NOT_ELIGIBLE)
+    }
+
+    /** RCL-03: 401 invalid_user → a conexão vira NeedsReconnect (o motor pede ao lado da autenticação que invalide o login). */
+    @Test
+    fun `401 asks the auth side to invalidate the login`() {
+        server.enqueue(status(401, errorBody("subscription_sharing_invalid_user")))
+        val recording = RecordingAuth()
+
+        assertThat((events(e = engine(recording)).single() as ReasoningEvent.Error).kind).isEqualTo(ReasoningError.UNAUTHORIZED)
+
+        assertThat(recording.invalidated).containsExactly(ProviderIds.OPENAI)
+    }
+
+    @Test
+    fun `invalid user in the middle of the stream also invalidates the login`() {
+        server.enqueue(sse(delta("x"), failed("subscription_sharing_invalid_user")))
+        val recording = RecordingAuth()
+
+        assertThat((events(e = engine(recording)).last() as ReasoningEvent.Error).kind).isEqualTo(ReasoningError.UNAUTHORIZED)
+
+        assertThat(recording.invalidated).containsExactly(ProviderIds.OPENAI)
+    }
+
+    @Test
+    fun `other errors never invalidate the login`() {
+        val recording = RecordingAuth()
+        server.enqueue(status(429, errorBody("subscription_sharing_usage_limit_exceeded")))
+        server.enqueue(status(503)); server.enqueue(status(503)); server.enqueue(status(503))
+        server.enqueue(status(400, errorBody("subscription_sharing_unsupported_capability")))
+        repeat(3) { events(e = engine(recording)) }
+        assertThat(recording.invalidated).isEmpty()
+    }
+
+    /** Review, Important 1: uma chave colada com um caractere invisível não pode virar exceção — o OkHttp a recusa no cabeçalho. */
+    @Test
+    fun `a credential the http layer cannot send is an unauthorized error, not an exception`() {
+        val zeroWidth = object : AuthorizationProvider {
+            override suspend fun headers(provider: ProviderId) = mapOf("Authorization" to "Bearer sk-abc\u200B")
+        }
+        assertThat((events(e = engine(zeroWidth)).single() as ReasoningEvent.Error).kind).isEqualTo(ReasoningError.UNAUTHORIZED)
+        assertThat(server.requestCount).isEqualTo(0)
     }
 
     @Test

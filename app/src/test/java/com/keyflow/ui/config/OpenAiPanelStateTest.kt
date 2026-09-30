@@ -79,6 +79,23 @@ class OpenAiPanelStateTest {
         assertThat(s.login!!.enabled).isTrue()
     }
 
+    /**
+     * Review, Important 6: o estado `Error` esconde a credencial guardada (um login que falhou por cima de uma conexão que existia).
+     * A tela nunca pode ficar sem saída: Desconectar continua ali — e limpa o erro e o que estiver no cofre.
+     */
+    @Test
+    fun `an error always offers to disconnect, because a credential may still be stored`() {
+        AuthErrorKind.entries.forEach { kind ->
+            assertThat(state(ConnectionState.Error(kind)).showDisconnect).isTrue()
+        }
+    }
+
+    /** Entrar com OUTRA conta volta como acesso negado: a mensagem diz o caminho (desconectar antes) em vez de girar em círculo. */
+    @Test
+    fun `the denied message tells how to switch accounts`() {
+        assertThat(openAiErrorMessage(AuthErrorKind.DENIED)).contains("Desconectar")
+    }
+
     @Test
     fun `an unavailable login is disabled with its reason — and the key still works`() {
         val blocked = listOf(FakeApiKeyFlow(), FakeOAuthFlow(availability = Availability.Unavailable(UnavailableAuthReason.PROVIDER_DISABLED)))

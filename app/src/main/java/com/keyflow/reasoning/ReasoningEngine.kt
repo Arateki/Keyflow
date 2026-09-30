@@ -21,7 +21,7 @@ sealed interface ReasoningEvent {
 }
 
 /** Por que a resposta falhou — o que a tela traduz em mensagem legível (RTS-04). */
-enum class ReasoningError { OOM, MODEL_MISSING, LOCAL, NETWORK, UNAUTHORIZED, RATE_LIMIT, ENGINE }
+enum class ReasoningError { OOM, MODEL_MISSING, LOCAL, NETWORK, UNAUTHORIZED, RATE_LIMIT, NOT_ELIGIBLE, ENGINE }
 
 /**
  * Quem responde: o modelo local (processo `:reasoning`) ou a OpenAI hoje; qualquer outro amanhã. A UI e os futuros

@@ -26,6 +26,7 @@ fun reasoningSourceTag(source: ReasoningSource): String = "raciocinio-source-${s
 
 const val RACIOCINIO_LOCAL_PRIVACY_TAG = "raciocinio-local-privacy"
 const val RACIOCINIO_OPENAI_PRIVACY_TAG = "raciocinio-openai-privacy"
+const val RACIOCINIO_LOCAL_UNSUPPORTED_TAG = "raciocinio-local-unsupported"
 
 /**
  * Aba Raciocínio (RSC-01..06): a origem do modelo de linguagem — **Local** (modelo de texto no aparelho, lista de
@@ -44,6 +45,8 @@ fun ReasoningPanel(
     resolve: (Settings) -> ReasoningResolution = { ReasoningResolution.Unavailable(UnavailableReason.NO_LOCAL_MODEL) },
     auth: AuthActions = AuthActions.None,
     initialTest: TestState = TestState(),
+    // Falso num aparelho que não roda o motor local (ARM de 32 bits): a lista de download some, com o motivo.
+    localSupported: Boolean = true,
 ) {
     val palette = LocalKeyFlowPalette.current
     val scroll = rememberScrollState()
@@ -70,7 +73,8 @@ fun ReasoningPanel(
                     onSelect = { onSettingsChange(settings.copy(reasoningSource = it)) },
                 )
                 when (settings.reasoningSource) {
-                    ReasoningSource.LOCAL -> ReasoningLocal(settings, onSettingsChange, models, actions)
+                    ReasoningSource.LOCAL ->
+                        if (localSupported) ReasoningLocal(settings, onSettingsChange, models, actions) else LocalUnsupported()
                     ReasoningSource.OPENAI -> OpenAiPanel(settings, onSettingsChange, auth, openAi, connection)
                 }
             }
@@ -113,4 +117,13 @@ private fun ReasoningLocal(
             Modifier.padding(top = 16.dp).testTag(RACIOCINIO_LOCAL_PRIVACY_TAG),
         )
     }
+}
+
+/** Aparelho sem o motor local (ARM de 32 bits): nada de baixar gigabytes de um modelo que não roda — a nuvem segue disponível. */
+@Composable
+private fun LocalUnsupported() {
+    SettingSub(
+        tr("Este aparelho não roda modelos locais (o motor só existe para processadores de 64 bits). Use a OpenAI."),
+        Modifier.padding(top = 20.dp).testTag(RACIOCINIO_LOCAL_UNSUPPORTED_TAG),
+    )
 }

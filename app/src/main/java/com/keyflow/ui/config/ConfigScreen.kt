@@ -123,6 +123,7 @@ fun ConfigScreen(
     localActions: LocalModelActions = LocalModelActions.None,
     reasoningAuth: AuthActions = AuthActions.None,
     initialReasoningTest: TestState = TestState(),
+    reasoningLocalSupported: Boolean = true,
 ) {
     val palette = LocalKeyFlowPalette.current
     var activeTab by rememberSaveable { mutableStateOf(initialTab) }
@@ -353,6 +354,7 @@ fun ConfigScreen(
                             resolve = resolveReasoning,
                             auth = reasoningAuth,
                             initialTest = initialReasoningTest,
+                            localSupported = reasoningLocalSupported,
                         )
                         // Ainda sem conteúdo: o painel fica vazio (o título da aba já aparece no cabeçalho).
                         ConfigTab.NOTIFICACAO, ConfigTab.VISAO, ConfigTab.FALA -> Unit

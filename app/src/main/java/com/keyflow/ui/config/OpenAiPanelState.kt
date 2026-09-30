@@ -71,7 +71,9 @@ fun openAiPanelState(connection: ConnectionState, flows: List<AuthFlow>): OpenAi
         )
         is ConnectionState.Error -> OpenAiPanelState(
             OpenAiStatus.ERROR, null, planInUse = false, planMissing = false,
-            login = login(), showKeyField = hasKeyFlow, showDisconnect = false, showCancel = false, error = connection.kind,
+            // Um login que falhou por cima de uma conexão que existia deixa a credencial no cofre: Desconectar (que também limpa o erro)
+            // é a saída — sem ela, entrar com outra conta girava em círculo.
+            login = login(), showKeyField = hasKeyFlow, showDisconnect = true, showCancel = false, error = connection.kind,
         )
     }
 }
@@ -79,7 +81,7 @@ fun openAiPanelState(connection: ConnectionState, flows: List<AuthFlow>): OpenAi
 /** Por que a conexão falhou — em palavras, sem token nem mensagem crua do provedor. */
 fun openAiErrorMessage(kind: AuthErrorKind): String = when (kind) {
     AuthErrorKind.NETWORK -> tr("Sem conexão com a OpenAI — confira a rede e tente de novo.")
-    AuthErrorKind.DENIED -> tr("O acesso foi negado — tente entrar de novo.")
+    AuthErrorKind.DENIED -> tr("O acesso foi negado — tente entrar de novo. Para trocar de conta, toque em Desconectar antes.")
     AuthErrorKind.INVALID_RESPONSE -> tr("A OpenAI respondeu de um jeito inesperado — tente de novo mais tarde.")
     AuthErrorKind.TIMEOUT -> tr("O navegador não voltou a tempo — tente entrar de novo.")
     AuthErrorKind.UNKNOWN -> tr("Não foi possível entrar — tente de novo.")

@@ -43,6 +43,47 @@ class TestRunnerTest {
 
     private fun ready(engine: ReasoningEngine) = ReasoningResolution.Ready(engine)
 
+    /** Uma exceção do motor (cofre, cabeçalho inválido, bug) vira erro na tela — nunca derruba o app (Review, Important 1). */
+    @Test
+    fun `an engine that throws becomes an ENGINE error and keeps the partial text`() = runTest {
+        val runner = TestRunner(backgroundScope) { currentTime }
+        runner.start(ready(Scripted { emit(ReasoningEvent.Delta("parc")); throw IllegalStateException("cofre") }), request)
+        runCurrent()
+
+        val state = runner.state.value
+        assertThat(state.error).isEqualTo(ReasoningError.ENGINE)
+        assertThat(state.text).isEqualTo("parc")
+        assertThat(state.running).isFalse()
+    }
+
+    @Test
+    fun `an engine that throws before any event is also an ENGINE error`() = runTest {
+        val runner = TestRunner(backgroundScope) { currentTime }
+        runner.start(ready(Scripted { throw IllegalArgumentException("Unexpected char 0x200b") }), request)
+        runCurrent()
+
+        assertThat(runner.state.value.error).isEqualTo(ReasoningError.ENGINE)
+        assertThat(runner.state.value.running).isFalse()
+    }
+
+    /** Review Focus 4 — Testar duas vezes: a limpeza do 1º (cancelado) não pode marcar o 2º como parado. */
+    @Test
+    fun `a cancelled first run cannot mark the second run as finished`() = runTest {
+        val runner = TestRunner(backgroundScope) { currentTime }
+        runner.start(ready(Scripted { awaitCancellation() }), request)
+        runCurrent()
+
+        runner.start(ready(Scripted { delay(1_000); emit(ReasoningEvent.Delta("b")); delay(1_000); emit(ReasoningEvent.Done) }), request)
+        runCurrent() // o 1º trata o cancelamento AGORA, depois de o 2º já ter começado
+
+        assertThat(runner.state.value.running).isTrue()
+        advanceTimeBy(1_100); runCurrent()
+        assertThat(runner.state.value.running).isTrue() // ainda gerando: o botão precisa continuar "Parar"
+        assertThat(runner.state.value.text).isEqualTo("b")
+        advanceTimeBy(1_000); runCurrent()
+        assertThat(runner.state.value.running).isFalse()
+    }
+
     /** O ponto de partida vem de fora (a galeria mostra a área "testando" sem clicar em nada). */
     @Test
     fun `it starts from the given state and stop keeps its text`() = runTest {

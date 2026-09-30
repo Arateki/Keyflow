@@ -69,9 +69,13 @@ class TestRunner(
     val state: StateFlow<TestState> = _state.asStateFlow()
     private var job: Job? = null
 
+    /** Cada `start` é uma geração; só a atual mexe no estado — a limpeza de uma execução já cancelada não pode apagar a nova. */
+    private var generation = 0
+
     fun start(resolution: ReasoningResolution, request: ReasoningRequest) {
         job?.cancel()
         job = null
+        val mine = ++generation
         when (resolution) {
             is ReasoningResolution.Unavailable -> _state.value = TestState(unavailable = resolution.reason)
             is ReasoningResolution.Ready -> {
@@ -92,8 +96,14 @@ class TestRunner(
                         // O fluxo acabou sem Done nem Error: não deixa a tela presa em "Parar".
                         _state.update { if (it.running) it.copy(running = false, totalMs = clock() - startedAt) else it }
                     } catch (e: CancellationException) {
-                        _state.update { it.copy(running = false) }
+                        if (generation == mine) _state.update { it.copy(running = false) }
                         throw e
+                    } catch (e: Exception) {
+                        // Um motor que lança (cofre, cabeçalho inválido, bug) vira erro na tela — este escopo é o da UI e uma exceção
+                        // solta derrubaria o app.
+                        if (generation == mine) {
+                            _state.update { it.copy(running = false, error = ReasoningError.ENGINE, totalMs = clock() - startedAt) }
+                        }
                     }
                 }
             }
@@ -103,6 +113,7 @@ class TestRunner(
     fun stop() {
         job?.cancel()
         job = null
+        generation++
         _state.update { it.copy(running = false) }
     }
 }
@@ -116,6 +127,7 @@ object ReasoningTestMessages {
         ReasoningError.NETWORK -> tr("Sem conexão com o provedor — confira a rede e tente de novo.")
         ReasoningError.UNAUTHORIZED -> tr("A credencial foi recusada — entre de novo ou confira a chave de API.")
         ReasoningError.RATE_LIMIT -> tr("Limite de uso atingido — tente de novo mais tarde.")
+        ReasoningError.NOT_ELIGIBLE -> tr("Esta conta do ChatGPT não pode ser usada por aqui — confira o seu plano ou use uma chave de API.")
         ReasoningError.ENGINE -> tr("O modelo falhou ao responder.")
     }
 

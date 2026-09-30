@@ -42,18 +42,14 @@ import kotlinx.coroutines.Job
 import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.ModelStore
 import com.keyflow.reasoning.ReasoningEngines
+import com.keyflow.reasoning.local.LocalLlmSupport
 import com.keyflow.reasoning.local.LocalReasoningEngine
-import com.keyflow.auth.AndroidBrowserLauncher
 import com.keyflow.auth.AuthController
-import com.keyflow.auth.AuthDependencies
-import com.keyflow.auth.AuthProviders
+import com.keyflow.App
 import com.keyflow.auth.Credential
-import com.keyflow.auth.DefaultAuthorizationProvider
 import com.keyflow.auth.ProviderIds
-import com.keyflow.auth.SecureCredentialStore
 import com.keyflow.ui.config.AccountModel
 import com.keyflow.ui.config.ControllerAuthActions
-import okhttp3.OkHttpClient
 import com.keyflow.reasoning.openai.OpenAiModels
 import com.keyflow.reasoning.openai.OpenAiReasoningEngine
 import com.keyflow.ui.config.LocalModelsUi
@@ -103,16 +99,13 @@ class SetupActivity : ComponentActivity() {
 
     // Autenticação dos provedores de nuvem (módulo `auth/`): cofre próprio, registro, controlador da tela e quem entrega os
     // cabeçalhos ao motor. A UI só conhece o registro e o `AuthController` — nada de provedor concreto.
-    private val authHttp by lazy { OkHttpClient() }
-    private val authStore by lazy { SecureCredentialStore(this) }
-    private val authRegistry by lazy { AuthProviders.create(AuthDependencies(authStore, http = authHttp)) }
-    private val authorization by lazy { DefaultAuthorizationProvider(authRegistry, authStore, System::currentTimeMillis) }
-    private val browser by lazy { AndroidBrowserLauncher(this) }
-    private val authController by lazy { AuthController(authRegistry, authStore, browser, activityScope, System::currentTimeMillis) }
+    // O grafo é do PROCESSO (App), não desta Activity: a renovação do token é serializada por um Mutex que tem de ser o mesmo
+    // para todos, e um login em andamento não pode morrer com a Activity.
+    private val auth by lazy { (application as App).authServices }
     private val openAiAuth by lazy {
-        val models = OpenAiModels(authHttp)
-        ControllerAuthActions(authRegistry.first { it.id == ProviderIds.OPENAI }, authController, browser) {
-            val headers = runCatching { authorization.headers(ProviderIds.OPENAI) }.getOrNull()
+        val models = OpenAiModels(auth.http)
+        ControllerAuthActions(auth.registry.first { it.id == ProviderIds.OPENAI }, auth.controller, auth.browser) {
+            val headers = runCatching { auth.authorization.headers(ProviderIds.OPENAI) }.getOrNull()
             if (headers == null) emptyList() else models.list(headers).map { AccountModel(it.id, it.displayName) }
         }
     }
@@ -122,9 +115,9 @@ class SetupActivity : ComponentActivity() {
         ReasoningEngines(
             isModelInstalled = { ModelStore.get(this).isInstalled(it) },
             // Um login sem tokens (o "esqueleto" da renovação que falhou) não é credencial: pede entrar de novo.
-            hasOpenAiCredential = { authStore.get(ProviderIds.OPENAI)?.let { it !is Credential.OAuth || !it.isSkeleton } == true },
+            hasOpenAiCredential = { auth.store.get(ProviderIds.OPENAI)?.let { it !is Credential.OAuth || !it.isSkeleton } == true },
             local = { LocalReasoningEngine.create(this, it) },
-            openAi = { OpenAiReasoningEngine(authorization, authHttp, it) },
+            openAi = { OpenAiReasoningEngine(auth.authorization, auth.http, it) },
         )
     }
     private var localSnapshot by mutableStateOf(LocalModelsSnapshot.EMPTY)
@@ -241,6 +234,7 @@ class SetupActivity : ComponentActivity() {
                         ),
                         resolveReasoning = reasoningEngines::resolve,
                         reasoningAuth = openAiAuth,
+                        reasoningLocalSupported = LocalLlmSupport.isSupported(android.os.Build.SUPPORTED_ABIS),
                         localActions = localModels,
                     )
                 } else {

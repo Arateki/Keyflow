@@ -156,7 +156,7 @@ private fun statusText(state: OpenAiPanelState): String = when (state.status) {
     OpenAiStatus.CONNECTED_LOGIN -> state.account?.let { tr("Conectado como %s", it) } ?: tr("Conectado")
     OpenAiStatus.CONNECTED_KEY -> tr("Conectado com chave de API")
     OpenAiStatus.NEEDS_RECONNECT -> tr("A sessão expirou — entre de novo.")
-    OpenAiStatus.ERROR -> tr("Não conectado")
+    OpenAiStatus.ERROR -> tr("Não foi possível conectar")
 }
 
 /** "Using ChatGPT plan" + "Manage usage", e a nota que separa esse uso das cobranças do próprio app (diretrizes da OpenAI). */

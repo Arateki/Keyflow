@@ -70,13 +70,19 @@ class OpenAiReasoningEngine(
         val body = bodyOf(request).toRequestBody("application/json".toMediaType())
         var attempt = 0
         while (true) {
-            val call = client.newCall(
-                Request.Builder().url("$apiBaseUrl/responses")
-                    .apply { headers.forEach { (name, value) -> header(name, value) } }
-                    .header("Accept", "text/event-stream")
-                    .post(body)
-                    .build(),
-            )
+            val call = try {
+                client.newCall(
+                    Request.Builder().url("$apiBaseUrl/responses")
+                        .apply { headers.forEach { (name, value) -> header(name, value) } }
+                        .header("Accept", "text/event-stream")
+                        .post(body)
+                        .build(),
+                )
+            } catch (e: IllegalArgumentException) {
+                // O OkHttp recusa um cabeçalho com caractere que não pode ir na rede (ex.: chave colada com espaço de largura zero).
+                send(ReasoningEvent.Error(ReasoningError.UNAUTHORIZED, "a credencial tem caracteres que não podem ser enviados"))
+                return@channelFlow
+            }
             val outcome = attemptOnce(call)
             if (outcome !is Outcome.Retry) return@channelFlow
             attempt++
@@ -127,6 +133,8 @@ class OpenAiReasoningEngine(
             if (!r.isSuccessful) {
                 val failure = httpFailure(r.code, r.body?.string().orEmpty())
                 if (failure.retry) return Outcome.Retry(failure.event)
+                // RCL-03: 401 = a credencial não vale mais → a conexão passa a pedir login de novo.
+                if (r.code == 401) authorization.invalidate(ProviderIds.OPENAI)
                 send(failure.event)
                 return Outcome.Finished
             }
@@ -181,6 +189,7 @@ class OpenAiReasoningEngine(
             }
             "response.failed" -> {
                 val code = json.optJSONObject("response")?.optJSONObject("error")?.optString("code").orEmpty()
+                if (code == "subscription_sharing_invalid_user") authorization.invalidate(ProviderIds.OPENAI)
                 send(ReasoningEvent.Error(failedError(code), "a resposta falhou ($code)"))
                 return true
             }
@@ -208,7 +217,11 @@ class OpenAiReasoningEngine(
         }
         val kind = when {
             status == 401 -> ReasoningError.UNAUTHORIZED
-            status == 403 -> if (code in FORBIDDEN_ENGINE_CODES) ReasoningError.ENGINE else ReasoningError.UNAUTHORIZED
+            status == 403 -> when {
+                code == NOT_ELIGIBLE_CODE -> ReasoningError.NOT_ELIGIBLE // explicar; entrar de novo não resolve, e nunca se repete
+                code in FORBIDDEN_ENGINE_CODES -> ReasoningError.ENGINE
+                else -> ReasoningError.UNAUTHORIZED
+            }
             status == 429 || code == "subscription_sharing_usage_limit_exceeded" -> ReasoningError.RATE_LIMIT
             status >= 500 -> ReasoningError.NETWORK
             else -> ReasoningError.ENGINE // 400 `unsupported_capability` e o resto: não se repete o mesmo corpo
@@ -219,7 +232,8 @@ class OpenAiReasoningEngine(
     private fun failedError(code: String): ReasoningError = when (code) {
         "subscription_sharing_usage_limit_exceeded" -> ReasoningError.RATE_LIMIT
         "subscription_sharing_usage_unavailable", "subscription_sharing_user_unavailable" -> ReasoningError.NETWORK
-        "subscription_sharing_user_not_eligible", "subscription_sharing_invalid_user" -> ReasoningError.UNAUTHORIZED
+        NOT_ELIGIBLE_CODE -> ReasoningError.NOT_ELIGIBLE
+        "subscription_sharing_invalid_user" -> ReasoningError.UNAUTHORIZED
         else -> ReasoningError.ENGINE
     }
 
@@ -240,6 +254,7 @@ class OpenAiReasoningEngine(
         const val MAX_ATTEMPTS = 3
         const val BACKOFF_MS = 200L
         const val READ_TIMEOUT_S = 120L
+        const val NOT_ELIGIBLE_CODE = "subscription_sharing_user_not_eligible"
 
         /** 403 que NÃO é "sem direito": a rota/permissão do cliente está errada — erro do motor, não do usuário. */
         val FORBIDDEN_ENGINE_CODES = setOf(

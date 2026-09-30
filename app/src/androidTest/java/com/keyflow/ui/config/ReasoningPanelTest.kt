@@ -52,10 +52,15 @@ class ReasoningPanelTest {
     ) {
         var settings by mutableStateOf(initial)
 
+        var localSupported by mutableStateOf(true)
+
         @Composable
         fun Content() {
             KeyFlowTheme(dark = false) {
-                ReasoningPanel(settings = settings, onSettingsChange = { settings = it }, models = models, actions = actions, resolve = resolve)
+                ReasoningPanel(
+                    settings = settings, onSettingsChange = { settings = it }, models = models, actions = actions, resolve = resolve,
+                    localSupported = localSupported,
+                )
             }
         }
     }
@@ -63,6 +68,19 @@ class ReasoningPanelTest {
     private fun textUi(installed: Set<String> = emptySet(), selected: String? = null) = LocalModelsUi.compose(
         catalog = ModelCatalog.TEXT, installed = installed, active = null, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_000,
     )
+
+    /** Review, Important 7: aparelho de 32 bits — sem lista de download, com o motivo escrito. */
+    @Test
+    fun aDeviceWithoutTheLocalEngineShowsNoDownloadsAndSaysWhy() {
+        val h = Harness(Settings(), textUi())
+        h.localSupported = false
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(RACIOCINIO_LOCAL_UNSUPPORTED_TAG).performScrollTo().assertIsDisplayed()
+        rule.onNodeWithTag("raciocinio-local-model-${qwen.id}").assertDoesNotExist()
+        rule.onNodeWithTag("raciocinio-local-model-${gemma.id}").assertDoesNotExist()
+        rule.onNodeWithTag(RACIOCINIO_LOCAL_PRIVACY_TAG).assertDoesNotExist()
+    }
 
     @Test
     fun opensOnTheLocalSourceWithTheTextModelsListed() {

@@ -283,8 +283,10 @@ class OpenAiPanelTest {
     fun anErrorShowsItsMessageAndKeepsTheLoginToTryAgain() {
         show(Harness(FakeAuth(initial = ConnectionState.Error(com.keyflow.auth.AuthErrorKind.TIMEOUT))))
 
+        text(OPENAI_STATUS_TAG).assertTextEquals("Não foi possível conectar")
         text(OPENAI_ERROR_TAG).assertIsDisplayed()
         text(OPENAI_LOGIN_TAG).assertIsDisplayed()
+        text(OPENAI_DISCONNECT_TAG).assertIsDisplayed() // a credencial pode estar no cofre: sempre há saída
     }
 
     // ── modelo da conta ───────────────────────────────────────────────────────────────────
