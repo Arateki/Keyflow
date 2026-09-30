@@ -43,6 +43,7 @@ fun ReasoningPanel(
     // Qual motor responde com estas Settings — ou por que nenhum. Sem fiação (galeria, testes), nenhum.
     resolve: (Settings) -> ReasoningResolution = { ReasoningResolution.Unavailable(UnavailableReason.NO_LOCAL_MODEL) },
     auth: AuthActions = AuthActions.None,
+    initialTest: TestState = TestState(),
 ) {
     val palette = LocalKeyFlowPalette.current
     val scroll = rememberScrollState()
@@ -78,7 +79,7 @@ fun ReasoningPanel(
             Column(Modifier.padding(vertical = 16.dp)) {
                 // "Manage usage" só faz sentido quando quem responde é o PLANO do ChatGPT (não a chave de API).
                 val manageUsage = auth.usageUrl?.takeIf { settings.reasoningSource == ReasoningSource.OPENAI && openAi.status == OpenAiStatus.CONNECTED_LOGIN }
-                ReasoningTestArea(resolution, onManageUsage = manageUsage?.let { url -> { auth.openUrl(url) } })
+                ReasoningTestArea(resolution, onManageUsage = manageUsage?.let { url -> { auth.openUrl(url) } }, initialState = initialTest)
             }
         }
     }

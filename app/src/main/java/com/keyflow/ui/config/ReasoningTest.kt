@@ -62,9 +62,10 @@ data class TestState(
  */
 class TestRunner(
     private val scope: CoroutineScope,
+    initial: TestState = TestState(),
     private val clock: () -> Long = { System.nanoTime() / 1_000_000 },
 ) {
-    private val _state = MutableStateFlow(TestState())
+    private val _state = MutableStateFlow(initial)
     val state: StateFlow<TestState> = _state.asStateFlow()
     private var job: Job? = null
 
@@ -134,12 +135,18 @@ internal fun formatTestDuration(ms: Long): String =
  * O botão Testar (RTS-01..04): manda uma frase à origem ativa, mostra a resposta chegando, vira "Parar" enquanto gera e,
  * no fim, os tempos. Sem motor pronto o botão fica desabilitado com o motivo escrito ao lado. [onManageUsage] não nulo faz do
  * limite de uso atingido um botão principal "Manage usage" (a doc da OpenAI: é a ação que resolve o limite do plano).
+ * [initialState] é só para a galeria de verificação mostrar a área já em andamento (como `initialTab` no ConfigScreen).
  */
 @Composable
-fun ReasoningTestArea(resolution: ReasoningResolution, modifier: Modifier = Modifier, onManageUsage: (() -> Unit)? = null) {
+fun ReasoningTestArea(
+    resolution: ReasoningResolution,
+    modifier: Modifier = Modifier,
+    onManageUsage: (() -> Unit)? = null,
+    initialState: TestState = TestState(),
+) {
     val palette = LocalKeyFlowPalette.current
     val scope = rememberCoroutineScope()
-    val runner = remember { TestRunner(scope) }
+    val runner = remember { TestRunner(scope, initialState) }
     val state by runner.state.collectAsState()
     val prompt = tr("Diga olá em uma frase curta.")
     val unavailable = (resolution as? ReasoningResolution.Unavailable)?.reason

@@ -43,6 +43,27 @@ class TestRunnerTest {
 
     private fun ready(engine: ReasoningEngine) = ReasoningResolution.Ready(engine)
 
+    /** O ponto de partida vem de fora (a galeria mostra a área "testando" sem clicar em nada). */
+    @Test
+    fun `it starts from the given state and stop keeps its text`() = runTest {
+        val initial = TestState(text = "Olá! Tudo", running = true, firstDeltaMs = 800)
+        val runner = TestRunner(backgroundScope, initial) { currentTime }
+        assertThat(runner.state.value).isEqualTo(initial)
+
+        runner.stop()
+
+        assertThat(runner.state.value).isEqualTo(initial.copy(running = false))
+    }
+
+    @Test
+    fun `starting from a given state replaces it with a fresh run`() = runTest {
+        val runner = TestRunner(backgroundScope, TestState(text = "velho", error = ReasoningError.NETWORK)) { currentTime }
+        runner.start(ready(Scripted { emit(ReasoningEvent.Delta("novo")); emit(ReasoningEvent.Done) }), request)
+        runCurrent()
+        assertThat(runner.state.value.text).isEqualTo("novo")
+        assertThat(runner.state.value.error).isNull()
+    }
+
     @Test
     fun `accumulates the deltas in order and finishes on done`() = runTest {
         val runner = TestRunner(backgroundScope) { currentTime }

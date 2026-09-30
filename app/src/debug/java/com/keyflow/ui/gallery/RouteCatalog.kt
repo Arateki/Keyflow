@@ -69,6 +69,20 @@ import com.keyflow.ui.config.LocalModelsUi
 import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.DownloadState
 import com.keyflow.data.models.DownloadProgress
+import com.keyflow.auth.AuthMethod
+import com.keyflow.auth.ConnectionState
+import com.keyflow.core.ReasoningSource
+import com.keyflow.reasoning.ReasoningEngine
+import com.keyflow.reasoning.ReasoningError
+import com.keyflow.reasoning.ReasoningEvent
+import com.keyflow.reasoning.ReasoningRequest
+import com.keyflow.reasoning.ReasoningResolution
+import com.keyflow.reasoning.UnavailableReason
+import com.keyflow.ui.config.AccountModel
+import com.keyflow.ui.config.AuthActions
+import com.keyflow.ui.config.TestState
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
 /**
  * Única fonte de verdade das rotas de verificação (VERIFY-05). Cada rota é uma tela/estado isolado,
@@ -252,7 +266,64 @@ object RouteCatalog {
         Route("config-teclado-skins") { SkinsRoute(orb = false) },
         // As abas novas (Notificação, Visão, Raciocínio, Voz), ainda vazias: só o cabeçalho com o nome e o menu com os ícones.
         Route("config-visao") { ConfigTabRoute(ConfigTab.VISAO) },
+        // Raciocínio: `config-raciocinio` é a origem Local sem nenhum modelo baixado; as outras cobrem baixando, pronto, a nuvem
+        // (desconectada, conectada com o plano) e a área do Testar em andamento e no limite de uso.
         Route("config-raciocinio") { ConfigTabRoute(ConfigTab.RACIOCINIO) },
+        Route("config-raciocinio-local-baixando") {
+            ConfigReasoningRoute(
+                localModels = galleryTextModels(
+                    active = DownloadProgress(
+                        ModelCatalog.GEMMA_4_E2B.id,
+                        DownloadState.RUNNING,
+                        bytesDone = ModelCatalog.GEMMA_4_E2B.totalBytes * 42 / 100,
+                        totalBytes = ModelCatalog.GEMMA_4_E2B.totalBytes,
+                    ),
+                ),
+            )
+        },
+        Route("config-raciocinio-local-pronto") {
+            ConfigReasoningRoute(
+                localModelId = ModelCatalog.QWEN3_0_6B.id,
+                localModels = galleryTextModels(installed = setOf(ModelCatalog.QWEN3_0_6B.id), selected = ModelCatalog.QWEN3_0_6B.id),
+                ready = true,
+            )
+        },
+        Route("config-raciocinio-openai-desconectado") {
+            ConfigReasoningRoute(source = ReasoningSource.OPENAI, auth = GalleryAuth(ConnectionState.Disconnected))
+        },
+        Route("config-raciocinio-openai-conectado") {
+            ConfigReasoningRoute(
+                source = ReasoningSource.OPENAI,
+                openAiModel = "modelo-a",
+                auth = GalleryAuth(
+                    ConnectionState.Connected("voce@exemplo.com", AuthMethod.OAUTH, planUsage = true),
+                    models = listOf(AccountModel("modelo-a", "Modelo A"), AccountModel("modelo-b", "Modelo B")),
+                ),
+                ready = true,
+            )
+        },
+        // Testar em andamento: um trecho já chegou (tempo até o 1º) e o botão virou "Parar".
+        Route("config-raciocinio-testando") {
+            ConfigReasoningRoute(
+                localModelId = ModelCatalog.QWEN3_0_6B.id,
+                localModels = galleryTextModels(installed = setOf(ModelCatalog.QWEN3_0_6B.id), selected = ModelCatalog.QWEN3_0_6B.id),
+                ready = true,
+                test = TestState(text = "Olá! Tudo bem por aí? Espero que o seu dia", running = true, firstDeltaMs = 820),
+            )
+        },
+        // Limite do plano atingido no meio da resposta: o texto parcial fica e "Manage usage" vira a ação principal.
+        Route("config-raciocinio-openai-limite") {
+            ConfigReasoningRoute(
+                source = ReasoningSource.OPENAI,
+                openAiModel = "modelo-a",
+                auth = GalleryAuth(
+                    ConnectionState.Connected("voce@exemplo.com", AuthMethod.OAUTH, planUsage = true),
+                    models = listOf(AccountModel("modelo-a", "Modelo A")),
+                ),
+                ready = true,
+                test = TestState(text = "Olá! Tudo", firstDeltaMs = 640, totalMs = 2_100, error = ReasoningError.RATE_LIMIT),
+            )
+        },
         Route("config-fala") { ConfigTabRoute(ConfigTab.FALA) },
         Route("config-notificacao") { ConfigTabRoute(ConfigTab.NOTIFICACAO) },
         Route("config-unlock") { ConfigTabRoute(ConfigTab.TECLADO, keyboardEnabled = true, unlockOpen = true) },
@@ -297,6 +368,59 @@ object RouteCatalog {
     /** Estado fixo do painel Local: RAM de sobra (sem aviso de peso) para os goldens não dependerem do aparelho. */
     private fun galleryLocalModels(installed: Set<String>, active: DownloadProgress? = null, selected: String? = null) =
         LocalModelsUi.compose(installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_192)
+
+    /** Estado fixo da lista de modelos de TEXTO do Raciocínio (RAM de sobra, como a de voz). */
+    private fun galleryTextModels(installed: Set<String> = emptySet(), active: DownloadProgress? = null, selected: String? = null) =
+        LocalModelsUi.compose(
+            catalog = ModelCatalog.TEXT, installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_192,
+        )
+
+    /** Aba Raciocínio: a origem, a lista local, o provedor de nuvem e a área do Testar num estado fixo. [ready] liga o botão Testar. */
+    @Composable
+    private fun ConfigReasoningRoute(
+        source: ReasoningSource = ReasoningSource.LOCAL,
+        localModelId: String? = null,
+        openAiModel: String = "",
+        localModels: LocalModelsUi = galleryTextModels(),
+        auth: AuthActions = AuthActions.None,
+        ready: Boolean = false,
+        test: TestState = TestState(),
+    ) {
+        ConfigScreen(
+            settings = FakeSettings.settings.copy(
+                reasoningSource = source, reasoningLocalModelId = localModelId, reasoningOpenAiModel = openAiModel,
+            ),
+            reasoningModels = localModels,
+            reasoningAuth = auth,
+            initialReasoningTest = test,
+            resolveReasoning = {
+                if (ready) ReasoningResolution.Ready(GalleryReasoningEngine)
+                else ReasoningResolution.Unavailable(if (source == ReasoningSource.OPENAI) UnavailableReason.NOT_CONNECTED else UnavailableReason.NO_LOCAL_MODEL)
+            },
+            permissions = PermissionStatus(
+                microphoneGranted = true,
+                overlayGranted = true,
+                keyboardEnabled = true,
+                notificationsGranted = true,
+            ),
+            saveController = SaveController(),
+            onOverlayModeChange = {},
+            onKeyboardModeChange = {},
+            onThemeChange = {},
+            onRequestOverlayPermission = {},
+            onRequestKeyboardPermission = {},
+            onRequestMicPermission = {},
+            onRequestNotificationPermission = {},
+            onSwitchKeyboard = {},
+            onSettingsChange = {},
+            initialTab = ConfigTab.RACIOCINIO,
+        )
+    }
+
+    /** O motor da galeria: nunca é chamado (ninguém toca no Testar) — só faz o botão aparecer ligado. */
+    private object GalleryReasoningEngine : ReasoningEngine {
+        override fun generate(request: ReasoningRequest): Flow<ReasoningEvent> = emptyFlow()
+    }
 
     /** Aba Voz por origem (Créditos/OpenAI/Custom/Local) — espelha os mocks 02-v2/03-v2. */
     @Composable
