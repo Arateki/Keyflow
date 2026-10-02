@@ -2116,3 +2116,33 @@ Branch `feature/skins-importaveis` (worktree `keyflow-skins-wt`); spec/design/ta
   a frio ~90 s, sem snapshot). Nada do AVD original (`~/.android/avd`) foi tocado. **[YAN]**: liberar espaço em `/home` (ou mover o AVD
   `keyflow_api34`, 5,8 GB, para a raiz) — vale para todas as frentes.
 
+## skin-packs — SKP-T2: núcleo puro do pacote (2026-10-02)
+`skins/SkinPackNames`, `SkinPackManifest`, `SkinPackReader`, `SvgTextCheck`, `ImportReport` — Kotlin/JVM puro (`java.util.zip`, `org.json`,
+`tr`), testado na JVM: **102 testes novos, 929 unitários, 0 falhas**.
+- **Segurança (SKP-IMP-04), provada por teste e por mutação**: os limites contam os bytes **lidos** na descompressão (total 60 MB,
+  512 KB por SVG, 64 KB no manifest), nunca `entry.size`; um teste adultera o cabeçalho local para "1 byte" e a bomba de 80 MB cai do
+  mesmo jeito; a bomba de 100 MB de zeros (<1 MB comprimida) aborta puxando só uma parte do `.zip`. Zip-slip (`..`, `/x`, `C:\x`,
+  `\`, controle) recusa o pacote inteiro e a mensagem nunca ecoa caractere de controle. O JSON aninhado é medido antes do `org.json`
+  (recursivo). Mutação: removi a recusa de `..`, os dois contadores de bytes, a de `DOCTYPE` e a de `href` externo — **13 testes
+  caíram**, em todos os grupos.
+- **Achado — `ZipInputStream` não distingue "fim do diretório central" de "arquivo cortado"**: um download cortado numa fronteira de
+  entrada saía como pacote válido com menos arquivos (o teste `a truncated zip…` pegou). O leitor agora lê o resto do arquivo (ainda
+  sob 25 MB) e exige o registro de fim do diretório central (`PK 05 06`) nos últimos 64 KB; todo corte de 7 em 7 bytes é recusado.
+- **Decisões onde o spec/FORMAT.md era omisso (o FORMAT.md é corrigido num commit `docs(skins)` próprio, no fim da fase 1):**
+  1. Campo inválido no manifest (cor mal escrita, fps fora de 1–60, `popup`/`navigationBarColor` translúcidas, `slice` incompleto) é
+     **erro com o caminho do campo**, nunca um padrão silencioso; campo desconhecido é aviso. Profundidade de JSON ≤ 16.
+  2. Nome de arquivo em maiúsculas (`Orb_Idle_01.svg`) é ignorado com aviso próprio ("precisam ser minúsculas"), não erro: se por
+     isso faltar `idle`/`key_normal`, o erro de obrigatório aparece de qualquer forma.
+  3. Lixo do macOS/Windows (`__MACOSX/`, `.DS_Store`, `Thumbs.db`, `desktop.ini`, `._*`) é ignorado **sem** aviso; `\` vale como `/`; a
+     pasta que envolve tudo só sai se TODOS os arquivos estão nela (senão o que está em pasta é "subpasta ignorada").
+  4. Estado sem frames usa os frames **e o ritmo** de `idle`; `orb.states.<estado>.fps` sem frames daquele estado é ignorado com aviso.
+  5. Frame `00`/zero é erro; frames duplicados (`_01` e `_1`) é erro citando os dois; buraco é aviso (lista até 5 faltantes); frame `05`
+     sozinho também é buraco (1–4 faltam). Instalado com nome canônico `orb_<estado>_<4 dígitos>.svg`.
+  6. Avisos de SVG (`<filter>`/`filter=`, `mix-blend-mode`, SMIL, animação CSS, fontes SVG) saem **agregados por tipo** ("a.svg, b.svg,
+     c.svg e mais 97: usa <filter>…"), não um por arquivo. Peças opcionais do teclado ausentes NÃO avisam (têm padrão documentado);
+     tray em SVG sem `trayColor`/`navigationBarColor` avisa que a faixa do sistema ficará preta.
+  7. Reforço além da lista do spec (ainda "referência externa"): `url(...)` em atributo/CSS que não seja `#id` ou `data:` PNG/JPEG,
+     `@import`, `<?xml-stylesheet?>` e qualquer valor de `href` com `&` (não dá para conferir o destino). `data:image/svg+xml` é recusado
+     (SVG aninhado). A checagem é textual e conservadora: `<script` dentro de um comentário também é recusado.
+  8. Tudo em UTF-8 estrito (BOM tolerado); outra codificação é erro com o nome do arquivo.
+

@@ -23,7 +23,10 @@ traceability do `spec.md` ao concluir.
 - **Done when**: todos os casos de borda do spec.md têm teste; os exemplos de JSON/nomes do FORMAT.md parseiam (SKP-DOC-01);
   zip-slip, zip bomb (bytes lidos), entidade/DOCTYPE, `<script>`, `href` externo → erro; `<filter>` → aviso.
 - **Tests**: unit (`SkinPack*Test`). **Gate**: `testDebugUnitTest`.
-- **Status**: Pending
+- **Status**: Done (2026-10-02) — `SkinPackNames`, `SkinPackManifest`, `SkinPackReader` (+ `SvgTextCheck`, `ImportReport`); 102 testes
+  novos, 929 unitários verdes. Os exemplos do FORMAT.md são lidos pelo teste (`SkinPackFormatDocTest`) e o pacote da árvore do §1
+  importa sem avisos. **Mutação**: tirar a recusa de `..`, a contagem de bytes lidos (total e por arquivo), a de DOCTYPE e a de
+  `href` externo derrubou 13 testes. Decisões onde o spec era omisso e correções do FORMAT.md: `STATE.md`.
 
 ### SKP-T3 — Store e ids (`pack:<id>`)
 - **What**: `SkinPackStore` (instalar atômico via `.tmp`+rename, listar, remover, reimportar com mesmo id, load lazy do

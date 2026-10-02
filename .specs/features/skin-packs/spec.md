@@ -93,12 +93,16 @@ a dele. A spec `theme-system` (M8, Draft) trata de tokens/cores, não de arte im
 
 | ID | Área | Status |
 | --- | ---- | ------ |
-| SKP-IMP-01..06 | Importação | Pending |
+| SKP-IMP-02 | Importação | Parcial (T2): manifest, nomes, limites e texto dos SVGs validados e relatados; falta o render de teste (T3) |
+| SKP-IMP-03 | Importação | Parcial (T2): o leitor devolve `Failed` sem conteúdo com qualquer erro; a atomicidade em disco é da T3 |
+| SKP-IMP-04 | Importação | Implemented (T2), com teste de mutação: zip-slip, zip bomb por bytes lidos, DOCTYPE/entidade, `<script>`, `<foreignObject>`, `href`/`url()` externo |
+| SKP-IMP-01, 05, 06 | Importação | Pending (SAF e UI na T6; id estável na T3; fora da main thread na T6) |
 | SKP-STO-01..05 | Armazenamento | Pending |
 | SKP-ORB-01..05 | Orbe | Pending |
 | SKP-KBD-01..05 | Teclado | Pending |
 | SKP-UI-01..04 | Interface | Pending |
-| SKP-DOC-01..02 | Docs/exemplo | Pending |
+| SKP-DOC-01 | Docs | Parcial (T2): `SkinPackFormatDocTest` amarra exemplos, nomes, limites e padrões do FORMAT.md ao código; falta o ajuste final (T7) |
+| SKP-DOC-02 | Exemplo | Pending |
 
 ## Success Criteria
 
