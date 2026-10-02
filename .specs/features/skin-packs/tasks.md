@@ -34,7 +34,9 @@ traceability do `spec.md` ao concluir.
 - **Done when**: instalar→listar→remover; reimportar atualiza sem mudar o id; pacote corrompido em disco → `null` sem crash;
   nenhum resíduo após erro; id estável e ASCII para nomes com acento/emoji.
 - **Tests**: instrumentado `SkinPackStoreTest` (+ unit do slug). **Gate**: unit + instrumentado escopado.
-- **Status**: Pending
+- **Status**: Done (2026-10-02) — `SkinIds`, `SkinPack`, `SkinPackStore`, `ReportText`; `SkinIdsTest` (9) na JVM e `SkinPackStoreTest` (21) no
+  emulador, com os 20 do `SvgRenderTest`: **41/41** em `com.keyflow.skins`; 938 unitários verdes. A troca da pasta é por `renameTo`
+  (a antiga só sai depois da nova no lugar), o desenho de teste acontece ANTES de gravar qualquer coisa e sobras de processo morto são varridas.
 
 ### SKP-T4 — Teclado: `PackKeySurface`, tray e ligação com `pack:<id>`
 - **What**: `PackKeySurface : KeySurface` (sprites por tamanho/estado/role em `SpriteCache`, 9-slice), `PackBackdrop`,

@@ -2146,3 +2146,19 @@ Branch `feature/skins-importaveis` (worktree `keyflow-skins-wt`); spec/design/ta
      (SVG aninhado). A checagem é textual e conservadora: `<script` dentro de um comentário também é recusado.
   8. Tudo em UTF-8 estrito (BOM tolerado); outra codificação é erro com o nome do arquivo.
 
+## skin-packs — SKP-T3: store e ids `pack:<id>` (2026-10-02)
+`skins/SkinIds` (JVM), `SkinPack`, `SkinPackStore`, `ReportText`. **41/41 instrumentados** em `com.keyflow.skins` (20 `SvgRenderTest` + 21
+`SkinPackStoreTest`) no emulador; **938 unitários** (`SkinIdsTest` +9).
+- **O id vira nome de pasta e o valor vem dos ajustes**: `SkinIds.packId` só aceita `pack:` + `[a-z0-9][a-z0-9-]{0,62}`; `pack:../x`,
+  maiúscula, ponto, barra e acento são "não é pacote". `SkinPackStore.load/remove` revalidam o id (teste com um arquivo-canário fora da
+  pasta que `remove("..")` não pode tocar). O id gerado é `slug(≤24)-hash(8 hex)` do nome em NFC/minúsculas/trim.
+- **Troca atômica**: o desenho de teste roda ANTES de gravar; depois `<id>.tmp-<nanos>/` → `renameTo` (a antiga vai a `<id>.old` e só
+  é apagada depois da nova no lugar; se a troca falha, a antiga volta). `sweepLeftovers` varre `*.tmp-*`/`*.old` de um processo morto.
+  Um `LOCK` estático (o IME, o overlay e a UI abrem instâncias diferentes sobre a mesma pasta, no mesmo processo).
+- **Render de teste do import**: 64 px por frame (MEET), 96 px por face (com a fatia, se houver) e 128×64 na bandeja. Erros: SVG que não lê
+  (nome do autor, `orb_idle_1.svg`, não o canônico), fatia que ocupa o viewBox inteiro (soma ≥ viewBox) e **tempo** > 1000 ms. Avisos:
+  sem viewBox nem width/height, viewBox não quadrado na orbe, quadro todo transparente (típico de recurso que o AndroidSVG não desenha),
+  > 150 ms ("pesado"). Orçamento de tempo injetável no construtor (os testes usam 0 ms para provar os dois caminhos).
+- **`PackSvg.sourceName` / `SkinPackContent.manifestBytes`** (T2 ajustada): as mensagens citam o nome do arquivo que o autor escreveu,
+  e o store grava o manifest original (reabre com o mesmo parser). `ReportText.names` agora é compartilhado entre o leitor e o store.
+

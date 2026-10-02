@@ -93,11 +93,14 @@ a dele. A spec `theme-system` (M8, Draft) trata de tokens/cores, não de arte im
 
 | ID | Área | Status |
 | --- | ---- | ------ |
-| SKP-IMP-02 | Importação | Parcial (T2): manifest, nomes, limites e texto dos SVGs validados e relatados; falta o render de teste (T3) |
-| SKP-IMP-03 | Importação | Parcial (T2): o leitor devolve `Failed` sem conteúdo com qualquer erro; a atomicidade em disco é da T3 |
+| SKP-IMP-02 | Importação | Implemented (T2+T3): manifest, nomes, limites, texto dos SVGs e render de teste (parse, tempo, fatia, quadro em branco), tudo relatado |
+| SKP-IMP-03 | Importação | Implemented (T2+T3): com qualquer erro nada é gravado (render antes do disco, pasta de preparo + `renameTo`, sobras varridas) |
 | SKP-IMP-04 | Importação | Implemented (T2), com teste de mutação: zip-slip, zip bomb por bytes lidos, DOCTYPE/entidade, `<script>`, `<foreignObject>`, `href`/`url()` externo |
-| SKP-IMP-01, 05, 06 | Importação | Pending (SAF e UI na T6; id estável na T3; fora da main thread na T6) |
-| SKP-STO-01..05 | Armazenamento | Pending |
+| SKP-IMP-05 | Importação | Implemented no store (T3): mesmo `name` → mesmo id, troca atômica, `replaced = true`; "mostra a versão nova ao vivo" depende das T4/T5/T6 |
+| SKP-IMP-01, 06 | Importação | Pending (SAF e a thread de fundo na T6; o store e o leitor já são síncronos e sem Android UI) |
+| SKP-STO-01, 02 (ids) | Armazenamento | Implemented (T3): `filesDir/skins/<id>/`, `pack:<id>`, id = slug ASCII + 8 hex do nome, estável; falta só a ligação com `Settings` (T4/T5/T6) |
+| SKP-STO-03, 04 | Armazenamento | Parcial (T3): `load` devolve `null` sem crash para pacote sumido/quebrado; a queda para Sistema/Ateliê é da T4/T5 |
+| SKP-STO-05 | Armazenamento | Decisão registrada (sem código): o export de config futuro leva só o id `pack:<id>`, nunca os arquivos |
 | SKP-ORB-01..05 | Orbe | Pending |
 | SKP-KBD-01..05 | Teclado | Pending |
 | SKP-UI-01..04 | Interface | Pending |

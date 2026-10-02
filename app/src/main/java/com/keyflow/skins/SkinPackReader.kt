@@ -10,8 +10,11 @@ import java.nio.charset.CodingErrorAction
 import java.util.zip.ZipException
 import java.util.zip.ZipInputStream
 
-/** Um SVG do pacote, já conferido: [fileName] é o nome canônico com o qual ele é instalado; [bytes], o conteúdo UTF-8 original. */
-class PackSvg(val fileName: String, val bytes: ByteArray)
+/**
+ * Um SVG do pacote, já conferido: [fileName] é o nome canônico com o qual ele é instalado; [bytes], o conteúdo UTF-8 original;
+ * [sourceName], o nome que o autor deu no `.zip` (`orb_idle_1.svg`) — é ele que as mensagens de erro citam.
+ */
+class PackSvg(val fileName: String, val bytes: ByteArray, val sourceName: String = fileName)
 
 /**
  * O conteúdo validado de um pacote, pronto para o store instalar: o [manifest] e os SVGs com nome canônico
@@ -21,6 +24,8 @@ class SkinPackContent(
     val manifest: SkinPackManifest,
     val orbFrames: Map<OrbPackState, List<PackSvg>>,
     val keyboardFaces: Map<KeyboardPart, PackSvg>,
+    /** O `manifest.json` como veio no `.zip` (já validado): é ele que o store grava, para reabrir o pacote com o mesmo parser. */
+    val manifestBytes: ByteArray,
 ) {
     val hasOrb: Boolean get() = orbFrames.isNotEmpty()
     val hasKeyboard: Boolean get() = keyboardFaces.isNotEmpty()
@@ -274,9 +279,9 @@ object SkinPackReader {
                     is PackFileKind.Unknown -> if (kind.lowercaseWouldMatch) wrongCase += file.name else ignored += file.name
                 }
             }
-            if (ignored.isNotEmpty()) warnings += tr("Arquivos fora do formato foram ignorados: %s", namesText(ignored))
-            if (wrongCase.isNotEmpty()) warnings += tr("Nomes de arquivo precisam ser em minúsculas — ignorados: %s", namesText(wrongCase))
-            if (reserved.isNotEmpty()) warnings += tr("Nomes reservados para versões futuras do formato foram ignorados: %s", namesText(reserved))
+            if (ignored.isNotEmpty()) warnings += tr("Arquivos fora do formato foram ignorados: %s", ReportText.names(ignored))
+            if (wrongCase.isNotEmpty()) warnings += tr("Nomes de arquivo precisam ser em minúsculas — ignorados: %s", ReportText.names(wrongCase))
+            if (reserved.isNotEmpty()) warnings += tr("Nomes reservados para versões futuras do formato foram ignorados: %s", ReportText.names(reserved))
 
             val orbFrames = assembleOrb(frames)
             assembleKeyboard(faces)
@@ -284,7 +289,7 @@ object SkinPackReader {
                 errors += tr("O pacote não tem orbe nem teclado — coloque pelo menos orb_idle_01.svg ou keyboard_key_normal.svg.")
             }
             warnManifestSections(parsed, orbFrames, hasKeyboard = faces.isNotEmpty(), hasTrayFile = KeyboardPart.TRAY in faces)
-            for ((kind, files) in svgWarnings) warnings += tr("%s: %s", namesText(files), svgWarningText(kind))
+            for ((kind, files) in svgWarnings) warnings += tr("%s: %s", ReportText.names(files), svgWarningText(kind))
 
             val manifest = parsed?.manifest
             if (errors.isNotEmpty() || manifest == null) return SkinPackReadResult.Failed(ImportReport(warnings = warnings, errors = errors))
@@ -292,7 +297,7 @@ object SkinPackReader {
                 if (orbFrames.isNotEmpty()) add(orbSummary(orbFrames))
                 if (faces.isNotEmpty()) add(keyboardSummary(faces))
             }
-            return SkinPackReadResult.Ok(SkinPackContent(manifest, orbFrames, faces), ImportReport(installed, warnings, errors))
+            return SkinPackReadResult.Ok(SkinPackContent(manifest, orbFrames, faces, manifestEntry!!.bytes!!), ImportReport(installed, warnings, errors))
         }
 
         /** Se TODOS os arquivos moram numa mesma pasta de primeiro nível, essa pasta é só a embalagem (o "comprimir pasta"): sai. */
@@ -340,7 +345,7 @@ object SkinPackReader {
             val check = SvgTextChecker.check(file.name, file.bytes)
             errors += check.errors
             for (warning in check.warnings) svgWarnings.getOrPut(warning) { mutableListOf() } += file.name
-            return if (check.errors.isEmpty()) PackSvg(canonicalName, file.bytes) else null
+            return if (check.errors.isEmpty()) PackSvg(canonicalName, file.bytes, file.name) else null
         }
 
         private fun assembleOrb(frames: Map<OrbPackState, Map<Int, Pair<Entry, PackSvg>>>): Map<OrbPackState, List<PackSvg>> {
@@ -424,12 +429,6 @@ object SkinPackReader {
             SvgWarning.SMIL_ANIMATION -> tr("tem animação SMIL (<animate>…), que é ignorada — a animação é feita pelos frames")
             SvgWarning.CSS_ANIMATION -> tr("tem animação CSS (@keyframes ou animation), que é ignorada — a animação é feita pelos frames")
             SvgWarning.SVG_FONT -> tr("usa fontes SVG (<font>), que não são suportadas")
-        }
-
-        /** "a.svg, b.svg, c.svg e mais 4": três nomes bastam para o autor achar o resto. */
-        private fun namesText(names: List<String>): String {
-            val shown = names.take(3).joinToString(", ")
-            return if (names.size <= 3) shown else tr("%s e mais %d", shown, names.size - 3)
         }
 
         private fun missingText(missing: List<Int>): String {
