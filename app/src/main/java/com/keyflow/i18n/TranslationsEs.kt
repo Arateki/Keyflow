@@ -19,6 +19,7 @@ internal val TranslationsEs: Map<String, String> = mapOf(
     "motor dos modelos de texto da aba Raciocínio, no aparelho — Apache 2.0 (Google)." to "motor de los modelos de texto de la pestaña Razonamiento, en el dispositivo — Apache 2.0 (Google).",
     "modelo de texto Equilibrado — Apache 2.0 (Google), baixado sob demanda." to "modelo de texto Equilibrado — Apache 2.0 (Google), descargado bajo demanda.",
     "modelo de texto Leve — Apache 2.0 (Alibaba), baixado sob demanda." to "modelo de texto Ligero — Apache 2.0 (Alibaba), descargado bajo demanda.",
+    "desenha os SVGs das skins importadas — Apache 2.0 (Cave Rock Software)." to "dibuja los SVG de las skins importadas — Apache 2.0 (Cave Rock Software).",
     "O login voltou sem permissão para usar o seu plano do ChatGPT. Entre de novo autorizando o uso do plano ou use uma chave de API." to "El inicio de sesión volvió sin permiso para usar tu plan de ChatGPT. Inicia sesión de nuevo autorizando el uso del plan o usa una clave de API.",
     "Chave de API" to "Clave de API",
     "Desconectar" to "Desconectar",

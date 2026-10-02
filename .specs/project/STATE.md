@@ -2070,3 +2070,49 @@ Testes até aqui: 610 unitários; instrumentados no emulador: `ui.config` 124/12
   segundo plano e o LLM no aparelho (tempo/RAM; `recommendedRamMb` e `IDLE_UNLOAD_MS` são estimativas até lá).
 - **Deferido (menor)**: aviso de "revogação não confirmada" ao Desconectar; `hasOpenAiCredential`/`apiKey()` leem o cofre na
   main thread (medir no A32); com login sem o escopo do plano o Testar segue habilitado (a tela já avisa).
+
+## skin-packs — SKP-T1: AndroidSVG + `SvgRender` (2026-10-02)
+Branch `feature/skins-importaveis` (worktree `keyflow-skins-wt`); spec/design/tasks/formato em `.specs/features/skin-packs/`.
+- **Dependência conferida, não presumida**: `maven-metadata.xml` do Maven Central lista só **1.3 e 1.4** (`release`=`latest`=1.4,
+  2019-05-28). AAR de 202 KB, SHA-1 igual ao `.aar.sha1` do repositório, POM Apache-2.0, minSdk 8, sem dependências. API lida no
+  `classes.jar` com `javap` (nada de memória): `SVG.getFromString`, `renderToCanvas(Canvas, RenderOptions)`,
+  `RenderOptions.viewPort/preserveAspectRatio`, `getDocumentViewBox`, `setDocumentWidth(String)`, `setInternalEntitiesEnabled`.
+  Licença (`LICENSE` do repositório, "Copyright 2013-2018 Cave Rock Software Ltd"; não há `NOTICE`) em `app/licenses/` + aba Docs.
+- **Só `skins/SvgRender.kt` importa `com.caverock`** (regra do design). Teste/produção usam `SvgImage`, `SvgFit`, `SliceInsets`.
+- **Achados do AndroidSVG 1.4 que o FORMAT.md não dizia** (cada um tem teste em `SvgRenderTest`):
+  1. **Entidades internas do XML vêm LIGADAS por padrão** (`enableInternalEntities = true` no `static {}`). `SvgRender.init` as desliga
+     (`SVG.setInternalEntitiesEnabled(false)`), barreira a mais além da recusa textual do `DOCTYPE` no leitor (T2). Medido: um SVG
+     com `<!ENTITY>` + `fill="&color;"` NÃO expande (renderiza preto).
+  2. **O `width`/`height` absolutos do `<svg>` mandam no tamanho do desenho, por cima do `RenderOptions.viewPort`** (um `width="50"`
+     desenhava a 50 px num destino de 100 px). O primeiro teste só passou por acaso (o retângulo cobria tudo) — o teste que fixou o
+     comportamento põe um quadrado no canto. `parse` normaliza o documento para `width/height = 100%`: o destino decide a escala.
+  3. **Sem `viewBox` a biblioteca não escala nada**. `parse` usa o `width`/`height` declarados como viewBox; sem nenhum dos dois,
+     `SvgImage.scalable = false` e o desenho sai 1:1 (o import deve avisar — T3).
+  4. `<filter>`/`filter=` é **ignorado** (o retângulo sai nítido, nada de exceção); imagem externa (`http:`, `file:`) some sem rede e
+     sem erro (nenhum `SVGExternalFileResolver` registrado); `data:image/png;base64` desenha; `<script>`/`<foreignObject>` são
+     ignorados pelo renderizador (o leitor os recusa antes, de qualquer jeito).
+- **Medidas no emulador** (`emulator-5554`, x86_64, API 34, renderização por **software** — o `Canvas` sobre `Bitmap` é CPU também no
+  aparelho, mas o host é bem mais rápido que o Helio G80 do A32: tratar como piso, não como teto). Quadro de orbe sintético de 256×256
+  de viewBox (halo e corpo em degradê radial, brilho em degradê linear, arco de traço): 60 repetições depois de ~190 de aquecimento,
+  mediana / p95 em ms:
+
+  | Quadro | Lado | parse | render (bitmap novo) |
+  | ------ | ---- | ----- | -------------------- |
+  | 24 pontos (2,7 KB) | 156 px | 2,1 / 3,1 | 3,1 / 3,9 |
+  | 160 pontos (12,5 KB) | 156 px | 6,7 / 10,0 | 10,5 / 16,4 |
+  | 24 pontos | 300 px | 1,4 / 2,2 | 3,6 / 6,3 |
+  | 160 pontos | 300 px | 4,4 / 6,4 | 10,8 / 16,8 |
+  | 24 pontos | 480 px | 1,9 / 2,1 | 6,9 / 8,6 |
+  | 160 pontos | 480 px | 5,9 / 10,1 | 17,9 / 30,9 |
+  | face de tecla 9-slice 120×150 px (9 desenhos) | — | — | 4,9 / 16,1 |
+
+  Sem aquecimento a primeira rodada saía 2–4× mais lenta (8,6 ms/32 ms a 156 px): o primeiro frame de uma orbe é pago a frio. Conclusão
+  para T5: um quadro de 10–30 ms não cabe no `onDraw` (16 ms) — o cache em bitmap com pré-aquecimento fora da main é obrigatório, não
+  otimização. Para T4: o sprite 9-slice custa ~5 ms uma vez por (tamanho, estado) e some do caminho de desenho.
+- **Ambiente**: `/home` está a 100% (983 MB livres) e o emulador se recusa a subir ("not enough disk space", `keyflow_api34`). A raiz `/`
+  tem ~10 GB livres e `/var/tmp` é gravável: criei um AVD **idêntico em configuração** (cópia do `config.ini`, `hw.device.name = pixel_6`,
+  1080×2400/420 dpi, API 34 google_apis x86_64, `disk.dataPartition.size` 4 GB) em `/var/tmp/keyflow-avd/skins_api34.avd`. Sobe com
+  `ANDROID_AVD_HOME=/var/tmp/keyflow-avd emulator -avd skins_api34 -no-window -gpu swiftshader_indirect -no-snapshot-save -no-audio` (arranque
+  a frio ~90 s, sem snapshot). Nada do AVD original (`~/.android/avd`) foi tocado. **[YAN]**: liberar espaço em `/home` (ou mover o AVD
+  `keyflow_api34`, 5,8 GB, para a raiz) — vale para todas as frentes.
+

@@ -53,6 +53,13 @@ class DocsSectionsTest {
         }
     }
 
+    /** SKP-T1: o renderizador dos SVGs das skins importadas (AndroidSVG, Apache 2.0) é atribuído na Docs. */
+    @Test
+    fun licensesAlsoNameTheSvgRenderer() {
+        val labels = docsSections.single { it.id == "licencas" }.blocks.filterIsInstance<DocBlock.Labeled>().map { it.label }
+        assertTrue("licença do AndroidSVG ausente", "AndroidSVG" in labels)
+    }
+
     @Test
     fun feedbackIsTheLastSectionAndTheOnlyOneWithActions() {
         assertEquals("feedback", ids.last())

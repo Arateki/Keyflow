@@ -13,7 +13,9 @@ traceability do `spec.md` ao concluir.
 - **Done when**: SVG de cor sólida renderiza o pixel esperado; gradiente linear/radial conferido; 9-slice mantém o canto
   com proporção; `<filter>` NÃO derruba (é ignorado); tempo de render medido e anotado em `.specs/project/STATE.md`.
 - **Tests**: instrumentado `SvgRenderTest`. **Gate**: `assembleDebug` + instrumentado escopado.
-- **Status**: Pending
+- **Status**: Done (2026-10-02) — `androidsvg-aar:1.4` (única `release` do Maven Central além da 1.3), `skins/SvgRender.kt` + `SliceInsets.kt`,
+  licença em `app/licenses/` e na aba Docs; `SvgRenderTest` 20/20 no emulador API 34; 827 unitários verdes. Achados do AndroidSVG
+  (entidades internas LIGADAS por padrão; `width`/`height` do `<svg>` mandavam no tamanho; sem `viewBox` não escala) e medidas no `STATE.md`.
 
 ### SKP-T2 — Núcleo puro: manifest, nomes, reader/validador, relatório
 - **What**: `SkinPackManifest`, `SkinPackNames`, `SkinPackReader`, `ImportReport` (FORMAT.md inteiro; limites do §5;
