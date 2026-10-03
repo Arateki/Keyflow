@@ -8,6 +8,7 @@ import com.keyflow.core.ShortcutOverflow
 import com.keyflow.core.TranscriptionSource
 import com.keyflow.core.VisionSource
 import com.keyflow.core.FalaSource
+import java.lang.reflect.Modifier
 
 /**
  * Estado completo de configuração persistido (T5 / VOZ-01..06, OVL-05, FND-04, REC modos).
@@ -19,6 +20,8 @@ import com.keyflow.core.FalaSource
  * Os segredos (tokens, chaves de API, senha e chave privada SSH, valores de cabeçalho de autenticação —
  * ver [SettingsSecrets.BY_PROPERTY]) ficam **criptografados**, fora do DataStore e do backup, e são preservados
  * ao trocar de preset — trocar a `source` nunca apaga a credencial de outro provedor.
+ *
+ * `toString()` não mostra nenhum deles: um `Log` ou uma mensagem de erro que imprima as Settings não vaza credencial.
  */
 data class Settings(
     val source: TranscriptionSource = TranscriptionSource.CUSTOM,
@@ -253,6 +256,21 @@ data class Settings(
     }
 
     private fun bearer(token: String): String = if (token.isBlank()) "" else "Bearer $token"
+
+    /**
+     * Igual ao `toString()` de uma data class, mas com `***` no lugar do valor de cada segredo
+     * ([SettingsSecrets.BY_PROPERTY]): o gerado imprimiria todos, e bastava um `Log`, uma mensagem de erro ou o
+     * inspetor de layout mostrando as Settings para a chave de API ir parar no logcat. Percorre os campos por
+     * reflexão (e não uma lista à mão) para um campo novo nunca ficar de fora.
+     */
+    override fun toString(): String = javaClass.declaredFields
+        .filterNot { Modifier.isStatic(it.modifiers) }
+        .joinToString(separator = ", ", prefix = "Settings(", postfix = ")") { field ->
+            field.isAccessible = true
+            val value = field.get(this)
+            val shown = if (field.name in SettingsSecrets.BY_PROPERTY && value is String && value.isNotEmpty()) "***" else value
+            "${field.name}=$shown"
+        }
 
     companion object {
         // Endpoints/modelos verificados nas docs (OpenAI/GroqDocs, 2026), não fabricados.
