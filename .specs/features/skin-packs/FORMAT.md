@@ -160,7 +160,7 @@ tray + 4 faces"), **Avisos** (ignorado, `filter` sem efeito, buraco na numeraç�
 
 Antes de gravar, o app **desenha** cada SVG de teste (orbe a 64 px, faces de tecla a 96 px com a fatia, bandeja a 128×64). É erro:
 SVG que a biblioteca não lê, `slice` sem miolo e um quadro que leva mais de 1 s. É aviso: quadro que sai todo transparente (provável
-recurso que o app não desenha), mais de 150 ms ("pesado"), `viewBox` não quadrado na orbe, SVG sem tamanho. Os avisos de recursos que o app não desenha
+recurso que o app não desenha), mais de 150 ms ("pesado"; um desenho que parece lento é medido uma segunda vez e vale o melhor dos dois, porque os primeiros desenhos de um app recém-aberto pagam o carregamento da biblioteca), `viewBox` não quadrado na orbe, SVG sem tamanho. Os avisos de recursos que o app não desenha
 (`<filter>`, `mix-blend-mode`, animação SMIL ou CSS, fontes SVG) saem **agrupados por tipo**, com os nomes dos arquivos. Um `keyboard_tray.svg` sem
 `keyboard.trayColor` nem `keyboard.navigationBarColor` avisa que a faixa do sistema sob o teclado ficará preta.
 

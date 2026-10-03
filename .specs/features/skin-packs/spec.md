@@ -3,7 +3,7 @@
 > O usuário cria a **própria skin** (orbe e/ou teclado) como um pacote `.zip` de SVGs — um arquivo por frame de
 > animação e por estado do app — e a **instala** no KeyFlow. Pedido do Yan em 2026-10-02 ("o usuário fazer a própria
 > skin e instalar no sistema"; ele corrigiu "exportar" para **importar**). O formato é o contrato de [FORMAT.md](FORMAT.md).
-> **Status**: Draft de implementação (autorizada pelo Yan na mesma conversa).
+> **Status**: Implementado e validado no emulador (fases 1 e 2); falta o roteiro no A32 **[YAN]**.
 
 ## Problem Statement
 
@@ -14,12 +14,12 @@ a dele. A spec `theme-system` (M8, Draft) trata de tokens/cores, não de arte im
 
 ## Goals
 
-- [ ] Importar um `.zip` (SAF) e instalá-lo, com **relatório** claro (instalado / avisos / erros) e instalação **tudo-ou-nada**.
-- [ ] Uma skin de pacote pode vestir a **orbe** (frames por estado, em loop) e o **teclado** (faces de tecla, fundo).
-- [ ] Skins instaladas aparecem na seção **Skins** das abas **Sobrepor** (orbe) e **Teclado**, com preview, e podem ser selecionadas e **removidas**.
-- [ ] Aplicação **ao vivo** (mesmo caminho das skins de hoje) e **sem custo em repouso** no IME (sprites em cache, nada por quadro).
-- [ ] **Zero regressão** nas 5 skins do teclado e 4 da orbe: goldens existentes bit-idênticos.
-- [ ] Formato versionado e **documentado** (FORMAT.md), com um pacote de exemplo no repo.
+- [x] Importar um `.zip` (SAF) e instalá-lo, com **relatório** claro (instalado / avisos / erros) e instalação **tudo-ou-nada**.
+- [x] Uma skin de pacote pode vestir a **orbe** (frames por estado, em loop) e o **teclado** (faces de tecla, fundo).
+- [x] Skins instaladas aparecem na seção **Skins** das abas **Sobrepor** (orbe) e **Teclado**, com preview, e podem ser selecionadas e **removidas**.
+- [x] Aplicação **ao vivo** (mesmo caminho das skins de hoje) e **sem custo em repouso** no IME (sprites em cache, nada por quadro).
+- [x] **Zero regressão** nas 5 skins do teclado e 4 da orbe: goldens existentes bit-idênticos (ver o critério de sucesso acima).
+- [x] Formato versionado e **documentado** (FORMAT.md), com um pacote de exemplo no repo.
 
 ## Out of Scope (v1)
 
@@ -96,21 +96,21 @@ a dele. A spec `theme-system` (M8, Draft) trata de tokens/cores, não de arte im
 | SKP-IMP-02 | Importação | Implemented (T2+T3): manifest, nomes, limites, texto dos SVGs e render de teste (parse, tempo, fatia, quadro em branco), tudo relatado |
 | SKP-IMP-03 | Importação | Implemented (T2+T3): com qualquer erro nada é gravado (render antes do disco, pasta de preparo + `renameTo`, sobras varridas) |
 | SKP-IMP-04 | Importação | Implemented (T2), com teste de mutação: zip-slip, zip bomb por bytes lidos, DOCTYPE/entidade, `<script>`, `<foreignObject>`, `href`/`url()` externo |
-| SKP-IMP-05 | Importação | Implemented no store (T3): mesmo `name` → mesmo id, troca atômica, `replaced = true`; "mostra a versão nova ao vivo" depende das T4/T5/T6 |
-| SKP-IMP-01, 06 | Importação | Pending (SAF e a thread de fundo na T6; o store e o leitor já são síncronos e sem Android UI) |
-| SKP-STO-01, 02 (ids) | Armazenamento | Implemented (T3): `filesDir/skins/<id>/`, `pack:<id>`, id = slug ASCII + 8 hex do nome, estável; falta só a ligação com `Settings` (T4/T5/T6) |
+| SKP-IMP-05 | Importação | **Verified** (T3+T4+T5+T6+T8): mesmo `name` → mesmo id, troca atômica; na UI real, reimportar `exemplo-neon-v2.zip` mostra "Skin updated" e o IME real já desenha a versão nova; a seleção continua |
+| SKP-IMP-01, 06 | Importação | **Verified** (T6+T8): `ACTION_OPEN_DOCUMENT` pelo `OpenDocument` com os tipos zip/x-zip-compressed/octet-stream, exercitado na DocumentsUI de verdade (emulador, por `adb`); leitura e instalação em `Dispatchers.IO` (`theImportRunsOffTheMainThread`) |
+| SKP-STO-01, 02 (ids) | Armazenamento | **Verified** (T3+T6+T8): `filesDir/skins/<id>/`, `pack:<id>`, id = slug ASCII + 8 hex do nome, estável; `pack:<id>` sobrevive a `am force-stop` + reabrir (arquivo, IME e orbe flutuante) — R2 |
 | SKP-STO-05 | Armazenamento | Decisão registrada (sem código): o export de config futuro leva só o id `pack:<id>`, nunca os arquivos |
 | SKP-ORB-01, 02, 03, 04 | Orbe | Implemented (T5): frame por `floor(t·fps/1000) mod n`, estado sem frames usa `idle` (frames e ritmo), relógio congelado → pixel determinístico (`PackOrbComposeTest`), centro/glifos do app na `orb.centerInk`; verificado também na orbe flutuante de verdade (`OverlayPackOrbTest`) |
 | SKP-ORB-05 | Orbe | Implemented (T5): cache com teto de 16 MB (despejo consciente da volta), render fora do `onDraw` e do pré-aquecimento; custo medido contra Aero/Rose Gold — thread de UI 3,8–4,2 ms por quadro contra 4,7–6,3 (nativas), desenho 0,5–0,6 ms contra 1,5–2,6. Pior caso legal (64 frames a 280 px, não cabe no cache): a animação repete frame em ~5–13% dos quadros no emulador sob carga; a UI não trava |
-| SKP-STO-03, 04 | Armazenamento | Implemented no teclado (T4) e na orbe (T5): pacote sumido, quebrado, removido ou id inseguro → Sistema/Ateliê sem crash, testado no IME e na janela flutuante reais; o **reset do ajuste** ao remover o selecionado fica para a UI (T6) |
+| SKP-STO-03, 04 | Armazenamento | **Verified** (T4+T5+T6+T8): pacote sumido, quebrado, removido ou id inseguro → Sistema/Ateliê sem crash (IME e janela flutuante reais); remover o selecionado pela UI reseta `keyboardSkin`/`orbSkin` NO ARQUIVO do DataStore (`system`/`atelie`), no IME e na tela (R1) |
 | SKP-KBD-01..05 | Teclado | Implemented (T4), verificado no IME real: faces SVG por papel e estado com 9-slice, bandeja e faixa de navegação, `ink`/`popup`, sprites em `SpriteCache` (em regime só `drawBitmap`, provado por canvas espião) e reconstrução ao vivo |
-| SKP-UI-01..04 | Interface | Pending |
-| SKP-DOC-01 | Docs | Parcial (T2): `SkinPackFormatDocTest` amarra exemplos, nomes, limites e padrões do FORMAT.md ao código; falta o ajuste final (T7) |
-| SKP-DOC-02 | Exemplo | Pending |
+| SKP-UI-01..04 | Interface | **Verified** (T6+T8): botão Importar skin, cartões com miniatura REAL do SVG, selecionar e remover com confirmação nas abas Teclado e Sobrepor (cada uma com os pacotes que têm a peça dela); relatório em diálogo (instalado/avisos/erros com nome de arquivo); `tr()` com EN/ES (`TranslationsTest` verde); UI em arquivos novos, 5 linhas + 2 linhas + 3 linhas nos compartilhados; 5 rotas novas da galeria com goldens |
+| SKP-DOC-01 | Docs | **Verified** (T2+T6+T7): `SkinPackFormatDocTest` amarra exemplos, nomes, limites (inclusive os 48 frames do aviso) e padrões do FORMAT.md ao código; o ponteiro para o README e a regra da 2ª medida do "pesado" estão no texto |
+| SKP-DOC-02 | Exemplo | **Verified** (T7+T8): `skin-packs/exemplo-neon/` (45 frames em 4 estados + teclado completo) + `scripts/build-skin-pack.sh` + `skin-packs/README.md`; importa SEM avisos pelo validador real (JVM e aparelho) e pelo seletor real, a frio; selecionado, muda o IME real e a orbe flutuante real |
 
 ## Success Criteria
 
-- [ ] O pacote de exemplo importa sem avisos e, selecionado, muda a orbe (animando) e o teclado **ao vivo**, no IME real do emulador.
-- [ ] Um pacote malicioso (zip-slip, zip bomb, SVG com script/entidade) é rejeitado sem instalar nada.
-- [ ] Goldens das skins existentes bit-idênticos; suíte unit + instrumentada verdes.
-- [ ] O Yan consegue criar um pacote só lendo FORMAT.md.
+- [x] O pacote de exemplo importa sem avisos e, selecionado, muda a orbe (animando) e o teclado **ao vivo**, no IME real do emulador (T8, 2026-10-03).
+- [x] Um pacote malicioso (zip-slip, zip bomb, SVG com script/entidade) é rejeitado sem instalar nada (T2, com teste de mutação; na UI, o relatório de erro mostra "Nada foi instalado.").
+- [x] Goldens das skins existentes bit-idênticos (138 de 154 PNGs idênticos a `0f0edab` sem fuzz; os 16 diferentes são a seção nova e o indicador de rolagem); suíte unit verde (972); instrumentada verde exceto flaky já presente na fase 1, medidos (ver STATE.md).
+- [ ] O Yan consegue criar um pacote só lendo FORMAT.md. **[YAN]** — o FORMAT.md e o `skin-packs/README.md` estão prontos; falta ele entregar o pacote dele e importar no A32.

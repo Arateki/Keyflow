@@ -82,18 +82,27 @@ traceability do `spec.md` ao concluir.
   cancelar o seletor não deixa nada; `TranslationsTest` verde; goldens existentes das abas só mudam se a seção Skins ganhar o
   botão — nesse caso **aprovar seletivamente** só os que mudaram por isso e justificar no commit.
 - **Tests**: instrumentado Compose (`SkinPacksSectionTest`) + goldens novos. **Gate**: unit + instrumentado + goldens.
-- **Status**: Pending
+- **Status**: Done (2026-10-03) — `ui/config/SkinPacksSection.kt` (seção "Suas skins": Importar skin pelo `OpenDocument`, relatório em `ConfigModal`, cartões com miniatura REAL do SVG, selecionar, remover com confirmação),
+  `RememberPackKeyboard.kt`, `skins/PackPreview.kt`; aparece em Teclado (pacote com teclado) e Sobrepor (com orbe); rotas da galeria e goldens (4 alterados + 10 novos, aprovados à mão; os outros 138 de 154 PNGs idênticos ao APK de `0f0edab`,
+  sem fuzz). **R1** (remover o selecionado reseta `keyboardSkin`/`orbSkin`), **R2** (causa: `FactorySettingsListener` devolve a config do dono no fim da rodada; prova do force-stop no app real) e **R3** (aviso para >48 frames) fechados — ver `STATE.md`.
+  Unit 972; instrumentados novos `SkinPacksSectionTest` 16, `PackPreviewTest` 6, `KeyboardSizePreviewPackTest` 2, `SkinSettingsPersistenceTest` 2. O seletor do sistema não é exercitado nos testes de UI (registro trocado); a DocumentsUI de verdade foi na T8.
+  **SPEC_DEVIATION** (design, "Ligações"): a seção entra com uma linha em `TecladoPanel` e outra em `OverlayPanel` (não "uma linha em `ConfigFields`") e os cartões são uma lista vertical; `ConfigFields` só troca os 5 `selected =` do teclado por `nativeKeyboardSkin`;
+  a prévia de tamanho do teclado também segue o pacote (não previsto); `build.gradle.kts` +1 `sourceSets`; `SkinPackStore(nanoClock)`. Achado corrigido: o aviso "pesado" do import dependia do processo estar frio (agora mede de novo o que parece lento).
 
 ### SKP-T7 — Pacote de exemplo + FORMAT.md final
 - **What**: `skin-packs/exemplo-neon/` (SVGs reais: orbe com 4 estados e frames, teclado completo com 9-slice, manifest) +
   `scripts/build-skin-pack.sh <pasta> <saida.zip>` + ajuste do FORMAT.md ao que o código realmente aceita.
 - **Done when**: o `.zip` importa **sem avisos**; teste unit confere o exemplo com o validador; FORMAT.md sem divergência.
 - **Tests**: unit + instrumentado do import do exemplo. **Gate**: unit + instrumentado escopado.
-- **Status**: Pending
+- **Status**: Done (2026-10-03) — `skin-packs/exemplo-neon/` ("Neon Noturno": 45 frames em 4 estados + teclado completo com `keyboard.slice`), `skin-packs/gerar-exemplo-neon.py`, `scripts/build-skin-pack.sh`, `skin-packs/README.md` (passo a passo para quem não programa);
+  `ExampleSkinPackTest` (JVM: a pasta zipada em memória e o `.zip` do script, sem erro e sem aviso) e `ExampleSkinPackImportTest` (aparelho). Importa SEM avisos também pelo seletor real, a frio (3 de 3). Nenhuma divergência visível entre o rsvg do host e o AndroidSVG do emulador;
+  nenhuma limitação nova do AndroidSVG. FORMAT.md: ponteiro para o README (§1) e a regra da segunda medida do "pesado" (§6).
 
 ### SKP-T8 — Validação ponta a ponta e fechamento
 - **What**: no **emulador** (nunca no aparelho do Yan sem ele pedir): instalar o exemplo pela UI/SAF, selecionar teclado e orbe,
   `screencap` do IME real e da orbe nos 4 estados; suíte unit completa + instrumentada relevante + `verify-screens`/`diff-screens`;
   atualizar `STATE.md`, traceability, `DEVELOPMENT-ORDER.md` (linha da feature).
 - **Done when**: tudo verde, evidências citadas (comandos + contagens), pendências do Yan listadas (roteiro manual no A32 **[YAN]**).
-- **Status**: Pending
+- **Status**: Done (2026-10-03), exceto o roteiro no A32 **[YAN]** — no emulador: importado pelo seletor REAL (DocumentsUI, por `adb`), selecionado teclado e orbe, IME real e orbe flutuante real com o exemplo (e depois de `am force-stop`), reimportação ao vivo
+  (`exemplo-neon-v2.zip`), remoção do selecionado (volta ao padrão no arquivo, no IME e na tela); a orbe flutuante nos 4 estados em 156/195/280 px (estado posto por `OrbButtonView.render`; gesto e microfone reais não exercitados). Unit 972/972; instrumentados `ui` 199/199, `overlay` 30/30,
+  `skins` 128 (flaky de fila medido no baseline também), `ime` 45 (1 flake de toque); goldens 138/154 idênticos a `0f0edab` e `diff-screens.sh` 160/160. Detalhes, números e a causa de cada flaky em `STATE.md`.
