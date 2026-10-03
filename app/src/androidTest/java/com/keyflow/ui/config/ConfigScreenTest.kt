@@ -188,12 +188,14 @@ class ConfigScreenTest {
     fun menuListsInterfacesThenCapabilitiesAndTheTitlesOnlyShowWhenExpanded() {
         // Yan, 2026-09-29: Teclado, Sobrepor e Notificação são interfaces; Transcrição, Visão, Raciocínio e Voz, capacidades.
         // Primeiro as interfaces. Recolhido, só uma linha separa os grupos; o título só aparece com o menu aberto.
+        // Depois: o KeyFlow (agente principal) abre o menu, sem grupo nem título, e Fluxos e Computador entram nas capacidades.
         val h = Harness()
         rule.setContent { h.Content() }
 
         val order = listOf(
+            ConfigTab.KEYFLOW,
             ConfigTab.TECLADO, ConfigTab.OVERLAY, ConfigTab.NOTIFICACAO,
-            ConfigTab.VOZ, ConfigTab.VISAO, ConfigTab.RACIOCINIO, ConfigTab.FALA,
+            ConfigTab.FLUXOS, ConfigTab.VOZ, ConfigTab.VISAO, ConfigTab.RACIOCINIO, ConfigTab.FALA, ConfigTab.COMPUTADOR,
             ConfigTab.DOCS,
         )
         assertEquals(order, ConfigTab.entries.toList())
