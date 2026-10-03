@@ -160,6 +160,25 @@ class KeyFlowKeyboardPackSkinTest {
 
     private val systemKey: Int get() = KeyboardColors.of(KeyboardSkin.SYSTEM, runBlocking { repo.themeDarkOnce() }).key
 
+    /**
+     * Espera a face de uma tecla de letra do teclado ATIVO chegar a [expected]. A reconstrução ao mudar a skin é assíncrona (o serviço reage ao fluxo
+     * dos ajustes) e a amostra única logo depois de `measuredView` pegava às vezes uma vista ainda sem o desenho final (`#D1D1D1`, a cor das teclas de
+     * função, no lugar de `#FDFDFD`): medido, esse teste falhava em 6 de 12 rodadas isoladas no commit da fase 1 (0f0edab) — não é regressão da T6.
+     */
+    private fun assertLetterFaceEventually(expected: Int, what: String, timeoutMs: Long = 8_000) {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        var last = 0
+        while (System.currentTimeMillis() < deadline) {
+            val view = KeyFlowKeyboardService.activeViewForTest
+            if (view != null && view.width > 0 && view.canvasGridForTest?.placedRowsForTest?.isNotEmpty() == true) {
+                last = keyFacePixel(view, snapshot(view), findKey(view) { it is KeyAction.Char })
+                if (abs(Color.red(last) - Color.red(expected)) <= 4 && abs(Color.green(last) - Color.green(expected)) <= 4 && abs(Color.blue(last) - Color.blue(expected)) <= 4) return
+            }
+            Thread.sleep(200)
+        }
+        assertColor(last, expected, what)
+    }
+
     // ── testes ───────────────────────────────────────────────────────────────
 
     @Test
@@ -230,19 +249,19 @@ class KeyFlowKeyboardPackSkinTest {
     fun aMissingOrBrokenPackFallsBackToSystemWithoutCrashing() {
         selectSkin(SkinIds.forPack("nao-existe-00000000"))
         var view = launchKeyboard()
-        assertColor(keyFacePixel(view, snapshot(view), findKey(view) { it is KeyAction.Char }), systemKey, "pacote inexistente → Sistema")
+        assertLetterFaceEventually(systemKey, "pacote inexistente → Sistema")
 
         // Um pacote instalado cuja tecla normal foi corrompida em disco depois.
         val packSkin = installPack("Quebrado")
         java.io.File(java.io.File(context.filesDir, "skins/${SkinIds.packId(packSkin)}"), "keyboard_key_normal.svg").writeText("<svg><rect></svg>")
         selectSkin(packSkin)
         view = measuredView(previous = view)
-        assertColor(keyFacePixel(view, snapshot(view), findKey(view) { it is KeyAction.Char }), systemKey, "tecla normal corrompida → Sistema")
+        assertLetterFaceEventually(systemKey, "tecla normal corrompida → Sistema")
 
         // Um id que nem é de pacote válido (caminho): o teclado ignora e usa o Sistema.
         selectSkin("pack:../../x")
         view = measuredView(previous = view)
-        assertColor(keyFacePixel(view, snapshot(view), findKey(view) { it is KeyAction.Char }), systemKey, "id inseguro → Sistema")
+        assertLetterFaceEventually(systemKey, "id inseguro → Sistema")
     }
 
     @Test
