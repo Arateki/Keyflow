@@ -27,6 +27,8 @@ const val ANTHROPIC_DISCONNECT_TAG = "raciocinio-anthropic-desconectar"
 const val ANTHROPIC_MODEL_TAG = "raciocinio-anthropic-modelo"
 const val ANTHROPIC_MODELS_REFRESH_TAG = "raciocinio-anthropic-atualizar"
 const val ANTHROPIC_PRIVACY_TAG = "raciocinio-anthropic-privacy"
+const val ANTHROPIC_TAB_SUBSCRIPTION_TAG = "raciocinio-anthropic-tab-assinatura"
+const val ANTHROPIC_TAB_API_TAG = "raciocinio-anthropic-tab-api"
 
 private const val LOGIN_LABEL = "Continue with Claude"
 
@@ -69,6 +71,10 @@ internal fun AnthropicPanel(
     val ssoModels = if (remoteModels.isNotEmpty()) remoteModels else ANTHROPIC_SSO_MODELS
     val chosenModel = settings.reasoningAnthropicModel.ifEmpty { "claude-sonnet-4-6" }
 
+    val apiKey = remember(connection, settings.providerAnthropicApiKey, settings.visionAnthropicApiKey) {
+        actions.apiKey().orEmpty().ifEmpty { settings.providerAnthropicApiKey.ifEmpty { settings.visionAnthropicApiKey } }
+    }
+
     UnifiedProviderCard(
         providerName = "Anthropic",
         providerLogo = KfIcons.LogoAnthropic,
@@ -76,6 +82,7 @@ internal fun AnthropicPanel(
         ssoButtonLabel = tr("Continuar com Claude"),
         onSsoConnect = { actions.connect(AuthMethod.OAUTH) },
         onSsoDisconnect = { actions.disconnect() },
+        showDisconnect = connection is ConnectionState.Connected || apiKey.isNotBlank(),
         onSsoRefresh = { refresh++ },
         selectedAuthMode = settings.providerAnthropicAuthMode,
         onSelectAuthMode = { onSettingsChange(settings.copy(providerAnthropicAuthMode = it)) },
@@ -87,9 +94,7 @@ internal fun AnthropicPanel(
         ssoWeeklyFraction = 0.40f,
         ssoWeeklyResetText = tr("Reseta qui, 10:00"),
         onOpenManageUsage = { actions.openUrl("https://claude.ai/settings/billing") },
-        apiKey = remember(connection, settings.providerAnthropicApiKey, settings.visionAnthropicApiKey) {
-            actions.apiKey().orEmpty().ifEmpty { settings.providerAnthropicApiKey.ifEmpty { settings.visionAnthropicApiKey } }
-        },
+        apiKey = apiKey,
         onApiKeyChange = {
             actions.saveApiKey(it)
             onSettingsChange(settings.copy(providerAnthropicApiKey = it, visionAnthropicApiKey = it))

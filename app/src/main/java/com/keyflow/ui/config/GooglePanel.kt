@@ -27,6 +27,8 @@ const val GOOGLE_DISCONNECT_TAG = "raciocinio-google-desconectar"
 const val GOOGLE_MODEL_TAG = "raciocinio-google-modelo"
 const val GOOGLE_MODELS_REFRESH_TAG = "raciocinio-google-atualizar"
 const val GOOGLE_PRIVACY_TAG = "raciocinio-google-privacy"
+const val GOOGLE_TAB_SUBSCRIPTION_TAG = "raciocinio-google-tab-assinatura"
+const val GOOGLE_TAB_API_TAG = "raciocinio-google-tab-api"
 
 private const val LOGIN_LABEL = "Continue with Google"
 private const val GOOGLE_AI_STUDIO_URL = "https://aistudio.google.com/app/apikey"
@@ -68,6 +70,12 @@ internal fun GooglePanel(
     val ssoModels = if (remoteModels.isNotEmpty()) remoteModels else GOOGLE_SSO_MODELS
     val chosenModel = settings.reasoningGoogleModel.ifEmpty { "gemini-2.0-flash" }
 
+    val apiKey = remember(connection, settings.providerGoogleApiKey, settings.visionGoogleApiKey, settings.falaGoogleApiKey) {
+        actions.apiKey().orEmpty().ifEmpty {
+            settings.providerGoogleApiKey.ifEmpty { settings.visionGoogleApiKey }.ifEmpty { settings.falaGoogleApiKey }
+        }
+    }
+
     UnifiedProviderCard(
         providerName = "Google",
         providerLogo = KfIcons.LogoGoogle,
@@ -75,6 +83,7 @@ internal fun GooglePanel(
         ssoButtonLabel = tr("Continuar com Google"),
         onSsoConnect = { actions.connect(AuthMethod.OAUTH) },
         onSsoDisconnect = { actions.disconnect() },
+        showDisconnect = connection is ConnectionState.Connected || apiKey.isNotBlank(),
         onSsoRefresh = { refresh++ },
         selectedAuthMode = settings.providerGoogleAuthMode,
         onSelectAuthMode = { onSettingsChange(settings.copy(providerGoogleAuthMode = it)) },
@@ -86,11 +95,7 @@ internal fun GooglePanel(
         ssoWeeklyFraction = 0.20f,
         ssoWeeklyResetText = tr("Reseta seg, 00:00"),
         onOpenManageUsage = { actions.openUrl("https://one.google.com") },
-        apiKey = remember(connection, settings.providerGoogleApiKey, settings.visionGoogleApiKey, settings.falaGoogleApiKey) {
-            actions.apiKey().orEmpty().ifEmpty {
-                settings.providerGoogleApiKey.ifEmpty { settings.visionGoogleApiKey }.ifEmpty { settings.falaGoogleApiKey }
-            }
-        },
+        apiKey = apiKey,
         onApiKeyChange = {
             actions.saveApiKey(it)
             onSettingsChange(settings.copy(providerGoogleApiKey = it, visionGoogleApiKey = it, falaGoogleApiKey = it))
