@@ -267,6 +267,7 @@ private fun KeyboardSizePreview(
     skin: String = KeyboardSkin.DEFAULT.id,
 ) {
     val palette = LocalKeyFlowPalette.current
+    val pack = rememberPackKeyboard(skin)
     // Largura do PAINEL (não da tela): com a navegação lateral, a largura da tela invadia o menu.
     Column(
         Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 16.dp),
@@ -279,7 +280,7 @@ private fun KeyboardSizePreview(
                 .background(palette.bg)
                 .testTag(TECLADO_SIZE_PREVIEW_TAG),
         ) {
-            key(scalePercent, dark, locale, numberRowEnabled, skin) {
+            key(scalePercent, dark, locale, numberRowEnabled, skin, pack) {
                 AndroidView(
                     factory = { ctx ->
                         KeyFlowKeyboardView(
@@ -290,6 +291,7 @@ private fun KeyboardSizePreview(
                             onExpand = {},
                             dark = dark,
                             skin = KeyboardSkin.of(skin),
+                            pack = pack,
                             scale = scalePercent / 100f,
                             locale = locale,
                             showLanguageKey = true,
