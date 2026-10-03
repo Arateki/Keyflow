@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -94,7 +95,7 @@ class MascotMotionArtifactTest {
             while (t <= clip.toMs) {
                 rule.runOnUiThread { now = t.toFloat() }
                 rule.waitForIdle()
-                val bitmap = rule.onNodeWithTag(SCENE).captureToImage().asAndroidBitmap()
+                val bitmap = captureFrame()
                 File(dir, "frame-%03d.png".format(index++)).outputStream().use {
                     bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
                 }
@@ -106,10 +107,29 @@ class MascotMotionArtifactTest {
         }
     }
 
+    /**
+     * Um quadro da cena. No emulador do CI (`-gpu swiftshader_indirect`, 2 núcleos) o `captureToImage` às vezes estoura os 2 s que
+     * dá para a janela redesenhar (visto com o 1º quadro depois de instalar), e o teste caía. Repete até 5 vezes, com a árvore ociosa entre elas.
+     */
+    private fun captureFrame(): android.graphics.Bitmap {
+        var last: ComposeTimeoutException? = null
+        repeat(CAPTURE_TRIES) {
+            try {
+                return rule.onNodeWithTag(SCENE).captureToImage().asAndroidBitmap()
+            } catch (e: ComposeTimeoutException) {
+                last = e
+                rule.waitForIdle()
+            }
+        }
+        throw last!!
+    }
+
     private companion object {
         const val SCENE = "mascot-motion-scene"
 
         /** 50 ms = 20 quadros por segundo: o bastante para a piscada (160 ms) ter quadros e o GIF ficar pequeno. */
         const val STEP_MS = 50
+
+        const val CAPTURE_TRIES = 5
     }
 }
