@@ -110,11 +110,11 @@ modelo não consegue olhar nem mexer em nada do app, e o usuário tem de ir às 
 | ID | Área | Status |
 | --- | ---- | ------ |
 | AGT-01 | Histórico com poda | Parcial — histórico neutro (`AgentMessage`) e poda (`AgentHistory.prune`) prontos e testados na JVM (AGT-T1); falta o chat que o guarda (AGT-T3) |
-| AGT-02 | Contrato `AgentEngine` | Parcial — contrato `AgentEngine`/`AgentEvent` pronto (AGT-T1), `ReasoningEngine` intocado; o adaptador da Anthropic é o AGT-T2 |
+| AGT-02 | Contrato `AgentEngine` | Implemented (JVM) — AGT-T1/T2; `ReasoningEngine` intocado |
 | AGT-03 | Laço enviar → ferramentas → repetir | Implemented (JVM) — `AgentLoop`, 12 passos |
 | AGT-04 | Cancelar sem estado pela metade | Implemented (JVM) — o conserto do histórico é do núcleo; a atomicidade da instalação é do AGT-T4 |
 | AGT-05 | Queda para o modo só texto | Pending (AGT-T3) |
-| AGT-06 | Erros do `ReasoningError` e ferramenta que falha | Parcial — ferramenta que falha vira resultado de erro e o laço continua (AGT-T1); os erros HTTP/limite/credencial do provedor são do adaptador (AGT-T2) |
+| AGT-06 | Erros do `ReasoningError` e ferramenta que falha | Implemented (JVM) — motor Anthropic (401/429/5xx/529/corte) e laço |
 | TLS-01 | Esquema, risco, validação antes de `run` | Implemented (JVM) |
 | TLS-02 | Confirmação com resumo do app | Parcial — núcleo e contrato `Confirmation` prontos; o painel é do AGT-T3 |
 | TLS-03 | Sem segredos; filtro; lista de permitidos | Parcial — `SecretFilter` e recusa de argumento com segredo prontos; a lista de permitidos de ajustes é do AGT-T6 |

@@ -18,7 +18,10 @@ trailer). Atualizar o Status aqui e a traceability do `spec.md` ao concluir.
 - **What**: `messages` em streaming com `tools`, parse de `tool_use`/`text` no SSE, conversão do histórico neutro (`tool_result`), mesmas credenciais/URL/retentativa do motor de texto; `ReasoningEngine` intocado.
 - **Done when**: testes com MockWebServer cobrem texto, uma e várias `tool_use`, erro HTTP/limite/credencial; **fixtures conferidas na doc oficial da Anthropic** (não presumir formato).
 - **Tests**: unit (MockWebServer). **Gate**: unit + build.
-- **Status**: Pending
+- **Status**: Done (2026-10-03, fase 1A). **SPEC_DEVIATION (local)**: o adaptador mora em `com.keyflow.reasoning.anthropic` (`AnthropicAgentEngine.kt` + `AnthropicAgentWire.kt`), não em `agent/providers/` como o design previa — o `AuthIsolationTest` só deixa o motor de cada provedor (`reasoning/<provedor>/`) importar `auth/providers/<x>` (a URL base e o formato do login), e afrouxar essa regra seria o desvio pior. O núcleo `agent/` continua sem conhecer o provedor.
+  - **Formato conferido na documentação oficial** (páginas em `STATE.md`): `AnthropicAgentWire` tem a lista no KDoc; as fixtures de SSE (`AnthropicSseFixtures`) copiam os exemplos da página `streaming` e dizem o que é inventado.
+  - **Testes novos (JVM)**: 60 (leitura do SSE e conversão do histórico 31; motor contra MockWebServer 29).
+  - O `ReasoningEngine` e o `AnthropicReasoningEngine` ficaram **intocados** (nenhum arquivo existente foi alterado).
 
 ### AGT-T3 — `AgentController` e o chat com histórico
 - **What**: mover a lógica do `KeyflowPanel` para `AgentController`; histórico; cartões de ferramenta; painel de confirmação (Permitir/Negar); cancelar; orbe reflete o estado; queda para o modo só texto (AGT-05); troca de origem.
