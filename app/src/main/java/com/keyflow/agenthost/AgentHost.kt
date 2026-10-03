@@ -13,7 +13,9 @@ import com.keyflow.agent.SecretFilter
 import com.keyflow.agent.ToolExecutor
 import com.keyflow.agent.ToolPolicy
 import com.keyflow.agent.ToolRegistry
+import com.keyflow.agent.tools.SkinTools
 import com.keyflow.data.SettingsRepository
+import com.keyflow.skins.SkinPackStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -77,7 +79,8 @@ object AgentHost {
         return assemble(
             // Fora da thread principal: o filtro decifra o cofre, o executor roda ferramentas e o motor fala com a rede; a tela só observa o StateFlow.
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
-            tools = emptyList(),
+            // As ferramentas de skin (SKL-01..06) sobre o mesmo SkinPackStore do import e da tela, e as duas chaves de skin dos ajustes.
+            tools = SkinTools(AndroidSkinWorkshop(app, SkinPackStore.of(app), RepositorySkinSelection(repository))).tools,
             policy = InMemoryPolicyConfigStore(),
             actionLog = InMemoryActionLog(),
             secrets = secrets,

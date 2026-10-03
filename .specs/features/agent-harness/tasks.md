@@ -35,7 +35,9 @@ trailer). Atualizar o Status aqui e a traceability do `spec.md` ao concluir.
 - **What**: `skin_get_format` (FORMAT.md embutido como asset), `skin_list`, `skin_preview` (folha de contato), `skin_install` (zip em memória → `SkinPackStore`), `skin_select`, `skin_remove`; limites por chamada (SKL-06); imagem opcional ao modelo.
 - **Done when**: o ciclo preview → confirmação → install → seleção → remoção funciona num teste instrumentado com um pacote real (o `exemplo-neon` como fixture); erro de validação não instala nada; nada vai a disco antes da confirmação.
 - **Tests**: unit + instrumentado. **Gate**: unit + instrumentado escopado.
-- **Status**: Pending
+- **Status**: Done (2026-10-03, fase 1B). **Decisão**: o `FORMAT.md` embutido é COPIADO pelo build (`copySkinFormatAsset`), não versionado em duplicata (UMA fonte da verdade; `SkinFormatAssetTest` confere byte a byte). **SPEC_DEVIATION (local)**: as ferramentas moram em `agent/tools/` como o design previa, mas falam com o app por uma porta (`SkinWorkshop`) cujo adaptador do aparelho mora em `agenthost/` (mesmo motivo da T3: o núcleo não importa `android.*` nem `skins/`); o `AgentIsolationTest` ganhou só a exceção `import com.keyflow.i18n.tr`.
+  - **O que existe**: as 6 ferramentas, rascunho em lotes com limites, `ContactSheet`, `SkinPackStore.validate`, `SettingsRepository.skinSelectionOnce/updateSkinSelection/resetSkinsUsing`, `AndroidSkinWorkshop`. Detalhes, provas e o que NÃO foi provado: `STATE.md`, seção "fase 1B, AGT-T4".
+  - **Testes**: 41 unit novos (1414 no total) + `SkinToolsDeviceTest` 13/13 no emulador (o ciclo preview → confirmação → instalação → seleção → remoção → desfazer com o `exemplo-neon` real).
 
 ### AGT-T5 — Seção "Ferramentas do agente" nos Ajustes do chat + registro de ações
 - **What**: chave geral, modo de confirmação, uma chave por ferramenta, **Registro de ações** (com desfazer onde houver), **Servidor MCP externo** como linha **desligada e desabilitada** ("em breve") até a fase 3; persistência no DataStore (nenhum segredo); strings `tr()` + EN/ES; rotas da galeria.

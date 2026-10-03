@@ -174,6 +174,41 @@ class SettingsRepository(
         return selected
     }
 
+    /**
+     * As skins escolhidas (teclado, orbe), lidas SÓ destas duas chaves — sem o round-trip das Settings inteiras, nem o cofre. O agente
+     * (`skin_select`/`skin_remove`) usa isto e [updateSkinSelection]/[resetSkinsUsing]: a mudança é atômica e não disputa com o auto-save da tela.
+     */
+    suspend fun skinSelectionOnce(): Pair<String, String> =
+        dataStore.data.first().let { (it[KEYBOARD_SKIN] ?: "system") to (it[ORB_SKIN] ?: "atelie") }
+
+    /** Grava só as escolhas de skin que vieram (`null` = não mexe). A UI recebe pelo [settingsFlow] como qualquer mudança. */
+    suspend fun updateSkinSelection(keyboard: String? = null, orb: String? = null) {
+        dataStore.edit { prefs ->
+            if (keyboard != null) prefs[KEYBOARD_SKIN] = keyboard
+            if (orb != null) prefs[ORB_SKIN] = orb
+        }
+    }
+
+    /**
+     * Devolve ao padrão (teclado → Sistema, orbe → Ateliê) quem usa [skinId] (`pack:<id>`) — o que a tela faz ao remover um pacote
+     * (`settingsAfterRemoval`), aqui atômico. Devolve se o teclado e a orbe usavam, para o resumo.
+     */
+    suspend fun resetSkinsUsing(skinId: String): Pair<Boolean, Boolean> {
+        var keyboard = false
+        var orb = false
+        dataStore.edit { prefs ->
+            if (prefs[KEYBOARD_SKIN] == skinId) {
+                prefs[KEYBOARD_SKIN] = "system"
+                keyboard = true
+            }
+            if (prefs[ORB_SKIN] == skinId) {
+                prefs[ORB_SKIN] = "atelie"
+                orb = true
+            }
+        }
+        return keyboard to orb
+    }
+
     /** Gancho do downloader ao instalar: o tipo vem do catálogo; id que o catálogo não conhece não seleciona nada. */
     internal suspend fun selectOnInstall(modelId: String) {
         val spec = ModelCatalog.byId(modelId) ?: return

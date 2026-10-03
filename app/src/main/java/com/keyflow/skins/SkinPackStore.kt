@@ -50,9 +50,23 @@ class SkinPackStore(
         is SkinPackReadResult.Ok -> install(read.content, read.report)
     }
 
-    private fun install(content: SkinPackContent, readReport: ImportReport): InstallResult {
+    /**
+     * O MESMO exame que o import faz antes de gravar — o leitor já validou o pacote ([read]) e aqui entra o desenho de teste de cada SVG
+     * — **sem gravar nada** em disco. É o que a pré-visualização do agente (`skin_preview`) usa: o relatório que ela mostra é, linha por
+     * linha, o que a instalação daria. Pesado (desenha os SVGs): chame fora da thread principal.
+     */
+    fun validate(read: SkinPackReadResult): ImportReport = when (read) {
+        is SkinPackReadResult.Failed -> read.report
+        is SkinPackReadResult.Ok -> examine(read.content, read.report)
+    }
+
+    private fun examine(content: SkinPackContent, readReport: ImportReport): ImportReport {
         val render = RenderCheck(content).run()
-        val report = readReport + ImportReport(warnings = render.warnings, errors = render.errors)
+        return readReport + ImportReport(warnings = render.warnings, errors = render.errors)
+    }
+
+    private fun install(content: SkinPackContent, readReport: ImportReport): InstallResult {
+        val report = examine(content, readReport)
         if (!report.ok) return InstallResult(report.copy(installed = emptyList()), packId = null)
 
         val id = SkinIds.idFor(content.manifest.name)

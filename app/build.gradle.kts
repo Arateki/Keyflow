@@ -73,6 +73,41 @@ kotlin {
     jvmToolchain(17)
 }
 
+// O FORMAT.md das skins importáveis vai embutido nos assets do APK (agent-harness, SKL-01): a ferramenta `skin_get_format` o devolve ao
+// modelo — "a versão que o código aceita". UMA fonte da verdade: o arquivo de `.specs/features/skin-packs/` é COPIADO no build (nada de
+// segunda cópia versionada que um dia diverge do original, e o `SkinPackFormatDocTest` já amarra esse mesmo arquivo ao código). A cópia
+// vai para `assets/agent/skin-format.md` por uma pasta gerada, no jeito do AGP para fontes geradas.
+abstract class CopySkinFormatTask : DefaultTask() {
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val format: RegularFileProperty
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun copy() {
+        val target = File(outputDir.get().asFile, "agent")
+        target.deleteRecursively()
+        target.mkdirs()
+        format.get().asFile.copyTo(File(target, "skin-format.md"), overwrite = true)
+    }
+}
+
+val copySkinFormat = tasks.register<CopySkinFormatTask>("copySkinFormatAsset") {
+    format.set(rootProject.layout.projectDirectory.file(".specs/features/skin-packs/FORMAT.md"))
+    outputDir.set(layout.buildDirectory.dir("generated/skinFormatAssets"))
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(copySkinFormat, CopySkinFormatTask::outputDir)
+    }
+}
+
+// O teste de unidade que confere que o asset é idêntico ao original lê o arquivo copiado: garante que a cópia existe antes de ele rodar.
+tasks.matching { it.name.endsWith("UnitTest") }.configureEach { dependsOn(copySkinFormat) }
+
 // sherpa-onnx (NM-T1): STT on-device. A distribuição Android oficial é só o AAR anexado ao release do
 // GitHub (o `com.github.k2-fsa:sherpa-onnx` do JitPack é o jar Java de desktop, sem .so Android).
 // São ~50 MB — em vez de versionar o binário, o build baixa a versão fixada quando falta em
