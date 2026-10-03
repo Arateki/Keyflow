@@ -241,46 +241,73 @@ class SkinPackReaderTest {
         assertThat(result.report.errors.single()).contains("orb_listening_00.svg")
     }
 
+    private fun packOf(vararg frameNames: String) = zip(listOf("manifest.json" to MANIFEST.toByteArray()) + frames(*frameNames))
+
+    private fun names(state: OrbPackState, count: Int) = (1..count).map { "orb_${state.key}_$it.svg" }
+
+    private fun memoryWarnings(result: SkinPackReadResult.Ok) = result.report.warnings.filter { it.contains("de memória") }
+
     @Test
-    fun `more than 64 frames in one state is an error`() {
-        val many = (1..65).map { "orb_idle_$it.svg" }.toTypedArray()
-        val result = failed(zip(listOf("manifest.json" to MANIFEST.toByteArray()) + frames(*many)))
-        assertThat(result.report.errors.single()).contains("65 frames; o máximo é 64")
-        val limit = (1..64).map { "orb_idle_$it.svg" }.toTypedArray()
-        ok(zip(listOf("manifest.json" to MANIFEST.toByteArray()) + frames(*limit)))
+    fun `more than the frames per state is an error and exactly the limit is not`() {
+        assertThat(SkinPackReader.MAX_FRAMES_PER_STATE).isEqualTo(240)
+        val many = names(OrbPackState.IDLE, SkinPackReader.MAX_FRAMES_PER_STATE + 1)
+        val result = failed(packOf(*many.toTypedArray()))
+        assertThat(result.report.errors.single()).contains("241 frames; o máximo é 240")
+        ok(packOf(*names(OrbPackState.IDLE, SkinPackReader.MAX_FRAMES_PER_STATE).toTypedArray()))
     }
 
     @Test
-    fun `a state above 48 frames installs with a smoothness warning, 48 does not`() {
-        val limit = (1..48).map { "orb_idle_$it.svg" }.toTypedArray()
-        assertThat(ok(zip(listOf("manifest.json" to MANIFEST.toByteArray()) + frames(*limit))).report.warnings.filter { it.contains("fluido") }).isEmpty()
-
-        val above = (1..49).map { "orb_idle_$it.svg" }.toTypedArray()
-        val result = ok(zip(listOf("manifest.json" to MANIFEST.toByteArray()) + frames(*above)))
-        val warning = result.report.warnings.single { it.contains("fluido") }
-        assertThat(warning).contains("idle (49)")
-        assertThat(warning).contains("menos frames ou um ritmo (fps) menor")
-        assertThat(result.content.orbFrames.getValue(OrbPackState.IDLE)).hasSize(49)
+    fun `the old 64 frame limit is gone`() {
+        val result = ok(packOf(*names(OrbPackState.IDLE, 65).toTypedArray()))
+        assertThat(result.content.orbFrames.getValue(OrbPackState.IDLE)).hasSize(65)
     }
 
     @Test
-    fun `the smoothness warning names every heavy state and only those`() {
-        val idle = (1..64).map { "orb_idle_$it.svg" }
-        val listening = (1..50).map { "orb_listening_$it.svg" }
-        val paused = (1..48).map { "orb_paused_$it.svg" }
-        val result = ok(zip(listOf("manifest.json" to MANIFEST.toByteArray()) + frames(*(idle + listening + paused).toTypedArray())))
-        val warning = result.report.warnings.single { it.contains("fluido") }
-        assertThat(warning).contains("idle (64), listening (50)")
-        assertThat(warning).doesNotContain("paused")
+    fun `a state that fits the 16 MB basic cache at 280 px has no memory warning, one that does not names its megabytes`() {
+        // 53 frames a 280 px = 16 620 800 bytes (15,85 MB): cabe nos 16 MB. 54 = 16 934 400 (16,15 MB): não cabe.
+        assertThat(memoryWarnings(ok(packOf(*names(OrbPackState.IDLE, 53).toTypedArray())))).isEmpty()
+        val above = ok(packOf(*names(OrbPackState.IDLE, 54).toTypedArray()))
+        val warning = memoryWarnings(above).single()
+        assertThat(warning).contains("o estado idle (54 frames) usa ~17 MB de memória a 280 px")
+        assertThat(warning).contains("acima dos 16 MB do cache básico")
+        assertThat(warning).contains("considere menos frames")
+        assertThat(above.content.orbFrames.getValue(OrbPackState.IDLE)).hasSize(54)
     }
 
     @Test
-    fun `more than 240 frames overall is an error`() {
-        val names = OrbPackState.entries.flatMap { state -> (1..64).map { "orb_${state.key}_$it.svg" } } // 256 no total, 64 por estado
-        val result = failed(zip(listOf("manifest.json" to MANIFEST.toByteArray()) + frames(*names.toTypedArray())))
-        assertThat(result.report.errors.single()).contains("256 frames; o máximo é 240")
-        val ok = names.take(240)
-        ok(zip(listOf("manifest.json" to MANIFEST.toByteArray()) + frames(*ok.toTypedArray())))
+    fun `the memory warning is the bytes of the state at 280 px, rounded up`() {
+        assertThat(memoryWarnings(ok(packOf(*names(OrbPackState.IDLE, 64).toTypedArray()))).single()).contains("usa ~20 MB de memória a 280 px") // 19,14 MB
+        assertThat(memoryWarnings(ok(packOf(*names(OrbPackState.IDLE, 120).toTypedArray()))).single()).contains("usa ~36 MB de memória a 280 px") // 35,89 MB
+        assertThat(memoryWarnings(ok(packOf(*names(OrbPackState.IDLE, 240).toTypedArray()))).single()).contains("usa ~72 MB de memória a 280 px") // 71,78 MB
+    }
+
+    @Test
+    fun `the memory warning names every heavy state and only those`() {
+        val result = ok(packOf(*(names(OrbPackState.IDLE, 64) + names(OrbPackState.LISTENING, 100) + names(OrbPackState.PAUSED, 48)).toTypedArray()))
+        val warnings = memoryWarnings(result)
+        assertThat(warnings).hasSize(2)
+        assertThat(warnings.single { it.contains("idle") }).contains("(64 frames)")
+        assertThat(warnings.single { it.contains("listening") }).contains("(100 frames)")
+        assertThat(warnings.none { it.contains("paused") }).isTrue()
+    }
+
+    @Test
+    fun `the largest legal state fits the absolute memory ceiling at the largest orb size`() {
+        // O elo entre o limite de frames do formato e o teto absoluto do cache: se um mudar sem o outro, o import aceitaria um estado que a orbe nunca segura.
+        assertThat(OrbMemoryPolicy.stateBytes(OrbMemoryPolicy.MAX_SIDE_PX, SkinPackReader.MAX_FRAMES_PER_STATE)).isAtMost(OrbMemoryPolicy.ABSOLUTE_MAX_BYTES)
+        assertThat(OrbMemoryPolicy.stateBytes(OrbMemoryPolicy.MAX_SIDE_PX, SkinPackReader.MAX_FRAMES_PER_STATE + 1)).isGreaterThan(OrbMemoryPolicy.ABSOLUTE_MAX_BYTES)
+    }
+
+    @Test
+    fun `more than the frames overall is an error and exactly the limit is not`() {
+        assertThat(SkinPackReader.MAX_FRAMES_TOTAL).isEqualTo(480)
+        val perState = SkinPackReader.MAX_FRAMES_TOTAL / OrbPackState.entries.size
+        val atLimit = OrbPackState.entries.flatMap { names(it, perState) }
+        ok(packOf(*atLimit.toTypedArray()))
+        val over = atLimit + "orb_idle_${perState + 1}.svg"
+        assertThat(failed(packOf(*over.toTypedArray())).report.errors.single()).contains("481 frames; o máximo é 480")
+        // Dois estados no teto de 240 também fecham em 480.
+        ok(packOf(*(names(OrbPackState.IDLE, 240) + names(OrbPackState.LISTENING, 240)).toTypedArray()))
     }
 
     // ── arquivos fora do vocabulário ─────────────────────────────────────────
@@ -480,12 +507,26 @@ class SkinPackReaderTest {
     }
 
     @Test
-    fun `more than 400 entries is refused`() {
-        // `orbOnly(1)` já são 2 entradas (manifest e um frame): 399 de lixo passam de 400; 398 fecham em 400.
-        val many = zip(orbOnly(1) + (1..399).map { "lixo/$it.txt" to byteArrayOf(1) })
-        assertThat(read(many).report.errors.single()).contains("mais de 400")
-        val exactly = zip(orbOnly(1) + (1..398).map { "lixo/$it.txt" to byteArrayOf(1) })
+    fun `more than the entry limit is refused`() {
+        assertThat(SkinPackReader.MAX_ENTRIES).isEqualTo(800)
+        // `orbOnly(1)` já são 2 entradas (manifest e um frame): MAX-1 de lixo passam do limite; MAX-2 fecham nele.
+        val many = zip(orbOnly(1) + (1..SkinPackReader.MAX_ENTRIES - 1).map { "lixo/$it.txt" to byteArrayOf(1) })
+        assertThat(read(many).report.errors.single()).contains("mais de ${SkinPackReader.MAX_ENTRIES} arquivos")
+        val exactly = zip(orbOnly(1) + (1..SkinPackReader.MAX_ENTRIES - 2).map { "lixo/$it.txt" to byteArrayOf(1) })
         assertThat(read(exactly).report.errors).isEmpty()
+    }
+
+    @Test
+    fun `a pack at every limit at once still fits the entry limit with room for the junk files of a desktop zip`() {
+        // O pior pacote legal: 480 frames, as 5 peças do teclado e o manifest (486 entradas) e ainda um `.DS_Store` e um `._` por frame.
+        val frames = OrbPackState.entries.flatMap { state -> (1..SkinPackReader.MAX_FRAMES_TOTAL / OrbPackState.entries.size).map { "orb_${state.key}_$it.svg" } }
+        val keyboard = listOf("keyboard_tray.svg", "keyboard_key_normal.svg", "keyboard_key_pressed.svg", "keyboard_modifier_normal.svg", "keyboard_modifier_pressed.svg")
+        val entries = listOf("manifest.json" to MANIFEST.toByteArray()) + (frames + keyboard).map { it to svg().toByteArray() } +
+            listOf(".DS_Store" to byteArrayOf(1)) + (1..SkinPackReader.MAX_ENTRIES - 487).map { "__MACOSX/._$it.svg" to byteArrayOf(1) }
+        assertThat(entries.size).isEqualTo(SkinPackReader.MAX_ENTRIES)
+        val result = read(zip(entries))
+        assertThat(result.report.errors).isEmpty()
+        assertThat(result.report.installed.first()).isEqualTo("orbe: 4 estados, 480 frames")
     }
 
     @Test

@@ -63,7 +63,7 @@ sealed interface PackFileKind {
 object SkinPackNames {
     const val MANIFEST = "manifest.json"
 
-    /** Dígitos demais viram `NumberFormatException`; nenhum pacote real passa de 64 frames por estado. */
+    /** Dígitos demais viram `NumberFormatException`; nenhum pacote real passa de 240 frames por estado (SkinPackReader.MAX_FRAMES_PER_STATE). */
     private const val MAX_FRAME_DIGITS = 9
 
     private val ORB_FRAME = Regex("""orb_([a-z]+)_([0-9]+)\.svg""")

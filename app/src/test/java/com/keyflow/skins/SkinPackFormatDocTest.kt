@@ -97,7 +97,32 @@ class SkinPackFormatDocTest {
         assertThat(limits).contains("total descompactado ≤ ${SkinPackReader.MAX_TOTAL_BYTES / (1024 * 1024)} MB")
         val files = section(2)
         assertThat(files).contains("Máximo **${SkinPackReader.MAX_FRAMES_PER_STATE} frames por estado** e **${SkinPackReader.MAX_FRAMES_TOTAL} no total**")
-        assertThat(files).contains("Acima de **${SkinPackReader.SMOOTH_FRAMES_PER_STATE} frames** num estado o import **avisa**")
+        assertThat(files).contains("Acima de **${SkinPackReader.MEMORY_WARNING_BYTES / (1024 * 1024)} MB** num estado")
+        assertThat(files).contains("a ${OrbMemoryPolicy.MAX_SIDE_PX} px")
+    }
+
+    @Test
+    fun `the memory table and the budget policy of the format are the numbers in the code`() {
+        val limits = section(5)
+        // A tabela de MB por lado da orbe: cada célula é `lado² × 4 × n` em MB de 1024², com uma vírgula decimal (duas casas no frame único, uma nos demais).
+        val columns = listOf(1, 24, 45, 64, 120, 240)
+        for ((label, side) in listOf("110 px" to 110, "156 px" to 156, "195 px (padrão)" to 195, "280 px (máximo)" to 280)) {
+            val row = limits.lines().single { it.trimStart().startsWith("| $label") }
+            val cells = row.split('|').map { it.trim() }.filter { it.isNotEmpty() }.drop(1)
+            assertThat(cells).hasSize(columns.size)
+            columns.forEachIndexed { i, frames ->
+                val mb = OrbMemoryPolicy.stateBytes(side, frames) / (1024.0 * 1024.0)
+                val expected = java.lang.String.format(java.util.Locale.ROOT, if (frames == 1) "%.2f" else "%.1f", mb).replace('.', ',')
+                assertThat(cells[i]).isEqualTo(expected)
+            }
+        }
+        assertThat(OrbMemoryPolicy.MAX_SIDE_PX).isEqualTo(280)
+        assertThat(limits).contains("O cache tem **${OrbMemoryPolicy.BASE_BYTES / (1024 * 1024)} MB** para todo pacote")
+        assertThat(limits).contains("72 MB (o estado de ${SkinPackReader.MAX_FRAMES_PER_STATE} frames a ${OrbMemoryPolicy.MAX_SIDE_PX} px)")
+        assertThat(OrbMemoryPolicy.ABSOLUTE_MAX_BYTES).isEqualTo(72L * 1024 * 1024)
+        assertThat(limits).contains("**¼ da classe de memória do aparelho**")
+        assertThat(OrbMemoryPolicy.MEMORY_CLASS_DIVISOR).isEqualTo(4L)
+        assertThat(limits).contains("`fps` até 60 e até 64 frames")
     }
 
     @Test

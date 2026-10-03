@@ -48,9 +48,11 @@ Tudo minúsculo, `_` entre as partes, extensão `.svg`.
   `orb.states.<estado>.fps` para um estado sem frames é ignorado, com aviso.
 - Buracos na numeração (1, 2, 4) são aceitos com **aviso**; o frame 3 simplesmente não existe. O frame `0` (`orb_idle_00.svg`) é
   **erro**, e o mesmo número escrito de duas formas (`orb_idle_01.svg` e `orb_idle_1.svg`) é **erro** citando os dois arquivos.
-- Máximo **64 frames por estado** e **240 no total**.
-- Acima de **48 frames** num estado o import **avisa**: nos tamanhos grandes da orbe a animação pode ficar menos fluida (medido: 64 frames a 280 px
-  repetem o quadro em 5–13% dos casos; 45 frames, em 1–2%). Considere menos frames ou um `fps` menor.
+- Máximo **240 frames por estado** e **480 no total** — 2 s de loop a 120 fps num estado; ou os quatro estados com 120 frames (1 s a 120 fps cada).
+- Cada frame vira um bitmap na memória, então o que pesa é `lado² × 4 × nFrames`. Acima de **16 MB** num estado (a 280 px, o maior tamanho da orbe) o
+  import **avisa** "o estado X (N frames) usa ~M MB de memória a 280 px": o app guarda 16 MB de frames por padrão, e um estado maior só cabe inteiro se o
+  aparelho deixar o cache crescer (§5, "Memória da orbe"); onde não deixa, a animação pode repetir quadros (medido: 64 frames a 280 px, que passam dos
+  16 MB, repetem o quadro em 5–13% dos casos; 45 frames, que cabem, em 1–2%). Considere menos frames.
 - Cada SVG é a orbe **inteira**, num quadrado (`viewBox` quadrado, ex.: `0 0 256 256`), incluindo halo e anéis: o app
   desenha o SVG no lado todo da janela da orbe. Fundo transparente. Um `viewBox` não quadrado é aceito com aviso: a orbe fica
   centralizada, sem esticar.
@@ -151,15 +153,39 @@ declarados fazem o papel dele; sem nenhum dos dois o SVG é desenhado em 1:1, se
 
 ## 5. Limites
 
-Zip ≤ 25 MB · ≤ 400 entradas · cada SVG ≤ 512 KB · `manifest.json` ≤ 64 KB · total descompactado ≤ 60 MB · nomes sem `..`, sem
+Zip ≤ 25 MB · ≤ 800 entradas · cada SVG ≤ 512 KB · `manifest.json` ≤ 64 KB · total descompactado ≤ 60 MB · nomes sem `..`, sem
 caminho absoluto (`/x`, `C:\x`) e sem caractere de controle. Os tamanhos são os **realmente lidos** ao descompactar, não os que o
 cabeçalho do zip declara. Estourou — ou o zip está cortado ou corrompido — o import falha inteiro, sem instalar nada.
+
+Os 60 MB descompactados dão em média 125 KB por frame nos 480 frames do limite (um frame de orbe de verdade tem 3–15 KB); as 800 entradas são os 486
+arquivos que o formato aceita (manifest, 480 frames, 5 peças de teclado) mais a folga do lixo de macOS/Windows.
+
+### Memória da orbe
+
+Cada frame da orbe é desenhado num bitmap do tamanho da janela da orbe (de 110 a 280 px de lado; 195 px por padrão) e fica num cache em memória: um
+frame custa `lado² × 4` bytes e um estado, `lado² × 4 × nFrames`. Em MB (1 MB = 1024 × 1024 bytes):
+
+| Lado da orbe       | 1 frame | 24 frames | 45 frames | 64 frames | 120 frames | 240 frames |
+| ------------------ | ------- | --------- | --------- | --------- | ---------- | ---------- |
+| 110 px             | 0,05    | 1,1       | 2,1       | 3,0       | 5,5        | 11,1       |
+| 156 px             | 0,09    | 2,2       | 4,2       | 5,9       | 11,1       | 22,3       |
+| 195 px (padrão)    | 0,15    | 3,5       | 6,5       | 9,3       | 17,4       | 34,8       |
+| 280 px (máximo)    | 0,30    | 7,2       | 13,5      | 19,1      | 35,9       | 71,8       |
+
+O cache tem **16 MB** para todo pacote — e só um estado toca por vez. Um pacote que cabe nos limites de antes dos 120 fps (`fps` até 60 e até 64 frames
+por estado) fica sempre nesses 16 MB, como sempre ficou. Um pacote que **pede mais** (`fps` acima de 60 ou mais de 64 frames num estado) ganha um
+orçamento que **cresce** quando o estado que toca, no tamanho de orbe de agora, não cabe em 16 MB: até o que o estado precisa, limitado pelo menor entre
+72 MB (o estado de 240 frames a 280 px) e **¼ da classe de memória do aparelho** (`ActivityManager.getMemoryClass`: 64 MB com 256 MB de classe, 48 MB com
+192 MB). Aparelho de pouca RAM (`isLowRamDevice`) nunca passa dos 16 MB. O orçamento é reavaliado quando o tamanho da orbe muda e **volta aos 16 MB** ao
+sair do estado ou fechar o pacote; se o sistema pede memória de volta, ele volta na hora. Se mesmo assim o estado não cabe, a animação repete o quadro
+anterior em alguns quadros — nunca trava nem para por falta de memória.
 
 ## 6. Resultado do import
 
 O app mostra um relatório com três listas — **Instalado** (o que entrou: "orbe: 4 estados, 46 frames · teclado:
 tray + 4 faces"), **Avisos** (ignorado, `filter` sem efeito, buraco na numeração, estado ausente usando `idle`…) e
-**Erros** (o que impediu a instalação, com o nome do arquivo). Com algum erro, **nada** é instalado.
+**Erros** (o que impediu a instalação, com o nome do arquivo). Com algum erro, **nada** é instalado. Os avisos de ritmo e de memória (`fps` acima de 90 e
+estado que passa de 16 MB a 280 px: §2, §3 e §5) dizem o número que o autor precisa para decidir.
 
 Antes de gravar, o app **desenha** cada SVG de teste (orbe a 64 px, faces de tecla a 96 px com a fatia, bandeja a 128×64). É erro:
 SVG que a biblioteca não lê, `slice` sem miolo e um quadro que leva mais de 1 s. É aviso: quadro que sai todo transparente (provável

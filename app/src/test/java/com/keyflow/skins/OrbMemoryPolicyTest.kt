@@ -66,6 +66,13 @@ class OrbMemoryPolicyTest {
     }
 
     @Test
+    fun `the largest state the format accepts fits the absolute ceiling exactly at the largest orb size`() {
+        val largest = OrbMemoryPolicy.stateBytes(OrbMemoryPolicy.MAX_SIDE_PX, SkinPackReader.MAX_FRAMES_PER_STATE)
+        assertThat(largest).isAtMost(OrbMemoryPolicy.ABSOLUTE_MAX_BYTES)
+        assertThat(largest).isGreaterThan(OrbMemoryPolicy.ABSOLUTE_MAX_BYTES - mb) // folga de menos de 1 MB: o teto é o estado máximo, não um número solto
+    }
+
+    @Test
     fun `the old limit of 64 frames at the largest size did not fit the basic budget, which is why the cache grows for it`() {
         assertThat(OrbMemoryPolicy.stateBytes(280, 64)).isGreaterThan(16 * mb)
         assertThat(OrbMemoryPolicy.stateBytes(280, 53)).isAtMost(16 * mb)

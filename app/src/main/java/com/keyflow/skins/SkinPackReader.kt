@@ -57,19 +57,31 @@ sealed interface SkinPackReadResult {
  */
 object SkinPackReader {
     const val MAX_ZIP_BYTES = 25L * 1024 * 1024
-    const val MAX_ENTRIES = 400
+
+    /**
+     * Entradas do `.zip`: o manifest, até [MAX_FRAMES_TOTAL] frames e as 5 peças do teclado são 486, mais a folga de lixo de macOS/Windows
+     * (`.DS_Store`, `__MACOSX/._*`) — a mesma proporção (~1,6×) que os 400 de antes davam para os 246 que o formato aceitava então.
+     */
+    const val MAX_ENTRIES = 800
     const val MAX_SVG_BYTES = 512 * 1024
     const val MAX_MANIFEST_BYTES = 64 * 1024
     const val MAX_TOTAL_BYTES = 60L * 1024 * 1024
-    const val MAX_FRAMES_PER_STATE = 64
-    const val MAX_FRAMES_TOTAL = 240
 
     /**
-     * Acima disto, um estado ainda é aceito (o teto é [MAX_FRAMES_PER_STATE]), mas o import **avisa**: medido no emulador, 64 frames a 280 px
-     * (o máximo do slider de tamanho da orbe) não cabem no cache de bitmaps e a animação repete o frame em 5–13% dos quadros, contra
-     * 1–2% com 45 frames na mesma largura.
+     * Frames por estado: 240 = 2 s de loop a 120 fps (era 64). É também o maior estado que o orçamento de memória da orbe sabe segurar: 240 frames a 280 px
+     * (o máximo do slider) são 71,8 MB, e o teto absoluto do cache é 72 MB ([OrbMemoryPolicy.ABSOLUTE_MAX_BYTES]) — um teste amarra os dois.
      */
-    const val SMOOTH_FRAMES_PER_STATE = 48
+    const val MAX_FRAMES_PER_STATE = 240
+
+    /** Frames no pacote todo: 480 = dois estados de 240 ou os quatro de 120 (1 s a 120 fps cada). Era 240. */
+    const val MAX_FRAMES_TOTAL = 480
+
+    /**
+     * Acima disto, um estado ainda é aceito, mas o import **avisa** o quanto ele ocupa de memória a 280 px: 16 MB é o orçamento do cache que todo
+     * pacote tem ([OrbMemoryPolicy.BASE_BYTES]); um estado maior só cabe inteiro se o aparelho deixar o orçamento crescer, e onde não deixa (pouca RAM) a
+     * animação repete frames — medido no emulador, 64 frames a 280 px (19,1 MB) repetiam o quadro em 5–13% dos casos, contra 1–2% com 45 frames (13,5 MB).
+     */
+    const val MEMORY_WARNING_BYTES = OrbMemoryPolicy.BASE_BYTES
 
     /** Aborta a leitura inteira. É um `IOException` para atravessar o `ZipInputStream` sem ser traduzido por ele. */
     private class Abort(message: String) : IOException(message)
@@ -106,7 +118,7 @@ object SkinPackReader {
         ZipInputStream(counted).use { zin ->
             while (true) {
                 val zipEntry = zin.nextEntry ?: break
-                if (++count > MAX_ENTRIES) throw Abort(tr("O .zip tem mais de 400 arquivos."))
+                if (++count > MAX_ENTRIES) throw Abort(tr("O .zip tem mais de %d arquivos.", MAX_ENTRIES))
                 val segments = normalize(zipEntry.name)
                     ?: throw Abort(tr("O .zip tem um arquivo com caminho inseguro (%s) — o pacote foi recusado.", printable(zipEntry.name)))
                 if (zipEntry.isDirectory || zipEntry.name.endsWith("/") || zipEntry.name.endsWith("\\") || segments.isEmpty()) continue
@@ -363,7 +375,7 @@ object SkinPackReader {
             val total = frames.values.sumOf { it.size }
             for ((state, byFrame) in frames) {
                 if (byFrame.size > MAX_FRAMES_PER_STATE) {
-                    errors += tr("orbe: o estado %s tem %d frames; o máximo é 64.", state.key, byFrame.size)
+                    errors += tr("orbe: o estado %s tem %d frames; o máximo é %d.", state.key, byFrame.size, MAX_FRAMES_PER_STATE)
                 }
                 val numbers = byFrame.keys.sorted()
                 val missing = (1..numbers.last()).filter { it !in byFrame }
@@ -375,13 +387,20 @@ object SkinPackReader {
                     )
                 }
             }
-            if (total > MAX_FRAMES_TOTAL) errors += tr("orbe: o pacote tem %d frames; o máximo é 240.", total)
-            val heavy = frames.filter { it.value.size in (SMOOTH_FRAMES_PER_STATE + 1)..MAX_FRAMES_PER_STATE }
-            if (heavy.isNotEmpty()) {
-                warnings += tr(
-                    "orbe: %s — mais de 48 frames num estado pode ficar menos fluido nos tamanhos grandes da orbe; considere menos frames ou um ritmo (fps) menor.",
-                    heavy.entries.joinToString(", ") { (state, byFrame) -> "${state.key} (${byFrame.size})" },
-                )
+            if (total > MAX_FRAMES_TOTAL) errors += tr("orbe: o pacote tem %d frames; o máximo é %d.", total, MAX_FRAMES_TOTAL)
+            // A memória que o estado ocupa na orbe MAIOR (280 px): lado² × 4 × frames. Só avisa acima do orçamento básico (16 MB); o erro de cima é o teto absoluto.
+            for ((state, byFrame) in frames) {
+                val bytes = OrbMemoryPolicy.stateBytes(OrbMemoryPolicy.MAX_SIDE_PX, byFrame.size)
+                if (bytes > MEMORY_WARNING_BYTES) {
+                    warnings += tr(
+                        "orbe: o estado %s (%d frames) usa ~%d MB de memória a %d px (o maior tamanho da orbe), acima dos %d MB do cache básico — em aparelhos com pouca memória a animação pode ficar menos fluida; considere menos frames.",
+                        state.key,
+                        byFrame.size,
+                        OrbMemoryPolicy.megabytes(bytes),
+                        OrbMemoryPolicy.MAX_SIDE_PX,
+                        OrbMemoryPolicy.megabytes(MEMORY_WARNING_BYTES),
+                    )
+                }
             }
             val withoutFrames = OrbPackState.entries.filter { it !in frames && it != OrbPackState.IDLE }
             if (withoutFrames.isNotEmpty() && OrbPackState.IDLE in frames) {
