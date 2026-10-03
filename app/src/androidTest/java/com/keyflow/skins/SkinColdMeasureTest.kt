@@ -1,10 +1,14 @@
 package com.keyflow.skins
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.util.Log
-import androidx.test.core.app.ApplicationProvider
+import android.view.View
 import androidx.test.platform.app.InstrumentationRegistry
 import com.keyflow.data.SettingsRepository
+import com.keyflow.ime.KeyFlowKeyboardView
+import com.keyflow.ime.KeyboardSkin
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assume.assumeTrue
@@ -22,7 +26,7 @@ import org.junit.Test
  * Só no emulador.
  */
 class SkinColdMeasureTest {
-    private val context: Context get() = ApplicationProvider.getApplicationContext()
+    private val context: Context get() = InstrumentationRegistry.getInstrumentation().targetContext
     private val args get() = InstrumentationRegistry.getArguments()
     private val step: String? get() = args.getString("skpCold")
     private val repo get() = SettingsRepository(context)
@@ -39,7 +43,7 @@ class SkinColdMeasureTest {
             val settings = repo.settingsFlow().first()
             repo.saveSettings(settings.copy(keyboardSkin = if (keyboard == "pack") result.skinId!! else keyboard, orbSkin = if (orb == "pack") result.skinId!! else orb))
         }
-        Log.i("SKP", "SKP-COLD prepare: pacote ${result.skinId}, teclado=$keyboard, orbe=$orb")
+        Log.i("SKP", "SKP-COLD prepare: pacote ${result.skinId}, teclado=$keyboard, orbe=$orb (pacote ${context.packageName}, lido de volta: ${runBlocking { repo.keyboardSkinOnce() }})")
     }
 
     @Test
@@ -62,5 +66,44 @@ class SkinColdMeasureTest {
         store.list().filter { it.name == "Medida a frio" }.forEach { store.remove(it.id) }
         runBlocking { repo.saveSettings(repo.settingsFlow().first().copy(keyboardSkin = "system", orbSkin = "atelie")) }
         Log.i("SKP", "SKP-COLD restore: pacote removido, skins no padrão")
+    }
+
+    /**
+     * O custo, num processo novo, de construir o teclado inteiro com [skpSkin] (`pack|aero|rosegold|glitch|system`) e desenhar o primeiro quadro (gera
+     * todos os sprites das teclas e a bandeja): `onCreateInputView` + primeiro `onDraw`, sem o DataStore no meio. Para o pacote, também o
+     * tempo de abrir o pacote do disco. Software canvas, 1080×1200 px.
+     */
+    @Test
+    fun coldView() {
+        assumeTrue(step == "coldView")
+        val which = args.getString("skpSkin") ?: "pack"
+        val store = SkinPackStore.of(context)
+        var openMs = 0.0
+        var pack: PackKeyboard? = null
+        if (which == "pack") {
+            val result = store.import(SkinPackFixtures.zip(SkinPackFixtures.realisticKeyboardPack("Medida a frio")).inputStream())
+            check(result.installed) { result.report.errors.toString() }
+            val t0 = System.nanoTime()
+            pack = PackKeyboard.load(store.loadBySkinId(result.skinId)!!)!!
+            openMs = (System.nanoTime() - t0) / 1e6
+        }
+        val skin = when (which) { "aero" -> KeyboardSkin.AERO; "rosegold" -> KeyboardSkin.ROSE_GOLD; "glitch" -> KeyboardSkin.GLITCH; else -> KeyboardSkin.SYSTEM }
+        var buildMs = 0.0
+        var drawMs = 0.0
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val t0 = System.nanoTime()
+            val view = KeyFlowKeyboardView(context = context, onKey = {}, onMic = {}, onHide = {}, skin = skin, pack = pack)
+            view.setExpanded(true)
+            val t1 = System.nanoTime()
+            view.measure(View.MeasureSpec.makeMeasureSpec(1080, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(2400, View.MeasureSpec.AT_MOST))
+            view.layout(0, 0, view.measuredWidth, view.measuredHeight)
+            val bitmap = Bitmap.createBitmap(view.measuredWidth, view.measuredHeight, Bitmap.Config.ARGB_8888)
+            view.draw(Canvas(bitmap))
+            val t2 = System.nanoTime()
+            buildMs = (t1 - t0) / 1e6
+            drawMs = (t2 - t1) / 1e6
+        }
+        Log.i("SKP", "SKP-COLD view $which (processo novo): abrir pacote=%.1fms construir a view=%.1fms medir+1º quadro (sprites)=%.1fms total=%.1fms".format(java.util.Locale.US, openMs, buildMs, drawMs, openMs + buildMs + drawMs))
+        if (which == "pack") store.list().filter { it.name == "Medida a frio" }.forEach { store.remove(it.id) }
     }
 }

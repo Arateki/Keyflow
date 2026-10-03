@@ -26,6 +26,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -42,6 +44,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.material3.Text
+import com.keyflow.skins.OrbPackState
+import com.keyflow.skins.PackOrb
+import com.keyflow.skins.SkinIds
 import com.keyflow.ui.theme.SpaceMono
 import kotlin.math.PI
 import kotlin.math.abs
@@ -97,13 +102,27 @@ enum class OrbStyle(
      * que cintilam. Feminina e elegante; paga, como as outras. A tinta do centro é vinho.
      */
     ROSE_GOLD("rosegold", paid = true),
+
+    /**
+     * Uma skin **de pacote** do usuário (SKP-ORB): os frames SVG por estado, desenhados por [PackOrb] — o pacote vem de [LocalOrbPack]. O
+     * id guardado nos ajustes não é este `"pack"`, e sim `pack:<id>` ([SkinIds]); [orbStyleFor] devolve este estilo para todos eles. Sem
+     * pacote em [LocalOrbPack] (sumiu, quebrou, não tem orbe) a orbe cai no Ateliê. Gratuita e nunca bloqueada: a skin é do usuário (D4).
+     */
+    PACK("pack", paid = false),
 }
 
 /** Estilo do orbe para a árvore abaixo — a overlay e as prévias das abas seguem a skin escolhida. */
 val LocalOrbStyle = staticCompositionLocalOf { OrbStyle.ATELIE }
 
-/** Id de skin da orbe ([com.keyflow.data.Settings.orbSkin]) → estilo; um id que não existe é o Ateliê. */
-fun orbStyleFor(orbSkinId: String): OrbStyle = OrbStyle.entries.firstOrNull { it.id == orbSkinId } ?: OrbStyle.ATELIE
+/** O pacote de skin que [OrbStyle.PACK] desenha; `null` = nenhum (a orbe cai no Ateliê). Quem provê abre o pacote (OverlayService, ConfigScreen). */
+val LocalOrbPack = staticCompositionLocalOf<PackOrb?> { null }
+
+/**
+ * Id de skin da orbe ([com.keyflow.data.Settings.orbSkin]) → estilo; `pack:<id>` válido é [OrbStyle.PACK]; um id que não existe (ou um
+ * `pack:` inseguro) é o Ateliê.
+ */
+fun orbStyleFor(orbSkinId: String): OrbStyle =
+    if (SkinIds.isPack(orbSkinId)) OrbStyle.PACK else OrbStyle.entries.firstOrNull { it.id == orbSkinId } ?: OrbStyle.ATELIE
 
 /** Conteúdo desenhado no centro do orbe (ORB-04). */
 sealed interface OrbCenter {
@@ -183,6 +202,8 @@ fun VoiceOrb(
     val provided = timeProvider ?: LocalOrbClock.current
     val animatedMs = rememberOrbClock(enabled = provided == null)
     val timeMs = provided?.invoke() ?: animatedMs
+    // A skin de pacote desenha só se há um pacote com orbe; sem ele, o estilo PACK é o Ateliê.
+    val pack = if (style == OrbStyle.PACK) LocalOrbPack.current else null
 
     // Tempo e glifos do centro na tinta do estilo (marrom no Ateliê, marinho no vidro do Aero).
     androidx.compose.runtime.CompositionLocalProvider(
@@ -191,6 +212,7 @@ fun VoiceOrb(
             OrbStyle.GLITCH -> Color.White
             OrbStyle.ROSE_GOLD -> RoseInk
             OrbStyle.ATELIE -> CenterInk
+            OrbStyle.PACK -> pack?.let { Color(it.centerInk) } ?: CenterInk
         },
         LocalCenterGlow provides if (style == OrbStyle.AERO) AeroInkGlow else null,
     ) {
@@ -205,7 +227,9 @@ fun VoiceOrb(
             // O Glitch soma as franjas (BlendMode.Plus): numa camada própria elas somam só entre si, não com o que está atrás
             // (sobre um fundo claro, ciano e vermelho viravam branco).
             val layer = if (style == OrbStyle.GLITCH) Modifier.graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen) else Modifier
-            Canvas(Modifier.matchParentSize().then(layer)) { drawOrb(timeMs, state, style, hasCenter) }
+            Canvas(Modifier.matchParentSize().then(layer)) {
+                if (pack != null) drawPackOrb(timeMs, state, pack, deterministic = provided != null) else drawOrb(timeMs, state, style, hasCenter)
+            }
             // Centro do estado. No modo-arrasto ele some conforme o alvo aparece (crossfade), pra não
             // sobrepor — os glifos têm o mesmo tamanho/área, então só o ativo da vez fica visível.
             val baseAlpha = dragHint?.let { (1f - it.centerAlpha).coerceIn(0f, 1f) } ?: 1f
@@ -401,6 +425,30 @@ private fun CancelGlyph(glyphSize: Dp) {
             drawLine(CancelAmber, Offset(w * fx, bodyTop + h * 0.07f), Offset(w * fx, bodyBottom - h * 0.07f), strokeWidth = sw * 0.7f, cap = StrokeCap.Round)
         }
     }
+}
+
+/**
+ * A orbe de um pacote de skin (SKP-ORB-01): o frame SVG do estado no quadrado inteiro da janela da orbe. O tempo e os glifos do centro
+ * não fazem parte do desenho — o Compose os põe por cima, na `orb.centerInk`. Só copia um bitmap já pronto ([PackOrb.frameFor]): nunca
+ * espera render, a não ser que o relógio seja injetado ([deterministic]: prévias, galeria, testes), onde o pixel precisa ser sempre o mesmo.
+ */
+private fun DrawScope.drawPackOrb(t: Float, state: OrbState, pack: PackOrb, deterministic: Boolean) {
+    // Ler a versão no desenho faz o Compose redesenhar quando um frame novo chega do fundo (com o relógio parado, ninguém mais pediria).
+    pack.version
+    val side = min(size.width, size.height).roundToInt()
+    if (side <= 0) return
+    val bitmap = pack.frameFor(state.toPackState(), t, side, deterministic) ?: return
+    drawIntoCanvas { canvas ->
+        canvas.nativeCanvas.drawBitmap(bitmap, ((size.width - side) / 2f).roundToInt().toFloat(), ((size.height - side) / 2f).roundToInt().toFloat(), null)
+    }
+}
+
+/** O estado do app → o estado de um pacote de skin (os mesmos quatro, com os mesmos nomes). */
+internal fun OrbState.toPackState(): OrbPackState = when (this) {
+    OrbState.Idle -> OrbPackState.IDLE
+    OrbState.Listening -> OrbPackState.LISTENING
+    OrbState.Paused -> OrbPackState.PAUSED
+    OrbState.Transcribing -> OrbPackState.TRANSCRIBING
 }
 
 private fun DrawScope.drawOrb(t: Float, state: OrbState, style: OrbStyle = OrbStyle.ATELIE, hasCenter: Boolean = false) {

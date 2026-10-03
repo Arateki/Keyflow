@@ -99,9 +99,10 @@ a dele. A spec `theme-system` (M8, Draft) trata de tokens/cores, não de arte im
 | SKP-IMP-05 | Importação | Implemented no store (T3): mesmo `name` → mesmo id, troca atômica, `replaced = true`; "mostra a versão nova ao vivo" depende das T4/T5/T6 |
 | SKP-IMP-01, 06 | Importação | Pending (SAF e a thread de fundo na T6; o store e o leitor já são síncronos e sem Android UI) |
 | SKP-STO-01, 02 (ids) | Armazenamento | Implemented (T3): `filesDir/skins/<id>/`, `pack:<id>`, id = slug ASCII + 8 hex do nome, estável; falta só a ligação com `Settings` (T4/T5/T6) |
-| SKP-STO-03, 04 | Armazenamento | Parcial: teclado Implemented (T4: pacote sumido, quebrado, removido ou id inseguro → Sistema, sem crash, testado no IME real); a orbe é da T5; o reset do ajuste ao remover o selecionado é da T6 |
 | SKP-STO-05 | Armazenamento | Decisão registrada (sem código): o export de config futuro leva só o id `pack:<id>`, nunca os arquivos |
-| SKP-ORB-01..05 | Orbe | Pending |
+| SKP-ORB-01, 02, 03, 04 | Orbe | Implemented (T5): frame por `floor(t·fps/1000) mod n`, estado sem frames usa `idle` (frames e ritmo), relógio congelado → pixel determinístico (`PackOrbComposeTest`), centro/glifos do app na `orb.centerInk`; verificado também na orbe flutuante de verdade (`OverlayPackOrbTest`) |
+| SKP-ORB-05 | Orbe | Implemented (T5): cache com teto de 16 MB (despejo consciente da volta), render fora do `onDraw` e do pré-aquecimento; custo medido contra Aero/Rose Gold — thread de UI 3,8–4,2 ms por quadro contra 4,7–6,3 (nativas), desenho 0,5–0,6 ms contra 1,5–2,6. Pior caso legal (64 frames a 280 px, não cabe no cache): a animação repete frame em ~5–13% dos quadros no emulador sob carga; a UI não trava |
+| SKP-STO-03, 04 | Armazenamento | Implemented no teclado (T4) e na orbe (T5): pacote sumido, quebrado, removido ou id inseguro → Sistema/Ateliê sem crash, testado no IME e na janela flutuante reais; o **reset do ajuste** ao remover o selecionado fica para a UI (T6) |
 | SKP-KBD-01..05 | Teclado | Implemented (T4), verificado no IME real: faces SVG por papel e estado com 9-slice, bandeja e faixa de navegação, `ink`/`popup`, sprites em `SpriteCache` (em regime só `drawBitmap`, provado por canvas espião) e reconstrução ao vivo |
 | SKP-UI-01..04 | Interface | Pending |
 | SKP-DOC-01 | Docs | Parcial (T2): `SkinPackFormatDocTest` amarra exemplos, nomes, limites e padrões do FORMAT.md ao código; falta o ajuste final (T7) |

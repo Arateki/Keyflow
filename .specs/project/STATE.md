@@ -2202,3 +2202,60 @@ as 6 views ganharam `pack: PackKeyboard? = null`; o serviço abre o pacote em `o
      (SKP-IMP-05) e removê-lo devolver o padrão (SKP-STO-04) **sem campo novo em `Settings`** e sem polling. Vale porque app, IME e overlay dividem o processo.
   6. O serviço registra `onCreateInputView: N ms (skin=…)` (nível debug) — leitura barata do custo de abertura de qualquer skin.
 
+## skin-packs — SKP-T5: orbe de pacote + desempenho nativo × pacote (2026-10-03)
+`skins/PackOrb` (frames por estado, cache em bitmaps, fila de fundo), `OrbTiming` (`frameIndex` puro), `ByteBudgetLru`; `OrbStyle.PACK` (gratuito, D4) + `LocalOrbPack` + `drawPackOrb` no `VoiceOrb` (o ramo vem
+ANTES dos outros: nenhum desenho existente mudou); `rememberOrbPack` (prévias da config), `OrbButtonView.setOrbPack`, `OverlayService.openOrbPack`/observação de `SkinPackStore.changes`; edição de
+`ConfigScreen.kt` = **uma linha** (o `LocalOrbPack`). Sem pacote (sumiu, quebrou, sem orbe, id inseguro) o estilo PACK desenha o Ateliê.
+- **Verificação**: unit **956** (`OrbTimingTest` 6, `ByteBudgetLruTest` 9, `VoiceOrbTest` +3); instrumentados em `com.keyflow.skins` **110/110** (inclui 16 métodos de medição que só rodam com `-e skpOrbCost`/`-e skpCold` e
+  passam como "assumption" nas rodadas normais), `com.keyflow.overlay` **30/30**, `com.keyflow.ui.tour` **20/20**, `com.keyflow.ui.config` **146/146** (a `ConfigScreen` mudou uma linha); o pacote de teclado no IME real continua 5/5; `OverlayPackOrbTest` roda **na janela flutuante de verdade** (screenshot do emulador: o frame do
+  pacote é um quadrado magenta inconfundível; reimportar com outra cor aparece ao vivo; voltar ao Ateliê; remover o pacote selecionado e `pack:../../x` caem no Ateliê sem derrubar o serviço).
+- **Goldens**: 154 rotas capturadas com o APK da T5 e comparadas **sem fuzz** com as do baseline (commit do spec): **152/154 idênticas pixel a pixel**; as 2 diferentes são as mesmas `config-docs[-dark]` da T1 (a licença nova na aba
+  Docs, 20–21 px do indicador de rolagem). `diff-screens.sh` 150/150. Nenhum golden aprovado. (O golden versionado NÃO é bit-idêntico às capturas deste emulador — ~100–250 px de ruído em todas as rotas, também no baseline —,
+  então a prova é baseline × T5.)
+- **Bugs reais da fila de fundo, achados MEDINDO** (`sustainedPlaybackBeyondTheCacheBudget`, 64 frames a 24 fps a 280 px = 19,6 MB, não cabem nos 16 MB): primeira versão errava o frame em **19%** dos desenhos. Causas: (1) o pedido do
+  frame de agora, já enfileirado como "à frente", **não era promovido** e esperava a fila; (2) um frame sendo renderizado podia ser pedido **de novo** (a fila só deduplicava o que ainda não tinha sido tomado) — renderizado em dobro;
+  (3) pedidos de frames que a animação já tinha passado continuavam na fila; (4) a thread em `THREAD_PRIORITY_BACKGROUND` (grupo de segundo plano) perde a CPU para qualquer coisa. Agora: fila por prioridade (agora > próximos >
+  aquecimento) com promoção, deduplicação inclusive do que está em andamento (`repeatedLiveRequests…` prova: 300 pedidos → 4 renders), descarte do que ficou para trás, lookahead de 1/4 s (3–12 frames) e prioridade
+  `LESS_FAVORABLE`. Isso levou o pior caso de 19% para ~12–14%.
+- **Achado — o LRU é o pior cache para um loop**: com mais frames do que cabem, o menos usado é exatamente o próximo a aparecer (o teste unitário simula 10 frames em 7 lugares: LRU erra 60/60). `ByteBudgetLru.chooseVictim` deixa o
+  dono escolher: sai primeiro o que não está tocando (outro estado/tamanho/orbe) e, entre os que estão, o **mais longe à frente do cursor** (o que acabou de passar). Cada volta passa a renderizar só N−C+1 frames (3 de 10 no
+  teste). No pior caso real caiu de ~13% para **5,5–12,8%** (varia com a carga do host: 7–8 de load médio durante a medição; uma rodada anterior sob load 7 chegou a 42%, antes disto).
+- **Sustentado (relógio real, 8 s, 24 fps, 1 desenho a cada 16 ms; "errado" = o desenho devolveu o frame anterior em vez do certo):**
+
+  | Pacote (frames × lado) | Cache | Errados |
+  | - | - | - |
+  | 24 × 156 px / 195 px / 280 px | 2,3 / 3,6 / 7,4 MB (cabe) | **0%** nas três |
+  | 45 × 280 px (o pacote realista inteiro) | 13,8 MB (cabe) | 1,4–2,2% (só a 1ª volta: o aquecimento cobre metade) |
+  | 64 × 195 px | 9,5 MB (cabe) | 1,0–1,2% |
+  | **64 × 280 px** (limite do FORMAT.md no máximo do slider) | 53 de 64 frames, 15,8 MB | **5,5–12,8%** (3 rodadas) |
+
+  O pior caso degrada a **fluidez** (a orbe repete o frame anterior por ~1 quadro), nunca a thread de UI: o `onDraw` continua sendo um `drawBitmap`. Mitigações propostas se o A32 mostrar isso (não feitas, para não otimizar às cegas):
+  renderizar os frames num lado menor que o da janela (≤ 224 px) e esticar o bitmap; ou subir o teto de 16 → 24 MB só quando o estado não cabe; ou o validador do import avisar "estado de 64 frames: pode ficar menos fluido em tamanhos grandes".
+- **Tempo de quadro da orbe, nativa × pacote** (emulador API 34 x86_64, **renderização por software (swiftshader)**: vale como relação, não como promessa para o A32; método: `FrameMetrics` da janela de uma Activity só com a orbe
+  em `Listening` com o tempo `0:12` no centro, relógio REAL, 3 s de aquecimento + 8 s medidos, um processo novo por célula; "UI" = input+animação+layout+desenho na thread principal; mediana [p95] em ms; rodada 2, a de host mais
+  quieto — a rodada 1 deu a mesma ordem, com picos de até 90 ms de p95 nas nativas por carga do host):
+
+  | | UI (mediana [p95]) | só desenho (mediana [p95]) |
+  | - | - | - |
+  | Aero 156 / 195 / 280 px | 5,4 [7,1] / 5,8 [8,2] / 6,3 [23,1] | 2,1 [2,8] / 2,2 [3,3] / 2,6 [8,4] |
+  | Rose Gold 156 / 195 / 280 px | 4,7 [7,4] / 5,0 [7,2] / 4,7 [6,2] | 1,6 [2,6] / 1,6 [2,4] / 1,5 [2,2] |
+  | **Pacote** 156 / 195 / 280 px | **3,9 [18,2] / 4,2 [7,2] / 3,8 [5,7]** | **0,6 [2,4] / 0,6 [1,0] / 0,5 [0,8]** |
+
+  O pacote é **mais barato** que as nativas na thread de UI (um `drawBitmap` contra caminhos e degradês do Compose) e o custo **não cresce com o tamanho**. O tempo TOTAL do quadro (vsync→apresentado) fica em 22–40 ms para as três e
+  acima de 16,7 ms em 100% dos quadros: é a composição por GPU do swiftshader, não a skin — por isso a comparação vale nas colunas de cima.
+- **Render por frame (o custo que sai do `onDraw`)**: `renderToCanvas` num bitmap novo, quadro sintético de 256² de viewBox (degradês radiais e lineares, arco, 24 ou 160 círculos): **24 pontos (2,7 KB)**: 4,3–5,5 ms (p95 8,5–15) nos 3 lados;
+  **160 pontos (12,5 KB)**: 8,9–10,7 ms (p95 16–17); mais o *parse*: 4–8 ms. Com o host quieto (T1): 3,1 + 2,1 ms (156 px, 24 pontos) e 10,5 + 6,7 ms (160 pontos). Ou seja, 9–18 ms por frame em segundo plano, num orçamento de 41 ms a 24 fps.
+- **Memória do cache de bitmaps** (pacote realista, 45 frames = 12 + 24 + 1 + 8 de `idle`/`listening`/`paused`/`transcribing`): **4,3 MB a 156 px** (95 KB/frame), **6,7 MB a 195 px** (149 KB), **13,8 MB a 280 px** (306 KB), teto 16 MB — cabe nos três
+  tamanhos; o pré-aquecimento dos 45 frames leva 0,4–2,1 s em segundo plano. Fora dos 16 MB só há o bitmap do frame na tela.
+- **Teclado, nativas × pacote** (mesmo emulador; os números do T4 acima, depois do 9-slice por `Picture`): 8 sprites de um teclado real, cache vazio, JIT quente — **pacote 4,7 ms** (p95 6,5) × Aero 10,4 (15,4) × Rose Gold 12,9 (22,1);
+  FRIO, num processo novo — pacote 19,2–19,5 ms (+ abrir o pacote 24–27 ms) × Aero 14,8–17,2 × Rose Gold 8,5–34,1; `onDraw` em regime: 21,8 µs × 18,9 × 30,7 (todos só `drawBitmap`).
+  **O teclado inteiro, a frio, num processo novo** (`SkinColdMeasureTest#coldView`: abrir o pacote + construir `KeyFlowKeyboardView` + medir + 1º quadro com todos os sprites, canvas de software, 3 rodadas, ms):
+  Sistema 46,6–61,5 · **pacote 69,2–77,4** (abrir o pacote 14,9–19,8 + construir 25,7–27,1 + 1º quadro 25,2–31,8) · Aero 65,3–77,0 · Rose Gold 53,8–69,1. Ou seja, o pacote custa **o mesmo que o Aero** a frio — e os ~15–20 ms de
+  abrir o pacote (manifest + listagem + *parse* de 3–5 SVGs, com as classes do AndroidSVG ainda frias) são o único custo que as nativas não têm. O `onCreateInputView` real do serviço, a frio, com a skin Sistema: 53–110 ms, típico ~80 (log `onCreateInputView: N ms`; dois picos de 308 e 531 ms sob carga do host).
+  **Não consegui medir o `onCreateInputView` do serviço com `pack:<id>` a frio por `am instrument` + `force-stop`**: a escrita do `keyboardSkin` pela instrumentação não chegou ao arquivo do DataStore (lido de volta na memória do mesmo
+  processo, mas o arquivo continuava `system`) — não investiguei se é do harness ou do app; o caminho vivo (`KeyFlowKeyboardPackSkinTest`, mesmo processo) funciona e é o que prova a ligação.
+- **Decisões onde o spec/FORMAT.md era omisso**: (1) a orbe fecha a anterior ao trocar o pacote (`openOrbPack`) e o cache é **de processo** (16 MB divididos entre todas as orbes: a da overlay e as prévias da config); (2) o frame que falta ao vivo
+  NUNCA é renderizado no `onDraw`: mostra o último do estado (ou qualquer um já pronto do mesmo tamanho) e a fila de fundo o entrega (`version` sobe e o Compose redesenha) — só com relógio injetado (prévia, galeria, teste) o frame é renderizado na
+  hora, porque ali o pixel precisa ser sempre o mesmo; (3) o relógio da orbe não reinicia ao trocar de estado (o `t` é o da composição), então o ciclo de `listening` começa onde o relógio estiver; (4) `rememberOrbPack` abre o pacote dentro da
+  composição (lê o manifest e lista a pasta: sub-ms) — se a UI da T6 listar muitos pacotes, mover isso para fora da composição.
+

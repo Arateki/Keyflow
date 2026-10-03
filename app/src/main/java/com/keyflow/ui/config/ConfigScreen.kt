@@ -275,6 +275,7 @@ fun ConfigScreen(
                 // Sobrepor, como a orbe de verdade; o orbe do cabeçalho é a marca do app e fica como está.
                 androidx.compose.runtime.CompositionLocalProvider(
                     com.keyflow.ui.orb.LocalOrbStyle provides com.keyflow.ui.orb.orbStyleFor(settings.orbSkin),
+                    com.keyflow.ui.orb.LocalOrbPack provides com.keyflow.ui.orb.rememberOrbPack(settings.orbSkin),
                 ) {
                 Column(
                     Modifier

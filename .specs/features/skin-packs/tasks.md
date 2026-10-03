@@ -51,6 +51,10 @@ traceability do `spec.md` ao concluir.
   e tinta; troca ao vivo; pacote removido/sumido/quebrado → Sistema; reimportação ao vivo); pacote `com.keyflow.ime` 44/45 (1 flaky, 13/13 nas repetições) e
   **goldens**: 152/154 rotas idênticas ao baseline pixel a pixel, as 2 restantes são a aba Docs com a licença nova (7×5 px no indicador de rolagem);
   `diff-screens.sh` 150/150. Medidas de custo contra as nativas e a mitigação (9-slice por `Picture`) no `STATE.md`.
+  **SPEC_DEVIATION** (design, "Renderização e desempenho"): o design mandava "renderizar o SVG em 9 recortes (clip + matriz)"; a biblioteca percorre a
+  árvore inteira a cada render, e nove renders custavam 10–20× as skins nativas. O documento é gravado **uma vez** num `Picture` e as nove células o
+  reproduzem (clip + matriz, como o design pedia) — pixel a pixel igual (teste contra o re-render, diferença máxima 0). Também `KeyboardColors.forPack(pack)` ficou sem o `density`
+  do design (não precisa) e `SkinPackStore.changes` é novo (o design não dizia como o teclado/orbe sabem que o pacote selecionado foi reimportado/removido).
 
 ### SKP-T5 — Orbe: `PackOrb`, `OrbStyle.PACK`, ligação com `pack:<id>`
 - **What**: frames por estado/tempo (`frameIndex` puro), cache LRU com teto de bytes + pré-aquecimento fora do `onDraw`,
@@ -60,7 +64,13 @@ traceability do `spec.md` ao concluir.
   frames usa `idle`; centro (tempo/glifos/arrasto) continua legível na `centerInk`; **goldens existentes bit-idênticos**;
   custo medido (tempo por frame, memória do cache) e anotado no `STATE.md`.
 - **Tests**: unit `frameIndex`; instrumentado `PackOrbTest`; `diff-screens.sh`. **Gate**: unit + instrumentado + goldens.
-- **Status**: Pending
+- **Status**: Done (2026-10-03) — `PackOrb`, `OrbTiming`, `ByteBudgetLru`, `OrbStyle.PACK`/`LocalOrbPack`/`drawPackOrb`, `rememberOrbPack`, `OrbButtonView.setOrbPack`, `OverlayService.openOrbPack`;
+  unit 956 (`OrbTimingTest` 6, `ByteBudgetLruTest` 9, `VoiceOrbTest` +3); instrumentados `PackOrbTest` 16, `PackOrbComposeTest` 6 (no `VoiceOrb` real, relógio congelado, pixel conferido) e
+  **`OverlayPackOrbTest` 2 na janela flutuante de verdade** (screenshot do emulador: frame do pacote, reimportar ao vivo, voltar ao Ateliê, remover selecionado → Ateliê, pacote inexistente/`pack:../../x` → Ateliê);
+  **goldens: 152/154 rotas idênticas ao baseline pixel a pixel** (as 2 são `config-docs[-dark]`, a licença da T1), nenhum aprovado. Custo nativo × pacote medido e anotado no `STATE.md`.
+  **SPEC_DEVIATION** (design, "Orbe"): o design pedia "cache LRU com teto de bytes". O LRU é o pior caso de uma animação em loop maior que o cache (o menos usado é sempre o próximo a aparecer: errou 100% numa
+  simulação), então o despejo é **consciente da volta**: sai primeiro o que não está tocando e, entre os que estão, o mais longe à frente do cursor ([`ByteBudgetLru.chooseVictim`]). O teto de ~16 MB e o
+  pré-aquecimento fora do `onDraw` são como no design; o pré-aquecimento cobre até metade do cache, e a fila de fundo tem prioridades (frame de agora > próximos > aquecimento).
 
 ## Fase 2 — Produto
 
