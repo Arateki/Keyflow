@@ -75,8 +75,10 @@ pálpebra caída do sonolento corta). Luz refletida do chão embaixo à direita 
 
 ## Verificação
 
-Emulador `keyflow_api34` (API 34, 1080x2400 a 420 dpi) — **com a GPU do host** (`-gpu host`), ver SPEC_DEVIATION abaixo. Tudo com `adb -s emulator-5554`, dentro
-do `flock /tmp/keyflow-emulator.lock`; contagens lidas do logcat (`TestRunner: run finished`), não do resumo do `am instrument`.
+Emulador `keyflow_api34` (API 34, 1080x2400 a 420 dpi), sempre `adb -s emulator-5554` dentro do `flock /tmp/keyflow-emulator.lock`; contagens lidas do logcat
+(`TestRunner: run finished`), não do resumo do `am instrument`. **Dois ambientes**: a 1ª rodada de verificação (suíte, goldens contra o APK base, desempenho) foi na GPU do
+host (`-gpu host`), porque o `swiftshader_indirect` derrubava o emulador (ver "A queda no swiftshader" abaixo); depois de achar e corrigir a causa, o emulador voltou ao modo do
+CI (`-gpu swiftshader_indirect -no-snapshot-save -no-audio -no-boot-anim -camera-back none -cores 2`, sem core dump) e **os goldens do mascote são desse ambiente**.
 
 - **Unit** (`testDebugUnitTest`, completo): **850/850**, 0 falhas. Novos: `MascotTimelineTest` 11 (determinismo, hash estável e uniforme, piscada dentro da
   fatia, nunca coladas — vão mínimo ≥ 700 ms e 150 ms de olho aberto na dupla —, irregular porém estável, tremida amortecida e de um lado só ou dos dois,
@@ -91,10 +93,14 @@ do `flock /tmp/keyflow-emulator.lock`; contagens lidas do logcat (`TestRunner: r
   (`generateOrbMotionArtifacts`, `OverlayServiceCancelTest`, `PartialOverlayServiceTest`), e `PartialOverlayServiceTest` + `ModelDownloaderDeviceTest`
   isoladas passaram 9/9 duas vezes com cada APK — são instabilidade do emulador sob carga (load average 15–19 no host), não do mascote. O pacote `ime` não
   foi rodado (o mascote não toca o teclado; outro agente o rodou no mesmo emulador).
-- **Galeria**: 168 PNGs (154 antigos + 14 das 7 rotas novas). **Os 152 goldens antigos que não mostram a seção de skins saem byte a byte iguais** aos
-  capturados com o APK base no mesmo emulador (`cmp`); só `config-overlay-skins` e `config-overlay-skins-dark` mudam (o cartão novo no lugar da amostra vazia
-  da 5ª coluna) — foram os únicos aprovados, à mão (`git status -s verification/golden/` conferido). `scripts/diff-screens.sh`: **164/164 dentro do limiar**
-  (150 antigos + 14 novos). Contra os goldens *versionados* (feitos em outro ambiente) os antigos diferem de 5 a 270 px (≤ 0,01%), bem abaixo do limiar de 0,02%.
+- **Galeria** (GPU do host, APK base × APK do mascote): 168 PNGs (154 antigos + 14 das 7 rotas novas). **Os 152 goldens antigos que não mostram a seção de skins saem byte a
+  byte iguais** (`cmp`); só `config-overlay-skins` e `config-overlay-skins-dark` mudam (o cartão novo no lugar da amostra vazia da 5ª coluna). `git status -s verification/golden/`
+  conferido em cada aprovação.
+- **Galeria no modo do CI** (`swiftshader_indirect`, APK com o rabo corrigido): 168 capturas, **0 quedas** (2 rotas esperaram mais de 20 s e passaram na 2ª tentativa).
+  Contra os goldens **versionados** das 148 rotas que não são do mascote nem do cartão: **144 byte a byte iguais, 146 com 0 px de diferença** (`config-docs`, 4 px;
+  `keyboard-glitch-*`, 0 px com fuzz de 5%), máximo 0,00017%. A GPU do host, no mesmo conjunto: **0 byte a byte iguais**, mediana 0,0043%, máximo 0,0200% e 2 rotas de
+  outras skins acima do limiar de 0,02% (`config-teclado-travado-dark` e mais uma). Ou seja, **os goldens do repositório foram feitos em swiftshader**: o conjunto do
+  swiftshader é o certo, e foi ele que virou golden (só os 14 PNGs do mascote e os 2 do cartão; nenhum outro muda). `scripts/diff-screens.sh`: **164/164 dentro do limiar**.
 - **Desempenho** (`OrbFrameCostArtifactTest`, 195 px, 8 s depois de 2 s de aquecimento, relógio de verdade, 5 rodadas em ordem alternada; mediana das rodadas):
 
   | caso | UI desenho p50 | RenderThread p50 | quadro p50 (gfxinfo) |
@@ -114,13 +120,45 @@ do `flock /tmp/keyflow-emulator.lock`; contagens lidas do logcat (`TestRunner: r
   as rotas do mascote, as duas do cartão e `overlay-idle`/`overlay-rosegold-idle` recapturadas com o APK do HEAD saem **byte a byte iguais** às da captura final (a 1ª tela
   depois de instalar às vezes sai escurecida por um scrim do sistema — a captura é repetida, e a repetição bate; foi o que aconteceu com `overlay-mascot-recording`).
 
+### A queda no swiftshader (investigada em 2026-10-03)
+
+O `.github/workflows/checks.yml` sobe o emulador com `-gpu swiftshader_indirect`, o modo em que o `qemu` tinha dado SIGSEGV (na `RenderThread` do renderizador gráfico) ao abrir
+`overlay-mascot-transcribing`. Roteiro: um rodízio de rotas em que a rota inicial gira a cada rodada, com o emulador subindo de novo na queda (a versão enxuta, sem o reinício, é o
+`scripts/stress-routes.sh`); emulador reiniciado uma vez no modo do CI, `ulimit -c 0` no mesmo shell (sem core dump), tudo dentro do `flock`.
+
+1. **Reprodução** (APK do HEAD, 13 rotas em rodízio, 6 rodadas, parou nas 10 quedas): `overlay-mascot-transcribing` **5/6 quedas**, `overlay-mascot-paused` 2/6, e as de controle
+   `overlay-aero-idle` **3/6** (rota antiga, sem o mascote), `overlay-aero-recording`, `overlay-glitch-idle|recording|transcribing`, `overlay-rosegold-idle|recording`,
+   `orb-transcribing`, `overlay-idle`, `overlay-mascot-idle|recording` **0/6**. Ou seja: a queda **não é só do mascote** (o Aero em repouso, que já está nos goldens do CI, também
+   cai neste emulador), mas o mascote cai mais, e a rota que mais cai é a de "transcrevendo".
+2. **Bisseção** na rota congelada (a abertura classifica a variante: a 1ª queda a marca como "cai"; "limpa" = 6 a 8 aberturas sem queda, com taxa de ~83% no original), desligando
+   partes de `drawMascotOrb` por uma máscara de bits temporária (não commitada):
+   nada desenhado 0/6 · só corpo+barriga+rosto+pontinhos 0/6 · só sombra+filete+orelhas/rabo/topete+pés **cai** (4ª abertura) · só a sombra 0/6 · só o filete 0/6 · só os pés 0/6 ·
+   só orelhas+rabo+topete (preenchimento) **cai** (1ª) · sem o corte da pálpebra ainda cai (6 quedas em 8) · sem os pontinhos ainda cai (4 em 5) · dentro de orelhas/rabo/topete:
+   orelhas 0/6, topete 0/6, contornos 0/6, **rabo cai** (2ª abertura).
+3. **No rabo**: cor lisa 0/6 · o **mesmo degradê num oval**, com o mesmo giro, 0/8 · degradê com os pontos de parada completos ou o eixo invertido, **cai** igual · degradê na folha **sem girar** 0/6,
+   girado 30° cai na 5ª abertura · **dobra da ponta 0 ou -0,04: 0/8; +0,03 (o repouso) ou +0,08: cai na 1ª a 5ª** · orelhas com a mesma dobra +0,06 forçada: 0/8.
+   Causa mínima: **preencher com degradê a folha do rabo, girada, com a ponta dobrada para o lado positivo**. Por que o `qemu` cai ali eu não isolei (o core não tem símbolos:
+   é uma chamada a ponteiro nulo na `RenderThread` do host, típica de um caminho de desenho que o swiftshader do emulador 37.1.11 não implementa); a convexidade da folha não
+   explica (a de +0,03 é convexa). Foi o que sobrou depois de eliminar tudo mais, com repetição.
+4. **Correção** (`e2c1aa2`): o rabo dobra sempre para cima (`tailBendOf`, entre -0,05 e 0, repouso em -0,03: a ponta fica ~3% do lado mais levantada; o visual segue o aprovado) e
+   um teste de unidade impede que volte a ficar positiva. **Prova** com o mesmo roteiro (13 rotas em rodízio, 20 rodadas, **20 aberturas de cada rota**, 260 no total):
+   `overlay-mascot-transcribing` **0/20**, `overlay-mascot-paused` 0/20 (1 espera de mais de 20 s, sem queda), `overlay-mascot-idle|recording` 0/20, `overlay-glitch-*`, `overlay-rosegold-*`,
+   `overlay-aero-recording`, `orb-transcribing`, `overlay-idle` 0/20 e **`overlay-aero-idle` 1/20** (a mesma instabilidade de antes, de outra causa). Mais: a galeria inteira em
+   swiftshader (168 capturas) sem nenhuma queda, e `MascotMotionArtifactTest` + `OverlayPanelTest` 8/8 três vezes seguidas, com 240 poses diferentes por rodada.
+5. **No CI**: não mexi no workflow. O mascote já não derruba o swiftshader. O que sobra é a instabilidade do **Aero em repouso** (1/20 a 3/6 neste emulador 37.1.11; o CI, que usa o
+   emulador que a action baixa na hora, já passou com ele nos goldens): se aparecer no CI, a mitigação mais barata é repetir a captura da rota que não ficou pronta (o
+   `verify-screens.sh` hoje aborta na 1ª rota que não fica pronta), antes de pensar em outro modo de GPU (`swangle_indirect`).
+6. **Suíte `com.keyflow.ui` em swiftshader (2 núcleos)**: 182/182 sem `SetupActivityTest` + 2/2 do `SetupActivityTest` isolado = 184/184. Duas instabilidades **do emulador no início, sem relação
+   com a orbe**: o 1º teste depois de reiniciar o emulador (`SetupActivityTest.overlayModeToggleStartsAndStopsForegroundService`) derrubou o processo duas vezes com
+   `ForegroundServiceDidNotStartInTimeException` e passou isolado; e o `captureToImage` do `MascotMotionArtifactTest` estourou 2 s uma vez (por isso agora repete até 5 vezes).
+
 ### SPEC_DEVIATION / achados do ambiente
 
-1. **Emulador e GPU.** O `qemu-system` do emulador deu SIGSEGV 4 vezes (3 com `swiftshader_indirect`, 1 com `-gpu guest`), sempre na `RenderThread` do renderer
-   gráfico; três delas ao abrir a rota `overlay-mascot-transcribing` (a quarta foi a do emulador do outro agente, de causa que não apurei). Cada queda deixou um **core de ~920 MB**
-   em `/var/lib/systemd/coredump` (root; 4 deles) — convém limpar com `sudo coredumpctl`/`rm`. Subi o `keyflow_api34` com `-gpu host -no-snapshot-save -no-audio` e
-   `ulimit -c 0` (sem mais cores) e ele ficou estável em centenas de aberturas de rota (duas capturas completas, a suíte e as medidas). O emulador em `emulator-5554` agora é esse (deixei ligado). Os goldens novos são desse
-   ambiente: se o CI usar renderização por software, pode haver diferença de alguns pixels de antialiasing nas rotas do mascote.
+1. **Emulador e GPU.** O `qemu-system` deu SIGSEGV 4 vezes (3 com `swiftshader_indirect`, 1 com `-gpu guest`), sempre na `RenderThread` do renderizador gráfico; três delas
+   ao abrir `overlay-mascot-transcribing`. Causa isolada em 2026-10-03 (seção acima): o preenchimento com degradê do rabo do mascote com a ponta dobrada para o lado positivo — corrigido
+   em `e2c1aa2` —, mais uma instabilidade própria do `overlay-aero-idle` neste emulador (37.1.11), que não é do mascote. Cada queda deixou um **core de ~920 MB** em
+   `/var/lib/systemd/coredump` (root, 4 deles; convém limpar com `sudo`). Para a 1ª rodada de verificação usei `-gpu host`; hoje o emulador em `emulator-5554` está **em
+   `swiftshader_indirect`** (o modo do CI), com `ulimit -c 0`, e é nele que estão os goldens do mascote.
 2. **Disco.** No começo `/home` estava a 100% (980 MB livres) e o emulador se recusava a subir; as saídas de build foram redirecionadas para `/var/tmp` com um init script
    fora do repositório (`-I`), sem tocar nos `build.gradle`. (Depois o `/home` voltou a ter 29 GB.)
 3. **GIFs.** O brief pedia quadros "da galeria com o relógio avançando"; a `GalleryActivity` congela o relógio de propósito, então usei o mesmo harness do
@@ -133,14 +171,15 @@ do `flock /tmp/keyflow-emulator.lock`; contagens lidas do logcat (`TestRunner: r
 ## Para abrir (neste diretório)
 
 - `ouvi-repouso.gif`, `ouvi-escutando.gif`, `ouvi-pausado.gif`, `ouvi-transcrevendo.gif` — 2,8 a 3,2 s cada, 156 px, sobre branco e preto, 20 quadros por segundo
-  (175 a 407 KB); `scripts/verify-mascot-gifs.sh` os regenera.
+  (120 a 330 KB, regerados no swiftshader com o rabo corrigido); `scripts/verify-mascot-gifs.sh` os regenera.
 - `ouvi-estados-claro-escuro.png` (cada estado e cada coisa que o app escreve no centro, sobre branco e preto) e `ouvi-tamanhos.png` (110 a 280 px).
 - Tela cheia: `verification/golden/overlay-mascot-*.png` e `config-overlay-skins-mascote*.png`.
 
 ## Commits
 
 `ebc7a26` calendário · `6fcfb4f` skin Mascote (pose, desenho, `OrbStyle.MASCOT`) · `e4014e6` cartão em Sobrepor (+ 2 goldens) · `eb727f8` rotas e goldens da galeria ·
-`efe39ff` GIFs e custo de quadro · `1e52fab` KDoc do pivô · `c06f3d2` custo UI × RenderThread · e o `docs(quick)` deste diretório.
+`efe39ff` GIFs e custo de quadro · `1e52fab` KDoc do pivô · `c06f3d2` custo UI × RenderThread · `c34459d` docs(quick) · e, na investigação do swiftshader: `e2c1aa2` rabo sem dobra positiva ·
+`e2d69b3` captura repetida no artefato de movimento · `b027d29` goldens do mascote e do cartão no swiftshader · `7ea1778` `stress-routes.sh` · e o `docs(quick)` que fecha este registro.
 
 ## Em aberto
 
@@ -150,7 +189,7 @@ do `flock /tmp/keyflow-emulator.lock`; contagens lidas do logcat (`TestRunner: r
 - **Os glifos do app não são do mascote**: a lixeira (âmbar) e o X (terracota) mantêm as cores de sempre (≈ 2,7–3:1 sobre o creme, como no Ateliê); a lixeira cai em parte
   sobre o verde.
 - O topete é discreto (âmbar e creme, meio escondido pelas orelhas); o "z" e os arcos de som são finos a 110 px.
-- Goldens do ambiente do host (GPU do host): o CI por software pode divergir uns pixels nas rotas do mascote. Não medi no A32 nem vi o mascote se mexendo no aparelho.
+- Não medi no A32 nem vi o mascote se mexendo no aparelho. O `overlay-aero-idle` (de outra skin) é instável neste emulador em swiftshader (1/20 a 3/6 aberturas); não investiguei a causa.
 - A frase da aba Docs não cita o Mascote (ver SPEC_DEVIATION 4).
 - Se o Yan não gostar do personagem: (1) trocar a espécie mantendo o motor — calendário, pose e disposições servem a qualquer criatura de corpo redondo e orelhas, só os
   `Path` e as cores mudam; (2) sem o filete creme (mais "limpo", mas perde a leitura no preto); (3) uma versão sem pés nem rabo, mais próxima do globo.
