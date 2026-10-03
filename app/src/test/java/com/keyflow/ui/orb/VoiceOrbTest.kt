@@ -48,6 +48,30 @@ class VoiceOrbTest {
     }
 
     @Test
+    fun `a pack skin id picks the pack style and an unsafe one does not`() {
+        assertThat(orbStyleFor("pack:neon-noturno-3fa91c2b")).isEqualTo(OrbStyle.PACK)
+        // Um `pack:` que não é um id seguro de pasta é lixo: cai no Ateliê, não no estilo PACK.
+        assertThat(orbStyleFor("pack:../../x")).isEqualTo(OrbStyle.ATELIE)
+        assertThat(orbStyleFor("pack:")).isEqualTo(OrbStyle.ATELIE)
+        // O id do próprio estilo ("pack", sem dois-pontos) continua dando a volta completa.
+        assertThat(orbStyleFor(OrbStyle.PACK.id)).isEqualTo(OrbStyle.PACK)
+    }
+
+    @Test
+    fun `the pack orb style is never paid and the built in styles keep their ids and prices`() {
+        // D4: a skin do usuário nunca fica atrás de `skinsUnlocked`. E nenhuma skin de hoje mudou de id nem de preço.
+        assertThat(OrbStyle.PACK.paid).isFalse()
+        assertThat(OrbStyle.entries.filter { it != OrbStyle.PACK }.map { it.id to it.paid }).containsExactly(
+            "atelie" to false, "aero" to true, "glitch" to true, "rosegold" to true,
+        ).inOrder()
+    }
+
+    @Test
+    fun `the app orb states map one to one to the pack states`() {
+        assertThat(OrbState.entries.map { it.toPackState().key }).containsExactly("idle", "listening", "paused", "transcribing").inOrder()
+    }
+
+    @Test
     fun `a new install keeps the Atelie orb even with the Aero keyboard`() {
         // As duas escolhas são independentes: o Aero no teclado não vira orbe de vidro (Yan, 2026-09-29).
         val settings = com.keyflow.data.Settings(keyboardSkin = "aero")

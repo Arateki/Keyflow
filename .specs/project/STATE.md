@@ -2070,3 +2070,271 @@ Testes até aqui: 610 unitários; instrumentados no emulador: `ui.config` 124/12
   segundo plano e o LLM no aparelho (tempo/RAM; `recommendedRamMb` e `IDLE_UNLOAD_MS` são estimativas até lá).
 - **Deferido (menor)**: aviso de "revogação não confirmada" ao Desconectar; `hasOpenAiCredential`/`apiKey()` leem o cofre na
   main thread (medir no A32); com login sem o escopo do plano o Testar segue habilitado (a tela já avisa).
+
+## skin-packs — SKP-T1: AndroidSVG + `SvgRender` (2026-10-02)
+Branch `feature/skins-importaveis` (worktree `keyflow-skins-wt`); spec/design/tasks/formato em `.specs/features/skin-packs/`.
+- **Dependência conferida, não presumida**: `maven-metadata.xml` do Maven Central lista só **1.3 e 1.4** (`release`=`latest`=1.4,
+  2019-05-28). AAR de 202 KB, SHA-1 igual ao `.aar.sha1` do repositório, POM Apache-2.0, minSdk 8, sem dependências. API lida no
+  `classes.jar` com `javap` (nada de memória): `SVG.getFromString`, `renderToCanvas(Canvas, RenderOptions)`,
+  `RenderOptions.viewPort/preserveAspectRatio`, `getDocumentViewBox`, `setDocumentWidth(String)`, `setInternalEntitiesEnabled`.
+  Licença (`LICENSE` do repositório, "Copyright 2013-2018 Cave Rock Software Ltd"; não há `NOTICE`) em `app/licenses/` + aba Docs.
+- **Só `skins/SvgRender.kt` importa `com.caverock`** (regra do design). Teste/produção usam `SvgImage`, `SvgFit`, `SliceInsets`.
+- **Achados do AndroidSVG 1.4 que o FORMAT.md não dizia** (cada um tem teste em `SvgRenderTest`):
+  1. **Entidades internas do XML vêm LIGADAS por padrão** (`enableInternalEntities = true` no `static {}`). `SvgRender.init` as desliga
+     (`SVG.setInternalEntitiesEnabled(false)`), barreira a mais além da recusa textual do `DOCTYPE` no leitor (T2). Medido: um SVG
+     com `<!ENTITY>` + `fill="&color;"` NÃO expande (renderiza preto).
+  2. **O `width`/`height` absolutos do `<svg>` mandam no tamanho do desenho, por cima do `RenderOptions.viewPort`** (um `width="50"`
+     desenhava a 50 px num destino de 100 px). O primeiro teste só passou por acaso (o retângulo cobria tudo) — o teste que fixou o
+     comportamento põe um quadrado no canto. `parse` normaliza o documento para `width/height = 100%`: o destino decide a escala.
+  3. **Sem `viewBox` a biblioteca não escala nada**. `parse` usa o `width`/`height` declarados como viewBox; sem nenhum dos dois,
+     `SvgImage.scalable = false` e o desenho sai 1:1 (o import deve avisar — T3).
+  4. `<filter>`/`filter=` é **ignorado** (o retângulo sai nítido, nada de exceção); imagem externa (`http:`, `file:`) some sem rede e
+     sem erro (nenhum `SVGExternalFileResolver` registrado); `data:image/png;base64` desenha; `<script>`/`<foreignObject>` são
+     ignorados pelo renderizador (o leitor os recusa antes, de qualquer jeito).
+- **Medidas no emulador** (`emulator-5554`, x86_64, API 34, renderização por **software** — o `Canvas` sobre `Bitmap` é CPU também no
+  aparelho, mas o host é bem mais rápido que o Helio G80 do A32: tratar como piso, não como teto). Quadro de orbe sintético de 256×256
+  de viewBox (halo e corpo em degradê radial, brilho em degradê linear, arco de traço): 60 repetições depois de ~190 de aquecimento,
+  mediana / p95 em ms:
+
+  | Quadro | Lado | parse | render (bitmap novo) |
+  | ------ | ---- | ----- | -------------------- |
+  | 24 pontos (2,7 KB) | 156 px | 2,1 / 3,1 | 3,1 / 3,9 |
+  | 160 pontos (12,5 KB) | 156 px | 6,7 / 10,0 | 10,5 / 16,4 |
+  | 24 pontos | 300 px | 1,4 / 2,2 | 3,6 / 6,3 |
+  | 160 pontos | 300 px | 4,4 / 6,4 | 10,8 / 16,8 |
+  | 24 pontos | 480 px | 1,9 / 2,1 | 6,9 / 8,6 |
+  | 160 pontos | 480 px | 5,9 / 10,1 | 17,9 / 30,9 |
+  | face de tecla 9-slice 120×150 px (9 desenhos) | — | — | 4,9 / 16,1 |
+
+  Sem aquecimento a primeira rodada saía 2–4× mais lenta (8,6 ms/32 ms a 156 px): o primeiro frame de uma orbe é pago a frio. Conclusão
+  para T5: um quadro de 10–30 ms não cabe no `onDraw` (16 ms) — o cache em bitmap com pré-aquecimento fora da main é obrigatório, não
+  otimização. Para T4: o sprite 9-slice custa ~5 ms uma vez por (tamanho, estado) e some do caminho de desenho.
+- **Ambiente**: `/home` está a 100% (983 MB livres) e o emulador se recusa a subir ("not enough disk space", `keyflow_api34`). A raiz `/`
+  tem ~10 GB livres e `/var/tmp` é gravável: criei um AVD **idêntico em configuração** (cópia do `config.ini`, `hw.device.name = pixel_6`,
+  1080×2400/420 dpi, API 34 google_apis x86_64, `disk.dataPartition.size` 4 GB) em `/var/tmp/keyflow-avd/skins_api34.avd`. Sobe com
+  `ANDROID_AVD_HOME=/var/tmp/keyflow-avd emulator -avd skins_api34 -no-window -gpu swiftshader_indirect -no-snapshot-save -no-audio` (arranque
+  a frio ~90 s, sem snapshot). Nada do AVD original (`~/.android/avd`) foi tocado. **[YAN]**: liberar espaço em `/home` (ou mover o AVD
+  `keyflow_api34`, 5,8 GB, para a raiz) — vale para todas as frentes.
+
+## skin-packs — SKP-T2: núcleo puro do pacote (2026-10-02)
+`skins/SkinPackNames`, `SkinPackManifest`, `SkinPackReader`, `SvgTextCheck`, `ImportReport` — Kotlin/JVM puro (`java.util.zip`, `org.json`,
+`tr`), testado na JVM: **102 testes novos, 929 unitários, 0 falhas**.
+- **Segurança (SKP-IMP-04), provada por teste e por mutação**: os limites contam os bytes **lidos** na descompressão (total 60 MB,
+  512 KB por SVG, 64 KB no manifest), nunca `entry.size`; um teste adultera o cabeçalho local para "1 byte" e a bomba de 80 MB cai do
+  mesmo jeito; a bomba de 100 MB de zeros (<1 MB comprimida) aborta puxando só uma parte do `.zip`. Zip-slip (`..`, `/x`, `C:\x`,
+  `\`, controle) recusa o pacote inteiro e a mensagem nunca ecoa caractere de controle. O JSON aninhado é medido antes do `org.json`
+  (recursivo). Mutação: removi a recusa de `..`, os dois contadores de bytes, a de `DOCTYPE` e a de `href` externo — **13 testes
+  caíram**, em todos os grupos.
+- **Achado — `ZipInputStream` não distingue "fim do diretório central" de "arquivo cortado"**: um download cortado numa fronteira de
+  entrada saía como pacote válido com menos arquivos (o teste `a truncated zip…` pegou). O leitor agora lê o resto do arquivo (ainda
+  sob 25 MB) e exige o registro de fim do diretório central (`PK 05 06`) nos últimos 64 KB; todo corte de 7 em 7 bytes é recusado.
+- **Decisões onde o spec/FORMAT.md era omisso (o FORMAT.md é corrigido num commit `docs(skins)` próprio, no fim da fase 1):**
+  1. Campo inválido no manifest (cor mal escrita, fps fora de 1–60, `popup`/`navigationBarColor` translúcidas, `slice` incompleto) é
+     **erro com o caminho do campo**, nunca um padrão silencioso; campo desconhecido é aviso. Profundidade de JSON ≤ 16.
+  2. Nome de arquivo em maiúsculas (`Orb_Idle_01.svg`) é ignorado com aviso próprio ("precisam ser minúsculas"), não erro: se por
+     isso faltar `idle`/`key_normal`, o erro de obrigatório aparece de qualquer forma.
+  3. Lixo do macOS/Windows (`__MACOSX/`, `.DS_Store`, `Thumbs.db`, `desktop.ini`, `._*`) é ignorado **sem** aviso; `\` vale como `/`; a
+     pasta que envolve tudo só sai se TODOS os arquivos estão nela (senão o que está em pasta é "subpasta ignorada").
+  4. Estado sem frames usa os frames **e o ritmo** de `idle`; `orb.states.<estado>.fps` sem frames daquele estado é ignorado com aviso.
+  5. Frame `00`/zero é erro; frames duplicados (`_01` e `_1`) é erro citando os dois; buraco é aviso (lista até 5 faltantes); frame `05`
+     sozinho também é buraco (1–4 faltam). Instalado com nome canônico `orb_<estado>_<4 dígitos>.svg`.
+  6. Avisos de SVG (`<filter>`/`filter=`, `mix-blend-mode`, SMIL, animação CSS, fontes SVG) saem **agregados por tipo** ("a.svg, b.svg,
+     c.svg e mais 97: usa <filter>…"), não um por arquivo. Peças opcionais do teclado ausentes NÃO avisam (têm padrão documentado);
+     tray em SVG sem `trayColor`/`navigationBarColor` avisa que a faixa do sistema ficará preta.
+  7. Reforço além da lista do spec (ainda "referência externa"): `url(...)` em atributo/CSS que não seja `#id` ou `data:` PNG/JPEG,
+     `@import`, `<?xml-stylesheet?>` e qualquer valor de `href` com `&` (não dá para conferir o destino). `data:image/svg+xml` é recusado
+     (SVG aninhado). A checagem é textual e conservadora: `<script` dentro de um comentário também é recusado.
+  8. Tudo em UTF-8 estrito (BOM tolerado); outra codificação é erro com o nome do arquivo.
+
+## skin-packs — SKP-T3: store e ids `pack:<id>` (2026-10-02)
+`skins/SkinIds` (JVM), `SkinPack`, `SkinPackStore`, `ReportText`. **41/41 instrumentados** em `com.keyflow.skins` (20 `SvgRenderTest` + 21
+`SkinPackStoreTest`) no emulador; **938 unitários** (`SkinIdsTest` +9).
+- **O id vira nome de pasta e o valor vem dos ajustes**: `SkinIds.packId` só aceita `pack:` + `[a-z0-9][a-z0-9-]{0,62}`; `pack:../x`,
+  maiúscula, ponto, barra e acento são "não é pacote". `SkinPackStore.load/remove` revalidam o id (teste com um arquivo-canário fora da
+  pasta que `remove("..")` não pode tocar). O id gerado é `slug(≤24)-hash(8 hex)` do nome em NFC/minúsculas/trim.
+- **Troca atômica**: o desenho de teste roda ANTES de gravar; depois `<id>.tmp-<nanos>/` → `renameTo` (a antiga vai a `<id>.old` e só
+  é apagada depois da nova no lugar; se a troca falha, a antiga volta). `sweepLeftovers` varre `*.tmp-*`/`*.old` de um processo morto.
+  Um `LOCK` estático (o IME, o overlay e a UI abrem instâncias diferentes sobre a mesma pasta, no mesmo processo).
+- **Render de teste do import**: 64 px por frame (MEET), 96 px por face (com a fatia, se houver) e 128×64 na bandeja. Erros: SVG que não lê
+  (nome do autor, `orb_idle_1.svg`, não o canônico), fatia que ocupa o viewBox inteiro (soma ≥ viewBox) e **tempo** > 1000 ms. Avisos:
+  sem viewBox nem width/height, viewBox não quadrado na orbe, quadro todo transparente (típico de recurso que o AndroidSVG não desenha),
+  > 150 ms ("pesado"). Orçamento de tempo injetável no construtor (os testes usam 0 ms para provar os dois caminhos).
+- **`PackSvg.sourceName` / `SkinPackContent.manifestBytes`** (T2 ajustada): as mensagens citam o nome do arquivo que o autor escreveu,
+  e o store grava o manifest original (reabre com o mesmo parser). `ReportText.names` agora é compartilhado entre o leitor e o store.
+
+## skin-packs — SKP-T4: teclado de pacote no IME (2026-10-02)
+`skins/PackKeyboard` (abre o pacote: SVGs de teclado + cores), `PackKeySurface` (sprites), `PackBackdrop` (bandeja); `KeySurface.draw(…, role: KeyRole)` com **implementação
+padrão** (os 3 pintores de hoje não mudaram), `SpriteCache.Key.variant` (default 0), `KeyboardColors.pack`/`forPack`/`of(skin, dark, pack)`/`backgroundDrawable`/`navigationBarColor`;
+as 6 views ganharam `pack: PackKeyboard? = null`; o serviço abre o pacote em `onCreateInputView` (`openPackKeyboard`) e cai no Sistema se `null`.
+- **Verificação**: `PackKeySurfaceTest` 19/19; **`KeyFlowKeyboardPackSkinTest` 5/5 no IME real do emulador** (pixel da face da letra e das funções, bandeja, tinta branca, botão de barra; troca
+  Sistema↔pacote ao vivo; remover o pacote selecionado, pacote inexistente, tecla normal corrompida e id `pack:../../x` → Sistema; reimportar o selecionado mostra a versão nova sem
+  tocar nos ajustes); pacote `skins` inteiro 73/73. Pacote `com.keyflow.ime` (as 44 existentes + `KeyboardColors`): **44/45** — falhou
+  `KeyFlowKeyboardSpellCheckerTest.spaceFinishesComposing…` ("campo não chegou a 'o'") dentro da rodada de 394 s; repetida **6× isolada + 1× a classe (7 testes) = 13/13**: instabilidade de
+  toque sintético sob carga do host (o emulador é software e o host dividia CPU com outra frente), não regressão — o teste não toca em skin.
+- **Goldens**: capturei as 154 rotas da galeria com o APK **do baseline** (commit do spec, antes da feature) e com o do T4 e comparei **sem fuzz**: **152/154 idênticas pixel a pixel**; as 2
+  diferentes são `config-docs[-dark]` (7×5 px no indicador de rolagem: a aba Docs ganhou a linha de licença do AndroidSVG na T1). `diff-screens.sh` contra o golden versionado: 150/150 dentro do
+  limiar — mas **não** é bit-idêntico (~100–250 px de ruído de antialiasing por rota, em TODAS, também no baseline: o golden foi gerado em outro emulador/GPU); por isso a prova
+  de "zero regressão" é baseline × T4, não golden × T4. Nenhum golden foi aprovado.
+- **Achado — o 9-slice por re-render era 10–20× mais caro que as skins nativas** (medido, `SkinSurfaceCostTest`, 8 sprites de um teclado real, cache vazio, JIT quente): pacote **115 ms**
+  (p95 168) × Aero 17,8 × Rose Gold 13,1. Causa: o AndroidSVG percorre a árvore e monta os shaders a cada `renderToCanvas`, e o 9-slice fazia nove. **Mitigação feita**: o documento é gravado
+  **uma vez num `Picture`** e as nove células o reproduzem (recorte + matriz). Resultado idêntico — comparado com o re-render célula a célula em 6 tamanhos: **diferença máxima 0 por canal**
+  — e o custo caiu para **4,7 ms** (p95 6,5): face de tecla 9-slice 120×150 de 4,9 → 0,28 ms.
+- **Custo do teclado de pacote × nativas** (emulador API 34, renderização por software — o A32 é mais lento, valem como relação, não como promessa):
+
+  | | pacote | Aero (vidro) | Rose Gold |
+  | - | - | - | - |
+  | 8 sprites, cache vazio, JIT quente — mediana / p95 | **4,7 / 6,5 ms** | 10,4 / 15,4 ms | 12,9 / 22,1 ms |
+  | 8 sprites, FRIO (processo novo) | **19,5 ms** (+ abrir 24–27 ms) | 14,8 / 17,2 ms | 8,5 / 34,1 ms |
+  | `onDraw` em regime (sprite em cache) | 21,8 µs | 18,9 µs | 30,7 µs |
+
+  O que o pacote paga a mais: **abrir** o pacote no `onCreateInputView` (manifest + listagem + parse de 4–5 SVGs): **24–27 ms** com as classes do AndroidSVG já carregadas por um import no mesmo
+  processo (o pior caso real, a frio, é medido abaixo); as nativas não têm essa etapa. Em regime, o `onDraw` é **só `drawBitmap`**: `inSteadyStateDrawIsOneBitmapCopyAndNothingElse` registra um canvas
+  espião (50 teclas → 50 `drawBitmap`, 0 `drawPath`/`save`/`clipRect`/`scale`/`translate`/`drawColor`, 0 rasterizações novas).
+- **Decisões onde o spec/FORMAT.md era omisso** (o FORMAT.md é corrigido no fim da fase 1):
+  1. **Espaço é tecla de função** (`keyboard_modifier_*`): o §2 da tabela do FORMAT.md manda, mesmo que a grade de hoje pinte o espaço com a cor de letra.
+  2. **Acento**: a face de pacote não é tingida, EXCETO quando a view passa uma tinta que não é a comum (shift ativo, mic gravando/pronto/erro): a face leva 80% dessa cor por cima, em
+     `SRC_ATOP` (mantém a silhueta). Sem isto o shift ativo e o mic gravando ficariam invisíveis. A "tinta comum" é `keyboard.popup` (é o que `KeyboardColors.forPack` põe em `key`/`modifier`).
+  3. **Pressionada**: `*_pressed.svg`, ou a normal escurecida em 20% (o mesmo `pressedOverlay` das teclas lisas); a função sem `*_pressed` usa a `modifier_normal` escurecida, e sem nenhuma arte de função usa
+     a `key_pressed`/`key_normal` escurecida.
+  4. **Bandeja**: com `keyboard_tray.svg` a cor lisa fica transparente (senão cobriria o SVG) e o fundo é um `PackBackdrop` (bitmap refeito só quando o tamanho muda); sem ele, `keyboard.trayColor`.
+     A bandeja que não desenha some e cai na cor lisa; só a `keyboard_key_normal.svg` que não carrega derruba o teclado do pacote inteiro (→ Sistema).
+  5. **`SkinPackStore.changes`** (`StateFlow<Int>` estático, sobe em instalar/remover): o IME (e, na T5, a orbe) reabre ao mudar — é o que faz reimportar o pacote selecionado aparecer ao vivo
+     (SKP-IMP-05) e removê-lo devolver o padrão (SKP-STO-04) **sem campo novo em `Settings`** e sem polling. Vale porque app, IME e overlay dividem o processo.
+  6. O serviço registra `onCreateInputView: N ms (skin=…)` (nível debug) — leitura barata do custo de abertura de qualquer skin.
+
+## skin-packs — SKP-T5: orbe de pacote + desempenho nativo × pacote (2026-10-03)
+`skins/PackOrb` (frames por estado, cache em bitmaps, fila de fundo), `OrbTiming` (`frameIndex` puro), `ByteBudgetLru`; `OrbStyle.PACK` (gratuito, D4) + `LocalOrbPack` + `drawPackOrb` no `VoiceOrb` (o ramo vem
+ANTES dos outros: nenhum desenho existente mudou); `rememberOrbPack` (prévias da config), `OrbButtonView.setOrbPack`, `OverlayService.openOrbPack`/observação de `SkinPackStore.changes`; edição de
+`ConfigScreen.kt` = **uma linha** (o `LocalOrbPack`). Sem pacote (sumiu, quebrou, sem orbe, id inseguro) o estilo PACK desenha o Ateliê.
+- **Verificação**: unit **956** (`OrbTimingTest` 6, `ByteBudgetLruTest` 9, `VoiceOrbTest` +3); instrumentados em `com.keyflow.skins` **110/110** (inclui 16 métodos de medição que só rodam com `-e skpOrbCost`/`-e skpCold` e
+  passam como "assumption" nas rodadas normais), `com.keyflow.overlay` **30/30**, `com.keyflow.ui.tour` **20/20**, `com.keyflow.ui.config` **146/146** (a `ConfigScreen` mudou uma linha); o pacote de teclado no IME real continua 5/5; `OverlayPackOrbTest` roda **na janela flutuante de verdade** (screenshot do emulador: o frame do
+  pacote é um quadrado magenta inconfundível; reimportar com outra cor aparece ao vivo; voltar ao Ateliê; remover o pacote selecionado e `pack:../../x` caem no Ateliê sem derrubar o serviço).
+- **Goldens**: 154 rotas capturadas com o APK da T5 e comparadas **sem fuzz** com as do baseline (commit do spec): **152/154 idênticas pixel a pixel**; as 2 diferentes são as mesmas `config-docs[-dark]` da T1 (a licença nova na aba
+  Docs, 20–21 px do indicador de rolagem). `diff-screens.sh` 150/150. Nenhum golden aprovado. (O golden versionado NÃO é bit-idêntico às capturas deste emulador — ~100–250 px de ruído em todas as rotas, também no baseline —,
+  então a prova é baseline × T5.)
+- **Bugs reais da fila de fundo, achados MEDINDO** (`sustainedPlaybackBeyondTheCacheBudget`, 64 frames a 24 fps a 280 px = 19,6 MB, não cabem nos 16 MB): primeira versão errava o frame em **19%** dos desenhos. Causas: (1) o pedido do
+  frame de agora, já enfileirado como "à frente", **não era promovido** e esperava a fila; (2) um frame sendo renderizado podia ser pedido **de novo** (a fila só deduplicava o que ainda não tinha sido tomado) — renderizado em dobro;
+  (3) pedidos de frames que a animação já tinha passado continuavam na fila; (4) a thread em `THREAD_PRIORITY_BACKGROUND` (grupo de segundo plano) perde a CPU para qualquer coisa. Agora: fila por prioridade (agora > próximos >
+  aquecimento) com promoção, deduplicação inclusive do que está em andamento (`repeatedLiveRequests…` prova: 300 pedidos → 4 renders), descarte do que ficou para trás, lookahead de 1/4 s (3–12 frames) e prioridade
+  `LESS_FAVORABLE`. Isso levou o pior caso de 19% para ~12–14%.
+- **Achado — o LRU é o pior cache para um loop**: com mais frames do que cabem, o menos usado é exatamente o próximo a aparecer (o teste unitário simula 10 frames em 7 lugares: LRU erra 60/60). `ByteBudgetLru.chooseVictim` deixa o
+  dono escolher: sai primeiro o que não está tocando (outro estado/tamanho/orbe) e, entre os que estão, o **mais longe à frente do cursor** (o que acabou de passar). Cada volta passa a renderizar só N−C+1 frames (3 de 10 no
+  teste). No pior caso real caiu de ~13% para **5,5–12,8%** (varia com a carga do host: 7–8 de load médio durante a medição; uma rodada anterior sob load 7 chegou a 42%, antes disto).
+- **Sustentado (relógio real, 8 s, 24 fps, 1 desenho a cada 16 ms; "errado" = o desenho devolveu o frame anterior em vez do certo):**
+
+  | Pacote (frames × lado) | Cache | Errados |
+  | - | - | - |
+  | 24 × 156 px / 195 px / 280 px | 2,3 / 3,6 / 7,4 MB (cabe) | **0%** nas três |
+  | 45 × 280 px (o pacote realista inteiro) | 13,8 MB (cabe) | 1,4–2,2% (só a 1ª volta: o aquecimento cobre metade) |
+  | 64 × 195 px | 9,5 MB (cabe) | 1,0–1,2% |
+  | **64 × 280 px** (limite do FORMAT.md no máximo do slider) | 53 de 64 frames, 15,8 MB | **5,5–12,8%** (3 rodadas) |
+
+  O pior caso degrada a **fluidez** (a orbe repete o frame anterior por ~1 quadro), nunca a thread de UI: o `onDraw` continua sendo um `drawBitmap`. Mitigações propostas se o A32 mostrar isso (não feitas, para não otimizar às cegas):
+  renderizar os frames num lado menor que o da janela (≤ 224 px) e esticar o bitmap; ou subir o teto de 16 → 24 MB só quando o estado não cabe; ou o validador do import avisar "estado de 64 frames: pode ficar menos fluido em tamanhos grandes".
+- **Tempo de quadro da orbe, nativa × pacote** (emulador API 34 x86_64, **renderização por software (swiftshader)**: vale como relação, não como promessa para o A32; método: `FrameMetrics` da janela de uma Activity só com a orbe
+  em `Listening` com o tempo `0:12` no centro, relógio REAL, 3 s de aquecimento + 8 s medidos, um processo novo por célula; "UI" = input+animação+layout+desenho na thread principal; mediana [p95] em ms; rodada 2, a de host mais
+  quieto — a rodada 1 deu a mesma ordem, com picos de até 90 ms de p95 nas nativas por carga do host):
+
+  | | UI (mediana [p95]) | só desenho (mediana [p95]) |
+  | - | - | - |
+  | Aero 156 / 195 / 280 px | 5,4 [7,1] / 5,8 [8,2] / 6,3 [23,1] | 2,1 [2,8] / 2,2 [3,3] / 2,6 [8,4] |
+  | Rose Gold 156 / 195 / 280 px | 4,7 [7,4] / 5,0 [7,2] / 4,7 [6,2] | 1,6 [2,6] / 1,6 [2,4] / 1,5 [2,2] |
+  | **Pacote** 156 / 195 / 280 px | **3,9 [18,2] / 4,2 [7,2] / 3,8 [5,7]** | **0,6 [2,4] / 0,6 [1,0] / 0,5 [0,8]** |
+
+  O pacote é **mais barato** que as nativas na thread de UI (um `drawBitmap` contra caminhos e degradês do Compose) e o custo **não cresce com o tamanho**. O tempo TOTAL do quadro (vsync→apresentado) fica em 22–40 ms para as três e
+  acima de 16,7 ms em 100% dos quadros: é a composição por GPU do swiftshader, não a skin — por isso a comparação vale nas colunas de cima.
+- **Render por frame (o custo que sai do `onDraw`)**: `renderToCanvas` num bitmap novo, quadro sintético de 256² de viewBox (degradês radiais e lineares, arco, 24 ou 160 círculos): **24 pontos (2,7 KB)**: 4,3–5,5 ms (p95 8,5–15) nos 3 lados;
+  **160 pontos (12,5 KB)**: 8,9–10,7 ms (p95 16–17); mais o *parse*: 4–8 ms. Com o host quieto (T1): 3,1 + 2,1 ms (156 px, 24 pontos) e 10,5 + 6,7 ms (160 pontos). Ou seja, 9–18 ms por frame em segundo plano, num orçamento de 41 ms a 24 fps.
+- **Memória do cache de bitmaps** (pacote realista, 45 frames = 12 + 24 + 1 + 8 de `idle`/`listening`/`paused`/`transcribing`): **4,3 MB a 156 px** (95 KB/frame), **6,7 MB a 195 px** (149 KB), **13,8 MB a 280 px** (306 KB), teto 16 MB — cabe nos três
+  tamanhos; o pré-aquecimento dos 45 frames leva 0,4–2,1 s em segundo plano. Fora dos 16 MB só há o bitmap do frame na tela.
+- **Teclado, nativas × pacote** (mesmo emulador; os números do T4 acima, depois do 9-slice por `Picture`): 8 sprites de um teclado real, cache vazio, JIT quente — **pacote 4,7 ms** (p95 6,5) × Aero 10,4 (15,4) × Rose Gold 12,9 (22,1);
+  FRIO, num processo novo — pacote 19,2–19,5 ms (+ abrir o pacote 24–27 ms) × Aero 14,8–17,2 × Rose Gold 8,5–34,1; `onDraw` em regime: 21,8 µs × 18,9 × 30,7 (todos só `drawBitmap`).
+  **O teclado inteiro, a frio, num processo novo** (`SkinColdMeasureTest#coldView`: abrir o pacote + construir `KeyFlowKeyboardView` + medir + 1º quadro com todos os sprites, canvas de software, 3 rodadas, ms):
+  Sistema 46,6–61,5 · **pacote 69,2–77,4** (abrir o pacote 14,9–19,8 + construir 25,7–27,1 + 1º quadro 25,2–31,8) · Aero 65,3–77,0 · Rose Gold 53,8–69,1. Ou seja, o pacote custa **o mesmo que o Aero** a frio — e os ~15–20 ms de
+  abrir o pacote (manifest + listagem + *parse* de 3–5 SVGs, com as classes do AndroidSVG ainda frias) são o único custo que as nativas não têm. O `onCreateInputView` real do serviço, a frio, com a skin Sistema: 53–110 ms, típico ~80 (log `onCreateInputView: N ms`; dois picos de 308 e 531 ms sob carga do host).
+  **Não consegui medir o `onCreateInputView` do serviço com `pack:<id>` a frio por `am instrument` + `force-stop`**: a escrita do `keyboardSkin` pela instrumentação não chegou ao arquivo do DataStore (lido de volta na memória do mesmo
+  processo, mas o arquivo continuava `system`) — não investiguei se é do harness ou do app; o caminho vivo (`KeyFlowKeyboardPackSkinTest`, mesmo processo) funciona e é o que prova a ligação.
+- **Decisões onde o spec/FORMAT.md era omisso**: (1) a orbe fecha a anterior ao trocar o pacote (`openOrbPack`) e o cache é **de processo** (16 MB divididos entre todas as orbes: a da overlay e as prévias da config); (2) o frame que falta ao vivo
+  NUNCA é renderizado no `onDraw`: mostra o último do estado (ou qualquer um já pronto do mesmo tamanho) e a fila de fundo o entrega (`version` sobe e o Compose redesenha) — só com relógio injetado (prévia, galeria, teste) o frame é renderizado na
+  hora, porque ali o pixel precisa ser sempre o mesmo; (3) o relógio da orbe não reinicia ao trocar de estado (o `t` é o da composição), então o ciclo de `listening` começa onde o relógio estiver; (4) `rememberOrbPack` abre o pacote dentro da
+  composição (lê o manifest e lista a pasta: sub-ms) — se a UI da T6 listar muitos pacotes, mover isso para fora da composição.
+
+## skin-packs — SKP-T6: UI de importação, R1/R2/R3 e o desenho de teste a frio (2026-10-03)
+Fase 2 (produto) na branch `feature/skins-importaveis`, sobre `0f0edab`. UI nova em arquivos novos: `ui/config/SkinPacksSection.kt` (seção "Suas skins", diálogo do relatório, importação, ajustes pós-import/remoção),
+`ui/config/RememberPackKeyboard.kt` (prévia de tamanho com o pacote), `skins/PackPreview.kt` (miniaturas renderizadas do SVG); debug: `ui/gallery/GallerySkinPacks.kt`.
+- **Como é a tela**: logo abaixo do cartão "Skins" das abas Teclado e Sobrepor (mesmo `SettingsGroup`), uma subseção "Suas skins": texto de apoio, botão **Importar skin**, um cartão por pacote que tem a peça da aba
+  (Teclado: tem `keyboard_*`; Sobrepor: tem `orb_*`) com miniatura REAL (frame 1 de `idle` sobre o fundo da tela; bandeja com a face da tecla, com o `keyboard.slice`), nome, autor e "orbe e teclado/só orbe/só teclado",
+  anel quando selecionado e lixeira com pergunta inline ("Remover X? Se ela estiver em uso, volta para a skin padrão."). O relatório do import é um `ConfigModal` (Instalado / Avisos / Erros, com o nome do pacote e do `.zip`;
+  com erro, "Nada foi instalado."). Importar **não** seleciona (escolher é um toque no cartão); reimportar um pacote já selecionado aparece ao vivo (o `SkinPackStore.changes` da fase 1).
+- **Seletor**: `ActivityResultContracts.OpenDocument` (API conferida com `javap` no `activity-1.9.3.aar`: `ActivityResultContract<Array<String>, Uri?>`), tipos `application/zip`, `application/x-zip-compressed`, `application/octet-stream`.
+  Leitura e instalação em `Dispatchers.IO` (`importSkinPack`, com a costura `open` para o teste provar a thread: `theImportRunsOffTheMainThread`). Arquivo que não abre/permissão perdida/defeito inesperado = relatório com 1 erro, nunca crash.
+- **R1 (resolvido)**: `settingsAfterRemoval` devolve `keyboardSkin` ao `system` e/ou `orbSkin` ao `atelie` (os dois campos, qualquer que seja a aba que removeu), gravando o ajuste ANTES de apagar o pacote.
+  Extra coerente: `settingsAfterInstall` — reimportar um pacote selecionado cuja versão nova perdeu a peça da superfície também devolve ao padrão (senão o cartão sumiria e nada ficaria marcado). Prova na UI real (emulador,
+  DocumentsUI de verdade): arquivo do DataStore `pack:neon-noturno-0a1186d8 pack:neon-noturno-0a1186d8` antes de remover → `system atelie` depois, `files/skins/` vazio, cartão "System" com anel e IME real de volta ao Sistema.
+- **R2 (causa achada, não é do app)**: `pack:<id>` chega ao ARQUIVO do DataStore (`filesDir/datastore/keyflow_settings.preferences_pb`) assim que `saveSettings` retorna — `SkinSettingsPersistenceTest` lê os bytes do arquivo. O que
+  desfazia a escolha era o **`FactorySettingsListener`** (`com.keyflow.testing`, registrado no `<instrumentation>`): `testRunStarted` guarda a config do dono do aparelho e põe o estado de fábrica; `testRunFinished` DEVOLVE a do dono.
+  Tudo que uma instrumentação grava nos ajustes some quando ela termina; quem olhava o arquivo depois da rodada via `system`/`atelie`. (O contexto não era o problema: `targetContext` é o do `com.keyflow`, mesmo `filesDir`.)
+  Medido com `-e skpHold 40` (grava `pack:…` e dorme; lido por fora com `run-as com.keyflow cat …` e `strings`): ANTES `system atelie`; DURANTE (25 s) `pack:persistencia-fora-0000dddd atelie`; DEPOIS `system atelie`, com
+  `FactorySettings: config do dono devolvida` no logcat no mesmo instante. **Prova do force-stop, sem instrumentação** (ver a T8): selecionar o cartão na UI real grava o arquivo; `am force-stop com.keyflow` + `ime enable/set` +
+  abrir o campo de teste → o IME real abre `skin=pack:neon-noturno-0a1186d8` (log `onCreateInputView: 113 ms`) e desenha o teclado Neon; a orbe flutuante, religada pelo toggle, também sai com o pacote.
+  Consequência para quem mede: **não dá para provar persistência de ajuste com `am instrument`** — usar o app real por `adb`.
+- **R3 (feito)**: `SkinPackReader.SMOOTH_FRAMES_PER_STATE = 48`: estado com mais de 48 frames instala com aviso ("pode ficar menos fluido nos tamanhos grandes da orbe; considere menos frames ou um ritmo (fps) menor"), listando
+  os estados e as contagens; testes no leitor, linha no FORMAT.md §2 e `SkinPackFormatDocTest` amarrando a constante.
+- **Achado da T8 corrigido aqui — o aviso "pesado" dependia do processo estar frio**: importando o exemplo pelo seletor logo depois de abrir o app, dois frames de `listening` saíram com "é pesado para desenhar" (>150 ms para um
+  quadro de 64 px); o segundo import, com o processo quente, não tinha aviso. Os primeiros desenhos pagam classes e JIT. O `RenderCheck` agora mede de novo o que passa do limiar e vale o MELHOR dos dois (`nanoClock` injetável;
+  3 testes novos no `SkinPackStoreTest`: frio sem aviso, pesado de verdade com aviso, travado com erro). Depois: 3 imports a frio seguidos pela UI real, todos sem aviso.
+- **Desvios do design/spec (SPEC_DEVIATION)**: (1) o design previa "plugar em UMA linha em `ConfigFields`": o cartão "Skins" não conhece pacotes, então a seção entra com uma linha em `TecladoPanel` e uma em `OverlayPanel`, e em `ConfigFields`
+  só os 5 `selected = KeyboardSkin.of(selectedSkin) == …` do teclado passam por `nativeKeyboardSkin` (um pacote selecionado caía no "Sistema" e o deixava com anel junto com o do pacote); (2) os pacotes são uma LISTA vertical de
+  cartões (nome de até 40 caracteres não cabe nas 5 células de 40 dp), não mais uma célula na fileira de swatches; (3) não previsto: a prévia de tamanho do teclado (aba Teclado) agora abre o pacote escolhido (3 linhas em
+  `TecladoPanel`; sem isso ela mostrava o Sistema com um pacote selecionado); (4) `app/build.gradle.kts` ganhou uma entrada de `sourceSets` (`skin-packs/` nos assets do APK de teste) para o instrumentado importar o pacote real;
+  (5) `SkinPackStore` ganhou o parâmetro `nanoClock` (padrão `System::nanoTime`).
+- **Edições em arquivos compartilhados (para prever o merge)**: `ConfigFields.kt` 5 linhas (linhas 932, 943, 952, 969 e 988 do arquivo na fase 2: os `selected =` do bloco do teclado); `TecladoPanel.kt` +1 linha (a chamada da seção) e 3 linhas na
+  `KeyboardSizePreview` (`val pack = rememberPackKeyboard(skin)`, `pack` no `key(...)` e `pack = pack`); `OverlayPanel.kt` +1 linha; `TranslationsEn/Es.kt` +22 linhas cada, em bloco, logo depois das strings do leitor (T2/T3) e antes de
+  "O login voltou…"; `app/build.gradle.kts` +7 linhas no fim do bloco `android {}`; debug: `RouteCatalog.kt` (rotas novas e `SkinsRoute`).
+- **Testes**: unit completa **972** (956 da fase 1 + 2 do leitor + 9 `SkinPackSelectionTest` + 5 `ExampleSkinPackTest`), 0 falhas. Instrumentados novos: `SkinPacksSectionTest` 16 (picker trocado por um `ActivityResultRegistry` que entrega o
+  `Uri` — **o seletor do sistema não é exercitado nesses testes**; a DocumentsUI de verdade foi exercitada na T8), `PackPreviewTest` 6, `KeyboardSizePreviewPackTest` 2, `SkinSettingsPersistenceTest` 2 (+1 de medição), mais os 3 do relógio no
+  `SkinPackStoreTest` (24 no total).
+- **Goldens**: ver a T8 (prova contra o APK de `0f0edab`). Os 4 PNGs de `config-{teclado,overlay}-skins[-dark]` mudam de propósito (mostram "Suas skins" e o botão) e os 10 das 5 rotas novas entram; aprovados à mão. ERRATA do corpo do commit
+  `b794ba4`: ele diz "4 rotas (8 PNGs)" + "(8 PNGs)"; o certo é **2 rotas = 4 PNGs** de skins + **6 rotas = 12 PNGs** só com o indicador de rolagem diferente (mesma soma, 16).
+
+## skin-packs — SKP-T7: pacote de exemplo "Neon Noturno" + script (2026-10-03)
+- `skin-packs/exemplo-neon/` (50 SVGs + `manifest.json`, 47,9 KB zipado): orbe com `idle` 12 frames (12 fps), `listening` 24 (24 fps), `paused` 1, `transcribing` 8 (12 fps) = **45 frames**; teclado com `keyboard_tray`, `key`/`modifier` ×
+  `normal`/`pressed` e `keyboard.slice` 24. Gerado por `skin-packs/gerar-exemplo-neon.py` (commitado junto, saída também commitada). Só caminhos, degradês, opacidade e `stroke-dasharray`; brilho neon = anéis concêntricos de opacidade
+  decrescente; laços sem emenda (pontos da `idle` repetem a cada 120°, equalizador com ondas de ciclo inteiro, cometa da `transcribing` com 45° por frame).
+- `scripts/build-skin-pack.sh <pasta> <saida.zip>`: `manifest.json` + `*.svg` da RAIZ na raiz do zip (o resto fica de fora e é listado), `zip` ou `python3 -m zipfile`, só bash 3, sobrescreve a saída. `skin-packs/README.md` = passo a passo
+  para quem não programa; o FORMAT.md §1 aponta para ele. `ExampleSkinPackTest` (JVM) importa a pasta zipada em memória E o `.zip` que o script gera: **sem erro e sem aviso**; `ExampleSkinPackImportTest` (aparelho) idem, com o desenho de teste real.
+- **Aparência conferida em três lugares**: no host (`rsvg-convert`, folhas de contato e um teclado 9-slice simulado) e, a prova final, no AndroidSVG do emulador: o IME real, a orbe flutuante real e as miniaturas. **Não achei divergência
+  visível entre o rsvg e o AndroidSVG** com o que o exemplo usa (degradês radiais e lineares em `userSpaceOnUse`, `stroke` com degradê, `stroke-dasharray` num círculo, `<line>` com `stroke-linecap`, `fill-opacity`/`stroke-opacity`).
+  Nenhuma limitação nova do AndroidSVG apareceu além das já documentadas (§4: `filter`, blend, SMIL).
+- **Custo medido** (`SKP-EXEMPLO` no logcat, emulador software, 45 frames, processo aquecido): com o host quieto, `renderToCanvas` mediana **4,2 ms** (p95 4,7) a 156 px e **4,7 ms** (p95 5,5) a 280 px; com o host sob carga (gradle em paralelo)
+  14,6–18,8 ms de mediana e p95 25–30 ms. Cache de bitmaps do exemplo a 280 px: 45 × 280² × 4 B = **14,1 MB** (conta, não medida) — cabe nos 16 MB. Troquei o degradê por barra do equalizador por cor lisa por barra (dd761ab) só
+  para baratear o desenho; o resultado visual é o mesmo.
+
+## skin-packs — SKP-T8: validação ponta a ponta e fechamento (2026-10-03)
+Emulador API 34 (`keyflow_api34`, `-gpu swiftshader_indirect`), nunca o A32.
+- **Fluxo real, por `adb` (`uiautomator dump` + `input tap`), sem instrumentação** — o seletor de VERDADE (DocumentsUI): `adb push exemplo-neon.zip /sdcard/Download/` → aba Teclado (extra `com.keyflow.nav=tab_keyboard_mic`) → **Import skin** → "Show roots"
+  → Downloads (a DocumentsUI lista os dois `.zip`: o filtro de tipos aceitou) → `exemplo-neon.zip` → diálogo "Skin installed · Neon Noturno · exemplo-neon.zip — orb: 4 states, 45 frames · keyboard: tray + 4 faces" →
+  tocar no cartão → arquivo do DataStore `pack:neon-noturno-0a1186d8` → **force-stop + ime set + campo de teste: o IME real desenha o Neon** → aba Sobrepor: a prévia do tour já usa a orbe do pacote; selecionar o cartão (`orbSkin` também `pack:`) → religar
+  o Modo Sobrepor: a orbe flutuante real sai com o pacote, **também depois de force-stop** → reimportar `exemplo-neon-v2.zip` (mesmo nome, cores trocadas): "Skin updated" e o IME real já com as bordas verdes/amarelas → remover pela lixeira + "Remove":
+  `system atelie` no arquivo, pasta `skins/` vazia, IME e aba de volta ao Sistema.
+- **A orbe flutuante nos 4 estados** (`SkinExampleCaptureTest`, janela real do `OverlayService`, estado posto por `OrbButtonView.render` — o gesto e o microfone reais NÃO foram exercitados; o contador do centro mostra um tempo sem sentido,
+  ex. `170:39`, porque o coordenador não iniciou a gravação): idle, listening (equalizador + tempo na `centerInk` branca), paused (glifo de pausa e `0:00`), transcribing (cometa), em 156/195/280 px, com sequência de quadros para GIF; IME real em
+  repouso e com letra/espaço/apagar segurados (face pressionada). Artefatos para o Yan: `/home/yan/Downloads/keyflow-skins-fase2/`.
+- **Goldens, prova contra o APK de `0f0edab`** (APK construído de `git archive 0f0edab` fora do repositório, mesmo emulador, `verify-screens.sh`, comparação `compare -metric AE` SEM fuzz): 154 PNGs → **138 idênticos**, 16 diferentes: 4 PNGs
+  (`config-overlay-skins[-dark]`, `config-teclado-skins[-dark]`: 996×458 px, a seção nova) e 12 PNGs (`config-teclado[-travado]`, `config-overlay[-travado]`, `config-ajuda-teclado`, `config-unlock`, claro/escuro) em que a diferença cabe numa
+  coluna de **7 px de largura** (x=1055, o indicador de rolagem, que varia de altura entre capturas do mesmo APK porque a aba ficou mais alta). `bar-custom-overflow` diferiu na 1ª captura do baseline por causa da barra de status à mostra; o APK de
+  `0f0edab` recapturado saiu idêntico ao novo (0 px). `diff-screens.sh` contra o golden versionado: **160/160** dentro do limiar (150 antigos + 10 novos). Aprovados à mão só os 4 + 10.
+- **Suíte**: unit **972/972**. Instrumentados por pacote no emulador: `com.keyflow.ui` **199/199**, `com.keyflow.overlay` **30/30**, `com.keyflow.ime` **45** com 1 falha de toque sintético
+  (`KeyFlowKeyboardSpellCheckerTest.typingLetters…`: isolada 6/6 e a classe 7/7 depois — mesma natureza da flakiness já registrada; o teste não toca em skin), `com.keyflow.skins` **128 testes** (110 da fase 1 + 18 novos): ver a flakiness abaixo.
+  Além do pacote, as classes novas e as de painel passaram inteiras: `SkinPacksSectionTest` 16, `PackPreviewTest` 6, `KeyboardSizePreviewPackTest` 2, `ExampleSkinPackImportTest` 4, `SkinSettingsPersistenceTest` 2 (+1 de medição), `SkinPackStoreTest` 24, `TecladoPanelTest`/`OverlayPanelTest`/`ConfigScreenTest`.
+- **Flakiness MEDIDA (a fase 1 só registrava a do `ime`)** — o pacote `skins` inteiro falha às vezes, e **no commit da fase 1 também**. Seis rodadas do pacote `skins` seguidas, intercaladas: BASELINE `0f0edab` (110 testes) 2 falhas / 2 falhas / **0**;
+  HEAD (128 testes) 2 falhas / **0 (128/128)** / 1 falha. Os testes que caem: `PackOrbTest.theCurrentFrameJumpsAheadOfAQueueOfWarmUpRequests` e `…liveDrawNeverWaitsForARenderTheFrameArrivesFromTheBackgroundAndBumpsTheVersion` (contam renders/esperam a
+  fila de fundo da orbe: dependem do escalonamento sob carga de host — a carga média passou de 5 durante as rodadas) e `KeyFlowKeyboardPackSkinTest.aMissingOrBrokenPackFallsBackToSystemWithoutCrashing`. Isolados e intercalados com o host mais quieto:
+  `theCurrentFrameJumps…` 10/10 no baseline e 10/10 no HEAD (antes, sob carga: 10/12 no HEAD, 12/12 no baseline); `aMissingOrBroken…` falhou **6 de 12 no baseline** e 1 de 12 no HEAD — essa eu corrigi (amostra única de pixel logo depois de
+  `measuredView`; agora espera até 8 s a face chegar à cor esperada: 12/12). Nenhum código de `PackOrb`/`SvgRender` mudou na fase 2. **Fica para a fase 3** endurecer os dois `PackOrbTest` de fila (contagem de renders → relação entre posições).
+- **Pendências do Yan [YAN] (roteiro manual no A32)**: (1) instalar o APK, copiar o `exemplo-neon.zip` (gerado por `scripts/build-skin-pack.sh skin-packs/exemplo-neon exemplo-neon.zip`; uma cópia está em
+  `/home/yan/Downloads/keyflow-skins-fase2/`) e importar pelo seletor do aparelho (a DocumentsUI do Samsung pode listar o `.zip` com outro tipo — os três tipos aceitos cobrem os casos que conheço, mas só o A32 diz); conferir "sem avisos",
+  o teclado Neon nos apps de verdade e a troca para Sistema e de volta; (2) **a orbe animada no Helio G80**: fluidez no tamanho padrão (195 px) e no máximo (280 px), principalmente `listening` a 24 fps — as medidas da T5 e da T7 são do emulador
+  (software) e valem como relação, não como promessa; se repetir quadro, as mitigações propostas na T5 (renderizar menor e esticar; subir o teto de 16 MB só quando o estado não cabe) estão prontas para decidir; (3) importar o pacote DELE e
+  dizer se o relatório (avisos e erros) é claro; (4) ver o gesto e o microfone reais com a skin (a captura da T8 põe o estado por `OrbButtonView.render`); (5) o merge na `main` é do revisor — os arquivos compartilhados editados estão listados
+  na T6.

@@ -35,8 +35,9 @@ class MicSelectorController(
     private val dark: Boolean,
     private val scale: Float,
     skin: KeyboardSkin = KeyboardSkin.DEFAULT,
+    pack: com.keyflow.skins.PackKeyboard? = null,
 ) {
-    private val colors = KeyboardColors.of(skin, dark)
+    private val colors = KeyboardColors.of(skin, dark, pack)
     private var popup: PopupWindow? = null
     private var actions: List<MicAction> = emptyList()
     private var chips: List<TextView> = emptyList()

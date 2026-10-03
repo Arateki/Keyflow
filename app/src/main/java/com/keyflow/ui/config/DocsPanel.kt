@@ -396,6 +396,7 @@ val docsSections: List<DocSection> get() = listOf(
             DocBlock.Labeled("LiteRT-LM", tr("motor dos modelos de texto da aba Raciocínio, no aparelho — Apache 2.0 (Google).")),
             DocBlock.Labeled("Gemma 4 E2B", tr("modelo de texto Equilibrado — Apache 2.0 (Google), baixado sob demanda.")),
             DocBlock.Labeled("Qwen3 0.6B", tr("modelo de texto Leve — Apache 2.0 (Alibaba), baixado sob demanda.")),
+            DocBlock.Labeled("AndroidSVG", tr("desenha os SVGs das skins importadas — Apache 2.0 (Cave Rock Software).")),
             DocBlock.Labeled(tr("Dicionários do corretor"), tr("listas de palavras do teclado do Android (AOSP LatinIME) para português, inglês e espanhol — Apache 2.0.")),
             DocBlock.Labeled(tr("Space Grotesk e Space Mono"), tr("fontes — SIL Open Font License 1.1.")),
         ),

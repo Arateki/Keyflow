@@ -31,6 +31,9 @@ import com.keyflow.data.Config
 import com.keyflow.data.OverlayPosition
 import com.keyflow.data.Settings
 import com.keyflow.data.SettingsRepository
+import com.keyflow.skins.PackOrb
+import com.keyflow.skins.SkinIds
+import com.keyflow.skins.SkinPackStore
 import com.keyflow.transcription.TranscriptionClient
 import com.keyflow.transcription.local.LocalTranscriber
 import com.keyflow.transcription.partial.PartialOverlay
@@ -46,6 +49,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -62,6 +66,9 @@ class OverlayService : Service() {
     private lateinit var recordingNotification: RecordingNotification
 
     private var floatingButton: OrbButtonView? = null
+
+    // A orbe do pacote de skin escolhido (SKP-ORB), se há um; fechada ao trocar de skin e ao remover o botão.
+    private var orbPack: PackOrb? = null
     private var floatingButtonParams: WindowManager.LayoutParams? = null
     private var composeHost: ComposeWindowHost? = null
 
@@ -349,6 +356,13 @@ class OverlayService : Service() {
     }
 
     private fun observeSettings() {
+        // Pacote de skin reimportado ou removido (SKP-IMP-05/STO-04): se a orbe usa um pacote, reabre — a versão nova aparece ao vivo, e um
+        // pacote que sumiu devolve a orbe ao Ateliê. O primeiro valor do fluxo (o de agora) não conta.
+        serviceScope.launch {
+            SkinPackStore.changes.drop(1).collect {
+                if (SkinIds.isPack(cachedSettings.orbSkin)) floatingButton?.setOrbPack(openOrbPack(cachedSettings.orbSkin))
+            }
+        }
         serviceScope.launch {
             settingsRepository.settingsFlow().collect {
                 val prevSizePx = cachedSettings.orbSizePx
@@ -363,7 +377,10 @@ class OverlayService : Service() {
                     postNotification(coordinator.currentState())
                 }
                 // Skin da orbe ao vivo (aba Sobrepor → Skins).
-                if (it.orbSkin != prevOrbSkin) floatingButton?.setOrbStyle(com.keyflow.ui.orb.orbStyleFor(it.orbSkin))
+                if (it.orbSkin != prevOrbSkin) {
+                    floatingButton?.setOrbStyle(com.keyflow.ui.orb.orbStyleFor(it.orbSkin))
+                    floatingButton?.setOrbPack(openOrbPack(it.orbSkin))
+                }
                 // Tema ao vivo (raro, disparado pelo usuário → barato): re-posta a notificação e recolore os
                 // banners de overlay visíveis, espelhando o que o toast in-app (Compose) já faz sozinho.
                 if (it.themeDark != prevThemeDark) {
@@ -410,6 +427,7 @@ class OverlayService : Service() {
             onIntent = { intent -> coordinator.onIntent(intent) },
             orbSizePx = cachedSettings.orbSizePx,
             orbStyle = com.keyflow.ui.orb.orbStyleFor(cachedSettings.orbSkin),
+            orbPack = openOrbPack(cachedSettings.orbSkin),
             tapBurstWindowMs = cachedSettings.tapBurstWindowMs.toLong(),
             onPositionChanged = { position ->
                 serviceScope.launch { settingsRepository.saveOverlayPosition(position) }
@@ -823,10 +841,23 @@ class OverlayService : Service() {
         runCatching { startActivity(intent) }
     }
 
+    /**
+     * Abre a orbe do pacote que [skinId] (`pack:<id>`) escolhe e fecha a anterior. `null` se a skin é uma das de hoje ou o pacote
+     * sumiu, quebrou ou não tem orbe: a orbe cai no Ateliê (SKP-STO-03). Abrir lê só o manifest e lista a pasta; os frames
+     * são renderizados fora da thread de desenho.
+     */
+    private fun openOrbPack(skinId: String): PackOrb? {
+        orbPack?.close()
+        orbPack = if (SkinIds.isPack(skinId)) PackOrb.open(SkinPackStore.of(this), skinId) else null
+        return orbPack
+    }
+
     private fun removeFloatingButton() {
         floatingButton?.let { button ->
             runCatching { windowManager.removeView(button) }
         }
+        orbPack?.close()
+        orbPack = null
         composeHost?.detach()
         composeHost = null
         floatingButton = null

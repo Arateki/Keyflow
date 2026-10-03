@@ -53,6 +53,7 @@
 | M8 | `theme-system` | spec/design/tasks prontos — nada implementado (⚠️ S3/S4/S5 nos checkpoints das TS-T6/T8/T9) |
 | — | Play Store | `PLAYSTORE_CHECKLIST.md`; **PS-1 (targetSdk 36) feito**, PS-2..PS-7 abertos |
 | — | `reasoning-models` (aba Raciocínio) | pedida pelo Yan em 2026-09-29, na branch `feature/raciocinio-modelos`: RSN-T0..T17 feitos (ícone de perfil, modelos locais Gemma/Qwen pelo LiteRT-LM em processo próprio, módulo `auth/` isolado, OpenAI por chave e por login ChatGPT); faltam RSN-T18 (privacidade/licenças), RSN-T19 (roteiro no A32 **[YAN]**) e a revisão final — ver Bloco 10 |
+| — | `skin-packs` (skins importáveis) | pedida pelo Yan em 2026-10-02, na branch `feature/skins-importaveis`: SKP-T1..T8 feitos e validados no emulador (2026-10-03) — motor (AndroidSVG, validador, store, teclado e orbe de pacote), UI de importação nas abas Teclado e Sobrepor, pacote de exemplo `skin-packs/exemplo-neon` + `scripts/build-skin-pack.sh`, `FORMAT.md`/`skin-packs/README.md`; 972 unit, goldens 138/154 idênticos. Faltam o merge (quem integra é o revisor) e o roteiro no A32 **[YAN]**: importar o pacote dele, conferir o desempenho da orbe animada no Helio G80 e o IME real — ver `.specs/features/skin-packs/` e o fim do `STATE.md` |
 
 ---
 

@@ -60,6 +60,13 @@ android {
             isReturnDefaultValues = true
         }
     }
+    // O pacote de skin de exemplo (`skin-packs/`, na raiz do repositório) vai nos assets do APK de teste: o instrumentado importa o pacote REAL,
+    // não uma cópia (SKP-DOC-02).
+    sourceSets {
+        getByName("androidTest") {
+            assets.srcDir("../skin-packs")
+        }
+    }
 }
 
 kotlin {
@@ -159,6 +166,13 @@ dependencies {
     //    Engine.createConversation(ConversationConfig(systemInstruction)), Conversation.sendMessageAsync(texto,
     //    MessageCallback{onMessage,onDone,onError}), Conversation.cancelProcess(), Message.toString() = o texto.
     implementation("com.google.ai.edge.litertlm:litertlm-android:0.16.1")
+
+    // Skins importáveis (skin-packs, SKP-T1): AndroidSVG desenha os SVGs dos pacotes de skin. Conferido em 2026-10-02 no
+    // Maven Central (maven-metadata.xml): só existem 1.3 e 1.4; a 1.4 (2019-05-28) é a `release` e a `latest`. Apache-2.0
+    // (licença em app/licenses/), minSdk 8, sem dependências. API usada, lida no classes.jar: `SVG.getFromString`,
+    // `SVG.renderToCanvas(Canvas, RenderOptions)`, `RenderOptions.viewPort/preserveAspectRatio`, `SVG.getDocumentViewBox`,
+    // `SVG.setInternalEntitiesEnabled`. Só `skins/SvgRender.kt` importa `com.caverock` — trocar o renderizador não vaza.
+    implementation("com.caverock:androidsvg-aar:1.4")
 
     // --- Testes ---
     // Unit

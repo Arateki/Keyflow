@@ -18,6 +18,14 @@ interface KeySurface {
     /** A face de uma tecla em [bounds], na tinta [tint], [pressed] enquanto o dedo está nela. */
     fun draw(canvas: Canvas, bounds: RectF, radius: Float, tint: Int, pressed: Boolean)
 
+    /**
+     * Como [draw], sabendo se a tecla é de letra ou de função ([role]). As skins de hoje pintam as duas pela tinta e ignoram o papel
+     * (é o que este padrão faz); a skin de pacote ([com.keyflow.skins.PackKeySurface]) desenha uma face de SVG diferente para cada.
+     * As views chamam ESTE método.
+     */
+    fun draw(canvas: Canvas, bounds: RectF, radius: Float, tint: Int, pressed: Boolean, role: KeyRole) =
+        draw(canvas, bounds, radius, tint, pressed)
+
     /** Quantas vezes o rótulo (texto ou ícone) é desenhado: uma, ou as camadas de cor do Glitch. */
     val labelPasses: Int get() = 1
 
@@ -33,3 +41,9 @@ interface KeySurface {
      */
     fun setEffect(amount: Float) = Unit
 }
+
+/**
+ * Que tipo de tecla uma face representa. [KEY] é a tecla de letra; [MODIFIER] são as de função (shift, apagar, `?123`, enter, globo,
+ * espaço) e os botões das barras — a divisão do FORMAT.md §2 (`keyboard_key_*` × `keyboard_modifier_*`).
+ */
+enum class KeyRole { KEY, MODIFIER }

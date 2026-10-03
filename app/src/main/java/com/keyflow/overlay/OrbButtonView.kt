@@ -26,8 +26,11 @@ import com.keyflow.ui.orb.OrbCenter
 import com.keyflow.ui.orb.OrbDragHint
 import com.keyflow.ui.orb.OrbDragKind
 import com.keyflow.ui.orb.OrbState
+import com.keyflow.skins.PackOrb
+import com.keyflow.ui.orb.LocalOrbPack
 import com.keyflow.ui.orb.OrbStyle
 import com.keyflow.ui.orb.VoiceOrb
+import com.keyflow.ui.orb.toPackState
 import kotlin.math.roundToInt
 
 /**
@@ -63,6 +66,8 @@ class OrbButtonView(
     orbSizePx: Int = 156,
     // Estilo do orbe (skin da orbe, aba Sobrepor; o Aero é uma bolha de vidro). Troca ao vivo: [setOrbStyle].
     orbStyle: OrbStyle = OrbStyle.ATELIE,
+    // O pacote de skin que o estilo PACK desenha (SKP-ORB); `null` = nenhum. Troca ao vivo: [setOrbPack].
+    orbPack: PackOrb? = null,
     // Janela máxima entre toques de uma "rajada" de atalho (threshold configurável na aba Sobrepor).
     tapBurstWindowMs: Long = DEFAULT_TAP_BURST_WINDOW_MS,
     private val clock: () -> Long = { SystemClock.elapsedRealtime() },
@@ -123,16 +128,24 @@ class OrbButtonView(
     fun setOrbSizePx(px: Int) {
         if (px == sizePx || px <= 0) return
         sizePx = px
+        currentOrbPack?.prepare(orbUi.state.toPackState(), px)
         requestLayout()
         windowParams?.let { updateWindowLayout?.invoke(it) }
     }
 
     private var orbUi by mutableStateOf(OrbButtonUi(OrbState.Idle, OrbCenter.None))
     private var currentOrbStyle by mutableStateOf(orbStyle)
+    private var currentOrbPack by mutableStateOf(orbPack)
 
     /** Skin da orbe trocada com ela na tela (aba Sobrepor → Skins): redesenha sem recriar a janela. */
     fun setOrbStyle(style: OrbStyle) {
         currentOrbStyle = style
+    }
+
+    /** Pacote de skin da orbe trocado com ela na tela (ou reimportado): quem chama fecha o anterior; aqui o novo já esquenta o estado atual. */
+    fun setOrbPack(pack: PackOrb?) {
+        currentOrbPack = pack
+        pack?.prepare(orbUi.state.toPackState(), sizePx)
     }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -177,13 +190,15 @@ class OrbButtonView(
             // O ComposeView não trata toque — o gesto é todo do FrameLayout pai.
             setContent {
                 val ui = orbUi
-                VoiceOrb(
-                    state = ui.state,
-                    modifier = Modifier.fillMaxSize(),
-                    center = ui.center,
-                    dragHint = ui.dragHint,
-                    style = currentOrbStyle,
-                )
+                androidx.compose.runtime.CompositionLocalProvider(LocalOrbPack provides currentOrbPack) {
+                    VoiceOrb(
+                        state = ui.state,
+                        modifier = Modifier.fillMaxSize(),
+                        center = ui.center,
+                        dragHint = ui.dragHint,
+                        style = currentOrbStyle,
+                    )
+                }
             }
         })
         isClickable = true
@@ -214,6 +229,8 @@ class OrbButtonView(
         if (state == ButtonState.RECORDING) startTicker() else stopTicker()
         // copy (não substitui): preserva dragHint/orbFraction se a orbe estiver no modo-arrasto.
         orbUi = orbUi.copy(state = orbStateFor(state), center = orbCenterFor(state))
+        // Entrou num estado: a orbe de pacote já esquenta os frames dele fora da thread de desenho.
+        currentOrbPack?.prepare(orbUi.state.toPackState(), sizePx)
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
