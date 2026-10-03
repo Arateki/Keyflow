@@ -109,21 +109,22 @@ modelo não consegue olhar nem mexer em nada do app, e o usuário tem de ir às 
 
 | ID | Área | Status |
 | --- | ---- | ------ |
-| AGT-01 | Histórico com poda | Parcial — histórico neutro (`AgentMessage`) e poda (`AgentHistory.prune`) prontos e testados na JVM (AGT-T1); falta o chat que o guarda (AGT-T3) |
+| AGT-01 | Histórico com poda | Implemented — histórico neutro e poda (AGT-T1) + o `AgentController` que o guarda e o envia a cada volta (AGT-T3; teste: o motor recebe o histórico acumulado, inclusive o resultado sintético depois de um cancelamento) |
 | AGT-02 | Contrato `AgentEngine` | Implemented (JVM) — AGT-T1/T2; `ReasoningEngine` intocado |
 | AGT-03 | Laço enviar → ferramentas → repetir | Implemented (JVM) — `AgentLoop`, 12 passos |
 | AGT-04 | Cancelar sem estado pela metade | Implemented (JVM) — o conserto do histórico é do núcleo; a atomicidade da instalação é do AGT-T4 |
-| AGT-05 | Queda para o modo só texto | Pending (AGT-T3) |
+| AGT-05 | Queda para o modo só texto | Implemented — `AgentBackends`: ferramentas só na Anthropic por chave de API; Local/OpenAI/Google/login/Créditos/sem credencial caem no texto de hoje, com a nota e a mensagem de credencial ausente (AGT-T3) |
 | AGT-06 | Erros do `ReasoningError` e ferramenta que falha | Implemented (JVM) — motor Anthropic (401/429/5xx/529/corte) e laço |
 | TLS-01 | Esquema, risco, validação antes de `run` | Implemented (JVM) |
-| TLS-02 | Confirmação com resumo do app | Parcial — núcleo e contrato `Confirmation` prontos; o painel é do AGT-T3 |
-| TLS-03 | Sem segredos; filtro; lista de permitidos | Parcial — `SecretFilter` e recusa de argumento com segredo prontos; a lista de permitidos de ajustes é do AGT-T6 |
+| TLS-02 | Confirmação com resumo do app | Parcial — núcleo, `ConfirmationGate` e o painel com resumo e prévia do app (AGT-T3); o resumo e a prévia das ferramentas de skin são do AGT-T4 |
+| TLS-03 | Sem segredos; filtro; lista de permitidos | Parcial — `SecretFilter` ligado aos cofres `keyflow_secure` e `auth/` (AGT-T3, provado no aparelho com sentinelas); a lista de permitidos de ajustes é do AGT-T6 |
 | TLS-04 | Resultado é dado | Implemented (JVM) — prompt de sistema + suíte de abuso inicial |
 | TLS-05 | Registro de ações, desfazer | Parcial — `ActionLog` em memória e `UndoCall` como dado; persistência e UI são do AGT-T5 |
 | TLS-06 | Tempo limite, fora da thread principal | Implemented (JVM) |
 | SKL-01..06 | Ferramentas de skin | Pending (AGT-T4) |
 | APP-01..03 | Ferramentas de app | Pending (AGT-T6) |
-| AUI-01..04 | Interface | Pending (AGT-T3, AGT-T5) |
+| AUI-01, AUI-02, AUI-04 | Cartões, painel de confirmação, textos `tr()` e orbe | Implemented (AGT-T3; instrumentado 12/12 + rotas de galeria) |
+| AUI-03 | Seção "Ferramentas do agente" nos Ajustes | Pending (AGT-T5) |
 | MCP-01..06 | Servidor MCP | Pending (AGT-T9) |
 
 ## Success Criteria

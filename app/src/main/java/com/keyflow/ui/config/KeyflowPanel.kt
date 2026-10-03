@@ -29,11 +29,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -43,21 +45,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.keyflow.agent.AgentController
+import com.keyflow.agent.ChatItem
+import com.keyflow.agent.AgentUiState
+import com.keyflow.agenthost.AgentBackends
+import com.keyflow.agenthost.AgentMode
+import com.keyflow.agenthost.AgentRuntime
 import com.keyflow.core.ReasoningSource
 import com.keyflow.data.Settings
 import com.keyflow.i18n.tr
 import com.keyflow.i18n.trKey
-import com.keyflow.reasoning.ReasoningEngine
-import com.keyflow.reasoning.ReasoningEvent
-import com.keyflow.reasoning.ReasoningRequest
 import com.keyflow.reasoning.ReasoningResolution
-import com.keyflow.reasoning.UnavailableReason
 import com.keyflow.ui.icons.KfIcon
 import com.keyflow.ui.icons.KfIcons
 import com.keyflow.ui.orb.OrbState
@@ -65,8 +71,6 @@ import com.keyflow.ui.orb.VoiceOrb
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
 import com.keyflow.ui.theme.SpaceMono
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 
 const val KEYFLOW_PANEL_TAG = "keyflow-panel"
 const val KEYFLOW_AJUSTES_TOGGLE_TAG = "keyflow-ajustes-toggle"
@@ -74,6 +78,7 @@ const val KEYFLOW_AJUSTES_AREA_TAG = "keyflow-ajustes-area"
 const val KEYFLOW_INPUT_TAG = "keyflow-chat-input"
 const val KEYFLOW_SEND_BUTTON_TAG = "keyflow-send-btn"
 const val KEYFLOW_ORB_TAG = "keyflow-orb"
+const val KEYFLOW_CANCEL_BUTTON_TAG = "keyflow-cancel-btn"
 
 /** Mensagem no chat do agente principal. */
 data class KeyflowChatMessage(
@@ -99,6 +104,10 @@ data class KeyflowAccountInfo(
 /**
  * Aba KeyFlow: interação direta com o agente principal através da orbe e chat por texto,
  * com área expansível de ajustes gerais do sistema.
+ *
+ * A lógica do chat mora no [AgentController] (histórico, cartões de ferramenta, confirmação, cancelamento): este Composable só
+ * desenha. Com [agent] o controlador é o do processo (a conversa sobrevive a trocar de aba) e o chat usa ferramentas quando a origem
+ * de raciocínio as suporta; sem [agent] é o chat de sempre — uma chamada de texto por mensagem, com o controlador só desta tela.
  */
 @Composable
 fun KeyflowPanel(
@@ -106,90 +115,82 @@ fun KeyflowPanel(
     onSettingsChange: (Settings) -> Unit,
     resolve: (Settings) -> ReasoningResolution,
     modifier: Modifier = Modifier,
+    agent: AgentRuntime? = null,
+) {
+    val scope = rememberCoroutineScope()
+    val backends = remember(agent, resolve) { agent?.backends ?: AgentBackends.plain(resolve) }
+    val controller = remember(agent) { agent?.controller ?: AgentController(scope) }
+    val state by controller.state.collectAsState()
+    val pending by controller.pendingConfirmation.collectAsState()
+    val mode by remember(backends, settings.reasoningSource, settings.reasoningAnthropicModel) { backends.modeFlow(settings) }
+        .collectAsState(initial = backends.mode(settings))
+    val labelOf: (String) -> String = { name -> agent?.registry?.get(name)?.label ?: name }
+
+    // Sair da aba com uma pergunta de permissão aberta cancela a execução: ninguém aprova o que não vê. Girar a tela não conta.
+    val activity = LocalContext.current as? android.app.Activity
+    DisposableEffect(controller) {
+        onDispose { if (activity?.isChangingConfigurations != true) controller.panelHidden() }
+    }
+
+    Box(modifier.fillMaxSize()) {
+        KeyflowPanelBody(
+            settings = settings,
+            state = state,
+            mode = mode,
+            agent = agent,
+            labelOf = labelOf,
+            onSend = { text -> controller.send(text, backends.resolve(settings)) },
+            onCancel = controller::cancel,
+            onClear = controller::clear,
+            modifier = Modifier.fillMaxSize(),
+        )
+        // O painel de confirmação fica por cima de tudo, colado ao campo de texto: vale com os Ajustes abertos também.
+        pending?.let { request ->
+            AgentConfirmationPanel(
+                request = request,
+                label = labelOf(request.toolName),
+                onDecision = { decision -> controller.respond(request.callId, decision) },
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 62.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun KeyflowPanelBody(
+    settings: Settings,
+    state: AgentUiState,
+    mode: AgentMode,
+    agent: AgentRuntime?,
+    labelOf: (String) -> String,
+    onSend: (String) -> Boolean,
+    onCancel: () -> Unit,
+    onClear: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val palette = LocalKeyFlowPalette.current
-    val scope = rememberCoroutineScope()
     var ajustesExpanded by remember { mutableStateOf(false) }
 
-    var orbState by remember { mutableStateOf<OrbState>(OrbState.Idle) }
+    // A orbe é do chat enquanto ele trabalha (pensando, executando, esperando a permissão); parado, um toque a alterna (como antes).
+    var manualOrb by remember { mutableStateOf<OrbState>(OrbState.Idle) }
+    val orbState: OrbState = if (state.busy) OrbState.Transcribing else manualOrb
     var account by remember { mutableStateOf(KeyflowAccountInfo()) }
     var inputText by remember { mutableStateOf("") }
-    var generationJob by remember { mutableStateOf<Job?>(null) }
-    val isGenerating = generationJob?.isActive == true
-
-    val messages = remember {
-        mutableStateListOf(
-            KeyflowChatMessage(
-                text = tr("Olá! Sou o agente KeyFlow. Como posso ajudar com sua produtividade, comandos ou automações hoje?"),
-                isUser = false,
-            ),
-        )
-    }
+    val isGenerating = state.busy
 
     val listState = rememberLazyListState()
 
-    LaunchedEffect(messages.size, messages.lastOrNull()?.text) {
-        if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
+    val tail = state.items.lastOrNull()
+    LaunchedEffect(state.items.size, (tail as? ChatItem.AssistantMessage)?.text, (tail as? ChatItem.ToolCard)?.phase) {
+        if (state.items.isNotEmpty()) {
+            listState.animateScrollToItem(state.items.size - 1)
         }
     }
 
     fun sendMessage() {
         val prompt = inputText.trim()
         if (prompt.isBlank() || isGenerating) return
-
-        messages.add(KeyflowChatMessage(text = prompt, isUser = true))
-        inputText = ""
-
-        val resolution = resolve(settings)
-        when (resolution) {
-            is ReasoningResolution.Ready -> {
-                orbState = OrbState.Transcribing
-                val assistantMsg = KeyflowChatMessage(text = "", isUser = false)
-                messages.add(assistantMsg)
-                val assistantIndex = messages.lastIndex
-
-                generationJob = scope.launch {
-                    try {
-                        val engine = resolution.engine
-                        var fullText = ""
-                        engine.generate(ReasoningRequest(system = "Você é o KeyFlow, um assistente de IA integrado ao sistema operacional Android.", user = prompt))
-                            .collect { event ->
-                                when (event) {
-                                    is ReasoningEvent.Delta -> {
-                                        fullText += event.text
-                                        messages[assistantIndex] = messages[assistantIndex].copy(text = fullText)
-                                    }
-                                    ReasoningEvent.Done -> {
-                                        orbState = OrbState.Idle
-                                    }
-                                    is ReasoningEvent.Error -> {
-                                        fullText += "\n[" + (event.message ?: event.kind.name) + "]"
-                                        messages[assistantIndex] = messages[assistantIndex].copy(text = fullText)
-                                        orbState = OrbState.Idle
-                                    }
-                                }
-                            }
-                    } catch (e: Exception) {
-                        messages[assistantIndex] = messages[assistantIndex].copy(
-                            text = (messages[assistantIndex].text + "\n" + (e.message ?: tr("Erro durante a geração."))).trim(),
-                        )
-                    } finally {
-                        orbState = OrbState.Idle
-                    }
-                }
-            }
-            is ReasoningResolution.Unavailable -> {
-                val reasonMsg = when (resolution.reason) {
-                    UnavailableReason.NO_LOCAL_MODEL -> tr("Nenhum modelo local selecionado. Acesse a aba Raciocínio para selecionar.")
-                    UnavailableReason.MODEL_NOT_INSTALLED -> tr("O modelo local selecionado ainda não foi baixado. Baixe-o na aba Raciocínio.")
-                    UnavailableReason.NOT_CONNECTED -> tr("Credenciais do modelo não configuradas. Configure a chave na aba Provedores ou Raciocínio.")
-                    UnavailableReason.NO_MODEL_CHOSEN -> tr("Nenhum modelo selecionado na origem ativa.")
-                }
-                messages.add(KeyflowChatMessage(text = reasonMsg, isUser = false))
-                orbState = OrbState.Idle
-            }
-        }
+        if (onSend(prompt)) inputText = ""
     }
 
     Column(
@@ -513,15 +514,7 @@ fun KeyflowPanel(
                 SecondaryButton(
                     text = tr("Limpar conversa"),
                     tag = "keyflow-clear-chat",
-                    onClick = {
-                        messages.clear()
-                        messages.add(
-                            KeyflowChatMessage(
-                                text = tr("Olá! Sou o agente KeyFlow. Como posso ajudar com sua produtividade, comandos ou automações hoje?"),
-                                isUser = false,
-                            ),
-                        )
-                    },
+                    onClick = onClear,
                     modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
                 )
             }
@@ -547,25 +540,18 @@ fun KeyflowPanel(
                         modifier = Modifier
                             .size(76.dp)
                             .clickable {
-                                if (orbState == OrbState.Idle) {
-                                    orbState = OrbState.Listening
-                                } else {
-                                    orbState = OrbState.Idle
-                                }
+                                manualOrb = if (orbState == OrbState.Idle) OrbState.Listening else OrbState.Idle
                             },
                     )
                 }
 
                 Text(
-                    when (orbState) {
-                        OrbState.Transcribing -> tr("Pensando…")
-                        OrbState.Listening -> tr("Ouvindo…")
-                        else -> tr("Pronto · Digite abaixo para interagir")
-                    },
+                    agentCaption(state.activity, listening = manualOrb == OrbState.Listening),
                     color = palette.muted,
                     fontFamily = SpaceMono,
                     fontSize = 10.5.sp,
                 )
+                if (mode == AgentMode.TEXT_ONLY) AgentModeNote(Modifier.padding(horizontal = 8.dp))
             }
         }
 
@@ -578,8 +564,8 @@ fun KeyflowPanel(
                 .padding(vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(messages, key = { it.id }) { msg ->
-                ChatMessageItem(msg)
+            items(state.items, key = { it.id }) { item ->
+                AgentChatEntry(item, labelOf)
             }
         }
 
@@ -622,20 +608,36 @@ fun KeyflowPanel(
                 },
             )
 
-            Box(
-                Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(if (inputText.isNotBlank() && !isGenerating) palette.teal else palette.line2.copy(alpha = 0.5f))
-                    .clickable(enabled = inputText.isNotBlank() && !isGenerating) { sendMessage() }
-                    .testTag(KEYFLOW_SEND_BUTTON_TAG),
-                contentAlignment = Alignment.Center,
-            ) {
-                KfIcon(
-                    KfIcons.Return,
-                    tint = if (inputText.isNotBlank() && !isGenerating) palette.bg else palette.muted,
-                    modifier = Modifier.size(15.dp),
-                )
+            if (isGenerating) {
+                // Durante a geração e a execução o botão vira Cancelar: interrompe o modelo e a ferramenta em andamento.
+                Box(
+                    Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(palette.terracotta)
+                        .clickable { onCancel() }
+                        .semantics { contentDescription = tr("Cancelar") }
+                        .testTag(KEYFLOW_CANCEL_BUTTON_TAG),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    KfIcon(KfIcons.Close, tint = palette.bg, modifier = Modifier.size(15.dp), strokeWidth = 2.2f)
+                }
+            } else {
+                Box(
+                    Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(if (inputText.isNotBlank()) palette.teal else palette.line2.copy(alpha = 0.5f))
+                        .clickable(enabled = inputText.isNotBlank()) { sendMessage() }
+                        .testTag(KEYFLOW_SEND_BUTTON_TAG),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    KfIcon(
+                        KfIcons.Return,
+                        tint = if (inputText.isNotBlank()) palette.bg else palette.muted,
+                        modifier = Modifier.size(15.dp),
+                    )
+                }
             }
         }
     }
@@ -664,7 +666,7 @@ private fun ProfileModelChip(category: String, model: String, modifier: Modifier
 }
 
 @Composable
-private fun ChatMessageItem(message: KeyflowChatMessage) {
+internal fun ChatMessageItem(message: KeyflowChatMessage) {
     val palette = LocalKeyFlowPalette.current
     val isUser = message.isUser
 

@@ -51,6 +51,13 @@ class SettingsRepository(
     }
 
     /**
+     * O cofre cifrado das Settings (`keyflow_secure`), para quem precisa LER todos os valores secretos — o filtro de segredos do agente, que
+     * os troca por valor em tudo que vai ao modelo. Só leitura: ninguém grava por aqui (as gravações são as do [saveSettings]). É a mesma
+     * instância preguiçosa que o repositório usa, então o nome do cofre fica num lugar só.
+     */
+    internal fun secretVault(): SharedPreferences = securePrefs
+
+    /**
      * Config efetivo consumido pelo transcritor. Resolve pela **origem selecionada** ([Settings.source])
      * via [Settings.effectiveConfigFor] — antes ignorava o source e usava só os campos legados do CUSTOM,
      * o que dava `CONFIG_MISSING` ao escolher OpenAI/Groq. CREDITS (em breve) → Config incompleto.

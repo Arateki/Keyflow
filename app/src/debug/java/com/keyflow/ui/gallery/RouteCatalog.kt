@@ -430,7 +430,7 @@ object RouteCatalog {
         Route("onboarding") { OnboardingRoute() },
         // PERM-04: o porquê de uma permissão aberto sob a linha (a do Teclado, que é a que FALTA no mock).
         Route("onboarding-why") { OnboardingRoute(explained = OnboardingPermission.KEYBOARD) },
-    )
+    ) + AgentGalleryRoutes.routes // agent-harness (AGT-T3..T5): o chat do agente, o painel de confirmação, os Ajustes e o registro
 
     private val byKey: Map<String, Route> = routes.associateBy { it.key }
 

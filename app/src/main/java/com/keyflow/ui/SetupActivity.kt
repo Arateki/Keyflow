@@ -56,7 +56,11 @@ import com.keyflow.ui.config.AuthActions
 import com.keyflow.ui.config.ControllerAuthActions
 import com.keyflow.reasoning.openai.OpenAiModels
 import com.keyflow.reasoning.openai.OpenAiReasoningEngine
+import com.keyflow.reasoning.anthropic.AnthropicAgentEngine
 import com.keyflow.reasoning.anthropic.AnthropicModels
+import com.keyflow.agenthost.AgentBackends
+import com.keyflow.agenthost.AgentHost
+import kotlinx.coroutines.flow.map
 import com.keyflow.reasoning.anthropic.AnthropicReasoningEngine
 import com.keyflow.reasoning.google.GoogleModels
 import com.keyflow.reasoning.google.GoogleReasoningEngine
@@ -158,6 +162,19 @@ class SetupActivity : ComponentActivity() {
             openAi = { OpenAiReasoningEngine(auth.authorization, auth.http, it) },
             anthropic = { AnthropicReasoningEngine(auth.authorization, auth.http, it) },
             google = { GoogleReasoningEngine(auth.authorization, auth.http, it) },
+        )
+    }
+    // O agente da aba KeyFlow (agent-harness): as peças vivem no processo; aqui só se escolhe, pela origem de raciocínio, se a próxima
+    // mensagem usa ferramentas (Anthropic por chave de API) ou o chat de texto de sempre.
+    private val agentRuntime by lazy {
+        AgentHost.of(this).runtime(
+            AgentBackends(
+                hasTools = { AgentHost.of(this).registry.all().isNotEmpty() },
+                anthropicApiKeyConnected = { auth.store.get(ProviderIds.ANTHROPIC) is Credential.ApiKey },
+                anthropicCredentialChanges = auth.store.changes(ProviderIds.ANTHROPIC).map { },
+                agentEngine = { model -> AnthropicAgentEngine(auth.authorization, auth.http, model) },
+                resolveText = reasoningEngines::resolve,
+            ),
         )
     }
     private var localSnapshot by mutableStateOf(LocalModelsSnapshot.EMPTY)
@@ -330,6 +347,7 @@ class SetupActivity : ComponentActivity() {
                         reasoningGoogleAuth = googleAuth,
                         reasoningLocalSupported = LocalLlmSupport.isSupported(android.os.Build.SUPPORTED_ABIS),
                         localActions = localModels,
+                        agent = agentRuntime,
                     )
                 } else {
                     OnboardingScreen(

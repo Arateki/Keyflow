@@ -132,6 +132,12 @@ interface AgentTool {
     /** O que faz, quando usar e quando NÃO usar, o que cada argumento significa — é o que o modelo lê para escolher a ferramenta. */
     val description: String
 
+    /**
+     * O nome que o USUÁRIO lê nos Ajustes e nos cartões do chat ("Pré-visualizar skin"), no idioma da interface — o [name] é do modelo.
+     * Avaliado a cada uso (uma chamada a `tr`), então acompanha a troca de idioma.
+     */
+    val label: String get() = name
+
     /** Esquema dos argumentos: um objeto no subconjunto de JSON Schema que o [ToolSchema] entende. */
     val inputSchema: JSONObject
 

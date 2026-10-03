@@ -141,6 +141,8 @@ fun ConfigScreen(
     reasoningGoogleAuth: AuthActions = AuthActions.None,
     initialReasoningTest: TestState = TestState(),
     reasoningLocalSupported: Boolean = true,
+    // O agente com ferramentas da aba KeyFlow (agent-harness); `null` = o chat de texto de sempre.
+    agent: com.keyflow.agenthost.AgentRuntime? = null,
 ) {
     val palette = LocalKeyFlowPalette.current
     var activeTab by rememberSaveable { mutableStateOf(initialTab) }
@@ -318,6 +320,7 @@ fun ConfigScreen(
                             settings = settings,
                             onSettingsChange = onSettingsChange,
                             resolve = resolveReasoning,
+                            agent = agent,
                         )
                         ConfigTab.VOZ -> VozPanel(
                             settings = settings,

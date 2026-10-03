@@ -27,7 +27,7 @@ data class ActionLogEntry(
 
 /**
  * O registro de ações, visível e apagável em Ajustes. Só `WRITE`/`DESTRUCTIVE` entram (ler não deixa rastro) — inclusive as NEGADAS e
- * as CANCELADAS, que também dizem o que o modelo tentou. A implementação em memória é a da fase 1A; a persistência é da 1B.
+ * as CANCELADAS, que também dizem o que o modelo tentou. A implementação em memória ([InMemoryActionLog]) serve aos testes e à galeria; a do aparelho é o [FileActionLog], em arquivo.
  */
 interface ActionLog {
     /** Grava e devolve a entrada com o [ActionLogEntry.id] definido. */
@@ -37,6 +37,12 @@ interface ActionLog {
     fun observe(): Flow<List<ActionLogEntry>>
 
     suspend fun clear()
+
+    /**
+     * O usuário já desfez [id]: tira a chamada de desfazer da entrada (o botão some) — desfazer duas vezes não faz sentido, e a segunda
+     * poderia apagar outra coisa (uma skin reinstalada com o mesmo nome). Padrão: não faz nada (um registro que não guarda estado).
+     */
+    suspend fun clearUndo(id: Long) {}
 }
 
 /** Em memória, limitado a [capacity] entradas (as mais antigas saem). Seguro entre threads. */
@@ -57,6 +63,10 @@ class InMemoryActionLog(private val capacity: Int = 200) : ActionLog {
 
     override suspend fun clear() {
         synchronized(this) { state.value = emptyList() }
+    }
+
+    override suspend fun clearUndo(id: Long) {
+        synchronized(this) { state.value = state.value.map { if (it.id == id) it.copy(undo = null) else it } }
     }
 
     /** A foto de agora (para testes e para quem não observa). */

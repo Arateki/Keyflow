@@ -27,7 +27,9 @@ trailer). Atualizar o Status aqui e a traceability do `spec.md` ao concluir.
 - **What**: mover a lógica do `KeyflowPanel` para `AgentController`; histórico; cartões de ferramenta; painel de confirmação (Permitir/Negar); cancelar; orbe reflete o estado; queda para o modo só texto (AGT-05); troca de origem.
 - **Done when**: sem ferramentas registradas o chat se comporta como hoje; com elas, o ciclo completo funciona num teste de UI com motor falso; goldens existentes da aba KeyFlow inalterados (ou só os que mudarem por intenção, justificados).
 - **Tests**: instrumentado (Compose) + goldens. **Gate**: unit + instrumentado escopado + goldens.
-- **Status**: Pending
+- **Status**: Done (2026-10-03, fase 1B). **SPEC_DEVIATION (local)**: o `AgentController` mora em `agent/` como o design previa, mas o que precisa de Android, da UI ou do `ReasoningEngine` mora no pacote novo `com.keyflow.agenthost` (`AgentHost`, `AgentBackends`, `AgentSecretSource`, `AgentRuntime`): o `AgentIsolationTest` proíbe `android.*`, a UI e o `reasoning/` dentro de `agent/`, e afrouxá-lo seria o desvio pior — o núcleo fala com o app por portas (`AgentBackend`, `ConfirmationGate`, `PolicyConfigStore`) e os adaptadores moram fora.
+  - **O que existe**: `AgentController`/`ChatItem`/`AgentBackend` · `ConfirmationGate` · `PolicyConfigStore` (interface + em memória; a persistência é a T5) · `ui/config/AgentCards.kt` · `KeyflowPanel` refatorada (wrapper + corpo) · imagem no `tool_result` (commit `5bd47f6`) · `AgentSecretSource` ligado aos cofres · 6 rotas de galeria. Detalhes, provas e o que NÃO foi provado: `STATE.md`, seção "fase 1B, AGT-T3".
+  - **Testes**: 82 unit novos (1373 no total) + `KeyflowPanelAgentTest` 12/12 e `AgentSecretsDeviceTest` 4/4 no emulador.
 
 ### AGT-T4 — Ferramentas de skin
 - **What**: `skin_get_format` (FORMAT.md embutido como asset), `skin_list`, `skin_preview` (folha de contato), `skin_install` (zip em memória → `SkinPackStore`), `skin_select`, `skin_remove`; limites por chamada (SKL-06); imagem opcional ao modelo.
