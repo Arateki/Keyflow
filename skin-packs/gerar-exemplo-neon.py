@@ -114,11 +114,17 @@ def frame_idle(i, total=12):
     return svg_orbe(defs, corpo, pontos)
 
 
+def cor_da_barra(x, y):
+    """A cor de um ponto na diagonal ciano → magenta → laranja (o degradê do equalizador, já resolvido: uma cor lisa por barra custa menos para desenhar
+    do que um degradê por barra)."""
+    t = max(0.0, min(1.0, (x + y - 2 * 40) / (2 * (216 - 40))))
+    return mistura(CIANO, MAGENTA, t * 2) if t < 0.5 else mistura(MAGENTA, LARANJA, (t - 0.5) * 2)
+
+
 def frame_listening(i, total=24, barras=36):
     """Gravando: o aro vira um equalizador de 36 barras (duas ondas com ciclos inteiros, para o laço fechar) e o corpo pulsa."""
     pulsa = 0.5 + 0.5 * math.sin(2 * math.pi * i / total)
     defs = orbe_defs(ROSA, ROSA, LARANJA, halo_alfa=0.85 + 0.15 * pulsa)
-    defs = defs.replace("</defs>", f'<linearGradient id="barras" x1="40" y1="40" x2="216" y2="216" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="{CIANO}"/><stop offset="0.5" stop-color="{MAGENTA}"/><stop offset="1" stop-color="{LARANJA}"/></linearGradient>\n</defs>')
     corpo = orbe_corpo(raio=75 + 3 * pulsa, aro=4.5 + 1.5 * pulsa)
     linhas = []
     for j in range(barras):
@@ -127,8 +133,9 @@ def frame_listening(i, total=24, barras=36):
         altura = 5 + 15 * onda + 6 * onda2
         x1, y1 = polar(88, j * 360 / barras)
         x2, y2 = polar(88 + altura, j * 360 / barras)
-        linhas.append(f'<line x1="{num(x1)}" y1="{num(y1)}" x2="{num(x2)}" y2="{num(y2)}"/>')
-    barras_svg = '<g stroke="url(#barras)" stroke-width="4.2" stroke-linecap="round">' + "".join(linhas) + "</g>\n"
+        cor = cor_da_barra((x1 + x2) / 2, (y1 + y2) / 2)
+        linhas.append(f'<line x1="{num(x1)}" y1="{num(y1)}" x2="{num(x2)}" y2="{num(y2)}" stroke="{cor}"/>')
+    barras_svg = '<g stroke-width="4.2" stroke-linecap="round">' + "".join(linhas) + "</g>\n"
     return svg_orbe(defs, corpo, barras_svg)
 
 
