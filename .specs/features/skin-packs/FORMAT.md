@@ -26,7 +26,8 @@ minha-skin.zip
 ```
 
 Um pacote pode ter só a **orbe**, só o **teclado**, ou os dois. Ele aparece na aba **Sobrepor** se tiver orbe e na aba
-**Teclado** se tiver teclado.
+**Teclado** se tiver teclado. Um pacote pronto para copiar e o passo a passo de criar e empacotar a sua skin estão em
+[`skin-packs/`](../../../skin-packs/README.md) (`exemplo-neon/`, `scripts/build-skin-pack.sh`).
 
 ## 2. Nome dos arquivos = estado do app + frame
 
