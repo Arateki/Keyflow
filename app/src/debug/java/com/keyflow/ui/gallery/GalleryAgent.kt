@@ -16,6 +16,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.keyflow.agent.ActionLogEntry
+import com.keyflow.agent.ActionOutcome
 import com.keyflow.agent.AgentBackend
 import com.keyflow.agent.AgentEngine
 import com.keyflow.agent.AgentEvent
@@ -36,7 +38,9 @@ import com.keyflow.agent.ToolImage
 import com.keyflow.agent.ToolOrigin
 import com.keyflow.agent.ToolOutput
 import com.keyflow.agent.ToolPreview
+import com.keyflow.agent.ToolPolicyConfig
 import com.keyflow.agent.ToolRisk
+import com.keyflow.agent.UndoCall
 import com.keyflow.agenthost.AgentBackends
 import com.keyflow.agenthost.AgentHost
 import com.keyflow.agenthost.AgentParts
@@ -47,6 +51,7 @@ import com.keyflow.reasoning.ReasoningResolution
 import com.keyflow.reasoning.UnavailableReason
 import com.keyflow.ui.config.AgentChatEntry
 import com.keyflow.ui.config.AgentConfirmationPanel
+import com.keyflow.ui.config.AgentSettingsSection
 import com.keyflow.ui.config.KeyflowPanel
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import java.io.ByteArrayOutputStream
@@ -71,6 +76,8 @@ object AgentGalleryRoutes {
         Route("agent-confirmacao-remover") { ConfirmationRoute(destructive = true) },
         Route("agent-keyflow-modo-texto") { PanelRoute(confirming = false, source = ReasoningSource.LOCAL) },
         Route("agent-keyflow-confirmacao", minDelayMs = 400) { PanelRoute(confirming = true, source = ReasoningSource.ANTHROPIC) },
+        // AGT-T5: a seção "Ferramentas do agente" dos Ajustes do chat, com uma liberada sempre, uma desligada e o registro com Desfazer.
+        Route("agent-ajustes") { SettingsRoute() },
     )
 
     // ── dados de mentira ─────────────────────────────────────────────────────
@@ -206,6 +213,43 @@ object AgentGalleryRoutes {
         }
     }
 
+    @Composable
+    private fun SettingsRoute() {
+        val runtime = remember { settingsRuntime() }
+        Box(Modifier.fillMaxSize().background(LocalKeyFlowPalette.current.bg).padding(horizontal = 16.dp, vertical = 24.dp)) {
+            Column(Modifier.verticalScroll(rememberScrollState())) { AgentSettingsSection(runtime) }
+        }
+    }
+
+    /** Um registro com três ações (uma com Desfazer, uma negada, uma vinda de fora) e a configuração com uma ferramenta desligada e uma liberada sempre. */
+    private fun settingsRuntime(): AgentRuntime {
+        val tools = listOf(
+            GalleryTool("skin_preview", ToolRisk.READ, "Pré-visualizar a skin."),
+            GalleryTool("skin_install", ToolRisk.WRITE, "Instalar a skin."),
+            GalleryTool("skin_remove", ToolRisk.DESTRUCTIVE, "Remover a skin."),
+        )
+        val log = InMemoryActionLog()
+        kotlinx.coroutines.runBlocking {
+            log.append(ActionLogEntry(atMs = SETTINGS_T0, toolName = "skin_install", risk = ToolRisk.WRITE, summary = "Instalar a skin «Cyberpunk» (orbe: 4 estados, 46 quadros).", outcome = ActionOutcome.DENIED, detail = "O usuário negou.", origin = ToolOrigin.CHAT))
+            log.append(ActionLogEntry(atMs = SETTINGS_T0 + 60_000, toolName = "skin_install", risk = ToolRisk.WRITE, summary = "Instalar a skin «Neon Noturno» (orbe: 4 estados, 45 quadros; teclado: bandeja + 4 faces).", outcome = ActionOutcome.OK, detail = "Instalada.", origin = ToolOrigin.CHAT, undo = UndoCall("skin_remove", """{"id":"neon-noturno"}""")))
+            log.append(ActionLogEntry(atMs = SETTINGS_T0 + 120_000, toolName = "skin_remove", risk = ToolRisk.DESTRUCTIVE, summary = "Remover a skin «Aurora».", outcome = ActionOutcome.OK, detail = "Removida.", origin = ToolOrigin.EXTERNAL))
+        }
+        val parts: AgentParts = AgentHost.assemble(
+            scope = CoroutineScope(Dispatchers.Unconfined),
+            tools = tools,
+            policy = InMemoryPolicyConfigStore(ToolPolicyConfig(disabledTools = setOf("skin_remove"), alwaysAllowed = setOf("skin_install"))),
+            actionLog = log,
+            secrets = { emptyList() },
+        )
+        val backends = AgentBackends(
+            hasTools = { true },
+            anthropicApiKeyConnected = { true },
+            agentEngine = { scriptedEngine() },
+            resolveText = { ReasoningResolution.Unavailable(UnavailableReason.NOT_CONNECTED) },
+        )
+        return parts.runtime(backends)
+    }
+
     private fun buildRuntime(confirming: Boolean): AgentRuntime {
         val tools = listOf(
             GalleryTool("skin_preview", ToolRisk.READ, "Pré-visualizar a skin."),
@@ -230,4 +274,7 @@ object AgentGalleryRoutes {
         }
         return parts.runtime(backends)
     }
+
+    /** 3 de outubro de 2026, 12:00 UTC: o registro da galeria tem horário fixo (o que muda o desenho é só o fuso do aparelho de captura). */
+    private const val SETTINGS_T0 = 1_790_942_400_000L
 }
