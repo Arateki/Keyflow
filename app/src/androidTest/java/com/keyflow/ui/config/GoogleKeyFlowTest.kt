@@ -126,6 +126,9 @@ class GoogleKeyFlowTest {
         // Sem chave: botão desabilitado
         rule.onNodeWithTag(REASONING_TEST_BUTTON_TAG).performScrollTo().assertIsNotEnabled()
 
+        // O cartão abre na aba Assinatura (login); o campo da chave mora na aba API.
+        rule.onNodeWithTag(GOOGLE_TAB_API_TAG).performScrollTo().performClick()
+
         // Digita a chave da Google
         rule.onNodeWithTag(GOOGLE_KEY_TAG).performScrollTo().performTextInput("AIzaSyTestKey")
         rule.onNodeWithTag(GOOGLE_STATUS_TAG).performClick() // tira o foco para salvar
@@ -133,7 +136,9 @@ class GoogleKeyFlowTest {
 
         // Testar: resposta chega em fluxo
         rule.onNodeWithTag(REASONING_TEST_BUTTON_TAG).performScrollTo().performClick()
-        rule.waitUntil(15_000) { runCatching { rule.onNodeWithTag(REASONING_TEST_TIMES_TAG).assertIsDisplayed() }.isSuccess }
+        rule.waitUntil(15_000) { runCatching { rule.onNodeWithTag(REASONING_TEST_TIMES_TAG).assertExists() }.isSuccess }
+        // Com o cartão da chave mais alto, os tempos ficam abaixo da dobra: rola até eles para conferir que aparecem.
+        rule.onNodeWithTag(REASONING_TEST_TIMES_TAG).performScrollTo().assertIsDisplayed()
         rule.onNodeWithTag(REASONING_TEST_RESPONSE_TAG).assertTextContains("Olá do Gemini!", substring = true)
 
         // Servidor recebeu a chave x-goog-api-key

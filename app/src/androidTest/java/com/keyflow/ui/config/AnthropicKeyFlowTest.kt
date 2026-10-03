@@ -127,6 +127,9 @@ class AnthropicKeyFlowTest {
         // Sem chave: botão desabilitado
         rule.onNodeWithTag(REASONING_TEST_BUTTON_TAG).performScrollTo().assertIsNotEnabled()
 
+        // O cartão abre na aba Assinatura (login); o campo da chave mora na aba API.
+        rule.onNodeWithTag(ANTHROPIC_TAB_API_TAG).performScrollTo().performClick()
+
         // Digita a chave da Anthropic
         rule.onNodeWithTag(ANTHROPIC_KEY_TAG).performScrollTo().performTextInput("sk-ant-testkey")
         rule.onNodeWithTag(ANTHROPIC_STATUS_TAG).performClick() // tira o foco para salvar
@@ -134,7 +137,9 @@ class AnthropicKeyFlowTest {
 
         // Testar: resposta chega em fluxo
         rule.onNodeWithTag(REASONING_TEST_BUTTON_TAG).performScrollTo().performClick()
-        rule.waitUntil(15_000) { runCatching { rule.onNodeWithTag(REASONING_TEST_TIMES_TAG).assertIsDisplayed() }.isSuccess }
+        rule.waitUntil(15_000) { runCatching { rule.onNodeWithTag(REASONING_TEST_TIMES_TAG).assertExists() }.isSuccess }
+        // Com o cartão da chave mais alto, os tempos ficam abaixo da dobra: rola até eles para conferir que aparecem.
+        rule.onNodeWithTag(REASONING_TEST_TIMES_TAG).performScrollTo().assertIsDisplayed()
         rule.onNodeWithTag(REASONING_TEST_RESPONSE_TAG).assertTextContains("Olá da Claude!", substring = true)
 
         // Servidor recebeu o cabeçalho x-api-key
