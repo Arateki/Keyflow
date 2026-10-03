@@ -8,6 +8,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -82,7 +83,22 @@ class PackOrbComposeTest {
         }
     }
 
-    private fun capture() = rule.onNodeWithTag(TAG).captureToImage().asAndroidBitmap()
+    /**
+     * `captureToImage` espera um redesenho da janela por no máximo 2 s — o limite é fixo na biblioteca — e um emulador de software com o host
+     * carregado às vezes demora mais que isso (`ComposeTimeoutException`, medido: 2 de 4 rodadas do pacote sob carga). Só essa exceção
+     * é repetida, até 5 vezes: o que a captura devolve continua sendo conferido pixel a pixel pelos testes.
+     */
+    private fun capture(): android.graphics.Bitmap {
+        var timedOut: ComposeTimeoutException? = null
+        repeat(5) {
+            try {
+                return rule.onNodeWithTag(TAG).captureToImage().asAndroidBitmap()
+            } catch (e: ComposeTimeoutException) {
+                timedOut = e
+            }
+        }
+        throw timedOut!!
+    }
 
     private fun near(actual: Int, expected: Int) =
         abs(Color.red(actual) - Color.red(expected)) <= 3 && abs(Color.green(actual) - Color.green(expected)) <= 3 && abs(Color.blue(actual) - Color.blue(expected)) <= 3

@@ -94,8 +94,12 @@ class OverlayPackOrbTest {
     private val cyan = 0xFF00FFFF.toInt()
     private val atelie = 0xFF4E9683.toInt() // MainOuter da orbe Ateliê
 
-    /** Espera o screenshot ter (ou não) pelo menos [min] px de [rgb] — a orbe leva uns quadros para refletir o ajuste. */
-    private fun waitForColor(rgb: Int, present: Boolean, what: String, min: Int = 6000, timeoutMs: Long = 12_000) {
+    /**
+     * Espera o screenshot ter (ou não) pelo menos [min] px de [rgb] — a orbe leva uns quadros para refletir o ajuste, e a PRIMEIRA vez, com o
+     * processo recém-aberto (Compose frio, renderização por software), leva muito mais: medido sob carga no host, 7–13 s até o Ateliê aparecer
+     * depois de o serviço subir (e 4–5 s no resto). É uma espera por condição, então o limite longo não custa nada quando tudo está rápido.
+     */
+    private fun waitForColor(rgb: Int, present: Boolean, what: String, min: Int = 6000, timeoutMs: Long = 60_000) {
         val deadline = System.currentTimeMillis() + timeoutMs
         var last = -1
         while (System.currentTimeMillis() < deadline) {
@@ -143,7 +147,7 @@ class OverlayPackOrbTest {
         assertTrue(OverlayService.isRunningForUi)
     }
 
-    private fun waitUntil(message: String, timeoutMs: Long = 10_000, condition: () -> Boolean) {
+    private fun waitUntil(message: String, timeoutMs: Long = 30_000, condition: () -> Boolean) {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
             if (condition()) return

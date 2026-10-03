@@ -7,6 +7,10 @@ import androidx.test.core.app.ApplicationProvider
 import com.keyflow.skins.SkinPackFixtures.manifest
 import com.keyflow.skins.SkinPackFixtures.svg
 import java.io.File
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.abs
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -74,7 +78,8 @@ class PackOrbTest {
     private val cyan = 0xFF00FFFF.toInt()
     private val magenta = 0xFFFF00FF.toInt()
 
-    private fun waitUntil(message: String, timeoutMs: Long = 10_000, condition: () -> Boolean) {
+    /** Espera uma condição (nunca um tempo fixo): o limite só existe para o teste não travar, e é longo para aguentar um host sob carga. */
+    private fun waitUntil(message: String, timeoutMs: Long = 30_000, condition: () -> Boolean) {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
             if (condition()) return
@@ -158,14 +163,46 @@ class PackOrbTest {
 
     // ── ao vivo: nunca espera o render ───────────────────────────────────────
 
+    /**
+     * Segura a thread de fundo no fim do render de um frame — depois de desenhado, antes de entrar no cache — até [release] ser solto (ou
+     * 30 s, para um teste que falhou nunca deixar a thread compartilhada do processo presa). Renders que acontecem na thread [caller] não são
+     * segurados: vão para [onCaller], que é o que um desenho ao vivo nunca pode fazer.
+     */
+    private fun holdBackgroundRenders(orb: PackOrb, caller: Thread, release: CountDownLatch, onCaller: MutableList<Int>) {
+        orb.onRendered = { _, index ->
+            if (Thread.currentThread() === caller) onCaller += index else release.await(30, TimeUnit.SECONDS)
+        }
+    }
+
     @Test
-    fun liveDrawNeverWaitsForARenderTheFrameArrivesFromTheBackgroundAndBumpsTheVersion() {
+    fun liveDrawNeverWaitsForARenderThatIsStillRunning() {
         val orb = open(orbPack("Ao vivo", idle = listOf("FF0000", "00FF00", "0000FF", "FFFF00")))
+        val release = CountDownLatch(1)
+        val onCaller = CopyOnWriteArrayList<Int>()
+        holdBackgroundRenders(orb, Thread.currentThread(), release, onCaller)
+        try {
+            // Cache frio, e o render do frame de agora preso no fundo: a chamada TEM de voltar sem nada para mostrar, em vez de esperar o render
+            // (se esperasse, ou renderizasse aqui mesmo, o frame chegaria antes de a chamada voltar e este null não viria).
+            assertNull("ao vivo o frame que falta não é esperado nem renderizado na thread que desenha", orb.frameFor(OrbPackState.IDLE, 0f, 64, deterministic = false))
+        } finally {
+            release.countDown()
+        }
+        assertTrue("nenhum render ao vivo pode acontecer na thread que desenha: $onCaller", onCaller.isEmpty())
+    }
+
+    @Test
+    fun aLiveFrameArrivesFromTheBackgroundAndBumpsTheVersion() {
+        val orb = open(orbPack("Do fundo", idle = listOf("FF0000", "00FF00", "0000FF", "FFFF00")))
+        val caller = Thread.currentThread()
+        val renderThreads = CopyOnWriteArrayList<Thread>()
+        orb.onRendered = { _, _ -> renderThreads += Thread.currentThread() }
         val before = orb.version
-        // Primeiríssima vez, cache frio: não há nada para mostrar — e, principalmente, a chamada VOLTA com null em vez de renderizar na hora.
-        assertNull("ao vivo o frame que falta não é renderizado na thread que desenha", orb.frameFor(OrbPackState.IDLE, 0f, 64, deterministic = false))
+        // Cache frio: o que esta chamada devolve não importa (nada, ou um frame que o fundo já tenha entregue) — o que importa é o que vem depois.
+        orb.frameFor(OrbPackState.IDLE, 0f, 64, deterministic = false)
         waitUntil("o frame não chegou do fundo") { orb.version > before }
         assertColor(center(orb.frameFor(OrbPackState.IDLE, 0f, 64, deterministic = false)), red, "frame 1 já pronto")
+        assertTrue("o frame foi renderizado por alguém", renderThreads.isNotEmpty())
+        assertTrue("todo render ao vivo foi na thread de fundo, nunca na de quem desenha", renderThreads.none { it === caller })
     }
 
     @Test
@@ -181,25 +218,48 @@ class PackOrbTest {
     @Test
     fun repeatedLiveRequestsForTheSameFramesNeverRenderAnythingTwice() {
         val orb = open(orbPack("Sem repetir", idle = listOf("FF0000", "00FF00", "0000FF", "FFFF00", "00FFFF", "FF00FF"), extraManifest = ""","orb":{"fps":10}"""))
+        val rendered = CopyOnWriteArrayList<Int>()
+        orb.onRendered = { _, index -> rendered += index }
         // 300 desenhos ao vivo no mesmo instante (a orbe real desenha ~60 vezes por segundo): o frame de agora e os 3 à frente, uma vez cada.
         repeat(300) { orb.frameFor(OrbPackState.IDLE, 0f, 64, deterministic = false) }
         waitUntil("os frames não chegaram") { orb.version >= 4 }
-        Thread.sleep(300)
-        assertEquals("cada frame pedido é renderizado uma vez só", 4, orb.renderedCount.get())
+        // Barreira em vez de um tempo fixo: o pré-aquecimento (a prioridade mais baixa) dos 2 frames que faltam só roda depois de todo pedido de
+        // frame de agora ou "à frente" que ainda estivesse na fila. Quando eles chegam, uma renderização repetida já teria aparecido na lista.
+        orb.prepare(OrbPackState.IDLE, 64)
+        waitUntil("a barreira de pré-aquecimento não chegou") { orb.version >= 6 }
+        assertEquals("cada frame pedido é renderizado uma vez só", listOf(0, 1, 2, 3, 4, 5), rendered.sorted())
     }
 
     @Test
     fun theCurrentFrameJumpsAheadOfAQueueOfWarmUpRequests() {
         val colors = (0 until 40).map { "%02X%02X%02X".format(it * 6, 255 - it * 6, 90) }
         val orb = open(orbPack("Fura a fila", idle = colors, extraManifest = ""","orb":{"fps":10}"""))
-        orb.prepare(OrbPackState.IDLE, 150) // 40 frames de pré-aquecimento na fila
-        // Logo em seguida a orbe pede o frame 30 (índice 29 em t=2900 ms): ele não pode esperar os 29 que estão na frente dele na fila.
+        // A propriedade é de ORDEM de chegada, não de quantos renders couberam num intervalo: registra o índice de cada frame na ordem em que a
+        // thread de fundo os entrega. E, para a fila não depender de quanta CPU o escalonador deu ao teste, prende a thread de fundo no 1º
+        // render: o frame 1 fica "em andamento" e os outros 39 pedidos de pré-aquecimento esperam na fila quando o frame de agora é pedido.
+        val arrivals = CopyOnWriteArrayList<Int>()
+        val release = CountDownLatch(1)
+        val held = AtomicBoolean(false)
+        orb.onRendered = { _, index ->
+            arrivals += index
+            if (!held.getAndSet(true)) release.await(30, TimeUnit.SECONDS)
+        }
         val expected = Color.rgb(29 * 6, 255 - 29 * 6, 90)
-        waitUntil("o frame 30 deveria chegar entre os primeiros") {
+        try {
+            orb.prepare(OrbPackState.IDLE, 150) // 40 frames de pré-aquecimento na fila
+            waitUntil("a thread de fundo não começou o pré-aquecimento") { arrivals.isNotEmpty() }
+            // Agora a orbe pede o frame 30 (índice 29 em t=2900 ms): ele não pode esperar os 28 que estão na frente dele na fila.
+            orb.frameFor(OrbPackState.IDLE, 2900f, 150, deterministic = false)
+        } finally {
+            release.countDown()
+        }
+        waitUntil("o frame 30 deveria chegar") { 29 in arrivals }
+        val before = arrivals.take(arrivals.indexOf(29))
+        assertTrue("antes do frame de agora só pode ter chegado o que já estava em andamento, e chegaram $before", before.none { it in 1..28 })
+        waitUntil("o frame 30 chegou, mas não com a cor dele") {
             val bitmap = orb.frameFor(OrbPackState.IDLE, 2900f, 150, deterministic = false)
             bitmap != null && Math.abs(Color.red(center(bitmap)) - Color.red(expected)) <= 2 && Math.abs(Color.green(center(bitmap)) - Color.green(expected)) <= 2
         }
-        assertTrue("o frame de agora esperou ${orb.renderedCount.get()} renders de pré-aquecimento", orb.renderedCount.get() <= 8)
     }
 
     @Test
@@ -218,11 +278,18 @@ class PackOrbTest {
         val orb = open(orbPack("Segura", idle = listOf("FF0000", "00FF00", "0000FF"), extraManifest = ""","orb":{"fps":10}"""))
         // Frame 1 pronto e mostrado (renderizado na hora só para o teste preparar a situação).
         assertColor(center(orb.frameFor(OrbPackState.IDLE, 0f, 64, deterministic = true)), red, "frame 1")
-        // Uma orbe de outro tamanho ainda não tem frames em 90 px, mas o último mostrado no estado vale a pena? Só se o tamanho bate:
-        assertNull("outro tamanho: nada do tamanho certo a mostrar ainda", orb.frameFor(OrbPackState.IDLE, 100f, 90, deterministic = false))
-        // No mesmo tamanho, um frame ainda não pronto (o 3º) cai no último mostrado (o 1º), em vez de sumir.
-        val held = orb.frameFor(OrbPackState.IDLE, 200f, 64, deterministic = false)
-        assertColor(center(held), red, "mostra o último frame enquanto o 3º não chega")
+        // Daqui em diante os renders do fundo ficam presos antes de entrar no cache: "o frame certo ainda não chegou" deixa de depender do escalonador.
+        val release = CountDownLatch(1)
+        holdBackgroundRenders(orb, Thread.currentThread(), release, CopyOnWriteArrayList())
+        try {
+            // Uma orbe de outro tamanho ainda não tem frames em 90 px, mas o último mostrado no estado vale a pena? Só se o tamanho bate:
+            assertNull("outro tamanho: nada do tamanho certo a mostrar ainda", orb.frameFor(OrbPackState.IDLE, 100f, 90, deterministic = false))
+            // No mesmo tamanho, um frame ainda não pronto (o 3º) cai no último mostrado (o 1º), em vez de sumir.
+            val held = orb.frameFor(OrbPackState.IDLE, 200f, 64, deterministic = false)
+            assertColor(center(held), red, "mostra o último frame enquanto o 3º não chega")
+        } finally {
+            release.countDown()
+        }
     }
 
     // ── teto de memória ──────────────────────────────────────────────────────

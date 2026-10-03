@@ -53,8 +53,13 @@ class PackOrb private constructor(private val pack: SkinPack) {
 
     private val ownerId = nextOwner.getAndIncrement()
 
-    /** Quantos frames esta orbe renderizou até agora (o teste de que um pedido repetido não renderiza duas vezes). */
-    internal val renderedCount = java.util.concurrent.atomic.AtomicInteger()
+    /**
+     * Só para os testes: chamado a cada frame renderizado, **na thread que o renderizou** (a de fundo; ou a de quem chamou, no caminho
+     * determinístico) e antes de ele entrar no cache — quem a usa vê a ordem em que os frames chegam e pode segurar a thread de fundo para
+     * montar a fila que quiser. Nulo fora dos testes (custa uma leitura volátil por render). Não muda nada do que a orbe faz.
+     */
+    @Volatile
+    internal var onRendered: ((state: OrbPackState, index: Int) -> Unit)? = null
 
     /**
      * O bitmap do frame de [state] em [timeMs] para uma orbe de [sidePx] px de lado, ou `null` se nada do estado está pronto (a orbe
@@ -141,13 +146,15 @@ class PackOrb private constructor(private val pack: SkinPack) {
             failed.add(key)
             return null
         }
-        return try {
-            SvgRender.toBitmap(SvgRender.parse(svgText), key.side, key.side, SvgFit.MEET).also { renderedCount.incrementAndGet() }
+        val bitmap = try {
+            SvgRender.toBitmap(SvgRender.parse(svgText), key.side, key.side, SvgFit.MEET)
         } catch (e: Exception) {
             Log.w(TAG, "${pack.id}: frame ${key.state.key} #${key.index + 1} não desenha (${e.message})")
             failed.add(key)
-            null
+            return null
         }
+        onRendered?.invoke(key.state, key.index)
+        return bitmap
     }
 
     private class Task(val owner: PackOrb, val key: FrameKey, val priority: Int, val sequence: Long)
