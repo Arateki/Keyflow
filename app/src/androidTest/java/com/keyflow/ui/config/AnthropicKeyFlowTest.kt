@@ -210,10 +210,11 @@ class AnthropicKeyFlowTest {
         rule.waitUntil(15_000) { runCatching { rule.onNodeWithTag(REASONING_TEST_TIMES_TAG).assertIsDisplayed() }.isSuccess }
         rule.onNodeWithTag(REASONING_TEST_RESPONSE_TAG).assertTextContains("Olá da Claude!", substring = true)
 
-        // Servidor recebeu o cabeçalho Authorization: Bearer e anthropic-beta: oauth-2025-04-20
+        // Servidor recebeu o cabeçalho Authorization: Bearer e o anthropic-beta do login (oauth-2025-04-20 mais o da identidade
+        // Claude Code, que o AnthropicProvider manda junto desde a 629db54).
         val req = requests.last { it.path?.contains("/messages") == true }
         assertEquals("Bearer test-anthropic-oauth-token", req.getHeader("Authorization"))
-        assertEquals("oauth-2025-04-20", req.getHeader("anthropic-beta"))
+        assertEquals("oauth-2025-04-20,claude-code-20250219", req.getHeader("anthropic-beta"))
 
         // Desconectar apaga a credencial OAuth do cofre
         rule.onNodeWithTag(ANTHROPIC_DISCONNECT_TAG).performScrollTo().performClick()
