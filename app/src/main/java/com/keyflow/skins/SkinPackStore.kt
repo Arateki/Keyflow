@@ -272,11 +272,12 @@ class SkinPackStore(
 
         /**
          * A pasta dos pacotes deste app: `filesDir/skins`. É por aqui que o app, o IME e o overlay abrem os pacotes, então é aqui que a orbe fica
-         * sabendo quanta memória o aparelho aguenta ([OrbDeviceMemory.install]: antes disso o orçamento do cache não passa dos 16 MB) — uma vez
-         * por processo.
+         * sabendo quanta memória o aparelho aguenta ([OrbDeviceMemory.install]: antes disso o orçamento do cache não passa dos 16 MB) e a quantos Hz
+         * a tela atualiza ([OrbDisplay.install]) — uma vez por processo.
          */
         fun of(context: Context): SkinPackStore {
             OrbDeviceMemory.install(context)
+            OrbDisplay.install(context)
             return SkinPackStore(File(context.filesDir, "skins"))
         }
     }

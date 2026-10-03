@@ -70,6 +70,11 @@ class PackOrb private constructor(private val pack: SkinPack) {
     @Volatile
     private var active: Playback? = null
 
+    // O estado e o lado cujo aquecimento ficou esperando o primeiro desenho: numa tela mais lenta que a animação só o relógio diz QUAIS frames ela
+    // vai mostrar (a fase), então [prepare] não aquece às cegas e o primeiro frame que falta aquece o resto, na ordem em que a tela os mostra.
+    @Volatile
+    private var warmOnFirstDraw: Playback? = null
+
     /**
      * Só para os testes: chamado a cada frame renderizado, **na thread que o renderizou** (a de fundo; ou a de quem chamou, no caminho
      * determinístico) e antes de ele entrar no cache — quem a usa vê a ordem em que os frames chegam e pode segurar a thread de fundo para
@@ -104,7 +109,13 @@ class PackOrb private constructor(private val pack: SkinPack) {
         cursor[effective] = index
         request(key, URGENT)
         val ahead = lookaheadFor(pack.fpsOf(state), files.size)
-        for (step in 1..ahead) request(key.copy(index = (index + step) % files.size), AHEAD)
+        if (extended) {
+            // Só os frames que a tela vai mostrar: numa tela de 60 Hz, uma animação de 120 fps tem metade deles sem uso (ver [OrbTiming.framesShownAhead]).
+            for (shown in OrbTiming.framesShownAhead(timeMs, pack.fpsOf(state), files.size, OrbDisplay.refreshHz, ahead)) request(key.copy(index = shown), AHEAD)
+            warmOnFirstDraw?.let { if (it.state == effective && it.side == sidePx) warmShownFrames(effective, sidePx, timeMs, files.size) }
+        } else {
+            for (step in 1..ahead) request(key.copy(index = (index + step) % files.size), AHEAD)
+        }
         return lastShown[effective]?.takeIf { it.width == sidePx } ?: anyCached(effective, sidePx)
     }
 
@@ -122,7 +133,8 @@ class PackOrb private constructor(private val pack: SkinPack) {
     /**
      * Pré-aquece os frames de [state] (e só os que cabem na metade do cache) para a orbe de [sidePx] px: chamar ao entrar no estado e ao mudar o
      * tamanho. Num pacote que pede mais ([extended]) isto também reavalia o orçamento (cresce até o que o estado precisa; encolhe se o estado novo é
-     * leve) e, se o estado cabe inteiro no orçamento, aquece o estado inteiro.
+     * leve) e, se o estado cabe inteiro no orçamento, aquece o estado inteiro — ou, numa tela mais lenta que a animação ([OrbDisplay]), só os frames que ela
+     * mostra, no primeiro desenho.
      */
     fun prepare(state: OrbPackState, sidePx: Int) {
         if (closed || sidePx <= 0) return
@@ -133,7 +145,26 @@ class PackOrb private constructor(private val pack: SkinPack) {
         active = Playback(effective, sidePx)
         val budget = if (extended) noteDemand(sidePx, files.size, revise = true) else CACHE_BYTES
         val fit = if (extended && files.size * frameBytes <= budget) files.size else (budget / 2 / frameBytes).toInt().coerceAtLeast(1)
+        if (extended && OrbDisplay.refreshHz.let { it > 0f && it < pack.fpsOf(effective) }) {
+            // A tela mostra só uma parte dos frames: o aquecimento espera o primeiro desenho, que diz quais (ver [warmShownFrames]).
+            warmOnFirstDraw = Playback(effective, sidePx)
+            return
+        }
         for (index in 0 until minOf(files.size, fit)) request(FrameKey(ownerId, effective, index, sidePx), WARM)
+    }
+
+    /**
+     * Aquece os frames que a tela vai mostrar em uma volta inteira, a partir de [timeMs], na ordem em que ela os mostra — e só eles: numa tela de 60 Hz,
+     * uma animação de 120 fps tem metade dos frames sem uso, e renderizá-los e guardá-los seria CPU e memória jogadas fora (SKP-ORB-06). Se a fase mudar
+     * depois (uma volta que não fecha em quadros da tela; a tela trocando de 60 para 90 Hz), o frame que faltar é pedido como qualquer outro.
+     */
+    private fun warmShownFrames(state: OrbPackState, sidePx: Int, timeMs: Float, frameCount: Int) {
+        warmOnFirstDraw = null
+        val shown = OrbTiming.framesShownAhead(timeMs, pack.fpsOf(state), frameCount, OrbDisplay.refreshHz, frameCount)
+        val frameBytes = sidePx.toLong() * sidePx * BYTES_PER_PIXEL
+        val budget = cache.maxBytes
+        val fit = if (shown.size * frameBytes <= budget) shown.size else (budget / 2 / frameBytes).toInt().coerceAtLeast(1)
+        for (index in shown.take(fit)) request(FrameKey(ownerId, state, index, sidePx), WARM)
     }
 
     /**

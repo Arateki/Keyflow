@@ -26,6 +26,7 @@ class PackOrbBudgetTest {
     private lateinit var context: Context
     private val opened = mutableListOf<PackOrb>()
     private val mb = 1024L * 1024
+    private var realRefreshHz = 0f
 
     @Before
     fun setUp() {
@@ -33,6 +34,9 @@ class PackOrbBudgetTest {
         base = SkinPackFixtures.tempRoot(context.cacheDir)
         store = SkinPackStore(File(base, "skins"))
         OrbDeviceMemory.setCeilingForTest(48 * mb)
+        // Tela desconhecida (0): o lookahead pede todo frame seguinte. Os testes da tela mais lenta que a animação fixam a taxa que querem.
+        realRefreshHz = OrbDisplay.refreshHz
+        OrbDisplay.setRefreshHzForTest(0f)
     }
 
     @After
@@ -40,6 +44,7 @@ class PackOrbBudgetTest {
         opened.forEach { it.close() }
         // Devolve o teto que o aparelho de verdade dá, para as outras classes do processo não herdarem o do teste.
         OrbDeviceMemory.setCeilingForTest(OrbDeviceMemory.ceilingOf(context))
+        OrbDisplay.setRefreshHzForTest(realRefreshHz)
         base.deleteRecursively()
     }
 
@@ -238,6 +243,56 @@ class PackOrbBudgetTest {
         // Acima de 60: o quarto de segundo inteiro.
         assertEquals((0..22).toList(), liveRequest(fps = 90, frames = 100))
         assertEquals("a 120 fps são 30 frames à frente", (0..30).toList(), liveRequest(fps = 120, frames = 150))
+    }
+
+    @Test
+    fun aScreenSlowerThanTheAnimationOnlyGetsTheFramesItShows() {
+        // 120 fps numa tela de 60 Hz: um frame sim, outro não. O frame de agora e só os que a tela vai mostrar nos próximos 30 frames são renderizados.
+        OrbDisplay.setRefreshHzForTest(60f)
+        val rendered = liveRequest(fps = 120, frames = 150)
+        val expected = (listOf(0) + OrbTiming.framesShownAhead(0f, 120, 150, 60f, 30)).sorted()
+        assertEquals(expected, rendered)
+        assertTrue("só metade dos frames da janela: $rendered", rendered.size <= 17)
+        assertTrue("e todos de índice par (a fase do relógio em t=0): $rendered", rendered.all { it % 2 == 0 })
+        // A 90 Hz, três de cada quatro.
+        OrbDisplay.setRefreshHzForTest(90f)
+        val at90 = liveRequest(fps = 120, frames = 150)
+        assertTrue("a 90 Hz o 3 mod 4 fica de fora: $at90", at90.none { it % 4 == 3 })
+        assertTrue("e vem mais que a 60 Hz: ${at90.size} contra ${rendered.size}", at90.size > rendered.size)
+    }
+
+    @Test
+    fun aScreenSlowerThanTheAnimationWarmsOnlyWhatItShowsAndOnlyAtTheFirstDraw() {
+        OrbDisplay.setRefreshHzForTest(60f)
+        val orb = open("Amostrado", mapOf("idle" to 150), fps = 120)
+        val rendered = CopyOnWriteArrayList<Int>()
+        orb.onRendered = { _, index -> rendered += index }
+        orb.prepare(OrbPackState.IDLE, 64)
+        Thread.sleep(400)
+        assertTrue("sem desenho, nada é aquecido às cegas: $rendered", rendered.isEmpty())
+        orb.frameFor(OrbPackState.IDLE, 0f, 64, deterministic = false) // o primeiro frame que falta aquece a volta
+        var previous = -1
+        waitUntil("o aquecimento não assentou") {
+            Thread.sleep(200)
+            val now = rendered.size
+            val settled = now > 20 && now == previous
+            previous = now
+            settled
+        }
+        val shown = rendered.sorted()
+        assertTrue("uma volta de 150 frames a 120 fps numa tela de 60 Hz tem ~75 frames visíveis: ${shown.size}", shown.size in 73..76)
+        assertTrue("todos de índice par: $shown", shown.all { it % 2 == 0 })
+        // E o frame seguinte que a tela pede (o 2, no desenho de 16,7 ms) já está pronto.
+        assertNotNull(orb.frameFor(OrbPackState.IDLE, 16.7f, 64, deterministic = false))
+    }
+
+    @Test
+    fun theDisplayRateOnlyChangesWhatPacksThatAskForMoreRequest() {
+        // Um pacote dos limites de antes (60 fps) pede o mesmo lookahead com a tela em 30, 60 ou 90 Hz: o caminho dele não olha a tela.
+        for (hz in listOf(0f, 30f, 60f, 90f)) {
+            OrbDisplay.setRefreshHzForTest(hz)
+            assertEquals("tela a $hz Hz", (0..12).toList(), liveRequest(fps = 60, frames = 40))
+        }
     }
 
     @Test
