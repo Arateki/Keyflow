@@ -19,8 +19,9 @@ shift
 [ "$#" -gt 0 ] || { echo "uso: stress-routes.sh <rodadas> <rota>..." >&2; exit 2; }
 ROUTES=("$@")
 
+# Sempre o emulador: sem `ANDROID_SERIAL`, o `adb` pegaria o único aparelho conectado — que pode ser o físico do Yan.
 adbx() {
-  if [ -n "${ANDROID_SERIAL:-}" ]; then adb -s "$ANDROID_SERIAL" "$@"; else adb "$@"; fi
+  adb -s "${ANDROID_SERIAL:-emulator-5554}" "$@"
 }
 
 alive() { [ "$(adbx get-state 2>/dev/null)" = device ]; }
