@@ -14,6 +14,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -141,6 +142,14 @@ object RouteCatalog {
         // Rose Gold (2026-09-29): a esfera de metal rosé, parada e gravando.
         orbRoute("overlay-rosegold-idle", OrbState.Idle, OrbCenter.None, OrbStyle.ROSE_GOLD),
         orbRoute("overlay-rosegold-recording", OrbState.Listening, OrbCenter.Time(12), OrbStyle.ROSE_GOLD),
+        // O Ouvi (2026-10-02): o mascote da orbe, um por estado; a placa e a "folha" põem tudo o que o app escreve no centro
+        // sobre a barriga, em fundo branco e preto lado a lado, e os "tamanhos" mostram o que o slider da aba Sobrepor dá.
+        orbRoute("overlay-mascot-idle", OrbState.Idle, OrbCenter.None, OrbStyle.MASCOT, timeMs = mascotStillMs(OrbState.Idle)),
+        orbRoute("overlay-mascot-recording", OrbState.Listening, OrbCenter.Time(12), OrbStyle.MASCOT, timeMs = mascotStillMs(OrbState.Listening)),
+        orbRoute("overlay-mascot-paused", OrbState.Paused, OrbCenter.PauseGlyph(12), OrbStyle.MASCOT, timeMs = mascotStillMs(OrbState.Paused)),
+        orbRoute("overlay-mascot-transcribing", OrbState.Transcribing, OrbCenter.None, OrbStyle.MASCOT, timeMs = mascotStillMs(OrbState.Transcribing)),
+        mascotBoardRoute("overlay-mascot-claro-escuro"),
+        mascotSizesRoute("overlay-mascot-tamanhos"),
         // Teclado reskinado (T23), grade Canvas (KC-T10, padrão único desde a promoção): View hospedado
         // via AndroidView, ancorado ao rodapé.
         keyboardRoute("keyboard-canvas-expanded", expanded = true, recording = false),
@@ -263,6 +272,8 @@ object RouteCatalog {
         // A seção Skins das duas abas (fica abaixo da dobra nas telas acima): a da orbe, na Sobrepor, e a do
         // teclado, na Teclado — escolhas separadas (Yan, 2026-09-29), aqui com o Aero marcado nas duas.
         Route("config-overlay-skins") { SkinsRoute(orb = true) },
+        // A mesma seção com o Mascote escolhido: o anel no cartão novo.
+        Route("config-overlay-skins-mascote") { SkinsRoute(orb = true, selectedOrb = "mascot") },
         Route("config-teclado-skins") { SkinsRoute(orb = false) },
         // As abas novas (Notificação, Visão, Raciocínio, Voz), ainda vazias: só o cabeçalho com o nome e o menu com os ícones.
         Route("config-visao") { ConfigTabRoute(ConfigTab.VISAO) },
@@ -861,14 +872,81 @@ object RouteCatalog {
         }
     }
 
+    /**
+     * O instante em que o mascote é congelado nas rotas: o relógio fixo de 1234 ms cairia no meio de uma piscada (e de uma
+     * tremida de orelha), e o quadro parado mostraria o olho fechado. Estes instantes têm o olho aberto e as orelhas em
+     * repouso (conferidos no [com.keyflow.ui.orb.MascotTimeline]); em repouso e pensando, o olhar já está de lado.
+     */
+    private fun mascotStillMs(state: OrbState): Float = when (state) {
+        OrbState.Idle -> 10_200f
+        OrbState.Listening -> 1_850f
+        OrbState.Paused -> 1_050f
+        OrbState.Transcribing -> 2_225f
+    }
+
+    /** Cada estado e cada coisa que o app escreve no centro, no tamanho padrão da orbe, sobre branco (esquerda) e preto (direita). */
+    private fun mascotBoardRoute(key: String): Route = Route(key) {
+        val side = with(androidx.compose.ui.platform.LocalDensity.current) { 156.toDp() }
+        val rows = listOf(
+            OrbState.Idle to OrbCenter.None,
+            OrbState.Listening to OrbCenter.Time(12),
+            OrbState.Paused to OrbCenter.PauseGlyph(12),
+            OrbState.Transcribing to OrbCenter.None,
+            OrbState.Paused to OrbCenter.CancelGlyph(12),
+            OrbState.Idle to OrbCenter.ErrorGlyph,
+        )
+        androidx.compose.foundation.layout.Row(Modifier.fillMaxSize()) {
+            for (bg in listOf(Color.White, Color.Black)) {
+                Column(
+                    Modifier.weight(1f).fillMaxSize().background(bg),
+                    verticalArrangement = Arrangement.SpaceEvenly,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    for ((state, center) in rows) {
+                        VoiceOrb(state, Modifier.requiredSize(side), center = center, timeProvider = { mascotStillMs(state) }, style = OrbStyle.MASCOT)
+                    }
+                }
+            }
+        }
+    }
+
+    /** O mascote nos tamanhos que o slider da aba Sobrepor dá (110 a 280 px), em repouso e gravando, sobre branco e sobre preto. */
+    private fun mascotSizesRoute(key: String): Route = Route(key) {
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        val sizes = listOf(110, 156, 195, 280)
+        Column(Modifier.fillMaxSize()) {
+            for (bg in listOf(Color.White, Color.Black)) {
+                Column(
+                    Modifier.weight(1f).fillMaxWidth().background(bg),
+                    verticalArrangement = Arrangement.SpaceEvenly,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    for (withTime in listOf(false, true)) {
+                        androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                            for (px in sizes) {
+                                VoiceOrb(
+                                    if (withTime) OrbState.Listening else OrbState.Idle,
+                                    Modifier.requiredSize(with(density) { px.toDp() }),
+                                    center = if (withTime) OrbCenter.Time(12) else OrbCenter.None,
+                                    timeProvider = { mascotStillMs(if (withTime) OrbState.Listening else OrbState.Idle) },
+                                    style = OrbStyle.MASCOT,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /** A seção Skins de uma aba, sozinha num cartão: [orb] = a da Sobrepor (orbe), senão a do Teclado. */
     @Composable
-    private fun SkinsRoute(orb: Boolean) {
+    private fun SkinsRoute(orb: Boolean, selectedOrb: String = "aero") {
         Box(Modifier.fillMaxSize().background(LocalKeyFlowPalette.current.bg).padding(16.dp)) {
             SettingsGroup(null) {
                 if (orb) {
                     SkinsSection(
-                        selectedOrbSkin = "aero",
+                        selectedOrbSkin = selectedOrb,
                         onOrbSkinSelected = {},
                         onUnlock = {},
                         unlockTag = "gallery-unlock",

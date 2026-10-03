@@ -124,4 +124,13 @@ class VoiceOrbTest {
         for (style in OrbStyle.entries) assertThat(orbStyleFor(style.id)).isEqualTo(style)
         assertThat(orbStyleFor("nao-existe")).isEqualTo(OrbStyle.ATELIE)
     }
+
+    @Test
+    fun `mascot is a paid orb style that orbStyleFor finds by id`() {
+        assertThat(orbStyleFor("mascot")).isEqualTo(OrbStyle.MASCOT)
+        assertThat(OrbStyle.MASCOT.paid).isTrue()
+        assertThat(OrbStyle.MASCOT.id).isEqualTo("mascot")
+        // Todo id de estilo continua voltando ao próprio estilo, o novo incluído.
+        for (style in OrbStyle.entries) assertThat(orbStyleFor(style.id)).isEqualTo(style)
+    }
 }

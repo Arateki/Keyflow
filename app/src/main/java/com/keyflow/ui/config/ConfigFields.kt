@@ -922,6 +922,17 @@ internal fun SkinsSection(
                         VoiceOrb(OrbState.Idle, Modifier.requiredSize(ORB_CHOICE_SIDE), timeProvider = ORB_CHOICE_CLOCK, style = OrbStyle.ROSE_GOLD)
                     }
                 }
+                SkinChoice(
+                    label = tr("Mascote"),
+                    selected = orbSelected == OrbStyle.MASCOT,
+                    onClick = { onOrbSkinSelected(OrbStyle.MASCOT.id) },
+                    tag = orbSkinTag(OrbStyle.MASCOT.id),
+                ) {
+                    // Menor que as outras prévias: as orelhas do mascote passam do miolo da orbe, e o cartão recorta o que sobra.
+                    Box(Modifier.fillMaxSize().background(palette.bg), contentAlignment = Alignment.Center) {
+                        VoiceOrb(OrbState.Idle, Modifier.requiredSize(ORB_MASCOT_CHOICE_SIDE), timeProvider = ORB_MASCOT_CHOICE_CLOCK, style = OrbStyle.MASCOT)
+                    }
+                }
             } else if (onSkinSelected == null) {
                 SkinSwatch(palette.fg)
                 SkinSwatch(palette.teal, selected = true)
@@ -1000,10 +1011,10 @@ internal fun SkinsSection(
                     }
                 }
             }
-            // Amostras travadas (decorativas) para completar a fileira de cinco: o teclado tem 5 escolhas (nenhuma sobra) e
-            // a orbe 4 (sobra 1).
+            // Amostras travadas (decorativas) para completar a fileira de cinco: o teclado tem 5 escolhas e a orbe também 5 (com o
+            // Mascote), então só a seção sem escolha nenhuma precisa delas.
             if (onSkinSelected == null && onOrbSkinSelected == null) SkinSwatch(palette.terracotta)
-            if (onSkinSelected == null) SkinSwatch(palette.bg, border = true)
+            if (onSkinSelected == null && onOrbSkinSelected == null) SkinSwatch(palette.bg, border = true)
         }
         Row(
             Modifier
@@ -1045,6 +1056,13 @@ private val ORB_GLITCH_CHOICE_CLOCK: () -> Float = { glitchBurstMidMs(OrbState.I
 
 /** Lado da orbe de prévia (maior que o cartão de 40dp: o cartão recorta o excesso, e o miolo cabe). */
 private val ORB_CHOICE_SIDE = 60.dp
+
+/**
+ * A prévia do mascote: o relógio parado num instante de olhos abertos e orelhas em repouso (o de 1234 ms cairia no meio de uma
+ * piscada), e menor que as outras — as orelhas e o corpo cabem inteiros no cartão de 40dp.
+ */
+private val ORB_MASCOT_CHOICE_CLOCK: () -> Float = { 1_500f }
+private val ORB_MASCOT_CHOICE_SIDE = 44.dp
 
 /** Céu e colina da paisagem Aero, de cima para baixo — o fundo das prévias do Aero (teclado e orbe). */
 private fun aeroSkyColors(dark: Boolean): List<Color> = if (dark) {

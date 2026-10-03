@@ -165,6 +165,7 @@ internal val TranslationsEn: Map<String, String> = mapOf(
     "sugestões" to "suggestions",
     "Alternar" to "Toggle",
     "Ateliê" to "Atelier",
+    "Mascote" to "Mascot",
     "Bloqueado" to "Locked",
     "Desbloquear skins" to "Unlock skins",
     "Sistema" to "System",
