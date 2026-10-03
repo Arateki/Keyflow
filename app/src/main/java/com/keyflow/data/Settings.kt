@@ -16,7 +16,8 @@ import com.keyflow.core.FalaSource
  * Os campos `custom*` compartilham as chaves legadas do DataStore (endpoint/header/model/language),
  * de modo que `SettingsRepository.flow()`/`save()` continuam válidos durante a migração (T10/T22).
  *
- * Tokens (`openaiToken`, `groqToken`, `customHeaderValue`) ficam **criptografados** e são preservados
+ * Os segredos (tokens, chaves de API, senha e chave privada SSH, valores de cabeçalho de autenticação —
+ * ver [SettingsSecrets.BY_PROPERTY]) ficam **criptografados**, fora do DataStore e do backup, e são preservados
  * ao trocar de preset — trocar a `source` nunca apaga a credencial de outro provedor.
  */
 data class Settings(
@@ -40,7 +41,8 @@ data class Settings(
     val localModelId: String? = null,
     val localLanguage: String? = null,
     // Raciocínio (reasoning-models): a origem, o modelo de texto local escolhido (id do catálogo `TEXT`; null =
-    // nenhum) e os modelos em nuvem (OpenAI, Anthropic, Google, Custom). Nenhuma credencial aqui: ficam no cofre de `auth/` (AUTH-02).
+    // nenhum) e os modelos em nuvem (OpenAI, Anthropic, Google, Custom). As credenciais dos provedores com login ficam no cofre
+    // de `auth/` (AUTH-02); só o valor do cabeçalho do Custom é segredo das Settings (cofre cifrado, ver [SettingsSecrets]).
     val reasoningSource: ReasoningSource = ReasoningSource.LOCAL,
     val reasoningLocalModelId: String? = null,
     val reasoningOpenAiModel: String = "",

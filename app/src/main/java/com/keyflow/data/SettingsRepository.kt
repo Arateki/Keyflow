@@ -3,6 +3,7 @@ package com.keyflow.data
 import android.content.Context
 import android.content.SharedPreferences
 import android.os.Build
+import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.MutablePreferences
@@ -34,6 +35,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import java.io.File
 
 class SettingsRepository(
@@ -175,8 +177,14 @@ class SettingsRepository(
      * O DataStore inteiro, chave por chave, como está gravado. Existe para o gate de instrumentados
      * guardar a config de quem é dono do aparelho antes de rodar a suíte no estado de fábrica
      * (`FactorySettingsListener`, androidTest) — nenhuma tela do app usa isto.
+     *
+     * Migra antes os segredos que um build antigo deixou em claro ([migrateLegacySecrets]): o gate copia o que
+     * lê para um arquivo em `files/`, que seria mais uma cópia em claro (e no backup) do segredo.
      */
-    internal suspend fun rawPreferencesOnce(): Preferences = dataStore.data.first()
+    internal suspend fun rawPreferencesOnce(): Preferences {
+        migrateLegacySecrets()
+        return dataStore.data.first()
+    }
 
     /** Troca o DataStore inteiro por [prefs]; vazio = estado de fábrica. Par de [rawPreferencesOnce]. */
     internal suspend fun replaceRawPreferences(prefs: Preferences) {
@@ -208,22 +216,23 @@ class SettingsRepository(
 
     /**
      * Estado completo de configuração (T5). Os campos `custom*` compartilham as chaves legadas;
-     * tokens de preset vêm do armazenamento criptografado e são preservados entre trocas de origem.
+     * os segredos (tokens, chaves de API, senha e chave SSH, valores de cabeçalho — [SettingsSecrets.BY_PROPERTY])
+     * vêm do armazenamento criptografado e são preservados entre trocas de origem.
      */
-    fun settingsFlow(): Flow<Settings> = dataStore.data.map { prefs ->
+    fun settingsFlow(): Flow<Settings> = dataStore.data.onStart { migrateLegacySecrets() }.map { prefs ->
         val mirrorUrl = prefs[CUSTOM_MODEL_MIRROR_URL]?.ifBlank { null }
         ModelProvisioning.customMirrorUrl = mirrorUrl
         Settings(
             source = prefs[SOURCE].toSource(),
             customEndpoint = prefs[ENDPOINT_URL].orEmpty(),
             customHeaderName = prefs[AUTH_HEADER_NAME] ?: "Authorization",
-            customHeaderValue = securePrefs.getString(AUTH_HEADER_VALUE, "").orEmpty(),
+            customHeaderValue = securePrefs.getString(SettingsSecrets.AUTH_HEADER_VALUE, "").orEmpty(),
             customModel = prefs[MODEL] ?: "whisper-1",
             customLanguage = prefs[LANGUAGE]?.takeIf { it.isNotBlank() },
-            openaiToken = securePrefs.getString(OPENAI_TOKEN, "").orEmpty(),
+            openaiToken = securePrefs.getString(SettingsSecrets.OPENAI_TOKEN, "").orEmpty(),
             openaiModel = prefs[OPENAI_MODEL] ?: Settings.OPENAI_MODEL,
             openaiLanguage = prefs[OPENAI_LANGUAGE]?.takeIf { it.isNotBlank() },
-            groqToken = securePrefs.getString(GROQ_TOKEN, "").orEmpty(),
+            groqToken = securePrefs.getString(SettingsSecrets.GROQ_TOKEN, "").orEmpty(),
             groqModel = prefs[GROQ_MODEL] ?: Settings.GROQ_MODEL,
             groqLanguage = prefs[GROQ_LANGUAGE]?.takeIf { it.isNotBlank() },
             localModelId = prefs[LOCAL_MODEL_ID]?.takeIf { it.isNotBlank() },
@@ -235,54 +244,54 @@ class SettingsRepository(
             reasoningGoogleModel = prefs[REASONING_GOOGLE_MODEL] ?: "gemini-2.0-flash",
             reasoningCustomEndpoint = prefs[REASONING_CUSTOM_ENDPOINT].orEmpty(),
             reasoningCustomHeaderName = prefs[REASONING_CUSTOM_HEADER_NAME] ?: "Authorization",
-            reasoningCustomHeaderValue = prefs[REASONING_CUSTOM_HEADER_VALUE].orEmpty(),
+            reasoningCustomHeaderValue = secret(prefs, SettingsSecrets.REASONING_CUSTOM_HEADER_VALUE),
             reasoningCustomModel = prefs[REASONING_CUSTOM_MODEL].orEmpty(),
             visionSource = prefs[VISION_SOURCE].toVisionSource(),
             visionLocalModelId = prefs[VISION_LOCAL_MODEL_ID]?.takeIf { it.isNotBlank() },
             visionTranslateTarget = prefs[VISION_TRANSLATE_TARGET] ?: "pt",
             visionOpenAiModel = prefs[VISION_OPENAI_MODEL] ?: "gpt-4o",
-            visionGoogleApiKey = prefs[VISION_GOOGLE_API_KEY].orEmpty(),
+            visionGoogleApiKey = secret(prefs, SettingsSecrets.VISION_GOOGLE_API_KEY),
             visionGoogleModel = prefs[VISION_GOOGLE_MODEL] ?: "gemini-2.0-flash",
-            visionAnthropicApiKey = prefs[VISION_ANTHROPIC_API_KEY].orEmpty(),
+            visionAnthropicApiKey = secret(prefs, SettingsSecrets.VISION_ANTHROPIC_API_KEY),
             visionAnthropicModel = prefs[VISION_ANTHROPIC_MODEL] ?: "claude-3-5-sonnet-latest",
             visionCustomEndpoint = prefs[VISION_CUSTOM_ENDPOINT].orEmpty(),
             visionCustomHeaderName = prefs[VISION_CUSTOM_HEADER_NAME] ?: "Authorization",
-            visionCustomHeaderValue = prefs[VISION_CUSTOM_HEADER_VALUE].orEmpty(),
+            visionCustomHeaderValue = secret(prefs, SettingsSecrets.VISION_CUSTOM_HEADER_VALUE),
             visionCustomModel = prefs[VISION_CUSTOM_MODEL].orEmpty(),
             falaSource = prefs[FALA_SOURCE].toFalaSource(),
             falaLocalModelId = prefs[FALA_LOCAL_MODEL_ID]?.takeIf { it.isNotBlank() },
             falaSpeed = prefs[FALA_SPEED] ?: 1.0f,
             falaCloudVoice = prefs[FALA_CLOUD_VOICE] ?: "alloy",
-            falaElevenLabsApiKey = prefs[FALA_ELEVENLABS_API_KEY].orEmpty(),
+            falaElevenLabsApiKey = secret(prefs, SettingsSecrets.FALA_ELEVENLABS_API_KEY),
             falaElevenLabsVoice = prefs[FALA_ELEVENLABS_VOICE] ?: "Rachel",
             falaElevenLabsModel = prefs[FALA_ELEVENLABS_MODEL] ?: "eleven_multilingual_v2",
-            falaGoogleApiKey = prefs[FALA_GOOGLE_API_KEY].orEmpty(),
+            falaGoogleApiKey = secret(prefs, SettingsSecrets.FALA_GOOGLE_API_KEY),
             falaGoogleVoice = prefs[FALA_GOOGLE_VOICE] ?: "pt-BR-Neural2-A",
             falaCustomEndpoint = prefs[FALA_CUSTOM_ENDPOINT].orEmpty(),
             falaCustomHeaderName = prefs[FALA_CUSTOM_HEADER_NAME] ?: "Authorization",
-            falaCustomHeaderValue = prefs[FALA_CUSTOM_HEADER_VALUE].orEmpty(),
+            falaCustomHeaderValue = secret(prefs, SettingsSecrets.FALA_CUSTOM_HEADER_VALUE),
             falaCustomModel = prefs[FALA_CUSTOM_MODEL].orEmpty(),
             computerMode = prefs[COMPUTER_MODE] ?: "ssh",
             computerSshHost = prefs[COMPUTER_SSH_HOST].orEmpty(),
             computerSshPort = prefs[COMPUTER_SSH_PORT] ?: 22,
             computerSshUser = prefs[COMPUTER_SSH_USER].orEmpty(),
             computerSshAuthType = prefs[COMPUTER_SSH_AUTH_TYPE] ?: "password",
-            computerSshPassword = prefs[COMPUTER_SSH_PASSWORD].orEmpty(),
-            computerSshKey = prefs[COMPUTER_SSH_KEY].orEmpty(),
+            computerSshPassword = secret(prefs, SettingsSecrets.COMPUTER_SSH_PASSWORD),
+            computerSshKey = secret(prefs, SettingsSecrets.COMPUTER_SSH_KEY),
             customModelMirrorUrl = prefs[CUSTOM_MODEL_MIRROR_URL].orEmpty(),
-            providerAnthropicApiKey = prefs[PROVIDER_ANTHROPIC_API_KEY].orEmpty(),
+            providerAnthropicApiKey = secret(prefs, SettingsSecrets.PROVIDER_ANTHROPIC_API_KEY),
             providerAnthropicModel = prefs[PROVIDER_ANTHROPIC_MODEL] ?: "claude-3-5-sonnet-latest",
             providerAnthropicAuthMode = prefs[PROVIDER_ANTHROPIC_AUTH_MODE] ?: "subscription",
-            providerOpenAiApiKey = prefs[PROVIDER_OPENAI_API_KEY].orEmpty(),
+            providerOpenAiApiKey = secret(prefs, SettingsSecrets.PROVIDER_OPENAI_API_KEY),
             providerOpenAiModel = prefs[PROVIDER_OPENAI_MODEL] ?: "gpt-4o",
             providerOpenAiAuthMode = prefs[PROVIDER_OPENAI_AUTH_MODE] ?: "subscription",
-            providerGoogleApiKey = prefs[PROVIDER_GOOGLE_API_KEY].orEmpty(),
+            providerGoogleApiKey = secret(prefs, SettingsSecrets.PROVIDER_GOOGLE_API_KEY),
             providerGoogleModel = prefs[PROVIDER_GOOGLE_MODEL] ?: "gemini-2.0-flash",
             providerGoogleAuthMode = prefs[PROVIDER_GOOGLE_AUTH_MODE] ?: "subscription",
             providerElevenLabsAuthMode = prefs[PROVIDER_ELEVENLABS_AUTH_MODE] ?: "subscription",
-            providerGroqApiKey = prefs[PROVIDER_GROQ_API_KEY].orEmpty(),
+            providerGroqApiKey = secret(prefs, SettingsSecrets.PROVIDER_GROQ_API_KEY),
             providerGroqModel = prefs[PROVIDER_GROQ_MODEL] ?: "llama-3.3-70b-versatile",
-            providerGrokApiKey = prefs[PROVIDER_GROK_API_KEY].orEmpty(),
+            providerGrokApiKey = secret(prefs, SettingsSecrets.PROVIDER_GROK_API_KEY),
             providerGrokModel = prefs[PROVIDER_GROK_MODEL] ?: "grok-2",
             overlayModeEnabled = prefs[OVERLAY_MODE_ENABLED] ?: false,
             keyboardModeEnabled = prefs[KEYBOARD_MODE_ENABLED] ?: false,
@@ -319,18 +328,37 @@ class SettingsRepository(
     }
 
     /**
-     * Persiste o estado completo (T5). Tokens criptografados; `null` em texto remove a chave do DataStore.
-     * Não apaga credenciais de outros provedores — todos os 3 tokens são reescritos a partir de [settings].
+     * Persiste o estado completo (T5). Segredos criptografados; `null` em texto remove a chave do DataStore.
+     * Não apaga credenciais de outros provedores — todos os segredos ([SettingsSecrets.BY_PROPERTY]) são
+     * reescritos a partir de [settings]. Só depois de o cofre confirmar o `commit()` o DataStore é tocado, e então
+     * qualquer cópia em claro que um build antigo tenha deixado lá é removida (ver [migrateLegacySecrets]).
      */
     suspend fun saveSettings(settings: Settings) {
-        val committed = securePrefs.edit()
-            .putString(AUTH_HEADER_VALUE, settings.customHeaderValue)
-            .putString(OPENAI_TOKEN, settings.openaiToken)
-            .putString(GROQ_TOKEN, settings.groqToken)
-            .commit()
+        val committed = synchronized(SettingsSecrets.LOCK) {
+            securePrefs.edit()
+                .putString(SettingsSecrets.AUTH_HEADER_VALUE, settings.customHeaderValue)
+                .putString(SettingsSecrets.OPENAI_TOKEN, settings.openaiToken)
+                .putString(SettingsSecrets.GROQ_TOKEN, settings.groqToken)
+                .putString(SettingsSecrets.REASONING_CUSTOM_HEADER_VALUE, settings.reasoningCustomHeaderValue)
+                .putString(SettingsSecrets.VISION_GOOGLE_API_KEY, settings.visionGoogleApiKey)
+                .putString(SettingsSecrets.VISION_ANTHROPIC_API_KEY, settings.visionAnthropicApiKey)
+                .putString(SettingsSecrets.VISION_CUSTOM_HEADER_VALUE, settings.visionCustomHeaderValue)
+                .putString(SettingsSecrets.FALA_ELEVENLABS_API_KEY, settings.falaElevenLabsApiKey)
+                .putString(SettingsSecrets.FALA_GOOGLE_API_KEY, settings.falaGoogleApiKey)
+                .putString(SettingsSecrets.FALA_CUSTOM_HEADER_VALUE, settings.falaCustomHeaderValue)
+                .putString(SettingsSecrets.COMPUTER_SSH_PASSWORD, settings.computerSshPassword)
+                .putString(SettingsSecrets.COMPUTER_SSH_KEY, settings.computerSshKey)
+                .putString(SettingsSecrets.PROVIDER_ANTHROPIC_API_KEY, settings.providerAnthropicApiKey)
+                .putString(SettingsSecrets.PROVIDER_OPENAI_API_KEY, settings.providerOpenAiApiKey)
+                .putString(SettingsSecrets.PROVIDER_GOOGLE_API_KEY, settings.providerGoogleApiKey)
+                .putString(SettingsSecrets.PROVIDER_GROQ_API_KEY, settings.providerGroqApiKey)
+                .putString(SettingsSecrets.PROVIDER_GROK_API_KEY, settings.providerGrokApiKey)
+                .commit()
+        }
         check(committed) { "Unable to persist provider tokens" }
 
         dataStore.edit { prefs ->
+            SettingsSecrets.LEGACY_IN_DATASTORE.forEach { prefs.remove(it) }
             prefs[SOURCE] = settings.source.name
             prefs[ENDPOINT_URL] = settings.customEndpoint
             prefs[AUTH_HEADER_NAME] = settings.customHeaderName
@@ -349,55 +377,41 @@ class SettingsRepository(
             prefs[REASONING_GOOGLE_MODEL] = settings.reasoningGoogleModel
             prefs[REASONING_CUSTOM_ENDPOINT] = settings.reasoningCustomEndpoint
             prefs[REASONING_CUSTOM_HEADER_NAME] = settings.reasoningCustomHeaderName
-            prefs[REASONING_CUSTOM_HEADER_VALUE] = settings.reasoningCustomHeaderValue
             prefs[REASONING_CUSTOM_MODEL] = settings.reasoningCustomModel
             prefs[VISION_SOURCE] = settings.visionSource.name
             settings.visionLocalModelId.putOrRemove(prefs, VISION_LOCAL_MODEL_ID)
             prefs[VISION_TRANSLATE_TARGET] = settings.visionTranslateTarget
             prefs[VISION_OPENAI_MODEL] = settings.visionOpenAiModel
-            prefs[VISION_GOOGLE_API_KEY] = settings.visionGoogleApiKey
             prefs[VISION_GOOGLE_MODEL] = settings.visionGoogleModel
-            prefs[VISION_ANTHROPIC_API_KEY] = settings.visionAnthropicApiKey
             prefs[VISION_ANTHROPIC_MODEL] = settings.visionAnthropicModel
             prefs[VISION_CUSTOM_ENDPOINT] = settings.visionCustomEndpoint
             prefs[VISION_CUSTOM_HEADER_NAME] = settings.visionCustomHeaderName
-            prefs[VISION_CUSTOM_HEADER_VALUE] = settings.visionCustomHeaderValue
             prefs[VISION_CUSTOM_MODEL] = settings.visionCustomModel
             prefs[FALA_SOURCE] = settings.falaSource.name
             settings.falaLocalModelId.putOrRemove(prefs, FALA_LOCAL_MODEL_ID)
             prefs[FALA_SPEED] = settings.falaSpeed
             prefs[FALA_CLOUD_VOICE] = settings.falaCloudVoice
-            prefs[FALA_ELEVENLABS_API_KEY] = settings.falaElevenLabsApiKey
             prefs[FALA_ELEVENLABS_VOICE] = settings.falaElevenLabsVoice
             prefs[FALA_ELEVENLABS_MODEL] = settings.falaElevenLabsModel
-            prefs[FALA_GOOGLE_API_KEY] = settings.falaGoogleApiKey
             prefs[FALA_GOOGLE_VOICE] = settings.falaGoogleVoice
             prefs[FALA_CUSTOM_ENDPOINT] = settings.falaCustomEndpoint
             prefs[FALA_CUSTOM_HEADER_NAME] = settings.falaCustomHeaderName
-            prefs[FALA_CUSTOM_HEADER_VALUE] = settings.falaCustomHeaderValue
             prefs[FALA_CUSTOM_MODEL] = settings.falaCustomModel
             prefs[COMPUTER_MODE] = settings.computerMode
             prefs[COMPUTER_SSH_HOST] = settings.computerSshHost
             prefs[COMPUTER_SSH_PORT] = settings.computerSshPort
             prefs[COMPUTER_SSH_USER] = settings.computerSshUser
             prefs[COMPUTER_SSH_AUTH_TYPE] = settings.computerSshAuthType
-            prefs[COMPUTER_SSH_PASSWORD] = settings.computerSshPassword
-            prefs[COMPUTER_SSH_KEY] = settings.computerSshKey
             prefs[CUSTOM_MODEL_MIRROR_URL] = settings.customModelMirrorUrl
             ModelProvisioning.customMirrorUrl = settings.customModelMirrorUrl.ifBlank { null }
-            prefs[PROVIDER_ANTHROPIC_API_KEY] = settings.providerAnthropicApiKey
             prefs[PROVIDER_ANTHROPIC_MODEL] = settings.providerAnthropicModel
             prefs[PROVIDER_ANTHROPIC_AUTH_MODE] = settings.providerAnthropicAuthMode
-            prefs[PROVIDER_OPENAI_API_KEY] = settings.providerOpenAiApiKey
             prefs[PROVIDER_OPENAI_MODEL] = settings.providerOpenAiModel
             prefs[PROVIDER_OPENAI_AUTH_MODE] = settings.providerOpenAiAuthMode
-            prefs[PROVIDER_GOOGLE_API_KEY] = settings.providerGoogleApiKey
             prefs[PROVIDER_GOOGLE_MODEL] = settings.providerGoogleModel
             prefs[PROVIDER_GOOGLE_AUTH_MODE] = settings.providerGoogleAuthMode
             prefs[PROVIDER_ELEVENLABS_AUTH_MODE] = settings.providerElevenLabsAuthMode
-            prefs[PROVIDER_GROQ_API_KEY] = settings.providerGroqApiKey
             prefs[PROVIDER_GROQ_MODEL] = settings.providerGroqModel
-            prefs[PROVIDER_GROK_API_KEY] = settings.providerGrokApiKey
             prefs[PROVIDER_GROK_MODEL] = settings.providerGrokModel
             prefs[OVERLAY_MODE_ENABLED] = settings.overlayModeEnabled
             prefs[KEYBOARD_MODE_ENABLED] = settings.keyboardModeEnabled
@@ -433,6 +447,29 @@ class SettingsRepository(
         if (this.isNullOrBlank()) prefs.remove(key) else prefs[key] = this
     }
 
+    /** O segredo [name]: o do cofre; ver [SettingsSecrets.read] para o caso do que ainda está em claro no DataStore. */
+    private fun secret(prefs: Preferences, name: String): String = SettingsSecrets.read(securePrefs, prefs, name)
+
+    /**
+     * Segredos que builds de desenvolvimento gravaram em claro no DataStore ([SettingsSecrets.LEGACY_IN_DATASTORE]):
+     * se o cofre ainda não tem o valor, copia para ele e **só depois** de o `commit()` confirmar remove a chave do
+     * DataStore. Roda ao começar cada coleta de [settingsFlow] e em [rawPreferencesOnce]; o caminho comum, sem nada
+     * em claro, só olha o DataStore e nem abre o cofre. Idempotente. Se o cofre falhar, o segredo fica onde está
+     * (a próxima leitura tenta de novo) e a leitura não cai.
+     */
+    private suspend fun migrateLegacySecrets() {
+        val current = dataStore.data.first()
+        val present = SettingsSecrets.legacyPresentIn(current)
+        if (present.isEmpty()) return
+        val movable = try {
+            SettingsSecrets.moveToVault(current, present, securePrefs)
+        } catch (e: Exception) {
+            Log.w(TAG, "Cofre indisponível; segredos antigos ficam no DataStore por enquanto", e)
+            return
+        }
+        if (movable.isNotEmpty()) dataStore.edit { prefs -> movable.forEach { prefs.remove(it) } }
+    }
+
     fun overlayPositionFlow(): Flow<OverlayPosition> = dataStore.data.map { prefs ->
         OverlayPosition(
             x = prefs[OVERLAY_X] ?: OverlayPosition().x,
@@ -442,7 +479,7 @@ class SettingsRepository(
 
     suspend fun save(cfg: Config) {
         val committed = securePrefs.edit()
-            .putString(AUTH_HEADER_VALUE, cfg.authHeaderValue)
+            .putString(SettingsSecrets.AUTH_HEADER_VALUE, cfg.authHeaderValue)
             .commit()
         check(committed) { "Unable to persist auth header value" }
 
@@ -504,6 +541,7 @@ class SettingsRepository(
     private companion object {
         const val DATASTORE_NAME = "keyflow_settings"
         const val SECURE_PREFS_NAME = "keyflow_secure"
+        const val TAG = "SettingsRepository"
         val DATASTORES = mutableMapOf<String, DataStore<Preferences>>()
 
         val ENDPOINT_URL = stringPreferencesKey("endpoint_url")
@@ -513,7 +551,6 @@ class SettingsRepository(
         val RECORDING_MODE = stringPreferencesKey("recording_mode")
         val OVERLAY_X = intPreferencesKey("overlay_x")
         val OVERLAY_Y = intPreferencesKey("overlay_y")
-        const val AUTH_HEADER_VALUE = "auth_header_value"
 
         // T5 — novas chaves
         val SOURCE = stringPreferencesKey("transcription_source")
@@ -532,52 +569,38 @@ class SettingsRepository(
         val VISION_LOCAL_MODEL_ID = stringPreferencesKey("vision_local_model_id")
         val VISION_TRANSLATE_TARGET = stringPreferencesKey("vision_translate_target")
         val VISION_OPENAI_MODEL = stringPreferencesKey("vision_openai_model")
-        val VISION_GOOGLE_API_KEY = stringPreferencesKey("vision_google_api_key")
         val VISION_GOOGLE_MODEL = stringPreferencesKey("vision_google_model")
-        val VISION_ANTHROPIC_API_KEY = stringPreferencesKey("vision_anthropic_api_key")
         val VISION_ANTHROPIC_MODEL = stringPreferencesKey("vision_anthropic_model")
         val FALA_SOURCE = stringPreferencesKey("fala_source")
         val FALA_LOCAL_MODEL_ID = stringPreferencesKey("fala_local_model_id")
         val FALA_SPEED = floatPreferencesKey("fala_speed")
         val FALA_CLOUD_VOICE = stringPreferencesKey("fala_cloud_voice")
-        val FALA_ELEVENLABS_API_KEY = stringPreferencesKey("fala_elevenlabs_api_key")
         val FALA_ELEVENLABS_VOICE = stringPreferencesKey("fala_elevenlabs_voice")
         val FALA_ELEVENLABS_MODEL = stringPreferencesKey("fala_elevenlabs_model")
-        val FALA_GOOGLE_API_KEY = stringPreferencesKey("fala_google_api_key")
         val FALA_GOOGLE_VOICE = stringPreferencesKey("fala_google_voice")
         val REASONING_CUSTOM_ENDPOINT = stringPreferencesKey("reasoning_custom_endpoint")
         val REASONING_CUSTOM_HEADER_NAME = stringPreferencesKey("reasoning_custom_header_name")
-        val REASONING_CUSTOM_HEADER_VALUE = stringPreferencesKey("reasoning_custom_header_value")
         val REASONING_CUSTOM_MODEL = stringPreferencesKey("reasoning_custom_model")
         val VISION_CUSTOM_ENDPOINT = stringPreferencesKey("vision_custom_endpoint")
         val VISION_CUSTOM_HEADER_NAME = stringPreferencesKey("vision_custom_header_name")
-        val VISION_CUSTOM_HEADER_VALUE = stringPreferencesKey("vision_custom_header_value")
         val VISION_CUSTOM_MODEL = stringPreferencesKey("vision_custom_model")
         val FALA_CUSTOM_ENDPOINT = stringPreferencesKey("fala_custom_endpoint")
         val FALA_CUSTOM_HEADER_NAME = stringPreferencesKey("fala_custom_header_name")
-        val FALA_CUSTOM_HEADER_VALUE = stringPreferencesKey("fala_custom_header_value")
         val FALA_CUSTOM_MODEL = stringPreferencesKey("fala_custom_model")
         val COMPUTER_MODE = stringPreferencesKey("computer_mode")
         val COMPUTER_SSH_HOST = stringPreferencesKey("computer_ssh_host")
         val COMPUTER_SSH_PORT = intPreferencesKey("computer_ssh_port")
         val COMPUTER_SSH_USER = stringPreferencesKey("computer_ssh_user")
         val COMPUTER_SSH_AUTH_TYPE = stringPreferencesKey("computer_ssh_auth_type")
-        val COMPUTER_SSH_PASSWORD = stringPreferencesKey("computer_ssh_password")
-        val COMPUTER_SSH_KEY = stringPreferencesKey("computer_ssh_key")
         val CUSTOM_MODEL_MIRROR_URL = stringPreferencesKey("custom_model_mirror_url")
-        val PROVIDER_ANTHROPIC_API_KEY = stringPreferencesKey("provider_anthropic_api_key")
         val PROVIDER_ANTHROPIC_MODEL = stringPreferencesKey("provider_anthropic_model")
         val PROVIDER_ANTHROPIC_AUTH_MODE = stringPreferencesKey("provider_anthropic_auth_mode")
-        val PROVIDER_OPENAI_API_KEY = stringPreferencesKey("provider_openai_api_key")
         val PROVIDER_OPENAI_MODEL = stringPreferencesKey("provider_openai_model")
         val PROVIDER_OPENAI_AUTH_MODE = stringPreferencesKey("provider_openai_auth_mode")
-        val PROVIDER_GOOGLE_API_KEY = stringPreferencesKey("provider_google_api_key")
         val PROVIDER_GOOGLE_MODEL = stringPreferencesKey("provider_google_model")
         val PROVIDER_GOOGLE_AUTH_MODE = stringPreferencesKey("provider_google_auth_mode")
         val PROVIDER_ELEVENLABS_AUTH_MODE = stringPreferencesKey("provider_elevenlabs_auth_mode")
-        val PROVIDER_GROQ_API_KEY = stringPreferencesKey("provider_groq_api_key")
         val PROVIDER_GROQ_MODEL = stringPreferencesKey("provider_groq_model")
-        val PROVIDER_GROK_API_KEY = stringPreferencesKey("provider_grok_api_key")
         val PROVIDER_GROK_MODEL = stringPreferencesKey("provider_grok_model")
         val OVERLAY_MODE_ENABLED = booleanPreferencesKey("overlay_mode_enabled")
         val KEYBOARD_MODE_ENABLED = booleanPreferencesKey("keyboard_mode_enabled")
@@ -611,8 +634,6 @@ class SettingsRepository(
         // Trabalho 3 (shortcut-bars): barras personalizáveis + teclados de atalhos, como JSON.
         val BARS_CONFIG_JSON = stringPreferencesKey("bars_config_json")
         val SHORTCUT_GRIDS_JSON = stringPreferencesKey("shortcut_grids_json")
-        const val OPENAI_TOKEN = "openai_token"
-        const val GROQ_TOKEN = "groq_token"
 
         fun createSecurePrefs(
             context: Context,
