@@ -109,12 +109,22 @@ modelo não consegue olhar nem mexer em nada do app, e o usuário tem de ir às 
 
 | ID | Área | Status |
 | --- | ---- | ------ |
-| AGT-01..06 | Laço do agente | Pending |
-| TLS-01..06 | Ferramentas e segurança | Pending |
-| SKL-01..06 | Ferramentas de skin | Pending |
-| APP-01..03 | Ferramentas de app | Pending |
-| AUI-01..04 | Interface | Pending |
-| MCP-01..06 | Servidor MCP | Pending |
+| AGT-01 | Histórico com poda | Parcial — histórico neutro (`AgentMessage`) e poda (`AgentHistory.prune`) prontos e testados na JVM (AGT-T1); falta o chat que o guarda (AGT-T3) |
+| AGT-02 | Contrato `AgentEngine` | Parcial — contrato `AgentEngine`/`AgentEvent` pronto (AGT-T1), `ReasoningEngine` intocado; o adaptador da Anthropic é o AGT-T2 |
+| AGT-03 | Laço enviar → ferramentas → repetir | Implemented (JVM) — `AgentLoop`, 12 passos |
+| AGT-04 | Cancelar sem estado pela metade | Implemented (JVM) — o conserto do histórico é do núcleo; a atomicidade da instalação é do AGT-T4 |
+| AGT-05 | Queda para o modo só texto | Pending (AGT-T3) |
+| AGT-06 | Erros do `ReasoningError` e ferramenta que falha | Parcial — ferramenta que falha vira resultado de erro e o laço continua (AGT-T1); os erros HTTP/limite/credencial do provedor são do adaptador (AGT-T2) |
+| TLS-01 | Esquema, risco, validação antes de `run` | Implemented (JVM) |
+| TLS-02 | Confirmação com resumo do app | Parcial — núcleo e contrato `Confirmation` prontos; o painel é do AGT-T3 |
+| TLS-03 | Sem segredos; filtro; lista de permitidos | Parcial — `SecretFilter` e recusa de argumento com segredo prontos; a lista de permitidos de ajustes é do AGT-T6 |
+| TLS-04 | Resultado é dado | Implemented (JVM) — prompt de sistema + suíte de abuso inicial |
+| TLS-05 | Registro de ações, desfazer | Parcial — `ActionLog` em memória e `UndoCall` como dado; persistência e UI são do AGT-T5 |
+| TLS-06 | Tempo limite, fora da thread principal | Implemented (JVM) |
+| SKL-01..06 | Ferramentas de skin | Pending (AGT-T4) |
+| APP-01..03 | Ferramentas de app | Pending (AGT-T6) |
+| AUI-01..04 | Interface | Pending (AGT-T3, AGT-T5) |
+| MCP-01..06 | Servidor MCP | Pending (AGT-T9) |
 
 ## Success Criteria
 

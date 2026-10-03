@@ -1,0 +1,139 @@
+package com.keyflow.agent
+
+import org.json.JSONObject
+
+/**
+ * O quanto uma ferramenta mexe no app (TLS-01). É o que, junto do modo de confirmação, decide se ela roda direto, pede permissão ou
+ * nem roda ([ToolPolicy]).
+ */
+enum class ToolRisk {
+    /** Só lê ou mostra; não muda nada. Roda sem perguntar (A2). */
+    READ,
+
+    /** Muda algo, mas é de baixo risco e dá para desfazer (instalar uma skin, mudar um ajuste). Pede permissão; é a única que aceita "permitir sempre". */
+    WRITE,
+
+    /** Apaga ou sobrescreve o que não volta sozinho (remover uma skin). Pede permissão SEMPRE — nenhum ajuste, nem "permitir sempre", muda isso. */
+    DESTRUCTIVE,
+}
+
+/** De onde veio o pedido. O servidor MCP (fase 3) é a segunda porta para o mesmo registro e a mesma política (MCP-06). */
+enum class ToolOrigin { CHAT, EXTERNAL }
+
+/** O que uma ferramenta recebe além dos argumentos. Pequeno de propósito: nada aqui dá acesso a segredo (TLS-03). */
+class ToolContext(
+    val origin: ToolOrigin = ToolOrigin.CHAT,
+    /** O id da chamada (o `tool_use.id` do modelo), para a ferramenta correlacionar o que mostra ao usuário. */
+    val callId: String = "",
+)
+
+/** Uma imagem que o app mostra ao usuário junto do pedido de confirmação (a folha de contato de uma skin, por exemplo). */
+class ToolPreview(
+    /** `image/png` etc. */
+    val mediaType: String,
+    val bytes: ByteArray,
+    val caption: String? = null,
+)
+
+/**
+ * O que o USUÁRIO lê no painel de confirmação (TLS-02): gerado pelo app a partir dos argumentos já validados, nunca o texto que o
+ * modelo escreveu sobre a própria ação.
+ */
+class ToolDescription(val summary: String, val preview: ToolPreview? = null)
+
+/**
+ * Como desfazer uma ação: outra chamada de ferramenta, guardada como DADO (nome + argumentos) e não como função — assim o registro
+ * de ações pode ser persistido (fase 1B) e o "Desfazer" passa pela mesma política e pelo mesmo painel de qualquer outra chamada.
+ */
+data class UndoCall(val toolName: String, val argsJson: String)
+
+/**
+ * O que uma ferramenta devolve. [content] vai ao modelo (depois do filtro de segredos e do corte de tamanho, no [ToolExecutor]).
+ * [isError] = a ferramenta falhou de um jeito que o modelo pode corrigir.
+ */
+class ToolOutput(
+    val content: String,
+    val isError: Boolean = false,
+    val undo: UndoCall? = null,
+) {
+    companion object {
+        fun ok(content: String, undo: UndoCall? = null) = ToolOutput(content, isError = false, undo = undo)
+        fun error(content: String) = ToolOutput(content, isError = true)
+    }
+}
+
+/**
+ * Falha esperada de uma ferramenta: a [message] é segura para o modelo ler ("a skin não existe", "o arquivo passa de 64 KB").
+ * Qualquer OUTRA exceção é tratada como defeito do app e o modelo só recebe o nome da classe.
+ */
+class ToolFailure(message: String) : Exception(message)
+
+/**
+ * Marca o único método que executa uma ferramenta de verdade: [AgentTool.run]. O compilador recusa quem o chamar (ou sobrescrever) sem
+ * o opt-in explícito, e o `AgentIsolationTest` confere no código-fonte que o opt-in de CHAMADA só existe no [ToolExecutor] — o único
+ * caminho até `run` é o que passa pela política e pela confirmação (D2). Quem implementa uma ferramenta anota o `override` com
+ * `@PolicyGated` (propagar o requisito); quem a chama é o [ToolExecutor].
+ */
+@RequiresOptIn(
+    level = RequiresOptIn.Level.ERROR,
+    message = "AgentTool.run só pode ser chamado pelo ToolExecutor, depois da política e da confirmação (D2).",
+)
+@Retention(AnnotationRetention.BINARY)
+@Target(AnnotationTarget.FUNCTION)
+annotation class PolicyGated
+
+/**
+ * Uma ferramenta que o modelo pode pedir. É código DO APP (não do modelo): o modelo só escolhe o nome e preenche os argumentos.
+ * Nada aqui toca em `android.*` — o que precisa de Context entra pelo construtor da implementação (fase 1B).
+ */
+interface AgentTool {
+    /** `^[a-zA-Z0-9_-]{1,128}$` (a regra da API da Anthropic); o [ToolRegistry] confere no registro. */
+    val name: String
+
+    /** O que faz, quando usar e quando NÃO usar, o que cada argumento significa — é o que o modelo lê para escolher a ferramenta. */
+    val description: String
+
+    /** Esquema dos argumentos: um objeto no subconjunto de JSON Schema que o [ToolSchema] entende. */
+    val inputSchema: JSONObject
+
+    val risk: ToolRisk
+
+    /** Tempo máximo de [run] (TLS-06). A espera pela confirmação do usuário NÃO conta. */
+    val timeoutMs: Long get() = DEFAULT_TIMEOUT_MS
+
+    /** Teto do texto devolvido ao modelo; o que passar é cortado com um aviso. */
+    val maxResultChars: Int get() = DEFAULT_MAX_RESULT_CHARS
+
+    /**
+     * O resumo do que vai acontecer, para o painel de confirmação — só é chamado nas ferramentas que pedem permissão, com os
+     * argumentos já validados. O padrão lista os argumentos; quem altera algo deve sobrescrever com uma frase própria (e a prévia).
+     */
+    suspend fun describe(args: JSONObject, ctx: ToolContext): ToolDescription = ToolDescription(genericSummary(name, args))
+
+    /** Executa. Só o [ToolExecutor] chama (ver [PolicyGated]); os [args] já passaram pelo esquema. */
+    @PolicyGated
+    suspend fun run(args: JSONObject, ctx: ToolContext): ToolOutput
+
+    companion object {
+        const val DEFAULT_TIMEOUT_MS = 60_000L
+        const val DEFAULT_MAX_RESULT_CHARS = 16_000
+    }
+}
+
+/** O mínimo que o modelo e os motores precisam conhecer de uma ferramenta: sem o risco e sem o `run`. */
+class ToolDefinition(val name: String, val description: String, val inputSchema: JSONObject)
+
+/** "nome(arg=valor, …)" com cada valor cortado — o resumo padrão de uma ferramenta que não escreveu o seu. */
+internal fun genericSummary(name: String, args: JSONObject): String {
+    val parts = ArrayList<String>()
+    val keys = args.keys()
+    while (keys.hasNext()) {
+        val key = keys.next()
+        val raw = args.opt(key)?.toString().orEmpty().replace('\n', ' ')
+        val shown = if (raw.length > SUMMARY_VALUE_CHARS) raw.take(SUMMARY_VALUE_CHARS) + "…" else raw
+        parts += "$key=$shown"
+    }
+    return if (parts.isEmpty()) name else "$name(${parts.joinToString(", ")})"
+}
+
+private const val SUMMARY_VALUE_CHARS = 60

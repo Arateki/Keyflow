@@ -9,7 +9,10 @@ trailer). Atualizar o Status aqui e a traceability do `spec.md` ao concluir.
 - **What**: `AgentTool`/`ToolRegistry` (esquema + validação), `ToolPolicy`, `Confirmation` (interface), `SecretFilter`, `ActionLog`, `AgentMessage`, `AgentEngine` (contrato), `AgentLoop` (limite de passos, cancelamento, negação, erro de ferramenta).
 - **Done when**: tudo na JVM com motor falso; matriz da política testada; filtro com sentinelas; laço com ordem/limite/cancelamento; nenhum `android.*` no núcleo.
 - **Tests**: unit. **Gate**: `testDebugUnitTest`.
-- **Status**: Pending
+- **Status**: Done (2026-10-03, fase 1A) — tudo em `app/src/main/java/com/keyflow/agent/` (Kotlin puro; o `AgentIsolationTest` confere que não há `android.*` e que só o `ToolExecutor` chama `AgentTool.run`).
+  - **O que existe**: `AgentTool`/`ToolRisk`/`ToolOutput`/`ToolFailure`/`UndoCall`/`@PolicyGated` · `ToolSchema` (subconjunto de JSON Schema + validador) · `ToolRegistry` · `ToolPolicy`/`ToolPolicyConfig`/`ConfirmationMode` · `Confirmation`/`ConfirmationRequest`/`ConfirmationDecision` · `SecretFilter` · `ActionLog`/`InMemoryActionLog` · `AgentMessage` (+ `ProviderState`) · `AgentHistory` (conserto da invariante chamada↔resultado e poda) · `AgentEngine`/`AgentEvent` · `AgentPrompt` · `ToolExecutor` (o único caminho até `run`) · `AgentLoop`/`AgentLimits`/`AgentLoopEvent`.
+  - **Testes novos (JVM)**: 153 nesta task (política 8, esquema 18, registro e argumentos 13, filtro 14, executor 35, laço 27, histórico 10, prompt 7, abuso 15, isolamento do núcleo 6).
+  - **Decisões onde a spec era omissa**: ver `.specs/project/STATE.md`, seção "agent-harness — AGT-T1".
 
 ### AGT-T2 — Adaptador Anthropic (`AnthropicAgentEngine`)
 - **What**: `messages` em streaming com `tools`, parse de `tool_use`/`text` no SSE, conversão do histórico neutro (`tool_result`), mesmas credenciais/URL/retentativa do motor de texto; `ReasoningEngine` intocado.
