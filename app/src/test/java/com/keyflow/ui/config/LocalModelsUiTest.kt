@@ -125,7 +125,9 @@ class LocalModelsUiTest {
 
     @Test
     fun `the text catalog lists only text models, lightest first`() {
-        assertThat(textUi().items.map { it.spec.id }).containsExactly(qwen, gemma).inOrder()
+        assertThat(textUi().items.map { it.spec.id })
+            .containsExactlyElementsIn(ModelCatalog.TEXT.map { it.id })
+            .inOrder()
         assertThat(textUi().items.map { it.spec.id }).containsNoneOf(base, small, parakeet)
     }
 
@@ -166,8 +168,77 @@ class LocalModelsUiTest {
     /** O vazio do Raciocínio nunca pode listar os modelos de fala (o `EMPTY` da Transcrição lista). */
     @Test
     fun `EMPTY_TEXT lists the text catalog and never the speech one`() {
-        assertThat(LocalModelsUi.EMPTY_TEXT.items.map { it.spec.id }).containsExactly(qwen, gemma).inOrder()
+        assertThat(LocalModelsUi.EMPTY_TEXT.items.map { it.spec.id })
+            .containsExactlyElementsIn(ModelCatalog.TEXT.map { it.id })
+            .inOrder()
         assertThat(LocalModelsUi.EMPTY_TEXT).isEqualTo(textUi(ramMb = 0))
         assertThat(LocalModelsUi.EMPTY.items.map { it.spec.id }).containsNoneOf(qwen, gemma)
+    }
+
+    // ── o catálogo de visão (aba Visão) ────────────────────────────────────────────────────────────
+
+    private val fastOcr = ModelCatalog.OCR_FAST.id
+    private val balancedOcr = ModelCatalog.OCR_BALANCED.id
+    private val smolVlm = ModelCatalog.VLM_MULTIMODAL.id
+
+    private fun visionUi(
+        installed: Set<String> = emptySet(),
+        active: DownloadProgress? = null,
+        selected: String? = null,
+        ramMb: Long = 8_000,
+    ) = LocalModelsUi.compose(
+        catalog = ModelCatalog.VISION, installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = ramMb,
+    )
+
+    @Test
+    fun `the vision catalog lists only vision models, lightest first`() {
+        assertThat(visionUi().items.map { it.spec.id })
+            .containsExactlyElementsIn(ModelCatalog.VISION.map { it.id })
+            .inOrder()
+        assertThat(visionUi().items.map { it.spec.id }).containsNoneOf(base, small, parakeet, qwen, gemma)
+    }
+
+    @Test
+    fun `EMPTY_VISION lists the vision catalog and never speech or text`() {
+        assertThat(LocalModelsUi.EMPTY_VISION.items.map { it.spec.id })
+            .containsExactlyElementsIn(ModelCatalog.VISION.map { it.id })
+            .inOrder()
+        assertThat(LocalModelsUi.EMPTY_VISION).isEqualTo(visionUi(ramMb = 0))
+        assertThat(LocalModelsUi.EMPTY.items.map { it.spec.id }).containsNoneOf(fastOcr, balancedOcr, smolVlm)
+        assertThat(LocalModelsUi.EMPTY_TEXT.items.map { it.spec.id }).containsNoneOf(fastOcr, balancedOcr, smolVlm)
+    }
+
+    // ── o catálogo de voz (aba Voz / Fala) ─────────────────────────────────────────────────────────
+
+    private val piper = ModelCatalog.VOICE_FAST.id
+    private val kokoro = ModelCatalog.VOICE_BALANCED.id
+    private val melo = ModelCatalog.VOICE_QUALITY.id
+
+    private fun voiceUi(
+        installed: Set<String> = emptySet(),
+        active: DownloadProgress? = null,
+        selected: String? = null,
+        ramMb: Long = 8_000,
+    ) = LocalModelsUi.compose(
+        catalog = ModelCatalog.VOICE, installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = ramMb,
+    )
+
+    @Test
+    fun `the voice catalog lists only voice models, lightest first`() {
+        assertThat(voiceUi().items.map { it.spec.id })
+            .containsExactlyElementsIn(ModelCatalog.VOICE.map { it.id })
+            .inOrder()
+        assertThat(voiceUi().items.map { it.spec.id }).containsNoneOf(base, small, parakeet, qwen, gemma, fastOcr, balancedOcr, smolVlm)
+    }
+
+    @Test
+    fun `EMPTY_FALA lists the voice catalog and never speech, text or vision`() {
+        assertThat(LocalModelsUi.EMPTY_FALA.items.map { it.spec.id })
+            .containsExactlyElementsIn(ModelCatalog.VOICE.map { it.id })
+            .inOrder()
+        assertThat(LocalModelsUi.EMPTY_FALA).isEqualTo(voiceUi(ramMb = 0))
+        assertThat(LocalModelsUi.EMPTY.items.map { it.spec.id }).containsNoneOf(piper, kokoro, melo)
+        assertThat(LocalModelsUi.EMPTY_TEXT.items.map { it.spec.id }).containsNoneOf(piper, kokoro, melo)
+        assertThat(LocalModelsUi.EMPTY_VISION.items.map { it.spec.id }).containsNoneOf(piper, kokoro, melo)
     }
 }

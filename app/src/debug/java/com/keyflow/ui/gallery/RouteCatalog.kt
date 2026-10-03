@@ -32,6 +32,8 @@ import com.keyflow.ui.tour.scenes.OrbScene
 import com.keyflow.ui.tour.buildOrbScripts
 import com.keyflow.ui.tour.tourFrameAt
 import com.keyflow.core.TranscriptionSource
+import com.keyflow.core.VisionSource
+import com.keyflow.core.FalaSource
 import android.view.KeyEvent
 import android.widget.FrameLayout
 import com.keyflow.core.shortcuts.BarButton
@@ -264,8 +266,50 @@ object RouteCatalog {
         // teclado, na Teclado — escolhas separadas (Yan, 2026-09-29), aqui com o Aero marcado nas duas.
         Route("config-overlay-skins") { SkinsRoute(orb = true) },
         Route("config-teclado-skins") { SkinsRoute(orb = false) },
-        // As abas novas (Notificação, Visão, Raciocínio, Voz), ainda vazias: só o cabeçalho com o nome e o menu com os ícones.
-        Route("config-visao") { ConfigTabRoute(ConfigTab.VISAO) },
+        // Visão: `config-visao` é a origem Local sem nenhum modelo baixado; as outras cobrem baixando e pronto.
+        Route("config-visao") { ConfigVisaoRoute() },
+        Route("config-visao-local-baixando") {
+            ConfigVisaoRoute(
+                localModels = galleryVisionModels(
+                    active = DownloadProgress(
+                        ModelCatalog.OCR_FAST.id,
+                        DownloadState.RUNNING,
+                        bytesDone = ModelCatalog.OCR_FAST.totalBytes * 42 / 100,
+                        totalBytes = ModelCatalog.OCR_FAST.totalBytes,
+                    ),
+                ),
+            )
+        },
+        Route("config-visao-local-pronto") {
+            ConfigVisaoRoute(
+                localModelId = ModelCatalog.OCR_FAST.id,
+                localModels = galleryVisionModels(installed = setOf(ModelCatalog.OCR_FAST.id), selected = ModelCatalog.OCR_FAST.id),
+            )
+        },
+        Route("config-visao-google") { ConfigVisaoRoute(source = VisionSource.GOOGLE, googleKey = "AIzaSyMockKeyForScreenshots") },
+        Route("config-visao-anthropic") { ConfigVisaoRoute(source = VisionSource.ANTHROPIC, anthropicKey = "sk-ant-api-mock-key") },
+        // Voz (Fala): `config-fala` é a origem Local sem nenhum modelo baixado; as outras cobrem baixando e pronto.
+        Route("config-fala") { ConfigFalaRoute() },
+        Route("config-fala-local-baixando") {
+            ConfigFalaRoute(
+                localModels = galleryVoiceModels(
+                    active = DownloadProgress(
+                        ModelCatalog.VOICE_FAST.id,
+                        DownloadState.RUNNING,
+                        bytesDone = ModelCatalog.VOICE_FAST.totalBytes * 42 / 100,
+                        totalBytes = ModelCatalog.VOICE_FAST.totalBytes,
+                    ),
+                ),
+            )
+        },
+        Route("config-fala-local-pronto") {
+            ConfigFalaRoute(
+                localModelId = ModelCatalog.VOICE_FAST.id,
+                localModels = galleryVoiceModels(installed = setOf(ModelCatalog.VOICE_FAST.id), selected = ModelCatalog.VOICE_FAST.id),
+            )
+        },
+        Route("config-fala-elevenlabs") { ConfigFalaRoute(source = FalaSource.ELEVENLABS, elevenLabsKey = "eleven_mock_key") },
+        Route("config-fala-google") { ConfigFalaRoute(source = FalaSource.GOOGLE, googleKey = "AIzaSyMockGoogleVoiceKey") },
         // Raciocínio: `config-raciocinio` é a origem Local sem nenhum modelo baixado; as outras cobrem baixando, pronto, a nuvem
         // (desconectada, conectada com o plano) e a área do Testar em andamento e no limite de uso.
         Route("config-raciocinio") { ConfigTabRoute(ConfigTab.RACIOCINIO) },
@@ -302,6 +346,34 @@ object RouteCatalog {
                 ready = true,
             )
         },
+        Route("config-raciocinio-anthropic-desconectado") {
+            ConfigReasoningRoute(source = ReasoningSource.ANTHROPIC)
+        },
+        Route("config-raciocinio-anthropic-conectado") {
+            ConfigReasoningRoute(
+                source = ReasoningSource.ANTHROPIC,
+                anthropicModel = "claude-3-5-sonnet-latest",
+                anthropicAuth = GalleryAuth(
+                    ConnectionState.Connected("claude@exemplo.com", AuthMethod.OAUTH),
+                    models = com.keyflow.ui.config.ANTHROPIC_MODELS_DEFAULT,
+                ),
+                ready = true,
+            )
+        },
+        Route("config-raciocinio-google-desconectado") {
+            ConfigReasoningRoute(source = ReasoningSource.GOOGLE)
+        },
+        Route("config-raciocinio-google-conectado") {
+            ConfigReasoningRoute(
+                source = ReasoningSource.GOOGLE,
+                googleModel = "gemini-2.0-flash",
+                googleAuth = GalleryAuth(
+                    ConnectionState.Connected("gemini@exemplo.com", AuthMethod.OAUTH),
+                    models = com.keyflow.ui.config.GOOGLE_MODELS_DEFAULT,
+                ),
+                ready = true,
+            )
+        },
         // Testar em andamento: um trecho já chegou (tempo até o 1º) e o botão virou "Parar".
         Route("config-raciocinio-testando") {
             ConfigReasoningRoute(
@@ -325,7 +397,6 @@ object RouteCatalog {
                 test = TestState(totalMs = 2_100, error = ReasoningError.RATE_LIMIT),
             )
         },
-        Route("config-fala") { ConfigTabRoute(ConfigTab.FALA) },
         Route("config-notificacao") { ConfigTabRoute(ConfigTab.NOTIFICACAO) },
         Route("config-unlock") { ConfigTabRoute(ConfigTab.TECLADO, keyboardEnabled = true, unlockOpen = true) },
         // "?" do cabeçalho aberto: a seção da Docs da aba, com o atalho para a Docs.
@@ -376,27 +447,126 @@ object RouteCatalog {
             catalog = ModelCatalog.TEXT, installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_192,
         )
 
+    /** Estado fixo da lista de modelos de VISÃO/OCR (RAM de sobra, como a de voz). */
+    private fun galleryVisionModels(installed: Set<String> = emptySet(), active: DownloadProgress? = null, selected: String? = null) =
+        LocalModelsUi.compose(
+            catalog = ModelCatalog.VISION, installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_192,
+        )
+
+    /** Aba Visão: a origem, a lista local e o seletor de tradução num estado fixo. */
+    @Composable
+    private fun ConfigVisaoRoute(
+        source: VisionSource = VisionSource.LOCAL,
+        localModelId: String? = null,
+        localModels: LocalModelsUi = galleryVisionModels(),
+        googleKey: String = "",
+        anthropicKey: String = "",
+    ) {
+        ConfigScreen(
+            settings = FakeSettings.settings.copy(
+                visionSource = source,
+                visionLocalModelId = localModelId,
+                visionGoogleApiKey = googleKey,
+                visionAnthropicApiKey = anthropicKey,
+            ),
+            visionModels = localModels,
+            permissions = PermissionStatus(
+                microphoneGranted = true,
+                overlayGranted = true,
+                keyboardEnabled = true,
+                notificationsGranted = true,
+            ),
+            saveController = SaveController(),
+            onOverlayModeChange = {},
+            onKeyboardModeChange = {},
+            onThemeChange = {},
+            onRequestOverlayPermission = {},
+            onRequestKeyboardPermission = {},
+            onRequestMicPermission = {},
+            onRequestNotificationPermission = {},
+            onSwitchKeyboard = {},
+            onSettingsChange = {},
+            initialTab = ConfigTab.VISAO,
+        )
+    }
+
+    private fun galleryVoiceModels(
+        installed: Set<String> = emptySet(),
+        active: DownloadProgress? = null,
+        selected: String? = null,
+    ): LocalModelsUi =
+        LocalModelsUi.compose(
+            catalog = ModelCatalog.VOICE, installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_192,
+        )
+
+    /** Aba Voz (Fala): a origem, a lista local e os controles de voz num estado fixo. */
+    @Composable
+    private fun ConfigFalaRoute(
+        source: FalaSource = FalaSource.LOCAL,
+        localModelId: String? = null,
+        localModels: LocalModelsUi = galleryVoiceModels(),
+        elevenLabsKey: String = "",
+        googleKey: String = "",
+    ) {
+        ConfigScreen(
+            settings = FakeSettings.settings.copy(
+                falaSource = source,
+                falaLocalModelId = localModelId,
+                falaElevenLabsApiKey = elevenLabsKey,
+                falaGoogleApiKey = googleKey,
+            ),
+            falaModels = localModels,
+            permissions = PermissionStatus(
+                microphoneGranted = true,
+                overlayGranted = true,
+                keyboardEnabled = true,
+                notificationsGranted = true,
+            ),
+            saveController = SaveController(),
+            onOverlayModeChange = {},
+            onKeyboardModeChange = {},
+            onThemeChange = {},
+            onRequestOverlayPermission = {},
+            onRequestKeyboardPermission = {},
+            onRequestMicPermission = {},
+            onRequestNotificationPermission = {},
+            onSwitchKeyboard = {},
+            onSettingsChange = {},
+            initialTab = ConfigTab.FALA,
+        )
+    }
+
     /** Aba Raciocínio: a origem, a lista local, o provedor de nuvem e a área do Testar num estado fixo. [ready] liga o botão Testar. */
     @Composable
     private fun ConfigReasoningRoute(
         source: ReasoningSource = ReasoningSource.LOCAL,
         localModelId: String? = null,
         openAiModel: String = "",
+        anthropicModel: String = "claude-3-5-sonnet-latest",
+        googleModel: String = "gemini-2.0-flash",
         localModels: LocalModelsUi = galleryTextModels(),
         auth: AuthActions = AuthActions.None,
+        anthropicAuth: AuthActions = AuthActions.None,
+        googleAuth: AuthActions = AuthActions.None,
         ready: Boolean = false,
         test: TestState = TestState(),
     ) {
         ConfigScreen(
             settings = FakeSettings.settings.copy(
-                reasoningSource = source, reasoningLocalModelId = localModelId, reasoningOpenAiModel = openAiModel,
+                reasoningSource = source,
+                reasoningLocalModelId = localModelId,
+                reasoningOpenAiModel = openAiModel,
+                reasoningAnthropicModel = anthropicModel,
+                reasoningGoogleModel = googleModel,
             ),
             reasoningModels = localModels,
             reasoningAuth = auth,
+            reasoningAnthropicAuth = anthropicAuth,
+            reasoningGoogleAuth = googleAuth,
             initialReasoningTest = test,
             resolveReasoning = {
                 if (ready) ReasoningResolution.Ready(GalleryReasoningEngine)
-                else ReasoningResolution.Unavailable(if (source == ReasoningSource.OPENAI) UnavailableReason.NOT_CONNECTED else UnavailableReason.NO_LOCAL_MODEL)
+                else ReasoningResolution.Unavailable(if (source != ReasoningSource.LOCAL) UnavailableReason.NOT_CONNECTED else UnavailableReason.NO_LOCAL_MODEL)
             },
             permissions = PermissionStatus(
                 microphoneGranted = true,

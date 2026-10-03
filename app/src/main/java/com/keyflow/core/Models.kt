@@ -9,11 +9,24 @@ enum class RecordingMode { TOGGLE, PUSH_TO_TALK }
 enum class TranscriptionSource { CREDITS, OPENAI, GROQ, CUSTOM, LOCAL }
 
 /**
- * Origem do raciocínio (aba Raciocínio, reasoning-models). LOCAL = modelo de texto rodando no aparelho
- * (LiteRT-LM, processo `:reasoning`); OPENAI = nuvem, por login ChatGPT ou chave de API. Independente da
+ * Origem do raciocínio (aba Raciocínio, reasoning-models). CREDITS = créditos KeyFlow; LOCAL = modelo de texto rodando no aparelho
+ * (LiteRT-LM, processo `:reasoning`); OPENAI/ANTHROPIC/GOOGLE = nuvem. Independente da
  * origem da transcrição: uma não muda a outra.
  */
-enum class ReasoningSource { LOCAL, OPENAI }
+enum class ReasoningSource { CREDITS, LOCAL, OPENAI, ANTHROPIC, GOOGLE, CUSTOM }
+
+/**
+ * Origem da visão (aba Visão, vision-capture). CREDITS = créditos KeyFlow; LOCAL = OCR e modelos visuais rodando no aparelho
+ * (100% offline); OPENAI = nuvem GPT-4o; GOOGLE = Google Gemini Vision; ANTHROPIC = Claude Vision; CUSTOM = API personalizada.
+ */
+enum class VisionSource { CREDITS, LOCAL, OPENAI, GOOGLE, ANTHROPIC, CUSTOM }
+
+/**
+ * Origem da voz / síntese de fala (aba Voz, FALA). CREDITS = créditos KeyFlow; LOCAL = modelos de voz no aparelho
+ * (100% offline, TTS); OPENAI = síntese via OpenAI TTS; ELEVENLABS = vozes ultra-realistas ElevenLabs;
+ * GOOGLE = síntese neural Google Cloud TTS; CUSTOM = API de voz personalizada.
+ */
+enum class FalaSource { CREDITS, LOCAL, OPENAI, ELEVENLABS, GOOGLE, CUSTOM }
 
 /** Lado inicial do overlay (OVL-05). */
 enum class OverlaySide { LEFT, RIGHT }

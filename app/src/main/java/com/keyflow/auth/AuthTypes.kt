@@ -10,6 +10,9 @@ value class ProviderId(val value: String)
  */
 object ProviderIds {
     val OPENAI = ProviderId("openai")
+    val ANTHROPIC = ProviderId("anthropic")
+    val GOOGLE = ProviderId("google")
+    val ELEVENLABS = ProviderId("elevenlabs")
 }
 
 /** Como se prova quem é: com uma chave colada, ou com um login no navegador. */

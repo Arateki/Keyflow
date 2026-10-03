@@ -8,22 +8,26 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.security.crypto.MasterKey
+import com.keyflow.core.FalaSource
 import com.keyflow.core.OrbShortcutAction
 import com.keyflow.core.OverlaySide
 import com.keyflow.core.ReasoningSource
 import com.keyflow.core.RecordingMode
 import com.keyflow.core.ShortcutOverflow
 import com.keyflow.core.TranscriptionSource
+import com.keyflow.core.VisionSource
 import com.keyflow.core.shortcuts.BarsConfig
 import com.keyflow.core.shortcuts.ShortcutCodec
 import com.keyflow.core.shortcuts.ShortcutGrid
 import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.ModelKind
+import com.keyflow.data.models.ModelProvisioning
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -141,12 +145,16 @@ class SettingsRepository(
     suspend fun selectLocalModelIfNone(modelId: String): Boolean = selectInstalledModelIfNone(modelId, ModelKind.SPEECH)
 
     /**
-     * O mesmo para os dois tipos de modelo: a chave é a do tipo — fala escolhe o modelo da Transcrição, texto escolhe o
-     * do Raciocínio. Um modelo de texto **nunca** vira o modelo de transcrição (senão baixar o Qwen com a Transcrição
-     * sem modelo faria o ditado tentar transcrever com um LLM).
+     * O mesmo para os tipos de modelo: a chave é a do tipo — fala escolhe o modelo da Transcrição, texto escolhe o
+     * do Raciocínio, visão escolhe o da Visão.
      */
     suspend fun selectInstalledModelIfNone(modelId: String, kind: ModelKind): Boolean {
-        val key = if (kind == ModelKind.TEXT) REASONING_LOCAL_MODEL_ID else LOCAL_MODEL_ID
+        val key = when (kind) {
+            ModelKind.TEXT -> REASONING_LOCAL_MODEL_ID
+            ModelKind.VISION -> VISION_LOCAL_MODEL_ID
+            ModelKind.VOICE -> FALA_LOCAL_MODEL_ID
+            ModelKind.SPEECH -> LOCAL_MODEL_ID
+        }
         var selected = false
         dataStore.edit { prefs ->
             if (prefs[key].isNullOrBlank()) {
@@ -203,6 +211,8 @@ class SettingsRepository(
      * tokens de preset vêm do armazenamento criptografado e são preservados entre trocas de origem.
      */
     fun settingsFlow(): Flow<Settings> = dataStore.data.map { prefs ->
+        val mirrorUrl = prefs[CUSTOM_MODEL_MIRROR_URL]?.ifBlank { null }
+        ModelProvisioning.customMirrorUrl = mirrorUrl
         Settings(
             source = prefs[SOURCE].toSource(),
             customEndpoint = prefs[ENDPOINT_URL].orEmpty(),
@@ -221,6 +231,59 @@ class SettingsRepository(
             reasoningSource = prefs[REASONING_SOURCE].toReasoningSource(),
             reasoningLocalModelId = prefs[REASONING_LOCAL_MODEL_ID]?.takeIf { it.isNotBlank() },
             reasoningOpenAiModel = prefs[REASONING_OPENAI_MODEL].orEmpty(),
+            reasoningAnthropicModel = prefs[REASONING_ANTHROPIC_MODEL] ?: "claude-3-5-sonnet-latest",
+            reasoningGoogleModel = prefs[REASONING_GOOGLE_MODEL] ?: "gemini-2.0-flash",
+            reasoningCustomEndpoint = prefs[REASONING_CUSTOM_ENDPOINT].orEmpty(),
+            reasoningCustomHeaderName = prefs[REASONING_CUSTOM_HEADER_NAME] ?: "Authorization",
+            reasoningCustomHeaderValue = prefs[REASONING_CUSTOM_HEADER_VALUE].orEmpty(),
+            reasoningCustomModel = prefs[REASONING_CUSTOM_MODEL].orEmpty(),
+            visionSource = prefs[VISION_SOURCE].toVisionSource(),
+            visionLocalModelId = prefs[VISION_LOCAL_MODEL_ID]?.takeIf { it.isNotBlank() },
+            visionTranslateTarget = prefs[VISION_TRANSLATE_TARGET] ?: "pt",
+            visionOpenAiModel = prefs[VISION_OPENAI_MODEL] ?: "gpt-4o",
+            visionGoogleApiKey = prefs[VISION_GOOGLE_API_KEY].orEmpty(),
+            visionGoogleModel = prefs[VISION_GOOGLE_MODEL] ?: "gemini-2.0-flash",
+            visionAnthropicApiKey = prefs[VISION_ANTHROPIC_API_KEY].orEmpty(),
+            visionAnthropicModel = prefs[VISION_ANTHROPIC_MODEL] ?: "claude-3-5-sonnet-latest",
+            visionCustomEndpoint = prefs[VISION_CUSTOM_ENDPOINT].orEmpty(),
+            visionCustomHeaderName = prefs[VISION_CUSTOM_HEADER_NAME] ?: "Authorization",
+            visionCustomHeaderValue = prefs[VISION_CUSTOM_HEADER_VALUE].orEmpty(),
+            visionCustomModel = prefs[VISION_CUSTOM_MODEL].orEmpty(),
+            falaSource = prefs[FALA_SOURCE].toFalaSource(),
+            falaLocalModelId = prefs[FALA_LOCAL_MODEL_ID]?.takeIf { it.isNotBlank() },
+            falaSpeed = prefs[FALA_SPEED] ?: 1.0f,
+            falaCloudVoice = prefs[FALA_CLOUD_VOICE] ?: "alloy",
+            falaElevenLabsApiKey = prefs[FALA_ELEVENLABS_API_KEY].orEmpty(),
+            falaElevenLabsVoice = prefs[FALA_ELEVENLABS_VOICE] ?: "Rachel",
+            falaElevenLabsModel = prefs[FALA_ELEVENLABS_MODEL] ?: "eleven_multilingual_v2",
+            falaGoogleApiKey = prefs[FALA_GOOGLE_API_KEY].orEmpty(),
+            falaGoogleVoice = prefs[FALA_GOOGLE_VOICE] ?: "pt-BR-Neural2-A",
+            falaCustomEndpoint = prefs[FALA_CUSTOM_ENDPOINT].orEmpty(),
+            falaCustomHeaderName = prefs[FALA_CUSTOM_HEADER_NAME] ?: "Authorization",
+            falaCustomHeaderValue = prefs[FALA_CUSTOM_HEADER_VALUE].orEmpty(),
+            falaCustomModel = prefs[FALA_CUSTOM_MODEL].orEmpty(),
+            computerMode = prefs[COMPUTER_MODE] ?: "ssh",
+            computerSshHost = prefs[COMPUTER_SSH_HOST].orEmpty(),
+            computerSshPort = prefs[COMPUTER_SSH_PORT] ?: 22,
+            computerSshUser = prefs[COMPUTER_SSH_USER].orEmpty(),
+            computerSshAuthType = prefs[COMPUTER_SSH_AUTH_TYPE] ?: "password",
+            computerSshPassword = prefs[COMPUTER_SSH_PASSWORD].orEmpty(),
+            computerSshKey = prefs[COMPUTER_SSH_KEY].orEmpty(),
+            customModelMirrorUrl = prefs[CUSTOM_MODEL_MIRROR_URL].orEmpty(),
+            providerAnthropicApiKey = prefs[PROVIDER_ANTHROPIC_API_KEY].orEmpty(),
+            providerAnthropicModel = prefs[PROVIDER_ANTHROPIC_MODEL] ?: "claude-3-5-sonnet-latest",
+            providerAnthropicAuthMode = prefs[PROVIDER_ANTHROPIC_AUTH_MODE] ?: "subscription",
+            providerOpenAiApiKey = prefs[PROVIDER_OPENAI_API_KEY].orEmpty(),
+            providerOpenAiModel = prefs[PROVIDER_OPENAI_MODEL] ?: "gpt-4o",
+            providerOpenAiAuthMode = prefs[PROVIDER_OPENAI_AUTH_MODE] ?: "subscription",
+            providerGoogleApiKey = prefs[PROVIDER_GOOGLE_API_KEY].orEmpty(),
+            providerGoogleModel = prefs[PROVIDER_GOOGLE_MODEL] ?: "gemini-2.0-flash",
+            providerGoogleAuthMode = prefs[PROVIDER_GOOGLE_AUTH_MODE] ?: "subscription",
+            providerElevenLabsAuthMode = prefs[PROVIDER_ELEVENLABS_AUTH_MODE] ?: "subscription",
+            providerGroqApiKey = prefs[PROVIDER_GROQ_API_KEY].orEmpty(),
+            providerGroqModel = prefs[PROVIDER_GROQ_MODEL] ?: "llama-3.3-70b-versatile",
+            providerGrokApiKey = prefs[PROVIDER_GROK_API_KEY].orEmpty(),
+            providerGrokModel = prefs[PROVIDER_GROK_MODEL] ?: "grok-2",
             overlayModeEnabled = prefs[OVERLAY_MODE_ENABLED] ?: false,
             keyboardModeEnabled = prefs[KEYBOARD_MODE_ENABLED] ?: false,
             overlayRecordingMode = prefs[OVERLAY_RECORDING_MODE].toRecordingMode(),
@@ -282,6 +345,60 @@ class SettingsRepository(
             prefs[REASONING_SOURCE] = settings.reasoningSource.name
             settings.reasoningLocalModelId.putOrRemove(prefs, REASONING_LOCAL_MODEL_ID)
             settings.reasoningOpenAiModel.putOrRemove(prefs, REASONING_OPENAI_MODEL)
+            prefs[REASONING_ANTHROPIC_MODEL] = settings.reasoningAnthropicModel
+            prefs[REASONING_GOOGLE_MODEL] = settings.reasoningGoogleModel
+            prefs[REASONING_CUSTOM_ENDPOINT] = settings.reasoningCustomEndpoint
+            prefs[REASONING_CUSTOM_HEADER_NAME] = settings.reasoningCustomHeaderName
+            prefs[REASONING_CUSTOM_HEADER_VALUE] = settings.reasoningCustomHeaderValue
+            prefs[REASONING_CUSTOM_MODEL] = settings.reasoningCustomModel
+            prefs[VISION_SOURCE] = settings.visionSource.name
+            settings.visionLocalModelId.putOrRemove(prefs, VISION_LOCAL_MODEL_ID)
+            prefs[VISION_TRANSLATE_TARGET] = settings.visionTranslateTarget
+            prefs[VISION_OPENAI_MODEL] = settings.visionOpenAiModel
+            prefs[VISION_GOOGLE_API_KEY] = settings.visionGoogleApiKey
+            prefs[VISION_GOOGLE_MODEL] = settings.visionGoogleModel
+            prefs[VISION_ANTHROPIC_API_KEY] = settings.visionAnthropicApiKey
+            prefs[VISION_ANTHROPIC_MODEL] = settings.visionAnthropicModel
+            prefs[VISION_CUSTOM_ENDPOINT] = settings.visionCustomEndpoint
+            prefs[VISION_CUSTOM_HEADER_NAME] = settings.visionCustomHeaderName
+            prefs[VISION_CUSTOM_HEADER_VALUE] = settings.visionCustomHeaderValue
+            prefs[VISION_CUSTOM_MODEL] = settings.visionCustomModel
+            prefs[FALA_SOURCE] = settings.falaSource.name
+            settings.falaLocalModelId.putOrRemove(prefs, FALA_LOCAL_MODEL_ID)
+            prefs[FALA_SPEED] = settings.falaSpeed
+            prefs[FALA_CLOUD_VOICE] = settings.falaCloudVoice
+            prefs[FALA_ELEVENLABS_API_KEY] = settings.falaElevenLabsApiKey
+            prefs[FALA_ELEVENLABS_VOICE] = settings.falaElevenLabsVoice
+            prefs[FALA_ELEVENLABS_MODEL] = settings.falaElevenLabsModel
+            prefs[FALA_GOOGLE_API_KEY] = settings.falaGoogleApiKey
+            prefs[FALA_GOOGLE_VOICE] = settings.falaGoogleVoice
+            prefs[FALA_CUSTOM_ENDPOINT] = settings.falaCustomEndpoint
+            prefs[FALA_CUSTOM_HEADER_NAME] = settings.falaCustomHeaderName
+            prefs[FALA_CUSTOM_HEADER_VALUE] = settings.falaCustomHeaderValue
+            prefs[FALA_CUSTOM_MODEL] = settings.falaCustomModel
+            prefs[COMPUTER_MODE] = settings.computerMode
+            prefs[COMPUTER_SSH_HOST] = settings.computerSshHost
+            prefs[COMPUTER_SSH_PORT] = settings.computerSshPort
+            prefs[COMPUTER_SSH_USER] = settings.computerSshUser
+            prefs[COMPUTER_SSH_AUTH_TYPE] = settings.computerSshAuthType
+            prefs[COMPUTER_SSH_PASSWORD] = settings.computerSshPassword
+            prefs[COMPUTER_SSH_KEY] = settings.computerSshKey
+            prefs[CUSTOM_MODEL_MIRROR_URL] = settings.customModelMirrorUrl
+            ModelProvisioning.customMirrorUrl = settings.customModelMirrorUrl.ifBlank { null }
+            prefs[PROVIDER_ANTHROPIC_API_KEY] = settings.providerAnthropicApiKey
+            prefs[PROVIDER_ANTHROPIC_MODEL] = settings.providerAnthropicModel
+            prefs[PROVIDER_ANTHROPIC_AUTH_MODE] = settings.providerAnthropicAuthMode
+            prefs[PROVIDER_OPENAI_API_KEY] = settings.providerOpenAiApiKey
+            prefs[PROVIDER_OPENAI_MODEL] = settings.providerOpenAiModel
+            prefs[PROVIDER_OPENAI_AUTH_MODE] = settings.providerOpenAiAuthMode
+            prefs[PROVIDER_GOOGLE_API_KEY] = settings.providerGoogleApiKey
+            prefs[PROVIDER_GOOGLE_MODEL] = settings.providerGoogleModel
+            prefs[PROVIDER_GOOGLE_AUTH_MODE] = settings.providerGoogleAuthMode
+            prefs[PROVIDER_ELEVENLABS_AUTH_MODE] = settings.providerElevenLabsAuthMode
+            prefs[PROVIDER_GROQ_API_KEY] = settings.providerGroqApiKey
+            prefs[PROVIDER_GROQ_MODEL] = settings.providerGroqModel
+            prefs[PROVIDER_GROK_API_KEY] = settings.providerGrokApiKey
+            prefs[PROVIDER_GROK_MODEL] = settings.providerGrokModel
             prefs[OVERLAY_MODE_ENABLED] = settings.overlayModeEnabled
             prefs[KEYBOARD_MODE_ENABLED] = settings.keyboardModeEnabled
             prefs[OVERLAY_RECORDING_MODE] = settings.overlayRecordingMode.name
@@ -362,6 +479,16 @@ class SettingsRepository(
         ?.let { runCatching { ReasoningSource.valueOf(it) }.getOrNull() }
         ?: ReasoningSource.LOCAL
 
+    /** Valor ausente ou desconhecido cai no Local — nunca derruba a leitura. */
+    private fun String?.toVisionSource(): VisionSource = this
+        ?.let { runCatching { VisionSource.valueOf(it) }.getOrNull() }
+        ?: VisionSource.LOCAL
+
+    /** Valor ausente ou desconhecido cai no Local — nunca derruba a leitura. */
+    private fun String?.toFalaSource(): FalaSource = this
+        ?.let { runCatching { FalaSource.valueOf(it) }.getOrNull() }
+        ?: FalaSource.LOCAL
+
     private fun String?.toOverlaySide(): OverlaySide = this
         ?.let { runCatching { OverlaySide.valueOf(it) }.getOrNull() }
         ?: OverlaySide.RIGHT
@@ -399,6 +526,59 @@ class SettingsRepository(
         val REASONING_SOURCE = stringPreferencesKey("reasoning_source")
         val REASONING_LOCAL_MODEL_ID = stringPreferencesKey("reasoning_local_model_id")
         val REASONING_OPENAI_MODEL = stringPreferencesKey("reasoning_openai_model")
+        val REASONING_ANTHROPIC_MODEL = stringPreferencesKey("reasoning_anthropic_model")
+        val REASONING_GOOGLE_MODEL = stringPreferencesKey("reasoning_google_model")
+        val VISION_SOURCE = stringPreferencesKey("vision_source")
+        val VISION_LOCAL_MODEL_ID = stringPreferencesKey("vision_local_model_id")
+        val VISION_TRANSLATE_TARGET = stringPreferencesKey("vision_translate_target")
+        val VISION_OPENAI_MODEL = stringPreferencesKey("vision_openai_model")
+        val VISION_GOOGLE_API_KEY = stringPreferencesKey("vision_google_api_key")
+        val VISION_GOOGLE_MODEL = stringPreferencesKey("vision_google_model")
+        val VISION_ANTHROPIC_API_KEY = stringPreferencesKey("vision_anthropic_api_key")
+        val VISION_ANTHROPIC_MODEL = stringPreferencesKey("vision_anthropic_model")
+        val FALA_SOURCE = stringPreferencesKey("fala_source")
+        val FALA_LOCAL_MODEL_ID = stringPreferencesKey("fala_local_model_id")
+        val FALA_SPEED = floatPreferencesKey("fala_speed")
+        val FALA_CLOUD_VOICE = stringPreferencesKey("fala_cloud_voice")
+        val FALA_ELEVENLABS_API_KEY = stringPreferencesKey("fala_elevenlabs_api_key")
+        val FALA_ELEVENLABS_VOICE = stringPreferencesKey("fala_elevenlabs_voice")
+        val FALA_ELEVENLABS_MODEL = stringPreferencesKey("fala_elevenlabs_model")
+        val FALA_GOOGLE_API_KEY = stringPreferencesKey("fala_google_api_key")
+        val FALA_GOOGLE_VOICE = stringPreferencesKey("fala_google_voice")
+        val REASONING_CUSTOM_ENDPOINT = stringPreferencesKey("reasoning_custom_endpoint")
+        val REASONING_CUSTOM_HEADER_NAME = stringPreferencesKey("reasoning_custom_header_name")
+        val REASONING_CUSTOM_HEADER_VALUE = stringPreferencesKey("reasoning_custom_header_value")
+        val REASONING_CUSTOM_MODEL = stringPreferencesKey("reasoning_custom_model")
+        val VISION_CUSTOM_ENDPOINT = stringPreferencesKey("vision_custom_endpoint")
+        val VISION_CUSTOM_HEADER_NAME = stringPreferencesKey("vision_custom_header_name")
+        val VISION_CUSTOM_HEADER_VALUE = stringPreferencesKey("vision_custom_header_value")
+        val VISION_CUSTOM_MODEL = stringPreferencesKey("vision_custom_model")
+        val FALA_CUSTOM_ENDPOINT = stringPreferencesKey("fala_custom_endpoint")
+        val FALA_CUSTOM_HEADER_NAME = stringPreferencesKey("fala_custom_header_name")
+        val FALA_CUSTOM_HEADER_VALUE = stringPreferencesKey("fala_custom_header_value")
+        val FALA_CUSTOM_MODEL = stringPreferencesKey("fala_custom_model")
+        val COMPUTER_MODE = stringPreferencesKey("computer_mode")
+        val COMPUTER_SSH_HOST = stringPreferencesKey("computer_ssh_host")
+        val COMPUTER_SSH_PORT = intPreferencesKey("computer_ssh_port")
+        val COMPUTER_SSH_USER = stringPreferencesKey("computer_ssh_user")
+        val COMPUTER_SSH_AUTH_TYPE = stringPreferencesKey("computer_ssh_auth_type")
+        val COMPUTER_SSH_PASSWORD = stringPreferencesKey("computer_ssh_password")
+        val COMPUTER_SSH_KEY = stringPreferencesKey("computer_ssh_key")
+        val CUSTOM_MODEL_MIRROR_URL = stringPreferencesKey("custom_model_mirror_url")
+        val PROVIDER_ANTHROPIC_API_KEY = stringPreferencesKey("provider_anthropic_api_key")
+        val PROVIDER_ANTHROPIC_MODEL = stringPreferencesKey("provider_anthropic_model")
+        val PROVIDER_ANTHROPIC_AUTH_MODE = stringPreferencesKey("provider_anthropic_auth_mode")
+        val PROVIDER_OPENAI_API_KEY = stringPreferencesKey("provider_openai_api_key")
+        val PROVIDER_OPENAI_MODEL = stringPreferencesKey("provider_openai_model")
+        val PROVIDER_OPENAI_AUTH_MODE = stringPreferencesKey("provider_openai_auth_mode")
+        val PROVIDER_GOOGLE_API_KEY = stringPreferencesKey("provider_google_api_key")
+        val PROVIDER_GOOGLE_MODEL = stringPreferencesKey("provider_google_model")
+        val PROVIDER_GOOGLE_AUTH_MODE = stringPreferencesKey("provider_google_auth_mode")
+        val PROVIDER_ELEVENLABS_AUTH_MODE = stringPreferencesKey("provider_elevenlabs_auth_mode")
+        val PROVIDER_GROQ_API_KEY = stringPreferencesKey("provider_groq_api_key")
+        val PROVIDER_GROQ_MODEL = stringPreferencesKey("provider_groq_model")
+        val PROVIDER_GROK_API_KEY = stringPreferencesKey("provider_grok_api_key")
+        val PROVIDER_GROK_MODEL = stringPreferencesKey("provider_grok_model")
         val OVERLAY_MODE_ENABLED = booleanPreferencesKey("overlay_mode_enabled")
         val KEYBOARD_MODE_ENABLED = booleanPreferencesKey("keyboard_mode_enabled")
         val OVERLAY_RECORDING_MODE = stringPreferencesKey("overlay_recording_mode")

@@ -38,8 +38,10 @@ object SherpaConfigs {
                 modelType = "nemo_transducer",
                 numThreads = numThreads,
             )
-            // Modelo de texto não passa por aqui: a fala só recebe o que sai de `ModelCatalog.SPEECH`.
+            // Modelos de texto, visão e voz (TTS) não passam por aqui: a transcrição só recebe o que sai de `ModelCatalog.SPEECH`.
             EngineType.LITERT_LM -> error("${model.modelId}: motor de texto (LiteRT-LM) não roda no sherpa-onnx")
+            EngineType.OCR -> error("${model.modelId}: motor de visão (OCR) não roda no sherpa-onnx")
+            EngineType.TTS -> error("${model.modelId}: motor de voz (TTS) não roda no reconhecedor de fala")
         }
         return OfflineRecognizerConfig(modelConfig = modelConfig)
     }

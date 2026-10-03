@@ -14,11 +14,20 @@ class ReasoningEnginesTest {
         override fun generate(request: ReasoningRequest): Flow<ReasoningEvent> = flowOf(ReasoningEvent.Done)
     }
 
-    private fun engines(installed: Set<String> = emptySet(), connected: Boolean = false) = ReasoningEngines(
+    private fun engines(
+        installed: Set<String> = emptySet(),
+        connected: Boolean = false,
+        anthropicConnected: Boolean = false,
+        googleConnected: Boolean = false,
+    ) = ReasoningEngines(
         isModelInstalled = { it in installed },
         hasOpenAiCredential = { connected },
+        hasAnthropicCredential = { anthropicConnected },
+        hasGoogleCredential = { googleConnected },
         local = { FakeEngine("local:$it") },
         openAi = { FakeEngine("openai:$it") },
+        anthropic = { FakeEngine("anthropic:$it") },
+        google = { FakeEngine("google:$it") },
     )
 
     private fun ready(resolution: ReasoningResolution): FakeEngine =
@@ -64,6 +73,39 @@ class ReasoningEnginesTest {
         assertThat(ready(engines(connected = true).resolve(settings)).label).isEqualTo("openai:algum-modelo")
     }
 
+    @Test
+    fun `anthropic without a credential is unavailable`() {
+        val settings = Settings(reasoningSource = ReasoningSource.ANTHROPIC, reasoningAnthropicModel = "claude-3-5-sonnet")
+        assertThat(engines(anthropicConnected = false).resolve(settings))
+            .isEqualTo(ReasoningResolution.Unavailable(UnavailableReason.NOT_CONNECTED))
+    }
+
+    @Test
+    fun `anthropic ready passes the chosen model`() {
+        val settings = Settings(reasoningSource = ReasoningSource.ANTHROPIC, reasoningAnthropicModel = "claude-3-5-sonnet")
+        assertThat(ready(engines(anthropicConnected = true).resolve(settings)).label).isEqualTo("anthropic:claude-3-5-sonnet")
+    }
+
+    @Test
+    fun `google without a credential is unavailable`() {
+        val settings = Settings(reasoningSource = ReasoningSource.GOOGLE, reasoningGoogleModel = "gemini-2.0-flash")
+        assertThat(engines(googleConnected = false).resolve(settings))
+            .isEqualTo(ReasoningResolution.Unavailable(UnavailableReason.NOT_CONNECTED))
+    }
+
+    @Test
+    fun `google connected but with no model chosen is unavailable`() {
+        val settings = Settings(reasoningSource = ReasoningSource.GOOGLE, reasoningGoogleModel = "")
+        assertThat(engines(googleConnected = true).resolve(settings))
+            .isEqualTo(ReasoningResolution.Unavailable(UnavailableReason.NO_MODEL_CHOSEN))
+    }
+
+    @Test
+    fun `google ready passes the chosen model`() {
+        val settings = Settings(reasoningSource = ReasoningSource.GOOGLE, reasoningGoogleModel = "gemini-2.0-flash")
+        assertThat(ready(engines(googleConnected = true).resolve(settings)).label).isEqualTo("google:gemini-2.0-flash")
+    }
+
     /** Uma origem nunca "vaza" para a outra: credencial da OpenAI não faz o local ficar pronto e vice-versa. */
     @Test
     fun `the chosen source decides, not what happens to be available`() {
@@ -81,5 +123,6 @@ class ReasoningEnginesTest {
         assertThat(settings.reasoningSource).isEqualTo(ReasoningSource.LOCAL)
         assertThat(settings.reasoningLocalModelId).isNull()
         assertThat(settings.reasoningOpenAiModel).isEmpty()
+        assertThat(settings.reasoningGoogleModel).isEqualTo("gemini-2.0-flash")
     }
 }

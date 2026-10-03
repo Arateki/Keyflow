@@ -31,11 +31,15 @@ import kotlinx.coroutines.withTimeoutOrNull
  * - cada conexão tem o seu prazo de leitura: uma conexão ociosa (o navegador abre especulativas) não trava as outras;
  * - quem valida o `state` é o fluxo de login, não este receptor (ele só entrega a URL completa).
  */
-class LoopbackRedirectReceiver(private val path: String, host: String = "127.0.0.1") : RedirectReceiver {
+class LoopbackRedirectReceiver(
+    private val path: String,
+    host: String = "127.0.0.1",
+    private val uriHost: String = host,
+) : RedirectReceiver {
 
     private val address: InetAddress = InetAddress.getByName(host).also { require(it.isLoopbackAddress) { "só loopback: $host" } }
     private val server = ServerSocket(0, BACKLOG, address)
-    private val origin = "http://$host:${server.localPort}"
+    private val origin = "http://$uriHost:${server.localPort}"
     private val result = CompletableDeferred<URI>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
