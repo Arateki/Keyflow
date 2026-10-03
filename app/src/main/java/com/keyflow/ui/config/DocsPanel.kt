@@ -206,7 +206,7 @@ val docsSections: List<DocSection> get() = listOf(
             DocBlock.Labeled(tr("Teclados de atalhos"), tr("as grades que os gatilhos da barra abrem ao segurar e arrastar.")),
             DocBlock.Labeled(
                 tr("Tamanho e skins"),
-                tr("o tamanho vale para teclas, barra e sugestões (a prévia mostra a altura real); as skins mudam a cara do teclado."),
+                tr("o tamanho vale para teclas, barra e sugestões (a prévia mostra a altura real); as skins mudam a cara do teclado, e dá para importar a sua, em .zip de SVGs, em “Suas skins”."),
             ),
         ),
     ),
@@ -228,7 +228,7 @@ val docsSections: List<DocSection> get() = listOf(
             ),
             DocBlock.Labeled(
                 tr("Skins"),
-                tr("a aparência da orbe: Ateliê, Aero (uma bolha de vidro com água), Glitch (falha gráfica em preto, vermelho e azul) ou Rose Gold (metal rosé). É uma escolha à parte da skin do teclado."),
+                tr("a aparência da orbe: Ateliê, Aero (uma bolha de vidro com água), Glitch (falha gráfica em preto, vermelho e azul), Rose Gold (metal rosé), Mascote (o Ouvi, um bichinho de orelhas grandes) ou uma skin sua, importada em .zip de SVGs. É uma escolha à parte da skin do teclado."),
             ),
             DocBlock.Labeled(
                 tr("Atalhos"),
