@@ -245,11 +245,53 @@ val docsSections: List<DocSection> get() = listOf(
             ),
             DocBlock.Labeled(
                 tr("Origem"),
-                tr("Local (um modelo pequeno rodando no aparelho, sem internet) ou OpenAI (na nuvem, com a sua conta ou a sua chave)."),
+                tr("Local (modelos no aparelho como Gemma, Qwen, Llama e DeepSeek, sem internet) ou Nuvem (OpenAI e Anthropic Claude via SSO ou chave de API)."),
             ),
             DocBlock.Labeled(
                 tr("Testar"),
                 tr("manda uma frase ao modelo e mostra a resposta chegando, com o tempo até o primeiro trecho."),
+            ),
+        ),
+    ),
+    DocSection(
+        "aba-visao",
+        tr("Aba Visão"),
+        listOf(
+            DocBlock.Paragraph(
+                tr("Configura o reconhecimento óptico de caracteres (OCR) e a compreensão visual da tela. As capturas são feitas diretamente pela orbe sobreposta."),
+            ),
+            DocBlock.Labeled(
+                tr("Origem"),
+                tr("Local (OCR e modelos visuais no aparelho como ML Kit, PP-OCR, MobileNet e Florence, 100% offline) ou Nuvem (OpenAI GPT-4o, Google Gemini Vision e Anthropic Claude Vision)."),
+            ),
+            DocBlock.Labeled(
+                tr("Tradução"),
+                tr("idioma de destino para traduzir o texto capturado nos gestos da orbe."),
+            ),
+            DocBlock.Labeled(
+                tr("Testar OCR"),
+                tr("executa o reconhecimento de texto e avalia a velocidade de resposta do modelo ativo."),
+            ),
+        ),
+    ),
+    DocSection(
+        "aba-voz",
+        tr("Aba Voz"),
+        listOf(
+            DocBlock.Paragraph(
+                tr("Configura a síntese de fala (Text-to-Speech) para ler respostas e mensagens em voz alta."),
+            ),
+            DocBlock.Labeled(
+                tr("Origem"),
+                tr("Local (modelos de voz no aparelho como Piper, Kokoro e MeloTTS, 100% offline) ou Nuvem (OpenAI TTS, ElevenLabs e Google Cloud TTS)."),
+            ),
+            DocBlock.Labeled(
+                tr("Velocidade"),
+                tr("ajuste do ritmo de fala para uma reprodução confortável."),
+            ),
+            DocBlock.Labeled(
+                tr("Testar voz"),
+                tr("reproduz uma frase de exemplo para conferir a qualidade e a entonação da voz escolhida."),
             ),
         ),
     ),
@@ -394,9 +436,23 @@ val docsSections: List<DocSection> get() = listOf(
             DocBlock.Labeled("Whisper", tr("modelos Rápido e Equilibrado — MIT (OpenAI); os cards do Hugging Face declaram Apache 2.0.")),
             DocBlock.Labeled("Parakeet TDT 0.6B v3", tr("modelo Máxima qualidade — CC BY 4.0 (NVIDIA), convertido para ONNX int8 pelo sherpa-onnx.")),
             DocBlock.Labeled("LiteRT-LM", tr("motor dos modelos de texto da aba Raciocínio, no aparelho — Apache 2.0 (Google).")),
-            DocBlock.Labeled("Gemma 4 E2B", tr("modelo de texto Equilibrado — Apache 2.0 (Google), baixado sob demanda.")),
             DocBlock.Labeled("Qwen3 0.6B", tr("modelo de texto Leve — Apache 2.0 (Alibaba), baixado sob demanda.")),
             DocBlock.Labeled("AndroidSVG", tr("desenha os SVGs das skins importadas — Apache 2.0 (Cave Rock Software).")),
+            DocBlock.Labeled("SmolLM2 1.7B", tr("modelo de linguagem leve e eficiente — Apache 2.0 (Hugging Face).")),
+            DocBlock.Labeled("Llama 3.2 1B", tr("modelo de linguagem ágil para dispositivos móveis — Llama 3.2 Community License (Meta).")),
+            DocBlock.Labeled("DeepSeek R1 Distill 1.5B", tr("modelo de raciocínio passo a passo destilado — MIT License (DeepSeek).")),
+            DocBlock.Labeled("Gemma 2 2B", tr("modelo de linguagem compacto de alto raciocínio — Google Gemma Terms / Apache 2.0.")),
+            DocBlock.Labeled("Gemma 4 E2B", tr("modelo de texto Equilibrado — Apache 2.0 (Google), baixado sob demanda.")),
+            DocBlock.Labeled("Llama 3.2 3B", tr("modelo de linguagem avançado para dispositivos móveis — Llama 3.2 Community License (Meta).")),
+            DocBlock.Labeled("Phi-3.5 Mini", tr("modelo de raciocínio analítico — MIT License (Microsoft).")),
+            DocBlock.Labeled("ML Kit Text Recognition", tr("reconhecimento óptico de caracteres (OCR) no aparelho — Google.")),
+            DocBlock.Labeled("PP-OCR v4", tr("reconhecimento óptico de caracteres (OCR) multilíngue — Apache 2.0 (PaddlePaddle).")),
+            DocBlock.Labeled("MobileNetV4", tr("reconhecimento óptico ultrarrápido para imagens e capturas — Apache 2.0.")),
+            DocBlock.Labeled("Florence-2", tr("modelo visual-linguagem para documentos e OCR — MIT License (Microsoft).")),
+            DocBlock.Labeled("SmolVLM 500M", tr("modelo multimodal de visão e linguagem — Apache 2.0 (Hugging Face).")),
+            DocBlock.Labeled("Piper TTS", tr("síntese de voz rápida no aparelho — MIT (rhasspy).")),
+            DocBlock.Labeled("Kokoro", tr("modelo de síntese de voz de alta fidelidade — Apache 2.0 (hexgrad).")),
+            DocBlock.Labeled("MeloTTS", tr("síntese de voz multilíngue — MIT (MyShell).")),
             DocBlock.Labeled(tr("Dicionários do corretor"), tr("listas de palavras do teclado do Android (AOSP LatinIME) para português, inglês e espanhol — Apache 2.0.")),
             DocBlock.Labeled(tr("Space Grotesk e Space Mono"), tr("fontes — SIL Open Font License 1.1.")),
         ),
@@ -635,8 +691,10 @@ fun docsSectionFor(tab: ConfigTab): DocSection? {
         ConfigTab.TECLADO -> "aba-teclado"
         ConfigTab.OVERLAY -> "aba-sobrepor"
         ConfigTab.RACIOCINIO -> "aba-raciocinio"
-        // Notificação, Visão e Voz ainda não têm conteúdo para explicar.
-        ConfigTab.NOTIFICACAO, ConfigTab.VISAO, ConfigTab.FALA, ConfigTab.DOCS -> return null
+        ConfigTab.VISAO -> "aba-visao"
+        ConfigTab.FALA -> "aba-voz"
+        // KeyFlow, Notificação, Fluxos e Computador ainda não têm seção na Docs.
+        ConfigTab.KEYFLOW, ConfigTab.NOTIFICACAO, ConfigTab.DOCS, ConfigTab.FLUXOS, ConfigTab.COMPUTADOR -> return null
     }
     return docsSections.first { it.id == id }
 }

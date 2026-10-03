@@ -96,7 +96,7 @@ class AuthController(
     fun saveApiKey(provider: ProviderId, key: String) {
         errors.update { it - provider }
         val trimmed = key.filter { it.code in 0x21..0x7E }
-        if (trimmed.isEmpty()) store.clear(provider) else store.put(provider, Credential.ApiKey(trimmed))
+        if (trimmed.isEmpty()) store.clearApiKey(provider) else store.put(provider, Credential.ApiKey(trimmed))
     }
 
     /**
@@ -134,7 +134,7 @@ class AuthController(
                 val method = if (credential is Credential.OAuth) AuthMethod.OAUTH else AuthMethod.API_KEY
                 runCatching { entry(provider).flows.firstOrNull { it.method == method }?.revoke(credential) }
             }
-            store.clear(provider)
+            store.clearOAuth(provider)
             errors.update { it - provider }
         }
     }

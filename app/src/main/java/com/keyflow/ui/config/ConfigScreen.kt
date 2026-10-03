@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,8 +35,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import com.keyflow.i18n.AppLanguage
 import com.keyflow.i18n.AppLocale
 import com.keyflow.overlay.Haptics
@@ -67,6 +72,7 @@ const val LANG_TOGGLE_TAG = "lang-toggle"
 /** Opção do menu de idioma do cabeçalho. */
 fun languageOptionTag(language: AppLanguage) = "lang-option-${language.code}"
 const val THEME_TOGGLE_TAG = "theme-toggle"
+const val ROTATION_TOGGLE_TAG = "rotation-toggle"
 const val HEADER_TAB_TITLE_TAG = "header-tab-title"
 const val HEADER_TAB_HELP_TAG = "header-tab-help"
 const val TAB_HELP_TAG = "tab-help"
@@ -98,6 +104,11 @@ fun ConfigScreen(
     onThemeChange: (Boolean) -> Unit,
     // Idioma da interface escolhido no cabeçalho (PT/EN/ES). Vale na hora: ver AppLocale.
     onAppLanguageChange: (AppLanguage) -> Unit = {},
+    // Rotação da tela controlada pelo cabeçalho (ignora rotação do sistema/sensor)
+    screenOrientation: AppScreenOrientation = AppScreenOrientation.PORTRAIT,
+    rotationStep: Int = screenOrientation.id,
+    isLandscape: Boolean = screenOrientation.isLandscape,
+    onRotationClick: () -> Unit = {},
     onRequestOverlayPermission: () -> Unit,
     onRequestKeyboardPermission: () -> Unit,
     onRequestMicPermission: () -> Unit,
@@ -118,10 +129,16 @@ fun ConfigScreen(
     localModels: LocalModelsUi = LocalModelsUi.EMPTY,
     // Os modelos de TEXTO da aba Raciocínio (a lista de cima é a dos de fala, da Transcrição).
     reasoningModels: LocalModelsUi = LocalModelsUi.EMPTY_TEXT,
+    // Os modelos de VISÃO/OCR da aba Visão.
+    visionModels: LocalModelsUi = LocalModelsUi.EMPTY_VISION,
+    // Os modelos de VOZ/TTS da aba Voz (Fala).
+    falaModels: LocalModelsUi = LocalModelsUi.EMPTY_FALA,
     // O motor que responde na aba Raciocínio, para a área do Testar (RSN-T10).
     resolveReasoning: (Settings) -> ReasoningResolution = { ReasoningResolution.Unavailable(UnavailableReason.NO_LOCAL_MODEL) },
     localActions: LocalModelActions = LocalModelActions.None,
     reasoningAuth: AuthActions = AuthActions.None,
+    reasoningAnthropicAuth: AuthActions = AuthActions.None,
+    reasoningGoogleAuth: AuthActions = AuthActions.None,
     initialReasoningTest: TestState = TestState(),
     reasoningLocalSupported: Boolean = true,
 ) {
@@ -252,8 +269,14 @@ fun ConfigScreen(
 
     Box(modifier.fillMaxSize().background(palette.bg)) {
         // Activity é edge-to-edge: o bg cobre a tela toda, mas o conteúdo respeita as barras do
-        // sistema (status no topo, navegação embaixo) para não ser cortado/ocultado.
         Column(Modifier.fillMaxSize().systemBarsPadding()) {
+            val effectiveOrientation = if (screenOrientation != AppScreenOrientation.PORTRAIT) {
+                screenOrientation
+            } else if (isLandscape) {
+                AppScreenOrientation.LANDSCAPE
+            } else {
+                AppScreenOrientation.PORTRAIT
+            }
             Header(
                 tabTitle = activeTab.label,
                 onTabHelp = if (docsSectionFor(activeTab) != null) ({ tabHelpOpen = true }) else null,
@@ -261,6 +284,9 @@ fun ConfigScreen(
                 language = AppLocale.current,
                 onLanguageChange = onAppLanguageChange,
                 onThemeClick = { onThemeChange(!settings.themeDark) },
+                screenOrientation = effectiveOrientation,
+                rotationStep = rotationStep,
+                onRotationClick = onRotationClick,
             )
             Box(Modifier.fillMaxSize()) {
             // A barra lateral recolhida ocupa uma faixa fixa à esquerda; aberta, desenha por cima do
@@ -288,6 +314,11 @@ fun ConfigScreen(
                         blockReason(tab)?.let { showToast(it, 2500, navActionFor(tab)) }
                     }
                     when (activeTab) {
+                        ConfigTab.KEYFLOW -> KeyflowPanel(
+                            settings = settings,
+                            onSettingsChange = onSettingsChange,
+                            resolve = resolveReasoning,
+                        )
                         ConfigTab.VOZ -> VozPanel(
                             settings = settings,
                             onSettingsChange = onSettingsChange,
@@ -354,11 +385,40 @@ fun ConfigScreen(
                             actions = localActions,
                             resolve = resolveReasoning,
                             auth = reasoningAuth,
+                            anthropicAuth = reasoningAnthropicAuth,
+                            googleAuth = reasoningGoogleAuth,
                             initialTest = initialReasoningTest,
                             localSupported = reasoningLocalSupported,
                         )
+                        ConfigTab.VISAO -> VisaoPanel(
+                            settings = settings,
+                            onSettingsChange = onSettingsChange,
+                            models = visionModels,
+                            actions = localActions,
+                            localSupported = reasoningLocalSupported,
+                            openAiAuth = reasoningAuth,
+                            googleAuth = reasoningGoogleAuth,
+                            anthropicAuth = reasoningAnthropicAuth,
+                        )
+                        ConfigTab.FALA -> FalaPanel(
+                            settings = settings,
+                            onSettingsChange = onSettingsChange,
+                            models = falaModels,
+                            actions = localActions,
+                            localSupported = reasoningLocalSupported,
+                            openAiAuth = reasoningAuth,
+                            googleAuth = reasoningGoogleAuth,
+                        )
+                        ConfigTab.FLUXOS -> FluxosPanel(
+                            settings = settings,
+                            onSettingsChange = onSettingsChange,
+                        )
+                        ConfigTab.COMPUTADOR -> ComputadorPanel(
+                            settings = settings,
+                            onSettingsChange = onSettingsChange,
+                        )
                         // Ainda sem conteúdo: o painel fica vazio (o título da aba já aparece no cabeçalho).
-                        ConfigTab.NOTIFICACAO, ConfigTab.VISAO, ConfigTab.FALA -> Unit
+                        ConfigTab.NOTIFICACAO -> Unit
                         ConfigTab.DOCS -> DocsPanel(focusSectionId = docsFocusSection, focusKey = docsFocusKey)
                     }
                 }
@@ -507,6 +567,9 @@ private fun Header(
     language: AppLanguage,
     onLanguageChange: (AppLanguage) -> Unit,
     onThemeClick: () -> Unit,
+    screenOrientation: AppScreenOrientation,
+    rotationStep: Int,
+    onRotationClick: () -> Unit,
 ) {
     val palette = LocalKeyFlowPalette.current
     // Compacto de propósito: a linha do nome da aba custaria ~25dp no A32 (a fonte do app e a do sistema
@@ -526,7 +589,7 @@ private fun Header(
             letterSpacing = (-0.3).sp,
             modifier = Modifier.padding(start = 9.dp).weight(1f),
         )
-        // Idioma e tema numa só cápsula de linha fina, separados por um fio — menos caixas no topo.
+        // Idioma, tema e rotação numa só cápsula de linha fina, separados por um fio — menos caixas no topo.
         val capsule = RoundedCornerShape(50)
         Row(
             Modifier
@@ -590,10 +653,48 @@ private fun Header(
                     .fillMaxHeight()
                     .clickable { onThemeClick() }
                     .testTag(THEME_TOGGLE_TAG)
-                    .padding(start = 10.dp, end = 12.dp),
+                    .padding(horizontal = 10.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 KfIcon(if (dark) KfIcons.Sun else KfIcons.Moon, palette.fg2, Modifier.size(15.dp))
+            }
+            Box(Modifier.width(1.dp).height(16.dp).background(palette.line))
+            // Rotação da tela — rotação contínua em sentido único para 4 orientações (ignora rotação do sistema/sensor).
+            val rotationAngle by animateFloatAsState(
+                targetValue = rotationStep * 90f,
+                animationSpec = tween(300),
+                label = "rotation-angle",
+            )
+            val isRotated = screenOrientation != AppScreenOrientation.PORTRAIT
+            Box(
+                Modifier
+                    .fillMaxHeight()
+                    .clickable { onRotationClick() }
+                    .testTag(ROTATION_TOGGLE_TAG)
+                    .padding(start = 10.dp, end = 12.dp)
+                    .semantics {
+                        contentDescription = when (screenOrientation) {
+                            AppScreenOrientation.PORTRAIT -> tr("Girar tela: alternar para modo paisagem")
+                            AppScreenOrientation.LANDSCAPE -> tr("Girar tela: alternar para modo retrato invertido")
+                            AppScreenOrientation.REVERSE_PORTRAIT -> tr("Girar tela: alternar para modo paisagem invertida")
+                            AppScreenOrientation.REVERSE_LANDSCAPE -> tr("Girar tela: alternar para modo retrato")
+                        }
+                        stateDescription = when (screenOrientation) {
+                            AppScreenOrientation.PORTRAIT -> "retrato"
+                            AppScreenOrientation.LANDSCAPE -> "paisagem"
+                            AppScreenOrientation.REVERSE_PORTRAIT -> "retrato invertido"
+                            AppScreenOrientation.REVERSE_LANDSCAPE -> "paisagem invertida"
+                        }
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                KfIcon(
+                    KfIcons.ScreenRotate,
+                    if (isRotated) palette.teal else palette.fg2,
+                    Modifier
+                        .size(15.dp)
+                        .graphicsLayer { rotationZ = rotationAngle },
+                )
             }
         }
     }

@@ -20,10 +20,16 @@ sealed interface ReasoningResolution {
 class ReasoningEngines(
     private val isModelInstalled: (modelId: String) -> Boolean,
     private val hasOpenAiCredential: () -> Boolean,
+    private val hasAnthropicCredential: () -> Boolean = { false },
+    private val hasGoogleCredential: () -> Boolean = { false },
     private val local: (modelId: String) -> ReasoningEngine,
     private val openAi: (model: String) -> ReasoningEngine,
+    private val anthropic: (model: String) -> ReasoningEngine = { openAi(it) },
+    private val google: (model: String) -> ReasoningEngine = { openAi(it) },
+    private val custom: (endpoint: String, model: String) -> ReasoningEngine = { _, m -> openAi(m) },
 ) {
     fun resolve(settings: Settings): ReasoningResolution = when (settings.reasoningSource) {
+        ReasoningSource.CREDITS -> ReasoningResolution.Unavailable(UnavailableReason.NOT_CONNECTED)
         ReasoningSource.LOCAL -> {
             val modelId = settings.reasoningLocalModelId
             when {
@@ -36,6 +42,21 @@ class ReasoningEngines(
             !hasOpenAiCredential() -> ReasoningResolution.Unavailable(UnavailableReason.NOT_CONNECTED)
             settings.reasoningOpenAiModel.isBlank() -> ReasoningResolution.Unavailable(UnavailableReason.NO_MODEL_CHOSEN)
             else -> ReasoningResolution.Ready(openAi(settings.reasoningOpenAiModel))
+        }
+        ReasoningSource.ANTHROPIC -> when {
+            !hasAnthropicCredential() -> ReasoningResolution.Unavailable(UnavailableReason.NOT_CONNECTED)
+            settings.reasoningAnthropicModel.isBlank() -> ReasoningResolution.Unavailable(UnavailableReason.NO_MODEL_CHOSEN)
+            else -> ReasoningResolution.Ready(anthropic(settings.reasoningAnthropicModel))
+        }
+        ReasoningSource.GOOGLE -> when {
+            !hasGoogleCredential() -> ReasoningResolution.Unavailable(UnavailableReason.NOT_CONNECTED)
+            settings.reasoningGoogleModel.isBlank() -> ReasoningResolution.Unavailable(UnavailableReason.NO_MODEL_CHOSEN)
+            else -> ReasoningResolution.Ready(google(settings.reasoningGoogleModel))
+        }
+        ReasoningSource.CUSTOM -> when {
+            settings.reasoningCustomEndpoint.isBlank() -> ReasoningResolution.Unavailable(UnavailableReason.NOT_CONNECTED)
+            settings.reasoningCustomModel.isBlank() -> ReasoningResolution.Unavailable(UnavailableReason.NO_MODEL_CHOSEN)
+            else -> ReasoningResolution.Ready(custom(settings.reasoningCustomEndpoint, settings.reasoningCustomModel))
         }
     }
 }

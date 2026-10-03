@@ -1,5 +1,7 @@
 package com.keyflow.auth
 
+import com.keyflow.auth.providers.anthropic.AnthropicProvider
+import com.keyflow.auth.providers.google.GoogleProvider
 import com.keyflow.auth.providers.openai.OpenAiProvider
 import okhttp3.OkHttpClient
 
@@ -17,5 +19,7 @@ class AuthDependencies(
 object AuthProviders {
     fun create(dependencies: AuthDependencies): List<ProviderAuth> = listOf(
         OpenAiProvider.create(dependencies),
+        AnthropicProvider.create(dependencies),
+        GoogleProvider.create(dependencies),
     )
 }

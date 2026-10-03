@@ -2,7 +2,12 @@ package com.keyflow.ui.config
 
 import com.keyflow.i18n.tr
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -32,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -212,10 +218,48 @@ private fun RailItem(
     onClick: () -> Unit,
 ) {
     val palette = LocalKeyFlowPalette.current
+    val isFluxos = tab == ConfigTab.FLUXOS
+
+    // Movimento e pulso contínuos para a aba Fluxos (hub central de capacidades)
+    val (iconScale, glowAlpha, beaconScale) = if (isFluxos) {
+        val infiniteTransition = rememberInfiniteTransition(label = "fluxos-pulse")
+        val scale by infiniteTransition.animateFloat(
+            initialValue = 1.0f,
+            targetValue = 1.18f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1300, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "fluxos-scale",
+        )
+        val alpha by infiniteTransition.animateFloat(
+            initialValue = 0.35f,
+            targetValue = 0.95f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1300, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "fluxos-glow",
+        )
+        val beacon by infiniteTransition.animateFloat(
+            initialValue = 0.7f,
+            targetValue = 1.35f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1300, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "fluxos-beacon",
+        )
+        Triple(scale, alpha, beacon)
+    } else {
+        Triple(1f, 0f, 1f)
+    }
+
     // Aba travada: alpha aplicado nas cores (Modifier.alpha cria um graphics layer que já deixou
     // contorno "preso" em cache ao destravar).
     val tint = when {
         isActive -> palette.fg
+        isFluxos -> palette.teal
         isEnabled -> palette.muted
         else -> palette.faint.copy(alpha = 0.45f)
     }
@@ -226,7 +270,15 @@ private fun RailItem(
             .padding(horizontal = RAIL_ITEM_INSET)
             .height(44.dp)
             .clip(shape)
-            .then(if (isActive) Modifier.background(raisedFill(palette)).border(1.dp, palette.line, shape) else Modifier)
+            .then(
+                when {
+                    isActive -> Modifier.background(raisedFill(palette)).border(1.dp, palette.line, shape)
+                    isFluxos -> Modifier
+                        .background(palette.teal.copy(alpha = glowAlpha * 0.08f))
+                        .border(1.dp, palette.teal.copy(alpha = glowAlpha * 0.45f), shape)
+                    else -> Modifier
+                },
+            )
             .clickable(
                 enabled = !isActive,
                 interactionSource = remember { MutableInteractionSource() },
@@ -242,19 +294,66 @@ private fun RailItem(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.width(RAIL_ICON_SLOT), contentAlignment = Alignment.Center) {
-            tab.Icon(tint = tint, modifier = Modifier.size(21.dp))
+            tab.Icon(
+                tint = tint,
+                modifier = Modifier
+                    .size(21.dp)
+                    .then(
+                        if (isFluxos) Modifier.graphicsLayer {
+                            scaleX = iconScale
+                            scaleY = iconScale
+                        } else Modifier,
+                    ),
+            )
+            if (isFluxos) {
+                Box(
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 8.dp, end = 7.dp)
+                        .size(5.dp)
+                        .graphicsLayer {
+                            scaleX = beaconScale
+                            scaleY = beaconScale
+                            alpha = glowAlpha
+                        }
+                        .background(palette.teal, CircleShape),
+                )
+            }
         }
         AnimatedVisibility(visible = expanded, enter = fadeIn(tween(200)), exit = fadeOut(tween(120))) {
-            Text(
-                tab.label,
-                color = tint,
-                fontFamily = SpaceGrotesk,
-                fontWeight = if (isActive) FontWeight.Medium else FontWeight.Normal,
-                fontSize = 11.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Clip,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(start = 4.dp, end = 12.dp),
-            )
+            ) {
+                Text(
+                    tab.label,
+                    color = tint,
+                    fontFamily = SpaceGrotesk,
+                    fontWeight = if (isActive || isFluxos) FontWeight.Medium else FontWeight.Normal,
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Clip,
+                )
+                if (isFluxos) {
+                    Box(
+                        Modifier
+                            .padding(start = 4.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(palette.teal.copy(alpha = 0.18f))
+                            .border(0.8.dp, palette.teal.copy(alpha = glowAlpha), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 4.dp, vertical = 1.dp),
+                    ) {
+                        Text(
+                            "HUB",
+                            color = palette.teal,
+                            fontFamily = SpaceMono,
+                            fontSize = 7.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.6.sp,
+                        )
+                    }
+                }
+            }
         }
     }
 }

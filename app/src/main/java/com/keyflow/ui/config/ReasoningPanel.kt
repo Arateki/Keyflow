@@ -13,6 +13,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.text.input.KeyboardType
 import com.keyflow.auth.ConnectionState
 import com.keyflow.core.ReasoningSource
 import com.keyflow.data.Settings
@@ -44,6 +46,8 @@ fun ReasoningPanel(
     // Qual motor responde com estas Settings — ou por que nenhum. Sem fiação (galeria, testes), nenhum.
     resolve: (Settings) -> ReasoningResolution = { ReasoningResolution.Unavailable(UnavailableReason.NO_LOCAL_MODEL) },
     auth: AuthActions = AuthActions.None,
+    anthropicAuth: AuthActions = AuthActions.None,
+    googleAuth: AuthActions = AuthActions.None,
     initialTest: TestState = TestState(),
     // Falso num aparelho que não roda o motor local (ARM de 32 bits): a lista de download some, com o motivo.
     localSupported: Boolean = true,
@@ -52,9 +56,11 @@ fun ReasoningPanel(
     val scroll = rememberScrollState()
     // Lido AQUI, no corpo do painel: quando a conexão muda, tudo abaixo — inclusive o "pronto para testar" — recompõe.
     val connection by remember(auth) { auth.state() }.collectAsState(ConnectionState.Disconnected)
+    val anthropicConnection by remember(anthropicAuth) { anthropicAuth.state() }.collectAsState(ConnectionState.Disconnected)
+    val googleConnection by remember(googleAuth) { googleAuth.state() }.collectAsState(ConnectionState.Disconnected)
     val openAi = openAiPanelState(connection, auth.flows)
     // O motor pronto (ou o motivo de não haver) depende das Settings, da conexão e dos modelos instalados.
-    val resolution = remember(settings, connection, models, resolve) { resolve(settings) }
+    val resolution = remember(settings, connection, anthropicConnection, googleConnection, models, resolve) { resolve(settings) }
     Column(
         modifier
             .fillMaxWidth()
@@ -73,9 +79,13 @@ fun ReasoningPanel(
                     onSelect = { onSettingsChange(settings.copy(reasoningSource = it)) },
                 )
                 when (settings.reasoningSource) {
+                    ReasoningSource.CREDITS -> CreditsCard(tag = "raciocinio-credits-card")
                     ReasoningSource.LOCAL ->
                         if (localSupported) ReasoningLocal(settings, onSettingsChange, models, actions) else LocalUnsupported()
                     ReasoningSource.OPENAI -> OpenAiPanel(settings, onSettingsChange, auth, openAi, connection)
+                    ReasoningSource.ANTHROPIC -> AnthropicPanel(settings, onSettingsChange, anthropicAuth)
+                    ReasoningSource.GOOGLE -> GooglePanel(settings, onSettingsChange, googleAuth)
+                    ReasoningSource.CUSTOM -> ReasoningCustomFields(settings, onSettingsChange)
                 }
             }
         }
@@ -89,10 +99,45 @@ fun ReasoningPanel(
     }
 }
 
-// "Local" e "OpenAI" são nomes próprios, iguais em todos os idiomas (como na origem da Transcrição).
+// "Local", "OpenAI", "Anthropic", "Google" e "Custom" são nomes próprios/técnicos.
 private fun reasoningSourceLabel(source: ReasoningSource): String = when (source) {
+    ReasoningSource.CREDITS -> tr("Créditos")
     ReasoningSource.LOCAL -> "Local"
     ReasoningSource.OPENAI -> "OpenAI"
+    ReasoningSource.ANTHROPIC -> "Anthropic"
+    ReasoningSource.GOOGLE -> "Google"
+    ReasoningSource.CUSTOM -> "Custom"
+}
+
+@Composable
+private fun ReasoningCustomFields(settings: Settings, onSettingsChange: (Settings) -> Unit) {
+    Column(Modifier.padding(top = 20.dp)) {
+        AutoSaveField(
+            tr("Endpoint"), settings.reasoningCustomEndpoint,
+            { onSettingsChange(settings.copy(reasoningCustomEndpoint = it)) }, "raciocinio-custom-endpoint",
+            keyboardType = KeyboardType.Uri,
+        )
+        Row(Modifier.fillMaxWidth().padding(top = 13.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            AutoSaveField(
+                tr("Header"), settings.reasoningCustomHeaderName,
+                { onSettingsChange(settings.copy(reasoningCustomHeaderName = it)) }, "raciocinio-custom-header-name", Modifier.weight(1f),
+            )
+            AutoSaveField(
+                tr("Valor"), settings.reasoningCustomHeaderValue,
+                { onSettingsChange(settings.copy(reasoningCustomHeaderValue = it)) }, "raciocinio-custom-header-value", Modifier.weight(1.3f),
+                keyboardType = KeyboardType.Password,
+            )
+        }
+        AutoSaveField(
+            tr("Modelo"), settings.reasoningCustomModel,
+            { onSettingsChange(settings.copy(reasoningCustomModel = it)) }, "raciocinio-custom-model",
+            modifier = Modifier.padding(top = 13.dp),
+        )
+        SettingSub(
+            tr("Padrão compatível com OpenAI Chat Completions — informe o endpoint e credenciais do seu serviço."),
+            Modifier.padding(top = 16.dp),
+        )
+    }
 }
 
 @Composable

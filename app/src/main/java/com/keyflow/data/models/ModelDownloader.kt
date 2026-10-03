@@ -192,8 +192,9 @@ class ModelDownloader(
         val enqueued = mutableMapOf<String, Long>()
         try {
             spec.files.forEachIndexed { index, file ->
+                val resolvedUrl = ModelProvisioning.resolveUrl(spec.id, file)
                 enqueued[file.fileName] = gateway.enqueue(
-                    url = file.url,
+                    url = resolvedUrl,
                     destination = File(dir, file.fileName),
                     title = "KeyFlow · ${spec.displayName} (${index + 1}/${spec.files.size})",
                     allowMetered = allowMetered,

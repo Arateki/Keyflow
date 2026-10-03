@@ -6,6 +6,8 @@ import com.keyflow.core.ReasoningSource
 import com.keyflow.core.RecordingMode
 import com.keyflow.core.ShortcutOverflow
 import com.keyflow.core.TranscriptionSource
+import com.keyflow.core.VisionSource
+import com.keyflow.core.FalaSource
 
 /**
  * Estado completo de configuração persistido (T5 / VOZ-01..06, OVL-05, FND-04, REC modos).
@@ -38,11 +40,68 @@ data class Settings(
     val localModelId: String? = null,
     val localLanguage: String? = null,
     // Raciocínio (reasoning-models): a origem, o modelo de texto local escolhido (id do catálogo `TEXT`; null =
-    // nenhum) e o modelo da OpenAI ("" = ainda não escolhido — vem da lista da conta, nunca de um id fixo).
-    // Nenhuma credencial aqui: ficam no cofre de `auth/` (AUTH-02).
+    // nenhum) e os modelos em nuvem (OpenAI, Anthropic, Google, Custom). Nenhuma credencial aqui: ficam no cofre de `auth/` (AUTH-02).
     val reasoningSource: ReasoningSource = ReasoningSource.LOCAL,
     val reasoningLocalModelId: String? = null,
     val reasoningOpenAiModel: String = "",
+    val reasoningAnthropicModel: String = "claude-3-5-sonnet-latest",
+    val reasoningGoogleModel: String = "gemini-2.0-flash",
+    val reasoningCustomEndpoint: String = "",
+    val reasoningCustomHeaderName: String = "Authorization",
+    val reasoningCustomHeaderValue: String = "",
+    val reasoningCustomModel: String = "",
+    // Visão (vision-capture): a origem, o modelo local escolhido, destino da tradução e configurações em nuvem/custom.
+    val visionSource: VisionSource = VisionSource.LOCAL,
+    val visionLocalModelId: String? = null,
+    val visionTranslateTarget: String = "pt",
+    val visionOpenAiModel: String = "gpt-4o",
+    val visionGoogleApiKey: String = "",
+    val visionGoogleModel: String = "gemini-2.0-flash",
+    val visionAnthropicApiKey: String = "",
+    val visionAnthropicModel: String = "claude-3-5-sonnet-latest",
+    val visionCustomEndpoint: String = "",
+    val visionCustomHeaderName: String = "Authorization",
+    val visionCustomHeaderValue: String = "",
+    val visionCustomModel: String = "",
+    // Voz / Fala (speech-synthesis): a origem, modelo local, velocidade, e provedores na nuvem (OpenAI, ElevenLabs, Google, Custom).
+    val falaSource: FalaSource = FalaSource.LOCAL,
+    val falaLocalModelId: String? = null,
+    val falaSpeed: Float = 1.0f,
+    val falaCloudVoice: String = "alloy",
+    val falaElevenLabsApiKey: String = "",
+    val falaElevenLabsVoice: String = "Rachel",
+    val falaElevenLabsModel: String = "eleven_multilingual_v2",
+    val falaGoogleApiKey: String = "",
+    val falaGoogleVoice: String = "pt-BR-Neural2-A",
+    val falaCustomEndpoint: String = "",
+    val falaCustomHeaderName: String = "Authorization",
+    val falaCustomHeaderValue: String = "",
+    val falaCustomModel: String = "",
+    // Computador (acesso SSH remoto e shell local)
+    val computerMode: String = "ssh",
+    val computerSshHost: String = "",
+    val computerSshPort: Int = 22,
+    val computerSshUser: String = "",
+    val computerSshAuthType: String = "password",
+    val computerSshPassword: String = "",
+    val computerSshKey: String = "",
+    // Provisionamento e espelhamento dinâmico de modelos via infra própria / API em Rust
+    val customModelMirrorUrl: String = "",
+    // Provedores em nuvem (perfis e chaves centralizadas)
+    val providerAnthropicApiKey: String = "",
+    val providerAnthropicModel: String = "claude-3-5-sonnet-latest",
+    val providerAnthropicAuthMode: String = "subscription",
+    val providerOpenAiApiKey: String = "",
+    val providerOpenAiModel: String = "gpt-4o",
+    val providerOpenAiAuthMode: String = "subscription",
+    val providerGoogleApiKey: String = "",
+    val providerGoogleModel: String = "gemini-2.0-flash",
+    val providerGoogleAuthMode: String = "subscription",
+    val providerElevenLabsAuthMode: String = "subscription",
+    val providerGroqApiKey: String = "",
+    val providerGroqModel: String = "llama-3.3-70b-versatile",
+    val providerGrokApiKey: String = "",
+    val providerGrokModel: String = "grok-2",
     // Modos habilitados (gating das abas; cada modo libera sua aba — CFG-02)
     val overlayModeEnabled: Boolean = false,
     val keyboardModeEnabled: Boolean = false,
