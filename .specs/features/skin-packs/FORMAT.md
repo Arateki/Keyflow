@@ -48,6 +48,8 @@ Tudo minúsculo, `_` entre as partes, extensão `.svg`.
 - Buracos na numeração (1, 2, 4) são aceitos com **aviso**; o frame 3 simplesmente não existe. O frame `0` (`orb_idle_00.svg`) é
   **erro**, e o mesmo número escrito de duas formas (`orb_idle_01.svg` e `orb_idle_1.svg`) é **erro** citando os dois arquivos.
 - Máximo **64 frames por estado** e **240 no total**.
+- Acima de **48 frames** num estado o import **avisa**: nos tamanhos grandes da orbe a animação pode ficar menos fluida (medido: 64 frames a 280 px
+  repetem o quadro em 5–13% dos casos; 45 frames, em 1–2%). Considere menos frames ou um `fps` menor.
 - Cada SVG é a orbe **inteira**, num quadrado (`viewBox` quadrado, ex.: `0 0 256 256`), incluindo halo e anéis: o app
   desenha o SVG no lado todo da janela da orbe. Fundo transparente. Um `viewBox` não quadrado é aceito com aviso: a orbe fica
   centralizada, sem esticar.

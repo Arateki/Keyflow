@@ -64,6 +64,13 @@ object SkinPackReader {
     const val MAX_FRAMES_PER_STATE = 64
     const val MAX_FRAMES_TOTAL = 240
 
+    /**
+     * Acima disto, um estado ainda é aceito (o teto é [MAX_FRAMES_PER_STATE]), mas o import **avisa**: medido no emulador, 64 frames a 280 px
+     * (o máximo do slider de tamanho da orbe) não cabem no cache de bitmaps e a animação repete o frame em 5–13% dos quadros, contra
+     * 1–2% com 45 frames na mesma largura.
+     */
+    const val SMOOTH_FRAMES_PER_STATE = 48
+
     /** Aborta a leitura inteira. É um `IOException` para atravessar o `ZipInputStream` sem ser traduzido por ele. */
     private class Abort(message: String) : IOException(message)
 
@@ -369,6 +376,13 @@ object SkinPackReader {
                 }
             }
             if (total > MAX_FRAMES_TOTAL) errors += tr("orbe: o pacote tem %d frames; o máximo é 240.", total)
+            val heavy = frames.filter { it.value.size in (SMOOTH_FRAMES_PER_STATE + 1)..MAX_FRAMES_PER_STATE }
+            if (heavy.isNotEmpty()) {
+                warnings += tr(
+                    "orbe: %s — mais de 48 frames num estado pode ficar menos fluido nos tamanhos grandes da orbe; considere menos frames ou um ritmo (fps) menor.",
+                    heavy.entries.joinToString(", ") { (state, byFrame) -> "${state.key} (${byFrame.size})" },
+                )
+            }
             val withoutFrames = OrbPackState.entries.filter { it !in frames && it != OrbPackState.IDLE }
             if (withoutFrames.isNotEmpty() && OrbPackState.IDLE in frames) {
                 warnings += tr("orbe: sem frames de %s — esses estados usam os de idle.", withoutFrames.joinToString(", ") { it.key })

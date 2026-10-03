@@ -97,6 +97,7 @@ class SkinPackFormatDocTest {
         assertThat(limits).contains("total descompactado ≤ ${SkinPackReader.MAX_TOTAL_BYTES / (1024 * 1024)} MB")
         val files = section(2)
         assertThat(files).contains("Máximo **${SkinPackReader.MAX_FRAMES_PER_STATE} frames por estado** e **${SkinPackReader.MAX_FRAMES_TOTAL} no total**")
+        assertThat(files).contains("Acima de **${SkinPackReader.SMOOTH_FRAMES_PER_STATE} frames** num estado o import **avisa**")
     }
 
     @Test

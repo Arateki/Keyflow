@@ -65,6 +65,7 @@ internal val TranslationsEs: Map<String, String> = mapOf(
     "orbe: o estado %s tem %d frames; o máximo é 64." to "orbe: el estado %s tiene %d fotogramas; el máximo es 64.",
     "orbe: o estado %s tem buracos na numeração (faltam os frames %s) — os frames que existem tocam em ordem." to "orbe: el estado %s tiene huecos en la numeración (faltan los fotogramas %s) — los fotogramas que existen se reproducen en orden.",
     "orbe: o pacote tem %d frames; o máximo é 240." to "orbe: el paquete tiene %d fotogramas; el máximo es 240.",
+    "orbe: %s — mais de 48 frames num estado pode ficar menos fluido nos tamanhos grandes da orbe; considere menos frames ou um ritmo (fps) menor." to "orbe: %s — más de 48 fotogramas en un estado pueden verse menos fluidos en los tamaños grandes de la orbe; considera menos fotogramas o un ritmo (fps) menor.",
     "orbe: sem frames de %s — esses estados usam os de idle." to "orbe: sin fotogramas de %s — esos estados usan los de idle.",
     "teclado: falta keyboard_key_normal.svg, que é obrigatório quando o pacote tem teclado." to "teclado: falta keyboard_key_normal.svg, obligatorio cuando el paquete tiene teclado.",
     "manifest.json: a seção orb foi ignorada — o pacote não tem frames de orbe." to "manifest.json: se ignoró la sección orb — el paquete no tiene fotogramas de orbe.",

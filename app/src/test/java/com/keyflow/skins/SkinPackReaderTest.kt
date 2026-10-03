@@ -251,6 +251,30 @@ class SkinPackReaderTest {
     }
 
     @Test
+    fun `a state above 48 frames installs with a smoothness warning, 48 does not`() {
+        val limit = (1..48).map { "orb_idle_$it.svg" }.toTypedArray()
+        assertThat(ok(zip(listOf("manifest.json" to MANIFEST.toByteArray()) + frames(*limit))).report.warnings.filter { it.contains("fluido") }).isEmpty()
+
+        val above = (1..49).map { "orb_idle_$it.svg" }.toTypedArray()
+        val result = ok(zip(listOf("manifest.json" to MANIFEST.toByteArray()) + frames(*above)))
+        val warning = result.report.warnings.single { it.contains("fluido") }
+        assertThat(warning).contains("idle (49)")
+        assertThat(warning).contains("menos frames ou um ritmo (fps) menor")
+        assertThat(result.content.orbFrames.getValue(OrbPackState.IDLE)).hasSize(49)
+    }
+
+    @Test
+    fun `the smoothness warning names every heavy state and only those`() {
+        val idle = (1..64).map { "orb_idle_$it.svg" }
+        val listening = (1..50).map { "orb_listening_$it.svg" }
+        val paused = (1..48).map { "orb_paused_$it.svg" }
+        val result = ok(zip(listOf("manifest.json" to MANIFEST.toByteArray()) + frames(*(idle + listening + paused).toTypedArray())))
+        val warning = result.report.warnings.single { it.contains("fluido") }
+        assertThat(warning).contains("idle (64), listening (50)")
+        assertThat(warning).doesNotContain("paused")
+    }
+
+    @Test
     fun `more than 240 frames overall is an error`() {
         val names = OrbPackState.entries.flatMap { state -> (1..64).map { "orb_${state.key}_$it.svg" } } // 256 no total, 64 por estado
         val result = failed(zip(listOf("manifest.json" to MANIFEST.toByteArray()) + frames(*names.toTypedArray())))
