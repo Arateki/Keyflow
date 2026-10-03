@@ -67,7 +67,8 @@ class AnthropicReasoningEngine(
 
         val isOAuth = headers["Authorization"]?.startsWith("Bearer ") == true
         val jsonBody = bodyOf(request, isOAuth)
-        android.util.Log.d("AnthropicReasoning", "Outgoing model: $resolvedModel, isOAuth: $isOAuth, body: $jsonBody")
+        // Sem o corpo: é o texto do usuário (ditado, prompt), e o Log.d sai também no release.
+        android.util.Log.d("AnthropicReasoning", "Outgoing model: $resolvedModel, isOAuth: $isOAuth, corpo: ${jsonBody.length} caracteres")
         val body = jsonBody.toRequestBody("application/json".toMediaType())
         var attempt = 0
 
