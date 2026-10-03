@@ -13,12 +13,17 @@ package com.keyflow.skins
  * o pior caso do LRU: com mais frames do que cabem, o menos usado é sempre exatamente o próximo a ser mostrado, e o cache erra sempre.
  */
 internal class ByteBudgetLru<K, V>(
-    private val maxBytes: Long,
+    maxBytes: Long,
     private val chooseVictim: ((keys: Iterable<K>, justInserted: K) -> K?)? = null,
     private val sizeOf: (V) -> Int,
 ) {
     private val map = LinkedHashMap<K, V>(16, 0.75f, true)
     private var total = 0L
+
+    /** O teto de agora. Só [setMaxBytes] o muda (o orçamento adaptativo da orbe); quem nunca chama vê o teto do construtor, como sempre. */
+    @get:Synchronized
+    var maxBytes: Long = maxBytes
+        private set
 
     /** Bytes guardados agora. */
     @get:Synchronized
@@ -41,6 +46,19 @@ internal class ByteBudgetLru<K, V>(
         while (total > maxBytes && map.size > 1) {
             // O que acabou de entrar é o último da ordem de acesso e nunca é o despejado enquanto houver outro.
             val victim = chooseVictim?.invoke(map.keys, key)?.takeIf { it != key && map.containsKey(it) } ?: map.keys.first { it != key }
+            map.remove(victim)?.let { total -= sizeOf(it) }
+        }
+    }
+
+    /**
+     * Troca o teto por [newMax] e, se o que está guardado passa dele, despeja até caber: um orçamento que encolhe (o estado pesado acabou, a orbe
+     * fechou) solta o excesso na hora. [chooseVictim] recebe as chaves da menos para a mais usada e devolve quem sai (`null` = o menos usado).
+     */
+    @Synchronized
+    fun setMaxBytes(newMax: Long, chooseVictim: ((keys: Iterable<K>) -> K?)? = null) {
+        maxBytes = newMax
+        while (total > maxBytes && map.isNotEmpty()) {
+            val victim = chooseVictim?.invoke(map.keys)?.takeIf { map.containsKey(it) } ?: map.keys.first()
             map.remove(victim)?.let { total -= sizeOf(it) }
         }
     }

@@ -24,6 +24,11 @@ import kotlin.concurrent.thread
  *
  * Com [deterministic] (relógio injetado: prévias, galeria, testes) o frame que falta é renderizado **na hora**, na thread que desenha — é
  * a única maneira de o mesmo pixel sair sempre; a orbe ao vivo (relógio real) nunca entra nesse caminho.
+ *
+ * **Pacotes que pedem mais** (SKP-ORB-06): um pacote que cabe nos limites de antes (fps ≤ 60 e até 64 frames por estado) usa o caminho e os 16 MB
+ * de sempre, sem nenhum desvio. Só o que passa deles ([extended]: fps acima de 60 ou mais de 64 frames num estado) ganha um orçamento que cresce
+ * até o que o estado que toca, no lado de agora, precisa ([OrbMemoryPolicy]) — limitado pelo teto absoluto e pelo que o aparelho aguenta
+ * ([OrbDeviceMemory]) — e que volta aos 16 MB quando a orbe sai do estado, muda de tamanho ou fecha.
  */
 class PackOrb private constructor(private val pack: SkinPack) {
 
@@ -52,6 +57,18 @@ class PackOrb private constructor(private val pack: SkinPack) {
     private data class FrameKey(val owner: Int, val state: OrbPackState, val index: Int, val side: Int)
 
     private val ownerId = nextOwner.getAndIncrement()
+
+    /**
+     * O pacote pede mais do que o formato aceitava antes dos 120 fps (SKP-ORB-06)? Só então valem o orçamento adaptativo, o aquecimento do estado
+     * inteiro e a fila maior; quem cabe nos limites de antes nunca passa por nenhum deles. Conta o ritmo e os frames de quem de fato toca em cada estado.
+     */
+    private val extended: Boolean = OrbPackState.entries.any { pack.fpsOf(it) > LEGACY_MAX_FPS || pack.framesOf(it).size > LEGACY_MAX_FRAMES_PER_STATE }
+
+    private class Playback(val state: OrbPackState, val side: Int)
+
+    // O estado e o lado que esta orbe tocou por último ([prepare]): o que o orçamento protege ao encolher e o que o aquecimento ainda quer.
+    @Volatile
+    private var active: Playback? = null
 
     /**
      * Só para os testes: chamado a cada frame renderizado, **na thread que o renderizou** (a de fundo; ou a de quem chamou, no caminho
@@ -83,6 +100,7 @@ class PackOrb private constructor(private val pack: SkinPack) {
             return lastShown[effective]
         }
         // Ao vivo: pede o frame de agora (urgente) e os próximos, e mostra o que já tem do estado.
+        if (extended) noteDemand(sidePx, files.size)
         cursor[effective] = index
         request(key, URGENT)
         val ahead = lookaheadFor(pack.fpsOf(state), files.size)
@@ -90,18 +108,43 @@ class PackOrb private constructor(private val pack: SkinPack) {
         return lastShown[effective]?.takeIf { it.width == sidePx } ?: anyCached(effective, sidePx)
     }
 
-    /** Quantos frames à frente do atual a thread de fundo mantém prontos: um quarto de segundo da animação, entre 3 e 12. */
-    private fun lookaheadFor(fps: Int, frameCount: Int): Int = (fps / 4).coerceIn(MIN_LOOKAHEAD, MAX_LOOKAHEAD).coerceAtMost(frameCount - 1)
+    /**
+     * Quantos frames à frente do atual a thread de fundo mantém prontos: um quarto de segundo da animação. Até 60 fps (o que o formato aceitava) são
+     * entre 3 e 12, como sempre; acima disso, o quarto de segundo inteiro (`fps / 4`: 15 frames a 60+, 30 a 120 fps) — o teto de 12 faria 100 ms de
+     * folga a 120 fps.
+     */
+    private fun lookaheadFor(fps: Int, frameCount: Int): Int {
+        val quarterSecond = fps / 4
+        val wanted = if (fps <= LEGACY_MAX_FPS) quarterSecond.coerceIn(MIN_LOOKAHEAD, MAX_LOOKAHEAD) else quarterSecond
+        return wanted.coerceAtMost(frameCount - 1)
+    }
 
-    /** Pré-aquece os frames de [state] (e só os que cabem na metade do cache) para a orbe de [sidePx] px: chamar ao entrar no estado. */
+    /**
+     * Pré-aquece os frames de [state] (e só os que cabem na metade do cache) para a orbe de [sidePx] px: chamar ao entrar no estado e ao mudar o
+     * tamanho. Num pacote que pede mais ([extended]) isto também reavalia o orçamento (cresce até o que o estado precisa; encolhe se o estado novo é
+     * leve) e, se o estado cabe inteiro no orçamento, aquece o estado inteiro.
+     */
     fun prepare(state: OrbPackState, sidePx: Int) {
         if (closed || sidePx <= 0) return
         val files = pack.framesOf(state)
         if (files.isEmpty()) return
         val effective = pack.effectiveState(state)
         val frameBytes = sidePx.toLong() * sidePx * BYTES_PER_PIXEL
-        val fit = (CACHE_BYTES / 2 / frameBytes).toInt().coerceAtLeast(1)
+        active = Playback(effective, sidePx)
+        val budget = if (extended) noteDemand(sidePx, files.size, revise = true) else CACHE_BYTES
+        val fit = if (extended && files.size * frameBytes <= budget) files.size else (budget / 2 / frameBytes).toInt().coerceAtLeast(1)
         for (index in 0 until minOf(files.size, fit)) request(FrameKey(ownerId, effective, index, sidePx), WARM)
+    }
+
+    /**
+     * Registra quanto esta orbe precisa agora — os bytes do estado que toca, no lado de agora — e reavalia o orçamento do cache quando o pedido
+     * mudou (ou sempre, com [revise]: ao entrar no estado o teto do aparelho pode ter mudado). Devolve o orçamento resultante. Só os pacotes que pedem
+     * mais chegam aqui ([extended]).
+     */
+    private fun noteDemand(sidePx: Int, frames: Int, revise: Boolean = false): Long {
+        val bytes = OrbMemoryPolicy.stateBytes(sidePx, frames)
+        if (demands.put(ownerId, bytes) != bytes || revise) reviseBudget()
+        return cache.maxBytes
     }
 
     /** Solta o que esta orbe guardou no cache e para de renderizar para ela. */
@@ -110,6 +153,7 @@ class PackOrb private constructor(private val pack: SkinPack) {
         owners.remove(ownerId)
         lastShown.clear()
         cache.removeWhere { it.owner == ownerId }
+        if (demands.remove(ownerId) != null) reviseBudget()
     }
 
     private fun remember(state: OrbPackState, bitmap: Bitmap): Bitmap {
@@ -131,7 +175,7 @@ class PackOrb private constructor(private val pack: SkinPack) {
             if (existing != null) {
                 // Já pedido (na fila ou sendo renderizado agora): só sobe de prioridade — o pedido do frame de agora passa na frente.
                 if (existing.priority <= priority || !queue.remove(existing)) return
-            } else if (priority != URGENT && queue.size >= MAX_QUEUE) {
+            } else if (priority != URGENT && queue.size >= if (extended) EXTENDED_MAX_QUEUE else MAX_QUEUE) {
                 return
             }
             val task = Task(this, key, priority, sequence.incrementAndGet())
@@ -152,6 +196,11 @@ class PackOrb private constructor(private val pack: SkinPack) {
             Log.w(TAG, "${pack.id}: frame ${key.state.key} #${key.index + 1} não desenha (${e.message})")
             failed.add(key)
             return null
+        } catch (e: OutOfMemoryError) {
+            // Sem memória para um bitmap: nunca derruba a orbe. O frame fica sem render (o anterior continua na tela) e o orçamento volta aos 16 MB.
+            Log.w(TAG, "${pack.id}: sem memória para o frame ${key.state.key} #${key.index + 1} (${key.side} px) — o orçamento volta ao básico")
+            OrbDeviceMemory.onMemoryPressure()
+            return null
         }
         onRendered?.invoke(key.state, key.index)
         return bitmap
@@ -159,10 +208,13 @@ class PackOrb private constructor(private val pack: SkinPack) {
 
     private class Task(val owner: PackOrb, val key: FrameKey, val priority: Int, val sequence: Long)
 
-    /** Este pedido ainda serve? Os de "à frente" que a animação já passou são largados; os de pré-aquecimento valem sempre. */
+    /**
+     * Este pedido ainda serve? Os de "à frente" que a animação já passou são largados; os de pré-aquecimento valem sempre — salvo num pacote que
+     * pede mais, em que um estado de até 240 frames na fila não pode atrasar o do estado seguinte: ali só vale o aquecimento do estado e do lado de agora.
+     */
     private fun isStillWanted(task: Task): Boolean {
         if (closed) return false
-        if (task.priority >= WARM) return true
+        if (task.priority >= WARM) return !extended || active.let { it == null || (it.state == task.key.state && it.side == task.key.side) }
         val key = task.key
         val count = pack.framesOf(key.state).size
         val now = cursor[key.state] ?: return true
@@ -186,13 +238,20 @@ class PackOrb private constructor(private val pack: SkinPack) {
     companion object {
         private const val TAG = "SKP"
 
-        /** O teto do cache de frames, para o processo inteiro (SKP-ORB-05). */
-        const val CACHE_BYTES = 16L * 1024 * 1024
+        /** O orçamento básico do cache de frames, para o processo inteiro (SKP-ORB-05): o de todo pacote que cabe nos limites de antes. */
+        const val CACHE_BYTES = OrbMemoryPolicy.BASE_BYTES
+
+        /** Os limites que o formato tinha antes dos 120 fps: quem passa de um deles pede mais ([extended]). */
+        private const val LEGACY_MAX_FPS = 60
+        private const val LEGACY_MAX_FRAMES_PER_STATE = 64
 
         private const val MIN_LOOKAHEAD = 3
         private const val MAX_LOOKAHEAD = 12
-        private const val BYTES_PER_PIXEL = 4
+        private const val BYTES_PER_PIXEL = OrbMemoryPolicy.BYTES_PER_PIXEL
         private const val MAX_QUEUE = 128
+
+        /** A fila de quem pede mais: cabe o aquecimento de um estado de 240 frames mais o quarto de segundo à frente (30 frames) e folga. */
+        private const val EXTENDED_MAX_QUEUE = 512
 
         // Prioridades (menor = antes): o frame de agora, os próximos e, por último, o pré-aquecimento do estado inteiro.
         private const val URGENT = 0
@@ -204,6 +263,42 @@ class PackOrb private constructor(private val pack: SkinPack) {
 
         // O cache de frames escolhe quem sai pela posição da animação (ver [victimOf]), não pelo menos usado.
         private val cache = ByteBudgetLru<FrameKey, Bitmap>(CACHE_BYTES, ::victimOf) { it.allocationByteCount }
+
+        // O que cada orbe de um pacote que pede mais precisa agora (bytes do estado que toca, no lado de agora), por dono. Vazio = orçamento básico.
+        private val demands = ConcurrentHashMap<Int, Long>()
+        private val budgetLock = Any()
+
+        /** O orçamento de agora: 16 MB, ou o que a orbe mais exigente pede, até o teto do aparelho ([OrbMemoryPolicy.budgetFor]). */
+        val budgetBytes: Long get() = cache.maxBytes
+
+        /**
+         * Recalcula o orçamento do cache a partir do que as orbes pedem e do teto do aparelho, e solta já o excesso se ele encolheu: primeiro os frames
+         * que não estão tocando, depois os mais longe à frente do cursor. Chamado quando o pedido muda (estado, lado, fechar) e quando o sistema aperta.
+         */
+        internal fun reviseBudget() {
+            synchronized(budgetLock) {
+                val demand = demands.values.maxOrNull() ?: 0L
+                cache.setMaxBytes(OrbMemoryPolicy.budgetFor(demand, OrbDeviceMemory.ceilingBytes), ::victimOnShrink)
+            }
+        }
+
+        /** Quem sai quando o orçamento encolhe: o menos usado entre os frames que não são do estado e do lado que a orbe toca; se só restam esses, o mais longe à frente do cursor. */
+        private fun victimOnShrink(keys: Iterable<FrameKey>): FrameKey? {
+            var farthest: FrameKey? = null
+            var farthestDistance = -1
+            for (candidate in keys) {
+                val owner = owners[candidate.owner] ?: return candidate
+                val playing = owner.active
+                if (playing == null || playing.state != candidate.state || playing.side != candidate.side) return candidate
+                val now = owner.cursor[candidate.state] ?: continue
+                val distance = Math.floorMod(candidate.index - now, owner.pack.framesOf(candidate.state).size.coerceAtLeast(1))
+                if (distance > farthestDistance) {
+                    farthestDistance = distance
+                    farthest = candidate
+                }
+            }
+            return farthest
+        }
 
         // As orbes abertas, por dono: o cache precisa saber em que frame cada animação está para escolher quem despejar.
         private val owners = ConcurrentHashMap<Int, PackOrb>()

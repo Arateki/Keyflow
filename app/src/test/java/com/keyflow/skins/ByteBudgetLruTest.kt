@@ -141,4 +141,78 @@ class ByteBudgetLruTest {
         // 10 frames em 7 lugares: a cada volta só os 3 de fora são renderizados (e a 1ª volta enche) — bem menos que 60.
         assertThat(misses).isAtMost(10 + 5 * 4)
     }
+
+    // ── o teto que muda (orçamento adaptativo da orbe, SKP-ORB-06) ───────────
+
+    @Test
+    fun `the budget starts as the constructor says and only setMaxBytes changes it`() {
+        val c = cache(100)
+        assertThat(c.maxBytes).isEqualTo(100)
+        c.put("a", ByteArray(60))
+        c.put("b", ByteArray(60))
+        assertThat(c.maxBytes).isEqualTo(100)
+        assertThat(c.bytes).isEqualTo(60)
+    }
+
+    @Test
+    fun `a bigger budget keeps what a smaller one would have evicted`() {
+        val c = cache(100)
+        c.setMaxBytes(300)
+        repeat(5) { c.put("k$it", ByteArray(50)) }
+        assertThat(c.bytes).isEqualTo(250)
+        assertThat(c.size).isEqualTo(5)
+        assertThat(c.maxBytes).isEqualTo(300)
+    }
+
+    @Test
+    fun `shrinking the budget evicts the excess right away, least recently used first by default`() {
+        val c = cache(300)
+        c.put("a", ByteArray(100))
+        c.put("b", ByteArray(100))
+        c.put("c", ByteArray(100))
+        c.get("a") // o menos usado agora é o b
+        c.setMaxBytes(200)
+        assertThat(c.bytes).isEqualTo(200)
+        assertThat(c.contains("b")).isFalse()
+        assertThat(c.contains("a") && c.contains("c")).isTrue()
+    }
+
+    @Test
+    fun `shrinking asks the chooser who goes and falls back to the least recently used on a bad answer`() {
+        val c = cache(300)
+        c.put("a", ByteArray(100))
+        c.put("b", ByteArray(100))
+        c.put("c", ByteArray(100))
+        c.setMaxBytes(200) { keys -> keys.first { it == "c" } }
+        assertThat(c.contains("c")).isFalse()
+        assertThat(c.bytes).isEqualTo(200)
+        c.setMaxBytes(100) { "não-existe" }
+        assertThat(c.contains("a")).isFalse() // o menos usado
+        assertThat(c.contains("b")).isTrue()
+        assertThat(c.bytes).isEqualTo(100)
+    }
+
+    @Test
+    fun `shrinking below one entry empties it and growing back works`() {
+        val c = cache(300)
+        c.put("a", ByteArray(100))
+        c.setMaxBytes(10)
+        assertThat(c.size).isEqualTo(0)
+        assertThat(c.bytes).isEqualTo(0)
+        c.setMaxBytes(300)
+        c.put("a", ByteArray(100))
+        assertThat(c.bytes).isEqualTo(100)
+    }
+
+    @Test
+    fun `a budget that never changes behaves exactly like before the setter existed`() {
+        // O mesmo laço de acessos num cache sem `setMaxBytes` e noutro em que o setter foi chamado com o MESMO valor: a mesma ordem de despejo.
+        fun run(c: ByteBudgetLru<String, ByteArray>): List<String> {
+            repeat(200) { i -> if (i % 3 == 0) c.get("k${i / 2}"); c.put("k$i", ByteArray(37)) }
+            return (0 until 200).filter { c.contains("k$it") }.map { "k$it" }
+        }
+        val plain = run(cache(1000))
+        val same = run(cache(1000).also { it.setMaxBytes(1000) })
+        assertThat(same).isEqualTo(plain)
+    }
 }
