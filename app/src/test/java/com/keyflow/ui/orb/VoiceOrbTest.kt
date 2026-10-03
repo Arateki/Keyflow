@@ -62,7 +62,7 @@ class VoiceOrbTest {
         // D4: a skin do usuário nunca fica atrás de `skinsUnlocked`. E nenhuma skin de hoje mudou de id nem de preço.
         assertThat(OrbStyle.PACK.paid).isFalse()
         assertThat(OrbStyle.entries.filter { it != OrbStyle.PACK }.map { it.id to it.paid }).containsExactly(
-            "atelie" to false, "aero" to true, "glitch" to true, "rosegold" to true,
+            "atelie" to false, "aero" to true, "glitch" to true, "rosegold" to true, "mascot" to true,
         ).inOrder()
     }
 
