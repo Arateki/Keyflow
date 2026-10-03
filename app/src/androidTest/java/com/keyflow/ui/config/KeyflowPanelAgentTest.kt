@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.keyflow.agent.AgentEngine
@@ -300,7 +301,10 @@ class KeyflowPanelAgentTest {
         say("primeira mensagem")
         waitForText("Resposta a: primeira mensagem")
         rule.onNodeWithTag(KEYFLOW_AJUSTES_TOGGLE_TAG).performClick()
-        rule.onNodeWithTag("keyflow-clear-chat").performClick()
+        // A seção "Ferramentas do agente" (AGT-T5) fica antes do botão, que agora mora abaixo da dobra da área de Ajustes.
+        rule.onNodeWithTag("keyflow-clear-chat").performScrollTo().performClick()
+        rule.waitUntil(10_000) { parts.controller.historySnapshot().isEmpty() }
+        rule.onNodeWithTag(KEYFLOW_AJUSTES_TOGGLE_TAG).performClick()
         rule.waitUntil(10_000) { rule.onAllNodes(androidx.compose.ui.test.hasText("Resposta a: primeira mensagem", substring = true)).fetchSemanticsNodes().isEmpty() }
         assertTrue(parts.controller.historySnapshot().isEmpty())
     }
