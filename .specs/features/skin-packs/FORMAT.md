@@ -7,7 +7,9 @@
 ## 1. O pacote
 
 Um arquivo **`.zip`** (qualquer nome) com SVGs e um `manifest.json`. Os arquivos podem estar na raiz do zip ou
-dentro de **uma única** pasta que envolve tudo (o que "comprimir pasta" faz). Subpastas além dessa são ignoradas.
+dentro de **uma única** pasta que envolve tudo (o que "comprimir pasta" faz) — só vale se **todos** os arquivos estão nela.
+Arquivos em outras subpastas são ignorados, com aviso. O lixo que macOS e Windows põem no zip (`__MACOSX/`, `.DS_Store`,
+`Thumbs.db`, `desktop.ini`, `._*`) é ignorado sem aviso, e `\` vale como `/`.
 
 ```
 minha-skin.zip
@@ -41,11 +43,16 @@ Tudo minúsculo, `_` entre as partes, extensão `.svg`.
 
 - `<frame>` é um inteiro ≥ 1 (pode ter zeros à esquerda: `1`, `01`, `0001`). Os frames tocam em **ordem numérica**, em
   loop. Um estado com **um frame só** é estático.
-- **`idle` é obrigatório** quando há orbe. Estado que faltar usa os frames de `idle`.
-- Buracos na numeração (1, 2, 4) são aceitos com **aviso**; o frame 3 simplesmente não existe.
+- **`idle` é obrigatório** quando há orbe. Estado que faltar usa os frames de `idle` **e o ritmo (`fps`) de `idle`** — um
+  `orb.states.<estado>.fps` para um estado sem frames é ignorado, com aviso.
+- Buracos na numeração (1, 2, 4) são aceitos com **aviso**; o frame 3 simplesmente não existe. O frame `0` (`orb_idle_00.svg`) é
+  **erro**, e o mesmo número escrito de duas formas (`orb_idle_01.svg` e `orb_idle_1.svg`) é **erro** citando os dois arquivos.
 - Máximo **64 frames por estado** e **240 no total**.
 - Cada SVG é a orbe **inteira**, num quadrado (`viewBox` quadrado, ex.: `0 0 256 256`), incluindo halo e anéis: o app
-  desenha o SVG no lado todo da janela da orbe. Fundo transparente.
+  desenha o SVG no lado todo da janela da orbe. Fundo transparente. Um `viewBox` não quadrado é aceito com aviso: a orbe fica
+  centralizada, sem esticar.
+- O frame no ar é `floor(tempoMs · fps / 1000) mod nFrames`, com o tempo contado do relógio da orbe (a animação **não reinicia** ao
+  trocar de estado). O app prepara os frames de cada estado em segundo plano ao entrar nele; nunca espera para desenhar.
 - O **tempo e os glifos do centro** (relógio `m:ss`, pausa, lixeira, X de erro) **não** fazem parte do SVG: o app
   desenha por cima, na cor `orb.centerInk` do manifesto.
 
@@ -59,11 +66,15 @@ Tudo minúsculo, `_` entre as partes, extensão `.svg`.
 | `keyboard_modifier_pressed.svg`   | Idem, pressionada                                                       | não — sem ele, usa a `modifier_normal` escurecida |
 | `keyboard_tray.svg`               | Fundo do teclado inteiro (atrás das teclas e das barras)                | não — sem ele, cor lisa `keyboard.trayColor` |
 
-- A face é desenhada **esticada** até o tamanho de cada tecla (letra ≈ quadrada; espaço ≈ 5× mais larga). Para os
-  cantos não deformarem, declare `keyboard.slice` (fatiamento 3×3, seção 3): os cantos mantêm a proporção e só o miolo
-  estica.
-- A cor das teclas vem **do SVG** (o app não tinge). Fundo transparente fora da tecla; sombra e brilho são bem-vindos
-  dentro do `viewBox` — deixe margem para eles.
+- A face é desenhada **esticada** até o tamanho de cada tecla (letra ≈ quadrada; espaço ≈ 5× mais larga), qualquer que seja o
+  `preserveAspectRatio` escrito no SVG. Para os cantos não deformarem, declare `keyboard.slice` (fatiamento 3×3, seção 3): os
+  cantos mantêm a proporção (todos na mesma escala, a do menor lado) e só o miolo estica. O `slice` precisa deixar miolo: se
+  `left + right` (ou `top + bottom`) ocupa o `viewBox` inteiro, o import falha.
+- A cor das teclas vem **do SVG** (o app não tinge). Exceção: a face de uma tecla em **destaque** — shift ativo, mic pronto ou
+  gravando, erro — leva por cima 80% da cor do destaque (o desenho da face continua aparecendo), senão o estado não se veria.
+  Fundo transparente fora da tecla; sombra e brilho são bem-vindos dentro do `viewBox` — deixe margem para eles.
+- Sem `keyboard_key_pressed.svg`, a tecla pressionada é a normal escurecida em 20%. Sem `keyboard_modifier_pressed.svg`, a de
+  função pressionada é a `modifier_normal` escurecida (ou, sem `modifier_normal`, a `key_pressed`/`key_normal`).
 - `keyboard_tray.svg` é esticado no teclado todo (largura × altura), com `preserveAspectRatio="none"`.
 
 ## 3. `manifest.json`
@@ -107,7 +118,11 @@ Só `schemaVersion` e `name` são obrigatórios. Tudo mais tem padrão.
 | `keyboard.navigationBarColor` | cor opaca, = `trayColor` opaca        | Faixa do sistema sob o teclado                                              |
 | `keyboard.slice`              | `{left,top,right,bottom}` em unidades do `viewBox`, sem padrão (= estica tudo) | Margens do fatiamento 3×3 das faces de tecla |
 
-Campos desconhecidos são ignorados com aviso (permite o formato crescer sem quebrar pacotes antigos).
+Campos desconhecidos são ignorados com aviso (permite o formato crescer sem quebrar pacotes antigos). Um campo **conhecido** com
+valor inválido (cor mal escrita, `fps` fora de 1–60, `popup` translúcido, `slice` incompleto) é **erro** com o caminho do campo —
+nunca um padrão aplicado em silêncio. O `manifest.json` é UTF-8, tem até 64 KB e até 16 níveis de `{`/`[`. As seções `orb` e
+`keyboard` sem os arquivos correspondentes no pacote são ignoradas, com aviso; `orb.states.error` e `orb.states.cancelling` são
+reservados (ignorados, com aviso).
 
 ## 4. O que o renderizador aceita (SVG)
 
@@ -119,19 +134,35 @@ O app usa o **AndroidSVG** (SVG 1.1 estático). Funciona: `path`, formas básica
 opacidade**), `mix-blend-mode`/`BlendMode`, animações SMIL/CSS (a animação é feita pelos frames!), scripts, fontes
 SVG, `<foreignObject>`.
 
-**Rejeitado** (segurança): `<script>`, `<foreignObject>`, `DOCTYPE`/entidades, referências externas (`href` para
-`http:`, `file:`, caminho de arquivo; só `#id` interno e `data:image/png|jpeg;base64` são aceitos).
+**Rejeitado** (segurança): `<script>`, `<foreignObject>`, `DOCTYPE`/entidades, folhas de estilo externas (`@import`,
+`<?xml-stylesheet?>`) e referências externas — `href`/`xlink:href` e `url(...)` para `http:`, `file:` ou caminho de arquivo; só
+`#id` interno e `data:image/png|jpeg;base64` são aceitos (`data:image/svg+xml` não). Um `href` com `&` é recusado por não dar para
+conferir o destino. A conferência é por texto e **conservadora**: um `<script` dentro de um comentário também é recusado. O
+SVG é UTF-8.
+
+**Tamanho do desenho**: quem manda é o retângulo de destino, não o `width`/`height` do `<svg>`. Sem `viewBox`, o `width`/`height`
+declarados fazem o papel dele; sem nenhum dos dois o SVG é desenhado em 1:1, sem escala (o import avisa). Declare sempre o `viewBox`.
 
 ## 5. Limites
 
-Zip ≤ 25 MB · ≤ 400 entradas · cada SVG ≤ 512 KB · total descompactado ≤ 60 MB · nomes sem `..` nem caminho absoluto.
-Estourou → o import falha inteiro, sem instalar nada.
+Zip ≤ 25 MB · ≤ 400 entradas · cada SVG ≤ 512 KB · `manifest.json` ≤ 64 KB · total descompactado ≤ 60 MB · nomes sem `..`, sem
+caminho absoluto (`/x`, `C:\x`) e sem caractere de controle. Os tamanhos são os **realmente lidos** ao descompactar, não os que o
+cabeçalho do zip declara. Estourou — ou o zip está cortado ou corrompido — o import falha inteiro, sem instalar nada.
 
 ## 6. Resultado do import
 
 O app mostra um relatório com três listas — **Instalado** (o que entrou: "orbe: 4 estados, 46 frames · teclado:
 tray + 4 faces"), **Avisos** (ignorado, `filter` sem efeito, buraco na numeração, estado ausente usando `idle`…) e
 **Erros** (o que impediu a instalação, com o nome do arquivo). Com algum erro, **nada** é instalado.
+
+Antes de gravar, o app **desenha** cada SVG de teste (orbe a 64 px, faces de tecla a 96 px com a fatia, bandeja a 128×64). É erro:
+SVG que a biblioteca não lê, `slice` sem miolo e um quadro que leva mais de 1 s. É aviso: quadro que sai todo transparente (provável
+recurso que o app não desenha), mais de 150 ms ("pesado"), `viewBox` não quadrado na orbe, SVG sem tamanho. Os avisos de recursos que o app não desenha
+(`<filter>`, `mix-blend-mode`, animação SMIL ou CSS, fontes SVG) saem **agrupados por tipo**, com os nomes dos arquivos. Um `keyboard_tray.svg` sem
+`keyboard.trayColor` nem `keyboard.navigationBarColor` avisa que a faixa do sistema sob o teclado ficará preta.
+
+Reimportar um pacote com o mesmo `name` **substitui** o instalado, mantendo o mesmo id: se ele está selecionado, a versão nova
+aparece na hora. Remover um pacote selecionado devolve a skin da superfície ao padrão (Sistema no teclado, Ateliê na orbe).
 
 ## 7. Fora da v1 (reservado)
 
