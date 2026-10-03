@@ -113,16 +113,19 @@ Só `schemaVersion` e `name` são obrigatórios. Tudo mais tem padrão.
 | `name`                        | texto 1–40, **obrigatório**           | Nome exibido na lista                                                       |
 | `author`                      | texto ≤ 60, opcional                  | Exibido na lista                                                            |
 | `orb.centerInk`               | `#RRGGBB` / `#AARRGGBB`, `#FFFFFF`    | Cor do tempo e dos glifos no centro da orbe                                 |
-| `orb.fps`                     | 1–60, `12`                            | Quadros por segundo de todos os estados                                     |
-| `orb.states.<estado>.fps`     | 1–60, herda `orb.fps`                 | Quadros por segundo só daquele estado                                       |
+| `orb.fps`                     | 1–120, `12`                           | Quadros por segundo de todos os estados                                     |
+| `orb.states.<estado>.fps`     | 1–120, herda `orb.fps`                | Quadros por segundo só daquele estado                                       |
 | `keyboard.ink`                | cor, `#1B1B1B`                        | Cor das letras e dos ícones das teclas                                      |
 | `keyboard.popup`              | cor **opaca**, `#FFFFFF`              | Fundo dos balões (prévia da tecla, acentos, grade de atalhos) e da faixa de sugestões |
 | `keyboard.trayColor`          | cor, `#00000000`                      | Fundo liso, usado quando não há `keyboard_tray.svg` (e de fallback)         |
 | `keyboard.navigationBarColor` | cor opaca, = `trayColor` opaca        | Faixa do sistema sob o teclado                                              |
 | `keyboard.slice`              | `{left,top,right,bottom}` em unidades do `viewBox`, sem padrão (= estica tudo) | Margens do fatiamento 3×3 das faces de tecla |
 
+Um `fps` acima de **90** é aceito (até 120), mas o import **avisa**: telas de 60/90 Hz (as de quase todos os aparelhos; o Galaxy A32 alterna entre
+as duas) não mostram os quadros a mais, só ajuda em telas de 120 Hz. Para a maioria das telas, 60 ou 90 é o que se vê.
+
 Campos desconhecidos são ignorados com aviso (permite o formato crescer sem quebrar pacotes antigos). Um campo **conhecido** com
-valor inválido (cor mal escrita, `fps` fora de 1–60, `popup` translúcido, `slice` incompleto) é **erro** com o caminho do campo —
+valor inválido (cor mal escrita, `fps` fora de 1–120, `popup` translúcido, `slice` incompleto) é **erro** com o caminho do campo —
 nunca um padrão aplicado em silêncio. O `manifest.json` é UTF-8, tem até 64 KB e até 16 níveis de `{`/`[`. As seções `orb` e
 `keyboard` sem os arquivos correspondentes no pacote são ignoradas, com aviso; `orb.states.error` e `orb.states.cancelling` são
 reservados (ignorados, com aviso).

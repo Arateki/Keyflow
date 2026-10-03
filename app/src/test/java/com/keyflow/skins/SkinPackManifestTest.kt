@@ -148,13 +148,43 @@ class SkinPackManifestTest {
     }
 
     @Test
-    fun `fps is an integer from 1 to 60, globally and per state`() {
+    fun `fps is an integer from 1 to 120, globally and per state`() {
         assertThat(ok("""{"schemaVersion":1,"name":"X","orb":{"fps":1}}""").orb.fps).isEqualTo(1)
         assertThat(ok("""{"schemaVersion":1,"name":"X","orb":{"fps":60}}""").orb.fps).isEqualTo(60)
-        for (bad in listOf("0", "61", "-5", "12.5", "\"12\"", "null", "true")) {
-            assertThat(errorsOf("""{"schemaVersion":1,"name":"X","orb":{"fps":$bad}}""").single()).contains("orb.fps")
+        assertThat(ok("""{"schemaVersion":1,"name":"X","orb":{"fps":120}}""").orb.fps).isEqualTo(120)
+        assertThat(ok("""{"schemaVersion":1,"name":"X","orb":{"states":{"listening":{"fps":120}}}}""").orb.fpsOf(OrbPackState.LISTENING)).isEqualTo(120)
+        for (bad in listOf("0", "121", "1000", "-5", "12.5", "\"12\"", "null", "true")) {
+            val global = errorsOf("""{"schemaVersion":1,"name":"X","orb":{"fps":$bad}}""").single()
+            assertThat(global).contains("orb.fps")
+            assertThat(global).contains("de 1 a 120")
             assertThat(errorsOf("""{"schemaVersion":1,"name":"X","orb":{"states":{"idle":{"fps":$bad}}}}""").single()).contains("orb.states.idle.fps")
         }
+    }
+
+    @Test
+    fun `the limit written in the error is the limit of the code`() {
+        assertThat(SkinPackManifest.MAX_FPS).isEqualTo(120)
+        assertThat(errorsOf("""{"schemaVersion":1,"name":"X","orb":{"fps":${SkinPackManifest.MAX_FPS + 1}}}""").single())
+            .isEqualTo("manifest.json: orb.fps precisa ser um número inteiro de 1 a ${SkinPackManifest.MAX_FPS}.")
+    }
+
+    @Test
+    fun `an fps above 90 is accepted with one warning that names every field, and up to 90 has none`() {
+        for (fps in listOf(1, 12, 60, 90)) {
+            assertThat(parse("""{"schemaVersion":1,"name":"X","orb":{"fps":$fps}}""").warnings).isEmpty()
+        }
+        val global = parse("""{"schemaVersion":1,"name":"X","orb":{"fps":91}}""")
+        assertThat(global.errors).isEmpty()
+        assertThat(global.warnings).hasSize(1)
+        assertThat(global.warnings.single()).contains("orb.fps (91)")
+        assertThat(global.warnings.single()).contains("acima de 90 quadros por segundo")
+        assertThat(global.warnings.single()).contains("telas de 60/90 Hz não mostram tudo, só ajuda em telas de 120 Hz")
+
+        val several = parse("""{"schemaVersion":1,"name":"X","orb":{"fps":24,"states":{"listening":{"fps":120},"transcribing":{"fps":100},"paused":{"fps":90}}}}""")
+        assertThat(several.warnings).hasSize(1)
+        assertThat(several.warnings.single()).contains("orb.states.listening.fps (120), orb.states.transcribing.fps (100)")
+        assertThat(several.warnings.single()).doesNotContain("paused")
+        assertThat(several.warnings.single()).doesNotContain("orb.fps (")
     }
 
     @Test
@@ -242,7 +272,7 @@ class SkinPackManifestTest {
 
     @Test
     fun `several errors are reported together`() {
-        val errors = errorsOf("""{"schemaVersion":1,"name":"","orb":{"fps":99,"centerInk":"azul"},"keyboard":{"popup":"#00000000"}}""")
+        val errors = errorsOf("""{"schemaVersion":1,"name":"","orb":{"fps":999,"centerInk":"azul"},"keyboard":{"popup":"#00000000"}}""")
         assertThat(errors).hasSize(4)
     }
 }

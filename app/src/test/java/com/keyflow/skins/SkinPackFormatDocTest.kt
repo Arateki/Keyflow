@@ -105,6 +105,8 @@ class SkinPackFormatDocTest {
         val table = section(3)
         val d = SkinPackManifest.DEFAULT_FPS
         assertThat(table).contains("| `orb.fps` | ${SkinPackManifest.MIN_FPS}–${SkinPackManifest.MAX_FPS}, `$d`")
+        assertThat(table).contains("| `orb.states.<estado>.fps` | ${SkinPackManifest.MIN_FPS}–${SkinPackManifest.MAX_FPS}, herda `orb.fps`")
+        assertThat(table).contains("Um `fps` acima de **${SkinPackManifest.MAX_SHOWN_FPS}** é aceito (até ${SkinPackManifest.MAX_FPS}), mas o import **avisa**")
         assertThat(table).contains("texto 1–${SkinPackManifest.MAX_NAME}, **obrigatório**")
         assertThat(table).contains("texto ≤ ${SkinPackManifest.MAX_AUTHOR}, opcional")
         assertThat(table).contains("`schemaVersion` | inteiro, **obrigatório** (`${SkinPackManifest.SCHEMA_VERSION}`)")

@@ -146,7 +146,7 @@ class SkinPackReaderTest {
 
     @Test
     fun `manifest errors and file errors are reported together`() {
-        val result = failed(zip(listOf("manifest.json" to """{"schemaVersion":1,"name":"","orb":{"fps":99}}""".toByteArray()) + frames("orb_listening_01.svg")))
+        val result = failed(zip(listOf("manifest.json" to """{"schemaVersion":1,"name":"","orb":{"fps":999}}""".toByteArray()) + frames("orb_listening_01.svg")))
         assertThat(result.report.errors.size).isAtLeast(3) // name, orb.fps e a falta do idle
     }
 

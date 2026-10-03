@@ -52,7 +52,15 @@ data class SkinPackManifest(
         const val SCHEMA_VERSION = 1
         const val DEFAULT_FPS = 12
         const val MIN_FPS = 1
-        const val MAX_FPS = 60
+
+        /** O maior ritmo aceito: 120 quadros por segundo (SKP-ORB-06). Era 60; quem fica até 60 continua exatamente como antes. */
+        const val MAX_FPS = 120
+
+        /**
+         * Acima disto o import AVISA: as telas de 60/90 Hz (o A32 alterna entre as duas, nunca 120) não mostram os quadros a mais — só ajuda em telas de
+         * 120 Hz. É aviso e não erro: o pacote funciona, só pede mais do que a tela mostra.
+         */
+        const val MAX_SHOWN_FPS = 90
         const val MAX_NAME = 40
         const val MAX_AUTHOR = 60
 
@@ -168,6 +176,9 @@ private class ManifestParser(private val json: String) {
         val defaults = OrbManifest()
         val fps = orb.opt("fps")?.let { fpsAt(it, "orb.fps") } ?: defaults.fps
         val stateFps = linkedMapOf<OrbPackState, Int>()
+        val beyondScreens = mutableListOf<String>()
+        if (fps > SkinPackManifest.MAX_SHOWN_FPS) beyondScreens += "orb.fps ($fps)"
+
         orb.opt("states")?.let { objectAt(it, "orb.states") }?.let { states ->
             for (key in states.keys().asSequence().toList()) {
                 val state = OrbPackState.ofKey(key)
@@ -181,8 +192,18 @@ private class ManifestParser(private val json: String) {
                 }
                 val entry = objectAt(states.opt(key), "orb.states.$key") ?: continue
                 warnUnknown(entry, setOf("fps"), prefix = "orb.states.$key.")
-                entry.opt("fps")?.let { fpsAt(it, "orb.states.$key.fps") }?.let { stateFps[state] = it }
+                entry.opt("fps")?.let { fpsAt(it, "orb.states.$key.fps") }?.let {
+                    stateFps[state] = it
+                    if (it > SkinPackManifest.MAX_SHOWN_FPS) beyondScreens += "orb.states.$key.fps ($it)"
+                }
             }
+        }
+        if (beyondScreens.isNotEmpty()) {
+            warnings += tr(
+                "manifest.json: %s — acima de %d quadros por segundo; telas de 60/90 Hz não mostram tudo, só ajuda em telas de 120 Hz.",
+                beyondScreens.joinToString(", "),
+                SkinPackManifest.MAX_SHOWN_FPS,
+            )
         }
         return OrbManifest(
             centerInk = orb.opt("centerInk")?.let { colorAt(it, "orb.centerInk", opaque = false) } ?: defaults.centerInk,
@@ -218,7 +239,7 @@ private class ManifestParser(private val json: String) {
     private fun fpsAt(value: Any, path: String): Int? {
         val number = (value as? Number)?.takeIf { it.toDouble() == Math.floor(it.toDouble()) }?.toLong()
         if (number == null || number < SkinPackManifest.MIN_FPS || number > SkinPackManifest.MAX_FPS) {
-            errors += tr("manifest.json: %s precisa ser um número inteiro de 1 a 60.", path)
+            errors += tr("manifest.json: %s precisa ser um número inteiro de 1 a %d.", path, SkinPackManifest.MAX_FPS)
             return null
         }
         return number.toInt()
