@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "name": "Neon Noturno",
+  "author": "KeyFlow (exemplo)",
+  "orb": {
+    "centerInk": "#FFFFFF",
+    "fps": 12,
+    "states": {
+      "listening": { "fps": 24 },
+      "transcribing": { "fps": 12 }
+    }
+  },
+  "keyboard": {
+    "ink": "#E8F7FF",
+    "popup": "#171A33",
+    "trayColor": "#0B0B1A",
+    "navigationBarColor": "#0B0B1A",
+    "slice": { "left": 24, "top": 24, "right": 24, "bottom": 24 }
+  }
+}
