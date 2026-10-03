@@ -108,3 +108,16 @@ traceability do `spec.md` ao concluir.
   `skins` 128 (flaky de fila medido no baseline também), `ime` 45 (1 flake de toque); goldens 138/154 idênticos a `0f0edab` e `diff-screens.sh` 160/160. Detalhes, números e a causa de cada flaky em `STATE.md`.
 - **Fase 3 — flakiness dos testes do pacote `skins`** (2026-10-03, Done): os dois `PackOrbTest` de fila (e um terceiro com a mesma corrida de teste) passaram a afirmar ordem de chegada com o gancho `PackOrb.onRendered`, e as outras três classes que caíam sob carga
   (`ExampleSkinPackImportTest`, `OverlayPackOrbTest`, `PackOrbComposeTest`) esperam por condição ou medem CPU em vez de parede. Causa (os testes, não o `PackOrb`), antes/depois e a observação de produto sobre o aviso "pesado" medido em tempo de parede: `STATE.md`, seção "fase 3".
+
+## Fase 4 — Orbe de até 120 fps (pedido do Yan, 2026-10-03)
+
+### SKP-T9 — `fps` até 120, mais frames por estado e orçamento de memória adaptativo (SKP-ORB-06)
+- **What**: `MAX_FPS` 60 → 120 (aviso acima de 90: telas de 60/90 Hz não mostram tudo); `MAX_FRAMES_PER_STATE` 64 → 240, `MAX_FRAMES_TOTAL` 240 → 480, `MAX_ENTRIES` 400 → 800
+  (zip, 60 MB descompactado e zip-slip/bomba intocados); o aviso de ">48 frames" vira aviso de **memória** (`lado² × 4 × n` a 280 px, acima de 16 MB); `OrbMemoryPolicy` (contas), `OrbDeviceMemory` (`getMemoryClass`/`isLowRamDevice`
+  e `onTrimMemory`), `ByteBudgetLru.setMaxBytes`, `PackOrb` com orçamento adaptativo só para quem pede mais (`extended`: fps > 60 ou > 64 frames num estado), lookahead de ¼ de segundo a 120 fps (30 frames), fila maior e
+  aquecimento do estado inteiro; `OrbDisplay` + `OrbTiming.framesShownAhead` (numa tela mais lenta que a animação só os frames que ela mostra são renderizados e guardados); FORMAT.md §2/§3/§5/§6 com a tabela de memória.
+- **Done when**: pacote dentro dos limites de antes **bit a bit igual** (hash dos pixels, orçamento de 16 MB, mesmo lookahead) e sem custo novo de quadro/memória (antes × depois, ≥ 5 rodadas intercaladas); pacote de 120 fps com 120 e 240 frames
+  toca sem repetir quadro quando o estado cabe (RAM real do cache = `lado² × 4 × n`); limites novos com teste (acima do teto = erro claro); testes de segurança do leitor e goldens inalterados.
+- **Tests**: unit (`OrbMemoryPolicyTest`, `OrbTimingTest`, `ByteBudgetLruTest`, `SkinPackManifestTest`, `SkinPackReaderTest`, `SkinPackFormatDocTest`); instrumentado `PackOrbBudgetTest` (20) e as medições `OrbLightCostTest` (antes × depois, `-e skpLight 1`) e `OrbHighFpsCostTest`
+  (`-e skpHfps 1`). **Gate**: unit completo + `com.keyflow.skins` + `com.keyflow.overlay` + goldens.
+- **Status**: Done (2026-10-03), exceto o que só o A32 diz **[YAN]** (classe de memória e fluidez a 90 Hz) — números e achados no `STATE.md`.

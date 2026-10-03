@@ -180,6 +180,10 @@ orçamento que **cresce** quando o estado que toca, no tamanho de orbe de agora,
 sair do estado ou fechar o pacote; se o sistema pede memória de volta, ele volta na hora. Se mesmo assim o estado não cabe, a animação repete o quadro
 anterior em alguns quadros — nunca trava nem para por falta de memória.
 
+Uma tela de 60 Hz mostra no máximo 60 desenhos por segundo (a de 90 Hz, 90), então de uma animação de 120 fps ela mostra um frame sim e outro não (ou três de
+cada quatro): o app **renderiza e guarda só os frames que a tela do aparelho mostra** (pela taxa de atualização de verdade), e a tabela acima é o pior caso —
+numa tela de 60 Hz, um estado de 240 frames a 120 fps ocupa metade; a 90 Hz, três quartos. É por isso que `fps` acima de 90 só vale a pena para quem tem tela de 120 Hz.
+
 ## 6. Resultado do import
 
 O app mostra um relatório com três listas — **Instalado** (o que entrou: "orbe: 4 estados, 46 frames · teclado:

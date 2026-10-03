@@ -28,8 +28,9 @@ O contrato completo do formato está em [`.specs/features/skin-packs/FORMAT.md`]
    | `keyboard_modifier_normal.svg` / `_pressed.svg` | Teclas de função (shift, apagar, enter, espaço) e botões das barras |
    | `keyboard_tray.svg` | Fundo do teclado inteiro |
 
-   Estado sem frames usa o `idle`. Até 64 frames por estado (acima de 48 o import avisa que a animação pode ficar menos fluida nos tamanhos grandes da orbe)
-   e 240 no total. Um pacote pode ter só a orbe, só o teclado ou os dois.
+   Estado sem frames usa o `idle`. Até 240 frames por estado e 480 no total (o `fps` do `manifest.json` vai de 1 a 120; acima de 90 o import avisa que só ajuda em telas de
+   120 Hz). Cada frame ocupa memória (`lado² × 4` bytes na orbe): um estado que passa de 16 MB a 280 px, o maior tamanho da orbe, recebe um aviso com o número — a tabela
+   está no `FORMAT.md` (§5, "Memória da orbe"). Um pacote pode ter só a orbe, só o teclado ou os dois.
 5. **Empacote.** Em Linux ou macOS, da raiz do repositório:
 
    ```sh
