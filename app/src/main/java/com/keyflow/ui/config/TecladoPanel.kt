@@ -240,6 +240,7 @@ fun TecladoPanel(
                     unlockTag = TECLADO_UNLOCK_TAG,
                     modifier = Modifier.padding(bottom = 16.dp),
                 )
+                SkinPacksSection(SkinPackSurface.KEYBOARD, settings, onSettingsChange)
             }
         }
     }

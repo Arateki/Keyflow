@@ -929,7 +929,7 @@ internal fun SkinsSection(
                 val system = KeyboardColors.of(KeyboardSkin.SYSTEM, palette.isDark)
                 SkinChoice(
                     label = tr("Sistema"),
-                    selected = KeyboardSkin.of(selectedSkin) == KeyboardSkin.SYSTEM,
+                    selected = nativeKeyboardSkin(selectedSkin) == KeyboardSkin.SYSTEM,
                     onClick = { onSkinSelected(KeyboardSkin.SYSTEM.id) },
                     tag = skinTag(KeyboardSkin.SYSTEM.id),
                 ) {
@@ -940,7 +940,7 @@ internal fun SkinsSection(
                 }
                 SkinChoice(
                     label = tr("Ateliê"),
-                    selected = KeyboardSkin.of(selectedSkin) == KeyboardSkin.ATELIE,
+                    selected = nativeKeyboardSkin(selectedSkin) == KeyboardSkin.ATELIE,
                     onClick = { onSkinSelected(KeyboardSkin.ATELIE.id) },
                     tag = skinTag(KeyboardSkin.ATELIE.id),
                 ) {
@@ -949,7 +949,7 @@ internal fun SkinsSection(
                 val aero = KeyboardColors.of(KeyboardSkin.AERO, palette.isDark)
                 SkinChoice(
                     label = "Aero",
-                    selected = KeyboardSkin.of(selectedSkin) == KeyboardSkin.AERO,
+                    selected = nativeKeyboardSkin(selectedSkin) == KeyboardSkin.AERO,
                     onClick = { onSkinSelected(KeyboardSkin.AERO.id) },
                     tag = skinTag(KeyboardSkin.AERO.id),
                 ) {
@@ -966,7 +966,7 @@ internal fun SkinsSection(
                 }
                 SkinChoice(
                     label = "Glitch",
-                    selected = KeyboardSkin.of(selectedSkin) == KeyboardSkin.GLITCH,
+                    selected = nativeKeyboardSkin(selectedSkin) == KeyboardSkin.GLITCH,
                     onClick = { onSkinSelected(KeyboardSkin.GLITCH.id) },
                     tag = skinTag(KeyboardSkin.GLITCH.id),
                 ) {
@@ -985,7 +985,7 @@ internal fun SkinsSection(
                 }
                 SkinChoice(
                     label = "Rose Gold",
-                    selected = KeyboardSkin.of(selectedSkin) == KeyboardSkin.ROSE_GOLD,
+                    selected = nativeKeyboardSkin(selectedSkin) == KeyboardSkin.ROSE_GOLD,
                     onClick = { onSkinSelected(KeyboardSkin.ROSE_GOLD.id) },
                     tag = skinTag(KeyboardSkin.ROSE_GOLD.id),
                 ) {
