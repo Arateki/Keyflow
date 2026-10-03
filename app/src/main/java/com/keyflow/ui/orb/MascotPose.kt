@@ -5,8 +5,8 @@ import kotlin.math.sin
 
 /**
  * A pose do mascote em um instante: tudo o que se mexe, já calculado — o desenho ([drawMascotOrb]) só lê estes números.
- * Função pura de `(t em ms, estado)` ([update] não lê nada além dos argumentos; o `hasCenter` só muda o espaço que o desenho dá ao rosto): relógio parado, pose parada.
- * É uma classe mutável de propósito — o desenho reaproveita uma instância por quadro em vez de alocar uma — e o
+ * Função pura de `(t em ms, estado)` — [update] não lê nada além dos argumentos; o `hasCenter` só muda o espaço que o
+ * desenho dá ao rosto —: relógio parado, pose parada. É uma classe mutável de propósito — o desenho reaproveita uma instância por quadro em vez de alocar uma — e o
  * teste de unidade confere que o resultado não depende do que a instância guardava antes.
  *
  * Os princípios de animação aplicados aqui (e não só "mexer"):
@@ -21,7 +21,8 @@ import kotlin.math.sin
  *   inclinada, olhos vagando para cima, orelhas alternando, pontinhos acima da cabeça).
  */
 internal class MascotPose {
-    // Corpo: a escala é em torno dos pés (que ficam no chão), a inclinação também; [bob] sobe e desce o conjunto.
+    // Corpo: a escala é em torno dos pés (que ficam no chão); a inclinação, em torno dos pés ou, com texto no centro, do centro da
+    // orbe (ver `leanPivotY` em MascotOrb.kt); [bob] sobe e desce o conjunto.
     var scaleX = 1f
     var scaleY = 1f
     var lean = 0f
@@ -106,8 +107,8 @@ internal class MascotPose {
             }
         }
 
-        // Orelhas: ângulo de repouso do estado + o balanço do corpo com atraso + a tremida rara. A de baixo, na
-        // ponta, atrasa mais ainda ([lagB]): é a parte que "chicoteia".
+        // Orelhas: ângulo de repouso do estado + o balanço do corpo com atraso + a tremida rara. A ponta atrasa mais
+        // ainda ([lagB]): é a parte que "chicoteia".
         val lagA = leanAt(t - 160f, state) - leanNow
         val lagB = leanAt(t - 330f, state) - leanAt(t - 160f, state)
         val spreadL: Float
