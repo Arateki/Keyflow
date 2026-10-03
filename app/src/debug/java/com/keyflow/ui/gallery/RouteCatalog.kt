@@ -15,8 +15,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.ui.viewinterop.AndroidView
@@ -54,7 +57,12 @@ import com.keyflow.ui.config.ConfigTab
 import com.keyflow.ui.config.GridsEditor
 import com.keyflow.ui.config.PhysicalKeyPicker
 import com.keyflow.ui.config.SettingsGroup
+import com.keyflow.ui.config.SkinImportReportDialog
+import com.keyflow.ui.config.SkinPackSurface
+import com.keyflow.ui.config.SkinPacksContent
 import com.keyflow.ui.config.SkinsSection
+import com.keyflow.ui.config.loadSkinPackCards
+import com.keyflow.skins.SkinIds
 import com.keyflow.ui.onboarding.OnboardingPermission
 import com.keyflow.ui.onboarding.OnboardingScreen
 import com.keyflow.ui.orb.OrbCenter
@@ -264,6 +272,13 @@ object RouteCatalog {
         // teclado, na Teclado — escolhas separadas (Yan, 2026-09-29), aqui com o Aero marcado nas duas.
         Route("config-overlay-skins") { SkinsRoute(orb = true) },
         Route("config-teclado-skins") { SkinsRoute(orb = false) },
+        // Com pacotes importados (SKP-T6): a seção "Suas skins" com os cartões — um selecionado —, a pergunta de remoção aberta e os dois
+        // relatórios do import (instalado com avisos; recusado com erros). Os pacotes são instalados de verdade, por `SkinPackStore.import`.
+        Route("config-overlay-skins-importadas") { SkinsRoute(orb = true, imported = true) },
+        Route("config-teclado-skins-importadas") { SkinsRoute(orb = false, imported = true) },
+        Route("config-teclado-skins-remover") { SkinsRoute(orb = false, imported = true, confirming = true) },
+        Route("skin-pack-relatorio") { SkinReportRoute(errors = false) },
+        Route("skin-pack-relatorio-erro") { SkinReportRoute(errors = true) },
         // As abas novas (Notificação, Visão, Raciocínio, Voz), ainda vazias: só o cabeçalho com o nome e o menu com os ícones.
         Route("config-visao") { ConfigTabRoute(ConfigTab.VISAO) },
         // Raciocínio: `config-raciocinio` é a origem Local sem nenhum modelo baixado; as outras cobrem baixando, pronto, a nuvem
@@ -861,14 +876,23 @@ object RouteCatalog {
         }
     }
 
-    /** A seção Skins de uma aba, sozinha num cartão: [orb] = a da Sobrepor (orbe), senão a do Teclado. */
+    /**
+     * A seção Skins de uma aba, sozinha num cartão: [orb] = a da Sobrepor (orbe), senão a do Teclado. Com [imported], os pacotes de mentira
+     * ([GallerySkinPacks]) estão instalados e o primeiro, selecionado; com [confirming], o cartão dele mostra a pergunta de remoção.
+     */
     @Composable
-    private fun SkinsRoute(orb: Boolean) {
+    private fun SkinsRoute(orb: Boolean, imported: Boolean = false, confirming: Boolean = false) {
+        val context = LocalContext.current
+        val density = LocalDensity.current.density
+        val packs = remember(imported) {
+            if (imported) GallerySkinPacks.install(context) to loadSkinPackCards(GallerySkinPacks.store(context), density) else null
+        }
+        val selectedPack = packs?.first
         Box(Modifier.fillMaxSize().background(LocalKeyFlowPalette.current.bg).padding(16.dp)) {
             SettingsGroup(null) {
                 if (orb) {
                     SkinsSection(
-                        selectedOrbSkin = "aero",
+                        selectedOrbSkin = selectedPack ?: "aero",
                         onOrbSkinSelected = {},
                         onUnlock = {},
                         unlockTag = "gallery-unlock",
@@ -876,15 +900,36 @@ object RouteCatalog {
                     )
                 } else {
                     SkinsSection(
-                        selectedSkin = "aero",
+                        selectedSkin = selectedPack ?: "aero",
                         onSkinSelected = {},
                         onUnlock = {},
                         unlockTag = "gallery-unlock",
                         modifier = Modifier.padding(bottom = 16.dp),
                     )
                 }
+                SkinPacksContent(
+                    surface = if (orb) SkinPackSurface.ORB else SkinPackSurface.KEYBOARD,
+                    cards = packs?.second.orEmpty(),
+                    selectedSkinId = selectedPack.orEmpty(),
+                    importing = false,
+                    confirmingId = if (confirming) SkinIds.packId(selectedPack) else null,
+                    onImport = {},
+                    onSelect = {},
+                    onRemoveRequest = {},
+                    onRemoveCancel = {},
+                    onRemoveConfirm = {},
+                )
             }
         }
+    }
+
+    /** O diálogo do relatório do import (SKP-UI-02): [errors] = o import recusado; senão o instalado com avisos. */
+    @Composable
+    private fun SkinReportRoute(errors: Boolean) {
+        val context = LocalContext.current
+        val outcome = remember(errors) { if (errors) GallerySkinPacks.errorOutcome(context) else GallerySkinPacks.warningOutcome(context) }
+        Box(Modifier.fillMaxSize().background(LocalKeyFlowPalette.current.bg))
+        SkinImportReportDialog(outcome, onDismiss = {})
     }
 
     /**
