@@ -2162,3 +2162,43 @@ Branch `feature/skins-importaveis` (worktree `keyflow-skins-wt`); spec/design/ta
 - **`PackSvg.sourceName` / `SkinPackContent.manifestBytes`** (T2 ajustada): as mensagens citam o nome do arquivo que o autor escreveu,
   e o store grava o manifest original (reabre com o mesmo parser). `ReportText.names` agora é compartilhado entre o leitor e o store.
 
+## skin-packs — SKP-T4: teclado de pacote no IME (2026-10-02)
+`skins/PackKeyboard` (abre o pacote: SVGs de teclado + cores), `PackKeySurface` (sprites), `PackBackdrop` (bandeja); `KeySurface.draw(…, role: KeyRole)` com **implementação
+padrão** (os 3 pintores de hoje não mudaram), `SpriteCache.Key.variant` (default 0), `KeyboardColors.pack`/`forPack`/`of(skin, dark, pack)`/`backgroundDrawable`/`navigationBarColor`;
+as 6 views ganharam `pack: PackKeyboard? = null`; o serviço abre o pacote em `onCreateInputView` (`openPackKeyboard`) e cai no Sistema se `null`.
+- **Verificação**: `PackKeySurfaceTest` 19/19; **`KeyFlowKeyboardPackSkinTest` 5/5 no IME real do emulador** (pixel da face da letra e das funções, bandeja, tinta branca, botão de barra; troca
+  Sistema↔pacote ao vivo; remover o pacote selecionado, pacote inexistente, tecla normal corrompida e id `pack:../../x` → Sistema; reimportar o selecionado mostra a versão nova sem
+  tocar nos ajustes); pacote `skins` inteiro 73/73. Pacote `com.keyflow.ime` (as 44 existentes + `KeyboardColors`): **44/45** — falhou
+  `KeyFlowKeyboardSpellCheckerTest.spaceFinishesComposing…` ("campo não chegou a 'o'") dentro da rodada de 394 s; repetida **6× isolada + 1× a classe (7 testes) = 13/13**: instabilidade de
+  toque sintético sob carga do host (o emulador é software e o host dividia CPU com outra frente), não regressão — o teste não toca em skin.
+- **Goldens**: capturei as 154 rotas da galeria com o APK **do baseline** (commit do spec, antes da feature) e com o do T4 e comparei **sem fuzz**: **152/154 idênticas pixel a pixel**; as 2
+  diferentes são `config-docs[-dark]` (7×5 px no indicador de rolagem: a aba Docs ganhou a linha de licença do AndroidSVG na T1). `diff-screens.sh` contra o golden versionado: 150/150 dentro do
+  limiar — mas **não** é bit-idêntico (~100–250 px de ruído de antialiasing por rota, em TODAS, também no baseline: o golden foi gerado em outro emulador/GPU); por isso a prova
+  de "zero regressão" é baseline × T4, não golden × T4. Nenhum golden foi aprovado.
+- **Achado — o 9-slice por re-render era 10–20× mais caro que as skins nativas** (medido, `SkinSurfaceCostTest`, 8 sprites de um teclado real, cache vazio, JIT quente): pacote **115 ms**
+  (p95 168) × Aero 17,8 × Rose Gold 13,1. Causa: o AndroidSVG percorre a árvore e monta os shaders a cada `renderToCanvas`, e o 9-slice fazia nove. **Mitigação feita**: o documento é gravado
+  **uma vez num `Picture`** e as nove células o reproduzem (recorte + matriz). Resultado idêntico — comparado com o re-render célula a célula em 6 tamanhos: **diferença máxima 0 por canal**
+  — e o custo caiu para **4,7 ms** (p95 6,5): face de tecla 9-slice 120×150 de 4,9 → 0,28 ms.
+- **Custo do teclado de pacote × nativas** (emulador API 34, renderização por software — o A32 é mais lento, valem como relação, não como promessa):
+
+  | | pacote | Aero (vidro) | Rose Gold |
+  | - | - | - | - |
+  | 8 sprites, cache vazio, JIT quente — mediana / p95 | **4,7 / 6,5 ms** | 10,4 / 15,4 ms | 12,9 / 22,1 ms |
+  | 8 sprites, FRIO (processo novo) | **19,5 ms** (+ abrir 24–27 ms) | 14,8 / 17,2 ms | 8,5 / 34,1 ms |
+  | `onDraw` em regime (sprite em cache) | 21,8 µs | 18,9 µs | 30,7 µs |
+
+  O que o pacote paga a mais: **abrir** o pacote no `onCreateInputView` (manifest + listagem + parse de 4–5 SVGs): **24–27 ms** com as classes do AndroidSVG já carregadas por um import no mesmo
+  processo (o pior caso real, a frio, é medido abaixo); as nativas não têm essa etapa. Em regime, o `onDraw` é **só `drawBitmap`**: `inSteadyStateDrawIsOneBitmapCopyAndNothingElse` registra um canvas
+  espião (50 teclas → 50 `drawBitmap`, 0 `drawPath`/`save`/`clipRect`/`scale`/`translate`/`drawColor`, 0 rasterizações novas).
+- **Decisões onde o spec/FORMAT.md era omisso** (o FORMAT.md é corrigido no fim da fase 1):
+  1. **Espaço é tecla de função** (`keyboard_modifier_*`): o §2 da tabela do FORMAT.md manda, mesmo que a grade de hoje pinte o espaço com a cor de letra.
+  2. **Acento**: a face de pacote não é tingida, EXCETO quando a view passa uma tinta que não é a comum (shift ativo, mic gravando/pronto/erro): a face leva 80% dessa cor por cima, em
+     `SRC_ATOP` (mantém a silhueta). Sem isto o shift ativo e o mic gravando ficariam invisíveis. A "tinta comum" é `keyboard.popup` (é o que `KeyboardColors.forPack` põe em `key`/`modifier`).
+  3. **Pressionada**: `*_pressed.svg`, ou a normal escurecida em 20% (o mesmo `pressedOverlay` das teclas lisas); a função sem `*_pressed` usa a `modifier_normal` escurecida, e sem nenhuma arte de função usa
+     a `key_pressed`/`key_normal` escurecida.
+  4. **Bandeja**: com `keyboard_tray.svg` a cor lisa fica transparente (senão cobriria o SVG) e o fundo é um `PackBackdrop` (bitmap refeito só quando o tamanho muda); sem ele, `keyboard.trayColor`.
+     A bandeja que não desenha some e cai na cor lisa; só a `keyboard_key_normal.svg` que não carrega derruba o teclado do pacote inteiro (→ Sistema).
+  5. **`SkinPackStore.changes`** (`StateFlow<Int>` estático, sobe em instalar/remover): o IME (e, na T5, a orbe) reabre ao mudar — é o que faz reimportar o pacote selecionado aparecer ao vivo
+     (SKP-IMP-05) e removê-lo devolver o padrão (SKP-STO-04) **sem campo novo em `Settings`** e sem polling. Vale porque app, IME e overlay dividem o processo.
+  6. O serviço registra `onCreateInputView: N ms (skin=…)` (nível debug) — leitura barata do custo de abertura de qualquer skin.
+

@@ -1,6 +1,8 @@
 package com.keyflow.ime
 
 import android.graphics.Typeface
+import android.graphics.drawable.Drawable
+import com.keyflow.skins.PackKeyboard
 
 /**
  * Esquema de cores do teclado (IME). [SYSTEM] é o padrão desde 2026-09-28 (pedido do Yan: "semelhante à
@@ -74,12 +76,26 @@ data class KeyboardColors(
     val labelWeight: LabelWeight = LabelWeight.NORMAL,
     /** Multiplica a espessura do traço dos ícones (1 = a de sempre). */
     val iconStrokeScale: Float = 1f,
+    /**
+     * O teclado de uma skin **de pacote** ([forPack]): as faces e o fundo vêm dos SVGs do pacote, ao lado do enum [backdrop] — que fica
+     * `null` aqui, porque o enum é fechado e as skins de hoje não mudam. `null` em todas as skins de hoje.
+     */
+    val pack: PackKeyboard? = null,
 ) {
-    /** A skin tem superfície própria (Aero, Glitch): teclas pintadas por um [KeySurface] sobre um [backdrop]. */
-    val hasSurface: Boolean get() = backdrop != null
+    /** A skin tem superfície própria (Aero, Glitch, pacote): teclas pintadas por um [KeySurface] sobre um fundo. */
+    val hasSurface: Boolean get() = backdrop != null || pack != null
 
     /** As teclas desta skin ([hasSurface]); `null` nas skins lisas. [blurBehind]: o aparelho desfoca o que está atrás. */
-    fun surface(density: Float, blurBehind: Boolean): KeySurface? = backdrop?.surface(density, blurBehind)
+    fun surface(density: Float, blurBehind: Boolean): KeySurface? = pack?.surface() ?: backdrop?.surface(density, blurBehind)
+
+    /**
+     * O fundo desenhado atrás das barras e da grade, ou `null` quando é a cor lisa [tray]: a lâmina do enum ([backdrop]) ou o
+     * `keyboard_tray.svg` do pacote. Uma instância nova a cada chamada (cada área do teclado tem o seu tamanho).
+     */
+    fun backgroundDrawable(density: Float, blurBehind: Boolean): Drawable? = pack?.backgroundDrawable() ?: backdrop?.drawable(density, blurBehind)
+
+    /** A cor da faixa do sistema sob o teclado, ou `null` para deixar a que o sistema já tem. */
+    fun navigationBarColor(blurBehind: Boolean): Int? = pack?.navigationBarColor ?: backdrop?.navigationBarColor(blurBehind)
 
     /**
      * Passa uma cor de acento compartilhada (o verde do mic pronto, o âmbar de gravando, o terracota de erro) para
@@ -191,6 +207,28 @@ data class KeyboardColors(
             labelWeight = LabelWeight.MEDIUM,
             iconStrokeScale = 1.1f,
         )
+
+        /**
+         * As cores do teclado de um pacote de skin (SKP-KBD-03): letras e ícones em `keyboard.ink`, balões e faixa de sugestões em
+         * `keyboard.popup`. As faces não têm cor aqui — vêm do SVG —, então [key] e [modifier] são a própria cor dos balões: é a tinta
+         * "comum" que a superfície reconhece, e as etiquetas de sugestão ficam legíveis. Com `keyboard_tray.svg` a bandeja é o SVG e
+         * [tray] fica transparente; sem ele, é a cor lisa `keyboard.trayColor`. Uma aparência só, no claro e no escuro (D5).
+         */
+        fun forPack(pack: PackKeyboard): KeyboardColors {
+            val kb = pack.manifest
+            return KeyboardColors(
+                tray = if (pack.hasTray) 0x00000000 else kb.trayColor,
+                key = kb.popup,
+                keyBorder = (kb.ink and 0x00FFFFFF) or 0x40000000,
+                modifier = kb.popup,
+                ink = kb.ink,
+                popup = kb.popup,
+                pack = pack,
+            )
+        }
+
+        /** As cores de [skin], ou as do [pack] quando há um (ele ganha: é a skin escolhida e carregada). */
+        fun of(skin: KeyboardSkin, dark: Boolean, pack: PackKeyboard?): KeyboardColors = pack?.let(::forPack) ?: of(skin, dark)
 
         fun of(skin: KeyboardSkin, dark: Boolean): KeyboardColors = when (skin) {
             KeyboardSkin.SYSTEM -> if (dark) SYSTEM_DARK else SYSTEM_LIGHT

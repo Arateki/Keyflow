@@ -29,8 +29,9 @@ class GridOverlayPopup(
     private val cellHeightPx: Float,
     private val scale: Float = 1f,
     skin: KeyboardSkin = KeyboardSkin.DEFAULT,
+    pack: com.keyflow.skins.PackKeyboard? = null,
 ) {
-    private val colors = KeyboardColors.of(skin, dark)
+    private val colors = KeyboardColors.of(skin, dark, pack)
     // A lente abre por cima do app: as células usam o tom opaco dos balões (no Aero a tecla é vidro).
     private val kbKey = colors.popup
     private val kbKeyBorder = colors.keyBorder

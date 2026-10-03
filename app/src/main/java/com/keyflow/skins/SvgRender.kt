@@ -2,6 +2,7 @@ package com.keyflow.skins
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Picture
 import android.graphics.RectF
 import com.caverock.androidsvg.PreserveAspectRatio
 import com.caverock.androidsvg.RenderOptions
@@ -41,6 +42,9 @@ class SvgImage internal constructor(
 ) {
     val width: Float get() = viewBox.width()
     val height: Float get() = viewBox.height()
+
+    /** O desenho do documento inteiro, gravado uma vez ([SvgRender.drawNineSlice] o reproduz nove vezes). `null` até o primeiro uso. */
+    internal var recorded: Picture? = null
 }
 
 /**
@@ -130,11 +134,14 @@ object SvgRender {
 
     /**
      * Desenha [image] em [dst] com **fatiamento 3×3**: os cantos mantêm a proporção (todos na mesma escala, a do menor lado
-     * relativo) e só o miolo estica para preencher [dst]. Cada uma das nove células é o SVG inteiro recortado e transladado
-     * — a biblioteca não fatia —, então o custo é nove desenhos: rode isto **uma vez** para gerar um sprite, nunca por quadro.
+     * relativo) e só o miolo estica para preencher [dst]. Cada uma das nove células é o desenho inteiro recortado e transladado — a
+     * biblioteca não fatia —, mas o documento é **percorrido uma vez só**: ele é gravado num [Picture] e as nove células o
+     * reproduzem. (Re-renderizar o SVG nove vezes custava 10–20× o das skins nativas por sprite, medido no emulador: o custo é
+     * andar na árvore e montar shaders, não rasterizar.) O resultado é o mesmo, vetor puro, sem reamostrar bitmap.
      *
      * [dst] deve ter bordas em px inteiros (o sprite é desenhado em `0,0,w,h`): as fronteiras das células são arredondadas
-     * para px, para não sobrar fresta nem sobrepor entre elas.
+     * para px, para não sobrar fresta nem sobrepor entre elas. Pensado para um [Canvas] de software (um bitmap de sprite): a
+     * reprodução de um [Picture] num canvas acelerado não é garantida nas versões antigas do Android.
      */
     fun drawNineSlice(canvas: Canvas, image: SvgImage, dst: RectF, slice: SliceInsets) {
         if (dst.width() <= 0f || dst.height() <= 0f) return
@@ -163,8 +170,15 @@ object SvgRender {
         val dy2 = maxOf(dy1, dst.bottom - (b * s).roundToInt())
         val destX = floatArrayOf(dst.left, dx1, dx2, dst.right)
         val destY = floatArrayOf(dst.top, dy1, dy2, dst.bottom)
-        val srcX = floatArrayOf(vb.left, vb.left + l, vb.right - r, vb.right)
-        val srcY = floatArrayOf(vb.top, vb.top + t, vb.bottom - b, vb.bottom)
+
+        // O Picture é gravado em unidades inteiras (px de gravação = unidades do viewBox × [fx]/[fy]; 1 para o viewBox inteiro).
+        val pictureW = maxOf(1, vbW.roundToInt())
+        val pictureH = maxOf(1, vbH.roundToInt())
+        val fx = pictureW / vbW
+        val fy = pictureH / vbH
+        val picture = recordedPicture(image, pictureW, pictureH)
+        val srcX = floatArrayOf(0f, l * fx, (vbW - r) * fx, pictureW.toFloat())
+        val srcY = floatArrayOf(0f, t * fy, (vbH - b) * fy, pictureH.toFloat())
 
         for (row in 0 until 3) {
             val cellH = destY[row + 1] - destY[row]
@@ -181,11 +195,16 @@ object SvgRender {
                 // O ponto (srcX, srcY) da célula de origem cai em (destX, destY): translada e escala, nessa ordem.
                 canvas.translate(destX[col] - srcX[col] * sx, destY[row] - srcY[row] * sy)
                 canvas.scale(sx, sy)
-                // O viewport é o próprio viewBox, então as coordenadas do SVG passam 1:1 pela matriz acima.
-                render(canvas, image, vb.left, vb.top, vbW, vbH, PreserveAspectRatio.STRETCH)
+                canvas.drawPicture(picture)
                 canvas.restore()
             }
         }
+    }
+
+    /** O documento gravado em [width]×[height] (esticado do viewBox: `preserveAspectRatio` "none"), uma vez por imagem. */
+    private fun recordedPicture(image: SvgImage, width: Int, height: Int): Picture = synchronized(image) {
+        image.recorded ?: image.svg.renderToPicture(width, height, RenderOptions.create().preserveAspectRatio(PreserveAspectRatio.STRETCH))
+            .also { image.recorded = it }
     }
 
     /**

@@ -99,10 +99,10 @@ a dele. A spec `theme-system` (M8, Draft) trata de tokens/cores, não de arte im
 | SKP-IMP-05 | Importação | Implemented no store (T3): mesmo `name` → mesmo id, troca atômica, `replaced = true`; "mostra a versão nova ao vivo" depende das T4/T5/T6 |
 | SKP-IMP-01, 06 | Importação | Pending (SAF e a thread de fundo na T6; o store e o leitor já são síncronos e sem Android UI) |
 | SKP-STO-01, 02 (ids) | Armazenamento | Implemented (T3): `filesDir/skins/<id>/`, `pack:<id>`, id = slug ASCII + 8 hex do nome, estável; falta só a ligação com `Settings` (T4/T5/T6) |
-| SKP-STO-03, 04 | Armazenamento | Parcial (T3): `load` devolve `null` sem crash para pacote sumido/quebrado; a queda para Sistema/Ateliê é da T4/T5 |
+| SKP-STO-03, 04 | Armazenamento | Parcial: teclado Implemented (T4: pacote sumido, quebrado, removido ou id inseguro → Sistema, sem crash, testado no IME real); a orbe é da T5; o reset do ajuste ao remover o selecionado é da T6 |
 | SKP-STO-05 | Armazenamento | Decisão registrada (sem código): o export de config futuro leva só o id `pack:<id>`, nunca os arquivos |
 | SKP-ORB-01..05 | Orbe | Pending |
-| SKP-KBD-01..05 | Teclado | Pending |
+| SKP-KBD-01..05 | Teclado | Implemented (T4), verificado no IME real: faces SVG por papel e estado com 9-slice, bandeja e faixa de navegação, `ink`/`popup`, sprites em `SpriteCache` (em regime só `drawBitmap`, provado por canvas espião) e reconstrução ao vivo |
 | SKP-UI-01..04 | Interface | Pending |
 | SKP-DOC-01 | Docs | Parcial (T2): `SkinPackFormatDocTest` amarra exemplos, nomes, limites e padrões do FORMAT.md ao código; falta o ajuste final (T7) |
 | SKP-DOC-02 | Exemplo | Pending |

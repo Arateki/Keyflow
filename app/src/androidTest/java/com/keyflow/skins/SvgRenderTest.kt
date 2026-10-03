@@ -27,7 +27,7 @@ class SvgRenderTest {
             abs(Color.red(actual) - Color.red(expected)) <= tolerance &&
             abs(Color.green(actual) - Color.green(expected)) <= tolerance &&
             abs(Color.blue(actual) - Color.blue(expected)) <= tolerance
-        assertTrue("$what pixel ($x,$y): esperava #%08X, veio #%08X".format(expected, actual), ok)
+        assertTrue("$what pixel ($x,$y): esperava #${"%08X".format(expected)}, veio #${"%08X".format(actual)}", ok)
     }
 
     @Test
@@ -183,6 +183,60 @@ class SvgRenderTest {
         // Escala 2: cada canto vira 48 px.
         assertPixel(sliced, 40, 40, 0xFFFF0000.toInt(), what = "canto 48 px")
         assertPixel(sliced, 55, 55, 0xFFFFFFFF.toInt(), what = "miolo depois dos 48 px")
+    }
+
+    /** O fatiamento "de referência": o SVG re-renderizado em cada uma das nove células (o que a implementação fazia antes do Picture). */
+    private fun nineSliceByRerender(image: SvgImage, w: Int, h: Int, slice: SliceInsets, vb: Float): Bitmap {
+        val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bitmap)
+        val scale = minOf(w / vb, h / vb)
+        val dx1 = Math.round(slice.left * scale).toFloat()
+        val dx2 = maxOf(dx1, w - Math.round(slice.right * scale).toFloat())
+        val dy1 = Math.round(slice.top * scale).toFloat()
+        val dy2 = maxOf(dy1, h - Math.round(slice.bottom * scale).toFloat())
+        val destX = floatArrayOf(0f, dx1, dx2, w.toFloat())
+        val destY = floatArrayOf(0f, dy1, dy2, h.toFloat())
+        val srcX = floatArrayOf(0f, slice.left, vb - slice.right, vb)
+        val srcY = floatArrayOf(0f, slice.top, vb - slice.bottom, vb)
+        for (row in 0 until 3) for (col in 0 until 3) {
+            val cw = destX[col + 1] - destX[col]
+            val ch = destY[row + 1] - destY[row]
+            val sw = srcX[col + 1] - srcX[col]
+            val sh = srcY[row + 1] - srcY[row]
+            if (cw <= 0f || ch <= 0f || sw <= 0f || sh <= 0f) continue
+            val sx = cw / sw
+            val sy = ch / sh
+            canvas.save()
+            canvas.clipRect(destX[col], destY[row], destX[col + 1], destY[row + 1])
+            canvas.translate(destX[col] - srcX[col] * sx, destY[row] - srcY[row] * sy)
+            canvas.scale(sx, sy)
+            SvgRender.draw(canvas, image, 0f, 0f, vb, vb)
+            canvas.restore()
+        }
+        return bitmap
+    }
+
+    @Test
+    fun theRecordedPictureNineSliceMatchesReRenderingEachCell() {
+        val face = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><defs>
+            <linearGradient id="k" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#3355AA"/></linearGradient>
+            <radialGradient id="r" cx="30" cy="30" r="40" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#FFEE88"/><stop offset="1" stop-color="#FFEE88" stop-opacity="0"/></radialGradient></defs>
+            <rect x="5" y="5" width="86" height="86" rx="20" fill="url(#k)" stroke="#223366" stroke-width="3"/>
+            <circle cx="30" cy="30" r="40" fill="url(#r)"/><path d="M10 80 L50 60 L86 84" fill="none" stroke="#FF3366" stroke-width="2.5"/></svg>"""
+        val image = SvgRender.parse(face)
+        val slice = SliceInsets(24f, 24f, 24f, 24f)
+        for ((w, h) in listOf(120 to 150, 440 to 99, 92 to 99, 133 to 61, 96 to 96, 300 to 40)) {
+            val recorded = SvgRender.toBitmap(image, w, h, slice = slice)
+            val reference = nineSliceByRerender(image, w, h, slice, 96f)
+            var worst = 0
+            for (y in 0 until h) for (x in 0 until w) {
+                val a = recorded.getPixel(x, y)
+                val b = reference.getPixel(x, y)
+                worst = maxOf(worst, abs(Color.alpha(a) - Color.alpha(b)), abs(Color.red(a) - Color.red(b)), abs(Color.green(a) - Color.green(b)), abs(Color.blue(a) - Color.blue(b)))
+            }
+            Log.i(TAG, "9-slice picture x re-render ${w}x$h: pior diferença por canal = $worst")
+            assertTrue("o fatiamento por Picture difere do de referência em ${w}x$h (pior canal: $worst)", worst <= 2)
+        }
     }
 
     @Test

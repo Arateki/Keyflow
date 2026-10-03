@@ -6,6 +6,9 @@ import com.keyflow.i18n.tr
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /** O que [SkinPackStore.install] fez: [packId] é o id da pasta se instalou, `null` se recusou (e então nada foi gravado). */
 class InstallResult(val report: ImportReport, val packId: String?, val replaced: Boolean = false) {
@@ -55,6 +58,7 @@ class SkinPackStore(
             try {
                 sweepLeftovers()
                 val replaced = swapIn(id, content)
+                changeCounter.value++
                 InstallResult(report, id, replaced)
             } catch (e: IOException) {
                 InstallResult(
@@ -118,6 +122,7 @@ class SkinPackStore(
         val doomed = File(root, "$id$OLD_SUFFIX")
         doomed.deleteRecursively()
         if (dir.renameTo(doomed)) doomed.deleteRecursively() else dir.deleteRecursively()
+        changeCounter.value++
         !dir.exists()
     }
 
@@ -237,6 +242,15 @@ class SkinPackStore(
 
         private const val STAGING_MARK = ".tmp-"
         private const val OLD_SUFFIX = ".old"
+
+        private val changeCounter = MutableStateFlow(0)
+
+        /**
+         * Sobe a cada instalação ou remoção, em qualquer instância (o app, o IME e o overlay dividem o processo). Quem está mostrando um
+         * pacote — o teclado, a orbe — reabre o seu quando o valor muda: é o que faz reimportar o pacote selecionado aparecer ao vivo
+         * (SKP-IMP-05) e removê-lo devolver a skin padrão (SKP-STO-04), sem polling e sem campo novo nos ajustes.
+         */
+        val changes: StateFlow<Int> = changeCounter.asStateFlow()
 
         /** Um só trinco para o processo todo: o IME, o overlay e a UI abrem instâncias diferentes sobre a mesma pasta. */
         private val LOCK = Any()

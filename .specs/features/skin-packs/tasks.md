@@ -46,7 +46,11 @@ traceability do `spec.md` ao concluir.
   do SVG (pixel conferido), tray, `ink`, `popup`; trocar skin ao vivo reconstrói; pacote removido → Sistema; **goldens
   existentes bit-idênticos**.
 - **Tests**: instrumentado (`PackKeySurfaceTest`, ajuste do teste de skin do service) + `diff-screens.sh`. **Gate**: unit + instrumentado + goldens.
-- **Status**: Pending
+- **Status**: Done (2026-10-02) — `PackKeySurface`, `PackBackdrop`, `PackKeyboard` (+ `KeyRole`/`KeySurface.draw(…, role)` com padrão, `SpriteCache.Key.variant`,
+  `KeyboardColors.forPack`, `SkinPackStore.changes`); `PackKeySurfaceTest` 19/19, `KeyFlowKeyboardPackSkinTest` 5/5 **no IME real** (pixel das faces, bandeja
+  e tinta; troca ao vivo; pacote removido/sumido/quebrado → Sistema; reimportação ao vivo); pacote `com.keyflow.ime` 44/45 (1 flaky, 13/13 nas repetições) e
+  **goldens**: 152/154 rotas idênticas ao baseline pixel a pixel, as 2 restantes são a aba Docs com a licença nova (7×5 px no indicador de rolagem);
+  `diff-screens.sh` 150/150. Medidas de custo contra as nativas e a mitigação (9-slice por `Picture`) no `STATE.md`.
 
 ### SKP-T5 — Orbe: `PackOrb`, `OrbStyle.PACK`, ligação com `pack:<id>`
 - **What**: frames por estado/tempo (`frameIndex` puro), cache LRU com teto de bytes + pré-aquecimento fora do `onDraw`,
