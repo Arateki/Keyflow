@@ -36,13 +36,16 @@ const val OPENAI_MODELS_REFRESH_TAG = "raciocinio-openai-atualizar"
 const val OPENAI_WELCOME_TAG = "raciocinio-openai-boas-vindas"
 const val OPENAI_WELCOME_CLOSE_TAG = "raciocinio-openai-boas-vindas-fechar"
 const val OPENAI_WELCOME_GOT_IT_TAG = "raciocinio-openai-boas-vindas-entendi"
+const val OPENAI_TAB_SUBSCRIPTION_TAG = "raciocinio-openai-tab-assinatura"
+const val OPENAI_TAB_API_TAG = "raciocinio-openai-tab-api"
 
 /** O aviso do 1º login com o plano é mostrado uma vez por conta neste aparelho (a doc da OpenAI). */
 const val OPENAI_PLAN_NOTICE = "plan_welcome"
 
-// Textos aprovados pela OpenAI: iguais em todos os idiomas.
+// Textos aprovados pela OpenAI: iguais em todos os idiomas, como "Local" e "OpenAI" na origem (openai-siwc-notes.md).
 private const val LOGIN_LABEL = "Continue with ChatGPT"
 private const val PLAN_IN_USE = "Using ChatGPT plan"
+private const val MANAGE_USAGE = "Manage usage"
 private const val WELCOME_TITLE = "You're using your ChatGPT plan"
 private const val WELCOME_GOT_IT = "Got it"
 
@@ -85,21 +88,28 @@ internal fun OpenAiPanel(
         }
     }
 
+    // Se a lista falha, `remoteModels` fica vazio e valem as listas de reserva do cartão; `modelsFailed` avisa (RCL-06).
+    var modelsFailed by remember { mutableStateOf(false) }
     LaunchedEffect(connection, refresh) {
         val remote = withContext(Dispatchers.IO) { actions.listModels() }
-        if (remote.isNotEmpty()) {
-            remoteModels = remote
-        }
+        remoteModels = remote
+        modelsFailed = remote.isEmpty() && connection is ConnectionState.Connected
     }
 
-    val ssoModels = if (remoteModels.isNotEmpty()) remoteModels else OPENAI_SSO_MODELS
-    val chosenModel = settings.reasoningOpenAiModel.ifEmpty { "gpt-4o" }
+    // Vazio = ainda não escolhido (RCL-06): o motor só responde com um modelo escolhido, então o seletor não finge um padrão.
+    val chosenModel = settings.reasoningOpenAiModel
+    // O modelo já escolhido continua na lista mesmo que a conta não o devolva agora (falha de rede, ou modelo que saiu).
+    fun withChosen(models: List<AccountModel>) =
+        if (chosenModel.isNotEmpty() && models.none { it.id == chosenModel }) listOf(AccountModel(chosenModel, chosenModel)) + models else models
+    val ssoModels = withChosen(remoteModels.ifEmpty { OPENAI_SSO_MODELS })
+    val apiKeyModels = withChosen(remoteModels.ifEmpty { OPENAI_API_KEY_MODELS })
+    val login = state.login
 
     UnifiedProviderCard(
         providerName = "OpenAI",
         providerLogo = KfIcons.LogoOpenAi,
         connectionState = connection,
-        ssoButtonLabel = tr("Continuar com ChatGPT"),
+        ssoButtonLabel = LOGIN_LABEL,
         onSsoConnect = { actions.connect(AuthMethod.OAUTH, forceConsent = state.planMissing) },
         onSsoDisconnect = { actions.disconnect() },
         onSsoRefresh = { refresh++ },
@@ -112,7 +122,23 @@ internal fun OpenAiPanel(
         ssoFiveHourResetText = tr("Reseta às 15:30"),
         ssoWeeklyFraction = 0.30f,
         ssoWeeklyResetText = tr("Reseta qua, 14:00"),
+        ssoPlanTitle = PLAN_IN_USE.takeIf { state.planInUse },
+        manageUsageLabel = MANAGE_USAGE,
+        planNote = tr("Esse uso é do seu plano do ChatGPT e tem o limite dele — não é uma cobrança do KeyFlow."),
         onOpenManageUsage = actions.usageUrl?.let { url -> { actions.openUrl(url) } },
+        // O que o registro decide (AUTH-03/09) e o aviso de login sem o plano (RCL-07): nada disso é "se for a OpenAI".
+        ssoOffered = actions.flows.any { it.method == AuthMethod.OAUTH },
+        ssoLoginEnabled = login?.enabled ?: true,
+        ssoLoginDisabledReason = login?.disabledReason?.let { openAiUnavailableMessage(it) },
+        loginReasonTag = OPENAI_LOGIN_REASON_TAG,
+        ssoNotice = tr("O login voltou sem permissão para usar o seu plano do ChatGPT. Entre de novo autorizando o uso do plano ou use uma chave de API.")
+            .takeIf { state.planMissing },
+        ssoNoticeTag = OPENAI_PLAN_MISSING_TAG,
+        showLoginWhenConnected = state.planMissing,
+        showDisconnect = state.showDisconnect,
+        onRefreshApiModels = { refresh++ },
+        modelsNote = tr("Não foi possível carregar os modelos da conta.").takeIf { modelsFailed },
+        modelsNoteTag = OPENAI_MODELS_EMPTY_TAG,
         apiKey = remember(connection, settings.providerOpenAiApiKey, settings.openaiToken) {
             actions.apiKey().orEmpty().ifEmpty { settings.providerOpenAiApiKey.ifEmpty { settings.openaiToken } }
         },
@@ -123,7 +149,7 @@ internal fun OpenAiPanel(
         getKeyUrl = "https://platform.openai.com/api-keys",
         onOpenGetKeyUrl = { actions.openUrl("https://platform.openai.com/api-keys") },
         getKeyButtonLabel = tr("Obter chave na OpenAI"),
-        apiKeyModels = OPENAI_API_KEY_MODELS,
+        apiKeyModels = apiKeyModels,
         selectedApiKeyModel = chosenModel,
         onSelectApiKeyModel = { onSettingsChange(settings.copy(reasoningOpenAiModel = it)) },
         onCancel = if (state.showCancel) { { actions.cancel() } } else null,
@@ -139,6 +165,7 @@ internal fun OpenAiPanel(
         ssoModelTag = OPENAI_MODEL_TAG,
         apiKeyModelTag = OPENAI_MODEL_TAG,
         planTag = OPENAI_PLAN_TAG,
+        limitsTag = "raciocinio-openai-limites",
         manageUsageTag = OPENAI_MANAGE_USAGE_TAG,
         planNoteTag = OPENAI_PLAN_NOTE_TAG,
         privacyTag = RACIOCINIO_OPENAI_PRIVACY_TAG,

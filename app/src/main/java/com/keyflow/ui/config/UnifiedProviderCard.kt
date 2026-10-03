@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -99,11 +100,42 @@ fun UnifiedProviderCard(
     privacyTag: String = "$tagPrefix-privacy",
     errorTag: String = "$tagPrefix-error",
     privacyNote: String = tr("O texto do teste é enviado à %s; as credenciais ficam só neste aparelho.", providerName),
+    // O que o provedor e o registro de autenticação decidem (AUTH-03/09, RCL-06/07) — o padrão é o comportamento genérico.
+    // `false`: o registro não oferece login, então só existe a aba API (sem sub-abas).
+    ssoOffered: Boolean = true,
+    // Login desligado pelo registro: o botão aparece desabilitado e [ssoLoginDisabledReason] diz por quê.
+    ssoLoginEnabled: Boolean = true,
+    ssoLoginDisabledReason: String? = null,
+    loginReasonTag: String = "$tagPrefix-sso-login-reason",
+    // Conectado pelo login mas com algo a avisar (ex.: sem o uso do plano): o aviso aparece no lugar dos limites e o botão do login
+    // continua ali para entrar de novo.
+    ssoNotice: String? = null,
+    ssoNoticeTag: String = "$tagPrefix-sso-notice",
+    showLoginWhenConnected: Boolean = false,
+    // Rótulo do link de gerenciar o uso e a nota que separa o uso do plano das cobranças do app (diretrizes do provedor).
+    manageUsageLabel: String? = null,
+    planNote: String? = null,
+    limitsTag: String = planTag,
+    // `true`: Desconectar também com a sessão expirada ou em erro (a credencial ainda está no cofre) e, na aba API, com uma chave
+    // guardada (apaga a chave); `null`: só na aba Assinatura, com algo conectado.
+    showDisconnect: Boolean? = null,
+    // Atualiza a lista de modelos do modo chave de API (a lista do modo assinatura usa [onSsoRefresh]).
+    onRefreshApiModels: (() -> Unit)? = null,
+    // A lista de modelos da conta não veio: o texto fica logo abaixo do seletor (RCL-06).
+    modelsNote: String? = null,
+    modelsNoteTag: String = "$tagPrefix-models-note",
     modifier: Modifier = Modifier,
 ) {
     val palette = LocalKeyFlowPalette.current
     val connected = connectionState is ConnectionState.Connected
     val isConnecting = connectionState is ConnectionState.Connecting
+    // Sem login no registro, só a chave: não há sub-abas e o conteúdo é sempre o da aba API.
+    val isSubscription = ssoOffered && selectedAuthMode == "subscription"
+    // Aba Assinatura: Desconectar com algo conectado — e, se o painel pede, também com a sessão expirada ou em erro (a credencial ainda
+    // está no cofre). Aba API: só se o painel pedir e houver uma chave.
+    val canDisconnectSubscription = connected ||
+        (showDisconnect == true && (connectionState is ConnectionState.NeedsReconnect || connectionState is ConnectionState.Error))
+    val canDisconnectApi = showDisconnect == true && apiKey.isNotBlank()
 
     Column(
         modifier
@@ -145,7 +177,6 @@ fun UnifiedProviderCard(
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp,
                     )
-                    val isSubscription = selectedAuthMode == "subscription"
                     Text(
                         when {
                             isSubscription -> when {
@@ -154,6 +185,8 @@ fun UnifiedProviderCard(
                                     if (!acc.isNullOrBlank()) tr("Conectado como %s", acc) else tr("Conectado via Assinatura")
                                 }
                                 isConnecting -> tr("Conectando...")
+                                connectionState is ConnectionState.NeedsReconnect -> tr("A sessão expirou — entre de novo.")
+                                connectionState is ConnectionState.Error -> tr("Não foi possível conectar")
                                 else -> tr("Não conectado")
                             }
                             else -> when {
@@ -170,7 +203,6 @@ fun UnifiedProviderCard(
             }
 
             // Badge de status
-            val isSubscription = selectedAuthMode == "subscription"
             val isTagActive = if (isSubscription) connected else apiKey.isNotBlank()
             val tagText = when {
                 isSubscription -> if (connected) tr("LOGADO") else tr("DESLOGADO")
@@ -210,7 +242,7 @@ fun UnifiedProviderCard(
 
         // ── Sub-abas: Assinatura / API
         val authModes = listOf("subscription", "api")
-        Row(
+        if (ssoOffered) Row(
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(10.dp))
@@ -219,7 +251,7 @@ fun UnifiedProviderCard(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             authModes.forEach { mode ->
-                val isSelected = selectedAuthMode == mode
+                val isSelected = (if (isSubscription) "subscription" else "api") == mode
                 val label = if (mode == "subscription") tr("Assinatura") else tr("API")
                 val tabTag = if (mode == "subscription") "$tagPrefix-tab-assinatura" else "$tagPrefix-tab-api"
 
@@ -233,7 +265,7 @@ fun UnifiedProviderCard(
                             else Modifier
                         )
                         .clickable {
-                            if (selectedAuthMode != mode) {
+                            if (!isSelected) {
                                 onSelectAuthMode(mode)
                             }
                         }
@@ -274,18 +306,21 @@ fun UnifiedProviderCard(
         }
 
         // ── Conteúdo da Sub-aba Selecionada
-        if (selectedAuthMode == "subscription") {
+        if (isSubscription) {
             // Modo Assinatura / SSO
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (!connected) {
+                if (!connected || showLoginWhenConnected) {
                     PrimaryButton(
                         text = ssoButtonLabel,
                         icon = providerLogo,
                         tag = loginTag,
-                        enabled = !isConnecting,
+                        enabled = !isConnecting && ssoLoginEnabled,
                         onClick = onSsoConnect,
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    if (ssoLoginDisabledReason != null) {
+                        SettingSub(ssoLoginDisabledReason, Modifier.testTag(loginReasonTag))
+                    }
 
                     if (isConnecting && onCancel != null) {
                         SecondaryButton(
@@ -295,9 +330,46 @@ fun UnifiedProviderCard(
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
-                } else {
-                    // Bloco compacto de limites de uso (mesmo tamanho do botão)
-                    Box(
+                }
+
+                if (connected) {
+                    if (ssoNotice != null) {
+                        InfoNote(ssoNotice, ssoNoticeTag)
+                    }
+                    // "Using ChatGPT plan" + "Manage usage" (texto aprovado pelo provedor) e a nota que separa o uso do plano das
+                    // cobranças do app.
+                    if (ssoPlanTitle != null) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                ssoPlanTitle,
+                                color = palette.teal,
+                                fontFamily = SpaceGrotesk,
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 11.5.sp,
+                                modifier = Modifier.testTag(planTag),
+                            )
+                            if (manageUsageLabel != null && onOpenManageUsage != null) {
+                                Text(
+                                    manageUsageLabel,
+                                    color = palette.fg2,
+                                    fontFamily = SpaceGrotesk,
+                                    fontSize = 11.5.sp,
+                                    textDecoration = TextDecoration.Underline,
+                                    modifier = Modifier
+                                        .clickable { onOpenManageUsage() }
+                                        .padding(vertical = 6.dp)
+                                        .testTag(manageUsageTag),
+                                )
+                            }
+                        }
+                        if (planNote != null) SettingSub(planNote, Modifier.testTag(planNoteTag))
+                    }
+                    // Bloco compacto de limites de uso (mesmo tamanho do botão); sem o uso do plano não há limite a mostrar.
+                    if (ssoNotice == null) Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
@@ -308,7 +380,7 @@ fun UnifiedProviderCard(
                                 else Modifier
                             )
                             .padding(horizontal = 8.dp, vertical = 7.dp)
-                            .testTag(planTag),
+                            .testTag(limitsTag),
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -448,27 +520,32 @@ fun UnifiedProviderCard(
                         selected = selectedSsoModel,
                         onSelect = onSelectSsoModel,
                         tag = ssoModelTag,
-                        display = { id -> ssoModels.firstOrNull { it.id == id }?.displayName ?: id },
+                        display = { id -> modelDisplayName(ssoModels, id) },
                     )
+                    if (modelsNote != null) SettingSub(modelsNote, Modifier.testTag(modelsNoteTag))
                 }
 
-                if (connected) {
+                if (canDisconnectSubscription) {
                     Row(
                         Modifier.fillMaxWidth().padding(top = 2.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        SecondaryButton(
-                            text = tr("Atualizar"),
-                            tag = refreshTag,
-                            onClick = onSsoRefresh,
-                            modifier = Modifier.weight(1f),
-                        )
-                        SecondaryButton(
-                            text = tr("Desconectar"),
-                            tag = disconnectTag,
-                            onClick = onSsoDisconnect,
-                            modifier = Modifier.weight(1f),
-                        )
+                        if (connected) {
+                            SecondaryButton(
+                                text = tr("Atualizar"),
+                                tag = refreshTag,
+                                onClick = onSsoRefresh,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        if (canDisconnectSubscription) {
+                            SecondaryButton(
+                                text = tr("Desconectar"),
+                                tag = disconnectTag,
+                                onClick = onSsoDisconnect,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
                     }
                 }
             }
@@ -500,8 +577,36 @@ fun UnifiedProviderCard(
                         selected = selectedApiKeyModel,
                         onSelect = onSelectApiKeyModel,
                         tag = apiKeyModelTag,
-                        display = { id -> apiKeyModels.firstOrNull { it.id == id }?.displayName ?: id },
+                        display = { id -> modelDisplayName(apiKeyModels, id) },
                     )
+                    if (modelsNote != null) SettingSub(modelsNote, Modifier.testTag(modelsNoteTag))
+                }
+
+                // Atualizar a lista e Desconectar no modo chave, quando o painel pede: sem isso não há como apagar a chave nem tentar a lista de novo.
+                val canRefresh = onRefreshApiModels != null && (connected || apiKey.isNotBlank())
+                if (canRefresh || canDisconnectApi) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(top = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        if (canRefresh) {
+                            SecondaryButton(
+                                text = tr("Atualizar"),
+                                tag = refreshTag,
+                                onClick = { onRefreshApiModels?.invoke() },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        if (canDisconnectApi) {
+                            // Apaga a chave (o cofre guarda a chave e o login à parte: o login, se houver, continua conectado).
+                            SecondaryButton(
+                                text = tr("Desconectar"),
+                                tag = disconnectTag,
+                                onClick = { onApiKeyChange("") },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -513,3 +618,7 @@ fun UnifiedProviderCard(
         )
     }
 }
+
+/** O nome do modelo no seletor; um id vazio é "ainda não escolhido" (RCL-06), nunca um modelo inventado. */
+private fun modelDisplayName(models: List<AccountModel>, id: String): String =
+    if (id.isEmpty()) tr("Escolha um modelo") else models.firstOrNull { it.id == id }?.displayName ?: id
