@@ -60,6 +60,13 @@ android {
             isReturnDefaultValues = true
         }
     }
+    // O pacote de skin de exemplo (`skin-packs/`, na raiz do repositório) vai nos assets do APK de teste: o instrumentado importa o pacote REAL,
+    // não uma cópia (SKP-DOC-02).
+    sourceSets {
+        getByName("androidTest") {
+            assets.srcDir("../skin-packs")
+        }
+    }
 }
 
 kotlin {
