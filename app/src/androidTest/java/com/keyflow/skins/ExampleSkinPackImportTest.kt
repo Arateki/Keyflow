@@ -2,6 +2,7 @@ package com.keyflow.skins
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.os.Debug
 import android.util.Log
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.platform.app.InstrumentationRegistry
@@ -29,7 +30,10 @@ class ExampleSkinPackImportTest {
     @Before
     fun setUp() {
         base = SkinPackFixtures.tempRoot(ApplicationProvider.getApplicationContext<Context>().cacheDir)
-        store = SkinPackStore(File(base, "skins"))
+        // O "pesado" do relatório mede quanto o desenho do SVG DEMORA; com o relógio de parede (o padrão) um host carregado, que deixa a thread do
+        // teste parada por 150 ms, faz o exemplo parecer pesado (medido: 2 frames do `listening` apontados num import sob carga, e sem aviso
+        // nenhum em repouso). Este teste afirma que o exemplo não é pesado, então mede o que o exemplo CUSTA: o tempo de CPU da própria thread.
+        store = SkinPackStore(File(base, "skins"), nanoClock = Debug::threadCpuTimeNanos)
     }
 
     @After
