@@ -119,13 +119,14 @@ modelo não consegue olhar nem mexer em nada do app, e o usuário tem de ir às 
 | TLS-02 | Confirmação com resumo do app | Implemented — núcleo, `ConfirmationGate`, painel com resumo e prévia do app (AGT-T3) e o resumo/folha de contato das ferramentas de skin (AGT-T4) |
 | TLS-03 | Sem segredos; filtro; lista de permitidos | Parcial — `SecretFilter` ligado aos cofres `keyflow_secure` e `auth/` (AGT-T3, provado no aparelho com sentinelas); a lista de permitidos de ajustes é do AGT-T6 |
 | TLS-04 | Resultado é dado | Implemented (JVM) — prompt de sistema + suíte de abuso inicial |
-| TLS-05 | Registro de ações, desfazer | Parcial — `ActionLog` em memória e `UndoCall` como dado; persistência e UI são do AGT-T5 |
+| TLS-05 | Registro de ações, desfazer | Implemented — `FileActionLog` (arquivo com teto, rotação e filtro de segredos, fora do backup) e Desfazer nos Ajustes pelo mesmo executor (AGT-T5) |
 | TLS-06 | Tempo limite, fora da thread principal | Implemented (JVM) |
 | SKL-01..06 | Ferramentas de skin | Implemented — as 6 ferramentas, prévia sem nada em disco, instalação com confirmação (relatório e folha de contato), lotes e limites; verificado no aparelho com o `exemplo-neon` real (`SkinToolsDeviceTest` 13/13) (AGT-T4). Pendência: o direito de skins pagas no `skin_select` (MZ-T9) |
 | APP-01..03 | Ferramentas de app | Pending (AGT-T6) |
 | AUI-01, AUI-02, AUI-04 | Cartões, painel de confirmação, textos `tr()` e orbe | Implemented (AGT-T3; instrumentado 12/12 + rotas de galeria) |
-| AUI-03 | Seção "Ferramentas do agente" nos Ajustes | Pending (AGT-T5) |
-| MCP-01..06 | Servidor MCP | Pending (AGT-T9) |
+| AUI-03 | Seção "Ferramentas do agente" nos Ajustes | Implemented — `AgentSettingsSection` + configuração persistida no DataStore próprio; MCP desligado e desabilitado (AGT-T5) |
+| MCP-01 | Servidor MCP desligado por padrão | Implemented — a linha existe nos Ajustes, desligada e desabilitada; nenhuma porta é aberta (não há servidor) |
+| MCP-02..06 | Servidor MCP | Pending (AGT-T9) |
 
 ## Success Criteria
 

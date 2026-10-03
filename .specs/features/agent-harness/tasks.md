@@ -43,7 +43,7 @@ trailer). Atualizar o Status aqui e a traceability do `spec.md` ao concluir.
 - **What**: chave geral, modo de confirmação, uma chave por ferramenta, **Registro de ações** (com desfazer onde houver), **Servidor MCP externo** como linha **desligada e desabilitada** ("em breve") até a fase 3; persistência no DataStore (nenhum segredo); strings `tr()` + EN/ES; rotas da galeria.
 - **Done when**: ligar/desligar reflete na lista de ferramentas enviada ao modelo; o registro mostra e apaga; goldens existentes inalterados exceto os da aba KeyFlow que mudarem por intenção.
 - **Tests**: instrumentado (Compose) + goldens + `TranslationsTest`. **Gate**: unit + instrumentado + goldens.
-- **Status**: Pending
+- **Status**: Done (2026-10-03, fase 1B, fechada pelo revisor). Configuração no DataStore próprio `keyflow_agent` (`DataStorePolicyConfigStore`) e registro em `files/agent/actions.jsonl` (`FileActionLog`: teto de 300 entradas/256 KB, rotação atômica, filtro de segredos, fora do backup); seção `ui/config/AgentSettingsSection.kt` nos Ajustes do chat (chave geral, modo, uma chave por ferramenta com o risco, "voltar a perguntar sempre", registro com Desfazer/Limpar, linha do MCP desligada e desabilitada); rota `agent-ajustes`. **Decisão**: se a configuração gravada não puder ser lida, as ferramentas ficam DESLIGADAS (os padrões religariam o que o usuário desligou) — `READ_FAILED`.
 
 ## Fase 2 — Ajustes do app e mais provedores
 

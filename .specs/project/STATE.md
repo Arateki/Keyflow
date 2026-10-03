@@ -2514,9 +2514,11 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
   Abuso (JVM): injeção no `author` de uma skin lida por `skin_list` (o motor falso obedece e pede `skin_install`) → o painel abre, o usuário nega, nada instala; origem externa nunca herda o "permitir sempre" do chat para a instalação.
   **O que NÃO provei**: nenhuma chamada à API real; o desempenho da folha de contato de um pacote de 480 frames em aparelho fraco (o A32); a folha vista por um modelo de verdade (AGT-T10).
 
-## agent-harness — estado da fase 1B (para retomar; atualizado em 2026-10-03, ao fechar a T4)
-- **Commitado**: imagem no `tool_result` · AGT-T3 · AGT-T4 (ver as seções acima).
-- **AGT-T5 não começada**: `FileActionLog` (arquivo, teto e rotação, sem segredo), `DataStorePolicyConfigStore` (DataStore próprio; trocar `InMemoryPolicyConfigStore`/`InMemoryActionLog` no `AgentHost.create`), `ui/config/AgentSettingsSection.kt` (chave geral, modo, uma chave por ferramenta com o risco, Registro de ações com Desfazer/Limpar, linha "Servidor MCP externo" desligada e desabilitada "em breve") ligada ao `KeyflowPanelBody` (entre as capacidades e "Limpar conversa"), strings `tr`+EN/ES, rotas de galeria novas (Ajustes e registro; em `GalleryAgent.kt`) com goldens SÓ das novas, `AgentSettingsSectionTest` e teste de persistência.
-- **Depois**: unit completo + instrumentados `com.keyflow.ui`, `com.keyflow.skins`, `com.keyflow.overlay` + os novos; `verify-screens.sh` + `diff-screens.sh` (os 198 goldens antigos têm de ficar idênticos, conferir também com `compare -metric AE`); relatório final.
-- **Como retomar**: worktree `/home/yan/Projects/keyflow-agent-wt`, branch `feature/agent-harness`; Gradle sempre sob `flock /tmp/keyflow-gradle.lock`; emulador `keyflow_api34` (`-gpu swiftshader_indirect`) por `adb -s emulator-5554`, NUNCA o A32; instrumentados com `am instrument -w -r -e class … com.keyflow.test/androidx.test.runner.AndroidJUnitRunner` (sob `flock /tmp/keyflow-emulator.lock`).
-
+## agent-harness — estado da fase 1B (FECHADA em 2026-10-03)
+- **Commitado**: imagem no `tool_result` · AGT-T3 · AGT-T4 · AGT-T5 (configuração e registro persistidos + seção "Ferramentas do agente" nos Ajustes + rota `agent-ajustes`).
+- **Fechamento (revisor, sem subagente)**: unit 1425/0; instrumentados `com.keyflow.agenthost` 17/17, `com.keyflow.skins` 171/171, `com.keyflow.ui` 233 com 1 falha que era do
+  teste (o "Limpar conversa" passou para baixo da dobra com a seção nova; o teste agora rola até ele) e depois `KeyflowPanelAgentTest` 12/12 em 3 rodadas.
+- **Achado na revisão**: o `DataStorePolicyConfigStore` caía nos PADRÕES quando a leitura falhava — com a chave geral LIGADA, o que religaria as ferramentas de quem as desligou.
+  Agora cai em `READ_FAILED` (ferramentas desligadas); teste com arquivo corrompido.
+- **Próximo**: fase 2 (AGT-T6 ferramentas de app com lista de permitidos; AGT-T7 OpenAI/Google), fase 3 (AGT-T8 skins parametrizadas; AGT-T9 servidor MCP), AGT-T10 (abuso e validação
+  real com a Anthropic — exige a chave e a autorização do Yan).
