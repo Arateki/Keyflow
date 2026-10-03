@@ -141,11 +141,14 @@ class OpenAiKeyFlowTest {
         rule.onNodeWithTag(REASONING_TEST_BUTTON_TAG).performScrollTo().assertIsNotEnabled()
         rule.onNodeWithTag(REASONING_TEST_REASON_TAG).performScrollTo().assertIsDisplayed()
 
+        // O cartão abre na aba Assinatura (login); o campo da chave mora na aba API.
+        rule.onNodeWithTag(OPENAI_TAB_API_TAG).performScrollTo().performClick()
+
         // Digita a chave: guarda no cofre e a conexão vira "com chave de API".
         rule.onNodeWithTag(OPENAI_KEY_TAG).performScrollTo().performTextInput("sk-e2e-segredo")
         rule.onNodeWithTag(OPENAI_STATUS_TAG).performClick() // tira o foco: salva no desfoque
         rule.waitUntil(10_000) { store.get(ProviderIds.OPENAI) != null }
-        rule.onNodeWithTag(OPENAI_STATUS_TAG).performScrollTo().assertTextEquals("Conectado com chave de API")
+        rule.onNodeWithTag(OPENAI_STATUS_TAG).performScrollTo().assertTextEquals("Chave de API ativa")
 
         // Lista os modelos da conta e escolhe um.
         rule.waitUntil(10_000) { requests.any { it.path == "/v1/models" } }
@@ -155,7 +158,9 @@ class OpenAiKeyFlowTest {
 
         // Testar: a resposta chega em fluxo, com os tempos.
         rule.onNodeWithTag(REASONING_TEST_BUTTON_TAG).performScrollTo().performClick()
-        rule.waitUntil(15_000) { runCatching { rule.onNodeWithTag(REASONING_TEST_TIMES_TAG).assertIsDisplayed() }.isSuccess }
+        rule.waitUntil(15_000) { runCatching { rule.onNodeWithTag(REASONING_TEST_TIMES_TAG).assertExists() }.isSuccess }
+        // Com o cartão da chave mais alto, os tempos ficam abaixo da dobra: rola até eles para conferir que aparecem.
+        rule.onNodeWithTag(REASONING_TEST_TIMES_TAG).performScrollTo().assertIsDisplayed()
         rule.onNodeWithTag(REASONING_TEST_RESPONSE_TAG).assertTextContains("Olá do servidor!", substring = true)
 
         // O servidor recebeu a chave em AMBAS as chamadas, e o corpo enxuto da Responses API.
@@ -175,7 +180,7 @@ class OpenAiKeyFlowTest {
         rule.onNodeWithTag(OPENAI_DISCONNECT_TAG).performScrollTo().performClick()
         rule.waitUntil(10_000) { store.get(ProviderIds.OPENAI) == null }
         assertNull(store.get(ProviderIds.OPENAI))
-        rule.onNodeWithTag(OPENAI_STATUS_TAG).performScrollTo().assertTextEquals("Não conectado")
+        rule.onNodeWithTag(OPENAI_STATUS_TAG).performScrollTo().assertTextEquals("Não configurado")
         rule.onNodeWithTag(REASONING_TEST_BUTTON_TAG).performScrollTo().assertIsNotEnabled()
     }
 }
