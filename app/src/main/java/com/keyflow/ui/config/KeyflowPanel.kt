@@ -511,6 +511,9 @@ private fun KeyflowPanelBody(
                     tr("A configuração e autenticação dos modelos são feitas diretamente na aba de cada capacidade específica."),
                 )
 
+                // 4. Ferramentas do agente: só com o agente do processo (sem ele o chat é o de texto de sempre, sem nada a configurar).
+                agent?.let { AgentSettingsSection(it) }
+
                 SecondaryButton(
                     text = tr("Limpar conversa"),
                     tag = "keyflow-clear-chat",
