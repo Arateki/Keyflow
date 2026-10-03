@@ -18,4 +18,6 @@
     <exclude domain="file" path="models" />
     <exclude domain="file" path="model-downloads.json" />
     <exclude domain="external" path="model-tmp" />
+    <!-- O registro de ações do agente (agent-harness): é deste aparelho — as chamadas de "desfazer" apontam para skins daqui. Não guarda segredo. -->
+    <exclude domain="file" path="agent/actions.jsonl" />
 </full-backup-content>

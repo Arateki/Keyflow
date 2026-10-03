@@ -6,8 +6,7 @@ import com.keyflow.agent.ActionLog
 import com.keyflow.agent.AgentController
 import com.keyflow.agent.AgentTool
 import com.keyflow.agent.ConfirmationGate
-import com.keyflow.agent.InMemoryActionLog
-import com.keyflow.agent.InMemoryPolicyConfigStore
+import com.keyflow.agent.FileActionLog
 import com.keyflow.agent.PolicyConfigStore
 import com.keyflow.agent.SecretFilter
 import com.keyflow.agent.ToolExecutor
@@ -16,6 +15,9 @@ import com.keyflow.agent.ToolRegistry
 import com.keyflow.agent.tools.SkinTools
 import com.keyflow.data.SettingsRepository
 import com.keyflow.skins.SkinPackStore
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.preferencesDataStoreFile
+import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -76,14 +78,27 @@ object AgentHost {
         val repository = SettingsRepository(app)
         val auth = (app as App).authServices
         val secrets = AgentSecretSource(vaultProvider = repository::secretVault, credentials = auth.store)
+        // O DataStore da configuração e o arquivo do registro: do agente, fora das Settings, e nenhum guarda segredo (o registro ainda passa pelo filtro).
+        val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val policy = DataStorePolicyConfigStore(
+            PreferenceDataStoreFactory.create(scope = io, produceFile = { app.preferencesDataStoreFile(POLICY_DATASTORE) }),
+            io,
+        )
+        val log = FileActionLog(File(app.filesDir, ACTION_LOG_FILE), sanitize = SecretFilter(secrets)::redact)
         return assemble(
             // Fora da thread principal: o filtro decifra o cofre, o executor roda ferramentas e o motor fala com a rede; a tela só observa o StateFlow.
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
             // As ferramentas de skin (SKL-01..06) sobre o mesmo SkinPackStore do import e da tela, e as duas chaves de skin dos ajustes.
             tools = SkinTools(AndroidSkinWorkshop(app, SkinPackStore.of(app), RepositorySkinSelection(repository))).tools,
-            policy = InMemoryPolicyConfigStore(),
-            actionLog = InMemoryActionLog(),
+            policy = policy,
+            actionLog = log,
             secrets = secrets,
         )
     }
+
+    /** O arquivo do DataStore da configuração das ferramentas (`datastore/keyflow_agent.preferences_pb`). */
+    const val POLICY_DATASTORE = "keyflow_agent"
+
+    /** O registro de ações, em `files/`: fora do backup (as chamadas de desfazer apontam para coisas deste aparelho). */
+    const val ACTION_LOG_FILE = "agent/actions.jsonl"
 }
