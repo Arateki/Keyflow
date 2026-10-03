@@ -218,6 +218,16 @@ class SkinPackReaderTest {
     }
 
     @Test
+    fun `an absurd frame number never builds a list of every missing number`() {
+        // O nome do arquivo pode trazer 9 dígitos: o leitor listava `1..999999999` para achar os buracos e o import morria de OutOfMemoryError
+        // (um zip malicioso derrubava o app). Agora só conta os buracos e lista os cinco primeiros.
+        val result = ok(zip(listOf("manifest.json" to MANIFEST.toByteArray()) + frames("orb_idle_01.svg", "orb_paused_999999999.svg")))
+        val warning = result.report.warnings.single { it.contains("paused") && it.contains("buracos") }
+        assertThat(warning).contains("1, 2, 3, 4, 5 …")
+        assertThat(result.content.orbFrames.getValue(OrbPackState.PAUSED)).hasSize(1)
+    }
+
+    @Test
     fun `a missing state warns that it will use idle`() {
         val result = ok(zip(orbOnly(1)))
         assertThat(result.report.warnings.single()).isEqualTo("orbe: sem frames de listening, paused, transcribing — esses estados usam os de idle.")

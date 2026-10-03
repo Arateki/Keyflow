@@ -64,6 +64,10 @@ object SkinPackReader {
      */
     const val MAX_ENTRIES = 800
     const val MAX_SVG_BYTES = 512 * 1024
+
+    /** Quantos números faltantes o aviso de buracos do import lista (o resto vira "…"). */
+    private const val MISSING_LISTED = 5
+
     const val MAX_MANIFEST_BYTES = 64 * 1024
     const val MAX_TOTAL_BYTES = 60L * 1024 * 1024
 
@@ -377,13 +381,17 @@ object SkinPackReader {
                 if (byFrame.size > MAX_FRAMES_PER_STATE) {
                     errors += tr("orbe: o estado %s tem %d frames; o máximo é %d.", state.key, byFrame.size, MAX_FRAMES_PER_STATE)
                 }
-                val numbers = byFrame.keys.sorted()
-                val missing = (1..numbers.last()).filter { it !in byFrame }
-                if (missing.isNotEmpty()) {
+                // Os buracos da numeração (1, 2, 4 → falta o 3). NUNCA materializar `1..último`: o nome do arquivo pode trazer até 9 dígitos
+                // (`orb_idle_999999999.svg`) e uma lista de um bilhão de inteiros derrubava o import com `OutOfMemoryError`. Todo número em
+                // [byFrame] é ≥ 1 (o zero é erro à parte), então a quantidade de buracos é `último − quantos existem`, e só os primeiros cinco são listados.
+                val last = byFrame.keys.max()
+                val missingCount = last - byFrame.keys.count { it >= 1 }
+                if (missingCount > 0) {
+                    val firstMissing = (1..last).asSequence().filter { it !in byFrame }.take(MISSING_LISTED).toList()
                     warnings += tr(
                         "orbe: o estado %s tem buracos na numeração (faltam os frames %s) — os frames que existem tocam em ordem.",
                         state.key,
-                        missingText(missing),
+                        missingText(firstMissing, missingCount),
                     )
                 }
             }
@@ -464,9 +472,9 @@ object SkinPackReader {
             SvgWarning.SVG_FONT -> tr("usa fontes SVG (<font>), que não são suportadas")
         }
 
-        private fun missingText(missing: List<Int>): String {
-            val shown = missing.take(5).joinToString(", ")
-            return if (missing.size <= 5) shown else "$shown …"
+        private fun missingText(firstMissing: List<Int>, missingCount: Int): String {
+            val shown = firstMissing.joinToString(", ")
+            return if (missingCount <= MISSING_LISTED) shown else "$shown …"
         }
     }
 }
