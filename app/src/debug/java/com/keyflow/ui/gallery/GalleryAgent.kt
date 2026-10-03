@@ -275,6 +275,6 @@ object AgentGalleryRoutes {
         return parts.runtime(backends)
     }
 
-    /** 3 de outubro de 2026, 12:00 UTC: o registro da galeria tem horário fixo (o que muda o desenho é só o fuso do aparelho de captura). */
+    /** 2 de outubro de 2026, 12:00 UTC (09:00 no fuso do emulador de captura): o registro da galeria tem horário fixo; só o fuso do aparelho muda o desenho. */
     private const val SETTINGS_T0 = 1_790_942_400_000L
 }
