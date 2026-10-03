@@ -61,7 +61,11 @@ diff_all() {
     local ae
     ae="$(compare -metric AE -fuzz "$FUZZ" "$g" "$cur" null: 2>&1 || true)"
     ae="${ae%% *}"  # "123 (0.0018)" → "123"
-    ae="${ae%%.*}"  # "123.4" → "123"
+    # O `compare` imprime em notação científica a partir de 7 dígitos ("1.11994e+06"): cortar no ponto dava "1" e uma tela inteira diferente
+    # passava como "1 px". Converte pelo awk (aceita "123", "123.4" e "1.11994e+06"); o que não é número fica como está e cai na checagem abaixo.
+    if [[ "$ae" =~ ^[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$ ]]; then
+      ae="$(awk -v a="$ae" 'BEGIN { printf "%.0f", a }')"
+    fi
 
     if ! [[ "$ae" =~ ^[0-9]+$ ]]; then
       echo "  ✗ $base — comparação falhou (dimensões diferentes?): $ae"
