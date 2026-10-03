@@ -108,5 +108,14 @@ class OverlayPanelTest {
 
         rule.runOnIdle { assertEquals("rosegold", h.settings.orbSkin) }
     }
-}
 
+    @Test
+    fun orbSkinMascotPersists() {
+        val h = Harness(Settings(orbSkin = "atelie"))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(orbSkinTag("mascot")).performScrollTo().performClick()
+
+        rule.runOnIdle { assertEquals("mascot", h.settings.orbSkin) }
+    }
+}

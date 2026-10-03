@@ -165,6 +165,7 @@ internal val TranslationsEs: Map<String, String> = mapOf(
     "sugestões" to "sugerencias",
     "Alternar" to "Alternar",
     "Ateliê" to "Atelier",
+    "Mascote" to "Mascota",
     "Bloqueado" to "Bloqueado",
     "Desbloquear skins" to "Desbloquear skins",
     "Sistema" to "Sistema",
