@@ -7,8 +7,10 @@ import com.keyflow.agent.AgentStopReason
 import com.keyflow.agent.ProviderState
 import com.keyflow.agent.TokenUsage
 import com.keyflow.agent.ToolDefinition
+import com.keyflow.agent.ToolImage
 import com.keyflow.reasoning.ReasoningError
 import java.util.TreeMap
+import okio.ByteString.Companion.toByteString
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
@@ -25,7 +27,12 @@ import org.json.JSONObject
  *    ÚNICA mensagem do usuário, com os `tool_result` ANTES de qualquer texto;
  *  - `…/agents-and-tools/tool-use/define-tools` — `name` casa `^[a-zA-Z0-9_-]{1,128}$`, `input_schema`, `eager_input_streaming`;
  *  - `…/build-with-claude/thinking` — numa volta de ferramenta os blocos `thinking`/`redacted_thinking` voltam COMPLETOS e sem mudança;
- *  - `…/build-with-claude/handling-stop-reasons` — os valores de `stop_reason`.
+ *  - `…/build-with-claude/handling-stop-reasons` — os valores de `stop_reason`;
+ *  - `…/agents-and-tools/tool-use/handle-tool-calls` (exemplo "tool result with images") e `…/build-with-claude/vision` — o `content` de
+ *    um `tool_result` pode ser uma lista de blocos `text`/`image`, e o bloco é `{"type":"image","source":{"type":"base64","media_type":
+ *    "image/png","data":"…"}}` (JPEG, PNG, GIF e WebP; 10 MB em base64 por imagem; "todos os modelos atuais aceitam imagem"; a partir de
+ *    20 imagens na requisição vale um limite de dimensão mais duro, contando também as de turnos antigos — por isso só as últimas
+ *    [MAX_IMAGES_IN_HISTORY] imagens do histórico são reenviadas).
  */
 internal object AnthropicAgentWire {
     /** O nome do provedor no [ProviderState]. */
@@ -37,6 +44,30 @@ internal object AnthropicAgentWire {
     /** O maior JSON de argumentos de UMA chamada que se aceita juntar em memória (o teto de tokens da resposta já limita; isto é a cinta). */
     const val MAX_TOOL_INPUT_CHARS = 4 * 1024 * 1024
 
+    /**
+     * Quantas imagens de resultado de ferramenta o histórico reenvia (as MAIS RECENTES). Cada requisição reenvia a conversa inteira; uma
+     * folha de contato por pré-visualização acumularia centenas de KB por volta e levaria a conversa ao limite de imagens da API. As
+     * mais antigas ficam só como texto (com uma nota).
+     */
+    const val MAX_IMAGES_IN_HISTORY = 2
+
+    private val CLAUDE_FAMILY = Regex("^claude-(?:opus|sonnet|haiku|fable|mythos)-(\\d+)")
+    private val CLAUDE_3_WITH_VISION = Regex("^claude-3-(?:5-sonnet|7-sonnet|opus|sonnet|haiku)")
+
+    /**
+     * O modelo aceita imagem na entrada? A documentação (`models/overview`, 2026-10-03) diz que TODOS os modelos atuais aceitam texto e
+     * imagem; aqui a regra é CONSERVADORA — só os que se sabe aceitarem — porque mandar uma imagem a um modelo que não a aceita vira um
+     * HTTP 400 que derruba a volta, e deixá-la de fora só tira do modelo a pré-visualização (ele continua com o relatório em texto):
+     * as famílias `claude-<opus|sonnet|haiku|fable|mythos>-<4 ou mais>` e as do Claude 3 que a aceitam desde o lançamento (Sonnet 3.5 e
+     * 3.7, Opus 3, Sonnet 3, Haiku 3). Id que não reconhece (o Haiku 3.5, um modelo novo de outra família) fica só com o texto. A
+     * consulta exata (`capabilities` do Models API) é da validação com o modelo de verdade (AGT-T10).
+     */
+    fun acceptsImages(model: String): Boolean {
+        val id = model.trim().lowercase()
+        CLAUDE_FAMILY.find(id)?.let { return it.groupValues[1].toIntOrNull()?.let { version -> version >= 4 } == true }
+        return CLAUDE_3_WITH_VISION.containsMatchIn(id)
+    }
+
     fun body(
         model: String,
         system: String,
@@ -45,6 +76,7 @@ internal object AnthropicAgentWire {
         maxTokens: Int,
         isOAuth: Boolean,
         eagerInputStreaming: Boolean,
+        sendImages: Boolean = acceptsImages(model),
     ): String = JSONObject().apply {
         put("model", model)
         put("max_tokens", maxTokens)
@@ -68,7 +100,7 @@ internal object AnthropicAgentWire {
                 },
             )
         }
-        put("messages", toApiMessages(messages, flattenTools = tools.isEmpty()))
+        put("messages", toApiMessages(messages, flattenTools = tools.isEmpty(), sendImages = sendImages))
     }.toString()
 
     /**
@@ -80,12 +112,17 @@ internal object AnthropicAgentWire {
      *    usuário): voltas antigas são reconstruídas sem eles, o que a documentação permite ("fora de uso de ferramenta, omita") e que
      *    evita o 400 quando o prefixo mudou (poda, ferramenta ligada/desligada) — o preço é cache de prompt mais curto;
      *  - sem nenhuma ferramenta ativa a API recusa `tool_use`/`tool_result` no histórico ("must define tools"): então as chamadas viram
-     *    texto ([flattenTools]).
+     *    texto ([flattenTools]) e as imagens somem;
+     *  - a imagem de um resultado vira um bloco `image` DENTRO do `content` do `tool_result` (depois do texto), só se [sendImages] (o modelo
+     *    aceita imagem) e só nas [MAX_IMAGES_IN_HISTORY] mais recentes; as outras ficam como texto, com uma nota.
      * Conserta antes ([AgentHistory.repair]): chamada sem resultado ganha um resultado de erro.
      */
-    fun toApiMessages(messages: List<AgentMessage>, flattenTools: Boolean): JSONArray {
+    fun toApiMessages(messages: List<AgentMessage>, flattenTools: Boolean, sendImages: Boolean = true): JSONArray {
         val repaired = AgentHistory.repair(messages).messages
         val lastUser = repaired.indexOfLast { it is AgentMessage.User }
+        // Os índices das imagens que voltam: as mais recentes. Com `sendImages` falso (ou sem ferramentas) nenhuma.
+        val keptImages: Set<Int> = if (!sendImages || flattenTools) emptySet() else
+            repaired.withIndex().filter { (_, m) -> m is AgentMessage.ToolResult && m.image != null }.map { it.index }.takeLast(MAX_IMAGES_IN_HISTORY).toSet()
         val names = HashMap<String, String>()
         val turns = ArrayList<Pair<String, MutableList<JSONObject>>>()
         fun append(role: String, block: JSONObject) {
@@ -100,7 +137,11 @@ internal object AnthropicAgentWire {
                 }
                 is AgentMessage.ToolResult -> append(
                     "user",
-                    if (flattenTools) textBlock("[Resultado da ferramenta ${names[message.callId] ?: "?"}${if (message.isError) " (erro)" else ""}]\n${message.content}") else toolResultBlock(message),
+                    if (flattenTools) {
+                        textBlock("[Resultado da ferramenta ${names[message.callId] ?: "?"}${if (message.isError) " (erro)" else ""}]\n${message.content}")
+                    } else {
+                        toolResultBlock(message, image = message.image?.takeIf { index in keptImages }, imageLeftOut = message.image != null && index !in keptImages && sendImages)
+                    },
                 )
             }
         }
@@ -115,12 +156,31 @@ internal object AnthropicAgentWire {
 
     private fun textBlock(text: String) = JSONObject().put("type", "text").put("text", text)
 
-    private fun toolResultBlock(result: AgentMessage.ToolResult) = JSONObject().apply {
+    /** Nota que fica no lugar de uma imagem antiga que o histórico não reenvia (só as mais recentes vão; ver [MAX_IMAGES_IN_HISTORY]). */
+    private const val IMAGE_LEFT_OUT_NOTE = "[A imagem deste resultado foi omitida do histórico para economizar contexto.]"
+
+    private fun toolResultBlock(result: AgentMessage.ToolResult, image: ToolImage?, imageLeftOut: Boolean) = JSONObject().apply {
         put("type", "tool_result")
         put("tool_use_id", result.callId)
-        if (result.content.isNotBlank()) put("content", result.content)
+        val text = if (imageLeftOut) listOf(result.content, IMAGE_LEFT_OUT_NOTE).filter { it.isNotBlank() }.joinToString("\n") else result.content
+        if (image != null) {
+            // `content` como lista de blocos: o texto primeiro (se houver) e a imagem depois, como no exemplo "tool result with images" da documentação.
+            put(
+                "content",
+                JSONArray().apply {
+                    if (text.isNotBlank()) put(textBlock(text))
+                    put(imageBlock(image))
+                },
+            )
+        } else if (text.isNotBlank()) {
+            put("content", text)
+        }
         if (result.isError) put("is_error", true)
     }
+
+    private fun imageBlock(image: ToolImage) = JSONObject()
+        .put("type", "image")
+        .put("source", JSONObject().put("type", "base64").put("media_type", image.mediaType).put("data", image.bytes.toByteString().base64()))
 
     private fun assistantBlocks(message: AgentMessage.Assistant, replayThinking: Boolean, flattenTools: Boolean): List<JSONObject> {
         val state = message.providerState

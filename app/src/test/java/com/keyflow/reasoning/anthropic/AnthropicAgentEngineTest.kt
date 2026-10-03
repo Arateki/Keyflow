@@ -8,6 +8,7 @@ import com.keyflow.agent.AgentStopReason
 import com.keyflow.agent.AgentToolCall
 import com.keyflow.agent.TokenUsage
 import com.keyflow.agent.ToolDefinition
+import com.keyflow.agent.ToolImage
 import com.keyflow.auth.AuthErrorKind
 import com.keyflow.auth.AuthException
 import com.keyflow.auth.AuthorizationProvider
@@ -387,5 +388,33 @@ class AnthropicAgentEngineTest {
         server.enqueue(sse("event: content_block_delta\ndata: {isto não é json\n\n" + AnthropicSseFixtures.TEXT_ONLY))
         val result = events()
         assertThat(result.last()).isInstanceOf(AgentEvent.Done::class.java)
+    }
+
+    // --- imagem no tool_result (A4) ---
+
+    private val sheetHistory = listOf(
+        AgentMessage.User("crie uma skin"),
+        AgentMessage.Assistant("", listOf(AgentToolCall("toolu_1", "skin_list", "{}"))),
+        AgentMessage.ToolResult("toolu_1", "relatório", false, ToolImage("image/png", byteArrayOf(1, 2, 3, 4))),
+    )
+
+    @Test
+    fun `a model that takes images gets the contact sheet inside the tool_result`() {
+        server.enqueue(sse(AnthropicSseFixtures.TEXT_ONLY))
+        events(sheetHistory, e = engine(model = "claude-opus-5-5"))
+        val content = lastBody().getJSONArray("messages").getJSONObject(2).getJSONArray("content").getJSONObject(0)
+        assertThat(content.getString("type")).isEqualTo("tool_result")
+        val blocks = content.getJSONArray("content")
+        assertThat(blocks.getJSONObject(1).getString("type")).isEqualTo("image")
+        assertThat(blocks.getJSONObject(1).getJSONObject("source").getString("data")).isEqualTo("AQIDBA==")
+    }
+
+    @Test
+    fun `a model not known to take images gets only the text`() {
+        server.enqueue(sse(AnthropicSseFixtures.TEXT_ONLY))
+        events(sheetHistory, e = engine(model = "claude-3-5-haiku"))
+        val body = lastBody()
+        assertThat(body.toString()).doesNotContain("\"image\"")
+        assertThat(body.getJSONArray("messages").getJSONObject(2).getJSONArray("content").getJSONObject(0).getString("content")).isEqualTo("relatório")
     }
 }

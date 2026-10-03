@@ -419,4 +419,21 @@ class AgentLoopTest {
         assertThat(write.runs).isEmpty()
         assertThat(h.confirmation.requests).isEmpty()
     }
+
+    @Test
+    fun `the image of a tool result goes into the history and back to the model on the next turn`() {
+        val png = ToolImage("image/png", byteArrayOf(5, 6, 7))
+        val read = FakeTool("r", onRun = { ToolOutput.ok("folha pronta", image = png) })
+        val h = Harness(listOf(read))
+        val engine = ScriptedEngine(
+            listOf(call("c1", "r"), done(AgentStopReason.TOOL_USE)),
+            text("vi a folha") + done(),
+        )
+        val result = events(loop(engine, h), listOf(user("mostre")))
+        val toolResult = result.added().filterIsInstance<AgentMessage.ToolResult>().single()
+        assertThat(toolResult.image).isEqualTo(png)
+        assertThat(result.filterIsInstance<AgentLoopEvent.ToolCallFinished>().single().outcome.image).isEqualTo(png)
+        // O motor da 2ª volta recebe a imagem (o adaptador decide se a envia ao provedor).
+        assertThat((engine.requests[1].messages.last() as AgentMessage.ToolResult).image).isEqualTo(png)
+    }
 }

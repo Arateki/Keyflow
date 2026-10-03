@@ -439,4 +439,44 @@ class ToolExecutorTest {
         Harness(listOf(read)).executor.execute(call("r", """{"text":"olá"}"""))
         assertThat(seen!!.getString("text")).isEqualTo("olá")
     }
+
+    // --- imagem no resultado e legenda da prévia (A4) ---
+
+    private val png = ToolImage("image/png", byteArrayOf(1, 2, 3))
+
+    @Test
+    fun `an image returned by a tool reaches the outcome, whether it succeeded or failed`() = blocking {
+        val ok = FakeTool("r_ok", onRun = { ToolOutput.ok("pronto", image = png) })
+        val bad = FakeTool("r_bad", onRun = { ToolOutput.error("inválida", image = png) })
+        val h = Harness(listOf(ok, bad))
+        assertThat(h.executor.execute(call("r_ok")).image).isEqualTo(png)
+        assertThat(h.executor.execute(call("r_bad", id = "c2")).image).isEqualTo(png)
+    }
+
+    @Test
+    fun `an image that passes the size limit is dropped and the text still goes`() = blocking {
+        val big = ToolImage("image/png", ByteArray(ToolImage.MAX_BYTES + 1))
+        val tool = FakeTool("r", onRun = { ToolOutput.ok("texto", image = big) })
+        val out = Harness(listOf(tool)).executor.execute(call("r"))
+        assertThat(out.image).isNull()
+        assertThat(out.content).isEqualTo("texto")
+    }
+
+    @Test
+    fun `a tool without an image gives an outcome without one`() = blocking {
+        assertThat(Harness(listOf(FakeTool("r"))).executor.execute(call("r")).image).isNull()
+    }
+
+    @Test
+    fun `the caption of the preview is filtered like the summary, and the image bytes are untouched`() = blocking {
+        val preview = ToolPreview("image/png", byteArrayOf(9, 8, 7), "orbe com a chave ${Sentinels.ANTHROPIC} no nome")
+        val write = FakeTool("w", ToolRisk.WRITE, summary = { "Instalar" }, preview = preview)
+        val h = Harness(listOf(write))
+        h.executor.execute(call("w"))
+        val shown = h.confirmation.requests.single().preview!!
+        assertThat(shown.caption).doesNotContain(Sentinels.ANTHROPIC)
+        assertThat(shown.caption).contains(SecretFilter.MARKER)
+        assertThat(shown.bytes).isEqualTo(byteArrayOf(9, 8, 7))
+        assertThat(shown.mediaType).isEqualTo("image/png")
+    }
 }

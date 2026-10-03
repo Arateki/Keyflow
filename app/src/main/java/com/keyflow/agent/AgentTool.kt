@@ -36,10 +36,46 @@ class ToolPreview(
 )
 
 /**
+ * Uma imagem que acompanha o RESULTADO de uma ferramenta e vai ao modelo (A4: a folha de contato do `skin_preview`). Só os formatos
+ * que a Messages API da Anthropic aceita num bloco `image` (`image/jpeg`, `image/png`, `image/gif`, `image/webp`; conferido na
+ * página `build-with-claude/vision`) — qualquer outro nem é construído, para o erro aparecer na ferramenta e não numa resposta 400.
+ *
+ * Igualdade pelo CONTEÚDO dos bytes (uma `ByteArray` num `data class` compararia por referência e quebraria a igualdade das
+ * mensagens do histórico); o `toString` não imprime os bytes.
+ */
+class ToolImage(val mediaType: String, val bytes: ByteArray) {
+    init {
+        require(mediaType in MEDIA_TYPES) { "tipo de imagem sem suporte: $mediaType" }
+    }
+
+    override fun equals(other: Any?): Boolean = other is ToolImage && other.mediaType == mediaType && other.bytes.contentEquals(bytes)
+
+    override fun hashCode(): Int = 31 * mediaType.hashCode() + bytes.contentHashCode()
+
+    override fun toString(): String = "ToolImage($mediaType, ${bytes.size} bytes)"
+
+    companion object {
+        val MEDIA_TYPES = setOf("image/jpeg", "image/png", "image/gif", "image/webp")
+
+        /** Acima disto a imagem não vai ao modelo (o limite da API é 10 MB em base64; aqui sobra folga para o JSON e para outras imagens do histórico). */
+        const val MAX_BYTES = 3 * 1024 * 1024
+    }
+}
+
+/**
  * O que o USUÁRIO lê no painel de confirmação (TLS-02): gerado pelo app a partir dos argumentos já validados, nunca o texto que o
  * modelo escreveu sobre a própria ação.
  */
 class ToolDescription(val summary: String, val preview: ToolPreview? = null)
+
+/**
+ * Uma ferramenta que guarda estado ENQUANTO uma mensagem do usuário está sendo atendida (os arquivos de uma skin que chega em lotes,
+ * em memória) e precisa soltá-lo quando o turno acaba — com sucesso, erro ou cancelamento. Quem conduz a conversa
+ * ([AgentController]) chama [turnEnded] de todas as ferramentas que a implementam.
+ */
+interface TurnScoped {
+    fun turnEnded()
+}
 
 /**
  * Como desfazer uma ação: outra chamada de ferramenta, guardada como DADO (nome + argumentos) e não como função — assim o registro
@@ -49,16 +85,19 @@ data class UndoCall(val toolName: String, val argsJson: String)
 
 /**
  * O que uma ferramenta devolve. [content] vai ao modelo (depois do filtro de segredos e do corte de tamanho, no [ToolExecutor]).
- * [isError] = a ferramenta falhou de um jeito que o modelo pode corrigir.
+ * [isError] = a ferramenta falhou de um jeito que o modelo pode corrigir. [image] é opcional (a folha de contato de uma skin): vai ao
+ * modelo num bloco `image` do `tool_result`, mas só se o modelo escolhido aceitar imagem — o adaptador do provedor decide — e a tela a
+ * mostra no cartão da ferramenta de qualquer jeito.
  */
 class ToolOutput(
     val content: String,
     val isError: Boolean = false,
     val undo: UndoCall? = null,
+    val image: ToolImage? = null,
 ) {
     companion object {
-        fun ok(content: String, undo: UndoCall? = null) = ToolOutput(content, isError = false, undo = undo)
-        fun error(content: String) = ToolOutput(content, isError = true)
+        fun ok(content: String, undo: UndoCall? = null, image: ToolImage? = null) = ToolOutput(content, isError = false, undo = undo, image = image)
+        fun error(content: String, image: ToolImage? = null) = ToolOutput(content, isError = true, image = image)
     }
 }
 

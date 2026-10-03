@@ -139,7 +139,7 @@ class AgentLoop(
                 }
                 // O resultado entra no histórico ANTES de o cartão ser atualizado: se o cancelamento chegar entre os dois, o que importa
                 // (o modelo saber que a ferramenta rodou) já está guardado.
-                add(working, AgentMessage.ToolResult(call.id, outcome.content, outcome.isError))
+                add(working, AgentMessage.ToolResult(call.id, outcome.content, outcome.isError, outcome.image))
                 emit(AgentLoopEvent.ToolCallFinished(call, outcome))
             }
             if (step >= limits.maxSteps) {

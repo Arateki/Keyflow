@@ -61,7 +61,7 @@ object AgentHistory {
 
     /**
      * A poda por tamanho aproximado (D10, AGT-01): se a conversa passa de [maxChars] caracteres, (1) resume os resultados GRANDES de
-     * ferramenta das voltas antigas e, se ainda passar, (2) tira as voltas mais antigas inteiras — mantendo a primeira mensagem do
+     * ferramenta das voltas antigas (e tira as imagens deles) e, se ainda passar, (2) tira as voltas mais antigas inteiras — mantendo a primeira mensagem do
      * usuário (o início) e as voltas mais recentes, e deixando uma nota no lugar. A volta atual (a última) nunca é tocada, e voltas
      * saem INTEIRAS, então chamada e resultado nunca se separam. Chamar só no começo de uma execução: mexer no histórico no meio dela
      * mudaria o prefixo que o provedor já viu.
@@ -102,9 +102,12 @@ object AgentHistory {
     }
 
     private fun trimOldResult(m: AgentMessage): AgentMessage {
-        if (m !is AgentMessage.ToolResult || m.content.length <= OLD_RESULT_KEEP) return m
-        val omitted = m.content.length - OLD_RESULT_KEEP
-        return m.copy(content = m.content.take(OLD_RESULT_KEEP) + "\n[… resultado antigo resumido: $omitted caracteres omitidos]")
+        if (m !is AgentMessage.ToolResult) return m
+        // A imagem de um resultado ANTIGO (a folha de contato de uma skin) já cumpriu o papel: sai primeiro, que é o que mais pesa na requisição.
+        val base = if (m.image != null) m.copy(image = null) else m
+        if (base.content.length <= OLD_RESULT_KEEP) return base
+        val omitted = base.content.length - OLD_RESULT_KEEP
+        return base.copy(content = base.content.take(OLD_RESULT_KEEP) + "\n[… resultado antigo resumido: $omitted caracteres omitidos]")
     }
 
     private fun sizeOf(m: AgentMessage): Int = when (m) {

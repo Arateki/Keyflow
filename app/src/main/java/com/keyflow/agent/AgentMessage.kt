@@ -26,6 +26,10 @@ sealed interface AgentMessage {
         val providerState: ProviderState? = null,
     ) : AgentMessage
 
-    /** O resultado de [callId]: DADO devolvido ao modelo, nunca instrução. [content] já passou pelo filtro de segredos. */
-    data class ToolResult(val callId: String, val content: String, val isError: Boolean = false) : AgentMessage
+    /**
+     * O resultado de [callId]: DADO devolvido ao modelo, nunca instrução. [content] já passou pelo filtro de segredos. [image] é a imagem
+     * opcional que a ferramenta devolveu (A4); cada adaptador a converte para o formato do provedor, ou a deixa de fora se o modelo
+     * não aceita imagem.
+     */
+    data class ToolResult(val callId: String, val content: String, val isError: Boolean = false, val image: ToolImage? = null) : AgentMessage
 }

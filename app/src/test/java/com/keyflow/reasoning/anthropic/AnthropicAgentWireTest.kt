@@ -8,6 +8,7 @@ import com.keyflow.agent.AgentToolCall
 import com.keyflow.agent.ProviderState
 import com.keyflow.agent.TokenUsage
 import com.keyflow.agent.ToolDefinition
+import com.keyflow.agent.ToolImage
 import com.keyflow.reasoning.ReasoningError
 import com.keyflow.reasoning.anthropic.AnthropicSseFixtures.sse
 import org.json.JSONArray
@@ -388,5 +389,104 @@ class AnthropicAgentWireTest {
     @Test
     fun `the login credential gets the Claude Code identity first in the system prompt, like the text engine`() {
         assertThat(body(isOAuth = true).getString("system")).isEqualTo("You are Claude Code, Anthropic's official CLI for Claude.\n\nSISTEMA")
+    }
+
+    // --- imagem no tool_result (A4) ---
+
+    private val png = ToolImage("image/png", byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3))
+    private val pngBase64 = "iVBORw0KGgoBAgM="
+
+    private fun withImages(vararg ids: String): List<AgentMessage> = buildList {
+        add(AgentMessage.User("crie uma skin"))
+        ids.forEachIndexed { i, id ->
+            add(AgentMessage.Assistant("", listOf(AgentToolCall(id, "skin_preview", "{}"))))
+            add(AgentMessage.ToolResult(id, "relatório $i", false, png))
+        }
+    }
+
+    private fun toolResultOf(m: JSONObject): JSONObject = content(m).single { it.getString("type") == "tool_result" }
+
+    @Test
+    fun `an image in a tool result becomes an image block after the text inside the tool_result content, as in the documentation`() {
+        val m = messages(withImages("t1"))
+        val result = toolResultOf(m[2])
+        assertThat(result.getString("tool_use_id")).isEqualTo("t1")
+        val blocks = result.getJSONArray("content")
+        assertThat(blocks.length()).isEqualTo(2)
+        assertThat(blocks.getJSONObject(0).getString("type")).isEqualTo("text")
+        assertThat(blocks.getJSONObject(0).getString("text")).isEqualTo("relatório 0")
+        val image = blocks.getJSONObject(1)
+        assertThat(image.getString("type")).isEqualTo("image")
+        assertThat(image.getJSONObject("source").getString("type")).isEqualTo("base64")
+        assertThat(image.getJSONObject("source").getString("media_type")).isEqualTo("image/png")
+        assertThat(image.getJSONObject("source").getString("data")).isEqualTo(pngBase64)
+    }
+
+    @Test
+    fun `a result with an image and no text has just the image block`() {
+        val history = listOf(AgentMessage.User("a"), AgentMessage.Assistant("", listOf(AgentToolCall("t1", "x", "{}"))), AgentMessage.ToolResult("t1", "", false, png))
+        val blocks = toolResultOf(messages(history)[2]).getJSONArray("content")
+        assertThat(blocks.length()).isEqualTo(1)
+        assertThat(blocks.getJSONObject(0).getString("type")).isEqualTo("image")
+    }
+
+    @Test
+    fun `an error result can carry the image too and keeps the flag`() {
+        val history = listOf(AgentMessage.User("a"), AgentMessage.Assistant("", listOf(AgentToolCall("t1", "x", "{}"))), AgentMessage.ToolResult("t1", "falhou", true, png))
+        val result = toolResultOf(messages(history)[2])
+        assertThat(result.getBoolean("is_error")).isTrue()
+        assertThat(result.getJSONArray("content").length()).isEqualTo(2)
+    }
+
+    @Test
+    fun `without vision the image is left out and the content stays a plain string`() {
+        val api = AnthropicAgentWire.toApiMessages(withImages("t1"), flattenTools = false, sendImages = false)
+        val result = (0 until api.length()).map { api.getJSONObject(it) }.let { toolResultOf(it[2]) }
+        assertThat(result.get("content")).isEqualTo("relatório 0")
+        assertThat(api.toString()).doesNotContain("\"image\"")
+    }
+
+    @Test
+    fun `the body sends the image only to a model known to accept it`() {
+        fun bodyFor(model: String) = AnthropicAgentWire.body(model, "S", withImages("t1"), listOf(tool), 100, false, false)
+        assertThat(bodyFor("claude-sonnet-5-5")).contains(pngBase64)
+        assertThat(bodyFor("claude-3-5-haiku-20241022")).doesNotContain(pngBase64)
+        assertThat(bodyFor("um-modelo-que-nao-conheco")).doesNotContain(pngBase64)
+    }
+
+    @Test
+    fun `which models take images - the conservative list`() {
+        for (id in listOf("claude-opus-5-5", "claude-sonnet-5-5", "claude-sonnet-5", "claude-fable-5-1", "claude-haiku-4-5-20251001", "claude-opus-4-6", "claude-sonnet-4-6", "claude-3-5-sonnet-20241022", "claude-3-5-sonnet-latest", "claude-3-7-sonnet-20250219", "claude-3-opus-20240229", "claude-3-haiku-20240307", "claude-opus-12-0", "CLAUDE-OPUS-5")) {
+            assertThat(AnthropicAgentWire.acceptsImages(id)).isTrue()
+        }
+        for (id in listOf("claude-3-5-haiku-20241022", "claude-3-5-haiku-latest", "claude-2.1", "claude-instant-1.2", "gpt-4o", "", "claude-opus-3", "outro")) {
+            assertThat(AnthropicAgentWire.acceptsImages(id)).isFalse()
+        }
+    }
+
+    @Test
+    fun `only the most recent images are resent, the older ones keep their text and a note`() {
+        val m = messages(withImages("t1", "t2", "t3"))
+        val results = m.flatMap { content(it) }.filter { it.getString("type") == "tool_result" }
+        assertThat(results.map { it.getString("tool_use_id") }).containsExactly("t1", "t2", "t3").inOrder()
+        // t1 (a mais antiga) perdeu a imagem; t2 e t3 mantêm.
+        assertThat(results[0].get("content")).isInstanceOf(String::class.java)
+        assertThat(results[0].getString("content")).contains("relatório 0")
+        assertThat(results[0].getString("content")).contains("omitida do histórico")
+        assertThat(results[1].getJSONArray("content").length()).isEqualTo(2)
+        assertThat(results[2].getJSONArray("content").length()).isEqualTo(2)
+        assertThat(AnthropicAgentWire.MAX_IMAGES_IN_HISTORY).isEqualTo(2)
+    }
+
+    @Test
+    fun `without active tools the image goes away with the tool blocks`() {
+        val m = messages(withImages("t1"), flatten = true)
+        assertThat(m.joinToString("\n") { it.toString() }).doesNotContain("\"image\"")
+    }
+
+    @Test
+    fun `an image type the API does not take is refused when the image is built`() {
+        val failure = runCatching { ToolImage("image/svg+xml", byteArrayOf(1)) }.exceptionOrNull()
+        assertThat(failure).isInstanceOf(IllegalArgumentException::class.java)
     }
 }

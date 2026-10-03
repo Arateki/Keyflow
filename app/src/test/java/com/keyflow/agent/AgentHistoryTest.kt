@@ -101,4 +101,17 @@ class AgentHistoryTest {
         val pruned = AgentHistory.prune(history, 1_000)
         assertThat(pruned.last()).isEqualTo(history.last())
     }
+
+    @Test
+    fun `pruning takes the image off the results of old turns, and keeps the one of the current turn`() {
+        val png = ToolImage("image/png", byteArrayOf(1))
+        val old = AgentMessage.ToolResult("1", "curto", false, png)
+        val current = AgentMessage.ToolResult("2", "atual", false, png)
+        val history = listOf(user("a"), assistant("", "1"), old, user("b" + "x".repeat(6_000)), assistant("", "2"), current)
+        val pruned = AgentHistory.prune(history, 6_000)
+        val results = pruned.filterIsInstance<AgentMessage.ToolResult>()
+        assertThat(results.first { it.callId == "2" }.image).isEqualTo(png)
+        // A volta antiga ou saiu inteira ou perdeu a imagem; nunca fica com ela.
+        results.filter { it.callId == "1" }.forEach { assertThat(it.image).isNull() }
+    }
 }

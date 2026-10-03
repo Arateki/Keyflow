@@ -38,6 +38,8 @@ class ToolOutcome(
     val content: String,
     val summary: String? = null,
     val undo: UndoCall? = null,
+    /** A imagem que a ferramenta devolveu (já dentro do limite de tamanho); a tela a mostra no cartão e o adaptador do provedor a envia ao modelo, se ele aceitar. */
+    val image: ToolImage? = null,
 ) {
     val isError: Boolean get() = status != ToolStatus.OK
 }
@@ -116,7 +118,7 @@ class ToolExecutor(
 
             if (decision is PolicyDecision.Ask) {
                 onPhase(ToolPhase.AWAITING_CONFIRMATION)
-                val request = ConfirmationRequest(call.id, tool.name, tool.risk, summary, description.preview, decision.canAlwaysAllow, origin)
+                val request = ConfirmationRequest(call.id, tool.name, tool.risk, summary, safePreview(description.preview), decision.canAlwaysAllow, origin)
                 val answer = try {
                     confirmLock.withLock { confirmation.request(request) }
                 } catch (e: CancellationException) {
@@ -161,13 +163,21 @@ class ToolExecutor(
         }
 
         val content = shape(output.content, tool.maxResultChars)
+        val image = output.image?.takeIf { it.bytes.size <= ToolImage.MAX_BYTES }
         val undo = output.undo?.let { UndoCall(it.toolName, secretFilter.redact(it.argsJson)) }
         val status = if (output.isError) ToolStatus.ERROR else ToolStatus.OK
         if (changes) {
             val detail = clip(content.lineSequence().firstOrNull().orEmpty(), DETAIL_CHARS)
             record(tool, origin, summary ?: tool.name, if (output.isError) ActionOutcome.ERROR else ActionOutcome.OK, detail, undo)
         }
-        return ToolOutcome(status, content, summary, undo)
+        return ToolOutcome(status, content, summary, undo, image)
+    }
+
+    /** A legenda da prévia também é texto do app que o usuário lê; passa pelo mesmo filtro que o resumo (a imagem em si é desenhada pelo app, não por texto do modelo). */
+    private fun safePreview(preview: ToolPreview?): ToolPreview? {
+        val caption = preview?.caption ?: return preview
+        val safe = clip(secretFilter.redact(caption), CAPTION_CHARS)
+        return if (safe == caption) preview else ToolPreview(preview.mediaType, preview.bytes, safe)
     }
 
     private fun blocked(tool: AgentTool, summary: String? = null) = ToolOutcome(
@@ -226,6 +236,7 @@ class ToolExecutor(
     private companion object {
         const val NAME_ECHO = 64
         const val SUMMARY_CHARS = 600
+        const val CAPTION_CHARS = 1_500
         const val DETAIL_CHARS = 200
 
         /** O que o modelo lê quando o usuário diz não (TLS-02, AUI-02). */
