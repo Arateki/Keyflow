@@ -36,6 +36,8 @@ class SkinPackStore(
     private val renderErrorMs: Long = DEFAULT_RENDER_ERROR_MS,
     /** E acima disto é só aviso ("pesado"). */
     private val renderWarnMs: Long = DEFAULT_RENDER_WARN_MS,
+    /** O relógio (ns) do desenho de teste; só os testes trocam, para provar a segunda medida de um desenho que parece lento. */
+    private val nanoClock: () -> Long = System::nanoTime,
 ) {
 
     // ── instalar ─────────────────────────────────────────────────────────────
@@ -195,10 +197,11 @@ class SkinPackStore(
         }
 
         private fun check(svg: PackSvg, width: Int, height: Int, fit: SvgFit, slice: SliceInsets?, isOrb: Boolean) {
-            val started = System.nanoTime()
+            val text = String(svg.bytes, Charsets.UTF_8).removePrefix("﻿")
+            val started = nanoClock()
             val bitmap: Bitmap
             try {
-                val image = SvgRender.parse(String(svg.bytes, Charsets.UTF_8).removePrefix("﻿"))
+                val image = SvgRender.parse(text)
                 if (!image.scalable) noScale += svg.sourceName
                 if (isOrb && image.scalable && kotlin.math.abs(image.width - image.height) > SQUARE_TOLERANCE * maxOf(image.width, image.height)) nonSquare += svg.sourceName
                 if (slice != null && image.scalable && (slice.left + slice.right >= image.width || slice.top + slice.bottom >= image.height)) {
@@ -214,7 +217,19 @@ class SkinPackStore(
                 errors += tr("%s: não foi possível desenhar o SVG — %s", svg.sourceName, e.message ?: e.javaClass.simpleName)
                 return
             }
-            val elapsedMs = (System.nanoTime() - started) / 1_000_000.0
+            var elapsedMs = (nanoClock() - started) / 1_000_000.0
+            if (elapsedMs > renderWarnMs) {
+                // Os primeiros desenhos de um processo novo pagam o carregamento das classes e o JIT: o pacote de exemplo, importado logo depois de abrir o
+                // app, tinha dois frames "pesados" que no segundo import (processo quente) não eram. Um desenho que parece lento é medido de novo e vale o
+                // MELHOR dos dois — o SVG realmente pesado continua pesado na segunda vez.
+                val retried = nanoClock()
+                try {
+                    SvgRender.toBitmap(SvgRender.parse(text), width, height, fit, slice).recycle()
+                    elapsedMs = minOf(elapsedMs, (nanoClock() - retried) / 1_000_000.0)
+                } catch (_: Exception) {
+                    // O primeiro desenho funcionou; se o segundo falhar, fica a primeira medida.
+                }
+            }
             if (elapsedMs > renderErrorMs) slow += svg.sourceName else if (elapsedMs > renderWarnMs) heavy += svg.sourceName
             if (isBlank(bitmap)) blank += svg.sourceName
             bitmap.recycle()

@@ -278,6 +278,38 @@ class SkinPackStoreTest {
         assertTrue(result.report.warnings.single { it.contains("pesado") }.startsWith("orb_idle_01.svg"))
     }
 
+    /** Um relógio que devolve, em ms, os [stamps] na ordem (e repete o último): o desenho de teste lê o relógio duas vezes por medida. */
+    private fun clockOf(vararg stamps: Long): () -> Long {
+        var i = 0
+        return { stamps[minOf(i++, stamps.size - 1)] * 1_000_000L }
+    }
+
+    @Test
+    fun aRenderThatLooksSlowOnlyBecauseTheProcessIsColdIsMeasuredAgainAndNotFlagged() {
+        // 1ª medida: 400 ms (processo frio: classes e JIT); 2ª: 8 ms. Vale o melhor dos dois — sem aviso e sem erro.
+        val cold = SkinPackStore(root, nanoClock = clockOf(0, 400, 400, 408))
+        val result = install(pack("Fria"), on = cold)
+        assertTrue(result.report.errors.toString(), result.installed)
+        assertEquals(emptyList<String>(), result.report.warnings.filter { it.contains("pesado") })
+    }
+
+    @Test
+    fun aRenderThatIsStillHeavyOnTheSecondTryIsStillFlagged() {
+        // 1ª: 400 ms; 2ª: 300 ms — as duas acima de 150 ms (e abaixo de 1 s): continua "pesado".
+        val heavy = SkinPackStore(root, nanoClock = clockOf(0, 400, 400, 700))
+        val result = install(pack("Pesada de verdade"), on = heavy)
+        assertTrue(result.installed)
+        assertTrue(result.report.warnings.single { it.contains("pesado") }.startsWith("orb_idle_01.svg"))
+    }
+
+    @Test
+    fun aRenderThatTakesOverASecondEvenOnTheRetryIsStillAnError() {
+        val slow = SkinPackStore(root, nanoClock = clockOf(0, 2000, 2000, 4500))
+        val result = install(pack("Travada"), on = slow)
+        assertFalse(result.installed)
+        assertTrue(result.report.errors.single().contains("demora demais para desenhar"))
+    }
+
     @Test
     fun renderWarningsAreAggregatedAndNameTheOriginalFiles() {
         val entries = pack("Avisos", idleFrames = 0) + listOf(
