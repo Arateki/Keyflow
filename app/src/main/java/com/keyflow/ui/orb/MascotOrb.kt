@@ -215,8 +215,9 @@ internal fun mascotEarTip(p: MascotPose, right: Boolean, hasCenter: Boolean): Of
 /** A ponta do rabo na janela, como em [mascotEarTip]. */
 internal fun mascotTailTip(p: MascotPose, hasCenter: Boolean): Offset {
     val angle = (TAIL_ANGLE + p.tail) * (PI.toFloat() / 180f)
-    val x = TAIL_X + p.tailBend * cos(angle) + TAIL_LEN * sin(angle)
-    val y = TAIL_Y + p.tailBend * sin(angle) - TAIL_LEN * cos(angle)
+    val bend = tailBendOf(p)
+    val x = TAIL_X + bend * cos(angle) + TAIL_LEN * sin(angle)
+    val y = TAIL_Y + bend * sin(angle) - TAIL_LEN * cos(angle)
     return bodyToWindow(p, x, y, hasCenter)
 }
 
@@ -312,9 +313,20 @@ private fun leaf(path: Path, len: Float, w: Float, bend: Float) {
     path.close()
 }
 
+/**
+ * A dobra da ponta do rabo no desenho: sempre para cima (<= 0 no espaço do rabo), de 0 a -0,05, com o acompanhamento da pose
+ * ([MascotPose.tailBend]) por cima de uma curvatura de repouso de -0,03.
+ *
+ * **Não pode virar positiva.** O emulador do CI roda com `-gpu swiftshader_indirect`, e nele o `qemu` leva SIGSEGV na
+ * RenderThread ao preencher com degradê a folha do rabo quando a ponta dobra para o outro lado (medido em 2026-10-03: só o rabo,
+ * com dobra de +0,03 ou +0,08, derrubou o emulador na 1ª a 5ª abertura da rota; com 0 ou -0,04, 0 quedas em 8 aberturas; o mesmo
+ * degradê num oval, com cor lisa ou com a dobra negativa, também não derrubou). Ver `.specs/quick/018-skin-mascote/TASK.md`.
+ */
+internal fun tailBendOf(p: MascotPose): Float = (p.tailBend - 0.03f).coerceIn(-0.05f, 0f)
+
 /** Monta as folhas do quadro (rabo, topete, as duas orelhas e o miolo delas) uma vez só: os dois passes do desenho as reaproveitam. */
 private fun buildLeaves(s: MascotScratch, p: MascotPose, l: MascotLayout) {
-    leaf(s.tail, TAIL_LEN, TAIL_W, p.tailBend + 0.03f)
+    leaf(s.tail, TAIL_LEN, TAIL_W, tailBendOf(p))
     leaf(s.tuft, TUFT_LEN, TUFT_W, p.tuft * 0.0006f)
     val len = l.earLen * p.earLen
     // O de dentro: terracota, menor, mais perto da base que da ponta.

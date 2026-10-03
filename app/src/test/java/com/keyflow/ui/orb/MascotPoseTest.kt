@@ -161,6 +161,20 @@ class MascotPoseTest {
     }
 
     @Test
+    fun `the tail bend never turns positive - a positive bend filled with a gradient crashes the swiftshader emulator`() {
+        // Medido em 2026-10-03 no emulador do CI (-gpu swiftshader_indirect): a folha do rabo com dobra de +0,03 ou mais, preenchida com
+        // degradê, derrubava o qemu (SIGSEGV na RenderThread) na 1ª a 5ª abertura de overlay-mascot-transcribing; com dobra <= 0, nunca.
+        for (state in OrbState.entries) {
+            var t = 0f
+            while (t < 120_000f) {
+                val bend = tailBendOf(mascotPose(t, state))
+                assertWithMessage("dobra do rabo em %s ms (%s)", t, state).that(bend).isIn(com.google.common.collect.Range.closed(-0.05f, 0f))
+                t += 53f
+            }
+        }
+    }
+
+    @Test
     fun `the effect phases loop inside 0 to 1`() {
         for (state in OrbState.entries) for (t in instants) {
             val p = mascotPose(t, state)
