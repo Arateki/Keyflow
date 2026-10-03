@@ -97,6 +97,13 @@ enum class OrbStyle(
      * que cintilam. Feminina e elegante; paga, como as outras. A tinta do centro é vinho.
      */
     ROSE_GOLD("rosegold", paid = true),
+
+    /**
+     * O Ouvi (Yan, 2026-10-02): um mascote vivo e orgânico no lugar dos globos — uma criatura redonda, de orelhas enormes,
+     * que respira, pisca, mexe as orelhas e muda de ânimo conforme o estado ([drawMascotOrb]). Paga, como as outras; a
+     * tinta do centro é o marrom do Ateliê, sobre a barriga creme.
+     */
+    MASCOT("mascot", paid = true),
 }
 
 /** Estilo do orbe para a árvore abaixo — a overlay e as prévias das abas seguem a skin escolhida. */
@@ -190,6 +197,7 @@ fun VoiceOrb(
             OrbStyle.AERO -> AeroInk
             OrbStyle.GLITCH -> Color.White
             OrbStyle.ROSE_GOLD -> RoseInk
+            OrbStyle.MASCOT -> MascotInk
             OrbStyle.ATELIE -> CenterInk
         },
         LocalCenterGlow provides if (style == OrbStyle.AERO) AeroInkGlow else null,
@@ -414,6 +422,10 @@ private fun DrawScope.drawOrb(t: Float, state: OrbState, style: OrbStyle = OrbSt
     }
     if (style == OrbStyle.ROSE_GOLD) {
         drawRoseGoldOrb(t, state)
+        return
+    }
+    if (style == OrbStyle.MASCOT) {
+        drawMascotOrb(t, state, hasCenter)
         return
     }
     val w = size.width
