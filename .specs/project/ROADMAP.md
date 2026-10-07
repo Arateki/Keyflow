@@ -191,6 +191,10 @@ Base: `PLAYSTORE_CHECKLIST.md` + Bloco 9 do `.specs/DEVELOPMENT-ORDER.md` (PS-1.
 
 **Status (2026-09-27):** só o PS-1 feito; PS-2..PS-7 abertos.
 
+**Recorte da v1 (2026-10-07):** a primeira versão sai gratuita e sem monetização, à frente de Visão,
+monetização e temas; o que não está pronto entra como "Em breve". Tasks V1-0..V1-8 no topo do
+`.specs/DEVELOPMENT-ORDER.md`. Monetização (Milestone 7, parte 2) vira a v1.1.
+
 ## Futuro (pós-v1, não priorizado)
 
 - ~~Teclado visível configurável (teclas reais)~~ — feito (commit 0331389)
