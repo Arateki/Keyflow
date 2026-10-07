@@ -37,6 +37,22 @@ jobs:
             -keypass android -alias androiddebugkey -dname "CN=Android Debug,O=Android,C=US" \
             -keyalg RSA -keysize 2048 -validity 10000
       - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+      # app/build.gradle.kts baixa o AAR do sherpa-onnx (~50 MB) do release do GitHub quando ele falta
+      # em app/libs/ (ignorado no git). Sem cache, todo job baixava de novo: em 2026-10-03 o GitHub
+      # respondeu 503 e derrubou a PR #7 antes de qualquer teste. A chave é a versão e o SHA256 fixados
+      # no build — subir o sherpa troca a chave sozinho.
+      - name: sherpa-onnx AAR version
+        id: sherpa
+        run: |
+          version=$(sed -n 's/^val sherpaOnnxVersion = "\(.*\)"$/\1/p' app/build.gradle.kts)
+          sha=$(sed -n 's/^val sherpaOnnxSha256 = "\(.*\)"$/\1/p' app/build.gradle.kts)
+          test -n "$version" && test -n "$sha"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: app/libs/sherpa-onnx-${{ steps.sherpa.outputs.version }}.aar
+          key: sherpa-onnx-${{ steps.sherpa.outputs.version }}-${{ steps.sherpa.outputs.sha }}
       - name: Unit tests and APKs
         run: ./gradlew --no-daemon testDebugUnitTest assembleDebug assembleDebugAndroidTest
       # STO-02: código nativo pronto para páginas de 16 KB (requisito do Play). Os .so do release são os
@@ -75,6 +91,19 @@ jobs:
             -keypass android -alias androiddebugkey -dname "CN=Android Debug,O=Android,C=US" \
             -keyalg RSA -keysize 2048 -validity 10000
       - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+      # Mesmo cache do AAR do sherpa-onnx do job unit (que já o salvou nesta rodada).
+      - name: sherpa-onnx AAR version
+        id: sherpa
+        run: |
+          version=$(sed -n 's/^val sherpaOnnxVersion = "\(.*\)"$/\1/p' app/build.gradle.kts)
+          sha=$(sed -n 's/^val sherpaOnnxSha256 = "\(.*\)"$/\1/p' app/build.gradle.kts)
+          test -n "$version" && test -n "$sha"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: app/libs/sherpa-onnx-${{ steps.sherpa.outputs.version }}.aar
+          key: sherpa-onnx-${{ steps.sherpa.outputs.version }}-${{ steps.sherpa.outputs.sha }}
       # O AVD pede ~7,2 GB livres só para a partição de dados, e o build roda depois disso no mesmo
       # disco. Medido em 2026-09-24: 7,1 GB livres na imagem → emulador abortou antes do boot. Tira
       # toolchains que o projeto não usa (o SDK Android fica); o `df` antes/depois fica no log.
