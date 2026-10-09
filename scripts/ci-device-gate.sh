@@ -1,25 +1,38 @@
 #!/usr/bin/env bash
 # Gate de device do CI (.github/workflows/checks.yml): roda com o emulador já de pé, dentro do
-# android-emulator-runner. Mesmo gate `full` + `screenshot` do TESTING.md, na ordem em que um
-# contribuidor roda localmente:
+# android-emulator-runner. O workflow espalha o gate `full` + `screenshot` do TESTING.md por vários
+# emuladores em paralelo, um modo por job:
 #
-#   1. suíte instrumentada inteira (connectedDebugAndroidTest), com o ponta a ponta do modelo local;
-#   2. APK debug reinstalado — o connected* desinstala o app no fim, e a galeria precisa dele;
-#   3. verify-screens.sh + diff-screens.sh contra verification/golden/.
+#   ci-device-gate.sh suite <índice> <total>   um pedaço da suíte instrumentada (numShards/shardIndex do
+#                                              AndroidJUnitRunner), com o ponta a ponta do modelo local;
+#   ci-device-gate.sh screens <light|dark>     as rotas da galeria num tema (o diff contra os goldens é um
+#                                              passo à parte do workflow, sem emulador).
+#
+# Sem Gradle aqui: o job do emulador sobe junto com o `Unit tests and build` e instala os APKs que ele
+# publica (artefato `apks`). Compilar de novo no runner do emulador custava ~7 min e disputava os 2
+# núcleos e os 7 GB do runner com o QEMU — na rodada de 2026-10-07 o emulador travou nesse aperto.
 #
 # Não para no primeiro erro: cada etapa roda e o exit code final acusa qualquer falha, para a
-# evidência (logcat, relatórios, prints) sair completa mesmo quando algo quebra.
+# evidência (logcat, saída bruta, prints) sair completa mesmo quando algo quebra.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
+MODE="${1:-}"
 EVIDENCE=app/build/ci-evidence
 mkdir -p "$EVIDENCE"
 ADB="${ANDROID_HOME:+$ANDROID_HOME/platform-tools/}adb"
+# Mesmo lugar do build local: os caminhos abaixo valem com ou sem o artefato.
+APK_DIR=app/build/outputs/apk
+APP_APK="$APK_DIR/debug/app-debug.apk"
+TEST_APK="$APK_DIR/androidTest/debug/app-debug-androidTest.apk"
+RUNNER=com.keyflow.test/androidx.test.runner.AndroidJUnitRunner
+# Nome do job que publica os APKs — tem que bater com o `name:` dele em checks.yml.
+UNIT_JOB="Unit tests and build"
 
 # Sem diálogo de "app não está respondendo" (a mesma lição do emulador do sandbox, ENVIRONMENT.md).
-# Medido no CI (2026-09-25 e 2026-09-27): logo após o boot, o launcher/systemui estouram ANR sob a carga
-# do build e o diálogo fica minutos na tela segurando o foco — nenhum campo recebe o IME e o 1º teste de
-# teclado falha. Tem que valer ANTES do build, quando os ANRs acontecem.
+# Medido no CI (2026-09-25 e 2026-09-27): logo após o boot, o launcher/systemui estouram ANR sob carga e
+# o diálogo fica minutos na tela segurando o foco — nenhum campo recebe o IME e o 1º teste de teclado
+# falha. Tem que valer cedo, enquanto o sistema ainda assenta.
 "$ADB" shell settings put global hide_error_dialogs 1 || true
 
 "$ADB" logcat -c || true
@@ -37,16 +50,90 @@ step() {
   echo "::endgroup::"
 }
 
+# Espera o artefato `apks` desta rodada. Falha logo se o job de unitários terminou sem publicá-lo.
+# Fora do Actions (sem GITHUB_RUN_ID) usa os APKs do build local.
+fetch_apks() {
+  local deadline=$((SECONDS + 20 * 60)) state="" misses=0
+  if [ -z "${GITHUB_RUN_ID:-}" ]; then
+    ls -la "$APP_APK" "$TEST_APK" || { echo "rode antes: ./gradlew assembleDebug assembleDebugAndroidTest" >&2; return 1; }
+    return 0
+  fi
+  while :; do
+    rm -rf "$APK_DIR"
+    if gh run download "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" -n apks -D "$APK_DIR" \
+        2> "$EVIDENCE/apk-download.err"; then
+      ls -la "$APP_APK" "$TEST_APK"
+      return 0
+    fi
+    state=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?per_page=100" \
+      --jq ".jobs[] | select(.name == \"$UNIT_JOB\") | .conclusion // .status" 2>/dev/null)
+    case "$state" in
+      success)
+        # Terminou bem e o artefato não aparece: a API demora um pouco, ou ele expirou (1 dia) e esta
+        # é uma re-execução só dos jobs que falharam — aí é preciso rodar o workflow inteiro.
+        misses=$((misses + 1))
+        if [ "$misses" -ge 6 ]; then
+          echo "::error::o '$UNIT_JOB' passou, mas o artefato apks não baixa (expirou? rode o workflow inteiro)"
+          cat "$EVIDENCE/apk-download.err"
+          return 1
+        fi ;;
+      failure|cancelled|timed_out|skipped)
+        echo "::error::o job '$UNIT_JOB' terminou em '$state': não há APKs para testar"
+        return 1 ;;
+    esac
+    if [ "$SECONDS" -gt "$deadline" ]; then
+      echo "::error::os APKs não chegaram em 20 min (estado do '$UNIT_JOB': ${state:-desconhecido})"
+      cat "$EVIDENCE/apk-download.err"
+      return 1
+    fi
+    echo "Esperando os APKs do '$UNIT_JOB' (${state:-?})..."
+    sleep 10
+  done
+}
+
+install_apks() {
+  local apk
+  for apk in "$@"; do
+    "$ADB" install -r -t "$apk" || return 1
+  done
+}
+
 # localModelE2E: liga o ponta a ponta do modelo local (baixa o Whisper base, ~160 MB, e transcreve).
-# Se um diálogo de sistema abriu antes do ajuste acima, fecha antes da suíte.
-"$ADB" shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1 || true
-step "Suíte instrumentada" ./gradlew --no-daemon connectedDebugAndroidTest \
-  -Pandroid.testInstrumentationRunnerArguments.localModelE2E=true
-step "Reinstala o APK debug" ./gradlew --no-daemon installDebug
-step "Captura das rotas da galeria" scripts/verify-screens.sh verification
-step "Diff contra os goldens" scripts/diff-screens.sh
+# O hash do nome de cada teste decide o pedaço: o mesmo teste cai sempre no mesmo shard.
+run_shard() {
+  local index="$1" total="$2"
+  "$ADB" shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1 || true
+  "$ADB" shell am instrument -w -r -e numShards "$total" -e shardIndex "$index" -e localModelE2E true "$RUNNER" \
+    | tee "$EVIDENCE/instrument-raw.txt" \
+    | python3 -u scripts/ci-instrument-summary.py --label "Instrumentados, shard $index de $total"
+}
+
+case "$MODE" in
+  suite)
+    [ $# -eq 3 ] || { echo "uso: $0 suite <índice> <total>" >&2; exit 2; }
+    if fetch_apks && install_apks "$APP_APK" "$TEST_APK"; then
+      step "Suíte instrumentada (shard $2 de $3)" run_shard "$2" "$3"
+      # Conferência pelo próprio runner (a lição C' da quick 010: o resumo do am instrument pode sumir).
+      grep -a "TestRunner: run finished" "$EVIDENCE/logcat.txt" || echo "::warning::sem 'run finished' no logcat"
+    else
+      status=1
+    fi
+    ;;
+  screens)
+    [ $# -eq 2 ] || { echo "uso: $0 screens <light|dark>" >&2; exit 2; }
+    if fetch_apks && install_apks "$APP_APK"; then
+      step "Captura das rotas da galeria ($2)" env THEMES="$2" scripts/verify-screens.sh verification
+    else
+      status=1
+    fi
+    mkdir -p "$EVIDENCE/screens"
+    cp verification/*.png "$EVIDENCE/screens/" 2>/dev/null || true
+    ;;
+  *)
+    echo "uso: $0 suite <índice> <total> | screens <light|dark>" >&2
+    status=2
+    ;;
+esac
 
 kill "$LOGCAT_PID" 2>/dev/null || true
-mkdir -p "$EVIDENCE/screens"
-cp verification/*.png "$EVIDENCE/screens/" 2>/dev/null || true
 exit "$status"

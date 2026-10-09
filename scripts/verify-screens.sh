@@ -8,6 +8,9 @@
 # ou o único device conectado. Rodar 2× deve produzir PNGs bit-idênticos para as rotas do orbe.
 #
 #   ANDROID_SERIAL=emulator-5554 scripts/verify-screens.sh [diretório-de-saída]
+#
+# THEMES escolhe os temas capturados (default "light dark"). O CI divide a galeria em dois emuladores,
+# um por tema (THEMES=light / THEMES=dark), e o diff-screens.sh aceita o mesmo filtro.
 set -euo pipefail
 
 PKG="com.keyflow"
@@ -18,6 +21,13 @@ ROUTES_FILE="$FILES_DIR/gallery_routes"
 
 OUT_DIR="${1:-verification}"
 mkdir -p "$OUT_DIR"
+THEMES="${THEMES:-light dark}"
+for theme in $THEMES; do
+  case "$theme" in
+    light|dark) ;;
+    *) echo "ERRO: tema '$theme' em THEMES (use light e/ou dark)" >&2; exit 2 ;;
+  esac
+done
 
 # adb com escopo opcional ao ANDROID_SERIAL.
 adbx() {
@@ -67,8 +77,9 @@ capture() {
 
 echo "Capturando rotas em $OUT_DIR/ ..."
 for route in $ROUTES; do
-  capture "$route" false ""
-  capture "$route" true "-dark"
+  for theme in $THEMES; do
+    if [ "$theme" = dark ]; then capture "$route" true "-dark"; else capture "$route" false ""; fi
+  done
 done
 adbx shell am force-stop "$PKG"
 echo "Concluído: $(ls "$OUT_DIR"/*.png | wc -l) PNGs."

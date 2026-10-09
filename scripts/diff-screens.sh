@@ -9,6 +9,8 @@
 #   scripts/diff-screens.sh --approve    # promove verification/ → golden/ (exceto sys-*)
 #
 # Requer ImageMagick (`compare`). Limiar: MAX_RATIO (default 0.0002 = 0,02% dos pixels).
+# THEMES (default "light dark") limita o diff aos goldens desses temas — `<rota>-dark.png` é escuro, o
+# resto é claro —, o mesmo filtro do verify-screens.sh: o CI captura e compara cada tema num emulador.
 #
 # Por que tão apertado: a captura é determinística (duas rodadas do mesmo build dão PNGs bit-idênticos —
 # medido em 2026-09-08, ruído de 0 px na pior rota), então não há variação legítima a tolerar. O limiar
@@ -23,8 +25,17 @@ GOLDEN_DIR="$VERIFY_DIR/golden"
 FUZZ="${FUZZ:-5%}"
 MAX_RATIO="${MAX_RATIO:-0.0002}"
 
+THEMES="${THEMES:-light dark}"
+
 # sys-* vêm de device real (wallpaper/relógio variáveis) → não entram no golden.
 is_excluded() { [[ "$1" == sys-* ]]; }
+
+# Golden de um tema pedido em THEMES?
+in_themes() {
+  local theme=light
+  [[ "$1" == *-dark.png ]] && theme=dark
+  [[ " $THEMES " == *" $theme "* ]]
+}
 
 approve() {
   mkdir -p "$GOLDEN_DIR"
@@ -48,6 +59,7 @@ diff_all() {
   local fails=0 checked=0
   for g in "$GOLDEN_DIR"/*.png; do
     local base; base="$(basename "$g")"
+    in_themes "$base" || continue
     local cur="$VERIFY_DIR/$base"
     checked=$((checked + 1))
 
@@ -86,6 +98,10 @@ diff_all() {
   done
 
   echo "—"
+  if [ "$checked" -eq 0 ]; then
+    echo "ERRO: nenhum golden dos temas '$THEMES'." >&2
+    exit 2
+  fi
   if [ "$fails" -gt 0 ]; then
     echo "REGRESSÃO: $fails/$checked acima do limiar."
     exit 1

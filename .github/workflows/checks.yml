@@ -8,6 +8,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  # Os jobs do emulador baixam os APKs desta rodada com ela ainda em curso (`gh run download`) e
+  # consultam o estado do job de unitários — ver scripts/ci-device-gate.sh.
+  actions: read
 # Um push novo no mesmo PR cancela a rodada anterior: o job de device leva dezenas de minutos e o
 # repositório é privado (minutos contam).
 concurrency:
@@ -15,6 +18,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   unit:
+    # scripts/ci-device-gate.sh procura este nome para saber se o job falhou.
     name: Unit tests and build
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -55,6 +59,20 @@ jobs:
           key: sherpa-onnx-${{ steps.sherpa.outputs.version }}-${{ steps.sherpa.outputs.sha }}
       - name: Unit tests and APKs
         run: ./gradlew --no-daemon testDebugUnitTest assembleDebug assembleDebugAndroidTest
+      # Os jobs do emulador não compilam: instalam estes APKs. Sobem antes do resto para eles saírem
+      # da espera o quanto antes. APK já é comprimido (compression-level 0); 1 dia de retenção porque só
+      # servem a esta rodada, e o armazenamento conta na cota do plano.
+      - name: APKs for the emulator jobs
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: apks
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+          overwrite: true
       # STO-02: código nativo pronto para páginas de 16 KB (requisito do Play). Os .so do release são os
       # mesmos do debug (só menos ABIs).
       - name: 16 KB alignment of native libraries
@@ -69,44 +87,37 @@ jobs:
           retention-days: 14
 
   device:
-    name: Instrumented and screenshots (API 34)
-    needs: unit
+    # Sem `needs: unit`: o preparo e o boot do emulador (~3 min) correm enquanto o `unit` compila, e o
+    # script espera o artefato `apks` (se o `unit` falhar, ele para logo). Em 2026-10-07 o gate num
+    # emulador só passou de 70 min — suíte de 584 testes (~38 min) + galeria de 216 PNGs, depois de
+    # recompilar o app no próprio runner — e o QEMU travou no fim. Agora: 4 pedaços da suíte e a galeria
+    # em 2 temas, cada um no seu emulador, em paralelo. Mudar o nº de pedaços = mexer nas linhas
+    # `suite <índice> <total>` abaixo (o total vai para o numShards do AndroidJUnitRunner).
+    name: ${{ matrix.name }}
     runs-on: ubuntu-24.04
-    # Medido: nenhuma rodada ainda neste runner. Referência local (KVM): suíte ~30 min + galeria
-    # ~10 min. Folga para boot e para a 1ª rodada; ajustar depois de medir.
-    timeout-minutes: 90
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: 'Instrumented (API 34, shard 0)', key: suite-0, gate: suite 0 4 }
+          - { name: 'Instrumented (API 34, shard 1)', key: suite-1, gate: suite 1 4 }
+          - { name: 'Instrumented (API 34, shard 2)', key: suite-2, gate: suite 2 4 }
+          - { name: 'Instrumented (API 34, shard 3)', key: suite-3, gate: suite 3 4 }
+          - { name: 'Screenshots (API 34, light)', key: screens-light, gate: screens light, theme: light }
+          - { name: 'Screenshots (API 34, dark)', key: screens-dark, gate: screens dark, theme: dark }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # Só para o sdkmanager/avdmanager do emulator-runner: aqui não há Gradle.
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: '17'
-      - name: JDK path and debug keystore
-        run: |
-          sudo ln -sfn "$JAVA_HOME" /usr/lib/jvm/java-17-openjdk
-          mkdir -p ~/.config/.android
-          keytool -genkeypair -keystore ~/.config/.android/debug.keystore -storepass android \
-            -keypass android -alias androiddebugkey -dname "CN=Android Debug,O=Android,C=US" \
-            -keyalg RSA -keysize 2048 -validity 10000
-      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
-      # Mesmo cache do AAR do sherpa-onnx do job unit (que já o salvou nesta rodada).
-      - name: sherpa-onnx AAR version
-        id: sherpa
-        run: |
-          version=$(sed -n 's/^val sherpaOnnxVersion = "\(.*\)"$/\1/p' app/build.gradle.kts)
-          sha=$(sed -n 's/^val sherpaOnnxSha256 = "\(.*\)"$/\1/p' app/build.gradle.kts)
-          test -n "$version" && test -n "$sha"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "sha=$sha" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: app/libs/sherpa-onnx-${{ steps.sherpa.outputs.version }}.aar
-          key: sherpa-onnx-${{ steps.sherpa.outputs.version }}-${{ steps.sherpa.outputs.sha }}
-      # O AVD pede ~7,2 GB livres só para a partição de dados, e o build roda depois disso no mesmo
-      # disco. Medido em 2026-09-24: 7,1 GB livres na imagem → emulador abortou antes do boot. Tira
-      # toolchains que o projeto não usa (o SDK Android fica); o `df` antes/depois fica no log.
+      # O AVD pede ~7,2 GB livres só para a partição de dados. Medido em 2026-09-24: 7,1 GB livres na
+      # imagem → emulador abortou antes do boot. Tira toolchains que o projeto não usa (o SDK Android
+      # fica); o `df` antes/depois fica no log.
       - name: Free disk space
         run: |
           df -h /
@@ -115,18 +126,25 @@ jobs:
           df -h /
       # Sem KVM o emulador cai para emulação por software (TCG) e a suíte vira horas de timeouts —
       # medido no sandbox da nuvem em 2026-09-24. Aqui KVM é requisito: falta dele é falha.
-      # ImageMagick: `compare` do diff-screens.sh.
-      - name: KVM and screenshot tooling
+      - name: KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
           test -c /dev/kvm
+      # `compare` do diff-screens.sh.
+      - name: ImageMagick
+        if: matrix.theme
+        run: |
           sudo apt-get update
           sudo apt-get install -y imagemagick
       # Mesmo AVD da referência local (Pixel 6, API 34, google_apis x86_64). Sem -noaudio: os testes
       # de gravação (audio.*, OverlayServiceCancelTest, seletor do mic) precisam de microfone.
+      # O timeout do passo é menor que o do job para a evidência subir mesmo se o emulador travar.
       - name: Device gate on the emulator
+        timeout-minutes: 28
+        env:
+          GH_TOKEN: ${{ github.token }}
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 34
@@ -138,15 +156,17 @@ jobs:
           disk-size: 6G
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-boot-anim -camera-back none
           disable-animations: true
-          script: scripts/ci-device-gate.sh
+          script: scripts/ci-device-gate.sh ${{ matrix.gate }}
+      - name: Diff against the goldens
+        if: matrix.theme
+        env:
+          THEMES: ${{ matrix.theme }}
+        run: scripts/diff-screens.sh
       - name: Device evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: device-evidence
-          path: |
-            app/build/ci-evidence/
-            app/build/reports/androidTests/
-            app/build/outputs/androidTest-results/
+          name: device-evidence-${{ matrix.key }}
+          path: app/build/ci-evidence/
           if-no-files-found: warn
           retention-days: 14
