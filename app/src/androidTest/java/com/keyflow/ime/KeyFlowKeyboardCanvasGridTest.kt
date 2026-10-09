@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
+import android.util.Log
 import android.view.InputDevice
 import android.view.MotionEvent
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -129,7 +130,7 @@ class KeyFlowKeyboardCanvasGridTest {
         val u = keyOnScreen(grid, "u")
 
         val down = SystemClock.uptimeMillis()
-        inject(MotionEvent.ACTION_DOWN, u.centerX, u.centerY, down)
+        injectDown(u.centerX, u.centerY, down)
         waitUntil("a tira de acentos do \"u\" não abriu") { grid.accentVariantsForTest != null }
         val variants = grid.accentVariantsForTest!!
         inject(MotionEvent.ACTION_UP, u.centerX, u.centerY, down)
@@ -148,7 +149,7 @@ class KeyFlowKeyboardCanvasGridTest {
         val u = keyOnScreen(grid, "u")
 
         val down = SystemClock.uptimeMillis()
-        inject(MotionEvent.ACTION_DOWN, u.centerX, u.centerY, down)
+        injectDown(u.centerX, u.centerY, down)
         waitUntil("a tira de acentos do \"u\" não abriu") { grid.accentVariantsForTest != null }
         val variants = grid.accentVariantsForTest!!
         val nextX = u.centerX + grid.accentChipWidthForTest!!.toInt()
@@ -275,6 +276,19 @@ class KeyFlowKeyboardCanvasGridTest {
      * primeiras rodadas após um `installDebug` falhavam assim. Sem o `catch`, a exceção escapava dos
      * laços de retry e reprovava o teste na hora.
      */
+    /**
+     * DOWN que a plataforma aceitou (ver [inject]). Segurar a tecla depende de um único DOWN: recusado, a tira de
+     * acentos nunca abre, e o teste esperava 5 s por nada (CI, 2026-10-09 — sem log, ficou sem prova de que foi isto;
+     * agora a recusa vai para o logcat).
+     */
+    private fun injectDown(x: Int, y: Int, time: Long) {
+        waitUntil("a plataforma recusou o toque em ($x, $y)") {
+            inject(MotionEvent.ACTION_DOWN, x, y, time).also { accepted ->
+                if (!accepted) Log.w("KeyFlow.CanvasGridTest", "injeção do DOWN recusada em ($x, $y); tentando de novo")
+            }
+        }
+    }
+
     private fun inject(action: Int, x: Int, y: Int, time: Long): Boolean {
         val event = MotionEvent.obtain(time, time, action, x.toFloat(), y.toFloat(), 0).apply {
             source = InputDevice.SOURCE_TOUCHSCREEN
