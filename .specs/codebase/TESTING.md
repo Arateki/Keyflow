@@ -53,22 +53,25 @@ DeckLock (actions fixadas por SHA, `permissions: contents: read`, evidência env
 | Job | O quê | Gate equivalente |
 | --- | ----- | ---------------- |
 | `Unit tests and build` | `testDebugUnitTest assembleDebug assembleDebugAndroidTest`; publica os APKs (artefato `apks`, 1 dia) | `quick` + `build` |
-| `Instrumented (API 34, shard 0..3)` | 4 emuladores Pixel 6 · API 34 · x86_64 **com KVM** → `scripts/ci-device-gate.sh suite <i> 4`: um quarto da suíte cada (`numShards`/`shardIndex` do AndroidJUnitRunner), por `am instrument` direto | `full` |
-| `Screenshots (API 34, light\|dark)` | 2 emuladores → `ci-device-gate.sh screens <tema>`: `verify-screens.sh` de um tema; depois `diff-screens.sh` do mesmo tema, fora do emulador | `screenshot` |
+| `Instrumented (API 34, shard 0..4)` | 5 emuladores Pixel 6 · API 34 · x86_64 **com KVM** → `scripts/ci-device-gate.sh suite <i> 5`: um quinto da suíte cada (`numShards`/`shardIndex` do AndroidJUnitRunner), por `am instrument` direto | `full` |
+| `Screenshots (API 34, <tema> k/2)` | 4 emuladores → `ci-device-gate.sh screens <tema> <k/2>`: `verify-screens.sh` de um tema e metade das rotas (`THEMES`, `ROUTE_SHARD`); depois `diff-screens.sh` do mesmo recorte, fora do emulador | `screenshot` |
 
-- Os 6 jobs de device sobem **junto** com o de unitários (sem `needs`): preparam o runner e ligam o
+- Os 9 jobs de device sobem **junto** com o de unitários (sem `needs`): preparam o runner e ligam o
   emulador enquanto ele compila, e então baixam o artefato `apks` da própria rodada (`gh run download`).
   Não há Gradle no runner do emulador. Se o job de unitários falhar, eles param logo.
+- Depois de instalar, o script roda `cmd package compile -m speed -f` nos dois pacotes: sem isso o app
+  fica `run-from-apk` e verifica as classes a cada abertura a frio (a galeria abre o app 216 vezes).
 - Por quê (2026-10-07): num emulador só, o gate passou de 70 min — recompilar o app no próprio runner
   (~7 min, disputando 2 núcleos/7 GB com o QEMU), suíte de 584 testes (~38 min) e galeria de 216 PNGs —
-  e o QEMU travou no fim. Em paralelo, cada job leva ~15 min.
+  e o QEMU travou no fim. A memória do QEMU cresce a cada abertura do app (~5 MB, medido no emulador
+  local); `host.txt` na evidência registra memória, swap e carga do runner a cada 20 s.
 - O pedaço de cada teste vem do hash do nome: o mesmo teste cai sempre no mesmo shard. Para repetir um
-  shard localmente: `assembleDebug assembleDebugAndroidTest` e `scripts/ci-device-gate.sh suite <i> 4`
+  shard localmente: `assembleDebug assembleDebugAndroidTest` e `scripts/ci-device-gate.sh suite <i> 5`
   com o emulador de pé (sem `GITHUB_RUN_ID`, o script usa os APKs do build local).
 - `ci-instrument-summary.py` lê a saída `-r` do `am instrument` e é quem decide o gate: o `am
   instrument` sai com 0 mesmo com falha ou com o processo caído no meio.
 - KVM é requisito dos jobs de device (`test -c /dev/kvm`): sem ele a suíte não cabe — ver
   `ENVIRONMENT.md`, sandbox sem KVM.
-- Artefatos: `unit-evidence` (relatórios JUnit) e `device-evidence-<suite-i|screens-tema>` (saída bruta
-  do `am instrument`, logcat da rodada, PNGs capturados), 14 dias.
+- Artefatos: `unit-evidence` (relatórios JUnit) e `device-evidence-<suite-i|screens-tema-k>` (saída
+  bruta do `am instrument`, logcat da rodada, `host.txt`, PNGs capturados), 14 dias.
 - O device físico (A32) e o emulador Android 17 seguem sendo gates manuais **[YAN]**.

@@ -122,7 +122,7 @@ derruba o `system_server` ("Lost network stack" / "Can't find service: package")
 em 2026-09-24. **Instrumentados e goldens passam a ser feitos pelo CI** (runner com KVM):
 
 1. push da branch e disparo manual do workflow `Checks` nela (`workflow_dispatch`, sem precisar de PR);
-2. baixar os artefatos `device-evidence-screens-light` e `device-evidence-screens-dark`
-   (`ci-evidence/screens/*.png` = o que o `verify-screens.sh` capturou em cada tema) — o print do CI é
+2. baixar os artefatos `device-evidence-screens-*` (`gh run download <run> -p 'device-evidence-screens-*'`;
+   `ci-evidence/screens/*.png` = o que o `verify-screens.sh` capturou em cada recorte) — o print do CI é
    **byte a byte igual** ao golden quando nada mudou;
 3. revisar os PNGs que mudaram de propósito, copiar para `verification/golden/` e subir de novo.

@@ -90,9 +90,11 @@ jobs:
     # Sem `needs: unit`: o preparo e o boot do emulador (~3 min) correm enquanto o `unit` compila, e o
     # script espera o artefato `apks` (se o `unit` falhar, ele para logo). Em 2026-10-07 o gate num
     # emulador só passou de 70 min — suíte de 584 testes (~38 min) + galeria de 216 PNGs, depois de
-    # recompilar o app no próprio runner — e o QEMU travou no fim. Agora: 4 pedaços da suíte e a galeria
-    # em 2 temas, cada um no seu emulador, em paralelo. Mudar o nº de pedaços = mexer nas linhas
-    # `suite <índice> <total>` abaixo (o total vai para o numShards do AndroidJUnitRunner).
+    # recompilar o app no próprio runner — e o QEMU travou no fim. Agora cada pedaço tem seu emulador:
+    # 5 da suíte e 4 da galeria (tema × metade das rotas). Em 2026-10-09, com 2 por tema (108 capturas),
+    # um QEMU travou depois de 85; a memória dele cresce a cada abertura do app (o `host.txt` da
+    # evidência mostra o quanto). Mudar o nº de pedaços = mexer nas linhas `suite <índice> <total>` (o
+    # total vai para o numShards do AndroidJUnitRunner) ou `screens <tema> <k/n>` abaixo.
     name: ${{ matrix.name }}
     runs-on: ubuntu-24.04
     timeout-minutes: 35
@@ -100,12 +102,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: 'Instrumented (API 34, shard 0)', key: suite-0, gate: suite 0 4 }
-          - { name: 'Instrumented (API 34, shard 1)', key: suite-1, gate: suite 1 4 }
-          - { name: 'Instrumented (API 34, shard 2)', key: suite-2, gate: suite 2 4 }
-          - { name: 'Instrumented (API 34, shard 3)', key: suite-3, gate: suite 3 4 }
-          - { name: 'Screenshots (API 34, light)', key: screens-light, gate: screens light, theme: light }
-          - { name: 'Screenshots (API 34, dark)', key: screens-dark, gate: screens dark, theme: dark }
+          - { name: 'Instrumented (API 34, shard 0)', key: suite-0, gate: suite 0 5 }
+          - { name: 'Instrumented (API 34, shard 1)', key: suite-1, gate: suite 1 5 }
+          - { name: 'Instrumented (API 34, shard 2)', key: suite-2, gate: suite 2 5 }
+          - { name: 'Instrumented (API 34, shard 3)', key: suite-3, gate: suite 3 5 }
+          - { name: 'Instrumented (API 34, shard 4)', key: suite-4, gate: suite 4 5 }
+          - { name: 'Screenshots (API 34, light 0/2)', key: screens-light-0, gate: screens light 0/2, theme: light, routes: 0/2 }
+          - { name: 'Screenshots (API 34, light 1/2)', key: screens-light-1, gate: screens light 1/2, theme: light, routes: 1/2 }
+          - { name: 'Screenshots (API 34, dark 0/2)', key: screens-dark-0, gate: screens dark 0/2, theme: dark, routes: 0/2 }
+          - { name: 'Screenshots (API 34, dark 1/2)', key: screens-dark-1, gate: screens dark 1/2, theme: dark, routes: 1/2 }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -161,6 +166,7 @@ jobs:
         if: matrix.theme
         env:
           THEMES: ${{ matrix.theme }}
+          ROUTE_SHARD: ${{ matrix.routes }}
         run: scripts/diff-screens.sh
       - name: Device evidence
         if: always()

@@ -9,8 +9,10 @@
 #   scripts/diff-screens.sh --approve    # promove verification/ → golden/ (exceto sys-*)
 #
 # Requer ImageMagick (`compare`). Limiar: MAX_RATIO (default 0.0002 = 0,02% dos pixels).
-# THEMES (default "light dark") limita o diff aos goldens desses temas — `<rota>-dark.png` é escuro, o
-# resto é claro —, o mesmo filtro do verify-screens.sh: o CI captura e compara cada tema num emulador.
+# Recortes, os mesmos do verify-screens.sh (o CI captura e compara cada pedaço da galeria num emulador):
+#   THEMES       (default "light dark") só os goldens desses temas — `<rota>-dark.png` é escuro, o resto, claro;
+#   ROUTE_SHARD  ("k/n", default "0/1") só as rotas do recorte, pela posição em verification/routes.txt
+#                (escrito pelo verify-screens.sh). Golden de rota que saiu do catálogo é acusado no recorte 0.
 #
 # Por que tão apertado: a captura é determinística (duas rodadas do mesmo build dão PNGs bit-idênticos —
 # medido em 2026-09-08, ruído de 0 px na pior rota), então não há variação legítima a tolerar. O limiar
@@ -37,6 +39,43 @@ in_themes() {
   [[ " $THEMES " == *" $theme "* ]]
 }
 
+ROUTE_SHARD="${ROUTE_SHARD:-0/1}"
+SHARD_INDEX="${ROUTE_SHARD%/*}"
+SHARD_COUNT="${ROUTE_SHARD#*/}"
+ROUTES_LIST="$VERIFY_DIR/routes.txt"
+
+# Posição de cada rota no catálogo (vazio sem routes.txt: aí todo golden conta, como antes dos recortes).
+declare -A ROUTE_POS=()
+load_routes() {
+  if ! [[ "$SHARD_INDEX" =~ ^[0-9]+$ && "$SHARD_COUNT" =~ ^[1-9][0-9]*$ ]] || [ "$SHARD_INDEX" -ge "$SHARD_COUNT" ]; then
+    echo "ERRO: ROUTE_SHARD='$ROUTE_SHARD' (use k/n, com 0 <= k < n)" >&2
+    exit 2
+  fi
+  if [ ! -f "$ROUTES_LIST" ]; then
+    if [ "$SHARD_COUNT" -gt 1 ]; then
+      echo "ERRO: ROUTE_SHARD=$ROUTE_SHARD sem $ROUTES_LIST (rode o verify-screens.sh antes)" >&2
+      exit 2
+    fi
+    return
+  fi
+  local i=0 route
+  while read -r route; do
+    [ -n "$route" ] || continue
+    ROUTE_POS[$route]=$i
+    i=$((i + 1))
+  done < "$ROUTES_LIST"
+}
+
+# 0 = comparar; 1 = rota de outro recorte; 2 = rota fora do catálogo.
+route_status() {
+  [ "${#ROUTE_POS[@]}" -eq 0 ] && return 0
+  local route="${1%.png}"
+  route="${route%-dark}"
+  [ -n "${ROUTE_POS[$route]+x}" ] || return 2
+  [ $((ROUTE_POS[$route] % SHARD_COUNT)) -eq "$SHARD_INDEX" ] || return 1
+  return 0
+}
+
 approve() {
   mkdir -p "$GOLDEN_DIR"
   local n=0
@@ -56,10 +95,21 @@ diff_all() {
     exit 2
   fi
 
+  load_routes
   local fails=0 checked=0
   for g in "$GOLDEN_DIR"/*.png; do
     local base; base="$(basename "$g")"
     in_themes "$base" || continue
+    local rs=0
+    route_status "$base" || rs=$?
+    if [ "$rs" -eq 1 ]; then continue; fi
+    if [ "$rs" -eq 2 ]; then
+      [ "$SHARD_INDEX" -eq 0 ] || continue
+      checked=$((checked + 1))
+      echo "  ✗ $base — a rota não está mais no RouteCatalog (apague o golden)"
+      fails=$((fails + 1))
+      continue
+    fi
     local cur="$VERIFY_DIR/$base"
     checked=$((checked + 1))
 

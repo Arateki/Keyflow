@@ -5,8 +5,9 @@
 #
 #   ci-device-gate.sh suite <índice> <total>   um pedaço da suíte instrumentada (numShards/shardIndex do
 #                                              AndroidJUnitRunner), com o ponta a ponta do modelo local;
-#   ci-device-gate.sh screens <light|dark>     as rotas da galeria num tema (o diff contra os goldens é um
-#                                              passo à parte do workflow, sem emulador).
+#   ci-device-gate.sh screens <light|dark> <k/n>  um recorte da galeria (tema + ROUTE_SHARD do
+#                                              verify-screens.sh); o diff contra os goldens é um passo à
+#                                              parte do workflow, sem emulador.
 #
 # Sem Gradle aqui: o job do emulador sobe junto com o `Unit tests and build` e instala os APKs que ele
 # publica (artefato `apks`). Compilar de novo no runner do emulador custava ~7 min e disputava os 2
@@ -38,6 +39,24 @@ UNIT_JOB="Unit tests and build"
 "$ADB" logcat -c || true
 "$ADB" logcat -v threadtime > "$EVIDENCE/logcat.txt" 2>&1 &
 LOGCAT_PID=$!
+
+# Memória e carga do HOST a cada 20 s (o QEMU travou na galeria em 2026-10-07 e 2026-10-09, e a memória
+# dele cresce ~5 MB a cada abertura do app — medido no emulador local). Uma linha por amostra:
+# hora, load average, memória livre e swap usada (MB), RSS do QEMU (MB).
+sample_host() {
+  local qemu
+  while :; do
+    qemu=$(pgrep -f qemu-system-x86_64 | head -1)
+    printf '%s load=%s mem_avail=%s swap_used=%s qemu_rss=%s\n' "$(date +%H:%M:%S)" \
+      "$(cut -d' ' -f1-3 /proc/loadavg)" \
+      "$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)" \
+      "$(awk '/SwapTotal/ {t=$2} /SwapFree/ {f=$2} END {print int((t-f)/1024)}' /proc/meminfo)" \
+      "$( [ -n "$qemu" ] && ps -o rss= -p "$qemu" | awk '{print int($1/1024)}')"
+    sleep 20
+  done
+}
+sample_host > "$EVIDENCE/host.txt" 2>&1 &
+SAMPLER_PID=$!
 
 status=0
 step() {
@@ -91,10 +110,17 @@ fetch_apks() {
   done
 }
 
+# Depois do `adb install` o app fica `run-from-apk`: sem a verificação gravada, cada abertura a frio
+# verifica as classes de novo. O `compile` grava (APK debuggable para em `verify`, sem AOT, e basta):
+# medido no emulador local, a GalleryActivity abre em 1,95 s contra 2,7 s.
 install_apks() {
-  local apk
+  local apk pkg
   for apk in "$@"; do
     "$ADB" install -r -t "$apk" || return 1
+  done
+  for pkg in com.keyflow com.keyflow.test; do
+    "$ADB" shell pm path "$pkg" >/dev/null 2>&1 || continue
+    "$ADB" shell cmd package compile -m speed -f "$pkg" || return 1
   done
 }
 
@@ -120,9 +146,10 @@ case "$MODE" in
     fi
     ;;
   screens)
-    [ $# -eq 2 ] || { echo "uso: $0 screens <light|dark>" >&2; exit 2; }
+    [ $# -eq 3 ] || { echo "uso: $0 screens <light|dark> <k/n>" >&2; exit 2; }
     if fetch_apks && install_apks "$APP_APK"; then
-      step "Captura das rotas da galeria ($2)" env THEMES="$2" scripts/verify-screens.sh verification
+      step "Captura das rotas da galeria ($2, recorte $3)" \
+        env THEMES="$2" ROUTE_SHARD="$3" scripts/verify-screens.sh verification
     else
       status=1
     fi
@@ -130,10 +157,11 @@ case "$MODE" in
     cp verification/*.png "$EVIDENCE/screens/" 2>/dev/null || true
     ;;
   *)
-    echo "uso: $0 suite <índice> <total> | screens <light|dark>" >&2
+    echo "uso: $0 suite <índice> <total> | screens <light|dark> <k/n>" >&2
     status=2
     ;;
 esac
 
-kill "$LOGCAT_PID" 2>/dev/null || true
+kill "$LOGCAT_PID" "$SAMPLER_PID" 2>/dev/null || true
+echo "Pior momento do host: $(sort -t= -k3 -n "$EVIDENCE/host.txt" | head -1)"
 exit "$status"
