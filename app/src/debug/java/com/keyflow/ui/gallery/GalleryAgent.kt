@@ -55,6 +55,7 @@ import com.keyflow.ui.config.AgentSettingsSection
 import com.keyflow.ui.config.KeyflowPanel
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import java.io.ByteArrayOutputStream
+import java.util.Calendar
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -275,6 +276,12 @@ object AgentGalleryRoutes {
         return parts.runtime(backends)
     }
 
-    /** 2 de outubro de 2026, 12:00 UTC (09:00 no fuso do emulador de captura): o registro da galeria tem horário fixo; só o fuso do aparelho muda o desenho. */
-    private const val SETTINGS_T0 = 1_790_942_400_000L
+    /**
+     * 2 de outubro de 2026, 09:00 no fuso do aparelho: o registro mostra o mesmo horário em qualquer fuso. Com um instante fixo
+     * (12:00 UTC), o golden só batia no emulador de captura (São Paulo, 09:00); o do CI, em UTC, desenhava 12:00 (2026-10-09).
+     */
+    private val SETTINGS_T0: Long = Calendar.getInstance().apply {
+        clear()
+        set(2026, Calendar.OCTOBER, 2, 9, 0)
+    }.timeInMillis
 }
