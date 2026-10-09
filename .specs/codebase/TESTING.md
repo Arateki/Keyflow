@@ -58,11 +58,13 @@ DeckLock (actions fixadas por SHA, `permissions: contents: read`, evidência env
 - Os 6 jobs de device sobem **junto** com o de unitários (sem `needs`): preparam o runner e ligam o
   emulador enquanto ele compila, e então baixam o artefato `apks` da própria rodada (`gh run download`).
   Não há Gradle no runner do emulador. Se o job de unitários falhar, eles param logo.
-- A galeria roda **depois** da suíte, no mesmo emulador. Em jobs próprios, com o emulador recém-ligado,
-  o 1º quadro das rotas mais pesadas (`config-overlay-travado`, `config-overlay-skins-importadas`)
-  compilava shaders no swiftshader por mais de 5 s e o Android matava o app por ANR em toda rodada
-  (2026-10-09); a última `main` verde fazia assim e elas abriam em ~9 s. Rota que não abre ganha uma 2ª
-  tentativa, com `::warning::` no PR.
+- A galeria roda **depois** da suíte, no mesmo emulador (um emulador por pedaço, não dois).
+- A `GalleryActivity` só compõe a rota depois de a janela confirmar o foco, e só grava o marcador de
+  pronta depois de o quadro chegar à tela. Sem isso, no emulador do CI o 1º quadro das rotas mais
+  pesadas (`config-overlay-travado`, `config-overlay-skins-importadas`) compilava shaders no swiftshader
+  por mais de 5 s com o evento de foco pendente — ANR ("Waited 5005ms for FocusEvent") e o app morto
+  calado (2026-10-09). Reproduzido no emulador local com a CPU do host saturada: 4 ANRs em 4 aberturas
+  antes, 0 em 4 depois. Rota que ainda não abrir ganha uma 2ª tentativa, com `::warning::` no PR.
 - Depois de instalar, o script roda `cmd package compile -m speed -f` nos dois pacotes: sem isso o app
   fica `run-from-apk` e verifica as classes a cada abertura a frio (a galeria abre o app 216 vezes).
 - Por quê (2026-10-07): num emulador só, o gate passou de 70 min — recompilar o app no próprio runner

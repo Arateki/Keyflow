@@ -91,9 +91,8 @@ jobs:
     # script espera o artefato `apks` (se o `unit` falhar, ele para logo). Em 2026-10-07 o gate num
     # emulador só passou de 70 min — suíte de 584 testes (~38 min) + galeria de 216 PNGs, depois de
     # recompilar o app no próprio runner — e o QEMU travou no fim. Agora cada job roda 1/N da suíte e,
-    # no mesmo emulador, 1/N das rotas da galeria (claro e escuro). A galeria em jobs próprios, com o
-    # emulador recém-ligado, deu ANR nas rotas mais pesadas em toda rodada (2026-10-09). Mudar o nº de
-    # pedaços = mexer na lista `shard` (o total vem de strategy.job-total).
+    # no mesmo emulador, 1/N das rotas da galeria (claro e escuro): um emulador por pedaço, não dois.
+    # Mudar o nº de pedaços = mexer na lista `shard` (o total vem de strategy.job-total).
     name: Device (API 34, ${{ matrix.shard }}/${{ strategy.job-total }})
     runs-on: ubuntu-24.04
     timeout-minutes: 40

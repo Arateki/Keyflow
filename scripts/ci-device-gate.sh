@@ -161,9 +161,8 @@ case "$MODE" in
     if fetch_apks && install_apks "$APP_APK" "$TEST_APK"; then
       step "Suíte instrumentada (shard $2 de $3)" run_shard "$2" "$3"
       grep -a "TestRunner: run finished" "$EVIDENCE/logcat.txt" || echo "::warning::sem 'run finished' no logcat"
-      # A galeria vem DEPOIS da suíte, no mesmo emulador. Em jobs próprios, com o emulador recém-ligado (2026-10-09),
-      # o 1º quadro das rotas mais pesadas passava dos 5 s e o Android matava o app por ANR em toda rodada; a última
-      # `main` verde rodava a galeria assim, depois da suíte, e essas rotas abriam em ~9 s sem ANR.
+      # A galeria vem depois da suíte, no mesmo emulador: cada emulador custa ~6 min de boot e espera dos APKs, e
+      # assim é um por pedaço, não dois. O app é reinstalado do zero, como na última `main` verde.
       if step "Reinstala o app para a galeria" reinstall_app; then
         capture_screens "light dark" "$2/$3"
       fi
