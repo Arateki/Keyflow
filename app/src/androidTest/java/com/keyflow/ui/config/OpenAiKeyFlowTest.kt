@@ -148,7 +148,9 @@ class OpenAiKeyFlowTest {
         rule.onNodeWithTag(OPENAI_KEY_TAG).performScrollTo().performTextInput("sk-e2e-segredo")
         rule.onNodeWithTag(OPENAI_STATUS_TAG).performClick() // tira o foco: salva no desfoque
         rule.waitUntil(10_000) { store.get(ProviderIds.OPENAI) != null }
-        rule.onNodeWithTag(OPENAI_STATUS_TAG).performScrollTo().assertTextEquals("Chave de API ativa")
+        // O status vem do cofre por fluxo: chega numa recomposição depois do cofre, não junto com ele.
+        rule.onNodeWithTag(OPENAI_STATUS_TAG).performScrollTo()
+        waitForStatus("Chave de API ativa")
 
         // Lista os modelos da conta e escolhe um.
         rule.waitUntil(10_000) { requests.any { it.path == "/v1/models" } }
@@ -180,7 +182,14 @@ class OpenAiKeyFlowTest {
         rule.onNodeWithTag(OPENAI_DISCONNECT_TAG).performScrollTo().performClick()
         rule.waitUntil(10_000) { store.get(ProviderIds.OPENAI) == null }
         assertNull(store.get(ProviderIds.OPENAI))
-        rule.onNodeWithTag(OPENAI_STATUS_TAG).performScrollTo().assertTextEquals("Não configurado")
+        // Medido no CI (2026-10-09): o cofre já estava vazio e a tela ainda dizia "Chave de API ativa".
+        rule.onNodeWithTag(OPENAI_STATUS_TAG).performScrollTo()
+        waitForStatus("Não configurado")
         rule.onNodeWithTag(REASONING_TEST_BUTTON_TAG).performScrollTo().assertIsNotEnabled()
+    }
+
+    private fun waitForStatus(text: String) {
+        rule.waitUntil(10_000) { runCatching { rule.onNodeWithTag(OPENAI_STATUS_TAG).assertTextEquals(text) }.isSuccess }
+        rule.onNodeWithTag(OPENAI_STATUS_TAG).assertTextEquals(text)
     }
 }

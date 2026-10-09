@@ -136,8 +136,11 @@ class SetupActivityTest {
         }
     }
 
+    // 15 s, não 5: no CI (2026-10-09) o serviço levou mais de 5 s para chegar ao `startForeground` sob carga, o
+    // teste desistiu e o `stopService` do tearDown, com o primeiro plano ainda pendente, fez o Android derrubar o
+    // processo — e os testes que faltavam no shard junto. O próprio sistema dá 10 s ao serviço.
     private fun waitUntil(predicate: () -> Boolean) {
-        val deadline = SystemClock.elapsedRealtime() + 5_000
+        val deadline = SystemClock.elapsedRealtime() + 15_000
         while (SystemClock.elapsedRealtime() < deadline) {
             if (predicate()) return
             SystemClock.sleep(100)
