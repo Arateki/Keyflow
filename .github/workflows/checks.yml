@@ -146,6 +146,11 @@ jobs:
       # Mesmo AVD da referência local (Pixel 6, API 34, google_apis x86_64). Sem -noaudio: os testes
       # de gravação (audio.*, OverlayServiceCancelTest, seletor do mic) precisam de microfone.
       # O timeout do passo é menor que o do job para a evidência subir mesmo se o emulador travar.
+      # emulator-build fixo: sem ele o action instala o emulador mais novo, e o 37.2.12 (build 16428233,
+      # em uso desde antes de 2026-10-07) vaza ~93 MB do host a cada abertura do app — medido A/B no mesmo
+      # AVD em 2026-10-09: 30 aberturas da galeria levaram o QEMU de 3,66 a 6,43 GB no 37.2.12 e de 3,78
+      # a 3,98 GB no 37.1.11 (build 15917651, o da última `main` verde). No runner de 7 GB isso virou
+      # swap e QEMU travado na galeria. Subir de versão = repetir o A/B antes.
       - name: Device gate on the emulator
         timeout-minutes: 28
         env:
@@ -153,6 +158,7 @@ jobs:
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 34
+          emulator-build: 15917651
           target: google_apis
           arch: x86_64
           profile: pixel_6

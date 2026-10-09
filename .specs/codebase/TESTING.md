@@ -63,8 +63,12 @@ DeckLock (actions fixadas por SHA, `permissions: contents: read`, evidência env
   fica `run-from-apk` e verifica as classes a cada abertura a frio (a galeria abre o app 216 vezes).
 - Por quê (2026-10-07): num emulador só, o gate passou de 70 min — recompilar o app no próprio runner
   (~7 min, disputando 2 núcleos/7 GB com o QEMU), suíte de 584 testes (~38 min) e galeria de 216 PNGs —
-  e o QEMU travou no fim. A memória do QEMU cresce a cada abertura do app (~5 MB, medido no emulador
-  local); `host.txt` na evidência registra memória, swap e carga do runner a cada 20 s.
+  e o QEMU travou no fim.
+- **Emulador fixo no 37.1.11** (`emulator-build: 15917651`). O 37.2.12, que o action passou a instalar
+  sozinho, vaza ~93 MB do host a cada abertura do app (A/B no mesmo AVD, 2026-10-09: 3,66 → 6,43 GB em
+  30 aberturas, contra 3,78 → 3,98 GB no 37.1.11) — no runner de 7 GB, swap e QEMU travado na galeria.
+  `host.txt` na evidência registra memória, swap, carga e RSS do QEMU a cada 20 s; subir de versão =
+  repetir o A/B antes.
 - A suíte roda com `-e motionFrames false`: os testes de artefato de movimento (orbe, mic do teclado)
   conferem os gestos sem gravar os PNGs dos GIFs (o da orbe levava ~10 min no CI só gravando).
 - O pedaço de cada teste vem do hash do nome: o mesmo teste cai sempre no mesmo shard. Para repetir um

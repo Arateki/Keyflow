@@ -40,13 +40,14 @@ UNIT_JOB="Unit tests and build"
 "$ADB" logcat -v threadtime > "$EVIDENCE/logcat.txt" 2>&1 &
 LOGCAT_PID=$!
 
-# Memória e carga do HOST a cada 20 s (o QEMU travou na galeria em 2026-10-07 e 2026-10-09, e a memória
-# dele cresce ~5 MB a cada abertura do app — medido no emulador local). Uma linha por amostra:
+# Memória e carga do HOST a cada 20 s: foi assim que apareceu o vazamento do emulador 37.2.12 (ver o
+# emulator-build fixo em checks.yml). Uma linha por amostra:
 # hora, load average, memória livre e swap usada (MB), RSS do QEMU (MB).
 sample_host() {
   local qemu
   while :; do
-    qemu=$(pgrep -f qemu-system-x86_64 | head -1)
+    # O maior entre os candidatos: o crashpad do emulador também leva "qemu-system" na linha de comando.
+    qemu=$(for p in $(pgrep -f qemu-system); do echo "$(ps -o rss= -p "$p") $p"; done | sort -n | tail -1 | awk '{print $2}')
     printf '%s load=%s mem_avail=%s swap_used=%s qemu_rss=%s\n' "$(date +%H:%M:%S)" \
       "$(cut -d' ' -f1-3 /proc/loadavg)" \
       "$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)" \
