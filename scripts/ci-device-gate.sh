@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # Gate de device do CI (.github/workflows/checks.yml): roda com o emulador já de pé, dentro do
 # android-emulator-runner. O workflow espalha o gate `full` + `screenshot` do TESTING.md por vários
-# emuladores em paralelo, um modo por job:
+# emuladores em paralelo; cada job roda `all`:
 #
-#   ci-device-gate.sh suite <índice> <total>   um pedaço da suíte instrumentada (numShards/shardIndex do
+#   ci-device-gate.sh all <índice> <total>     o pedaço <índice> da suíte e depois o mesmo recorte da
+#                                              galeria (ROUTE_SHARD), no mesmo emulador;
+#   ci-device-gate.sh suite <índice> <total>   só o pedaço da suíte instrumentada (numShards/shardIndex do
 #                                              AndroidJUnitRunner), com o ponta a ponta do modelo local;
-#   ci-device-gate.sh screens <light|dark> <k/n>  um recorte da galeria (tema + ROUTE_SHARD do
-#                                              verify-screens.sh); o diff contra os goldens é um passo à
-#                                              parte do workflow, sem emulador.
+#   ci-device-gate.sh screens <temas> <k/n>    só um recorte da galeria (THEMES + ROUTE_SHARD do
+#                                              verify-screens.sh, ex.: "light dark" 0/6).
+# O diff contra os goldens é um passo à parte do workflow, sem emulador.
 #
 # Sem Gradle aqui: o job do emulador sobe junto com o `Unit tests and build` e instala os APKs que ele
 # publica (artefato `apks`). Compilar de novo no runner do emulador custava ~7 min e disputava os 2
@@ -63,11 +65,14 @@ status=0
 step() {
   echo "::group::$1"
   shift
-  if ! "$@"; then
+  local rc=0
+  "$@" || rc=$?
+  if [ "$rc" -ne 0 ]; then
     echo "::error::falhou: $*"
     status=1
   fi
   echo "::endgroup::"
+  return "$rc"
 }
 
 # Espera o artefato `apks` desta rodada. Falha logo se o job de unitários terminou sem publicá-lo.
@@ -137,7 +142,35 @@ run_shard() {
     | python3 -u scripts/ci-instrument-summary.py --label "Instrumentados, shard $index de $total"
 }
 
+# Galeria num app recém-instalado, como na última `main` verde (o connected* desinstalava o app no fim da suíte).
+reinstall_app() {
+  "$ADB" uninstall com.keyflow >/dev/null 2>&1 || true
+  install_apks "$APP_APK"
+}
+
+capture_screens() {
+  step "Captura das rotas da galeria (temas: $1; recorte $2)" \
+    env THEMES="$1" ROUTE_SHARD="$2" scripts/verify-screens.sh verification
+  mkdir -p "$EVIDENCE/screens"
+  cp verification/*.png "$EVIDENCE/screens/" 2>/dev/null || true
+}
+
 case "$MODE" in
+  all)
+    [ $# -eq 3 ] || { echo "uso: $0 all <índice> <total>" >&2; exit 2; }
+    if fetch_apks && install_apks "$APP_APK" "$TEST_APK"; then
+      step "Suíte instrumentada (shard $2 de $3)" run_shard "$2" "$3"
+      grep -a "TestRunner: run finished" "$EVIDENCE/logcat.txt" || echo "::warning::sem 'run finished' no logcat"
+      # A galeria vem DEPOIS da suíte, no mesmo emulador. Em jobs próprios, com o emulador recém-ligado (2026-10-09),
+      # o 1º quadro das rotas mais pesadas passava dos 5 s e o Android matava o app por ANR em toda rodada; a última
+      # `main` verde rodava a galeria assim, depois da suíte, e essas rotas abriam em ~9 s sem ANR.
+      if step "Reinstala o app para a galeria" reinstall_app; then
+        capture_screens "light dark" "$2/$3"
+      fi
+    else
+      status=1
+    fi
+    ;;
   suite)
     [ $# -eq 3 ] || { echo "uso: $0 suite <índice> <total>" >&2; exit 2; }
     if fetch_apks && install_apks "$APP_APK" "$TEST_APK"; then
@@ -149,18 +182,15 @@ case "$MODE" in
     fi
     ;;
   screens)
-    [ $# -eq 3 ] || { echo "uso: $0 screens <light|dark> <k/n>" >&2; exit 2; }
+    [ $# -eq 3 ] || { echo "uso: $0 screens <temas> <k/n>" >&2; exit 2; }
     if fetch_apks && install_apks "$APP_APK"; then
-      step "Captura das rotas da galeria ($2, recorte $3)" \
-        env THEMES="$2" ROUTE_SHARD="$3" scripts/verify-screens.sh verification
+      capture_screens "$2" "$3"
     else
       status=1
     fi
-    mkdir -p "$EVIDENCE/screens"
-    cp verification/*.png "$EVIDENCE/screens/" 2>/dev/null || true
     ;;
   *)
-    echo "uso: $0 suite <índice> <total> | screens <light|dark> <k/n>" >&2
+    echo "uso: $0 all <índice> <total> | suite <índice> <total> | screens <temas> <k/n>" >&2
     status=2
     ;;
 esac

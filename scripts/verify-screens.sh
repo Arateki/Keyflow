@@ -70,20 +70,33 @@ if [ -z "$ROUTES" ]; then
 fi
 printf '%s\n' $ROUTES > "$OUT_DIR/routes.txt"
 
-capture() {
-  local route="$1" dark="$2" suffix="$3"
+# Abre a rota e espera o marcador; 0 = pronta.
+open_route() {
+  local route="$1" dark="$2"
   adbx shell am force-stop "$PKG"
   adbx shell am start -W -n "$ACT" --es route "$route" --ez dark "$dark" >/dev/null
-  local ok="" deadline=$((SECONDS + READY_TIMEOUT))
+  local deadline=$((SECONDS + READY_TIMEOUT))
   while [ "$SECONDS" -le "$deadline" ]; do
     local v
     v=$(adbx shell "cat $READY 2>/dev/null || true" | tr -d '\r')
-    if [ "$v" = "$route" ]; then ok=1; break; fi
+    if [ "$v" = "$route" ]; then return 0; fi
     sleep 0.25
   done
-  if [ -z "$ok" ]; then
-    echo "ERRO: rota '$route' (dark=$dark) não ficou pronta em ${READY_TIMEOUT} s" >&2
-    exit 1
+  return 1
+}
+
+# Uma segunda chance, com aviso: no emulador do CI (GPU por software, 2 núcleos) o 1º quadro das rotas mais pesadas
+# compila muitos shaders e pode passar dos 5 s que o Android dá à janela — ANR, e com hide_error_dialogs o app morre
+# calado (2026-10-09, config-overlay-travado). O que a 2ª abertura mostrar ainda passa pelo diff contra o golden.
+capture() {
+  local route="$1" dark="$2" suffix="$3"
+  if ! open_route "$route" "$dark"; then
+    echo "AVISO: rota '$route' (dark=$dark) não ficou pronta em ${READY_TIMEOUT} s; abrindo de novo" >&2
+    [ -n "${GITHUB_ACTIONS:-}" ] && echo "::warning::galeria: '$route$suffix' só abriu na 2ª tentativa (ver logcat: ANR?)"
+    if ! open_route "$route" "$dark"; then
+      echo "ERRO: rota '$route' (dark=$dark) não ficou pronta em ${READY_TIMEOUT} s, duas vezes" >&2
+      exit 1
+    fi
   fi
   adbx exec-out screencap -p > "$OUT_DIR/$route$suffix.png"
   echo "  ✓ $route$suffix.png"

@@ -53,12 +53,16 @@ DeckLock (actions fixadas por SHA, `permissions: contents: read`, evidência env
 | Job | O quê | Gate equivalente |
 | --- | ----- | ---------------- |
 | `Unit tests and build` | `testDebugUnitTest assembleDebug assembleDebugAndroidTest`; publica os APKs (artefato `apks`, 1 dia) | `quick` + `build` |
-| `Instrumented (API 34, shard 0..4)` | 5 emuladores Pixel 6 · API 34 · x86_64 **com KVM** → `scripts/ci-device-gate.sh suite <i> 5`: um quinto da suíte cada (`numShards`/`shardIndex` do AndroidJUnitRunner), por `am instrument` direto | `full` |
-| `Screenshots (API 34, <tema> k/2)` | 4 emuladores → `ci-device-gate.sh screens <tema> <k/2>`: `verify-screens.sh` de um tema e metade das rotas (`THEMES`, `ROUTE_SHARD`); depois `diff-screens.sh` do mesmo recorte, fora do emulador | `screenshot` |
+| `Device (API 34, i/6)` | 6 emuladores Pixel 6 · API 34 · x86_64 **com KVM** → `scripts/ci-device-gate.sh all <i> 6`: 1/6 da suíte (`numShards`/`shardIndex` do AndroidJUnitRunner, por `am instrument` direto), app reinstalado do zero e 1/6 das rotas da galeria, claro e escuro (`ROUTE_SHARD`); depois `diff-screens.sh` do mesmo recorte, fora do emulador | `full` + `screenshot` |
 
-- Os 9 jobs de device sobem **junto** com o de unitários (sem `needs`): preparam o runner e ligam o
+- Os 6 jobs de device sobem **junto** com o de unitários (sem `needs`): preparam o runner e ligam o
   emulador enquanto ele compila, e então baixam o artefato `apks` da própria rodada (`gh run download`).
   Não há Gradle no runner do emulador. Se o job de unitários falhar, eles param logo.
+- A galeria roda **depois** da suíte, no mesmo emulador. Em jobs próprios, com o emulador recém-ligado,
+  o 1º quadro das rotas mais pesadas (`config-overlay-travado`, `config-overlay-skins-importadas`)
+  compilava shaders no swiftshader por mais de 5 s e o Android matava o app por ANR em toda rodada
+  (2026-10-09); a última `main` verde fazia assim e elas abriam em ~9 s. Rota que não abre ganha uma 2ª
+  tentativa, com `::warning::` no PR.
 - Depois de instalar, o script roda `cmd package compile -m speed -f` nos dois pacotes: sem isso o app
   fica `run-from-apk` e verifica as classes a cada abertura a frio (a galeria abre o app 216 vezes).
 - Por quê (2026-10-07): num emulador só, o gate passou de 70 min — recompilar o app no próprio runner
@@ -72,12 +76,13 @@ DeckLock (actions fixadas por SHA, `permissions: contents: read`, evidência env
 - A suíte roda com `-e motionFrames false`: os testes de artefato de movimento (orbe, mic do teclado)
   conferem os gestos sem gravar os PNGs dos GIFs (o da orbe levava ~10 min no CI só gravando).
 - O pedaço de cada teste vem do hash do nome: o mesmo teste cai sempre no mesmo shard. Para repetir um
-  shard localmente: `assembleDebug assembleDebugAndroidTest` e `scripts/ci-device-gate.sh suite <i> 5`
-  com o emulador de pé (sem `GITHUB_RUN_ID`, o script usa os APKs do build local).
+  job localmente: `assembleDebug assembleDebugAndroidTest` e `scripts/ci-device-gate.sh all <i> 6` com o
+  emulador de pé (sem `GITHUB_RUN_ID`, o script usa os APKs do build local); `suite` e `screens` rodam
+  só uma das metades.
 - `ci-instrument-summary.py` lê a saída `-r` do `am instrument` e é quem decide o gate: o `am
   instrument` sai com 0 mesmo com falha ou com o processo caído no meio.
 - KVM é requisito dos jobs de device (`test -c /dev/kvm`): sem ele a suíte não cabe — ver
   `ENVIRONMENT.md`, sandbox sem KVM.
-- Artefatos: `unit-evidence` (relatórios JUnit) e `device-evidence-<suite-i|screens-tema-k>` (saída
-  bruta do `am instrument`, logcat da rodada, `host.txt`, PNGs capturados), 14 dias.
+- Artefatos: `unit-evidence` (relatórios JUnit) e `device-evidence-<i>` (saída bruta do `am instrument`,
+  logcat da rodada, `host.txt`, PNGs capturados), 14 dias.
 - O device físico (A32) e o emulador Android 17 seguem sendo gates manuais **[YAN]**.

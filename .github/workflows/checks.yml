@@ -90,27 +90,17 @@ jobs:
     # Sem `needs: unit`: o preparo e o boot do emulador (~3 min) correm enquanto o `unit` compila, e o
     # script espera o artefato `apks` (se o `unit` falhar, ele para logo). Em 2026-10-07 o gate num
     # emulador só passou de 70 min — suíte de 584 testes (~38 min) + galeria de 216 PNGs, depois de
-    # recompilar o app no próprio runner — e o QEMU travou no fim. Agora cada pedaço tem seu emulador:
-    # 5 da suíte e 4 da galeria (tema × metade das rotas). Em 2026-10-09, com 2 por tema (108 capturas),
-    # um QEMU travou depois de 85; a memória dele cresce a cada abertura do app (o `host.txt` da
-    # evidência mostra o quanto). Mudar o nº de pedaços = mexer nas linhas `suite <índice> <total>` (o
-    # total vai para o numShards do AndroidJUnitRunner) ou `screens <tema> <k/n>` abaixo.
-    name: ${{ matrix.name }}
+    # recompilar o app no próprio runner — e o QEMU travou no fim. Agora cada job roda 1/N da suíte e,
+    # no mesmo emulador, 1/N das rotas da galeria (claro e escuro). A galeria em jobs próprios, com o
+    # emulador recém-ligado, deu ANR nas rotas mais pesadas em toda rodada (2026-10-09). Mudar o nº de
+    # pedaços = mexer na lista `shard` (o total vem de strategy.job-total).
+    name: Device (API 34, ${{ matrix.shard }}/${{ strategy.job-total }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { name: 'Instrumented (API 34, shard 0)', key: suite-0, gate: suite 0 5 }
-          - { name: 'Instrumented (API 34, shard 1)', key: suite-1, gate: suite 1 5 }
-          - { name: 'Instrumented (API 34, shard 2)', key: suite-2, gate: suite 2 5 }
-          - { name: 'Instrumented (API 34, shard 3)', key: suite-3, gate: suite 3 5 }
-          - { name: 'Instrumented (API 34, shard 4)', key: suite-4, gate: suite 4 5 }
-          - { name: 'Screenshots (API 34, light 0/2)', key: screens-light-0, gate: screens light 0/2, theme: light, routes: 0/2 }
-          - { name: 'Screenshots (API 34, light 1/2)', key: screens-light-1, gate: screens light 1/2, theme: light, routes: 1/2 }
-          - { name: 'Screenshots (API 34, dark 0/2)', key: screens-dark-0, gate: screens dark 0/2, theme: dark, routes: 0/2 }
-          - { name: 'Screenshots (API 34, dark 1/2)', key: screens-dark-1, gate: screens dark 1/2, theme: dark, routes: 1/2 }
+        shard: [0, 1, 2, 3, 4, 5]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -139,7 +129,6 @@ jobs:
           test -c /dev/kvm
       # `compare` do diff-screens.sh.
       - name: ImageMagick
-        if: matrix.theme
         run: |
           sudo apt-get update
           sudo apt-get install -y imagemagick
@@ -152,7 +141,8 @@ jobs:
       # a 3,98 GB no 37.1.11 (build 15917651, o da última `main` verde). No runner de 7 GB isso virou
       # swap e QEMU travado na galeria. Subir de versão = repetir o A/B antes.
       - name: Device gate on the emulator
-        timeout-minutes: 28
+        id: gate
+        timeout-minutes: 33
         env:
           GH_TOKEN: ${{ github.token }}
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
@@ -167,18 +157,18 @@ jobs:
           disk-size: 6G
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-boot-anim -camera-back none
           disable-animations: true
-          script: scripts/ci-device-gate.sh ${{ matrix.gate }}
+          script: scripts/ci-device-gate.sh all ${{ matrix.shard }} ${{ strategy.job-total }}
+      # Roda mesmo com teste falhando na suíte (o passo do gate fica vermelho, mas as capturas existem).
       - name: Diff against the goldens
-        if: matrix.theme
+        if: ${{ !cancelled() && steps.gate.outcome != 'skipped' }}
         env:
-          THEMES: ${{ matrix.theme }}
-          ROUTE_SHARD: ${{ matrix.routes }}
+          ROUTE_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
         run: scripts/diff-screens.sh
       - name: Device evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: device-evidence-${{ matrix.key }}
+          name: device-evidence-${{ matrix.shard }}
           path: app/build/ci-evidence/
           if-no-files-found: warn
           retention-days: 14
