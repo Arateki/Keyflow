@@ -65,6 +65,8 @@ DeckLock (actions fixadas por SHA, `permissions: contents: read`, evidência env
   (~7 min, disputando 2 núcleos/7 GB com o QEMU), suíte de 584 testes (~38 min) e galeria de 216 PNGs —
   e o QEMU travou no fim. A memória do QEMU cresce a cada abertura do app (~5 MB, medido no emulador
   local); `host.txt` na evidência registra memória, swap e carga do runner a cada 20 s.
+- A suíte roda com `-e motionFrames false`: os testes de artefato de movimento (orbe, mic do teclado)
+  conferem os gestos sem gravar os PNGs dos GIFs (o da orbe levava ~10 min no CI só gravando).
 - O pedaço de cada teste vem do hash do nome: o mesmo teste cai sempre no mesmo shard. Para repetir um
   shard localmente: `assembleDebug assembleDebugAndroidTest` e `scripts/ci-device-gate.sh suite <i> 5`
   com o emulador de pé (sem `GITHUB_RUN_ID`, o script usa os APKs do build local).

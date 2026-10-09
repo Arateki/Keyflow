@@ -125,11 +125,13 @@ install_apks() {
 }
 
 # localModelE2E: liga o ponta a ponta do modelo local (baixa o Whisper base, ~160 MB, e transcreve).
+# motionFrames=false: os testes de artefato de movimento conferem os gestos sem gravar os quadros dos GIFs.
 # O hash do nome de cada teste decide o pedaço: o mesmo teste cai sempre no mesmo shard.
 run_shard() {
   local index="$1" total="$2"
   "$ADB" shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1 || true
-  "$ADB" shell am instrument -w -r -e numShards "$total" -e shardIndex "$index" -e localModelE2E true "$RUNNER" \
+  "$ADB" shell am instrument -w -r -e numShards "$total" -e shardIndex "$index" -e localModelE2E true \
+    -e motionFrames false "$RUNNER" \
     | tee "$EVIDENCE/instrument-raw.txt" \
     | python3 -u scripts/ci-instrument-summary.py --label "Instrumentados, shard $index de $total"
 }
