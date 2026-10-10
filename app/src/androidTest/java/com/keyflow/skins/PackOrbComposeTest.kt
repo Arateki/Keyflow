@@ -85,15 +85,19 @@ class PackOrbComposeTest {
 
     /**
      * `captureToImage` espera um redesenho da janela por no máximo 2 s — o limite é fixo na biblioteca — e um emulador de software com o host
-     * carregado às vezes demora mais que isso (`ComposeTimeoutException`, medido: 2 de 4 rodadas do pacote sob carga). Só essa exceção
-     * é repetida, até 5 vezes: o que a captura devolve continua sendo conferido pixel a pixel pelos testes.
+     * carregado às vezes demora mais que isso (`ComposeTimeoutException`, medido: 2 de 4 rodadas do pacote sob carga). No swangle a mesma
+     * espera estoura como `AssertionError("Failed waiting for PixelCopy!")` (CI, 2026-10-10). Só essas duas são repetidas, até 5 vezes:
+     * o que a captura devolve continua sendo conferido pixel a pixel pelos testes.
      */
     private fun capture(): android.graphics.Bitmap {
-        var timedOut: ComposeTimeoutException? = null
+        var timedOut: Throwable? = null
         repeat(5) {
             try {
                 return rule.onNodeWithTag(TAG).captureToImage().asAndroidBitmap()
             } catch (e: ComposeTimeoutException) {
+                timedOut = e
+            } catch (e: AssertionError) {
+                if (e.message?.contains("PixelCopy") != true) throw e
                 timedOut = e
             }
         }
