@@ -59,11 +59,15 @@ internal fun awaitKeyboardAttached(device: UiDevice, relaunch: () -> Unit) {
         Thread.sleep(50)
     }
     if (KeyFlowKeyboardService.activeViewForTest == null) throw AssertionError("KeyFlowKeyboardView não anexou")
-    awaitImeWindowSettled(device)
+    awaitImeWindowSettled(device, timeoutMs = IME_OPEN_SETTLE_TIMEOUT_MS, reopenAfterMs = IME_REOPEN_AFTER_MS)
 }
 
 /** Prazo para a janela do teclado assentar onde a view está ([awaitImeWindowSettled]). */
 internal const val IME_SETTLE_TIMEOUT_MS = 10_000L
+
+/** Na abertura (o 1º teste do processo pega o teclado a frio): até 3 reaberturas, uma a cada [IME_REOPEN_AFTER_MS]. */
+private const val IME_OPEN_SETTLE_TIMEOUT_MS = 20_000L
+private const val IME_REOPEN_AFTER_MS = 5_000L
 
 /**
  * Espera a janela do teclado ficar, para o sistema de entrada, exatamente onde a própria view acha que está — em duas
@@ -74,9 +78,18 @@ internal const val IME_SETTLE_TIMEOUT_MS = 10_000L
  * guardando a posição certa — por um instante (campo em outro processo) ou por segundos (campo no processo do teclado).
  * O toque calculado pela view caía fora da grade: na barra, no mic, no campo. A captura na hora da falha mostrou o
  * teclado desenhado fora do lugar, não só a área de toque.
+ *
+ * Com [reopenAfterMs] (só na abertura, no [awaitKeyboardAttached]): sem assentar nesse tempo, fecha e reabre o teclado e
+ * espera de novo. A causa medida é a abertura a frio — cada `am instrument` reinicia o processo, e o executor de testes e o
+ * UiAutomator rodam no mesmo processo do teclado do KeyFlow, atrasando a thread principal dele: o 1º quadro passa do prazo
+ * de 1 s do Android e a janela fica com a geometria da transição (tamanho de Dialog, altura da tela, 126 px abaixo). No
+ * processo do teclado essa geometria chegou a ficar presa por mais de 10 s; uma abertura nova, já quente, se acerta. No meio
+ * de um teste não reabre: fechar o teclado mexeria no estado do teste (composição, seletor), e aí a falha é a resposta.
  */
-internal fun awaitImeWindowSettled(device: UiDevice, timeoutMs: Long = IME_SETTLE_TIMEOUT_MS) {
+internal fun awaitImeWindowSettled(device: UiDevice, timeoutMs: Long = IME_SETTLE_TIMEOUT_MS, reopenAfterMs: Long? = null) {
     val deadline = System.currentTimeMillis() + timeoutMs
+    var reopenAt = reopenAfterMs?.let { System.currentTimeMillis() + it }
+    var reopened = 0
     var stable = 0
     var last = ""
     while (System.currentTimeMillis() < deadline) {
@@ -88,9 +101,28 @@ internal fun awaitImeWindowSettled(device: UiDevice, timeoutMs: Long = IME_SETTL
         } else {
             stable = 0
         }
+        if (reopenAt != null && reopenAfterMs != null && System.currentTimeMillis() >= reopenAt && reopened < MAX_REOPENS) {
+            android.util.Log.i("KeyFlow.ImeTest", "janela do teclado fora do lugar ($last): reabrindo o teclado")
+            reopenKeyboard(device)
+            reopened++
+            reopenAt = System.currentTimeMillis() + reopenAfterMs
+            continue
+        }
         Thread.sleep(100)
     }
-    throw AssertionError("a janela do teclado não assentou onde a view está em ${timeoutMs / 1000} s ($last)")
+    throw AssertionError(
+        "a janela do teclado não assentou onde a view está em ${timeoutMs / 1000} s, reabrindo $reopened vez(es) ($last)",
+    )
+}
+
+private const val MAX_REOPENS = 3
+
+/** Fecha o teclado (só se ele estiver de pé: o "voltar" com o teclado fechado fecharia o campo) e toca no campo de novo. */
+private fun reopenKeyboard(device: UiDevice) {
+    if (imeInputFrame(device) != null) device.pressBack()
+    Thread.sleep(500)
+    device.wait(Until.hasObject(By.desc("ime_probe_field")), IME_ATTACH_NUDGE_MS)
+    runCatching { device.findObject(By.desc("ime_probe_field"))?.click() }
 }
 
 /** A janela do teclado como a view a vê (raiz da hierarquia), no formato do `dumpsys input`: `[l,t][r,b]`. */
