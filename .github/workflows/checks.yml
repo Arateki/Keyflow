@@ -139,6 +139,11 @@ jobs:
       # AVD em 2026-10-09: 30 aberturas da galeria levaram o QEMU de 3,66 a 6,43 GB no 37.2.12 e de 3,78
       # a 3,98 GB no 37.1.11 (build 15917651, o da última `main` verde). No runner de 7 GB isso virou
       # swap e QEMU travado na galeria. Subir de versão = repetir o A/B antes.
+      # -gpu swangle_indirect (ANGLE sobre o SwiftShader Vulkan), não swiftshader_indirect: neste o QEMU
+      # caía na RenderThread do host ao desenhar a prévia do Aero (tela de skins: queda na 2ª e na 12ª
+      # abertura no emulador local, 2026-10-09; a quick 018 já tinha visto o Aero cair sem achar a causa).
+      # No swangle, 0 quedas em 40 aberturas e duas galerias inteiras byte a byte iguais; 36 goldens
+      # mudaram só na suavização de borda e foram reaprovados.
       - name: Device gate on the emulator
         id: gate
         timeout-minutes: 33
@@ -154,7 +159,7 @@ jobs:
           cores: 2
           ram-size: 4096M
           disk-size: 6G
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-boot-anim -camera-back none
+          emulator-options: -no-window -gpu swangle_indirect -no-snapshot -no-boot-anim -camera-back none
           disable-animations: true
           script: scripts/ci-device-gate.sh all ${{ matrix.shard }} ${{ strategy.job-total }}
       # Roda mesmo com teste falhando na suíte (o passo do gate fica vermelho, mas as capturas existem).

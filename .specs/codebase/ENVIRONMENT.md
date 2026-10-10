@@ -48,8 +48,8 @@ gradle wrapper --gradle-version 9.6.1
 ./gradlew testDebugUnitTest          # unit tests (JVM) — gate "quick"
 ./gradlew connectedDebugAndroidTest  # instrumented — precisa do emulador rodando — gate "full"
 
-# Subir o emulador Android 14 (headless, com KVM):
-emulator -avd keyflow_api34 -no-window -no-audio -gpu swiftshader_indirect &
+# Subir o emulador Android 14 (headless, com KVM) no renderizador do CI (os goldens saem dele):
+emulator -avd keyflow_api34 -no-window -no-audio -gpu swangle_indirect &
 adb wait-for-device && adb shell getprop sys.boot_completed   # "1" = pronto
 
 # Subir com janela (se houver display):

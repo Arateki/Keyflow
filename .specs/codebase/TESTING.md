@@ -75,6 +75,10 @@ DeckLock (actions fixadas por SHA, `permissions: contents: read`, evidência env
   30 aberturas, contra 3,78 → 3,98 GB no 37.1.11) — no runner de 7 GB, swap e QEMU travado na galeria.
   `host.txt` na evidência registra memória, swap, carga e RSS do QEMU a cada 20 s; subir de versão =
   repetir o A/B antes.
+- **Renderizador `swangle_indirect`**, não `swiftshader_indirect`: neste o QEMU caía na RenderThread do host
+  ao desenhar a prévia do Aero (tela de skins). No swangle, 0 quedas em 40 aberturas; 36 goldens mudaram
+  só na suavização de borda e foram reaprovados a partir de capturas `swangle` (2026-10-09). Gerar
+  golden no emulador local = subir com `-gpu swangle_indirect`.
 - A suíte roda com `-e motionFrames false`: os testes de artefato de movimento (orbe, mic do teclado)
   conferem os gestos sem gravar os PNGs dos GIFs (o da orbe levava ~10 min no CI só gravando).
 - O pedaço de cada teste vem do hash do nome: o mesmo teste cai sempre no mesmo shard. Para repetir um

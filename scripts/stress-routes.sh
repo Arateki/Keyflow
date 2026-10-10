@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Abre rotas da galeria em rodízio, várias vezes, até o emulador cair ou as rodadas acabarem.
 #
-# Por que existe: o `qemu` do emulador em `-gpu swiftshader_indirect` (o modo do CI) tem um SIGSEGV na RenderThread do renderizador
+# Por que existe: o `qemu` do emulador em `-gpu swiftshader_indirect` (o modo do CI até 2026-10-09; hoje é swangle_indirect) tem um SIGSEGV na RenderThread do renderizador
 # gráfico que depende do que a rota desenha (medido em 2026-10-03, ver .specs/quick/018-skin-mascote/TASK.md: o rabo do mascote com
 # degradê e dobra positiva derrubava o emulador na 1ª a 5ª abertura). Capturar a galeria inteira só mostra "rota X não ficou pronta";
 # isto isola qual rota derruba e em que abertura.
