@@ -36,7 +36,10 @@ def main():
     workers = []
     for artifact in sorted(p for p in root.iterdir() if p.is_dir()):
         meta = read_lines(artifact / "meta.txt")
+        # A condição de cada emulador: a CPU e, se houver, os argumentos extras do teste (ex.: -e probeProcess remoto).
         cpu = next((m.split(": ", 1)[1] for m in meta if m.startswith("cpu do emulador")), "?")
+        extra = next((m.split(": ", 1)[1] for m in meta if m.startswith("argumentos")), "")
+        cpu = f"{cpu} {extra}".strip()
         workers.append((artifact.name, meta))
         for round_dir in sorted(artifact.glob("volta-*")):
             for name in read_lines(round_dir / "passed.txt"):
@@ -52,7 +55,7 @@ def main():
     out.append(f"{len(workers)} emuladores, {len(runs)} testes, {total_runs} execuções no total.")
     out.append("")
     if fails:
-        out.append("| Teste | " + " | ".join(f"falhas / execuções (CPU {c})" for c in conditions) + " |")
+        out.append("| Teste | " + " | ".join(f"falhas / execuções ({c})" for c in conditions) + " |")
         out.append("|---|" + "---|" * len(conditions))
         for name in sorted(fails, key=lambda n: -sum(fails[n].values())):
             cells = [f"{fails[name][c]} / {runs[name][c]}" for c in conditions]

@@ -17,7 +17,7 @@ import android.widget.FrameLayout
  * Activity debug com um único `EditText` focado — só para o teste de superfícies de sistema (T25)
  * capturar o IME real sobre um campo. Exportada para `am start` via shell; não tem launcher.
  */
-class ImeProbeActivity : Activity() {
+open class ImeProbeActivity : Activity() {
 
     private var field: EditText? = null
 

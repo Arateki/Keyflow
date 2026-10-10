@@ -136,7 +136,9 @@ while [ "$SECONDS" -lt "$deadline" ]; do
   fi
   "$ADB" shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1 || true
   "$ADB" shell rm -f "$FAILURE_SHOTS/falha-*.png" >/dev/null 2>&1 || true
-  "$ADB" shell am instrument -w -r -e class "$CLASSES" -e motionFrames false "$RUNNER" > "$dir/raw.txt"
+  # STRESS_INSTRUMENT_ARGS: argumentos extras do teste, separados por espaço (ex.: "-e probeProcess remoto").
+  # shellcheck disable=SC2086
+  "$ADB" shell am instrument -w -r -e class "$CLASSES" -e motionFrames false ${STRESS_INSTRUMENT_ARGS:-} "$RUNNER" > "$dir/raw.txt"
   # --retry-follows: sem anotação por volta (seriam centenas); o relatório anota no fim.
   env -u GITHUB_STEP_SUMMARY python3 scripts/ci-instrument-summary.py --label "volta $i" --retry-follows \
     --passed-out "$dir/passed.txt" --failed-out "$dir/failed.txt" < "$dir/raw.txt" > "$dir/summary.txt"
@@ -160,6 +162,7 @@ kill "$LOGCAT_PID" 2>/dev/null || true
 {
   echo "voltas: $i (com falha: $failed_rounds)"
   if [ -n "$CPU" ]; then echo "cpu do emulador: $CPU%"; else echo "cpu do emulador: livre"; fi
+  [ -z "${STRESS_INSTRUMENT_ARGS:-}" ] || echo "argumentos: $STRESS_INSTRUMENT_ARGS"
   frame_stats
 } | tee "$OUT/meta.txt"
 # O logcat inteiro tem centenas de milhares de linhas; as voltas com falha já guardaram o seu trecho.

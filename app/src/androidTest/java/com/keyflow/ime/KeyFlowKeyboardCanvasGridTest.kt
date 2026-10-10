@@ -188,7 +188,7 @@ class KeyFlowKeyboardCanvasGridTest {
         shell("ime set $IME")
 
         val intent = Intent()
-            .setClassName(context.packageName, "com.keyflow.ui.ImeProbeActivity")
+            .setClassName(context.packageName, probeActivity())
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         context.startActivity(intent)
 
@@ -199,6 +199,14 @@ class KeyFlowKeyboardCanvasGridTest {
         device.wait(Until.hasObject(By.text("🎙")), TIMEOUT)
         awaitKeyboardAttached(device) { context.startActivity(intent) }
     }
+
+    /**
+     * `-e probeProcess remoto` troca o campo pelo [com.keyflow.ui.ImeProbeRemoteActivity], num processo separado do teclado,
+     * como num app de verdade — o experimento da esteira sobre a animação de entrada do teclado fora do lugar.
+     */
+    private fun probeActivity(): String =
+        if (InstrumentationRegistry.getArguments().getString("probeProcess") == "remoto") "com.keyflow.ui.ImeProbeRemoteActivity"
+        else "com.keyflow.ui.ImeProbeActivity"
 
     /** Acha a tecla [label] na camada de letras via geometria já computada e injeta um toque real nela. */
     private fun tapKey(grid: com.keyflow.ime.keyboard.KeyboardGridView, label: String) {
