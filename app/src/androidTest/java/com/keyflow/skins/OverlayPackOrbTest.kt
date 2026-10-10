@@ -77,7 +77,8 @@ class OverlayPackOrbTest {
         runBlocking { repo.saveSettings(repo.settingsFlow().first().copy(orbSkin = skinId)) }
     }
 
-    private fun screenshot(): Bitmap = instrumentation.uiAutomation.takeScreenshot()
+    /** `null` quando a captura do sistema falha — no emulador do CI isso acontece de vez em quando (2026-10-10); quem espera tenta de novo. */
+    private fun screenshot(): Bitmap? = instrumentation.uiAutomation.takeScreenshot()
 
     /** Quantos pixels do screenshot estão a menos de [tolerance] por canal de [rgb]. */
     private fun countNear(bitmap: Bitmap, rgb: Int, tolerance: Int = 12): Int {
@@ -103,8 +104,11 @@ class OverlayPackOrbTest {
         val deadline = System.currentTimeMillis() + timeoutMs
         var last = -1
         while (System.currentTimeMillis() < deadline) {
-            last = countNear(screenshot(), rgb)
-            if ((last >= min) == present && (present || last < 300)) return
+            val shot = screenshot()
+            if (shot != null) {
+                last = countNear(shot, rgb)
+                if ((last >= min) == present && (present || last < 300)) return
+            }
             Thread.sleep(250)
         }
         throw AssertionError("$what: esperava ${if (present) "ter" else "não ter"} #${"%06X".format(rgb and 0xFFFFFF)} na tela; último count=$last")
