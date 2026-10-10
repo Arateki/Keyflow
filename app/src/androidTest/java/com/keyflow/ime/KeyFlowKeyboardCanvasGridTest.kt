@@ -131,7 +131,7 @@ class KeyFlowKeyboardCanvasGridTest {
 
         val down = SystemClock.uptimeMillis()
         injectDown(u.centerX, u.centerY, down)
-        waitUntil("a tira de acentos do \"u\" não abriu") { grid.accentVariantsForTest != null }
+        waitUntil({ "a tira de acentos do \"u\" não abriu (${keyboardState(grid, u)})" }) { grid.accentVariantsForTest != null }
         val variants = grid.accentVariantsForTest!!
         inject(MotionEvent.ACTION_UP, u.centerX, u.centerY, down)
 
@@ -150,7 +150,7 @@ class KeyFlowKeyboardCanvasGridTest {
 
         val down = SystemClock.uptimeMillis()
         injectDown(u.centerX, u.centerY, down)
-        waitUntil("a tira de acentos do \"u\" não abriu") { grid.accentVariantsForTest != null }
+        waitUntil({ "a tira de acentos do \"u\" não abriu (${keyboardState(grid, u)})" }) { grid.accentVariantsForTest != null }
         val variants = grid.accentVariantsForTest!!
         val nextX = u.centerX + grid.accentChipWidthForTest!!.toInt()
         inject(MotionEvent.ACTION_MOVE, nextX, u.centerY, down)
@@ -303,13 +303,26 @@ class KeyFlowKeyboardCanvasGridTest {
         }
     }
 
-    private fun waitUntil(message: String, timeoutMs: Long = TIMEOUT, condition: () -> Boolean) {
+    private fun waitUntil(message: String, timeoutMs: Long = TIMEOUT, condition: () -> Boolean) =
+        waitUntil({ message }, timeoutMs, condition)
+
+    private fun waitUntil(message: () -> String, timeoutMs: Long = TIMEOUT, condition: () -> Boolean) {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
             if (condition()) return
             Thread.sleep(50)
         }
-        throw AssertionError(message)
+        throw AssertionError(message())
+    }
+
+    /** O que a grade e o teclado diziam na hora da falha — para a próxima falha dizer por quê. */
+    private fun keyboardState(grid: com.keyflow.ime.keyboard.KeyboardGridView, key: KeyOnScreen): String {
+        val view = KeyFlowKeyboardService.activeViewForTest
+        val loc = IntArray(2).also { grid.getLocationOnScreen(it) }
+        val language = runBlocking { SettingsRepository(context).keyboardLanguageOnce() }
+        return "toque em (${key.centerX}, ${key.centerY}); grade em (${loc[0]}, ${loc[1]}) ${grid.width}x${grid.height}, " +
+            "visível=${grid.isShown}, mesma view ativa=${view?.canvasGridForTest === grid}, expandido=${view?.expandedForTest}, " +
+            "camada=${grid.currentLayerIdForTest}, fileiras=${grid.placedRowsForTest.size}, idioma salvo=$language"
     }
 
     private fun shell(command: String) {
