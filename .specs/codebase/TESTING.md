@@ -121,8 +121,9 @@ ele é; a outra metade com o QEMU num cgroup limitado a 2 núcleos, perto do run
 falhas apareciam mais. O job `Stress report` (`scripts/ci-stress-report.py`) soma tudo: falhas/execuções por
 teste e condição de CPU, a 1ª linha do erro e onde está a evidência (artefato `stress-evidence-<n>-cpu…` →
 volta: saída bruta, trecho do logcat, tela). Fica vermelho quando acha alguma falha. Não bloqueia PR.
-Cada emulador para na 1ª volta com falha — o GitHub só libera log e artefato de job terminado, então é
-assim que a falha aparece na hora; `STRESS_KEEP_GOING=1` no script segue até o fim (taxa de falha).
+Cada emulador roda o tempo todo (uma falha frequente não tira ninguém da caça às raras); como o GitHub só
+libera log e artefato de job terminado, cada volta com falha publica na hora um status `esteira/<emulador>/
+volta-N` no commit, com o teste e a 1ª linha do erro — o aviso antecipado. A evidência completa sai no fim.
 
 - Rodar com o código de um commit qualquer: `git push origin HEAD:ci/esteira-lenta` (serve também para
   conferir uma correção sob repetição antes de mesclar). Com o arquivo na `main`: Actions → Stress → Run

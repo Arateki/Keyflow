@@ -10,8 +10,8 @@ name: Stress
 #
 # Metade dos emuladores roda no runner como ele é; a outra metade com o QEMU limitado a 2 núcleos, perto do
 # runner privado (2 vCPU) onde as falhas apareciam mais — no repositório público o runner tem 4.
-# Cada emulador para na 1ª volta com falha: o job fica vermelho na hora, com a evidência já no artefato
-# (log e artefato só saem de job terminado), e os demais seguem caçando.
+# Cada emulador roda o tempo todo e junta todas as falhas; uma volta com falha publica na hora um status
+# `esteira/…` no commit (log e artefato só saem de job terminado) — é o aviso antecipado.
 on:
   push:
     branches: ['ci/esteira-lenta**']
@@ -25,6 +25,8 @@ on:
         default: '40'
 permissions:
   contents: read
+  # Os status `esteira/<emulador>/volta-N` do aviso antecipado (scripts/ci-stress.sh).
+  statuses: write
 concurrency:
   group: stress-${{ github.ref }}
   cancel-in-progress: true
@@ -114,6 +116,9 @@ jobs:
       # O mesmo emulador do gate (checks.yml: versão fixa, swangle, Pixel 6, 2 núcleos, 4 GB).
       - name: Stress loop on the emulator
         timeout-minutes: 65
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STRESS_WORKER: ${{ matrix.worker }}-cpu${{ matrix.cpu || 'livre' }}
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 34

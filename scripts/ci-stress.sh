@@ -14,9 +14,10 @@
 # de instalar (o holdingAKey… da CanvasGridTest é sempre o 1º teste de teclado do processo). Toda volta
 # grava passed.txt/failed.txt; a que falha guarda também a saída bruta, o trecho do logcat e a tela.
 #
-# Para na 1ª volta com falha e sai com 1: o GitHub só libera log e artefato de job terminado, então é
-# assim que a falha aparece na hora, com evidência, enquanto os outros emuladores seguem caçando.
-# STRESS_KEEP_GOING=1 segue até o fim do tempo (para medir a taxa de falha) e sai com 0.
+# Roda o tempo todo, mesmo depois de uma falha: uma falha frequente não pode tirar o emulador da caça às
+# raras. Como o GitHub só libera log e artefato de job terminado, cada volta com falha publica na hora um
+# status no commit (`esteira/<emulador>/volta-N`: o teste e a 1ª linha do erro) — é o aviso antecipado;
+# a evidência completa sobe no fim. Sai com 1 se alguma volta falhou.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
@@ -56,6 +57,19 @@ limit_cpu() {
 install_app() {
   "$ADB" install -r -t "$APP_APK" >/dev/null || return 1
   "$ADB" shell cmd package compile -m speed -f com.keyflow >/dev/null
+}
+
+# O aviso antecipado: um status no commit, que a API mostra com o job ainda rodando. Fora do Actions
+# (sem GITHUB_SHA) não faz nada.
+announce_failure() {
+  local dir="$1" round="$2" test error
+  [ -n "${GITHUB_SHA:-}" ] && [ -n "${GH_TOKEN:-}" ] || return 0
+  test=$(head -1 "$dir/failed.txt" | sed 's/^.*\.//')
+  error=$(grep -A1 "^  ✗ " "$dir/summary.txt" | sed -n 2p | sed 's/^ *//')
+  gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" -f state=failure \
+    -f context="esteira/${STRESS_WORKER:-?}/volta-$round" \
+    -f description="$(printf '%s: %s' "${test:-processo caiu}" "$error" | cut -c1-140)" \
+    -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >/dev/null || true
 }
 
 # Mediana e p90 do tempo de quadro do processo de teste: é o número que compara este emulador com o
@@ -115,7 +129,7 @@ while [ "$SECONDS" -lt "$deadline" ]; do
     sed -n "$((from + 1)),\$p" "$OUT/logcat-full.txt" > "$dir/logcat.txt"
     "$ADB" exec-out screencap -p > "$dir/tela.png" 2>/dev/null || rm -f "$dir/tela.png"
     echo "volta $i ($((SECONDS - start)) s):$score — FALHOU: $(paste -sd' ' "$dir/failed.txt")"
-    [ "${STRESS_KEEP_GOING:-0}" = 1 ] || break
+    announce_failure "$dir" "$i"
   fi
 done
 
@@ -128,4 +142,4 @@ kill "$LOGCAT_PID" 2>/dev/null || true
 # O logcat inteiro tem centenas de milhares de linhas; as voltas com falha já guardaram o seu trecho.
 rm -f "$OUT/logcat-full.txt"
 [ "$i" -gt 0 ] && [ -s "$OUT/volta-001/passed.txt" -o -s "$OUT/volta-001/failed.txt" ] || exit 1
-[ "$failed_rounds" -eq 0 ] || [ "${STRESS_KEEP_GOING:-0}" = 1 ] || exit 1
+[ "$failed_rounds" -eq 0 ]
