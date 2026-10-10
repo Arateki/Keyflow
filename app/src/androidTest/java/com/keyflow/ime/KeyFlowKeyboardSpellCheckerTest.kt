@@ -209,6 +209,7 @@ class KeyFlowKeyboardSpellCheckerTest {
         waitUntil("grade Canvas ainda sem geometria medida") { grid.placedRowsForTest.isNotEmpty() }
         val placed = grid.placedRowsForTest.flatMap { it.keys }
             .first { (it.keyDef.action as? CanvasKeyAction.Char)?.text == label }
+        awaitImeWindowSettled(device)
         val loc = IntArray(2).also { grid.getLocationOnScreen(it) }
         val x = (loc[0] + (placed.left + placed.right) / 2).toInt()
         val y = (loc[1] + (placed.top + placed.bottom) / 2).toInt()
@@ -217,6 +218,7 @@ class KeyFlowKeyboardSpellCheckerTest {
 
     private fun tapAction(grid: KeyboardGridView, action: CanvasKeyAction) {
         val placed = grid.placedRowsForTest.flatMap { it.keys }.first { it.keyDef.action == action }
+        awaitImeWindowSettled(device)
         val loc = IntArray(2).also { grid.getLocationOnScreen(it) }
         tapScreen((loc[0] + (placed.left + placed.right) / 2).toInt(), (loc[1] + (placed.top + placed.bottom) / 2).toInt())
     }
@@ -236,6 +238,7 @@ class KeyFlowKeyboardSpellCheckerTest {
     private fun tapBackspaceOnGrid(grid: KeyboardGridView) {
         val placed = grid.placedRowsForTest.flatMap { it.keys }
             .first { it.keyDef.action == CanvasKeyAction.Backspace }
+        awaitImeWindowSettled(device)
         val loc = IntArray(2).also { grid.getLocationOnScreen(it) }
         val x = (loc[0] + (placed.left + placed.right) / 2).toInt()
         val y = (loc[1] + (placed.top + placed.bottom) / 2).toInt()

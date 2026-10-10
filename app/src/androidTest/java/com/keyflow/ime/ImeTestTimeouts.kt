@@ -1,5 +1,6 @@
 package com.keyflow.ime
 
+import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
@@ -44,7 +45,7 @@ internal fun awaitKeyboardAttached(device: UiDevice, relaunch: () -> Unit) {
     val deadline = System.currentTimeMillis() + IME_COLD_ATTACH_TIMEOUT_MS
     var nextNudge = System.currentTimeMillis() + IME_ATTACH_NUDGE_MS
     while (System.currentTimeMillis() < deadline) {
-        if (KeyFlowKeyboardService.activeViewForTest != null) return
+        if (KeyFlowKeyboardService.activeViewForTest != null) break
         if (System.currentTimeMillis() >= nextNudge) {
             if (device.executeShellCommand("settings get secure default_input_method").trim() != KEYFLOW_IME) {
                 device.executeShellCommand("ime enable $KEYFLOW_IME")
@@ -57,5 +58,55 @@ internal fun awaitKeyboardAttached(device: UiDevice, relaunch: () -> Unit) {
         }
         Thread.sleep(50)
     }
-    throw AssertionError("KeyFlowKeyboardView não anexou")
+    if (KeyFlowKeyboardService.activeViewForTest == null) throw AssertionError("KeyFlowKeyboardView não anexou")
+    awaitImeWindowSettled(device)
 }
+
+/** Prazo para a janela do teclado assentar onde a view está ([awaitImeWindowSettled]). */
+internal const val IME_SETTLE_TIMEOUT_MS = 10_000L
+
+/**
+ * Espera a janela do teclado ficar, para o sistema de entrada, exatamente onde a própria view acha que está — em duas
+ * leituras seguidas. Chamar antes de calcular um toque pela posição da view.
+ *
+ * Esteira de instabilidade (2026-10-10): no emulador sob carga a camada da animação de entrada do teclado chegou a ficar
+ * 126 px abaixo (a barra de navegação que o teclado desenha) ou no topo da tela, com o gerenciador de janelas e a view
+ * guardando a posição certa — por um instante (campo em outro processo) ou por segundos (campo no processo do teclado).
+ * O toque calculado pela view caía fora da grade: na barra, no mic, no campo. A captura na hora da falha mostrou o
+ * teclado desenhado fora do lugar, não só a área de toque.
+ */
+internal fun awaitImeWindowSettled(device: UiDevice, timeoutMs: Long = IME_SETTLE_TIMEOUT_MS) {
+    val deadline = System.currentTimeMillis() + timeoutMs
+    var stable = 0
+    var last = ""
+    while (System.currentTimeMillis() < deadline) {
+        val expected = keyboardWindowOnScreen()
+        val seen = imeInputFrame(device)
+        last = "sistema de entrada=$seen, view=$expected"
+        if (expected != null && seen == expected) {
+            if (++stable >= 2) return
+        } else {
+            stable = 0
+        }
+        Thread.sleep(100)
+    }
+    throw AssertionError("a janela do teclado não assentou onde a view está em ${timeoutMs / 1000} s ($last)")
+}
+
+/** A janela do teclado como a view a vê (raiz da hierarquia), no formato do `dumpsys input`: `[l,t][r,b]`. */
+private fun keyboardWindowOnScreen(): String? {
+    var frame: String? = null
+    InstrumentationRegistry.getInstrumentation().runOnMainSync {
+        val root = KeyFlowKeyboardService.activeViewForTest?.rootView ?: return@runOnMainSync
+        if (!root.isShown || root.width == 0) return@runOnMainSync
+        val loc = IntArray(2).also { root.getLocationOnScreen(it) }
+        frame = "[${loc[0]},${loc[1]}][${loc[0] + root.width},${loc[1] + root.height}]"
+    }
+    return frame
+}
+
+/** O frame da janela do IME para o InputDispatcher (`dumpsys input`), ou `null` se ela não está listada. */
+internal fun imeInputFrame(device: UiDevice): String? =
+    device.executeShellCommand("dumpsys input").lineSequence()
+        .firstOrNull { it.contains(" InputMethod'") && it.contains("frame=") }
+        ?.let { Regex("frame=(\\[[^]]*]\\[[^]]*])").find(it)?.groupValues?.get(1) }

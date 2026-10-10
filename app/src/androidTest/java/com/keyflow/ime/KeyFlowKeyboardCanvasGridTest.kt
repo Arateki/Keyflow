@@ -211,6 +211,7 @@ class KeyFlowKeyboardCanvasGridTest {
     /** Acha a tecla [label] na camada de letras via geometria já computada e injeta um toque real nela. */
     private fun tapKey(grid: com.keyflow.ime.keyboard.KeyboardGridView, label: String) {
         waitUntil("grade Canvas ainda sem geometria medida") { grid.placedRowsForTest.isNotEmpty() }
+        awaitImeWindowSettled(device)
         val placed = grid.placedRowsForTest.flatMap { it.keys }
             .first { (it.keyDef.action as? CanvasKeyAction.Char)?.text == label }
         val loc = IntArray(2).also { grid.getLocationOnScreen(it) }
@@ -227,6 +228,7 @@ class KeyFlowKeyboardCanvasGridTest {
 
     private fun keyOnScreen(grid: com.keyflow.ime.keyboard.KeyboardGridView, label: String): KeyOnScreen {
         waitUntil("grade Canvas ainda sem geometria medida") { grid.placedRowsForTest.isNotEmpty() }
+        awaitImeWindowSettled(device)
         val placed = grid.placedRowsForTest.flatMap { it.keys }
             .first { (it.keyDef.action as? CanvasKeyAction.Char)?.text == label }
         val loc = IntArray(2).also { grid.getLocationOnScreen(it) }

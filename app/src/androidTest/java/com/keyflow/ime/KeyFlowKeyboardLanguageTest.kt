@@ -128,6 +128,7 @@ class KeyFlowKeyboardLanguageTest {
     /** Toca a tecla globo (KeyAction.Language) na geometria real da grade. */
     private fun tapGlobe(grid: KeyboardGridView) {
         val placed = grid.placedRowsForTest.flatMap { it.keys }.first { it.keyDef.action == CanvasKeyAction.Language }
+        awaitImeWindowSettled(device)
         val loc = IntArray(2).also { grid.getLocationOnScreen(it) }
         val x = (loc[0] + (placed.left + placed.right) / 2).toInt()
         val y = (loc[1] + (placed.top + placed.bottom) / 2).toInt()
