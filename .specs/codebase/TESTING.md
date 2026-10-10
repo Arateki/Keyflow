@@ -52,6 +52,33 @@ Estratégia escolhida: **cobertura completa** (unit + instrumented). Greenfield 
 - Teste que precisa agir DENTRO de uma janela de tempo do produto (ex.: desfazer o cancelamento, 3 s) alonga a janela por um
   gancho `…ForTest` em vez de correr contra o relógio: no emulador do CI um quadro do teclado chega a 1–2 s.
 
+## Técnicas além do teste de exemplo (2026-10-10)
+
+Código que testa o código de outro jeito — cada uma pega uma classe de defeito que o teste "dada esta entrada, espero esta
+saída" deixa passar.
+
+| Técnica | Onde | O que pega | Roda |
+| ------- | ---- | ---------- | ---- |
+| Regras de arquitetura | `ArchitectureRulesTest` (lê o fonte como texto) | Convenção que já custou CI: `collectAsState` direto, `runBlocking` novo, `stopService` no OverlayService, teste que grava sem parar o serviço, espera às cegas pelo "🎙", `}` solto em Regex do ICU. Exceção = entrada na lista do teste, com o porquê | unit |
+| StrictMode | `StrictModeGuard` (debug) + `StrictModeKeyboardTest` | Disco/rede na thread principal ao abrir o teclado (achou 5; zeradas). Violação nova falha; `KNOWN` só encolhe | gate (instrumentado, API 28+) |
+| Cobertura | `-Pcoverage` (JaCoCo do AGP) + `scripts/coverage-summary.py` | Mapa do que nenhum teste de unidade toca | job de unitários |
+| Propriedade | `app/src/test/…/properties/` (kotest-property) | Regra que vale para TODA entrada: barras/grades ida e volta, teclas contíguas e sem buraco (achou a fresta de 0,00006 px na borda direita), orçamento e quadros da orbe, repetição de tecla | unit |
+| Fuzz | `app/src/test/…/fuzz/` | Entrada de fora nunca derruba o app: pacote de skin (bytes, zip corrompido, nomes hostis, SVG), manifest, barras, credenciais, argumentos do agente (~30 mil entradas, ~4 s) | unit |
+| Máquina de estados | `OverlayCoordinatorStateMachineTest` | Sequências aleatórias de gestos/intenções/cancelar/desfazer/troca de campo/limite com relógio virtual: o microfone capta se e só se o estado é RECORDING, nunca liga duas vezes, a tela mostra o estado real, sempre volta ao repouso. Achou o RESUME em SENDING que deixava o microfone aberto em repouso | unit |
+| Mutação | `./gradlew :app:pitest` + `scripts/mutation-summary.py` + `.github/workflows/mutation.yml` | Onde os testes rodam o código mas não conferem o resultado (mutante que sobrevive) | semanal / manual |
+
+- kotest-property no JUnit4: `fun x() = runBlocking<Unit> { checkAll(...) }` (método JUnit4 tem de devolver Unit). A falha
+  traz a semente ("Repeat this test by using seed …") e a entrada já encolhida; para repetir, `checkAll(PropTestConfig(seed =
+  …), …)`. O gerador tem de respeitar as normalizações do código (ex.: o codec das barras troca rótulo vazio por "⌗") — senão
+  a propriedade falha por culpa do teste.
+- Fuzz não usa Jazzer (pede JUnit5): os geradores do kotest bastam, com JSON válido mutado e aninhamento fundo.
+- Mutação pela linha de comando do PIT (o plugin Gradle para Android não acompanha o AGP 9): a tarefa reusa o classpath do
+  `testDebugUnitTest` e só muta o jar de classes do app. Alvos padrão no `app/build.gradle.kts` (lógica pura bem coberta);
+  outros com `-PpitTargets='com.keyflow.overlay.*'`. Sobrevivente ≠ bug: às vezes a mudança é equivalente; quase sempre é uma
+  regra que nenhum teste confere. 1ª medição (2026-10-10, local, 7 min): força 81% (1890 de 2327 mutantes cobertos), 437
+  sobreviventes — ex.: apagar o `publishTime()`/`timeFreeze()` do `OverlayCoordinator` passa, nenhum teste confere o
+  cronômetro da gravação (`onRecordingTime`).
+
 ## CI (GitHub Actions) — `.github/workflows/checks.yml`
 
 Roda em PR para `main`, push em `main`, merge queue e manual (`workflow_dispatch`), no padrão do
