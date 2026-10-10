@@ -62,6 +62,18 @@ DeckLock (actions fixadas por SHA, `permissions: contents: read`, evidência env
 | `Unit tests and build` | `testDebugUnitTest assembleDebug assembleDebugAndroidTest`; publica os APKs (artefato `apks`, 1 dia) | `quick` + `build` |
 | `Device (API 34, i/6)` | 6 emuladores Pixel 6 · API 34 · x86_64 **com KVM** → `scripts/ci-device-gate.sh all <i> 6`: 1/6 da suíte (`numShards`/`shardIndex` do AndroidJUnitRunner, por `am instrument` direto), app reinstalado do zero e 1/6 das rotas da galeria, claro e escuro (`ROUTE_SHARD`); depois `diff-screens.sh` do mesmo recorte, fora do emulador | `full` + `screenshot` |
 
+- Teste de teclado não espera às cegas: o `awaitKeyboardAttached` (ImeTestTimeouts.kt) espera a janela do IME estar, no
+  `dumpsys input`, onde a raiz da view está (2 leituras seguidas) e, se não assenta em 5 s na abertura, fecha e reabre o
+  teclado (até 3×, só tocando no campo com o teclado fora da tela). Antes de calcular a posição de uma tecla, chame
+  `awaitImeWindowSettled` (sem reabrir). Motivo medido na esteira (2026-10-10): cada `am instrument` reinicia o processo, e o
+  executor de testes e o UiAutomator rodam no processo do teclado do KeyFlow — a abertura a frio passa do prazo de 1 s do
+  Android e a janela fica em transição (tamanho de Dialog, altura da tela, no topo, 126 px abaixo).
+- Toque injetado em emulador lento pode passar dos 250 ms da tira de acentos e virar "segurar": teste que só toca usa
+  `accentHoldMsForTest` (os da tira de acentos, não).
+- `scripts/ime-placement.py --ime keyflow|gboard [--cold]` mede de FORA do app (adb) onde a janela do teclado fica ao abrir
+  — sem teste no processo. A frio, no emulador lento: KeyFlow 6/8 aberturas em transição, Gboard 1/8 (desempenho da
+  abertura a frio é tarefa aberta).
+- Teste que inicia gravação de verdade para o `OverlayService` no `@After` (a gravação vazava para o teste seguinte).
 - Os 6 jobs de device sobem **junto** com o de unitários (sem `needs`): preparam o runner e ligam o
   emulador enquanto ele compila, e então baixam o artefato `apks` da própria rodada (`gh run download`).
   Não há Gradle no runner do emulador. Se o job de unitários falhar, eles param logo.
