@@ -108,8 +108,10 @@ class KeyFlowKeyboardSpellCheckerTest {
 
         performUntil("o") { tapKey(grid, "o") }
         performUntil("oi") { tapKey(grid, "i") }
+        waitUntil("o teclado não soube do cursor no fim de \"oi\"") { KeyFlowKeyboardService.selectionStartForTest == 2 }
         ImeProbeActivity.moveCursorForTest(1)
-        Thread.sleep(500) // o aviso de seleção chega ao teclado de forma assíncrona
+        // O aviso de seleção chega ao teclado de forma assíncrona: antes eram 500 ms fixos, que no CI não bastaram (2026-10-10).
+        waitUntil("o teclado não soube do cursor movido") { KeyFlowKeyboardService.selectionStartForTest == 1 }
         tapKey(grid, "a")
 
         waitUntil("a letra deveria entrar no cursor (\"oai\")") { fieldText() == "oai" }

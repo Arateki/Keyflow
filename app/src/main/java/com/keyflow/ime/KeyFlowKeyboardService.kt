@@ -528,6 +528,14 @@ class KeyFlowKeyboardService : InputMethodService() {
         candidatesEnd: Int,
     ) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        try {
+            followSelection(newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        } finally {
+            selectionStartForTest = newSelStart
+        }
+    }
+
+    private fun followSelection(newSelStart: Int, newSelEnd: Int, candidatesStart: Int, candidatesEnd: Int) {
         selectionStart = newSelStart
         selectionEnd = newSelEnd
         val word = wordTracker.currentWord
@@ -732,6 +740,11 @@ class KeyFlowKeyboardService : InputMethodService() {
         /** Dicionário do idioma atual carregado — só para o instrumentado esperar antes de digitar. */
         @Volatile
         var suggesterReadyForTest: Boolean = false
+            private set
+
+        /** Início da seleção do último [onUpdateSelection] já tratado — só para o instrumentado esperar o aviso do cursor. */
+        @Volatile
+        var selectionStartForTest: Int = -1
             private set
 
         /**
