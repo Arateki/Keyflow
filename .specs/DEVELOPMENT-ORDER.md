@@ -89,8 +89,9 @@ Groq, endpoint próprio) ou os modelos locais, offline.
 
 ### Tasks da v1 (em ordem; uma por vez, gate verde)
 
-- **V1-0** — Mesclar a PR #7 (skins até 120 fps, mascote, provedores Anthropic/Google, agente fase 1)
-  com o CI verde.
+- ~~**V1-0** — Mesclar a PR #7 (skins até 120 fps, mascote, provedores Anthropic/Google, agente fase 1)
+  com o CI verde.~~ **Feito em 2026-10-10** (merge `4cd4ee4`, CI #35 verde sem repetição). No caminho: repo
+  público, regra "main protegida", gate que repete 1× o que falha, esteira de instabilidade (TESTING.md).
 - **V1-1** — "Em breve" e fim das cascas inertes (listas acima). Instrumentado + goldens das rotas.
 - **V1-2** — Higiene do release, pendências herdadas do trabalho do Gemini: logs que imprimem o texto
   ditado (`KeyFlowController`, `OverlayCoordinator` — `take(30)`) só no debug; leitura dos segredos fora
@@ -389,7 +390,7 @@ texto literal da doc da OpenAI). Ordem: RSN-T0 → T1 → … → T19 (uma por v
 
 ```
 feito: Q1..Q11 → SB → GT → NM → RSN → SKP → AGT fase 1 (faltam só manuais [YAN])
-agora: V1-0 (PR #7) → V1-1..V1-8 → v1 na Play Store
+agora: V1-1..V1-8 → v1 na Play Store (V1-0, PR #7, mesclada em 2026-10-10)
 em paralelo: API-T13 (staging) → [conta Play + service account] → v1.1 = MZ-T1..T15 + API-T14
 depois: VC (visão) · TS (temas, spec a revisar) · AGT fases 2/3 · Fala/Fluxos/Computador (sem spec)
 ```
