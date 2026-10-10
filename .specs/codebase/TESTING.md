@@ -96,6 +96,10 @@ DeckLock (actions fixadas por SHA, `permissions: contents: read`, evidência env
   testes que nem chegaram a rodar vêm junto. Falhou de novo → erro e gate vermelho; passou → aviso
   "instável" no PR e no resumo do job. Os avisos são a lista de instabilidades a atacar, não ruído.
   O arquivo não pode ter linha vazia: o runner a lê como o pacote `""` e excluiria a suíte inteira.
+- A `main` é protegida por uma regra do repositório ("main protegida", 2026-10-10): só entra por PR, sem
+  push forçado nem exclusão, e com os 7 jobs do `checks.yml` verdes (`Unit tests and build` e
+  `Device (API 34, i/6)`). Admin pode mesclar um PR vermelho marcando o bypass (`gh pr merge --admin`); push
+  direto na `main`, não. O `api.yml` não é obrigatório: ele só roda quando `api/` muda.
 - KVM é requisito dos jobs de device (`test -c /dev/kvm`): sem ele a suíte não cabe — ver
   `ENVIRONMENT.md`, sandbox sem KVM.
 - Artefatos: `unit-evidence` (relatórios JUnit) e `device-evidence-<i>` (saída bruta do `am instrument`
