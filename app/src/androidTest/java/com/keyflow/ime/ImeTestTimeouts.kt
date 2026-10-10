@@ -117,10 +117,17 @@ internal fun awaitImeWindowSettled(device: UiDevice, timeoutMs: Long = IME_SETTL
 
 private const val MAX_REOPENS = 3
 
-/** Fecha o teclado (só se ele estiver de pé: o "voltar" com o teclado fechado fecharia o campo) e toca no campo de novo. */
+/**
+ * Fecha o teclado (só se ele estiver de pé: o "voltar" com o teclado fechado fecharia o campo) e toca no campo de novo — mas
+ * só com o teclado já fora da tela. Esteira 38087774045: preso no topo ([120,128][1200,915]), o teclado ainda cobria o campo
+ * quando o toque de reabrir chegou, e o toque em (540, 283) virou a tecla "r" ("rooo" no lugar de "o"). Se ele não sai em
+ * 3 s, não toca: a próxima volta da espera tenta de novo.
+ */
 private fun reopenKeyboard(device: UiDevice) {
     if (imeInputFrame(device) != null) device.pressBack()
-    Thread.sleep(500)
+    val goneBy = System.currentTimeMillis() + 3_000
+    while (imeInputFrame(device) != null && System.currentTimeMillis() < goneBy) Thread.sleep(100)
+    if (imeInputFrame(device) != null) return
     device.wait(Until.hasObject(By.desc("ime_probe_field")), IME_ATTACH_NUDGE_MS)
     runCatching { device.findObject(By.desc("ime_probe_field"))?.click() }
 }
