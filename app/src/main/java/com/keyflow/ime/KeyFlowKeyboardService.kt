@@ -408,13 +408,8 @@ class KeyFlowKeyboardService : InputMethodService() {
      * o Modo Sobrepor desligado — teclado e overlay são independentes (Fase 1).
      */
     private fun startMicSession() {
-        val intent = OverlayService.keyboardMicIntent(this)
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(intent)
-            } else {
-                startService(intent)
-            }
+            OverlayService.start(this, OverlayService.keyboardMicIntent(this))
         } catch (e: Exception) {
             // Ex.: ForegroundServiceStartNotAllowedException se a isenção de FGS em background falhar.
             Log.e(TAG, "startMicSession falhou: ${e.message}", e)

@@ -522,7 +522,7 @@ class SetupActivity : ComponentActivity() {
         val status = permissionsChecker.snapshot(this)
         if (!status.overlayGranted || !status.notificationsGranted) {
             persistOverlayModeEnabled(false)
-            stopService(OverlayService.intent(this))
+            OverlayService.stop(this)
         }
     }
 
@@ -672,7 +672,7 @@ class SetupActivity : ComponentActivity() {
             pendingOverlayEnable = false
             lastOverlayBlockingStep = null
             persistOverlayModeEnabled(false)
-            stopService(OverlayService.intent(this))
+            OverlayService.stop(this)
         }
     }
 
@@ -720,12 +720,7 @@ class SetupActivity : ComponentActivity() {
         pendingOverlayEnable = false
         lastOverlayBlockingStep = null
         persistOverlayModeEnabled(true)
-        val intent = OverlayService.startOverlayIntent(this)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent)
-        } else {
-            startService(intent)
-        }
+        OverlayService.start(this, OverlayService.startOverlayIntent(this))
         continueOnboardingKeyboardChainIfNeeded()
     }
 

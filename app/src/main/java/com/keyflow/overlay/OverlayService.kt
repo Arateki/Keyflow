@@ -133,8 +133,7 @@ class OverlayService : Service() {
         when (intent?.action) {
             ACTION_START_OVERLAY -> startOverlay()
             ACTION_KEYBOARD_MIC -> {
-                ensureForeground()
-                if (::coordinator.isInitialized) handleKeyboardMicTap()
+                if (ensureForeground() && ::coordinator.isInitialized) handleKeyboardMicTap()
             }
             RecordingNotification.ACTION_PAUSE_RESUME -> handlePauseResume()
             RecordingNotification.ACTION_STOP_PASTE -> handleStopPaste()
@@ -142,8 +141,7 @@ class OverlayService : Service() {
             ACTION_UNDO_CANCEL -> { if (::coordinator.isInitialized) coordinator.onUndoCancel() }
             ACTION_COMMIT_CANCEL -> { if (::coordinator.isInitialized) coordinator.onCommitCancel() }
             ACTION_RECORD -> {
-                ensureForeground()
-                if (::coordinator.isInitialized) coordinator.onTap() // ocioso → inicia (inclui tela de bloqueio)
+                if (ensureForeground() && ::coordinator.isInitialized) coordinator.onTap() // ocioso → inicia (inclui tela de bloqueio)
             }
             ACTION_OPEN_CONFIG -> openKeyFlowApp()
         }
@@ -152,7 +150,7 @@ class OverlayService : Service() {
 
     /** Modo Sobrepor: serviço persistente em primeiro plano + orbe flutuante (se houver permissão). */
     private fun startOverlay() {
-        ensureForeground()
+        if (!ensureForeground()) return
         overlayActive = true
         syncLocalEngine()
         isRunningForUi = true
@@ -161,9 +159,29 @@ class OverlayService : Service() {
         }
     }
 
-    /** Promove a primeiro plano (FGS de microfone) sob demanda. Idempotente. */
-    private fun ensureForeground() {
-        if (isForeground) return
+    /**
+     * Promove a primeiro plano (FGS de microfone) sob demanda. Idempotente. Devolve `false` quando o serviço não deve
+     * seguir: o primeiro plano falhou, ou um [stop] chegou antes dele (aí o serviço se encerra aqui mesmo).
+     */
+    private fun ensureForeground(): Boolean {
+        if (!isForeground && !promoteToForeground()) return false
+        foregroundPending = false
+        if (stopRequested) {
+            stopRequested = false
+            stopNow()
+            return false
+        }
+        return true
+    }
+
+    private fun stopNow() {
+        overlayActive = false
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        isForeground = false
+        stopSelf()
+    }
+
+    private fun promoteToForeground(): Boolean {
         syncLocalEngine()
         val notification = recordingNotification.build(
             if (::coordinator.isInitialized) coordinator.currentState() else ButtonState.IDLE_NO_FIELD,
@@ -176,10 +194,14 @@ class OverlayService : Service() {
                 startForeground(NOTIFICATION_ID, notification)
             }
             isForeground = true
+            return true
         } catch (e: Exception) {
             // Restrição de FGS em background (Android 12+): encerra limpo em vez de crashar.
             android.util.Log.e("KeyFlow.Overlay", "startForeground falhou: ${e.message}", e)
+            foregroundPending = false
+            stopRequested = false
             stopSelf()
+            return false
         }
     }
 
@@ -278,6 +300,8 @@ class OverlayService : Service() {
 
     override fun onDestroy() {
         isRunningForUi = false
+        foregroundPending = false
+        stopRequested = false
         partialOverlay?.remove()
         removeErrorBanner()
         removeCancelBanner()
@@ -928,7 +952,42 @@ class OverlayService : Service() {
         var isRunningForUi: Boolean = false
             private set
 
+        // Um startForegroundService ainda sem o startForeground do serviço, e um stop() que chegou nesse meio-tempo.
+        // Tudo roda na thread principal do mesmo processo (a SetupActivity, o IME e o serviço), então não há corrida
+        // entre quem anota e quem lê.
+        @Volatile
+        private var foregroundPending = false
+
+        @Volatile
+        private var stopRequested = false
+
         fun intent(context: Context): Intent = Intent(context, OverlayService::class.java)
+
+        /**
+         * Sobe o serviço em primeiro plano. Use no lugar de `startForegroundService` direto: é o que deixa o [stop]
+         * saber que o primeiro plano ainda não chegou.
+         */
+        fun start(context: Context, intent: Intent) {
+            foregroundPending = true
+            stopRequested = false
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent) else context.startService(intent)
+            } catch (e: Exception) {
+                foregroundPending = false
+                throw e
+            }
+        }
+
+        /**
+         * Para o serviço. Se ele foi subido por [start] e ainda não chamou `startForeground`, um `stopService` agora faz
+         * o Android derrubar o app inteiro (ForegroundServiceDidNotStartInTimeException: "Bringing down service while
+         * still waiting for start foreground") — dá para provocar ligando e desligando o Modo Sobrepor depressa com a
+         * thread principal ocupada (visto no CI, 2026-10-09). Nesse caso o pedido fica anotado e o serviço se encerra
+         * ao chegar ao primeiro plano.
+         */
+        fun stop(context: Context) {
+            if (foregroundPending) stopRequested = true else context.stopService(intent(context))
+        }
 
         /** Inicia/garante o Modo Sobrepor (serviço persistente + orbe). */
         fun startOverlayIntent(context: Context): Intent =

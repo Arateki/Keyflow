@@ -56,12 +56,12 @@ class SetupActivityTest {
     @Before
     fun setUp() {
         shell("appops set ${context.packageName} SYSTEM_ALERT_WINDOW allow")
-        context.stopService(OverlayService.intent(context))
+        OverlayService.stop(context)
     }
 
     @After
     fun tearDown() {
-        context.stopService(OverlayService.intent(context))
+        OverlayService.stop(context)
     }
 
     @Test
