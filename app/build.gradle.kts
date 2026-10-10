@@ -236,3 +236,64 @@ dependencies {
     // Servidor HTTP local para o DownloadManager real baixar no instrumentado (NM-T6/T7).
     androidTestImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
 }
+
+// --- Teste de mutação (PIT) ---
+// Muda o código de produção de propósito (troca um < por <=, apaga uma chamada, inverte um if) e roda os testes de unidade
+// contra cada mudança: a que nenhum teste percebe ("sobrevive") mostra uma regra que os testes não conferem. Periódico, não
+// por PR (.github/workflows/mutation.yml). Pela linha de comando do PIT, e não pelo plugin Gradle: o plugin para Android não
+// acompanha o AGP 9; aqui só se reusa o classpath do testDebugUnitTest. 1.30.0: release de 2026-08-27 no Maven Central.
+//   ./gradlew :app:pitest                                   (alvos padrão abaixo)
+//   ./gradlew :app:pitest -PpitTargets='com.keyflow.overlay.ButtonStateMachine*'
+val pitestTool: Configuration by configurations.creating
+dependencies { pitestTool("org.pitest:pitest-command-line:1.30.0") }
+
+// A lógica pura que os testes de unidade cobrem bem — telas, teclado e serviços são dos instrumentados e só dariam "sem cobertura".
+val pitDefaultTargets = listOf(
+    "com.keyflow.overlay.ButtonStateMachine*",
+    "com.keyflow.overlay.OverlayCoordinator*",
+    "com.keyflow.overlay.RecordingGestureController*",
+    "com.keyflow.overlay.GestureInterpreter*",
+    "com.keyflow.core.shortcuts.*",
+    "com.keyflow.ime.keyboard.layout.*",
+    "com.keyflow.ime.keyboard.dictionary.*",
+    "com.keyflow.ime.keys.*",
+    "com.keyflow.skins.SkinPack*",
+    "com.keyflow.agent.*",
+    "com.keyflow.auth.oauth.*",
+)
+
+tasks.register<JavaExec>("pitest") {
+    group = "verification"
+    description = "Teste de mutação (PIT) da lógica pura contra os testes de unidade; relatório em build/reports/pitest."
+    val unitTests = tasks.named<Test>("testDebugUnitTest")
+    val reportDir = layout.buildDirectory.dir("reports/pitest")
+    val targets = providers.gradleProperty("pitTargets").orElse(pitDefaultTargets.joinToString(","))
+    // PIT na frente; atrás, o mesmo classpath dos testes (as classes do app chegam no classes.jar do AGP).
+    classpath(pitestTool, unitTests.map { it.classpath })
+    mainClass.set("org.pitest.mutationtest.commandline.MutationCoverageReport")
+    // Os testes leem arquivos relativos ao módulo (ArchitectureRulesTest), como no testDebugUnitTest.
+    workingDir = projectDir
+    outputs.dir(reportDir)
+    outputs.upToDateWhen { false }
+    argumentProviders.add(CommandLineArgumentProvider {
+        listOf(
+            "--reportDir=${reportDir.get().asFile}",
+            "--targetClasses=${targets.get()}",
+            "--targetTests=com.keyflow.*",
+            // Fuzz só confere "não quebra" e leva segundos por mutante: fica de fora.
+            "--excludedTestClasses=com.keyflow.fuzz.*",
+            "--sourceDirs=${file("src/main/java")}",
+            // Só o código do app é mutável (o jar do AGP); teste e biblioteca nunca.
+            "--mutableCodePaths=*bundleDebugClassesToRuntimeJar*",
+            // O que o compilador Kotlin gera (checagens de nulo, o throwOnFailure das coroutines, equals/hashCode/toString/copy de
+            // data class) só faria ruído.
+            "--avoidCallsTo=kotlin.jvm.internal,kotlin.ResultKt,android.util.Log",
+            "--excludedMethods=equals,hashCode,toString,copy,copy\$default,component*",
+            "--jvmArgs=-Dfile.encoding=UTF-8,-Duser.language=pt,-Duser.country=BR,-ea,-Xmx1g",
+            "--threads=${Runtime.getRuntime().availableProcessors().coerceAtMost(8)}",
+            "--outputFormats=HTML,XML",
+            "--timestampedReports=false",
+            "--timeoutConst=8000",
+        )
+    })
+}
