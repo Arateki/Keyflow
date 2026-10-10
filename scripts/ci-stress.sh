@@ -30,6 +30,7 @@ APP_APK=app/build/outputs/apk/debug/app-debug.apk
 TEST_APK=app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 RUNNER=com.keyflow.test/androidx.test.runner.AndroidJUnitRunner
 KEYFLOW_IME=com.keyflow/.ime.KeyFlowKeyboardService
+FAILURE_SHOTS=/sdcard/Android/data/com.keyflow/files
 mkdir -p "$OUT"
 
 # Sem diálogo de "app não está respondendo" segurando o foco (a mesma lição do ci-device-gate.sh).
@@ -134,6 +135,7 @@ while [ "$SECONDS" -lt "$deadline" ]; do
     break
   fi
   "$ADB" shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1 || true
+  "$ADB" shell rm -f "$FAILURE_SHOTS/falha-*.png" >/dev/null 2>&1 || true
   "$ADB" shell am instrument -w -r -e class "$CLASSES" -e motionFrames false "$RUNNER" > "$dir/raw.txt"
   # --retry-follows: sem anotação por volta (seriam centenas); o relatório anota no fim.
   env -u GITHUB_STEP_SUMMARY python3 scripts/ci-instrument-summary.py --label "volta $i" --retry-follows \
@@ -147,6 +149,8 @@ while [ "$SECONDS" -lt "$deadline" ]; do
     failed_rounds=$((failed_rounds + 1))
     sed -n "$((from + 1)),\$p" "$OUT/logcat-full.txt" > "$dir/logcat.txt"
     "$ADB" exec-out screencap -p > "$dir/tela.png" 2>/dev/null || rm -f "$dir/tela.png"
+    # As capturas que os próprios testes tiram na hora da falha (KeyFlowKeyboardCanvasGridTest.screenshotOnFailure).
+    "$ADB" pull "$FAILURE_SHOTS/." "$dir/" >/dev/null 2>&1 || true
     echo "volta $i ($((SECONDS - start)) s):$score — FALHOU: $(paste -sd' ' "$dir/failed.txt")"
     announce_failure "$dir" "$i"
   fi

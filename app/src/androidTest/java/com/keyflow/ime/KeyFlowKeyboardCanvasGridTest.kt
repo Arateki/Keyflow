@@ -334,7 +334,41 @@ class KeyFlowKeyboardCanvasGridTest {
         return "toque em (${key.centerX}, ${key.centerY}); grade em (${loc[0]}, ${loc[1]}) ${grid.width}x${grid.height}, " +
             "visível=${grid.isShown}, mesma view ativa=${view?.canvasGridForTest === grid}, expandido=${view?.expandedForTest}, " +
             "camada=${grid.currentLayerIdForTest}, fileiras=${grid.placedRowsForTest.size}, idioma salvo=$language; " +
-            "janela do IME para o sistema de entrada: ${imeInputWindow()}"
+            "janela do IME para o sistema de entrada: ${imeInputWindow()}; " +
+            "raiz da view: ${rootViewState()}; gerenciador de janelas: ${imeWindowManagerState()}; tela: ${screenshotOnFailure()}"
+    }
+
+    /** Onde a própria view acha que a janela do teclado está — comparar com o que o sistema de entrada vê. */
+    private fun rootViewState(): String {
+        val root = KeyFlowKeyboardService.activeViewForTest?.rootView ?: return "sem view"
+        val loc = IntArray(2).also { root.getLocationOnScreen(it) }
+        return "(${loc[0]}, ${loc[1]}) ${root.width}x${root.height}"
+    }
+
+    /**
+     * A janela do IME para o gerenciador de janelas: altura pedida, frame e se ainda está presa numa animação de entrada
+     * (`insets_animation`). Esteira de instabilidade, 2026-10-10: na falha, o sistema de entrada via a janela 126 px abaixo
+     * de onde a view achava que estava ([0,1739][1080,2526] × grade em 1686), com o pedido de mostrar o teclado repetido e a
+     * animação cancelada logo antes.
+     */
+    private fun imeWindowManagerState(): String {
+        val lines = shell("dumpsys window windows").lines()
+        // Sem Regex com chaves: o ICU do Android recusa o "}" solto (PatternSyntaxException derrubava o diagnóstico).
+        val isWindowHeader = { line: String -> line.trim().startsWith("Window #") && line.contains(" Window{") }
+        val start = lines.indexOfFirst { isWindowHeader(it) && it.contains("InputMethod}") }
+        if (start < 0) return "não listada"
+        val block = lines.drop(start + 1).takeWhile { !isWindowHeader(it) }
+        val requested = block.firstOrNull { it.trim().startsWith("Requested ") }?.trim()?.substringBefore(" mLayoutSeq")
+        val frames = block.firstOrNull { it.trim().startsWith("Frames:") }?.let { Regex("frame=\\S+ last=\\S+").find(it)?.value }
+        val draw = block.firstOrNull { it.contains("mDrawState=") }?.let { Regex("mDrawState=\\S+").find(it)?.value }
+        val leash = if (block.any { it.contains("insets_animation") }) "com leash de insets" else "sem leash de insets"
+        return "$requested $frames $draw $leash"
+    }
+
+    /** Captura da tela na hora da falha, nos arquivos do app — a esteira (scripts/ci-stress.sh) a traz para a evidência. */
+    private fun screenshotOnFailure(): String {
+        val file = java.io.File(context.getExternalFilesDir(null), "falha-${System.currentTimeMillis()}.png")
+        return if (runCatching { device.takeScreenshot(file) }.getOrDefault(false)) file.name else "falhou"
     }
 
     /**
