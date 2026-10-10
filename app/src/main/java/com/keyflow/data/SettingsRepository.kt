@@ -139,6 +139,25 @@ class SettingsRepository(
     suspend fun shortcutGridsOnce(): List<ShortcutGrid> =
         ShortcutCodec.decodeGrids(dataStore.data.first()[SHORTCUT_GRIDS_JSON])
 
+    /**
+     * Tudo o que o IME lê para montar o teclado, de UMA leitura do DataStore. O `onCreateInputView` roda na thread principal
+     * bem quando o Android vai mostrar o teclado: eram oito leituras avulsas (oito idas e voltas entre threads), até 400 ms no
+     * emulador lento — e o 1º quadro do teclado passava do prazo de 1 s que o Android dá para a janela aparecer (esteira de
+     * instabilidade, 2026-10-10). Mesmos padrões das leituras avulsas ([themeDarkOnce] e companhia).
+     */
+    suspend fun keyboardSnapshotOnce(): KeyboardSnapshot = dataStore.data.first().let { prefs ->
+        KeyboardSnapshot(
+            dark = prefs[THEME_DARK] ?: false,
+            scalePercent = prefs[KEYBOARD_SCALE_PERCENT] ?: 100,
+            language = prefs[KEYBOARD_LANGUAGE] ?: "pt",
+            numberRowEnabled = prefs[KEYBOARD_NUMBER_ROW_ENABLED] ?: false,
+            skin = prefs[KEYBOARD_SKIN] ?: "system",
+            bars = ShortcutCodec.decodeBars(prefs[BARS_CONFIG_JSON]),
+            grids = ShortcutCodec.decodeGrids(prefs[SHORTCUT_GRIDS_JSON]),
+            vibration = prefs[VIBRATION_INTENSITY] ?: (if (prefs[HAPTIC_FEEDBACK] == false) 0 else 60),
+        )
+    }
+
     /** Observação ao vivo (BAR-07): o service recria a view do teclado quando a config muda. */
     fun barsConfigFlow(): Flow<BarsConfig> =
         dataStore.data.map { ShortcutCodec.decodeBars(it[BARS_CONFIG_JSON]) }
@@ -699,3 +718,15 @@ class SettingsRepository(
         }
     }
 }
+
+/** O que o teclado precisa para ser montado — ver [SettingsRepository.keyboardSnapshotOnce]. */
+data class KeyboardSnapshot(
+    val dark: Boolean,
+    val scalePercent: Int,
+    val language: String,
+    val numberRowEnabled: Boolean,
+    val skin: String,
+    val bars: BarsConfig,
+    val grids: List<ShortcutGrid>,
+    val vibration: Int,
+)

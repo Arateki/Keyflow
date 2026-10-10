@@ -453,4 +453,51 @@ class SettingsRepositoryTest {
 
         assertEquals(saved, repository.overlayPositionFlow().first())
     }
+
+    /**
+     * O teclado lê tudo de UMA vez ao ser criado (`onCreateInputView`, thread principal): eram oito idas ao DataStore, até
+     * 400 ms no emulador lento (esteira de instabilidade, 2026-10-10). O retrato tem que dizer exatamente o que as leituras
+     * avulsas dizem — gravado e no padrão.
+     */
+    @Test
+    fun keyboardSnapshotMatchesTheSingleReads() = runTest {
+        val repository = newRepository()
+        repository.saveSettings(
+            Settings(themeDark = true, keyboardScalePercent = 85, keyboardNumberRowEnabled = true, keyboardSkin = "glitch", vibrationIntensity = 30),
+        )
+        repository.saveKeyboardLanguageOnce("en")
+
+        val snapshot = repository.keyboardSnapshotOnce()
+
+        assertEquals(repository.themeDarkOnce(), snapshot.dark)
+        assertEquals(repository.keyboardScalePercentOnce(), snapshot.scalePercent)
+        assertEquals(repository.keyboardLanguageOnce(), snapshot.language)
+        assertEquals(repository.keyboardNumberRowEnabledOnce(), snapshot.numberRowEnabled)
+        assertEquals(repository.keyboardSkinOnce(), snapshot.skin)
+        assertEquals(repository.barsConfigOnce(), snapshot.bars)
+        assertEquals(repository.shortcutGridsOnce(), snapshot.grids)
+        assertEquals(repository.vibrationIntensityOnce(), snapshot.vibration)
+        assertEquals(KeyboardSnapshot(true, 85, "en", true, "glitch", snapshot.bars, snapshot.grids, 30), snapshot)
+    }
+
+    @Test
+    fun keyboardSnapshotUsesTheSameDefaultsAsTheSingleReads() = runTest {
+        val repository = newRepository()
+
+        val snapshot = repository.keyboardSnapshotOnce()
+
+        assertEquals(
+            KeyboardSnapshot(
+                dark = repository.themeDarkOnce(),
+                scalePercent = repository.keyboardScalePercentOnce(),
+                language = repository.keyboardLanguageOnce(),
+                numberRowEnabled = repository.keyboardNumberRowEnabledOnce(),
+                skin = repository.keyboardSkinOnce(),
+                bars = repository.barsConfigOnce(),
+                grids = repository.shortcutGridsOnce(),
+                vibration = repository.vibrationIntensityOnce(),
+            ),
+            snapshot,
+        )
+    }
 }

@@ -298,18 +298,18 @@ class KeyFlowKeyboardService : InputMethodService() {
 
     override fun onCreateInputView(): View {
         val createStartedNs = System.nanoTime()
-        val repo = SettingsRepository(this@KeyFlowKeyboardService)
-        val dark = runBlocking { repo.themeDarkOnce() }
-        // Tamanho do teclado (pedido do Yan, 2026-07-02): mesma leitura leve do tema — só DataStore, sem
-        // inicializar o EncryptedSharedPreferences (cripto cara) no caminho crítico do IME.
-        val scalePercent = runBlocking { repo.keyboardScalePercentOnce() }
+        // Tema, tamanho (2026-07-02), idioma do app (2026-07-02, não o subtype do sistema), fileira de números (NUMROW-01),
+        // skin, barras e grades (SB-T5) e vibração: UMA leitura do DataStore, sem o EncryptedSharedPreferences (cripto cara) —
+        // aqui é o caminho crítico do IME, na thread principal, bem quando o Android vai mostrar o teclado. Oito leituras
+        // avulsas custavam até 400 ms no emulador lento e empurravam o 1º quadro para além do prazo de 1 s da janela
+        // (esteira de instabilidade, 2026-10-10).
+        val snapshot = runBlocking { SettingsRepository(this@KeyFlowKeyboardService).keyboardSnapshotOnce() }
+        val dark = snapshot.dark
+        val scalePercent = snapshot.scalePercent
         val scale = scalePercent / 100f
-        // Idioma gerenciado pelo app (pedido do Yan, 2026-07-02) — não pelo subtype do sistema, mesma
-        // leitura leve do tema/tamanho.
-        val language = runBlocking { repo.keyboardLanguageOnce() }
-        // Fileira de números (NUMROW-01, pedido do Yan, 2026-07-03) — mesma leitura leve do tema/tamanho.
-        val numberRowEnabled = runBlocking { repo.keyboardNumberRowEnabledOnce() }
-        val skin = runBlocking { repo.keyboardSkinOnce() }
+        val language = snapshot.language
+        val numberRowEnabled = snapshot.numberRowEnabled
+        val skin = snapshot.skin
         // Skin de pacote (SKP-KBD): abre o pacote escolhido. Sumiu ou não carrega → `null`, e `KeyboardSkin.of` já cai no Sistema.
         val packKeyboard = openPackKeyboard(skin)
         appliedLiveConfig = LiveKeyboardConfig(dark, scalePercent, language, numberRowEnabled, skin)
@@ -322,10 +322,9 @@ class KeyFlowKeyboardService : InputMethodService() {
                 suggesterReadyForTest = loaded != null
             }
         }
-        // Barras Canvas (SB-T5): leitura leve como o tema — só DataStore no caminho crítico do IME.
-        val barsConfig = runBlocking { repo.barsConfigOnce() }
-        val grids = runBlocking { repo.shortcutGridsOnce() }
-        val vibration = runBlocking { repo.vibrationIntensityOnce() }
+        val barsConfig = snapshot.bars
+        val grids = snapshot.grids
+        val vibration = snapshot.vibration
         appliedBarsConfig = barsConfig
         appliedGrids = grids
         val readsDoneNs = System.nanoTime()
