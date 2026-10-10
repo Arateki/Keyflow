@@ -1,13 +1,13 @@
 package com.keyflow.ui.config
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import com.keyflow.skins.PackKeyboard
 import com.keyflow.skins.SkinIds
 import com.keyflow.skins.SkinPackStore
+import com.keyflow.ui.common.collectAsStateOnMain
 
 /**
  * O teclado do pacote que [skinId] (`pack:<id>`) escolhe, para as views de teclado da config (a prévia de tamanho da aba Teclado mostra a skin escolhida).
@@ -18,6 +18,6 @@ import com.keyflow.skins.SkinPackStore
 fun rememberPackKeyboard(skinId: String): PackKeyboard? {
     if (!SkinIds.isPack(skinId)) return null
     val context = LocalContext.current.applicationContext
-    val changes by SkinPackStore.changes.collectAsState()
+    val changes by SkinPackStore.changes.collectAsStateOnMain()
     return remember(skinId, changes) { SkinPackStore.of(context).loadBySkinId(skinId)?.let(PackKeyboard::load) }
 }

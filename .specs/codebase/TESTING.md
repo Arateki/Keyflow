@@ -44,6 +44,11 @@ Estratégia escolhida: **cobertura completa** (unit + instrumented). Greenfield 
 - Unit: JUnit4 + `kotlinx-coroutines-test` + `MockWebServer` (OkHttp) + Truth/AssertJ.
 - Instrumented: AndroidX Test (`androidx.test.ext:junit`, `core-ktx`) + Espresso (UI) + UiAutomator (interações de sistema, ex.: conceder overlay).
 - "Test count" em cada gate previne deleção silenciosa de testes.
+- Tela que coleta fluxo usa `collectAsStateOnMain` (`ui/common/CollectOnMain.kt`), nunca `collectAsState` direto; estado de
+  tela escrito depois de `withContext(Dispatchers.IO)` vai dentro de `withContext(Dispatchers.Main.immediate)`. No
+  `createComposeRule` (Compose 1.7) a composição coleta num dispatcher "unconfined": valor vindo de outra thread recompunha
+  ali — CalledFromWrongThreadException, "performMeasureAndLayout called during measure layout", SlotTable corrompida.
+  No app não muda nada. `CollectOnMainTest` confere.
 
 ## CI (GitHub Actions) — `.github/workflows/checks.yml`
 

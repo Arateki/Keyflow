@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -25,6 +24,7 @@ import com.keyflow.agent.ToolOrigin
 import com.keyflow.agent.ToolRisk
 import com.keyflow.agenthost.AgentRuntime
 import com.keyflow.i18n.tr
+import com.keyflow.ui.common.collectAsStateOnMain
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
 import com.keyflow.ui.theme.SpaceMono
@@ -58,9 +58,9 @@ private const val LOG_SHOWN = 30
 internal fun AgentSettingsSection(runtime: AgentRuntime, modifier: Modifier = Modifier) {
     val palette = LocalKeyFlowPalette.current
     val scope = rememberCoroutineScope()
-    val config by runtime.policy.config.collectAsState()
-    val loaded by runtime.policy.loaded.collectAsState()
-    val log by remember(runtime) { runtime.actionLog.observe() }.collectAsState(initial = emptyList())
+    val config by runtime.policy.config.collectAsStateOnMain()
+    val loaded by runtime.policy.loaded.collectAsStateOnMain()
+    val log by remember(runtime) { runtime.actionLog.observe() }.collectAsStateOnMain(emptyList())
     val tools = remember(runtime) { runtime.registry.all() }
 
     Column(modifier.fillMaxWidth().testTag(AGENT_SETTINGS_TAG), verticalArrangement = Arrangement.spacedBy(4.dp)) {

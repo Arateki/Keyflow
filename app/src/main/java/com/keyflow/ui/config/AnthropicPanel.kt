@@ -3,7 +3,6 @@ package com.keyflow.ui.config
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -16,6 +15,7 @@ import com.keyflow.auth.ConnectionState
 import com.keyflow.data.Settings
 import com.keyflow.i18n.tr
 import com.keyflow.reasoning.anthropic.AnthropicModels
+import com.keyflow.ui.common.collectAsStateOnMain
 import com.keyflow.ui.icons.KfIcons
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -57,7 +57,7 @@ internal fun AnthropicPanel(
     onSettingsChange: (Settings) -> Unit,
     actions: AuthActions,
 ) {
-    val connection by remember(actions) { actions.state() }.collectAsState(ConnectionState.Disconnected)
+    val connection by remember(actions) { actions.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
     var refresh by remember { mutableIntStateOf(0) }
     var remoteModels by remember { mutableStateOf<List<AccountModel>>(emptyList()) }
 

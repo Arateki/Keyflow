@@ -13,7 +13,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,6 +30,7 @@ import com.keyflow.auth.ConnectionState
 import com.keyflow.core.FalaSource
 import com.keyflow.data.Settings
 import com.keyflow.i18n.tr
+import com.keyflow.ui.common.collectAsStateOnMain
 import com.keyflow.ui.common.verticalScrollbar
 import com.keyflow.ui.icons.KfIcons
 import com.keyflow.ui.theme.LocalKeyFlowPalette
@@ -235,7 +235,7 @@ private fun FalaOpenAi(
     Box(Modifier.testTag(FALA_OPENAI_INFO_TAG)) {
         val models = FALA_CLOUD_VOICES.map { AccountModel(it, it) }
         val chosen = settings.falaCloudVoice.ifEmpty { "alloy" }
-        val connection by remember(auth) { auth.state() }.collectAsState(ConnectionState.Disconnected)
+        val connection by remember(auth) { auth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
         var refresh by remember { mutableIntStateOf(0) }
         val apiKey = remember(connection, settings.providerOpenAiApiKey, settings.openaiToken) {
             auth.apiKey().orEmpty().ifEmpty { settings.providerOpenAiApiKey.ifEmpty { settings.openaiToken } }
@@ -324,7 +324,7 @@ private fun FalaGoogle(
 ) {
     val models = FALA_GOOGLE_VOICES.map { AccountModel(it, it) }
     val chosen = settings.falaGoogleVoice.ifEmpty { "pt-BR-Neural2-A" }
-    val connection by remember(auth) { auth.state() }.collectAsState(ConnectionState.Disconnected)
+    val connection by remember(auth) { auth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
     var refresh by remember { mutableIntStateOf(0) }
     val apiKey = remember(connection, settings.providerGoogleApiKey, settings.visionGoogleApiKey, settings.falaGoogleApiKey) {
         auth.apiKey().orEmpty().ifEmpty {

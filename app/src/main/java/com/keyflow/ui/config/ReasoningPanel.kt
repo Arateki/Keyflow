@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -21,6 +20,7 @@ import com.keyflow.data.Settings
 import com.keyflow.i18n.tr
 import com.keyflow.reasoning.ReasoningResolution
 import com.keyflow.reasoning.UnavailableReason
+import com.keyflow.ui.common.collectAsStateOnMain
 import com.keyflow.ui.common.verticalScrollbar
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 
@@ -55,9 +55,9 @@ fun ReasoningPanel(
     val palette = LocalKeyFlowPalette.current
     val scroll = rememberScrollState()
     // Lido AQUI, no corpo do painel: quando a conexão muda, tudo abaixo — inclusive o "pronto para testar" — recompõe.
-    val connection by remember(auth) { auth.state() }.collectAsState(ConnectionState.Disconnected)
-    val anthropicConnection by remember(anthropicAuth) { anthropicAuth.state() }.collectAsState(ConnectionState.Disconnected)
-    val googleConnection by remember(googleAuth) { googleAuth.state() }.collectAsState(ConnectionState.Disconnected)
+    val connection by remember(auth) { auth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
+    val anthropicConnection by remember(anthropicAuth) { anthropicAuth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
+    val googleConnection by remember(googleAuth) { googleAuth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
     val openAi = openAiPanelState(connection, auth.flows)
     // O motor pronto (ou o motivo de não haver) depende das Settings, da conexão e dos modelos instalados.
     val resolution = remember(settings, connection, anthropicConnection, googleConnection, models, resolve) { resolve(settings) }

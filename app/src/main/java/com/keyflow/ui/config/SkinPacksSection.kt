@@ -25,7 +25,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -59,6 +58,7 @@ import com.keyflow.skins.PackPreview
 import com.keyflow.skins.SkinIds
 import com.keyflow.skins.SkinPack
 import com.keyflow.skins.SkinPackStore
+import com.keyflow.ui.common.collectAsStateOnMain
 import com.keyflow.ui.icons.KfIcon
 import com.keyflow.ui.icons.KfIcons
 import com.keyflow.ui.orb.OrbStyle
@@ -305,9 +305,10 @@ private fun cardOf(pack: SkinPack, width: Int, height: Int) = SkinPackCard(
 @Composable
 private fun rememberSkinPackCards(store: SkinPackStore): State<List<SkinPackCard>?> {
     val density = LocalDensity.current.density
-    val changes by SkinPackStore.changes.collectAsState()
+    val changes by SkinPackStore.changes.collectAsStateOnMain()
     return produceState<List<SkinPackCard>?>(initialValue = null, store, changes, density) {
-        value = withContext(Dispatchers.IO) { loadSkinPackCards(store, density) }
+        val cards = withContext(Dispatchers.IO) { loadSkinPackCards(store, density) }
+        withContext(Dispatchers.Main.immediate) { value = cards } // na main thread: ver collectAsStateOnMain
     }
 }
 

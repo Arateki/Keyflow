@@ -35,7 +35,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -64,6 +63,7 @@ import com.keyflow.data.Settings
 import com.keyflow.i18n.tr
 import com.keyflow.i18n.trKey
 import com.keyflow.reasoning.ReasoningResolution
+import com.keyflow.ui.common.collectAsStateOnMain
 import com.keyflow.ui.icons.KfIcon
 import com.keyflow.ui.icons.KfIcons
 import com.keyflow.ui.orb.OrbState
@@ -120,10 +120,10 @@ fun KeyflowPanel(
     val scope = rememberCoroutineScope()
     val backends = remember(agent, resolve) { agent?.backends ?: AgentBackends.plain(resolve) }
     val controller = remember(agent) { agent?.controller ?: AgentController(scope) }
-    val state by controller.state.collectAsState()
-    val pending by controller.pendingConfirmation.collectAsState()
+    val state by controller.state.collectAsStateOnMain()
+    val pending by controller.pendingConfirmation.collectAsStateOnMain()
     val mode by remember(backends, settings.reasoningSource, settings.reasoningAnthropicModel) { backends.modeFlow(settings) }
-        .collectAsState(initial = backends.mode(settings))
+        .collectAsStateOnMain(backends.mode(settings))
     val labelOf: (String) -> String = { name -> agent?.registry?.get(name)?.label ?: name }
 
     // Sair da aba com uma pergunta de permissão aberta cancela a execução: ninguém aprova o que não vê. Girar a tela não conta.

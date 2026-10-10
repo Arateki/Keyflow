@@ -13,7 +13,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,6 +30,7 @@ import com.keyflow.auth.ConnectionState
 import com.keyflow.core.VisionSource
 import com.keyflow.data.Settings
 import com.keyflow.i18n.tr
+import com.keyflow.ui.common.collectAsStateOnMain
 import com.keyflow.ui.common.verticalScrollbar
 import com.keyflow.ui.icons.KfIcons
 import com.keyflow.ui.theme.LocalKeyFlowPalette
@@ -218,7 +218,7 @@ private fun VisaoOpenAi(
     Box(Modifier.testTag(VISAO_OPENAI_INFO_TAG)) {
         val models = VISAO_OPENAI_MODELS.map { AccountModel(it, it) }
         val chosen = settings.visionOpenAiModel.ifEmpty { "gpt-4o" }
-        val connection by remember(auth) { auth.state() }.collectAsState(ConnectionState.Disconnected)
+        val connection by remember(auth) { auth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
         var refresh by remember { mutableIntStateOf(0) }
         val apiKey = remember(connection, settings.providerOpenAiApiKey, settings.openaiToken) {
             auth.apiKey().orEmpty().ifEmpty { settings.providerOpenAiApiKey.ifEmpty { settings.openaiToken } }
@@ -272,7 +272,7 @@ private fun VisaoGoogle(
 ) {
     val models = VISAO_GOOGLE_MODELS.map { AccountModel(it, it) }
     val chosen = settings.visionGoogleModel.ifEmpty { "gemini-2.0-flash" }
-    val connection by remember(auth) { auth.state() }.collectAsState(ConnectionState.Disconnected)
+    val connection by remember(auth) { auth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
     var refresh by remember { mutableIntStateOf(0) }
     val apiKey = remember(connection, settings.providerGoogleApiKey, settings.visionGoogleApiKey, settings.falaGoogleApiKey) {
         auth.apiKey().orEmpty().ifEmpty {
@@ -327,7 +327,7 @@ private fun VisaoAnthropic(
 ) {
     val models = VISAO_ANTHROPIC_MODELS.map { AccountModel(it, it) }
     val chosen = settings.visionAnthropicModel.ifEmpty { "claude-3-5-sonnet-latest" }
-    val connection by remember(auth) { auth.state() }.collectAsState(ConnectionState.Disconnected)
+    val connection by remember(auth) { auth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
     var refresh by remember { mutableIntStateOf(0) }
     val apiKey = remember(connection, settings.providerAnthropicApiKey, settings.visionAnthropicApiKey) {
         auth.apiKey().orEmpty().ifEmpty { settings.providerAnthropicApiKey.ifEmpty { settings.visionAnthropicApiKey } }

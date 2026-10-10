@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -23,6 +22,7 @@ import com.keyflow.reasoning.ReasoningEvent
 import com.keyflow.reasoning.ReasoningRequest
 import com.keyflow.reasoning.ReasoningResolution
 import com.keyflow.reasoning.UnavailableReason
+import com.keyflow.ui.common.collectAsStateOnMain
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
 import java.util.Locale
@@ -163,7 +163,7 @@ fun ReasoningTestArea(
     // Compose — lá a thread de binder seguiu até a recomposição e caiu em CalledFromWrongThreadException (CI, 2026-10-09).
     val scope = rememberCoroutineScope { Dispatchers.Main.immediate }
     val runner = remember { TestRunner(scope, initialState) }
-    val state by runner.state.collectAsState()
+    val state by runner.state.collectAsStateOnMain()
     val prompt = tr("Diga olá em uma frase curta.")
     val unavailable = (resolution as? ReasoningResolution.Unavailable)?.reason
 
