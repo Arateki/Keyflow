@@ -82,8 +82,9 @@ DeckLock (actions fixadas por SHA, `permissions: contents: read`, evidência env
 - O `compare -fuzz` do ImageMagick 6 (CI) conta bem mais pixels que o 7 (local) no mesmo par de imagens
   (2.783 contra 461 px numa tela): golden "dentro do limiar" aqui pode passar do limiar no CI. Com golden
   e captura do mesmo renderizador a diferença é zero e a versão não importa.
-- A suíte roda com `-e motionFrames false`: os testes de artefato de movimento (orbe, mic do teclado)
-  conferem os gestos sem gravar os PNGs dos GIFs (o da orbe levava ~10 min no CI só gravando).
+- A suíte roda com `-e motionFrames false`: os geradores de GIF que só gravam quadros (orbe, tour,
+  mascote) são pulados — o arrasto da orbe é conferido no `OrbButtonViewTest` —, e o do mic do teclado
+  confere os gestos sem gravar os PNGs. Os scripts `verify-*-gifs.sh` não passam o argumento.
 - O pedaço de cada teste vem do hash do nome: o mesmo teste cai sempre no mesmo shard. Para repetir um
   job localmente: `assembleDebug assembleDebugAndroidTest` e `scripts/ci-device-gate.sh all <i> 6` com o
   emulador de pé (sem `GITHUB_RUN_ID`, o script usa os APKs do build local); `suite` e `screens` rodam
