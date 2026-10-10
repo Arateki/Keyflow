@@ -24,12 +24,27 @@ class ArchitectureRulesTest {
 
     private fun File.rel(root: File) = relativeTo(root).path
 
-    /** Linhas de [file] (1-based) que casam [predicate], ignorando comentários de linha. */
-    private fun matches(file: File, predicate: (String) -> Boolean): List<Int> =
-        file.readLines().mapIndexedNotNull { i, line ->
-            val code = line.substringBefore("//")
-            if (predicate(code)) i + 1 else null
+    /**
+     * Linhas de [file] (1-based) cujo CÓDIGO casa [predicate]: comentários `//` e `/* … */` (KDoc inclusive, que atravessa
+     * linhas) ficam de fora — a documentação pode citar o que a regra proíbe.
+     */
+    private fun matches(file: File, predicate: (String) -> Boolean): List<Int> {
+        var inBlock = false
+        return file.readLines().mapIndexedNotNull { i, line ->
+            val code = StringBuilder()
+            var j = 0
+            while (j < line.length) {
+                when {
+                    inBlock && line.startsWith("*/", j) -> { inBlock = false; j += 2 }
+                    inBlock -> j++
+                    line.startsWith("/*", j) -> { inBlock = true; j += 2 }
+                    line.startsWith("//", j) -> j = line.length
+                    else -> { code.append(line[j]); j++ }
+                }
+            }
+            if (predicate(code.toString())) i + 1 else null
         }
+    }
 
     /**
      * Tela coleta fluxo por `collectAsStateOnMain` (ui/common/CollectOnMain.kt), nunca `collectAsState` direto: no
