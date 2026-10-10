@@ -17,5 +17,11 @@
         <activity
             android:name=".ui.ImeProbeActivity"
             android:exported="true" />
+
+        <!-- O mesmo campo num processo separado do teclado, como num app de verdade (ImeProbeRemoteActivity). -->
+        <activity
+            android:name=".ui.ImeProbeRemoteActivity"
+            android:exported="true"
+            android:process=":probe" />
     </application>
 </manifest>

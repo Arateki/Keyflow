@@ -263,6 +263,13 @@ class PackOrb private constructor(private val pack: SkinPack) {
         val bitmap = render(key, pack.readSvg(file)) ?: return
         if (closed) return
         cache.put(key, bitmap)
+        // O close() pode ter caído entre a checagem acima e o put: o quadro entrava no cache de uma orbe já fechada e ficava
+        // órfão (um quadro de 156 px, 97 KB, achado pelo PackOrbBudgetTest na esteira de instabilidade, 2026-10-10). Como o
+        // close() marca `closed` antes de limpar o cache, conferir de novo depois de guardar cobre todas as ordens.
+        if (closed) {
+            cache.removeWhere { it == key }
+            return
+        }
         versionState.intValue++
     }
 

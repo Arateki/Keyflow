@@ -37,6 +37,14 @@ import com.keyflow.ime.keyboard.layout.PlacedRow
 import com.keyflow.ime.keyboard.layout.RepeatSchedule
 
 /**
+ * Quanto segurar até a tira de acentos abrir, no lugar dos [KeyboardGridView] 250 ms — só para o instrumentado. No emulador
+ * lento do CI a própria injeção de um toque (DOWN → UP) passa de 250 ms: o toque virava "segurar" e o "q" digitava "1"
+ * (esteira de instabilidade, 2026-10-10). Os testes que só tocam alongam; os que testam o segurar deixam `null` (250 ms).
+ */
+@Volatile
+var accentHoldMsForTest: Long? = null
+
+/**
  * A grade de teclas (QWERTY/`?123`) desenhada numa única `View` em `Canvas` (RND-01). O rendering é
  * **função pura** do [KeyboardGridState]/[KeyboardLayout] — nada de `View` por tecla. Mic, action row e
  * barra retraída continuam Views, intocados (fronteira `onKeyAction`, design G4).
@@ -184,6 +192,19 @@ class KeyboardGridView(
 
     /** Largura de um chip da tira aberta, só para o instrumentado andar o dedo um chip para o lado. */
     val accentChipWidthForTest: Float? get() = accentStrips.values.firstOrNull()?.chipWidth
+
+    /**
+     * Quantos eventos de toque a grade recebeu e o último (ação e posição na tela), só para o instrumentado dizer, quando
+     * uma tecla não chega ao campo, se o toque nem chegou ao teclado (caiu na janela de baixo) ou chegou e se perdeu depois.
+     */
+    var touchesSeenForTest: Int = 0
+        private set
+    val lastTouchForTest: String
+        get() = if (lastTouchAction < 0) "nenhum" else
+            "${MotionEvent.actionToString(lastTouchAction)} em (${lastTouchRawX.toInt()}, ${lastTouchRawY.toInt()})"
+    private var lastTouchAction = -1
+    private var lastTouchRawX = 0f
+    private var lastTouchRawY = 0f
 
     /**
      * Altura de fileira: o ideal ([IDEAL_ROW_HEIGHT_DP]) até o limite de [keyboardHeightFraction] da altura da tela pro
@@ -342,6 +363,10 @@ class KeyboardGridView(
 
     @Suppress("ClickableViewAccessibility") // a11y própria chega na KC-T8 (ExploreByTouchHelper)
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        touchesSeenForTest++
+        lastTouchAction = event.actionMasked
+        lastTouchRawX = event.rawX
+        lastTouchRawY = event.rawY
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
                 // 1º dedo de um gesto novo: sobra de um gesto que não terminou (UP perdido) é descartada,
@@ -591,7 +616,7 @@ class KeyboardGridView(
             if (pressedKeys[pointerId] === placed) openAccentStrip(pointerId, placed)
         }
         accentTimers[pointerId] = runnable
-        accentHandler.postDelayed(runnable, ACCENT_HOLD_MS)
+        accentHandler.postDelayed(runnable, accentHoldMsForTest ?: ACCENT_HOLD_MS)
     }
 
     private fun cancelAccentTimer(pointerId: Int) {

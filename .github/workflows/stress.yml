@@ -1,0 +1,162 @@
+name: Stress
+# Esteira de instabilidade: repete em laço, em vários emuladores ao mesmo tempo, os testes que já falharam
+# "às vezes" no gate, até a falha aparecer com evidência (scripts/ci-stress.sh). Não bloqueia PR e não faz
+# parte da regra da main — é ferramenta de caça.
+#
+# Rodar:
+# - push numa branch `ci/esteira-lenta…`: testa o código DAQUELE commit — serve também para conferir uma
+#   correção sob carga antes de mesclar (`git push origin HEAD:ci/esteira-lenta`);
+# - com este arquivo na main: Actions → Stress → Run workflow, escolhendo classes e minutos.
+#
+# Metade dos emuladores roda no runner como ele é; a outra metade com o QEMU limitado a 2 núcleos, perto do
+# runner privado (2 vCPU) onde as falhas apareciam mais — no repositório público o runner tem 4.
+# Cada emulador roda o tempo todo e junta todas as falhas; uma volta com falha publica na hora um status
+# `esteira/…` no commit (log e artefato só saem de job terminado) — é o aviso antecipado.
+on:
+  push:
+    branches: ['ci/esteira-lenta**']
+  workflow_dispatch:
+    inputs:
+      classes:
+        description: Classes ou Classe#metodo do AndroidJUnitRunner, separadas por vírgula
+        default: com.keyflow.ime.KeyFlowKeyboardCanvasGridTest,com.keyflow.ime.KeyFlowKeyboardSpellCheckerTest,com.keyflow.ime.KeyFlowKeyboardBarsTest,com.keyflow.overlay.OverlayServiceCancelTest,com.keyflow.skins.PackOrbBudgetTest
+      minutes:
+        description: Minutos de laço em cada emulador (até 45)
+        default: '40'
+      instrument_args:
+        description: Argumentos extras do teste, separados por espaço (ex. -e probeProcess remoto)
+        default: ''
+permissions:
+  contents: read
+  # Os status `esteira/<emulador>/volta-N` do aviso antecipado (scripts/ci-stress.sh).
+  statuses: write
+concurrency:
+  group: stress-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  # Os testes que deram "instável" ou falharam sem causa no gate entre 2026-10-07 e 2026-10-10.
+  STRESS_CLASSES: ${{ inputs.classes || 'com.keyflow.ime.KeyFlowKeyboardCanvasGridTest,com.keyflow.ime.KeyFlowKeyboardSpellCheckerTest,com.keyflow.ime.KeyFlowKeyboardBarsTest,com.keyflow.overlay.OverlayServiceCancelTest,com.keyflow.skins.PackOrbBudgetTest' }}
+  STRESS_MINUTES: ${{ inputs.minutes || '40' }}
+jobs:
+  build:
+    name: APKs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # O mesmo preparo do job `unit` do checks.yml (ver os comentários de lá), sem os testes de unidade.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: JDK path and debug keystore
+        run: |
+          sudo ln -sfn "$JAVA_HOME" /usr/lib/jvm/java-17-openjdk
+          mkdir -p ~/.config/.android
+          keytool -genkeypair -keystore ~/.config/.android/debug.keystore -storepass android \
+            -keypass android -alias androiddebugkey -dname "CN=Android Debug,O=Android,C=US" \
+            -keyalg RSA -keysize 2048 -validity 10000
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+      - name: sherpa-onnx AAR version
+        id: sherpa
+        run: |
+          version=$(sed -n 's/^val sherpaOnnxVersion = "\(.*\)"$/\1/p' app/build.gradle.kts)
+          sha=$(sed -n 's/^val sherpaOnnxSha256 = "\(.*\)"$/\1/p' app/build.gradle.kts)
+          test -n "$version" && test -n "$sha"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: app/libs/sherpa-onnx-${{ steps.sherpa.outputs.version }}.aar
+          key: sherpa-onnx-${{ steps.sherpa.outputs.version }}-${{ steps.sherpa.outputs.sha }}
+      - name: APKs
+        run: ./gradlew --no-daemon assembleDebug assembleDebugAndroidTest
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: apks
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  stress:
+    name: Stress ${{ matrix.worker }} (CPU ${{ matrix.cpu && format('{0}%', matrix.cpu) || 'livre' }})
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        worker: [1, 2, 3, 4, 5, 6, 7, 8]
+        cpu: ['', '200']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/.ghcup /opt/ghc /opt/hostedtoolcache/CodeQL \
+            /usr/share/swift /usr/local/share/boost /usr/local/share/powershell /usr/local/julia*
+          df -h /
+      - name: KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          test -c /dev/kvm
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: apks
+          path: app/build/outputs/apk
+      # O mesmo emulador do gate (checks.yml: versão fixa, swangle, Pixel 6, 2 núcleos, 4 GB).
+      - name: Stress loop on the emulator
+        timeout-minutes: 65
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STRESS_WORKER: ${{ matrix.worker }}-cpu${{ matrix.cpu || 'livre' }}
+          STRESS_INSTRUMENT_ARGS: ${{ inputs.instrument_args }}
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 34
+          emulator-build: 15917651
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          cores: 2
+          ram-size: 4096M
+          disk-size: 6G
+          emulator-options: -no-window -gpu swangle_indirect -no-snapshot -no-boot-anim -camera-back none
+          disable-animations: true
+          script: scripts/ci-stress.sh "$STRESS_CLASSES" "$STRESS_MINUTES" "${{ matrix.cpu }}"
+      - name: Stress evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: stress-evidence-${{ matrix.worker }}-cpu${{ matrix.cpu || 'livre' }}
+          path: app/build/stress-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
+  report:
+    name: Stress report
+    needs: stress
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: stress-evidence-*
+          path: stress
+      - name: Failures across all emulators
+        run: python3 scripts/ci-stress-report.py stress

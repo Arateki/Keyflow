@@ -48,10 +48,17 @@ class KeyFlowKeyboardCanvasGridTest {
         userSettings.capture()
         // A grade só entra na hierarquia (e só é medida) com o teclado expandido.
         userSettings.forceExpanded()
+        // Toque que demora a ser injetado no emulador lento não pode virar "segurar" (o "q" digitava "1"). Os testes da tira de
+        // acentos voltam para os 250 ms do produto — ver withPortugueseKeyboard.
+        com.keyflow.ime.keyboard.accentHoldMsForTest = TAP_ONLY_HOLD_MS
     }
 
     @After
     fun tearDown() {
+        com.keyflow.ime.keyboard.accentHoldMsForTest = null
+        // canvasGridDoesNotDisturbTheMicButton deixa uma gravação de verdade no serviço: sem parar, ela seguia por baixo e o
+        // próximo teste de mic encontrava "● 2:20" no lugar do "🎙" (esteira de instabilidade, 134/134 voltas, 2026-10-10).
+        runCatching { com.keyflow.overlay.OverlayService.stop(context) }
         userSettings.restore()
         device.pressHome()
         // KeyFlowController é singleton de processo (sobrevive ao fim deste teste, dentro do mesmo gate).
@@ -67,8 +74,8 @@ class KeyFlowKeyboardCanvasGridTest {
 
         tapKey(grid!!, "q")
 
-        waitUntil("o campo não recebeu \"q\" digitado pela grade") {
-            device.findObject(By.desc("ime_probe_field"))?.text?.contains("q") == true
+        waitUntil({ "o campo não recebeu \"q\" digitado pela grade (${typingState(grid!!, "q")})" }) {
+            fieldText()?.contains("q") == true
         }
     }
 
@@ -83,7 +90,7 @@ class KeyFlowKeyboardCanvasGridTest {
         inject(MotionEvent.ACTION_DOWN, q.centerX, q.centerY, down)
         inject(MotionEvent.ACTION_UP, q.right + q.width / 10, q.centerY, down)
 
-        waitUntil("o \"q\" tocado se perdeu com o dedo escorregando para o \"w\"") { fieldText() == "q" }
+        waitUntil({ "o \"q\" tocado se perdeu com o dedo escorregando para o \"w\" (${typingState(grid, "q")})" }) { fieldText() == "q" }
     }
 
     /** Arrastar até outra tecla antes de soltar digita a tecla onde o dedo saiu. */
@@ -99,7 +106,7 @@ class KeyFlowKeyboardCanvasGridTest {
         inject(MotionEvent.ACTION_MOVE, e.centerX, e.centerY, down)
         inject(MotionEvent.ACTION_UP, e.centerX, e.centerY, down)
 
-        waitUntil("arrastar do \"q\" até o \"e\" deveria digitar \"e\"") { fieldText() == "e" }
+        waitUntil({ "arrastar do \"q\" até o \"e\" deveria digitar \"e\" (${typingState(grid, "e")})" }) { fieldText() == "e" }
     }
 
     /**
@@ -119,7 +126,7 @@ class KeyFlowKeyboardCanvasGridTest {
         injectPointers(pointerAction(MotionEvent.ACTION_POINTER_UP, 1), down, listOf(q.centerX to q.centerY, p.centerX to p.centerY))
         injectPointers(MotionEvent.ACTION_UP, down, listOf(q.centerX to q.centerY))
 
-        waitUntil("dois dedos sobrepostos deveriam digitar \"qp\", na ordem do toque") { fieldText() == "qp" }
+        waitUntil({ "dois dedos sobrepostos deveriam digitar \"qp\", na ordem do toque (${typingState(grid, "p")})" }) { fieldText() == "qp" }
     }
 
     /** Segurar uma tecla com acentos abre a tira com a 1ª variante já escolhida; soltar sem mexer insere ela. */
@@ -181,21 +188,29 @@ class KeyFlowKeyboardCanvasGridTest {
         shell("ime set $IME")
 
         val intent = Intent()
-            .setClassName(context.packageName, "com.keyflow.ui.ImeProbeActivity")
+            .setClassName(context.packageName, probeActivity())
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         context.startActivity(intent)
 
         device.wait(Until.hasObject(By.desc("ime_probe_field")), TIMEOUT)
         device.findObject(By.desc("ime_probe_field"))?.click()
-        // Nunca acha o "🎙" (o mic é desenhado pela BarView): na prática são 5 s para a entrada do teclado assentar. Tirá-los
-        // rendeu 4 falhas de teclado em 2 rodadas do CI (2026-10-10). Trocar só por uma condição que espere o mesmo assentamento.
-        device.wait(Until.hasObject(By.text("🎙")), TIMEOUT)
+        // O awaitKeyboardAttached espera a janela do teclado assentar onde a view está (e reabre o teclado se ela não
+        // assenta): substitui os 5 s às cegas do "🎙" que nunca aparecia (o mic é desenhado pela BarView).
         awaitKeyboardAttached(device) { context.startActivity(intent) }
     }
+
+    /**
+     * `-e probeProcess remoto` troca o campo pelo [com.keyflow.ui.ImeProbeRemoteActivity], num processo separado do teclado,
+     * como num app de verdade — o experimento da esteira sobre a animação de entrada do teclado fora do lugar.
+     */
+    private fun probeActivity(): String =
+        if (InstrumentationRegistry.getArguments().getString("probeProcess") == "remoto") "com.keyflow.ui.ImeProbeRemoteActivity"
+        else "com.keyflow.ui.ImeProbeActivity"
 
     /** Acha a tecla [label] na camada de letras via geometria já computada e injeta um toque real nela. */
     private fun tapKey(grid: com.keyflow.ime.keyboard.KeyboardGridView, label: String) {
         waitUntil("grade Canvas ainda sem geometria medida") { grid.placedRowsForTest.isNotEmpty() }
+        awaitImeWindowSettled(device)
         val placed = grid.placedRowsForTest.flatMap { it.keys }
             .first { (it.keyDef.action as? CanvasKeyAction.Char)?.text == label }
         val loc = IntArray(2).also { grid.getLocationOnScreen(it) }
@@ -212,6 +227,7 @@ class KeyFlowKeyboardCanvasGridTest {
 
     private fun keyOnScreen(grid: com.keyflow.ime.keyboard.KeyboardGridView, label: String): KeyOnScreen {
         waitUntil("grade Canvas ainda sem geometria medida") { grid.placedRowsForTest.isNotEmpty() }
+        awaitImeWindowSettled(device)
         val placed = grid.placedRowsForTest.flatMap { it.keys }
             .first { (it.keyDef.action as? CanvasKeyAction.Char)?.text == label }
         val loc = IntArray(2).also { grid.getLocationOnScreen(it) }
@@ -223,10 +239,18 @@ class KeyFlowKeyboardCanvasGridTest {
         )
     }
 
-    private fun fieldText(): String? = device.findObject(By.desc("ime_probe_field"))?.text
+    // O nó do campo pode ser trocado entre achar e ler (StaleObjectException derrubava o teste): lê de novo na próxima volta.
+    private fun fieldText(): String? = runCatching { device.findObject(By.desc("ime_probe_field"))?.text }.getOrNull()
+
+    /** Para a mensagem de falha de digitação: o estado do teclado, o texto do campo e se a grade chegou a ver o toque. */
+    private fun typingState(grid: com.keyflow.ime.keyboard.KeyboardGridView, label: String): String =
+        "campo=\"${fieldText()}\", a grade viu ${grid.touchesSeenForTest} eventos de toque, o último ${grid.lastTouchForTest}; " +
+            keyboardState(grid, keyOnScreen(grid, label))
 
     /** Acentos existem em pt (não em en): fixa pt durante [block] e devolve o idioma que o aparelho tinha. */
     private fun withPortugueseKeyboard(block: () -> Unit) {
+        // Os testes da tira de acentos são os que testam o segurar: tempo do produto.
+        com.keyflow.ime.keyboard.accentHoldMsForTest = null
         val repo = SettingsRepository(context)
         val original = runBlocking { repo.keyboardLanguageOnce() }
         runBlocking { repo.saveKeyboardLanguageOnce("pt") }
@@ -325,7 +349,41 @@ class KeyFlowKeyboardCanvasGridTest {
         return "toque em (${key.centerX}, ${key.centerY}); grade em (${loc[0]}, ${loc[1]}) ${grid.width}x${grid.height}, " +
             "visível=${grid.isShown}, mesma view ativa=${view?.canvasGridForTest === grid}, expandido=${view?.expandedForTest}, " +
             "camada=${grid.currentLayerIdForTest}, fileiras=${grid.placedRowsForTest.size}, idioma salvo=$language; " +
-            "janela do IME para o sistema de entrada: ${imeInputWindow()}"
+            "janela do IME para o sistema de entrada: ${imeInputWindow()}; " +
+            "raiz da view: ${rootViewState()}; gerenciador de janelas: ${imeWindowManagerState()}; tela: ${screenshotOnFailure()}"
+    }
+
+    /** Onde a própria view acha que a janela do teclado está — comparar com o que o sistema de entrada vê. */
+    private fun rootViewState(): String {
+        val root = KeyFlowKeyboardService.activeViewForTest?.rootView ?: return "sem view"
+        val loc = IntArray(2).also { root.getLocationOnScreen(it) }
+        return "(${loc[0]}, ${loc[1]}) ${root.width}x${root.height}"
+    }
+
+    /**
+     * A janela do IME para o gerenciador de janelas: altura pedida, frame e se ainda está presa numa animação de entrada
+     * (`insets_animation`). Esteira de instabilidade, 2026-10-10: na falha, o sistema de entrada via a janela 126 px abaixo
+     * de onde a view achava que estava ([0,1739][1080,2526] × grade em 1686), com o pedido de mostrar o teclado repetido e a
+     * animação cancelada logo antes.
+     */
+    private fun imeWindowManagerState(): String {
+        val lines = shell("dumpsys window windows").lines()
+        // Sem Regex com chaves: o ICU do Android recusa o "}" solto (PatternSyntaxException derrubava o diagnóstico).
+        val isWindowHeader = { line: String -> line.trim().startsWith("Window #") && line.contains(" Window{") }
+        val start = lines.indexOfFirst { isWindowHeader(it) && it.contains("InputMethod}") }
+        if (start < 0) return "não listada"
+        val block = lines.drop(start + 1).takeWhile { !isWindowHeader(it) }
+        val requested = block.firstOrNull { it.trim().startsWith("Requested ") }?.trim()?.substringBefore(" mLayoutSeq")
+        val frames = block.firstOrNull { it.trim().startsWith("Frames:") }?.let { Regex("frame=\\S+ last=\\S+").find(it)?.value }
+        val draw = block.firstOrNull { it.contains("mDrawState=") }?.let { Regex("mDrawState=\\S+").find(it)?.value }
+        val leash = if (block.any { it.contains("insets_animation") }) "com leash de insets" else "sem leash de insets"
+        return "$requested $frames $draw $leash"
+    }
+
+    /** Captura da tela na hora da falha, nos arquivos do app — a esteira (scripts/ci-stress.sh) a traz para a evidência. */
+    private fun screenshotOnFailure(): String {
+        val file = java.io.File(context.getExternalFilesDir(null), "falha-${System.currentTimeMillis()}.png")
+        return if (runCatching { device.takeScreenshot(file) }.getOrDefault(false)) file.name else "falhou"
     }
 
     /**
@@ -355,5 +413,6 @@ class KeyFlowKeyboardCanvasGridTest {
     private companion object {
         const val IME = "com.keyflow/.ime.KeyFlowKeyboardService"
         const val TIMEOUT = 5000L
+        const val TAP_ONLY_HOLD_MS = 10_000L
     }
 }

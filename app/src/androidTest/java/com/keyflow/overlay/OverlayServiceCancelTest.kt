@@ -42,6 +42,11 @@ class OverlayServiceCancelTest {
     fun setUp() {
         shell("pm grant ${context.packageName} ${Manifest.permission.RECORD_AUDIO}")
         shell("appops set ${context.packageName} SYSTEM_ALERT_WINDOW allow")
+        // Os testes desfazem/concluem/olham o cancelamento DENTRO da janela de desfazer: com os 3 s do produto, um processo
+        // recém-criado ou um aparelho lento deixava a janela fechar antes (o "desfazer" achava IDLE; esteira de
+        // instabilidade e emulador local, 2026-10-10). 30 s aqui; cancelExpiresAndDiscardsAudio, que testa a janela
+        // fechando, volta aos 3 s.
+        OverlayService.cancelWindowMsForTest = 30_000L
         // Sobe o serviço já em RECORDING: ACTION_RECORD chama ensureForeground() (startForeground
         // imediato, sem warm-up extra) e coordinator.onTap() (ocioso → grava, MIN_RECORDING_MS à parte).
         OverlayService.start(context, OverlayService.actionIntent(context, OverlayService.ACTION_RECORD))
@@ -50,6 +55,7 @@ class OverlayServiceCancelTest {
 
     @After
     fun tearDown() {
+        OverlayService.cancelWindowMsForTest = null
         OverlayService.stop(context)
     }
 
@@ -78,6 +84,7 @@ class OverlayServiceCancelTest {
 
     @Test
     fun cancelExpiresAndDiscardsAudio() {
+        OverlayService.cancelWindowMsForTest = null // a janela do produto, 3 s: é ela que este teste vê fechar
         sendAction(RecordingNotification.ACTION_CANCEL)
         waitUntilState(ButtonState.CANCELLING)
 
@@ -87,15 +94,18 @@ class OverlayServiceCancelTest {
 
     @Test
     fun commitCancelEndsImmediatelyWithoutWaitingWindow() {
+        // Com a janela em 30 s (setUp), o "concluir" tem que encerrar muito antes dela. Com os 3 s do produto o teste dava 2 s
+        // ao "concluir" — e no emulador lento só parar e soltar o gravador passou disso (esteira de instabilidade,
+        // 2026-10-10). Assim "concluir funciona" (sai em segundos) e "concluir ignorado" (30 s em CANCELLING) não se confundem.
         sendAction(RecordingNotification.ACTION_CANCEL)
         waitUntilState(ButtonState.CANCELLING)
 
         val start = System.currentTimeMillis()
-        // CANCEL-05: toque na orbe durante CANCELLING conclui o descarte JÁ (sem esperar os 3s).
+        // CANCEL-05: toque na orbe durante CANCELLING conclui o descarte JÁ (sem esperar a janela).
         sendAction(OverlayService.ACTION_COMMIT_CANCEL)
-        waitUntilState(ButtonState.IDLE_NO_FIELD, ButtonState.IDLE_READY, timeoutMs = 2000)
+        waitUntilState(ButtonState.IDLE_NO_FIELD, ButtonState.IDLE_READY, timeoutMs = 15_000)
         val elapsed = System.currentTimeMillis() - start
-        assertTrue("commit deveria ser bem mais rápido que a janela de 3s (foi ${elapsed}ms)", elapsed < 2500)
+        assertTrue("commit deveria encerrar bem antes da janela de 30 s (foi ${elapsed}ms)", elapsed < 15_000)
     }
 
     @Test
@@ -122,18 +132,19 @@ class OverlayServiceCancelTest {
     }
 
     private fun waitUntilState(vararg expected: ButtonState, timeoutMs: Long = TIMEOUT) {
-        waitUntil("esperando $expected, estado atual: ${KeyFlowController.buttonState.value}", timeoutMs) {
+        // A mensagem é montada no fim da espera: antes ela dizia o estado do começo (e o array como endereço).
+        waitUntil({ "esperando ${expected.joinToString(" ou ")}, estado atual: ${KeyFlowController.buttonState.value}" }, timeoutMs) {
             KeyFlowController.buttonState.value in expected
         }
     }
 
-    private fun waitUntil(message: String, timeoutMs: Long = TIMEOUT, condition: () -> Boolean) {
+    private fun waitUntil(message: () -> String, timeoutMs: Long = TIMEOUT, condition: () -> Boolean) {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
             if (condition()) return
             Thread.sleep(50)
         }
-        throw AssertionError(message)
+        throw AssertionError(message())
     }
 
     private fun shell(command: String) {

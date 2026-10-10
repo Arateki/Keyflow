@@ -115,9 +115,8 @@ class KeyFlowKeyboardLanguageTest {
 
         device.wait(Until.hasObject(By.desc("ime_probe_field")), TIMEOUT)
         device.findObject(By.desc("ime_probe_field"))?.click()
-        // Nunca acha o "🎙" (o mic é desenhado pela BarView): na prática são 5 s para a entrada do teclado assentar. Tirá-los
-        // rendeu 4 falhas de teclado em 2 rodadas do CI (2026-10-10). Trocar só por uma condição que espere o mesmo assentamento.
-        device.wait(Until.hasObject(By.text("🎙")), TIMEOUT)
+        // O awaitKeyboardAttached espera a janela do teclado assentar onde a view está (e reabre o teclado se ela não
+        // assenta): substitui os 5 s às cegas do "🎙" que nunca aparecia (o mic é desenhado pela BarView).
         awaitKeyboardAttached(device) { context.startActivity(intent) }
         waitUntil("grade Canvas não montou") { KeyFlowKeyboardService.activeViewForTest!!.canvasGridForTest != null }
         val grid = KeyFlowKeyboardService.activeViewForTest!!.canvasGridForTest!!
@@ -128,6 +127,7 @@ class KeyFlowKeyboardLanguageTest {
     /** Toca a tecla globo (KeyAction.Language) na geometria real da grade. */
     private fun tapGlobe(grid: KeyboardGridView) {
         val placed = grid.placedRowsForTest.flatMap { it.keys }.first { it.keyDef.action == CanvasKeyAction.Language }
+        awaitImeWindowSettled(device)
         val loc = IntArray(2).also { grid.getLocationOnScreen(it) }
         val x = (loc[0] + (placed.left + placed.right) / 2).toInt()
         val y = (loc[1] + (placed.top + placed.bottom) / 2).toInt()
