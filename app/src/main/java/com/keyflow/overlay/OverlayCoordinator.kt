@@ -347,25 +347,37 @@ class OverlayCoordinator(
     }
 
     fun onHold() {
-        handleState(machine.onHold())
+        moveTo(machine.state, machine.onHold())
     }
 
     fun onRelease() {
-        handleState(machine.onRelease())
+        moveTo(machine.state, machine.onRelease())
+    }
+
+    /**
+     * Efeitos só quando a máquina mudou de fato: um START em RECORDING (ou STOP em SENDING) devolve o mesmo estado, e
+     * reaplicá-lo religava o gravador / reenviava o áudio. Os chamadores de hoje conferem o estado antes, mas a guarda fica
+     * aqui (achado do OverlayCoordinatorStateMachineTest, 2026-10-10).
+     */
+    private fun moveTo(prev: ButtonState, next: ButtonState) {
+        if (next != prev) handleState(next)
     }
 
     /** Aplica uma intenção do [RecordingGestureController] à máquina + efeitos (gravação/pausa). */
     fun onIntent(intent: GestureIntent) {
         when (intent) {
-            GestureIntent.START -> handleState(machine.onStart())   // → startRecording
-            GestureIntent.STOP -> handleState(machine.onStop())     // → stopAndTranscribe
-            GestureIntent.PAUSE -> {
+            GestureIntent.START -> moveTo(machine.state, machine.onStart())   // → startRecording
+            GestureIntent.STOP -> moveTo(machine.state, machine.onStop())     // → stopAndTranscribe
+            // PAUSE só de RECORDING e RESUME só de PAUSED: a orbe decide o arrasto pelo estado de quando ele começou e só
+            // dispara ao soltar — se o envio começou nesse meio-tempo (mic do teclado, notificação), um RESUME em SENDING
+            // ligava o gravador e a transcrição terminava em repouso com o microfone aberto (máquina de estados, 2026-10-10).
+            GestureIntent.PAUSE -> if (machine.state == ButtonState.RECORDING) {
                 cancelLimitJob()
                 pauseRecorder()
                 timeFreeze()
                 render(machine.onPause())
             }
-            GestureIntent.RESUME -> {
+            GestureIntent.RESUME -> if (machine.state == ButtonState.PAUSED) {
                 if (limitDecisionPending) {
                     retriggerLimitBanner()
                 } else if (partial != null && partialRecorderStopped) {
