@@ -69,6 +69,16 @@ data class LocalModelsUi(
         val EMPTY_TEXT: LocalModelsUi = compose(
             catalog = ModelCatalog.TEXT, installed = emptySet(), active = null, failures = emptyMap(), selectedId = null, deviceRamMb = 0,
         )
+
+        /** O vazio da Visão: lista os modelos de VISÃO/OCR. */
+        val EMPTY_VISION: LocalModelsUi = compose(
+            catalog = ModelCatalog.VISION, installed = emptySet(), active = null, failures = emptyMap(), selectedId = null, deviceRamMb = 0,
+        )
+
+        /** O vazio da Voz (Fala): lista os modelos de VOZ/TTS. */
+        val EMPTY_FALA: LocalModelsUi = compose(
+            catalog = ModelCatalog.VOICE, installed = emptySet(), active = null, failures = emptyMap(), selectedId = null, deviceRamMb = 0,
+        )
     }
 }
 

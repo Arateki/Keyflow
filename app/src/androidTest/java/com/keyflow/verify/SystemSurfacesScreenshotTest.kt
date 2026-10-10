@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.os.ParcelFileDescriptor
+import android.os.SystemClock
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
@@ -105,12 +106,12 @@ class SystemSurfacesScreenshotTest {
             // em "OverlayService não subiu" e ~10s depois o sistema matava o PROCESSO com
             // ForegroundServiceDidNotStartInTimeException, derrubando de carona o teste seguinte
             // (2026-09-08). `startOverlayIntent` é o que o app usa de verdade e independe da setting.
-            context.startForegroundService(OverlayService.startOverlayIntent(context))
+            OverlayService.start(context, OverlayService.startOverlayIntent(context))
             waitUntil("OverlayService não subiu") { OverlayService.isRunningForUi }
             Thread.sleep(1200) // deixa o ComposeView do orbe compor
             capture("sys-overlay-over-app")
         } finally {
-            context.stopService(OverlayService.intent(context))
+            OverlayService.stop(context)
             waitUntil("OverlayService não encerrou", timeoutMs = 5000) { !OverlayService.isRunningForUi }
         }
     }
@@ -142,9 +143,16 @@ class SystemSurfacesScreenshotTest {
 
     // ── helpers ────────────────────────────────────────────────────────────────
 
+    // A captura do sistema às vezes falha no emulador do CI (2026-10-10, swangle): tenta de novo antes de desistir.
     private fun capture(name: String) {
         val file = File(outDir, "$name.png")
-        assertTrue("falha ao capturar $name", device.takeScreenshot(file))
+        val captured = (1..CAPTURE_TRIES).any { attempt ->
+            device.takeScreenshot(file) || run {
+                if (attempt < CAPTURE_TRIES) SystemClock.sleep(500)
+                false
+            }
+        }
+        assertTrue("falha ao capturar $name ($CAPTURE_TRIES tentativas)", captured)
     }
 
     private fun createChannel() {
@@ -175,5 +183,6 @@ class SystemSurfacesScreenshotTest {
         const val NOTIF_ID = 1001
         const val IME = "com.keyflow/.ime.KeyFlowKeyboardService"
         const val TIMEOUT = 5000L
+        const val CAPTURE_TRIES = 3
     }
 }

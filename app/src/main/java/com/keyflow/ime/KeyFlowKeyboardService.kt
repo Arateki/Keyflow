@@ -25,6 +25,9 @@ import com.keyflow.ime.keyboard.isNumericInputType
 import com.keyflow.ime.keys.PhysicalKeyEmitter
 import com.keyflow.overlay.OverlayService
 import com.keyflow.overlay.RecordingNotification
+import com.keyflow.skins.PackKeyboard
+import com.keyflow.skins.SkinIds
+import com.keyflow.skins.SkinPackStore
 import com.keyflow.transcription.local.LocalTranscriber
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
@@ -35,6 +38,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -185,6 +189,13 @@ class KeyFlowKeyboardService : InputMethodService() {
                     if (keyboardView != null && config != appliedLiveConfig) setInputView(onCreateInputView())
                 }
         }
+        // Pacote de skin instalado, reimportado ou removido (SKP-IMP-05/STO-04): se o que está na tela é um pacote, reabre. O primeiro
+        // valor do fluxo (o de agora) não conta.
+        serviceScope.launch {
+            SkinPackStore.changes.drop(1).collect {
+                if (keyboardView != null && SkinIds.isPack(appliedLiveConfig?.skin)) setInputView(onCreateInputView())
+            }
+        }
     }
 
     override fun onWindowShown() {
@@ -253,6 +264,7 @@ class KeyFlowKeyboardService : InputMethodService() {
     }
 
     override fun onCreateInputView(): View {
+        val createStartedNs = System.nanoTime()
         val repo = SettingsRepository(this@KeyFlowKeyboardService)
         val dark = runBlocking { repo.themeDarkOnce() }
         // Tamanho do teclado (pedido do Yan, 2026-07-02): mesma leitura leve do tema — só DataStore, sem
@@ -265,6 +277,8 @@ class KeyFlowKeyboardService : InputMethodService() {
         // Fileira de números (NUMROW-01, pedido do Yan, 2026-07-03) — mesma leitura leve do tema/tamanho.
         val numberRowEnabled = runBlocking { repo.keyboardNumberRowEnabledOnce() }
         val skin = runBlocking { repo.keyboardSkinOnce() }
+        // Skin de pacote (SKP-KBD): abre o pacote escolhido. Sumiu ou não carrega → `null`, e `KeyboardSkin.of` já cai no Sistema.
+        val packKeyboard = openPackKeyboard(skin)
         appliedLiveConfig = LiveKeyboardConfig(dark, scalePercent, language, numberRowEnabled, skin)
         suggester = null
         suggesterReadyForTest = false
@@ -305,6 +319,7 @@ class KeyFlowKeyboardService : InputMethodService() {
             },
             dark = dark,
             skin = KeyboardSkin.of(skin),
+            pack = packKeyboard,
             scale = scale,
             locale = language,
             showLanguageKey = true,
@@ -321,12 +336,31 @@ class KeyFlowKeyboardService : InputMethodService() {
         )
         keyboardView = view
         activeViewForTest = view
-        applyGlassWindow(KeyboardColors.of(KeyboardSkin.of(skin), dark))
+        applyGlassWindow(KeyboardColors.of(KeyboardSkin.of(skin), dark, packKeyboard))
         // Sincroniza o estado atual na criação: o StateFlow só re-emite em mudança, então se a orbe já
         // estava (ex.) pausada quando o teclado abriu, a view nasceria dessincronizada (ex.: trocar de
         // teclado por atalho com o overlay pausado).
         view.updateMicState(KeyFlowController.buttonState.value)
+        Log.d(TAG, "onCreateInputView: ${(System.nanoTime() - createStartedNs) / 1_000_000} ms (skin=$skin)")
         return view
+    }
+
+    /**
+     * Abre o teclado do pacote que [skinId] (`pack:<id>`) escolhe — no caminho crítico do IME, então só o que é preciso: o manifest e as
+     * cinco peças de teclado, pequenas (os frames da orbe não são tocados). `null` se [skinId] é uma skin de hoje ou o pacote sumiu,
+     * está quebrado ou não tem teclado: nunca lança, e o chamador segue com o Sistema (SKP-STO-03).
+     */
+    private fun openPackKeyboard(skinId: String): PackKeyboard? {
+        if (!SkinIds.isPack(skinId)) return null
+        val started = System.nanoTime()
+        val keyboard = try {
+            SkinPackStore.of(this).loadBySkinId(skinId)?.let(PackKeyboard::load)
+        } catch (e: Exception) {
+            Log.w(TAG, "skin de pacote $skinId não abriu: ${e.message}")
+            null
+        }
+        Log.d(TAG, "skin de pacote $skinId: ${if (keyboard != null) "aberta" else "indisponível, usando o Sistema"} em ${(System.nanoTime() - started) / 1000} µs")
+        return keyboard
     }
 
     override fun onCreateCandidatesView(): View? = null
@@ -344,7 +378,7 @@ class KeyFlowKeyboardService : InputMethodService() {
     private fun applyGlassWindow(colors: KeyboardColors) {
         val w = window?.window ?: return
         val systemColor = systemNavigationBarColor ?: w.navigationBarColor.also { systemNavigationBarColor = it }
-        w.navigationBarColor = colors.backdrop?.navigationBarColor(windowBlurAvailable(this)) ?: systemColor
+        w.navigationBarColor = colors.navigationBarColor(windowBlurAvailable(this)) ?: systemColor
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val blurPx = if (colors.backdrop == KeyboardBackdrop.AERO && windowBlurAvailable(this)) (WINDOW_BLUR_DP * resources.displayMetrics.density).toInt() else 0
             w.setBackgroundBlurRadius(blurPx)
@@ -374,13 +408,8 @@ class KeyFlowKeyboardService : InputMethodService() {
      * o Modo Sobrepor desligado — teclado e overlay são independentes (Fase 1).
      */
     private fun startMicSession() {
-        val intent = OverlayService.keyboardMicIntent(this)
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(intent)
-            } else {
-                startService(intent)
-            }
+            OverlayService.start(this, OverlayService.keyboardMicIntent(this))
         } catch (e: Exception) {
             // Ex.: ForegroundServiceStartNotAllowedException se a isenção de FGS em background falhar.
             Log.e(TAG, "startMicSession falhou: ${e.message}", e)
@@ -499,6 +528,14 @@ class KeyFlowKeyboardService : InputMethodService() {
         candidatesEnd: Int,
     ) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        try {
+            followSelection(newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        } finally {
+            selectionStartForTest = newSelStart
+        }
+    }
+
+    private fun followSelection(newSelStart: Int, newSelEnd: Int, candidatesStart: Int, candidatesEnd: Int) {
         selectionStart = newSelStart
         selectionEnd = newSelEnd
         val word = wordTracker.currentWord
@@ -703,6 +740,11 @@ class KeyFlowKeyboardService : InputMethodService() {
         /** Dicionário do idioma atual carregado — só para o instrumentado esperar antes de digitar. */
         @Volatile
         var suggesterReadyForTest: Boolean = false
+            private set
+
+        /** Início da seleção do último [onUpdateSelection] já tratado — só para o instrumentado esperar o aviso do cursor. */
+        @Volatile
+        var selectionStartForTest: Int = -1
             private set
 
         /**

@@ -2,7 +2,9 @@ package com.keyflow.ui
 
 import com.keyflow.i18n.tr
 import android.Manifest
+import android.content.Context
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -28,6 +30,7 @@ import com.keyflow.data.SettingsRepository
 import com.keyflow.overlay.OverlayService
 import com.keyflow.ui.common.SaveController
 import com.keyflow.i18n.AppLanguage
+import com.keyflow.ui.config.AppScreenOrientation
 import com.keyflow.ui.config.ConfigScreen
 import com.keyflow.ui.config.ConfigTab
 import com.keyflow.ui.onboarding.OnboardingScreen
@@ -49,9 +52,18 @@ import com.keyflow.App
 import com.keyflow.auth.Credential
 import com.keyflow.auth.ProviderIds
 import com.keyflow.ui.config.AccountModel
+import com.keyflow.ui.config.AuthActions
 import com.keyflow.ui.config.ControllerAuthActions
 import com.keyflow.reasoning.openai.OpenAiModels
 import com.keyflow.reasoning.openai.OpenAiReasoningEngine
+import com.keyflow.reasoning.anthropic.AnthropicAgentEngine
+import com.keyflow.reasoning.anthropic.AnthropicModels
+import com.keyflow.agenthost.AgentBackends
+import com.keyflow.agenthost.AgentHost
+import kotlinx.coroutines.flow.map
+import com.keyflow.reasoning.anthropic.AnthropicReasoningEngine
+import com.keyflow.reasoning.google.GoogleModels
+import com.keyflow.reasoning.google.GoogleReasoningEngine
 import com.keyflow.ui.config.LocalModelsUi
 import com.keyflow.ui.config.LocalModelsSnapshot
 import com.keyflow.ui.config.LocalModelsController
@@ -106,18 +118,63 @@ class SetupActivity : ComponentActivity() {
         val models = OpenAiModels(auth.http)
         ControllerAuthActions(auth.registry.first { it.id == ProviderIds.OPENAI }, auth.controller, auth.browser) {
             val headers = runCatching { auth.authorization.headers(ProviderIds.OPENAI) }.getOrNull()
-            if (headers == null) emptyList() else models.list(headers).map { AccountModel(it.id, it.displayName) }
+            val list = if (headers == null) emptyList() else models.list(headers)
+            if (list.isNotEmpty()) list.map { AccountModel(it.id, it.displayName) }
+            else OpenAiModels.DEFAULT_MODELS.map { AccountModel(it.id, it.displayName) }
         }
     }
 
-    // O motor do Raciocínio: local pelo :reasoning; OpenAI pela Responses API com a credencial do cofre.
+    private val anthropicAuth by lazy {
+        val provider = auth.registry.firstOrNull { it.id == ProviderIds.ANTHROPIC }
+        if (provider == null) AuthActions.None
+        else {
+            val models = AnthropicModels(auth.http)
+            ControllerAuthActions(provider, auth.controller, auth.browser) {
+                val headers = runCatching { auth.authorization.headers(ProviderIds.ANTHROPIC) }.getOrNull()
+                val list = models.list(headers.orEmpty())
+                list.map { AccountModel(it.id, it.displayName) }
+            }
+        }
+    }
+
+    private val googleAuth by lazy {
+        val provider = auth.registry.firstOrNull { it.id == ProviderIds.GOOGLE }
+        if (provider == null) AuthActions.None
+        else {
+            val models = GoogleModels(auth.http)
+            ControllerAuthActions(provider, auth.controller, auth.browser) {
+                val headers = runCatching { auth.authorization.headers(ProviderIds.GOOGLE) }.getOrNull()
+                val list = models.list(headers.orEmpty())
+                list.map { AccountModel(it.id, it.displayName) }
+            }
+        }
+    }
+
+    // O motor do Raciocínio: local pelo :reasoning; OpenAI, Anthropic e Google por APIs na nuvem com as credenciais do cofre.
     private val reasoningEngines by lazy {
         ReasoningEngines(
             isModelInstalled = { ModelStore.get(this).isInstalled(it) },
             // Um login sem tokens (o "esqueleto" da renovação que falhou) não é credencial: pede entrar de novo.
             hasOpenAiCredential = { auth.store.get(ProviderIds.OPENAI)?.let { it !is Credential.OAuth || !it.isSkeleton } == true },
+            hasAnthropicCredential = { auth.store.get(ProviderIds.ANTHROPIC)?.let { it !is Credential.OAuth || !it.isSkeleton } == true },
+            hasGoogleCredential = { auth.store.get(ProviderIds.GOOGLE)?.let { it !is Credential.OAuth || !it.isSkeleton } == true },
             local = { LocalReasoningEngine.create(this, it) },
             openAi = { OpenAiReasoningEngine(auth.authorization, auth.http, it) },
+            anthropic = { AnthropicReasoningEngine(auth.authorization, auth.http, it) },
+            google = { GoogleReasoningEngine(auth.authorization, auth.http, it) },
+        )
+    }
+    // O agente da aba KeyFlow (agent-harness): as peças vivem no processo; aqui só se escolhe, pela origem de raciocínio, se a próxima
+    // mensagem usa ferramentas (Anthropic por chave de API) ou o chat de texto de sempre.
+    private val agentRuntime by lazy {
+        AgentHost.of(this).runtime(
+            AgentBackends(
+                hasTools = { AgentHost.of(this).registry.all().isNotEmpty() },
+                anthropicApiKeyConnected = { auth.store.get(ProviderIds.ANTHROPIC) is Credential.ApiKey },
+                anthropicCredentialChanges = auth.store.changes(ProviderIds.ANTHROPIC).map { },
+                agentEngine = { model -> AnthropicAgentEngine(auth.authorization, auth.http, model) },
+                resolveText = reasoningEngines::resolve,
+            ),
         )
     }
     private var localSnapshot by mutableStateOf(LocalModelsSnapshot.EMPTY)
@@ -162,9 +219,33 @@ class SetupActivity : ComponentActivity() {
         ),
     )
 
+    // Rotação da tela controlada exclusivamente pelo botão do cabeçalho em sentido único contínuo.
+    private var screenOrientation by mutableStateOf(AppScreenOrientation.PORTRAIT)
+    private var rotationStep by mutableStateOf(0)
+
+    private fun applyScreenOrientation(orientation: AppScreenOrientation) {
+        requestedOrientation = when (orientation) {
+            AppScreenOrientation.PORTRAIT -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            AppScreenOrientation.LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            AppScreenOrientation.REVERSE_PORTRAIT -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT
+            AppScreenOrientation.REVERSE_LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        val uiPrefs = getSharedPreferences("keyflow_ui_state", Context.MODE_PRIVATE)
+        val savedOrientationId = if (uiPrefs.contains("screen_orientation")) {
+            uiPrefs.getInt("screen_orientation", 0)
+        } else if (uiPrefs.getBoolean("screen_landscape", false)) {
+            1
+        } else {
+            0
+        }
+        screenOrientation = AppScreenOrientation.fromId(savedOrientationId)
+        rotationStep = screenOrientation.id
+        applyScreenOrientation(screenOrientation)
         settingsRepository = SettingsRepository(this)
         handleNavIntent(intent)
 
@@ -199,6 +280,18 @@ class SetupActivity : ComponentActivity() {
                         onKeyboardModeChange = ::onKeyboardModeChange,
                         onThemeChange = { dark -> persist { it.copy(themeDark = dark) } },
                         onAppLanguageChange = { language -> persist { it.copy(appLanguage = language.code) } },
+                        screenOrientation = screenOrientation,
+                        rotationStep = rotationStep,
+                        onRotationClick = {
+                            rotationStep++
+                            val target = screenOrientation.next()
+                            screenOrientation = target
+                            getSharedPreferences("keyflow_ui_state", Context.MODE_PRIVATE)
+                                .edit()
+                                .putInt("screen_orientation", target.id)
+                                .apply()
+                            applyScreenOrientation(target)
+                        },
                         onRequestOverlayPermission = ::openOverlaySettings,
                         onRequestKeyboardPermission = ::openKeyboardSettings,
                         onRequestMicPermission = ::onMicChipClicked,
@@ -232,10 +325,29 @@ class SetupActivity : ComponentActivity() {
                             selectedId = settings.reasoningLocalModelId,
                             deviceRamMb = localModels.deviceRamMb,
                         ),
+                        visionModels = LocalModelsUi.compose(
+                            catalog = ModelCatalog.VISION,
+                            installed = localSnapshot.installed,
+                            active = localSnapshot.active,
+                            failures = localSnapshot.failures,
+                            selectedId = settings.visionLocalModelId,
+                            deviceRamMb = localModels.deviceRamMb,
+                        ),
+                        falaModels = LocalModelsUi.compose(
+                            catalog = ModelCatalog.VOICE,
+                            installed = localSnapshot.installed,
+                            active = localSnapshot.active,
+                            failures = localSnapshot.failures,
+                            selectedId = settings.falaLocalModelId,
+                            deviceRamMb = localModels.deviceRamMb,
+                        ),
                         resolveReasoning = reasoningEngines::resolve,
                         reasoningAuth = openAiAuth,
+                        reasoningAnthropicAuth = anthropicAuth,
+                        reasoningGoogleAuth = googleAuth,
                         reasoningLocalSupported = LocalLlmSupport.isSupported(android.os.Build.SUPPORTED_ABIS),
                         localActions = localModels,
+                        agent = agentRuntime,
                     )
                 } else {
                     OnboardingScreen(
@@ -410,7 +522,7 @@ class SetupActivity : ComponentActivity() {
         val status = permissionsChecker.snapshot(this)
         if (!status.overlayGranted || !status.notificationsGranted) {
             persistOverlayModeEnabled(false)
-            stopService(OverlayService.intent(this))
+            OverlayService.stop(this)
         }
     }
 
@@ -560,7 +672,7 @@ class SetupActivity : ComponentActivity() {
             pendingOverlayEnable = false
             lastOverlayBlockingStep = null
             persistOverlayModeEnabled(false)
-            stopService(OverlayService.intent(this))
+            OverlayService.stop(this)
         }
     }
 
@@ -608,12 +720,7 @@ class SetupActivity : ComponentActivity() {
         pendingOverlayEnable = false
         lastOverlayBlockingStep = null
         persistOverlayModeEnabled(true)
-        val intent = OverlayService.startOverlayIntent(this)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent)
-        } else {
-            startService(intent)
-        }
+        OverlayService.start(this, OverlayService.startOverlayIntent(this))
         continueOnboardingKeyboardChainIfNeeded()
     }
 

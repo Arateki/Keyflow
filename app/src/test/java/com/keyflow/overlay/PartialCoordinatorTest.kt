@@ -109,7 +109,7 @@ class PartialCoordinatorTest {
             render = { sink.states += it },
             onClipboard = { sink.clipboard += it },
             recordingClockMs = { t.also { t += 500L } },
-            cancelWindowMs = 3_000L,
+            cancelWindowMs = { 3_000L },
             partialOnPause = { partialOn },
             onPartial = { sink.partials += it },
         )

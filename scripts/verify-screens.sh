@@ -8,6 +8,14 @@
 # ou o único device conectado. Rodar 2× deve produzir PNGs bit-idênticos para as rotas do orbe.
 #
 #   ANDROID_SERIAL=emulator-5554 scripts/verify-screens.sh [diretório-de-saída]
+#
+# Recortes (o CI divide a galeria entre emuladores; o diff-screens.sh aceita os mesmos):
+#   THEMES       temas capturados (default "light dark");
+#   ROUTE_SHARD  "k/n": só as rotas de posição i no catálogo com i % n == k (default "0/1", todas).
+# A lista completa de rotas fica em <saída>/routes.txt, para o diff saber o que é de cada recorte.
+#
+# READY_TIMEOUT (s, default 30): espera máxima pelo marcador de cada rota. Medido no CI (2026-10-09):
+# a GalleryActivity leva 3–8 s para abrir a frio no emulador de 2 núcleos; 10 s não bastaram.
 set -euo pipefail
 
 PKG="com.keyflow"
@@ -18,6 +26,21 @@ ROUTES_FILE="$FILES_DIR/gallery_routes"
 
 OUT_DIR="${1:-verification}"
 mkdir -p "$OUT_DIR"
+THEMES="${THEMES:-light dark}"
+for theme in $THEMES; do
+  case "$theme" in
+    light|dark) ;;
+    *) echo "ERRO: tema '$theme' em THEMES (use light e/ou dark)" >&2; exit 2 ;;
+  esac
+done
+ROUTE_SHARD="${ROUTE_SHARD:-0/1}"
+SHARD_INDEX="${ROUTE_SHARD%/*}"
+SHARD_COUNT="${ROUTE_SHARD#*/}"
+if ! [[ "$SHARD_INDEX" =~ ^[0-9]+$ && "$SHARD_COUNT" =~ ^[1-9][0-9]*$ ]] || [ "$SHARD_INDEX" -ge "$SHARD_COUNT" ]; then
+  echo "ERRO: ROUTE_SHARD='$ROUTE_SHARD' (use k/n, com 0 <= k < n)" >&2
+  exit 2
+fi
+READY_TIMEOUT="${READY_TIMEOUT:-30}"
 
 # adb com escopo opcional ao ANDROID_SERIAL.
 adbx() {
@@ -45,30 +68,48 @@ if [ -z "$ROUTES" ]; then
   echo "ERRO: não obtive a lista de rotas do RouteCatalog" >&2
   exit 1
 fi
+printf '%s\n' $ROUTES > "$OUT_DIR/routes.txt"
 
-capture() {
-  local route="$1" dark="$2" suffix="$3"
+# Abre a rota e espera o marcador; 0 = pronta.
+open_route() {
+  local route="$1" dark="$2"
   adbx shell am force-stop "$PKG"
   adbx shell am start -W -n "$ACT" --es route "$route" --ez dark "$dark" >/dev/null
-  local ok=""
-  for _ in $(seq 1 40); do
+  local deadline=$((SECONDS + READY_TIMEOUT))
+  while [ "$SECONDS" -le "$deadline" ]; do
     local v
     v=$(adbx shell "cat $READY 2>/dev/null || true" | tr -d '\r')
-    if [ "$v" = "$route" ]; then ok=1; break; fi
+    if [ "$v" = "$route" ]; then return 0; fi
     sleep 0.25
   done
-  if [ -z "$ok" ]; then
-    echo "ERRO: rota '$route' (dark=$dark) não ficou pronta" >&2
-    exit 1
+  return 1
+}
+
+# Uma segunda chance, com aviso: no emulador do CI (GPU por software, 2 núcleos) o 1º quadro das rotas mais pesadas
+# compila muitos shaders e pode passar dos 5 s que o Android dá à janela — ANR, e com hide_error_dialogs o app morre
+# calado (2026-10-09, config-overlay-travado). O que a 2ª abertura mostrar ainda passa pelo diff contra o golden.
+capture() {
+  local route="$1" dark="$2" suffix="$3"
+  if ! open_route "$route" "$dark"; then
+    echo "AVISO: rota '$route' (dark=$dark) não ficou pronta em ${READY_TIMEOUT} s; abrindo de novo" >&2
+    [ -n "${GITHUB_ACTIONS:-}" ] && echo "::warning::galeria: '$route$suffix' só abriu na 2ª tentativa (ver logcat: ANR?)"
+    if ! open_route "$route" "$dark"; then
+      echo "ERRO: rota '$route' (dark=$dark) não ficou pronta em ${READY_TIMEOUT} s, duas vezes" >&2
+      exit 1
+    fi
   fi
   adbx exec-out screencap -p > "$OUT_DIR/$route$suffix.png"
   echo "  ✓ $route$suffix.png"
 }
 
-echo "Capturando rotas em $OUT_DIR/ ..."
+echo "Capturando rotas em $OUT_DIR/ (temas: $THEMES; recorte $ROUTE_SHARD) ..."
+i=0
 for route in $ROUTES; do
-  capture "$route" false ""
-  capture "$route" true "-dark"
+  i=$((i + 1))
+  [ $(((i - 1) % SHARD_COUNT)) -eq "$SHARD_INDEX" ] || continue
+  for theme in $THEMES; do
+    if [ "$theme" = dark ]; then capture "$route" true "-dark"; else capture "$route" false ""; fi
+  done
 done
 adbx shell am force-stop "$PKG"
 echo "Concluído: $(ls "$OUT_DIR"/*.png | wc -l) PNGs."

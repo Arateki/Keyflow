@@ -118,6 +118,14 @@ class ReasoningPanelTest {
         rule.onNodeWithTag(reasoningSourceTag(ReasoningSource.LOCAL)).performClick()
         rule.runOnIdle { assertEquals(ReasoningSource.LOCAL, h.settings.reasoningSource) }
         rule.onNodeWithTag("raciocinio-local-model-${qwen.id}").performScrollTo().assertIsDisplayed()
+
+        rule.onNodeWithTag(reasoningSourceTag(ReasoningSource.ANTHROPIC)).performClick()
+        rule.runOnIdle { assertEquals(ReasoningSource.ANTHROPIC, h.settings.reasoningSource) }
+        rule.onNodeWithTag(ANTHROPIC_PRIVACY_TAG).performScrollTo().assertIsDisplayed()
+
+        rule.onNodeWithTag(reasoningSourceTag(ReasoningSource.GOOGLE)).performClick()
+        rule.runOnIdle { assertEquals(ReasoningSource.GOOGLE, h.settings.reasoningSource) }
+        rule.onNodeWithTag(GOOGLE_PRIVACY_TAG).performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -189,7 +197,7 @@ class ReasoningPanelTest {
         rule.onNodeWithTag(REASONING_TEST_REASON_TAG).performScrollTo()
             .assertTextEquals(ReasoningTestMessages.unavailable(UnavailableReason.NO_LOCAL_MODEL))
 
-        rule.onNodeWithTag(reasoningSourceTag(ReasoningSource.OPENAI)).performClick()
+        rule.onNodeWithTag(reasoningSourceTag(ReasoningSource.OPENAI)).performScrollTo().performClick()
 
         rule.onNodeWithTag(REASONING_TEST_REASON_TAG).performScrollTo()
             .assertTextEquals(ReasoningTestMessages.unavailable(UnavailableReason.NOT_CONNECTED))

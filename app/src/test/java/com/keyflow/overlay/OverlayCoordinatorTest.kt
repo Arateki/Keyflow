@@ -931,7 +931,7 @@ class OverlayCoordinatorTest {
         maxRecordingMs = maxRecordingMs,
         limitBannerDismissMs = limitBannerDismissMs,
         onError = onError,
-        cancelWindowMs = cancelWindowMs,
+        cancelWindowMs = { cancelWindowMs },
         recordingClockMs = recordingClockMs,
         concatAudioSegments = concatAudioSegments,
         microphoneGranted = microphoneGranted,

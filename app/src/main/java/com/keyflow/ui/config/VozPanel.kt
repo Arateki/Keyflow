@@ -17,6 +17,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
@@ -27,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import com.keyflow.core.TranscriptionSource
 import com.keyflow.data.Settings
 import com.keyflow.ui.common.verticalScrollbar
+import com.keyflow.ui.icons.KfIcon
 import com.keyflow.ui.icons.KfIconSpec
 import com.keyflow.ui.icons.KfIcons
 import com.keyflow.ui.theme.LocalKeyFlowPalette
@@ -72,7 +75,6 @@ fun VozPanel(
             .padding(top = 20.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(GROUP_GAP),
     ) {
-        PartialSection(settings, onSettingsChange)
         SettingsGroup(tr("Origem da transcrição")) {
           Column(Modifier.padding(vertical = 16.dp)) {
             Segmented(
@@ -84,24 +86,24 @@ fun VozPanel(
             )
 
             when (settings.source) {
-            TranscriptionSource.CREDITS -> CreditsCard()
+            TranscriptionSource.CREDITS -> CreditsCard(tag = VOZ_CREDITS_CARD_TAG, rechargeTag = VOZ_RECHARGE_TAG)
             TranscriptionSource.OPENAI -> KeyProviderFields(
                 provName = "OpenAI",
-                token = settings.openaiToken,
+                token = settings.providerOpenAiApiKey.ifEmpty { settings.openaiToken },
                 models = OPENAI_MODELS,
                 model = settings.openaiModel,
                 language = settings.openaiLanguage.orEmpty(),
-                onToken = { onSettingsChange(settings.copy(openaiToken = it)) },
+                onToken = { onSettingsChange(settings.copy(providerOpenAiApiKey = it, openaiToken = it)) },
                 onModel = { onSettingsChange(settings.copy(openaiModel = it)) },
                 onLanguage = { onSettingsChange(settings.copy(openaiLanguage = it.ifBlank { null })) },
             )
             TranscriptionSource.GROQ -> KeyProviderFields(
                 provName = "Groq",
-                token = settings.groqToken,
+                token = settings.providerGroqApiKey.ifEmpty { settings.groqToken },
                 models = GROQ_MODELS,
                 model = settings.groqModel,
                 language = settings.groqLanguage.orEmpty(),
-                onToken = { onSettingsChange(settings.copy(groqToken = it)) },
+                onToken = { onSettingsChange(settings.copy(providerGroqApiKey = it, groqToken = it)) },
                 onModel = { onSettingsChange(settings.copy(groqModel = it)) },
                 onLanguage = { onSettingsChange(settings.copy(groqLanguage = it.ifBlank { null })) },
             )
@@ -110,6 +112,7 @@ fun VozPanel(
             }
           }
         }
+        PartialSection(settings, onSettingsChange)
 
         // Abaixo do token/credenciais do preset ativo (pedido do Yan, 2026-07-02) — não compete por
         // atenção no topo do painel com a escolha de origem.
@@ -256,87 +259,6 @@ private fun GeneralSection(settings: Settings, onSettingsChange: (Settings) -> U
 }
 
 @Composable
-private fun CreditsCard() {
-    val palette = LocalKeyFlowPalette.current
-    Column(Modifier.padding(top = 20.dp)) {
-        // Já dentro do cartão do grupo "Origem": o saldo é um bloco recuado (papel do fundo), não outro
-        // cartão com contorno.
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(palette.bg)
-                .padding(horizontal = 16.dp, vertical = 14.dp)
-                .testTag(VOZ_CREDITS_CARD_TAG),
-        ) {
-            Eyebrow(tr("Saldo de créditos"))
-            Row(
-                Modifier.fillMaxWidth().padding(top = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Bottom,
-            ) {
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(
-                        "128",
-                        color = palette.fg,
-                        fontFamily = SpaceGrotesk,
-                        fontWeight = FontWeight.Light,
-                        fontSize = 26.sp,
-                        letterSpacing = (-0.6).sp,
-                    )
-                    Text(
-                        " / 500",
-                        color = palette.faint,
-                        fontFamily = SpaceGrotesk,
-                        fontWeight = FontWeight.Light,
-                        fontSize = 13.sp,
-                        modifier = Modifier.padding(bottom = 4.dp),
-                    )
-                }
-                Text(
-                    tr("créditos"),
-                    color = palette.muted,
-                    fontFamily = SpaceGrotesk,
-                    fontWeight = FontWeight.Light,
-                    fontSize = 10.sp,
-                    modifier = Modifier.padding(bottom = 5.dp),
-                )
-            }
-            // Barra de progresso (26% — mock): trilho fino, sem bloco.
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp)
-                    .height(3.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(palette.line2),
-            ) {
-                Box(Modifier.fillMaxWidth(0.26f).height(3.dp).clip(RoundedCornerShape(2.dp)).background(palette.teal))
-            }
-            Row(
-                Modifier.fillMaxWidth().padding(top = 9.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(tr("≈ 42 min usados"), color = palette.muted, fontFamily = SpaceMono, fontWeight = FontWeight.Light, fontSize = 9.5.sp)
-                Text(tr("165 min no total"), color = palette.muted, fontFamily = SpaceMono, fontWeight = FontWeight.Light, fontSize = 9.5.sp)
-            }
-        }
-        // CTA inerte (MON-02): não compra nada.
-        PrimaryButton(
-            tr("Recarregar créditos"),
-            tag = VOZ_RECHARGE_TAG,
-            onClick = { /* inerte nesta fase */ },
-            modifier = Modifier.padding(top = 14.dp),
-            icon = KfIcons.Plus,
-        )
-        Eyebrow(
-            tr("Pagamento via Google Play"),
-            Modifier.fillMaxWidth().padding(top = 10.dp).wrapContentWidth(Alignment.CenterHorizontally),
-        )
-    }
-}
-
-@Composable
 private fun KeyProviderFields(
     provName: String,
     token: String,
@@ -347,7 +269,61 @@ private fun KeyProviderFields(
     onModel: (String) -> Unit,
     onLanguage: (String) -> Unit,
 ) {
+    val palette = LocalKeyFlowPalette.current
+    val logo = if (provName == "OpenAI") KfIcons.LogoOpenAi else KfIcons.LogoGroq
     Column(Modifier.padding(top = 20.dp)) {
+        Row(
+            Modifier.fillMaxWidth().padding(bottom = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Box(
+                    Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(palette.panel)
+                        .border(1.dp, palette.line2, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    KfIcon(logo, tint = palette.fg, modifier = Modifier.size(18.dp))
+                }
+                Column {
+                    Text(
+                        provName,
+                        color = palette.fg,
+                        fontFamily = SpaceGrotesk,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                    )
+                    Text(
+                        if (token.isNotBlank()) tr("Chave de API ativa") else tr("Não configurado"),
+                        color = if (token.isNotBlank()) palette.teal else palette.muted,
+                        fontFamily = SpaceMono,
+                        fontSize = 10.5.sp,
+                    )
+                }
+            }
+
+            Box(
+                Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (token.isNotBlank()) palette.record.copy(alpha = 0.15f) else palette.bg)
+                    .border(1.dp, if (token.isNotBlank()) palette.record.copy(alpha = 0.4f) else palette.line2, RoundedCornerShape(8.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            ) {
+                Text(
+                    if (token.isNotBlank()) tr("API KEY") else tr("OFFLINE"),
+                    color = if (token.isNotBlank()) palette.record else palette.muted,
+                    fontFamily = SpaceMono,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 9.sp,
+                )
+            }
+        }
         AutoSaveField(tr("Token de acesso · %s", provName), token, onToken, VOZ_TOKEN_TAG, keyboardType = KeyboardType.Password)
         Row(Modifier.fillMaxWidth().padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             Dropdown(tr("Modelo"), models, model, onModel, VOZ_MODEL_TAG, Modifier.weight(1f))

@@ -68,6 +68,8 @@ class KeyFlowKeyboardView(
     private val onErrorTap: () -> Unit = {},
     private val dark: Boolean = false,
     private val skin: KeyboardSkin = KeyboardSkin.DEFAULT,
+    // Teclado de uma skin de pacote (SKP-KBD), já aberto pelo serviço; `null` = a skin é uma das de hoje ([skin]).
+    private val pack: com.keyflow.skins.PackKeyboard? = null,
     // Idioma ativo (KC-T9): decide Layouts.forLocale(...) da grade Canvas. "en" cai no fallback do LAY-05.
     private val locale: String = "en",
     // Só true quando há mais de 1 idioma habilitado (globo perde sentido com um só) — KC-T9.
@@ -187,7 +189,7 @@ class KeyFlowKeyboardView(
     val gridDragActiveForTest: Boolean get() = gridDragActive
 
     // Paleta Ateliê resolvida por tema (ints Android; o View não usa Compose).
-    private val colors = KeyboardColors.of(skin, dark)
+    private val colors = KeyboardColors.of(skin, dark, pack)
     private val kbTray = colors.tray
     private val kbKeyBorder = colors.keyBorder
     private val kbModifier = colors.modifier
@@ -347,6 +349,7 @@ class KeyFlowKeyboardView(
                 def = def,
                 dark = dark,
                 skin = skin,
+                pack = pack,
                 expandedMode = expandedMode,
                 grids = shortcutGrids,
                 callbacks = callbacks,
@@ -376,6 +379,7 @@ class KeyFlowKeyboardView(
             layout = layoutFor(numericField),
             dark = dark,
             skin = skin,
+            pack = pack,
             onKeyAction = ::forwardCanvasKeyAction,
             scale = scale,
             initialLayer = initialLayerFor(numericField),
@@ -423,7 +427,7 @@ class KeyFlowKeyboardView(
         orientation = VERTICAL
         layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
         // Com paisagem (Aero), as barras são transparentes: ela vai atrás delas também no retraído.
-        colors.backdrop?.let { background = it.drawable(resources.displayMetrics.density * scale, windowBlurAvailable(context)) }
+        colors.backgroundDrawable(resources.displayMetrics.density * scale, windowBlurAvailable(context))?.let { background = it }
         buildBars(expandedMode = false).forEach { addView(it, barLayoutParams()) }
     }
 
@@ -461,9 +465,9 @@ class KeyFlowKeyboardView(
     /** Barras + grade: fundo liso [kbTray], ou a paisagem inteira atrás das duas (Aero). */
     private fun column(): LinearLayout = LinearLayout(context).apply {
         orientation = VERTICAL
-        val backdrop = colors.backdrop
+        val backdrop = colors.backgroundDrawable(resources.displayMetrics.density * scale, windowBlurAvailable(context))
         if (backdrop != null) {
-            background = backdrop.drawable(resources.displayMetrics.density * scale, windowBlurAvailable(context))
+            background = backdrop
         } else {
             setBackgroundColor(kbTray)
         }

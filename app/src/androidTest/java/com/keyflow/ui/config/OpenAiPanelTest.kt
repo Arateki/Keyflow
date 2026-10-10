@@ -123,6 +123,9 @@ class OpenAiPanelTest {
 
     private fun text(tag: String) = rule.onNodeWithTag(tag).performScrollTo()
 
+    /** O cartão abre na aba Assinatura (o login); o campo da chave e o "Desconectar" da chave moram na aba API. */
+    private fun apiTab() = rule.onNodeWithTag(OPENAI_TAB_API_TAG).performScrollTo().performClick()
+
     private fun count(tag: String) = rule.onAllNodesWithTag(tag).fetchSemanticsNodes().size
 
     // ── os botões vêm do registro ─────────────────────────────────────────────────────────
@@ -133,10 +136,17 @@ class OpenAiPanelTest {
 
         text(OPENAI_STATUS_TAG).assertTextEquals("Não conectado")
         text(OPENAI_LOGIN_TAG).assertIsDisplayed()
-        text(OPENAI_KEY_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(OPENAI_KEY_TAG).assertDoesNotExist() // a chave está na aba API
         rule.onNodeWithTag(OPENAI_DISCONNECT_TAG).assertDoesNotExist()
-        rule.onNodeWithTag(OPENAI_MODEL_TAG).assertDoesNotExist() // sem conta, sem modelos para listar
+        // Sem conta o seletor mostra as listas de reserva do cartão, mas nenhum modelo vem escolhido: o motor só responde com um escolhido.
+        text(OPENAI_MODEL_TAG).assertTextContains("Escolha um modelo", substring = true)
         text(RACIOCINIO_OPENAI_PRIVACY_TAG).assertIsDisplayed()
+
+        apiTab()
+        text(OPENAI_KEY_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(OPENAI_LOGIN_TAG).assertDoesNotExist()
+        rule.onNodeWithTag(OPENAI_DISCONNECT_TAG).assertDoesNotExist()
+        text(OPENAI_MODEL_TAG).assertTextContains("Escolha um modelo", substring = true)
     }
 
     /** AUTH-03: um registro sem login não tem o botão; um registro sem chave não tem o campo. */
@@ -153,6 +163,7 @@ class OpenAiPanelTest {
 
         text(OPENAI_LOGIN_TAG).assertIsNotEnabled()
         text(OPENAI_LOGIN_REASON_TAG).assertIsDisplayed()
+        apiTab()
         text(OPENAI_KEY_TAG).assertIsDisplayed() // a chave segue funcionando
     }
 
@@ -184,12 +195,13 @@ class OpenAiPanelTest {
         val auth = FakeAuth()
         show(Harness(auth))
 
+        apiTab()
         text(OPENAI_KEY_TAG).performTextInput("sk-teste-1234")
         text(OPENAI_STATUS_TAG).performClick() // tira o foco do campo: salva no desfoque
 
         rule.waitUntil(3_000) { auth.savedKeys.isNotEmpty() }
         assertEquals(listOf("sk-teste-1234"), auth.savedKeys)
-        text(OPENAI_STATUS_TAG).assertTextEquals("Conectado com chave de API")
+        text(OPENAI_STATUS_TAG).assertTextEquals("Chave de API ativa")
         text(OPENAI_DISCONNECT_TAG).assertIsDisplayed()
     }
 
@@ -199,8 +211,9 @@ class OpenAiPanelTest {
         val auth = FakeAuth(initial = ConnectionState.Connected(null, AuthMethod.API_KEY), storedKey = "sk-segredo-999")
         show(Harness(auth))
 
+        apiTab()
         val statusNode = rule.onNodeWithTag(OPENAI_STATUS_TAG).performScrollTo()
-        statusNode.assertTextEquals("Conectado com chave de API")
+        statusNode.assertTextEquals("Chave de API ativa")
         // O texto editável de um campo Password não expõe a chave em claro na árvore de acessibilidade.
         rule.onNodeWithTag(OPENAI_KEY_TAG).performScrollTo().assertIsDisplayed()
         val shown = rule.onNodeWithTag(OPENAI_KEY_TAG).fetchSemanticsNode().config.toString()
@@ -262,10 +275,13 @@ class OpenAiPanelTest {
 
         text(OPENAI_PLAN_MISSING_TAG).assertIsDisplayed()
         rule.onNodeWithTag(OPENAI_PLAN_TAG).assertDoesNotExist()
-        text(OPENAI_KEY_TAG).assertIsDisplayed()
 
         text(OPENAI_LOGIN_TAG).performClick()
         assertEquals(listOf(AuthMethod.OAUTH to true), auth.connects) // forceConsent
+
+        // E a chave de API segue oferecida — na aba API.
+        apiTab()
+        text(OPENAI_KEY_TAG).assertIsDisplayed()
     }
 
     @Test
@@ -300,6 +316,7 @@ class OpenAiPanelTest {
         val h = Harness(auth)
         show(h)
 
+        apiTab() // a conexão é por chave
         rule.waitUntil(3_000) { auth.modelCalls >= 1 }
         text(OPENAI_MODEL_TAG).assertTextContains("Escolha um modelo", substring = true).performClick()
         rule.onNodeWithText("Modelo B").performClick()
@@ -314,7 +331,10 @@ class OpenAiPanelTest {
         val auth = FakeAuth(initial = ConnectionState.Connected(null, AuthMethod.API_KEY), models = emptyList())
         show(Harness(auth, Settings(reasoningSource = ReasoningSource.OPENAI, reasoningOpenAiModel = "gpt-guardado")))
 
-        rule.waitUntil(3_000) { auth.modelCalls == 1 }
+        apiTab() // a conexão é por chave
+        // O painel lista na composição (sem conexão ainda) e de novo quando a conexão chega: espera a falha da lista da conta aparecer.
+        rule.waitUntil(3_000) { count(OPENAI_MODELS_EMPTY_TAG) == 1 }
+        val callsBeforeRefresh = auth.modelCalls
         text(OPENAI_MODEL_TAG).assertTextContains("gpt-guardado", substring = true)
         text(OPENAI_MODELS_EMPTY_TAG).assertIsDisplayed()
         // O rótulo mostra o id escolhido de qualquer jeito; o que garante que ele continua SELECIONÁVEL é o item no menu aberto.
@@ -325,7 +345,7 @@ class OpenAiPanelTest {
         auth.models = listOf(AccountModel("gpt-guardado", "Nome bonito"))
         text(OPENAI_MODELS_REFRESH_TAG).performClick()
 
-        rule.waitUntil(3_000) { auth.modelCalls == 2 }
+        rule.waitUntil(3_000) { auth.modelCalls > callsBeforeRefresh }
         text(OPENAI_MODEL_TAG).assertTextContains("Nome bonito", substring = true)
     }
 

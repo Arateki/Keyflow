@@ -1,12 +1,6 @@
 package com.keyflow.ui.config
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -14,19 +8,14 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.keyflow.auth.AuthMethod
+import com.keyflow.auth.ConnectionState
 import com.keyflow.data.Settings
 import com.keyflow.i18n.tr
-import com.keyflow.ui.theme.LocalKeyFlowPalette
-import com.keyflow.ui.theme.SpaceGrotesk
+import com.keyflow.reasoning.openai.OpenAiModels
+import com.keyflow.ui.icons.KfIcons
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -47,6 +36,8 @@ const val OPENAI_MODELS_REFRESH_TAG = "raciocinio-openai-atualizar"
 const val OPENAI_WELCOME_TAG = "raciocinio-openai-boas-vindas"
 const val OPENAI_WELCOME_CLOSE_TAG = "raciocinio-openai-boas-vindas-fechar"
 const val OPENAI_WELCOME_GOT_IT_TAG = "raciocinio-openai-boas-vindas-entendi"
+const val OPENAI_TAB_SUBSCRIPTION_TAG = "raciocinio-openai-tab-assinatura"
+const val OPENAI_TAB_API_TAG = "raciocinio-openai-tab-api"
 
 /** O aviso do 1º login com o plano é mostrado uma vez por conta neste aparelho (a doc da OpenAI). */
 const val OPENAI_PLAN_NOTICE = "plan_welcome"
@@ -58,83 +49,129 @@ private const val MANAGE_USAGE = "Manage usage"
 private const val WELCOME_TITLE = "You're using your ChatGPT plan"
 private const val WELCOME_GOT_IT = "Got it"
 
-/**
- * O conteúdo da origem **OpenAI** (RSC-03/04, RCL-01/06/07): estado da conexão, os controles que o REGISTRO oferece, o modelo
- * da conta e a nota de privacidade. Vem inteiro de [openAiPanelState] e do [actions]: nenhum "se for a OpenAI" decide botão.
- */
+val OPENAI_SSO_MODELS = listOf(
+    AccountModel("gpt-6-astra", "GPT-6-Astra"),
+    AccountModel("gpt-5.6-sol", "GPT-5.6-Sol"),
+    AccountModel("gpt-5.6-luna", "GPT-5.6-Luna"),
+    AccountModel("gpt-5.5", "GPT-5.5"),
+    AccountModel("gpt-4o", "GPT-4o"),
+    AccountModel("o3-mini", "o3-mini"),
+    AccountModel("o1", "o1"),
+)
+
+val OPENAI_API_KEY_MODELS = listOf(
+    AccountModel("gpt-4o", "GPT-4o"),
+    AccountModel("gpt-4o-mini", "GPT-4o Mini"),
+    AccountModel("o3-mini", "o3-mini"),
+    AccountModel("o1", "o1"),
+    AccountModel("chatgpt-4o-latest", "ChatGPT-4o (Latest)"),
+    AccountModel("gpt-4-turbo", "GPT-4 Turbo"),
+)
+
+val OPENAI_MODELS_DEFAULT = OpenAiModels.DEFAULT_MODELS.map { AccountModel(it.id, it.displayName) }
+
 @Composable
 internal fun OpenAiPanel(
     settings: Settings,
     onSettingsChange: (Settings) -> Unit,
     actions: AuthActions,
     state: OpenAiPanelState,
-    connection: com.keyflow.auth.ConnectionState,
+    connection: ConnectionState,
 ) {
     var welcome by remember { mutableStateOf(false) }
-    val connected = state.status == OpenAiStatus.CONNECTED_LOGIN || state.status == OpenAiStatus.CONNECTED_KEY
+    var refresh by remember { mutableIntStateOf(0) }
+    var remoteModels by remember { mutableStateOf<List<AccountModel>>(emptyList()) }
 
     LaunchedEffect(state.status, state.planInUse) {
-        if (state.status == OpenAiStatus.CONNECTED_LOGIN && state.planInUse && actions.consumeNotice(OPENAI_PLAN_NOTICE)) welcome = true
+        if (state.status == OpenAiStatus.CONNECTED_LOGIN && state.planInUse && actions.consumeNotice(OPENAI_PLAN_NOTICE)) {
+            welcome = true
+        }
     }
 
-    Column(Modifier.padding(top = 20.dp)) {
-        Eyebrow(tr("Conexão"))
-        SettingTitle(statusText(state), Modifier.padding(top = 6.dp).testTag(OPENAI_STATUS_TAG))
-        state.error?.let {
-            SettingSub(openAiErrorMessage(it), Modifier.padding(top = 4.dp).testTag(OPENAI_ERROR_TAG))
-        }
-        if (state.planInUse) PlanInUse(actions)
-        if (state.planMissing) {
-            InfoNote(
-                tr("O login voltou sem permissão para usar o seu plano do ChatGPT. Entre de novo autorizando o uso do plano ou use uma chave de API."),
-                OPENAI_PLAN_MISSING_TAG,
-                Modifier.padding(top = 12.dp),
-            )
-        }
-
-        state.login?.let { login ->
-            PrimaryButton(
-                text = LOGIN_LABEL,
-                tag = OPENAI_LOGIN_TAG,
-                enabled = login.enabled,
-                // Sem o uso do plano, reautorizar pede o consentimento de novo (`prompt=consent`); nos outros casos, o login normal.
-                onClick = { actions.connect(AuthMethod.OAUTH, forceConsent = state.planMissing) },
-                modifier = Modifier.padding(top = 16.dp),
-            )
-            login.disabledReason?.let {
-                SettingSub(openAiUnavailableMessage(it), Modifier.padding(top = 8.dp).testTag(OPENAI_LOGIN_REASON_TAG))
-            }
-        }
-        if (state.showCancel) {
-            SecondaryButton(tr("Cancelar"), OPENAI_CANCEL_TAG, { actions.cancel() }, Modifier.padding(top = 10.dp))
-        }
-
-        if (state.showKeyField) {
-            // Relê a chave quando a conexão muda (guardar, apagar, desconectar) — o campo reflete o que está no cofre.
-            val stored = remember(connection) { actions.apiKey().orEmpty() }
-            AutoSaveField(
-                label = tr("Chave de API"),
-                value = stored,
-                onCommit = { actions.saveApiKey(it) },
-                tag = OPENAI_KEY_TAG,
-                modifier = Modifier.padding(top = 18.dp),
-                keyboardType = KeyboardType.Password,
-            )
-        }
-
-        if (connected) {
-            AccountModelPicker(settings, onSettingsChange, actions, connection)
-        }
-
-        if (state.showDisconnect) {
-            SecondaryButton(tr("Desconectar"), OPENAI_DISCONNECT_TAG, { actions.disconnect() }, Modifier.padding(top = 18.dp))
-        }
-
-        SettingSub(
-            tr("O texto do teste é enviado à OpenAI; as credenciais ficam só neste aparelho."),
-            Modifier.padding(top = 16.dp).testTag(RACIOCINIO_OPENAI_PRIVACY_TAG),
-        )
+    // Se a lista falha, `remoteModels` fica vazio e valem as listas de reserva do cartão; `modelsFailed` avisa (RCL-06).
+    var modelsFailed by remember { mutableStateOf(false) }
+    LaunchedEffect(connection, refresh) {
+        val remote = withContext(Dispatchers.IO) { actions.listModels() }
+        remoteModels = remote
+        modelsFailed = remote.isEmpty() && connection is ConnectionState.Connected
     }
+
+    // Vazio = ainda não escolhido (RCL-06): o motor só responde com um modelo escolhido, então o seletor não finge um padrão.
+    val chosenModel = settings.reasoningOpenAiModel
+    // O modelo já escolhido continua na lista mesmo que a conta não o devolva agora (falha de rede, ou modelo que saiu).
+    fun withChosen(models: List<AccountModel>) =
+        if (chosenModel.isNotEmpty() && models.none { it.id == chosenModel }) listOf(AccountModel(chosenModel, chosenModel)) + models else models
+    val ssoModels = withChosen(remoteModels.ifEmpty { OPENAI_SSO_MODELS })
+    val apiKeyModels = withChosen(remoteModels.ifEmpty { OPENAI_API_KEY_MODELS })
+    val login = state.login
+
+    UnifiedProviderCard(
+        providerName = "OpenAI",
+        providerLogo = KfIcons.LogoOpenAi,
+        connectionState = connection,
+        ssoButtonLabel = LOGIN_LABEL,
+        onSsoConnect = { actions.connect(AuthMethod.OAUTH, forceConsent = state.planMissing) },
+        onSsoDisconnect = { actions.disconnect() },
+        onSsoRefresh = { refresh++ },
+        selectedAuthMode = settings.providerOpenAiAuthMode,
+        onSelectAuthMode = { onSettingsChange(settings.copy(providerOpenAiAuthMode = it)) },
+        ssoModels = ssoModels,
+        selectedSsoModel = chosenModel,
+        onSelectSsoModel = { onSettingsChange(settings.copy(reasoningOpenAiModel = it)) },
+        ssoFiveHourFraction = 0.15f,
+        ssoFiveHourResetText = tr("Reseta às 15:30"),
+        ssoWeeklyFraction = 0.30f,
+        ssoWeeklyResetText = tr("Reseta qua, 14:00"),
+        ssoPlanTitle = PLAN_IN_USE.takeIf { state.planInUse },
+        manageUsageLabel = MANAGE_USAGE,
+        planNote = tr("Esse uso é do seu plano do ChatGPT e tem o limite dele — não é uma cobrança do KeyFlow."),
+        onOpenManageUsage = actions.usageUrl?.let { url -> { actions.openUrl(url) } },
+        // O que o registro decide (AUTH-03/09) e o aviso de login sem o plano (RCL-07): nada disso é "se for a OpenAI".
+        ssoOffered = actions.flows.any { it.method == AuthMethod.OAUTH },
+        ssoLoginEnabled = login?.enabled ?: true,
+        ssoLoginDisabledReason = login?.disabledReason?.let { openAiUnavailableMessage(it) },
+        loginReasonTag = OPENAI_LOGIN_REASON_TAG,
+        ssoNotice = tr("O login voltou sem permissão para usar o seu plano do ChatGPT. Entre de novo autorizando o uso do plano ou use uma chave de API.")
+            .takeIf { state.planMissing },
+        ssoNoticeTag = OPENAI_PLAN_MISSING_TAG,
+        showLoginWhenConnected = state.planMissing,
+        showDisconnect = state.showDisconnect,
+        onRefreshApiModels = { refresh++ },
+        modelsNote = tr("Não foi possível carregar os modelos da conta.").takeIf { modelsFailed },
+        modelsNoteTag = OPENAI_MODELS_EMPTY_TAG,
+        apiKey = remember(connection, settings.providerOpenAiApiKey, settings.openaiToken) {
+            actions.apiKey().orEmpty().ifEmpty { settings.providerOpenAiApiKey.ifEmpty { settings.openaiToken } }
+        },
+        onApiKeyChange = {
+            actions.saveApiKey(it)
+            onSettingsChange(settings.copy(providerOpenAiApiKey = it, openaiToken = it))
+        },
+        getKeyUrl = "https://platform.openai.com/api-keys",
+        onOpenGetKeyUrl = { actions.openUrl("https://platform.openai.com/api-keys") },
+        getKeyButtonLabel = tr("Obter chave na OpenAI"),
+        apiKeyModels = apiKeyModels,
+        selectedApiKeyModel = chosenModel,
+        onSelectApiKeyModel = { onSettingsChange(settings.copy(reasoningOpenAiModel = it)) },
+        onCancel = if (state.showCancel) { { actions.cancel() } } else null,
+        errorMessage = state.error?.let { openAiErrorMessage(it) },
+        tagPrefix = "raciocinio-openai",
+        statusTag = OPENAI_STATUS_TAG,
+        loginTag = OPENAI_LOGIN_TAG,
+        cancelTag = OPENAI_CANCEL_TAG,
+        keyTag = OPENAI_KEY_TAG,
+        getKeyTag = "raciocinio-openai-obter-chave",
+        disconnectTag = OPENAI_DISCONNECT_TAG,
+        refreshTag = OPENAI_MODELS_REFRESH_TAG,
+        ssoModelTag = OPENAI_MODEL_TAG,
+        apiKeyModelTag = OPENAI_MODEL_TAG,
+        planTag = OPENAI_PLAN_TAG,
+        limitsTag = "raciocinio-openai-limites",
+        manageUsageTag = OPENAI_MANAGE_USAGE_TAG,
+        planNoteTag = OPENAI_PLAN_NOTE_TAG,
+        privacyTag = RACIOCINIO_OPENAI_PRIVACY_TAG,
+        errorTag = OPENAI_ERROR_TAG,
+        modifier = Modifier.padding(top = 8.dp),
+    )
 
     if (welcome) {
         ConfigModal(
@@ -147,88 +184,4 @@ internal fun OpenAiPanel(
             PrimaryButton(WELCOME_GOT_IT, OPENAI_WELCOME_GOT_IT_TAG, { welcome = false }, Modifier.padding(top = 18.dp))
         }
     }
-}
-
-@Composable
-private fun statusText(state: OpenAiPanelState): String = when (state.status) {
-    OpenAiStatus.NOT_CONNECTED -> tr("Não conectado")
-    OpenAiStatus.CONNECTING -> tr("Aguardando o navegador…")
-    OpenAiStatus.CONNECTED_LOGIN -> state.account?.let { tr("Conectado como %s", it) } ?: tr("Conectado")
-    OpenAiStatus.CONNECTED_KEY -> tr("Conectado com chave de API")
-    OpenAiStatus.NEEDS_RECONNECT -> tr("A sessão expirou — entre de novo.")
-    OpenAiStatus.ERROR -> tr("Não foi possível conectar")
-}
-
-/** "Using ChatGPT plan" + "Manage usage", e a nota que separa esse uso das cobranças do próprio app (diretrizes da OpenAI). */
-@Composable
-private fun PlanInUse(actions: AuthActions) {
-    val palette = LocalKeyFlowPalette.current
-    Row(
-        Modifier.fillMaxWidth().padding(top = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            PLAN_IN_USE,
-            color = palette.teal,
-            fontFamily = SpaceGrotesk,
-            fontWeight = FontWeight.Medium,
-            fontSize = 11.5.sp,
-            modifier = Modifier.testTag(OPENAI_PLAN_TAG),
-        )
-        actions.usageUrl?.let { url ->
-            Text(
-                MANAGE_USAGE,
-                color = palette.fg2,
-                fontFamily = SpaceGrotesk,
-                fontSize = 11.5.sp,
-                textDecoration = TextDecoration.Underline,
-                modifier = Modifier.clickable { actions.openUrl(url) }.padding(vertical = 6.dp).testTag(OPENAI_MANAGE_USAGE_TAG),
-            )
-        }
-    }
-    SettingSub(
-        tr("Esse uso é do seu plano do ChatGPT e tem o limite dele — não é uma cobrança do KeyFlow."),
-        Modifier.padding(top = 2.dp).testTag(OPENAI_PLAN_NOTE_TAG),
-    )
-}
-
-/**
- * O dropdown **Modelo** (RCL-06): o que a conta pode usar, lido do provedor. Se a lista falha, o modelo já escolhido continua
- * aparecendo e "Atualizar" tenta de novo — nunca se inventa um id.
- */
-@Composable
-private fun AccountModelPicker(
-    settings: Settings,
-    onSettingsChange: (Settings) -> Unit,
-    actions: AuthActions,
-    connection: com.keyflow.auth.ConnectionState,
-) {
-    var models by remember { mutableStateOf<List<AccountModel>>(emptyList()) }
-    var loaded by remember { mutableStateOf(false) }
-    var refresh by remember { mutableIntStateOf(0) }
-    LaunchedEffect(connection, refresh) {
-        loaded = false
-        models = withContext(Dispatchers.IO) { actions.listModels() }
-        loaded = true
-    }
-
-    val chosen = settings.reasoningOpenAiModel
-    val names = models.associate { it.id to it.displayName }
-    // O modelo já escolhido fica na lista mesmo que a conta não o devolva agora (falha de rede, ou modelo que saiu).
-    val options = (if (chosen.isNotEmpty() && chosen !in names) listOf(chosen) else emptyList()) + models.map { it.id }
-
-    Dropdown(
-        label = tr("Modelo"),
-        options = options,
-        selected = chosen,
-        onSelect = { onSettingsChange(settings.copy(reasoningOpenAiModel = it)) },
-        tag = OPENAI_MODEL_TAG,
-        modifier = Modifier.padding(top = 18.dp),
-        display = { id -> if (id.isEmpty()) tr("Escolha um modelo") else names[id] ?: id },
-    )
-    if (loaded && models.isEmpty()) {
-        SettingSub(tr("Não foi possível carregar os modelos da conta."), Modifier.padding(top = 6.dp).testTag(OPENAI_MODELS_EMPTY_TAG))
-    }
-    SecondaryButton(tr("Atualizar"), OPENAI_MODELS_REFRESH_TAG, { refresh++ }, Modifier.padding(top = 10.dp))
 }

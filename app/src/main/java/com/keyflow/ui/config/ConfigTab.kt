@@ -15,6 +15,7 @@ import com.keyflow.ui.icons.KfIcons
  * não é de nenhum dos dois.
  */
 enum class TabGroup(private val titlePt: String?) {
+    PRINCIPAL(null),
     INTERFACES(trKey("Interfaces")),
     CAPACIDADES(trKey("Capacidades")),
     OUTROS(null),
@@ -31,18 +32,23 @@ enum class TabGroup(private val titlePt: String?) {
  * têm conteúdo. A aba Modo saiu (Yan, 2026-09-28): o cartão de cada modo abre a aba da própria interface.
  */
 enum class ConfigTab(private val labelPt: String, private val icon: KfIconSpec, val group: TabGroup) {
+    // ── Agente Principal
+    KEYFLOW("KeyFlow", KfIcons.TabKeyflow, TabGroup.PRINCIPAL),
+
     // ── Interfaces
     TECLADO(trKey("Teclado"), KfIcons.TabTeclado, TabGroup.INTERFACES),
     OVERLAY(trKey("Sobrepor"), KfIcons.TabSobrepor, TabGroup.INTERFACES),
     NOTIFICACAO(trKey("Notificação"), KfIcons.TabNotificacao, TabGroup.INTERFACES),
 
-    // ── Capacidades. O nome interno [VOZ] é, desde o começo, a aba Transcrição; a aba "Voz" (boca) é a FALA — renomear
-    // a primeira mexeria em intents, tags e testes sem ganho.
+    // ── Capacidades. Fluxos é a central de orquestração e conexões, vindo em primeiro lugar.
+    FLUXOS(trKey("Fluxos"), KfIcons.TabFluxos, TabGroup.CAPACIDADES),
     VOZ(trKey("Transcrição"), KfIcons.TabVoz, TabGroup.CAPACIDADES),
     VISAO(trKey("Visão"), KfIcons.TabVisao, TabGroup.CAPACIDADES),
     RACIOCINIO(trKey("Raciocínio"), KfIcons.TabRaciocinio, TabGroup.CAPACIDADES),
     FALA(trKey("Voz"), KfIcons.TabBoca, TabGroup.CAPACIDADES),
+    COMPUTADOR(trKey("Computador"), KfIcons.TabComputador, TabGroup.CAPACIDADES),
 
+    // ── Outros
     DOCS("Docs", KfIcons.TabDocs, TabGroup.OUTROS),
     ;
 

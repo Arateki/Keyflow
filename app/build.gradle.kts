@@ -60,11 +60,53 @@ android {
             isReturnDefaultValues = true
         }
     }
+    // O pacote de skin de exemplo (`skin-packs/`, na raiz do repositório) vai nos assets do APK de teste: o instrumentado importa o pacote REAL,
+    // não uma cópia (SKP-DOC-02).
+    sourceSets {
+        getByName("androidTest") {
+            assets.srcDir("../skin-packs")
+        }
+    }
 }
 
 kotlin {
     jvmToolchain(17)
 }
+
+// O FORMAT.md das skins importáveis vai embutido nos assets do APK (agent-harness, SKL-01): a ferramenta `skin_get_format` o devolve ao
+// modelo — "a versão que o código aceita". UMA fonte da verdade: o arquivo de `.specs/features/skin-packs/` é COPIADO no build (nada de
+// segunda cópia versionada que um dia diverge do original, e o `SkinPackFormatDocTest` já amarra esse mesmo arquivo ao código). A cópia
+// vai para `assets/agent/skin-format.md` por uma pasta gerada, no jeito do AGP para fontes geradas.
+abstract class CopySkinFormatTask : DefaultTask() {
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val format: RegularFileProperty
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun copy() {
+        val target = File(outputDir.get().asFile, "agent")
+        target.deleteRecursively()
+        target.mkdirs()
+        format.get().asFile.copyTo(File(target, "skin-format.md"), overwrite = true)
+    }
+}
+
+val copySkinFormat = tasks.register<CopySkinFormatTask>("copySkinFormatAsset") {
+    format.set(rootProject.layout.projectDirectory.file(".specs/features/skin-packs/FORMAT.md"))
+    outputDir.set(layout.buildDirectory.dir("generated/skinFormatAssets"))
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(copySkinFormat, CopySkinFormatTask::outputDir)
+    }
+}
+
+// O teste de unidade que confere que o asset é idêntico ao original lê o arquivo copiado: garante que a cópia existe antes de ele rodar.
+tasks.matching { it.name.endsWith("UnitTest") }.configureEach { dependsOn(copySkinFormat) }
 
 // sherpa-onnx (NM-T1): STT on-device. A distribuição Android oficial é só o AAR anexado ao release do
 // GitHub (o `com.github.k2-fsa:sherpa-onnx` do JitPack é o jar Java de desktop, sem .so Android).
@@ -159,6 +201,13 @@ dependencies {
     //    Engine.createConversation(ConversationConfig(systemInstruction)), Conversation.sendMessageAsync(texto,
     //    MessageCallback{onMessage,onDone,onError}), Conversation.cancelProcess(), Message.toString() = o texto.
     implementation("com.google.ai.edge.litertlm:litertlm-android:0.16.1")
+
+    // Skins importáveis (skin-packs, SKP-T1): AndroidSVG desenha os SVGs dos pacotes de skin. Conferido em 2026-10-02 no
+    // Maven Central (maven-metadata.xml): só existem 1.3 e 1.4; a 1.4 (2019-05-28) é a `release` e a `latest`. Apache-2.0
+    // (licença em app/licenses/), minSdk 8, sem dependências. API usada, lida no classes.jar: `SVG.getFromString`,
+    // `SVG.renderToCanvas(Canvas, RenderOptions)`, `RenderOptions.viewPort/preserveAspectRatio`, `SVG.getDocumentViewBox`,
+    // `SVG.setInternalEntitiesEnabled`. Só `skins/SvgRender.kt` importa `com.caverock` — trocar o renderizador não vaza.
+    implementation("com.caverock:androidsvg-aar:1.4")
 
     // --- Testes ---
     // Unit

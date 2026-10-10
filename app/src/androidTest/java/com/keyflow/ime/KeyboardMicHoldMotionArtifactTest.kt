@@ -44,6 +44,11 @@ import java.util.TimeZone
 class KeyboardMicHoldMotionArtifactTest {
 
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
+
+    // `-e motionFrames false` (o gate do CI, scripts/ci-device-gate.sh): os gestos e as asserções rodam iguais, só
+    // não grava os PNGs de tela cheia dos GIFs — no emulador do CI cada um custava ~4 s (2026-10-09: o teste da
+    // orbe levou 596 s). Os scripts verify-*-gifs.sh não passam o argumento e seguem gravando.
+    private val framesEnabled = InstrumentationRegistry.getArguments().getString("motionFrames") != "false"
     private val context = instrumentation.targetContext
     private val device: UiDevice = UiDevice.getInstance(instrumentation)
     private val outRoot: File by lazy {
@@ -239,6 +244,13 @@ class KeyboardMicHoldMotionArtifactTest {
     }
 
     private fun capture(dir: File, index: Int, label: String) {
+        if (!framesEnabled) {
+            // Sem quadro para gravar, basta a thread principal ter processado o gesto. waitForIdleSync espera ela ficar
+            // OCIOSA, e no arrasto a orbe redesenha sem parar: no emulador do CI (swangle, 150–200 ms por quadro) ela
+            // nunca ficava, e o teste travava até o timeout do job (2026-10-10).
+            instrumentation.runOnMainSync {}
+            return
+        }
         instrumentation.waitForIdleSync()
         Thread.sleep(80)
         val file = File(dir, "frame-%02d-%s.png".format(index, label))

@@ -107,7 +107,7 @@ class OrbGestureIntegrationTest {
             flushPending = { false },
             targetAvailable = { true },
             render = { state -> renderedStates += state; view.render(state) },
-            cancelWindowMs = cancelWindowMs,
+            cancelWindowMs = { cancelWindowMs },
             concatAudioSegments = concatAudioSegments,
         )
         view.render(coordinator.currentState())

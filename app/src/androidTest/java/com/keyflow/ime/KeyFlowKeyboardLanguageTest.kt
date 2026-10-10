@@ -115,6 +115,8 @@ class KeyFlowKeyboardLanguageTest {
 
         device.wait(Until.hasObject(By.desc("ime_probe_field")), TIMEOUT)
         device.findObject(By.desc("ime_probe_field"))?.click()
+        // Nunca acha o "🎙" (o mic é desenhado pela BarView): na prática são 5 s para a entrada do teclado assentar. Tirá-los
+        // rendeu 4 falhas de teclado em 2 rodadas do CI (2026-10-10). Trocar só por uma condição que espere o mesmo assentamento.
         device.wait(Until.hasObject(By.text("🎙")), TIMEOUT)
         awaitKeyboardAttached(device) { context.startActivity(intent) }
         waitUntil("grade Canvas não montou") { KeyFlowKeyboardService.activeViewForTest!!.canvasGridForTest != null }

@@ -58,7 +58,8 @@ class OverlayCoordinator(
     // Banner clicável "cancelado · desfazer" durante a janela de descarte (Fase 2a).
     private val onShowCancelUndo: () -> Unit = {},
     private val onHideCancelUndo: () -> Unit = {},
-    private val cancelWindowMs: Long = DEFAULT_CANCEL_WINDOW_MS,
+    // Lida a cada cancelamento: o teste de aparelho lento alonga a janela (OverlayService.cancelWindowMsForTest).
+    private val cancelWindowMs: () -> Long = { DEFAULT_CANCEL_WINDOW_MS },
     // Aviso "enviar ou descartar" ao atingir Settings.maxRecordingSec (0 = desabilitado; lido ao vivo,
     // como os demais ajustes editáveis durante o uso — ver tapBurstWindowMs no OverlayService).
     private val onShowLimitReached: () -> Unit = {},
@@ -276,7 +277,7 @@ class OverlayCoordinator(
         onShowCancelUndo()
         cancelJob?.cancel()
         cancelJob = scope.launch {
-            delay(cancelWindowMs)
+            delay(cancelWindowMs())
             finalizeCancel()
         }
     }

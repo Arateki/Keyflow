@@ -48,8 +48,8 @@ gradle wrapper --gradle-version 9.6.1
 ./gradlew testDebugUnitTest          # unit tests (JVM) — gate "quick"
 ./gradlew connectedDebugAndroidTest  # instrumented — precisa do emulador rodando — gate "full"
 
-# Subir o emulador Android 14 (headless, com KVM):
-emulator -avd keyflow_api34 -no-window -no-audio -gpu swiftshader_indirect &
+# Subir o emulador Android 14 (headless, com KVM) no renderizador do CI (os goldens saem dele):
+emulator -avd keyflow_api34 -no-window -no-audio -gpu swangle_indirect &
 adb wait-for-device && adb shell getprop sys.boot_completed   # "1" = pronto
 
 # Subir com janela (se houver display):
@@ -122,6 +122,7 @@ derruba o `system_server` ("Lost network stack" / "Can't find service: package")
 em 2026-09-24. **Instrumentados e goldens passam a ser feitos pelo CI** (runner com KVM):
 
 1. push da branch e disparo manual do workflow `Checks` nela (`workflow_dispatch`, sem precisar de PR);
-2. baixar o artefato `device-evidence` (`ci-evidence/screens/*.png` = o que o `verify-screens.sh`
-   capturou) — o print do CI é **byte a byte igual** ao golden quando nada mudou;
+2. baixar os artefatos `device-evidence-*` (`gh run download <run> -p 'device-evidence-*'`;
+   `ci-evidence/screens/*.png` = o que o `verify-screens.sh` capturou em cada recorte) — o print do CI é
+   **byte a byte igual** ao golden quando nada mudou;
 3. revisar os PNGs que mudaram de propósito, copiar para `verification/golden/` e subir de novo.

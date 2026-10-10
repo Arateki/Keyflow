@@ -33,7 +33,7 @@ class AuthIsolationTest {
     @Test
     fun `only the registry and the provider's own reasoning engine import a provider package`() {
         val allowed = { path: String ->
-            path == "auth/AuthProviders.kt" || path.startsWith("auth/providers/") || path.startsWith("reasoning/openai/")
+            path == "auth/AuthProviders.kt" || path.startsWith("auth/providers/") || path.startsWith("reasoning/openai/") || path.startsWith("reasoning/anthropic/") || path.startsWith("reasoning/google/")
         }
         val found = violations({ !allowed(it) }, "com.keyflow.auth.providers.")
         assertWithMessage("importa um provedor concreto fora do registro:\n${found.joinToString("\n")}").that(found).isEmpty()

@@ -6,6 +6,9 @@ import com.keyflow.core.ReasoningSource
 import com.keyflow.core.RecordingMode
 import com.keyflow.core.ShortcutOverflow
 import com.keyflow.core.TranscriptionSource
+import com.keyflow.core.VisionSource
+import com.keyflow.core.FalaSource
+import java.lang.reflect.Modifier
 
 /**
  * Estado completo de configuração persistido (T5 / VOZ-01..06, OVL-05, FND-04, REC modos).
@@ -14,8 +17,11 @@ import com.keyflow.core.TranscriptionSource
  * Os campos `custom*` compartilham as chaves legadas do DataStore (endpoint/header/model/language),
  * de modo que `SettingsRepository.flow()`/`save()` continuam válidos durante a migração (T10/T22).
  *
- * Tokens (`openaiToken`, `groqToken`, `customHeaderValue`) ficam **criptografados** e são preservados
+ * Os segredos (tokens, chaves de API, senha e chave privada SSH, valores de cabeçalho de autenticação —
+ * ver [SettingsSecrets.BY_PROPERTY]) ficam **criptografados**, fora do DataStore e do backup, e são preservados
  * ao trocar de preset — trocar a `source` nunca apaga a credencial de outro provedor.
+ *
+ * `toString()` não mostra nenhum deles: um `Log` ou uma mensagem de erro que imprima as Settings não vaza credencial.
  */
 data class Settings(
     val source: TranscriptionSource = TranscriptionSource.CUSTOM,
@@ -38,11 +44,69 @@ data class Settings(
     val localModelId: String? = null,
     val localLanguage: String? = null,
     // Raciocínio (reasoning-models): a origem, o modelo de texto local escolhido (id do catálogo `TEXT`; null =
-    // nenhum) e o modelo da OpenAI ("" = ainda não escolhido — vem da lista da conta, nunca de um id fixo).
-    // Nenhuma credencial aqui: ficam no cofre de `auth/` (AUTH-02).
+    // nenhum) e os modelos em nuvem (OpenAI, Anthropic, Google, Custom). As credenciais dos provedores com login ficam no cofre
+    // de `auth/` (AUTH-02); só o valor do cabeçalho do Custom é segredo das Settings (cofre cifrado, ver [SettingsSecrets]).
     val reasoningSource: ReasoningSource = ReasoningSource.LOCAL,
     val reasoningLocalModelId: String? = null,
     val reasoningOpenAiModel: String = "",
+    val reasoningAnthropicModel: String = "claude-3-5-sonnet-latest",
+    val reasoningGoogleModel: String = "gemini-2.0-flash",
+    val reasoningCustomEndpoint: String = "",
+    val reasoningCustomHeaderName: String = "Authorization",
+    val reasoningCustomHeaderValue: String = "",
+    val reasoningCustomModel: String = "",
+    // Visão (vision-capture): a origem, o modelo local escolhido, destino da tradução e configurações em nuvem/custom.
+    val visionSource: VisionSource = VisionSource.LOCAL,
+    val visionLocalModelId: String? = null,
+    val visionTranslateTarget: String = "pt",
+    val visionOpenAiModel: String = "gpt-4o",
+    val visionGoogleApiKey: String = "",
+    val visionGoogleModel: String = "gemini-2.0-flash",
+    val visionAnthropicApiKey: String = "",
+    val visionAnthropicModel: String = "claude-3-5-sonnet-latest",
+    val visionCustomEndpoint: String = "",
+    val visionCustomHeaderName: String = "Authorization",
+    val visionCustomHeaderValue: String = "",
+    val visionCustomModel: String = "",
+    // Voz / Fala (speech-synthesis): a origem, modelo local, velocidade, e provedores na nuvem (OpenAI, ElevenLabs, Google, Custom).
+    val falaSource: FalaSource = FalaSource.LOCAL,
+    val falaLocalModelId: String? = null,
+    val falaSpeed: Float = 1.0f,
+    val falaCloudVoice: String = "alloy",
+    val falaElevenLabsApiKey: String = "",
+    val falaElevenLabsVoice: String = "Rachel",
+    val falaElevenLabsModel: String = "eleven_multilingual_v2",
+    val falaGoogleApiKey: String = "",
+    val falaGoogleVoice: String = "pt-BR-Neural2-A",
+    val falaCustomEndpoint: String = "",
+    val falaCustomHeaderName: String = "Authorization",
+    val falaCustomHeaderValue: String = "",
+    val falaCustomModel: String = "",
+    // Computador (acesso SSH remoto e shell local)
+    val computerMode: String = "ssh",
+    val computerSshHost: String = "",
+    val computerSshPort: Int = 22,
+    val computerSshUser: String = "",
+    val computerSshAuthType: String = "password",
+    val computerSshPassword: String = "",
+    val computerSshKey: String = "",
+    // Provisionamento e espelhamento dinâmico de modelos via infra própria / API em Rust
+    val customModelMirrorUrl: String = "",
+    // Provedores em nuvem (perfis e chaves centralizadas)
+    val providerAnthropicApiKey: String = "",
+    val providerAnthropicModel: String = "claude-3-5-sonnet-latest",
+    val providerAnthropicAuthMode: String = "subscription",
+    val providerOpenAiApiKey: String = "",
+    val providerOpenAiModel: String = "gpt-4o",
+    val providerOpenAiAuthMode: String = "subscription",
+    val providerGoogleApiKey: String = "",
+    val providerGoogleModel: String = "gemini-2.0-flash",
+    val providerGoogleAuthMode: String = "subscription",
+    val providerElevenLabsAuthMode: String = "subscription",
+    val providerGroqApiKey: String = "",
+    val providerGroqModel: String = "llama-3.3-70b-versatile",
+    val providerGrokApiKey: String = "",
+    val providerGrokModel: String = "grok-2",
     // Modos habilitados (gating das abas; cada modo libera sua aba — CFG-02)
     val overlayModeEnabled: Boolean = false,
     val keyboardModeEnabled: Boolean = false,
@@ -192,6 +256,21 @@ data class Settings(
     }
 
     private fun bearer(token: String): String = if (token.isBlank()) "" else "Bearer $token"
+
+    /**
+     * Igual ao `toString()` de uma data class, mas com `***` no lugar do valor de cada segredo
+     * ([SettingsSecrets.BY_PROPERTY]): o gerado imprimiria todos, e bastava um `Log`, uma mensagem de erro ou o
+     * inspetor de layout mostrando as Settings para a chave de API ir parar no logcat. Percorre os campos por
+     * reflexão (e não uma lista à mão) para um campo novo nunca ficar de fora.
+     */
+    override fun toString(): String = javaClass.declaredFields
+        .filterNot { Modifier.isStatic(it.modifiers) }
+        .joinToString(separator = ", ", prefix = "Settings(", postfix = ")") { field ->
+            field.isAccessible = true
+            val value = field.get(this)
+            val shown = if (field.name in SettingsSecrets.BY_PROPERTY && value is String && value.isNotEmpty()) "***" else value
+            "${field.name}=$shown"
+        }
 
     companion object {
         // Endpoints/modelos verificados nas docs (OpenAI/GroqDocs, 2026), não fabricados.

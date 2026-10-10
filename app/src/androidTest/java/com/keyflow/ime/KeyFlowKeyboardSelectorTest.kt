@@ -18,6 +18,7 @@ import com.keyflow.ime.bars.BarView
 import android.graphics.Rect
 import com.keyflow.core.ButtonState
 import com.keyflow.core.KeyFlowController
+import com.keyflow.overlay.OverlayService
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -58,6 +59,10 @@ class KeyFlowKeyboardSelectorTest {
         context.getSharedPreferences("keyflow_kb_ui", Context.MODE_PRIVATE)
             .edit().putBoolean("kbd_bars", false).commit()
         shell("pm grant ${context.packageName} ${Manifest.permission.RECORD_AUDIO}")
+        // Em CANCELLING o teste segura o mic duas vezes (confere o seletor, depois arrasta até "desfazer"): no emulador do CI,
+        // com quadros de 1–2 s, isso passava dos 3 s da janela, o cancelamento se concluía sozinho e o "desfazer" sumia
+        // (2 rodadas seguidas em 2026-10-10). O que se confere aqui é o seletor, não o tempo da janela (OverlayCoordinatorTest).
+        OverlayService.cancelWindowMsForTest = 30_000L
         shell("ime enable $IME")
         shell("ime set $IME")
 
@@ -68,13 +73,16 @@ class KeyFlowKeyboardSelectorTest {
 
         device.wait(Until.hasObject(By.desc("ime_probe_field")), TIMEOUT)
         device.findObject(By.desc("ime_probe_field"))?.click()
+        // Nunca acha o "🎙" (o mic é desenhado pela BarView): na prática são 5 s para a entrada do teclado assentar. Tirá-los
+        // rendeu 4 falhas de teclado em 2 rodadas do CI (2026-10-10). Trocar só por uma condição que espere o mesmo assentamento.
         device.wait(Until.hasObject(By.text("🎙")), TIMEOUT)
         awaitKeyboardAttached(device) { context.startActivity(intent) }
     }
 
     @After
     fun tearDown() {
-        runCatching { context.stopService(com.keyflow.overlay.OverlayService.intent(context)) }
+        runCatching { OverlayService.stop(context) }
+        OverlayService.cancelWindowMsForTest = null
         context.getSharedPreferences("keyflow_kb_ui", Context.MODE_PRIVATE).edit().remove("kbd_bars").commit()
         userSettings.restore()
         device.pressHome()
@@ -176,7 +184,9 @@ class KeyFlowKeyboardSelectorTest {
      */
     private fun selectChipAndWaitFor(action: MicAction, expected: ButtonState, attempts: Int = 3) {
         var lastError: Throwable? = null
+        val startStates = mutableListOf<ButtonState>()
         repeat(attempts) { attempt ->
+            startStates += KeyFlowController.buttonState.value
             try {
                 holdMic()
                 dragAndReleaseOnAction(action)
@@ -185,19 +195,24 @@ class KeyFlowKeyboardSelectorTest {
             } catch (e: Throwable) {
                 lastError = e
             }
-            // Recuperação antes de tentar de novo: garante que nenhum gesto ficou "pendurado".
-            runCatching { releaseAtMic() }
+            // Recuperação antes de tentar de novo: encerra o gesto que ficou "pendurado". CANCEL, não UP: um UP no mic com o
+            // seletor fechado é um toque, e o toque muda o estado (em IDLE começava a gravar de novo e escondia a causa).
+            runCatching { cancelGesture() }
             Thread.sleep(200)
         }
         throw AssertionError(
             "estado não chegou a $expected após $attempts tentativas de \"$action\"; " +
-                "atual: ${KeyFlowController.buttonState.value}",
+                "atual: ${KeyFlowController.buttonState.value}; no início de cada tentativa: $startStates",
             lastError,
         )
     }
 
     private fun releaseAtMic() {
         inject(MotionEvent.ACTION_UP, micDownX, micDownY, SystemClock.uptimeMillis())
+    }
+
+    private fun cancelGesture() {
+        inject(MotionEvent.ACTION_CANCEL, micDownX, micDownY, SystemClock.uptimeMillis())
     }
 
     private fun inject(action: Int, x: Int, y: Int, time: Long) {

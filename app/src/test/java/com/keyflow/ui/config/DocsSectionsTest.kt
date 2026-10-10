@@ -53,6 +53,13 @@ class DocsSectionsTest {
         }
     }
 
+    /** SKP-T1: o renderizador dos SVGs das skins importadas (AndroidSVG, Apache 2.0) é atribuído na Docs. */
+    @Test
+    fun licensesAlsoNameTheSvgRenderer() {
+        val labels = docsSections.single { it.id == "licencas" }.blocks.filterIsInstance<DocBlock.Labeled>().map { it.label }
+        assertTrue("licença do AndroidSVG ausente", "AndroidSVG" in labels)
+    }
+
     @Test
     fun feedbackIsTheLastSectionAndTheOnlyOneWithActions() {
         assertEquals("feedback", ids.last())
@@ -85,14 +92,41 @@ class DocsSectionsTest {
         assertTrue(body.indexOf(FeedbackKind.BUG.prompt) < body.indexOf("KeyFlow 0.1.0"))
     }
 
-    /** RSC-05: a aba Raciocínio ganhou conteúdo, então ganhou o "?" e a seção da Docs; as abas ainda vazias seguem sem. */
     @Test
-    fun theReasoningTabHasItsOwnHelpSectionAndTheEmptyOnesStillHaveNone() {
-        val section = docsSectionFor(ConfigTab.RACIOCINIO)
-        assertTrue("Raciocínio sem seção", section != null)
-        assertEquals("aba-raciocinio", section!!.id)
-        assertTrue(section.blocks.isNotEmpty())
-        listOf(ConfigTab.VISAO, ConfigTab.NOTIFICACAO, ConfigTab.FALA, ConfigTab.DOCS).forEach {
+    fun licensesAlsoNameVisionModels() {
+        val labels = docsSections.single { it.id == "licencas" }.blocks.filterIsInstance<DocBlock.Labeled>().map { it.label }
+        listOf("ML Kit Text Recognition", "PP-OCR v4", "SmolVLM 500M").forEach {
+            assertTrue("licença de $it ausente", it in labels)
+        }
+    }
+
+    @Test
+    fun licensesAlsoNameVoiceModels() {
+        val labels = docsSections.single { it.id == "licencas" }.blocks.filterIsInstance<DocBlock.Labeled>().map { it.label }
+        listOf("Piper TTS", "Kokoro", "MeloTTS").forEach {
+            assertTrue("licença de $it ausente", it in labels)
+        }
+    }
+
+    /** As abas Raciocínio, Visão e Voz têm conteúdo, então ganharam o "?" e a seção da Docs; Notificação segue vazia. */
+    @Test
+    fun theReasoningVisionAndVoiceTabsHaveHelpSectionsAndTheEmptyOnesStillHaveNone() {
+        val rSection = docsSectionFor(ConfigTab.RACIOCINIO)
+        assertTrue("Raciocínio sem seção", rSection != null)
+        assertEquals("aba-raciocinio", rSection!!.id)
+        assertTrue(rSection.blocks.isNotEmpty())
+
+        val vSection = docsSectionFor(ConfigTab.VISAO)
+        assertTrue("Visão sem seção", vSection != null)
+        assertEquals("aba-visao", vSection!!.id)
+        assertTrue(vSection.blocks.isNotEmpty())
+
+        val fSection = docsSectionFor(ConfigTab.FALA)
+        assertTrue("Voz sem seção", fSection != null)
+        assertEquals("aba-voz", fSection!!.id)
+        assertTrue(fSection.blocks.isNotEmpty())
+
+        listOf(ConfigTab.KEYFLOW, ConfigTab.NOTIFICACAO, ConfigTab.DOCS, ConfigTab.FLUXOS, ConfigTab.COMPUTADOR).forEach {
             assertEquals("$it não deveria ter seção ainda", null, docsSectionFor(it))
         }
     }

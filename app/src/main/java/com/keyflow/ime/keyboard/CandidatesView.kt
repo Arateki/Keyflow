@@ -30,9 +30,10 @@ class CandidatesView(
     private val onTap: (String) -> Unit,
     private val scale: Float = 1f,
     skin: KeyboardSkin = KeyboardSkin.DEFAULT,
+    pack: com.keyflow.skins.PackKeyboard? = null,
 ) : HorizontalScrollView(context) {
 
-    private val colors = KeyboardColors.of(skin, dark)
+    private val colors = KeyboardColors.of(skin, dark, pack)
     private val chipOutline = colors.chipOutline
 
     private val kbTray = colors.tray

@@ -108,7 +108,8 @@ class VozPanelTest {
         val h = Harness(Settings(source = TranscriptionSource.OPENAI))
         rule.setContent { h.Content() }
 
-        rule.onNodeWithTag(timeoutTag(15_000)).assertIsDisplayed()
+        // O cabeçalho do provedor e a origem em duas linhas empurraram a seção "Geral" para baixo da dobra: rola até lá.
+        rule.onNodeWithTag(timeoutTag(15_000)).performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -116,7 +117,7 @@ class VozPanelTest {
         val h = Harness(Settings(source = TranscriptionSource.OPENAI))
         rule.setContent { h.Content() }
 
-        rule.onNodeWithTag(timeoutTag(30_000)).performClick()
+        rule.onNodeWithTag(timeoutTag(30_000)).performScrollTo().performClick()
 
         rule.runOnIdle { assertEquals(30_000, h.settings.transcriptionTimeoutMs) }
     }

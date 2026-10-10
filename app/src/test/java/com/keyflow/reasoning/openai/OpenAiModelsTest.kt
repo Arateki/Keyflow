@@ -90,4 +90,27 @@ class OpenAiModelsTest {
         server.enqueue(json(JSONObject().put("data", JSONArray().put(JSONObject().put("object", "model")).put(JSONObject().put("id", "ok")))))
         assertThat(runBlocking { models.list(headers) }.map { it.id }).containsExactly("ok")
     }
+
+    @Test
+    fun `non-chat and legacy snapshots are filtered out while modern models are prioritized`() {
+        server.enqueue(
+            json(
+                JSONObject().put(
+                    "data",
+                    JSONArray()
+                        .put(JSONObject().put("id", "whisper-1"))
+                        .put(JSONObject().put("id", "text-embedding-3-small"))
+                        .put(JSONObject().put("id", "babbage-002"))
+                        .put(JSONObject().put("id", "gpt-3.5-turbo-0301"))
+                        .put(JSONObject().put("id", "gpt-3.5-turbo"))
+                        .put(JSONObject().put("id", "gpt-4o"))
+                        .put(JSONObject().put("id", "o3-mini")),
+                ),
+            ),
+        )
+
+        val result = runBlocking { models.list(headers) }
+        assertThat(result.map { it.id }).containsExactly("o3-mini", "gpt-4o", "gpt-3.5-turbo").inOrder()
+        assertThat(result.map { it.displayName }).containsExactly("o3-mini", "GPT-4o", "GPT-3.5 Turbo").inOrder()
+    }
 }

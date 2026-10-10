@@ -116,74 +116,74 @@ internal fun <T> Segmented(
     hintLines: Int = 3,
     // Opção desenhada como ícone (ex.: ∞ = sem limite); o [label] dela vira o nome acessível.
     icon: ((T) -> KfIconSpec?)? = null,
+    allowTwoRows: Boolean = true,
 ) {
     val palette = LocalKeyFlowPalette.current
     val raised = raisedFill(palette)
     androidx.compose.foundation.layout.BoxWithConstraints(modifier.fillMaxWidth()) {
-    // Com muitas opções num painel estreito (origem da transcrição: 5), o rótulo encolhe até caber
-    // inteiro na célula em vez de ser cortado ("Crédito", "Custo").
-    val cellText = (maxWidth - SEGMENT_TRACK_PADDING * 2 - SEGMENT_GAP * (options.size - 1)) / options.size -
-        SEGMENT_TEXT_PADDING * 2
-    val fontSp = fittedFontSizeSp(
-        labels = options.filter { icon?.invoke(it) == null }.map(label),
-        maxTextWidth = cellText.coerceAtLeast(1.dp),
-        maxSp = 12f,
-        minSp = 8.5f,
-        fontFamily = SpaceGrotesk,
-    )
-    Column(Modifier.fillMaxWidth()) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .height(IntrinsicSize.Min)
-            .clip(RoundedCornerShape(12.dp))
-            .background(palette.panel)
-            .padding(SEGMENT_TRACK_PADDING),
-        horizontalArrangement = Arrangement.spacedBy(SEGMENT_GAP),
-    ) {
-        options.forEach { option ->
-            val isActive = option == selected
-            val optionIcon = icon?.invoke(option)
-            if (optionIcon != null) {
-                SegmentIcon(
-                    icon = optionIcon,
-                    description = label(option),
-                    isActive = isActive,
-                    sizeSp = fontSp * 1.5f,
-                    onClick = { onSelect(option) },
-                    tag = tag(option),
-                )
-                return@forEach
+        val shouldWrapTwoRows = allowTwoRows && options.size >= 4 && (options.size >= 5 || maxWidth < (options.size * 72).dp)
+        val itemsPerRow = if (shouldWrapTwoRows) (options.size + 1) / 2 else options.size
+        // Com muitas opções num painel estreito, o rótulo encolhe até caber inteiro na célula.
+        // Em 2 linhas, as células ganham mais largura e os nomes não são ocultados/cortados.
+        val cellText = (maxWidth - SEGMENT_TRACK_PADDING * 2 - SEGMENT_GAP * (itemsPerRow - 1)) / itemsPerRow -
+            SEGMENT_TEXT_PADDING * 2
+        val fontSp = fittedFontSizeSp(
+            labels = options.filter { icon?.invoke(it) == null }.map(label),
+            maxTextWidth = cellText.coerceAtLeast(1.dp),
+            maxSp = 12f,
+            minSp = 8.5f,
+            fontFamily = SpaceGrotesk,
+        )
+        Column(Modifier.fillMaxWidth()) {
+            if (shouldWrapTwoRows) {
+                val row1Count = (options.size + 1) / 2
+                val row1 = options.take(row1Count)
+                val row2 = options.drop(row1Count)
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(palette.panel)
+                        .padding(SEGMENT_TRACK_PADDING),
+                    verticalArrangement = Arrangement.spacedBy(SEGMENT_GAP),
+                ) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(IntrinsicSize.Min),
+                        horizontalArrangement = Arrangement.spacedBy(SEGMENT_GAP),
+                    ) {
+                        row1.forEach { option ->
+                            SegmentCell(option, selected, label, tag, onSelect, fontSp, palette, raised, icon)
+                        }
+                    }
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(IntrinsicSize.Min),
+                        horizontalArrangement = Arrangement.spacedBy(SEGMENT_GAP),
+                    ) {
+                        row2.forEach { option ->
+                            SegmentCell(option, selected, label, tag, onSelect, fontSp, palette, raised, icon)
+                        }
+                    }
+                }
+            } else {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(IntrinsicSize.Min)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(palette.panel)
+                        .padding(SEGMENT_TRACK_PADDING),
+                    horizontalArrangement = Arrangement.spacedBy(SEGMENT_GAP),
+                ) {
+                    options.forEach { option ->
+                        SegmentCell(option, selected, label, tag, onSelect, fontSp, palette, raised, icon)
+                    }
+                }
             }
-            // A opção ativa "sobe" do trilho: superfície clara com fio, tinta cheia — em vez do bloco
-            // preto, que pesava mais que o conteúdo da tela.
-            Text(
-                text = label(option),
-                color = if (isActive) palette.fg else palette.muted,
-                fontFamily = SpaceGrotesk,
-                fontWeight = if (isActive) FontWeight.Medium else FontWeight.Normal,
-                fontSize = fontSp.sp,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(9.dp))
-                    .then(
-                        if (isActive) {
-                            Modifier
-                                .background(raised)
-                                .border(1.dp, palette.line, RoundedCornerShape(9.dp))
-                        } else {
-                            Modifier
-                        },
-                    )
-                    .clickable(enabled = !isActive) { onSelect(option) }
-                    .padding(horizontal = SEGMENT_TEXT_PADDING, vertical = 10.dp)
-                    .testTag(tag(option)),
-            )
-        }
-    }
-    if (hint != null) {
+        if (hint != null) {
         Row(
             Modifier
                 .fillMaxWidth()
@@ -212,6 +212,58 @@ internal fun <T> Segmented(
     }
     }
     }
+}
+
+/** Célula padrão de texto ou ícone do [Segmented]. */
+@Composable
+private fun <T> androidx.compose.foundation.layout.RowScope.SegmentCell(
+    option: T,
+    selected: T,
+    label: (T) -> String,
+    tag: (T) -> String,
+    onSelect: (T) -> Unit,
+    fontSp: Float,
+    palette: com.keyflow.ui.theme.KeyFlowPalette,
+    raised: Color,
+    icon: ((T) -> KfIconSpec?)?,
+) {
+    val isActive = option == selected
+    val optionIcon = icon?.invoke(option)
+    if (optionIcon != null) {
+        SegmentIcon(
+            icon = optionIcon,
+            description = label(option),
+            isActive = isActive,
+            sizeSp = fontSp * 1.5f,
+            onClick = { onSelect(option) },
+            tag = tag(option),
+        )
+        return
+    }
+    Text(
+        text = label(option),
+        color = if (isActive) palette.fg else palette.muted,
+        fontFamily = SpaceGrotesk,
+        fontWeight = if (isActive) FontWeight.Medium else FontWeight.Normal,
+        fontSize = fontSp.sp,
+        textAlign = TextAlign.Center,
+        maxLines = 1,
+        modifier = Modifier
+            .weight(1f)
+            .clip(RoundedCornerShape(9.dp))
+            .then(
+                if (isActive) {
+                    Modifier
+                        .background(raised)
+                        .border(1.dp, palette.line, RoundedCornerShape(9.dp))
+                } else {
+                    Modifier
+                },
+            )
+            .clickable(enabled = !isActive) { onSelect(option) }
+            .padding(horizontal = SEGMENT_TEXT_PADDING, vertical = 9.dp)
+            .testTag(tag(option)),
+    )
 }
 
 /** Célula do [Segmented] desenhada como ícone: mesma altura das de texto, fundo "que sobe" quando ativa. */
@@ -922,6 +974,17 @@ internal fun SkinsSection(
                         VoiceOrb(OrbState.Idle, Modifier.requiredSize(ORB_CHOICE_SIDE), timeProvider = ORB_CHOICE_CLOCK, style = OrbStyle.ROSE_GOLD)
                     }
                 }
+                SkinChoice(
+                    label = tr("Mascote"),
+                    selected = orbSelected == OrbStyle.MASCOT,
+                    onClick = { onOrbSkinSelected(OrbStyle.MASCOT.id) },
+                    tag = orbSkinTag(OrbStyle.MASCOT.id),
+                ) {
+                    // Menor que as outras prévias: as orelhas do mascote passam do miolo da orbe, e o cartão recorta o que sobra.
+                    Box(Modifier.fillMaxSize().background(palette.bg), contentAlignment = Alignment.Center) {
+                        VoiceOrb(OrbState.Idle, Modifier.requiredSize(ORB_MASCOT_CHOICE_SIDE), timeProvider = ORB_MASCOT_CHOICE_CLOCK, style = OrbStyle.MASCOT)
+                    }
+                }
             } else if (onSkinSelected == null) {
                 SkinSwatch(palette.fg)
                 SkinSwatch(palette.teal, selected = true)
@@ -929,7 +992,7 @@ internal fun SkinsSection(
                 val system = KeyboardColors.of(KeyboardSkin.SYSTEM, palette.isDark)
                 SkinChoice(
                     label = tr("Sistema"),
-                    selected = KeyboardSkin.of(selectedSkin) == KeyboardSkin.SYSTEM,
+                    selected = nativeKeyboardSkin(selectedSkin) == KeyboardSkin.SYSTEM,
                     onClick = { onSkinSelected(KeyboardSkin.SYSTEM.id) },
                     tag = skinTag(KeyboardSkin.SYSTEM.id),
                 ) {
@@ -940,7 +1003,7 @@ internal fun SkinsSection(
                 }
                 SkinChoice(
                     label = tr("Ateliê"),
-                    selected = KeyboardSkin.of(selectedSkin) == KeyboardSkin.ATELIE,
+                    selected = nativeKeyboardSkin(selectedSkin) == KeyboardSkin.ATELIE,
                     onClick = { onSkinSelected(KeyboardSkin.ATELIE.id) },
                     tag = skinTag(KeyboardSkin.ATELIE.id),
                 ) {
@@ -949,7 +1012,7 @@ internal fun SkinsSection(
                 val aero = KeyboardColors.of(KeyboardSkin.AERO, palette.isDark)
                 SkinChoice(
                     label = "Aero",
-                    selected = KeyboardSkin.of(selectedSkin) == KeyboardSkin.AERO,
+                    selected = nativeKeyboardSkin(selectedSkin) == KeyboardSkin.AERO,
                     onClick = { onSkinSelected(KeyboardSkin.AERO.id) },
                     tag = skinTag(KeyboardSkin.AERO.id),
                 ) {
@@ -966,7 +1029,7 @@ internal fun SkinsSection(
                 }
                 SkinChoice(
                     label = "Glitch",
-                    selected = KeyboardSkin.of(selectedSkin) == KeyboardSkin.GLITCH,
+                    selected = nativeKeyboardSkin(selectedSkin) == KeyboardSkin.GLITCH,
                     onClick = { onSkinSelected(KeyboardSkin.GLITCH.id) },
                     tag = skinTag(KeyboardSkin.GLITCH.id),
                 ) {
@@ -985,7 +1048,7 @@ internal fun SkinsSection(
                 }
                 SkinChoice(
                     label = "Rose Gold",
-                    selected = KeyboardSkin.of(selectedSkin) == KeyboardSkin.ROSE_GOLD,
+                    selected = nativeKeyboardSkin(selectedSkin) == KeyboardSkin.ROSE_GOLD,
                     onClick = { onSkinSelected(KeyboardSkin.ROSE_GOLD.id) },
                     tag = skinTag(KeyboardSkin.ROSE_GOLD.id),
                 ) {
@@ -1000,10 +1063,10 @@ internal fun SkinsSection(
                     }
                 }
             }
-            // Amostras travadas (decorativas) para completar a fileira de cinco: o teclado tem 5 escolhas (nenhuma sobra) e
-            // a orbe 4 (sobra 1).
+            // Amostras travadas (decorativas) para completar a fileira de cinco: o teclado tem 5 escolhas e a orbe também 5 (com o
+            // Mascote), então só a seção sem escolha nenhuma precisa delas.
             if (onSkinSelected == null && onOrbSkinSelected == null) SkinSwatch(palette.terracotta)
-            if (onSkinSelected == null) SkinSwatch(palette.bg, border = true)
+            if (onSkinSelected == null && onOrbSkinSelected == null) SkinSwatch(palette.bg, border = true)
         }
         Row(
             Modifier
@@ -1045,6 +1108,13 @@ private val ORB_GLITCH_CHOICE_CLOCK: () -> Float = { glitchBurstMidMs(OrbState.I
 
 /** Lado da orbe de prévia (maior que o cartão de 40dp: o cartão recorta o excesso, e o miolo cabe). */
 private val ORB_CHOICE_SIDE = 60.dp
+
+/**
+ * A prévia do mascote: o relógio parado num instante de olhos abertos e orelhas em repouso (o de 1234 ms cairia no meio de uma
+ * piscada), e menor que as outras — as orelhas e o corpo cabem inteiros no cartão de 40dp.
+ */
+private val ORB_MASCOT_CHOICE_CLOCK: () -> Float = { 1_500f }
+private val ORB_MASCOT_CHOICE_SIDE = 44.dp
 
 /** Céu e colina da paisagem Aero, de cima para baixo — o fundo das prévias do Aero (teclado e orbe). */
 private fun aeroSkyColors(dark: Boolean): List<Color> = if (dark) {

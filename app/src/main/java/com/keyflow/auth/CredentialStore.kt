@@ -23,6 +23,8 @@ interface CredentialStore {
     fun changes(provider: ProviderId): Flow<Credential?>
     fun meta(provider: ProviderId, key: String): String?
     fun putMeta(provider: ProviderId, key: String, value: String)
+    fun clearOAuth(provider: ProviderId) = clear(provider)
+    fun clearApiKey(provider: ProviderId) = clear(provider)
 }
 
 /** O formato em que a credencial vai para o cofre. Lixo (ou formato desconhecido) lê como `null`, nunca como erro. */
@@ -89,14 +91,50 @@ class SecureCredentialStore(
 
     private val prefs: SharedPreferences = SecurePrefs.create(context.applicationContext, prefsName, keyAlias)
 
-    override fun get(provider: ProviderId): Credential? = prefs.getString(credKey(provider), null)?.let(CredentialCodec::decode)
+    override fun get(provider: ProviderId): Credential? =
+        prefs.getString(credKey(provider), null)?.let(CredentialCodec::decode)
+            ?: prefs.getString(oauthKey(provider), null)?.let(CredentialCodec::decode)
+            ?: prefs.getString(apiKeyKey(provider), null)?.let(CredentialCodec::decode)
 
     override fun put(provider: ProviderId, credential: Credential) {
-        check(prefs.edit().putString(credKey(provider), CredentialCodec.encode(credential)).commit()) { "não consegui gravar a credencial" }
+        val editor = prefs.edit()
+        when (credential) {
+            is Credential.OAuth -> editor.putString(oauthKey(provider), CredentialCodec.encode(credential))
+            is Credential.ApiKey -> editor.putString(apiKeyKey(provider), CredentialCodec.encode(credential))
+        }
+        editor.putString(credKey(provider), CredentialCodec.encode(credential))
+        check(editor.commit()) { "não consegui gravar a credencial" }
     }
 
     override fun clear(provider: ProviderId) {
-        check(prefs.edit().remove(credKey(provider)).commit()) { "não consegui apagar a credencial" }
+        check(prefs.edit()
+            .remove(credKey(provider))
+            .remove(oauthKey(provider))
+            .remove(apiKeyKey(provider))
+            .commit()
+        ) { "não consegui apagar a credencial" }
+    }
+
+    override fun clearOAuth(provider: ProviderId) {
+        val editor = prefs.edit().remove(oauthKey(provider))
+        val existingApiKey = prefs.getString(apiKeyKey(provider), null)
+        if (existingApiKey != null) {
+            editor.putString(credKey(provider), existingApiKey)
+        } else {
+            editor.remove(credKey(provider))
+        }
+        check(editor.commit()) { "não consegui apagar a credencial de assinatura" }
+    }
+
+    override fun clearApiKey(provider: ProviderId) {
+        val editor = prefs.edit().remove(apiKeyKey(provider))
+        val existingOAuth = prefs.getString(oauthKey(provider), null)
+        if (existingOAuth != null) {
+            editor.putString(credKey(provider), existingOAuth)
+        } else {
+            editor.remove(credKey(provider))
+        }
+        check(editor.commit()) { "não consegui apagar a chave de API" }
     }
 
     override fun changes(provider: ProviderId): Flow<Credential?> = callbackFlow {
@@ -114,6 +152,8 @@ class SecureCredentialStore(
     }
 
     private fun credKey(provider: ProviderId) = "cred.${provider.value}"
+    private fun oauthKey(provider: ProviderId) = "oauth.${provider.value}"
+    private fun apiKeyKey(provider: ProviderId) = "apikey.${provider.value}"
     private fun metaKey(provider: ProviderId, key: String) = "meta.${provider.value}.$key"
 
     companion object {

@@ -2,6 +2,7 @@ package com.keyflow.ime.bars
 
 import com.keyflow.i18n.tr
 import com.keyflow.ime.GlassSheetLocator
+import com.keyflow.ime.KeyRole
 import com.keyflow.ime.KeySurface
 import com.keyflow.ime.KeyboardColors
 import com.keyflow.ime.KeyboardSkin
@@ -75,6 +76,8 @@ class BarView(
     private val dark: Boolean,
     private val expandedMode: Boolean,
     private val skin: KeyboardSkin = KeyboardSkin.DEFAULT,
+    // Teclado de uma skin de pacote (SKP-KBD): quando há, é ele quem manda nas cores e nas faces.
+    private val pack: com.keyflow.skins.PackKeyboard? = null,
     grids: List<ShortcutGrid> = emptyList(),
     private val callbacks: BarCallbacks = BarCallbacks(),
     private val scale: Float = 1f,
@@ -116,7 +119,7 @@ class BarView(
     private val knownGridIds: Set<String> = gridsById.keys
 
     // Paleta Ateliê (mesmos ints da grade Canvas/barra atual).
-    private val colors = KeyboardColors.of(skin, dark)
+    private val colors = KeyboardColors.of(skin, dark, pack)
     private val kbTray = colors.tray
     private val kbKeyBorder = colors.keyBorder
     private val kbModifier = colors.modifier
@@ -165,7 +168,7 @@ class BarView(
             }
         }
     }
-    private val micSelector = MicSelectorController(context, dark, scale, skin)
+    private val micSelector = MicSelectorController(context, dark, scale, skin, pack)
     private var holdRunnable: Runnable? = null
 
     // Grade efêmera (SB-T6/GRD-01..07): sessão pura + popup de lente; vivem só enquanto o dedo pressiona.
@@ -211,7 +214,7 @@ class BarView(
     init {
         setWillNotDraw(false)
         if (declaredButtons.contains(BarButton.Candidates)) {
-            candidatesView = CandidatesView(context, dark, onTap = callbacks.onCandidateTap, scale = scale, skin = skin)
+            candidatesView = CandidatesView(context, dark, onTap = callbacks.onCandidateTap, scale = scale, skin = skin, pack = pack)
                 .also {
                     // A área é reservada nos dois modos; vazia, só a marcação sutil aparece (ver onDraw).
                     it.visibility = VISIBLE
@@ -338,7 +341,7 @@ class BarView(
 
         val pressed = placed.index == pressedIndex
         if (surface != null) {
-            surface.draw(canvas, bounds, cornerRadius, bg, pressed = pressed)
+            surface.draw(canvas, bounds, cornerRadius, bg, pressed = pressed, role = KeyRole.MODIFIER)
         } else {
             fillPaint.color = bg
             canvas.drawRoundRect(bounds, cornerRadius, cornerRadius, fillPaint)
@@ -719,6 +722,7 @@ class BarView(
             context = context,
             dark = dark,
             skin = skin,
+            pack = pack,
             grid = grid,
             cellWidthPx = cellWidthPx,
             cellHeightPx = cellHeightPx,

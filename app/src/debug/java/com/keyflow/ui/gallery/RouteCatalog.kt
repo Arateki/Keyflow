@@ -14,9 +14,13 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.ui.viewinterop.AndroidView
@@ -32,6 +36,8 @@ import com.keyflow.ui.tour.scenes.OrbScene
 import com.keyflow.ui.tour.buildOrbScripts
 import com.keyflow.ui.tour.tourFrameAt
 import com.keyflow.core.TranscriptionSource
+import com.keyflow.core.VisionSource
+import com.keyflow.core.FalaSource
 import android.view.KeyEvent
 import android.widget.FrameLayout
 import com.keyflow.core.shortcuts.BarButton
@@ -54,7 +60,12 @@ import com.keyflow.ui.config.ConfigTab
 import com.keyflow.ui.config.GridsEditor
 import com.keyflow.ui.config.PhysicalKeyPicker
 import com.keyflow.ui.config.SettingsGroup
+import com.keyflow.ui.config.SkinImportReportDialog
+import com.keyflow.ui.config.SkinPackSurface
+import com.keyflow.ui.config.SkinPacksContent
 import com.keyflow.ui.config.SkinsSection
+import com.keyflow.ui.config.loadSkinPackCards
+import com.keyflow.skins.SkinIds
 import com.keyflow.ui.onboarding.OnboardingPermission
 import com.keyflow.ui.onboarding.OnboardingScreen
 import com.keyflow.ui.orb.OrbCenter
@@ -141,6 +152,14 @@ object RouteCatalog {
         // Rose Gold (2026-09-29): a esfera de metal rosé, parada e gravando.
         orbRoute("overlay-rosegold-idle", OrbState.Idle, OrbCenter.None, OrbStyle.ROSE_GOLD),
         orbRoute("overlay-rosegold-recording", OrbState.Listening, OrbCenter.Time(12), OrbStyle.ROSE_GOLD),
+        // O Ouvi (2026-10-02): o mascote da orbe, um por estado; a placa e a "folha" põem tudo o que o app escreve no centro
+        // sobre a barriga, em fundo branco e preto lado a lado, e os "tamanhos" mostram o que o slider da aba Sobrepor dá.
+        orbRoute("overlay-mascot-idle", OrbState.Idle, OrbCenter.None, OrbStyle.MASCOT, timeMs = mascotStillMs(OrbState.Idle)),
+        orbRoute("overlay-mascot-recording", OrbState.Listening, OrbCenter.Time(12), OrbStyle.MASCOT, timeMs = mascotStillMs(OrbState.Listening)),
+        orbRoute("overlay-mascot-paused", OrbState.Paused, OrbCenter.PauseGlyph(12), OrbStyle.MASCOT, timeMs = mascotStillMs(OrbState.Paused)),
+        orbRoute("overlay-mascot-transcribing", OrbState.Transcribing, OrbCenter.None, OrbStyle.MASCOT, timeMs = mascotStillMs(OrbState.Transcribing)),
+        mascotBoardRoute("overlay-mascot-claro-escuro"),
+        mascotSizesRoute("overlay-mascot-tamanhos"),
         // Teclado reskinado (T23), grade Canvas (KC-T10, padrão único desde a promoção): View hospedado
         // via AndroidView, ancorado ao rodapé.
         keyboardRoute("keyboard-canvas-expanded", expanded = true, recording = false),
@@ -263,9 +282,60 @@ object RouteCatalog {
         // A seção Skins das duas abas (fica abaixo da dobra nas telas acima): a da orbe, na Sobrepor, e a do
         // teclado, na Teclado — escolhas separadas (Yan, 2026-09-29), aqui com o Aero marcado nas duas.
         Route("config-overlay-skins") { SkinsRoute(orb = true) },
+        // A mesma seção com o Mascote escolhido: o anel no cartão novo.
+        Route("config-overlay-skins-mascote") { SkinsRoute(orb = true, selectedOrb = "mascot") },
         Route("config-teclado-skins") { SkinsRoute(orb = false) },
-        // As abas novas (Notificação, Visão, Raciocínio, Voz), ainda vazias: só o cabeçalho com o nome e o menu com os ícones.
-        Route("config-visao") { ConfigTabRoute(ConfigTab.VISAO) },
+        // Com pacotes importados (SKP-T6): a seção "Suas skins" com os cartões — um selecionado —, a pergunta de remoção aberta e os dois
+        // relatórios do import (instalado com avisos; recusado com erros). Os pacotes são instalados de verdade, por `SkinPackStore.import`.
+        Route("config-overlay-skins-importadas") { SkinsRoute(orb = true, imported = true) },
+        Route("config-teclado-skins-importadas") { SkinsRoute(orb = false, imported = true) },
+        Route("config-teclado-skins-remover") { SkinsRoute(orb = false, imported = true, confirming = true) },
+        Route("skin-pack-relatorio") { SkinReportRoute(errors = false) },
+        Route("skin-pack-relatorio-erro") { SkinReportRoute(errors = true) },
+        // Visão: `config-visao` é a origem Local sem nenhum modelo baixado; as outras cobrem baixando e pronto.
+        Route("config-visao") { ConfigVisaoRoute() },
+        Route("config-visao-local-baixando") {
+            ConfigVisaoRoute(
+                localModels = galleryVisionModels(
+                    active = DownloadProgress(
+                        ModelCatalog.OCR_FAST.id,
+                        DownloadState.RUNNING,
+                        bytesDone = ModelCatalog.OCR_FAST.totalBytes * 42 / 100,
+                        totalBytes = ModelCatalog.OCR_FAST.totalBytes,
+                    ),
+                ),
+            )
+        },
+        Route("config-visao-local-pronto") {
+            ConfigVisaoRoute(
+                localModelId = ModelCatalog.OCR_FAST.id,
+                localModels = galleryVisionModels(installed = setOf(ModelCatalog.OCR_FAST.id), selected = ModelCatalog.OCR_FAST.id),
+            )
+        },
+        Route("config-visao-google") { ConfigVisaoRoute(source = VisionSource.GOOGLE, googleKey = "AIzaSyMockKeyForScreenshots") },
+        Route("config-visao-anthropic") { ConfigVisaoRoute(source = VisionSource.ANTHROPIC, anthropicKey = "sk-ant-api-mock-key") },
+        // Voz (Fala): `config-fala` é a origem Local sem nenhum modelo baixado; as outras cobrem baixando e pronto.
+        Route("config-fala") { ConfigFalaRoute() },
+        Route("config-fala-local-baixando") {
+            ConfigFalaRoute(
+                localModels = galleryVoiceModels(
+                    active = DownloadProgress(
+                        ModelCatalog.VOICE_FAST.id,
+                        DownloadState.RUNNING,
+                        bytesDone = ModelCatalog.VOICE_FAST.totalBytes * 42 / 100,
+                        totalBytes = ModelCatalog.VOICE_FAST.totalBytes,
+                    ),
+                ),
+            )
+        },
+        Route("config-fala-local-pronto") {
+            ConfigFalaRoute(
+                localModelId = ModelCatalog.VOICE_FAST.id,
+                localModels = galleryVoiceModels(installed = setOf(ModelCatalog.VOICE_FAST.id), selected = ModelCatalog.VOICE_FAST.id),
+            )
+        },
+        Route("config-fala-elevenlabs") { ConfigFalaRoute(source = FalaSource.ELEVENLABS, elevenLabsKey = "eleven_mock_key") },
+        Route("config-fala-google") { ConfigFalaRoute(source = FalaSource.GOOGLE, googleKey = "AIzaSyMockGoogleVoiceKey") },
         // Raciocínio: `config-raciocinio` é a origem Local sem nenhum modelo baixado; as outras cobrem baixando, pronto, a nuvem
         // (desconectada, conectada com o plano) e a área do Testar em andamento e no limite de uso.
         Route("config-raciocinio") { ConfigTabRoute(ConfigTab.RACIOCINIO) },
@@ -302,6 +372,34 @@ object RouteCatalog {
                 ready = true,
             )
         },
+        Route("config-raciocinio-anthropic-desconectado") {
+            ConfigReasoningRoute(source = ReasoningSource.ANTHROPIC)
+        },
+        Route("config-raciocinio-anthropic-conectado") {
+            ConfigReasoningRoute(
+                source = ReasoningSource.ANTHROPIC,
+                anthropicModel = "claude-3-5-sonnet-latest",
+                anthropicAuth = GalleryAuth(
+                    ConnectionState.Connected("claude@exemplo.com", AuthMethod.OAUTH),
+                    models = com.keyflow.ui.config.ANTHROPIC_MODELS_DEFAULT,
+                ),
+                ready = true,
+            )
+        },
+        Route("config-raciocinio-google-desconectado") {
+            ConfigReasoningRoute(source = ReasoningSource.GOOGLE)
+        },
+        Route("config-raciocinio-google-conectado") {
+            ConfigReasoningRoute(
+                source = ReasoningSource.GOOGLE,
+                googleModel = "gemini-2.0-flash",
+                googleAuth = GalleryAuth(
+                    ConnectionState.Connected("gemini@exemplo.com", AuthMethod.OAUTH),
+                    models = com.keyflow.ui.config.GOOGLE_MODELS_DEFAULT,
+                ),
+                ready = true,
+            )
+        },
         // Testar em andamento: um trecho já chegou (tempo até o 1º) e o botão virou "Parar".
         Route("config-raciocinio-testando") {
             ConfigReasoningRoute(
@@ -325,7 +423,6 @@ object RouteCatalog {
                 test = TestState(totalMs = 2_100, error = ReasoningError.RATE_LIMIT),
             )
         },
-        Route("config-fala") { ConfigTabRoute(ConfigTab.FALA) },
         Route("config-notificacao") { ConfigTabRoute(ConfigTab.NOTIFICACAO) },
         Route("config-unlock") { ConfigTabRoute(ConfigTab.TECLADO, keyboardEnabled = true, unlockOpen = true) },
         // "?" do cabeçalho aberto: a seção da Docs da aba, com o atalho para a Docs.
@@ -333,7 +430,7 @@ object RouteCatalog {
         Route("onboarding") { OnboardingRoute() },
         // PERM-04: o porquê de uma permissão aberto sob a linha (a do Teclado, que é a que FALTA no mock).
         Route("onboarding-why") { OnboardingRoute(explained = OnboardingPermission.KEYBOARD) },
-    )
+    ) + AgentGalleryRoutes.routes // agent-harness (AGT-T3..T5): o chat do agente, o painel de confirmação, os Ajustes e o registro
 
     private val byKey: Map<String, Route> = routes.associateBy { it.key }
 
@@ -376,27 +473,126 @@ object RouteCatalog {
             catalog = ModelCatalog.TEXT, installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_192,
         )
 
+    /** Estado fixo da lista de modelos de VISÃO/OCR (RAM de sobra, como a de voz). */
+    private fun galleryVisionModels(installed: Set<String> = emptySet(), active: DownloadProgress? = null, selected: String? = null) =
+        LocalModelsUi.compose(
+            catalog = ModelCatalog.VISION, installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_192,
+        )
+
+    /** Aba Visão: a origem, a lista local e o seletor de tradução num estado fixo. */
+    @Composable
+    private fun ConfigVisaoRoute(
+        source: VisionSource = VisionSource.LOCAL,
+        localModelId: String? = null,
+        localModels: LocalModelsUi = galleryVisionModels(),
+        googleKey: String = "",
+        anthropicKey: String = "",
+    ) {
+        ConfigScreen(
+            settings = FakeSettings.settings.copy(
+                visionSource = source,
+                visionLocalModelId = localModelId,
+                visionGoogleApiKey = googleKey,
+                visionAnthropicApiKey = anthropicKey,
+            ),
+            visionModels = localModels,
+            permissions = PermissionStatus(
+                microphoneGranted = true,
+                overlayGranted = true,
+                keyboardEnabled = true,
+                notificationsGranted = true,
+            ),
+            saveController = SaveController(),
+            onOverlayModeChange = {},
+            onKeyboardModeChange = {},
+            onThemeChange = {},
+            onRequestOverlayPermission = {},
+            onRequestKeyboardPermission = {},
+            onRequestMicPermission = {},
+            onRequestNotificationPermission = {},
+            onSwitchKeyboard = {},
+            onSettingsChange = {},
+            initialTab = ConfigTab.VISAO,
+        )
+    }
+
+    private fun galleryVoiceModels(
+        installed: Set<String> = emptySet(),
+        active: DownloadProgress? = null,
+        selected: String? = null,
+    ): LocalModelsUi =
+        LocalModelsUi.compose(
+            catalog = ModelCatalog.VOICE, installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_192,
+        )
+
+    /** Aba Voz (Fala): a origem, a lista local e os controles de voz num estado fixo. */
+    @Composable
+    private fun ConfigFalaRoute(
+        source: FalaSource = FalaSource.LOCAL,
+        localModelId: String? = null,
+        localModels: LocalModelsUi = galleryVoiceModels(),
+        elevenLabsKey: String = "",
+        googleKey: String = "",
+    ) {
+        ConfigScreen(
+            settings = FakeSettings.settings.copy(
+                falaSource = source,
+                falaLocalModelId = localModelId,
+                falaElevenLabsApiKey = elevenLabsKey,
+                falaGoogleApiKey = googleKey,
+            ),
+            falaModels = localModels,
+            permissions = PermissionStatus(
+                microphoneGranted = true,
+                overlayGranted = true,
+                keyboardEnabled = true,
+                notificationsGranted = true,
+            ),
+            saveController = SaveController(),
+            onOverlayModeChange = {},
+            onKeyboardModeChange = {},
+            onThemeChange = {},
+            onRequestOverlayPermission = {},
+            onRequestKeyboardPermission = {},
+            onRequestMicPermission = {},
+            onRequestNotificationPermission = {},
+            onSwitchKeyboard = {},
+            onSettingsChange = {},
+            initialTab = ConfigTab.FALA,
+        )
+    }
+
     /** Aba Raciocínio: a origem, a lista local, o provedor de nuvem e a área do Testar num estado fixo. [ready] liga o botão Testar. */
     @Composable
     private fun ConfigReasoningRoute(
         source: ReasoningSource = ReasoningSource.LOCAL,
         localModelId: String? = null,
         openAiModel: String = "",
+        anthropicModel: String = "claude-3-5-sonnet-latest",
+        googleModel: String = "gemini-2.0-flash",
         localModels: LocalModelsUi = galleryTextModels(),
         auth: AuthActions = AuthActions.None,
+        anthropicAuth: AuthActions = AuthActions.None,
+        googleAuth: AuthActions = AuthActions.None,
         ready: Boolean = false,
         test: TestState = TestState(),
     ) {
         ConfigScreen(
             settings = FakeSettings.settings.copy(
-                reasoningSource = source, reasoningLocalModelId = localModelId, reasoningOpenAiModel = openAiModel,
+                reasoningSource = source,
+                reasoningLocalModelId = localModelId,
+                reasoningOpenAiModel = openAiModel,
+                reasoningAnthropicModel = anthropicModel,
+                reasoningGoogleModel = googleModel,
             ),
             reasoningModels = localModels,
             reasoningAuth = auth,
+            reasoningAnthropicAuth = anthropicAuth,
+            reasoningGoogleAuth = googleAuth,
             initialReasoningTest = test,
             resolveReasoning = {
                 if (ready) ReasoningResolution.Ready(GalleryReasoningEngine)
-                else ReasoningResolution.Unavailable(if (source == ReasoningSource.OPENAI) UnavailableReason.NOT_CONNECTED else UnavailableReason.NO_LOCAL_MODEL)
+                else ReasoningResolution.Unavailable(if (source != ReasoningSource.LOCAL) UnavailableReason.NOT_CONNECTED else UnavailableReason.NO_LOCAL_MODEL)
             },
             permissions = PermissionStatus(
                 microphoneGranted = true,
@@ -861,14 +1057,90 @@ object RouteCatalog {
         }
     }
 
-    /** A seção Skins de uma aba, sozinha num cartão: [orb] = a da Sobrepor (orbe), senão a do Teclado. */
+    /**
+     * O instante em que o mascote é congelado nas rotas: o relógio fixo de 1234 ms cairia no meio de uma piscada (e de uma
+     * tremida de orelha), e o quadro parado mostraria o olho fechado. Estes instantes têm o olho aberto e as orelhas em
+     * repouso (conferidos no [com.keyflow.ui.orb.MascotTimeline]); em repouso e pensando, o olhar já está de lado.
+     */
+    private fun mascotStillMs(state: OrbState): Float = when (state) {
+        OrbState.Idle -> 10_200f
+        OrbState.Listening -> 1_850f
+        OrbState.Paused -> 1_050f
+        OrbState.Transcribing -> 2_225f
+    }
+
+    /** Cada estado e cada coisa que o app escreve no centro, no tamanho padrão da orbe, sobre branco (esquerda) e preto (direita). */
+    private fun mascotBoardRoute(key: String): Route = Route(key) {
+        val side = with(androidx.compose.ui.platform.LocalDensity.current) { 156.toDp() }
+        val rows = listOf(
+            OrbState.Idle to OrbCenter.None,
+            OrbState.Listening to OrbCenter.Time(12),
+            OrbState.Paused to OrbCenter.PauseGlyph(12),
+            OrbState.Transcribing to OrbCenter.None,
+            OrbState.Paused to OrbCenter.CancelGlyph(12),
+            OrbState.Idle to OrbCenter.ErrorGlyph,
+        )
+        androidx.compose.foundation.layout.Row(Modifier.fillMaxSize()) {
+            for (bg in listOf(Color.White, Color.Black)) {
+                Column(
+                    Modifier.weight(1f).fillMaxSize().background(bg),
+                    verticalArrangement = Arrangement.SpaceEvenly,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    for ((state, center) in rows) {
+                        VoiceOrb(state, Modifier.requiredSize(side), center = center, timeProvider = { mascotStillMs(state) }, style = OrbStyle.MASCOT)
+                    }
+                }
+            }
+        }
+    }
+
+    /** O mascote nos tamanhos que o slider da aba Sobrepor dá (110 a 280 px), em repouso e gravando, sobre branco e sobre preto. */
+    private fun mascotSizesRoute(key: String): Route = Route(key) {
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        val sizes = listOf(110, 156, 195, 280)
+        Column(Modifier.fillMaxSize()) {
+            for (bg in listOf(Color.White, Color.Black)) {
+                Column(
+                    Modifier.weight(1f).fillMaxWidth().background(bg),
+                    verticalArrangement = Arrangement.SpaceEvenly,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    for (withTime in listOf(false, true)) {
+                        androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                            for (px in sizes) {
+                                VoiceOrb(
+                                    if (withTime) OrbState.Listening else OrbState.Idle,
+                                    Modifier.requiredSize(with(density) { px.toDp() }),
+                                    center = if (withTime) OrbCenter.Time(12) else OrbCenter.None,
+                                    timeProvider = { mascotStillMs(if (withTime) OrbState.Listening else OrbState.Idle) },
+                                    style = OrbStyle.MASCOT,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * A seção Skins de uma aba, sozinha num cartão: [orb] = a da Sobrepor (orbe), senão a do Teclado. Com [imported], os pacotes de mentira
+     * ([GallerySkinPacks]) estão instalados e o primeiro, selecionado; com [confirming], o cartão dele mostra a pergunta de remoção.
+     */
     @Composable
-    private fun SkinsRoute(orb: Boolean) {
+    private fun SkinsRoute(orb: Boolean, selectedOrb: String = "aero", imported: Boolean = false, confirming: Boolean = false) {
+        val context = LocalContext.current
+        val density = LocalDensity.current.density
+        val packs = remember(imported) {
+            if (imported) GallerySkinPacks.install(context) to loadSkinPackCards(GallerySkinPacks.store(context), density) else null
+        }
+        val selectedPack = packs?.first
         Box(Modifier.fillMaxSize().background(LocalKeyFlowPalette.current.bg).padding(16.dp)) {
             SettingsGroup(null) {
                 if (orb) {
                     SkinsSection(
-                        selectedOrbSkin = "aero",
+                        selectedOrbSkin = selectedPack ?: selectedOrb,
                         onOrbSkinSelected = {},
                         onUnlock = {},
                         unlockTag = "gallery-unlock",
@@ -876,15 +1148,36 @@ object RouteCatalog {
                     )
                 } else {
                     SkinsSection(
-                        selectedSkin = "aero",
+                        selectedSkin = selectedPack ?: "aero",
                         onSkinSelected = {},
                         onUnlock = {},
                         unlockTag = "gallery-unlock",
                         modifier = Modifier.padding(bottom = 16.dp),
                     )
                 }
+                SkinPacksContent(
+                    surface = if (orb) SkinPackSurface.ORB else SkinPackSurface.KEYBOARD,
+                    cards = packs?.second.orEmpty(),
+                    selectedSkinId = selectedPack.orEmpty(),
+                    importing = false,
+                    confirmingId = if (confirming) SkinIds.packId(selectedPack) else null,
+                    onImport = {},
+                    onSelect = {},
+                    onRemoveRequest = {},
+                    onRemoveCancel = {},
+                    onRemoveConfirm = {},
+                )
             }
         }
+    }
+
+    /** O diálogo do relatório do import (SKP-UI-02): [errors] = o import recusado; senão o instalado com avisos. */
+    @Composable
+    private fun SkinReportRoute(errors: Boolean) {
+        val context = LocalContext.current
+        val outcome = remember(errors) { if (errors) GallerySkinPacks.errorOutcome(context) else GallerySkinPacks.warningOutcome(context) }
+        Box(Modifier.fillMaxSize().background(LocalKeyFlowPalette.current.bg))
+        SkinImportReportDialog(outcome, onDismiss = {})
     }
 
     /**

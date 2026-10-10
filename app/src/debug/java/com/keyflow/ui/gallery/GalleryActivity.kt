@@ -9,6 +9,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -18,7 +22,9 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.keyflow.ui.theme.KeyFlowTheme
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.suspendCancellableCoroutine
 import java.io.File
+import kotlin.coroutines.resume
 
 /**
  * Harness de verificação (VERIFY-01/02). Renderiza **uma** rota do [RouteCatalog] isolada, em tela
@@ -60,6 +66,17 @@ class GalleryActivity : ComponentActivity() {
 
         val route = RouteCatalog.route(routeKey)
         setContent {
+            // A rota só compõe depois de a janela confirmar o foco (ou de 3 s sem ele). No emulador do CI (GPU por
+            // software, 2 núcleos) o 1º quadro das rotas mais pesadas compila shaders por mais de 5 s; com o evento de
+            // foco ainda esperando resposta nesse quadro, o Android dava ANR ("Waited 5005ms for FocusEvent") e matava
+            // o app — calado, com hide_error_dialogs (2026-10-09: config-overlay-travado, skins-importadas). Com o foco
+            // já respondido, o quadro pesado não tem evento nenhum esperando.
+            var focusWaitOver by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) {
+                delay(FOCUS_WAIT_MS)
+                focusWaitOver = true
+            }
+            if (!windowFocused.value && !focusWaitOver) return@setContent
             // Congela TODO orbe da árvore (header de config, onboarding, …) para frames determinísticos.
             // O tour da aba Modo anima igual à orbe: sem congelar os DOIS, `config-modo` renderiza um
             // frame diferente a cada captura e o golden vira ruído.
@@ -82,11 +99,29 @@ class GalleryActivity : ComponentActivity() {
                         // Rotas com estado assíncrono real (ex.: reveal por tempo parado da grade
                         // efêmera, SB-T10/GRD-06) pedem tempo extra além dos 3 frames padrão.
                         route?.minDelayMs?.takeIf { it > 0 }?.let { delay(it) }
+                        // Quadro da thread principal não é quadro na tela: com a rota composta depois do foco, a
+                        // entrega à tela vinha atrasada, e a captura pegava a janela ainda vazia (o 1º quadro, que o
+                        // Android sincroniza com a janela aparecer, já não é o da rota).
+                        repeat(2) { awaitFrameCommit() }
                         writeReadyMarker(if (route != null) routeKey else "unknown:$routeKey")
                     }
                 }
             }
         }
+    }
+
+    private val windowFocused = mutableStateOf(false)
+
+    /** Espera o próximo quadro ser entregue à tela (render thread terminou e mandou o buffer). */
+    private suspend fun awaitFrameCommit() = suspendCancellableCoroutine { cont ->
+        val decor = window.decorView
+        decor.viewTreeObserver.registerFrameCommitCallback { if (cont.isActive) cont.resume(Unit) }
+        decor.invalidate()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) windowFocused.value = true
     }
 
     private fun enterImmersiveMode() {
@@ -114,5 +149,6 @@ class GalleryActivity : ComponentActivity() {
         const val READY_MARKER = "gallery_ready"
         const val LIST_ROUTES = "__list__"
         const val ROUTES_FILE = "gallery_routes"
+        private const val FOCUS_WAIT_MS = 3_000L
     }
 }

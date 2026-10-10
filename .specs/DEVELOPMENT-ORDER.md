@@ -35,7 +35,108 @@
 9. **Portões do Yan**: itens marcados **[YAN]** são decisões/validações manuais dele (device
    físico, Play Console, aprovações). O agente prepara tudo, avisa, e **não** executa por ele.
 
-## Estado atual (2026-09-28)
+## Recorte da v1 — a primeira versão na Play Store (2026-10-07)
+
+> **Decisão do Yan (2026-10-07)**: a primeira versão pública sai **gratuita e sem monetização**. Até
+> aqui a loja ficava no fim da fila (VC → MZ → TS → PS), presa às credenciais da API. Agora a v1 é o
+> próximo marco; o que não está pronto entra como "Em breve", e a cadeia API → monetização anda em
+> paralelo para uma atualização (v1.1). Fica valendo a partir daqui — os Blocos 5, 7 e 8 saem da frente
+> da loja.
+
+**O que a v1 é**: o teclado de voz completo sem conta nossa — a pessoa usa a própria chave (OpenAI,
+Groq, endpoint próprio) ou os modelos locais, offline.
+
+### Entra (já existe e funciona)
+
+- Teclado de voz: IME, orbe flutuante, gravação (FGS `microphone`), pausa, cancelar/desfazer, gestos.
+- Transcrição por chave própria (OpenAI/Groq/Custom) e por modelos locais (sherpa-onnx, offline).
+- Teclado Canvas (PT/EN/ES, acentos, corretor próprio), barras de atalhos, grades e teclas físicas.
+- Tour de gestos, Docs, onboarding.
+- Aparência: Ateliê, Aero, Glitch, Rose Gold, o mascote e skins importáveis (`.zip`) — ver decisão 3.
+- Raciocínio: modelos locais (Gemma/Qwen) e provedores por chave de API (OpenAI, Anthropic, Google).
+  Login ChatGPT e SSO do Google continuam desligados no release (`enabled = BuildConfig.DEBUG`).
+- Agente KeyFlow da fase 1 (chat + ferramentas de skin com confirmação; MCP desligado) — **só se a
+  V1-4 fechar**; senão ele entra como "Em breve".
+
+### Entra como "Em breve" (visível, rotulado, sem nada que pareça funcionar)
+
+- Abas **Visão, Fala, Fluxos, Computador e Notificação**: um cartão "Em breve" no lugar do conteúdo —
+  nenhum campo, botão ou permissão. Hoje Visão/Fala/Fluxos/Computador têm tela e `Settings`, mas nenhum
+  motor (vieram do trabalho do Gemini, sem spec); a Computador tem um "Testar conexão" simulado
+  (`delay(600)`) e guarda chave privada SSH.
+- Origem **Créditos** (Transcrição, Raciocínio, KeyFlow): desabilitada, com "Em breve"; sem recarga.
+
+### Sai do build de release
+
+- `UnlockSheet` ("Desbloquear skins", "Pagar R$ 15 — uma vez", "Recarregar R$ 20 em créditos") e o
+  "Recarregar créditos" do `CreditsCard`: botão com preço que não cobra é o pior caso na revisão
+  (funcionalidade quebrada e cobrança fora do Play Billing).
+- Fica para depois da v1: monetização (MZ, v1.1), `vision-capture`, `theme-system` (spec a revisar —
+  ver Estado atual), fases 2/3 do agente e os motores de Fala/Fluxos/Computador (sem spec).
+
+### Regras da Play que moldam o recorte (lidas na fonte em 2026-10-07)
+
+- **Minimum Functionality** (answer/9898783): proíbe app "designed to do nothing or have no function" e
+  funcionalidade quebrada ("crash, force close, freeze, or otherwise function abnormally"). Não fala de
+  "em breve". O núcleo da v1 funciona; um "Em breve" honesto não é funcionalidade quebrada — um botão
+  que não faz nada é.
+- **Deceptive Behavior** (answer/9888077): sem "false or misleading information or claims, including in
+  the description, title, icon, and screenshots" → a listagem (V1-7) mostra só o que entra. E o §5
+  proíbe recurso "hidden, dormant, or undocumented" feito para ser ligado remotamente → um "Em breve"
+  vira recurso **numa versão nova do app**, nunca por config remota.
+- **Teste obrigatório** (answer/14151465): conta **pessoal** criada depois de 13/11/2023 precisa de teste
+  fechado com **12 testadores por 14 dias seguidos** antes de pedir produção (análise de até ~7 dias).
+
+### Tasks da v1 (em ordem; uma por vez, gate verde)
+
+- **V1-0** — Mesclar a PR #7 (skins até 120 fps, mascote, provedores Anthropic/Google, agente fase 1)
+  com o CI verde.
+- **V1-1** — "Em breve" e fim das cascas inertes (listas acima). Instrumentado + goldens das rotas.
+- **V1-2** — Higiene do release, pendências herdadas do trabalho do Gemini: logs que imprimem o texto
+  ditado (`KeyFlowController`, `OverlayCoordinator` — `take(30)`) só no debug; leitura dos segredos fora
+  da main thread (`settingsFlow` → `flowOn(Dispatchers.IO)`); chave de API num lugar só (o cofre
+  `keyflow_auth`, contra AUTH-02). Os três logins por assinatura (OpenAI, Anthropic, Google) já são
+  `enabled = BuildConfig.DEBUG`; conferir no AAB que o da Anthropic não vai junto — a política dela
+  proíbe login de assinatura em produto de terceiros (Bloco 10), e código dormente pesa no §5 acima.
+- **V1-3** — Build de release (PS-5): R8 (`isMinifyEnabled`) com keep rules (AIDL dos processos
+  `:inference`/`:reasoning`, sherpa-onnx, LiteRT-LM, AndroidSVG), AAB, `versionName` 1.0.0, smoke do
+  release no A32. **[YAN]**: chave de upload (Play App Signing) e o `applicationId` (decisão 2).
+- **V1-4** — Agente na v1: recorte da AGT-T10 para a fase 1 (abuso: injeção, segredo, argumentos,
+  flood) + validação real com a chave do Yan **[YAN]**. Não fechou → agente vira "Em breve".
+- **V1-5** — Política de privacidade (PS-2): áudio sob demanda para a origem escolhida, modelos locais,
+  provedores de raciocínio por chave (`PLAYSTORE_CHECKLIST.md` §1b), agente, skins importadas; sem
+  anúncios nem compras na v1. URL permanente **[YAN decide onde]** + link no app.
+- **V1-6** — Prominent disclosure no onboarding (PS-3). Instrumentado + golden.
+- **V1-7** — Listing (PS-6) só com o que entra **[YAN aprova textos]**; rascunho campo a campo do Data
+  Safety (PS-4) e da declaração dos serviços em primeiro plano (`microphone`, `dataSync`) — o Yan
+  preenche no Console **[YAN]**.
+- **V1-8** — Trilha interna → teste fechado → produção (PS-7) **[YAN]**. Antes dela, os roteiros
+  manuais pendentes no A32 do que entra: GT-T8, NM-T13/T18, RSN-T19 (Gemma/Qwen: tempo e RAM) e o das
+  skins.
+
+### Decisões do Yan que a v1 precisa
+
+1. **Conta de desenvolvedor**: pessoal ou organização (Arateki). Organização exige D-U-N-S (grátis na
+   Dun & Bradstreet, até 30 dias) e, portanto, uma empresa registrada. Conta pessoal que monetiza
+   mostra o **endereço completo** na Play (answer/13628312).
+2. **`applicationId` definitivo** antes do 1º upload — depois dele não muda: `com.keyflow` (atual; não
+   há app público com esse id, mas só o Console confirma) ou `com.arateki.keyflow`. Muda junto o
+   `PACKAGE_NAME` da API.
+3. **Temas "pagos, liberados por ora"** (Aero, Glitch, Rose Gold, mascote) numa v1 sem cobrança:
+   (a) grátis para sempre, só temas futuros pagos — não tira nada de quem instalou; (b) grátis na v1 e
+   pagos na v1.1, preservando quem já tem; (c) "Em breve" na v1.
+4. Onde hospedar a política de privacidade.
+
+**Pronto quando**: app aprovado em produção; teste fechado cumprido; nenhum botão que não faz nada;
+listing só com o que existe.
+
+### Em paralelo: API em staging (pré-requisito da v1.1)
+
+A API-T13 não bloqueia a v1. O staging sobe já com `INTEGRITY_RELAXED=true` (Postgres + domínio +
+provedor de transcrição); a service account do Google depende do app existir no Play Console (V1-3/V1-8)
+e entra depois. A v1.1 = MZ-T1..T15 + API-T14 em cima da v1 publicada.
+
+## Estado atual (2026-10-07)
 
 | Milestone | Feature | Status |
 | --------- | ------- | ------ |
@@ -47,12 +148,16 @@
 | — | `gesture-tour` | GT-T1..T10 feitos (2026-09-24); falta só o manual do GT-T8 no A32 **[YAN]** |
 | — | `native-voice-models` | ✅ código completo (NM-T1..T12, T14..T17 + núcleo da T18; PR #3). CI verde em `5db6d75`: 240/240 instrumentados, telas 84/84. Desde o PR #5 o download é da fila do app (IPv4 primeiro), não do DownloadManager — desvio da G6 no design. Faltam os roteiros manuais T13/T18 no A32 **[YAN]** (`manual-validation.md`) |
 | — | Teclado pós-uso no A32 (PR #5) | ✅ fluidez (sem chamada síncrona por letra, escorregar, rollover, vibração, prévia na janela), acentos no jeito do Samsung, fileira de 56 dp, cores "Sistema" padrão, corretor próprio com troca no espaço (Q9), cursor no meio do texto |
-| — | `vision-capture` | spec/design/tasks prontos — nada implementado; **próximo bloco da Frente A (VC-T1)** |
+| — | `vision-capture` | spec/design/tasks prontos — nada do motor implementado; fora da v1. ⚠️ A aba Visão do trabalho do Gemini já existe com "Origem da visão" (Créditos/endpoint próprio), contra a spec ("nenhum byte sai do aparelho") — decidir antes da VC-T11 |
 | M7 | `keyflow-api` | API-T1..T12 ✅ + T13 parcial (Dockerfile + `api/docs/deploy.md`), **na `main` desde 2026-09-28** (PR #4); T13 parou nas credenciais/staging **[YAN]** |
 | M7 | `monetization` | spec/design/tasks prontos — nada implementado (depende da API em staging; MZ-T1/T2/T5/T11 podem adiantar) |
-| M8 | `theme-system` | spec/design/tasks prontos — nada implementado (⚠️ S3/S4/S5 nos checkpoints das TS-T6/T8/T9) |
-| — | Play Store | `PLAYSTORE_CHECKLIST.md`; **PS-1 (targetSdk 36) feito**, PS-2..PS-7 abertos |
-| — | `reasoning-models` (aba Raciocínio) | pedida pelo Yan em 2026-09-29, na branch `feature/raciocinio-modelos`: RSN-T0..T17 feitos (ícone de perfil, modelos locais Gemma/Qwen pelo LiteRT-LM em processo próprio, módulo `auth/` isolado, OpenAI por chave e por login ChatGPT); faltam RSN-T18 (privacidade/licenças), RSN-T19 (roteiro no A32 **[YAN]**) e a revisão final — ver Bloco 10 |
+| M8 | `theme-system` | spec de 2026-07-04, nada implementado — **defasada**: Aero, Glitch e Rose Gold saíram por fora (quick 013/015/016, pintores no IME como `KeySurface`/`RoseGoldPainter`) e as skins por pacote existem; não há `ThemeRegistry`. Revisar a spec antes de executar. Fora da v1 |
+| — | Play Store | **v1 = recorte acima** (V1-0..V1-8). `PLAYSTORE_CHECKLIST.md`; PS-1 (targetSdk 36) feito; PS-2..PS-7 viram V1-3/V1-5..V1-8 |
+| — | `reasoning-models` (aba Raciocínio) | **na `main` desde 2026-09-30**: RSN-T0..T17 feitos e o texto de privacidade da RSN-T18 em `PLAYSTORE_CHECKLIST.md` §1b (a traceability RPRV-01..04 ainda diz "In Tasks"). Faltam só **[YAN]**: repositório público, elegibilidade do login ChatGPT (RPRV-04) e o roteiro RSN-T19 no A32 — ver Bloco 10 |
+| — | `skin-packs` (skins importáveis) + skin mascote | SKP-T1..T9 feitos (motor AndroidSVG, importação nas abas Teclado e Sobrepor, pacote de exemplo, orbe de pacote até 120 fps) e o mascote nativo (quick 018); na `main` local e na **PR #7**. Falta o roteiro no A32 **[YAN]** (pacote dele, orbe animada no Helio G80, IME real) |
+| — | `agent-harness` (agente KeyFlow) | fase 1 (AGT-T1..T5: núcleo, Anthropic, chat, ferramentas de skin, Ajustes; MCP desligado) na `main` local e na **PR #7**. Pendentes: AGT-T6 (ferramentas de app), T7 (OpenAI/Google), T8 (skins por modelo), T9 (MCP), T10 (abuso + validação real **[YAN]**) — o recorte da T10 para a fase 1 é a V1-4 |
+| — | Trabalho do Gemini (abas KeyFlow, Fluxos, Computador, Fala, Visão; provedores Anthropic/Google) | commitado e na PR #7. Provedores e aba KeyFlow funcionam; **Fluxos, Computador, Fala e Visão são só tela + `Settings`, sem motor e sem spec** → "Em breve" na v1 (V1-1). Pendências de segurança/release herdadas → V1-2 |
+| — | CI | 2026-10-07: cache do AAR do sherpa-onnx nos dois jobs (um 503 do GitHub derrubou a PR #7 antes dos testes) |
 
 ---
 
@@ -231,7 +336,9 @@ TS-T1 → T2 → T3 → T4 → T5 → T6(⚠️) → T7 → T8(⚠️) → T9(�
 
 ## Bloco 9 — Publicação na Play Store
 
-Base: `PLAYSTORE_CHECKLIST.md` (raiz). Executar como quick tasks / tasks avulsas:
+Base: `PLAYSTORE_CHECKLIST.md` (raiz). **Desde 2026-10-07 estes itens são executados pelo recorte da
+v1** (topo deste arquivo): PS-5 → V1-3, PS-2 → V1-5, PS-3 → V1-6, PS-4/PS-6 → V1-7, PS-7 → V1-8. Na v1
+não há anúncios nem compras — o que abaixo cita monetização/AdMob entra na v1.1.
 
 - [x] **PS-1 — targetSdk 36**: FEITO em 2026-09-09 (`9bc8a96`). `compileSdk`/`targetSdk` 36, sem
       mudança de código necessária; 252 unitários, 163/163 no A32 e 163/163 no emulador A17.
@@ -281,14 +388,19 @@ texto literal da doc da OpenAI). Ordem: RSN-T0 → T1 → … → T19 (uma por v
 ## Resumo da fila (visão de uma linha)
 
 ```
-[YAN gates] → Q1..Q4 → SB-T8..T10 → GT (tour/Docs) → NM (modelos locais+parcial) → VC (visão)
-→ API (Rust, pode paralelizar) → MZ (monetização) → TS (temas, ⚠️ checkpoints) → PS-1..PS-7 (loja)
-(fora da fila, independente: RSN — aba Raciocínio, Bloco 10)
+feito: Q1..Q11 → SB → GT → NM → RSN → SKP → AGT fase 1 (faltam só manuais [YAN])
+agora: V1-0 (PR #7) → V1-1..V1-8 → v1 na Play Store
+em paralelo: API-T13 (staging) → [conta Play + service account] → v1.1 = MZ-T1..T15 + API-T14
+depois: VC (visão) · TS (temas, spec a revisar) · AGT fases 2/3 · Fala/Fluxos/Computador (sem spec)
 ```
 
-**Posição atual (2026-09-28)**: GT e NM fechados (faltam só manuais **[YAN]**); ajustes do teclado
-pós-uso no A32 fechados (PR #5); a Frente A segue para **VC-T1**; a API está na `main` e a Frente B
-está parada no gate **[YAN]** da API-T13 (credenciais/staging).
+**Posição atual (2026-10-07)**: o próximo marco é a **v1** (recorte no topo deste arquivo). A PR #7
+está no CI; depois dela vem a V1-1. A API sai do gate **[YAN]** da API-T13 em paralelo: o staging sobe
+sem as credenciais do Google (`INTEGRITY_RELAXED=true`), e a service account entra quando o app existir
+no Play Console.
+
+> Até 2026-09-28 a fila era GT → NM → VC → API → MZ → TS → PS, com a loja no fim. O recorte da v1
+> (2026-10-07) puxou a loja para a frente; o racional abaixo vale para a ordem **depois** da v1.
 
 **Racional da ordem**: primeiro fechar o que está em voo (barras) e o que não depende de nada
 externo (tour/Docs — também é pré-requisito de conteúdo da loja); depois as features grandes de

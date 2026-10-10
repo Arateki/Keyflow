@@ -56,12 +56,12 @@ class SetupActivityTest {
     @Before
     fun setUp() {
         shell("appops set ${context.packageName} SYSTEM_ALERT_WINDOW allow")
-        context.stopService(OverlayService.intent(context))
+        OverlayService.stop(context)
     }
 
     @After
     fun tearDown() {
-        context.stopService(OverlayService.intent(context))
+        OverlayService.stop(context)
     }
 
     @Test
@@ -136,8 +136,11 @@ class SetupActivityTest {
         }
     }
 
+    // 15 s, não 5: no CI (2026-10-09) o serviço levou mais de 5 s para chegar ao `startForeground` sob carga, o
+    // teste desistiu e o `stopService` do tearDown, com o primeiro plano ainda pendente, fez o Android derrubar o
+    // processo — e os testes que faltavam no shard junto. O próprio sistema dá 10 s ao serviço.
     private fun waitUntil(predicate: () -> Boolean) {
-        val deadline = SystemClock.elapsedRealtime() + 5_000
+        val deadline = SystemClock.elapsedRealtime() + 15_000
         while (SystemClock.elapsedRealtime() < deadline) {
             if (predicate()) return
             SystemClock.sleep(100)
@@ -171,7 +174,7 @@ class SetupActivityTest {
 class SeedOnboardingRule(private val done: Boolean) : org.junit.rules.ExternalResource() {
     override fun before() {
         val ctx = InstrumentationRegistry.getInstrumentation().targetContext
-        ctx.stopService(OverlayService.intent(ctx))
+        OverlayService.stop(ctx)
         runBlocking {
             val repo = SettingsRepository(ctx)
             repo.saveSettings(repo.settingsFlow().first().copy(onboardingDone = done, overlayModeEnabled = false))

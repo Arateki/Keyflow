@@ -70,6 +70,22 @@ internal data class ModelListTags(
             { "raciocinio-local-notice-$it" }, { "raciocinio-local-confirm-$it" },
             "raciocinio-local-confirm-yes", "raciocinio-local-confirm-no",
         )
+
+        /** As tags da aba Visão. */
+        val Visao = ModelListTags(
+            { "visao-local-model-$it" }, { "visao-local-download-$it" }, { "visao-local-cancel-$it" },
+            { "visao-local-delete-$it" }, { "visao-local-progress-$it" }, { "visao-local-heavy-$it" },
+            { "visao-local-notice-$it" }, { "visao-local-confirm-$it" },
+            "visao-local-confirm-yes", "visao-local-confirm-no",
+        )
+
+        /** As tags da aba Voz (Fala). */
+        val Fala = ModelListTags(
+            { "fala-local-model-$it" }, { "fala-local-download-$it" }, { "fala-local-cancel-$it" },
+            { "fala-local-delete-$it" }, { "fala-local-progress-$it" }, { "fala-local-heavy-$it" },
+            { "fala-local-notice-$it" }, { "fala-local-confirm-$it" },
+            "fala-local-confirm-yes", "fala-local-confirm-no",
+        )
     }
 }
 

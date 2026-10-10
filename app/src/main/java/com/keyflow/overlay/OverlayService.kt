@@ -31,6 +31,9 @@ import com.keyflow.data.Config
 import com.keyflow.data.OverlayPosition
 import com.keyflow.data.Settings
 import com.keyflow.data.SettingsRepository
+import com.keyflow.skins.PackOrb
+import com.keyflow.skins.SkinIds
+import com.keyflow.skins.SkinPackStore
 import com.keyflow.transcription.TranscriptionClient
 import com.keyflow.transcription.local.LocalTranscriber
 import com.keyflow.transcription.partial.PartialOverlay
@@ -46,6 +49,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -62,6 +66,9 @@ class OverlayService : Service() {
     private lateinit var recordingNotification: RecordingNotification
 
     private var floatingButton: OrbButtonView? = null
+
+    // A orbe do pacote de skin escolhido (SKP-ORB), se há um; fechada ao trocar de skin e ao remover o botão.
+    private var orbPack: PackOrb? = null
     private var floatingButtonParams: WindowManager.LayoutParams? = null
     private var composeHost: ComposeWindowHost? = null
 
@@ -87,7 +94,7 @@ class OverlayService : Service() {
     private var dragArrowsView: DragArrowsView? = null
 
     // Duração da janela de desfazer: compartilhada entre o coordinator (descarte) e a barra do banner.
-    private val cancelWindowMs = 3000L
+    private val cancelWindowMs: Long get() = cancelWindowMsForTest ?: CANCEL_WINDOW_MS
     private val limitBannerDismissMs = 3000L
 
     // Ciclo de vida desacoplado (Fase 1): a orbe mantém o serviço persistente; o teclado o sobe sob
@@ -126,8 +133,7 @@ class OverlayService : Service() {
         when (intent?.action) {
             ACTION_START_OVERLAY -> startOverlay()
             ACTION_KEYBOARD_MIC -> {
-                ensureForeground()
-                if (::coordinator.isInitialized) handleKeyboardMicTap()
+                if (ensureForeground() && ::coordinator.isInitialized) handleKeyboardMicTap()
             }
             RecordingNotification.ACTION_PAUSE_RESUME -> handlePauseResume()
             RecordingNotification.ACTION_STOP_PASTE -> handleStopPaste()
@@ -135,8 +141,7 @@ class OverlayService : Service() {
             ACTION_UNDO_CANCEL -> { if (::coordinator.isInitialized) coordinator.onUndoCancel() }
             ACTION_COMMIT_CANCEL -> { if (::coordinator.isInitialized) coordinator.onCommitCancel() }
             ACTION_RECORD -> {
-                ensureForeground()
-                if (::coordinator.isInitialized) coordinator.onTap() // ocioso → inicia (inclui tela de bloqueio)
+                if (ensureForeground() && ::coordinator.isInitialized) coordinator.onTap() // ocioso → inicia (inclui tela de bloqueio)
             }
             ACTION_OPEN_CONFIG -> openKeyFlowApp()
         }
@@ -145,7 +150,7 @@ class OverlayService : Service() {
 
     /** Modo Sobrepor: serviço persistente em primeiro plano + orbe flutuante (se houver permissão). */
     private fun startOverlay() {
-        ensureForeground()
+        if (!ensureForeground()) return
         overlayActive = true
         syncLocalEngine()
         isRunningForUi = true
@@ -154,9 +159,29 @@ class OverlayService : Service() {
         }
     }
 
-    /** Promove a primeiro plano (FGS de microfone) sob demanda. Idempotente. */
-    private fun ensureForeground() {
-        if (isForeground) return
+    /**
+     * Promove a primeiro plano (FGS de microfone) sob demanda. Idempotente. Devolve `false` quando o serviço não deve
+     * seguir: o primeiro plano falhou, ou um [stop] chegou antes dele (aí o serviço se encerra aqui mesmo).
+     */
+    private fun ensureForeground(): Boolean {
+        if (!isForeground && !promoteToForeground()) return false
+        foregroundPending = false
+        if (stopRequested) {
+            stopRequested = false
+            stopNow()
+            return false
+        }
+        return true
+    }
+
+    private fun stopNow() {
+        overlayActive = false
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        isForeground = false
+        stopSelf()
+    }
+
+    private fun promoteToForeground(): Boolean {
         syncLocalEngine()
         val notification = recordingNotification.build(
             if (::coordinator.isInitialized) coordinator.currentState() else ButtonState.IDLE_NO_FIELD,
@@ -169,10 +194,14 @@ class OverlayService : Service() {
                 startForeground(NOTIFICATION_ID, notification)
             }
             isForeground = true
+            return true
         } catch (e: Exception) {
             // Restrição de FGS em background (Android 12+): encerra limpo em vez de crashar.
             android.util.Log.e("KeyFlow.Overlay", "startForeground falhou: ${e.message}", e)
+            foregroundPending = false
+            stopRequested = false
             stopSelf()
+            return false
         }
     }
 
@@ -271,6 +300,8 @@ class OverlayService : Service() {
 
     override fun onDestroy() {
         isRunningForUi = false
+        foregroundPending = false
+        stopRequested = false
         partialOverlay?.remove()
         removeErrorBanner()
         removeCancelBanner()
@@ -317,7 +348,7 @@ class OverlayService : Service() {
             onShowKeyboardPicker = { showInputMethodPicker() },
             onShowCancelUndo = { showCancelBanner() },
             onHideCancelUndo = { removeCancelBanner() },
-            cancelWindowMs = cancelWindowMs,
+            cancelWindowMs = { cancelWindowMs },
             onShowLimitReached = { showLimitBanner() },
             onHideLimitReached = { removeLimitBanner() },
             maxRecordingMs = { cachedSettings.maxRecordingSec * 1000L },
@@ -349,6 +380,13 @@ class OverlayService : Service() {
     }
 
     private fun observeSettings() {
+        // Pacote de skin reimportado ou removido (SKP-IMP-05/STO-04): se a orbe usa um pacote, reabre — a versão nova aparece ao vivo, e um
+        // pacote que sumiu devolve a orbe ao Ateliê. O primeiro valor do fluxo (o de agora) não conta.
+        serviceScope.launch {
+            SkinPackStore.changes.drop(1).collect {
+                if (SkinIds.isPack(cachedSettings.orbSkin)) floatingButton?.setOrbPack(openOrbPack(cachedSettings.orbSkin))
+            }
+        }
         serviceScope.launch {
             settingsRepository.settingsFlow().collect {
                 val prevSizePx = cachedSettings.orbSizePx
@@ -363,7 +401,10 @@ class OverlayService : Service() {
                     postNotification(coordinator.currentState())
                 }
                 // Skin da orbe ao vivo (aba Sobrepor → Skins).
-                if (it.orbSkin != prevOrbSkin) floatingButton?.setOrbStyle(com.keyflow.ui.orb.orbStyleFor(it.orbSkin))
+                if (it.orbSkin != prevOrbSkin) {
+                    floatingButton?.setOrbStyle(com.keyflow.ui.orb.orbStyleFor(it.orbSkin))
+                    floatingButton?.setOrbPack(openOrbPack(it.orbSkin))
+                }
                 // Tema ao vivo (raro, disparado pelo usuário → barato): re-posta a notificação e recolore os
                 // banners de overlay visíveis, espelhando o que o toast in-app (Compose) já faz sozinho.
                 if (it.themeDark != prevThemeDark) {
@@ -410,6 +451,7 @@ class OverlayService : Service() {
             onIntent = { intent -> coordinator.onIntent(intent) },
             orbSizePx = cachedSettings.orbSizePx,
             orbStyle = com.keyflow.ui.orb.orbStyleFor(cachedSettings.orbSkin),
+            orbPack = openOrbPack(cachedSettings.orbSkin),
             tapBurstWindowMs = cachedSettings.tapBurstWindowMs.toLong(),
             onPositionChanged = { position ->
                 serviceScope.launch { settingsRepository.saveOverlayPosition(position) }
@@ -823,10 +865,23 @@ class OverlayService : Service() {
         runCatching { startActivity(intent) }
     }
 
+    /**
+     * Abre a orbe do pacote que [skinId] (`pack:<id>`) escolhe e fecha a anterior. `null` se a skin é uma das de hoje ou o pacote
+     * sumiu, quebrou ou não tem orbe: a orbe cai no Ateliê (SKP-STO-03). Abrir lê só o manifest e lista a pasta; os frames
+     * são renderizados fora da thread de desenho.
+     */
+    private fun openOrbPack(skinId: String): PackOrb? {
+        orbPack?.close()
+        orbPack = if (SkinIds.isPack(skinId)) PackOrb.open(SkinPackStore.of(this), skinId) else null
+        return orbPack
+    }
+
     private fun removeFloatingButton() {
         floatingButton?.let { button ->
             runCatching { windowManager.removeView(button) }
         }
+        orbPack?.close()
+        orbPack = null
         composeHost?.detach()
         composeHost = null
         floatingButton = null
@@ -897,7 +952,51 @@ class OverlayService : Service() {
         var isRunningForUi: Boolean = false
             private set
 
+        private const val CANCEL_WINDOW_MS = 3000L
+
+        /**
+         * Alonga a janela de desfazer nos testes que precisam fazer algo DENTRO dela: no emulador do CI um quadro do teclado
+         * leva 1–2 s, e segurar o mic duas vezes não cabe em 3 s (KeyFlowKeyboardSelectorTest, 2026-10-10). `null` = 3 s.
+         */
+        @Volatile
+        var cancelWindowMsForTest: Long? = null
+
+        // Um startForegroundService ainda sem o startForeground do serviço, e um stop() que chegou nesse meio-tempo.
+        // Tudo roda na thread principal do mesmo processo (a SetupActivity, o IME e o serviço), então não há corrida
+        // entre quem anota e quem lê.
+        @Volatile
+        private var foregroundPending = false
+
+        @Volatile
+        private var stopRequested = false
+
         fun intent(context: Context): Intent = Intent(context, OverlayService::class.java)
+
+        /**
+         * Sobe o serviço em primeiro plano. Use no lugar de `startForegroundService` direto: é o que deixa o [stop]
+         * saber que o primeiro plano ainda não chegou.
+         */
+        fun start(context: Context, intent: Intent) {
+            foregroundPending = true
+            stopRequested = false
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent) else context.startService(intent)
+            } catch (e: Exception) {
+                foregroundPending = false
+                throw e
+            }
+        }
+
+        /**
+         * Para o serviço. Se ele foi subido por [start] e ainda não chamou `startForeground`, um `stopService` agora faz
+         * o Android derrubar o app inteiro (ForegroundServiceDidNotStartInTimeException: "Bringing down service while
+         * still waiting for start foreground") — dá para provocar ligando e desligando o Modo Sobrepor depressa com a
+         * thread principal ocupada (visto no CI, 2026-10-09). Nesse caso o pedido fica anotado e o serviço se encerra
+         * ao chegar ao primeiro plano.
+         */
+        fun stop(context: Context) {
+            if (foregroundPending) stopRequested = true else context.stopService(intent(context))
+        }
 
         /** Inicia/garante o Modo Sobrepor (serviço persistente + orbe). */
         fun startOverlayIntent(context: Context): Intent =

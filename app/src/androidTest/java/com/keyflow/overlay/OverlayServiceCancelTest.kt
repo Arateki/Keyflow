@@ -44,13 +44,13 @@ class OverlayServiceCancelTest {
         shell("appops set ${context.packageName} SYSTEM_ALERT_WINDOW allow")
         // Sobe o serviço já em RECORDING: ACTION_RECORD chama ensureForeground() (startForeground
         // imediato, sem warm-up extra) e coordinator.onTap() (ocioso → grava, MIN_RECORDING_MS à parte).
-        context.startForegroundService(OverlayService.actionIntent(context, OverlayService.ACTION_RECORD))
+        OverlayService.start(context, OverlayService.actionIntent(context, OverlayService.ACTION_RECORD))
         waitUntilState(ButtonState.RECORDING)
     }
 
     @After
     fun tearDown() {
-        context.stopService(OverlayService.intent(context))
+        OverlayService.stop(context)
     }
 
     @Test

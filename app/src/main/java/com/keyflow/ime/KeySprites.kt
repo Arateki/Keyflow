@@ -27,8 +27,11 @@ internal class LruMap<K, V>(private val maxEntries: Int) {
  */
 internal class SpriteCache(maxEntries: Int = 40) {
 
-    /** O que define a aparência de um sprite: tamanho, raio dos cantos, cor e se está pressionada. */
-    data class Key(val width: Int, val height: Int, val radius: Int, val tint: Int, val pressed: Boolean)
+    /**
+     * O que define a aparência de um sprite: tamanho, raio dos cantos, cor e se está pressionada. [variant] separa sprites que o resto da
+     * chave não distingue (a skin de pacote guarda aqui o papel da tecla: letra ou função); as skins de hoje não usam e ficam em 0.
+     */
+    data class Key(val width: Int, val height: Int, val radius: Int, val tint: Int, val pressed: Boolean, val variant: Int = 0)
 
     private val cache = LruMap<Key, Bitmap>(maxEntries)
 

@@ -3,33 +3,39 @@ package com.keyflow.data
 import android.content.Context
 import android.content.SharedPreferences
 import android.os.Build
+import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.security.crypto.MasterKey
+import com.keyflow.core.FalaSource
 import com.keyflow.core.OrbShortcutAction
 import com.keyflow.core.OverlaySide
 import com.keyflow.core.ReasoningSource
 import com.keyflow.core.RecordingMode
 import com.keyflow.core.ShortcutOverflow
 import com.keyflow.core.TranscriptionSource
+import com.keyflow.core.VisionSource
 import com.keyflow.core.shortcuts.BarsConfig
 import com.keyflow.core.shortcuts.ShortcutCodec
 import com.keyflow.core.shortcuts.ShortcutGrid
 import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.ModelKind
+import com.keyflow.data.models.ModelProvisioning
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import java.io.File
 
 class SettingsRepository(
@@ -43,6 +49,13 @@ class SettingsRepository(
     private val securePrefs: SharedPreferences by lazy {
         createSecurePrefs(appContext, securePrefsName)
     }
+
+    /**
+     * O cofre cifrado das Settings (`keyflow_secure`), para quem precisa LER todos os valores secretos — o filtro de segredos do agente, que
+     * os troca por valor em tudo que vai ao modelo. Só leitura: ninguém grava por aqui (as gravações são as do [saveSettings]). É a mesma
+     * instância preguiçosa que o repositório usa, então o nome do cofre fica num lugar só.
+     */
+    internal fun secretVault(): SharedPreferences = securePrefs
 
     /**
      * Config efetivo consumido pelo transcritor. Resolve pela **origem selecionada** ([Settings.source])
@@ -141,12 +154,16 @@ class SettingsRepository(
     suspend fun selectLocalModelIfNone(modelId: String): Boolean = selectInstalledModelIfNone(modelId, ModelKind.SPEECH)
 
     /**
-     * O mesmo para os dois tipos de modelo: a chave é a do tipo — fala escolhe o modelo da Transcrição, texto escolhe o
-     * do Raciocínio. Um modelo de texto **nunca** vira o modelo de transcrição (senão baixar o Qwen com a Transcrição
-     * sem modelo faria o ditado tentar transcrever com um LLM).
+     * O mesmo para os tipos de modelo: a chave é a do tipo — fala escolhe o modelo da Transcrição, texto escolhe o
+     * do Raciocínio, visão escolhe o da Visão.
      */
     suspend fun selectInstalledModelIfNone(modelId: String, kind: ModelKind): Boolean {
-        val key = if (kind == ModelKind.TEXT) REASONING_LOCAL_MODEL_ID else LOCAL_MODEL_ID
+        val key = when (kind) {
+            ModelKind.TEXT -> REASONING_LOCAL_MODEL_ID
+            ModelKind.VISION -> VISION_LOCAL_MODEL_ID
+            ModelKind.VOICE -> FALA_LOCAL_MODEL_ID
+            ModelKind.SPEECH -> LOCAL_MODEL_ID
+        }
         var selected = false
         dataStore.edit { prefs ->
             if (prefs[key].isNullOrBlank()) {
@@ -155,6 +172,41 @@ class SettingsRepository(
             }
         }
         return selected
+    }
+
+    /**
+     * As skins escolhidas (teclado, orbe), lidas SÓ destas duas chaves — sem o round-trip das Settings inteiras, nem o cofre. O agente
+     * (`skin_select`/`skin_remove`) usa isto e [updateSkinSelection]/[resetSkinsUsing]: a mudança é atômica e não disputa com o auto-save da tela.
+     */
+    suspend fun skinSelectionOnce(): Pair<String, String> =
+        dataStore.data.first().let { (it[KEYBOARD_SKIN] ?: "system") to (it[ORB_SKIN] ?: "atelie") }
+
+    /** Grava só as escolhas de skin que vieram (`null` = não mexe). A UI recebe pelo [settingsFlow] como qualquer mudança. */
+    suspend fun updateSkinSelection(keyboard: String? = null, orb: String? = null) {
+        dataStore.edit { prefs ->
+            if (keyboard != null) prefs[KEYBOARD_SKIN] = keyboard
+            if (orb != null) prefs[ORB_SKIN] = orb
+        }
+    }
+
+    /**
+     * Devolve ao padrão (teclado → Sistema, orbe → Ateliê) quem usa [skinId] (`pack:<id>`) — o que a tela faz ao remover um pacote
+     * (`settingsAfterRemoval`), aqui atômico. Devolve se o teclado e a orbe usavam, para o resumo.
+     */
+    suspend fun resetSkinsUsing(skinId: String): Pair<Boolean, Boolean> {
+        var keyboard = false
+        var orb = false
+        dataStore.edit { prefs ->
+            if (prefs[KEYBOARD_SKIN] == skinId) {
+                prefs[KEYBOARD_SKIN] = "system"
+                keyboard = true
+            }
+            if (prefs[ORB_SKIN] == skinId) {
+                prefs[ORB_SKIN] = "atelie"
+                orb = true
+            }
+        }
+        return keyboard to orb
     }
 
     /** Gancho do downloader ao instalar: o tipo vem do catálogo; id que o catálogo não conhece não seleciona nada. */
@@ -167,8 +219,14 @@ class SettingsRepository(
      * O DataStore inteiro, chave por chave, como está gravado. Existe para o gate de instrumentados
      * guardar a config de quem é dono do aparelho antes de rodar a suíte no estado de fábrica
      * (`FactorySettingsListener`, androidTest) — nenhuma tela do app usa isto.
+     *
+     * Migra antes os segredos que um build antigo deixou em claro ([migrateLegacySecrets]): o gate copia o que
+     * lê para um arquivo em `files/`, que seria mais uma cópia em claro (e no backup) do segredo.
      */
-    internal suspend fun rawPreferencesOnce(): Preferences = dataStore.data.first()
+    internal suspend fun rawPreferencesOnce(): Preferences {
+        migrateLegacySecrets()
+        return dataStore.data.first()
+    }
 
     /** Troca o DataStore inteiro por [prefs]; vazio = estado de fábrica. Par de [rawPreferencesOnce]. */
     internal suspend fun replaceRawPreferences(prefs: Preferences) {
@@ -200,20 +258,23 @@ class SettingsRepository(
 
     /**
      * Estado completo de configuração (T5). Os campos `custom*` compartilham as chaves legadas;
-     * tokens de preset vêm do armazenamento criptografado e são preservados entre trocas de origem.
+     * os segredos (tokens, chaves de API, senha e chave SSH, valores de cabeçalho — [SettingsSecrets.BY_PROPERTY])
+     * vêm do armazenamento criptografado e são preservados entre trocas de origem.
      */
-    fun settingsFlow(): Flow<Settings> = dataStore.data.map { prefs ->
+    fun settingsFlow(): Flow<Settings> = dataStore.data.onStart { migrateLegacySecrets() }.map { prefs ->
+        val mirrorUrl = prefs[CUSTOM_MODEL_MIRROR_URL]?.ifBlank { null }
+        ModelProvisioning.customMirrorUrl = mirrorUrl
         Settings(
             source = prefs[SOURCE].toSource(),
             customEndpoint = prefs[ENDPOINT_URL].orEmpty(),
             customHeaderName = prefs[AUTH_HEADER_NAME] ?: "Authorization",
-            customHeaderValue = securePrefs.getString(AUTH_HEADER_VALUE, "").orEmpty(),
+            customHeaderValue = securePrefs.getString(SettingsSecrets.AUTH_HEADER_VALUE, "").orEmpty(),
             customModel = prefs[MODEL] ?: "whisper-1",
             customLanguage = prefs[LANGUAGE]?.takeIf { it.isNotBlank() },
-            openaiToken = securePrefs.getString(OPENAI_TOKEN, "").orEmpty(),
+            openaiToken = securePrefs.getString(SettingsSecrets.OPENAI_TOKEN, "").orEmpty(),
             openaiModel = prefs[OPENAI_MODEL] ?: Settings.OPENAI_MODEL,
             openaiLanguage = prefs[OPENAI_LANGUAGE]?.takeIf { it.isNotBlank() },
-            groqToken = securePrefs.getString(GROQ_TOKEN, "").orEmpty(),
+            groqToken = securePrefs.getString(SettingsSecrets.GROQ_TOKEN, "").orEmpty(),
             groqModel = prefs[GROQ_MODEL] ?: Settings.GROQ_MODEL,
             groqLanguage = prefs[GROQ_LANGUAGE]?.takeIf { it.isNotBlank() },
             localModelId = prefs[LOCAL_MODEL_ID]?.takeIf { it.isNotBlank() },
@@ -221,6 +282,59 @@ class SettingsRepository(
             reasoningSource = prefs[REASONING_SOURCE].toReasoningSource(),
             reasoningLocalModelId = prefs[REASONING_LOCAL_MODEL_ID]?.takeIf { it.isNotBlank() },
             reasoningOpenAiModel = prefs[REASONING_OPENAI_MODEL].orEmpty(),
+            reasoningAnthropicModel = prefs[REASONING_ANTHROPIC_MODEL] ?: "claude-3-5-sonnet-latest",
+            reasoningGoogleModel = prefs[REASONING_GOOGLE_MODEL] ?: "gemini-2.0-flash",
+            reasoningCustomEndpoint = prefs[REASONING_CUSTOM_ENDPOINT].orEmpty(),
+            reasoningCustomHeaderName = prefs[REASONING_CUSTOM_HEADER_NAME] ?: "Authorization",
+            reasoningCustomHeaderValue = secret(prefs, SettingsSecrets.REASONING_CUSTOM_HEADER_VALUE),
+            reasoningCustomModel = prefs[REASONING_CUSTOM_MODEL].orEmpty(),
+            visionSource = prefs[VISION_SOURCE].toVisionSource(),
+            visionLocalModelId = prefs[VISION_LOCAL_MODEL_ID]?.takeIf { it.isNotBlank() },
+            visionTranslateTarget = prefs[VISION_TRANSLATE_TARGET] ?: "pt",
+            visionOpenAiModel = prefs[VISION_OPENAI_MODEL] ?: "gpt-4o",
+            visionGoogleApiKey = secret(prefs, SettingsSecrets.VISION_GOOGLE_API_KEY),
+            visionGoogleModel = prefs[VISION_GOOGLE_MODEL] ?: "gemini-2.0-flash",
+            visionAnthropicApiKey = secret(prefs, SettingsSecrets.VISION_ANTHROPIC_API_KEY),
+            visionAnthropicModel = prefs[VISION_ANTHROPIC_MODEL] ?: "claude-3-5-sonnet-latest",
+            visionCustomEndpoint = prefs[VISION_CUSTOM_ENDPOINT].orEmpty(),
+            visionCustomHeaderName = prefs[VISION_CUSTOM_HEADER_NAME] ?: "Authorization",
+            visionCustomHeaderValue = secret(prefs, SettingsSecrets.VISION_CUSTOM_HEADER_VALUE),
+            visionCustomModel = prefs[VISION_CUSTOM_MODEL].orEmpty(),
+            falaSource = prefs[FALA_SOURCE].toFalaSource(),
+            falaLocalModelId = prefs[FALA_LOCAL_MODEL_ID]?.takeIf { it.isNotBlank() },
+            falaSpeed = prefs[FALA_SPEED] ?: 1.0f,
+            falaCloudVoice = prefs[FALA_CLOUD_VOICE] ?: "alloy",
+            falaElevenLabsApiKey = secret(prefs, SettingsSecrets.FALA_ELEVENLABS_API_KEY),
+            falaElevenLabsVoice = prefs[FALA_ELEVENLABS_VOICE] ?: "Rachel",
+            falaElevenLabsModel = prefs[FALA_ELEVENLABS_MODEL] ?: "eleven_multilingual_v2",
+            falaGoogleApiKey = secret(prefs, SettingsSecrets.FALA_GOOGLE_API_KEY),
+            falaGoogleVoice = prefs[FALA_GOOGLE_VOICE] ?: "pt-BR-Neural2-A",
+            falaCustomEndpoint = prefs[FALA_CUSTOM_ENDPOINT].orEmpty(),
+            falaCustomHeaderName = prefs[FALA_CUSTOM_HEADER_NAME] ?: "Authorization",
+            falaCustomHeaderValue = secret(prefs, SettingsSecrets.FALA_CUSTOM_HEADER_VALUE),
+            falaCustomModel = prefs[FALA_CUSTOM_MODEL].orEmpty(),
+            computerMode = prefs[COMPUTER_MODE] ?: "ssh",
+            computerSshHost = prefs[COMPUTER_SSH_HOST].orEmpty(),
+            computerSshPort = prefs[COMPUTER_SSH_PORT] ?: 22,
+            computerSshUser = prefs[COMPUTER_SSH_USER].orEmpty(),
+            computerSshAuthType = prefs[COMPUTER_SSH_AUTH_TYPE] ?: "password",
+            computerSshPassword = secret(prefs, SettingsSecrets.COMPUTER_SSH_PASSWORD),
+            computerSshKey = secret(prefs, SettingsSecrets.COMPUTER_SSH_KEY),
+            customModelMirrorUrl = prefs[CUSTOM_MODEL_MIRROR_URL].orEmpty(),
+            providerAnthropicApiKey = secret(prefs, SettingsSecrets.PROVIDER_ANTHROPIC_API_KEY),
+            providerAnthropicModel = prefs[PROVIDER_ANTHROPIC_MODEL] ?: "claude-3-5-sonnet-latest",
+            providerAnthropicAuthMode = prefs[PROVIDER_ANTHROPIC_AUTH_MODE] ?: "subscription",
+            providerOpenAiApiKey = secret(prefs, SettingsSecrets.PROVIDER_OPENAI_API_KEY),
+            providerOpenAiModel = prefs[PROVIDER_OPENAI_MODEL] ?: "gpt-4o",
+            providerOpenAiAuthMode = prefs[PROVIDER_OPENAI_AUTH_MODE] ?: "subscription",
+            providerGoogleApiKey = secret(prefs, SettingsSecrets.PROVIDER_GOOGLE_API_KEY),
+            providerGoogleModel = prefs[PROVIDER_GOOGLE_MODEL] ?: "gemini-2.0-flash",
+            providerGoogleAuthMode = prefs[PROVIDER_GOOGLE_AUTH_MODE] ?: "subscription",
+            providerElevenLabsAuthMode = prefs[PROVIDER_ELEVENLABS_AUTH_MODE] ?: "subscription",
+            providerGroqApiKey = secret(prefs, SettingsSecrets.PROVIDER_GROQ_API_KEY),
+            providerGroqModel = prefs[PROVIDER_GROQ_MODEL] ?: "llama-3.3-70b-versatile",
+            providerGrokApiKey = secret(prefs, SettingsSecrets.PROVIDER_GROK_API_KEY),
+            providerGrokModel = prefs[PROVIDER_GROK_MODEL] ?: "grok-2",
             overlayModeEnabled = prefs[OVERLAY_MODE_ENABLED] ?: false,
             keyboardModeEnabled = prefs[KEYBOARD_MODE_ENABLED] ?: false,
             overlayRecordingMode = prefs[OVERLAY_RECORDING_MODE].toRecordingMode(),
@@ -256,18 +370,37 @@ class SettingsRepository(
     }
 
     /**
-     * Persiste o estado completo (T5). Tokens criptografados; `null` em texto remove a chave do DataStore.
-     * Não apaga credenciais de outros provedores — todos os 3 tokens são reescritos a partir de [settings].
+     * Persiste o estado completo (T5). Segredos criptografados; `null` em texto remove a chave do DataStore.
+     * Não apaga credenciais de outros provedores — todos os segredos ([SettingsSecrets.BY_PROPERTY]) são
+     * reescritos a partir de [settings]. Só depois de o cofre confirmar o `commit()` o DataStore é tocado, e então
+     * qualquer cópia em claro que um build antigo tenha deixado lá é removida (ver [migrateLegacySecrets]).
      */
     suspend fun saveSettings(settings: Settings) {
-        val committed = securePrefs.edit()
-            .putString(AUTH_HEADER_VALUE, settings.customHeaderValue)
-            .putString(OPENAI_TOKEN, settings.openaiToken)
-            .putString(GROQ_TOKEN, settings.groqToken)
-            .commit()
+        val committed = synchronized(SettingsSecrets.LOCK) {
+            securePrefs.edit()
+                .putString(SettingsSecrets.AUTH_HEADER_VALUE, settings.customHeaderValue)
+                .putString(SettingsSecrets.OPENAI_TOKEN, settings.openaiToken)
+                .putString(SettingsSecrets.GROQ_TOKEN, settings.groqToken)
+                .putString(SettingsSecrets.REASONING_CUSTOM_HEADER_VALUE, settings.reasoningCustomHeaderValue)
+                .putString(SettingsSecrets.VISION_GOOGLE_API_KEY, settings.visionGoogleApiKey)
+                .putString(SettingsSecrets.VISION_ANTHROPIC_API_KEY, settings.visionAnthropicApiKey)
+                .putString(SettingsSecrets.VISION_CUSTOM_HEADER_VALUE, settings.visionCustomHeaderValue)
+                .putString(SettingsSecrets.FALA_ELEVENLABS_API_KEY, settings.falaElevenLabsApiKey)
+                .putString(SettingsSecrets.FALA_GOOGLE_API_KEY, settings.falaGoogleApiKey)
+                .putString(SettingsSecrets.FALA_CUSTOM_HEADER_VALUE, settings.falaCustomHeaderValue)
+                .putString(SettingsSecrets.COMPUTER_SSH_PASSWORD, settings.computerSshPassword)
+                .putString(SettingsSecrets.COMPUTER_SSH_KEY, settings.computerSshKey)
+                .putString(SettingsSecrets.PROVIDER_ANTHROPIC_API_KEY, settings.providerAnthropicApiKey)
+                .putString(SettingsSecrets.PROVIDER_OPENAI_API_KEY, settings.providerOpenAiApiKey)
+                .putString(SettingsSecrets.PROVIDER_GOOGLE_API_KEY, settings.providerGoogleApiKey)
+                .putString(SettingsSecrets.PROVIDER_GROQ_API_KEY, settings.providerGroqApiKey)
+                .putString(SettingsSecrets.PROVIDER_GROK_API_KEY, settings.providerGrokApiKey)
+                .commit()
+        }
         check(committed) { "Unable to persist provider tokens" }
 
         dataStore.edit { prefs ->
+            SettingsSecrets.LEGACY_IN_DATASTORE.forEach { prefs.remove(it) }
             prefs[SOURCE] = settings.source.name
             prefs[ENDPOINT_URL] = settings.customEndpoint
             prefs[AUTH_HEADER_NAME] = settings.customHeaderName
@@ -282,6 +415,46 @@ class SettingsRepository(
             prefs[REASONING_SOURCE] = settings.reasoningSource.name
             settings.reasoningLocalModelId.putOrRemove(prefs, REASONING_LOCAL_MODEL_ID)
             settings.reasoningOpenAiModel.putOrRemove(prefs, REASONING_OPENAI_MODEL)
+            prefs[REASONING_ANTHROPIC_MODEL] = settings.reasoningAnthropicModel
+            prefs[REASONING_GOOGLE_MODEL] = settings.reasoningGoogleModel
+            prefs[REASONING_CUSTOM_ENDPOINT] = settings.reasoningCustomEndpoint
+            prefs[REASONING_CUSTOM_HEADER_NAME] = settings.reasoningCustomHeaderName
+            prefs[REASONING_CUSTOM_MODEL] = settings.reasoningCustomModel
+            prefs[VISION_SOURCE] = settings.visionSource.name
+            settings.visionLocalModelId.putOrRemove(prefs, VISION_LOCAL_MODEL_ID)
+            prefs[VISION_TRANSLATE_TARGET] = settings.visionTranslateTarget
+            prefs[VISION_OPENAI_MODEL] = settings.visionOpenAiModel
+            prefs[VISION_GOOGLE_MODEL] = settings.visionGoogleModel
+            prefs[VISION_ANTHROPIC_MODEL] = settings.visionAnthropicModel
+            prefs[VISION_CUSTOM_ENDPOINT] = settings.visionCustomEndpoint
+            prefs[VISION_CUSTOM_HEADER_NAME] = settings.visionCustomHeaderName
+            prefs[VISION_CUSTOM_MODEL] = settings.visionCustomModel
+            prefs[FALA_SOURCE] = settings.falaSource.name
+            settings.falaLocalModelId.putOrRemove(prefs, FALA_LOCAL_MODEL_ID)
+            prefs[FALA_SPEED] = settings.falaSpeed
+            prefs[FALA_CLOUD_VOICE] = settings.falaCloudVoice
+            prefs[FALA_ELEVENLABS_VOICE] = settings.falaElevenLabsVoice
+            prefs[FALA_ELEVENLABS_MODEL] = settings.falaElevenLabsModel
+            prefs[FALA_GOOGLE_VOICE] = settings.falaGoogleVoice
+            prefs[FALA_CUSTOM_ENDPOINT] = settings.falaCustomEndpoint
+            prefs[FALA_CUSTOM_HEADER_NAME] = settings.falaCustomHeaderName
+            prefs[FALA_CUSTOM_MODEL] = settings.falaCustomModel
+            prefs[COMPUTER_MODE] = settings.computerMode
+            prefs[COMPUTER_SSH_HOST] = settings.computerSshHost
+            prefs[COMPUTER_SSH_PORT] = settings.computerSshPort
+            prefs[COMPUTER_SSH_USER] = settings.computerSshUser
+            prefs[COMPUTER_SSH_AUTH_TYPE] = settings.computerSshAuthType
+            prefs[CUSTOM_MODEL_MIRROR_URL] = settings.customModelMirrorUrl
+            ModelProvisioning.customMirrorUrl = settings.customModelMirrorUrl.ifBlank { null }
+            prefs[PROVIDER_ANTHROPIC_MODEL] = settings.providerAnthropicModel
+            prefs[PROVIDER_ANTHROPIC_AUTH_MODE] = settings.providerAnthropicAuthMode
+            prefs[PROVIDER_OPENAI_MODEL] = settings.providerOpenAiModel
+            prefs[PROVIDER_OPENAI_AUTH_MODE] = settings.providerOpenAiAuthMode
+            prefs[PROVIDER_GOOGLE_MODEL] = settings.providerGoogleModel
+            prefs[PROVIDER_GOOGLE_AUTH_MODE] = settings.providerGoogleAuthMode
+            prefs[PROVIDER_ELEVENLABS_AUTH_MODE] = settings.providerElevenLabsAuthMode
+            prefs[PROVIDER_GROQ_MODEL] = settings.providerGroqModel
+            prefs[PROVIDER_GROK_MODEL] = settings.providerGrokModel
             prefs[OVERLAY_MODE_ENABLED] = settings.overlayModeEnabled
             prefs[KEYBOARD_MODE_ENABLED] = settings.keyboardModeEnabled
             prefs[OVERLAY_RECORDING_MODE] = settings.overlayRecordingMode.name
@@ -316,6 +489,29 @@ class SettingsRepository(
         if (this.isNullOrBlank()) prefs.remove(key) else prefs[key] = this
     }
 
+    /** O segredo [name]: o do cofre; ver [SettingsSecrets.read] para o caso do que ainda está em claro no DataStore. */
+    private fun secret(prefs: Preferences, name: String): String = SettingsSecrets.read(securePrefs, prefs, name)
+
+    /**
+     * Segredos que builds de desenvolvimento gravaram em claro no DataStore ([SettingsSecrets.LEGACY_IN_DATASTORE]):
+     * se o cofre ainda não tem o valor, copia para ele e **só depois** de o `commit()` confirmar remove a chave do
+     * DataStore. Roda ao começar cada coleta de [settingsFlow] e em [rawPreferencesOnce]; o caminho comum, sem nada
+     * em claro, só olha o DataStore e nem abre o cofre. Idempotente. Se o cofre falhar, o segredo fica onde está
+     * (a próxima leitura tenta de novo) e a leitura não cai.
+     */
+    private suspend fun migrateLegacySecrets() {
+        val current = dataStore.data.first()
+        val present = SettingsSecrets.legacyPresentIn(current)
+        if (present.isEmpty()) return
+        val movable = try {
+            SettingsSecrets.moveToVault(current, present, securePrefs)
+        } catch (e: Exception) {
+            Log.w(TAG, "Cofre indisponível; segredos antigos ficam no DataStore por enquanto", e)
+            return
+        }
+        if (movable.isNotEmpty()) dataStore.edit { prefs -> movable.forEach { prefs.remove(it) } }
+    }
+
     fun overlayPositionFlow(): Flow<OverlayPosition> = dataStore.data.map { prefs ->
         OverlayPosition(
             x = prefs[OVERLAY_X] ?: OverlayPosition().x,
@@ -325,7 +521,7 @@ class SettingsRepository(
 
     suspend fun save(cfg: Config) {
         val committed = securePrefs.edit()
-            .putString(AUTH_HEADER_VALUE, cfg.authHeaderValue)
+            .putString(SettingsSecrets.AUTH_HEADER_VALUE, cfg.authHeaderValue)
             .commit()
         check(committed) { "Unable to persist auth header value" }
 
@@ -362,6 +558,16 @@ class SettingsRepository(
         ?.let { runCatching { ReasoningSource.valueOf(it) }.getOrNull() }
         ?: ReasoningSource.LOCAL
 
+    /** Valor ausente ou desconhecido cai no Local — nunca derruba a leitura. */
+    private fun String?.toVisionSource(): VisionSource = this
+        ?.let { runCatching { VisionSource.valueOf(it) }.getOrNull() }
+        ?: VisionSource.LOCAL
+
+    /** Valor ausente ou desconhecido cai no Local — nunca derruba a leitura. */
+    private fun String?.toFalaSource(): FalaSource = this
+        ?.let { runCatching { FalaSource.valueOf(it) }.getOrNull() }
+        ?: FalaSource.LOCAL
+
     private fun String?.toOverlaySide(): OverlaySide = this
         ?.let { runCatching { OverlaySide.valueOf(it) }.getOrNull() }
         ?: OverlaySide.RIGHT
@@ -377,6 +583,7 @@ class SettingsRepository(
     private companion object {
         const val DATASTORE_NAME = "keyflow_settings"
         const val SECURE_PREFS_NAME = "keyflow_secure"
+        const val TAG = "SettingsRepository"
         val DATASTORES = mutableMapOf<String, DataStore<Preferences>>()
 
         val ENDPOINT_URL = stringPreferencesKey("endpoint_url")
@@ -386,7 +593,6 @@ class SettingsRepository(
         val RECORDING_MODE = stringPreferencesKey("recording_mode")
         val OVERLAY_X = intPreferencesKey("overlay_x")
         val OVERLAY_Y = intPreferencesKey("overlay_y")
-        const val AUTH_HEADER_VALUE = "auth_header_value"
 
         // T5 — novas chaves
         val SOURCE = stringPreferencesKey("transcription_source")
@@ -399,6 +605,45 @@ class SettingsRepository(
         val REASONING_SOURCE = stringPreferencesKey("reasoning_source")
         val REASONING_LOCAL_MODEL_ID = stringPreferencesKey("reasoning_local_model_id")
         val REASONING_OPENAI_MODEL = stringPreferencesKey("reasoning_openai_model")
+        val REASONING_ANTHROPIC_MODEL = stringPreferencesKey("reasoning_anthropic_model")
+        val REASONING_GOOGLE_MODEL = stringPreferencesKey("reasoning_google_model")
+        val VISION_SOURCE = stringPreferencesKey("vision_source")
+        val VISION_LOCAL_MODEL_ID = stringPreferencesKey("vision_local_model_id")
+        val VISION_TRANSLATE_TARGET = stringPreferencesKey("vision_translate_target")
+        val VISION_OPENAI_MODEL = stringPreferencesKey("vision_openai_model")
+        val VISION_GOOGLE_MODEL = stringPreferencesKey("vision_google_model")
+        val VISION_ANTHROPIC_MODEL = stringPreferencesKey("vision_anthropic_model")
+        val FALA_SOURCE = stringPreferencesKey("fala_source")
+        val FALA_LOCAL_MODEL_ID = stringPreferencesKey("fala_local_model_id")
+        val FALA_SPEED = floatPreferencesKey("fala_speed")
+        val FALA_CLOUD_VOICE = stringPreferencesKey("fala_cloud_voice")
+        val FALA_ELEVENLABS_VOICE = stringPreferencesKey("fala_elevenlabs_voice")
+        val FALA_ELEVENLABS_MODEL = stringPreferencesKey("fala_elevenlabs_model")
+        val FALA_GOOGLE_VOICE = stringPreferencesKey("fala_google_voice")
+        val REASONING_CUSTOM_ENDPOINT = stringPreferencesKey("reasoning_custom_endpoint")
+        val REASONING_CUSTOM_HEADER_NAME = stringPreferencesKey("reasoning_custom_header_name")
+        val REASONING_CUSTOM_MODEL = stringPreferencesKey("reasoning_custom_model")
+        val VISION_CUSTOM_ENDPOINT = stringPreferencesKey("vision_custom_endpoint")
+        val VISION_CUSTOM_HEADER_NAME = stringPreferencesKey("vision_custom_header_name")
+        val VISION_CUSTOM_MODEL = stringPreferencesKey("vision_custom_model")
+        val FALA_CUSTOM_ENDPOINT = stringPreferencesKey("fala_custom_endpoint")
+        val FALA_CUSTOM_HEADER_NAME = stringPreferencesKey("fala_custom_header_name")
+        val FALA_CUSTOM_MODEL = stringPreferencesKey("fala_custom_model")
+        val COMPUTER_MODE = stringPreferencesKey("computer_mode")
+        val COMPUTER_SSH_HOST = stringPreferencesKey("computer_ssh_host")
+        val COMPUTER_SSH_PORT = intPreferencesKey("computer_ssh_port")
+        val COMPUTER_SSH_USER = stringPreferencesKey("computer_ssh_user")
+        val COMPUTER_SSH_AUTH_TYPE = stringPreferencesKey("computer_ssh_auth_type")
+        val CUSTOM_MODEL_MIRROR_URL = stringPreferencesKey("custom_model_mirror_url")
+        val PROVIDER_ANTHROPIC_MODEL = stringPreferencesKey("provider_anthropic_model")
+        val PROVIDER_ANTHROPIC_AUTH_MODE = stringPreferencesKey("provider_anthropic_auth_mode")
+        val PROVIDER_OPENAI_MODEL = stringPreferencesKey("provider_openai_model")
+        val PROVIDER_OPENAI_AUTH_MODE = stringPreferencesKey("provider_openai_auth_mode")
+        val PROVIDER_GOOGLE_MODEL = stringPreferencesKey("provider_google_model")
+        val PROVIDER_GOOGLE_AUTH_MODE = stringPreferencesKey("provider_google_auth_mode")
+        val PROVIDER_ELEVENLABS_AUTH_MODE = stringPreferencesKey("provider_elevenlabs_auth_mode")
+        val PROVIDER_GROQ_MODEL = stringPreferencesKey("provider_groq_model")
+        val PROVIDER_GROK_MODEL = stringPreferencesKey("provider_grok_model")
         val OVERLAY_MODE_ENABLED = booleanPreferencesKey("overlay_mode_enabled")
         val KEYBOARD_MODE_ENABLED = booleanPreferencesKey("keyboard_mode_enabled")
         val OVERLAY_RECORDING_MODE = stringPreferencesKey("overlay_recording_mode")
@@ -431,8 +676,6 @@ class SettingsRepository(
         // Trabalho 3 (shortcut-bars): barras personalizáveis + teclados de atalhos, como JSON.
         val BARS_CONFIG_JSON = stringPreferencesKey("bars_config_json")
         val SHORTCUT_GRIDS_JSON = stringPreferencesKey("shortcut_grids_json")
-        const val OPENAI_TOKEN = "openai_token"
-        const val GROQ_TOKEN = "groq_token"
 
         fun createSecurePrefs(
             context: Context,

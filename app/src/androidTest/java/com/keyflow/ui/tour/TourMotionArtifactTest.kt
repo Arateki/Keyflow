@@ -22,6 +22,8 @@ import com.keyflow.ui.theme.KeyFlowTheme
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.tour.scenes.KeyboardScene
 import com.keyflow.ui.tour.scenes.OrbScene
+import org.junit.Assume.assumeTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -40,6 +42,17 @@ class TourMotionArtifactTest {
 
     @get:Rule
     val rule = createComposeRule()
+
+    // Só gera os quadros dos GIFs, sem nada a conferir: com `-e motionFrames false` (o gate do CI) é pulado. No emulador
+    // do CI o captureToImage destes quadros ainda estourava o prazo do PixelCopy (2026-10-10); os scripts verify-*-gifs.sh
+    // não passam o argumento e seguem gravando.
+    @Before
+    fun onlyWhenRecordingFrames() {
+        assumeTrue(
+            "motionFrames=false: sem quadros para gravar",
+            InstrumentationRegistry.getArguments().getString("motionFrames") != "false",
+        )
+    }
 
     private val outRoot: File by lazy {
         val context = InstrumentationRegistry.getInstrumentation().targetContext

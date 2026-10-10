@@ -7,10 +7,16 @@ import org.junit.Test
 class ConfigTabTest {
 
     @Test
-    fun `interfaces come first, then capabilities, then the docs`() {
-        assertThat(TabGroup.entries).containsExactly(TabGroup.INTERFACES, TabGroup.CAPACIDADES, TabGroup.OUTROS).inOrder()
+    fun `keyflow comes first, then interfaces, then capabilities, then the docs`() {
+        assertThat(TabGroup.entries).containsExactly(TabGroup.PRINCIPAL, TabGroup.INTERFACES, TabGroup.CAPACIDADES, TabGroup.OUTROS).inOrder()
         assertThat(ConfigTab.entries.map { it.group }.distinct())
-            .containsExactly(TabGroup.INTERFACES, TabGroup.CAPACIDADES, TabGroup.OUTROS).inOrder()
+            .containsExactly(TabGroup.PRINCIPAL, TabGroup.INTERFACES, TabGroup.CAPACIDADES, TabGroup.OUTROS).inOrder()
+    }
+
+    @Test
+    fun `keyflow is the principal agent tab`() {
+        assertThat(ConfigTab.entries.filter { it.group == TabGroup.PRINCIPAL })
+            .containsExactly(ConfigTab.KEYFLOW)
     }
 
     @Test
@@ -20,10 +26,17 @@ class ConfigTabTest {
     }
 
     @Test
-    fun `transcription, vision, reasoning and voice are the capabilities`() {
-        // VOZ é a Transcrição; a aba "Voz" (a boca) é a FALA.
+    fun `fluxos, transcription, vision, reasoning, voice, and computador are the capabilities`() {
+        // FLUXOS vem em primeiro nas capacidades (central de orquestração); VOZ é a Transcrição; a aba "Voz" (a boca) é a FALA.
         assertThat(ConfigTab.entries.filter { it.group == TabGroup.CAPACIDADES })
-            .containsExactly(ConfigTab.VOZ, ConfigTab.VISAO, ConfigTab.RACIOCINIO, ConfigTab.FALA).inOrder()
+            .containsExactly(
+                ConfigTab.FLUXOS,
+                ConfigTab.VOZ,
+                ConfigTab.VISAO,
+                ConfigTab.RACIOCINIO,
+                ConfigTab.FALA,
+                ConfigTab.COMPUTADOR,
+            ).inOrder()
     }
 
     @Test
@@ -33,10 +46,11 @@ class ConfigTabTest {
     }
 
     @Test
-    fun `every group has tabs and every group but the last has a title`() {
+    fun `every group has tabs and interfaces and capabilities have titles`() {
         assertThat(ConfigTab.entries.map { it.name }).containsNoDuplicates()
         assertThat(ConfigTab.entries.groupBy { it.group }.keys).containsExactlyElementsIn(TabGroup.entries)
-        // Interfaces e Capacidades têm título (que só aparece com o menu aberto); o grupo da Docs só tem a linha.
+        // Keyflow (topo) e Outros (Docs/Provedores) só têm a linha/espaço; Interfaces e Capacidades têm título.
+        assertThat(TabGroup.PRINCIPAL.title).isNull()
         assertThat(TabGroup.INTERFACES.title).isEqualTo("Interfaces")
         assertThat(TabGroup.CAPACIDADES.title).isEqualTo("Capacidades")
         assertThat(TabGroup.OUTROS.title).isNull()

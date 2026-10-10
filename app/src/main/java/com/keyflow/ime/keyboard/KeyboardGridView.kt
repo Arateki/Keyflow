@@ -1,9 +1,11 @@
 package com.keyflow.ime.keyboard
 
 import com.keyflow.ime.GlassSheetLocator
+import com.keyflow.ime.KeyRole
 import com.keyflow.ime.KeySurface
 import com.keyflow.ime.KeyboardColors
 import com.keyflow.ime.KeyboardSkin
+import com.keyflow.skins.PackKeyboard
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
@@ -54,9 +56,11 @@ class KeyboardGridView(
     initialLayer: LayerId = LayerId.LETTERS,
     private val hapticFeedback: Boolean = true,
     skin: KeyboardSkin = KeyboardSkin.DEFAULT,
+    // Teclado de uma skin de pacote (SKP-KBD): quando há, é ele quem manda nas cores e nas faces.
+    pack: PackKeyboard? = null,
 ) : View(context) {
 
-    private val colors = KeyboardColors.of(skin, dark)
+    private val colors = KeyboardColors.of(skin, dark, pack)
 
     private var state = KeyboardGridState(layout, initialLayer = initialLayer)
 
@@ -262,7 +266,9 @@ class KeyboardGridView(
         val isModifier = placed.keyDef.action !is KeyAction.Char && placed.keyDef.action != KeyAction.Space
         val pressed = pressedKeys.containsValue(placed)
         if (surface != null) {
-            surface.draw(canvas, bounds, cornerRadius, keyColorFor(placed), pressed = pressed)
+            // Letra × função: a skin de pacote tem uma face para cada (as de hoje ignoram o papel). O espaço é função (FORMAT.md §2).
+            val role = if (placed.keyDef.action is KeyAction.Char) KeyRole.KEY else KeyRole.MODIFIER
+            surface.draw(canvas, bounds, cornerRadius, keyColorFor(placed), pressed = pressed, role = role)
         } else {
             keyPaint.color = keyColorFor(placed)
             canvas.drawRoundRect(bounds, cornerRadius, cornerRadius, keyPaint)

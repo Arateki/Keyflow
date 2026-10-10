@@ -123,15 +123,12 @@ class ConfigScreenTest {
 
     @Test
     fun newTabsStartEmptyWithTheirNameInTheHeader() {
-        // Abas novas (Yan, 2026-09-29): Notificação, Visão e Voz, com o nome no cabeçalho e ainda sem conteúdo (o Raciocínio já tem).
-        // A Voz é a FALA por dentro: VOZ é, desde sempre, a aba Transcrição.
+        // Aba ainda sem conteúdo (Yan, 2026-09-29): Notificação, com o nome no cabeçalho e sem ajuda.
         val h = Harness()
         rule.setContent { h.Content() }
 
         val tabs = listOf(
             ConfigTab.NOTIFICACAO to "Notificação",
-            ConfigTab.VISAO to "Visão",
-            ConfigTab.FALA to "Voz",
         )
         for ((tab, title) in tabs) {
             rule.onNodeWithTag(tabTag(tab)).performClick()
@@ -139,6 +136,36 @@ class ConfigScreenTest {
             rule.onNodeWithTag(HEADER_TAB_TITLE_TAG).assertTextEquals(title)
             rule.onAllNodesWithTag(HEADER_TAB_HELP_TAG).assertCountEquals(0)
         }
+    }
+
+    @Test
+    fun theVisionTabIsAlwaysEnabledAndHasItsHelp() {
+        val h = Harness()
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(tabTag(ConfigTab.VISAO)).performClick()
+        rule.onNodeWithTag(panelTag(ConfigTab.VISAO)).assertIsDisplayed()
+        rule.onNodeWithTag(HEADER_TAB_TITLE_TAG).assertTextEquals("Visão")
+        rule.onAllNodesWithTag(HEADER_TAB_HELP_TAG).assertCountEquals(1)
+        rule.onNodeWithTag(visionSourceTag(com.keyflow.core.VisionSource.LOCAL)).assertIsDisplayed()
+
+        rule.onNodeWithTag(HEADER_TAB_HELP_TAG).performClick()
+        rule.onNodeWithTag(TAB_HELP_TAG).assertTextContains("Configura o reconhecimento óptico de caracteres", substring = true)
+    }
+
+    @Test
+    fun theVoiceTabIsAlwaysEnabledAndHasItsHelp() {
+        val h = Harness()
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(tabTag(ConfigTab.FALA)).performClick()
+        rule.onNodeWithTag(panelTag(ConfigTab.FALA)).assertIsDisplayed()
+        rule.onNodeWithTag(HEADER_TAB_TITLE_TAG).assertTextEquals("Voz")
+        rule.onAllNodesWithTag(HEADER_TAB_HELP_TAG).assertCountEquals(1)
+        rule.onNodeWithTag(falaSourceTag(com.keyflow.core.FalaSource.LOCAL)).assertIsDisplayed()
+
+        rule.onNodeWithTag(HEADER_TAB_HELP_TAG).performClick()
+        rule.onNodeWithTag(TAB_HELP_TAG).assertTextContains("Configura a síntese de fala", substring = true)
     }
 
     @Test
@@ -161,12 +188,14 @@ class ConfigScreenTest {
     fun menuListsInterfacesThenCapabilitiesAndTheTitlesOnlyShowWhenExpanded() {
         // Yan, 2026-09-29: Teclado, Sobrepor e Notificação são interfaces; Transcrição, Visão, Raciocínio e Voz, capacidades.
         // Primeiro as interfaces. Recolhido, só uma linha separa os grupos; o título só aparece com o menu aberto.
+        // Depois: o KeyFlow (agente principal) abre o menu, sem grupo nem título, e Fluxos e Computador entram nas capacidades.
         val h = Harness()
         rule.setContent { h.Content() }
 
         val order = listOf(
+            ConfigTab.KEYFLOW,
             ConfigTab.TECLADO, ConfigTab.OVERLAY, ConfigTab.NOTIFICACAO,
-            ConfigTab.VOZ, ConfigTab.VISAO, ConfigTab.RACIOCINIO, ConfigTab.FALA,
+            ConfigTab.FLUXOS, ConfigTab.VOZ, ConfigTab.VISAO, ConfigTab.RACIOCINIO, ConfigTab.FALA, ConfigTab.COMPUTADOR,
             ConfigTab.DOCS,
         )
         assertEquals(order, ConfigTab.entries.toList())

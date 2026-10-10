@@ -28,7 +28,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.withContext
 
 /**
  * Sinaliza "salvo" para a UI sem botão global (CFG-04/05, C22). A camada de auto-save chama
@@ -54,9 +56,11 @@ fun SaveToast(controller: SaveController, modifier: Modifier = Modifier) {
     var generation by remember { mutableStateOf(0) }
 
     LaunchedEffect(controller) {
-        controller.events.collect {
-            generation++
-            visible = true
+        withContext(Dispatchers.Main.immediate) { // o evento pode vir de outra thread: ver collectAsStateOnMain
+            controller.events.collect {
+                generation++
+                visible = true
+            }
         }
     }
     LaunchedEffect(generation) {

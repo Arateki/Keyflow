@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
+import android.util.Log
 import android.view.InputDevice
 import android.view.MotionEvent
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -129,8 +130,8 @@ class KeyFlowKeyboardCanvasGridTest {
         val u = keyOnScreen(grid, "u")
 
         val down = SystemClock.uptimeMillis()
-        inject(MotionEvent.ACTION_DOWN, u.centerX, u.centerY, down)
-        waitUntil("a tira de acentos do \"u\" não abriu") { grid.accentVariantsForTest != null }
+        injectDown(u.centerX, u.centerY, down)
+        waitUntil({ "a tira de acentos do \"u\" não abriu (${keyboardState(grid, u)})" }) { grid.accentVariantsForTest != null }
         val variants = grid.accentVariantsForTest!!
         inject(MotionEvent.ACTION_UP, u.centerX, u.centerY, down)
 
@@ -148,8 +149,8 @@ class KeyFlowKeyboardCanvasGridTest {
         val u = keyOnScreen(grid, "u")
 
         val down = SystemClock.uptimeMillis()
-        inject(MotionEvent.ACTION_DOWN, u.centerX, u.centerY, down)
-        waitUntil("a tira de acentos do \"u\" não abriu") { grid.accentVariantsForTest != null }
+        injectDown(u.centerX, u.centerY, down)
+        waitUntil({ "a tira de acentos do \"u\" não abriu (${keyboardState(grid, u)})" }) { grid.accentVariantsForTest != null }
         val variants = grid.accentVariantsForTest!!
         val nextX = u.centerX + grid.accentChipWidthForTest!!.toInt()
         inject(MotionEvent.ACTION_MOVE, nextX, u.centerY, down)
@@ -186,6 +187,8 @@ class KeyFlowKeyboardCanvasGridTest {
 
         device.wait(Until.hasObject(By.desc("ime_probe_field")), TIMEOUT)
         device.findObject(By.desc("ime_probe_field"))?.click()
+        // Nunca acha o "🎙" (o mic é desenhado pela BarView): na prática são 5 s para a entrada do teclado assentar. Tirá-los
+        // rendeu 4 falhas de teclado em 2 rodadas do CI (2026-10-10). Trocar só por uma condição que espere o mesmo assentamento.
         device.wait(Until.hasObject(By.text("🎙")), TIMEOUT)
         awaitKeyboardAttached(device) { context.startActivity(intent) }
     }
@@ -275,6 +278,19 @@ class KeyFlowKeyboardCanvasGridTest {
      * primeiras rodadas após um `installDebug` falhavam assim. Sem o `catch`, a exceção escapava dos
      * laços de retry e reprovava o teste na hora.
      */
+    /**
+     * DOWN que a plataforma aceitou (ver [inject]). Segurar a tecla depende de um único DOWN: recusado, a tira de
+     * acentos nunca abre, e o teste esperava 5 s por nada (CI, 2026-10-09 — sem log, ficou sem prova de que foi isto;
+     * agora a recusa vai para o logcat).
+     */
+    private fun injectDown(x: Int, y: Int, time: Long) {
+        waitUntil("a plataforma recusou o toque em ($x, $y)") {
+            inject(MotionEvent.ACTION_DOWN, x, y, time).also { accepted ->
+                if (!accepted) Log.w("KeyFlow.CanvasGridTest", "injeção do DOWN recusada em ($x, $y); tentando de novo")
+            }
+        }
+    }
+
     private fun inject(action: Int, x: Int, y: Int, time: Long): Boolean {
         val event = MotionEvent.obtain(time, time, action, x.toFloat(), y.toFloat(), 0).apply {
             source = InputDevice.SOURCE_TOUCHSCREEN
@@ -289,19 +305,48 @@ class KeyFlowKeyboardCanvasGridTest {
         }
     }
 
-    private fun waitUntil(message: String, timeoutMs: Long = TIMEOUT, condition: () -> Boolean) {
+    private fun waitUntil(message: String, timeoutMs: Long = TIMEOUT, condition: () -> Boolean) =
+        waitUntil({ message }, timeoutMs, condition)
+
+    private fun waitUntil(message: () -> String, timeoutMs: Long = TIMEOUT, condition: () -> Boolean) {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
             if (condition()) return
             Thread.sleep(50)
         }
-        throw AssertionError(message)
+        throw AssertionError(message())
     }
 
-    private fun shell(command: String) {
+    /** O que a grade e o teclado diziam na hora da falha — para a próxima falha dizer por quê. */
+    private fun keyboardState(grid: com.keyflow.ime.keyboard.KeyboardGridView, key: KeyOnScreen): String {
+        val view = KeyFlowKeyboardService.activeViewForTest
+        val loc = IntArray(2).also { grid.getLocationOnScreen(it) }
+        val language = runBlocking { SettingsRepository(context).keyboardLanguageOnce() }
+        return "toque em (${key.centerX}, ${key.centerY}); grade em (${loc[0]}, ${loc[1]}) ${grid.width}x${grid.height}, " +
+            "visível=${grid.isShown}, mesma view ativa=${view?.canvasGridForTest === grid}, expandido=${view?.expandedForTest}, " +
+            "camada=${grid.currentLayerIdForTest}, fileiras=${grid.placedRowsForTest.size}, idioma salvo=$language; " +
+            "janela do IME para o sistema de entrada: ${imeInputWindow()}"
+    }
+
+    /**
+     * Frame, região tocável e translação da janela do IME como o InputDispatcher a vê. A injeção é aceita em qualquer janela do
+     * próprio app — inclusive a do probe, por baixo —, então um toque "aceito" pode não ter chegado ao teclado.
+     */
+    private fun imeInputWindow(): String {
+        val lines = shell("dumpsys input").lines()
+        val i = lines.indexOfFirst { it.contains(" InputMethod'") && it.contains("frame=") }
+        if (i < 0) return "não listada"
+        val line = lines[i]
+        val frame = Regex("frame=\\[[^]]*]\\[[^]]*]").find(line)?.value
+        val touchable = Regex("touchableRegion=[^a-zA-Z]*").find(line)?.value?.trimEnd(',', ' ')
+        val translate = lines.drop(i + 1).take(6).filter { it.trim().matches(Regex("[-0-9. ]+")) }.joinToString(" / ") { it.trim() }
+        return "$frame $touchable transform=[$translate]"
+    }
+
+    private fun shell(command: String): String {
         val fd: ParcelFileDescriptor = instrumentation.uiAutomation.executeShellCommand(command)
         try {
-            java.io.FileInputStream(fd.fileDescriptor).readBytes()
+            return String(java.io.FileInputStream(fd.fileDescriptor).readBytes())
         } finally {
             fd.close()
         }
