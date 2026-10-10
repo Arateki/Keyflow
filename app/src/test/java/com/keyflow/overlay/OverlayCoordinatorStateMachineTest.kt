@@ -28,7 +28,8 @@ import org.junit.Test
  * notificação podem mandar — tocar, segurar, as intenções, cancelar, desfazer, concluir, trocar de campo, as saídas do limite
  * de tempo — com o relógio andando entre elas (inclusive além da janela de desfazer e no meio de uma transcrição lenta).
  *
- * Depois de CADA passo valem as invariantes, e no fim a gravação sempre volta ao repouso: é a área com mais bugs da história
+ * Depois de CADA passo valem as invariantes (inclusive o cronômetro da gravação, que o PIT mostrou sem teste), e no fim a
+ * gravação sempre volta ao repouso: é a área com mais bugs da história
  * do projeto (o CANCELLING que orfanizava o descarte na troca de campo, a janela que fechava antes do desfazer). Uma falha
  * mostra a sequência inteira e a semente para repetir.
  */
@@ -103,6 +104,13 @@ class OverlayCoordinatorStateMachineTest {
         var bannerHidden = 0
         var target = true
         val history = mutableListOf<String>()
+        // O cronômetro como a orbe, o teclado e a barra o mostram: acumulado + (agora − início do trecho, se gravando).
+        var timeAccumulated = 0L
+        var timeSegmentStart = 0L
+        fun shownTimeMs(state: ButtonState) = timeAccumulated + if (state == ButtonState.RECORDING) scheduler.currentTime - timeSegmentStart else 0L
+        var lastShownMs = 0L
+        // Teto do que pode aparecer: todo o tempo virtual passado em RECORDING desde o último zero (envio, repouso).
+        var recordedSinceResetMs = 0L
         val coordinator = OverlayCoordinator(
             scope = scope,
             configProvider = { Config(endpointUrl = "https://example.test/v1/audio/transcriptions", authHeaderValue = "Bearer t") },
@@ -116,6 +124,7 @@ class OverlayCoordinatorStateMachineTest {
             onHideCancelUndo = { bannerHidden++ },
             maxRecordingMs = { s.maxRecordingMs },
             recordingClockMs = { scheduler.currentTime },
+            onRecordingTime = { accumulated, segmentStart -> timeAccumulated = accumulated; timeSegmentStart = segmentStart },
             concatAudioSegments = { segments, _ -> segments.first() },
             partialOnPause = { s.partialOnPause },
         )
@@ -130,6 +139,16 @@ class OverlayCoordinatorStateMachineTest {
                 if (state in IDLE && recorder.recording) add("em repouso ($state) com uma gravação aberta")
                 if (rendered.isNotEmpty() && rendered.last() != state) add("a tela mostra ${rendered.last()} mas o estado é $state")
                 if (bannerShown - bannerHidden !in 0..1) add("aviso de desfazer mostrado $bannerShown e escondido $bannerHidden vezes")
+                // O cronômetro só zera ao enviar ou voltar ao repouso; gravando, pausado ou no desfazer, nunca anda para trás nem
+                // passa do tempo gravado de fato.
+                val shown = shownTimeMs(state)
+                if (state in RESETS_TIMER) {
+                    recordedSinceResetMs = 0L
+                } else {
+                    if (shown < lastShownMs) add("o cronômetro voltou de ${lastShownMs} ms para ${shown} ms em $state")
+                    if (shown > recordedSinceResetMs) add("o cronômetro mostra ${shown} ms, mas só ${recordedSinceResetMs} ms foram gravados")
+                }
+                lastShownMs = if (state in RESETS_TIMER) 0L else shown
             }
             if (problems.isNotEmpty()) fail("$where: $problems\npassos: $history\ncenário: ${s.copy(steps = emptyList())}")
         }
@@ -156,7 +175,12 @@ class OverlayCoordinatorStateMachineTest {
                     Action.LIMIT_DISCARD -> coordinator.onLimitDiscard()
                 }
                 scheduler.runCurrent()
-                if (st.waitMs > 0) { scheduler.advanceTimeBy(st.waitMs); scheduler.runCurrent() }
+                if (st.waitMs > 0) {
+                    // Por cima: o limite de tempo pode pausar no meio da espera, e aí conta a espera inteira.
+                    if (coordinator.currentState() == ButtonState.RECORDING) recordedSinceResetMs += st.waitMs
+                    scheduler.advanceTimeBy(st.waitMs)
+                    scheduler.runCurrent()
+                }
             } catch (t: Throwable) {
                 fail("${st.action} lançou ${t.javaClass.simpleName}: ${t.message}\npassos: $history")
             }
@@ -177,5 +201,7 @@ class OverlayCoordinatorStateMachineTest {
     companion object {
         const val ITERATIONS = 3_000
         val IDLE = setOf(ButtonState.IDLE_READY, ButtonState.IDLE_NO_FIELD)
+        /** Estados em que o cronômetro volta a zero (o áudio foi enviado ou descartado). */
+        val RESETS_TIMER = IDLE + setOf(ButtonState.SENDING, ButtonState.ERROR, ButtonState.PENDING_PASTE)
     }
 }
