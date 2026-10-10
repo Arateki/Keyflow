@@ -83,14 +83,14 @@ class PartialOverlayServiceTest {
                 ),
             )
         }
-        context.startForegroundService(OverlayService.actionIntent(context, OverlayService.ACTION_RECORD))
+        OverlayService.start(context, OverlayService.actionIntent(context, OverlayService.ACTION_RECORD))
         waitUntilState(ButtonState.RECORDING)
     }
 
     @After
     fun tearDown() {
         instrumentation.runOnMainSync { KeyFlowController.clearInserter() }
-        context.stopService(OverlayService.intent(context))
+        OverlayService.stop(context)
         runBlocking { repository.saveSettings(saved) }
         server.shutdown()
     }

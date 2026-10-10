@@ -106,12 +106,12 @@ class SystemSurfacesScreenshotTest {
             // em "OverlayService não subiu" e ~10s depois o sistema matava o PROCESSO com
             // ForegroundServiceDidNotStartInTimeException, derrubando de carona o teste seguinte
             // (2026-09-08). `startOverlayIntent` é o que o app usa de verdade e independe da setting.
-            context.startForegroundService(OverlayService.startOverlayIntent(context))
+            OverlayService.start(context, OverlayService.startOverlayIntent(context))
             waitUntil("OverlayService não subiu") { OverlayService.isRunningForUi }
             Thread.sleep(1200) // deixa o ComposeView do orbe compor
             capture("sys-overlay-over-app")
         } finally {
-            context.stopService(OverlayService.intent(context))
+            OverlayService.stop(context)
             waitUntil("OverlayService não encerrou", timeoutMs = 5000) { !OverlayService.isRunningForUi }
         }
     }

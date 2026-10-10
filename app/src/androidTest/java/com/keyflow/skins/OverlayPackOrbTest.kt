@@ -49,13 +49,13 @@ class OverlayPackOrbTest {
         shell("appops set ${context.packageName} SYSTEM_ALERT_WINDOW allow")
         saved = runBlocking { repo.settingsFlow().first() }
         runBlocking { repo.saveSettings(saved.copy(orbSkin = "atelie", orbSizePx = 195, overlayModeEnabled = true)) }
-        context.startForegroundService(OverlayService.startOverlayIntent(context))
+        OverlayService.start(context, OverlayService.startOverlayIntent(context))
         waitUntil("o serviço do overlay não subiu") { OverlayService.isRunningForUi }
     }
 
     @After
     fun tearDown() {
-        context.stopService(OverlayService.intent(context))
+        OverlayService.stop(context)
         runBlocking { repo.saveSettings(saved) }
         installed.forEach { store.remove(it) }
         KeyFlowController.updateButtonState(ButtonState.IDLE_NO_FIELD)

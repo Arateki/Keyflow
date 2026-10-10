@@ -174,7 +174,7 @@ class SetupActivityTest {
 class SeedOnboardingRule(private val done: Boolean) : org.junit.rules.ExternalResource() {
     override fun before() {
         val ctx = InstrumentationRegistry.getInstrumentation().targetContext
-        ctx.stopService(OverlayService.intent(ctx))
+        OverlayService.stop(ctx)
         runBlocking {
             val repo = SettingsRepository(ctx)
             repo.saveSettings(repo.settingsFlow().first().copy(onboardingDone = done, overlayModeEnabled = false))

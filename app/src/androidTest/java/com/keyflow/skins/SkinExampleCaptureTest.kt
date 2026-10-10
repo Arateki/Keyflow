@@ -81,7 +81,7 @@ class SkinExampleCaptureTest {
     @After
     fun tearDown() {
         if (!::saved.isInitialized) return
-        if (overlayStarted) context.stopService(OverlayService.intent(context))
+        if (overlayStarted) OverlayService.stop(context)
         runBlocking { repo.saveSettings(saved) }
         packId?.let { store.remove(it) }
         userSettings.restore()
@@ -235,7 +235,7 @@ class SkinExampleCaptureTest {
         shell("appops set ${context.packageName} SYSTEM_ALERT_WINDOW allow")
         val skinId = installExample()
         runBlocking { repo.saveSettings(saved.copy(orbSkin = skinId, orbSizePx = 195, overlayModeEnabled = true)) }
-        context.startForegroundService(OverlayService.startOverlayIntent(context))
+        OverlayService.start(context, OverlayService.startOverlayIntent(context))
         overlayStarted = true
         waitUntil("o serviço do overlay não subiu") { OverlayService.isRunningForUi }
         waitUntil("a orbe flutuante não apareceu") { runCatching { floatingOrb() }.isSuccess }
