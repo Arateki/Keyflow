@@ -187,7 +187,6 @@ class KeyFlowKeyboardCanvasGridTest {
 
         device.wait(Until.hasObject(By.desc("ime_probe_field")), TIMEOUT)
         device.findObject(By.desc("ime_probe_field"))?.click()
-        device.wait(Until.hasObject(By.text("🎙")), TIMEOUT)
         awaitKeyboardAttached(device) { context.startActivity(intent) }
     }
 
