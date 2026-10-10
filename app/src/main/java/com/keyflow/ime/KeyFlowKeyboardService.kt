@@ -126,6 +126,9 @@ class KeyFlowKeyboardService : InputMethodService() {
 
     override fun onCreate() {
         super.onCreate()
+        // As preferências do teclado (expandido/encolhido) abertas fora da thread principal: abrir um SharedPreferences lê o
+        // disco, e o onStartInputView, que as lê, é o caminho que o Android cronometra (StrictModeKeyboardTest).
+        serviceScope.launch(Dispatchers.IO) { uiPrefs.getBoolean(KEY_EXPANDED, true) }
         serviceScope.launch {
             KeyFlowController.buttonState.collect { state ->
                 keyboardView?.updateMicState(state)
@@ -138,7 +141,7 @@ class KeyFlowKeyboardService : InputMethodService() {
                 KeyFlowController.autoPasteOnFocus = it.autoPasteOnFocus
                 voiceSource = it.effectiveConfigFor()
                 // Trocou origem/modelo com o teclado aberto: carrega o novo ou solta a RAM (NAT-05/09).
-                if (keyboardView?.isShown == true) LocalTranscriber.get(this@KeyFlowKeyboardService).sync(voiceSource)
+                if (keyboardView?.isShown == true) LocalTranscriber.syncWith(this@KeyFlowKeyboardService, voiceSource)
             }
         }
         // Mostrar (ou não) com teclado físico conectado. Precisa de `updateInputViewShown()` na troca:
@@ -514,7 +517,7 @@ class KeyFlowKeyboardService : InputMethodService() {
         traceFirstFrame("onStartInputView")
         mainHandler.post { Log.d(TAG, "onStartInputView: ${(System.nanoTime() - startedNs) / 1_000_000} ms até a thread principal soltar") }
         // Teclado aberto = modo ativo: com origem Local, o modelo já fica carregado para o mic (NAT-05).
-        LocalTranscriber.get(this).sync(voiceSource)
+        LocalTranscriber.syncWith(this, voiceSource)
         KeyFlowController.registerInserter { text ->
             getCurrentInputConnection()?.commitText(text, 1) == true
         }
