@@ -76,9 +76,12 @@ DeckLock (actions fixadas por SHA, `permissions: contents: read`, evidência env
   `host.txt` na evidência registra memória, swap, carga e RSS do QEMU a cada 20 s; subir de versão =
   repetir o A/B antes.
 - **Renderizador `swangle_indirect`**, não `swiftshader_indirect`: neste o QEMU caía na RenderThread do host
-  ao desenhar a prévia do Aero (tela de skins). No swangle, 0 quedas em 40 aberturas; 36 goldens mudaram
-  só na suavização de borda e foram reaprovados a partir de capturas `swangle` (2026-10-09). Gerar
-  golden no emulador local = subir com `-gpu swangle_indirect`.
+  ao desenhar a prévia do Aero (tela de skins). No swangle, 0 quedas em 40 aberturas. **Todos os goldens
+  são capturas `swangle`** (2026-10-10): as do CI saem byte a byte iguais às do emulador local (180/180
+  conferidas, de 5 runners diferentes), então gerar golden local = subir com `-gpu swangle_indirect`.
+- O `compare -fuzz` do ImageMagick 6 (CI) conta bem mais pixels que o 7 (local) no mesmo par de imagens
+  (2.783 contra 461 px numa tela): golden "dentro do limiar" aqui pode passar do limiar no CI. Com golden
+  e captura do mesmo renderizador a diferença é zero e a versão não importa.
 - A suíte roda com `-e motionFrames false`: os testes de artefato de movimento (orbe, mic do teclado)
   conferem os gestos sem gravar os PNGs dos GIFs (o da orbe levava ~10 min no CI só gravando).
 - O pedaço de cada teste vem do hash do nome: o mesmo teste cai sempre no mesmo shard. Para repetir um
