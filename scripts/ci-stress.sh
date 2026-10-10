@@ -29,6 +29,7 @@ ADB="${ANDROID_HOME:+$ANDROID_HOME/platform-tools/}adb"
 APP_APK=app/build/outputs/apk/debug/app-debug.apk
 TEST_APK=app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 RUNNER=com.keyflow.test/androidx.test.runner.AndroidJUnitRunner
+KEYFLOW_IME=com.keyflow/.ime.KeyFlowKeyboardService
 mkdir -p "$OUT"
 
 # Sem diálogo de "app não está respondendo" segurando o foco (a mesma lição do ci-device-gate.sh).
@@ -53,10 +54,26 @@ limit_cpu() {
   echo "QEMU $pid: cgroup $(cut -d: -f3 "/proc/$pid/cgroup"), cpu.max $(cat "$cg/cpu.max")"
 }
 
+# Depois de (re)instalar, o sistema reconstrói a lista de teclados em segundo plano; até lá, `ime enable` e
+# `ime set` do KeyFlow são recusados ("unrecognized IME ID") e o 1º teste de teclado espera um teclado que
+# não tem como subir. No emulador lento da esteira de instabilidade isso passou de 75 s (2026-10-10).
+wait_ime_registered() {
+  local start=$SECONDS
+  until "$ADB" shell ime list -a -s 2>/dev/null | tr -d '\r' | grep -qx "$KEYFLOW_IME"; do
+    if [ $((SECONDS - start)) -ge 180 ]; then
+      echo "::error::o sistema não registrou o teclado do KeyFlow em 180 s"
+      return 1
+    fi
+    sleep 2
+  done
+  echo "teclado do KeyFlow registrado pelo sistema em $((SECONDS - start)) s"
+}
+
 # Depois do `adb install` o app fica `run-from-apk`; o compile grava a verificação (ci-device-gate.sh).
 install_app() {
   "$ADB" install -r -t "$APP_APK" >/dev/null || return 1
   "$ADB" shell cmd package compile -m speed -f com.keyflow >/dev/null
+  wait_ime_registered
 }
 
 # O aviso antecipado: um status no commit, que a API mostra com o job ainda rodando. Fora do Actions

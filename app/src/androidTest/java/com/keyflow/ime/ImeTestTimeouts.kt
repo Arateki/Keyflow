@@ -33,6 +33,12 @@ private const val KEYFLOW_IME = "com.keyflow/.ime.KeyFlowKeyboardService"
  * a frio e, no fim da inicialização, regrava `default_input_method` com o valor que leu antes. O
  * `ime set` deste teste caiu 2 ms antes dessa gravação, o sistema voltou para o Samsung e nenhum toque
  * no campo trazia o KeyFlow de volta.
+ *
+ * O `ime enable` também é repetido: logo depois de (re)instalar o app, o sistema ainda não registrou o
+ * teclado e recusa os dois comandos ("unrecognized IME ID") — no emulador lento da esteira de
+ * instabilidade isso durou mais de 75 s (2026-10-10). Só o `ime set` de novo não bastava: sem o
+ * `enable` aceito, o KeyFlow nunca virava o teclado. O toque é tolerante ao campo recriado pelo
+ * relançamento (StaleObjectException derrubava a espera inteira).
  */
 internal fun awaitKeyboardAttached(device: UiDevice, relaunch: () -> Unit) {
     val deadline = System.currentTimeMillis() + IME_COLD_ATTACH_TIMEOUT_MS
@@ -41,11 +47,12 @@ internal fun awaitKeyboardAttached(device: UiDevice, relaunch: () -> Unit) {
         if (KeyFlowKeyboardService.activeViewForTest != null) return
         if (System.currentTimeMillis() >= nextNudge) {
             if (device.executeShellCommand("settings get secure default_input_method").trim() != KEYFLOW_IME) {
+                device.executeShellCommand("ime enable $KEYFLOW_IME")
                 device.executeShellCommand("ime set $KEYFLOW_IME")
             }
             relaunch()
             device.wait(Until.hasObject(By.desc("ime_probe_field")), IME_ATTACH_NUDGE_MS)
-            device.findObject(By.desc("ime_probe_field"))?.click()
+            runCatching { device.findObject(By.desc("ime_probe_field"))?.click() }
             nextNudge = System.currentTimeMillis() + IME_ATTACH_NUDGE_MS
         }
         Thread.sleep(50)

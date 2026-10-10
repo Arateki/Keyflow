@@ -29,6 +29,7 @@ APK_DIR=app/build/outputs/apk
 APP_APK="$APK_DIR/debug/app-debug.apk"
 TEST_APK="$APK_DIR/androidTest/debug/app-debug-androidTest.apk"
 RUNNER=com.keyflow.test/androidx.test.runner.AndroidJUnitRunner
+KEYFLOW_IME=com.keyflow/.ime.KeyFlowKeyboardService
 # O que passou na 1ª tentativa, lido pelo processo do app na repetição (notTestFile).
 PASSED_ON_DEVICE=/data/local/tmp/keyflow-passed.txt
 # Nome do job que publica os APKs — tem que bater com o `name:` dele em checks.yml.
@@ -121,6 +122,21 @@ fetch_apks() {
 # Depois do `adb install` o app fica `run-from-apk`: sem a verificação gravada, cada abertura a frio
 # verifica as classes de novo. O `compile` grava (APK debuggable para em `verify`, sem AOT, e basta):
 # medido no emulador local, a GalleryActivity abre em 1,95 s contra 2,7 s.
+# Depois de (re)instalar, o sistema reconstrói a lista de teclados em segundo plano; até lá, `ime enable` e
+# `ime set` do KeyFlow são recusados ("unrecognized IME ID") e o 1º teste de teclado espera um teclado que
+# não tem como subir. No emulador lento da esteira de instabilidade isso passou de 75 s (2026-10-10).
+wait_ime_registered() {
+  local start=$SECONDS
+  until "$ADB" shell ime list -a -s 2>/dev/null | tr -d '\r' | grep -qx "$KEYFLOW_IME"; do
+    if [ $((SECONDS - start)) -ge 180 ]; then
+      echo "::error::o sistema não registrou o teclado do KeyFlow em 180 s"
+      return 1
+    fi
+    sleep 2
+  done
+  echo "teclado do KeyFlow registrado pelo sistema em $((SECONDS - start)) s"
+}
+
 install_apks() {
   local apk pkg
   for apk in "$@"; do
@@ -130,6 +146,7 @@ install_apks() {
     "$ADB" shell pm path "$pkg" >/dev/null 2>&1 || continue
     "$ADB" shell cmd package compile -m speed -f "$pkg" || return 1
   done
+  wait_ime_registered
 }
 
 # localModelE2E: liga o ponta a ponta do modelo local (baixa o Whisper base, ~160 MB, e transcreve).
