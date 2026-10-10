@@ -222,6 +222,9 @@ dependencies {
     // org.json real p/ os unit tests JVM (o android.jar mockado lança em JSONObject/JSONArray); o app usa
     // o org.json do próprio Android — zero dependência nova no APK (ShortcutCodec, SB-T1).
     testImplementation("org.json:json:20240303")
+    // Testes de propriedade (geram milhares de entradas e conferem uma regra que vale para todas). 6.0.5: compilada com Kotlin
+    // 2.2.0 (as 6.0.7+ já pedem 2.2.21); funciona no JUnit4 sem o executor do Kotest (checkAll dentro de runBlocking).
+    testImplementation("io.kotest:kotest-property:6.0.5")
 
     // Instrumented
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
