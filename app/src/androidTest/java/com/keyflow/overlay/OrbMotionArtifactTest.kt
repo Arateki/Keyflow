@@ -19,6 +19,8 @@ import com.keyflow.core.RecordingMode
 import com.keyflow.ui.orb.OrbDragKind
 import org.junit.After
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
@@ -41,10 +43,18 @@ class OrbMotionArtifactTest {
 
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
 
-    // `-e motionFrames false` (o gate do CI, scripts/ci-device-gate.sh): os gestos e as asserções rodam iguais, só
-    // não grava os PNGs de tela cheia dos GIFs — no emulador do CI cada um custava ~4 s (2026-10-09: o teste da
-    // orbe levou 596 s). Os scripts verify-*-gifs.sh não passam o argumento e seguem gravando.
-    private val framesEnabled = InstrumentationRegistry.getArguments().getString("motionFrames") != "false"
+    // Pulado com `-e motionFrames false` (o gate do CI): o que ele confere dos gestos o OrbButtonViewTest também confere
+    // (pausar, retomar, cancelar e abrir a configuração, nos dois modos), e o resto é gerar quadros de GIF. No emulador do
+    // CI (swangle) a orbe em arrasto leva 150–200 ms por quadro e redesenha sem parar: o teste passava de 6 min, e com
+    // waitForIdleSync nem terminava (2026-10-10). Os scripts verify-*-gifs.sh não passam o argumento e seguem gravando.
+    @Before
+    fun onlyWhenRecordingFrames() {
+        assumeTrue(
+            "motionFrames=false: sem quadros para gravar",
+            InstrumentationRegistry.getArguments().getString("motionFrames") != "false",
+        )
+    }
+
     private val context = instrumentation.targetContext
     private val device: UiDevice = UiDevice.getInstance(instrumentation)
     private val outRoot: File by lazy {
@@ -291,7 +301,6 @@ class OrbMotionArtifactTest {
     private fun capture(dir: File, index: Int, label: String) {
         instrumentation.waitForIdleSync()
         Thread.sleep(80)
-        if (!framesEnabled) return
         val file = File(dir, "frame-%02d-%s.png".format(index, label))
         assertTrue("falha ao capturar ${file.name}", device.takeScreenshot(file))
     }

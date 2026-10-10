@@ -244,9 +244,15 @@ class KeyboardMicHoldMotionArtifactTest {
     }
 
     private fun capture(dir: File, index: Int, label: String) {
+        if (!framesEnabled) {
+            // Sem quadro para gravar, basta a thread principal ter processado o gesto. waitForIdleSync espera ela ficar
+            // OCIOSA, e no arrasto a orbe redesenha sem parar: no emulador do CI (swangle, 150–200 ms por quadro) ela
+            // nunca ficava, e o teste travava até o timeout do job (2026-10-10).
+            instrumentation.runOnMainSync {}
+            return
+        }
         instrumentation.waitForIdleSync()
         Thread.sleep(80)
-        if (!framesEnabled) return
         val file = File(dir, "frame-%02d-%s.png".format(index, label))
         assertTrue("falha ao capturar ${file.name}", device.takeScreenshot(file))
     }

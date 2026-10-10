@@ -24,6 +24,8 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.keyflow.ui.theme.KeyFlowTheme
+import org.junit.Assume.assumeTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -43,6 +45,17 @@ class MascotMotionArtifactTest {
 
     @get:Rule
     val rule = createComposeRule()
+
+    // Só gera os quadros dos GIFs, sem nada a conferir: com `-e motionFrames false` (o gate do CI) é pulado. No emulador
+    // do CI o captureToImage destes quadros ainda estourava o prazo do PixelCopy (2026-10-10); os scripts verify-*-gifs.sh
+    // não passam o argumento e seguem gravando.
+    @Before
+    fun onlyWhenRecordingFrames() {
+        assumeTrue(
+            "motionFrames=false: sem quadros para gravar",
+            InstrumentationRegistry.getArguments().getString("motionFrames") != "false",
+        )
+    }
 
     private var now by mutableFloatStateOf(0f)
     private var scene by mutableStateOf(Scene(OrbState.Idle, OrbCenter.None))

@@ -36,6 +36,7 @@ class OrbButtonViewTest {
     private fun view(
         mode: RecordingMode = RecordingMode.TOGGLE,
         onPositionChanged: (OverlayPosition) -> Unit = {},
+        onOpenConfig: () -> Unit = {},
     ): OrbButtonView {
         val controller = RecordingGestureController(
             mode = { mode },
@@ -48,6 +49,7 @@ class OrbButtonViewTest {
             onIntent = { intents += it },
             onPositionChanged = onPositionChanged,
             onShortcut = { shortcutTaps += it },
+            onOpenConfig = onOpenConfig,
         )
     }
 
@@ -188,6 +190,29 @@ class OrbButtonViewTest {
         release(view, x = 100f, y = 100f - DRAG_DISTANCE)
 
         assertTrue("esperava PAUSE em $intents", intents.contains(GestureIntent.PAUSE))
+        assertFalse(view.dragLockedForTest)
+    }
+
+    // Arrastar para baixo abre a configuração, nos dois modos. Era só o OrbMotionArtifactTest que conferia isso, e ele
+    // agora é pulado no gate do CI (só gera quadros de GIF; no swangle levava 6 min).
+    @Test
+    fun holdingDownWhileRecordingOpensTheConfigInToggleMode() = assertHoldingDownOpensTheConfig(RecordingMode.TOGGLE)
+
+    @Test
+    fun holdingDownWhileRecordingOpensTheConfigInPushToTalkMode() = assertHoldingDownOpensTheConfig(RecordingMode.PUSH_TO_TALK)
+
+    private fun assertHoldingDownOpensTheConfig(mode: RecordingMode) {
+        fakeState = ButtonState.RECORDING
+        var configOpened = 0
+        val view = view(mode = mode, onOpenConfig = { configOpened++ })
+        view.render(ButtonState.RECORDING)
+
+        startHold(view)
+        dragTo(view, dx = 0f, dy = DRAG_DISTANCE)
+        waitUntil("dragKindForTest não resolveu CONFIG ($mode)") { view.dragKindForTest == OrbDragKind.CONFIG }
+        release(view, x = 100f, y = 100f + DRAG_DISTANCE)
+
+        assertTrue("arrastar para baixo deveria abrir a configuração ($mode)", configOpened == 1)
         assertFalse(view.dragLockedForTest)
     }
 
