@@ -94,7 +94,7 @@ class OverlayService : Service() {
     private var dragArrowsView: DragArrowsView? = null
 
     // Duração da janela de desfazer: compartilhada entre o coordinator (descarte) e a barra do banner.
-    private val cancelWindowMs = 3000L
+    private val cancelWindowMs: Long get() = cancelWindowMsForTest ?: CANCEL_WINDOW_MS
     private val limitBannerDismissMs = 3000L
 
     // Ciclo de vida desacoplado (Fase 1): a orbe mantém o serviço persistente; o teclado o sobe sob
@@ -348,7 +348,7 @@ class OverlayService : Service() {
             onShowKeyboardPicker = { showInputMethodPicker() },
             onShowCancelUndo = { showCancelBanner() },
             onHideCancelUndo = { removeCancelBanner() },
-            cancelWindowMs = cancelWindowMs,
+            cancelWindowMs = { cancelWindowMs },
             onShowLimitReached = { showLimitBanner() },
             onHideLimitReached = { removeLimitBanner() },
             maxRecordingMs = { cachedSettings.maxRecordingSec * 1000L },
@@ -951,6 +951,15 @@ class OverlayService : Service() {
         @Volatile
         var isRunningForUi: Boolean = false
             private set
+
+        private const val CANCEL_WINDOW_MS = 3000L
+
+        /**
+         * Alonga a janela de desfazer nos testes que precisam fazer algo DENTRO dela: no emulador do CI um quadro do teclado
+         * leva 1–2 s, e segurar o mic duas vezes não cabe em 3 s (KeyFlowKeyboardSelectorTest, 2026-10-10). `null` = 3 s.
+         */
+        @Volatile
+        var cancelWindowMsForTest: Long? = null
 
         // Um startForegroundService ainda sem o startForeground do serviço, e um stop() que chegou nesse meio-tempo.
         // Tudo roda na thread principal do mesmo processo (a SetupActivity, o IME e o serviço), então não há corrida

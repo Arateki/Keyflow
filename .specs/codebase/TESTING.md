@@ -49,6 +49,8 @@ Estratégia escolhida: **cobertura completa** (unit + instrumented). Greenfield 
   `createComposeRule` (Compose 1.7) a composição coleta num dispatcher "unconfined": valor vindo de outra thread recompunha
   ali — CalledFromWrongThreadException, "performMeasureAndLayout called during measure layout", SlotTable corrompida.
   No app não muda nada. `CollectOnMainTest` confere.
+- Teste que precisa agir DENTRO de uma janela de tempo do produto (ex.: desfazer o cancelamento, 3 s) alonga a janela por um
+  gancho `…ForTest` em vez de correr contra o relógio: no emulador do CI um quadro do teclado chega a 1–2 s.
 
 ## CI (GitHub Actions) — `.github/workflows/checks.yml`
 
