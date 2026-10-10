@@ -58,8 +58,10 @@ jobs:
         with:
           path: app/libs/sherpa-onnx-${{ steps.sherpa.outputs.version }}.aar
           key: sherpa-onnx-${{ steps.sherpa.outputs.version }}-${{ steps.sherpa.outputs.sha }}
-      - name: Unit tests and APKs
-        run: ./gradlew --no-daemon testDebugUnitTest assembleDebug assembleDebugAndroidTest
+      # Os APKs primeiro: os jobs do emulador esperam por eles (é o caminho crítico do gate). Os testes de unidade e a
+      # cobertura vêm depois, já sem atrasar ninguém — juntos no mesmo passo, os testes empurravam os APKs ~30 s.
+      - name: APKs
+        run: ./gradlew --no-daemon assembleDebug assembleDebugAndroidTest
       # Os jobs do emulador não compilam: instalam estes APKs. Sobem antes do resto para eles saírem
       # da espera o quanto antes. APK já é comprimido (compression-level 0); 1 dia de retenção porque só
       # servem a esta rodada, e o armazenamento conta na cota do plano.
@@ -78,12 +80,21 @@ jobs:
       # mesmos do debug (só menos ABIs).
       - name: 16 KB alignment of native libraries
         run: python3 scripts/check-16kb-alignment.py app/build/outputs/apk/debug/app-debug.apk
+      # Cobertura (JaCoCo do AGP, ligada por -Pcoverage): mapa do que nenhum teste de unidade toca, no resumo do job e no
+      # artefato unit-evidence (HTML). Não é meta de número.
+      - name: Unit tests and coverage
+        run: ./gradlew --no-daemon -Pcoverage testDebugUnitTest createDebugUnitTestCoverageReport
+      - name: Coverage summary
+        if: ${{ !cancelled() }}
+        run: python3 scripts/coverage-summary.py app/build/reports/coverage/test/debug/report.xml
       - name: Unit test evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: unit-evidence
-          path: app/build/reports/tests/
+          path: |
+            app/build/reports/tests/
+            app/build/reports/coverage/test/debug/
           if-no-files-found: warn
           retention-days: 14
 

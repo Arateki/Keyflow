@@ -70,6 +70,10 @@ DeckLock (actions fixadas por SHA, `permissions: contents: read`, evidência env
   Android e a janela fica em transição (tamanho de Dialog, altura da tela, no topo, 126 px abaixo).
 - Toque injetado em emulador lento pode passar dos 250 ms da tira de acentos e virar "segurar": teste que só toca usa
   `accentHoldMsForTest` (os da tira de acentos, não).
+- Cobertura dos testes de unidade: `./gradlew -Pcoverage createDebugUnitTestCoverageReport` (JaCoCo do AGP, só com a
+  propriedade) → `app/build/reports/coverage/test/debug/`; `scripts/coverage-summary.py` resume por pacote. O CI faz isso no
+  job de unitários, depois de publicar os APKs (fora do caminho crítico), e põe a tabela no resumo do job. Mapa do que nenhum
+  teste de unidade toca, não meta: telas, teclado e serviços são cobertos pelos instrumentados.
 - `scripts/ime-placement.py --ime keyflow|gboard [--cold]` mede de FORA do app (adb) onde a janela do teclado fica ao abrir
   — sem teste no processo. A frio, no emulador lento: KeyFlow 6/8 aberturas em transição, Gboard 1/8 (desempenho da
   abertura a frio é tarefa aberta).

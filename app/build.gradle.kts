@@ -39,6 +39,10 @@ android {
         // emulador. O x86 de 32 bits que vem no AAR não entra em nenhum.
         debug {
             ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
+            // Cobertura dos testes de unidade (JaCoCo do próprio AGP): só com `-Pcoverage`, para o dia a dia não pagar a
+            // instrumentação. `./gradlew -Pcoverage createDebugUnitTestCoverageReport` → app/build/reports/coverage/test/debug/.
+            // É mapa do que nenhum teste toca, não meta de número.
+            enableUnitTestCoverage = providers.gradleProperty("coverage").isPresent
         }
         release {
             isMinifyEnabled = false
