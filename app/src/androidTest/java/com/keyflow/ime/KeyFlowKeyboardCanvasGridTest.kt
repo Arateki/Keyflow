@@ -52,6 +52,9 @@ class KeyFlowKeyboardCanvasGridTest {
 
     @After
     fun tearDown() {
+        // canvasGridDoesNotDisturbTheMicButton deixa uma gravação de verdade no serviço: sem parar, ela seguia por baixo e o
+        // próximo teste de mic encontrava "● 2:20" no lugar do "🎙" (esteira de instabilidade, 134/134 voltas, 2026-10-10).
+        runCatching { com.keyflow.overlay.OverlayService.stop(context) }
         userSettings.restore()
         device.pressHome()
         // KeyFlowController é singleton de processo (sobrevive ao fim deste teste, dentro do mesmo gate).
