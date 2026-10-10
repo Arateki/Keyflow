@@ -11,6 +11,11 @@ do app cai no meio, ele só escreve `shortMsg=Process crashed.` e os testes que 
 então o código de saída dele não serve de gate.
 
 Cada falha vira também uma anotação `::error::` do GitHub Actions (aparece no resumo do PR).
+
+O gate repete uma vez o que não passou (ci-device-gate.sh). Na 1ª tentativa (`--retry-follows`) não há
+anotação: `--passed-out` grava o que terminou sem falha — o `notTestFile` da repetição — e `--failed-out` o
+que falhou ou estava rodando quando o processo caiu. Na repetição, `--earlier-failures` recebe esse último
+arquivo: quem falhou antes e passou agora vira aviso de teste instável; quem falhou de novo, erro.
 """
 import argparse
 import os
@@ -38,6 +43,10 @@ def annotation_property(text):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--label", default="instrumentados")
+    parser.add_argument("--retry-follows", action="store_true")
+    parser.add_argument("--passed-out")
+    parser.add_argument("--failed-out")
+    parser.add_argument("--earlier-failures")
     args = parser.parse_args()
 
     status, result = {}, {}
@@ -100,14 +109,31 @@ def main():
     if numtests is None and not finished:
         problems.append("nenhum teste rodou")
 
+    if args.passed_out:
+        # Sem linha vazia: o runner lê linha vazia como o pacote "" e excluiria a suíte inteira.
+        done = [n for n, c in finished.items() if c in (OK, IGNORED, ASSUMPTION_FAILURE)]
+        with open(args.passed_out, "w", encoding="utf-8") as out:
+            out.writelines(f"{n}\n" for n in done)
+    if args.failed_out:
+        with open(args.failed_out, "w", encoding="utf-8") as out:
+            out.writelines(f"{n}\n" for n in dict.fromkeys([n for n, _ in failures] + unfinished))
+    flaky = []
+    if args.earlier_failures:
+        with open(args.earlier_failures, encoding="utf-8") as earlier:
+            flaky = [n for n in (line.strip() for line in earlier) if finished.get(n) == OK]
+
     total = numtests if numtests is not None else len(finished)
     score = f"{total} testes — passaram: {passed}, falharam: {len(failures)}, pulados: {skipped}"
     print(f"\n{args.label}: {score}", flush=True)
-    for name, stack in failures:
-        first = "\n".join(stack.splitlines()[:3])
-        print(f"::error title={annotation_property(name)}::{annotation(first)}", flush=True)
-    for problem in problems:
-        print(f"::error title={annotation_property(args.label)}::{annotation(problem)}", flush=True)
+    if not args.retry_follows:
+        for name, stack in failures:
+            first = "\n".join(stack.splitlines()[:3])
+            print(f"::error title={annotation_property(name)}::{annotation(first)}", flush=True)
+        for problem in problems:
+            print(f"::error title={annotation_property(args.label)}::{annotation(problem)}", flush=True)
+    for name in flaky:
+        print(f"::warning title={annotation_property(name)}::instável: falhou na 1ª tentativa e passou na repetição",
+              flush=True)
 
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary:
@@ -117,6 +143,10 @@ def main():
                 out.write(f"- ✗ `{name}`\n")
             for problem in problems:
                 out.write(f"- ⚠ {problem}\n")
+            for name in flaky:
+                out.write(f"- ⚠ instável (passou na repetição): `{name}`\n")
+            if args.retry_follows and (failures or problems):
+                out.write("\nO que não passou é repetido uma vez a seguir.\n")
 
     return 1 if failures or problems else 0
 

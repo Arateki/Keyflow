@@ -91,8 +91,13 @@ DeckLock (actions fixadas por SHA, `permissions: contents: read`, evidência env
   só uma das metades.
 - `ci-instrument-summary.py` lê a saída `-r` do `am instrument` e é quem decide o gate: o `am
   instrument` sai com 0 mesmo com falha ou com o processo caído no meio.
+- O que não passa no shard é repetido **uma vez** no mesmo emulador: a repetição roda o pedaço com
+  `-e notTestFile` (o que passou na 1ª tentativa, em `/data/local/tmp`), então, se o processo caiu, os
+  testes que nem chegaram a rodar vêm junto. Falhou de novo → erro e gate vermelho; passou → aviso
+  "instável" no PR e no resumo do job. Os avisos são a lista de instabilidades a atacar, não ruído.
+  O arquivo não pode ter linha vazia: o runner a lê como o pacote `""` e excluiria a suíte inteira.
 - KVM é requisito dos jobs de device (`test -c /dev/kvm`): sem ele a suíte não cabe — ver
   `ENVIRONMENT.md`, sandbox sem KVM.
-- Artefatos: `unit-evidence` (relatórios JUnit) e `device-evidence-<i>` (saída bruta do `am instrument`,
-  logcat da rodada, `host.txt`, PNGs capturados), 14 dias.
+- Artefatos: `unit-evidence` (relatórios JUnit) e `device-evidence-<i>` (saída bruta do `am instrument`
+  e da repetição, `passed.txt`/`failed.txt`, logcat da rodada, `host.txt`, PNGs capturados), 14 dias.
 - O device físico (A32) e o emulador Android 17 seguem sendo gates manuais **[YAN]**.

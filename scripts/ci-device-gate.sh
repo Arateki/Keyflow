@@ -29,6 +29,8 @@ APK_DIR=app/build/outputs/apk
 APP_APK="$APK_DIR/debug/app-debug.apk"
 TEST_APK="$APK_DIR/androidTest/debug/app-debug-androidTest.apk"
 RUNNER=com.keyflow.test/androidx.test.runner.AndroidJUnitRunner
+# O que passou na 1ª tentativa, lido pelo processo do app na repetição (notTestFile).
+PASSED_ON_DEVICE=/data/local/tmp/keyflow-passed.txt
 # Nome do job que publica os APKs — tem que bater com o `name:` dele em checks.yml.
 UNIT_JOB="Unit tests and build"
 
@@ -132,14 +134,30 @@ install_apks() {
 
 # localModelE2E: liga o ponta a ponta do modelo local (baixa o Whisper base, ~160 MB, e transcreve).
 # motionFrames=false: os testes de artefato de movimento conferem os gestos sem gravar os quadros dos GIFs.
-# O hash do nome de cada teste decide o pedaço: o mesmo teste cai sempre no mesmo shard.
-run_shard() {
-  local index="$1" total="$2"
+instrument() {
   "$ADB" shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1 || true
-  "$ADB" shell am instrument -w -r -e numShards "$total" -e shardIndex "$index" -e localModelE2E true \
-    -e motionFrames false "$RUNNER" \
+  "$ADB" shell am instrument -w -r "$@" -e localModelE2E true -e motionFrames false "$RUNNER"
+}
+
+# O hash do nome de cada teste decide o pedaço: o mesmo teste cai sempre no mesmo shard.
+# O que não passa é repetido UMA vez: na rodada 38028614941 (2026-10-10) caíram 4 testes diferentes em 6 shards,
+# todos instáveis no emulador do CI, e cada um derrubava a rodada inteira. Falha de verdade falha de novo e o
+# gate fica vermelho; quem passa na repetição sai como aviso de "instável" no PR. A repetição exclui o que
+# passou (notTestFile) em vez de listar o que falhou: se o processo caiu, os testes que nem rodaram vêm junto.
+run_shard() {
+  local label="Instrumentados, shard $1 de $2"
+  local shard=(-e numShards "$2" -e shardIndex "$1")
+  instrument "${shard[@]}" \
     | tee "$EVIDENCE/instrument-raw.txt" \
-    | python3 -u scripts/ci-instrument-summary.py --label "Instrumentados, shard $index de $total"
+    | python3 -u scripts/ci-instrument-summary.py --label "$label" --retry-follows \
+        --passed-out "$EVIDENCE/passed.txt" --failed-out "$EVIDENCE/failed.txt" \
+    && return 0
+  echo "Repetindo o que não passou: $(paste -sd' ' "$EVIDENCE/failed.txt")"
+  "$ADB" push "$EVIDENCE/passed.txt" "$PASSED_ON_DEVICE" >/dev/null || return 1
+  instrument "${shard[@]}" -e notTestFile "$PASSED_ON_DEVICE" \
+    | tee "$EVIDENCE/instrument-retry-raw.txt" \
+    | python3 -u scripts/ci-instrument-summary.py --label "$label, repetição" \
+        --earlier-failures "$EVIDENCE/failed.txt"
 }
 
 # Galeria num app recém-instalado, como na última `main` verde (o connected* desinstalava o app no fim da suíte).
