@@ -48,10 +48,14 @@ class KeyFlowKeyboardCanvasGridTest {
         userSettings.capture()
         // A grade só entra na hierarquia (e só é medida) com o teclado expandido.
         userSettings.forceExpanded()
+        // Toque que demora a ser injetado no emulador lento não pode virar "segurar" (o "q" digitava "1"). Os testes da tira de
+        // acentos voltam para os 250 ms do produto — ver withPortugueseKeyboard.
+        com.keyflow.ime.keyboard.accentHoldMsForTest = TAP_ONLY_HOLD_MS
     }
 
     @After
     fun tearDown() {
+        com.keyflow.ime.keyboard.accentHoldMsForTest = null
         // canvasGridDoesNotDisturbTheMicButton deixa uma gravação de verdade no serviço: sem parar, ela seguia por baixo e o
         // próximo teste de mic encontrava "● 2:20" no lugar do "🎙" (esteira de instabilidade, 134/134 voltas, 2026-10-10).
         runCatching { com.keyflow.overlay.OverlayService.stop(context) }
@@ -236,6 +240,8 @@ class KeyFlowKeyboardCanvasGridTest {
 
     /** Acentos existem em pt (não em en): fixa pt durante [block] e devolve o idioma que o aparelho tinha. */
     private fun withPortugueseKeyboard(block: () -> Unit) {
+        // Os testes da tira de acentos são os que testam o segurar: tempo do produto.
+        com.keyflow.ime.keyboard.accentHoldMsForTest = null
         val repo = SettingsRepository(context)
         val original = runBlocking { repo.keyboardLanguageOnce() }
         runBlocking { repo.saveKeyboardLanguageOnce("pt") }
@@ -398,5 +404,6 @@ class KeyFlowKeyboardCanvasGridTest {
     private companion object {
         const val IME = "com.keyflow/.ime.KeyFlowKeyboardService"
         const val TIMEOUT = 5000L
+        const val TAP_ONLY_HOLD_MS = 10_000L
     }
 }

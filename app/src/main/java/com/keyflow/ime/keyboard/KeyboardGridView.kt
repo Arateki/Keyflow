@@ -37,6 +37,14 @@ import com.keyflow.ime.keyboard.layout.PlacedRow
 import com.keyflow.ime.keyboard.layout.RepeatSchedule
 
 /**
+ * Quanto segurar até a tira de acentos abrir, no lugar dos [KeyboardGridView] 250 ms — só para o instrumentado. No emulador
+ * lento do CI a própria injeção de um toque (DOWN → UP) passa de 250 ms: o toque virava "segurar" e o "q" digitava "1"
+ * (esteira de instabilidade, 2026-10-10). Os testes que só tocam alongam; os que testam o segurar deixam `null` (250 ms).
+ */
+@Volatile
+var accentHoldMsForTest: Long? = null
+
+/**
  * A grade de teclas (QWERTY/`?123`) desenhada numa única `View` em `Canvas` (RND-01). O rendering é
  * **função pura** do [KeyboardGridState]/[KeyboardLayout] — nada de `View` por tecla. Mic, action row e
  * barra retraída continuam Views, intocados (fronteira `onKeyAction`, design G4).
@@ -608,7 +616,7 @@ class KeyboardGridView(
             if (pressedKeys[pointerId] === placed) openAccentStrip(pointerId, placed)
         }
         accentTimers[pointerId] = runnable
-        accentHandler.postDelayed(runnable, ACCENT_HOLD_MS)
+        accentHandler.postDelayed(runnable, accentHoldMsForTest ?: ACCENT_HOLD_MS)
     }
 
     private fun cancelAccentTimer(pointerId: Int) {

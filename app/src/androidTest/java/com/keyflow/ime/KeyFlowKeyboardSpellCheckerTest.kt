@@ -55,10 +55,13 @@ class KeyFlowKeyboardSpellCheckerTest {
         userSettings.capture()
         // A grade só entra na hierarquia (e só é medida) com o teclado expandido.
         userSettings.forceExpanded()
+        // Aqui só se toca: um toque lento de injetar no emulador do CI não pode abrir a tira de acentos.
+        com.keyflow.ime.keyboard.accentHoldMsForTest = 10_000L
     }
 
     @After
     fun tearDown() {
+        com.keyflow.ime.keyboard.accentHoldMsForTest = null
         userSettings.restore()
         device.pressHome()
         KeyFlowController.clearInserter()
