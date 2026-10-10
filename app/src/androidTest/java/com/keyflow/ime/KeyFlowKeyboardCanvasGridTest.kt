@@ -70,8 +70,8 @@ class KeyFlowKeyboardCanvasGridTest {
 
         tapKey(grid!!, "q")
 
-        waitUntil("o campo não recebeu \"q\" digitado pela grade") {
-            device.findObject(By.desc("ime_probe_field"))?.text?.contains("q") == true
+        waitUntil({ "o campo não recebeu \"q\" digitado pela grade (${typingState(grid!!, "q")})" }) {
+            fieldText()?.contains("q") == true
         }
     }
 
@@ -86,7 +86,7 @@ class KeyFlowKeyboardCanvasGridTest {
         inject(MotionEvent.ACTION_DOWN, q.centerX, q.centerY, down)
         inject(MotionEvent.ACTION_UP, q.right + q.width / 10, q.centerY, down)
 
-        waitUntil("o \"q\" tocado se perdeu com o dedo escorregando para o \"w\"") { fieldText() == "q" }
+        waitUntil({ "o \"q\" tocado se perdeu com o dedo escorregando para o \"w\" (${typingState(grid, "q")})" }) { fieldText() == "q" }
     }
 
     /** Arrastar até outra tecla antes de soltar digita a tecla onde o dedo saiu. */
@@ -102,7 +102,7 @@ class KeyFlowKeyboardCanvasGridTest {
         inject(MotionEvent.ACTION_MOVE, e.centerX, e.centerY, down)
         inject(MotionEvent.ACTION_UP, e.centerX, e.centerY, down)
 
-        waitUntil("arrastar do \"q\" até o \"e\" deveria digitar \"e\"") { fieldText() == "e" }
+        waitUntil({ "arrastar do \"q\" até o \"e\" deveria digitar \"e\" (${typingState(grid, "e")})" }) { fieldText() == "e" }
     }
 
     /**
@@ -122,7 +122,7 @@ class KeyFlowKeyboardCanvasGridTest {
         injectPointers(pointerAction(MotionEvent.ACTION_POINTER_UP, 1), down, listOf(q.centerX to q.centerY, p.centerX to p.centerY))
         injectPointers(MotionEvent.ACTION_UP, down, listOf(q.centerX to q.centerY))
 
-        waitUntil("dois dedos sobrepostos deveriam digitar \"qp\", na ordem do toque") { fieldText() == "qp" }
+        waitUntil({ "dois dedos sobrepostos deveriam digitar \"qp\", na ordem do toque (${typingState(grid, "p")})" }) { fieldText() == "qp" }
     }
 
     /** Segurar uma tecla com acentos abre a tira com a 1ª variante já escolhida; soltar sem mexer insere ela. */
@@ -226,7 +226,13 @@ class KeyFlowKeyboardCanvasGridTest {
         )
     }
 
-    private fun fieldText(): String? = device.findObject(By.desc("ime_probe_field"))?.text
+    // O nó do campo pode ser trocado entre achar e ler (StaleObjectException derrubava o teste): lê de novo na próxima volta.
+    private fun fieldText(): String? = runCatching { device.findObject(By.desc("ime_probe_field"))?.text }.getOrNull()
+
+    /** Para a mensagem de falha de digitação: o estado do teclado, o texto do campo e se a grade chegou a ver o toque. */
+    private fun typingState(grid: com.keyflow.ime.keyboard.KeyboardGridView, label: String): String =
+        "campo=\"${fieldText()}\", a grade viu ${grid.touchesSeenForTest} eventos de toque, o último ${grid.lastTouchForTest}; " +
+            keyboardState(grid, keyOnScreen(grid, label))
 
     /** Acentos existem em pt (não em en): fixa pt durante [block] e devolve o idioma que o aparelho tinha. */
     private fun withPortugueseKeyboard(block: () -> Unit) {

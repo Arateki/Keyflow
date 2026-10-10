@@ -186,6 +186,19 @@ class KeyboardGridView(
     val accentChipWidthForTest: Float? get() = accentStrips.values.firstOrNull()?.chipWidth
 
     /**
+     * Quantos eventos de toque a grade recebeu e o último (ação e posição na tela), só para o instrumentado dizer, quando
+     * uma tecla não chega ao campo, se o toque nem chegou ao teclado (caiu na janela de baixo) ou chegou e se perdeu depois.
+     */
+    var touchesSeenForTest: Int = 0
+        private set
+    val lastTouchForTest: String
+        get() = if (lastTouchAction < 0) "nenhum" else
+            "${MotionEvent.actionToString(lastTouchAction)} em (${lastTouchRawX.toInt()}, ${lastTouchRawY.toInt()})"
+    private var lastTouchAction = -1
+    private var lastTouchRawX = 0f
+    private var lastTouchRawY = 0f
+
+    /**
      * Altura de fileira: o ideal ([IDEAL_ROW_HEIGHT_DP]) até o limite de [keyboardHeightFraction] da altura da tela pro
      * teclado inteiro — sem isto, a grade mantinha a MESMA altura absoluta em paisagem (bem mais baixa),
      * devorando proporcionalmente muito mais tela que em retrato (achado do Yan, 2026-07-06: "as teclas
@@ -342,6 +355,10 @@ class KeyboardGridView(
 
     @Suppress("ClickableViewAccessibility") // a11y própria chega na KC-T8 (ExploreByTouchHelper)
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        touchesSeenForTest++
+        lastTouchAction = event.actionMasked
+        lastTouchRawX = event.rawX
+        lastTouchRawY = event.rawY
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
                 // 1º dedo de um gesto novo: sobra de um gesto que não terminou (UP perdido) é descartada,
