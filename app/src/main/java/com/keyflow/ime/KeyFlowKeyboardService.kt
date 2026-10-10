@@ -218,6 +218,8 @@ class KeyFlowKeyboardService : InputMethodService() {
      * ("SurfaceSyncGroup: Failed to receive transaction ready in 1000ms").
      */
     private fun traceFirstFrame(from: String) {
+        // registerFrameCommitCallback é do Android 10; abaixo disso, sem o diagnóstico (antes lançava NoSuchMethodError).
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
         val view = keyboardView ?: return
         val started = SystemClock.uptimeMillis()
         val observer = view.viewTreeObserver
