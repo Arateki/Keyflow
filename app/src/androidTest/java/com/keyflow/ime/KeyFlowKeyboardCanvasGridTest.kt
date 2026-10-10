@@ -321,13 +321,29 @@ class KeyFlowKeyboardCanvasGridTest {
         val language = runBlocking { SettingsRepository(context).keyboardLanguageOnce() }
         return "toque em (${key.centerX}, ${key.centerY}); grade em (${loc[0]}, ${loc[1]}) ${grid.width}x${grid.height}, " +
             "visível=${grid.isShown}, mesma view ativa=${view?.canvasGridForTest === grid}, expandido=${view?.expandedForTest}, " +
-            "camada=${grid.currentLayerIdForTest}, fileiras=${grid.placedRowsForTest.size}, idioma salvo=$language"
+            "camada=${grid.currentLayerIdForTest}, fileiras=${grid.placedRowsForTest.size}, idioma salvo=$language; " +
+            "janela do IME para o sistema de entrada: ${imeInputWindow()}"
     }
 
-    private fun shell(command: String) {
+    /**
+     * Frame, região tocável e translação da janela do IME como o InputDispatcher a vê. A injeção é aceita em qualquer janela do
+     * próprio app — inclusive a do probe, por baixo —, então um toque "aceito" pode não ter chegado ao teclado.
+     */
+    private fun imeInputWindow(): String {
+        val lines = shell("dumpsys input").lines()
+        val i = lines.indexOfFirst { it.contains(" InputMethod'") && it.contains("frame=") }
+        if (i < 0) return "não listada"
+        val line = lines[i]
+        val frame = Regex("frame=\\[[^]]*]\\[[^]]*]").find(line)?.value
+        val touchable = Regex("touchableRegion=[^a-zA-Z]*").find(line)?.value?.trimEnd(',', ' ')
+        val translate = lines.drop(i + 1).take(6).filter { it.trim().matches(Regex("[-0-9. ]+")) }.joinToString(" / ") { it.trim() }
+        return "$frame $touchable transform=[$translate]"
+    }
+
+    private fun shell(command: String): String {
         val fd: ParcelFileDescriptor = instrumentation.uiAutomation.executeShellCommand(command)
         try {
-            java.io.FileInputStream(fd.fileDescriptor).readBytes()
+            return String(java.io.FileInputStream(fd.fileDescriptor).readBytes())
         } finally {
             fd.close()
         }
