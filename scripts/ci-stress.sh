@@ -66,9 +66,11 @@ announce_failure() {
   [ -n "${GITHUB_SHA:-}" ] && [ -n "${GH_TOKEN:-}" ] || return 0
   test=$(head -1 "$dir/failed.txt" | sed 's/^.*\.//')
   error=$(grep -A1 "^  ✗ " "$dir/summary.txt" | sed -n 2p | sed 's/^ *//')
+  # A descrição aceita até 140 caracteres e recusa Unicode de 4 bytes (o "🎙" de um erro derrubava o aviso).
   gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" -f state=failure \
     -f context="esteira/${STRESS_WORKER:-?}/volta-$round" \
-    -f description="$(printf '%s: %s' "${test:-processo caiu}" "$error" | cut -c1-140)" \
+    -f description="$(printf '%s: %s' "${test:-processo caiu}" "$error" |
+      python3 -c 'import sys; print("".join(c for c in sys.stdin.read() if ord(c) <= 0xFFFF).strip()[:140])')" \
     -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >/dev/null || true
 }
 
