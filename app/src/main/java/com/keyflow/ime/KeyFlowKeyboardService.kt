@@ -3,6 +3,7 @@ package com.keyflow.ime
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.text.InputType
 import android.util.Log
 import android.view.KeyEvent
@@ -170,7 +171,7 @@ class KeyFlowKeyboardService : InputMethodService() {
                 .distinctUntilChanged()
                 .collect { (bars, grids) ->
                     val changed = bars != appliedBarsConfig || grids != appliedGrids
-                    if (keyboardView != null && changed) setInputView(onCreateInputView())
+                    if (keyboardView != null && changed) recreateInputView("barras/grades mudaram")
                 }
         }
         // Tema/tamanho/idioma ao vivo (pedido do Yan, 2026-07-03): antes só aplicava ao reabrir o
@@ -186,15 +187,47 @@ class KeyFlowKeyboardService : InputMethodService() {
             ) { dark, scale, lang, numberRow, skin -> LiveKeyboardConfig(dark, scale, lang, numberRow, skin) }
                 .distinctUntilChanged()
                 .collect { config ->
-                    if (keyboardView != null && config != appliedLiveConfig) setInputView(onCreateInputView())
+                    if (keyboardView != null && config != appliedLiveConfig) recreateInputView("tema/tamanho/idioma/skin mudou")
                 }
         }
         // Pacote de skin instalado, reimportado ou removido (SKP-IMP-05/STO-04): se o que está na tela é um pacote, reabre. O primeiro
         // valor do fluxo (o de agora) não conta.
         serviceScope.launch {
             SkinPackStore.changes.drop(1).collect {
-                if (keyboardView != null && SkinIds.isPack(appliedLiveConfig?.skin)) setInputView(onCreateInputView())
+                if (keyboardView != null && SkinIds.isPack(appliedLiveConfig?.skin)) recreateInputView("pacote de skin mudou")
             }
+        }
+    }
+
+    /**
+     * Recria a view do teclado (config mudou ao vivo). Com o teclado aberto, a janela troca de conteúdo e pode mudar de tamanho:
+     * o log diz quando e por quê — a esteira de instabilidade (2026-10-10) viu a janela ficar fora do lugar ao abrir.
+     */
+    private fun recreateInputView(reason: String) {
+        Log.d(TAG, "recriando a view do teclado: $reason (visível=${keyboardView?.isShown == true})")
+        setInputView(onCreateInputView())
+    }
+
+    /**
+     * Diagnóstico da abertura: quanto tempo do [onStartInputView] até o 1º quadro entregue, e cada mudança de tamanho da janela.
+     * Esteira de instabilidade (2026-10-10): sob carga a janela do KeyFlow ficava fora do lugar para a tela e o toque (126 px
+     * abaixo, no topo, ou com a região tocável vazia) e o Gboard não — com o Android desistindo de esperar o 1º desenho
+     * ("SurfaceSyncGroup: Failed to receive transaction ready in 1000ms").
+     */
+    private fun traceFirstFrame(from: String) {
+        val view = keyboardView ?: return
+        val started = SystemClock.uptimeMillis()
+        val observer = view.viewTreeObserver
+        if (!observer.isAlive) return
+        observer.registerFrameCommitCallback {
+            val root = view.rootView
+            Log.d(TAG, "1º quadro depois de $from: ${SystemClock.uptimeMillis() - started} ms (janela ${root.width}x${root.height})")
+        }
+    }
+
+    private val windowSizeLogger = View.OnLayoutChangeListener { v, _, top, _, bottom, _, oldTop, _, oldBottom ->
+        if (bottom - top != oldBottom - oldTop) {
+            Log.d(TAG, "janela do teclado mudou de altura: ${oldBottom - oldTop} → ${bottom - top} (largura ${v.width})")
         }
     }
 
@@ -260,7 +293,7 @@ class KeyFlowKeyboardService : InputMethodService() {
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
         super.onConfigurationChanged(newConfig)
         Log.d(TAG, "onConfigurationChanged orientation=${newConfig.orientation} keyboardView=$keyboardView")
-        if (keyboardView != null) setInputView(onCreateInputView())
+        if (keyboardView != null) recreateInputView("configuração do aparelho mudou")
     }
 
     override fun onCreateInputView(): View {
@@ -295,6 +328,7 @@ class KeyFlowKeyboardService : InputMethodService() {
         val vibration = runBlocking { repo.vibrationIntensityOnce() }
         appliedBarsConfig = barsConfig
         appliedGrids = grids
+        val readsDoneNs = System.nanoTime()
         val view = KeyFlowKeyboardView(
             context = this,
             onKey = ::handleKey,
@@ -341,7 +375,15 @@ class KeyFlowKeyboardService : InputMethodService() {
         // estava (ex.) pausada quando o teclado abriu, a view nasceria dessincronizada (ex.: trocar de
         // teclado por atalho com o overlay pausado).
         view.updateMicState(KeyFlowController.buttonState.value)
-        Log.d(TAG, "onCreateInputView: ${(System.nanoTime() - createStartedNs) / 1_000_000} ms (skin=$skin)")
+        Log.d(
+            TAG,
+            "onCreateInputView: ${(System.nanoTime() - createStartedNs) / 1_000_000} ms " +
+                "(leituras de config ${(readsDoneNs - createStartedNs) / 1_000_000} ms, view ${(System.nanoTime() - readsDoneNs) / 1_000_000} ms, skin=$skin)",
+        )
+        window.window?.decorView?.let { decor ->
+            decor.removeOnLayoutChangeListener(windowSizeLogger)
+            decor.addOnLayoutChangeListener(windowSizeLogger)
+        }
         return view
     }
 
@@ -467,8 +509,11 @@ class KeyFlowKeyboardService : InputMethodService() {
     }
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
+        val startedNs = System.nanoTime()
         super.onStartInputView(info, restarting)
         Log.d(TAG, "onStartInputView restarting=$restarting")
+        traceFirstFrame("onStartInputView")
+        mainHandler.post { Log.d(TAG, "onStartInputView: ${(System.nanoTime() - startedNs) / 1_000_000} ms até a thread principal soltar") }
         // Teclado aberto = modo ativo: com origem Local, o modelo já fica carregado para o mic (NAT-05).
         LocalTranscriber.get(this).sync(voiceSource)
         KeyFlowController.registerInserter { text ->
