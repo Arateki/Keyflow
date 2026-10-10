@@ -11,8 +11,9 @@ permissions:
   # Os jobs do emulador baixam os APKs desta rodada com ela ainda em curso (`gh run download`) e
   # consultam o estado do job de unitários — ver scripts/ci-device-gate.sh.
   actions: read
-# Um push novo no mesmo PR cancela a rodada anterior: o job de device leva dezenas de minutos e o
-# repositório é privado (minutos contam).
+# Um push novo no mesmo PR cancela a rodada anterior: ela testa um commit que já ficou para trás, e os
+# runners que ela ocupa contam no limite de 20 jobs simultâneos do plano (o repositório é público desde
+# 2026-10-10: os minutos não contam mais).
 concurrency:
   group: checks-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
