@@ -112,3 +112,19 @@ DeckLock (actions fixadas por SHA, `permissions: contents: read`, evidência env
 - Artefatos: `unit-evidence` (relatórios JUnit) e `device-evidence-<i>` (saída bruta do `am instrument`
   e da repetição, `passed.txt`/`failed.txt`, logcat da rodada, `host.txt`, PNGs capturados), 14 dias.
 - O device físico (A32) e o emulador Android 17 seguem sendo gates manuais **[YAN]**.
+
+### Esteira de instabilidade — `.github/workflows/stress.yml`
+
+Caça ao teste que falha "às vezes": 16 emuladores (o mesmo do gate) repetem as mesmas classes em laço por
+~40 min, reinstalando o app a cada volta como o gate faz (`scripts/ci-stress.sh`). Metade roda no runner como
+ele é; a outra metade com o QEMU num cgroup limitado a 2 núcleos, perto do runner privado de 2 vCPU onde as
+falhas apareciam mais. O job `Stress report` (`scripts/ci-stress-report.py`) soma tudo: falhas/execuções por
+teste e condição de CPU, a 1ª linha do erro e onde está a evidência (artefato `stress-evidence-<n>-cpu…` →
+volta: saída bruta, trecho do logcat, tela). Fica vermelho quando acha alguma falha. Não bloqueia PR.
+
+- Rodar com o código de um commit qualquer: `git push origin HEAD:ci/esteira-lenta` (serve também para
+  conferir uma correção sob repetição antes de mesclar). Com o arquivo na `main`: Actions → Stress → Run
+  workflow, com as classes e os minutos.
+- Por que no CI e não em laço local: ~15 emuladores ao mesmo tempo (~10× mais voltas por hora), a própria
+  máquina onde as falhas apareceram, e o computador do Yan livre. O emulador lento local
+  (`systemd-run --user --scope -p CPUQuota=300%`) serve para reproduzir uma falha já achada.
