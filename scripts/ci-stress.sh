@@ -13,7 +13,10 @@
 # Cada volta reinstala o app, como o gate faz antes da suíte: as falhas que sobraram aparecem logo depois
 # de instalar (o holdingAKey… da CanvasGridTest é sempre o 1º teste de teclado do processo). Toda volta
 # grava passed.txt/failed.txt; a que falha guarda também a saída bruta, o trecho do logcat e a tela.
-# Sai com 0 mesmo com teste falhando — achar falha é o produto da esteira, e quem acusa é o relatório.
+#
+# Para na 1ª volta com falha e sai com 1: o GitHub só libera log e artefato de job terminado, então é
+# assim que a falha aparece na hora, com evidência, enquanto os outros emuladores seguem caçando.
+# STRESS_KEEP_GOING=1 segue até o fim do tempo (para medir a taxa de falha) e sai com 0.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
@@ -112,6 +115,7 @@ while [ "$SECONDS" -lt "$deadline" ]; do
     sed -n "$((from + 1)),\$p" "$OUT/logcat-full.txt" > "$dir/logcat.txt"
     "$ADB" exec-out screencap -p > "$dir/tela.png" 2>/dev/null || rm -f "$dir/tela.png"
     echo "volta $i ($((SECONDS - start)) s):$score — FALHOU: $(paste -sd' ' "$dir/failed.txt")"
+    [ "${STRESS_KEEP_GOING:-0}" = 1 ] || break
   fi
 done
 
@@ -123,4 +127,5 @@ kill "$LOGCAT_PID" 2>/dev/null || true
 } | tee "$OUT/meta.txt"
 # O logcat inteiro tem centenas de milhares de linhas; as voltas com falha já guardaram o seu trecho.
 rm -f "$OUT/logcat-full.txt"
-[ "$i" -gt 0 ] && [ -s "$OUT/volta-001/passed.txt" -o -s "$OUT/volta-001/failed.txt" ]
+[ "$i" -gt 0 ] && [ -s "$OUT/volta-001/passed.txt" -o -s "$OUT/volta-001/failed.txt" ] || exit 1
+[ "$failed_rounds" -eq 0 ] || [ "${STRESS_KEEP_GOING:-0}" = 1 ] || exit 1

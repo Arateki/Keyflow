@@ -10,6 +10,8 @@ name: Stress
 #
 # Metade dos emuladores roda no runner como ele é; a outra metade com o QEMU limitado a 2 núcleos, perto do
 # runner privado (2 vCPU) onde as falhas apareciam mais — no repositório público o runner tem 4.
+# Cada emulador para na 1ª volta com falha: o job fica vermelho na hora, com a evidência já no artefato
+# (log e artefato só saem de job terminado), e os demais seguem caçando.
 on:
   push:
     branches: ['ci/esteira-lenta**']
