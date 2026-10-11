@@ -178,8 +178,25 @@ class KeyflowPanelAgentTest {
     private fun waitForTag(tag: String, present: Boolean = true) =
         rule.waitUntil(10_000) { rule.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() == present }
 
-    private fun waitForText(text: String) =
-        rule.waitUntil(10_000) { rule.onAllNodes(androidx.compose.ui.test.hasText(text, substring = true)).fetchSemanticsNodes().isNotEmpty() }
+    /**
+     * Espera [text] na tela. Se não vier, a falha diz o que havia: quantas vezes o motor foi chamado (0 = o envio nem saiu), o
+     * que as ferramentas rodaram e os textos na tela — no gate de 2026-10-10 a resposta não veio em 10 s uma vez e passou na
+     * repetição, sem rastro; a esteira não reproduziu em 208 voltas da classe.
+     */
+    private fun waitForText(text: String) {
+        try {
+            rule.waitUntil(10_000) { rule.onAllNodes(androidx.compose.ui.test.hasText(text, substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        } catch (e: androidx.compose.ui.test.ComposeTimeoutException) {
+            val texts = rule.onAllNodes(androidx.compose.ui.test.SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.Text))
+                .fetchSemanticsNodes()
+                .flatMap { node -> node.config[androidx.compose.ui.semantics.SemanticsProperties.Text].map { it.text } }
+            throw AssertionError(
+                "\"$text\" não apareceu em 10 s. Motor chamado ${engine.requests.size}× (último: ${engine.requests.lastOrNull()?.lastOrNull()}); " +
+                    "ferramentas: ${reader.runs + writer.runs + destroyer.runs}; na tela (o campo vazio mostra o texto-guia): $texts",
+                e,
+            )
+        }
+    }
 
     /** O texto dentro do painel de confirmação (o mesmo resumo também aparece no cartão do chat). */
     private fun inPanel(text: String) = rule.onNode(androidx.compose.ui.test.hasText(text) and androidx.compose.ui.test.hasAnyAncestor(androidx.compose.ui.test.hasTestTag(AGENT_CONFIRM_PANEL_TAG)))
