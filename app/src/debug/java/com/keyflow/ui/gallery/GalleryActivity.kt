@@ -1,5 +1,6 @@
 package com.keyflow.ui.gallery
 
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -112,10 +113,17 @@ class GalleryActivity : ComponentActivity() {
 
     private val windowFocused = mutableStateOf(false)
 
-    /** Espera o próximo quadro ser entregue à tela (render thread terminou e mandou o buffer). */
+    /**
+     * Espera o próximo quadro ser entregue à tela (render thread terminou e mandou o buffer). O aviso de quadro entregue é do
+     * Android 10; abaixo disso, o passo de animação do quadro seguinte é o mais perto que há.
+     */
     private suspend fun awaitFrameCommit() = suspendCancellableCoroutine { cont ->
         val decor = window.decorView
-        decor.viewTreeObserver.registerFrameCommitCallback { if (cont.isActive) cont.resume(Unit) }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            decor.viewTreeObserver.registerFrameCommitCallback { if (cont.isActive) cont.resume(Unit) }
+        } else {
+            decor.postOnAnimation { if (cont.isActive) cont.resume(Unit) }
+        }
         decor.invalidate()
     }
 

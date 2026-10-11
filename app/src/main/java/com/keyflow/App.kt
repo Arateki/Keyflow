@@ -20,6 +20,8 @@ class App : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Disco/rede na thread principal e recursos não fechados, só no debug — ver StrictModeGuard.
+        if (BuildConfig.DEBUG) StrictModeGuard.install()
         // Idioma da interface para o processo inteiro (app, orbe, notificação, teclado): um lugar só.
         scope.launch {
             SettingsRepository(this@App).appLanguageFlow().distinctUntilChanged().collect { code ->

@@ -5,6 +5,8 @@ plugins {
     id("com.android.application")
     // AGP 9.2.0 aplica o Kotlin internamente; aqui só o plugin do compilador Compose.
     id("org.jetbrains.kotlin.plugin.compose")
+    // Consome o perfil de base gerado pelo :baselineprofile (app/src/release/generated/baselineProfiles/).
+    id("androidx.baselineprofile")
 }
 
 android {
@@ -39,11 +41,32 @@ android {
         // emulador. O x86 de 32 bits que vem no AAR não entra em nenhum.
         debug {
             ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
+            // Cobertura dos testes de unidade (JaCoCo do próprio AGP): só com `-Pcoverage`, para o dia a dia não pagar a
+            // instrumentação. `./gradlew -Pcoverage createDebugUnitTestCoverageReport` → app/build/reports/coverage/test/debug/.
+            // É mapa do que nenhum teste toca, não meta de número.
+            enableUnitTestCoverage = providers.gradleProperty("coverage").isPresent
         }
         release {
             isMinifyEnabled = false
             ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
         }
+        // As variantes que o plugin do perfil de base cria a partir do release (nonMinifiedRelease, benchmarkRelease) só
+        // rodam no emulador: assinadas com a keystore de debug e com x86_64.
+        configureEach {
+            if (name == "nonMinifiedRelease" || name == "benchmarkRelease") {
+                signingConfig = signingConfigs.getByName("debug")
+                ndk { abiFilters += "x86_64" }
+            }
+        }
+    }
+    // Lint só com a checagem de versão de API (NewApi): chamada a API mais nova que o minSdk, sem conferir a versão, quebra em
+    // aparelho antigo e nenhum teste pega — o gate roda no Android 14. Foi assim que um registerFrameCommitCallback (Android
+    // 10) no caminho de abrir o teclado passou (2026-10-10). As outras checagens do lint nunca foram triadas neste projeto;
+    // ligar mais uma = tirá-la daqui depois de zerar o que ela acusa. CI: `./gradlew :app:lintDebug` no job de unidade.
+    lint {
+        checkOnly += "NewApi"
+        abortOnError = true
+        checkDependencies = false
     }
     buildFeatures {
         compose = true
@@ -209,6 +232,11 @@ dependencies {
     // `SVG.setInternalEntitiesEnabled`. Só `skins/SvgRender.kt` importa `com.caverock` — trocar o renderizador não vaza.
     implementation("com.caverock:androidsvg-aar:1.4")
 
+    // Instala o perfil de base (o caminho de abertura compilado de antemão) também fora da Play: APK lateral, adb. 1.4.1:
+    // estável de 2024-10-02. O perfil vem do :baselineprofile.
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
+    baselineProfile(project(":baselineprofile"))
+
     // --- Testes ---
     // Unit
     testImplementation("junit:junit:4.13.2")
@@ -218,6 +246,9 @@ dependencies {
     // org.json real p/ os unit tests JVM (o android.jar mockado lança em JSONObject/JSONArray); o app usa
     // o org.json do próprio Android — zero dependência nova no APK (ShortcutCodec, SB-T1).
     testImplementation("org.json:json:20240303")
+    // Testes de propriedade (geram milhares de entradas e conferem uma regra que vale para todas). 6.0.5: compilada com Kotlin
+    // 2.2.0 (as 6.0.7+ já pedem 2.2.21); funciona no JUnit4 sem o executor do Kotest (checkAll dentro de runBlocking).
+    testImplementation("io.kotest:kotest-property:6.0.5")
 
     // Instrumented
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
@@ -228,4 +259,65 @@ dependencies {
     androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     // Servidor HTTP local para o DownloadManager real baixar no instrumentado (NM-T6/T7).
     androidTestImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+}
+
+// --- Teste de mutação (PIT) ---
+// Muda o código de produção de propósito (troca um < por <=, apaga uma chamada, inverte um if) e roda os testes de unidade
+// contra cada mudança: a que nenhum teste percebe ("sobrevive") mostra uma regra que os testes não conferem. Periódico, não
+// por PR (.github/workflows/mutation.yml). Pela linha de comando do PIT, e não pelo plugin Gradle: o plugin para Android não
+// acompanha o AGP 9; aqui só se reusa o classpath do testDebugUnitTest. 1.30.0: release de 2026-08-27 no Maven Central.
+//   ./gradlew :app:pitest                                   (alvos padrão abaixo)
+//   ./gradlew :app:pitest -PpitTargets='com.keyflow.overlay.ButtonStateMachine*'
+val pitestTool: Configuration by configurations.creating
+dependencies { pitestTool("org.pitest:pitest-command-line:1.30.0") }
+
+// A lógica pura que os testes de unidade cobrem bem — telas, teclado e serviços são dos instrumentados e só dariam "sem cobertura".
+val pitDefaultTargets = listOf(
+    "com.keyflow.overlay.ButtonStateMachine*",
+    "com.keyflow.overlay.OverlayCoordinator*",
+    "com.keyflow.overlay.RecordingGestureController*",
+    "com.keyflow.overlay.GestureInterpreter*",
+    "com.keyflow.core.shortcuts.*",
+    "com.keyflow.ime.keyboard.layout.*",
+    "com.keyflow.ime.keyboard.dictionary.*",
+    "com.keyflow.ime.keys.*",
+    "com.keyflow.skins.SkinPack*",
+    "com.keyflow.agent.*",
+    "com.keyflow.auth.oauth.*",
+)
+
+tasks.register<JavaExec>("pitest") {
+    group = "verification"
+    description = "Teste de mutação (PIT) da lógica pura contra os testes de unidade; relatório em build/reports/pitest."
+    val unitTests = tasks.named<Test>("testDebugUnitTest")
+    val reportDir = layout.buildDirectory.dir("reports/pitest")
+    val targets = providers.gradleProperty("pitTargets").orElse(pitDefaultTargets.joinToString(","))
+    // PIT na frente; atrás, o mesmo classpath dos testes (as classes do app chegam no classes.jar do AGP).
+    classpath(pitestTool, unitTests.map { it.classpath })
+    mainClass.set("org.pitest.mutationtest.commandline.MutationCoverageReport")
+    // Os testes leem arquivos relativos ao módulo (ArchitectureRulesTest), como no testDebugUnitTest.
+    workingDir = projectDir
+    outputs.dir(reportDir)
+    outputs.upToDateWhen { false }
+    argumentProviders.add(CommandLineArgumentProvider {
+        listOf(
+            "--reportDir=${reportDir.get().asFile}",
+            "--targetClasses=${targets.get()}",
+            "--targetTests=com.keyflow.*",
+            // Fuzz só confere "não quebra" e leva segundos por mutante: fica de fora.
+            "--excludedTestClasses=com.keyflow.fuzz.*",
+            "--sourceDirs=${file("src/main/java")}",
+            // Só o código do app é mutável (o jar do AGP); teste e biblioteca nunca.
+            "--mutableCodePaths=*bundleDebugClassesToRuntimeJar*",
+            // O que o compilador Kotlin gera (checagens de nulo, o throwOnFailure das coroutines, equals/hashCode/toString/copy de
+            // data class) só faria ruído.
+            "--avoidCallsTo=kotlin.jvm.internal,kotlin.ResultKt,android.util.Log",
+            "--excludedMethods=equals,hashCode,toString,copy,copy\$default,component*",
+            "--jvmArgs=-Dfile.encoding=UTF-8,-Duser.language=pt,-Duser.country=BR,-ea,-Xmx1g",
+            "--threads=${Runtime.getRuntime().availableProcessors().coerceAtMost(8)}",
+            "--outputFormats=HTML,XML",
+            "--timestampedReports=false",
+            "--timeoutConst=8000",
+        )
+    })
 }

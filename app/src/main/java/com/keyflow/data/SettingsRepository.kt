@@ -34,13 +34,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import java.io.File
 
 class SettingsRepository(
     context: Context,
-    dataStoreFile: File = context.preferencesDataStoreFile(DATASTORE_NAME),
+    dataStoreFile: File = defaultDataStoreFile(context),
     private val securePrefsName: String = SECURE_PREFS_NAME,
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) {
@@ -280,6 +281,8 @@ class SettingsRepository(
      * os segredos (tokens, chaves de API, senha e chave SSH, valores de cabeçalho — [SettingsSecrets.BY_PROPERTY])
      * vêm do armazenamento criptografado e são preservados entre trocas de origem.
      */
+    // O map lê o cofre cifrado (abre o EncryptedSharedPreferences: disco + Keystore) e roda na thread de quem coleta — o
+    // teclado e a orbe coletam na principal. flowOn leva a leitura (e a migração do onStart) para o IO (StrictModeKeyboardTest).
     fun settingsFlow(): Flow<Settings> = dataStore.data.onStart { migrateLegacySecrets() }.map { prefs ->
         val mirrorUrl = prefs[CUSTOM_MODEL_MIRROR_URL]?.ifBlank { null }
         ModelProvisioning.customMirrorUrl = mirrorUrl
@@ -386,7 +389,7 @@ class SettingsRepository(
             orbSkin = prefs[ORB_SKIN] ?: "atelie",
             appLanguage = prefs[APP_LANGUAGE] ?: "",
         )
-    }
+    }.flowOn(Dispatchers.IO)
 
     /**
      * Persiste o estado completo (T5). Segredos criptografados; `null` em texto remove a chave do DataStore.
@@ -701,6 +704,15 @@ class SettingsRepository(
             name: String,
             keyAlias: String = MasterKey.DEFAULT_MASTER_KEY_ALIAS,
         ): SharedPreferences = SecurePrefs.create(context, name, keyAlias)
+
+        /**
+         * O mesmo arquivo de `preferencesDataStoreFile(DATASTORE_NAME)`, montado sem tocar no disco: o `filesDir` confere e
+         * cria a pasta a cada chamada (StrictMode: leitura de disco na thread principal a cada repositório criado, inclusive
+         * ao abrir o teclado), e `filesDir` é sempre `<dataDir>/files`. Quem cria a pasta é o `produceFile` do DataStore, na
+         * thread dele.
+         */
+        fun defaultDataStoreFile(context: Context): File =
+            File(context.applicationInfo.dataDir, "files/datastore/$DATASTORE_NAME.preferences_pb")
 
         fun dataStoreFor(
             file: File,

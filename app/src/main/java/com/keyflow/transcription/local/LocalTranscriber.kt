@@ -216,6 +216,15 @@ class LocalTranscriber internal constructor(
         @Volatile
         private var instance: LocalTranscriber? = null
 
+        /**
+         * Acompanha a origem de voz: com a Local, cria (se preciso) e pré-carrega o modelo; com outra, só solta o que estiver
+         * preso — sem criar o transcritor, cuja criação varre a pasta de modelos no disco. O teclado chama isto ao abrir, na
+         * thread principal (StrictModeKeyboardTest).
+         */
+        fun syncWith(context: Context, effective: EffectiveConfig) {
+            if (effective is EffectiveConfig.Local) get(context).sync(effective) else instance?.sync(effective)
+        }
+
         fun get(context: Context): LocalTranscriber = instance ?: synchronized(this) {
             instance ?: LocalTranscriber(
                 context.applicationContext,

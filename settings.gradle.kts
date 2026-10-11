@@ -15,3 +15,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "keyflow"
 include(":app")
+include(":baselineprofile")

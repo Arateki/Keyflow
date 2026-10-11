@@ -52,6 +52,49 @@ Estratégia escolhida: **cobertura completa** (unit + instrumented). Greenfield 
 - Teste que precisa agir DENTRO de uma janela de tempo do produto (ex.: desfazer o cancelamento, 3 s) alonga a janela por um
   gancho `…ForTest` em vez de correr contra o relógio: no emulador do CI um quadro do teclado chega a 1–2 s.
 
+## Técnicas além do teste de exemplo (2026-10-10)
+
+Código que testa o código de outro jeito — cada uma pega uma classe de defeito que o teste "dada esta entrada, espero esta
+saída" deixa passar.
+
+| Técnica | Onde | O que pega | Roda |
+| ------- | ---- | ---------- | ---- |
+| Regras de arquitetura | `ArchitectureRulesTest` (lê o fonte como texto) | Convenção que já custou CI: `collectAsState` direto, `runBlocking` novo, `stopService` no OverlayService, teste que grava sem parar o serviço, espera às cegas pelo "🎙", `}` solto em Regex do ICU. Exceção = entrada na lista do teste, com o porquê | unit |
+| StrictMode | `StrictModeGuard` (debug) + `StrictModeKeyboardTest` | Disco/rede na thread principal ao abrir o teclado (achou 5; zeradas). Violação nova falha; `KNOWN` só encolhe | gate (instrumentado, API 28+) |
+| Cobertura | `-Pcoverage` (JaCoCo do AGP) + `scripts/coverage-summary.py` | Mapa do que nenhum teste de unidade toca | job de unitários |
+| Lint de versão de API | `./gradlew :app:lintDebug` (só `NewApi`, `lint {}` no `app/build.gradle.kts`) | Chamada a API mais nova que o `minSdk` 24 sem conferir a versão — quebra em aparelho antigo e o gate (Android 14) não vê. Pegaria o `registerFrameCommitCallback` do diagnóstico do teclado (Android 7–9) | job de unitários |
+| Propriedade | `app/src/test/…/properties/` (kotest-property) | Regra que vale para TODA entrada: barras/grades ida e volta, teclas contíguas e sem buraco (achou a fresta de 0,00006 px na borda direita), orçamento e quadros da orbe, repetição de tecla | unit |
+| Fuzz | `app/src/test/…/fuzz/` | Entrada de fora nunca derruba o app: pacote de skin (bytes, zip corrompido, nomes hostis, SVG), manifest, barras, credenciais, argumentos do agente (~30 mil entradas, ~4 s) | unit |
+| Máquina de estados | `OverlayCoordinatorStateMachineTest` | Sequências aleatórias de gestos/intenções/cancelar/desfazer/troca de campo/limite com relógio virtual: o microfone capta se e só se o estado é RECORDING, nunca liga duas vezes, a tela mostra o estado real, sempre volta ao repouso. Achou o RESUME em SENDING que deixava o microfone aberto em repouso | unit |
+| Mutação | `./gradlew :app:pitest` + `scripts/mutation-summary.py` + `.github/workflows/mutation.yml` | Onde os testes rodam o código mas não conferem o resultado (mutante que sobrevive) | semanal / manual |
+| Perfil de base + benchmark | módulo `:baselineprofile` (`BaselineProfileGenerator`, `OpeningBenchmarks`) + `profileinstaller` no app | Abertura a frio do app e do teclado com e sem o perfil (o caminho compilado de antemão na instalação, sem JIT) | à mão, no emulador |
+
+- kotest-property no JUnit4: `fun x() = runBlocking<Unit> { checkAll(...) }` (método JUnit4 tem de devolver Unit). A falha
+  traz a semente ("Repeat this test by using seed …") e a entrada já encolhida; para repetir, `checkAll(PropTestConfig(seed =
+  …), …)`. O gerador tem de respeitar as normalizações do código (ex.: o codec das barras troca rótulo vazio por "⌗") — senão
+  a propriedade falha por culpa do teste.
+- Fuzz não usa Jazzer (pede JUnit5): os geradores do kotest bastam, com JSON válido mutado e aninhamento fundo.
+- Mutação pela linha de comando do PIT (o plugin Gradle para Android não acompanha o AGP 9): a tarefa reusa o classpath do
+  `testDebugUnitTest` e só muta o jar de classes do app. Alvos padrão no `app/build.gradle.kts` (lógica pura bem coberta);
+  outros com `-PpitTargets='com.keyflow.overlay.*'`. Sobrevivente ≠ bug: às vezes a mudança é equivalente; quase sempre é uma
+  regra que nenhum teste confere. 1ª medição (2026-10-10, local, 7 min): força 81% (1890 de 2327 mutantes cobertos), 437
+  sobreviventes — ex.: apagar o `publishTime()`/`timeFreeze()` do `OverlayCoordinator` passa, nenhum teste confere o
+  cronômetro da gravação (`onRecordingTime`).
+- Perfil de base: `ANDROID_SERIAL=emulator-5554 ./gradlew :app:generateBaselineProfile` grava
+  `app/src/release/generated/baselineProfiles/` (versionado; gerar de novo quando o caminho de abertura mudar). Medir:
+  `ANDROID_SERIAL=… ./gradlew :baselineprofile:connectedBenchmarkReleaseAndroidTest`. **Só emulador**: instala a variante
+  release (`nonMinifiedRelease`/`benchmarkRelease`, mesmo `com.keyflow`, keystore de debug) — num aparelho com o app de debug,
+  a troca apaga os dados; sem `ANDROID_SERIAL`, o Gradle roda em TODOS os conectados (o A32 inclusive). O teclado é medido
+  pelas seções de trace do `KeyFlowKeyboardService` (`KeyFlow.keyboardOpen` do 1º passo do ciclo de mostrar ao 1º quadro
+  entregue, Android 10+; `KeyFlow.onCreateInputView`; `KeyFlow.onStartInputView`), que também aparecem num trace do Perfetto.
+  O campo fica numa Activity do APK de benchmark: o teclado abre sobre outro app, com o processo do KeyFlow frio. O
+  `killProcess()` do Macrobenchmark é um force-stop, que tira o KeyFlow de teclado ativo: o `ime set` vem DEPOIS dele, e a
+  volta confere que a janela aberta é do uid do KeyFlow (antes, metade das voltas media o Gboard).
+  1ª medição (2026-10-10, emulador API 34, mediana sem → com perfil): `onCreateInputView` 22 → 8,5 ms no emulador rápido e
+  65 → 16 ms com a cota de 300% (≈ CI); a abertura até o 1º quadro fica em ~340–390 ms (rápido) e ~990 ms (lento) com ou sem
+  perfil — esse resto é sistema e renderização (swangle, por software), não o nosso código; app a frio 1,0 s / 2,3 s, −3 a −5%
+  (ruído). Os traces do Perfetto de cada volta ficam em `baselineprofile/build/outputs/connected_android_test_additional_output/`.
+
 ## CI (GitHub Actions) — `.github/workflows/checks.yml`
 
 Roda em PR para `main`, push em `main`, merge queue e manual (`workflow_dispatch`), no padrão do
@@ -70,6 +113,10 @@ DeckLock (actions fixadas por SHA, `permissions: contents: read`, evidência env
   Android e a janela fica em transição (tamanho de Dialog, altura da tela, no topo, 126 px abaixo).
 - Toque injetado em emulador lento pode passar dos 250 ms da tira de acentos e virar "segurar": teste que só toca usa
   `accentHoldMsForTest` (os da tira de acentos, não).
+- Cobertura dos testes de unidade: `./gradlew -Pcoverage createDebugUnitTestCoverageReport` (JaCoCo do AGP, só com a
+  propriedade) → `app/build/reports/coverage/test/debug/`; `scripts/coverage-summary.py` resume por pacote. O CI faz isso no
+  job de unitários, depois de publicar os APKs (fora do caminho crítico), e põe a tabela no resumo do job. Mapa do que nenhum
+  teste de unidade toca, não meta: telas, teclado e serviços são cobertos pelos instrumentados.
 - `scripts/ime-placement.py --ime keyflow|gboard [--cold]` mede de FORA do app (adb) onde a janela do teclado fica ao abrir
   — sem teste no processo. A frio, no emulador lento: KeyFlow 6/8 aberturas em transição, Gboard 1/8 (desempenho da
   abertura a frio é tarefa aberta).
@@ -94,6 +141,10 @@ DeckLock (actions fixadas por SHA, `permissions: contents: read`, evidência env
   30 aberturas, contra 3,78 → 3,98 GB no 37.1.11) — no runner de 7 GB, swap e QEMU travado na galeria.
   `host.txt` na evidência registra memória, swap, carga e RSS do QEMU a cada 20 s; subir de versão =
   repetir o A/B antes.
+- O script do gate encerra o emulador ele mesmo no fim (`emu kill`, até 30 s de espera, `kill -9` no QEMU/netsimd/crashpad
+  que sobrar, com o nome no log). Em 2026-10-10 um shard todo verde ficou 35 min parado depois do "Terminate Emulator" do
+  action, até o timeout de 45 min do passo — causa não provada. Se a linha "Processos do emulador vivos…" aparecer num log,
+  é o caso anormal: guardar. Passo do gate parado sem saída depois de "Concluído: N PNGs" = isso, não teste.
 - **Renderizador `swangle_indirect`**, não `swiftshader_indirect`: neste o QEMU caía na RenderThread do host
   ao desenhar a prévia do Aero (tela de skins). No swangle, 0 quedas em 40 aberturas. **Todos os goldens
   são capturas `swangle`** (2026-10-10): as do CI saem byte a byte iguais às do emulador local (180/180

@@ -16,13 +16,18 @@ data class PlacedRow(val keys: List<PlacedKey>)
  */
 object Geometry {
     fun placeRow(row: KeyRow, top: Float, bottom: Float, totalWidth: Float): List<PlacedKey> {
-        val totalWeight = row.keys.sumOf { it.widthWeight.toDouble() }.toFloat()
-        var x = 0f
-        return row.keys.map { key ->
-            val width = totalWidth * (key.widthWeight / totalWeight)
-            val placed = PlacedKey(key, left = x, top = top, right = x + width, bottom = bottom)
-            x += width
-            placed
+        val totalWeight = row.keys.sumOf { it.widthWeight.toDouble() }
+        var cumulative = 0.0
+        // Cada borda sai do peso acumulado (Double), e a última é a própria largura: somar larguras em Float deixava a última
+        // tecla acabar um tico antes da borda (930,99994 de 931 px) — uma fresta onde o toque não caía em tecla nenhuma
+        // (achado pelo GeometryPropertyTest). Vizinhas continuam encostadas: a direita de uma e a esquerda da seguinte saem
+        // da mesma conta.
+        val edge = { weight: Double -> (totalWidth * (weight / totalWeight)).toFloat() }
+        return row.keys.mapIndexed { index, key ->
+            val left = edge(cumulative)
+            cumulative += key.widthWeight
+            val right = if (index == row.keys.lastIndex) totalWidth else edge(cumulative)
+            PlacedKey(key, left = left, top = top, right = right, bottom = bottom)
         }
     }
 
