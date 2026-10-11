@@ -140,6 +140,10 @@ DeckLock (actions fixadas por SHA, `permissions: contents: read`, evidência env
   30 aberturas, contra 3,78 → 3,98 GB no 37.1.11) — no runner de 7 GB, swap e QEMU travado na galeria.
   `host.txt` na evidência registra memória, swap, carga e RSS do QEMU a cada 20 s; subir de versão =
   repetir o A/B antes.
+- O script do gate encerra o emulador ele mesmo no fim (`emu kill`, até 30 s de espera, `kill -9` no QEMU/netsimd/crashpad
+  que sobrar, com o nome no log). Em 2026-10-10 um shard todo verde ficou 35 min parado depois do "Terminate Emulator" do
+  action, até o timeout de 45 min do passo — causa não provada. Se a linha "Processos do emulador vivos…" aparecer num log,
+  é o caso anormal: guardar. Passo do gate parado sem saída depois de "Concluído: N PNGs" = isso, não teste.
 - **Renderizador `swangle_indirect`**, não `swiftshader_indirect`: neste o QEMU caía na RenderThread do host
   ao desenhar a prévia do Aero (tela de skins). No swangle, 0 quedas em 40 aberturas. **Todos os goldens
   são capturas `swangle`** (2026-10-10): as do CI saem byte a byte iguais às do emulador local (180/180

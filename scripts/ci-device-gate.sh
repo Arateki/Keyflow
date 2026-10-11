@@ -232,17 +232,18 @@ esac
 kill "$LOGCAT_PID" "$SAMPLER_PID" 2>/dev/null || true
 echo "Pior momento do host: $(sort -t= -k3 -n "$EVIDENCE/host.txt" | head -1)"
 
-# O emulator-runner sobe o emulador com a saída ligada à própria action e, depois deste script, só manda `emu kill`: a
-# action só termina quando nenhum processo do emulador segura essa saída. Em 2026-10-10 um shard verde (suíte e galeria ok)
-# ficou 35 min parado depois do "Terminate Emulator", até o timeout do passo — nos outros, 1 s. Encerra aqui, espera até
-# 30 s e mata à força o que sobrar, deixando no log quem foi.
+# O emulator-runner sobe o emulador com a saída ligada à própria action e, depois deste script, só manda `emu kill`. Em
+# 2026-10-10 um shard verde (suíte e galeria ok) ficou 35 min parado depois do "Terminate Emulator", até o timeout do passo —
+# nos outros, 1 s. A causa não ficou provada (o amostrador do host já tinha parado); a suspeita é um processo do emulador
+# que não saiu. Encerra aqui, espera até 30 s o QEMU, o netsimd e o crashpad saírem e mata à força o que sobrar, deixando no
+# log quem foi: no caso normal os três saem na hora e nada é impresso. O vigia do próprio emulador (`emulator -kill <pid>
+# -sleep 20`) fica de fora — sai sozinho e não segura a action.
 "$ADB" emu kill >/dev/null 2>&1 || true
+EMULATOR_PROCS='/emulator/(qemu/|netsimd|crashpad_handler)'
 for _ in $(seq 30); do
-  pgrep -f qemu-system >/dev/null || break
+  pgrep -f "$EMULATOR_PROCS" >/dev/null || break
   sleep 1
 done
-# Só o que vive na pasta emulator/ do SDK (o QEMU, o netsimd, o crashpad dele e o lançador).
-EMULATOR_PROCS='/emulator/(qemu/|netsimd|crashpad_handler|emulator )'
 leftover=$(pgrep -af "$EMULATOR_PROCS" | grep -v pgrep || true)
 if [ -n "$leftover" ]; then
   echo "Processos do emulador vivos 30 s depois do emu kill (encerrados à força):"
