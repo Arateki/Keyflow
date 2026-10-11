@@ -59,6 +59,15 @@ android {
             }
         }
     }
+    // Lint só com a checagem de versão de API (NewApi): chamada a API mais nova que o minSdk, sem conferir a versão, quebra em
+    // aparelho antigo e nenhum teste pega — o gate roda no Android 14. Foi assim que um registerFrameCommitCallback (Android
+    // 10) no caminho de abrir o teclado passou (2026-10-10). As outras checagens do lint nunca foram triadas neste projeto;
+    // ligar mais uma = tirá-la daqui depois de zerar o que ela acusa. CI: `./gradlew :app:lintDebug` no job de unidade.
+    lint {
+        checkOnly += "NewApi"
+        abortOnError = true
+        checkDependencies = false
+    }
     buildFeatures {
         compose = true
         buildConfig = true
