@@ -52,6 +52,12 @@ adbx shell settings put secure immersive_mode_confirmations confirmed >/dev/null
 adbx shell settings put global window_animation_scale 0 >/dev/null || true
 adbx shell settings put global transition_animation_scale 0 >/dev/null || true
 adbx shell settings put global animator_duration_scale 0 >/dev/null || true
+# Diálogo de sistema deixado aberto (ex.: o seletor de teclado que o "Pular" do onboarding abre quando o KeyFlow está
+# habilitado mas não ativo) fica com o foco: a galeria nunca o recebe, as barras do sistema não somem e toda captura sai com
+# a barra de status real (gate da main de 2026-10-11, 22 de 36 telas). O HOME fecha os diálogos de sistema; a aba de
+# notificações, o collapse.
+adbx shell input keyevent KEYCODE_HOME >/dev/null || true
+adbx shell cmd statusbar collapse >/dev/null 2>&1 || true
 
 # Lista de rotas a partir da fonte única (RouteCatalog), via modo lista da galeria.
 adbx shell am force-stop "$PKG"
