@@ -12,6 +12,7 @@ import com.keyflow.data.SettingsRepository
 import com.keyflow.ui.onboarding.ONBOARDING_SKIP_TAG
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -63,4 +64,30 @@ class OnboardingRoutingTest {
         }
         assertTrue("onboardingDone deveria ter sido persistido", persisted)
     }
+
+    /**
+     * O "Pular" liga o que já está permitido: com o teclado do KeyFlow habilitado mas não ativo, abre o seletor de teclado
+     * do Android (`showInputMethodPicker`, assíncrono — sobe ~1 s depois). Se ele subir depois de a Activity fechar, fica
+     * aberto com o foco: no gate da main de 2026-10-11 ficou minutos, e a galeria inteira saiu com a barra de status (o
+     * modo imersivo só vale com foco); no meio da suíte, rouba o foco dos testes seguintes. Espera até 2 s e fecha.
+     */
+    @After
+    fun closeKeyboardPickerLeftBySkip() {
+        val deadline = SystemClock.elapsedRealtime() + 2_000
+        while (SystemClock.elapsedRealtime() < deadline) {
+            if (focusedWindow().contains("Select input method")) {
+                shell("input keyevent KEYCODE_BACK")
+                return
+            }
+            SystemClock.sleep(100)
+        }
+    }
+
+    private fun focusedWindow(): String =
+        shell("dumpsys window").lineSequence().firstOrNull { "mCurrentFocus" in it }.orEmpty()
+
+    private fun shell(command: String): String =
+        InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command).use { fd ->
+            java.io.FileInputStream(fd.fileDescriptor).bufferedReader().readText()
+        }
 }
