@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- O campo onde o teclado abre: noutro app (este APK de benchmark), como no uso real, para o processo do KeyFlow
+         subir a frio só para o teclado. -->
+    <application>
+        <activity
+            android:name=".FieldActivity"
+            android:exported="true"
+            android:windowSoftInputMode="stateHidden|adjustResize" />
+    </application>
+</manifest>

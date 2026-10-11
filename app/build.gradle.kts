@@ -5,6 +5,8 @@ plugins {
     id("com.android.application")
     // AGP 9.2.0 aplica o Kotlin internamente; aqui só o plugin do compilador Compose.
     id("org.jetbrains.kotlin.plugin.compose")
+    // Consome o perfil de base gerado pelo :baselineprofile (app/src/release/generated/baselineProfiles/).
+    id("androidx.baselineprofile")
 }
 
 android {
@@ -47,6 +49,14 @@ android {
         release {
             isMinifyEnabled = false
             ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
+        }
+        // As variantes que o plugin do perfil de base cria a partir do release (nonMinifiedRelease, benchmarkRelease) só
+        // rodam no emulador: assinadas com a keystore de debug e com x86_64.
+        configureEach {
+            if (name == "nonMinifiedRelease" || name == "benchmarkRelease") {
+                signingConfig = signingConfigs.getByName("debug")
+                ndk { abiFilters += "x86_64" }
+            }
         }
     }
     buildFeatures {
@@ -212,6 +222,11 @@ dependencies {
     // `SVG.renderToCanvas(Canvas, RenderOptions)`, `RenderOptions.viewPort/preserveAspectRatio`, `SVG.getDocumentViewBox`,
     // `SVG.setInternalEntitiesEnabled`. Só `skins/SvgRender.kt` importa `com.caverock` — trocar o renderizador não vaza.
     implementation("com.caverock:androidsvg-aar:1.4")
+
+    // Instala o perfil de base (o caminho de abertura compilado de antemão) também fora da Play: APK lateral, adb. 1.4.1:
+    // estável de 2024-10-02. O perfil vem do :baselineprofile.
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
+    baselineProfile(project(":baselineprofile"))
 
     // --- Testes ---
     // Unit

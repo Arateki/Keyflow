@@ -66,6 +66,7 @@ saída" deixa passar.
 | Fuzz | `app/src/test/…/fuzz/` | Entrada de fora nunca derruba o app: pacote de skin (bytes, zip corrompido, nomes hostis, SVG), manifest, barras, credenciais, argumentos do agente (~30 mil entradas, ~4 s) | unit |
 | Máquina de estados | `OverlayCoordinatorStateMachineTest` | Sequências aleatórias de gestos/intenções/cancelar/desfazer/troca de campo/limite com relógio virtual: o microfone capta se e só se o estado é RECORDING, nunca liga duas vezes, a tela mostra o estado real, sempre volta ao repouso. Achou o RESUME em SENDING que deixava o microfone aberto em repouso | unit |
 | Mutação | `./gradlew :app:pitest` + `scripts/mutation-summary.py` + `.github/workflows/mutation.yml` | Onde os testes rodam o código mas não conferem o resultado (mutante que sobrevive) | semanal / manual |
+| Perfil de base + benchmark | módulo `:baselineprofile` (`BaselineProfileGenerator`, `OpeningBenchmarks`) + `profileinstaller` no app | Abertura a frio do app e do teclado com e sem o perfil (o caminho compilado de antemão na instalação, sem JIT) | à mão, no emulador |
 
 - kotest-property no JUnit4: `fun x() = runBlocking<Unit> { checkAll(...) }` (método JUnit4 tem de devolver Unit). A falha
   traz a semente ("Repeat this test by using seed …") e a entrada já encolhida; para repetir, `checkAll(PropTestConfig(seed =
@@ -78,6 +79,20 @@ saída" deixa passar.
   regra que nenhum teste confere. 1ª medição (2026-10-10, local, 7 min): força 81% (1890 de 2327 mutantes cobertos), 437
   sobreviventes — ex.: apagar o `publishTime()`/`timeFreeze()` do `OverlayCoordinator` passa, nenhum teste confere o
   cronômetro da gravação (`onRecordingTime`).
+- Perfil de base: `ANDROID_SERIAL=emulator-5554 ./gradlew :app:generateBaselineProfile` grava
+  `app/src/release/generated/baselineProfiles/` (versionado; gerar de novo quando o caminho de abertura mudar). Medir:
+  `ANDROID_SERIAL=… ./gradlew :baselineprofile:connectedBenchmarkReleaseAndroidTest`. **Só emulador**: instala a variante
+  release (`nonMinifiedRelease`/`benchmarkRelease`, mesmo `com.keyflow`, keystore de debug) — num aparelho com o app de debug,
+  a troca apaga os dados; sem `ANDROID_SERIAL`, o Gradle roda em TODOS os conectados (o A32 inclusive). O teclado é medido
+  pelas seções de trace do `KeyFlowKeyboardService` (`KeyFlow.keyboardOpen` do 1º passo do ciclo de mostrar ao 1º quadro
+  entregue, Android 10+; `KeyFlow.onCreateInputView`; `KeyFlow.onStartInputView`), que também aparecem num trace do Perfetto.
+  O campo fica numa Activity do APK de benchmark: o teclado abre sobre outro app, com o processo do KeyFlow frio. O
+  `killProcess()` do Macrobenchmark é um force-stop, que tira o KeyFlow de teclado ativo: o `ime set` vem DEPOIS dele, e a
+  volta confere que a janela aberta é do uid do KeyFlow (antes, metade das voltas media o Gboard).
+  1ª medição (2026-10-10, emulador API 34, mediana sem → com perfil): `onCreateInputView` 22 → 8,5 ms no emulador rápido e
+  65 → 16 ms com a cota de 300% (≈ CI); a abertura até o 1º quadro fica em ~340–390 ms (rápido) e ~990 ms (lento) com ou sem
+  perfil — esse resto é sistema e renderização (swangle, por software), não o nosso código; app a frio 1,0 s / 2,3 s, −3 a −5%
+  (ruído). Os traces do Perfetto de cada volta ficam em `baselineprofile/build/outputs/connected_android_test_additional_output/`.
 
 ## CI (GitHub Actions) — `.github/workflows/checks.yml`
 
