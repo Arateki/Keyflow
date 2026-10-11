@@ -49,6 +49,12 @@ Estratégia escolhida: **cobertura completa** (unit + instrumented). Greenfield 
   `createComposeRule` (Compose 1.7) a composição coleta num dispatcher "unconfined": valor vindo de outra thread recompunha
   ali — CalledFromWrongThreadException, "performMeasureAndLayout called during measure layout", SlotTable corrompida.
   No app não muda nada. `CollectOnMainTest` confere.
+- Teste que dispara uma janela do SISTEMA (seletor de teclado, diálogo de permissão) fecha-a antes de terminar: ela fica com
+  o foco depois de a Activity do teste fechar e derruba quem vem depois — testes do mesmo shard e a galeria inteira (as barras
+  do sistema só somem com foco; em 2026-10-11 o seletor que o "Pular" do onboarding abre ficou minutos aberto e 22 de 36
+  capturas saíram com a barra de status real). `OnboardingRoutingTest` espera o seletor até 2 s e fecha; o `verify-screens.sh`
+  aperta HOME antes de capturar; a galeria só marca pronto com as barras escondidas (ou avisa "barras do sistema ainda
+  visíveis" no logcat). Captura com barra de status no diff = foco roubado, não mudança de tela.
 - Teste que precisa agir DENTRO de uma janela de tempo do produto (ex.: desfazer o cancelamento, 3 s) alonga a janela por um
   gancho `…ForTest` em vez de correr contra o relógio: no emulador do CI um quadro do teclado chega a 1–2 s.
 

@@ -2,6 +2,8 @@ package com.keyflow.ui.gallery
 
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -103,6 +105,7 @@ class GalleryActivity : ComponentActivity() {
                         // Quadro da thread principal não é quadro na tela: com a rota composta depois do foco, a
                         // entrega à tela vinha atrasada, e a captura pegava a janela ainda vazia (o 1º quadro, que o
                         // Android sincroniza com a janela aparecer, já não é o da rota).
+                        awaitSystemBarsHidden()
                         repeat(2) { awaitFrameCommit() }
                         writeReadyMarker(if (route != null) routeKey else "unknown:$routeKey")
                     }
@@ -125,6 +128,22 @@ class GalleryActivity : ComponentActivity() {
             decor.postOnAnimation { if (cont.isActive) cont.resume(Unit) }
         }
         decor.invalidate()
+    }
+
+    /**
+     * Espera as barras do sistema sumirem de fato. O pedido do [enterImmersiveMode] só vale quando a janela ganha o foco; se o
+     * foco passa dos 3 s de [FOCUS_WAIT_MS], a rota compõe e ficava pronta com a barra de status ainda na tela — a captura
+     * pegava o relógio real e os ícones (gate da main de 2026-10-11: 22 das 36 telas de um recorte, ~0,24% dos pixels cada).
+     * Não sumiram em [BARS_WAIT_MS]: segue e avisa no log, para a captura errada se explicar.
+     */
+    private suspend fun awaitSystemBarsHidden() {
+        val deadline = SystemClock.uptimeMillis() + BARS_WAIT_MS
+        while (SystemClock.uptimeMillis() < deadline) {
+            val insets = window.decorView.rootWindowInsets?.let { WindowInsetsCompat.toWindowInsetsCompat(it, window.decorView) }
+            if (insets != null && !insets.isVisible(WindowInsetsCompat.Type.systemBars())) return
+            withFrameNanos { }
+        }
+        Log.w(TAG, "barras do sistema ainda visíveis $BARS_WAIT_MS ms depois de pedir para esconder (foco=${windowFocused.value})")
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -158,5 +177,7 @@ class GalleryActivity : ComponentActivity() {
         const val LIST_ROUTES = "__list__"
         const val ROUTES_FILE = "gallery_routes"
         private const val FOCUS_WAIT_MS = 3_000L
+        private const val BARS_WAIT_MS = 10_000L
+        private const val TAG = "KeyFlow.Gallery"
     }
 }
