@@ -4,6 +4,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.os.Trace
 import android.text.InputType
 import android.util.Log
 import android.view.KeyEvent
@@ -208,7 +209,31 @@ class KeyFlowKeyboardService : InputMethodService() {
      */
     private fun recreateInputView(reason: String) {
         Log.d(TAG, "recriando a view do teclado: $reason (visível=${keyboardView?.isShown == true})")
-        setInputView(onCreateInputView())
+        recreatingInputView = true
+        try {
+            setInputView(onCreateInputView())
+        } finally {
+            recreatingInputView = false
+        }
+    }
+
+    // Abertura do teclado no trace do sistema (Perfetto, e o Macrobenchmark do módulo :baselineprofile): "KeyFlow.keyboardOpen"
+    // vai do 1º passo do ciclo de mostrar (onCreateInputView pedido pelo Android, ou onStartInputView) ao 1º quadro entregue.
+    // Seção assíncrona (Android 10+): começa e termina em chamadas diferentes. A recriação ao vivo não abre seção.
+    private var recreatingInputView = false
+    private var openTraceCookie = 0
+    private var openTraceActive = false
+
+    private fun beginOpenTrace() {
+        if (openTraceActive || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
+        openTraceActive = true
+        Trace.beginAsyncSection(OPEN_TRACE, ++openTraceCookie)
+    }
+
+    private fun endOpenTrace() {
+        if (!openTraceActive || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
+        openTraceActive = false
+        Trace.endAsyncSection(OPEN_TRACE, openTraceCookie)
     }
 
     /**
@@ -220,11 +245,12 @@ class KeyFlowKeyboardService : InputMethodService() {
     private fun traceFirstFrame(from: String) {
         // registerFrameCommitCallback é do Android 10; abaixo disso, sem o diagnóstico (antes lançava NoSuchMethodError).
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
-        val view = keyboardView ?: return
+        val view = keyboardView ?: return endOpenTrace()
         val started = SystemClock.uptimeMillis()
         val observer = view.viewTreeObserver
-        if (!observer.isAlive) return
+        if (!observer.isAlive) return endOpenTrace()
         observer.registerFrameCommitCallback {
+            endOpenTrace()
             val root = view.rootView
             Log.d(TAG, "1º quadro depois de $from: ${SystemClock.uptimeMillis() - started} ms (janela ${root.width}x${root.height})")
         }
@@ -302,6 +328,16 @@ class KeyFlowKeyboardService : InputMethodService() {
     }
 
     override fun onCreateInputView(): View {
+        if (!recreatingInputView) beginOpenTrace()
+        Trace.beginSection("KeyFlow.onCreateInputView")
+        try {
+            return createInputView()
+        } finally {
+            Trace.endSection()
+        }
+    }
+
+    private fun createInputView(): View {
         val createStartedNs = System.nanoTime()
         // Tema, tamanho (2026-07-02), idioma do app (2026-07-02, não o subtype do sistema), fileira de números (NUMROW-01),
         // skin, barras e grades (SB-T5) e vibração: UMA leitura do DataStore, sem o EncryptedSharedPreferences (cripto cara) —
@@ -513,6 +549,16 @@ class KeyFlowKeyboardService : InputMethodService() {
     }
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
+        beginOpenTrace()
+        Trace.beginSection("KeyFlow.onStartInputView")
+        try {
+            startInputView(info, restarting)
+        } finally {
+            Trace.endSection()
+        }
+    }
+
+    private fun startInputView(info: EditorInfo?, restarting: Boolean) {
         val startedNs = System.nanoTime()
         super.onStartInputView(info, restarting)
         Log.d(TAG, "onStartInputView restarting=$restarting")
@@ -776,6 +822,8 @@ class KeyFlowKeyboardService : InputMethodService() {
 
     companion object {
         private const val TAG = "KeyFlow.Keyboard"
+        /** Seção do trace da abertura (ver [beginOpenTrace]); o OpeningBenchmarks do :baselineprofile a mede pelo nome. */
+        private const val OPEN_TRACE = "KeyFlow.keyboardOpen"
 
         // Raio do desfoque atrás do vidro do Aero, em dp (quando o aparelho desfoca janelas).
         private const val WINDOW_BLUR_DP = 24
