@@ -34,11 +34,13 @@ chave; o `TranslationsTest` confere as traduções.
   `flock /tmp/keyflow-emulator.lock …`, e **um emulador por vez** (o PC tem 14 GB de RAM).
 - **No servidor (`archlinux-server`)**: o repositório fica em `/srv/dev/keyflow` e as ferramentas em
   `/srv/dev/ferramentas` (ver o `LEIA-ME.md` de lá). Gradle:
-  `GRADLE_USER_HOME=/srv/dev/keyflow/.gradle /srv/dev/ferramentas/bin/gradle --no-daemon <tarefas>`. O emulador
-  (`keyflow_api34`, o mesmo AVD) roda no host: `emulador ligar`, espere `emulador estado` dizer `pronto`, e
-  `emulador desligar` no fim (ocupa ~3 GB). Dentro do container o `ANDROID_SERIAL=emulator-5554` já vem definido e
-  as travas de `/tmp` são as mesmas para todos os agentes. Não há credencial de git: commite na branch, e quem está
-  no Deck busca com `git fetch servidor`.
+  `GRADLE_USER_HOME=/srv/dev/keyflow/.gradle /srv/dev/ferramentas/bin/gradle --no-daemon <tarefas>`. Testes
+  instrumentados: `instrumentar <Classe | Classe#metodo | pacote ...>` da sua worktree — liga o emulador
+  (`keyflow_api34`, o mesmo AVD, no host) se precisar, segura as travas, instala e roda `am instrument` só no
+  pedido (~1 min com o emulador ligado). Rode os afetados antes de entregar; não espere o CI. O emulador desliga
+  sozinho depois de 30 min sem uso (`emulador estado|ligar|desligar` para controle manual). Dentro do container
+  o `ANDROID_SERIAL=emulator-5554` já vem definido e as travas de `/tmp` são as mesmas para todos os agentes. Não
+  há credencial de git: commite na branch, e quem está no Deck busca com `git fetch servidor`.
 - **Instrumentados no emulador**: AVD `keyflow_api34`, sempre com `-gpu swangle_indirect` (é o renderizador
   dos goldens e do CI) e sempre com `ANDROID_SERIAL=emulator-5554` — sem ele o Gradle instala em todos os
   aparelhos conectados, inclusive o do Yan.
