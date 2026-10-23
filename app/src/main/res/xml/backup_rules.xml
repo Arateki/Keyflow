@@ -7,6 +7,8 @@
   que é o comportamento correto. `SecurePrefs` ainda tem recuperação pra quem já está com o estado quebrado.
 -->
 <full-backup-content>
+    <!-- A identidade anônima é deliberadamente clara e acompanha a reinstalação; o Block Store é o fallback. -->
+    <include domain="sharedpref" path="identity.xml" />
     <exclude domain="sharedpref" path="keyflow_secure.xml" />
     <!-- O cofre das credenciais de IA (auth/): mesma razão, chave de Keystore própria — ver SecureCredentialStore. -->
     <exclude domain="sharedpref" path="keyflow_auth.xml" />
