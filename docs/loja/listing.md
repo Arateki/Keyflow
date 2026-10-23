@@ -16,7 +16,7 @@ KeyFlow: Teclado de Voz & IA
 ```
 Teclado ágil com ditado por voz sob demanda, IA offline ou na nuvem e temas.
 ```
-*(Contagem: 77 caracteres)*
+*(Contagem: 76 caracteres)*
 
 ### 1.3. Descrição Completa (≤ 4000 caracteres)
 ```
@@ -35,7 +35,7 @@ Escolha como sua voz vira texto:
 - Nuvem com Chave Própria: conecte sua própria chave de API da OpenAI (Whisper), Groq ou servidor customizado compatível.
 
 • Teclado Canvas Rápido e Preciso
-Interface desenhada em Canvas de alta performance com suporte a Português, Inglês e Espanhol, acentuação dinâmica intuitiva, corretor ortográfico local com aprendizado, barra de atalhos personalizável e resposta tátil precisa.
+Interface desenhada em Canvas de alta performance com suporte a Português, Inglês e Espanhol, acentuação dinâmica intuitiva, corretor ortográfico local com dicionários integrados, barra de atalhos personalizável e resposta tátil precisa.
 
 • Personalização e Temas Visuais
 Personalize a aparência do seu teclado:
@@ -47,13 +47,13 @@ Personalize a aparência do seu teclado:
 Gere textos e consulte assistentes inteligentes diretamente pelas configurações:
 - Modelos Locais (offline): Gemma e Qwen rodando no próprio dispositivo via LiteRT-LM.
 - Nuvem: conecte seus provedores favoritos (OpenAI, Anthropic Claude, Google Gemini) via chave de API ou login por assinatura.
-- Agente KeyFlow: converse com o assistente do app para personalizar temas e tirar dúvidas.
+- Em breve: Agente KeyFlow para assistência inteligente e customização assistida de temas.
 
 PRIVACIDADE COMO PRIORIDADE
 
 • Suas teclas não saem do aparelho: o que você digita é processado estritamente na memória local e entregue direto ao app em uso. Nenhum caractere digitado é gravado ou enviado para a internet.
 • Sem contas obrigatórias: use o app de imediato sem criar cadastro no KeyFlow.
-• Suas chaves protegidas: credenciais de API e tokens de login são cifrados no hardware de segurança do seu celular (Android Keystore).
+• Suas chaves protegidas: credenciais de API e tokens de login são cifrados e protegidos pelo Android Keystore.
 
 MONETIZAÇÃO TRANSPARENTE
 
@@ -61,7 +61,7 @@ O KeyFlow é gratuito para usar:
 • A versão gratuita conta com anúncios discretos (banner e intersticial) exibidos exclusivamente na tela de configurações do aplicativo. Nenhum anúncio é exibido no teclado ou na orbe.
 • Compra única opcional (R$ 15): desbloqueia permanentemente todos os temas visuais (Aero, Glitch, Rose Gold e Mascote) e remove todos os anúncios do aplicativo para sempre. Não é assinatura; pague uma vez e use vitaliciamente.
 ```
-*(Contagem: ~2.650 caracteres — bem abaixo do limite de 4000)*
+*(Contagem: 2.750 caracteres — bem abaixo do limite de 4000)*
 
 ---
 
@@ -96,7 +96,7 @@ Choose how your voice turns into text:
 - Cloud with Your Own Key: Connect your personal OpenAI Whisper, Groq, or compatible custom API key.
 
 • High-Performance Canvas Keyboard
-Engineered with high-speed Canvas rendering supporting English, Portuguese, and Spanish, intuitive accent popups, on-device spell check with local dictionary learning, customizable shortcut bars, and haptic feedback.
+Engineered with high-speed Canvas rendering supporting English, Portuguese, and Spanish, intuitive accent popups, on-device spell check with built-in dictionaries, customizable shortcut bars, and haptic feedback.
 
 • Themes and Visual Customization
 Tailor your keyboard's look and feel:
@@ -108,13 +108,13 @@ Tailor your keyboard's look and feel:
 Generate text and test AI models directly in settings:
 - Local Models (Offline): Gemma and Qwen running entirely on-device via LiteRT-LM.
 - Cloud Providers: Connect OpenAI, Anthropic Claude, or Google Gemini via personal API key or subscription login.
-- KeyFlow Agent: Chat with the in-app assistant to customize theme colors and get answers.
+- Coming soon: KeyFlow Agent for smart assistance and conversational theme customization.
 
 PRIVACY BY DESIGN
 
 • Your keystrokes stay on your device: Typed text and passwords are processed strictly in local memory and sent directly to the active app. We never log or transmit typed characters.
 • No account required: Start using the keyboard immediately without creating a KeyFlow profile.
-• Hardware-grade security: API keys and login tokens are encrypted using the Android Keystore.
+• Secure credentials: API keys and login tokens are encrypted and protected via the Android Keystore.
 
 TRANSPARENT MONETIZATION
 
@@ -122,7 +122,7 @@ KeyFlow is free to use:
 • The free version displays discreet banner and interstitial ads strictly within the app's settings screen. No ads ever appear inside the keyboard or floating orb.
 • Optional one-time purchase: Permanently unlocks all premium themes (Aero, Glitch, Rose Gold, Mascot) and completely removes all advertisements forever. No recurring subscriptions.
 ```
-*(Character count: ~2.550)*
+*(Character count: 2.504 — well below the 4000 character limit)*
 
 ---
 
@@ -134,15 +134,15 @@ KeyFlow is free to use:
 
 #### Justificativa para o formulário do Play Console:
 ```
-O KeyFlow é um teclado de entrada de texto (Input Method Editor — IME) com recurso central de ditado por voz sob demanda. Como o teclado e sua orbe flutuante operam em janelas de sistema sobrepostas a outros aplicativos (como navegadores, clientes de e-mail e mensageiros), a captura contínua de áudio do microfone pelo serviço OverlayService precisa permanecer ativa enquanto o usuário dita seu texto fora da janela principal do app. O serviço é iniciado exclusivamente por ação direta do usuário (ao tocar no botão de microfone), exibe notificação contínua na barra de status indicando a gravação em curso com botão para parar, e é imediatamente encerrado assim que o usuário para ou cancela o ditado.
+O KeyFlow é um teclado de entrada de texto (Input Method Editor — IME) com recurso central de ditado por voz sob demanda. Como o teclado e sua orbe flutuante operam em janelas de sistema sobrepostas a outros aplicativos (como navegadores, clientes de e-mail e mensageiros), a captura de áudio do microfone pelo serviço OverlayService precisa operar fora da Activity principal. O microfone grava exclusivamente enquanto o usuário dita texto ativamente. No modo só-teclado, o serviço em primeiro plano é iniciado sob demanda pelo toque no microfone e encerrado imediatamente após o término ou cancelamento do ditado; no modo Sobrepor (orbe flutuante ativa), o serviço mantém a orbe acessível com notificação contínua na barra de status indicando o estado do serviço e permitindo pausar ou fechar, captando o microfone estritamente durante o ditado.
 ```
 
 #### Roteiro do Vídeo Demonstrativo (Microphone FGS Video Script):
 - **Duração:** 30 a 45 segundos.
 - **Passo 1 (00:00 - 00:08):** Abrir um aplicativo de terceiros (ex.: Bloco de Notas ou Mensagens) e tocar em um campo de texto para abrir o teclado KeyFlow.
-- **Passo 2 (00:08 - 00:15):** Tocar no botão de microfone do teclado. Destacar o início imediato do indicador visual de gravação no teclado e a orbe flutuante pulsando em vermelho/verde.
+- **Passo 2 (00:08 - 00:15):** Tocar no botão de microfone do teclado. Destacar o início imediato da gravação e o indicador visual no teclado.
 - **Passo 3 (00:15 - 00:25):** Deslizar para baixo a barra de notificações do Android, mostrando a notificação contínua obrigatória do serviço em primeiro plano: *"KeyFlow — Ditado por voz ativo"*.
-- **Passo 4 (00:25 - 00:35):** Falar uma frase breve, tocar no botão de concluir/parar gravação. Mostrar o texto transcrito sendo inserido no campo de texto e a notificação de primeiro plano sumindo imediatamente.
+- **Passo 4 (00:25 - 00:35):** Falar uma frase breve, tocar no botão de concluir/parar gravação. Mostrar o texto transcrito sendo inserido no campo de texto e a notificação de primeiro plano encerrando-se no modo só-teclado (ou retornando ao status pronto da orbe no modo Sobrepor).
 
 ---
 

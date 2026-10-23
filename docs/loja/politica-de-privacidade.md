@@ -2,13 +2,13 @@
 
 **Última atualização:** 23 de outubro de 2026  
 **Vigência a partir de:** 23 de outubro de 2026  
-**URL permanente:** [YAN: Definir URL oficial de hospedagem, ex.: `https://arateki.com/keyflow/privacidade`]
+**URL permanente:** `https://keyflow.arateki.com/privacidade`
 
 ---
 
-A **Arateki** [YAN: Inserir razão social completa e CNPJ, se aplicável] desenvolveu o **KeyFlow** com um compromisso fundamental: **sua privacidade é a prioridade**. O KeyFlow é um teclado para Android focado em produtividade e ditado por voz sob demanda.
+A **Arateki LTDA** (CNPJ 45.642.122/0001-10, com sede em Fortaleza/CE) desenvolveu o **KeyFlow** com um compromisso fundamental: **sua privacidade é a prioridade**. O KeyFlow é um teclado para Android focado em produtividade, digitação ágil e ditado por voz sob demanda.
 
-Esta política explica, de maneira simples e transparente, quais dados são tratados, como são protegidos e quais são os seus direitos.
+Esta política explica, de maneira simples, transparente e em conformidade com a LGPD e o GDPR, quais dados são tratados, como são protegidos e quais são os seus direitos.
 
 ---
 
@@ -16,9 +16,9 @@ Esta política explica, de maneira simples e transparente, quais dados são trat
 
 Para garantir sua total tranquilidade ao utilizar o KeyFlow como seu teclado padrão no Android:
 
-- **NÃO coletamos, NÃO gravamos e NÃO transmitimos o que você digita:** Suas teclas tocadas, textos digitados em campos de senha, mensagens, documentos ou termos de busca são processados estritamente na memória local do seu aparelho e entregues diretamente ao aplicativo em que você está digitando.
+- **NÃO coletamos, NÃO gravamos e NÃO transmitimos o que você digita:** Suas teclas tocadas, textos digitados em campos de senha, mensagens, documentos ou termos de busca são processados estritamente na memória local do seu aparelho e entregues diretamente ao aplicativo em que você está digitando via `InputConnection`. Nenhum caractere digitado é gravado em arquivos de log ou enviado para a internet.
 - **NÃO temos acesso contínuo ao seu microfone:** O microfone do seu celular só é ativado quando você clica deliberadamente no botão de gravar (no teclado ou na orbe flutuante) e é desligado imediatamente após a conclusão do ditado.
-- **NÃO coletamos dados sensíveis:** Não coletamos sua localização GPS, agenda de contatos, histórico de navegação ou fotos.
+- **NÃO coletamos dados sensíveis:** O aplicativo não requer nem utiliza permissões de localização geográfica precisa ou aproximada por GPS (`ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION`), agenda de contatos, fotos ou histórico de navegação.
 
 ---
 
@@ -26,32 +26,36 @@ Para garantir sua total tranquilidade ao utilizar o KeyFlow como seu teclado pad
 
 ### a) Gravações de Áudio para Ditado por Voz
 - **O que é:** O áudio capturado enquanto você mantém a gravação ativada.
-- **Finalidade:** Transcrever sua fala em texto.
+- **Finalidade:** Transcrever sua fala em texto sob demanda do usuário.
 - **Como funciona:**
   - Se você escolher a **Transcrição Local (Offline):** O áudio é processado inteiramente dentro do seu aparelho usando modelos neurais compactos (`sherpa-onnx`). **Nenhum byte de áudio sai do seu celular.**
   - Se você escolher a **Transcrição na Nuvem (OpenAI, Groq ou Servidor Customizado):** O arquivo de áudio temporário é transmitido diretamente do seu aparelho via conexão segura criptografada (HTTPS) para o endpoint escolhido por você, utilizando a sua própria chave de API.
-- **Armazenamento:** O arquivo de áudio gravado fica em cache temporário no seu aparelho e é **descartado imediatamente** assim que a transcrição é concluída ou se você cancelar a gravação.
+- **Armazenamento e Exclusão no Aparelho:** O arquivo de áudio gravado é mantido em cache temporário (`cacheDir/keyflow-recordings/`) durante a transcrição e durante a janela de cancelamento de 3 segundos (que permite desfazer o envio). Ele é **apagado imediatamente** assim que a transcrição é concluída (com sucesso ou erro) ou ao expirar o cancelamento. Arquivos órfãos com mais de 24 horas são limpos automaticamente na inicialização do aplicativo.
+- **Retenção nos Provedores de Terceiros:** Nos provedores de nuvem (OpenAI, Groq ou endpoint compatível), o tratamento e a retenção do áudio transmitido regem-se exclusivamente pelas políticas de privacidade de cada provedor e pelas configurações da sua chave/conta. Não podemos garantir retenção zero em servidores de terceiros. Se você deseja garantia absoluta de não retenção externa, utilize a transcrição 100% offline no aparelho.
 
-### b) Prompts de Texto para Modelos de Raciocínio (IA)
-- **O que é:** O texto que você digita para testes de raciocínio ou no chat com o Agente KeyFlow nas configurações do app.
+### b) Prompts de Texto e Dados para Modelos de Raciocínio (IA)
+- **O que é:** O texto que você digita para testes de raciocínio nas configurações do aplicativo.
 - **Finalidade:** Obter respostas inteligentes ou customizar a interface do teclado.
 - **Como funciona:**
   - Se você usar **Modelos Locais (LiteRT-LM):** O processamento é 100% offline no seu aparelho.
-  - Se você usar **Provedores de Nuvem (OpenAI, Anthropic ou Google):** O texto é enviado diretamente do seu aparelho para os servidores do provedor configurado, usando sua chave de API ou sua assinatura conectada (OAuth). Na OpenAI, as requisições utilizam o parâmetro `store: false`.
+  - Se você usar **Provedores de Nuvem (OpenAI, Anthropic ou Google):** O texto é enviado diretamente do seu aparelho para os servidores do provedor configurado, usando sua chave de API ou sua assinatura conectada (OAuth). Na OpenAI, as requisições utilizam o parâmetro `store: false` para solicitar a não retenção em histórico de API, mas a retenção remota (ex.: até 30 dias para monitoramento de abusos conforme a política da plataforma) segue as regras da OpenAI. Na Anthropic e no Google, a retenção segue as políticas de cada empresa. No caso de ferramentas de customização visual de temas via Anthropic por chave de API, metadados de skins e imagens de prévia geradas podem ser enviados como parâmetros de ferramentas.
+- **Agente KeyFlow:** Recurso de assistência interativa planejado como "Em breve" para versões futuras da v1.
 
 ### c) Chaves de API e Credenciais de Acesso
 - **O que é:** Suas chaves de API pessoais e tokens de autenticação das contas conectadas.
-- **Como são guardadas:** Armazenadas **exclusivamente no seu aparelho**, criptografadas pelo cofre seguro do Android (**Android Keystore** com AES-256). Elas **nunca** são enviadas para servidores da Arateki e são excluídas dos backups em nuvem do Android.
+- **Como são tratadas:** Armazenadas no seu aparelho e protegidas por criptografia no **Android Keystore** (AES-256-GCM). Elas **nunca** são enviadas para servidores da Arateki e são excluídas dos backups em nuvem do Android. Para a execução das requisições solicitadas por você, os tokens ou chaves são transmitidos diretamente e com segurança (HTTPS) aos respectivos provedores de terceiros (OpenAI, Anthropic ou Google) exclusivamente para fins de autenticação.
 
-### d) Identificador Anônimo do Aparelho e Compras
-- **O que é:** Um identificador aleatório gerado no seu aparelho (UUIDv4) e o recibo de compra fornecido pelo Google Play (`purchaseToken`).
-- **Finalidade:** Validar a compra única de **R$ 15** (desbloqueio vitalício de temas e remoção de anúncios) e manter seu status de desbloqueio mesmo se reinstalar o app.
-- **Privacidade:** Esse identificador é completamente anônimo e não é associado ao seu nome, e-mail ou número de telefone.
+### d) Identificador Anônimo do Aparelho, Integridade e Compras
+- **O que é:** Um identificador anônimo gerado aleatoriamente no seu aparelho (UUIDv4), o token de verificação de integridade do Google Play Integrity e o recibo de compra fornecido pelo Google Play (`purchaseToken`).
+- **Finalidade:** Verificar a autenticidade do aplicativo, gerenciar e validar o status de direitos (entitlements) — incluindo a compra única de **R$ 15** (desbloqueio vitalício de temas e remoção de anúncios) — e permitir a restauração da licença em caso de reinstalação.
+- **Como é transmitido:** Ao concluir o onboarding nas configurações, o app registra o UUID anônimo e o token de integridade junto à API da Arateki (`keyflow-api.arateki.com/v1/register`, `v1/account`). Na compra ou restauração, o recibo é validado em `/v1/purchases/redeem`. Um resumo criptográfico (hash) do UUID também é enviado ao Google Play Billing (`obfuscatedAccountId`). A compra única não encerra a verificação periódica de licença.
+- **Privacidade:** O identificador anônimo não é associado ao seu nome, e-mail ou número de telefone.
 
 ### e) Anúncios e Consentimento (Google AdMob / UMP)
 - O KeyFlow exibe anúncios discretos (banner e intersticial) **exclusivamente na tela de configurações do aplicativo** (`SetupActivity`).
 - **Nenhum anúncio é exibido no teclado ou na orbe flutuante.**
-- O aplicativo utiliza a plataforma **Google User Messaging Platform (UMP)** para solicitar seu consentimento para exibição de anúncios personalizados de acordo com a LGPD e o GDPR.
+- O aplicativo utiliza a plataforma **Google User Messaging Platform (UMP)** para solicitar seu consentimento para exibição de anúncios de acordo com a LGPD e o GDPR.
+- **Revisão a qualquer momento:** O usuário pode rever ou revogar suas preferências de consentimento de anúncios a qualquer momento através da opção **"Privacidade dos anúncios"** localizada na aba **Docs** das configurações do aplicativo.
 - A compra única de **R$ 15** remove todos os anúncios do aplicativo em definitivo.
 
 ---
@@ -65,29 +69,34 @@ A Arateki **não vende, não aluga e não comercializa** seus dados pessoais. O 
    - **Groq:** [Política de Privacidade da Groq](https://groq.com/privacy-policy/)
    - **Anthropic:** [Política de Privacidade da Anthropic](https://www.anthropic.com/privacy)
    - **Google Generative AI:** [Política de Privacidade do Google](https://policies.google.com/privacy)
-2. **Plataformas de Infraestrutura e Pagamento:**
+2. **Plataformas de Infraestrutura, Pagamento e Anúncios:**
    - **Google Play:** Para processamento de compras no aplicativo e verificação de integridade do app ([Privacidade do Google](https://policies.google.com/privacy)).
-   - **Google AdMob:** Para veiculação de anúncios na tela de configurações para usuários da versão gratuita ([Tecnologias de Anúncios do Google](https://policies.google.com/technologies/ads)).
-   - **Hugging Face:** Apenas para download dos arquivos públicos de pesos de modelos locais de voz e raciocínio ([Privacidade do Hugging Face](https://huggingface.co/privacy)).
-   - **API da Arateki (`keyflow-api.arateki.com`):** Recebe apenas o token de validação de compra do Google Play e o UUID anônimo do aparelho para registrar o desbloqueio. [YAN: Definir política de retenção de logs da API — sugestão: 30 dias para logs técnicos de erro].
+   - **Google AdMob:** Para veiculação de anúncios na tela de configurações para usuários da versão gratuita ([Tecnologias de Anúncios do Google](https://policies.google.com/technologies/ads)). O SDK pode coletar identificadores de publicidade, endereço IP e localização aproximada derivada de IP.
+   - **Hugging Face e Espelhos Autorizados:** Para download dos arquivos públicos de pesos de modelos locais de voz e raciocínio ([Privacidade do Hugging Face](https://huggingface.co/privacy)), ou outros espelhos de distribuição indicados no catálogo remoto.
+   - **API da Arateki (`keyflow-api.arateki.com`):** Recebe o UUID anônimo, token do Play Integrity e tokens de compra para validação de licenças, e fornece arquivos de configuração e catálogo (`/v1/config`, `/v1/models`). [YAN: Definir política de retenção dos registros na nossa API — sugestão: 30 dias para logs técnicos de erro e integridade].
+3. **Suporte por E-mail Voluntário:**
+   - Caso o usuário escolha utilizar o recurso de contato na aba Docs, um rascunho de e-mail é gerado com dados técnicos básicos de diagnóstico do aparelho (modelo, versão do Android e do app). O envio é estritamente manual e voluntário pelo próprio cliente de e-mail do usuário.
 
 ---
 
 ## 4. O Que Fica 100% no Seu Celular
 
-- Todas as teclas que você digita no teclado Canvas.
+- Todas as teclas que você digita no teclado Canvas (sem telemetria e sem registro).
+- O corretor ortográfico local e sugestões de palavras baseadas em dicionários embutidos estáticos (o app não aprende hábitos de digitação nem salva seu vocabulário pessoal).
 - Todo o processamento de ditado por voz quando configurado em modo Local (sherpa-onnx).
 - Todo o raciocínio de texto em modo Local (LiteRT-LM).
-- Suas chaves de API e tokens de autenticação (cifrados no Android Keystore).
-- O dicionário pessoal de palavras e termos aprendidos pelo teclado.
+- O armazenamento local das suas chaves de API e credenciais de login, protegidas pelo Android Keystore.
+- Arquivos de temas personalizados importados em formato `.zip`, processados e armazenados estritamente na memória local.
 
 ---
 
 ## 5. Retenção e Exclusão de Dados
 
-- **Áudios de voz:** Descartados do aparelho imediatamente após a entrega do texto transcrito ou no cancelamento da gravação.
-- **No seu aparelho:** Você pode excluir todas as suas chaves, modelos locais baixados e configurações a qualquer momento limpando os dados do aplicativo nas Configurações do Android ou desinstalando o KeyFlow.
-- **Na API da Arateki:** Como não coletamos dados pessoais vinculados a cadastros, a exclusão dos dados locais do seu aparelho remove o vínculo com o identificador anônimo.
+- **Áudios de voz:** Apagados do armazenamento temporário imediatamente após a conclusão ou falha da transcrição, ou ao expirar o cancelamento (3 segundos). Limpeza periódica automática remove arquivos residuais com mais de 24 horas.
+- **No seu aparelho:** Você pode excluir configurações locais, chaves de API e modelos baixados limpando os dados do aplicativo nas Configurações do Android ou desinstalando o app.
+- **Restauração de Identidade (Google Block Store):** Para garantir que compras legítimas não sejam perdidas ao reinstalar o aplicativo ou trocar de aparelho, o identificador anônimo (UUID) pode ser restaurado via Google Block Store.
+- **Na API da Arateki:** Como não mantemos contas nominais ou cadastros com e-mail, os registros vinculados ao UUID anônimo destinam-se exclusivamente à validação de licenças. [YAN: Definir procedimento e prazo para exclusão de registros na API a pedido via contato@arateki.com].
+- **Em Provedores Externos:** A solicitação de exclusão de dados enviados a provedores de nuvem (OpenAI, Anthropic, Google) deve ser realizada pelo usuário junto à respectiva plataforma.
 
 ---
 
@@ -95,15 +104,17 @@ A Arateki **não vende, não aluga e não comercializa** seus dados pessoais. O 
 
 Implementamos medidas técnicas rigorosas para proteger seus dados:
 - Todas as transmissões externas utilizam criptografia **TLS/HTTPS**.
-- As credenciais de API salvas no aparelho são cifradas com chaves mantidas no hardware de segurança do dispositivo (**Android Keystore**).
-- O código do aplicativo isola tarefas pesadas de inferência em processos separados (`:inference` e `:reasoning`) para prevenir vazamento de memória.
+- As credenciais de API e tokens salvos no aparelho são cifrados e protegidos pelo **Android Keystore** (AES-256-GCM).
+- O código do aplicativo isola tarefas pesadas de inferência e raciocínio em processos separados (`:inference` e `:reasoning`) para prevenir vazamentos de memória.
 
 ---
 
 ## 7. Direitos do Titular (LGPD e GDPR)
 
 Em conformidade com a Lei Geral de Proteção de Dados Pessoais (LGPD — Lei nº 13.709/2018) e o Regulamento Geral sobre a Proteção de Dados (GDPR):
-- Você tem o direito de saber quais dados são tratados, revogar consentimentos de anúncios a qualquer momento pelas configurações do app e solicitar esclarecimentos sobre o tratamento de informações.
+- Você tem o direito de obter informações claras sobre o tratamento de seus dados.
+- Você pode rever e revogar consentimentos de anúncios a qualquer momento pelas configurações do app ("Privacidade dos anúncios").
+- Você tem o direito de solicitar a exclusão ou esclarecimentos sobre dados tratados entrando em contato pelo e-mail `contato@arateki.com`.
 
 ---
 
@@ -115,7 +126,8 @@ O KeyFlow não é direcionado a crianças menores de 13 anos e não coleta inten
 
 ## 9. Contato e Dúvidas
 
-Para qualquer dúvida, comentário ou solicitação a respeito desta Política de Privacidade ou sobre as práticas de privacidade do KeyFlow, entre em contato com nosso responsável por privacidade:
+Para qualquer dúvida, comentário ou solicitação a respeito desta Política de Privacidade ou sobre as práticas de proteção de dados do KeyFlow, entre em contato:
 
 - **E-mail de Contato:** `contato@arateki.com`
-- **Desenvolvedor:** Arateki [YAN: Inserir endereço físico comercial se exigido pelo perfil de desenvolvedor da Play Store]
+- **Controlador dos Dados:** Arateki LTDA (CNPJ 45.642.122/0001-10)  
+  Fortaleza, Ceará, Brasil
