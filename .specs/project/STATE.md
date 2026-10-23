@@ -2544,6 +2544,12 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
 - Normalize `cred.*` para o slot tipado antes de migrar fontes antigas; a chave de API legada não pode sobrescrever OAuth. A credencial ativa acompanha o modo salvo.
 - Não segure o lock entre processos em getters: inicialize cofres fora da main e limite o lock às cópias/gravações síncronas. O instrumentado StrictMode prova que abrir o teclado não faz I/O de disco/rede na main.
 
+## V1-2 — rodada 6 (2026-10-23)
+- Modo de autenticação ausente deve ser inferido uma vez na migração (OAuth prevalece quando há ambos); o modo escolhido é preferência, não exclusão: `get()` mantém fallback para a outra credencial e para `cred.*`.
+
+## API — V1-9 (2026-10-23)
+- Em GitHub Actions, use `defaults.run.shell: bash` nos jobs de container; os testes da API precisam de Postgres no serviço, e instale/valide `cmake` dentro do container de build.
+
 ## Monetização — V1-10a, Fase A (2026-10-23)
 - A API ainda sem staging e o Play Console sem o app tornam MockWebServer/fakes obrigatórios na fundação; Play Integrity `1.6.0` e Billing `9.1.0` ficam atrás de portas degradáveis, sem tocar onboarding, IME ou overlay.
 

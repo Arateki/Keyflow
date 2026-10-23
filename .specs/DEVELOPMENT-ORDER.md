@@ -156,14 +156,12 @@ upload interno, o produto de R$15 e a service account. As tasks V1-1..V1-8 não 
   essa trilha: teste fechado com license testers da compra → produção. Antes dela, os roteiros
   manuais pendentes no A32 do que entra: GT-T8, NM-T13/T18, RSN-T19 (Gemma/Qwen: tempo e RAM) e o
   das skins.
-- **V1-9** — API em staging e produção na AWS (API-T13 + teste de carga). A menor e mais barata
-  máquina; o plano está em `api/docs/aws.md` (não inventar números). DNS/TLS pela Cloudflare; o Yan
-  tem domínios na Cloudflare e na GoDaddy. Rust para render o máximo numa máquina pequena; o teste
-  de carga diz quantos usuários ela aguenta.
-  API-T11 e API-T12 ficam desligadas na v1, cada uma com a própria config
-  (`TRANSCRIBE_ENABLED`, `SSV_ADMOB_ENABLED`; padrão desligado). A rota desligada responde 404 e
-  não toca no banco. Pode andar em paralelo desde já. Staging acessível só
-  ao Yan (VPN ou equivalente) — anotado, sem configurar agora.
+- ~~**V1-9** — API em staging e produção na AWS (API-T13 + teste de carga), DNS/TLS Cloudflare,
+  rotas de transcrição e SSV desligadas por padrão.~~ **Feita em 2026-10-23**: staging no Lightsail
+  `keyflow-v1` (release `api-staging-20261023T112732Z-4853523`, acesso local) e produção em
+  `https://keyflow-api.arateki.com` (`/health` 200); deploy por release assinada (`api-deploy`, PRs
+  #12–#14). Debug usa staging + Cloudflare Access; release usa produção sem credenciais de Access.
+  API-T11 e API-T12 seguem desligadas por padrão.
 - **V1-10** — Monetização da v1, **depois da API em staging**: MZ-T1, T2, T3, T4, T9, T10, T11, T13,
   T14 e T15. Fora: T5–T8 e T12 (créditos e o rewarded "Ganhar minutos"). Na MZ-T9 a sheet cobra o
   R$15; o botão de recarga não entra. MZ-T3 e MZ-T9 andam com fakes: a sheet e os entitlements
@@ -197,13 +195,12 @@ só no app de configuração.
 
 ### Em paralelo: API em staging e produção (pré-requisito da v1)
 
-A V1-9 (API-T13 + teste de carga) não espera o app: é servidor e pode andar desde já. Staging e
-produção sobem na **menor e mais barata máquina da AWS**. O plano está em `api/docs/aws.md`;
-máquina e região saem de lá — não inventar números. DNS e TLS pela Cloudflare; o Yan tem domínios
-na Cloudflare e na GoDaddy. O servidor é em Rust para render o máximo numa máquina pequena. O
-teste de carga diz quantos usuários essa máquina aguenta. Na v1, `POST /v1/transcribe` e
-`GET /v1/ssv/admob` sobem desligadas (`TRANSCRIBE_ENABLED` e `SSV_ADMOB_ENABLED`); cada uma
-responde 404 sem consultar o banco até alguém ligar a flag.
+**Entregue em 2026-10-23**: staging e produção estão no Lightsail nano `keyflow-v1`; o primeiro
+é acessível internamente na máquina e produção responde em `https://keyflow-api.arateki.com`.
+Deploy por release assinada no workflow `api-deploy` (PRs #12–#14). Debug usa `keyflow-api-staging`
+com Cloudflare Access; release usa produção e não incorpora credenciais de Access. `POST
+/v1/transcribe` e `GET /v1/ssv/admob` permanecem desligadas por padrão (`TRANSCRIBE_ENABLED` e
+`SSV_ADMOB_ENABLED`) e respondem 404 sem tocar no banco.
 
 A rota de transcrição (API-T11) e a SSV (API-T12) ficam desligadas na v1. O staging sobe com
 `INTEGRITY_RELAXED=true`. MZ-T3 e MZ-T9 andam com fakes enquanto não há app no Play Console.
