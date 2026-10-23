@@ -23,8 +23,8 @@ flock /tmp/keyflow-gradle.lock env GRADLE_USER_HOME="$gradle_user_home" "$gradle
 dex_dump="$(mktemp /tmp/keyflow-release-dex.XXXXXX)"
 trap 'rm -f "$dex_dump"' EXIT
 unzip -p "$apk" 'classes*.dex' > "$dex_dump"
-if grep -aE 'keyflowStagingAccess|keyflow-api-staging\.arateki\.com' "$dex_dump"; then
-    echo "release contém configuração/host de staging" >&2
+if grep -aE 'keyflowStagingAccess|keyflow-api-staging\.arateki\.com|KEYFLOW_SIMULATED_PURCHASE|SimulatedPurchase|simulated_purchase|/v1/test/purchases|kfsim1' "$dex_dump"; then
+    echo "release contém configuração/host de staging ou caminho de compra simulada" >&2
     exit 1
 fi
 rm -f "$dex_dump"

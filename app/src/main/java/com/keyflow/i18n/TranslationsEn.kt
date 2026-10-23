@@ -2,6 +2,14 @@ package com.keyflow.i18n
 
 /** Português → inglês. Chave = o texto exato passado a [tr] (ver `TranslationsTest`). */
 internal val TranslationsEn: Map<String, String> = mapOf(
+    "Pronto para testar a compra no staging." to "Ready to test a purchase on staging.",
+    "Simular compra" to "Simulate purchase",
+    "Reembolsar compra simulada" to "Refund simulated purchase",
+    "Nenhuma compra simulada nesta sessão." to "No simulated purchase in this session.",
+    "Conectando ao staging…" to "Connecting to staging…",
+    "Compra simulada concluída." to "Simulated purchase complete.",
+    "Reembolso simulado concluído." to "Simulated refund complete.",
+    "Falha na simulação: %s" to "Simulation failed: %s",
     " / indisponível" to " / unavailable",
     " e " to " and ",
     "%d toques" to "%d taps",
