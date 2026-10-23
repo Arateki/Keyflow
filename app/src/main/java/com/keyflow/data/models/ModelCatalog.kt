@@ -65,6 +65,9 @@ data class ModelSpec(
  */
 object ModelCatalog {
 
+    @Volatile
+    private var remoteModels: List<ModelSpec>? = null
+
     private const val WHISPER_BASE_REPO = "https://huggingface.co/csukuangfj/sherpa-onnx-whisper-base/resolve/bb53ee204431c90d314c1cc08d28d23e5b7927cc"
     private const val WHISPER_SMALL_REPO = "https://huggingface.co/csukuangfj/sherpa-onnx-whisper-small/resolve/8f3c18b358db4d1f2fc1eae49d75cd20989e4309"
     private const val PARAKEET_REPO = "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/2bda32ec70b097a55adaa07d9a7173915b43cc78"
@@ -479,5 +482,24 @@ object ModelCatalog {
     /** Todos, para quem só resolve por id ([byId]) — o downloader e o store não sabem de tipo. */
     val MODELS: List<ModelSpec> = SPEECH + TEXT + VISION + VOICE
 
-    fun byId(id: String?): ModelSpec? = MODELS.firstOrNull { it.id == id }
+    /**
+     * Troca a fonte inteira por um manifesto validado. `null`/lista vazia volta ao catálogo embutido;
+     * o downloader continua chamando [byId] e, portanto, não precisa conhecer a origem do catálogo.
+     */
+    @Synchronized
+    fun applyRemoteManifest(models: List<ModelSpec>?) {
+        remoteModels = models?.takeIf { it.isNotEmpty() }?.toList()
+    }
+
+    @Synchronized
+    fun clearRemoteManifest() {
+        remoteModels = null
+    }
+
+    /** Lista efetiva de uma finalidade, usada pela configuração para refletir o manifesto novo. */
+    fun current(kind: ModelKind): List<ModelSpec> = effectiveModels().filter { it.kind == kind }
+
+    fun byId(id: String?): ModelSpec? = effectiveModels().firstOrNull { it.id == id }
+
+    private fun effectiveModels(): List<ModelSpec> = remoteModels ?: MODELS
 }
