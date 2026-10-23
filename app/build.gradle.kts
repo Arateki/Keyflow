@@ -111,6 +111,10 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            // Só para o smoke local: sem a propriedade, o release continua sem assinatura de debug.
+            if (providers.gradleProperty("keyflowSmokeSigning").orNull == "true") {
+                signingConfig = signingConfigs.getByName("debug")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
