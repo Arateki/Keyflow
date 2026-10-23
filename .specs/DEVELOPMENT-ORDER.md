@@ -146,7 +146,7 @@ upload interno, o produto de R$15 e a service account. As tasks V1-1..V1-8 não 
   provedores de raciocínio por chave (`PLAYSTORE_CHECKLIST.md` §1b), agente, skins importadas, AdMob
   (banner e intersticial só no app de configuração, consentimento UMP) e a compra única de R$15.
   URL permanente **[YAN decide onde]** + link no app.
-- **V1-6** — Prominent disclosure no onboarding (PS-3). Instrumentado + golden.
+- ~~**V1-6** — Prominent disclosure no onboarding (PS-3): tela antes de `RECORD_AUDIO`, aceite versionado, recusa sem permissão e caminho de aceite posterior. Instrumentado + golden claro/escuro.~~ **Feita em 2026-10-23** (commit `a6ce554`; gates e relatório em `.equipe/relatorios/v1-6-divulgacao.md`).
 - **V1-7** — Listing (PS-6) só com o que entra **[YAN aprova textos]**, com anúncios e a compra de
   R$15 (selo "Contém anúncios"); rascunho campo a campo do Data Safety (PS-4), agora com anúncios e
   compras, e da declaração dos serviços em primeiro plano (`microphone`, `dataSync`) — o Yan
