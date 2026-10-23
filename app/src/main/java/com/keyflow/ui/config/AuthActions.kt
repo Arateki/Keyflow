@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.launch
 
 /** Um modelo que a conta pode usar: o [id] vai na chamada, o [displayName] vai na tela. */
 data class AccountModel(val id: String, val displayName: String)
@@ -43,7 +44,7 @@ interface AuthActions {
     fun apiKeyFlow(): Flow<String?> = flowOf(apiKey())
 
     /** `true` na 1ª vez que o aviso [key] é pedido, `false` depois (ex.: o modal do 1º login com o plano). */
-    fun consumeNotice(key: String): Boolean
+    suspend fun consumeNotice(key: String): Boolean
     fun openUrl(url: String)
 
     /** Pode falar com a rede: chamar fora da main thread. Falha = lista vazia. */
@@ -60,7 +61,7 @@ interface AuthActions {
         override fun saveApiKey(key: String) = Unit
         override fun apiKey(): String? = null
         override fun apiKeyFlow(): Flow<String?> = flowOf(null)
-        override fun consumeNotice(key: String): Boolean = false
+        override suspend fun consumeNotice(key: String): Boolean = false
         override fun openUrl(url: String) = Unit
         override suspend fun listModels(): List<AccountModel> = emptyList()
     }
@@ -83,7 +84,7 @@ class ControllerAuthActions(
     override fun saveApiKey(key: String) = controller.saveApiKey(provider.id, key)
     override fun apiKey(): String? = controller.apiKey(provider.id)
     override fun apiKeyFlow(): Flow<String?> = controller.apiKeyFlow(provider.id)
-    override fun consumeNotice(key: String): Boolean = controller.consumeNotice(provider.id, key)
+    override suspend fun consumeNotice(key: String): Boolean = controller.consumeNotice(provider.id, key)
     override fun openUrl(url: String) {
         runCatching { browser.open(url) } // sem navegador, o toque não faz nada — e não derruba a tela
     }
@@ -94,6 +95,7 @@ class ControllerAuthActions(
 class DirectApiKeyActions(
     private val store: CredentialStore,
     private val provider: ProviderId,
+    private val scope: kotlinx.coroutines.CoroutineScope,
 ) : AuthActions {
     override val flows: List<AuthFlow> = emptyList()
     override val usageUrl: String? = null
@@ -107,12 +109,14 @@ class DirectApiKeyActions(
 
     override fun connect(method: AuthMethod, forceConsent: Boolean) = Unit
     override fun cancel() = Unit
-    override fun disconnect() = store.clearApiKey(provider)
+    override fun disconnect() { scope.launch(Dispatchers.IO) { store.clearApiKey(provider) } }
 
     override fun saveApiKey(key: String) {
         val sanitized = key.filter { it.code in 0x21..0x7E }
-        if (sanitized.isEmpty()) store.clearApiKey(provider)
-        else store.put(provider, Credential.ApiKey(sanitized))
+        scope.launch(Dispatchers.IO) {
+            if (sanitized.isEmpty()) store.clearApiKey(provider)
+            else store.put(provider, Credential.ApiKey(sanitized))
+        }
     }
 
     override fun apiKey(): String? = CredentialMask.of(store.getApiKey(provider)?.value)
@@ -121,7 +125,7 @@ class DirectApiKeyActions(
         .map { store.getApiKey(provider)?.value?.let(CredentialMask::of) }
         .flowOn(Dispatchers.IO)
 
-    override fun consumeNotice(key: String): Boolean = false
+    override suspend fun consumeNotice(key: String): Boolean = false
     override fun openUrl(url: String) = Unit
     override suspend fun listModels(): List<AccountModel> = emptyList()
 }

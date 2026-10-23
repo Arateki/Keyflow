@@ -93,6 +93,7 @@ class AuthControllerTest {
     fun `saving an api key stores it and reads as connected by key`() = runTest {
         val c = controller()
         c.saveApiKey(provider, "  sk-teste  ")
+        runCurrent()
         assertThat(store.get(provider)).isEqualTo(Credential.ApiKey("sk-teste")) // sem os espaços do colar
         assertThat(c.current()).isEqualTo(ConnectionState.Connected(account = null, method = AuthMethod.API_KEY))
     }
@@ -150,9 +151,11 @@ class AuthControllerTest {
     fun `a pasted key keeps only printable ascii`() = runTest {
         val c = controller()
         c.saveApiKey(provider, "  sk-abc\u200B-123\n456\t ")
+        runCurrent()
         assertThat(store.get(provider)).isEqualTo(Credential.ApiKey("sk-abc-123456"))
 
         c.saveApiKey(provider, "\u200B \n")
+        runCurrent()
         assertThat(store.get(provider)).isNull() // só lixo invisível = em branco = apagar
     }
 
@@ -172,6 +175,7 @@ class AuthControllerTest {
         val c = controller()
         assertThat(c.apiKey(provider)).isNull()
         c.saveApiKey(provider, "sk-teste")
+        runCurrent()
         assertThat(c.apiKey(provider)).isEqualTo("••••este")
         store.put(provider, oauth())
         assertThat(c.apiKey(provider)).isNull() // um login não devolve token nenhum

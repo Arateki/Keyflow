@@ -77,6 +77,23 @@ class SecureCredentialStoreTest {
     }
 
     @Test
+    fun activeCredentialFollowsTheSavedAuthMode() {
+        val s = store()
+        val oauth = oauth()
+        val apiKey = Credential.ApiKey("sk-api")
+        s.put(provider, oauth)
+        s.put(provider, apiKey)
+
+        s.setAuthMode(provider, AuthMethod.OAUTH)
+        assertEquals(oauth, s.get(provider))
+        assertEquals(oauth, s.forAuthorization(provider))
+
+        s.setAuthMode(provider, AuthMethod.API_KEY)
+        assertEquals(apiKey, s.get(provider))
+        assertEquals(apiKey, s.forAuthorization(provider))
+    }
+
+    @Test
     fun clearErasesTheCredentialButNotTheMeta() {
         val s = store()
         s.put(provider, Credential.ApiKey("x"))

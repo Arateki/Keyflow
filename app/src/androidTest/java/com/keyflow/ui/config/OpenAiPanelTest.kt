@@ -102,7 +102,7 @@ class OpenAiPanelTest {
         }
         override fun apiKey(): String? = maskedKey.value
         override fun apiKeyFlow(): Flow<String?> = maskedKey
-        override fun consumeNotice(key: String): Boolean = noticeFirst.also { noticeFirst = false }
+        override suspend fun consumeNotice(key: String): Boolean = noticeFirst.also { noticeFirst = false }
         override fun openUrl(url: String) { opened += url }
         override suspend fun listModels(): List<AccountModel> { modelCalls++; return models }
     }

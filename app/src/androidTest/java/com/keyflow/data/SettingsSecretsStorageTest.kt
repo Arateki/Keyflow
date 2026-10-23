@@ -7,6 +7,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.keyflow.auth.Credential
 import com.keyflow.auth.CredentialStore
+import com.keyflow.auth.CredentialCodec
 import com.keyflow.auth.ProviderId
 import com.keyflow.auth.ProviderIds
 import com.keyflow.auth.SecureCredentialStore
@@ -104,6 +105,8 @@ class SettingsSecretsStorageTest {
     /** O cofre antigo, usado só para semear a migração. */
     private fun legacyVault() = SecurePrefs.create(context, securePrefsName)
 
+    private fun authVaultRaw() = SecurePrefs.create(context, authPrefsName, SecureCredentialStore.KEY_ALIAS)
+
     /** O destino único da V1-2. */
     private fun vault() = SecureCredentialStore(context, authPrefsName)
 
@@ -156,7 +159,7 @@ class SettingsSecretsStorageTest {
             .mapNotNull { name -> legacy[name]?.let { value -> migratedProvider(name)?.let { it to value } } }
             .distinctBy { it.first }
             .forEach { (provider, value) ->
-                assertEquals(value, (vault().get(provider) as Credential.ApiKey).value)
+                assertEquals(value, vault().getApiKey(provider)?.value)
             }
         legacy.filterKeys { migratedProvider(it) == null }.forEach { (name, value) ->
             assertEquals(value, vault().getSecret(targetSecretKey(name)))
@@ -262,7 +265,7 @@ class SettingsSecretsStorageTest {
 
         repository.settingsFlow().first()
 
-        assertEquals(old, (vault().get(ProviderIds.ANTHROPIC) as Credential.ApiKey).value)
+        assertEquals(old, vault().getApiKey(ProviderIds.ANTHROPIC)?.value)
         assertFalse(legacyVault().contains(SettingsSecrets.PROVIDER_ANTHROPIC_API_KEY))
     }
 
@@ -288,7 +291,7 @@ class SettingsSecretsStorageTest {
 
         val read = repository.settingsFlow().first()
 
-        assertEquals("SENTINELA-NO-COFRE", (vault().get(ProviderIds.ANTHROPIC) as Credential.ApiKey).value)
+        assertEquals("SENTINELA-NO-COFRE", vault().getApiKey(ProviderIds.ANTHROPIC)?.value)
         assertFalse(dataStoreText().contains("SENTINELA-ANTIGO-provider_anthropic_api_key"))
     }
 
@@ -343,6 +346,31 @@ class SettingsSecretsStorageTest {
     }
 
     @Test
+    fun oldCredOAuthIsNormalizedBeforeMigratingLegacyApiKey() = runTest {
+        val repository = newRepository()
+        val oauth = Credential.OAuth(
+            accessToken = "old-access",
+            refreshToken = "old-refresh",
+            expiresAtMs = 9_000_000,
+            earliestRefreshAtMs = null,
+            scopes = setOf("models:read"),
+            idToken = "old-id",
+            clientId = "client",
+            subject = "subject",
+            account = "old@example.test",
+        )
+        authVaultRaw().edit().putString("cred.openai", CredentialCodec.encode(oauth)).commit()
+        legacyVault().edit().putString(SettingsSecrets.OPENAI_TOKEN, "SENTINELA-LEGACY-OPENAI").commit()
+
+        repository.settingsFlow().first()
+
+        assertEquals(oauth, vault().getOAuth(ProviderIds.OPENAI))
+        assertEquals("SENTINELA-LEGACY-OPENAI", vault().getApiKey(ProviderIds.OPENAI)?.value)
+        assertEquals(oauth, vault().get(ProviderIds.OPENAI))
+        assertFalse(legacyVault().contains(SettingsSecrets.OPENAI_TOKEN))
+    }
+
+    @Test
     fun theProviderCandidateWinsAcrossSecurePrefsAndDataStoreOrigins() = runTest {
         val repository = newRepository()
         legacyVault().edit().putString(SettingsSecrets.OPENAI_TOKEN, "SENTINELA-SECURE-TRANSCRIPTION").commit()
@@ -384,9 +412,9 @@ class SettingsSecretsStorageTest {
         SettingsSecrets.LEGACY_IN_DATASTORE.forEach {
             assertFalse("${it.name} ainda está no DataStore", after.contains(it.name) || after.contains("SENTINELA-ANTIGO-${it.name}"))
         }
-        assertEquals("SENTINELA-NOVA", (vault().get(ProviderIds.GROQ) as Credential.ApiKey).value)
+        assertEquals("SENTINELA-NOVA", vault().getApiKey(ProviderIds.GROQ)?.value)
         newRepository().settingsFlow().first()
-        assertEquals("SENTINELA-NOVA", (vault().get(ProviderIds.GROQ) as Credential.ApiKey).value)
+        assertEquals("SENTINELA-NOVA", vault().getApiKey(ProviderIds.GROQ)?.value)
     }
 
     @Test

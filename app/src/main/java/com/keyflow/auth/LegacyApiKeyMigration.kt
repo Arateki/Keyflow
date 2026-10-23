@@ -19,12 +19,13 @@ internal object LegacyApiKeyMigration {
 
     /** Compatibilidade dos testes antigos; a produção migra pelo repositório de Settings. */
     fun migrate(legacy: SharedPreferences, target: CredentialStore) = synchronized(LOCK) {
+        target.migrateLegacyActiveCredentials()
         val editor = legacy.edit()
         var changed = false
         for ((provider, key) in legacyKeys) {
             val value = legacy.getString(key, null).orEmpty()
             if (value.isNotBlank() && target.getApiKey(provider) == null) {
-                target.put(provider, Credential.ApiKey(value))
+                target.putMigratedApiKey(provider, Credential.ApiKey(value))
             }
             if (legacy.contains(key)) {
                 editor.remove(key)

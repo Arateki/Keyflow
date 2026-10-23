@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * O que a tela pede aos provedores — conectar, guardar uma chave, cancelar, desconectar — e o único [ConnectionState] que ela
@@ -98,7 +99,9 @@ class AuthController(
     fun saveApiKey(provider: ProviderId, key: String) {
         errors.update { it - provider }
         val trimmed = key.filter { it.code in 0x21..0x7E }
-        if (trimmed.isEmpty()) store.clearApiKey(provider) else store.put(provider, Credential.ApiKey(trimmed))
+        scope.launch {
+            if (trimmed.isEmpty()) store.clearApiKey(provider) else store.put(provider, Credential.ApiKey(trimmed))
+        }
     }
 
     /** Só a máscara chega à UI; o valor decifrado fica dentro do auth/ e não entra no estado Compose. */
@@ -114,11 +117,11 @@ class AuthController(
      * Um aviso que se mostra UMA vez por provedor e chave (ex.: "você está usando o seu plano"). Devolve `true` na 1ª chamada e
      * `false` nas seguintes; o marcador é do `meta` do cofre, então sobrevive ao Desconectar.
      */
-    fun consumeNotice(provider: ProviderId, key: String): Boolean {
+    suspend fun consumeNotice(provider: ProviderId, key: String): Boolean = withContext(kotlinx.coroutines.Dispatchers.IO) {
         val marker = "notice.$key"
-        if (store.meta(provider, marker) != null) return false
+        if (store.meta(provider, marker) != null) return@withContext false
         store.putMeta(provider, marker, "1")
-        return true
+        true
     }
 
     /** Desiste do login em andamento: fecha o receptor e volta a "desconectado". */
@@ -133,13 +136,13 @@ class AuthController(
     /** Revoga no provedor (o que der) e apaga o que está guardado — a falha da revogação nunca impede de apagar. */
     fun disconnect(provider: ProviderId) {
         cancel(provider)
-        val active = store.get(provider)
-        val credential = when (active) {
-            is Credential.OAuth -> store.getOAuth(provider) ?: active
-            is Credential.ApiKey -> store.getApiKey(provider) ?: active
-            null -> store.getOAuth(provider) ?: store.getApiKey(provider)
-        }
         scope.launch {
+            val active = store.get(provider)
+            val credential = when (active) {
+                is Credential.OAuth -> store.getOAuth(provider) ?: active
+                is Credential.ApiKey -> store.getApiKey(provider) ?: active
+                null -> null
+            }
             if (credential != null) {
                 val method = if (credential is Credential.OAuth) AuthMethod.OAUTH else AuthMethod.API_KEY
                 runCatching { entry(provider).flows.firstOrNull { it.method == method }?.revoke(credential) }

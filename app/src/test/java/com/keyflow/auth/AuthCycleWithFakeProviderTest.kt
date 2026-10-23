@@ -106,6 +106,7 @@ class AuthCycleWithFakeProviderTest {
         val engine = FakeReasoningEngine(authorization(registry))
 
         controller.saveApiKey(provider, "chave-123")
+        runCurrent()
 
         assertThat(controller.state(provider).first()).isEqualTo(ConnectionState.Connected(null, AuthMethod.API_KEY))
         assertThat(engine.generate(ReasoningRequest(user = "oi")).toList().first()).isEqualTo(ReasoningEvent.Delta("chave-123|oi"))

@@ -2539,6 +2539,10 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
 - O formato antigo `cred.*` continua legível pelos acessores tipados até a migração; autenticação e desconexão escolhem explicitamente o slot API ou OAuth. A prioridade precisa ser aplicada depois de juntar as origens antigas.
 - Erros e eventos da Anthropic não carregam corpo ou mensagem do servidor; o filtro do agente tira o snapshot do cofre sob o mesmo lock.
 
+## V1-2 — rodada 5 (2026-10-23)
+- Normalize `cred.*` para o slot tipado antes de migrar fontes antigas; a chave de API legada não pode sobrescrever OAuth. A credencial ativa acompanha o modo salvo.
+- Não segure o lock entre processos em getters: inicialize cofres fora da main e limite o lock às cópias/gravações síncronas. O instrumentado StrictMode prova que abrir o teclado não faz I/O de disco/rede na main.
+
 ## Monetização — V1-10a, Fase A (2026-10-23)
 - A API ainda sem staging e o Play Console sem o app tornam MockWebServer/fakes obrigatórios na fundação; Play Integrity `1.6.0` e Billing `9.1.0` ficam atrás de portas degradáveis, sem tocar onboarding, IME ou overlay.
 

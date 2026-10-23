@@ -151,7 +151,7 @@ internal object SettingsSecrets {
     private fun moveOne(name: String, value: String, target: CredentialStore): Boolean {
         if (value.isBlank()) return true
         providerFor(name)?.let { provider ->
-            if (target.getApiKey(provider) == null) target.put(provider, Credential.ApiKey(value))
+            if (target.getApiKey(provider) == null) target.putMigratedApiKey(provider, Credential.ApiKey(value))
             return true
         }
         val targetKey = targetKeyFor(name) ?: return false
