@@ -1,21 +1,31 @@
 use keyflow_api::google::auth::ServiceAccountKey;
 use keyflow_api::google::integrity::IntegrityClient;
 use keyflow_api::google::publisher::PublisherClient;
+use keyflow_api::middleware::ratelimit::{CLEANUP_INTERVAL, RateLimiters};
 use keyflow_api::{AppState, app, config::Config, db, init_tracing, jobs};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpListener;
 
-const PLAY_INTEGRITY_BASE_URL: &str = "https://playintegrity.googleapis.com";
-const ANDROID_PUBLISHER_BASE_URL: &str = "https://androidpublisher.googleapis.com";
 const ADMOB_VERIFIER_KEYS_URL: &str = "https://www.gstatic.com/admob/reward/verifier-keys.json";
 
-#[tokio::main]
-async fn main() {
+fn main() {
     init_tracing();
 
     let config = Config::from_env().unwrap_or_else(|e| panic!("config error: {e}"));
 
-    let pool = db::connect(&config.database_url)
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(config.tokio_worker_threads.get() as usize)
+        .max_blocking_threads(config.tokio_max_blocking_threads.get() as usize)
+        .enable_all()
+        .build()
+        .unwrap_or_else(|e| panic!("failed to start tokio runtime: {e}"));
+
+    runtime.block_on(run(config));
+}
+
+async fn run(config: Config) {
+    let pool = db::connect_with(&config.database_url, config.pool_settings())
         .await
         .unwrap_or_else(|e| panic!("failed to connect to database: {e}"));
     db::MIGRATOR
@@ -28,13 +38,13 @@ async fn main() {
             .unwrap_or_else(|e| panic!("failed to load Google service account key: {e}"));
     let integrity = IntegrityClient::new(
         reqwest::Client::new(),
-        PLAY_INTEGRITY_BASE_URL.to_string(),
+        config.play_integrity_base_url.clone(),
         config.package_name.clone(),
         service_account.clone(),
     );
     let publisher = PublisherClient::new(
         reqwest::Client::new(),
-        ANDROID_PUBLISHER_BASE_URL.to_string(),
+        config.android_publisher_base_url.clone(),
         config.package_name.clone(),
         service_account.clone(),
     );
@@ -42,7 +52,7 @@ async fn main() {
     // Cliente próprio pro job (TokenCache separada do que atende requests) — mesma credencial.
     let job_publisher = PublisherClient::new(
         reqwest::Client::new(),
-        ANDROID_PUBLISHER_BASE_URL.to_string(),
+        config.android_publisher_base_url.clone(),
         config.package_name.clone(),
         service_account,
     );
@@ -74,7 +84,11 @@ async fn main() {
             reward_seconds: config.ads_reward_seconds.get() as i64,
             daily_cap: config.ads_daily_cap.get() as i64,
         },
-    );
+    )
+    .with_trusted_proxies(config.trusted_proxies.clone());
+
+    // O handle fica vivo enquanto o servidor roda. Dropar no fim só desanexa a tarefa.
+    let _cleanup = RateLimiters::spawn_cleanup(Arc::clone(&state.rate_limiters), CLEANUP_INTERVAL);
 
     let listener = TcpListener::bind(config.bind_addr)
         .await

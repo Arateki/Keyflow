@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::net::{IpAddr, SocketAddr};
 use std::num::NonZeroU32;
+use std::time::Duration;
 
 use ipnet::IpNet;
 
@@ -14,6 +15,15 @@ const DEFAULT_TRANSCRIPTION_MAX_BYTES: u32 = 26_214_400; // 25 MiB — mesmo pla
 const DEFAULT_PROVIDER_UNHEALTHY_COOLDOWN_SECS: u32 = 60;
 const DEFAULT_ADS_REWARD_SECONDS: u32 = 60;
 const DEFAULT_ADS_DAILY_CAP: u32 = 5;
+/// Pool enxuto para 0,5 GB (aws.md §2.4 / §5). Testes de integração usam `db::connect`, não isto.
+const DEFAULT_DB_MAX_CONNECTIONS: u32 = 5;
+const DEFAULT_DB_MIN_CONNECTIONS: u32 = 0;
+const DEFAULT_DB_IDLE_TIMEOUT_SECS: u32 = 300;
+const DEFAULT_DB_ACQUIRE_TIMEOUT_SECS: u32 = 5;
+const DEFAULT_TOKIO_WORKER_THREADS: u32 = 2;
+const DEFAULT_TOKIO_MAX_BLOCKING_THREADS: u32 = 8;
+const DEFAULT_PLAY_INTEGRITY_BASE_URL: &str = "https://playintegrity.googleapis.com";
+const DEFAULT_ANDROID_PUBLISHER_BASE_URL: &str = "https://androidpublisher.googleapis.com";
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -45,6 +55,16 @@ pub struct Config {
     pub ads_daily_cap: NonZeroU32,
     /// Redes (CIDR ou IP) de onde `CF-Connecting-IP` é aceito. Vazio = header ignorado.
     pub trusted_proxies: Vec<IpNet>,
+    pub db_max_connections: u32,
+    pub db_min_connections: u32,
+    pub db_idle_timeout: Duration,
+    pub db_acquire_timeout: Duration,
+    pub tokio_worker_threads: NonZeroU32,
+    pub tokio_max_blocking_threads: NonZeroU32,
+    /// Base do Play Integrity. Default é a URL oficial; o teste de carga aponta para o mock.
+    pub play_integrity_base_url: String,
+    /// Base da Play Developer API. Default é a URL oficial.
+    pub android_publisher_base_url: String,
 }
 
 #[derive(Debug)]
@@ -169,6 +189,47 @@ impl Config {
                 .unwrap_or(""),
         )?;
 
+        let db_max_connections =
+            parse_u32_at_least(vars, "DB_MAX_CONNECTIONS", DEFAULT_DB_MAX_CONNECTIONS, 1)?;
+        let db_min_connections =
+            parse_u32_at_least(vars, "DB_MIN_CONNECTIONS", DEFAULT_DB_MIN_CONNECTIONS, 0)?;
+        if db_min_connections > db_max_connections {
+            return Err(ConfigError::InvalidEnv {
+                var: "DB_MIN_CONNECTIONS",
+                value: db_min_connections.to_string(),
+                reason: format!("must be <= DB_MAX_CONNECTIONS ({db_max_connections})"),
+            });
+        }
+        let db_idle_timeout = Duration::from_secs(parse_u32_at_least(
+            vars,
+            "DB_IDLE_TIMEOUT_SECS",
+            DEFAULT_DB_IDLE_TIMEOUT_SECS,
+            1,
+        )? as u64);
+        let db_acquire_timeout = Duration::from_secs(parse_u32_at_least(
+            vars,
+            "DB_ACQUIRE_TIMEOUT_SECS",
+            DEFAULT_DB_ACQUIRE_TIMEOUT_SECS,
+            1,
+        )? as u64);
+        let tokio_worker_threads =
+            parse_nonzero_u32(vars, "TOKIO_WORKER_THREADS", DEFAULT_TOKIO_WORKER_THREADS)?;
+        let tokio_max_blocking_threads = parse_nonzero_u32(
+            vars,
+            "TOKIO_MAX_BLOCKING_THREADS",
+            DEFAULT_TOKIO_MAX_BLOCKING_THREADS,
+        )?;
+        let play_integrity_base_url = parse_nonempty_string(
+            vars,
+            "PLAY_INTEGRITY_BASE_URL",
+            DEFAULT_PLAY_INTEGRITY_BASE_URL,
+        )?;
+        let android_publisher_base_url = parse_nonempty_string(
+            vars,
+            "ANDROID_PUBLISHER_BASE_URL",
+            DEFAULT_ANDROID_PUBLISHER_BASE_URL,
+        )?;
+
         Ok(Config {
             database_url,
             bind_addr,
@@ -185,7 +246,24 @@ impl Config {
             ads_reward_seconds,
             ads_daily_cap,
             trusted_proxies,
+            db_max_connections,
+            db_min_connections,
+            db_idle_timeout,
+            db_acquire_timeout,
+            tokio_worker_threads,
+            tokio_max_blocking_threads,
+            play_integrity_base_url,
+            android_publisher_base_url,
         })
+    }
+
+    pub fn pool_settings(&self) -> crate::db::PoolSettings {
+        crate::db::PoolSettings {
+            max_connections: self.db_max_connections,
+            min_connections: self.db_min_connections,
+            idle_timeout: self.db_idle_timeout,
+            acquire_timeout: self.db_acquire_timeout,
+        }
     }
 }
 
@@ -244,6 +322,49 @@ fn parse_nonzero_u32(
         value: raw.clone(),
         reason: "must be greater than zero".to_string(),
     })
+}
+
+fn parse_u32_at_least(
+    vars: &HashMap<String, String>,
+    var: &'static str,
+    default: u32,
+    min: u32,
+) -> Result<u32, ConfigError> {
+    let raw = match vars.get(var) {
+        Some(value) => value,
+        None => return Ok(default),
+    };
+    let parsed: u32 =
+        raw.parse()
+            .map_err(|e: std::num::ParseIntError| ConfigError::InvalidEnv {
+                var,
+                value: raw.clone(),
+                reason: e.to_string(),
+            })?;
+    if parsed < min {
+        return Err(ConfigError::InvalidEnv {
+            var,
+            value: raw.clone(),
+            reason: format!("must be at least {min}"),
+        });
+    }
+    Ok(parsed)
+}
+
+fn parse_nonempty_string(
+    vars: &HashMap<String, String>,
+    var: &'static str,
+    default: &str,
+) -> Result<String, ConfigError> {
+    match vars.get(var) {
+        None => Ok(default.to_string()),
+        Some(value) if value.is_empty() => Err(ConfigError::InvalidEnv {
+            var,
+            value: value.clone(),
+            reason: "must not be empty".to_string(),
+        }),
+        Some(value) => Ok(value.clone()),
+    }
 }
 
 #[cfg(test)]
@@ -518,5 +639,50 @@ mod tests {
             Config::from_map(&with_required(&[("TRUSTED_PROXIES", "not-an-ip")])).unwrap_err();
         assert!(err.to_string().contains("TRUSTED_PROXIES"));
         assert!(err.to_string().contains("not-an-ip"));
+    }
+
+    #[test]
+    fn pool_and_tokio_defaults_match_the_small_machine() {
+        let config = Config::from_map(&with_required(&[])).unwrap();
+        assert_eq!(config.db_max_connections, DEFAULT_DB_MAX_CONNECTIONS);
+        assert_eq!(config.db_min_connections, 0);
+        assert_eq!(config.db_idle_timeout, Duration::from_secs(300));
+        assert_eq!(config.db_acquire_timeout, Duration::from_secs(5));
+        assert_eq!(config.tokio_worker_threads.get(), 2);
+        assert_eq!(config.tokio_max_blocking_threads.get(), 8);
+        assert_eq!(
+            config.play_integrity_base_url,
+            DEFAULT_PLAY_INTEGRITY_BASE_URL
+        );
+        assert_eq!(
+            config.android_publisher_base_url,
+            DEFAULT_ANDROID_PUBLISHER_BASE_URL
+        );
+        let pool = config.pool_settings();
+        assert_eq!(pool.max_connections, 5);
+        assert_eq!(pool.min_connections, 0);
+    }
+
+    #[test]
+    fn db_min_connections_cannot_exceed_max() {
+        let err = Config::from_map(&with_required(&[
+            ("DB_MAX_CONNECTIONS", "2"),
+            ("DB_MIN_CONNECTIONS", "3"),
+        ]))
+        .unwrap_err();
+        assert!(err.to_string().contains("DB_MIN_CONNECTIONS"));
+    }
+
+    #[test]
+    fn google_base_urls_are_configurable() {
+        let config = Config::from_map(&with_required(&[
+            ("PLAY_INTEGRITY_BASE_URL", "http://mock:8081"),
+            ("ANDROID_PUBLISHER_BASE_URL", "http://mock:8081"),
+            ("TOKIO_WORKER_THREADS", "1"),
+        ]))
+        .unwrap();
+        assert_eq!(config.play_integrity_base_url, "http://mock:8081");
+        assert_eq!(config.android_publisher_base_url, "http://mock:8081");
+        assert_eq!(config.tokio_worker_threads.get(), 1);
     }
 }

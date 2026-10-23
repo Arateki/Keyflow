@@ -33,6 +33,13 @@ Módulo disjunto do app Android (`app/`): o Gradle não enxerga esta pasta e vic
     `CF-Connecting-IP` pode substituir o IP do socket no limite de `/v1/register`. Sem esta
     variável o header é ignorado (um cliente não forja o IP). IP sem máscara vale como `/32` ou
     `/128`.
+  - `DB_MAX_CONNECTIONS` (opcional, default `5`), `DB_MIN_CONNECTIONS` (opcional, default `0`,
+    não pode passar do máximo), `DB_IDLE_TIMEOUT_SECS` (opcional, default `300`),
+    `DB_ACQUIRE_TIMEOUT_SECS` (opcional, default `5`) — pool do Postgres.
+  - `TOKIO_WORKER_THREADS` (opcional, default `2`), `TOKIO_MAX_BLOCKING_THREADS` (opcional,
+    default `8`) — runtime do processo. Ambos ≥ 1.
+  - `PLAY_INTEGRITY_BASE_URL` e `ANDROID_PUBLISHER_BASE_URL` (opcionais) — caem nas URLs oficiais
+    do Google. O teste de carga aponta as duas para um mock.
   - `TRANSCRIPTION_PROVIDERS_JSON` (obrigatória) — lista ordenada de provedores Whisper-compatible
     (design §Proxy): `[{"name","url","authHeaderName","authValueEnv","model"}]`. `authValueEnv`
     é o **nome de outra env var** que guarda o segredo de verdade (nunca inline no JSON — OPS-03).
