@@ -4,7 +4,10 @@
 > (compra única de R$15 + AdMob banner e intersticial só no app de configuração; V1-10 no
 > `DEVELOPMENT-ORDER.md`). Ficam para depois: MZ-T5, T6, T7 e T8 (créditos) e MZ-T12 (rewarded
 > "Ganhar minutos"). Na MZ-T9, a v1 cobra o R$15; o botão de recarga não entra. Na T14 e na T15,
-> goldens e e2e da v1 cobrem o unlock, o banner e o intersticial; as rotas de créditos ficam de fora.
+> goldens da v1 cobrem o unlock, o banner e o intersticial. MZ-T3 e MZ-T9 andam com fakes. O e2e
+> com compra real (MZ-T15/API-T14) espera o app no Play Console: upload na trilha interna, com
+> permissão de billing, para criar o produto de R$15, e a service account para a API validar —
+> decisões 1 (conta) e 2 (`applicationId`) no caminho crítico. Rotas de créditos ficam de fora.
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (M7–M10)
 **Status**: Aprovada pelo Yan em 2026-07-04 (Bloco 0 do `DEVELOPMENT-ORDER.md`) — nada implementado.

@@ -104,9 +104,11 @@ R$15, que também tira os anúncios para sempre. Os anúncios ficam só no app d
 
 ### Tasks da v1 (em ordem; uma por vez, gate verde)
 
-Ordem: **V1-1 → V1-2 → V1-10** (a V1-10 só depois da API em staging) **→ V1-3 → V1-4 → V1-5 →
-V1-6 → V1-7 → V1-8**. A **V1-9** corre em paralelo desde já (é servidor) e entrega o staging de que
-a V1-10 precisa. As tasks V1-1..V1-8 não foram renumeradas.
+Ordem: **V1-1 → V1-2 → V1-10 com fakes** (MZ-T3/T9 inclusive; só depois da API em staging) **→
+V1-3 → upload interno antecipado → e2e real da V1-10** (MZ-T15/API-T14) **→ V1-4 → V1-5 → V1-6 →
+V1-7 → V1-8** (teste fechado → produção). A **V1-9** corre em paralelo desde já e entrega o
+staging. As decisões **1** (conta) e **2** (`applicationId`) entram no caminho crítico: travam o
+upload interno, o produto de R$15 e a service account. As tasks V1-1..V1-8 não foram renumeradas.
 
 - ~~**V1-0** — Mesclar a PR #7 (skins até 120 fps, mascote, provedores Anthropic/Google, agente fase 1)
   com o CI verde.~~ **Feito em 2026-10-10** (merge `4cd4ee4`, CI #35 verde sem repetição). No caminho: repo
@@ -122,7 +124,10 @@ a V1-10 precisa. As tasks V1-1..V1-8 não foram renumeradas.
 - **V1-3** — Build de release (PS-5): R8 (`isMinifyEnabled`) com keep rules (AIDL dos processos
   `:inference`/`:reasoning`, sherpa-onnx, LiteRT-LM, AndroidSVG, Play Billing, AdMob), AAB,
   `versionName` 1.0.0, smoke do release no A32. **[YAN]**: chave de upload (Play App Signing) e o
-  `applicationId` (decisão 2). Vem depois da V1-10, para o AAB já levar a compra e os anúncios.
+  `applicationId` (decisão 2, caminho crítico). Vem depois da V1-10 com fakes, para o AAB já levar
+  a compra e os anúncios. Em seguida sobe na trilha interna **[YAN]**, com a permissão de billing,
+  para criar o produto de R$15 — antes do e2e real (MZ-T15/API-T14). A conta (decisão 1) trava
+  esse upload.
 - **V1-4** — Agente na v1: recorte da AGT-T10 para a fase 1 (abuso: injeção, segredo, argumentos,
   flood) + validação real com a chave do Yan **[YAN]**. Não fechou → agente vira "Em breve".
 - **V1-5** — Política de privacidade (PS-2): áudio sob demanda para a origem escolhida, modelos locais,
@@ -134,29 +139,37 @@ a V1-10 precisa. As tasks V1-1..V1-8 não foram renumeradas.
   R$15 (selo "Contém anúncios"); rascunho campo a campo do Data Safety (PS-4), agora com anúncios e
   compras, e da declaração dos serviços em primeiro plano (`microphone`, `dataSync`) — o Yan
   preenche no Console **[YAN]**.
-- **V1-8** — Trilha interna → teste fechado → produção (PS-7) **[YAN]**. O teste fechado inclui
-  license testers para a compra de R$15. Antes dela, os roteiros manuais pendentes no A32 do que
-  entra: GT-T8, NM-T13/T18, RSN-T19 (Gemma/Qwen: tempo e RAM) e o das skins.
+- **V1-8** — Teste fechado → produção (PS-7) **[YAN]**. O primeiro AAB já subiu na trilha interna
+  logo depois da V1-3 (permissão de billing e produto de R$15), antes do e2e real. A V1-8 retoma
+  essa trilha: teste fechado com license testers da compra → produção. Antes dela, os roteiros
+  manuais pendentes no A32 do que entra: GT-T8, NM-T13/T18, RSN-T19 (Gemma/Qwen: tempo e RAM) e o
+  das skins.
 - **V1-9** — API em staging e produção na AWS (API-T13 + teste de carga). A menor e mais barata
-  máquina; o plano está em `api/docs/aws.md` (tarefa aws-plano, branch `equipe/aws-plano` — não
-  inventar números). DNS/TLS pela Cloudflare; o Yan tem domínios na Cloudflare e na GoDaddy. Rust
-  para render o máximo numa máquina pequena; o teste de carga diz quantos usuários ela aguenta.
+  máquina; o plano está em `api/docs/aws.md` (não inventar números). DNS/TLS pela Cloudflare; o Yan
+  tem domínios na Cloudflare e na GoDaddy. Rust para render o máximo numa máquina pequena; o teste
+  de carga diz quantos usuários ela aguenta.
   API-T11 e API-T12 ficam desligadas na v1. Pode andar em paralelo desde já. Staging acessível só
   ao Yan (VPN ou equivalente) — anotado, sem configurar agora.
 - **V1-10** — Monetização da v1, **depois da API em staging**: MZ-T1, T2, T3, T4, T9, T10, T11, T13,
   T14 e T15. Fora: T5–T8 e T12 (créditos e o rewarded "Ganhar minutos"). Na MZ-T9 a sheet cobra o
-  R$15; o botão de recarga não entra. Na T14 e na T15, goldens e e2e cobrem o unlock, o banner e o
-  intersticial — as rotas de créditos ficam para depois.
+  R$15; o botão de recarga não entra. MZ-T3 e MZ-T9 andam com fakes: a sheet e os entitlements
+  fecham sem o Play Console. O e2e com compra real (MZ-T15/API-T14) precisa do app no Console — um
+  upload na trilha interna, com a permissão de billing, para criar o produto de R$15, e a service
+  account do Google para a API validar a compra. Isso depende das decisões 1 (conta) e 2
+  (`applicationId`), no caminho crítico; o upload antecipado fica entre a V1-3 e esse e2e. Na T14,
+  os goldens cobrem o unlock, o banner e o intersticial. Na T15, o e2e real é a compra de R$15 e
+  os anúncios; as rotas de créditos ficam para depois.
 
 ### Decisões do Yan que a v1 precisa
 
-1. **Conta de desenvolvedor** — **urgente**. Com venda na v1 é preciso o perfil de pagamentos no
-   Play Console. Pessoal ou organização (Arateki). Organização exige D-U-N-S (grátis na Dun &
-   Bradstreet, até 30 dias) e, portanto, uma empresa registrada. Conta pessoal que vende mostra o
-   **endereço completo** do Yan na Play (answer/13628312).
-2. **`applicationId` definitivo** antes do 1º upload — depois dele não muda: `com.keyflow` (atual; não
-   há app público com esse id, mas só o Console confirma) ou `com.arateki.keyflow`. Muda junto o
-   `PACKAGE_NAME` da API.
+1. **Conta de desenvolvedor** — **urgente, caminho crítico**. Com venda na v1 é preciso o perfil
+   de pagamentos no Play Console. Sem a conta não há upload interno, produto de R$15 nem service
+   account, e o e2e real (MZ-T15/API-T14) não fecha. Pessoal ou organização (Arateki). Organização
+   exige D-U-N-S (grátis na Dun & Bradstreet, até 30 dias) e, portanto, uma empresa registrada.
+   Conta pessoal que vende mostra o **endereço completo** do Yan na Play (answer/13628312).
+2. **`applicationId` definitivo** — **caminho crítico**, antes do 1º upload (a trilha interna que
+   antecede o e2e real). Depois dele não muda: `com.keyflow` (atual; não há app público com esse
+   id, mas só o Console confirma) ou `com.arateki.keyflow`. Muda junto o `PACKAGE_NAME` da API.
 3. **Temas pagos na v1** — **resolvida (2026-10-23)**: Aero, Glitch, Rose Gold e o mascote são pagos
    já na v1, liberados pela compra de R$15.
 4. Onde hospedar a política de privacidade.
@@ -169,20 +182,23 @@ só no app de configuração.
 ### Em paralelo: API em staging e produção (pré-requisito da v1)
 
 A V1-9 (API-T13 + teste de carga) não espera o app: é servidor e pode andar desde já. Staging e
-produção sobem na **menor e mais barata máquina da AWS**. O plano está sendo escrito em
-`api/docs/aws.md` (tarefa aws-plano, branch `equipe/aws-plano`); máquina e região saem de lá — não
-inventar números. DNS e TLS pela Cloudflare; o Yan tem domínios na Cloudflare e na GoDaddy. O
-servidor é em Rust para render o máximo numa máquina pequena. O teste de carga diz quantos
-usuários essa máquina aguenta.
+produção sobem na **menor e mais barata máquina da AWS**. O plano está em `api/docs/aws.md`;
+máquina e região saem de lá — não inventar números. DNS e TLS pela Cloudflare; o Yan tem domínios
+na Cloudflare e na GoDaddy. O servidor é em Rust para render o máximo numa máquina pequena. O
+teste de carga diz quantos usuários essa máquina aguenta.
 
 A rota de transcrição (API-T11) e a SSV (API-T12) ficam desligadas na v1. O staging sobe com
-`INTEGRITY_RELAXED=true` enquanto não houver service account do Google; ela depende do app existir
-no Play Console (V1-3/V1-8) e entra depois.
+`INTEGRITY_RELAXED=true`. MZ-T3 e MZ-T9 andam com fakes enquanto não há app no Play Console.
+
+O e2e com compra real (MZ-T15/API-T14) precisa do app no Console. No caminho crítico, antes dele:
+as decisões 1 (conta) e 2 (`applicationId`), o AAB da V1-3 e um upload na trilha interna com a
+permissão de billing — é assim que se cria o produto de R$15. A service account do Google,
+vinculada a esse app, é o que permite a API validar a compra.
 
 **Anotação, sem configurar agora**: o staging fica acessível só ao Yan (VPN ou equivalente).
 
-Depois da v1: créditos (MZ-T5–T8, MZ-T12) e ligar API-T11/T12. A API-T14 fecha junto com a MZ-T15,
-no recorte da v1 (compra de R$15 e anúncios; o fluxo de créditos fica de fora).
+Depois da v1: créditos (MZ-T5–T8, MZ-T12) e ligar API-T11/T12. O fluxo de créditos fica de fora
+do e2e da v1.
 
 ## Estado atual (2026-10-23)
 
@@ -198,7 +214,7 @@ no recorte da v1 (compra de R$15 e anúncios; o fluxo de créditos fica de fora)
 | — | Teclado pós-uso no A32 (PR #5) | ✅ fluidez (sem chamada síncrona por letra, escorregar, rollover, vibração, prévia na janela), acentos no jeito do Samsung, fileira de 56 dp, cores "Sistema" padrão, corretor próprio com troca no espaço (Q9), cursor no meio do texto |
 | — | `vision-capture` | spec/design/tasks prontos — nada do motor implementado; fora da v1. ⚠️ A aba Visão do trabalho do Gemini já existe com "Origem da visão" (Créditos/endpoint próprio), contra a spec ("nenhum byte sai do aparelho") — decidir antes da VC-T11 |
 | M7 | `keyflow-api` | API-T1..T12 ✅ + T13 parcial (Dockerfile + `api/docs/deploy.md`), **na `main` desde 2026-09-28** (PR #4); T13 parou nas credenciais/staging **[YAN]**. A v1 exige staging e produção na AWS (V1-9); plano em `api/docs/aws.md`. API-T11 e API-T12 ficam desligadas na v1 |
-| M7 | `monetization` | spec/design/tasks prontos — nada implementado. **Parte entra na v1** (V1-10: MZ-T1, T2, T3, T4, T9, T10, T11, T13, T14, T15), depois da API em staging. Créditos (T5–T8) e o rewarded (T12) ficam para depois |
+| M7 | `monetization` | spec/design/tasks prontos — nada implementado. **Parte entra na v1** (V1-10: MZ-T1, T2, T3, T4, T9, T10, T11, T13, T14, T15). MZ-T3/T9 com fakes depois do staging; o e2e real (MZ-T15/API-T14) espera o upload interno e as decisões 1 e 2. Créditos (T5–T8) e o rewarded (T12) ficam para depois |
 | M8 | `theme-system` | spec de 2026-07-04, nada implementado — **defasada**: Aero, Glitch e Rose Gold saíram por fora (quick 013/015/016, pintores no IME como `KeySurface`/`RoseGoldPainter`) e as skins por pacote existem; não há `ThemeRegistry`. Revisar a spec antes de executar. Fora da v1 |
 | — | Play Store | **v1 = recorte de 2026-10-23** (V1-0 feita; seguem V1-1..V1-8, com V1-9 em paralelo e V1-10 depois do staging). `PLAYSTORE_CHECKLIST.md`; PS-1 (targetSdk 36) feito; PS-2..PS-7 viram V1-3/V1-5..V1-8 |
 | — | `reasoning-models` (aba Raciocínio) | **na `main` desde 2026-09-30**: RSN-T0..T17 feitos e o texto de privacidade da RSN-T18 em `PLAYSTORE_CHECKLIST.md` §1b (a traceability RPRV-01..04 ainda diz "In Tasks"). Faltam só **[YAN]**: repositório público, elegibilidade do login ChatGPT (RPRV-04) e o roteiro RSN-T19 no A32 — ver Bloco 10 |
@@ -367,11 +383,14 @@ Spec: `.specs/features/monetization/`. **Pré-requisito: API em staging (API-T13
 feature inteira:
 MZ-T1 → T2 → T3 → T4 → T5 → T6 → T7 → T8 → T9 → T10 → T11 → T12 → T13 → T14 → T15.
 **Recorte da v1 (2026-10-23, V1-10)**: entram T1, T2, T3, T4, T9, T10, T11, T13, T14 e T15.
-T5–T8 e T12 (créditos e rewarded) ficam para depois.
+T5–T8 e T12 (créditos e rewarded) ficam para depois. MZ-T3/T9 andam com fakes; o e2e real
+(MZ-T15/API-T14) espera o upload interno e as decisões 1 e 2.
 
-- **[YAN]**: produtos no Play Console + license testers (antes de MZ-T3 testar de verdade);
-  conta/unidades AdMob + SSV (antes de MZ-T10/T12 saírem dos test ads); MZ-T15 = e2e com compras
-  de teste no device (junto com API-T14).
+- **[YAN]**: o produto de R$15 no Play Console nasce de um upload na trilha interna com permissão
+  de billing (depois da V1-3; decisões 1 e 2 no caminho crítico). License testers antes do e2e
+  real. MZ-T3/T9 não esperam isso: seguem com fakes. Conta/unidades AdMob antes de MZ-T10 sair
+  dos test ads; a SSV é da MZ-T12, fora da v1. MZ-T15 = e2e da compra real no device (junto com
+  API-T14), depois da service account.
 - MZ-T1, MZ-T2 e MZ-T11 (lógica pura) podem começar antes do staging existir. A MZ-T5 também
   pode, mas está fora da v1 (créditos).
 
@@ -444,8 +463,8 @@ texto literal da doc da OpenAI). Ordem: RSN-T0 → T1 → … → T19 (uma por v
 ```
 feito: Q1..Q11 → SB → GT → NM → RSN → SKP → AGT fase 1 (faltam só manuais [YAN])
        PRs #8..#11 (2026-10-10..22) fora da fila da v1; V1-0 (PR #7) feita em 2026-10-10
-agora: V1-1 → V1-2 → V1-10 → V1-3 → V1-4 → V1-5 → V1-6 → V1-7 → V1-8
-em paralelo: V1-9 (API-T13 na AWS, staging + produção, teste de carga) — a V1-10 espera o staging
+agora: V1-1 → V1-2 → V1-10 (fakes) → V1-3 → upload interno → e2e MZ-T15/API-T14 → V1-4 → … → V1-8
+em paralelo: V1-9 (API-T13 na AWS) — fakes esperam o staging; o e2e real espera conta, applicationId e o upload
 depois: créditos (MZ-T5..T8, T12) e ligar API-T11/T12 · VC (visão) · TS (temas, spec a revisar) ·
        AGT fases 2/3 · Fala/Fluxos/Computador (sem spec; ideias em
        .specs/features/computer-terminal/ideias.md)
@@ -453,8 +472,9 @@ depois: créditos (MZ-T5..T8, T12) e ligar API-T11/T12 · VC (visão) · TS (tem
 
 **Posição atual (2026-10-23)**: o próximo marco é a **v1** (recorte no topo). A V1-0 está feita
 (PR #7, 2026-10-10). O próximo passo da fila é a V1-1. A V1-9 (API na AWS) corre em paralelo desde
-já; a V1-10 espera o staging. A service account do Google entra quando o app existir no Play
-Console. As PRs #8 a #11 não mudam a fila.
+já. A V1-10 com fakes espera o staging. O e2e com compra real espera as decisões 1 e 2, o AAB da
+V1-3 e o upload na trilha interna (produto de R$15 e service account). As PRs #8 a #11 não mudam
+a fila.
 
 > Até 2026-09-28 a fila era GT → NM → VC → API → MZ → TS → PS, com a loja no fim. O recorte de
 > 2026-10-07 puxou a loja para a frente (decisão no histórico, no topo). Em 2026-10-23 a compra de
@@ -492,8 +512,9 @@ O paralelismo aqui é limitado por **recursos físicos compartilhados**, não po
 - **Frente B — keyflow-api** (mesmo repo, **worktree própria**, tocando SÓ `api/`,
   `.github/workflows/api.yml`, `.gitignore` e o Status do `tasks.md` da feature): Bloco 6
   completo. Pastas disjuntas do Android → merge pro master trivial e frequente (a cada task).
-- **Sincronização**: a V1-10 precisa da API em staging (V1-9 / API-T13). MZ-T1 e MZ-T2 podem
-  adiantar sem staging. MZ-T5 (créditos) fica fora da v1.
+- **Sincronização**: a V1-10 com fakes precisa da API em staging (V1-9 / API-T13). O e2e real
+  (MZ-T15/API-T14) espera ainda as decisões 1 e 2, o upload interno e a service account. MZ-T1 e
+  MZ-T2 podem adiantar sem staging. MZ-T5 (créditos) fica fora da v1.
 - **Frente C (opcional, ganho modesto)**: worktree Android fazendo APENAS tasks unit-puras de
   gate `quick` sem goldens (TS-T1, TS-T5, GT-T1 — arquivos novos, conflito baixo). Merge revisado
   pelo Yan ANTES de a Frente A entrar nos mesmos pacotes. Não dar a esta frente nenhuma task com
