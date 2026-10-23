@@ -227,6 +227,10 @@ dependencies {
     // Identidade anônima (MZ-T1): fallback Block Store para reinstalações na mesma conta Google.
     implementation("com.google.android.gms:play-services-auth-blockstore:16.4.0")
 
+    // AdMob + UMP (MZ-T10): SDK atual, usado apenas pelo pacote ads/.
+    implementation("com.google.android.gms:play-services-ads:25.5.0")
+    implementation("com.google.android.ump:user-messaging-platform:4.0.0")
+
     // Config persistida
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 

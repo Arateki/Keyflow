@@ -2,6 +2,8 @@ package com.keyflow.ui.config
 
 import com.keyflow.i18n.tr
 import com.keyflow.ime.KeyboardSkin
+import com.keyflow.ads.AdsController
+import com.keyflow.ads.BannerSlot
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -81,6 +83,8 @@ fun TecladoPanel(
     onSettingsChange: (Settings) -> Unit,
     onUnlockSkins: () -> Unit,
     skinsUnlocked: Boolean = false,
+    adsController: AdsController? = null,
+    adsOff: Boolean = false,
     onOverlayRequired: () -> Unit = {},
     barsConfig: BarsConfig = BarsConfig.DEFAULT,
     onBarsConfigChange: (BarsConfig) -> Unit = {},
@@ -245,6 +249,7 @@ fun TecladoPanel(
                 SkinPacksSection(SkinPackSurface.KEYBOARD, settings, onSettingsChange)
             }
         }
+        adsController?.let { BannerSlot(it, adsOff) }
     }
 }
 

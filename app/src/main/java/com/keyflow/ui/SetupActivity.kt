@@ -80,6 +80,10 @@ import com.keyflow.data.monetization.RemoteConfigRepository
 import com.keyflow.data.monetization.RemoteConfigSnapshot
 import com.keyflow.ui.config.UnlockPurchaseState
 import com.android.billingclient.api.BillingClient
+import com.keyflow.ads.AdsController
+import com.keyflow.ads.DataStoreInterstitialPolicyStore
+import com.keyflow.ads.InterstitialPolicy
+import com.keyflow.ads.toInterstitialPolicyParams
 
 /**
  * Tela de configuração em Compose (T10). Substitui o formulário XML legado pelo scaffold de abas
@@ -205,6 +209,9 @@ class SetupActivity : ComponentActivity() {
     private var billingManager: BillingManager? = null
     private var entitlementsRepository: EntitlementsRepository? = null
     private var remoteConfigRepository: RemoteConfigRepository? = null
+    private var adsController: AdsController? = null
+    private var interstitialPolicy by mutableStateOf<InterstitialPolicy?>(null)
+    private var interstitialPolicyStore: DataStoreInterstitialPolicyStore? = null
     private var entitlements by mutableStateOf(Entitlements())
     private var remoteSnapshot by mutableStateOf(RemoteConfigSnapshot())
     private var unlockPurchaseState by mutableStateOf(UnlockPurchaseState.IDLE)
@@ -343,6 +350,10 @@ class SetupActivity : ComponentActivity() {
                         skinsUnlocked = entitlements.skinsUnlocked,
                         onUnlockPurchase = ::buyUnlock,
                         unlockPurchaseState = unlockPurchaseState,
+                        adsController = adsController,
+                        adsOff = entitlements.adsOff,
+                        interstitialPolicy = interstitialPolicy,
+                        onInterstitialPolicyChanged = ::persistInterstitialPolicy,
                         localModels = LocalModelsUi.compose(
                             catalog = remoteCatalog.filter { it.kind == ModelKind.SPEECH }
                                 .ifEmpty { ModelCatalog.current(ModelKind.SPEECH) },
@@ -642,6 +653,8 @@ class SetupActivity : ComponentActivity() {
         monetizationJobs.forEach(Job::cancel)
         entitlementsRepository?.close()
         remoteConfigRepository?.close()
+        adsController?.close()
+        interstitialPolicyStore?.close()
         billingManager?.close()
         activityScope.cancel()
         super.onDestroy()
@@ -655,9 +668,21 @@ class SetupActivity : ComponentActivity() {
         val billing = BillingManager(this, redeemPurchase = { purchase -> api.redeem(purchase) })
         val repository = EntitlementsRepository(this, api, billing)
         val remote = RemoteConfigRepository(this, http = auth.http)
+        val ads = AdsController(this)
+        val policyStore = DataStoreInterstitialPolicyStore(this)
         billingManager = billing
         entitlementsRepository = repository
         remoteConfigRepository = remote
+        adsController = ads
+        interstitialPolicyStore = policyStore
+        monetizationJobs += activityScope.launch {
+            val policy = InterstitialPolicy(
+                params = remoteSnapshot.config.ads.toInterstitialPolicyParams(),
+                initialState = policyStore.read(),
+            )
+            interstitialPolicy = policy
+            policyStore.write(policy.snapshot())
+        }
         monetizationJobs += activityScope.launch {
             repository.entitlements.collect { value ->
                 entitlements = value
@@ -679,8 +704,15 @@ class SetupActivity : ComponentActivity() {
         monetizationJobs += activityScope.launch {
             val snapshot = remote.refresh()
             remoteSnapshot = snapshot
+            interstitialPolicy?.updateParams(snapshot.config.ads.toInterstitialPolicyParams())
             ModelCatalog.applyRemoteManifest(snapshot.models)
         }
+    }
+
+    private fun persistInterstitialPolicy() {
+        val policy = interstitialPolicy ?: return
+        val store = interstitialPolicyStore ?: return
+        activityScope.launch { store.write(policy.snapshot()) }
     }
 
     private fun buyUnlock() {
@@ -689,6 +721,8 @@ class SetupActivity : ComponentActivity() {
             return
         }
         if (unlockPurchaseState == UnlockPurchaseState.PURCHASING) return
+        interstitialPolicy?.markPurchaseStarted()
+        persistInterstitialPolicy()
         unlockPurchaseState = UnlockPurchaseState.PURCHASING
         monetizationJobs += activityScope.launch {
             val result = runCatching { billing.purchase(this@SetupActivity, MonetizationProducts.UNLOCK_FOREVER) }
