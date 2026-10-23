@@ -26,7 +26,7 @@ internal object AnthropicProvider {
     fun create(dependencies: AuthDependencies): ProviderAuth {
         val flows = buildList<AuthFlow> {
             add(AnthropicApiKeyFlow())
-            AnthropicSsoFlowFactory.create(dependencies)?.let(::add)
+            add(AnthropicSsoFlowFactory.create(dependencies))
         }
         return ProviderAuth(
             id = ProviderIds.ANTHROPIC,

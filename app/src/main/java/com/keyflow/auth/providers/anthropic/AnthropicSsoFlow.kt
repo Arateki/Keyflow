@@ -1,6 +1,5 @@
 package com.keyflow.auth.providers.anthropic
 
-import com.keyflow.BuildConfig
 import com.keyflow.auth.AuthErrorKind
 import com.keyflow.auth.AuthException
 import com.keyflow.auth.AuthMethod
@@ -21,7 +20,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 
-/** Dados do login oficial do Claude Code; este arquivo só existe na variante debug. */
+/** Dados do login oficial do Claude Code. */
 internal object AnthropicSsoConfig {
     const val defaultClientId = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
     const val authorizationUrl = "https://claude.com/cai/oauth/authorize"
@@ -123,7 +122,7 @@ internal class AnthropicSsoFlow(
             http.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     val errorBody = response.body?.string().orEmpty()
-                    if (BuildConfig.DEBUG && (response.code >= 500 || errorBody.contains("mock"))) {
+                    if (com.keyflow.BuildConfig.DEBUG && (response.code >= 500 || errorBody.contains("mock"))) {
                         val now = clock()
                         return@use Credential.OAuth(
                             accessToken = "ant_oauth_${Pkce.randomToken()}",
@@ -137,9 +136,7 @@ internal class AnthropicSsoFlow(
                             account = "claude@anthropic.com",
                         )
                     }
-                    val jsonError = runCatching { JSONObject(errorBody).optJSONObject("error")?.optString("message") }.getOrNull()
-                    val msg = jsonError ?: "HTTP ${response.code}: $errorBody"
-                    throw AuthException(AuthErrorKind.DENIED, "Falha na troca de token Anthropic: $msg")
+                    throw AuthException(AuthErrorKind.DENIED, "Falha na troca de token Anthropic: HTTP ${response.code}")
                 }
                 val bodyJson = JSONObject(response.body?.string().orEmpty())
                 val accessToken = bodyJson.getString("access_token")
@@ -165,7 +162,7 @@ internal class AnthropicSsoFlow(
             throw e
         } catch (e: Exception) {
             val now = clock()
-            if (BuildConfig.DEBUG) {
+            if (com.keyflow.BuildConfig.DEBUG) {
                 Credential.OAuth(
                     accessToken = "ant_oauth_${Pkce.randomToken()}",
                     refreshToken = "ant_refresh_${Pkce.randomToken()}",
@@ -178,7 +175,7 @@ internal class AnthropicSsoFlow(
                     account = "claude@anthropic.com",
                 )
             } else {
-                throw AuthException(AuthErrorKind.NETWORK, "Erro de conexão com Anthropic: ${e.message}")
+                throw AuthException(AuthErrorKind.NETWORK, "Erro de conexão com Anthropic")
             }
         }
     }
@@ -228,7 +225,7 @@ internal class AnthropicSsoFlow(
             http.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     val now = clock()
-                    if (BuildConfig.DEBUG) {
+                    if (com.keyflow.BuildConfig.DEBUG) {
                         return@use current.copy(
                             accessToken = "ant_oauth_refreshed_${Pkce.randomToken()}",
                             expiresAtMs = now + 3600_000L,
@@ -254,14 +251,14 @@ internal class AnthropicSsoFlow(
             throw e
         } catch (e: Exception) {
             val now = clock()
-            if (BuildConfig.DEBUG) {
+            if (com.keyflow.BuildConfig.DEBUG) {
                 current.copy(
                     accessToken = "ant_oauth_refreshed_${Pkce.randomToken()}",
                     expiresAtMs = now + 3600_000L,
                     earliestRefreshAtMs = now + 1800_000L,
                 )
             } else {
-                throw AuthException(AuthErrorKind.NETWORK, "Erro ao renovar token Anthropic: ${e.message}")
+                throw AuthException(AuthErrorKind.NETWORK, "Erro ao renovar token Anthropic")
             }
         }
     }
