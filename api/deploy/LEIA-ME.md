@@ -47,11 +47,32 @@ mudou no restart antes de testar `/health`.
   PostgreSQL com o padrão de `shared_buffers=128MB` nos 447 MB de RAM; o serviço só sobe depois que
   `99-keyflow.conf` (`shared_buffers=64MB`, `max_connections=20`) está gravado.
 
-### 3. Domínio em lugar único (`KEYFLOW_DOMAIN`)
-Centralizado em `/etc/keyflow/domain.conf` (`KEYFLOW_DOMAIN`, padrão `keyflow-api.arateki.com`):
+### 3. Domínios em lugar único (`KEYFLOW_DOMAIN` e `KEYFLOW_STAGING_DOMAIN`)
+Centralizados em `/etc/keyflow/domain.conf`. Padrões: produção `keyflow-api.arateki.com` e staging
+`keyflow-api-staging.arateki.com`. O valor passado no ambiente vence o arquivo; o que não for passado
+é reaproveitado. Rodar o script de novo reescreve o vhost, sem duplicar `server`.
 ```bash
-ssh admin@<IP_DA_MAQUINA> 'sudo KEYFLOW_DOMAIN=novo.dominio.com bash -s' < api/deploy/provisionar.sh
+ssh admin@<IP_DA_MAQUINA> 'sudo KEYFLOW_DOMAIN=novo.dominio.com KEYFLOW_STAGING_DOMAIN=staging.novo.dominio.com bash -s' < api/deploy/provisionar.sh
 ```
+
+### 4. Staging e produção na mesma máquina, staging atrás do Cloudflare Access
+Os dois processos dividem a Lightsail: produção em `127.0.0.1:8080`, staging em `127.0.0.1:8081`.
+O Nginx publica os dois com o mesmo certificado de origem (`*.arateki.com` em `/etc/keyflow/tls/`):
+
+- `https://keyflow-api.arateki.com` → produção
+- `https://keyflow-api-staging.arateki.com` → staging
+
+O endereço de staging está numa aplicação do **Cloudflare Access**. Sem o service token a Cloudflare
+responde **401** e o pedido não chega na máquina. Quem chama envia os cabeçalhos
+`CF-Access-Client-Id` e `CF-Access-Client-Secret`. O token (Client ID e Client Secret) fica **fora do
+git** — no cofre ou no painel Zero Trust, nunca neste repositório, no `provisionar.sh` nem num `.env`
+versionado. A política de Access desse hostname precisa ser **Service Auth**; política de login HTML
+devolve página em vez do JSON da API.
+
+Depois que o Access deixa o pedido passar, ele injeta `Cf-Access-Jwt-Assertion`. O vhost de staging
+responde **403** se esse cabeçalho não vier. O Nginx não valida a assinatura do JWT: a checagem só
+fecha o acesso direto à origem. Host que não é produção nem staging cai no `default_server` (portas
+80 e 443) e a conexão é encerrada (`return 444`), para não ser atendido pela produção.
 
 ---
 
@@ -97,7 +118,8 @@ ssh admin@<IP_DA_MAQUINA> \
 
 ### Passo 2 — Instalar o Certificado TLS de Origem (Cloudflare) e as Service Accounts do Google
 
-1. Certificado Origin CA (15 anos) da Cloudflare para `keyflow-api.arateki.com`:
+1. Certificado Origin CA (15 anos) da Cloudflare. O mesmo arquivo cobre produção e staging
+   (`*.arateki.com`; os dois vhosts usam `/etc/keyflow/tls/origin.pem` e `origin.key`):
    ```bash
    scp origin.pem origin.key admin@<IP_DA_MAQUINA>:/tmp/
    ssh admin@<IP_DA_MAQUINA> 'sudo install -m 0644 -o root -g root /tmp/origin.pem /etc/keyflow/tls/origin.pem && \
@@ -125,6 +147,13 @@ ssh admin@<IP_DA_MAQUINA> \
    ssh admin@<IP_DA_MAQUINA> 'sudo /usr/local/sbin/keyflow-atualizar.sh staging'
    ssh -L 8081:127.0.0.1:8081 admin@<IP_DA_MAQUINA>
    curl -i http://127.0.0.1:8081/health
+   ```
+   Pelo endereço público (o token não entra no comando versionado; exporte no shell e não o grave):
+   ```bash
+   curl -fsS \
+     -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" \
+     -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}" \
+     https://keyflow-api-staging.arateki.com/health
    ```
 2. **Nota sobre `MemoryDenyWriteExecute=true` e `aws-lc-rs`:** caso o serviço caia no primeiro boot,
    verifique com `sudo journalctl -u keyflow-api-staging.service -n 50 --no-pager`. Se houver falha
