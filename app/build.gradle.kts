@@ -35,6 +35,20 @@ android {
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
+        // A API de monetização usa a mesma base no release; o debug pode apontar para um MockWebServer
+        // sem alterar código (`-PkeyflowApiBaseUrl=http://10.0.2.2:8080`).
+        val apiBaseUrl = providers.gradleProperty("keyflowApiBaseUrl")
+            .orElse("https://keyflow-api.arateki.com")
+            .get()
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+        buildConfigField("String", "KEYFLOW_API_BASE_URL", "\"$apiBaseUrl\"")
+        buildConfigField(
+            "long",
+            "KEYFLOW_INTEGRITY_CLOUD_PROJECT_NUMBER",
+            providers.gradleProperty("keyflowIntegrityCloudProjectNumber").orElse("0").get(),
+        )
+
     }
 
     buildTypes {
@@ -203,6 +217,9 @@ dependencies {
 
     // HTTP — upload multipart para API Whisper
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // Play Integrity classic para registrar a identidade antes das operações sensíveis (MZ-T2).
+    implementation("com.google.android.play:integrity:1.6.0")
 
     // Identidade anônima (MZ-T1): fallback Block Store para reinstalações na mesma conta Google.
     implementation("com.google.android.gms:play-services-auth-blockstore:16.4.0")
