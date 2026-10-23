@@ -221,6 +221,9 @@ dependencies {
     // Play Integrity classic para registrar a identidade antes das operações sensíveis (MZ-T2).
     implementation("com.google.android.play:integrity:1.6.0")
 
+    // Play Billing 9.1.0: versão estável indicada pela documentação oficial (MZ-T3).
+    implementation("com.android.billingclient:billing:9.1.0")
+
     // Identidade anônima (MZ-T1): fallback Block Store para reinstalações na mesma conta Google.
     implementation("com.google.android.gms:play-services-auth-blockstore:16.4.0")
 
