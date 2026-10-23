@@ -13,7 +13,8 @@ class TranslationsTest {
 
     private val keys: Set<String> by lazy {
         val call = Regex("""(?<![A-Za-z0-9_])tr(?:Key)?\(\s*"((?:[^"\\]|\\.)*)"""", RegexOption.MULTILINE)
-        File("src/main/java").walkTopDown()
+        listOf(File("src/main/java"), File("src/debug/java")).asSequence()
+            .flatMap { it.walkTopDown() }
             .filter { it.isFile && it.extension == "kt" && it.name != "Tr.kt" }
             .flatMap { file -> call.findAll(file.readText()).map { unescape(it.groupValues[1]) } }
             .toSet()
