@@ -146,6 +146,10 @@ fun ConfigScreen(
     reasoningLocalSupported: Boolean = true,
     // O agente com ferramentas da aba KeyFlow (agent-harness); `null` = o chat de texto de sempre.
     agent: com.keyflow.agenthost.AgentRuntime? = null,
+    // Entitlements da compra única. Nulos/false mantêm as telas de galeria e testes sem Billing.
+    skinsUnlocked: Boolean = false,
+    onUnlockPurchase: () -> Unit = {},
+    unlockPurchaseState: UnlockPurchaseState = UnlockPurchaseState.IDLE,
 ) {
     val palette = LocalKeyFlowPalette.current
     var activeTab by rememberSaveable { mutableStateOf(initialTab) }
@@ -158,6 +162,10 @@ fun ConfigScreen(
     var docsFocusKey by remember { mutableStateOf(0) }
     // Atalho da orbe com o bottom sheet aberto (2 ou 3 toques); null = fechado.
     var shortcutSheetTaps by remember { mutableStateOf<Int?>(null) }
+
+    LaunchedEffect(skinsUnlocked) {
+        if (skinsUnlocked) unlockOpen = false
+    }
 
     // A aba de um modo só fica "liberada" com o modo ligado E tudo pronto: permissões concedidas (mic +
     // a específica) e, para o Teclado, o KeyFlow sendo o teclado ativo. Sem isso o cartão do modo segue
@@ -337,6 +345,7 @@ fun ConfigScreen(
                             settings = settings,
                             onSettingsChange = onSettingsChange,
                             onUnlockSkins = { unlockOpen = true },
+                            skinsUnlocked = skinsUnlocked,
                             onOverlayRequired = onOverlayRequired,
                             barsConfig = barsConfig,
                             onBarsConfigChange = onBarsConfigChange,
@@ -361,6 +370,7 @@ fun ConfigScreen(
                             settings = settings,
                             onSettingsChange = onSettingsChange,
                             onUnlockSkins = { unlockOpen = true },
+                            skinsUnlocked = skinsUnlocked,
                             onOpenShortcutSheet = { shortcutSheetTaps = it },
                             onShortcut1Blocked = {
                                 showToast(
@@ -457,7 +467,12 @@ fun ConfigScreen(
             },
             modifier = Modifier.fillMaxSize().systemBarsPadding(),
         )
-        UnlockSheet(visible = unlockOpen, onDismiss = { unlockOpen = false })
+        UnlockSheet(
+            visible = unlockOpen,
+            onDismiss = { unlockOpen = false },
+            onBuy = onUnlockPurchase,
+            purchaseState = unlockPurchaseState,
+        )
         ShortcutActionSheet(
             taps = shortcutSheetTaps,
             current = shortcutSheetTaps?.let { settings.shortcutForTaps(it) } ?: OrbShortcutAction.NONE,

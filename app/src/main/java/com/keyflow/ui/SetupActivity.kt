@@ -40,6 +40,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import com.keyflow.data.models.ModelCatalog
@@ -68,6 +69,14 @@ import com.keyflow.reasoning.google.GoogleReasoningEngine
 import com.keyflow.ui.config.LocalModelsUi
 import com.keyflow.ui.config.LocalModelsSnapshot
 import com.keyflow.ui.config.LocalModelsController
+import com.keyflow.data.monetization.BillingManager
+import com.keyflow.data.monetization.Entitlements
+import com.keyflow.data.monetization.EntitlementsRepository
+import com.keyflow.data.monetization.KeyFlowApiClient
+import com.keyflow.data.monetization.MonetizationProducts
+import com.keyflow.data.monetization.StorePurchaseState
+import com.keyflow.ui.config.UnlockPurchaseState
+import com.android.billingclient.api.BillingClient
 
 /**
  * Tela de configuração em Compose (T10). Substitui o formulário XML legado pelo scaffold de abas
@@ -188,6 +197,14 @@ class SetupActivity : ComponentActivity() {
     // Barras/grades de atalhos do teclado (SB-T9) — chaves de DataStore próprias, fora de `Settings`.
     private var barsConfig by mutableStateOf(BarsConfig.DEFAULT)
     private var shortcutGrids by mutableStateOf<List<ShortcutGrid>>(emptyList())
+    // Monetização só é criada/conectada depois que o onboarding terminou; o onboarding não toca Play,
+    // Integrity, API nem a camada de ads (MZ-T9/ADS-01).
+    private var billingManager: BillingManager? = null
+    private var entitlementsRepository: EntitlementsRepository? = null
+    private var entitlements by mutableStateOf(Entitlements())
+    private var unlockPurchaseState by mutableStateOf(UnlockPurchaseState.IDLE)
+    private var monetizationJobs = mutableListOf<Job>()
+    private var monetizationStarted = false
     // Desligar o Modo Teclado abre o seletor; só efetiva se o KeyFlow deixar de ser o teclado ativo.
     private var pendingKeyboardDisable = false
     // Ativação pendente (Yan, 2026-07-04): o usuário só precisa tocar o toggle UMA vez — cada permissão
@@ -257,6 +274,7 @@ class SetupActivity : ComponentActivity() {
             settingsRepository.settingsFlow().collectLatest {
                 settings = it
                 settingsLoaded = true
+                if (it.onboardingDone) startMonetizationIfNeeded()
                 // Primeira abertura: a interface assume o idioma do aparelho (PT/EN/ES; outros → inglês).
                 // Depois disso, quem manda é o botão de idioma do cabeçalho.
                 if (it.appLanguage.isBlank()) persist { s -> s.copy(appLanguage = AppLanguage.fromSystem().code) }
@@ -314,6 +332,9 @@ class SetupActivity : ComponentActivity() {
                         },
                         requestedTab = requestedTab,
                         requestedTabKey = requestedTabKey,
+                        skinsUnlocked = entitlements.skinsUnlocked,
+                        onUnlockPurchase = ::buyUnlock,
+                        unlockPurchaseState = unlockPurchaseState,
                         localModels = LocalModelsUi.compose(
                             installed = localSnapshot.installed,
                             active = localSnapshot.active,
@@ -605,8 +626,60 @@ class SetupActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        monetizationJobs.forEach(Job::cancel)
+        entitlementsRepository?.close()
+        billingManager?.close()
         activityScope.cancel()
         super.onDestroy()
+    }
+
+    /** Inicializa o grafo de compra somente na configuração, nunca durante o onboarding. */
+    private fun startMonetizationIfNeeded() {
+        if (monetizationStarted) return
+        monetizationStarted = true
+        val billing = BillingManager(this)
+        val repository = EntitlementsRepository(this, KeyFlowApiClient(this), billing)
+        billingManager = billing
+        entitlementsRepository = repository
+        monetizationJobs += activityScope.launch {
+            repository.entitlements.collect { value ->
+                entitlements = value
+                if (value.skinsUnlocked) unlockPurchaseState = UnlockPurchaseState.IDLE
+            }
+        }
+        monetizationJobs += activityScope.launch {
+            billing.purchases.collectLatest { purchases ->
+                if (purchases.any { it.products.contains(MonetizationProducts.UNLOCK_FOREVER) && it.state == StorePurchaseState.PENDING }) {
+                    unlockPurchaseState = UnlockPurchaseState.PENDING
+                }
+                repository.refresh()
+            }
+        }
+        monetizationJobs += activityScope.launch {
+            billing.connect()
+            repository.refresh()
+        }
+    }
+
+    private fun buyUnlock() {
+        val billing = billingManager ?: run {
+            unlockPurchaseState = UnlockPurchaseState.UNAVAILABLE
+            return
+        }
+        if (unlockPurchaseState == UnlockPurchaseState.PURCHASING) return
+        unlockPurchaseState = UnlockPurchaseState.PURCHASING
+        monetizationJobs += activityScope.launch {
+            val result = runCatching { billing.purchase(this@SetupActivity, MonetizationProducts.UNLOCK_FOREVER) }
+                .getOrElse {
+                    unlockPurchaseState = UnlockPurchaseState.ERROR
+                    return@launch
+                }
+            unlockPurchaseState = when {
+                result.ok -> UnlockPurchaseState.PENDING
+                result.responseCode == BillingClient.BillingResponseCode.USER_CANCELED -> UnlockPurchaseState.IDLE
+                else -> UnlockPurchaseState.ERROR
+            }
+        }
     }
 
     /** Persiste a transformação do estado e sinaliza "salvo" (CFG-04/05). */

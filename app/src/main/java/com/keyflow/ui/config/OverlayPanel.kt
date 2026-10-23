@@ -74,6 +74,7 @@ fun OverlayPanel(
     settings: Settings,
     onSettingsChange: (Settings) -> Unit,
     onUnlockSkins: () -> Unit,
+    skinsUnlocked: Boolean = false,
     modifier: Modifier = Modifier,
     onOpenShortcutSheet: (Int) -> Unit = {},
     onShortcut1Blocked: () -> Unit = {},
@@ -220,6 +221,7 @@ fun OverlayPanel(
                     selectedOrbSkin = settings.orbSkin,
                     onOrbSkinSelected = { onSettingsChange(settings.copy(orbSkin = it)) },
                     onUnlock = onUnlockSkins,
+                    skinsUnlocked = skinsUnlocked,
                     unlockTag = OVERLAY_UNLOCK_TAG,
                     modifier = Modifier.padding(bottom = 16.dp),
                 )

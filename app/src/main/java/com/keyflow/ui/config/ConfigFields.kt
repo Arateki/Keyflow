@@ -949,12 +949,19 @@ internal fun SkinsSection(
     onUnlock: () -> Unit,
     unlockTag: String,
     modifier: Modifier = Modifier,
+    skinsUnlocked: Boolean = false,
     selectedSkin: String? = null,
     onSkinSelected: ((String) -> Unit)? = null,
     selectedOrbSkin: String? = null,
     onOrbSkinSelected: ((String) -> Unit)? = null,
 ) {
     val palette = LocalKeyFlowPalette.current
+    fun selectOrb(style: OrbStyle) {
+        if (!style.paid || skinsUnlocked) onOrbSkinSelected?.invoke(style.id) else onUnlock()
+    }
+    fun selectKeyboard(skin: KeyboardSkin) {
+        if (!skin.paid || skinsUnlocked) onSkinSelected?.invoke(skin.id) else onUnlock()
+    }
     Column(
         modifier
             .fillMaxWidth()
@@ -970,8 +977,13 @@ internal fun SkinsSection(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                KfIcon(KfIcons.Lock, palette.faint, Modifier.size(11.dp), strokeWidth = 2f)
-                Eyebrow(tr("Bloqueado"))
+                KfIcon(
+                    if (skinsUnlocked) KfIcons.Check else KfIcons.Lock,
+                    if (skinsUnlocked) palette.teal else palette.faint,
+                    Modifier.size(11.dp),
+                    strokeWidth = 2f,
+                )
+                Eyebrow(tr(if (skinsUnlocked) "Desbloqueado" else "Bloqueado"))
             }
         }
         if (onOrbSkinSelected != null) {
@@ -995,7 +1007,7 @@ internal fun SkinsSection(
                 SkinChoice(
                     label = tr("Ateliê"),
                     selected = orbSelected == OrbStyle.ATELIE,
-                    onClick = { onOrbSkinSelected(OrbStyle.ATELIE.id) },
+                    onClick = { selectOrb(OrbStyle.ATELIE) },
                     tag = orbSkinTag(OrbStyle.ATELIE.id),
                 ) {
                     Box(Modifier.fillMaxSize().background(palette.bg), contentAlignment = Alignment.Center) {
@@ -1005,7 +1017,7 @@ internal fun SkinsSection(
                 SkinChoice(
                     label = "Aero",
                     selected = orbSelected == OrbStyle.AERO,
-                    onClick = { onOrbSkinSelected(OrbStyle.AERO.id) },
+                    onClick = { selectOrb(OrbStyle.AERO) },
                     tag = orbSkinTag(OrbStyle.AERO.id),
                 ) {
                     // O céu por trás, para a bolha de vidro mostrar o que atravessa.
@@ -1016,7 +1028,7 @@ internal fun SkinsSection(
                 SkinChoice(
                     label = "Glitch",
                     selected = orbSelected == OrbStyle.GLITCH,
-                    onClick = { onOrbSkinSelected(OrbStyle.GLITCH.id) },
+                    onClick = { selectOrb(OrbStyle.GLITCH) },
                     tag = orbSkinTag(OrbStyle.GLITCH.id),
                 ) {
                     // Congelada no pico de uma rajada, para a amostra mostrar a falha e não só as franjas.
@@ -1027,7 +1039,7 @@ internal fun SkinsSection(
                 SkinChoice(
                     label = "Rose Gold",
                     selected = orbSelected == OrbStyle.ROSE_GOLD,
-                    onClick = { onOrbSkinSelected(OrbStyle.ROSE_GOLD.id) },
+                    onClick = { selectOrb(OrbStyle.ROSE_GOLD) },
                     tag = orbSkinTag(OrbStyle.ROSE_GOLD.id),
                 ) {
                     Box(Modifier.fillMaxSize().background(palette.bg), contentAlignment = Alignment.Center) {
@@ -1037,7 +1049,7 @@ internal fun SkinsSection(
                 SkinChoice(
                     label = tr("Mascote"),
                     selected = orbSelected == OrbStyle.MASCOT,
-                    onClick = { onOrbSkinSelected(OrbStyle.MASCOT.id) },
+                    onClick = { selectOrb(OrbStyle.MASCOT) },
                     tag = orbSkinTag(OrbStyle.MASCOT.id),
                 ) {
                     // Menor que as outras prévias: as orelhas do mascote passam do miolo da orbe, e o cartão recorta o que sobra.
@@ -1053,7 +1065,7 @@ internal fun SkinsSection(
                 SkinChoice(
                     label = tr("Sistema"),
                     selected = nativeKeyboardSkin(selectedSkin) == KeyboardSkin.SYSTEM,
-                    onClick = { onSkinSelected(KeyboardSkin.SYSTEM.id) },
+                    onClick = { selectKeyboard(KeyboardSkin.SYSTEM) },
                     tag = skinTag(KeyboardSkin.SYSTEM.id),
                 ) {
                     // Fundo e tecla do próprio esquema, como uma tecla do Samsung.
@@ -1064,7 +1076,7 @@ internal fun SkinsSection(
                 SkinChoice(
                     label = tr("Ateliê"),
                     selected = nativeKeyboardSkin(selectedSkin) == KeyboardSkin.ATELIE,
-                    onClick = { onSkinSelected(KeyboardSkin.ATELIE.id) },
+                    onClick = { selectKeyboard(KeyboardSkin.ATELIE) },
                     tag = skinTag(KeyboardSkin.ATELIE.id),
                 ) {
                     Box(Modifier.fillMaxSize().background(palette.teal))
@@ -1073,7 +1085,7 @@ internal fun SkinsSection(
                 SkinChoice(
                     label = "Aero",
                     selected = nativeKeyboardSkin(selectedSkin) == KeyboardSkin.AERO,
-                    onClick = { onSkinSelected(KeyboardSkin.AERO.id) },
+                    onClick = { selectKeyboard(KeyboardSkin.AERO) },
                     tag = skinTag(KeyboardSkin.AERO.id),
                 ) {
                     // Céu e colina da paisagem, com uma tecla de vidro por cima.
@@ -1090,7 +1102,7 @@ internal fun SkinsSection(
                 SkinChoice(
                     label = "Glitch",
                     selected = nativeKeyboardSkin(selectedSkin) == KeyboardSkin.GLITCH,
-                    onClick = { onSkinSelected(KeyboardSkin.GLITCH.id) },
+                    onClick = { selectKeyboard(KeyboardSkin.GLITCH) },
                     tag = skinTag(KeyboardSkin.GLITCH.id),
                 ) {
                     // Uma tecla cinza escuro sobre o fundo neutro, com as duas marcas de registro: ciano em cima à
@@ -1109,7 +1121,7 @@ internal fun SkinsSection(
                 SkinChoice(
                     label = "Rose Gold",
                     selected = nativeKeyboardSkin(selectedSkin) == KeyboardSkin.ROSE_GOLD,
-                    onClick = { onSkinSelected(KeyboardSkin.ROSE_GOLD.id) },
+                    onClick = { selectKeyboard(KeyboardSkin.ROSE_GOLD) },
                     tag = skinTag(KeyboardSkin.ROSE_GOLD.id),
                 ) {
                     // Fundo blush e uma tecla de cetim rosé com o bisel de metal.
@@ -1128,27 +1140,29 @@ internal fun SkinsSection(
             if (onSkinSelected == null && onOrbSkinSelected == null) SkinSwatch(palette.terracotta)
             if (onSkinSelected == null && onOrbSkinSelected == null) SkinSwatch(palette.bg, border = true)
         }
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(top = 14.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .border(1.dp, palette.terracotta.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
-                .clickable { onUnlock() }
-                .testTag(unlockTag)
-                .padding(vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            KfIcon(KfIcons.LockOpen, palette.terracotta, Modifier.size(15.dp))
-            Text(
-                tr("Desbloquear skins"),
-                color = palette.terracotta,
-                fontFamily = SpaceGrotesk,
-                fontWeight = FontWeight.Medium,
-                fontSize = 12.sp,
-                letterSpacing = 0.2.sp,
-            )
+        if (!skinsUnlocked) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 14.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .border(1.dp, palette.terracotta.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
+                    .clickable { onUnlock() }
+                    .testTag(unlockTag)
+                    .padding(vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                KfIcon(KfIcons.LockOpen, palette.terracotta, Modifier.size(15.dp))
+                Text(
+                    tr("Desbloquear skins"),
+                    color = palette.terracotta,
+                    fontFamily = SpaceGrotesk,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 12.sp,
+                    letterSpacing = 0.2.sp,
+                )
+            }
         }
     }
 }
