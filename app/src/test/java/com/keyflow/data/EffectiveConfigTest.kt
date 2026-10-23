@@ -11,12 +11,11 @@ class EffectiveConfigTest {
     fun `openai resolves to fixed endpoint and bearer token`() {
         val settings = Settings(
             source = TranscriptionSource.OPENAI,
-            openaiToken = "sk-abc",
             openaiModel = "whisper-1",
             openaiLanguage = "pt",
         )
 
-        val ready = settings.effectiveConfigFor() as EffectiveConfig.Ready
+        val ready = settings.effectiveConfigFor(credentials = SettingsCredentialValues(openaiToken = "sk-abc")) as EffectiveConfig.Ready
         assertThat(ready.config.endpointUrl).isEqualTo(Settings.OPENAI_ENDPOINT)
         assertThat(ready.config.authHeaderName).isEqualTo("Authorization")
         assertThat(ready.config.authHeaderValue).isEqualTo("Bearer sk-abc")
@@ -27,9 +26,9 @@ class EffectiveConfigTest {
 
     @Test
     fun `groq resolves to fixed endpoint and model`() {
-        val settings = Settings(source = TranscriptionSource.GROQ, groqToken = "gsk-xyz")
+        val settings = Settings(source = TranscriptionSource.GROQ)
 
-        val ready = settings.effectiveConfigFor() as EffectiveConfig.Ready
+        val ready = settings.effectiveConfigFor(credentials = SettingsCredentialValues(groqToken = "gsk-xyz")) as EffectiveConfig.Ready
         assertThat(ready.config.endpointUrl).isEqualTo(Settings.GROQ_ENDPOINT)
         assertThat(ready.config.authHeaderValue).isEqualTo("Bearer gsk-xyz")
         assertThat(ready.config.model).isEqualTo(Settings.GROQ_MODEL)
@@ -66,7 +65,7 @@ class EffectiveConfigTest {
 
     @Test
     fun `byo preset without token is incomplete and cannot transcribe`() {
-        val settings = Settings(source = TranscriptionSource.OPENAI, openaiToken = "")
+        val settings = Settings(source = TranscriptionSource.OPENAI)
         val ready = settings.effectiveConfigFor() as EffectiveConfig.Ready
         assertThat(ready.config.authHeaderValue).isEmpty()
         assertThat(ready.config.isComplete()).isFalse()
@@ -74,7 +73,7 @@ class EffectiveConfigTest {
 
     @Test
     fun `effectiveConfigFor honors an explicit source over the stored one`() {
-        val settings = Settings(source = TranscriptionSource.CUSTOM, groqToken = "gsk-1")
+        val settings = Settings(source = TranscriptionSource.CUSTOM)
         val ready = settings.effectiveConfigFor(TranscriptionSource.GROQ) as EffectiveConfig.Ready
         assertThat(ready.config.endpointUrl).isEqualTo(Settings.GROQ_ENDPOINT)
     }
@@ -83,14 +82,13 @@ class EffectiveConfigTest {
     fun `transcriptionTimeoutMs is shared across providers, not per-preset`() {
         val settings = Settings(
             transcriptionTimeoutMs = 30_000,
-            openaiToken = "sk-abc",
-            groqToken = "gsk-1",
             customEndpoint = "https://self.host/v1/audio/transcriptions",
             customHeaderValue = "raw-key",
         )
-        assertThat((settings.effectiveConfigFor(TranscriptionSource.OPENAI) as EffectiveConfig.Ready).config.timeoutMs)
+        val credentials = SettingsCredentialValues(openaiToken = "sk-abc", groqToken = "gsk-1")
+        assertThat((settings.effectiveConfigFor(TranscriptionSource.OPENAI, credentials) as EffectiveConfig.Ready).config.timeoutMs)
             .isEqualTo(30_000L)
-        assertThat((settings.effectiveConfigFor(TranscriptionSource.GROQ) as EffectiveConfig.Ready).config.timeoutMs)
+        assertThat((settings.effectiveConfigFor(TranscriptionSource.GROQ, credentials) as EffectiveConfig.Ready).config.timeoutMs)
             .isEqualTo(30_000L)
         assertThat((settings.effectiveConfigFor(TranscriptionSource.CUSTOM) as EffectiveConfig.Ready).config.timeoutMs)
             .isEqualTo(30_000L)
@@ -107,8 +105,8 @@ class EffectiveConfigTest {
 
     @Test
     fun `transcriptionTimeoutMs defaults to Config's default`() {
-        val settings = Settings(source = TranscriptionSource.OPENAI, openaiToken = "sk-abc")
-        val ready = settings.effectiveConfigFor() as EffectiveConfig.Ready
+        val settings = Settings(source = TranscriptionSource.OPENAI)
+        val ready = settings.effectiveConfigFor(credentials = SettingsCredentialValues(openaiToken = "sk-abc")) as EffectiveConfig.Ready
         assertThat(ready.config.timeoutMs).isEqualTo(com.keyflow.data.Config.DEFAULT_TIMEOUT_MS)
     }
 
@@ -138,9 +136,9 @@ class EffectiveConfigTest {
 
     @Test
     fun `choosing another source keeps the local model for when the user comes back`() {
-        val settings = Settings(source = TranscriptionSource.OPENAI, openaiToken = "sk-abc", localModelId = "whisper-base")
+        val settings = Settings(source = TranscriptionSource.OPENAI, localModelId = "whisper-base")
 
-        assertThat(settings.effectiveConfigFor()).isInstanceOf(EffectiveConfig.Ready::class.java)
+        assertThat(settings.effectiveConfigFor(credentials = SettingsCredentialValues(openaiToken = "sk-abc"))).isInstanceOf(EffectiveConfig.Ready::class.java)
         assertThat(settings.effectiveConfigFor(TranscriptionSource.LOCAL)).isInstanceOf(EffectiveConfig.Local::class.java)
     }
 }

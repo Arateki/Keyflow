@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -99,11 +101,14 @@ class AuthController(
         if (trimmed.isEmpty()) store.clearApiKey(provider) else store.put(provider, Credential.ApiKey(trimmed))
     }
 
-    /**
-     * A chave de API guardada, para preencher o campo (mascarado) da tela. Só devolve chave de API — um login nunca entrega token
-     * nenhum por aqui (AUTH-04).
-     */
-    fun apiKey(provider: ProviderId): String? = (store.get(provider) as? Credential.ApiKey)?.value
+    /** Só a máscara chega à UI; o valor decifrado fica dentro do auth/ e não entra no estado Compose. */
+    fun apiKey(provider: ProviderId): String? = CredentialMask.of((store.get(provider) as? Credential.ApiKey)?.value)
+
+    /** A leitura do cofre acontece no IO; a UI recebe apenas a máscara e pode observar mudanças. */
+    fun apiKeyFlow(provider: ProviderId): Flow<String?> = store.changes(provider)
+        .map { (it as? Credential.ApiKey)?.value?.let(CredentialMask::of) }
+        .distinctUntilChanged()
+        .flowOn(kotlinx.coroutines.Dispatchers.IO)
 
     /**
      * Um aviso que se mostra UMA vez por provedor e chave (ex.: "você está usando o seu plano"). Devolve `true` na 1ª chamada e

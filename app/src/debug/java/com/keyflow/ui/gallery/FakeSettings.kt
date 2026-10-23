@@ -22,7 +22,6 @@ object FakeSettings {
 
     val settings = Settings(
         source = TranscriptionSource.OPENAI,
-        openaiToken = "sk-fake-3b",
         customEndpoint = "https://self.host/v1/audio/transcriptions",
         overlaySide = OverlaySide.RIGHT,
         orbSizePx = 156,

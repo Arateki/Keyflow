@@ -492,8 +492,6 @@ object RouteCatalog {
             settings = FakeSettings.settings.copy(
                 visionSource = source,
                 visionLocalModelId = localModelId,
-                visionGoogleApiKey = googleKey,
-                visionAnthropicApiKey = anthropicKey,
             ),
             visionModels = localModels,
             permissions = PermissionStatus(
@@ -538,8 +536,6 @@ object RouteCatalog {
             settings = FakeSettings.settings.copy(
                 falaSource = source,
                 falaLocalModelId = localModelId,
-                falaElevenLabsApiKey = elevenLabsKey,
-                falaGoogleApiKey = googleKey,
             ),
             falaModels = localModels,
             permissions = PermissionStatus(

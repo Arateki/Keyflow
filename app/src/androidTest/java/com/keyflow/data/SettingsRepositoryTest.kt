@@ -1,7 +1,6 @@
 package com.keyflow.data
 
 import android.content.Context
-import android.content.SharedPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -11,10 +10,10 @@ import com.keyflow.core.ReasoningSource
 import com.keyflow.core.RecordingMode
 import com.keyflow.core.TranscriptionSource
 import com.keyflow.core.VisionSource
+import com.keyflow.auth.CredentialStore
+import com.keyflow.auth.SecureCredentialStore
 import com.keyflow.data.models.ModelKind
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -46,6 +45,7 @@ class SettingsRepositoryTest {
         dataStoreFile.delete()
         dataStoreFile.parentFile?.delete()
         context.deleteSharedPreferences(securePrefsName)
+        context.deleteSharedPreferences("${SecureCredentialStore.PREFS_NAME}_$securePrefsName")
     }
 
     private fun newRepository() = SettingsRepository(
@@ -94,7 +94,10 @@ class SettingsRepositoryTest {
         )
 
         val dataStoreBytes = dataStoreFile.readBytes().toString(Charsets.ISO_8859_1)
-        val securePrefsFile = File(context.applicationInfo.dataDir, "shared_prefs/$securePrefsName.xml")
+        val securePrefsFile = File(
+            context.applicationInfo.dataDir,
+            "shared_prefs/${SecureCredentialStore.PREFS_NAME}_$securePrefsName.xml",
+        )
         val securePrefsXml = securePrefsFile.readText()
 
         assertFalse(dataStoreBytes.contains(secret))
@@ -102,20 +105,20 @@ class SettingsRepositoryTest {
     }
 
     @Test
-    fun settingsFlowReadsTheSecurePrefsOffTheCollectorThread() = runBlocking(Dispatchers.Main.immediate) {
+    fun settingsFlowReadsTheSecurePrefsOffTheCollectorThread() = runTest {
         val reads = CopyOnWriteArrayList<Thread>()
-        val delegate = context.getSharedPreferences("settings-flow-thread-$securePrefsName", Context.MODE_PRIVATE)
-        val recordingPrefs = object : SharedPreferences by delegate {
-            override fun getString(key: String?, defValue: String?): String? {
+        val delegate = SecureCredentialStore(context, "${SecureCredentialStore.PREFS_NAME}_$securePrefsName")
+        val recordingStore = object : CredentialStore by delegate {
+            override fun getSecret(key: String): String? {
                 reads += Thread.currentThread()
-                return delegate.getString(key, defValue)
+                return delegate.getSecret(key)
             }
         }
         val repository = SettingsRepository(
             context = context,
             dataStoreFile = dataStoreFile,
             securePrefsName = securePrefsName,
-            securePrefsFactory = { _, _ -> recordingPrefs },
+            credentialStoreFactory = { _, _ -> recordingStore },
         )
         val collector = Thread.currentThread()
 
@@ -135,10 +138,8 @@ class SettingsRepositoryTest {
             customHeaderValue = "custom-secret",
             customModel = "whisper-large-v3",
             customLanguage = "es",
-            openaiToken = "sk-openai",
             openaiModel = "whisper-1",
             openaiLanguage = "pt",
-            groqToken = "gsk-groq",
             groqModel = "whisper-large-v3",
             groqLanguage = "en",
             localModelId = "whisper-base",
@@ -158,8 +159,11 @@ class SettingsRepositoryTest {
         )
 
         repository.saveSettings(saved)
+        repository.saveSecret(SettingsCredentialKeys.OPENAI_TOKEN, "sk-openai")
+        repository.saveSecret(SettingsCredentialKeys.GROQ_TOKEN, "gsk-groq")
 
         assertEquals(saved, repository.settingsFlow().first())
+        assertEquals("Bearer sk-openai", repository.flow().first().authHeaderValue)
     }
 
     /** RSC-01/02: o Raciocínio guarda a própria origem e o próprio modelo, sem tocar nos da Transcrição. */
@@ -303,11 +307,11 @@ class SettingsRepositoryTest {
                 source = TranscriptionSource.LOCAL,
                 localModelId = "whisper-base-int8",
                 localLanguage = "pt",
-                openaiToken = "sk-guardado",
                 customEndpoint = "https://example.test",
                 customHeaderValue = "Bearer guardado",
             ),
         )
+        repository.saveSecret(SettingsCredentialKeys.OPENAI_TOKEN, "sk-guardado")
 
         val cfg = repository.flow().first()
 
@@ -336,7 +340,8 @@ class SettingsRepositoryTest {
     @Test
     fun selectLocalModelIfNoneOnlyFillsAnEmptySelection() = runTest {
         val repository = newRepository()
-        repository.saveSettings(Settings(source = TranscriptionSource.LOCAL, localLanguage = "pt", openaiToken = "sk-x"))
+        repository.saveSettings(Settings(source = TranscriptionSource.LOCAL, localLanguage = "pt"))
+        repository.saveSecret(SettingsCredentialKeys.OPENAI_TOKEN, "sk-x")
 
         assertEquals(true, repository.selectLocalModelIfNone("whisper-base-int8"))
         assertEquals(false, repository.selectLocalModelIfNone("whisper-small-int8"))
@@ -344,7 +349,7 @@ class SettingsRepositoryTest {
         val read = repository.settingsFlow().first()
         assertEquals("whisper-base-int8", read.localModelId)
         assertEquals("pt", read.localLanguage)
-        assertEquals("sk-x", read.openaiToken)
+        assertEquals("", repository.flow().first().authHeaderValue)
     }
 
     @Test
@@ -461,15 +466,16 @@ class SettingsRepositoryTest {
             Settings(
                 source = TranscriptionSource.OPENAI,
                 customHeaderValue = "custom-key",
-                openaiToken = "sk-openai",
-                groqToken = "gsk-groq",
             )
         )
+        repository.saveSecret(SettingsCredentialKeys.OPENAI_TOKEN, "sk-openai")
+        repository.saveSecret(SettingsCredentialKeys.GROQ_TOKEN, "gsk-groq")
 
         val restored = repository.settingsFlow().first()
-        assertEquals("sk-openai", restored.openaiToken)
-        assertEquals("gsk-groq", restored.groqToken)
         assertEquals("custom-key", restored.customHeaderValue)
+        assertEquals("Bearer sk-openai", repository.flow().first().authHeaderValue)
+        repository.saveSettings(restored.copy(source = TranscriptionSource.GROQ))
+        assertEquals("Bearer gsk-groq", repository.flow().first().authHeaderValue)
     }
 
     @Test
@@ -478,11 +484,14 @@ class SettingsRepositoryTest {
         val openai = "sk-openai-must-not-appear"
         val groq = "gsk-groq-must-not-appear"
 
-        repository.saveSettings(Settings(openaiToken = openai, groqToken = groq))
+        repository.saveSecret(SettingsCredentialKeys.OPENAI_TOKEN, openai)
+        repository.saveSecret(SettingsCredentialKeys.GROQ_TOKEN, groq)
 
-        val dataStoreBytes = dataStoreFile.readBytes().toString(Charsets.ISO_8859_1)
-        val securePrefsXml =
-            File(context.applicationInfo.dataDir, "shared_prefs/$securePrefsName.xml").readText()
+        val dataStoreBytes = if (dataStoreFile.exists()) dataStoreFile.readBytes().toString(Charsets.ISO_8859_1) else ""
+        val securePrefsXml = File(
+            context.applicationInfo.dataDir,
+            "shared_prefs/${SecureCredentialStore.PREFS_NAME}_$securePrefsName.xml",
+        ).readText()
         assertFalse(dataStoreBytes.contains(openai))
         assertFalse(dataStoreBytes.contains(groq))
         assertFalse(securePrefsXml.contains(openai))

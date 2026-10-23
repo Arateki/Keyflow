@@ -23,6 +23,14 @@ interface CredentialStore {
     fun changes(provider: ProviderId): Flow<Credential?>
     fun meta(provider: ProviderId, key: String): String?
     fun putMeta(provider: ProviderId, key: String, value: String)
+    /** Segredos de capacidades que não têm login OAuth; continuam no mesmo cofre cifrado. */
+    fun getSecret(key: String): String? = null
+    fun putSecret(key: String, value: String) = Unit
+    fun clearSecret(key: String) = Unit
+    fun secretChanges(key: String): Flow<String?> = callbackFlow {
+        trySend(getSecret(key))
+        awaitClose()
+    }
     fun clearOAuth(provider: ProviderId) = clear(provider)
     fun clearApiKey(provider: ProviderId) = clear(provider)
 }
@@ -151,10 +159,31 @@ class SecureCredentialStore(
         check(prefs.edit().putString(metaKey(provider, key), value).commit()) { "não consegui gravar o dado do provedor" }
     }
 
+    override fun getSecret(key: String): String? = prefs.getString(secretKey(key), null)
+
+    override fun putSecret(key: String, value: String) {
+        check(prefs.edit().putString(secretKey(key), value).commit()) { "não consegui gravar o segredo" }
+    }
+
+    override fun clearSecret(key: String) {
+        check(prefs.edit().remove(secretKey(key)).commit()) { "não consegui apagar o segredo" }
+    }
+
+    override fun secretChanges(key: String): Flow<String?> = callbackFlow {
+        val preferenceKey = secretKey(key)
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, changed ->
+            if (changed == preferenceKey || changed == null) trySend(getSecret(key))
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        trySend(getSecret(key))
+        awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }.distinctUntilChanged()
+
     private fun credKey(provider: ProviderId) = "cred.${provider.value}"
     private fun oauthKey(provider: ProviderId) = "oauth.${provider.value}"
     private fun apiKeyKey(provider: ProviderId) = "apikey.${provider.value}"
     private fun metaKey(provider: ProviderId, key: String) = "meta.${provider.value}.$key"
+    private fun secretKey(key: String) = "settings.$key"
 
     companion object {
         const val PREFS_NAME = "keyflow_auth"

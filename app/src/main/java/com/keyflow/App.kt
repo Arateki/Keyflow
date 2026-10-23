@@ -27,7 +27,6 @@ class App : Application() {
         // e, logo depois, move as cópias do cofre das Settings para o único cofre de auth — tudo em IO.
         scope.launch(Dispatchers.IO) {
             SettingsRepository(this@App).settingsFlow().first()
-            authServices.migrateLegacySettingsApiKeys()
         }
         // Idioma da interface para o processo inteiro (app, orbe, notificação, teclado): um lugar só.
         scope.launch {

@@ -126,7 +126,7 @@ class AuthControllerTest {
         val c = controller()
         assertThat(c.apiKey(provider)).isNull()
         c.saveApiKey(provider, "sk-teste")
-        assertThat(c.apiKey(provider)).isEqualTo("sk-teste")
+        assertThat(c.apiKey(provider)).isEqualTo("••••este")
         store.put(provider, oauth())
         assertThat(c.apiKey(provider)).isNull() // um login não devolve token nenhum
     }
