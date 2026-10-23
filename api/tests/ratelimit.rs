@@ -259,3 +259,48 @@ async fn cf_connecting_ip_splits_quota_only_for_a_trusted_proxy() {
     let third = register_from(state, addr, Some("203.0.113.8")).await;
     assert_eq!(third.status(), StatusCode::TOO_MANY_REQUESTS);
 }
+
+#[tokio::test]
+async fn repeated_cf_connecting_ip_falls_back_to_the_peer() {
+    let google = mock_google_ok().await;
+    let state = state_with_limits(google.uri(), 1, 1000)
+        .await
+        .with_trusted_proxy_cidrs(&["127.0.0.1/32"]);
+    let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+
+    let first =
+        register_with_cf_headers(state.clone(), addr, &["203.0.113.8", "203.0.113.9"]).await;
+    assert_eq!(first.status(), StatusCode::OK);
+
+    // Dois headers de novo, com IPs que seriam cota nova se o primeiro fosse aceito.
+    // A cota é a do peer, então a segunda estoura.
+    let second = register_with_cf_headers(state, addr, &["198.51.100.1", "198.51.100.2"]).await;
+    assert_eq!(second.status(), StatusCode::TOO_MANY_REQUESTS);
+}
+
+async fn register_with_cf_headers(
+    state: AppState,
+    addr: SocketAddr,
+    cf_values: &[&str],
+) -> axum::http::Response<Body> {
+    let device_key = format!("device-{}", uuid::Uuid::new_v4());
+    let mut builder = Request::builder()
+        .method("POST")
+        .uri("/v1/register")
+        .header(header::CONTENT_TYPE, "application/json")
+        .extension(axum::extract::ConnectInfo(addr));
+    for ip in cf_values {
+        builder = builder.header("cf-connecting-ip", *ip);
+    }
+    app(state)
+        .oneshot(
+            builder
+                .body(Body::from(
+                    json!({ "deviceKey": device_key, "integrityToken": "fake-integrity-token" })
+                        .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap()
+}

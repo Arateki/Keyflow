@@ -58,9 +58,14 @@ pub async fn register(
     headers: HeaderMap,
     Json(body): Json<RegisterRequest>,
 ) -> Result<Json<RegisterResponse>, RegisterError> {
-    let cf_connecting_ip = headers
-        .get("cf-connecting-ip")
-        .and_then(|value| value.to_str().ok());
+    // Mais de um CF-Connecting-IP (headers repetidos) não tem um IP só: ignora o header
+    // e fica no peer. `get` devolveria o primeiro e um cliente forjaria a cota.
+    let cf_values: Vec<_> = headers.get_all("cf-connecting-ip").iter().collect();
+    let cf_connecting_ip = if cf_values.len() == 1 {
+        cf_values[0].to_str().ok()
+    } else {
+        None
+    };
     let ip = client_ip(addr.ip(), cf_connecting_ip, &state.trusted_proxies);
     state.rate_limiters.check_register(ip)?;
 
