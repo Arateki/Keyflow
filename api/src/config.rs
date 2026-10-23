@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 use std::fmt;
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::num::NonZeroU32;
+
+use ipnet::IpNet;
 
 const DEFAULT_BIND_ADDR: &str = "0.0.0.0:8080";
 const DEFAULT_REGISTER_RATE_LIMIT_PER_MINUTE: u32 = 5;
@@ -41,6 +43,8 @@ pub struct Config {
     pub ads_reward_seconds: NonZeroU32,
     /// Cap diário de recompensas por conta (ADS-01).
     pub ads_daily_cap: NonZeroU32,
+    /// Redes (CIDR ou IP) de onde `CF-Connecting-IP` é aceito. Vazio = header ignorado.
+    pub trusted_proxies: Vec<IpNet>,
 }
 
 #[derive(Debug)]
@@ -159,6 +163,12 @@ impl Config {
             parse_nonzero_u32(vars, "ADS_REWARD_SECONDS", DEFAULT_ADS_REWARD_SECONDS)?;
         let ads_daily_cap = parse_nonzero_u32(vars, "ADS_DAILY_CAP", DEFAULT_ADS_DAILY_CAP)?;
 
+        let trusted_proxies = parse_trusted_proxies(
+            vars.get("TRUSTED_PROXIES")
+                .map(String::as_str)
+                .unwrap_or(""),
+        )?;
+
         Ok(Config {
             database_url,
             bind_addr,
@@ -174,8 +184,39 @@ impl Config {
             provider_unhealthy_cooldown_secs,
             ads_reward_seconds,
             ads_daily_cap,
+            trusted_proxies,
         })
     }
+}
+
+/// `TRUSTED_PROXIES`: vazio, ou IPs/CIDRs separados por vírgula (`10.0.0.0/8, 127.0.0.1`).
+/// IP sem máscara vira `/32` ou `/128`.
+pub fn parse_trusted_proxies(raw: &str) -> Result<Vec<IpNet>, ConfigError> {
+    let mut nets = Vec::new();
+    for part in raw.split(',') {
+        let part = part.trim();
+        if part.is_empty() {
+            continue;
+        }
+        let net = if part.contains('/') {
+            part.parse::<IpNet>().map_err(|e| ConfigError::InvalidEnv {
+                var: "TRUSTED_PROXIES",
+                value: part.to_string(),
+                reason: e.to_string(),
+            })?
+        } else {
+            let ip = part
+                .parse::<IpAddr>()
+                .map_err(|e: std::net::AddrParseError| ConfigError::InvalidEnv {
+                    var: "TRUSTED_PROXIES",
+                    value: part.to_string(),
+                    reason: e.to_string(),
+                })?;
+            IpNet::from(ip)
+        };
+        nets.push(net);
+    }
+    Ok(nets)
 }
 
 fn parse_nonzero_u32(
@@ -453,5 +494,29 @@ mod tests {
 
         assert_eq!(config.transcription_timeout_ms.get(), 5000);
         assert_eq!(config.transcription_max_bytes.get(), 1000);
+    }
+
+    #[test]
+    fn trusted_proxies_default_to_empty_and_parse_cidr_or_ip() {
+        let config = Config::from_map(&with_required(&[])).unwrap();
+        assert!(config.trusted_proxies.is_empty());
+
+        let config = Config::from_map(&with_required(&[(
+            "TRUSTED_PROXIES",
+            "10.0.0.0/8, 127.0.0.1, 2001:db8::1",
+        )]))
+        .unwrap();
+        assert_eq!(config.trusted_proxies.len(), 3);
+        assert!(config.trusted_proxies[0].contains(&"10.1.2.3".parse::<IpAddr>().unwrap()));
+        assert_eq!(config.trusted_proxies[1].prefix_len(), 32);
+        assert_eq!(config.trusted_proxies[2].prefix_len(), 128);
+    }
+
+    #[test]
+    fn invalid_trusted_proxy_fails_with_specific_message() {
+        let err =
+            Config::from_map(&with_required(&[("TRUSTED_PROXIES", "not-an-ip")])).unwrap_err();
+        assert!(err.to_string().contains("TRUSTED_PROXIES"));
+        assert!(err.to_string().contains("not-an-ip"));
     }
 }

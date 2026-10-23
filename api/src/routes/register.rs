@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 
 use axum::Json;
 use axum::extract::{ConnectInfo, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 
@@ -10,6 +10,7 @@ use crate::AppState;
 use crate::auth::generate_token;
 use crate::db::accounts;
 use crate::google::integrity::verify_verdicts;
+use crate::middleware::client_ip::client_ip;
 use crate::middleware::ratelimit::RateLimitRejection;
 
 #[derive(Debug, Deserialize)]
@@ -54,9 +55,14 @@ impl IntoResponse for RegisterError {
 pub async fn register(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
     Json(body): Json<RegisterRequest>,
 ) -> Result<Json<RegisterResponse>, RegisterError> {
-    state.rate_limiters.check_register(addr.ip())?;
+    let cf_connecting_ip = headers
+        .get("cf-connecting-ip")
+        .and_then(|value| value.to_str().ok());
+    let ip = client_ip(addr.ip(), cf_connecting_ip, &state.trusted_proxies);
+    state.rate_limiters.check_register(ip)?;
 
     let payload = state
         .integrity

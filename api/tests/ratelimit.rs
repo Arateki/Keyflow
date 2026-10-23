@@ -197,3 +197,65 @@ async fn account_flood_gets_429_with_retry_after_header() {
         .unwrap();
     assert!(retry_after >= 1);
 }
+
+async fn register_from(
+    state: AppState,
+    addr: SocketAddr,
+    cf_connecting_ip: Option<&str>,
+) -> axum::http::Response<Body> {
+    let device_key = format!("device-{}", uuid::Uuid::new_v4());
+    let mut builder = Request::builder()
+        .method("POST")
+        .uri("/v1/register")
+        .header(header::CONTENT_TYPE, "application/json")
+        .extension(axum::extract::ConnectInfo(addr));
+    if let Some(ip) = cf_connecting_ip {
+        builder = builder.header("cf-connecting-ip", ip);
+    }
+    app(state)
+        .oneshot(
+            builder
+                .body(Body::from(
+                    json!({ "deviceKey": device_key, "integrityToken": "fake-integrity-token" })
+                        .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn cf_connecting_ip_is_ignored_without_trusted_proxy() {
+    let google = mock_google_ok().await;
+    let state = state_with_limits(google.uri(), 1, 1000).await;
+    let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+
+    let first = register_from(state.clone(), addr, Some("203.0.113.8")).await;
+    assert_eq!(first.status(), StatusCode::OK);
+
+    // Header diferente, mesmo peer: sem proxy confiável a cota continua sendo a do socket.
+    let second = register_from(state, addr, Some("203.0.113.9")).await;
+    assert_eq!(second.status(), StatusCode::TOO_MANY_REQUESTS);
+}
+
+#[tokio::test]
+async fn cf_connecting_ip_splits_quota_only_for_a_trusted_proxy() {
+    let google = mock_google_ok().await;
+    let state = state_with_limits(google.uri(), 1, 1000)
+        .await
+        .with_trusted_proxy_cidrs(&["127.0.0.1/32"]);
+    let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+
+    let first = register_from(state.clone(), addr, Some("203.0.113.8")).await;
+    assert_eq!(first.status(), StatusCode::OK);
+    let second = register_from(state.clone(), addr, Some("203.0.113.9")).await;
+    assert_eq!(
+        second.status(),
+        StatusCode::OK,
+        "IP real diferente tem cota própria"
+    );
+
+    let third = register_from(state, addr, Some("203.0.113.8")).await;
+    assert_eq!(third.status(), StatusCode::TOO_MANY_REQUESTS);
+}

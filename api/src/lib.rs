@@ -22,6 +22,7 @@ use tower_http::trace::TraceLayer;
 use google::admob::AdmobKeysCache;
 use google::integrity::IntegrityClient;
 use google::publisher::PublisherClient;
+use ipnet::IpNet;
 use middleware::ratelimit::RateLimiters;
 use providers::{ProviderHealth, ResolvedProvider};
 
@@ -48,7 +49,9 @@ pub struct AppStateInner {
     pub http: reqwest::Client,
     pub package_name: String,
     pub integrity_relaxed: bool,
-    pub rate_limiters: RateLimiters,
+    pub rate_limiters: Arc<RateLimiters>,
+    /// Redes de proxy que podem mandar `CF-Connecting-IP`. Vazia = o header é ignorado.
+    pub trusted_proxies: Vec<IpNet>,
     pub providers: Vec<ResolvedProvider>,
     pub provider_health: ProviderHealth,
     pub transcription_timeout: Duration,
@@ -87,10 +90,11 @@ impl AppState {
             http,
             package_name,
             integrity_relaxed,
-            rate_limiters: RateLimiters::new(
+            rate_limiters: Arc::new(RateLimiters::new(
                 register_rate_limit_per_minute,
                 account_rate_limit_per_minute,
-            ),
+            )),
+            trusted_proxies: Vec::new(),
             providers: transcription.providers,
             provider_health,
             transcription_timeout: transcription.timeout,
@@ -100,6 +104,23 @@ impl AppState {
             ads_reward_seconds: ads.reward_seconds,
             ads_daily_cap: ads.daily_cap,
         }))
+    }
+
+    /// Liga a lista de proxies confiáveis. Chamar antes de clonar o estado: o `Arc` ainda
+    /// é único logo depois de `new`.
+    pub fn with_trusted_proxies(self, trusted_proxies: Vec<IpNet>) -> Self {
+        let mut inner = match Arc::try_unwrap(self.0) {
+            Ok(inner) => inner,
+            Err(_) => panic!("estado ainda não foi compartilhado"),
+        };
+        inner.trusted_proxies = trusted_proxies;
+        Self(Arc::new(inner))
+    }
+
+    pub fn with_trusted_proxy_cidrs(self, cidrs: &[&str]) -> Self {
+        let nets = crate::config::parse_trusted_proxies(&cidrs.join(","))
+            .expect("CIDR de proxy confiável");
+        self.with_trusted_proxies(nets)
     }
 }
 

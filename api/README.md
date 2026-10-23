@@ -29,6 +29,10 @@ Módulo disjunto do app Android (`app/`): o Gradle não enxerga esta pasta e vic
   - `REGISTER_RATE_LIMIT_PER_MINUTE` (opcional, default `5`) — limite de `POST /v1/register` por
     IP (ID-04). `ACCOUNT_RATE_LIMIT_PER_MINUTE` (opcional, default `60`) — limite por conta nas
     rotas autenticadas. Estouro → `429` + header `Retry-After` (segundos).
+  - `TRUSTED_PROXIES` (opcional, default vazio) — IPs ou CIDRs, separados por vírgula, de onde
+    `CF-Connecting-IP` pode substituir o IP do socket no limite de `/v1/register`. Sem esta
+    variável o header é ignorado (um cliente não forja o IP). IP sem máscara vale como `/32` ou
+    `/128`.
   - `TRANSCRIPTION_PROVIDERS_JSON` (obrigatória) — lista ordenada de provedores Whisper-compatible
     (design §Proxy): `[{"name","url","authHeaderName","authValueEnv","model"}]`. `authValueEnv`
     é o **nome de outra env var** que guarda o segredo de verdade (nunca inline no JSON — OPS-03).
