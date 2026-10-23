@@ -299,7 +299,9 @@ pub fn parse_trusted_proxies(raw: &str) -> Result<Vec<IpNet>, ConfigError> {
                     value: part.to_string(),
                     reason: e.to_string(),
                 })?;
-            IpNet::from(ip)
+            // `::ffff:127.0.0.1` vira `127.0.0.1`. O peer em `client_ip` já passa por
+            // `to_canonical()`; sem isto a rede fica em IPv6 e não contém o peer.
+            IpNet::from(ip.to_canonical())
         };
         nets.push(net);
     }
@@ -646,6 +648,18 @@ mod tests {
         assert!(config.trusted_proxies[0].contains(&"10.1.2.3".parse::<IpAddr>().unwrap()));
         assert_eq!(config.trusted_proxies[1].prefix_len(), 32);
         assert_eq!(config.trusted_proxies[2].prefix_len(), 128);
+    }
+
+    #[test]
+    fn ipv4_mapped_trusted_proxy_matches_the_canonical_peer() {
+        let nets = parse_trusted_proxies("::ffff:127.0.0.1").unwrap();
+        let v4: IpAddr = "127.0.0.1".parse().unwrap();
+        let mapped: IpAddr = "::ffff:127.0.0.1".parse().unwrap();
+
+        assert_eq!(nets.len(), 1);
+        assert_eq!(nets[0].prefix_len(), 32);
+        assert!(nets[0].contains(&v4));
+        assert!(nets[0].contains(&mapped.to_canonical()));
     }
 
     #[test]
