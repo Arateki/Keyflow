@@ -651,9 +651,10 @@ class SetupActivity : ComponentActivity() {
     private fun startMonetizationIfNeeded() {
         if (monetizationStarted) return
         monetizationStarted = true
-        val billing = BillingManager(this)
-        val repository = EntitlementsRepository(this, KeyFlowApiClient(this), billing)
-        val remote = RemoteConfigRepository(this)
+        val api = KeyFlowApiClient(this, http = auth.http)
+        val billing = BillingManager(this, redeemPurchase = { purchase -> api.redeem(purchase) })
+        val repository = EntitlementsRepository(this, api, billing)
+        val remote = RemoteConfigRepository(this, http = auth.http)
         billingManager = billing
         entitlementsRepository = repository
         remoteConfigRepository = remote
