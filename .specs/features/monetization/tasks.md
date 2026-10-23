@@ -10,7 +10,8 @@
 > decisões 1 (conta) e 2 (`applicationId`) no caminho crítico. Rotas de créditos ficam de fora.
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (M7–M10)
-**Status**: Aprovada pelo Yan em 2026-07-04 (Bloco 0 do `DEVELOPMENT-ORDER.md`) — nada implementado.
+**Status**: Aprovada pelo Yan em 2026-07-04 (Bloco 0 do `DEVELOPMENT-ORDER.md`). Fase A (MZ-T1–T4)
+concluída em 2026-10-23; as demais tasks continuam pendentes do recorte da v1 e do staging.
 A API está na `main` desde 2026-09-28 (PR #4: API-T1..T12 + T13 parcial), ainda sem staging (gate
 [YAN] da API-T13).
 
@@ -42,7 +43,7 @@ no device (TESTING.md).
 
 ## Fase A — Identidade & fundação
 
-### MZ-T1 — `AnonymousIdentity` (UUID + Auto Backup + Block Store)
+### MZ-T1 — `AnonymousIdentity` (UUID + Auto Backup + Block Store) — ✅ Feita em 2026-10-23 (`a0579ad`)
 - **What**: UUID v4 persistido em prefs claro próprio (`identity.xml`); leitura com fallback
   Block Store → gerar novo; gravação no Block Store no primeiro uso. Regras de backup
   (`dataExtractionRules`/`fullBackupContent`) **incluindo** a identidade — reconciliar com as
@@ -54,7 +55,7 @@ no device (TESTING.md).
   (inspeção do manifest merge); unit do resolvedor de fonte (arquivo/BlockStore/novo) com fakes.
 - **Tests**: unit + instrumented (camada `data`). **Gate**: `full`.
 
-### MZ-T2 — `KeyFlowApiClient` (register lazy + account) + Play Integrity
+### MZ-T2 — `KeyFlowApiClient` (register lazy + account) + Play Integrity — ✅ Feita em 2026-10-23 (`4e31870`)
 - **What**: client OkHttp (reusa o client base do app): `ensureRegistered()` (Integrity classic
   request → `POST /v1/register`; accessToken → EncryptedSharedPreferences; 401 → re-registro),
   `account()` (saldo+entitlements), erros tipados re-tentáveis (IDN-03). Base URL da API em
@@ -66,7 +67,7 @@ no device (TESTING.md).
   referência; conferido por teste existente do onboarding verde).
 - **Tests**: unit (MockWebServer) + instrumentado do storage. **Gate**: `full`.
 
-### MZ-T3 — `BillingManager` + SKUs + `obfuscatedAccountId` `[P]`
+### MZ-T3 — `BillingManager` + SKUs + `obfuscatedAccountId` `[P]` — ✅ Feita em 2026-10-23 (`6690063`)
 - **What**: Play Billing Library (versão da doc oficial): conexão resiliente,
   `queryProductDetails` dos 4 SKUs, fluxo de compra com `obfuscatedAccountId =
   sha256hex(uuid)[..64]` (unit com vetor fixo — MESMO do design da API), listener +
@@ -79,7 +80,7 @@ no device (TESTING.md).
   B/C testarem sem Play real.
 - **Tests**: unit + instrumented smoke. **Gate**: `full`.
 
-### MZ-T4 — `EntitlementsRepository` (união + cache offline)
+### MZ-T4 — `EntitlementsRepository` (união + cache offline) — ✅ Feita em 2026-10-23
 - **What**: `Flow<Entitlements>` = união (Play local `unlock_forever` ∪ conta da API) com cache
   DataStore; sync na abertura da config e pós-compra/redeem; interface `EntitlementsProvider`
   exposta (consumo pelo theme-system futuro).

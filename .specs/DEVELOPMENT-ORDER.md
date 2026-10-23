@@ -165,6 +165,8 @@ upload interno, o produto de R$15 e a service account. As tasks V1-1..V1-8 não 
   (`applicationId`), no caminho crítico; o upload antecipado fica entre a V1-3 e esse e2e. Na T14,
   os goldens cobrem o unlock, o banner e o intersticial. Na T15, o e2e real é a compra de R$15 e
   os anúncios; as rotas de créditos ficam para depois.
+  **Fase A (V1-10a)** feita em 2026-10-23: MZ-T1–T4 (`a0579ad`, `4e31870`, `6690063` e o
+  commit da MZ-T4), com MockWebServer/fakes enquanto o staging e o Play Console não existem.
 
 ### Decisões do Yan que a v1 precisa
 
@@ -470,17 +472,17 @@ texto literal da doc da OpenAI). Ordem: RSN-T0 → T1 → … → T19 (uma por v
 
 ```
 feito: Q1..Q11 → SB → GT → NM → RSN → SKP → AGT fase 1 (faltam só manuais [YAN])
-       PRs #8..#11 (2026-10-10..22) fora da fila da v1; V1-0 (PR #7) feita em 2026-10-10
-agora: V1-1 → V1-2 → V1-10 (fakes) → V1-3 → upload interno → e2e MZ-T15/API-T14 → V1-4 → … → V1-8
+       PRs #8..#11 (2026-10-10..22) fora da fila da v1; V1-0..V1-2 e V1-10a feitas
+agora: V1-10 (fakes) → V1-3 → upload interno → e2e MZ-T15/API-T14 → V1-4 → … → V1-8
 em paralelo: V1-9 (API-T13 na AWS) — fakes esperam o staging; o e2e real espera conta, applicationId e o upload
 depois: créditos (MZ-T5..T8, T12) e ligar API-T11/T12 · VC (visão) · TS (temas, spec a revisar) ·
        AGT fases 2/3 · Fala/Fluxos/Computador (sem spec; ideias em
        .specs/features/computer-terminal/ideias.md)
 ```
 
-**Posição atual (2026-10-23)**: o próximo marco é a **v1** (recorte no topo). A V1-0 está feita
-(PR #7, 2026-10-10). O próximo passo da fila é a V1-1. A V1-9 (API na AWS) corre em paralelo desde
-já. A V1-10 com fakes espera o staging. O e2e com compra real espera as decisões 1 e 2, o AAB da
+**Posição atual (2026-10-23)**: o próximo marco é a **v1** (recorte no topo). V1-0, V1-1, V1-2 e
+a Fase A da V1-10 estão feitas. O próximo passo da fila é a V1-3; a V1-9 (API na AWS) corre em
+paralelo desde já. A V1-10 restante com fakes espera o staging. O e2e com compra real espera as decisões 1 e 2, o AAB da
 V1-3 e o upload na trilha interna (produto de R$15 e service account). As PRs #8 a #11 não mudam
 a fila.
 
