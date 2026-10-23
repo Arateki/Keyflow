@@ -1,5 +1,7 @@
+import java.io.File
 import java.net.URI
 import java.security.MessageDigest
+import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -7,6 +9,33 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     // Consome o perfil de base gerado pelo :baselineprofile (app/src/release/generated/baselineProfiles/).
     id("androidx.baselineprofile")
+}
+
+// Service token do Cloudflare Access: só -P, o gradle.properties do GRADLE_USER_HOME ou local.properties.
+// O gradle.properties do repositório é versionado e não entra nessa leitura.
+fun unversionedProperty(name: String): String {
+    val command = gradle.startParameter.projectProperties
+    if (command.containsKey(name)) return command.getValue(name)
+    readPropertiesFile(File(gradle.gradleUserHomeDir, "gradle.properties"), name)?.let { return it }
+    readPropertiesFile(rootProject.file("local.properties"), name)?.let { return it }
+    return ""
+}
+
+fun readPropertiesFile(file: File, name: String): String? {
+    if (!file.isFile) return null
+    val props = Properties()
+    file.reader(Charsets.UTF_8).use { props.load(it) }
+    if (!props.containsKey(name)) return null
+    return props.getProperty(name).orEmpty()
+}
+
+fun buildConfigString(value: String): String {
+    val escaped = value
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+        .replace("\r", "\\r")
+        .replace("\n", "\\n")
+    return "\"$escaped\""
 }
 
 android {
@@ -35,14 +64,15 @@ android {
         versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // A API de monetização usa a mesma base no release; o debug pode apontar para um MockWebServer
-        // sem alterar código (`-PkeyflowApiBaseUrl=http://10.0.2.2:8080`).
+        // Release (e as variantes derivadas) fala com a produção. O debug troca para o staging, abaixo.
+        // `-PkeyflowApiBaseUrl` vence os dois — é o gancho dos testes com MockWebServer.
         val apiBaseUrl = providers.gradleProperty("keyflowApiBaseUrl")
             .orElse("https://keyflow-api.arateki.com")
             .get()
-            .replace("\\", "\\\\")
-            .replace("\"", "\\\"")
-        buildConfigField("String", "KEYFLOW_API_BASE_URL", "\"$apiBaseUrl\"")
+        buildConfigField("String", "KEYFLOW_API_BASE_URL", buildConfigString(apiBaseUrl))
+        // O token do Access só é preenchido no debug. Aqui fica vazio de propósito: o release não lê a propriedade.
+        buildConfigField("String", "KEYFLOW_STAGING_ACCESS_CLIENT_ID", "\"\"")
+        buildConfigField("String", "KEYFLOW_STAGING_ACCESS_CLIENT_SECRET", "\"\"")
         buildConfigField(
             "long",
             "KEYFLOW_INTEGRITY_CLOUD_PROJECT_NUMBER",
@@ -55,6 +85,23 @@ android {
         // ABIs do sherpa-onnx (STO-02): celulares ARM de 64 e 32 bits; x86_64 só no debug, para o
         // emulador. O x86 de 32 bits que vem no AAR não entra em nenhum.
         debug {
+            if (!providers.gradleProperty("keyflowApiBaseUrl").isPresent) {
+                buildConfigField(
+                    "String",
+                    "KEYFLOW_API_BASE_URL",
+                    buildConfigString("https://keyflow-api-staging.arateki.com"),
+                )
+            }
+            buildConfigField(
+                "String",
+                "KEYFLOW_STAGING_ACCESS_CLIENT_ID",
+                buildConfigString(unversionedProperty("keyflowStagingAccessClientId")),
+            )
+            buildConfigField(
+                "String",
+                "KEYFLOW_STAGING_ACCESS_CLIENT_SECRET",
+                buildConfigString(unversionedProperty("keyflowStagingAccessClientSecret")),
+            )
             ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
             // Cobertura dos testes de unidade (JaCoCo do próprio AGP): só com `-Pcoverage`, para o dia a dia não pagar a
             // instrumentação. `./gradlew -Pcoverage createDebugUnitTestCoverageReport` → app/build/reports/coverage/test/debug/.

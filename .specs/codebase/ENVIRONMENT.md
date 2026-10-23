@@ -56,6 +56,32 @@ adb wait-for-device && adb shell getprop sys.boot_completed   # "1" = pronto
 emulator -avd keyflow_api34
 ```
 
+## API: debug no staging, release na produção
+
+O `BuildConfig.KEYFLOW_API_BASE_URL` depende do tipo de build:
+
+| Variante | Endereço padrão |
+| -------- | --------------- |
+| debug | `https://keyflow-api-staging.arateki.com` |
+| release | `https://keyflow-api.arateki.com` |
+
+`-PkeyflowApiBaseUrl=http://10.0.2.2:8080` (ou outra base) vence os dois. Os testes com MockWebServer usam esse gancho quando precisam fixar a base na compilação.
+
+O staging fica atrás do Cloudflare Access. Só o APK de **debug** lê o service token, e só de fonte que não está no git. A primeira que definir a chave vence:
+
+1. `-PkeyflowStagingAccessClientId` e `-PkeyflowStagingAccessClientSecret`
+2. `$GRADLE_USER_HOME/gradle.properties` — no desenvolvimento do Yan o `GRADLE_USER_HOME` é `/home/yan/Projects/keyflow/.gradle`; no servidor, `/srv/dev/keyflow/.gradle`
+3. `local.properties` na raiz do repositório (está no `.gitignore`)
+
+```properties
+keyflowStagingAccessClientId=<Client ID do service token>
+keyflowStagingAccessClientSecret=<Client Secret do service token>
+```
+
+Chave ausente ou em branco deixa o campo vazio. O release não lê essas propriedades: os dois campos ficam `""` e o token não entra no APK. Não grave o token no `gradle.properties` do repositório, no código nem em log.
+
+Com os dois valores preenchidos, o `KeyFlowHttpClient` envia `CF-Access-Client-Id` e `CF-Access-Client-Secret` só para o host da base da API. Sem o token, o debug continua no staging; um 401 desse host aparece no log de debug como `token do Cloudflare Access ausente — veja api/deploy/LEIA-ME.md`. O app segue com o cache ou com o erro que a API já trata.
+
 ## Notas / pegadinhas
 
 - **Smoke build**: um app Android trivial compilou e gerou APK (Gradle 9.6.1 + AGP 9.2.0 + JDK 17 + SDK). A fundação está provada; o projeto descartável ficou no scratchpad temporário, fora do repo.
