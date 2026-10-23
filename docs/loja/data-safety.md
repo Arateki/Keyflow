@@ -20,7 +20,7 @@
 - **Justificativa:** 
   1. O áudio do ditado é temporário e excluído automaticamente do aparelho após o envio/entrega do texto, em caso de erro na transcrição ou ao expirar a janela de cancelamento de 3 segundos (`OverlayCoordinator.kt:555`, `AudioRecorder.kt:187-193`).
   2. Todos os dados locais (chaves de API no Android Keystore, modelos locais de IA, configurações) podem ser excluídos pelo próprio usuário limpando os dados do aplicativo nas Configurações do Android ou desinstalando o app.
-  3. A solicitação de exclusão de registros anônimos na API do KeyFlow (`keyflow-api.arateki.com`) pode ser enviada para `contato@arateki.com`. Para dados mantidos por provedores terceiros (OpenAI, Anthropic, Google), o usuário pode solicitar a exclusão diretamente no painel de cada provedor.
+  3. A exclusão dos dados mantidos na API da Arateki (`keyflow-api.arateki.com`) pode ser realizada diretamente dentro do app pelo botão **"Apagar meus dados"** na aba **Docs** das configurações (apaga na hora o registro do aparelho; a compra continua no Google Play e volta ao restaurar) ou por solicitação via e-mail para `contato@arateki.com` (com resposta em até 15 dias conforme a LGPD). Para dados mantidos por provedores terceiros (OpenAI, Anthropic, Google), o usuário pode solicitar a exclusão diretamente no painel de cada provedor.
 
 ---
 
@@ -105,7 +105,7 @@
   2. **Publicidade ou marketing (Advertising or marketing):** O SDK do Google Mobile Ads (AdMob) coleta o ID de publicidade do Google (Advertising ID) e telemetria na versão gratuita para exibição de anúncios na tela de configurações (`SetupActivity`).
 - **A coleta é obrigatória ou opcional?** O UUID anônimo é gerado para gestão de integridade/licenças. A publicidade é opcional e removida definitivamente com a compra de R$ 15; preferências de consentimento gerenciadas pelo Google UMP com opção de revisão a qualquer momento ("Privacidade dos anúncios" na aba Docs).
 - **Criptografado em trânsito?** **Sim** (HTTPS/TLS).
-- **O usuário pode solicitar a exclusão?** **Sim** (A limpeza de dados do app apaga o armazenamento local, embora o Google Block Store possa restaurar o UUID para manter compras legítimas. Exclusão de registros na API da Arateki pode ser solicitada via `contato@arateki.com`).
+- **O usuário pode solicitar a exclusão?** **Sim** (Disponível no próprio app pelo botão "Apagar meus dados" na aba Docs — exclusão imediata do registro do aparelho nos servidores —, e por e-mail para `contato@arateki.com` com resposta em até 15 dias. A limpeza de dados do app apaga o armazenamento local; compras no Google Play são preservadas e reativadas via restauração. Logs técnicos da API são retidos por 30 dias e apagados automaticamente).
 - **Citação no código:**
   - `AnonymousIdentity.kt:30-60` (UUIDv4 persistido localmente e via Block Store)
   - `KeyFlowApiClient.kt:104,159` (registro do UUID e consulta de conta na API)

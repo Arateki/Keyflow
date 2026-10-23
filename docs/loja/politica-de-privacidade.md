@@ -73,7 +73,7 @@ A Arateki **não vende, não aluga e não comercializa** seus dados pessoais. O 
    - **Google Play:** Para processamento de compras no aplicativo e verificação de integridade do app ([Privacidade do Google](https://policies.google.com/privacy)).
    - **Google AdMob:** Para veiculação de anúncios na tela de configurações para usuários da versão gratuita ([Tecnologias de Anúncios do Google](https://policies.google.com/technologies/ads)). O SDK pode coletar identificadores de publicidade, endereço IP e localização aproximada derivada de IP.
    - **Hugging Face e Espelhos Autorizados:** Para download dos arquivos públicos de pesos de modelos locais de voz e raciocínio ([Privacidade do Hugging Face](https://huggingface.co/privacy)), ou outros espelhos de distribuição indicados no catálogo remoto.
-   - **API da Arateki (`keyflow-api.arateki.com`):** Recebe o UUID anônimo, token do Play Integrity e tokens de compra para validação de licenças, e fornece arquivos de configuração e catálogo (`/v1/config`, `/v1/models`). [YAN: Definir política de retenção dos registros na nossa API — sugestão: 30 dias para logs técnicos de erro e integridade].
+   - **API da Arateki (`keyflow-api.arateki.com`):** Recebe o UUID anônimo, token do Play Integrity e tokens de compra para validação de licenças, e fornece arquivos de configuração e catálogo (`/v1/config`, `/v1/models`). Os logs técnicos da API (registros de acesso, endereço IP e erros) são mantidos por 30 dias para fins de segurança e integridade, sendo apagados automaticamente após esse período.
 3. **Suporte por E-mail Voluntário:**
    - Caso o usuário escolha utilizar o recurso de contato na aba Docs, um rascunho de e-mail é gerado com dados técnicos básicos de diagnóstico do aparelho (modelo, versão do Android e do app). O envio é estritamente manual e voluntário pelo próprio cliente de e-mail do usuário.
 
@@ -95,7 +95,7 @@ A Arateki **não vende, não aluga e não comercializa** seus dados pessoais. O 
 - **Áudios de voz:** Apagados do armazenamento temporário imediatamente após a conclusão ou falha da transcrição, ou ao expirar o cancelamento (3 segundos). Limpeza periódica automática remove arquivos residuais com mais de 24 horas.
 - **No seu aparelho:** Você pode excluir configurações locais, chaves de API e modelos baixados limpando os dados do aplicativo nas Configurações do Android ou desinstalando o app.
 - **Restauração de Identidade (Google Block Store):** Para garantir que compras legítimas não sejam perdidas ao reinstalar o aplicativo ou trocar de aparelho, o identificador anônimo (UUID) pode ser restaurado via Google Block Store.
-- **Na API da Arateki:** Como não mantemos contas nominais ou cadastros com e-mail, os registros vinculados ao UUID anônimo destinam-se exclusivamente à validação de licenças. [YAN: Definir procedimento e prazo para exclusão de registros na API a pedido via contato@arateki.com].
+- **Na API da Arateki:** Como não mantemos contas nominais ou cadastros com e-mail, os registros vinculados ao UUID anônimo destinam-se exclusivamente à validação de integridade e licenças. Você pode excluir os dados do seu aparelho guardados na API a qualquer momento diretamente pelo botão **"Apagar meus dados"** na aba **Docs** das configurações do aplicativo (o que apaga na hora o registro do dispositivo em nossos servidores; a compra única permanece válida no Google Play e volta ao restaurar compras) ou mediante solicitação por e-mail para `contato@arateki.com`, que será atendida no prazo de até 15 dias corridos em conformidade com a LGPD.
 - **Em Provedores Externos:** A solicitação de exclusão de dados enviados a provedores de nuvem (OpenAI, Anthropic, Google) deve ser realizada pelo usuário junto à respectiva plataforma.
 
 ---
@@ -114,7 +114,7 @@ Implementamos medidas técnicas rigorosas para proteger seus dados:
 Em conformidade com a Lei Geral de Proteção de Dados Pessoais (LGPD — Lei nº 13.709/2018) e o Regulamento Geral sobre a Proteção de Dados (GDPR):
 - Você tem o direito de obter informações claras sobre o tratamento de seus dados.
 - Você pode rever e revogar consentimentos de anúncios a qualquer momento pelas configurações do app ("Privacidade dos anúncios").
-- Você tem o direito de solicitar a exclusão ou esclarecimentos sobre dados tratados entrando em contato pelo e-mail `contato@arateki.com`.
+- Você tem o direito de solicitar a exclusão de seus dados e registros a qualquer momento pelo botão **"Apagar meus dados"** na aba **Docs** do aplicativo ou enviando uma mensagem para `contato@arateki.com` (atendimento em até 15 dias corridos nos termos da LGPD).
 
 ---
 

@@ -73,7 +73,7 @@ Arateki **does not sell, rent, or trade** personal data. Data is shared exclusiv
    - **Google Play:** For purchase processing and app integrity verification ([Google Privacy](https://policies.google.com/privacy)).
    - **Google AdMob:** For serving ads in settings for free-tier users ([Google Ad Technologies](https://policies.google.com/technologies/ads)). The SDK may collect advertising IDs, IP addresses, and coarse location derived from IP.
    - **Hugging Face and Authorized Mirrors:** For downloading public model weights ([Hugging Face Privacy](https://huggingface.co/privacy)), or alternative mirror URLs specified by the remote catalog.
-   - **Arateki API (`keyflow-api.arateki.com`):** Receives anonymous UUID, Play Integrity tokens, and purchase receipts for license validation, and serves remote configuration and model catalogs (`/v1/config`, `/v1/models`). [YAN: Server log retention policy — recommended: 30 days for technical error and integrity logs].
+   - **Arateki API (`keyflow-api.arateki.com`):** Receives anonymous UUID, Play Integrity tokens, and purchase receipts for license validation, and serves remote configuration and model catalogs (`/v1/config`, `/v1/models`). Technical server logs (access logs, IP addresses, and errors) are retained for 30 days for security and integrity purposes, and are automatically deleted thereafter.
 3. **Voluntary Email Support:**
    - When using the support email link in Docs, a draft email is created with basic device diagnostics (model, Android version, app version). Sending is entirely manual and voluntary via the user's email client.
 
@@ -95,7 +95,7 @@ Arateki **does not sell, rent, or trade** personal data. Data is shared exclusiv
 - **Voice audio:** Deleted from local storage immediately upon transcription completion or error, or upon expiration of the 3-second cancellation window. Automatic cleanup removes stale files older than 24 hours.
 - **On your device:** You can delete local configuration, API keys, and models by clearing app data in Android Settings or by uninstalling KeyFlow.
 - **Identity Restoration (Google Block Store):** To prevent losing legitimate purchases upon app reinstallation or device migration, the anonymous device UUID may be restored via Google Block Store.
-- **On Arateki API:** Since we maintain no user accounts or email lists, records linked to the anonymous UUID exist solely to validate licenses. [YAN: Define procedure and timeframe for deleting records on the API upon request via contato@arateki.com].
+- **On Arateki API:** Since we maintain no user accounts or email lists, records linked to the anonymous UUID exist solely to validate integrity and licenses. You can delete your device data stored on the API at any time directly through the **"Delete my data"** button in the **Docs** tab in settings (which immediately deletes the device record on our servers; your one-time purchase remains valid on Google Play and is restored upon purchase restore) or by emailing `contato@arateki.com`, with requests answered within 15 days in accordance with the LGPD.
 - **On External Providers:** Requests to delete data processed by third-party cloud providers (OpenAI, Anthropic, Google) must be submitted directly through those respective providers.
 
 ---
@@ -114,7 +114,7 @@ We implement rigorous technical safeguards:
 In compliance with GDPR and LGPD regulations:
 - You have the right to transparent information regarding data processing.
 - You have the right to review and revoke advertising consent at any time via settings ("Ads privacy").
-- You have the right to request deletion or clarification regarding processed data by contacting `contato@arateki.com`.
+- You have the right to request deletion of your data and records at any time using the **"Delete my data"** button in the **Docs** tab in settings or by sending an email to `contato@arateki.com` (handled within 15 days under the LGPD).
 
 ---
 
