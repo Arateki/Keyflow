@@ -32,7 +32,7 @@ android {
         minSdk = 24
         targetSdk = 36
         versionCode = 1
-        versionName = "0.1.0"
+        versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // A API de monetização usa a mesma base no release; o debug pode apontar para um MockWebServer
@@ -62,7 +62,12 @@ android {
             enableUnitTestCoverage = providers.gradleProperty("coverage").isPresent
         }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
             ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
         }
         // As variantes que o plugin do perfil de base cria a partir do release (nonMinifiedRelease, benchmarkRelease) só
