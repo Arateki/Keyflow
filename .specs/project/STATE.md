@@ -2536,3 +2536,9 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
 
 ## Monetização — V1-10a, Fase A (2026-10-23)
 - A API ainda sem staging e o Play Console sem o app tornam MockWebServer/fakes obrigatórios na fundação; Play Integrity `1.6.0` e Billing `9.1.0` ficam atrás de portas degradáveis, sem tocar onboarding, IME ou overlay.
+
+## Monetização — V1-10b, revisão da parte 2 (2026-10-23)
+- O primeiro frame da Config não pode assumir entitlements: `AdsController` e `BannerSlot` recebem um gate explícito de carregamento; o estado remoto também precisa estar pronto antes de habilitar ads.
+- Redeem e ack são responsabilidades independentes: `pending` não é crédito, 401 refaz o registro uma vez, e toda compra `PURCHASED` não reconhecida recebe ack local mesmo após sucesso remoto.
+- A escolha salva de uma skin paga não é apagada no reembolso; a resolução cai em Sistema/Ateliê enquanto `skinsUnlocked` estiver falso e reaparece quando o direito voltar. A mesma regra vale no IME e no overlay.
+- O kill switch remoto suspende apenas monetização e mostra aviso traduzido; `minAppVersion` avisa sem bloquear o restante da configuração.

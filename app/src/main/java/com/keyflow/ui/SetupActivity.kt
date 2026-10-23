@@ -212,7 +212,9 @@ class SetupActivity : ComponentActivity() {
     private var interstitialPolicy by mutableStateOf<InterstitialPolicy?>(null)
     private var interstitialPolicyStore: DataStoreInterstitialPolicyStore? = null
     private var entitlements by mutableStateOf(Entitlements())
+    private var entitlementsLoaded by mutableStateOf(false)
     private var remoteSnapshot by mutableStateOf(RemoteConfigSnapshot())
+    private var remoteConfigLoaded by mutableStateOf(false)
     private var unlockPurchaseState by mutableStateOf(UnlockPurchaseState.IDLE)
     private var monetizationJobs = mutableListOf<Job>()
     private var monetizationStarted = false
@@ -351,6 +353,10 @@ class SetupActivity : ComponentActivity() {
                         unlockPurchaseState = unlockPurchaseState,
                         adsController = adsController,
                         adsOff = entitlements.adsOff,
+                        entitlementsLoaded = entitlementsLoaded,
+                        remoteConfigLoaded = remoteConfigLoaded,
+                        showUpdateWarning = remoteSnapshot.requiresUpdate(),
+                        monetizationDisabled = remoteSnapshot.config.killSwitch,
                         interstitialPolicy = interstitialPolicy,
                         onInterstitialPolicyChanged = ::persistInterstitialPolicy,
                         localModels = LocalModelsUi.compose(
@@ -686,6 +692,7 @@ class SetupActivity : ComponentActivity() {
             repository.entitlements.collect { value ->
                 entitlements = value
                 if (value.skinsUnlocked) unlockPurchaseState = UnlockPurchaseState.IDLE
+                if (entitlementsLoaded) settingsRepository.saveSkinsUnlocked(value.skinsUnlocked)
             }
         }
         monetizationJobs += activityScope.launch {
@@ -693,16 +700,23 @@ class SetupActivity : ComponentActivity() {
                 if (purchases.any { it.products.contains(MonetizationProducts.UNLOCK_FOREVER) && it.state == StorePurchaseState.PENDING }) {
                     unlockPurchaseState = UnlockPurchaseState.PENDING
                 }
-                repository.refresh()
+                val refreshed = repository.refresh()
+                entitlements = refreshed
+                settingsRepository.saveSkinsUnlocked(refreshed.skinsUnlocked)
+                entitlementsLoaded = true
             }
         }
         monetizationJobs += activityScope.launch {
             billing.connect()
-            repository.refresh()
+            val refreshed = repository.refresh()
+            entitlements = refreshed
+            settingsRepository.saveSkinsUnlocked(refreshed.skinsUnlocked)
+            entitlementsLoaded = true
         }
         monetizationJobs += activityScope.launch {
             val snapshot = remote.refresh()
             remoteSnapshot = snapshot
+            remoteConfigLoaded = true
             interstitialPolicy?.updateParams(snapshot.config.ads.toInterstitialPolicyParams())
             ModelCatalog.applyRemoteManifest(snapshot.models)
         }

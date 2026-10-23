@@ -22,13 +22,14 @@ val BANNER_RESERVED_HEIGHT = 50.dp
 fun BannerSlot(
     controller: AdsController,
     adsOff: Boolean,
+    entitlementsLoaded: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
-    if (adsOff) return
+    if (!entitlementsLoaded || adsOff) return
     val context = LocalContext.current
     val ready by controller.ready.collectAsStateOnMain()
     val view = remember(controller, ready) {
-        if (ready) controller.bannerView(context, adsOff = false) else null
+        if (ready) controller.bannerView(context, adsOff = false, entitlementsLoaded = true) else null
     }
     DisposableEffect(view) {
         onDispose { view?.let(controller::destroyBanner) }

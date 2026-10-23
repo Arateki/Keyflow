@@ -34,7 +34,7 @@ class InterstitialPolicyTest {
         assertThat(first.shouldShow(true)).isTrue()
         first.markShown()
 
-        now += 239_999L
+        now += 119_999L
         assertThat(first.shouldShow(true)).isFalse()
         now += 1L
         repeat(5) { first.recordInteraction() }
@@ -43,7 +43,7 @@ class InterstitialPolicyTest {
 
         val restored = InterstitialPolicy(clock = { now }, initialState = first.snapshot())
         repeat(5) { restored.recordInteraction() }
-        now += 479_999L
+        now += 239_999L
         assertThat(restored.shouldShow(true)).isFalse()
         now += 1L
         assertThat(restored.shouldShow(true)).isTrue()

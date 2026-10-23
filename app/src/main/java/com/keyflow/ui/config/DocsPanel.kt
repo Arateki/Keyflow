@@ -446,6 +446,7 @@ fun DocsPanel(
     focusKey: Int = 0,
     adsController: AdsController? = null,
     adsOff: Boolean = false,
+    entitlementsLoaded: Boolean = true,
 ) {
     val palette = LocalKeyFlowPalette.current
     val context = LocalContext.current
@@ -514,7 +515,7 @@ fun DocsPanel(
                 }
             }
         }
-        adsController?.let { BannerSlot(it, adsOff) }
+        adsController?.let { BannerSlot(it, adsOff = adsOff, entitlementsLoaded = entitlementsLoaded) }
     }
 }
 

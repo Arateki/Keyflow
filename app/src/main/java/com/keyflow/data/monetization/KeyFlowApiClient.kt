@@ -118,7 +118,28 @@ class KeyFlowApiClient(
     /** Redime a compra no servidor; o servidor valida e faz o acknowledge no Play. */
     suspend fun redeem(purchase: StorePurchase): Boolean = withContext(Dispatchers.IO) {
         val productId = purchase.products.firstOrNull() ?: return@withContext false
-        val token = ensureRegistered()
+        var token = ensureRegistered()
+        var response = redeemRequest(token, productId, purchase)
+        if (response.code == 401) {
+            response.close()
+            token = registerLock.withLock {
+                accessTokenStore.clear()
+                registerLocked()
+            }
+            response = redeemRequest(token, productId, purchase)
+        }
+        response.use { result ->
+            val text = result.body?.string().orEmpty()
+            if (!result.isSuccessful) throw apiFailure("resgate", result.code, text)
+            return@withContext when (runCatching { JSONObject(text).optString("status") }.getOrNull()) {
+                "credited", "already_credited" -> true
+                "pending" -> false
+                else -> throw KeyFlowApiException.InvalidResponse("resposta de resgate inválida")
+            }
+        }
+    }
+
+    private suspend fun redeemRequest(token: String, productId: String, purchase: StorePurchase): Response {
         val integrity = integrityToken(nonceFor(identity()))
         val body = JSONObject()
             .put("productId", productId)
@@ -132,11 +153,7 @@ class KeyFlowApiClient(
             .header("Authorization", "Bearer $token")
             .post(body)
             .build()
-        execute(request).use { response ->
-            val text = response.body?.string().orEmpty()
-            if (!response.isSuccessful) throw apiFailure("resgate", response.code, text)
-            true
-        }
+        return execute(request)
     }
 
     private suspend fun registerLocked(): String {

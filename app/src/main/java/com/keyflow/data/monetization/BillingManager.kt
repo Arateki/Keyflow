@@ -202,12 +202,10 @@ class BillingManager(
             .forEach { purchase ->
                 if (!acknowledgementsInFlight.add(purchase.purchaseToken)) return@forEach
                 scope.launch {
-                    val serverHandled = runCatching { redeemPurchase(purchase) }.getOrDefault(false)
-                    val result = if (serverHandled) {
-                        BillingOperationResult(BillingClient.BillingResponseCode.OK)
-                    } else {
-                        acknowledge(purchase)
-                    }
+                    // O servidor pode responder pending/credited e pode ter falhado o próprio ack. O Play
+                    // local continua sendo confirmado sempre, para não deixar a compra presa no cliente.
+                    runCatching { redeemPurchase(purchase) }
+                    val result = acknowledge(purchase)
                     if (!result.ok) acknowledgementsInFlight.remove(purchase.purchaseToken)
                 }
             }

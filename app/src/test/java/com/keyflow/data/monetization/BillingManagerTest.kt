@@ -105,6 +105,29 @@ class BillingManagerTest {
         manager.close()
     }
 
+    @Test
+    fun `acknowledge local acontece mesmo quando o redeem remoto confirma`() = runTest {
+        val purchase = StorePurchase(
+            products = listOf(MonetizationProducts.UNLOCK_FOREVER),
+            purchaseToken = "unlock-token",
+            state = StorePurchaseState.PURCHASED,
+            acknowledged = false,
+        )
+        val backend = FakeBillingBackend(products = emptyList(), initialPurchases = listOf(purchase))
+        val manager = BillingManager(
+            context = null,
+            identity = { "identity" },
+            backend = backend,
+            redeemPurchase = { true },
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
+        )
+
+        manager.connect()
+
+        assertThat(backend.acknowledgedToken).isEqualTo("unlock-token")
+        manager.close()
+    }
+
     private class FakeBillingBackend(
         private val products: List<StoreProduct>,
         private val initialPurchases: List<StorePurchase> = emptyList(),

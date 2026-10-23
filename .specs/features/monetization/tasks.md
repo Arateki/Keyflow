@@ -154,6 +154,11 @@ no device (TESTING.md).
   restore na recriação; suíte existente da UnlockSheet/Teclado verde.
 - **Tests**: instrumented + unit. **Gate**: `full`.
 
+**Revisão da parte 2 (2026-10-23)**: corrigido o primeiro frame sem entitlement (UMP, Mobile Ads e banner só
+após `entitlementsLoaded`), o fallback de skins pagas no Config/IME/overlay sem apagar a escolha salva, e o
+ack local mesmo quando o redeem remoto responde sucesso, pending ou falha. `redeem` agora interpreta o status
+da API e refaz o registro uma vez em 401.
+
 ## Fase D — Ads
 
 ### MZ-T10 — AdMob + UMP + `BannerSlot` (gateado por adsOff) — ✅ Feita em 2026-10-23 (`24879fb`)
@@ -183,6 +188,9 @@ no device (TESTING.md).
   aba sem engajamento não mostra; suíte existente do ConfigScreen verde.
 - **Tests**: unit (grosso) + instrumented (fiação). **Gate**: `full`.
 
+**Revisão da parte 2 (2026-10-23)**: troca de aba deixou de contar como engajamento; o primeiro cooldown
+usa expoente zero (`shownCount - 1`), preservando o backoff a partir do segundo anúncio.
+
 ### MZ-T12 — Rewarded ("Ganhar minutos" via SSV)
 - **What**: botão real na tela de créditos (existe mesmo com adsOff — RWD-04): mostra rewarded
   com `custom_data = accountId`; ao fechar com recompensa → "creditando…" + polling curto do
@@ -207,6 +215,9 @@ no device (TESTING.md).
 - **Done when**: unit MockWebServer — 304 usa cache; API fora → defaults/última lista; manifest
   substitui o embutido quando válido; suíte da native-voice-models verde (se já implementada).
 - **Tests**: unit + instrumented (cache em disco). **Gate**: `full`.
+
+**Revisão da parte 2 (2026-10-23)**: `requiresUpdate()` chega à ConfigScreen como aviso não bloqueante e
+`killSwitch` suprime compra e ads com texto traduzido em inglês/espanhol.
 
 ## Fase F — Fecho
 

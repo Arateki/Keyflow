@@ -43,6 +43,22 @@ class AdsControllerInstrumentedTest {
         rule.onNodeWithTag(BANNER_SLOT_TAG).assertExists()
     }
 
+    @Test
+    fun entitlementsNotLoadedDoesNotMountOrInitialize() {
+        val runtime = FakeRuntime()
+        val consent = FakeConsent()
+        val controller = AdsController(ApplicationProvider.getApplicationContext(), runtime, consent)
+
+        rule.setContent { BannerSlot(controller, adsOff = false, entitlementsLoaded = false) }
+        rule.onNodeWithTag(BANNER_SLOT_TAG).assertDoesNotExist()
+        rule.runOnIdle {
+            controller.initializeIfNeeded(activity = Activity(), adsOff = false, entitlementsLoaded = false)
+        }
+
+        assertEquals(0, consent.requests)
+        assertEquals(0, runtime.initializations)
+    }
+
     private class FakeConsent : ConsentRequester {
         var requests = 0
         override fun request(activity: Activity, onReady: () -> Unit) {
