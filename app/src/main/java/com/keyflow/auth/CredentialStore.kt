@@ -128,7 +128,7 @@ class SecureCredentialStore(
         return when (prefs.getString(authModeKey(provider), null)) {
             AuthMethod.OAUTH.name -> oauth ?: apiKey ?: legacy
             AuthMethod.API_KEY.name -> apiKey ?: oauth ?: legacy
-            else -> oauth ?: apiKey ?: legacy
+            else -> legacy ?: oauth ?: apiKey
         }
     }
 
