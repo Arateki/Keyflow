@@ -33,22 +33,21 @@ class EntitlementsRepositoryTest {
 
     @Test
     fun `reembolso remoto derruba somente a fonte remota`() = runTest {
-        val remote = MutableStateFlow(KeyFlowAccount(8, adsOff = true, skinsUnlocked = true))
-        val repository = repository(local = MutableStateFlow(false), remote = remote.value)
-
-        assertThat(repository.refresh().adsOff).isTrue()
-        remote.value = KeyFlowAccount(8, adsOff = false, skinsUnlocked = false)
-        val refreshed = EntitlementsRepository(
+        var remote = KeyFlowAccount(8, adsOff = true, skinsUnlocked = true)
+        val repository = EntitlementsRepository(
             context = null,
-            account = { remote.value },
+            account = { remote },
             localUnlock = MutableStateFlow(false),
             cache = MemoryCache(),
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
-        ).also { it.refresh() }
-        assertThat(refreshed.entitlements.value.adsOff).isFalse()
-        assertThat(refreshed.entitlements.value.skinsUnlocked).isFalse()
+        )
+
+        assertThat(repository.refresh().adsOff).isTrue()
+        remote = KeyFlowAccount(8, adsOff = false, skinsUnlocked = false)
+        val refreshed = repository.refresh()
+        assertThat(refreshed.adsOff).isFalse()
+        assertThat(refreshed.skinsUnlocked).isFalse()
         repository.close()
-        refreshed.close()
     }
 
     @Test
