@@ -156,7 +156,7 @@ no device (TESTING.md).
 
 ## Fase D — Ads
 
-### MZ-T10 — AdMob + UMP + `BannerSlot` (gateado por adsOff) — ✅ Feita em 2026-10-23 (`760950c`)
+### MZ-T10 — AdMob + UMP + `BannerSlot` (gateado por adsOff) — ✅ Feita em 2026-10-23 (`24879fb`)
 - **What**: dependências AdMob/UMP; `AdsController` (init 1×, **só** se `!adsOff` — ADS-05; UMP
   consent form na primeira sessão com ads); `BannerSlot` composable com altura reservada fixa no
   rodapé de **Docs/Modo/Teclado** (nunca Voz/onboarding — ADS-01/02); falha de load → slot vazio
@@ -171,7 +171,7 @@ no device (TESTING.md).
   fora de `ads/`** (garantia ADS-01 p/ IME/overlay).
 - **Tests**: instrumented + unit (gate de init). **Gate**: `full`.
 
-### MZ-T11 — `InterstitialPolicy` (pura) + fiação na troca de aba
+### MZ-T11 — `InterstitialPolicy` (pura) + fiação na troca de aba — ✅ Feita em 2026-10-23
 - **What**: classe pura com clock/params injetáveis: engajamento mínimo, cooldown com backoff ×2
   **persistido** (DataStore), cap diário, primeira sessão nunca, janela pós-compra; params da
   config remota com defaults (ADS-03/04). Fiação: contador de interações + hook de troca de aba
