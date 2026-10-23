@@ -237,6 +237,7 @@ usa expoente zero (`shownCount - 1`), preservando o backoff a partir do segundo 
 - **Tests**: screenshot. **Gate**: `screenshot`.
 
 ### MZ-T15 — e2e com compras de teste + traceability (com API-T14)
+- **Andamento (2026-10-23)**: modo HMAC temporário de staging e instrumentado de registro, unlock, re-registro e reembolso preparados em `v1-compra-simulada`; isso não substitui a validação Play/Integrity real nem reinstalação física descritas abaixo.
 - **What**: no device físico com license testing e staging: recarga → saldo → transcrição por
   créditos → débito visível; esgotar → 402 → CTA; unlock → skins+zero ads; reinstalar → restore;
   R$20 → entitlements; rewarded → SSV credita; cadência do interstitial; **API fora do ar →

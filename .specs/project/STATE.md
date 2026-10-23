@@ -2575,3 +2575,6 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
 - Arquivos de gravação ficam em `cacheDir/keyflow-recordings`: apague após resultado terminal, mas preserve durante a janela de desfazer de cancelamento; na abertura, remova só arquivos com mais de 24 h. O cache pode conter áudio enquanto o app está em uso.
 - A verificação do aceite versionado deve ficar no ponto comum anterior a iniciar o recorder, e a tela da divulgação precisa reabrir mesmo quando `onboardingDone=true`; teste atualizações com microfone já concedido.
 - A entrada UMP depende de `privacyOptionsRequirementStatus == REQUIRED`; a API `showPrivacyOptionsForm` deve ser chamada como resposta ao toque do usuário.
+
+## Monetização — compra simulada de staging (2026-10-23)
+- A chave HMAC de teste também fica no APK debug para assinar recibos; use exclusivamente em staging, com dados descartáveis, e rotacione ao terminar. A re-registração testa restore remoto, mas não substitui Play Integrity real nem reinstalação física.
