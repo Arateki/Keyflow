@@ -6,6 +6,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -34,18 +35,36 @@ class AnonymousIdentityInstrumentedTest {
         assertEquals(first, second)
         assertEquals(listOf(first), blockStore.writes)
 
-        assertTrue(hasBackupEntry(com.keyflow.R.xml.backup_rules, "identity.xml"))
-        assertTrue(hasBackupEntry(com.keyflow.R.xml.data_extraction_rules, "identity.xml"))
+        assertBackupPolicy(com.keyflow.R.xml.backup_rules)
+        assertBackupPolicy(com.keyflow.R.xml.data_extraction_rules)
     }
 
-    private fun hasBackupEntry(resourceId: Int, expectedPath: String): Boolean {
+    private fun assertBackupPolicy(resourceId: Int) {
+        assertFalse(hasBackupEntry(resourceId, "identity.xml", "include"))
+        assertFalse(hasBackupEntry(resourceId, "identity.xml", "exclude"))
+        assertFalse(hasBackupEntry(resourceId, "keyflow_settings.preferences_pb", "exclude"))
+        assertTrue(hasBackupEntry(resourceId, "keyflow_auth.xml", "exclude"))
+        assertFalse(hasBackupTag(resourceId, "include"))
+    }
+
+    private fun hasBackupEntry(resourceId: Int, expectedPath: String, expectedTag: String): Boolean {
         val parser = context.resources.getXml(resourceId)
         var found = false
         while (parser.next() != XmlPullParser.END_DOCUMENT) {
-            if (parser.eventType == XmlPullParser.START_TAG && parser.name == "include") {
+            if (parser.eventType == XmlPullParser.START_TAG && parser.name == expectedTag) {
                 val path = parser.getAttributeValue(null, "path")
                 if (path == expectedPath) found = true
             }
+        }
+        parser.close()
+        return found
+    }
+
+    private fun hasBackupTag(resourceId: Int, expectedTag: String): Boolean {
+        val parser = context.resources.getXml(resourceId)
+        var found = false
+        while (parser.next() != XmlPullParser.END_DOCUMENT) {
+            if (parser.eventType == XmlPullParser.START_TAG && parser.name == expectedTag) found = true
         }
         parser.close()
         return found
