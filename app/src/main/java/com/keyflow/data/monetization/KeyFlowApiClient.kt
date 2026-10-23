@@ -6,7 +6,7 @@ import com.keyflow.BuildConfig
 import com.keyflow.auth.HttpErrorMessage
 import com.keyflow.auth.SecureCredentialStore
 import com.keyflow.data.SecurePrefs
-import com.keyflow.data.models.KeyFlowHttpClient
+import com.keyflow.net.KeyFlowHttpClient
 import com.google.android.gms.tasks.Task
 import com.google.android.play.core.integrity.IntegrityManager
 import com.google.android.play.core.integrity.IntegrityManagerFactory

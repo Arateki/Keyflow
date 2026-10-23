@@ -3,7 +3,7 @@ package com.keyflow.auth
 import com.keyflow.auth.providers.anthropic.AnthropicProvider
 import com.keyflow.auth.providers.google.GoogleProvider
 import com.keyflow.auth.providers.openai.OpenAiProvider
-import com.keyflow.data.models.KeyFlowHttpClient
+import com.keyflow.net.KeyFlowHttpClient
 import okhttp3.OkHttpClient
 
 /** O que um provedor precisa do resto do app para funcionar. Cresce conforme os provedores entram. */

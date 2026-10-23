@@ -1,7 +1,7 @@
 package com.keyflow.auth
 
 import android.content.Context
-import com.keyflow.data.models.KeyFlowHttpClient
+import com.keyflow.net.KeyFlowHttpClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
