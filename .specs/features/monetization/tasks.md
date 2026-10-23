@@ -221,13 +221,18 @@ usa expoente zero (`shownCount - 1`), preservando o backoff a partir do segundo 
 
 ## Fase F — Fecho
 
-### MZ-T14 — Goldens + varredura de compliance
-- **What**: rotas de galeria (créditos com saldo/sem saldo/creditando, sheet de recarga, unlock
-  real, banner placeholder nas 3 abas) claro/escuro com fakes; regenerar+aprovar goldens
-  (existentes bit-idênticos); espelhar em `/tmp/keyflow-prints/`. Varredura final ADS-01: grep de
-  imports de ads fora de `ads/` + nenhuma init fora da config.
+### MZ-T14 — Goldens + varredura de compliance — ✅ Feita em 2026-10-23
+- **What**: rotas de galeria para unlock e banner placeholder nas três abas (Docs, Sobrepor e Teclado),
+  claro/escuro com fakes; regenerar/aprovar goldens (existentes bit-idênticos) e espelhar em
+  `/tmp/keyflow-prints/`. Varredura final ADS-01: grep de imports de ads em IME/overlay/onboarding e
+  conferir que `MobileAds.initialize` e a inicialização real do controller ficam na camada de ads/config.
+- **SPEC_DEVIATION (recorte v1, 2026-10-23)**: o texto original desta task pedia rotas de créditos e
+  recarga, mas o recorte aprovado no cabeçalho desta lista exclui MZ-T5..T8 e MZ-T12; não reintroduzir
+  saldo, recarga nem rewarded como telas funcionais. `config-voz-creditos` permanece estado Em breve.
+- **Ajuste de layout**: os três slots ficaram fixos abaixo da área rolável; as rotas com unlock continuam
+  usando o runtime/consentimento fake da galeria.
 - **Where**: `RouteCatalog.kt` (debug), `verification/golden/`.
-- **Depends on**: MZ-T6..T12. **Covers**: ADS-01 (verificação), success criteria visuais.
+- **Depends on**: MZ-T9..T11, MZ-T13. **Covers**: ADS-01 (verificação), success criteria visuais.
 - **Done when**: `verify-screens.sh` + `diff-screens.sh` verdes; grep limpo.
 - **Tests**: screenshot. **Gate**: `screenshot`.
 

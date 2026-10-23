@@ -2558,3 +2558,8 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
 - Redeem e ack são responsabilidades independentes: `pending` não é crédito, 401 refaz o registro uma vez, e toda compra `PURCHASED` não reconhecida recebe ack local mesmo após sucesso remoto.
 - A escolha salva de uma skin paga não é apagada no reembolso; a resolução cai em Sistema/Ateliê enquanto `skinsUnlocked` estiver falso e reaparece quando o direito voltar. A mesma regra vale no IME e no overlay.
 - O kill switch remoto suspende apenas monetização e mostra aviso traduzido; `minAppVersion` avisa sem bloquear o restante da configuração.
+
+## Monetização — MZ-T14 (2026-10-23)
+- **SPEC_DEVIATION**: o corpo antigo da T14 incluía rotas de saldo/recarga, mas o recorte v1 aprovado exclui créditos e rewarded; os goldens cobrem unlock e banners fake, sem implementar essas telas.
+- Capturas de banner da galeria devem injetar runtime e consentimento fakes; a execução visual não pode inicializar Mobile Ads real nem fazer rede.
+- Os slots não podem ficar dentro do `verticalScroll`: senão somem do primeiro quadro. Reserve o rodapé de 50 dp como irmão da área rolável e faça o `AndroidView` ocupar a altura toda.

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -108,164 +109,167 @@ fun OverlayPanel(
             modeHighlight.animateTo(0f, animationSpec = tween(durationMillis = 1700))
         }
     }
-    Column(
-        modifier
-            .fillMaxWidth()
-            .verticalScrollbar(scroll, palette.muted.copy(alpha = 0.35f), rightBleed = 9.dp)
-            .verticalScroll(scroll)
-            .padding(top = 20.dp, bottom = 32.dp),
-        verticalArrangement = Arrangement.spacedBy(GROUP_GAP),
-    ) {
-        modeCard?.invoke()
-        // Sem o modo pronto (ligado e com as permissões), o resto da aba só se lê.
-        LockedSection(locked = locked, onLockedTap = onLockedTap) {
-            // ── ÁREA 1 · USABILIDADE ───────────────────────────────────────────
-            SettingsGroup(tr("Usabilidade")) {
-                GroupItem(
-                    tr("Mão preferencial"),
-                    tr("Encosta a orbe no seu lado e define a direção do arrasto de cancelar, sempre para o centro, longe da borda."),
-                ) {
-                    Segmented(
-                        options = OverlaySide.entries,
-                        selected = settings.overlaySide,
-                        label = ::overlaySideLabel,
-                        tag = ::overlaySideTag,
-                        onSelect = { onSettingsChange(settings.copy(overlaySide = it)) },
-                        modifier = Modifier.padding(top = 14.dp),
-                    )
-                }
-                GroupDivider()
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .bringIntoViewRequester(modeBringIntoView)
-                        .clip(RoundedCornerShape(12.dp))
-                        // Pulso teal discreto que esvai ao chegar do aviso (não desloca o layout).
-                        .background(palette.teal.copy(alpha = modeHighlight.value * 0.14f)),
-                ) {
-                    // Descrição acima do seletor (como as outras), mas dinâmica: segue o modo selecionado.
-                    GroupItem(tr("Modo de gravação"), pauseHintFor(settings.overlayRecordingMode)) {
+    Column(modifier.fillMaxSize()) {
+        Column(
+            Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScrollbar(scroll, palette.muted.copy(alpha = 0.35f), rightBleed = 9.dp)
+                .verticalScroll(scroll)
+                .padding(top = 20.dp, bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(GROUP_GAP),
+        ) {
+            modeCard?.invoke()
+            // Sem o modo pronto (ligado e com as permissões), o resto da aba só se lê.
+            LockedSection(locked = locked, onLockedTap = onLockedTap) {
+                // ── ÁREA 1 · USABILIDADE ───────────────────────────────────────────
+                SettingsGroup(tr("Usabilidade")) {
+                    GroupItem(
+                        tr("Mão preferencial"),
+                        tr("Encosta a orbe no seu lado e define a direção do arrasto de cancelar, sempre para o centro, longe da borda."),
+                    ) {
                         Segmented(
-                            options = RecordingMode.entries,
-                            selected = settings.overlayRecordingMode,
-                            label = ::recordingModeLabel,
-                            tag = ::overlayModeTag,
-                            onSelect = { onSettingsChange(settings.copy(overlayRecordingMode = it)) },
+                            options = OverlaySide.entries,
+                            selected = settings.overlaySide,
+                            label = ::overlaySideLabel,
+                            tag = ::overlaySideTag,
+                            onSelect = { onSettingsChange(settings.copy(overlaySide = it)) },
                             modifier = Modifier.padding(top = 14.dp),
                         )
                     }
-                }
-                GroupDivider()
-                // Slider contínuo (px) — a orbe na tela redimensiona em tempo real (OVL-05).
-                GroupItem(tr("Tamanho da orbe")) {
-                    KfSlider(
-                        value = settings.orbSizePx.toFloat(),
-                        onValueChange = { onSettingsChange(settings.copy(orbSizePx = it.roundToInt())) },
-                        valueRange = 110f..280f,
-                        tag = ORB_SIZE_SLIDER_TAG,
-                        modifier = Modifier.padding(top = 6.dp),
-                    )
-                }
-                GroupDivider()
-                GroupItem(
-                    tr("Tempo de reação"),
-                    tr("Janela de reação da orbe: tempo entre toques para os atalhos e atraso até iniciar a captação."),
-                ) {
-                    // Slider em ms (passos de 10) — define a janela de rajada de toques (atalhos + delay de start).
-                    KfSlider(
-                        value = settings.tapBurstWindowMs.toFloat(),
-                        onValueChange = {
-                            onSettingsChange(settings.copy(tapBurstWindowMs = (it / 10f).roundToInt() * 10))
-                        },
-                        valueRange = 100f..700f,
-                        tag = TAP_BURST_SLIDER_TAG,
-                        modifier = Modifier.padding(top = 6.dp),
-                    )
-                    // Dois limiares derivados: toque (valor) e segurar (valor + 150ms, espelha HOLD_OFFSET_MS).
-                    Text(
-                        tr("toque %d ms  ·  segurar %d ms", settings.tapBurstWindowMs, settings.tapBurstWindowMs + HOLD_OFFSET_MS),
-                        color = palette.fg2,
-                        fontFamily = SpaceMono,
-                        fontWeight = FontWeight.Light,
-                        fontSize = 10.5.sp,
-                    )
-                    Text(
-                        tr("ms = milissegundos"),
-                        color = palette.faint,
-                        fontFamily = SpaceGrotesk,
-                        fontWeight = FontWeight.Light,
-                        fontSize = 8.5.sp,
-                        modifier = Modifier.padding(top = 2.dp),
-                    )
-                }
-                GroupDivider()
-                GroupItem(tr("Vibração"), tr("Intensidade da vibração ao interagir com a orbe. No zero, sem vibração.")) {
-                    KfSlider(
-                        value = settings.vibrationIntensity.toFloat(),
-                        onValueChange = {
-                            val v = it.roundToInt()
-                            onSettingsChange(settings.copy(vibrationIntensity = v))
-                            // Vibra ao arrastar pra dar pra sentir a intensidade — a cada ~5 passos, na força atual.
-                            if (v > 0 && abs(v - lastVibValue.value) >= 5) {
-                                Haptics.tick(context, v)
-                                lastVibValue.value = v
-                            } else if (v == 0) {
-                                lastVibValue.value = 0
-                            }
-                        },
-                        valueRange = 0f..100f,
-                        tag = VIBRATION_SLIDER_TAG,
-                        modifier = Modifier.padding(top = 6.dp),
-                    )
-                }
-            }
-
-            // ── ÁREA 2 · SKINS ─────────────────────────────────────────────────
-            SettingsGroup(null) {
-                SkinsSection(
-                    selectedOrbSkin = settings.orbSkin,
-                    onOrbSkinSelected = { onSettingsChange(settings.copy(orbSkin = it)) },
-                    onUnlock = onUnlockSkins,
-                    skinsUnlocked = skinsUnlocked,
-                    unlockTag = OVERLAY_UNLOCK_TAG,
-                    modifier = Modifier.padding(bottom = 16.dp),
-                )
-                SkinPacksSection(SkinPackSurface.ORB, settings, onSettingsChange)
-            }
-
-            // ── ÁREA 3 · ATALHOS ───────────────────────────────────────────────
-            SettingsGroup(tr("Atalhos")) {
-                GroupItem(
-                    tr("Ações por toque"),
-                    tr("Toque a orbe para acionar. 2 e 3 toques valem nos dois modos; 1 toque apenas no modo Push-to-talk (onde o toque é livre — a gravação começa ao segurar)."),
-                ) {
-                    val pttMode = settings.overlayRecordingMode == RecordingMode.PUSH_TO_TALK
-                    Column(Modifier.padding(top = 8.dp)) {
-                        ShortcutRow(
-                            taps = 1,
-                            action = settings.shortcut1Tap,
-                            keyboardAvailable = keyboardShortcutAvailable,
-                            enabled = pttMode,
-                            disabledNote = tr("Disponível apenas no modo Push-to-talk"),
-                        ) { if (pttMode) onOpenShortcutSheet(1) else onShortcut1Blocked() }
-                        ShortcutRow(2, settings.shortcut2Tap, keyboardShortcutAvailable) { onOpenShortcutSheet(2) }
-                        ShortcutRow(3, settings.shortcut3Tap, keyboardShortcutAvailable) { onOpenShortcutSheet(3) }
+                    GroupDivider()
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .bringIntoViewRequester(modeBringIntoView)
+                            .clip(RoundedCornerShape(12.dp))
+                            // Pulso teal discreto que esvai ao chegar do aviso (não desloca o layout).
+                            .background(palette.teal.copy(alpha = modeHighlight.value * 0.14f)),
+                    ) {
+                        // Descrição acima do seletor (como as outras), mas dinâmica: segue o modo selecionado.
+                        GroupItem(tr("Modo de gravação"), pauseHintFor(settings.overlayRecordingMode)) {
+                            Segmented(
+                                options = RecordingMode.entries,
+                                selected = settings.overlayRecordingMode,
+                                label = ::recordingModeLabel,
+                                tag = ::overlayModeTag,
+                                onSelect = { onSettingsChange(settings.copy(overlayRecordingMode = it)) },
+                                modifier = Modifier.padding(top = 14.dp),
+                            )
+                        }
+                    }
+                    GroupDivider()
+                    // Slider contínuo (px) — a orbe na tela redimensiona em tempo real (OVL-05).
+                    GroupItem(tr("Tamanho da orbe")) {
+                        KfSlider(
+                            value = settings.orbSizePx.toFloat(),
+                            onValueChange = { onSettingsChange(settings.copy(orbSizePx = it.roundToInt())) },
+                            valueRange = 110f..280f,
+                            tag = ORB_SIZE_SLIDER_TAG,
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
+                    }
+                    GroupDivider()
+                    GroupItem(
+                        tr("Tempo de reação"),
+                        tr("Janela de reação da orbe: tempo entre toques para os atalhos e atraso até iniciar a captação."),
+                    ) {
+                        // Slider em ms (passos de 10) — define a janela de rajada de toques (atalhos + delay de start).
+                        KfSlider(
+                            value = settings.tapBurstWindowMs.toFloat(),
+                            onValueChange = {
+                                onSettingsChange(settings.copy(tapBurstWindowMs = (it / 10f).roundToInt() * 10))
+                            },
+                            valueRange = 100f..700f,
+                            tag = TAP_BURST_SLIDER_TAG,
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
+                        // Dois limiares derivados: toque (valor) e segurar (valor + 150ms, espelha HOLD_OFFSET_MS).
+                        Text(
+                            tr("toque %d ms  ·  segurar %d ms", settings.tapBurstWindowMs, settings.tapBurstWindowMs + HOLD_OFFSET_MS),
+                            color = palette.fg2,
+                            fontFamily = SpaceMono,
+                            fontWeight = FontWeight.Light,
+                            fontSize = 10.5.sp,
+                        )
+                        Text(
+                            tr("ms = milissegundos"),
+                            color = palette.faint,
+                            fontFamily = SpaceGrotesk,
+                            fontWeight = FontWeight.Light,
+                            fontSize = 8.5.sp,
+                            modifier = Modifier.padding(top = 2.dp),
+                        )
+                    }
+                    GroupDivider()
+                    GroupItem(tr("Vibração"), tr("Intensidade da vibração ao interagir com a orbe. No zero, sem vibração.")) {
+                        KfSlider(
+                            value = settings.vibrationIntensity.toFloat(),
+                            onValueChange = {
+                                val v = it.roundToInt()
+                                onSettingsChange(settings.copy(vibrationIntensity = v))
+                                // Vibra ao arrastar pra dar pra sentir a intensidade — a cada ~5 passos, na força atual.
+                                if (v > 0 && abs(v - lastVibValue.value) >= 5) {
+                                    Haptics.tick(context, v)
+                                    lastVibValue.value = v
+                                } else if (v == 0) {
+                                    lastVibValue.value = 0
+                                }
+                            },
+                            valueRange = 0f..100f,
+                            tag = VIBRATION_SLIDER_TAG,
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
                     }
                 }
-                GroupDivider()
-                GroupItem(tr("Ao tocar mais de 3 vezes")) {
-                    OverflowOption(
-                        selected = settings.shortcutOverflow == ShortcutOverflow.NEAREST_DOWN,
-                        title = tr("Usar o atalho anterior"),
-                        sub = tr("Cai no atalho ativo de menos toques mais próximo (ex.: 4 toques aciona o de 3)."),
-                        onSelect = { onSettingsChange(settings.copy(shortcutOverflow = ShortcutOverflow.NEAREST_DOWN)) },
+
+                // ── ÁREA 2 · SKINS ─────────────────────────────────────────────────
+                SettingsGroup(null) {
+                    SkinsSection(
+                        selectedOrbSkin = settings.orbSkin,
+                        onOrbSkinSelected = { onSettingsChange(settings.copy(orbSkin = it)) },
+                        onUnlock = onUnlockSkins,
+                        skinsUnlocked = skinsUnlocked,
+                        unlockTag = OVERLAY_UNLOCK_TAG,
+                        modifier = Modifier.padding(bottom = 16.dp),
                     )
-                    OverflowOption(
-                        selected = settings.shortcutOverflow == ShortcutOverflow.CANCEL,
-                        title = tr("Não fazer nada"),
-                        sub = tr("Ignora os toques extras; o gesto é cancelado."),
-                        onSelect = { onSettingsChange(settings.copy(shortcutOverflow = ShortcutOverflow.CANCEL)) },
-                    )
+                    SkinPacksSection(SkinPackSurface.ORB, settings, onSettingsChange)
+                }
+
+                // ── ÁREA 3 · ATALHOS ───────────────────────────────────────────────
+                SettingsGroup(tr("Atalhos")) {
+                    GroupItem(
+                        tr("Ações por toque"),
+                        tr("Toque a orbe para acionar. 2 e 3 toques valem nos dois modos; 1 toque apenas no modo Push-to-talk (onde o toque é livre — a gravação começa ao segurar)."),
+                    ) {
+                        val pttMode = settings.overlayRecordingMode == RecordingMode.PUSH_TO_TALK
+                        Column(Modifier.padding(top = 8.dp)) {
+                            ShortcutRow(
+                                taps = 1,
+                                action = settings.shortcut1Tap,
+                                keyboardAvailable = keyboardShortcutAvailable,
+                                enabled = pttMode,
+                                disabledNote = tr("Disponível apenas no modo Push-to-talk"),
+                            ) { if (pttMode) onOpenShortcutSheet(1) else onShortcut1Blocked() }
+                            ShortcutRow(2, settings.shortcut2Tap, keyboardShortcutAvailable) { onOpenShortcutSheet(2) }
+                            ShortcutRow(3, settings.shortcut3Tap, keyboardShortcutAvailable) { onOpenShortcutSheet(3) }
+                        }
+                    }
+                    GroupDivider()
+                    GroupItem(tr("Ao tocar mais de 3 vezes")) {
+                        OverflowOption(
+                            selected = settings.shortcutOverflow == ShortcutOverflow.NEAREST_DOWN,
+                            title = tr("Usar o atalho anterior"),
+                            sub = tr("Cai no atalho ativo de menos toques mais próximo (ex.: 4 toques aciona o de 3)."),
+                            onSelect = { onSettingsChange(settings.copy(shortcutOverflow = ShortcutOverflow.NEAREST_DOWN)) },
+                        )
+                        OverflowOption(
+                            selected = settings.shortcutOverflow == ShortcutOverflow.CANCEL,
+                            title = tr("Não fazer nada"),
+                            sub = tr("Ignora os toques extras; o gesto é cancelado."),
+                            onSelect = { onSettingsChange(settings.copy(shortcutOverflow = ShortcutOverflow.CANCEL)) },
+                        )
+                    }
                 }
             }
         }

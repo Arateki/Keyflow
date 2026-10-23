@@ -1,5 +1,9 @@
 package com.keyflow.ui.gallery
 
+import android.app.Activity
+import android.content.Context
+import android.view.View
+import android.widget.TextView
 import androidx.compose.foundation.background
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -92,6 +96,9 @@ import com.keyflow.reasoning.UnavailableReason
 import com.keyflow.ui.config.AccountModel
 import com.keyflow.ui.config.AuthActions
 import com.keyflow.ui.config.TestState
+import com.keyflow.ads.AdsController
+import com.keyflow.ads.AdsRuntime
+import com.keyflow.ads.ConsentRequester
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 
@@ -660,6 +667,13 @@ object RouteCatalog {
         unlockOpen: Boolean = false,
         tabHelpOpen: Boolean = false,
     ) {
+        val bannerTab = tab == ConfigTab.DOCS || tab == ConfigTab.OVERLAY || tab == ConfigTab.TECLADO
+        val context = LocalContext.current
+        val dark = LocalKeyFlowPalette.current.isDark
+        val galleryAdsRuntime = remember(dark) { GalleryAdsRuntime(dark) }
+        val adsController = remember(tab, dark) {
+            if (bannerTab) AdsController(context.applicationContext, galleryAdsRuntime, GalleryConsentRequester) else null
+        }
         ConfigScreen(
             settings = FakeSettings.settings.copy(
                 overlayModeEnabled = overlayEnabled,
@@ -687,7 +701,25 @@ object RouteCatalog {
             initialTab = tab,
             initialUnlockOpen = unlockOpen,
             initialTabHelpOpen = tabHelpOpen,
+            adsController = adsController,
         )
+    }
+
+    /** Banner determinístico, sem rede/SDK real, apenas nas capturas de configuração da galeria. */
+    private class GalleryAdsRuntime(private val dark: Boolean) : AdsRuntime {
+        override fun initialize(context: Context, onComplete: () -> Unit) = onComplete()
+        override fun createBanner(context: Context, adUnitId: String): View = TextView(context).apply {
+            val gray = if (dark) 58 else 238
+            setBackgroundColor(android.graphics.Color.rgb(gray, gray, gray))
+            text = ""
+        }
+        override fun loadInterstitial(context: Context, adUnitId: String, onReady: () -> Unit, onFailed: () -> Unit) = onFailed()
+        override fun showInterstitial(activity: Activity): Boolean = false
+        override fun destroy(view: View) = Unit
+    }
+
+    private object GalleryConsentRequester : ConsentRequester {
+        override fun request(activity: Activity, onReady: () -> Unit) = onReady()
     }
 
     /** Hospeda o [KeyFlowKeyboardView] (View) numa rota Compose, ancorado ao rodapé (KBD screenshots). */

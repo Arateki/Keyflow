@@ -43,7 +43,7 @@ fun BannerSlot(
         view?.let { banner ->
             AndroidView(
                 factory = { banner },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().height(BANNER_RESERVED_HEIGHT),
             )
         }
     }
