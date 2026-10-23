@@ -120,4 +120,10 @@ class DocsSectionsTest {
             assertEquals("$it não deveria ter seção ainda", null, docsSectionFor(it))
         }
     }
+
+    @Test
+    fun deferredCapabilitySectionsAreNotListedAsAvailableDocumentation() {
+        assertTrue("Visão ainda aparece na Docs", "aba-visao" !in ids)
+        assertTrue("Fala ainda aparece na Docs", "aba-voz" !in ids)
+    }
 }

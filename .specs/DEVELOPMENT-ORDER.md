@@ -114,8 +114,9 @@ upload interno, o produto de R$15 e a service account. As tasks V1-1..V1-8 não 
 - ~~**V1-0** — Mesclar a PR #7 (skins até 120 fps, mascote, provedores Anthropic/Google, agente fase 1)
   com o CI verde.~~ **Feito em 2026-10-10** (merge `4cd4ee4`, CI #35 verde sem repetição). No caminho: repo
   público, regra "main protegida", gate que repete 1× o que falha, esteira de instabilidade (TESTING.md).
-- **V1-1** — "Em breve" nas abas e na origem Créditos (listas acima). A `UnlockSheet` fica; sai só a
-  recarga de créditos. Instrumentado + goldens das rotas.
+- ~~**V1-1** — "Em breve" nas abas e na origem Créditos (listas acima). A `UnlockSheet` fica; sai só a
+  recarga de créditos. Instrumentado + goldens das rotas.~~ **Feito em 2026-10-23** (commit `a59e3c3`;
+  instrumentado e goldens verdes).
 - **V1-2** — Higiene do release, pendências herdadas do trabalho do Gemini: logs que imprimem o texto
   ditado (`KeyFlowController`, `OverlayCoordinator` — `take(30)`) só no debug; leitura dos segredos fora
   da main thread (`settingsFlow` → `flowOn(Dispatchers.IO)`); chave de API num lugar só (o cofre

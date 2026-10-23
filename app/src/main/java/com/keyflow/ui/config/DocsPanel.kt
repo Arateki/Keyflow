@@ -254,48 +254,6 @@ val docsSections: List<DocSection> get() = listOf(
         ),
     ),
     DocSection(
-        "aba-visao",
-        tr("Aba Visão"),
-        listOf(
-            DocBlock.Paragraph(
-                tr("Configura o reconhecimento óptico de caracteres (OCR) e a compreensão visual da tela. As capturas são feitas diretamente pela orbe sobreposta."),
-            ),
-            DocBlock.Labeled(
-                tr("Origem"),
-                tr("Local (OCR e modelos visuais no aparelho como ML Kit, PP-OCR, MobileNet e Florence, 100% offline) ou Nuvem (OpenAI GPT-4o, Google Gemini Vision e Anthropic Claude Vision)."),
-            ),
-            DocBlock.Labeled(
-                tr("Tradução"),
-                tr("idioma de destino para traduzir o texto capturado nos gestos da orbe."),
-            ),
-            DocBlock.Labeled(
-                tr("Testar OCR"),
-                tr("executa o reconhecimento de texto e avalia a velocidade de resposta do modelo ativo."),
-            ),
-        ),
-    ),
-    DocSection(
-        "aba-voz",
-        tr("Aba Voz"),
-        listOf(
-            DocBlock.Paragraph(
-                tr("Configura a síntese de fala (Text-to-Speech) para ler respostas e mensagens em voz alta."),
-            ),
-            DocBlock.Labeled(
-                tr("Origem"),
-                tr("Local (modelos de voz no aparelho como Piper, Kokoro e MeloTTS, 100% offline) ou Nuvem (OpenAI TTS, ElevenLabs e Google Cloud TTS)."),
-            ),
-            DocBlock.Labeled(
-                tr("Velocidade"),
-                tr("ajuste do ritmo de fala para uma reprodução confortável."),
-            ),
-            DocBlock.Labeled(
-                tr("Testar voz"),
-                tr("reproduz uma frase de exemplo para conferir a qualidade e a entonação da voz escolhida."),
-            ),
-        ),
-    ),
-    DocSection(
         "texto",
         tr("Onde o texto aparece"),
         listOf(
