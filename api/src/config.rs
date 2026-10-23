@@ -302,7 +302,8 @@ fn parse_nonzero_u32(
     var: &'static str,
     default: u32,
 ) -> Result<NonZeroU32, ConfigError> {
-    let raw = match vars.get(var) {
+    // `VAR=""` conta como ausente: o default vale. Valor inválido continua erro.
+    let raw = match vars.get(var).filter(|value| !value.is_empty()) {
         Some(value) => value,
         None => {
             return Ok(NonZeroU32::new(default).expect("default rate limit is non-zero"));
@@ -330,7 +331,7 @@ fn parse_u32_at_least(
     default: u32,
     min: u32,
 ) -> Result<u32, ConfigError> {
-    let raw = match vars.get(var) {
+    let raw = match vars.get(var).filter(|value| !value.is_empty()) {
         Some(value) => value,
         None => return Ok(default),
     };
@@ -356,14 +357,9 @@ fn parse_nonempty_string(
     var: &'static str,
     default: &str,
 ) -> Result<String, ConfigError> {
-    match vars.get(var) {
+    match vars.get(var).filter(|value| !value.is_empty()) {
         None => Ok(default.to_string()),
-        Some(value) if value.is_empty() => Err(ConfigError::InvalidEnv {
-            var,
-            value: value.clone(),
-            reason: "must not be empty".to_string(),
-        }),
-        Some(value) => Ok(value.clone()),
+        Some(value) => Ok((*value).clone()),
     }
 }
 
@@ -671,6 +667,36 @@ mod tests {
         ]))
         .unwrap_err();
         assert!(err.to_string().contains("DB_MIN_CONNECTIONS"));
+    }
+
+    #[test]
+    fn empty_optional_env_counts_as_absent() {
+        let config = Config::from_map(&with_required(&[
+            ("DB_ACQUIRE_TIMEOUT_SECS", ""),
+            ("TOKIO_WORKER_THREADS", ""),
+            ("TOKIO_MAX_BLOCKING_THREADS", ""),
+            ("PLAY_INTEGRITY_BASE_URL", ""),
+            ("ANDROID_PUBLISHER_BASE_URL", ""),
+        ]))
+        .unwrap();
+
+        assert_eq!(config.db_acquire_timeout, Duration::from_secs(5));
+        assert_eq!(
+            config.tokio_worker_threads.get(),
+            DEFAULT_TOKIO_WORKER_THREADS
+        );
+        assert_eq!(
+            config.tokio_max_blocking_threads.get(),
+            DEFAULT_TOKIO_MAX_BLOCKING_THREADS
+        );
+        assert_eq!(
+            config.play_integrity_base_url,
+            DEFAULT_PLAY_INTEGRITY_BASE_URL
+        );
+        assert_eq!(
+            config.android_publisher_base_url,
+            DEFAULT_ANDROID_PUBLISHER_BASE_URL
+        );
     }
 
     #[test]
