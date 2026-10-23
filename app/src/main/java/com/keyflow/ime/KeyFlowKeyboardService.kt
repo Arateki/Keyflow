@@ -77,6 +77,7 @@ class KeyFlowKeyboardService : InputMethodService() {
         val language: String,
         val numberRowEnabled: Boolean,
         val skin: String,
+        val skinsUnlocked: Boolean,
     )
     private var appliedLiveConfig: LiveKeyboardConfig? = null
 
@@ -188,7 +189,17 @@ class KeyFlowKeyboardService : InputMethodService() {
                 repo.keyboardLanguageFlow(),
                 repo.keyboardNumberRowEnabledFlow(),
                 repo.keyboardSkinFlow(),
-            ) { dark, scale, lang, numberRow, skin -> LiveKeyboardConfig(dark, scale, lang, numberRow, skin) }
+                repo.skinsUnlockedFlow(),
+            ) { values ->
+                LiveKeyboardConfig(
+                    dark = values[0] as Boolean,
+                    scalePercent = values[1] as Int,
+                    language = values[2] as String,
+                    numberRowEnabled = values[3] as Boolean,
+                    skin = values[4] as String,
+                    skinsUnlocked = values[5] as Boolean,
+                )
+            }
                 .distinctUntilChanged()
                 .collect { config ->
                     if (keyboardView != null && config != appliedLiveConfig) recreateInputView("tema/tamanho/idioma/skin mudou")
@@ -351,9 +362,10 @@ class KeyFlowKeyboardService : InputMethodService() {
         val language = snapshot.language
         val numberRowEnabled = snapshot.numberRowEnabled
         val skin = snapshot.skin
+        val resolvedSkin = KeyboardSkin.effective(skin, snapshot.skinsUnlocked)
         // Skin de pacote (SKP-KBD): abre o pacote escolhido. Sumiu ou não carrega → `null`, e `KeyboardSkin.of` já cai no Sistema.
         val packKeyboard = openPackKeyboard(skin)
-        appliedLiveConfig = LiveKeyboardConfig(dark, scalePercent, language, numberRowEnabled, skin)
+        appliedLiveConfig = LiveKeyboardConfig(dark, scalePercent, language, numberRowEnabled, skin, snapshot.skinsUnlocked)
         suggester = null
         suggesterReadyForTest = false
         Dictionaries.suggesterFor(this, language).thenAccept { loaded ->
@@ -392,7 +404,7 @@ class KeyFlowKeyboardService : InputMethodService() {
                 startActivity(intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
             },
             dark = dark,
-            skin = KeyboardSkin.of(skin),
+            skin = resolvedSkin,
             pack = packKeyboard,
             scale = scale,
             locale = language,
@@ -410,7 +422,7 @@ class KeyFlowKeyboardService : InputMethodService() {
         )
         keyboardView = view
         activeViewForTest = view
-        applyGlassWindow(KeyboardColors.of(KeyboardSkin.of(skin), dark, packKeyboard))
+        applyGlassWindow(KeyboardColors.of(resolvedSkin, dark, packKeyboard))
         // Sincroniza o estado atual na criação: o StateFlow só re-emite em mudança, então se a orbe já
         // estava (ex.) pausada quando o teclado abriu, a view nasceria dessincronizada (ex.: trocar de
         // teclado por atalho com o overlay pausado).

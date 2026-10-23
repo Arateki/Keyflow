@@ -85,12 +85,50 @@ class KeyFlowApiClientTest {
         assertThat(redeem.body.readUtf8()).contains("purchase-token")
     }
 
+    @Test
+    fun `redeem pending não confirma a compra`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(200).setBody("{\"accessToken\":\"token-1\"}"))
+        server.enqueue(MockResponse().setResponseCode(200).setBody("{\"status\":\"pending\"}"))
+
+        assertThat(client(FakeTokenStore()).redeem(purchase())).isFalse()
+    }
+
+    @Test
+    fun `redeem registra de novo uma vez depois de 401`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(200).setBody("{\"accessToken\":\"token-1\"}"))
+        server.enqueue(MockResponse().setResponseCode(401))
+        server.enqueue(MockResponse().setResponseCode(200).setBody("{\"accessToken\":\"token-2\"}"))
+        server.enqueue(MockResponse().setResponseCode(200).setBody("{\"status\":\"already_credited\"}"))
+
+        val tokens = FakeTokenStore()
+        assertThat(client(tokens).redeem(purchase())).isTrue()
+        assertThat(tokens.value).isEqualTo("token-2")
+        assertThat(server.requestCount).isEqualTo(4)
+    }
+
+    @Test
+    fun `falha de rede no redeem continua sendo erro re-tentavel`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(200).setBody("{\"accessToken\":\"token-1\"}"))
+        server.shutdown()
+
+        val failure = runCatching { client(FakeTokenStore(), baseUrl = server.url("/").toString()).redeem(purchase()) }
+            .exceptionOrNull()
+        assertThat(failure).isInstanceOf(KeyFlowApiException.Retryable::class.java)
+    }
+
     private fun client(tokens: FakeTokenStore, baseUrl: String = server.url("/").toString()) = KeyFlowApiClient(
         context = null,
         baseUrl = baseUrl,
         identity = { "550e8400-e29b-41d4-a716-446655440000" },
         integrityToken = { "integrity-fake" },
         tokenStore = tokens,
+    )
+
+    private fun purchase() = StorePurchase(
+        products = listOf(MonetizationProducts.UNLOCK_FOREVER),
+        purchaseToken = "purchase-token",
+        state = StorePurchaseState.PURCHASED,
+        acknowledged = false,
     )
 
     private class FakeTokenStore : KeyFlowAccessTokenStore {

@@ -130,12 +130,20 @@ class SettingsRepository(
     fun keyboardAutoCorrectFlow(): Flow<Boolean> = dataStore.data.map { it[KEYBOARD_AUTO_CORRECT] ?: true }
 
     fun keyboardSkinFlow(): Flow<String> = dataStore.data.map { it[KEYBOARD_SKIN] ?: "system" }
+    fun skinsUnlockedFlow(): Flow<Boolean> = dataStore.data.map { it[SKINS_UNLOCKED] ?: false }
 
     /** Idioma da interface, leve (só DataStore): o [com.keyflow.App] aplica no processo inteiro. */
     fun appLanguageFlow(): Flow<String> = dataStore.data.map { it[APP_LANGUAGE] ?: "" }
 
     /** Mesma leitura leve de [themeDarkOnce], para as cores do teclado em `onCreateInputView`. */
     suspend fun keyboardSkinOnce(): String = dataStore.data.first()[KEYBOARD_SKIN] ?: "system"
+
+    suspend fun skinsUnlockedOnce(): Boolean = dataStore.data.first()[SKINS_UNLOCKED] ?: false
+
+    /** Estado técnico compartilhado com o IME e o overlay; não altera a escolha de skin salva. */
+    suspend fun saveSkinsUnlocked(unlocked: Boolean) {
+        dataStore.edit { it[SKINS_UNLOCKED] = unlocked }
+    }
 
     /**
      * Idioma do teclado ("pt"/"en"/"es"), gerenciado pelo app (não pelos subtypes do sistema — ver
@@ -190,6 +198,7 @@ class SettingsRepository(
             language = prefs[KEYBOARD_LANGUAGE] ?: "pt",
             numberRowEnabled = prefs[KEYBOARD_NUMBER_ROW_ENABLED] ?: false,
             skin = prefs[KEYBOARD_SKIN] ?: "system",
+            skinsUnlocked = prefs[SKINS_UNLOCKED] ?: false,
             bars = ShortcutCodec.decodeBars(prefs[BARS_CONFIG_JSON]),
             grids = ShortcutCodec.decodeGrids(prefs[SHORTCUT_GRIDS_JSON]),
             vibration = prefs[VIBRATION_INTENSITY] ?: (if (prefs[HAPTIC_FEEDBACK] == false) 0 else 60),
@@ -751,6 +760,7 @@ class SettingsRepository(
         val KEYBOARD_SHOW_WITH_HARD_KEYBOARD = booleanPreferencesKey("keyboard_show_with_hard_keyboard")
         val KEYBOARD_AUTO_CORRECT = booleanPreferencesKey("keyboard_auto_correct")
         val KEYBOARD_SKIN = stringPreferencesKey("keyboard_skin")
+        val SKINS_UNLOCKED = booleanPreferencesKey("skins_unlocked")
         val ORB_SKIN = stringPreferencesKey("orb_skin")
         val APP_LANGUAGE = stringPreferencesKey("app_language")
         // Trabalho 3 (shortcut-bars): barras personalizáveis + teclados de atalhos, como JSON.
@@ -799,4 +809,5 @@ data class KeyboardSnapshot(
     val bars: BarsConfig,
     val grids: List<ShortcutGrid>,
     val vibration: Int,
+    val skinsUnlocked: Boolean = false,
 )

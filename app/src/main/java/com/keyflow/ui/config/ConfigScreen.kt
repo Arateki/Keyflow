@@ -83,6 +83,8 @@ const val TAB_HELP_CLOSE_TAG = "tab-help-close"
 const val TAB_HELP_DOCS_TAG = "tab-help-docs"
 const val TOGGLE_OVERLAY_MODE_TAG = "toggle-overlay-mode"
 const val TOGGLE_KEYBOARD_MODE_TAG = "toggle-keyboard-mode"
+const val REMOTE_UPDATE_WARNING_TAG = "remote-update-warning"
+const val REMOTE_KILL_SWITCH_TAG = "remote-kill-switch"
 
 // Atraso entre o toast de "permissões pendentes" subir e a tela/diálogo da permissão abrir sozinha —
 // só o suficiente pro usuário ler o aviso antes da navegação tomar a tela. `internal`: o teste avança o
@@ -155,6 +157,10 @@ fun ConfigScreen(
     unlockPurchaseState: UnlockPurchaseState = UnlockPurchaseState.IDLE,
     adsController: AdsController? = null,
     adsOff: Boolean = false,
+    entitlementsLoaded: Boolean = true,
+    remoteConfigLoaded: Boolean = true,
+    showUpdateWarning: Boolean = false,
+    monetizationDisabled: Boolean = false,
     interstitialPolicy: InterstitialPolicy? = null,
     onInterstitialPolicyChanged: () -> Unit = {},
 ) {
@@ -172,6 +178,9 @@ fun ConfigScreen(
 
     LaunchedEffect(skinsUnlocked) {
         if (skinsUnlocked) unlockOpen = false
+    }
+    LaunchedEffect(monetizationDisabled) {
+        if (monetizationDisabled) unlockOpen = false
     }
 
     // A aba de um modo só fica "liberada" com o modo ligado E tudo pronto: permissões concedidas (mic +
@@ -202,10 +211,12 @@ fun ConfigScreen(
     var recordingModeHighlightKey by remember { mutableStateOf(0) }
     val hapticContext = LocalContext.current
     val configActivity = LocalContext.current as? Activity
-    LaunchedEffect(adsController, adsOff) {
+    val adsEntitlementsLoaded = entitlementsLoaded && remoteConfigLoaded
+    val adsSuppressed = !adsEntitlementsLoaded || adsOff || monetizationDisabled
+    LaunchedEffect(adsController, adsSuppressed, adsEntitlementsLoaded) {
         val controller = adsController ?: return@LaunchedEffect
-        controller.initializeIfNeeded(configActivity, adsOff) {
-            controller.preloadInterstitial(configActivity, adsOff)
+        controller.initializeIfNeeded(configActivity, adsSuppressed, adsEntitlementsLoaded) {
+            controller.preloadInterstitial(configActivity, adsSuppressed, adsEntitlementsLoaded)
         }
     }
     LaunchedEffect(toastGeneration) {
@@ -245,15 +256,14 @@ fun ConfigScreen(
     fun selectTab(tab: ConfigTab) {
         if (tab == activeTab) return
         activeTab = tab
-        interstitialPolicy?.recordInteraction()
         val policy = interstitialPolicy
         if (policy?.shouldShow(tabSwitch = true) == true &&
-            adsController?.showInterstitial(configActivity, adsOff) == true
+            adsController?.showInterstitial(configActivity, adsSuppressed, adsEntitlementsLoaded) == true
         ) {
             policy.markShown()
             onInterstitialPolicyChanged()
         }
-        adsController?.preloadInterstitial(configActivity, adsOff)
+        adsController?.preloadInterstitial(configActivity, adsSuppressed, adsEntitlementsLoaded)
     }
 
     // Navegação do aviso → aba da interface, no topo, destacando o cartão do modo que resolve o bloqueio.
@@ -334,6 +344,14 @@ fun ConfigScreen(
                 rotationStep = rotationStep,
                 onRotationClick = onRotationClick,
             )
+            if (showUpdateWarning) RemoteNotice(
+                text = tr("Há uma atualização do KeyFlow disponível."),
+                tag = REMOTE_UPDATE_WARNING_TAG,
+            )
+            if (monetizationDisabled) RemoteNotice(
+                text = tr("A monetização está temporariamente indisponível."),
+                tag = REMOTE_KILL_SWITCH_TAG,
+            )
             Box(Modifier.fillMaxSize()) {
             // A barra lateral recolhida ocupa uma faixa fixa à esquerda; aberta, desenha por cima do
             // painel (mais abaixo, fora desta Row) sem mudar a largura dele.
@@ -346,7 +364,7 @@ fun ConfigScreen(
                 // As prévias das abas (tour da orbe nos cartões) seguem a skin da orbe escolhida na aba
                 // Sobrepor, como a orbe de verdade; o orbe do cabeçalho é a marca do app e fica como está.
                 androidx.compose.runtime.CompositionLocalProvider(
-                    com.keyflow.ui.orb.LocalOrbStyle provides com.keyflow.ui.orb.orbStyleFor(settings.orbSkin),
+                    com.keyflow.ui.orb.LocalOrbStyle provides com.keyflow.ui.orb.orbStyleFor(settings.orbSkin, skinsUnlocked),
                     com.keyflow.ui.orb.LocalOrbPack provides com.keyflow.ui.orb.rememberOrbPack(settings.orbSkin),
                 ) {
                 Column(
@@ -377,10 +395,11 @@ fun ConfigScreen(
                         ConfigTab.TECLADO -> TecladoPanel(
                             settings = settings,
                             onSettingsChange = ::recordSettingsChange,
-                            onUnlockSkins = { unlockOpen = true },
+                            onUnlockSkins = { if (!monetizationDisabled) unlockOpen = true },
                             skinsUnlocked = skinsUnlocked,
                             adsController = adsController,
-                            adsOff = adsOff,
+                            adsOff = adsSuppressed,
+                            entitlementsLoaded = adsEntitlementsLoaded,
                             onOverlayRequired = onOverlayRequired,
                             barsConfig = barsConfig,
                             onBarsConfigChange = onBarsConfigChange,
@@ -404,10 +423,11 @@ fun ConfigScreen(
                         ConfigTab.OVERLAY -> OverlayPanel(
                             settings = settings,
                             onSettingsChange = ::recordSettingsChange,
-                            onUnlockSkins = { unlockOpen = true },
+                            onUnlockSkins = { if (!monetizationDisabled) unlockOpen = true },
                             skinsUnlocked = skinsUnlocked,
                             adsController = adsController,
-                            adsOff = adsOff,
+                            adsOff = adsSuppressed,
+                            entitlementsLoaded = adsEntitlementsLoaded,
                             onOpenShortcutSheet = { shortcutSheetTaps = it },
                             onShortcut1Blocked = {
                                 showToast(
@@ -454,7 +474,8 @@ fun ConfigScreen(
                             focusSectionId = docsFocusSection,
                             focusKey = docsFocusKey,
                             adsController = adsController,
-                            adsOff = adsOff,
+                            adsOff = adsSuppressed,
+                            entitlementsLoaded = adsEntitlementsLoaded,
                         )
                     }
                 }
@@ -510,9 +531,9 @@ fun ConfigScreen(
             modifier = Modifier.fillMaxSize().systemBarsPadding(),
         )
         UnlockSheet(
-            visible = unlockOpen,
+            visible = unlockOpen && !monetizationDisabled,
             onDismiss = { unlockOpen = false },
-            onBuy = onUnlockPurchase,
+            onBuy = { if (!monetizationDisabled) onUnlockPurchase() },
             purchaseState = unlockPurchaseState,
         )
         ShortcutActionSheet(
@@ -536,6 +557,29 @@ fun ConfigScreen(
 
 const val MESSAGE_TOAST_TAG = "message-toast"
 const val READONLY_SCRIM_TAG = "readonly-scrim"
+
+@Composable
+private fun RemoteNotice(text: String, tag: String) {
+    val palette = LocalKeyFlowPalette.current
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 16.dp, bottom = 6.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(palette.teal.copy(alpha = 0.12f))
+            .testTag(tag)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = text,
+            color = palette.fg,
+            fontFamily = SpaceGrotesk,
+            fontSize = 11.sp,
+            lineHeight = 15.sp,
+        )
+    }
+}
 
 /**
  * Toast discreto (aba travada, avisos de modo). Visível enquanto [message] não for nulo. Quando

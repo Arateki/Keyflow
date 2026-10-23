@@ -1003,7 +1003,7 @@ internal fun SkinsSection(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (onOrbSkinSelected != null) {
-                val orbSelected = orbStyleFor(selectedOrbSkin ?: OrbStyle.ATELIE.id)
+        val orbSelected = orbStyleFor(selectedOrbSkin ?: OrbStyle.ATELIE.id, skinsUnlocked)
                 SkinChoice(
                     label = tr("Ateliê"),
                     selected = orbSelected == OrbStyle.ATELIE,
@@ -1064,7 +1064,7 @@ internal fun SkinsSection(
                 val system = KeyboardColors.of(KeyboardSkin.SYSTEM, palette.isDark)
                 SkinChoice(
                     label = tr("Sistema"),
-                    selected = nativeKeyboardSkin(selectedSkin) == KeyboardSkin.SYSTEM,
+                    selected = nativeKeyboardSkin(selectedSkin, skinsUnlocked) == KeyboardSkin.SYSTEM,
                     onClick = { selectKeyboard(KeyboardSkin.SYSTEM) },
                     tag = skinTag(KeyboardSkin.SYSTEM.id),
                 ) {
@@ -1075,7 +1075,7 @@ internal fun SkinsSection(
                 }
                 SkinChoice(
                     label = tr("Ateliê"),
-                    selected = nativeKeyboardSkin(selectedSkin) == KeyboardSkin.ATELIE,
+                    selected = nativeKeyboardSkin(selectedSkin, skinsUnlocked) == KeyboardSkin.ATELIE,
                     onClick = { selectKeyboard(KeyboardSkin.ATELIE) },
                     tag = skinTag(KeyboardSkin.ATELIE.id),
                 ) {
@@ -1084,7 +1084,7 @@ internal fun SkinsSection(
                 val aero = KeyboardColors.of(KeyboardSkin.AERO, palette.isDark)
                 SkinChoice(
                     label = "Aero",
-                    selected = nativeKeyboardSkin(selectedSkin) == KeyboardSkin.AERO,
+                    selected = nativeKeyboardSkin(selectedSkin, skinsUnlocked) == KeyboardSkin.AERO,
                     onClick = { selectKeyboard(KeyboardSkin.AERO) },
                     tag = skinTag(KeyboardSkin.AERO.id),
                 ) {
@@ -1101,7 +1101,7 @@ internal fun SkinsSection(
                 }
                 SkinChoice(
                     label = "Glitch",
-                    selected = nativeKeyboardSkin(selectedSkin) == KeyboardSkin.GLITCH,
+                    selected = nativeKeyboardSkin(selectedSkin, skinsUnlocked) == KeyboardSkin.GLITCH,
                     onClick = { selectKeyboard(KeyboardSkin.GLITCH) },
                     tag = skinTag(KeyboardSkin.GLITCH.id),
                 ) {
@@ -1120,7 +1120,7 @@ internal fun SkinsSection(
                 }
                 SkinChoice(
                     label = "Rose Gold",
-                    selected = nativeKeyboardSkin(selectedSkin) == KeyboardSkin.ROSE_GOLD,
+                    selected = nativeKeyboardSkin(selectedSkin, skinsUnlocked) == KeyboardSkin.ROSE_GOLD,
                     onClick = { selectKeyboard(KeyboardSkin.ROSE_GOLD) },
                     tag = skinTag(KeyboardSkin.ROSE_GOLD.id),
                 ) {

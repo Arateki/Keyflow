@@ -173,7 +173,8 @@ internal fun rememberSkinPackStore(): SkinPackStore {
  * A skin nativa que [selectedSkin] marca nos cartões do teclado, ou `null` se ele é um pacote: `KeyboardSkin.of` cai no Sistema para qualquer id que
  * não conhece, e o cartão do Sistema ficaria com anel junto com o do pacote.
  */
-internal fun nativeKeyboardSkin(selectedSkin: String?): KeyboardSkin? = if (SkinIds.isPack(selectedSkin)) null else KeyboardSkin.of(selectedSkin)
+internal fun nativeKeyboardSkin(selectedSkin: String?, skinsUnlocked: Boolean = true): KeyboardSkin? =
+    if (SkinIds.isPack(selectedSkin)) null else KeyboardSkin.effective(selectedSkin, skinsUnlocked)
 
 /**
  * Os ajustes depois de remover o pacote [skinId] (`pack:<id>`): a superfície que o usava volta ao padrão — o teclado ao Sistema, a orbe ao

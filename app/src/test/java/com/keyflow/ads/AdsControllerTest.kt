@@ -25,6 +25,19 @@ class AdsControllerTest {
     }
 
     @Test
+    fun `entitlements ainda não carregados não tocam consentimento nem SDK`() {
+        val runtime = FakeRuntime()
+        val consent = FakeConsent()
+        val controller = AdsController(context, runtime, consent)
+
+        controller.initializeIfNeeded(Activity(), adsOff = false, entitlementsLoaded = false)
+
+        assertThat(consent.requests).isEqualTo(0)
+        assertThat(runtime.initializations).isEqualTo(0)
+        assertThat(controller.bannerView(context, adsOff = false, entitlementsLoaded = false)).isNull()
+    }
+
+    @Test
     fun `inicializa uma vez depois do consentimento`() {
         val runtime = FakeRuntime()
         val controller = AdsController(context, runtime, FakeConsent())

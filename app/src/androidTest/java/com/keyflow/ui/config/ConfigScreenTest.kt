@@ -81,6 +81,8 @@ class ConfigScreenTest {
         val saveController = SaveController()
         var adsController: AdsController? = null
         var adsOff = false
+        var showUpdateWarning = false
+        var monetizationDisabled = false
         var interstitialPolicy: InterstitialPolicy? = null
         var interstitialPolicyChanges = 0
 
@@ -116,6 +118,8 @@ class ConfigScreenTest {
                     onSettingsChange = { settings = it },
                     adsController = adsController,
                     adsOff = adsOff,
+                    showUpdateWarning = showUpdateWarning,
+                    monetizationDisabled = monetizationDisabled,
                     interstitialPolicy = interstitialPolicy,
                     onInterstitialPolicyChanged = { interstitialPolicyChanges++ },
                     modifier = Modifier.fillMaxSize(),
@@ -468,6 +472,29 @@ class ConfigScreenTest {
         rule.onNodeWithTag(UNLOCK_SHEET_TAG).assertIsDisplayed()
 
         rule.onNodeWithTag(UNLOCK_CLOSE_TAG).performClick()
+        rule.onAllNodesWithTag(UNLOCK_SHEET_TAG).assertCountEquals(0)
+    }
+
+    @Test
+    fun remoteWarningsAreVisibleAndKillSwitchDoesNotOpenUnlockOrBanner() {
+        val h = Harness().also {
+            it.settings = Settings(keyboardModeEnabled = true)
+            it.showUpdateWarning = true
+            it.monetizationDisabled = true
+            it.adsController = AdsController(
+                ApplicationProvider.getApplicationContext(),
+                FakeAdsRuntime(),
+                FakeConsentRequester(),
+            )
+        }
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(REMOTE_UPDATE_WARNING_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(REMOTE_KILL_SWITCH_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(tabTag(ConfigTab.DOCS)).performClick()
+        rule.onAllNodesWithTag(BANNER_SLOT_TAG).assertCountEquals(0)
+        rule.onNodeWithTag(tabTag(ConfigTab.TECLADO)).performClick()
+        rule.onNodeWithTag(TECLADO_UNLOCK_TAG).performScrollTo().performClick()
         rule.onAllNodesWithTag(UNLOCK_SHEET_TAG).assertCountEquals(0)
     }
 

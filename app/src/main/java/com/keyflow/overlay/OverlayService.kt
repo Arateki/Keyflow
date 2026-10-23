@@ -50,6 +50,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -105,6 +106,8 @@ class OverlayService : Service() {
     // Settings em cache: o modo de gravação é lido a cada gesto (pode mudar na config).
     @Volatile
     private var cachedSettings: Settings = Settings()
+    @Volatile
+    private var skinsUnlocked = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -380,6 +383,12 @@ class OverlayService : Service() {
     }
 
     private fun observeSettings() {
+        serviceScope.launch {
+            settingsRepository.skinsUnlockedFlow().distinctUntilChanged().collect { unlocked ->
+                skinsUnlocked = unlocked
+                floatingButton?.setOrbStyle(com.keyflow.ui.orb.orbStyleFor(cachedSettings.orbSkin, unlocked))
+            }
+        }
         // Pacote de skin reimportado ou removido (SKP-IMP-05/STO-04): se a orbe usa um pacote, reabre — a versão nova aparece ao vivo, e um
         // pacote que sumiu devolve a orbe ao Ateliê. O primeiro valor do fluxo (o de agora) não conta.
         serviceScope.launch {
@@ -402,7 +411,7 @@ class OverlayService : Service() {
                 }
                 // Skin da orbe ao vivo (aba Sobrepor → Skins).
                 if (it.orbSkin != prevOrbSkin) {
-                    floatingButton?.setOrbStyle(com.keyflow.ui.orb.orbStyleFor(it.orbSkin))
+                    floatingButton?.setOrbStyle(com.keyflow.ui.orb.orbStyleFor(it.orbSkin, skinsUnlocked))
                     floatingButton?.setOrbPack(openOrbPack(it.orbSkin))
                 }
                 // Tema ao vivo (raro, disparado pelo usuário → barato): re-posta a notificação e recolore os
@@ -450,7 +459,7 @@ class OverlayService : Service() {
             side = { cachedSettings.overlaySide },
             onIntent = { intent -> coordinator.onIntent(intent) },
             orbSizePx = cachedSettings.orbSizePx,
-            orbStyle = com.keyflow.ui.orb.orbStyleFor(cachedSettings.orbSkin),
+            orbStyle = com.keyflow.ui.orb.orbStyleFor(cachedSettings.orbSkin, skinsUnlocked),
             orbPack = openOrbPack(cachedSettings.orbSkin),
             tapBurstWindowMs = cachedSettings.tapBurstWindowMs.toLong(),
             onPositionChanged = { position ->

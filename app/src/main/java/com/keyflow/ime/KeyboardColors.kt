@@ -40,6 +40,12 @@ enum class KeyboardSkin(
         val DEFAULT = SYSTEM
 
         fun of(id: String?): KeyboardSkin = entries.firstOrNull { it.id == id } ?: DEFAULT
+
+        /** Resolve a escolha salva sem apagá-la quando o direito de uso foi revogado. */
+        fun effective(id: String?, skinsUnlocked: Boolean): KeyboardSkin {
+            val skin = of(id)
+            return if (skin.paid && !skinsUnlocked) DEFAULT else skin
+        }
     }
 }
 

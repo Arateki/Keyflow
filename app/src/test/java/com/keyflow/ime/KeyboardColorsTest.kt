@@ -162,4 +162,11 @@ class KeyboardColorsTest {
         assertThat(KeyboardSkin.ROSE_GOLD.paid).isTrue()
         assertThat(KeyboardSkin.DEFAULT.paid).isFalse()
     }
+
+    @Test
+    fun `revoked paid keyboard skin resolves to system without changing saved id`() {
+        assertThat(KeyboardSkin.effective("glitch", skinsUnlocked = false)).isEqualTo(KeyboardSkin.SYSTEM)
+        assertThat(KeyboardSkin.effective("glitch", skinsUnlocked = true)).isEqualTo(KeyboardSkin.GLITCH)
+        assertThat(KeyboardSkin.of("glitch").id).isEqualTo("glitch")
+    }
 }

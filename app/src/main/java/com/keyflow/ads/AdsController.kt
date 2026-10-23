@@ -49,8 +49,13 @@ class AdsController(
     var initializationCount: Int = 0
         private set
 
-    fun initializeIfNeeded(activity: Activity?, adsOff: Boolean, onReady: () -> Unit = {}) {
-        if (adsOff || activity == null || !initializationStarted.compareAndSet(false, true)) return
+    fun initializeIfNeeded(
+        activity: Activity?,
+        adsOff: Boolean,
+        entitlementsLoaded: Boolean = true,
+        onReady: () -> Unit = {},
+    ) {
+        if (!entitlementsLoaded || adsOff || activity == null || !initializationStarted.compareAndSet(false, true)) return
         consent.request(activity) {
             initializationCount++
             runtime.initialize(appContext) {
@@ -60,13 +65,13 @@ class AdsController(
         }
     }
 
-    fun bannerView(context: Context, adsOff: Boolean): View? {
-        if (adsOff || !_ready.value) return null
+    fun bannerView(context: Context, adsOff: Boolean, entitlementsLoaded: Boolean = true): View? {
+        if (!entitlementsLoaded || adsOff || !_ready.value) return null
         return runCatching { runtime.createBanner(context, context.getString(R.string.admob_banner_ad_unit_id)) }.getOrNull()
     }
 
-    fun preloadInterstitial(activity: Activity?, adsOff: Boolean) {
-        if (adsOff || activity == null || !_ready.value || interstitialReady) return
+    fun preloadInterstitial(activity: Activity?, adsOff: Boolean, entitlementsLoaded: Boolean = true) {
+        if (!entitlementsLoaded || adsOff || activity == null || !_ready.value || interstitialReady) return
         runtime.loadInterstitial(
             appContext,
             appContext.getString(R.string.admob_interstitial_ad_unit_id),
@@ -75,8 +80,8 @@ class AdsController(
         )
     }
 
-    fun showInterstitial(activity: Activity?, adsOff: Boolean): Boolean {
-        if (adsOff || activity == null || !_ready.value || !interstitialReady) return false
+    fun showInterstitial(activity: Activity?, adsOff: Boolean, entitlementsLoaded: Boolean = true): Boolean {
+        if (!entitlementsLoaded || adsOff || activity == null || !_ready.value || !interstitialReady) return false
         interstitialReady = false
         return runtime.showInterstitial(activity)
     }

@@ -89,7 +89,7 @@ class InterstitialPolicy(
 
     private fun cooldownMillis(): Long {
         val seconds = params.initialCooldownSeconds.toDouble() *
-            params.cooldownFactor.powClamped(state.shownCount)
+            params.cooldownFactor.powClamped((state.shownCount - 1L).coerceAtLeast(0L))
         return seconds.coerceAtMost(params.maxCooldownSeconds.toDouble())
             .times(1_000.0)
             .toLong()

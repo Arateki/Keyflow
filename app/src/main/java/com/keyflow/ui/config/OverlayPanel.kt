@@ -79,6 +79,7 @@ fun OverlayPanel(
     skinsUnlocked: Boolean = false,
     adsController: AdsController? = null,
     adsOff: Boolean = false,
+    entitlementsLoaded: Boolean = true,
     modifier: Modifier = Modifier,
     onOpenShortcutSheet: (Int) -> Unit = {},
     onShortcut1Blocked: () -> Unit = {},
@@ -268,7 +269,7 @@ fun OverlayPanel(
                 }
             }
         }
-        adsController?.let { BannerSlot(it, adsOff) }
+        adsController?.let { BannerSlot(it, adsOff = adsOff, entitlementsLoaded = entitlementsLoaded) }
     }
 }
 

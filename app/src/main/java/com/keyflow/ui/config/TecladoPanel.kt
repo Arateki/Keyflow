@@ -34,6 +34,7 @@ import com.keyflow.core.shortcuts.BarsConfig
 import com.keyflow.core.shortcuts.ShortcutGrid
 import com.keyflow.data.Settings
 import com.keyflow.ime.KeyFlowKeyboardView
+import com.keyflow.skins.SkinIds
 import com.keyflow.ui.common.verticalScrollbar
 import com.keyflow.ui.icons.KfIcon
 import com.keyflow.ui.icons.KfIcons
@@ -85,6 +86,7 @@ fun TecladoPanel(
     skinsUnlocked: Boolean = false,
     adsController: AdsController? = null,
     adsOff: Boolean = false,
+    entitlementsLoaded: Boolean = true,
     onOverlayRequired: () -> Unit = {},
     barsConfig: BarsConfig = BarsConfig.DEFAULT,
     onBarsConfigChange: (BarsConfig) -> Unit = {},
@@ -233,7 +235,11 @@ fun TecladoPanel(
                     dark = palette.isDark,
                     locale = settings.keyboardLanguage,
                     numberRowEnabled = settings.keyboardNumberRowEnabled,
-                    skin = settings.keyboardSkin,
+                    skin = if (SkinIds.isPack(settings.keyboardSkin)) {
+                        settings.keyboardSkin
+                    } else {
+                        KeyboardSkin.effective(settings.keyboardSkin, skinsUnlocked).id
+                    },
                 )
             }
 
@@ -249,7 +255,7 @@ fun TecladoPanel(
                 SkinPacksSection(SkinPackSurface.KEYBOARD, settings, onSettingsChange)
             }
         }
-        adsController?.let { BannerSlot(it, adsOff) }
+        adsController?.let { BannerSlot(it, adsOff = adsOff, entitlementsLoaded = entitlementsLoaded) }
     }
 }
 

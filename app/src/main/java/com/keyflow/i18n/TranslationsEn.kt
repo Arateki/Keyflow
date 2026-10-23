@@ -69,6 +69,8 @@ internal val TranslationsEn: Map<String, String> = mapOf(
     "Ative o Modo Teclado para usar este atalho." to "Turn on Keyboard mode to use this shortcut.",
     "Ativo" to "Active",
     "Atualizar" to "Refresh",
+    "A monetização está temporariamente indisponível." to "Monetization is temporarily unavailable.",
+    "Há uma atualização do KeyFlow disponível." to "A newer version of KeyFlow is available.",
     "Autenticação SSH" to "SSH authentication",
     "Automático" to "Automatic",
     "Avançado" to "Advanced",
