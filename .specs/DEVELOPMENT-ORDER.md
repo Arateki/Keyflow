@@ -392,7 +392,8 @@ texto literal da doc da OpenAI). Ordem: RSN-T0 → T1 → … → T19 (uma por v
 feito: Q1..Q11 → SB → GT → NM → RSN → SKP → AGT fase 1 (faltam só manuais [YAN])
 agora: V1-1..V1-8 → v1 na Play Store (V1-0, PR #7, mesclada em 2026-10-10)
 em paralelo: API-T13 (staging) → [conta Play + service account] → v1.1 = MZ-T1..T15 + API-T14
-depois: VC (visão) · TS (temas, spec a revisar) · AGT fases 2/3 · Fala/Fluxos/Computador (sem spec)
+depois: VC (visão) · TS (temas, spec a revisar) · AGT fases 2/3 · Fala/Fluxos/Computador (sem spec;
+       ideias da Computador em .specs/features/computer-terminal/ideias.md)
 ```
 
 **Posição atual (2026-10-07)**: o próximo marco é a **v1** (recorte no topo deste arquivo). A PR #7
