@@ -56,10 +56,11 @@ class AnthropicReasoningEngineTest {
 
     @Test
     fun `translates 401 to unauthorized`() {
-        server.enqueue(MockResponse().setResponseCode(401).setBody("{\"error\": {\"message\": \"Invalid API Key\"}}"))
+        server.enqueue(MockResponse().setResponseCode(401).setBody("{\"error\": {\"message\": \"Invalid API Key\"}, \"request_id\": \"private-request-123\"}"))
 
         val result = events()
         val error = result.filterIsInstance<ReasoningEvent.Error>().single()
         assertThat(error.kind).isEqualTo(ReasoningError.UNAUTHORIZED)
+        assertThat(error.message.orEmpty()).doesNotContain("private-request-123")
     }
 }

@@ -46,6 +46,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.RandomAccessFile
 
 class SettingsRepository(
     context: Context,
@@ -302,8 +303,8 @@ class SettingsRepository(
 
     fun flow(): Flow<Config> = settingsFlow().map { settings ->
         val values = SettingsCredentialValues(
-            openaiToken = (credentials.get(ProviderIds.OPENAI) as? Credential.ApiKey)?.value.orEmpty(),
-            groqToken = (credentials.get(ProviderIds.GROQ) as? Credential.ApiKey)?.value.orEmpty(),
+            openaiToken = credentials.getApiKey(ProviderIds.OPENAI)?.value.orEmpty(),
+            groqToken = credentials.getApiKey(ProviderIds.GROQ)?.value.orEmpty(),
         )
         when (val eff = settings.effectiveConfigFor(credentials = values)) {
             is EffectiveConfig.Ready -> eff.config
@@ -571,13 +572,20 @@ class SettingsRepository(
 
     /** Pré-condição: [SettingsSecrets.SUSPEND_LOCK] está adquirido. Falha propaga para não apagar a origem. */
     private suspend fun migrateLegacySecretsLocked() {
-        val current = dataStore.data.first()
-        SettingsSecrets.moveLegacyPrefs(legacyPrefs, credentials)
-        val present = SettingsSecrets.legacyPresentIn(current)
-        val movable = SettingsSecrets.moveToVault(current, present, credentials)
-        if (movable.isNotEmpty()) {
-            // A remoção só acontece depois de cada destino confirmar o commit cifrado.
-            dataStore.edit { prefs -> movable.forEach { prefs.remove(it) } }
+        // O Mutex acima evita sobreposição no processo; este arquivo fecha a mesma janela entre o app,
+        // o IME e qualquer serviço que tenha aberto outro processo. O destino é confirmado antes de
+        // tocar em qualquer origem, e a operação continua idempotente se um processo morrer no meio.
+        RandomAccessFile(File(appContext.filesDir, MIGRATION_LOCK_FILE), "rw").use { lockFile ->
+            lockFile.channel.lock().use {
+                val current = dataStore.data.first()
+                SettingsSecrets.moveLegacyPrefs(legacyPrefs, credentials)
+                val present = SettingsSecrets.legacyPresentIn(current)
+                val movable = SettingsSecrets.moveToVault(current, present, credentials)
+                if (movable.isNotEmpty()) {
+                    // A remoção só acontece depois de cada destino confirmar o commit cifrado.
+                    dataStore.edit { prefs -> movable.forEach { prefs.remove(it) } }
+                }
+            }
         }
     }
 
@@ -654,6 +662,7 @@ class SettingsRepository(
     private companion object {
         const val DATASTORE_NAME = "keyflow_settings"
         const val SECURE_PREFS_NAME = "keyflow_secure"
+        const val MIGRATION_LOCK_FILE = "keyflow_credentials_migration.lock"
         const val TAG = "SettingsRepository"
         val DATASTORES = mutableMapOf<String, DataStore<Preferences>>()
 

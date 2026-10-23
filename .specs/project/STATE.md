@@ -2527,5 +2527,12 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
 - No servidor falta ImageMagick; por isso `scripts/diff-screens.sh` não roda como no CI sem instalar/fixar o comparador. A validação local precisou de um fallback temporário em `/tmp`.
 - 2026-10-23 — O `diff-screens.sh` só deve ser considerado validado com `compare`/`identify` reais; nesta rodada o host continuou sem ImageMagick, então rodei o script em um container descartável e deixei os goldens divergentes para revisão da T14 (14/216 capturas, incluindo `config-menu-aberto`).
 
+## V1-2 — rodada 3 (2026-10-23)
+- A migração de segredos tem ordem fixa: cofre existente > chaves de Provedores/Raciocínio > Transcrição > Visão > Fala. Uma chave legada que perde uma colisão é descartada; há uma chave de API compartilhada por provedor.
+- API key e OAuth ficam em slots distintos do mesmo provedor; `providerXAuthMode` continua sendo a escolha ativa. Consumidores que precisam de um tipo usam `getApiKey`/`getOAuth`, e o filtro do agente coleta ambos.
+- A migração do DataStore e do `keyflow_secure` é idempotente e protegida por lock de arquivo, além do Mutex do processo; o destino cifrado confirma antes de a origem sair. A migração assíncrona do `App` foi removida para não criar uma corrida de inicialização entre processos.
+- Cabeçalho de autenticação, senha e chave SSH são segredos e continuam no cofre; nome do cabeçalho, host, usuário e porta SSH são configuração não secreta e permanecem no DataStore.
+- Erros HTTP de Anthropic usam `HttpErrorMessage`; o corpo completo e detalhes de SSE não chegam à mensagem do release.
+
 ## Monetização — V1-10a, Fase A (2026-10-23)
 - A API ainda sem staging e o Play Console sem o app tornam MockWebServer/fakes obrigatórios na fundação; Play Integrity `1.6.0` e Billing `9.1.0` ficam atrás de portas degradáveis, sem tocar onboarding, IME ou overlay.

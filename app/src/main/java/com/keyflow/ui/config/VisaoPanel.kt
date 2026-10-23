@@ -257,6 +257,7 @@ private fun VisaoOpenAi(
             keyTag = VISAO_OPENAI_KEY_TAG,
             ssoModelTag = VISAO_OPENAI_MODEL_TAG,
             apiKeyModelTag = VISAO_OPENAI_MODEL_TAG,
+            showDisconnect = true,
             ssoOffered = auth.flows.any { it.method == AuthMethod.OAUTH },
         )
     }
@@ -309,6 +310,7 @@ private fun VisaoGoogle(
         keyTag = VISAO_GOOGLE_KEY_TAG,
         ssoModelTag = VISAO_GOOGLE_MODEL_TAG,
         apiKeyModelTag = VISAO_GOOGLE_MODEL_TAG,
+        showDisconnect = true,
         ssoOffered = auth.flows.any { it.method == AuthMethod.OAUTH },
     )
 }
@@ -356,6 +358,7 @@ private fun VisaoAnthropic(
         keyTag = VISAO_ANTHROPIC_KEY_TAG,
         ssoModelTag = VISAO_ANTHROPIC_MODEL_TAG,
         apiKeyModelTag = VISAO_ANTHROPIC_MODEL_TAG,
+        showDisconnect = true,
         ssoOffered = ssoOffered,
     )
 }

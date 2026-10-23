@@ -102,11 +102,11 @@ class AuthController(
     }
 
     /** Só a máscara chega à UI; o valor decifrado fica dentro do auth/ e não entra no estado Compose. */
-    fun apiKey(provider: ProviderId): String? = CredentialMask.of((store.get(provider) as? Credential.ApiKey)?.value)
+    fun apiKey(provider: ProviderId): String? = CredentialMask.of(store.getApiKey(provider)?.value)
 
     /** A leitura do cofre acontece no IO; a UI recebe apenas a máscara e pode observar mudanças. */
     fun apiKeyFlow(provider: ProviderId): Flow<String?> = store.changes(provider)
-        .map { (it as? Credential.ApiKey)?.value?.let(CredentialMask::of) }
+        .map { store.getApiKey(provider)?.value?.let(CredentialMask::of) }
         .distinctUntilChanged()
         .flowOn(kotlinx.coroutines.Dispatchers.IO)
 
@@ -139,7 +139,7 @@ class AuthController(
                 val method = if (credential is Credential.OAuth) AuthMethod.OAUTH else AuthMethod.API_KEY
                 runCatching { entry(provider).flows.firstOrNull { it.method == method }?.revoke(credential) }
             }
-            store.clearOAuth(provider)
+            if (credential is Credential.OAuth) store.clearOAuth(provider) else if (credential is Credential.ApiKey) store.clearApiKey(provider)
             errors.update { it - provider }
         }
     }

@@ -16,6 +16,13 @@ import org.json.JSONObject
  */
 interface CredentialStore {
     fun get(provider: ProviderId): Credential?
+
+    /** A chave de API, mesmo quando um OAuth é a credencial ativa em [get]. */
+    fun getApiKey(provider: ProviderId): Credential.ApiKey? = get(provider) as? Credential.ApiKey
+
+    /** A sessão OAuth, mesmo quando uma chave de API é a credencial ativa em [get]. */
+    fun getOAuth(provider: ProviderId): Credential.OAuth? = get(provider) as? Credential.OAuth
+
     fun put(provider: ProviderId, credential: Credential)
     fun clear(provider: ProviderId)
 
@@ -104,6 +111,12 @@ class SecureCredentialStore(
             ?: prefs.getString(oauthKey(provider), null)?.let(CredentialCodec::decode)
             ?: prefs.getString(apiKeyKey(provider), null)?.let(CredentialCodec::decode)
 
+    override fun getApiKey(provider: ProviderId): Credential.ApiKey? =
+        prefs.getString(apiKeyKey(provider), null)?.let(CredentialCodec::decode) as? Credential.ApiKey
+
+    override fun getOAuth(provider: ProviderId): Credential.OAuth? =
+        prefs.getString(oauthKey(provider), null)?.let(CredentialCodec::decode) as? Credential.OAuth
+
     override fun put(provider: ProviderId, credential: Credential) {
         val editor = prefs.edit()
         when (credential) {
@@ -146,8 +159,8 @@ class SecureCredentialStore(
     }
 
     override fun changes(provider: ProviderId): Flow<Credential?> = callbackFlow {
-        val key = credKey(provider)
-        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, changed -> if (changed == key || changed == null) trySend(get(provider)) }
+        val keys = setOf(credKey(provider), oauthKey(provider), apiKeyKey(provider))
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, changed -> if (changed in keys || changed == null) trySend(get(provider)) }
         prefs.registerOnSharedPreferenceChangeListener(listener)
         trySend(get(provider))
         awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }

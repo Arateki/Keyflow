@@ -53,7 +53,7 @@ internal class OpenAiChatGptFlow(
     @Volatile private var attempt: Attempt? = null
 
     override suspend fun begin(forceConsent: Boolean): AuthStart {
-        val existing = store.get(ProviderIds.OPENAI) as? Credential.OAuth
+        val existing = store.getOAuth(ProviderIds.OPENAI)
         val issued = existing?.clientId
         val reauth = issued != null
         val receiver = receiverFactory()

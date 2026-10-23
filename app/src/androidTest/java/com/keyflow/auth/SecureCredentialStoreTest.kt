@@ -53,6 +53,30 @@ class SecureCredentialStoreTest {
     }
 
     @Test
+    fun anApiKeyAndOAuthCoexistAndClearingOneLeavesTheOther() {
+        val s = store()
+        val full = oauth()
+
+        s.put(provider, full)
+        s.put(provider, Credential.ApiKey("sk-teste"))
+
+        assertEquals(Credential.ApiKey("sk-teste"), s.get(provider))
+        assertEquals(Credential.ApiKey("sk-teste"), s.getApiKey(provider))
+        assertEquals(full, s.getOAuth(provider))
+
+        s.clearApiKey(provider)
+        assertEquals(full, s.get(provider))
+        assertNull(s.getApiKey(provider))
+        assertEquals(full, s.getOAuth(provider))
+
+        s.put(provider, Credential.ApiKey("sk-novo"))
+        s.clearOAuth(provider)
+        assertEquals(Credential.ApiKey("sk-novo"), s.get(provider))
+        assertEquals(Credential.ApiKey("sk-novo"), s.getApiKey(provider))
+        assertNull(s.getOAuth(provider))
+    }
+
+    @Test
     fun clearErasesTheCredentialButNotTheMeta() {
         val s = store()
         s.put(provider, Credential.ApiKey("x"))

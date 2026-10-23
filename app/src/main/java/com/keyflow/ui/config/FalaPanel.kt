@@ -275,6 +275,7 @@ private fun FalaOpenAi(
             keyTag = FALA_OPENAI_KEY_TAG,
             ssoModelTag = FALA_CLOUD_VOICE_TAG,
             apiKeyModelTag = FALA_CLOUD_VOICE_TAG,
+            showDisconnect = true,
             ssoOffered = auth.flows.any { it.method == AuthMethod.OAUTH },
         )
     }
@@ -313,6 +314,7 @@ private fun FalaElevenLabs(
         keyTag = FALA_ELEVENLABS_KEY_TAG,
         ssoModelTag = FALA_ELEVENLABS_MODEL_TAG,
         apiKeyModelTag = FALA_ELEVENLABS_MODEL_TAG,
+        showDisconnect = true,
     )
 }
 
@@ -357,6 +359,7 @@ private fun FalaGoogle(
         keyTag = FALA_GOOGLE_KEY_TAG,
         ssoModelTag = FALA_GOOGLE_VOICE_TAG,
         apiKeyModelTag = FALA_GOOGLE_VOICE_TAG,
+        showDisconnect = true,
         ssoOffered = auth.flows.any { it.method == AuthMethod.OAUTH },
     )
 }

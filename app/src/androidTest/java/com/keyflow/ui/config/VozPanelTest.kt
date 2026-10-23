@@ -127,6 +127,18 @@ class VozPanelTest {
     }
 
     @Test
+    fun explicitDeleteClearsTheMaskedToken() {
+        val auth = FakeApiKeyActions(initial = "sk-token-to-delete")
+        val h = Harness(Settings(source = TranscriptionSource.OPENAI), auth)
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(VOZ_TOKEN_DELETE_TAG).performScrollTo().performClick()
+
+        rule.runOnIdle { assertEquals("", auth.saved) }
+        rule.onAllNodesWithTag(VOZ_TOKEN_DELETE_TAG).assertCountEquals(0)
+    }
+
+    @Test
     fun timeoutDefaultsTo15SecondsSelected() {
         val h = Harness(Settings(source = TranscriptionSource.OPENAI))
         rule.setContent { h.Content() }
