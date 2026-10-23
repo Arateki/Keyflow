@@ -1,5 +1,11 @@
 # Monetization — Tasks
 
+> **Recorte da v1 (2026-10-23)**: entram na v1 a MZ-T1, T2, T3, T4, T9, T10, T11, T13, T14 e T15
+> (compra única de R$15 + AdMob banner e intersticial só no app de configuração; V1-10 no
+> `DEVELOPMENT-ORDER.md`). Ficam para depois: MZ-T5, T6, T7 e T8 (créditos) e MZ-T12 (rewarded
+> "Ganhar minutos"). Na MZ-T9, a v1 cobra o R$15; o botão de recarga não entra. Na T14 e na T15,
+> goldens e e2e da v1 cobrem o unlock, o banner e o intersticial; as rotas de créditos ficam de fora.
+
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (M7–M10)
 **Status**: Aprovada pelo Yan em 2026-07-04 (Bloco 0 do `DEVELOPMENT-ORDER.md`) — nada implementado.
 A API está na `main` desde 2026-09-28 (PR #4: API-T1..T12 + T13 parcial), ainda sem staging (gate
