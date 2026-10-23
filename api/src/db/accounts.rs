@@ -125,4 +125,26 @@ mod tests {
         let by_new = find_by_token_hash(&pool, &new_hash).await.unwrap().unwrap();
         assert_eq!(by_new.id, created.id);
     }
+
+    #[tokio::test]
+    async fn token_hash_is_unique() {
+        let pool = test_pool().await;
+        let token_hash = Uuid::new_v4().into_bytes().to_vec();
+        create(&pool, &format!("test-{}", Uuid::new_v4()), &token_hash)
+            .await
+            .unwrap();
+
+        let err = create(&pool, &format!("test-{}", Uuid::new_v4()), &token_hash)
+            .await
+            .unwrap_err();
+        let db_err = err
+            .as_database_error()
+            .expect("violação de unique é erro do Postgres");
+        assert_eq!(db_err.code().as_deref(), Some("23505"));
+        assert!(
+            db_err.message().contains("accounts_token_hash_idx"),
+            "mensagem foi: {}",
+            db_err.message()
+        );
+    }
 }
