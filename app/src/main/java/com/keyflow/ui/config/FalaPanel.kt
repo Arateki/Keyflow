@@ -237,8 +237,8 @@ private fun FalaOpenAi(
         val chosen = settings.falaCloudVoice.ifEmpty { "alloy" }
         val connection by remember(auth) { auth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
         var refresh by remember { mutableIntStateOf(0) }
-        val apiKey = remember(connection, settings.providerOpenAiApiKey, settings.openaiToken) {
-            auth.apiKey().orEmpty().ifEmpty { settings.providerOpenAiApiKey.ifEmpty { settings.openaiToken } }
+        val apiKey = remember(connection, settings.openaiToken) {
+            auth.apiKey().orEmpty().ifEmpty { settings.openaiToken }
         }
         val effectiveConnection = when {
             connection is ConnectionState.Connected -> connection
@@ -266,7 +266,6 @@ private fun FalaOpenAi(
             apiKey = apiKey,
             onApiKeyChange = {
                 auth.saveApiKey(it)
-                onSettingsChange(settings.copy(providerOpenAiApiKey = it, openaiToken = it))
             },
             getKeyUrl = "https://platform.openai.com/api-keys",
             onOpenGetKeyUrl = { auth.openUrl("https://platform.openai.com/api-keys") },
@@ -326,9 +325,9 @@ private fun FalaGoogle(
     val chosen = settings.falaGoogleVoice.ifEmpty { "pt-BR-Neural2-A" }
     val connection by remember(auth) { auth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
     var refresh by remember { mutableIntStateOf(0) }
-    val apiKey = remember(connection, settings.providerGoogleApiKey, settings.visionGoogleApiKey, settings.falaGoogleApiKey) {
+    val apiKey = remember(connection, settings.visionGoogleApiKey, settings.falaGoogleApiKey) {
         auth.apiKey().orEmpty().ifEmpty {
-            settings.providerGoogleApiKey.ifEmpty { settings.falaGoogleApiKey }.ifEmpty { settings.visionGoogleApiKey }
+            settings.falaGoogleApiKey.ifEmpty { settings.visionGoogleApiKey }
         }
     }
     UnifiedProviderCard(
@@ -351,7 +350,6 @@ private fun FalaGoogle(
         apiKey = apiKey,
         onApiKeyChange = {
             auth.saveApiKey(it)
-            onSettingsChange(settings.copy(providerGoogleApiKey = it, falaGoogleApiKey = it, visionGoogleApiKey = it))
         },
         getKeyUrl = "https://cloud.google.com/text-to-speech",
         onOpenGetKeyUrl = { auth.openUrl("https://cloud.google.com/text-to-speech") },

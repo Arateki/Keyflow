@@ -1,9 +1,11 @@
 package com.keyflow.auth
 
 import android.content.Context
+import com.keyflow.data.SecurePrefs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 
 /**
@@ -29,4 +31,10 @@ class AuthServices(
     val authorization: AuthorizationProvider by lazy { DefaultAuthorizationProvider(registry, store, clock) }
     val browser: BrowserLauncher by lazy { AndroidBrowserLauncher(appContext) }
     val controller: AuthController by lazy { AuthController(registry, store, browser, scope, clock) }
+
+    /** Migra a chave que versões antigas deixaram em `keyflow_secure`, sempre fora da main thread. */
+    suspend fun migrateLegacySettingsApiKeys() = withContext(Dispatchers.IO) {
+        val legacy = SecurePrefs.create(appContext, LegacyApiKeyMigration.LEGACY_PREFS_NAME)
+        LegacyApiKeyMigration.migrate(legacy, store)
+    }
 }

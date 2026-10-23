@@ -30,6 +30,7 @@ internal object SettingsSecrets {
     const val FALA_CUSTOM_HEADER_VALUE = "fala_custom_header_value"
     const val COMPUTER_SSH_PASSWORD = "computer_ssh_password"
     const val COMPUTER_SSH_KEY = "computer_ssh_key"
+    // Legado: versões anteriores guardaram estas três chaves aqui; a V1-2 move-as para `keyflow_auth`.
     const val PROVIDER_ANTHROPIC_API_KEY = "provider_anthropic_api_key"
     const val PROVIDER_OPENAI_API_KEY = "provider_openai_api_key"
     const val PROVIDER_GOOGLE_API_KEY = "provider_google_api_key"
@@ -50,9 +51,6 @@ internal object SettingsSecrets {
         "falaCustomHeaderValue" to FALA_CUSTOM_HEADER_VALUE,
         "computerSshPassword" to COMPUTER_SSH_PASSWORD,
         "computerSshKey" to COMPUTER_SSH_KEY,
-        "providerAnthropicApiKey" to PROVIDER_ANTHROPIC_API_KEY,
-        "providerOpenAiApiKey" to PROVIDER_OPENAI_API_KEY,
-        "providerGoogleApiKey" to PROVIDER_GOOGLE_API_KEY,
         "providerGroqApiKey" to PROVIDER_GROQ_API_KEY,
         "providerGrokApiKey" to PROVIDER_GROK_API_KEY,
     )
@@ -61,8 +59,9 @@ internal object SettingsSecrets {
      * Os segredos que builds de desenvolvimento gravaram em claro no DataStore (a chave do DataStore tinha o mesmo
      * nome da do cofre). Os três primeiros de [BY_PROPERTY] nunca estiveram lá.
      */
-    val LEGACY_IN_DATASTORE: List<Preferences.Key<String>> = BY_PROPERTY.values
-        .filter { it != AUTH_HEADER_VALUE && it != OPENAI_TOKEN && it != GROQ_TOKEN }
+    val LEGACY_IN_DATASTORE: List<Preferences.Key<String>> = (BY_PROPERTY.values
+        .filter { it != AUTH_HEADER_VALUE && it != OPENAI_TOKEN && it != GROQ_TOKEN } +
+        listOf(PROVIDER_ANTHROPIC_API_KEY, PROVIDER_OPENAI_API_KEY, PROVIDER_GOOGLE_API_KEY))
         .map { stringPreferencesKey(it) }
 
     /**

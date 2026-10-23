@@ -71,8 +71,8 @@ internal fun AnthropicPanel(
     val ssoModels = if (remoteModels.isNotEmpty()) remoteModels else ANTHROPIC_SSO_MODELS
     val chosenModel = settings.reasoningAnthropicModel.ifEmpty { "claude-sonnet-4-6" }
 
-    val apiKey = remember(connection, settings.providerAnthropicApiKey, settings.visionAnthropicApiKey) {
-        actions.apiKey().orEmpty().ifEmpty { settings.providerAnthropicApiKey.ifEmpty { settings.visionAnthropicApiKey } }
+    val apiKey = remember(connection, settings.visionAnthropicApiKey) {
+        actions.apiKey().orEmpty().ifEmpty { settings.visionAnthropicApiKey }
     }
 
     UnifiedProviderCard(
@@ -97,7 +97,6 @@ internal fun AnthropicPanel(
         apiKey = apiKey,
         onApiKeyChange = {
             actions.saveApiKey(it)
-            onSettingsChange(settings.copy(providerAnthropicApiKey = it, visionAnthropicApiKey = it))
         },
         getKeyUrl = "https://console.anthropic.com/settings/keys",
         onOpenGetKeyUrl = { actions.openUrl("https://console.anthropic.com/settings/keys") },

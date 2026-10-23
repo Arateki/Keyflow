@@ -83,9 +83,6 @@ class SettingsSecretsStorageTest {
         computerSshPassword = sentinel("computerSshPassword"),
         // Uma chave privada de verdade tem várias linhas: o sentinela está no meio do bloco.
         computerSshKey = "-----BEGIN OPENSSH PRIVATE KEY-----\n${sentinel("computerSshKey")}\n-----END OPENSSH PRIVATE KEY-----",
-        providerAnthropicApiKey = "SENTINELA-ANTHROPIC-123",
-        providerOpenAiApiKey = sentinel("providerOpenAiApiKey"),
-        providerGoogleApiKey = sentinel("providerGoogleApiKey"),
         providerGroqApiKey = sentinel("providerGroqApiKey"),
         providerGrokApiKey = sentinel("providerGrokApiKey"),
     )
@@ -102,7 +99,7 @@ class SettingsSecretsStorageTest {
         val dataStore = dataStoreText()
         // Controle: o arquivo é o certo e a leitura dos bytes funciona — o que NÃO é segredo está lá em claro.
         assertTrue("o arquivo do DataStore deveria ter o host SSH em claro", dataStore.contains("host.claro.test"))
-        assertEquals(17, SettingsSecrets.BY_PROPERTY.size)
+        assertEquals(14, SettingsSecrets.BY_PROPERTY.size)
         for (property in SettingsSecrets.BY_PROPERTY.keys) {
             assertFalse("$property está em claro no DataStore", dataStore.contains(sentinel(property)))
         }
@@ -163,7 +160,7 @@ class SettingsSecretsStorageTest {
         val read = repository.settingsFlow().first()
 
         // A tela continua vendo os valores...
-        legacy.forEach { (name, value) -> assertEquals(value, read.property(propertyOf.getValue(name))) }
+        legacy.filterKeys { it in propertyOf }.forEach { (name, value) -> assertEquals(value, read.property(propertyOf.getValue(name))) }
         // ...que agora estão no cofre...
         legacy.forEach { (name, value) -> assertEquals(value, vault().getString(name, null)) }
         // ...e saíram do arquivo em claro, sem levar junto o que não é segredo.
@@ -204,7 +201,6 @@ class SettingsSecretsStorageTest {
 
         val read = repository.settingsFlow().first()
 
-        assertEquals("SENTINELA-NO-COFRE", read.providerAnthropicApiKey)
         assertEquals("SENTINELA-NO-COFRE", vault().getString(SettingsSecrets.PROVIDER_ANTHROPIC_API_KEY, null))
         assertFalse(dataStoreText().contains("SENTINELA-ANTIGO-provider_anthropic_api_key"))
     }

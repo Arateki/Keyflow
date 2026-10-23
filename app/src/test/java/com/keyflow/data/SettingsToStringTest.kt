@@ -23,7 +23,9 @@ class SettingsToStringTest {
 
     @Test
     fun `Settings toString does not claim a secret that is not set`() {
-        assertThat(Settings().toString()).contains("providerAnthropicApiKey=,")
+        assertThat(Settings().toString()).doesNotContain("providerAnthropicApiKey")
+        assertThat(Settings().toString()).doesNotContain("providerOpenAiApiKey")
+        assertThat(Settings().toString()).doesNotContain("providerGoogleApiKey")
     }
 
     @Test
@@ -53,9 +55,6 @@ class SettingsToStringTest {
         computerSshHost = "host.test",
         computerSshPassword = sentinel("computerSshPassword"),
         computerSshKey = sentinel("computerSshKey"),
-        providerAnthropicApiKey = sentinel("providerAnthropicApiKey"),
-        providerOpenAiApiKey = sentinel("providerOpenAiApiKey"),
-        providerGoogleApiKey = sentinel("providerGoogleApiKey"),
         providerGroqApiKey = sentinel("providerGroqApiKey"),
         providerGrokApiKey = sentinel("providerGrokApiKey"),
     )

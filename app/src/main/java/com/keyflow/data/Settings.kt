@@ -92,14 +92,11 @@ data class Settings(
     val computerSshKey: String = "",
     // Provisionamento e espelhamento dinâmico de modelos via infra própria / API em Rust
     val customModelMirrorUrl: String = "",
-    // Provedores em nuvem (perfis e chaves centralizadas)
-    val providerAnthropicApiKey: String = "",
+    // Provedores em nuvem (perfis; as chaves ficam exclusivamente no `auth/`, ver AUTH-02)
     val providerAnthropicModel: String = "claude-3-5-sonnet-latest",
     val providerAnthropicAuthMode: String = "subscription",
-    val providerOpenAiApiKey: String = "",
     val providerOpenAiModel: String = "gpt-4o",
     val providerOpenAiAuthMode: String = "subscription",
-    val providerGoogleApiKey: String = "",
     val providerGoogleModel: String = "gemini-2.0-flash",
     val providerGoogleAuthMode: String = "subscription",
     val providerElevenLabsAuthMode: String = "subscription",
