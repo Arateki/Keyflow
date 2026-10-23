@@ -386,9 +386,11 @@ tarefa):
       a outra.
     - Rota desligada responde **404** numa camada anterior ao handler: o extractor de conta (que
       consulta o banco) e a verificação SSV não rodam.
-    - Ainda em aberto neste item: aceitar `TRANSCRIPTION_PROVIDERS_JSON` vazio quando a
-      transcrição está desligada, e não instanciar `AdmobKeysCache` com a SSV desligada. O
-      processo continua exigindo a lista de provedores para subir.
+    - Com a transcrição desligada, `TRANSCRIPTION_PROVIDERS_JSON` e a env da chave do provedor
+      não são exigidas no boot. Ligada, as duas voltam a ser obrigatórias. A SSV desligada
+      também não exige variável própria (`ADS_REWARD_SECONDS` e `ADS_DAILY_CAP` já têm padrão;
+      a URL das chaves do AdMob não é env). `AdmobKeysCache` ainda é criado no `AppState`, mas
+      não lê env nem busca a rede no boot.
 11. **Compilação para ARM64 (Graviton) e imagem/deploy leve — `api/Dockerfile` (linhas 3, 11 e 13):**
     - **Nunca compilar Rust dentro da máquina de 0,5 GB ou 1 GB da AWS** (`rustc` + `sqlx` + `aws-lc-rs`
       passam de 1,5 GB de RAM no build). Compilar na máquina de dev/CI:

@@ -155,18 +155,26 @@ impl Config {
             DEFAULT_VOIDED_PURCHASES_JOB_INTERVAL_SECS,
         )?;
 
-        let providers_json = vars
-            .get("TRANSCRIPTION_PROVIDERS_JSON")
-            .cloned()
-            .ok_or(ConfigError::MissingEnv("TRANSCRIPTION_PROVIDERS_JSON"))?;
-        let providers =
-            crate::providers::parse_and_resolve(&providers_json, vars).map_err(|reason| {
+        let transcribe_enabled = parse_flag(vars, "TRANSCRIBE_ENABLED");
+        let ssv_enabled = parse_flag(vars, "SSV_ADMOB_ENABLED");
+        // Com a rota desligada o boot não exige a lista nem a env da chave (`authValueEnv`).
+        // A SSV também não: `ADS_*` já tem padrão e a URL das chaves do AdMob não é env.
+        let providers = if transcribe_enabled {
+            let providers_json = vars
+                .get("TRANSCRIPTION_PROVIDERS_JSON")
+                .map(String::as_str)
+                .filter(|value| !value.is_empty())
+                .ok_or(ConfigError::MissingEnv("TRANSCRIPTION_PROVIDERS_JSON"))?;
+            crate::providers::parse_and_resolve(providers_json, vars).map_err(|reason| {
                 ConfigError::InvalidEnv {
                     var: "TRANSCRIPTION_PROVIDERS_JSON",
-                    value: providers_json.clone(),
+                    value: providers_json.to_string(),
                     reason,
                 }
-            })?;
+            })?
+        } else {
+            Vec::new()
+        };
 
         let transcription_timeout_ms = parse_nonzero_u32(
             vars,
@@ -224,9 +232,6 @@ impl Config {
             "TOKIO_MAX_BLOCKING_THREADS",
             DEFAULT_TOKIO_MAX_BLOCKING_THREADS,
         )?;
-        let transcribe_enabled = parse_flag(vars, "TRANSCRIBE_ENABLED");
-        let ssv_enabled = parse_flag(vars, "SSV_ADMOB_ENABLED");
-
         let play_integrity_base_url = parse_nonempty_string(
             vars,
             "PLAY_INTEGRITY_BASE_URL",
@@ -431,7 +436,11 @@ mod tests {
 
     #[test]
     fn valid_env_produces_config() {
-        let config = Config::from_map(&with_required(&[("BIND_ADDR", "127.0.0.1:9090")])).unwrap();
+        let config = Config::from_map(&with_required(&[
+            ("BIND_ADDR", "127.0.0.1:9090"),
+            ("TRANSCRIBE_ENABLED", "true"),
+        ]))
+        .unwrap();
 
         assert_eq!(
             config.database_url,
@@ -609,6 +618,7 @@ mod tests {
                 "/secrets/google-sa.json",
             ),
             ("PACKAGE_NAME", "com.keyflow"),
+            ("TRANSCRIBE_ENABLED", "true"),
         ]))
         .unwrap_err();
 
@@ -620,7 +630,7 @@ mod tests {
 
     #[test]
     fn invalid_providers_json_fails_with_specific_message() {
-        let mut map = with_required(&[]);
+        let mut map = with_required(&[("TRANSCRIBE_ENABLED", "true")]);
         map.insert(
             "TRANSCRIPTION_PROVIDERS_JSON".to_string(),
             "not json".to_string(),
@@ -771,5 +781,58 @@ mod tests {
         .unwrap();
         assert!(!only_ssv.transcribe_enabled);
         assert!(only_ssv.ssv_enabled);
+    }
+
+    #[test]
+    fn disabled_routes_do_not_require_transcribe_or_ssv_secrets() {
+        let base = vars(&[
+            (
+                "DATABASE_URL",
+                "postgres://keyflow:keyflow@localhost/keyflow_api",
+            ),
+            (
+                "GOOGLE_SERVICE_ACCOUNT_JSON_PATH",
+                "/secrets/google-sa.json",
+            ),
+            ("PACKAGE_NAME", "com.keyflow"),
+        ]);
+
+        let config = Config::from_map(&base).unwrap();
+        assert!(!config.transcribe_enabled);
+        assert!(!config.ssv_enabled);
+        assert!(config.providers.is_empty());
+
+        // JSON presente sem a chave do provedor: desligado, a chave não é exigida.
+        let mut with_json = base.clone();
+        with_json.insert(
+            "TRANSCRIPTION_PROVIDERS_JSON".to_string(),
+            r#"[{"name":"primary","url":"https://p1.example/transcribe","authHeaderName":"Authorization","authValueEnv":"TEST_PROVIDER_KEY","model":"whisper-1"}]"#
+                .to_string(),
+        );
+        let config = Config::from_map(&with_json).unwrap();
+        assert!(config.providers.is_empty());
+
+        let mut transcribe_on = base.clone();
+        transcribe_on.insert("TRANSCRIBE_ENABLED".to_string(), "true".to_string());
+        let err = Config::from_map(&transcribe_on).unwrap_err();
+        assert!(err.to_string().contains("TRANSCRIPTION_PROVIDERS_JSON"));
+
+        transcribe_on.insert(
+            "TRANSCRIPTION_PROVIDERS_JSON".to_string(),
+            r#"[{"name":"primary","url":"https://p1.example/transcribe","authHeaderName":"Authorization","authValueEnv":"TEST_PROVIDER_KEY","model":"whisper-1"}]"#
+                .to_string(),
+        );
+        let err = Config::from_map(&transcribe_on).unwrap_err();
+        assert!(err.to_string().contains("TEST_PROVIDER_KEY"));
+
+        // SSV ligada não pede provedor, chave, nem variável que só ela usaria.
+        let mut ssv_on = base;
+        ssv_on.insert("SSV_ADMOB_ENABLED".to_string(), "1".to_string());
+        let config = Config::from_map(&ssv_on).unwrap();
+        assert!(config.ssv_enabled);
+        assert!(!config.transcribe_enabled);
+        assert!(config.providers.is_empty());
+        assert_eq!(config.ads_reward_seconds.get(), DEFAULT_ADS_REWARD_SECONDS);
+        assert_eq!(config.ads_daily_cap.get(), DEFAULT_ADS_DAILY_CAP);
     }
 }

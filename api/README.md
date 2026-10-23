@@ -45,12 +45,15 @@ Módulo disjunto do app Android (`app/`): o Gradle não enxerga esta pasta e vic
     `VAR=""` conta como ausente) — uma flag por rota. Na v1 as duas nascem desligadas:
     `POST /v1/transcribe` e `GET /v1/ssv/admob` respondem `404` sem consultar o banco. Ligar uma
     não liga a outra.
-  - `TRANSCRIPTION_PROVIDERS_JSON` (obrigatória) — lista ordenada de provedores Whisper-compatible
+  - `TRANSCRIPTION_PROVIDERS_JSON` — lista ordenada de provedores Whisper-compatible
     (design §Proxy): `[{"name","url","authHeaderName","authValueEnv","model"}]`. `authValueEnv`
     é o **nome de outra env var** que guarda o segredo de verdade (nunca inline no JSON — OPS-03).
-    Exemplo: `[{"name":"openai","url":"https://api.openai.com/v1/audio/transcriptions",
+    Obrigatória só com `TRANSCRIBE_ENABLED` ligado; nesse caso a env da chave também é. Com a
+    rota desligada as duas são ignoradas (JSON vazio, ausente ou sem chave não impede o boot).
+    Exemplo, quando a rota está ligada: `[{"name":"openai","url":"https://api.openai.com/v1/audio/transcriptions",
     "authHeaderName":"Authorization","authValueEnv":"OPENAI_KEY","model":"whisper-1"}]` com
-    `OPENAI_KEY=Bearer sk-...` setada à parte.
+    `OPENAI_KEY=Bearer sk-...` setada à parte. A SSV não acrescenta variável obrigatória:
+    `ADS_REWARD_SECONDS` e `ADS_DAILY_CAP` têm padrão, e a URL das chaves do AdMob não é env.
   - `TRANSCRIPTION_TIMEOUT_MS` (opcional, default `30000`), `TRANSCRIPTION_MAX_BYTES` (opcional,
     default `26214400` = 25 MiB), `PROVIDER_UNHEALTHY_COOLDOWN_SECS` (opcional, default `60`).
   - `ADS_REWARD_SECONDS` (opcional, default `60`) — segundos creditados por rewarded ad
@@ -115,8 +118,6 @@ execução só loga e tenta de novo na próxima janela (não é caminho crítico
 DATABASE_URL=postgres://keyflow:keyflow@localhost/keyflow_api \
 GOOGLE_SERVICE_ACCOUNT_JSON_PATH=/path/to/service-account.json \
 PACKAGE_NAME=com.keyflow \
-TRANSCRIPTION_PROVIDERS_JSON='[{"name":"openai","url":"https://api.openai.com/v1/audio/transcriptions","authHeaderName":"Authorization","authValueEnv":"OPENAI_KEY","model":"whisper-1"}]' \
-OPENAI_KEY="Bearer sk-..." \
 cargo run
 ```
 
