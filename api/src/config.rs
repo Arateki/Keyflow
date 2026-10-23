@@ -110,7 +110,8 @@ impl Config {
             .cloned()
             .ok_or(ConfigError::MissingEnv("DATABASE_URL"))?;
 
-        let bind_addr = match vars.get("BIND_ADDR") {
+        // `BIND_ADDR=""` conta como ausente, igual às outras opcionais.
+        let bind_addr = match vars.get("BIND_ADDR").filter(|value| !value.is_empty()) {
             Some(value) => value
                 .parse::<SocketAddr>()
                 .map_err(|e| ConfigError::InvalidEnv {
@@ -526,6 +527,13 @@ mod tests {
     #[test]
     fn missing_bind_addr_falls_back_to_default() {
         let config = Config::from_map(&with_required(&[])).unwrap();
+
+        assert_eq!(config.bind_addr, DEFAULT_BIND_ADDR.parse().unwrap());
+    }
+
+    #[test]
+    fn empty_bind_addr_counts_as_absent() {
+        let config = Config::from_map(&with_required(&[("BIND_ADDR", "")])).unwrap();
 
         assert_eq!(config.bind_addr, DEFAULT_BIND_ADDR.parse().unwrap());
     }

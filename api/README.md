@@ -14,7 +14,8 @@ Módulo disjunto do app Android (`app/`): o Gradle não enxerga esta pasta e vic
 - Variáveis de ambiente (ver `src/config.rs`):
   - `DATABASE_URL` (obrigatória) — string de conexão Postgres. Ausente → erro claro no boot
     (`missing required environment variable: DATABASE_URL`), sem stack trace genérico.
-  - `BIND_ADDR` (opcional, default `0.0.0.0:8080`) — endereço:porta do axum.
+  - `BIND_ADDR` (opcional, default `0.0.0.0:8080`; `VAR=""` conta como ausente) — endereço:porta
+    do axum.
   - `RUST_LOG` (opcional, default `info,tower_http=debug`) — diretivas do `tracing_subscriber`;
     o default já deixa a latência por rota (`tower_http::trace`) visível sem precisar setar nada.
   - `GOOGLE_SERVICE_ACCOUNT_JSON_PATH` (obrigatória) — caminho do JSON da service account do
