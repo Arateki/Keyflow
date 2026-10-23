@@ -115,10 +115,10 @@ class DirectApiKeyActions(
         else store.put(provider, Credential.ApiKey(sanitized))
     }
 
-    override fun apiKey(): String? = CredentialMask.of((store.get(provider) as? Credential.ApiKey)?.value)
+    override fun apiKey(): String? = CredentialMask.of(store.getApiKey(provider)?.value)
 
     override fun apiKeyFlow(): Flow<String?> = store.changes(provider)
-        .map { (it as? Credential.ApiKey)?.value?.let(CredentialMask::of) }
+        .map { store.getApiKey(provider)?.value?.let(CredentialMask::of) }
         .flowOn(Dispatchers.IO)
 
     override fun consumeNotice(key: String): Boolean = false

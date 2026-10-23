@@ -150,10 +150,10 @@ class SettingsSecretsStorageTest {
         else -> null
     }
 
-    /** Várias chaves antigas representam o mesmo provedor; a primeira delas vence no cofre. */
+    /** Várias chaves antigas representam o mesmo provedor; a precedência da migração é explícita. */
     private fun assertMigratedValues(legacy: Map<String, String>) {
-        legacy.entries
-            .mapNotNull { (name, value) -> migratedProvider(name)?.let { it to value } }
+        SettingsSecrets.LEGACY_MIGRATION_ORDER
+            .mapNotNull { name -> legacy[name]?.let { value -> migratedProvider(name)?.let { it to value } } }
             .distinctBy { it.first }
             .forEach { (provider, value) ->
                 assertEquals(value, (vault().get(provider) as Credential.ApiKey).value)
@@ -293,6 +293,45 @@ class SettingsSecretsStorageTest {
     }
 
     @Test
+    fun anOAuthAlreadyInTheVaultWinsOverEveryLegacyApiKeyForThatProvider() = runTest {
+        val repository = newRepository()
+        seedLegacyDataStore(repository)
+        val existing = Credential.OAuth(
+            accessToken = "oauth-access",
+            refreshToken = "oauth-refresh",
+            expiresAtMs = Long.MAX_VALUE,
+            earliestRefreshAtMs = null,
+            scopes = emptySet(),
+            idToken = "oauth-id",
+            clientId = "oauth-client",
+            subject = "oauth-subject",
+            account = "oauth@example.test",
+        )
+        vault().put(ProviderIds.GOOGLE, existing)
+
+        repository.settingsFlow().first()
+
+        assertEquals(existing, vault().getOAuth(ProviderIds.GOOGLE))
+        assertFalse(dataStoreText().contains("SENTINELA-ANTIGO-provider_google_api_key"))
+        assertFalse(dataStoreText().contains("SENTINELA-ANTIGO-vision_google_api_key"))
+        assertFalse(dataStoreText().contains("SENTINELA-ANTIGO-fala_google_api_key"))
+    }
+
+    @Test
+    fun everyLegacyProviderCollisionUsesProviderThenTranscriptionThenVisionThenFala() = runTest {
+        val repository = newRepository()
+        val legacy = seedLegacyDataStore(repository)
+
+        repository.settingsFlow().first()
+
+        assertMigratedValues(legacy)
+        assertEquals("SENTINELA-ANTIGO-provider_openai_api_key", vault().getApiKey(ProviderIds.OPENAI)?.value)
+        assertEquals("SENTINELA-ANTIGO-provider_groq_api_key", vault().getApiKey(ProviderIds.GROQ)?.value)
+        assertEquals("SENTINELA-ANTIGO-provider_google_api_key", vault().getApiKey(ProviderIds.GOOGLE)?.value)
+        assertEquals("SENTINELA-ANTIGO-provider_anthropic_api_key", vault().getApiKey(ProviderIds.ANTHROPIC)?.value)
+    }
+
+    @Test
     fun savingBeforeAnyReadAlsoPurgesTheOldClearTextCopies() = runTest {
         val repository = newRepository()
         seedLegacyDataStore(repository)
@@ -324,9 +363,10 @@ class SettingsSecretsStorageTest {
             assertFalse("${key.name} ainda está no DataStore", dataStoreText().contains(key.name))
         }
         assertEquals(
-            "SENTINELA-ANTIGO-openai_token",
-            (vault().get(ProviderIds.OPENAI) as Credential.ApiKey).value,
+            "SENTINELA-ANTIGO-provider_openai_api_key",
+            vault().getApiKey(ProviderIds.OPENAI)?.value,
         )
+        assertMigratedValues(SettingsSecrets.LEGACY_IN_DATASTORE.associate { it.name to "SENTINELA-ANTIGO-${it.name}" })
     }
 
     @Test
@@ -338,9 +378,9 @@ class SettingsSecretsStorageTest {
         repository.settingsFlow().first()
 
         // A primeira escrita chegou ao destino, mas a segunda falhou: nada da origem pode ter sido apagado.
-        assertEquals(legacy.getValue(SettingsSecrets.AUTH_HEADER_VALUE), target.getSecret(SettingsCredentialKeys.CUSTOM_HEADER))
+        assertEquals(legacy.getValue(SettingsSecrets.PROVIDER_ANTHROPIC_API_KEY), target.get(ProviderIds.ANTHROPIC)?.let { (it as Credential.ApiKey).value })
+        assertTrue(dataStoreText().contains(legacy.getValue(SettingsSecrets.PROVIDER_OPENAI_API_KEY)))
         assertTrue(dataStoreText().contains(legacy.getValue(SettingsSecrets.OPENAI_TOKEN)))
-        assertTrue(dataStoreText().contains(legacy.getValue(SettingsSecrets.GROQ_TOKEN)))
 
         target.writesBeforeFailure = null
         repository.settingsFlow().first()
@@ -349,11 +389,11 @@ class SettingsSecretsStorageTest {
             assertFalse("$name ainda está no DataStore", dataStoreText().contains(name) || dataStoreText().contains(value))
         }
         assertEquals(
-            legacy.getValue(SettingsSecrets.OPENAI_TOKEN),
+            legacy.getValue(SettingsSecrets.PROVIDER_OPENAI_API_KEY),
             (target.get(ProviderIds.OPENAI) as Credential.ApiKey).value,
         )
         assertEquals(
-            legacy.getValue(SettingsSecrets.GROQ_TOKEN),
+            legacy.getValue(SettingsSecrets.PROVIDER_GROQ_API_KEY),
             (target.get(ProviderIds.GROQ) as Credential.ApiKey).value,
         )
     }

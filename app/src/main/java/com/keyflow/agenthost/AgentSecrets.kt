@@ -1,7 +1,6 @@
 package com.keyflow.agenthost
 
 import android.content.SharedPreferences
-import com.keyflow.auth.Credential
 import com.keyflow.auth.CredentialStore
 import com.keyflow.auth.ProviderId
 import com.keyflow.auth.ProviderIds
@@ -60,14 +59,14 @@ internal class AgentSecretSource(
         val out = LinkedHashSet<String>()
         for (value in vault.all.values) if (value is String && value.isNotEmpty()) out += value
         for (provider in providers) {
-            when (val credential = credentials.get(provider)) {
-                null -> Unit
-                is Credential.ApiKey -> out += credential.value
-                is Credential.OAuth -> {
-                    out += credential.accessToken
-                    credential.refreshToken?.let { out += it }
-                    credential.idToken?.let { out += it }
-                }
+            // A leitura principal também é uma prova de que o cofre está legível; não deixe uma
+            // implementação de store que falha cair silenciosamente nos acessos tipados.
+            credentials.get(provider)
+            credentials.getApiKey(provider)?.let { out += it.value }
+            credentials.getOAuth(provider)?.let { credential ->
+                out += credential.accessToken
+                credential.refreshToken?.let { out += it }
+                credential.idToken?.let { out += it }
             }
         }
         out.remove("")

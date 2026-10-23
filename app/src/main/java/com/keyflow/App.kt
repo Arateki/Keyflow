@@ -9,7 +9,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class App : Application() {
@@ -23,11 +22,6 @@ class App : Application() {
         super.onCreate()
         // Disco/rede na thread principal e recursos não fechados, só no debug — ver StrictModeGuard.
         if (BuildConfig.DEBUG) StrictModeGuard.install()
-        // A primeira leitura também recolhe as chaves que uma versão antiga deixou em claro no DataStore
-        // e, logo depois, move as cópias do cofre das Settings para o único cofre de auth — tudo em IO.
-        scope.launch(Dispatchers.IO) {
-            SettingsRepository(this@App).settingsFlow().first()
-        }
         // Idioma da interface para o processo inteiro (app, orbe, notificação, teclado): um lugar só.
         scope.launch {
             SettingsRepository(this@App).appLanguageFlow().distinctUntilChanged().collect { code ->

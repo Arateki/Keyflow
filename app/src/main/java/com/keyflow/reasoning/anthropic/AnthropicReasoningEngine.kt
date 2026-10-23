@@ -4,6 +4,7 @@ import com.keyflow.BuildConfig
 import com.keyflow.auth.AuthErrorKind
 import com.keyflow.auth.AuthException
 import com.keyflow.auth.AuthorizationProvider
+import com.keyflow.auth.HttpErrorMessage
 import com.keyflow.auth.ProviderIds
 import com.keyflow.auth.providers.anthropic.AnthropicAuthConfig
 import com.keyflow.data.models.Ipv4FirstDns
@@ -209,7 +210,7 @@ class AnthropicReasoningEngine(
                 val err = json.optJSONObject("error")
                 val msg = err?.optString("message").orEmpty()
                 if (BuildConfig.DEBUG) android.util.Log.e("AnthropicReasoning", "SSE error: $msg | data: $data")
-                send(ReasoningEvent.Error(ReasoningError.ENGINE, "Anthropic error: $msg"))
+                send(ReasoningEvent.Error(ReasoningError.ENGINE, "erro no fluxo SSE da Anthropic"))
                 return true
             }
         }
@@ -219,13 +220,7 @@ class AnthropicReasoningEngine(
     private class HttpFailure(val event: ReasoningEvent.Error, val retry: Boolean)
 
     private fun httpFailure(status: Int, body: String): HttpFailure {
-        val json = runCatching { JSONObject(body) }.getOrNull()
-        val errorObj = json?.optJSONObject("error")
-        val message = errorObj?.optString("message").orEmpty()
-        val note = buildString {
-            append("Anthropic HTTP $status")
-            if (message.isNotEmpty()) append(": $message")
-        }
+        val note = HttpErrorMessage.of("Anthropic", status, body)
 
         val kind = when {
             status == 401 || status == 403 -> ReasoningError.UNAUTHORIZED

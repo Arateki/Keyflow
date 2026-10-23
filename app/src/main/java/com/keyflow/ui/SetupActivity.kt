@@ -51,7 +51,6 @@ import com.keyflow.reasoning.local.LocalLlmSupport
 import com.keyflow.reasoning.local.LocalReasoningEngine
 import com.keyflow.auth.AuthController
 import com.keyflow.App
-import com.keyflow.auth.Credential
 import com.keyflow.auth.ProviderIds
 import com.keyflow.ui.config.AccountModel
 import com.keyflow.ui.config.AuthActions
@@ -175,9 +174,9 @@ class SetupActivity : ComponentActivity() {
         ReasoningEngines(
             isModelInstalled = { ModelStore.get(this).isInstalled(it) },
             // Um login sem tokens (o "esqueleto" da renovação que falhou) não é credencial: pede entrar de novo.
-            hasOpenAiCredential = { auth.store.get(ProviderIds.OPENAI)?.let { it !is Credential.OAuth || !it.isSkeleton } == true },
-            hasAnthropicCredential = { auth.store.get(ProviderIds.ANTHROPIC)?.let { it !is Credential.OAuth || !it.isSkeleton } == true },
-            hasGoogleCredential = { auth.store.get(ProviderIds.GOOGLE)?.let { it !is Credential.OAuth || !it.isSkeleton } == true },
+            hasOpenAiCredential = { auth.store.getApiKey(ProviderIds.OPENAI) != null || auth.store.getOAuth(ProviderIds.OPENAI)?.isSkeleton == false },
+            hasAnthropicCredential = { auth.store.getApiKey(ProviderIds.ANTHROPIC) != null || auth.store.getOAuth(ProviderIds.ANTHROPIC)?.isSkeleton == false },
+            hasGoogleCredential = { auth.store.getApiKey(ProviderIds.GOOGLE) != null || auth.store.getOAuth(ProviderIds.GOOGLE)?.isSkeleton == false },
             local = { LocalReasoningEngine.create(this, it) },
             openAi = { OpenAiReasoningEngine(auth.authorization, auth.http, it) },
             anthropic = { AnthropicReasoningEngine(auth.authorization, auth.http, it) },
@@ -190,7 +189,7 @@ class SetupActivity : ComponentActivity() {
         AgentHost.of(this).runtime(
             AgentBackends(
                 hasTools = { AgentHost.of(this).registry.all().isNotEmpty() },
-                anthropicApiKeyConnected = { auth.store.get(ProviderIds.ANTHROPIC) is Credential.ApiKey },
+                anthropicApiKeyConnected = { auth.store.getApiKey(ProviderIds.ANTHROPIC) != null },
                 anthropicCredentialChanges = auth.store.changes(ProviderIds.ANTHROPIC).map { },
                 agentEngine = { model -> AnthropicAgentEngine(auth.authorization, auth.http, model) },
                 resolveText = reasoningEngines::resolve,

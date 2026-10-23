@@ -44,6 +44,7 @@ fun maxRecordingTag(sec: Int): String = "voz-max-recording-$sec"
 
 const val VOZ_CREDITS_CARD_TAG = "voz-credits-card"
 const val VOZ_TOKEN_TAG = "voz-token"
+const val VOZ_TOKEN_DELETE_TAG = "voz-token-desconectar"
 const val VOZ_MODEL_TAG = "voz-model"
 const val VOZ_LANGUAGE_TAG = "voz-language"
 const val VOZ_ENDPOINT_TAG = "voz-endpoint"
@@ -332,6 +333,14 @@ private fun KeyProviderFields(
             }
         }
         AutoSaveField(tr("Token de acesso · %s", provName), token, onToken, VOZ_TOKEN_TAG, keyboardType = KeyboardType.Password, masked = true)
+        if (token.isNotBlank()) {
+            SecondaryButton(
+                text = tr("Desconectar"),
+                tag = VOZ_TOKEN_DELETE_TAG,
+                onClick = { onToken("") },
+                modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+            )
+        }
         Row(Modifier.fillMaxWidth().padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             Dropdown(tr("Modelo"), models, model, onModel, VOZ_MODEL_TAG, Modifier.weight(1f))
             Dropdown(tr("Idioma"), LANGUAGE_OPTIONS, language, onLanguage, VOZ_LANGUAGE_TAG, Modifier.weight(1f), display = ::languageLabel)

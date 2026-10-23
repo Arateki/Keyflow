@@ -41,7 +41,7 @@ class DefaultAuthorizationProvider(
     private val locks = ConcurrentHashMap<ProviderId, Mutex>()
 
     override fun invalidate(provider: ProviderId) {
-        val current = store.get(provider) as? Credential.OAuth ?: return
+        val current = store.getOAuth(provider) ?: return
         if (!current.isSkeleton) store.put(provider, skeletonOf(current))
     }
 

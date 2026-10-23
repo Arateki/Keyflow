@@ -48,12 +48,41 @@ internal object SettingsSecrets {
         PROVIDER_GROK_API_KEY,
     ).map(::stringPreferencesKey)
 
+    /**
+     * Ordem da migração, independente da ordem de [SharedPreferences.all]. Para um mesmo provedor,
+     * o valor já no cofre vence; depois vêm Provedores/Raciocínio, Transcrição, Visão e Fala.
+     * Os valores legados que perderem uma colisão são descartados junto com a origem.
+     */
+    val LEGACY_MIGRATION_ORDER: List<String> = listOf(
+        PROVIDER_ANTHROPIC_API_KEY,
+        PROVIDER_OPENAI_API_KEY,
+        PROVIDER_GOOGLE_API_KEY,
+        PROVIDER_GROQ_API_KEY,
+        PROVIDER_GROK_API_KEY,
+        OPENAI_TOKEN,
+        GROQ_TOKEN,
+        VISION_GOOGLE_API_KEY,
+        VISION_ANTHROPIC_API_KEY,
+        FALA_ELEVENLABS_API_KEY,
+        FALA_GOOGLE_API_KEY,
+        AUTH_HEADER_VALUE,
+        REASONING_CUSTOM_HEADER_VALUE,
+        VISION_CUSTOM_HEADER_VALUE,
+        FALA_CUSTOM_HEADER_VALUE,
+        COMPUTER_SSH_PASSWORD,
+        COMPUTER_SSH_KEY,
+    )
+
+    private val LEGACY_ORDER_INDEX = LEGACY_MIGRATION_ORDER.withIndex().associate { it.value to it.index }
+
     /** saveSettings e as migrações usam o mesmo lock: gravar o destino vem antes de remover a origem. */
     val LOCK = Any()
     val SUSPEND_LOCK = Mutex()
 
     fun legacyPresentIn(datastore: Preferences): List<Preferences.Key<String>> =
-        LEGACY_IN_DATASTORE.filter { it in datastore }
+        LEGACY_IN_DATASTORE
+            .filter { it in datastore }
+            .sortedBy { LEGACY_ORDER_INDEX[it.name] ?: Int.MAX_VALUE }
 
     /** Move cada segredo para o auth vault e só devolve as chaves que já podem sair do DataStore. */
     fun moveToVault(
@@ -61,14 +90,17 @@ internal object SettingsSecrets {
         present: List<Preferences.Key<String>>,
         target: CredentialStore,
     ): Set<Preferences.Key<String>> = synchronized(LOCK) {
-        present.filter { moveOne(it.name, datastore[it].orEmpty(), target) }.toSet()
+        present
+            .sortedBy { LEGACY_ORDER_INDEX[it.name] ?: Int.MAX_VALUE }
+            .filter { moveOne(it.name, datastore[it].orEmpty(), target) }
+            .toSet()
     }
 
     /** Migra o antigo `keyflow_secure`; cada origem é removida só depois do destino cifrado confirmar. */
     fun moveLegacyPrefs(legacy: SharedPreferences, target: CredentialStore) = synchronized(LOCK) {
         val editor = legacy.edit()
         var changed = false
-        legacy.all.keys.filter { it in LEGACY_NAMES }.forEach { name ->
+        LEGACY_MIGRATION_ORDER.filter { it in legacy.all.keys }.forEach { name ->
             if (moveOne(name, legacy.getString(name, null).orEmpty(), target)) {
                 editor.remove(name)
                 changed = true
@@ -107,15 +139,6 @@ internal object SettingsSecrets {
         COMPUTER_SSH_KEY -> SettingsCredentialKeys.COMPUTER_SSH_KEY
         else -> null
     }
-
-    private val LEGACY_NAMES = setOf(
-        AUTH_HEADER_VALUE, OPENAI_TOKEN, GROQ_TOKEN, REASONING_CUSTOM_HEADER_VALUE,
-        VISION_GOOGLE_API_KEY, VISION_ANTHROPIC_API_KEY, VISION_CUSTOM_HEADER_VALUE,
-        FALA_ELEVENLABS_API_KEY, FALA_GOOGLE_API_KEY, FALA_CUSTOM_HEADER_VALUE,
-        COMPUTER_SSH_PASSWORD, COMPUTER_SSH_KEY, PROVIDER_ANTHROPIC_API_KEY,
-        PROVIDER_OPENAI_API_KEY, PROVIDER_GOOGLE_API_KEY, PROVIDER_GROQ_API_KEY,
-        PROVIDER_GROK_API_KEY,
-    )
 
     // Compatibilidade dos testes puros antigos; o código de produção não usa SharedPreferences como destino.
     fun read(vault: SharedPreferences, datastore: Preferences, name: String): String =
