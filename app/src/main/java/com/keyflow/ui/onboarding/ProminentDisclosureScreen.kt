@@ -59,6 +59,11 @@ fun ProminentDisclosureScreen(
             color = palette.muted, fontFamily = SpaceGrotesk, fontSize = 14.sp, lineHeight = 21.sp,
             textAlign = TextAlign.Start, modifier = Modifier.fillMaxWidth().testTag("disclosure-copy"),
         )
+        Text(
+            tr("Aceite esta divulgação para ativar o ditado por voz. Sem aceite, o microfone não inicia."),
+            color = palette.recordSoft, fontFamily = SpaceGrotesk, fontSize = 13.sp, lineHeight = 19.sp,
+            modifier = Modifier.fillMaxWidth().testTag("disclosure-recording-gate-explanation"),
+        )
         if (declined) {
             Text(
                 tr("Sem aceitar, o ditado por voz fica indisponível. Você pode aceitar depois pelo item Microfone nas configurações."),

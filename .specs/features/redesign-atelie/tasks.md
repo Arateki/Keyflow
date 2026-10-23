@@ -342,8 +342,8 @@ gatilho, `overlaySide`, `orbSize`, `onboardingDone` e `effectiveConfigFor(source
 **Tests**: instrumented · **Gate**: full · **Commit**: `feat: integrar redesign Ateliê`  ✅
 
 ### V1-6: Prominent disclosure (PS-3)
-- [x] Divulgação em primeira execução antes do pedido de `RECORD_AUDIO`; aceite versionado; recusa sem permissão, explicação de ditado indisponível e reabertura pelo chip Microfone. Link centralizado com `TODO(V1-5)`.
-- [x] Testes unitários do estado/versão, instrumentados de tela/rota e goldens claro/escuro; ver gates e pendências em `.equipe/relatorios/v1-6-divulgacao.md`.
+- [x] Divulgação em primeira execução antes do pedido de `RECORD_AUDIO`; aceite versionado; recusa sem permissão, explicação de ditado indisponível e reabertura pelo chip Microfone. O aceite da versão atual também bloqueia a captura em teclado/orbe/notificação após atualização. Link centralizado com `TODO(V1-5)`.
+- [x] Testes unitários do estado/versão e do gate, instrumentados de tela/atualização e goldens claro/escuro; ver gates e pendências em `.equipe/relatorios/v1-6-divulgacao.md` e `.equipe/relatorios/v1-correcoes-privacidade.md`.
 
 ---
 

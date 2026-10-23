@@ -315,7 +315,7 @@ headless e capturar prints rotulados para comparar com os mocks e iterar.
 | ONB-01 | P1 Onboarding | Execute | Verified |
 | ONB-02 | P1 Onboarding (checklist) | Execute | Verified |
 | ONB-03 | P1 Onboarding (conceder/pular) | Execute | Verified |
-| ONB-04 | P1 Prominent disclosure antes do microfone, aceite versionado e recusa/reabertura | Execute | Verified |
+| ONB-04 | P1 Prominent disclosure antes de toda captura, aceite versionado e recusa/reabertura | Execute | Verified |
 | VERIFY-01 | P1 Harness (determinismo) | Execute | Verified |
 | VERIFY-02 | P1 Harness (1 PNG/rota) | Execute | Verified |
 | VERIFY-03 | P1 Harness (UiAutomator sistema) | Execute | Verified |

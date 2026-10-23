@@ -2566,3 +2566,8 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
 
 ## Play — V1-6 Prominent disclosure (2026-10-23)
 - A divulgação deve preceder todo caminho de solicitação do microfone; guarde a versão aceita, e trate recusa como estado diferente de aceite. No servidor falta ImageMagick, então `scripts/diff-screens.sh` não roda como no CI: executar o comparador em container descartável.
+
+## Privacidade — correções de comportamento (2026-10-23)
+- Arquivos de gravação ficam em `cacheDir/keyflow-recordings`: apague após resultado terminal, mas preserve durante a janela de desfazer de cancelamento; na abertura, remova só arquivos com mais de 24 h. O cache pode conter áudio enquanto o app está em uso.
+- A verificação do aceite versionado deve ficar no ponto comum anterior a iniciar o recorder, e a tela da divulgação precisa reabrir mesmo quando `onboardingDone=true`; teste atualizações com microfone já concedido.
+- A entrada UMP depende de `privacyOptionsRequirementStatus == REQUIRED`; a API `showPrivacyOptionsForm` deve ser chamada como resposta ao toque do usuário.

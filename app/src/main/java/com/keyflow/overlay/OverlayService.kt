@@ -42,6 +42,8 @@ import com.keyflow.transcription.partial.PartialUi
 import com.keyflow.transcription.partial.PartialUiMode
 import androidx.compose.ui.graphics.toArgb
 import com.keyflow.ui.common.ComposeWindowHost
+import com.keyflow.ui.SetupActivity
+import com.keyflow.ui.onboarding.DisclosureConsent
 import com.keyflow.ui.theme.paletteFor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -373,6 +375,12 @@ class OverlayService : Service() {
             microphoneGranted = {
                 ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
                     PackageManager.PERMISSION_GRANTED
+            },
+            recordingConsentAccepted = {
+                DisclosureConsent(cachedSettings.disclosureAcceptedVersion).isAcceptedForCurrentVersion()
+            },
+            onDisclosureRequired = {
+                startActivity(SetupActivity.openDisclosureIntent(this))
             },
         )
     }

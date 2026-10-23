@@ -80,6 +80,8 @@ class OverlayCoordinator(
     // orbe, teclado, notificação — davam só um toast genérico "falha ao iniciar", sem dizer o motivo nem
     // levar a lugar nenhum).
     private val microphoneGranted: () -> Boolean = { true },
+    private val recordingConsentAccepted: () -> Boolean = { true },
+    private val onDisclosureRequired: () -> Unit = {},
     // Funde os segmentos retidos num arquivo só antes de reenviar (ver stopAndTranscribe()). Injetável
     // porque o real usa MediaExtractor/MediaMuxer (framework Android, não roda em unit test puro).
     private val concatAudioSegments: (List<File>, File) -> File = { segments, dir -> AudioConcatenator.concat(segments, dir) },
@@ -344,7 +346,7 @@ class OverlayCoordinator(
 
         val prev = machine.state
         val next = if (prev == ButtonState.ERROR) machine.onErrorDismissed() else machine.onTap()
-        if (next != prev) handleState(next)
+        moveTo(prev, next)
     }
 
     fun onHold() {
@@ -361,6 +363,11 @@ class OverlayCoordinator(
      * aqui (achado do OverlayCoordinatorStateMachineTest, 2026-10-10).
      */
     private fun moveTo(prev: ButtonState, next: ButtonState) {
+        if (next == ButtonState.RECORDING && !recordingConsentAccepted()) {
+            render(machine.onErrorDismissed())
+            onDisclosureRequired()
+            return
+        }
         if (next != prev) handleState(next)
     }
 
@@ -379,7 +386,9 @@ class OverlayCoordinator(
                 render(machine.onPause())
             }
             GestureIntent.RESUME -> if (machine.state == ButtonState.PAUSED) {
-                if (limitDecisionPending) {
+                if (!recordingConsentAccepted()) {
+                    onDisclosureRequired()
+                } else if (limitDecisionPending) {
                     retriggerLimitBanner()
                 } else if (partial != null && partialRecorderStopped) {
                     // Desfez um cancelamento feito durante o envio da sessão parcial: o recorder já tinha

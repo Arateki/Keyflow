@@ -18,6 +18,7 @@ import com.keyflow.overlay.OverlayService
 import com.keyflow.ui.config.TOGGLE_OVERLAY_MODE_TAG
 import com.keyflow.ui.config.tabTag
 import com.keyflow.ui.config.ConfigTab
+import com.keyflow.ui.onboarding.DISCLOSURE_VERSION
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -41,7 +42,7 @@ class SetupActivityTest {
 
     @get:Rule
     val chain: RuleChain = RuleChain
-        .outerRule(SeedOnboardingRule(done = true))
+        .outerRule(SeedOnboardingRule(done = true, acceptedVersion = DISCLOSURE_VERSION))
         .around(
             GrantPermissionRule.grant(
                 Manifest.permission.RECORD_AUDIO,
@@ -171,7 +172,10 @@ class SetupActivityTest {
  * asserções (Yan, 2026-07-04: falha intermitente em `overlayModeToggleStaysOffWithoutOverlayPermission`
  * quando a suíte roda combinada com outras classes).
  */
-class SeedOnboardingRule(private val done: Boolean) : org.junit.rules.ExternalResource() {
+class SeedOnboardingRule(
+    private val done: Boolean,
+    private val acceptedVersion: Int = 0,
+) : org.junit.rules.ExternalResource() {
     override fun before() {
         val ctx = InstrumentationRegistry.getInstrumentation().targetContext
         OverlayService.stop(ctx)
@@ -181,7 +185,7 @@ class SeedOnboardingRule(private val done: Boolean) : org.junit.rules.ExternalRe
                 repo.settingsFlow().first().copy(
                     onboardingDone = done,
                     overlayModeEnabled = false,
-                    disclosureAcceptedVersion = 0,
+                    disclosureAcceptedVersion = acceptedVersion,
                     disclosureDeclined = false,
                 ),
             )

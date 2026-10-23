@@ -84,6 +84,7 @@ internal val TranslationsEs: Map<String, String> = mapOf(
     "Sem aceitar, o ditado por voz fica indisponível. Você pode aceitar depois pelo item Microfone nas configurações." to "Sin aceptar, el dictado por voz no está disponible. Puedes aceptar más tarde desde el elemento Micrófono en los ajustes.",
     "Política de privacidade" to "Política de privacidad",
     "Privacidade dos anúncios" to "Privacidad de los anuncios",
+    "Aceite esta divulgação para ativar o ditado por voz. Sem aceite, o microfone não inicia." to "Acepta esta divulgación para activar el dictado por voz. Sin aceptarla, el micrófono no se inicia.",
     "Aceitar e continuar" to "Aceptar y continuar",
     "Recusar" to "Rechazar",
     "Continuar sem ditado" to "Continuar sin dictado",

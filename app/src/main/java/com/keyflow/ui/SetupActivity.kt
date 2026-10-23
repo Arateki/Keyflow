@@ -286,6 +286,7 @@ class SetupActivity : ComponentActivity() {
         rotationStep = screenOrientation.id
         applyScreenOrientation(screenOrientation)
         settingsRepository = SettingsRepository(this)
+        showDisclosure = intent.getBooleanExtra(EXTRA_REQUIRE_DISCLOSURE, false)
         handleNavIntent(intent)
 
         activityScope.launch {
@@ -311,7 +312,11 @@ class SetupActivity : ComponentActivity() {
                 if (!settingsLoaded) {
                     // Placeholder neutro enquanto o DataStore carrega — evita o flash do onboarding.
                     Box(Modifier.fillMaxSize().background(LocalKeyFlowPalette.current.bg))
-                } else if (showDisclosure || !DisclosureConsent.fromStoredVersion(settings.disclosureAcceptedVersion).isAcceptedForCurrentVersion() && !settings.onboardingDone) {
+                } else if (
+                    showDisclosure ||
+                    !DisclosureConsent.fromStoredVersion(settings.disclosureAcceptedVersion).isAcceptedForCurrentVersion() &&
+                    (!settings.onboardingDone || !settings.disclosureDeclined)
+                ) {
                     ProminentDisclosureScreen(
                         declined = settings.disclosureDeclined,
                         onAccept = ::acceptDisclosure,
@@ -531,6 +536,7 @@ class SetupActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        if (intent.getBooleanExtra(EXTRA_REQUIRE_DISCLOSURE, false)) showDisclosure = true
         handleNavIntent(intent)
     }
 
@@ -1018,6 +1024,7 @@ class SetupActivity : ComponentActivity() {
 
     companion object {
         private const val EXTRA_NAV = "com.keyflow.nav"
+        private const val EXTRA_REQUIRE_DISCLOSURE = "com.keyflow.require_disclosure"
         private const val NAV_TAB_VOZ = "tab_voz"
         private const val NAV_TAB_OVERLAY_MIC = "tab_overlay_mic"
         private const val NAV_TAB_KEYBOARD_MIC = "tab_keyboard_mic"
@@ -1035,5 +1042,10 @@ class SetupActivity : ComponentActivity() {
                 EXTRA_NAV,
                 if (tab == ConfigTab.TECLADO) NAV_TAB_KEYBOARD_MIC else NAV_TAB_OVERLAY_MIC,
             )
+
+        fun openDisclosureIntent(context: android.content.Context): Intent =
+            Intent(context, SetupActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                .putExtra(EXTRA_REQUIRE_DISCLOSURE, true)
     }
 }

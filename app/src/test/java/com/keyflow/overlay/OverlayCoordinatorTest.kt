@@ -102,6 +102,26 @@ class OverlayCoordinatorTest {
     }
 
     @Test
+    fun `starting without current disclosure acceptance opens disclosure and does not record`() = runTest {
+        val recorder = FakeRecorder(null)
+        var disclosureRequests = 0
+        val coordinator = coordinator(
+            scope = this,
+            recorder = recorder,
+            recordingConsentAccepted = { false },
+            onDisclosureRequired = { disclosureRequests++ },
+        )
+
+        coordinator.onTap()
+        coordinator.onIntent(GestureIntent.START)
+        runCurrent()
+
+        assertThat(recorder.started).isEqualTo(0)
+        assertThat(coordinator.currentState()).isEqualTo(ButtonState.IDLE_READY)
+        assertThat(disclosureRequests).isEqualTo(2)
+    }
+
+    @Test
     fun `successful transcription without target copies to clipboard and returns to idle`() = runTest {
         val audio = temporaryFolder.newFile("audio.m4a").also { it.writeText("audio") }
         val renderedStates = mutableListOf<ButtonState>()
@@ -934,6 +954,8 @@ class OverlayCoordinatorTest {
         configTimeoutMs: Long = Config.DEFAULT_TIMEOUT_MS,
         concatAudioSegments: (List<File>, File) -> File = { segments, _ -> segments.first() },
         microphoneGranted: () -> Boolean = { true },
+        recordingConsentAccepted: () -> Boolean = { true },
+        onDisclosureRequired: () -> Unit = {},
     ) = OverlayCoordinator(
         scope = scope,
         configProvider = { completeConfig(configTimeoutMs) },
@@ -955,6 +977,8 @@ class OverlayCoordinatorTest {
         recordingClockMs = recordingClockMs,
         concatAudioSegments = concatAudioSegments,
         microphoneGranted = microphoneGranted,
+        recordingConsentAccepted = recordingConsentAccepted,
+        onDisclosureRequired = onDisclosureRequired,
     )
 
     private fun completeConfig(timeoutMs: Long = Config.DEFAULT_TIMEOUT_MS): Config = Config(
