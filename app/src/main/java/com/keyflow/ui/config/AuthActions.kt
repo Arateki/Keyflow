@@ -5,9 +5,14 @@ import com.keyflow.auth.AuthFlow
 import com.keyflow.auth.AuthMethod
 import com.keyflow.auth.BrowserLauncher
 import com.keyflow.auth.ConnectionState
+import com.keyflow.auth.Credential
+import com.keyflow.auth.CredentialMask
+import com.keyflow.auth.CredentialStore
 import com.keyflow.auth.ProviderAuth
+import com.keyflow.auth.ProviderId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 
@@ -34,6 +39,9 @@ interface AuthActions {
     /** A chave guardada, só para preencher o campo mascarado; nulo se a conexão não é por chave. */
     fun apiKey(): String?
 
+    /** A máscara observável; a leitura do cofre fica fora da thread da UI. */
+    fun apiKeyFlow(): Flow<String?> = flowOf(apiKey())
+
     /** `true` na 1ª vez que o aviso [key] é pedido, `false` depois (ex.: o modal do 1º login com o plano). */
     fun consumeNotice(key: String): Boolean
     fun openUrl(url: String)
@@ -51,6 +59,7 @@ interface AuthActions {
         override fun disconnect() = Unit
         override fun saveApiKey(key: String) = Unit
         override fun apiKey(): String? = null
+        override fun apiKeyFlow(): Flow<String?> = flowOf(null)
         override fun consumeNotice(key: String): Boolean = false
         override fun openUrl(url: String) = Unit
         override suspend fun listModels(): List<AccountModel> = emptyList()
@@ -73,9 +82,46 @@ class ControllerAuthActions(
     override fun disconnect() = controller.disconnect(provider.id)
     override fun saveApiKey(key: String) = controller.saveApiKey(provider.id, key)
     override fun apiKey(): String? = controller.apiKey(provider.id)
+    override fun apiKeyFlow(): Flow<String?> = controller.apiKeyFlow(provider.id)
     override fun consumeNotice(key: String): Boolean = controller.consumeNotice(provider.id, key)
     override fun openUrl(url: String) {
         runCatching { browser.open(url) } // sem navegador, o toque não faz nada — e não derruba a tela
     }
     override suspend fun listModels(): List<AccountModel> = models()
+}
+
+/** Ação de chave direta para provedores sem login OAuth (por exemplo Groq e ElevenLabs). */
+class DirectApiKeyActions(
+    private val store: CredentialStore,
+    private val provider: ProviderId,
+) : AuthActions {
+    override val flows: List<AuthFlow> = emptyList()
+    override val usageUrl: String? = null
+
+    override fun state(): Flow<ConnectionState> = store.changes(provider)
+        .map { credential ->
+            if (credential is Credential.ApiKey) ConnectionState.Connected(null, AuthMethod.API_KEY)
+            else ConnectionState.Disconnected
+        }
+        .flowOn(Dispatchers.IO)
+
+    override fun connect(method: AuthMethod, forceConsent: Boolean) = Unit
+    override fun cancel() = Unit
+    override fun disconnect() = store.clearApiKey(provider)
+
+    override fun saveApiKey(key: String) {
+        val sanitized = key.filter { it.code in 0x21..0x7E }
+        if (sanitized.isEmpty()) store.clearApiKey(provider)
+        else store.put(provider, Credential.ApiKey(sanitized))
+    }
+
+    override fun apiKey(): String? = CredentialMask.of((store.get(provider) as? Credential.ApiKey)?.value)
+
+    override fun apiKeyFlow(): Flow<String?> = store.changes(provider)
+        .map { (it as? Credential.ApiKey)?.value?.let(CredentialMask::of) }
+        .flowOn(Dispatchers.IO)
+
+    override fun consumeNotice(key: String): Boolean = false
+    override fun openUrl(url: String) = Unit
+    override suspend fun listModels(): List<AccountModel> = emptyList()
 }

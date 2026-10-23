@@ -19,6 +19,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.keyflow.auth.CredentialMask
 import com.keyflow.auth.ApiKeyFlow
 import com.keyflow.auth.AuthFlow
 import com.keyflow.auth.AuthMethod
@@ -81,6 +82,7 @@ class OpenAiPanelTest {
         var noticeFirst: Boolean = true,
     ) : AuthActions {
         val connection = MutableStateFlow(initial)
+        private val maskedKey = MutableStateFlow(CredentialMask.of(storedKey))
         val connects = mutableListOf<Pair<AuthMethod, Boolean>>()
         val savedKeys = mutableListOf<String>()
         val opened = mutableListOf<String>()
@@ -91,13 +93,15 @@ class OpenAiPanelTest {
         override fun state(): Flow<ConnectionState> = connection
         override fun connect(method: AuthMethod, forceConsent: Boolean) { connects += method to forceConsent }
         override fun cancel() { cancels++ }
-        override fun disconnect() { disconnects++; storedKey = null; connection.value = ConnectionState.Disconnected }
+        override fun disconnect() { disconnects++; storedKey = null; maskedKey.value = null; connection.value = ConnectionState.Disconnected }
         override fun saveApiKey(key: String) {
             savedKeys += key
             storedKey = key
+            maskedKey.value = CredentialMask.of(key)
             connection.value = ConnectionState.Connected(null, AuthMethod.API_KEY)
         }
-        override fun apiKey(): String? = storedKey
+        override fun apiKey(): String? = maskedKey.value
+        override fun apiKeyFlow(): Flow<String?> = maskedKey
         override fun consumeNotice(key: String): Boolean = noticeFirst.also { noticeFirst = false }
         override fun openUrl(url: String) { opened += url }
         override suspend fun listModels(): List<AccountModel> { modelCalls++; return models }

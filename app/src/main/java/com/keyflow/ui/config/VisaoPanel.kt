@@ -220,9 +220,7 @@ private fun VisaoOpenAi(
         val chosen = settings.visionOpenAiModel.ifEmpty { "gpt-4o" }
         val connection by remember(auth) { auth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
         var refresh by remember { mutableIntStateOf(0) }
-        val apiKey = remember(connection, settings.openaiToken) {
-            auth.apiKey().orEmpty().ifEmpty { settings.openaiToken }
-        }
+        val apiKey = remember(auth) { auth.apiKeyFlow() }.collectAsStateOnMain(null).value.orEmpty()
         val effectiveConnection = when {
             connection is ConnectionState.Connected -> connection
             connection is ConnectionState.Connecting -> connection
@@ -259,6 +257,7 @@ private fun VisaoOpenAi(
             keyTag = VISAO_OPENAI_KEY_TAG,
             ssoModelTag = VISAO_OPENAI_MODEL_TAG,
             apiKeyModelTag = VISAO_OPENAI_MODEL_TAG,
+            ssoOffered = auth.flows.any { it.method == AuthMethod.OAUTH },
         )
     }
 }
@@ -273,11 +272,7 @@ private fun VisaoGoogle(
     val chosen = settings.visionGoogleModel.ifEmpty { "gemini-2.0-flash" }
     val connection by remember(auth) { auth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
     var refresh by remember { mutableIntStateOf(0) }
-    val apiKey = remember(connection, settings.visionGoogleApiKey, settings.falaGoogleApiKey) {
-        auth.apiKey().orEmpty().ifEmpty {
-            settings.visionGoogleApiKey.ifEmpty { settings.falaGoogleApiKey }
-        }
-    }
+    val apiKey = remember(auth) { auth.apiKeyFlow() }.collectAsStateOnMain(null).value.orEmpty()
     val effectiveConnection = when {
         connection is ConnectionState.Connected -> connection
         connection is ConnectionState.Connecting -> connection
@@ -314,6 +309,7 @@ private fun VisaoGoogle(
         keyTag = VISAO_GOOGLE_KEY_TAG,
         ssoModelTag = VISAO_GOOGLE_MODEL_TAG,
         apiKeyModelTag = VISAO_GOOGLE_MODEL_TAG,
+        ssoOffered = auth.flows.any { it.method == AuthMethod.OAUTH },
     )
 }
 
@@ -327,9 +323,9 @@ private fun VisaoAnthropic(
     val chosen = settings.visionAnthropicModel.ifEmpty { "claude-3-5-sonnet-latest" }
     val connection by remember(auth) { auth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
     var refresh by remember { mutableIntStateOf(0) }
-    val apiKey = remember(connection, settings.visionAnthropicApiKey) {
-        auth.apiKey().orEmpty().ifEmpty { settings.visionAnthropicApiKey }
-    }
+    val apiKey = remember(auth) { auth.apiKeyFlow() }.collectAsStateOnMain(null).value.orEmpty()
+    val ssoOffered = auth.flows.any { it.method == AuthMethod.OAUTH }
+    val selectedAuthMode = if (!ssoOffered && settings.providerAnthropicAuthMode == "subscription") "api_key" else settings.providerAnthropicAuthMode
     UnifiedProviderCard(
         providerName = "Anthropic",
         providerLogo = KfIcons.LogoAnthropic,
@@ -338,7 +334,7 @@ private fun VisaoAnthropic(
         onSsoConnect = { auth.connect(AuthMethod.OAUTH) },
         onSsoDisconnect = { auth.disconnect() },
         onSsoRefresh = { refresh++ },
-        selectedAuthMode = settings.providerAnthropicAuthMode,
+        selectedAuthMode = selectedAuthMode,
         onSelectAuthMode = { onSettingsChange(settings.copy(providerAnthropicAuthMode = it)) },
         ssoModels = models,
         selectedSsoModel = chosen,
@@ -360,6 +356,7 @@ private fun VisaoAnthropic(
         keyTag = VISAO_ANTHROPIC_KEY_TAG,
         ssoModelTag = VISAO_ANTHROPIC_MODEL_TAG,
         apiKeyModelTag = VISAO_ANTHROPIC_MODEL_TAG,
+        ssoOffered = ssoOffered,
     )
 }
 
