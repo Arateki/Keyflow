@@ -1,6 +1,7 @@
 package com.keyflow.data
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -12,6 +13,8 @@ import com.keyflow.core.TranscriptionSource
 import com.keyflow.core.VisionSource
 import com.keyflow.data.models.ModelKind
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -21,6 +24,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 import java.util.UUID
+import java.util.concurrent.CopyOnWriteArrayList
 
 @RunWith(AndroidJUnit4::class)
 class SettingsRepositoryTest {
@@ -95,6 +99,30 @@ class SettingsRepositoryTest {
 
         assertFalse(dataStoreBytes.contains(secret))
         assertFalse(securePrefsXml.contains(secret))
+    }
+
+    @Test
+    fun settingsFlowReadsTheSecurePrefsOffTheCollectorThread() = runBlocking(Dispatchers.Main.immediate) {
+        val reads = CopyOnWriteArrayList<Thread>()
+        val delegate = context.getSharedPreferences("settings-flow-thread-$securePrefsName", Context.MODE_PRIVATE)
+        val recordingPrefs = object : SharedPreferences by delegate {
+            override fun getString(key: String?, defValue: String?): String? {
+                reads += Thread.currentThread()
+                return delegate.getString(key, defValue)
+            }
+        }
+        val repository = SettingsRepository(
+            context = context,
+            dataStoreFile = dataStoreFile,
+            securePrefsName = securePrefsName,
+            securePrefsFactory = { _, _ -> recordingPrefs },
+        )
+        val collector = Thread.currentThread()
+
+        repository.settingsFlow().first()
+
+        assertFalse("o cofre deve ter sido lido", reads.isEmpty())
+        assertFalse("settingsFlow leu o cofre na thread de quem coleta", reads.any { it === collector })
     }
 
     @Test

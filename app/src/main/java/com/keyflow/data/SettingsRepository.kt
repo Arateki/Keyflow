@@ -44,11 +44,12 @@ class SettingsRepository(
     dataStoreFile: File = defaultDataStoreFile(context),
     private val securePrefsName: String = SECURE_PREFS_NAME,
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+    private val securePrefsFactory: (Context, String) -> SharedPreferences = { app, name -> SecurePrefs.create(app, name) },
 ) {
     private val appContext = context.applicationContext
     private val dataStore: DataStore<Preferences> = dataStoreFor(dataStoreFile, scope)
     private val securePrefs: SharedPreferences by lazy {
-        createSecurePrefs(appContext, securePrefsName)
+        securePrefsFactory(appContext, securePrefsName)
     }
 
     /**
