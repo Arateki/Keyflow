@@ -2525,3 +2525,6 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
 
 ## V1-1 — lição de ambiente (2026-10-23)
 - No servidor falta ImageMagick; por isso `scripts/diff-screens.sh` não roda como no CI sem instalar/fixar o comparador. A validação local precisou de um fallback temporário em `/tmp`.
+
+## Monetização — V1-10a, Fase A (2026-10-23)
+- A API ainda sem staging e o Play Console sem o app tornam MockWebServer/fakes obrigatórios na fundação; Play Integrity `1.6.0` e Billing `9.1.0` ficam atrás de portas degradáveis, sem tocar onboarding, IME ou overlay.

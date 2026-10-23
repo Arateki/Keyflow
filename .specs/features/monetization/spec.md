@@ -177,15 +177,16 @@ de aba → 1 interstitial; próximo só depois do dobro do intervalo; comprar un
 
 | ID | Área | Status |
 | --- | ---- | ------ |
-| IDN-01..03 | Identidade no app | Pending |
+| IDN-01..03 | Identidade no app | Parcial — MZ-T1/T2; staging da API pendente |
 | CRD-01..05 | Créditos (aba Voz) | Pending |
-| UNL-01..04 | Desbloqueio/entitlements | Pending |
+| UNL-01..04 | Desbloqueio/entitlements | Parcial — MZ-T3/T4; UI e gating pendentes |
 | ADS-01..06 | Dinâmica de anúncios | Pending |
 | RWD-01..04 | Rewarded | Pending |
 | RMT-01..02 | Manifest/config remota | Pending |
 
-**Coverage:** 24 total, 0 mapeados a tasks (Design/Tasks após aprovação; **depende da KeyFlow API
-existir** — ver `.specs/features/keyflow-api/`).
+**Coverage:** 24 total; IDN e UNL parcialmente verificados em MZ-T1–T4. O restante depende das
+tasks seguintes e, no caminho remoto, da KeyFlow API existir em staging — ver
+`.specs/features/keyflow-api/`.
 
 ---
 
