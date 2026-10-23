@@ -397,6 +397,7 @@ class SettingsSecretsStorageTest {
                 stringPreferencesKey(SettingsSecrets.PROVIDER_OPENAI_API_KEY) to "sk-legada-teste",
                 stringPreferencesKey(SettingsSecrets.PROVIDER_GOOGLE_API_KEY) to "sk-google-teste",
                 stringPreferencesKey("reasoning_source") to ReasoningSource.OPENAI.name,
+                stringPreferencesKey("reasoning_openai_model") to "gpt-4o",
             ),
         )
 
@@ -432,6 +433,10 @@ class SettingsSecretsStorageTest {
     @Test
     fun readingSettingsDoesNotRewriteCredentialModesAfterMigration() = runTest {
         val store = FailingCredentialStore()
+        store.put(ProviderIds.OPENAI, Credential.ApiKey("sk-teste"))
+        store.put(ProviderIds.ANTHROPIC, Credential.ApiKey("sk-teste"))
+        store.put(ProviderIds.GOOGLE, Credential.ApiKey("sk-teste"))
+        store.authModeWrites = 0
         val repository = newRepository(store)
 
         repository.settingsFlow().first()

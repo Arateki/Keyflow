@@ -70,6 +70,9 @@ internal class AgentSecretSource(
                 credential.idToken?.let { out += it }
             }
         }
+        for (key in com.keyflow.data.SettingsCredentialKeys.ALL) {
+            credentials.getSecret(key)?.let { if (it.isNotEmpty()) out += it }
+        }
         out.remove("")
         return out.toList()
     }

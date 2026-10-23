@@ -591,11 +591,10 @@ class SettingsRepository(
                 PROVIDER_GOOGLE_AUTH_MODE to ProviderIds.GOOGLE,
             ).mapNotNull { (key, provider) ->
                 if (current[key] != null) return@mapNotNull null
-                val mode = when {
-                    credentials.getOAuth(provider) != null -> "subscription"
-                    credentials.getApiKey(provider) != null -> "api_key"
-                    else -> "subscription"
-                }
+                val oauth = credentials.getOAuth(provider)
+                val apiKey = credentials.getApiKey(provider)
+                if (oauth == null && apiKey == null) return@mapNotNull null
+                val mode = if (oauth != null) "subscription" else "api_key"
                 Triple(key, provider, mode)
             }
             migrated to modes

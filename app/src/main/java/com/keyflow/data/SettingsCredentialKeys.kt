@@ -16,6 +16,13 @@ internal object SettingsCredentialKeys {
     const val FALA_CUSTOM_HEADER = "fala_custom_header_value"
     const val COMPUTER_SSH_PASSWORD = "computer_ssh_password"
     const val COMPUTER_SSH_KEY = "computer_ssh_key"
+
+    val ALL = listOf(
+        OPENAI_TOKEN, GROQ_TOKEN, VISION_GOOGLE_API_KEY, VISION_ANTHROPIC_API_KEY,
+        FALA_ELEVENLABS_API_KEY, FALA_GOOGLE_API_KEY, PROVIDER_GROQ_API_KEY, PROVIDER_GROK_API_KEY,
+        CUSTOM_HEADER, REASONING_CUSTOM_HEADER, VISION_CUSTOM_HEADER, FALA_CUSTOM_HEADER,
+        COMPUTER_SSH_PASSWORD, COMPUTER_SSH_KEY,
+    )
 }
 
 /** Um campo de segredo que o estado Compose pode carregar sem carregar o segredo. */
