@@ -47,11 +47,28 @@ class OverlayCoordinatorTest {
         assertThat(recorder.stopped).isEqualTo(1)
         assertThat(transcriber.audioFiles).containsExactly(audio)
         assertThat(inserted).containsExactly("hello from overlay")
+        assertThat(audio.exists()).isFalse()
         assertThat(renderedStates).containsAtLeast(
             ButtonState.RECORDING,
             ButtonState.SENDING,
             ButtonState.IDLE_READY,
         ).inOrder()
+    }
+
+    @Test
+    fun `audio is deleted after a failed transcription`() = runTest {
+        val audio = temporaryFolder.newFile("audio-error.m4a").also { it.writeText("audio") }
+        val coordinator = coordinator(
+            scope = this,
+            recorder = FakeRecorder(audio),
+            transcriber = FakeTranscriber(TranscriptionResult.Error(com.keyflow.core.ErrorKind.NETWORK, "offline")),
+        )
+
+        coordinator.onTap()
+        coordinator.onTap()
+        advanceUntilIdle()
+
+        assertThat(audio.exists()).isFalse()
     }
 
     /**
@@ -352,7 +369,8 @@ class OverlayCoordinatorTest {
 
     @Test
     fun `cancel window expiry discards recorder and returns to idle`() = runTest {
-        val recorder = FakeRecorder(temporaryFolder.newFile("a.m4a").also { it.writeText("a") })
+        val audio = temporaryFolder.newFile("a.m4a").also { it.writeText("a") }
+        val recorder = FakeRecorder(audio)
         val renderedStates = mutableListOf<ButtonState>()
         var hidden = 0
 
@@ -370,6 +388,7 @@ class OverlayCoordinatorTest {
         advanceTimeBy(3001)
 
         assertThat(recorder.discarded).isEqualTo(1)
+        assertThat(audio.exists()).isFalse()
         assertThat(renderedStates.last()).isEqualTo(ButtonState.IDLE_READY)
         assertThat(hidden).isEqualTo(1)
     }
@@ -773,6 +792,7 @@ class OverlayCoordinatorTest {
             assertThat(recorder.stopped).isEqualTo(1) // não chamou stop() de novo no gravador já liberado
             assertThat(transcriber.audioFiles).containsExactly(audio, audio) // reenviou o MESMO arquivo
             assertThat(inserted).containsExactly("done")
+            assertThat(audio.exists()).isFalse()
             assertThat(renderedStates.last()).isEqualTo(ButtonState.IDLE_READY)
         }
 
@@ -961,7 +981,10 @@ class OverlayCoordinatorTest {
         }
         override fun pause() { paused++ }
         override fun resume() { resumed++ }
-        override fun discard() { discarded++ }
+        override fun discard() {
+            discarded++
+            audioFiles.filterNotNull().forEach(File::delete)
+        }
     }
 
     private class FakeTranscriber(private val result: TranscriptionResult) : OverlayTranscriber {

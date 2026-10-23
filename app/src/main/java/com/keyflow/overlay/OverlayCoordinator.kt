@@ -552,6 +552,7 @@ class OverlayCoordinator(
             if (attempt != sendAttempt || machine.state != ButtonState.SENDING) return@launch
             pendingAudioFile = null
             priorSegmentsMs = 0L
+            audio.delete()
             deliver(result)
         }
     }
