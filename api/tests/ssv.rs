@@ -70,6 +70,7 @@ async fn state_with_admob(
         std::num::NonZeroU32::new(1000).unwrap(),
         unused_transcription_config(),
         AdsConfig {
+            enabled: true,
             verifier_keys_url: keys_url,
             reward_seconds,
             daily_cap,

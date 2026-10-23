@@ -1,0 +1,225 @@
+name: api-deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "api/**"
+      - ".github/workflows/api-deploy.yml"
+  workflow_dispatch:
+    inputs:
+      canal:
+        description: "Canal de destino da release na branch main (staging = imediato; producao = exige aprovação no environment 'producao')"
+        required: true
+        default: "staging"
+        type: choice
+        options:
+          - staging
+          - producao
+
+# Mínimo privilégio no nível do workflow: o job que compila e roda testes nunca tem permissão de escrita
+# nem acesso às chaves privadas de assinatura.
+permissions:
+  contents: read
+
+concurrency:
+  group: api-deploy-${{ github.event_name == 'workflow_dispatch' && inputs.canal || 'staging' }}
+  cancel-in-progress: false
+
+jobs:
+  compilar:
+    name: Compilar binário (Debian 12 Bookworm)
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    container:
+      image: rust:1.96-slim-bookworm@sha256:e18a79fc84dfcfc3ab5ba72290398a644c135c97eaa881447fddc354ee4701a3
+    timeout-minutes: 25
+    outputs:
+      canal: ${{ steps.meta.outputs.canal }}
+      tag: ${{ steps.meta.outputs.tag }}
+      commit_sha: ${{ steps.meta.outputs.commit_sha }}
+    steps:
+      - name: Dependências do container Bookworm
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates git binutils
+          rm -rf /var/lib/apt/lists/*
+
+      - name: Checkout do código (exclusivamente HEAD da main)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Definir metadados da release
+        id: meta
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          GITHUB_REF_NAME_FULL: ${{ github.ref }}
+          INPUT_CANAL: ${{ inputs.canal }}
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF_NAME_FULL}" != "refs/heads/main" ]]; then
+            echo "::error::Este workflow só pode compilar e publicar a partir de refs/heads/main (atual: ${GITHUB_REF_NAME_FULL})."
+            exit 1
+          fi
+          if [[ "${EVENT_NAME}" == "workflow_dispatch" && "${INPUT_CANAL}" == "producao" ]]; then
+            canal="prod"
+          else
+            canal="staging"
+          fi
+          short_sha="$(git rev-parse --short=7 HEAD)"
+          commit_sha="$(git rev-parse HEAD)"
+          ts="$(date -u +%Y%m%dT%H%M%SZ)"
+          tag="api-${canal}-${ts}-${short_sha}"
+          echo "canal=${canal}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "commit_sha=${commit_sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Compilar binário de release (x86_64 Debian 12 glibc)
+        working-directory: api
+        run: |
+          set -euo pipefail
+          cargo test --lib --locked
+          cargo build --release --locked --bin keyflow-api
+          strip target/release/keyflow-api || true
+          mkdir -p dist
+          cp target/release/keyflow-api dist/keyflow-api
+          chmod 0755 dist/keyflow-api
+
+      - name: Subir binário compilado para o job de assinatura e publicação
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: api-binario-unsigned
+          path: api/dist/keyflow-api
+          if-no-files-found: error
+          retention-days: 1
+
+  assinar-publicar-staging:
+    name: Assinar e publicar release (Staging)
+    needs: compilar
+    if: ${{ needs.compilar.outputs.canal == 'staging' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    environment: staging
+    permissions:
+      contents: write
+      actions: read
+    timeout-minutes: 10
+    steps:
+      - name: Baixar binário compilado desta execução
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh run download "${RUN_ID}" -R "${GITHUB_REPOSITORY}" -n api-binario-unsigned -D dist
+          chmod 0755 dist/keyflow-api
+
+      - name: Gerar manifesto (staging|tag|sha256), assinar com Ed25519 e publicar Release
+        working-directory: dist
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SIGNING_KEY_PEM: ${{ secrets.API_RELEASE_SIGNING_KEY }}
+          TAG: ${{ needs.compilar.outputs.tag }}
+          COMMIT_SHA: ${{ needs.compilar.outputs.commit_sha }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${SIGNING_KEY_PEM}" ]]; then
+            echo "::error::Secret API_RELEASE_SIGNING_KEY ausente no environment 'staging'. Veja api/deploy/LEIA-ME.md."
+            exit 1
+          fi
+          if [[ ! "${TAG}" =~ ^api-staging-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{7,40}$ ]]; then
+            echo "::error::Formato de tag inválido para staging: ${TAG}"
+            exit 1
+          fi
+
+          bin_sha256="$(sha256sum keyflow-api | awk '{print $1}')"
+          printf 'staging|%s|%s\n' "${TAG}" "${bin_sha256}" > keyflow-api.manifest
+
+          umask 077
+          keyfile="$(mktemp)"
+          pubfile="$(mktemp)"
+          trap 'rm -f "$keyfile" "$pubfile"' EXIT
+          printf '%s\n' "${SIGNING_KEY_PEM}" > "$keyfile"
+
+          openssl pkey -in "$keyfile" -pubout -out "$pubfile" >/dev/null
+          openssl pkeyutl -sign -inkey "$keyfile" -rawin -in keyflow-api.manifest -out keyflow-api.manifest.sig
+          openssl pkeyutl -verify -pubin -inkey "$pubfile" -rawin -in keyflow-api.manifest -sigfile keyflow-api.manifest.sig
+
+          gh release create "${TAG}" \
+            keyflow-api \
+            keyflow-api.manifest \
+            keyflow-api.manifest.sig \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${COMMIT_SHA}" \
+            --title "KeyFlow API Staging (${TAG})" \
+            --notes "Build automático do canal **staging** a partir do commit \`${COMMIT_SHA}\`." \
+            --prerelease
+
+  assinar-publicar-producao:
+    name: Assinar e publicar release (Produção)
+    needs: compilar
+    if: ${{ needs.compilar.outputs.canal == 'prod' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    environment: producao
+    permissions:
+      contents: write
+      actions: read
+    timeout-minutes: 10
+    steps:
+      - name: Baixar binário compilado desta execução
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh run download "${RUN_ID}" -R "${GITHUB_REPOSITORY}" -n api-binario-unsigned -D dist
+          chmod 0755 dist/keyflow-api
+
+      - name: Gerar manifesto (prod|tag|sha256), assinar com Ed25519 e publicar Release
+        working-directory: dist
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SIGNING_KEY_PEM: ${{ secrets.API_RELEASE_SIGNING_KEY }}
+          TAG: ${{ needs.compilar.outputs.tag }}
+          COMMIT_SHA: ${{ needs.compilar.outputs.commit_sha }}
+          GITHUB_REF_FULL: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF_FULL}" != "refs/heads/main" ]]; then
+            echo "::error::Releases de produção só podem ser assinadas a partir de refs/heads/main."
+            exit 1
+          fi
+          if [[ -z "${SIGNING_KEY_PEM}" ]]; then
+            echo "::error::Secret API_RELEASE_SIGNING_KEY ausente no environment 'producao'. Veja api/deploy/LEIA-ME.md."
+            exit 1
+          fi
+          if [[ ! "${TAG}" =~ ^api-prod-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{7,40}$ ]]; then
+            echo "::error::Formato de tag inválido para produção: ${TAG}"
+            exit 1
+          fi
+
+          bin_sha256="$(sha256sum keyflow-api | awk '{print $1}')"
+          printf 'prod|%s|%s\n' "${TAG}" "${bin_sha256}" > keyflow-api.manifest
+
+          umask 077
+          keyfile="$(mktemp)"
+          pubfile="$(mktemp)"
+          trap 'rm -f "$keyfile" "$pubfile"' EXIT
+          printf '%s\n' "${SIGNING_KEY_PEM}" > "$keyfile"
+
+          openssl pkey -in "$keyfile" -pubout -out "$pubfile" >/dev/null
+          openssl pkeyutl -sign -inkey "$keyfile" -rawin -in keyflow-api.manifest -out keyflow-api.manifest.sig
+          openssl pkeyutl -verify -pubin -inkey "$pubfile" -rawin -in keyflow-api.manifest -sigfile keyflow-api.manifest.sig
+
+          gh release create "${TAG}" \
+            keyflow-api \
+            keyflow-api.manifest \
+            keyflow-api.manifest.sig \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${COMMIT_SHA}" \
+            --title "KeyFlow API Produção (${TAG})" \
+            --notes "Release de **produção** aprovada a partir do commit \`${COMMIT_SHA}\`." \
+            --latest=false

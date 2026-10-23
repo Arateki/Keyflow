@@ -1,11 +1,17 @@
 use std::net::IpAddr;
 use std::num::NonZeroU32;
+use std::sync::Arc;
+use std::time::Duration;
 
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use governor::clock::{Clock, DefaultClock};
 use governor::{DefaultKeyedRateLimiter, Quota};
+use tokio::task::JoinHandle;
 use uuid::Uuid;
+
+/// De quanto em quanto a tarefa de limpeza esquece chaves que já voltaram à cota cheia.
+pub const CLEANUP_INTERVAL: Duration = Duration::from_secs(5 * 60);
 
 /// Limitadores keyed do design (ID-04): por IP no `/v1/register` (rota sem auth — só o IP
 /// identifica quem está batendo) e por conta nas rotas autenticadas.
@@ -31,11 +37,49 @@ impl IntoResponse for RateLimitRejection {
 
 impl RateLimiters {
     pub fn new(register_per_minute: NonZeroU32, account_per_minute: NonZeroU32) -> Self {
+        Self::with_quotas(
+            Quota::per_minute(register_per_minute),
+            Quota::per_minute(account_per_minute),
+        )
+    }
+
+    fn with_quotas(register: Quota, account: Quota) -> Self {
         Self {
-            register_by_ip: DefaultKeyedRateLimiter::keyed(Quota::per_minute(register_per_minute)),
-            account: DefaultKeyedRateLimiter::keyed(Quota::per_minute(account_per_minute)),
+            register_by_ip: DefaultKeyedRateLimiter::keyed(register),
+            account: DefaultKeyedRateLimiter::keyed(account),
             clock: DefaultClock::default(),
         }
+    }
+
+    /// Esquece chaves que já voltaram à cota cheia e devolve a capacidade do mapa.
+    /// O `DashMap` do governor não faz isso sozinho: sem esta chamada ele cresce para sempre.
+    pub fn cleanup(&self) {
+        self.register_by_ip.retain_recent();
+        self.register_by_ip.shrink_to_fit();
+        self.account.retain_recent();
+        self.account.shrink_to_fit();
+    }
+
+    pub fn len_register(&self) -> usize {
+        self.register_by_ip.len()
+    }
+
+    pub fn len_account(&self) -> usize {
+        self.account.len()
+    }
+
+    /// Limpeza periódica. A primeira passada espera `every` — no boot o mapa está vazio.
+    pub fn spawn_cleanup(limiters: Arc<Self>, every: Duration) -> JoinHandle<()> {
+        tokio::spawn(async move {
+            let mut ticker = tokio::time::interval(every);
+            ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+            // O primeiro tick do `interval` completa na hora; descarta para esperar `every`.
+            ticker.tick().await;
+            loop {
+                ticker.tick().await;
+                limiters.cleanup();
+            }
+        })
     }
 
     pub fn check_register(&self, ip: IpAddr) -> Result<(), RateLimitRejection> {
@@ -126,5 +170,55 @@ mod tests {
         assert!(limiters.check_account(account_a).is_ok());
         assert!(limiters.check_account(account_a).is_err());
         assert!(limiters.check_account(account_b).is_ok());
+    }
+
+    fn short_quota() -> Quota {
+        Quota::with_period(Duration::from_millis(80))
+            .expect("80ms é período válido")
+            .allow_burst(NonZeroU32::new(1).unwrap())
+    }
+
+    #[test]
+    fn cleanup_drops_keys_that_are_back_to_full_quota() {
+        let limiters = RateLimiters::with_quotas(short_quota(), short_quota());
+        let ip = IpAddr::V4(Ipv4Addr::new(203, 0, 113, 9));
+        let account_id = Uuid::new_v4();
+
+        assert!(limiters.check_register(ip).is_ok());
+        assert!(limiters.check_account(account_id).is_ok());
+        assert_eq!(limiters.len_register(), 1);
+        assert_eq!(limiters.len_account(), 1);
+
+        // Ainda dentro da janela: a chave foi usada e não pode sumir.
+        limiters.cleanup();
+        assert_eq!(limiters.len_register(), 1);
+        assert_eq!(limiters.len_account(), 1);
+
+        std::thread::sleep(Duration::from_millis(200));
+        limiters.cleanup();
+        assert_eq!(limiters.len_register(), 0, "IP ocioso deveria sair do mapa");
+        assert_eq!(
+            limiters.len_account(),
+            0,
+            "conta ociosa deveria sair do mapa"
+        );
+    }
+
+    #[tokio::test]
+    async fn cleanup_task_drops_idle_keys() {
+        let limiters = Arc::new(RateLimiters::with_quotas(short_quota(), short_quota()));
+        let ip = IpAddr::V4(Ipv4Addr::new(203, 0, 113, 10));
+        assert!(limiters.check_register(ip).is_ok());
+        assert_eq!(limiters.len_register(), 1);
+
+        let task = RateLimiters::spawn_cleanup(Arc::clone(&limiters), Duration::from_millis(40));
+        tokio::time::sleep(Duration::from_millis(400)).await;
+        task.abort();
+
+        assert_eq!(
+            limiters.len_register(),
+            0,
+            "a tarefa tokio deveria ter limpado a chave ociosa"
+        );
     }
 }

@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 use std::fmt;
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::num::NonZeroU32;
+use std::time::Duration;
+
+use ipnet::IpNet;
 
 const DEFAULT_BIND_ADDR: &str = "0.0.0.0:8080";
 const DEFAULT_REGISTER_RATE_LIMIT_PER_MINUTE: u32 = 5;
@@ -12,6 +15,15 @@ const DEFAULT_TRANSCRIPTION_MAX_BYTES: u32 = 26_214_400; // 25 MiB — mesmo pla
 const DEFAULT_PROVIDER_UNHEALTHY_COOLDOWN_SECS: u32 = 60;
 const DEFAULT_ADS_REWARD_SECONDS: u32 = 60;
 const DEFAULT_ADS_DAILY_CAP: u32 = 5;
+/// Pool enxuto para 0,5 GB (aws.md §2.4 / §5). Testes de integração usam `db::connect`, não isto.
+const DEFAULT_DB_MAX_CONNECTIONS: u32 = 5;
+const DEFAULT_DB_MIN_CONNECTIONS: u32 = 0;
+const DEFAULT_DB_IDLE_TIMEOUT_SECS: u32 = 300;
+const DEFAULT_DB_ACQUIRE_TIMEOUT_SECS: u32 = 5;
+const DEFAULT_TOKIO_WORKER_THREADS: u32 = 2;
+const DEFAULT_TOKIO_MAX_BLOCKING_THREADS: u32 = 8;
+const DEFAULT_PLAY_INTEGRITY_BASE_URL: &str = "https://playintegrity.googleapis.com";
+const DEFAULT_ANDROID_PUBLISHER_BASE_URL: &str = "https://androidpublisher.googleapis.com";
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -41,6 +53,22 @@ pub struct Config {
     pub ads_reward_seconds: NonZeroU32,
     /// Cap diário de recompensas por conta (ADS-01).
     pub ads_daily_cap: NonZeroU32,
+    /// Redes (CIDR ou IP) de onde `CF-Connecting-IP` é aceito. Vazio = header ignorado.
+    pub trusted_proxies: Vec<IpNet>,
+    pub db_max_connections: u32,
+    pub db_min_connections: u32,
+    pub db_idle_timeout: Duration,
+    pub db_acquire_timeout: Duration,
+    pub tokio_worker_threads: NonZeroU32,
+    pub tokio_max_blocking_threads: NonZeroU32,
+    /// Base do Play Integrity. Default é a URL oficial; o teste de carga aponta para o mock.
+    pub play_integrity_base_url: String,
+    /// Base da Play Developer API. Default é a URL oficial.
+    pub android_publisher_base_url: String,
+    /// `POST /v1/transcribe` na v1. Padrão desligado: a rota responde 404.
+    pub transcribe_enabled: bool,
+    /// `GET /v1/ssv/admob` na v1. Padrão desligado: a rota responde 404.
+    pub ssv_enabled: bool,
 }
 
 #[derive(Debug)]
@@ -82,7 +110,8 @@ impl Config {
             .cloned()
             .ok_or(ConfigError::MissingEnv("DATABASE_URL"))?;
 
-        let bind_addr = match vars.get("BIND_ADDR") {
+        // `BIND_ADDR=""` conta como ausente, igual às outras opcionais.
+        let bind_addr = match vars.get("BIND_ADDR").filter(|value| !value.is_empty()) {
             Some(value) => value
                 .parse::<SocketAddr>()
                 .map_err(|e| ConfigError::InvalidEnv {
@@ -126,18 +155,26 @@ impl Config {
             DEFAULT_VOIDED_PURCHASES_JOB_INTERVAL_SECS,
         )?;
 
-        let providers_json = vars
-            .get("TRANSCRIPTION_PROVIDERS_JSON")
-            .cloned()
-            .ok_or(ConfigError::MissingEnv("TRANSCRIPTION_PROVIDERS_JSON"))?;
-        let providers =
-            crate::providers::parse_and_resolve(&providers_json, vars).map_err(|reason| {
+        let transcribe_enabled = parse_flag(vars, "TRANSCRIBE_ENABLED");
+        let ssv_enabled = parse_flag(vars, "SSV_ADMOB_ENABLED");
+        // Com a rota desligada o boot não exige a lista nem a env da chave (`authValueEnv`).
+        // A SSV também não: `ADS_*` já tem padrão e a URL das chaves do AdMob não é env.
+        let providers = if transcribe_enabled {
+            let providers_json = vars
+                .get("TRANSCRIPTION_PROVIDERS_JSON")
+                .map(String::as_str)
+                .filter(|value| !value.is_empty())
+                .ok_or(ConfigError::MissingEnv("TRANSCRIPTION_PROVIDERS_JSON"))?;
+            crate::providers::parse_and_resolve(providers_json, vars).map_err(|reason| {
                 ConfigError::InvalidEnv {
                     var: "TRANSCRIPTION_PROVIDERS_JSON",
-                    value: providers_json.clone(),
+                    value: providers_json.to_string(),
                     reason,
                 }
-            })?;
+            })?
+        } else {
+            Vec::new()
+        };
 
         let transcription_timeout_ms = parse_nonzero_u32(
             vars,
@@ -159,6 +196,53 @@ impl Config {
             parse_nonzero_u32(vars, "ADS_REWARD_SECONDS", DEFAULT_ADS_REWARD_SECONDS)?;
         let ads_daily_cap = parse_nonzero_u32(vars, "ADS_DAILY_CAP", DEFAULT_ADS_DAILY_CAP)?;
 
+        let trusted_proxies = parse_trusted_proxies(
+            vars.get("TRUSTED_PROXIES")
+                .map(String::as_str)
+                .unwrap_or(""),
+        )?;
+
+        let db_max_connections =
+            parse_u32_at_least(vars, "DB_MAX_CONNECTIONS", DEFAULT_DB_MAX_CONNECTIONS, 1)?;
+        let db_min_connections =
+            parse_u32_at_least(vars, "DB_MIN_CONNECTIONS", DEFAULT_DB_MIN_CONNECTIONS, 0)?;
+        if db_min_connections > db_max_connections {
+            return Err(ConfigError::InvalidEnv {
+                var: "DB_MIN_CONNECTIONS",
+                value: db_min_connections.to_string(),
+                reason: format!("must be <= DB_MAX_CONNECTIONS ({db_max_connections})"),
+            });
+        }
+        let db_idle_timeout = Duration::from_secs(parse_u32_at_least(
+            vars,
+            "DB_IDLE_TIMEOUT_SECS",
+            DEFAULT_DB_IDLE_TIMEOUT_SECS,
+            1,
+        )? as u64);
+        let db_acquire_timeout = Duration::from_secs(parse_u32_at_least(
+            vars,
+            "DB_ACQUIRE_TIMEOUT_SECS",
+            DEFAULT_DB_ACQUIRE_TIMEOUT_SECS,
+            1,
+        )? as u64);
+        let tokio_worker_threads =
+            parse_nonzero_u32(vars, "TOKIO_WORKER_THREADS", DEFAULT_TOKIO_WORKER_THREADS)?;
+        let tokio_max_blocking_threads = parse_nonzero_u32(
+            vars,
+            "TOKIO_MAX_BLOCKING_THREADS",
+            DEFAULT_TOKIO_MAX_BLOCKING_THREADS,
+        )?;
+        let play_integrity_base_url = parse_nonempty_string(
+            vars,
+            "PLAY_INTEGRITY_BASE_URL",
+            DEFAULT_PLAY_INTEGRITY_BASE_URL,
+        )?;
+        let android_publisher_base_url = parse_nonempty_string(
+            vars,
+            "ANDROID_PUBLISHER_BASE_URL",
+            DEFAULT_ANDROID_PUBLISHER_BASE_URL,
+        )?;
+
         Ok(Config {
             database_url,
             bind_addr,
@@ -174,8 +258,60 @@ impl Config {
             provider_unhealthy_cooldown_secs,
             ads_reward_seconds,
             ads_daily_cap,
+            trusted_proxies,
+            db_max_connections,
+            db_min_connections,
+            db_idle_timeout,
+            db_acquire_timeout,
+            tokio_worker_threads,
+            tokio_max_blocking_threads,
+            play_integrity_base_url,
+            android_publisher_base_url,
+            transcribe_enabled,
+            ssv_enabled,
         })
     }
+
+    pub fn pool_settings(&self) -> crate::db::PoolSettings {
+        crate::db::PoolSettings {
+            max_connections: self.db_max_connections,
+            min_connections: self.db_min_connections,
+            idle_timeout: self.db_idle_timeout,
+            acquire_timeout: self.db_acquire_timeout,
+        }
+    }
+}
+
+/// `TRUSTED_PROXIES`: vazio, ou IPs/CIDRs separados por vírgula (`10.0.0.0/8, 127.0.0.1`).
+/// IP sem máscara vira `/32` ou `/128`.
+pub fn parse_trusted_proxies(raw: &str) -> Result<Vec<IpNet>, ConfigError> {
+    let mut nets = Vec::new();
+    for part in raw.split(',') {
+        let part = part.trim();
+        if part.is_empty() {
+            continue;
+        }
+        let net = if part.contains('/') {
+            part.parse::<IpNet>().map_err(|e| ConfigError::InvalidEnv {
+                var: "TRUSTED_PROXIES",
+                value: part.to_string(),
+                reason: e.to_string(),
+            })?
+        } else {
+            let ip = part
+                .parse::<IpAddr>()
+                .map_err(|e: std::net::AddrParseError| ConfigError::InvalidEnv {
+                    var: "TRUSTED_PROXIES",
+                    value: part.to_string(),
+                    reason: e.to_string(),
+                })?;
+            // `::ffff:127.0.0.1` vira `127.0.0.1`. O peer em `client_ip` já passa por
+            // `to_canonical()`; sem isto a rede fica em IPv6 e não contém o peer.
+            IpNet::from(ip.to_canonical())
+        };
+        nets.push(net);
+    }
+    Ok(nets)
 }
 
 fn parse_nonzero_u32(
@@ -183,7 +319,8 @@ fn parse_nonzero_u32(
     var: &'static str,
     default: u32,
 ) -> Result<NonZeroU32, ConfigError> {
-    let raw = match vars.get(var) {
+    // `VAR=""` conta como ausente: o default vale. Valor inválido continua erro.
+    let raw = match vars.get(var).filter(|value| !value.is_empty()) {
         Some(value) => value,
         None => {
             return Ok(NonZeroU32::new(default).expect("default rate limit is non-zero"));
@@ -203,6 +340,54 @@ fn parse_nonzero_u32(
         value: raw.clone(),
         reason: "must be greater than zero".to_string(),
     })
+}
+
+fn parse_u32_at_least(
+    vars: &HashMap<String, String>,
+    var: &'static str,
+    default: u32,
+    min: u32,
+) -> Result<u32, ConfigError> {
+    let raw = match vars.get(var).filter(|value| !value.is_empty()) {
+        Some(value) => value,
+        None => return Ok(default),
+    };
+    let parsed: u32 =
+        raw.parse()
+            .map_err(|e: std::num::ParseIntError| ConfigError::InvalidEnv {
+                var,
+                value: raw.clone(),
+                reason: e.to_string(),
+            })?;
+    if parsed < min {
+        return Err(ConfigError::InvalidEnv {
+            var,
+            value: raw.clone(),
+            reason: format!("must be at least {min}"),
+        });
+    }
+    Ok(parsed)
+}
+
+/// `true` ou `1` ligam. Ausente ou `VAR=""` fica desligado.
+fn parse_flag(vars: &HashMap<String, String>, var: &str) -> bool {
+    matches!(
+        vars.get(var)
+            .map(String::as_str)
+            .filter(|value| !value.is_empty()),
+        Some("true" | "1")
+    )
+}
+
+fn parse_nonempty_string(
+    vars: &HashMap<String, String>,
+    var: &'static str,
+    default: &str,
+) -> Result<String, ConfigError> {
+    match vars.get(var).filter(|value| !value.is_empty()) {
+        None => Ok(default.to_string()),
+        Some(value) => Ok((*value).clone()),
+    }
 }
 
 #[cfg(test)]
@@ -251,7 +436,11 @@ mod tests {
 
     #[test]
     fn valid_env_produces_config() {
-        let config = Config::from_map(&with_required(&[("BIND_ADDR", "127.0.0.1:9090")])).unwrap();
+        let config = Config::from_map(&with_required(&[
+            ("BIND_ADDR", "127.0.0.1:9090"),
+            ("TRANSCRIBE_ENABLED", "true"),
+        ]))
+        .unwrap();
 
         assert_eq!(
             config.database_url,
@@ -352,6 +541,13 @@ mod tests {
     }
 
     #[test]
+    fn empty_bind_addr_counts_as_absent() {
+        let config = Config::from_map(&with_required(&[("BIND_ADDR", "")])).unwrap();
+
+        assert_eq!(config.bind_addr, DEFAULT_BIND_ADDR.parse().unwrap());
+    }
+
+    #[test]
     fn invalid_bind_addr_fails_with_specific_message() {
         let err = Config::from_map(&with_required(&[("BIND_ADDR", "not-an-addr")])).unwrap_err();
 
@@ -422,6 +618,7 @@ mod tests {
                 "/secrets/google-sa.json",
             ),
             ("PACKAGE_NAME", "com.keyflow"),
+            ("TRANSCRIBE_ENABLED", "true"),
         ]))
         .unwrap_err();
 
@@ -433,7 +630,7 @@ mod tests {
 
     #[test]
     fn invalid_providers_json_fails_with_specific_message() {
-        let mut map = with_required(&[]);
+        let mut map = with_required(&[("TRANSCRIBE_ENABLED", "true")]);
         map.insert(
             "TRANSCRIPTION_PROVIDERS_JSON".to_string(),
             "not json".to_string(),
@@ -453,5 +650,189 @@ mod tests {
 
         assert_eq!(config.transcription_timeout_ms.get(), 5000);
         assert_eq!(config.transcription_max_bytes.get(), 1000);
+    }
+
+    #[test]
+    fn trusted_proxies_default_to_empty_and_parse_cidr_or_ip() {
+        let config = Config::from_map(&with_required(&[])).unwrap();
+        assert!(config.trusted_proxies.is_empty());
+
+        let config = Config::from_map(&with_required(&[(
+            "TRUSTED_PROXIES",
+            "10.0.0.0/8, 127.0.0.1, 2001:db8::1",
+        )]))
+        .unwrap();
+        assert_eq!(config.trusted_proxies.len(), 3);
+        assert!(config.trusted_proxies[0].contains(&"10.1.2.3".parse::<IpAddr>().unwrap()));
+        assert_eq!(config.trusted_proxies[1].prefix_len(), 32);
+        assert_eq!(config.trusted_proxies[2].prefix_len(), 128);
+    }
+
+    #[test]
+    fn ipv4_mapped_trusted_proxy_matches_the_canonical_peer() {
+        let nets = parse_trusted_proxies("::ffff:127.0.0.1").unwrap();
+        let v4: IpAddr = "127.0.0.1".parse().unwrap();
+        let mapped: IpAddr = "::ffff:127.0.0.1".parse().unwrap();
+
+        assert_eq!(nets.len(), 1);
+        assert_eq!(nets[0].prefix_len(), 32);
+        assert!(nets[0].contains(&v4));
+        assert!(nets[0].contains(&mapped.to_canonical()));
+    }
+
+    #[test]
+    fn invalid_trusted_proxy_fails_with_specific_message() {
+        let err =
+            Config::from_map(&with_required(&[("TRUSTED_PROXIES", "not-an-ip")])).unwrap_err();
+        assert!(err.to_string().contains("TRUSTED_PROXIES"));
+        assert!(err.to_string().contains("not-an-ip"));
+    }
+
+    #[test]
+    fn pool_and_tokio_defaults_match_the_small_machine() {
+        let config = Config::from_map(&with_required(&[])).unwrap();
+        assert_eq!(config.db_max_connections, DEFAULT_DB_MAX_CONNECTIONS);
+        assert_eq!(config.db_min_connections, 0);
+        assert_eq!(config.db_idle_timeout, Duration::from_secs(300));
+        assert_eq!(config.db_acquire_timeout, Duration::from_secs(5));
+        assert_eq!(config.tokio_worker_threads.get(), 2);
+        assert_eq!(config.tokio_max_blocking_threads.get(), 8);
+        assert_eq!(
+            config.play_integrity_base_url,
+            DEFAULT_PLAY_INTEGRITY_BASE_URL
+        );
+        assert_eq!(
+            config.android_publisher_base_url,
+            DEFAULT_ANDROID_PUBLISHER_BASE_URL
+        );
+        let pool = config.pool_settings();
+        assert_eq!(pool.max_connections, 5);
+        assert_eq!(pool.min_connections, 0);
+    }
+
+    #[test]
+    fn db_min_connections_cannot_exceed_max() {
+        let err = Config::from_map(&with_required(&[
+            ("DB_MAX_CONNECTIONS", "2"),
+            ("DB_MIN_CONNECTIONS", "3"),
+        ]))
+        .unwrap_err();
+        assert!(err.to_string().contains("DB_MIN_CONNECTIONS"));
+    }
+
+    #[test]
+    fn empty_optional_env_counts_as_absent() {
+        let config = Config::from_map(&with_required(&[
+            ("DB_ACQUIRE_TIMEOUT_SECS", ""),
+            ("TOKIO_WORKER_THREADS", ""),
+            ("TOKIO_MAX_BLOCKING_THREADS", ""),
+            ("PLAY_INTEGRITY_BASE_URL", ""),
+            ("ANDROID_PUBLISHER_BASE_URL", ""),
+        ]))
+        .unwrap();
+
+        assert_eq!(config.db_acquire_timeout, Duration::from_secs(5));
+        assert_eq!(
+            config.tokio_worker_threads.get(),
+            DEFAULT_TOKIO_WORKER_THREADS
+        );
+        assert_eq!(
+            config.tokio_max_blocking_threads.get(),
+            DEFAULT_TOKIO_MAX_BLOCKING_THREADS
+        );
+        assert_eq!(
+            config.play_integrity_base_url,
+            DEFAULT_PLAY_INTEGRITY_BASE_URL
+        );
+        assert_eq!(
+            config.android_publisher_base_url,
+            DEFAULT_ANDROID_PUBLISHER_BASE_URL
+        );
+    }
+
+    #[test]
+    fn google_base_urls_are_configurable() {
+        let config = Config::from_map(&with_required(&[
+            ("PLAY_INTEGRITY_BASE_URL", "http://mock:8081"),
+            ("ANDROID_PUBLISHER_BASE_URL", "http://mock:8081"),
+            ("TOKIO_WORKER_THREADS", "1"),
+        ]))
+        .unwrap();
+        assert_eq!(config.play_integrity_base_url, "http://mock:8081");
+        assert_eq!(config.android_publisher_base_url, "http://mock:8081");
+        assert_eq!(config.tokio_worker_threads.get(), 1);
+    }
+
+    #[test]
+    fn v1_routes_default_off_and_each_flag_is_independent() {
+        let config = Config::from_map(&with_required(&[])).unwrap();
+        assert!(!config.transcribe_enabled);
+        assert!(!config.ssv_enabled);
+
+        let only_transcribe =
+            Config::from_map(&with_required(&[("TRANSCRIBE_ENABLED", "true")])).unwrap();
+        assert!(only_transcribe.transcribe_enabled);
+        assert!(!only_transcribe.ssv_enabled);
+
+        let only_ssv = Config::from_map(&with_required(&[
+            ("TRANSCRIBE_ENABLED", ""),
+            ("SSV_ADMOB_ENABLED", "1"),
+        ]))
+        .unwrap();
+        assert!(!only_ssv.transcribe_enabled);
+        assert!(only_ssv.ssv_enabled);
+    }
+
+    #[test]
+    fn disabled_routes_do_not_require_transcribe_or_ssv_secrets() {
+        let base = vars(&[
+            (
+                "DATABASE_URL",
+                "postgres://keyflow:keyflow@localhost/keyflow_api",
+            ),
+            (
+                "GOOGLE_SERVICE_ACCOUNT_JSON_PATH",
+                "/secrets/google-sa.json",
+            ),
+            ("PACKAGE_NAME", "com.keyflow"),
+        ]);
+
+        let config = Config::from_map(&base).unwrap();
+        assert!(!config.transcribe_enabled);
+        assert!(!config.ssv_enabled);
+        assert!(config.providers.is_empty());
+
+        // JSON presente sem a chave do provedor: desligado, a chave não é exigida.
+        let mut with_json = base.clone();
+        with_json.insert(
+            "TRANSCRIPTION_PROVIDERS_JSON".to_string(),
+            r#"[{"name":"primary","url":"https://p1.example/transcribe","authHeaderName":"Authorization","authValueEnv":"TEST_PROVIDER_KEY","model":"whisper-1"}]"#
+                .to_string(),
+        );
+        let config = Config::from_map(&with_json).unwrap();
+        assert!(config.providers.is_empty());
+
+        let mut transcribe_on = base.clone();
+        transcribe_on.insert("TRANSCRIBE_ENABLED".to_string(), "true".to_string());
+        let err = Config::from_map(&transcribe_on).unwrap_err();
+        assert!(err.to_string().contains("TRANSCRIPTION_PROVIDERS_JSON"));
+
+        transcribe_on.insert(
+            "TRANSCRIPTION_PROVIDERS_JSON".to_string(),
+            r#"[{"name":"primary","url":"https://p1.example/transcribe","authHeaderName":"Authorization","authValueEnv":"TEST_PROVIDER_KEY","model":"whisper-1"}]"#
+                .to_string(),
+        );
+        let err = Config::from_map(&transcribe_on).unwrap_err();
+        assert!(err.to_string().contains("TEST_PROVIDER_KEY"));
+
+        // SSV ligada não pede provedor, chave, nem variável que só ela usaria.
+        let mut ssv_on = base;
+        ssv_on.insert("SSV_ADMOB_ENABLED".to_string(), "1".to_string());
+        let config = Config::from_map(&ssv_on).unwrap();
+        assert!(config.ssv_enabled);
+        assert!(!config.transcribe_enabled);
+        assert!(config.providers.is_empty());
+        assert_eq!(config.ads_reward_seconds.get(), DEFAULT_ADS_REWARD_SECONDS);
+        assert_eq!(config.ads_daily_cap.get(), DEFAULT_ADS_DAILY_CAP);
     }
 }

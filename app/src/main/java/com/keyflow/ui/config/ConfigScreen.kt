@@ -393,35 +393,11 @@ fun ConfigScreen(
                             initialTest = initialReasoningTest,
                             localSupported = reasoningLocalSupported,
                         )
-                        ConfigTab.VISAO -> VisaoPanel(
-                            settings = settings,
-                            onSettingsChange = onSettingsChange,
-                            models = visionModels,
-                            actions = localActions,
-                            localSupported = reasoningLocalSupported,
-                            openAiAuth = reasoningAuth,
-                            googleAuth = reasoningGoogleAuth,
-                            anthropicAuth = reasoningAnthropicAuth,
-                        )
-                        ConfigTab.FALA -> FalaPanel(
-                            settings = settings,
-                            onSettingsChange = onSettingsChange,
-                            models = falaModels,
-                            actions = localActions,
-                            localSupported = reasoningLocalSupported,
-                            openAiAuth = reasoningAuth,
-                            googleAuth = reasoningGoogleAuth,
-                        )
-                        ConfigTab.FLUXOS -> FluxosPanel(
-                            settings = settings,
-                            onSettingsChange = onSettingsChange,
-                        )
-                        ConfigTab.COMPUTADOR -> ComputadorPanel(
-                            settings = settings,
-                            onSettingsChange = onSettingsChange,
-                        )
-                        // Ainda sem conteúdo: o painel fica vazio (o título da aba já aparece no cabeçalho).
-                        ConfigTab.NOTIFICACAO -> Unit
+                        ConfigTab.VISAO,
+                        ConfigTab.FALA,
+                        ConfigTab.FLUXOS,
+                        ConfigTab.COMPUTADOR,
+                        ConfigTab.NOTIFICACAO -> ComingSoonPanel()
                         ConfigTab.DOCS -> DocsPanel(focusSectionId = docsFocusSection, focusKey = docsFocusKey)
                     }
                 }

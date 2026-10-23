@@ -32,9 +32,9 @@ const val RACIOCINIO_LOCAL_UNSUPPORTED_TAG = "raciocinio-local-unsupported"
 
 /**
  * Aba Raciocínio (RSC-01..06): a origem do modelo de linguagem — **Local** (modelo de texto no aparelho, lista de
- * download no mesmo molde da Transcrição) ou **OpenAI** (nuvem: login, chave e modelo da conta). Independe da origem da
- * transcrição e nunca lista os modelos de fala. [models] já vem composto com o catálogo de TEXTO; [auth] é a porta para o
- * módulo de autenticação (sem ele, a origem OpenAI não tem o que conectar).
+ * download no mesmo molde da Transcrição) ou uma origem de nuvem/custom. Créditos fica desabilitado e marcado como
+ * "Em breve"; configurações legadas caem no Local. Independe da origem da transcrição e nunca lista modelos de fala.
+ * [models] já vem composto com o catálogo de TEXTO; [auth] é a porta para o módulo de autenticação.
  */
 @Composable
 fun ReasoningPanel(
@@ -54,13 +54,14 @@ fun ReasoningPanel(
 ) {
     val palette = LocalKeyFlowPalette.current
     val scroll = rememberScrollState()
+    val activeSettings = settings.withoutCredits()
     // Lido AQUI, no corpo do painel: quando a conexão muda, tudo abaixo — inclusive o "pronto para testar" — recompõe.
     val connection by remember(auth) { auth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
     val anthropicConnection by remember(anthropicAuth) { anthropicAuth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
     val googleConnection by remember(googleAuth) { googleAuth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
     val openAi = openAiPanelState(connection, auth.flows)
     // O motor pronto (ou o motivo de não haver) depende das Settings, da conexão e dos modelos instalados.
-    val resolution = remember(settings, connection, anthropicConnection, googleConnection, models, resolve) { resolve(settings) }
+    val resolution = remember(activeSettings, connection, anthropicConnection, googleConnection, models, resolve) { resolve(activeSettings) }
     Column(
         modifier
             .fillMaxWidth()
@@ -73,26 +74,28 @@ fun ReasoningPanel(
             Column(Modifier.padding(vertical = 16.dp)) {
                 Segmented(
                     options = ReasoningSource.entries,
-                    selected = settings.reasoningSource,
+                    selected = activeSettings.reasoningSource,
                     label = ::reasoningSourceLabel,
                     tag = ::reasoningSourceTag,
-                    onSelect = { onSettingsChange(settings.copy(reasoningSource = it)) },
+                    onSelect = { onSettingsChange(activeSettings.copy(reasoningSource = it)) },
+                    disabled = { it == ReasoningSource.CREDITS },
+                    disabledLabel = { if (it == ReasoningSource.CREDITS) tr("Em breve") else null },
                 )
-                when (settings.reasoningSource) {
-                    ReasoningSource.CREDITS -> CreditsCard(tag = "raciocinio-credits-card")
+                when (activeSettings.reasoningSource) {
+                    ReasoningSource.CREDITS -> Unit
                     ReasoningSource.LOCAL ->
-                        if (localSupported) ReasoningLocal(settings, onSettingsChange, models, actions) else LocalUnsupported()
-                    ReasoningSource.OPENAI -> OpenAiPanel(settings, onSettingsChange, auth, openAi, connection)
-                    ReasoningSource.ANTHROPIC -> AnthropicPanel(settings, onSettingsChange, anthropicAuth)
-                    ReasoningSource.GOOGLE -> GooglePanel(settings, onSettingsChange, googleAuth)
-                    ReasoningSource.CUSTOM -> ReasoningCustomFields(settings, onSettingsChange)
+                        if (localSupported) ReasoningLocal(activeSettings, onSettingsChange, models, actions) else LocalUnsupported()
+                    ReasoningSource.OPENAI -> OpenAiPanel(activeSettings, onSettingsChange, auth, openAi, connection)
+                    ReasoningSource.ANTHROPIC -> AnthropicPanel(activeSettings, onSettingsChange, anthropicAuth)
+                    ReasoningSource.GOOGLE -> GooglePanel(activeSettings, onSettingsChange, googleAuth)
+                    ReasoningSource.CUSTOM -> ReasoningCustomFields(activeSettings, onSettingsChange)
                 }
             }
         }
         SettingsGroup(tr("Testar")) {
             Column(Modifier.padding(vertical = 16.dp)) {
                 // "Manage usage" só faz sentido quando quem responde é o PLANO do ChatGPT (não a chave de API).
-                val manageUsage = auth.usageUrl?.takeIf { settings.reasoningSource == ReasoningSource.OPENAI && openAi.status == OpenAiStatus.CONNECTED_LOGIN }
+                val manageUsage = auth.usageUrl?.takeIf { activeSettings.reasoningSource == ReasoningSource.OPENAI && openAi.status == OpenAiStatus.CONNECTED_LOGIN }
                 ReasoningTestArea(resolution, onManageUsage = manageUsage?.let { url -> { auth.openUrl(url) } }, initialState = initialTest)
             }
         }

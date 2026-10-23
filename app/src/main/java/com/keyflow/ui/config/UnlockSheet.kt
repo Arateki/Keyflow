@@ -34,12 +34,11 @@ import com.keyflow.ui.theme.SpaceGrotesk
 
 const val UNLOCK_SHEET_TAG = "unlock-sheet"
 const val UNLOCK_CLOSE_TAG = "unlock-close"
-const val UNLOCK_RECHARGE_TAG = "unlock-recharge"
 const val UNLOCK_ONCE_TAG = "unlock-once"
 
 /**
- * Bottom-sheet "Desbloquear skins" (SKIN-02/03), **inerte**: duas opções (recarga R$20 que vira saldo +
- * skins; R$15 só skins) e "Pagamento via Google Play". Nada compra nesta fase; fechar pelo scrim ou X.
+ * Bottom-sheet "Desbloquear skins" (SKIN-02/03), com a compra única de skins que entra na v1.
+ * A opção de créditos não faz parte desta versão; fechar pelo scrim ou X.
  * O tema ativo (Ateliê claro/escuro) é herdado do [com.keyflow.ui.theme.KeyFlowTheme] em volta.
  */
 @Composable
@@ -77,7 +76,7 @@ fun UnlockSheet(visible: Boolean, onDismiss: () -> Unit, modifier: Modifier = Mo
                         letterSpacing = (-0.4).sp,
                     )
                     Text(
-                        tr("Personalize o teclado e o overlay com temas. Escolha como liberar — para sempre."),
+                        tr("Personalize o teclado e o overlay com temas. Libere as skins para sempre."),
                         color = palette.muted,
                         fontFamily = SpaceGrotesk,
                         fontWeight = FontWeight.Light,
@@ -99,50 +98,11 @@ fun UnlockSheet(visible: Boolean, onDismiss: () -> Unit, modifier: Modifier = Mo
                 }
             }
 
-            // Opção recomendada — recarga que vira saldo + skins (inerte).
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(top = 20.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(palette.fg)
-                    .clickable(interactionSource = noRipple, indication = null) { /* inerte */ }
-                    .testTag(UNLOCK_RECHARGE_TAG)
-                    .padding(horizontal = 16.dp, vertical = 15.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(tr("Recarregar R$ 20 em créditos"), color = palette.onFill, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Medium, fontSize = 13.5.sp)
-                    Text(
-                        tr("Vira saldo de transcrição e libera todas as skins para sempre."),
-                        color = palette.onFill.copy(alpha = 0.68f),
-                        fontFamily = SpaceGrotesk,
-                        fontWeight = FontWeight.Light,
-                        fontSize = 10.5.sp,
-                        lineHeight = 15.sp,
-                        modifier = Modifier.padding(top = 3.dp),
-                    )
-                }
-                Text(
-                    "MELHOR",
-                    color = PaperWarm,
-                    fontFamily = SpaceGrotesk,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 7.5.sp,
-                    letterSpacing = 1.2.sp,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(50))
-                        .background(palette.teal)
-                        .padding(horizontal = 9.dp, vertical = 4.dp),
-                )
-            }
-
-            // Opção única — só skins (inerte).
+            // Opção única — só skins. A fiação da compra entra na tarefa MZ-T9.
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .padding(top = 10.dp)
+                    .padding(top = 20.dp)
                     .clip(RoundedCornerShape(16.dp))
                     .border(1.dp, palette.line, RoundedCornerShape(16.dp))
                     .clickable(interactionSource = noRipple, indication = null) { /* inerte */ }

@@ -172,7 +172,7 @@ val docsSections: List<DocSection> get() = listOf(
             ),
             DocBlock.Labeled(
                 tr("Origem"),
-                tr("Créditos, OpenAI, Groq, Custom (qualquer serviço compatível) ou Local (modelo no aparelho, sem internet). Nas da nuvem, informe o token; modelo e idioma são opcionais."),
+                tr("Créditos — Em breve; OpenAI, Groq, Custom (qualquer serviço compatível) ou Local (modelo no aparelho, sem internet). Nas origens de nuvem, informe o token; modelo e idioma são opcionais."),
             ),
             DocBlock.Labeled(
                 tr("Tempo limite"),
@@ -250,48 +250,6 @@ val docsSections: List<DocSection> get() = listOf(
             DocBlock.Labeled(
                 tr("Testar"),
                 tr("manda uma frase ao modelo e mostra a resposta chegando, com o tempo até o primeiro trecho."),
-            ),
-        ),
-    ),
-    DocSection(
-        "aba-visao",
-        tr("Aba Visão"),
-        listOf(
-            DocBlock.Paragraph(
-                tr("Configura o reconhecimento óptico de caracteres (OCR) e a compreensão visual da tela. As capturas são feitas diretamente pela orbe sobreposta."),
-            ),
-            DocBlock.Labeled(
-                tr("Origem"),
-                tr("Local (OCR e modelos visuais no aparelho como ML Kit, PP-OCR, MobileNet e Florence, 100% offline) ou Nuvem (OpenAI GPT-4o, Google Gemini Vision e Anthropic Claude Vision)."),
-            ),
-            DocBlock.Labeled(
-                tr("Tradução"),
-                tr("idioma de destino para traduzir o texto capturado nos gestos da orbe."),
-            ),
-            DocBlock.Labeled(
-                tr("Testar OCR"),
-                tr("executa o reconhecimento de texto e avalia a velocidade de resposta do modelo ativo."),
-            ),
-        ),
-    ),
-    DocSection(
-        "aba-voz",
-        tr("Aba Voz"),
-        listOf(
-            DocBlock.Paragraph(
-                tr("Configura a síntese de fala (Text-to-Speech) para ler respostas e mensagens em voz alta."),
-            ),
-            DocBlock.Labeled(
-                tr("Origem"),
-                tr("Local (modelos de voz no aparelho como Piper, Kokoro e MeloTTS, 100% offline) ou Nuvem (OpenAI TTS, ElevenLabs e Google Cloud TTS)."),
-            ),
-            DocBlock.Labeled(
-                tr("Velocidade"),
-                tr("ajuste do ritmo de fala para uma reprodução confortável."),
-            ),
-            DocBlock.Labeled(
-                tr("Testar voz"),
-                tr("reproduz uma frase de exemplo para conferir a qualidade e a entonação da voz escolhida."),
             ),
         ),
     ),
@@ -425,7 +383,7 @@ val docsSections: List<DocSection> get() = listOf(
     DocSection(
         "creditos",
         tr("Créditos"),
-        listOf(DocBlock.Paragraph(tr("Sem provedor próprio? Use Créditos e pague por minuto via Google Play."))),
+        listOf(DocBlock.Paragraph(tr("Créditos ainda não fazem parte desta versão."))),
     ),
     DocSection(
         "licencas",
@@ -691,10 +649,15 @@ fun docsSectionFor(tab: ConfigTab): DocSection? {
         ConfigTab.TECLADO -> "aba-teclado"
         ConfigTab.OVERLAY -> "aba-sobrepor"
         ConfigTab.RACIOCINIO -> "aba-raciocinio"
-        ConfigTab.VISAO -> "aba-visao"
-        ConfigTab.FALA -> "aba-voz"
-        // KeyFlow, Notificação, Fluxos e Computador ainda não têm seção na Docs.
-        ConfigTab.KEYFLOW, ConfigTab.NOTIFICACAO, ConfigTab.DOCS, ConfigTab.FLUXOS, ConfigTab.COMPUTADOR -> return null
+        // As abas ainda não entregues ficam apenas com o cartão "Em breve", sem ajuda que prometa
+        // controles inexistentes.
+        ConfigTab.KEYFLOW,
+        ConfigTab.VISAO,
+        ConfigTab.FALA,
+        ConfigTab.NOTIFICACAO,
+        ConfigTab.DOCS,
+        ConfigTab.FLUXOS,
+        ConfigTab.COMPUTADOR -> return null
     }
     return docsSections.first { it.id == id }
 }

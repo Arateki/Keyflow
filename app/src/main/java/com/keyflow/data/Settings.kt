@@ -188,6 +188,20 @@ data class Settings(
     val partialViewEdit: Boolean = false,
 ) {
     /**
+     * Compatibilidade com configurações gravadas antes da remoção de Créditos da v1.
+     *
+     * Os defaults são os mesmos do construtor: Custom para transcrição e Local para as
+     * capacidades de modelo. Assim uma instalação que ainda tenha CREDITS não tenta usar um
+     * motor que não existe nem deixa a tela presa num estado sem ação.
+     */
+    fun withoutCredits(): Settings = copy(
+        source = if (source == TranscriptionSource.CREDITS) TranscriptionSource.CUSTOM else source,
+        reasoningSource = if (reasoningSource == ReasoningSource.CREDITS) ReasoningSource.LOCAL else reasoningSource,
+        visionSource = if (visionSource == VisionSource.CREDITS) VisionSource.LOCAL else visionSource,
+        falaSource = if (falaSource == FalaSource.CREDITS) FalaSource.LOCAL else falaSource,
+    )
+
+    /**
      * Resolve a [Config] efetiva para uma origem (VOZ-02/03/06). CREDITS é stub: retorna
      * [EffectiveConfig.Unavailable] para o consumidor avisar "em breve" e abortar (VOZ-05).
      *

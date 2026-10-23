@@ -1,5 +1,14 @@
 # Monetization — Tasks
 
+> **Recorte da v1 (2026-10-23)**: entram na v1 a MZ-T1, T2, T3, T4, T9, T10, T11, T13, T14 e T15
+> (compra única de R$15 + AdMob banner e intersticial só no app de configuração; V1-10 no
+> `DEVELOPMENT-ORDER.md`). Ficam para depois: MZ-T5, T6, T7 e T8 (créditos) e MZ-T12 (rewarded
+> "Ganhar minutos"). Na MZ-T9, a v1 cobra o R$15; o botão de recarga não entra. Na T14 e na T15,
+> goldens da v1 cobrem o unlock, o banner e o intersticial. MZ-T3 e MZ-T9 andam com fakes. O e2e
+> com compra real (MZ-T15/API-T14) espera o app no Play Console: upload na trilha interna, com
+> permissão de billing, para criar o produto de R$15, e a service account para a API validar —
+> decisões 1 (conta) e 2 (`applicationId`) no caminho crítico. Rotas de créditos ficam de fora.
+
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (M7–M10)
 **Status**: Aprovada pelo Yan em 2026-07-04 (Bloco 0 do `DEVELOPMENT-ORDER.md`) — nada implementado.
 A API está na `main` desde 2026-09-28 (PR #4: API-T1..T12 + T13 parcial), ainda sem staging (gate
@@ -134,8 +143,8 @@ no device (TESTING.md).
   (UNL-01); `queryPurchases` na abertura restaura sem botão (UNL-02); `skinsUnlocked` destrava a
   seção Skins da aba Teclado (sai o cadeado/estado bloqueado — a escolha real de skin chega com o
   theme-system); `adsOff` → `AdsController` nem inicializa (asserção na T10).
-- **Nota (2026-09-29, Yan)**: o bloqueio segue `KeyboardSkin.paid`/`OrbStyle.paid` (UNL-05) — só a Sistema e a
-  orbe padrão são gratuitas; Ateliê, Aero, Glitch e Rose Gold (teclado) e Aero, Glitch e Rose Gold (orbe) travam sem `skinsUnlocked`. Hoje estão
+- **Nota (2026-09-29, Yan)**: o bloqueio segue `KeyboardSkin.paid`/`OrbStyle.paid` (UNL-05) — só a Sistema, a Ateliê (teclado,
+  gratuita desde 2026-10-23 — nesta task, `ATELIE` passa a `paid = false` em `ime/KeyboardColors.kt`) e a orbe padrão são gratuitas; Aero, Glitch e Rose Gold (teclado) e Aero, Glitch e Rose Gold (orbe) travam sem `skinsUnlocked`. Hoje estão
   todas liberadas para teste; esta task é onde passam a ficar bloqueadas (nas duas abas: Teclado e Sobrepor).
 - **Where**: `ui/config/UnlockSheet.kt`, `ui/config/TecladoPanel.kt`, fiação `SetupActivity`.
 - **Depends on**: MZ-T3, MZ-T4. **Covers**: UNL-01, UNL-02, UNL-04 (parcial — skins full no

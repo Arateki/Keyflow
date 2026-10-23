@@ -28,8 +28,9 @@ enum class TabGroup(private val titlePt: String?) {
 /**
  * As abas da configuração (CFG-01), na ordem do menu lateral: primeiro as **interfaces** (Teclado, Sobrepor,
  * Notificação), depois as **capacidades** (Transcrição, Visão, Raciocínio, Voz) e a Docs. Os ícones são do conjunto
- * próprio ([KfIcons]) — o mesmo traço dos botões da barra do teclado. Notificação, Visão, Raciocínio e Voz ainda não
- * têm conteúdo. A aba Modo saiu (Yan, 2026-09-28): o cartão de cada modo abre a aba da própria interface.
+ * próprio ([KfIcons]) — o mesmo traço dos botões da barra do teclado. Visão, Voz, Fluxos, Computador e Notificação
+ * ficam explícitas como "Em breve" até seus motores existirem. A aba Modo saiu (Yan, 2026-09-28): o cartão de cada
+ * modo abre a aba da própria interface.
  */
 enum class ConfigTab(private val labelPt: String, private val icon: KfIconSpec, val group: TabGroup) {
     // ── Agente Principal

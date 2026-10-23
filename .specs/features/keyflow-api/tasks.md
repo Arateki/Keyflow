@@ -391,6 +391,12 @@ então `[P]` real se houver dois agentes — senão seguir a ordem sequencial.
 ## Fase G — Deploy & e2e
 
 ### API-T13 — Deploy (TLS/secrets/Postgres) + smoke em staging — 🟡 Parcial (2026-07-03) — **[YAN]**
+
+> **Nota (2026-10-23)**: o alvo da v1 é AWS, staging e produção, na menor e mais barata máquina
+> (plano em `api/docs/aws.md`; máquina e região ainda pendentes). DNS/TLS pela Cloudflare. A rota
+> de transcrição (API-T11) e a SSV (API-T12) ficam desligadas na v1. Ver V1-9 no
+> `DEVELOPMENT-ORDER.md`.
+
 - **What**: Dockerfile de release; guia de deploy (reverse proxy com TLS, envs/secrets, Postgres
   gerenciado ou host, job ativo); subir staging; smoke: health/config/models/register (com
   Integrity **relaxado por flag** se a credencial ainda não existir — documentar o que ficou

@@ -14,7 +14,8 @@ Módulo disjunto do app Android (`app/`): o Gradle não enxerga esta pasta e vic
 - Variáveis de ambiente (ver `src/config.rs`):
   - `DATABASE_URL` (obrigatória) — string de conexão Postgres. Ausente → erro claro no boot
     (`missing required environment variable: DATABASE_URL`), sem stack trace genérico.
-  - `BIND_ADDR` (opcional, default `0.0.0.0:8080`) — endereço:porta do axum.
+  - `BIND_ADDR` (opcional, default `0.0.0.0:8080`; `VAR=""` conta como ausente) — endereço:porta
+    do axum.
   - `RUST_LOG` (opcional, default `info,tower_http=debug`) — diretivas do `tracing_subscriber`;
     o default já deixa a latência por rota (`tower_http::trace`) visível sem precisar setar nada.
   - `GOOGLE_SERVICE_ACCOUNT_JSON_PATH` (obrigatória) — caminho do JSON da service account do
@@ -29,12 +30,30 @@ Módulo disjunto do app Android (`app/`): o Gradle não enxerga esta pasta e vic
   - `REGISTER_RATE_LIMIT_PER_MINUTE` (opcional, default `5`) — limite de `POST /v1/register` por
     IP (ID-04). `ACCOUNT_RATE_LIMIT_PER_MINUTE` (opcional, default `60`) — limite por conta nas
     rotas autenticadas. Estouro → `429` + header `Retry-After` (segundos).
-  - `TRANSCRIPTION_PROVIDERS_JSON` (obrigatória) — lista ordenada de provedores Whisper-compatible
+  - `TRUSTED_PROXIES` (opcional, default vazio) — IPs ou CIDRs, separados por vírgula, de onde
+    `CF-Connecting-IP` pode substituir o IP do socket no limite de `/v1/register`. Sem esta
+    variável o header é ignorado (um cliente não forja o IP). IP sem máscara vale como `/32` ou
+    `/128`.
+  - `DB_MAX_CONNECTIONS` (opcional, default `5`), `DB_MIN_CONNECTIONS` (opcional, default `0`,
+    não pode passar do máximo), `DB_IDLE_TIMEOUT_SECS` (opcional, default `300`),
+    `DB_ACQUIRE_TIMEOUT_SECS` (opcional, default `5`) — pool do Postgres.
+  - `TOKIO_WORKER_THREADS` (opcional, default `2`), `TOKIO_MAX_BLOCKING_THREADS` (opcional,
+    default `8`) — runtime do processo. Ambos ≥ 1.
+  - `PLAY_INTEGRITY_BASE_URL` e `ANDROID_PUBLISHER_BASE_URL` (opcionais) — caem nas URLs oficiais
+    do Google. O teste de carga aponta as duas para um mock.
+  - `TRANSCRIBE_ENABLED` e `SSV_ADMOB_ENABLED` (opcionais, padrão desligado; `true`/`1` ligam,
+    `VAR=""` conta como ausente) — uma flag por rota. Na v1 as duas nascem desligadas:
+    `POST /v1/transcribe` e `GET /v1/ssv/admob` respondem `404` sem consultar o banco. Ligar uma
+    não liga a outra.
+  - `TRANSCRIPTION_PROVIDERS_JSON` — lista ordenada de provedores Whisper-compatible
     (design §Proxy): `[{"name","url","authHeaderName","authValueEnv","model"}]`. `authValueEnv`
     é o **nome de outra env var** que guarda o segredo de verdade (nunca inline no JSON — OPS-03).
-    Exemplo: `[{"name":"openai","url":"https://api.openai.com/v1/audio/transcriptions",
+    Obrigatória só com `TRANSCRIBE_ENABLED` ligado; nesse caso a env da chave também é. Com a
+    rota desligada as duas são ignoradas (JSON vazio, ausente ou sem chave não impede o boot).
+    Exemplo, quando a rota está ligada: `[{"name":"openai","url":"https://api.openai.com/v1/audio/transcriptions",
     "authHeaderName":"Authorization","authValueEnv":"OPENAI_KEY","model":"whisper-1"}]` com
-    `OPENAI_KEY=Bearer sk-...` setada à parte.
+    `OPENAI_KEY=Bearer sk-...` setada à parte. A SSV não acrescenta variável obrigatória:
+    `ADS_REWARD_SECONDS` e `ADS_DAILY_CAP` têm padrão, e a URL das chaves do AdMob não é env.
   - `TRANSCRIPTION_TIMEOUT_MS` (opcional, default `30000`), `TRANSCRIPTION_MAX_BYTES` (opcional,
     default `26214400` = 25 MiB), `PROVIDER_UNHEALTHY_COOLDOWN_SECS` (opcional, default `60`).
   - `ADS_REWARD_SECONDS` (opcional, default `60`) — segundos creditados por rewarded ad
@@ -99,8 +118,6 @@ execução só loga e tenta de novo na próxima janela (não é caminho crítico
 DATABASE_URL=postgres://keyflow:keyflow@localhost/keyflow_api \
 GOOGLE_SERVICE_ACCOUNT_JSON_PATH=/path/to/service-account.json \
 PACKAGE_NAME=com.keyflow \
-TRANSCRIPTION_PROVIDERS_JSON='[{"name":"openai","url":"https://api.openai.com/v1/audio/transcriptions","authHeaderName":"Authorization","authValueEnv":"OPENAI_KEY","model":"whisper-1"}]' \
-OPENAI_KEY="Bearer sk-..." \
 cargo run
 ```
 

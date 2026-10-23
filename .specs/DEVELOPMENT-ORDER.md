@@ -35,28 +35,38 @@
 9. **Portões do Yan**: itens marcados **[YAN]** são decisões/validações manuais dele (device
    físico, Play Console, aprovações). O agente prepara tudo, avisa, e **não** executa por ele.
 
-## Recorte da v1 — a primeira versão na Play Store (2026-10-07)
+## Recorte da v1 — a primeira versão na Play Store (2026-10-23)
 
-> **Decisão do Yan (2026-10-07)**: a primeira versão pública sai **gratuita e sem monetização**. Até
-> aqui a loja ficava no fim da fila (VC → MZ → TS → PS), presa às credenciais da API. Agora a v1 é o
-> próximo marco; o que não está pronto entra como "Em breve", e a cadeia API → monetização anda em
-> paralelo para uma atualização (v1.1). Fica valendo a partir daqui — os Blocos 5, 7 e 8 saem da frente
-> da loja.
+> **Decisão do Yan (2026-10-23)**: a v1 sai **com monetização, sem créditos**. Entram a compra única
+> de R$15 (não consumível, restaurável: desbloqueia as skins pagas e remove os anúncios para sempre)
+> e anúncios AdMob só no app de configuração (banner + intersticial, conforme
+> `.specs/features/monetization/context.md` M7/M8; nunca no teclado nem no overlay). Não entram
+> créditos (origem Créditos, recarga, saldo) nem o rewarded "Ganhar minutos" — ficam "Em breve". A
+> API em staging e produção passa a ser pré-requisito da v1.
+
+> **Histórico (2026-10-07)**: a primeira versão pública saía gratuita e sem monetização, e a cadeia API → monetização ficava para a v1.1.
 
 **O que a v1 é**: o teclado de voz completo sem conta nossa — a pessoa usa a própria chave (OpenAI,
-Groq, endpoint próprio) ou os modelos locais, offline.
+Groq, endpoint próprio) ou os modelos locais, offline. As skins pagas liberam com a compra única de
+R$15, que também tira os anúncios para sempre. Os anúncios ficam só no app de configuração.
 
-### Entra (já existe e funciona)
+### Entra (já existe e funciona, mais o que a V1-10 liga)
 
 - Teclado de voz: IME, orbe flutuante, gravação (FGS `microphone`), pausa, cancelar/desfazer, gestos.
 - Transcrição por chave própria (OpenAI/Groq/Custom) e por modelos locais (sherpa-onnx, offline).
 - Teclado Canvas (PT/EN/ES, acentos, corretor próprio), barras de atalhos, grades e teclas físicas.
 - Tour de gestos, Docs, onboarding.
-- Aparência: Ateliê, Aero, Glitch, Rose Gold, o mascote e skins importáveis (`.zip`) — ver decisão 3.
+- Aparência: Ateliê, Aero, Glitch, Rose Gold, o mascote e skins importáveis (`.zip`). Aero, Glitch,
+  Rose Gold e o mascote são pagos já na v1, liberados pela compra de R$15 (decisão 3); a Sistema e a
+  Ateliê do teclado e a orbe padrão são grátis.
+- Compra única de R$15 pelo Play Billing (não consumível, restaurável) e anúncios AdMob no app de
+  configuração: banner + intersticial (M7/M8). Nunca no teclado nem no overlay. Fiação na V1-10.
 - Raciocínio: modelos locais (Gemma/Qwen) e provedores por chave de API (OpenAI, Anthropic, Google).
   Login ChatGPT e SSO do Google continuam desligados no release (`enabled = BuildConfig.DEBUG`).
 - Agente KeyFlow da fase 1 (chat + ferramentas de skin com confirmação; MCP desligado) — **só se a
   V1-4 fechar**; senão ele entra como "Em breve".
+- API em staging e produção (V1-9), com a rota de transcrição (API-T11) e a SSV (API-T12)
+  desligadas (`TRANSCRIBE_ENABLED` e `SSV_ADMOB_ENABLED`, padrão desligado, 404 sem banco).
 
 ### Entra como "Em breve" (visível, rotulado, sem nada que pareça funcionar)
 
@@ -64,15 +74,18 @@ Groq, endpoint próprio) ou os modelos locais, offline.
   nenhum campo, botão ou permissão. Hoje Visão/Fala/Fluxos/Computador têm tela e `Settings`, mas nenhum
   motor (vieram do trabalho do Gemini, sem spec); a Computador tem um "Testar conexão" simulado
   (`delay(600)`) e guarda chave privada SSH.
-- Origem **Créditos** (Transcrição, Raciocínio, KeyFlow): desabilitada, com "Em breve"; sem recarga.
+- Origem **Créditos** (Transcrição, Raciocínio, KeyFlow): desabilitada, com "Em breve"; sem recarga
+  e sem saldo.
+- Rewarded **"Ganhar minutos"**: "Em breve". A SSV (API-T12) fica desligada na v1.
 
 ### Sai do build de release
 
-- `UnlockSheet` ("Desbloquear skins", "Pagar R$ 15 — uma vez", "Recarregar R$ 20 em créditos") e o
-  "Recarregar créditos" do `CreditsCard`: botão com preço que não cobra é o pior caso na revisão
-  (funcionalidade quebrada e cobrança fora do Play Billing).
-- Fica para depois da v1: monetização (MZ, v1.1), `vision-capture`, `theme-system` (spec a revisar —
-  ver Estado atual), fases 2/3 do agente e os motores de Fala/Fluxos/Computador (sem spec).
+- A recarga de créditos: o "Recarregar créditos" do `CreditsCard` e o "Recarregar R$ 20 em créditos"
+  da `UnlockSheet`. Botão com preço que não cobra é o pior caso na revisão (funcionalidade quebrada
+  e cobrança fora do Play Billing). A `UnlockSheet` **não sai** — ganha fiação na MZ-T9 (V1-10) e
+  cobra o R$15 de verdade.
+- Fica para depois da v1: créditos (MZ-T5–T8 e MZ-T12), `vision-capture`, `theme-system` (spec a
+  revisar — ver Estado atual), fases 2/3 do agente e os motores de Fala/Fluxos/Computador (sem spec).
 
 ### Regras da Play que moldam o recorte (lidas na fonte em 2026-10-07)
 
@@ -86,13 +99,25 @@ Groq, endpoint próprio) ou os modelos locais, offline.
   vira recurso **numa versão nova do app**, nunca por config remota.
 - **Teste obrigatório** (answer/14151465): conta **pessoal** criada depois de 13/11/2023 precisa de teste
   fechado com **12 testadores por 14 dias seguidos** antes de pedir produção (análise de até ~7 dias).
+- **O que a monetização acrescenta (2026-10-23)**, sem regra nova: selo "Contém anúncios"; a compra
+  no app é o R$15 pelo Play Billing (a `UnlockSheet` cobra de verdade na MZ-T9); o consentimento dos
+  anúncios é o UMP, já previsto na MZ-T10. Créditos e o rewarded continuam "Em breve" — não viram
+  botão que não cobra.
 
 ### Tasks da v1 (em ordem; uma por vez, gate verde)
+
+Ordem: **V1-1 → V1-2 → V1-10 com fakes** (MZ-T3/T9 inclusive; só depois da API em staging) **→
+V1-3 → upload interno antecipado → e2e real da V1-10** (MZ-T15/API-T14) **→ V1-4 → V1-5 → V1-6 →
+V1-7 → V1-8** (teste fechado → produção). A **V1-9** corre em paralelo desde já e entrega o
+staging. As decisões **1** (conta) e **2** (`applicationId`) entram no caminho crítico: travam o
+upload interno, o produto de R$15 e a service account. As tasks V1-1..V1-8 não foram renumeradas.
 
 - ~~**V1-0** — Mesclar a PR #7 (skins até 120 fps, mascote, provedores Anthropic/Google, agente fase 1)
   com o CI verde.~~ **Feito em 2026-10-10** (merge `4cd4ee4`, CI #35 verde sem repetição). No caminho: repo
   público, regra "main protegida", gate que repete 1× o que falha, esteira de instabilidade (TESTING.md).
-- **V1-1** — "Em breve" e fim das cascas inertes (listas acima). Instrumentado + goldens das rotas.
+- ~~**V1-1** — "Em breve" nas abas e na origem Créditos (listas acima). A `UnlockSheet` fica; sai só a
+  recarga de créditos. Instrumentado + goldens das rotas.~~ **Feito em 2026-10-23** (commit `a59e3c3`;
+  instrumentado e goldens verdes).
 - **V1-2** — Higiene do release, pendências herdadas do trabalho do Gemini: logs que imprimem o texto
   ditado (`KeyFlowController`, `OverlayCoordinator` — `take(30)`) só no debug; leitura dos segredos fora
   da main thread (`settingsFlow` → `flowOn(Dispatchers.IO)`); chave de API num lugar só (o cofre
@@ -100,44 +125,89 @@ Groq, endpoint próprio) ou os modelos locais, offline.
   `enabled = BuildConfig.DEBUG`; conferir no AAB que o da Anthropic não vai junto — a política dela
   proíbe login de assinatura em produto de terceiros (Bloco 10), e código dormente pesa no §5 acima.
 - **V1-3** — Build de release (PS-5): R8 (`isMinifyEnabled`) com keep rules (AIDL dos processos
-  `:inference`/`:reasoning`, sherpa-onnx, LiteRT-LM, AndroidSVG), AAB, `versionName` 1.0.0, smoke do
-  release no A32. **[YAN]**: chave de upload (Play App Signing) e o `applicationId` (decisão 2).
+  `:inference`/`:reasoning`, sherpa-onnx, LiteRT-LM, AndroidSVG, Play Billing, AdMob), AAB,
+  `versionName` 1.0.0, smoke do release no A32. **[YAN]**: chave de upload (Play App Signing) e o
+  `applicationId` (decisão 2, caminho crítico). Vem depois da V1-10 com fakes, para o AAB já levar
+  a compra e os anúncios. Em seguida sobe na trilha interna **[YAN]**, com a permissão de billing,
+  para criar o produto de R$15 — antes do e2e real (MZ-T15/API-T14). A conta (decisão 1) trava
+  esse upload.
 - **V1-4** — Agente na v1: recorte da AGT-T10 para a fase 1 (abuso: injeção, segredo, argumentos,
   flood) + validação real com a chave do Yan **[YAN]**. Não fechou → agente vira "Em breve".
 - **V1-5** — Política de privacidade (PS-2): áudio sob demanda para a origem escolhida, modelos locais,
-  provedores de raciocínio por chave (`PLAYSTORE_CHECKLIST.md` §1b), agente, skins importadas; sem
-  anúncios nem compras na v1. URL permanente **[YAN decide onde]** + link no app.
+  provedores de raciocínio por chave (`PLAYSTORE_CHECKLIST.md` §1b), agente, skins importadas, AdMob
+  (banner e intersticial só no app de configuração, consentimento UMP) e a compra única de R$15.
+  URL permanente **[YAN decide onde]** + link no app.
 - **V1-6** — Prominent disclosure no onboarding (PS-3). Instrumentado + golden.
-- **V1-7** — Listing (PS-6) só com o que entra **[YAN aprova textos]**; rascunho campo a campo do Data
-  Safety (PS-4) e da declaração dos serviços em primeiro plano (`microphone`, `dataSync`) — o Yan
+- **V1-7** — Listing (PS-6) só com o que entra **[YAN aprova textos]**, com anúncios e a compra de
+  R$15 (selo "Contém anúncios"); rascunho campo a campo do Data Safety (PS-4), agora com anúncios e
+  compras, e da declaração dos serviços em primeiro plano (`microphone`, `dataSync`) — o Yan
   preenche no Console **[YAN]**.
-- **V1-8** — Trilha interna → teste fechado → produção (PS-7) **[YAN]**. Antes dela, os roteiros
-  manuais pendentes no A32 do que entra: GT-T8, NM-T13/T18, RSN-T19 (Gemma/Qwen: tempo e RAM) e o das
-  skins.
+- **V1-8** — Teste fechado → produção (PS-7) **[YAN]**. O primeiro AAB já subiu na trilha interna
+  logo depois da V1-3 (permissão de billing e produto de R$15), antes do e2e real. A V1-8 retoma
+  essa trilha: teste fechado com license testers da compra → produção. Antes dela, os roteiros
+  manuais pendentes no A32 do que entra: GT-T8, NM-T13/T18, RSN-T19 (Gemma/Qwen: tempo e RAM) e o
+  das skins.
+- **V1-9** — API em staging e produção na AWS (API-T13 + teste de carga). A menor e mais barata
+  máquina; o plano está em `api/docs/aws.md` (não inventar números). DNS/TLS pela Cloudflare; o Yan
+  tem domínios na Cloudflare e na GoDaddy. Rust para render o máximo numa máquina pequena; o teste
+  de carga diz quantos usuários ela aguenta.
+  API-T11 e API-T12 ficam desligadas na v1, cada uma com a própria config
+  (`TRANSCRIBE_ENABLED`, `SSV_ADMOB_ENABLED`; padrão desligado). A rota desligada responde 404 e
+  não toca no banco. Pode andar em paralelo desde já. Staging acessível só
+  ao Yan (VPN ou equivalente) — anotado, sem configurar agora.
+- **V1-10** — Monetização da v1, **depois da API em staging**: MZ-T1, T2, T3, T4, T9, T10, T11, T13,
+  T14 e T15. Fora: T5–T8 e T12 (créditos e o rewarded "Ganhar minutos"). Na MZ-T9 a sheet cobra o
+  R$15; o botão de recarga não entra. MZ-T3 e MZ-T9 andam com fakes: a sheet e os entitlements
+  fecham sem o Play Console. O e2e com compra real (MZ-T15/API-T14) precisa do app no Console — um
+  upload na trilha interna, com a permissão de billing, para criar o produto de R$15, e a service
+  account do Google para a API validar a compra. Isso depende das decisões 1 (conta) e 2
+  (`applicationId`), no caminho crítico; o upload antecipado fica entre a V1-3 e esse e2e. Na T14,
+  os goldens cobrem o unlock, o banner e o intersticial. Na T15, o e2e real é a compra de R$15 e
+  os anúncios; as rotas de créditos ficam para depois.
 
 ### Decisões do Yan que a v1 precisa
 
-1. **Conta de desenvolvedor**: pessoal ou organização (Arateki). Organização exige D-U-N-S (grátis na
-   Dun & Bradstreet, até 30 dias) e, portanto, uma empresa registrada. Conta pessoal que monetiza
-   mostra o **endereço completo** na Play (answer/13628312).
-2. **`applicationId` definitivo** antes do 1º upload — depois dele não muda: `com.keyflow` (atual; não
-   há app público com esse id, mas só o Console confirma) ou `com.arateki.keyflow`. Muda junto o
-   `PACKAGE_NAME` da API.
-3. **Temas "pagos, liberados por ora"** (Aero, Glitch, Rose Gold, mascote) numa v1 sem cobrança:
-   (a) grátis para sempre, só temas futuros pagos — não tira nada de quem instalou; (b) grátis na v1 e
-   pagos na v1.1, preservando quem já tem; (c) "Em breve" na v1.
+1. **Conta de desenvolvedor** — **urgente, caminho crítico**. Com venda na v1 é preciso o perfil
+   de pagamentos no Play Console. Sem a conta não há upload interno, produto de R$15 nem service
+   account, e o e2e real (MZ-T15/API-T14) não fecha. Pessoal ou organização (Arateki). Organização
+   exige D-U-N-S (grátis na Dun & Bradstreet, até 30 dias) e, portanto, uma empresa registrada.
+   Conta pessoal que vende mostra o **endereço completo** do Yan na Play (answer/13628312).
+2. **`applicationId` definitivo** — **caminho crítico**, antes do 1º upload (a trilha interna que
+   antecede o e2e real). Depois dele não muda: `com.keyflow` (atual; não há app público com esse
+   id, mas só o Console confirma) ou `com.arateki.keyflow`. Muda junto o `PACKAGE_NAME` da API.
+3. **Temas pagos na v1** — **resolvida (2026-10-23)**: Aero, Glitch, Rose Gold e o mascote são pagos
+   já na v1, liberados pela compra de R$15. A Ateliê do teclado é grátis (emenda à UNL-05 da monetização).
 4. Onde hospedar a política de privacidade.
+5. **Máquina e região da AWS** (staging e produção): pendente do plano em `api/docs/aws.md`.
 
-**Pronto quando**: app aprovado em produção; teste fechado cumprido; nenhum botão que não faz nada;
-listing só com o que existe.
+**Pronto quando**: app aprovado em produção; teste fechado cumprido, com license testers da compra;
+nenhum botão que não faz nada; listing só com o que existe; compra de R$15 restaurável e anúncios
+só no app de configuração.
 
-### Em paralelo: API em staging (pré-requisito da v1.1)
+### Em paralelo: API em staging e produção (pré-requisito da v1)
 
-A API-T13 não bloqueia a v1. O staging sobe já com `INTEGRITY_RELAXED=true` (Postgres + domínio +
-provedor de transcrição); a service account do Google depende do app existir no Play Console (V1-3/V1-8)
-e entra depois. A v1.1 = MZ-T1..T15 + API-T14 em cima da v1 publicada.
+A V1-9 (API-T13 + teste de carga) não espera o app: é servidor e pode andar desde já. Staging e
+produção sobem na **menor e mais barata máquina da AWS**. O plano está em `api/docs/aws.md`;
+máquina e região saem de lá — não inventar números. DNS e TLS pela Cloudflare; o Yan tem domínios
+na Cloudflare e na GoDaddy. O servidor é em Rust para render o máximo numa máquina pequena. O
+teste de carga diz quantos usuários essa máquina aguenta. Na v1, `POST /v1/transcribe` e
+`GET /v1/ssv/admob` sobem desligadas (`TRANSCRIBE_ENABLED` e `SSV_ADMOB_ENABLED`); cada uma
+responde 404 sem consultar o banco até alguém ligar a flag.
 
-## Estado atual (2026-10-07)
+A rota de transcrição (API-T11) e a SSV (API-T12) ficam desligadas na v1. O staging sobe com
+`INTEGRITY_RELAXED=true`. MZ-T3 e MZ-T9 andam com fakes enquanto não há app no Play Console.
+
+O e2e com compra real (MZ-T15/API-T14) precisa do app no Console. No caminho crítico, antes dele:
+as decisões 1 (conta) e 2 (`applicationId`), o AAB da V1-3 e um upload na trilha interna com a
+permissão de billing — é assim que se cria o produto de R$15. A service account do Google,
+vinculada a esse app, é o que permite a API validar a compra.
+
+**Anotação, sem configurar agora**: o staging fica acessível só ao Yan (VPN ou equivalente).
+
+Depois da v1: créditos (MZ-T5–T8, MZ-T12) e ligar API-T11/T12. O fluxo de créditos fica de fora
+do e2e da v1.
+
+## Estado atual (2026-10-23)
 
 | Milestone | Feature | Status |
 | --------- | ------- | ------ |
@@ -150,15 +220,16 @@ e entra depois. A v1.1 = MZ-T1..T15 + API-T14 em cima da v1 publicada.
 | — | `native-voice-models` | ✅ código completo (NM-T1..T12, T14..T17 + núcleo da T18; PR #3). CI verde em `5db6d75`: 240/240 instrumentados, telas 84/84. Desde o PR #5 o download é da fila do app (IPv4 primeiro), não do DownloadManager — desvio da G6 no design. Faltam os roteiros manuais T13/T18 no A32 **[YAN]** (`manual-validation.md`) |
 | — | Teclado pós-uso no A32 (PR #5) | ✅ fluidez (sem chamada síncrona por letra, escorregar, rollover, vibração, prévia na janela), acentos no jeito do Samsung, fileira de 56 dp, cores "Sistema" padrão, corretor próprio com troca no espaço (Q9), cursor no meio do texto |
 | — | `vision-capture` | spec/design/tasks prontos — nada do motor implementado; fora da v1. ⚠️ A aba Visão do trabalho do Gemini já existe com "Origem da visão" (Créditos/endpoint próprio), contra a spec ("nenhum byte sai do aparelho") — decidir antes da VC-T11 |
-| M7 | `keyflow-api` | API-T1..T12 ✅ + T13 parcial (Dockerfile + `api/docs/deploy.md`), **na `main` desde 2026-09-28** (PR #4); T13 parou nas credenciais/staging **[YAN]** |
-| M7 | `monetization` | spec/design/tasks prontos — nada implementado (depende da API em staging; MZ-T1/T2/T5/T11 podem adiantar) |
+| M7 | `keyflow-api` | API-T1..T12 ✅ + T13 parcial (Dockerfile + `api/docs/deploy.md`), **na `main` desde 2026-09-28** (PR #4); T13 parou nas credenciais/staging **[YAN]**. A v1 exige staging e produção na AWS (V1-9); plano em `api/docs/aws.md`. API-T11 e API-T12 ficam desligadas na v1 |
+| M7 | `monetization` | spec/design/tasks prontos — nada implementado. **Parte entra na v1** (V1-10: MZ-T1, T2, T3, T4, T9, T10, T11, T13, T14, T15). MZ-T3/T9 com fakes depois do staging; o e2e real (MZ-T15/API-T14) espera o upload interno e as decisões 1 e 2. Créditos (T5–T8) e o rewarded (T12) ficam para depois |
 | M8 | `theme-system` | spec de 2026-07-04, nada implementado — **defasada**: Aero, Glitch e Rose Gold saíram por fora (quick 013/015/016, pintores no IME como `KeySurface`/`RoseGoldPainter`) e as skins por pacote existem; não há `ThemeRegistry`. Revisar a spec antes de executar. Fora da v1 |
-| — | Play Store | **v1 = recorte acima** (V1-0..V1-8). `PLAYSTORE_CHECKLIST.md`; PS-1 (targetSdk 36) feito; PS-2..PS-7 viram V1-3/V1-5..V1-8 |
+| — | Play Store | **v1 = recorte de 2026-10-23** (V1-0 feita; seguem V1-1..V1-8, com V1-9 em paralelo e V1-10 depois do staging). `PLAYSTORE_CHECKLIST.md`; PS-1 (targetSdk 36) feito; PS-2..PS-7 viram V1-3/V1-5..V1-8 |
 | — | `reasoning-models` (aba Raciocínio) | **na `main` desde 2026-09-30**: RSN-T0..T17 feitos e o texto de privacidade da RSN-T18 em `PLAYSTORE_CHECKLIST.md` §1b (a traceability RPRV-01..04 ainda diz "In Tasks"). Faltam só **[YAN]**: repositório público, elegibilidade do login ChatGPT (RPRV-04) e o roteiro RSN-T19 no A32 — ver Bloco 10 |
 | — | `skin-packs` (skins importáveis) + skin mascote | SKP-T1..T9 feitos (motor AndroidSVG, importação nas abas Teclado e Sobrepor, pacote de exemplo, orbe de pacote até 120 fps) e o mascote nativo (quick 018); na `main` local e na **PR #7**. Falta o roteiro no A32 **[YAN]** (pacote dele, orbe animada no Helio G80, IME real) |
 | — | `agent-harness` (agente KeyFlow) | fase 1 (AGT-T1..T5: núcleo, Anthropic, chat, ferramentas de skin, Ajustes; MCP desligado) na `main` local e na **PR #7**. Pendentes: AGT-T6 (ferramentas de app), T7 (OpenAI/Google), T8 (skins por modelo), T9 (MCP), T10 (abuso + validação real **[YAN]**) — o recorte da T10 para a fase 1 é a V1-4 |
 | — | Trabalho do Gemini (abas KeyFlow, Fluxos, Computador, Fala, Visão; provedores Anthropic/Google) | commitado e na PR #7. Provedores e aba KeyFlow funcionam; **Fluxos, Computador, Fala e Visão são só tela + `Settings`, sem motor e sem spec** → "Em breve" na v1 (V1-1). Pendências de segurança/release herdadas → V1-2 |
 | — | CI | 2026-10-07: cache do AAR do sherpa-onnx nos dois jobs (um 503 do GitHub derrubou a PR #7 antes dos testes) |
+| — | 2026-10-10..22 | PRs #8 a #11 (estabilidade dos testes, desempenho da abertura do teclado, CI, galeria) — fora da fila da v1 |
 
 ---
 
@@ -315,13 +386,20 @@ a regra "merge a cada task" não foi seguida). Gate `rust` verde no CI (111 test
 
 ## Bloco 7 — `monetization` (app) — Milestone 7, parte 2
 
-Spec: `.specs/features/monetization/`. **Pré-requisito: API em staging (API-T13).** Ordem:
+Spec: `.specs/features/monetization/`. **Pré-requisito: API em staging (API-T13).** Ordem da
+feature inteira:
 MZ-T1 → T2 → T3 → T4 → T5 → T6 → T7 → T8 → T9 → T10 → T11 → T12 → T13 → T14 → T15.
+**Recorte da v1 (2026-10-23, V1-10)**: entram T1, T2, T3, T4, T9, T10, T11, T13, T14 e T15.
+T5–T8 e T12 (créditos e rewarded) ficam para depois. MZ-T3/T9 andam com fakes; o e2e real
+(MZ-T15/API-T14) espera o upload interno e as decisões 1 e 2.
 
-- **[YAN]**: produtos no Play Console + license testers (antes de MZ-T3 testar de verdade);
-  conta/unidades AdMob + SSV (antes de MZ-T10/T12 saírem dos test ads); MZ-T15 = e2e com compras
-  de teste no device (junto com API-T14).
-- MZ-T1..T2, T5 e T11 (lógica pura) podem começar antes do staging existir.
+- **[YAN]**: o produto de R$15 no Play Console nasce de um upload na trilha interna com permissão
+  de billing (depois da V1-3; decisões 1 e 2 no caminho crítico). License testers antes do e2e
+  real. MZ-T3/T9 não esperam isso: seguem com fakes. Conta/unidades AdMob antes de MZ-T10 sair
+  dos test ads; a SSV é da MZ-T12, fora da v1. MZ-T15 = e2e da compra real no device (junto com
+  API-T14), depois da service account.
+- MZ-T1, MZ-T2 e MZ-T11 (lógica pura) podem começar antes do staging existir. A MZ-T5 também
+  pode, mas está fora da v1 (créditos).
 
 ## Bloco 8 — `theme-system` — Milestone 8
 
@@ -338,18 +416,19 @@ TS-T1 → T2 → T3 → T4 → T5 → T6(⚠️) → T7 → T8(⚠️) → T9(�
 ## Bloco 9 — Publicação na Play Store
 
 Base: `PLAYSTORE_CHECKLIST.md` (raiz). **Desde 2026-10-07 estes itens são executados pelo recorte da
-v1** (topo deste arquivo): PS-5 → V1-3, PS-2 → V1-5, PS-3 → V1-6, PS-4/PS-6 → V1-7, PS-7 → V1-8. Na v1
-não há anúncios nem compras — o que abaixo cita monetização/AdMob entra na v1.1.
+v1** (topo deste arquivo): PS-5 → V1-3, PS-2 → V1-5, PS-3 → V1-6, PS-4/PS-6 → V1-7, PS-7 → V1-8.
+**Desde 2026-10-23** a v1 tem anúncios AdMob (só no app de configuração) e a compra de R$15; o que
+abaixo cita monetização entra na V1-10. Créditos continuam fora.
 
 - [x] **PS-1 — targetSdk 36**: FEITO em 2026-09-09 (`9bc8a96`). `compileSdk`/`targetSdk` 36, sem
       mudança de código necessária; 252 unitários, 163/163 no A32 e 163/163 no emulador A17.
       `PLAYSTORE_CHECKLIST.md` já marca o bloqueante 0 como resolvido. Falta só **[YAN]**: o passe
       manual usando o app no A32 — **confirmado pelo Yan em 2026-09-09**, funcionando normal.
 - [ ] **PS-2 — Política de privacidade pública**: redigir (conteúdo mínimo do checklist: áudio
-      sob demanda, endpoint do usuário/proxy, sem keystrokes; agora também: créditos/identidade
-      anônima [monetization], modelos locais [native-voice-models], captura de tela efêmera
-      [vision-capture], AdMob) + publicar em URL permanente **[YAN decide onde]** + link dentro
-      do app (aba Docs/Sistema).
+      sob demanda, endpoint do usuário/proxy, sem keystrokes; agora também: identidade anônima,
+      compra de R$15 e AdMob [monetization] — créditos ficam para depois da v1; modelos locais
+      [native-voice-models], captura de tela efêmera [vision-capture]) + publicar em URL
+      permanente **[YAN decide onde]** + link dentro do app (aba Docs/Sistema). Executado pela V1-5.
 - [ ] **PS-3 — Prominent disclosure**: tela de consentimento explícito no onboarding (texto do
       checklist + botão de aceite; o "?" por permissão do gesture-tour complementa, não
       substitui). Instrumented + golden.
@@ -390,18 +469,24 @@ texto literal da doc da OpenAI). Ordem: RSN-T0 → T1 → … → T19 (uma por v
 
 ```
 feito: Q1..Q11 → SB → GT → NM → RSN → SKP → AGT fase 1 (faltam só manuais [YAN])
-agora: V1-1..V1-8 → v1 na Play Store (V1-0, PR #7, mesclada em 2026-10-10)
-em paralelo: API-T13 (staging) → [conta Play + service account] → v1.1 = MZ-T1..T15 + API-T14
-depois: VC (visão) · TS (temas, spec a revisar) · AGT fases 2/3 · Fala/Fluxos/Computador (sem spec)
+       PRs #8..#11 (2026-10-10..22) fora da fila da v1; V1-0 (PR #7) feita em 2026-10-10
+agora: V1-1 → V1-2 → V1-10 (fakes) → V1-3 → upload interno → e2e MZ-T15/API-T14 → V1-4 → … → V1-8
+em paralelo: V1-9 (API-T13 na AWS) — fakes esperam o staging; o e2e real espera conta, applicationId e o upload
+depois: créditos (MZ-T5..T8, T12) e ligar API-T11/T12 · VC (visão) · TS (temas, spec a revisar) ·
+       AGT fases 2/3 · Fala/Fluxos/Computador (sem spec; ideias em
+       .specs/features/computer-terminal/ideias.md)
 ```
 
-**Posição atual (2026-10-07)**: o próximo marco é a **v1** (recorte no topo deste arquivo). A PR #7
-está no CI; depois dela vem a V1-1. A API sai do gate **[YAN]** da API-T13 em paralelo: o staging sobe
-sem as credenciais do Google (`INTEGRITY_RELAXED=true`), e a service account entra quando o app existir
-no Play Console.
+**Posição atual (2026-10-23)**: o próximo marco é a **v1** (recorte no topo). A V1-0 está feita
+(PR #7, 2026-10-10). O próximo passo da fila é a V1-1. A V1-9 (API na AWS) corre em paralelo desde
+já. A V1-10 com fakes espera o staging. O e2e com compra real espera as decisões 1 e 2, o AAB da
+V1-3 e o upload na trilha interna (produto de R$15 e service account). As PRs #8 a #11 não mudam
+a fila.
 
-> Até 2026-09-28 a fila era GT → NM → VC → API → MZ → TS → PS, com a loja no fim. O recorte da v1
-> (2026-10-07) puxou a loja para a frente; o racional abaixo vale para a ordem **depois** da v1.
+> Até 2026-09-28 a fila era GT → NM → VC → API → MZ → TS → PS, com a loja no fim. O recorte de
+> 2026-10-07 puxou a loja para a frente (decisão no histórico, no topo). Em 2026-10-23 a compra de
+> R$15, os anúncios no app de configuração e a API na AWS entraram na v1; créditos ficaram de fora.
+> O racional abaixo descreve a ordem antiga — vale para o que ficou **depois** da v1.
 
 **Racional da ordem**: primeiro fechar o que está em voo (barras) e o que não depende de nada
 externo (tour/Docs — também é pré-requisito de conteúdo da loja); depois as features grandes de
@@ -434,8 +519,9 @@ O paralelismo aqui é limitado por **recursos físicos compartilhados**, não po
 - **Frente B — keyflow-api** (mesmo repo, **worktree própria**, tocando SÓ `api/`,
   `.github/workflows/api.yml`, `.gitignore` e o Status do `tasks.md` da feature): Bloco 6
   completo. Pastas disjuntas do Android → merge pro master trivial e frequente (a cada task).
-- **Sincronização**: Bloco 7 (MZ) precisa da API em staging (API-T13); MZ-T1/T2/T5/T11 (lógica
-  pura) podem adiantar sem staging.
+- **Sincronização**: a V1-10 com fakes precisa da API em staging (V1-9 / API-T13). O e2e real
+  (MZ-T15/API-T14) espera ainda as decisões 1 e 2, o upload interno e a service account. MZ-T1 e
+  MZ-T2 podem adiantar sem staging. MZ-T5 (créditos) fica fora da v1.
 - **Frente C (opcional, ganho modesto)**: worktree Android fazendo APENAS tasks unit-puras de
   gate `quick` sem goldens (TS-T1, TS-T5, GT-T1 — arquivos novos, conflito baixo). Merge revisado
   pelo Yan ANTES de a Frente A entrar nos mesmos pacotes. Não dar a esta frente nenhuma task com

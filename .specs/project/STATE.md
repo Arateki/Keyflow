@@ -2522,3 +2522,6 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
   Agora cai em `READ_FAILED` (ferramentas desligadas); teste com arquivo corrompido.
 - **Próximo**: fase 2 (AGT-T6 ferramentas de app com lista de permitidos; AGT-T7 OpenAI/Google), fase 3 (AGT-T8 skins parametrizadas; AGT-T9 servidor MCP), AGT-T10 (abuso e validação
   real com a Anthropic — exige a chave e a autorização do Yan).
+
+## V1-1 — lição de ambiente (2026-10-23)
+- No servidor falta ImageMagick; por isso `scripts/diff-screens.sh` não roda como no CI sem instalar/fixar o comparador. A validação local precisou de um fallback temporário em `/tmp`.

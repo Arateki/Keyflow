@@ -3,26 +3,26 @@ package com.keyflow.core
 enum class RecordingMode { TOGGLE, PUSH_TO_TALK }
 
 /**
- * Origem da transcrição (aba Voz). CREDITS é stub inerte nesta fase (VOZ-01). LOCAL = modelo de voz
+ * Origem da transcrição (aba Voz). CREDITS é uma opção legada, desabilitada nesta versão. LOCAL = modelo de voz
  * rodando no aparelho (native-voice-models, MGR-01) — última da lista, é a 5ª opção do seletor.
  */
 enum class TranscriptionSource { CREDITS, OPENAI, GROQ, CUSTOM, LOCAL }
 
 /**
- * Origem do raciocínio (aba Raciocínio, reasoning-models). CREDITS = créditos KeyFlow; LOCAL = modelo de texto rodando no aparelho
+ * Origem do raciocínio (aba Raciocínio, reasoning-models). CREDITS é uma opção legada, desabilitada nesta versão; LOCAL = modelo de texto no aparelho
  * (LiteRT-LM, processo `:reasoning`); OPENAI/ANTHROPIC/GOOGLE = nuvem. Independente da
  * origem da transcrição: uma não muda a outra.
  */
 enum class ReasoningSource { CREDITS, LOCAL, OPENAI, ANTHROPIC, GOOGLE, CUSTOM }
 
 /**
- * Origem da visão (aba Visão, vision-capture). CREDITS = créditos KeyFlow; LOCAL = OCR e modelos visuais rodando no aparelho
+ * Origem da visão (aba Visão, vision-capture). CREDITS é uma opção legada, desabilitada nesta versão; LOCAL = OCR e modelos visuais no aparelho
  * (100% offline); OPENAI = nuvem GPT-4o; GOOGLE = Google Gemini Vision; ANTHROPIC = Claude Vision; CUSTOM = API personalizada.
  */
 enum class VisionSource { CREDITS, LOCAL, OPENAI, GOOGLE, ANTHROPIC, CUSTOM }
 
 /**
- * Origem da voz / síntese de fala (aba Voz, FALA). CREDITS = créditos KeyFlow; LOCAL = modelos de voz no aparelho
+ * Origem da voz / síntese de fala (aba Voz, FALA). CREDITS é uma opção legada, desabilitada nesta versão; LOCAL = modelos de voz no aparelho
  * (100% offline, TTS); OPENAI = síntese via OpenAI TTS; ELEVENLABS = vozes ultra-realistas ElevenLabs;
  * GOOGLE = síntese neural Google Cloud TTS; CUSTOM = API de voz personalizada.
  */

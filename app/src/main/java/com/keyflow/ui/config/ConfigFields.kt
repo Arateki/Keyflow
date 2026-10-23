@@ -68,6 +68,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
@@ -117,6 +118,8 @@ internal fun <T> Segmented(
     // Opção desenhada como ícone (ex.: ∞ = sem limite); o [label] dela vira o nome acessível.
     icon: ((T) -> KfIconSpec?)? = null,
     allowTwoRows: Boolean = true,
+    disabled: (T) -> Boolean = { false },
+    disabledLabel: ((T) -> String?)? = null,
 ) {
     val palette = LocalKeyFlowPalette.current
     val raised = raisedFill(palette)
@@ -154,7 +157,7 @@ internal fun <T> Segmented(
                         horizontalArrangement = Arrangement.spacedBy(SEGMENT_GAP),
                     ) {
                         row1.forEach { option ->
-                            SegmentCell(option, selected, label, tag, onSelect, fontSp, palette, raised, icon)
+                            SegmentCell(option, selected, label, tag, onSelect, fontSp, palette, raised, icon, disabled, disabledLabel)
                         }
                     }
                     Row(
@@ -164,7 +167,7 @@ internal fun <T> Segmented(
                         horizontalArrangement = Arrangement.spacedBy(SEGMENT_GAP),
                     ) {
                         row2.forEach { option ->
-                            SegmentCell(option, selected, label, tag, onSelect, fontSp, palette, raised, icon)
+                            SegmentCell(option, selected, label, tag, onSelect, fontSp, palette, raised, icon, disabled, disabledLabel)
                         }
                     }
                 }
@@ -179,7 +182,7 @@ internal fun <T> Segmented(
                     horizontalArrangement = Arrangement.spacedBy(SEGMENT_GAP),
                 ) {
                     options.forEach { option ->
-                        SegmentCell(option, selected, label, tag, onSelect, fontSp, palette, raised, icon)
+                        SegmentCell(option, selected, label, tag, onSelect, fontSp, palette, raised, icon, disabled, disabledLabel)
                     }
                 }
             }
@@ -226,8 +229,12 @@ private fun <T> androidx.compose.foundation.layout.RowScope.SegmentCell(
     palette: com.keyflow.ui.theme.KeyFlowPalette,
     raised: Color,
     icon: ((T) -> KfIconSpec?)?,
+    isDisabledOption: (T) -> Boolean,
+    disabledLabel: ((T) -> String?)?,
 ) {
     val isActive = option == selected
+    val isDisabled = isDisabledOption(option)
+    val status = disabledLabel?.invoke(option)
     val optionIcon = icon?.invoke(option)
     if (optionIcon != null) {
         SegmentIcon(
@@ -240,15 +247,7 @@ private fun <T> androidx.compose.foundation.layout.RowScope.SegmentCell(
         )
         return
     }
-    Text(
-        text = label(option),
-        color = if (isActive) palette.fg else palette.muted,
-        fontFamily = SpaceGrotesk,
-        fontWeight = if (isActive) FontWeight.Medium else FontWeight.Normal,
-        fontSize = fontSp.sp,
-        textAlign = TextAlign.Center,
-        maxLines = 1,
-        modifier = Modifier
+    val cellModifier = Modifier
             .weight(1f)
             .clip(RoundedCornerShape(9.dp))
             .then(
@@ -260,10 +259,58 @@ private fun <T> androidx.compose.foundation.layout.RowScope.SegmentCell(
                     Modifier
                 },
             )
-            .clickable(enabled = !isActive) { onSelect(option) }
-            .padding(horizontal = SEGMENT_TEXT_PADDING, vertical = 9.dp)
-            .testTag(tag(option)),
-    )
+            .clickable(enabled = !isActive && !isDisabled) { onSelect(option) }
+            .then(
+                if (isDisabled) {
+                    Modifier.semantics(mergeDescendants = true) { disabled() }
+                } else {
+                    Modifier
+                },
+            )
+    if (status == null) {
+        Text(
+            text = label(option),
+            color = when {
+                isDisabled -> palette.faint
+                isActive -> palette.fg
+                else -> palette.muted
+            },
+            fontFamily = SpaceGrotesk,
+            fontWeight = if (isActive) FontWeight.Medium else FontWeight.Normal,
+            fontSize = fontSp.sp,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            modifier = cellModifier
+                .padding(horizontal = SEGMENT_TEXT_PADDING, vertical = 9.dp)
+                .testTag(tag(option)),
+        )
+    } else {
+        Column(
+            modifier = cellModifier
+                .padding(horizontal = SEGMENT_TEXT_PADDING, vertical = 7.dp)
+                .testTag(tag(option)),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = label(option),
+                color = palette.faint,
+                fontFamily = SpaceGrotesk,
+                fontWeight = FontWeight.Normal,
+                fontSize = fontSp.sp,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+            )
+            Text(
+                text = status,
+                color = palette.faint,
+                fontFamily = SpaceMono,
+                fontWeight = FontWeight.Medium,
+                fontSize = 7.5.sp,
+                maxLines = 1,
+                modifier = Modifier.padding(top = 1.dp),
+            )
+        }
+    }
 }
 
 /** Célula do [Segmented] desenhada como ícone: mesma altura das de texto, fundo "que sobe" quando ativa. */
