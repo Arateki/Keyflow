@@ -7,6 +7,7 @@ pub mod jobs;
 pub mod middleware;
 pub mod providers;
 pub mod routes;
+pub mod simulated;
 
 use std::num::NonZeroU32;
 use std::sync::Arc;
@@ -69,6 +70,8 @@ pub struct AppStateInner {
     pub ads_daily_cap: i64,
     pub transcribe_enabled: bool,
     pub ssv_enabled: bool,
+    pub simulated_purchases_enabled: bool,
+    pub simulated_purchase_hmac_secret: Option<String>,
 }
 
 /// Estado compartilhado entre handlers — `Clone` barato (`Arc` por dentro; `PgPool` também já é
@@ -114,6 +117,8 @@ impl AppState {
             ads_daily_cap: ads.daily_cap,
             transcribe_enabled: transcription.enabled,
             ssv_enabled: ads.enabled,
+            simulated_purchases_enabled: false,
+            simulated_purchase_hmac_secret: None,
         }))
     }
 
@@ -132,6 +137,13 @@ impl AppState {
         let nets = crate::config::parse_trusted_proxies(&cidrs.join(","))
             .expect("CIDR de proxy confiável");
         self.with_trusted_proxies(nets)
+    }
+
+    pub fn with_simulated_purchases(mut self, enabled: bool, hmac_secret: Option<String>) -> Self {
+        let inner = Arc::get_mut(&mut self.0).expect("estado ainda não foi compartilhado");
+        inner.simulated_purchases_enabled = enabled;
+        inner.simulated_purchase_hmac_secret = if enabled { hmac_secret } else { None };
+        self
     }
 }
 
@@ -181,6 +193,16 @@ pub fn app(state: AppState) -> Router {
         .route("/v1/register", post(routes::register::register))
         .route("/v1/account", get(routes::account::get_account))
         .route("/v1/purchases/redeem", post(routes::redeem::redeem))
+        .route(
+            "/v1/test/purchases/simulate",
+            post(routes::simulated_purchase::simulate_purchase)
+                .layer(hide_unless!(state.simulated_purchases_enabled)),
+        )
+        .route(
+            "/v1/test/purchases/refund",
+            post(routes::simulated_purchase::refund_purchase)
+                .layer(hide_unless!(state.simulated_purchases_enabled)),
+        )
         .route("/v1/config", get(routes::content::get_config))
         .route("/v1/models", get(routes::content::get_models))
         .route(

@@ -69,6 +69,10 @@ pub struct Config {
     pub transcribe_enabled: bool,
     /// `GET /v1/ssv/admob` na v1. Padrão desligado: a rota responde 404.
     pub ssv_enabled: bool,
+    /// Endpoints de compra simulada (só staging/debug); desligados por padrão.
+    pub simulated_purchases_enabled: bool,
+    /// Chave HMAC de teste; obrigatória apenas quando a simulação está ligada.
+    pub simulated_purchase_hmac_secret: Option<String>,
 }
 
 #[derive(Debug)]
@@ -157,6 +161,22 @@ impl Config {
 
         let transcribe_enabled = parse_flag(vars, "TRANSCRIBE_ENABLED");
         let ssv_enabled = parse_flag(vars, "SSV_ADMOB_ENABLED");
+        let simulated_purchases_enabled = parse_flag(vars, "SIMULATED_PURCHASES_ENABLED");
+        let simulated_purchase_hmac_secret = if simulated_purchases_enabled {
+            let secret = vars
+                .get("SIMULATED_PURCHASE_HMAC_SECRET")
+                .filter(|value| value.len() >= 32)
+                .cloned()
+                .ok_or(ConfigError::InvalidEnv {
+                    var: "SIMULATED_PURCHASE_HMAC_SECRET",
+                    value: "<ausente ou menor que 32 bytes>".to_string(),
+                    reason: "must contain at least 32 bytes when simulated purchases are enabled"
+                        .to_string(),
+                })?;
+            Some(secret)
+        } else {
+            None
+        };
         // Com a rota desligada o boot não exige a lista nem a env da chave (`authValueEnv`).
         // A SSV também não: `ADS_*` já tem padrão e a URL das chaves do AdMob não é env.
         let providers = if transcribe_enabled {
@@ -269,6 +289,8 @@ impl Config {
             android_publisher_base_url,
             transcribe_enabled,
             ssv_enabled,
+            simulated_purchases_enabled,
+            simulated_purchase_hmac_secret,
         })
     }
 
@@ -478,6 +500,34 @@ mod tests {
         );
         assert_eq!(config.ads_reward_seconds.get(), DEFAULT_ADS_REWARD_SECONDS);
         assert_eq!(config.ads_daily_cap.get(), DEFAULT_ADS_DAILY_CAP);
+    }
+
+    #[test]
+    fn simulated_purchases_default_off_and_require_a_long_test_key_when_enabled() {
+        let config = Config::from_map(&with_required(&[])).unwrap();
+        assert!(!config.simulated_purchases_enabled);
+        assert!(config.simulated_purchase_hmac_secret.is_none());
+
+        let enabled_without_key =
+            Config::from_map(&with_required(&[("SIMULATED_PURCHASES_ENABLED", "true")]))
+                .unwrap_err()
+                .to_string();
+        assert!(enabled_without_key.contains("SIMULATED_PURCHASE_HMAC_SECRET"));
+        assert!(!enabled_without_key.contains("fake"));
+
+        let enabled = Config::from_map(&with_required(&[
+            ("SIMULATED_PURCHASES_ENABLED", "true"),
+            (
+                "SIMULATED_PURCHASE_HMAC_SECRET",
+                "fake-simulation-key-for-tests-only-0001",
+            ),
+        ]))
+        .unwrap();
+        assert!(enabled.simulated_purchases_enabled);
+        assert_eq!(
+            enabled.simulated_purchase_hmac_secret.as_deref(),
+            Some("fake-simulation-key-for-tests-only-0001")
+        );
     }
 
     #[test]
