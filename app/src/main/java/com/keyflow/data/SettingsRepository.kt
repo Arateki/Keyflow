@@ -424,11 +424,7 @@ class SettingsRepository(
             keyboardSkin = prefs[KEYBOARD_SKIN] ?: "system",
             orbSkin = prefs[ORB_SKIN] ?: "atelie",
             appLanguage = prefs[APP_LANGUAGE] ?: "",
-        ).withoutCredits().also { settings ->
-            credentials.setAuthMode(ProviderIds.OPENAI, settings.providerOpenAiAuthMode.toCredentialAuthMethod())
-            credentials.setAuthMode(ProviderIds.ANTHROPIC, settings.providerAnthropicAuthMode.toCredentialAuthMethod())
-            credentials.setAuthMode(ProviderIds.GOOGLE, settings.providerGoogleAuthMode.toCredentialAuthMethod())
-        }
+        ).withoutCredits()
         })
     }.flowOn(Dispatchers.IO)
 
@@ -586,13 +582,33 @@ class SettingsRepository(
     private suspend fun migrateLegacySecretsLocked() {
         // O DataStore é lido antes do lock de arquivo: não há suspensão enquanto outro processo espera pela cópia cifrada.
         val current = dataStore.data.first()
-        val movable = CredentialVaultLock.withLock(appContext) {
+        val (movable, inferredModes) = CredentialVaultLock.withLock(appContext) {
             credentials.migrateLegacyActiveCredentials()
-            SettingsSecrets.migrateLegacySources(current, legacyPrefs, credentials)
+            val migrated = SettingsSecrets.migrateLegacySources(current, legacyPrefs, credentials)
+            val modes = listOf(
+                PROVIDER_OPENAI_AUTH_MODE to ProviderIds.OPENAI,
+                PROVIDER_ANTHROPIC_AUTH_MODE to ProviderIds.ANTHROPIC,
+                PROVIDER_GOOGLE_AUTH_MODE to ProviderIds.GOOGLE,
+            ).mapNotNull { (key, provider) ->
+                if (current[key] != null) return@mapNotNull null
+                val mode = when {
+                    credentials.getOAuth(provider) != null -> "subscription"
+                    credentials.getApiKey(provider) != null -> "api_key"
+                    else -> "subscription"
+                }
+                Triple(key, provider, mode)
+            }
+            migrated to modes
         }
-        if (movable.isNotEmpty()) {
-            // A remoção só acontece depois de cada destino confirmar o commit cifrado e fora do lock síncrono.
-            dataStore.edit { prefs -> movable.forEach { prefs.remove(it) } }
+        if (movable.isNotEmpty() || inferredModes.isNotEmpty()) {
+            // A remoção das origens e a gravação do modo inferido só ocorrem após o commit cifrado.
+            dataStore.edit { prefs ->
+                movable.forEach { prefs.remove(it) }
+                inferredModes.forEach { (key, _, mode) -> if (prefs[key] == null) prefs[key] = mode }
+            }
+            inferredModes.forEach { (_, provider, mode) ->
+                credentials.setAuthMode(provider, mode.toCredentialAuthMethod())
+            }
         }
     }
 

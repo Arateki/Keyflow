@@ -8,9 +8,17 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.keyflow.auth.Credential
 import com.keyflow.auth.CredentialStore
 import com.keyflow.auth.CredentialCodec
+import com.keyflow.auth.AuthMethod
 import com.keyflow.auth.ProviderId
 import com.keyflow.auth.ProviderIds
 import com.keyflow.auth.SecureCredentialStore
+import com.keyflow.core.ReasoningSource
+import com.keyflow.reasoning.ReasoningEngine
+import com.keyflow.reasoning.ReasoningEngines
+import com.keyflow.reasoning.ReasoningEvent
+import com.keyflow.reasoning.ReasoningRequest
+import com.keyflow.reasoning.ReasoningResolution
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.Flow
@@ -78,6 +86,7 @@ class SettingsSecretsStorageTest {
         private val credentials = mutableMapOf<ProviderId, Credential>()
         private val secrets = mutableMapOf<String, String>()
         var writesBeforeFailure: Int? = null
+        var authModeWrites = 0
 
         private fun beforeWrite() {
             val remaining = writesBeforeFailure ?: return
@@ -86,6 +95,7 @@ class SettingsSecretsStorageTest {
         }
 
         override fun get(provider: ProviderId): Credential? = credentials[provider]
+        override fun setAuthMode(provider: ProviderId, method: AuthMethod?) { authModeWrites++ }
         override fun put(provider: ProviderId, credential: Credential) {
             beforeWrite()
             credentials[provider] = credential
@@ -160,6 +170,8 @@ class SettingsSecretsStorageTest {
             .distinctBy { it.first }
             .forEach { (provider, value) ->
                 assertEquals(value, vault().getApiKey(provider)?.value)
+                assertEquals(Credential.ApiKey(value), vault().get(provider))
+                assertEquals(Credential.ApiKey(value), vault().forAuthorization(provider))
             }
         legacy.filterKeys { migratedProvider(it) == null }.forEach { (name, value) ->
             assertEquals(value, vault().getSecret(targetSecretKey(name)))
@@ -265,7 +277,7 @@ class SettingsSecretsStorageTest {
 
         repository.settingsFlow().first()
 
-        assertEquals(old, vault().getApiKey(ProviderIds.ANTHROPIC)?.value)
+        assertEquals(Credential.ApiKey(old), vault().get(ProviderIds.ANTHROPIC))
         assertFalse(legacyVault().contains(SettingsSecrets.PROVIDER_ANTHROPIC_API_KEY))
     }
 
@@ -291,7 +303,7 @@ class SettingsSecretsStorageTest {
 
         val read = repository.settingsFlow().first()
 
-        assertEquals("SENTINELA-NO-COFRE", vault().getApiKey(ProviderIds.ANTHROPIC)?.value)
+        assertEquals(Credential.ApiKey("SENTINELA-NO-COFRE"), vault().get(ProviderIds.ANTHROPIC))
         assertFalse(dataStoreText().contains("SENTINELA-ANTIGO-provider_anthropic_api_key"))
     }
 
@@ -371,6 +383,64 @@ class SettingsSecretsStorageTest {
     }
 
     @Test
+    fun missingAuthModesAreInferredOnceFromMigratedCredentialsAndRemainUsable() = runTest {
+        val repository = newRepository()
+        val oauth = Credential.OAuth(
+            accessToken = "oauth-access", refreshToken = "oauth-refresh", expiresAtMs = Long.MAX_VALUE,
+            earliestRefreshAtMs = null, scopes = setOf("openid"), idToken = "id", clientId = "client",
+            subject = "subject", account = "pessoa@exemplo.test",
+        )
+        vault().put(ProviderIds.ANTHROPIC, oauth)
+        vault().put(ProviderIds.GOOGLE, oauth)
+        repository.replaceRawPreferences(
+            mutablePreferencesOf(
+                stringPreferencesKey(SettingsSecrets.PROVIDER_OPENAI_API_KEY) to "sk-legada-teste",
+                stringPreferencesKey(SettingsSecrets.PROVIDER_GOOGLE_API_KEY) to "sk-google-teste",
+                stringPreferencesKey("reasoning_source") to ReasoningSource.OPENAI.name,
+            ),
+        )
+
+        val settings = repository.settingsFlow().first()
+
+        assertEquals("api_key", settings.providerOpenAiAuthMode)
+        assertEquals("subscription", settings.providerAnthropicAuthMode)
+        assertEquals("subscription", settings.providerGoogleAuthMode)
+        assertEquals(Credential.ApiKey("sk-legada-teste"), vault().get(ProviderIds.OPENAI))
+        assertEquals(Credential.ApiKey("sk-legada-teste"), vault().forAuthorization(ProviderIds.OPENAI))
+        assertEquals(oauth, vault().get(ProviderIds.ANTHROPIC))
+        assertEquals(oauth, vault().forAuthorization(ProviderIds.ANTHROPIC))
+        assertEquals(oauth, vault().get(ProviderIds.GOOGLE))
+        assertEquals(oauth, vault().forAuthorization(ProviderIds.GOOGLE))
+
+        val noOpEngine = object : ReasoningEngine {
+            override fun generate(request: ReasoningRequest) = emptyFlow<ReasoningEvent>()
+        }
+        val resolution = ReasoningEngines(
+            isModelInstalled = { false },
+            hasOpenAiCredential = { vault().forAuthorization(ProviderIds.OPENAI) != null },
+            local = { noOpEngine },
+            openAi = { noOpEngine },
+        ).resolve(settings)
+        assertTrue("a chave legada deve deixar o raciocínio conectado", resolution is ReasoningResolution.Ready)
+
+        vault().setAuthMode(ProviderIds.OPENAI, AuthMethod.OAUTH)
+        assertEquals("credencial por preferência com reserva", Credential.ApiKey("sk-legada-teste"), vault().get(ProviderIds.OPENAI))
+        vault().setAuthMode(ProviderIds.ANTHROPIC, AuthMethod.API_KEY)
+        assertEquals("credencial OAuth alternativa", oauth, vault().get(ProviderIds.ANTHROPIC))
+    }
+
+    @Test
+    fun readingSettingsDoesNotRewriteCredentialModesAfterMigration() = runTest {
+        val store = FailingCredentialStore()
+        val repository = newRepository(store)
+
+        repository.settingsFlow().first()
+        repository.settingsFlow().first()
+
+        assertEquals("os três modos só são sincronizados uma vez", 3, store.authModeWrites)
+    }
+
+    @Test
     fun theProviderCandidateWinsAcrossSecurePrefsAndDataStoreOrigins() = runTest {
         val repository = newRepository()
         legacyVault().edit().putString(SettingsSecrets.OPENAI_TOKEN, "SENTINELA-SECURE-TRANSCRIPTION").commit()
@@ -380,7 +450,7 @@ class SettingsSecretsStorageTest {
 
         repository.settingsFlow().first()
 
-        assertEquals("SENTINELA-DATASTORE-PROVIDER", vault().getApiKey(ProviderIds.OPENAI)?.value)
+        assertEquals(Credential.ApiKey("SENTINELA-DATASTORE-PROVIDER"), vault().get(ProviderIds.OPENAI))
         assertFalse(legacyVault().contains(SettingsSecrets.OPENAI_TOKEN))
         assertFalse(dataStoreText().contains(SettingsSecrets.PROVIDER_OPENAI_API_KEY))
         assertFalse(dataStoreText().contains("SENTINELA-SECURE-TRANSCRIPTION"))
@@ -394,10 +464,10 @@ class SettingsSecretsStorageTest {
         repository.settingsFlow().first()
 
         assertMigratedValues(legacy)
-        assertEquals("SENTINELA-ANTIGO-provider_openai_api_key", vault().getApiKey(ProviderIds.OPENAI)?.value)
-        assertEquals("SENTINELA-ANTIGO-provider_groq_api_key", vault().getApiKey(ProviderIds.GROQ)?.value)
-        assertEquals("SENTINELA-ANTIGO-provider_google_api_key", vault().getApiKey(ProviderIds.GOOGLE)?.value)
-        assertEquals("SENTINELA-ANTIGO-provider_anthropic_api_key", vault().getApiKey(ProviderIds.ANTHROPIC)?.value)
+        assertEquals(Credential.ApiKey("SENTINELA-ANTIGO-provider_openai_api_key"), vault().get(ProviderIds.OPENAI))
+        assertEquals(Credential.ApiKey("SENTINELA-ANTIGO-provider_groq_api_key"), vault().get(ProviderIds.GROQ))
+        assertEquals(Credential.ApiKey("SENTINELA-ANTIGO-provider_google_api_key"), vault().get(ProviderIds.GOOGLE))
+        assertEquals(Credential.ApiKey("SENTINELA-ANTIGO-provider_anthropic_api_key"), vault().get(ProviderIds.ANTHROPIC))
     }
 
     @Test

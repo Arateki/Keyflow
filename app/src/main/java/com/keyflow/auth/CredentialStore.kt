@@ -122,11 +122,14 @@ class SecureCredentialStore(
     private fun decode(key: String): Credential? = prefs.getString(key, null)?.let(CredentialCodec::decode)
 
     private fun getUnlocked(provider: ProviderId): Credential? {
-        when (prefs.getString(authModeKey(provider), null)) {
-            AuthMethod.OAUTH.name -> return decode(oauthKey(provider))
-            AuthMethod.API_KEY.name -> return decode(apiKeyKey(provider))
+        val apiKey = decode(apiKeyKey(provider)) as? Credential.ApiKey
+        val oauth = decode(oauthKey(provider)) as? Credential.OAuth
+        val legacy = decode(credKey(provider))
+        return when (prefs.getString(authModeKey(provider), null)) {
+            AuthMethod.OAUTH.name -> oauth ?: apiKey ?: legacy
+            AuthMethod.API_KEY.name -> apiKey ?: oauth ?: legacy
+            else -> oauth ?: apiKey ?: legacy
         }
-        return decode(credKey(provider)) ?: decode(oauthKey(provider)) ?: decode(apiKeyKey(provider))
     }
 
     override fun get(provider: ProviderId): Credential? = getUnlocked(provider)
