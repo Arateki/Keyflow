@@ -108,8 +108,9 @@ class BillingManagerTest {
     private class FakeBillingBackend(
         private val products: List<StoreProduct>,
         private val initialPurchases: List<StorePurchase> = emptyList(),
-        override val purchaseUpdates: Flow<List<StorePurchase>> = emptyFlow(),
+        private val updates: Flow<List<StorePurchase>> = emptyFlow(),
     ) : BillingBackend {
+        override val purchaseUpdates: Flow<List<StorePurchase>> = updates
         var obfuscatedAccountId: String? = null
         var acknowledgedToken: String? = null
         override suspend fun connect() = Unit
