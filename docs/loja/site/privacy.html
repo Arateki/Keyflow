@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy Policy — KeyFlow</title>
+  <style>
+:root {
+  --bg: #ffffff;
+  --text: #1f2328;
+  --text-muted: #656d76;
+  --border: #d0d7de;
+  --heading: #0f1419;
+  --link: #0969da;
+  --link-hover: #0550ae;
+  --code-bg: #f6f8fa;
+  --nav-bg: #f6f8fa;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1117;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --border: #30363d;
+    --heading: #ffffff;
+    --link: #4493f8;
+    --link-hover: #79c0ff;
+    --code-bg: #161b22;
+    --nav-bg: #161b22;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.6;
+  color: var(--text);
+  background-color: var(--bg);
+  margin: 0;
+  padding: 1.5rem 1rem 3rem;
+}
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+}
+.nav-header {
+  border: 1px solid var(--border);
+  background-color: var(--nav-bg);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 2rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+}
+.nav-links a {
+  margin-right: 1rem;
+}
+.lang-switch {
+  font-weight: 500;
+}
+h1, h2, h3, h4 {
+  color: var(--heading);
+  line-height: 1.3;
+}
+h1 { font-size: 2rem; margin-top: 0; margin-bottom: 0.75rem; }
+h2 { font-size: 1.35rem; margin-top: 2rem; border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; }
+h3 { font-size: 1.15rem; margin-top: 1.5rem; }
+p, ul, ol { margin: 1rem 0; }
+li { margin: 0.35rem 0; }
+ul, ol { padding-left: 1.5rem; }
+ul ul, ol ol, ul ol, ol ul { margin: 0.25rem 0; }
+hr {
+  border: 0;
+  height: 1px;
+  background: var(--border);
+  margin: 2rem 0;
+}
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code {
+  background-color: var(--code-bg);
+  padding: 0.2em 0.4em;
+  border-radius: 4px;
+  font-size: 0.9em;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+footer {
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+</style>
+</head>
+<body>
+  <div class="container">
+    <nav class="nav-header">
+      <div class="nav-links">
+  <a href="index.html">← Home</a>
+  <a href="terms.html">Terms of Use</a>
+</div>
+<div class="lang-switch">
+  <a href="privacidade.html" hreflang="pt-BR">Português</a> | <span>English</span>
+</div>
+    </nav>
+    <main>
+      <h1>Privacy Policy — KeyFlow</h1>
+<p><strong>Last updated:</strong> October 23, 2026<br>
+<strong>Effective date:</strong> October 23, 2026<br>
+<strong>Permanent URL:</strong> <code>https://keyflow.arateki.com/privacy</code></p>
+<hr>
+<p><strong>Arateki LTDA</strong> (registration/tax ID CNPJ 45.642.122/0001-10, based in Fortaleza/CE, Brazil) developed <strong>KeyFlow</strong> with one fundamental commitment: <strong>your privacy comes first</strong>. KeyFlow is an Android keyboard engineered for high productivity, responsive typing, and on-demand voice dictation.</p>
+<p>This policy clearly explains, in plain language and in compliance with GDPR and LGPD regulations, what data is processed, how it is safeguarded, and what your rights are.</p>
+<hr>
+<h2>1. Core Principle: What We DO NOT Collect</h2>
+<p>To provide complete peace of mind when using KeyFlow as your default Android keyboard:</p>
+<ul>
+<li><strong>We DO NOT collect, record, or transmit what you type:</strong> Keystrokes, passwords, private messages, documents, and search terms are processed strictly in your device's local memory and delivered directly to the active application via <code>InputConnection</code>. We never log or transmit typed characters over the internet.</li>
+<li><strong>We DO NOT have continuous microphone access:</strong> Your microphone is activated only when you deliberately tap the voice dictation button (on the keyboard or floating orb) and shuts down immediately when dictation ends.</li>
+<li><strong>We DO NOT collect sensitive personal data:</strong> The app does not request or use permissions for precise or coarse GPS location (<code>ACCESS_FINE_LOCATION</code> / <code>ACCESS_COARSE_LOCATION</code>), address book contacts, personal photos, or browsing history.</li>
+</ul>
+<hr>
+<h2>2. What Data Is Processed and Why</h2>
+<h3>a) Voice Audio Recordings for Dictation</h3>
+<ul>
+<li><strong>What it is:</strong> Audio captured while dictation is actively recording.</li>
+<li><strong>Purpose:</strong> Transcribing your spoken words into written text upon your explicit request.</li>
+<li><strong>How it works:</strong></li>
+<ul>
+<li><strong>Local (Offline) Mode:</strong> Audio is processed entirely inside your device using compact on-device models (<code>sherpa-onnx</code>). <strong>Zero audio bytes ever leave your phone.</strong></li>
+<li><strong>Cloud Mode (OpenAI, Groq, or Custom Endpoint):</strong> Audio is sent directly from your device over an encrypted HTTPS connection to your chosen API endpoint, using your personal API key (BYOK).</li>
+</ul>
+<li><strong>On-Device Storage and Deletion:</strong> Audio files are kept in a temporary cache (<code>cacheDir/keyflow-recordings/</code>) during transcription and during a 3-second cancellation window (allowing you to undo sending). The file is <strong>deleted immediately</strong> once transcription finishes (whether successful or failed) or after the cancellation window expires. Stale recordings older than 24 hours are automatically removed during app startup.</li>
+<li><strong>Third-Party Provider Retention:</strong> For cloud providers (OpenAI, Groq, or custom endpoints), retention and processing are governed strictly by each provider's privacy policy and your account terms. We cannot guarantee zero retention on third-party servers. If you require absolute assurance that audio never leaves your device, select 100% offline local transcription.</li>
+</ul>
+<h3>b) Text Prompts for AI Reasoning Models</h3>
+<ul>
+<li><strong>What it is:</strong> Text you enter when testing AI models in settings.</li>
+<li><strong>Purpose:</strong> Generating AI responses or customizing keyboard themes.</li>
+<li><strong>How it works:</strong></li>
+<ul>
+<li><strong>Local Models (LiteRT-LM):</strong> Processed 100% offline on your device.</li>
+<li><strong>Cloud Providers (OpenAI, Anthropic, Google):</strong> Sent directly from your device to the selected provider's API using your personal API key or connected subscription (OAuth). On OpenAI, requests specify <code>store: false</code> to request that prompts are not stored in completion history, though platform retention (e.g. up to 30 days for abuse monitoring under OpenAI API terms) remains subject to their policy. Anthropic and Google retain data according to their respective policies. When using Anthropic with an API key for theme customization, theme metadata and generated SVG previews may be transmitted as tool parameters.</li>
+</ul>
+<li><strong>KeyFlow Agent:</strong> Interactive assistant feature planned as "Coming soon" for future v1 updates.</li>
+</ul>
+<h3>c) API Keys and Authentication Credentials</h3>
+<ul>
+<li><strong>What it is:</strong> Your personal API keys and OAuth access tokens.</li>
+<li><strong>How they are handled:</strong> Stored on your device and encrypted by the <strong>Android Keystore</strong> (AES-256-GCM). They are <strong>never</strong> sent to Arateki servers and are excluded from Android cloud backups. During requested operations, credentials or tokens are transmitted directly and securely (HTTPS) to the respective third-party provider solely for authentication.</li>
+</ul>
+<h3>d) Anonymous Device Identifier, Integrity, and Purchases</h3>
+<ul>
+<li><strong>What it is:</strong> A locally generated random identifier (UUIDv4), Google Play Integrity tokens, and purchase receipts (<code>purchaseToken</code>).</li>
+<li><strong>Purpose:</strong> Verifying app authenticity, managing and validating entitlement status — including the one-time <strong>R$ 15</strong> purchase (lifetime theme unlock and permanent ad removal) — and restoring purchases across reinstalls.</li>
+<li><strong>How it is transmitted:</strong> After completing onboarding, the app registers the anonymous UUID and integrity token with the Arateki API (<code>keyflow-api.arateki.com/v1/register</code>, <code>v1/account</code>). Upon purchase or restore, receipts are validated at <code>/v1/purchases/redeem</code>. A cryptographic hash of the UUID is also sent to Google Play Billing (<code>obfuscatedAccountId</code>). Purchasing does not stop periodic entitlement checks.</li>
+<li><strong>Privacy:</strong> This identifier is completely anonymous and never linked to your name, email, or phone number.</li>
+</ul>
+<h3>e) Advertisements and Consent (Google AdMob / UMP)</h3>
+<ul>
+<li>KeyFlow displays standard banner and interstitial ads <strong>strictly within the settings app (<code>SetupActivity</code>)</strong>.</li>
+<li><strong>No ads are ever displayed on the keyboard or floating orb.</strong></li>
+<li>We use the <strong>Google User Messaging Platform (UMP)</strong> to request consent for ads in compliance with GDPR and LGPD.</li>
+<li><strong>Review at any time:</strong> Users can review or revoke advertising consent at any time via the <strong>"Ads privacy"</strong> option located in the <strong>Docs</strong> tab in settings.</li>
+<li>The one-time purchase of <strong>R$ 15</strong> permanently disables all advertisements.</li>
+</ul>
+<hr>
+<h2>3. Third Parties and Data Sharing</h2>
+<p>Arateki <strong>does not sell, rent, or trade</strong> personal data. Data is shared exclusively to deliver the functionality you explicitly choose:</p>
+<ol>
+<li><strong>AI Providers Chosen by You:</strong></li>
+<ul>
+<li><strong>OpenAI:</strong> <a href="https://openai.com/policies/privacy-policy/">OpenAI Privacy Policy</a></li>
+<li><strong>Groq:</strong> <a href="https://groq.com/privacy-policy/">Groq Privacy Policy</a></li>
+<li><strong>Anthropic:</strong> <a href="https://www.anthropic.com/privacy">Anthropic Privacy Policy</a></li>
+<li><strong>Google Generative AI:</strong> <a href="https://policies.google.com/privacy">Google Privacy Policy</a></li>
+</ul>
+<li><strong>Infrastructure, Payments, and Ad Platforms:</strong></li>
+<ul>
+<li><strong>Google Play:</strong> For purchase processing and app integrity verification (<a href="https://policies.google.com/privacy">Google Privacy</a>).</li>
+<li><strong>Google AdMob:</strong> For serving ads in settings for free-tier users (<a href="https://policies.google.com/technologies/ads">Google Ad Technologies</a>). The SDK may collect advertising IDs, IP addresses, and coarse location derived from IP.</li>
+<li><strong>Hugging Face and Authorized Mirrors:</strong> For downloading public model weights (<a href="https://huggingface.co/privacy">Hugging Face Privacy</a>), or alternative mirror URLs specified by the remote catalog.</li>
+<li><strong>Arateki API (<code>keyflow-api.arateki.com</code>):</strong> Receives anonymous UUID, Play Integrity tokens, and purchase receipts for license validation, and serves remote configuration and model catalogs (<code>/v1/config</code>, <code>/v1/models</code>). [YAN: Server log retention policy — recommended: 30 days for technical error and integrity logs].</li>
+</ul>
+<li><strong>Voluntary Email Support:</strong></li>
+<ul>
+<li>When using the support email link in Docs, a draft email is created with basic device diagnostics (model, Android version, app version). Sending is entirely manual and voluntary via the user's email client.</li>
+</ul>
+</ol>
+<hr>
+<h2>4. What Remains 100% On-Device</h2>
+<ul>
+<li>All typed characters and keystrokes on the Canvas keyboard (zero telemetry and zero logging).</li>
+<li>On-device spell checking and suggestions based on static built-in dictionaries (the app does not learn or record user typing habits).</li>
+<li>Local voice dictation processing (sherpa-onnx).</li>
+<li>Local text reasoning processing (LiteRT-LM).</li>
+<li>Local storage of API keys and login tokens, protected by Android Keystore.</li>
+<li>Imported custom theme packages (.zip), parsed and stored locally.</li>
+</ul>
+<hr>
+<h2>5. Data Retention and Deletion</h2>
+<ul>
+<li><strong>Voice audio:</strong> Deleted from local storage immediately upon transcription completion or error, or upon expiration of the 3-second cancellation window. Automatic cleanup removes stale files older than 24 hours.</li>
+<li><strong>On your device:</strong> You can delete local configuration, API keys, and models by clearing app data in Android Settings or by uninstalling KeyFlow.</li>
+<li><strong>Identity Restoration (Google Block Store):</strong> To prevent losing legitimate purchases upon app reinstallation or device migration, the anonymous device UUID may be restored via Google Block Store.</li>
+<li><strong>On Arateki API:</strong> Since we maintain no user accounts or email lists, records linked to the anonymous UUID exist solely to validate licenses. [YAN: Define procedure and timeframe for deleting records on the API upon request via contato@arateki.com].</li>
+<li><strong>On External Providers:</strong> Requests to delete data processed by third-party cloud providers (OpenAI, Anthropic, Google) must be submitted directly through those respective providers.</li>
+</ul>
+<hr>
+<h2>6. Security</h2>
+<p>We implement rigorous technical safeguards:</p>
+<ul>
+<li>All external network communications enforce <strong>TLS/HTTPS</strong>.</li>
+<li>Locally stored credentials and tokens are encrypted and protected by the <strong>Android Keystore</strong> (AES-256-GCM).</li>
+<li>Heavy computational tasks are isolated in dedicated worker processes (<code>:inference</code> and <code>:reasoning</code>) to ensure memory safety.</li>
+</ul>
+<hr>
+<h2>7. User Rights (GDPR &amp; LGPD)</h2>
+<p>In compliance with GDPR and LGPD regulations:</p>
+<ul>
+<li>You have the right to transparent information regarding data processing.</li>
+<li>You have the right to review and revoke advertising consent at any time via settings ("Ads privacy").</li>
+<li>You have the right to request deletion or clarification regarding processed data by contacting <code>contato@arateki.com</code>.</li>
+</ul>
+<hr>
+<h2>8. Children's Privacy</h2>
+<p>KeyFlow is not directed at children under the age of 13 and does not knowingly collect personal information from children. If we become aware that data from a child has been collected inadvertently, it will be promptly deleted.</p>
+<hr>
+<h2>9. Contact Us</h2>
+<p>If you have questions, comments, or requests regarding this Privacy Policy or our data protection practices, please contact:</p>
+<ul>
+<li><strong>Email:</strong> <code>contato@arateki.com</code></li>
+<li><strong>Data Controller:</strong> Arateki LTDA (CNPJ 45.642.122/0001-10)  </li>
+</ul>
+<p>Fortaleza, Ceará, Brazil</p>
+    </main>
+    <footer>
+      <p>KeyFlow &bull; Arateki LTDA (CNPJ 45.642.122/0001-10) &bull; Fortaleza/CE, Brazil</p>
+<p><a href="privacy.html">Privacy Policy</a> &bull; <a href="terms.html">Terms of Use</a> &bull; <a href="mailto:contato@arateki.com">contato@arateki.com</a></p>
+    </footer>
+  </div>
+</body>
+</html>
