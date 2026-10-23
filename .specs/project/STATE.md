@@ -2534,6 +2534,11 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
 - Cabeçalho de autenticação, senha e chave SSH são segredos e continuam no cofre; nome do cabeçalho, host, usuário e porta SSH são configuração não secreta e permanecem no DataStore.
 - Erros HTTP de Anthropic usam `HttpErrorMessage`; o corpo completo e detalhes de SSE não chegam à mensagem do release.
 
+## V1-2 — rodada 4 (2026-10-23)
+- O lock de arquivo deve envolver somente cópias síncronas do cofre: ler ou editar DataStore suspende fora dele; o overlay inicia e trata ações pendentes depois da primeira configuração, sem bloquear a main.
+- O formato antigo `cred.*` continua legível pelos acessores tipados até a migração; autenticação e desconexão escolhem explicitamente o slot API ou OAuth. A prioridade precisa ser aplicada depois de juntar as origens antigas.
+- Erros e eventos da Anthropic não carregam corpo ou mensagem do servidor; o filtro do agente tira o snapshot do cofre sob o mesmo lock.
+
 ## Monetização — V1-10a, Fase A (2026-10-23)
 - A API ainda sem staging e o Play Console sem o app tornam MockWebServer/fakes obrigatórios na fundação; Play Integrity `1.6.0` e Billing `9.1.0` ficam atrás de portas degradáveis, sem tocar onboarding, IME ou overlay.
 
