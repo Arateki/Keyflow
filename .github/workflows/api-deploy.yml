@@ -34,6 +34,20 @@ jobs:
     container:
       image: rust:1.96-slim-bookworm@sha256:e18a79fc84dfcfc3ab5ba72290398a644c135c97eaa881447fddc354ee4701a3
     timeout-minutes: 25
+    # Os testes de integração da API precisam de um Postgres, como no workflow api.yml. Com o job dentro de
+    # container, o serviço responde pelo nome (postgres:5432), não por localhost.
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: keyflow
+          POSTGRES_PASSWORD: keyflow
+          POSTGRES_DB: keyflow_api
+        options: >-
+          --health-cmd "pg_isready -U keyflow -d keyflow_api"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 15
     # Dentro de container o shell padrão do `run` é o sh (dash), que não tem `pipefail` nem `[[`.
     defaults:
       run:
@@ -46,7 +60,8 @@ jobs:
       - name: Dependências do container Bookworm
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends ca-certificates git binutils
+          # cmake: o aws-lc-sys (rustls e jsonwebtoken) pode pedir no build de C, conforme a versão.
+          apt-get install -y --no-install-recommends ca-certificates git binutils cmake
           rm -rf /var/lib/apt/lists/*
 
       - name: Checkout do código (exclusivamente HEAD da main)
@@ -84,6 +99,8 @@ jobs:
 
       - name: Compilar binário de release (x86_64 Debian 12 glibc)
         working-directory: api
+        env:
+          DATABASE_URL: postgres://keyflow:keyflow@postgres:5432/keyflow_api
         run: |
           set -euo pipefail
           cargo test --lib --locked
