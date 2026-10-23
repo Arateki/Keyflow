@@ -3,6 +3,7 @@ package com.keyflow.overlay
 import com.keyflow.i18n.tr
 import android.os.SystemClock
 import android.util.Log
+import com.keyflow.BuildConfig
 import com.keyflow.audio.AudioConcatenator
 import com.keyflow.core.ButtonState
 import com.keyflow.core.ErrorKind
@@ -586,13 +587,13 @@ class OverlayCoordinator(
         when (result) {
             is TranscriptionResult.Success -> {
                 if (insertOrHold(result.text) == InsertOutcome.Held) {
-                    Log.d(TAG, "transcription held → clipboard: '${result.text.take(30)}'")
+                    if (BuildConfig.DEBUG) Log.d(TAG, "transcription held → clipboard: '${result.text.take(30)}'")
                     onClipboard(result.text)
                 }
                 render(machine.onTranscriptionSuccess())
             }
             is TranscriptionResult.Error -> {
-                Log.d(TAG, "transcription error: ${result.kind} ${result.message}")
+                if (BuildConfig.DEBUG) Log.d(TAG, "transcription error: ${result.kind} ${result.message}")
                 onError(errorMessage(result), errorNavTarget(result.kind))
                 handleState(machine.onTranscriptionError())
             }

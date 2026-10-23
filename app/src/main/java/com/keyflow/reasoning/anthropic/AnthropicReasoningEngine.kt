@@ -1,5 +1,6 @@
 package com.keyflow.reasoning.anthropic
 
+import com.keyflow.BuildConfig
 import com.keyflow.auth.AuthErrorKind
 import com.keyflow.auth.AuthException
 import com.keyflow.auth.AuthorizationProvider
@@ -133,7 +134,7 @@ class AnthropicReasoningEngine(
         response.use { r ->
             if (!r.isSuccessful) {
                 val errorBody = r.body?.string().orEmpty()
-                android.util.Log.e("AnthropicReasoning", "HTTP ${r.code}: $errorBody")
+                if (BuildConfig.DEBUG) android.util.Log.e("AnthropicReasoning", "HTTP ${r.code}: $errorBody")
                 val failure = httpFailure(r.code, errorBody)
                 if (failure.retry) return Outcome.Retry(failure.event)
                 if (r.code == 401) authorization.invalidate(ProviderIds.ANTHROPIC)
@@ -207,7 +208,7 @@ class AnthropicReasoningEngine(
             "error" -> {
                 val err = json.optJSONObject("error")
                 val msg = err?.optString("message").orEmpty()
-                android.util.Log.e("AnthropicReasoning", "SSE error: $msg | data: $data")
+                if (BuildConfig.DEBUG) android.util.Log.e("AnthropicReasoning", "SSE error: $msg | data: $data")
                 send(ReasoningEvent.Error(ReasoningError.ENGINE, "Anthropic error: $msg"))
                 return true
             }
