@@ -1,6 +1,7 @@
 package com.keyflow.auth
 
 import android.content.Context
+import com.keyflow.data.models.KeyFlowHttpClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -16,7 +17,7 @@ import okhttp3.OkHttpClient
  */
 class AuthServices(
     context: Context,
-    val http: OkHttpClient = OkHttpClient(),
+    val http: OkHttpClient = KeyFlowHttpClient.base(),
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val appContext = context.applicationContext

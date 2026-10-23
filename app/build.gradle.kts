@@ -46,7 +46,7 @@ android {
         buildConfigField(
             "long",
             "KEYFLOW_INTEGRITY_CLOUD_PROJECT_NUMBER",
-            providers.gradleProperty("keyflowIntegrityCloudProjectNumber").orElse("0").get(),
+            "${providers.gradleProperty("keyflowIntegrityCloudProjectNumber").orElse("0").get()}L",
         )
 
     }

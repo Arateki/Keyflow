@@ -7,6 +7,7 @@ import com.keyflow.data.models.FileRole
 import com.keyflow.data.models.ModelFile
 import com.keyflow.data.models.ModelKind
 import com.keyflow.data.models.ModelSpec
+import com.keyflow.data.models.KeyFlowHttpClient
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -90,7 +91,7 @@ internal class SharedPreferencesRemoteConfigCache(context: Context) : RemoteConf
 class RemoteConfigRepository(
     context: Context? = null,
     private val baseUrl: String = BuildConfig.KEYFLOW_API_BASE_URL,
-    private val http: OkHttpClient = OkHttpClient(),
+    private val http: OkHttpClient = KeyFlowHttpClient.base(),
     cache: RemoteConfigCache? = context?.let { SharedPreferencesRemoteConfigCache(it) },
     private val io: CoroutineDispatcher = Dispatchers.IO,
 ) : AutoCloseable {

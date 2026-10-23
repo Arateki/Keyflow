@@ -8,7 +8,6 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.net.Inet4Address
 import java.net.InetAddress
-import java.util.concurrent.TimeUnit
 
 /** Como terminou uma tentativa de baixar um arquivo. */
 sealed interface FetchResult {
@@ -87,11 +86,7 @@ class HttpFileFetcher(private val client: OkHttpClient = defaultClient()) {
         private const val BUFFER_BYTES = 64 * 1024
         private const val PROGRESS_EVERY_MS = 250L
 
-        fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
-            .dns(Ipv4FirstDns())
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .build()
+        fun defaultClient(): OkHttpClient = KeyFlowHttpClient.base()
     }
 }
 
