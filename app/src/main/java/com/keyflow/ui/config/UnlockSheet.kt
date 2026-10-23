@@ -35,6 +35,9 @@ import com.keyflow.ui.theme.SpaceGrotesk
 const val UNLOCK_SHEET_TAG = "unlock-sheet"
 const val UNLOCK_CLOSE_TAG = "unlock-close"
 const val UNLOCK_ONCE_TAG = "unlock-once"
+const val UNLOCK_STATUS_TAG = "unlock-status"
+
+enum class UnlockPurchaseState { IDLE, PURCHASING, PENDING, UNAVAILABLE, ERROR }
 
 /**
  * Bottom-sheet "Desbloquear skins" (SKIN-02/03), com a compra única de skins que entra na v1.
@@ -42,7 +45,13 @@ const val UNLOCK_ONCE_TAG = "unlock-once"
  * O tema ativo (Ateliê claro/escuro) é herdado do [com.keyflow.ui.theme.KeyFlowTheme] em volta.
  */
 @Composable
-fun UnlockSheet(visible: Boolean, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+fun UnlockSheet(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    onBuy: () -> Unit = {},
+    purchaseState: UnlockPurchaseState = UnlockPurchaseState.IDLE,
+    modifier: Modifier = Modifier,
+) {
     if (!visible) return
     val palette = LocalKeyFlowPalette.current
     val noRipple = remember { MutableInteractionSource() }
@@ -98,14 +107,19 @@ fun UnlockSheet(visible: Boolean, onDismiss: () -> Unit, modifier: Modifier = Mo
                 }
             }
 
-            // Opção única — só skins. A fiação da compra entra na tarefa MZ-T9.
+            // Opção única — só skins. Créditos e recarga pertencem a uma tarefa posterior.
             Column(
                 Modifier
                     .fillMaxWidth()
                     .padding(top = 20.dp)
                     .clip(RoundedCornerShape(16.dp))
                     .border(1.dp, palette.line, RoundedCornerShape(16.dp))
-                    .clickable(interactionSource = noRipple, indication = null) { /* inerte */ }
+                    .clickable(
+                        interactionSource = noRipple,
+                        indication = null,
+                        enabled = purchaseState != UnlockPurchaseState.PURCHASING,
+                        onClick = onBuy,
+                    )
                     .testTag(UNLOCK_ONCE_TAG)
                     .padding(horizontal = 16.dp, vertical = 15.dp),
             ) {
@@ -119,6 +133,27 @@ fun UnlockSheet(visible: Boolean, onDismiss: () -> Unit, modifier: Modifier = Mo
                     lineHeight = 15.sp,
                     modifier = Modifier.padding(top = 3.dp),
                 )
+                val status = when (purchaseState) {
+                    UnlockPurchaseState.IDLE -> null
+                    UnlockPurchaseState.PURCHASING -> tr("Abrindo pagamento…")
+                    UnlockPurchaseState.PENDING -> tr("Aguardando confirmação do pagamento…")
+                    UnlockPurchaseState.UNAVAILABLE -> tr("Compra indisponível agora. Tente novamente.")
+                    UnlockPurchaseState.ERROR -> tr("Não foi possível iniciar a compra. Tente novamente.")
+                }
+                if (status != null) {
+                    Text(
+                        status,
+                        color = if (purchaseState == UnlockPurchaseState.ERROR || purchaseState == UnlockPurchaseState.UNAVAILABLE) {
+                            palette.terracotta
+                        } else {
+                            palette.teal
+                        },
+                        fontFamily = SpaceGrotesk,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 10.5.sp,
+                        modifier = Modifier.padding(top = 8.dp).testTag(UNLOCK_STATUS_TAG),
+                    )
+                }
             }
 
             Eyebrow(

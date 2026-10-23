@@ -80,6 +80,7 @@ fun TecladoPanel(
     settings: Settings,
     onSettingsChange: (Settings) -> Unit,
     onUnlockSkins: () -> Unit,
+    skinsUnlocked: Boolean = false,
     onOverlayRequired: () -> Unit = {},
     barsConfig: BarsConfig = BarsConfig.DEFAULT,
     onBarsConfigChange: (BarsConfig) -> Unit = {},
@@ -237,6 +238,7 @@ fun TecladoPanel(
                     selectedSkin = settings.keyboardSkin,
                     onSkinSelected = { onSettingsChange(settings.copy(keyboardSkin = it)) },
                     onUnlock = onUnlockSkins,
+                    skinsUnlocked = skinsUnlocked,
                     unlockTag = TECLADO_UNLOCK_TAG,
                     modifier = Modifier.padding(bottom = 16.dp),
                 )

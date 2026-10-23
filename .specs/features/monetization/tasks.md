@@ -138,7 +138,7 @@ no device (TESTING.md).
 
 ## Fase C — Unlock
 
-### MZ-T9 — `UnlockSheet` real + skins destravam + restore
+### MZ-T9 — `UnlockSheet` real + skins destravam + restore — ✅ Feita em 2026-10-23
 - **What**: a sheet inerte (T16 do redesign) vira real: "Pagar R$ 15 — uma vez" → fluxo Billing
   do `unlock_forever`; "Recarregar R$ 20" → abre a recarga (T6); comprado → entitlements na hora
   (UNL-01); `queryPurchases` na abertura restaura sem botão (UNL-02); `skinsUnlocked` destrava a
