@@ -30,10 +30,10 @@ class SettingsToStringTest {
 
     @Test
     fun `a copy keeps hiding the secrets`() {
-        val printed = settingsWithSentinels().copy(providerGroqApiKey = "SENTINELA-NOVA").toString()
+        val printed = settingsWithSentinels().copy(computerSshPassword = "SENTINELA-NOVA").toString()
 
         assertThat(printed).doesNotContain("SENTINELA-NOVA")
-        assertThat(printed).contains("providerGroqApiKey=***")
+        assertThat(printed).contains("computerSshPassword=***")
     }
 
     // ── Apoio ─────────────────────────────────────────────────────────────
@@ -43,19 +43,11 @@ class SettingsToStringTest {
     /** [Settings] com um valor único e reconhecível em cada campo secreto. */
     private fun settingsWithSentinels() = Settings(
         customHeaderValue = sentinel("customHeaderValue"),
-        openaiToken = sentinel("openaiToken"),
-        groqToken = sentinel("groqToken"),
         reasoningCustomHeaderValue = sentinel("reasoningCustomHeaderValue"),
-        visionGoogleApiKey = sentinel("visionGoogleApiKey"),
-        visionAnthropicApiKey = sentinel("visionAnthropicApiKey"),
         visionCustomHeaderValue = sentinel("visionCustomHeaderValue"),
-        falaElevenLabsApiKey = sentinel("falaElevenLabsApiKey"),
-        falaGoogleApiKey = sentinel("falaGoogleApiKey"),
         falaCustomHeaderValue = sentinel("falaCustomHeaderValue"),
         computerSshHost = "host.test",
         computerSshPassword = sentinel("computerSshPassword"),
         computerSshKey = sentinel("computerSshKey"),
-        providerGroqApiKey = sentinel("providerGroqApiKey"),
-        providerGrokApiKey = sentinel("providerGrokApiKey"),
     )
 }

@@ -15,9 +15,10 @@ internal object LegacyApiKeyMigration {
         ProviderIds.OPENAI to "provider_openai_api_key",
         ProviderIds.GOOGLE to "provider_google_api_key",
     )
+    private val LOCK = Any()
 
-    /** Copia valores não vazios e só remove a cópia antiga depois de preparar o novo cofre. */
-    fun migrate(legacy: SharedPreferences, target: CredentialStore) {
+    /** Compatibilidade dos testes antigos; a produção migra pelo repositório de Settings. */
+    fun migrate(legacy: SharedPreferences, target: CredentialStore) = synchronized(LOCK) {
         val editor = legacy.edit()
         var changed = false
         for ((provider, key) in legacyKeys) {

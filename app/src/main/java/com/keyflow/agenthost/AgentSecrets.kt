@@ -78,6 +78,13 @@ internal class AgentSecretSource(
         const val TTL_MS = 2_000L
 
         /** Todos os provedores que o app conhece (o login e a chave de API de cada um moram no cofre do `auth/`). */
-        val ALL_PROVIDERS = listOf(ProviderIds.OPENAI, ProviderIds.ANTHROPIC, ProviderIds.GOOGLE, ProviderIds.ELEVENLABS)
+        val ALL_PROVIDERS = listOf(
+            ProviderIds.OPENAI,
+            ProviderIds.ANTHROPIC,
+            ProviderIds.GOOGLE,
+            ProviderIds.ELEVENLABS,
+            ProviderIds.GROQ,
+            ProviderIds.GROK,
+        )
     }
 }

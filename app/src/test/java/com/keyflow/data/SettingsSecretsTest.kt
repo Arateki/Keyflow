@@ -47,17 +47,27 @@ class SettingsSecretsTest {
     }
 
     @Test
-    fun `the secrets an old build wrote to the DataStore are the vault keys, minus the three that never were there`() {
-        val neverInDataStore = setOf(
-            SettingsSecrets.AUTH_HEADER_VALUE, SettingsSecrets.OPENAI_TOKEN, SettingsSecrets.GROQ_TOKEN,
-        )
-
+    fun `the secrets an old build could write to the DataStore include every migrated key`() {
         assertThat(SettingsSecrets.LEGACY_IN_DATASTORE.map { it.name })
             .containsExactlyElementsIn(
-                (SettingsSecrets.BY_PROPERTY.values - neverInDataStore) + listOf(
+                listOf(
+                    SettingsSecrets.AUTH_HEADER_VALUE,
+                    SettingsSecrets.OPENAI_TOKEN,
+                    SettingsSecrets.GROQ_TOKEN,
+                    SettingsSecrets.REASONING_CUSTOM_HEADER_VALUE,
+                    SettingsSecrets.VISION_GOOGLE_API_KEY,
+                    SettingsSecrets.VISION_ANTHROPIC_API_KEY,
+                    SettingsSecrets.VISION_CUSTOM_HEADER_VALUE,
+                    SettingsSecrets.FALA_ELEVENLABS_API_KEY,
+                    SettingsSecrets.FALA_GOOGLE_API_KEY,
+                    SettingsSecrets.FALA_CUSTOM_HEADER_VALUE,
+                    SettingsSecrets.COMPUTER_SSH_PASSWORD,
+                    SettingsSecrets.COMPUTER_SSH_KEY,
                     SettingsSecrets.PROVIDER_ANTHROPIC_API_KEY,
                     SettingsSecrets.PROVIDER_OPENAI_API_KEY,
                     SettingsSecrets.PROVIDER_GOOGLE_API_KEY,
+                    SettingsSecrets.PROVIDER_GROQ_API_KEY,
+                    SettingsSecrets.PROVIDER_GROK_API_KEY,
                 ),
             )
     }
