@@ -61,7 +61,7 @@ class SettingsRepository(
     /**
      * Config efetivo consumido pelo transcritor. Resolve pela **origem selecionada** ([Settings.source])
      * via [Settings.effectiveConfigFor] — antes ignorava o source e usava só os campos legados do CUSTOM,
-     * o que dava `CONFIG_MISSING` ao escolher OpenAI/Groq. CREDITS (em breve) → Config incompleto.
+     * o que dava `CONFIG_MISSING` ao escolher OpenAI/Groq. CREDITS legado é normalizado para o padrão antes da leitura.
      */
     /**
      * Leitura leve só do tema, lendo **apenas o DataStore** — não inicializa o EncryptedSharedPreferences
@@ -388,7 +388,7 @@ class SettingsRepository(
             keyboardSkin = prefs[KEYBOARD_SKIN] ?: "system",
             orbSkin = prefs[ORB_SKIN] ?: "atelie",
             appLanguage = prefs[APP_LANGUAGE] ?: "",
-        )
+        ).withoutCredits()
     }.flowOn(Dispatchers.IO)
 
     /**
@@ -398,112 +398,113 @@ class SettingsRepository(
      * qualquer cópia em claro que um build antigo tenha deixado lá é removida (ver [migrateLegacySecrets]).
      */
     suspend fun saveSettings(settings: Settings) {
+        val persisted = settings.withoutCredits()
         val committed = synchronized(SettingsSecrets.LOCK) {
             securePrefs.edit()
-                .putString(SettingsSecrets.AUTH_HEADER_VALUE, settings.customHeaderValue)
-                .putString(SettingsSecrets.OPENAI_TOKEN, settings.openaiToken)
-                .putString(SettingsSecrets.GROQ_TOKEN, settings.groqToken)
-                .putString(SettingsSecrets.REASONING_CUSTOM_HEADER_VALUE, settings.reasoningCustomHeaderValue)
-                .putString(SettingsSecrets.VISION_GOOGLE_API_KEY, settings.visionGoogleApiKey)
-                .putString(SettingsSecrets.VISION_ANTHROPIC_API_KEY, settings.visionAnthropicApiKey)
-                .putString(SettingsSecrets.VISION_CUSTOM_HEADER_VALUE, settings.visionCustomHeaderValue)
-                .putString(SettingsSecrets.FALA_ELEVENLABS_API_KEY, settings.falaElevenLabsApiKey)
-                .putString(SettingsSecrets.FALA_GOOGLE_API_KEY, settings.falaGoogleApiKey)
-                .putString(SettingsSecrets.FALA_CUSTOM_HEADER_VALUE, settings.falaCustomHeaderValue)
-                .putString(SettingsSecrets.COMPUTER_SSH_PASSWORD, settings.computerSshPassword)
-                .putString(SettingsSecrets.COMPUTER_SSH_KEY, settings.computerSshKey)
-                .putString(SettingsSecrets.PROVIDER_ANTHROPIC_API_KEY, settings.providerAnthropicApiKey)
-                .putString(SettingsSecrets.PROVIDER_OPENAI_API_KEY, settings.providerOpenAiApiKey)
-                .putString(SettingsSecrets.PROVIDER_GOOGLE_API_KEY, settings.providerGoogleApiKey)
-                .putString(SettingsSecrets.PROVIDER_GROQ_API_KEY, settings.providerGroqApiKey)
-                .putString(SettingsSecrets.PROVIDER_GROK_API_KEY, settings.providerGrokApiKey)
+                .putString(SettingsSecrets.AUTH_HEADER_VALUE, persisted.customHeaderValue)
+                .putString(SettingsSecrets.OPENAI_TOKEN, persisted.openaiToken)
+                .putString(SettingsSecrets.GROQ_TOKEN, persisted.groqToken)
+                .putString(SettingsSecrets.REASONING_CUSTOM_HEADER_VALUE, persisted.reasoningCustomHeaderValue)
+                .putString(SettingsSecrets.VISION_GOOGLE_API_KEY, persisted.visionGoogleApiKey)
+                .putString(SettingsSecrets.VISION_ANTHROPIC_API_KEY, persisted.visionAnthropicApiKey)
+                .putString(SettingsSecrets.VISION_CUSTOM_HEADER_VALUE, persisted.visionCustomHeaderValue)
+                .putString(SettingsSecrets.FALA_ELEVENLABS_API_KEY, persisted.falaElevenLabsApiKey)
+                .putString(SettingsSecrets.FALA_GOOGLE_API_KEY, persisted.falaGoogleApiKey)
+                .putString(SettingsSecrets.FALA_CUSTOM_HEADER_VALUE, persisted.falaCustomHeaderValue)
+                .putString(SettingsSecrets.COMPUTER_SSH_PASSWORD, persisted.computerSshPassword)
+                .putString(SettingsSecrets.COMPUTER_SSH_KEY, persisted.computerSshKey)
+                .putString(SettingsSecrets.PROVIDER_ANTHROPIC_API_KEY, persisted.providerAnthropicApiKey)
+                .putString(SettingsSecrets.PROVIDER_OPENAI_API_KEY, persisted.providerOpenAiApiKey)
+                .putString(SettingsSecrets.PROVIDER_GOOGLE_API_KEY, persisted.providerGoogleApiKey)
+                .putString(SettingsSecrets.PROVIDER_GROQ_API_KEY, persisted.providerGroqApiKey)
+                .putString(SettingsSecrets.PROVIDER_GROK_API_KEY, persisted.providerGrokApiKey)
                 .commit()
         }
         check(committed) { "Unable to persist provider tokens" }
 
         dataStore.edit { prefs ->
             SettingsSecrets.LEGACY_IN_DATASTORE.forEach { prefs.remove(it) }
-            prefs[SOURCE] = settings.source.name
-            prefs[ENDPOINT_URL] = settings.customEndpoint
-            prefs[AUTH_HEADER_NAME] = settings.customHeaderName
-            prefs[MODEL] = settings.customModel
-            settings.customLanguage.putOrRemove(prefs, LANGUAGE)
-            prefs[OPENAI_MODEL] = settings.openaiModel
-            settings.openaiLanguage.putOrRemove(prefs, OPENAI_LANGUAGE)
-            prefs[GROQ_MODEL] = settings.groqModel
-            settings.groqLanguage.putOrRemove(prefs, GROQ_LANGUAGE)
-            settings.localModelId.putOrRemove(prefs, LOCAL_MODEL_ID)
-            settings.localLanguage.putOrRemove(prefs, LOCAL_LANGUAGE)
-            prefs[REASONING_SOURCE] = settings.reasoningSource.name
-            settings.reasoningLocalModelId.putOrRemove(prefs, REASONING_LOCAL_MODEL_ID)
-            settings.reasoningOpenAiModel.putOrRemove(prefs, REASONING_OPENAI_MODEL)
-            prefs[REASONING_ANTHROPIC_MODEL] = settings.reasoningAnthropicModel
-            prefs[REASONING_GOOGLE_MODEL] = settings.reasoningGoogleModel
-            prefs[REASONING_CUSTOM_ENDPOINT] = settings.reasoningCustomEndpoint
-            prefs[REASONING_CUSTOM_HEADER_NAME] = settings.reasoningCustomHeaderName
-            prefs[REASONING_CUSTOM_MODEL] = settings.reasoningCustomModel
-            prefs[VISION_SOURCE] = settings.visionSource.name
-            settings.visionLocalModelId.putOrRemove(prefs, VISION_LOCAL_MODEL_ID)
-            prefs[VISION_TRANSLATE_TARGET] = settings.visionTranslateTarget
-            prefs[VISION_OPENAI_MODEL] = settings.visionOpenAiModel
-            prefs[VISION_GOOGLE_MODEL] = settings.visionGoogleModel
-            prefs[VISION_ANTHROPIC_MODEL] = settings.visionAnthropicModel
-            prefs[VISION_CUSTOM_ENDPOINT] = settings.visionCustomEndpoint
-            prefs[VISION_CUSTOM_HEADER_NAME] = settings.visionCustomHeaderName
-            prefs[VISION_CUSTOM_MODEL] = settings.visionCustomModel
-            prefs[FALA_SOURCE] = settings.falaSource.name
-            settings.falaLocalModelId.putOrRemove(prefs, FALA_LOCAL_MODEL_ID)
-            prefs[FALA_SPEED] = settings.falaSpeed
-            prefs[FALA_CLOUD_VOICE] = settings.falaCloudVoice
-            prefs[FALA_ELEVENLABS_VOICE] = settings.falaElevenLabsVoice
-            prefs[FALA_ELEVENLABS_MODEL] = settings.falaElevenLabsModel
-            prefs[FALA_GOOGLE_VOICE] = settings.falaGoogleVoice
-            prefs[FALA_CUSTOM_ENDPOINT] = settings.falaCustomEndpoint
-            prefs[FALA_CUSTOM_HEADER_NAME] = settings.falaCustomHeaderName
-            prefs[FALA_CUSTOM_MODEL] = settings.falaCustomModel
-            prefs[COMPUTER_MODE] = settings.computerMode
-            prefs[COMPUTER_SSH_HOST] = settings.computerSshHost
-            prefs[COMPUTER_SSH_PORT] = settings.computerSshPort
-            prefs[COMPUTER_SSH_USER] = settings.computerSshUser
-            prefs[COMPUTER_SSH_AUTH_TYPE] = settings.computerSshAuthType
-            prefs[CUSTOM_MODEL_MIRROR_URL] = settings.customModelMirrorUrl
-            ModelProvisioning.customMirrorUrl = settings.customModelMirrorUrl.ifBlank { null }
-            prefs[PROVIDER_ANTHROPIC_MODEL] = settings.providerAnthropicModel
-            prefs[PROVIDER_ANTHROPIC_AUTH_MODE] = settings.providerAnthropicAuthMode
-            prefs[PROVIDER_OPENAI_MODEL] = settings.providerOpenAiModel
-            prefs[PROVIDER_OPENAI_AUTH_MODE] = settings.providerOpenAiAuthMode
-            prefs[PROVIDER_GOOGLE_MODEL] = settings.providerGoogleModel
-            prefs[PROVIDER_GOOGLE_AUTH_MODE] = settings.providerGoogleAuthMode
-            prefs[PROVIDER_ELEVENLABS_AUTH_MODE] = settings.providerElevenLabsAuthMode
-            prefs[PROVIDER_GROQ_MODEL] = settings.providerGroqModel
-            prefs[PROVIDER_GROK_MODEL] = settings.providerGrokModel
-            prefs[OVERLAY_MODE_ENABLED] = settings.overlayModeEnabled
-            prefs[KEYBOARD_MODE_ENABLED] = settings.keyboardModeEnabled
-            prefs[OVERLAY_RECORDING_MODE] = settings.overlayRecordingMode.name
-            prefs[AUTO_PASTE_IN_FIELD] = settings.autoPasteInField
-            prefs[AUTO_PASTE_ON_FOCUS] = settings.autoPasteOnFocus
-            prefs[OVERLAY_SIDE] = settings.overlaySide.name
-            prefs[ORB_SIZE_PX] = settings.orbSizePx
-            prefs[TAP_BURST_WINDOW_MS] = settings.tapBurstWindowMs
-            prefs[SHORTCUT_1_TAP] = settings.shortcut1Tap.name
-            prefs[SHORTCUT_2_TAP] = settings.shortcut2Tap.name
-            prefs[SHORTCUT_3_TAP] = settings.shortcut3Tap.name
-            prefs[SHORTCUT_OVERFLOW] = settings.shortcutOverflow.name
-            prefs[VIBRATION_INTENSITY] = settings.vibrationIntensity
-            prefs[THEME_DARK] = settings.themeDark
-            prefs[ONBOARDING_DONE] = settings.onboardingDone
-            prefs[TRANSCRIPTION_TIMEOUT_MS] = settings.transcriptionTimeoutMs
-            prefs[MAX_RECORDING_SEC] = settings.maxRecordingSec
-            prefs[KEYBOARD_SCALE_PERCENT] = settings.keyboardScalePercent
-            prefs[KEYBOARD_LANGUAGE] = settings.keyboardLanguage
-            prefs[KEYBOARD_NUMBER_ROW_ENABLED] = settings.keyboardNumberRowEnabled
-            prefs[PARTIAL_ON_PAUSE] = settings.partialOnPause
-            prefs[PARTIAL_VIEW_EDIT] = settings.partialViewEdit
-            prefs[KEYBOARD_SHOW_WITH_HARD_KEYBOARD] = settings.keyboardShowWithHardKeyboard
-            prefs[KEYBOARD_AUTO_CORRECT] = settings.keyboardAutoCorrect
-            prefs[KEYBOARD_SKIN] = settings.keyboardSkin
-            prefs[ORB_SKIN] = settings.orbSkin
-            prefs[APP_LANGUAGE] = settings.appLanguage
+            prefs[SOURCE] = persisted.source.name
+            prefs[ENDPOINT_URL] = persisted.customEndpoint
+            prefs[AUTH_HEADER_NAME] = persisted.customHeaderName
+            prefs[MODEL] = persisted.customModel
+            persisted.customLanguage.putOrRemove(prefs, LANGUAGE)
+            prefs[OPENAI_MODEL] = persisted.openaiModel
+            persisted.openaiLanguage.putOrRemove(prefs, OPENAI_LANGUAGE)
+            prefs[GROQ_MODEL] = persisted.groqModel
+            persisted.groqLanguage.putOrRemove(prefs, GROQ_LANGUAGE)
+            persisted.localModelId.putOrRemove(prefs, LOCAL_MODEL_ID)
+            persisted.localLanguage.putOrRemove(prefs, LOCAL_LANGUAGE)
+            prefs[REASONING_SOURCE] = persisted.reasoningSource.name
+            persisted.reasoningLocalModelId.putOrRemove(prefs, REASONING_LOCAL_MODEL_ID)
+            persisted.reasoningOpenAiModel.putOrRemove(prefs, REASONING_OPENAI_MODEL)
+            prefs[REASONING_ANTHROPIC_MODEL] = persisted.reasoningAnthropicModel
+            prefs[REASONING_GOOGLE_MODEL] = persisted.reasoningGoogleModel
+            prefs[REASONING_CUSTOM_ENDPOINT] = persisted.reasoningCustomEndpoint
+            prefs[REASONING_CUSTOM_HEADER_NAME] = persisted.reasoningCustomHeaderName
+            prefs[REASONING_CUSTOM_MODEL] = persisted.reasoningCustomModel
+            prefs[VISION_SOURCE] = persisted.visionSource.name
+            persisted.visionLocalModelId.putOrRemove(prefs, VISION_LOCAL_MODEL_ID)
+            prefs[VISION_TRANSLATE_TARGET] = persisted.visionTranslateTarget
+            prefs[VISION_OPENAI_MODEL] = persisted.visionOpenAiModel
+            prefs[VISION_GOOGLE_MODEL] = persisted.visionGoogleModel
+            prefs[VISION_ANTHROPIC_MODEL] = persisted.visionAnthropicModel
+            prefs[VISION_CUSTOM_ENDPOINT] = persisted.visionCustomEndpoint
+            prefs[VISION_CUSTOM_HEADER_NAME] = persisted.visionCustomHeaderName
+            prefs[VISION_CUSTOM_MODEL] = persisted.visionCustomModel
+            prefs[FALA_SOURCE] = persisted.falaSource.name
+            persisted.falaLocalModelId.putOrRemove(prefs, FALA_LOCAL_MODEL_ID)
+            prefs[FALA_SPEED] = persisted.falaSpeed
+            prefs[FALA_CLOUD_VOICE] = persisted.falaCloudVoice
+            prefs[FALA_ELEVENLABS_VOICE] = persisted.falaElevenLabsVoice
+            prefs[FALA_ELEVENLABS_MODEL] = persisted.falaElevenLabsModel
+            prefs[FALA_GOOGLE_VOICE] = persisted.falaGoogleVoice
+            prefs[FALA_CUSTOM_ENDPOINT] = persisted.falaCustomEndpoint
+            prefs[FALA_CUSTOM_HEADER_NAME] = persisted.falaCustomHeaderName
+            prefs[FALA_CUSTOM_MODEL] = persisted.falaCustomModel
+            prefs[COMPUTER_MODE] = persisted.computerMode
+            prefs[COMPUTER_SSH_HOST] = persisted.computerSshHost
+            prefs[COMPUTER_SSH_PORT] = persisted.computerSshPort
+            prefs[COMPUTER_SSH_USER] = persisted.computerSshUser
+            prefs[COMPUTER_SSH_AUTH_TYPE] = persisted.computerSshAuthType
+            prefs[CUSTOM_MODEL_MIRROR_URL] = persisted.customModelMirrorUrl
+            ModelProvisioning.customMirrorUrl = persisted.customModelMirrorUrl.ifBlank { null }
+            prefs[PROVIDER_ANTHROPIC_MODEL] = persisted.providerAnthropicModel
+            prefs[PROVIDER_ANTHROPIC_AUTH_MODE] = persisted.providerAnthropicAuthMode
+            prefs[PROVIDER_OPENAI_MODEL] = persisted.providerOpenAiModel
+            prefs[PROVIDER_OPENAI_AUTH_MODE] = persisted.providerOpenAiAuthMode
+            prefs[PROVIDER_GOOGLE_MODEL] = persisted.providerGoogleModel
+            prefs[PROVIDER_GOOGLE_AUTH_MODE] = persisted.providerGoogleAuthMode
+            prefs[PROVIDER_ELEVENLABS_AUTH_MODE] = persisted.providerElevenLabsAuthMode
+            prefs[PROVIDER_GROQ_MODEL] = persisted.providerGroqModel
+            prefs[PROVIDER_GROK_MODEL] = persisted.providerGrokModel
+            prefs[OVERLAY_MODE_ENABLED] = persisted.overlayModeEnabled
+            prefs[KEYBOARD_MODE_ENABLED] = persisted.keyboardModeEnabled
+            prefs[OVERLAY_RECORDING_MODE] = persisted.overlayRecordingMode.name
+            prefs[AUTO_PASTE_IN_FIELD] = persisted.autoPasteInField
+            prefs[AUTO_PASTE_ON_FOCUS] = persisted.autoPasteOnFocus
+            prefs[OVERLAY_SIDE] = persisted.overlaySide.name
+            prefs[ORB_SIZE_PX] = persisted.orbSizePx
+            prefs[TAP_BURST_WINDOW_MS] = persisted.tapBurstWindowMs
+            prefs[SHORTCUT_1_TAP] = persisted.shortcut1Tap.name
+            prefs[SHORTCUT_2_TAP] = persisted.shortcut2Tap.name
+            prefs[SHORTCUT_3_TAP] = persisted.shortcut3Tap.name
+            prefs[SHORTCUT_OVERFLOW] = persisted.shortcutOverflow.name
+            prefs[VIBRATION_INTENSITY] = persisted.vibrationIntensity
+            prefs[THEME_DARK] = persisted.themeDark
+            prefs[ONBOARDING_DONE] = persisted.onboardingDone
+            prefs[TRANSCRIPTION_TIMEOUT_MS] = persisted.transcriptionTimeoutMs
+            prefs[MAX_RECORDING_SEC] = persisted.maxRecordingSec
+            prefs[KEYBOARD_SCALE_PERCENT] = persisted.keyboardScalePercent
+            prefs[KEYBOARD_LANGUAGE] = persisted.keyboardLanguage
+            prefs[KEYBOARD_NUMBER_ROW_ENABLED] = persisted.keyboardNumberRowEnabled
+            prefs[PARTIAL_ON_PAUSE] = persisted.partialOnPause
+            prefs[PARTIAL_VIEW_EDIT] = persisted.partialViewEdit
+            prefs[KEYBOARD_SHOW_WITH_HARD_KEYBOARD] = persisted.keyboardShowWithHardKeyboard
+            prefs[KEYBOARD_AUTO_CORRECT] = persisted.keyboardAutoCorrect
+            prefs[KEYBOARD_SKIN] = persisted.keyboardSkin
+            prefs[ORB_SKIN] = persisted.orbSkin
+            prefs[APP_LANGUAGE] = persisted.appLanguage
         }
     }
 

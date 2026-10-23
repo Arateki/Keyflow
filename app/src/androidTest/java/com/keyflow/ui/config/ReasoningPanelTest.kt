@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -91,6 +92,17 @@ class ReasoningPanelTest {
         rule.onNodeWithTag("raciocinio-local-model-${qwen.id}").performScrollTo().assertIsDisplayed()
         rule.onNodeWithTag("raciocinio-local-model-${gemma.id}").performScrollTo().assertIsDisplayed()
         rule.onNodeWithTag(RACIOCINIO_LOCAL_PRIVACY_TAG).performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun legacyCreditsFallsBackToLocalAndTheOptionIsDisabled() {
+        val h = Harness(Settings(reasoningSource = ReasoningSource.CREDITS), textUi())
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(reasoningSourceTag(ReasoningSource.LOCAL)).assertIsDisplayed()
+        rule.onNodeWithTag(reasoningSourceTag(ReasoningSource.CREDITS))
+            .assertIsNotEnabled()
+            .assertTextContains("Em breve", substring = true)
     }
 
     /** O Raciocínio nunca lista os modelos de fala. */

@@ -41,7 +41,6 @@ fun timeoutTag(ms: Int): String = "voz-timeout-$ms"
 fun maxRecordingTag(sec: Int): String = "voz-max-recording-$sec"
 
 const val VOZ_CREDITS_CARD_TAG = "voz-credits-card"
-const val VOZ_RECHARGE_TAG = "voz-recharge"
 const val VOZ_TOKEN_TAG = "voz-token"
 const val VOZ_MODEL_TAG = "voz-model"
 const val VOZ_LANGUAGE_TAG = "voz-language"
@@ -52,10 +51,9 @@ const val VOZ_PARTIAL_ON_PAUSE_TAG = "voz-partial-on-pause"
 const val VOZ_PARTIAL_VIEW_EDIT_TAG = "voz-partial-view-edit"
 
 /**
- * Aba Voz (VOZ-01..06): origem da transcrição via [Segmented] + campos por preset com auto-save.
- * Créditos é stub inerte (saldo mock + CTA que não compra nada — MON-02). OpenAI/Groq pedem token e
- * pré-preenchem modelo; Custom é manual. Tudo persiste por [onSettingsChange]; o consumidor (overlay/
- * teclado) resolve via [Settings.effectiveConfigFor] e trata CREDITS como indisponível.
+ * Aba Transcrição (VOZ-01..06): origem via [Segmented] + campos por preset com auto-save.
+ * Créditos fica desabilitado e marcado como "Em breve"; configurações legadas caem no Custom. OpenAI/Groq
+ * pedem token e pré-preenchem modelo; Custom é manual. Tudo persiste por [onSettingsChange].
  */
 @Composable
 fun VozPanel(
@@ -67,6 +65,7 @@ fun VozPanel(
 ) {
     val palette = LocalKeyFlowPalette.current
     val scroll = rememberScrollState()
+    val activeSettings = settings.withoutCredits()
     Column(
         modifier
             .fillMaxWidth()
@@ -79,44 +78,46 @@ fun VozPanel(
           Column(Modifier.padding(vertical = 16.dp)) {
             Segmented(
                 options = TranscriptionSource.entries,
-                selected = settings.source,
+                selected = activeSettings.source,
                 label = ::sourceLabel,
                 tag = ::sourceTag,
-                onSelect = { onSettingsChange(settings.copy(source = it)) },
+                onSelect = { onSettingsChange(activeSettings.copy(source = it)) },
+                disabled = { it == TranscriptionSource.CREDITS },
+                disabledLabel = { if (it == TranscriptionSource.CREDITS) tr("Em breve") else null },
             )
 
-            when (settings.source) {
-            TranscriptionSource.CREDITS -> CreditsCard(tag = VOZ_CREDITS_CARD_TAG, rechargeTag = VOZ_RECHARGE_TAG)
+            when (activeSettings.source) {
+            TranscriptionSource.CREDITS -> Unit
             TranscriptionSource.OPENAI -> KeyProviderFields(
                 provName = "OpenAI",
-                token = settings.providerOpenAiApiKey.ifEmpty { settings.openaiToken },
+                token = activeSettings.providerOpenAiApiKey.ifEmpty { activeSettings.openaiToken },
                 models = OPENAI_MODELS,
-                model = settings.openaiModel,
-                language = settings.openaiLanguage.orEmpty(),
-                onToken = { onSettingsChange(settings.copy(providerOpenAiApiKey = it, openaiToken = it)) },
-                onModel = { onSettingsChange(settings.copy(openaiModel = it)) },
-                onLanguage = { onSettingsChange(settings.copy(openaiLanguage = it.ifBlank { null })) },
+                model = activeSettings.openaiModel,
+                language = activeSettings.openaiLanguage.orEmpty(),
+                onToken = { onSettingsChange(activeSettings.copy(providerOpenAiApiKey = it, openaiToken = it)) },
+                onModel = { onSettingsChange(activeSettings.copy(openaiModel = it)) },
+                onLanguage = { onSettingsChange(activeSettings.copy(openaiLanguage = it.ifBlank { null })) },
             )
             TranscriptionSource.GROQ -> KeyProviderFields(
                 provName = "Groq",
-                token = settings.providerGroqApiKey.ifEmpty { settings.groqToken },
+                token = activeSettings.providerGroqApiKey.ifEmpty { activeSettings.groqToken },
                 models = GROQ_MODELS,
-                model = settings.groqModel,
-                language = settings.groqLanguage.orEmpty(),
-                onToken = { onSettingsChange(settings.copy(providerGroqApiKey = it, groqToken = it)) },
-                onModel = { onSettingsChange(settings.copy(groqModel = it)) },
-                onLanguage = { onSettingsChange(settings.copy(groqLanguage = it.ifBlank { null })) },
+                model = activeSettings.groqModel,
+                language = activeSettings.groqLanguage.orEmpty(),
+                onToken = { onSettingsChange(activeSettings.copy(providerGroqApiKey = it, groqToken = it)) },
+                onModel = { onSettingsChange(activeSettings.copy(groqModel = it)) },
+                onLanguage = { onSettingsChange(activeSettings.copy(groqLanguage = it.ifBlank { null })) },
             )
-            TranscriptionSource.CUSTOM -> CustomFields(settings, onSettingsChange)
-            TranscriptionSource.LOCAL -> LocalPanel(settings, onSettingsChange, localModels, localActions)
+            TranscriptionSource.CUSTOM -> CustomFields(activeSettings, onSettingsChange)
+            TranscriptionSource.LOCAL -> LocalPanel(activeSettings, onSettingsChange, localModels, localActions)
             }
           }
         }
-        PartialSection(settings, onSettingsChange)
+        PartialSection(activeSettings, onSettingsChange)
 
         // Abaixo do token/credenciais do preset ativo (pedido do Yan, 2026-07-02) — não compete por
         // atenção no topo do painel com a escolha de origem.
-        GeneralSection(settings, onSettingsChange)
+        GeneralSection(activeSettings, onSettingsChange)
     }
 }
 

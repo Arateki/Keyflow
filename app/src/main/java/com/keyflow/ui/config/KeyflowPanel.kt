@@ -88,20 +88,6 @@ data class KeyflowChatMessage(
 )
 
 /**
- * Informações da conta e assinatura premium do usuário vindas da API (KeyFlow Pro, créditos, etc.).
- */
-data class KeyflowAccountInfo(
-    val email: String = "contato@arateki.com",
-    val name: String = "Yan",
-    val planName: String = "KeyFlow Pro",
-    val subscriptionStatus: String = "Assinatura ativa",
-    val renewalDate: String = "15/12/2026",
-    val availableCredits: Int = 1250,
-    val totalCredits: Int = 2000,
-    val isLoggedIn: Boolean = true,
-)
-
-/**
  * Aba KeyFlow: interação direta com o agente principal através da orbe e chat por texto,
  * com área expansível de ajustes gerais do sistema.
  *
@@ -118,12 +104,13 @@ fun KeyflowPanel(
     agent: AgentRuntime? = null,
 ) {
     val scope = rememberCoroutineScope()
+    val activeSettings = settings.withoutCredits()
     val backends = remember(agent, resolve) { agent?.backends ?: AgentBackends.plain(resolve) }
     val controller = remember(agent) { agent?.controller ?: AgentController(scope) }
     val state by controller.state.collectAsStateOnMain()
     val pending by controller.pendingConfirmation.collectAsStateOnMain()
-    val mode by remember(backends, settings.reasoningSource, settings.reasoningAnthropicModel) { backends.modeFlow(settings) }
-        .collectAsStateOnMain(backends.mode(settings))
+    val mode by remember(backends, activeSettings.reasoningSource, activeSettings.reasoningAnthropicModel) { backends.modeFlow(activeSettings) }
+        .collectAsStateOnMain(backends.mode(activeSettings))
     val labelOf: (String) -> String = { name -> agent?.registry?.get(name)?.label ?: name }
 
     // Sair da aba com uma pergunta de permissão aberta cancela a execução: ninguém aprova o que não vê. Girar a tela não conta.
@@ -134,12 +121,12 @@ fun KeyflowPanel(
 
     Box(modifier.fillMaxSize()) {
         KeyflowPanelBody(
-            settings = settings,
+            settings = activeSettings,
             state = state,
             mode = mode,
             agent = agent,
             labelOf = labelOf,
-            onSend = { text -> controller.send(text, backends.resolve(settings)) },
+            onSend = { text -> controller.send(text, backends.resolve(activeSettings)) },
             onCancel = controller::cancel,
             onClear = controller::clear,
             modifier = Modifier.fillMaxSize(),
@@ -174,7 +161,6 @@ private fun KeyflowPanelBody(
     // A orbe é do chat enquanto ele trabalha (pensando, executando, esperando a permissão); parado, um toque a alterna (como antes).
     var manualOrb by remember { mutableStateOf<OrbState>(OrbState.Idle) }
     val orbState: OrbState = if (state.busy) OrbState.Transcribing else manualOrb
-    var account by remember { mutableStateOf(KeyflowAccountInfo()) }
     var inputText by remember { mutableStateOf("") }
     val isGenerating = state.busy
 
@@ -258,216 +244,12 @@ private fun KeyflowPanelBody(
                     .testTag(KEYFLOW_AJUSTES_AREA_TAG),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                // 1. Cabeçalho de Conta & Logout
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        Box(
-                            Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(if (account.isLoggedIn) palette.teal.copy(alpha = 0.15f) else palette.bg)
-                                .border(1.dp, if (account.isLoggedIn) palette.teal.copy(alpha = 0.5f) else palette.line2, CircleShape),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            if (account.isLoggedIn) {
-                                Text(
-                                    account.name.take(1).uppercase(),
-                                    color = palette.teal,
-                                    fontFamily = SpaceGrotesk,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp,
-                                )
-                            } else {
-                                KfIcon(KfIcons.User, tint = palette.muted, modifier = Modifier.size(18.dp))
-                            }
-                        }
-
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text(
-                                    if (account.isLoggedIn) account.name else tr("Conta não conectada"),
-                                    color = palette.fg,
-                                    fontFamily = SpaceGrotesk,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 13.5.sp,
-                                )
-                                if (account.isLoggedIn) {
-                                    Box(
-                                        Modifier
-                                            .clip(RoundedCornerShape(4.dp))
-                                            .background(palette.teal.copy(alpha = 0.2f))
-                                            .padding(horizontal = 5.dp, vertical = 1.dp),
-                                    ) {
-                                        Text(
-                                            "PRO",
-                                            color = palette.teal,
-                                            fontFamily = SpaceMono,
-                                            fontSize = 8.sp,
-                                            fontWeight = FontWeight.Bold,
-                                        )
-                                    }
-                                }
-                            }
-                            Text(
-                                if (account.isLoggedIn) account.email else tr("Conecte para sincronizar planos e créditos"),
-                                color = palette.muted,
-                                fontFamily = SpaceMono,
-                                fontSize = 10.sp,
-                            )
-                        }
-                    }
-
-                    if (account.isLoggedIn) {
-                        Box(
-                            Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { account = account.copy(isLoggedIn = false) }
-                                .padding(horizontal = 8.dp, vertical = 6.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            ) {
-                                KfIcon(KfIcons.Exit, tint = palette.faint, modifier = Modifier.size(14.dp))
-                                Text(
-                                    tr("Sair"),
-                                    color = palette.faint,
-                                    fontFamily = SpaceMono,
-                                    fontSize = 10.5.sp,
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // 2. Detalhes de Assinatura Premium e Créditos da API
-                if (account.isLoggedIn) {
-                    Column(
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(palette.bg.copy(alpha = 0.7f))
-                            .padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column {
-                                Text(
-                                    tr("Plano e Assinatura"),
-                                    color = palette.muted,
-                                    fontFamily = SpaceMono,
-                                    fontSize = 9.5.sp,
-                                )
-                                Text(
-                                    account.planName,
-                                    color = palette.fg,
-                                    fontFamily = SpaceGrotesk,
-                                    fontWeight = FontWeight.Medium,
-                                    fontSize = 13.sp,
-                                )
-                            }
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text(
-                                    tr("Status"),
-                                    color = palette.muted,
-                                    fontFamily = SpaceMono,
-                                    fontSize = 9.5.sp,
-                                )
-                                Text(
-                                    tr("Assinatura ativa"),
-                                    color = palette.teal,
-                                    fontFamily = SpaceGrotesk,
-                                    fontWeight = FontWeight.Medium,
-                                    fontSize = 12.sp,
-                                )
-                            }
-                        }
-
-                        // Medidor de créditos da API
-                        Column(Modifier.fillMaxWidth().padding(top = 2.dp)) {
-                            Row(
-                                Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    tr("Créditos Premium"),
-                                    color = palette.muted,
-                                    fontFamily = SpaceMono,
-                                    fontSize = 9.5.sp,
-                                )
-                                Text(
-                                    "${account.availableCredits} / ${account.totalCredits}",
-                                    color = palette.fg,
-                                    fontFamily = SpaceMono,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp,
-                                )
-                            }
-                            Box(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 6.dp)
-                                    .height(4.dp)
-                                    .clip(RoundedCornerShape(2.dp))
-                                    .background(palette.line2),
-                            ) {
-                                val fraction = (account.availableCredits.toFloat() / account.totalCredits.coerceAtLeast(1).toFloat()).coerceIn(0f, 1f)
-                                Box(
-                                    Modifier
-                                        .fillMaxWidth(fraction)
-                                        .height(4.dp)
-                                        .clip(RoundedCornerShape(2.dp))
-                                        .background(palette.teal),
-                                )
-                            }
-                            Row(
-                                Modifier.fillMaxWidth().padding(top = 4.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                Text(
-                                    tr("Renovação em %s", account.renewalDate),
-                                    color = palette.faint,
-                                    fontFamily = SpaceMono,
-                                    fontSize = 9.sp,
-                                )
-                                Text(
-                                    tr("Saldo na API"),
-                                    color = palette.faint,
-                                    fontFamily = SpaceMono,
-                                    fontSize = 9.sp,
-                                )
-                            }
-                        }
-                    }
-
-                    SecondaryButton(
-                        text = tr("Gerenciar assinatura"),
-                        tag = "keyflow-manage-sub",
-                        onClick = { },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                } else {
-                    PrimaryButton(
-                        text = tr("Conectar conta KeyFlow"),
-                        tag = "keyflow-login-btn",
-                        onClick = { account = account.copy(isLoggedIn = true) },
-                        modifier = Modifier.fillMaxWidth(),
-                        icon = KfIcons.User,
-                    )
-                }
+                Text(
+                    tr("Créditos — Em breve"),
+                    color = palette.muted,
+                    fontFamily = SpaceMono,
+                    fontSize = 10.5.sp,
+                )
 
                 // 3. Capacidades Ativas do Agente
                 Text(

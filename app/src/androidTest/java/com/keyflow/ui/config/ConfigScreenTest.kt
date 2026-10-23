@@ -9,6 +9,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.assertTextContains
@@ -122,12 +127,16 @@ class ConfigScreenTest {
     }
 
     @Test
-    fun newTabsStartEmptyWithTheirNameInTheHeader() {
-        // Aba ainda sem conteúdo (Yan, 2026-09-29): Notificação, com o nome no cabeçalho e sem ajuda.
+    fun deferredTabsShowComingSoonCardWithoutControls() {
+        // Estas abas continuam na navegação, mas não expõem controles antes da entrega do recurso.
         val h = Harness()
         rule.setContent { h.Content() }
 
         val tabs = listOf(
+            ConfigTab.VISAO to "Visão",
+            ConfigTab.FALA to "Voz",
+            ConfigTab.FLUXOS to "Fluxos",
+            ConfigTab.COMPUTADOR to "Computador",
             ConfigTab.NOTIFICACAO to "Notificação",
         )
         for ((tab, title) in tabs) {
@@ -135,37 +144,32 @@ class ConfigScreenTest {
             rule.onNodeWithTag(panelTag(tab)).assertIsDisplayed()
             rule.onNodeWithTag(HEADER_TAB_TITLE_TAG).assertTextEquals(title)
             rule.onAllNodesWithTag(HEADER_TAB_HELP_TAG).assertCountEquals(0)
+            rule.onNodeWithTag(COMING_SOON_LABEL_TAG).assertTextEquals("Em breve")
+            rule.onAllNodes(hasAnyAncestor(hasTestTag(panelTag(tab))) and hasClickAction()).assertCountEquals(0)
+            rule.onAllNodes(hasAnyAncestor(hasTestTag(panelTag(tab))) and hasSetTextAction()).assertCountEquals(0)
         }
     }
 
     @Test
-    fun theVisionTabIsAlwaysEnabledAndHasItsHelp() {
-        val h = Harness()
+    fun creditsSourceIsDisabledAndLegacySelectionUsesCapabilityDefault() {
+        val h = Harness().also {
+            it.settings = Settings(
+                source = com.keyflow.core.TranscriptionSource.CREDITS,
+                reasoningSource = com.keyflow.core.ReasoningSource.CREDITS,
+            )
+        }
         rule.setContent { h.Content() }
 
-        rule.onNodeWithTag(tabTag(ConfigTab.VISAO)).performClick()
-        rule.onNodeWithTag(panelTag(ConfigTab.VISAO)).assertIsDisplayed()
-        rule.onNodeWithTag(HEADER_TAB_TITLE_TAG).assertTextEquals("Visão")
-        rule.onAllNodesWithTag(HEADER_TAB_HELP_TAG).assertCountEquals(1)
-        rule.onNodeWithTag(visionSourceTag(com.keyflow.core.VisionSource.LOCAL)).assertIsDisplayed()
+        rule.onNodeWithTag(sourceTag(com.keyflow.core.TranscriptionSource.CREDITS))
+            .assertIsNotEnabled()
+            .assertTextContains("Em breve", substring = true)
+        rule.onNodeWithTag(sourceTag(com.keyflow.core.TranscriptionSource.CUSTOM)).assertIsDisplayed()
 
-        rule.onNodeWithTag(HEADER_TAB_HELP_TAG).performClick()
-        rule.onNodeWithTag(TAB_HELP_TAG).assertTextContains("Configura o reconhecimento óptico de caracteres", substring = true)
-    }
-
-    @Test
-    fun theVoiceTabIsAlwaysEnabledAndHasItsHelp() {
-        val h = Harness()
-        rule.setContent { h.Content() }
-
-        rule.onNodeWithTag(tabTag(ConfigTab.FALA)).performClick()
-        rule.onNodeWithTag(panelTag(ConfigTab.FALA)).assertIsDisplayed()
-        rule.onNodeWithTag(HEADER_TAB_TITLE_TAG).assertTextEquals("Voz")
-        rule.onAllNodesWithTag(HEADER_TAB_HELP_TAG).assertCountEquals(1)
-        rule.onNodeWithTag(falaSourceTag(com.keyflow.core.FalaSource.LOCAL)).assertIsDisplayed()
-
-        rule.onNodeWithTag(HEADER_TAB_HELP_TAG).performClick()
-        rule.onNodeWithTag(TAB_HELP_TAG).assertTextContains("Configura a síntese de fala", substring = true)
+        rule.onNodeWithTag(tabTag(ConfigTab.RACIOCINIO)).performClick()
+        rule.onNodeWithTag(reasoningSourceTag(com.keyflow.core.ReasoningSource.CREDITS))
+            .assertIsNotEnabled()
+            .assertTextContains("Em breve", substring = true)
+        rule.onNodeWithTag(reasoningSourceTag(com.keyflow.core.ReasoningSource.LOCAL)).assertIsDisplayed()
     }
 
     @Test

@@ -108,25 +108,15 @@ class DocsSectionsTest {
         }
     }
 
-    /** As abas Raciocínio, Visão e Voz têm conteúdo, então ganharam o "?" e a seção da Docs; Notificação segue vazia. */
+    /** Raciocínio mantém ajuda; as abas ainda não entregues ficam sem "?" até terem conteúdo real. */
     @Test
-    fun theReasoningVisionAndVoiceTabsHaveHelpSectionsAndTheEmptyOnesStillHaveNone() {
+    fun reasoningHasHelpAndDeferredTabsDoNot() {
         val rSection = docsSectionFor(ConfigTab.RACIOCINIO)
         assertTrue("Raciocínio sem seção", rSection != null)
         assertEquals("aba-raciocinio", rSection!!.id)
         assertTrue(rSection.blocks.isNotEmpty())
 
-        val vSection = docsSectionFor(ConfigTab.VISAO)
-        assertTrue("Visão sem seção", vSection != null)
-        assertEquals("aba-visao", vSection!!.id)
-        assertTrue(vSection.blocks.isNotEmpty())
-
-        val fSection = docsSectionFor(ConfigTab.FALA)
-        assertTrue("Voz sem seção", fSection != null)
-        assertEquals("aba-voz", fSection!!.id)
-        assertTrue(fSection.blocks.isNotEmpty())
-
-        listOf(ConfigTab.KEYFLOW, ConfigTab.NOTIFICACAO, ConfigTab.DOCS, ConfigTab.FLUXOS, ConfigTab.COMPUTADOR).forEach {
+        listOf(ConfigTab.KEYFLOW, ConfigTab.VISAO, ConfigTab.FALA, ConfigTab.NOTIFICACAO, ConfigTab.DOCS, ConfigTab.FLUXOS, ConfigTab.COMPUTADOR).forEach {
             assertEquals("$it não deveria ter seção ainda", null, docsSectionFor(it))
         }
     }

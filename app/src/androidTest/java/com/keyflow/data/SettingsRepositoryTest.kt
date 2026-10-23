@@ -5,9 +5,11 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.keyflow.core.OverlaySide
+import com.keyflow.core.FalaSource
 import com.keyflow.core.ReasoningSource
 import com.keyflow.core.RecordingMode
 import com.keyflow.core.TranscriptionSource
+import com.keyflow.core.VisionSource
 import com.keyflow.data.models.ModelKind
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -177,6 +179,25 @@ class SettingsRepositoryTest {
         }
         repository.replaceRawPreferences(corrupted)
         assertEquals(ReasoningSource.LOCAL, repository.settingsFlow().first().reasoningSource)
+    }
+
+    @Test
+    fun persistedCreditsSourcesFallBackToCapabilityDefaults() = runTest {
+        val repository = newRepository()
+        repository.saveSettings(Settings())
+        val legacyCredits = repository.rawPreferencesOnce().toMutablePreferences().also {
+            it[stringPreferencesKey("transcription_source")] = "CREDITS"
+            it[stringPreferencesKey("reasoning_source")] = "CREDITS"
+            it[stringPreferencesKey("vision_source")] = "CREDITS"
+            it[stringPreferencesKey("fala_source")] = "CREDITS"
+        }
+        repository.replaceRawPreferences(legacyCredits)
+
+        val restored = repository.settingsFlow().first()
+        assertEquals(TranscriptionSource.CUSTOM, restored.source)
+        assertEquals(ReasoningSource.LOCAL, restored.reasoningSource)
+        assertEquals(VisionSource.LOCAL, restored.visionSource)
+        assertEquals(FalaSource.LOCAL, restored.falaSource)
     }
 
     /** MGR-03 e o análogo do Raciocínio: quando um modelo instala e nenhum daquele tipo está escolhido, ele é escolhido. */

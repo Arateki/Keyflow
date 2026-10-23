@@ -8,6 +8,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -26,7 +27,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Testes da aba Voz (T12 / VOZ-01..06): selecionar a origem persiste, Créditos mostra o cartão stub e
+ * Testes da aba Voz (T12 / VOZ-01..06): selecionar a origem persiste, Créditos fica indisponível e
  * editar o token persiste via auto-save (ImeAction Done).
  */
 @RunWith(AndroidJUnit4::class)
@@ -84,11 +85,15 @@ class VozPanelTest {
     }
 
     @Test
-    fun creditsShowsBalanceCard() {
+    fun legacyCreditsFallsBackToCustomAndShowsDisabledOption() {
         val h = Harness(Settings(source = TranscriptionSource.CREDITS))
         rule.setContent { h.Content() }
 
-        rule.onNodeWithTag(VOZ_CREDITS_CARD_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(sourceTag(TranscriptionSource.CUSTOM)).assertIsDisplayed()
+        rule.onNodeWithTag(sourceTag(TranscriptionSource.CREDITS))
+            .assertIsNotEnabled()
+            .assertTextContains("Em breve", substring = true)
+        rule.onAllNodesWithTag(VOZ_CREDITS_CARD_TAG).assertCountEquals(0)
         rule.onAllNodesWithTag(VOZ_TOKEN_TAG).assertCountEquals(0)
     }
 
@@ -124,7 +129,7 @@ class VozPanelTest {
 
     @Test
     fun timeoutSectionIsSharedAcrossEveryProvider() {
-        // Não é por preset (CREDITS ainda mostra Geral, mesmo sendo um card stub sem token).
+        // Não é por preset: o legado CREDITS cai no Custom e continua compartilhando Geral.
         val h = Harness(Settings(source = TranscriptionSource.CREDITS))
         rule.setContent { h.Content() }
 

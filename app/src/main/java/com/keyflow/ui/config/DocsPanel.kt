@@ -172,7 +172,7 @@ val docsSections: List<DocSection> get() = listOf(
             ),
             DocBlock.Labeled(
                 tr("Origem"),
-                tr("Créditos, OpenAI, Groq, Custom (qualquer serviço compatível) ou Local (modelo no aparelho, sem internet). Nas da nuvem, informe o token; modelo e idioma são opcionais."),
+                tr("Créditos — Em breve; OpenAI, Groq, Custom (qualquer serviço compatível) ou Local (modelo no aparelho, sem internet). Nas origens de nuvem, informe o token; modelo e idioma são opcionais."),
             ),
             DocBlock.Labeled(
                 tr("Tempo limite"),
@@ -425,7 +425,7 @@ val docsSections: List<DocSection> get() = listOf(
     DocSection(
         "creditos",
         tr("Créditos"),
-        listOf(DocBlock.Paragraph(tr("Sem provedor próprio? Use Créditos e pague por minuto via Google Play."))),
+        listOf(DocBlock.Paragraph(tr("Créditos ainda não fazem parte desta versão."))),
     ),
     DocSection(
         "licencas",
@@ -691,10 +691,15 @@ fun docsSectionFor(tab: ConfigTab): DocSection? {
         ConfigTab.TECLADO -> "aba-teclado"
         ConfigTab.OVERLAY -> "aba-sobrepor"
         ConfigTab.RACIOCINIO -> "aba-raciocinio"
-        ConfigTab.VISAO -> "aba-visao"
-        ConfigTab.FALA -> "aba-voz"
-        // KeyFlow, Notificação, Fluxos e Computador ainda não têm seção na Docs.
-        ConfigTab.KEYFLOW, ConfigTab.NOTIFICACAO, ConfigTab.DOCS, ConfigTab.FLUXOS, ConfigTab.COMPUTADOR -> return null
+        // As abas ainda não entregues ficam apenas com o cartão "Em breve", sem ajuda que prometa
+        // controles inexistentes.
+        ConfigTab.KEYFLOW,
+        ConfigTab.VISAO,
+        ConfigTab.FALA,
+        ConfigTab.NOTIFICACAO,
+        ConfigTab.DOCS,
+        ConfigTab.FLUXOS,
+        ConfigTab.COMPUTADOR -> return null
     }
     return docsSections.first { it.id == id }
 }
