@@ -118,12 +118,13 @@ upload interno, o produto de R$15 e a service account. As tasks V1-1..V1-8 não 
 - ~~**V1-1** — "Em breve" nas abas e na origem Créditos (listas acima). A `UnlockSheet` fica; sai só a
   recarga de créditos. Instrumentado + goldens das rotas.~~ **Feito em 2026-10-23** (commit `a59e3c3`;
   instrumentado e goldens verdes).
-- **V1-2** — Higiene do release, pendências herdadas do trabalho do Gemini: logs que imprimem o texto
+- ~~**V1-2** — Higiene do release, pendências herdadas do trabalho do Gemini: logs que imprimem o texto
   ditado (`KeyFlowController`, `OverlayCoordinator` — `take(30)`) só no debug; leitura dos segredos fora
   da main thread (`settingsFlow` → `flowOn(Dispatchers.IO)`); chave de API num lugar só (o cofre
   `keyflow_auth`, contra AUTH-02). Os três logins por assinatura (OpenAI, Anthropic, Google) já são
   `enabled = BuildConfig.DEBUG`; conferir no AAB que o da Anthropic não vai junto — a política dela
-  proíbe login de assinatura em produto de terceiros (Bloco 10), e código dormente pesa no §5 acima.
+  proíbe login de assinatura em produto de terceiros (Bloco 10), e código dormente pesa no §5 acima.~~
+  **Feito em 2026-10-23** (commits `c17ba25`, `7ed0b76`, `0eccdef`, `605a9d0`; gates verdes).
 - **V1-3** — Build de release (PS-5): R8 (`isMinifyEnabled`) com keep rules (AIDL dos processos
   `:inference`/`:reasoning`, sherpa-onnx, LiteRT-LM, AndroidSVG, Play Billing, AdMob), AAB,
   `versionName` 1.0.0, smoke do release no A32. **[YAN]**: chave de upload (Play App Signing) e o
