@@ -15,7 +15,6 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.security.crypto.MasterKey
-import com.keyflow.BuildConfig
 import com.keyflow.auth.Credential
 import com.keyflow.auth.CredentialStore
 import com.keyflow.auth.CredentialVaultLock
@@ -386,9 +385,7 @@ class SettingsRepository(
             computerSshKey = secret(SettingsCredentialKeys.COMPUTER_SSH_KEY),
             customModelMirrorUrl = prefs[CUSTOM_MODEL_MIRROR_URL].orEmpty(),
             providerAnthropicModel = prefs[PROVIDER_ANTHROPIC_MODEL] ?: "claude-3-5-sonnet-latest",
-            providerAnthropicAuthMode = prefs[PROVIDER_ANTHROPIC_AUTH_MODE]
-                ?.takeIf { BuildConfig.DEBUG || it != "subscription" }
-                ?: if (BuildConfig.DEBUG) "subscription" else "api_key",
+            providerAnthropicAuthMode = prefs[PROVIDER_ANTHROPIC_AUTH_MODE] ?: "subscription",
             providerOpenAiModel = prefs[PROVIDER_OPENAI_MODEL] ?: "gpt-4o",
             providerOpenAiAuthMode = prefs[PROVIDER_OPENAI_AUTH_MODE] ?: "subscription",
             providerGoogleModel = prefs[PROVIDER_GOOGLE_MODEL] ?: "gemini-2.0-flash",

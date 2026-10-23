@@ -1,15 +1,13 @@
 package com.keyflow.auth.providers.openai
 
-import com.keyflow.BuildConfig
-
 /**
  * A configuração do login da OpenAI — SÓ dados, sem lógica (AUTH-05). É o único arquivo a editar quando a OpenAI mudar algo.
  * Cada valor vem do texto literal da documentação (`.specs/features/reasoning-models/openai-siwc-notes.md`, conferido em
  * 2026-09-29). Recurso em prévia: reconferir antes de publicar.
  */
 internal object OpenAiAuthConfig {
-    /** RPRV-04: ligado só em builds de dev até o Yan decidir a elegibilidade do app. A chave de API NÃO depende disto. */
-    val enabled: Boolean = BuildConfig.DEBUG
+    /** Login por assinatura disponível no release por decisão do Yan (2026-10-23); chave API independente. */
+    const val enabled: Boolean = true
 
     /** De onde saem o `jwks_uri` e o `revocation_endpoint` (a doc manda usar a descoberta, não fixar a URL). */
     const val discoveryUrl = "https://auth.openai.com/.well-known/openid-configuration"

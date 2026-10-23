@@ -36,8 +36,8 @@ class OpenAiPartsTest {
     }
 
     @Test
-    fun `the login is enabled in debug builds only until the eligibility decision`() {
-        assertThat(OpenAiAuthConfig.enabled).isEqualTo(com.keyflow.BuildConfig.DEBUG)
+    fun `the login is enabled in release`() {
+        assertThat(OpenAiAuthConfig.enabled).isTrue()
     }
 
     // ── id do host ────────────────────────────────────────────────────────────────────────
@@ -66,7 +66,7 @@ class OpenAiPartsTest {
     // ── chave de API ──────────────────────────────────────────────────────────────────────
 
     @Test
-    fun `the api key flow is always available — even while the login is disabled`() {
+    fun `the api key flow is always available`() {
         val flow = OpenAiApiKeyFlow()
         assertThat(flow.method).isEqualTo(AuthMethod.API_KEY)
         assertThat(flow.availability).isEqualTo(Availability.Available)
