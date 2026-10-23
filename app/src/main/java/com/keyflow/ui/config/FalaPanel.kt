@@ -76,6 +76,7 @@ fun FalaPanel(
     initialTest: FalaTestState = FalaTestState(),
     openAiAuth: AuthActions = AuthActions.None,
     googleAuth: AuthActions = AuthActions.None,
+    elevenLabsAuth: AuthActions = AuthActions.None,
 ) {
     val palette = LocalKeyFlowPalette.current
     val scroll = rememberScrollState()
@@ -103,7 +104,7 @@ fun FalaPanel(
                     FalaSource.LOCAL ->
                         if (localSupported) FalaLocal(settings, onSettingsChange, models, actions) else LocalUnsupported()
                     FalaSource.OPENAI -> FalaOpenAi(settings, onSettingsChange, openAiAuth)
-                    FalaSource.ELEVENLABS -> FalaElevenLabs(settings, onSettingsChange)
+                    FalaSource.ELEVENLABS -> FalaElevenLabs(settings, onSettingsChange, elevenLabsAuth)
                     FalaSource.GOOGLE -> FalaGoogle(settings, onSettingsChange, googleAuth)
                     FalaSource.CUSTOM -> FalaCustomFields(settings, onSettingsChange)
                 }
@@ -237,9 +238,7 @@ private fun FalaOpenAi(
         val chosen = settings.falaCloudVoice.ifEmpty { "alloy" }
         val connection by remember(auth) { auth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
         var refresh by remember { mutableIntStateOf(0) }
-        val apiKey = remember(connection, settings.openaiToken) {
-            auth.apiKey().orEmpty().ifEmpty { settings.openaiToken }
-        }
+        val apiKey = remember(auth) { auth.apiKeyFlow() }.collectAsStateOnMain(null).value.orEmpty()
         val effectiveConnection = when {
             connection is ConnectionState.Connected -> connection
             connection is ConnectionState.Connecting -> connection
@@ -276,6 +275,7 @@ private fun FalaOpenAi(
             keyTag = FALA_OPENAI_KEY_TAG,
             ssoModelTag = FALA_CLOUD_VOICE_TAG,
             apiKeyModelTag = FALA_CLOUD_VOICE_TAG,
+            ssoOffered = auth.flows.any { it.method == AuthMethod.OAUTH },
         )
     }
 }
@@ -284,10 +284,11 @@ private fun FalaOpenAi(
 private fun FalaElevenLabs(
     settings: Settings,
     onSettingsChange: (Settings) -> Unit,
+    auth: AuthActions,
 ) {
     val models = FALA_ELEVENLABS_MODELS.map { AccountModel(it, it) }
     val chosen = settings.falaElevenLabsModel.ifEmpty { "eleven_multilingual_v2" }
-    val apiKey = settings.falaElevenLabsApiKey
+    val apiKey = remember(auth) { auth.apiKeyFlow() }.collectAsStateOnMain(null).value.orEmpty()
     UnifiedProviderCard(
         providerName = "ElevenLabs",
         providerLogo = KfIcons.LogoElevenLabs,
@@ -302,7 +303,7 @@ private fun FalaElevenLabs(
         selectedSsoModel = chosen,
         onSelectSsoModel = { onSettingsChange(settings.copy(falaElevenLabsModel = it)) },
         apiKey = apiKey,
-        onApiKeyChange = { onSettingsChange(settings.copy(falaElevenLabsApiKey = it)) },
+        onApiKeyChange = auth::saveApiKey,
         getKeyUrl = "https://elevenlabs.io/app/api-keys",
         onOpenGetKeyUrl = {},
         apiKeyModels = models,
@@ -325,11 +326,7 @@ private fun FalaGoogle(
     val chosen = settings.falaGoogleVoice.ifEmpty { "pt-BR-Neural2-A" }
     val connection by remember(auth) { auth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
     var refresh by remember { mutableIntStateOf(0) }
-    val apiKey = remember(connection, settings.visionGoogleApiKey, settings.falaGoogleApiKey) {
-        auth.apiKey().orEmpty().ifEmpty {
-            settings.falaGoogleApiKey.ifEmpty { settings.visionGoogleApiKey }
-        }
-    }
+    val apiKey = remember(auth) { auth.apiKeyFlow() }.collectAsStateOnMain(null).value.orEmpty()
     UnifiedProviderCard(
         providerName = "Google",
         providerLogo = KfIcons.LogoGoogle,
@@ -360,6 +357,7 @@ private fun FalaGoogle(
         keyTag = FALA_GOOGLE_KEY_TAG,
         ssoModelTag = FALA_GOOGLE_VOICE_TAG,
         apiKeyModelTag = FALA_GOOGLE_VOICE_TAG,
+        ssoOffered = auth.flows.any { it.method == AuthMethod.OAUTH },
     )
 }
 

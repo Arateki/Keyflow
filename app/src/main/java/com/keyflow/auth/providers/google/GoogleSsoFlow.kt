@@ -7,6 +7,7 @@ import com.keyflow.auth.AuthStart
 import com.keyflow.auth.Availability
 import com.keyflow.auth.Credential
 import com.keyflow.auth.CredentialStore
+import com.keyflow.auth.HttpErrorMessage
 import com.keyflow.auth.OAuthFlow
 import com.keyflow.auth.ProviderIds
 import com.keyflow.auth.RedirectReceiver
@@ -94,7 +95,8 @@ internal class GoogleSsoFlow(
 
         val body = response.body?.string().orEmpty()
         if (!response.isSuccessful) {
-            throw AuthException(AuthErrorKind.INVALID_RESPONSE, "Erro do token Google: ${response.code} $body")
+            HttpErrorMessage.log("Google token", response.code, body)
+            throw AuthException(AuthErrorKind.INVALID_RESPONSE, HttpErrorMessage.of("Google token", response.code, body))
         }
 
         val json = try {
@@ -164,10 +166,11 @@ internal class GoogleSsoFlow(
 
         val body = response.body?.string().orEmpty()
         if (!response.isSuccessful) {
+            HttpErrorMessage.log("Google token", response.code, body)
             if (response.code in 400..499) {
-                throw AuthException(AuthErrorKind.NEEDS_RECONNECT, "Sessão expirada: $body")
+                throw AuthException(AuthErrorKind.NEEDS_RECONNECT, HttpErrorMessage.of("Google token", response.code, body))
             }
-            throw AuthException(AuthErrorKind.INVALID_RESPONSE, "Erro ao renovar token: ${response.code}")
+            throw AuthException(AuthErrorKind.INVALID_RESPONSE, HttpErrorMessage.of("Google token", response.code, body))
         }
 
         val json = JSONObject(body)

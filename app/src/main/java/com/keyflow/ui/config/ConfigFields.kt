@@ -797,22 +797,30 @@ internal fun AutoSaveField(
     tag: String,
     modifier: Modifier = Modifier,
     keyboardType: KeyboardType = KeyboardType.Text,
+    masked: Boolean = false,
 ) {
     val palette = LocalKeyFlowPalette.current
     val focusManager = LocalFocusManager.current
     var text by remember(value) { mutableStateOf(value) }
     var wasFocused by remember { mutableStateOf(false) }
+    var maskedEditDirty by remember(value) { mutableStateOf(false) }
     // Sempre o valor mais recente para o commit no descarte (a troca de aba pode pular o focus-out).
     val currentText by rememberUpdatedState(text)
     val currentValue by rememberUpdatedState(value)
 
     fun commitIfChanged() {
-        if (text != value) onCommit(text)
+        if (masked && text.isBlank() && !maskedEditDirty) {
+            text = value
+        } else if (text != value) onCommit(text)
     }
 
     // Salva ao sair de cena (ex.: trocar de aba) se o valor mudou — rede de segurança do focus-out.
     DisposableEffect(Unit) {
-        onDispose { if (currentText != currentValue) onCommit(currentText) }
+        onDispose {
+            if (currentText != currentValue && !(masked && currentText.isBlank() && !maskedEditDirty)) {
+                onCommit(currentText)
+            }
+        }
     }
 
     Column(modifier.fillMaxWidth()) {
@@ -824,6 +832,7 @@ internal fun AutoSaveField(
                 // desfoque/Done/descarte.
                 val pasted = new.length - text.length > 1
                 text = new
+                if (masked) maskedEditDirty = true
                 if (pasted) commitIfChanged()
             },
             singleLine = true,
@@ -849,6 +858,10 @@ internal fun AutoSaveField(
                 .padding(top = 8.dp, bottom = 9.dp)
                 .testTag(tag)
                 .onFocusChanged { state ->
+                    if (state.isFocused && masked && text == value) {
+                        text = ""
+                        maskedEditDirty = false
+                    }
                     if (wasFocused && !state.isFocused) commitIfChanged()
                     wasFocused = state.isFocused
                 },

@@ -70,11 +70,7 @@ internal fun GooglePanel(
     val ssoModels = if (remoteModels.isNotEmpty()) remoteModels else GOOGLE_SSO_MODELS
     val chosenModel = settings.reasoningGoogleModel.ifEmpty { "gemini-2.0-flash" }
 
-    val apiKey = remember(connection, settings.visionGoogleApiKey, settings.falaGoogleApiKey) {
-        actions.apiKey().orEmpty().ifEmpty {
-            settings.visionGoogleApiKey.ifEmpty { settings.falaGoogleApiKey }
-        }
-    }
+    val apiKey = remember(actions) { actions.apiKeyFlow() }.collectAsStateOnMain(null).value.orEmpty()
 
     UnifiedProviderCard(
         providerName = "Google",
@@ -115,6 +111,7 @@ internal fun GooglePanel(
         ssoModelTag = GOOGLE_MODEL_TAG,
         apiKeyModelTag = GOOGLE_MODEL_TAG,
         privacyTag = GOOGLE_PRIVACY_TAG,
+        ssoOffered = actions.flows.any { it.method == AuthMethod.OAUTH },
         modifier = Modifier.padding(top = 8.dp),
     )
 }

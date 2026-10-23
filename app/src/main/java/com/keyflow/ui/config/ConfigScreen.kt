@@ -139,6 +139,9 @@ fun ConfigScreen(
     reasoningAuth: AuthActions = AuthActions.None,
     reasoningAnthropicAuth: AuthActions = AuthActions.None,
     reasoningGoogleAuth: AuthActions = AuthActions.None,
+    transcriptionOpenAiAuth: AuthActions = AuthActions.None,
+    transcriptionGroqAuth: AuthActions = AuthActions.None,
+    falaElevenLabsAuth: AuthActions = AuthActions.None,
     initialReasoningTest: TestState = TestState(),
     reasoningLocalSupported: Boolean = true,
     // O agente com ferramentas da aba KeyFlow (agent-harness); `null` = o chat de texto de sempre.
@@ -327,6 +330,8 @@ fun ConfigScreen(
                             onSettingsChange = onSettingsChange,
                             localModels = localModels,
                             localActions = localActions,
+                            openAiAuth = transcriptionOpenAiAuth,
+                            groqAuth = transcriptionGroqAuth,
                         )
                         ConfigTab.TECLADO -> TecladoPanel(
                             settings = settings,

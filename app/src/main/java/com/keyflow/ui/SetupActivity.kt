@@ -54,6 +54,7 @@ import com.keyflow.auth.ProviderIds
 import com.keyflow.ui.config.AccountModel
 import com.keyflow.ui.config.AuthActions
 import com.keyflow.ui.config.ControllerAuthActions
+import com.keyflow.ui.config.DirectApiKeyActions
 import com.keyflow.reasoning.openai.OpenAiModels
 import com.keyflow.reasoning.openai.OpenAiReasoningEngine
 import com.keyflow.reasoning.anthropic.AnthropicAgentEngine
@@ -123,6 +124,9 @@ class SetupActivity : ComponentActivity() {
             else OpenAiModels.DEFAULT_MODELS.map { AccountModel(it.id, it.displayName) }
         }
     }
+
+    private val groqAuth by lazy { DirectApiKeyActions(auth.store, ProviderIds.GROQ) }
+    private val elevenLabsAuth by lazy { DirectApiKeyActions(auth.store, ProviderIds.ELEVENLABS) }
 
     private val anthropicAuth by lazy {
         val provider = auth.registry.firstOrNull { it.id == ProviderIds.ANTHROPIC }
@@ -345,6 +349,9 @@ class SetupActivity : ComponentActivity() {
                         reasoningAuth = openAiAuth,
                         reasoningAnthropicAuth = anthropicAuth,
                         reasoningGoogleAuth = googleAuth,
+                        transcriptionOpenAiAuth = openAiAuth,
+                        transcriptionGroqAuth = groqAuth,
+                        falaElevenLabsAuth = elevenLabsAuth,
                         reasoningLocalSupported = LocalLlmSupport.isSupported(android.os.Build.SUPPORTED_ABIS),
                         localActions = localModels,
                         agent = agentRuntime,

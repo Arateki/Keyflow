@@ -71,9 +71,9 @@ internal fun AnthropicPanel(
     val ssoModels = if (remoteModels.isNotEmpty()) remoteModels else ANTHROPIC_SSO_MODELS
     val chosenModel = settings.reasoningAnthropicModel.ifEmpty { "claude-sonnet-4-6" }
 
-    val apiKey = remember(connection, settings.visionAnthropicApiKey) {
-        actions.apiKey().orEmpty().ifEmpty { settings.visionAnthropicApiKey }
-    }
+    val apiKey = remember(actions) { actions.apiKeyFlow() }.collectAsStateOnMain(null).value.orEmpty()
+    val ssoOffered = actions.flows.any { it.method == AuthMethod.OAUTH }
+    val selectedAuthMode = if (!ssoOffered && settings.providerAnthropicAuthMode == "subscription") "api_key" else settings.providerAnthropicAuthMode
 
     UnifiedProviderCard(
         providerName = "Anthropic",
@@ -84,7 +84,7 @@ internal fun AnthropicPanel(
         onSsoDisconnect = { actions.disconnect() },
         showDisconnect = connection is ConnectionState.Connected || apiKey.isNotBlank(),
         onSsoRefresh = { refresh++ },
-        selectedAuthMode = settings.providerAnthropicAuthMode,
+        selectedAuthMode = selectedAuthMode,
         onSelectAuthMode = { onSettingsChange(settings.copy(providerAnthropicAuthMode = it)) },
         ssoModels = ssoModels,
         selectedSsoModel = chosenModel,
@@ -114,6 +114,7 @@ internal fun AnthropicPanel(
         ssoModelTag = ANTHROPIC_MODEL_TAG,
         apiKeyModelTag = ANTHROPIC_MODEL_TAG,
         privacyTag = ANTHROPIC_PRIVACY_TAG,
+        ssoOffered = ssoOffered,
         modifier = Modifier.padding(top = 8.dp),
     )
 }

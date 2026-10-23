@@ -3,6 +3,7 @@ package com.keyflow.reasoning.google
 import com.keyflow.auth.AuthErrorKind
 import com.keyflow.auth.AuthException
 import com.keyflow.auth.AuthorizationProvider
+import com.keyflow.auth.HttpErrorMessage
 import com.keyflow.auth.ProviderIds
 import com.keyflow.auth.providers.google.GoogleAuthConfig
 import com.keyflow.data.models.Ipv4FirstDns
@@ -210,13 +211,7 @@ class GoogleReasoningEngine(
     private class HttpFailure(val event: ReasoningEvent.Error, val retry: Boolean)
 
     private fun httpFailure(status: Int, body: String): HttpFailure {
-        val json = runCatching { JSONObject(body) }.getOrNull()
-        val errorObj = json?.optJSONObject("error")
-        val message = errorObj?.optString("message").orEmpty()
-        val note = buildString {
-            append("Google Gemini HTTP $status")
-            if (message.isNotEmpty()) append(": $message")
-        }
+        val note = HttpErrorMessage.of("Google Gemini", status, body)
 
         val kind = when {
             status == 401 || status == 403 -> ReasoningError.UNAUTHORIZED

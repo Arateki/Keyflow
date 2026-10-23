@@ -7,6 +7,7 @@ import com.keyflow.agent.ToolDefinition
 import com.keyflow.auth.AuthErrorKind
 import com.keyflow.auth.AuthException
 import com.keyflow.auth.AuthorizationProvider
+import com.keyflow.auth.HttpErrorMessage
 import com.keyflow.auth.ProviderIds
 import com.keyflow.auth.providers.anthropic.AnthropicAuthConfig
 import com.keyflow.data.models.Ipv4FirstDns
@@ -155,7 +156,7 @@ class AnthropicAgentEngine(
         response.use { r ->
             if (!r.isSuccessful) {
                 val errorBody = r.body?.string().orEmpty()
-                android.util.Log.e("AnthropicAgent", "HTTP ${r.code}")
+                HttpErrorMessage.log("AnthropicAgent", r.code, errorBody)
                 val failure = httpFailure(r.code, errorBody)
                 if (failure.retry) return Outcome.Retry(failure.event)
                 if (r.code == 401) authorization.invalidate(ProviderIds.ANTHROPIC)
@@ -206,12 +207,7 @@ class AnthropicAgentEngine(
     private class HttpFailure(val event: AgentEvent.Error, val retry: Boolean)
 
     private fun httpFailure(status: Int, body: String): HttpFailure {
-        val json = runCatching { JSONObject(body) }.getOrNull()
-        val message = (json?.optJSONObject("error")?.opt("message") as? String).orEmpty()
-        val note = buildString {
-            append("Anthropic HTTP $status")
-            if (message.isNotEmpty()) append(": $message")
-        }
+        val note = HttpErrorMessage.of("Anthropic", status, body)
         val kind = when {
             status == 401 || status == 403 -> ReasoningError.UNAUTHORIZED
             status == 429 -> ReasoningError.RATE_LIMIT
