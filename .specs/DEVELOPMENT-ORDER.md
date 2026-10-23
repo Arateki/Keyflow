@@ -57,7 +57,8 @@ R$15, que também tira os anúncios para sempre. Os anúncios ficam só no app d
 - Teclado Canvas (PT/EN/ES, acentos, corretor próprio), barras de atalhos, grades e teclas físicas.
 - Tour de gestos, Docs, onboarding.
 - Aparência: Ateliê, Aero, Glitch, Rose Gold, o mascote e skins importáveis (`.zip`). Aero, Glitch,
-  Rose Gold e o mascote são pagos já na v1, liberados pela compra de R$15 (decisão 3).
+  Rose Gold e o mascote são pagos já na v1, liberados pela compra de R$15 (decisão 3); a Sistema e a
+  Ateliê do teclado e a orbe padrão são grátis.
 - Compra única de R$15 pelo Play Billing (não consumível, restaurável) e anúncios AdMob no app de
   configuração: banner + intersticial (M7/M8). Nunca no teclado nem no overlay. Fiação na V1-10.
 - Raciocínio: modelos locais (Gemma/Qwen) e provedores por chave de API (OpenAI, Anthropic, Google).
@@ -171,7 +172,7 @@ upload interno, o produto de R$15 e a service account. As tasks V1-1..V1-8 não 
    antecede o e2e real). Depois dele não muda: `com.keyflow` (atual; não há app público com esse
    id, mas só o Console confirma) ou `com.arateki.keyflow`. Muda junto o `PACKAGE_NAME` da API.
 3. **Temas pagos na v1** — **resolvida (2026-10-23)**: Aero, Glitch, Rose Gold e o mascote são pagos
-   já na v1, liberados pela compra de R$15.
+   já na v1, liberados pela compra de R$15. A Ateliê do teclado é grátis (emenda à UNL-05 da monetização).
 4. Onde hospedar a política de privacidade.
 5. **Máquina e região da AWS** (staging e produção): pendente do plano em `api/docs/aws.md`.
 
