@@ -11,10 +11,12 @@
 > ⚠️ **Regra de ouro:** **NUNCA** execute `connectedAndroidTest` no aparelho do Yan! Isso desinstala o app e remove o KeyFlow como teclado padrão. Utilize sempre `installDebug`.
 
 ### 1. Compilar e Instalar o APK de Debug:
-No terminal da sua máquina de desenvolvimento:
+O APK a ser testado é o da branch integrada indicada pelo coordenador/Yan.
+
+No terminal da sua máquina de desenvolvimento (o `ANDROID_SERIAL=RX8T10DERKW` garante a instalação exclusivamente no Galaxy A32, sem tocar em outros emuladores/dispositivos conectados):
 ```bash
-# Compilar e instalar a versão de depuração
-GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon installDebug
+# Compilar e instalar a versão de depuração exclusivamente no A32
+ANDROID_SERIAL=RX8T10DERKW GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon installDebug
 ```
 
 ### 2. Acompanhar Logs em Tempo Real (opcional, deixe rodando em uma janela do terminal):
