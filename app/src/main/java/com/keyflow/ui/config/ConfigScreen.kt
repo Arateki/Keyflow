@@ -1,6 +1,9 @@
 package com.keyflow.ui.config
 
 import com.keyflow.i18n.tr
+import android.app.Activity
+import com.keyflow.ads.AdsController
+import com.keyflow.ads.InterstitialPolicy
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -150,6 +153,10 @@ fun ConfigScreen(
     skinsUnlocked: Boolean = false,
     onUnlockPurchase: () -> Unit = {},
     unlockPurchaseState: UnlockPurchaseState = UnlockPurchaseState.IDLE,
+    adsController: AdsController? = null,
+    adsOff: Boolean = false,
+    interstitialPolicy: InterstitialPolicy? = null,
+    onInterstitialPolicyChanged: () -> Unit = {},
 ) {
     val palette = LocalKeyFlowPalette.current
     var activeTab by rememberSaveable { mutableStateOf(initialTab) }
@@ -194,6 +201,13 @@ fun ConfigScreen(
     // Realce do seletor de Modo de gravação (aviso do atalho de 1 toque → leva à subárea responsável).
     var recordingModeHighlightKey by remember { mutableStateOf(0) }
     val hapticContext = LocalContext.current
+    val configActivity = LocalContext.current as? Activity
+    LaunchedEffect(adsController, adsOff) {
+        val controller = adsController ?: return@LaunchedEffect
+        controller.initializeIfNeeded(configActivity, adsOff) {
+            controller.preloadInterstitial(configActivity, adsOff)
+        }
+    }
     LaunchedEffect(toastGeneration) {
         if (toastMessage != null) {
             kotlinx.coroutines.delay(toastDuration)
@@ -223,14 +237,33 @@ fun ConfigScreen(
         pendingPermissionGeneration++
     }
 
+    fun recordSettingsChange(updated: Settings) {
+        interstitialPolicy?.recordInteraction()
+        onSettingsChange(updated)
+    }
+
+    fun selectTab(tab: ConfigTab) {
+        if (tab == activeTab) return
+        activeTab = tab
+        interstitialPolicy?.recordInteraction()
+        val policy = interstitialPolicy
+        if (policy?.shouldShow(tabSwitch = true) == true &&
+            adsController?.showInterstitial(configActivity, adsOff) == true
+        ) {
+            policy.markShown()
+            onInterstitialPolicyChanged()
+        }
+        adsController?.preloadInterstitial(configActivity, adsOff)
+    }
+
     // Navegação do aviso → aba da interface, no topo, destacando o cartão do modo que resolve o bloqueio.
     // Null = sem atalho.
     fun navActionFor(tab: ConfigTab): (() -> Unit)? = when (tab) {
         ConfigTab.OVERLAY -> {
-            { activeTab = ConfigTab.OVERLAY; overlayHighlightKey++ }
+            { selectTab(ConfigTab.OVERLAY); overlayHighlightKey++ }
         }
         ConfigTab.TECLADO -> {
-            { activeTab = ConfigTab.TECLADO; keyboardHighlightKey++ }
+            { selectTab(ConfigTab.TECLADO); keyboardHighlightKey++ }
         }
         else -> null
     }
@@ -238,7 +271,7 @@ fun ConfigScreen(
     // Navegação externa (clique no erro → Transcrição, ou falta de microfone → aba da interface que avisou,
     // já no cartão do modo). A chave dispara mesmo repetindo a mesma aba.
     LaunchedEffect(requestedTabKey) {
-        if (requestedTabKey > 0) requestedTab?.let { tab -> navActionFor(tab)?.invoke() ?: run { activeTab = tab } }
+        if (requestedTabKey > 0) requestedTab?.let { tab -> navActionFor(tab)?.invoke() ?: selectTab(tab) }
     }
 
     // Aviso de opção que depende do Modo Sobrepor: clicar leva à aba Sobrepor e destaca o cartão do modo.
@@ -329,13 +362,13 @@ fun ConfigScreen(
                     when (activeTab) {
                         ConfigTab.KEYFLOW -> KeyflowPanel(
                             settings = settings,
-                            onSettingsChange = onSettingsChange,
+                            onSettingsChange = ::recordSettingsChange,
                             resolve = resolveReasoning,
                             agent = agent,
                         )
                         ConfigTab.VOZ -> VozPanel(
                             settings = settings,
-                            onSettingsChange = onSettingsChange,
+                            onSettingsChange = ::recordSettingsChange,
                             localModels = localModels,
                             localActions = localActions,
                             openAiAuth = transcriptionOpenAiAuth,
@@ -343,9 +376,11 @@ fun ConfigScreen(
                         )
                         ConfigTab.TECLADO -> TecladoPanel(
                             settings = settings,
-                            onSettingsChange = onSettingsChange,
+                            onSettingsChange = ::recordSettingsChange,
                             onUnlockSkins = { unlockOpen = true },
                             skinsUnlocked = skinsUnlocked,
+                            adsController = adsController,
+                            adsOff = adsOff,
                             onOverlayRequired = onOverlayRequired,
                             barsConfig = barsConfig,
                             onBarsConfigChange = onBarsConfigChange,
@@ -368,9 +403,11 @@ fun ConfigScreen(
                         )
                         ConfigTab.OVERLAY -> OverlayPanel(
                             settings = settings,
-                            onSettingsChange = onSettingsChange,
+                            onSettingsChange = ::recordSettingsChange,
                             onUnlockSkins = { unlockOpen = true },
                             skinsUnlocked = skinsUnlocked,
+                            adsController = adsController,
+                            adsOff = adsOff,
                             onOpenShortcutSheet = { shortcutSheetTaps = it },
                             onShortcut1Blocked = {
                                 showToast(
@@ -398,7 +435,7 @@ fun ConfigScreen(
                         )
                         ConfigTab.RACIOCINIO -> ReasoningPanel(
                             settings = settings,
-                            onSettingsChange = onSettingsChange,
+                            onSettingsChange = ::recordSettingsChange,
                             models = reasoningModels,
                             actions = localActions,
                             resolve = resolveReasoning,
@@ -413,7 +450,12 @@ fun ConfigScreen(
                         ConfigTab.FLUXOS,
                         ConfigTab.COMPUTADOR,
                         ConfigTab.NOTIFICACAO -> ComingSoonPanel()
-                        ConfigTab.DOCS -> DocsPanel(focusSectionId = docsFocusSection, focusKey = docsFocusKey)
+                        ConfigTab.DOCS -> DocsPanel(
+                            focusSectionId = docsFocusSection,
+                            focusKey = docsFocusKey,
+                            adsController = adsController,
+                            adsOff = adsOff,
+                        )
                     }
                 }
                 }
@@ -424,7 +466,7 @@ fun ConfigScreen(
                 active = activeTab,
                 // Nenhuma aba fica esmaecida no menu: a de uma interface desligada é justamente onde ligá-la.
                 enabled = { true },
-                onSelect = { tab -> activeTab = tab },
+                onSelect = ::selectTab,
                 expanded = railExpanded,
                 onExpandedChange = { railExpanded = it },
             )
@@ -444,7 +486,7 @@ fun ConfigScreen(
                     tag = TAB_HELP_DOCS_TAG,
                     onClick = {
                         tabHelpOpen = false
-                        activeTab = ConfigTab.DOCS
+                        selectTab(ConfigTab.DOCS)
                         docsFocusSection = helpSection.id
                         docsFocusKey++
                     },
@@ -479,9 +521,9 @@ fun ConfigScreen(
             keyboardAvailable = permissions.keyboardActive,
             onSelect = { action ->
                 when (shortcutSheetTaps) {
-                    1 -> onSettingsChange(settings.copy(shortcut1Tap = action))
-                    2 -> onSettingsChange(settings.copy(shortcut2Tap = action))
-                    3 -> onSettingsChange(settings.copy(shortcut3Tap = action))
+                    1 -> recordSettingsChange(settings.copy(shortcut1Tap = action))
+                    2 -> recordSettingsChange(settings.copy(shortcut2Tap = action))
+                    3 -> recordSettingsChange(settings.copy(shortcut3Tap = action))
                 }
             },
             onBlockedKeyboard = {

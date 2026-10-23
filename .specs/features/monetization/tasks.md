@@ -156,7 +156,7 @@ no device (TESTING.md).
 
 ## Fase D — Ads
 
-### MZ-T10 — AdMob + UMP + `BannerSlot` (gateado por adsOff)
+### MZ-T10 — AdMob + UMP + `BannerSlot` (gateado por adsOff) — ✅ Feita em 2026-10-23 (`760950c`)
 - **What**: dependências AdMob/UMP; `AdsController` (init 1×, **só** se `!adsOff` — ADS-05; UMP
   consent form na primeira sessão com ads); `BannerSlot` composable com altura reservada fixa no
   rodapé de **Docs/Modo/Teclado** (nunca Voz/onboarding — ADS-01/02); falha de load → slot vazio

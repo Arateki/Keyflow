@@ -1,5 +1,8 @@
 package com.keyflow.ui.config
 
+import android.app.Activity
+import android.content.Context
+import android.view.View
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -26,6 +29,13 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.core.app.ApplicationProvider
+import com.keyflow.ads.AdsController
+import com.keyflow.ads.AdsRuntime
+import com.keyflow.ads.BANNER_SLOT_TAG
+import com.keyflow.ads.ConsentRequester
+import com.keyflow.ads.InterstitialPolicy
+import com.keyflow.ads.InterstitialPolicyState
 import com.keyflow.data.Settings
 import com.keyflow.ui.PermissionStatus
 import com.keyflow.ui.common.SaveController
@@ -69,6 +79,10 @@ class ConfigScreenTest {
         var notificationPermissionRequests = 0
         var keyboardPermissionRequests = 0
         val saveController = SaveController()
+        var adsController: AdsController? = null
+        var adsOff = false
+        var interstitialPolicy: InterstitialPolicy? = null
+        var interstitialPolicyChanges = 0
 
         @Composable
         fun Content() {
@@ -100,6 +114,10 @@ class ConfigScreenTest {
                     onRequestNotificationPermission = { notificationPermissionRequests++ },
                     onSwitchKeyboard = {},
                     onSettingsChange = { settings = it },
+                    adsController = adsController,
+                    adsOff = adsOff,
+                    interstitialPolicy = interstitialPolicy,
+                    onInterstitialPolicyChanged = { interstitialPolicyChanges++ },
                     modifier = Modifier.fillMaxSize(),
                 )
                 }
@@ -124,6 +142,51 @@ class ConfigScreenTest {
         rule.onNodeWithTag(tabTag(ConfigTab.OVERLAY)).performClick()
         rule.onNodeWithTag(panelTag(ConfigTab.OVERLAY)).assertIsDisplayed()
         rule.onNodeWithTag(HEADER_TAB_TITLE_TAG).assertTextEquals("Sobrepor")
+    }
+
+    @Test
+    fun bannerSlotsExistOnlyOnDocsModeAndKeyboard() {
+        val h = Harness().also {
+            it.settings = Settings(overlayModeEnabled = true, keyboardModeEnabled = true)
+            it.adsController = AdsController(
+                ApplicationProvider.getApplicationContext(),
+                FakeAdsRuntime(),
+                FakeConsentRequester(),
+            )
+        }
+        rule.setContent { h.Content() }
+
+        rule.onAllNodesWithTag(BANNER_SLOT_TAG).assertCountEquals(0)
+        for (tab in listOf(ConfigTab.DOCS, ConfigTab.OVERLAY, ConfigTab.TECLADO)) {
+            rule.onNodeWithTag(tabTag(tab)).performClick()
+            rule.onNodeWithTag(BANNER_SLOT_TAG).assertExists()
+        }
+        for (tab in listOf(ConfigTab.VOZ, ConfigTab.FALA, ConfigTab.FLUXOS)) {
+            rule.onNodeWithTag(tabTag(tab)).performClick()
+            rule.onAllNodesWithTag(BANNER_SLOT_TAG).assertCountEquals(0)
+        }
+    }
+
+    @Test
+    fun tabSwitchWithoutEngagementDoesNotShowInterstitial() {
+        val runtime = FakeAdsRuntime()
+        val h = Harness().also {
+            it.adsController = AdsController(
+                ApplicationProvider.getApplicationContext(),
+                runtime,
+                FakeConsentRequester(),
+            )
+            it.interstitialPolicy = InterstitialPolicy(
+                initialState = InterstitialPolicyState(sessionCount = 1),
+            )
+        }
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(tabTag(ConfigTab.TECLADO)).performClick()
+        rule.onNodeWithTag(tabTag(ConfigTab.OVERLAY)).performClick()
+
+        assertEquals(0, runtime.interstitialShows)
+        assertEquals(0, h.interstitialPolicyChanges)
     }
 
     @Test
@@ -411,5 +474,27 @@ class ConfigScreenTest {
     private companion object {
         /** Um quadro do relógio de teste do Compose — folga para o efeito rodar depois do atraso. */
         const val FRAME_MS = 16L
+    }
+
+    private class FakeConsentRequester : ConsentRequester {
+        override fun request(activity: Activity, onReady: () -> Unit) = onReady()
+    }
+
+    private class FakeAdsRuntime : AdsRuntime {
+        var interstitialShows = 0
+
+        override fun initialize(context: Context, onComplete: () -> Unit) = onComplete()
+        override fun createBanner(context: Context, adUnitId: String): View? = null
+        override fun loadInterstitial(
+            context: Context,
+            adUnitId: String,
+            onReady: () -> Unit,
+            onFailed: () -> Unit,
+        ) = onReady()
+        override fun showInterstitial(activity: Activity): Boolean {
+            interstitialShows++
+            return true
+        }
+        override fun destroy(view: View) = Unit
     }
 }

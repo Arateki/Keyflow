@@ -49,6 +49,8 @@ import com.keyflow.ui.icons.KfIcon
 import com.keyflow.ui.icons.KfIcons
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
+import com.keyflow.ads.AdsController
+import com.keyflow.ads.BannerSlot
 import com.keyflow.ui.theme.SpaceMono
 
 const val OVERLAY_UNLOCK_TAG = "overlay-unlock-skins"
@@ -75,6 +77,8 @@ fun OverlayPanel(
     onSettingsChange: (Settings) -> Unit,
     onUnlockSkins: () -> Unit,
     skinsUnlocked: Boolean = false,
+    adsController: AdsController? = null,
+    adsOff: Boolean = false,
     modifier: Modifier = Modifier,
     onOpenShortcutSheet: (Int) -> Unit = {},
     onShortcut1Blocked: () -> Unit = {},
@@ -264,6 +268,7 @@ fun OverlayPanel(
                 }
             }
         }
+        adsController?.let { BannerSlot(it, adsOff) }
     }
 }
 
