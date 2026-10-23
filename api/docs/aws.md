@@ -516,6 +516,94 @@ containers na mesma rede Docker com os seguintes limites rígidos:
 
 ---
 
+## Resultados do teste de carga
+
+Medição em 2026-10-23, no binário de release já com a Parte A (índice único em
+`accounts.token_hash`, limpeza do rate limit, `CF-Connecting-IP` só com proxy confiável, perfil de
+release, pool e threads do Tokio configuráveis). Sem `panic = "abort"`. Postgres **17.10** (o CI
+usa 18). Google falso na mesma rede, com **50 ms** de atraso, fora da cota de RAM. O gerador também
+fica fora dessa cota.
+
+**Como a máquina foi imitada.** Memória total **512 MiB** para API + Postgres, **256 MiB** cada,
+com `--memory-swap` igual a `--memory` (sem swap extra). Rajada: **1,0 + 1,0 vCPU** (os 2 vCPUs do
+plano, repartidos como no §6.2). Linha de base: **0,05 + 0,05 vCPU = 0,10 vCPU** no total — os 5%
+por vCPU que o §1 dá para o `t4g.nano` / `t3a.nano`. O §1 não publica o percentual do Lightsail
+Nano; o §6.2 pedia 0,10 + 0,10. `docker inspect` confirmou `NanoCpus` 1000000000 / 50000000 e
+`Memory` 268435456. O kernel, o nginx e o staging da VM real não entram nessa conta: os 512 MiB
+foram só da API e do Postgres.
+
+**Como o número foi escolhido.** Laço fechado, degraus de 12 s, concorrência 1, 2, 4, 8, 16, 32,
+64. Para quando o erro passa de 1% ou o ganho de req/s fica abaixo de 8%. A tabela traz o último
+ponto antes de parar. p50/p99 são só das respostas com o status esperado. Em todo ponto abaixo a
+taxa de erro foi **0** (só 200 e 304; nenhum 5xx). OOM: **não** (`OOMKilled=false`).
+
+| Rota | Rajada req/s | p50 | p99 | Base req/s | p50 | p99 |
+| --- | --- | --- | --- | --- | --- | --- |
+| `GET /v1/config` (80% `If-None-Match`) | 2.957 (c=4) | 0,8 ms | 6,4 ms | 177 (c=1) | 2,2 ms | 64 ms |
+| `GET /v1/models` (80% `If-None-Match`) | 3.950 (c=8) | 1,4 ms | 8,5 ms | 373 (c=64) | 182 ms | 298 ms |
+| `GET /v1/account` (2.000 contas) | 1.971 (c=4) | 1,5 ms | 7,7 ms | 316 (c=8) | 10 ms | 97 ms |
+| `POST /v1/register` (50% novo / 50% rotação) | 174 (c=16) | 88 ms | 175 ms | 77 (c=16) | 201 ms | 416 ms |
+| `POST /v1/purchases/redeem` (token inédito) | 79 (c=16) | 195 ms | 439 ms | 34 (c=8) | 222 ms | 361 ms |
+| Mix v1, 180 s | 942 (c=32) | 22 ms | 165 ms | 172 (c=4) | 3,5 ms | 304 ms |
+
+O mix é 45% config (85% com ETag), 35% account, 10% models (85% com ETag), 8% register, 2% redeem.
+O plano pedia 15 min; a corrida longa foi **180 s** depois da rampa. Na base, `models` ainda subia
+~8% no último degrau (c=64): 373 req/s é o topo da escada, com p95 de 231 ms. Na rajada, uma sonda
+de 12 s em c=64 no mix deu 902 req/s, abaixo dos 942 do ponto de 180 s.
+
+Metas de p95 do §6.5 (config, models e account abaixo de 50 ms; register e redeem abaixo de 250 ms,
+já com os 50 ms do Google). Na rajada, o ponto da tabela fica dentro: config 3,8 ms, models 5,3 ms, account 5,2 ms,
+register 125 ms, redeem 244 ms. Na base, o ponto de maior req/s estoura a meta em models, account,
+register e redeem. Dentro da meta: config 177 req/s (p95 33 ms); models 196 req/s no c=1 (p95 15
+ms); account 192 req/s no c=1 (p95 18 ms); register 68 req/s no c=8 (p95 199 ms); redeem 11 req/s
+no c=2 (p95 195 ms).
+
+**Resgate.** Vinte chamadas simultâneas com o mesmo `purchaseToken` deram as vinte `200
+{"status":"credited"}`, **1** linha em `purchases` e **1** acknowledge, na rajada e na base. No
+throughput da rajada os 2.000 tokens inéditos acabaram no c=16 (79 req/s, zero replay). Os degraus
+seguintes foram replay e a regra de parada foi parar em c=64 com 239 req/s, p50 255 ms, p99 523 ms,
+100% replay. Uma sonda com 12.000 tokens novos, tabela já grande, deu 113 req/s no c=32 (p99 474
+ms) e 131 req/s no c=64 (p99 1,6 s), ainda sem erro e sem replay. Na base o ponto da tabela é só
+token inédito (zero replay).
+
+**Índice, na mesma rajada, tabela com ~22 mil contas, c=8.** Com `accounts_token_hash_idx`: Index
+Scan, `EXPLAIN ANALYZE` 0,091 ms, 1.161 req/s, p50 5,2 ms, p99 29 ms. Sem o índice: Seq Scan, 7,4
+ms, 21.891 linhas filtradas, 208 req/s, p50 36 ms, p99 85 ms. Cerca de 5,6×. Não houve segundo
+binário da árvore anterior: o antes/depois é este `DROP INDEX` no binário da Parte A.
+
+**Memória no pico** (`memory.peak` do cgroup; inclui cache de página):
+
+| Regime | API | Postgres |
+| --- | --- | --- |
+| Rajada | 22,8 MiB | 97,9 MiB |
+| Base | 22,0 MiB | 111,1 MiB |
+
+`docker stats` na rajada viu RSS menor (API até ~17 MiB, Postgres até ~77 MiB). Os dois cabem
+folgados em 256 + 256 MiB.
+
+**Cota de registro.** A tabela acima usa `REGISTER_RATE_LIMIT_PER_MINUTE=100000` e
+`ACCOUNT_RATE_LIMIT_PER_MINUTE=100000`, senão um único IP do gerador esbarra nos 5/min. Com o
+limite de produção em 5, oito `POST /v1/register` seguidos responderam
+`200, 200, 200, 200, 200, 429, 429, 429`.
+
+**Usuários.** Premissa do §6.5, batida com o mix: um usuário ativo faz **~3 chamadas/dia** (abre o
+app: config com ETag e account; models de vez em quando; register só em aparelho novo ou rotação;
+redeem é a compra única, 2% do mix). A transcrição do teclado não passa pela API. Fator de pico
+**10×**. DAU ≈ req/s do mix × 2.880.
+
+- Rajada: **942 req/s → ~2,7 milhões de usuários ativos/dia**. No ponto medido havia **32
+  requisições em voo**. Como cada chamada volta em dezenas de milissegundos, usuários que disparam
+  uma chamada no mesmo segundo cabem até **~942**.
+- Base (0,10 vCPU contínuo): **172 req/s → ~494 mil usuários ativos/dia**, **4 requisições em
+  voo**, até **~172** disparando no mesmo segundo.
+
+Esses tetos são o cgroup num servidor x86_64 de desenvolvimento, com os 512 MiB inteiros para um
+par API+Postgres. Na VM real sobram menos (SO, nginx e o staging dividem os mesmos 512 MiB) e o
+crédito de CPU do Lightsail não é um `--cpus` fixo. O número da base é o piso se o crédito acabar;
+o da rajada é o pico enquanto o crédito existe.
+
+---
+
 ## 7. Passo a Passo do Yan vs. O Que a Equipe Faz Sem Credenciais
 
 ### 7.1 O que a equipe pode fazer agora (sem credenciais da AWS/Cloudflare/Google)
