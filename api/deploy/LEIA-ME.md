@@ -53,6 +53,45 @@ Centralizado em `/etc/keyflow/domain.conf` (`KEYFLOW_DOMAIN`, padrão `keyflow-a
 ssh admin@<IP_DA_MAQUINA> 'sudo KEYFLOW_DOMAIN=novo.dominio.com bash -s' < api/deploy/provisionar.sh
 ```
 
+### 4. Staging no APK de debug (Cloudflare Access)
+
+A produção exige Play Integrity e recusa o APK de debug instalado à mão. O staging relaxa essa
+checagem. O app escolhe o endereço pelo tipo de build:
+
+| Variante | Endereço padrão |
+| -------- | --------------- |
+| debug | `https://keyflow-api-staging.arateki.com` |
+| release | `https://keyflow-api.arateki.com` |
+
+`-PkeyflowApiBaseUrl` vence os dois (é o que aponta um teste para o MockWebServer).
+
+O hostname de staging está atrás do **Cloudflare Access**. Sem o service token a borda responde
+**401**. O APK de debug envia `CF-Access-Client-Id` e `CF-Access-Client-Secret` juntos, e só no host
+da base da API. O APK de release não lê o token: os campos ficam vazios e o segredo não entra no
+pacote.
+
+O token é do Yan e **não entra no git**, no código nem em log. Configure as duas propriedades numa
+destas fontes (a primeira que existir vence):
+
+1. na linha de comando: `-PkeyflowStagingAccessClientId=…` e `-PkeyflowStagingAccessClientSecret=…`
+2. no `gradle.properties` do `GRADLE_USER_HOME` (não o `gradle.properties` do repositório)
+3. no `local.properties` da raiz do projeto (está no `.gitignore`)
+
+```properties
+keyflowStagingAccessClientId=<Client ID do service token>
+keyflowStagingAccessClientSecret=<Client Secret do service token>
+```
+
+Sem as duas preenchidas, o debug continua apontando para o staging. O 401 vira esta linha no log de
+debug, e o app não quebra (a configuração cai no cache ou nos padrões; a conta trata o erro da API):
+
+```text
+token do Cloudflare Access ausente — veja api/deploy/LEIA-ME.md
+```
+
+Para um `curl` no staging, exporte as mesmas variáveis no shell e mande os dois cabeçalhos. Não
+cole o valor em arquivo versionado.
+
 ---
 
 ## Preparação Única no GitHub (Coordenador)
