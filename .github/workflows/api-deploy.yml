@@ -34,6 +34,10 @@ jobs:
     container:
       image: rust:1.96-slim-bookworm@sha256:e18a79fc84dfcfc3ab5ba72290398a644c135c97eaa881447fddc354ee4701a3
     timeout-minutes: 25
+    # Dentro de container o shell padrão do `run` é o sh (dash), que não tem `pipefail` nem `[[`.
+    defaults:
+      run:
+        shell: bash
     outputs:
       canal: ${{ steps.meta.outputs.canal }}
       tag: ${{ steps.meta.outputs.tag }}
@@ -59,6 +63,8 @@ jobs:
           INPUT_CANAL: ${{ inputs.canal }}
         run: |
           set -euo pipefail
+          # O checkout pertence a outro usuário dentro do container; sem isto o git recusa o repositório.
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           if [[ "${GITHUB_REF_NAME_FULL}" != "refs/heads/main" ]]; then
             echo "::error::Este workflow só pode compilar e publicar a partir de refs/heads/main (atual: ${GITHUB_REF_NAME_FULL})."
             exit 1
