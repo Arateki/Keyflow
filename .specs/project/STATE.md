@@ -2524,6 +2524,10 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
 - **Próximo**: fase 2 (AGT-T6 ferramentas de app com lista de permitidos; AGT-T7 OpenAI/Google), fase 3 (AGT-T8 skins parametrizadas; AGT-T9 servidor MCP), AGT-T10 (abuso e validação
   real com a Anthropic — exige a chave e a autorização do Yan).
 
+## V1-4 — recorte de abuso do agente (2026-10-23)
+- O `ToolExecutor` centraliza validação, filtro e confirmação; a política de flood também precisa atravessar mensagens do usuário, então a janela móvel monotônica de 60 s mora no executor compartilhado do processo (24 tentativas, inclusive inválidas), não só no `AgentLoop` de cada turno. Teste com relógio falso cobre bloqueio e recuperação.
+- Os testes com motor falso provam as barreiras do app, não a resistência/comportamento do modelo real. Até o Yan autorizar e validar com a chave dele **[YAN]**, o agente não deve ser anunciado como funcional no release: fica **Em breve**.
+
 ## V1-1 — lição de ambiente (2026-10-23)
 - No servidor falta ImageMagick; por isso `scripts/diff-screens.sh` não roda como no CI sem instalar/fixar o comparador. A validação local precisou de um fallback temporário em `/tmp`.
 - 2026-10-23 — O `diff-screens.sh` só deve ser considerado validado com `compare`/`identify` reais; nesta rodada o host continuou sem ImageMagick, então rodei o script em um container descartável e deixei os goldens divergentes para revisão da T14 (14/216 capturas, incluindo `config-menu-aberto`).

@@ -99,6 +99,28 @@ class ToolExecutorTest {
     }
 
     @Test
+    fun `a sliding per-minute limit applies across calls and recovers after the window`() = blocking {
+        var now = 10_000L
+        val read = FakeTool("r")
+        val executor = ToolExecutor(
+            ToolRegistry(listOf(read)), ToolPolicy({ ToolPolicyConfig() }), DenyAllConfirmation,
+            SecretFilter(), InMemoryActionLog(), clock = { now }, rateClock = { now }, maxCallsPerMinute = 2,
+            dispatcher = Dispatchers.Unconfined,
+        )
+
+        assertThat(executor.execute(call("r", id = "1")).status).isEqualTo(ToolStatus.OK)
+        assertThat(executor.execute(call("r", id = "2")).status).isEqualTo(ToolStatus.OK)
+        val limited = executor.execute(call("r", id = "3"))
+        assertThat(limited.status).isEqualTo(ToolStatus.ERROR)
+        assertThat(limited.content).contains("2 chamadas de ferramenta por minuto")
+        assertThat(read.runs).hasSize(2)
+
+        now += 60_001L
+        assertThat(executor.execute(call("r", id = "4")).status).isEqualTo(ToolStatus.OK)
+        assertThat(read.runs).hasSize(3)
+    }
+
+    @Test
     fun `a write asks with the summary the app wrote, then runs and is logged`() = blocking {
         val preview = ToolPreview("image/png", byteArrayOf(1, 2, 3), "folha de contato")
         val write = FakeTool("skin_install", ToolRisk.WRITE, summary = { "Instalar a skin Neon Rain" }, preview = preview, onRun = { ToolOutput.ok("instalada", undo = UndoCall("skin_remove", """{"id":"neon"}""")) })
