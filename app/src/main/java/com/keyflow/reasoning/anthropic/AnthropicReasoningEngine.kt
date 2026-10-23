@@ -207,9 +207,7 @@ class AnthropicReasoningEngine(
                 return true
             }
             "error" -> {
-                val err = json.optJSONObject("error")
-                val msg = err?.optString("message").orEmpty()
-                if (BuildConfig.DEBUG) android.util.Log.e("AnthropicReasoning", "SSE error: $msg | data: $data")
+                if (BuildConfig.DEBUG) android.util.Log.e("AnthropicReasoning", "SSE error recebido")
                 send(ReasoningEvent.Error(ReasoningError.ENGINE, "erro no fluxo SSE da Anthropic"))
                 return true
             }
@@ -220,7 +218,7 @@ class AnthropicReasoningEngine(
     private class HttpFailure(val event: ReasoningEvent.Error, val retry: Boolean)
 
     private fun httpFailure(status: Int, body: String): HttpFailure {
-        val note = HttpErrorMessage.of("Anthropic", status, body)
+        val note = HttpErrorMessage.of("Anthropic", status, body, includeDebugDetail = false)
 
         val kind = when {
             status == 401 || status == 403 -> ReasoningError.UNAUTHORIZED

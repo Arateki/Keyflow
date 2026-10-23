@@ -74,6 +74,7 @@ internal object SettingsSecrets {
     )
 
     private val LEGACY_ORDER_INDEX = LEGACY_MIGRATION_ORDER.withIndex().associate { it.value to it.index }
+    private val LEGACY_DATASTORE_KEY_BY_NAME = LEGACY_IN_DATASTORE.associateBy { it.name }
 
     /** saveSettings e as migrações usam o mesmo lock: gravar o destino vem antes de remover a origem. */
     val LOCK = Any()
@@ -109,10 +110,48 @@ internal object SettingsSecrets {
         if (changed) check(editor.commit()) { "não consegui remover credenciais antigas" }
     }
 
+    /**
+     * Junta as duas origens antigas antes de aplicar a prioridade. Assim `provider_*` do DataStore não perde para
+     * `openai_token` só porque o arquivo cifrado foi visitado primeiro. Em empate de nome, o cofre antigo vem primeiro.
+     * O DataStore só é apagado pelo chamador, depois que este bloco síncrono termina sem exceção.
+     */
+    fun migrateLegacySources(
+        datastore: Preferences,
+        legacy: SharedPreferences,
+        target: CredentialStore,
+    ): Set<Preferences.Key<String>> = synchronized(LOCK) {
+        val legacyNames = legacy.all.keys
+        val datastoreKeys = LEGACY_DATASTORE_KEY_BY_NAME.values.filter { it in datastore }
+        val names = (legacyNames + datastoreKeys.map { it.name })
+            .filter { it in LEGACY_ORDER_INDEX }
+            .distinct()
+            .sortedBy { LEGACY_ORDER_INDEX[it] ?: Int.MAX_VALUE }
+        val editor = legacy.edit()
+        val removableDataStore = mutableSetOf<Preferences.Key<String>>()
+        var legacyChanged = false
+
+        names.forEach { name ->
+            val datastoreKey = LEGACY_DATASTORE_KEY_BY_NAME[name]
+            val candidates = buildList {
+                if (name in legacyNames) add(legacy.getString(name, null).orEmpty())
+                if (datastoreKey != null && datastoreKey in datastore) add(datastore[datastoreKey].orEmpty())
+            }
+            candidates.forEach { value -> check(moveOne(name, value, target)) { "segredo legado desconhecido: $name" } }
+            if (name in legacyNames) {
+                editor.remove(name)
+                legacyChanged = true
+            }
+            if (datastoreKey != null && datastoreKey in datastore) removableDataStore += datastoreKey
+        }
+
+        if (legacyChanged) check(editor.commit()) { "não consegui remover credenciais antigas" }
+        removableDataStore
+    }
+
     private fun moveOne(name: String, value: String, target: CredentialStore): Boolean {
         if (value.isBlank()) return true
         providerFor(name)?.let { provider ->
-            if (target.get(provider) == null) target.put(provider, Credential.ApiKey(value))
+            if (target.getApiKey(provider) == null) target.put(provider, Credential.ApiKey(value))
             return true
         }
         val targetKey = targetKeyFor(name) ?: return false

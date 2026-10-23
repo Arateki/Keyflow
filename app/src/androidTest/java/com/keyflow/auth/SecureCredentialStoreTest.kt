@@ -138,6 +138,20 @@ class SecureCredentialStoreTest {
         assertEquals(Credential.ApiKey("ok"), store().get(ProviderId("bom")))
     }
 
+    @Test
+    fun theOldCredFormatIsVisibleThroughTypedAccessors() {
+        val legacyApi = Credential.ApiKey("legacy-api")
+        SecurePrefs.create(context, prefsName, keyAlias)
+            .edit()
+            .putString("cred.${provider.value}", CredentialCodec.encode(legacyApi))
+            .commit()
+
+        val s = store()
+
+        assertEquals(legacyApi, s.getApiKey(provider))
+        assertEquals(legacyApi, s.get(provider))
+    }
+
     private fun oauth(
         earliestRefreshAtMs: Long? = null,
         scopes: Set<String> = setOf("openid", "offline_access"),

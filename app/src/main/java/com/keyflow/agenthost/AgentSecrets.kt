@@ -28,6 +28,7 @@ internal class AgentSecretSource(
     private val providers: List<ProviderId> = ALL_PROVIDERS,
     private val clockMs: () -> Long = System::currentTimeMillis,
     private val ttlMs: Long = TTL_MS,
+    private val vaultSnapshot: ((SharedPreferences) -> Collection<Any?>)? = null,
 ) : () -> Collection<String> {
 
     private class Snapshot(val atMs: Long, val values: List<String>)
@@ -57,10 +58,10 @@ internal class AgentSecretSource(
 
     private fun read(): List<String> {
         val out = LinkedHashSet<String>()
-        for (value in vault.all.values) if (value is String && value.isNotEmpty()) out += value
+        val vaultValues = vaultSnapshot?.invoke(vault) ?: vault.all.values
+        for (value in vaultValues) if (value is String && value.isNotEmpty()) out += value
         for (provider in providers) {
-            // A leitura principal também é uma prova de que o cofre está legível; não deixe uma
-            // implementação de store que falha cair silenciosamente nos acessos tipados.
+            // Também prova que o cofre está legível; os valores usados pelo filtro vêm apenas dos acessores tipados.
             credentials.get(provider)
             credentials.getApiKey(provider)?.let { out += it.value }
             credentials.getOAuth(provider)?.let { credential ->
