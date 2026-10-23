@@ -60,7 +60,8 @@ jobs:
       - name: Dependências do container Bookworm
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends ca-certificates git binutils
+          # cmake: o aws-lc-sys (rustls e jsonwebtoken) pode pedir no build de C, conforme a versão.
+          apt-get install -y --no-install-recommends ca-certificates git binutils cmake
           rm -rf /var/lib/apt/lists/*
 
       - name: Checkout do código (exclusivamente HEAD da main)
