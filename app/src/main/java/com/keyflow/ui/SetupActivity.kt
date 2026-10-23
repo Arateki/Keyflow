@@ -34,6 +34,9 @@ import com.keyflow.ui.config.AppScreenOrientation
 import com.keyflow.ui.config.ConfigScreen
 import com.keyflow.ui.config.ConfigTab
 import com.keyflow.ui.onboarding.OnboardingScreen
+import com.keyflow.ui.onboarding.ProminentDisclosureScreen
+import com.keyflow.ui.onboarding.DISCLOSURE_VERSION
+import com.keyflow.ui.onboarding.DisclosureConsent
 import com.keyflow.ui.theme.KeyFlowTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -122,6 +125,7 @@ class SetupActivity : ComponentActivity() {
     }
 
     private var settings by mutableStateOf(Settings())
+    private var showDisclosure by mutableStateOf(false)
 
     // Modelos de voz locais (native-voice-models, NM-T10).
     private val localModels by lazy { LocalModelsController(this) }
@@ -307,6 +311,12 @@ class SetupActivity : ComponentActivity() {
                 if (!settingsLoaded) {
                     // Placeholder neutro enquanto o DataStore carrega — evita o flash do onboarding.
                     Box(Modifier.fillMaxSize().background(LocalKeyFlowPalette.current.bg))
+                } else if (showDisclosure || !DisclosureConsent.fromStoredVersion(settings.disclosureAcceptedVersion).isAcceptedForCurrentVersion() && !settings.onboardingDone) {
+                    ProminentDisclosureScreen(
+                        declined = settings.disclosureDeclined,
+                        onAccept = ::acceptDisclosure,
+                        onDecline = ::declineDisclosure,
+                    )
                 } else if (settings.onboardingDone) {
                     // Ler o snapshot aqui faz a composição reagir à chegada do manifesto; o catálogo
                     // global também é atualizado para SettingsRepository/ModelDownloader.
@@ -431,6 +441,29 @@ class SetupActivity : ComponentActivity() {
             }
         }
         requestPermissions.launch(perms.toTypedArray())
+    }
+
+    /** Só este aceite libera a solicitação de RECORD_AUDIO; aceite antigo reapresenta a tela. */
+    private fun acceptDisclosure() {
+        settings = settings.copy(disclosureAcceptedVersion = DISCLOSURE_VERSION, disclosureDeclined = false)
+        activityScope.launch { settingsRepository.saveDisclosureConsent(DISCLOSURE_VERSION, declined = false) }
+        showDisclosure = false
+        if (permissions.microphoneGranted) return
+        requestMicPermission.launch(Manifest.permission.RECORD_AUDIO)
+    }
+
+    private fun declineDisclosure() {
+        if (settings.disclosureDeclined) {
+            requestedTab = ConfigTab.OVERLAY
+            requestedTabKey++
+            showDisclosure = false
+            persistOnboardingDone(true)
+            return
+        }
+        settings = settings.copy(disclosureDeclined = true)
+        activityScope.launch {
+            settingsRepository.saveDisclosureConsent(settings.disclosureAcceptedVersion, declined = true)
+        }
     }
 
     /**
@@ -880,6 +913,10 @@ class SetupActivity : ComponentActivity() {
      * qualquer estado. Usa [requestOrOpenSettings] pra continuar funcionando mesmo negada antes.
      */
     private fun onMicChipClicked() {
+        if (!DisclosureConsent.fromStoredVersion(settings.disclosureAcceptedVersion).isAcceptedForCurrentVersion()) {
+            showDisclosure = true
+            return
+        }
         if (permissions.microphoneGranted) {
             openAppDetailsSettings()
         } else {

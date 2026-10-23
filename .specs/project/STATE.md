@@ -2563,3 +2563,6 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
 - **SPEC_DEVIATION**: o corpo antigo da T14 incluía rotas de saldo/recarga, mas o recorte v1 aprovado exclui créditos e rewarded; os goldens cobrem unlock e banners fake, sem implementar essas telas.
 - Capturas de banner da galeria devem injetar runtime e consentimento fakes; a execução visual não pode inicializar Mobile Ads real nem fazer rede.
 - Os slots não podem ficar dentro do `verticalScroll`: senão somem do primeiro quadro. Reserve o rodapé de 50 dp como irmão da área rolável e faça o `AndroidView` ocupar a altura toda.
+
+## Play — V1-6 Prominent disclosure (2026-10-23)
+- A divulgação deve preceder todo caminho de solicitação do microfone; guarde a versão aceita, e trate recusa como estado diferente de aceite. No servidor falta ImageMagick, então `scripts/diff-screens.sh` não roda como no CI: executar o comparador em container descartável.

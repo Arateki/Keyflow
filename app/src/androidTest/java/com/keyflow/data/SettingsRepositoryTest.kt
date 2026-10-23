@@ -442,6 +442,17 @@ class SettingsRepositoryTest {
     }
 
     @Test
+    fun disclosureConsentVersionAndDeclineStatePersistIndependently() = runTest {
+        val repository = newRepository()
+        repository.saveDisclosureConsent(version = 4, declined = true)
+
+        val settings = repository.settingsFlow().first()
+        assertEquals(4, settings.disclosureAcceptedVersion)
+        assertEquals(true, settings.disclosureDeclined)
+        assertEquals(false, settings.onboardingDone)
+    }
+
+    @Test
     fun themeDarkScaleAndLanguageFlowsReflectLiveChanges() = runTest {
         // Pedido do Yan, 2026-07-03: o teclado aberto precisa reagir sem precisar reabrir — a base disso
         // é o Flow realmente emitir de novo quando o valor muda (mesmo padrão de barsConfigFlow/BAR-07).

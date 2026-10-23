@@ -129,6 +129,8 @@ data class Settings(
     // Tema + onboarding
     val themeDark: Boolean = false,
     val onboardingDone: Boolean = false,
+    val disclosureAcceptedVersion: Int = 0,
+    val disclosureDeclined: Boolean = false,
     // Tempo limite de resposta da transcrição (ms) — compartilhado entre OpenAI/Groq/Custom, não é por
     // preset (aba Voz → seção Geral). Bug real reportado pelo Yan: sem isto, uma rota de rede ruim
     // trava "transcrevendo" pra sempre (OkHttp/JVM não tem timeout de DNS por padrão).

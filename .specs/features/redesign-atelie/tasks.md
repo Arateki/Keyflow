@@ -341,6 +341,10 @@ gatilho, `overlaySide`, `orbSize`, `onboardingDone` e `effectiveConfigFor(source
 - [x] Traceability `spec.md` atualizada: 52 requisitos Pending→**Verified**; Goals + Success Criteria marcados (e2e de transcrição com endpoint real anotado como pendente em device físico).
 **Tests**: instrumented · **Gate**: full · **Commit**: `feat: integrar redesign Ateliê`  ✅
 
+### V1-6: Prominent disclosure (PS-3)
+- [x] Divulgação em primeira execução antes do pedido de `RECORD_AUDIO`; aceite versionado; recusa sem permissão, explicação de ditado indisponível e reabertura pelo chip Microfone. Link centralizado com `TODO(V1-5)`.
+- [x] Testes unitários do estado/versão, instrumentados de tela/rota e goldens claro/escuro; ver gates e pendências em `.equipe/relatorios/v1-6-divulgacao.md`.
+
 ---
 
 ## Parallel Execution Map

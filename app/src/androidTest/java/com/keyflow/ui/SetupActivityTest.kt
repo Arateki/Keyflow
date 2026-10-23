@@ -177,7 +177,14 @@ class SeedOnboardingRule(private val done: Boolean) : org.junit.rules.ExternalRe
         OverlayService.stop(ctx)
         runBlocking {
             val repo = SettingsRepository(ctx)
-            repo.saveSettings(repo.settingsFlow().first().copy(onboardingDone = done, overlayModeEnabled = false))
+            repo.saveSettings(
+                repo.settingsFlow().first().copy(
+                    onboardingDone = done,
+                    overlayModeEnabled = false,
+                    disclosureAcceptedVersion = 0,
+                    disclosureDeclined = false,
+                ),
+            )
         }
         val deadline = SystemClock.elapsedRealtime() + 3000
         while (OverlayService.isRunningForUi && SystemClock.elapsedRealtime() < deadline) {

@@ -179,4 +179,20 @@ class OnboardingScreenTest {
         rule.onNodeWithContentDescription("Por que pedimos Microfone").assertIsDisplayed()
         rule.onNodeWithContentDescription("Por que pedimos Notificações").assertIsDisplayed()
     }
+
+    @Test
+    fun disclosureDeclineExplainsAndOffersLaterAcceptance() {
+        val declined = mutableStateOf(false)
+        var accepted = false
+        rule.setContent {
+            KeyFlowTheme(dark = false) {
+                ProminentDisclosureScreen(declined = declined.value, onAccept = { accepted = true }, onDecline = { declined.value = true })
+            }
+        }
+        rule.onNodeWithTag("disclosure-copy").assertIsDisplayed()
+        rule.onNodeWithTag(DISCLOSURE_DECLINE_TAG).performClick()
+        rule.onNodeWithTag(DISCLOSURE_DECLINED_EXPLANATION_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(DISCLOSURE_ACCEPT_TAG).performClick()
+        rule.runOnIdle { assertTrue(accepted) }
+    }
 }
