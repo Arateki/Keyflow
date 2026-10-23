@@ -196,7 +196,7 @@ no device (TESTING.md).
 
 ## Fase E — Remoto
 
-### MZ-T13 — `RemoteConfigRepository` + manifest de modelos
+### MZ-T13 — `RemoteConfigRepository` + manifest de modelos — ✅ Feita em 2026-10-23
 - **What**: fetch de `/v1/config` na abertura da config (ETag/If-None-Match, cache em disco,
   defaults embutidos; aviso de versão mínima — RMT-02); `/v1/models` alimenta o `ModelCatalog`
   da native-voice-models com o embutido como fallback + cache (RMT-01; o downloader existente já

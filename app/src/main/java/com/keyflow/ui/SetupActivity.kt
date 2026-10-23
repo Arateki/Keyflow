@@ -44,6 +44,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import com.keyflow.data.models.ModelCatalog
+import com.keyflow.data.models.ModelKind
 import com.keyflow.data.models.ModelStore
 import com.keyflow.reasoning.ReasoningEngines
 import com.keyflow.reasoning.local.LocalLlmSupport
@@ -75,6 +76,8 @@ import com.keyflow.data.monetization.EntitlementsRepository
 import com.keyflow.data.monetization.KeyFlowApiClient
 import com.keyflow.data.monetization.MonetizationProducts
 import com.keyflow.data.monetization.StorePurchaseState
+import com.keyflow.data.monetization.RemoteConfigRepository
+import com.keyflow.data.monetization.RemoteConfigSnapshot
 import com.keyflow.ui.config.UnlockPurchaseState
 import com.android.billingclient.api.BillingClient
 
@@ -201,7 +204,9 @@ class SetupActivity : ComponentActivity() {
     // Integrity, API nem a camada de ads (MZ-T9/ADS-01).
     private var billingManager: BillingManager? = null
     private var entitlementsRepository: EntitlementsRepository? = null
+    private var remoteConfigRepository: RemoteConfigRepository? = null
     private var entitlements by mutableStateOf(Entitlements())
+    private var remoteSnapshot by mutableStateOf(RemoteConfigSnapshot())
     private var unlockPurchaseState by mutableStateOf(UnlockPurchaseState.IDLE)
     private var monetizationJobs = mutableListOf<Job>()
     private var monetizationStarted = false
@@ -294,6 +299,9 @@ class SetupActivity : ComponentActivity() {
                     // Placeholder neutro enquanto o DataStore carrega — evita o flash do onboarding.
                     Box(Modifier.fillMaxSize().background(LocalKeyFlowPalette.current.bg))
                 } else if (settings.onboardingDone) {
+                    // Ler o snapshot aqui faz a composição reagir à chegada do manifesto; o catálogo
+                    // global também é atualizado para SettingsRepository/ModelDownloader.
+                    val remoteCatalog = remoteSnapshot.models
                     ConfigScreen(
                         settings = settings,
                         permissions = permissions,
@@ -336,6 +344,8 @@ class SetupActivity : ComponentActivity() {
                         onUnlockPurchase = ::buyUnlock,
                         unlockPurchaseState = unlockPurchaseState,
                         localModels = LocalModelsUi.compose(
+                            catalog = remoteCatalog.filter { it.kind == ModelKind.SPEECH }
+                                .ifEmpty { ModelCatalog.current(ModelKind.SPEECH) },
                             installed = localSnapshot.installed,
                             active = localSnapshot.active,
                             failures = localSnapshot.failures,
@@ -343,7 +353,8 @@ class SetupActivity : ComponentActivity() {
                             deviceRamMb = localModels.deviceRamMb,
                         ),
                         reasoningModels = LocalModelsUi.compose(
-                            catalog = ModelCatalog.TEXT,
+                            catalog = remoteCatalog.filter { it.kind == ModelKind.TEXT }
+                                .ifEmpty { ModelCatalog.current(ModelKind.TEXT) },
                             installed = localSnapshot.installed,
                             active = localSnapshot.active,
                             failures = localSnapshot.failures,
@@ -351,7 +362,8 @@ class SetupActivity : ComponentActivity() {
                             deviceRamMb = localModels.deviceRamMb,
                         ),
                         visionModels = LocalModelsUi.compose(
-                            catalog = ModelCatalog.VISION,
+                            catalog = remoteCatalog.filter { it.kind == ModelKind.VISION }
+                                .ifEmpty { ModelCatalog.current(ModelKind.VISION) },
                             installed = localSnapshot.installed,
                             active = localSnapshot.active,
                             failures = localSnapshot.failures,
@@ -359,7 +371,8 @@ class SetupActivity : ComponentActivity() {
                             deviceRamMb = localModels.deviceRamMb,
                         ),
                         falaModels = LocalModelsUi.compose(
-                            catalog = ModelCatalog.VOICE,
+                            catalog = remoteCatalog.filter { it.kind == ModelKind.VOICE }
+                                .ifEmpty { ModelCatalog.current(ModelKind.VOICE) },
                             installed = localSnapshot.installed,
                             active = localSnapshot.active,
                             failures = localSnapshot.failures,
@@ -628,6 +641,7 @@ class SetupActivity : ComponentActivity() {
     override fun onDestroy() {
         monetizationJobs.forEach(Job::cancel)
         entitlementsRepository?.close()
+        remoteConfigRepository?.close()
         billingManager?.close()
         activityScope.cancel()
         super.onDestroy()
@@ -639,8 +653,10 @@ class SetupActivity : ComponentActivity() {
         monetizationStarted = true
         val billing = BillingManager(this)
         val repository = EntitlementsRepository(this, KeyFlowApiClient(this), billing)
+        val remote = RemoteConfigRepository(this)
         billingManager = billing
         entitlementsRepository = repository
+        remoteConfigRepository = remote
         monetizationJobs += activityScope.launch {
             repository.entitlements.collect { value ->
                 entitlements = value
@@ -658,6 +674,11 @@ class SetupActivity : ComponentActivity() {
         monetizationJobs += activityScope.launch {
             billing.connect()
             repository.refresh()
+        }
+        monetizationJobs += activityScope.launch {
+            val snapshot = remote.refresh()
+            remoteSnapshot = snapshot
+            ModelCatalog.applyRemoteManifest(snapshot.models)
         }
     }
 
