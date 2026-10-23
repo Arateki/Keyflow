@@ -133,7 +133,12 @@ class AuthController(
     /** Revoga no provedor (o que der) e apaga o que está guardado — a falha da revogação nunca impede de apagar. */
     fun disconnect(provider: ProviderId) {
         cancel(provider)
-        val credential = store.get(provider)
+        val active = store.get(provider)
+        val credential = when (active) {
+            is Credential.OAuth -> store.getOAuth(provider) ?: active
+            is Credential.ApiKey -> store.getApiKey(provider) ?: active
+            null -> store.getOAuth(provider) ?: store.getApiKey(provider)
+        }
         scope.launch {
             if (credential != null) {
                 val method = if (credential is Credential.OAuth) AuthMethod.OAUTH else AuthMethod.API_KEY

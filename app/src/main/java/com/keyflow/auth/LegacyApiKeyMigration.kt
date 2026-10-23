@@ -23,7 +23,7 @@ internal object LegacyApiKeyMigration {
         var changed = false
         for ((provider, key) in legacyKeys) {
             val value = legacy.getString(key, null).orEmpty()
-            if (value.isNotBlank() && target.get(provider) == null) {
+            if (value.isNotBlank() && target.getApiKey(provider) == null) {
                 target.put(provider, Credential.ApiKey(value))
             }
             if (legacy.contains(key)) {

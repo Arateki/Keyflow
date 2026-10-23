@@ -293,7 +293,7 @@ class SettingsSecretsStorageTest {
     }
 
     @Test
-    fun anOAuthAlreadyInTheVaultWinsOverEveryLegacyApiKeyForThatProvider() = runTest {
+    fun anOAuthAlreadyInTheVaultCoexistsWithTheLegacyApiKeyForThatProvider() = runTest {
         val repository = newRepository()
         seedLegacyDataStore(repository)
         val existing = Credential.OAuth(
@@ -312,9 +312,50 @@ class SettingsSecretsStorageTest {
         repository.settingsFlow().first()
 
         assertEquals(existing, vault().getOAuth(ProviderIds.GOOGLE))
+        assertEquals("SENTINELA-ANTIGO-provider_google_api_key", vault().getApiKey(ProviderIds.GOOGLE)?.value)
         assertFalse(dataStoreText().contains("SENTINELA-ANTIGO-provider_google_api_key"))
         assertFalse(dataStoreText().contains("SENTINELA-ANTIGO-vision_google_api_key"))
         assertFalse(dataStoreText().contains("SENTINELA-ANTIGO-fala_google_api_key"))
+    }
+
+    @Test
+    fun aLegacyApiKeyIsAddedBesideAnExistingOAuthCredential() = runTest {
+        val repository = newRepository()
+        val existing = Credential.OAuth(
+            accessToken = "oauth-access",
+            refreshToken = "oauth-refresh",
+            expiresAtMs = Long.MAX_VALUE,
+            earliestRefreshAtMs = null,
+            scopes = emptySet(),
+            idToken = "oauth-id",
+            clientId = "oauth-client",
+            subject = "oauth-subject",
+            account = "oauth@example.test",
+        )
+        vault().put(ProviderIds.OPENAI, existing)
+        legacyVault().edit().putString(SettingsSecrets.OPENAI_TOKEN, "SENTINELA-LEGACY-OPENAI").commit()
+
+        repository.settingsFlow().first()
+
+        assertEquals(existing, vault().getOAuth(ProviderIds.OPENAI))
+        assertEquals("SENTINELA-LEGACY-OPENAI", vault().getApiKey(ProviderIds.OPENAI)?.value)
+        assertFalse(legacyVault().contains(SettingsSecrets.OPENAI_TOKEN))
+    }
+
+    @Test
+    fun theProviderCandidateWinsAcrossSecurePrefsAndDataStoreOrigins() = runTest {
+        val repository = newRepository()
+        legacyVault().edit().putString(SettingsSecrets.OPENAI_TOKEN, "SENTINELA-SECURE-TRANSCRIPTION").commit()
+        repository.replaceRawPreferences(
+            mutablePreferencesOf(stringPreferencesKey(SettingsSecrets.PROVIDER_OPENAI_API_KEY) to "SENTINELA-DATASTORE-PROVIDER"),
+        )
+
+        repository.settingsFlow().first()
+
+        assertEquals("SENTINELA-DATASTORE-PROVIDER", vault().getApiKey(ProviderIds.OPENAI)?.value)
+        assertFalse(legacyVault().contains(SettingsSecrets.OPENAI_TOKEN))
+        assertFalse(dataStoreText().contains(SettingsSecrets.PROVIDER_OPENAI_API_KEY))
+        assertFalse(dataStoreText().contains("SENTINELA-SECURE-TRANSCRIPTION"))
     }
 
     @Test

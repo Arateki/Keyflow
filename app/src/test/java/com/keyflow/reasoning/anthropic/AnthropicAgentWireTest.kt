@@ -184,8 +184,8 @@ class AnthropicAgentWireTest {
     fun `an error event in the middle of the stream is an error of the right kind`() {
         val overloaded = read(AnthropicSseFixtures.OVERLOADED_EVENT).single() as AgentEvent.Error
         assertThat(overloaded.kind).isEqualTo(ReasoningError.NETWORK)
-        assertThat(overloaded.message).contains("overloaded_error")
-        assertThat(overloaded.message).contains("Overloaded")
+        assertThat(overloaded.message).doesNotContain("overloaded_error")
+        assertThat(overloaded.message).doesNotContain("Overloaded")
         fun kindOf(type: String) = (read(sse("error" to """{"type":"error","error":{"type":"$type","message":"m"}}""")).single() as AgentEvent.Error).kind
         assertThat(kindOf("rate_limit_error")).isEqualTo(ReasoningError.RATE_LIMIT)
         assertThat(kindOf("authentication_error")).isEqualTo(ReasoningError.UNAUTHORIZED)
