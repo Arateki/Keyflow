@@ -19,6 +19,7 @@ object FakeSettings {
 
     /** Máscara de token exibida nos campos de credencial. */
     const val MASKED_TOKEN = "sk-••3b"
+    const val OPENAI_API_KEY = "sk-galeria-0000"
 
     val settings = Settings(
         source = TranscriptionSource.OPENAI,
