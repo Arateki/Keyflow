@@ -12,6 +12,7 @@ import com.google.android.gms.ads.MobileAds
 import com.google.android.gms.ads.interstitial.InterstitialAd
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.google.android.ump.ConsentRequestParameters
+import com.google.android.ump.ConsentInformation
 import com.google.android.ump.UserMessagingPlatform
 import com.keyflow.R
 import java.util.concurrent.atomic.AtomicBoolean
@@ -31,6 +32,8 @@ interface AdsRuntime {
 /** UMP fica separado para a asserção de que [AdsController] não toca consentimento quando adsOff. */
 interface ConsentRequester {
     fun request(activity: Activity, onReady: () -> Unit)
+    fun privacyOptionsRequired(context: Context): Boolean = false
+    fun showPrivacyOptionsForm(activity: Activity, onDismissed: () -> Unit) = onDismissed()
 }
 
 /** Fachada do AdMob. Não deve ser referenciada pelo IME, pelo overlay ou pelo onboarding. */
@@ -41,9 +44,11 @@ class AdsController(
 ) : AutoCloseable {
     private val initializationStarted = AtomicBoolean(false)
     private val _ready = MutableStateFlow(false)
+    private val _privacyOptionsRequired = MutableStateFlow(false)
     private var interstitialReady = false
 
     val ready: StateFlow<Boolean> = _ready.asStateFlow()
+    val privacyOptionsRequired: StateFlow<Boolean> = _privacyOptionsRequired.asStateFlow()
 
     /** Observável também nos testes: com adsOff o valor nunca sai de zero. */
     var initializationCount: Int = 0
@@ -57,6 +62,7 @@ class AdsController(
     ) {
         if (!entitlementsLoaded || adsOff || activity == null || !initializationStarted.compareAndSet(false, true)) return
         consent.request(activity) {
+            _privacyOptionsRequired.value = runCatching { consent.privacyOptionsRequired(appContext) }.getOrDefault(false)
             initializationCount++
             runtime.initialize(appContext) {
                 _ready.value = true
@@ -88,6 +94,13 @@ class AdsController(
 
     fun destroyBanner(view: View) = runtime.destroy(view)
 
+    fun showPrivacyOptionsForm(activity: Activity) {
+        if (!_privacyOptionsRequired.value) return
+        consent.showPrivacyOptionsForm(activity) {
+            _privacyOptionsRequired.value = runCatching { consent.privacyOptionsRequired(appContext) }.getOrDefault(false)
+        }
+    }
+
     override fun close() {
         _ready.value = false
         interstitialReady = false
@@ -106,6 +119,14 @@ private object GoogleConsentRequester : ConsentRequester {
             },
             { onReady() },
         )
+    }
+
+    override fun privacyOptionsRequired(context: Context): Boolean =
+        UserMessagingPlatform.getConsentInformation(context).privacyOptionsRequirementStatus ==
+            ConsentInformation.PrivacyOptionsRequirementStatus.REQUIRED
+
+    override fun showPrivacyOptionsForm(activity: Activity, onDismissed: () -> Unit) {
+        UserMessagingPlatform.showPrivacyOptionsForm(activity) { onDismissed() }
     }
 }
 

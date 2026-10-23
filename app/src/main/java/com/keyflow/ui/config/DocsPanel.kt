@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.sp
 import com.keyflow.BuildConfig
 import com.keyflow.ads.AdsController
 import com.keyflow.ads.BannerSlot
+import com.keyflow.ads.AdsPrivacyOptionsEntry
 import com.keyflow.core.RecordingMode
 import com.keyflow.ui.common.verticalScrollbar
 import com.keyflow.ui.theme.LocalKeyFlowPalette
@@ -519,7 +520,10 @@ fun DocsPanel(
                 }
             }
         }
-        adsController?.let { BannerSlot(it, adsOff = adsOff, entitlementsLoaded = entitlementsLoaded) }
+        adsController?.let {
+            AdsPrivacyOptionsEntry(it)
+            BannerSlot(it, adsOff = adsOff, entitlementsLoaded = entitlementsLoaded)
+        }
     }
 }
 
