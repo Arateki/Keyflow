@@ -2,8 +2,8 @@
 # Script idempotente de provisionamento da máquina da KeyFlow API (Amazon Lightsail Debian 12 x86_64, 447 MB RAM).
 # Execução remota pelo coordenador:
 #   ssh admin@<IP_DA_MAQUINA> 'sudo bash -s' < api/deploy/provisionar.sh
-# Ou informando o domínio / chaves públicas Ed25519 na linha de comando:
-#   ssh admin@<IP_DA_MAQUINA> 'sudo KEYFLOW_DOMAIN=keyflow-api.arateki.com bash -s' < api/deploy/provisionar.sh
+# Ou informando os domínios / chaves públicas Ed25519 na linha de comando:
+#   ssh admin@<IP_DA_MAQUINA> 'sudo KEYFLOW_DOMAIN=keyflow-api.arateki.com KEYFLOW_STAGING_DOMAIN=keyflow-api-staging.arateki.com bash -s' < api/deploy/provisionar.sh
 #
 # Regras de segurança:
 # - Nunca usa `set -x` e nunca imprime senhas ou chaves no terminal/log.
@@ -15,19 +15,30 @@ set +x
 umask 022
 
 # ==============================================================================
-# 0. Variável única de domínio e parâmetros globais
+# 0. Domínios (produção e staging) e parâmetros globais
 # ==============================================================================
 CONF_DIR="/etc/keyflow"
 TLS_DIR="${CONF_DIR}/tls"
 DOMAIN_CONF="${CONF_DIR}/domain.conf"
 DEPLOY_CONF="${CONF_DIR}/deploy.conf"
 
-# Se já existir /etc/keyflow/domain.conf e KEYFLOW_DOMAIN não foi passado no ambiente, reaproveita.
-if [[ -z "${KEYFLOW_DOMAIN:-}" && -f "${DOMAIN_CONF}" ]]; then
+# O que vier no ambiente vence o arquivo. O que não vier é reaproveitado de domain.conf
+# (execuções antigas só tinham KEYFLOW_DOMAIN; o staging cai no padrão e passa a ser gravado).
+_dominio_env="${KEYFLOW_DOMAIN:-}"
+_staging_env="${KEYFLOW_STAGING_DOMAIN:-}"
+if [[ -f "${DOMAIN_CONF}" ]]; then
     # shellcheck source=/dev/null
     source "${DOMAIN_CONF}"
 fi
+if [[ -n "${_dominio_env}" ]]; then
+    KEYFLOW_DOMAIN="${_dominio_env}"
+fi
+if [[ -n "${_staging_env}" ]]; then
+    KEYFLOW_STAGING_DOMAIN="${_staging_env}"
+fi
+unset _dominio_env _staging_env
 KEYFLOW_DOMAIN="${KEYFLOW_DOMAIN:-keyflow-api.arateki.com}"
+KEYFLOW_STAGING_DOMAIN="${KEYFLOW_STAGING_DOMAIN:-keyflow-api-staging.arateki.com}"
 GITHUB_REPO="${GITHUB_REPO:-Arateki/Keyflow}"
 SWAP_FILE="${SWAP_FILE:-/swapfile}"
 SWAP_SIZE_MB="${SWAP_SIZE_MB:-1024}"
@@ -47,6 +58,21 @@ erro() {
 
 if [[ "${EUID}" -ne 0 ]]; then
     erro "Este script precisa rodar como root (use: sudo bash -s < provisionar.sh)."
+fi
+
+validar_nome_de_dominio() {
+    local nome="$1"
+    local valor="$2"
+    # Hostname DNS (letras, dígitos e hífen). Recusa espaço, aspas e '$', que quebrariam o nginx.
+    if [[ ! "${valor}" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$ ]]; then
+        erro "Valor inválido para ${nome} (${valor}). Use um hostname como keyflow-api.arateki.com."
+    fi
+}
+
+validar_nome_de_dominio "KEYFLOW_DOMAIN" "${KEYFLOW_DOMAIN}"
+validar_nome_de_dominio "KEYFLOW_STAGING_DOMAIN" "${KEYFLOW_STAGING_DOMAIN}"
+if [[ "${KEYFLOW_DOMAIN}" == "${KEYFLOW_STAGING_DOMAIN}" ]]; then
+    erro "KEYFLOW_DOMAIN e KEYFLOW_STAGING_DOMAIN são iguais (${KEYFLOW_DOMAIN}); os vhosts ficariam ambíguos."
 fi
 
 tem_systemd() {
@@ -69,6 +95,21 @@ recarregar_servico_sistema() {
         systemctl reload "${svc}"
     else
         service "${svc}" reload || /etc/init.d/"${svc}" reload
+    fi
+}
+
+# nginx -t antes de qualquer reload. Se o processo ainda não existe, inicia.
+recarregar_ou_iniciar_nginx() {
+    nginx -t
+    if tem_systemd && systemctl is-active --quiet nginx; then
+        log "Configuração do nginx válida; recarregando o serviço."
+        recarregar_servico_sistema nginx
+    elif command -v pgrep >/dev/null 2>&1 && pgrep -x nginx >/dev/null 2>&1; then
+        log "Configuração do nginx válida; recarregando o processo."
+        recarregar_servico_sistema nginx
+    else
+        log "Configuração do nginx válida; iniciando o serviço."
+        reiniciar_servico_sistema nginx
     fi
 }
 
@@ -209,7 +250,11 @@ configurar_usuario_e_diretorios() {
         /opt/keyflow/staging/bin \
         /opt/keyflow/staging/state
 
-    printf 'KEYFLOW_DOMAIN="%s"\n' "${KEYFLOW_DOMAIN}" > "${DOMAIN_CONF}"
+    {
+        printf '%s\n' '# Domínios do Nginx. Produção e staging dividem esta máquina.'
+        printf 'KEYFLOW_DOMAIN="%s"\n' "${KEYFLOW_DOMAIN}"
+        printf 'KEYFLOW_STAGING_DOMAIN="%s"\n' "${KEYFLOW_STAGING_DOMAIN}"
+    } > "${DOMAIN_CONF}"
     chmod 0644 "${DOMAIN_CONF}"
 
     if [[ ! -f "${DEPLOY_CONF}" ]]; then
@@ -464,18 +509,36 @@ EOF
 
 # ==============================================================================
 # 5. Nginx com TLS de origem e repasse de CF-Connecting-IP (aws.md §4)
+#    Produção e staging dividem a máquina. O arquivo é reescrito por inteiro
+#    a cada execução (rodar de novo não duplica server).
 # ==============================================================================
 configurar_nginx() {
-    log "Configurando site Nginx para o domínio ${KEYFLOW_DOMAIN} (staging restrito a localhost:8081)..."
+    log "Configurando Nginx: produção ${KEYFLOW_DOMAIN} → :8080; staging ${KEYFLOW_STAGING_DOMAIN} → :8081..."
     local site_avail="/etc/nginx/sites-available/keyflow-api.conf"
     local site_enab="/etc/nginx/sites-enabled/keyflow-api.conf"
     local cert_pem="${TLS_DIR}/origin.pem"
     local cert_key="${TLS_DIR}/origin.key"
 
-    cat > "${site_avail}" <<EOF
-# Configuração gerada por provisionar.sh — domínio centralizado em ${DOMAIN_CONF}.
-# Expõe SOMENTE a produção (127.0.0.1:8080) via HTTPS para a Cloudflare.
-# O staging (127.0.0.1:8081) permanece restrito ao loopback (acesso via túnel SSH / VPN).
+    # Um único heredoc: a extração para o teste do nginx -t renderiza os três server.
+    cat > "${site_avail}" <<EONGINX
+# Configuração gerada por provisionar.sh — domínios em ${DOMAIN_CONF}.
+# Produção e staging dividem esta máquina e o mesmo certificado de origem (*.arateki.com).
+# Host desconhecido cai no default_server (444) e não herda o vhost da produção.
+# listen ... http2 é a sintaxe do nginx 1.22 (Debian 12). No 1.25+ só gera aviso.
+
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    listen 443 ssl http2 default_server;
+    listen [::]:443 ssl http2 default_server;
+    server_name _;
+
+    ssl_certificate     ${cert_pem};
+    ssl_certificate_key ${cert_key};
+    ssl_protocols       TLSv1.2 TLSv1.3;
+
+    return 444;
+}
 
 server {
     listen 443 ssl http2;
@@ -528,7 +591,65 @@ server {
         proxy_read_timeout 35s;
     }
 }
-EOF
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name ${KEYFLOW_STAGING_DOMAIN};
+
+    ssl_certificate     ${cert_pem};
+    ssl_certificate_key ${cert_key};
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_session_cache   shared:SSL:4m;
+    ssl_session_timeout 1d;
+
+    # Faixas oficiais da Cloudflare (https://www.cloudflare.com/ips/) para extrair o IP real:
+    set_real_ip_from 173.245.48.0/20;
+    set_real_ip_from 103.21.244.0/22;
+    set_real_ip_from 103.22.200.0/22;
+    set_real_ip_from 103.31.4.0/22;
+    set_real_ip_from 141.101.64.0/18;
+    set_real_ip_from 108.162.192.0/18;
+    set_real_ip_from 190.93.240.0/20;
+    set_real_ip_from 188.114.96.0/20;
+    set_real_ip_from 197.234.240.0/22;
+    set_real_ip_from 198.41.128.0/17;
+    set_real_ip_from 162.158.0.0/15;
+    set_real_ip_from 104.16.0.0/13;
+    set_real_ip_from 104.24.0.0/14;
+    set_real_ip_from 172.64.0.0/13;
+    set_real_ip_from 131.0.72.0/22;
+    set_real_ip_from 2400:cb00::/32;
+    set_real_ip_from 2606:4700::/32;
+    set_real_ip_from 2803:f800::/32;
+    set_real_ip_from 2405:b500::/32;
+    set_real_ip_from 2405:8100::/32;
+    set_real_ip_from 2a06:98c0::/29;
+    set_real_ip_from 2c0f:f248::/32;
+    real_ip_header CF-Connecting-IP;
+    real_ip_recursive on;
+
+    client_max_body_size 1m;
+
+    # O Cloudflare Access injeta Cf-Access-Jwt-Assertion em todo pedido que deixou passar.
+    # Não valida a assinatura: só recusa acesso direto à origem, sem o cabeçalho.
+    if (\$http_cf_access_jwt_assertion = "") {
+        return 403;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:8081;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host \$host;
+        # Repassa o IP autenticado pela Cloudflare para a API (que confia em TRUSTED_PROXIES=127.0.0.1, ::1):
+        proxy_set_header CF-Connecting-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_read_timeout 35s;
+    }
+}
+EONGINX
     chmod 0644 "${site_avail}"
 
     rm -f /etc/nginx/sites-enabled/default
@@ -538,13 +659,11 @@ EOF
         chmod 0600 "${cert_key}"
         chown root:root "${cert_pem}" "${cert_key}"
         ln -sfn "${site_avail}" "${site_enab}"
-        nginx -t
-        reiniciar_servico_sistema nginx
-        log "Certificado TLS encontrado em ${TLS_DIR}; site Nginx '${KEYFLOW_DOMAIN}' ATIVADO."
+        recarregar_ou_iniciar_nginx
+        log "Certificado TLS encontrado em ${TLS_DIR}; sites '${KEYFLOW_DOMAIN}' e '${KEYFLOW_STAGING_DOMAIN}' ATIVADOS."
     else
         rm -f "${site_enab}"
-        nginx -t
-        reiniciar_servico_sistema nginx
+        recarregar_ou_iniciar_nginx
         aviso "Certificado TLS ainda não existe em ${cert_pem} e ${cert_key}; site Nginx mantido DESLIGADO até os dois arquivos serem instalados."
     fi
 }
@@ -1299,4 +1418,4 @@ configurar_nginx
 instalar_scripts_operacionais
 configurar_systemd
 
-log "Provisionamento concluído com sucesso! Domínio configurado: ${KEYFLOW_DOMAIN}."
+log "Provisionamento concluído com sucesso! Produção: ${KEYFLOW_DOMAIN}. Staging: ${KEYFLOW_STAGING_DOMAIN}."
