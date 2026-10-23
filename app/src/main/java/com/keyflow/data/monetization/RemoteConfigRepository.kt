@@ -7,7 +7,7 @@ import com.keyflow.data.models.FileRole
 import com.keyflow.data.models.ModelFile
 import com.keyflow.data.models.ModelKind
 import com.keyflow.data.models.ModelSpec
-import com.keyflow.data.models.KeyFlowHttpClient
+import com.keyflow.net.KeyFlowHttpClient
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow

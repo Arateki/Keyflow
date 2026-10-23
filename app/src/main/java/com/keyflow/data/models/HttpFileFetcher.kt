@@ -1,5 +1,6 @@
 package com.keyflow.data.models
 
+import com.keyflow.net.KeyFlowHttpClient
 import okhttp3.Dns
 import okhttp3.OkHttpClient
 import okhttp3.Request

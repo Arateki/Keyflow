@@ -1,5 +1,6 @@
-package com.keyflow.data.models
+package com.keyflow.net
 
+import com.keyflow.data.models.Ipv4FirstDns
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 
