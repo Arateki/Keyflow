@@ -62,7 +62,7 @@ R$15, que também tira os anúncios para sempre. Os anúncios ficam só no app d
 - Compra única de R$15 pelo Play Billing (não consumível, restaurável) e anúncios AdMob no app de
   configuração: banner + intersticial (M7/M8). Nunca no teclado nem no overlay. Fiação na V1-10.
 - Raciocínio: modelos locais (Gemma/Qwen) e provedores por chave de API (OpenAI, Anthropic, Google).
-  Login ChatGPT e SSO do Google continuam desligados no release (`enabled = BuildConfig.DEBUG`).
+  Os logins por assinatura ChatGPT, Claude e Google também entram no release (decisão do Yan, 2026-10-23).
 - Agente KeyFlow da fase 1 (chat + ferramentas de skin com confirmação; MCP desligado) — **só se a
   V1-4 fechar**; senão ele entra como "Em breve".
 - API em staging e produção (V1-9), com a rota de transcrição (API-T11) e a SSV (API-T12)
@@ -121,9 +121,7 @@ upload interno, o produto de R$15 e a service account. As tasks V1-1..V1-8 não 
 - ~~**V1-2** — Higiene do release, pendências herdadas do trabalho do Gemini: logs que imprimem o texto
   ditado (`KeyFlowController`, `OverlayCoordinator` — `take(30)`) só no debug; leitura dos segredos fora
   da main thread (`settingsFlow` → `flowOn(Dispatchers.IO)`); chave de API num lugar só (o cofre
-  `keyflow_auth`, contra AUTH-02). Os três logins por assinatura (OpenAI, Anthropic, Google) já são
-  `enabled = BuildConfig.DEBUG`; conferir no AAB que o da Anthropic não vai junto — a política dela
-  proíbe login de assinatura em produto de terceiros (Bloco 10), e código dormente pesa no §5 acima.~~
+  `keyflow_auth`, contra AUTH-02).~~
   **Feito em 2026-10-23** (commits `c17ba25`, `7ed0b76`, `0eccdef`, `605a9d0`; gates verdes). Rodada 3
   concluída em 2026-10-23: migração determinística com lock entre processos, coexistência API/OAuth,
   exclusão explícita das chaves e saneamento do erro HTTP Anthropic; gates verdes. Rodada 4 concluída em
@@ -131,14 +129,15 @@ upload interno, o produto de R$15 e a service account. As tasks V1-1..V1-8 não 
   formatos antigos `cred.*`, desconexão por tipo, prioridade única na migração, overlay sem espera na
   main e erros Anthropic sem corpo do servidor; gates verdes. Rodada 5 concluída em 2026-10-23: OAuth
   antigo normalizado antes das chaves legadas, seleção ativa por modo, acessos comuns sem lock de arquivo;
-  gates e 24 instrumentados verdes.
+  gates e 24 instrumentados verdes. Decisão SSO do Yan executada no commit `9d64e9b`: ChatGPT, Claude e
+  Google disponíveis também no release; classes verificadas no APK.
 - **V1-3** — Build de release (PS-5): R8 (`isMinifyEnabled`) com keep rules (AIDL dos processos
   `:inference`/`:reasoning`, sherpa-onnx, LiteRT-LM, AndroidSVG, Play Billing, AdMob), AAB,
   `versionName` 1.0.0, smoke do release no A32. **[YAN]**: chave de upload (Play App Signing) e o
   `applicationId` (decisão 2, caminho crítico). Vem depois da V1-10 com fakes, para o AAB já levar
   a compra e os anúncios. Em seguida sobe na trilha interna **[YAN]**, com a permissão de billing,
   para criar o produto de R$15 — antes do e2e real (MZ-T15/API-T14). A conta (decisão 1) trava
-  esse upload.
+  esse upload. **[YAN]**: configurar/verificar no Console o client OAuth Google com o SHA-1 da chave de assinatura Play e o `applicationId` definitivo.
 - **V1-4** — Agente na v1: recorte da AGT-T10 para a fase 1 (abuso: injeção, segredo, argumentos,
   flood) + validação real com a chave do Yan **[YAN]**. Não fechou → agente vira "Em breve".
 - **V1-5** — Política de privacidade (PS-2): áudio sob demanda para a origem escolhida, modelos locais,
@@ -234,7 +233,7 @@ do e2e da v1.
 | M7 | `monetization` | spec/design/tasks prontos — nada implementado. **Parte entra na v1** (V1-10: MZ-T1, T2, T3, T4, T9, T10, T11, T13, T14, T15). MZ-T3/T9 com fakes depois do staging; o e2e real (MZ-T15/API-T14) espera o upload interno e as decisões 1 e 2. Créditos (T5–T8) e o rewarded (T12) ficam para depois |
 | M8 | `theme-system` | spec de 2026-07-04, nada implementado — **defasada**: Aero, Glitch e Rose Gold saíram por fora (quick 013/015/016, pintores no IME como `KeySurface`/`RoseGoldPainter`) e as skins por pacote existem; não há `ThemeRegistry`. Revisar a spec antes de executar. Fora da v1 |
 | — | Play Store | **v1 = recorte de 2026-10-23** (V1-0 feita; seguem V1-1..V1-8, com V1-9 em paralelo e V1-10 depois do staging). `PLAYSTORE_CHECKLIST.md`; PS-1 (targetSdk 36) feito; PS-2..PS-7 viram V1-3/V1-5..V1-8 |
-| — | `reasoning-models` (aba Raciocínio) | **na `main` desde 2026-09-30**: RSN-T0..T17 feitos e o texto de privacidade da RSN-T18 em `PLAYSTORE_CHECKLIST.md` §1b (a traceability RPRV-01..04 ainda diz "In Tasks"). Faltam só **[YAN]**: repositório público, elegibilidade do login ChatGPT (RPRV-04) e o roteiro RSN-T19 no A32 — ver Bloco 10 |
+| — | `reasoning-models` (aba Raciocínio) | **na `main` desde 2026-09-30**: RSN-T0..T17 feitos e o texto de privacidade da RSN-T18 em `PLAYSTORE_CHECKLIST.md` §1b (a traceability RPRV-01..04 ainda diz "In Tasks"). Faltam só **[YAN]**: repositório público e o roteiro RSN-T19 no A32 — ver Bloco 10 |
 | — | `skin-packs` (skins importáveis) + skin mascote | SKP-T1..T9 feitos (motor AndroidSVG, importação nas abas Teclado e Sobrepor, pacote de exemplo, orbe de pacote até 120 fps) e o mascote nativo (quick 018); na `main` local e na **PR #7**. Falta o roteiro no A32 **[YAN]** (pacote dele, orbe animada no Helio G80, IME real) |
 | — | `agent-harness` (agente KeyFlow) | fase 1 (AGT-T1..T5: núcleo, Anthropic, chat, ferramentas de skin, Ajustes; MCP desligado) na `main` local e na **PR #7**. Pendentes: AGT-T6 (ferramentas de app), T7 (OpenAI/Google), T8 (skins por modelo), T9 (MCP), T10 (abuso + validação real **[YAN]**) — o recorte da T10 para a fase 1 é a V1-4 |
 | — | Trabalho do Gemini (abas KeyFlow, Fluxos, Computador, Fala, Visão; provedores Anthropic/Google) | commitado e na PR #7. Provedores e aba KeyFlow funcionam; **Fluxos, Computador, Fala e Visão são só tela + `Settings`, sem motor e sem spec** → "Em breve" na v1 (V1-1). Pendências de segurança/release herdadas → V1-2 |
@@ -458,17 +457,14 @@ Spec: `.specs/features/reasoning-models/` (`spec.md` 45 requisitos, `design.md`,
 texto literal da doc da OpenAI). Ordem: RSN-T0 → T1 → … → T19 (uma por vez, um commit por task).
 
 - **Escopo**: só CONECTAR modelos de linguagem + botão Testar. Quem consome o raciocínio (limpar ditado, comandos, resumo)
-  é feature futura. Origens: **Local** (Qwen3 0.6B e Gemma 4 E2B pelo LiteRT-LM, processo `:reasoning`) e **OpenAI**
-  (chave de API ou login "Continue with ChatGPT"). Anthropic fica de fora: a política dela proíbe o login com assinatura em
-  produto de terceiros — entra depois **só por chave de API**.
+  é feature futura. Origens: **Local** (Qwen3 0.6B e Gemma 4 E2B pelo LiteRT-LM, processo `:reasoning`) e provedores
+  **OpenAI, Anthropic e Google** por chave de API ou login por assinatura, conforme disponibilidade da conta.
 - **O login mora em `auth/`** e é trocável: o núcleo não conhece UI, `Settings` nem provedor; cada provedor é uma pasta em
   `auth/providers/` mais uma linha no registro (`AuthProviders`). O `AuthIsolationTest` confere isso lendo os imports.
-- **Independe dos outros blocos** (só reusa o downloader/`ModelStore` do Bloco 4). Entra no build de release da PS-5: se o
-  login da OpenAI for ligado, a decisão de elegibilidade abaixo precisa estar tomada antes.
+- **Independe dos outros blocos** (só reusa o downloader/`ModelStore` do Bloco 4). Os três logins por assinatura entram no
+  release por decisão do Yan (2026-10-23); elegibilidade RPRV-04 decidida.
 - **[YAN]**: (1) tornar o repositório público — o caminho aberto da OpenAI (registro dinâmico, sem client ID a pedir) parte
-  dessa premissa; (2) **decidir a elegibilidade** (RPRV-04): o KeyFlow é open source e local, mas planeja créditos, skins
-  pagas e anúncios — `OpenAiAuthConfig.enabled = BuildConfig.DEBUG` mantém o login desligado no release até lá (a chave de
-  API funciona sempre); (3) rodar o roteiro `manual-validation.md` no A32 (login real com uma conta de plano, o Gemma/Qwen no
+  dessa premissa; (2) rodar o roteiro `manual-validation.md` no A32 (login real com uma conta de plano, o Gemma/Qwen no
   aparelho e o consumo de RAM).
 - **Não faz parte do bloco**: a aceitação REAL do registro dinâmico pela OpenAI não é provada por teste nenhum daqui — só a conta
   de plano no aparelho prova (RSN-T19).
