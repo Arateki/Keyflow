@@ -549,7 +549,8 @@ taxa de erro foi **0** (só 200 e 304; nenhum 5xx). OOM: **não** (`OOMKilled=fa
 | Mix v1, 180 s | 942 (c=32) | 22 ms | 165 ms | 172 (c=4) | 3,5 ms | 304 ms |
 
 O mix é 45% config (85% com ETag), 35% account, 10% models (85% com ETag), 8% register, 2% redeem.
-O plano pedia 15 min; a corrida longa foi **180 s** depois da rampa. Na base, `models` ainda subia
+O plano pedia 15 min; a corrida longa foi **180 s** depois da rampa. Esses 180 s ficam abaixo do
+intervalo de limpeza do rate limit (300 s), então o mix não exercita o `retain_recent`. Na base, `models` ainda subia
 ~8% no último degrau (c=64): 373 req/s é o topo da escada, com p95 de 231 ms. Na rajada, uma sonda
 de 12 s em c=64 no mix deu 902 req/s, abaixo dos 942 do ponto de 180 s.
 
@@ -596,8 +597,8 @@ redeem é a compra única, 2% do mix). A transcrição do teclado não passa pel
 - Rajada: **942 req/s → ~2,7 milhões de usuários ativos/dia**. No ponto medido havia **32
   requisições em voo**. Como cada chamada volta em dezenas de milissegundos, usuários que disparam
   uma chamada no mesmo segundo cabem até **~942**.
-- Base (0,10 vCPU contínuo): **172 req/s → ~494 mil usuários ativos/dia**, **4 requisições em
-  voo**, até **~172** disparando no mesmo segundo.
+- Base (0,10 vCPU contínuo): **172 req/s × 2.880 = 495.360 → ~495 mil usuários ativos/dia**,
+  **4 requisições em voo**, até **~172** disparando no mesmo segundo.
 
 Esses tetos são o cgroup num servidor x86_64 de desenvolvimento, com os 512 MiB inteiros para um
 par API+Postgres. Na VM real sobram menos (SO, nginx e o staging dividem os mesmos 512 MiB) e o
