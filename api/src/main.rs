@@ -72,6 +72,7 @@ async fn run(config: Config) {
         config.register_rate_limit_per_minute,
         config.account_rate_limit_per_minute,
         keyflow_api::TranscriptionConfig {
+            enabled: config.transcribe_enabled,
             providers: config.providers,
             timeout: Duration::from_millis(config.transcription_timeout_ms.get() as u64),
             max_bytes: config.transcription_max_bytes.get() as u64,
@@ -80,6 +81,7 @@ async fn run(config: Config) {
             ),
         },
         keyflow_api::AdsConfig {
+            enabled: config.ssv_enabled,
             verifier_keys_url: ADMOB_VERIFIER_KEYS_URL.to_string(),
             reward_seconds: config.ads_reward_seconds.get() as i64,
             daily_cap: config.ads_daily_cap.get() as i64,

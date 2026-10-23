@@ -40,6 +40,10 @@ Módulo disjunto do app Android (`app/`): o Gradle não enxerga esta pasta e vic
     default `8`) — runtime do processo. Ambos ≥ 1.
   - `PLAY_INTEGRITY_BASE_URL` e `ANDROID_PUBLISHER_BASE_URL` (opcionais) — caem nas URLs oficiais
     do Google. O teste de carga aponta as duas para um mock.
+  - `TRANSCRIBE_ENABLED` e `SSV_ADMOB_ENABLED` (opcionais, padrão desligado; `true`/`1` ligam,
+    `VAR=""` conta como ausente) — uma flag por rota. Na v1 as duas nascem desligadas:
+    `POST /v1/transcribe` e `GET /v1/ssv/admob` respondem `404` sem consultar o banco. Ligar uma
+    não liga a outra.
   - `TRANSCRIPTION_PROVIDERS_JSON` (obrigatória) — lista ordenada de provedores Whisper-compatible
     (design §Proxy): `[{"name","url","authHeaderName","authValueEnv","model"}]`. `authValueEnv`
     é o **nome de outra env var** que guarda o segredo de verdade (nunca inline no JSON — OPS-03).

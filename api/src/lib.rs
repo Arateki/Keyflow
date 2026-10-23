@@ -12,8 +12,11 @@ use std::num::NonZeroU32;
 use std::sync::Arc;
 use std::time::Duration;
 
+use axum::body::Body;
 use axum::extract::{MatchedPath, State};
 use axum::http::{Request, StatusCode};
+use axum::middleware::Next;
+use axum::response::IntoResponse;
 use axum::routing::post;
 use axum::{Router, routing::get};
 use sqlx::PgPool;
@@ -29,6 +32,8 @@ use providers::{ProviderHealth, ResolvedProvider};
 /// Config do proxy de transcrição (design §Proxy, API-T11) — agrupado à parte pra não inchar
 /// ainda mais `AppState::new`.
 pub struct TranscriptionConfig {
+    /// Na v1 a rota nasce desligada. Ligar não altera o default da SSV.
+    pub enabled: bool,
     pub providers: Vec<ResolvedProvider>,
     pub timeout: Duration,
     pub max_bytes: u64,
@@ -37,6 +42,8 @@ pub struct TranscriptionConfig {
 
 /// Config do rewarded SSV (design §Rewarded, API-T12).
 pub struct AdsConfig {
+    /// Na v1 a rota nasce desligada. Ligar não altera o default da transcrição.
+    pub enabled: bool,
     pub verifier_keys_url: String,
     pub reward_seconds: i64,
     pub daily_cap: i64,
@@ -60,6 +67,8 @@ pub struct AppStateInner {
     pub admob_keys: AdmobKeysCache,
     pub ads_reward_seconds: i64,
     pub ads_daily_cap: i64,
+    pub transcribe_enabled: bool,
+    pub ssv_enabled: bool,
 }
 
 /// Estado compartilhado entre handlers — `Clone` barato (`Arc` por dentro; `PgPool` também já é
@@ -103,6 +112,8 @@ impl AppState {
             admob_keys,
             ads_reward_seconds: ads.reward_seconds,
             ads_daily_cap: ads.daily_cap,
+            transcribe_enabled: transcription.enabled,
+            ssv_enabled: ads.enabled,
         }))
     }
 
@@ -139,7 +150,29 @@ async fn health(State(state): State<AppState>) -> Result<&'static str, StatusCod
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }
 
+/// 404 antes do handler. O extractor `Account` (que consulta o banco) não chega a rodar.
+///
+/// Expande no ponto da rota: o tipo concreto do `from_fn` precisa aparecer onde o
+/// `MethodRouter::layer` exige o `Service` associado.
+macro_rules! hide_unless {
+    ($enabled:expr) => {{
+        let enabled = $enabled;
+        axum::middleware::from_fn(move |request: Request<Body>, next: Next| {
+            let enabled = enabled;
+            async move {
+                if enabled {
+                    next.run(request).await
+                } else {
+                    StatusCode::NOT_FOUND.into_response()
+                }
+            }
+        })
+    }};
+}
+
 pub fn app(state: AppState) -> Router {
+    let transcribe_enabled = state.transcribe_enabled;
+    let ssv_enabled = state.ssv_enabled;
     // `route_layer` (não `layer`): só assim a extensão `MatchedPath` já está no request quando
     // `make_span_with` roda — `layer` envolve o roteamento inteiro e roda ANTES da extensão ser
     // inserida (gotcha documentado do axum).
@@ -150,8 +183,14 @@ pub fn app(state: AppState) -> Router {
         .route("/v1/purchases/redeem", post(routes::redeem::redeem))
         .route("/v1/config", get(routes::content::get_config))
         .route("/v1/models", get(routes::content::get_models))
-        .route("/v1/transcribe", post(routes::transcribe::transcribe))
-        .route("/v1/ssv/admob", get(routes::ssv::ssv_admob))
+        .route(
+            "/v1/transcribe",
+            post(routes::transcribe::transcribe).layer(hide_unless!(transcribe_enabled)),
+        )
+        .route(
+            "/v1/ssv/admob",
+            get(routes::ssv::ssv_admob).layer(hide_unless!(ssv_enabled)),
+        )
         .route_layer(
             TraceLayer::new_for_http().make_span_with(|request: &Request<_>| {
                 let matched_path = request
@@ -239,6 +278,7 @@ mod tests {
 
     fn test_transcription_config() -> TranscriptionConfig {
         TranscriptionConfig {
+            enabled: false,
             providers: vec![ResolvedProvider {
                 name: "unused".to_string(),
                 url: "http://127.0.0.1:0".to_string(),
@@ -254,6 +294,7 @@ mod tests {
 
     fn test_ads_config() -> AdsConfig {
         AdsConfig {
+            enabled: false,
             verifier_keys_url: "http://127.0.0.1:0".to_string(),
             reward_seconds: 60,
             daily_cap: 5,

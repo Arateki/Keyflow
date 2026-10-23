@@ -380,13 +380,15 @@ tarefa):
      `(Bytes, String /* etag */)` em memória com TTL de 60 segundos (ou ler `etag` pré-calculado).
      Com isso, um `304 Not Modified` responde em microssegundos sem tocar no Postgres nem alocar
      memória.
-10. **Rotas fora de escopo na v1 e env var obrigatória — `api/src/lib.rs` (linhas 132–133) e
-    `api/src/config.rs` (linhas 129–140):**
-    - Como créditos não entram na v1, `POST /v1/transcribe` (`api/src/lib.rs:132`) e
-      `GET /v1/ssv/admob` (`api/src/lib.rs:133`) devem ficar desligadas (e
-      `TRANSCRIPTION_PROVIDERS_JSON` em `api/src/config.rs:129-140` deve aceitar lista vazia/default
-      quando a transcrição estiver desabilitada), evitando expor endpoints inativos e instanciar
-      `AdmobKeysCache`.
+10. **Rotas fora de escopo na v1 — feito, uma config por rota, padrão desligado:**
+    - `POST /v1/transcribe` segue `TRANSCRIBE_ENABLED` e `GET /v1/ssv/admob` segue
+      `SSV_ADMOB_ENABLED` (`true`/`1` ligam; ausente ou vazio fica desligado). Ligar uma não liga
+      a outra.
+    - Rota desligada responde **404** numa camada anterior ao handler: o extractor de conta (que
+      consulta o banco) e a verificação SSV não rodam.
+    - Ainda em aberto neste item: aceitar `TRANSCRIPTION_PROVIDERS_JSON` vazio quando a
+      transcrição está desligada, e não instanciar `AdmobKeysCache` com a SSV desligada. O
+      processo continua exigindo a lista de provedores para subir.
 11. **Compilação para ARM64 (Graviton) e imagem/deploy leve — `api/Dockerfile` (linhas 3, 11 e 13):**
     - **Nunca compilar Rust dentro da máquina de 0,5 GB ou 1 GB da AWS** (`rustc` + `sqlx` + `aws-lc-rs`
       passam de 1,5 GB de RAM no build). Compilar na máquina de dev/CI:
@@ -611,8 +613,8 @@ o da rajada é o pico enquanto o crédito existe.
 1. **No código da API (`api/`):**
    - Aplicar os ajustes da Seção 5 (`[profile.release]`, `reqwest::Client` compartilhado,
      `PublisherClient` compartilhado, limpeza periódica do `governor` rate-limiter, cache em memória
-     de `/v1/config` e `/v1/models`, `DB_MAX_CONNECTIONS` configurável, desligar `/v1/transcribe` e
-     `/v1/ssv/admob` por flag na v1).
+     de `/v1/config` e `/v1/models`, `DB_MAX_CONNECTIONS` configurável). `/v1/transcribe` e
+     `/v1/ssv/admob` já nascem desligadas (`TRANSCRIBE_ENABLED`, `SSV_ADMOB_ENABLED`).
    - Adicionar migration com índice em `accounts(token_hash)` (descoberto na análise da Seção 6.4)
      e seed real do catálogo de modelos (`native-voice-models`) e parâmetros de anúncios da v1.
    - Permitir sobrescrever `PLAY_INTEGRITY_BASE_URL` e `ANDROID_PUBLISHER_BASE_URL` via env var para

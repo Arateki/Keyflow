@@ -56,6 +56,7 @@ pub async fn balance_of(pool: &PgPool, account_id: uuid::Uuid) -> i64 {
 #[allow(dead_code)]
 pub fn unused_transcription_config() -> TranscriptionConfig {
     TranscriptionConfig {
+        enabled: false,
         providers: vec![ResolvedProvider {
             name: "unused".to_string(),
             url: "http://127.0.0.1:0".to_string(),
@@ -74,6 +75,7 @@ pub fn unused_transcription_config() -> TranscriptionConfig {
 #[allow(dead_code)]
 pub fn unused_ads_config() -> AdsConfig {
     AdsConfig {
+        enabled: false,
         verifier_keys_url: "http://127.0.0.1:0".to_string(),
         reward_seconds: 60,
         daily_cap: 5,

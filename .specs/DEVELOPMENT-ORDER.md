@@ -65,7 +65,8 @@ R$15, que também tira os anúncios para sempre. Os anúncios ficam só no app d
   Login ChatGPT e SSO do Google continuam desligados no release (`enabled = BuildConfig.DEBUG`).
 - Agente KeyFlow da fase 1 (chat + ferramentas de skin com confirmação; MCP desligado) — **só se a
   V1-4 fechar**; senão ele entra como "Em breve".
-- API em staging e produção (V1-9), com a rota de transcrição (API-T11) e a SSV (API-T12) desligadas.
+- API em staging e produção (V1-9), com a rota de transcrição (API-T11) e a SSV (API-T12)
+  desligadas (`TRANSCRIBE_ENABLED` e `SSV_ADMOB_ENABLED`, padrão desligado, 404 sem banco).
 
 ### Entra como "Em breve" (visível, rotulado, sem nada que pareça funcionar)
 
@@ -150,7 +151,9 @@ upload interno, o produto de R$15 e a service account. As tasks V1-1..V1-8 não 
   máquina; o plano está em `api/docs/aws.md` (não inventar números). DNS/TLS pela Cloudflare; o Yan
   tem domínios na Cloudflare e na GoDaddy. Rust para render o máximo numa máquina pequena; o teste
   de carga diz quantos usuários ela aguenta.
-  API-T11 e API-T12 ficam desligadas na v1. Pode andar em paralelo desde já. Staging acessível só
+  API-T11 e API-T12 ficam desligadas na v1, cada uma com a própria config
+  (`TRANSCRIBE_ENABLED`, `SSV_ADMOB_ENABLED`; padrão desligado). A rota desligada responde 404 e
+  não toca no banco. Pode andar em paralelo desde já. Staging acessível só
   ao Yan (VPN ou equivalente) — anotado, sem configurar agora.
 - **V1-10** — Monetização da v1, **depois da API em staging**: MZ-T1, T2, T3, T4, T9, T10, T11, T13,
   T14 e T15. Fora: T5–T8 e T12 (créditos e o rewarded "Ganhar minutos"). Na MZ-T9 a sheet cobra o
@@ -187,7 +190,9 @@ A V1-9 (API-T13 + teste de carga) não espera o app: é servidor e pode andar de
 produção sobem na **menor e mais barata máquina da AWS**. O plano está em `api/docs/aws.md`;
 máquina e região saem de lá — não inventar números. DNS e TLS pela Cloudflare; o Yan tem domínios
 na Cloudflare e na GoDaddy. O servidor é em Rust para render o máximo numa máquina pequena. O
-teste de carga diz quantos usuários essa máquina aguenta.
+teste de carga diz quantos usuários essa máquina aguenta. Na v1, `POST /v1/transcribe` e
+`GET /v1/ssv/admob` sobem desligadas (`TRANSCRIBE_ENABLED` e `SSV_ADMOB_ENABLED`); cada uma
+responde 404 sem consultar o banco até alguém ligar a flag.
 
 A rota de transcrição (API-T11) e a SSV (API-T12) ficam desligadas na v1. O staging sobe com
 `INTEGRITY_RELAXED=true`. MZ-T3 e MZ-T9 andam com fakes enquanto não há app no Play Console.

@@ -58,6 +58,7 @@ async fn state_with_providers(providers: Vec<ResolvedProvider>, max_bytes: u64) 
         std::num::NonZeroU32::new(1000).unwrap(),
         std::num::NonZeroU32::new(1000).unwrap(),
         TranscriptionConfig {
+            enabled: true,
             providers,
             timeout: Duration::from_secs(5),
             max_bytes,

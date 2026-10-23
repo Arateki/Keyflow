@@ -65,6 +65,10 @@ pub struct Config {
     pub play_integrity_base_url: String,
     /// Base da Play Developer API. Default é a URL oficial.
     pub android_publisher_base_url: String,
+    /// `POST /v1/transcribe` na v1. Padrão desligado: a rota responde 404.
+    pub transcribe_enabled: bool,
+    /// `GET /v1/ssv/admob` na v1. Padrão desligado: a rota responde 404.
+    pub ssv_enabled: bool,
 }
 
 #[derive(Debug)]
@@ -219,6 +223,9 @@ impl Config {
             "TOKIO_MAX_BLOCKING_THREADS",
             DEFAULT_TOKIO_MAX_BLOCKING_THREADS,
         )?;
+        let transcribe_enabled = parse_flag(vars, "TRANSCRIBE_ENABLED");
+        let ssv_enabled = parse_flag(vars, "SSV_ADMOB_ENABLED");
+
         let play_integrity_base_url = parse_nonempty_string(
             vars,
             "PLAY_INTEGRITY_BASE_URL",
@@ -254,6 +261,8 @@ impl Config {
             tokio_max_blocking_threads,
             play_integrity_base_url,
             android_publisher_base_url,
+            transcribe_enabled,
+            ssv_enabled,
         })
     }
 
@@ -350,6 +359,16 @@ fn parse_u32_at_least(
         });
     }
     Ok(parsed)
+}
+
+/// `true` ou `1` ligam. Ausente ou `VAR=""` fica desligado.
+fn parse_flag(vars: &HashMap<String, String>, var: &str) -> bool {
+    matches!(
+        vars.get(var)
+            .map(String::as_str)
+            .filter(|value| !value.is_empty()),
+        Some("true" | "1")
+    )
 }
 
 fn parse_nonempty_string(
@@ -710,5 +729,25 @@ mod tests {
         assert_eq!(config.play_integrity_base_url, "http://mock:8081");
         assert_eq!(config.android_publisher_base_url, "http://mock:8081");
         assert_eq!(config.tokio_worker_threads.get(), 1);
+    }
+
+    #[test]
+    fn v1_routes_default_off_and_each_flag_is_independent() {
+        let config = Config::from_map(&with_required(&[])).unwrap();
+        assert!(!config.transcribe_enabled);
+        assert!(!config.ssv_enabled);
+
+        let only_transcribe =
+            Config::from_map(&with_required(&[("TRANSCRIBE_ENABLED", "true")])).unwrap();
+        assert!(only_transcribe.transcribe_enabled);
+        assert!(!only_transcribe.ssv_enabled);
+
+        let only_ssv = Config::from_map(&with_required(&[
+            ("TRANSCRIBE_ENABLED", ""),
+            ("SSV_ADMOB_ENABLED", "1"),
+        ]))
+        .unwrap();
+        assert!(!only_ssv.transcribe_enabled);
+        assert!(only_ssv.ssv_enabled);
     }
 }
