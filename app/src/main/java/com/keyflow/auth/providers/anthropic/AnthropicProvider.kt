@@ -1,6 +1,7 @@
 package com.keyflow.auth.providers.anthropic
 
 import com.keyflow.auth.AuthDependencies
+import com.keyflow.auth.AuthFlow
 import com.keyflow.auth.Credential
 import com.keyflow.auth.ProviderAuth
 import com.keyflow.auth.ProviderIds
@@ -23,15 +24,14 @@ internal object AnthropicProvider {
     fun planUsage(credential: Credential.OAuth): Boolean = true
 
     fun create(dependencies: AuthDependencies): ProviderAuth {
-        val sso = AnthropicSsoFlow(
-            store = dependencies.store,
-            http = dependencies.http,
-            clock = dependencies.clock,
-        )
+        val flows = buildList<AuthFlow> {
+            add(AnthropicApiKeyFlow())
+            AnthropicSsoFlowFactory.create(dependencies)?.let(::add)
+        }
         return ProviderAuth(
             id = ProviderIds.ANTHROPIC,
             displayName = "Anthropic",
-            flows = listOf(AnthropicApiKeyFlow(), sso),
+            flows = flows,
             planUsage = ::planUsage,
             usageUrl = AnthropicAuthConfig.usageUrl,
             headersFor = ::headersFor,
