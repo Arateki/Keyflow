@@ -983,7 +983,7 @@ internal fun SkinsSection(
                     Modifier.size(11.dp),
                     strokeWidth = 2f,
                 )
-                Eyebrow(tr(if (skinsUnlocked) "Desbloqueado" else "Bloqueado"))
+                Eyebrow(if (skinsUnlocked) tr("Desbloqueado") else tr("Bloqueado"))
             }
         }
         if (onOrbSkinSelected != null) {
