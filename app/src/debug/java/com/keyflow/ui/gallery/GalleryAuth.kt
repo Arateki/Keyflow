@@ -49,7 +49,7 @@ class GalleryAuth(
     override fun apiKey(): String? = storedKey
 
     /** O aviso do 1º login já foi visto: o print mostra a tela, não o modal por cima. */
-    override fun consumeNotice(key: String): Boolean = false
+    override suspend fun consumeNotice(key: String): Boolean = false
     override fun openUrl(url: String) = Unit
     override suspend fun listModels(): List<AccountModel> = models
 }

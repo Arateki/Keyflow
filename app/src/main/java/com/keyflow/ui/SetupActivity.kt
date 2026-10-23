@@ -40,6 +40,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
@@ -140,8 +141,8 @@ class SetupActivity : ComponentActivity() {
         }
     }
 
-    private val groqAuth by lazy { DirectApiKeyActions(auth.store, ProviderIds.GROQ) }
-    private val elevenLabsAuth by lazy { DirectApiKeyActions(auth.store, ProviderIds.ELEVENLABS) }
+    private val groqAuth by lazy { DirectApiKeyActions(auth.store, ProviderIds.GROQ, activityScope) }
+    private val elevenLabsAuth by lazy { DirectApiKeyActions(auth.store, ProviderIds.ELEVENLABS, activityScope) }
 
     private val anthropicAuth by lazy {
         val provider = auth.registry.firstOrNull { it.id == ProviderIds.ANTHROPIC }
@@ -696,7 +697,7 @@ class SetupActivity : ComponentActivity() {
             }
         }
         monetizationJobs += activityScope.launch {
-            billing.purchases.collectLatest { purchases ->
+            billing.purchases.drop(1).collectLatest { purchases ->
                 if (purchases.any { it.products.contains(MonetizationProducts.UNLOCK_FOREVER) && it.state == StorePurchaseState.PENDING }) {
                     unlockPurchaseState = UnlockPurchaseState.PENDING
                 }

@@ -129,7 +129,9 @@ upload interno, o produto de R$15 e a service account. As tasks V1-1..V1-8 não 
   exclusão explícita das chaves e saneamento do erro HTTP Anthropic; gates verdes. Rodada 4 concluída em
   2026-10-23 no commit `dc3fceb`: lock síncrono sem atravessar suspensão do DataStore, leitura dos
   formatos antigos `cred.*`, desconexão por tipo, prioridade única na migração, overlay sem espera na
-  main e erros Anthropic sem corpo do servidor; gates verdes.
+  main e erros Anthropic sem corpo do servidor; gates verdes. Rodada 5 concluída em 2026-10-23: OAuth
+  antigo normalizado antes das chaves legadas, seleção ativa por modo, acessos comuns sem lock de arquivo;
+  gates e 24 instrumentados verdes.
 - **V1-3** — Build de release (PS-5): R8 (`isMinifyEnabled`) com keep rules (AIDL dos processos
   `:inference`/`:reasoning`, sherpa-onnx, LiteRT-LM, AndroidSVG, Play Billing, AdMob), AAB,
   `versionName` 1.0.0, smoke do release no A32. **[YAN]**: chave de upload (Play App Signing) e o

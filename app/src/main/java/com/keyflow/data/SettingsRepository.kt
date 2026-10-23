@@ -73,7 +73,7 @@ class SettingsRepository(
      * os troca por valor em tudo que vai ao modelo. Só leitura: ninguém grava por aqui (as gravações são as do [saveSettings]). É a mesma
      * instância preguiçosa que o repositório usa, então o nome do cofre fica num lugar só.
      */
-    internal fun secretVault(): SharedPreferences = CredentialVaultLock.withLock(appContext) { legacyPrefs }
+    internal fun secretVault(): SharedPreferences = legacyPrefs
 
     /** Grava uma chave sem colocar o valor no estado de [Settings] nem na thread da UI. */
     suspend fun saveSecret(key: String, value: String) = withContext(Dispatchers.IO) {
@@ -427,7 +427,11 @@ class SettingsRepository(
             keyboardSkin = prefs[KEYBOARD_SKIN] ?: "system",
             orbSkin = prefs[ORB_SKIN] ?: "atelie",
             appLanguage = prefs[APP_LANGUAGE] ?: "",
-        ).withoutCredits()
+        ).withoutCredits().also { settings ->
+            credentials.setAuthMode(ProviderIds.OPENAI, settings.providerOpenAiAuthMode.toCredentialAuthMethod())
+            credentials.setAuthMode(ProviderIds.ANTHROPIC, settings.providerAnthropicAuthMode.toCredentialAuthMethod())
+            credentials.setAuthMode(ProviderIds.GOOGLE, settings.providerGoogleAuthMode.toCredentialAuthMethod())
+        }
         })
     }.flowOn(Dispatchers.IO)
 
@@ -538,6 +542,9 @@ class SettingsRepository(
             prefs[ORB_SKIN] = persisted.orbSkin
             prefs[APP_LANGUAGE] = persisted.appLanguage
                 }
+                credentials.setAuthMode(ProviderIds.OPENAI, persisted.providerOpenAiAuthMode.toCredentialAuthMethod())
+                credentials.setAuthMode(ProviderIds.ANTHROPIC, persisted.providerAnthropicAuthMode.toCredentialAuthMethod())
+                credentials.setAuthMode(ProviderIds.GOOGLE, persisted.providerGoogleAuthMode.toCredentialAuthMethod())
             }
         }
     }
@@ -545,6 +552,9 @@ class SettingsRepository(
     private fun String?.putOrRemove(prefs: MutablePreferences, key: Preferences.Key<String>) {
         if (this.isNullOrBlank()) prefs.remove(key) else prefs[key] = this
     }
+
+    private fun String.toCredentialAuthMethod(): com.keyflow.auth.AuthMethod =
+        if (this == "subscription") com.keyflow.auth.AuthMethod.OAUTH else com.keyflow.auth.AuthMethod.API_KEY
 
     /** O segredo não entra no DataStore nem em `Settings` para chaves de API; os campos legados restantes leem o auth vault. */
     private fun secret(name: String): String = credentials.getSecret(name).orEmpty()
@@ -580,6 +590,7 @@ class SettingsRepository(
         // O DataStore é lido antes do lock de arquivo: não há suspensão enquanto outro processo espera pela cópia cifrada.
         val current = dataStore.data.first()
         val movable = CredentialVaultLock.withLock(appContext) {
+            credentials.migrateLegacyActiveCredentials()
             SettingsSecrets.migrateLegacySources(current, legacyPrefs, credentials)
         }
         if (movable.isNotEmpty()) {

@@ -15,6 +15,7 @@ object ProviderIds {
     val ELEVENLABS = ProviderId("elevenlabs")
     val GROQ = ProviderId("groq")
     val GROK = ProviderId("grok")
+    val all = listOf(OPENAI, ANTHROPIC, GOOGLE, ELEVENLABS, GROQ, GROK)
 }
 
 /** Como se prova quem é: com uma chave colada, ou com um login no navegador. */
