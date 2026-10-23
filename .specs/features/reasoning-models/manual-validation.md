@@ -4,8 +4,9 @@ Device: Galaxy A32 (`RX8T10DERKW`). APK: `./gradlew installDebug` (build **compl
 `compileDebugKotlin`). Antes de começar, CI verde no commit instalado (unit + instrumentados + goldens).
 Instrumentado no aparelho: só `am instrument` (o `connectedAndroidTest` desinstala o app e derruba o KeyFlow como teclado).
 
-O login ChatGPT só está ligado em build **debug** (`OpenAiAuthConfig.enabled = BuildConfig.DEBUG`, decisão RPRV-04
-pendente): use o `installDebug`. A **chave de API** funciona em qualquer build.
+Os logins ChatGPT, Claude e Google também são incluídos no release (decisão RPRV-04, 2026-10-23). Para este roteiro, use
+`installDebug`; o login Google no release depende da configuração de Console com SHA-1 Play e `applicationId` definitivos **[YAN]**.
+A **chave de API** funciona em qualquer build.
 
 Medições em tempo real (deixe rodando num terminal):
 
