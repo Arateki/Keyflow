@@ -34,6 +34,7 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
     }
 
     buildTypes {
@@ -202,6 +203,9 @@ dependencies {
 
     // HTTP — upload multipart para API Whisper
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // Identidade anônima (MZ-T1): fallback Block Store para reinstalações na mesma conta Google.
+    implementation("com.google.android.gms:play-services-auth-blockstore:16.4.0")
 
     // Config persistida
     implementation("androidx.datastore:datastore-preferences:1.1.1")
