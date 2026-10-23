@@ -5,6 +5,7 @@ import android.content.Context
 import com.android.billingclient.api.BillingClient
 import com.android.billingclient.api.BillingFlowParams
 import com.android.billingclient.api.BillingResult
+import com.android.billingclient.api.AcknowledgePurchaseParams
 import com.android.billingclient.api.ConsumeParams
 import com.android.billingclient.api.PendingPurchasesParams
 import com.android.billingclient.api.ProductDetails
@@ -86,6 +87,7 @@ interface BillingBackend {
     suspend fun queryPurchases(): List<StorePurchase>
     fun launch(activity: Activity, product: StoreProduct, obfuscatedAccountId: String): BillingOperationResult
     suspend fun consume(purchaseToken: String): BillingOperationResult
+    suspend fun acknowledge(purchaseToken: String): BillingOperationResult
     fun close()
 }
 
@@ -103,11 +105,13 @@ class BillingManager(
     private val backend: BillingBackend = context?.let { PlayBillingBackend(it.applicationContext) }
         ?: error("BillingManager precisa de backend em testes sem Context"),
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+    private val redeemPurchase: suspend (StorePurchase) -> Boolean = { false },
 ) : AutoCloseable {
     private val _state = MutableStateFlow<BillingState>(BillingState.Disconnected)
     private val _products = MutableStateFlow<List<StoreProduct>>(emptyList())
     private val _purchases = MutableStateFlow<List<StorePurchase>>(emptyList())
     private var updatesJob: Job? = null
+    private val acknowledgementsInFlight = mutableSetOf<String>()
 
     val state: StateFlow<BillingState> = _state.asStateFlow()
     val products: StateFlow<List<StoreProduct>> = _products.asStateFlow()
@@ -134,7 +138,7 @@ class BillingManager(
 
     suspend fun refreshPurchases() {
         runCatching { backend.queryPurchases() }
-            .onSuccess(::acceptPurchases)
+            .onSuccess(::publishPurchases)
     }
 
     suspend fun purchase(activity: Activity, productId: String): BillingOperationResult {
@@ -155,14 +159,72 @@ class BillingManager(
         return backend.consume(purchase.purchaseToken)
     }
 
+    suspend fun acknowledge(purchase: StorePurchase): BillingOperationResult {
+        val productId = purchase.products.firstOrNull() ?: return BillingOperationResult(
+            BillingClient.BillingResponseCode.ITEM_NOT_OWNED,
+            "compra sem produto",
+        )
+        if (purchase.state != StorePurchaseState.PURCHASED ||
+            MonetizationProducts.kind(productId) != MonetizationProductKind.NON_CONSUMABLE
+        ) {
+            return BillingOperationResult(BillingClient.BillingResponseCode.ITEM_NOT_OWNED, "compra não confirmável")
+        }
+        if (purchase.acknowledged) return BillingOperationResult(BillingClient.BillingResponseCode.OK)
+        return backend.acknowledge(purchase.purchaseToken)
+    }
+
     override fun close() {
         updatesJob?.cancel()
         scope.coroutineContext[Job]?.cancel()
         backend.close()
     }
 
-    private fun acceptPurchases(purchases: List<StorePurchase>) {
+    private fun acceptPurchases(updates: List<StorePurchase>) {
+        if (updates.isEmpty()) return
+        val merged = mergePurchases(_purchases.value, updates)
+        _purchases.value = merged
+        scheduleAcknowledgements(merged)
+    }
+
+    private fun publishPurchases(purchases: List<StorePurchase>) {
         _purchases.value = purchases
+        scheduleAcknowledgements(purchases)
+    }
+
+    private fun scheduleAcknowledgements(purchases: List<StorePurchase>) {
+        purchases
+            .filter { it.state == StorePurchaseState.PURCHASED && !it.acknowledged }
+            .filter { purchase ->
+                purchase.products.any { productId ->
+                    MonetizationProducts.kind(productId) == MonetizationProductKind.NON_CONSUMABLE
+                }
+            }
+            .forEach { purchase ->
+                if (!acknowledgementsInFlight.add(purchase.purchaseToken)) return@forEach
+                scope.launch {
+                    val serverHandled = runCatching { redeemPurchase(purchase) }.getOrDefault(false)
+                    val result = if (serverHandled) {
+                        BillingOperationResult(BillingClient.BillingResponseCode.OK)
+                    } else {
+                        acknowledge(purchase)
+                    }
+                    if (!result.ok) acknowledgementsInFlight.remove(purchase.purchaseToken)
+                }
+            }
+    }
+
+    private fun mergePurchases(
+        current: List<StorePurchase>,
+        updates: List<StorePurchase>,
+    ): List<StorePurchase> {
+        val byProduct = linkedMapOf<String, StorePurchase>()
+        current.forEach { purchase ->
+            purchase.products.forEach { productId -> byProduct[productId] = purchase }
+        }
+        updates.forEach { purchase ->
+            purchase.products.forEach { productId -> byProduct[productId] = purchase }
+        }
+        return byProduct.values.distinctBy(StorePurchase::purchaseToken)
     }
 
     private fun StorePurchase.isPurchased(productId: String): Boolean =
@@ -276,6 +338,18 @@ private class PlayBillingBackend(context: Context) : BillingBackend {
         val (result, _) = suspendCancellableCoroutine<Pair<BillingResult, String?>> { continuation ->
             client.consumeAsync(params) { billingResult, token ->
                 if (continuation.isActive) continuation.resume(billingResult to token)
+            }
+        }
+        return BillingOperationResult(result.responseCode, result.debugMessage)
+    }
+
+    override suspend fun acknowledge(purchaseToken: String): BillingOperationResult {
+        val params = AcknowledgePurchaseParams.newBuilder()
+            .setPurchaseToken(purchaseToken)
+            .build()
+        val result = suspendCancellableCoroutine<BillingResult> { continuation ->
+            client.acknowledgePurchase(params) { billingResult ->
+                if (continuation.isActive) continuation.resume(billingResult)
             }
         }
         return BillingOperationResult(result.responseCode, result.debugMessage)

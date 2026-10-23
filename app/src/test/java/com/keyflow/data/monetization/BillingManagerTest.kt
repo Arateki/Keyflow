@@ -7,6 +7,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
@@ -49,20 +50,81 @@ class BillingManagerTest {
         manager.close()
     }
 
+    @Test
+    fun `atualizacao parcial do Play preserva os demais produtos`() = runTest {
+        val updates = MutableSharedFlow<List<StorePurchase>>(extraBufferCapacity = 1)
+        val credit = StorePurchase(
+            products = listOf(MonetizationProducts.CREDITS_10),
+            purchaseToken = "credit-token",
+            state = StorePurchaseState.PURCHASED,
+            acknowledged = true,
+        )
+        val unlock = StorePurchase(
+            products = listOf(MonetizationProducts.UNLOCK_FOREVER),
+            purchaseToken = "unlock-token",
+            state = StorePurchaseState.PURCHASED,
+            acknowledged = false,
+        )
+        val backend = FakeBillingBackend(
+            products = emptyList(),
+            initialPurchases = listOf(credit),
+            updates = updates,
+        )
+        val manager = BillingManager(
+            context = null,
+            identity = { "identity" },
+            backend = backend,
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
+        )
+
+        manager.connect()
+        updates.emit(listOf(unlock))
+
+        assertThat(manager.purchases.value).containsExactly(credit, unlock)
+        manager.close()
+    }
+
+    @Test
+    fun `unlock não confirmado usa acknowledge do fake`() = runTest {
+        val backend = FakeBillingBackend(products = emptyList())
+        val manager = BillingManager(
+            context = null,
+            identity = { "identity" },
+            backend = backend,
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
+        )
+        val purchase = StorePurchase(
+            products = listOf(MonetizationProducts.UNLOCK_FOREVER),
+            purchaseToken = "unlock-token",
+            state = StorePurchaseState.PURCHASED,
+            acknowledged = false,
+        )
+
+        assertThat(manager.acknowledge(purchase).ok).isTrue()
+        assertThat(backend.acknowledgedToken).isEqualTo("unlock-token")
+        manager.close()
+    }
+
     private class FakeBillingBackend(
         private val products: List<StoreProduct>,
+        private val initialPurchases: List<StorePurchase> = emptyList(),
+        override val purchaseUpdates: Flow<List<StorePurchase>> = emptyFlow(),
     ) : BillingBackend {
-        override val purchaseUpdates: Flow<List<StorePurchase>> = emptyFlow()
         var obfuscatedAccountId: String? = null
+        var acknowledgedToken: String? = null
         override suspend fun connect() = Unit
         override suspend fun queryProducts(productIds: List<String>): List<StoreProduct> = products
-        override suspend fun queryPurchases(): List<StorePurchase> = emptyList()
+        override suspend fun queryPurchases(): List<StorePurchase> = initialPurchases
         override fun launch(activity: Activity, product: StoreProduct, obfuscatedAccountId: String): BillingOperationResult {
             this.obfuscatedAccountId = obfuscatedAccountId
             return BillingOperationResult(BillingClient.BillingResponseCode.OK)
         }
         override suspend fun consume(purchaseToken: String): BillingOperationResult =
             BillingOperationResult(BillingClient.BillingResponseCode.OK)
+        override suspend fun acknowledge(purchaseToken: String): BillingOperationResult {
+            acknowledgedToken = purchaseToken
+            return BillingOperationResult(BillingClient.BillingResponseCode.OK)
+        }
         override fun close() = Unit
     }
 }

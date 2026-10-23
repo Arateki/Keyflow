@@ -6,6 +6,7 @@ import com.keyflow.BuildConfig
 import com.keyflow.auth.HttpErrorMessage
 import com.keyflow.auth.SecureCredentialStore
 import com.keyflow.data.SecurePrefs
+import com.keyflow.data.models.KeyFlowHttpClient
 import com.google.android.gms.tasks.Task
 import com.google.android.play.core.integrity.IntegrityManager
 import com.google.android.play.core.integrity.IntegrityManagerFactory
@@ -72,7 +73,7 @@ data class KeyFlowAccount(
  */
 class KeyFlowApiClient(
     context: Context?,
-    private val http: OkHttpClient = OkHttpClient(),
+    private val http: OkHttpClient = KeyFlowHttpClient.base(),
     private val baseUrl: String = BuildConfig.KEYFLOW_API_BASE_URL,
     private val identity: suspend () -> String = context?.let { app -> { AnonymousIdentity(app.applicationContext).get() } }
         ?: { error("KeyFlowApiClient precisa de identity em testes sem Context") },
@@ -112,6 +113,30 @@ class KeyFlowApiClient(
             response = getAccount(token)
         }
         response.use { it.parseAccount() }
+    }
+
+    /** Redime a compra no servidor; o servidor valida e faz o acknowledge no Play. */
+    suspend fun redeem(purchase: StorePurchase): Boolean = withContext(Dispatchers.IO) {
+        val productId = purchase.products.firstOrNull() ?: return@withContext false
+        val token = ensureRegistered()
+        val integrity = integrityToken(nonceFor(identity()))
+        val body = JSONObject()
+            .put("productId", productId)
+            .put("purchaseToken", purchase.purchaseToken)
+            .put("integrityToken", integrity)
+            .toString()
+            .toRequestBody(JSON)
+        val request = Request.Builder()
+            .url("$urlBase/v1/purchases/redeem")
+            .header("Accept", "application/json")
+            .header("Authorization", "Bearer $token")
+            .post(body)
+            .build()
+        execute(request).use { response ->
+            val text = response.body?.string().orEmpty()
+            if (!response.isSuccessful) throw apiFailure("resgate", response.code, text)
+            true
+        }
     }
 
     private suspend fun registerLocked(): String {

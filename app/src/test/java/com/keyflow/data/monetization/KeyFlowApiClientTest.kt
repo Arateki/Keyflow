@@ -63,6 +63,28 @@ class KeyFlowApiClientTest {
         assertThat(failure).isInstanceOf(KeyFlowApiException.Retryable::class.java)
     }
 
+    @Test
+    fun `redeem envia a compra ao servidor`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(200).setBody("{\"accessToken\":\"token-1\"}"))
+        server.enqueue(MockResponse().setResponseCode(200).setBody("{\"status\":\"credited\"}"))
+        val client = client(FakeTokenStore())
+
+        assertThat(client.redeem(
+            StorePurchase(
+                products = listOf(MonetizationProducts.UNLOCK_FOREVER),
+                purchaseToken = "purchase-token",
+                state = StorePurchaseState.PURCHASED,
+                acknowledged = false,
+            ),
+        )).isTrue()
+        val register = server.takeRequest(1, TimeUnit.SECONDS)
+        val redeem = server.takeRequest(1, TimeUnit.SECONDS)
+        assertThat(register!!.path).isEqualTo("/v1/register")
+        assertThat(redeem!!.path).isEqualTo("/v1/purchases/redeem")
+        assertThat(redeem.getHeader("Authorization")).isEqualTo("Bearer token-1")
+        assertThat(redeem.body.readUtf8()).contains("purchase-token")
+    }
+
     private fun client(tokens: FakeTokenStore, baseUrl: String = server.url("/").toString()) = KeyFlowApiClient(
         context = null,
         baseUrl = baseUrl,
