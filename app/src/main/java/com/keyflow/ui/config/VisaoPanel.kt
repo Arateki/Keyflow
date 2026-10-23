@@ -220,8 +220,8 @@ private fun VisaoOpenAi(
         val chosen = settings.visionOpenAiModel.ifEmpty { "gpt-4o" }
         val connection by remember(auth) { auth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
         var refresh by remember { mutableIntStateOf(0) }
-        val apiKey = remember(connection, settings.providerOpenAiApiKey, settings.openaiToken) {
-            auth.apiKey().orEmpty().ifEmpty { settings.providerOpenAiApiKey.ifEmpty { settings.openaiToken } }
+        val apiKey = remember(connection, settings.openaiToken) {
+            auth.apiKey().orEmpty().ifEmpty { settings.openaiToken }
         }
         val effectiveConnection = when {
             connection is ConnectionState.Connected -> connection
@@ -249,7 +249,6 @@ private fun VisaoOpenAi(
             apiKey = apiKey,
             onApiKeyChange = {
                 auth.saveApiKey(it)
-                onSettingsChange(settings.copy(providerOpenAiApiKey = it, openaiToken = it))
             },
             getKeyUrl = "https://platform.openai.com/api-keys",
             onOpenGetKeyUrl = { auth.openUrl("https://platform.openai.com/api-keys") },
@@ -274,9 +273,9 @@ private fun VisaoGoogle(
     val chosen = settings.visionGoogleModel.ifEmpty { "gemini-2.0-flash" }
     val connection by remember(auth) { auth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
     var refresh by remember { mutableIntStateOf(0) }
-    val apiKey = remember(connection, settings.providerGoogleApiKey, settings.visionGoogleApiKey, settings.falaGoogleApiKey) {
+    val apiKey = remember(connection, settings.visionGoogleApiKey, settings.falaGoogleApiKey) {
         auth.apiKey().orEmpty().ifEmpty {
-            settings.providerGoogleApiKey.ifEmpty { settings.visionGoogleApiKey }.ifEmpty { settings.falaGoogleApiKey }
+            settings.visionGoogleApiKey.ifEmpty { settings.falaGoogleApiKey }
         }
     }
     val effectiveConnection = when {
@@ -305,7 +304,6 @@ private fun VisaoGoogle(
         apiKey = apiKey,
         onApiKeyChange = {
             auth.saveApiKey(it)
-            onSettingsChange(settings.copy(providerGoogleApiKey = it, visionGoogleApiKey = it, falaGoogleApiKey = it))
         },
         getKeyUrl = "https://aistudio.google.com/app/apikey",
         onOpenGetKeyUrl = { auth.openUrl("https://aistudio.google.com/app/apikey") },
@@ -329,8 +327,8 @@ private fun VisaoAnthropic(
     val chosen = settings.visionAnthropicModel.ifEmpty { "claude-3-5-sonnet-latest" }
     val connection by remember(auth) { auth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
     var refresh by remember { mutableIntStateOf(0) }
-    val apiKey = remember(connection, settings.providerAnthropicApiKey, settings.visionAnthropicApiKey) {
-        auth.apiKey().orEmpty().ifEmpty { settings.providerAnthropicApiKey.ifEmpty { settings.visionAnthropicApiKey } }
+    val apiKey = remember(connection, settings.visionAnthropicApiKey) {
+        auth.apiKey().orEmpty().ifEmpty { settings.visionAnthropicApiKey }
     }
     UnifiedProviderCard(
         providerName = "Anthropic",
@@ -352,7 +350,6 @@ private fun VisaoAnthropic(
         apiKey = apiKey,
         onApiKeyChange = {
             auth.saveApiKey(it)
-            onSettingsChange(settings.copy(providerAnthropicApiKey = it, visionAnthropicApiKey = it))
         },
         getKeyUrl = "https://console.anthropic.com/settings/keys",
         onOpenGetKeyUrl = { auth.openUrl("https://console.anthropic.com/settings/keys") },

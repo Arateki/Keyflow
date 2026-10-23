@@ -70,9 +70,9 @@ internal fun GooglePanel(
     val ssoModels = if (remoteModels.isNotEmpty()) remoteModels else GOOGLE_SSO_MODELS
     val chosenModel = settings.reasoningGoogleModel.ifEmpty { "gemini-2.0-flash" }
 
-    val apiKey = remember(connection, settings.providerGoogleApiKey, settings.visionGoogleApiKey, settings.falaGoogleApiKey) {
+    val apiKey = remember(connection, settings.visionGoogleApiKey, settings.falaGoogleApiKey) {
         actions.apiKey().orEmpty().ifEmpty {
-            settings.providerGoogleApiKey.ifEmpty { settings.visionGoogleApiKey }.ifEmpty { settings.falaGoogleApiKey }
+            settings.visionGoogleApiKey.ifEmpty { settings.falaGoogleApiKey }
         }
     }
 
@@ -98,7 +98,6 @@ internal fun GooglePanel(
         apiKey = apiKey,
         onApiKeyChange = {
             actions.saveApiKey(it)
-            onSettingsChange(settings.copy(providerGoogleApiKey = it, visionGoogleApiKey = it, falaGoogleApiKey = it))
         },
         getKeyUrl = GOOGLE_AI_STUDIO_URL,
         onOpenGetKeyUrl = { actions.openUrl(GOOGLE_AI_STUDIO_URL) },

@@ -90,11 +90,11 @@ fun VozPanel(
             TranscriptionSource.CREDITS -> Unit
             TranscriptionSource.OPENAI -> KeyProviderFields(
                 provName = "OpenAI",
-                token = activeSettings.providerOpenAiApiKey.ifEmpty { activeSettings.openaiToken },
+                token = activeSettings.openaiToken,
                 models = OPENAI_MODELS,
                 model = activeSettings.openaiModel,
                 language = activeSettings.openaiLanguage.orEmpty(),
-                onToken = { onSettingsChange(activeSettings.copy(providerOpenAiApiKey = it, openaiToken = it)) },
+                onToken = { onSettingsChange(activeSettings.copy(openaiToken = it)) },
                 onModel = { onSettingsChange(activeSettings.copy(openaiModel = it)) },
                 onLanguage = { onSettingsChange(activeSettings.copy(openaiLanguage = it.ifBlank { null })) },
             )

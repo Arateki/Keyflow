@@ -139,12 +139,11 @@ internal fun OpenAiPanel(
         onRefreshApiModels = { refresh++ },
         modelsNote = tr("Não foi possível carregar os modelos da conta.").takeIf { modelsFailed },
         modelsNoteTag = OPENAI_MODELS_EMPTY_TAG,
-        apiKey = remember(connection, settings.providerOpenAiApiKey, settings.openaiToken) {
-            actions.apiKey().orEmpty().ifEmpty { settings.providerOpenAiApiKey.ifEmpty { settings.openaiToken } }
+        apiKey = remember(connection, settings.openaiToken) {
+            actions.apiKey().orEmpty().ifEmpty { settings.openaiToken }
         },
         onApiKeyChange = {
             actions.saveApiKey(it)
-            onSettingsChange(settings.copy(providerOpenAiApiKey = it, openaiToken = it))
         },
         getKeyUrl = "https://platform.openai.com/api-keys",
         onOpenGetKeyUrl = { actions.openUrl("https://platform.openai.com/api-keys") },

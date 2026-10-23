@@ -53,7 +53,13 @@ class SettingsSecretsTest {
         )
 
         assertThat(SettingsSecrets.LEGACY_IN_DATASTORE.map { it.name })
-            .containsExactlyElementsIn(SettingsSecrets.BY_PROPERTY.values - neverInDataStore)
+            .containsExactlyElementsIn(
+                (SettingsSecrets.BY_PROPERTY.values - neverInDataStore) + listOf(
+                    SettingsSecrets.PROVIDER_ANTHROPIC_API_KEY,
+                    SettingsSecrets.PROVIDER_OPENAI_API_KEY,
+                    SettingsSecrets.PROVIDER_GOOGLE_API_KEY,
+                ),
+            )
     }
 
     // ── Migração do DataStore para o cofre ───────────────────────────────────

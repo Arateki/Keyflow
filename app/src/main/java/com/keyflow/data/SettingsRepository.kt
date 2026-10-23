@@ -344,13 +344,10 @@ class SettingsRepository(
             computerSshPassword = secret(prefs, SettingsSecrets.COMPUTER_SSH_PASSWORD),
             computerSshKey = secret(prefs, SettingsSecrets.COMPUTER_SSH_KEY),
             customModelMirrorUrl = prefs[CUSTOM_MODEL_MIRROR_URL].orEmpty(),
-            providerAnthropicApiKey = secret(prefs, SettingsSecrets.PROVIDER_ANTHROPIC_API_KEY),
             providerAnthropicModel = prefs[PROVIDER_ANTHROPIC_MODEL] ?: "claude-3-5-sonnet-latest",
             providerAnthropicAuthMode = prefs[PROVIDER_ANTHROPIC_AUTH_MODE] ?: "subscription",
-            providerOpenAiApiKey = secret(prefs, SettingsSecrets.PROVIDER_OPENAI_API_KEY),
             providerOpenAiModel = prefs[PROVIDER_OPENAI_MODEL] ?: "gpt-4o",
             providerOpenAiAuthMode = prefs[PROVIDER_OPENAI_AUTH_MODE] ?: "subscription",
-            providerGoogleApiKey = secret(prefs, SettingsSecrets.PROVIDER_GOOGLE_API_KEY),
             providerGoogleModel = prefs[PROVIDER_GOOGLE_MODEL] ?: "gemini-2.0-flash",
             providerGoogleAuthMode = prefs[PROVIDER_GOOGLE_AUTH_MODE] ?: "subscription",
             providerElevenLabsAuthMode = prefs[PROVIDER_ELEVENLABS_AUTH_MODE] ?: "subscription",
@@ -414,9 +411,6 @@ class SettingsRepository(
                 .putString(SettingsSecrets.FALA_CUSTOM_HEADER_VALUE, persisted.falaCustomHeaderValue)
                 .putString(SettingsSecrets.COMPUTER_SSH_PASSWORD, persisted.computerSshPassword)
                 .putString(SettingsSecrets.COMPUTER_SSH_KEY, persisted.computerSshKey)
-                .putString(SettingsSecrets.PROVIDER_ANTHROPIC_API_KEY, persisted.providerAnthropicApiKey)
-                .putString(SettingsSecrets.PROVIDER_OPENAI_API_KEY, persisted.providerOpenAiApiKey)
-                .putString(SettingsSecrets.PROVIDER_GOOGLE_API_KEY, persisted.providerGoogleApiKey)
                 .putString(SettingsSecrets.PROVIDER_GROQ_API_KEY, persisted.providerGroqApiKey)
                 .putString(SettingsSecrets.PROVIDER_GROK_API_KEY, persisted.providerGrokApiKey)
                 .commit()
