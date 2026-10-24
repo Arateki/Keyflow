@@ -18,6 +18,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
+import com.keyflow.ui.theme.LocalKeyFlowPalette
+import com.keyflow.ui.theme.SpaceGrotesk
 import com.keyflow.i18n.tr
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -30,22 +34,28 @@ internal fun DeleteMyDataSection(onDelete: suspend () -> Unit, initiallyOpen: Bo
     var failed by remember { mutableStateOf(false) }
     var deleted by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val palette = LocalKeyFlowPalette.current
 
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(tr("Apaga o registro deste aparelho na API e os dados associados."))
-        Text(tr("Também é possível pedir a exclusão por e-mail: contato@arateki.com. Prazo de até 15 dias."))
+        DocBlocks(listOf(
+            DocBlock.Paragraph(tr("Apaga o registro deste aparelho na API e os dados associados.")),
+            DocBlock.Paragraph(tr("Também é possível pedir a exclusão por e-mail: contato@arateki.com. Prazo de até 15 dias.")),
+        ))
         TextButton(onClick = { open = true; failed = false }, enabled = !busy, modifier = Modifier.testTag("delete-my-data")) {
-            Text(tr("Apagar meus dados"))
+            Text(tr("Apagar meus dados"), color = palette.fg, fontSize = 11.5.sp)
         }
-        if (deleted) Text(tr("Dados apagados. A compra continua no Google Play."), Modifier.testTag("delete-my-data-success"))
+        if (deleted) DeletionText(tr("Dados apagados. A compra continua no Google Play."), Modifier.testTag("delete-my-data-success"))
     }
     if (open) AlertDialog(
+        containerColor = palette.card,
+        titleContentColor = palette.fg,
+        textContentColor = palette.fg2,
         onDismissRequest = { if (!busy) open = false },
-        title = { Text(tr("Apagar os dados da API?")) },
+        title = { Text(tr("Apagar os dados da API?"), fontSize = 17.sp) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(tr("Isso apaga o registro e os vínculos de compras deste aparelho na API. A compra continua no Google Play e o desbloqueio pode ser restaurado. As configurações e as chaves dos provedores neste aparelho permanecem. Logs técnicos são apagados em até 30 dias."))
-                if (failed) Text(tr("Não foi possível apagar os dados. Verifique a conexão e tente de novo."), Modifier.testTag("delete-my-data-error"))
+                DeletionText(tr("Isso apaga o registro e os vínculos de compras deste aparelho na API. A compra continua no Google Play e o desbloqueio pode ser restaurado. As configurações e as chaves dos provedores neste aparelho permanecem. Logs técnicos são apagados em até 30 dias."))
+                if (failed) DeletionText(tr("Não foi possível apagar os dados. Verifique a conexão e tente de novo."), Modifier.testTag("delete-my-data-error"))
             }
         },
         confirmButton = {
@@ -67,12 +77,25 @@ internal fun DeleteMyDataSection(onDelete: suspend () -> Unit, initiallyOpen: Bo
                         }
                     }
                 }
-            }) { Text(if (busy) tr("Apagando…") else tr("Apagar dados")) }
+            }) { Text(if (busy) tr("Apagando…") else tr("Apagar dados"), color = if (busy) palette.muted else palette.fg, fontSize = 11.5.sp) }
         },
         dismissButton = {
             TextButton(enabled = !busy, onClick = { open = false }, modifier = Modifier.testTag("delete-my-data-cancel")) {
-                Text(tr("Cancelar"))
+                Text(tr("Cancelar"), color = if (busy) palette.muted else palette.fg2, fontSize = 11.5.sp)
             }
         },
+    )
+}
+
+
+@Composable
+private fun DeletionText(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text, modifier,
+        color = LocalKeyFlowPalette.current.fg2,
+        fontFamily = SpaceGrotesk,
+        fontWeight = FontWeight.Light,
+        fontSize = 11.sp,
+        lineHeight = 17.sp,
     )
 }
