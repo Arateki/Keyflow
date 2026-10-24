@@ -28,12 +28,23 @@ if grep -aE 'keyflowStagingAccess|keyflow-api-staging\.arateki\.com|KEYFLOW_SIMU
     echo "release contém caminho de staging, compra simulada ou chat do agente" >&2
     exit 1
 fi
-for symbol in 'androidx/work/impl/WorkDatabase_Impl' 'com/keyflow/transcription/local/ITranscriptionEngine$Stub' 'com/caverock/androidsvg/SVG' 'com/keyflow/data/monetization/BillingManager'; do
+for symbol in 'androidx/work/impl/WorkDatabase_Impl' 'com/keyflow/transcription/local/ITranscriptionEngine$Stub' 'com/caverock/androidsvg/SVG'; do
     if ! grep -aFq "$symbol" "$dex_dump"; then
         echo "classe protegida por R8 ausente do release: $symbol" >&2
         exit 1
     fi
 done
+mapping="app/build/outputs/mapping/release/mapping.txt"
+billing_class="$(awk '$1 == "com.keyflow.data.monetization.BillingManager" && $2 == "->" { sub(/:$/, "", $3); print $3; exit }' "$mapping")"
+if [[ -z "$billing_class" ]]; then
+    echo "BillingManager ausente do mapping R8 da release" >&2
+    exit 1
+fi
+billing_descriptor="L${billing_class//./\\/};"
+if ! grep -aFq "$billing_descriptor" "$dex_dump"; then
+    echo "BillingManager mapeada para $billing_class não encontrada no DEX" >&2
+    exit 1
+fi
 rm -f "$dex_dump"
 
 "$adb_bin" -s "$serial" install -r "$apk"
