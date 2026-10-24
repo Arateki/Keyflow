@@ -152,6 +152,7 @@ class HttpDownloadGatewayTest {
         val id = gateway.enqueue(url(), destination(), "Teste", allowMetered = false)
 
         waitFor("falhar") { gateway.query(listOf(id)).getValue(id).status == RowStatus.FAILED }
+        waitFor("notificar falha ao modelo") { finished.contains("modelo") }
         assertThat(server.requestCount).isEqualTo(1)
         assertThat(finished).containsExactly("modelo")
     }
