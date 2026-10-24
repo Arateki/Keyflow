@@ -347,25 +347,6 @@ dependencies {
     // `SVG.setInternalEntitiesEnabled`. Só `skins/SvgRender.kt` importa `com.caverock` — trocar o renderizador não vaza.
     implementation("com.caverock:androidsvg-aar:1.4")
 
-    // Visão (vision-capture, VC-T2): OCR, identificação de idioma e tradução no aparelho, com o ML Kit.
-    // Versões conferidas em 2026-10-24 na documentação do ML Kit e no maven-metadata.xml de dl.google.com/dl/android/maven2
-    // (são as mais recentes de cada artefato). minSdk 23 nos três; o app tem 24.
-    //  - `text-recognition` (v2, alfabeto latino: PT/EN/ES): o modelo vai DENTRO do app ("linked statically", disponível já na
-    //    1ª chamada, segundo a doc) — não o `play-services-mlkit-text-recognition`, que depende do Google Play Services para
-    //    obter o modelo (sideload, aparelho sem GMS, 1ª vez sem rede).
-    //  - `language-id`: idem, embutido (origem do texto extraído; a tradução parte dela).
-    //  - `translate`: só existe embutido; o código nativo vem no APK e os pacotes de idioma (~30 MB por idioma) são baixados
-    //    sob demanda e geridos pelo `RemoteModelManager` (aba Visão, VC-T11).
-    // Medido no APK de debug (2026-10-24; antes → depois, 3 ABIs): 161,9 → 243,1 MB (+81,2 MB). Só no arm64-v8a, sem compressão
-    // (os .so ficam sem compressão no APK): OCR 11,1 MB de .so + 1,3 MB de modelos, tradução 16,4 MB, language-id 1,0 MB + 0,3 MB
-    // = ~30 MB a mais instalado (~13 MB de download, estimado por zlib); armeabi-v7a ~21 MB. A doc do ML Kit diz "~4 MB por
-    // alfabeto por arquitetura" para o OCR: o medido é ~12 MB no arm64. Permissões do manifest mesclado: nenhuma nova; componentes
-    // novos: `MlKitComponentDiscoveryService` e `MlKitInitProvider`. Os SDKs do ML Kit mandam métricas de uso ao Google (a doc
-    // diz que nunca o conteúdo): ver o STATE.md, "vision-capture VC-T2".
-    implementation("com.google.mlkit:text-recognition:16.0.1")
-    implementation("com.google.mlkit:language-id:17.0.6")
-    implementation("com.google.mlkit:translate:17.0.3")
-
     // Instala o perfil de base (o caminho de abertura compilado de antemão) também fora da Play: APK lateral, adb. 1.4.1:
     // estável de 2024-10-02. O perfil vem do :baselineprofile.
     implementation("androidx.profileinstaller:profileinstaller:1.4.1")
