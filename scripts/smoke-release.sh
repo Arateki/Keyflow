@@ -71,7 +71,7 @@ import xml.etree.ElementTree as ET
 root = ET.parse(sys.argv[1]).getroot()
 needles = [value.casefold() for value in sys.argv[2:]]
 for node in root.iter("node"):
-    label = " ".join((node.attrib.get("text", ""), node.attrib.get("content-desc", ""))).casefold()
+    label = " ".join((node.attrib.get("text", ""), node.attrib.get("content-desc", ""))).strip().casefold()
     if any(label == needle for needle in needles):
         bounds = node.attrib.get("bounds", "")
         if bounds:
