@@ -5,11 +5,8 @@ import android.content.Context
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.printToString
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
@@ -119,21 +116,18 @@ class SetupActivityTest {
      * `compose.waitUntil` NÃO resolve: com o relógio congelado ele só consulta a condição, sem produzir
      * o quadro que falta — estourava os 15s (medido em 2026-09-09, com a árvore contendo só o nó raiz).
      * Esperar por idle também não serve: a orbe do cabeçalho anima sem parar. Quem destrava é avançar o
-     * relógio à mão até a tela existir.
+     * relógio à mão até a tela existir, com prazo em tempo real (`pumpUntil`, FrozenClockPump.kt): um laço de
+     * "150 quadros" acabava antes de a emissão do DataStore chegar no emulador ocupado.
      */
     private fun awaitToggle() {
-        var pumps = 0
         var tabOpened = false
-        while (compose.onAllNodesWithTag(TOGGLE_OVERLAY_MODE_TAG).fetchSemanticsNodes().isEmpty()) {
-            if (pumps++ >= 150) {
-                throw AssertionError("toggle não apareceu; árvore:\n" + compose.onRoot().printToString())
-            }
+        compose.pumpUntil("o interruptor do Modo Sobrepor ($TOGGLE_OVERLAY_MODE_TAG)") {
             // O interruptor mora no topo da aba Sobrepor desde que a aba Modo saiu (2026-09-28).
-            if (!tabOpened && compose.onAllNodesWithTag(tabTag(ConfigTab.OVERLAY)).fetchSemanticsNodes().isNotEmpty()) {
+            if (!tabOpened && compose.hasNodeWithTag(tabTag(ConfigTab.OVERLAY))) {
                 compose.onNodeWithTag(tabTag(ConfigTab.OVERLAY)).performClick()
                 tabOpened = true
             }
-            compose.mainClock.advanceTimeBy(100)
+            compose.hasNodeWithTag(TOGGLE_OVERLAY_MODE_TAG)
         }
     }
 
