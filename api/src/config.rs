@@ -91,7 +91,8 @@ impl fmt::Debug for Config {
             })
             .collect::<Vec<_>>();
         f.debug_struct("Config")
-            .field("database_url", &self.database_url)
+            // A URL pode conter senha no userinfo ou na query; omite o valor inteiro do Debug.
+            .field("database_url", &"<redacted>")
             .field("bind_addr", &self.bind_addr)
             .field(
                 "google_service_account_json_path",
@@ -531,6 +532,25 @@ mod tests {
         let mut all = REQUIRED.to_vec();
         all.extend_from_slice(extra);
         vars(&all)
+    }
+
+    #[test]
+    fn debug_oculta_credenciais_do_banco_sem_alterar_a_url_da_conexao() {
+        for database_url in [
+            "postgres://usuario-falso:senha-falsa@db.invalid/keyflow",
+            "postgresql://usuario-falso:senha%40falsa@db.invalid/keyflow",
+            "postgresql://db.invalid/keyflow?user=usuario-falso&password=senha-falsa",
+        ] {
+            let config =
+                Config::from_map(&with_required(&[("DATABASE_URL", database_url)])).unwrap();
+            for debug in [format!("{config:?}"), format!("{config:#?}")] {
+                assert!(!debug.contains("usuario-falso"));
+                assert!(!debug.contains("senha"));
+                assert!(!debug.contains(database_url));
+                assert!(debug.contains("database_url: \"<redacted>\""));
+            }
+            assert_eq!(config.database_url, database_url);
+        }
     }
 
     #[test]
