@@ -215,7 +215,7 @@ tasks seguintes e, no caminho remoto, da KeyFlow API existir em staging — ver
 
 ## Aba Privacidade — decisão V1 (2026-10-24)
 
-**Implementado**: aba `PRIVACIDADE` no grupo `OUTROS`, junto da Docs, com ícone nativo de cadeado.
+**Verificado**: aba `PRIVACIDADE` no grupo `OUTROS`, junto da Docs, com ícone nativo de cadeado.
 Ordem: política/termos (abertura segura), opções UMP somente quando REQUIRED e sem `adsOff`,
 aviso versionado do ditado com ação de revisão, exclusão dos dados e contato `contato@arateki.com`
 (pedidos em até 15 dias). A Docs mantém a explicação e um atalho para a aba, sem controles duplicados.
@@ -223,3 +223,7 @@ Rever usa a própria divulgação destacada; recusar invalida o aceite salvo e m
 continuação sem ditado do fluxo de atualização. Os gates de gravação voltam a exigir aceite atual.
 Rastreabilidade: `PrivacyPanelTest`, `ConfigScreenTest`, `DocsPanelTest`, `AccountDeletionTest`,
 `DisclosureUpgradeTest` e goldens claro/escuro de `config-privacidade*`.
+
+Validação local: debug/release, lint e 1.530 JVM verdes; 57 cenários instrumentados aprovados
+(52 em sete classes e cinco na PrivacyPanelTest reexecutada). Noventa capturas de configuração
+passam no diff oficial, incluindo os seis PNGs da aba nova; referências alheias preservadas.

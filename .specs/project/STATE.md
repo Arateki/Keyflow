@@ -2637,3 +2637,14 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
   consultam essa versão, então só `disclosureDeclined=true` permitiria continuar gravando.
 - Testes de links e exclusão foram transferidos para PrivacyPanel sem perder cenários; a navegação
   Docs→Privacidade, UMP condicional e revogação persistente são exercitadas separadamente.
+
+- Validação da aba: debug/release + lint + 1.530 JVM; 52 instrumentados nas outras sete classes e
+  PrivacyPanelTest 5/5 após corrigir `assertTextContains(..., substring = true)` (57 cenários).
+  O texto exibido estava correto; a asserção anterior comparava o trecho como texto inteiro.
+- Goldens: 94 capturas, 90 PNGs de configuração verdes no diff oficial; seis novos substituem os
+  seis destinos antigos da Docs, 72 atualizados e 146 originais bit-idênticos. Fora da barra, só
+  28 pixels no indicador da Docs por tema mudam devido à transferência dos controles.
+- Controle extra de disclosure revelou rótulo de link antigo nos dois goldens (mudança já feita
+  em 16a7ccd). Fonte idêntico à base 001740f; diferença medida só na linha do link e preservada
+  fora do escopo. A captura de onboarding foi bit-idêntica. Comparações durante captura devem
+  aguardar o marcador de PNG concluído, pois o arquivo existe antes de terminar de ser gravado.
