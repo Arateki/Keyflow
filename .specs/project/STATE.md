@@ -2685,3 +2685,59 @@ O que está no código (commit `629db54`, 2026-10-03, de outra frente) e o que a
   conferidos) e o "Testar OCR" de mentira; os campos `vision*` de Settings que sobrarem sem uso saem junto (o
   `SettingsRepository` ignora chave desconhecida, então não há migração). Decisão do Yan: se o seletor por API deve existir
   já no MVP (contraria a spec; a nota da spec diz que foi decisão dele em 2026-07-01 ficar 100% local).
+
+## 2026-10-24 — vision-capture VC-T2: ML Kit no build (decisões do Yan em aberto)
+
+Versões (as mais recentes no Google Maven em 2026-10-24 e as da doc do ML Kit): `com.google.mlkit:text-recognition:16.0.1`
+(embutido, alfabeto latino), `language-id:17.0.6` (embutido), `translate:17.0.3`. Gate: `assembleDebug`, `assembleRelease`
+(R8, IDs sintéticos do AdMob como no CI), 1.538 unitários, `:app:lintDebug` — verdes, 17 min com a máquina cheia.
+
+**Tamanho (medido; a doc errou).** A doc diz "~4 MB por alfabeto por arquitetura" para o OCR; no APK são ~12,5 MB no arm64
+(`libmlkit_google_ocr_pipeline.so` 11,1 MB + modelos 1,3 MB; no pacote `text-recognition` o código nativo vem do
+`text-recognition-bundled-common`). `.so` ficam sem compressão no APK, então o tamanho instalado é o dos arquivos:
+
+| | arm64-v8a | armeabi-v7a |
+| --- | --- | --- |
+| tradução (`libtranslate_jni.so`) | 16,4 MB | 11,6 MB |
+| OCR (`libmlkit_google_ocr_pipeline.so` + modelos) | 12,5 MB | 8,4 MB |
+| language-id (`.so` + `tflite_langid`) | 1,3 MB | 0,9 MB |
+| **soma** | **~30,2 MB** (~13 MB comprimido, zlib-6) | **~21 MB** |
+
+Debug (3 ABIs, x86_64 incluso): 161,9 → 243,1 MB (+81,2). Release universal: ~83,7 → 132,7 MB (+49,0, +59%). Instalação num
+arm64 (APK dividido): ~61,4 → 91,5 MB (**+30,0 MB, +49%**). Libs arm64 do ML Kit com alinhamento de 16 KB (ok para a Play).
+Nada disso é opcional dentro do ML Kit: a tradução só existe embutida (o `translate` não tem variante via Play Services).
+
+**Permissões e manifest.** O manifest mesclado **não ganhou permissão alguma** (`INTERNET` e `ACCESS_NETWORK_STATE` já
+existiam; as do AdMob também). Ganhou dois componentes: `MlKitComponentDiscoveryService` e `MlKitInitProvider` (este
+inicializa no `Application`, também no caminho de abertura a frio do teclado, que o projeto mede em milissegundos: medir
+`scripts/ime-placement.py`/`OpeningBenchmarks` antes e depois, na T6, não foi medido aqui com a máquina saturada).
+
+**Decisão do Yan 1 — o ML Kit manda métricas ao Google.** A doc de divulgação do ML Kit
+(`developers.google.com/ml-kit/android-data-disclosure`) lista, para os recursos embutidos: dados do aparelho (fabricante,
+modelo, versão do SO), pacote e versão do app, identificador **por instalação** (não pretende identificar a pessoa ou o
+aparelho), métricas de desempenho, tamanho de entrada/saída, configuração da API, código de erro — e, na identificação de
+idioma, os idiomas identificados; na tradução, os idiomas de origem/destino e Firebase Installations/Remote Config. Tudo por
+HTTPS, sem repasse a terceiros. Os termos (`developers.google.com/ml-kit/terms`) dizem que o ML Kit **não envia a
+imagem, o texto nem o resultado** ao Google, e que **o app deve informar os usuários** do processamento das métricas. Não
+achei opt-out oficial (só um truque não suportado de remover o backend do DataTransport, que silenciaria outros SDKs).
+Consequências: (1) "nenhum byte sai do aparelho" vale para o **conteúdo**; as métricas saem — a copy da aba Visão, a Política e
+o formulário de Segurança dos dados (Diagnóstico / identificadores do app) precisam dizer isso; o AdMob já impõe
+identificadores no APK, então a categoria provavelmente já está declarada, mas a política deve citar o ML Kit; (2) OCR-03/TRD-04
+("zero requests de rede no fluxo") não é testável como escrito se o envio de métricas ocorrer durante o fluxo: o teste de rede
+deve medir o **conteúdo** (nada com a imagem/texto), ou aceitar o envio assíncrono em lote. Opções: aceitar e divulgar;
+tentar bloquear (não suportado); ou trocar o motor (Tesseract/PaddleOCR + modelo próprio de tradução: sem telemetria, pior
+qualidade e mais trabalho).
+
+**Decisão do Yan 2 — +30 MB de instalação (+49%) no arm64.** Alternativas: (a) aceitar; (b) OCR e language-id **sem** pacote
+embutido (`play-services-mlkit-text-recognition`/`-language-id`): tira ~13 MB do arm64, mas o modelo vem pelo Google Play
+Services (precisa de GMS e de rede na 1ª vez — o que a V3 do `context.md` rejeitou por sideload e offline) — a tradução (16,4
+MB) continua embutida de qualquer jeito; (c) módulo de entrega sob demanda da Play (Play Feature Delivery) para a Visão: o
+APK base não cresce, mas é arquitetura nova (módulo dinâmico, sem sideload) e não cabe numa task; (d) adiar a Visão da loja
+até a v1.1 (o bloco já está fora da V1).
+
+Fora do ML Kit, o pacote de tradução (~30 MB por idioma) segue baixado sob demanda, como a spec manda.
+
+Armadilhas de ferramenta registradas nesta rodada: `instrumentar` só aceita **nome qualificado** (`com.keyflow.data.
+SettingsRepositoryTest`; sem o pacote, `am instrument` dá `Failed loading specified test class` em todas e o script perde 20
+min na fila da trava para dizer isso); com a trava do Gradle disputada por ~8 agentes, compile os APKs primeiro e rode
+`adb install` + `am instrument` sob o `flock` do emulador (o `flock` de `adb` não aninha com o do `instrumentar`).

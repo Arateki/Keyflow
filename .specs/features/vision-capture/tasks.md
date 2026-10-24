@@ -1,8 +1,8 @@
 # Vision Capture — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (V1–V6)
-**Status**: Em implementação na branch `equipe/visao` (2026-10-24) — VC-T1 feita; as demais seguem a ordem
-abaixo. Decidido: 3 direções + tap na orbe = cancelar/retorno à gravação; propostas ⚠️ restantes: toast sem
+**Status**: Em implementação na branch `equipe/visao` (2026-10-24) — VC-T1 e VC-T2 feitas (a VC-T2 deixa duas
+decisões do Yan, no `STATE.md`); as demais seguem a ordem abaixo. Decidido: 3 direções + tap na orbe = cancelar/retorno à gravação; propostas ⚠️ restantes: toast sem
 input p/ imagem; V3/V6. A aba Visão que já existe no app (origem Créditos/Local/OpenAI/…) contradiz a
 spec: ver `STATE.md` › "vision-capture — aba Visão existente × spec" (a VC-T11 a reconcilia).
 
@@ -49,7 +49,7 @@ Ordem prática sequencial: T1 → T2 → T3 → T4 → T5 → T6 → T7 → T8 �
   (`GestureScriptCatalogTest`), `SettingsRepositoryTest` (persistência do atalho e do destino; valor desconhecido →
   padrão) e `ShortcutActionSheetTest` (instrumentado, Compose).
 
-### VC-T2 — Dependências ML Kit no build
+### VC-T2 — Dependências ML Kit no build ✅ CONCLUÍDA (2026-10-24) — **com decisões do Yan em aberto (APK e métricas do ML Kit)**
 - **What**: `com.google.mlkit:text-recognition` (bundled), `com.google.mlkit:translate`,
   `com.google.mlkit:language-id`; delta de tamanho do APK registrado; termos/atribuições
   levantados p/ a Docs (STO-V03 parcial).
@@ -57,6 +57,12 @@ Ordem prática sequencial: T1 → T2 → T3 → T4 → T5 → T6 → T7 → T8 �
 - **Depends on**: —. **Requirement**: STO-V03 (parcial).
 - **Done when**: `assembleDebug` verde; delta anotado.
 - **Tests**: none (deps de build). **Gate**: `build`.
+- **Feito**: `text-recognition:16.0.1` (embutido), `language-id:17.0.6` e `translate:17.0.3` — as últimas de cada artefato no
+  Google Maven e as que a doc do ML Kit cita (2026-10-24). `assembleDebug`, `assembleRelease` (R8, sem regra nova), 1.538
+  unitários e `:app:lintDebug` verdes. **Delta medido** (detalhes e decisões no `STATE.md`): debug (3 ABIs) 161,9 → 243,1 MB
+  (+81,2); release universal (arm64 + v7) ~83,7 → 132,7 MB (+49,0); instalação num arm64 ~61,4 → 91,5 MB (**+30,0 MB, +49%**;
+  ~13 MB de download estimados). O "~4 MB por alfabeto" da doc do ML Kit não confere: o OCR sozinho pesa ~12,5 MB no arm64.
+  Manifest mesclado: **nenhuma permissão nova**; componentes novos `MlKitComponentDiscoveryService` e `MlKitInitProvider`.
 
 ## Fase B — Fluxo efêmero
 

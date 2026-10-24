@@ -164,7 +164,7 @@ e ter alguns segundos para manipular o texto copiado.
 | CFG-V03 | P2-E | VC-T12 | In Tasks |
 | STO-V01 | P2-F | VC-T3, VC-T13 | In Tasks |
 | STO-V02 | P2-F | VC-T8, VC-T13 | In Tasks |
-| STO-V03 | P2-F | VC-T2, VC-T13 | In Tasks |
+| STO-V03 | P2-F | VC-T2, VC-T13 | Implementing (tamanho registrado na VC-T2; termos/atribuições na VC-T13) |
 
 **Coverage:** 30 total, 29 mapeados em tasks, 1 N/A deliberado (ACT-07 — ausência de guarda é a decisão).
 **Status values:** Pending → In Design → In Tasks → Implementing → Verified.
