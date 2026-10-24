@@ -1,8 +1,10 @@
 # Vision Capture — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (V1–V6)
-**Status**: Draft (aguardando aprovação do Yan; decidido: 3 direções + tap na orbe = cancelar/
-retorno à gravação; propostas ⚠️ restantes: toast sem input p/ imagem; V3/V6)
+**Status**: Em implementação na branch `equipe/visao` (2026-10-24) — VC-T1 feita; as demais seguem a ordem
+abaixo. Decidido: 3 direções + tap na orbe = cancelar/retorno à gravação; propostas ⚠️ restantes: toast sem
+input p/ imagem; V3/V6. A aba Visão que já existe no app (origem Créditos/Local/OpenAI/…) contradiz a
+spec: ver `STATE.md` › "vision-capture — aba Visão existente × spec" (a VC-T11 a reconcilia).
 
 > Gate no sandbox: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon <task>`
 > Instrumentado escopado: `ANDROID_SERIAL=emulator-5554`. Antes de instalar no device do Yan:
@@ -30,7 +32,7 @@ Ordem prática sequencial: T1 → T2 → T3 → T4 → T5 → T6 → T7 → T8 �
 
 ## Fase A — Fundação
 
-### VC-T1 — `OrbShortcutAction.VISION_MODE` + Settings
+### VC-T1 — `OrbShortcutAction.VISION_MODE` + Settings ✅ CONCLUÍDA (2026-10-24)
 - **What**: novo caso no enum (+ rótulo/descrição na `ShortcutActionSheet`/aba Sobrepor);
   `Settings` += `visionTranslateTarget: String = "pt"`. (A exceção de gating — atalho válido
   durante gravação — é da VC-T4, não daqui.)
@@ -40,6 +42,12 @@ Ordem prática sequencial: T1 → T2 → T3 → T4 → T5 → T6 → T7 → T8 �
 - **Done when**: unit de `resolveShortcut`/labels com o caso novo; instrumented do repo persiste
   o campo novo; suíte existente verde.
 - **Tests**: unit + instrumented (camada `data`). **Gate**: `full`.
+- **Feito**: `VISION_MODE` no enum (`core/Models.kt`), rótulo/descrição/linha na `ShortcutActionSheet` (PT/EN/ES), ramo
+  inerte no `OverlayService.handleOrbShortcut` até a VC-T4. **`Settings.visionTranslateTarget` já existia** (o painel Visão
+  anterior o criou, com persistência no `SettingsRepository`): nada a acrescentar, só teste — `SettingsShortcutTest`
+  (VISION_MODE nas 3 rajadas, overflow, padrão `"pt"`), `ShortcutActionTextTest`, roteiro do tour
+  (`GestureScriptCatalogTest`), `SettingsRepositoryTest` (persistência do atalho e do destino; valor desconhecido →
+  padrão) e `ShortcutActionSheetTest` (instrumentado, Compose).
 
 ### VC-T2 — Dependências ML Kit no build
 - **What**: `com.google.mlkit:text-recognition` (bundled), `com.google.mlkit:translate`,

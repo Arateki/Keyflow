@@ -2648,3 +2648,40 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
   em 16a7ccd). Fonte idêntico à base 001740f; diferença medida só na linha do link e preservada
   fora do escopo. A captura de onboarding foi bit-idêntica. Comparações durante captura devem
   aguardar o marcador de PNG concluído, pois o arquivo existe antes de terminar de ser gravado.
+
+## 2026-10-24 — vision-capture VC-T1: atalho VISION_MODE (branch `equipe/visao`)
+
+- `Settings.visionTranslateTarget` (e o resto do bloco `vision*`) **já existia**: o painel Visão anterior o criou, com
+  persistência no `SettingsRepository`. A VC-T1 acrescentou só o `OrbShortcutAction.VISION_MODE` (enum, rótulo, descrição e
+  linha na folha de escolha, PT/EN/ES) e testes; o ramo dele no `OverlayService.handleOrbShortcut` é inerte até a VC-T4 —
+  mapear o atalho hoje não faz nada, de propósito (a exceção de gating durante a gravação também é da VC-T4).
+- O `OrbShortcutAction` é lido por `valueOf` com padrão: um valor desconhecido no disco (um build antigo lendo
+  `VISION_MODE`, ou lixo) cai no padrão do atalho em vez de derrubar a leitura — `SettingsRepositoryTest` confere.
+- O tour de gestos já monta um roteiro por atalho mapeado a partir do rótulo/descrição: a Visão entrou nele sem código
+  novo (só o teste `visionShortcutGetsItsOwnScriptWithTheCaptureLabel`).
+- Armadilha de ferramenta: **`flock /srv/dev/run/keyflow-emulator.lock instrumentar …` trava para sempre**. O
+  `instrumentar` já segura a trava do emulador por dentro (`/tmp/keyflow-emulator.lock` é link para o mesmo arquivo) e o
+  `flock` é por descritor aberto, não por processo: o de fora bloqueia o de dentro (medido: `timeout 3 flock` interno → 124).
+  Rode `instrumentar` direto; use o `flock` de fora só para `adb`/scripts que não o seguram.
+
+## 2026-10-24 — vision-capture: aba Visão existente × spec (para a VC-T11)
+
+O que está no código (commit `629db54`, 2026-10-03, de outra frente) e o que a spec manda:
+
+| | Código atual | Spec (`vision-capture`) |
+| --- | --- | --- |
+| Origem | seletor Créditos · Local · OpenAI · Google · Anthropic · Custom, com chaves e endpoint próprio | **nenhuma**: 100% no aparelho (ML Kit); origens por API são a **fase 2** (fora do MVP) |
+| OCR | catálogo de "modelos de visão" baixáveis (`ModelCatalog.VISION`: OCR rápido/equilibrado, SmolVLM, Florence) | ML Kit Text Recognition **embutido** no APK; nada a baixar; só os pacotes de **tradução** são baixáveis |
+| Ligação | `ConfigScreen` mostra `ComingSoonPanel` para `VISAO`: o `VisaoPanel` **não está no app**, só nos testes | aba real, 6ª aba, gating do overlay |
+| "Testar OCR" | botão com `delay(60)` e texto fixo ("Texto reconhecido com sucesso…") | sem equivalente; o teste real é o `OcrEngine` da VC-T6 |
+| Rede | OpenAI/Google/Anthropic/Custom mandam a captura para fora | "nenhum byte sai do aparelho" (OCR-03, TRD-04) |
+
+- **Dado fabricado**: as entradas de `ModelCatalog.VISION` têm SHA-256 sequenciais (`4a8f9c1e…`, `b1c2d3e4…`), commits de
+  repositório inventados nas URLs do Hugging Face e um "ML Kit OCR Latin" como `.bin` baixável, que não existe (o ML Kit não
+  se distribui assim). Contraria a regra de ouro 8; nenhum download delas funcionaria. Nenhum teste as protege além da forma.
+- **Recomendação (VC-T11)**: reduzir o painel ao que a spec pede — destino da tradução (já persistido), gerenciador de
+  pacotes do ML Kit, nota de privacidade e o cartão "Origem multimodal — em breve" — e levar o seletor de origem por API e o
+  catálogo de VLM para a fase 2, onde a spec os coloca. Remover `ModelCatalog.VISION` falso (ou trocá-lo por dados reais
+  conferidos) e o "Testar OCR" de mentira; os campos `vision*` de Settings que sobrarem sem uso saem junto (o
+  `SettingsRepository` ignora chave desconhecida, então não há migração). Decisão do Yan: se o seletor por API deve existir
+  já no MVP (contraria a spec; a nota da spec diz que foi decisão dele em 2026-07-01 ficar 100% local).

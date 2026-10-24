@@ -104,6 +104,15 @@ class GestureScriptCatalogTest {
     }
 
     @Test
+    fun visionShortcutGetsItsOwnScriptWithTheCaptureLabel() {
+        val scripts = buildOrbScripts(settings(tap2 = OrbShortcutAction.VISION_MODE))
+
+        val script = scripts.first { it.id == "orb-shortcut-2tap" }
+        assertTrue("título sem o rótulo da Visão: ${script.title}", script.title.contains("Capturar a tela (Visão)"))
+        assertEquals(2, script.steps.first { it.action == FingerAction.MULTI_TAP }.tapCount)
+    }
+
+    @Test
     fun shortcutStepUsesTheConfiguredTapCount() {
         val scripts = buildOrbScripts(settings(tap3 = OrbShortcutAction.SWITCH_IME))
 

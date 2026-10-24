@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.keyflow.core.OrbShortcutAction
 import com.keyflow.core.OverlaySide
 import com.keyflow.core.FalaSource
 import com.keyflow.core.ReasoningSource
@@ -164,6 +165,39 @@ class SettingsRepositoryTest {
 
         assertEquals(saved, repository.settingsFlow().first())
         assertEquals("Bearer sk-openai", repository.flow().first().authHeaderValue)
+    }
+
+    /** VC-T1 (MODE-01): o atalho da Visão e o idioma de destino da tradução sobrevivem ao disco; valor desconhecido volta ao padrão. */
+    @Test
+    fun visionShortcutAndTranslateTargetPersist() = runTest {
+        val repository = newRepository()
+
+        repository.saveSettings(
+            Settings(
+                shortcut1Tap = OrbShortcutAction.VISION_MODE,
+                shortcut2Tap = OrbShortcutAction.NONE,
+                shortcut3Tap = OrbShortcutAction.VISION_MODE,
+                visionTranslateTarget = "en",
+            ),
+        )
+
+        val restored = repository.settingsFlow().first()
+        assertEquals(OrbShortcutAction.VISION_MODE, restored.shortcut1Tap)
+        assertEquals(OrbShortcutAction.NONE, restored.shortcut2Tap)
+        assertEquals(OrbShortcutAction.VISION_MODE, restored.shortcut3Tap)
+        assertEquals("en", restored.visionTranslateTarget)
+    }
+
+    @Test
+    fun anUnknownShortcutActionFallsBackToTheDefault() = runTest {
+        val repository = newRepository()
+        repository.saveSettings(Settings())
+        val corrupted = repository.rawPreferencesOnce().toMutablePreferences().also {
+            it[stringPreferencesKey("shortcut_2_tap")] = "ACAO_QUE_NAO_EXISTE"
+        }
+        repository.replaceRawPreferences(corrupted)
+
+        assertEquals(Settings().shortcut2Tap, repository.settingsFlow().first().shortcut2Tap)
     }
 
     /** RSC-01/02: o Raciocínio guarda a própria origem e o próprio modelo, sem tocar nos da Transcrição. */

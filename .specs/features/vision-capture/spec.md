@@ -135,7 +135,7 @@ e ter alguns segundos para manipular o texto copiado.
 
 | Requirement | Story | Task | Status |
 | ----------- | ----- | ---- | ------ |
-| MODE-01 | P1-A | VC-T1 | In Tasks |
+| MODE-01 | P1-A | VC-T1 | Implemented |
 | MODE-02 | P1-A | VC-T4 | In Tasks |
 | MODE-03 | P1-A | VC-T4 | In Tasks |
 | MODE-04 | P1-A | VC-T4, VC-T10 | In Tasks |
