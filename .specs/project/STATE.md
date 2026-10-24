@@ -2582,3 +2582,15 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
 
 ## Monetização — compra simulada de staging (2026-10-23)
 - A chave HMAC de teste também fica no APK debug para assinar recibos; use exclusivamente em staging, com dados descartáveis, e rotacione ao terminar. A re-registração testa restore remoto, mas não substitui Play Integrity real nem reinstalação física.
+
+
+## 2026-10-24 — Exclusão de registro e retenção técnica (v1-apagar-dados)
+
+- Excluir credencial torna o próximo DELETE um 401: o efeito permanece idempotente sem guardar tokens
+  apagados. Retry seguro registra a mesma identidade e exclui novamente; não aceitar qualquer 401 como
+  sucesso, pois poderia sobrar uma conta remota. Os quatro FKs com CASCADE cobrem todos os vínculos.
+- Limpar só o token permite refresh/redeem recriar a conta imediatamente. Persistir intenção de exclusão,
+  serializar com refresh e preservar a identidade de vínculo Play; compra nova explícita retoma o registro.
+- Rotação diária de 30 arquivos pode guardar registros por mais de 30 dias. Históricos de 29 dias,
+  arquivos horários, ifempty e timer horário dão margem; conferir cópias do provisionador com teste e
+  exercitar logrotate em arquivos temporários. Implantação e serviços de borda continuam com o Yan.

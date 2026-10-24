@@ -162,10 +162,22 @@ sem saldo → 402; provedor derrubado → erro sem débito.
 
 ---
 
+## Exclusão e retenção — decisão do Yan (2026-10-23)
+
+**DEL-01**: o usuário pode apagar o registro do próprio aparelho e todos os vínculos da API,
+com autenticação do registro, confirmação explícita no app e repetição segura. Não permite apagar
+outro aparelho. Falha de rede mantém os dados locais e permite tentar de novo.
+**DEL-02**: a compra continua no Google Play, restaurável após novo registro com a identidade
+anônima preservada; o cache remoto é limpo, sem apagar a compra local reconhecida pelo Play.
+**LOG-01**: logs técnicos de acesso/IP/erros na origem têm limpeza automática em até 30 dias.
+**DEL-03**: solicitação também por contato@arateki.com, atendida em até 15 dias.
+
 ## Requirement Traceability
 
 | ID | Área | Status |
 | --- | ---- | ------ |
+| DEL-01..03 | Exclusão e restauração | Implementado — v1-apagar-dados; testes API/JVM/Compose e goldens; atendimento por e-mail com Yan |
+| LOG-01 | Retenção técnica | Configuração e testes locais — implantação Lightsail e conferência Cloudflare pendentes [YAN] |
 | ID-01..04 | Identidade/segurança | Pending |
 | PAY-01..06 | Compras/entitlements | Pending |
 | TRX-01..05 | Proxy de transcrição | Pending |

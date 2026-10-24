@@ -47,3 +47,19 @@ pub async fn get_account(
         skins_unlocked: account.skins_unlocked,
     }))
 }
+
+/// Só aceita a conta resolvida pelo Bearer; nenhum ID de destino vem do pedido.
+/// O token deixa de autenticar após a exclusão (repetição sequencial retorna 401).
+pub async fn delete_account(
+    State(state): State<AppState>,
+    account: Account,
+) -> Result<axum::http::StatusCode, Response> {
+    state
+        .rate_limiters
+        .check_account(account.id)
+        .map_err(IntoResponse::into_response)?;
+    crate::db::accounts::delete(&state.pool, account.id)
+        .await
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response())?;
+    Ok(axum::http::StatusCode::NO_CONTENT)
+}

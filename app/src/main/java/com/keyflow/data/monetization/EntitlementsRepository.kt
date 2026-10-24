@@ -130,6 +130,14 @@ class EntitlementsRepository(
         _entitlements.value
     }
 
+    /** Serializa com refresh: uma leitura iniciada antes da exclusão não pode repor o cache antigo. */
+    suspend fun deleteRemoteData(deleteAccount: suspend () -> Unit) = refreshLock.withLock {
+        deleteAccount()
+        base = Entitlements()
+        cache.write(base)
+        apply(base, localUnlock.first())
+    }
+
     override fun close() {
         scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
     }

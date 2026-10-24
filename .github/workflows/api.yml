@@ -53,3 +53,9 @@ jobs:
 
       - name: cargo test
         run: cargo test
+
+      - name: Retenção dos logs técnicos
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends logrotate nginx-light openssl
+          sudo python3 deploy/test-retencao.py

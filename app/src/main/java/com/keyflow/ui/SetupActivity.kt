@@ -212,6 +212,7 @@ class SetupActivity : ComponentActivity() {
     private var shortcutGrids by mutableStateOf<List<ShortcutGrid>>(emptyList())
     // Monetização só é criada/conectada depois que o onboarding terminou; o onboarding não toca Play,
     // Integrity, API nem a camada de ads (MZ-T9/ADS-01).
+    private var monetizationApi: KeyFlowApiClient? = null
     private var billingManager: BillingManager? = null
     private var entitlementsRepository: EntitlementsRepository? = null
     private var remoteConfigRepository: RemoteConfigRepository? = null
@@ -370,6 +371,10 @@ class SetupActivity : ComponentActivity() {
                         skinsUnlocked = entitlements.skinsUnlocked,
                         onUnlockPurchase = ::buyUnlock,
                         unlockPurchaseState = unlockPurchaseState,
+                        onDeleteMyData = {
+                            val api = checkNotNull(monetizationApi)
+                            checkNotNull(entitlementsRepository).deleteRemoteData { api.deleteAccount() }
+                        },
                         adsController = adsController,
                         adsOff = entitlements.adsOff,
                         entitlementsLoaded = entitlementsLoaded,
@@ -717,6 +722,7 @@ class SetupActivity : ComponentActivity() {
         if (monetizationStarted) return
         monetizationStarted = true
         val api = KeyFlowApiClient(this, http = auth.http)
+        monetizationApi = api
         val billing = BillingManager(this, redeemPurchase = { purchase -> api.redeem(purchase) })
         val repository = EntitlementsRepository(this, api, billing)
         val remote = RemoteConfigRepository(this, http = auth.http)
@@ -785,7 +791,10 @@ class SetupActivity : ComponentActivity() {
         persistInterstitialPolicy()
         unlockPurchaseState = UnlockPurchaseState.PURCHASING
         monetizationJobs += activityScope.launch {
-            val result = runCatching { billing.purchase(this@SetupActivity, MonetizationProducts.UNLOCK_FOREVER) }
+            val result = runCatching {
+                monetizationApi?.resumeRegistrationAfterDeletion()
+                billing.purchase(this@SetupActivity, MonetizationProducts.UNLOCK_FOREVER)
+            }
                 .getOrElse {
                     unlockPurchaseState = UnlockPurchaseState.ERROR
                     return@launch

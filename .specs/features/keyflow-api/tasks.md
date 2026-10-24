@@ -13,6 +13,20 @@
 > Credenciais reais (service account, chaves de provedor) são do Yan — tasks que dependem delas
 > têm a parte "com credencial" marcada como **manual/Yan**.
 
+
+## v1-apagar-dados — Implementado; validação em andamento (2026-10-24)
+
+- Exclusão autenticada do próprio registro e quatro tabelas dependentes; repetição sem efeito adicional,
+  sem tombstone de credencial. O Bearer revogado responde 401; o cliente recupera a mesma identidade e
+  exclui novamente quando precisa repetir uma resposta perdida.
+- Docs: confirmação, cancelamento, espera e erro com nova tentativa; limpa credencial/cache remoto
+  após 204 e preserva compra local do Play. Marcador persistente impede registro automático após excluir.
+- Restauração da mesma compra após novo registro coberta com os fixtures Google existentes; compra e
+  identidade anônima usada no vínculo Play permanecem. E-mail contato@arateki.com, até 15 dias.
+- Logs no Lightsail: arquivos versionados + provisionamento + timer horário; limite até 30 dias com
+  margem de rotação. Sem tabela de IP/eventos. Ativação na origem e conferência Cloudflare: **[YAN]**.
+- Testes e evidências: ver relatório `.equipe/relatorios/v1-apagar-dados.md` e LEIA-ME de deploy.
+
 ## Execution Plan
 
 ```

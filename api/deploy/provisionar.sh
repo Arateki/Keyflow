@@ -185,6 +185,7 @@ EOF
         openssl \
         procps \
         nginx \
+        logrotate \
         postgresql \
         postgresql-client \
         unattended-upgrades \
@@ -512,6 +513,104 @@ EOF
 #    Produção e staging dividem a máquina. O arquivo é reescrito por inteiro
 #    a cada execução (rodar de novo não duplica server).
 # ==============================================================================
+# Logs técnicos: política de até 30 dias, com margem para o arquivo ativo e o timer.
+configurar_retencao_logs() {
+    mkdir -p /etc/systemd/journald.conf.d /etc/logrotate.d /etc/systemd/system /var/lib/logrotate /var/log/journal
+    install -d -m 0755 -o root -g adm /var/log/keyflow
+    for arquivo_log in /var/log/keyflow/nginx-access.log /var/log/keyflow/nginx-error.log; do
+        touch "$arquivo_log"
+        chown www-data:adm "$arquivo_log"
+        chmod 0640 "$arquivo_log"
+    done
+    cat > /etc/systemd/journald.conf.d/30-keyflow-retencao.conf <<'KEYFLOW_RETENCAO_0'
+# Limite aprovado: até 30 dias. A margem cobre o arquivo ativo e a limpeza horária.
+[Journal]
+Storage=persistent
+MaxRetentionSec=29day
+MaxFileSec=1h
+SystemMaxUse=64M
+RuntimeMaxUse=16M
+ForwardToSyslog=no
+ForwardToKMsg=no
+ForwardToConsole=no
+ForwardToWall=no
+KEYFLOW_RETENCAO_0
+    chmod 0644 /etc/systemd/journald.conf.d/30-keyflow-retencao.conf
+    cat > /etc/logrotate.d/nginx <<'KEYFLOW_RETENCAO_1'
+# 29 dias de arquivos horários + arquivo ativo + intervalo da limpeza < 30 dias.
+/var/log/keyflow/nginx-access.log /var/log/keyflow/nginx-error.log /var/log/nginx/*.log {
+    hourly
+    rotate 696
+    maxage 29
+    missingok
+    ifempty
+    compress
+    delaycompress
+    create 0640 www-data adm
+    sharedscripts
+    postrotate
+        if [ -s /run/nginx.pid ]; then
+            kill -USR1 "$(cat /run/nginx.pid)"
+        fi
+    endscript
+}
+KEYFLOW_RETENCAO_1
+    chmod 0644 /etc/logrotate.d/nginx
+    cat > /etc/logrotate.d/postgresql-common <<'KEYFLOW_RETENCAO_2'
+# Substitui a regra semanal do Debian; usa o mesmo estado do logrotate do sistema.
+/var/log/postgresql/*.log {
+    hourly
+    rotate 696
+    maxage 29
+    missingok
+    ifempty
+    compress
+    delaycompress
+    copytruncate
+    su root root
+}
+KEYFLOW_RETENCAO_2
+    chmod 0644 /etc/logrotate.d/postgresql-common
+    cat > /etc/systemd/system/keyflow-retencao-logs.service <<'KEYFLOW_RETENCAO_3'
+[Unit]
+Description=Limpeza dos logs técnicos da KeyFlow API (limite de 30 dias)
+After=systemd-journald.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/journalctl --rotate
+ExecStart=/usr/bin/journalctl --vacuum-time=29d
+ExecStart=/usr/sbin/logrotate --wait-for-state-lock --state /var/lib/logrotate/status /etc/logrotate.d/nginx /etc/logrotate.d/postgresql-common
+TimeoutStartSec=5min
+Nice=10
+NoNewPrivileges=true
+ProtectHome=true
+ProtectSystem=strict
+PrivateTmp=true
+ReadWritePaths=/var/log /var/lib/logrotate -/run/log
+KEYFLOW_RETENCAO_3
+    chmod 0644 /etc/systemd/system/keyflow-retencao-logs.service
+    cat > /etc/systemd/system/keyflow-retencao-logs.timer <<'KEYFLOW_RETENCAO_4'
+[Unit]
+Description=Limpeza horária dos logs da KeyFlow API
+
+[Timer]
+OnCalendar=hourly
+AccuracySec=1min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+KEYFLOW_RETENCAO_4
+    chmod 0644 /etc/systemd/system/keyflow-retencao-logs.timer
+    if tem_systemd; then
+        systemctl daemon-reload
+        systemctl restart systemd-journald.service
+        systemctl enable --now keyflow-retencao-logs.timer
+        systemctl start keyflow-retencao-logs.service
+    fi
+}
+
 configurar_nginx() {
     log "Configurando Nginx: produção ${KEYFLOW_DOMAIN} → :8080; staging ${KEYFLOW_STAGING_DOMAIN} → :8081..."
     local site_avail="/etc/nginx/sites-available/keyflow-api.conf"
@@ -526,7 +625,12 @@ configurar_nginx() {
 # Host desconhecido cai no default_server (444) e não herda o vhost da produção.
 # listen ... http2 é a sintaxe do nginx 1.22 (Debian 12). No 1.25+ só gera aviso.
 
+# Sem query string, corpo, Authorization ou tokens nos logs de acesso.
+log_format keyflow_api '\$remote_addr [\$time_iso8601] "\$request_method \$uri \$server_protocol" \$status \$body_bytes_sent \$request_time';
+
 server {
+    access_log /var/log/keyflow/nginx-access.log keyflow_api;
+    error_log /var/log/keyflow/nginx-error.log warn;
     listen 80 default_server;
     listen [::]:80 default_server;
     listen 443 ssl http2 default_server;
@@ -541,6 +645,8 @@ server {
 }
 
 server {
+    access_log /var/log/keyflow/nginx-access.log keyflow_api;
+    error_log /var/log/keyflow/nginx-error.log warn;
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
     server_name ${KEYFLOW_DOMAIN};
@@ -593,6 +699,8 @@ server {
 }
 
 server {
+    access_log /var/log/keyflow/nginx-access.log keyflow_api;
+    error_log /var/log/keyflow/nginx-error.log warn;
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
     server_name ${KEYFLOW_STAGING_DOMAIN};
@@ -1414,6 +1522,7 @@ instalar_pacotes_e_atualizacoes
 configurar_usuario_e_diretorios
 configurar_postgres
 provisionar_bancos_e_envs
+configurar_retencao_logs
 configurar_nginx
 instalar_scripts_operacionais
 configurar_systemd

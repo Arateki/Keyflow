@@ -1,6 +1,9 @@
 package com.keyflow.data.monetization
 
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -63,6 +66,62 @@ class EntitlementsRepositoryTest {
 
         assertThat(repository.refresh()).isEqualTo(Entitlements(19, adsOff = true, skinsUnlocked = false))
         repository.close()
+    }
+
+    @Test
+    fun `exclusão limpa somente a fonte remota e preserva a compra do Play`() = runTest {
+        val cache = MemoryCache()
+        val repository = EntitlementsRepository(
+            context = null, account = { KeyFlowAccount(10, true, true) },
+            localUnlock = MutableStateFlow(true), cache = cache,
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
+        )
+        repository.refresh()
+        var deleted = false
+        repository.deleteRemoteData { deleted = true }
+        assertThat(deleted).isTrue()
+        assertThat(cache.value).isEqualTo(Entitlements())
+        assertThat(repository.entitlements.value).isEqualTo(Entitlements(0, true, true))
+        repository.close()
+    }
+
+    @Test
+    fun `falha da API não apaga o cache antes da confirmação`() = runTest {
+        val cache = MemoryCache()
+        val repository = EntitlementsRepository(
+            context = null, account = { KeyFlowAccount(10, true, true) },
+            localUnlock = MutableStateFlow(false), cache = cache,
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
+        )
+        repository.refresh()
+        assertThat(runCatching { repository.deleteRemoteData { error("rede indisponível") } }.isFailure).isTrue()
+        assertThat(cache.value).isEqualTo(Entitlements(10, true, true))
+        assertThat(repository.entitlements.value).isEqualTo(Entitlements(10, true, true))
+        repository.close()
+    }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun `exclusão aguarda refresh anterior e não deixa cache antigo voltar`() = runTest {
+        val started = CompletableDeferred<Unit>()
+        val response = CompletableDeferred<KeyFlowAccount>()
+        val cache = MemoryCache()
+        val repository = EntitlementsRepository(
+            context = null, account = { started.complete(Unit); response.await() },
+            localUnlock = MutableStateFlow(false), cache = cache, scope = backgroundScope,
+        )
+        val refresh = launch { repository.refresh() }
+        started.await()
+        var deleted = false
+        val deletion = launch { repository.deleteRemoteData { deleted = true } }
+        runCurrent()
+        assertThat(deleted).isFalse()
+        response.complete(KeyFlowAccount(99, true, true))
+        refresh.join()
+        deletion.join()
+        assertThat(deleted).isTrue()
+        assertThat(cache.value).isEqualTo(Entitlements())
+        assertThat(repository.entitlements.value).isEqualTo(Entitlements())
     }
 
     private fun repository(

@@ -129,3 +129,122 @@ async fn invalid_bearer_returns_401() {
 
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
+
+async fn delete_account(state: AppState, token: Option<&str>) -> StatusCode {
+    let mut request = Request::builder().method("DELETE").uri("/v1/account");
+    if let Some(token) = token {
+        request = request.header(header::AUTHORIZATION, format!("Bearer {token}"));
+    }
+    app(state)
+        .oneshot(request.body(Body::empty()).unwrap())
+        .await
+        .unwrap()
+        .status()
+}
+
+#[tokio::test]
+async fn deletion_purges_all_links_only_for_the_authenticated_device() {
+    let state = test_state().await;
+    let (token, hash) = generate_token();
+    let own = accounts::create(
+        &state.pool,
+        &format!("delete-{}", uuid::Uuid::new_v4()),
+        &hash,
+    )
+    .await
+    .unwrap();
+    let (other_token, other_hash) = generate_token();
+    let other = accounts::create(
+        &state.pool,
+        &format!("other-{}", uuid::Uuid::new_v4()),
+        &other_hash,
+    )
+    .await
+    .unwrap();
+    for id in [own.id, other.id] {
+        sqlx::query("insert into ledger(account_id,delta_seconds,reason) values($1,1,'purchase')")
+            .bind(id)
+            .execute(&state.pool)
+            .await
+            .unwrap();
+        sqlx::query("insert into purchases(token_hash,account_id,product_id,status,credited_seconds) values($1,$2,'unlock_forever','credited',0)")
+            .bind(id.as_bytes().as_slice()).bind(id).execute(&state.pool).await.unwrap();
+        sqlx::query("insert into rewards(transaction_id,account_id,seconds) values($1,$2,1)")
+            .bind(id.to_string())
+            .bind(id)
+            .execute(&state.pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "insert into transcribe_requests(account_id,request_id,seconds) values($1,'req',1)",
+        )
+        .bind(id)
+        .execute(&state.pool)
+        .await
+        .unwrap();
+    }
+    assert_eq!(
+        delete_account(state.clone(), None).await,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        delete_account(state.clone(), Some("not-a-real-token")).await,
+        StatusCode::UNAUTHORIZED
+    );
+    assert!(accounts::exists(&state.pool, own.id).await.unwrap());
+    assert_eq!(
+        delete_account(state.clone(), Some(&token)).await,
+        StatusCode::NO_CONTENT
+    );
+    for table in [
+        "accounts",
+        "ledger",
+        "purchases",
+        "rewards",
+        "transcribe_requests",
+    ] {
+        let column = if table == "accounts" {
+            "id"
+        } else {
+            "account_id"
+        };
+        // Nomes fixos do schema, sem interpolação de dados do pedido.
+        let sql = format!("select count(*) from {table} where {column}=$1");
+        let removed: i64 = sqlx::query_scalar(sql.as_str())
+            .bind(own.id)
+            .fetch_one(&state.pool)
+            .await
+            .unwrap();
+        let preserved: i64 = sqlx::query_scalar(sql.as_str())
+            .bind(other.id)
+            .fetch_one(&state.pool)
+            .await
+            .unwrap();
+        assert_eq!(removed, 0, "{table}");
+        assert_eq!(preserved, 1, "{table}");
+    }
+    // O efeito é idempotente; o Bearer apagado não autentica mais e nenhum tombstone é guardado.
+    assert_eq!(
+        delete_account(state.clone(), Some(&token)).await,
+        StatusCode::UNAUTHORIZED
+    );
+    accounts::delete(&state.pool, own.id).await.unwrap();
+    assert_eq!(
+        get_account(state.clone(), Some(&other_token)).await.0,
+        StatusCode::OK
+    );
+    // Um ID arbitrário na URL não dá acesso ao aparelho vizinho.
+    let response = app(state.clone())
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!("/v1/account/{}", other.id))
+                .header(header::AUTHORIZATION, format!("Bearer {token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    assert!(accounts::exists(&state.pool, other.id).await.unwrap());
+}
