@@ -395,17 +395,42 @@ def generate_site(repo_root: Path, output_dir: Path) -> dict:
 
 # ── Validação ──────────────────────────────────────────────────────────────────────────────────────
 
-_ATRIBUTOS_URL = re.compile(r'\s(?:href|src)="([^"]*)"')
-_SRCSET = re.compile(r'\ssrcset="([^"]*)"')
-_IDS = re.compile(r'\sid="([^"]+)"')
+_ATRIBUTOS_URL = re.compile(r'\s(?:href|src)=(?:"([^"]*)"|\'([^\']*)\')')
+_SRCSET = re.compile(r'\ssrcset=(?:"([^"]*)"|\'([^\']*)\')')
+_IDS = re.compile(r'\sid=(?:"([^"]+)"|\'([^\']+)\')')
 _CSS_URL = re.compile(r'url\(\s*["\']?([^"\')]+)["\']?\s*\)')
 _SCRIPTS_EM_LINHA = re.compile(r"<script>(.*?)</script>", re.S)
-_CSP = re.compile(r'<meta http-equiv="Content-Security-Policy" content="([^"]+)"')
+_CSP = re.compile(r'<meta\s+http-equiv=["\']Content-Security-Policy["\']\s+content=(?:"([^"]*)"|\'([^\']*)\')', re.I)
+_META_TAG = re.compile(r'<meta\s+[^>]*>', re.I)
+_META_CONTENT = re.compile(r'content=(?:"([^"]*)"|\'([^\']*)\')', re.I)
+_STYLE_TAG = re.compile(r'<style\b', re.I)
+_STYLE_ATTR = re.compile(r'\sstyle=(?:"([^"]*)"|\'([^\']*)\')', re.I)
+_SITEMAP_LOC = re.compile(r'<loc>([^<]+)</loc>')
+_XHTML_LINK_HREF = re.compile(r'<xhtml:link\s+[^>]*href=(?:"([^"]*)"|\'([^\']*)\')', re.I)
 
 
 def _alvo_local(base: Path, url: str, saida: Path):
-    """Arquivo que uma URL local aponta, ou None se ela é externa (http, mailto...) ou só uma âncora."""
+    """Arquivo que uma URL aponta se for local ou do próprio site (keyflow.arateki.com),
+    ou None se for externa a keyflow.arateki.com (mailto, arateki.com...) ou data:.
+    Para URLs de keyflow.arateki.com, aplica a regra da Cloudflare:
+      '/' vira 'index.html';
+      '/x' vira 'x.html';
+      caminho com extensão vira o próprio arquivo."""
     partes = urlsplit(url)
+    if partes.scheme in ("http", "https"):
+        if partes.netloc != "keyflow.arateki.com":
+            return None
+        caminho = unquote(partes.path)
+        if not caminho or caminho == "/":
+            return saida / "index.html"
+        caminho = caminho.lstrip("/")
+        if caminho.endswith("/"):
+            return saida / caminho / "index.html"
+        alvo = saida / caminho
+        if alvo.suffix:
+            return alvo
+        return saida / f"{caminho}.html"
+
     if partes.scheme or partes.netloc or url.startswith("data:"):
         return None
     caminho = unquote(partes.path)
@@ -466,10 +491,26 @@ def verify_generated_site(generated: dict, output_dir: Path):
     for pagina in sorted(output_dir.rglob("*.html")):
         nome = pagina.relative_to(output_dir).as_posix()
         content = pagina.read_text(encoding="utf-8")
-        ids = set(_IDS.findall(content))
-        urls = _ATRIBUTOS_URL.findall(content)
-        for srcset in _SRCSET.findall(content):
+
+        # Reprova estilo em linha (style="..." ou <style>) bloqueados pela CSP style-src 'self'
+        if _STYLE_TAG.search(content):
+            erros.append(f"{nome}: tag <style> em linha bloqueada pela Content-Security-Policy")
+        if _STYLE_ATTR.search(content):
+            erros.append(f"{nome}: atributo style em linha bloqueado pela Content-Security-Policy")
+
+        ids = {g[0] or g[1] for g in _IDS.findall(content)}
+        urls = [g[0] or g[1] for g in _ATRIBUTOS_URL.findall(content)]
+        for srcset_t in _SRCSET.findall(content):
+            srcset = srcset_t[0] or srcset_t[1]
             urls += [item.strip().split(" ")[0] for item in srcset.split(",") if item.strip()]
+
+        for meta in _META_TAG.findall(content):
+            m = _META_CONTENT.search(meta)
+            if m:
+                val = (m.group(1) or m.group(2)).strip()
+                if val.startswith(("https://keyflow.arateki.com", "http://keyflow.arateki.com")):
+                    urls.append(val)
+
         for url in urls:
             if url.startswith("#"):
                 if len(url) > 1 and url[1:] not in ids:
@@ -477,14 +518,27 @@ def verify_generated_site(generated: dict, output_dir: Path):
                 continue
             alvo = _alvo_local(pagina, url, output_dir)
             if alvo is not None and not alvo.is_file():
-                erros.append(f"{nome}: link interno quebrado → {url}")
-        csp = _CSP.search(content)
-        if csp:
+                erros.append(f"{nome}: link interno ou URL do site quebrado → {url}")
+        csp_match = _CSP.search(content)
+        if csp_match:
+            csp_content = csp_match.group(1) or csp_match.group(2)
             for script in _SCRIPTS_EM_LINHA.findall(content):
-                if _sha256_csp(script) not in csp.group(1):
+                if _sha256_csp(script) not in csp_content:
                     erros.append(f"{nome}: script em linha sem o hash {_sha256_csp(script)} no Content-Security-Policy")
-            if "http" in csp.group(1):
+            if "http" in csp_content:
                 erros.append(f"{nome}: o Content-Security-Policy libera origem externa")
+
+    # 2b. Sitemap: URLs absolutas do site em <loc> e <xhtml:link href> existem
+    for sitemap in sorted(output_dir.rglob("*.xml")):
+        s_nome = sitemap.relative_to(output_dir).as_posix()
+        s_content = sitemap.read_text(encoding="utf-8")
+        s_urls = _SITEMAP_LOC.findall(s_content)
+        s_urls += [g[0] or g[1] for g in _XHTML_LINK_HREF.findall(s_content)]
+        for s_url in s_urls:
+            s_url = s_url.strip()
+            alvo = _alvo_local(sitemap, s_url, output_dir)
+            if alvo is not None and not alvo.is_file():
+                erros.append(f"{s_nome}: URL no sitemap aponta para arquivo inexistente → {s_url}")
 
     # 3. CSS: todo url() local existe.
     for folha in sorted(output_dir.rglob("*.css")):
@@ -497,15 +551,15 @@ def verify_generated_site(generated: dict, output_dir: Path):
     # 4. Nada de recurso externo na página inicial (privacidade: sem CDN, fontes remotas ou rastreadores).
     for nome in ("index.html", "en.html"):
         content = (output_dir / nome).read_text(encoding="utf-8")
-        for url in re.findall(r'\s(?:src|href)="(https?://[^"]+)"', content):
+        for url in re.findall(r'''\s(?:src|href)=["'](https?://[^"']+)["']''', content):
             permitido = url.startswith(("https://keyflow.arateki.com", "https://arateki.com"))
             if not permitido:
                 erros.append(f"{nome}: recurso ou link externo não previsto → {url}")
-        if re.search(r'<script[^>]+src="https?://', content):
+        if re.search(r'''<script[^>]+src=["']https?://''', content):
             erros.append(f"{nome}: script carregado de fora")
         for tag in re.findall(r"<link\s[^>]*>", content):
-            rel = re.search(r'rel="([^"]+)"', tag)
-            externo = re.search(r'href="https?://', tag)
+            rel = re.search(r'''rel=["']([^"']+)["']''', tag)
+            externo = re.search(r'''href=["']https?://''', tag)
             if externo and rel and rel.group(1) not in ("canonical", "alternate"):
                 erros.append(f"{nome}: <link rel=\"{rel.group(1)}\"> carregado de fora")
 
