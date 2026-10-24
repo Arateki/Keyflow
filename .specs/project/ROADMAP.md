@@ -172,7 +172,8 @@ roteiros manuais da T13 e da T18 no A32 (`manual-validation.md`).
 ## Milestone 11 — Visão (captura de tela pela orbe)
 
 Fluxo efêmero: atalho da orbe pausa a ditação, seleciona área da tela, e por gesto copia
-imagem/texto (OCR ML Kit) ou tradução on-device; estado sempre restaurado.
+imagem/texto (OCR com modelo aberto baixado pela aba Visão) ou tradução no aparelho (Qwen3 0.6B) ou na nuvem por
+opção; estado sempre restaurado.
 
 Spec: `.specs/features/vision-capture/` (completa). Tasks: VC-T1..T14.
 
