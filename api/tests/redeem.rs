@@ -322,3 +322,84 @@ async fn unknown_product_is_rejected() {
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(body["error"], "unknown_product");
 }
+
+#[tokio::test]
+async fn deleting_then_registering_again_can_restore_the_same_play_unlock() {
+    let google = MockServer::start().await;
+    mock_integrity_ok(&google).await;
+    let state = state_with_google(google.uri()).await;
+    let (token, old_id, device_key) = create_account(&state).await;
+    let purchase_token = format!("restore-{}", uuid::Uuid::new_v4());
+    mock_purchase(
+        &google,
+        "unlock_forever",
+        &purchase_token,
+        0,
+        &device_key_account_id(&device_key),
+    )
+    .await;
+    mock_acknowledge_expect_n(&google, "unlock_forever", &purchase_token, 2).await;
+    assert_eq!(
+        redeem_request(state.clone(), &token, "unlock_forever", &purchase_token)
+            .await
+            .0,
+        StatusCode::OK
+    );
+    let response = app(state.clone())
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri("/v1/account")
+                .header(header::AUTHORIZATION, format!("Bearer {token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+    assert!(!accounts::exists(&state.pool, old_id).await.unwrap());
+    let response = app(state.clone())
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/register")
+                .extension(axum::extract::ConnectInfo(
+                    "127.0.0.1:0".parse::<std::net::SocketAddr>().unwrap(),
+                ))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(
+                    json!({"deviceKey": device_key, "integrityToken": "fake-integrity-token"})
+                        .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body: Value = serde_json::from_slice(
+        &axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    let new_token = body["accessToken"].as_str().unwrap();
+    assert_ne!(new_token, token);
+    let fresh = accounts::find_by_device_key(&state.pool, &device_key)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_ne!(fresh.id, old_id);
+    assert!(!fresh.skins_unlocked);
+    assert_eq!(
+        redeem_request(state.clone(), new_token, "unlock_forever", &purchase_token)
+            .await
+            .0,
+        StatusCode::OK
+    );
+    let restored = accounts::find_by_device_key(&state.pool, &device_key)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(restored.ads_off && restored.skins_unlocked);
+    assert_eq!(restored.balance_seconds, 0);
+}

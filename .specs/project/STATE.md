@@ -2605,3 +2605,24 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
 - URLs públicas centralizadas em `LegalUrls` com base única `https://keyflow.arateki.com` e resolução por idioma (`/privacidade` e `/termos` em PT; `/privacy` e `/terms` em EN/ES).
 - Aba Docs (`DocsPanel`) expõe itens clicáveis na seção Privacidade que disparam `Intent(Intent.ACTION_VIEW)` sem WebView.
 - Divulgação destacada (`ProminentDisclosureScreen`) atualizada para "Ler a política de privacidade completa" com abertura direta da URL correspondente. Injeção de handler de abertura hermético permite testes instrumentados sem tráfego de rede.
+
+## 2026-10-24 — Exclusão de registro e retenção técnica (v1-apagar-dados)
+
+- Excluir credencial torna o próximo DELETE um 401: o efeito permanece idempotente sem guardar tokens
+  apagados. Retry seguro registra a mesma identidade e exclui novamente; não aceitar qualquer 401 como
+  sucesso, pois poderia sobrar uma conta remota. Os quatro FKs com CASCADE cobrem todos os vínculos.
+- Limpar só o token permite refresh/redeem recriar a conta imediatamente. Persistir intenção de exclusão,
+  serializar com refresh e preservar a identidade de vínculo Play; compra nova explícita retoma o registro.
+- Rotação diária de 30 arquivos pode guardar registros por mais de 30 dias. Históricos de 29 dias,
+  arquivos horários, ifempty e timer horário dão margem; conferir cópias do provisionador com teste e
+  exercitar logrotate em arquivos temporários. Implantação e serviços de borda continuam com o Yan.
+
+- Revisão dos goldens encontrou os textos novos herdando corpo e cores padrão do Material: no claro
+  destoavam da Docs e no escuro perdiam contraste. Reusar DocBlocks, paleta e tamanhos explícitos também
+  no diálogo; instrumentados de comportamento sozinhos não cobrem esse defeito visual.
+- SQLx 0.9 exige SqlSafeStr: a matriz de contagens do teste de exclusão usa consultas literais,
+  sem formatar o SQL em tempo de execução. Teste autenticado comprova cascata nas quatro tabelas,
+  isolamento do aparelho vizinho e restauração do mesmo purchaseToken após novo registro.
+- Gate final: Android debug/release + lint + 1.519 JVM; Rust fmt/clippy + 145 testes; 4 testes de
+  retenção e 13 instrumentados verdes. Quatro goldens novos revistos nos dois temas e bit-idênticos
+  na recaptura; os antigos ficam preservados. Lightsail/Cloudflare e Play real continuam com o Yan.

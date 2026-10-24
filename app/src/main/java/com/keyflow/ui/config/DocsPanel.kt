@@ -460,6 +460,8 @@ fun DocsPanel(
     adsController: AdsController? = null,
     adsOff: Boolean = false,
     entitlementsLoaded: Boolean = true,
+    onDeleteMyData: suspend () -> Unit = { error("Ação de exclusão indisponível") },
+    initialDeleteMyDataOpen: Boolean = false,
 ) {
     val palette = LocalKeyFlowPalette.current
     val context = LocalContext.current
@@ -518,6 +520,9 @@ fun DocsPanel(
                 ) {
                     if (section.legalActions) {
                         LegalActions(onOpenUrl = launchUrl)
+                    }
+                    if (section.id == "privacidade") {
+                        DeleteMyDataSection(onDeleteMyData, initiallyOpen = initialDeleteMyDataOpen)
                     }
                     if (section.feedbackActions) {
                         FeedbackActions(

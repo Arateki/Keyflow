@@ -33,6 +33,25 @@ Configuração e pendências **[YAN] da V1-8**: [admob-release.md](admob-release
 Verificado: debug/release, 1.514 unitários (3 novos), lint, falha do release sem IDs e smoke no
 emulador com abertura da Activity e XML fresco; scanner aprovado no APK release.
 
+## v1-apagar-dados — ✅ Concluído; implantação com Yan pendente (2026-10-24)
+
+- Exclusão autenticada do próprio registro e quatro tabelas dependentes; repetição sem efeito adicional,
+  sem tombstone de credencial. O Bearer revogado responde 401; o cliente recupera a mesma identidade e
+  exclui novamente quando precisa repetir uma resposta perdida.
+- Docs: confirmação, cancelamento, espera e erro com nova tentativa; limpa credencial/cache remoto
+  após 204 e preserva compra local do Play. Marcador persistente impede registro automático após excluir.
+- Restauração da mesma compra após novo registro coberta com os fixtures Google existentes; compra e
+  identidade anônima usada no vínculo Play permanecem. E-mail contato@arateki.com, até 15 dias.
+- Logs no Lightsail: arquivos versionados + provisionamento + timer horário; limite até 30 dias com
+  margem de rotação. Sem tabela de IP/eventos. Ativação na origem e conferência Cloudflare: **[YAN]**.
+- Gates locais verdes: assembleDebug + assembleRelease + testDebugUnitTest (1.519, zero falhas) +
+  lintDebug + assembleDebugAndroidTest; cargo fmt --check + clippy --all-targets -D warnings +
+  cargo test (145, zero falhas; PostgreSQL 18 isolado); retenção (4, incluindo nginx -t real e logrotate).
+- Instrumentados no emulator-5554: AccountDeletionTest, DocsPanelTest, EntitlementsRepositoryInstrumentedTest
+  e BillingManagerInstrumentedTest: 13/13. Quatro goldens novos claro/escuro revisados, recaptura bit-idêntica;
+  oito capturas comparadas, goldens antigos preservados (diferença de 20–22 pixels só no indicador de rolagem).
+- Evidências: `.equipe/relatorios/v1-apagar-dados.md`; operação e ativação pendente no LEIA-ME de deploy.
+
 ## Execution Plan
 
 ```

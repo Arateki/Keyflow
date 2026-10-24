@@ -191,7 +191,10 @@ pub fn app(state: AppState) -> Router {
     Router::new()
         .route("/health", get(health))
         .route("/v1/register", post(routes::register::register))
-        .route("/v1/account", get(routes::account::get_account))
+        .route(
+            "/v1/account",
+            get(routes::account::get_account).delete(routes::account::delete_account),
+        )
         .route("/v1/purchases/redeem", post(routes::redeem::redeem))
         .route(
             "/v1/test/purchases/simulate",

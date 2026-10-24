@@ -49,14 +49,15 @@ dinâmica de anúncios precisa de parâmetros ajustáveis sem release (config re
 **Como** usuário, **quero** que meus créditos sejam meus sem precisar criar conta.
 
 1. **ID-01**: WHEN o app se registra (primeiro uso) THEN a API SHALL criar uma conta anônima
-   keyed por um **ID gerado no device** (UUID), sem coletar nenhum dado pessoal, e devolver um
+   keyed por um **ID gerado no device** (UUID), sem pedir nome ou e-mail, e devolver um
    **token de acesso** para as chamadas seguintes.
 2. **ID-02**: WHEN uma operação sensível é chamada (registro, resgate de compra, SSV) THEN a API
    SHALL exigir e validar um **verdict do Play Integrity** (app legítimo, device íntegro) e
    rejeitar com erro específico quando inválido — é o que impede apps adulterados de usar o proxy.
 3. **ID-03**: a API SHALL armazenar apenas: ID anônimo, ledger, purchaseTokens processados e
-   metadados operacionais — **nenhum** dado pessoal, áudio persistido ou texto transcrito
-   (privacidade da Docs do app continua verdadeira: "o áudio só é enviado à origem configurada").
+   metadados operacionais — sem nome/e-mail, áudio persistido ou texto transcrito na base.
+   Logs técnicos de acesso/IP/erros seguem o limite de até 30 dias de LOG-01 (decisão do Yan,
+   2026-10-23). O áudio só é enviado à origem configurada.
 4. **ID-04**: WHEN um cliente excede limites (req/min por conta e por IP) THEN a API SHALL
    responder 429 com `Retry-After` — proteção de custo do proxy.
 
@@ -162,10 +163,22 @@ sem saldo → 402; provedor derrubado → erro sem débito.
 
 ---
 
+## Exclusão e retenção — decisão do Yan (2026-10-23)
+
+**DEL-01**: o usuário pode apagar o registro do próprio aparelho e todos os vínculos da API,
+com autenticação do registro, confirmação explícita no app e repetição segura. Não permite apagar
+outro aparelho. Falha de rede mantém os dados locais e permite tentar de novo.
+**DEL-02**: a compra continua no Google Play, restaurável após novo registro com a identidade
+anônima preservada; o cache remoto é limpo, sem apagar a compra local reconhecida pelo Play.
+**LOG-01**: logs técnicos de acesso/IP/erros na origem têm limpeza automática em até 30 dias.
+**DEL-03**: solicitação também por contato@arateki.com, atendida em até 15 dias.
+
 ## Requirement Traceability
 
 | ID | Área | Status |
 | --- | ---- | ------ |
+| DEL-01..03 | Exclusão e restauração | Verificado localmente — v1-apagar-dados, testes API/JVM/Compose e goldens; atendimento por e-mail com Yan |
+| LOG-01 | Retenção técnica | Configuração e testes locais — implantação Lightsail e conferência Cloudflare pendentes [YAN] |
 | ID-01..04 | Identidade/segurança | Pending |
 | PAY-01..06 | Compras/entitlements | Pending |
 | TRX-01..05 | Proxy de transcrição | Pending |
@@ -173,7 +186,7 @@ sem saldo → 402; provedor derrubado → erro sem débito.
 | ADS-01 | Rewarded SSV | Pending |
 | OPS-01..04 | Operacional | Pending |
 
-**Coverage:** 22 total, mapeados em `tasks.md` (API-T1..T14 — código em `api/` no monorepo;
+**Coverage:** 26 total, mapeados em `tasks.md` (API-T1..T14 — código em `api/` no monorepo;
 implementação pendente).
 
 ---
@@ -184,4 +197,4 @@ implementação pendente).
 - [ ] App adulterado (sem Integrity) não consegue registrar nem transcrever.
 - [ ] Transcrição de 10s debita 10s e devolve texto no formato que o `TranscriptionClient` atual parseia.
 - [ ] Manifest de modelos e config remota respondem < 100ms (cacheados) e o app opera com defaults se a API estiver fora.
-- [ ] Nenhum dado pessoal, áudio ou texto persistido no servidor (verificável por inspeção do schema).
+- [ ] Sem nome/e-mail, áudio ou texto transcrito na base; logs técnicos de IP limitados a até 30 dias (LOG-01).

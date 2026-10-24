@@ -3,6 +3,15 @@ package com.keyflow.i18n
 /** Português → espanhol. Chave = o texto exato passado a [tr] (ver `TranslationsTest`). */
 internal val TranslationsEs: Map<String, String> = mapOf(
     "Não há aplicativo disponível para abrir este link." to "No hay ninguna aplicación disponible para abrir este enlace.",
+    "Apaga o registro deste aparelho na API e os dados associados." to "Borra el registro de este dispositivo en la API y los datos asociados.",
+    "Também é possível pedir a exclusão por e-mail: contato@arateki.com. Prazo de até 15 dias." to "También puedes solicitar la eliminación por correo: contato@arateki.com. Plazo de hasta 15 días.",
+    "Apagar meus dados" to "Borrar mis datos",
+    "Dados apagados. A compra continua no Google Play." to "Datos borrados. La compra permanece en Google Play.",
+    "Apagar os dados da API?" to "¿Borrar los datos de la API?",
+    "Isso apaga o registro e os vínculos de compras deste aparelho na API. A compra continua no Google Play e o desbloqueio pode ser restaurado. As configurações e as chaves dos provedores neste aparelho permanecem. Logs técnicos são apagados em até 30 dias." to "Esto borra el registro y los vínculos de compras de este dispositivo en la API. La compra permanece en Google Play y el desbloqueo se puede restaurar. Las configuraciones y las claves de los proveedores en este dispositivo permanecen. Los registros técnicos se eliminan en un máximo de 30 días.",
+    "Não foi possível apagar os dados. Verifique a conexão e tente de novo." to "No se pudieron borrar los datos. Comprueba la conexión e inténtalo de nuevo.",
+    "Apagando…" to "Borrando…",
+    "Apagar dados" to "Borrar datos",
     "Pronto para testar a compra no staging." to "Listo para probar una compra en staging.",
     "Simular compra" to "Simular compra",
     "Reembolsar compra simulada" to "Reembolsar compra simulada",

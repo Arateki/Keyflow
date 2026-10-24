@@ -35,6 +35,9 @@ interface KeyFlowAccessTokenStore {
     fun get(): String?
     fun put(token: String)
     fun clear()
+    fun isDeleted(): Boolean = false
+    fun clearAfterDeletion() { clear() }
+    fun resumeRegistration() {}
 }
 
 internal class SharedPreferencesAccessTokenStore(
@@ -42,13 +45,22 @@ internal class SharedPreferencesAccessTokenStore(
 ) : KeyFlowAccessTokenStore {
     override fun get(): String? = prefs.getString(KEY, null)?.takeIf { it.isNotBlank() }
     override fun put(token: String) {
-        check(prefs.edit().putString(KEY, token).commit()) { "não consegui guardar o token da API" }
+        check(prefs.edit().putString(KEY, token).remove(DELETED).commit()) { "não consegui guardar o token da API" }
     }
     override fun clear() {
         check(prefs.edit().remove(KEY).commit()) { "não consegui apagar o token da API" }
     }
 
+    override fun isDeleted(): Boolean = prefs.getBoolean(DELETED, false)
+    override fun clearAfterDeletion() {
+        check(prefs.edit().remove(KEY).putBoolean(DELETED, true).commit()) { "não consegui limpar o registro local" }
+    }
+    override fun resumeRegistration() {
+        check(prefs.edit().remove(DELETED).commit()) { "não consegui retomar o registro" }
+    }
+
     private companion object {
+        const val DELETED = "monetization.account_deleted"
         const val KEY = "monetization.access_token"
     }
 }
@@ -90,6 +102,7 @@ class KeyFlowApiClient(
         "KeyFlowApiClient precisa de tokenStore em testes sem Context"
     }
     private val registerLock = Mutex()
+    private val operationLock = Mutex()
     private val urlBase = baseUrl.trimEnd('/')
 
     /** Registra ou recupera o token; chamado somente por um fluxo que realmente precisa da API. */
@@ -102,42 +115,81 @@ class KeyFlowApiClient(
 
     /** Conta é leitura barata; um 401 gira o token uma vez e repete a chamada. */
     suspend fun account(): KeyFlowAccount = withContext(Dispatchers.IO) {
-        var token = ensureRegistered()
-        var response = getAccount(token)
-        if (response.code == 401) {
-            response.close()
-            token = registerLock.withLock {
-                accessTokenStore.clear()
-                registerLocked()
+        operationLock.withLock {
+            if (accessTokenStore.isDeleted()) return@withLock KeyFlowAccount(0, false, false)
+            var token = ensureRegistered()
+            var response = getAccount(token)
+            if (response.code == 401) {
+                response.close()
+                token = registerLock.withLock {
+                    accessTokenStore.clear()
+                    registerLocked()
+                }
+                response = getAccount(token)
             }
-            response = getAccount(token)
+            response.use { it.parseAccount() }
         }
-        response.use { it.parseAccount() }
     }
 
     /** Redime a compra no servidor; o servidor valida e faz o acknowledge no Play. */
     suspend fun redeem(purchase: StorePurchase): Boolean = withContext(Dispatchers.IO) {
-        val productId = purchase.products.firstOrNull() ?: return@withContext false
-        var token = ensureRegistered()
-        var response = redeemRequest(token, productId, purchase)
-        if (response.code == 401) {
-            response.close()
-            token = registerLock.withLock {
-                accessTokenStore.clear()
-                registerLocked()
+        operationLock.withLock {
+            if (accessTokenStore.isDeleted()) return@withLock false
+            val productId = purchase.products.firstOrNull() ?: return@withLock false
+            var token = ensureRegistered()
+            var response = redeemRequest(token, productId, purchase)
+            if (response.code == 401) {
+                response.close()
+                token = registerLock.withLock {
+                    accessTokenStore.clear()
+                    registerLocked()
+                }
+                response = redeemRequest(token, productId, purchase)
             }
-            response = redeemRequest(token, productId, purchase)
-        }
-        response.use { result ->
-            val text = result.body?.string().orEmpty()
-            if (!result.isSuccessful) throw apiFailure("resgate", result.code, text)
-            return@withContext when (runCatching { JSONObject(text).optString("status") }.getOrNull()) {
-                "credited", "already_credited" -> true
-                "pending" -> false
-                else -> throw KeyFlowApiException.InvalidResponse("resposta de resgate inválida")
+            response.use { result ->
+                val text = result.body?.string().orEmpty()
+                if (!result.isSuccessful) throw apiFailure("resgate", result.code, text)
+                return@withLock when (runCatching { JSONObject(text).optString("status") }.getOrNull()) {
+                    "credited", "already_credited" -> true
+                    "pending" -> false
+                    else -> throw KeyFlowApiException.InvalidResponse("resposta de resgate inválida")
+                }
             }
         }
     }
+
+    /** Exclusão confirmada pelo usuário: só limpa o registro local após o 204 da API. */
+    suspend fun deleteAccount(): Unit = withContext(Dispatchers.IO) {
+        operationLock.withLock {
+            var token = ensureRegistered()
+            var response = deleteRequest(token)
+            // Resposta perdida após excluir: o Bearer já morreu. Re-registra a mesma identidade e
+            // exclui de novo, sem deixar uma conta criada pelo retry na base.
+            if (response.code == 401) {
+                response.close()
+                token = registerLock.withLock {
+                    accessTokenStore.clear()
+                    registerLocked()
+                }
+                response = deleteRequest(token)
+            }
+            response.use {
+                if (it.code != 204) throw apiFailure("exclusão", it.code, it.body?.string().orEmpty())
+                accessTokenStore.clearAfterDeletion()
+            }
+        }
+    }
+
+
+    /** Uma nova compra iniciada pelo usuário permite registrar a conta novamente. */
+    suspend fun resumeRegistrationAfterDeletion(): Unit = withContext(Dispatchers.IO) {
+        operationLock.withLock { accessTokenStore.resumeRegistration() }
+    }
+
+    private suspend fun deleteRequest(token: String): Response = execute(
+        Request.Builder().url("$urlBase/v1/account")
+            .header("Authorization", "Bearer $token").delete().build(),
+    )
 
     private suspend fun redeemRequest(token: String, productId: String, purchase: StorePurchase): Response {
         val integrity = integrityToken(nonceFor(identity()))

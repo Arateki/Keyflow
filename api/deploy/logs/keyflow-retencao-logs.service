@@ -1,0 +1,16 @@
+[Unit]
+Description=Limpeza dos logs técnicos da KeyFlow API (limite de 30 dias)
+After=systemd-journald.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/journalctl --rotate
+ExecStart=/usr/bin/journalctl --vacuum-time=29d
+ExecStart=/usr/sbin/logrotate --wait-for-state-lock --state /var/lib/logrotate/status /etc/logrotate.d/nginx /etc/logrotate.d/postgresql-common
+TimeoutStartSec=5min
+Nice=10
+NoNewPrivileges=true
+ProtectHome=true
+ProtectSystem=strict
+PrivateTmp=true
+ReadWritePaths=/var/log /var/lib/logrotate -/run/log

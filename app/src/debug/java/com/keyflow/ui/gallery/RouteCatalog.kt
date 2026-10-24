@@ -287,6 +287,10 @@ object RouteCatalog {
         Route("config-teclado-travado") { ConfigTabRoute(ConfigTab.TECLADO) },
         Route("config-overlay-travado") { ConfigTabRoute(ConfigTab.OVERLAY) },
         Route("config-docs") { ConfigTabRoute(ConfigTab.DOCS) },
+        Route("config-docs-apagar-dados", minDelayMs = 1000L) { ConfigTabRoute(ConfigTab.DOCS, docsSection = "privacidade") },
+        Route("config-docs-apagar-dados-confirmar", minDelayMs = 1000L) {
+            ConfigTabRoute(ConfigTab.DOCS, docsSection = "privacidade", deleteMyDataOpen = true)
+        },
         Route("config-docs-privacy-required") { ConfigTabRoute(ConfigTab.DOCS, adsPrivacyRequired = true) },
         // A seção Skins das duas abas (fica abaixo da dobra nas telas acima): a da orbe, na Sobrepor, e a do
         // teclado, na Teclado — escolhas separadas (Yan, 2026-09-29), aqui com o Aero marcado nas duas.
@@ -670,6 +674,8 @@ object RouteCatalog {
         unlockOpen: Boolean = false,
         tabHelpOpen: Boolean = false,
         adsPrivacyRequired: Boolean = false,
+        docsSection: String? = null,
+        deleteMyDataOpen: Boolean = false,
     ) {
         val bannerTab = tab == ConfigTab.DOCS || tab == ConfigTab.OVERLAY || tab == ConfigTab.TECLADO
         val context = LocalContext.current
@@ -707,6 +713,9 @@ object RouteCatalog {
             onSwitchKeyboard = {},
             onSettingsChange = {},
             initialTab = tab,
+            initialDocsSection = docsSection,
+            initialDeleteMyDataOpen = deleteMyDataOpen,
+            onDeleteMyData = {},
             initialUnlockOpen = unlockOpen,
             initialTabHelpOpen = tabHelpOpen,
             adsController = adsController,

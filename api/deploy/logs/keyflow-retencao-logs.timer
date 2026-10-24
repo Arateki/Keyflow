@@ -1,0 +1,10 @@
+[Unit]
+Description=Limpeza horária dos logs da KeyFlow API
+
+[Timer]
+OnCalendar=hourly
+AccuracySec=1min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
