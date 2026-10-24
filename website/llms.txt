@@ -9,7 +9,7 @@
 - **Voice Transcription:**
   - **On-Device (Offline):** Uses local models (such as Whisper and Parakeet via sherpa-onnx) running completely on the phone, even in airplane mode. Audio is never transmitted.
   - **Cloud (Optional):** Users can optionally connect cloud transcription providers (e.g. OpenAI, Groq) using their own API keys.
-- **Supported Languages:** Portuguese (Brazil), English, and Spanish. On-device offline transcription supports Portuguese and English.
+- **Supported Languages:** Portuguese (Brazil), English, and Spanish. On-device offline transcription supports Portuguese, English, and Spanish (and dozens more via Whisper and Parakeet).
 - **AI Integration:** Supports on-device LLMs (e.g. Gemma, Qwen) and cloud AI providers (e.g. OpenAI, Anthropic, Google) with the user's own credentials.
 
 ## Documentation and Canonical Links

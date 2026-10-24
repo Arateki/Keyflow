@@ -92,7 +92,7 @@
           "name": "O KeyFlow funciona sem internet?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Sim. O ditado por voz funciona totalmente offline no próprio aparelho, usando modelos como Whisper e Parakeet, inclusive em modo avião. Se preferir, você também pode usar serviços em nuvem com a sua própria chave de API."
+            "text": "Sim. O ditado por voz offline requer apenas o download inicial do modelo no primeiro uso (com internet). Depois disso, a transcrição funciona totalmente no próprio aparelho, sem nenhuma conexão, inclusive em modo avião. Você também pode conectar serviços em nuvem com sua chave de API caso prefira."
           }
         },
         {
@@ -100,15 +100,15 @@
           "name": "O teclado envia o que eu digito para algum servidor?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Não. Suas teclas e o texto digitado vão direto para o aplicativo em que você está escrevendo. Nenhum texto digitado é gravado, armazenado ou transmitido para servidores do KeyFlow ou de terceiros."
+            "text": "Não para digitação comum. O texto digitado e as teclas pressionadas não saem do aparelho. A única exceção ocorre quando você escolhe acionar recursos de IA na nuvem (como agente, transcrição em nuvem ou raciocínio): nesse caso, o pedido específico é enviado diretamente ao provedor que você configurou, usando sua própria chave de API."
           }
         },
         {
           "@type": "Question",
-          "name": "Quais idiomas são suportados no ditado por voz?",
+          "name": "Quais idiomas são suportados?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "O ditado por voz e o teclado suportam português (Brasil), inglês e espanhol. Os modelos offline transcrevem em português e inglês."
+            "text": "O teclado possui layouts dedicados para português (Brasil), inglês e espanhol, com acentuação e pontuação nativas. O ditado por voz offline também suporta esses três idiomas e dezenas de outros por meio dos modelos Whisper (99 idiomas) e Parakeet (25 idiomas europeus)."
           }
         },
         {
@@ -336,21 +336,21 @@
           <span class="faq-n" aria-hidden="true">01</span>
           <div>
             <h3>O KeyFlow funciona sem internet?</h3>
-            <p>Sim. O ditado por voz funciona totalmente offline no próprio aparelho, usando modelos como Whisper e Parakeet, inclusive em modo avião. Se preferir, você também pode usar serviços em nuvem com a sua própria chave de API.</p>
+            <p>Sim. O ditado por voz offline requer apenas o download inicial do modelo no primeiro uso (com internet). Depois disso, a transcrição funciona totalmente no próprio aparelho, sem nenhuma conexão, inclusive em modo avião. Você também pode conectar serviços em nuvem com sua chave de API caso prefira.</p>
           </div>
         </li>
         <li class="faq-item revela">
           <span class="faq-n" aria-hidden="true">02</span>
           <div>
             <h3>O teclado envia o que eu digito para algum servidor?</h3>
-            <p>Não. Suas teclas e o texto digitado vão direto para o aplicativo em que você está escrevendo. Nenhum texto digitado é gravado, armazenado ou transmitido para servidores do KeyFlow ou de terceiros.</p>
+            <p>Não para digitação comum. O texto digitado e as teclas pressionadas não saem do aparelho. A única exceção ocorre quando você escolhe acionar recursos de IA na nuvem (como agente, transcrição em nuvem ou raciocínio): nesse caso, o pedido específico é enviado diretamente ao provedor que você configurou, usando sua própria chave de API.</p>
           </div>
         </li>
         <li class="faq-item revela">
           <span class="faq-n" aria-hidden="true">03</span>
           <div>
-            <h3>Quais idiomas são suportados no ditado por voz?</h3>
-            <p>O ditado por voz e o teclado suportam português (Brasil), inglês e espanhol. Os modelos offline transcrevem em português e inglês.</p>
+            <h3>Quais idiomas são suportados?</h3>
+            <p>O teclado possui layouts dedicados para português (Brasil), inglês e espanhol, com acentuação e pontuação nativas. O ditado por voz offline também suporta esses três idiomas e dezenas de outros por meio dos modelos Whisper (99 idiomas) e Parakeet (25 idiomas europeus).</p>
           </div>
         </li>
         <li class="faq-item revela">
