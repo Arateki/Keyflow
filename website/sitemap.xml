@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://keyflow.arateki.com/</loc>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://keyflow.arateki.com/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://keyflow.arateki.com/en"/>
+  </url>
+  <url>
+    <loc>https://keyflow.arateki.com/en</loc>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://keyflow.arateki.com/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://keyflow.arateki.com/en"/>
+  </url>
+  <url><loc>https://keyflow.arateki.com/privacidade</loc></url>
+  <url><loc>https://keyflow.arateki.com/termos</loc></url>
+  <url><loc>https://keyflow.arateki.com/privacy</loc></url>
+  <url><loc>https://keyflow.arateki.com/terms</loc></url>
+</urlset>

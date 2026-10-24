@@ -2677,3 +2677,49 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
   (25 de 25 com o código antigo, 1 de 1 com o novo). As esperas do fim do teste foram para 60 s, mas não deu para medir de novo:
   o emulador caiu várias vezes com o servidor de swap cheio. Se voltar no CI, o passo seguinte é tirar essa inicialização da
   thread principal.
+
+## 2026-10-24 — Página inicial do site (equipe/site-inicial)
+
+- `website/` é a página inicial (PT em `index.html`, EN em `en.html`): HTML/CSS/JS estáticos, sem
+  build, sem CDN e sem rastreador; fontes Space Grotesk/Space Mono em subconjunto woff2 com as OFL.
+  `scripts/gerar-site.py` junta `website/` às páginas legais e valida links, âncoras, `url()` do CSS,
+  hash da CSP, recursos externos e o orçamento de 400 KB da primeira carga (hoje 126 KB).
+- O `site.yml` mandava `--content-type text/html` para tudo: CSS, fontes e imagens chegariam com o
+  tipo errado no R2. Agora há um `s3 sync` por extensão, com tipo e cache vindos de `gerar-site.py
+  --tipos`; extensão nova precisa entrar em `TIPOS` (a validação recusa o que não conhece).
+- A CSP de `<meta>` bloqueia `<style>`/`style=""` em linha (só o script do tema passa, por hash).
+  Captura que injeta CSS precisa de `bypassCSP`; trocar o script do tema exige recalcular o hash.
+- No container sem fontes do sistema, o Chromium headless gira a 100% sem pintar: o fontconfig vazio
+  trava o renderer. Um `fonts.conf` em `/tmp` apontando para as DejaVu extraídas resolve.
+- `fullPage` do Chromium muda a altura da janela e recompõe trechos com layouts diferentes (`svh`,
+  animações ligadas à rolagem): capturas de página inteira saem melhores costuradas tela a tela,
+  com rolagem `behavior: 'instant'` (o `scroll-behavior: smooth` da página atrasa o `scrollTo`).
+- Brilho desfocado que vaza da coluna (`inset` negativo + `blur`) alargava a página no celular e
+  empurrava o topo fixo para fora da tela; as seções agora usam `overflow-x: clip`.
+
+## 2026-10-24 — Ícone do app (v1-icone)
+
+- Decisão do Yan: a logo do app é a orbe. O ícone é a orbe parada do Ateliê (VoiceOrb.kt: corpo, miolo e ponto de luz,
+  no instante 1234 ms da galeria) sobre um fundo escuro quente (degradê de 3A342B a 211E19, família do `bg` escuro).
+  Skins de pacote (`skin-packs/`) não entram: o ícone usa o visual padrão. Na prancha o Yan aprovou o fundo escuro, o
+  tamanho (orbe a 72% da janela visível) e mandou tirar o brilho externo deslocado da orbe, que lia como sombra esverdeada
+  no escuro; ele sai do foreground, do monochrome, dos PNGs legados e do ícone da loja. O fundo creme segue disponível em
+  `--fundo claro`.
+- Fonte única: `scripts/gerar-icone.py` escreve os três drawables (`ic_launcher_{background,foreground,monochrome}`), os 10
+  PNGs legados e `docs/loja/icone-512.png`. Os XMLs de `mipmap-anydpi-v26/` são fixos. O `android:icon` e o `roundIcon`
+  estão no manifesto. O raio da orbe é 26 dp no canvas de 108: sem o brilho externo o corpo chega a 27,2 dp, dentro dos 33 dp da zona segura.
+- Lição de render: o `Image.radial_gradient` do Pillow vale distância × √2 (255 só no canto), e não distância/raio. Usado
+  cru, o degradê não chega à cor final na borda do raio e deixa uma faixa no corpo da orbe. O script corrige pela
+  constante `RAIO_NO_GRADIENTE`. A forma foi conferida contra `orb-idle-dark.png`: o perfil radial da golden bate com a
+  fórmula em t = 1234 (erro quadrático 0,0065, mínimo exatamente nesse t).
+- O lint do projeto só confere `NewApi` (`checkOnly`), então ele não acusa ícone; as regras de ícone (formato, tamanho,
+  duplicata) foram conferidas à mão. Nenhuma tela do app desenha o ícone, então nenhuma golden muda: amostra de 20 capturas
+  (rotas 0/12, nos dois temas, incluindo `orb-idle`) bit-idêntica, 0 px.
+- O CI acusou o `OverlayPackOrbTest`: o teste conta o `#4E9683` (borda do corpo da orbe Ateliê) no screenshot da TELA INTEIRA
+  e espera zerar quando o pacote assume a orbe. Com o ícone do app (a orbe parada) o launcher atrás do overlay passou a ter
+  esses pixels sozinho: 1.412 px parados, igual nas duas tentativas (um ícone de 156 px do script tem ~2.100 px na mesma
+  tolerância, a mesma ordem). Correção: o teste mede o fundo antes de o serviço subir e conta só o que passa disso (também
+  fecha o falso positivo de "começa com a orbe Ateliê", que passava só com o ícone na tela). Rodada verde depois da correção.
+  Regra: teste que conta cor na tela inteira precisa descontar o fundo, porque o que o launcher mostra muda com o ícone.
+- Ambiente: o `diff-screens.sh` pede o `compare` do ImageMagick no PATH (`/srv/dev/ferramentas/bin`); sem ele todo golden
+  sai como "comparação falhou (dimensões diferentes?)", mensagem que engana.
