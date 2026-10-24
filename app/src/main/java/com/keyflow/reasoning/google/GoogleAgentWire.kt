@@ -121,18 +121,17 @@ internal object GoogleAgentWire {
      */
     fun toContents(messages: List<AgentMessage>, flattenTools: Boolean): JSONArray {
         val repaired = AgentHistory.repair(messages).messages
-        val lastUser = repaired.indexOfLast { it is AgentMessage.User }
         val names = HashMap<String, String>()
         val turns = ArrayList<Pair<String, MutableList<JSONObject>>>()
         fun append(role: String, part: JSONObject) {
             if (turns.isNotEmpty() && turns.last().first == role) turns.last().second += part else turns += role to mutableListOf(part)
         }
-        repaired.forEachIndexed { index, message ->
+        repaired.forEach { message ->
             when (message) {
                 is AgentMessage.User -> if (message.text.isNotBlank()) append("user", textPart(message.text))
                 is AgentMessage.Assistant -> {
                     message.toolCalls.forEach { names[it.id] = it.name }
-                    val replay = if (index > lastUser && !flattenTools) replayed(message) else null
+                    val replay = if (!flattenTools) replayed(message) else null
                     when {
                         replay != null -> replay.forEach { append("model", it) }
                         flattenTools -> {
@@ -306,7 +305,7 @@ internal object GoogleAgentWire {
 
         /** As partes da resposta como a API as mandou, guardadas só quando há assinatura de pensamento; sem ela, reconstruir dá o mesmo. */
         private fun providerState(): ProviderState? {
-            if (!hasSignature || !hasCalls) return null
+            if (!hasSignature || parts.isEmpty()) return null
             return ProviderState(PROVIDER, JSONArray(parts).toString())
         }
 

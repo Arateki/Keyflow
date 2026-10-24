@@ -187,6 +187,57 @@ class GoogleAgentEngineTest {
     }
 
     @Test
+    fun `an old turn preserves thoughtSignature across subsequent conversation turns`() {
+        server.enqueue(sse(GoogleAgentSseFixtures.SIGNED_CALL))
+        server.enqueue(sse(GoogleAgentSseFixtures.TEXT_ONLY))
+        val first = events()
+        val done = first.last() as AgentEvent.Done
+        val call = first.filterIsInstance<AgentEvent.ToolCall>().single()
+        lastBody()
+
+        // Histórico com uma volta subsequente: User -> Assistant (com thoughtSignature) -> ToolResult -> Assistant -> User (nova pergunta)
+        val history = listOf(
+            AgentMessage.User("quais skins?"),
+            AgentMessage.Assistant("Vou olhar.", listOf(AgentToolCall(call.id, call.name, call.argsJson)), done.providerState),
+            AgentMessage.ToolResult(call.id, "2 skins: neon, aero"),
+            AgentMessage.Assistant("Aqui estão as skins neon e aero."),
+            AgentMessage.User("instale a neon"),
+        )
+        events(history)
+        val contents = lastBody().getJSONArray("contents")
+        // O assistant da volta 1 (índice 1) deve preservar as partes assinadas intactas
+        val oldModel = contents.getJSONObject(1)
+        assertThat(oldModel.getString("role")).isEqualTo("model")
+        val parts = oldModel.getJSONArray("parts")
+        assertThat(parts.getJSONObject(0).getString("thoughtSignature")).isEqualTo(GoogleAgentSseFixtures.SIGNATURE)
+        assertThat(parts.getJSONObject(1).getString("thoughtSignature")).isEqualTo(GoogleAgentSseFixtures.SIGNATURE + "-fc")
+    }
+
+    @Test
+    fun `a text only turn with thoughtSignature preserves provider state and replays with signature`() {
+        server.enqueue(sse(GoogleAgentSseFixtures.SIGNED_TEXT_ONLY))
+        server.enqueue(sse(GoogleAgentSseFixtures.TEXT_ONLY))
+        val first = events()
+        val done = first.last() as AgentEvent.Done
+        val texts = first.filterIsInstance<AgentEvent.TextDelta>().map { it.text }
+        assertThat(texts).containsExactly("Aqui está a resposta.")
+        assertThat(done.providerState).isNotNull()
+        lastBody()
+
+        val history = listOf(
+            AgentMessage.User("como vai?"),
+            AgentMessage.Assistant("Aqui está a resposta.", providerState = done.providerState),
+            AgentMessage.User("e agora?"),
+        )
+        events(history)
+        val contents = lastBody().getJSONArray("contents")
+        val model = contents.getJSONObject(1)
+        val parts = model.getJSONArray("parts")
+        assertThat(parts.length()).isEqualTo(2)
+        assertThat(parts.getJSONObject(0).getString("thoughtSignature")).isEqualTo("CiQBjz1rX-signature-blob-thought-only")
+    }
+
+    @Test
     fun `a tool error goes back under the error key, and an invented id is not sent to the api`() {
         server.enqueue(sse(GoogleAgentSseFixtures.NO_ARGS_CALL))
         server.enqueue(sse(GoogleAgentSseFixtures.TEXT_ONLY))

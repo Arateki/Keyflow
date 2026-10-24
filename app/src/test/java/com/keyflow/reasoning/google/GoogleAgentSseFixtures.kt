@@ -49,6 +49,11 @@ internal object GoogleAgentSseFixtures {
         """{"candidates":[{"content":{"parts":[{"functionCall":{"name":"skin_list","args":{},"id":"call-sig-1"},"thoughtSignature":"CiQBjz1rX-signature-blob-AbCdEf0123456789-fc"}],"role":"model"},"index":0,"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":80,"candidatesTokenCount":10,"thoughtsTokenCount":256,"totalTokenCount":346}}""",
     )
 
+    /** Resposta só de texto com thoughtSignature (modelo pensando antes de responder sem ferramentas). Inventada. */
+    val SIGNED_TEXT_ONLY = sse(
+        """{"candidates":[{"content":{"parts":[{"text":"Pensando...","thought":true,"thoughtSignature":"CiQBjz1rX-signature-blob-thought-only"},{"text":"Aqui está a resposta."}],"role":"model"},"index":0,"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":30,"candidatesTokenCount":10,"thoughtsTokenCount":50}}""",
+    )
+
     /** Um resumo de pensamento (`thought: true`), que não é texto da resposta, e depois a resposta. Inventada. */
     val THOUGHT_SUMMARY = sse(
         """{"candidates":[{"content":{"parts":[{"text":"Pensando em voz alta…","thought":true}],"role":"model"},"index":0}]}""",
