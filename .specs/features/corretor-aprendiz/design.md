@@ -1,0 +1,433 @@
+# Corretor aprendiz — Design
+
+Arquitetura. Requisitos em `spec.md`; estudo, medidas e licenças em `context.md`. Nada aqui está
+implementado. Os números marcados "medido" vêm de protótipos descartáveis rodados em 2026-10-24
+(`context.md` §3 e §7); os marcados "a medir" dependem do banco (BEN) e do A32.
+
+## Princípio condutor
+
+**O corretor decide em bits.** Cada candidata tem um custo em bits somando (1) o quanto o toque é
+improvável para as letras dela (modelo espacial), (2) quanto a palavra é rara (a frequência do
+dicionário, que já é logarítmica: 8,589 pontos = 1 bit) e (3) o quanto ela é improvável depois da
+palavra anterior. "Trocar ou só sugerir" vira comparar esse custo com o custo de a palavra digitada ser
+mesmo uma palavra nova da pessoa. O aprendido mexe nesses termos (palavra conhecida, par ensinado, viés
+de toque, bigrama); o banco de avaliação calibra os limiares. Isto é o mesmo desenho do LatinIME
+(distância espacial + improbabilidade da língua, `context.md` §6), em log-probabilidade, que é a forma
+em que bigramas e aprendizado se somam sem regra especial.
+
+```
+KeyboardGridView ── Char + Touch(x,y em unidades de tecla) ─┐
+                                                             ▼
+KeyFlowKeyboardService ── ComposingWordTracker (letras + toques)
+   │  finishComposing / undoCorrection / onCandidateTapped
+   │        │ LearnEvent (Typed, Rejected, Keep, PairTap, Rewrite, TouchObs, Bigram)
+   │        ▼
+   │   LearningPolicy (puro: o campo e a palavra são elegíveis?)
+   │        ▼                        fila → thread "keyflow-suggest" (a única que toca nos dados)
+   │   PersonalLexicon (puro, relógio injetado) ◄──► LearnedStore (arquivo files/corretor/<idioma>.kfl)
+   │        ▲
+   └─ pede sugestões ─► Suggester(words, personal, params).suggest(typed, touches?, prev?)
+                              │ WordList (dicionário fixo, 100 mil)  │ SpatialCosts  │ LetterGrid
+                              ▼
+                       Suggestions(words, autoCorrect, classe da troca)
+```
+
+Pacotes novos: `ime/keyboard/learning/` (política, léxico, loja, tracker de reescrita, viés de toque,
+bigramas — tudo puro exceto a loja, que só usa `java.io`), `ime/keyboard/dictionary/` (ganha
+`SpatialCosts`, `LetterGrid`, `SwapClass`), `ui/config/LearnedWordsPanel.kt`, e o banco em
+`app/src/test/.../ime/keyboard/dictionary/bench/`.
+
+---
+
+## 1. Banco de avaliação (BEN) — primeira tarefa
+
+Um teste de unidade (`CorretorBenchTest`) que monta casos, roda o `Suggester` e escreve
+`app/build/bench/corretor.json`. Sem aparelho, determinístico, ~segundos por conjunto.
+
+**Conjuntos e formatos** (TSV em `app/src/test/resources/bench/`, UTF-8):
+
+| Arquivo | Linhas | Para quê |
+| ------- | ------ | -------- |
+| `manter.tsv` `digitado⇥esperado⇥grupo` | ≥ 300 | Fora do dicionário que **não** se troca (`esperado = digitado`) e as poucas trocas legítimas (`nao⇥não`). Começa nas 548 do estudo, com os grupos: abreviação, risada, gíria, nome, lugar, marca, técnico, inglês, espanhol, alongamento |
+| `erros.tsv` `digitado⇥pretendida⇥tipo` | ≥ 300 | Erros reais à mão: omissão, inserção, troca de ordem, tecla vizinha, acento, "ç/ss", "s/z", "x/ch", "g/j" |
+| gerador `SyntheticTyping` | ≥ 2000 por configuração | Palavra do dicionário digitada com ruído sobre o layout real |
+| `reais.tsv` `pretendida⇥digitada⇥x1,y1;x2,y2;…` | local, **fora do git** | Digitações gravadas no A32 (BEN-07) |
+| `sessoes/*.tsv` | alguns | Texto longo de uma pessoa simulada, com eventos de desfazer, para a curva de aprendizado |
+
+**Gerador sintético.** Layout `Layouts.forLocale("pt")` + `Geometry.placeLayer` com uma largura nominal
+(razão largura/altura ≈ 0,73, ~72×98 px numa tela de 720 px; a CA-T1 confere com a medida real do A32). Para cada letra da palavra: toque = centro da tecla
++ `N(0, σ·largura)`, `N(0, σ·altura)` + viés; a letra digitada é a tecla sob o toque (fora do teclado,
+a mais próxima). σ ∈ {0,20; 0,30; 0,40} (o padrão do gerador de erros do FUTO, `temperature` 0,6 × 80 px sobre teclas de ~143 px, dá ≈ 0,34 na horizontal e ≈ 0,23 na vertical; `TrainingDataGenerator.kt`, só a ideia),
+viés ∈ {nenhum, por fileira do LatinIME (Y: 0, +0,038, +0,088 da altura), forte (+0,12 largura, +0,15
+altura)}. Amostra **uniforme** (testa o dicionário todo) e **ponderada** por `2^(freq/8,589)` (testa o
+que se digita). Taxas fixas de omissão, inserção e troca de ordem entram numa 2ª configuração.
+
+**Métricas** (BEN-03), por conjunto: troca certa, troca errada, **troca indevida** (qualquer troca onde
+se esperava manter; mudar só a caixa ou tirar um acento digitado conta), perdida, pretendida na faixa em
+1º e nos 3 primeiros, parcela de erros que viram outra palavra válida, ms/palavra p50/p95, heap. Uma nota
+única só para ordenar mudanças, com peso declarado: `ganho = certas − 5·indevidas − 3·erradas` (o peso
+é do Yan, `context.md` §8; o JSON guarda as parcelas).
+
+**Catraca.** `corretor-bench-baseline.json` (gerado na CA-T1 pelo código de hoje) e tolerância por
+métrica; `CorretorBenchTest` falha se algo piora; melhora entra atualizando o baseline no mesmo commit.
+`scripts/corretor-bench.sh [ref]` roda o banco no `HEAD` e no `ref` (worktree temporária) e imprime a
+tabela lado a lado.
+
+**Reais.** Debug apenas: a tela de teste do teclado mostra uma frase-guia, o teclado grava (toques em
+unidades de tecla, digitada, pretendida) em `files/bench/reais.tsv` (fora do backup); o Yan puxa por
+`adb pull`. Duas rodadas: digitação normal e digitação rápida, ~300 palavras cada.
+
+**Tempo no aparelho** (BEN-06): `CorretorTempoTest` instrumentado roda as mesmas ~300 palavras do conjunto
+de erros após aquecer o JIT e grava p50/p95 em ms. Roda no emulador (`instrumentar`) e no A32 (`am
+instrument` direto, nunca `connectedAndroidTest`).
+
+---
+
+## 2. Base sem aprendizado (BAS)
+
+**Classe da troca.** `Suggester` passa a devolver, junto de `autoCorrect`, a `SwapClass` que a produziu:
+`ACCENT`, `CAPITAL` (inicial), `ACRONYM` (tudo maiúsculo), `EDIT1`, `EDIT2`, `PAIR` (aprendido). Cada
+classe tem um limiar próprio em `SuggestParams` (hoje: frequência ≥ 40 e folga ≥ 15 para 1 erro;
+palavra ≥ 6 letras, frequência ≥ 90 e folga ≥ 30 para 2). O banco mede a precisão de cada classe;
+abaixo de 95% a classe só sugere (BAS-01).
+
+**Regras de partida** (cada uma entra no banco e fica só se ele mostrar ganho):
+
+| Regra | Medido hoje (`context.md` §3) | Por quê |
+| ----- | ----------------------------- | ------- |
+| Sigla só sugere (`vc`→`VC`) | 57 das 165 trocas só mudam a caixa | "VC", "TB", "MSG" gritam; `api`→`API` exige decisão do Yan |
+| Acento digitado não se perde | `Ágatha`→`Agatha`, `Taís`→`Tais`, `piá`→`pia`, `parça`→`parca` | `Suggester.suggest` pega `sameLetters.first()` e ignora os acentos que a pessoa pôs |
+| Só consoantes, ≤ 4 letras → sugere | `td`→`te`, `hj`→`um`, `qdo`→`do`, `tmj`→`TMN` | abreviação sem vogal |
+| 3+ letras iguais seguidas → sugere | `kkkk`→`Kiko`, `hahaha`→`Havana`, `simm`→`sim` | alongamento é intenção |
+| Existe no en/es → sugere | 39% do inglês comum e 63% do espanhol comum viram outra palavra | inglês no meio do português |
+| Hífen: partes e conjunto | `faça-o`→`facão` | ênclise |
+| Léxico informal curado | 56 das 62 abreviações estão fora do dicionário e 68% delas são trocadas | `scripts/dict-extras/pt.tsv`, lista própria (sem licença externa) |
+
+**Guarda de outro idioma.** Em vez de carregar `en` e `es` inteiros (2 MB cada em disco, vários MB em
+arrays) no teclado pt, o `build-dictionaries.py` gera `pt.estrangeiras.kfd` com as palavras de
+`en`/`es` de frequência ≥ F que não estão no `pt` (~20–30 mil, ~0,3 MB). A CA-T7 mede F no banco. Para o
+teclado en, vale o inverso com pt. É a ideia do "plausibility threshold"/lista de outro idioma do
+LatinIME e da "confiança por idioma" do HeliBoard (só a ideia; `context.md` §4).
+
+---
+
+## 3. Léxico pessoal (LRN, REJ, FIX)
+
+### Dados
+
+```kotlin
+class Entry(var weight: Float, var lastDay: Int, var valid: Boolean, var lastTypedSec: Long)
+// words[idioma]: HashMap<String, Entry>      chave: minúscula, sem trocar acento (o que foi digitado)
+// pairs[idioma]: HashMap<String /*digitada*/, PairEntry(chosen: String, weight, lastDay)>
+```
+
+`LearningParams` (um lugar só, todos calibráveis pelo banco; valores de partida entre parênteses):
+
+| Parâmetro | Valor | Origem da ideia |
+| --------- | ----- | --------------- |
+| `VALID_AT` | 3 pontos | AOSP: palavra nova vale na 2ª digitação; HeliBoard ≥ 3 usos; ASK ~5 |
+| pontos: digitada 1 · recusa 3 · manter 3 · reescrita 3 · par por toque 1 · par por reescrita 2 | | ASK: digitar 2, escolher 3 de 9 |
+| `TYPED_COOLDOWN` | 60 s | evitar "kkk kkk kkk" valer 3 |
+| `HALF_LIFE_DAYS` | 90 | AOSP v4 joga fora após 300 dias sem uso; contagem divide por 2 no teto |
+| `KEEP_ABOVE` / `DROP_BELOW` | 1,0 / 0,5 | histerese: 3 pontos duram ~142 dias parados e somem em ~232 |
+| `CANDIDATE_TTL_DAYS` | 30 | AOSP descarta entrada de nível 0 após 30 passos |
+| `WEIGHT_CAP` | 12 | uso intenso não prende a palavra para sempre (~320 dias) |
+| `MAX_WORDS` / `MAX_PAIRS` / `MAX_BIGRAMS` | 5000 / 2000 / 10 000 por idioma | AOSP: 10 000 unigramas / 30 000 bigramas |
+| `REWRITE_WINDOW` | 20 s | |
+| `PAIR_ACTIVE_AT` | 2 pontos | |
+
+**Peso com decaimento, na leitura:** `peso(agora) = peso · 0,5^(max(0, agora − ultimoUso)/90 dias)`. Evento:
+`peso = peso(agora) + pontos`, `ultimoUso = agora`, `valid ||= peso ≥ VALID_AT`. `conhece(w) = valid &&
+peso(agora) ≥ KEEP_ABOVE`. Sem tarefa de fundo: a limpeza acontece ao carregar e ao passar do teto.
+
+### Quando algo vale pontos (decisão por evento)
+
+| Evento (origem no serviço) | Condição | Efeito |
+| -------------------------- | -------- | ------ |
+| `Typed(w)` — `finishComposing` sem troca | campo elegível; `w` fora do dicionário, fora do aprendido e sem par ativo; **o corretor não teria trocado com confiança** | +1 (respeita o cooldown) |
+| `Typed(w)` | o corretor teria trocado com confiança | nada (erro de digitação isolado, LRN-05) |
+| troca aplicada e **não** desfeita | — | nada para a original (LRN-06) |
+| `Rejected(original, troca)` — recomitar a mesma palavra após desfazer (REJ-01) ou reescrever a original (REJ-03) | pendência viva | `original` +3; apaga par de `original` |
+| `Keep(w)` — toque na palavra como digitada na faixa (REJ-02) | elegível | `w` +3; apaga par |
+| `PairTap(d, e)` — toque numa sugestão ≠ digitada (FIX-01) | `d` fora do dicionário e do aprendido | par `d→e` +1; zera a palavra `d` se existir |
+| `Rewrite(original, v)` — `RewriteTracker` (FIX-02) | condições do FIX-02 | par `original→v` +2 |
+
+O "o corretor teria trocado" vem de `Suggestions.autoCorrect` calculado de qualquer forma na hora do
+espaço; a diferença é só se o campo/opção permite trocar. Em campo que não troca (ou com "Correção
+automática" desligada) **nada é aprendido** (PRV-02).
+
+### Recusa pendente e o desfazer
+
+Hoje `undoCorrection` apaga `corrigida + separador` e faz `commitText(original)`: o texto fica solto,
+sem composição, e o serviço não vê a pessoa confirmar. Mudança (D1): estado do tracker **antes** de mexer
+no campo (lição do Q9: o `onUpdateSelection` chega dentro da chamada), depois
+`ic.setComposingText(original, 1)`; guardar `PendingRejection(original, troca, idioma)`. Quem decide:
+
+- `finishComposing` com a palavra igual a `original` e com separador → suprime a troca (REJ-05) e envia
+  `Rejected`;
+- letra, backspace, troca de campo, troca de idioma, movimento de cursor → limpa a pendência.
+
+O teste instrumentado de hoje (`fieldText() == "nao"` após o backspace) continua valendo. ASK e AOSP
+também recompõem a palavra original depois de reverter (ASK por `setComposingRegion`, `context.md` §4).
+
+### RewriteTracker (FIX-02, REJ-03) — máquina de estados pura
+
+Entrada: `Committed(mostrada, digitadaOriginal, tamSeparador, t)`, `Backspace`, `Letter(c)`,
+`Separator`, `Reset` (cursor, campo, idioma, atalho, colar). Estados:
+
+```
+Idle ──Committed──► Armed(W, orig, sepLen, t0)
+Armed ──Backspace×sepLen──► Armed(sepApagado)
+Armed(sepApagado) ──Backspace×k (k ≤ |W|)──► Editing(prefixo = W.dropLast(k))
+Editing ──Letter──► Typing(prefixo + letras)
+Typing ──Separator──► emite Rewrite(orig, prefixo+letras) se vale; ──► Idle
+qualquer ── Reset | t − t0 > 20 s | backspace além de W | letra sem apagar o separador ──► Idle
+```
+
+`V = prefixo + resto` vem só dos eventos: as letras novas ficam na composição do serviço e o que sobrou de
+W é texto comitado; o tracker junta os dois sem ler o campo (ARM-03). Valida: `V ≠ W`, `V` está no
+dicionário ou no aprendido, a original não vale como palavra, distância(W, V) ≤ 2 edições (a mesma
+`distance` do `Suggester`). Se `V == orig` e W era uma troca → é uma recusa (REJ-03).
+
+### Pares e candidatas pessoais
+
+`pairFor(digitada)`: par ativo (peso(agora) ≥ 2), só se `digitada` não é palavra do dicionário nem do
+aprendido. Entra no `Suggester` como `SwapClass.PAIR`: troca sem o teste de folga e vai em 1º na faixa
+(FIX-03). **Candidatas pessoais:** palavras que valem entram como candidatas de correção (erro de
+digitação de uma palavra da própria pessoa, "Arateky"→"Arateki") e como completações; a troca automática
+para elas só com peso ≥ 6 e 1 edição (fase E).
+
+---
+
+## 4. Modelo espacial (SPA)
+
+### Como o LatinIME faz (resumo; arquivos em `context.md` §6)
+
+- Cada tecla tem um centro de "ponto doce" e um raio (≈ 0,15 da diagonal da tecla); o centro vem do
+  hitbox mais um deslocamento **estático** por fileira (Y: −0,0006, +0,0382, +0,0881 da altura; X obsoleto).
+- Para cada toque e cada tecla guarda `d² normalizada = ‖toque − centro‖² / raio²`.
+- Custo de casar a letra da candidata com o toque = `0,1524 · fator(d²)`, `fator` linear por partes
+  (0 no centro, 0,24 a 0,25, 1,2 a partir de 1), mais 0,0694 se a letra não é a tecla pressionada.
+- Omissão 0,467, inserção 0,7248, troca de ordem 0,5608, substituição 0,3806. Custo de língua = `(255 −
+  p)/255 · 1,1214` (p = probabilidade em contexto: bigrama se há palavra anterior). Placar final
+  `1 − distância/(1,1214 + 0,1·n)`; troca se o placar normalizado passa de 0,185 ("modest").
+
+### Como o KeyFlow faz hoje
+
+`distance()` em meias-edições: tecla vizinha na tabela QWERTY custa 1, outra 2, ou seja, **toda vizinha
+custa o mesmo**, caia o dedo na borda ou em cima da outra tecla. Medido (`context.md` §7, protótipo): com σ 0,40 o corretor de
+hoje troca errado em 4,2% (B com margem ≥ 3 bits: 1,2%, mesmo acerto) e, com viés de toque, acerta a troca em 87,6%
+(B: 94,2%); com σ 0,30 sem viés a diferença é pequena (95,1% nos dois).
+
+### Proposta
+
+1. **Unidade de tecla.** `Touch(x, y)` em unidades de tecla: `x/larguraMédiaDaTecla`, `y/alturaDaLinha`
+   (independe do aparelho e da densidade). A grade calcula isso no `onFingerUp` com o ponto em que a tecla
+   foi decidida (o mesmo `slideTarget` que decide a letra) e entrega junto da `KeyAction.Char`.
+2. **`LetterGrid`** (pura): centros das 26 letras a partir de `Layouts` (pesos) em unidades de tecla;
+   `ñ` no es. Um `LetterGrid` por idioma, calculado uma vez.
+3. **Tabela por palavra.** Antes de comparar candidatas, `SpatialCosts.fill(touches)` calcula
+   `bits[i][c] = min(CAP, ((Δx/σx)² + (Δy/σy)²)/2 · log2 e)` para i = toques e c = a..z: ≤ 26·32 floats
+   num buffer reaproveitado (o `Suggester` já reaproveita linhas da distância e não é thread-safe).
+   Convertido para **inteiros em 1/16 de bit** para o laço de `Int` que já existe.
+4. **Laço da distância** troca `Keyboard.adjacent(ca, cb)` por `bitsInt[(a−1)·26 + (cb − 'a')]`; omissão,
+   inserção e troca de ordem são constantes em bits (partida: 9 / 9 / 7). Letra fora de a..z (hífen,
+   apóstrofo) custa o máximo. **Custo extra de CPU ≈ 0** no laço quente (uma leitura de tabela no lugar de
+   uma leitura de tabela); o custo novo é a tabela por palavra: 26·k contas com 1 divisão, ~µs.
+5. **Prior em bits.** `(255 − freq)/8,589` (a escala do `ProbabilityUtils` do LatinIME); a candidata
+   pessoal usa `peso → freq` por uma curva monotônica; o bigrama (fase F) entra aqui.
+6. **Decisão.** Ordena por custo total; `troca` quando `melhor.total ≤ T[classe]` e `margem ≥ M[classe]`;
+   `T` e `M` por classe vêm do banco (curvas certa × indevida × margem; o protótipo já traz a forma em
+   `context.md` §7). Substitui as constantes `40/15/90/30`.
+7. **Sem toque** (acessibilidade, tecla física, ditado): a `distance` de hoje, inalterada (o
+   `SuggesterTest` atual continua valendo).
+8. **Candidatas.** O filtro por 1ª letra (digitada, vizinha, 2ª) vira "teclas a < 1,3 tecla do 1º toque" +
+   a 2ª letra: o mesmo custo de bucket, com a vizinhança vinda da geometria.
+
+Parâmetros de partida e como calibrar: σ ∈ [0,25; 0,40] em tecla (a varredura no banco escolhe; o
+protótipo usou 0,30 sem ajuste fino), `CAP` 12 bits, e os 3 custos fixos. Calibra-se no sintético **e**
+no real (o real é o que vale: a distribuição do toque do A32 não é gaussiana perfeita).
+
+---
+
+## 5. Adaptação ao jeito de tocar (ADP)
+
+LatinIME e HeliBoard só têm correção **estática** (a tabela de 3 fileiras acima, medida num aparelho
+antigo); nenhum dos projetos lidos adapta por pessoa (`context.md` §6). Proposta em duas camadas, a 1ª
+sem risco de interface:
+
+1. **Viés no modelo** (ADP-01/02). Por tecla: `(μx, μy, n)`. Quando uma palavra é comitada como digitada,
+   está no dicionário, tem ≥ 3 letras e não foi desfeita, cada toque é uma observação do centro da tecla
+   que a pessoa **quis**: `μ ← μ + α·(obs − μ)`, `α = 1/(n + 20)` (o prior em zero segura os poucos dados),
+   `|μ| ≤ 0,25` tecla. O custo espacial usa `centro + μ`. 26 × 3 números por layout (≈ 300 bytes);
+   zero custo na digitação (cada comit atualiza ≤ 10 teclas).
+2. **Hit-test adaptado** (experimento, não promessa). Deslocar o ponto antes de decidir a tecla reduziria
+   os erros de letra pela raiz, mas a tecla sob o dedo passaria a diferir do que se vê na prévia. O banco
+   (conjunto sintético com viés) mede o teto: erro por letra com e sem compensar o viés conhecido
+   (`context.md` §7). Só vira tarefa de produto se o Yan quiser (CA-T24).
+
+Risco: reforço de erro (o viés aprende o erro). Mitigações: só palavras do dicionário comitadas como
+estão; prior forte; teto de 0,25; apagar o aprendido zera (ADP-03); o banco tem um caso com viés
+**errado** de propósito para provar que o modelo não diverge.
+
+---
+
+## 6. Contexto da palavra anterior (CTX)
+
+- **O que há de graça:** nada. As listas do AOSP que o projeto usa (`pt_BR_wordlist.combined`, `es`,
+  `en_US`) têm 0 linhas `bigram=` (conferido nos arquivos do branch `lineage-24.0`): só unigramas.
+- **Pessoal** (CTX-01): `(anterior, palavra) → peso/dia`, mesmas regras de decaimento e teto; a anterior
+  vem dos eventos de comit (zera em `. ! ? ;` de fim de frase, quebra de linha, campo ou cursor).
+- **Combinação** (CTX-02): `P(w | a) = λ·c(a,w)/c(a) + (1−λ)·P(w)`, com `λ = c(a)/(c(a) + T(a))`
+  (Witten-Bell; `T(a)` = quantas palavras distintas já vieram depois de `a`). Entra no prior em bits no
+  lugar de `(255−freq)/8,589`. É o análogo do `getBigramNodeImprobability` do LatinIME, em log.
+- **Estático** (CTX-03, opcional): tabela de bigramas pt-BR de um corpus com licença compatível. Candidato
+  verificado: as frases do Common Voice são CC0 (domínio público; `context.md` §5) — registro formal/lido,
+  pouca fala de chat, contagem de frases pt **não verificada**. Formato: top 30 mil palavras × 8 próximas,
+  id de 2 bytes + log-prob de 1 byte ≈ 0,75 MB. Só entra se o banco de contexto mostrar ganho.
+- **Limite honesto:** erro que vira **outra palavra válida** ("casa"→"caso") o corretor atual não toca, e
+  esta spec também não (Out of Scope): medido em `context.md` §7 quanto desses erros existem.
+
+---
+
+## 7. Privacidade (PRV)
+
+`LearningPolicy` (pura, `ime/keyboard/learning/LearningPolicy.kt`), no estilo de `autoCorrectAllowed`:
+
+```kotlin
+fun fieldAllowsLearning(inputType: Int, imeOptions: Int, learningEnabled: Boolean, autoCorrectEnabled: Boolean): Boolean
+// texto comum (autoCorrectAllowed) E sem IME_FLAG_NO_PERSONALIZED_LEARNING (0x1000000) E as duas opções ligadas
+fun wordEligible(word: String): Boolean        // LRN-02
+```
+
+- `onStartInputView` calcula `learningAllowed` junto de `autoCorrectAllowed` (só booleanos, na janela que o
+  `StrictModeKeyboardTest` cronometra).
+- Arquivo em `files/corretor/` + exclusões explícitas em `backup_rules.xml` e `data_extraction_rules.xml`
+  (`cloud-backup` e `device-transfer`), como `models` e `agent/actions.jsonl`; `BackupRulesTest` passa a
+  cobrir a pasta.
+- **Apagar:** `PersonalLexicon.clear()` + apagar os arquivos, numa função só (`LearnedStore.wipe()`), chamada
+  (a) pelo botão da aba Teclado, (b) por `onDeleteMyData` **antes** de `deleteRemoteData`; (b) hoje só chama
+  a API (`SetupActivity.kt`: `entitlementsRepository.deleteRemoteData { api.deleteAccount() }`).
+- **Texto novo da interface** via `tr("…")`, em pt/en/es; textos novos nas tarefas CA-T15 e CA-T16.
+- Nada de rede: o módulo não importa `net/`; um teste de arquitetura (`ArchitectureRulesTest`) confere que
+  `ime/keyboard/learning/` não importa `okhttp`/`java.net`.
+
+---
+
+## 8. Armazenamento (ARM)
+
+| Opção | Contra | A favor |
+| ----- | ------ | ------- |
+| **Room** | Não está no projeto; precisa de KSP/kapt no AGP 9 (**não conferi** a compatibilidade com o AGP 9.2 daqui); ~1 MB de dex; esquema e migração para ≤ 10 mil linhas | Consultas SQL (não precisamos: tudo cabe em memória) |
+| **DataStore** (já no projeto) | Reescreve o arquivo inteiro a cada `edit`; pensado para preferências pequenas; 5000 palavras = ~150 KB por gravação | Já existe |
+| `SQLiteOpenHelper` | Trava de banco e I/O por tecla; é uma API pesada para um mapa pequeno | Sem dependência nova, transacional |
+| **Arquivo próprio** (escolhido) | Código de formato (diário, compactação) | ≤ 300 KB; lido uma vez para `HashMap`; consulta O(1) sem I/O; diário de acréscimos sobrevive a processo morto; 100% testável na JVM com `TemporaryFolder`; tem precedente no projeto (`agent/actions.jsonl`, `model-downloads.json`); apagar = apagar |
+
+**Formato** `files/corretor/<idioma>.kfl` (texto, uma linha por registro, `\t`):
+
+```
+KFL1 pt
+W⇥yan⇥3.0⇥20386⇥1            palavra: peso, dia (desde 1970), válida
+P⇥vc⇥você⇥2.0⇥20386           par: digitada, escolhida, peso, dia
+B⇥de⇥casa⇥1.0⇥20386           bigrama (fase F)
+T⇥e⇥0.05⇥-0.02⇥12             viés de toque da tecla: μx, μy, n (fase D)
+-W⇥yan                        remover (diário)
+```
+
+Ao carregar: lê, aplica linha a linha (linha inválida: ignora), compacta para um arquivo novo
+(`.tmp` + `rename` atômico) se o diário passou de 2× o tamanho útil. Gravar: `append` + `flush`, sem
+`fsync` (perder as últimas linhas num desligamento brusco é aceitável). O dia, não o milissegundo, evita
+guardar horário exato de digitação.
+
+**Threads.** O carregamento é assíncrono (`CompletableFuture`, como `Dictionaries`). Eventos e consultas
+rodam na thread `keyflow-suggest`; a tela de palavras usa um `ReentrantLock` curto sobre as mesmas
+estruturas (operações O(1) ou varredura de ≤ 5000 entradas, < 1 ms). IME e config rodam no mesmo processo
+(só `:inference` e `:reasoning` são outros, `AndroidManifest.xml`).
+
+---
+
+## 9. Desempenho no Galaxy A32
+
+| Item | Orçamento | Como se mede |
+| ---- | --------- | ------------ |
+| Sugestão por palavra (JIT quente) | ≤ 25 ms (hoje ~15 ms, Q9) | `CorretorTempoTest` no A32 |
+| Consulta ao aprendido por palavra | ≤ 1 ms | idem, com 5000 palavras |
+| Tabela espacial por palavra | ≤ 2 ms | idem |
+| Evento gravado | ≤ 0,3 ms na thread de sugestões | unit com arquivo real |
+| Carga do arquivo (5000 palavras) | ≤ 50 ms, fora da main thread | unit + `StrictModeKeyboardTest` |
+| Memória | ≤ 1,5 MB por idioma ativo (+0,3 MB da lista estrangeira) | `Runtime` no unit |
+| Abertura do teclado | 0 trabalho novo na main thread | `Trace` `KeyFlow.keyboardOpen` igual ao de hoje |
+
+O dicionário continua em arrays contíguos (`WordList`); o aprendido é um `HashMap` pequeno ao lado, não
+mistura com os arrays.
+
+---
+
+## 10. Modelo neural pequeno (estilo FUTO): agora ou depois?
+
+**Depois, e só se o banco pedir.** Fatos (`context.md` §6): o modelo do FUTO tem ~36 M de parâmetros,
+arquitetura Llama (vocabulário 15 008, 8 camadas, dimensão 512), ~62 MB em Q6_K, roda por llama.cpp,
+trata cada toque como token e devolve até 128 candidatas que se fundem às do dicionário; foi treinado
+com bilhões de tokens; o app é "source first" (proíbe uso comercial) — **nenhum código dele serve**, e a
+licença dos pesos não está registrada em lugar nenhum que eu tenha lido.
+
+| Eixo | Para o KeyFlow |
+| ---- | -------------- |
+| Peso | +60 MB de modelo (cabe no mecanismo de modelos baixáveis que o app já tem para voz/raciocínio) + biblioteca nativa; RAM de 35–70 MB quantizado (relatos de comunidade para modelos de 33 M) |
+| CPU no A32 | **não medido**; uma passada por toque numa CPU Helio G80 pode passar do orçamento de 25 ms — medir antes (llama.cpp, 4 threads, 20 toques) |
+| Dados | Não há modelo pt-BR aberto conhecido; treinar pede bilhões de tokens e GPU; conversa de chat quase não existe em corpus aberto |
+| Ganho | Erro de palavra real e frase inteira (onde o dicionário + bigrama não alcançam); ajuste ao usuário por LoRA só carregando (o FUTO deixa desligado por padrão) |
+| Risco | O modelo vira o gargalo de bateria e latência; qualidade pt-BR incerta; suporte de um runtime a mais |
+
+**Critérios para revisitar:** (1) o banco mostra que o resíduo de erros é dominado por palavra real/contexto
+depois das fases A–F; (2) existe um modelo pt-BR de ≤ 40 M com licença permissiva e qualidade medida no
+mesmo banco; (3) p95 por toque ≤ 25 ms no A32 com 2–4 threads; (4) o Yan aceita +60 MB baixáveis. Até lá
+as fases C (espacial) e F (bigramas) pegam a maior parte do que um modelo pequeno daria, por uma fração do
+custo. Alternativa mais barata a medir antes: um modelo de caracteres/palavras de ~5–10 M treinado por nós
+(ainda precisa de corpus).
+
+---
+
+## 11. Licenças e atribuição
+
+O KeyFlow vai ser de código aberto, ainda sem licença definida, e usa AdMob e Play Billing (SDKs
+fechados) — por isso o que vem de GPL não entra como código (decisão do Yan pendente).
+
+| Origem | Licença | O que se faz |
+| ------ | ------- | ------------ |
+| LatinIME (AOSP) | Apache-2.0 | Pode adaptar código com aviso. Reimplementa-se em Kotlin (o motor nativo traria `.so`, JNI e formato de dicionário). Constantes e fórmulas reusadas com atribuição: `ScoringParams`, `touch-position-correction`, `getSweetSpotFactor`, escala `8,589`, limiares 0,185/0,067, decaimento/descarte de 300 dias. Aviso em `app/licenses/` e nos cabeçalhos dos arquivos que adaptam |
+| AnySoftKeyboard | Apache-2.0 | Pode adaptar: pontuação de aprendizado (digitar 2, escolher 3, limiar 9), promoção do auto-dicionário, recompor ao reverter, `AutoText`, `SubWordSuggestionCallback` |
+| FlorisBoard | Apache-2.0 | Estrutura do modo anônimo de 3 estados (liga/desliga/dinâmico) e entidade do dicionário do usuário; nada de aprendizado real |
+| HeliBoard | **GPL-3.0** | **Só a ideia**: `UnlearnEvent`, lista de bloqueio por idioma, promoção por uso repetido, modo anônimo por flag, "confiança por idioma". Onde copiar o código pouparia trabalho: `DictionaryFacilitatorImpl.kt` (≈0,5 dia a menos para a lista de bloqueio e a promoção), `PersonalDictionaryScreen.kt` (≈1 dia, mas amarrada ao provedor `UserDictionary` do Android, que não usamos) e a confiança por idioma (≈2 dias; só vale se o teclado passar a misturar idiomas). Tudo isso é pequeno: não compensa o conflito de licença |
+| FUTO Keyboard | Source First 1.1-kb (proíbe uso comercial) | **Só ideias**: pesos de importância por tipo de evento, log de treino com desfazer, treino só carregando, gerador de erros por ruído gaussiano. Nenhum código, nenhum peso |
+
+---
+
+## 12. Testes (resumo; tarefa a tarefa em `tasks.md`)
+
+- **Unitários puros:** `LearningPolicyTest` (matriz de `inputType` × flag × opções), `PersonalLexiconTest`
+  (relógio injetado: 3 pontos valem, cooldown, decaimento, teto, evidência mais recente vence),
+  `LearnedStoreTest` (ida e volta, diário, compactação, linha torta, versão futura), `RewriteTrackerTest`
+  (sequências de eventos), `SpatialCostsTest` (borda × centro), `TouchBiasTest`, `BigramTest`.
+- **Propriedade** (kotest): decaimento monótono; `replay(diário) == estado`; teto sempre respeitado; nenhum
+  peso negativo. **Fuzz:** arquivo com bytes aleatórios nunca derruba e nunca passa dos tetos.
+- **Mutação:** o pacote `learning` entra nos alvos padrão do PIT.
+- **Instrumentados** (`instrumentar KeyFlowKeyboardLearningTest`): desfazer → recomitar vira palavra
+  conhecida; recusa cancelada por edição; faixa "manter"; senha e `NO_PERSONALIZED_LEARNING` não gravam;
+  "Apagar meus dados" apaga o arquivo; `StrictModeKeyboardTest` segue zerado.
+- **Arquitetura:** `ArchitectureRulesTest` (nada de `runBlocking`, `collectAsStateOnMain`, sem rede no pacote).
+- **Goldens:** aba Teclado (novo grupo), lista de palavras (vazia/cheia), diálogo; `--approve` copia tudo:
+  restaurar com `git checkout -- verification/golden/…` o que não é desta mudança.
+
+## 13. Riscos
+
+| Risco | Mitigação |
+| ----- | --------- |
+| Aprender erro de digitação | LRN-05/06 + recusa pendente confirmada + 3 pontos + sessões no banco |
+| Recompor a palavra após o desfazer difere por app | Instrumentado em campo real + `Edge Cases`; se um app falhar, cai no `commitText` de hoje e a pendência é descartada |
+| Coordenada de toque errada (rotação, layout trocado) | Unidade de tecla vinda da geometria viva da grade; sem toque, cai na tabela de vizinhas |
+| σ e custos só bons no sintético | Calibrar com `reais` do A32; o sintético só ordena mudanças |
+| Viés de toque diverge | Prior, teto, só palavras do dicionário, caso adversarial no banco |
+| Perceção de privacidade / ficha da Play | PRV-04/05; tela de palavras; texto jurídico é do Yan |
+| Goldens mudam | Só aba Teclado e Privacidade; revisão antes de `--approve` |
+| Tempo no A32 estoura | Orçamento PER-01 por tarefa; a espacial só entra com número do A32 |
