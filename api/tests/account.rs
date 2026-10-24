@@ -196,26 +196,28 @@ async fn deletion_purges_all_links_only_for_the_authenticated_device() {
         delete_account(state.clone(), Some(&token)).await,
         StatusCode::NO_CONTENT
     );
-    for table in [
-        "accounts",
-        "ledger",
-        "purchases",
-        "rewards",
-        "transcribe_requests",
+    for (table, sql) in [
+        ("accounts", "select count(*) from accounts where id=$1"),
+        ("ledger", "select count(*) from ledger where account_id=$1"),
+        (
+            "purchases",
+            "select count(*) from purchases where account_id=$1",
+        ),
+        (
+            "rewards",
+            "select count(*) from rewards where account_id=$1",
+        ),
+        (
+            "transcribe_requests",
+            "select count(*) from transcribe_requests where account_id=$1",
+        ),
     ] {
-        let column = if table == "accounts" {
-            "id"
-        } else {
-            "account_id"
-        };
-        // Nomes fixos do schema, sem interpolação de dados do pedido.
-        let sql = format!("select count(*) from {table} where {column}=$1");
-        let removed: i64 = sqlx::query_scalar(sql.as_str())
+        let removed: i64 = sqlx::query_scalar(sql)
             .bind(own.id)
             .fetch_one(&state.pool)
             .await
             .unwrap();
-        let preserved: i64 = sqlx::query_scalar(sql.as_str())
+        let preserved: i64 = sqlx::query_scalar(sql)
             .bind(other.id)
             .fetch_one(&state.pool)
             .await
