@@ -19,6 +19,9 @@ import android.graphics.Rect
 import com.keyflow.core.ButtonState
 import com.keyflow.core.KeyFlowController
 import com.keyflow.overlay.OverlayService
+import com.keyflow.data.SettingsRepository
+import com.keyflow.ui.onboarding.DISCLOSURE_VERSION
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -58,6 +61,9 @@ class KeyFlowKeyboardSelectorTest {
         // antiga sair, este arquivo migra para o seletor equivalente da BarView (MicSelectorController).
         context.getSharedPreferences("keyflow_kb_ui", Context.MODE_PRIVATE)
             .edit().putBoolean("kbd_bars", false).commit()
+        runBlocking {
+            SettingsRepository(context).saveDisclosureConsent(DISCLOSURE_VERSION, declined = false)
+        }
         shell("pm grant ${context.packageName} ${Manifest.permission.RECORD_AUDIO}")
         // Em CANCELLING o teste segura o mic duas vezes (confere o seletor, depois arrasta até "desfazer"): no emulador do CI,
         // com quadros de 1–2 s, isso passava dos 3 s da janela, o cancelamento se concluía sozinho e o "desfazer" sumia

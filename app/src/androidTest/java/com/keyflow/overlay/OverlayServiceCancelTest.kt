@@ -11,6 +11,9 @@ import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import com.keyflow.core.ButtonState
 import com.keyflow.core.KeyFlowController
+import com.keyflow.data.SettingsRepository
+import com.keyflow.ui.onboarding.DISCLOSURE_VERSION
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -49,6 +52,9 @@ class OverlayServiceCancelTest {
         OverlayService.cancelWindowMsForTest = 30_000L
         // Sobe o serviço já em RECORDING: ACTION_RECORD chama ensureForeground() (startForeground
         // imediato, sem warm-up extra) e coordinator.onTap() (ocioso → grava, MIN_RECORDING_MS à parte).
+        runBlocking {
+            SettingsRepository(context).saveDisclosureConsent(DISCLOSURE_VERSION, declined = false)
+        }
         OverlayService.start(context, OverlayService.actionIntent(context, OverlayService.ACTION_RECORD))
         waitUntilState(ButtonState.RECORDING)
     }
