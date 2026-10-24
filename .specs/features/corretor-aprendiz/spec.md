@@ -69,7 +69,7 @@ Duas frentes, na ordem do que dá mais acerto por esforço:
 **Como** pessoa que digita em português do Brasil, **quero** que o corretor pare de trocar o que não é erro **desde a primeira vez**.
 
 1. **BAS-01**: WHEN uma candidata é avaliada THEN a decisão de trocar SHALL ser **por classe** — acento que faltou, inicial maiúscula (nome próprio), **sigla** (tudo maiúsculo), 1 edição, 2 edições, par ensinado pela pessoa (FIX) — cada classe com o seu limiar, calibrado no banco; classe com precisão < 95% no banco **só sugere**.
-2. **BAS-02**: WHEN a palavra digitada é minúscula e a única candidata é a **sigla** ou a forma de outra caixa de uma palavra de ≤ 4 letras ("vc"→"VC", "tb"→"TB", "ok"→"OK") THEN o corretor SHALL só sugerir (decisão do Yan sobre "api"→"API", que o teste atual espera: `context.md` §8).
+2. **BAS-02**: WHEN a palavra digitada é minúscula e a única candidata é a **sigla** ou a forma de outra caixa de uma palavra de ≤ 4 letras ("vc"→"VC", "tb"→"TB", "ok"→"OK") THEN o corretor SHALL só sugerir , inclusive "api"→"API" e "url"→"URL" (decisão do Yan, 24/10: siglas só sugerem; o `RealDictionaryTest` passa a esperar só a sugestão).
 3. **BAS-03**: WHEN a palavra digitada tem acento ou cedilha que a pessoa digitou THEN o corretor SHALL **nunca** trocá-la por forma com menos acento ("Ágatha"→"Agatha", "Taís"→"Tais", "piá"→"pia", "parça"→"parca"); a escolha de forma entre as de mesmas letras respeita o que foi digitado.
 4. **BAS-04**: WHEN a palavra tem 3 ou mais letras iguais seguidas ("kkkk", "simmm", "nãooo", "oiii") ou é só consoantes de até 4 letras ("vc", "tb", "td", "hj", "msg") THEN o corretor SHALL só sugerir.
 5. **BAS-05**: WHEN a palavra digitada existe no dicionário de **outro** idioma instalado (en/es) com frequência ≥ F (calibrada no banco) e o teclado ativo é pt THEN o corretor SHALL só sugerir ("deploy", "push", "the", "you"; hoje 39% do inglês comum e 63% do espanhol comum viram outra palavra).
@@ -151,6 +151,8 @@ Duas frentes, na ordem do que dá mais acerto por esforço:
 3. **LST-03**: WHEN a pessoa remove uma palavra THEN ela SHALL deixar de valer na hora e o corretor SHALL voltar a tratá-la como qualquer palavra fora do dicionário.
 4. **LST-04**: WHEN há texto novo THEN SHALL passar por `tr("…")` com inglês e espanhol (`TranslationsTest`); a tela coleta fluxo por `collectAsStateOnMain`, lê o arquivo fora da thread principal e tem `testTag` por item.
 5. **LST-05**: WHEN as telas estabilizam THEN SHALL haver goldens da aba Teclado (novo grupo), da lista (vazia e com itens) e do diálogo de apagar, claro e escuro; os goldens existentes que não mudam ficam bit-idênticos.
+6. **LST-06**: WHEN a pessoa toca **"Exportar"** no grupo "Aprendizado do corretor" THEN o app SHALL avisar que o arquivo contém palavras pessoais e fica fora da proteção do app, e então gravar o aprendido (palavras, pares, bigramas e vieses de toque, por idioma) num arquivo que ela escolhe pelo seletor do sistema (`ACTION_CREATE_DOCUMENT`), em texto versionado com uma seção por idioma no formato de linha do ARM-01; nada passa pela rede (pedido do Yan, 24/10).
+7. **LST-07**: WHEN a pessoa toca **"Importar"** e escolhe um arquivo (`ACTION_OPEN_DOCUMENT`) THEN o app SHALL validar versão, tamanho (≤ 5 MB) e cada linha, mostrar o resumo (palavras e pares por idioma) e, confirmado, **mesclar** com o aprendido atual (ocorrências somadas; par em conflito fica o mais recente); arquivo inválido não muda nada e mostra o erro; com o aprendizado desligado ou em modo anônimo a importação continua permitida, porque é um pedido explícito.
 
 ### Armazenamento e desempenho (`ARM`, `PER`)
 
@@ -196,7 +198,7 @@ Duas frentes, na ordem do que dá mais acerto por esforço:
 | ADP-01..04 | Adaptação do toque | Pending | banco (sintético com viés) + unit |
 | CTX-01..04 | Contexto | Pending | unit + banco (conjunto de contexto) |
 | PRV-01..06 | Privacidade | Pending | unit (`LearningPolicyTest`, `BackupRulesTest`) + instrumentado + Compose (apagar) |
-| LST-01..05 | Tela de palavras | Pending | Compose instrumentado + goldens + `TranslationsTest` |
+| LST-01..07 | Tela de palavras, exportar e importar | Pending | Compose instrumentado + goldens + `TranslationsTest` |
 | ARM-01..03, PER-01..02 | Armazenamento e desempenho | Pending | unit (arquivo, fuzz) + `StrictModeKeyboardTest` + tempo no A32 |
 | ROL-01..04 | Rollout | Pending | flag de debug + gates |
 

@@ -71,7 +71,7 @@
 - **Tests**: unit + banco. **Gate**: `quick` + `assembleDebug`.
 - **Fim da fase A**: "manter" ≤ 10% trocadas, "erros" sem perda (catraca atualizada).
 
-## Fase B — Palavras do usuário e correção recusada (~7 dias)
+## Fase B — Palavras do usuário e correção recusada (~8 dias)
 
 ### CA-T8 — `LearningPolicy` e parâmetros
 - **What**: `LearningPolicy` (`fieldAllowsLearning`, `wordEligible`), `LearningParams`; constante
@@ -145,6 +145,16 @@
 - **Done when**: remover uma palavra a faz voltar a ser trocada/sugerida na hora; goldens só dos recortes novos
   (`config-teclado*`, `config-palavras-aprendidas*`, `config-privacidade-apagar-dados-confirmar*`), o resto bit-idêntico.
 - **Tests**: Compose instrumentado + goldens. **Gate**: `full` + `screenshot`.
+
+### CA-T16b — Exportar e importar o aprendido
+- **What**: "Exportar" e "Importar" no grupo "Aprendizado do corretor": aviso de dados pessoais, seletor do sistema,
+  arquivo de texto versionado por idioma, validação, resumo antes de mesclar, mescla (soma ocorrências; par em conflito
+  fica o mais recente).
+- **Where**: `LearnedStore` (serializar e mesclar), `LearnedWordsPanel.kt`. **Depends on**: CA-T10, CA-T16.
+- **Covers**: LST-06..07.
+- **Done when**: exportar → apagar tudo → importar devolve o mesmo aprendido (teste de ida e volta); arquivo truncado,
+  de versão futura ou > 5 MB é recusado sem mudar nada; nenhuma chamada de rede; goldens do aviso e do resumo.
+- **Tests**: unit (ida e volta, mescla, fuzz do leitor) + Compose instrumentado + goldens. **Gate**: `full` + `screenshot`.
 
 ### CA-T17 — Sessões no banco (curva de aprendizado)
 - **What**: `sessoes/*.tsv` com a pessoa simulada (palavras fora do dicionário recorrentes, desfazendo trocas, um
@@ -276,6 +286,7 @@
 | REJ-02, FIX-01 | CA-T14 |
 | PRV-01, 03, 04 | CA-T15 |
 | LST-01..05 | CA-T16 |
+| LST-06..07 | CA-T16b |
 | ROL-02 | CA-T18 |
 | SPA-01 | CA-T20 |
 | SPA-02..05 | CA-T19, CA-T21, CA-T22 |

@@ -294,3 +294,17 @@ número que vale sai da CA-T1 (sintético) e da CA-T2 (digitação real no A32).
 10. **Bigramas estáticos**: aceita corpus aberto CC0 (formal, pouca fala de chat) ou só o histórico pessoal?
 11. **Textos legais** (aviso do ditado, política, ficha da Play): mencionar o aprendizado no aparelho (a revisão é sua).
 12. **Modelo neural** (~60 MB baixável, depois): aceita avaliar quando o banco mostrar o resíduo?
+
+### Respostas do Yan (24/10)
+1. Licença: Apache 2.0, titular Yan Lucas. Nada de código do HeliBoard nem do FUTO (só ideias).
+2. Siglas **só sugerem**, inclusive `api`→`API` (BAS-02).
+3. Aprender **ligado por padrão**, com modo anônimo manual (LRN-08).
+4. **Fora** do backup e da transferência (PRV-01). Pedido novo: a pessoa pode **exportar e importar** o aprendido por
+   arquivo, quando quiser (LST-06..07, CA-T16b).
+5. Sem `READ_CONTACTS`: nomes vêm do uso.
+6. Peso 5:1 e 7. troca automática do par ensinado por toque duplo: como proposto.
+8. **Sim**: o Yan digita as ~600 palavras no A32 quando o gravador (CA-T2) estiver pronto; as frases-guia aparecem
+   na tela do gravador.
+9. Hit-test adaptado: entra na fase D, como no plano apresentado. 10. Bigramas: corpus CC0 + histórico pessoal.
+11. Textos legais: o Yan revisa quando a fase B chegar. 12. Neural: só depois, pelo catálogo sob demanda e com
+   licença compatível (o do FUTO fica fora).
