@@ -21,7 +21,7 @@ permissions:
 
 concurrency:
   group: site-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   site:
@@ -44,11 +44,22 @@ jobs:
           AWS_DEFAULT_REGION: auto
           R2_ENDPOINT: ${{ secrets.R2_SITE_ENDPOINT }}
         # Um sync por extensão, cada um com o content-type certo (a tabela TIPOS do gerar-site.py; o HTML vai
-        # por último). O --delete de cada passada só apaga, no bucket, arquivos daquela extensão que saíram do site.
+        # por último). Primeiro sincroniza tudo sem apagar nada; depois uma segunda passada com --delete só
+        # para remover arquivos excluídos, garantindo que o HTML antigo nunca aponte para assets que sumiram.
         run: |
           set -euo pipefail
-          python3 scripts/gerar-site.py --tipos | while IFS=$'\t' read -r ext tipo cache; do
+          tipos=$(python3 scripts/gerar-site.py --tipos)
+          echo "$tipos" | while IFS=$'\t' read -r ext tipo cache; do
             echo "Publicando *.$ext como $tipo"
+            aws s3 sync build/site s3://keyflow-site \
+              --endpoint-url "$R2_ENDPOINT" \
+              --exclude "*" \
+              --include "*.$ext" \
+              --content-type "$tipo" \
+              --cache-control "$cache" < /dev/null
+          done
+          echo "$tipos" | while IFS=$'\t' read -r ext tipo cache; do
+            echo "Limpando *.$ext excluídos"
             aws s3 sync build/site s3://keyflow-site \
               --endpoint-url "$R2_ENDPOINT" \
               --delete \
