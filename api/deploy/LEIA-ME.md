@@ -117,6 +117,31 @@ cole o valor em arquivo versionado.
 
 ## Preparação Única no GitHub (Coordenador)
 
+### Modo de compra simulada (somente staging, ativação manual)
+
+O padrão é desligado: sem `SIMULATED_PURCHASES_ENABLED=true`, as duas rotas de simulação respondem 404 e o
+registro continua exigindo Play Integrity real. Para uma rodada temporária no staging, o Yan pode definir no
+arquivo de ambiente **não versionado** do serviço `keyflow-api-staging`:
+
+```dotenv
+SIMULATED_PURCHASES_ENABLED=true
+SIMULATED_PURCHASE_HMAC_SECRET=<chave-de-teste-aleatoria-com-pelo-menos-32-bytes>
+```
+
+A chave precisa ser a mesma propriedade local `keyflowSimulatedPurchaseHmacSecret` usada para compilar o APK
+debug, junto das propriedades Cloudflare Access já descritas acima. É uma chave de teste compartilhada que
+fica legível no APK debug: use apenas em staging, com dados descartáveis, nunca uma credencial Google ou chave
+de produção; rotacione-a ao encerrar a rodada. No serviço de produção deixe a flag ausente (ou `false`) e não
+configure a chave. O boot falha se a simulação for ligada sem chave com pelo menos 32 bytes. Desligue a flag
+depois do teste; este guia não autoriza nem realiza deploy.
+
+O APK debug expõe a tela `.DebugSimulatedPurchaseActivity` (compra e reembolso identificáveis); o release não
+inclui essa classe nem as rotas. O instrumentado `SimulatedPurchaseStagingE2eTest` pula explicitamente quando
+faltam Access ou chave HMAC locais. A re-registração comprova a recuperação de entitlement no servidor, mas não
+substitui o teste de reinstalação real do Play/Integrity pendente da MZ-T15.
+
+## Preparação Única no GitHub (Coordenador)
+
 ### 1. Gerar os DOIS pares de chaves Ed25519 (staging e produção, fora do git!)
 ```bash
 umask 077

@@ -63,8 +63,8 @@ R$15, que também tira os anúncios para sempre. Os anúncios ficam só no app d
   configuração: banner + intersticial (M7/M8). Nunca no teclado nem no overlay. Fiação na V1-10.
 - Raciocínio: modelos locais (Gemma/Qwen) e provedores por chave de API (OpenAI, Anthropic, Google).
   Os logins por assinatura ChatGPT, Claude e Google também entram no release (decisão do Yan, 2026-10-23).
-- Agente KeyFlow da fase 1 (chat + ferramentas de skin com confirmação; MCP desligado) — **só se a
-  V1-4 fechar**; senão ele entra como "Em breve".
+- Agente KeyFlow da fase 1 (chat + ferramentas de skin com confirmação; MCP desligado) — no debug;
+  no release fica "Em breve" até a validação real autorizada da V1-4 **[YAN]**.
 - API em staging e produção (V1-9), com a rota de transcrição (API-T11) e a SSV (API-T12)
   desligadas (`TRANSCRIBE_ENABLED` e `SSV_ADMOB_ENABLED`, padrão desligado, 404 sem banco).
 
@@ -140,13 +140,13 @@ upload interno, o produto de R$15 e a service account. As tasks V1-1..V1-8 não 
   a compra e os anúncios. Em seguida sobe na trilha interna **[YAN]**, com a permissão de billing,
   para criar o produto de R$15 — antes do e2e real (MZ-T15/API-T14). A conta (decisão 1) trava
   esse upload. **[YAN]**: configurar/verificar no Console o client OAuth Google com o SHA-1 da chave de assinatura Play e o `applicationId` definitivo.
-- **V1-4** — Agente na v1: recorte da AGT-T10 para a fase 1 (abuso: injeção, segredo, argumentos,
-  flood) + validação real com a chave do Yan **[YAN]**. Não fechou → agente vira "Em breve".
+- ~~**V1-4** — Agente na v1: recorte da AGT-T10 para a fase 1 (abuso: injeção, segredo, argumentos,
+  flood) + validação real com a chave do Yan **[YAN]**.~~ **Feita em 2026-10-23** (recorte de abuso automatizado revisado; falta a validação real [YAN], então o agente fica **Em breve** no release até ela fechar; relatório em `.equipe/relatorios/v1-4-agente.md`).
 - **V1-5** — Política de privacidade (PS-2): áudio sob demanda para a origem escolhida, modelos locais,
   provedores de raciocínio por chave (`PLAYSTORE_CHECKLIST.md` §1b), agente, skins importadas, AdMob
   (banner e intersticial só no app de configuração, consentimento UMP) e a compra única de R$15.
   URL permanente **[YAN decide onde]** + link no app.
-- **V1-6** — Prominent disclosure no onboarding (PS-3). Instrumentado + golden.
+- ~~**V1-6** — Prominent disclosure no onboarding (PS-3): tela antes de `RECORD_AUDIO`, aceite versionado, recusa sem permissão e caminho de aceite posterior. Instrumentado + golden claro/escuro.~~ **Feita em 2026-10-23** (commit `a6ce554`; reforço do gate de captura nesta tarefa; relatório em `.equipe/relatorios/v1-6-divulgacao.md` e `.equipe/relatorios/v1-correcoes-privacidade.md`).
 - **V1-7** — Listing (PS-6) só com o que entra **[YAN aprova textos]**, com anúncios e a compra de
   R$15 (selo "Contém anúncios"); rascunho campo a campo do Data Safety (PS-4), agora com anúncios e
   compras, e da declaração dos serviços em primeiro plano (`microphone`, `dataSync`) — o Yan
@@ -234,7 +234,7 @@ do e2e da v1.
 | — | Play Store | **v1 = recorte de 2026-10-23** (V1-0 feita; seguem V1-1..V1-8, com V1-9 em paralelo e V1-10 depois do staging). `PLAYSTORE_CHECKLIST.md`; PS-1 (targetSdk 36) feito; PS-2..PS-7 viram V1-3/V1-5..V1-8 |
 | — | `reasoning-models` (aba Raciocínio) | **na `main` desde 2026-09-30**: RSN-T0..T17 feitos e o texto de privacidade da RSN-T18 em `PLAYSTORE_CHECKLIST.md` §1b (a traceability RPRV-01..04 ainda diz "In Tasks"). Faltam só **[YAN]**: repositório público e o roteiro RSN-T19 no A32 — ver Bloco 10 |
 | — | `skin-packs` (skins importáveis) + skin mascote | SKP-T1..T9 feitos (motor AndroidSVG, importação nas abas Teclado e Sobrepor, pacote de exemplo, orbe de pacote até 120 fps) e o mascote nativo (quick 018); na `main` local e na **PR #7**. Falta o roteiro no A32 **[YAN]** (pacote dele, orbe animada no Helio G80, IME real) |
-| — | `agent-harness` (agente KeyFlow) | fase 1 (AGT-T1..T5: núcleo, Anthropic, chat, ferramentas de skin, Ajustes; MCP desligado) na `main` local e na **PR #7**. Pendentes: AGT-T6 (ferramentas de app), T7 (OpenAI/Google), T8 (skins por modelo), T9 (MCP), T10 (abuso + validação real **[YAN]**) — o recorte da T10 para a fase 1 é a V1-4 |
+| — | `agent-harness` (agente KeyFlow) | fase 1 (AGT-T1..T5: núcleo, Anthropic, chat, ferramentas de skin, Ajustes; MCP desligado) na `main` local e na **PR #7**. Pendentes: AGT-T6 (ferramentas de app), T7 (OpenAI/Google), T8 (skins por modelo), T9 (MCP), T10 (validação real **[YAN]**; abuso automatizado do recorte V1-4 coberto parcialmente) |
 | — | Trabalho do Gemini (abas KeyFlow, Fluxos, Computador, Fala, Visão; provedores Anthropic/Google) | commitado e na PR #7. Provedores e aba KeyFlow funcionam; **Fluxos, Computador, Fala e Visão são só tela + `Settings`, sem motor e sem spec** → "Em breve" na v1 (V1-1). Pendências de segurança/release herdadas → V1-2 |
 | — | CI | 2026-10-07: cache do AAR do sherpa-onnx nos dois jobs (um 503 do GitHub derrubou a PR #7 antes dos testes) |
 | — | 2026-10-10..22 | PRs #8 a #11 (estabilidade dos testes, desempenho da abertura do teclado, CI, galeria) — fora da fila da v1 |

@@ -63,11 +63,17 @@ class ToolExecutor(
     val secretFilter: SecretFilter,
     private val actionLog: ActionLog,
     private val clock: () -> Long = System::currentTimeMillis,
+    private val rateClock: () -> Long = { System.nanoTime() / NANOS_PER_MILLI },
+    private val maxCallsPerMinute: Int = DEFAULT_MAX_CALLS_PER_MINUTE,
     /** Onde `run` executa (TLS-06): nunca a thread principal. Os testes injetam um dispatcher de teste. */
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
+    init { require(maxCallsPerMinute > 0) { "maxCallsPerMinute precisa ser positivo" } }
+
     /** Uma pergunta por vez: o painel de confirmação é um só, e duas chamadas (chat e MCP) não se atropelam nele. */
     private val confirmLock = Mutex()
+    private val rateLock = Any()
+    private val callTimes = java.util.ArrayDeque<Long>()
 
     /** As ferramentas LIGADAS agora. */
     fun activeTools(): List<AgentTool> = registry.active(policy::isEnabled)
@@ -80,6 +86,9 @@ class ToolExecutor(
         origin: ToolOrigin = ToolOrigin.CHAT,
         onPhase: suspend (ToolPhase) -> Unit = {},
     ): ToolOutcome {
+        if (!admitCall()) {
+            return refuse(ToolStatus.ERROR, "Limite de $maxCallsPerMinute chamadas de ferramenta por minuto atingido. Aguarde antes de tentar novamente.")
+        }
         val tool = registry[call.name]
             ?: return refuse(ToolStatus.ERROR, "Ferramenta desconhecida: «${clip(call.name, NAME_ECHO)}». ${availableTools()}")
 
@@ -233,11 +242,23 @@ class ToolExecutor(
 
     private fun clip(text: String, max: Int): String = if (text.length <= max) text else text.take(max) + "…"
 
+    private fun admitCall(): Boolean = synchronized(rateLock) {
+        val now = rateClock()
+        val cutoff = now - RATE_WINDOW_MS
+        while (callTimes.peekFirst()?.let { it <= cutoff } == true) callTimes.removeFirst()
+        if (callTimes.size >= maxCallsPerMinute) return@synchronized false
+        callTimes.addLast(now)
+        true
+    }
+
     private companion object {
         const val NAME_ECHO = 64
         const val SUMMARY_CHARS = 600
         const val CAPTION_CHARS = 1_500
         const val DETAIL_CHARS = 200
+        const val DEFAULT_MAX_CALLS_PER_MINUTE = 24
+        private const val RATE_WINDOW_MS = 60_000L
+        private const val NANOS_PER_MILLI = 1_000_000L
 
         /** O que o modelo lê quando o usuário diz não (TLS-02, AUI-02). */
         const val DENIED_TEXT = "O usuário negou esta ação. Não insista nem tente de outro jeito; diga o que você ia fazer e pergunte o que ele prefere."

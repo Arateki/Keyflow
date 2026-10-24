@@ -156,6 +156,13 @@ class SettingsRepository(
         dataStore.edit { it[ONBOARDING_DONE] = done }
     }
 
+    suspend fun saveDisclosureConsent(version: Int, declined: Boolean) {
+        dataStore.edit {
+            it[DISCLOSURE_ACCEPTED_VERSION] = version
+            it[DISCLOSURE_DECLINED] = declined
+        }
+    }
+
     suspend fun saveOverlayModeEnabled(enabled: Boolean) {
         dataStore.edit { it[OVERLAY_MODE_ENABLED] = enabled }
     }
@@ -412,6 +419,8 @@ class SettingsRepository(
                 ?: (if (prefs[HAPTIC_FEEDBACK] == false) 0 else 60),
             themeDark = prefs[THEME_DARK] ?: false,
             onboardingDone = prefs[ONBOARDING_DONE] ?: false,
+            disclosureAcceptedVersion = prefs[DISCLOSURE_ACCEPTED_VERSION] ?: 0,
+            disclosureDeclined = prefs[DISCLOSURE_DECLINED] ?: false,
             transcriptionTimeoutMs = prefs[TRANSCRIPTION_TIMEOUT_MS] ?: Config.DEFAULT_TIMEOUT_MS.toInt(),
             maxRecordingSec = prefs[MAX_RECORDING_SEC] ?: 300,
             keyboardScalePercent = prefs[KEYBOARD_SCALE_PERCENT] ?: 100,
@@ -522,6 +531,8 @@ class SettingsRepository(
             prefs[VIBRATION_INTENSITY] = persisted.vibrationIntensity
             prefs[THEME_DARK] = persisted.themeDark
             prefs[ONBOARDING_DONE] = persisted.onboardingDone
+            prefs[DISCLOSURE_ACCEPTED_VERSION] = persisted.disclosureAcceptedVersion
+            prefs[DISCLOSURE_DECLINED] = persisted.disclosureDeclined
             prefs[TRANSCRIPTION_TIMEOUT_MS] = persisted.transcriptionTimeoutMs
             prefs[MAX_RECORDING_SEC] = persisted.maxRecordingSec
             prefs[KEYBOARD_SCALE_PERCENT] = persisted.keyboardScalePercent
@@ -762,6 +773,8 @@ class SettingsRepository(
         val VIBRATION_INTENSITY = intPreferencesKey("vibration_intensity")
         val THEME_DARK = booleanPreferencesKey("theme_dark")
         val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
+        val DISCLOSURE_ACCEPTED_VERSION = intPreferencesKey("disclosure_accepted_version")
+        val DISCLOSURE_DECLINED = booleanPreferencesKey("disclosure_declined")
         val TRANSCRIPTION_TIMEOUT_MS = intPreferencesKey("transcription_timeout_ms")
         val MAX_RECORDING_SEC = intPreferencesKey("max_recording_sec")
         val KEYBOARD_SCALE_PERCENT = intPreferencesKey("keyboard_scale_percent")

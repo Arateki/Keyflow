@@ -73,6 +73,8 @@ android {
         // O token do Access só é preenchido no debug. Aqui fica vazio de propósito: o release não lê a propriedade.
         buildConfigField("String", "KEYFLOW_STAGING_ACCESS_CLIENT_ID", "\"\"")
         buildConfigField("String", "KEYFLOW_STAGING_ACCESS_CLIENT_SECRET", "\"\"")
+        buildConfigField("String", "KEYFLOW_SIMULATED_PURCHASE_HMAC_SECRET", "\"\"")
+        buildConfigField("boolean", "AGENT_ENABLED", "false")
         buildConfigField(
             "long",
             "KEYFLOW_INTEGRITY_CLOUD_PROJECT_NUMBER",
@@ -85,6 +87,7 @@ android {
         // ABIs do sherpa-onnx (STO-02): celulares ARM de 64 e 32 bits; x86_64 só no debug, para o
         // emulador. O x86 de 32 bits que vem no AAR não entra em nenhum.
         debug {
+            buildConfigField("boolean", "AGENT_ENABLED", "true")
             if (!providers.gradleProperty("keyflowApiBaseUrl").isPresent) {
                 buildConfigField(
                     "String",
@@ -101,6 +104,11 @@ android {
                 "String",
                 "KEYFLOW_STAGING_ACCESS_CLIENT_SECRET",
                 buildConfigString(unversionedProperty("keyflowStagingAccessClientSecret")),
+            )
+            buildConfigField(
+                "String",
+                "KEYFLOW_SIMULATED_PURCHASE_HMAC_SECRET",
+                buildConfigString(unversionedProperty("keyflowSimulatedPurchaseHmacSecret")),
             )
             ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
             // Cobertura dos testes de unidade (JaCoCo do próprio AGP): só com `-Pcoverage`, para o dia a dia não pagar a

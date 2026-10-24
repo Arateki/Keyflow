@@ -1,5 +1,9 @@
 package com.keyflow.ui.gallery
 
+import android.app.Activity
+import android.content.Context
+import android.view.View
+import android.widget.TextView
 import androidx.compose.foundation.background
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -68,6 +72,7 @@ import com.keyflow.ui.config.loadSkinPackCards
 import com.keyflow.skins.SkinIds
 import com.keyflow.ui.onboarding.OnboardingPermission
 import com.keyflow.ui.onboarding.OnboardingScreen
+import com.keyflow.ui.onboarding.ProminentDisclosureScreen
 import com.keyflow.ui.orb.OrbCenter
 import com.keyflow.ui.orb.OrbDragHint
 import com.keyflow.ui.orb.OrbDragKind
@@ -92,6 +97,9 @@ import com.keyflow.reasoning.UnavailableReason
 import com.keyflow.ui.config.AccountModel
 import com.keyflow.ui.config.AuthActions
 import com.keyflow.ui.config.TestState
+import com.keyflow.ads.AdsController
+import com.keyflow.ads.AdsRuntime
+import com.keyflow.ads.ConsentRequester
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 
@@ -279,6 +287,7 @@ object RouteCatalog {
         Route("config-teclado-travado") { ConfigTabRoute(ConfigTab.TECLADO) },
         Route("config-overlay-travado") { ConfigTabRoute(ConfigTab.OVERLAY) },
         Route("config-docs") { ConfigTabRoute(ConfigTab.DOCS) },
+        Route("config-docs-privacy-required") { ConfigTabRoute(ConfigTab.DOCS, adsPrivacyRequired = true) },
         // A seção Skins das duas abas (fica abaixo da dobra nas telas acima): a da orbe, na Sobrepor, e a do
         // teclado, na Teclado — escolhas separadas (Yan, 2026-09-29), aqui com o Aero marcado nas duas.
         Route("config-overlay-skins") { SkinsRoute(orb = true) },
@@ -429,6 +438,7 @@ object RouteCatalog {
         Route("config-unlock") { ConfigTabRoute(ConfigTab.TECLADO, keyboardEnabled = true, unlockOpen = true) },
         // "?" do cabeçalho aberto: a seção da Docs da aba, com o atalho para a Docs.
         Route("config-ajuda-teclado") { ConfigTabRoute(ConfigTab.TECLADO, keyboardEnabled = true, tabHelpOpen = true) },
+        Route("disclosure") { ProminentDisclosureScreen(declined = false, onAccept = {}, onDecline = {}) },
         Route("onboarding") { OnboardingRoute() },
         // PERM-04: o porquê de uma permissão aberto sob a linha (a do Teclado, que é a que FALTA no mock).
         Route("onboarding-why") { OnboardingRoute(explained = OnboardingPermission.KEYBOARD) },
@@ -659,7 +669,19 @@ object RouteCatalog {
         keyboardEnabled: Boolean = false,
         unlockOpen: Boolean = false,
         tabHelpOpen: Boolean = false,
+        adsPrivacyRequired: Boolean = false,
     ) {
+        val bannerTab = tab == ConfigTab.DOCS || tab == ConfigTab.OVERLAY || tab == ConfigTab.TECLADO
+        val context = LocalContext.current
+        val dark = LocalKeyFlowPalette.current.isDark
+        val galleryAdsRuntime = remember(dark) { GalleryAdsRuntime(dark) }
+        val adsController = remember(tab, dark) {
+            if (bannerTab) AdsController(
+                context.applicationContext,
+                galleryAdsRuntime,
+                GalleryConsentRequester(privacyOptionsRequired = adsPrivacyRequired),
+            ) else null
+        }
         ConfigScreen(
             settings = FakeSettings.settings.copy(
                 overlayModeEnabled = overlayEnabled,
@@ -687,7 +709,26 @@ object RouteCatalog {
             initialTab = tab,
             initialUnlockOpen = unlockOpen,
             initialTabHelpOpen = tabHelpOpen,
+            adsController = adsController,
         )
+    }
+
+    /** Banner determinístico, sem rede/SDK real, apenas nas capturas de configuração da galeria. */
+    private class GalleryAdsRuntime(private val dark: Boolean) : AdsRuntime {
+        override fun initialize(context: Context, onComplete: () -> Unit) = onComplete()
+        override fun createBanner(context: Context, adUnitId: String): View = TextView(context).apply {
+            val gray = if (dark) 58 else 238
+            setBackgroundColor(android.graphics.Color.rgb(gray, gray, gray))
+            text = ""
+        }
+        override fun loadInterstitial(context: Context, adUnitId: String, onReady: () -> Unit, onFailed: () -> Unit) = onFailed()
+        override fun showInterstitial(activity: Activity): Boolean = false
+        override fun destroy(view: View) = Unit
+    }
+
+    private class GalleryConsentRequester(private val privacyOptionsRequired: Boolean) : ConsentRequester {
+        override fun request(activity: Activity, onReady: () -> Unit) = onReady()
+        override fun privacyOptionsRequired(context: Context): Boolean = privacyOptionsRequired
     }
 
     /** Hospeda o [KeyFlowKeyboardView] (View) numa rota Compose, ancorado ao rodapé (KBD screenshots). */

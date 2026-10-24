@@ -10,9 +10,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.keyflow.ui.common.collectAsStateOnMain
+import com.keyflow.i18n.tr
 
 const val BANNER_SLOT_TAG = "admob-banner-slot"
 val BANNER_RESERVED_HEIGHT = 50.dp
@@ -38,12 +41,13 @@ fun BannerSlot(
         modifier
             .fillMaxWidth()
             .height(BANNER_RESERVED_HEIGHT)
+        .semantics { contentDescription = tr("Banner de anúncios") }
             .testTag(BANNER_SLOT_TAG),
     ) {
         view?.let { banner ->
             AndroidView(
                 factory = { banner },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().height(BANNER_RESERVED_HEIGHT),
             )
         }
     }

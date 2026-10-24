@@ -187,6 +187,7 @@ pausar/retomar e parar e copiar.
 1. WHEN o app abre pela 1ª vez (ou com pré-requisitos pendentes) THEN o sistema SHALL exibir o onboarding Ateliê (orbe grande, headline "Sua voz vira texto em qualquer campo.", checklist Microfone/Sobreposição/Teclado, "Conceder permissões", "Pular por agora").
 2. WHEN cada permissão está concedida/pendente THEN o checklist SHALL refletir o estado (✓ / FALTA).
 3. WHEN o usuário toca "Conceder permissões" THEN o sistema SHALL encaminhar às telas de sistema apropriadas; "Pular por agora" leva à config.
+4. WHEN o app ainda não tem aceite da divulgação de privacidade vigente THEN SHALL mostrar o aviso dentro do app antes de pedir microfone; aceitar persiste a versão e continua, recusar não pede permissão, informa que ditado fica indisponível e deixa reabrir pelo item Microfone. A tela declara áudio sob demanda, transcrição local ou provedor configurado, inserção no campo ativo, não transmissão de teclas e anúncios AdMob sujeitos a UMP.
 
 **Independent Test**: Instalação limpa → onboarding com checklist; conceder e chegar à config.
 
@@ -314,6 +315,7 @@ headless e capturar prints rotulados para comparar com os mocks e iterar.
 | ONB-01 | P1 Onboarding | Execute | Verified |
 | ONB-02 | P1 Onboarding (checklist) | Execute | Verified |
 | ONB-03 | P1 Onboarding (conceder/pular) | Execute | Verified |
+| ONB-04 | P1 Prominent disclosure antes de toda captura, aceite versionado e recusa/reabertura | Execute | Verified |
 | VERIFY-01 | P1 Harness (determinismo) | Execute | Verified |
 | VERIFY-02 | P1 Harness (1 PNG/rota) | Execute | Verified |
 | VERIFY-03 | P1 Harness (UiAutomator sistema) | Execute | Verified |

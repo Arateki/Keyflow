@@ -2524,6 +2524,14 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
 - **Próximo**: fase 2 (AGT-T6 ferramentas de app com lista de permitidos; AGT-T7 OpenAI/Google), fase 3 (AGT-T8 skins parametrizadas; AGT-T9 servidor MCP), AGT-T10 (abuso e validação
   real com a Anthropic — exige a chave e a autorização do Yan).
 
+## V1-4 — recorte de abuso do agente (2026-10-23)
+- O `ToolExecutor` centraliza validação, filtro e confirmação; a política de flood também precisa atravessar mensagens do usuário, então a janela móvel monotônica de 60 s mora no executor compartilhado do processo (24 tentativas, inclusive inválidas), não só no `AgentLoop` de cada turno. Teste com relógio falso cobre bloqueio e recuperação.
+- Os testes com motor falso provam as barreiras do app, não a resistência/comportamento do modelo real. Até o Yan autorizar e validar com a chave dele **[YAN]**, o agente não deve ser anunciado como funcional no release: fica **Em breve**.
+
+## V1 — correções da revisão (2026-10-23)
+- A flag `AGENT_ENABLED` habilita o agente apenas em debug; a `SetupActivity` só lê `agentRuntime` quando habilitado e a aba do release mostra o painel Em breve. O smoke checa DEX e navegação real, não apenas que a Activity abriu.
+- Ao testar fluxo de app em release, limpe o estado do emulador antes do launch: onboarding concluído pode esconder a divulgação e fazer o roteiro validar a tela errada.
+
 ## V1-1 — lição de ambiente (2026-10-23)
 - No servidor falta ImageMagick; por isso `scripts/diff-screens.sh` não roda como no CI sem instalar/fixar o comparador. A validação local precisou de um fallback temporário em `/tmp`.
 - 2026-10-23 — O `diff-screens.sh` só deve ser considerado validado com `compare`/`identify` reais; nesta rodada o host continuou sem ImageMagick, então rodei o script em um container descartável e deixei os goldens divergentes para revisão da T14 (14/216 capturas, incluindo `config-menu-aberto`).
@@ -2558,3 +2566,19 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
 - Redeem e ack são responsabilidades independentes: `pending` não é crédito, 401 refaz o registro uma vez, e toda compra `PURCHASED` não reconhecida recebe ack local mesmo após sucesso remoto.
 - A escolha salva de uma skin paga não é apagada no reembolso; a resolução cai em Sistema/Ateliê enquanto `skinsUnlocked` estiver falso e reaparece quando o direito voltar. A mesma regra vale no IME e no overlay.
 - O kill switch remoto suspende apenas monetização e mostra aviso traduzido; `minAppVersion` avisa sem bloquear o restante da configuração.
+
+## Monetização — MZ-T14 (2026-10-23)
+- **SPEC_DEVIATION**: o corpo antigo da T14 incluía rotas de saldo/recarga, mas o recorte v1 aprovado exclui créditos e rewarded; os goldens cobrem unlock e banners fake, sem implementar essas telas.
+- Capturas de banner da galeria devem injetar runtime e consentimento fakes; a execução visual não pode inicializar Mobile Ads real nem fazer rede.
+- Os slots não podem ficar dentro do `verticalScroll`: senão somem do primeiro quadro. Reserve o rodapé de 50 dp como irmão da área rolável e faça o `AndroidView` ocupar a altura toda.
+
+## Play — V1-6 Prominent disclosure (2026-10-23)
+- A divulgação deve preceder todo caminho de solicitação do microfone; guarde a versão aceita, e trate recusa como estado diferente de aceite. No servidor falta ImageMagick, então `scripts/diff-screens.sh` não roda como no CI: executar o comparador em container descartável.
+
+## Privacidade — correções de comportamento (2026-10-23)
+- Arquivos de gravação ficam em `cacheDir/keyflow-recordings`: apague após resultado terminal, mas preserve durante a janela de desfazer de cancelamento; na abertura, remova só arquivos com mais de 24 h. O cache pode conter áudio enquanto o app está em uso.
+- A verificação do aceite versionado deve ficar no ponto comum anterior a iniciar o recorder, e a tela da divulgação precisa reabrir mesmo quando `onboardingDone=true`; teste atualizações com microfone já concedido.
+- A entrada UMP depende de `privacyOptionsRequirementStatus == REQUIRED`; a API `showPrivacyOptionsForm` deve ser chamada como resposta ao toque do usuário.
+
+## Monetização — compra simulada de staging (2026-10-23)
+- A chave HMAC de teste também fica no APK debug para assinar recibos; use exclusivamente em staging, com dados descartáveis, e rotacione ao terminar. A re-registração testa restore remoto, mas não substitui Play Integrity real nem reinstalação física.

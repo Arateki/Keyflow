@@ -47,11 +47,47 @@ class OverlayCoordinatorTest {
         assertThat(recorder.stopped).isEqualTo(1)
         assertThat(transcriber.audioFiles).containsExactly(audio)
         assertThat(inserted).containsExactly("hello from overlay")
+        assertThat(audio.exists()).isFalse()
         assertThat(renderedStates).containsAtLeast(
             ButtonState.RECORDING,
             ButtonState.SENDING,
             ButtonState.IDLE_READY,
         ).inOrder()
+    }
+
+    @Test
+    fun `audio is deleted after a failed transcription`() = runTest {
+        val audio = temporaryFolder.newFile("audio-error.m4a").also { it.writeText("audio") }
+        val coordinator = coordinator(
+            scope = this,
+            recorder = FakeRecorder(audio),
+            transcriber = FakeTranscriber(TranscriptionResult.Error(com.keyflow.core.ErrorKind.NETWORK, "offline")),
+        )
+
+        coordinator.onTap()
+        coordinator.onTap()
+        advanceUntilIdle()
+
+        assertThat(audio.exists()).isFalse()
+    }
+
+    @Test
+    fun `recording shorter than minimum deletes file returned by recorder`() = runTest {
+        val audio = temporaryFolder.newFile("audio-short.m4a").also { it.writeText("audio") }
+        val recorder = FakeRecorder(audio)
+        var clock = 0L
+        val coordinator = coordinator(
+            scope = this,
+            recorder = recorder,
+            recordingClockMs = { clock },
+        )
+
+        coordinator.onTap()
+        clock = 350L
+        coordinator.onTap()
+
+        assertThat(recorder.stopped).isEqualTo(1)
+        assertThat(audio.exists()).isFalse()
     }
 
     /**
@@ -82,6 +118,26 @@ class OverlayCoordinatorTest {
         assertThat(renderedStates.last()).isEqualTo(ButtonState.ERROR)
         assertThat(lastTarget).isEqualTo(com.keyflow.core.ErrorNavTarget.MIC)
         assertThat(lastMessage).isEqualTo("Conceda permissão de microfone para usar essa função.")
+    }
+
+    @Test
+    fun `starting without current disclosure acceptance opens disclosure and does not record`() = runTest {
+        val recorder = FakeRecorder(null)
+        var disclosureRequests = 0
+        val coordinator = coordinator(
+            scope = this,
+            recorder = recorder,
+            recordingConsentAccepted = { false },
+            onDisclosureRequired = { disclosureRequests++ },
+        )
+
+        coordinator.onTap()
+        coordinator.onIntent(GestureIntent.START)
+        runCurrent()
+
+        assertThat(recorder.started).isEqualTo(0)
+        assertThat(coordinator.currentState()).isEqualTo(ButtonState.IDLE_READY)
+        assertThat(disclosureRequests).isEqualTo(2)
     }
 
     @Test
@@ -352,7 +408,8 @@ class OverlayCoordinatorTest {
 
     @Test
     fun `cancel window expiry discards recorder and returns to idle`() = runTest {
-        val recorder = FakeRecorder(temporaryFolder.newFile("a.m4a").also { it.writeText("a") })
+        val audio = temporaryFolder.newFile("a.m4a").also { it.writeText("a") }
+        val recorder = FakeRecorder(audio)
         val renderedStates = mutableListOf<ButtonState>()
         var hidden = 0
 
@@ -370,6 +427,7 @@ class OverlayCoordinatorTest {
         advanceTimeBy(3001)
 
         assertThat(recorder.discarded).isEqualTo(1)
+        assertThat(audio.exists()).isFalse()
         assertThat(renderedStates.last()).isEqualTo(ButtonState.IDLE_READY)
         assertThat(hidden).isEqualTo(1)
     }
@@ -773,6 +831,7 @@ class OverlayCoordinatorTest {
             assertThat(recorder.stopped).isEqualTo(1) // não chamou stop() de novo no gravador já liberado
             assertThat(transcriber.audioFiles).containsExactly(audio, audio) // reenviou o MESMO arquivo
             assertThat(inserted).containsExactly("done")
+            assertThat(audio.exists()).isFalse()
             assertThat(renderedStates.last()).isEqualTo(ButtonState.IDLE_READY)
         }
 
@@ -914,6 +973,8 @@ class OverlayCoordinatorTest {
         configTimeoutMs: Long = Config.DEFAULT_TIMEOUT_MS,
         concatAudioSegments: (List<File>, File) -> File = { segments, _ -> segments.first() },
         microphoneGranted: () -> Boolean = { true },
+        recordingConsentAccepted: () -> Boolean = { true },
+        onDisclosureRequired: () -> Unit = {},
     ) = OverlayCoordinator(
         scope = scope,
         configProvider = { completeConfig(configTimeoutMs) },
@@ -935,6 +996,8 @@ class OverlayCoordinatorTest {
         recordingClockMs = recordingClockMs,
         concatAudioSegments = concatAudioSegments,
         microphoneGranted = microphoneGranted,
+        recordingConsentAccepted = recordingConsentAccepted,
+        onDisclosureRequired = onDisclosureRequired,
     )
 
     private fun completeConfig(timeoutMs: Long = Config.DEFAULT_TIMEOUT_MS): Config = Config(
@@ -961,7 +1024,10 @@ class OverlayCoordinatorTest {
         }
         override fun pause() { paused++ }
         override fun resume() { resumed++ }
-        override fun discard() { discarded++ }
+        override fun discard() {
+            discarded++
+            audioFiles.filterNotNull().forEach(File::delete)
+        }
     }
 
     private class FakeTranscriber(private val result: TranscriptionResult) : OverlayTranscriber {

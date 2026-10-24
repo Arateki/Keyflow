@@ -33,6 +33,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.keyflow.ads.AdsController
 import com.keyflow.ads.AdsRuntime
 import com.keyflow.ads.BANNER_SLOT_TAG
+import com.keyflow.ads.ADS_PRIVACY_OPTIONS_TAG
 import com.keyflow.ads.ConsentRequester
 import com.keyflow.ads.InterstitialPolicy
 import com.keyflow.ads.InterstitialPolicyState
@@ -83,6 +84,7 @@ class ConfigScreenTest {
         var adsOff = false
         var showUpdateWarning = false
         var monetizationDisabled = false
+        var agentEnabled = true
         var interstitialPolicy: InterstitialPolicy? = null
         var interstitialPolicyChanges = 0
 
@@ -120,6 +122,7 @@ class ConfigScreenTest {
                     adsOff = adsOff,
                     showUpdateWarning = showUpdateWarning,
                     monetizationDisabled = monetizationDisabled,
+                    agentEnabled = agentEnabled,
                     interstitialPolicy = interstitialPolicy,
                     onInterstitialPolicyChanged = { interstitialPolicyChanges++ },
                     modifier = Modifier.fillMaxSize(),
@@ -149,6 +152,16 @@ class ConfigScreenTest {
     }
 
     @Test
+    fun disabledAgentShowsComingSoonInsteadOfChat() {
+        val h = Harness().also { it.agentEnabled = false }
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(tabTag(ConfigTab.KEYFLOW)).performClick()
+        rule.onNodeWithTag(COMING_SOON_PANEL_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(KEYFLOW_INPUT_TAG).assertDoesNotExist()
+    }
+
+    @Test
     fun bannerSlotsExistOnlyOnDocsModeAndKeyboard() {
         val h = Harness().also {
             it.settings = Settings(overlayModeEnabled = true, keyboardModeEnabled = true)
@@ -169,6 +182,22 @@ class ConfigScreenTest {
             rule.onNodeWithTag(tabTag(tab)).performClick()
             rule.onAllNodesWithTag(BANNER_SLOT_TAG).assertCountEquals(0)
         }
+    }
+
+    @Test
+    fun requiredAdsPrivacyOptionsCanBeReopenedFromDocs() {
+        val consent = FakeConsentRequester(required = true)
+        val h = Harness().also {
+            it.adsController = AdsController(
+                ApplicationProvider.getApplicationContext(),
+                FakeAdsRuntime(),
+                consent,
+            )
+        }
+        rule.setContent { h.Content() }
+        rule.onNodeWithTag(tabTag(ConfigTab.DOCS)).performClick()
+        rule.onNodeWithTag(ADS_PRIVACY_OPTIONS_TAG).assertIsDisplayed().performClick()
+        assertEquals(1, consent.privacyOptionsFormsShown)
     }
 
     @Test
@@ -503,8 +532,14 @@ class ConfigScreenTest {
         const val FRAME_MS = 16L
     }
 
-    private class FakeConsentRequester : ConsentRequester {
+    private class FakeConsentRequester(private val required: Boolean = false) : ConsentRequester {
+        var privacyOptionsFormsShown = 0
         override fun request(activity: Activity, onReady: () -> Unit) = onReady()
+        override fun privacyOptionsRequired(context: Context): Boolean = required
+        override fun showPrivacyOptionsForm(activity: Activity, onDismissed: () -> Unit) {
+            privacyOptionsFormsShown++
+            onDismissed()
+        }
     }
 
     private class FakeAdsRuntime : AdsRuntime {

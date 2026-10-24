@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -52,6 +53,7 @@ import androidx.compose.ui.unit.sp
 import com.keyflow.BuildConfig
 import com.keyflow.ads.AdsController
 import com.keyflow.ads.BannerSlot
+import com.keyflow.ads.AdsPrivacyOptionsEntry
 import com.keyflow.core.RecordingMode
 import com.keyflow.ui.common.verticalScrollbar
 import com.keyflow.ui.theme.LocalKeyFlowPalette
@@ -477,45 +479,51 @@ fun DocsPanel(
         scrollTo(id)
     }
 
-    Column(
-        modifier
-            .fillMaxWidth()
-            .onGloballyPositioned { viewport[0] = it }
-            .verticalScrollbar(scroll, palette.muted.copy(alpha = 0.35f), rightBleed = 9.dp)
-            .verticalScroll(scroll)
-            .padding(top = 20.dp, bottom = 32.dp),
-    ) {
-        SettingsGroup(tr("Como funciona")) {
-            Column(Modifier.padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-                Step("01", tr("Fale"), tr("Toque em Gravar no teclado, ou no orbe flutuante."))
-                Step("02", tr("Transcreve"), tr("O áudio vai à origem de voz escolhida e volta como texto."))
-                Step("03", tr("Cola"), tr("O texto entra direto no campo ativo do app."))
+    Column(modifier.fillMaxSize()) {
+        Column(
+            Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .onGloballyPositioned { viewport[0] = it }
+                .verticalScrollbar(scroll, palette.muted.copy(alpha = 0.35f), rightBleed = 9.dp)
+                .verticalScroll(scroll)
+                .padding(top = 20.dp, bottom = 32.dp),
+        ) {
+            SettingsGroup(tr("Como funciona")) {
+                Column(Modifier.padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                    Step("01", tr("Fale"), tr("Toque em Gravar no teclado, ou no orbe flutuante."))
+                    Step("02", tr("Transcreve"), tr("O áudio vai à origem de voz escolhida e volta como texto."))
+                    Step("03", tr("Cola"), tr("O texto entra direto no campo ativo do app."))
+                }
             }
-        }
 
-        DocsIndex(docsSections, onSelect = ::scrollTo)
+            DocsIndex(docsSections, onSelect = ::scrollTo)
 
-        docsSections.forEach { section ->
-            Section(
-                section,
-                Modifier.onGloballyPositioned { anchors[section.id] = it },
-            ) {
-                if (section.feedbackActions) {
-                    FeedbackActions(
-                        noEmailApp = noEmailApp,
-                        onSend = { kind ->
-                            try {
-                                launch(feedbackIntent(kind, FeedbackDiagnostics.current()))
-                                noEmailApp = false
-                            } catch (_: ActivityNotFoundException) {
-                                noEmailApp = true
-                            }
-                        },
-                    )
+            docsSections.forEach { section ->
+                Section(
+                    section,
+                    Modifier.onGloballyPositioned { anchors[section.id] = it },
+                ) {
+                    if (section.feedbackActions) {
+                        FeedbackActions(
+                            noEmailApp = noEmailApp,
+                            onSend = { kind ->
+                                try {
+                                    launch(feedbackIntent(kind, FeedbackDiagnostics.current()))
+                                    noEmailApp = false
+                                } catch (_: ActivityNotFoundException) {
+                                    noEmailApp = true
+                                }
+                            },
+                        )
+                    }
                 }
             }
         }
-        adsController?.let { BannerSlot(it, adsOff = adsOff, entitlementsLoaded = entitlementsLoaded) }
+        adsController?.let {
+            AdsPrivacyOptionsEntry(it, adsOff = adsOff)
+            BannerSlot(it, adsOff = adsOff, entitlementsLoaded = entitlementsLoaded)
+        }
     }
 }
 
