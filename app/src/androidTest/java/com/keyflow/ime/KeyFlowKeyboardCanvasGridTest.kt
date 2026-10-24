@@ -17,6 +17,7 @@ import androidx.test.uiautomator.Until
 import com.keyflow.core.ButtonState
 import com.keyflow.core.KeyFlowController
 import com.keyflow.data.SettingsRepository
+import com.keyflow.ui.onboarding.DISCLOSURE_VERSION
 import com.keyflow.ime.keyboard.layout.KeyAction as CanvasKeyAction
 import org.junit.After
 import org.junit.Before
@@ -46,6 +47,9 @@ class KeyFlowKeyboardCanvasGridTest {
     @Before
     fun captureUserSettings() {
         userSettings.capture()
+        runBlocking {
+            SettingsRepository(context).saveDisclosureConsent(DISCLOSURE_VERSION, declined = false)
+        }
         // A grade só entra na hierarquia (e só é medida) com o teclado expandido.
         userSettings.forceExpanded()
         // Toque que demora a ser injetado no emulador lento não pode virar "segurar" (o "q" digitava "1"). Os testes da tira de

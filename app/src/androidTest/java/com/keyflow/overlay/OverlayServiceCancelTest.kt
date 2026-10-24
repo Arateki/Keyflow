@@ -11,6 +11,10 @@ import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import com.keyflow.core.ButtonState
 import com.keyflow.core.KeyFlowController
+import com.keyflow.data.SettingsRepository
+import com.keyflow.ui.onboarding.DISCLOSURE_VERSION
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -37,6 +41,8 @@ class OverlayServiceCancelTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context: Context get() = instrumentation.targetContext
     private val device: UiDevice get() = UiDevice.getInstance(instrumentation)
+    private var savedDisclosureVersion = 0
+    private var savedDisclosureDeclined = false
 
     @Before
     fun setUp() {
@@ -49,6 +55,12 @@ class OverlayServiceCancelTest {
         OverlayService.cancelWindowMsForTest = 30_000L
         // Sobe o serviço já em RECORDING: ACTION_RECORD chama ensureForeground() (startForeground
         // imediato, sem warm-up extra) e coordinator.onTap() (ocioso → grava, MIN_RECORDING_MS à parte).
+        runBlocking {
+            val s = SettingsRepository(context).settingsFlow().first()
+            savedDisclosureVersion = s.disclosureAcceptedVersion
+            savedDisclosureDeclined = s.disclosureDeclined
+            SettingsRepository(context).saveDisclosureConsent(DISCLOSURE_VERSION, declined = false)
+        }
         OverlayService.start(context, OverlayService.actionIntent(context, OverlayService.ACTION_RECORD))
         waitUntilState(ButtonState.RECORDING)
     }
@@ -57,6 +69,9 @@ class OverlayServiceCancelTest {
     fun tearDown() {
         OverlayService.cancelWindowMsForTest = null
         OverlayService.stop(context)
+        runBlocking {
+            SettingsRepository(context).saveDisclosureConsent(savedDisclosureVersion, savedDisclosureDeclined)
+        }
     }
 
     @Test

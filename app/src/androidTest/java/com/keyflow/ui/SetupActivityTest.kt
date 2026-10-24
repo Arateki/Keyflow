@@ -176,13 +176,17 @@ class SeedOnboardingRule(
     private val done: Boolean,
     private val acceptedVersion: Int = 0,
 ) : org.junit.rules.ExternalResource() {
+    private var saved: com.keyflow.data.Settings? = null
+
     override fun before() {
         val ctx = InstrumentationRegistry.getInstrumentation().targetContext
         OverlayService.stop(ctx)
         runBlocking {
             val repo = SettingsRepository(ctx)
+            val current = repo.settingsFlow().first()
+            saved = current
             repo.saveSettings(
-                repo.settingsFlow().first().copy(
+                current.copy(
                     onboardingDone = done,
                     overlayModeEnabled = false,
                     disclosureAcceptedVersion = acceptedVersion,
@@ -193,6 +197,17 @@ class SeedOnboardingRule(
         val deadline = SystemClock.elapsedRealtime() + 3000
         while (OverlayService.isRunningForUi && SystemClock.elapsedRealtime() < deadline) {
             SystemClock.sleep(50)
+        }
+    }
+
+    override fun after() {
+        val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+        OverlayService.stop(ctx)
+        val previous = saved
+        if (previous != null) {
+            runBlocking {
+                SettingsRepository(ctx).saveSettings(previous)
+            }
         }
     }
 }
