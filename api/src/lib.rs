@@ -278,13 +278,13 @@ mod tests {
         let integrity = IntegrityClient::new(
             Client::new(),
             "http://127.0.0.1:0".to_string(),
-            "com.keyflow".to_string(),
+            "com.arateki.keyflow".to_string(),
             unused_key.clone(),
         );
         let publisher = PublisherClient::new(
             Client::new(),
             "http://127.0.0.1:0".to_string(),
-            "com.keyflow".to_string(),
+            "com.arateki.keyflow".to_string(),
             unused_key,
         );
         AppState::new(
@@ -292,7 +292,7 @@ mod tests {
             integrity,
             publisher,
             Client::new(),
-            "com.keyflow".to_string(),
+            "com.arateki.keyflow".to_string(),
             false,
             std::num::NonZeroU32::new(1000).unwrap(),
             std::num::NonZeroU32::new(1000).unwrap(),

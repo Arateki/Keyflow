@@ -14,7 +14,7 @@ use sha2::Sha256;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tower::ServiceExt;
 
-const PACKAGE_NAME: &str = "com.keyflow";
+const PACKAGE_NAME: &str = "com.arateki.keyflow";
 
 fn state(transcription: TranscriptionConfig, ads: AdsConfig, pool: sqlx::PgPool) -> AppState {
     let unused_key = ServiceAccountKey {

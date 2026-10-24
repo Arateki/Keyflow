@@ -55,7 +55,7 @@ Lista completa (ver também `api/README.md` §Setup):
 | `DATABASE_URL` | sim | Passo 2 acima |
 | `BIND_ADDR` | não (default `0.0.0.0:8080`) | — |
 | `GOOGLE_SERVICE_ACCOUNT_JSON_PATH` | sim | **[YAN]** service account do Google Cloud (Play Integrity + Developer API habilitadas) — ver abaixo |
-| `PACKAGE_NAME` | sim | `com.keyflow` (já conhecido, não é segredo) |
+| `PACKAGE_NAME` | sim | `com.arateki.keyflow` (já conhecido, não é segredo) |
 | `INTEGRITY_RELAXED` | não (default `false`) | `true` só se a credencial real ainda não existir (ver §5) |
 | `REGISTER_RATE_LIMIT_PER_MINUTE`, `ACCOUNT_RATE_LIMIT_PER_MINUTE` | não | defaults razoáveis, ajustar depois de medir tráfego real |
 | `VOIDED_PURCHASES_JOB_INTERVAL_SECS` | não (default `3600`) | — |
@@ -67,7 +67,7 @@ Lista completa (ver também `api/README.md` §Setup):
 ### Service account do Google — **[YAN]**
 
 Precisa de uma service account no Google Cloud com:
-- API **Play Integrity** habilitada, permissão pra decodificar tokens do app `com.keyflow`.
+- API **Play Integrity** habilitada, permissão pra decodificar tokens do app `com.arateki.keyflow`.
 - API **Google Play Android Developer** habilitada (`androidpublisher`), vinculada ao app no
   Play Console (Configurações da API no Play Console → vincular o projeto GCP → conceder acesso
   à service account).
@@ -96,7 +96,7 @@ curl -si https://api.keyflow.example/v1/models | head -20
 ```
 
 `POST /v1/register` só é testável de ponta a ponta com um `integrityToken` real gerado por um
-device Android de verdade contra o app `com.keyflow` publicado (ou em teste interno) no Play —
+device Android de verdade contra o app `com.arateki.keyflow` publicado (ou em teste interno) no Play —
 não dá pra fabricar um token de Integrity válido fora desse fluxo. Esse smoke específico fica
 **[YAN]** (junto com API-T14, que cruza com MZ-T15 do app).
 

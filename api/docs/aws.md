@@ -661,7 +661,7 @@ o da rajada é o pico enquanto o crédito existe.
 #### Etapa B — Console do Google Cloud / Play Console (se ainda não criado na API-T13)
 4. No **Google Cloud Console**, habilitar a **Play Integrity API** e a **Google Play Android
    Developer API**, criar uma Service Account, baixar o JSON da chave privada e vinculá-la ao app
-   `com.keyflow` no **Google Play Console** (com permissão de visualizar dados financeiros/gerenciar
+   `com.arateki.keyflow` no **Google Play Console** (com permissão de visualizar dados financeiros/gerenciar
    pedidos para validar compras e ler `voidedpurchases`).
 
 #### Etapa C — Console da Cloudflare e Servidor
