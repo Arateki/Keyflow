@@ -2594,3 +2594,10 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
 - Rotação diária de 30 arquivos pode guardar registros por mais de 30 dias. Históricos de 29 dias,
   arquivos horários, ifempty e timer horário dão margem; conferir cópias do provisionador com teste e
   exercitar logrotate em arquivos temporários. Implantação e serviços de borda continuam com o Yan.
+
+- Revisão dos goldens encontrou os textos novos herdando corpo e cores padrão do Material: no claro
+  destoavam da Docs e no escuro perdiam contraste. Reusar DocBlocks, paleta e tamanhos explícitos também
+  no diálogo; instrumentados de comportamento sozinhos não cobrem esse defeito visual.
+- SQLx 0.9 exige SqlSafeStr: a matriz de contagens do teste de exclusão usa consultas literais,
+  sem formatar o SQL em tempo de execução. Teste autenticado comprova cascata nas quatro tabelas,
+  isolamento do aparelho vizinho e restauração do mesmo purchaseToken após novo registro.

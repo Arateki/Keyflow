@@ -198,7 +198,7 @@ anônima preservada; o cache remoto é limpo, sem apagar a compra local reconhec
 | RWD-01..04 | Rewarded | Pending |
 | RMT-01..03 | Manifest/config remota | Parcial — MZ-T13 + revisão; aviso e kill switch ligados à UI |
 
-**Coverage:** 24 total; IDN e UNL parcialmente verificados em MZ-T1–T4. O restante depende das
+**Coverage:** 28 total; IDN e UNL parcialmente verificados em MZ-T1–T4. O restante depende das
 tasks seguintes e, no caminho remoto, da KeyFlow API existir em staging — ver
 `.specs/features/keyflow-api/`.
 
