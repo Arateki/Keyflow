@@ -87,7 +87,11 @@ async fn run(config: Config) {
             daily_cap: config.ads_daily_cap.get() as i64,
         },
     )
-    .with_trusted_proxies(config.trusted_proxies.clone());
+    .with_trusted_proxies(config.trusted_proxies.clone())
+    .with_simulated_purchases(
+        config.simulated_purchases_enabled,
+        config.simulated_purchase_hmac_secret.clone(),
+    );
 
     // O handle fica vivo enquanto o servidor roda. Dropar no fim só desanexa a tarefa.
     let _cleanup = RateLimiters::spawn_cleanup(Arc::clone(&state.rate_limiters), CLEANUP_INTERVAL);

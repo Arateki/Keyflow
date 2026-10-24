@@ -16,6 +16,7 @@ import com.keyflow.data.Settings
 import com.keyflow.i18n.tr
 import com.keyflow.reasoning.openai.OpenAiModels
 import com.keyflow.ui.icons.KfIcons
+import com.keyflow.ui.common.collectAsStateOnMain
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -139,12 +140,9 @@ internal fun OpenAiPanel(
         onRefreshApiModels = { refresh++ },
         modelsNote = tr("Não foi possível carregar os modelos da conta.").takeIf { modelsFailed },
         modelsNoteTag = OPENAI_MODELS_EMPTY_TAG,
-        apiKey = remember(connection, settings.providerOpenAiApiKey, settings.openaiToken) {
-            actions.apiKey().orEmpty().ifEmpty { settings.providerOpenAiApiKey.ifEmpty { settings.openaiToken } }
-        },
+        apiKey = remember(actions) { actions.apiKeyFlow() }.collectAsStateOnMain(null).value.orEmpty(),
         onApiKeyChange = {
             actions.saveApiKey(it)
-            onSettingsChange(settings.copy(providerOpenAiApiKey = it, openaiToken = it))
         },
         getKeyUrl = "https://platform.openai.com/api-keys",
         onOpenGetKeyUrl = { actions.openUrl("https://platform.openai.com/api-keys") },

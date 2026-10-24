@@ -1,0 +1,49 @@
+name: site
+
+on:
+  pull_request:
+    paths:
+      - "docs/loja/**"
+      - "scripts/gerar-site.py"
+      - ".github/workflows/site.yml"
+  push:
+    branches: [main]
+    paths:
+      - "docs/loja/**"
+      - "scripts/gerar-site.py"
+      - ".github/workflows/site.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: site-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  site:
+    name: Gerar e publicar site
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Gerar e validar páginas estáticas
+        run: python3 scripts/gerar-site.py
+
+      - name: Publicar site no Cloudflare R2
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_SITE_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SITE_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ENDPOINT: ${{ secrets.R2_SITE_ENDPOINT }}
+        run: |
+          aws s3 sync build/site s3://keyflow-site \
+            --endpoint-url "$R2_ENDPOINT" \
+            --delete \
+            --content-type "text/html; charset=utf-8" \
+            --cache-control "public, max-age=300"

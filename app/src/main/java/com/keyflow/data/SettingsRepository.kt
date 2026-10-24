@@ -15,6 +15,11 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.security.crypto.MasterKey
+import com.keyflow.auth.Credential
+import com.keyflow.auth.CredentialStore
+import com.keyflow.auth.CredentialVaultLock
+import com.keyflow.auth.ProviderIds
+import com.keyflow.auth.SecureCredentialStore
 import com.keyflow.core.FalaSource
 import com.keyflow.core.OrbShortcutAction
 import com.keyflow.core.OverlaySide
@@ -33,10 +38,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.io.File
 
 class SettingsRepository(
@@ -44,19 +52,43 @@ class SettingsRepository(
     dataStoreFile: File = defaultDataStoreFile(context),
     private val securePrefsName: String = SECURE_PREFS_NAME,
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+    private val securePrefsFactory: (Context, String) -> SharedPreferences = { app, name -> SecurePrefs.create(app, name) },
+    private val credentialStoreFactory: (Context, String) -> CredentialStore = { app, name -> SecureCredentialStore(app, name) },
 ) {
     private val appContext = context.applicationContext
     private val dataStore: DataStore<Preferences> = dataStoreFor(dataStoreFile, scope)
-    private val securePrefs: SharedPreferences by lazy {
-        createSecurePrefs(appContext, securePrefsName)
+    private val legacyPrefs: SharedPreferences by lazy {
+        securePrefsFactory(appContext, securePrefsName)
     }
+    private val authPrefsName = if (securePrefsName == SECURE_PREFS_NAME) {
+        SecureCredentialStore.PREFS_NAME
+    } else {
+        "${SecureCredentialStore.PREFS_NAME}_$securePrefsName"
+    }
+    private val credentials: CredentialStore by lazy { credentialStoreFactory(appContext, authPrefsName) }
 
     /**
      * O cofre cifrado das Settings (`keyflow_secure`), para quem precisa LER todos os valores secretos — o filtro de segredos do agente, que
      * os troca por valor em tudo que vai ao modelo. Só leitura: ninguém grava por aqui (as gravações são as do [saveSettings]). É a mesma
      * instância preguiçosa que o repositório usa, então o nome do cofre fica num lugar só.
      */
-    internal fun secretVault(): SharedPreferences = securePrefs
+    internal fun secretVault(): SharedPreferences = legacyPrefs
+
+    /** Grava uma chave sem colocar o valor no estado de [Settings] nem na thread da UI. */
+    suspend fun saveSecret(key: String, value: String) = withContext(Dispatchers.IO) {
+        SettingsSecrets.SUSPEND_LOCK.withLock {
+            // Mesmo a gravação pontual precisa concluir a migração antes de tocar na origem antiga.
+            migrateLegacySecretsLocked()
+            val provider = apiKeyProvider(key)
+            if (provider != null) {
+                if (value.isBlank()) credentials.clearApiKey(provider) else credentials.put(provider, Credential.ApiKey(value))
+            } else if (value.isBlank()) {
+                credentials.clearSecret(key)
+            } else {
+                credentials.putSecret(key, value)
+            }
+        }
+    }
 
     /**
      * Config efetivo consumido pelo transcritor. Resolve pela **origem selecionada** ([Settings.source])
@@ -93,12 +125,20 @@ class SettingsRepository(
     fun keyboardAutoCorrectFlow(): Flow<Boolean> = dataStore.data.map { it[KEYBOARD_AUTO_CORRECT] ?: true }
 
     fun keyboardSkinFlow(): Flow<String> = dataStore.data.map { it[KEYBOARD_SKIN] ?: "system" }
+    fun skinsUnlockedFlow(): Flow<Boolean> = dataStore.data.map { it[SKINS_UNLOCKED] ?: false }
 
     /** Idioma da interface, leve (só DataStore): o [com.keyflow.App] aplica no processo inteiro. */
     fun appLanguageFlow(): Flow<String> = dataStore.data.map { it[APP_LANGUAGE] ?: "" }
 
     /** Mesma leitura leve de [themeDarkOnce], para as cores do teclado em `onCreateInputView`. */
     suspend fun keyboardSkinOnce(): String = dataStore.data.first()[KEYBOARD_SKIN] ?: "system"
+
+    suspend fun skinsUnlockedOnce(): Boolean = dataStore.data.first()[SKINS_UNLOCKED] ?: false
+
+    /** Estado técnico compartilhado com o IME e o overlay; não altera a escolha de skin salva. */
+    suspend fun saveSkinsUnlocked(unlocked: Boolean) {
+        dataStore.edit { it[SKINS_UNLOCKED] = unlocked }
+    }
 
     /**
      * Idioma do teclado ("pt"/"en"/"es"), gerenciado pelo app (não pelos subtypes do sistema — ver
@@ -114,6 +154,13 @@ class SettingsRepository(
 
     suspend fun saveOnboardingDone(done: Boolean) {
         dataStore.edit { it[ONBOARDING_DONE] = done }
+    }
+
+    suspend fun saveDisclosureConsent(version: Int, declined: Boolean) {
+        dataStore.edit {
+            it[DISCLOSURE_ACCEPTED_VERSION] = version
+            it[DISCLOSURE_DECLINED] = declined
+        }
     }
 
     suspend fun saveOverlayModeEnabled(enabled: Boolean) {
@@ -153,6 +200,7 @@ class SettingsRepository(
             language = prefs[KEYBOARD_LANGUAGE] ?: "pt",
             numberRowEnabled = prefs[KEYBOARD_NUMBER_ROW_ENABLED] ?: false,
             skin = prefs[KEYBOARD_SKIN] ?: "system",
+            skinsUnlocked = prefs[SKINS_UNLOCKED] ?: false,
             bars = ShortcutCodec.decodeBars(prefs[BARS_CONFIG_JSON]),
             grids = ShortcutCodec.decodeGrids(prefs[SHORTCUT_GRIDS_JSON]),
             vibration = prefs[VIBRATION_INTENSITY] ?: (if (prefs[HAPTIC_FEEDBACK] == false) 0 else 60),
@@ -265,7 +313,11 @@ class SettingsRepository(
     }
 
     fun flow(): Flow<Config> = settingsFlow().map { settings ->
-        when (val eff = settings.effectiveConfigFor()) {
+        val values = SettingsCredentialValues(
+            openaiToken = credentials.getApiKey(ProviderIds.OPENAI)?.value.orEmpty(),
+            groqToken = credentials.getApiKey(ProviderIds.GROQ)?.value.orEmpty(),
+        )
+        when (val eff = settings.effectiveConfigFor(credentials = values)) {
             is EffectiveConfig.Ready -> eff.config
             // Sem endpoint nem token: o RoutingTranscriber manda para o :inference (NM-T9, PRV-01).
             is EffectiveConfig.Local -> Config(
@@ -274,7 +326,7 @@ class SettingsRepository(
             )
             EffectiveConfig.Unavailable -> Config()
         }
-    }
+    }.flowOn(Dispatchers.IO)
 
     /**
      * Estado completo de configuração (T5). Os campos `custom*` compartilham as chaves legadas;
@@ -283,20 +335,20 @@ class SettingsRepository(
      */
     // O map lê o cofre cifrado (abre o EncryptedSharedPreferences: disco + Keystore) e roda na thread de quem coleta — o
     // teclado e a orbe coletam na principal. flowOn leva a leitura (e a migração do onStart) para o IO (StrictModeKeyboardTest).
-    fun settingsFlow(): Flow<Settings> = dataStore.data.onStart { migrateLegacySecrets() }.map { prefs ->
+    fun settingsFlow(): Flow<Settings> = flow {
+        migrateLegacySecrets()
+        emitAll(dataStore.data.map { prefs ->
         val mirrorUrl = prefs[CUSTOM_MODEL_MIRROR_URL]?.ifBlank { null }
         ModelProvisioning.customMirrorUrl = mirrorUrl
         Settings(
             source = prefs[SOURCE].toSource(),
             customEndpoint = prefs[ENDPOINT_URL].orEmpty(),
             customHeaderName = prefs[AUTH_HEADER_NAME] ?: "Authorization",
-            customHeaderValue = securePrefs.getString(SettingsSecrets.AUTH_HEADER_VALUE, "").orEmpty(),
+            customHeaderValue = credentials.getSecret(SettingsCredentialKeys.CUSTOM_HEADER).orEmpty(),
             customModel = prefs[MODEL] ?: "whisper-1",
             customLanguage = prefs[LANGUAGE]?.takeIf { it.isNotBlank() },
-            openaiToken = securePrefs.getString(SettingsSecrets.OPENAI_TOKEN, "").orEmpty(),
             openaiModel = prefs[OPENAI_MODEL] ?: Settings.OPENAI_MODEL,
             openaiLanguage = prefs[OPENAI_LANGUAGE]?.takeIf { it.isNotBlank() },
-            groqToken = securePrefs.getString(SettingsSecrets.GROQ_TOKEN, "").orEmpty(),
             groqModel = prefs[GROQ_MODEL] ?: Settings.GROQ_MODEL,
             groqLanguage = prefs[GROQ_LANGUAGE]?.takeIf { it.isNotBlank() },
             localModelId = prefs[LOCAL_MODEL_ID]?.takeIf { it.isNotBlank() },
@@ -308,54 +360,45 @@ class SettingsRepository(
             reasoningGoogleModel = prefs[REASONING_GOOGLE_MODEL] ?: "gemini-2.0-flash",
             reasoningCustomEndpoint = prefs[REASONING_CUSTOM_ENDPOINT].orEmpty(),
             reasoningCustomHeaderName = prefs[REASONING_CUSTOM_HEADER_NAME] ?: "Authorization",
-            reasoningCustomHeaderValue = secret(prefs, SettingsSecrets.REASONING_CUSTOM_HEADER_VALUE),
+            reasoningCustomHeaderValue = secret(SettingsCredentialKeys.REASONING_CUSTOM_HEADER),
             reasoningCustomModel = prefs[REASONING_CUSTOM_MODEL].orEmpty(),
             visionSource = prefs[VISION_SOURCE].toVisionSource(),
             visionLocalModelId = prefs[VISION_LOCAL_MODEL_ID]?.takeIf { it.isNotBlank() },
             visionTranslateTarget = prefs[VISION_TRANSLATE_TARGET] ?: "pt",
             visionOpenAiModel = prefs[VISION_OPENAI_MODEL] ?: "gpt-4o",
-            visionGoogleApiKey = secret(prefs, SettingsSecrets.VISION_GOOGLE_API_KEY),
             visionGoogleModel = prefs[VISION_GOOGLE_MODEL] ?: "gemini-2.0-flash",
-            visionAnthropicApiKey = secret(prefs, SettingsSecrets.VISION_ANTHROPIC_API_KEY),
             visionAnthropicModel = prefs[VISION_ANTHROPIC_MODEL] ?: "claude-3-5-sonnet-latest",
             visionCustomEndpoint = prefs[VISION_CUSTOM_ENDPOINT].orEmpty(),
             visionCustomHeaderName = prefs[VISION_CUSTOM_HEADER_NAME] ?: "Authorization",
-            visionCustomHeaderValue = secret(prefs, SettingsSecrets.VISION_CUSTOM_HEADER_VALUE),
+            visionCustomHeaderValue = secret(SettingsCredentialKeys.VISION_CUSTOM_HEADER),
             visionCustomModel = prefs[VISION_CUSTOM_MODEL].orEmpty(),
             falaSource = prefs[FALA_SOURCE].toFalaSource(),
             falaLocalModelId = prefs[FALA_LOCAL_MODEL_ID]?.takeIf { it.isNotBlank() },
             falaSpeed = prefs[FALA_SPEED] ?: 1.0f,
             falaCloudVoice = prefs[FALA_CLOUD_VOICE] ?: "alloy",
-            falaElevenLabsApiKey = secret(prefs, SettingsSecrets.FALA_ELEVENLABS_API_KEY),
             falaElevenLabsVoice = prefs[FALA_ELEVENLABS_VOICE] ?: "Rachel",
             falaElevenLabsModel = prefs[FALA_ELEVENLABS_MODEL] ?: "eleven_multilingual_v2",
-            falaGoogleApiKey = secret(prefs, SettingsSecrets.FALA_GOOGLE_API_KEY),
             falaGoogleVoice = prefs[FALA_GOOGLE_VOICE] ?: "pt-BR-Neural2-A",
             falaCustomEndpoint = prefs[FALA_CUSTOM_ENDPOINT].orEmpty(),
             falaCustomHeaderName = prefs[FALA_CUSTOM_HEADER_NAME] ?: "Authorization",
-            falaCustomHeaderValue = secret(prefs, SettingsSecrets.FALA_CUSTOM_HEADER_VALUE),
+            falaCustomHeaderValue = secret(SettingsCredentialKeys.FALA_CUSTOM_HEADER),
             falaCustomModel = prefs[FALA_CUSTOM_MODEL].orEmpty(),
             computerMode = prefs[COMPUTER_MODE] ?: "ssh",
             computerSshHost = prefs[COMPUTER_SSH_HOST].orEmpty(),
             computerSshPort = prefs[COMPUTER_SSH_PORT] ?: 22,
             computerSshUser = prefs[COMPUTER_SSH_USER].orEmpty(),
             computerSshAuthType = prefs[COMPUTER_SSH_AUTH_TYPE] ?: "password",
-            computerSshPassword = secret(prefs, SettingsSecrets.COMPUTER_SSH_PASSWORD),
-            computerSshKey = secret(prefs, SettingsSecrets.COMPUTER_SSH_KEY),
+            computerSshPassword = secret(SettingsCredentialKeys.COMPUTER_SSH_PASSWORD),
+            computerSshKey = secret(SettingsCredentialKeys.COMPUTER_SSH_KEY),
             customModelMirrorUrl = prefs[CUSTOM_MODEL_MIRROR_URL].orEmpty(),
-            providerAnthropicApiKey = secret(prefs, SettingsSecrets.PROVIDER_ANTHROPIC_API_KEY),
             providerAnthropicModel = prefs[PROVIDER_ANTHROPIC_MODEL] ?: "claude-3-5-sonnet-latest",
             providerAnthropicAuthMode = prefs[PROVIDER_ANTHROPIC_AUTH_MODE] ?: "subscription",
-            providerOpenAiApiKey = secret(prefs, SettingsSecrets.PROVIDER_OPENAI_API_KEY),
             providerOpenAiModel = prefs[PROVIDER_OPENAI_MODEL] ?: "gpt-4o",
             providerOpenAiAuthMode = prefs[PROVIDER_OPENAI_AUTH_MODE] ?: "subscription",
-            providerGoogleApiKey = secret(prefs, SettingsSecrets.PROVIDER_GOOGLE_API_KEY),
             providerGoogleModel = prefs[PROVIDER_GOOGLE_MODEL] ?: "gemini-2.0-flash",
             providerGoogleAuthMode = prefs[PROVIDER_GOOGLE_AUTH_MODE] ?: "subscription",
             providerElevenLabsAuthMode = prefs[PROVIDER_ELEVENLABS_AUTH_MODE] ?: "subscription",
-            providerGroqApiKey = secret(prefs, SettingsSecrets.PROVIDER_GROQ_API_KEY),
             providerGroqModel = prefs[PROVIDER_GROQ_MODEL] ?: "llama-3.3-70b-versatile",
-            providerGrokApiKey = secret(prefs, SettingsSecrets.PROVIDER_GROK_API_KEY),
             providerGrokModel = prefs[PROVIDER_GROK_MODEL] ?: "grok-2",
             overlayModeEnabled = prefs[OVERLAY_MODE_ENABLED] ?: false,
             keyboardModeEnabled = prefs[KEYBOARD_MODE_ENABLED] ?: false,
@@ -376,6 +419,8 @@ class SettingsRepository(
                 ?: (if (prefs[HAPTIC_FEEDBACK] == false) 0 else 60),
             themeDark = prefs[THEME_DARK] ?: false,
             onboardingDone = prefs[ONBOARDING_DONE] ?: false,
+            disclosureAcceptedVersion = prefs[DISCLOSURE_ACCEPTED_VERSION] ?: 0,
+            disclosureDeclined = prefs[DISCLOSURE_DECLINED] ?: false,
             transcriptionTimeoutMs = prefs[TRANSCRIPTION_TIMEOUT_MS] ?: Config.DEFAULT_TIMEOUT_MS.toInt(),
             maxRecordingSec = prefs[MAX_RECORDING_SEC] ?: 300,
             keyboardScalePercent = prefs[KEYBOARD_SCALE_PERCENT] ?: 100,
@@ -389,6 +434,7 @@ class SettingsRepository(
             orbSkin = prefs[ORB_SKIN] ?: "atelie",
             appLanguage = prefs[APP_LANGUAGE] ?: "",
         ).withoutCredits()
+        })
     }.flowOn(Dispatchers.IO)
 
     /**
@@ -399,30 +445,22 @@ class SettingsRepository(
      */
     suspend fun saveSettings(settings: Settings) {
         val persisted = settings.withoutCredits()
-        val committed = synchronized(SettingsSecrets.LOCK) {
-            securePrefs.edit()
-                .putString(SettingsSecrets.AUTH_HEADER_VALUE, persisted.customHeaderValue)
-                .putString(SettingsSecrets.OPENAI_TOKEN, persisted.openaiToken)
-                .putString(SettingsSecrets.GROQ_TOKEN, persisted.groqToken)
-                .putString(SettingsSecrets.REASONING_CUSTOM_HEADER_VALUE, persisted.reasoningCustomHeaderValue)
-                .putString(SettingsSecrets.VISION_GOOGLE_API_KEY, persisted.visionGoogleApiKey)
-                .putString(SettingsSecrets.VISION_ANTHROPIC_API_KEY, persisted.visionAnthropicApiKey)
-                .putString(SettingsSecrets.VISION_CUSTOM_HEADER_VALUE, persisted.visionCustomHeaderValue)
-                .putString(SettingsSecrets.FALA_ELEVENLABS_API_KEY, persisted.falaElevenLabsApiKey)
-                .putString(SettingsSecrets.FALA_GOOGLE_API_KEY, persisted.falaGoogleApiKey)
-                .putString(SettingsSecrets.FALA_CUSTOM_HEADER_VALUE, persisted.falaCustomHeaderValue)
-                .putString(SettingsSecrets.COMPUTER_SSH_PASSWORD, persisted.computerSshPassword)
-                .putString(SettingsSecrets.COMPUTER_SSH_KEY, persisted.computerSshKey)
-                .putString(SettingsSecrets.PROVIDER_ANTHROPIC_API_KEY, persisted.providerAnthropicApiKey)
-                .putString(SettingsSecrets.PROVIDER_OPENAI_API_KEY, persisted.providerOpenAiApiKey)
-                .putString(SettingsSecrets.PROVIDER_GOOGLE_API_KEY, persisted.providerGoogleApiKey)
-                .putString(SettingsSecrets.PROVIDER_GROQ_API_KEY, persisted.providerGroqApiKey)
-                .putString(SettingsSecrets.PROVIDER_GROK_API_KEY, persisted.providerGrokApiKey)
-                .commit()
-        }
-        check(committed) { "Unable to persist provider tokens" }
-
-        dataStore.edit { prefs ->
+        withContext(Dispatchers.IO) {
+            SettingsSecrets.SUSPEND_LOCK.withLock {
+                // Nunca descarte uma cópia legada antes de a mover para o auth vault.
+                migrateLegacySecretsLocked()
+                val values = mapOf(
+                    SettingsCredentialKeys.CUSTOM_HEADER to persisted.customHeaderValue,
+                    SettingsCredentialKeys.REASONING_CUSTOM_HEADER to persisted.reasoningCustomHeaderValue,
+                    SettingsCredentialKeys.VISION_CUSTOM_HEADER to persisted.visionCustomHeaderValue,
+                    SettingsCredentialKeys.FALA_CUSTOM_HEADER to persisted.falaCustomHeaderValue,
+                    SettingsCredentialKeys.COMPUTER_SSH_PASSWORD to persisted.computerSshPassword,
+                    SettingsCredentialKeys.COMPUTER_SSH_KEY to persisted.computerSshKey,
+                )
+                values.forEach { (key, value) ->
+                    if (value.isBlank()) credentials.clearSecret(key) else credentials.putSecret(key, value)
+                }
+                dataStore.edit { prefs ->
             SettingsSecrets.LEGACY_IN_DATASTORE.forEach { prefs.remove(it) }
             prefs[SOURCE] = persisted.source.name
             prefs[ENDPOINT_URL] = persisted.customEndpoint
@@ -493,6 +531,8 @@ class SettingsRepository(
             prefs[VIBRATION_INTENSITY] = persisted.vibrationIntensity
             prefs[THEME_DARK] = persisted.themeDark
             prefs[ONBOARDING_DONE] = persisted.onboardingDone
+            prefs[DISCLOSURE_ACCEPTED_VERSION] = persisted.disclosureAcceptedVersion
+            prefs[DISCLOSURE_DECLINED] = persisted.disclosureDeclined
             prefs[TRANSCRIPTION_TIMEOUT_MS] = persisted.transcriptionTimeoutMs
             prefs[MAX_RECORDING_SEC] = persisted.maxRecordingSec
             prefs[KEYBOARD_SCALE_PERCENT] = persisted.keyboardScalePercent
@@ -505,6 +545,11 @@ class SettingsRepository(
             prefs[KEYBOARD_SKIN] = persisted.keyboardSkin
             prefs[ORB_SKIN] = persisted.orbSkin
             prefs[APP_LANGUAGE] = persisted.appLanguage
+                }
+                credentials.setAuthMode(ProviderIds.OPENAI, persisted.providerOpenAiAuthMode.toCredentialAuthMethod())
+                credentials.setAuthMode(ProviderIds.ANTHROPIC, persisted.providerAnthropicAuthMode.toCredentialAuthMethod())
+                credentials.setAuthMode(ProviderIds.GOOGLE, persisted.providerGoogleAuthMode.toCredentialAuthMethod())
+            }
         }
     }
 
@@ -512,8 +557,22 @@ class SettingsRepository(
         if (this.isNullOrBlank()) prefs.remove(key) else prefs[key] = this
     }
 
-    /** O segredo [name]: o do cofre; ver [SettingsSecrets.read] para o caso do que ainda está em claro no DataStore. */
-    private fun secret(prefs: Preferences, name: String): String = SettingsSecrets.read(securePrefs, prefs, name)
+    private fun String.toCredentialAuthMethod(): com.keyflow.auth.AuthMethod =
+        if (this == "subscription") com.keyflow.auth.AuthMethod.OAUTH else com.keyflow.auth.AuthMethod.API_KEY
+
+    /** O segredo não entra no DataStore nem em `Settings` para chaves de API; os campos legados restantes leem o auth vault. */
+    private fun secret(name: String): String = credentials.getSecret(name).orEmpty()
+
+    private fun apiKeyProvider(key: String) = when (key) {
+        SettingsCredentialKeys.OPENAI_TOKEN -> ProviderIds.OPENAI
+        SettingsCredentialKeys.GROQ_TOKEN -> ProviderIds.GROQ
+        SettingsCredentialKeys.VISION_GOOGLE_API_KEY, SettingsCredentialKeys.FALA_GOOGLE_API_KEY -> ProviderIds.GOOGLE
+        SettingsCredentialKeys.VISION_ANTHROPIC_API_KEY -> ProviderIds.ANTHROPIC
+        SettingsCredentialKeys.FALA_ELEVENLABS_API_KEY -> ProviderIds.ELEVENLABS
+        SettingsCredentialKeys.PROVIDER_GROQ_API_KEY -> ProviderIds.GROQ
+        SettingsCredentialKeys.PROVIDER_GROK_API_KEY -> ProviderIds.GROK
+        else -> null
+    }
 
     /**
      * Segredos que builds de desenvolvimento gravaram em claro no DataStore ([SettingsSecrets.LEGACY_IN_DATASTORE]):
@@ -523,16 +582,44 @@ class SettingsRepository(
      * (a próxima leitura tenta de novo) e a leitura não cai.
      */
     private suspend fun migrateLegacySecrets() {
-        val current = dataStore.data.first()
-        val present = SettingsSecrets.legacyPresentIn(current)
-        if (present.isEmpty()) return
-        val movable = try {
-            SettingsSecrets.moveToVault(current, present, securePrefs)
+        try {
+            SettingsSecrets.SUSPEND_LOCK.withLock { migrateLegacySecretsLocked() }
         } catch (e: Exception) {
-            Log.w(TAG, "Cofre indisponível; segredos antigos ficam no DataStore por enquanto", e)
-            return
+            Log.w(TAG, "Cofre indisponível; segredos antigos ficam no local de origem por enquanto", e)
         }
-        if (movable.isNotEmpty()) dataStore.edit { prefs -> movable.forEach { prefs.remove(it) } }
+    }
+
+    /** Pré-condição: [SettingsSecrets.SUSPEND_LOCK] está adquirido. Falha propaga para não apagar a origem. */
+    private suspend fun migrateLegacySecretsLocked() {
+        // O DataStore é lido antes do lock de arquivo: não há suspensão enquanto outro processo espera pela cópia cifrada.
+        val current = dataStore.data.first()
+        val (movable, inferredModes) = CredentialVaultLock.withLock(appContext) {
+            credentials.migrateLegacyActiveCredentials()
+            val migrated = SettingsSecrets.migrateLegacySources(current, legacyPrefs, credentials)
+            val modes = listOf(
+                PROVIDER_OPENAI_AUTH_MODE to ProviderIds.OPENAI,
+                PROVIDER_ANTHROPIC_AUTH_MODE to ProviderIds.ANTHROPIC,
+                PROVIDER_GOOGLE_AUTH_MODE to ProviderIds.GOOGLE,
+            ).mapNotNull { (key, provider) ->
+                if (current[key] != null) return@mapNotNull null
+                val oauth = credentials.getOAuth(provider)
+                val apiKey = credentials.getApiKey(provider)
+                if (oauth == null && apiKey == null) return@mapNotNull null
+                val mode = if (oauth != null) "subscription" else "api_key"
+                Triple(key, provider, mode)
+            }
+            migrated to modes
+        }
+        if (movable.isNotEmpty() || inferredModes.isNotEmpty()) {
+            // A remoção das origens e a gravação do modo inferido só ocorrem após o commit cifrado.
+            dataStore.edit { prefs ->
+                movable.forEach { prefs.remove(it) }
+                inferredModes.forEach { (key, _, mode) -> if (prefs[key] == null) prefs[key] = mode }
+            }
+            inferredModes.forEach { (_, provider, mode) ->
+                credentials.setAuthMode(provider, mode.toCredentialAuthMethod())
+            }
+        }
     }
 
     fun overlayPositionFlow(): Flow<OverlayPosition> = dataStore.data.map { prefs ->
@@ -543,12 +630,12 @@ class SettingsRepository(
     }
 
     suspend fun save(cfg: Config) {
-        val committed = securePrefs.edit()
-            .putString(SettingsSecrets.AUTH_HEADER_VALUE, cfg.authHeaderValue)
-            .commit()
-        check(committed) { "Unable to persist auth header value" }
-
-        dataStore.edit { prefs ->
+        withContext(Dispatchers.IO) {
+            SettingsSecrets.SUSPEND_LOCK.withLock {
+                migrateLegacySecretsLocked()
+                if (cfg.authHeaderValue.isBlank()) credentials.clearSecret(SettingsCredentialKeys.CUSTOM_HEADER)
+                else credentials.putSecret(SettingsCredentialKeys.CUSTOM_HEADER, cfg.authHeaderValue)
+                dataStore.edit { prefs ->
             prefs[ENDPOINT_URL] = cfg.endpointUrl
             prefs[AUTH_HEADER_NAME] = cfg.authHeaderName
             prefs[MODEL] = cfg.model
@@ -557,6 +644,8 @@ class SettingsRepository(
                 prefs.remove(LANGUAGE)
             } else {
                 prefs[LANGUAGE] = cfg.language
+            }
+                }
             }
         }
     }
@@ -684,6 +773,8 @@ class SettingsRepository(
         val VIBRATION_INTENSITY = intPreferencesKey("vibration_intensity")
         val THEME_DARK = booleanPreferencesKey("theme_dark")
         val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
+        val DISCLOSURE_ACCEPTED_VERSION = intPreferencesKey("disclosure_accepted_version")
+        val DISCLOSURE_DECLINED = booleanPreferencesKey("disclosure_declined")
         val TRANSCRIPTION_TIMEOUT_MS = intPreferencesKey("transcription_timeout_ms")
         val MAX_RECORDING_SEC = intPreferencesKey("max_recording_sec")
         val KEYBOARD_SCALE_PERCENT = intPreferencesKey("keyboard_scale_percent")
@@ -694,6 +785,7 @@ class SettingsRepository(
         val KEYBOARD_SHOW_WITH_HARD_KEYBOARD = booleanPreferencesKey("keyboard_show_with_hard_keyboard")
         val KEYBOARD_AUTO_CORRECT = booleanPreferencesKey("keyboard_auto_correct")
         val KEYBOARD_SKIN = stringPreferencesKey("keyboard_skin")
+        val SKINS_UNLOCKED = booleanPreferencesKey("skins_unlocked")
         val ORB_SKIN = stringPreferencesKey("orb_skin")
         val APP_LANGUAGE = stringPreferencesKey("app_language")
         // Trabalho 3 (shortcut-bars): barras personalizáveis + teclados de atalhos, como JSON.
@@ -742,4 +834,5 @@ data class KeyboardSnapshot(
     val bars: BarsConfig,
     val grids: List<ShortcutGrid>,
     val vibration: Int,
+    val skinsUnlocked: Boolean = false,
 )

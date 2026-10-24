@@ -34,26 +34,33 @@ import com.keyflow.ui.config.AppScreenOrientation
 import com.keyflow.ui.config.ConfigScreen
 import com.keyflow.ui.config.ConfigTab
 import com.keyflow.ui.onboarding.OnboardingScreen
+import com.keyflow.ui.onboarding.ProminentDisclosureScreen
+import com.keyflow.ui.onboarding.DISCLOSURE_VERSION
+import com.keyflow.ui.onboarding.DisclosureConsent
 import com.keyflow.ui.theme.KeyFlowTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import com.keyflow.data.models.ModelCatalog
+import com.keyflow.data.models.ModelKind
 import com.keyflow.data.models.ModelStore
 import com.keyflow.reasoning.ReasoningEngines
 import com.keyflow.reasoning.local.LocalLlmSupport
 import com.keyflow.reasoning.local.LocalReasoningEngine
 import com.keyflow.auth.AuthController
 import com.keyflow.App
-import com.keyflow.auth.Credential
+import com.keyflow.BuildConfig
 import com.keyflow.auth.ProviderIds
 import com.keyflow.ui.config.AccountModel
 import com.keyflow.ui.config.AuthActions
 import com.keyflow.ui.config.ControllerAuthActions
+import com.keyflow.ui.config.DirectApiKeyActions
 import com.keyflow.reasoning.openai.OpenAiModels
 import com.keyflow.reasoning.openai.OpenAiReasoningEngine
 import com.keyflow.reasoning.anthropic.AnthropicAgentEngine
@@ -67,6 +74,20 @@ import com.keyflow.reasoning.google.GoogleReasoningEngine
 import com.keyflow.ui.config.LocalModelsUi
 import com.keyflow.ui.config.LocalModelsSnapshot
 import com.keyflow.ui.config.LocalModelsController
+import com.keyflow.data.monetization.BillingManager
+import com.keyflow.data.monetization.Entitlements
+import com.keyflow.data.monetization.EntitlementsRepository
+import com.keyflow.data.monetization.KeyFlowApiClient
+import com.keyflow.data.monetization.MonetizationProducts
+import com.keyflow.data.monetization.StorePurchaseState
+import com.keyflow.data.monetization.RemoteConfigRepository
+import com.keyflow.data.monetization.RemoteConfigSnapshot
+import com.keyflow.ui.config.UnlockPurchaseState
+import com.android.billingclient.api.BillingClient
+import com.keyflow.ads.AdsController
+import com.keyflow.ads.DataStoreInterstitialPolicyStore
+import com.keyflow.ads.InterstitialPolicy
+import com.keyflow.ads.toInterstitialPolicyParams
 
 /**
  * Tela de configuração em Compose (T10). Substitui o formulário XML legado pelo scaffold de abas
@@ -105,6 +126,8 @@ class SetupActivity : ComponentActivity() {
     }
 
     private var settings by mutableStateOf(Settings())
+    private var showDisclosure by mutableStateOf(false)
+    private var showDeclineExplanation by mutableStateOf(false)
 
     // Modelos de voz locais (native-voice-models, NM-T10).
     private val localModels by lazy { LocalModelsController(this) }
@@ -123,6 +146,9 @@ class SetupActivity : ComponentActivity() {
             else OpenAiModels.DEFAULT_MODELS.map { AccountModel(it.id, it.displayName) }
         }
     }
+
+    private val groqAuth by lazy { DirectApiKeyActions(auth.store, ProviderIds.GROQ, activityScope) }
+    private val elevenLabsAuth by lazy { DirectApiKeyActions(auth.store, ProviderIds.ELEVENLABS, activityScope) }
 
     private val anthropicAuth by lazy {
         val provider = auth.registry.firstOrNull { it.id == ProviderIds.ANTHROPIC }
@@ -155,9 +181,9 @@ class SetupActivity : ComponentActivity() {
         ReasoningEngines(
             isModelInstalled = { ModelStore.get(this).isInstalled(it) },
             // Um login sem tokens (o "esqueleto" da renovação que falhou) não é credencial: pede entrar de novo.
-            hasOpenAiCredential = { auth.store.get(ProviderIds.OPENAI)?.let { it !is Credential.OAuth || !it.isSkeleton } == true },
-            hasAnthropicCredential = { auth.store.get(ProviderIds.ANTHROPIC)?.let { it !is Credential.OAuth || !it.isSkeleton } == true },
-            hasGoogleCredential = { auth.store.get(ProviderIds.GOOGLE)?.let { it !is Credential.OAuth || !it.isSkeleton } == true },
+            hasOpenAiCredential = { auth.store.getApiKey(ProviderIds.OPENAI) != null || auth.store.getOAuth(ProviderIds.OPENAI)?.isSkeleton == false },
+            hasAnthropicCredential = { auth.store.getApiKey(ProviderIds.ANTHROPIC) != null || auth.store.getOAuth(ProviderIds.ANTHROPIC)?.isSkeleton == false },
+            hasGoogleCredential = { auth.store.getApiKey(ProviderIds.GOOGLE) != null || auth.store.getOAuth(ProviderIds.GOOGLE)?.isSkeleton == false },
             local = { LocalReasoningEngine.create(this, it) },
             openAi = { OpenAiReasoningEngine(auth.authorization, auth.http, it) },
             anthropic = { AnthropicReasoningEngine(auth.authorization, auth.http, it) },
@@ -170,7 +196,7 @@ class SetupActivity : ComponentActivity() {
         AgentHost.of(this).runtime(
             AgentBackends(
                 hasTools = { AgentHost.of(this).registry.all().isNotEmpty() },
-                anthropicApiKeyConnected = { auth.store.get(ProviderIds.ANTHROPIC) is Credential.ApiKey },
+                anthropicApiKeyConnected = { auth.store.getApiKey(ProviderIds.ANTHROPIC) != null },
                 anthropicCredentialChanges = auth.store.changes(ProviderIds.ANTHROPIC).map { },
                 agentEngine = { model -> AnthropicAgentEngine(auth.authorization, auth.http, model) },
                 resolveText = reasoningEngines::resolve,
@@ -184,6 +210,21 @@ class SetupActivity : ComponentActivity() {
     // Barras/grades de atalhos do teclado (SB-T9) — chaves de DataStore próprias, fora de `Settings`.
     private var barsConfig by mutableStateOf(BarsConfig.DEFAULT)
     private var shortcutGrids by mutableStateOf<List<ShortcutGrid>>(emptyList())
+    // Monetização só é criada/conectada depois que o onboarding terminou; o onboarding não toca Play,
+    // Integrity, API nem a camada de ads (MZ-T9/ADS-01).
+    private var billingManager: BillingManager? = null
+    private var entitlementsRepository: EntitlementsRepository? = null
+    private var remoteConfigRepository: RemoteConfigRepository? = null
+    private var adsController: AdsController? = null
+    private var interstitialPolicy by mutableStateOf<InterstitialPolicy?>(null)
+    private var interstitialPolicyStore: DataStoreInterstitialPolicyStore? = null
+    private var entitlements by mutableStateOf(Entitlements())
+    private var entitlementsLoaded by mutableStateOf(false)
+    private var remoteSnapshot by mutableStateOf(RemoteConfigSnapshot())
+    private var remoteConfigLoaded by mutableStateOf(false)
+    private var unlockPurchaseState by mutableStateOf(UnlockPurchaseState.IDLE)
+    private var monetizationJobs = mutableListOf<Job>()
+    private var monetizationStarted = false
     // Desligar o Modo Teclado abre o seletor; só efetiva se o KeyFlow deixar de ser o teclado ativo.
     private var pendingKeyboardDisable = false
     // Ativação pendente (Yan, 2026-07-04): o usuário só precisa tocar o toggle UMA vez — cada permissão
@@ -247,12 +288,14 @@ class SetupActivity : ComponentActivity() {
         rotationStep = screenOrientation.id
         applyScreenOrientation(screenOrientation)
         settingsRepository = SettingsRepository(this)
+        showDisclosure = intent.getBooleanExtra(EXTRA_REQUIRE_DISCLOSURE, false)
         handleNavIntent(intent)
 
         activityScope.launch {
             settingsRepository.settingsFlow().collectLatest {
                 settings = it
                 settingsLoaded = true
+                if (it.onboardingDone) startMonetizationIfNeeded()
                 // Primeira abertura: a interface assume o idioma do aparelho (PT/EN/ES; outros → inglês).
                 // Depois disso, quem manda é o botão de idioma do cabeçalho.
                 if (it.appLanguage.isBlank()) persist { s -> s.copy(appLanguage = AppLanguage.fromSystem().code) }
@@ -271,7 +314,21 @@ class SetupActivity : ComponentActivity() {
                 if (!settingsLoaded) {
                     // Placeholder neutro enquanto o DataStore carrega — evita o flash do onboarding.
                     Box(Modifier.fillMaxSize().background(LocalKeyFlowPalette.current.bg))
+                } else if (
+                    showDisclosure ||
+                    showDeclineExplanation ||
+                    !DisclosureConsent.fromStoredVersion(settings.disclosureAcceptedVersion).isAcceptedForCurrentVersion() &&
+                    (!settings.onboardingDone || !settings.disclosureDeclined)
+                ) {
+                    ProminentDisclosureScreen(
+                        declined = settings.disclosureDeclined,
+                        onAccept = ::acceptDisclosure,
+                        onDecline = ::declineDisclosure,
+                    )
                 } else if (settings.onboardingDone) {
+                    // Ler o snapshot aqui faz a composição reagir à chegada do manifesto; o catálogo
+                    // global também é atualizado para SettingsRepository/ModelDownloader.
+                    val remoteCatalog = remoteSnapshot.models
                     ConfigScreen(
                         settings = settings,
                         permissions = permissions,
@@ -310,7 +367,20 @@ class SetupActivity : ComponentActivity() {
                         },
                         requestedTab = requestedTab,
                         requestedTabKey = requestedTabKey,
+                        skinsUnlocked = entitlements.skinsUnlocked,
+                        onUnlockPurchase = ::buyUnlock,
+                        unlockPurchaseState = unlockPurchaseState,
+                        adsController = adsController,
+                        adsOff = entitlements.adsOff,
+                        entitlementsLoaded = entitlementsLoaded,
+                        remoteConfigLoaded = remoteConfigLoaded,
+                        showUpdateWarning = remoteSnapshot.requiresUpdate(),
+                        monetizationDisabled = remoteSnapshot.config.killSwitch,
+                        interstitialPolicy = interstitialPolicy,
+                        onInterstitialPolicyChanged = ::persistInterstitialPolicy,
                         localModels = LocalModelsUi.compose(
+                            catalog = remoteCatalog.filter { it.kind == ModelKind.SPEECH }
+                                .ifEmpty { ModelCatalog.current(ModelKind.SPEECH) },
                             installed = localSnapshot.installed,
                             active = localSnapshot.active,
                             failures = localSnapshot.failures,
@@ -318,7 +388,8 @@ class SetupActivity : ComponentActivity() {
                             deviceRamMb = localModels.deviceRamMb,
                         ),
                         reasoningModels = LocalModelsUi.compose(
-                            catalog = ModelCatalog.TEXT,
+                            catalog = remoteCatalog.filter { it.kind == ModelKind.TEXT }
+                                .ifEmpty { ModelCatalog.current(ModelKind.TEXT) },
                             installed = localSnapshot.installed,
                             active = localSnapshot.active,
                             failures = localSnapshot.failures,
@@ -326,7 +397,8 @@ class SetupActivity : ComponentActivity() {
                             deviceRamMb = localModels.deviceRamMb,
                         ),
                         visionModels = LocalModelsUi.compose(
-                            catalog = ModelCatalog.VISION,
+                            catalog = remoteCatalog.filter { it.kind == ModelKind.VISION }
+                                .ifEmpty { ModelCatalog.current(ModelKind.VISION) },
                             installed = localSnapshot.installed,
                             active = localSnapshot.active,
                             failures = localSnapshot.failures,
@@ -334,7 +406,8 @@ class SetupActivity : ComponentActivity() {
                             deviceRamMb = localModels.deviceRamMb,
                         ),
                         falaModels = LocalModelsUi.compose(
-                            catalog = ModelCatalog.VOICE,
+                            catalog = remoteCatalog.filter { it.kind == ModelKind.VOICE }
+                                .ifEmpty { ModelCatalog.current(ModelKind.VOICE) },
                             installed = localSnapshot.installed,
                             active = localSnapshot.active,
                             failures = localSnapshot.failures,
@@ -345,9 +418,13 @@ class SetupActivity : ComponentActivity() {
                         reasoningAuth = openAiAuth,
                         reasoningAnthropicAuth = anthropicAuth,
                         reasoningGoogleAuth = googleAuth,
+                        transcriptionOpenAiAuth = openAiAuth,
+                        transcriptionGroqAuth = groqAuth,
+                        falaElevenLabsAuth = elevenLabsAuth,
                         reasoningLocalSupported = LocalLlmSupport.isSupported(android.os.Build.SUPPORTED_ABIS),
                         localActions = localModels,
-                        agent = agentRuntime,
+                        agentEnabled = BuildConfig.AGENT_ENABLED,
+                        agent = if (BuildConfig.AGENT_ENABLED) agentRuntime else null,
                     )
                 } else {
                     OnboardingScreen(
@@ -373,6 +450,32 @@ class SetupActivity : ComponentActivity() {
             }
         }
         requestPermissions.launch(perms.toTypedArray())
+    }
+
+    /** Só este aceite libera a solicitação de RECORD_AUDIO; aceite antigo reapresenta a tela. */
+    private fun acceptDisclosure() {
+        settings = settings.copy(disclosureAcceptedVersion = DISCLOSURE_VERSION, disclosureDeclined = false)
+        showDeclineExplanation = false
+        activityScope.launch { settingsRepository.saveDisclosureConsent(DISCLOSURE_VERSION, declined = false) }
+        showDisclosure = false
+        if (permissions.microphoneGranted) return
+        requestMicPermission.launch(Manifest.permission.RECORD_AUDIO)
+    }
+
+    private fun declineDisclosure() {
+        if (settings.disclosureDeclined) {
+            showDeclineExplanation = false
+            requestedTab = ConfigTab.OVERLAY
+            requestedTabKey++
+            showDisclosure = false
+            persistOnboardingDone(true)
+            return
+        }
+        settings = settings.copy(disclosureDeclined = true)
+        showDeclineExplanation = true
+        activityScope.launch {
+            settingsRepository.saveDisclosureConsent(settings.disclosureAcceptedVersion, declined = true)
+        }
     }
 
     /**
@@ -440,6 +543,7 @@ class SetupActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        if (intent.getBooleanExtra(EXTRA_REQUIRE_DISCLOSURE, false)) showDisclosure = true
         handleNavIntent(intent)
     }
 
@@ -598,8 +702,100 @@ class SetupActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        monetizationJobs.forEach(Job::cancel)
+        entitlementsRepository?.close()
+        remoteConfigRepository?.close()
+        adsController?.close()
+        interstitialPolicyStore?.close()
+        billingManager?.close()
         activityScope.cancel()
         super.onDestroy()
+    }
+
+    /** Inicializa o grafo de compra somente na configuração, nunca durante o onboarding. */
+    private fun startMonetizationIfNeeded() {
+        if (monetizationStarted) return
+        monetizationStarted = true
+        val api = KeyFlowApiClient(this, http = auth.http)
+        val billing = BillingManager(this, redeemPurchase = { purchase -> api.redeem(purchase) })
+        val repository = EntitlementsRepository(this, api, billing)
+        val remote = RemoteConfigRepository(this, http = auth.http)
+        val ads = AdsController(this)
+        val policyStore = DataStoreInterstitialPolicyStore(this)
+        billingManager = billing
+        entitlementsRepository = repository
+        remoteConfigRepository = remote
+        adsController = ads
+        interstitialPolicyStore = policyStore
+        monetizationJobs += activityScope.launch {
+            val policy = InterstitialPolicy(
+                params = remoteSnapshot.config.ads.toInterstitialPolicyParams(),
+                initialState = policyStore.read(),
+            )
+            interstitialPolicy = policy
+            policyStore.write(policy.snapshot())
+        }
+        monetizationJobs += activityScope.launch {
+            repository.entitlements.collect { value ->
+                entitlements = value
+                if (value.skinsUnlocked) unlockPurchaseState = UnlockPurchaseState.IDLE
+                if (entitlementsLoaded) settingsRepository.saveSkinsUnlocked(value.skinsUnlocked)
+            }
+        }
+        monetizationJobs += activityScope.launch {
+            billing.purchases.drop(1).collectLatest { purchases ->
+                if (purchases.any { it.products.contains(MonetizationProducts.UNLOCK_FOREVER) && it.state == StorePurchaseState.PENDING }) {
+                    unlockPurchaseState = UnlockPurchaseState.PENDING
+                }
+                val refreshed = repository.refresh()
+                entitlements = refreshed
+                settingsRepository.saveSkinsUnlocked(refreshed.skinsUnlocked)
+                entitlementsLoaded = true
+            }
+        }
+        monetizationJobs += activityScope.launch {
+            billing.connect()
+            val refreshed = repository.refresh()
+            entitlements = refreshed
+            settingsRepository.saveSkinsUnlocked(refreshed.skinsUnlocked)
+            entitlementsLoaded = true
+        }
+        monetizationJobs += activityScope.launch {
+            val snapshot = remote.refresh()
+            remoteSnapshot = snapshot
+            remoteConfigLoaded = true
+            interstitialPolicy?.updateParams(snapshot.config.ads.toInterstitialPolicyParams())
+            ModelCatalog.applyRemoteManifest(snapshot.models)
+        }
+    }
+
+    private fun persistInterstitialPolicy() {
+        val policy = interstitialPolicy ?: return
+        val store = interstitialPolicyStore ?: return
+        activityScope.launch { store.write(policy.snapshot()) }
+    }
+
+    private fun buyUnlock() {
+        val billing = billingManager ?: run {
+            unlockPurchaseState = UnlockPurchaseState.UNAVAILABLE
+            return
+        }
+        if (unlockPurchaseState == UnlockPurchaseState.PURCHASING) return
+        interstitialPolicy?.markPurchaseStarted()
+        persistInterstitialPolicy()
+        unlockPurchaseState = UnlockPurchaseState.PURCHASING
+        monetizationJobs += activityScope.launch {
+            val result = runCatching { billing.purchase(this@SetupActivity, MonetizationProducts.UNLOCK_FOREVER) }
+                .getOrElse {
+                    unlockPurchaseState = UnlockPurchaseState.ERROR
+                    return@launch
+                }
+            unlockPurchaseState = when {
+                result.ok -> UnlockPurchaseState.PENDING
+                result.responseCode == BillingClient.BillingResponseCode.USER_CANCELED -> UnlockPurchaseState.IDLE
+                else -> UnlockPurchaseState.ERROR
+            }
+        }
     }
 
     /** Persiste a transformação do estado e sinaliza "salvo" (CFG-04/05). */
@@ -730,6 +926,10 @@ class SetupActivity : ComponentActivity() {
      * qualquer estado. Usa [requestOrOpenSettings] pra continuar funcionando mesmo negada antes.
      */
     private fun onMicChipClicked() {
+        if (!DisclosureConsent.fromStoredVersion(settings.disclosureAcceptedVersion).isAcceptedForCurrentVersion()) {
+            showDisclosure = true
+            return
+        }
         if (permissions.microphoneGranted) {
             openAppDetailsSettings()
         } else {
@@ -831,6 +1031,7 @@ class SetupActivity : ComponentActivity() {
 
     companion object {
         private const val EXTRA_NAV = "com.keyflow.nav"
+        private const val EXTRA_REQUIRE_DISCLOSURE = "com.keyflow.require_disclosure"
         private const val NAV_TAB_VOZ = "tab_voz"
         private const val NAV_TAB_OVERLAY_MIC = "tab_overlay_mic"
         private const val NAV_TAB_KEYBOARD_MIC = "tab_keyboard_mic"
@@ -848,5 +1049,10 @@ class SetupActivity : ComponentActivity() {
                 EXTRA_NAV,
                 if (tab == ConfigTab.TECLADO) NAV_TAB_KEYBOARD_MIC else NAV_TAB_OVERLAY_MIC,
             )
+
+        fun openDisclosureIntent(context: android.content.Context): Intent =
+            Intent(context, SetupActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                .putExtra(EXTRA_REQUIRE_DISCLOSURE, true)
     }
 }

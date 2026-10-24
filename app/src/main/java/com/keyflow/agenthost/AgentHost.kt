@@ -13,6 +13,7 @@ import com.keyflow.agent.ToolExecutor
 import com.keyflow.agent.ToolPolicy
 import com.keyflow.agent.ToolRegistry
 import com.keyflow.agent.tools.SkinTools
+import com.keyflow.auth.CredentialVaultLock
 import com.keyflow.data.SettingsRepository
 import com.keyflow.skins.SkinPackStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
@@ -77,7 +78,12 @@ object AgentHost {
     private fun create(app: Context): AgentParts {
         val repository = SettingsRepository(app)
         val auth = (app as App).authServices
-        val secrets = AgentSecretSource(vaultProvider = repository::secretVault, credentials = auth.store)
+        val secrets = AgentSecretSource(
+            vaultProvider = repository::secretVault,
+            credentials = auth.store,
+            // A fonte antiga pode ser migrada por outro processo enquanto o filtro roda; a leitura do snapshot espera só a cópia síncrona.
+            vaultSnapshot = { vault -> CredentialVaultLock.withLock(app) { vault.all.values.toList() } },
+        )
         // O DataStore da configuração e o arquivo do registro: do agente, fora das Settings, e nenhum guarda segredo (o registro ainda passa pelo filtro).
         val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val policy = DataStorePolicyConfigStore(

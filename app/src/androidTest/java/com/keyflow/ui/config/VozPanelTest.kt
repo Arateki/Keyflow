@@ -18,9 +18,12 @@ import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.keyflow.auth.CredentialMask
 import com.keyflow.core.TranscriptionSource
 import com.keyflow.data.Settings
 import com.keyflow.ui.theme.KeyFlowTheme
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.Flow
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -36,13 +39,27 @@ class VozPanelTest {
     @get:Rule
     val rule = createComposeRule()
 
-    private inner class Harness(initial: Settings) {
+    private class FakeApiKeyActions(initial: String = "") : AuthActions by AuthActions.None {
+        private var raw = initial
+        private val mask = MutableStateFlow(CredentialMask.of(initial))
+
+        val saved: String get() = raw
+
+        override fun apiKey(): String? = mask.value
+        override fun apiKeyFlow(): Flow<String?> = mask
+        override fun saveApiKey(key: String) {
+            raw = key
+            mask.value = CredentialMask.of(key)
+        }
+    }
+
+    private inner class Harness(initial: Settings, val openAiAuth: AuthActions = AuthActions.None) {
         var settings by mutableStateOf(initial)
 
         @Composable
         fun Content() {
             KeyFlowTheme(dark = false) {
-                VozPanel(settings = settings, onSettingsChange = { settings = it })
+                VozPanel(settings = settings, onSettingsChange = { settings = it }, openAiAuth = openAiAuth)
             }
         }
     }
@@ -99,13 +116,26 @@ class VozPanelTest {
 
     @Test
     fun editingTokenPersistsOnImeDone() {
-        val h = Harness(Settings(source = TranscriptionSource.OPENAI, openaiToken = ""))
+        val auth = FakeApiKeyActions()
+        val h = Harness(Settings(source = TranscriptionSource.OPENAI), auth)
         rule.setContent { h.Content() }
 
         rule.onNodeWithTag(VOZ_TOKEN_TAG).performTextReplacement("sk-new-token")
         rule.onNodeWithTag(VOZ_TOKEN_TAG).performImeAction()
 
-        rule.runOnIdle { assertEquals("sk-new-token", h.settings.openaiToken) }
+        rule.runOnIdle { assertEquals("sk-new-token", auth.saved) }
+    }
+
+    @Test
+    fun explicitDeleteClearsTheMaskedToken() {
+        val auth = FakeApiKeyActions(initial = "sk-token-to-delete")
+        val h = Harness(Settings(source = TranscriptionSource.OPENAI), auth)
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(VOZ_TOKEN_DELETE_TAG).performScrollTo().performClick()
+
+        rule.runOnIdle { assertEquals("", auth.saved) }
+        rule.onAllNodesWithTag(VOZ_TOKEN_DELETE_TAG).assertCountEquals(0)
     }
 
     @Test

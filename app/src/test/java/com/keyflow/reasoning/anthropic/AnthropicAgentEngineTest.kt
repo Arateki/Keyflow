@@ -201,12 +201,14 @@ class AnthropicAgentEngineTest {
 
     @Test
     fun `401 is unauthorized, is not retried and asks the auth side to invalidate`() {
-        server.enqueue(status(401, AnthropicSseFixtures.AUTH_HTTP_BODY))
+        val marker = "anthropic-private-body-marker"
+        server.enqueue(status(401, """{"type":"error","error":{"type":"authentication_error","message":"$marker"},"request_id":"$marker"}"""))
         val auth = RecordingAuth()
-        val error = events(e = engine(auth)).single() as AgentEvent.Error
+        val result = events(e = engine(auth))
+        val error = result.single() as AgentEvent.Error
         assertThat(error.kind).isEqualTo(ReasoningError.UNAUTHORIZED)
-        assertThat(error.message).contains("401")
-        assertThat(error.message).contains("invalid x-api-key")
+        assertThat(error.message).contains("authentication_error")
+        assertThat(result.toString()).doesNotContain(marker)
         assertThat(server.requestCount).isEqualTo(1)
         assertThat(auth.invalidated).containsExactly(ProviderIds.ANTHROPIC)
     }
@@ -222,7 +224,8 @@ class AnthropicAgentEngineTest {
         server.enqueue(status(429, """{"type":"error","error":{"type":"rate_limit_error","message":"slow down"}}"""))
         val error = events().single() as AgentEvent.Error
         assertThat(error.kind).isEqualTo(ReasoningError.RATE_LIMIT)
-        assertThat(error.message).contains("slow down")
+        assertThat(error.message).contains("rate_limit_error")
+        assertThat(error.message).doesNotContain("slow down")
         assertThat(server.requestCount).isEqualTo(1)
     }
 
@@ -240,7 +243,8 @@ class AnthropicAgentEngineTest {
         val error = events().single() as AgentEvent.Error
         assertThat(error.kind).isEqualTo(ReasoningError.NETWORK)
         assertThat(error.message).contains("529")
-        assertThat(error.message).contains("Overloaded")
+        assertThat(error.message).contains("overloaded_error")
+        assertThat(error.message).doesNotContain("Overloaded")
         assertThat(server.requestCount).isEqualTo(3)
         assertThat(pauses).containsExactly(200L, 400L).inOrder()
     }
@@ -293,7 +297,8 @@ class AnthropicAgentEngineTest {
         assertThat(result.first()).isEqualTo(AgentEvent.TextDelta("Vou criar uma skin"))
         val error = result.last() as AgentEvent.Error
         assertThat(error.kind).isEqualTo(ReasoningError.NETWORK)
-        assertThat(error.message).contains("overloaded_error")
+        assertThat(error.message).doesNotContain("overloaded_error")
+        assertThat(error.message).doesNotContain("Overloaded")
         assertThat(result.filterIsInstance<AgentEvent.Done>()).isEmpty()
         assertThat(server.requestCount).isEqualTo(1) // erro no fluxo não repete: já chegou texto
     }

@@ -45,7 +45,7 @@ pub async fn process_once(
 
 /// `true` se esta chamada de fato reverteu algo (primeira vez que vemos este token voided);
 /// `false` se o token é desconhecido ou já tinha sido revertido antes (idempotência).
-async fn revoke_purchase(pool: &PgPool, token_hash: &[u8]) -> bool {
+pub async fn revoke_purchase(pool: &PgPool, token_hash: &[u8]) -> bool {
     let mut tx = match pool.begin().await {
         Ok(tx) => tx,
         Err(e) => {

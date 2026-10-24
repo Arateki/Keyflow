@@ -22,6 +22,14 @@ class AuthProvidersTest {
         }
     }
 
+    @Test
+    fun `subscription OAuth is offered for OpenAI Anthropic and Google`() {
+        listOf(ProviderIds.OPENAI, ProviderIds.ANTHROPIC, ProviderIds.GOOGLE).forEach { id ->
+            val oauth = providers.single { it.id == id }.flows.single { it.method == AuthMethod.OAUTH }
+            assertThat(oauth.availability).isEqualTo(Availability.Available)
+        }
+    }
+
     /** O id da OpenAI mora no núcleo: a UI e o motor o usam sem importar nada de `providers/`. */
     @Test
     fun `the well known provider ids live in the core`() {

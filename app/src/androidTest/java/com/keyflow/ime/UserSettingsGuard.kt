@@ -5,6 +5,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.keyflow.core.shortcuts.BarsConfig
 import com.keyflow.core.shortcuts.ShortcutGrid
 import com.keyflow.data.SettingsRepository
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -46,12 +47,17 @@ class UserSettingsGuard(
     private var expanded = true
     private var capturedImeWithHardKeyboard = false
     private var imeWithHardKeyboard: String? = null
+    private var disclosureAcceptedVersion: Int? = null
+    private var disclosureDeclined: Boolean? = null
 
     /** Chame no `@Before`, antes de qualquer escrita do teste. */
     fun capture() {
         runBlocking {
             bars = repo.barsConfigOnce()
             grids = repo.shortcutGridsOnce()
+            val s = repo.settingsFlow().first()
+            disclosureAcceptedVersion = s.disclosureAcceptedVersion
+            disclosureDeclined = s.disclosureDeclined
         }
         defaultIme = shell("settings get secure default_input_method").trim().takeIf { it.isNotBlank() && it != "null" }
         hadExpanded = uiPrefs.contains(KEY_EXPANDED)
@@ -88,6 +94,13 @@ class UserSettingsGuard(
             runBlocking {
                 repo.saveBarsConfig(savedBars)
                 repo.saveShortcutGrids(savedGrids)
+            }
+        }
+        val ver = disclosureAcceptedVersion
+        val dec = disclosureDeclined
+        if (ver != null && dec != null) {
+            runBlocking {
+                repo.saveDisclosureConsent(ver, dec)
             }
         }
         defaultIme?.let { shell("ime set $it") }

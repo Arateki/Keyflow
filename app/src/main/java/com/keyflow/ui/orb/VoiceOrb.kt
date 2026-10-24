@@ -131,6 +131,12 @@ val LocalOrbPack = staticCompositionLocalOf<PackOrb?> { null }
 fun orbStyleFor(orbSkinId: String): OrbStyle =
     if (SkinIds.isPack(orbSkinId)) OrbStyle.PACK else OrbStyle.entries.firstOrNull { it.id == orbSkinId } ?: OrbStyle.ATELIE
 
+/** Resolve a skin paga salva sem apagar a escolha: se o direito voltar, ela reaparece automaticamente. */
+fun orbStyleFor(orbSkinId: String, skinsUnlocked: Boolean): OrbStyle {
+    val style = orbStyleFor(orbSkinId)
+    return if (style.paid && !skinsUnlocked) OrbStyle.ATELIE else style
+}
+
 /** Conteúdo desenhado no centro do orbe (ORB-04). */
 sealed interface OrbCenter {
     data object None : OrbCenter

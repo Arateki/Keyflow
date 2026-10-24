@@ -62,9 +62,9 @@ R$15, que também tira os anúncios para sempre. Os anúncios ficam só no app d
 - Compra única de R$15 pelo Play Billing (não consumível, restaurável) e anúncios AdMob no app de
   configuração: banner + intersticial (M7/M8). Nunca no teclado nem no overlay. Fiação na V1-10.
 - Raciocínio: modelos locais (Gemma/Qwen) e provedores por chave de API (OpenAI, Anthropic, Google).
-  Login ChatGPT e SSO do Google continuam desligados no release (`enabled = BuildConfig.DEBUG`).
-- Agente KeyFlow da fase 1 (chat + ferramentas de skin com confirmação; MCP desligado) — **só se a
-  V1-4 fechar**; senão ele entra como "Em breve".
+  Os logins por assinatura ChatGPT, Claude e Google também entram no release (decisão do Yan, 2026-10-23).
+- Agente KeyFlow da fase 1 (chat + ferramentas de skin com confirmação; MCP desligado) — no debug;
+  no release fica "Em breve" até a validação real autorizada da V1-4 **[YAN]**.
 - API em staging e produção (V1-9), com a rota de transcrição (API-T11) e a SSV (API-T12)
   desligadas (`TRANSCRIBE_ENABLED` e `SSV_ADMOB_ENABLED`, padrão desligado, 404 sem banco).
 
@@ -118,26 +118,35 @@ upload interno, o produto de R$15 e a service account. As tasks V1-1..V1-8 não 
 - ~~**V1-1** — "Em breve" nas abas e na origem Créditos (listas acima). A `UnlockSheet` fica; sai só a
   recarga de créditos. Instrumentado + goldens das rotas.~~ **Feito em 2026-10-23** (commit `a59e3c3`;
   instrumentado e goldens verdes).
-- **V1-2** — Higiene do release, pendências herdadas do trabalho do Gemini: logs que imprimem o texto
+- ~~**V1-2** — Higiene do release, pendências herdadas do trabalho do Gemini: logs que imprimem o texto
   ditado (`KeyFlowController`, `OverlayCoordinator` — `take(30)`) só no debug; leitura dos segredos fora
   da main thread (`settingsFlow` → `flowOn(Dispatchers.IO)`); chave de API num lugar só (o cofre
-  `keyflow_auth`, contra AUTH-02). Os três logins por assinatura (OpenAI, Anthropic, Google) já são
-  `enabled = BuildConfig.DEBUG`; conferir no AAB que o da Anthropic não vai junto — a política dela
-  proíbe login de assinatura em produto de terceiros (Bloco 10), e código dormente pesa no §5 acima.
+  `keyflow_auth`, contra AUTH-02).~~
+  **Feito em 2026-10-23** (commits `c17ba25`, `7ed0b76`, `0eccdef`, `605a9d0`; gates verdes). Rodada 3
+  concluída em 2026-10-23: migração determinística com lock entre processos, coexistência API/OAuth,
+  exclusão explícita das chaves e saneamento do erro HTTP Anthropic; gates verdes. Rodada 4 concluída em
+  2026-10-23 no commit `dc3fceb`: lock síncrono sem atravessar suspensão do DataStore, leitura dos
+  formatos antigos `cred.*`, desconexão por tipo, prioridade única na migração, overlay sem espera na
+  main e erros Anthropic sem corpo do servidor; gates verdes. Rodada 5 concluída em 2026-10-23: OAuth
+  antigo normalizado antes das chaves legadas, seleção ativa por modo, acessos comuns sem lock de arquivo;
+  gates e 24 instrumentados verdes. Decisão SSO do Yan executada no commit `9d64e9b`: ChatGPT, Claude e
+  Google disponíveis também no release; classes verificadas no APK. Rodada 6 implementada: modo inferido uma vez,
+  fallback entre API/OAuth e `settingsFlow` somente leitura; build, unitários, lint e compilação dos instrumentados
+  verdes. Execução instrumentada pendente: AVD API 34 em TCG permanece offline após quase 20 min de boot frio.
 - **V1-3** — Build de release (PS-5): R8 (`isMinifyEnabled`) com keep rules (AIDL dos processos
   `:inference`/`:reasoning`, sherpa-onnx, LiteRT-LM, AndroidSVG, Play Billing, AdMob), AAB,
   `versionName` 1.0.0, smoke do release no A32. **[YAN]**: chave de upload (Play App Signing) e o
   `applicationId` (decisão 2, caminho crítico). Vem depois da V1-10 com fakes, para o AAB já levar
   a compra e os anúncios. Em seguida sobe na trilha interna **[YAN]**, com a permissão de billing,
   para criar o produto de R$15 — antes do e2e real (MZ-T15/API-T14). A conta (decisão 1) trava
-  esse upload.
-- **V1-4** — Agente na v1: recorte da AGT-T10 para a fase 1 (abuso: injeção, segredo, argumentos,
-  flood) + validação real com a chave do Yan **[YAN]**. Não fechou → agente vira "Em breve".
-- **V1-5** — Política de privacidade (PS-2): áudio sob demanda para a origem escolhida, modelos locais,
+  esse upload. **[YAN]**: configurar/verificar no Console o client OAuth Google com o SHA-1 da chave de assinatura Play e o `applicationId` definitivo.
+- ~~**V1-4** — Agente na v1: recorte da AGT-T10 para a fase 1 (abuso: injeção, segredo, argumentos,
+  flood) + validação real com a chave do Yan **[YAN]**.~~ **Feita em 2026-10-23** (recorte de abuso automatizado revisado; falta a validação real [YAN], então o agente fica **Em breve** no release até ela fechar; relatório em `.equipe/relatorios/v1-4-agente.md`).
+- ~~**V1-5** — Política de privacidade (PS-2): áudio sob demanda para a origem escolhida, modelos locais,
   provedores de raciocínio por chave (`PLAYSTORE_CHECKLIST.md` §1b), agente, skins importadas, AdMob
   (banner e intersticial só no app de configuração, consentimento UMP) e a compra única de R$15.
-  URL permanente **[YAN decide onde]** + link no app.
-- **V1-6** — Prominent disclosure no onboarding (PS-3). Instrumentado + golden.
+  URL permanente **[YAN decide onde]** + link no app.~~ **Feita no app em 2026-10-23** (URLs definitivas em `LegalUrls`, itens na aba Docs e link na divulgação V1-6; relatório em `.equipe/relatorios/v1-link-politica.md`).
+- ~~**V1-6** — Prominent disclosure no onboarding (PS-3): tela antes de `RECORD_AUDIO`, aceite versionado, recusa sem permissão e caminho de aceite posterior. Instrumentado + golden claro/escuro.~~ **Feita em 2026-10-23** (commit `a6ce554`; reforço do gate de captura nesta tarefa; relatório em `.equipe/relatorios/v1-6-divulgacao.md` e `.equipe/relatorios/v1-correcoes-privacidade.md`).
 - **V1-7** — Listing (PS-6) só com o que entra **[YAN aprova textos]**, com anúncios e a compra de
   R$15 (selo "Contém anúncios"); rascunho campo a campo do Data Safety (PS-4), agora com anúncios e
   compras, e da declaração dos serviços em primeiro plano (`microphone`, `dataSync`) — o Yan
@@ -146,15 +155,15 @@ upload interno, o produto de R$15 e a service account. As tasks V1-1..V1-8 não 
   logo depois da V1-3 (permissão de billing e produto de R$15), antes do e2e real. A V1-8 retoma
   essa trilha: teste fechado com license testers da compra → produção. Antes dela, os roteiros
   manuais pendentes no A32 do que entra: GT-T8, NM-T13/T18, RSN-T19 (Gemma/Qwen: tempo e RAM) e o
-  das skins.
-- **V1-9** — API em staging e produção na AWS (API-T13 + teste de carga). A menor e mais barata
-  máquina; o plano está em `api/docs/aws.md` (não inventar números). DNS/TLS pela Cloudflare; o Yan
-  tem domínios na Cloudflare e na GoDaddy. Rust para render o máximo numa máquina pequena; o teste
-  de carga diz quantos usuários ela aguenta.
-  API-T11 e API-T12 ficam desligadas na v1, cada uma com a própria config
-  (`TRANSCRIBE_ENABLED`, `SSV_ADMOB_ENABLED`; padrão desligado). A rota desligada responde 404 e
-  não toca no banco. Pode andar em paralelo desde já. Staging acessível só
-  ao Yan (VPN ou equivalente) — anotado, sem configurar agora.
+  das skins. **[YAN] AdMob**: criar conta/app e blocos, configurar os IDs reais do release e
+  publicar `app-ads.txt` no domínio de desenvolvedor; roteiro em
+  `.specs/features/monetization/admob-release.md`.
+- ~~**V1-9** — API em staging e produção na AWS (API-T13 + teste de carga), DNS/TLS Cloudflare,
+  rotas de transcrição e SSV desligadas por padrão.~~ **Feita em 2026-10-23**: staging no Lightsail
+  `keyflow-v1` (release `api-staging-20261023T112732Z-4853523`, acesso local) e produção em
+  `https://keyflow-api.arateki.com` (`/health` 200); deploy por release assinada (`api-deploy`, PRs
+  #12–#14). Debug usa staging + Cloudflare Access; release usa produção sem credenciais de Access.
+  API-T11 e API-T12 seguem desligadas por padrão.
 - **V1-10** — Monetização da v1, **depois da API em staging**: MZ-T1, T2, T3, T4, T9, T10, T11, T13,
   T14 e T15. Fora: T5–T8 e T12 (créditos e o rewarded "Ganhar minutos"). Na MZ-T9 a sheet cobra o
   R$15; o botão de recarga não entra. MZ-T3 e MZ-T9 andam com fakes: a sheet e os entitlements
@@ -164,6 +173,8 @@ upload interno, o produto de R$15 e a service account. As tasks V1-1..V1-8 não 
   (`applicationId`), no caminho crítico; o upload antecipado fica entre a V1-3 e esse e2e. Na T14,
   os goldens cobrem o unlock, o banner e o intersticial. Na T15, o e2e real é a compra de R$15 e
   os anúncios; as rotas de créditos ficam para depois.
+  **Fase A (V1-10a)** feita em 2026-10-23: MZ-T1–T4 (`a0579ad`, `4e31870`, `6690063` e o
+  commit da MZ-T4), com MockWebServer/fakes enquanto o staging e o Play Console não existem.
 
 ### Decisões do Yan que a v1 precisa
 
@@ -186,13 +197,12 @@ só no app de configuração.
 
 ### Em paralelo: API em staging e produção (pré-requisito da v1)
 
-A V1-9 (API-T13 + teste de carga) não espera o app: é servidor e pode andar desde já. Staging e
-produção sobem na **menor e mais barata máquina da AWS**. O plano está em `api/docs/aws.md`;
-máquina e região saem de lá — não inventar números. DNS e TLS pela Cloudflare; o Yan tem domínios
-na Cloudflare e na GoDaddy. O servidor é em Rust para render o máximo numa máquina pequena. O
-teste de carga diz quantos usuários essa máquina aguenta. Na v1, `POST /v1/transcribe` e
-`GET /v1/ssv/admob` sobem desligadas (`TRANSCRIBE_ENABLED` e `SSV_ADMOB_ENABLED`); cada uma
-responde 404 sem consultar o banco até alguém ligar a flag.
+**Entregue em 2026-10-23**: staging e produção estão no Lightsail nano `keyflow-v1`; o primeiro
+é acessível internamente na máquina e produção responde em `https://keyflow-api.arateki.com`.
+Deploy por release assinada no workflow `api-deploy` (PRs #12–#14). Debug usa `keyflow-api-staging`
+com Cloudflare Access; release usa produção e não incorpora credenciais de Access. `POST
+/v1/transcribe` e `GET /v1/ssv/admob` permanecem desligadas por padrão (`TRANSCRIBE_ENABLED` e
+`SSV_ADMOB_ENABLED`) e respondem 404 sem tocar no banco.
 
 A rota de transcrição (API-T11) e a SSV (API-T12) ficam desligadas na v1. O staging sobe com
 `INTEGRITY_RELAXED=true`. MZ-T3 e MZ-T9 andam com fakes enquanto não há app no Play Console.
@@ -224,9 +234,9 @@ do e2e da v1.
 | M7 | `monetization` | spec/design/tasks prontos — nada implementado. **Parte entra na v1** (V1-10: MZ-T1, T2, T3, T4, T9, T10, T11, T13, T14, T15). MZ-T3/T9 com fakes depois do staging; o e2e real (MZ-T15/API-T14) espera o upload interno e as decisões 1 e 2. Créditos (T5–T8) e o rewarded (T12) ficam para depois |
 | M8 | `theme-system` | spec de 2026-07-04, nada implementado — **defasada**: Aero, Glitch e Rose Gold saíram por fora (quick 013/015/016, pintores no IME como `KeySurface`/`RoseGoldPainter`) e as skins por pacote existem; não há `ThemeRegistry`. Revisar a spec antes de executar. Fora da v1 |
 | — | Play Store | **v1 = recorte de 2026-10-23** (V1-0 feita; seguem V1-1..V1-8, com V1-9 em paralelo e V1-10 depois do staging). `PLAYSTORE_CHECKLIST.md`; PS-1 (targetSdk 36) feito; PS-2..PS-7 viram V1-3/V1-5..V1-8 |
-| — | `reasoning-models` (aba Raciocínio) | **na `main` desde 2026-09-30**: RSN-T0..T17 feitos e o texto de privacidade da RSN-T18 em `PLAYSTORE_CHECKLIST.md` §1b (a traceability RPRV-01..04 ainda diz "In Tasks"). Faltam só **[YAN]**: repositório público, elegibilidade do login ChatGPT (RPRV-04) e o roteiro RSN-T19 no A32 — ver Bloco 10 |
+| — | `reasoning-models` (aba Raciocínio) | **na `main` desde 2026-09-30**: RSN-T0..T17 feitos e o texto de privacidade da RSN-T18 em `PLAYSTORE_CHECKLIST.md` §1b (a traceability RPRV-01..04 ainda diz "In Tasks"). Faltam só **[YAN]**: repositório público e o roteiro RSN-T19 no A32 — ver Bloco 10 |
 | — | `skin-packs` (skins importáveis) + skin mascote | SKP-T1..T9 feitos (motor AndroidSVG, importação nas abas Teclado e Sobrepor, pacote de exemplo, orbe de pacote até 120 fps) e o mascote nativo (quick 018); na `main` local e na **PR #7**. Falta o roteiro no A32 **[YAN]** (pacote dele, orbe animada no Helio G80, IME real) |
-| — | `agent-harness` (agente KeyFlow) | fase 1 (AGT-T1..T5: núcleo, Anthropic, chat, ferramentas de skin, Ajustes; MCP desligado) na `main` local e na **PR #7**. Pendentes: AGT-T6 (ferramentas de app), T7 (OpenAI/Google), T8 (skins por modelo), T9 (MCP), T10 (abuso + validação real **[YAN]**) — o recorte da T10 para a fase 1 é a V1-4 |
+| — | `agent-harness` (agente KeyFlow) | fase 1 (AGT-T1..T5: núcleo, Anthropic, chat, ferramentas de skin, Ajustes; MCP desligado) na `main` local e na **PR #7**. Pendentes: AGT-T6 (ferramentas de app), T7 (OpenAI/Google), T8 (skins por modelo), T9 (MCP), T10 (validação real **[YAN]**; abuso automatizado do recorte V1-4 coberto parcialmente) |
 | — | Trabalho do Gemini (abas KeyFlow, Fluxos, Computador, Fala, Visão; provedores Anthropic/Google) | commitado e na PR #7. Provedores e aba KeyFlow funcionam; **Fluxos, Computador, Fala e Visão são só tela + `Settings`, sem motor e sem spec** → "Em breve" na v1 (V1-1). Pendências de segurança/release herdadas → V1-2 |
 | — | CI | 2026-10-07: cache do AAR do sherpa-onnx nos dois jobs (um 503 do GitHub derrubou a PR #7 antes dos testes) |
 | — | 2026-10-10..22 | PRs #8 a #11 (estabilidade dos testes, desempenho da abertura do teclado, CI, galeria) — fora da fila da v1 |
@@ -424,7 +434,7 @@ abaixo cita monetização entra na V1-10. Créditos continuam fora.
       mudança de código necessária; 252 unitários, 163/163 no A32 e 163/163 no emulador A17.
       `PLAYSTORE_CHECKLIST.md` já marca o bloqueante 0 como resolvido. Falta só **[YAN]**: o passe
       manual usando o app no A32 — **confirmado pelo Yan em 2026-09-09**, funcionando normal.
-- [ ] **PS-2 — Política de privacidade pública**: redigir (conteúdo mínimo do checklist: áudio
+- [x] **PS-2 — Política de privacidade pública**: redigir (conteúdo mínimo do checklist: áudio
       sob demanda, endpoint do usuário/proxy, sem keystrokes; agora também: identidade anônima,
       compra de R$15 e AdMob [monetization] — créditos ficam para depois da v1; modelos locais
       [native-voice-models], captura de tela efêmera [vision-capture]) + publicar em URL
@@ -448,17 +458,14 @@ Spec: `.specs/features/reasoning-models/` (`spec.md` 45 requisitos, `design.md`,
 texto literal da doc da OpenAI). Ordem: RSN-T0 → T1 → … → T19 (uma por vez, um commit por task).
 
 - **Escopo**: só CONECTAR modelos de linguagem + botão Testar. Quem consome o raciocínio (limpar ditado, comandos, resumo)
-  é feature futura. Origens: **Local** (Qwen3 0.6B e Gemma 4 E2B pelo LiteRT-LM, processo `:reasoning`) e **OpenAI**
-  (chave de API ou login "Continue with ChatGPT"). Anthropic fica de fora: a política dela proíbe o login com assinatura em
-  produto de terceiros — entra depois **só por chave de API**.
+  é feature futura. Origens: **Local** (Qwen3 0.6B e Gemma 4 E2B pelo LiteRT-LM, processo `:reasoning`) e provedores
+  **OpenAI, Anthropic e Google** por chave de API ou login por assinatura, conforme disponibilidade da conta.
 - **O login mora em `auth/`** e é trocável: o núcleo não conhece UI, `Settings` nem provedor; cada provedor é uma pasta em
   `auth/providers/` mais uma linha no registro (`AuthProviders`). O `AuthIsolationTest` confere isso lendo os imports.
-- **Independe dos outros blocos** (só reusa o downloader/`ModelStore` do Bloco 4). Entra no build de release da PS-5: se o
-  login da OpenAI for ligado, a decisão de elegibilidade abaixo precisa estar tomada antes.
+- **Independe dos outros blocos** (só reusa o downloader/`ModelStore` do Bloco 4). Os três logins por assinatura entram no
+  release por decisão do Yan (2026-10-23); elegibilidade RPRV-04 decidida.
 - **[YAN]**: (1) tornar o repositório público — o caminho aberto da OpenAI (registro dinâmico, sem client ID a pedir) parte
-  dessa premissa; (2) **decidir a elegibilidade** (RPRV-04): o KeyFlow é open source e local, mas planeja créditos, skins
-  pagas e anúncios — `OpenAiAuthConfig.enabled = BuildConfig.DEBUG` mantém o login desligado no release até lá (a chave de
-  API funciona sempre); (3) rodar o roteiro `manual-validation.md` no A32 (login real com uma conta de plano, o Gemma/Qwen no
+  dessa premissa; (2) rodar o roteiro `manual-validation.md` no A32 (login real com uma conta de plano, o Gemma/Qwen no
   aparelho e o consumo de RAM).
 - **Não faz parte do bloco**: a aceitação REAL do registro dinâmico pela OpenAI não é provada por teste nenhum daqui — só a conta
   de plano no aparelho prova (RSN-T19).
@@ -469,17 +476,17 @@ texto literal da doc da OpenAI). Ordem: RSN-T0 → T1 → … → T19 (uma por v
 
 ```
 feito: Q1..Q11 → SB → GT → NM → RSN → SKP → AGT fase 1 (faltam só manuais [YAN])
-       PRs #8..#11 (2026-10-10..22) fora da fila da v1; V1-0 (PR #7) feita em 2026-10-10
-agora: V1-1 → V1-2 → V1-10 (fakes) → V1-3 → upload interno → e2e MZ-T15/API-T14 → V1-4 → … → V1-8
+       PRs #8..#11 (2026-10-10..22) fora da fila da v1; V1-0..V1-2 e V1-10a feitas
+agora: V1-10 (fakes) → V1-3 → upload interno → e2e MZ-T15/API-T14 → V1-4 → … → V1-8
 em paralelo: V1-9 (API-T13 na AWS) — fakes esperam o staging; o e2e real espera conta, applicationId e o upload
 depois: créditos (MZ-T5..T8, T12) e ligar API-T11/T12 · VC (visão) · TS (temas, spec a revisar) ·
        AGT fases 2/3 · Fala/Fluxos/Computador (sem spec; ideias em
        .specs/features/computer-terminal/ideias.md)
 ```
 
-**Posição atual (2026-10-23)**: o próximo marco é a **v1** (recorte no topo). A V1-0 está feita
-(PR #7, 2026-10-10). O próximo passo da fila é a V1-1. A V1-9 (API na AWS) corre em paralelo desde
-já. A V1-10 com fakes espera o staging. O e2e com compra real espera as decisões 1 e 2, o AAB da
+**Posição atual (2026-10-23)**: o próximo marco é a **v1** (recorte no topo). V1-0, V1-1, V1-2 e
+a Fase A da V1-10 estão feitas. O próximo passo da fila é a V1-3; a V1-9 (API na AWS) corre em
+paralelo desde já. A V1-10 restante com fakes espera o staging. O e2e com compra real espera as decisões 1 e 2, o AAB da
 V1-3 e o upload na trilha interna (produto de R$15 e service account). As PRs #8 a #11 não mudam
 a fila.
 

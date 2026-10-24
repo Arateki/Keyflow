@@ -16,6 +16,7 @@ import com.keyflow.core.TranscriptionSource
 import com.keyflow.data.Settings
 import com.keyflow.data.SettingsRepository
 import com.keyflow.ui.ImeProbeActivity
+import com.keyflow.ui.onboarding.DISCLOSURE_VERSION
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.Dispatcher
@@ -80,6 +81,8 @@ class PartialOverlayServiceTest {
                     partialViewEdit = true,
                     // A entrega vai para o inserter do teste: não depende do que outro teste deixou salvo.
                     autoPasteInField = true,
+                    disclosureAcceptedVersion = DISCLOSURE_VERSION,
+                    disclosureDeclined = false,
                 ),
             )
         }

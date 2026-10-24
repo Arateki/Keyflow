@@ -363,14 +363,19 @@ internal object AnthropicAgentWire {
 
         private fun error(error: JSONObject?): AgentEvent.Error {
             val type = error?.opt("type") as? String
-            val message = error?.opt("message") as? String
             val kind = when (type) {
                 "overloaded_error", "api_error", "timeout_error" -> ReasoningError.NETWORK
                 "rate_limit_error" -> ReasoningError.RATE_LIMIT
                 "authentication_error", "permission_error" -> ReasoningError.UNAUTHORIZED
                 else -> ReasoningError.ENGINE
             }
-            return AgentEvent.Error(kind, "Anthropic error: ${listOfNotNull(type, message).joinToString(": ")}")
+            val note = when (kind) {
+                ReasoningError.NETWORK -> "Anthropic: falha de rede"
+                ReasoningError.RATE_LIMIT -> "Anthropic: limite de requisições atingido"
+                ReasoningError.UNAUTHORIZED -> "Anthropic: credenciais inválidas"
+                else -> "Anthropic: resposta inválida"
+            }
+            return AgentEvent.Error(kind, note)
         }
 
         private fun intOf(value: Any?): Int? = (value as? Number)?.toInt()

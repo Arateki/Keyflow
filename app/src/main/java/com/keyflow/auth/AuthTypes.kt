@@ -13,6 +13,9 @@ object ProviderIds {
     val ANTHROPIC = ProviderId("anthropic")
     val GOOGLE = ProviderId("google")
     val ELEVENLABS = ProviderId("elevenlabs")
+    val GROQ = ProviderId("groq")
+    val GROK = ProviderId("grok")
+    val all = listOf(OPENAI, ANTHROPIC, GOOGLE, ELEVENLABS, GROQ, GROK)
 }
 
 /** Como se prova quem é: com uma chave colada, ou com um login no navegador. */
@@ -53,6 +56,14 @@ sealed interface Credential {
     ) : Credential {
         /** Sem tokens, só o registro (ver acima). */
         val isSkeleton: Boolean get() = accessToken.isEmpty() && refreshToken == null
+    }
+}
+
+/** A UI só recebe esta forma — nunca o texto da credencial que o cofre decifrou. */
+object CredentialMask {
+    fun of(value: String?): String? {
+        val secret = value?.takeIf { it.isNotEmpty() } ?: return null
+        return "••••${secret.takeLast(4)}"
     }
 }
 

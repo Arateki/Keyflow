@@ -10,7 +10,8 @@
 > decisões 1 (conta) e 2 (`applicationId`) no caminho crítico. Rotas de créditos ficam de fora.
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (M7–M10)
-**Status**: Aprovada pelo Yan em 2026-07-04 (Bloco 0 do `DEVELOPMENT-ORDER.md`) — nada implementado.
+**Status**: Aprovada pelo Yan em 2026-07-04 (Bloco 0 do `DEVELOPMENT-ORDER.md`). Fase A (MZ-T1–T4)
+concluída em 2026-10-23; as demais tasks continuam pendentes do recorte da v1 e do staging.
 A API está na `main` desde 2026-09-28 (PR #4: API-T1..T12 + T13 parcial), ainda sem staging (gate
 [YAN] da API-T13).
 
@@ -23,6 +24,14 @@ A API está na `main` desde 2026-09-28 (PR #4: API-T1..T12 + T13 parcial), ainda
 > IME/overlay/onboarding** (ADS-01 — conferir por grep na T14).
 > **Coisas que só o Yan pode fazer** (Play Console: produtos/license testers; AdMob: unidades/
 > SSV; credenciais): cada task marca; usar test ads/fakes até existirem.
+
+## IDs AdMob do release — v1-admob-ids — ✅ Feito (2026-10-24)
+
+Implementado: debug fixo em teste; release com propriedades locais/ambiente, formato validado e
+publisher de teste recusado; testes JVM e inspeção do APK no smoke/Checks.
+Configuração e pendências **[YAN] da V1-8**: [admob-release.md](admob-release.md).
+Verificado: debug/release, 1.514 unitários (3 novos), lint, falha do release sem IDs e smoke no
+emulador com abertura da Activity e XML fresco; scanner aprovado no APK release.
 
 ## Execution Plan
 
@@ -42,7 +51,7 @@ no device (TESTING.md).
 
 ## Fase A — Identidade & fundação
 
-### MZ-T1 — `AnonymousIdentity` (UUID + Auto Backup + Block Store)
+### MZ-T1 — `AnonymousIdentity` (UUID + Auto Backup + Block Store) — ✅ Feita em 2026-10-23 (`a0579ad`)
 - **What**: UUID v4 persistido em prefs claro próprio (`identity.xml`); leitura com fallback
   Block Store → gerar novo; gravação no Block Store no primeiro uso. Regras de backup
   (`dataExtractionRules`/`fullBackupContent`) **incluindo** a identidade — reconciliar com as
@@ -54,7 +63,7 @@ no device (TESTING.md).
   (inspeção do manifest merge); unit do resolvedor de fonte (arquivo/BlockStore/novo) com fakes.
 - **Tests**: unit + instrumented (camada `data`). **Gate**: `full`.
 
-### MZ-T2 — `KeyFlowApiClient` (register lazy + account) + Play Integrity
+### MZ-T2 — `KeyFlowApiClient` (register lazy + account) + Play Integrity — ✅ Feita em 2026-10-23 (`4e31870`)
 - **What**: client OkHttp (reusa o client base do app): `ensureRegistered()` (Integrity classic
   request → `POST /v1/register`; accessToken → EncryptedSharedPreferences; 401 → re-registro),
   `account()` (saldo+entitlements), erros tipados re-tentáveis (IDN-03). Base URL da API em
@@ -66,7 +75,7 @@ no device (TESTING.md).
   referência; conferido por teste existente do onboarding verde).
 - **Tests**: unit (MockWebServer) + instrumentado do storage. **Gate**: `full`.
 
-### MZ-T3 — `BillingManager` + SKUs + `obfuscatedAccountId` `[P]`
+### MZ-T3 — `BillingManager` + SKUs + `obfuscatedAccountId` `[P]` — ✅ Feita em 2026-10-23 (`6690063`)
 - **What**: Play Billing Library (versão da doc oficial): conexão resiliente,
   `queryProductDetails` dos 4 SKUs, fluxo de compra com `obfuscatedAccountId =
   sha256hex(uuid)[..64]` (unit com vetor fixo — MESMO do design da API), listener +
@@ -79,7 +88,7 @@ no device (TESTING.md).
   B/C testarem sem Play real.
 - **Tests**: unit + instrumented smoke. **Gate**: `full`.
 
-### MZ-T4 — `EntitlementsRepository` (união + cache offline)
+### MZ-T4 — `EntitlementsRepository` (união + cache offline) — ✅ Feita em 2026-10-23
 - **What**: `Flow<Entitlements>` = união (Play local `unlock_forever` ∪ conta da API) com cache
   DataStore; sync na abertura da config e pós-compra/redeem; interface `EntitlementsProvider`
   exposta (consumo pelo theme-system futuro).
@@ -137,7 +146,7 @@ no device (TESTING.md).
 
 ## Fase C — Unlock
 
-### MZ-T9 — `UnlockSheet` real + skins destravam + restore
+### MZ-T9 — `UnlockSheet` real + skins destravam + restore — ✅ Feita em 2026-10-23
 - **What**: a sheet inerte (T16 do redesign) vira real: "Pagar R$ 15 — uma vez" → fluxo Billing
   do `unlock_forever`; "Recarregar R$ 20" → abre a recarga (T6); comprado → entitlements na hora
   (UNL-01); `queryPurchases` na abertura restaura sem botão (UNL-02); `skinsUnlocked` destrava a
@@ -153,9 +162,14 @@ no device (TESTING.md).
   restore na recriação; suíte existente da UnlockSheet/Teclado verde.
 - **Tests**: instrumented + unit. **Gate**: `full`.
 
+**Revisão da parte 2 (2026-10-23)**: corrigido o primeiro frame sem entitlement (UMP, Mobile Ads e banner só
+após `entitlementsLoaded`), o fallback de skins pagas no Config/IME/overlay sem apagar a escolha salva, e o
+ack local mesmo quando o redeem remoto responde sucesso, pending ou falha. `redeem` agora interpreta o status
+da API e refaz o registro uma vez em 401.
+
 ## Fase D — Ads
 
-### MZ-T10 — AdMob + UMP + `BannerSlot` (gateado por adsOff)
+### MZ-T10 — AdMob + UMP + `BannerSlot` (gateado por adsOff) — ✅ Feita em 2026-10-23 (`24879fb`)
 - **What**: dependências AdMob/UMP; `AdsController` (init 1×, **só** se `!adsOff` — ADS-05; UMP
   consent form na primeira sessão com ads); `BannerSlot` composable com altura reservada fixa no
   rodapé de **Docs/Modo/Teclado** (nunca Voz/onboarding — ADS-01/02); falha de load → slot vazio
@@ -170,7 +184,7 @@ no device (TESTING.md).
   fora de `ads/`** (garantia ADS-01 p/ IME/overlay).
 - **Tests**: instrumented + unit (gate de init). **Gate**: `full`.
 
-### MZ-T11 — `InterstitialPolicy` (pura) + fiação na troca de aba
+### MZ-T11 — `InterstitialPolicy` (pura) + fiação na troca de aba — ✅ Feita em 2026-10-23
 - **What**: classe pura com clock/params injetáveis: engajamento mínimo, cooldown com backoff ×2
   **persistido** (DataStore), cap diário, primeira sessão nunca, janela pós-compra; params da
   config remota com defaults (ADS-03/04). Fiação: contador de interações + hook de troca de aba
@@ -181,6 +195,9 @@ no device (TESTING.md).
   "sessões" fake, cap diário reseta por dia, janela pós-compra suprime); instrumented — troca de
   aba sem engajamento não mostra; suíte existente do ConfigScreen verde.
 - **Tests**: unit (grosso) + instrumented (fiação). **Gate**: `full`.
+
+**Revisão da parte 2 (2026-10-23)**: troca de aba deixou de contar como engajamento; o primeiro cooldown
+usa expoente zero (`shownCount - 1`), preservando o backoff a partir do segundo anúncio.
 
 ### MZ-T12 — Rewarded ("Ganhar minutos" via SSV)
 - **What**: botão real na tela de créditos (existe mesmo com adsOff — RWD-04): mostra rewarded
@@ -195,7 +212,7 @@ no device (TESTING.md).
 
 ## Fase E — Remoto
 
-### MZ-T13 — `RemoteConfigRepository` + manifest de modelos
+### MZ-T13 — `RemoteConfigRepository` + manifest de modelos — ✅ Feita em 2026-10-23
 - **What**: fetch de `/v1/config` na abertura da config (ETag/If-None-Match, cache em disco,
   defaults embutidos; aviso de versão mínima — RMT-02); `/v1/models` alimenta o `ModelCatalog`
   da native-voice-models com o embutido como fallback + cache (RMT-01; o downloader existente já
@@ -207,19 +224,28 @@ no device (TESTING.md).
   substitui o embutido quando válido; suíte da native-voice-models verde (se já implementada).
 - **Tests**: unit + instrumented (cache em disco). **Gate**: `full`.
 
+**Revisão da parte 2 (2026-10-23)**: `requiresUpdate()` chega à ConfigScreen como aviso não bloqueante e
+`killSwitch` suprime compra e ads com texto traduzido em inglês/espanhol.
+
 ## Fase F — Fecho
 
-### MZ-T14 — Goldens + varredura de compliance
-- **What**: rotas de galeria (créditos com saldo/sem saldo/creditando, sheet de recarga, unlock
-  real, banner placeholder nas 3 abas) claro/escuro com fakes; regenerar+aprovar goldens
-  (existentes bit-idênticos); espelhar em `/tmp/keyflow-prints/`. Varredura final ADS-01: grep de
-  imports de ads fora de `ads/` + nenhuma init fora da config.
+### MZ-T14 — Goldens + varredura de compliance — ✅ Feita em 2026-10-23
+- **What**: rotas de galeria para unlock e banner placeholder nas três abas (Docs, Sobrepor e Teclado),
+  claro/escuro com fakes; regenerar/aprovar goldens (existentes bit-idênticos) e espelhar em
+  `/tmp/keyflow-prints/`. Varredura final ADS-01: grep de imports de ads em IME/overlay/onboarding e
+  conferir que `MobileAds.initialize` e a inicialização real do controller ficam na camada de ads/config.
+- **SPEC_DEVIATION (recorte v1, 2026-10-23)**: o texto original desta task pedia rotas de créditos e
+  recarga, mas o recorte aprovado no cabeçalho desta lista exclui MZ-T5..T8 e MZ-T12; não reintroduzir
+  saldo, recarga nem rewarded como telas funcionais. `config-voz-creditos` permanece estado Em breve.
+- **Ajuste de layout**: os três slots ficaram fixos abaixo da área rolável; as rotas com unlock continuam
+  usando o runtime/consentimento fake da galeria.
 - **Where**: `RouteCatalog.kt` (debug), `verification/golden/`.
-- **Depends on**: MZ-T6..T12. **Covers**: ADS-01 (verificação), success criteria visuais.
+- **Depends on**: MZ-T9..T11, MZ-T13. **Covers**: ADS-01 (verificação), success criteria visuais.
 - **Done when**: `verify-screens.sh` + `diff-screens.sh` verdes; grep limpo.
 - **Tests**: screenshot. **Gate**: `screenshot`.
 
 ### MZ-T15 — e2e com compras de teste + traceability (com API-T14)
+- **Andamento (2026-10-23)**: modo HMAC temporário de staging e instrumentado de registro, unlock, re-registro e reembolso preparados em `v1-compra-simulada`; isso não substitui a validação Play/Integrity real nem reinstalação física descritas abaixo.
 - **What**: no device físico com license testing e staging: recarga → saldo → transcrição por
   créditos → débito visível; esgotar → 402 → CTA; unlock → skins+zero ads; reinstalar → restore;
   R$20 → entitlements; rewarded → SSV credita; cadência do interstitial; **API fora do ar →

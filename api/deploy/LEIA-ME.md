@@ -74,7 +74,71 @@ responde **403** se esse cabeçalho não vier. O Nginx não valida a assinatura 
 fecha o acesso direto à origem. Host que não é produção nem staging cai no `default_server` (portas
 80 e 443) e a conexão é encerrada (`return 444`), para não ser atendido pela produção.
 
+### 5. Staging no APK de debug (Cloudflare Access)
+
+A produção exige Play Integrity e recusa o APK de debug instalado à mão. O staging relaxa essa
+checagem. O app escolhe o endereço pelo tipo de build:
+
+| Variante | Endereço padrão |
+| -------- | --------------- |
+| debug | `https://keyflow-api-staging.arateki.com` |
+| release | `https://keyflow-api.arateki.com` |
+
+`-PkeyflowApiBaseUrl` vence os dois (é o que aponta um teste para o MockWebServer).
+
+O hostname de staging está atrás do **Cloudflare Access**. Sem o service token a borda responde
+**401**. O APK de debug envia `CF-Access-Client-Id` e `CF-Access-Client-Secret` juntos, e só no host
+da base da API. O APK de release não lê o token: os campos ficam vazios e o segredo não entra no
+pacote.
+
+O token é do Yan e **não entra no git**, no código nem em log. Configure as duas propriedades numa
+destas fontes (a primeira que existir vence):
+
+1. na linha de comando: `-PkeyflowStagingAccessClientId=…` e `-PkeyflowStagingAccessClientSecret=…`
+2. no `gradle.properties` do `GRADLE_USER_HOME` (não o `gradle.properties` do repositório)
+3. no `local.properties` da raiz do projeto (está no `.gitignore`)
+
+```properties
+keyflowStagingAccessClientId=<Client ID do service token>
+keyflowStagingAccessClientSecret=<Client Secret do service token>
+```
+
+Sem as duas preenchidas, o debug continua apontando para o staging. O 401 vira esta linha no log de
+debug, e o app não quebra (a configuração cai no cache ou nos padrões; a conta trata o erro da API):
+
+```text
+token do Cloudflare Access ausente — veja api/deploy/LEIA-ME.md
+```
+
+Para um `curl` no staging, exporte as mesmas variáveis no shell e mande os dois cabeçalhos. Não
+cole o valor em arquivo versionado.
+
 ---
+
+## Preparação Única no GitHub (Coordenador)
+
+### Modo de compra simulada (somente staging, ativação manual)
+
+O padrão é desligado: sem `SIMULATED_PURCHASES_ENABLED=true`, as duas rotas de simulação respondem 404 e o
+registro continua exigindo Play Integrity real. Para uma rodada temporária no staging, o Yan pode definir no
+arquivo de ambiente **não versionado** do serviço `keyflow-api-staging`:
+
+```dotenv
+SIMULATED_PURCHASES_ENABLED=true
+SIMULATED_PURCHASE_HMAC_SECRET=<chave-de-teste-aleatoria-com-pelo-menos-32-bytes>
+```
+
+A chave precisa ser a mesma propriedade local `keyflowSimulatedPurchaseHmacSecret` usada para compilar o APK
+debug, junto das propriedades Cloudflare Access já descritas acima. É uma chave de teste compartilhada que
+fica legível no APK debug: use apenas em staging, com dados descartáveis, nunca uma credencial Google ou chave
+de produção; rotacione-a ao encerrar a rodada. No serviço de produção deixe a flag ausente (ou `false`) e não
+configure a chave. O boot falha se a simulação for ligada sem chave com pelo menos 32 bytes. Desligue a flag
+depois do teste; este guia não autoriza nem realiza deploy.
+
+O APK debug expõe a tela `.DebugSimulatedPurchaseActivity` (compra e reembolso identificáveis); o release não
+inclui essa classe nem as rotas. O instrumentado `SimulatedPurchaseStagingE2eTest` pula explicitamente quando
+faltam Access ou chave HMAC locais. A re-registração comprova a recuperação de entitlement no servidor, mas não
+substitui o teste de reinstalação real do Play/Integrity pendente da MZ-T15.
 
 ## Preparação Única no GitHub (Coordenador)
 

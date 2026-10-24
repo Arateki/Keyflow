@@ -7,6 +7,7 @@
   que é o comportamento correto. `SecurePrefs` ainda tem recuperação pra quem já está com o estado quebrado.
 -->
 <full-backup-content>
+    <!-- A identidade anônima e as preferências do app ficam claras e acompanham a reinstalação; o Block Store é o fallback. -->
     <exclude domain="sharedpref" path="keyflow_secure.xml" />
     <!-- O cofre das credenciais de IA (auth/): mesma razão, chave de Keystore própria — ver SecureCredentialStore. -->
     <exclude domain="sharedpref" path="keyflow_auth.xml" />

@@ -1,7 +1,6 @@
 package com.keyflow.agenthost
 
 import android.content.SharedPreferences
-import com.keyflow.auth.Credential
 import com.keyflow.auth.CredentialStore
 import com.keyflow.auth.ProviderId
 import com.keyflow.auth.ProviderIds
@@ -29,6 +28,7 @@ internal class AgentSecretSource(
     private val providers: List<ProviderId> = ALL_PROVIDERS,
     private val clockMs: () -> Long = System::currentTimeMillis,
     private val ttlMs: Long = TTL_MS,
+    private val vaultSnapshot: ((SharedPreferences) -> Collection<Any?>)? = null,
 ) : () -> Collection<String> {
 
     private class Snapshot(val atMs: Long, val values: List<String>)
@@ -58,17 +58,20 @@ internal class AgentSecretSource(
 
     private fun read(): List<String> {
         val out = LinkedHashSet<String>()
-        for (value in vault.all.values) if (value is String && value.isNotEmpty()) out += value
+        val vaultValues = vaultSnapshot?.invoke(vault) ?: vault.all.values
+        for (value in vaultValues) if (value is String && value.isNotEmpty()) out += value
         for (provider in providers) {
-            when (val credential = credentials.get(provider)) {
-                null -> Unit
-                is Credential.ApiKey -> out += credential.value
-                is Credential.OAuth -> {
-                    out += credential.accessToken
-                    credential.refreshToken?.let { out += it }
-                    credential.idToken?.let { out += it }
-                }
+            // Também prova que o cofre está legível; os valores usados pelo filtro vêm apenas dos acessores tipados.
+            credentials.get(provider)
+            credentials.getApiKey(provider)?.let { out += it.value }
+            credentials.getOAuth(provider)?.let { credential ->
+                out += credential.accessToken
+                credential.refreshToken?.let { out += it }
+                credential.idToken?.let { out += it }
             }
+        }
+        for (key in com.keyflow.data.SettingsCredentialKeys.ALL) {
+            credentials.getSecret(key)?.let { if (it.isNotEmpty()) out += it }
         }
         out.remove("")
         return out.toList()
@@ -78,6 +81,13 @@ internal class AgentSecretSource(
         const val TTL_MS = 2_000L
 
         /** Todos os provedores que o app conhece (o login e a chave de API de cada um moram no cofre do `auth/`). */
-        val ALL_PROVIDERS = listOf(ProviderIds.OPENAI, ProviderIds.ANTHROPIC, ProviderIds.GOOGLE, ProviderIds.ELEVENLABS)
+        val ALL_PROVIDERS = listOf(
+            ProviderIds.OPENAI,
+            ProviderIds.ANTHROPIC,
+            ProviderIds.GOOGLE,
+            ProviderIds.ELEVENLABS,
+            ProviderIds.GROQ,
+            ProviderIds.GROK,
+        )
     }
 }

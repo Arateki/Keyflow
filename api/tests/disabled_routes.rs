@@ -2,11 +2,16 @@ mod common;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode, header};
+use base64::Engine as _;
 use common::{test_pool, unused_ads_config, unused_transcription_config};
+use hmac::{Hmac, KeyInit, Mac};
 use keyflow_api::google::auth::ServiceAccountKey;
 use keyflow_api::google::integrity::IntegrityClient;
 use keyflow_api::google::publisher::PublisherClient;
 use keyflow_api::{AdsConfig, AppState, TranscriptionConfig, app};
+use serde_json::json;
+use sha2::Sha256;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tower::ServiceExt;
 
 const PACKAGE_NAME: &str = "com.keyflow";
@@ -139,4 +144,70 @@ async fn ssv_on_without_query_reaches_the_handler() {
     )
     .await;
     assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn simulated_purchase_routes_are_404_by_default_before_auth_or_database() {
+    for (method, uri) in [
+        ("POST", "/v1/test/purchases/simulate"),
+        ("POST", "/v1/test/purchases/refund"),
+    ] {
+        let status = status_of(
+            state(
+                unused_transcription_config(),
+                unused_ads_config(),
+                lazy_pool(),
+            ),
+            method,
+            uri,
+            Some("not-a-real-token"),
+        )
+        .await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "{method} {uri}");
+    }
+}
+
+#[tokio::test]
+async fn production_default_rejects_a_valid_simulated_integrity_receipt() {
+    let secret = "fake-simulation-key-for-tests-only-0001";
+    let payload = json!({
+        "purpose": "integrity",
+        "deviceKey": "production-rejection-test-device",
+        "productId": null,
+        "nonce": "nonce-0123456789abcdef",
+        "issuedAt": SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i64
+    });
+    let payload_part = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .encode(serde_json::to_vec(&payload).unwrap());
+    let message = format!("kfsim1.{payload_part}");
+    let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes()).unwrap();
+    mac.update(message.as_bytes());
+    let receipt = format!(
+        "{message}.{}",
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(mac.finalize().into_bytes())
+    );
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/register")
+        .header(header::CONTENT_TYPE, "application/json")
+        .extension(axum::extract::ConnectInfo(
+            "127.0.0.1:0".parse::<std::net::SocketAddr>().unwrap(),
+        ))
+        .body(Body::from(
+            json!({
+                "deviceKey": "production-rejection-test-device",
+                "integrityToken": receipt
+            })
+            .to_string(),
+        ))
+        .unwrap();
+    let response = app(state(
+        unused_transcription_config(),
+        unused_ads_config(),
+        lazy_pool(),
+    ))
+    .oneshot(request)
+    .await
+    .unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
 }

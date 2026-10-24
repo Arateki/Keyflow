@@ -102,7 +102,7 @@ fun UnifiedProviderCard(
     privacyNote: String = tr("O texto do teste é enviado à %s; as credenciais ficam só neste aparelho.", providerName),
     // O que o provedor e o registro de autenticação decidem (AUTH-03/09, RCL-06/07) — o padrão é o comportamento genérico.
     // `false`: o registro não oferece login, então só existe a aba API (sem sub-abas).
-    ssoOffered: Boolean = true,
+    ssoOffered: Boolean = false,
     // Login desligado pelo registro: o botão aparece desabilitado e [ssoLoginDisabledReason] diz por quê.
     ssoLoginEnabled: Boolean = true,
     ssoLoginDisabledReason: String? = null,
@@ -241,7 +241,7 @@ fun UnifiedProviderCard(
         }
 
         // ── Sub-abas: Assinatura / API
-        val authModes = listOf("subscription", "api")
+        val authModes = listOf("subscription", "api_key")
         if (ssoOffered) Row(
             Modifier
                 .fillMaxWidth()
@@ -251,7 +251,7 @@ fun UnifiedProviderCard(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             authModes.forEach { mode ->
-                val isSelected = (if (isSubscription) "subscription" else "api") == mode
+                val isSelected = (if (isSubscription) "subscription" else "api_key") == mode
                 val label = if (mode == "subscription") tr("Assinatura") else tr("API")
                 val tabTag = if (mode == "subscription") "$tagPrefix-tab-assinatura" else "$tagPrefix-tab-api"
 
@@ -292,7 +292,7 @@ fun UnifiedProviderCard(
                                     .clip(CircleShape)
                                     .background(palette.teal)
                             )
-                        } else if (mode == "api" && apiKey.isNotBlank()) {
+                        } else if (mode == "api_key" && apiKey.isNotBlank()) {
                             Box(
                                 Modifier
                                     .size(6.dp)
@@ -558,6 +558,7 @@ fun UnifiedProviderCard(
                     onCommit = onApiKeyChange,
                     tag = keyTag,
                     keyboardType = KeyboardType.Password,
+                    masked = true,
                 )
 
                 if (getKeyUrl != null && onOpenGetKeyUrl != null) {

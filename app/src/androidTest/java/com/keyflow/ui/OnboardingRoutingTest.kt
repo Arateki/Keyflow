@@ -9,7 +9,10 @@ import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.keyflow.data.SettingsRepository
-import com.keyflow.ui.onboarding.ONBOARDING_SKIP_TAG
+import com.keyflow.ui.onboarding.DISCLOSURE_ACCEPT_TAG
+import com.keyflow.ui.onboarding.DISCLOSURE_CONTINUE_TAG
+import com.keyflow.ui.onboarding.DISCLOSURE_DECLINE_TAG
+import com.keyflow.ui.config.ACTIVATE_MIC_TAG
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -38,7 +41,7 @@ class OnboardingRoutingTest {
         get() = InstrumentationRegistry.getInstrumentation().targetContext
 
     @Test
-    fun firstRunShowsOnboardingAndSkipPersistsDone() {
+    fun firstRunRequiresDisclosureBeforeMicPermissionAndDeclineCanBeReopened() {
         compose.mainClock.autoAdvance = false
         // A `SetupActivity` compõe um placeholder vazio até o DataStore emitir (`settingsLoaded`), e o
         // relógio congelado acima não gera o frame da recomposição que traria o onboarding — a árvore
@@ -47,22 +50,36 @@ class OnboardingRoutingTest {
         // chega depois (medido em 2026-09-09, com a árvore impressa na falha). Esperar por idle não
         // serve: a orbe `Listening` anima sem parar. Então bombeia o relógio à mão até a tela existir.
         var pumps = 0
-        while (compose.onAllNodesWithTag(ONBOARDING_SKIP_TAG).fetchSemanticsNodes().isEmpty() && pumps++ < 100) {
+        while (compose.onAllNodesWithTag(DISCLOSURE_DECLINE_TAG).fetchSemanticsNodes().isEmpty() && pumps++ < 100) {
             compose.mainClock.advanceTimeBy(100)
         }
 
-        // A tela inicial é o onboarding (semeado false antes do launch).
-        compose.onNodeWithTag(ONBOARDING_SKIP_TAG).performClick()
+        // Primeiro uso deve exibir a divulgação antes de qualquer permissão.
+        compose.onNodeWithTag(DISCLOSURE_DECLINE_TAG).assertExists()
+        compose.onNodeWithTag(DISCLOSURE_DECLINE_TAG).performClick()
+        compose.mainClock.advanceTimeBy(100)
+        compose.onNodeWithTag("disclosure-declined-explanation").assertExists()
+        compose.onNodeWithTag(DISCLOSURE_CONTINUE_TAG).performClick()
 
-        // "Pular" persiste onboardingDone=true.
+        // Recusar e continuar persiste a conclusão sem consentimento.
         val deadline = SystemClock.elapsedRealtime() + 5_000
         var persisted = false
         while (SystemClock.elapsedRealtime() < deadline) {
-            persisted = runBlocking { SettingsRepository(context).settingsFlow().first().onboardingDone }
+            val current = runBlocking { SettingsRepository(context).settingsFlow().first() }
+            persisted = current.onboardingDone && current.disclosureDeclined
             if (persisted) break
             SystemClock.sleep(100)
         }
-        assertTrue("onboardingDone deveria ter sido persistido", persisted)
+        assertTrue("recusa e conclusão sem ditado deveriam ter sido persistidas", persisted)
+        var frames = 0
+        while (compose.onAllNodesWithTag(ACTIVATE_MIC_TAG).fetchSemanticsNodes().isEmpty() && frames++ < 100) {
+            compose.mainClock.advanceTimeBy(100)
+        }
+        compose.onNodeWithTag(ACTIVATE_MIC_TAG).performClick()
+        compose.mainClock.advanceTimeBy(100)
+        compose.onNodeWithTag(DISCLOSURE_CONTINUE_TAG).assertExists()
+        compose.onNodeWithTag(DISCLOSURE_ACCEPT_TAG).assertExists()
+        compose.onNodeWithTag("disclosure-declined-explanation").assertExists()
     }
 
     /**

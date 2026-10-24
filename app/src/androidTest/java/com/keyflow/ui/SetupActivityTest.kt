@@ -18,6 +18,7 @@ import com.keyflow.overlay.OverlayService
 import com.keyflow.ui.config.TOGGLE_OVERLAY_MODE_TAG
 import com.keyflow.ui.config.tabTag
 import com.keyflow.ui.config.ConfigTab
+import com.keyflow.ui.onboarding.DISCLOSURE_VERSION
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -41,7 +42,7 @@ class SetupActivityTest {
 
     @get:Rule
     val chain: RuleChain = RuleChain
-        .outerRule(SeedOnboardingRule(done = true))
+        .outerRule(SeedOnboardingRule(done = true, acceptedVersion = DISCLOSURE_VERSION))
         .around(
             GrantPermissionRule.grant(
                 Manifest.permission.RECORD_AUDIO,
@@ -171,17 +172,42 @@ class SetupActivityTest {
  * asserções (Yan, 2026-07-04: falha intermitente em `overlayModeToggleStaysOffWithoutOverlayPermission`
  * quando a suíte roda combinada com outras classes).
  */
-class SeedOnboardingRule(private val done: Boolean) : org.junit.rules.ExternalResource() {
+class SeedOnboardingRule(
+    private val done: Boolean,
+    private val acceptedVersion: Int = 0,
+) : org.junit.rules.ExternalResource() {
+    private var saved: com.keyflow.data.Settings? = null
+
     override fun before() {
         val ctx = InstrumentationRegistry.getInstrumentation().targetContext
         OverlayService.stop(ctx)
         runBlocking {
             val repo = SettingsRepository(ctx)
-            repo.saveSettings(repo.settingsFlow().first().copy(onboardingDone = done, overlayModeEnabled = false))
+            val current = repo.settingsFlow().first()
+            saved = current
+            repo.saveSettings(
+                current.copy(
+                    onboardingDone = done,
+                    overlayModeEnabled = false,
+                    disclosureAcceptedVersion = acceptedVersion,
+                    disclosureDeclined = false,
+                ),
+            )
         }
         val deadline = SystemClock.elapsedRealtime() + 3000
         while (OverlayService.isRunningForUi && SystemClock.elapsedRealtime() < deadline) {
             SystemClock.sleep(50)
+        }
+    }
+
+    override fun after() {
+        val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+        OverlayService.stop(ctx)
+        val previous = saved
+        if (previous != null) {
+            runBlocking {
+                SettingsRepository(ctx).saveSettings(previous)
+            }
         }
     }
 }

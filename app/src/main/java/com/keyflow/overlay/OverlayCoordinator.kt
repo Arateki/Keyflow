@@ -3,6 +3,7 @@ package com.keyflow.overlay
 import com.keyflow.i18n.tr
 import android.os.SystemClock
 import android.util.Log
+import com.keyflow.BuildConfig
 import com.keyflow.audio.AudioConcatenator
 import com.keyflow.core.ButtonState
 import com.keyflow.core.ErrorKind
@@ -79,6 +80,8 @@ class OverlayCoordinator(
     // orbe, teclado, notificação — davam só um toast genérico "falha ao iniciar", sem dizer o motivo nem
     // levar a lugar nenhum).
     private val microphoneGranted: () -> Boolean = { true },
+    private val recordingConsentAccepted: () -> Boolean = { true },
+    private val onDisclosureRequired: () -> Unit = {},
     // Funde os segmentos retidos num arquivo só antes de reenviar (ver stopAndTranscribe()). Injetável
     // porque o real usa MediaExtractor/MediaMuxer (framework Android, não roda em unit test puro).
     private val concatAudioSegments: (List<File>, File) -> File = { segments, dir -> AudioConcatenator.concat(segments, dir) },
@@ -343,7 +346,7 @@ class OverlayCoordinator(
 
         val prev = machine.state
         val next = if (prev == ButtonState.ERROR) machine.onErrorDismissed() else machine.onTap()
-        if (next != prev) handleState(next)
+        moveTo(prev, next)
     }
 
     fun onHold() {
@@ -360,6 +363,11 @@ class OverlayCoordinator(
      * aqui (achado do OverlayCoordinatorStateMachineTest, 2026-10-10).
      */
     private fun moveTo(prev: ButtonState, next: ButtonState) {
+        if (next == ButtonState.RECORDING && !recordingConsentAccepted()) {
+            render(machine.onErrorDismissed())
+            onDisclosureRequired()
+            return
+        }
         if (next != prev) handleState(next)
     }
 
@@ -378,7 +386,9 @@ class OverlayCoordinator(
                 render(machine.onPause())
             }
             GestureIntent.RESUME -> if (machine.state == ButtonState.PAUSED) {
-                if (limitDecisionPending) {
+                if (!recordingConsentAccepted()) {
+                    onDisclosureRequired()
+                } else if (limitDecisionPending) {
                     retriggerLimitBanner()
                 } else if (partial != null && partialRecorderStopped) {
                     // Desfez um cancelamento feito durante o envio da sessão parcial: o recorder já tinha
@@ -522,7 +532,7 @@ class OverlayCoordinator(
                 val duration = recordingClockMs() - recordingStartMs
                 if (duration < MIN_RECORDING_MS) {
                     Log.d(TAG, "recording too short (${duration}ms), cancelling")
-                    runCatching { recorder.stop() }
+                    runCatching { recorder.stop()?.delete() }
                     onError(tr("Gravação muito curta."), ErrorNavTarget.NONE)
                     render(machine.onErrorDismissed())
                     return
@@ -551,6 +561,7 @@ class OverlayCoordinator(
             if (attempt != sendAttempt || machine.state != ButtonState.SENDING) return@launch
             pendingAudioFile = null
             priorSegmentsMs = 0L
+            audio.delete()
             deliver(result)
         }
     }
@@ -586,13 +597,13 @@ class OverlayCoordinator(
         when (result) {
             is TranscriptionResult.Success -> {
                 if (insertOrHold(result.text) == InsertOutcome.Held) {
-                    Log.d(TAG, "transcription held → clipboard: '${result.text.take(30)}'")
+                    if (BuildConfig.DEBUG) Log.d(TAG, "transcription held → clipboard: '${result.text.take(30)}'")
                     onClipboard(result.text)
                 }
                 render(machine.onTranscriptionSuccess())
             }
             is TranscriptionResult.Error -> {
-                Log.d(TAG, "transcription error: ${result.kind} ${result.message}")
+                if (BuildConfig.DEBUG) Log.d(TAG, "transcription error: ${result.kind} ${result.message}")
                 onError(errorMessage(result), errorNavTarget(result.kind))
                 handleState(machine.onTranscriptionError())
             }

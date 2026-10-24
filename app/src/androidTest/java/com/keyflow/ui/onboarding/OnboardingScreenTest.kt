@@ -1,5 +1,7 @@
 package com.keyflow.ui.onboarding
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
@@ -12,9 +14,11 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.keyflow.legal.LegalUrls
 import com.keyflow.ui.PermissionStatus
 import com.keyflow.ui.orb.LocalOrbClock
 import com.keyflow.ui.theme.KeyFlowTheme
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -178,5 +182,77 @@ class OnboardingScreenTest {
         rule.setContent { Screen(perms()) }
         rule.onNodeWithContentDescription("Por que pedimos Microfone").assertIsDisplayed()
         rule.onNodeWithContentDescription("Por que pedimos Notificações").assertIsDisplayed()
+    }
+
+    @Test
+    fun disclosureDeclineExplainsAndOffersLaterAcceptance() {
+        val declined = mutableStateOf(false)
+        var accepted = false
+        rule.setContent {
+            KeyFlowTheme(dark = false) {
+                ProminentDisclosureScreen(declined = declined.value, onAccept = { accepted = true }, onDecline = { declined.value = true })
+            }
+        }
+        rule.onNodeWithTag("disclosure-copy").assertIsDisplayed()
+        rule.onNodeWithTag(DISCLOSURE_DECLINE_TAG).performClick()
+        rule.onNodeWithTag(DISCLOSURE_DECLINED_EXPLANATION_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(DISCLOSURE_ACCEPT_TAG).performClick()
+        rule.runOnIdle { assertTrue(accepted) }
+    }
+
+    /** V1-6 / V1-5: link "Ler a política de privacidade completa" abre a URL no navegador sem rede. */
+    @Test
+    fun disclosurePrivacyLinkOpensPrivacyPolicyUrl() {
+        val opened = mutableListOf<Intent>()
+        rule.setContent {
+            KeyFlowTheme(dark = false) {
+                ProminentDisclosureScreen(
+                    declined = false,
+                    onAccept = {},
+                    onDecline = {},
+                    openUrl = { opened += it },
+                )
+            }
+        }
+        rule.onNodeWithTag("disclosure-privacy-link").assertIsDisplayed().performClick()
+        assertEquals(1, opened.size)
+        val intent = opened.single()
+        assertEquals(Intent.ACTION_VIEW, intent.action)
+        assertTrue(intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0)
+        assertEquals(LegalUrls.privacyPolicy(), intent.dataString)
+    }
+    @Test
+    fun politicaSemNavegadorMostraMensagemSemAceitarOuRecusarDivulgacao() {
+        var unavailable = true
+        var accepted = false
+        var declined = false
+        val opened = mutableListOf<Intent>()
+        rule.setContent {
+            KeyFlowTheme(dark = true) {
+                ProminentDisclosureScreen(
+                    declined = false,
+                    onAccept = { accepted = true },
+                    onDecline = { declined = true },
+                    openUrl = {
+                        opened += it
+                        if (unavailable) throw ActivityNotFoundException("sem navegador de teste")
+                    },
+                )
+            }
+        }
+        rule.onNodeWithTag("disclosure-privacy-link").performClick()
+        rule.onNodeWithTag(DISCLOSURE_LEGAL_NO_APP_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(DISCLOSURE_ACCEPT_TAG).assertIsDisplayed()
+        rule.runOnIdle {
+            assertFalse(accepted)
+            assertFalse(declined)
+            assertEquals(1, opened.size)
+            assertTrue(opened.single().flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0)
+            unavailable = false
+        }
+        rule.onNodeWithTag("disclosure-privacy-link").performClick()
+        rule.onNodeWithTag(DISCLOSURE_LEGAL_NO_APP_TAG).assertDoesNotExist()
+        rule.onNodeWithTag(DISCLOSURE_ACCEPT_TAG).performClick()
+        rule.runOnIdle { assertTrue(accepted); assertEquals(2, opened.size) }
     }
 }

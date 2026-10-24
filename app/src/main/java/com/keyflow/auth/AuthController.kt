@@ -9,8 +9,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * O que a tela pede aos provedores — conectar, guardar uma chave, cancelar, desconectar — e o único [ConnectionState] que ela
@@ -96,24 +99,29 @@ class AuthController(
     fun saveApiKey(provider: ProviderId, key: String) {
         errors.update { it - provider }
         val trimmed = key.filter { it.code in 0x21..0x7E }
-        if (trimmed.isEmpty()) store.clearApiKey(provider) else store.put(provider, Credential.ApiKey(trimmed))
+        scope.launch {
+            if (trimmed.isEmpty()) store.clearApiKey(provider) else store.put(provider, Credential.ApiKey(trimmed))
+        }
     }
 
-    /**
-     * A chave de API guardada, para preencher o campo (mascarado) da tela. Só devolve chave de API — um login nunca entrega token
-     * nenhum por aqui (AUTH-04).
-     */
-    fun apiKey(provider: ProviderId): String? = (store.get(provider) as? Credential.ApiKey)?.value
+    /** Só a máscara chega à UI; o valor decifrado fica dentro do auth/ e não entra no estado Compose. */
+    fun apiKey(provider: ProviderId): String? = CredentialMask.of(store.getApiKey(provider)?.value)
+
+    /** A leitura do cofre acontece no IO; a UI recebe apenas a máscara e pode observar mudanças. */
+    fun apiKeyFlow(provider: ProviderId): Flow<String?> = store.changes(provider)
+        .map { store.getApiKey(provider)?.value?.let(CredentialMask::of) }
+        .distinctUntilChanged()
+        .flowOn(kotlinx.coroutines.Dispatchers.IO)
 
     /**
      * Um aviso que se mostra UMA vez por provedor e chave (ex.: "você está usando o seu plano"). Devolve `true` na 1ª chamada e
      * `false` nas seguintes; o marcador é do `meta` do cofre, então sobrevive ao Desconectar.
      */
-    fun consumeNotice(provider: ProviderId, key: String): Boolean {
+    suspend fun consumeNotice(provider: ProviderId, key: String): Boolean = withContext(kotlinx.coroutines.Dispatchers.IO) {
         val marker = "notice.$key"
-        if (store.meta(provider, marker) != null) return false
+        if (store.meta(provider, marker) != null) return@withContext false
         store.putMeta(provider, marker, "1")
-        return true
+        true
     }
 
     /** Desiste do login em andamento: fecha o receptor e volta a "desconectado". */
@@ -128,13 +136,18 @@ class AuthController(
     /** Revoga no provedor (o que der) e apaga o que está guardado — a falha da revogação nunca impede de apagar. */
     fun disconnect(provider: ProviderId) {
         cancel(provider)
-        val credential = store.get(provider)
         scope.launch {
+            val active = store.get(provider)
+            val credential = when (active) {
+                is Credential.OAuth -> store.getOAuth(provider) ?: active
+                is Credential.ApiKey -> store.getApiKey(provider) ?: active
+                null -> null
+            }
             if (credential != null) {
                 val method = if (credential is Credential.OAuth) AuthMethod.OAUTH else AuthMethod.API_KEY
                 runCatching { entry(provider).flows.firstOrNull { it.method == method }?.revoke(credential) }
             }
-            store.clearOAuth(provider)
+            if (credential is Credential.OAuth) store.clearOAuth(provider) else if (credential is Credential.ApiKey) store.clearApiKey(provider)
             errors.update { it - provider }
         }
     }

@@ -53,6 +53,47 @@ class SecureCredentialStoreTest {
     }
 
     @Test
+    fun anApiKeyAndOAuthCoexistAndClearingOneLeavesTheOther() {
+        val s = store()
+        val full = oauth()
+
+        s.put(provider, full)
+        s.put(provider, Credential.ApiKey("sk-teste"))
+
+        assertEquals(Credential.ApiKey("sk-teste"), s.get(provider))
+        assertEquals(Credential.ApiKey("sk-teste"), s.getApiKey(provider))
+        assertEquals(full, s.getOAuth(provider))
+
+        s.clearApiKey(provider)
+        assertEquals(full, s.get(provider))
+        assertNull(s.getApiKey(provider))
+        assertEquals(full, s.getOAuth(provider))
+
+        s.put(provider, Credential.ApiKey("sk-novo"))
+        s.clearOAuth(provider)
+        assertEquals(Credential.ApiKey("sk-novo"), s.get(provider))
+        assertEquals(Credential.ApiKey("sk-novo"), s.getApiKey(provider))
+        assertNull(s.getOAuth(provider))
+    }
+
+    @Test
+    fun activeCredentialFollowsTheSavedAuthMode() {
+        val s = store()
+        val oauth = oauth()
+        val apiKey = Credential.ApiKey("sk-api")
+        s.put(provider, oauth)
+        s.put(provider, apiKey)
+
+        s.setAuthMode(provider, AuthMethod.OAUTH)
+        assertEquals(oauth, s.get(provider))
+        assertEquals(oauth, s.forAuthorization(provider))
+
+        s.setAuthMode(provider, AuthMethod.API_KEY)
+        assertEquals(apiKey, s.get(provider))
+        assertEquals(apiKey, s.forAuthorization(provider))
+    }
+
+    @Test
     fun clearErasesTheCredentialButNotTheMeta() {
         val s = store()
         s.put(provider, Credential.ApiKey("x"))
@@ -112,6 +153,20 @@ class SecureCredentialStoreTest {
 
         assertNull(store().get(ProviderId("ruim")))
         assertEquals(Credential.ApiKey("ok"), store().get(ProviderId("bom")))
+    }
+
+    @Test
+    fun theOldCredFormatIsVisibleThroughTypedAccessors() {
+        val legacyApi = Credential.ApiKey("legacy-api")
+        SecurePrefs.create(context, prefsName, keyAlias)
+            .edit()
+            .putString("cred.${provider.value}", CredentialCodec.encode(legacyApi))
+            .commit()
+
+        val s = store()
+
+        assertEquals(legacyApi, s.getApiKey(provider))
+        assertEquals(legacyApi, s.get(provider))
     }
 
     private fun oauth(

@@ -22,15 +22,11 @@ import com.keyflow.skins.PackKeyboard
  */
 enum class KeyboardSkin(
     val id: String,
-    /**
-     * Skin paga. Decisão do Yan (2026-09-29): **só a Sistema é gratuita**; a Ateliê e a Aero são pagas. Por
-     * enquanto NADA é bloqueado — todas seguem liberadas para ele testar. Quando a monetização entrar (Milestone
-     * 7, UNL-04 / MZ-T9), as pagas ficam bloqueadas até `skinsUnlocked`.
-     */
+    /** Skin paga; Sistema e Ateliê são gratuitas na V1, as demais exigem o unlock. */
     val paid: Boolean,
 ) {
     SYSTEM("system", paid = false),
-    ATELIE("atelie", paid = true),
+    ATELIE("atelie", paid = false),
     AERO("aero", paid = true),
 
     /** Falha gráfica em preto, branco, vermelho e azul (a logo do TikTok). Paga, como o Aero: só o Sistema é livre. */
@@ -44,6 +40,12 @@ enum class KeyboardSkin(
         val DEFAULT = SYSTEM
 
         fun of(id: String?): KeyboardSkin = entries.firstOrNull { it.id == id } ?: DEFAULT
+
+        /** Resolve a escolha salva sem apagá-la quando o direito de uso foi revogado. */
+        fun effective(id: String?, skinsUnlocked: Boolean): KeyboardSkin {
+            val skin = of(id)
+            return if (skin.paid && !skinsUnlocked) DEFAULT else skin
+        }
     }
 }
 

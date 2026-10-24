@@ -88,6 +88,7 @@ class SkinPackSelectionTest {
         assertThat(nativeKeyboardSkin(pack)).isNull()
         assertThat(nativeKeyboardSkin("system")).isEqualTo(com.keyflow.ime.KeyboardSkin.SYSTEM)
         assertThat(nativeKeyboardSkin("glitch")).isEqualTo(com.keyflow.ime.KeyboardSkin.GLITCH)
+        assertThat(nativeKeyboardSkin("glitch", skinsUnlocked = false)).isEqualTo(com.keyflow.ime.KeyboardSkin.SYSTEM)
         // Um id que não existe (ou um `pack:` inseguro) continua caindo no Sistema, como o teclado de verdade.
         assertThat(nativeKeyboardSkin("pack:../../x")).isEqualTo(com.keyflow.ime.KeyboardSkin.SYSTEM)
         assertThat(nativeKeyboardSkin(null)).isEqualTo(com.keyflow.ime.KeyboardSkin.SYSTEM)

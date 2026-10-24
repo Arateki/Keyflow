@@ -41,7 +41,7 @@ class DefaultAuthorizationProvider(
     private val locks = ConcurrentHashMap<ProviderId, Mutex>()
 
     override fun invalidate(provider: ProviderId) {
-        val current = store.get(provider) as? Credential.OAuth ?: return
+        val current = store.getOAuth(provider) ?: return
         if (!current.isSkeleton) store.put(provider, skeletonOf(current))
     }
 
@@ -51,10 +51,10 @@ class DefaultAuthorizationProvider(
 
     override suspend fun headers(provider: ProviderId): Map<String, String> {
         val entry = requireNotNull(registry.firstOrNull { it.id == provider }) { "provedor não registrado: ${provider.value}" }
-        var credential = store.get(provider) ?: throw AuthException(AuthErrorKind.NOT_CONNECTED, "sem credencial guardada")
+        var credential = store.forAuthorization(provider) ?: throw AuthException(AuthErrorKind.NOT_CONNECTED, "sem credencial guardada")
         if (credential is Credential.OAuth && needsRefresh(credential)) {
             credential = locks.getOrPut(provider) { Mutex() }.withLock {
-                val current = store.get(provider) ?: throw AuthException(AuthErrorKind.NOT_CONNECTED, "a credencial sumiu")
+                val current = store.forAuthorization(provider) ?: throw AuthException(AuthErrorKind.NOT_CONNECTED, "a credencial sumiu")
                 // A renovação TROCA o refresh token no servidor: se quem chamou for cancelado no meio, o novo ainda precisa ser
                 // gravado — senão o cofre fica com o velho, que a próxima renovação vê como reusado e força um login novo.
                 if (current is Credential.OAuth && needsRefresh(current)) withContext(NonCancellable) { refresh(entry, current) } else current

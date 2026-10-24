@@ -1,5 +1,9 @@
 package com.keyflow.ui.gallery
 
+import android.app.Activity
+import android.content.Context
+import android.view.View
+import android.widget.TextView
 import androidx.compose.foundation.background
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -68,6 +72,7 @@ import com.keyflow.ui.config.loadSkinPackCards
 import com.keyflow.skins.SkinIds
 import com.keyflow.ui.onboarding.OnboardingPermission
 import com.keyflow.ui.onboarding.OnboardingScreen
+import com.keyflow.ui.onboarding.ProminentDisclosureScreen
 import com.keyflow.ui.orb.OrbCenter
 import com.keyflow.ui.orb.OrbDragHint
 import com.keyflow.ui.orb.OrbDragKind
@@ -92,6 +97,9 @@ import com.keyflow.reasoning.UnavailableReason
 import com.keyflow.ui.config.AccountModel
 import com.keyflow.ui.config.AuthActions
 import com.keyflow.ui.config.TestState
+import com.keyflow.ads.AdsController
+import com.keyflow.ads.AdsRuntime
+import com.keyflow.ads.ConsentRequester
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 
@@ -279,6 +287,7 @@ object RouteCatalog {
         Route("config-teclado-travado") { ConfigTabRoute(ConfigTab.TECLADO) },
         Route("config-overlay-travado") { ConfigTabRoute(ConfigTab.OVERLAY) },
         Route("config-docs") { ConfigTabRoute(ConfigTab.DOCS) },
+        Route("config-docs-privacy-required") { ConfigTabRoute(ConfigTab.DOCS, adsPrivacyRequired = true) },
         // A seção Skins das duas abas (fica abaixo da dobra nas telas acima): a da orbe, na Sobrepor, e a do
         // teclado, na Teclado — escolhas separadas (Yan, 2026-09-29), aqui com o Aero marcado nas duas.
         Route("config-overlay-skins") { SkinsRoute(orb = true) },
@@ -359,7 +368,7 @@ object RouteCatalog {
             )
         },
         Route("config-raciocinio-openai-desconectado") {
-            ConfigReasoningRoute(source = ReasoningSource.OPENAI, auth = GalleryAuth(ConnectionState.Disconnected))
+            ConfigReasoningRoute(source = ReasoningSource.OPENAI, auth = GalleryAuth(ConnectionState.Disconnected, storedKey = FakeSettings.OPENAI_API_KEY))
         },
         Route("config-raciocinio-openai-conectado") {
             ConfigReasoningRoute(
@@ -368,12 +377,13 @@ object RouteCatalog {
                 auth = GalleryAuth(
                     ConnectionState.Connected("voce@exemplo.com", AuthMethod.OAUTH, planUsage = true),
                     models = listOf(AccountModel("modelo-a", "Modelo A"), AccountModel("modelo-b", "Modelo B")),
+                    storedKey = FakeSettings.OPENAI_API_KEY,
                 ),
                 ready = true,
             )
         },
         Route("config-raciocinio-anthropic-desconectado") {
-            ConfigReasoningRoute(source = ReasoningSource.ANTHROPIC)
+            ConfigReasoningRoute(source = ReasoningSource.ANTHROPIC, anthropicAuth = GalleryAuth(ConnectionState.Disconnected))
         },
         Route("config-raciocinio-anthropic-conectado") {
             ConfigReasoningRoute(
@@ -387,7 +397,7 @@ object RouteCatalog {
             )
         },
         Route("config-raciocinio-google-desconectado") {
-            ConfigReasoningRoute(source = ReasoningSource.GOOGLE)
+            ConfigReasoningRoute(source = ReasoningSource.GOOGLE, googleAuth = GalleryAuth(ConnectionState.Disconnected))
         },
         Route("config-raciocinio-google-conectado") {
             ConfigReasoningRoute(
@@ -418,6 +428,7 @@ object RouteCatalog {
                 auth = GalleryAuth(
                     ConnectionState.Connected("voce@exemplo.com", AuthMethod.OAUTH, planUsage = true),
                     models = listOf(AccountModel("modelo-a", "Modelo A")),
+                    storedKey = FakeSettings.OPENAI_API_KEY,
                 ),
                 ready = true,
                 test = TestState(totalMs = 2_100, error = ReasoningError.RATE_LIMIT),
@@ -427,6 +438,7 @@ object RouteCatalog {
         Route("config-unlock") { ConfigTabRoute(ConfigTab.TECLADO, keyboardEnabled = true, unlockOpen = true) },
         // "?" do cabeçalho aberto: a seção da Docs da aba, com o atalho para a Docs.
         Route("config-ajuda-teclado") { ConfigTabRoute(ConfigTab.TECLADO, keyboardEnabled = true, tabHelpOpen = true) },
+        Route("disclosure") { ProminentDisclosureScreen(declined = false, onAccept = {}, onDecline = {}) },
         Route("onboarding") { OnboardingRoute() },
         // PERM-04: o porquê de uma permissão aberto sob a linha (a do Teclado, que é a que FALTA no mock).
         Route("onboarding-why") { OnboardingRoute(explained = OnboardingPermission.KEYBOARD) },
@@ -443,6 +455,7 @@ object RouteCatalog {
     private fun ConfigMenuRoute(railExpanded: Boolean = false) {
         ConfigScreen(
             settings = FakeSettings.settings.copy(overlayModeEnabled = true, keyboardModeEnabled = true),
+            transcriptionOpenAiAuth = GalleryAuth(ConnectionState.Disconnected, storedKey = FakeSettings.OPENAI_API_KEY),
             permissions = PermissionStatus(
                 microphoneGranted = true,
                 overlayGranted = true,
@@ -492,8 +505,6 @@ object RouteCatalog {
             settings = FakeSettings.settings.copy(
                 visionSource = source,
                 visionLocalModelId = localModelId,
-                visionGoogleApiKey = googleKey,
-                visionAnthropicApiKey = anthropicKey,
             ),
             visionModels = localModels,
             permissions = PermissionStatus(
@@ -538,8 +549,6 @@ object RouteCatalog {
             settings = FakeSettings.settings.copy(
                 falaSource = source,
                 falaLocalModelId = localModelId,
-                falaElevenLabsApiKey = elevenLabsKey,
-                falaGoogleApiKey = googleKey,
             ),
             falaModels = localModels,
             permissions = PermissionStatus(
@@ -571,7 +580,9 @@ object RouteCatalog {
         anthropicModel: String = "claude-3-5-sonnet-latest",
         googleModel: String = "gemini-2.0-flash",
         localModels: LocalModelsUi = galleryTextModels(),
-        auth: AuthActions = AuthActions.None,
+        auth: AuthActions = if (source == ReasoningSource.OPENAI) {
+            GalleryAuth(ConnectionState.Disconnected, storedKey = FakeSettings.OPENAI_API_KEY)
+        } else AuthActions.None,
         anthropicAuth: AuthActions = AuthActions.None,
         googleAuth: AuthActions = AuthActions.None,
         ready: Boolean = false,
@@ -629,6 +640,7 @@ object RouteCatalog {
         ConfigScreen(
             settings = FakeSettings.settings.copy(source = source, localModelId = localModelId),
             localModels = localModels,
+            transcriptionOpenAiAuth = GalleryAuth(ConnectionState.Disconnected, storedKey = FakeSettings.OPENAI_API_KEY),
             permissions = PermissionStatus(
                 microphoneGranted = true,
                 overlayGranted = true,
@@ -657,7 +669,19 @@ object RouteCatalog {
         keyboardEnabled: Boolean = false,
         unlockOpen: Boolean = false,
         tabHelpOpen: Boolean = false,
+        adsPrivacyRequired: Boolean = false,
     ) {
+        val bannerTab = tab == ConfigTab.DOCS || tab == ConfigTab.OVERLAY || tab == ConfigTab.TECLADO
+        val context = LocalContext.current
+        val dark = LocalKeyFlowPalette.current.isDark
+        val galleryAdsRuntime = remember(dark) { GalleryAdsRuntime(dark) }
+        val adsController = remember(tab, dark) {
+            if (bannerTab) AdsController(
+                context.applicationContext,
+                galleryAdsRuntime,
+                GalleryConsentRequester(privacyOptionsRequired = adsPrivacyRequired),
+            ) else null
+        }
         ConfigScreen(
             settings = FakeSettings.settings.copy(
                 overlayModeEnabled = overlayEnabled,
@@ -685,7 +709,26 @@ object RouteCatalog {
             initialTab = tab,
             initialUnlockOpen = unlockOpen,
             initialTabHelpOpen = tabHelpOpen,
+            adsController = adsController,
         )
+    }
+
+    /** Banner determinístico, sem rede/SDK real, apenas nas capturas de configuração da galeria. */
+    private class GalleryAdsRuntime(private val dark: Boolean) : AdsRuntime {
+        override fun initialize(context: Context, onComplete: () -> Unit) = onComplete()
+        override fun createBanner(context: Context, adUnitId: String): View = TextView(context).apply {
+            val gray = if (dark) 58 else 238
+            setBackgroundColor(android.graphics.Color.rgb(gray, gray, gray))
+            text = ""
+        }
+        override fun loadInterstitial(context: Context, adUnitId: String, onReady: () -> Unit, onFailed: () -> Unit) = onFailed()
+        override fun showInterstitial(activity: Activity): Boolean = false
+        override fun destroy(view: View) = Unit
+    }
+
+    private class GalleryConsentRequester(private val privacyOptionsRequired: Boolean) : ConsentRequester {
+        override fun request(activity: Activity, onReady: () -> Unit) = onReady()
+        override fun privacyOptionsRequired(context: Context): Boolean = privacyOptionsRequired
     }
 
     /** Hospeda o [KeyFlowKeyboardView] (View) numa rota Compose, ancorado ao rodapé (KBD screenshots). */
@@ -1144,6 +1187,7 @@ object RouteCatalog {
                         onOrbSkinSelected = {},
                         onUnlock = {},
                         unlockTag = "gallery-unlock",
+                        skinsUnlocked = selectedOrb == "mascot",
                         modifier = Modifier.padding(bottom = 16.dp),
                     )
                 } else {

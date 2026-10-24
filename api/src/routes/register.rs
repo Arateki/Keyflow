@@ -69,14 +69,30 @@ pub async fn register(
     let ip = client_ip(addr.ip(), cf_connecting_ip, &state.trusted_proxies);
     state.rate_limiters.check_register(ip)?;
 
-    let payload = state
-        .integrity
-        .decode(&body.integrity_token)
-        .await
-        .map_err(|_| RegisterError::Integrity)?;
+    let simulated_ok = state.simulated_purchases_enabled
+        && state
+            .simulated_purchase_hmac_secret
+            .as_deref()
+            .is_some_and(|secret| {
+                crate::simulated::verify(
+                    &body.integrity_token,
+                    secret,
+                    "integrity",
+                    &body.device_key,
+                    None,
+                )
+                .is_ok()
+            });
+    if !simulated_ok {
+        let payload = state
+            .integrity
+            .decode(&body.integrity_token)
+            .await
+            .map_err(|_| RegisterError::Integrity)?;
 
-    verify_verdicts(&payload, &state.package_name, state.integrity_relaxed)
-        .map_err(|_| RegisterError::Integrity)?;
+        verify_verdicts(&payload, &state.package_name, state.integrity_relaxed)
+            .map_err(|_| RegisterError::Integrity)?;
+    }
 
     let (access_token, token_hash) = generate_token();
 

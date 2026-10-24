@@ -29,7 +29,7 @@ class OverlayPanelTest {
     @get:Rule
     val rule = createComposeRule()
 
-    private inner class Harness(initial: Settings) {
+    private inner class Harness(initial: Settings, val skinsUnlocked: Boolean = false) {
         var settings by mutableStateOf(initial)
 
         @Composable
@@ -39,6 +39,7 @@ class OverlayPanelTest {
                     settings = settings,
                     onSettingsChange = { settings = it },
                     onUnlockSkins = {},
+                    skinsUnlocked = skinsUnlocked,
                 )
             }
         }
@@ -78,7 +79,7 @@ class OverlayPanelTest {
     @Test
     fun orbSkinPersistsAndLeavesTheKeyboardSkinAlone() {
         // A skin da orbe é escolha própria da aba Sobrepor (Yan, 2026-09-29): não depende da do teclado.
-        val h = Harness(Settings(keyboardSkin = "system", orbSkin = "atelie"))
+        val h = Harness(Settings(keyboardSkin = "system", orbSkin = "atelie"), skinsUnlocked = true)
         rule.setContent { h.Content() }
 
         rule.onNodeWithTag(orbSkinTag("aero")).performScrollTo().performClick()
@@ -91,7 +92,7 @@ class OverlayPanelTest {
 
     @Test
     fun orbSkinGlitchPersists() {
-        val h = Harness(Settings(orbSkin = "atelie"))
+        val h = Harness(Settings(orbSkin = "atelie"), skinsUnlocked = true)
         rule.setContent { h.Content() }
 
         rule.onNodeWithTag(orbSkinTag("glitch")).performScrollTo().performClick()
@@ -101,7 +102,7 @@ class OverlayPanelTest {
 
     @Test
     fun orbSkinRoseGoldPersists() {
-        val h = Harness(Settings(orbSkin = "atelie"))
+        val h = Harness(Settings(orbSkin = "atelie"), skinsUnlocked = true)
         rule.setContent { h.Content() }
 
         rule.onNodeWithTag(orbSkinTag("rosegold")).performScrollTo().performClick()
@@ -111,7 +112,7 @@ class OverlayPanelTest {
 
     @Test
     fun orbSkinMascotPersists() {
-        val h = Harness(Settings(orbSkin = "atelie"))
+        val h = Harness(Settings(orbSkin = "atelie"), skinsUnlocked = true)
         rule.setContent { h.Content() }
 
         rule.onNodeWithTag(orbSkinTag("mascot")).performScrollTo().performClick()

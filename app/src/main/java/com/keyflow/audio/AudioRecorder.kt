@@ -183,3 +183,13 @@ class AudioRecorder(
         const val AUDIO_SAMPLE_RATE = 16_000
     }
 }
+
+/** Remove gravações órfãs do cache, sem tocar em arquivos recentes que ainda podem estar em uso. */
+fun cleanupStaleRecordings(outputDir: File, nowMs: Long, maxAgeMs: Long = RECORDING_MAX_AGE_MS): Int {
+    val cutoff = nowMs - maxAgeMs
+    return outputDir.listFiles().orEmpty().count { file ->
+        file.isFile && file.lastModified() < cutoff && file.delete()
+    }
+}
+
+const val RECORDING_MAX_AGE_MS = 24L * 60 * 60 * 1000

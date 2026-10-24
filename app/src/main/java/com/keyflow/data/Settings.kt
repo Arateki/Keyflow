@@ -31,12 +31,10 @@ data class Settings(
     val customHeaderValue: String = "",
     val customModel: String = "whisper-1",
     val customLanguage: String? = null,
-    // OpenAI (BYO-key)
-    val openaiToken: String = "",
+    // OpenAI (BYO-key): a chave fica no cofre de `auth/`; a Settings só guarda configuração pública.
     val openaiModel: String = OPENAI_MODEL,
     val openaiLanguage: String? = null,
-    // Groq (BYO-key)
-    val groqToken: String = "",
+    // Groq (BYO-key): a chave fica no cofre de `auth/`.
     val groqModel: String = GROQ_MODEL,
     val groqLanguage: String? = null,
     // Local (native-voice-models): modelo de voz do aparelho selecionado no gerenciador (id do
@@ -60,9 +58,7 @@ data class Settings(
     val visionLocalModelId: String? = null,
     val visionTranslateTarget: String = "pt",
     val visionOpenAiModel: String = "gpt-4o",
-    val visionGoogleApiKey: String = "",
     val visionGoogleModel: String = "gemini-2.0-flash",
-    val visionAnthropicApiKey: String = "",
     val visionAnthropicModel: String = "claude-3-5-sonnet-latest",
     val visionCustomEndpoint: String = "",
     val visionCustomHeaderName: String = "Authorization",
@@ -73,10 +69,8 @@ data class Settings(
     val falaLocalModelId: String? = null,
     val falaSpeed: Float = 1.0f,
     val falaCloudVoice: String = "alloy",
-    val falaElevenLabsApiKey: String = "",
     val falaElevenLabsVoice: String = "Rachel",
     val falaElevenLabsModel: String = "eleven_multilingual_v2",
-    val falaGoogleApiKey: String = "",
     val falaGoogleVoice: String = "pt-BR-Neural2-A",
     val falaCustomEndpoint: String = "",
     val falaCustomHeaderName: String = "Authorization",
@@ -92,20 +86,15 @@ data class Settings(
     val computerSshKey: String = "",
     // Provisionamento e espelhamento dinâmico de modelos via infra própria / API em Rust
     val customModelMirrorUrl: String = "",
-    // Provedores em nuvem (perfis e chaves centralizadas)
-    val providerAnthropicApiKey: String = "",
+    // Provedores em nuvem (perfis; as chaves ficam exclusivamente no `auth/`, ver AUTH-02)
     val providerAnthropicModel: String = "claude-3-5-sonnet-latest",
     val providerAnthropicAuthMode: String = "subscription",
-    val providerOpenAiApiKey: String = "",
     val providerOpenAiModel: String = "gpt-4o",
     val providerOpenAiAuthMode: String = "subscription",
-    val providerGoogleApiKey: String = "",
     val providerGoogleModel: String = "gemini-2.0-flash",
     val providerGoogleAuthMode: String = "subscription",
     val providerElevenLabsAuthMode: String = "subscription",
-    val providerGroqApiKey: String = "",
     val providerGroqModel: String = "llama-3.3-70b-versatile",
-    val providerGrokApiKey: String = "",
     val providerGrokModel: String = "grok-2",
     // Modos habilitados (gating das abas; cada modo libera sua aba — CFG-02)
     val overlayModeEnabled: Boolean = false,
@@ -140,6 +129,8 @@ data class Settings(
     // Tema + onboarding
     val themeDark: Boolean = false,
     val onboardingDone: Boolean = false,
+    val disclosureAcceptedVersion: Int = 0,
+    val disclosureDeclined: Boolean = false,
     // Tempo limite de resposta da transcrição (ms) — compartilhado entre OpenAI/Groq/Custom, não é por
     // preset (aba Voz → seção Geral). Bug real reportado pelo Yan: sem isto, uma rota de rede ruim
     // trava "transcrevendo" pra sempre (OkHttp/JVM não tem timeout de DNS por padrão).
@@ -208,13 +199,19 @@ data class Settings(
      * LOCAL não tem [Config] HTTP: com modelo selecionado vira [EffectiveConfig.Local]; sem modelo cai
      * em [EffectiveConfig.Unavailable], o mesmo caminho que já termina em `CONFIG_MISSING` (NAT-03).
      */
-    fun effectiveConfigFor(source: TranscriptionSource = this.source): EffectiveConfig = when (source) {
+    fun effectiveConfigFor(source: TranscriptionSource = this.source): EffectiveConfig =
+        effectiveConfigFor(source, SettingsCredentialValues())
+
+    internal fun effectiveConfigFor(
+        source: TranscriptionSource = this.source,
+        credentials: SettingsCredentialValues,
+    ): EffectiveConfig = when (source) {
         TranscriptionSource.CREDITS -> EffectiveConfig.Unavailable
         TranscriptionSource.OPENAI -> EffectiveConfig.Ready(
             Config(
                 endpointUrl = OPENAI_ENDPOINT,
                 authHeaderName = "Authorization",
-                authHeaderValue = bearer(openaiToken),
+                authHeaderValue = bearer(credentials.openaiToken),
                 model = openaiModel,
                 language = openaiLanguage,
                 timeoutMs = transcriptionTimeoutMs.toLong(),
@@ -224,7 +221,7 @@ data class Settings(
             Config(
                 endpointUrl = GROQ_ENDPOINT,
                 authHeaderName = "Authorization",
-                authHeaderValue = bearer(groqToken),
+                authHeaderValue = bearer(credentials.groqToken),
                 model = groqModel,
                 language = groqLanguage,
                 timeoutMs = transcriptionTimeoutMs.toLong(),
@@ -271,12 +268,7 @@ data class Settings(
 
     private fun bearer(token: String): String = if (token.isBlank()) "" else "Bearer $token"
 
-    /**
-     * Igual ao `toString()` de uma data class, mas com `***` no lugar do valor de cada segredo
-     * ([SettingsSecrets.BY_PROPERTY]): o gerado imprimiria todos, e bastava um `Log`, uma mensagem de erro ou o
-     * inspetor de layout mostrando as Settings para a chave de API ir parar no logcat. Percorre os campos por
-     * reflexão (e não uma lista à mão) para um campo novo nunca ficar de fora.
-     */
+    /** O estado pode aparecer em logs de diagnóstico; campos secretos ficam mascarados. */
     override fun toString(): String = javaClass.declaredFields
         .filterNot { Modifier.isStatic(it.modifiers) }
         .joinToString(separator = ", ", prefix = "Settings(", postfix = ")") { field ->
