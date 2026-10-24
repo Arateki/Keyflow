@@ -1,5 +1,6 @@
 use axum::Json;
 use axum::extract::State;
+use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use serde::Serialize;
 
@@ -17,6 +18,7 @@ pub struct AccountResponse {
 
 pub enum AccountError {
     RateLimited(RateLimitRejection),
+    Internal,
 }
 
 impl From<RateLimitRejection> for AccountError {
@@ -29,6 +31,7 @@ impl IntoResponse for AccountError {
     fn into_response(self) -> Response {
         match self {
             AccountError::RateLimited(rejection) => rejection.into_response(),
+            AccountError::Internal => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
         }
     }
 }
@@ -53,13 +56,10 @@ pub async fn get_account(
 pub async fn delete_account(
     State(state): State<AppState>,
     account: Account,
-) -> Result<axum::http::StatusCode, Response> {
-    state
-        .rate_limiters
-        .check_account(account.id)
-        .map_err(IntoResponse::into_response)?;
+) -> Result<StatusCode, AccountError> {
+    state.rate_limiters.check_account(account.id)?;
     crate::db::accounts::delete(&state.pool, account.id)
         .await
-        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response())?;
-    Ok(axum::http::StatusCode::NO_CONTENT)
+        .map_err(|_| AccountError::Internal)?;
+    Ok(StatusCode::NO_CONTENT)
 }
