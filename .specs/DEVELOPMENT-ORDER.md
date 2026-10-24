@@ -142,10 +142,10 @@ upload interno, o produto de R$15 e a service account. As tasks V1-1..V1-8 não 
   esse upload. **[YAN]**: configurar/verificar no Console o client OAuth Google com o SHA-1 da chave de assinatura Play e o `applicationId` definitivo.
 - ~~**V1-4** — Agente na v1: recorte da AGT-T10 para a fase 1 (abuso: injeção, segredo, argumentos,
   flood) + validação real com a chave do Yan **[YAN]**.~~ **Feita em 2026-10-23** (recorte de abuso automatizado revisado; falta a validação real [YAN], então o agente fica **Em breve** no release até ela fechar; relatório em `.equipe/relatorios/v1-4-agente.md`).
-- **V1-5** — Política de privacidade (PS-2): áudio sob demanda para a origem escolhida, modelos locais,
+- ~~**V1-5** — Política de privacidade (PS-2): áudio sob demanda para a origem escolhida, modelos locais,
   provedores de raciocínio por chave (`PLAYSTORE_CHECKLIST.md` §1b), agente, skins importadas, AdMob
   (banner e intersticial só no app de configuração, consentimento UMP) e a compra única de R$15.
-  URL permanente **[YAN decide onde]** + link no app.
+  URL permanente **[YAN decide onde]** + link no app.~~ **Feita no app em 2026-10-23** (URLs definitivas em `LegalUrls`, itens na aba Docs e link na divulgação V1-6; relatório em `.equipe/relatorios/v1-link-politica.md`).
 - ~~**V1-6** — Prominent disclosure no onboarding (PS-3): tela antes de `RECORD_AUDIO`, aceite versionado, recusa sem permissão e caminho de aceite posterior. Instrumentado + golden claro/escuro.~~ **Feita em 2026-10-23** (commit `a6ce554`; reforço do gate de captura nesta tarefa; relatório em `.equipe/relatorios/v1-6-divulgacao.md` e `.equipe/relatorios/v1-correcoes-privacidade.md`).
 - **V1-7** — Listing (PS-6) só com o que entra **[YAN aprova textos]**, com anúncios e a compra de
   R$15 (selo "Contém anúncios"); rascunho campo a campo do Data Safety (PS-4), agora com anúncios e
@@ -432,7 +432,7 @@ abaixo cita monetização entra na V1-10. Créditos continuam fora.
       mudança de código necessária; 252 unitários, 163/163 no A32 e 163/163 no emulador A17.
       `PLAYSTORE_CHECKLIST.md` já marca o bloqueante 0 como resolvido. Falta só **[YAN]**: o passe
       manual usando o app no A32 — **confirmado pelo Yan em 2026-09-09**, funcionando normal.
-- [ ] **PS-2 — Política de privacidade pública**: redigir (conteúdo mínimo do checklist: áudio
+- [x] **PS-2 — Política de privacidade pública**: redigir (conteúdo mínimo do checklist: áudio
       sob demanda, endpoint do usuário/proxy, sem keystrokes; agora também: identidade anônima,
       compra de R$15 e AdMob [monetization] — créditos ficam para depois da v1; modelos locais
       [native-voice-models], captura de tela efêmera [vision-capture]) + publicar em URL

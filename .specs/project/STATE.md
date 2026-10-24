@@ -2575,3 +2575,8 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
 - Arquivos de gravação ficam em `cacheDir/keyflow-recordings`: apague após resultado terminal, mas preserve durante a janela de desfazer de cancelamento; na abertura, remova só arquivos com mais de 24 h. O cache pode conter áudio enquanto o app está em uso.
 - A verificação do aceite versionado deve ficar no ponto comum anterior a iniciar o recorder, e a tela da divulgação precisa reabrir mesmo quando `onboardingDone=true`; teste atualizações com microfone já concedido.
 - A entrada UMP depende de `privacyOptionsRequirementStatus == REQUIRED`; a API `showPrivacyOptionsForm` deve ser chamada como resposta ao toque do usuário.
+
+## Links da política e termos — V1-5 (2026-10-23)
+- URLs públicas centralizadas em `LegalUrls` com base única `https://keyflow.arateki.com` e resolução por idioma (`/privacidade` e `/termos` em PT; `/privacy` e `/terms` em EN/ES).
+- Aba Docs (`DocsPanel`) expõe itens clicáveis na seção Privacidade que disparam `Intent(Intent.ACTION_VIEW)` sem WebView.
+- Divulgação destacada (`ProminentDisclosureScreen`) atualizada para "Ler a política de privacidade completa" com abertura direta da URL correspondente. Injeção de handler de abertura hermético permite testes instrumentados sem tráfego de rede.

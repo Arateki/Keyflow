@@ -14,6 +14,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.keyflow.legal.LegalUrls
 import com.keyflow.ui.theme.KeyFlowTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -142,6 +143,34 @@ class DocsPanelTest {
 
         rule.onNodeWithTag(DOCS_FEEDBACK_NO_APP_TAG).performScrollTo().assertIsDisplayed()
         rule.onNodeWithText(FEEDBACK_EMAIL, substring = true).assertIsDisplayed()
+    }
+
+    /** V1-5: "Política de privacidade" abre o navegador (ACTION_VIEW) na URL correspondente ao idioma. */
+    @Test
+    fun privacyPolicyActionOpensBrowserWithPrivacyUrl() {
+        val opened = mutableListOf<Intent>()
+        rule.setContent { KeyFlowTheme(dark = false) { DocsPanel(openUrl = { opened += it }) } }
+
+        rule.onNodeWithTag(DOCS_PRIVACY_POLICY_TAG).performScrollTo().performClick()
+
+        assertEquals(1, opened.size)
+        val intent = opened.single()
+        assertEquals(Intent.ACTION_VIEW, intent.action)
+        assertEquals(LegalUrls.privacyPolicy(), intent.dataString)
+    }
+
+    /** V1-5: "Termos de uso" abre o navegador (ACTION_VIEW) na URL correspondente ao idioma. */
+    @Test
+    fun termsOfUseActionOpensBrowserWithTermsUrl() {
+        val opened = mutableListOf<Intent>()
+        rule.setContent { KeyFlowTheme(dark = false) { DocsPanel(openUrl = { opened += it }) } }
+
+        rule.onNodeWithTag(DOCS_TERMS_TAG).performScrollTo().performClick()
+
+        assertEquals(1, opened.size)
+        val intent = opened.single()
+        assertEquals(Intent.ACTION_VIEW, intent.action)
+        assertEquals(LegalUrls.termsOfUse(), intent.dataString)
     }
 
     private companion object {

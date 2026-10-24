@@ -67,6 +67,11 @@ class DocsSectionsTest {
     }
 
     @Test
+    fun privacySectionHasLegalActions() {
+        assertEquals(listOf("privacidade"), docsSections.filter { it.legalActions }.map { it.id })
+    }
+
+    @Test
     fun orbGesturesQuoteTheSameSentencesAsTheModeTab() {
         val texts = docsSections.single { it.id == "gestos" }.blocks
             .filterIsInstance<DocBlock.Labeled>()
