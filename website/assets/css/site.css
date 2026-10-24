@@ -183,7 +183,17 @@ html {
   text-size-adjust: 100%;
   background: var(--fundo);
   scroll-behavior: smooth;
-  scroll-padding-top: 88px;
+  scroll-padding-top: calc(88px + env(safe-area-inset-top, 0px));
+}
+
+/* Âncoras e seções: mantém respiro abaixo do cabeçalho fixo ao navegar por # */
+:target,
+[id],
+section,
+.legal-artigo h1,
+.legal-artigo h2,
+.legal-artigo h3 {
+  scroll-margin-top: calc(88px + env(safe-area-inset-top, 0px));
 }
 
 body {
@@ -326,6 +336,7 @@ main, .rodape { position: relative; z-index: 1; }
   inset: 0 0 auto;
   z-index: 50;
   border-bottom: 1px solid transparent;
+  padding-top: env(safe-area-inset-top, 0px);
   transition: background-color 0.5s, border-color 0.5s, backdrop-filter 0.5s;
 }
 .topo.rolou {
@@ -1471,7 +1482,9 @@ main, .rodape { position: relative; z-index: 1; }
 /* ── Páginas legais ── */
 .legal-artigo {
   max-width: 760px;
-  padding-block: clamp(32px, 6vw, 64px);
+  padding-top: calc(72px + env(safe-area-inset-top, 0px) + clamp(36px, 5vw, 64px));
+  padding-bottom: clamp(48px, 8vw, 80px);
+  font-family: var(--fonte);
 }
 .legal-artigo h1 {
   font-weight: 300;
@@ -1494,6 +1507,7 @@ main, .rodape { position: relative; z-index: 1; }
 .legal-artigo h3 {
   font-weight: 500;
   font-size: 1.1rem;
+  letter-spacing: -0.01em;
   margin-top: 1.8rem;
   color: var(--texto);
 }
@@ -1501,10 +1515,18 @@ main, .rodape { position: relative; z-index: 1; }
 .legal-artigo ul,
 .legal-artigo ol {
   margin: 1.1rem 0;
+  font-family: var(--fonte);
+  font-size: clamp(1rem, 0.96rem + 0.2vw, 1.0625rem);
+  line-height: 1.65;
+  letter-spacing: -0.012em;
+  font-feature-settings: normal;
   color: var(--texto-2);
+  text-wrap: pretty;
 }
 .legal-artigo li {
   margin: 0.4rem 0;
+  font-family: var(--fonte);
+  letter-spacing: -0.012em;
 }
 .legal-artigo ul,
 .legal-artigo ol {
