@@ -7,7 +7,8 @@ Este diretório contém os textos oficiais da ficha do app na Google Play Store,
 ## 1. Fonte da Verdade e Publicação do Site
 
 - **Fonte canônica:** Os arquivos Markdown (`.md`) deste diretório (`politica-de-privacidade.md`, `termos-de-uso.md`, `privacy-policy.md`, `terms-of-use.md`) são a única fonte da verdade.
-- **Não edite arquivos HTML manualmente:** As páginas estáticas disponibilizadas em `https://keyflow.arateki.com` são geradas automaticamente pelo script `scripts/gerar-site.py`.
+- **Não edite os HTML das páginas legais manualmente:** As páginas legais disponibilizadas em `https://keyflow.arateki.com` são geradas automaticamente pelo script `scripts/gerar-site.py`.
+- **Página inicial:** o código-fonte da página inicial (`/` em português e `/en` em inglês) fica em `website/` — HTML, CSS e JS feitos à mão, sem passo de build. O `scripts/gerar-site.py` copia essa pasta e gera as páginas legais ao lado, em `build/site/`, e valida tudo (links internos, âncoras, títulos, hash do script no CSP, content-type de cada arquivo e o orçamento de 400 KB da primeira carga). Pastas que começam com `_` (como `website/_fonte/`, de onde saem a imagem de prévia e os ícones PNG) não vão ao ar.
 - **Fluxo de alteração:**
   1. Crie uma branch e edite os arquivos `.md` correspondentes em `docs/loja/`;
   2. Teste a geração localmente rodando:
@@ -15,7 +16,7 @@ Este diretório contém os textos oficiais da ficha do app na Google Play Store,
      python3 scripts/gerar-site.py
      ```
   3. Abra um Pull Request. A action `.github/workflows/site.yml` valida a geração das páginas automaticamente;
-  4. Após a revisão e aprovação da equipe, o merge para a branch `main` executa a publicação automática dos arquivos gerados no bucket Cloudflare R2 (`keyflow-site`), atualizando o site público imediatamente.
+  4. Após a revisão e aprovação da equipe, o merge para a branch `main` executa a publicação automática dos arquivos gerados no bucket Cloudflare R2 (`keyflow-site`), um tipo de arquivo por vez e cada um com o seu content-type (tabela `TIPOS` do gerador), atualizando o site público em poucos minutos (cache de 5 minutos no HTML, CSS e JS).
 
 ---
 
