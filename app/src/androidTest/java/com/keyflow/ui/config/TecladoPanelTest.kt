@@ -38,7 +38,7 @@ class TecladoPanelTest {
     @get:Rule
     val rule = createComposeRule()
 
-    private inner class Harness(initial: Settings) {
+    private inner class Harness(initial: Settings, val skinsUnlocked: Boolean = false) {
         var settings by mutableStateOf(initial)
         var unlockClicks = 0
 
@@ -49,6 +49,7 @@ class TecladoPanelTest {
                     settings = settings,
                     onSettingsChange = { settings = it },
                     onUnlockSkins = { unlockClicks++ },
+                    skinsUnlocked = skinsUnlocked,
                 )
             }
         }
@@ -98,7 +99,7 @@ class TecladoPanelTest {
     @Test
     fun keyboardSkinLeavesTheOrbSkinAlone() {
         // O Aero no teclado vale só para o teclado; a orbe tem a skin dela na aba Sobrepor (Yan, 2026-09-29).
-        val h = Harness(Settings(keyboardSkin = "system", orbSkin = "atelie"))
+        val h = Harness(Settings(keyboardSkin = "system", orbSkin = "atelie"), skinsUnlocked = true)
         rule.setContent { h.Content() }
 
         rule.onNodeWithTag(skinTag("aero")).performScrollTo().performClick()
@@ -111,7 +112,7 @@ class TecladoPanelTest {
 
     @Test
     fun keyboardSkinGlitchPersists() {
-        val h = Harness(Settings(keyboardSkin = "system", orbSkin = "atelie"))
+        val h = Harness(Settings(keyboardSkin = "system", orbSkin = "atelie"), skinsUnlocked = true)
         rule.setContent { h.Content() }
 
         rule.onNodeWithTag(skinTag("glitch")).performScrollTo().performClick()
@@ -124,7 +125,7 @@ class TecladoPanelTest {
 
     @Test
     fun keyboardSkinRoseGoldPersists() {
-        val h = Harness(Settings(keyboardSkin = "system", orbSkin = "atelie"))
+        val h = Harness(Settings(keyboardSkin = "system", orbSkin = "atelie"), skinsUnlocked = true)
         rule.setContent { h.Content() }
 
         rule.onNodeWithTag(skinTag("rosegold")).performScrollTo().performClick()
