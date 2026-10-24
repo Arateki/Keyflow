@@ -162,7 +162,7 @@ class OpenAiAgentEngineTest {
     }
 
     @Test
-    fun `an old turn is rebuilt without reasoning and without the item id`() {
+    fun `an old turn preserves the provider state including reasoning and function call items`() {
         server.enqueue(sse(OpenAiAgentSseFixtures.TEXT_ONLY))
         val history = listOf(
             AgentMessage.User("a"),
@@ -173,8 +173,24 @@ class OpenAiAgentEngineTest {
         )
         events(history)
         val body = lastBody().getJSONArray("input").toString()
-        assertThat(body).doesNotContain("rs_old")
-        assertThat(body).doesNotContain("fc_old")
+        assertThat(body).contains("rs_old")
+        assertThat(body).contains("fc_old")
+        assertThat(body).contains("call_old")
+    }
+
+    @Test
+    fun `an old turn without provider state is rebuilt from text and calls`() {
+        server.enqueue(sse(OpenAiAgentSseFixtures.TEXT_ONLY))
+        val history = listOf(
+            AgentMessage.User("a"),
+            AgentMessage.Assistant("vou", listOf(AgentToolCall("call_old", "skin_list", "{}")), providerState = null),
+            AgentMessage.ToolResult("call_old", "ok"),
+            AgentMessage.Assistant("feito"),
+            AgentMessage.User("e agora?"),
+        )
+        events(history)
+        val body = lastBody().getJSONArray("input").toString()
+        assertThat(body).doesNotContain("reasoning")
         assertThat(body).contains("call_old")
     }
 

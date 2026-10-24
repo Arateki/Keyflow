@@ -75,16 +75,15 @@ internal object OpenAiAgentWire {
      * O histórico neutro como itens de `input`. Regras (da documentação acima):
      *  - uma chamada do modelo é um item `function_call` (`call_id`, `name`, `arguments`) e cada resultado, um `function_call_output` com o
      *    MESMO `call_id` — itens soltos, na ordem;
-     *  - os itens de saída da volta de ferramenta em andamento (as mensagens depois da última do usuário) voltam INTACTOS quando há
-     *    raciocínio guardado ([ProviderState]); voltas antigas são reconstruídas do texto e das chamadas, sem o raciocínio (e sem `id` de
-     *    item: com `store:false` o `fc_…` não existe no servidor);
+     *  - os itens de saída guardados de cada volta ([ProviderState]) voltam INTACTOS em todas as voltas quando há raciocínio e chamadas
+     *    (necessário com `store:false` para preservar o raciocínio criptografado e não gerar chamadas órfãs); sem estado, reconstrói do texto
+     *    e das chamadas;
      *  - mensagem vazia não existe; a imagem de um resultado não vai (só texto: a validação com o modelo é da AGT-T10);
      *  - sem nenhuma ferramenta ativa as chamadas do histórico viram TEXTO, em vez de itens de ferramenta sem `tools` na requisição.
      * Conserta antes ([AgentHistory.repair]): chamada sem resultado ganha um resultado de erro.
      */
     fun toInput(messages: List<AgentMessage>, flattenTools: Boolean): JSONArray {
         val repaired = AgentHistory.repair(messages).messages
-        val lastUser = repaired.indexOfLast { it is AgentMessage.User }
         val names = HashMap<String, String>()
         val items = JSONArray()
         repaired.forEachIndexed { index, message ->
@@ -92,7 +91,7 @@ internal object OpenAiAgentWire {
                 is AgentMessage.User -> if (message.text.isNotBlank()) items.put(textMessage("user", message.text))
                 is AgentMessage.Assistant -> {
                     message.toolCalls.forEach { names[it.id] = it.name }
-                    val replay = if (index > lastUser && !flattenTools) replayed(message) else null
+                    val replay = if (!flattenTools) replayed(message) else null
                     if (replay != null) {
                         for (i in 0 until replay.length()) items.put(replay.get(i))
                     } else if (flattenTools) {
