@@ -1,3 +1,5 @@
+import com.keyflow.admob.AdMobIds
+import com.android.build.api.variant.ResValue
 import java.io.File
 import java.net.URI
 import java.security.MessageDigest
@@ -142,6 +144,7 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        resValues = true
         // Fronteira com o processo :inference (native-voice-models, NM-T8).
         aidl = true
     }
@@ -157,6 +160,7 @@ android {
     // O pacote de skin de exemplo (`skin-packs/`, na raiz do repositório) vai nos assets do APK de teste: o instrumentado importa o pacote REAL,
     // não uma cópia (SKP-DOC-02).
     sourceSets {
+        getByName("test") { java.srcDir("../buildSrc/src/main/java") }
         getByName("androidTest") {
             assets.srcDir("../skin-packs")
         }
@@ -193,8 +197,27 @@ val copySkinFormat = tasks.register<CopySkinFormatTask>("copySkinFormatAsset") {
     outputDir.set(layout.buildDirectory.dir("generated/skinFormatAssets"))
 }
 
+// Providers adiados: tarefas só de debug não exigem a conta AdMob do release.
+val admobReleaseIds = providers.provider {
+    AdMobIds.select(false, listOf(AdMobIds.APP, AdMobIds.BANNER, AdMobIds.INTERSTITIAL).associateWith { key ->
+        unversionedProperty(key).ifBlank { providers.environmentVariable(key).orNull.orEmpty() }
+    })
+}
+
 androidComponents {
     onVariants { variant ->
+        val ids = if (variant.buildType == "debug") {
+            providers.provider { AdMobIds.select(true, emptyMap()) }
+        } else admobReleaseIds
+        mapOf(
+            "admob_app_id" to AdMobIds.APP,
+            "admob_banner_ad_unit_id" to AdMobIds.BANNER,
+            "admob_interstitial_ad_unit_id" to AdMobIds.INTERSTITIAL,
+        ).forEach { (resource, key) ->
+            variant.resValues.put(variant.makeResValueKey("string", resource), ids.map {
+                ResValue(it.getValue(key), "ID AdMob selecionado pela variante; não editar.")
+            })
+        }
         variant.sources.assets?.addGeneratedSourceDirectory(copySkinFormat, CopySkinFormatTask::outputDir)
     }
 }

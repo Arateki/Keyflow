@@ -182,7 +182,7 @@ de aba → 1 interstitial; próximo só depois do dobro do intervalo; comprar un
 | IDN-01..03 | Identidade no app | Parcial — MZ-T1/T2; staging da API pendente |
 | CRD-01..05 | Créditos (aba Voz) | Pending |
 | UNL-01..05 | Desbloqueio/entitlements | Parcial — MZ-T9 + revisão e goldens claro/escuro do unlock; resolução de skins e gate inicial verificados, staging pendente |
-| ADS-01..06 | Dinâmica de anúncios | Parcial — MZ-T10/T11/T14; grep ADS-01 limpo em IME/overlay/onboarding e goldens dos slots; gate de entitlement/cadência verificados, device/Play pendentes |
+| ADS-01..06 | Dinâmica de anúncios | IDs por variante verificados em JVM e APK release (v1-admob-ids; `AdMobIdsTest`, inspeção do APK no smoke/Checks; configuração em `admob-release.md`). Parcial — MZ-T10/T11/T14; grep ADS-01 limpo em IME/overlay/onboarding e goldens dos slots; gate de entitlement/cadência verificados, device/Play pendentes |
 | RWD-01..04 | Rewarded | Pending |
 | RMT-01..03 | Manifest/config remota | Parcial — MZ-T13 + revisão; aviso e kill switch ligados à UI |
 

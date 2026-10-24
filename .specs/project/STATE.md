@@ -2575,3 +2575,21 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
 - Arquivos de gravação ficam em `cacheDir/keyflow-recordings`: apague após resultado terminal, mas preserve durante a janela de desfazer de cancelamento; na abertura, remova só arquivos com mais de 24 h. O cache pode conter áudio enquanto o app está em uso.
 - A verificação do aceite versionado deve ficar no ponto comum anterior a iniciar o recorder, e a tela da divulgação precisa reabrir mesmo quando `onboardingDone=true`; teste atualizações com microfone já concedido.
 - A entrada UMP depende de `privacyOptionsRequirementStatus == REQUIRED`; a API `showPrivacyOptionsForm` deve ser chamada como resposta ao toque do usuário.
+
+### 2026-10-23 — IDs AdMob por variante (v1-admob-ids)
+
+- Recursos AdMob vêm de `variant.resValues` com providers adiados: o debug não exige conta AdMob;
+  gerar recursos do release valida os três IDs e recusa o publisher de teste.
+- O scanner do APK precisa procurar UTF-8 e UTF-16 em entradas descomprimidas: procurar só no DEX
+  deixa passar o ID do manifest/recursos. IDs sintéticos do Checks não servem para distribuição.
+- Conta, IDs reais e `app-ads.txt` seguem [YAN] da V1-8 (`monetization/admob-release.md`).
+- O gate revelou corrida em `HttpDownloadGatewayTest`: `SUCCESSFUL` é publicado antes do
+  callback. O teste agora aguarda os dois sinais; a falha mostrava `missing: modelo` e
+  `but was: [modelo]` porque a lista mudou durante a própria asserção. Correção em commit separado.
+- O smoke encontrou `am start` com `Error type 3` e UiAutomator sem raiz, ambos saindo com
+  zero; havia XML antigo no aparelho. Agora exige `Status: ok` e remove o XML remoto antes de
+  capturar. Abrir a Activity novamente confirmou o componente correto do release.
+- Validação final: debug/release + 1.514 unitários + lint verdes; `assembleRelease` sem IDs
+  recusado; scanner aprovado no release e recusado no debug; smoke com Activity aberta e XML
+  fresco verde. Cache compartilhado travou no journal (PID 25478); usou-se cópia em `/tmp`,
+  JDK portátil e os mesmos flocks, sem interferir no processo dono do cache.
