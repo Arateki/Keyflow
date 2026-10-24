@@ -20,7 +20,8 @@ public final class AdMobIds {
         );
         Map<String, String> result = new LinkedHashMap<>();
         for (String key : new String[] { APP, BANNER, INTERSTITIAL }) {
-            String value = configured.getOrDefault(key, "").trim();
+            String configuredValue = configured.get(key);
+            String value = configuredValue == null ? "" : configuredValue.trim();
             String separator = key.equals(APP) ? "~" : "/";
             if (!value.matches("ca-app-pub-[0-9]{16}" + separator + "[0-9]{10}")
                     || value.contains(TEST_PUBLISHER)) {

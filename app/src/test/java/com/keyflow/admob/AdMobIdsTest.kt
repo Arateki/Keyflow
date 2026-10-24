@@ -20,6 +20,17 @@ class AdMobIdsTest {
         assertEquals(valid, AdMobIds.select(false, valid))
     }
 
+    @Test fun `release trata valor nulo como ausente e debug continua em teste`() {
+        for (key in valid.keys) {
+            val configured = valid + (key to null)
+            val error = assertThrows(IllegalArgumentException::class.java) {
+                AdMobIds.select(false, configured)
+            }
+            assertTrue(error.message!!.contains(key))
+            assertEquals(AdMobIds.select(true, emptyMap()), AdMobIds.select(true, configured))
+        }
+    }
+
     @Test fun `release rejeita cada ID ausente malformado ou de teste`() {
         for (key in valid.keys) {
             val testId = AdMobIds.select(true, emptyMap()).getValue(key)
