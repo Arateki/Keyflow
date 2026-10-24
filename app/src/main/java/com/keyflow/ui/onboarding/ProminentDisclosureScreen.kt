@@ -1,7 +1,6 @@
 package com.keyflow.ui.onboarding
 
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -13,6 +12,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -22,11 +25,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.keyflow.i18n.tr
 import com.keyflow.legal.LegalUrls
+import com.keyflow.legal.openLegalUrl
 import com.keyflow.ui.config.PaperWarm
 import com.keyflow.ui.config.PrimaryButton
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
 
+const val DISCLOSURE_LEGAL_NO_APP_TAG = "disclosure-link-sem-aplicativo"
 const val DISCLOSURE_ACCEPT_TAG = "disclosure-accept"
 const val DISCLOSURE_DECLINE_TAG = "disclosure-decline"
 const val DISCLOSURE_CONTINUE_TAG = "disclosure-continue-without-dictation"
@@ -42,7 +47,8 @@ fun ProminentDisclosureScreen(
 ) {
     val palette = LocalKeyFlowPalette.current
     val context = LocalContext.current
-    val launchUrl: (Intent) -> Unit = openUrl ?: { context.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+    val launchUrl: (Intent) -> Unit = openUrl ?: { context.startActivity(it) }
+    var noBrowserApp by remember { mutableStateOf(false) }
     val declineLabel = if (declined) tr("Continuar sem ditado") else tr("Recusar")
     Column(
         modifier.fillMaxSize().background(palette.bg).systemBarsPadding().padding(horizontal = 26.dp, vertical = 28.dp),
@@ -74,9 +80,18 @@ fun ProminentDisclosureScreen(
         Text(
             tr("Ler a política de privacidade completa"), color = palette.teal, fontFamily = SpaceGrotesk, fontSize = 14.sp,
             modifier = Modifier.clickable {
-                launchUrl(Intent(Intent.ACTION_VIEW, Uri.parse(LegalUrls.privacyPolicy())))
+                noBrowserApp = !openLegalUrl(LegalUrls.privacyPolicy(), launchUrl)
             }.testTag("disclosure-privacy-link"),
         )
+        if (noBrowserApp) {
+            Text(
+                tr("Não há aplicativo disponível para abrir este link."),
+                color = palette.fg2,
+                fontFamily = SpaceGrotesk,
+                fontSize = 11.sp,
+                modifier = Modifier.testTag(DISCLOSURE_LEGAL_NO_APP_TAG),
+            )
+        }
         Spacer(Modifier.weight(1f))
         PrimaryButton(tr("Aceitar e continuar"), tag = DISCLOSURE_ACCEPT_TAG, onClick = onAccept)
         Text(

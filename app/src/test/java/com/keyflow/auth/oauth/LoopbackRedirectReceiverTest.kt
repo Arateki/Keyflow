@@ -3,7 +3,6 @@ package com.keyflow.auth.oauth
 import com.google.common.truth.Truth.assertThat
 import com.keyflow.auth.AuthErrorKind
 import com.keyflow.auth.AuthException
-import java.net.ConnectException
 import java.net.BindException
 import java.net.InetAddress
 import java.net.ServerSocket
@@ -118,10 +117,18 @@ class LoopbackRedirectReceiverTest {
         val waiting = async { r.await(5_000) }
         get(r, "/auth/callback?code=1&state=s")
         waiting.await()
-        delay(100) // o servidor fecha logo depois de responder
-
-        assertThrows(ConnectException::class.java) { Socket("127.0.0.1", port(r)).close() }
-        Unit // o JUnit exige método void: assertThrows devolve a exceção
+        // Espera a liberação real da porta, inclusive o término do accept nativo.
+        withTimeout(2_000) {
+            while (true) {
+                try {
+                    ServerSocket(port(r), 1, InetAddress.getByName("127.0.0.1")).use { }
+                    break
+                } catch (_: BindException) {
+                    delay(10)
+                }
+            }
+        }
+        Unit
     }
 
     /** O navegador abre conexões especulativas sem mandar nada: uma não pode travar a verdadeira. */

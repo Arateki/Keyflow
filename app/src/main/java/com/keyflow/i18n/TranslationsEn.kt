@@ -2,6 +2,7 @@ package com.keyflow.i18n
 
 /** Português → inglês. Chave = o texto exato passado a [tr] (ver `TranslationsTest`). */
 internal val TranslationsEn: Map<String, String> = mapOf(
+    "Não há aplicativo disponível para abrir este link." to "No app is available to open this link.",
     "Pronto para testar a compra no staging." to "Ready to test a purchase on staging.",
     "Simular compra" to "Simulate purchase",
     "Reembolsar compra simulada" to "Refund simulated purchase",
