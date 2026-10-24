@@ -8,13 +8,13 @@
   alternative is commented right below it). The inline <head> script is hashed in the
   Content-Security-Policy: if it changes, update the hash (gerar-site.py checks it).
 -->
-<html lang="en" data-linha="agente">
+<html lang="en" data-linha="ia">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-WcmYBmhyB2LnXFHPuADHghNUO64YpV8GDhXVBaz/mco='; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'">
-<title>KeyFlow — your personal agent, starting with your voice</title>
-<!-- Alternative (data-linha="ia"): <title>KeyFlow — a new way to use artificial intelligence</title> -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-3Q2+v2Y2rE9T3EDX2Vz2NW9nj2r6+FbnIV6qjmrNec8='; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<title>KeyFlow — a new way to use artificial intelligence</title>
+<!-- Alternative (data-linha="agente"): <title>KeyFlow — your personal agent, starting with your voice</title> -->
 <meta name="description" content="An Android keyboard with voice dictation in any app. Transcribe on your phone, offline, or in the cloud with your own key, and connect the AI you choose. Coming soon to Google Play.">
 <link rel="canonical" href="https://keyflow.arateki.com/en">
 <link rel="alternate" hreflang="pt-BR" href="https://keyflow.arateki.com/">
@@ -27,7 +27,7 @@
 <meta property="og:locale" content="en_US">
 <meta property="og:locale:alternate" content="pt_BR">
 <meta property="og:url" content="https://keyflow.arateki.com/en">
-<meta property="og:title" content="KeyFlow — your personal agent, starting with your voice">
+<meta property="og:title" content="KeyFlow — a new way to use artificial intelligence">
 <meta property="og:description" content="Speak in any app and the text appears. On your phone, offline, or in the cloud with your own key. Coming soon to Google Play.">
 <meta property="og:image" content="https://keyflow.arateki.com/assets/img/og.jpg">
 <meta property="og:image:width" content="1200">
@@ -40,7 +40,7 @@
 <link rel="preload" href="assets/fonts/space-grotesk-300.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="assets/fonts/space-grotesk-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="assets/css/site.css">
-<script>(function(){try{if(localStorage.getItem('kf-tema')==='claro')document.documentElement.setAttribute('data-theme','claro')}catch(e){}})();</script>
+<script>(function(){try{var t=localStorage.getItem('kf-tema');if(t==='claro'||t==='escuro')document.documentElement.setAttribute('data-theme',t)}catch(e){}})();</script>
 <script src="assets/js/orbe.js" defer></script>
 <script src="assets/js/site.js" defer></script>
 </head>
@@ -229,36 +229,6 @@
         <li class="trilha-item revela"><span class="trilha-n" aria-hidden="true">06</span><div><h3>Credits</h3><p>Use transcription and AI without an API key of your own.</p></div><span class="estado estado-breve">Coming soon</span></li>
       </ol>
       <p class="trilha-nota">Each feature arrives in an app update, when it's ready. No promised dates.</p>
-    </div>
-  </section>
-
-  <section id="preco" class="secao preco" aria-labelledby="preco-titulo">
-    <div class="caixa">
-      <div class="cabeca">
-        <p class="rotulo">06 — Pricing</p>
-        <h2 id="preco-titulo" class="titulo-secao revela">Free to use. <span class="tenue">One purchase, forever.</span></h2>
-      </div>
-      <div class="planos">
-        <article class="plano revela">
-          <h3>Free</h3>
-          <p class="plano-valor">Free</p>
-          <ul>
-            <li>Keyboard, orb and gestures</li>
-            <li>On-device or bring-your-own-key transcription</li>
-            <li>The AI you connect</li>
-            <li>Discreet ads only on the settings screen — never on the keyboard or the orb</li>
-          </ul>
-        </article>
-        <article class="plano plano-destaque revela">
-          <h3>One-time purchase</h3>
-          <p class="plano-valor">Pay once <small>no subscription</small></p>
-          <ul>
-            <li>Unlocks Aero, Glitch, Rose Gold and the mascot</li>
-            <li>Removes the ads for good</li>
-            <li>Restore it anytime when you switch phones</li>
-          </ul>
-        </article>
-      </div>
     </div>
   </section>
 

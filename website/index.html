@@ -8,13 +8,13 @@
   comentada logo abaixo dele). O script em linha do <head> tem o hash no Content-Security-Policy: se
   mudar o script, atualize o hash (o gerar-site.py confere e avisa).
 -->
-<html lang="pt-BR" data-linha="agente">
+<html lang="pt-BR" data-linha="ia">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-WcmYBmhyB2LnXFHPuADHghNUO64YpV8GDhXVBaz/mco='; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'">
-<title>KeyFlow — seu agente pessoal, a começar pela voz</title>
-<!-- Alternativa (data-linha="ia"): <title>KeyFlow — a nova forma de usar inteligência artificial</title> -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-3Q2+v2Y2rE9T3EDX2Vz2NW9nj2r6+FbnIV6qjmrNec8='; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<title>KeyFlow — a nova forma de usar inteligência artificial</title>
+<!-- Alternativa (data-linha="agente"): <title>KeyFlow — seu agente pessoal, a começar pela voz</title> -->
 <meta name="description" content="Teclado para Android com ditado por voz em qualquer app. Transcreva no próprio aparelho, sem internet, ou na nuvem com a sua chave, e conecte a IA que você escolher. Em breve no Google Play.">
 <link rel="canonical" href="https://keyflow.arateki.com/">
 <link rel="alternate" hreflang="pt-BR" href="https://keyflow.arateki.com/">
@@ -27,7 +27,7 @@
 <meta property="og:locale" content="pt_BR">
 <meta property="og:locale:alternate" content="en_US">
 <meta property="og:url" content="https://keyflow.arateki.com/">
-<meta property="og:title" content="KeyFlow — seu agente pessoal, a começar pela voz">
+<meta property="og:title" content="KeyFlow — a nova forma de usar inteligência artificial">
 <meta property="og:description" content="Fale em qualquer app e o texto aparece. No aparelho, offline, ou na nuvem com a sua chave. Em breve no Google Play.">
 <meta property="og:image" content="https://keyflow.arateki.com/assets/img/og.jpg">
 <meta property="og:image:width" content="1200">
@@ -40,7 +40,7 @@
 <link rel="preload" href="assets/fonts/space-grotesk-300.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="assets/fonts/space-grotesk-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="assets/css/site.css">
-<script>(function(){try{if(localStorage.getItem('kf-tema')==='claro')document.documentElement.setAttribute('data-theme','claro')}catch(e){}})();</script>
+<script>(function(){try{var t=localStorage.getItem('kf-tema');if(t==='claro'||t==='escuro')document.documentElement.setAttribute('data-theme',t)}catch(e){}})();</script>
 <script src="assets/js/orbe.js" defer></script>
 <script src="assets/js/site.js" defer></script>
 </head>
@@ -229,36 +229,6 @@
         <li class="trilha-item revela"><span class="trilha-n" aria-hidden="true">06</span><div><h3>Créditos</h3><p>Use a transcrição e a IA sem precisar de uma chave própria.</p></div><span class="estado estado-breve">Em breve</span></li>
       </ol>
       <p class="trilha-nota">Cada recurso chega numa atualização do app, quando estiver pronto. Sem data prometida.</p>
-    </div>
-  </section>
-
-  <section id="preco" class="secao preco" aria-labelledby="preco-titulo">
-    <div class="caixa">
-      <div class="cabeca">
-        <p class="rotulo">06 — Preço</p>
-        <h2 id="preco-titulo" class="titulo-secao revela">Grátis para usar. <span class="tenue">Uma compra, para sempre.</span></h2>
-      </div>
-      <div class="planos">
-        <article class="plano revela">
-          <h3>Grátis</h3>
-          <p class="plano-valor">R$ 0</p>
-          <ul>
-            <li>Teclado, orbe e gestos</li>
-            <li>Transcrição no aparelho ou com a sua chave</li>
-            <li>A IA que você conectar</li>
-            <li>Anúncios discretos só na tela de configurações — nunca no teclado nem na orbe</li>
-          </ul>
-        </article>
-        <article class="plano plano-destaque revela">
-          <h3>Compra única</h3>
-          <p class="plano-valor">R$ 15 <small>uma vez</small></p>
-          <ul>
-            <li>Libera Aero, Glitch, Rose Gold e o mascote</li>
-            <li>Remove os anúncios para sempre</li>
-            <li>Não é assinatura: pague uma vez e restaure quando trocar de aparelho</li>
-          </ul>
-        </article>
-      </div>
     </div>
   </section>
 
