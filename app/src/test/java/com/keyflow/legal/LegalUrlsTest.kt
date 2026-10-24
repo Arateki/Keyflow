@@ -2,6 +2,7 @@ package com.keyflow.legal
 
 import com.keyflow.i18n.AppLanguage
 import com.keyflow.i18n.AppLocale
+import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -42,6 +43,28 @@ class LegalUrlsTest {
             assertEquals("https://keyflow.arateki.com/terms", LegalUrls.termsOfUse())
         } finally {
             AppLocale.pinned = previousPinned
+        }
+    }
+
+    @Test
+    fun idiomaConfiguradoDoAppPrevaleceSobreSistemaSemOverrideDaGaleria() {
+        val previousPinned = AppLocale.pinned
+        val previousLanguage = AppLocale.language
+        val previousSystem = Locale.getDefault()
+        try {
+            AppLocale.pinned = null
+            for (language in AppLanguage.entries) {
+                Locale.setDefault(if (language == AppLanguage.PT) Locale.ENGLISH else Locale("pt", "BR"))
+                AppLocale.language = language
+                val expectedPrivacy = if (language == AppLanguage.PT) "privacidade" else "privacy"
+                val expectedTerms = if (language == AppLanguage.PT) "termos" else "terms"
+                assertEquals("https://keyflow.arateki.com/$expectedPrivacy", LegalUrls.privacyPolicy())
+                assertEquals("https://keyflow.arateki.com/$expectedTerms", LegalUrls.termsOfUse())
+            }
+        } finally {
+            AppLocale.pinned = previousPinned
+            AppLocale.language = previousLanguage
+            Locale.setDefault(previousSystem)
         }
     }
 
