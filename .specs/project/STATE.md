@@ -2648,3 +2648,28 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
   em 16a7ccd). Fonte idêntico à base 001740f; diferença medida só na linha do link e preservada
   fora do escopo. A captura de onboarding foi bit-idêntica. Comparações durante captura devem
   aguardar o marcador de PNG concluído, pois o arquivo existe antes de terminar de ser gravado.
+
+## 2026-10-24 — V1-3: build de release (R8, AAB, chave de upload, applicationId)
+
+- **Keep rule por classe não basta com JNI.** O `liblitertlm_jni.so` chama de volta `JniMessageCallback.onMessage/onDone/onError`
+  e lê `SamplerConfig.getTopK...` por nome; nenhum Java os chama, então o R8 apagava os métodos da interface (o `mapping.txt` mostrava a
+  classe com o nome original e sem membros) e o Raciocínio local morreria com `NoSuchMethodError`. Vale o pacote inteiro
+  (`-keep class com.google.ai.edge.litertlm.** { *; }`). `scripts/check-release-jni.py` confere no mapping e no DEX (falha no build
+  antigo, passa no novo) e o job do release do CI o roda. Ao subir de versão o LiteRT-LM ou o sherpa-onnx, o CI avisa se algo novo
+  passar a ser chamado só pelo nativo. Componentes do manifesto não precisam de regra: o AAPT2 as gera (`aapt_rules.txt`).
+- **`applicationId` `com.arateki.keyflow`, `namespace` `com.keyflow`.** O id curto de componente (`pkg/.ime.X`) é relativo ao
+  `applicationId`, mas as classes ficam no namespace: `com.arateki.keyflow/.ime.X` aponta para uma classe que não existe. Scripts e
+  testes usam o nome completo (`com.arateki.keyflow/com.keyflow.ime.KeyFlowKeyboardService`). O `instrumentar` descobre o id da
+  worktree (aapt2 no APK de teste ou o `build.gradle.kts`) e serve às branches com `com.keyflow` e às novas.
+- **Chave de upload só no Gradle, fora do git:** `~/.keyflow/android/upload-keystore.properties` ou `KEYFLOW_UPLOAD_*`. Sem ela o release
+  sai `app-release-unsigned.apk` (é o que o CI confere). Com ela, o APK e o AAB saem assinados com o certificado de upload; o
+  SHA-256 público bate com o cadastrado. Release assinado com a chave de upload no emulador impede o `installDebug` seguinte (mesmo
+  id, assinatura diferente): o smoke desinstala no fim.
+- **Smoke de release no emulador (lições):** o app de release tem só ABIs ARM; o emulador x86_64 roda arm64 por tradução. Com a orbe
+  flutuante na tela o `uiautomator dump` comum volta "null root node": use `dump --windows`. Com o KeyFlow habilitado e outro teclado
+  ativo, o app abre o seletor de teclados do sistema ao fim do onboarding e ele cobre tudo: `ime set` antes de abrir. A folha de
+  compra não é um diálogo: o botão Voltar do sistema fecha o app, não a folha (fecha pelo véu ou pelo X). O AdMob serve anúncios de
+  TESTE ("Test Ad") a qualquer emulador, mesmo com IDs de release, então o banner carrega de verdade no smoke. O Billing sem Play Store
+  responde `BILLING_UNAVAILABLE` (3) e a folha mostra o aviso, sem crash.
+- **Tamanho:** o R8 + redução de recursos tira ~10 MB do APK de release (94,3 → 83,8 MB) e ~3,4 MB do AAB (50,3 → 46,8 MB); o peso é de
+  código nativo (sherpa-onnx e LiteRT-LM), que o R8 não toca. O AAB leva o `mapping.txt` (`BUNDLE-METADATA/.../proguard.map`) e o perfil de base.
