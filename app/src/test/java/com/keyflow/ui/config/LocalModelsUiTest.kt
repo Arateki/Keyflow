@@ -6,6 +6,7 @@ import com.keyflow.data.models.DownloadProgress
 import com.keyflow.data.models.DownloadState
 import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.StartResult
+import com.keyflow.ui.gallery.SamplePanelModels
 import org.junit.Test
 
 /** NM-T10: a composição pura do estado do painel Local e os textos que dependem dele. */
@@ -177,9 +178,11 @@ class LocalModelsUiTest {
 
     // ── o catálogo de visão (aba Visão) ────────────────────────────────────────────────────────────
 
-    private val fastOcr = ModelCatalog.OCR_FAST.id
-    private val balancedOcr = ModelCatalog.OCR_BALANCED.id
-    private val smolVlm = ModelCatalog.VLM_MULTIMODAL.id
+    // O catálogo real de Visão e o de Voz estão vazios (2026-10-24, pins inventados saíram): a composição da lista é
+    // exercitada com modelos de amostra.
+    private val fastOcr = SamplePanelModels.VISION_LIGHT.id
+    private val balancedOcr = SamplePanelModels.VISION_BALANCED.id
+    private val smolVlm = SamplePanelModels.VISION_HEAVY.id
 
     private fun visionUi(
         installed: Set<String> = emptySet(),
@@ -187,13 +190,13 @@ class LocalModelsUiTest {
         selected: String? = null,
         ramMb: Long = 8_000,
     ) = LocalModelsUi.compose(
-        catalog = ModelCatalog.VISION, installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = ramMb,
+        catalog = SamplePanelModels.VISION, installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = ramMb,
     )
 
     @Test
-    fun `the vision catalog lists only vision models, lightest first`() {
+    fun `a vision list shows only the vision models it was given, lightest first`() {
         assertThat(visionUi().items.map { it.spec.id })
-            .containsExactlyElementsIn(ModelCatalog.VISION.map { it.id })
+            .containsExactlyElementsIn(SamplePanelModels.VISION.map { it.id })
             .inOrder()
         assertThat(visionUi().items.map { it.spec.id }).containsNoneOf(base, small, parakeet, qwen, gemma)
     }
@@ -203,16 +206,19 @@ class LocalModelsUiTest {
         assertThat(LocalModelsUi.EMPTY_VISION.items.map { it.spec.id })
             .containsExactlyElementsIn(ModelCatalog.VISION.map { it.id })
             .inOrder()
-        assertThat(LocalModelsUi.EMPTY_VISION).isEqualTo(visionUi(ramMb = 0))
+        assertThat(LocalModelsUi.EMPTY_VISION).isEqualTo(
+            LocalModelsUi.compose(catalog = ModelCatalog.VISION, installed = emptySet(), active = null, failures = emptyMap(), selectedId = null, deviceRamMb = 0),
+        )
+        assertThat(LocalModelsUi.EMPTY_VISION.items.map { it.spec.id }).containsNoneOf(base, small, parakeet, qwen, gemma)
         assertThat(LocalModelsUi.EMPTY.items.map { it.spec.id }).containsNoneOf(fastOcr, balancedOcr, smolVlm)
         assertThat(LocalModelsUi.EMPTY_TEXT.items.map { it.spec.id }).containsNoneOf(fastOcr, balancedOcr, smolVlm)
     }
 
     // ── o catálogo de voz (aba Voz / Fala) ─────────────────────────────────────────────────────────
 
-    private val piper = ModelCatalog.VOICE_FAST.id
-    private val kokoro = ModelCatalog.VOICE_BALANCED.id
-    private val melo = ModelCatalog.VOICE_QUALITY.id
+    private val piper = SamplePanelModels.VOICE_LIGHT.id
+    private val kokoro = SamplePanelModels.VOICE_BALANCED.id
+    private val melo = SamplePanelModels.VOICE_HEAVY.id
 
     private fun voiceUi(
         installed: Set<String> = emptySet(),
@@ -220,13 +226,13 @@ class LocalModelsUiTest {
         selected: String? = null,
         ramMb: Long = 8_000,
     ) = LocalModelsUi.compose(
-        catalog = ModelCatalog.VOICE, installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = ramMb,
+        catalog = SamplePanelModels.VOICE, installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = ramMb,
     )
 
     @Test
-    fun `the voice catalog lists only voice models, lightest first`() {
+    fun `a voice list shows only the voice models it was given, lightest first`() {
         assertThat(voiceUi().items.map { it.spec.id })
-            .containsExactlyElementsIn(ModelCatalog.VOICE.map { it.id })
+            .containsExactlyElementsIn(SamplePanelModels.VOICE.map { it.id })
             .inOrder()
         assertThat(voiceUi().items.map { it.spec.id }).containsNoneOf(base, small, parakeet, qwen, gemma, fastOcr, balancedOcr, smolVlm)
     }
@@ -236,7 +242,10 @@ class LocalModelsUiTest {
         assertThat(LocalModelsUi.EMPTY_FALA.items.map { it.spec.id })
             .containsExactlyElementsIn(ModelCatalog.VOICE.map { it.id })
             .inOrder()
-        assertThat(LocalModelsUi.EMPTY_FALA).isEqualTo(voiceUi(ramMb = 0))
+        assertThat(LocalModelsUi.EMPTY_FALA).isEqualTo(
+            LocalModelsUi.compose(catalog = ModelCatalog.VOICE, installed = emptySet(), active = null, failures = emptyMap(), selectedId = null, deviceRamMb = 0),
+        )
+        assertThat(LocalModelsUi.EMPTY_FALA.items.map { it.spec.id }).containsNoneOf(base, small, parakeet, qwen, gemma)
         assertThat(LocalModelsUi.EMPTY.items.map { it.spec.id }).containsNoneOf(piper, kokoro, melo)
         assertThat(LocalModelsUi.EMPTY_TEXT.items.map { it.spec.id }).containsNoneOf(piper, kokoro, melo)
         assertThat(LocalModelsUi.EMPTY_VISION.items.map { it.spec.id }).containsNoneOf(piper, kokoro, melo)
