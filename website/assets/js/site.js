@@ -12,11 +12,16 @@
 
   function limitar(v, min, max) { return Math.min(max, Math.max(min, v)); }
 
-  /* ── Tema: escuro por padrão, claro opcional; a escolha fica neste navegador. ── */
+  /* ── Tema: segue o aparelho por padrão, claro/escuro opcional; lembra no navegador. ── */
   var botaoTema = document.querySelector('.tema');
   var corTema = document.querySelector('meta[name="theme-color"]');
+  var mediaClaro = window.matchMedia('(prefers-color-scheme: light)');
 
-  function temaAtual() { return raiz.getAttribute('data-theme') === 'claro' ? 'claro' : 'escuro'; }
+  function temaAtual() {
+    var definido = raiz.getAttribute('data-theme');
+    if (definido === 'claro' || definido === 'escuro') return definido;
+    return mediaClaro.matches ? 'claro' : 'escuro';
+  }
 
   function sincronizarTema() {
     var claro = temaAtual() === 'claro';
@@ -26,9 +31,16 @@
 
   function aplicarTema(tema) {
     if (tema === 'claro') raiz.setAttribute('data-theme', 'claro');
-    else raiz.removeAttribute('data-theme');
+    else if (tema === 'escuro') raiz.setAttribute('data-theme', 'escuro');
     try { localStorage.setItem('kf-tema', tema); } catch (e) { /* armazenamento bloqueado: segue sem lembrar */ }
     sincronizarTema();
+  }
+
+  if (mediaClaro && mediaClaro.addEventListener) {
+    mediaClaro.addEventListener('change', function () {
+      try { if (localStorage.getItem('kf-tema')) return; } catch (e) {}
+      sincronizarTema();
+    });
   }
 
   if (botaoTema) {

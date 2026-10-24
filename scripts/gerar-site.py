@@ -46,120 +46,11 @@ PAGINAS_LEGAIS = ("privacidade.html", "termos.html", "privacy.html", "terms.html
 # preguiçosas e ficam de fora.
 ORCAMENTO_PRIMEIRA_CARGA = 400 * 1024
 
-# Script em linha das páginas legais: aplica o tema claro escolhido na página inicial (o padrão é o escuro).
+# Script em linha das páginas legais: aplica o tema claro/escuro escolhido (o padrão segue o sistema).
 SCRIPT_TEMA = (
-    "(function(){try{if(localStorage.getItem('kf-tema')==='claro')"
-    "document.documentElement.setAttribute('data-theme','claro')}catch(e){}})();"
+    "(function(){try{var t=localStorage.getItem('kf-tema');if(t==='claro'||t==='escuro')"
+    "document.documentElement.setAttribute('data-theme',t)}catch(e){}})();"
 )
-
-CSS = """
-@font-face { font-family: "Space Grotesk"; src: url("assets/fonts/space-grotesk-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
-@font-face { font-family: "Space Grotesk"; src: url("assets/fonts/space-grotesk-500.woff2") format("woff2"); font-weight: 500; font-display: swap; }
-@font-face { font-family: "Space Grotesk"; src: url("assets/fonts/space-grotesk-300.woff2") format("woff2"); font-weight: 300; font-display: swap; }
-@font-face { font-family: "Space Mono"; src: url("assets/fonts/space-mono-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
-:root {
-  color-scheme: dark;
-  --bg: #12100d;
-  --text: #f1e7c9;
-  --text-muted: #b6ac8c;
-  --border: rgba(241, 231, 201, 0.12);
-  --heading: #f1e7c9;
-  --link: #8fc3b3;
-  --link-line: rgba(143, 195, 179, 0.35);
-  --code-bg: rgba(241, 231, 201, 0.06);
-}
-:root[data-theme="claro"] {
-  color-scheme: light;
-  --bg: #f1e7c9;
-  --text: #2b2720;
-  --text-muted: #5c5340;
-  --border: rgba(43, 39, 32, 0.14);
-  --heading: #2b2720;
-  --link: #2c6a59;
-  --link-line: rgba(44, 106, 89, 0.35);
-  --code-bg: rgba(43, 39, 32, 0.06);
-}
-@media (prefers-reduced-motion: no-preference) {
-  @view-transition { navigation: auto; }
-}
-* { box-sizing: border-box; }
-body {
-  font-family: "Space Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  font-size: 1.0625rem;
-  line-height: 1.7;
-  color: var(--text);
-  background-color: var(--bg);
-  margin: 0;
-  padding: 0 1rem 4rem;
-  -webkit-font-smoothing: antialiased;
-}
-.container {
-  max-width: 760px;
-  margin: 0 auto;
-}
-.nav-header {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background-color: var(--bg);
-  border-bottom: 1px solid var(--border);
-  padding: 1.1rem 0;
-  margin-bottom: 3rem;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.75rem;
-  font-size: 0.92rem;
-}
-.nav-links a {
-  margin-right: 1.25rem;
-}
-.lang-switch {
-  font-family: "Space Mono", ui-monospace, monospace;
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-h1, h2, h3, h4 {
-  color: var(--heading);
-  line-height: 1.25;
-}
-h1 { font-weight: 300; font-size: clamp(2rem, 1.4rem + 2.4vw, 3rem); letter-spacing: -0.035em; line-height: 1.08; margin-top: 0; margin-bottom: 1rem; }
-h2 { font-weight: 500; font-size: 1.3rem; letter-spacing: -0.015em; margin-top: 2.6rem; padding-top: 1.4rem; border-top: 1px solid var(--border); }
-h3 { font-weight: 500; font-size: 1.08rem; margin-top: 1.6rem; }
-p, ul, ol { margin: 1rem 0; }
-li { margin: 0.35rem 0; }
-ul, ol { padding-left: 1.5rem; }
-ul ul, ol ol, ul ol, ol ul { margin: 0.25rem 0; }
-strong { font-weight: 500; }
-hr {
-  border: 0;
-  height: 1px;
-  background: var(--border);
-  margin: 2.5rem 0;
-}
-hr + h2 { margin-top: 0; padding-top: 0; border-top: 0; }
-a { color: var(--link); text-decoration: none; border-bottom: 1px solid var(--link-line); }
-a:hover { border-bottom-color: currentColor; }
-a:focus-visible { outline: 2px solid var(--link); outline-offset: 3px; border-radius: 4px; }
-code {
-  background-color: var(--code-bg);
-  padding: 0.15em 0.4em;
-  border-radius: 6px;
-  font-size: 0.85em;
-  font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-}
-footer {
-  margin-top: 4rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--border);
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  text-align: center;
-}
-"""
 
 
 def render_markdown(md_text: str) -> str:
@@ -271,33 +162,35 @@ def render_markdown(md_text: str) -> str:
     return '\n'.join(out)
 
 
-def build_page(title: str, lang: str, nav_html: str, body_html: str, footer_html: str) -> str:
-    return f"""<!DOCTYPE html>
+def build_page(title: str, lang: str, header_html: str, body_html: str, footer_html: str, skip_text: str = "Pular para o conteúdo") -> str:
+    csp_hash = _sha256_csp(SCRIPT_TEMA)
+    return f"""<!doctype html>
 <html lang="{lang}">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{html.escape(title)}</title>
-  <meta name="color-scheme" content="dark light">
-  <meta name="theme-color" content="#12100d">
-  <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="icon" href="assets/img/favicon-32.png" sizes="32x32" type="image/png">
-  <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
-  <script>{SCRIPT_TEMA}</script>
-  <style>{CSS.strip()}</style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' {csp_hash}; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<title>{html.escape(title)}</title>
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#12100d">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="assets/img/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
+<link rel="preload" href="assets/fonts/space-grotesk-300.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/space-grotesk-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/css/site.css">
+<script>{SCRIPT_TEMA}</script>
+<script src="assets/js/site.js" defer></script>
 </head>
 <body>
-  <div class="container">
-    <nav class="nav-header">
-      {nav_html}
-    </nav>
-    <main>
-      {body_html}
-    </main>
-    <footer>
-      {footer_html}
-    </footer>
-  </div>
+<a class="pular" href="#conteudo">{skip_text}</a>
+{header_html}
+<main id="conteudo">
+  <article class="caixa legal-artigo">
+{body_html}
+  </article>
+</main>
+{footer_html}
 </body>
 </html>
 """
@@ -335,6 +228,57 @@ def limpar_saida(repo_root: Path, output_dir: Path):
     shutil.rmtree(saida)
 
 
+def make_header(lang: str, current_page: str) -> str:
+    if lang == "pt-BR":
+        home_url = "index.html"
+        nav_label = "Navegação"
+        home_label = "Início"
+        priv_label = "Política de Privacidade"
+        termos_label = "Termos de Uso"
+        alt_url = "privacy.html" if current_page == "privacidade.html" else "terms.html"
+        alt_code = "en"
+        alt_text = "EN"
+        alt_reader = "English version"
+        tema_label = "Alternar tema claro/escuro"
+        priv_curr = ' aria-current="page"' if current_page == "privacidade.html" else ""
+        termos_curr = ' aria-current="page"' if current_page == "termos.html" else ""
+        priv_url = "privacidade.html"
+        termos_url = "termos.html"
+    else:
+        home_url = "en.html"
+        nav_label = "Navigation"
+        home_label = "Home"
+        priv_label = "Privacy Policy"
+        termos_label = "Terms of Use"
+        alt_url = "privacidade.html" if current_page == "privacy.html" else "termos.html"
+        alt_code = "pt-BR"
+        alt_text = "PT"
+        alt_reader = "versão em português"
+        tema_label = "Switch light/dark theme"
+        priv_curr = ' aria-current="page"' if current_page == "privacy.html" else ""
+        termos_curr = ' aria-current="page"' if current_page == "terms.html" else ""
+        priv_url = "privacy.html"
+        termos_url = "terms.html"
+
+    return f"""<header class="topo">
+  <div class="caixa topo-in">
+    <a class="marca" href="{home_url}"><span class="marca-orbe" aria-hidden="true"></span>KeyFlow</a>
+    <nav class="nav" aria-label="{nav_label}">
+      <a href="{home_url}">{home_label}</a>
+      <a href="{priv_url}"{priv_curr}>{priv_label}</a>
+      <a href="{termos_url}"{termos_curr}>{termos_label}</a>
+    </nav>
+    <div class="topo-acoes">
+      <a class="idioma" href="{alt_url}" hreflang="{alt_code}" lang="{alt_code}">{alt_text}<span class="so-leitor"> — {alt_reader}</span></a>
+      <button class="tema" type="button" aria-pressed="false" aria-label="{tema_label}">
+        <svg class="sol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/></svg>
+        <svg class="lua" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.6A8 8 0 0 1 9.4 4a8 8 0 1 0 10.6 10.6Z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>"""
+
+
 def generate_site(repo_root: Path, output_dir: Path) -> dict:
     docs_loja = repo_root / "docs" / "loja"
     limpar_saida(repo_root, output_dir)
@@ -342,25 +286,81 @@ def generate_site(repo_root: Path, output_dir: Path) -> dict:
 
     copy_website(repo_root, output_dir)
 
-    footer_pt = """<p>KeyFlow &bull; Arateki LTDA (CNPJ 45.642.122/0001-10) &bull; Fortaleza/CE, Brasil</p>
-<p><a href="privacidade.html">Política de Privacidade</a> &bull; <a href="termos.html">Termos de Uso</a> &bull; <a href="mailto:contato@arateki.com">contato@arateki.com</a></p>"""
+    footer_pt = """<footer class="rodape">
+  <div class="caixa rodape-grade">
+    <div class="rodape-marca">
+      <a class="marca" href="index.html"><span class="marca-orbe" aria-hidden="true"></span>KeyFlow</a>
+      <p>Um produto da <a href="https://arateki.com">Arateki</a>, feito em Fortaleza, Brasil.</p>
+    </div>
+    <nav aria-labelledby="rodape-docs">
+      <h2 id="rodape-docs" class="rodape-titulo">Documentos</h2>
+      <ul>
+        <li><a href="privacidade.html">Política de Privacidade</a></li>
+        <li><a href="termos.html">Termos de Uso</a></li>
+        <li><a href="privacy.html" hreflang="en" lang="en">Privacy Policy</a></li>
+        <li><a href="terms.html" hreflang="en" lang="en">Terms of Use</a></li>
+      </ul>
+    </nav>
+    <div>
+      <h2 class="rodape-titulo">Contato</h2>
+      <ul><li><a href="mailto:contato@arateki.com">contato@arateki.com</a></li></ul>
+    </div>
+    <div>
+      <h2 class="rodape-titulo">Idioma</h2>
+      <ul>
+        <li><a href="index.html">Português</a></li>
+        <li><a href="en.html" hreflang="en" lang="en">English</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="caixa rodape-base">
+    <p>© 2026 Arateki LTDA · CNPJ 45.642.122/0001-10</p>
+    <p>Google Play é marca da Google LLC.</p>
+  </div>
+  <p class="rodape-gigante" aria-hidden="true">KeyFlow</p>
+</footer>"""
 
-    footer_en = """<p>KeyFlow &bull; Arateki LTDA (CNPJ 45.642.122/0001-10) &bull; Fortaleza/CE, Brazil</p>
-<p><a href="privacy.html">Privacy Policy</a> &bull; <a href="terms.html">Terms of Use</a> &bull; <a href="mailto:contato@arateki.com">contato@arateki.com</a></p>"""
+    footer_en = """<footer class="rodape">
+  <div class="caixa rodape-grade">
+    <div class="rodape-marca">
+      <a class="marca" href="en.html"><span class="marca-orbe" aria-hidden="true"></span>KeyFlow</a>
+      <p>A product by <a href="https://arateki.com">Arateki</a>, made in Fortaleza, Brazil.</p>
+    </div>
+    <nav aria-labelledby="rodape-docs">
+      <h2 id="rodape-docs" class="rodape-titulo">Legal</h2>
+      <ul>
+        <li><a href="privacidade.html" hreflang="pt-BR" lang="pt-BR">Política de Privacidade</a></li>
+        <li><a href="termos.html" hreflang="pt-BR" lang="pt-BR">Termos de Uso</a></li>
+        <li><a href="privacy.html">Privacy Policy</a></li>
+        <li><a href="terms.html">Terms of Use</a></li>
+      </ul>
+    </nav>
+    <div>
+      <h2 class="rodape-titulo">Contact</h2>
+      <ul><li><a href="mailto:contato@arateki.com">contato@arateki.com</a></li></ul>
+    </div>
+    <div>
+      <h2 class="rodape-titulo">Language</h2>
+      <ul>
+        <li><a href="index.html" hreflang="pt-BR" lang="pt-BR">Português</a></li>
+        <li><a href="en.html">English</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="caixa rodape-base">
+    <p>© 2026 Arateki LTDA · CNPJ 45.642.122/0001-10</p>
+    <p>Google Play is a trademark of Google LLC.</p>
+  </div>
+  <p class="rodape-gigante" aria-hidden="true">KeyFlow</p>
+</footer>"""
 
     # 1. privacidade.html
     priv_file = docs_loja / "politica-de-privacidade.md"
     if not priv_file.exists():
         raise FileNotFoundError(f"Arquivo não encontrado: {priv_file}")
     pt_priv_body = render_markdown(priv_file.read_text(encoding="utf-8"))
-    nav_pt_priv = """<div class="nav-links">
-  <a href="index.html">← Início</a>
-  <a href="termos.html">Termos de Uso</a>
-</div>
-<div class="lang-switch">
-  <span>Português</span> | <a href="privacy.html" hreflang="en">English</a>
-</div>"""
-    priv_html = build_page("Política de Privacidade — KeyFlow", "pt-BR", nav_pt_priv, pt_priv_body, footer_pt)
+    header_pt_priv = make_header("pt-BR", "privacidade.html")
+    priv_html = build_page("Política de Privacidade — KeyFlow", "pt-BR", header_pt_priv, pt_priv_body, footer_pt, "Pular para o conteúdo")
     (output_dir / "privacidade.html").write_text(priv_html, encoding="utf-8")
 
     # 2. termos.html
@@ -368,14 +368,8 @@ def generate_site(repo_root: Path, output_dir: Path) -> dict:
     if not termos_file.exists():
         raise FileNotFoundError(f"Arquivo não encontrado: {termos_file}")
     pt_termos_body = render_markdown(termos_file.read_text(encoding="utf-8"))
-    nav_pt_termos = """<div class="nav-links">
-  <a href="index.html">← Início</a>
-  <a href="privacidade.html">Política de Privacidade</a>
-</div>
-<div class="lang-switch">
-  <span>Português</span> | <a href="terms.html" hreflang="en">English</a>
-</div>"""
-    termos_html = build_page("Termos de Uso — KeyFlow", "pt-BR", nav_pt_termos, pt_termos_body, footer_pt)
+    header_pt_termos = make_header("pt-BR", "termos.html")
+    termos_html = build_page("Termos de Uso — KeyFlow", "pt-BR", header_pt_termos, pt_termos_body, footer_pt, "Pular para o conteúdo")
     (output_dir / "termos.html").write_text(termos_html, encoding="utf-8")
 
     # 3. privacy.html
@@ -383,14 +377,8 @@ def generate_site(repo_root: Path, output_dir: Path) -> dict:
     if not privacy_file.exists():
         raise FileNotFoundError(f"Arquivo não encontrado: {privacy_file}")
     en_priv_body = render_markdown(privacy_file.read_text(encoding="utf-8"))
-    nav_en_priv = """<div class="nav-links">
-  <a href="en.html">← Home</a>
-  <a href="terms.html">Terms of Use</a>
-</div>
-<div class="lang-switch">
-  <a href="privacidade.html" hreflang="pt-BR">Português</a> | <span>English</span>
-</div>"""
-    privacy_html = build_page("Privacy Policy — KeyFlow", "en", nav_en_priv, en_priv_body, footer_en)
+    header_en_priv = make_header("en", "privacy.html")
+    privacy_html = build_page("Privacy Policy — KeyFlow", "en", header_en_priv, en_priv_body, footer_en, "Skip to content")
     (output_dir / "privacy.html").write_text(privacy_html, encoding="utf-8")
 
     # 4. terms.html
@@ -398,14 +386,8 @@ def generate_site(repo_root: Path, output_dir: Path) -> dict:
     if not terms_file.exists():
         raise FileNotFoundError(f"Arquivo não encontrado: {terms_file}")
     en_terms_body = render_markdown(terms_file.read_text(encoding="utf-8"))
-    nav_en_terms = """<div class="nav-links">
-  <a href="en.html">← Home</a>
-  <a href="privacy.html">Privacy Policy</a>
-</div>
-<div class="lang-switch">
-  <a href="termos.html" hreflang="pt-BR">Português</a> | <span>English</span>
-</div>"""
-    terms_html = build_page("Terms of Use — KeyFlow", "en", nav_en_terms, en_terms_body, footer_en)
+    header_en_terms = make_header("en", "terms.html")
+    terms_html = build_page("Terms of Use — KeyFlow", "en", header_en_terms, en_terms_body, footer_en, "Skip to content")
     (output_dir / "terms.html").write_text(terms_html, encoding="utf-8")
 
     return {nome: output_dir / nome for nome in ("index.html", "en.html") + PAGINAS_LEGAIS}
