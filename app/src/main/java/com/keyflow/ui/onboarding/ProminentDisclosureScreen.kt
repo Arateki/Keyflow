@@ -21,13 +21,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.keyflow.i18n.tr
+import com.keyflow.legal.LegalUrls
 import com.keyflow.ui.config.PaperWarm
 import com.keyflow.ui.config.PrimaryButton
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
-
-/** URL deliberadamente centralizada até a URL pública ser definida na V1-5. */
-const val PRIVACY_POLICY_URL = "https://example.invalid/privacy" // TODO(V1-5): Yan definir URL pública.
 
 const val DISCLOSURE_ACCEPT_TAG = "disclosure-accept"
 const val DISCLOSURE_DECLINE_TAG = "disclosure-decline"
@@ -40,9 +38,11 @@ fun ProminentDisclosureScreen(
     onAccept: () -> Unit,
     onDecline: () -> Unit,
     modifier: Modifier = Modifier,
+    openUrl: ((Intent) -> Unit)? = null,
 ) {
     val palette = LocalKeyFlowPalette.current
     val context = LocalContext.current
+    val launchUrl: (Intent) -> Unit = openUrl ?: { context.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
     val declineLabel = if (declined) tr("Continuar sem ditado") else tr("Recusar")
     Column(
         modifier.fillMaxSize().background(palette.bg).systemBarsPadding().padding(horizontal = 26.dp, vertical = 28.dp),
@@ -72,9 +72,9 @@ fun ProminentDisclosureScreen(
             )
         }
         Text(
-            tr("Política de privacidade"), color = palette.teal, fontFamily = SpaceGrotesk, fontSize = 14.sp,
+            tr("Ler a política de privacidade completa"), color = palette.teal, fontFamily = SpaceGrotesk, fontSize = 14.sp,
             modifier = Modifier.clickable {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PRIVACY_POLICY_URL)))
+                launchUrl(Intent(Intent.ACTION_VIEW, Uri.parse(LegalUrls.privacyPolicy())))
             }.testTag("disclosure-privacy-link"),
         )
         Spacer(Modifier.weight(1f))

@@ -1,5 +1,6 @@
 package com.keyflow.ui.onboarding
 
+import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
@@ -12,9 +13,11 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.keyflow.legal.LegalUrls
 import com.keyflow.ui.PermissionStatus
 import com.keyflow.ui.orb.LocalOrbClock
 import com.keyflow.ui.theme.KeyFlowTheme
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -194,5 +197,26 @@ class OnboardingScreenTest {
         rule.onNodeWithTag(DISCLOSURE_DECLINED_EXPLANATION_TAG).assertIsDisplayed()
         rule.onNodeWithTag(DISCLOSURE_ACCEPT_TAG).performClick()
         rule.runOnIdle { assertTrue(accepted) }
+    }
+
+    /** V1-6 / V1-5: link "Ler a política de privacidade completa" abre a URL no navegador sem rede. */
+    @Test
+    fun disclosurePrivacyLinkOpensPrivacyPolicyUrl() {
+        val opened = mutableListOf<Intent>()
+        rule.setContent {
+            KeyFlowTheme(dark = false) {
+                ProminentDisclosureScreen(
+                    declined = false,
+                    onAccept = {},
+                    onDecline = {},
+                    openUrl = { opened += it },
+                )
+            }
+        }
+        rule.onNodeWithTag("disclosure-privacy-link").assertIsDisplayed().performClick()
+        assertEquals(1, opened.size)
+        val intent = opened.single()
+        assertEquals(Intent.ACTION_VIEW, intent.action)
+        assertEquals(LegalUrls.privacyPolicy(), intent.dataString)
     }
 }

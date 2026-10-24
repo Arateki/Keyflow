@@ -2600,3 +2600,8 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
   recusado; scanner aprovado no release e recusado no debug; smoke com Activity aberta e XML
   fresco verde. Cache compartilhado travou no journal (PID 25478); usou-se cópia em `/tmp`,
   JDK portátil e os mesmos flocks, sem interferir no processo dono do cache.
+
+## Links da política e termos — V1-5 (2026-10-23)
+- URLs públicas centralizadas em `LegalUrls` com base única `https://keyflow.arateki.com` e resolução por idioma (`/privacidade` e `/termos` em PT; `/privacy` e `/terms` em EN/ES).
+- Aba Docs (`DocsPanel`) expõe itens clicáveis na seção Privacidade que disparam `Intent(Intent.ACTION_VIEW)` sem WebView.
+- Divulgação destacada (`ProminentDisclosureScreen`) atualizada para "Ler a política de privacidade completa" com abertura direta da URL correspondente. Injeção de handler de abertura hermético permite testes instrumentados sem tráfego de rede.

@@ -91,6 +91,8 @@ internal val TranslationsEs: Map<String, String> = mapOf(
     "O microfone só grava quando você toca nele. O áudio é transcrito no aparelho, sem sair dele, ou enviado ao provedor que você configurar. O texto transcrito vai para o campo em que você digita (ou para a área de transferência se não houver campo ativo); o KeyFlow não envia o que você digita. O app de configuração mostra anúncios do AdMob, sujeitos ao consentimento do Google UMP." to "El micrófono solo graba cuando lo tocas. El audio se transcribe en el dispositivo sin salir de él, o se envía al proveedor que configures. El texto transcrito va al campo donde escribes (o al portapapeles si no hay un campo activo); KeyFlow no envía lo que escribes. La app de ajustes muestra anuncios de AdMob, sujetos al consentimiento de Google UMP.",
     "Sem aceitar, o ditado por voz fica indisponível. Você pode aceitar depois pelo item Microfone nas configurações." to "Sin aceptar, el dictado por voz no está disponible. Puedes aceptar más tarde desde el elemento Micrófono en los ajustes.",
     "Política de privacidade" to "Política de privacidad",
+    "Ler a política de privacidade completa" to "Leer la política de privacidad completa",
+    "Termos de uso" to "Términos de uso",
     "Privacidade dos anúncios" to "Privacidad de los anuncios",
     "Aceite esta divulgação para ativar o ditado por voz. Sem aceite, o microfone não inicia." to "Acepta esta divulgación para activar el dictado por voz. Sin aceptarla, el micrófono no se inicia.",
     "Aceitar e continuar" to "Aceptar y continuar",
