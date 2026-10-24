@@ -2648,3 +2648,22 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
   em 16a7ccd). Fonte idêntico à base 001740f; diferença medida só na linha do link e preservada
   fora do escopo. A captura de onboarding foi bit-idêntica. Comparações durante captura devem
   aguardar o marcador de PNG concluído, pois o arquivo existe antes de terminar de ser gravado.
+
+## 2026-10-24 — Ícone do app (v1-icone)
+
+- Decisão do Yan: a logo do app é a orbe. O ícone é a orbe parada do Ateliê (VoiceOrb.kt: brilho, corpo e miolo, no
+  instante 1234 ms da galeria) sobre um fundo escuro quente (degradê de 3A342B a 211E19, família do `bg` escuro).
+  Skins de pacote (`skin-packs/`) não entram: o ícone usa o visual padrão. A cor do fundo, escura ou creme, ficou para o
+  Yan aprovar na prancha; trocar é `--fundo claro` no script e rodar de novo.
+- Fonte única: `scripts/gerar-icone.py` escreve os três drawables (`ic_launcher_{background,foreground,monochrome}`), os 10
+  PNGs legados e `docs/loja/icone-512.png`. Os XMLs de `mipmap-anydpi-v26/` são fixos. O `android:icon` e o `roundIcon`
+  estão no manifesto. O raio da orbe é 26 dp no canvas de 108: o brilho chega a 30,8 dp, dentro dos 33 dp da zona segura.
+- Lição de render: o `Image.radial_gradient` do Pillow vale distância × √2 (255 só no canto), e não distância/raio. Usado
+  cru, o degradê não chega à cor final na borda do raio e deixa uma faixa no corpo da orbe. O script corrige pela
+  constante `RAIO_NO_GRADIENTE`. A forma foi conferida contra `orb-idle-dark.png`: o perfil radial da golden bate com a
+  fórmula em t = 1234 (erro quadrático 0,0065, mínimo exatamente nesse t).
+- O lint do projeto só confere `NewApi` (`checkOnly`), então ele não acusa ícone; as regras de ícone (formato, tamanho,
+  duplicata) foram conferidas à mão. Nenhuma tela do app desenha o ícone, então nenhuma golden muda: amostra de 20 capturas
+  (rotas 0/12, nos dois temas, incluindo `orb-idle`) bit-idêntica, 0 px.
+- Ambiente: o `diff-screens.sh` pede o `compare` do ImageMagick no PATH (`/srv/dev/ferramentas/bin`); sem ele todo golden
+  sai como "comparação falhou (dimensões diferentes?)", mensagem que engana.
