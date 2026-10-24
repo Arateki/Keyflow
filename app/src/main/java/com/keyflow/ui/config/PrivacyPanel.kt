@@ -46,7 +46,7 @@ fun PrivacyPanel(
     adsController: AdsController? = null,
     adsOff: Boolean = false,
     onReviewDisclosure: () -> Unit = {},
-    onDeleteMyData: suspend () -> Unit = { error("Ação de exclusão indisponível") },
+    onDeleteMyData: suspend () -> Unit = {},
     initialDeleteMyDataOpen: Boolean = false,
     openUrl: ((Intent) -> Unit)? = null,
 ) {

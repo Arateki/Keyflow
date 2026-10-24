@@ -260,7 +260,7 @@ Responde `204`; sem credencial válida, `401`. Repetir o efeito é seguro, mas o
 não autentica. Se a resposta se perder, o app registra a mesma identidade e exclui novamente.
 O aparelho conserva a identidade anônima usada no vínculo do Google Play: uma reinstalação com
 restauração da identidade ou um novo registro com essa identidade pode restaurar a compra.
-A compra permanece no Google Play. O botão em Docs limpa a credencial e o cache remoto somente
+A compra permanece no Google Play. O botão na aba Privacidade limpa a credencial e o cache remoto somente
 após o sucesso; um marcador local impede recriação automática ao reabrir o app. O desbloqueio
 local já reconhecido pelo Play permanece. Configurações e chaves de provedores não são apagadas.
 Pedidos por e-mail: **contato@arateki.com, prazo de até 15 dias**.

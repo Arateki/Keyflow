@@ -55,7 +55,7 @@ To provide complete peace of mind when using KeyFlow as your default Android key
 - KeyFlow displays standard banner and interstitial ads **strictly within the settings app (`SetupActivity`)**.
 - **No ads are ever displayed on the keyboard or floating orb.**
 - We use the **Google User Messaging Platform (UMP)** to request consent for ads in compliance with GDPR and LGPD.
-- **Review at any time:** Users can review or revoke advertising consent at any time via the **"Ads privacy"** option located in the **Docs** tab in settings.
+- **Review at any time:** Users can review or revoke advertising consent at any time via the **"Ads privacy"** option located in the **Privacy** tab in settings.
 - The one-time purchase of **R$ 15** permanently disables all advertisements.
 
 ---
@@ -95,7 +95,7 @@ Arateki **does not sell, rent, or trade** personal data. Data is shared exclusiv
 - **Voice audio:** Deleted from local storage immediately upon transcription completion or error, or upon expiration of the 3-second cancellation window. Automatic cleanup removes stale files older than 24 hours.
 - **On your device:** You can delete local configuration, API keys, and models by clearing app data in Android Settings or by uninstalling KeyFlow.
 - **Identity Restoration (Google Block Store):** To prevent losing legitimate purchases upon app reinstallation or device migration, the anonymous device UUID may be restored via Google Block Store.
-- **On Arateki API:** Since we maintain no user accounts or email lists, records linked to the anonymous UUID exist solely to validate integrity and licenses. You can delete your device data stored on the API at any time directly through the **"Delete my data"** button in the **Docs** tab in settings (which immediately deletes the device record on our servers; your one-time purchase remains valid on Google Play and is restored upon purchase restore) or by emailing `contato@arateki.com`, with requests answered within 15 days in accordance with the LGPD.
+- **On Arateki API:** Since we maintain no user accounts or email lists, records linked to the anonymous UUID exist solely to validate integrity and licenses. You can delete your device data stored on the API at any time directly through the **"Delete my data"** button in the **Privacy** tab in settings (which immediately deletes the device record on our servers; your one-time purchase remains valid on Google Play and is restored upon purchase restore) or by emailing `contato@arateki.com`, with requests answered within 15 days in accordance with the LGPD.
 - **On External Providers:** Requests to delete data processed by third-party cloud providers (OpenAI, Anthropic, Google) must be submitted directly through those respective providers.
 
 ---
@@ -114,7 +114,7 @@ We implement rigorous technical safeguards:
 In compliance with GDPR and LGPD regulations:
 - You have the right to transparent information regarding data processing.
 - You have the right to review and revoke advertising consent at any time via settings ("Ads privacy").
-- You have the right to request deletion of your data and records at any time using the **"Delete my data"** button in the **Docs** tab in settings or by sending an email to `contato@arateki.com` (handled within 15 days under the LGPD).
+- You have the right to request deletion of your data and records at any time using the **"Delete my data"** button in the **Privacy** tab in settings or by sending an email to `contato@arateki.com` (handled within 15 days under the LGPD).
 
 ---
 

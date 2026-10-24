@@ -20,7 +20,7 @@
 - **Justificativa:** 
   1. O áudio do ditado é temporário e excluído automaticamente do aparelho após o envio/entrega do texto, em caso de erro na transcrição ou ao expirar a janela de cancelamento de 3 segundos (`OverlayCoordinator.kt:555`, `AudioRecorder.kt:187-193`).
   2. Todos os dados locais (chaves de API no Android Keystore, modelos locais de IA, configurações) podem ser excluídos pelo próprio usuário limpando os dados do aplicativo nas Configurações do Android ou desinstalando o app.
-  3. A exclusão dos dados mantidos na API da Arateki (`keyflow-api.arateki.com`) pode ser realizada diretamente dentro do app pelo botão **"Apagar meus dados"** na aba **Docs** das configurações (apaga na hora o registro do aparelho; a compra continua no Google Play e volta ao restaurar) ou por solicitação via e-mail para `contato@arateki.com` (com resposta em até 15 dias conforme a LGPD). Para dados mantidos por provedores terceiros (OpenAI, Anthropic, Google), o usuário pode solicitar a exclusão diretamente no painel de cada provedor.
+  3. A exclusão dos dados mantidos na API da Arateki (`keyflow-api.arateki.com`) pode ser realizada diretamente dentro do app pelo botão **"Apagar meus dados"** na aba **Privacidade** das configurações (apaga na hora o registro do aparelho; a compra continua no Google Play e volta ao restaurar) ou por solicitação via e-mail para `contato@arateki.com` (com resposta em até 15 dias conforme a LGPD). Para dados mantidos por provedores terceiros (OpenAI, Anthropic, Google), o usuário pode solicitar a exclusão diretamente no painel de cada provedor.
 
 ---
 
@@ -103,15 +103,15 @@
 - **Finalidades:**
   1. **Funcionalidade do app (App functionality):** Identificador anônimo gerado aleatoriamente (UUIDv4) no dispositivo e token de integridade (Google Play Integrity) enviados à API da Arateki (`keyflow-api.arateki.com/v1/register`, `v1/account`) automaticamente após a conclusão do onboarding para verificar autenticidade e status de desbloqueio de temas e anúncios (`AnonymousIdentity.kt:30-60`, `KeyFlowApiClient.kt:104,159`). A compra de R$ 15 não encerra a verificação periódica de direitos.
   2. **Publicidade ou marketing (Advertising or marketing):** O SDK do Google Mobile Ads (AdMob) coleta o ID de publicidade do Google (Advertising ID) e telemetria na versão gratuita para exibição de anúncios na tela de configurações (`SetupActivity`).
-- **A coleta é obrigatória ou opcional?** O UUID anônimo é gerado para gestão de integridade/licenças. A publicidade é opcional e removida definitivamente com a compra de R$ 15; preferências de consentimento gerenciadas pelo Google UMP com opção de revisão a qualquer momento ("Privacidade dos anúncios" na aba Docs).
+- **A coleta é obrigatória ou opcional?** O UUID anônimo é gerado para gestão de integridade/licenças. A publicidade é opcional e removida definitivamente com a compra de R$ 15; preferências de consentimento gerenciadas pelo Google UMP com opção de revisão a qualquer momento ("Privacidade dos anúncios" na aba Privacidade).
 - **Criptografado em trânsito?** **Sim** (HTTPS/TLS).
-- **O usuário pode solicitar a exclusão?** **Sim** (Disponível no próprio app pelo botão "Apagar meus dados" na aba Docs — exclusão imediata do registro do aparelho nos servidores —, e por e-mail para `contato@arateki.com` com resposta em até 15 dias. A limpeza de dados do app apaga o armazenamento local; compras no Google Play são preservadas e reativadas via restauração. Logs técnicos da API são retidos por 30 dias e apagados automaticamente).
+- **O usuário pode solicitar a exclusão?** **Sim** (Disponível no próprio app pelo botão "Apagar meus dados" na aba Privacidade — exclusão imediata do registro do aparelho nos servidores —, e por e-mail para `contato@arateki.com` com resposta em até 15 dias. A limpeza de dados do app apaga o armazenamento local; compras no Google Play são preservadas e reativadas via restauração. Logs técnicos da API são retidos por 30 dias e apagados automaticamente).
 - **Citação no código:**
   - `AnonymousIdentity.kt:30-60` (UUIDv4 persistido localmente e via Block Store)
   - `KeyFlowApiClient.kt:104,159` (registro do UUID e consulta de conta na API)
   - `BillingManager.kt:147,328` (envio do hash do UUID para o Google Play Billing)
   - `AdsController.kt:52-87` (inicialização de anúncios condicionada a `adsOff == false`)
-  - `AdsPrivacyOptionsEntry.kt:20-35` (revisão de consentimento UMP na aba Docs)
+  - `AdsPrivacyOptionsEntry.kt:20-35` (revisão de consentimento UMP na aba Privacidade)
 
 ---
 
