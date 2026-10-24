@@ -16,3 +16,17 @@ api/target/
 
 # SDK local e service token do Cloudflare Access (staging). Nunca versionar.
 /local.properties
+
+# Chaves e credenciais: nunca versionar (o repositório é público). A chave de upload da Play fica fora do repo.
+*.jks
+*.keystore
+*.p12
+*.pem
+!api/tests/fixtures/test_service_account_key.pem
+.env
+.env.*
+!.env.example
+google-services.json
+
+# Arquivos da coordenação dos agentes (tarefas e relatórios locais)
+.equipe/
