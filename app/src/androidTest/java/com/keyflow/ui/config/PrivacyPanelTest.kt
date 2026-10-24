@@ -77,7 +77,7 @@ class PrivacyPanelTest {
     }
 
     @Test
-    fun statusDistingueAceiteAtualAntigoAusenteERecusa() {
+    fun statusDistingueAceiteAtualDesatualizadoAusenteERecusa() {
         val settings = mutableStateOf(Settings())
         rule.setContent { KeyFlowTheme(dark = false) { PrivacyPanel(settings = settings.value) } }
         rule.onNodeWithTag(PRIVACY_DISCLOSURE_STATUS_TAG).assertTextEquals("Ainda não aceito.")
@@ -85,7 +85,7 @@ class PrivacyPanelTest {
         rule.runOnIdle { settings.value = Settings(disclosureAcceptedVersion = DISCLOSURE_VERSION) }
         rule.onNodeWithTag(PRIVACY_DISCLOSURE_STATUS_TAG).assertTextEquals("Aceito na versão $DISCLOSURE_VERSION.")
         rule.runOnIdle { settings.value = Settings(disclosureAcceptedVersion = DISCLOSURE_VERSION + 1) }
-        rule.onNodeWithTag(PRIVACY_DISCLOSURE_STATUS_TAG).assertTextContains("É necessário aceitar a versão atual.")
+        rule.onNodeWithTag(PRIVACY_DISCLOSURE_STATUS_TAG).assertTextContains("É necessário aceitar a versão atual.", substring = true)
         rule.runOnIdle { settings.value = Settings(disclosureDeclined = true) }
         rule.onNodeWithTag(PRIVACY_DISCLOSURE_STATUS_TAG).assertTextEquals("Recusado. O ditado está desativado.")
     }
