@@ -532,7 +532,7 @@ class OverlayCoordinator(
                 val duration = recordingClockMs() - recordingStartMs
                 if (duration < MIN_RECORDING_MS) {
                     Log.d(TAG, "recording too short (${duration}ms), cancelling")
-                    runCatching { recorder.stop() }
+                    runCatching { recorder.stop()?.delete() }
                     onError(tr("Gravação muito curta."), ErrorNavTarget.NONE)
                     render(machine.onErrorDismissed())
                     return

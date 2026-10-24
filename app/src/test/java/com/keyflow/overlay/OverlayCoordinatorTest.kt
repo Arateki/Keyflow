@@ -71,6 +71,25 @@ class OverlayCoordinatorTest {
         assertThat(audio.exists()).isFalse()
     }
 
+    @Test
+    fun `recording shorter than minimum deletes file returned by recorder`() = runTest {
+        val audio = temporaryFolder.newFile("audio-short.m4a").also { it.writeText("audio") }
+        val recorder = FakeRecorder(audio)
+        var clock = 0L
+        val coordinator = coordinator(
+            scope = this,
+            recorder = recorder,
+            recordingClockMs = { clock },
+        )
+
+        coordinator.onTap()
+        clock = 350L
+        coordinator.onTap()
+
+        assertThat(recorder.stopped).isEqualTo(1)
+        assertThat(audio.exists()).isFalse()
+    }
+
     /**
      * Checagem proativa (Yan, 2026-07-04): sem RECORD_AUDIO, nem tenta `recorder.start()` — vai direto
      * pro erro certo, com [ErrorNavTarget.MIC] (antes só descobria a falta quando o recorder nativo
