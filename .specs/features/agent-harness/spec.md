@@ -117,13 +117,13 @@ modelo não consegue olhar nem mexer em nada do app, e o usuário tem de ir às 
 | AGT-06 | Erros do `ReasoningError` e ferramenta que falha | Implemented (JVM) — motor Anthropic (401/429/5xx/529/corte) e laço |
 | TLS-01 | Esquema, risco, validação antes de `run` | Implemented (JVM) |
 | TLS-02 | Confirmação com resumo do app | Implemented — núcleo, `ConfirmationGate`, painel com resumo e prévia do app (AGT-T3) e o resumo/folha de contato das ferramentas de skin (AGT-T4) |
-| TLS-03 | Sem segredos; filtro; lista de permitidos | Parcial — `SecretFilter` ligado aos cofres `keyflow_secure` e `auth/` (AGT-T3, provado no aparelho com sentinelas); argumentos recusam segredos; lista de permitidos de ajustes é do AGT-T6 |
+| TLS-03 | Sem segredos; filtro; lista de permitidos | Implemented — `SecretFilter` ligado aos cofres `keyflow_secure` e `auth/` (AGT-T3, provado no aparelho com sentinelas); argumentos recusam segredos; a lista de permitidos de ajustes é a tabela `AppSettingsAllowlist` (AGT-T6), com o teste que FALHA se um campo de `SettingsSecrets`, um endereço ou um nome com cara de credencial entrar nela, e o repositório só grava as chaves da tabela `AgentSettingKeys` |
 | TLS-04 | Resultado é dado | Implemented (JVM) — prompt de sistema + suíte de abuso; injeções em resultado/ditado nunca contornam a confirmação |
 | TLS-05 | Registro de ações, desfazer | Implemented — `FileActionLog` (arquivo com teto, rotação e filtro de segredos, fora do backup) e Desfazer nos Ajustes pelo mesmo executor (AGT-T5) |
 | TLS-06 | Tempo limite, fora da thread principal | Implemented (JVM) |
 | AGT-T10 (recorte V1-4) | Abuso e flood | Parcial — teste JVM de injeção, segredos, argumentos, flood (8 chamadas por passo/12 passos), resultado e cancelamento; executor limita ainda a 24 tentativas por janela móvel de 60 s. Instrumentados conferem os cofres cifrados e o chat. Validação com a Anthropic real pendente **[YAN]**; decisão de release desta V1: **Em breve** até essa validação. |
 | SKL-01..06 | Ferramentas de skin | Implemented — as 6 ferramentas, prévia sem nada em disco, instalação com confirmação (relatório e folha de contato), lotes e limites; verificado no aparelho com o `exemplo-neon` real (`SkinToolsDeviceTest` 13/13) (AGT-T4). Pendência: o direito de skins pagas no `skin_select` (MZ-T9) |
-| APP-01..03 | Ferramentas de app | Pending (AGT-T6) |
+| APP-01..03 | Ferramentas de app | Implemented — `app_status`, `settings_get/set` (antes → depois e desfazer) e `open_tab` (abre ao fim da resposta); provado no aparelho com o DataStore e o cofre de verdade (AGT-T6) |
 | AUI-01, AUI-02, AUI-04 | Cartões, painel de confirmação, textos `tr()` e orbe | Implemented (AGT-T3; instrumentado 12/12 + rotas de galeria) |
 | AUI-03 | Seção "Ferramentas do agente" nos Ajustes | Implemented — `AgentSettingsSection` + configuração persistida no DataStore próprio; MCP desligado e desabilitado (AGT-T5) |
 | MCP-01 | Servidor MCP desligado por padrão | Implemented — a linha existe nos Ajustes, desligada e desabilitada; nenhuma porta é aberta (não há servidor) |

@@ -49,7 +49,7 @@ trailer). Atualizar o Status aqui e a traceability do `spec.md` ao concluir.
 
 ### AGT-T6 — Ferramentas de app (`app_status`, `settings_get/set`, `open_tab`)
 - **What**: a **lista de permitidos** (tabela com tipo e faixa) + teste que falha se aparecer campo de `SettingsSecrets`; `settings_set` com antes → depois e desfazer.
-- **Tests**: unit + instrumentado. **Status**: Pending
+- **Tests**: unit + instrumentado. **Status**: Done (2026-10-24, fase 2). `agent/tools/AppTools.kt` (as 4 ferramentas) sobre a porta `AppControl`, a tabela `AppSettingsAllowlist` (12 linhas, tipo e faixa; as duas skins só para leitura) e o adaptador `agenthost/AndroidAppControl.kt`; a gravação é `SettingsRepository.updateAgentSettings` (atômica, só nas chaves de `data/AgentSettingKeys.kt`, as não secretas). **Decisões**: `value` do `settings_set` é sempre texto (o esquema do app não tem união de tipos); as skins só mudam pelo `skin_select`; `open_tab` abre a aba quando a resposta TERMINA (`TurnScoped.turnCancelled` descarta ao cancelar) para o painel de confirmação da ferramenta seguinte não ficar numa tela escondida. Unit 1574/0 falhas e lint limpo; instrumentados `AppToolsDeviceTest` 11/11, `AgentSecretsDeviceTest` 4/4, `SkinToolsDeviceTest` 13/13, `KeyflowPanelAgentTest` 12/12 e `SettingsRepositoryTest` 32/32 no emulador; nenhuma tela mudou (goldens intactos). Detalhes, provas e o que NÃO foi provado: `STATE.md`, seção "fase 2, AGT-T6".
 
 ### AGT-T7 — Adaptadores OpenAI e Google
 - **What**: `OpenAiAgentEngine` (`tool_calls`/`role=tool`) e `GoogleAgentEngine` (`functionCall`/`functionResponse`), conversão do histórico neutro, fixtures conferidas nas docs oficiais.

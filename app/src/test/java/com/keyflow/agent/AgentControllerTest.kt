@@ -507,6 +507,45 @@ class AgentControllerTest {
         assertThat(scoped.ended.get()).isEqualTo(3)
     }
 
+    private class ScopedSplit(name: String) : AgentTool, TurnScoped {
+        val ended = AtomicInteger()
+        val cancelled = AtomicInteger()
+        override val name = name
+        override val description = "x"
+        override val inputSchema: JSONObject = JSONObject(TEXT_SCHEMA)
+        override val risk = ToolRisk.READ
+
+        @PolicyGated
+        override suspend fun run(args: JSONObject, ctx: ToolContext) = ToolOutput.ok("ok")
+
+        override fun turnEnded() {
+            ended.incrementAndGet()
+        }
+
+        override fun turnCancelled() {
+            cancelled.incrementAndGet()
+        }
+    }
+
+    @Test
+    fun `a tool that tells ended from cancelled hears ended on success and cancelled on cancel and on clear`() {
+        val scoped = ScopedSplit("s")
+        val env = Env(listOf(scoped))
+        env.controller.send("a", env.withTools(ScriptedEngine(text("x") + done())))
+        assertThat(scoped.ended.get()).isEqualTo(1)
+        assertThat(scoped.cancelled.get()).isEqualTo(0)
+
+        val release = CompletableDeferred<Unit>()
+        env.controller.send("b", AgentBackend.TextOnly { flow { release.await(); emit(AgentEvent.Done()) } })
+        env.controller.cancel()
+        assertThat(scoped.ended.get()).isEqualTo(1)
+        assertThat(scoped.cancelled.get()).isEqualTo(1)
+
+        env.controller.clear()
+        assertThat(scoped.ended.get()).isEqualTo(1)
+        assertThat(scoped.cancelled.get()).isEqualTo(2)
+    }
+
     @Test
     fun `nothing runs before the policy is ready`() {
         val gate = CompletableDeferred<Unit>()

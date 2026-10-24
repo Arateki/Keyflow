@@ -74,7 +74,14 @@ class ToolDescription(val summary: String, val preview: ToolPreview? = null)
  * ([AgentController]) chama [turnEnded] de todas as ferramentas que a implementam.
  */
 interface TurnScoped {
+    /** O turno acabou (com sucesso ou erro). */
     fun turnEnded()
+
+    /**
+     * O turno foi CANCELADO (o usuário tocou em Cancelar) ou a conversa foi limpa. Por padrão é o mesmo que [turnEnded]; quem tem um efeito
+     * que só vale quando o turno termina bem (a navegação do `open_tab`) o descarta aqui.
+     */
+    fun turnCancelled() = turnEnded()
 }
 
 /**

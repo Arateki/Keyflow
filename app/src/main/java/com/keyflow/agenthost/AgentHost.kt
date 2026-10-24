@@ -12,6 +12,7 @@ import com.keyflow.agent.SecretFilter
 import com.keyflow.agent.ToolExecutor
 import com.keyflow.agent.ToolPolicy
 import com.keyflow.agent.ToolRegistry
+import com.keyflow.agent.tools.AppTools
 import com.keyflow.agent.tools.SkinTools
 import com.keyflow.auth.CredentialVaultLock
 import com.keyflow.data.SettingsRepository
@@ -46,6 +47,9 @@ class AgentParts internal constructor(
 object AgentHost {
     @Volatile
     private var parts: AgentParts? = null
+
+    /** Quem abre as abas do app a pedido de `open_tab`: a `SetupActivity` se anexa enquanto está na tela. */
+    val tabNavigator = AgentTabNavigator()
 
     /** As peças do processo (criadas na primeira chamada). */
     fun of(context: Context): AgentParts = parts ?: synchronized(this) { parts ?: create(context.applicationContext).also { parts = it } }
@@ -94,8 +98,10 @@ object AgentHost {
         return assemble(
             // Fora da thread principal: o filtro decifra o cofre, o executor roda ferramentas e o motor fala com a rede; a tela só observa o StateFlow.
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
-            // As ferramentas de skin (SKL-01..06) sobre o mesmo SkinPackStore do import e da tela, e as duas chaves de skin dos ajustes.
-            tools = SkinTools(AndroidSkinWorkshop(app, SkinPackStore.of(app), RepositorySkinSelection(repository))).tools,
+            // As ferramentas de skin (SKL-01..06) sobre o mesmo SkinPackStore do import e da tela, e as duas chaves de skin dos ajustes;
+            // e as de app (APP-01..03): o estado, a lista de permitidos de ajustes e a navegação.
+            tools = SkinTools(AndroidSkinWorkshop(app, SkinPackStore.of(app), RepositorySkinSelection(repository))).tools +
+                AppTools(AndroidAppControl(app, repository, tabNavigator)).tools,
             policy = policy,
             actionLog = log,
             secrets = secrets,

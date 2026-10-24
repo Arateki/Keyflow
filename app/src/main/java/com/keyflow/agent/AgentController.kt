@@ -190,7 +190,7 @@ class AgentController(
             history.clear()
             _state.value = AgentUiState(listOf(ChatItem.Greeting(ids.getAndIncrement())))
         }
-        releaseTurnState()
+        releaseTurnState(cancelled = true)
     }
 
     /** O usuário respondeu ao painel de confirmação do pedido [callId]. */
@@ -226,9 +226,11 @@ class AgentController(
         val mine = synchronized(lock) { ++runNumber }
         setActivity(initial)
         job = scope.launch {
+            var cancelled = false
             try {
                 block(mine)
             } catch (e: CancellationException) {
+                cancelled = true
                 throw e
             } catch (e: Exception) {
                 // Um defeito inesperado vira texto no chat, nunca um crash da aba. A mensagem é a da exceção (como o chat de antes).
@@ -237,13 +239,13 @@ class AgentController(
                     if (message != null) appendToBubble("\n[$message]") else addItem(ChatItem.Notice(ids.getAndIncrement(), NoticeKind.GENERATION_ERROR))
                 }
             } finally {
-                if (mine == runNumber) finishRun()
+                if (mine == runNumber) finishRun(cancelled)
             }
         }
     }
 
     /** Fim de uma execução (qualquer que seja o motivo): solta o estado do turno, para a atividade e fecha o que ficou em andamento. */
-    private fun finishRun() {
+    private fun finishRun(cancelled: Boolean) {
         synchronized(lock) { currentBubble = null }
         _state.update { s ->
             s.copy(
@@ -253,12 +255,18 @@ class AgentController(
                 },
             )
         }
-        releaseTurnState()
+        releaseTurnState(cancelled)
     }
 
-    /** As ferramentas que guardam estado enquanto o turno dura (os arquivos de uma skin em lotes) o soltam. */
-    private fun releaseTurnState() {
-        executor?.registry?.all()?.forEach { (it as? TurnScoped)?.turnEnded() }
+    /**
+     * As ferramentas que guardam estado enquanto o turno dura (os arquivos de uma skin em lotes) o soltam; a que tem um efeito só para
+     * quando o turno termina bem (`open_tab`) sabe, por [cancelled], se deve aplicá-lo ou descartá-lo.
+     */
+    private fun releaseTurnState(cancelled: Boolean) {
+        executor?.registry?.all()?.forEach { tool ->
+            val scoped = tool as? TurnScoped ?: return@forEach
+            if (cancelled) scoped.turnCancelled() else scoped.turnEnded()
+        }
     }
 
     /** O modo só texto: uma chamada por mensagem, sem histórico — o chat de hoje, com o mesmo fluxo e o mesmo texto de erro. */

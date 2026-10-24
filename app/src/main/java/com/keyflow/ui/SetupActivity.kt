@@ -291,6 +291,8 @@ class SetupActivity : ComponentActivity() {
         settingsRepository = SettingsRepository(this)
         showDisclosure = intent.getBooleanExtra(EXTRA_REQUIRE_DISCLOSURE, false)
         handleNavIntent(intent)
+        // `open_tab` do agente (APP-03): a aba pedida abre como qualquer navegação por intent (o mesmo `requestedTab` do clique num erro).
+        if (BuildConfig.AGENT_ENABLED) AgentHost.tabNavigator.attach(openTabForAgent)
 
         activityScope.launch {
             settingsRepository.settingsFlow().collectLatest {
@@ -558,6 +560,14 @@ class SetupActivity : ComponentActivity() {
         handleNavIntent(intent)
     }
 
+    /** O `open_tab` do agente: chamado de qualquer thread, abre a aba na principal pelo mesmo caminho da navegação por intent. */
+    private val openTabForAgent: (ConfigTab) -> Unit = { tab ->
+        runOnUiThread {
+            requestedTab = tab
+            requestedTabKey++
+        }
+    }
+
     /** Lê extras de navegação: pular para a aba Transcrição, Sobrepor ou Teclado (clique num erro clicável). */
     private fun handleNavIntent(intent: Intent?) {
         val tab = when (intent?.getStringExtra(EXTRA_NAV)) {
@@ -713,6 +723,7 @@ class SetupActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        if (BuildConfig.AGENT_ENABLED) AgentHost.tabNavigator.detach(openTabForAgent)
         monetizationJobs.forEach(Job::cancel)
         entitlementsRepository?.close()
         remoteConfigRepository?.close()
