@@ -53,7 +53,7 @@ trailer). Atualizar o Status aqui e a traceability do `spec.md` ao concluir.
 
 ### AGT-T7 — Adaptadores OpenAI e Google
 - **What**: `OpenAiAgentEngine` (`tool_calls`/`role=tool`) e `GoogleAgentEngine` (`functionCall`/`functionResponse`), conversão do histórico neutro, fixtures conferidas nas docs oficiais.
-- **Tests**: unit (MockWebServer). **Status**: Pending
+- **Tests**: unit (MockWebServer). **Status**: Done (2026-10-24, fase 2). **SPEC_DEVIATION (local)**: o `OpenAiAgentEngine` fala a **Responses API** (`function_call`/`function_call_output`), não a Chat Completions (`tool_calls`/`role=tool`) do texto acima — a doc oficial diz que os modelos GPT-6 exigem a Responses para ferramentas, e o motor de texto do app já usa `/responses`; o Google usa a `streamGenerateContent` (não a Interactions API, Beta). Os dois moram em `reasoning/<provedor>/` (`…AgentEngine.kt` rede/retentativa, `…AgentWire.kt` corpo/histórico/SSE puro), como o da Anthropic, e o `AgentBackends` os liga **só com chave de API** (login por assinatura segue no texto). 99 testes JVM novos (motores contra MockWebServer, conversão do histórico, `AgentBackends`); recorte local 751/0 falhas e lint limpo; instrumentados 27/27; goldens: só a nota do modo só texto mudou. Detalhes, fontes oficiais, o que NÃO foi provado e **o que o Yan precisa criar para usar o Google**: `STATE.md`, seção "fase 2, AGT-T7".
 
 ## Fase 3 — Skins parametrizadas e servidor MCP
 

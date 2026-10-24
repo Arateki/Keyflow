@@ -64,6 +64,8 @@ import com.keyflow.ui.config.DirectApiKeyActions
 import com.keyflow.reasoning.openai.OpenAiModels
 import com.keyflow.reasoning.openai.OpenAiReasoningEngine
 import com.keyflow.reasoning.anthropic.AnthropicAgentEngine
+import com.keyflow.reasoning.google.GoogleAgentEngine
+import com.keyflow.reasoning.openai.OpenAiAgentEngine
 import com.keyflow.reasoning.anthropic.AnthropicModels
 import com.keyflow.agenthost.AgentBackends
 import com.keyflow.agenthost.AgentHost
@@ -200,6 +202,13 @@ class SetupActivity : ComponentActivity() {
                 anthropicCredentialChanges = auth.store.changes(ProviderIds.ANTHROPIC).map { },
                 agentEngine = { model -> AnthropicAgentEngine(auth.authorization, auth.http, model) },
                 resolveText = reasoningEngines::resolve,
+                // OpenAI e Google (AGT-T7): ferramentas só com a CHAVE de API, como a Anthropic (o login por assinatura segue no texto).
+                openAiApiKeyConnected = { auth.store.getApiKey(ProviderIds.OPENAI) != null },
+                openAiCredentialChanges = auth.store.changes(ProviderIds.OPENAI).map { },
+                openAiAgentEngine = { model -> OpenAiAgentEngine(auth.authorization, auth.http, model) },
+                googleApiKeyConnected = { auth.store.getApiKey(ProviderIds.GOOGLE) != null },
+                googleCredentialChanges = auth.store.changes(ProviderIds.GOOGLE).map { },
+                googleAgentEngine = { model -> GoogleAgentEngine(auth.authorization, auth.http, model) },
             ),
         )
     }

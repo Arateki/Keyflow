@@ -771,7 +771,7 @@ internal val TranslationsEn: Map<String, String> = mapOf(
     "Cheguei ao limite de passos desta mensagem. Peça para continuar, se quiser." to "I reached the step limit for this message. Ask me to continue if you want.",
     "A resposta foi cortada por limite de tamanho." to "The answer was cut off by a size limit.",
     "O modelo recusou responder a isto." to "The model declined to answer this.",
-    "Modo só texto · ferramentas disponíveis com a Anthropic por chave de API" to "Text-only mode · tools are available with Anthropic by API key",
+    "Modo só texto · ferramentas disponíveis com Anthropic, OpenAI ou Google por chave de API" to "Text-only mode · tools are available with Anthropic, OpenAI or Google by API key",
     "Executando ferramenta…" to "Running a tool…",
     "Aguardando sua permissão…" to "Waiting for your permission…",
     "O agente quer fazer isto" to "The agent wants to do this",

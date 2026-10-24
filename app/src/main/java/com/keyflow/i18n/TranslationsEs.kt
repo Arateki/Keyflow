@@ -771,7 +771,7 @@ internal val TranslationsEs: Map<String, String> = mapOf(
     "Cheguei ao limite de passos desta mensagem. Peça para continuar, se quiser." to "Llegué al límite de pasos de este mensaje. Pídeme que continúe si quieres.",
     "A resposta foi cortada por limite de tamanho." to "La respuesta se cortó por un límite de tamaño.",
     "O modelo recusou responder a isto." to "El modelo se negó a responder esto.",
-    "Modo só texto · ferramentas disponíveis com a Anthropic por chave de API" to "Modo solo texto · herramientas disponibles con Anthropic por clave de API",
+    "Modo só texto · ferramentas disponíveis com Anthropic, OpenAI ou Google por chave de API" to "Modo solo texto · herramientas disponibles con Anthropic, OpenAI o Google por clave de API",
     "Executando ferramenta…" to "Ejecutando una herramienta…",
     "Aguardando sua permissão…" to "Esperando tu permiso…",
     "O agente quer fazer isto" to "El agente quiere hacer esto",
