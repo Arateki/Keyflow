@@ -143,7 +143,7 @@ tap_label 'Computador' 'Computer' 'Computadora'
 
 # A tela de teclado compõe a prévia de skins; navegar até o fim também força o desenho de SVGs.
 tap_label 'Teclado' 'Keyboard'
-for _ in {1..3}; do "$adb_bin" -s "$serial" shell input swipe 850 800 850 260 400; sleep 1; done
+for _ in {1..4}; do "$adb_bin" -s "$serial" shell input swipe 600 1900 600 600 500; sleep 1; done
 assert_label 'Suas skins' 'Your skins' 'Tus skins'
 
 # Docs e Teclado são os hosts de banner. A etiqueta semântica confirma slot montado quando a
