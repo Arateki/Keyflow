@@ -2,10 +2,11 @@
 """
 Gera o ícone do KeyFlow a partir da orbe parada (estado Idle do estilo Ateliê).
 
-A orbe é desenhada em `VoiceOrb.kt` (`drawOrb`): um brilho, o corpo e o miolo, três blobs vivos com degradê
-radial, mais um pontinho de luz. Este script reproduz esse desenho (mesmas cores, degradês, proporções e o mesmo
-instante da galeria de verificação, `GALLERY_ORB_TIME_MS`, para a forma bater com `verification/golden/orb-idle.png`)
-e produz, de uma só fonte:
+A orbe é desenhada em `VoiceOrb.kt` (`drawOrb`): um brilho externo, o corpo e o miolo, três blobs vivos com degradê
+radial, mais um pontinho de luz. O ícone leva o corpo, o miolo e o pontinho de luz, sem o brilho externo (decisão do
+Yan: o halo deslocado lia como sombra no fundo escuro). Este script reproduz esse desenho (mesmas cores, degradês,
+proporções e o mesmo instante da galeria de verificação, `GALLERY_ORB_TIME_MS`, para a forma bater com
+`verification/golden/orb-idle.png`) e produz, de uma só fonte:
 
   - os VectorDrawables do ícone adaptativo (API 26+):
       app/src/main/res/drawable/ic_launcher_background.xml
@@ -27,7 +28,7 @@ Uso (do diretório do repositório; só precisa do Pillow):
     python3 scripts/gerar-icone.py --previa /tmp/keyflow-icone/previa.png --so-previa
 
 Zona segura: o adaptativo tem 108 dp, a máscara do launcher mostra no máximo 72 dp no centro e só 66 dp (círculo)
-é garantido. O script confere que o brilho da orbe cabe nos 66 dp.
+é garantido. O script confere que a orbe cabe nos 66 dp.
 
 Para trocar a cor do fundo ou o tamanho da orbe, mexa nas constantes `FUNDOS` e `RAIO_CORPO` aqui e rode de novo:
 os XMLs e os PNGs saem sempre juntos, para nunca divergirem.
@@ -49,7 +50,6 @@ LOJA = RAIZ / "docs/loja"
 
 # --- A orbe (VoiceOrb.kt, drawOrb) ---------------------------------------------------------------------------------
 # Paleta Ateliê (paleta A). ARGB.
-BRILHO_DENTRO, BRILHO_FORA = 0x667EB8A8, 0x007EB8A8
 CORPO_DENTRO, CORPO_FORA = 0xFF9AD0BF, 0xFF4E9683
 MIOLO_DENTRO, MIOLO_FORA = 0xFFF4ECCF, 0xFFBFE0D4
 ALFA_CORPO, ALFA_MIOLO, ALFA_LUZ = 0.96, 0.95, 0.30
@@ -73,7 +73,7 @@ FUNDOS = {
 }
 
 # Ícone temático (monochrome): só o alfa conta; o sistema pinta com a cor do tema.
-MONO_ALFA_BRILHO, MONO_ALFA_MIOLO = 0.22, 0.34
+MONO_ALFA_MIOLO = 0.34
 
 K = 24  # px por dp do mestre (2592 px)
 SUPER = 2  # as máscaras dos blobs saem em 2x e descem para o mestre (serrilhado some)
@@ -113,7 +113,6 @@ class Camada:
 def camadas():
     r = RAIO_CORPO
     return [
-        Camada("brilho", r * 1.12, AMP * 0.7, VEL * 0.8, 5.0, BRILHO_DENTRO, BRILHO_FORA, 1.0),
         Camada("corpo", r, AMP * NIVEL, VEL, 2.0, CORPO_DENTRO, CORPO_FORA, ALFA_CORPO),
         Camada("miolo", r * 0.66, AMP * 0.7, VEL * 1.35, 9.0, MIOLO_DENTRO, MIOLO_FORA, ALFA_MIOLO),
     ]
@@ -235,14 +234,12 @@ def xml_frente():
 
 
 def xml_mono():
-    brilho, corpo, miolo = camadas()
+    corpo, miolo = camadas()
     lx, ly, lr = luz()
     anel = caminho_bezier(corpo.pontos(N_BEZIER)) + caminho_bezier(miolo.pontos(N_BEZIER))
     return (
         CABECALHO
         + f"<vector {NS_VETOR}>\n"
-        + f'    <!-- brilho, bem fraco -->\n    <path\n        android:fillColor="#FF000000"\n        android:fillAlpha="{MONO_ALFA_BRILHO}"\n'
-        + f'        android:pathData="{caminho_bezier(brilho.pontos(N_BEZIER))}" />\n'
         + f'    <!-- corpo menos o miolo: o aro -->\n    <path\n        android:fillColor="#FF000000"\n        android:fillType="evenOdd"\n'
         + f'        android:pathData="{anel}" />\n'
         + f'    <!-- miolo, translúcido -->\n    <path\n        android:fillColor="#FF000000"\n        android:fillAlpha="{MONO_ALFA_MIOLO}"\n'
@@ -318,13 +315,11 @@ def raster_frente():
 
 def raster_mono():
     """Alfa do ícone temático (imagem 'L'): o mesmo que o XML do monochrome."""
-    brilho, corpo, miolo = camadas()
-    m_brilho = mascara_poligono(brilho.pontos(720)).point(lambda v: round(v * MONO_ALFA_BRILHO))
+    corpo, miolo = camadas()
     m_corpo, m_miolo = mascara_poligono(corpo.pontos(720)), mascara_poligono(miolo.pontos(720))
     anel = ImageChops.subtract(m_corpo, m_miolo)
     lx, ly, lr = luz()
-    alfa = ImageChops.lighter(m_brilho, anel)
-    alfa = ImageChops.lighter(alfa, m_miolo.point(lambda v: round(v * MONO_ALFA_MIOLO)))
+    alfa = ImageChops.lighter(anel, m_miolo.point(lambda v: round(v * MONO_ALFA_MIOLO)))
     return ImageChops.lighter(alfa, mascara_circulo(lx, ly, lr))
 
 
@@ -391,7 +386,7 @@ def conferir_zona_segura():
         max(math.hypot(x - CENTRO, y - CENTRO) for x, y in c.pontos(720)) for c in camadas()
     )
     if pior > ZONA_SEGURA_DP / 2:
-        sys.exit(f"O brilho da orbe passa da zona segura: {pior:.1f} dp de raio > {ZONA_SEGURA_DP / 2:.0f}.")
+        sys.exit(f"A orbe passa da zona segura: {pior:.1f} dp de raio > {ZONA_SEGURA_DP / 2:.0f}.")
     return pior
 
 

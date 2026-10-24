@@ -2651,13 +2651,15 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
 
 ## 2026-10-24 — Ícone do app (v1-icone)
 
-- Decisão do Yan: a logo do app é a orbe. O ícone é a orbe parada do Ateliê (VoiceOrb.kt: brilho, corpo e miolo, no
-  instante 1234 ms da galeria) sobre um fundo escuro quente (degradê de 3A342B a 211E19, família do `bg` escuro).
-  Skins de pacote (`skin-packs/`) não entram: o ícone usa o visual padrão. A cor do fundo, escura ou creme, ficou para o
-  Yan aprovar na prancha; trocar é `--fundo claro` no script e rodar de novo.
+- Decisão do Yan: a logo do app é a orbe. O ícone é a orbe parada do Ateliê (VoiceOrb.kt: corpo, miolo e ponto de luz,
+  no instante 1234 ms da galeria) sobre um fundo escuro quente (degradê de 3A342B a 211E19, família do `bg` escuro).
+  Skins de pacote (`skin-packs/`) não entram: o ícone usa o visual padrão. Na prancha o Yan aprovou o fundo escuro, o
+  tamanho (orbe a 72% da janela visível) e mandou tirar o brilho externo deslocado da orbe, que lia como sombra esverdeada
+  no escuro; ele sai do foreground, do monochrome, dos PNGs legados e do ícone da loja. O fundo creme segue disponível em
+  `--fundo claro`.
 - Fonte única: `scripts/gerar-icone.py` escreve os três drawables (`ic_launcher_{background,foreground,monochrome}`), os 10
   PNGs legados e `docs/loja/icone-512.png`. Os XMLs de `mipmap-anydpi-v26/` são fixos. O `android:icon` e o `roundIcon`
-  estão no manifesto. O raio da orbe é 26 dp no canvas de 108: o brilho chega a 30,8 dp, dentro dos 33 dp da zona segura.
+  estão no manifesto. O raio da orbe é 26 dp no canvas de 108: sem o brilho externo o corpo chega a 27,2 dp, dentro dos 33 dp da zona segura.
 - Lição de render: o `Image.radial_gradient` do Pillow vale distância × √2 (255 só no canto), e não distância/raio. Usado
   cru, o degradê não chega à cor final na borda do raio e deixa uma faixa no corpo da orbe. O script corrige pela
   constante `RAIO_NO_GRADIENTE`. A forma foi conferida contra `orb-idle-dark.png`: o perfil radial da golden bate com a
