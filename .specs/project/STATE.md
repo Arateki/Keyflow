@@ -2685,3 +2685,30 @@ O que está no código (commit `629db54`, 2026-10-03, de outra frente) e o que a
   conferidos) e o "Testar OCR" de mentira; os campos `vision*` de Settings que sobrarem sem uso saem junto (o
   `SettingsRepository` ignora chave desconhecida, então não há migração). Decisão do Yan: se o seletor por API deve existir
   já no MVP (contraria a spec; a nota da spec diz que foi decisão dele em 2026-07-01 ficar 100% local).
+
+## 2026-10-24 — vision-capture: o ML Kit saiu; modelos abertos sob demanda (branch `equipe/visao`)
+
+Decisão do Yan: todo modelo local vem do nosso catálogo (URL fixa + SHA-256), baixado pelo usuário; nenhum dado nem métrica
+sai do aparelho; nada de GPL/LGPL/AGPL nem licença não comercial. Spec reescrita (`vision-capture`; contexto da síntese de
+fala em `sintese-fala/context.md`). O que ficou de lição:
+
+- **ML Kit fora.** A VC-T2 (deps) foi revertida em `427b3d1`. Medido antes de reverter: +30,0 MB instalados no arm64 (+49%;
+  debug 161,9 → 243,1 MB; release universal ~83,7 → 132,7 MB) e métricas de uso mandadas ao Google (identificador por
+  instalação, dados do aparelho, idiomas), sem opt-out oficial; a tradução do ML Kit só existe embutida. As duas decisões
+  que a VC-T2 deixara em aberto (APK e métricas) ficam resolvidas por esta.
+- **Lingua recusada.** O jar `lingua 1.2.2` tem **80.412.159 B** no Maven Central (HEAD em 2026-10-24) porque embute todos os
+  modelos: contraria "nada embutido no APK". Idioma da origem: pelos dicionários do corretor (`assets/dict/*.kfd`).
+- **eSpeak NG (GPL-3.0) está no AAR do sherpa-onnx 1.13.8** que o app distribui. Prova: `unzip -p app/libs/sherpa-onnx-1.13.8.aar
+  jni/<abi>/libsherpa-onnx-jni.so | strings -a | grep -c 'Empty _dict file\|(expected 0x%x, got 0x%x)\|has not been built
+  into espeak-ng'` → 3 nas três ABIs (frases literais do `dictionary.c`/`error.c` do eSpeak); o `libonnxruntime.so` está
+  limpo. Vem do padrão `SHERPA_ONNX_ENABLE_TTS=ON` do upstream, mesmo o app não usando TTS. Risco de licença para o app
+  inteiro, antes da Play: decisão do Yan; saída técnica = AAR recompilado com TTS desligado (detalhes em `sintese-fala/context.md`).
+  Armadilha: `grep -i espeak` casa "Offline**eSpeak**er" (`OfflineSpeakerDiarization`) e dá falso positivo.
+- **O relatório de pesquisa errou em três pontos** (corrigidos na spec): o repositório `deepghs/paddleocr` declara
+  `license: other`, não Apache-2.0 (o par escolhido é do `monkt/paddleocr-onnx`, Apache-2.0); os pesos do Coqui pt-BR são
+  BSD-3-Clause, não MPL-2.0; `onnxruntime-android` + `pickFirst` custa ~+0,23 MB, não +15 MB (o problema é a divergência de
+  versão: a ORT 1.28.2 do sherpa não existe no Maven Central).
+- **Catálogo com dados fabricados.** Além do `ModelCatalog.VISION`, as quatro entradas de `VOICE` e as de texto de
+  `SMOLLM2_1_7B` a `PHI_3_5_MINI` têm commits e SHA-256 inventados (padrões sequenciais; os de texto repetem o fim do SHA do
+  Qwen3). Só Qwen3 0.6B e Gemma 4 E2B são reais. Nenhuma é baixável: conferir cada uma por download antes de mostrar na UI
+  (regra de ouro 8). A Visão conserta o seu `VISION` na VC-T2a; `VOICE` e as de texto ficam para quem for dono delas.
