@@ -371,7 +371,11 @@ class SetupActivity : ComponentActivity() {
                         skinsUnlocked = entitlements.skinsUnlocked,
                         onUnlockPurchase = ::buyUnlock,
                         unlockPurchaseState = unlockPurchaseState,
-                        onReviewDisclosure = { showDisclosure = true },
+                        onReviewDisclosure = {
+                            requestedTab = ConfigTab.PRIVACIDADE
+                            requestedTabKey++
+                            showDisclosure = true
+                        },
                         onDeleteMyData = {
                             val api = checkNotNull(monetizationApi)
                             checkNotNull(entitlementsRepository).deleteRemoteData { api.deleteAccount() }
