@@ -50,6 +50,7 @@ enum class ConfigTab(private val labelPt: String, private val icon: KfIconSpec, 
     COMPUTADOR(trKey("Computador"), KfIcons.TabComputador, TabGroup.CAPACIDADES),
 
     // ── Outros
+    PRIVACIDADE(trKey("Privacidade"), KfIcons.Lock, TabGroup.OUTROS),
     DOCS("Docs", KfIcons.TabDocs, TabGroup.OUTROS),
     ;
 

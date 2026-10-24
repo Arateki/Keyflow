@@ -287,11 +287,11 @@ object RouteCatalog {
         Route("config-teclado-travado") { ConfigTabRoute(ConfigTab.TECLADO) },
         Route("config-overlay-travado") { ConfigTabRoute(ConfigTab.OVERLAY) },
         Route("config-docs") { ConfigTabRoute(ConfigTab.DOCS) },
-        Route("config-docs-apagar-dados", minDelayMs = 1000L) { ConfigTabRoute(ConfigTab.DOCS, docsSection = "privacidade") },
-        Route("config-docs-apagar-dados-confirmar", minDelayMs = 1000L) {
-            ConfigTabRoute(ConfigTab.DOCS, docsSection = "privacidade", deleteMyDataOpen = true)
+        Route("config-privacidade") { ConfigTabRoute(ConfigTab.PRIVACIDADE) },
+        Route("config-privacidade-apagar-dados-confirmar", minDelayMs = 1000L) {
+            ConfigTabRoute(ConfigTab.PRIVACIDADE, deleteMyDataOpen = true)
         },
-        Route("config-docs-privacy-required") { ConfigTabRoute(ConfigTab.DOCS, adsPrivacyRequired = true) },
+        Route("config-privacidade-ump") { ConfigTabRoute(ConfigTab.PRIVACIDADE, adsPrivacyRequired = true) },
         // A seção Skins das duas abas (fica abaixo da dobra nas telas acima): a da orbe, na Sobrepor, e a do
         // teclado, na Teclado — escolhas separadas (Yan, 2026-09-29), aqui com o Aero marcado nas duas.
         Route("config-overlay-skins") { SkinsRoute(orb = true) },
@@ -682,7 +682,7 @@ object RouteCatalog {
         val dark = LocalKeyFlowPalette.current.isDark
         val galleryAdsRuntime = remember(dark) { GalleryAdsRuntime(dark) }
         val adsController = remember(tab, dark) {
-            if (bannerTab) AdsController(
+            if (bannerTab || tab == ConfigTab.PRIVACIDADE) AdsController(
                 context.applicationContext,
                 galleryAdsRuntime,
                 GalleryConsentRequester(privacyOptionsRequired = adsPrivacyRequired),

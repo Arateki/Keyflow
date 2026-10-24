@@ -128,6 +128,7 @@ fun ConfigScreen(
     initialTab: ConfigTab = ConfigTab.VOZ,
     initialDocsSection: String? = null,
     initialDeleteMyDataOpen: Boolean = false,
+    onReviewDisclosure: () -> Unit = {},
     onDeleteMyData: suspend () -> Unit = { error("Ação de exclusão indisponível") },
     initialUnlockOpen: Boolean = false,
     initialTabHelpOpen: Boolean = false,
@@ -478,9 +479,16 @@ fun ConfigScreen(
                         ConfigTab.FLUXOS,
                         ConfigTab.COMPUTADOR,
                         ConfigTab.NOTIFICACAO -> ComingSoonPanel()
-                        ConfigTab.DOCS -> DocsPanel(
+                        ConfigTab.PRIVACIDADE -> PrivacyPanel(
+                            settings = settings,
+                            adsController = adsController,
+                            adsOff = adsSuppressed,
+                            onReviewDisclosure = onReviewDisclosure,
                             onDeleteMyData = onDeleteMyData,
                             initialDeleteMyDataOpen = initialDeleteMyDataOpen,
+                        )
+                        ConfigTab.DOCS -> DocsPanel(
+                            onOpenPrivacy = { selectTab(ConfigTab.PRIVACIDADE) },
                             focusSectionId = docsFocusSection,
                             focusKey = docsFocusKey,
                             adsController = adsController,

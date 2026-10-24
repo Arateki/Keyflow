@@ -40,7 +40,7 @@ class AccountDeletionTest {
         val finish = CompletableDeferred<Unit>()
         rule.setContent {
             KeyFlowTheme(dark = false) {
-                DocsPanel(onDeleteMyData = { calls++; finish.await() })
+                PrivacyPanel(onDeleteMyData = { calls++; finish.await() })
             }
         }
         rule.onNodeWithTag("delete-my-data").performScrollTo().performClick()
@@ -60,7 +60,7 @@ class AccountDeletionTest {
         var calls = 0
         rule.setContent {
             KeyFlowTheme(dark = true) {
-                DocsPanel(onDeleteMyData = { if (++calls == 1) throw IOException("rede de teste") })
+                PrivacyPanel(onDeleteMyData = { if (++calls == 1) throw IOException("rede de teste") })
             }
         }
         rule.onNodeWithTag("delete-my-data").performScrollTo().performClick()

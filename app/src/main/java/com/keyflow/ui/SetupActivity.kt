@@ -371,6 +371,7 @@ class SetupActivity : ComponentActivity() {
                         skinsUnlocked = entitlements.skinsUnlocked,
                         onUnlockPurchase = ::buyUnlock,
                         unlockPurchaseState = unlockPurchaseState,
+                        onReviewDisclosure = { showDisclosure = true },
                         onDeleteMyData = {
                             val api = checkNotNull(monetizationApi)
                             checkNotNull(entitlementsRepository).deleteRemoteData { api.deleteAccount() }
@@ -476,10 +477,11 @@ class SetupActivity : ComponentActivity() {
             persistOnboardingDone(true)
             return
         }
-        settings = settings.copy(disclosureDeclined = true)
+        // Recusar ao rever um aceite atual também revoga a versão que libera o gravador.
+        settings = settings.copy(disclosureAcceptedVersion = 0, disclosureDeclined = true)
         showDeclineExplanation = true
         activityScope.launch {
-            settingsRepository.saveDisclosureConsent(settings.disclosureAcceptedVersion, declined = true)
+            settingsRepository.saveDisclosureConsent(0, declined = true)
         }
     }
 

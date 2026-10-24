@@ -2,6 +2,16 @@ package com.keyflow.i18n
 
 /** Português → inglês. Chave = o texto exato passado a [tr] (ver `TranslationsTest`). */
 internal val TranslationsEn: Map<String, String> = mapOf(
+    "Contato" to "Contact",
+    "Abrir Privacidade" to "Open Privacy",
+    "Aviso do ditado" to "Dictation notice",
+    "Recusado. O ditado está desativado." to "Declined. Dictation is disabled.",
+    "Aceito na versão %s." to "Accepted version %s.",
+    "Aceito na versão %s. É necessário aceitar a versão atual." to "Accepted version %s. You need to accept the current version.",
+    "Ainda não aceito." to "Not yet accepted.",
+    "Versão atual do aviso: %s." to "Current notice version: %s.",
+    "Rever aviso do ditado" to "Review dictation notice",
+    "Pedidos de privacidade são atendidos em até 15 dias." to "Privacy requests are handled within 15 days.",
     "Não há aplicativo disponível para abrir este link." to "No app is available to open this link.",
     "Apaga o registro deste aparelho na API e os dados associados." to "Deletes this device’s API registration and associated data.",
     "Também é possível pedir a exclusão por e-mail: contato@arateki.com. Prazo de até 15 dias." to "You can also request deletion by email: contato@arateki.com. Requests are handled within 15 days.",

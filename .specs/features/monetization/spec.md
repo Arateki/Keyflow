@@ -212,3 +212,14 @@ tasks seguintes e, no caminho remoto, da KeyFlow API existir em staging — ver
 - [ ] Rewarded credita minutos que aparecem no saldo (via SSV, nunca otimista).
 - [ ] Zero anúncios/chamadas ao AdMob no IME/overlay e com `adsOff`.
 - [ ] Com a API fora do ar: teclado/overlay/OpenAI/Groq/Custom funcionam normalmente.
+
+## Aba Privacidade — decisão V1 (2026-10-24)
+
+**Implementado**: aba `PRIVACIDADE` no grupo `OUTROS`, junto da Docs, com ícone nativo de cadeado.
+Ordem: política/termos (abertura segura), opções UMP somente quando REQUIRED e sem `adsOff`,
+aviso versionado do ditado com ação de revisão, exclusão dos dados e contato `contato@arateki.com`
+(pedidos em até 15 dias). A Docs mantém a explicação e um atalho para a aba, sem controles duplicados.
+Rever usa a própria divulgação destacada; recusar invalida o aceite salvo e mantém a explicação e
+continuação sem ditado do fluxo de atualização. Os gates de gravação voltam a exigir aceite atual.
+Rastreabilidade: `PrivacyPanelTest`, `ConfigScreenTest`, `DocsPanelTest`, `AccountDeletionTest`,
+`DisclosureUpgradeTest` e goldens claro/escuro de `config-privacidade*`.

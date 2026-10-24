@@ -2626,3 +2626,14 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
 - Gate final: Android debug/release + lint + 1.519 JVM; Rust fmt/clippy + 145 testes; 4 testes de
   retenção e 13 instrumentados verdes. Quatro goldens novos revistos nos dois temas e bit-idênticos
   na recaptura; os antigos ficam preservados. Lightsail/Cloudflare e Play real continuam com o Yan.
+
+## 2026-10-24 — Aba Privacidade própria (v1-aba-privacidade)
+
+- Decisão do Yan: os controles ficam em Privacidade, grupo OUTROS junto da Docs; a Docs conserva
+  ajuda e um atalho. Ordem: links legais, UMP quando exigido/sem desbloqueio, aviso do ditado,
+  exclusão e contato/prazo de até 15 dias. Ícone Lock do próprio KfIcons; PT/EN/ES.
+- Reabrir a divulgação deve reutilizar os callbacks da atualização. Ao recusar depois de já ter
+  aceitado a versão atual, é necessário zerar `disclosureAcceptedVersion`: os gates da gravação
+  consultam essa versão, então só `disclosureDeclined=true` permitiria continuar gravando.
+- Testes de links e exclusão foram transferidos para PrivacyPanel sem perder cenários; a navegação
+  Docs→Privacidade, UMP condicional e revogação persistente são exercitadas separadamente.

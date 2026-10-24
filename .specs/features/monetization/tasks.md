@@ -320,3 +320,11 @@ usa expoente zero (`shownCount - 1`), preservando o backoff a partir do segundo 
 **Saída**: modo Créditos real (comprar minutos, saldo vivo, proxy), unlock de R$15 restaurável,
 entitlements por união com cache offline, anúncios confinados ao app de config com dinâmica
 não-chata dirigida por config remota, rewarded via SSV — e o app 100% funcional com a API fora.
+
+## v1-aba-privacidade — implementação (2026-10-24)
+
+- [x] Integrar exclusão de dados e separar a aba Privacidade no grupo OUTROS.
+- [x] Mover links legais protegidos, opções UMP condicionais e exclusão; manter ajuda/atalho na Docs.
+- [x] Exibir estado/versão do aviso, rever pela divulgação existente e revogar aceite ao recusar.
+- [x] Contato/prazo de 15 dias, traduções PT/EN/ES e testes migrados com cobertura equivalente.
+- [ ] Gates Android, instrumentados afetados e revisão dos goldens claro/escuro (ver relatório).
