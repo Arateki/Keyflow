@@ -11,6 +11,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import com.keyflow.ui.theme.KeyFlowTheme
 
 @RunWith(AndroidJUnit4::class)
 class AdsControllerInstrumentedTest {
@@ -57,6 +58,19 @@ class AdsControllerInstrumentedTest {
 
         assertEquals(0, consent.requests)
         assertEquals(0, runtime.initializations)
+    }
+
+    @Test
+    fun adsPrivacyEntryIsHiddenWhenUnlockSuppressesAds() {
+        val controller = AdsController(ApplicationProvider.getApplicationContext(), FakeRuntime(), FakeConsent())
+
+        rule.setContent {
+            KeyFlowTheme(dark = false) {
+                AdsPrivacyOptionsEntry(controller, adsOff = true)
+            }
+        }
+
+        rule.onNodeWithTag(ADS_PRIVACY_OPTIONS_TAG).assertDoesNotExist()
     }
 
     private class FakeConsent : ConsentRequester {

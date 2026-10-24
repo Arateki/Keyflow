@@ -19,7 +19,8 @@ import com.keyflow.ui.theme.LocalKeyFlowPalette
 const val ADS_PRIVACY_OPTIONS_TAG = "ads-privacy-options"
 
 @Composable
-fun AdsPrivacyOptionsEntry(controller: AdsController) {
+fun AdsPrivacyOptionsEntry(controller: AdsController, adsOff: Boolean = false) {
+    if (adsOff) return
     val required by controller.privacyOptionsRequired.collectAsStateOnMain()
     val activity = LocalContext.current as? Activity
     if (!required || activity == null) return

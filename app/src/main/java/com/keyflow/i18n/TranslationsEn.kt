@@ -173,6 +173,7 @@ internal val TranslationsEn: Map<String, String> = mapOf(
     "Duração máxima de gravação" to "Maximum recording length",
     "Editar grade" to "Edit grid",
     "Em breve" to "Coming soon",
+    "Banner de anúncios" to "Ad banner",
     "Em breve você poderá executar scripts, ferramentas de linha de comando e automações locais diretamente no aparelho." to "Soon you will be able to run scripts, command-line tools, and local automations directly on the device.",
     "Encolhe ou aumenta o teclado inteiro — teclas, faixa de sugestões e barra retraída." to "Shrinks or enlarges the whole keyboard — keys, suggestion strip and collapsed bar.",
     "Encolhe ou expande o teclado KeyFlow na tela." to "Shrinks or expands the KeyFlow keyboard on screen.",

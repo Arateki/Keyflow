@@ -521,7 +521,7 @@ fun DocsPanel(
             }
         }
         adsController?.let {
-            AdsPrivacyOptionsEntry(it)
+            AdsPrivacyOptionsEntry(it, adsOff = adsOff)
             BannerSlot(it, adsOff = adsOff, entitlementsLoaded = entitlementsLoaded)
         }
     }
