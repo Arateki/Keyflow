@@ -2665,5 +2665,11 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
 - O lint do projeto só confere `NewApi` (`checkOnly`), então ele não acusa ícone; as regras de ícone (formato, tamanho,
   duplicata) foram conferidas à mão. Nenhuma tela do app desenha o ícone, então nenhuma golden muda: amostra de 20 capturas
   (rotas 0/12, nos dois temas, incluindo `orb-idle`) bit-idêntica, 0 px.
+- O CI acusou o `OverlayPackOrbTest`: o teste conta o `#4E9683` (borda do corpo da orbe Ateliê) no screenshot da TELA INTEIRA
+  e espera zerar quando o pacote assume a orbe. Com o ícone do app (a orbe parada) o launcher atrás do overlay passou a ter
+  esses pixels sozinho: 1.412 px parados, igual nas duas tentativas (um ícone de 156 px do script tem ~2.100 px na mesma
+  tolerância, a mesma ordem). Correção: o teste mede o fundo antes de o serviço subir e conta só o que passa disso (também
+  fecha o falso positivo de "começa com a orbe Ateliê", que passava só com o ícone na tela). Rodada verde depois da correção.
+  Regra: teste que conta cor na tela inteira precisa descontar o fundo, porque o que o launcher mostra muda com o ícone.
 - Ambiente: o `diff-screens.sh` pede o `compare` do ImageMagick no PATH (`/srv/dev/ferramentas/bin`); sem ele todo golden
   sai como "comparação falhou (dimensões diferentes?)", mensagem que engana.
