@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -29,6 +30,7 @@ import androidx.compose.ui.unit.sp
 import com.keyflow.core.TranscriptionSource
 import com.keyflow.data.Settings
 import com.keyflow.ui.common.verticalScrollbar
+import com.keyflow.ui.common.collectAsStateOnMain
 import com.keyflow.ui.icons.KfIcon
 import com.keyflow.ui.icons.KfIconSpec
 import com.keyflow.ui.icons.KfIcons
@@ -42,6 +44,7 @@ fun maxRecordingTag(sec: Int): String = "voz-max-recording-$sec"
 
 const val VOZ_CREDITS_CARD_TAG = "voz-credits-card"
 const val VOZ_TOKEN_TAG = "voz-token"
+const val VOZ_TOKEN_DELETE_TAG = "voz-token-desconectar"
 const val VOZ_MODEL_TAG = "voz-model"
 const val VOZ_LANGUAGE_TAG = "voz-language"
 const val VOZ_ENDPOINT_TAG = "voz-endpoint"
@@ -62,9 +65,13 @@ fun VozPanel(
     modifier: Modifier = Modifier,
     localModels: LocalModelsUi = LocalModelsUi.EMPTY,
     localActions: LocalModelActions = LocalModelActions.None,
+    openAiAuth: AuthActions = AuthActions.None,
+    groqAuth: AuthActions = AuthActions.None,
 ) {
     val palette = LocalKeyFlowPalette.current
     val scroll = rememberScrollState()
+    val openAiApiKey = remember(openAiAuth) { openAiAuth.apiKeyFlow() }.collectAsStateOnMain(null).value.orEmpty()
+    val groqApiKey = remember(groqAuth) { groqAuth.apiKeyFlow() }.collectAsStateOnMain(null).value.orEmpty()
     val activeSettings = settings.withoutCredits()
     Column(
         modifier
@@ -90,21 +97,21 @@ fun VozPanel(
             TranscriptionSource.CREDITS -> Unit
             TranscriptionSource.OPENAI -> KeyProviderFields(
                 provName = "OpenAI",
-                token = activeSettings.providerOpenAiApiKey.ifEmpty { activeSettings.openaiToken },
+                token = openAiApiKey,
                 models = OPENAI_MODELS,
                 model = activeSettings.openaiModel,
                 language = activeSettings.openaiLanguage.orEmpty(),
-                onToken = { onSettingsChange(activeSettings.copy(providerOpenAiApiKey = it, openaiToken = it)) },
+                onToken = openAiAuth::saveApiKey,
                 onModel = { onSettingsChange(activeSettings.copy(openaiModel = it)) },
                 onLanguage = { onSettingsChange(activeSettings.copy(openaiLanguage = it.ifBlank { null })) },
             )
             TranscriptionSource.GROQ -> KeyProviderFields(
                 provName = "Groq",
-                token = activeSettings.providerGroqApiKey.ifEmpty { activeSettings.groqToken },
+                token = groqApiKey,
                 models = GROQ_MODELS,
                 model = activeSettings.groqModel,
                 language = activeSettings.groqLanguage.orEmpty(),
-                onToken = { onSettingsChange(activeSettings.copy(providerGroqApiKey = it, groqToken = it)) },
+                onToken = groqAuth::saveApiKey,
                 onModel = { onSettingsChange(activeSettings.copy(groqModel = it)) },
                 onLanguage = { onSettingsChange(activeSettings.copy(groqLanguage = it.ifBlank { null })) },
             )
@@ -325,7 +332,15 @@ private fun KeyProviderFields(
                 )
             }
         }
-        AutoSaveField(tr("Token de acesso · %s", provName), token, onToken, VOZ_TOKEN_TAG, keyboardType = KeyboardType.Password)
+        AutoSaveField(tr("Token de acesso · %s", provName), token, onToken, VOZ_TOKEN_TAG, keyboardType = KeyboardType.Password, masked = true)
+        if (token.isNotBlank()) {
+            SecondaryButton(
+                text = tr("Desconectar"),
+                tag = VOZ_TOKEN_DELETE_TAG,
+                onClick = { onToken("") },
+                modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+            )
+        }
         Row(Modifier.fillMaxWidth().padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             Dropdown(tr("Modelo"), models, model, onModel, VOZ_MODEL_TAG, Modifier.weight(1f))
             Dropdown(tr("Idioma"), LANGUAGE_OPTIONS, language, onLanguage, VOZ_LANGUAGE_TAG, Modifier.weight(1f), display = ::languageLabel)

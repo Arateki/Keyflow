@@ -3,6 +3,7 @@ package com.keyflow.reasoning.openai
 import com.keyflow.auth.AuthErrorKind
 import com.keyflow.auth.AuthException
 import com.keyflow.auth.AuthorizationProvider
+import com.keyflow.auth.HttpErrorMessage
 import com.keyflow.auth.ProviderIds
 import com.keyflow.auth.providers.openai.OpenAiAuthConfig
 import com.keyflow.data.models.Ipv4FirstDns
@@ -209,12 +210,7 @@ class OpenAiReasoningEngine(
     private fun httpFailure(status: Int, body: String): HttpFailure {
         val json = runCatching { JSONObject(body) }.getOrNull()
         val code = json?.optJSONObject("error")?.optString("code").orEmpty()
-        val detail = json?.optString("detail").orEmpty()
-        val note = buildString {
-            append("HTTP $status")
-            if (code.isNotEmpty()) append(" $code")
-            if (detail.isNotEmpty()) append(": $detail")
-        }
+        val note = HttpErrorMessage.of("OpenAI", status, body)
         val kind = when {
             status == 401 -> ReasoningError.UNAUTHORIZED
             status == 403 -> when {

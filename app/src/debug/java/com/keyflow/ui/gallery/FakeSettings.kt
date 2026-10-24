@@ -19,10 +19,10 @@ object FakeSettings {
 
     /** Máscara de token exibida nos campos de credencial. */
     const val MASKED_TOKEN = "sk-••3b"
+    const val OPENAI_API_KEY = "sk-galeria-0000"
 
     val settings = Settings(
         source = TranscriptionSource.OPENAI,
-        openaiToken = "sk-fake-3b",
         customEndpoint = "https://self.host/v1/audio/transcriptions",
         overlaySide = OverlaySide.RIGHT,
         orbSizePx = 156,

@@ -2050,8 +2050,8 @@ Testes até aqui: 610 unitários; instrumentados no emulador: `ui.config` 124/12
 - **Login da OpenAI** (`auth/providers/openai/`, RSN-T14), literal da doc: registro dinâmico (`dynamic_agent_client` só na 1ª
   vez; depois o `oaiapp_…` emitido), PKCE S256, `state` e `nonce`, redirect `http://127.0.0.1:<porta>/auth/callback`, troca sem
   `client_secret`, **ID token verificado por JWKS (RS256) + emissor + audiência + nonce**, refresh rotativo (Mutex por provedor,
-  credencial nova gravada ANTES de usar, falha temporária nunca apaga), revogação com repetição. `enabled = BuildConfig.DEBUG`
-  só vale para o **login**; a **chave de API funciona sempre**. Validado por mutação (assinatura, nonce, alg, client_id do
+  credencial nova gravada ANTES de usar, falha temporária nunca apaga), revogação com repetição. A **chave de API funciona sempre**.
+  Validado por mutação (assinatura, nonce, alg, client_id do
   refresh, erro-antes-do-state).
 - **Motor OpenAI** (RSN-T15): Responses API, corpo enxuto (`store:false`, `stream:true`, `instructions` para o system), SSE
   lido linha a linha, **sucesso só em `response.completed`**, erros mapeados sem trocar de cobrança, 5xx com nova tentativa
@@ -2063,9 +2063,10 @@ Testes até aqui: 610 unitários; instrumentados no emulador: `ui.config` 124/12
   **chave** provado de ponta a ponta no emulador (cofre real + registro + motor + lista, contra servidor local).
 - **Achado de teste**: um teste do modelo escolhido passava mesmo sem a lógica (o rótulo do dropdown mostra o id de qualquer
   jeito) — a mutação achou; o teste agora abre o menu.
-- **Pendências [YAN]** (nada disto um teste daqui prova): (1) **tornar o repositório público**; (2) **decidir a elegibilidade
-  da OpenAI** (RPRV-04, `PLAYSTORE_CHECKLIST.md` §1c) — o KeyFlow planeja créditos/skins/anúncios, e a OpenAI manda apps
-  "pagos ou hospedados remotamente" para um formulário; **não publicar com o login ligado** até decidir; (3) rodar
+- **Decisão posterior do Yan (2026-10-23)**: os logins por assinatura de OpenAI, Anthropic e Google entram no release. A escolha
+  de elegibilidade RPRV-04 está feita; para o login Google, falta no Console configurar/verificar o client OAuth com o SHA-1
+  da chave Play e o `applicationId` definitivo **[YAN]**. No Anthropic OAuth, erros de troca/renovação não expõem body nem
+  mensagem da exceção. **Pendências [YAN]**: tornar o repositório público e rodar
   `.specs/features/reasoning-models/manual-validation.md` no A32 — a aceitação REAL do registro dinâmico, o callback com o app em
   segundo plano e o LLM no aparelho (tempo/RAM; `recommendedRamMb` e `IDLE_UNLOAD_MS` são estimativas até lá).
 - **Deferido (menor)**: aviso de "revogação não confirmada" ao Desconectar; `hasOpenAiCredential`/`apiKey()` leem o cofre na
@@ -2525,3 +2526,35 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
 
 ## V1-1 — lição de ambiente (2026-10-23)
 - No servidor falta ImageMagick; por isso `scripts/diff-screens.sh` não roda como no CI sem instalar/fixar o comparador. A validação local precisou de um fallback temporário em `/tmp`.
+- 2026-10-23 — O `diff-screens.sh` só deve ser considerado validado com `compare`/`identify` reais; nesta rodada o host continuou sem ImageMagick, então rodei o script em um container descartável e deixei os goldens divergentes para revisão da T14 (14/216 capturas, incluindo `config-menu-aberto`).
+
+## V1-2 — rodada 3 (2026-10-23)
+- A migração de segredos tem ordem fixa: cofre existente > chaves de Provedores/Raciocínio > Transcrição > Visão > Fala. Uma chave legada que perde uma colisão é descartada; há uma chave de API compartilhada por provedor.
+- API key e OAuth ficam em slots distintos do mesmo provedor; `providerXAuthMode` continua sendo a escolha ativa. Consumidores que precisam de um tipo usam `getApiKey`/`getOAuth`, e o filtro do agente coleta ambos.
+- A migração do DataStore e do `keyflow_secure` é idempotente e protegida por lock de arquivo, além do Mutex do processo; o destino cifrado confirma antes de a origem sair. A migração assíncrona do `App` foi removida para não criar uma corrida de inicialização entre processos.
+- Cabeçalho de autenticação, senha e chave SSH são segredos e continuam no cofre; nome do cabeçalho, host, usuário e porta SSH são configuração não secreta e permanecem no DataStore.
+- Erros HTTP de Anthropic usam `HttpErrorMessage`; o corpo completo e detalhes de SSE não chegam à mensagem do release.
+
+## V1-2 — rodada 4 (2026-10-23)
+- O lock de arquivo deve envolver somente cópias síncronas do cofre: ler ou editar DataStore suspende fora dele; o overlay inicia e trata ações pendentes depois da primeira configuração, sem bloquear a main.
+- O formato antigo `cred.*` continua legível pelos acessores tipados até a migração; autenticação e desconexão escolhem explicitamente o slot API ou OAuth. A prioridade precisa ser aplicada depois de juntar as origens antigas.
+- Erros e eventos da Anthropic não carregam corpo ou mensagem do servidor; o filtro do agente tira o snapshot do cofre sob o mesmo lock.
+
+## V1-2 — rodada 5 (2026-10-23)
+- Normalize `cred.*` para o slot tipado antes de migrar fontes antigas; a chave de API legada não pode sobrescrever OAuth. A credencial ativa acompanha o modo salvo.
+- Não segure o lock entre processos em getters: inicialize cofres fora da main e limite o lock às cópias/gravações síncronas. O instrumentado StrictMode prova que abrir o teclado não faz I/O de disco/rede na main.
+
+## V1-2 — rodada 6 (2026-10-23)
+- Modo de autenticação ausente deve ser inferido uma vez na migração (OAuth prevalece quando há ambos); o modo escolhido é preferência, não exclusão: `get()` mantém fallback para a outra credencial e para `cred.*`.
+
+## API — V1-9 (2026-10-23)
+- Em GitHub Actions, use `defaults.run.shell: bash` nos jobs de container; os testes da API precisam de Postgres no serviço, e instale/valide `cmake` dentro do container de build.
+
+## Monetização — V1-10a, Fase A (2026-10-23)
+- A API ainda sem staging e o Play Console sem o app tornam MockWebServer/fakes obrigatórios na fundação; Play Integrity `1.6.0` e Billing `9.1.0` ficam atrás de portas degradáveis, sem tocar onboarding, IME ou overlay.
+
+## Monetização — V1-10b, revisão da parte 2 (2026-10-23)
+- O primeiro frame da Config não pode assumir entitlements: `AdsController` e `BannerSlot` recebem um gate explícito de carregamento; o estado remoto também precisa estar pronto antes de habilitar ads.
+- Redeem e ack são responsabilidades independentes: `pending` não é crédito, 401 refaz o registro uma vez, e toda compra `PURCHASED` não reconhecida recebe ack local mesmo após sucesso remoto.
+- A escolha salva de uma skin paga não é apagada no reembolso; a resolução cai em Sistema/Ateliê enquanto `skinsUnlocked` estiver falso e reaparece quando o direito voltar. A mesma regra vale no IME e no overlay.
+- O kill switch remoto suspende apenas monetização e mostra aviso traduzido; `minAppVersion` avisa sem bloquear o restante da configuração.

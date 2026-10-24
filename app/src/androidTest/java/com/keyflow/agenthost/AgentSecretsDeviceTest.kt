@@ -57,6 +57,7 @@ class AgentSecretsDeviceTest {
     private lateinit var repository: SettingsRepository
     private lateinit var credentials: SecureCredentialStore
     private lateinit var originalSettings: Settings
+    private var originalVaultValue: String? = null
     private var originalAnthropic: Credential? = null
     private var originalOpenAi: Credential? = null
     private val scopes = CopyOnWriteArrayList<CoroutineScope>()
@@ -74,9 +75,10 @@ class AgentSecretsDeviceTest {
         repository = SettingsRepository(context)
         credentials = SecureCredentialStore(context)
         originalSettings = repository.settingsFlow().first()
+        originalVaultValue = repository.secretVault().getString("agent_test_vault_secret", null)
         originalAnthropic = credentials.get(ProviderIds.ANTHROPIC)
         originalOpenAi = credentials.get(ProviderIds.OPENAI)
-        repository.saveSettings(originalSettings.copy(providerAnthropicApiKey = vaultSecret, computerSshPassword = sshSecret))
+        repository.secretVault().edit().putString("agent_test_vault_secret", vaultSecret).putString("computer_ssh_password", sshSecret).commit()
         credentials.put(ProviderIds.ANTHROPIC, Credential.ApiKey(apiKeySecret))
         credentials.put(ProviderIds.OPENAI, Credential.OAuth(accessSecret, refreshSecret, System.currentTimeMillis() + 3_600_000, null, emptySet(), idSecret, "client-publico", "sub", "conta@exemplo.com"))
     }
@@ -85,6 +87,9 @@ class AgentSecretsDeviceTest {
     fun tearDown() = runBlocking {
         scopes.forEach { it.cancel() }
         repository.saveSettings(originalSettings)
+        repository.secretVault().edit().apply {
+            if (originalVaultValue == null) remove("agent_test_vault_secret") else putString("agent_test_vault_secret", originalVaultValue)
+        }.commit()
         restore(ProviderIds.ANTHROPIC, originalAnthropic)
         restore(ProviderIds.OPENAI, originalOpenAi)
     }

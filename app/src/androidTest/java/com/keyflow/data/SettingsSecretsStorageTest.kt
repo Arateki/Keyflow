@@ -5,6 +5,24 @@ import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.keyflow.auth.Credential
+import com.keyflow.auth.CredentialStore
+import com.keyflow.auth.CredentialCodec
+import com.keyflow.auth.AuthMethod
+import com.keyflow.auth.ProviderId
+import com.keyflow.auth.ProviderIds
+import com.keyflow.auth.SecureCredentialStore
+import com.keyflow.core.ReasoningSource
+import com.keyflow.reasoning.ReasoningEngine
+import com.keyflow.reasoning.ReasoningEngines
+import com.keyflow.reasoning.ReasoningEvent
+import com.keyflow.reasoning.ReasoningRequest
+import com.keyflow.reasoning.ReasoningResolution
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -31,6 +49,7 @@ class SettingsSecretsStorageTest {
     private lateinit var context: Context
     private lateinit var dataStoreFile: File
     private lateinit var securePrefsName: String
+    private lateinit var authPrefsName: String
 
     @Before
     fun setUp() {
@@ -38,6 +57,7 @@ class SettingsSecretsStorageTest {
         val id = UUID.randomUUID().toString()
         dataStoreFile = File(context.filesDir, "test-secrets-datastore/$id.preferences_pb")
         securePrefsName = "test_keyflow_secure_secrets_$id"
+        authPrefsName = "${SecureCredentialStore.PREFS_NAME}_$securePrefsName"
     }
 
     @After
@@ -45,6 +65,7 @@ class SettingsSecretsStorageTest {
         dataStoreFile.delete()
         dataStoreFile.parentFile?.delete()
         context.deleteSharedPreferences(securePrefsName)
+        context.deleteSharedPreferences(authPrefsName)
     }
 
     private fun newRepository() = SettingsRepository(
@@ -53,13 +74,56 @@ class SettingsSecretsStorageTest {
         securePrefsName = securePrefsName,
     )
 
-    /** O cofre aberto direto, para conferir o que a migração e a gravação deixaram nele. */
-    private fun vault() = SecurePrefs.create(context, securePrefsName)
+    private fun newRepository(store: CredentialStore) = SettingsRepository(
+        context = context,
+        dataStoreFile = dataStoreFile,
+        securePrefsName = securePrefsName,
+        credentialStoreFactory = { _, _ -> store },
+    )
+
+    /** Cofre controlável para provar que uma falha depois de uma gravação não apaga a origem. */
+    private class FailingCredentialStore : CredentialStore {
+        private val credentials = mutableMapOf<ProviderId, Credential>()
+        private val secrets = mutableMapOf<String, String>()
+        var writesBeforeFailure: Int? = null
+        var authModeWrites = 0
+
+        private fun beforeWrite() {
+            val remaining = writesBeforeFailure ?: return
+            if (remaining == 0) error("falha de teste no meio da migração")
+            writesBeforeFailure = remaining - 1
+        }
+
+        override fun get(provider: ProviderId): Credential? = credentials[provider]
+        override fun setAuthMode(provider: ProviderId, method: AuthMethod?) { authModeWrites++ }
+        override fun put(provider: ProviderId, credential: Credential) {
+            beforeWrite()
+            credentials[provider] = credential
+        }
+        override fun clear(provider: ProviderId) { credentials.remove(provider) }
+        override fun changes(provider: ProviderId): Flow<Credential?> = flowOf(credentials[provider])
+        override fun meta(provider: ProviderId, key: String): String? = null
+        override fun putMeta(provider: ProviderId, key: String, value: String) = Unit
+        override fun getSecret(key: String): String? = secrets[key]
+        override fun putSecret(key: String, value: String) {
+            beforeWrite()
+            secrets[key] = value
+        }
+        override fun clearSecret(key: String) { secrets.remove(key) }
+    }
+
+    /** O cofre antigo, usado só para semear a migração. */
+    private fun legacyVault() = SecurePrefs.create(context, securePrefsName)
+
+    private fun authVaultRaw() = SecurePrefs.create(context, authPrefsName, SecureCredentialStore.KEY_ALIAS)
+
+    /** O destino único da V1-2. */
+    private fun vault() = SecureCredentialStore(context, authPrefsName)
 
     private fun dataStoreText(): String = dataStoreFile.readBytes().toString(Charsets.ISO_8859_1)
 
     private fun vaultXml(): String =
-        File(context.applicationInfo.dataDir, "shared_prefs/$securePrefsName.xml").readText()
+        File(context.applicationInfo.dataDir, "shared_prefs/$authPrefsName.xml").readText()
 
     private fun sentinel(property: String) = "SENTINELA-${property.uppercase()}-123"
 
@@ -70,25 +134,49 @@ class SettingsSecretsStorageTest {
     /** Um valor-sentinela distinto em cada um dos segredos ([SettingsSecrets.BY_PROPERTY]) — escrito campo a campo. */
     private fun settingsWithSentinels() = Settings(
         customHeaderValue = sentinel("customHeaderValue"),
-        openaiToken = sentinel("openaiToken"),
-        groqToken = sentinel("groqToken"),
         reasoningCustomHeaderValue = sentinel("reasoningCustomHeaderValue"),
-        visionGoogleApiKey = sentinel("visionGoogleApiKey"),
-        visionAnthropicApiKey = sentinel("visionAnthropicApiKey"),
         visionCustomHeaderValue = sentinel("visionCustomHeaderValue"),
-        falaElevenLabsApiKey = sentinel("falaElevenLabsApiKey"),
-        falaGoogleApiKey = sentinel("falaGoogleApiKey"),
         falaCustomHeaderValue = sentinel("falaCustomHeaderValue"),
         computerSshHost = "host.claro.test",
         computerSshPassword = sentinel("computerSshPassword"),
         // Uma chave privada de verdade tem várias linhas: o sentinela está no meio do bloco.
         computerSshKey = "-----BEGIN OPENSSH PRIVATE KEY-----\n${sentinel("computerSshKey")}\n-----END OPENSSH PRIVATE KEY-----",
-        providerAnthropicApiKey = "SENTINELA-ANTHROPIC-123",
-        providerOpenAiApiKey = sentinel("providerOpenAiApiKey"),
-        providerGoogleApiKey = sentinel("providerGoogleApiKey"),
-        providerGroqApiKey = sentinel("providerGroqApiKey"),
-        providerGrokApiKey = sentinel("providerGrokApiKey"),
     )
+
+    private fun targetSecretKey(key: String) = when (key) {
+        SettingsSecrets.AUTH_HEADER_VALUE -> SettingsCredentialKeys.CUSTOM_HEADER
+        SettingsSecrets.REASONING_CUSTOM_HEADER_VALUE -> SettingsCredentialKeys.REASONING_CUSTOM_HEADER
+        SettingsSecrets.VISION_CUSTOM_HEADER_VALUE -> SettingsCredentialKeys.VISION_CUSTOM_HEADER
+        SettingsSecrets.FALA_CUSTOM_HEADER_VALUE -> SettingsCredentialKeys.FALA_CUSTOM_HEADER
+        SettingsSecrets.COMPUTER_SSH_PASSWORD -> SettingsCredentialKeys.COMPUTER_SSH_PASSWORD
+        SettingsSecrets.COMPUTER_SSH_KEY -> SettingsCredentialKeys.COMPUTER_SSH_KEY
+        else -> error("não é segredo de Settings: $key")
+    }
+
+    private fun migratedProvider(key: String) = when (key) {
+        SettingsSecrets.OPENAI_TOKEN, SettingsSecrets.PROVIDER_OPENAI_API_KEY -> ProviderIds.OPENAI
+        SettingsSecrets.GROQ_TOKEN, SettingsSecrets.PROVIDER_GROQ_API_KEY -> ProviderIds.GROQ
+        SettingsSecrets.VISION_GOOGLE_API_KEY, SettingsSecrets.FALA_GOOGLE_API_KEY, SettingsSecrets.PROVIDER_GOOGLE_API_KEY -> ProviderIds.GOOGLE
+        SettingsSecrets.VISION_ANTHROPIC_API_KEY, SettingsSecrets.PROVIDER_ANTHROPIC_API_KEY -> ProviderIds.ANTHROPIC
+        SettingsSecrets.FALA_ELEVENLABS_API_KEY -> ProviderIds.ELEVENLABS
+        SettingsSecrets.PROVIDER_GROK_API_KEY -> ProviderIds.GROK
+        else -> null
+    }
+
+    /** Várias chaves antigas representam o mesmo provedor; a precedência da migração é explícita. */
+    private fun assertMigratedValues(legacy: Map<String, String>) {
+        SettingsSecrets.LEGACY_MIGRATION_ORDER
+            .mapNotNull { name -> legacy[name]?.let { value -> migratedProvider(name)?.let { it to value } } }
+            .distinctBy { it.first }
+            .forEach { (provider, value) ->
+                assertEquals(value, vault().getApiKey(provider)?.value)
+                assertEquals(Credential.ApiKey(value), vault().get(provider))
+                assertEquals(Credential.ApiKey(value), vault().forAuthorization(provider))
+            }
+        legacy.filterKeys { migratedProvider(it) == null }.forEach { (name, value) ->
+            assertEquals(value, vault().getSecret(targetSecretKey(name)))
+        }
+    }
 
     // ── Gravação: nada em claro no arquivo do DataStore ──────────────────────
 
@@ -102,7 +190,7 @@ class SettingsSecretsStorageTest {
         val dataStore = dataStoreText()
         // Controle: o arquivo é o certo e a leitura dos bytes funciona — o que NÃO é segredo está lá em claro.
         assertTrue("o arquivo do DataStore deveria ter o host SSH em claro", dataStore.contains("host.claro.test"))
-        assertEquals(17, SettingsSecrets.BY_PROPERTY.size)
+        assertEquals(6, SettingsSecrets.BY_PROPERTY.size)
         for (property in SettingsSecrets.BY_PROPERTY.keys) {
             assertFalse("$property está em claro no DataStore", dataStore.contains(sentinel(property)))
         }
@@ -120,7 +208,7 @@ class SettingsSecretsStorageTest {
         assertEquals(saved, repository.settingsFlow().first())
         assertEquals(saved, newRepository().settingsFlow().first())
         for ((property, vaultKey) in SettingsSecrets.BY_PROPERTY) {
-            assertEquals(saved.property(property), vault().getString(vaultKey, null))
+            assertEquals(saved.property(property), vault().getSecret(targetSecretKey(vaultKey)))
         }
     }
 
@@ -129,12 +217,11 @@ class SettingsSecretsStorageTest {
         val repository = newRepository()
         repository.saveSettings(settingsWithSentinels())
 
-        repository.saveSettings(repository.settingsFlow().first().copy(providerGrokApiKey = "", computerSshKey = ""))
+        repository.saveSettings(repository.settingsFlow().first().copy(computerSshKey = ""))
 
         val read = repository.settingsFlow().first()
-        assertEquals("", read.providerGrokApiKey)
         assertEquals("", read.computerSshKey)
-        assertEquals(sentinel("providerGroqApiKey"), read.providerGroqApiKey) // os outros ficam
+        assertEquals(sentinel("computerSshPassword"), read.computerSshPassword)
     }
 
     // ── Migração de quem já gravou em claro ───────────────────────────────────
@@ -163,9 +250,9 @@ class SettingsSecretsStorageTest {
         val read = repository.settingsFlow().first()
 
         // A tela continua vendo os valores...
-        legacy.forEach { (name, value) -> assertEquals(value, read.property(propertyOf.getValue(name))) }
+        legacy.filterKeys { it in propertyOf }.forEach { (name, value) -> assertEquals(value, read.property(propertyOf.getValue(name))) }
         // ...que agora estão no cofre...
-        legacy.forEach { (name, value) -> assertEquals(value, vault().getString(name, null)) }
+        assertMigratedValues(legacy)
         // ...e saíram do arquivo em claro, sem levar junto o que não é segredo.
         val after = dataStoreText()
         legacy.forEach { (name, value) ->
@@ -179,7 +266,19 @@ class SettingsSecretsStorageTest {
         assertEquals(read, repository.settingsFlow().first())
         assertEquals(read, newRepository().settingsFlow().first())
         assertTrue(bytesAfter.contentEquals(dataStoreFile.readBytes()))
-        legacy.forEach { (name, value) -> assertEquals(value, vault().getString(name, null)) }
+        assertMigratedValues(legacy)
+    }
+
+    @Test
+    fun readingMovesTheOldSecurePrefsKeysToTheAuthVault() = runTest {
+        val repository = newRepository()
+        val old = "SENTINELA-SECURE-ANTHROPIC"
+        legacyVault().edit().putString(SettingsSecrets.PROVIDER_ANTHROPIC_API_KEY, old).commit()
+
+        repository.settingsFlow().first()
+
+        assertEquals(Credential.ApiKey(old), vault().get(ProviderIds.ANTHROPIC))
+        assertFalse(legacyVault().contains(SettingsSecrets.PROVIDER_ANTHROPIC_API_KEY))
     }
 
     @Test
@@ -193,20 +292,187 @@ class SettingsSecretsStorageTest {
         val names = raw.asMap().keys.map { it.name }
         legacy.keys.forEach { assertFalse("$it ficou no snapshot", it in names) }
         assertTrue("computer_ssh_host" in names)
-        legacy.forEach { (name, value) -> assertEquals(value, vault().getString(name, null)) }
+        assertMigratedValues(legacy)
     }
 
     @Test
     fun aValueAlreadyInTheVaultWinsOverTheOldOneAndTheOldOneStillLeavesTheFile() = runTest {
         val repository = newRepository()
         seedLegacyDataStore(repository)
-        vault().edit().putString(SettingsSecrets.PROVIDER_ANTHROPIC_API_KEY, "SENTINELA-NO-COFRE").commit()
+        vault().put(ProviderIds.ANTHROPIC, Credential.ApiKey("SENTINELA-NO-COFRE"))
 
         val read = repository.settingsFlow().first()
 
-        assertEquals("SENTINELA-NO-COFRE", read.providerAnthropicApiKey)
-        assertEquals("SENTINELA-NO-COFRE", vault().getString(SettingsSecrets.PROVIDER_ANTHROPIC_API_KEY, null))
+        assertEquals(Credential.ApiKey("SENTINELA-NO-COFRE"), vault().get(ProviderIds.ANTHROPIC))
         assertFalse(dataStoreText().contains("SENTINELA-ANTIGO-provider_anthropic_api_key"))
+    }
+
+    @Test
+    fun anOAuthAlreadyInTheVaultCoexistsWithTheLegacyApiKeyForThatProvider() = runTest {
+        val repository = newRepository()
+        seedLegacyDataStore(repository)
+        val existing = Credential.OAuth(
+            accessToken = "oauth-access",
+            refreshToken = "oauth-refresh",
+            expiresAtMs = Long.MAX_VALUE,
+            earliestRefreshAtMs = null,
+            scopes = emptySet(),
+            idToken = "oauth-id",
+            clientId = "oauth-client",
+            subject = "oauth-subject",
+            account = "oauth@example.test",
+        )
+        vault().put(ProviderIds.GOOGLE, existing)
+
+        repository.settingsFlow().first()
+
+        assertEquals(existing, vault().getOAuth(ProviderIds.GOOGLE))
+        assertEquals("SENTINELA-ANTIGO-provider_google_api_key", vault().getApiKey(ProviderIds.GOOGLE)?.value)
+        assertFalse(dataStoreText().contains("SENTINELA-ANTIGO-provider_google_api_key"))
+        assertFalse(dataStoreText().contains("SENTINELA-ANTIGO-vision_google_api_key"))
+        assertFalse(dataStoreText().contains("SENTINELA-ANTIGO-fala_google_api_key"))
+    }
+
+    @Test
+    fun aLegacyApiKeyIsAddedBesideAnExistingOAuthCredential() = runTest {
+        val repository = newRepository()
+        val existing = Credential.OAuth(
+            accessToken = "oauth-access",
+            refreshToken = "oauth-refresh",
+            expiresAtMs = Long.MAX_VALUE,
+            earliestRefreshAtMs = null,
+            scopes = emptySet(),
+            idToken = "oauth-id",
+            clientId = "oauth-client",
+            subject = "oauth-subject",
+            account = "oauth@example.test",
+        )
+        vault().put(ProviderIds.OPENAI, existing)
+        legacyVault().edit().putString(SettingsSecrets.OPENAI_TOKEN, "SENTINELA-LEGACY-OPENAI").commit()
+
+        repository.settingsFlow().first()
+
+        assertEquals(existing, vault().getOAuth(ProviderIds.OPENAI))
+        assertEquals("SENTINELA-LEGACY-OPENAI", vault().getApiKey(ProviderIds.OPENAI)?.value)
+        assertFalse(legacyVault().contains(SettingsSecrets.OPENAI_TOKEN))
+    }
+
+    @Test
+    fun oldCredOAuthIsNormalizedBeforeMigratingLegacyApiKey() = runTest {
+        val repository = newRepository()
+        val oauth = Credential.OAuth(
+            accessToken = "old-access",
+            refreshToken = "old-refresh",
+            expiresAtMs = 9_000_000,
+            earliestRefreshAtMs = null,
+            scopes = setOf("models:read"),
+            idToken = "old-id",
+            clientId = "client",
+            subject = "subject",
+            account = "old@example.test",
+        )
+        authVaultRaw().edit().putString("cred.openai", CredentialCodec.encode(oauth)).commit()
+        legacyVault().edit().putString(SettingsSecrets.OPENAI_TOKEN, "SENTINELA-LEGACY-OPENAI").commit()
+
+        repository.settingsFlow().first()
+
+        assertEquals(oauth, vault().getOAuth(ProviderIds.OPENAI))
+        assertEquals("SENTINELA-LEGACY-OPENAI", vault().getApiKey(ProviderIds.OPENAI)?.value)
+        assertEquals(oauth, vault().get(ProviderIds.OPENAI))
+        assertFalse(legacyVault().contains(SettingsSecrets.OPENAI_TOKEN))
+    }
+
+    @Test
+    fun missingAuthModesAreInferredOnceFromMigratedCredentialsAndRemainUsable() = runTest {
+        val repository = newRepository()
+        val oauth = Credential.OAuth(
+            accessToken = "oauth-access", refreshToken = "oauth-refresh", expiresAtMs = Long.MAX_VALUE,
+            earliestRefreshAtMs = null, scopes = setOf("openid"), idToken = "id", clientId = "client",
+            subject = "subject", account = "pessoa@exemplo.test",
+        )
+        vault().put(ProviderIds.ANTHROPIC, oauth)
+        vault().put(ProviderIds.GOOGLE, oauth)
+        repository.replaceRawPreferences(
+            mutablePreferencesOf(
+                stringPreferencesKey(SettingsSecrets.PROVIDER_OPENAI_API_KEY) to "sk-legada-teste",
+                stringPreferencesKey(SettingsSecrets.PROVIDER_GOOGLE_API_KEY) to "sk-google-teste",
+                stringPreferencesKey("reasoning_source") to ReasoningSource.OPENAI.name,
+                stringPreferencesKey("reasoning_openai_model") to "gpt-4o",
+            ),
+        )
+
+        val settings = repository.settingsFlow().first()
+
+        assertEquals("api_key", settings.providerOpenAiAuthMode)
+        assertEquals("subscription", settings.providerAnthropicAuthMode)
+        assertEquals("subscription", settings.providerGoogleAuthMode)
+        assertEquals(Credential.ApiKey("sk-legada-teste"), vault().get(ProviderIds.OPENAI))
+        assertEquals(Credential.ApiKey("sk-legada-teste"), vault().forAuthorization(ProviderIds.OPENAI))
+        assertEquals(oauth, vault().get(ProviderIds.ANTHROPIC))
+        assertEquals(oauth, vault().forAuthorization(ProviderIds.ANTHROPIC))
+        assertEquals(oauth, vault().get(ProviderIds.GOOGLE))
+        assertEquals(oauth, vault().forAuthorization(ProviderIds.GOOGLE))
+
+        val noOpEngine = object : ReasoningEngine {
+            override fun generate(request: ReasoningRequest) = emptyFlow<ReasoningEvent>()
+        }
+        val resolution = ReasoningEngines(
+            isModelInstalled = { false },
+            hasOpenAiCredential = { vault().forAuthorization(ProviderIds.OPENAI) != null },
+            local = { noOpEngine },
+            openAi = { noOpEngine },
+        ).resolve(settings)
+        assertTrue("a chave legada deve deixar o raciocínio conectado", resolution is ReasoningResolution.Ready)
+
+        vault().setAuthMode(ProviderIds.OPENAI, AuthMethod.OAUTH)
+        assertEquals("credencial por preferência com reserva", Credential.ApiKey("sk-legada-teste"), vault().get(ProviderIds.OPENAI))
+        vault().setAuthMode(ProviderIds.ANTHROPIC, AuthMethod.API_KEY)
+        assertEquals("credencial OAuth alternativa", oauth, vault().get(ProviderIds.ANTHROPIC))
+    }
+
+    @Test
+    fun readingSettingsDoesNotRewriteCredentialModesAfterMigration() = runTest {
+        val store = FailingCredentialStore()
+        store.put(ProviderIds.OPENAI, Credential.ApiKey("sk-teste"))
+        store.put(ProviderIds.ANTHROPIC, Credential.ApiKey("sk-teste"))
+        store.put(ProviderIds.GOOGLE, Credential.ApiKey("sk-teste"))
+        store.authModeWrites = 0
+        val repository = newRepository(store)
+
+        repository.settingsFlow().first()
+        repository.settingsFlow().first()
+
+        assertEquals("os três modos só são sincronizados uma vez", 3, store.authModeWrites)
+    }
+
+    @Test
+    fun theProviderCandidateWinsAcrossSecurePrefsAndDataStoreOrigins() = runTest {
+        val repository = newRepository()
+        legacyVault().edit().putString(SettingsSecrets.OPENAI_TOKEN, "SENTINELA-SECURE-TRANSCRIPTION").commit()
+        repository.replaceRawPreferences(
+            mutablePreferencesOf(stringPreferencesKey(SettingsSecrets.PROVIDER_OPENAI_API_KEY) to "SENTINELA-DATASTORE-PROVIDER"),
+        )
+
+        repository.settingsFlow().first()
+
+        assertEquals(Credential.ApiKey("SENTINELA-DATASTORE-PROVIDER"), vault().get(ProviderIds.OPENAI))
+        assertFalse(legacyVault().contains(SettingsSecrets.OPENAI_TOKEN))
+        assertFalse(dataStoreText().contains(SettingsSecrets.PROVIDER_OPENAI_API_KEY))
+        assertFalse(dataStoreText().contains("SENTINELA-SECURE-TRANSCRIPTION"))
+    }
+
+    @Test
+    fun everyLegacyProviderCollisionUsesProviderThenTranscriptionThenVisionThenFala() = runTest {
+        val repository = newRepository()
+        val legacy = seedLegacyDataStore(repository)
+
+        repository.settingsFlow().first()
+
+        assertMigratedValues(legacy)
+        assertEquals(Credential.ApiKey("SENTINELA-ANTIGO-provider_openai_api_key"), vault().get(ProviderIds.OPENAI))
+        assertEquals(Credential.ApiKey("SENTINELA-ANTIGO-provider_groq_api_key"), vault().get(ProviderIds.GROQ))
+        assertEquals(Credential.ApiKey("SENTINELA-ANTIGO-provider_google_api_key"), vault().get(ProviderIds.GOOGLE))
+        assertEquals(Credential.ApiKey("SENTINELA-ANTIGO-provider_anthropic_api_key"), vault().get(ProviderIds.ANTHROPIC))
     }
 
     @Test
@@ -215,13 +481,64 @@ class SettingsSecretsStorageTest {
         seedLegacyDataStore(repository)
 
         // A gravação é a verdade do usuário: vale o que ela traz, e as cópias antigas em claro não sobram.
-        repository.saveSettings(Settings(providerGroqApiKey = "SENTINELA-NOVA"))
+        repository.saveSecret(SettingsCredentialKeys.PROVIDER_GROQ_API_KEY, "SENTINELA-NOVA")
 
         val after = dataStoreText()
         SettingsSecrets.LEGACY_IN_DATASTORE.forEach {
             assertFalse("${it.name} ainda está no DataStore", after.contains(it.name) || after.contains("SENTINELA-ANTIGO-${it.name}"))
         }
-        assertEquals("SENTINELA-NOVA", vault().getString(SettingsSecrets.PROVIDER_GROQ_API_KEY, null))
-        assertEquals("SENTINELA-NOVA", newRepository().settingsFlow().first().providerGroqApiKey)
+        assertEquals("SENTINELA-NOVA", vault().getApiKey(ProviderIds.GROQ)?.value)
+        newRepository().settingsFlow().first()
+        assertEquals("SENTINELA-NOVA", vault().getApiKey(ProviderIds.GROQ)?.value)
+    }
+
+    @Test
+    fun twoRepositoriesSerializeTheSameMigration() = runTest {
+        val first = newRepository()
+        val second = newRepository()
+        seedLegacyDataStore(first)
+
+        listOf(
+            async { first.settingsFlow().first() },
+            async { second.settingsFlow().first() },
+        ).awaitAll()
+
+        SettingsSecrets.LEGACY_IN_DATASTORE.forEach { key ->
+            assertFalse("${key.name} ainda está no DataStore", dataStoreText().contains(key.name))
+        }
+        assertEquals(
+            "SENTINELA-ANTIGO-provider_openai_api_key",
+            vault().getApiKey(ProviderIds.OPENAI)?.value,
+        )
+        assertMigratedValues(SettingsSecrets.LEGACY_IN_DATASTORE.associate { it.name to "SENTINELA-ANTIGO-${it.name}" })
+    }
+
+    @Test
+    fun aFailureMidMigrationLeavesEverySourceUntilTheNextRead() = runTest {
+        val target = FailingCredentialStore().apply { writesBeforeFailure = 1 }
+        val repository = newRepository(target)
+        val legacy = seedLegacyDataStore(repository)
+
+        repository.settingsFlow().first()
+
+        // A primeira escrita chegou ao destino, mas a segunda falhou: nada da origem pode ter sido apagado.
+        assertEquals(legacy.getValue(SettingsSecrets.PROVIDER_ANTHROPIC_API_KEY), target.get(ProviderIds.ANTHROPIC)?.let { (it as Credential.ApiKey).value })
+        assertTrue(dataStoreText().contains(legacy.getValue(SettingsSecrets.PROVIDER_OPENAI_API_KEY)))
+        assertTrue(dataStoreText().contains(legacy.getValue(SettingsSecrets.OPENAI_TOKEN)))
+
+        target.writesBeforeFailure = null
+        repository.settingsFlow().first()
+
+        legacy.forEach { (name, value) ->
+            assertFalse("$name ainda está no DataStore", dataStoreText().contains(name) || dataStoreText().contains(value))
+        }
+        assertEquals(
+            legacy.getValue(SettingsSecrets.PROVIDER_OPENAI_API_KEY),
+            (target.get(ProviderIds.OPENAI) as Credential.ApiKey).value,
+        )
+        assertEquals(
+            legacy.getValue(SettingsSecrets.PROVIDER_GROQ_API_KEY),
+            (target.get(ProviderIds.GROQ) as Credential.ApiKey).value,
+        )
     }
 }

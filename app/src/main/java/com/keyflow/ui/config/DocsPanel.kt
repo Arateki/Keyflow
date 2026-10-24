@@ -50,6 +50,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.keyflow.BuildConfig
+import com.keyflow.ads.AdsController
+import com.keyflow.ads.BannerSlot
 import com.keyflow.core.RecordingMode
 import com.keyflow.ui.common.verticalScrollbar
 import com.keyflow.ui.theme.LocalKeyFlowPalette
@@ -442,6 +444,9 @@ fun DocsPanel(
     // Chegando do "?" do cabeçalho ("Ver na Docs"): rola até esta seção assim que ela tiver posição.
     focusSectionId: String? = null,
     focusKey: Int = 0,
+    adsController: AdsController? = null,
+    adsOff: Boolean = false,
+    entitlementsLoaded: Boolean = true,
 ) {
     val palette = LocalKeyFlowPalette.current
     val context = LocalContext.current
@@ -510,6 +515,7 @@ fun DocsPanel(
                 }
             }
         }
+        adsController?.let { BannerSlot(it, adsOff = adsOff, entitlementsLoaded = entitlementsLoaded) }
     }
 }
 

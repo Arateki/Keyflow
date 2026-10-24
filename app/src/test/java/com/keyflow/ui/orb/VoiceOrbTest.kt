@@ -109,6 +109,13 @@ class VoiceOrbTest {
     }
 
     @Test
+    fun `revoked paid orb skin resolves to Atelie without changing saved id`() {
+        assertThat(orbStyleFor("aero", skinsUnlocked = false)).isEqualTo(OrbStyle.ATELIE)
+        assertThat(orbStyleFor("aero", skinsUnlocked = true)).isEqualTo(OrbStyle.AERO)
+        assertThat(orbStyleFor("aero")).isEqualTo(OrbStyle.AERO)
+    }
+
+    @Test
     fun `glitch is a paid orb style that orbStyleFor finds by id`() {
         assertThat(orbStyleFor("glitch")).isEqualTo(OrbStyle.GLITCH)
         assertThat(OrbStyle.GLITCH.paid).isTrue()

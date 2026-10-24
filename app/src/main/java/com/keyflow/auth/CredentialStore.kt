@@ -16,6 +16,22 @@ import org.json.JSONObject
  */
 interface CredentialStore {
     fun get(provider: ProviderId): Credential?
+
+    /** Copia `cred.*` para o slot tipado sem trocar a seleção ativa. */
+    fun migrateLegacyActiveCredentials() = Unit
+
+    /** Migra uma chave antiga sem substituir um OAuth ativo em `cred.*`. */
+    fun putMigratedApiKey(provider: ProviderId, credential: Credential.ApiKey) = put(provider, credential)
+
+    /** Modo escolhido em Settings; null mantém a seleção legada de `cred.*`. */
+    fun setAuthMode(provider: ProviderId, method: AuthMethod?) = Unit
+
+    /** A chave de API, mesmo quando um OAuth é a credencial ativa em [get]. */
+    fun getApiKey(provider: ProviderId): Credential.ApiKey? = get(provider) as? Credential.ApiKey
+
+    /** A sessão OAuth, mesmo quando uma chave de API é a credencial ativa em [get]. */
+    fun getOAuth(provider: ProviderId): Credential.OAuth? = get(provider) as? Credential.OAuth
+
     fun put(provider: ProviderId, credential: Credential)
     fun clear(provider: ProviderId)
 
@@ -23,8 +39,19 @@ interface CredentialStore {
     fun changes(provider: ProviderId): Flow<Credential?>
     fun meta(provider: ProviderId, key: String): String?
     fun putMeta(provider: ProviderId, key: String, value: String)
+    /** Segredos de capacidades que não têm login OAuth; continuam no mesmo cofre cifrado. */
+    fun getSecret(key: String): String? = null
+    fun putSecret(key: String, value: String) = Unit
+    fun clearSecret(key: String) = Unit
+    fun secretChanges(key: String): Flow<String?> = callbackFlow {
+        trySend(getSecret(key))
+        awaitClose()
+    }
     fun clearOAuth(provider: ProviderId) = clear(provider)
     fun clearApiKey(provider: ProviderId) = clear(provider)
+
+    /** Credencial escolhida pelo modo ativo; o formato antigo é normalizado antes da migração de chaves. */
+    fun forAuthorization(provider: ProviderId): Credential? = get(provider)
 }
 
 /** O formato em que a credencial vai para o cofre. Lixo (ou formato desconhecido) lê como `null`, nunca como erro. */
@@ -89,57 +116,124 @@ class SecureCredentialStore(
     keyAlias: String = KEY_ALIAS,
 ) : CredentialStore {
 
-    private val prefs: SharedPreferences = SecurePrefs.create(context.applicationContext, prefsName, keyAlias)
+    private val appContext = context.applicationContext
+    private val prefs: SharedPreferences = SecurePrefs.create(appContext, prefsName, keyAlias)
 
-    override fun get(provider: ProviderId): Credential? =
-        prefs.getString(credKey(provider), null)?.let(CredentialCodec::decode)
-            ?: prefs.getString(oauthKey(provider), null)?.let(CredentialCodec::decode)
-            ?: prefs.getString(apiKeyKey(provider), null)?.let(CredentialCodec::decode)
+    private fun decode(key: String): Credential? = prefs.getString(key, null)?.let(CredentialCodec::decode)
+
+    private fun getUnlocked(provider: ProviderId): Credential? {
+        val apiKey = decode(apiKeyKey(provider)) as? Credential.ApiKey
+        val oauth = decode(oauthKey(provider)) as? Credential.OAuth
+        val legacy = decode(credKey(provider))
+        return when (prefs.getString(authModeKey(provider), null)) {
+            AuthMethod.OAUTH.name -> oauth ?: apiKey ?: legacy
+            AuthMethod.API_KEY.name -> apiKey ?: oauth ?: legacy
+            else -> legacy ?: oauth ?: apiKey
+        }
+    }
+
+    override fun get(provider: ProviderId): Credential? = getUnlocked(provider)
+
+    override fun getApiKey(provider: ProviderId): Credential.ApiKey? =
+        (decode(apiKeyKey(provider)) as? Credential.ApiKey)
+            ?: (decode(credKey(provider)) as? Credential.ApiKey)
+
+    override fun getOAuth(provider: ProviderId): Credential.OAuth? =
+        (decode(oauthKey(provider)) as? Credential.OAuth)
+            ?: (decode(credKey(provider)) as? Credential.OAuth)
 
     override fun put(provider: ProviderId, credential: Credential) {
-        val editor = prefs.edit()
-        when (credential) {
-            is Credential.OAuth -> editor.putString(oauthKey(provider), CredentialCodec.encode(credential))
-            is Credential.ApiKey -> editor.putString(apiKeyKey(provider), CredentialCodec.encode(credential))
+        CredentialVaultLock.withLock(appContext) {
+            val editor = prefs.edit()
+            when (credential) {
+                is Credential.OAuth -> editor.putString(oauthKey(provider), CredentialCodec.encode(credential))
+                is Credential.ApiKey -> editor.putString(apiKeyKey(provider), CredentialCodec.encode(credential))
+            }
+            editor.putString(credKey(provider), CredentialCodec.encode(credential))
+            check(editor.commit()) { "não consegui gravar a credencial" }
         }
-        editor.putString(credKey(provider), CredentialCodec.encode(credential))
-        check(editor.commit()) { "não consegui gravar a credencial" }
+    }
+
+    override fun putMigratedApiKey(provider: ProviderId, credential: Credential.ApiKey) {
+        CredentialVaultLock.withLock(appContext) {
+            val encoded = CredentialCodec.encode(credential)
+            val editor = prefs.edit().putString(apiKeyKey(provider), encoded)
+            if (decode(credKey(provider)) !is Credential.OAuth) editor.putString(credKey(provider), encoded)
+            check(editor.commit()) { "não consegui migrar a chave de API" }
+        }
+    }
+
+    override fun migrateLegacyActiveCredentials() {
+        CredentialVaultLock.withLock(appContext) {
+            ProviderIds.all.forEach { provider ->
+                when (val active = decode(credKey(provider))) {
+                    is Credential.ApiKey -> if (decode(apiKeyKey(provider)) !is Credential.ApiKey) {
+                        check(prefs.edit().putString(apiKeyKey(provider), CredentialCodec.encode(active)).commit()) {
+                            "não consegui normalizar a chave de API antiga"
+                        }
+                    }
+                    is Credential.OAuth -> if (decode(oauthKey(provider)) !is Credential.OAuth) {
+                        check(prefs.edit().putString(oauthKey(provider), CredentialCodec.encode(active)).commit()) {
+                            "não consegui normalizar a sessão antiga"
+                        }
+                    }
+                    null -> Unit
+                }
+            }
+        }
+    }
+
+    override fun setAuthMode(provider: ProviderId, method: AuthMethod?) {
+        CredentialVaultLock.withLock(appContext) {
+            if (prefs.getString(authModeKey(provider), null) == method?.name) return@withLock
+            val editor = prefs.edit()
+            if (method == null) editor.remove(authModeKey(provider)) else editor.putString(authModeKey(provider), method.name)
+            check(editor.commit()) { "não consegui salvar o modo de autenticação" }
+        }
     }
 
     override fun clear(provider: ProviderId) {
-        check(prefs.edit()
-            .remove(credKey(provider))
-            .remove(oauthKey(provider))
-            .remove(apiKeyKey(provider))
-            .commit()
-        ) { "não consegui apagar a credencial" }
+        CredentialVaultLock.withLock(appContext) {
+            check(prefs.edit()
+                .remove(credKey(provider))
+                .remove(oauthKey(provider))
+                .remove(apiKeyKey(provider))
+                .commit()
+            ) { "não consegui apagar a credencial" }
+        }
     }
 
     override fun clearOAuth(provider: ProviderId) {
-        val editor = prefs.edit().remove(oauthKey(provider))
-        val existingApiKey = prefs.getString(apiKeyKey(provider), null)
-        if (existingApiKey != null) {
-            editor.putString(credKey(provider), existingApiKey)
-        } else {
-            editor.remove(credKey(provider))
+        CredentialVaultLock.withLock(appContext) {
+            val editor = prefs.edit().remove(oauthKey(provider))
+            val existingApiKey = getApiKey(provider)
+            if (existingApiKey != null) {
+                val encoded = CredentialCodec.encode(existingApiKey)
+                editor.putString(apiKeyKey(provider), encoded).putString(credKey(provider), encoded)
+            } else {
+                editor.remove(credKey(provider))
+            }
+            check(editor.commit()) { "não consegui apagar a credencial de assinatura" }
         }
-        check(editor.commit()) { "não consegui apagar a credencial de assinatura" }
     }
 
     override fun clearApiKey(provider: ProviderId) {
-        val editor = prefs.edit().remove(apiKeyKey(provider))
-        val existingOAuth = prefs.getString(oauthKey(provider), null)
-        if (existingOAuth != null) {
-            editor.putString(credKey(provider), existingOAuth)
-        } else {
-            editor.remove(credKey(provider))
+        CredentialVaultLock.withLock(appContext) {
+            val editor = prefs.edit().remove(apiKeyKey(provider))
+            val existingOAuth = getOAuth(provider)
+            if (existingOAuth != null) {
+                val encoded = CredentialCodec.encode(existingOAuth)
+                editor.putString(oauthKey(provider), encoded).putString(credKey(provider), encoded)
+            } else {
+                editor.remove(credKey(provider))
+            }
+            check(editor.commit()) { "não consegui apagar a chave de API" }
         }
-        check(editor.commit()) { "não consegui apagar a chave de API" }
     }
 
     override fun changes(provider: ProviderId): Flow<Credential?> = callbackFlow {
-        val key = credKey(provider)
-        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, changed -> if (changed == key || changed == null) trySend(get(provider)) }
+        val keys = setOf(credKey(provider), oauthKey(provider), apiKeyKey(provider), authModeKey(provider))
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, changed -> if (changed in keys || changed == null) trySend(get(provider)) }
         prefs.registerOnSharedPreferenceChangeListener(listener)
         trySend(get(provider))
         awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
@@ -148,13 +242,41 @@ class SecureCredentialStore(
     override fun meta(provider: ProviderId, key: String): String? = prefs.getString(metaKey(provider, key), null)
 
     override fun putMeta(provider: ProviderId, key: String, value: String) {
-        check(prefs.edit().putString(metaKey(provider, key), value).commit()) { "não consegui gravar o dado do provedor" }
+        CredentialVaultLock.withLock(appContext) {
+            check(prefs.edit().putString(metaKey(provider, key), value).commit()) { "não consegui gravar o dado do provedor" }
+        }
     }
+
+    override fun getSecret(key: String): String? = prefs.getString(secretKey(key), null)
+
+    override fun putSecret(key: String, value: String) {
+        CredentialVaultLock.withLock(appContext) {
+            check(prefs.edit().putString(secretKey(key), value).commit()) { "não consegui gravar o segredo" }
+        }
+    }
+
+    override fun clearSecret(key: String) {
+        CredentialVaultLock.withLock(appContext) {
+            check(prefs.edit().remove(secretKey(key)).commit()) { "não consegui apagar o segredo" }
+        }
+    }
+
+    override fun secretChanges(key: String): Flow<String?> = callbackFlow {
+        val preferenceKey = secretKey(key)
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, changed ->
+            if (changed == preferenceKey || changed == null) trySend(getSecret(key))
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        trySend(getSecret(key))
+        awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }.distinctUntilChanged()
 
     private fun credKey(provider: ProviderId) = "cred.${provider.value}"
     private fun oauthKey(provider: ProviderId) = "oauth.${provider.value}"
     private fun apiKeyKey(provider: ProviderId) = "apikey.${provider.value}"
     private fun metaKey(provider: ProviderId, key: String) = "meta.${provider.value}.$key"
+    private fun secretKey(key: String) = "settings.$key"
+    private fun authModeKey(provider: ProviderId) = "mode.${provider.value}"
 
     companion object {
         const val PREFS_NAME = "keyflow_auth"

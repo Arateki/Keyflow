@@ -8,6 +8,8 @@ import com.keyflow.auth.fake.FakeOAuthFlow
 import com.keyflow.auth.fake.oauth
 import java.net.URI
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.currentTime
@@ -25,7 +27,51 @@ class AuthControllerTest {
     private val oauthFlow = FakeOAuthFlow()
     private val keyFlow = FakeApiKeyFlow()
 
+    private class DualCredentialStore : CredentialStore {
+        private var active: Credential? = null
+        private var apiKey: Credential.ApiKey? = null
+        private var oauth: Credential.OAuth? = null
+        private val current = MutableStateFlow<Credential?>(null)
+
+        override fun get(provider: ProviderId): Credential? = active
+        override fun getApiKey(provider: ProviderId): Credential.ApiKey? = apiKey
+        override fun getOAuth(provider: ProviderId): Credential.OAuth? = oauth
+
+        override fun put(provider: ProviderId, credential: Credential) {
+            when (credential) {
+                is Credential.ApiKey -> apiKey = credential
+                is Credential.OAuth -> oauth = credential
+            }
+            active = credential
+            current.value = active
+        }
+
+        override fun clear(provider: ProviderId) {
+            active = null
+            apiKey = null
+            oauth = null
+            current.value = null
+        }
+
+        override fun clearOAuth(provider: ProviderId) {
+            oauth = null
+            if (active is Credential.OAuth) active = apiKey
+            current.value = active
+        }
+
+        override fun clearApiKey(provider: ProviderId) {
+            apiKey = null
+            if (active is Credential.ApiKey) active = oauth
+            current.value = active
+        }
+
+        override fun changes(provider: ProviderId): Flow<Credential?> = current
+        override fun meta(provider: ProviderId, key: String): String? = null
+        override fun putMeta(provider: ProviderId, key: String, value: String) = Unit
+    }
+
     private fun TestScope.controller(
+        store: CredentialStore = this@AuthControllerTest.store,
         planUsage: (Credential.OAuth) -> Boolean = { true },
         flows: List<AuthFlow> = listOf(keyFlow, oauthFlow),
     ) = AuthController(
@@ -47,6 +93,7 @@ class AuthControllerTest {
     fun `saving an api key stores it and reads as connected by key`() = runTest {
         val c = controller()
         c.saveApiKey(provider, "  sk-teste  ")
+        runCurrent()
         assertThat(store.get(provider)).isEqualTo(Credential.ApiKey("sk-teste")) // sem os espaços do colar
         assertThat(c.current()).isEqualTo(ConnectionState.Connected(account = null, method = AuthMethod.API_KEY))
     }
@@ -104,9 +151,11 @@ class AuthControllerTest {
     fun `a pasted key keeps only printable ascii`() = runTest {
         val c = controller()
         c.saveApiKey(provider, "  sk-abc\u200B-123\n456\t ")
+        runCurrent()
         assertThat(store.get(provider)).isEqualTo(Credential.ApiKey("sk-abc-123456"))
 
         c.saveApiKey(provider, "\u200B \n")
+        runCurrent()
         assertThat(store.get(provider)).isNull() // só lixo invisível = em branco = apagar
     }
 
@@ -126,7 +175,8 @@ class AuthControllerTest {
         val c = controller()
         assertThat(c.apiKey(provider)).isNull()
         c.saveApiKey(provider, "sk-teste")
-        assertThat(c.apiKey(provider)).isEqualTo("sk-teste")
+        runCurrent()
+        assertThat(c.apiKey(provider)).isEqualTo("••••este")
         store.put(provider, oauth())
         assertThat(c.apiKey(provider)).isNull() // um login não devolve token nenhum
     }
@@ -208,6 +258,39 @@ class AuthControllerTest {
         assertThat(oauthFlow.revoked).hasSize(1)
         assertThat(store.get(provider)).isNull()
         assertThat(c.current()).isEqualTo(ConnectionState.Disconnected)
+    }
+
+    @Test
+    fun `disconnecting the active oauth only clears oauth and leaves the api key`() = runTest {
+        val dual = DualCredentialStore()
+        dual.put(provider, Credential.ApiKey("sk-preserved"))
+        dual.put(provider, oauth())
+        val c = controller(store = dual)
+
+        c.disconnect(provider)
+        runCurrent()
+
+        assertThat(dual.getOAuth(provider)).isNull()
+        assertThat(dual.getApiKey(provider)).isEqualTo(Credential.ApiKey("sk-preserved"))
+        assertThat(oauthFlow.revoked).containsExactly(oauth())
+        assertThat(keyFlow.revoked).isEmpty()
+    }
+
+    @Test
+    fun `disconnecting the active api key only clears the key and leaves oauth`() = runTest {
+        val dual = DualCredentialStore()
+        val login = oauth()
+        dual.put(provider, login)
+        dual.put(provider, Credential.ApiKey("sk-to-delete"))
+        val c = controller(store = dual)
+
+        c.disconnect(provider)
+        runCurrent()
+
+        assertThat(dual.getApiKey(provider)).isNull()
+        assertThat(dual.getOAuth(provider)).isEqualTo(login)
+        assertThat(keyFlow.revoked).containsExactly(Credential.ApiKey("sk-to-delete"))
+        assertThat(oauthFlow.revoked).isEmpty()
     }
 
     @Test

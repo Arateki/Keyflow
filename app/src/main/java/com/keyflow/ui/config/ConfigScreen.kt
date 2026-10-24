@@ -1,6 +1,9 @@
 package com.keyflow.ui.config
 
 import com.keyflow.i18n.tr
+import android.app.Activity
+import com.keyflow.ads.AdsController
+import com.keyflow.ads.InterstitialPolicy
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -80,6 +83,8 @@ const val TAB_HELP_CLOSE_TAG = "tab-help-close"
 const val TAB_HELP_DOCS_TAG = "tab-help-docs"
 const val TOGGLE_OVERLAY_MODE_TAG = "toggle-overlay-mode"
 const val TOGGLE_KEYBOARD_MODE_TAG = "toggle-keyboard-mode"
+const val REMOTE_UPDATE_WARNING_TAG = "remote-update-warning"
+const val REMOTE_KILL_SWITCH_TAG = "remote-kill-switch"
 
 // Atraso entre o toast de "permissões pendentes" subir e a tela/diálogo da permissão abrir sozinha —
 // só o suficiente pro usuário ler o aviso antes da navegação tomar a tela. `internal`: o teste avança o
@@ -139,10 +144,25 @@ fun ConfigScreen(
     reasoningAuth: AuthActions = AuthActions.None,
     reasoningAnthropicAuth: AuthActions = AuthActions.None,
     reasoningGoogleAuth: AuthActions = AuthActions.None,
+    transcriptionOpenAiAuth: AuthActions = AuthActions.None,
+    transcriptionGroqAuth: AuthActions = AuthActions.None,
+    falaElevenLabsAuth: AuthActions = AuthActions.None,
     initialReasoningTest: TestState = TestState(),
     reasoningLocalSupported: Boolean = true,
     // O agente com ferramentas da aba KeyFlow (agent-harness); `null` = o chat de texto de sempre.
     agent: com.keyflow.agenthost.AgentRuntime? = null,
+    // Entitlements da compra única. Nulos/false mantêm as telas de galeria e testes sem Billing.
+    skinsUnlocked: Boolean = false,
+    onUnlockPurchase: () -> Unit = {},
+    unlockPurchaseState: UnlockPurchaseState = UnlockPurchaseState.IDLE,
+    adsController: AdsController? = null,
+    adsOff: Boolean = false,
+    entitlementsLoaded: Boolean = true,
+    remoteConfigLoaded: Boolean = true,
+    showUpdateWarning: Boolean = false,
+    monetizationDisabled: Boolean = false,
+    interstitialPolicy: InterstitialPolicy? = null,
+    onInterstitialPolicyChanged: () -> Unit = {},
 ) {
     val palette = LocalKeyFlowPalette.current
     var activeTab by rememberSaveable { mutableStateOf(initialTab) }
@@ -155,6 +175,13 @@ fun ConfigScreen(
     var docsFocusKey by remember { mutableStateOf(0) }
     // Atalho da orbe com o bottom sheet aberto (2 ou 3 toques); null = fechado.
     var shortcutSheetTaps by remember { mutableStateOf<Int?>(null) }
+
+    LaunchedEffect(skinsUnlocked) {
+        if (skinsUnlocked) unlockOpen = false
+    }
+    LaunchedEffect(monetizationDisabled) {
+        if (monetizationDisabled) unlockOpen = false
+    }
 
     // A aba de um modo só fica "liberada" com o modo ligado E tudo pronto: permissões concedidas (mic +
     // a específica) e, para o Teclado, o KeyFlow sendo o teclado ativo. Sem isso o cartão do modo segue
@@ -183,6 +210,15 @@ fun ConfigScreen(
     // Realce do seletor de Modo de gravação (aviso do atalho de 1 toque → leva à subárea responsável).
     var recordingModeHighlightKey by remember { mutableStateOf(0) }
     val hapticContext = LocalContext.current
+    val configActivity = LocalContext.current as? Activity
+    val adsEntitlementsLoaded = entitlementsLoaded && remoteConfigLoaded
+    val adsSuppressed = !adsEntitlementsLoaded || adsOff || monetizationDisabled
+    LaunchedEffect(adsController, adsSuppressed, adsEntitlementsLoaded) {
+        val controller = adsController ?: return@LaunchedEffect
+        controller.initializeIfNeeded(configActivity, adsSuppressed, adsEntitlementsLoaded) {
+            controller.preloadInterstitial(configActivity, adsSuppressed, adsEntitlementsLoaded)
+        }
+    }
     LaunchedEffect(toastGeneration) {
         if (toastMessage != null) {
             kotlinx.coroutines.delay(toastDuration)
@@ -212,14 +248,32 @@ fun ConfigScreen(
         pendingPermissionGeneration++
     }
 
+    fun recordSettingsChange(updated: Settings) {
+        interstitialPolicy?.recordInteraction()
+        onSettingsChange(updated)
+    }
+
+    fun selectTab(tab: ConfigTab) {
+        if (tab == activeTab) return
+        activeTab = tab
+        val policy = interstitialPolicy
+        if (policy?.shouldShow(tabSwitch = true) == true &&
+            adsController?.showInterstitial(configActivity, adsSuppressed, adsEntitlementsLoaded) == true
+        ) {
+            policy.markShown()
+            onInterstitialPolicyChanged()
+        }
+        adsController?.preloadInterstitial(configActivity, adsSuppressed, adsEntitlementsLoaded)
+    }
+
     // Navegação do aviso → aba da interface, no topo, destacando o cartão do modo que resolve o bloqueio.
     // Null = sem atalho.
     fun navActionFor(tab: ConfigTab): (() -> Unit)? = when (tab) {
         ConfigTab.OVERLAY -> {
-            { activeTab = ConfigTab.OVERLAY; overlayHighlightKey++ }
+            { selectTab(ConfigTab.OVERLAY); overlayHighlightKey++ }
         }
         ConfigTab.TECLADO -> {
-            { activeTab = ConfigTab.TECLADO; keyboardHighlightKey++ }
+            { selectTab(ConfigTab.TECLADO); keyboardHighlightKey++ }
         }
         else -> null
     }
@@ -227,7 +281,7 @@ fun ConfigScreen(
     // Navegação externa (clique no erro → Transcrição, ou falta de microfone → aba da interface que avisou,
     // já no cartão do modo). A chave dispara mesmo repetindo a mesma aba.
     LaunchedEffect(requestedTabKey) {
-        if (requestedTabKey > 0) requestedTab?.let { tab -> navActionFor(tab)?.invoke() ?: run { activeTab = tab } }
+        if (requestedTabKey > 0) requestedTab?.let { tab -> navActionFor(tab)?.invoke() ?: selectTab(tab) }
     }
 
     // Aviso de opção que depende do Modo Sobrepor: clicar leva à aba Sobrepor e destaca o cartão do modo.
@@ -290,6 +344,14 @@ fun ConfigScreen(
                 rotationStep = rotationStep,
                 onRotationClick = onRotationClick,
             )
+            if (showUpdateWarning) RemoteNotice(
+                text = tr("Há uma atualização do KeyFlow disponível."),
+                tag = REMOTE_UPDATE_WARNING_TAG,
+            )
+            if (monetizationDisabled) RemoteNotice(
+                text = tr("A monetização está temporariamente indisponível."),
+                tag = REMOTE_KILL_SWITCH_TAG,
+            )
             Box(Modifier.fillMaxSize()) {
             // A barra lateral recolhida ocupa uma faixa fixa à esquerda; aberta, desenha por cima do
             // painel (mais abaixo, fora desta Row) sem mudar a largura dele.
@@ -302,7 +364,7 @@ fun ConfigScreen(
                 // As prévias das abas (tour da orbe nos cartões) seguem a skin da orbe escolhida na aba
                 // Sobrepor, como a orbe de verdade; o orbe do cabeçalho é a marca do app e fica como está.
                 androidx.compose.runtime.CompositionLocalProvider(
-                    com.keyflow.ui.orb.LocalOrbStyle provides com.keyflow.ui.orb.orbStyleFor(settings.orbSkin),
+                    com.keyflow.ui.orb.LocalOrbStyle provides com.keyflow.ui.orb.orbStyleFor(settings.orbSkin, skinsUnlocked),
                     com.keyflow.ui.orb.LocalOrbPack provides com.keyflow.ui.orb.rememberOrbPack(settings.orbSkin),
                 ) {
                 Column(
@@ -318,20 +380,26 @@ fun ConfigScreen(
                     when (activeTab) {
                         ConfigTab.KEYFLOW -> KeyflowPanel(
                             settings = settings,
-                            onSettingsChange = onSettingsChange,
+                            onSettingsChange = ::recordSettingsChange,
                             resolve = resolveReasoning,
                             agent = agent,
                         )
                         ConfigTab.VOZ -> VozPanel(
                             settings = settings,
-                            onSettingsChange = onSettingsChange,
+                            onSettingsChange = ::recordSettingsChange,
                             localModels = localModels,
                             localActions = localActions,
+                            openAiAuth = transcriptionOpenAiAuth,
+                            groqAuth = transcriptionGroqAuth,
                         )
                         ConfigTab.TECLADO -> TecladoPanel(
                             settings = settings,
-                            onSettingsChange = onSettingsChange,
-                            onUnlockSkins = { unlockOpen = true },
+                            onSettingsChange = ::recordSettingsChange,
+                            onUnlockSkins = { if (!monetizationDisabled) unlockOpen = true },
+                            skinsUnlocked = skinsUnlocked,
+                            adsController = adsController,
+                            adsOff = adsSuppressed,
+                            entitlementsLoaded = adsEntitlementsLoaded,
                             onOverlayRequired = onOverlayRequired,
                             barsConfig = barsConfig,
                             onBarsConfigChange = onBarsConfigChange,
@@ -354,8 +422,12 @@ fun ConfigScreen(
                         )
                         ConfigTab.OVERLAY -> OverlayPanel(
                             settings = settings,
-                            onSettingsChange = onSettingsChange,
-                            onUnlockSkins = { unlockOpen = true },
+                            onSettingsChange = ::recordSettingsChange,
+                            onUnlockSkins = { if (!monetizationDisabled) unlockOpen = true },
+                            skinsUnlocked = skinsUnlocked,
+                            adsController = adsController,
+                            adsOff = adsSuppressed,
+                            entitlementsLoaded = adsEntitlementsLoaded,
                             onOpenShortcutSheet = { shortcutSheetTaps = it },
                             onShortcut1Blocked = {
                                 showToast(
@@ -383,7 +455,7 @@ fun ConfigScreen(
                         )
                         ConfigTab.RACIOCINIO -> ReasoningPanel(
                             settings = settings,
-                            onSettingsChange = onSettingsChange,
+                            onSettingsChange = ::recordSettingsChange,
                             models = reasoningModels,
                             actions = localActions,
                             resolve = resolveReasoning,
@@ -398,7 +470,13 @@ fun ConfigScreen(
                         ConfigTab.FLUXOS,
                         ConfigTab.COMPUTADOR,
                         ConfigTab.NOTIFICACAO -> ComingSoonPanel()
-                        ConfigTab.DOCS -> DocsPanel(focusSectionId = docsFocusSection, focusKey = docsFocusKey)
+                        ConfigTab.DOCS -> DocsPanel(
+                            focusSectionId = docsFocusSection,
+                            focusKey = docsFocusKey,
+                            adsController = adsController,
+                            adsOff = adsSuppressed,
+                            entitlementsLoaded = adsEntitlementsLoaded,
+                        )
                     }
                 }
                 }
@@ -409,7 +487,7 @@ fun ConfigScreen(
                 active = activeTab,
                 // Nenhuma aba fica esmaecida no menu: a de uma interface desligada é justamente onde ligá-la.
                 enabled = { true },
-                onSelect = { tab -> activeTab = tab },
+                onSelect = ::selectTab,
                 expanded = railExpanded,
                 onExpandedChange = { railExpanded = it },
             )
@@ -429,7 +507,7 @@ fun ConfigScreen(
                     tag = TAB_HELP_DOCS_TAG,
                     onClick = {
                         tabHelpOpen = false
-                        activeTab = ConfigTab.DOCS
+                        selectTab(ConfigTab.DOCS)
                         docsFocusSection = helpSection.id
                         docsFocusKey++
                     },
@@ -452,16 +530,21 @@ fun ConfigScreen(
             },
             modifier = Modifier.fillMaxSize().systemBarsPadding(),
         )
-        UnlockSheet(visible = unlockOpen, onDismiss = { unlockOpen = false })
+        UnlockSheet(
+            visible = unlockOpen && !monetizationDisabled,
+            onDismiss = { unlockOpen = false },
+            onBuy = { if (!monetizationDisabled) onUnlockPurchase() },
+            purchaseState = unlockPurchaseState,
+        )
         ShortcutActionSheet(
             taps = shortcutSheetTaps,
             current = shortcutSheetTaps?.let { settings.shortcutForTaps(it) } ?: OrbShortcutAction.NONE,
             keyboardAvailable = permissions.keyboardActive,
             onSelect = { action ->
                 when (shortcutSheetTaps) {
-                    1 -> onSettingsChange(settings.copy(shortcut1Tap = action))
-                    2 -> onSettingsChange(settings.copy(shortcut2Tap = action))
-                    3 -> onSettingsChange(settings.copy(shortcut3Tap = action))
+                    1 -> recordSettingsChange(settings.copy(shortcut1Tap = action))
+                    2 -> recordSettingsChange(settings.copy(shortcut2Tap = action))
+                    3 -> recordSettingsChange(settings.copy(shortcut3Tap = action))
                 }
             },
             onBlockedKeyboard = {
@@ -474,6 +557,29 @@ fun ConfigScreen(
 
 const val MESSAGE_TOAST_TAG = "message-toast"
 const val READONLY_SCRIM_TAG = "readonly-scrim"
+
+@Composable
+private fun RemoteNotice(text: String, tag: String) {
+    val palette = LocalKeyFlowPalette.current
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 16.dp, bottom = 6.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(palette.teal.copy(alpha = 0.12f))
+            .testTag(tag)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = text,
+            color = palette.fg,
+            fontFamily = SpaceGrotesk,
+            fontSize = 11.sp,
+            lineHeight = 15.sp,
+        )
+    }
+}
 
 /**
  * Toast discreto (aba travada, avisos de modo). Visível enquanto [message] não for nulo. Quando

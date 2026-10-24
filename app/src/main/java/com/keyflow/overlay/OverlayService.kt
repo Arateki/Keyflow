@@ -50,9 +50,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -105,6 +105,12 @@ class OverlayService : Service() {
     // Settings em cache: o modo de gravação é lido a cada gesto (pode mudar na config).
     @Volatile
     private var cachedSettings: Settings = Settings()
+    @Volatile
+    private var skinsUnlocked = false
+    private var settingsReady = false
+    private var pendingOverlayStart = false
+    private var pendingKeyboardMic = false
+    private var pendingRecord = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -115,25 +121,22 @@ class OverlayService : Service() {
         recordingNotification = RecordingNotification(this, NOTIFICATION_CHANNEL_ID)
         createNotificationChannel()
 
-        cachedSettings = runBlocking { settingsRepository.settingsFlow().first() }
-
         createCoordinator()
         createGestureController()
         observeSettings()
         observeControllerState()
         observeOverlayPosition()
-
-        // Se o Modo Sobrepor está ligado (inclui restart sticky), restaura a orbe + serviço persistente.
-        if (cachedSettings.overlayModeEnabled && OverlayPermission.canDrawOverlays(this)) {
-            startOverlay()
-        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_START_OVERLAY -> startOverlay()
+            ACTION_START_OVERLAY -> if (settingsReady) startOverlay() else pendingOverlayStart = true
             ACTION_KEYBOARD_MIC -> {
-                if (ensureForeground() && ::coordinator.isInitialized) handleKeyboardMicTap()
+                if (settingsReady) {
+                    if (ensureForeground() && ::coordinator.isInitialized) handleKeyboardMicTap()
+                } else {
+                    pendingKeyboardMic = true
+                }
             }
             RecordingNotification.ACTION_PAUSE_RESUME -> handlePauseResume()
             RecordingNotification.ACTION_STOP_PASTE -> handleStopPaste()
@@ -141,7 +144,11 @@ class OverlayService : Service() {
             ACTION_UNDO_CANCEL -> { if (::coordinator.isInitialized) coordinator.onUndoCancel() }
             ACTION_COMMIT_CANCEL -> { if (::coordinator.isInitialized) coordinator.onCommitCancel() }
             ACTION_RECORD -> {
-                if (ensureForeground() && ::coordinator.isInitialized) coordinator.onTap() // ocioso → inicia (inclui tela de bloqueio)
+                if (settingsReady) {
+                    if (ensureForeground() && ::coordinator.isInitialized) coordinator.onTap() // ocioso → inicia (inclui tela de bloqueio)
+                } else {
+                    pendingRecord = true
+                }
             }
             ACTION_OPEN_CONFIG -> openKeyFlowApp()
         }
@@ -380,6 +387,12 @@ class OverlayService : Service() {
     }
 
     private fun observeSettings() {
+        serviceScope.launch {
+            settingsRepository.skinsUnlockedFlow().distinctUntilChanged().collect { unlocked ->
+                skinsUnlocked = unlocked
+                floatingButton?.setOrbStyle(com.keyflow.ui.orb.orbStyleFor(cachedSettings.orbSkin, unlocked))
+            }
+        }
         // Pacote de skin reimportado ou removido (SKP-IMP-05/STO-04): se a orbe usa um pacote, reabre — a versão nova aparece ao vivo, e um
         // pacote que sumiu devolve a orbe ao Ateliê. O primeiro valor do fluxo (o de agora) não conta.
         serviceScope.launch {
@@ -402,7 +415,7 @@ class OverlayService : Service() {
                 }
                 // Skin da orbe ao vivo (aba Sobrepor → Skins).
                 if (it.orbSkin != prevOrbSkin) {
-                    floatingButton?.setOrbStyle(com.keyflow.ui.orb.orbStyleFor(it.orbSkin))
+                    floatingButton?.setOrbStyle(com.keyflow.ui.orb.orbStyleFor(it.orbSkin, skinsUnlocked))
                     floatingButton?.setOrbPack(openOrbPack(it.orbSkin))
                 }
                 // Tema ao vivo (raro, disparado pelo usuário → barato): re-posta a notificação e recolore os
@@ -425,6 +438,21 @@ class OverlayService : Service() {
                 }
                 // Posição inicial (lado) ao vivo: encosta a orbe no lado escolhido.
                 if (it.overlaySide != prevSide) snapOrbToSide(it.overlaySide)
+                if (!settingsReady) {
+                    settingsReady = true
+                    if (pendingOverlayStart || (it.overlayModeEnabled && OverlayPermission.canDrawOverlays(this@OverlayService))) {
+                        pendingOverlayStart = false
+                        startOverlay()
+                    }
+                    if (pendingKeyboardMic) {
+                        pendingKeyboardMic = false
+                        if (ensureForeground() && ::coordinator.isInitialized) handleKeyboardMicTap()
+                    }
+                    if (pendingRecord) {
+                        pendingRecord = false
+                        if (ensureForeground() && ::coordinator.isInitialized) coordinator.onTap()
+                    }
+                }
             }
         }
     }
@@ -450,7 +478,7 @@ class OverlayService : Service() {
             side = { cachedSettings.overlaySide },
             onIntent = { intent -> coordinator.onIntent(intent) },
             orbSizePx = cachedSettings.orbSizePx,
-            orbStyle = com.keyflow.ui.orb.orbStyleFor(cachedSettings.orbSkin),
+            orbStyle = com.keyflow.ui.orb.orbStyleFor(cachedSettings.orbSkin, skinsUnlocked),
             orbPack = openOrbPack(cachedSettings.orbSkin),
             tapBurstWindowMs = cachedSettings.tapBurstWindowMs.toLong(),
             onPositionChanged = { position ->

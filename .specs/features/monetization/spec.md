@@ -158,6 +158,8 @@ de aba → 1 interstitial; próximo só depois do dobro do intervalo; comprar un
    última lista cacheada.
 2. **RMT-02**: o app SHALL buscar a config remota (CFG-01) na abertura (com cache/ETag) e aplicar:
    preços/minutos exibidos, parâmetros de ads, aviso de versão mínima.
+3. **RMT-03**: WHEN `killSwitch` THEN a interface SHALL mostrar um aviso não bloqueante e suspender os
+   fluxos de monetização (compra, banners e interstitials), sem impedir o restante da configuração.
 
 ---
 
@@ -177,15 +179,16 @@ de aba → 1 interstitial; próximo só depois do dobro do intervalo; comprar un
 
 | ID | Área | Status |
 | --- | ---- | ------ |
-| IDN-01..03 | Identidade no app | Pending |
+| IDN-01..03 | Identidade no app | Parcial — MZ-T1/T2; staging da API pendente |
 | CRD-01..05 | Créditos (aba Voz) | Pending |
-| UNL-01..04 | Desbloqueio/entitlements | Pending |
-| ADS-01..06 | Dinâmica de anúncios | Pending |
+| UNL-01..05 | Desbloqueio/entitlements | Parcial — MZ-T9 + revisão; resolução de skins e gate inicial verificados, staging pendente |
+| ADS-01..06 | Dinâmica de anúncios | Parcial — MZ-T10/T11 + revisão; gate de entitlement e cadência verificados |
 | RWD-01..04 | Rewarded | Pending |
-| RMT-01..02 | Manifest/config remota | Pending |
+| RMT-01..03 | Manifest/config remota | Parcial — MZ-T13 + revisão; aviso e kill switch ligados à UI |
 
-**Coverage:** 24 total, 0 mapeados a tasks (Design/Tasks após aprovação; **depende da KeyFlow API
-existir** — ver `.specs/features/keyflow-api/`).
+**Coverage:** 24 total; IDN e UNL parcialmente verificados em MZ-T1–T4. O restante depende das
+tasks seguintes e, no caminho remoto, da KeyFlow API existir em staging — ver
+`.specs/features/keyflow-api/`.
 
 ---
 

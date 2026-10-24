@@ -154,13 +154,19 @@ class KeyboardColorsTest {
     }
 
     @Test
-    fun `only the system keyboard skin is free — the rest is paid but still unlocked for testing`() {
-        // Decisão do Yan (2026-09-29). O bloqueio de verdade vem com a monetização (UNL-04); até lá `paid` só
-        // registra a decisão e nada esconde as skins.
-        assertThat(KeyboardSkin.entries.filter { !it.paid }).containsExactly(KeyboardSkin.SYSTEM)
+    fun `system and atelie keyboard skins are free`() {
+        assertThat(KeyboardSkin.entries.filter { !it.paid })
+            .containsExactly(KeyboardSkin.SYSTEM, KeyboardSkin.ATELIE)
         assertThat(KeyboardSkin.AERO.paid).isTrue()
         assertThat(KeyboardSkin.GLITCH.paid).isTrue()
         assertThat(KeyboardSkin.ROSE_GOLD.paid).isTrue()
         assertThat(KeyboardSkin.DEFAULT.paid).isFalse()
+    }
+
+    @Test
+    fun `revoked paid keyboard skin resolves to system without changing saved id`() {
+        assertThat(KeyboardSkin.effective("glitch", skinsUnlocked = false)).isEqualTo(KeyboardSkin.SYSTEM)
+        assertThat(KeyboardSkin.effective("glitch", skinsUnlocked = true)).isEqualTo(KeyboardSkin.GLITCH)
+        assertThat(KeyboardSkin.of("glitch").id).isEqualTo("glitch")
     }
 }

@@ -469,9 +469,9 @@ Fase A/B (o device é o gargalo: instrumentado serializa).
 
 ### RSN-T18 — Privacidade, licenças e elegibilidade
 - **What**: `PLAYSTORE_CHECKLIST.md` e o rascunho da política/Data Safety ganham: modelos de texto locais (no aparelho), OpenAI (texto enviado, login OIDC, credenciais só no aparelho, sem `client_secret`) (RPRV-01);
-  licenças na aba Docs (RPRV-02); **registrar a decisão de elegibilidade (RPRV-04)** que o Yan tomar — enquanto não houver, `OpenAiAuthConfig.enabled = BuildConfig.DEBUG` e a checklist marca o login ChatGPT como **"não publicar ligado"**.
+  licenças na aba Docs (RPRV-02); decisão de elegibilidade do Yan (RPRV-04), registrada em 2026-10-23: logins por assinatura OpenAI, Anthropic e Google entram no release.
 - **Where**: `PLAYSTORE_CHECKLIST.md`, `app/licenses/`, `ui/config/DocsPanel.kt`, `.specs/project/STATE.md`.
-- **Done when**: itens da checklist atualizados; a Docs mostra as licenças; a decisão pendente está escrita como **[YAN]**.
+- **Done when**: itens da checklist atualizados; a Docs mostra as licenças; a decisão está escrita e client OAuth Google no release fica anotado como pendência **[YAN]**.
 - **Tests**: unit (`DocsPanelTest` cobre a seção nova). **Gate**: `quick`. **Commit**: `docs(loja): privacidade, licenças e elegibilidade do login ChatGPT`.
 
 ### RSN-T19 — Validação manual no Galaxy A32 **[YAN]**

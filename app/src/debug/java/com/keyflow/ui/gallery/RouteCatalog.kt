@@ -359,7 +359,7 @@ object RouteCatalog {
             )
         },
         Route("config-raciocinio-openai-desconectado") {
-            ConfigReasoningRoute(source = ReasoningSource.OPENAI, auth = GalleryAuth(ConnectionState.Disconnected))
+            ConfigReasoningRoute(source = ReasoningSource.OPENAI, auth = GalleryAuth(ConnectionState.Disconnected, storedKey = FakeSettings.OPENAI_API_KEY))
         },
         Route("config-raciocinio-openai-conectado") {
             ConfigReasoningRoute(
@@ -368,12 +368,13 @@ object RouteCatalog {
                 auth = GalleryAuth(
                     ConnectionState.Connected("voce@exemplo.com", AuthMethod.OAUTH, planUsage = true),
                     models = listOf(AccountModel("modelo-a", "Modelo A"), AccountModel("modelo-b", "Modelo B")),
+                    storedKey = FakeSettings.OPENAI_API_KEY,
                 ),
                 ready = true,
             )
         },
         Route("config-raciocinio-anthropic-desconectado") {
-            ConfigReasoningRoute(source = ReasoningSource.ANTHROPIC)
+            ConfigReasoningRoute(source = ReasoningSource.ANTHROPIC, anthropicAuth = GalleryAuth(ConnectionState.Disconnected))
         },
         Route("config-raciocinio-anthropic-conectado") {
             ConfigReasoningRoute(
@@ -387,7 +388,7 @@ object RouteCatalog {
             )
         },
         Route("config-raciocinio-google-desconectado") {
-            ConfigReasoningRoute(source = ReasoningSource.GOOGLE)
+            ConfigReasoningRoute(source = ReasoningSource.GOOGLE, googleAuth = GalleryAuth(ConnectionState.Disconnected))
         },
         Route("config-raciocinio-google-conectado") {
             ConfigReasoningRoute(
@@ -418,6 +419,7 @@ object RouteCatalog {
                 auth = GalleryAuth(
                     ConnectionState.Connected("voce@exemplo.com", AuthMethod.OAUTH, planUsage = true),
                     models = listOf(AccountModel("modelo-a", "Modelo A")),
+                    storedKey = FakeSettings.OPENAI_API_KEY,
                 ),
                 ready = true,
                 test = TestState(totalMs = 2_100, error = ReasoningError.RATE_LIMIT),
@@ -443,6 +445,7 @@ object RouteCatalog {
     private fun ConfigMenuRoute(railExpanded: Boolean = false) {
         ConfigScreen(
             settings = FakeSettings.settings.copy(overlayModeEnabled = true, keyboardModeEnabled = true),
+            transcriptionOpenAiAuth = GalleryAuth(ConnectionState.Disconnected, storedKey = FakeSettings.OPENAI_API_KEY),
             permissions = PermissionStatus(
                 microphoneGranted = true,
                 overlayGranted = true,
@@ -492,8 +495,6 @@ object RouteCatalog {
             settings = FakeSettings.settings.copy(
                 visionSource = source,
                 visionLocalModelId = localModelId,
-                visionGoogleApiKey = googleKey,
-                visionAnthropicApiKey = anthropicKey,
             ),
             visionModels = localModels,
             permissions = PermissionStatus(
@@ -538,8 +539,6 @@ object RouteCatalog {
             settings = FakeSettings.settings.copy(
                 falaSource = source,
                 falaLocalModelId = localModelId,
-                falaElevenLabsApiKey = elevenLabsKey,
-                falaGoogleApiKey = googleKey,
             ),
             falaModels = localModels,
             permissions = PermissionStatus(
@@ -571,7 +570,9 @@ object RouteCatalog {
         anthropicModel: String = "claude-3-5-sonnet-latest",
         googleModel: String = "gemini-2.0-flash",
         localModels: LocalModelsUi = galleryTextModels(),
-        auth: AuthActions = AuthActions.None,
+        auth: AuthActions = if (source == ReasoningSource.OPENAI) {
+            GalleryAuth(ConnectionState.Disconnected, storedKey = FakeSettings.OPENAI_API_KEY)
+        } else AuthActions.None,
         anthropicAuth: AuthActions = AuthActions.None,
         googleAuth: AuthActions = AuthActions.None,
         ready: Boolean = false,
@@ -629,6 +630,7 @@ object RouteCatalog {
         ConfigScreen(
             settings = FakeSettings.settings.copy(source = source, localModelId = localModelId),
             localModels = localModels,
+            transcriptionOpenAiAuth = GalleryAuth(ConnectionState.Disconnected, storedKey = FakeSettings.OPENAI_API_KEY),
             permissions = PermissionStatus(
                 microphoneGranted = true,
                 overlayGranted = true,
@@ -1144,6 +1146,7 @@ object RouteCatalog {
                         onOrbSkinSelected = {},
                         onUnlock = {},
                         unlockTag = "gallery-unlock",
+                        skinsUnlocked = selectedOrb == "mascot",
                         modifier = Modifier.padding(bottom = 16.dp),
                     )
                 } else {

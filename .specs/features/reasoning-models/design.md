@@ -255,7 +255,7 @@ Sair: POST form ao `revocation_endpoint` do documento de descoberta (token, toke
 ```kotlin
 // auth/providers/openai/OpenAiAuthConfig.kt — SÓ dados. É o único arquivo a editar quando a OpenAI mudar algo.
 internal object OpenAiAuthConfig {
-    val enabled = BuildConfig.DEBUG                          // RPRV-04: só builds de dev até o Yan decidir a elegibilidade
+    const val enabled = true                                  // decisão do Yan em 2026-10-23: login também no release
     const val discoveryUrl = "https://auth.openai.com/.well-known/openid-configuration"   // jwks_uri e revocation_endpoint saem daqui
     const val issuer = "https://auth.openai.com"
     const val authorizationUrl = "https://auth.openai.com/api/accounts/authorize"

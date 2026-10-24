@@ -2,6 +2,8 @@ package com.keyflow.ui.config
 
 import com.keyflow.i18n.tr
 import com.keyflow.ime.KeyboardSkin
+import com.keyflow.ads.AdsController
+import com.keyflow.ads.BannerSlot
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -32,6 +34,7 @@ import com.keyflow.core.shortcuts.BarsConfig
 import com.keyflow.core.shortcuts.ShortcutGrid
 import com.keyflow.data.Settings
 import com.keyflow.ime.KeyFlowKeyboardView
+import com.keyflow.skins.SkinIds
 import com.keyflow.ui.common.verticalScrollbar
 import com.keyflow.ui.icons.KfIcon
 import com.keyflow.ui.icons.KfIcons
@@ -80,6 +83,10 @@ fun TecladoPanel(
     settings: Settings,
     onSettingsChange: (Settings) -> Unit,
     onUnlockSkins: () -> Unit,
+    skinsUnlocked: Boolean = false,
+    adsController: AdsController? = null,
+    adsOff: Boolean = false,
+    entitlementsLoaded: Boolean = true,
     onOverlayRequired: () -> Unit = {},
     barsConfig: BarsConfig = BarsConfig.DEFAULT,
     onBarsConfigChange: (BarsConfig) -> Unit = {},
@@ -228,7 +235,11 @@ fun TecladoPanel(
                     dark = palette.isDark,
                     locale = settings.keyboardLanguage,
                     numberRowEnabled = settings.keyboardNumberRowEnabled,
-                    skin = settings.keyboardSkin,
+                    skin = if (SkinIds.isPack(settings.keyboardSkin)) {
+                        settings.keyboardSkin
+                    } else {
+                        KeyboardSkin.effective(settings.keyboardSkin, skinsUnlocked).id
+                    },
                 )
             }
 
@@ -237,12 +248,14 @@ fun TecladoPanel(
                     selectedSkin = settings.keyboardSkin,
                     onSkinSelected = { onSettingsChange(settings.copy(keyboardSkin = it)) },
                     onUnlock = onUnlockSkins,
+                    skinsUnlocked = skinsUnlocked,
                     unlockTag = TECLADO_UNLOCK_TAG,
                     modifier = Modifier.padding(bottom = 16.dp),
                 )
                 SkinPacksSection(SkinPackSurface.KEYBOARD, settings, onSettingsChange)
             }
         }
+        adsController?.let { BannerSlot(it, adsOff = adsOff, entitlementsLoaded = entitlementsLoaded) }
     }
 }
 

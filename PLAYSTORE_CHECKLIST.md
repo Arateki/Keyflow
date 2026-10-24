@@ -71,15 +71,12 @@ do emulador Android 17 (`.specs/quick/010-suite-no-aparelho/`) existe para achar
   efêmero) — decisão do Yan no Play Console. "Personal info → e-mail": o e-mail vem do ID token e fica só no aparelho (o login em
   si é entre o usuário e a OpenAI); conferir o mesmo critério.
 
-#### 1c. Login ChatGPT — elegibilidade (RPRV-04) — **[YAN] decidir antes de publicar com ele ligado**
+#### 1c. Login ChatGPT — elegibilidade (RPRV-04) — decisão registrada em 2026-10-23
 
-A OpenAI libera o uso do plano do usuário para "apps open-source e hospedados localmente" e manda "apps pagos ou hospedados
-remotamente" para um formulário de interesse. O KeyFlow é open source (quando o repositório ficar público **[YAN]**) e roda no
-aparelho, mas planeja créditos, skins pagas e anúncios. **A decisão de enquadramento é do Yan** e, quando vier, fica registrada
-aqui (data + escolha: seguir como open source / enviar o formulário / deixar só a chave de API).
-
-**Até lá: NÃO publicar com o login ligado.** `OpenAiAuthConfig.enabled = BuildConfig.DEBUG` mantém o botão "Continue with
-ChatGPT" desabilitado (com o motivo escrito) em build de release; a **chave de API** da OpenAI funciona em qualquer build.
+A OpenAI permite uso do plano do usuário em apps open-source e hospedados localmente e direciona apps pagos ou hospedados
+remotamente ao formulário de interesse. Em 2026-10-23, Yan decidiu incluir no release os três logins por assinatura
+(ChatGPT, Claude e Google). O login ChatGPT está habilitado no release; não há `client_secret` no APK. A pendência de
+publicação é verificar no Console as credenciais OAuth e a elegibilidade aplicável ao app, sem alterar a decisão de produto.
 
 ### 2. Tela de consentimento (Prominent Disclosure)
 

@@ -1,6 +1,7 @@
 package com.keyflow.core
 
 import android.util.Log
+import com.keyflow.BuildConfig
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -107,7 +108,7 @@ object KeyFlowController {
         // Flush automático ao focar um campo: só cola o pendente se autoPasteOnFocus estiver ligado.
         val pendingText = _pending.value
         if (pendingText != null && autoPasteOnFocus && fn(pendingText)) {
-            Log.d(TAG, "registerInserter: auto-flushed pending '${pendingText.take(30)}'")
+            if (BuildConfig.DEBUG) Log.d(TAG, "registerInserter: auto-flushed pending '${pendingText.take(30)}'")
             _pending.value = null
         }
         _targetAvailable.value = true
@@ -127,7 +128,7 @@ object KeyFlowController {
             // contrário vai SÓ para a área de transferência. Nunca vira pendente — senão vazaria para o
             // flush de "onFocus" ao reabrir o campo, colando um texto que não foi captado sem campo.
             if (autoPasteInField && insert(text)) {
-                Log.d(TAG, "insertOrHold: inserted in-field '${text.take(30)}'")
+                if (BuildConfig.DEBUG) Log.d(TAG, "insertOrHold: inserted in-field '${text.take(30)}'")
                 return InsertOutcome.Inserted
             }
             Log.d(TAG, "insertOrHold: in-field → clipboard (inField=$autoPasteInField)")
@@ -139,7 +140,7 @@ object KeyFlowController {
         if (autoPasteOnFocus) {
             _pending.value = text
         }
-        Log.d(TAG, "insertOrHold: no field, held '${text.take(30)}' onFocus=$autoPasteOnFocus")
+        if (BuildConfig.DEBUG) Log.d(TAG, "insertOrHold: no field, held '${text.take(30)}' onFocus=$autoPasteOnFocus")
         return InsertOutcome.Held
     }
 
@@ -149,7 +150,7 @@ object KeyFlowController {
         val insert = inserter ?: return false
         if (!insert(text)) return false
 
-        Log.d(TAG, "flushPending: flushed '${text.take(30)}'")
+        if (BuildConfig.DEBUG) Log.d(TAG, "flushPending: flushed '${text.take(30)}'")
         _pending.value = null
         return true
     }

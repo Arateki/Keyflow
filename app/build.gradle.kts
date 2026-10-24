@@ -1,5 +1,7 @@
+import java.io.File
 import java.net.URI
 import java.security.MessageDigest
+import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -7,6 +9,33 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     // Consome o perfil de base gerado pelo :baselineprofile (app/src/release/generated/baselineProfiles/).
     id("androidx.baselineprofile")
+}
+
+// Service token do Cloudflare Access: só -P, o gradle.properties do GRADLE_USER_HOME ou local.properties.
+// O gradle.properties do repositório é versionado e não entra nessa leitura.
+fun unversionedProperty(name: String): String {
+    val command = gradle.startParameter.projectProperties
+    if (command.containsKey(name)) return command.getValue(name)
+    readPropertiesFile(File(gradle.gradleUserHomeDir, "gradle.properties"), name)?.let { return it }
+    readPropertiesFile(rootProject.file("local.properties"), name)?.let { return it }
+    return ""
+}
+
+fun readPropertiesFile(file: File, name: String): String? {
+    if (!file.isFile) return null
+    val props = Properties()
+    file.reader(Charsets.UTF_8).use { props.load(it) }
+    if (!props.containsKey(name)) return null
+    return props.getProperty(name).orEmpty()
+}
+
+fun buildConfigString(value: String): String {
+    val escaped = value
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+        .replace("\r", "\\r")
+        .replace("\n", "\\n")
+    return "\"$escaped\""
 }
 
 android {
@@ -32,14 +61,47 @@ android {
         minSdk = 24
         targetSdk = 36
         versionCode = 1
-        versionName = "0.1.0"
+        versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Release (e as variantes derivadas) fala com a produção. O debug troca para o staging, abaixo.
+        // `-PkeyflowApiBaseUrl` vence os dois — é o gancho dos testes com MockWebServer.
+        val apiBaseUrl = providers.gradleProperty("keyflowApiBaseUrl")
+            .orElse("https://keyflow-api.arateki.com")
+            .get()
+        buildConfigField("String", "KEYFLOW_API_BASE_URL", buildConfigString(apiBaseUrl))
+        // O token do Access só é preenchido no debug. Aqui fica vazio de propósito: o release não lê a propriedade.
+        buildConfigField("String", "KEYFLOW_STAGING_ACCESS_CLIENT_ID", "\"\"")
+        buildConfigField("String", "KEYFLOW_STAGING_ACCESS_CLIENT_SECRET", "\"\"")
+        buildConfigField(
+            "long",
+            "KEYFLOW_INTEGRITY_CLOUD_PROJECT_NUMBER",
+            "${providers.gradleProperty("keyflowIntegrityCloudProjectNumber").orElse("0").get()}L",
+        )
+
     }
 
     buildTypes {
         // ABIs do sherpa-onnx (STO-02): celulares ARM de 64 e 32 bits; x86_64 só no debug, para o
         // emulador. O x86 de 32 bits que vem no AAR não entra em nenhum.
         debug {
+            if (!providers.gradleProperty("keyflowApiBaseUrl").isPresent) {
+                buildConfigField(
+                    "String",
+                    "KEYFLOW_API_BASE_URL",
+                    buildConfigString("https://keyflow-api-staging.arateki.com"),
+                )
+            }
+            buildConfigField(
+                "String",
+                "KEYFLOW_STAGING_ACCESS_CLIENT_ID",
+                buildConfigString(unversionedProperty("keyflowStagingAccessClientId")),
+            )
+            buildConfigField(
+                "String",
+                "KEYFLOW_STAGING_ACCESS_CLIENT_SECRET",
+                buildConfigString(unversionedProperty("keyflowStagingAccessClientSecret")),
+            )
             ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
             // Cobertura dos testes de unidade (JaCoCo do próprio AGP): só com `-Pcoverage`, para o dia a dia não pagar a
             // instrumentação. `./gradlew -Pcoverage createDebugUnitTestCoverageReport` → app/build/reports/coverage/test/debug/.
@@ -47,7 +109,16 @@ android {
             enableUnitTestCoverage = providers.gradleProperty("coverage").isPresent
         }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            // Só para o smoke local: sem a propriedade, o release continua sem assinatura de debug.
+            if (providers.gradleProperty("keyflowSmokeSigning").orNull == "true") {
+                signingConfig = signingConfigs.getByName("debug")
+            }
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
             ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
         }
         // As variantes que o plugin do perfil de base cria a partir do release (nonMinifiedRelease, benchmarkRelease) só
@@ -202,6 +273,19 @@ dependencies {
 
     // HTTP — upload multipart para API Whisper
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // Play Integrity classic para registrar a identidade antes das operações sensíveis (MZ-T2).
+    implementation("com.google.android.play:integrity:1.6.0")
+
+    // Play Billing 9.1.0: versão estável indicada pela documentação oficial (MZ-T3).
+    implementation("com.android.billingclient:billing:9.1.0")
+
+    // Identidade anônima (MZ-T1): fallback Block Store para reinstalações na mesma conta Google.
+    implementation("com.google.android.gms:play-services-auth-blockstore:16.4.0")
+
+    // AdMob + UMP (MZ-T10): SDK atual, usado apenas pelo pacote ads/.
+    implementation("com.google.android.gms:play-services-ads:25.5.0")
+    implementation("com.google.android.ump:user-messaging-platform:4.0.0")
 
     // Config persistida
     implementation("androidx.datastore:datastore-preferences:1.1.1")

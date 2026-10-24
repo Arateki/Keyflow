@@ -13,3 +13,6 @@ build/
 
 # KeyFlow API (Rust, monorepo — api/)
 api/target/
+
+# SDK local e service token do Cloudflare Access (staging). Nunca versionar.
+/local.properties

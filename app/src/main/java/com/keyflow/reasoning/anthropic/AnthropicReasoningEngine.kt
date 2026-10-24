@@ -1,8 +1,10 @@
 package com.keyflow.reasoning.anthropic
 
+import com.keyflow.BuildConfig
 import com.keyflow.auth.AuthErrorKind
 import com.keyflow.auth.AuthException
 import com.keyflow.auth.AuthorizationProvider
+import com.keyflow.auth.HttpErrorMessage
 import com.keyflow.auth.ProviderIds
 import com.keyflow.auth.providers.anthropic.AnthropicAuthConfig
 import com.keyflow.data.models.Ipv4FirstDns
@@ -133,7 +135,7 @@ class AnthropicReasoningEngine(
         response.use { r ->
             if (!r.isSuccessful) {
                 val errorBody = r.body?.string().orEmpty()
-                android.util.Log.e("AnthropicReasoning", "HTTP ${r.code}: $errorBody")
+                if (BuildConfig.DEBUG) android.util.Log.e("AnthropicReasoning", "HTTP ${r.code}: $errorBody")
                 val failure = httpFailure(r.code, errorBody)
                 if (failure.retry) return Outcome.Retry(failure.event)
                 if (r.code == 401) authorization.invalidate(ProviderIds.ANTHROPIC)
@@ -205,10 +207,8 @@ class AnthropicReasoningEngine(
                 return true
             }
             "error" -> {
-                val err = json.optJSONObject("error")
-                val msg = err?.optString("message").orEmpty()
-                android.util.Log.e("AnthropicReasoning", "SSE error: $msg | data: $data")
-                send(ReasoningEvent.Error(ReasoningError.ENGINE, "Anthropic error: $msg"))
+                if (BuildConfig.DEBUG) android.util.Log.e("AnthropicReasoning", "SSE error recebido")
+                send(ReasoningEvent.Error(ReasoningError.ENGINE, "erro no fluxo SSE da Anthropic"))
                 return true
             }
         }
@@ -218,13 +218,7 @@ class AnthropicReasoningEngine(
     private class HttpFailure(val event: ReasoningEvent.Error, val retry: Boolean)
 
     private fun httpFailure(status: Int, body: String): HttpFailure {
-        val json = runCatching { JSONObject(body) }.getOrNull()
-        val errorObj = json?.optJSONObject("error")
-        val message = errorObj?.optString("message").orEmpty()
-        val note = buildString {
-            append("Anthropic HTTP $status")
-            if (message.isNotEmpty()) append(": $message")
-        }
+        val note = HttpErrorMessage.of("Anthropic", status, body, includeDebugDetail = false)
 
         val kind = when {
             status == 401 || status == 403 -> ReasoningError.UNAUTHORIZED
