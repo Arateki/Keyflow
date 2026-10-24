@@ -151,6 +151,16 @@ async fn simulated_unlock_register_restore_and_refund_use_the_real_entitlement_f
     .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(refund["status"], "refunded");
+    let (status, repeated_refund) = request(
+        state.clone(),
+        "POST",
+        "/v1/test/purchases/refund",
+        Some(&token),
+        json!({"purchaseReceipt": purchase_receipt}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert_eq!(repeated_refund["error"], "simulated_purchase_refunded");
     let (status, account) = request(state, "GET", "/v1/account", Some(&token), json!({})).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(account["adsOff"], false);

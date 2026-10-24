@@ -180,7 +180,18 @@ pub async fn refund_purchase(
     }
 
     if !voided::revoke_purchase(&state.pool, &token_hash).await {
-        return Err(SimulatedPurchaseError::Internal);
+        let status: Option<(String,)> = sqlx::query_as(
+            "select status from purchases where token_hash = $1 and account_id = $2",
+        )
+        .bind(&token_hash)
+        .bind(account.id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|_| SimulatedPurchaseError::Internal)?;
+        return match status {
+            Some((status,)) if status == "voided" => Err(SimulatedPurchaseError::AlreadyRefunded),
+            _ => Err(SimulatedPurchaseError::Internal),
+        };
     }
     Ok(Json(SimulatedPurchaseResponse { status: "refunded" }))
 }

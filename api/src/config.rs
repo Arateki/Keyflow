@@ -25,7 +25,7 @@ const DEFAULT_TOKIO_MAX_BLOCKING_THREADS: u32 = 8;
 const DEFAULT_PLAY_INTEGRITY_BASE_URL: &str = "https://playintegrity.googleapis.com";
 const DEFAULT_ANDROID_PUBLISHER_BASE_URL: &str = "https://androidpublisher.googleapis.com";
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Config {
     pub database_url: String,
     pub bind_addr: SocketAddr,
@@ -73,6 +73,83 @@ pub struct Config {
     pub simulated_purchases_enabled: bool,
     /// Chave HMAC de teste; obrigatória apenas quando a simulação está ligada.
     pub simulated_purchase_hmac_secret: Option<String>,
+}
+
+impl fmt::Debug for Config {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let providers = self
+            .providers
+            .iter()
+            .map(|provider| {
+                (
+                    &provider.name,
+                    &provider.url,
+                    &provider.auth_header_name,
+                    "<redacted>",
+                    &provider.model,
+                )
+            })
+            .collect::<Vec<_>>();
+        f.debug_struct("Config")
+            .field("database_url", &self.database_url)
+            .field("bind_addr", &self.bind_addr)
+            .field(
+                "google_service_account_json_path",
+                &self.google_service_account_json_path,
+            )
+            .field("package_name", &self.package_name)
+            .field("integrity_relaxed", &self.integrity_relaxed)
+            .field(
+                "register_rate_limit_per_minute",
+                &self.register_rate_limit_per_minute,
+            )
+            .field(
+                "account_rate_limit_per_minute",
+                &self.account_rate_limit_per_minute,
+            )
+            .field(
+                "voided_purchases_job_interval_secs",
+                &self.voided_purchases_job_interval_secs,
+            )
+            .field("providers", &providers)
+            .field("transcription_timeout_ms", &self.transcription_timeout_ms)
+            .field("transcription_max_bytes", &self.transcription_max_bytes)
+            .field(
+                "provider_unhealthy_cooldown_secs",
+                &self.provider_unhealthy_cooldown_secs,
+            )
+            .field("ads_reward_seconds", &self.ads_reward_seconds)
+            .field("ads_daily_cap", &self.ads_daily_cap)
+            .field("trusted_proxies", &self.trusted_proxies)
+            .field("db_max_connections", &self.db_max_connections)
+            .field("db_min_connections", &self.db_min_connections)
+            .field("db_idle_timeout", &self.db_idle_timeout)
+            .field("db_acquire_timeout", &self.db_acquire_timeout)
+            .field("tokio_worker_threads", &self.tokio_worker_threads)
+            .field(
+                "tokio_max_blocking_threads",
+                &self.tokio_max_blocking_threads,
+            )
+            .field("play_integrity_base_url", &self.play_integrity_base_url)
+            .field(
+                "android_publisher_base_url",
+                &self.android_publisher_base_url,
+            )
+            .field("transcribe_enabled", &self.transcribe_enabled)
+            .field("ssv_enabled", &self.ssv_enabled)
+            .field(
+                "simulated_purchases_enabled",
+                &self.simulated_purchases_enabled,
+            )
+            .field(
+                "simulated_purchase_hmac_secret",
+                &self
+                    .simulated_purchase_hmac_secret
+                    .as_ref()
+                    .map(|_| "<redacted>"),
+            )
+            .finish()
+    }
 }
 
 #[derive(Debug)]
@@ -528,6 +605,9 @@ mod tests {
             enabled.simulated_purchase_hmac_secret.as_deref(),
             Some("fake-simulation-key-for-tests-only-0001")
         );
+        let debug = format!("{enabled:?}");
+        assert!(debug.contains("<redacted>"));
+        assert!(!debug.contains("fake-simulation-key-for-tests-only-0001"));
     }
 
     #[test]

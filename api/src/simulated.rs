@@ -69,7 +69,9 @@ pub fn verify(
         .duration_since(UNIX_EPOCH)
         .map_err(|_| ReceiptError::Expired)?
         .as_secs() as i64;
-    if receipt.issued_at > now + FUTURE_SKEW_SECS || now - receipt.issued_at > MAX_AGE_SECS {
+    if receipt.issued_at > now + FUTURE_SKEW_SECS
+        || now.saturating_sub(receipt.issued_at) > MAX_AGE_SECS
+    {
         return Err(ReceiptError::Expired);
     }
     if receipt.purpose != expected_purpose
@@ -187,6 +189,19 @@ mod tests {
                 TEST_KEY,
                 "purchase",
                 &old.device_key,
+                Some("unlock_forever")
+            ),
+            Err(ReceiptError::Expired)
+        );
+
+        let mut extreme_old = receipt();
+        extreme_old.issued_at = i64::MIN;
+        assert_eq!(
+            verify(
+                &sign_for_test(TEST_KEY, &extreme_old),
+                TEST_KEY,
+                "purchase",
+                &extreme_old.device_key,
                 Some("unlock_forever")
             ),
             Err(ReceiptError::Expired)
