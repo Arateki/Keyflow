@@ -67,8 +67,11 @@ class DocsSectionsTest {
     }
 
     @Test
-    fun privacySectionHasLegalActions() {
-        assertEquals(listOf("privacidade"), docsSections.filter { it.legalActions }.map { it.id })
+    fun privacyTabHasItsHelpSectionInDocs() {
+        val privacy = docsSections.single { it.id == "privacidade" }
+        assertEquals(privacy, docsSectionFor(ConfigTab.PRIVACIDADE))
+        assertTrue("a ajuda sobre o destino do áudio deve continuar na Docs", privacy.blocks.isNotEmpty())
+        assertEquals(listOf("feedback"), docsSections.filter { it.feedbackActions }.map { it.id })
     }
 
     @Test
