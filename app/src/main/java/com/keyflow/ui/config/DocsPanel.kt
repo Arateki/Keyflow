@@ -58,6 +58,7 @@ import com.keyflow.ads.BannerSlot
 import com.keyflow.ads.AdsPrivacyOptionsEntry
 import com.keyflow.core.RecordingMode
 import com.keyflow.legal.LegalUrls
+import com.keyflow.legal.openLegalUrl
 import com.keyflow.ui.common.verticalScrollbar
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
@@ -74,6 +75,7 @@ const val DOCS_INDEX_TAG = "docs-indice"
 const val DOCS_FEEDBACK_NO_APP_TAG = "docs-feedback-sem-email"
 const val DOCS_PRIVACY_POLICY_TAG = "docs-link-politica-privacidade"
 const val DOCS_TERMS_TAG = "docs-link-termos-uso"
+const val DOCS_LEGAL_NO_APP_TAG = "docs-link-sem-aplicativo"
 
 /** Tag de uma seção — `docs-<id>`; mantém as tags que já existiam antes da lista (pausa/atalhos/…). */
 fun docsSectionTag(id: String): String = "docs-$id"
@@ -468,7 +470,7 @@ fun DocsPanel(
     val viewport = remember { arrayOfNulls<LayoutCoordinates>(1) }
     var noEmailApp by remember { mutableStateOf(false) }
     val launch: (Intent) -> Unit = sendFeedback ?: { context.startFeedbackActivity(it) }
-    val launchUrl: (Intent) -> Unit = openUrl ?: { context.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+    val launchUrl: (Intent) -> Unit = openUrl ?: { context.startActivity(it) }
 
     fun scrollTo(id: String) {
         val target = anchors[id] ?: return
@@ -740,10 +742,11 @@ private fun FeedbackActions(noEmailApp: Boolean, onSend: (FeedbackKind) -> Unit)
 }
 
 /** Ações da seção de privacidade (V1-5): abrem a política e os termos no navegador. */
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 private fun LegalActions(onOpenUrl: (Intent) -> Unit) {
     val palette = LocalKeyFlowPalette.current
+    var noBrowserApp by remember { mutableStateOf(false) }
     FlowRow(
         modifier = Modifier.padding(top = 14.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -759,7 +762,7 @@ private fun LegalActions(onOpenUrl: (Intent) -> Unit) {
                 .clip(RoundedCornerShape(50))
                 .border(1.dp, palette.line, RoundedCornerShape(50))
                 .clickable(role = Role.Button) {
-                    onOpenUrl(Intent(Intent.ACTION_VIEW, Uri.parse(LegalUrls.privacyPolicy())))
+                    noBrowserApp = !openLegalUrl(LegalUrls.privacyPolicy(), onOpenUrl)
                 }
                 .padding(horizontal = 16.dp, vertical = 9.dp)
                 .testTag(DOCS_PRIVACY_POLICY_TAG),
@@ -774,10 +777,21 @@ private fun LegalActions(onOpenUrl: (Intent) -> Unit) {
                 .clip(RoundedCornerShape(50))
                 .border(1.dp, palette.line, RoundedCornerShape(50))
                 .clickable(role = Role.Button) {
-                    onOpenUrl(Intent(Intent.ACTION_VIEW, Uri.parse(LegalUrls.termsOfUse())))
+                    noBrowserApp = !openLegalUrl(LegalUrls.termsOfUse(), onOpenUrl)
                 }
                 .padding(horizontal = 16.dp, vertical = 9.dp)
                 .testTag(DOCS_TERMS_TAG),
+        )
+    }
+    if (noBrowserApp) {
+        val bring = remember { BringIntoViewRequester() }
+        LaunchedEffect(Unit) { bring.bringIntoView() }
+        Text(
+            tr("Não há aplicativo disponível para abrir este link."),
+            color = palette.fg2,
+            fontFamily = SpaceGrotesk,
+            fontSize = 11.sp,
+            modifier = Modifier.padding(top = 8.dp).bringIntoViewRequester(bring).testTag(DOCS_LEGAL_NO_APP_TAG),
         )
     }
 }

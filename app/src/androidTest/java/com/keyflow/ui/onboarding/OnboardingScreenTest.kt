@@ -1,5 +1,6 @@
 package com.keyflow.ui.onboarding
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -217,6 +218,41 @@ class OnboardingScreenTest {
         assertEquals(1, opened.size)
         val intent = opened.single()
         assertEquals(Intent.ACTION_VIEW, intent.action)
+        assertTrue(intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0)
         assertEquals(LegalUrls.privacyPolicy(), intent.dataString)
+    }
+    @Test
+    fun politicaSemNavegadorMostraMensagemSemAceitarOuRecusarDivulgacao() {
+        var unavailable = true
+        var accepted = false
+        var declined = false
+        val opened = mutableListOf<Intent>()
+        rule.setContent {
+            KeyFlowTheme(dark = true) {
+                ProminentDisclosureScreen(
+                    declined = false,
+                    onAccept = { accepted = true },
+                    onDecline = { declined = true },
+                    openUrl = {
+                        opened += it
+                        if (unavailable) throw ActivityNotFoundException("sem navegador de teste")
+                    },
+                )
+            }
+        }
+        rule.onNodeWithTag("disclosure-privacy-link").performClick()
+        rule.onNodeWithTag(DISCLOSURE_LEGAL_NO_APP_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(DISCLOSURE_ACCEPT_TAG).assertIsDisplayed()
+        rule.runOnIdle {
+            assertFalse(accepted)
+            assertFalse(declined)
+            assertEquals(1, opened.size)
+            assertTrue(opened.single().flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0)
+            unavailable = false
+        }
+        rule.onNodeWithTag("disclosure-privacy-link").performClick()
+        rule.onNodeWithTag(DISCLOSURE_LEGAL_NO_APP_TAG).assertDoesNotExist()
+        rule.onNodeWithTag(DISCLOSURE_ACCEPT_TAG).performClick()
+        rule.runOnIdle { assertTrue(accepted); assertEquals(2, opened.size) }
     }
 }
