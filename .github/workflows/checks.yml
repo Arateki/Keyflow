@@ -92,6 +92,15 @@ jobs:
       - name: API level lint
         if: ${{ !cancelled() }}
         run: ./gradlew --no-daemon :app:lintDebug
+      # Valores sintéticos só deste passo: nunca publicar o APK produzido pelo Checks.
+      - name: Release without Google test ads
+        env:
+          KEYFLOW_ADMOB_APP_ID: ca-app-pub-0000000000000000~0000000000
+          KEYFLOW_ADMOB_BANNER_ID: ca-app-pub-0000000000000000/0000000001
+          KEYFLOW_ADMOB_INTERSTITIAL_ID: ca-app-pub-0000000000000000/0000000002
+        run: |
+          ./gradlew --no-daemon assembleRelease
+          python3 scripts/check-release-admob.py app/build/outputs/apk/release/app-release-unsigned.apk
       - name: Unit test evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

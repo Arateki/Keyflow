@@ -4,6 +4,9 @@ import com.google.common.truth.Truth.assertThat
 import com.keyflow.auth.AuthErrorKind
 import com.keyflow.auth.AuthException
 import java.net.ConnectException
+import java.net.BindException
+import java.net.InetAddress
+import java.net.ServerSocket
 import java.net.Socket
 import java.net.URI
 import kotlinx.coroutines.CancellationException
@@ -183,7 +186,18 @@ class LoopbackRedirectReceiverTest {
 
         val outcome = withTimeout(2_000) { waiting.await() }
         assertThat(outcome.exceptionOrNull()).isInstanceOf(CancellationException::class.java)
-        assertThrows(ConnectException::class.java) { Socket("127.0.0.1", port(r)).close() }
+        // Reivindica a porta liberada: uma conexão nova pode atingir outro listener que a reutilizou.
+        // O accept nativo também pode levar alguns instantes para concluir o fechamento.
+        withTimeout(2_000) {
+            while (true) {
+                try {
+                    ServerSocket(port(r), 1, InetAddress.getByName("127.0.0.1")).use { }
+                    break
+                } catch (_: BindException) {
+                    delay(10)
+                }
+            }
+        }
         Unit
     }
 

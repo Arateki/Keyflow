@@ -155,7 +155,9 @@ upload interno, o produto de R$15 e a service account. As tasks V1-1..V1-8 não 
   logo depois da V1-3 (permissão de billing e produto de R$15), antes do e2e real. A V1-8 retoma
   essa trilha: teste fechado com license testers da compra → produção. Antes dela, os roteiros
   manuais pendentes no A32 do que entra: GT-T8, NM-T13/T18, RSN-T19 (Gemma/Qwen: tempo e RAM) e o
-  das skins.
+  das skins. **[YAN] AdMob**: criar conta/app e blocos, configurar os IDs reais do release e
+  publicar `app-ads.txt` no domínio de desenvolvedor; roteiro em
+  `.specs/features/monetization/admob-release.md`.
 - ~~**V1-9** — API em staging e produção na AWS (API-T13 + teste de carga), DNS/TLS Cloudflare,
   rotas de transcrição e SSV desligadas por padrão.~~ **Feita em 2026-10-23**: staging no Lightsail
   `keyflow-v1` (release `api-staging-20261023T112732Z-4853523`, acesso local) e produção em

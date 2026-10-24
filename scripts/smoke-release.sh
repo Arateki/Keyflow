@@ -19,6 +19,9 @@ flock /tmp/keyflow-gradle.lock env GRADLE_USER_HOME="$gradle_user_home" "$gradle
     -PkeyflowSmokeSigning=true :app:assembleRelease
 [[ -f "$apk" ]] || { echo "APK release assinado pelo Gradle ausente: $apk" >&2; exit 2; }
 
+# Varre todas as entradas descomprimidas (resources.arsc usa UTF-16, DEX usa UTF-8).
+python3 scripts/check-release-admob.py "$apk"
+
 # O release usa produção e não pode embutir identificador/token de Access, simulador ou agente.
 dex_dump="$(mktemp /tmp/keyflow-release-dex.XXXXXX)"
 window_xml="$(mktemp /tmp/keyflow-release-window.XXXXXX)"
@@ -55,10 +58,16 @@ rm -f "$dex_dump"
 "$adb_bin" -s "$serial" shell ime enable com.keyflow/.ime.KeyFlowKeyboardService
 "$adb_bin" -s "$serial" logcat -c
 "$adb_bin" -s "$serial" shell am force-stop com.keyflow
-"$adb_bin" -s "$serial" shell am start -W -n com.keyflow/.ui.SetupActivity
+launch_result="$("$adb_bin" -s "$serial" shell am start -W -n com.keyflow/.ui.SetupActivity 2>&1)"
+printf '%s\n' "$launch_result"
+if ! grep -q '^Status: ok' <<< "$launch_result"; then
+    echo "SetupActivity do release não abriu" >&2
+    exit 1
+fi
 sleep 5
 
 dump_window() {
+    "$adb_bin" -s "$serial" shell rm -f /sdcard/keyflow-release-window.xml
     "$adb_bin" -s "$serial" shell uiautomator dump /sdcard/keyflow-release-window.xml >/dev/null 2>&1
     "$adb_bin" -s "$serial" pull /sdcard/keyflow-release-window.xml "$window_xml" >/dev/null 2>&1
 }

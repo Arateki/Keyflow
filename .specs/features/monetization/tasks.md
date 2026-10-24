@@ -25,6 +25,14 @@ A API está na `main` desde 2026-09-28 (PR #4: API-T1..T12 + T13 parcial), ainda
 > **Coisas que só o Yan pode fazer** (Play Console: produtos/license testers; AdMob: unidades/
 > SSV; credenciais): cada task marca; usar test ads/fakes até existirem.
 
+## IDs AdMob do release — v1-admob-ids — ✅ Feito (2026-10-24)
+
+Implementado: debug fixo em teste; release com propriedades locais/ambiente, formato validado e
+publisher de teste recusado; testes JVM e inspeção do APK no smoke/Checks.
+Configuração e pendências **[YAN] da V1-8**: [admob-release.md](admob-release.md).
+Verificado: debug/release, 1.514 unitários (3 novos), lint, falha do release sem IDs e smoke no
+emulador com abertura da Activity e XML fresco; scanner aprovado no APK release.
+
 ## Execution Plan
 
 ```

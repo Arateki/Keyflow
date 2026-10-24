@@ -65,6 +65,8 @@ class HttpDownloadGatewayTest {
 
         assertThat(dest.readBytes()).isEqualTo(body)
         assertThat(gateway.query(listOf(id)).getValue(id).bytesSoFar).isEqualTo(body.size.toLong())
+        // O worker publica SUCCESSFUL antes de chamar o listener; são dois sinais distintos.
+        waitFor("notificar conclusão") { finished.contains("modelo") }
         assertThat(finished).containsExactly("modelo")
     }
 
