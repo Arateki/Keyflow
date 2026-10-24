@@ -2648,3 +2648,22 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
   em 16a7ccd). Fonte idêntico à base 001740f; diferença medida só na linha do link e preservada
   fora do escopo. A captura de onboarding foi bit-idêntica. Comparações durante captura devem
   aguardar o marcador de PNG concluído, pois o arquivo existe antes de terminar de ser gravado.
+
+## 2026-10-24 — Página inicial do site (equipe/site-inicial)
+
+- `website/` é a página inicial (PT em `index.html`, EN em `en.html`): HTML/CSS/JS estáticos, sem
+  build, sem CDN e sem rastreador; fontes Space Grotesk/Space Mono em subconjunto woff2 com as OFL.
+  `scripts/gerar-site.py` junta `website/` às páginas legais e valida links, âncoras, `url()` do CSS,
+  hash da CSP, recursos externos e o orçamento de 400 KB da primeira carga (hoje 126 KB).
+- O `site.yml` mandava `--content-type text/html` para tudo: CSS, fontes e imagens chegariam com o
+  tipo errado no R2. Agora há um `s3 sync` por extensão, com tipo e cache vindos de `gerar-site.py
+  --tipos`; extensão nova precisa entrar em `TIPOS` (a validação recusa o que não conhece).
+- A CSP de `<meta>` bloqueia `<style>`/`style=""` em linha (só o script do tema passa, por hash).
+  Captura que injeta CSS precisa de `bypassCSP`; trocar o script do tema exige recalcular o hash.
+- No container sem fontes do sistema, o Chromium headless gira a 100% sem pintar: o fontconfig vazio
+  trava o renderer. Um `fonts.conf` em `/tmp` apontando para as DejaVu extraídas resolve.
+- `fullPage` do Chromium muda a altura da janela e recompõe trechos com layouts diferentes (`svh`,
+  animações ligadas à rolagem): capturas de página inteira saem melhores costuradas tela a tela,
+  com rolagem `behavior: 'instant'` (o `scroll-behavior: smooth` da página atrasa o `scrollTo`).
+- Brilho desfocado que vaza da coluna (`inset` negativo + `blur`) alargava a página no celular e
+  empurrava o topo fixo para fora da tela; as seções agora usam `overflow-x: clip`.
