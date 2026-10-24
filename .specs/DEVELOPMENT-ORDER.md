@@ -133,13 +133,19 @@ upload interno, o produto de R$15 e a service account. As tasks V1-1..V1-8 não 
   Google disponíveis também no release; classes verificadas no APK. Rodada 6 implementada: modo inferido uma vez,
   fallback entre API/OAuth e `settingsFlow` somente leitura; build, unitários, lint e compilação dos instrumentados
   verdes. Execução instrumentada pendente: AVD API 34 em TCG permanece offline após quase 20 min de boot frio.
-- **V1-3** — Build de release (PS-5): R8 (`isMinifyEnabled`) com keep rules (AIDL dos processos
+- ~~**V1-3** — Build de release (PS-5): R8 (`isMinifyEnabled`) com keep rules (AIDL dos processos
   `:inference`/`:reasoning`, sherpa-onnx, LiteRT-LM, AndroidSVG, Play Billing, AdMob), AAB,
-  `versionName` 1.0.0, smoke do release no A32. **[YAN]**: chave de upload (Play App Signing) e o
-  `applicationId` (decisão 2, caminho crítico). Vem depois da V1-10 com fakes, para o AAB já levar
-  a compra e os anúncios. Em seguida sobe na trilha interna **[YAN]**, com a permissão de billing,
-  para criar o produto de R$15 — antes do e2e real (MZ-T15/API-T14). A conta (decisão 1) trava
-  esse upload. **[YAN]**: configurar/verificar no Console o client OAuth Google com o SHA-1 da chave de assinatura Play e o `applicationId` definitivo.
+  `versionName` 1.0.0, smoke do release.~~ **Feita em 2026-10-24** (branch `equipe/v1-3-release`, PR #20; relatório em
+  `.equipe/relatorios/v1-3-release.md`): R8 e redução de recursos ligados no release; keep rule do pacote inteiro do LiteRT-LM
+  (a regra por classe deixava o R8 apagar os callbacks que só o `.so` chama) e `scripts/check-release-jni.py`, que o CI roda;
+  `bundleRelease` gera o AAB assinado com a chave de upload lida de fora do repositório
+  (`~/.keyflow/android/upload-keystore.properties`, ver `.specs/codebase/ENVIRONMENT.md`); `applicationId` **`com.arateki.keyflow`**
+  (decisão 2); `versionCode` 1 / `versionName` 1.0.0; smoke do APK de release no emulador (`scripts/smoke-release.sh`).
+  Vem depois da V1-10 com fakes, para o AAB já levar a compra e os anúncios. **[YAN]**: criar o app no Console com o id novo,
+  cadastrar a chave de upload (SHA-256 `AB:17:29:3A:…:A8:DC`) e subir o AAB na trilha interna, com a permissão de billing, para criar o
+  produto de R$15 — antes do e2e real (MZ-T15/API-T14). A conta (decisão 1) trava esse upload. **[YAN]**: configurar/verificar
+  no Console o client OAuth Google com o SHA-1 da chave de assinatura Play e o `applicationId` `com.arateki.keyflow`; desinstalar o
+  `com.keyflow` antigo do A32; o smoke no A32 fica no roteiro manual (V1-8).
 - ~~**V1-4** — Agente na v1: recorte da AGT-T10 para a fase 1 (abuso: injeção, segredo, argumentos,
   flood) + validação real com a chave do Yan **[YAN]**.~~ **Feita em 2026-10-23** (recorte de abuso automatizado revisado; falta a validação real [YAN], então o agente fica **Em breve** no release até ela fechar; relatório em `.equipe/relatorios/v1-4-agente.md`).
 - ~~**V1-5** — Política de privacidade (PS-2): áudio sob demanda para a origem escolhida, modelos locais,
@@ -183,9 +189,10 @@ upload interno, o produto de R$15 e a service account. As tasks V1-1..V1-8 não 
    account, e o e2e real (MZ-T15/API-T14) não fecha. Pessoal ou organização (Arateki). Organização
    exige D-U-N-S (grátis na Dun & Bradstreet, até 30 dias) e, portanto, uma empresa registrada.
    Conta pessoal que vende mostra o **endereço completo** do Yan na Play (answer/13628312).
-2. **`applicationId` definitivo** — **caminho crítico**, antes do 1º upload (a trilha interna que
-   antecede o e2e real). Depois dele não muda: `com.keyflow` (atual; não há app público com esse
-   id, mas só o Console confirma) ou `com.arateki.keyflow`. Muda junto o `PACKAGE_NAME` da API.
+2. **`applicationId` definitivo** — **resolvida (2026-10-24): `com.arateki.keyflow`**, no debug e no
+   release (o `namespace` e o pacote do código seguem `com.keyflow`). Depois do 1º upload não muda.
+   Feito na V1-3, junto com o `PACKAGE_NAME` da API. **[YAN]** ainda: o client OAuth do Google com o
+   pacote novo e o SHA-1 da chave de assinatura da Play, e desinstalar o `com.keyflow` antigo do A32.
 3. **Temas pagos na v1** — **resolvida (2026-10-23)**: Aero, Glitch, Rose Gold e o mascote são pagos
    já na v1, liberados pela compra de R$15. A Ateliê do teclado é grátis (emenda à UNL-05 da monetização).
 4. Onde hospedar a política de privacidade.
@@ -444,8 +451,9 @@ abaixo cita monetização entra na V1-10. Créditos continuam fora.
       substitui). Instrumented + golden.
 - [ ] **PS-4 — Data Safety Form**: preencher no Play Console **[YAN]** com a tabela do checklist
       (+ ads/purchases/device IDs da monetização — o agente prepara o rascunho campo a campo).
-- [ ] **PS-5 — Build de release**: keystore de assinatura **[YAN]**, `minifyEnabled`/R8 (conferir
-      keep rules p/ AIDL/sherpa/Billing), AAB, `versionCode/Name`, smoke do release no A32.
+- [x] **PS-5 — Build de release**: FEITO em 2026-10-24 (V1-3). R8 com keep rules conferidas por `check-release-jni.py`,
+      AAB assinado com a chave de upload, `versionCode` 1 / `versionName` 1.0.0, smoke no emulador. Falta **[YAN]**: o app no Console
+      com `com.arateki.keyflow`, o upload e o smoke manual no A32 (V1-8).
 - [ ] **PS-6 — Listing**: screenshots (overlay + teclado em uso — reusar galeria), descrição
       ("teclado de voz", "transcrição sob demanda"), categoria Productivity/Tools **[YAN aprova
       textos]**.
@@ -477,7 +485,7 @@ texto literal da doc da OpenAI). Ordem: RSN-T0 → T1 → … → T19 (uma por v
 ```
 feito: Q1..Q11 → SB → GT → NM → RSN → SKP → AGT fase 1 (faltam só manuais [YAN])
        PRs #8..#11 (2026-10-10..22) fora da fila da v1; V1-0..V1-2 e V1-10a feitas
-agora: V1-10 (fakes) → V1-3 → upload interno → e2e MZ-T15/API-T14 → V1-4 → … → V1-8
+agora: (V1-10 fakes e V1-3 feitas) → upload interno → e2e MZ-T15/API-T14 → V1-4 → … → V1-8
 em paralelo: V1-9 (API-T13 na AWS) — fakes esperam o staging; o e2e real espera conta, applicationId e o upload
 depois: créditos (MZ-T5..T8, T12) e ligar API-T11/T12 · VC (visão) · TS (temas, spec a revisar) ·
        AGT fases 2/3 · Fala/Fluxos/Computador (sem spec; ideias em
@@ -485,7 +493,8 @@ depois: créditos (MZ-T5..T8, T12) e ligar API-T11/T12 · VC (visão) · TS (tem
 ```
 
 **Posição atual (2026-10-23)**: o próximo marco é a **v1** (recorte no topo). V1-0, V1-1, V1-2 e
-a Fase A da V1-10 estão feitas. O próximo passo da fila é a V1-3; a V1-9 (API na AWS) corre em
+a Fase A da V1-10 estão feitas. A V1-3 foi feita em 2026-10-24 (AAB assinado e `applicationId` `com.arateki.keyflow`); o próximo
+passo é o upload na trilha interna **[YAN]**; a V1-9 (API na AWS) corre em
 paralelo desde já. A V1-10 restante com fakes espera o staging. O e2e com compra real espera as decisões 1 e 2, o AAB da
 V1-3 e o upload na trilha interna (produto de R$15 e service account). As PRs #8 a #11 não mudam
 a fila.

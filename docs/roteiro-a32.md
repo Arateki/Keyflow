@@ -19,6 +19,11 @@ No terminal da sua máquina de desenvolvimento (o `ANDROID_SERIAL=RX8T10DERKW` g
 ANDROID_SERIAL=RX8T10DERKW GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon installDebug
 ```
 
+> **Pacote novo (2026-10-24):** o `applicationId` agora é `com.arateki.keyflow` (o `namespace` do código segue `com.keyflow`). O
+> `installDebug` instala um app **novo**, sem dados nem teclado habilitado do anterior: o `com.keyflow` que já está no A32 continua lá
+> até você desinstalá-lo (`adb -s RX8T10DERKW uninstall com.keyflow`), e o KeyFlow novo precisa ser habilitado e escolhido como teclado
+> de novo. Os comandos `run-as`/`pm clear` abaixo já usam o id novo.
+
 ### 2. Acompanhar Logs em Tempo Real (opcional, deixe rodando em uma janela do terminal):
 ```bash
 adb -s RX8T10DERKW logcat -v time -s \

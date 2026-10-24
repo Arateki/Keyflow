@@ -131,6 +131,7 @@ Ao criar o app listing, preencher a seção **"Data safety"** declarando:
 | 3. Data Safety Form | ⏳ depende do Play Console, não do código |
 | 4. Política e Data Safety cobrem a aba Raciocínio (seção 1b) | ⏳ texto pronto (2026-09-30); entra junto com PS-2/PS-4 |
 | 5. Login ChatGPT (seção 1c) | ⏸ desligado no release (`enabled = BuildConfig.DEBUG`) — **[YAN] decidir a elegibilidade; NÃO publicar ligado** |
+| 6. Build de release (PS-5, V1-3) | ✅ 2026-10-24: R8 + redução de recursos ligados, `bundleRelease` gera o AAB assinado com a chave de upload (lida de fora do repositório), `versionCode` 1 / `versionName` 1.0.0, `applicationId` `com.arateki.keyflow`; smoke do APK de release no emulador (`scripts/smoke-release.sh`). Falta **[YAN]**: criar o app no Console com esse id, cadastrar a chave de upload (SHA-256 `AB:17:29:3A:…:A8:DC`), o client OAuth Google com o pacote novo e subir o AAB na trilha interna. Detalhes: `.specs/codebase/ENVIRONMENT.md` › "Release". |
 
 ## Estado atual do código relevante
 
