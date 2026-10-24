@@ -189,7 +189,7 @@ anônima preservada; o cache remoto é limpo, sem apagar a compra local reconhec
 
 | ID | Área | Status |
 | --- | ---- | ------ |
-| DEL-01..03 | Exclusão e restauração | Implementado — v1-apagar-dados; testes API/JVM/Compose e goldens; atendimento por e-mail com Yan |
+| DEL-01..03 | Exclusão e restauração | Verificado localmente — v1-apagar-dados, testes API/JVM/Compose e goldens; atendimento por e-mail com Yan |
 | LOG-01 | Retenção técnica | Configuração e testes locais — implantação Lightsail e conferência Cloudflare pendentes [YAN] |
 | IDN-01..03 | Identidade no app | Parcial — MZ-T1/T2; staging da API pendente |
 | CRD-01..05 | Créditos (aba Voz) | Pending |

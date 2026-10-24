@@ -2601,3 +2601,6 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
 - SQLx 0.9 exige SqlSafeStr: a matriz de contagens do teste de exclusão usa consultas literais,
   sem formatar o SQL em tempo de execução. Teste autenticado comprova cascata nas quatro tabelas,
   isolamento do aparelho vizinho e restauração do mesmo purchaseToken após novo registro.
+- Gate final: Android debug/release + lint + 1.519 JVM; Rust fmt/clippy + 145 testes; 4 testes de
+  retenção e 13 instrumentados verdes. Quatro goldens novos revistos nos dois temas e bit-idênticos
+  na recaptura; os antigos ficam preservados. Lightsail/Cloudflare e Play real continuam com o Yan.
