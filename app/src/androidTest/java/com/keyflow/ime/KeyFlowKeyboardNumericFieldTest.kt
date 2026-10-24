@@ -131,7 +131,7 @@ class KeyFlowKeyboardNumericFieldTest {
     }
 
     private companion object {
-        const val IME = "com.keyflow/.ime.KeyFlowKeyboardService"
+        const val IME = "com.arateki.keyflow/com.keyflow.ime.KeyFlowKeyboardService"
         const val TIMEOUT = 5000L
     }
 }

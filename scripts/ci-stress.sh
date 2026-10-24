@@ -28,9 +28,9 @@ OUT=app/build/stress-evidence
 ADB="${ANDROID_HOME:+$ANDROID_HOME/platform-tools/}adb"
 APP_APK=app/build/outputs/apk/debug/app-debug.apk
 TEST_APK=app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
-RUNNER=com.keyflow.test/androidx.test.runner.AndroidJUnitRunner
-KEYFLOW_IME=com.keyflow/.ime.KeyFlowKeyboardService
-FAILURE_SHOTS=/sdcard/Android/data/com.keyflow/files
+RUNNER=com.arateki.keyflow.test/androidx.test.runner.AndroidJUnitRunner
+KEYFLOW_IME=com.arateki.keyflow/com.keyflow.ime.KeyFlowKeyboardService
+FAILURE_SHOTS=/sdcard/Android/data/com.arateki.keyflow/files
 mkdir -p "$OUT"
 
 # Sem diálogo de "app não está respondendo" segurando o foco (a mesma lição do ci-device-gate.sh).
@@ -73,7 +73,7 @@ wait_ime_registered() {
 # Depois do `adb install` o app fica `run-from-apk`; o compile grava a verificação (ci-device-gate.sh).
 install_app() {
   "$ADB" install -r -t "$APP_APK" >/dev/null || return 1
-  "$ADB" shell cmd package compile -m speed -f com.keyflow >/dev/null
+  "$ADB" shell cmd package compile -m speed -f com.arateki.keyflow >/dev/null
   wait_ime_registered
 }
 
@@ -115,7 +115,7 @@ if ! "$ADB" install -r -t "$TEST_APK" >/dev/null; then
   echo "::error::o APK de teste não instalou"
   exit 1
 fi
-"$ADB" shell cmd package compile -m speed -f com.keyflow.test >/dev/null
+"$ADB" shell cmd package compile -m speed -f com.arateki.keyflow.test >/dev/null
 if [ -n "$CPU" ] && ! limit_cpu; then
   echo "::error::não consegui limitar a CPU do emulador a $CPU%"
   exit 1

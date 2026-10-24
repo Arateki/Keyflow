@@ -18,7 +18,7 @@ internal const val IME_COLD_ATTACH_TIMEOUT_MS = 30_000L
 /** De quanto em quanto tempo, sem a view anexada, o probe volta para a frente e o campo é tocado de novo. */
 private const val IME_ATTACH_NUDGE_MS = 6_000L
 
-private const val KEYFLOW_IME = "com.keyflow/.ime.KeyFlowKeyboardService"
+private const val KEYFLOW_IME = "com.arateki.keyflow/com.keyflow.ime.KeyFlowKeyboardService"
 
 /**
  * Espera a view do teclado anexar ao campo do `ImeProbeActivity`. Enquanto não anexa, a cada

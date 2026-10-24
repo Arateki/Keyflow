@@ -46,7 +46,7 @@ chave; o `TranslationsTest` confere as traduções.
   aparelhos conectados, inclusive o do Yan.
 - **Aparelho do Yan (Galaxy A32, `RX8T10DERKW`)**: nunca `connectedAndroidTest` — ele desinstala o app ao
   terminar e o KeyFlow deixa de ser o teclado do Yan. Use `installDebug installDebugAndroidTest` e
-  `adb -s RX8T10DERKW shell am instrument -w -r [-e class …] com.keyflow.test/androidx.test.runner.AndroidJUnitRunner`.
+  `adb -s RX8T10DERKW shell am instrument -w -r [-e class …] com.arateki.keyflow.test/androidx.test.runner.AndroidJUnitRunner`.
   Antes de qualquer `adb install -r`, rode `installDebug` ou `assembleDebug` — nunca só `compileDebugKotlin`
   (não gera APK novo).
 - **Goldens**: `verification/golden/` é a fonte de verdade. Fluxo `scripts/verify-screens.sh` →

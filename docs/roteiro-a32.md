@@ -33,7 +33,7 @@ adb -s RX8T10DERKW logcat -v time -s \
 > **Pré-requisitos:** Nenhum (primeira execução limpa).
 
 ### Passo 1.1 — Primeira Abertura e Divulgação em Destaque (Prominent Disclosure)
-- **Ação:** Se o app já estiver instalado, limpe os dados para simular novo usuário (`adb shell pm clear com.keyflow`) e abra o aplicativo KeyFlow.
+- **Ação:** Se o app já estiver instalado, limpe os dados para simular novo usuário (`adb shell pm clear com.arateki.keyflow`) e abra o aplicativo KeyFlow.
 - **O que observar:**
   - A tela inicial exibe a **Divulgação em Destaque** antes de pedir permissão de microfone.
   - O texto informa com clareza: o microfone só grava sob demanda; o áudio é processado no celular ou enviado ao provedor configurado; nenhuma tecla é transmitida; o app exibe anúncios AdMob com consentimento UMP.
@@ -52,8 +52,8 @@ adb -s RX8T10DERKW logcat -v time -s \
 ### Passo 1.4 — Gate de Atualização de Versão (Upgrade)
 - **Ação:** Simule uma versão desatualizada de consentimento via adb:
   ```bash
-  adb -s RX8T10DERKW shell "run-as com.keyflow sed -i 's/\"disclosure_accepted_version\":[0-9]*/\"disclosure_accepted_version\":0/' shared_prefs/com.keyflow_preferences.xml"
-  adb -s RX8T10DERKW shell am force-stop com.keyflow
+  adb -s RX8T10DERKW shell "run-as com.arateki.keyflow sed -i 's/\"disclosure_accepted_version\":[0-9]*/\"disclosure_accepted_version\":0/' shared_prefs/com.arateki.keyflow_preferences.xml"
+  adb -s RX8T10DERKW shell am force-stop com.arateki.keyflow
   ```
   Abra o teclado e toque no microfone.
 - **Resultado esperado:** A gravação é **bloqueada** e o app abre a tela de divulgação exigindo novo aceite da versão vigente antes de liberar o microfone.
@@ -133,7 +133,7 @@ adb -s RX8T10DERKW logcat -v time -s \
 - **Exclusão do Arquivo de Áudio:**
   - Após a transcrição, execute no computador:
     ```bash
-    adb -s RX8T10DERKW shell run-as com.keyflow ls -la cache/keyflow-recordings
+    adb -s RX8T10DERKW shell run-as com.arateki.keyflow ls -la cache/keyflow-recordings
     ```
   - *Resultado esperado:* O diretório de cache de gravações está **vazio** (o arquivo é apagado imediatamente após a entrega).
 
@@ -171,7 +171,7 @@ adb -s RX8T10DERKW logcat -v time -s \
 - **Medição de RAM (Helio G80):**
   - Durante a resposta, execute no computador:
     ```bash
-    adb -s RX8T10DERKW shell dumpsys meminfo com.keyflow:reasoning
+    adb -s RX8T10DERKW shell dumpsys meminfo com.arateki.keyflow:reasoning
     ```
   - Anote o valor de **TOTAL PSS** (em MB).
 - **Descarga por Ociosidade:** Deixe o aparelho parado por 2 minutos e 30 segundos sem usar o raciocínio e verifique o `dumpsys meminfo` novamente.
@@ -180,7 +180,7 @@ adb -s RX8T10DERKW logcat -v time -s \
 ### Passo 5.2 — Isolamento de Falhas do Processo de Raciocínio
 - **Ação:** Inicie um teste do modelo local e, enquanto o texto estiver sendo gerado, force a finalização do processo no terminal:
   ```bash
-  adb -s RX8T10DERKW shell run-as com.keyflow kill -9 $(adb -s RX8T10DERKW shell pidof com.keyflow:reasoning)
+  adb -s RX8T10DERKW shell run-as com.arateki.keyflow kill -9 $(adb -s RX8T10DERKW shell pidof com.arateki.keyflow:reasoning)
   ```
 - **Resultado esperado:** A tela de configurações exibe aviso amigável de que o motor foi interrompido. **O teclado e a orbe continuam funcionando normalmente sem fechar**. Um novo toque em "Testar" reinicia o motor sem problemas.
 
@@ -193,7 +193,7 @@ adb -s RX8T10DERKW logcat -v time -s \
 - **Segurança das Credenciais (Android Keystore):**
   - Execute no computador:
     ```bash
-    adb -s RX8T10DERKW shell run-as com.keyflow cat shared_prefs/keyflow_auth.xml
+    adb -s RX8T10DERKW shell run-as com.arateki.keyflow cat shared_prefs/keyflow_auth.xml
     ```
   - *Resultado esperado:* O arquivo existe e seu conteúdo é **completamente cifrado e ilegível**. A chave `sk-...` **NÃO** aparece em texto puro em nenhum arquivo de preferências ou banco de dados.
 

@@ -43,7 +43,7 @@ import org.junit.Test
 /**
  * SKP-T8, evidência visual (só com `-e skpShots 1`; fora disso é "assumption"): instala o pacote de exemplo REAL (dos assets do APK de teste) no
  * `filesDir/skins` do app, escolhe-o nos ajustes para o teclado e a orbe e salva screenshots da tela inteira em
- * `/sdcard/Android/data/com.keyflow/files/skp-shots/` (puxar com `adb pull`):
+ * `/sdcard/Android/data/com.arateki.keyflow/files/skp-shots/` (puxar com `adb pull`):
  *
  *  - **o IME real** (`KeyFlowKeyboardService` num campo do `ImeProbeActivity`): repouso, com uma tecla de letra e uma de função **seguradas**
  *    (a face pressionada) e, sem pacote, o Sistema, para comparar;
@@ -263,7 +263,7 @@ class SkinExampleCaptureTest {
     }
 
     private companion object {
-        const val IME = "com.keyflow/.ime.KeyFlowKeyboardService"
+        const val IME = "com.arateki.keyflow/com.keyflow.ime.KeyFlowKeyboardService"
         const val FRAME_GAP_MS = 90L
 
         /** (rótulo, estado do botão, quantos quadros capturar para o GIF) */

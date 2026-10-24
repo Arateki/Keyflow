@@ -8,7 +8,7 @@ import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 
 /** O app medido e o seu teclado. */
-const val TARGET = "com.keyflow"
+const val TARGET = "com.arateki.keyflow"
 private const val IME = "$TARGET/.ime.KeyFlowKeyboardService"
 
 /**

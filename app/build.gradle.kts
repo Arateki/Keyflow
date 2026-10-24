@@ -43,7 +43,7 @@ fun buildConfigString(value: String): String {
 // applicationId definitivo (decisão 2 do Yan, 2026-10-24): `com.arateki.keyflow`, no debug e no release; o id do APK de teste
 // vira `com.arateki.keyflow.test`. Depois do 1º upload na Play não muda mais. O `namespace` abaixo é outra coisa — o pacote do
 // código e do `R` — e continua `com.keyflow`. Quem mais depende do id está em .specs/codebase/ENVIRONMENT.md › "applicationId".
-val keyflowApplicationId = "com.keyflow"
+val keyflowApplicationId = "com.arateki.keyflow"
 
 // Chave de upload da Play (Play App Signing): o keystore e as senhas ficam FORA do repositório. Fontes, nesta ordem:
 //  1. variáveis de ambiente KEYFLOW_UPLOAD_STORE_FILE, KEYFLOW_UPLOAD_STORE_PASSWORD, KEYFLOW_UPLOAD_KEY_ALIAS e

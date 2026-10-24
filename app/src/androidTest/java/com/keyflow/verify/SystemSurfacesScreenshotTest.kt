@@ -181,7 +181,7 @@ class SystemSurfacesScreenshotTest {
     private companion object {
         const val CHANNEL = "keyflow_overlay"
         const val NOTIF_ID = 1001
-        const val IME = "com.keyflow/.ime.KeyFlowKeyboardService"
+        const val IME = "com.arateki.keyflow/com.keyflow.ime.KeyFlowKeyboardService"
         const val TIMEOUT = 5000L
         const val CAPTURE_TRIES = 3
     }
