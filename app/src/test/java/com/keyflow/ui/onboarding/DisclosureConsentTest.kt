@@ -1,9 +1,15 @@
 package com.keyflow.ui.onboarding
 
 import com.google.common.truth.Truth.assertThat
+import com.keyflow.BuildConfig
 import org.junit.Test
 
 class DisclosureConsentTest {
+    @Test
+    fun `agent is enabled only in debug variant`() {
+        assertThat(BuildConfig.AGENT_ENABLED).isEqualTo(BuildConfig.DEBUG)
+    }
+
     @Test
     fun `first use is not accepted`() {
         assertThat(DisclosureConsent.fromStoredVersion(0).isAcceptedForCurrentVersion()).isFalse()

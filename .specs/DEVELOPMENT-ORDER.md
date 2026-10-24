@@ -63,8 +63,8 @@ R$15, que também tira os anúncios para sempre. Os anúncios ficam só no app d
   configuração: banner + intersticial (M7/M8). Nunca no teclado nem no overlay. Fiação na V1-10.
 - Raciocínio: modelos locais (Gemma/Qwen) e provedores por chave de API (OpenAI, Anthropic, Google).
   Os logins por assinatura ChatGPT, Claude e Google também entram no release (decisão do Yan, 2026-10-23).
-- Agente KeyFlow da fase 1 (chat + ferramentas de skin com confirmação; MCP desligado) — **só se a
-  V1-4 fechar**; senão ele entra como "Em breve".
+- Agente KeyFlow da fase 1 (chat + ferramentas de skin com confirmação; MCP desligado) — no debug;
+  no release fica "Em breve" até a validação real autorizada da V1-4 **[YAN]**.
 - API em staging e produção (V1-9), com a rota de transcrição (API-T11) e a SSV (API-T12)
   desligadas (`TRANSCRIBE_ENABLED` e `SSV_ADMOB_ENABLED`, padrão desligado, 404 sem banco).
 

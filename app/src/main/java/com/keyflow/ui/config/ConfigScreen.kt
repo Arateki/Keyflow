@@ -151,6 +151,7 @@ fun ConfigScreen(
     reasoningLocalSupported: Boolean = true,
     // O agente com ferramentas da aba KeyFlow (agent-harness); `null` = o chat de texto de sempre.
     agent: com.keyflow.agenthost.AgentRuntime? = null,
+    agentEnabled: Boolean = true,
     // Entitlements da compra única. Nulos/false mantêm as telas de galeria e testes sem Billing.
     skinsUnlocked: Boolean = false,
     onUnlockPurchase: () -> Unit = {},
@@ -378,12 +379,16 @@ fun ConfigScreen(
                         blockReason(tab)?.let { showToast(it, 2500, navActionFor(tab)) }
                     }
                     when (activeTab) {
-                        ConfigTab.KEYFLOW -> KeyflowPanel(
-                            settings = settings,
-                            onSettingsChange = ::recordSettingsChange,
-                            resolve = resolveReasoning,
-                            agent = agent,
-                        )
+                        ConfigTab.KEYFLOW -> if (agentEnabled) {
+                            KeyflowPanel(
+                                settings = settings,
+                                onSettingsChange = ::recordSettingsChange,
+                                resolve = resolveReasoning,
+                                agent = agent,
+                            )
+                        } else {
+                            ComingSoonPanel()
+                        }
                         ConfigTab.VOZ -> VozPanel(
                             settings = settings,
                             onSettingsChange = ::recordSettingsChange,

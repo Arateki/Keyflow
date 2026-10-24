@@ -55,6 +55,7 @@ import com.keyflow.reasoning.local.LocalLlmSupport
 import com.keyflow.reasoning.local.LocalReasoningEngine
 import com.keyflow.auth.AuthController
 import com.keyflow.App
+import com.keyflow.BuildConfig
 import com.keyflow.auth.ProviderIds
 import com.keyflow.ui.config.AccountModel
 import com.keyflow.ui.config.AuthActions
@@ -126,6 +127,7 @@ class SetupActivity : ComponentActivity() {
 
     private var settings by mutableStateOf(Settings())
     private var showDisclosure by mutableStateOf(false)
+    private var showDeclineExplanation by mutableStateOf(false)
 
     // Modelos de voz locais (native-voice-models, NM-T10).
     private val localModels by lazy { LocalModelsController(this) }
@@ -314,6 +316,7 @@ class SetupActivity : ComponentActivity() {
                     Box(Modifier.fillMaxSize().background(LocalKeyFlowPalette.current.bg))
                 } else if (
                     showDisclosure ||
+                    showDeclineExplanation ||
                     !DisclosureConsent.fromStoredVersion(settings.disclosureAcceptedVersion).isAcceptedForCurrentVersion() &&
                     (!settings.onboardingDone || !settings.disclosureDeclined)
                 ) {
@@ -420,7 +423,8 @@ class SetupActivity : ComponentActivity() {
                         falaElevenLabsAuth = elevenLabsAuth,
                         reasoningLocalSupported = LocalLlmSupport.isSupported(android.os.Build.SUPPORTED_ABIS),
                         localActions = localModels,
-                        agent = agentRuntime,
+                        agentEnabled = BuildConfig.AGENT_ENABLED,
+                        agent = if (BuildConfig.AGENT_ENABLED) agentRuntime else null,
                     )
                 } else {
                     OnboardingScreen(
@@ -451,6 +455,7 @@ class SetupActivity : ComponentActivity() {
     /** Só este aceite libera a solicitação de RECORD_AUDIO; aceite antigo reapresenta a tela. */
     private fun acceptDisclosure() {
         settings = settings.copy(disclosureAcceptedVersion = DISCLOSURE_VERSION, disclosureDeclined = false)
+        showDeclineExplanation = false
         activityScope.launch { settingsRepository.saveDisclosureConsent(DISCLOSURE_VERSION, declined = false) }
         showDisclosure = false
         if (permissions.microphoneGranted) return
@@ -459,6 +464,7 @@ class SetupActivity : ComponentActivity() {
 
     private fun declineDisclosure() {
         if (settings.disclosureDeclined) {
+            showDeclineExplanation = false
             requestedTab = ConfigTab.OVERLAY
             requestedTabKey++
             showDisclosure = false
@@ -466,6 +472,7 @@ class SetupActivity : ComponentActivity() {
             return
         }
         settings = settings.copy(disclosureDeclined = true)
+        showDeclineExplanation = true
         activityScope.launch {
             settingsRepository.saveDisclosureConsent(settings.disclosureAcceptedVersion, declined = true)
         }

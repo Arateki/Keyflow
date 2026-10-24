@@ -84,6 +84,7 @@ class ConfigScreenTest {
         var adsOff = false
         var showUpdateWarning = false
         var monetizationDisabled = false
+        var agentEnabled = true
         var interstitialPolicy: InterstitialPolicy? = null
         var interstitialPolicyChanges = 0
 
@@ -121,6 +122,7 @@ class ConfigScreenTest {
                     adsOff = adsOff,
                     showUpdateWarning = showUpdateWarning,
                     monetizationDisabled = monetizationDisabled,
+                    agentEnabled = agentEnabled,
                     interstitialPolicy = interstitialPolicy,
                     onInterstitialPolicyChanged = { interstitialPolicyChanges++ },
                     modifier = Modifier.fillMaxSize(),
@@ -147,6 +149,16 @@ class ConfigScreenTest {
         rule.onNodeWithTag(tabTag(ConfigTab.OVERLAY)).performClick()
         rule.onNodeWithTag(panelTag(ConfigTab.OVERLAY)).assertIsDisplayed()
         rule.onNodeWithTag(HEADER_TAB_TITLE_TAG).assertTextEquals("Sobrepor")
+    }
+
+    @Test
+    fun disabledAgentShowsComingSoonInsteadOfChat() {
+        val h = Harness().also { it.agentEnabled = false }
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(tabTag(ConfigTab.KEYFLOW)).performClick()
+        rule.onNodeWithTag(COMING_SOON_PANEL_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(KEYFLOW_INPUT_TAG).assertDoesNotExist()
     }
 
     @Test
