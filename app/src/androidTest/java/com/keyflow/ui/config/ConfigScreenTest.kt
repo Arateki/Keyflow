@@ -185,7 +185,7 @@ class ConfigScreenTest {
     }
 
     @Test
-    fun requiredAdsPrivacyOptionsCanBeReopenedFromDocs() {
+    fun requiredAdsPrivacyOptionsCanBeReopenedFromPrivacy() {
         val consent = FakeConsentRequester(required = true)
         val h = Harness().also {
             it.adsController = AdsController(
@@ -195,9 +195,41 @@ class ConfigScreenTest {
             )
         }
         rule.setContent { h.Content() }
-        rule.onNodeWithTag(tabTag(ConfigTab.DOCS)).performClick()
+        rule.onNodeWithTag(tabTag(ConfigTab.PRIVACIDADE)).performClick()
         rule.onNodeWithTag(ADS_PRIVACY_OPTIONS_TAG).assertIsDisplayed().performClick()
         assertEquals(1, consent.privacyOptionsFormsShown)
+    }
+
+    @Test
+    fun docsAbreNovaAbaDePrivacidade() {
+        val h = Harness()
+        rule.setContent { h.Content() }
+        rule.onNodeWithTag(tabTag(ConfigTab.DOCS)).performClick()
+        rule.onNodeWithTag(DOCS_OPEN_PRIVACY_TAG).performScrollTo().performClick()
+        rule.onNodeWithTag(panelTag(ConfigTab.PRIVACIDADE)).assertIsDisplayed()
+        rule.onNodeWithTag(PRIVACY_POLICY_TAG).assertExists()
+    }
+
+    @Test
+    fun desbloqueioOcultaOpcoesUmpNaAbaPrivacidade() {
+        val h = Harness().also {
+            it.adsOff = true
+            it.adsController = AdsController(ApplicationProvider.getApplicationContext(), FakeAdsRuntime(), FakeConsentRequester(required = true))
+        }
+        rule.setContent { h.Content() }
+        rule.onNodeWithTag(tabTag(ConfigTab.PRIVACIDADE)).performClick()
+        rule.onNodeWithTag(ADS_PRIVACY_OPTIONS_TAG).assertDoesNotExist()
+        rule.onNodeWithTag(PRIVACY_REVIEW_DISCLOSURE_TAG).assertExists()
+    }
+
+    @Test
+    fun privacidadeNaoMostraOpcoesUmpSemExigencia() {
+        val h = Harness().also {
+            it.adsController = AdsController(ApplicationProvider.getApplicationContext(), FakeAdsRuntime(), FakeConsentRequester())
+        }
+        rule.setContent { h.Content() }
+        rule.onNodeWithTag(tabTag(ConfigTab.PRIVACIDADE)).performClick()
+        rule.onNodeWithTag(ADS_PRIVACY_OPTIONS_TAG).assertDoesNotExist()
     }
 
     @Test
@@ -296,7 +328,7 @@ class ConfigScreenTest {
             ConfigTab.KEYFLOW,
             ConfigTab.TECLADO, ConfigTab.OVERLAY, ConfigTab.NOTIFICACAO,
             ConfigTab.FLUXOS, ConfigTab.VOZ, ConfigTab.VISAO, ConfigTab.RACIOCINIO, ConfigTab.FALA, ConfigTab.COMPUTADOR,
-            ConfigTab.DOCS,
+            ConfigTab.PRIVACIDADE, ConfigTab.DOCS,
         )
         assertEquals(order, ConfigTab.entries.toList())
         fun tops() = order.map { rule.onNodeWithTag(tabTag(it)).getUnclippedBoundsInRoot().top }

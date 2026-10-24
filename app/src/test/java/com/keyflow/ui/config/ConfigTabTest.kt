@@ -41,7 +41,8 @@ class ConfigTabTest {
 
     @Test
     fun `the docs are in no group of their own and sit last`() {
-        assertThat(ConfigTab.DOCS.group).isEqualTo(TabGroup.OUTROS)
+        assertThat(ConfigTab.entries.filter { it.group == TabGroup.OUTROS })
+            .containsExactly(ConfigTab.PRIVACIDADE, ConfigTab.DOCS).inOrder()
         assertThat(ConfigTab.entries.last()).isEqualTo(ConfigTab.DOCS)
     }
 

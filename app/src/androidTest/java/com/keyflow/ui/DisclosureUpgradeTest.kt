@@ -5,6 +5,12 @@ import android.content.Context
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performScrollTo
+import com.keyflow.ui.config.tabTag
+import com.keyflow.ui.config.PRIVACY_REVIEW_DISCLOSURE_TAG
+import com.keyflow.ui.onboarding.DISCLOSURE_DECLINE_TAG
+import com.keyflow.ui.onboarding.DISCLOSURE_CONTINUE_TAG
+import com.keyflow.ui.onboarding.DISCLOSURE_DECLINED_EXPLANATION_TAG
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -62,4 +68,41 @@ class DisclosureUpgradeTest {
         }
         compose.onNodeWithTag(panelTag(ConfigTab.VOZ)).assertExists()
     }
+    @Test
+    fun reverAvisoERecusarRevogaAceiteAtualComoNaAtualizacao() {
+        compose.mainClock.autoAdvance = false
+        fun espera(tag: String) {
+            var frames = 0
+            while (compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isEmpty() && frames++ < 100) {
+                compose.mainClock.advanceTimeBy(100)
+            }
+            compose.onNodeWithTag(tag).assertExists()
+        }
+        espera(DISCLOSURE_ACCEPT_TAG)
+        compose.onNodeWithTag(DISCLOSURE_ACCEPT_TAG).performClick()
+        espera(tabTag(ConfigTab.PRIVACIDADE))
+        compose.onNodeWithTag(tabTag(ConfigTab.PRIVACIDADE)).performScrollTo().performClick()
+        compose.mainClock.advanceTimeBy(300)
+        compose.onNodeWithTag(PRIVACY_REVIEW_DISCLOSURE_TAG).performScrollTo().performClick()
+        espera(DISCLOSURE_ACCEPT_TAG)
+        compose.onNodeWithTag(DISCLOSURE_ACCEPT_TAG).performClick()
+        espera(panelTag(ConfigTab.PRIVACIDADE))
+        compose.onNodeWithTag(PRIVACY_REVIEW_DISCLOSURE_TAG).performScrollTo().performClick()
+        espera(DISCLOSURE_DECLINE_TAG)
+        compose.onNodeWithTag(DISCLOSURE_DECLINE_TAG).performClick()
+        compose.mainClock.advanceTimeBy(100)
+        compose.onNodeWithTag(DISCLOSURE_DECLINED_EXPLANATION_TAG).assertExists()
+        compose.onNodeWithTag(DISCLOSURE_CONTINUE_TAG).performClick()
+        espera(panelTag(ConfigTab.OVERLAY))
+        val deadline = android.os.SystemClock.elapsedRealtime() + 5_000
+        var revoked = false
+        while (android.os.SystemClock.elapsedRealtime() < deadline) {
+            val saved = runBlocking { SettingsRepository(context).settingsFlow().first() }
+            revoked = saved.disclosureDeclined && saved.disclosureAcceptedVersion == 0
+            if (revoked) break
+            android.os.SystemClock.sleep(50)
+        }
+        assertTrue("recusar novamente deve invalidar o aceite que libera o gravador", revoked)
+    }
+
 }

@@ -191,3 +191,19 @@ Sem TESTING.md do app aqui — convenção própria do repo Rust (fica no README
   contrato no app (monetization) fixa o bitrate esperado.
 - **Monorepo**: CI da API com path filter (`api/**`) p/ não rodar cargo em commits só-Android
   (e o CI Android, se existir, ignora `api/**`); `api/target/` no `.gitignore` da raiz.
+
+
+## Exclusão pelo aparelho e retenção (v1-apagar-dados)
+
+`DELETE /v1/account` usa o mesmo extractor Bearer do GET. A migration 0004 muda os quatro FKs para
+`ON DELETE CASCADE`, preservando atomicidade e isolamento por conta. Sem tombstone: 204 no sucesso,
+401 com o token já revogado. Repetição após resposta perdida usa registro da mesma identidade e novo
+DELETE; somente depois remove credencial e zera cache remoto. O mutex do repositório serializa com
+refresh para impedir retorno do cache antigo. O marcador de exclusão persiste no armazenamento seguro;
+leitura de conta e restauração automática não recriam o cadastro. Nova compra explícita libera registro.
+A identidade usada no obfuscatedAccountId do Play e o desbloqueio local reconhecido são preservados.
+
+Logs não têm tabela de IP/eventos: tracing → journald; Nginx em arquivos próprios; PostgreSQL em log
+local. Configuração em `api/deploy/logs/`, implantada pelo provisionamento sem dependência de checkout
+remoto. Timer horário, histórico de 29 dias e margem para arquivo ativo/atraso da limpeza mantêm limite
+de 30 dias. Detalhes e ativação pendente com Yan: `api/deploy/LEIA-ME.md`.

@@ -63,6 +63,16 @@ pub async fn rotate_token(
     Ok(())
 }
 
+/// Idempotente: excluir novamente o mesmo ID não cria estado nem afeta outra conta.
+/// As FKs em cascata removem todos os vínculos atomicamente com a conta.
+pub async fn delete(pool: &PgPool, account_id: Uuid) -> sqlx::Result<()> {
+    sqlx::query("delete from accounts where id = $1")
+        .bind(account_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

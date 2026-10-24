@@ -8,6 +8,8 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,8 +26,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -55,10 +55,7 @@ import androidx.compose.ui.unit.sp
 import com.keyflow.BuildConfig
 import com.keyflow.ads.AdsController
 import com.keyflow.ads.BannerSlot
-import com.keyflow.ads.AdsPrivacyOptionsEntry
 import com.keyflow.core.RecordingMode
-import com.keyflow.legal.LegalUrls
-import com.keyflow.legal.openLegalUrl
 import com.keyflow.ui.common.verticalScrollbar
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
@@ -71,11 +68,10 @@ import kotlinx.coroutines.launch
  */
 const val FEEDBACK_EMAIL = "xyan.lucasx@live.com"
 
+const val DOCS_OPEN_PRIVACY_TAG = "docs-abrir-privacidade"
+
 const val DOCS_INDEX_TAG = "docs-indice"
 const val DOCS_FEEDBACK_NO_APP_TAG = "docs-feedback-sem-email"
-const val DOCS_PRIVACY_POLICY_TAG = "docs-link-politica-privacidade"
-const val DOCS_TERMS_TAG = "docs-link-termos-uso"
-const val DOCS_LEGAL_NO_APP_TAG = "docs-link-sem-aplicativo"
 
 /** Tag de uma seção — `docs-<id>`; mantém as tags que já existiam antes da lista (pausa/atalhos/…). */
 fun docsSectionTag(id: String): String = "docs-$id"
@@ -104,8 +100,6 @@ data class DocSection(
     val blocks: List<DocBlock>,
     /** Seção de feedback: além dos blocos, renderiza as ações de e-mail (DOC-04). */
     val feedbackActions: Boolean = false,
-    /** Seção de privacidade: além dos blocos, renderiza as ações de links legais (V1-5). */
-    val legalActions: Boolean = false,
 )
 
 enum class FeedbackKind(
@@ -392,7 +386,6 @@ val docsSections: List<DocSection> get() = listOf(
                 tr("O áudio só é enviado à origem configurada em Transcrição — com a origem Local, ele nunca sai do aparelho. Tokens ficam apenas no aparelho."),
             ),
         ),
-        legalActions = true,
     ),
     DocSection(
         "creditos",
@@ -453,7 +446,7 @@ val docsSections: List<DocSection> get() = listOf(
 fun DocsPanel(
     modifier: Modifier = Modifier,
     sendFeedback: ((Intent) -> Unit)? = null,
-    openUrl: ((Intent) -> Unit)? = null,
+    onOpenPrivacy: () -> Unit = {},
     // Chegando do "?" do cabeçalho ("Ver na Docs"): rola até esta seção assim que ela tiver posição.
     focusSectionId: String? = null,
     focusKey: Int = 0,
@@ -470,7 +463,6 @@ fun DocsPanel(
     val viewport = remember { arrayOfNulls<LayoutCoordinates>(1) }
     var noEmailApp by remember { mutableStateOf(false) }
     val launch: (Intent) -> Unit = sendFeedback ?: { context.startFeedbackActivity(it) }
-    val launchUrl: (Intent) -> Unit = openUrl ?: { context.startActivity(it) }
 
     fun scrollTo(id: String) {
         val target = anchors[id] ?: return
@@ -516,8 +508,13 @@ fun DocsPanel(
                     section,
                     Modifier.onGloballyPositioned { anchors[section.id] = it },
                 ) {
-                    if (section.legalActions) {
-                        LegalActions(onOpenUrl = launchUrl)
+                    if (section.id == "privacidade") {
+                        Text(
+                            tr("Abrir Privacidade"), color = palette.teal,
+                            fontFamily = SpaceGrotesk, fontSize = 11.5.sp,
+                            modifier = Modifier.padding(top = 12.dp).clickable(role = Role.Button, onClick = onOpenPrivacy)
+                                .padding(vertical = 10.dp).testTag(DOCS_OPEN_PRIVACY_TAG),
+                        )
                     }
                     if (section.feedbackActions) {
                         FeedbackActions(
@@ -536,7 +533,6 @@ fun DocsPanel(
             }
         }
         adsController?.let {
-            AdsPrivacyOptionsEntry(it, adsOff = adsOff)
             BannerSlot(it, adsOff = adsOff, entitlementsLoaded = entitlementsLoaded)
         }
     }
@@ -674,6 +670,7 @@ internal fun DocBlocks(blocks: List<DocBlock>) {
 /** A seção da Docs que explica [tab] — o que o "?" do cabeçalho mostra. A própria Docs não tem. */
 fun docsSectionFor(tab: ConfigTab): DocSection? {
     val id = when (tab) {
+        ConfigTab.PRIVACIDADE -> "privacidade"
         ConfigTab.VOZ -> "aba-transcricao"
         ConfigTab.TECLADO -> "aba-teclado"
         ConfigTab.OVERLAY -> "aba-sobrepor"
@@ -737,61 +734,6 @@ private fun FeedbackActions(noEmailApp: Boolean, onSend: (FeedbackKind) -> Unit)
                 .padding(top = 8.dp)
                 .bringIntoViewRequester(bring)
                 .testTag(DOCS_FEEDBACK_NO_APP_TAG),
-        )
-    }
-}
-
-/** Ações da seção de privacidade (V1-5): abrem a política e os termos no navegador. */
-@OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
-@Composable
-private fun LegalActions(onOpenUrl: (Intent) -> Unit) {
-    val palette = LocalKeyFlowPalette.current
-    var noBrowserApp by remember { mutableStateOf(false) }
-    FlowRow(
-        modifier = Modifier.padding(top = 14.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(
-            tr("Política de privacidade"),
-            color = palette.fg,
-            fontFamily = SpaceGrotesk,
-            fontWeight = FontWeight.Medium,
-            fontSize = 11.5.sp,
-            modifier = Modifier
-                .clip(RoundedCornerShape(50))
-                .border(1.dp, palette.line, RoundedCornerShape(50))
-                .clickable(role = Role.Button) {
-                    noBrowserApp = !openLegalUrl(LegalUrls.privacyPolicy(), onOpenUrl)
-                }
-                .padding(horizontal = 16.dp, vertical = 9.dp)
-                .testTag(DOCS_PRIVACY_POLICY_TAG),
-        )
-        Text(
-            tr("Termos de uso"),
-            color = palette.fg,
-            fontFamily = SpaceGrotesk,
-            fontWeight = FontWeight.Medium,
-            fontSize = 11.5.sp,
-            modifier = Modifier
-                .clip(RoundedCornerShape(50))
-                .border(1.dp, palette.line, RoundedCornerShape(50))
-                .clickable(role = Role.Button) {
-                    noBrowserApp = !openLegalUrl(LegalUrls.termsOfUse(), onOpenUrl)
-                }
-                .padding(horizontal = 16.dp, vertical = 9.dp)
-                .testTag(DOCS_TERMS_TAG),
-        )
-    }
-    if (noBrowserApp) {
-        val bring = remember { BringIntoViewRequester() }
-        LaunchedEffect(Unit) { bring.bringIntoView() }
-        Text(
-            tr("Não há aplicativo disponível para abrir este link."),
-            color = palette.fg2,
-            fontFamily = SpaceGrotesk,
-            fontSize = 11.sp,
-            modifier = Modifier.padding(top = 8.dp).bringIntoViewRequester(bring).testTag(DOCS_LEGAL_NO_APP_TAG),
         )
     }
 }

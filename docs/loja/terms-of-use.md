@@ -39,11 +39,11 @@ KeyFlow is built upon a straightforward and transparent monetization model:
 - Core keyboard functionality is free to use.
 - The free tier displays standard banner and interstitial ads provided by Google AdMob **strictly within the settings screen (`SetupActivity`)**.
 - **No advertisements are ever displayed on the keyboard or inside the floating orb.**
-- You can review or revoke your advertising privacy consent preferences at any time via the "Ads privacy" entry in the Docs tab of settings.
+- You can review or revoke your advertising privacy consent preferences at any time via the "Ads privacy" entry in the Privacy tab of settings.
 
 ### 3.2. One-Time Purchase of R$ 15 (Permanent Unlock)
 - You may choose to purchase, for a single one-time payment of **R$ 15 (Brazilian Reais)** (or local equivalent on Google Play), permanent access to premium visual themes (Aero, Glitch, Rose Gold, and the animated Mascot orb) and **complete, permanent removal of all advertisements**.
-- **Not a subscription:** You pay once and enjoy lifetime access across device reinstalls linked to your account. Deleting device data via the "Delete my data" button in the Docs tab or upon request to Arateki removes the device registration from our servers without revoking the Google Play purchase entitlement, which can be restored at any time.
+- **Not a subscription:** You pay once and enjoy lifetime access across device reinstalls linked to your account. Deleting device data via the "Delete my data" button in the Privacy tab or upon request to Arateki removes the device registration from our servers without revoking the Google Play purchase entitlement, which can be restored at any time.
 
 ### 3.3. Payment Processing and Refunds (Consumer Rights & Google Play)
 - All financial transactions are securely processed through the **Google Play Billing** system operated by Google LLC.

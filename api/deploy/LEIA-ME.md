@@ -251,3 +251,40 @@ systemctl start keyflow-api-prod.service
 curl -fsS http://127.0.0.1:8080/health && echo " -> Restauração concluída e API saudável!"
 EOF
 ```
+
+## Exclusão solicitada e retenção dos logs (decisão do Yan, 2026-10-23)
+
+`DELETE /v1/account`, com o Bearer do próprio registro, apaga a conta e, por `ON DELETE CASCADE`,
+ledger, compras, recompensas e pedidos de transcrição associados. Não recebe um ID de destino.
+Responde `204`; sem credencial válida, `401`. Repetir o efeito é seguro, mas o token apagado já
+não autentica. Se a resposta se perder, o app registra a mesma identidade e exclui novamente.
+O aparelho conserva a identidade anônima usada no vínculo do Google Play: uma reinstalação com
+restauração da identidade ou um novo registro com essa identidade pode restaurar a compra.
+A compra permanece no Google Play. O botão na aba Privacidade limpa a credencial e o cache remoto somente
+após o sucesso; um marcador local impede recriação automática ao reabrir o app. O desbloqueio
+local já reconhecido pelo Play permanece. Configurações e chaves de provedores não são apagadas.
+Pedidos por e-mail: **contato@arateki.com, prazo de até 15 dias**.
+
+A API não tem tabela de IP/eventos: os dados operacionais ficam em logs. No Lightsail dedicado,
+`provisionar.sh` instala as configurações versionadas em `api/deploy/logs/`:
+
+- journald persistente: `MaxRetentionSec=29day`, arquivos de no máximo uma hora; sem encaminhar
+  cópias para syslog, console, kernel ou wall. A política alcança o journal da máquina inteira;
+- Nginx: acesso e erros em `/var/log/keyflow/`; acesso registra IP, horário, método, caminho sem
+  query, status, tamanho e duração, sem Authorization nem corpo. A regra substitui a do Debian
+  e também alcança os arquivos anteriores em `/var/log/nginx/`;
+- PostgreSQL: substitui a regra semanal do Debian por rotação horária com `copytruncate`;
+- `keyflow-retencao-logs.timer`: a cada hora rotaciona/vacua o journal e roda logrotate com o
+  mesmo arquivo de estado do sistema e trava. `Persistent=true` recupera execução após desligamento.
+
+O limite é **até 30 dias**. Usamos 29 dias de arquivos históricos (696 rotações horárias), com
+margem para o arquivo ativo e o próximo ciclo de limpeza; limites de espaço podem apagar antes.
+A limpeza também roda com logs vazios. Arquivos antigos abrangidos pelas regras são limpos no
+primeiro ciclo. O backup PostgreSQL não inclui esses diretórios de logs. Esta configuração cobre
+a origem Lightsail; retenção de serviços externos como Cloudflare exige conferência pelo Yan.
+
+**Ativação pendente com o Yan:** revisar e reaplicar o provisionamento pelo procedimento deste
+LEIA-ME, que instala os arquivos e habilita o timer; este trabalho não implanta na máquina.
+Depois conferir `systemctl status keyflow-retencao-logs.timer` e
+`journalctl -u keyflow-retencao-logs.service`, além de `nginx -t`.
+Teste local, sem logs de produção: `python3 api/deploy/test-retencao.py` (Python 3, bash, logrotate, Nginx e OpenSSL).

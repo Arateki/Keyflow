@@ -175,10 +175,22 @@ de aba → 1 interstitial; próximo só depois do dobro do intervalo; comprar un
 
 ---
 
+## Exclusão e retenção — decisão do Yan (2026-10-23)
+
+**DEL-01**: o usuário pode apagar o registro do próprio aparelho e todos os vínculos da API,
+com autenticação do registro, confirmação explícita no app e repetição segura. Não permite apagar
+outro aparelho. Falha de rede mantém os dados locais e permite tentar de novo.
+**DEL-02**: a compra continua no Google Play, restaurável após novo registro com a identidade
+anônima preservada; o cache remoto é limpo, sem apagar a compra local reconhecida pelo Play.
+**LOG-01**: logs técnicos de acesso/IP/erros na origem têm limpeza automática em até 30 dias.
+**DEL-03**: solicitação também por contato@arateki.com, atendida em até 15 dias.
+
 ## Requirement Traceability
 
 | ID | Área | Status |
 | --- | ---- | ------ |
+| DEL-01..03 | Exclusão e restauração | Verificado localmente — v1-apagar-dados, testes API/JVM/Compose e goldens; atendimento por e-mail com Yan |
+| LOG-01 | Retenção técnica | Configuração e testes locais — implantação Lightsail e conferência Cloudflare pendentes [YAN] |
 | IDN-01..03 | Identidade no app | Parcial — MZ-T1/T2; staging da API pendente |
 | CRD-01..05 | Créditos (aba Voz) | Pending |
 | UNL-01..05 | Desbloqueio/entitlements | Parcial — MZ-T9 + revisão e goldens claro/escuro; fluxo de compra/reembolso simulado no staging implementado; Play real, reinstalação física e MZ-T15 ainda pendentes |
@@ -186,7 +198,7 @@ de aba → 1 interstitial; próximo só depois do dobro do intervalo; comprar un
 | RWD-01..04 | Rewarded | Pending |
 | RMT-01..03 | Manifest/config remota | Parcial — MZ-T13 + revisão; aviso e kill switch ligados à UI |
 
-**Coverage:** 24 total; IDN e UNL parcialmente verificados em MZ-T1–T4. O restante depende das
+**Coverage:** 28 total; IDN e UNL parcialmente verificados em MZ-T1–T4. O restante depende das
 tasks seguintes e, no caminho remoto, da KeyFlow API existir em staging — ver
 `.specs/features/keyflow-api/`.
 
@@ -200,3 +212,18 @@ tasks seguintes e, no caminho remoto, da KeyFlow API existir em staging — ver
 - [ ] Rewarded credita minutos que aparecem no saldo (via SSV, nunca otimista).
 - [ ] Zero anúncios/chamadas ao AdMob no IME/overlay e com `adsOff`.
 - [ ] Com a API fora do ar: teclado/overlay/OpenAI/Groq/Custom funcionam normalmente.
+
+## Aba Privacidade — decisão V1 (2026-10-24)
+
+**Verificado**: aba `PRIVACIDADE` no grupo `OUTROS`, junto da Docs, com ícone nativo de cadeado.
+Ordem: política/termos (abertura segura), opções UMP somente quando REQUIRED e sem `adsOff`,
+aviso versionado do ditado com ação de revisão, exclusão dos dados e contato `contato@arateki.com`
+(pedidos em até 15 dias). A Docs mantém a explicação e um atalho para a aba, sem controles duplicados.
+Rever usa a própria divulgação destacada; recusar invalida o aceite salvo e mantém a explicação e
+continuação sem ditado do fluxo de atualização. Os gates de gravação voltam a exigir aceite atual.
+Rastreabilidade: `PrivacyPanelTest`, `ConfigScreenTest`, `DocsPanelTest`, `AccountDeletionTest`,
+`DisclosureUpgradeTest` e goldens claro/escuro de `config-privacidade*`.
+
+Validação local: debug/release, lint e 1.530 JVM verdes; 57 cenários instrumentados aprovados
+(52 em sete classes e cinco na PrivacyPanelTest reexecutada). Noventa capturas de configuração
+passam no diff oficial, incluindo os seis PNGs da aba nova; referências alheias preservadas.

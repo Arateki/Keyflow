@@ -55,7 +55,7 @@ Para garantir sua total tranquilidade ao utilizar o KeyFlow como seu teclado pad
 - O KeyFlow exibe anúncios discretos (banner e intersticial) **exclusivamente na tela de configurações do aplicativo** (`SetupActivity`).
 - **Nenhum anúncio é exibido no teclado ou na orbe flutuante.**
 - O aplicativo utiliza a plataforma **Google User Messaging Platform (UMP)** para solicitar seu consentimento para exibição de anúncios de acordo com a LGPD e o GDPR.
-- **Revisão a qualquer momento:** O usuário pode rever ou revogar suas preferências de consentimento de anúncios a qualquer momento através da opção **"Privacidade dos anúncios"** localizada na aba **Docs** das configurações do aplicativo.
+- **Revisão a qualquer momento:** O usuário pode rever ou revogar suas preferências de consentimento de anúncios a qualquer momento através da opção **"Privacidade dos anúncios"** localizada na aba **Privacidade** das configurações do aplicativo.
 - A compra única de **R$ 15** remove todos os anúncios do aplicativo em definitivo.
 
 ---
@@ -95,7 +95,7 @@ A Arateki **não vende, não aluga e não comercializa** seus dados pessoais. O 
 - **Áudios de voz:** Apagados do armazenamento temporário imediatamente após a conclusão ou falha da transcrição, ou ao expirar o cancelamento (3 segundos). Limpeza periódica automática remove arquivos residuais com mais de 24 horas.
 - **No seu aparelho:** Você pode excluir configurações locais, chaves de API e modelos baixados limpando os dados do aplicativo nas Configurações do Android ou desinstalando o app.
 - **Restauração de Identidade (Google Block Store):** Para garantir que compras legítimas não sejam perdidas ao reinstalar o aplicativo ou trocar de aparelho, o identificador anônimo (UUID) pode ser restaurado via Google Block Store.
-- **Na API da Arateki:** Como não mantemos contas nominais ou cadastros com e-mail, os registros vinculados ao UUID anônimo destinam-se exclusivamente à validação de integridade e licenças. Você pode excluir os dados do seu aparelho guardados na API a qualquer momento diretamente pelo botão **"Apagar meus dados"** na aba **Docs** das configurações do aplicativo (o que apaga na hora o registro do dispositivo em nossos servidores; a compra única permanece válida no Google Play e volta ao restaurar compras) ou mediante solicitação por e-mail para `contato@arateki.com`, que será atendida no prazo de até 15 dias corridos em conformidade com a LGPD.
+- **Na API da Arateki:** Como não mantemos contas nominais ou cadastros com e-mail, os registros vinculados ao UUID anônimo destinam-se exclusivamente à validação de integridade e licenças. Você pode excluir os dados do seu aparelho guardados na API a qualquer momento diretamente pelo botão **"Apagar meus dados"** na aba **Privacidade** das configurações do aplicativo (o que apaga na hora o registro do dispositivo em nossos servidores; a compra única permanece válida no Google Play e volta ao restaurar compras) ou mediante solicitação por e-mail para `contato@arateki.com`, que será atendida no prazo de até 15 dias corridos em conformidade com a LGPD.
 - **Em Provedores Externos:** A solicitação de exclusão de dados enviados a provedores de nuvem (OpenAI, Anthropic, Google) deve ser realizada pelo usuário junto à respectiva plataforma.
 
 ---
@@ -114,7 +114,7 @@ Implementamos medidas técnicas rigorosas para proteger seus dados:
 Em conformidade com a Lei Geral de Proteção de Dados Pessoais (LGPD — Lei nº 13.709/2018) e o Regulamento Geral sobre a Proteção de Dados (GDPR):
 - Você tem o direito de obter informações claras sobre o tratamento de seus dados.
 - Você pode rever e revogar consentimentos de anúncios a qualquer momento pelas configurações do app ("Privacidade dos anúncios").
-- Você tem o direito de solicitar a exclusão de seus dados e registros a qualquer momento pelo botão **"Apagar meus dados"** na aba **Docs** do aplicativo ou enviando uma mensagem para `contato@arateki.com` (atendimento em até 15 dias corridos nos termos da LGPD).
+- Você tem o direito de solicitar a exclusão de seus dados e registros a qualquer momento pelo botão **"Apagar meus dados"** na aba **Privacidade** do aplicativo ou enviando uma mensagem para `contato@arateki.com` (atendimento em até 15 dias corridos nos termos da LGPD).
 
 ---
 

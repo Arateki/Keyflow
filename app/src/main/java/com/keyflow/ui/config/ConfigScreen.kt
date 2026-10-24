@@ -126,6 +126,10 @@ fun ConfigScreen(
     onShortcutGridsChange: (List<ShortcutGrid>) -> Unit = {},
     modifier: Modifier = Modifier,
     initialTab: ConfigTab = ConfigTab.VOZ,
+    initialDocsSection: String? = null,
+    initialDeleteMyDataOpen: Boolean = false,
+    onReviewDisclosure: () -> Unit = {},
+    onDeleteMyData: suspend () -> Unit = { error("Ação de exclusão indisponível") },
     initialUnlockOpen: Boolean = false,
     initialTabHelpOpen: Boolean = false,
     initialRailExpanded: Boolean = false,
@@ -172,8 +176,8 @@ fun ConfigScreen(
     var railExpanded by rememberSaveable { mutableStateOf(initialRailExpanded) }
     // "?" do cabeçalho: a seção da Docs da aba aberta num modal; "Ver na Docs" rola até ela na aba Docs.
     var tabHelpOpen by rememberSaveable { mutableStateOf(initialTabHelpOpen) }
-    var docsFocusSection by remember { mutableStateOf<String?>(null) }
-    var docsFocusKey by remember { mutableStateOf(0) }
+    var docsFocusSection by remember { mutableStateOf(initialDocsSection) }
+    var docsFocusKey by remember { mutableStateOf(if (initialDocsSection == null) 0 else 1) }
     // Atalho da orbe com o bottom sheet aberto (2 ou 3 toques); null = fechado.
     var shortcutSheetTaps by remember { mutableStateOf<Int?>(null) }
 
@@ -475,7 +479,16 @@ fun ConfigScreen(
                         ConfigTab.FLUXOS,
                         ConfigTab.COMPUTADOR,
                         ConfigTab.NOTIFICACAO -> ComingSoonPanel()
+                        ConfigTab.PRIVACIDADE -> PrivacyPanel(
+                            settings = settings,
+                            adsController = adsController,
+                            adsOff = adsSuppressed,
+                            onReviewDisclosure = onReviewDisclosure,
+                            onDeleteMyData = onDeleteMyData,
+                            initialDeleteMyDataOpen = initialDeleteMyDataOpen,
+                        )
                         ConfigTab.DOCS -> DocsPanel(
+                            onOpenPrivacy = { selectTab(ConfigTab.PRIVACIDADE) },
                             focusSectionId = docsFocusSection,
                             focusKey = docsFocusKey,
                             adsController = adsController,

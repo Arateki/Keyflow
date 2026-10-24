@@ -1,0 +1,12 @@
+# Substitui a regra semanal do Debian; usa o mesmo estado do logrotate do sistema.
+/var/log/postgresql/*.log {
+    hourly
+    rotate 696
+    maxage 29
+    missingok
+    ifempty
+    compress
+    delaycompress
+    copytruncate
+    su root root
+}

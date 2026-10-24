@@ -39,11 +39,11 @@ O KeyFlow foi construído sobre um modelo de monetização claro e transparente:
 - O uso básico do aplicativo é gratuito.
 - A versão gratuita exibe anúncios publicitários (banners e intersticiais) fornecidos pelo Google AdMob **exclusivamente na tela de configurações (`SetupActivity`)**.
 - **Nenhum anúncio é exibido no teclado ou na orbe flutuante.**
-- As preferências de consentimento de privacidade para anúncios podem ser ajustadas ou revogadas a qualquer momento no item "Privacidade dos anúncios" na aba Docs das configurações.
+- As preferências de consentimento de privacidade para anúncios podem ser ajustadas ou revogadas a qualquer momento no item "Privacidade dos anúncios" na aba Privacidade das configurações.
 
 ### 3.2. Compra Única de R$ 15 (Desbloqueio Permanente)
 - Você pode optar por adquirir, mediante pagamento único de **R$ 15 (quinze reais)**, o desbloqueio definitivo de temas visuais exclusivos (Aero, Glitch, Rose Gold e Mascote animado) e a **remoção permanente de todos os anúncios** do Aplicativo.
-- **Não é uma assinatura:** O pagamento é realizado uma única vez, garantindo acesso vitalício aos recursos desbloqueados na sua instalação e em restaurações vinculadas à sua conta. A exclusão de dados do aparelho pelo botão "Apagar meus dados" na aba Docs ou mediante solicitação à Arateki remove o registro do dispositivo em nossos servidores sem anular o direito de compra na Google Play Store, que pode ser reativado a qualquer momento via restauração de compras.
+- **Não é uma assinatura:** O pagamento é realizado uma única vez, garantindo acesso vitalício aos recursos desbloqueados na sua instalação e em restaurações vinculadas à sua conta. A exclusão de dados do aparelho pelo botão "Apagar meus dados" na aba Privacidade ou mediante solicitação à Arateki remove o registro do dispositivo em nossos servidores sem anular o direito de compra na Google Play Store, que pode ser reativado a qualquer momento via restauração de compras.
 
 ### 3.3. Processamento e Reembolsos (Código de Defesa do Consumidor e Google Play)
 - Todas as transações financeiras são intermediadas e processadas de forma segura e exclusiva pela plataforma **Google Play Billing**, da Google LLC.

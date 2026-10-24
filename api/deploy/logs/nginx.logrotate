@@ -1,0 +1,17 @@
+# 29 dias de arquivos horários + arquivo ativo + intervalo da limpeza < 30 dias.
+/var/log/keyflow/nginx-access.log /var/log/keyflow/nginx-error.log /var/log/nginx/*.log {
+    hourly
+    rotate 696
+    maxage 29
+    missingok
+    ifempty
+    compress
+    delaycompress
+    create 0640 www-data adm
+    sharedscripts
+    postrotate
+        if [ -s /run/nginx.pid ]; then
+            kill -USR1 "$(cat /run/nginx.pid)"
+        fi
+    endscript
+}

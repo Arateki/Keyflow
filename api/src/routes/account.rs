@@ -1,5 +1,6 @@
 use axum::Json;
 use axum::extract::State;
+use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use serde::Serialize;
 
@@ -17,6 +18,7 @@ pub struct AccountResponse {
 
 pub enum AccountError {
     RateLimited(RateLimitRejection),
+    Internal,
 }
 
 impl From<RateLimitRejection> for AccountError {
@@ -29,6 +31,7 @@ impl IntoResponse for AccountError {
     fn into_response(self) -> Response {
         match self {
             AccountError::RateLimited(rejection) => rejection.into_response(),
+            AccountError::Internal => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
         }
     }
 }
@@ -46,4 +49,17 @@ pub async fn get_account(
         ads_off: account.ads_off,
         skins_unlocked: account.skins_unlocked,
     }))
+}
+
+/// Só aceita a conta resolvida pelo Bearer; nenhum ID de destino vem do pedido.
+/// O token deixa de autenticar após a exclusão (repetição sequencial retorna 401).
+pub async fn delete_account(
+    State(state): State<AppState>,
+    account: Account,
+) -> Result<StatusCode, AccountError> {
+    state.rate_limiters.check_account(account.id)?;
+    crate::db::accounts::delete(&state.pool, account.id)
+        .await
+        .map_err(|_| AccountError::Internal)?;
+    Ok(StatusCode::NO_CONTENT)
 }
