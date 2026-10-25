@@ -1660,13 +1660,15 @@ main, .rodape { position: relative; z-index: 1; }
 .doc-topo .caixa { position: relative; }
 /* A orbe parada do app, grande e meio apagada ao fundo, só no computador. */
 .doc-orbe {
+  --lado: clamp(200px, 24vw, 320px);
   display: none;
   position: absolute;
   right: 2%;
   top: 50%;
-  width: clamp(200px, 24vw, 320px);
-  aspect-ratio: 1;
-  transform: translateY(-50%);
+  width: var(--lado);
+  height: var(--lado);
+  /* Centra pela margem, não por transform: a animação "respira" ocupa o transform (scale) e anularia um translate. */
+  margin-top: calc(var(--lado) / -2);
   background: url("../../favicon.svg") center / contain no-repeat;
   filter: drop-shadow(0 0 60px rgba(78, 150, 131, 0.5));
   opacity: 0.9;
