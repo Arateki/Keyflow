@@ -2705,6 +2705,35 @@ Dois motores com ferramentas ao lado do da Anthropic: `reasoning/openai/OpenAiAg
   fora do escopo. A captura de onboarding foi bit-idêntica. Comparações durante captura devem
   aguardar o marcador de PNG concluído, pois o arquivo existe antes de terminar de ser gravado.
 
+## 2026-10-24 — `OnboardingRoutingTest` instável: laço de quadros contra o DataStore (teste-instavel-onboarding)
+
+- Sintoma: nos dois CI do PR #17 (rodadas 40116791161 e 40117792341, shard 1/6) o teste caía na 1ª tentativa e passava na repetição:
+  `AssertionError: Failed: assertExists … (TestTag = 'disclosure-decline')`, `OnboardingRoutingTest.kt:58`, logo depois do
+  laço de espera; o teste anterior do shard era o `DisclosureUpgradeTest`.
+- Causa (do teste, não do app): com `mainClock.autoAdvance = false` o laço empurrava o relógio no máximo 100 vezes
+  (`pumps++ < 100`). Isso acaba em milissegundos reais, e a divulgação só existe depois da 1ª emissão do `settingsFlow()` da
+  `SetupActivity` (DataStore, migração dos segredos e cofres cifrados, fora da thread principal), que não anda com o relógio do
+  teste. Com o emulador ocupado a emissão chegava depois do 100º quadro e a árvore tinha só o placeholder.
+- Reprodução (emulador de 4 núcleos com 6 laços `dd` ocupando a CPU, para imitar o runner de 2 vCPU; servidor com carga 12–20):
+  antes, o par `DisclosureUpgradeTest` + `OnboardingRoutingTest` falhou 9 de 12 voltas com a mesma mensagem (o
+  `DisclosureUpgradeTest` caiu uma vez no `disclosure-accept`); sem carga, 25 de 25 passaram — por isso nunca aparecia local.
+  Sonda com o laço antigo sob carga: a tela levou 135 e 239 quadros (6 e 7 s) em 2 de 4 voltas.
+- Correção: `FrozenClockPump.kt` (`pumpUntil`/`pumpUntilTag`) espera por tempo REAL, empurra o relógio e dorme 25 ms entre os quadros
+  para dar CPU ao app; no prazo, falha com a árvore. Usado nos quatro testes que lançam a `SetupActivity` com o relógio parado
+  (`OnboardingRoutingTest`, `DisclosureUpgradeTest`, `DisclosureUpdateRoutingTest`, `SetupActivityTest`), inclusive nas esperas
+  depois do clique e na leitura do DataStore. `ArchitectureRulesTest.frozenClockWaitsGoThroughPumpUntil` barra o laço de quadros.
+- Lição: com o relógio de composição congelado, o que depende de outra thread (DataStore, rede, serviço) se espera com prazo em
+  tempo real, nunca por número de quadros; e falha "às vezes" no CI de 2 vCPU se reproduz local com `dd if=/dev/zero of=/dev/null`
+  em laços dentro do emulador (`adb shell`), medindo antes e depois com a mesma carga.
+- Resíduo medido, ainda aberto: sob a mesma carga pesada, depois da correção, o último passo (tocar no chip do microfone na
+  config e esperar a divulgação reabrir) falhou em 1 de 10 voltas (espera de 30 s) e em 3 de 12 (versão de diagnóstico, espera de
+  8 s); nas 2 falhas lidas com reflexão o app tinha `showDisclosure=true` e a tela seguia sem recompor. Coincide com a thread
+  principal ocupada logo depois de `onboardingDone=true` (`startMonetizationIfNeeded`: Billing, AdMob e `EntitlementsRepository`
+  lendo disco na thread principal; `Skipped 568 frames` e `Davey 10 s` no logcat da volta que falhou). Sem carga o passo não falhou
+  (25 de 25 com o código antigo, 1 de 1 com o novo). As esperas do fim do teste foram para 60 s, mas não deu para medir de novo:
+  o emulador caiu várias vezes com o servidor de swap cheio. Se voltar no CI, o passo seguinte é tirar essa inicialização da
+  thread principal.
+
 ## 2026-10-24 — Página inicial do site (equipe/site-inicial)
 
 - `website/` é a página inicial (PT em `index.html`, EN em `en.html`): HTML/CSS/JS estáticos, sem
