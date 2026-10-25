@@ -235,10 +235,10 @@ Duas frentes, na ordem do que dá mais acerto por esforço:
 | ARM-01, PER-02 | Armazenamento | CA-T10 | Pending | unit (arquivo, fuzz) |
 | ARM-02, ARM-03 | Armazenamento | CA-T12 | Pending | `StrictModeKeyboardTest` + `ArchitectureRulesTest` |
 | PER-01 | Desempenho | CA-T3, CA-T22 | Pending | tempo no A32 |
-| ROL-01 | Rollover | CA-T8..T11, CA-T23, CA-T25, CA-T27 (PIT: CA-T30) | Pending | unit + propriedade + fuzz |
-| ROL-02 | Rollover | CA-T18 | Pending | instrumentado |
-| ROL-03 | Rollover | CA-T12 | Pending | unit + instrumentado |
-| ROL-04 | Rollover | CA-T4, CA-T30 | Pending | `RealDictionaryTest`/`SuggesterTest` |
+| ROL-01 | Testes e rollout | CA-T8..T11, CA-T23, CA-T25, CA-T27 (PIT: CA-T30) | Pending | unit + propriedade + fuzz |
+| ROL-02 | Testes e rollout | CA-T18 | Pending | instrumentado |
+| ROL-03 | Testes e rollout | CA-T12 | Pending | unit + instrumentado |
+| ROL-04 | Testes e rollout | CA-T4, CA-T30 | Pending | `RealDictionaryTest`/`SuggesterTest` |
 
 **Status values:** Pending → In Design → In Tasks → Implementing → Verified.
 **Coverage:** ver `tasks.md` (cada requisito aponta para uma ou mais tarefas).
