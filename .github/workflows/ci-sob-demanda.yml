@@ -1,0 +1,239 @@
+name: CI sob demanda
+run-name: demanda-${{ inputs.rotulo }}-${{ github.ref_name }}
+on:
+  workflow_dispatch:
+    inputs:
+      tarefas:
+        description: 'Tarefas permitidas, por espaço ou vírgula; filtro JVM --tests=pacote.Classe'
+        type: string
+        default: ''
+      classes:
+        description: 'Classes instrumentadas ou Classe#metodo, por vírgula (nome curto ou completo)'
+        type: string
+        default: ''
+      pedacos:
+        description: 'Emuladores em paralelo (1–6)'
+        type: string
+        default: '1'
+      repeticoes:
+        description: 'Repetições instrumentadas por pedaço (1–20)'
+        type: string
+        default: '1'
+      rotulo:
+        description: 'Identificador do pedido (1–32 caracteres: letras, números, . _ -)'
+        type: string
+        required: true
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: bash
+concurrency:
+  group: demanda-${{ github.ref }}-${{ inputs.rotulo }}
+  cancel-in-progress: false
+jobs:
+  validar:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      gradle_tasks: ${{ steps.entradas.outputs.gradle_tasks }}
+      classes: ${{ steps.entradas.outputs.classes }}
+      has_device: ${{ steps.entradas.outputs.has_device }}
+      shards: ${{ steps.entradas.outputs.shards }}
+      pedacos: ${{ steps.entradas.outputs.pedacos }}
+      repeticoes: ${{ steps.entradas.outputs.repeticoes }}
+      rotulo: ${{ steps.entradas.outputs.rotulo }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validar antes de reservar runners de build e device
+        id: entradas
+        env:
+          CI_TAREFAS: ${{ inputs.tarefas }}
+          CI_CLASSES: ${{ inputs.classes }}
+          CI_PEDACOS: ${{ inputs.pedacos }}
+          CI_REPETICOES: ${{ inputs.repeticoes }}
+          CI_ROTULO: ${{ inputs.rotulo }}
+          CI_REF: ${{ github.ref }}
+        run: python3 scripts/ci-sob-demanda.py validar --saida-github "$GITHUB_OUTPUT"
+
+  build:
+    name: Gradle solicitado e APKs
+    needs: validar
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: JDK e keystore de debug descartável
+        run: |
+          sudo ln -sfn "$JAVA_HOME" /usr/lib/jvm/java-17-openjdk
+          mkdir -p ~/.config/.android
+          keytool -genkeypair -keystore ~/.config/.android/debug.keystore -storepass android \
+            -keypass android -alias androiddebugkey -dname "CN=Android Debug,O=Android,C=US" \
+            -keyalg RSA -keysize 2048 -validity 10000
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+      - name: Versão do AAR sherpa-onnx
+        id: sherpa
+        run: |
+          version=$(sed -n 's/^val sherpaOnnxVersion = "\(.*\)"$/\1/p' app/build.gradle.kts)
+          sha=$(sed -n 's/^val sherpaOnnxSha256 = "\(.*\)"$/\1/p' app/build.gradle.kts)
+          test -n "$version" && test -n "$sha"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: app/libs/sherpa-onnx-${{ steps.sherpa.outputs.version }}.aar
+          key: sherpa-onnx-${{ steps.sherpa.outputs.version }}-${{ steps.sherpa.outputs.sha }}
+      - name: Executar somente o Gradle solicitado e preparar APKs se necessário
+        env:
+          CI_TAREFAS: ${{ needs.validar.outputs.gradle_tasks }}
+          CI_DEVICE: ${{ needs.validar.outputs.has_device }}
+        run: |
+          mkdir -p demanda-gradle
+          tarefas=()
+          if [[ -n $CI_TAREFAS ]]; then IFS=, read -r -a tarefas <<< "$CI_TAREFAS"; fi
+          # Os APKs precisam existir mesmo quando o pedido só contém instrumentados.
+          if [[ $CI_DEVICE == true ]]; then
+            ./gradlew --no-daemon assembleDebug assembleDebugAndroidTest 2>&1 | tee demanda-gradle/apks.log
+          fi
+          if ((${#tarefas[@]})); then
+            ./gradlew --no-daemon "${tarefas[@]}" 2>&1 | tee demanda-gradle/tarefas.log
+          fi
+      - name: APKs para os emuladores
+        if: ${{ success() && needs.validar.outputs.has_device == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: demanda-apks
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+      - name: Evidência Gradle
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: demanda-gradle
+          path: |
+            demanda-gradle/
+            app/build/test-results/
+            app/build/reports/tests/
+            app/build/reports/lint-results-debug.html
+          retention-days: 7
+
+  device:
+    name: Demanda device ${{ matrix.shard }}
+    needs: [validar, build]
+    if: ${{ needs.validar.outputs.has_device == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        shard: ${{ fromJSON(needs.validar.outputs.shards) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Liberar disco
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/.ghcup /opt/ghc /opt/hostedtoolcache/CodeQL \
+            /usr/share/swift /usr/local/share/boost /usr/local/share/powershell /usr/local/julia*
+          df -h /
+      - name: KVM obrigatório
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          test -c /dev/kvm
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: demanda-apks
+          path: app/build/outputs/apk
+      - name: Classes pedidas no emulador do gate
+        timeout-minutes: 170
+        env:
+          ANDROID_SERIAL: emulator-5554
+          CI_APKS_READY: '1'
+          CI_CLASSES: ${{ needs.validar.outputs.classes }}
+          CI_SHARD_INDEX: ${{ matrix.shard }}
+          CI_PEDACOS: ${{ needs.validar.outputs.pedacos }}
+          CI_REPETICOES: ${{ needs.validar.outputs.repeticoes }}
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 34
+          emulator-build: 15917651
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          cores: 2
+          ram-size: 4096M
+          disk-size: 6G
+          emulator-options: -no-window -gpu swangle_indirect -no-snapshot -no-boot-anim -camera-back none
+          disable-animations: true
+          script: scripts/ci-device-gate.sh selected "$CI_SHARD_INDEX" "$CI_PEDACOS" "$CI_REPETICOES"
+      - name: Evidência de cada pedaço
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: demanda-device-${{ matrix.shard }}
+          path: app/build/ci-evidence/
+          if-no-files-found: warn
+          retention-days: 7
+
+  resumo:
+    name: Resumo do pedido
+    needs: [validar, build, device]
+    if: ${{ always() && needs.validar.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        if: ${{ needs.validar.outputs.has_device == 'true' && needs.build.result == 'success' }}
+        continue-on-error: true
+        with:
+          pattern: demanda-device-*
+          path: evidencias
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        continue-on-error: true
+        with:
+          name: demanda-gradle
+          path: evidencias/gradle
+      - name: Placar por classe e repetição, com trechos das falhas
+        env:
+          CI_CLASSES: ${{ needs.validar.outputs.classes }}
+          CI_REPETICOES: ${{ needs.validar.outputs.repeticoes }}
+          CI_PEDACOS: ${{ needs.validar.outputs.pedacos }}
+          CI_ROTULO: ${{ needs.validar.outputs.rotulo }}
+          CI_TAREFAS: ${{ needs.validar.outputs.gradle_tasks }}
+          CI_BUILD_RESULT: ${{ needs.build.result }}
+          CI_DEVICE_RESULT: ${{ needs.device.result }}
+        run: |
+          python3 scripts/ci-sob-demanda.py resumir --evidencia evidencias --saida resumo.md \
+            --classes "$CI_CLASSES" --repeticoes "$CI_REPETICOES" --pedacos "$CI_PEDACOS" \
+            --rotulo "$CI_ROTULO" --branch "$GITHUB_REF_NAME" --tarefas-resultado "$CI_TAREFAS" \
+            --build-resultado "$CI_BUILD_RESULT" --device-resultado "$CI_DEVICE_RESULT"
+      - name: Resumo para ci rodar
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-sob-demanda-resumo
+          path: resumo.md
+          if-no-files-found: error
+          retention-days: 7

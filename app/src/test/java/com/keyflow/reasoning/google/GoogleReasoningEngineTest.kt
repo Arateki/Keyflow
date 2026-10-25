@@ -34,13 +34,14 @@ class GoogleReasoningEngineTest {
     private fun events(request: ReasoningRequest = ReasoningRequest(user = "olá"), e: GoogleReasoningEngine = engine()): List<ReasoningEvent> =
         runBlocking { withTimeout(5_000) { e.generate(request).toList() } }
 
+    private val sampleSse = buildString {
+        append("data: {\"candidates\": [{\"content\": {\"parts\": [{\"text\": \"Olá, \"}]}, \"finishReason\": \"\"}]}\n\n")
+        append("data: {\"candidates\": [{\"content\": {\"parts\": [{\"text\": \"como vai?\"}]}, \"finishReason\": \"STOP\"}]}\n\n")
+    }
+
     @Test
     fun `parses gemini streaming candidates and completes on STOP`() {
-        val sseBody = buildString {
-            append("data: {\"candidates\": [{\"content\": {\"parts\": [{\"text\": \"Olá, \"}]}, \"finishReason\": \"\"}]}\n\n")
-            append("data: {\"candidates\": [{\"content\": {\"parts\": [{\"text\": \"como vai?\"}]}, \"finishReason\": \"STOP\"}]}\n\n")
-        }
-        server.enqueue(MockResponse().setResponseCode(200).setHeader("Content-Type", "text/event-stream").setBody(sseBody))
+        server.enqueue(MockResponse().setResponseCode(200).setHeader("Content-Type", "text/event-stream").setBody(sampleSse))
 
         val result = events()
         val recorded = server.takeRequest()
@@ -51,6 +52,28 @@ class GoogleReasoningEngineTest {
         val deltas = result.filterIsInstance<ReasoningEvent.Delta>().map { it.text }
         assertThat(deltas).containsExactly("Olá, ", "como vai?").inOrder()
         assertThat(result.last()).isEqualTo(ReasoningEvent.Done)
+    }
+
+    @Test
+    fun `strips models prefix and escapes path`() {
+        server.enqueue(MockResponse().setResponseCode(200).setHeader("Content-Type", "text/event-stream").setBody(sampleSse))
+
+        events(e = engine(model = "models/gemini-2.0-flash"))
+        val recorded = server.takeRequest()
+
+        assertThat(recorded.path).contains("/models/gemini-2.0-flash:streamGenerateContent?alt=sse")
+    }
+
+    @Test
+    fun `an invalid model name is rejected before calling the api`() {
+        for (bad in listOf("models/", "models/models/gemini", "gemini/pro", "gemini:flash", "models/gemini:pro", "a/b", "a:b", "")) {
+            val result = events(e = engine(model = bad))
+            assertThat(result).hasSize(1)
+            val error = result.single() as ReasoningEvent.Error
+            assertThat(error.kind).isEqualTo(ReasoningError.ENGINE)
+            assertThat(error.message).contains("Google Gemini: nome de modelo inválido")
+            assertThat(server.requestCount).isEqualTo(0)
+        }
     }
 
     @Test

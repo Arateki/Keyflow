@@ -101,6 +101,43 @@ saída" deixa passar.
   perfil — esse resto é sistema e renderização (swangle, por software), não o nosso código; app a frio 1,0 s / 2,3 s, −3 a −5%
   (ruído). Os traces do Perfetto de cada volta ficam em `baselineprofile/build/outputs/connected_android_test_additional_output/`.
 
+## CI sob demanda — mais um nó do pool
+
+Use `ci rodar` para lotes grandes, várias classes e repetições que ocupariam o único emulador do servidor.
+Para uma classe curta ou um teste afetado, continue com `instrumentar Classe#metodo` local: evita o preparo
+do runner remoto. O pedido manual não substitui os sete jobs obrigatórios de `checks.yml` no PR.
+
+```sh
+ci rodar --tarefas assembleDebug --classes PermissionsCheckerTest --pedacos 2 --repetir 2
+ci rodar --tarefas 'testDebugUnitTest --tests=com.keyflow.overlay.OverlayCoordinatorStateMachineTest'
+ci rodar --classes ClasseA,ClasseB#metodo --pedacos 4 --repetir 20 --rotulo lote-ui
+```
+
+- A fonte é `scripts/ci`; o coordenador revisa/instala `.equipe/ferramentas/ci` e seu diff. Os helpers
+  `scripts/ci-rodar.py` e `scripts/ci-sob-demanda.py` precisam existir na branch. O `gh` e a autenticação
+  são os mesmos de `ci enviar`; não há credencial adicional nem segredo no workflow.
+- Só branches `equipe/*`. O cliente confere nomes/conteúdo com cara de segredo, publica commits com push
+  normal apenas quando necessário e dispara `ci-sob-demanda.yml` com `--ref` da branch. Nunca force.
+  A rodada retornada precisa bater com HEAD e rótulo. Mudanças não commitadas não entram no pedido.
+- `--tarefas` aceita espaços ou vírgulas: `assembleDebug`, `assembleDebugAndroidTest`, `testDebugUnitTest`,
+  `:app:lintDebug`, `lintDebug`, `check`. Filtro JVM: `--tests=pacote.Classe[.metodo]` imediatamente depois
+  de `testDebugUnitTest`; `*` é aceito como curinga literal. `--classes` aceita nomes curtos/completos e
+  `Classe#metodo`, por vírgula; resolve o pacote pelos fontes antes de publicar.
+- `--pedacos`: 1–6; `--repetir`: 1–20. Cada emulador repete sequencialmente o seu pedaço. O cliente reserva
+  conservadoramente os jobs das rodadas ativas (teto 20), espera com aviso e serializa reservas locais em
+  `/tmp/ci-sob-demanda/pool.lock`. Disparos externos ainda passam pelo limite global do GitHub.
+  `CI_ESPERA` limita a espera (padrão 10800 s); 75 indica espera expirada. Confira URL/rótulo antes de
+  redisparar. Cada job de device tem limite de 180 minutos.
+- O resumo mostra X/Y por classe e repetição, unitários por classe e trechos de falhas, no resumo do
+  Actions e no artefato `ci-sob-demanda-resumo`; `ci rodar` baixa e imprime esse artefato. Queda de processo,
+  classe sem teste, pedaço ausente e falha de teste deixam a rodada vermelha. Evidências duram sete dias.
+- O primeiro uso exige integrar o workflow na `main` e publicar a branch de teste: o GitHub exige que
+  [`workflow_dispatch` exista na branch padrão](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
+  Depois, `--ref equipe/...` executa a versão dessa branch. O rótulo automático é único; rótulo manual já
+  ativo é recusado para evitar substituir um pedido pendente da mesma combinação branch+rótulo.
+- Regressões sem rede: `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests -v`.
+  Usam `CI_GH_BIN` falso, remotos Git locais descartáveis e logs sintéticos; não disparam Actions.
+
 ## CI (GitHub Actions) — `.github/workflows/checks.yml`
 
 Roda em PR para `main`, push em `main`, merge queue e manual (`workflow_dispatch`), no padrão do

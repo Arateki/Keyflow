@@ -64,6 +64,8 @@ import com.keyflow.ui.config.DirectApiKeyActions
 import com.keyflow.reasoning.openai.OpenAiModels
 import com.keyflow.reasoning.openai.OpenAiReasoningEngine
 import com.keyflow.reasoning.anthropic.AnthropicAgentEngine
+import com.keyflow.reasoning.google.GoogleAgentEngine
+import com.keyflow.reasoning.openai.OpenAiAgentEngine
 import com.keyflow.reasoning.anthropic.AnthropicModels
 import com.keyflow.agenthost.AgentBackends
 import com.keyflow.agenthost.AgentHost
@@ -201,6 +203,13 @@ class SetupActivity : ComponentActivity() {
                 anthropicCredentialChanges = auth.store.changes(ProviderIds.ANTHROPIC).map { },
                 agentEngine = { model -> AnthropicAgentEngine(auth.authorization, auth.http, model) },
                 resolveText = reasoningEngines::resolve,
+                // OpenAI e Google (AGT-T7): ferramentas só com a CHAVE de API, como a Anthropic (o login por assinatura segue no texto).
+                openAiApiKeyConnected = { auth.store.getApiKey(ProviderIds.OPENAI) != null },
+                openAiCredentialChanges = auth.store.changes(ProviderIds.OPENAI).map { },
+                openAiAgentEngine = { model -> OpenAiAgentEngine(auth.authorization, auth.http, model) },
+                googleApiKeyConnected = { auth.store.getApiKey(ProviderIds.GOOGLE) != null },
+                googleCredentialChanges = auth.store.changes(ProviderIds.GOOGLE).map { },
+                googleAgentEngine = { model -> GoogleAgentEngine(auth.authorization, auth.http, model) },
             ),
         ) else null
     }
@@ -292,6 +301,8 @@ class SetupActivity : ComponentActivity() {
         settingsRepository = SettingsRepository(this)
         showDisclosure = intent.getBooleanExtra(EXTRA_REQUIRE_DISCLOSURE, false)
         handleNavIntent(intent)
+        // `open_tab` do agente (APP-03): a aba pedida abre como qualquer navegação por intent (o mesmo `requestedTab` do clique num erro).
+        if (BuildConfig.AGENT_ENABLED) AgentHost.tabNavigator.attach(openTabForAgent)
 
         activityScope.launch {
             settingsRepository.settingsFlow().collectLatest {
@@ -559,6 +570,14 @@ class SetupActivity : ComponentActivity() {
         handleNavIntent(intent)
     }
 
+    /** O `open_tab` do agente: chamado de qualquer thread, abre a aba na principal pelo mesmo caminho da navegação por intent. */
+    private val openTabForAgent: (ConfigTab) -> Unit = { tab ->
+        runOnUiThread {
+            requestedTab = tab
+            requestedTabKey++
+        }
+    }
+
     /** Lê extras de navegação: pular para a aba Transcrição, Sobrepor ou Teclado (clique num erro clicável). */
     private fun handleNavIntent(intent: Intent?) {
         val tab = when (intent?.getStringExtra(EXTRA_NAV)) {
@@ -714,6 +733,7 @@ class SetupActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        if (BuildConfig.AGENT_ENABLED) AgentHost.tabNavigator.detach(openTabForAgent)
         monetizationJobs.forEach(Job::cancel)
         entitlementsRepository?.close()
         remoteConfigRepository?.close()

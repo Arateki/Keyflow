@@ -17,7 +17,17 @@ api/target/
 # SDK local e service token do Cloudflare Access (staging). Nunca versionar.
 /local.properties
 
-# Chave de upload da Play e keystores: ficam FORA do repositório (~/.keyflow/android/, ver .specs/codebase/ENVIRONMENT.md).
+# Chaves e credenciais: nunca versionar (o repositório é público). A chave de upload da Play e os keystores ficam FORA do repositório (~/.keyflow/android/, ver .specs/codebase/ENVIRONMENT.md).
 *.jks
 *.keystore
+*.p12
+*.pem
 upload-keystore.properties
+!api/tests/fixtures/test_service_account_key.pem
+.env
+.env.*
+!.env.example
+google-services.json
+
+# Arquivos da coordenação dos agentes (tarefas e relatórios locais)
+.equipe/
