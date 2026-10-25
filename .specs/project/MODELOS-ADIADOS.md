@@ -51,10 +51,10 @@ Em deliberação de 25/10/2026 (19:58), o Yan estabeleceu o escopo imediato e as
 
 ---
 
-### 2. Google Gemma (Gemma 1, Gemma 2, Gemma 3 / 3n)
+### 2. Google Gemma (Gemma 1, Gemma 2, Gemma 3 / 3n; o Gemma 4 não está adiado)
 
 * **O que é**: Família de modelos abertos desenvolvida pelo Google DeepMind, com variantes leves (ex.: Gemma 2-2B-IT).
-* **Licença e obrigações concretas**: *Gemma Terms of Use* e *Gemma Prohibited Use Policy*. Não é licença aberta aprovada pela OSI (nenhuma geração adota Apache-2.0 ou MIT). Permite exploração comercial gratuita, mas inclui cláusula anti-concorrência proibindo utilizar as saídas do modelo para treinar ou aprimorar modelos de linguagem concorrentes (salvo modelos derivados do próprio Gemma). Exige redistribuição acompanhada dos termos.
+* **Licença e obrigações concretas**: *Gemma Terms of Use* e *Gemma Prohibited Use Policy*. Não é licença aberta aprovada pela OSI (Gemma 1, 2 e 3 não adotam Apache-2.0 nem MIT). **Exceção: o Gemma 4 é Apache-2.0 e sem gate** (`litert-community/gemma-4-E2B-it-litert-lm`, conferido na API do HF em 2026-10-25), e o Gemma 4 E2B já está no catálogo do app como o modelo "Equilibrado"; o adiamento vale só para as gerações 1 a 3. Permite exploração comercial gratuita, mas inclui cláusula anti-concorrência proibindo utilizar as saídas do modelo para treinar ou aprimorar modelos de linguagem concorrentes (salvo modelos derivados do próprio Gemma). Exige redistribuição acompanhada dos termos.
 * **O que bloqueia hoje**: Todas as distribuições oficiais e conversões comunitárias para LiteRT (`google/gemma-2-2b-it`, `litert-community/Gemma2-2B-IT`) são mantidas como *gated* no Hugging Face (requerem token de autenticação e preenchimento de formulário de consentimento da Google). Não há justificativa técnica para o esforço de hospedagem própria quando SmolLM2-1.7B (Apache-2.0) e DeepSeek-R1-Qwen-1.5B (MIT) já estão disponíveis de forma totalmente ungated e sob licenças livres padrão.
 * **Caminho para adotar**: Caso benchmarks futuros justifiquem o modelo, o KeyFlow precisará gerar a versão `.litertlm` internamente e disponibilizá-la em bucket próprio S3/R2 com as declarações de licença da Google.
 * **Custo e tamanho**: ~1,6 GB a ~2,6 GB (Gemma 2-2B em formato LiteRT quantizado).
