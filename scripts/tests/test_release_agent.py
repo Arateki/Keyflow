@@ -93,7 +93,7 @@ class SmokeMappingTest(unittest.TestCase):
 
 
 class SmokeKeyboardTest(unittest.TestCase):
-    def run_keyboard(self, missing):
+    def run_keyboard(self, missing, absent_dumps=0):
         source = (Path(__file__).resolve().parents[1] / "smoke-release.sh").read_text()
         snippet = source[source.index("# Só toca teclas"):source.index("# Ditado com o modelo local")]
         with tempfile.TemporaryDirectory() as tmp:
@@ -102,13 +102,20 @@ class SmokeKeyboardTest(unittest.TestCase):
             xml.write_text("<displays/>")
             calls = root / "calls"
             env = dict(os.environ, TEST_XML=str(xml), TEST_EVIDENCE=str(root),
-                       TEST_CALLS=str(calls), TEST_MISSING="1" if missing else "0")
+                       TEST_CALLS=str(calls), TEST_MISSING="1" if missing else "0",
+                       TEST_COUNT=str(root / "count"), TEST_ABSENT=str(absent_dumps))
             preamble = '''
 window_xml=$TEST_XML
 evidence=$TEST_EVIDENCE
 dump_window() { echo dump >> "$TEST_CALLS"; }
 find_bounds() {
     if [[ "$1" == h && "$TEST_MISSING" == 1 ]]; then return; fi
+    if [[ "$1" == h ]]; then
+        local seen=0
+        [[ -f "$TEST_COUNT" ]] && seen=$(<"$TEST_COUNT")
+        echo $((seen + 1)) > "$TEST_COUNT"
+        if (( seen < TEST_ABSENT )); then return; fi
+    fi
     echo "[600,1833][720,1980]"
 }
 tap_bounds() { echo tap >> "$TEST_CALLS"; }
@@ -123,7 +130,12 @@ sleep() { :; }
         result, calls = self.run_keyboard(True)
         self.assertEqual(1, result.returncode)
         self.assertIn("tecla h ausente", result.stderr)
-        self.assertEqual(["dump"], calls)
+        self.assertEqual(["dump"] * 10, calls)  # repete a captura e nunca toca coordenadas às cegas
+
+    def test_janela_do_ime_ausente_em_uma_captura_isolada(self):
+        result, calls = self.run_keyboard(False, absent_dumps=2)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(["dump", "dump", "dump", "tap", "dump", "tap", "dump"], calls)
 
     def test_consulta_arvore_antes_de_cada_tecla(self):
         result, calls = self.run_keyboard(False)
