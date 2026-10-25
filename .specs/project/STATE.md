@@ -2918,3 +2918,43 @@ Dois motores com ferramentas ao lado do da Anthropic: `reasoning/openai/OpenAiAg
   primeira rodada real cabe ao coordenador após instalar o comando e publicar os commits.
 - Na estreia, `ci rodar` recusou a branch já integrada: ele exige arquivo diferente da `main`, e o dispatch
   usa o workflow do `--ref`. Branches anteriores ao `26ee5ce` precisam da `main` mesclada antes do pedido.
+
+## 2026-10-24 — Catálogo de modelos sem pin inventado (equipe/catalogo-real)
+
+- **15 das 20 entradas do `ModelCatalog` eram inventadas** (6 de texto, 5 de visão, 4 de voz; entraram juntas no `629db54`).
+  Cada uma tinha repositório que não existe (o `-litert-lm` do Llama, Gemma 2, SmolLM2, DeepSeek e Phi-3.5; os de OCR/VLM; o
+  `vits-pt-br-neural`; o MeloTTS) ou commit que não existe num repositório real (Piper faber, Kokoro), mais SHA-256 sequenciais
+  (`1a2b3c…`, `a5f6e7…`) ou copiados do Qwen3 com o começo trocado (`777779ff2f4f…`). As 5 reais (Whisper base e small,
+  Parakeet v3, Qwen3 0.6B, Gemma 4 E2B) bateram em tudo: commit, tamanho, SHA-256 (o `lfs.oid` da API; os 3 `tokens.txt` foram
+  baixados e calculados) e pedido de faixa 206. **Nenhum pin real precisou de correção**: as inventadas saíram, não foram
+  "consertadas" — um pin consertado em cima de repositório que não existe seria outro dado fabricado.
+- Em produção, baixar uma falsa falhava em `DOWNLOAD_FAILED` (a API do HF devolve **401**, não 404, para repositório inexistente:
+  sem token, "não existe" e "exige login" são indistinguíveis; commit inexistente em repositório que existe dá 404). O usuário só
+  chegava às falsas pela lista de texto da aba Raciocínio (8 modelos, 6 falsos). A Visão e a Voz são `ComingSoonPanel` no app:
+  `VisaoPanel`/`FalaPanel` só existem em teste e na galeria — por isso os goldens dessas abas são bit-idênticos entre si e não
+  mudam com o catálogo.
+- `ModelCatalog.VISION` e `ModelCatalog.VOICE` agora são `emptyList()` (Visão está na `equipe/visao`, que traz entradas novas na
+  VC-T2a; Voz depende da feature de síntese de fala, e o Piper/Kokoro puxam o eSpeak, GPL). Os painéis continuam existindo:
+  testes e galeria usam `SamplePanelModels` (debug), com URL `.invalid` e SHA-256 zero — nunca no catálogo. As atribuições de
+  licença da Docs dos modelos que saíram também saíram; `DocsSectionsTest` passou a exigir licença na Docs para todo modelo de
+  texto, visão e voz que o catálogo vier a ter.
+- **Nada disso volta sem aviso**: `PinSanityTest` (unitário, sem rede) recusa commit que não tenha 40 hex ou que tenha cara de
+  digitado à mão (corrida de 6+ caracteres iguais, contagem de 1 em 1 ou de 2 em 2, dígito e letra alternados por 20+, repetição
+  periódica, SHA-256 que copia o começo ou o fim de outro); e `scripts/verify-model-catalog.py` confere cada URL, tamanho e
+  SHA-256 contra a API do HF, sem token, e a licença do cartão (roda à mão e no `catalogo-modelos.yml`, que não bloqueia).
+  **Entrada nova no catálogo: rode o script antes de commitar.**
+- Calibragem do detector: cinco caracteres iguais seguidos aparecem em 1 de cada ~1.100 hashes aleatórios (falso alarme demais);
+  o limite é 6 (1 de ~18.000). O `777779ff…` inventado só é pego pela regra do fim compartilhado com o SHA-256 real do Qwen3 —
+  a regra de um hash sozinho não o distingue de um real com cinco 7.
+- Candidatos reais para quando o Yan decidir (conferidos na API em 2026-10-24, nenhum testado no LiteRT-LM do app):
+  `litert-community/SmolLM2-1.7B-Instruct` (Apache-2.0, `SmolLM2-1_7B-Instruct_dynamic_wi8_afp32.litertlm`),
+  `litert-community/DeepSeek-R1-Distill-Qwen-1.5B` (MIT, `…_q8_ekv4096.litertlm`), `litert-community/Phi-3-mini-4k-instruct` e
+  `Phi-4-mini-instruct` (MIT; não existe Phi-3.5 no `litert-community`). Llama 3.2 (`llama3.2`) e Gemma 2 (`gemma`) têm termos próprios
+  e os repositórios do `litert-community` são `gated: auto` — o downloader não tem token.
+
+## 2026-10-25 — Definição do catálogo de modelos e itens adiados
+
+- Decisão do Yan em 25/10/2026 (19:58): A fala da aba Voz usa, por enquanto, só o `android.speech.tts.TextToSpeech` nativo do Android (0 MB e licença do AOSP). Modelos de texto locais no LiteRT-LM adotam imediatamente SmolLM2-1.7B-Instruct (Apache-2.0, ~1,73 GB) e DeepSeek-R1-Distill-Qwen-1.5B (MIT, ~1,83 GB), ambos com download ungated e licença sem restrições comerciais. Phi-3-mini e Phi-4-mini (~3,9 GB) ficam de fora pelo tamanho.
+- Ficam adiados: Llama 3.2 (hospedagem própria no S3/R2 para contornar o gating no HF), Gemma 1 a 3 (termos próprios e gated; o Gemma 4 é Apache-2.0, sem gate, e o E2B já está no catálogo), ML Kit (escrita à mão Digital Ink, estritamente opcional com consentimento e inicialização tardia fora do boot) e vozes offline próprias no sherpa-onnx (VITS Coqui pt-cv por caracteres ou Piper pt_BR com léxico livre para evitar contaminação do eSpeak-ng GPLv3).
+- Descartados em definitivo: MobileLLM (licença não comercial FAIR NC) e Gemini Nano (acesso restrito ao AICore de fábrica em aparelhos topo de linha).
+- Documento de referência técnica completo: `.specs/project/MODELOS-ADIADOS.md`.

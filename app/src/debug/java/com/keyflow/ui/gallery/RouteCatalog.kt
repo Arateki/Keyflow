@@ -311,18 +311,18 @@ object RouteCatalog {
             ConfigVisaoRoute(
                 localModels = galleryVisionModels(
                     active = DownloadProgress(
-                        ModelCatalog.OCR_FAST.id,
+                        SamplePanelModels.VISION_LIGHT.id,
                         DownloadState.RUNNING,
-                        bytesDone = ModelCatalog.OCR_FAST.totalBytes * 42 / 100,
-                        totalBytes = ModelCatalog.OCR_FAST.totalBytes,
+                        bytesDone = SamplePanelModels.VISION_LIGHT.totalBytes * 42 / 100,
+                        totalBytes = SamplePanelModels.VISION_LIGHT.totalBytes,
                     ),
                 ),
             )
         },
         Route("config-visao-local-pronto") {
             ConfigVisaoRoute(
-                localModelId = ModelCatalog.OCR_FAST.id,
-                localModels = galleryVisionModels(installed = setOf(ModelCatalog.OCR_FAST.id), selected = ModelCatalog.OCR_FAST.id),
+                localModelId = SamplePanelModels.VISION_LIGHT.id,
+                localModels = galleryVisionModels(installed = setOf(SamplePanelModels.VISION_LIGHT.id), selected = SamplePanelModels.VISION_LIGHT.id),
             )
         },
         Route("config-visao-google") { ConfigVisaoRoute(source = VisionSource.GOOGLE, googleKey = "AIzaSyMockKeyForScreenshots") },
@@ -333,18 +333,18 @@ object RouteCatalog {
             ConfigFalaRoute(
                 localModels = galleryVoiceModels(
                     active = DownloadProgress(
-                        ModelCatalog.VOICE_FAST.id,
+                        SamplePanelModels.VOICE_LIGHT.id,
                         DownloadState.RUNNING,
-                        bytesDone = ModelCatalog.VOICE_FAST.totalBytes * 42 / 100,
-                        totalBytes = ModelCatalog.VOICE_FAST.totalBytes,
+                        bytesDone = SamplePanelModels.VOICE_LIGHT.totalBytes * 42 / 100,
+                        totalBytes = SamplePanelModels.VOICE_LIGHT.totalBytes,
                     ),
                 ),
             )
         },
         Route("config-fala-local-pronto") {
             ConfigFalaRoute(
-                localModelId = ModelCatalog.VOICE_FAST.id,
-                localModels = galleryVoiceModels(installed = setOf(ModelCatalog.VOICE_FAST.id), selected = ModelCatalog.VOICE_FAST.id),
+                localModelId = SamplePanelModels.VOICE_LIGHT.id,
+                localModels = galleryVoiceModels(installed = setOf(SamplePanelModels.VOICE_LIGHT.id), selected = SamplePanelModels.VOICE_LIGHT.id),
             )
         },
         Route("config-fala-elevenlabs") { ConfigFalaRoute(source = FalaSource.ELEVENLABS, elevenLabsKey = "eleven_mock_key") },
@@ -490,10 +490,10 @@ object RouteCatalog {
             catalog = ModelCatalog.TEXT, installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_192,
         )
 
-    /** Estado fixo da lista de modelos de VISÃO/OCR (RAM de sobra, como a de voz). */
+    /** Estado fixo da lista de modelos de VISÃO/OCR (RAM de sobra, como a de voz), com os modelos de amostra: o catálogo real está vazio. */
     private fun galleryVisionModels(installed: Set<String> = emptySet(), active: DownloadProgress? = null, selected: String? = null) =
         LocalModelsUi.compose(
-            catalog = ModelCatalog.VISION, installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_192,
+            catalog = SamplePanelModels.VISION, installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_192,
         )
 
     /** Aba Visão: a origem, a lista local e o seletor de tradução num estado fixo. */
@@ -537,7 +537,7 @@ object RouteCatalog {
         selected: String? = null,
     ): LocalModelsUi =
         LocalModelsUi.compose(
-            catalog = ModelCatalog.VOICE, installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_192,
+            catalog = SamplePanelModels.VOICE, installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_192,
         )
 
     /** Aba Voz (Fala): a origem, a lista local e os controles de voz num estado fixo. */
