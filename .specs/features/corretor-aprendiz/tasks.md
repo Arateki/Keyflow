@@ -8,7 +8,7 @@
 > Cada task fecha com Status aqui, traceability no `spec.md` e lições no `STATE.md` (regra de ouro 6).
 > Estimativas em dias de agente, sem testes manuais do Yan. Ordem = mais acerto por esforço.
 
-## Fase A — Banco de avaliação e base sem aprendizado (~5 dias)
+## Fase A — Banco de avaliação, base sem aprendizado e toque da grade (~5 dias, mais a T20, que antes contava na C)
 
 ### CA-T1 — Banco de avaliação offline  `[base, 1ª tarefa]`
 - **What**: `CorretorBenchTest` + `bench/` (casos, gerador sintético `SyntheticTyping`, métricas, JSON,
@@ -28,14 +28,40 @@
   determinística falha o teste, tempo e memória só são impressos; o script imprime antes × depois (BEN-09).
 - **Tests**: unit. **Gate**: `quick`.
 
-### CA-T2 — Gravador de digitações reais (debug)  `[P com T1, [YAN] digita]`
-- **What**: tela/modo debug com frase-guia; o teclado grava (toques em unidade de tecla, digitada,
-  pretendida) em `files/bench/reais.tsv`; fora do backup; só `BuildConfig.DEBUG`; importador no banco (conjunto d).
-- **Where**: `app/src/debug/…` (guia), `KeyFlowKeyboardService`/grade (gancho), `bench/` (leitor).
-- **Depends on**: CA-T1 (leitor), CA-T20 (toques) para as coordenadas; antes disso grava só digitada/pretendida.
+### CA-T20 — Toque da grade até o serviço  `[fase A: antes do gravador; antes ficava na C]`
+- **What**: o caminho de `design.md` §4, item 1. `KeyTouch` (puro); `KeyboardGridView` guarda o ponto no `press` por
+  dedo e o passa em `activateKey` (toque normal, **rollover** `releaseEarly`, popup de acento com o toque da
+  tecla-base; clique de acessibilidade sem ponto); `onKeyAction(action, touch)`; **os dois `KeyAction`** (o do layout
+  não muda; o do serviço ganha `Character(char, touch)`); `forwardCanvasKeyAction`; `handleKey`;
+  `ComposingWordTracker` com toques paralelos às letras; `Correction` guarda os toques.
+- **Where**: `keyboard/KeyboardGridView.kt` (`press`, `releaseEarly`, `onFingerUp`, `activateKey`),
+  `KeyFlowKeyboardView.kt` (`KeyAction.Character`, `forwardCanvasKeyAction`), `KeyFlowKeyboardService.kt`
+  (`handleKey`, `Correction`), `keyboard/ComposingWordTracker.kt`, `keyboard/dictionary/KeyTouch.kt`.
+- **Depends on**: —. (Não precisa do `SpatialCosts`: só o tipo `KeyTouch`, que a T19 usa depois.)
+- **Covers**: SPA-01.
+- **Done when**: unit: `ComposingWordTrackerTest` (toques paralelos às letras; backspace tira o último; reset limpa) e a
+  conversão para unidade de tecla; instrumentado: (a) o toque normal chega com o ponto; (b) **rollover** com dois
+  dedos sobrepostos: cada letra sai com o seu ponto e na ordem; (c) letra do popup (ç, ã) sai com o ponto da
+  tecla-base; (d) clique de acessibilidade sai sem ponto; (e) o ponto é igual, em unidades de tecla, em 720 e 1080 px
+  de largura; rotação e troca de camada não quebram; golden do teclado intacto; `StrictModeKeyboardTest` verde.
+- **Tests**: unit + instrumentado. **Gate**: `full`.
+
+### CA-T2 — Gravador de digitações reais (debug)  `[depois da T20; [YAN] digita]`
+- **What**: tela/modo **só debug** com frase-guia; o teclado grava (toques em unidade de tecla, os da T20, digitada,
+  pretendida) em `files/bench/reais.tsv`; opt-in; importador no banco (conjunto d). As frases-guia cobrem os grupos
+  do `manter` (abreviação, gíria, nomes, marcas, termos técnicos, inglês no meio) além do português corrente, em
+  duas rodadas (normal e rápida, ~300 palavras cada): as ~600 palavras servem também de teste real do "manter", de
+  que a meta das T4–T7 depende. A digitação é real mas guiada (a pessoa copia o texto), não livre.
+- **Where**: `app/src/debug/…` (tela da frase-guia e implementação do gravador), gancho (interface, sem
+  implementação) na grade e no serviço em `main`, `bench/` (leitor), `backup_rules.xml` e
+  `data_extraction_rules.xml` (`files/bench`, nas três seções), `BackupRulesTest`.
+- **Depends on**: CA-T1 (leitor e conjunto) e **CA-T20** (os toques): sem as coordenadas o Yan digitaria à toa,
+  porque o que calibra o modelo espacial é o ponto do toque. A task só fecha com a digitação do Yan **depois** da T20.
 - **Covers**: BEN-07, BEN-02d.
-- **Done when**: 2 rodadas de ~300 palavras no A32 puxadas por `adb pull`; o banco lê o arquivo; a release não
-  contém a classe (`ManifestWiringTest`/teste de classes debug).
+- **Done when**: 2 rodadas de ~300 palavras no A32 **[YAN]**, puxadas por `adb pull`, todas as linhas com
+  coordenadas; o banco lê o arquivo; o `BackupRulesTest` confere `bench` nas três seções; o APK/AAB de release não
+  contém as classes do gravador (script `scripts/check-release-*.py` no molde do `check-release-agent.py`, rodado
+  depois de `assembleRelease`; o código vive em `app/src/debug/`, que o release não compila).
 - **Tests**: unit (leitor) + instrumentado leve. **Gate**: `full` + manual **[YAN]** digitar.
 
 ### CA-T3 — Tempo no aparelho
@@ -219,31 +245,25 @@
 - **Tests**: unit (`TranslationsTest`). **Gate**: `quick` + revisão **[YAN]**.
 - **Fim da fase B**: a queixa do Yan resolvida (recusa uma vez e some) e os textos legais aprovados (T18b).
 
-## Fase C — Modelo espacial do toque (~5 dias)
+## Fase C — Modelo espacial do toque (~5 dias, menos a T20, que passou para a A)
 
 ### CA-T19 — Custos espaciais e laço da distância
 - **What**: `LetterGrid` (centros por `Layouts`, unidades de tecla), `SpatialCosts.fill` (bits em 1/16),
-  `Suggester.suggest(typed, touches)` com a tabela no lugar de `Keyboard.adjacent`; omissão/inserção/troca fixas.
-- **Where**: `dictionary/SpatialCosts.kt`, `dictionary/LetterGrid.kt`, `dictionary/Suggester.kt`. **Depends on**: CA-T1.
-- **Covers**: SPA-02..05.
+  `Suggester.suggest(typed, touches)` com a tabela no lugar de `Keyboard.adjacent`; omissão/inserção/troca fixas;
+  letra sem toque cai no custo da tabela de vizinhas em bits, por posição (SPA-06); letra acentuada pela letra-base.
+- **Where**: `dictionary/SpatialCosts.kt`, `dictionary/LetterGrid.kt`, `dictionary/Suggester.kt`.
+- **Depends on**: CA-T1, CA-T20 (o tipo `KeyTouch`).
+- **Covers**: SPA-02..06.
 - **Done when**: no sintético, a pretendida em 1º e nos 3 primeiros **sobe** sobre o baseline em σ 0,30/0,40 (números
   na catraca); toque na borda custa menos que no centro da vizinha (`SpatialCostsTest`); sem toque = comportamento
   de hoje; a razão ms B/A medida na mesma execução é **relatada** (o protótipo deu +32% a +35%) e não derruba o
   teste; a otimização mira o orçamento do A32 (PER-01), medido na T22.
 - **Tests**: unit + banco. **Gate**: `quick`.
 
-### CA-T20 — Toque da grade até o corretor
-- **What**: `KeyboardGridView` entrega o ponto (unidade de tecla) com a `KeyAction.Char`; `ComposingWordTracker` guarda
-  os toques da palavra; popup de acento, tecla física e acessibilidade seguem sem toque.
-- **Where**: `KeyboardGridView.kt`, `layout/KeyAction.kt` (ou canal paralelo), `ComposingWordTracker.kt`, serviço.
-- **Depends on**: CA-T19. **Covers**: SPA-01.
-- **Done when**: instrumentado: o ponto chega normalizado e igual em 720 e 1080 px de largura; rotação e troca de
-  camada não quebram; golden do teclado intacto.
-- **Tests**: unit (geometria) + instrumentado. **Gate**: `full`.
-
 ### CA-T21 — Decisão em bits e limiares por classe
 - **What**: placar em bits; `T[classe]`/`M[classe]` calibrados no banco (sintético + reais) no lugar de `40/15/90/30`.
-- **Where**: `Suggester.kt`, `SuggestParams`. **Depends on**: CA-T19, CA-T2 (reais). **Covers**: SPA-03, BAS-01.
+- **Where**: `Suggester.kt`, `SuggestParams`. **Depends on**: CA-T19, CA-T20, CA-T4 (as classes), CA-T2 (os toques
+  reais, que só existem depois da T20). **Covers**: SPA-03, SPA-06 (constantes), BAS-01.
 - **Done when**: a curva certa × indevida do **nível completo** mostra o ponto escolhido; mais trocas certas com as
   mesmas indevidas (ou menos indevidas com as mesmas certas) que o baseline, em sintético **e** reais; baseline
   do nível rápido atualizado e baseline do completo gravado.
@@ -353,7 +373,7 @@
 | LST-06..07 | CA-T16b |
 | ROL-02 | CA-T18 |
 | SPA-01 | CA-T20 |
-| SPA-02..05 | CA-T19, CA-T21, CA-T22 |
+| SPA-02..06 | CA-T19, CA-T21, CA-T22 |
 | ADP-01..04 | CA-T23 |
 | ADP-05 | CA-T24 |
 | FIX-02, 04, 06, REJ-03 | CA-T25 |

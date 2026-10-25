@@ -251,15 +251,38 @@ o acerto fica praticamente igual: 82,1% → 81,0%); com σ 0,30 e viés forte de
 
 ### Proposta
 
-1. **Unidade de tecla.** `Touch(x, y)` em unidades de tecla: `x/larguraMédiaDaTecla`, `y/alturaDaLinha`
-   (independe do aparelho e da densidade). A grade calcula isso no `onFingerUp` com o ponto em que a tecla
-   foi decidida (o mesmo `slideTarget` que decide a letra) e entrega junto da `KeyAction.Char`.
+1. **Unidade de tecla e caminho do toque.** `KeyTouch(x, y)` em unidades de tecla (`x/larguraMédiaDaTecla`,
+   `y/alturaDaLinha`; independe do aparelho e da densidade), tipo puro em `dictionary/`. O caminho, com os nomes do
+   código de hoje:
+   - `KeyboardGridView.press(pointerId, placed)` (chamado pelo `onFingerDown` e pelo `slideTo`) guarda o ponto por
+     dedo, ao lado de `pressedKeys`; `onFingerUp`, `releaseEarly` e `cancelFinger` o limpam. Gravar no `press` e
+     não na soltura é o que cobre o **rollover**: `releaseEarly` (RND-05) aciona a tecla quando outro dedo encosta,
+     sem ponto de soltura.
+   - `activateKey(keyDef, touch)`: o toque normal (`onFingerUp`) e o rollover passam o ponto guardado (no `up`, se a
+     soltura decide outra tecla que a do `press`, vale o ponto do `up`); o clique de acessibilidade (A11Y-02)
+     chama com `touch = null`.
+   - **Popup de acento**: a tira abre sobre a tecla-base (`openAccentStrip`); ao soltar, o ramo `accent != null` do
+     `onFingerUp` emite a variante (hoje `KeyAction.Char(consumeShiftFor(variant))`) **com o ponto da tecla-base**,
+     e o custo compara pela letra-base (SPA-02): ç e ã, comuns no pt, não deixam buracos na palavra.
+   - Há **dois `KeyAction`**. O do layout (`keyboard/layout/KeyAction.kt`, `Char(text, variants, digitHint)`) é
+     definição estática de tecla (mora em `KeyDef`): o toque **não** entra nele; a grade passa a chamar
+     `onKeyAction(action, touch)` com `KeyTouch?`. `KeyFlowKeyboardView.forwardCanvasKeyAction` (linha 413) traduz
+     para o `KeyAction.Character(char, touch)` do **serviço** (a sealed interface de `KeyFlowKeyboardView.kt`, outro
+     tipo). `KeyboardGridState.onKeyTapped` só maiusculiza o texto e não mexe no toque.
+   - `KeyFlowKeyboardService.handleKey` (ramo `Character`) entrega a letra e o toque ao
+     `ComposingWordTracker.onLetter(letter, touch)`, que guarda os toques **paralelos às letras** (`onBackspace`
+     tira o último; `reset` e `onSeparator` limpam). `finishComposing` passa os toques ao `Suggester` e os guarda
+     em `Correction(original, corrected, separator)`, para o `restore(original)` do desfazer (CA-T13) devolver a
+     palavra **com** os toques; sem eles, vale o custo por letra do item 3.
 2. **`LetterGrid`** (pura): centros das 26 letras a partir de `Layouts` (pesos) em unidades de tecla;
    `ñ` no es. Um `LetterGrid` por idioma, calculado uma vez.
 3. **Tabela por palavra.** Antes de comparar candidatas, `SpatialCosts.fill(touches)` calcula
    `bits[i][c] = min(CAP, ((Δx/σx)² + (Δy/σy)²)/2 · log2 e)` para i = toques e c = a..z: ≤ 26·32 floats
    num buffer reaproveitado (o `Suggester` já reaproveita linhas da distância e não é thread-safe).
-   Convertido para **inteiros em 1/16 de bit** para o laço de `Int` que já existe.
+   Convertido para **inteiros em 1/16 de bit** para o laço de `Int` que já existe. Letra **sem toque** (SPA-06): a
+   linha `i` da tabela é preenchida com o custo da tabela de vizinhas de hoje em bits (igual 0; vizinha e outra com
+   as constantes `NEIGHBOR_BITS` e `MISS_BITS`, de partida a calibrar na CA-T21), então uma palavra pode misturar
+   letras com e sem toque no mesmo laço. Letra acentuada entra pela letra-base.
 4. **Laço da distância** troca `Keyboard.adjacent(ca, cb)` por `bitsInt[(a−1)·26 + (cb − 'a')]`; omissão,
    inserção e troca de ordem são constantes em bits (partida: 9 / 9 / 7). Letra fora de a..z (hífen,
    apóstrofo) custa o máximo. **CPU: a otimizar.** O protótipo (JVM do servidor, sem otimizar: poda por linha
@@ -271,8 +294,8 @@ o acerto fica praticamente igual: 82,1% → 81,0%); com σ 0,30 e viés forte de
 6. **Decisão.** Ordena por custo total; `troca` quando `melhor.total ≤ T[classe]` e `margem ≥ M[classe]`;
    `T` e `M` por classe vêm do banco (curvas certa × indevida × margem; o protótipo já traz a forma em
    `context.md` §7). Substitui as constantes `40/15/90/30`.
-7. **Sem toque** (acessibilidade, tecla física, ditado): a `distance` de hoje, inalterada (o
-   `SuggesterTest` atual continua valendo).
+7. **Sem nenhum toque** (palavra inteira por clique de acessibilidade): a `distance` de hoje, inalterada (o
+   `SuggesterTest` atual continua valendo). Teclas físicas e ditado não passam por `handleKey` (Q9).
 8. **Candidatas.** O filtro por 1ª letra (digitada, vizinha, 2ª) vira "teclas a < 1,3 tecla do 1º toque" +
    a 2ª letra: o mesmo custo de bucket, com a vizinhança vinda da geometria.
 

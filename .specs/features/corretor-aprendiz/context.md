@@ -26,7 +26,8 @@ repositórios foram lidos em cópias rasas; commits e datas abaixo.
   e **comita** a original (sem composição); não guarda nada. Sem dicionário pessoal, sem palavra anterior,
   sem aprendizado. `autoCorrectAllowed` exclui URL, e-mail, senha e filtro; terminal nem compõe.
 - A grade (`KeyboardGridView`) decide a tecla com `Geometry.keyAt`/`slideTarget`; as coordenadas do toque
-  **não** chegam ao corretor (`KeyAction.Char` só leva o texto).
+  **não** chegam ao corretor: o `KeyAction.Char` do layout só leva o texto e o `KeyAction.Character` do serviço
+  (`KeyFlowKeyboardView.kt`, convertido em `forwardCanvasKeyAction`) também.
 - Armazenamento no projeto: DataStore (configurações), arquivos próprios (`agent/actions.jsonl`,
   `model-downloads.json`). Sem Room. IME e config rodam no mesmo processo.
 - "Apagar meus dados" (aba Privacidade) hoje só apaga o registro na API (`SetupActivity.kt` →
