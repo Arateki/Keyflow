@@ -126,7 +126,7 @@ class Entry(var weight: Float, var lastDay: Int, var valid: Boolean, var lastTyp
 | Parâmetro | Valor | Origem da ideia |
 | --------- | ----- | --------------- |
 | `VALID_AT` | 3 pontos | AOSP: palavra nova vale na 2ª digitação; HeliBoard ≥ 3 usos; ASK ~5 |
-| pontos: digitada 1 · recusa 3 · manter 3 · reescrita 3 · par por toque 1 · par por reescrita 2 | | ASK: digitar 2, escolher 3 de 9 |
+| pontos: digitada 1 · renovação de palavra que vale 1 · recusa 3 · manter 3 · reescrita 3 · par por toque 1 · par por reescrita 2 · renovação de par 1 | | ASK: digitar 2, escolher 3 de 9 |
 | `TYPED_COOLDOWN` | 60 s | evitar "kkk kkk kkk" valer 3 |
 | `HALF_LIFE_DAYS` | 90 | AOSP v4 joga fora após 300 dias sem uso; contagem divide por 2 no teto |
 | `KEEP_ABOVE` / `DROP_BELOW` | 1,0 / 0,5 | histerese: 3 pontos duram ~142 dias parados e somem em ~232 |
@@ -144,17 +144,23 @@ peso(agora) ≥ KEEP_ABOVE`. Sem tarefa de fundo: a limpeza acontece ao carregar
 
 | Evento (origem no serviço) | Condição | Efeito |
 | -------------------------- | -------- | ------ |
-| `Typed(w)` — `finishComposing` sem troca | campo elegível; `w` fora do dicionário, fora do aprendido e sem par ativo; **o corretor não teria trocado com confiança** | +1 (respeita o cooldown) |
-| `Typed(w)` | o corretor teria trocado com confiança | nada (erro de digitação isolado, LRN-05) |
-| troca aplicada e **não** desfeita | — | nada para a original (LRN-06) |
+| `Typed(w)` — `finishComposing` sem troca | campo elegível; `w` fora do dicionário e **sem valer** no aprendido (nova ou em observação) e sem par ativo; resposta **NÃO** a "o corretor teria trocado?" (abaixo) | +1 (respeita o cooldown) |
+| `Typed(w)` | resposta **SIM** ou **DESCONHECIDO** | nada (erro de digitação isolado, LRN-05) |
+| `Typed(w)` — **renovação** | `w` já vale no aprendido (`conhece(w)`) | +1 (respeita o cooldown; `ultimoUso = agora`): o uso diário nunca expira (LRN-01b) |
+| troca aplicada e **não** desfeita | a original | nada para a original (LRN-06) |
+| troca por **par** aplicada e **não** desfeita | par ativo | par +1 (renova; mesmo cooldown) |
 | `Rejected(original, troca)` — recomitar a mesma palavra após desfazer (REJ-01) ou reescrever a original (REJ-03) | pendência viva | `original` +3; apaga par de `original` |
 | `Keep(w)` — toque na palavra como digitada na faixa (REJ-02) | elegível | `w` +3; apaga par |
 | `PairTap(d, e)` — toque numa sugestão ≠ digitada (FIX-01) | `d` fora do dicionário e do aprendido | par `d→e` +1; zera a palavra `d` se existir |
 | `Rewrite(original, v)` — `RewriteTracker` (FIX-02) | condições do FIX-02 | par `original→v` +2 |
 
-O "o corretor teria trocado" vem de `Suggestions.autoCorrect` calculado de qualquer forma na hora do
-espaço; a diferença é só se o campo/opção permite trocar. Em campo que não troca (ou com "Correção
-automática" desligada) **nada é aprendido** (PRV-02).
+**"O corretor teria trocado?" tem três respostas**, não duas. **SIM**: o `Suggestions.autoCorrect` existe e é
+diferente da digitada. **NÃO**: as sugestões foram calculadas a tempo e não há troca. **DESCONHECIDO**: não houve
+cálculo — o comit veio sem separador (Enter, colar, atalho: `finishComposing(ic)` sem `separator` nem chama o
+`Suggester`), o `suggestionsFor` estourou `SUGGEST_WAIT_MS` (150 ms) ou as sugestões estão desligadas. Só **NÃO**
+vale o ponto de `Typed`; DESCONHECIDO = sem ponto, senão o erro de digitação que termina no Enter ou num timeout
+ganharia +1 e furaria o LRN-05 (custo: a última palavra antes do Enter não pontua; pontua nas próximas vezes). Em
+campo que não troca (ou com "Correção automática" desligada) **nada é aprendido** (PRV-02).
 
 ### Recusa pendente e o desfazer
 

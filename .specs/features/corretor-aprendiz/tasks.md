@@ -86,7 +86,9 @@
   pares; relógio injetado; eventos `LearnEvent`.
 - **Where**: `learning/PersonalLexicon.kt`. **Depends on**: CA-T8. **Covers**: LRN-03..07, FIX-03..05 (modelo).
 - **Done when**: 3 pontos valem; recusa vale na hora; "kkk kkk kkk" = 1; 142 dias parada deixa de valer;
-  teto 5000 expulsa o menor; propriedade: peso nunca negativo, decaimento monótono.
+  **uso de 1 por dia durante 400 dias nunca expira** (renovação de palavra que vale, LRN-01b; o peso para no
+  `WEIGHT_CAP`), e o mesmo para um par usado todo dia; teto 5000 expulsa o menor; propriedade: peso nunca negativo,
+  decaimento monótono.
 - **Tests**: unit + propriedade. **Gate**: `quick`.
 
 ### CA-T10 — `LearnedStore` (arquivo)
@@ -116,7 +118,9 @@
 - **Where**: `KeyFlowKeyboardService.kt`, `learning/LearningRuntime.kt`. **Depends on**: CA-T8..T11.
 - **Covers**: LRN-01, ARM-02, ARM-03.
 - **Done when**: instrumentado: digitar 3× um nome com o cooldown encurtado por `…ForTest` o faz valer; senha,
-  `NO_SUGGESTIONS` e `NO_PERSONALIZED_LEARNING` não gravam; `StrictModeKeyboardTest` verde.
+  `NO_SUGGESTIONS` e `NO_PERSONALIZED_LEARNING` não gravam; um erro de digitação que termina no Enter ou num
+  `suggestionsFor` que estoura o tempo (teste com executor travado) **não** pontua (DESCONHECIDO = sem ponto);
+  `StrictModeKeyboardTest` verde.
 - **Tests**: instrumentado + `ArchitectureRulesTest`. **Gate**: `full`.
 
 ### CA-T13 — Recusa: desfazer recompõe e confirma
