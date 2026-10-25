@@ -2673,3 +2673,30 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
   responde `BILLING_UNAVAILABLE` (3) e a folha mostra o aviso, sem crash.
 - **Tamanho:** o R8 + redução de recursos tira ~10 MB do APK de release (94,3 → 83,8 MB) e ~3,4 MB do AAB (50,3 → 46,8 MB); o peso é de
   código nativo (sherpa-onnx e LiteRT-LM), que o R8 não toca. O AAB leva o `mapping.txt` (`BUNDLE-METADATA/.../proguard.map`) e o perfil de base.
+
+
+## 2026-10-25 — V1-3: fechamento do smoke e falha nativa no ditado do emulador
+
+- **Smoke padrão do APK assinado:** passou do zero até o fim, com R8 e recursos reduzidos, usando o artefato de upload
+  (`com.arateki.keyflow`, 83.842.560 bytes). Troca Sistema → Ateliê: 15.077 pixels diferentes nas fileiras de letras da
+  prévia, excluindo a orbe e os chips de seleção. Passou por todas as abas, folha de compra e aviso de indisponibilidade,
+  banner com “Test Ad”, teclado de verdade digitando “hi” nos Ajustes e divulgação persistida ao reabrir. Billing indisponível
+  não comprova compra real nem `ProxyBillingActivity`. `PermissionsCheckerTest`: 2/2; APKs debug e de testes recompilados.
+- **Captura de acessibilidade:** o comando `uiautomator dump --windows` do API 34 lançou NPE em `childNafCheck`; houve também
+  dumps só da barra de status e ANRs da System UI, comprovados por foco e screenshot. `--compressed` e a janela ativa não
+  resolveram. `scripts/ReleaseUiDump.java` roda via `app_process`, espera as janelas, renova o cache e tolera filhos nulos;
+  é compilado com o SDK/JDK e enviado/removido sob a trava, sem alterar o APK. Banner passou em três verificações consecutivas.
+  O leitor de log distingue os PIDs do APK, reinícios, subprocessos e tombstones dos processos do capturador/sistema, mantendo
+  o log completo para revisão. Controle com logs reais: NPE do capturador não vira crash do app; três SIGSEGV do app são recusados.
+- **Campo real para o IME:** os Ajustes restauram uma busca anterior. Uma coordenada fixa pode tocar fora do campo e fechar
+  o teclado; o smoke localiza “Search settings”, toca explicitamente o `EditText` e espera o IME correto aparecer. A comparação
+  AE do ImageMagick 7 imprime também a métrica normalizada entre parênteses; usar só o primeiro número, inclusive em notação científica.
+- **Ditado local NÃO aprovado:** o trecho opcional do smoke foi executado isoladamente com `KEYFLOW_SMOKE_DICTATION=1`, modelo
+  Rápido/Whisper base baixado e instalado pelo app e gravação confirmada pelo cronômetro. O processo `:inference` caiu três vezes
+  com SIGSEGV, endereço `0x8`, antes do marcador de modelo carregado; o app apresentou interrupção local e continuou aberto.
+  O release não contém bibliotecas x86_64: o AVD é x86_64, `primaryCpuAbi=arm64-v8a`, ponte `libndk_translation.so`.
+  Isso limita a conclusão: não foi isolado se o defeito está na tradução ou no caminho nativo do app. Falta reproduzir em ARM
+  (roteiro do A32), sem considerar os checks estáticos do JNI como prova de inferência executada.
+- **Entrega:** código do smoke em `43bc418`; relatório e evidências em `.equipe/relatorios/v1-3-release.md` e `/tmp/v1-3-fim/`.
+  Travas compartilhadas respeitadas, execução com prioridade 15 e somente `emulator-5554`; nenhum push feito. O coordenador
+  envia os commits e acompanha o CI da PR #20.
