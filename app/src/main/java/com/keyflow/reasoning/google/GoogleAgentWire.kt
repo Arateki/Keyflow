@@ -113,8 +113,8 @@ internal object GoogleAgentWire {
      *    todos os resultados da volta vão juntos num `Content` de papel `user`, cada um um `functionResponse` (`name`, `response`, `id`) —
      *    por isso mensagens seguidas do mesmo papel são fundidas e os `functionResponse` vêm antes de qualquer texto;
      *  - o `response` é um objeto: `{"result": texto}` e, se a ferramenta falhou, `{"error": texto}`;
-     *  - as partes do modelo da volta de ferramenta em andamento (as mensagens depois da última do usuário) voltam INTACTAS, com as
-     *    `thoughtSignature`, quando guardadas ([ProviderState]); voltas antigas são reconstruídas do texto e das chamadas;
+     *  - as partes do modelo voltam INTACTAS, com as `thoughtSignature`, quando guardadas ([ProviderState]), em todas as voltas da
+     *    conversa; sem estado guardado (ou se as chamadas divergirem), a volta é reconstruída do texto e das chamadas;
      *  - mensagem vazia não existe; a imagem de um resultado não vai (só texto: a validação com o modelo é da AGT-T10);
      *  - sem nenhuma ferramenta ativa as chamadas do histórico viram TEXTO, em vez de partes `functionCall` sem `tools` na requisição.
      * Conserta antes ([AgentHistory.repair]): chamada sem resultado ganha um resultado de erro.

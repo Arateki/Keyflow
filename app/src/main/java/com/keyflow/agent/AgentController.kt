@@ -182,15 +182,17 @@ class AgentController(
 
     /** "Limpar conversa": cancela o que estiver rodando, zera o histórico e o chat (volta só a saudação). */
     fun clear() {
-        synchronized(lock) {
+        val cancelledRun = synchronized(lock) {
+            val r = runNumber
             runNumber++
             job?.cancel()
             job = null
             currentBubble = null
             history.clear()
             _state.value = AgentUiState(listOf(ChatItem.Greeting(ids.getAndIncrement())))
+            r
         }
-        releaseTurnState(cancelled = true)
+        releaseTurnState(cancelledRun, cancelled = true)
     }
 
     /** O usuário respondeu ao painel de confirmação do pedido [callId]. */
@@ -224,6 +226,7 @@ class AgentController(
 
     private fun start(initial: AgentActivity, block: suspend (run: Long) -> Unit) {
         val mine = synchronized(lock) { ++runNumber }
+        startTurnState(mine)
         setActivity(initial)
         job = scope.launch {
             var cancelled = false
@@ -239,13 +242,13 @@ class AgentController(
                     if (message != null) appendToBubble("\n[$message]") else addItem(ChatItem.Notice(ids.getAndIncrement(), NoticeKind.GENERATION_ERROR))
                 }
             } finally {
-                if (mine == runNumber) finishRun(cancelled) else releaseTurnState(cancelled = true)
+                if (mine == runNumber) finishRun(mine, cancelled) else releaseTurnState(mine, cancelled = true)
             }
         }
     }
 
     /** Fim de uma execução (qualquer que seja o motivo): solta o estado do turno, para a atividade e fecha o que ficou em andamento. */
-    private fun finishRun(cancelled: Boolean) {
+    private fun finishRun(run: Long, cancelled: Boolean) {
         synchronized(lock) { currentBubble = null }
         _state.update { s ->
             s.copy(
@@ -255,17 +258,24 @@ class AgentController(
                 },
             )
         }
-        releaseTurnState(cancelled)
+        releaseTurnState(run, cancelled)
     }
 
     /**
      * As ferramentas que guardam estado enquanto o turno dura (os arquivos de uma skin em lotes) o soltam; a que tem um efeito só para
      * quando o turno termina bem (`open_tab`) sabe, por [cancelled], se deve aplicá-lo ou descartá-lo.
      */
-    private fun releaseTurnState(cancelled: Boolean) {
+    private fun releaseTurnState(run: Long, cancelled: Boolean) {
         executor?.registry?.all()?.forEach { tool ->
             val scoped = tool as? TurnScoped ?: return@forEach
-            if (cancelled) scoped.turnCancelled() else scoped.turnEnded()
+            if (cancelled) scoped.turnCancelled(run) else scoped.turnEnded(run)
+        }
+    }
+
+    private fun startTurnState(run: Long) {
+        executor?.registry?.all()?.forEach { tool ->
+            val scoped = tool as? TurnScoped ?: return@forEach
+            scoped.turnStarted(run)
         }
     }
 

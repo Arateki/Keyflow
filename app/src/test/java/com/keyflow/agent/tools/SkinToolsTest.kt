@@ -254,6 +254,27 @@ class SkinToolsTest {
         assertThat(out.content).contains("rascunho está vazio")
     }
 
+    @Test
+    fun `a delayed turn release from an older turn does not clear the draft of a newer turn`() = blocking {
+        val h = harness()
+        val scoped = skinTools.tools.filterIsInstance<TurnScoped>()
+
+        // Turno A inicia na geração 1
+        scoped.forEach { it.turnStarted(1L) }
+        h.executor.execute(callOf("skin_preview", files(manifest)))
+
+        // Turno B inicia na geração 2 e acrescenta arquivos ao rascunho
+        scoped.forEach { it.turnStarted(2L) }
+        h.executor.execute(callOf("skin_preview", files(idle)))
+
+        // O finally atrasado do Turno A cancelado roda na geração 1
+        scoped.forEach { it.turnCancelled(1L) }
+
+        // O rascunho do Turno B NÃO pode ter sido apagado pelo Turno A
+        val out = h.executor.execute(callOf("skin_preview", """{"files":{}}""", id = "c3"))
+        assertThat(out.status).isEqualTo(ToolStatus.OK)
+    }
+
     // ── limites (SKL-06) ─────────────────────────────────────────────────────
 
     @Test

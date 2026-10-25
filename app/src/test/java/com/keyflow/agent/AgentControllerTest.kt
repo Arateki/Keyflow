@@ -508,6 +508,9 @@ class AgentControllerTest {
     }
 
     private class ScopedSplit(name: String) : AgentTool, TurnScoped {
+        val startedGen = CopyOnWriteArrayList<Long>()
+        val endedGen = CopyOnWriteArrayList<Long>()
+        val cancelledGen = CopyOnWriteArrayList<Long>()
         val ended = AtomicInteger()
         val cancelled = AtomicInteger()
         override val name = name
@@ -517,6 +520,20 @@ class AgentControllerTest {
 
         @PolicyGated
         override suspend fun run(args: JSONObject, ctx: ToolContext) = ToolOutput.ok("ok")
+
+        override fun turnStarted(generation: Long) {
+            startedGen += generation
+        }
+
+        override fun turnEnded(generation: Long) {
+            endedGen += generation
+            turnEnded()
+        }
+
+        override fun turnCancelled(generation: Long) {
+            cancelledGen += generation
+            turnCancelled()
+        }
 
         override fun turnEnded() {
             ended.incrementAndGet()
@@ -555,12 +572,16 @@ class AgentControllerTest {
         assertThat(scoped.cancelled.get()).isEqualTo(0)
 
         env.controller.clear()
-        // O job cancelado garante que releaseTurnState(cancelled = true) foi chamado
+        // O job cancelado garante que releaseTurnState(cancelled = true) foi chamado para a geração 1
         assertThat(scoped.cancelled.get()).isAtLeast(1)
+        assertThat(scoped.cancelledGen).contains(1L)
         assertThat(env.controller.isBusy).isFalse()
 
         env.controller.send("y", env.withTools(ScriptedEngine(text("oi") + done())))
         assertThat(scoped.ended.get()).isEqualTo(1)
+        // O turno novo (geração 3) conclui e recebe ended(3), e a soltura de 1 nunca tocou em 3
+        assertThat(scoped.endedGen).contains(3L)
+        assertThat(scoped.cancelledGen).doesNotContain(3L)
     }
 
     @Test

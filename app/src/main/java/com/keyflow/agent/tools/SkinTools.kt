@@ -125,6 +125,9 @@ internal class SkinDraft(private val limits: SkinLimits, private val classify: (
 class SkinTools(private val workshop: SkinWorkshop, private val limits: SkinLimits = SkinLimits()) {
     private val draft = SkinDraft(limits, workshop::classify)
 
+    @Volatile
+    private var draftGen = 0L
+
     val tools: List<AgentTool> = listOf(
         GetFormatTool(),
         ListTool(),
@@ -205,7 +208,34 @@ class SkinTools(private val workshop: SkinWorkshop, private val limits: SkinLimi
             return ToolOutput.ok("$text\n$shown Para instalar, chame skin_install (os arquivos ficam guardados até o fim desta resposta; mande em `files` só o que quiser trocar).", image = check.sheet)
         }
 
-        override fun turnEnded() = draft.clear()
+        override fun turnStarted(generation: Long) {
+            synchronized(draft) {
+                if (draftGen != 0L && draftGen != generation) {
+                    draft.clear()
+                }
+                draftGen = generation
+            }
+        }
+
+        override fun turnEnded(generation: Long) {
+            synchronized(draft) {
+                if (draftGen == generation) {
+                    draft.clear()
+                    draftGen = 0L
+                }
+            }
+        }
+
+        override fun turnCancelled(generation: Long) {
+            turnEnded(generation)
+        }
+
+        override fun turnEnded() {
+            synchronized(draft) {
+                draft.clear()
+                draftGen = 0L
+            }
+        }
     }
 
     // ── instalar ─────────────────────────────────────────────────────────────
@@ -251,9 +281,36 @@ class SkinTools(private val workshop: SkinWorkshop, private val limits: SkinLimi
             return ToolOutput.ok("Skin «${result.name ?: id}» instalada (id: $id).$note Ela aparece em «Suas skins»; ainda NÃO está em uso — chame skin_select se o usuário a quiser no teclado ou na orbe.\n" + reportText(result.name, result.report), undo = undo)
         }
 
+        override fun turnStarted(generation: Long) {
+            synchronized(described) { described.clear() }
+            synchronized(draft) {
+                if (draftGen != 0L && draftGen != generation) {
+                    draft.clear()
+                }
+                draftGen = generation
+            }
+        }
+
+        override fun turnEnded(generation: Long) {
+            synchronized(described) { described.clear() }
+            synchronized(draft) {
+                if (draftGen == generation) {
+                    draft.clear()
+                    draftGen = 0L
+                }
+            }
+        }
+
+        override fun turnCancelled(generation: Long) {
+            turnEnded(generation)
+        }
+
         override fun turnEnded() {
             synchronized(described) { described.clear() }
-            draft.clear()
+            synchronized(draft) {
+                draft.clear()
+                draftGen = 0L
+            }
         }
     }
 

@@ -149,7 +149,17 @@ class AppTools(private val control: AppControl) {
         )
 
         @Volatile
+        private var currentGen = 0L
+        @Volatile
+        private var pendingGen = 0L
+        @Volatile
         private var pending: String? = null
+
+        override fun turnStarted(generation: Long) {
+            synchronized(this) {
+                currentGen = generation
+            }
+        }
 
         override suspend fun describe(args: JSONObject, ctx: ToolContext): ToolDescription {
             val tab = tabOf(args)
@@ -163,19 +173,56 @@ class AppTools(private val control: AppControl) {
 
         @PolicyGated
         override suspend fun run(args: JSONObject, ctx: ToolContext): ToolOutput {
+            val gen = currentGen
             val tab = tabOf(args)
-            pending = tab.id
+            synchronized(this) {
+                if (gen >= currentGen && currentGen > 0L) {
+                    pending = tab.id
+                    pendingGen = currentGen
+                } else if (currentGen == 0L) {
+                    // Sem controlador (testes unitários isolados da ferramenta)
+                    pending = tab.id
+                }
+            }
             return ToolOutput.ok("A aba «${tab.label}» (${tab.id}) vai abrir quando você terminar esta resposta. Diga isso ao usuário e encerre; não chame mais ferramentas só para esperar.")
         }
 
+        override fun turnEnded(generation: Long) {
+            val id = synchronized(this) {
+                if (pendingGen == generation) {
+                    val id = pending
+                    pending = null
+                    pendingGen = 0L
+                    id
+                } else null
+            }
+            if (id != null) control.openTab(id)
+        }
+
+        override fun turnCancelled(generation: Long) {
+            synchronized(this) {
+                if (pendingGen == generation) {
+                    pending = null
+                    pendingGen = 0L
+                }
+            }
+        }
+
         override fun turnEnded() {
-            val id = pending ?: return
-            pending = null
-            control.openTab(id)
+            val id = synchronized(this) {
+                val id = pending
+                pending = null
+                pendingGen = 0L
+                id
+            }
+            if (id != null) control.openTab(id)
         }
 
         override fun turnCancelled() {
-            pending = null
+            synchronized(this) {
+                pending = null
+                pendingGen = 0L
+            }
         }
     }
 

@@ -3,6 +3,9 @@ package com.keyflow.agent.tools
 import com.google.common.truth.Truth.assertThat
 import com.keyflow.agent.AgentBackend
 import com.keyflow.agent.AgentController
+import com.keyflow.agent.AgentEngine
+import com.keyflow.agent.AgentEvent
+import com.keyflow.agent.AgentMessage
 import com.keyflow.agent.AgentStopReason
 import com.keyflow.agent.AgentToolCall
 import com.keyflow.agent.ConfirmationDecision
@@ -12,6 +15,7 @@ import com.keyflow.agent.InMemoryActionLog
 import com.keyflow.agent.ScriptedEngine
 import com.keyflow.agent.Sentinels
 import com.keyflow.agent.SecretFilter
+import com.keyflow.agent.ToolDefinition
 import com.keyflow.agent.ToolExecutor
 import com.keyflow.agent.ToolPolicy
 import com.keyflow.agent.ToolPolicyConfig
@@ -23,10 +27,13 @@ import com.keyflow.agent.call
 import com.keyflow.agent.done
 import com.keyflow.agent.text
 import java.util.concurrent.CopyOnWriteArrayList
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
@@ -487,6 +494,60 @@ class AppToolsTest {
         env.controller.send("nova pergunta", AgentBackend.WithTools(engine2))
         assertThat(env.controller.isBusy).isFalse()
         assertThat(control.opened).isEmpty()
+    }
+
+    @Test
+    fun `cancelled turn finally running after subsequent turn arms open_tab must not wipe out subsequent turn state`() {
+        val env = ChatEnv()
+        val blockFinallyA = CompletableDeferred<Unit>()
+        val engineA = AgentBackend.TextOnly {
+            flow {
+                try {
+                    kotlinx.coroutines.awaitCancellation()
+                } finally {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                        blockFinallyA.await()
+                    }
+                }
+            }
+        }
+        // Turno A inicia
+        env.controller.send("pergunta A", engineA)
+
+        // Usuário limpa a conversa (cancela Turno A)
+        env.controller.clear()
+
+        // Turno B inicia, executa open_tab e suspende antes de terminar
+        val pauseTurnB = CompletableDeferred<Unit>()
+        val engineB = object : AgentEngine {
+            private var iteration = 0
+            override fun chat(
+                messages: List<AgentMessage>,
+                tools: List<ToolDefinition>,
+                system: String,
+                maxTokens: Int,
+            ): Flow<AgentEvent> = flow {
+                if (iteration++ == 0) {
+                    emit(AgentEvent.ToolCall("c1", "open_tab", """{"tab":"teclado"}"""))
+                    emit(AgentEvent.Done(AgentStopReason.TOOL_USE))
+                } else {
+                    pauseTurnB.await()
+                    emit(AgentEvent.TextDelta("concluído"))
+                    emit(AgentEvent.Done(AgentStopReason.END_TURN))
+                }
+            }
+        }
+        env.controller.send("pergunta B", AgentBackend.WithTools(engineB))
+
+        // Agora liberamos o finally do Turno A para rodar enquanto o Turno B tem open_tab armado
+        blockFinallyA.complete(Unit)
+
+        // Turno B conclui sua resposta
+        pauseTurnB.complete(Unit)
+        assertThat(env.controller.isBusy).isFalse()
+
+        // A aba teclado pedida pelo turno B DEVE abrir!
+        assertThat(control.opened).containsExactly("teclado")
     }
 
     @Test
