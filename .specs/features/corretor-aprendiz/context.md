@@ -212,7 +212,8 @@ Nenhum dos cinco projetos lidos adapta por pessoa: LatinIME/HeliBoard/FUTO têm 
 ASK e Floris nem isso. É técnica de pesquisa (toque pessoal, deslocamento sistemático): **sem implementação aberta que
 eu tenha lido**, então a proposta é nossa (`design.md` §5): viés por tecla no **modelo** (sem mexer no que o dedo vê)
 e, como experimento, deslocar o hit-test. Custo: ~300 bytes e 0 CPU na digitação. **Recomendação:** viés no modelo
-na fase D; hit-test adaptado só se o teto medido no banco compensar e o Yan quiser.
+na fase D; o hit-test adaptado também entra na fase D, como experimento medido no banco mais protótipo só no debug
+(resposta 9 do Yan, 24/10); ligar na release só com o teto medido e o aceite dele depois de testar no A32.
 
 ### 6.4 Modelo neural pequeno (FUTO)
 

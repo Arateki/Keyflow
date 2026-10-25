@@ -261,10 +261,14 @@ sem risco de interface:
    que a pessoa **quis**: `μ ← μ + α·(obs − μ)`, `α = 1/(n + 20)` (o prior em zero segura os poucos dados),
    `|μ| ≤ 0,25` tecla. O custo espacial usa `centro + μ`. 26 × 3 números por layout (≈ 300 bytes);
    zero custo na digitação (cada comit atualiza ≤ 10 teclas).
-2. **Hit-test adaptado** (experimento, não promessa). Deslocar o ponto antes de decidir a tecla reduziria
-   os erros de letra pela raiz, mas a tecla sob o dedo passaria a diferir do que se vê na prévia. O banco
-   (conjunto sintético com viés) mede o teto: erro por letra com e sem compensar o viés conhecido
-   (`context.md` §7). Só vira tarefa de produto se o Yan quiser (CA-T24).
+2. **Hit-test adaptado** (ADP-05, fase D; o Yan mandou entrar na fase D, resposta 9 de 24/10). Deslocar o
+   ponto antes de decidir a tecla reduziria os erros de letra pela raiz, mas a tecla sob o dedo passaria a
+   diferir do que se vê na prévia. A fase D entrega as duas metades do plano (CA-T24): (a) o banco mede o
+   teto (erro por letra com e sem compensar o viés conhecido, no sintético com viés e nos toques reais da
+   CA-T2; o protótipo de `context.md` §7 indicou 19,6% → 13,8% numa só configuração, n = 200, número
+   preliminar); (b) um protótipo **só no debug**, atrás de opção desligada, que desloca o ponto pelo viés
+   da tecla antes do `Geometry.keyAt`, de modo que a prévia e a letra emitida usem a mesma tecla. O Yan
+   testa no A32; ligar na release exige o teto medido e o aceite dele depois do teste.
 
 Risco: reforço de erro (o viés aprende o erro). Mitigações: só palavras do dicionário comitadas como
 estão; prior forte; teto de 0,25; apagar o aprendido zera (ADP-03); o banco tem um caso com viés

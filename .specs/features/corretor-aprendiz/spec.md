@@ -32,7 +32,8 @@ Duas frentes, na ordem do que dá mais acerto por esforço:
 - [ ] Palavras novas da pessoa passam a valer sozinhas depois de poucos usos, com contagem que decai; erro de digitação isolado não é aprendido.
 - [ ] Correções que a pessoa faz (tocar numa sugestão, apagar e reescrever) viram pares "erro → certo".
 - [ ] Nada sai do aparelho; não aprende em senha, número, e-mail, URL nem com `IME_FLAG_NO_PERSONALIZED_LEARNING`; "Apagar meus dados" e uma tela própria apagam o aprendido.
-- [ ] Modelo espacial com a coordenada do toque no lugar da tabela de teclas vizinhas, sem custo relevante no Galaxy A32.
+- [ ] Modelo espacial com a coordenada do toque no lugar da tabela de teclas vizinhas, com o custo de CPU medido no Galaxy A32 (PER-01).
+- [ ] Adaptação ao jeito de tocar (fase D): viés por tecla no modelo e, como pediu o Yan (resposta 9, 24/10), o experimento de deslocar também o alvo do toque, medido no banco e com protótipo só no debug.
 - [ ] Contexto da palavra anterior (bigramas), como fase posterior.
 
 ## Out of Scope
@@ -124,9 +125,10 @@ Duas frentes, na ordem do que dá mais acerto por esforço:
 ### Adaptação ao jeito de tocar (`ADP`)
 
 1. **ADP-01**: WHEN uma palavra é comitada **como digitada**, está no dicionário, tem ≥ 3 letras e não foi desfeita THEN o deslocamento de cada toque em relação ao centro da tecla SHALL atualizar, por média móvel com prior em zero (α = 1/(n+20)), o viés (μx, μy) daquela tecla; teto |μ| ≤ 0,25 tecla; 26 teclas × 3 números por layout.
-2. **ADP-02**: WHEN o viés existe THEN o custo espacial SHALL usar o centro deslocado (SPA-02); o **hit-test** da grade continua intocado nesta spec (deslocar o alvo de toque muda o que a pessoa vê; fica como decisão do Yan, `context.md` §8).
+2. **ADP-02**: WHEN o viés existe THEN o custo espacial SHALL usar o centro deslocado (SPA-02); o **hit-test** da grade não muda por causa disso (deslocar o alvo de toque muda o que a pessoa vê): só o experimento do ADP-05 mexe nele, e só no debug.
 3. **ADP-03**: WHEN a pessoa apaga o aprendido (PRV-04) THEN o viés SHALL voltar a zero.
 4. **ADP-04**: WHEN os toques vêm de modo anônimo ou campo inelegível THEN nenhum viés SHALL ser atualizado.
+5. **ADP-05** (fase D, resposta 9 do Yan, 24/10): WHEN a fase D roda THEN o banco SHALL medir o **teto** de deslocar também o hit-test (erro por letra com e sem compensar o viés conhecido, no sintético com viés e nos toques reais da CA-T2) e SHALL existir um **protótipo só no debug**, atrás de opção desligada por padrão, que desloca o ponto do toque pelo viés da tecla antes de decidir a tecla (a prévia e a letra que sai usam a mesma tecla); o Yan testa no A32. Ligar na release só depois dos números do banco e do teste dele, porque muda o que o dedo vê.
 
 ### Contexto da palavra anterior (`CTX`) — fase posterior
 
@@ -195,7 +197,7 @@ Duas frentes, na ordem do que dá mais acerto por esforço:
 | REJ-01..06 | Correção recusada | Pending | unit (máquina de recusa) + instrumentado (`KeyFlowKeyboardLearningTest`) |
 | FIX-01..06 | Correção feita pela pessoa | Pending | unit (`RewriteTrackerTest`, pares) + instrumentado |
 | SPA-01..05 | Modelo espacial | Pending | banco (sintético, reais) + unit + instrumentado (tempo no A32) |
-| ADP-01..04 | Adaptação do toque | Pending | banco (sintético com viés) + unit |
+| ADP-01..05 | Adaptação do toque | Pending | banco (sintético com viés e reais) + unit + instrumentado (protótipo) + manual no A32 |
 | CTX-01..04 | Contexto | Pending | unit + banco (conjunto de contexto) |
 | PRV-01..06 | Privacidade | Pending | unit (`LearningPolicyTest`, `BackupRulesTest`) + instrumentado + Compose (apagar) |
 | LST-01..07 | Tela de palavras, exportar e importar | Pending | Compose instrumentado + goldens + `TranslationsTest` |

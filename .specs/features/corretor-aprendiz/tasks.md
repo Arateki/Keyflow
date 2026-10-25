@@ -204,7 +204,7 @@
 - **Done when**: ≤ 25 ms p95 no A32 **[YAN]**; se estourar, otimiza ou a fase fica atrás de flag.
 - **Tests**: instrumentado. **Gate**: `full` + manual.
 
-## Fase D — Adaptação ao jeito de tocar (~2,5 dias)
+## Fase D — Adaptação ao jeito de tocar (~2,5 dias para a T23, mais a T24, a estimar ao fechar a T23)
 
 ### CA-T23 — Viés por tecla
 - **What**: `TouchBias` (média móvel com prior, teto), observações só de palavras comitadas como digitadas e no
@@ -215,10 +215,20 @@
   (teto); apagar zera.
 - **Tests**: unit + propriedade + banco. **Gate**: `quick`.
 
-### CA-T24 — Experimento: hit-test adaptado  `[opcional, YAN decide]`
-- **What**: simulação no banco (erro por letra com/sem compensar o viés) e, se o teto compensar, protótipo em
-  debug para o Yan testar no A32.
-- **Covers**: ADP-02 (decisão). **Tests**: unit + manual **[YAN]**. **Gate**: manual.
+### CA-T24 — Hit-test adaptado: experimento e protótipo debug
+- **What**: (1) no banco, simulação `HitTestAdaptado`: erro por letra com e sem compensar o viés conhecido, no
+  sintético com viés (nenhum / por fileira / forte; σ 0,30 e 0,40) e nos toques reais da CA-T2; (2) protótipo
+  **só no debug**, atrás de opção desligada por padrão, que desloca o ponto do toque pelo viés `TouchBias` da
+  tecla antes do `Geometry.keyAt`; a prévia, o destaque e a letra emitida usam a mesma tecla.
+- **Where**: `bench/` (simulação), `keyboard/KeyboardGridView.kt`, `keyboard/layout/Geometry.kt`, `app/src/debug/…` (opção).
+- **Depends on**: CA-T20 (ponto do toque), CA-T23 (viés), CA-T2 (toques reais).
+- **Covers**: ADP-05 (e o limite do ADP-02: o hit-test só muda com a opção).
+- **Done when**: o banco imprime erro por letra com × sem compensação (o protótipo deu 19,6% → 13,8% em σ 0,30
+  com viés forte, n = 200: preliminar, a confirmar); com a opção desligada o teclado e os goldens ficam
+  bit-idênticos; instrumentado com a opção ligada e um viés injetado: o toque deslocado cai na tecla
+  pretendida e a prévia mostra essa tecla; a opção não existe na release (`check-release-*.py`, como na CA-T2);
+  relatório curto com os números. **[YAN]** testa o protótipo no A32; ligar na release **não** faz parte desta task.
+- **Tests**: unit (simulação, geometria) + instrumentado + manual **[YAN]**. **Gate**: `full`.
 
 ## Fase E — Pares erro → certo (~3 dias)
 
@@ -290,7 +300,8 @@
 | ROL-02 | CA-T18 |
 | SPA-01 | CA-T20 |
 | SPA-02..05 | CA-T19, CA-T21, CA-T22 |
-| ADP-01..04 | CA-T23, CA-T24 |
+| ADP-01..04 | CA-T23 |
+| ADP-05 | CA-T24 |
 | FIX-02, 04, 06, REJ-03 | CA-T25 |
 | CTX-01, 02 | CA-T27 |
 | CTX-03 | CA-T28 |
