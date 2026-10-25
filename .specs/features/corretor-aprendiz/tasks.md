@@ -141,7 +141,8 @@
   `app/src/test/java/com/keyflow/auth/BackupRulesTest.kt`.
 - **Depends on**: CA-T9. **Covers**: ARM-01, PER-02, PRV-01.
 - **Done when**: ida e volta; diário reproduz o estado; arquivo truncado/corrompido/aleatório não derruba nem passa
-  do teto (fuzz, ~30 mil entradas); carga de 5000 palavras ≤ 50 ms (meta, a medir); o `BackupRulesTest`, que hoje só
+  do teto (fuzz, ~30 mil entradas); carga de 5000 palavras ≤ 50 ms e tamanho do arquivo e memória com 5000 palavras e
+  2000 pares **medidos** (metas: ≈ 0,2 MB e ≤ 1,5 MB, sem bigramas); o `BackupRulesTest`, que hoje só
   filtra `domain="sharedpref"` (linha 24), passa a conferir também `domain="file"` e falha se `corretor` sair de
   qualquer das três seções.
 - **Tests**: unit + propriedade + fuzz. **Gate**: `quick`.
@@ -323,7 +324,9 @@
 - **What**: `Bigrams` (peso/dia, teto), anterior vinda dos eventos, Witten-Bell no prior em bits, persistência `B⇥…`.
 - **Where**: `learning/Bigrams.kt`, `Suggester.kt`, `LearnedStore`. **Depends on**: CA-T21. **Covers**: CTX-01, CTX-02.
 - **Done when**: no conjunto de contexto do banco, duas candidatas parecidas se desempatam pela palavra anterior;
-  nenhuma piora nos conjuntos manter/erros; o texto legal da T18b é revisto para citar os bigramas (**[YAN]** aprova).
+  nenhuma piora nos conjuntos manter/erros; tamanho do arquivo e memória **com** 10 000 bigramas medidos e o
+  orçamento da `design.md` §8 refeito (a estimativa é ≈ 0,5–0,6 MB e 2–3 MB); o texto legal da T18b é revisto para
+  citar os bigramas (**[YAN]** aprova).
 - **Tests**: unit + propriedade + banco. **Gate**: `quick`.
 
 ### CA-T28 — Bigramas estáticos pt-BR  `[condicional: só entra se o banco mostrar ganho]`

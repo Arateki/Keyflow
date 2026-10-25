@@ -128,9 +128,12 @@ abaixo de 95% a classe só sugere (BAS-01).
 
 **Guarda de outro idioma.** Em vez de carregar `en` e `es` inteiros (2 MB cada em disco, vários MB em
 arrays) no teclado pt, o `build-dictionaries.py` gera `pt.estrangeiras.kfd` com as palavras de
-`en`/`es` de frequência ≥ F que não estão no `pt` (~20–30 mil, ~0,3 MB). A CA-T7 mede F no banco. Para o
-teclado en, vale o inverso com pt. É a ideia do "plausibility threshold"/lista de outro idioma do
-LatinIME e da "confiança por idioma" do HeliBoard (só a ideia; `context.md` §4).
+`en` **e** `es` de frequência ≥ F que não estão no `pt`; nos teclados en e es vale o inverso (as outras duas
+línguas). A CA-T7 mede F no banco **e o tamanho**: o formato de hoje custa ≈ 20 B por palavra em disco (2 MB por
+100 mil), então os "20–30 mil" da primeira versão desta spec — um palpite, sem medida — dariam 0,4–0,6 MB, não
+0,3 MB, e o pt precisa de en e de es. O orçamento da T7 é refeito com o número medido (subindo F, se preciso). É a
+ideia do "plausibility threshold"/lista de outro idioma do LatinIME e da "confiança por idioma" do HeliBoard (só a
+ideia; `context.md` §4).
 
 ---
 
@@ -153,7 +156,7 @@ class Entry(var weight: Float, var lastDay: Int, var valid: Boolean, var lastTyp
 | `TYPED_COOLDOWN` | 60 s | evitar "kkk kkk kkk" valer 3 |
 | `HALF_LIFE_DAYS` | 90 | AOSP v4 joga fora após 300 dias sem uso; contagem divide por 2 no teto |
 | `KEEP_ABOVE` / `DROP_BELOW` | 1,0 / 0,5 | histerese: 3 pontos duram ~142 dias parados e somem em ~232 |
-| `CANDIDATE_TTL_DAYS` | 30 | AOSP descarta entrada de nível 0 após 30 passos |
+| `CANDIDATE_TTL_DAYS` | 30 | Escolha nossa, a calibrar nas sessões (CA-T17). O AOSP descarta a entrada de nível 0 após 30 passos de 15/32 dia, ≈ **14 dias** (`forgetting_curve_utils.cpp`: `DURATION_TO_LOWER_THE_LEVEL_IN_SECONDS` = 15 dias ÷ 32 passos), não 30 |
 | `WEIGHT_CAP` | 12 | uso intenso não prende a palavra para sempre (~320 dias) |
 | `MAX_WORDS` / `MAX_PAIRS` / `MAX_BIGRAMS` | 5000 / 2000 / 10 000 por idioma | AOSP: 10 000 unigramas / 30 000 bigramas |
 | `REWRITE_WINDOW` | 20 s | |
@@ -395,7 +398,12 @@ fun wordEligible(word: String): Boolean        // LRN-02
 | **Room** | Não está no projeto; precisa de KSP/kapt no AGP 9 (**não conferi** a compatibilidade com o AGP 9.2 daqui); ~1 MB de dex; esquema e migração para ≤ 10 mil linhas | Consultas SQL (não precisamos: tudo cabe em memória) |
 | **DataStore** (já no projeto) | Reescreve o arquivo inteiro a cada `edit`; pensado para preferências pequenas; 5000 palavras = ~150 KB por gravação | Já existe |
 | `SQLiteOpenHelper` | Trava de banco e I/O por tecla; é uma API pesada para um mapa pequeno | Sem dependência nova, transacional |
-| **Arquivo próprio** (escolhido) | Código de formato (diário, compactação) | ≤ 300 KB; lido uma vez para `HashMap`; consulta O(1) sem I/O; diário de acréscimos sobrevive a processo morto; 100% testável na JVM com `TemporaryFolder`; tem precedente no projeto (`agent/actions.jsonl`, `model-downloads.json`); apagar = apagar |
+| **Arquivo próprio** (escolhido) | Código de formato (diário, compactação) | ≈ 0,2 MB sem bigramas (estimativa: 5000 palavras e 2000 pares em linhas de 20–35 B; ver abaixo); lido uma vez para `HashMap`; consulta O(1) sem I/O; diário de acréscimos sobrevive a processo morto; 100% testável na JVM com `TemporaryFolder`; tem precedente no projeto (`agent/actions.jsonl`, `model-downloads.json`); apagar = apagar |
+
+**Tamanho (estimativas minhas, a medir na CA-T10 e na CA-T27).** Sem bigramas: o arquivo fica em ≈ 0,2 MB e o
+`HashMap<String, …>` na ART em ≈ 1 MB (≈ 100–150 B por entrada), dentro dos ≤ 300 KB e ≤ 1,5 MB da spec. **Com** os
+10 000 bigramas da fase F esses dois tetos não valem: o arquivo passa a ≈ 0,5–0,6 MB e a memória a ≈ 2–3 MB; a CA-T27
+refaz o orçamento com a medida (estrutura compacta, com ids de palavra no lugar de `String`, se precisar).
 
 **Formato** `files/corretor/<idioma>.kfl` (texto, uma linha por registro, `\t`):
 
