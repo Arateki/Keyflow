@@ -3,7 +3,6 @@ package com.keyflow.ui
 import android.content.Context
 import android.os.SystemClock
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -12,6 +11,7 @@ import com.keyflow.data.SettingsRepository
 import com.keyflow.ui.onboarding.DISCLOSURE_ACCEPT_TAG
 import com.keyflow.ui.onboarding.DISCLOSURE_CONTINUE_TAG
 import com.keyflow.ui.onboarding.DISCLOSURE_DECLINE_TAG
+import com.keyflow.ui.onboarding.DISCLOSURE_DECLINED_EXPLANATION_TAG
 import com.keyflow.ui.config.ACTIVATE_MIC_TAG
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -43,26 +43,20 @@ class OnboardingRoutingTest {
     @Test
     fun firstRunRequiresDisclosureBeforeMicPermissionAndDeclineCanBeReopened() {
         compose.mainClock.autoAdvance = false
-        // A `SetupActivity` compõe um placeholder vazio até o DataStore emitir (`settingsLoaded`), e o
-        // relógio congelado acima não gera o frame da recomposição que traria o onboarding — a árvore
-        // fica só com o nó raiz e o teste falha com "não achei o nó". Sozinho passa porque a emissão
-        // chega antes de congelar; depois do `OverlayServiceCancelTest` o processo está ocupado e ela
-        // chega depois (medido em 2026-09-09, com a árvore impressa na falha). Esperar por idle não
-        // serve: a orbe `Listening` anima sem parar. Então bombeia o relógio à mão até a tela existir.
-        var pumps = 0
-        while (compose.onAllNodesWithTag(DISCLOSURE_DECLINE_TAG).fetchSemanticsNodes().isEmpty() && pumps++ < 100) {
-            compose.mainClock.advanceTimeBy(100)
-        }
+        // A `SetupActivity` compõe um placeholder vazio até o DataStore emitir (`settingsLoaded`). Com o relógio
+        // congelado a árvore só ganha a divulgação se o teste empurrar o relógio, e o prazo tem de ser em tempo real:
+        // contar quadros acabava antes da emissão num emulador ocupado (CI de 2026-10-24, duas vezes).
+        compose.pumpUntilTag(DISCLOSURE_DECLINE_TAG)
 
         // Primeiro uso deve exibir a divulgação antes de qualquer permissão.
         compose.onNodeWithTag(DISCLOSURE_DECLINE_TAG).assertExists()
         compose.onNodeWithTag(DISCLOSURE_DECLINE_TAG).performClick()
-        compose.mainClock.advanceTimeBy(100)
-        compose.onNodeWithTag("disclosure-declined-explanation").assertExists()
+        compose.pumpUntilTag(DISCLOSURE_DECLINED_EXPLANATION_TAG)
+        compose.onNodeWithTag(DISCLOSURE_DECLINED_EXPLANATION_TAG).assertExists()
         compose.onNodeWithTag(DISCLOSURE_CONTINUE_TAG).performClick()
 
         // Recusar e continuar persiste a conclusão sem consentimento.
-        val deadline = SystemClock.elapsedRealtime() + 5_000
+        val deadline = SystemClock.elapsedRealtime() + PUMP_TIMEOUT_MS
         var persisted = false
         while (SystemClock.elapsedRealtime() < deadline) {
             val current = runBlocking { SettingsRepository(context).settingsFlow().first() }
@@ -71,15 +65,12 @@ class OnboardingRoutingTest {
             SystemClock.sleep(100)
         }
         assertTrue("recusa e conclusão sem ditado deveriam ter sido persistidas", persisted)
-        var frames = 0
-        while (compose.onAllNodesWithTag(ACTIVATE_MIC_TAG).fetchSemanticsNodes().isEmpty() && frames++ < 100) {
-            compose.mainClock.advanceTimeBy(100)
-        }
+        compose.pumpUntilTag(ACTIVATE_MIC_TAG)
         compose.onNodeWithTag(ACTIVATE_MIC_TAG).performClick()
-        compose.mainClock.advanceTimeBy(100)
+        compose.pumpUntilTag(DISCLOSURE_ACCEPT_TAG)
         compose.onNodeWithTag(DISCLOSURE_CONTINUE_TAG).assertExists()
         compose.onNodeWithTag(DISCLOSURE_ACCEPT_TAG).assertExists()
-        compose.onNodeWithTag("disclosure-declined-explanation").assertExists()
+        compose.onNodeWithTag(DISCLOSURE_DECLINED_EXPLANATION_TAG).assertExists()
     }
 
     /**

@@ -121,6 +121,21 @@ class ArchitectureRulesTest {
     }
 
     /**
+     * Teste instrumentado que espera um nó com o relógio de composição congelado usa `pumpUntil`/`pumpUntilTag`
+     * (FrozenClockPump.kt), que desiste só por prazo em tempo REAL. Laço de "N quadros" (`frames++ < 100`) acaba em
+     * milissegundos reais e não espera o DataStore da SetupActivity: no emulador do CI ocupado a divulgação chegava
+     * depois do 100º quadro e `OnboardingRoutingTest` caía no `assertExists` (PR #17, 2026-10-24, duas vezes; medido
+     * com carga: a tela levou de 3 a 7 s e 135 e 239 quadros).
+     */
+    @Test
+    fun frozenClockWaitsGoThroughPumpUntil() {
+        val offenders = kotlinFiles(androidTest).filter { it.name != "FrozenClockPump.kt" }.flatMap { file ->
+            matches(file) { Regex("""\bwhile\s*\(.*fetchSemanticsNodes""").containsMatchIn(it) }.map { "${file.rel(androidTest)}:$it" }
+        }
+        assertEquals("espere o nó com compose.pumpUntilTag(tag) / compose.pumpUntil(...), não com um laço de quadros", emptyList<String>(), offenders)
+    }
+
+    /**
      * Regex de teste instrumentado roda no ICU do Android, que recusa um `}` solto (PatternSyntaxException derrubou o
      * diagnóstico do teclado em 2026-10-10). Quantificador `{n,m}` pode; `}` sem `{` aberto, não.
      */

@@ -1,7 +1,6 @@
 package com.keyflow.ui
 
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -36,11 +35,7 @@ class DisclosureUpdateRoutingTest {
     @Test
     fun updateDeclineShowsExplanationBeforeContinuingWithoutDictation() {
         compose.mainClock.autoAdvance = false
-        var frames = 0
-        while (compose.onAllNodesWithTag(DISCLOSURE_DECLINE_TAG).fetchSemanticsNodes().isEmpty() && frames++ < 100) {
-            compose.mainClock.advanceTimeBy(100)
-            android.os.SystemClock.sleep(20)
-        }
+        compose.pumpUntilTag(DISCLOSURE_DECLINE_TAG)
 
         compose.onNodeWithTag(DISCLOSURE_DECLINE_TAG).performClick()
         compose.mainClock.advanceTimeBy(100)
@@ -48,11 +43,7 @@ class DisclosureUpdateRoutingTest {
         compose.onNodeWithTag(DISCLOSURE_DECLINED_EXPLANATION_TAG).assertExists()
         compose.onNodeWithTag(DISCLOSURE_CONTINUE_TAG).performClick()
 
-        frames = 0
-        while (compose.onAllNodesWithTag(panelTag(ConfigTab.OVERLAY)).fetchSemanticsNodes().isEmpty() && frames++ < 100) {
-            compose.mainClock.advanceTimeBy(100)
-            android.os.SystemClock.sleep(20)
-        }
+        compose.pumpUntilTag(panelTag(ConfigTab.OVERLAY))
         compose.onNodeWithTag(panelTag(ConfigTab.OVERLAY)).assertExists()
     }
 }
