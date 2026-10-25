@@ -2705,6 +2705,124 @@ Dois motores com ferramentas ao lado do da Anthropic: `reasoning/openai/OpenAiAg
   fora do escopo. A captura de onboarding foi bit-idêntica. Comparações durante captura devem
   aguardar o marcador de PNG concluído, pois o arquivo existe antes de terminar de ser gravado.
 
+## 2026-10-24 — V1-3: build de release (R8, AAB, chave de upload, applicationId)
+
+- **Keep rule por classe não basta com JNI.** O `liblitertlm_jni.so` chama de volta `JniMessageCallback.onMessage/onDone/onError`
+  e lê `SamplerConfig.getTopK...` por nome; nenhum Java os chama, então o R8 apagava os métodos da interface (o `mapping.txt` mostrava a
+  classe com o nome original e sem membros) e o Raciocínio local morreria com `NoSuchMethodError`. Vale o pacote inteiro
+  (`-keep class com.google.ai.edge.litertlm.** { *; }`). `scripts/check-release-jni.py` confere no mapping e no DEX (falha no build
+  antigo, passa no novo) e o job do release do CI o roda. Ao subir de versão o LiteRT-LM ou o sherpa-onnx, o CI avisa se algo novo
+  passar a ser chamado só pelo nativo. Componentes do manifesto não precisam de regra: o AAPT2 as gera (`aapt_rules.txt`).
+- **`applicationId` `com.arateki.keyflow`, `namespace` `com.keyflow`.** O id curto de componente (`pkg/.ime.X`) é relativo ao
+  `applicationId`, mas as classes ficam no namespace: `com.arateki.keyflow/.ime.X` aponta para uma classe que não existe. Scripts e
+  testes usam o nome completo (`com.arateki.keyflow/com.keyflow.ime.KeyFlowKeyboardService`). O `instrumentar` descobre o id da
+  worktree (aapt2 no APK de teste ou o `build.gradle.kts`) e serve às branches com `com.keyflow` e às novas.
+- **Chave de upload só no Gradle, fora do git:** `~/.keyflow/android/upload-keystore.properties` ou `KEYFLOW_UPLOAD_*`. Sem ela o release
+  sai `app-release-unsigned.apk` (é o que o CI confere). Com ela, o APK e o AAB saem assinados com o certificado de upload; o
+  SHA-256 público bate com o cadastrado. Release assinado com a chave de upload no emulador impede o `installDebug` seguinte (mesmo
+  id, assinatura diferente): o smoke desinstala no fim.
+- **Smoke de release no emulador (lições):** o app de release tem só ABIs ARM; o emulador x86_64 roda arm64 por tradução. Com a orbe
+  flutuante na tela o `uiautomator dump` comum volta "null root node": use `dump --windows`. Com o KeyFlow habilitado e outro teclado
+  ativo, o app abre o seletor de teclados do sistema ao fim do onboarding e ele cobre tudo: `ime set` antes de abrir. A folha de
+  compra não é um diálogo: o botão Voltar do sistema fecha o app, não a folha (fecha pelo véu ou pelo X). O AdMob serve anúncios de
+  TESTE ("Test Ad") a qualquer emulador, mesmo com IDs de release, então o banner carrega de verdade no smoke. O Billing sem Play Store
+  responde `BILLING_UNAVAILABLE` (3) e a folha mostra o aviso, sem crash.
+- **Tamanho:** o R8 + redução de recursos tira ~10 MB do APK de release (94,3 → 83,8 MB) e ~3,4 MB do AAB (50,3 → 46,8 MB); o peso é de
+  código nativo (sherpa-onnx e LiteRT-LM), que o R8 não toca. O AAB leva o `mapping.txt` (`BUNDLE-METADATA/.../proguard.map`) e o perfil de base.
+
+
+## 2026-10-25 — V1-3: fechamento do smoke e falha nativa no ditado do emulador
+
+- **Smoke padrão do APK assinado:** passou do zero até o fim, com R8 e recursos reduzidos, usando o artefato de upload
+  (`com.arateki.keyflow`, 83.842.560 bytes). Troca Sistema → Ateliê: 15.077 pixels diferentes nas fileiras de letras da
+  prévia, excluindo a orbe e os chips de seleção. Passou por todas as abas, folha de compra e aviso de indisponibilidade,
+  banner com “Test Ad”, teclado de verdade digitando “hi” nos Ajustes e divulgação persistida ao reabrir. Billing indisponível
+  não comprova compra real nem `ProxyBillingActivity`. `PermissionsCheckerTest`: 2/2; APKs debug e de testes recompilados.
+- **Captura de acessibilidade:** o comando `uiautomator dump --windows` do API 34 lançou NPE em `childNafCheck`; houve também
+  dumps só da barra de status e ANRs da System UI, comprovados por foco e screenshot. `--compressed` e a janela ativa não
+  resolveram. `scripts/ReleaseUiDump.java` roda via `app_process`, espera as janelas, renova o cache e tolera filhos nulos;
+  é compilado com o SDK/JDK e enviado/removido sob a trava, sem alterar o APK. Banner passou em três verificações consecutivas.
+  O leitor de log distingue os PIDs do APK, reinícios, subprocessos e tombstones dos processos do capturador/sistema, mantendo
+  o log completo para revisão. Controle com logs reais: NPE do capturador não vira crash do app; três SIGSEGV do app são recusados.
+- **Campo real para o IME:** os Ajustes restauram uma busca anterior. Uma coordenada fixa pode tocar fora do campo e fechar
+  o teclado; o smoke localiza “Search settings”, toca explicitamente o `EditText` e espera o IME correto aparecer. A comparação
+  AE do ImageMagick 7 imprime também a métrica normalizada entre parênteses; usar só o primeiro número, inclusive em notação científica.
+- **Ditado local NÃO aprovado:** o trecho opcional do smoke foi executado isoladamente com `KEYFLOW_SMOKE_DICTATION=1`, modelo
+  Rápido/Whisper base baixado e instalado pelo app e gravação confirmada pelo cronômetro. O processo `:inference` caiu três vezes
+  com SIGSEGV, endereço `0x8`, antes do marcador de modelo carregado; o app apresentou interrupção local e continuou aberto.
+  O release não contém bibliotecas x86_64: o AVD é x86_64, `primaryCpuAbi=arm64-v8a`, ponte `libndk_translation.so`.
+  Naquela rodada não havia sido isolado se o defeito estava na tradução ou no caminho nativo do app; faltava reproduzir em ARM,
+  sem considerar os checks estáticos do JNI como prova de inferência executada. A comparação controlada abaixo encerra essa pendência.
+- **Entrega:** código do smoke em `43bc418`; relatório e evidências em `.equipe/relatorios/v1-3-release.md` e `/tmp/v1-3-fim/`.
+  Travas compartilhadas respeitadas, execução com prioridade 15 e somente `emulator-5554`; nenhum push feito. O coordenador
+  envia os commits e acompanha o CI da PR #20.
+
+
+## 2026-10-25 — V1-3: ditado em ARM aprovado; SIGSEGV isolado na execução traduzida
+
+- **Comparação controlada, com R8 ligado:** cópias de release assinadas com debug, `com.arateki.keyflow.teste`, uma incluindo
+  x86_64 e outra só ARM. O DEX minificado e o mapping são byte a byte idênticos entre elas; todas as bibliotecas arm64 são
+  idênticas às do APK de upload. O build original foi restaurado exatamente; mudanças locais de ABI/id/assinatura não foram
+  commitadas, e a chave de upload não foi lida. O check estático do JNI passou nos dois APKs (122 sherpa, 72 LiteRT-LM, oito contratos).
+- **Sonda do serviço real:** driver separado, sem classes do app, chama o Binder com o contrato AIDL, baixa o Whisper base
+  fixado no catálogo e confere seus SHA-256. Exige callback de preload e transcrição da fixture `speech-en-short.m4a`
+  contendo “nightfall” e “yellow lamps”. Isso exercita carga, JNI, Parcel e decodificação/inferência do APK minificado;
+  não ativa IME nem grava microfone. As medidas abaixo são de uma execução, não um benchmark.
+- **Resultados:** x86_64 nativo **1/1** (carga 1.550 ms, transcrição 4.514 ms de 6.656 ms de áudio); A32 ARM real **1/1**
+  (carga 4.317 ms, transcrição 8.916 ms de 6.720 ms de áudio). O **mesmo APK ARM** no AVD x86_64 por `libndk_translation.so`
+  falhou **0/1**, com SIGSEGV em `0x8` antes de carregar o modelo, reproduzindo o incidente inicial. A falha ficou isolada
+  ao caminho ARM traduzido nesse AVD; os caminhos nativos validam as keep rules existentes. Não foi localizado o defeito
+  interno da ponte, nem alterada uma regra de R8 para contornar o emulador.
+- **Instrumentação também precisa de isolamento:** o runner atual do debug depende de Kotlin/Tracing eliminados ou
+  renomeados no release. Acrescentar a stdlib inteira ao runner causou colisão com a `Function3` minificada (`invoke`/`g`),
+  antes de executar o teste. A prova válida usou APK próprio com AndroidJUnitRunner oficial 1.4.0/JUnit, sem nenhuma referência
+  Kotlin ou classe JNI/serviço/config do app. Não ampliar keep rules de produção para fazer um runner de debug carregar.
+- **A32 preservado:** todas as operações passaram por `scripts/celular.sh` da worktree de celular, com trava e nice 15.
+  `verificar` final aprovado: app pessoal 1.0.0/código 1, permissões e resumo SHA dos dados iguais; lista de IMEs e teclado
+  Samsung iguais aos do início. A cópia `.teste` e seu runner permanecem instalados porque o atalho não autoriza removê-los.
+- **Provas para revisão:** `.equipe/artefatos/v1-3-arm/` preserva os dois APKs, runner, mapping, SHA-256, fonte da sonda,
+  logs dos três ambientes e verificações do A32. Arquivos de trabalho e receita do runner em `/tmp/v1-3-arm/`.
+
+## 2026-10-25 — V1-3: correções da revisão do release
+- **Exclusão do agente pela flag já decidida:** `AGENT_ENABLED=false` precisa proteger o corpo do `lazy` da
+  `SetupActivity` e a chamada do painel em `ConfigScreen`. Proteger apenas a leitura do runtime deixava o inicializador
+  e os ramos da UI no grafo do R8. A flag permanece verdadeira em debug; nenhuma flavor ou regra de keep foi acrescentada.
+- **Prova no binário:** `check-release-agent.py` cruza classes originais → ofuscadas do mapping com definições reais do
+  DEX, reutilizando o leitor de `dexdump` do guard JNI. Recusou o APK anterior por 145 classes do agente definidas no DEX;
+  no novo APK não há nenhuma dos pacotes `agent`/`agenthost`, nem cabeçalhos de classes desses pacotes no mapping. Referências ao tipo original nas assinaturas da UI
+  permanecem como informação de desofuscação; não são definições de classes ou corpos de métodos do agente. O AAB contém o
+  mesmo mapping e os mesmos dois DEX, byte a byte. O guard também roda no CI.
+- **Smoke com mapping obrigatório:** ausência/vazio falha antes do emulador, sem pular JNI. Oito regressões passaram;
+  os dois testes do smoke falham na versão anterior (mapping não obrigatório e segunda chamada com assinatura de debug).
+- **Assinatura:** `keyflowSmokeSigning=true` agora falha na configuração; não existe mais fallback automático no smoke.
+  Configuração parcial também falha, inclusive só a senha opcional ou arquivo presente sem campos completos. Três
+  builds negativos com dados falsos confirmaram a recusa. Sem configuração, o release continua sem assinatura no CI;
+  para smoke sem upload, é preciso fornecer explicitamente APK assinado e mapping. ENVIRONMENT.md foi atualizado.
+- **Artefatos novos:** APK 83.727.872 bytes e AAB 46.534.325 bytes, assinados pelo certificado público de upload
+  `AB:17:29:3A:…:A8:DC`; os três IDs públicos reais do AdMob estão nos recursos. Chave e senhas não foram inspecionadas,
+  copiadas ou versionadas. Gradle utilizou somente a configuração de upload já existente.
+- **Gates:** `testDebugUnitTest` 1.530/1.530, `:app:lintDebug`, `assembleRelease` e `bundleRelease` passaram.
+  `PermissionsCheckerTest` 2/2 e `KeyflowPanelAgentTest` 12/12 passaram no AVD, validando a continuidade do agente em debug.
+- **AVD:** a primeira instalação falhou sem `emulator-5554`; o controle confirmou serviço `failed parado`.
+  Após religar sob a trava, os instrumentados passaram. O logcat de limpeza do smoke agora tem prazo de 20 s para não
+  esperar indefinidamente quando o dispositivo some. Não foi atribuída uma causa à queda do serviço sem logs do host.
+- **Digitação comprovada:** a segunda rodada completa chegou ao anúncio de teste, mas terminou com busca vazia e XML
+  sem IME. Não houve fatal do processo do app; o fatal registrado era do capturador. A reprodução curta capturou a grade
+  real e seus limites. O roteiro passou a exigir os nós `h`/`i`, renovar a árvore antes de cada tecla e guardar XML/PNG
+  anteriores aos toques; removeu o fallback por coordenadas fixas. A reprodução curta digitou `hi` corretamente, e dois
+  testes novos impedem toque sem tecla e exigem nova captura por tecla. A causa exata da transição anterior não foi provada.
+- **Host de texto controlado:** a terceira execução terminou na tela do launcher ao tentar restaurar os Ajustes.
+  O smoke agora compila `ReleaseInputActivity.java` em APK separado (`com.keyflow.smoke.input`), com um EditText vazio,
+  aberto explicitamente a cada rodada. A fixture usa a chave de debug, é instalada somente sob a trava do AVD e removida
+  na limpeza; o APK/AAB de upload não recebe sua classe. A reprodução curta comprovou `hi` nesse editor próprio.
+- **Fechamento:** smoke completo aprovado com código 0 (quarta rodada): abas e Em breve, prévia Sistema → Ateliê
+  com 9.255 pixels diferentes, Billing indisponível, banner Test Ad, `hi` no EditText da fixture e divulgação persistida
+  após force-stop/reabertura. Varredura de PIDs do app sem erro fatal; nenhuma recuperação de ANR do Sistema nesta rodada.
+  Leitura final sob trava confirmou app/fixture desinstalados, Gboard padrão e capturador remoto removido.
+- **Evidências novas para upload/revisão:** `.equipe/artefatos/v1-3-correcoes/` contém APK/AAB corrigidos, mapping,
+  SHA-256, certificados públicos, gates, regressões, tentativas anteriores e execução final. Os artefatos anteriores
+  servem como controle da regressão. Trabalho com nice 15 e travas compartilhadas; sem operações no aparelho físico.
+
 ## 2026-10-24 — `OnboardingRoutingTest` instável: laço de quadros contra o DataStore (teste-instavel-onboarding)
 
 - Sintoma: nos dois CI do PR #17 (rodadas 40116791161 e 40117792341, shard 1/6) o teste caía na 1ª tentativa e passava na repetição:

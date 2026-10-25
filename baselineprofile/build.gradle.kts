@@ -4,7 +4,7 @@ plugins {
 }
 
 // Perfil de base (Baseline Profile) e benchmarks de abertura do KeyFlow — ver .specs/codebase/TESTING.md.
-// Instala uma variante RELEASE do app (mesmo applicationId com.keyflow, assinada com a keystore de debug): rode com
+// Instala uma variante RELEASE do app (mesmo applicationId com.arateki.keyflow, assinada com a keystore de debug): rode com
 // ANDROID_SERIAL apontando para um EMULADOR. Num aparelho com o app de debug, a troca de variante apaga os dados.
 android {
     namespace = "com.keyflow.baselineprofile"

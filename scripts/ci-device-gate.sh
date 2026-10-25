@@ -29,8 +29,8 @@ ADB="${ANDROID_HOME:+$ANDROID_HOME/platform-tools/}adb"
 APK_DIR=app/build/outputs/apk
 APP_APK="$APK_DIR/debug/app-debug.apk"
 TEST_APK="$APK_DIR/androidTest/debug/app-debug-androidTest.apk"
-RUNNER=com.keyflow.test/androidx.test.runner.AndroidJUnitRunner
-KEYFLOW_IME=com.keyflow/.ime.KeyFlowKeyboardService
+RUNNER=com.arateki.keyflow.test/androidx.test.runner.AndroidJUnitRunner
+KEYFLOW_IME=com.arateki.keyflow/com.keyflow.ime.KeyFlowKeyboardService
 # O que passou na 1ª tentativa, lido pelo processo do app na repetição (notTestFile).
 PASSED_ON_DEVICE=/data/local/tmp/keyflow-passed.txt
 # Nome do job que publica os APKs — tem que bater com o `name:` dele em checks.yml.
@@ -147,7 +147,7 @@ install_apks() {
   for apk in "$@"; do
     "$ADB" install -r -t "$apk" || return 1
   done
-  for pkg in com.keyflow com.keyflow.test; do
+  for pkg in com.arateki.keyflow com.arateki.keyflow.test; do
     "$ADB" shell pm path "$pkg" >/dev/null 2>&1 || continue
     "$ADB" shell cmd package compile -m speed -f "$pkg" || return 1
   done
@@ -210,7 +210,7 @@ run_selected() {
 
 # Galeria num app recém-instalado, como na última `main` verde (o connected* desinstalava o app no fim da suíte).
 reinstall_app() {
-  "$ADB" uninstall com.keyflow >/dev/null 2>&1 || true
+  "$ADB" uninstall com.arateki.keyflow >/dev/null 2>&1 || true
   install_apks "$APP_APK"
 }
 

@@ -89,7 +89,7 @@ saída" deixa passar.
 - Perfil de base: `ANDROID_SERIAL=emulator-5554 ./gradlew :app:generateBaselineProfile` grava
   `app/src/release/generated/baselineProfiles/` (versionado; gerar de novo quando o caminho de abertura mudar). Medir:
   `ANDROID_SERIAL=… ./gradlew :baselineprofile:connectedBenchmarkReleaseAndroidTest`. **Só emulador**: instala a variante
-  release (`nonMinifiedRelease`/`benchmarkRelease`, mesmo `com.keyflow`, keystore de debug) — num aparelho com o app de debug,
+  release (`nonMinifiedRelease`/`benchmarkRelease`, mesmo `com.arateki.keyflow`, keystore de debug) — num aparelho com o app de debug,
   a troca apaga os dados; sem `ANDROID_SERIAL`, o Gradle roda em TODOS os conectados (o A32 inclusive). O teclado é medido
   pelas seções de trace do `KeyFlowKeyboardService` (`KeyFlow.keyboardOpen` do 1º passo do ciclo de mostrar ao 1º quadro
   entregue, Android 10+; `KeyFlow.onCreateInputView`; `KeyFlow.onStartInputView`), que também aparecem num trace do Perfetto.
@@ -165,7 +165,7 @@ DeckLock (actions fixadas por SHA, `permissions: contents: read`, evidência env
   teste de unidade toca, não meta: telas, teclado e serviços são cobertos pelos instrumentados.
 - `scripts/ime-placement.py --ime keyflow|gboard [--cold] [--seconds 12]` mede de FORA do app (adb) onde a janela do teclado
   fica ao abrir — sem teste no processo — e em quantos segundos ela fica visível e no lugar de vez. A frio, emulador com a
-  CPU a 300% e o app compilado (`cmd package compile -m speed -f com.keyflow`), 8 aberturas (2026-10-10): KeyFlow visível
+  CPU a 300% e o app compilado (`cmd package compile -m speed -f com.arateki.keyflow`), 8 aberturas (2026-10-10): KeyFlow visível
   em 2,0 s e no lugar de vez em 2,9 s, com a janela em transição nas 8; Gboard visível em 3,8 s e no lugar em 4,0 s, sem
   transição. O KeyFlow é o mais rápido; a diferença é o tipo de janela — a do Gboard tem a altura da tela desde o início
   (ele desenha 1080×2272), a nossa tem a altura do teclado (787 px) e passa pelos tamanhos de transição até o 1º quadro
@@ -179,7 +179,7 @@ DeckLock (actions fixadas por SHA, `permissions: contents: read`, evidência env
   KeyFlow e do Gboard ficam vazios — e todo processo novo recompila tudo); ~110 ms esperando o buffer da janela; **20–65 ms
   do nosso código** na thread principal. Não é lentidão do app, e o perfil de base não alcança isso. Não medido em aparelho
   de verdade: para conferir no A32, `installDebug`, um `adb shell perfetto … gfx view` numa abertura a frio e olhar
-  `Creating EGLContext`/`shader_compile`; `adb shell run-as com.keyflow ls code_cache` deve mostrar
+  `Creating EGLContext`/`shader_compile`; `adb shell run-as com.arateki.keyflow ls code_cache` deve mostrar
   `com.android.skia.shaders_cache` (programas guardados).
 - Teste que inicia gravação de verdade para o `OverlayService` no `@After` (a gravação vazava para o teste seguinte).
 - Os 6 jobs de device sobem **junto** com o de unitários (sem `needs`): preparam o runner e ligam o

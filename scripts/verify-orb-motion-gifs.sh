@@ -13,8 +13,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PKG="com.keyflow"
-TEST_PKG="com.keyflow.test"
+PKG="com.arateki.keyflow"
+TEST_PKG="com.arateki.keyflow.test"
 TEST_CLASS="com.keyflow.overlay.OrbMotionArtifactTest"
 RUNNER="$TEST_PKG/androidx.test.runner.AndroidJUnitRunner"
 DEVICE_DIR="/sdcard/Android/data/$PKG/files/motion-gifs"

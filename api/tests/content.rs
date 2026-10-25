@@ -10,7 +10,7 @@ use keyflow_api::google::integrity::IntegrityClient;
 use keyflow_api::google::publisher::PublisherClient;
 use tower::ServiceExt;
 
-const PACKAGE_NAME: &str = "com.keyflow";
+const PACKAGE_NAME: &str = "com.arateki.keyflow";
 
 async fn test_state() -> AppState {
     let pool = test_pool().await;

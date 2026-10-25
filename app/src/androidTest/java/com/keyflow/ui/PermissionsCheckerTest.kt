@@ -41,7 +41,7 @@ class PermissionsCheckerTest {
     @Test
     fun snapshotSeesTheKeyboardOnceItIsEnabledInTheSystem() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val ime = "${context.packageName}/.ime.KeyFlowKeyboardService"
+        val ime = "${context.packageName}/com.keyflow.ime.KeyFlowKeyboardService"
         val wasEnabled = shell("settings get secure enabled_input_methods").contains(ime)
 
         try {

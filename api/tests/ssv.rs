@@ -18,7 +18,7 @@ use tower::ServiceExt;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
-const PACKAGE_NAME: &str = "com.keyflow";
+const PACKAGE_NAME: &str = "com.arateki.keyflow";
 const KEY_ID: u64 = 42;
 
 async fn mock_verifier_keys(signing_key: &SigningKey) -> MockServer {

@@ -136,7 +136,7 @@ async fn register_request(state: AppState, device_key: &str) -> (StatusCode, Val
 
 #[tokio::test]
 async fn register_with_valid_integrity_returns_token_that_works_on_protected_extractor() {
-    let package_name = "com.keyflow";
+    let package_name = "com.arateki.keyflow";
     let google = mock_google_ok(package_name).await;
     let state = state_with_google(google.uri(), package_name).await;
     let device_key = format!("device-{}", uuid::Uuid::new_v4());
@@ -164,7 +164,7 @@ async fn register_with_valid_integrity_returns_token_that_works_on_protected_ext
 
 #[tokio::test]
 async fn register_with_invalid_integrity_returns_403() {
-    let package_name = "com.keyflow";
+    let package_name = "com.arateki.keyflow";
     let google = mock_google_bad_device(package_name).await;
     let state = state_with_google(google.uri(), package_name).await;
     let device_key = format!("device-{}", uuid::Uuid::new_v4());
@@ -177,7 +177,7 @@ async fn register_with_invalid_integrity_returns_403() {
 
 #[tokio::test]
 async fn re_register_same_device_key_keeps_account_rotates_token() {
-    let package_name = "com.keyflow";
+    let package_name = "com.arateki.keyflow";
     let google = mock_google_ok(package_name).await;
     let state = state_with_google(google.uri(), package_name).await;
     let device_key = format!("device-{}", uuid::Uuid::new_v4());
@@ -218,7 +218,7 @@ async fn re_register_same_device_key_keeps_account_rotates_token() {
 
 #[tokio::test]
 async fn missing_bearer_is_rejected_with_401() {
-    let package_name = "com.keyflow";
+    let package_name = "com.arateki.keyflow";
     let google = mock_google_ok(package_name).await;
     let state = state_with_google(google.uri(), package_name).await;
 

@@ -170,7 +170,7 @@ mod tests {
         mock_token(&google).await;
         Mock::given(method("GET"))
             .and(path(
-                "/androidpublisher/v3/applications/com.keyflow/purchases/products/credits_20/tokens/tok-1",
+                "/androidpublisher/v3/applications/com.arateki.keyflow/purchases/products/credits_20/tokens/tok-1",
             ))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
                 "purchaseState": 0,
@@ -182,7 +182,7 @@ mod tests {
         let client = PublisherClient::new(
             reqwest::Client::new(),
             google.uri(),
-            "com.keyflow".to_string(),
+            "com.arateki.keyflow".to_string(),
             test_key(format!("{}/token", google.uri())),
         );
 
@@ -204,7 +204,7 @@ mod tests {
         mock_token(&google).await;
         Mock::given(method("POST"))
             .and(path(
-                "/androidpublisher/v3/applications/com.keyflow/purchases/products/credits_20/tokens/tok-1:acknowledge",
+                "/androidpublisher/v3/applications/com.arateki.keyflow/purchases/products/credits_20/tokens/tok-1:acknowledge",
             ))
             .respond_with(ResponseTemplate::new(200))
             .expect(1)
@@ -214,7 +214,7 @@ mod tests {
         let client = PublisherClient::new(
             reqwest::Client::new(),
             google.uri(),
-            "com.keyflow".to_string(),
+            "com.arateki.keyflow".to_string(),
             test_key(format!("{}/token", google.uri())),
         );
 
@@ -230,7 +230,7 @@ mod tests {
         mock_token(&google).await;
         Mock::given(method("GET"))
             .and(path(
-                "/androidpublisher/v3/applications/com.keyflow/purchases/voidedpurchases",
+                "/androidpublisher/v3/applications/com.arateki.keyflow/purchases/voidedpurchases",
             ))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
                 "voidedPurchases": [
@@ -244,7 +244,7 @@ mod tests {
         let client = PublisherClient::new(
             reqwest::Client::new(),
             google.uri(),
-            "com.keyflow".to_string(),
+            "com.arateki.keyflow".to_string(),
             test_key(format!("{}/token", google.uri())),
         );
 

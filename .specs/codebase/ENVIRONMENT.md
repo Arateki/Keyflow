@@ -82,6 +82,66 @@ Chave ausente ou em branco deixa o campo vazio. O release não lê essas proprie
 
 Com os dois valores preenchidos, o `KeyFlowHttpClient` envia `CF-Access-Client-Id` e `CF-Access-Client-Secret` só para o host da base da API. Sem o token, o debug continua no staging; um 401 desse host aparece no log de debug como `token do Cloudflare Access ausente — veja api/deploy/LEIA-ME.md`. O app segue com o cache ou com o erro que a API já trata.
 
+## Release: AAB, chave de upload e `applicationId` (V1-3)
+
+`bundleRelease` gera o `.aab` da Play em `app/build/outputs/bundle/release/app-release.aab`; `assembleRelease`, o APK em
+`app/build/outputs/apk/release/`. Os dois passam pelo R8 (`isMinifyEnabled` e `isShrinkResources` ligados, regras em
+`app/proguard-rules.pro`) e exigem os três IDs do AdMob (`.specs/features/monetization/admob-release.md`). O
+`mapping.txt` vai embutido no AAB (a Play o usa para desofuscar os crashes) e também fica em
+`app/build/outputs/mapping/release/`. `scripts/smoke-release.sh` roda o APK de release no emulador.
+
+```sh
+gradle --no-daemon :app:bundleRelease     # com KEYFLOW_ADMOB_* no ambiente ou no gradle.properties do usuário
+```
+
+### Chave de upload (fora do repositório)
+
+O release só é assinado com a chave de upload quando ela está configurada. A primeira fonte que definir os campos vence:
+
+1. variáveis de ambiente `KEYFLOW_UPLOAD_STORE_FILE`, `KEYFLOW_UPLOAD_STORE_PASSWORD`, `KEYFLOW_UPLOAD_KEY_ALIAS` e
+   `KEYFLOW_UPLOAD_KEY_PASSWORD` (a última é opcional: sem ela vale a senha do keystore);
+2. o arquivo `~/.keyflow/android/upload-keystore.properties` (outro caminho em `KEYFLOW_UPLOAD_PROPERTIES`):
+
+```properties
+storeFile=/home/yan/.keyflow/android/upload.jks
+storePassword=<senha do keystore>
+keyAlias=upload
+keyPassword=<senha da chave; opcional, igual à do keystore se omitida>
+```
+
+`storeFile` pode ser absoluto, `~/…` ou relativo à pasta do `.properties`. O arquivo fica com `chmod 600`, nunca no git
+nem em `local.properties`; o build não imprime nenhum valor (só o nome do campo que faltar). Só o Gradle lê o arquivo.
+
+- **Sem a chave** (CI, máquina de outro agente) o release segue **sem assinatura**: o CI confere
+  `app-release-unsigned.apk`, e o AAB sai sem assinatura (a Play recusa — é o sinal de que falta a chave).
+- **Campos faltando** (só `storeFile`, por exemplo): o Gradle falha, informando somente os nomes dos campos.
+- **`-PkeyflowSmokeSigning=true`** foi removido e falha na configuração, antes de gerar APK/AAB. O release só usa a chave
+  de upload; o smoke sem ela recebe um APK assinado explicitamente em `KEYFLOW_SMOKE_APK`, junto de `KEYFLOW_SMOKE_MAPPING`.
+- Conferir a assinatura do que vai subir: `apksigner verify --print-certs app-release.apk` e
+  `jarsigner -verify -certs app-release.aab`; o SHA-256 do certificado tem de ser o da chave de upload cadastrada no Console
+  (`AB:17:29:3A:E8:18:C8:A1:3A:4E:59:C9:71:67:F0:CC:FB:D8:72:83:CB:79:EB:56:B4:73:73:95:56:B9:A8:DC`, gerada em 2026-10-24).
+- A Play assina o que chega ao usuário (Play App Signing); a de upload só prova que o AAB veio de nós. Perdeu a chave de
+  upload: pede reset no Console. Faça cópia do `.jks` e das senhas fora desta máquina.
+
+### `applicationId`: `com.arateki.keyflow`
+
+Decisão 2 do Yan (2026-10-24), no debug e no release. No app é **uma linha**: `keyflowApplicationId` no topo de
+`app/build.gradle.kts`. O `namespace` (o pacote do código e do `R`) continua `com.keyflow`; o APK de teste é
+`com.arateki.keyflow.test`. Consequências:
+
+- O id curto de componente (`com.arateki.keyflow/.ime.X`) é relativo ao `applicationId`, mas as classes estão em
+  `com.keyflow`: use o nome completo, `com.arateki.keyflow/com.keyflow.ime.KeyFlowKeyboardService`. O Gradle já escreve
+  assim no manifesto; os scripts e os testes foram ajustados.
+- `/srv/dev/ferramentas/bin/instrumentar` descobre o id da worktree (pelo APK de teste construído, com o `aapt2`, ou pelo
+  `build.gradle.kts`) e serve às branches com `com.keyflow` e às novas.
+- API: `PACKAGE_NAME=com.arateki.keyflow` em `api/deploy/provisionar.sh` (staging e produção) e no exemplo do `api/README.md`;
+  é o que a API confere no Play Integrity e na validação da compra. Quem já provisionou o Lightsail com `com.keyflow`
+  precisa trocar o `PACKAGE_NAME` do `.env` e reiniciar o serviço.
+- Id novo é app novo: não herda dados, permissões nem o teclado habilitado do `com.keyflow`. O `com.keyflow` que já está
+  no A32 do Yan continua instalado até ele desinstalar (os dois convivem; só um é o teclado ativo).
+- Play Console/Google **[YAN]**: o app e o produto de R$15; o client OAuth Google com o pacote novo e o SHA-1 da chave de
+  assinatura da Play; o vínculo do Play Integrity (projeto na nuvem); o app no AdMob (`app-ads.txt` e os IDs).
+
 ## Notas / pegadinhas
 
 - **Smoke build**: um app Android trivial compilou e gerou APK (Gradle 9.6.1 + AGP 9.2.0 + JDK 17 + SDK). A fundação está provada; o projeto descartável ficou no scratchpad temporário, fora do repo.
@@ -132,7 +192,7 @@ echo "sdk.dir=/root/Android/Sdk" > local.properties   # (+ .git/info/exclude)
   sob TCG, o boot image não se regenera → mesmo loop do zygote. Depois do boot limpo: desabilitar
   `com.android.vending` e os apps pesados do Google, e salvar um snapshot
   (`adb emu avd snapshot save keyflow_ready`; voltar com `-snapshot keyflow_ready`).
-- **Rodar `cmd package compile -m speed -f com.keyflow`** depois de instalar: sem AOT, a verificação de
+- **Rodar `cmd package compile -m speed -f com.arateki.keyflow`** depois de instalar: sem AOT, a verificação de
   bytecode na 1ª abertura estoura os 5 s de input e o app leva ANR (com `hide_error_dialogs` o sistema
   o mata calado — parece crash, não é).
 - **A aba Modo ao vivo (2 tours animando) derruba o System UI por ANR sob TCG.** Prints do tour: só

@@ -159,7 +159,7 @@ mod tests {
             .mount(&google)
             .await;
         Mock::given(method("GET"))
-            .and(path("/androidpublisher/v3/applications/com.keyflow/purchases/voidedpurchases"))
+            .and(path("/androidpublisher/v3/applications/com.arateki.keyflow/purchases/voidedpurchases"))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
                 "voidedPurchases": tokens.iter().map(|t| serde_json::json!({"purchaseToken": t})).collect::<Vec<_>>()
             })))
@@ -169,7 +169,7 @@ mod tests {
         let publisher = PublisherClient::new(
             reqwest::Client::new(),
             google.uri(),
-            "com.keyflow".to_string(),
+            "com.arateki.keyflow".to_string(),
             ServiceAccountKey {
                 client_email: "test@keyflow-test.iam.gserviceaccount.com".to_string(),
                 private_key: include_str!("../../tests/fixtures/test_service_account_key.pem")

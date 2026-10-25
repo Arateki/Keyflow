@@ -11,7 +11,7 @@ use keyflow_api::{AppState, auth::generate_token, db::accounts};
 use serde_json::Value;
 use tower::ServiceExt;
 
-const PACKAGE_NAME: &str = "com.keyflow";
+const PACKAGE_NAME: &str = "com.arateki.keyflow";
 
 async fn test_state() -> AppState {
     let pool = test_pool().await;
