@@ -14,7 +14,7 @@ use tower::ServiceExt;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
-const PACKAGE_NAME: &str = "com.keyflow";
+const PACKAGE_NAME: &str = "com.arateki.keyflow";
 
 async fn mock_integrity_ok(google: &MockServer) {
     Mock::given(method("POST"))

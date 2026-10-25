@@ -145,4 +145,4 @@ class DeviceSettingsSnapshot(
     private fun JSONArray.toStringSet(): Set<String> = (0 until length()).map { getString(it) }.toSet()
 }
 
-const val KEYFLOW_IME = "com.keyflow/.ime.KeyFlowKeyboardService"
+const val KEYFLOW_IME = "com.arateki.keyflow/com.keyflow.ime.KeyFlowKeyboardService"

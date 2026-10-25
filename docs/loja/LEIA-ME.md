@@ -32,3 +32,17 @@ Caso uma alteração na Política de Privacidade ou nas práticas de tratamento 
   const val DISCLOSURE_VERSION = 1
   ```
 - Ao incrementar `DISCLOSURE_VERSION`, os testes instrumentados e unitários de consentimento (`DisclosureConsentTest`, `DisclosureUpgradeTest`) garantem que o gate de captura bloqueie gravações até que o novo aceite seja confirmado na tela de divulgação.
+
+---
+
+## 3. Ícone do app
+
+- **Origem:** a orbe parada do estilo Ateliê (`VoiceOrb.kt`), sobre o fundo escuro do app. Tudo sai de **um** script,
+  `scripts/gerar-icone.py`, para o ícone adaptativo, os PNGs legados e o da loja nunca divergirem:
+  - `app/src/main/res/drawable/ic_launcher_{background,foreground,monochrome}.xml` (ícone adaptativo e temático);
+  - `app/src/main/res/mipmap-{m,h,xh,xxh,xxxh}dpi/ic_launcher{,_round}.png` (API 24 e 25);
+  - `docs/loja/icone-512.png`: o ícone da Play Store (512×512, 32 bits, fundo opaco). **Não entra no APK**; é o arquivo que
+    se envia no Play Console.
+- **Regenerar:** `python3 scripts/gerar-icone.py` (precisa do Pillow). `--fundo claro` gera a variante de fundo creme;
+  `--previa caminho.png --so-previa` só desenha a prancha de prévia (círculo, squircle, quadrado arredondado e temático).
+- Os dois XMLs de `mipmap-anydpi-v26/` são fixos e apontam para os três drawables.

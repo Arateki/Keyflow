@@ -23,7 +23,7 @@ Módulo disjunto do app Android (`app/`): o Gradle não enxerga esta pasta e vic
     do fluxo OAuth (Play Integrity). **Credencial real é do Yan** (API-T13); localmente, qualquer
     JSON com esse shape e uma chave RSA válida serve para o processo subir (só falha de verdade
     ao chamar o Google).
-  - `PACKAGE_NAME` (obrigatória) — package name do app Android (ex.: `com.keyflow`), conferido
+  - `PACKAGE_NAME` (obrigatória) — package name do app Android (ex.: `com.arateki.keyflow`), conferido
     contra `requestPackageName` do Play Integrity.
   - `INTEGRITY_RELAXED` (opcional, default `false`; `true`/`1` liga) — relaxa só o
     `appRecognitionVerdict` (builds de teste/interno); nunca relaxa pacote nem device.
@@ -117,7 +117,7 @@ execução só loga e tenta de novo na próxima janela (não é caminho crítico
 ```bash
 DATABASE_URL=postgres://keyflow:keyflow@localhost/keyflow_api \
 GOOGLE_SERVICE_ACCOUNT_JSON_PATH=/path/to/service-account.json \
-PACKAGE_NAME=com.keyflow \
+PACKAGE_NAME=com.arateki.keyflow \
 cargo run
 ```
 

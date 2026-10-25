@@ -25,6 +25,8 @@ class ToolContext(
     val origin: ToolOrigin = ToolOrigin.CHAT,
     /** O id da chamada (o `tool_use.id` do modelo), para a ferramenta correlacionar o que mostra ao usuário. */
     val callId: String = "",
+    /** A geração do turno em que esta chamada foi criada (0 quando não rastreada). */
+    val generation: Long = 0L,
 )
 
 /** Uma imagem que o app mostra ao usuário junto do pedido de confirmação (a folha de contato de uma skin, por exemplo). */
@@ -74,7 +76,26 @@ class ToolDescription(val summary: String, val preview: ToolPreview? = null)
  * ([AgentController]) chama [turnEnded] de todas as ferramentas que a implementam.
  */
 interface TurnScoped {
-    fun turnEnded()
+    /** Começou um novo turno de geração [generation]. */
+    fun turnStarted(generation: Long) {}
+
+    /** O turno [generation] acabou (com sucesso ou erro). */
+    fun turnEnded(generation: Long) { turnEnded() }
+
+    /** O turno acabou (com sucesso ou erro). */
+    fun turnEnded() {}
+
+    /**
+     * O turno [generation] foi CANCELADO (o usuário tocou em Cancelar) ou a conversa foi limpa. Por padrão é o mesmo que [turnEnded]; quem tem um efeito
+     * que só vale quando o turno termina bem (a navegação do `open_tab`) o descarta aqui.
+     */
+    fun turnCancelled(generation: Long) { turnCancelled() }
+
+    /**
+     * O turno foi CANCELADO (o usuário tocou em Cancelar) ou a conversa foi limpa. Por padrão é o mesmo que [turnEnded]; quem tem um efeito
+     * que só vale quando o turno termina bem (a navegação do `open_tab`) o descarta aqui.
+     */
+    fun turnCancelled() = turnEnded()
 }
 
 /**

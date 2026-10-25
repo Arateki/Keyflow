@@ -8,7 +8,7 @@
     -->
     <instrumentation
         android:name="androidx.test.runner.AndroidJUnitRunner"
-        android:targetPackage="com.keyflow">
+        android:targetPackage="com.arateki.keyflow">
         <meta-data
             android:name="listener"
             android:value="com.keyflow.testing.FactorySettingsListener" />

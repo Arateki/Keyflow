@@ -141,7 +141,7 @@ class ImeWindowPlacementTest {
 
     private companion object {
         const val TAG = "KeyFlow.ImePlacement"
-        const val KEYFLOW = "com.keyflow/.ime.KeyFlowKeyboardService"
+        const val KEYFLOW = "com.arateki.keyflow/com.keyflow.ime.KeyFlowKeyboardService"
         const val GBOARD = "com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME"
         const val OPENINGS = 8
         const val SAMPLE_MS = 4_000L

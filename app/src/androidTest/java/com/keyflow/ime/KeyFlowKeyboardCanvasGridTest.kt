@@ -415,7 +415,7 @@ class KeyFlowKeyboardCanvasGridTest {
     }
 
     private companion object {
-        const val IME = "com.keyflow/.ime.KeyFlowKeyboardService"
+        const val IME = "com.arateki.keyflow/com.keyflow.ime.KeyFlowKeyboardService"
         const val TIMEOUT = 5000L
         const val TAP_ONLY_HOLD_MS = 10_000L
     }

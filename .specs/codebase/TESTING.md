@@ -89,7 +89,7 @@ saída" deixa passar.
 - Perfil de base: `ANDROID_SERIAL=emulator-5554 ./gradlew :app:generateBaselineProfile` grava
   `app/src/release/generated/baselineProfiles/` (versionado; gerar de novo quando o caminho de abertura mudar). Medir:
   `ANDROID_SERIAL=… ./gradlew :baselineprofile:connectedBenchmarkReleaseAndroidTest`. **Só emulador**: instala a variante
-  release (`nonMinifiedRelease`/`benchmarkRelease`, mesmo `com.keyflow`, keystore de debug) — num aparelho com o app de debug,
+  release (`nonMinifiedRelease`/`benchmarkRelease`, mesmo `com.arateki.keyflow`, keystore de debug) — num aparelho com o app de debug,
   a troca apaga os dados; sem `ANDROID_SERIAL`, o Gradle roda em TODOS os conectados (o A32 inclusive). O teclado é medido
   pelas seções de trace do `KeyFlowKeyboardService` (`KeyFlow.keyboardOpen` do 1º passo do ciclo de mostrar ao 1º quadro
   entregue, Android 10+; `KeyFlow.onCreateInputView`; `KeyFlow.onStartInputView`), que também aparecem num trace do Perfetto.
@@ -100,6 +100,46 @@ saída" deixa passar.
   65 → 16 ms com a cota de 300% (≈ CI); a abertura até o 1º quadro fica em ~340–390 ms (rápido) e ~990 ms (lento) com ou sem
   perfil — esse resto é sistema e renderização (swangle, por software), não o nosso código; app a frio 1,0 s / 2,3 s, −3 a −5%
   (ruído). Os traces do Perfetto de cada volta ficam em `baselineprofile/build/outputs/connected_android_test_additional_output/`.
+
+## CI sob demanda — mais um nó do pool
+
+Use `ci rodar` para lotes grandes, várias classes e repetições que ocupariam os emuladores do pool.
+Para uma classe curta ou um teste afetado, use `pool instrumentar Classe#metodo` (servidor ou Deck, o que estiver
+livre): evita o preparo do runner remoto. O pedido manual não substitui os sete jobs obrigatórios de `checks.yml` no PR.
+
+```sh
+ci rodar --tarefas assembleDebug --classes PermissionsCheckerTest --pedacos 2 --repetir 2
+ci rodar --tarefas 'testDebugUnitTest --tests=com.keyflow.overlay.OverlayCoordinatorStateMachineTest'
+ci rodar --classes ClasseA,ClasseB#metodo --pedacos 4 --repetir 20 --rotulo lote-ui
+```
+
+- A fonte é `scripts/ci`; o coordenador revisa/instala `.equipe/ferramentas/ci` e seu diff. Os helpers
+  `scripts/ci-rodar.py` e `scripts/ci-sob-demanda.py` precisam existir na branch. O `gh` e a autenticação
+  são os mesmos de `ci enviar`; não há credencial adicional nem segredo no workflow.
+- Só branches `equipe/*`. O cliente confere nomes/conteúdo com cara de segredo, publica commits com push
+  normal apenas quando necessário e dispara `ci-sob-demanda.yml` com `--ref` da branch. Nunca force.
+  A rodada retornada precisa bater com HEAD e rótulo. Mudanças não commitadas não entram no pedido.
+- A branch precisa conter a `main` com o workflow (do merge `26ee5ce` em diante; se nasceu antes,
+  `git merge origin/main`) e diferir da `main` em pelo menos um arquivo: branch idêntica é recusada antes de
+  publicar, e o GitHub roda o `ci-sob-demanda.yml` da própria branch.
+- `--tarefas` aceita espaços ou vírgulas: `assembleDebug`, `assembleDebugAndroidTest`, `testDebugUnitTest`,
+  `:app:lintDebug`, `lintDebug`, `check`. Filtro JVM: `--tests=pacote.Classe[.metodo]` imediatamente depois
+  de `testDebugUnitTest`; `*` é aceito como curinga literal. `--classes` aceita nomes curtos/completos e
+  `Classe#metodo`, por vírgula; resolve o pacote pelos fontes antes de publicar.
+- `--pedacos`: 1–6; `--repetir`: 1–20. Cada emulador repete sequencialmente o seu pedaço. O cliente reserva
+  conservadoramente os jobs das rodadas ativas (teto 20), espera com aviso e serializa reservas locais em
+  `/tmp/ci-sob-demanda/pool.lock`. Disparos externos ainda passam pelo limite global do GitHub.
+  `CI_ESPERA` limita a espera (padrão 10800 s); 75 indica espera expirada. Confira URL/rótulo antes de
+  redisparar. Cada job de device tem limite de 180 minutos.
+- O resumo mostra X/Y por classe e repetição, unitários por classe e trechos de falhas, no resumo do
+  Actions e no artefato `ci-sob-demanda-resumo`; `ci rodar` baixa e imprime esse artefato. Queda de processo,
+  classe sem teste, pedaço ausente e falha de teste deixam a rodada vermelha. Evidências duram sete dias.
+- O primeiro uso exige integrar o workflow na `main` e publicar a branch de teste: o GitHub exige que
+  [`workflow_dispatch` exista na branch padrão](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
+  Depois, `--ref equipe/...` executa a versão dessa branch. O rótulo automático é único; rótulo manual já
+  ativo é recusado para evitar substituir um pedido pendente da mesma combinação branch+rótulo.
+- Regressões sem rede: `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests -v`.
+  Usam `CI_GH_BIN` falso, remotos Git locais descartáveis e logs sintéticos; não disparam Actions.
 
 ## CI (GitHub Actions) — `.github/workflows/checks.yml`
 
@@ -125,7 +165,7 @@ DeckLock (actions fixadas por SHA, `permissions: contents: read`, evidência env
   teste de unidade toca, não meta: telas, teclado e serviços são cobertos pelos instrumentados.
 - `scripts/ime-placement.py --ime keyflow|gboard [--cold] [--seconds 12]` mede de FORA do app (adb) onde a janela do teclado
   fica ao abrir — sem teste no processo — e em quantos segundos ela fica visível e no lugar de vez. A frio, emulador com a
-  CPU a 300% e o app compilado (`cmd package compile -m speed -f com.keyflow`), 8 aberturas (2026-10-10): KeyFlow visível
+  CPU a 300% e o app compilado (`cmd package compile -m speed -f com.arateki.keyflow`), 8 aberturas (2026-10-10): KeyFlow visível
   em 2,0 s e no lugar de vez em 2,9 s, com a janela em transição nas 8; Gboard visível em 3,8 s e no lugar em 4,0 s, sem
   transição. O KeyFlow é o mais rápido; a diferença é o tipo de janela — a do Gboard tem a altura da tela desde o início
   (ele desenha 1080×2272), a nossa tem a altura do teclado (787 px) e passa pelos tamanhos de transição até o 1º quadro
@@ -139,7 +179,7 @@ DeckLock (actions fixadas por SHA, `permissions: contents: read`, evidência env
   KeyFlow e do Gboard ficam vazios — e todo processo novo recompila tudo); ~110 ms esperando o buffer da janela; **20–65 ms
   do nosso código** na thread principal. Não é lentidão do app, e o perfil de base não alcança isso. Não medido em aparelho
   de verdade: para conferir no A32, `installDebug`, um `adb shell perfetto … gfx view` numa abertura a frio e olhar
-  `Creating EGLContext`/`shader_compile`; `adb shell run-as com.keyflow ls code_cache` deve mostrar
+  `Creating EGLContext`/`shader_compile`; `adb shell run-as com.arateki.keyflow ls code_cache` deve mostrar
   `com.android.skia.shaders_cache` (programas guardados).
 - Teste que inicia gravação de verdade para o `OverlayService` no `@After` (a gravação vazava para o teste seguinte).
 - Os 6 jobs de device sobem **junto** com o de unitários (sem `needs`): preparam o runner e ligam o

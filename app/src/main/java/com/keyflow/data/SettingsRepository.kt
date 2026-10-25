@@ -277,6 +277,54 @@ class SettingsRepository(
         return keyboard to orb
     }
 
+    /**
+     * Os valores atuais dos ajustes que o agente pode ler (`settings_get`): SÓ as [keys] que existem em [AgentSettingKeys], lidas direto do
+     * DataStore — sem o round-trip das Settings inteiras e SEM abrir os cofres (nenhum segredo passa por aqui). Chave desconhecida fica de fora.
+     */
+    internal suspend fun agentSettingsOnce(keys: Collection<String>): Map<String, Any> {
+        val prefs = dataStore.data.first()
+        val defaults = Settings()
+        return keys.mapNotNull { name -> AgentSettingKeys.all[name]?.let { name to it.read(prefs, defaults) } }.toMap()
+    }
+
+    /**
+     * Grava os ajustes que o agente mudou (`settings_set`): atômico (uma edição do DataStore) e SÓ nas chaves de [AgentSettingKeys.writable].
+     * Qualquer outra chave — um campo secreto, um endereço, as skins (que o `skin_select` confere) — lança sem gravar NADA. A UI recebe pelo
+     * [settingsFlow] como qualquer mudança.
+     */
+    internal suspend fun updateAgentSettings(changes: Map<String, Any>) {
+        val entries = changes.map { (name, value) ->
+            val entry = AgentSettingKeys.all[name]?.takeIf { name in AgentSettingKeys.writable } ?: throw IllegalArgumentException("o agente não pode gravar o ajuste \"$name\"")
+            entry to value
+        }
+        dataStore.edit { prefs -> entries.forEach { (entry, value) -> entry.write(prefs, value) } }
+    }
+
+    /**
+     * O que `app_status` precisa das Settings: os modos, as skins e a origem de raciocínio com o modelo dela — SÓ do DataStore, sem cofre e
+     * sem credencial (o app_status nunca diz o que está guardado).
+     */
+    internal suspend fun agentStatusOnce(): AgentStatusSettings {
+        val prefs = dataStore.data.first()
+        val source = prefs[REASONING_SOURCE].toReasoningSource().let { if (it == ReasoningSource.CREDITS) ReasoningSource.LOCAL else it }
+        val model = when (source) {
+            ReasoningSource.ANTHROPIC -> prefs[REASONING_ANTHROPIC_MODEL] ?: Settings().reasoningAnthropicModel
+            ReasoningSource.OPENAI -> prefs[REASONING_OPENAI_MODEL]
+            ReasoningSource.GOOGLE -> prefs[REASONING_GOOGLE_MODEL] ?: Settings().reasoningGoogleModel
+            ReasoningSource.LOCAL -> prefs[REASONING_LOCAL_MODEL_ID]
+            ReasoningSource.CUSTOM -> prefs[REASONING_CUSTOM_MODEL]
+            ReasoningSource.CREDITS -> null
+        }?.takeIf { it.isNotBlank() }
+        return AgentStatusSettings(
+            overlayModeEnabled = prefs[OVERLAY_MODE_ENABLED] ?: false,
+            keyboardModeEnabled = prefs[KEYBOARD_MODE_ENABLED] ?: false,
+            keyboardSkin = prefs[KEYBOARD_SKIN] ?: "system",
+            orbSkin = prefs[ORB_SKIN] ?: "atelie",
+            reasoningSource = source,
+            reasoningModel = model,
+        )
+    }
+
     /** Gancho do downloader ao instalar: o tipo vem do catálogo; id que o catálogo não conhece não seleciona nada. */
     internal suspend fun selectOnInstall(modelId: String) {
         val spec = ModelCatalog.byId(modelId) ?: return
@@ -823,6 +871,16 @@ class SettingsRepository(
         }
     }
 }
+
+/** O que o agente lê das Settings para o `app_status` — ver [SettingsRepository.agentStatusOnce]. Nada secreto. */
+internal class AgentStatusSettings(
+    val overlayModeEnabled: Boolean,
+    val keyboardModeEnabled: Boolean,
+    val keyboardSkin: String,
+    val orbSkin: String,
+    val reasoningSource: ReasoningSource,
+    val reasoningModel: String?,
+)
 
 /** O que o teclado precisa para ser montado — ver [SettingsRepository.keyboardSnapshotOnce]. */
 data class KeyboardSnapshot(
