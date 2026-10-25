@@ -69,7 +69,7 @@ Play**: a T18b (textos legais, revisados pelo Yan) fecha a fase B; sem ela o apr
   `sessoes/`, `corretor-bench-baseline.json` (nível rápido) gerado **pelo código de hoje**,
   `scripts/corretor-bench.sh [--completo] [ref]`.
 - **Where**: `app/src/test/java/com/keyflow/ime/keyboard/dictionary/bench/`, `app/src/test/resources/bench/`, `scripts/`.
-- **Covers**: BEN-01..05, BEN-08.
+- **Covers**: BEN-01..05, BEN-08, BEN-09.
 - **Done when**: o baseline registra o ponto de partida **medido pelo banco** (por grupo do `manter-dev` e do
   `manter-teste`: trocadas e indevidas; inglês e espanhol comuns; acento restaurado; sintético por configuração) — não
   os números preliminares do protótipo, que usou lista montada por agente e 200 amostras por linha; o resultado
@@ -133,12 +133,12 @@ Play**: a T18b (textos legais, revisados pelo Yan) fecha a fase B; sem ela o apr
 - **What**: `SwapClass` + `SuggestParams` por classe; `Suggester.suggest` devolve a classe; siglas (candidata toda em
   maiúsculas, qualquer tamanho) só sugerem; acento digitado nunca se perde (corrige `sameLetters.first()`).
 - **Where**: `dictionary/Suggester.kt`, `dictionary/SwapClass.kt`.
-- **Depends on**: CA-T1. **Covers**: BAS-01..03.
+- **Depends on**: CA-T1. **Covers**: BAS-01..03, ROL-04.
 - **Done when**: no banco, as trocas indevidas do "manter" caem sem piorar "erros" (alvo desta task sozinha: cerca de
   31% das palavras fora do dicionário ainda trocadas — 101 de 322 pelas contas de `context.md` §3: 165 − 57 só de
   caixa − ~7 acentos digitados —, **não** ≤ 25%; a queda até ≤ 10% vem das T5, T6 e T7; números a confirmar com o
-  baseline da T1); as
-  expectativas de `RealDictionaryTest` que mudam de propósito (`api`→`API`, resposta 2 do Yan) listadas aqui com o motivo.
+  baseline da T1); as expectativas de `RealDictionaryTest` que mudam de propósito (`api`→`API`, resposta 2 do Yan)
+  ficam listadas aqui com o motivo.
 - **Tests**: unit + banco. **Gate**: `quick`.
 
 ### CA-T5 — Léxico informal pt-BR
@@ -193,7 +193,7 @@ Play**: a T18b (textos legais, revisados pelo Yan) fecha a fase B; sem ela o apr
   pares; relógio injetado; eventos `LearnEvent`.
 - **Where**: `learning/PersonalLexicon.kt`. **Depends on**: CA-T8. **Covers**: LRN-03..07, FIX-03..05 (modelo).
 - **Done when**: 3 pontos valem; recusa vale na hora; "kkk kkk kkk" = 1; 142 dias parada deixa de valer;
-  **uso de 1 por dia durante 400 dias nunca expira** (renovação de palavra que vale, LRN-01b; o peso para no
+  **uso de 1 por dia durante 400 dias nunca expira** (renovação de palavra que vale, LRN-01 (b); o peso para no
   `WEIGHT_CAP`), e o mesmo para um par usado todo dia; teto 5000 expulsa o menor; propriedade: peso nunca negativo,
   decaimento monótono.
 - **Tests**: unit + propriedade. **Gate**: `quick`.
@@ -257,16 +257,16 @@ Play**: a T18b (textos legais, revisados pelo Yan) fecha a fase B; sem ela o apr
 - **Done when**: tocar a digitada = recusa imediata; tocar outra soma 1 ao par; o golden da faixa não muda.
 - **Tests**: unit + instrumentado. **Gate**: `full`.
 
-### CA-T15 — Opções, "Apagar meus dados" e backup
+### CA-T15 — Opções e "Apagar meus dados"
 - **Status**: Pending
 - **What**: `Settings.keyboardLearning` (ligado) + `SettingsRepository` + interruptor "Aprender com o que eu digito" na
   aba Teclado, com o texto que explica o modo anônimo manual quando desligado (PRV-07); `wipe()` em
   `onDeleteMyData` **antes** da API; texto do diálogo.
 - **Where**: `data/Settings*.kt`, `ui/config/TecladoPanel.kt`, `ui/SetupActivity.kt`, `DeleteMyDataSection.kt`.
 - **Depends on**: CA-T10. **Covers**: PRV-03, PRV-04, PRV-07.
-- **Done when**: apagar sem rede apaga o arquivo; o teste Compose
-  de exclusão confere a ordem; instrumentado: com o interruptor desligado nada novo é gravado e o aprendido
-  continua valendo (PRV-07); `TranslationsTest` verde (pt/en/es).
+- **Done when**: apagar sem rede apaga o arquivo; o teste Compose de exclusão confere a ordem; instrumentado: com o
+  interruptor desligado nada novo é gravado e o aprendido continua valendo (PRV-07); `TranslationsTest` verde
+  (pt/en/es).
 - **Tests**: unit + Compose instrumentado. **Gate**: `full`.
 
 ### CA-T16 — Tela "Palavras aprendidas"
@@ -311,6 +311,7 @@ Play**: a T18b (textos legais, revisados pelo Yan) fecha a fase B; sem ela o apr
 - **What**: `KeyFlowKeyboardLearningTest` completo: recusa, faixa, privacidade, apagar.
 - **Depends on**: CA-T13..T16b. **Covers**: ROL-02, PRV-06 (a verificação).
 - **Tests**: instrumentado. **Gate**: `full`.
+
 ### CA-T18b — Textos legais do aprendizado  `[portão [YAN]: sem eles a fase B não vai para a Play]`
 - **Status**: Pending
 - **What**: escrever (pt/en/es, por `tr("…")` quando for texto do app) o que o aprendizado guarda e onde: (a) o
@@ -318,7 +319,7 @@ Play**: a T18b (textos legais, revisados pelo Yan) fecha a fase B; sem ela o apr
   (b) a linha "Keystrokes / dados digitados" do Data Safety em `PLAYSTORE_CHECKLIST.md` §3 — conferir na regra
   oficial da Play se dado que só existe no aparelho, e o arquivo que a pessoa exporta, contam como "coletado"
   (regra de ouro 8: sem chute); (c) o texto da aba Privacidade e do aviso de exportar (consistente com T15 e T16b);
-  (d) a aba Docs sobre o aprendizado.
+  (d) a aba Docs sobre o aprendizado (o JSON do site sai do mesmo texto, `DocsSiteExportTest`).
 - **Where**: `PLAYSTORE_CHECKLIST.md`, `ui/config/PrivacyPanel.kt`, aba Docs, política no site.
 - **Depends on**: CA-T15, CA-T16b (o que é guardado e exportado tem de estar fechado).
 - **Covers**: PRV-05.

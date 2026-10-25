@@ -17,9 +17,9 @@ de toque, bigrama); o banco de avaliação calibra os limiares. Isto é o mesmo 
 em que bigramas e aprendizado se somam sem regra especial.
 
 ```
-KeyboardGridView ── Char + Touch(x,y em unidades de tecla) ─┐
-                                                             ▼
-KeyFlowKeyboardService ── ComposingWordTracker (letras + toques)
+KeyboardGridView ── Char + KeyTouch(x,y; unidades de tecla, do `press`) ─┐   (§4, item 1)
+                                                                           ▼
+KeyFlowKeyboardService ── ComposingWordTracker (letras + toques paralelos)
    │  finishComposing / undoCorrection / onCandidateTapped
    │        │ LearnEvent (Typed, Rejected, Keep, PairTap, Rewrite, TouchObs, Bigram)
    │        ▼
@@ -33,8 +33,8 @@ KeyFlowKeyboardService ── ComposingWordTracker (letras + toques)
                        Suggestions(words, autoCorrect, classe da troca)
 ```
 
-Pacotes novos: `ime/keyboard/learning/` (política, léxico, loja, tracker de reescrita, viés de toque,
-bigramas — tudo puro exceto a loja, que só usa `java.io`), `ime/keyboard/dictionary/` (ganha
+Pacotes novos: `ime/keyboard/learning/` (política, léxico, loja, leitor de importação, tracker de reescrita, viés de
+toque, bigramas — tudo puro exceto a loja, que só usa `java.io`/`ContentResolver`), `ime/keyboard/dictionary/` (ganha
 `SpatialCosts`, `LetterGrid`, `SwapClass`), `ui/config/LearnedWordsPanel.kt`, e o banco em
 `app/src/test/.../ime/keyboard/dictionary/bench/`.
 
@@ -172,7 +172,7 @@ peso(agora) ≥ KEEP_ABOVE`. Sem tarefa de fundo: a limpeza acontece ao carregar
 | -------------------------- | -------- | ------ |
 | `Typed(w)` — `finishComposing` sem troca | campo elegível; `w` fora do dicionário e **sem valer** no aprendido (nova ou em observação) e sem par ativo; resposta **NÃO** a "o corretor teria trocado?" (abaixo) | +1 (respeita o cooldown) |
 | `Typed(w)` | resposta **SIM** ou **DESCONHECIDO** | nada (erro de digitação isolado, LRN-05) |
-| `Typed(w)` — **renovação** | `w` já vale no aprendido (`conhece(w)`) | +1 (respeita o cooldown; `ultimoUso = agora`): o uso diário nunca expira (LRN-01b) |
+| `Typed(w)` — **renovação** | `w` já vale no aprendido (`conhece(w)`) | +1 (respeita o cooldown; `ultimoUso = agora`): o uso diário nunca expira (LRN-01 (b)) |
 | troca aplicada e **não** desfeita | a original | nada para a original (LRN-06) |
 | troca por **par** aplicada e **não** desfeita | par ativo | par +1 (renova; mesmo cooldown) |
 | `Rejected(original, troca)` — recomitar a mesma palavra após desfazer (REJ-01) ou reescrever a original (REJ-03) | recusa em espera ainda viva | `original` +3; apaga par de `original` |
