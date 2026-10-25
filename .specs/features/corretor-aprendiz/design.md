@@ -300,12 +300,16 @@ estão; prior forte; teto de 0,25; apagar o aprendido zera (ADP-03); o banco tem
 
 ```kotlin
 fun fieldAllowsLearning(inputType: Int, imeOptions: Int, learningEnabled: Boolean, autoCorrectEnabled: Boolean): Boolean
-// texto comum (autoCorrectAllowed) E sem IME_FLAG_NO_PERSONALIZED_LEARNING (0x1000000) E as duas opções ligadas
+// texto comum (autoCorrectAllowed) E sem TYPE_TEXT_FLAG_NO_SUGGESTIONS (0x80000) E sem IME_FLAG_NO_PERSONALIZED_LEARNING (0x1000000) E as duas opções ligadas
 fun wordEligible(word: String): Boolean        // LRN-02
 ```
 
 - `onStartInputView` calcula `learningAllowed` junto de `autoCorrectAllowed` (só booleanos, na janela que o
   `StrictModeKeyboardTest` cronometra).
+- **`NO_SUGGESTIONS`**: o `autoCorrectAllowed` do KeyFlow aceita o campo (decisão de 2026-09-28: a busca do Google
+  marca `0xa0001` só porque mostra as próprias sugestões), mas o aprender não: o AOSP trata o campo como sem
+  autocorreção e, portanto, sem aprendizado, e há apps que usam a flag como sinal de privacidade. Corrige e sugere
+  como hoje; não grava nada ali (PRV-02, alínea b).
 - Arquivo em `files/corretor/` + exclusões explícitas em `backup_rules.xml` e `data_extraction_rules.xml`
   (`cloud-backup` e `device-transfer`), como `models` e `agent/actions.jsonl`; `BackupRulesTest` passa a
   cobrir a pasta.
@@ -471,7 +475,7 @@ O KeyFlow é Apache-2.0, com titular Yan Lucas (`LICENSE` e `NOTICE` na raiz da 
   peso negativo. **Fuzz:** arquivo com bytes aleatórios nunca derruba e nunca passa dos tetos.
 - **Mutação:** o pacote `learning` entra nos alvos padrão do PIT.
 - **Instrumentados** (`instrumentar KeyFlowKeyboardLearningTest`): desfazer → recomitar vira palavra
-  conhecida; recusa cancelada por edição; faixa "manter"; senha e `NO_PERSONALIZED_LEARNING` não gravam;
+  conhecida; recusa cancelada por edição; faixa "manter"; senha, `NO_SUGGESTIONS` e `NO_PERSONALIZED_LEARNING` não gravam;
   "Apagar meus dados" apaga o arquivo; `StrictModeKeyboardTest` segue zerado.
 - **Arquitetura:** `ArchitectureRulesTest` (nada de `runBlocking`, `collectAsStateOnMain`, sem rede no pacote).
 - **Goldens:** aba Teclado (novo grupo), lista de palavras (vazia/cheia), diálogo; `--approve` copia tudo:

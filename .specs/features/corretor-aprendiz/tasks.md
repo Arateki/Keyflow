@@ -77,7 +77,8 @@
 - **What**: `LearningPolicy` (`fieldAllowsLearning`, `wordEligible`), `LearningParams`; constante
   `IME_FLAG_NO_PERSONALIZED_LEARNING`; `autoCorrectAllowed` continua a base.
 - **Where**: `learning/LearningPolicy.kt`, `learning/LearningParams.kt`. **Covers**: PRV-02, LRN-02, LRN-08.
-- **Done when**: matriz de `inputType` × flag × opções; palavras de teste (`kkk`, `API`, `abc123`, `a`, 40 letras).
+- **Done when**: matriz de `inputType` × flag × opções, com `NO_SUGGESTIONS` (a busca do Google, `0xa0001`, corrige e
+  sugere mas não aprende) e senha/URL/e-mail/número fora; palavras de teste (`kkk`, `API`, `abc123`, `a`, 40 letras).
 - **Tests**: unit. **Gate**: `quick` + `:app:lintDebug` (a constante não pode acusar `NewApi`).
 
 ### CA-T9 — `PersonalLexicon`
@@ -90,10 +91,16 @@
 
 ### CA-T10 — `LearnedStore` (arquivo)
 - **What**: `files/corretor/<idioma>.kfl`, diário, compactação por `rename`, linha inválida ignorada, versão
-  futura ignorada, `wipe()`.
-- **Where**: `learning/LearnedStore.kt`. **Depends on**: CA-T9. **Covers**: ARM-01, PER-02.
+  futura ignorada, `wipe()`; **junto do primeiro arquivo gravado**, as exclusões do backup: `<exclude domain="file"
+  path="corretor" />` no `full-backup-content` do `backup_rules.xml` e em `cloud-backup` e `device-transfer` do
+  `data_extraction_rules.xml` (as três seções), e o `BackupRulesTest` estendido.
+- **Where**: `learning/LearnedStore.kt`, `app/src/main/res/xml/backup_rules.xml`, `data_extraction_rules.xml`,
+  `app/src/test/java/com/keyflow/auth/BackupRulesTest.kt`.
+- **Depends on**: CA-T9. **Covers**: ARM-01, PER-02, PRV-01.
 - **Done when**: ida e volta; diário reproduz o estado; arquivo truncado/corrompido/aleatório não derruba nem passa
-  do teto (fuzz, ~30 mil entradas); carga de 5000 palavras ≤ 50 ms.
+  do teto (fuzz, ~30 mil entradas); carga de 5000 palavras ≤ 50 ms (meta, a medir); o `BackupRulesTest`, que hoje só
+  filtra `domain="sharedpref"` (linha 24), passa a conferir também `domain="file"` e falha se `corretor` sair de
+  qualquer das três seções.
 - **Tests**: unit + propriedade + fuzz. **Gate**: `quick`.
 
 ### CA-T11 — `Suggester` enxerga o aprendido
@@ -108,8 +115,8 @@
   `LearnedStore` (como `Dictionaries`); fila de eventos na thread `keyflow-suggest`; sem `runBlocking`.
 - **Where**: `KeyFlowKeyboardService.kt`, `learning/LearningRuntime.kt`. **Depends on**: CA-T8..T11.
 - **Covers**: LRN-01, ARM-02, ARM-03.
-- **Done when**: instrumentado: digitar 3× um nome com o cooldown encurtado por `…ForTest` o faz valer; senha e
-  `NO_PERSONALIZED_LEARNING` não gravam; `StrictModeKeyboardTest` verde.
+- **Done when**: instrumentado: digitar 3× um nome com o cooldown encurtado por `…ForTest` o faz valer; senha,
+  `NO_SUGGESTIONS` e `NO_PERSONALIZED_LEARNING` não gravam; `StrictModeKeyboardTest` verde.
 - **Tests**: instrumentado + `ArchitectureRulesTest`. **Gate**: `full`.
 
 ### CA-T13 — Recusa: desfazer recompõe e confirma
@@ -131,10 +138,10 @@
 ### CA-T15 — Opções, "Apagar meus dados" e backup
 - **What**: `Settings.keyboardLearning` (ligado) + `SettingsRepository` + interruptor "Aprender com o que eu digito" na
   aba Teclado, com o texto que explica o modo anônimo manual quando desligado (PRV-07); `wipe()` em
-  `onDeleteMyData` **antes** da API; texto do diálogo; exclusões em `backup_rules.xml`/`data_extraction_rules.xml`.
-- **Where**: `data/Settings*.kt`, `ui/config/TecladoPanel.kt`, `ui/SetupActivity.kt`, `DeleteMyDataSection.kt`, XMLs.
-- **Depends on**: CA-T10. **Covers**: PRV-01, PRV-03, PRV-04, PRV-07.
-- **Done when**: `BackupRulesTest` cobre a pasta nas duas regras; apagar sem rede apaga o arquivo; o teste Compose
+  `onDeleteMyData` **antes** da API; texto do diálogo.
+- **Where**: `data/Settings*.kt`, `ui/config/TecladoPanel.kt`, `ui/SetupActivity.kt`, `DeleteMyDataSection.kt`.
+- **Depends on**: CA-T10. **Covers**: PRV-03, PRV-04, PRV-07.
+- **Done when**: apagar sem rede apaga o arquivo; o teste Compose
   de exclusão confere a ordem; instrumentado: com o interruptor desligado nada novo é gravado e o aprendido
   continua valendo (PRV-07); `TranslationsTest` verde (pt/en/es).
 - **Tests**: unit + Compose instrumentado. **Gate**: `full`.
@@ -318,7 +325,8 @@
 | LRN-01, ARM-02, ARM-03 | CA-T12 |
 | REJ-01, 04, 05, 06 | CA-T13 |
 | REJ-02, FIX-01 | CA-T14 |
-| PRV-01, 03, 04, 07 | CA-T15 |
+| PRV-01 | CA-T10 (exceção da exportação: CA-T16b) |
+| PRV-03, 04, 07 | CA-T15 |
 | LST-01..05 | CA-T16 |
 | LST-06..07 | CA-T16b |
 | ROL-02 | CA-T18 |
