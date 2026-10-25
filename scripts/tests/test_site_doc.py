@@ -144,6 +144,14 @@ class SiteCompleto(unittest.TestCase):
             pagina = (self.saida / arquivo).read_text(encoding="utf-8")
             self.assertGreaterEqual(pagina.count(f'href="{destino}"'), 2, f"{arquivo}: cabeçalho e rodapé devem ligar a {destino}")
 
+    def test_cabecalho_do_celular_tem_o_atalho_docs_menos_na_propria_documentacao(self):
+        for arquivo, destino in (("index.html", "doc.html"), ("en.html", "docs.html"), ("404.html", "doc.html"),
+                                 ("privacidade.html", "doc.html"), ("terms.html", "docs.html")):
+            pagina = (self.saida / arquivo).read_text(encoding="utf-8")
+            self.assertIn(f'<a class="docs-atalho" href="{destino}">Docs', pagina, arquivo)
+        for arquivo in ("doc.html", "docs.html"):
+            self.assertNotIn("docs-atalho", (self.saida / arquivo).read_text(encoding="utf-8"), arquivo)
+
     def test_sitemap_e_llms_listam_a_documentacao(self):
         sitemap = (self.saida / "sitemap.xml").read_text(encoding="utf-8")
         llms = (self.saida / "llms.txt").read_text(encoding="utf-8")

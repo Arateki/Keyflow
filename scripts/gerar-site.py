@@ -347,6 +347,12 @@ def make_header(lang: str, current_page: str) -> str:
         tema_label = "Switch light/dark theme"
         doc_url, priv_url, termos_url = "docs.html", "privacy.html", "terms.html"
 
+    # No celular o menu some; o atalho leva à documentação (a própria página de documentação não precisa dele).
+    atalho_docs = ""
+    if current_page not in PAGINAS_DOC:
+        leitor = "Documentação" if lang == "pt-BR" else "Documentation"
+        atalho_docs = f'<a class="docs-atalho" href="{doc_url}">Docs<span class="so-leitor"> — {leitor}</span></a>\n      '
+
     return f"""<header class="topo">
   <div class="caixa topo-in">
     <a class="marca" href="{home_url}"><span class="marca-orbe" aria-hidden="true"></span>KeyFlow</a>
@@ -357,7 +363,7 @@ def make_header(lang: str, current_page: str) -> str:
       <a href="{termos_url}"{atual(termos_url)}>{termos_label}</a>
     </nav>
     <div class="topo-acoes">
-      <a class="idioma" href="{alt_url}" hreflang="{alt_code}" lang="{alt_code}">{alt_text}<span class="so-leitor"> — {alt_reader}</span></a>
+      {atalho_docs}<a class="idioma" href="{alt_url}" hreflang="{alt_code}" lang="{alt_code}">{alt_text}<span class="so-leitor"> — {alt_reader}</span></a>
       <button class="tema" type="button" aria-pressed="false" aria-label="{tema_label}">
         <svg class="sol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/></svg>
         <svg class="lua" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.6A8 8 0 0 1 9.4 4a8 8 0 1 0 10.6 10.6Z"/></svg>

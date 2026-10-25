@@ -395,7 +395,8 @@ main, .rodape { position: relative; z-index: 1; }
 .nav a:hover::after { transform: scaleX(1); }
 
 .topo-acoes { display: flex; align-items: center; gap: 0.5rem; }
-.idioma {
+.idioma,
+.docs-atalho {
   font-family: var(--mono);
   font-size: 0.72rem;
   letter-spacing: 0.14em;
@@ -406,7 +407,10 @@ main, .rodape { position: relative; z-index: 1; }
   text-decoration: none;
   transition: border-color 0.3s, background-color 0.3s;
 }
-.idioma:hover { border-color: var(--linha-forte); background: var(--superficie-2); }
+.idioma:hover,
+.docs-atalho:hover { border-color: var(--linha-forte); background: var(--superficie-2); }
+/* Atalho "Docs": no celular o menu some, e a documentação continua a um toque. */
+.docs-atalho { display: none; text-transform: uppercase; }
 .tema {
   display: grid;
   place-items: center;
@@ -439,6 +443,7 @@ main, .rodape { position: relative; z-index: 1; }
 /* O menu mais largo (o da página inicial em português, com a Documentação) só cabe em uma linha a partir de ~960 px. */
 @media (max-width: 960px) {
   .nav { display: none; }
+  .docs-atalho { display: inline-block; }
 }
 
 /* ── Herói ── */
