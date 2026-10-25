@@ -71,16 +71,23 @@ fun resolveUploadSigning(): UploadSigning? {
     val keyPassword = value("KEYFLOW_UPLOAD_KEY_PASSWORD", "keyPassword").ifEmpty { storePassword }
     val missing = listOf("storeFile" to store, "storePassword" to storePassword, "keyAlias" to alias)
         .filter { it.second.isEmpty() }.map { it.first }
-    if (missing.size == 3) return null // nada configurado: o caso normal (CI, debug, máquina sem a chave)
+    val configured = file.isFile || listOf(
+        "KEYFLOW_UPLOAD_STORE_FILE", "KEYFLOW_UPLOAD_STORE_PASSWORD", "KEYFLOW_UPLOAD_KEY_ALIAS", "KEYFLOW_UPLOAD_KEY_PASSWORD",
+    ).any { !env[it].isNullOrBlank() }
+    if (!configured) return null // nenhuma configuração: release sem assinatura, como no CI
     if (missing.isNotEmpty()) {
-        logger.warn("Chave de upload ignorada: faltam ${missing.joinToString()} (ver .specs/codebase/ENVIRONMENT.md).")
-        return null
+        throw GradleException("Assinatura de upload incompleta: faltam ${missing.joinToString()} (ver .specs/codebase/ENVIRONMENT.md).")
     }
     val expanded = if (store.startsWith("~/")) System.getProperty("user.home") + store.substring(1) else store
     val storeFile = File(expanded).let { if (it.isAbsolute) it else File(file.absoluteFile.parentFile, expanded) }
     return UploadSigning(storeFile, storePassword, alias, keyPassword)
 }
 
+// O antigo atalho podia produzir app-release.apk/AAB com certificado de debug e nome de upload.
+// Para smoke sem chave de upload, forneça explicitamente um APK assinado a KEYFLOW_SMOKE_APK.
+if (providers.gradleProperty("keyflowSmokeSigning").orNull == "true") {
+    throw GradleException("keyflowSmokeSigning foi removido: release nunca usa assinatura de debug; forneça KEYFLOW_SMOKE_APK ao smoke.")
+}
 val uploadSigning = resolveUploadSigning()
 
 android {
@@ -174,12 +181,8 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            // Assinatura do release, por precedência: (1) `-PkeyflowSmokeSigning=true`, só para o smoke local, com a chave de
-            // debug; (2) a chave de upload, quando configurada fora do repositório; (3) nenhuma — o release sai como
-            // `app-release-unsigned.apk`, que é o que o CI espera. O release nunca é assinado com a chave de debug sem o (1).
-            if (providers.gradleProperty("keyflowSmokeSigning").orNull == "true") {
-                signingConfig = signingConfigs.getByName("debug")
-            } else if (uploadSigning != null) {
+            // Sem chave configurada o release sai sem assinatura; somente a chave de upload assina esta variante.
+            if (uploadSigning != null) {
                 signingConfig = signingConfigs.getByName("upload")
             }
             proguardFiles(

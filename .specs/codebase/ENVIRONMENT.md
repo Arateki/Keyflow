@@ -114,9 +114,9 @@ nem em `local.properties`; o build não imprime nenhum valor (só o nome do camp
 
 - **Sem a chave** (CI, máquina de outro agente) o release segue **sem assinatura**: o CI confere
   `app-release-unsigned.apk`, e o AAB sai sem assinatura (a Play recusa — é o sinal de que falta a chave).
-- **Campos faltando** (só `storeFile`, por exemplo): o Gradle avisa quais e ignora a chave.
-- **`-PkeyflowSmokeSigning=true`** assina o release com a chave de **debug**, só para o smoke no emulador quando não há
-  chave de upload. Vence a chave de upload. Nunca suba esse APK.
+- **Campos faltando** (só `storeFile`, por exemplo): o Gradle falha, informando somente os nomes dos campos.
+- **`-PkeyflowSmokeSigning=true`** foi removido e falha na configuração, antes de gerar APK/AAB. O release só usa a chave
+  de upload; o smoke sem ela recebe um APK assinado explicitamente em `KEYFLOW_SMOKE_APK`, junto de `KEYFLOW_SMOKE_MAPPING`.
 - Conferir a assinatura do que vai subir: `apksigner verify --print-certs app-release.apk` e
   `jarsigner -verify -certs app-release.aab`; o SHA-256 do certificado tem de ser o da chave de upload cadastrada no Console
   (`AB:17:29:3A:E8:18:C8:A1:3A:4E:59:C9:71:67:F0:CC:FB:D8:72:83:CB:79:EB:56:B4:73:73:95:56:B9:A8:DC`, gerada em 2026-10-24).

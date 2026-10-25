@@ -4,8 +4,8 @@
 #   scripts/smoke-release.sh
 #
 # O que o R8 costuma quebrar sem avisar (reflexão, JNI, classes por nome) só aparece rodando o app. Este script:
-#   1. gera o APK de release (com a chave de upload, se ela estiver configurada fora do repositório; senão assina com a de
-#      debug só para o smoke) e confere, sem emulador, o que dá para ver no APK: nenhum ID de teste do AdMob, nenhum caminho
+#   1. gera o APK de release com a chave de upload já configurada fora do repositório (ou recebe um APK assinado explícito)
+#      e confere, sem emulador, o que dá para ver no APK: nenhum ID de teste do AdMob, nenhum caminho
 #      de staging/compra simulada/agente, classes protegidas e o que o JNI acessa por nome (check-release-jni.py);
 #   2. instala no emulador, aceita a divulgação, percorre as abas, troca a skin do teclado, abre a folha de compra (Billing),
 #      espera o banner do AdMob, habilita o KeyFlow como teclado e o abre num campo de texto de verdade;
@@ -46,10 +46,6 @@ if [[ "${KEYFLOW_SMOKE_PHASE:-1}" == 1 ]]; then
         }
         gradle_release :app:assembleRelease
         apk="app/build/outputs/apk/release/app-release.apk"
-        if [[ ! -f "$apk" ]]; then
-            # Sem a chave de upload o release sai sem assinatura: o smoke assina com a de debug (só aqui, nunca para subir).
-            gradle_release -PkeyflowSmokeSigning=true :app:assembleRelease
-        fi
         [[ -f "$apk" ]] || { echo "APK de release assinado ausente: $apk" >&2; exit 2; }
     fi
     # O dump do sistema no API 34 pode lançar NPE em childNafCheck. Este leitor espera as
