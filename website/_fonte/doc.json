@@ -59,7 +59,7 @@
           "titulo": "Aba Raciocínio",
           "blocos": [
             {"tipo": "paragrafo", "texto": "Conecta um modelo de linguagem — no aparelho ou na nuvem — e deixa você testar se ele responde. O ditado e os comandos ainda não o usam: isso vem depois."},
-            {"tipo": "rotulado", "rotulo": "Origem", "texto": "Local (modelos no aparelho como Gemma, Qwen, Llama e DeepSeek, sem internet) ou Nuvem (OpenAI e Anthropic Claude via SSO ou chave de API)."},
+            {"tipo": "rotulado", "rotulo": "Origem", "texto": "Local (modelos no aparelho como Gemma e Qwen, sem internet) ou Nuvem (OpenAI e Anthropic Claude via SSO ou chave de API)."},
             {"tipo": "rotulado", "rotulo": "Testar", "texto": "manda uma frase ao modelo e mostra a resposta chegando, com o tempo até o primeiro trecho."}
           ]
         },
@@ -171,21 +171,7 @@
             {"tipo": "rotulado", "rotulo": "LiteRT-LM", "texto": "motor dos modelos de texto da aba Raciocínio, no aparelho — Apache 2.0 (Google)."},
             {"tipo": "rotulado", "rotulo": "Qwen3 0.6B", "texto": "modelo de texto Leve — Apache 2.0 (Alibaba), baixado sob demanda."},
             {"tipo": "rotulado", "rotulo": "AndroidSVG", "texto": "desenha os SVGs das skins importadas — Apache 2.0 (Cave Rock Software)."},
-            {"tipo": "rotulado", "rotulo": "SmolLM2 1.7B", "texto": "modelo de linguagem leve e eficiente — Apache 2.0 (Hugging Face)."},
-            {"tipo": "rotulado", "rotulo": "Llama 3.2 1B", "texto": "modelo de linguagem ágil para dispositivos móveis — Llama 3.2 Community License (Meta)."},
-            {"tipo": "rotulado", "rotulo": "DeepSeek R1 Distill 1.5B", "texto": "modelo de raciocínio passo a passo destilado — MIT License (DeepSeek)."},
-            {"tipo": "rotulado", "rotulo": "Gemma 2 2B", "texto": "modelo de linguagem compacto de alto raciocínio — Google Gemma Terms / Apache 2.0."},
             {"tipo": "rotulado", "rotulo": "Gemma 4 E2B", "texto": "modelo de texto Equilibrado — Apache 2.0 (Google), baixado sob demanda."},
-            {"tipo": "rotulado", "rotulo": "Llama 3.2 3B", "texto": "modelo de linguagem avançado para dispositivos móveis — Llama 3.2 Community License (Meta)."},
-            {"tipo": "rotulado", "rotulo": "Phi-3.5 Mini", "texto": "modelo de raciocínio analítico — MIT License (Microsoft)."},
-            {"tipo": "rotulado", "rotulo": "ML Kit Text Recognition", "texto": "reconhecimento óptico de caracteres (OCR) no aparelho — Google."},
-            {"tipo": "rotulado", "rotulo": "PP-OCR v4", "texto": "reconhecimento óptico de caracteres (OCR) multilíngue — Apache 2.0 (PaddlePaddle)."},
-            {"tipo": "rotulado", "rotulo": "MobileNetV4", "texto": "reconhecimento óptico ultrarrápido para imagens e capturas — Apache 2.0."},
-            {"tipo": "rotulado", "rotulo": "Florence-2", "texto": "modelo visual-linguagem para documentos e OCR — MIT License (Microsoft)."},
-            {"tipo": "rotulado", "rotulo": "SmolVLM 500M", "texto": "modelo multimodal de visão e linguagem — Apache 2.0 (Hugging Face)."},
-            {"tipo": "rotulado", "rotulo": "Piper TTS", "texto": "síntese de voz rápida no aparelho — MIT (rhasspy)."},
-            {"tipo": "rotulado", "rotulo": "Kokoro", "texto": "modelo de síntese de voz de alta fidelidade — Apache 2.0 (hexgrad)."},
-            {"tipo": "rotulado", "rotulo": "MeloTTS", "texto": "síntese de voz multilíngue — MIT (MyShell)."},
             {"tipo": "rotulado", "rotulo": "Dicionários do corretor", "texto": "listas de palavras do teclado do Android (AOSP LatinIME) para português, inglês e espanhol — Apache 2.0."},
             {"tipo": "rotulado", "rotulo": "Space Grotesk e Space Mono", "texto": "fontes — SIL Open Font License 1.1."}
           ]
@@ -258,7 +244,7 @@
           "titulo": "Reasoning tab",
           "blocos": [
             {"tipo": "paragrafo", "texto": "Connects a language model — on the device or in the cloud — and lets you test whether it answers. Dictation and commands don't use it yet: that comes later."},
-            {"tipo": "rotulado", "rotulo": "Source", "texto": "Local (models on device such as Gemma, Qwen, Llama and DeepSeek, without internet) or Cloud (OpenAI and Anthropic Claude via SSO or API key)."},
+            {"tipo": "rotulado", "rotulo": "Source", "texto": "Local (models on device such as Gemma and Qwen, without internet) or Cloud (OpenAI and Anthropic Claude via SSO or API key)."},
             {"tipo": "rotulado", "rotulo": "Test", "texto": "sends a sentence to the model and shows the answer arriving, with the time to the first piece."}
           ]
         },
@@ -370,21 +356,7 @@
             {"tipo": "rotulado", "rotulo": "LiteRT-LM", "texto": "engine for the text models of the Reasoning tab, on the device — Apache 2.0 (Google)."},
             {"tipo": "rotulado", "rotulo": "Qwen3 0.6B", "texto": "Light text model — Apache 2.0 (Alibaba), downloaded on demand."},
             {"tipo": "rotulado", "rotulo": "AndroidSVG", "texto": "draws the SVGs of imported skins — Apache 2.0 (Cave Rock Software)."},
-            {"tipo": "rotulado", "rotulo": "SmolLM2 1.7B", "texto": "lightweight and efficient language model — Apache 2.0 (Hugging Face)."},
-            {"tipo": "rotulado", "rotulo": "Llama 3.2 1B", "texto": "agile language model for mobile devices — Llama 3.2 Community License (Meta)."},
-            {"tipo": "rotulado", "rotulo": "DeepSeek R1 Distill 1.5B", "texto": "distilled step-by-step reasoning model — MIT License (DeepSeek)."},
-            {"tipo": "rotulado", "rotulo": "Gemma 2 2B", "texto": "compact high-reasoning language model — Google Gemma Terms / Apache 2.0."},
             {"tipo": "rotulado", "rotulo": "Gemma 4 E2B", "texto": "Balanced text model — Apache 2.0 (Google), downloaded on demand."},
-            {"tipo": "rotulado", "rotulo": "Llama 3.2 3B", "texto": "advanced language model for mobile devices — Llama 3.2 Community License (Meta)."},
-            {"tipo": "rotulado", "rotulo": "Phi-3.5 Mini", "texto": "analytical reasoning model — MIT License (Microsoft)."},
-            {"tipo": "rotulado", "rotulo": "ML Kit Text Recognition", "texto": "on-device optical character recognition (OCR) — Google."},
-            {"tipo": "rotulado", "rotulo": "PP-OCR v4", "texto": "multilingual optical character recognition (OCR) — Apache 2.0 (PaddlePaddle)."},
-            {"tipo": "rotulado", "rotulo": "MobileNetV4", "texto": "ultra-fast optical recognition for images and captures — Apache 2.0."},
-            {"tipo": "rotulado", "rotulo": "Florence-2", "texto": "visual-language model for documents and OCR — MIT License (Microsoft)."},
-            {"tipo": "rotulado", "rotulo": "SmolVLM 500M", "texto": "multimodal vision and language model — Apache 2.0 (Hugging Face)."},
-            {"tipo": "rotulado", "rotulo": "Piper TTS", "texto": "fast on-device speech synthesis — MIT (rhasspy)."},
-            {"tipo": "rotulado", "rotulo": "Kokoro", "texto": "high-fidelity speech synthesis model — Apache 2.0 (hexgrad)."},
-            {"tipo": "rotulado", "rotulo": "MeloTTS", "texto": "multilingual speech synthesis — MIT (MyShell)."},
             {"tipo": "rotulado", "rotulo": "Spell checker dictionaries", "texto": "word lists from the Android keyboard (AOSP LatinIME) for Portuguese, English and Spanish — Apache 2.0."},
             {"tipo": "rotulado", "rotulo": "Space Grotesk and Space Mono", "texto": "fonts — SIL Open Font License 1.1."}
           ]
