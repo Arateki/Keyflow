@@ -17,6 +17,7 @@ import com.keyflow.data.Settings
 import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.ModelSpec
 import com.keyflow.data.models.StartResult
+import com.keyflow.ui.gallery.SamplePanelModels
 import com.keyflow.ui.theme.KeyFlowTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -30,9 +31,10 @@ class VisaoPanelTest {
     @get:Rule
     val rule = createComposeRule()
 
-    private val fastOcr = ModelCatalog.OCR_FAST
-    private val balancedOcr = ModelCatalog.OCR_BALANCED
-    private val smolVlm = ModelCatalog.VLM_MULTIMODAL
+    // O catálogo real de Visão está vazio (2026-10-24): o painel é exercitado com modelos de amostra.
+    private val fastOcr = SamplePanelModels.VISION_LIGHT
+    private val balancedOcr = SamplePanelModels.VISION_BALANCED
+    private val smolVlm = SamplePanelModels.VISION_HEAVY
     private val whisper = ModelCatalog.WHISPER_BASE
     private val qwen = ModelCatalog.QWEN3_0_6B
 
@@ -66,7 +68,7 @@ class VisaoPanelTest {
     }
 
     private fun visionUi(installed: Set<String> = emptySet(), selected: String? = null) = LocalModelsUi.compose(
-        catalog = ModelCatalog.VISION, installed = installed, active = null, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_000,
+        catalog = SamplePanelModels.VISION, installed = installed, active = null, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_000,
     )
 
     @Test

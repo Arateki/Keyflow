@@ -17,6 +17,7 @@ import com.keyflow.data.Settings
 import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.ModelSpec
 import com.keyflow.data.models.StartResult
+import com.keyflow.ui.gallery.SamplePanelModels
 import com.keyflow.ui.theme.KeyFlowTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -30,12 +31,13 @@ class FalaPanelTest {
     @get:Rule
     val rule = createComposeRule()
 
-    private val piper = ModelCatalog.VOICE_FAST
-    private val kokoro = ModelCatalog.VOICE_BALANCED
-    private val melo = ModelCatalog.VOICE_QUALITY
+    // O catálogo real de Voz está vazio (2026-10-24): o painel é exercitado com modelos de amostra.
+    private val piper = SamplePanelModels.VOICE_LIGHT
+    private val kokoro = SamplePanelModels.VOICE_BALANCED
+    private val melo = SamplePanelModels.VOICE_HEAVY
     private val whisper = ModelCatalog.WHISPER_BASE
     private val qwen = ModelCatalog.QWEN3_0_6B
-    private val ocr = ModelCatalog.OCR_FAST
+    private val ocr = SamplePanelModels.VISION_LIGHT
 
     private class FakeActions : LocalModelActions {
         val deletes = mutableListOf<String>()
@@ -67,7 +69,7 @@ class FalaPanelTest {
     }
 
     private fun voiceUi(installed: Set<String> = emptySet(), selected: String? = null) = LocalModelsUi.compose(
-        catalog = ModelCatalog.VOICE, installed = installed, active = null, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_000,
+        catalog = SamplePanelModels.VOICE, installed = installed, active = null, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_000,
     )
 
     @Test
