@@ -40,10 +40,10 @@ Duas frentes, na ordem do que dá mais acerto por esforço:
 
 | Fora | Razão |
 | ---- | ----- |
-| Modelo neural no aparelho (estilo FUTO) | Decisão e critérios para revisitar em `design.md` §10: 60+ MB, runtime nativo, sem modelo pt-BR aberto e sem medida no A32 |
+| Modelo neural no aparelho (estilo FUTO) | Resposta 12 do Yan (24/10): só depois, pelo catálogo de modelos sob demanda e com licença compatível (o do FUTO fica fora). Critérios para revisitar em `design.md` §10: 60+ MB, runtime nativo, sem modelo pt-BR aberto e sem medida no A32 |
 | Digitação por deslize (glide) | Outro motor; a coordenada do toque desta spec é só de toque |
 | Sincronizar o aprendido entre aparelhos / nuvem | Contraria "nada sai do aparelho" |
-| Dicionário de contatos (`READ_CONTACTS`) | Permissão sensível; pergunta ao Yan em `context.md` §8 |
+| Dicionário de contatos (`READ_CONTACTS`) | Resposta 5 do Yan (24/10): sem a permissão; os nomes vêm do uso (LRN) |
 | Corrigir palavra **válida** por contexto ("casa" → "caso") | Sem precisão medida ≥ 99% no banco, só sugerir (já é assim) |
 | Ditado por voz | Esta spec é só do teclado de toque |
 | Expansão de abreviações ("vc" → "você") ligada por padrão | Seria nova troca automática; só como par que a pessoa ensina (FIX) |
@@ -70,7 +70,7 @@ Duas frentes, na ordem do que dá mais acerto por esforço:
 **Como** pessoa que digita em português do Brasil, **quero** que o corretor pare de trocar o que não é erro **desde a primeira vez**.
 
 1. **BAS-01**: WHEN uma candidata é avaliada THEN a decisão de trocar SHALL ser **por classe** — acento que faltou, inicial maiúscula (nome próprio), **sigla** (tudo maiúsculo), 1 edição, 2 edições, par ensinado pela pessoa (FIX) — cada classe com o seu limiar, calibrado no banco; classe com precisão < 95% no banco **só sugere**.
-2. **BAS-02**: WHEN a palavra digitada é minúscula e a única candidata é a **sigla** ou a forma de outra caixa de uma palavra de ≤ 4 letras ("vc"→"VC", "tb"→"TB", "ok"→"OK") THEN o corretor SHALL só sugerir , inclusive "api"→"API" e "url"→"URL" (decisão do Yan, 24/10: siglas só sugerem; o `RealDictionaryTest` passa a esperar só a sugestão).
+2. **BAS-02**: WHEN a candidata de troca é a **sigla** da palavra digitada (a mesma palavra toda em maiúsculas, de qualquer tamanho: "vc"→"VC", "tb"→"TB", "ok"→"OK", "api"→"API", "url"→"URL") THEN o corretor SHALL só sugerir (resposta 2 do Yan, 24/10: siglas só sugerem, inclusive `api`→`API`; o `RealDictionaryTest` passa a esperar só a sugestão). A troca de caixa que não é sigla ("paulo"→"Paulo", inicial maiúscula de nome próprio) segue a regra da sua classe (BAS-01).
 3. **BAS-03**: WHEN a palavra digitada tem acento ou cedilha que a pessoa digitou THEN o corretor SHALL **nunca** trocá-la por forma com menos acento ("Ágatha"→"Agatha", "Taís"→"Tais", "piá"→"pia", "parça"→"parca"); a escolha de forma entre as de mesmas letras respeita o que foi digitado.
 4. **BAS-04**: WHEN a palavra tem 3 ou mais letras iguais seguidas ("kkkk", "simmm", "nãooo", "oiii") ou é só consoantes de até 4 letras ("vc", "tb", "td", "hj", "msg") THEN o corretor SHALL só sugerir.
 5. **BAS-05**: WHEN a palavra digitada existe no dicionário de **outro** idioma instalado (en/es) com frequência ≥ F (calibrada no banco) e o teclado ativo é pt THEN o corretor SHALL só sugerir ("deploy", "push", "the", "you"; hoje 39% do inglês comum e 63% do espanhol comum viram outra palavra).
@@ -134,7 +134,7 @@ Duas frentes, na ordem do que dá mais acerto por esforço:
 
 1. **CTX-01**: WHEN uma palavra é comitada e a anterior é palavra do mesmo trecho (sem pontuação final, quebra de linha ou mudança de campo no meio) THEN o par (anterior, palavra) SHALL somar 1 no arquivo do aprendido (teto de 10 000 pares por idioma, mesma regra de decaimento).
 2. **CTX-02**: WHEN há duas candidatas de troca parecidas THEN o bigrama conhecido SHALL entrar no placar em bits (`λ·P(w|anterior) + (1−λ)·P(w)`, λ de Witten-Bell) e poderá liberar a troca que sozinha não passava pela folga.
-3. **CTX-03**: WHEN existe uma tabela estática de bigramas pt-BR de corpus de licença compatível THEN ela SHALL entrar como base do CTX-02 (opcional; ver `context.md` §5: as listas do AOSP não trazem nenhum bigrama).
+3. **CTX-03**: WHEN o banco de contexto mostra ganho THEN uma tabela estática de bigramas pt-BR de corpus CC0 (resposta 10 do Yan: corpus CC0 mais o histórico pessoal) SHALL entrar como base do CTX-02 (`context.md` §5: as listas do AOSP não trazem nenhum bigrama).
 4. **CTX-04** *(opcional)*: WHEN a faixa está vazia após um espaço THEN SHALL mostrar até 3 próximas palavras prováveis.
 
 ### Privacidade (`PRV`)

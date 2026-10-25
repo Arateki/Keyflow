@@ -155,16 +155,16 @@ a lixeira a remove; "Delete learned words" nas configurações, com confirmaçã
 
 ## 5. Licenças — política desta spec
 
-O KeyFlow vai ser de código aberto; a licença ainda não foi definida; o app usa AdMob e Play Billing (SDKs fechados).
+O KeyFlow é Apache-2.0, titular Yan Lucas (resposta 1 do Yan, 24/10; `LICENSE` e `NOTICE` já estão na `main`) e usa
+AdMob e Play Billing (SDKs fechados).
 
 - **Apache-2.0 / MIT** (LatinIME, AnySoftKeyboard, FlorisBoard): pode adaptar código, mantendo o aviso de autoria
   (`app/licenses/Apache-2.0_latinime.txt` + cabeçalho nos arquivos que adaptam). Nesta spec nada é copiado do motor
   nativo do LatinIME: reimplementa-se em Kotlin, reusando **constantes e fórmulas** com atribuição.
-- **GPL-3.0** (HeliBoard): código GPL junto de SDKs fechados é conflito conhecido, e a licença do KeyFlow é decisão do
-  Yan. Só se reimplementa a **ideia**. Onde copiar pouparia trabalho (todos pequenos): lista de bloqueio e promoção
-  por uso repetido (`DictionaryFacilitatorImpl.kt`, ≈ 0,5 dia), `PersonalDictionaryScreen.kt` (≈ 1 dia, e amarrada ao
-  `UserDictionary` do Android, que não usamos), confiança por idioma (≈ 2 dias, só se o teclado passar a misturar idiomas).
-  Parte desse código é do AOSP (Apache) e dá para tirar da origem.
+- **GPL-3.0** (HeliBoard): regra do Yan (24/10): nenhum código, só a ideia. Reimplementam-se do zero a lista de bloqueio
+  e a promoção por uso repetido (`DictionaryFacilitatorImpl.kt`), a tela de palavras (`PersonalDictionaryScreen.kt`,
+  amarrada ao `UserDictionary` do Android, que não usamos) e, só se o teclado passar a misturar idiomas, a confiança
+  por idioma. Parte desse código é do AOSP (Apache) e dá para adaptar da origem.
 - **FUTO** (Source First): ideias, nunca código nem pesos.
 - **Dados:** as listas de palavras do AOSP que o projeto já usa vêm do LatinIME (Apache); as frases do Common Voice
   são CC0 ("The Sentence Collector only accepts public domain text"; datasets "released under CC0" —
@@ -232,7 +232,7 @@ frase inteira.
 | Confusões ortográficas do pt-BR (s↔z, ss↔ç, x↔ch, g↔j, e↔i/o↔u finais, h mudo) com custo reduzido | **hipótese minha, não vem de código lido** | 0 | A medir no conjunto "erros" (ortografia não é toque) | Fase C/E, só entra se o banco provar |
 | Espaço faltando/sobrando ("obrigadopor") | LatinIME (`SPACE_OMISSION_COST` 0,1), ASK (`WordsSplitter`) | médio (partições por prefixo) | Baixo/médio | Depois |
 | Índice de deleções (SymSpell, MIT) | literatura | dezenas de MB (não medido) | só velocidade | Não adotar: a busca atual cabe em ~15 ms |
-| Dicionário de contatos (nomes) | LatinIME, HeliBoard | `READ_CONTACTS`; pouca memória | Médio nos nomes | Pergunta ao Yan (§8) |
+| Dicionário de contatos (nomes) | LatinIME, HeliBoard | `READ_CONTACTS`; pouca memória | Médio nos nomes | Fora (resposta 5 do Yan, 24/10: sem a permissão; nomes vêm do uso) |
 | Contexto "campo/app" (aprender por app) | — | pouco | Incerto | Fora |
 
 ## 7. Protótipo do banco sintético (descartável)
@@ -278,34 +278,22 @@ palavras de dicionário (não chat). Serve para ordenar as fases e dimensionar o
 número que vale sai da CA-T1 (sintético) e da CA-T2 (digitação real no A32).
 
 
-## 8. Perguntas que só o Yan responde
+## 8. Perguntas ao Yan e respostas (24/10)
 
-1. **Licença do KeyFlow** (de código aberto, qual?). Se vier a ser GPL-compatível, parte da lista do HeliBoard poderia
-   ser adaptada; com AdMob e Billing no app, esta spec assume que não.
-2. **Siglas**: `api`→`API`, `url`→`URL` hoje trocam sozinhos (e o `RealDictionaryTest` espera `api`→`API`); `vc`→`VC` também.
-   Proposta: siglas só sugerem. Mantém `api`→`API` automático?
-3. **Aprender ligado por padrão** (como Gboard e AOSP) ou opt-in? Quer um **modo anônimo manual** além do
-   `NO_PERSONALIZED_LEARNING` do app?
-4. **Aprendido no backup/transferência**: excluir das duas (proposto, "nada sai do aparelho") ou levar para o aparelho novo?
-5. **Contatos** como fonte de nomes (`READ_CONTACTS`, ajuda `Yan`, `Luan`, `Dayane`; pede permissão e revisão da Play)?
-6. **Peso do banco**: uma troca indevida custa quantas trocas certas? (Proposto 5:1; é o que ordena as mudanças.)
-7. **Par aprendido por toque duplo** ("tmbm"→"também" tocado 2×): troca automática (proposto) ou perguntar na faixa?
-8. **Gravar suas digitações reais** no A32 (debug, local, ~600 palavras em 2 rodadas) para calibrar o modelo espacial?
-9. **Hit-test adaptado** (deslocar o alvo do toque ao seu jeito): quer que eu teste? Muda o que o dedo vê.
-10. **Bigramas estáticos**: aceita corpus aberto CC0 (formal, pouca fala de chat) ou só o histórico pessoal?
-11. **Textos legais** (aviso do ditado, política, ficha da Play): mencionar o aprendizado no aparelho (a revisão é sua).
-12. **Modelo neural** (~60 MB baixável, depois): aceita avaliar quando o banco mostrar o resíduo?
+As 12 perguntas foram respondidas pelo Yan em 24/10 e as respostas mandam: nenhuma delas é pendência. O que ainda
+está em aberto fica só no fim desta seção.
 
-### Respostas do Yan (24/10)
-1. Licença: Apache 2.0, titular Yan Lucas. Nada de código do HeliBoard nem do FUTO (só ideias).
-2. Siglas **só sugerem**, inclusive `api`→`API` (BAS-02).
-3. Aprender **ligado por padrão**, com modo anônimo manual (LRN-08).
-4. **Fora** do backup e da transferência (PRV-01). Pedido novo: a pessoa pode **exportar e importar** o aprendido por
-   arquivo, quando quiser (LST-06..07, CA-T16b).
-5. Sem `READ_CONTACTS`: nomes vêm do uso.
-6. Peso 5:1 e 7. troca automática do par ensinado por toque duplo: como proposto.
-8. **Sim**: o Yan digita as ~600 palavras no A32 quando o gravador (CA-T2) estiver pronto; as frases-guia aparecem
-   na tela do gravador.
-9. Hit-test adaptado: entra na fase D, como no plano apresentado. 10. Bigramas: corpus CC0 + histórico pessoal.
-11. Textos legais: o Yan revisa quando a fase B chegar. 12. Neural: só depois, pelo catálogo sob demanda e com
-   licença compatível (o do FUTO fica fora).
+| # | Pergunta | Resposta do Yan | Onde entrou |
+| - | -------- | --------------- | ----------- |
+| 1 | Licença do KeyFlow | Apache-2.0, titular Yan Lucas; nada de código do HeliBoard nem do FUTO (só ideias) | `LICENSE` e `NOTICE` na `main`; `design.md` §11 |
+| 2 | Siglas (`api`→`API`, `url`→`URL`, `vc`→`VC`) | Só sugerem, inclusive `api`→`API` | BAS-02, CA-T4 |
+| 3 | Aprender ligado por padrão ou opt-in? Modo anônimo manual? | Ligado por padrão, com modo anônimo manual | PRV-03, PRV-07, LRN-08 |
+| 4 | Aprendido no backup e na transferência? | **Fora** dos dois. Pedido novo: a pessoa pode **exportar e importar** o aprendido por arquivo, quando quiser | PRV-01, LST-06..07, `design.md` §8.1, CA-T10, CA-T16b |
+| 5 | Contatos como fonte de nomes | Sem `READ_CONTACTS`: os nomes vêm do uso | Out of Scope |
+| 6 | Peso do banco: uma troca indevida custa quantas certas? | 5:1 | `design.md` §1 (placar) |
+| 7 | Par aprendido por toque duplo | Troca automática, como proposto | FIX-03 |
+| 8 | Gravar as digitações reais no A32 | **Sim**: o Yan digita as ~600 palavras no A32 quando o gravador (CA-T2) estiver pronto; as frases-guia aparecem na tela do gravador | BEN-07, CA-T2 |
+| 9 | Hit-test adaptado | Entra na fase D, como no plano apresentado | ADP-05, CA-T24 |
+| 10 | Bigramas estáticos | Corpus CC0 + histórico pessoal | CTX-03, CA-T28 |
+| 11 | Textos legais | O Yan revisa quando a fase B chegar | PRV-05, CA-T18b |
+| 12 | Modelo neural | Só depois, pelo catálogo sob demanda e com licença compatível (o do FUTO fica fora) | `design.md` §10 |

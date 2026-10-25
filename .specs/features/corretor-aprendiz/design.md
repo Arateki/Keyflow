@@ -95,7 +95,7 @@ abaixo de 95% a classe só sugere (BAS-01).
 
 | Regra | Medido hoje (`context.md` §3) | Por quê |
 | ----- | ----------------------------- | ------- |
-| Sigla só sugere (`vc`→`VC`) | 57 das 165 trocas só mudam a caixa | "VC", "TB", "MSG" gritam; `api`→`API` exige decisão do Yan |
+| Sigla só sugere (`vc`→`VC`) | 57 das 165 trocas só mudam a caixa (45 viram sigla toda em maiúsculas) | "VC", "TB", "MSG" gritam; inclusive `api`→`API` (resposta 2 do Yan, 24/10) |
 | Acento digitado não se perde | `Ágatha`→`Agatha`, `Taís`→`Tais`, `piá`→`pia`, `parça`→`parca` | `Suggester.suggest` pega `sameLetters.first()` e ignora os acentos que a pessoa pôs |
 | Só consoantes, ≤ 4 letras → sugere | `td`→`te`, `hj`→`um`, `qdo`→`do`, `tmj`→`TMN` | abreviação sem vogal |
 | 3+ letras iguais seguidas → sugere | `kkkk`→`Kiko`, `hahaha`→`Havana`, `simm`→`sim` | alongamento é intenção |
@@ -369,7 +369,7 @@ mistura com os arrays.
 
 ## 10. Modelo neural pequeno (estilo FUTO): agora ou depois?
 
-**Depois, e só se o banco pedir.** Fatos (`context.md` §6): o modelo do FUTO tem ~36 M de parâmetros,
+**Depois, e só se o banco pedir** (resposta 12 do Yan, 24/10: só depois, pelo catálogo de modelos sob demanda e com licença compatível; o modelo do FUTO fica fora). Fatos (`context.md` §6): o modelo do FUTO tem ~36 M de parâmetros,
 arquitetura Llama (vocabulário 15 008, 8 camadas, dimensão 512), ~62 MB em Q6_K, roda por llama.cpp,
 trata cada toque como token e devolve até 128 candidatas que se fundem às do dicionário; foi treinado
 com bilhões de tokens; o app é "source first" (proíbe uso comercial) — **nenhum código dele serve**, e a
@@ -385,7 +385,7 @@ licença dos pesos não está registrada em lugar nenhum que eu tenha lido.
 
 **Critérios para revisitar:** (1) o banco mostra que o resíduo de erros é dominado por palavra real/contexto
 depois das fases A–F; (2) existe um modelo pt-BR de ≤ 40 M com licença permissiva e qualidade medida no
-mesmo banco; (3) p95 por toque ≤ 25 ms no A32 com 2–4 threads; (4) o Yan aceita +60 MB baixáveis. Até lá
+mesmo banco; (3) p95 por toque ≤ 25 ms no A32 com 2–4 threads; (4) entra pelo catálogo de modelos sob demanda do app (download opcional, +60 MB só para quem baixar). Até lá
 as fases C (espacial) e F (bigramas) pegam a maior parte do que um modelo pequeno daria, por uma fração do
 custo. Alternativa mais barata a medir antes: um modelo de caracteres/palavras de ~5–10 M treinado por nós
 (ainda precisa de corpus).
@@ -394,15 +394,16 @@ custo. Alternativa mais barata a medir antes: um modelo de caracteres/palavras d
 
 ## 11. Licenças e atribuição
 
-O KeyFlow vai ser de código aberto, ainda sem licença definida, e usa AdMob e Play Billing (SDKs
-fechados) — por isso o que vem de GPL não entra como código (decisão do Yan pendente).
+O KeyFlow é Apache-2.0, com titular Yan Lucas (`LICENSE` e `NOTICE` na raiz da `main`; resposta 1 do Yan,
+24/10), e usa AdMob e Play Billing (SDKs fechados). A regra do Yan é só esta: **nenhum código do HeliBoard
+(GPL-3.0) nem do FUTO (Source First), só ideias**; o que vem de Apache/MIT entra com aviso.
 
 | Origem | Licença | O que se faz |
 | ------ | ------- | ------------ |
 | LatinIME (AOSP) | Apache-2.0 | Pode adaptar código com aviso. Reimplementa-se em Kotlin (o motor nativo traria `.so`, JNI e formato de dicionário). Constantes e fórmulas reusadas com atribuição: `ScoringParams`, `touch-position-correction`, `getSweetSpotFactor`, escala `8,589`, limiares 0,185/0,067, decaimento/descarte de 300 dias. Aviso em `app/licenses/` e nos cabeçalhos dos arquivos que adaptam |
 | AnySoftKeyboard | Apache-2.0 | Pode adaptar: pontuação de aprendizado (digitar 2, escolher 3, limiar 9), promoção do auto-dicionário, recompor ao reverter, `AutoText`, `SubWordSuggestionCallback` |
 | FlorisBoard | Apache-2.0 | Estrutura do modo anônimo de 3 estados (liga/desliga/dinâmico) e entidade do dicionário do usuário; nada de aprendizado real |
-| HeliBoard | **GPL-3.0** | **Só a ideia**: `UnlearnEvent`, lista de bloqueio por idioma, promoção por uso repetido, modo anônimo por flag, "confiança por idioma". Onde copiar o código pouparia trabalho: `DictionaryFacilitatorImpl.kt` (≈0,5 dia a menos para a lista de bloqueio e a promoção), `PersonalDictionaryScreen.kt` (≈1 dia, mas amarrada ao provedor `UserDictionary` do Android, que não usamos) e a confiança por idioma (≈2 dias; só vale se o teclado passar a misturar idiomas). Tudo isso é pequeno: não compensa o conflito de licença |
+| HeliBoard | **GPL-3.0** | **Só a ideia** (regra do Yan: nenhum código): `UnlearnEvent`, lista de bloqueio por idioma, promoção por uso repetido, modo anônimo por flag, "confiança por idioma". Reimplementa-se do zero; o que é do AOSP dentro do HeliBoard dá para adaptar da origem (Apache) |
 | FUTO Keyboard | Source First 1.1-kb (proíbe uso comercial) | **Só ideias**: pesos de importância por tipo de evento, log de treino com desfazer, treino só carregando, gerador de erros por ruído gaussiano. Nenhum código, nenhum peso |
 
 ---

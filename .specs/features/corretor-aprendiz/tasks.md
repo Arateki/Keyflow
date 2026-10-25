@@ -39,12 +39,12 @@
 - **Tests**: instrumentado. **Gate**: `full`.
 
 ### CA-T4 — Decisão por classe de troca
-- **What**: `SwapClass` + `SuggestParams` por classe; `Suggester.suggest` devolve a classe; siglas e troca só de
-  caixa de palavra ≤ 4 letras só sugerem; acento digitado nunca se perde (corrige `sameLetters.first()`).
+- **What**: `SwapClass` + `SuggestParams` por classe; `Suggester.suggest` devolve a classe; siglas (candidata toda em
+  maiúsculas, qualquer tamanho) só sugerem; acento digitado nunca se perde (corrige `sameLetters.first()`).
 - **Where**: `dictionary/Suggester.kt`, `dictionary/SwapClass.kt`.
 - **Depends on**: CA-T1. **Covers**: BAS-01..03.
 - **Done when**: no banco, "manter" cai (alvo: ≤ 25% trocadas só com esta task) sem piorar "erros"; as
-  expectativas de `RealDictionaryTest` que mudam de propósito (`api`→`API`, decisão do Yan) listadas aqui com o motivo.
+  expectativas de `RealDictionaryTest` que mudam de propósito (`api`→`API`, resposta 2 do Yan) listadas aqui com o motivo.
 - **Tests**: unit + banco. **Gate**: `quick`.
 
 ### CA-T5 — Léxico informal pt-BR
@@ -268,11 +268,12 @@
   nenhuma piora nos conjuntos manter/erros; o texto legal da T18b é revisto para citar os bigramas (**[YAN]** aprova).
 - **Tests**: unit + propriedade + banco. **Gate**: `quick`.
 
-### CA-T28 — Bigramas estáticos pt-BR  `[opcional, YAN: corpus e licença]`
-- **What**: script que gera `pt.bigramas.kfd` (top 30 mil × 8) de um corpus de licença compatível (candidato: frases
-  CC0 do Common Voice); medir no banco.
-- **Covers**: CTX-03. **Tests**: unit + banco. **Gate**: `quick` + `assembleDebug` (+0,75 MB de APK).
-- **Done when**: o ganho no banco justifica os ~0,75 MB; senão fica de fora.
+### CA-T28 — Bigramas estáticos pt-BR  `[condicional: só entra se o banco mostrar ganho]`
+- **What**: script que gera `pt.bigramas.kfd` (top 30 mil × 8) de corpus CC0 (resposta 10 do Yan; candidato: frases
+  do Common Voice, cuja contagem de frases pt ainda não foi verificada, `context.md` §5); medir no banco.
+- **Covers**: CTX-03. **Tests**: unit + banco. **Gate**: `quick` + `assembleDebug` (+0,75 MB de APK, estimativa).
+- **Done when**: licença e origem do corpus registradas no cabeçalho do script e no `NOTICE`; o ganho no banco
+  justifica os ~0,75 MB (a medir); senão fica de fora.
 
 ### CA-T29 — Próximas palavras na faixa vazia  `[opcional]`
 - **What**: após o espaço, até 3 próximas palavras prováveis na `CandidatesView`; tocar insere.
