@@ -92,15 +92,19 @@ jobs:
       - name: API level lint
         if: ${{ !cancelled() }}
         run: ./gradlew --no-daemon :app:lintDebug
-      # Valores sintéticos só deste passo: nunca publicar o APK produzido pelo Checks.
+      # Valores sintéticos só deste passo: nunca publicar o APK nem o AAB produzidos pelo Checks (sem a chave de upload, saem sem assinatura).
       - name: Release without Google test ads
         env:
           KEYFLOW_ADMOB_APP_ID: ca-app-pub-0000000000000000~0000000000
           KEYFLOW_ADMOB_BANNER_ID: ca-app-pub-0000000000000000/0000000001
           KEYFLOW_ADMOB_INTERSTITIAL_ID: ca-app-pub-0000000000000000/0000000002
         run: |
-          ./gradlew --no-daemon assembleRelease
+          ./gradlew --no-daemon assembleRelease bundleRelease
           python3 scripts/check-release-admob.py app/build/outputs/apk/release/app-release-unsigned.apk
+          # R8 (V1-3): o que os .so do sherpa-onnx e do LiteRT-LM acessam por nome tem de sobreviver à minificação.
+          python3 scripts/check-release-jni.py app/build/outputs/mapping/release/mapping.txt app/build/outputs/apk/release/app-release-unsigned.apk
+          python3 scripts/check-release-agent.py app/build/outputs/mapping/release/mapping.txt app/build/outputs/apk/release/app-release-unsigned.apk
+          python3 -m unittest discover -s scripts/tests -v
       - name: Unit test evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

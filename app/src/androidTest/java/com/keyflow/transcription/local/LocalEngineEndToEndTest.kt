@@ -69,8 +69,14 @@ class LocalEngineEndToEndTest {
         val audio = copyAsset(asset)
         val model = EngineModel.from(spec, ModelStore(storeDir(context)).dirFor(spec.id), "en")
         InferenceClient(context).use { client ->
+            val started = android.os.SystemClock.elapsedRealtime()
             val reply = client.call(300) { engine, cb -> engine.transcribe(model.toParcel(), audio.absolutePath, cb) }
             check(reply is EngineReply.Success) { "transcrição falhou: $reply" }
+            // Só as fixtures deste teste: deixa texto e duração na evidência de `am instrument`.
+            val elapsed = android.os.SystemClock.elapsedRealtime() - started
+            instrumentation.sendStatus(2, android.os.Bundle().apply {
+                putString("stream", "\nE2E $asset ($elapsed ms): ${reply.text}\n")
+            })
             return reply.text.lowercase()
         }
     }

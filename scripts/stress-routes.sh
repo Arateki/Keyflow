@@ -11,8 +11,8 @@
 # Para não gerar core dump de ~1 GB a cada queda, suba o emulador com `ulimit -c 0` no mesmo shell.
 set -uo pipefail
 
-PKG="com.keyflow"
-ACT="$PKG/.ui.gallery.GalleryActivity"
+PKG="com.arateki.keyflow"
+ACT="$PKG/com.keyflow.ui.gallery.GalleryActivity"
 READY="/sdcard/Android/data/$PKG/files/gallery_ready"
 ROUNDS="${1:?uso: stress-routes.sh <rodadas> <rota>...}"
 shift

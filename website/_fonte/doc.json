@@ -1,0 +1,375 @@
+{
+  "gerado_por": "app/src/test/java/com/keyflow/ui/config/DocsSiteExportTest.kt — não edite à mão: o texto vem de DocsPanel.kt e das traduções do app",
+  "idiomas": {
+    "pt": {
+      "comoFunciona": {
+        "titulo": "Como funciona",
+        "passos": [
+          {"numero": "01", "titulo": "Fale", "texto": "Toque em Gravar no teclado, ou no orbe flutuante."},
+          {"numero": "02", "titulo": "Transcreve", "texto": "O áudio vai à origem de voz escolhida e volta como texto."},
+          {"numero": "03", "titulo": "Cola", "texto": "O texto entra direto no campo ativo do app."}
+        ]
+      },
+      "indice": "Índice",
+      "secoes": [
+        {
+          "id": "modos",
+          "titulo": "Modos",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "Sobrepor flutua sobre qualquer app, com o teclado do sistema. Teclado é o teclado KeyFlow. Use um ou ambos."}
+          ]
+        },
+        {
+          "id": "aba-transcricao",
+          "titulo": "Aba Transcrição",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "Escolhe quem transforma sua voz em texto e como a gravação se comporta — vale para a orbe e para o teclado."},
+            {"tipo": "rotulado", "rotulo": "Parcial", "texto": "transcrever parcialmente ao pausar já adianta o texto a cada pausa; com a visualização ligada, dá para ler e corrigir antes de enviar."},
+            {"tipo": "rotulado", "rotulo": "Origem", "texto": "Créditos — Em breve; OpenAI, Groq, Custom (qualquer serviço compatível) ou Local (modelo no aparelho, sem internet). Nas origens de nuvem, informe o token; modelo e idioma são opcionais."},
+            {"tipo": "rotulado", "rotulo": "Tempo limite", "texto": "quanto esperar pela transcrição antes de mostrar erro. No infinito, espera o quanto for preciso."},
+            {"tipo": "rotulado", "rotulo": "Duração máxima", "texto": "ao atingir o limite, a gravação pausa e pergunta se envia ou descarta. No infinito, grava até você parar."}
+          ]
+        },
+        {
+          "id": "aba-teclado",
+          "titulo": "Aba Teclado",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "Tudo do teclado KeyFlow. No topo, o cartão do Modo Teclado liga o KeyFlow como teclado e mostra as permissões; sem ele pronto, o resto da aba fica só para leitura."},
+            {"tipo": "rotulado", "rotulo": "Colar", "texto": "cola a transcrição direto no campo aberto, ou guarda e cola quando você tocar num campo depois de gravar fora dele (esta, só com o Modo Sobrepor)."},
+            {"tipo": "rotulado", "rotulo": "Digitação", "texto": "idioma (o mesmo que o globo alterna), correção automática, fileira de números e manter o teclado com um teclado físico conectado."},
+            {"tipo": "rotulado", "rotulo": "Layout", "texto": "os botões da barra do teclado — mic, colar, alavanca, teclas avulsas, gatilhos de grade. O \"?\" de cada opção explica o que ela faz."},
+            {"tipo": "rotulado", "rotulo": "Teclados de atalhos", "texto": "as grades que os gatilhos da barra abrem ao segurar e arrastar."},
+            {"tipo": "rotulado", "rotulo": "Tamanho e skins", "texto": "o tamanho vale para teclas, barra e sugestões (a prévia mostra a altura real); as skins mudam a cara do teclado, e dá para importar a sua, em .zip de SVGs, em “Suas skins”."}
+          ]
+        },
+        {
+          "id": "aba-sobrepor",
+          "titulo": "Aba Sobrepor",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "A orbe flutuante, que grava por cima de qualquer app. No topo, o cartão do Modo Sobrepor liga a orbe e mostra as permissões (microfone, sobrepor e notificações); sem ele pronto, o resto da aba fica só para leitura."},
+            {"tipo": "rotulado", "rotulo": "Mão preferencial", "texto": "encosta a orbe no seu lado e define para onde arrastar para cancelar."},
+            {"tipo": "rotulado", "rotulo": "Modo de gravação", "texto": "Alternar (o toque grava e para) ou Push-to-talk (segure para gravar, solte para enviar)."},
+            {"tipo": "rotulado", "rotulo": "Orbe", "texto": "tamanho, tempo de reação entre toques de uma rajada e intensidade da vibração ao tocá-la."},
+            {"tipo": "rotulado", "rotulo": "Skins", "texto": "a aparência da orbe: Ateliê, Aero (uma bolha de vidro com água), Glitch (falha gráfica em preto, vermelho e azul), Rose Gold (metal rosé), Mascote (o Ouvi, um bichinho de orelhas grandes) ou uma skin sua, importada em .zip de SVGs. É uma escolha à parte da skin do teclado."},
+            {"tipo": "rotulado", "rotulo": "Atalhos", "texto": "o que 1, 2 ou 3 toques em rajada fazem, e o que acontece quando você toca mais vezes."}
+          ]
+        },
+        {
+          "id": "aba-raciocinio",
+          "titulo": "Aba Raciocínio",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "Conecta um modelo de linguagem — no aparelho ou na nuvem — e deixa você testar se ele responde. O ditado e os comandos ainda não o usam: isso vem depois."},
+            {"tipo": "rotulado", "rotulo": "Origem", "texto": "Local (modelos no aparelho como Gemma e Qwen, sem internet) ou Nuvem (OpenAI e Anthropic Claude via SSO ou chave de API)."},
+            {"tipo": "rotulado", "rotulo": "Testar", "texto": "manda uma frase ao modelo e mostra a resposta chegando, com o tempo até o primeiro trecho."}
+          ]
+        },
+        {
+          "id": "texto",
+          "titulo": "Onde o texto aparece",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "No modo Sobrepor com o teclado do sistema, o texto transcrito vai para a área de transferência e você é avisado — é só colar. A cola automática só acontece com o teclado KeyFlow ativo (configurável na aba Teclado)."}
+          ]
+        },
+        {
+          "id": "gestos",
+          "titulo": "Gestos da orbe",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "O toque na orbe depende do modo de gravação escolhido na aba Sobrepor:"},
+            {"tipo": "rotulado", "rotulo": "Alternar", "texto": "Toque para gravar ou parar · segure para pausar e retomar."},
+            {"tipo": "rotulado", "rotulo": "Push-to-talk", "texto": "Segure para gravar · solte para enviar · toque rápido após soltar para pausar."},
+            {"tipo": "paragrafo", "texto": "Arraste a orbe para onde ela não atrapalhar — ela gruda na lateral mais próxima. Arrastar até o alvo cancela a gravação, e tocar em rajada aciona atalhos: as duas seções a seguir explicam."}
+          ]
+        },
+        {
+          "id": "atalhos",
+          "titulo": "Atalhos por toques",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "Tocar a orbe em rajada aciona atalhos que você escolhe na aba Sobrepor. De fábrica, 2 toques retraem ou expandem o teclado e 3 trocam o teclado do sistema. O atalho de 1 toque só existe no modo Push-to-talk — no modo Alternar o toque já é a própria gravação. Toques além do máximo caem no atalho ativo de menos toques mais próximo, ou não fazem nada, conforme sua escolha na mesma aba."}
+          ]
+        },
+        {
+          "id": "cancelar",
+          "titulo": "Cancelar e desfazer",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "Arraste a orbe até o alvo para cancelar a gravação. O áudio não é descartado na hora: fica guardado por 3 segundos, com um banner de Desfazer na tela — desfazer devolve a gravação pausada, de onde parou. Sem ação nesses 3 segundos, o áudio é descartado. Pela notificação, o mesmo cancelamento tem os botões de concluir agora ou desfazer."}
+          ]
+        },
+        {
+          "id": "pausa",
+          "titulo": "Pausa",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "Pausar congela o cronômetro e guarda o que já foi gravado; retomar continua a mesma gravação, e o envio sai num texto só."},
+            {"tipo": "rotulado", "rotulo": "Orbe", "texto": "segure (Alternar) ou toque rápido logo após soltar (Push-to-talk)."},
+            {"tipo": "rotulado", "rotulo": "Teclado", "texto": "segure o mic durante a gravação e solte em pausar."},
+            {"tipo": "rotulado", "rotulo": "Notificação", "texto": "botão pausar e retomar."},
+            {"tipo": "paragrafo", "texto": "Ao atingir a duração máxima de gravação (aba Transcrição), a gravação pausa sozinha e pergunta se você quer enviar ou descartar."},
+            {"tipo": "rotulado", "rotulo": "Parcial", "texto": "com \"Transcrever parcialmente ao pausar\" ligado (aba Transcrição), cada pausa já transcreve o trecho gravado e um aviso aparece junto à orbe. Com a visualização ligada, toque no aviso para ler e toque de novo para editar; o texto novo entra depois das suas edições, e o envio entrega tudo junto."}
+          ]
+        },
+        {
+          "id": "teclado",
+          "titulo": "Teclado KeyFlow",
+          "blocos": [
+            {"tipo": "rotulado", "rotulo": "Retrair", "texto": "a seta encolhe o teclado até a barra; tocar de novo traz as teclas de volta."},
+            {"tipo": "rotulado", "rotulo": "Mic", "texto": "toque para gravar e de novo para enviar. Segure durante a gravação para abrir o seletor — arraste até pausar ou cancelar e solte."},
+            {"tipo": "rotulado", "rotulo": "Acentos", "texto": "segure uma letra para ver as variantes (á, ã, ç…) e deslize até a que quiser."},
+            {"tipo": "rotulado", "rotulo": "Idioma", "texto": "o globo alterna layout, acentos e corretor entre português, inglês e espanhol."},
+            {"tipo": "rotulado", "rotulo": "Números", "texto": "campos numéricos e de telefone já abrem na grade numérica; nos outros, ?\u2060123 troca para números e símbolos."},
+            {"tipo": "rotulado", "rotulo": "Sugestões", "texto": "vêm do corretor ortográfico do aparelho e aparecem na faixa Candidatos — adicione-a a uma barra na aba Teclado."}
+          ]
+        },
+        {
+          "id": "notificacao",
+          "titulo": "Notificação de gravação",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "Fica visível enquanto o modo Sobrepor está ligado — o Android exige uma notificação para o app poder usar o microfone por cima de outros apps. Parada, ela oferece gravar e ⚙ para abrir o KeyFlow."},
+            {"tipo": "paragrafo", "texto": "Enquanto o Modo Sobrepor grava, a notificação traz três controles: pausar e retomar, enviar (encerra e entrega o texto) e cancelar. Durante os 3 segundos do cancelamento, eles viram concluir o descarte e desfazer."}
+          ]
+        },
+        {
+          "id": "erros",
+          "titulo": "Erros & tempo limite",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "Quando algo falha, a orbe e o mic do teclado mostram ✖ por 2 segundos, junto com o motivo. Aquela gravação não é reenviada — é só gravar de novo."},
+            {"tipo": "rotulado", "rotulo": "Token ou origem", "texto": "tocar no ✖ (ou no aviso) abre a aba Transcrição para corrigir."},
+            {"tipo": "rotulado", "rotulo": "Microfone", "texto": "tocar leva à aba da interface que avisou (Sobrepor ou Teclado), onde a permissão pendente pisca no cartão do modo."},
+            {"tipo": "rotulado", "rotulo": "Tempo esgotado", "texto": "a origem de voz não respondeu dentro do tempo limite de resposta (aba Transcrição, 15s de fábrica). Em rede lenta ou áudios longos, aumente o prazo."},
+            {"tipo": "rotulado", "rotulo": "Rede ou servidor", "texto": "tente de novo; se persistir, confira a URL e o token na aba Transcrição."}
+          ]
+        },
+        {
+          "id": "voz-local",
+          "titulo": "Voz no aparelho",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "A origem Local transcreve sem internet: escolha um modelo na aba Transcrição, baixe uma vez e ele fica no aparelho. O Rápido é leve; o Equilibrado é mais preciso; o Máxima qualidade é o mais preciso e o mais pesado."},
+            {"tipo": "rotulado", "rotulo": "Download", "texto": "em Wi-Fi começa direto; em dados móveis o app pergunta antes, mostrando o tamanho. Um modelo por vez."},
+            {"tipo": "rotulado", "rotulo": "Espaço", "texto": "apagar um modelo na aba Transcrição devolve o espaço na hora. Modelos não entram no backup e somem se o app for desinstalado."}
+          ]
+        },
+        {
+          "id": "privacidade",
+          "titulo": "Privacidade",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "O áudio só é enviado à origem configurada em Transcrição — com a origem Local, ele nunca sai do aparelho. Tokens ficam apenas no aparelho."}
+          ]
+        },
+        {
+          "id": "creditos",
+          "titulo": "Créditos",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "Créditos ainda não fazem parte desta versão."}
+          ]
+        },
+        {
+          "id": "licencas",
+          "titulo": "Licenças",
+          "blocos": [
+            {"tipo": "rotulado", "rotulo": "sherpa-onnx", "texto": "reconhecimento de voz no aparelho — Apache 2.0 (k2-fsa)."},
+            {"tipo": "rotulado", "rotulo": "ONNX Runtime", "texto": "motor de inferência dentro do sherpa-onnx — MIT (Microsoft)."},
+            {"tipo": "rotulado", "rotulo": "Whisper", "texto": "modelos Rápido e Equilibrado — MIT (OpenAI); os cards do Hugging Face declaram Apache 2.0."},
+            {"tipo": "rotulado", "rotulo": "Parakeet TDT 0.6B v3", "texto": "modelo Máxima qualidade — CC BY 4.0 (NVIDIA), convertido para ONNX int8 pelo sherpa-onnx."},
+            {"tipo": "rotulado", "rotulo": "LiteRT-LM", "texto": "motor dos modelos de texto da aba Raciocínio, no aparelho — Apache 2.0 (Google)."},
+            {"tipo": "rotulado", "rotulo": "Qwen3 0.6B", "texto": "modelo de texto Leve — Apache 2.0 (Alibaba), baixado sob demanda."},
+            {"tipo": "rotulado", "rotulo": "AndroidSVG", "texto": "desenha os SVGs das skins importadas — Apache 2.0 (Cave Rock Software)."},
+            {"tipo": "rotulado", "rotulo": "Gemma 4 E2B", "texto": "modelo de texto Equilibrado — Apache 2.0 (Google), baixado sob demanda."},
+            {"tipo": "rotulado", "rotulo": "Dicionários do corretor", "texto": "listas de palavras do teclado do Android (AOSP LatinIME) para português, inglês e espanhol — Apache 2.0."},
+            {"tipo": "rotulado", "rotulo": "Space Grotesk e Space Mono", "texto": "fontes — SIL Open Font License 1.1."}
+          ]
+        },
+        {
+          "id": "feedback",
+          "titulo": "Feedback",
+          "feedback": true,
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "Achou um problema ou tem uma ideia? Os botões abrem seu app de e-mail com a versão do app, do Android e o modelo do aparelho já preenchidos — é só contar o que aconteceu."}
+          ]
+        }
+      ]
+    },
+    "en": {
+      "comoFunciona": {
+        "titulo": "How it works",
+        "passos": [
+          {"numero": "01", "titulo": "Speak", "texto": "Tap Record on the keyboard, or on the floating orb."},
+          {"numero": "02", "titulo": "Transcribe", "texto": "The audio goes to the voice source you chose and comes back as text."},
+          {"numero": "03", "titulo": "Paste", "texto": "The text goes straight into the app's active field."}
+        ]
+      },
+      "indice": "Contents",
+      "secoes": [
+        {
+          "id": "modos",
+          "titulo": "Modes",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "Overlay floats over any app, alongside the system keyboard. Keyboard is the KeyFlow keyboard. Use one or both."}
+          ]
+        },
+        {
+          "id": "aba-transcricao",
+          "titulo": "Transcription tab",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "Chooses who turns your voice into text and how recording behaves — it applies to the orb and to the keyboard."},
+            {"tipo": "rotulado", "rotulo": "Partial", "texto": "transcribing partially on pause gets the text ready at each pause; with the preview on, you can read and fix it before sending."},
+            {"tipo": "rotulado", "rotulo": "Source", "texto": "Credits — Coming soon; OpenAI, Groq, Custom (any compatible service) or Local (on-device model, no internet). For cloud sources, enter the token; model and language are optional."},
+            {"tipo": "rotulado", "rotulo": "Timeout", "texto": "how long to wait for the transcription before showing an error. On infinity, it waits as long as it takes."},
+            {"tipo": "rotulado", "rotulo": "Maximum length", "texto": "when the limit is reached, recording pauses and asks whether to send or discard. On infinity, it records until you stop."}
+          ]
+        },
+        {
+          "id": "aba-teclado",
+          "titulo": "Keyboard tab",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "Everything about the KeyFlow keyboard. At the top, the Keyboard mode card turns KeyFlow on as your keyboard and shows the permissions; until it's ready, the rest of the tab is read-only."},
+            {"tipo": "rotulado", "rotulo": "Paste", "texto": "pastes the transcription straight into the open field, or keeps it and pastes when you tap a field after recording outside one (this one only with Overlay mode)."},
+            {"tipo": "rotulado", "rotulo": "Typing", "texto": "language (the same one the globe switches), autocorrect, number row and keeping the keyboard with a physical keyboard connected."},
+            {"tipo": "rotulado", "rotulo": "Layout", "texto": "the keyboard bar buttons — mic, paste, joystick, single keys, grid triggers. The \"?\" next to each option explains what it does."},
+            {"tipo": "rotulado", "rotulo": "Shortcut keyboards", "texto": "the grids the bar triggers open when you hold and drag."},
+            {"tipo": "rotulado", "rotulo": "Size and skins", "texto": "the size applies to keys, bar and suggestions (the preview shows the real height); skins change how the keyboard looks, and you can import your own, as a .zip of SVGs, under “Your skins”."}
+          ]
+        },
+        {
+          "id": "aba-sobrepor",
+          "titulo": "Overlay tab",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "The floating orb, which records on top of any app. At the top, the Overlay mode card turns the orb on and shows the permissions (microphone, overlay and notifications); until it's ready, the rest of the tab is read-only."},
+            {"tipo": "rotulado", "rotulo": "Preferred hand", "texto": "docks the orb on your side and sets which way to drag to cancel."},
+            {"tipo": "rotulado", "rotulo": "Recording mode", "texto": "Toggle (a tap records and stops) or Push-to-talk (hold to record, release to send)."},
+            {"tipo": "rotulado", "rotulo": "Orb", "texto": "size, reaction time between taps in a burst and vibration strength when you touch it."},
+            {"tipo": "rotulado", "rotulo": "Skins", "texto": "the orb's look: Atelier, Aero (a glass bubble with water), Glitch (a graphic glitch in black, red and blue), Rose Gold (rosé metal), Mascot (Ouvi, a little creature with big ears) or a skin of your own, imported as a .zip of SVGs. It is a separate choice from the keyboard skin."},
+            {"tipo": "rotulado", "rotulo": "Shortcuts", "texto": "what 1, 2 or 3 taps in a burst do, and what happens when you tap more times."}
+          ]
+        },
+        {
+          "id": "aba-raciocinio",
+          "titulo": "Reasoning tab",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "Connects a language model — on the device or in the cloud — and lets you test whether it answers. Dictation and commands don't use it yet: that comes later."},
+            {"tipo": "rotulado", "rotulo": "Source", "texto": "Local (models on device such as Gemma and Qwen, without internet) or Cloud (OpenAI and Anthropic Claude via SSO or API key)."},
+            {"tipo": "rotulado", "rotulo": "Test", "texto": "sends a sentence to the model and shows the answer arriving, with the time to the first piece."}
+          ]
+        },
+        {
+          "id": "texto",
+          "titulo": "Where the text shows up",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "In Overlay mode with the system keyboard, the transcribed text goes to the clipboard and you're notified — just paste it. Automatic pasting only happens with the KeyFlow keyboard active (configurable in the Keyboard tab)."}
+          ]
+        },
+        {
+          "id": "gestos",
+          "titulo": "Orb gestures",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "Tapping the orb depends on the recording mode chosen in the Overlay tab:"},
+            {"tipo": "rotulado", "rotulo": "Toggle", "texto": "Tap to record or stop · hold to pause and resume."},
+            {"tipo": "rotulado", "rotulo": "Push-to-talk", "texto": "Hold to record · release to send · tap quickly after releasing to pause."},
+            {"tipo": "paragrafo", "texto": "Drag the orb wherever it's out of the way — it snaps to the nearest edge. Dragging it to the target cancels the recording, and tapping in a burst triggers shortcuts: the next two sections explain."}
+          ]
+        },
+        {
+          "id": "atalhos",
+          "titulo": "Tap shortcuts",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "Tapping the orb in a burst triggers shortcuts you choose in the Overlay tab. By default, 2 taps collapse or expand the keyboard and 3 switch the system keyboard. The 1-tap shortcut only exists in Push-to-talk mode — in Toggle mode the tap is the recording itself. Taps beyond the maximum fall back to the nearest active shortcut with fewer taps, or do nothing, depending on your choice in the same tab."}
+          ]
+        },
+        {
+          "id": "cancelar",
+          "titulo": "Cancel and undo",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "Drag the orb to the target to cancel the recording. The audio isn't thrown away right away: it's kept for 3 seconds, with an Undo banner on screen — undoing brings the recording back paused, where it left off. With no action in those 3 seconds, the audio is discarded. From the notification, the same cancel has buttons to finish now or undo."}
+          ]
+        },
+        {
+          "id": "pausa",
+          "titulo": "Pause",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "Pausing freezes the timer and keeps what's been recorded; resuming continues the same recording, and it's sent as a single text."},
+            {"tipo": "rotulado", "rotulo": "Orb", "texto": "hold (Toggle) or tap quickly right after releasing (Push-to-talk)."},
+            {"tipo": "rotulado", "rotulo": "Keyboard", "texto": "hold the mic while recording and release on pause."},
+            {"tipo": "rotulado", "rotulo": "Notification", "texto": "pause and resume button."},
+            {"tipo": "paragrafo", "texto": "When the maximum recording length is reached (Transcription tab), recording pauses on its own and asks whether you want to send or discard."},
+            {"tipo": "rotulado", "rotulo": "Partial", "texto": "with \"Transcribe partially on pause\" on (Transcription tab), each pause already transcribes the recorded stretch and a notice shows up next to the orb. With the preview on, tap the notice to read it and tap again to edit; new text goes after your edits, and sending delivers it all together."}
+          ]
+        },
+        {
+          "id": "teclado",
+          "titulo": "KeyFlow keyboard",
+          "blocos": [
+            {"tipo": "rotulado", "rotulo": "Collapse", "texto": "the arrow shrinks the keyboard down to the bar; tapping again brings the keys back."},
+            {"tipo": "rotulado", "rotulo": "Mic", "texto": "tap to record and again to send. Hold while recording to open the picker — drag to pause or cancel and release."},
+            {"tipo": "rotulado", "rotulo": "Accents", "texto": "hold a letter to see its variants (á, ã, ç…) and slide to the one you want."},
+            {"tipo": "rotulado", "rotulo": "Language", "texto": "the globe switches layout, accents and spell checker between Portuguese, English and Spanish."},
+            {"tipo": "rotulado", "rotulo": "Numbers", "texto": "number and phone fields open on the number pad; in the others, ?\u2060123 switches to numbers and symbols."},
+            {"tipo": "rotulado", "rotulo": "Suggestions", "texto": "come from the device's spell checker and show up in the Candidates strip — add it to a bar in the Keyboard tab."}
+          ]
+        },
+        {
+          "id": "notificacao",
+          "titulo": "Recording notification",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "It stays visible while Overlay mode is on — Android requires a notification for the app to use the microphone on top of other apps. When idle, it offers record and ⚙ to open KeyFlow."},
+            {"tipo": "paragrafo", "texto": "While Overlay mode records, the notification has three controls: pause and resume, send (ends and delivers the text) and cancel. During the 3 seconds of a cancel, they become finish discarding and undo."}
+          ]
+        },
+        {
+          "id": "erros",
+          "titulo": "Errors & timeout",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "When something fails, the orb and the keyboard mic show ✖ for 2 seconds, along with the reason. That recording isn't resent — just record again."},
+            {"tipo": "rotulado", "rotulo": "Token or source", "texto": "tapping the ✖ (or the notice) opens the Transcription tab to fix it."},
+            {"tipo": "rotulado", "rotulo": "Microphone", "texto": "tapping takes you to the tab of the interface that warned you (Overlay or Keyboard), where the pending permission blinks on the mode card."},
+            {"tipo": "rotulado", "rotulo": "Timed out", "texto": "the voice source didn't answer within the response timeout (Transcription tab, 15s by default). On slow networks or long audio, raise the limit."},
+            {"tipo": "rotulado", "rotulo": "Network or server", "texto": "try again; if it keeps happening, check the URL and the token in the Transcription tab."}
+          ]
+        },
+        {
+          "id": "voz-local",
+          "titulo": "On-device voice",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "The Local source transcribes without internet: pick a model in the Transcription tab, download it once and it stays on the device. Fast is light; Balanced is more accurate; Best quality is the most accurate and the heaviest."},
+            {"tipo": "rotulado", "rotulo": "Download", "texto": "on Wi-Fi it starts right away; on mobile data the app asks first, showing the size. One model at a time."},
+            {"tipo": "rotulado", "rotulo": "Storage", "texto": "deleting a model in the Transcription tab frees the space right away. Models aren't backed up and are removed if the app is uninstalled."}
+          ]
+        },
+        {
+          "id": "privacidade",
+          "titulo": "Privacy",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "Audio is only sent to the source set up in Transcription — with the Local source, it never leaves the device. Tokens stay only on the device."}
+          ]
+        },
+        {
+          "id": "creditos",
+          "titulo": "Credits",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "Credits are not part of this version yet."}
+          ]
+        },
+        {
+          "id": "licencas",
+          "titulo": "Licenses",
+          "blocos": [
+            {"tipo": "rotulado", "rotulo": "sherpa-onnx", "texto": "on-device speech recognition — Apache 2.0 (k2-fsa)."},
+            {"tipo": "rotulado", "rotulo": "ONNX Runtime", "texto": "inference engine inside sherpa-onnx — MIT (Microsoft)."},
+            {"tipo": "rotulado", "rotulo": "Whisper", "texto": "Fast and Balanced models — MIT (OpenAI); the Hugging Face cards state Apache 2.0."},
+            {"tipo": "rotulado", "rotulo": "Parakeet TDT 0.6B v3", "texto": "Best quality model — CC BY 4.0 (NVIDIA), converted to ONNX int8 by sherpa-onnx."},
+            {"tipo": "rotulado", "rotulo": "LiteRT-LM", "texto": "engine for the text models of the Reasoning tab, on the device — Apache 2.0 (Google)."},
+            {"tipo": "rotulado", "rotulo": "Qwen3 0.6B", "texto": "Light text model — Apache 2.0 (Alibaba), downloaded on demand."},
+            {"tipo": "rotulado", "rotulo": "AndroidSVG", "texto": "draws the SVGs of imported skins — Apache 2.0 (Cave Rock Software)."},
+            {"tipo": "rotulado", "rotulo": "Gemma 4 E2B", "texto": "Balanced text model — Apache 2.0 (Google), downloaded on demand."},
+            {"tipo": "rotulado", "rotulo": "Spell checker dictionaries", "texto": "word lists from the Android keyboard (AOSP LatinIME) for Portuguese, English and Spanish — Apache 2.0."},
+            {"tipo": "rotulado", "rotulo": "Space Grotesk and Space Mono", "texto": "fonts — SIL Open Font License 1.1."}
+          ]
+        },
+        {
+          "id": "feedback",
+          "titulo": "Feedback",
+          "feedback": true,
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "Found a problem or have an idea? The buttons open your email app with the app version, the Android version and the device model already filled in — just tell us what happened."}
+          ]
+        }
+      ]
+    }
+  }
+}

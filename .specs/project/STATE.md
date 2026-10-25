@@ -1882,6 +1882,33 @@ suíte. O re-toque do `awaitKeyboardAttached` fica (cobre o toque perdido, caso 
 não mesclada (teste usa `useUnmergedTree`), e a linha de progresso ganhou `mergeDescendants` (leitor de
 tela lê barra e rótulo juntos; o teste lê o "50%" na própria tag).
 
+## sherpa-onnx sem TTS — AAR sem eSpeak NG (2026-10-25)
+
+O AAR oficial 1.13.8 (50.129.134 B, SHA `633c2432…bd96`) vem com `SHERPA_ONNX_ENABLE_TTS=ON` e embute o
+eSpeak NG (GPL-3.0). O app passa a usar o recompilado pelo `.github/workflows/sherpa-sem-tts.yml`
+(rodada 40140437418, 45.875.067 B, SHA `5660e13fb737557be7fbec780606990ca9c10f3f0d6804b8486595c66f98eb45`),
+baixado do release `sherpa-onnx-1.13.8-sem-tts` e recusado se o SHA divergir. `SherpaAarSemGplTest`
+varre todo `.so` do AAR em `app/libs`.
+
+- **NDK r29.** O oficial traz `0x14206865` no `.note.android.ident`. O workflow instala o NDK
+  `29.0.14206865` e recompila a tag `v1.13.8` no commit `11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf`,
+  com as mesmas opções do upstream e `SHERPA_ONNX_ENABLE_TTS=OFF`.
+- **ONNX Runtime idêntica.** As `libonnxruntime.so` (1.28.2) dos quatro ABIs são byte a byte as do
+  AAR oficial. O que muda no nativo é o sherpa sem TTS.
+- **Contagem 2, não 6.** Em cada ABI, `libsherpa-onnx-jni.so` e `libsherpa-onnx-c-api.so` tinham 2
+  textos do eSpeak (`strings -a`); `libsherpa-onnx-cxx-api.so` e `libonnxruntime.so` tinham 0. No AAR
+  novo os quatro estão em 0. O pedido original falava em 6 por `.so`; a medida foi 2.
+- **c-api e cxx-api empacotadas e sem uso.** No arm64-v8a: c-api 3.280.624 B + cxx-api 440.688 B
+  (~3,7 MB). O app não chama essas bibliotecas. A c-api continua exportando as funções C de TTS; o
+  que saiu do JNI foram 9 símbolos de TTS. As classes Kotlin de TTS (14, entre elas `Tts.kt`) não
+  estão no AAR: uso vira erro de compilação.
+- **Catálogo de TTS sem runtime.** `ModelCatalog` ainda lista Piper, Kokoro e MeloTTS com
+  `EngineType.TTS`. `SherpaEngine` recusa esse tipo. TTS local por este sherpa exigiria o
+  `espeak-ng-data`, que é GPL — não entra no app.
+- **Alinhamento.** Todo `PT_LOAD` dos `.so` continua ≥ 16 KB.
+- **Reprodutibilidade.** Cada push que dispara o workflow pode gerar outro binário e outro SHA.
+  Publicar o artefato da rodada citada e conferir o SHA contra `app/build.gradle.kts` antes do release.
+
 ## CI verde — native-voice-models (2026-09-27)
 
 Rodada em 5db6d75: **240/240 instrumentados, 0 pulados, telas 84/84** no limiar. Com o
@@ -2524,6 +2551,35 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
 - **Próximo**: fase 2 (AGT-T6 ferramentas de app com lista de permitidos; AGT-T7 OpenAI/Google), fase 3 (AGT-T8 skins parametrizadas; AGT-T9 servidor MCP), AGT-T10 (abuso e validação
   real com a Anthropic — exige a chave e a autorização do Yan).
 
+## agent-harness — fase 2, AGT-T6: ferramentas de app (2026-10-24)
+Branch `equipe/agente-fase2` (worktree `keyflow-equipe-agente2`), a partir da `main` `8bd6311`. Nenhuma chamada à API real (motor falso em tudo). Quatro ferramentas em `agent/tools/AppTools.kt` sobre uma porta (`AppControl`), adaptador do aparelho em `agenthost/AndroidAppControl.kt` (mesmo desenho da T4: o núcleo continua sem `android.*`; o `AgentIsolationTest` só ganhou a exceção `import com.keyflow.i18n.trKey`, para o nome de cada ajuste da lista).
+- **`app_status` (READ)**: versão, modos ligados, permissões concedidas (só leitura), skins em uso e origem de raciocínio com o modelo dela. Lê SÓ o DataStore (`SettingsRepository.agentStatusOnce`) e o `PermissionsChecker`: **nunca abre o cofre** e não diz nem se há credencial guardada.
+- **A lista de permitidos** (`AppSettingsAllowlist`, uma tabela com tipo e faixa) tem 12 linhas: `themeDark`, `keyboardLanguage` (pt/en/es), `keyboardScalePercent` (70–130), `keyboardNumberRowEnabled`, `orbSizePx` (110–280), `vibrationIntensity` (0–100), `tapBurstWindowMs` (100–700, de 10 em 10 — a faixa e o passo do controle da tela), os modelos de Raciocínio das três nuvens (`reasoning{Anthropic,OpenAi,Google}Model`: só caracteres de nome de modelo, nunca endereço) e as duas skins em uso (`keyboardSkin`/`orbSkin`). **Decisão onde o design era omisso**: as skins estão na lista só para LEITURA — `settings_set` as recusa e aponta o `skin_select`, que confere a skin e o direito (MZ-T9); gravar `orbSkin` pelo `settings_set` seria um caminho sem essa conferência. A origem de raciocínio (`reasoningSource`) fica FORA: trocá-la liga/desliga o próprio agente.
+  **Fora, sempre**: tudo de `SettingsSecrets`, `custom*Endpoint`/`*HeaderName`, `customModelMirrorUrl`, SSH, origens e modos de autenticação. **O teste que falha** (`AppSettingsAllowlistTest`): nenhuma chave da lista (nem das graváveis) está em `SettingsSecrets.BY_PROPERTY`; nenhuma chave casa `secret|token|passw|credential|apikey|bearer|ssh|header|endpoint|mirror|authmode|computer|custom|url|host` (e só `keyboard…` pode ter "key"); nenhum campo de `Settings` com cara de credencial/endereço (`headerValue|password|sshKey|apiKey|token|endpoint|mirror|headerName`) está na lista; toda chave é campo real de `Settings` com o tipo certo e o padrão do app cabe na faixa.
+- **`settings_get` (READ) / `settings_set` (WRITE)**: o esquema de `key` é um `enum` com as chaves da lista (`settings_set`: só as graváveis) — uma chave de fora (segredo, endereço, `../x`) é recusada na validação, ANTES de qualquer `run`, sem ler nem perguntar. **`value` é sempre texto** (`"true"`, `"220"`, `"pt"`): o subconjunto de esquema do app não tem união de tipos e inventar um para isto seria o desvio pior; a linha da tabela lê o texto pelo tipo e pela faixa e devolve ao modelo o motivo ("fora da faixa", "múltiplos de 10", "aceita só pt, en, es"). `describe` valida e lê o valor atual: o painel mostra «Mudar «Tamanho da orbe»: 195 px → 250 px» (escrito pelo app) e um pedido que não vale (faixa, tipo, valor igual ao atual, valor ilegível) nem chega ao usuário. O `run` lê de novo o antes, grava e RELÊ: se o valor lido depois não confere, devolve erro em vez de sucesso. O desfazer é uma `UndoCall` de `settings_set` com o valor anterior — passa pela mesma política e painel.
+- **Gravação (`SettingsRepository.updateAgentSettings`, `data/AgentSettingKeys.kt`)**: uma edição atômica do DataStore, SÓ nas chaves da tabela `AgentSettingKeys` (uma linha por ajuste: nome do campo em `Settings` ↔ chave em disco), e SÓ nas graváveis: qualquer outra (um segredo, um endereço, as skins) lança `IllegalArgumentException` sem gravar nada, e o tipo errado também. É a defesa por baixo da ferramenta. Os nomes em disco têm teste de texto contra o `SettingsRepository` (`val X = intPreferencesKey("orb_size_px")`) e o instrumentado grava e relê cada chave pelo `settingsFlow`. A leitura copia o fallback do app antigo da vibração (`haptic_feedback=false` → 0). Não passa pelo cofre nem pelo `saveSettings` (que reescreve tudo e disputaria com o auto-save da tela, como a T4 já evitou).
+- **`open_tab` (READ)**: a aba abre **quando a resposta do agente termina**, não no meio. Navegar no meio esconderia o chat de quem ainda precisa responder ao painel da ferramenta seguinte ("abra a aba Teclado e aumente o teclado" pediria a permissão numa tela que o usuário não vê — e o painel só cancela a execução se já estava aberto quando a aba saiu, T3 `panelHidden`). O `TurnScoped` ganhou `turnCancelled()` (padrão = `turnEnded()`): `open_tab` o sobrescreve e DESCARTA o pedido ao cancelar ou limpar a conversa; o controlador agora sabe se o turno acabou ou foi cancelado. A ponte com a Activity é o `AgentTabNavigator` (um por processo, no `AgentHost`): a `SetupActivity` se anexa no `onCreate` e se solta no `onDestroy` (só com `AGENT_ENABLED`) e navega pelo MESMO `requestedTab`/`requestedTabKey` do clique num erro. Sem Activity o pedido não tem para quem ir (`openTab` devolve `false`). **Não coberto**: uma confirmação que chega com a aba KeyFlow já escondida (o usuário saiu à mão no meio de uma execução) segue esperando até ele voltar — a T3 só trata a pergunta aberta no momento de sair.
+- **Textos**: o que vai ao MODELO é português fixo (resultados, descrições, motivos de recusa); o que o USUÁRIO lê (rótulo da ferramenta, nome de cada ajuste, o antes → depois, "ligado/desligado") passa por `tr`, com EN/ES (`TranslationsTest`).
+- **O que provei**: unit **1574, 0 falhas** (`assembleDebug testDebugUnitTest :app:lintDebug` num comando só; 44 novos: `AppSettingsAllowlistTest` 16, `AppToolsTest` 27 — executor, política, painel e controlador de verdade com um `AppControl` falso, inclusive abuso: chave secreta/endereço/`../x` recusadas no esquema sem ler nem perguntar, segredo no valor, injeção em resultado que não contorna a confirmação, cancelar com o painel aberto descarta a navegação —, e 1 no `AgentControllerTest` para o `turnCancelled`); lint "No issues found"; instrumentados no emulador API 34 (DataStore e cofre de verdade, motor falso): `AppToolsDeviceTest` **11/11** (cada chave gravável grava o campo certo de `Settings`; leitura = padrões do app + o fallback da vibração; antes → depois e desfazer; um valor SENTINELA no cofre real não aparece em nenhuma saída com o filtro VAZIO; o repositório recusa gravar segredo, endereço, skin e tipo errado; `app_status`; a aba só abre depois da permissão e do fim da resposta; a fiação de `AgentHost.of`), `AgentSecretsDeviceTest` 4/4, `SkinToolsDeviceTest` 13/13, `KeyflowPanelAgentTest` 12/12 e `SettingsRepositoryTest` 32/32 (72/72). Nenhuma rota de galeria mudou: os goldens ficam como estão (nenhuma tela mudou).
+  **Achado dos próprios testes**: a 1ª regra de nome de modelo aceitava `https://evil.example/v1` (`:` e `/` são permitidos para `models/gemini-pro` e `llama3:8b`) — o teste de abuso pegou; agora o nome é feito de segmentos separados por UM `/` ou `:` (ou `::`, o dos modelos ajustados da OpenAI), sem `..` (o nome entra no caminho da URL do Google).
+  **O que NÃO provei**: nada contra um modelo de verdade; a navegação de ponta a ponta na tela (o `requestedTab` é o mecanismo que já existia; o teste prova o navegador e o momento, não a aba aparecendo); o `settings_set` com o auto-save da tela aberto ao mesmo tempo (a janela de corrida é a mesma do `skin_select`: o `settingsFlow` atualiza o estado da tela logo depois da edição).
+
+## agent-harness — fase 2, AGT-T7: adaptadores OpenAI e Google (2026-10-24)
+Dois motores com ferramentas ao lado do da Anthropic: `reasoning/openai/OpenAiAgentEngine.kt` + `OpenAiAgentWire.kt` e `reasoning/google/GoogleAgentEngine.kt` + `GoogleAgentWire.kt` (o `Wire` é puro/JVM: corpo, conversão do histórico neutro e leitura do SSE; o `Engine` é rede/retentativa). **SPEC_DEVIATION (local, como na T2)**: moram em `reasoning/<provedor>/` e não em `agent/providers/` — a mesma razão do `AuthIsolationTest`. Nenhum arquivo do motor de texto foi alterado (`OpenAiReasoningEngine`, `GoogleReasoningEngine` intocados; mapeamento de erro e retentativa duplicados de propósito). Nenhuma chamada à API real, credenciais falsas.
+- **OpenAI = Responses API, não Chat Completions (SPEC_DEVIATION)**. O design (D8) dizia `tool_calls`/`role=tool`. Conferido em `developers.openai.com/api/docs/guides/function-calling` (2026-10-24): "GPT-6 Astra and GPT-6.1 Sol require the Responses API for tool calling" (os exemplos de Chat Completions usam o GPT-5.6 Terra com raciocínio desligado), e o motor de texto do app (e o login por plano) já fala `POST /v1/responses`. Chat Completions deixaria de fora os modelos novos. Formato conferido: a definição `{"type":"function","name","description","parameters","strict"}`; o item `function_call` (`id` `fc_…`, `call_id`, `name`, `arguments` em TEXTO); o resultado `{"type":"function_call_output","call_id","output"}`; os eventos `response.output_item.added`/`response.function_call_arguments.delta|done`/`response.output_item.done`; "reasoning items … must also be passed back with tool call outputs"; em modo sem estado (`store:false`) os itens `reasoning` trazem `encrypted_content` por padrão (`guides/reasoning`). Por isso o `ProviderState` guarda os itens de saída da volta (só com raciocínio E chamada) e o adaptador os reenvia intactos na volta de ferramenta em andamento; voltas antigas são reconstruídas sem o raciocínio e SEM o `id` do item (com `store:false` o `fc_…` não existe no servidor). `strict:false` explícito: sem ele a Responses tenta normalizar o esquema para o modo estrito, e os esquemas das ferramentas têm propriedades opcionais. O resultado vai em `output` como texto (erro de ferramenta: prefixo `[erro da ferramenta]`; o item não tem flag de erro).
+- **Google = `generateContent`/`streamGenerateContent`, não a Interactions API**. Em `ai.google.dev/gemini-api/docs/interactions`: a Interactions API é Beta ("subject to breaking changes") e "recommended for all new projects", mas a `generateContent` "remains fully supported" e, na página de function calling da Interactions, "for stable production deployments, we recommend you continue to use the `generateContent` API". O app já fala `streamGenerateContent` (mesma URL, mesmas credenciais: `x-goog-api-key` ou `Authorization: Bearer`). Formato conferido no documento de descoberta `generativelanguage.googleapis.com/$discovery/rest?version=v1beta` (revisão 20261023, fonte oficial legível por máquina): `Tool.functionDeclarations[{name,description,parametersJsonSchema}]` (JSON Schema; o subconjunto que o app usa é o que `structured-output` lista — `minLength`/`maxLength` são ignorados pelo servidor, sem erro; o app tira só o `default`), `Part.functionCall{name,args,id?}`/`functionResponse{name,response,id?}` ("if the function call failed to execute, the response can have an \"error\" key"), `Part.thoughtSignature`, `Candidate.finishReason` (inclui `MALFORMED_FUNCTION_CALL`, `UNEXPECTED_TOOL_CALL`, `TOO_MANY_TOOL_CALLS`, `MISSING_THOUGHT_SIGNATURE`), `UsageMetadata`, `PromptFeedback.blockReason`; e o exemplo da `generateContent` em `migrate-to-interactions` (a chamada chega completa num chunk; o resultado volta num `Content` de papel `user`).
+  Decisões: (1) o `functionCall.id` é OPCIONAL na API: sem ele o app inventa um id único (`gemini-call-N`, contador do processo) e NÃO o reenvia como `id` (a API não o conhece); com ele, vai de volta. (2) A `thoughtSignature` "pode viver em qualquer parte" (`thinking`): o `ProviderState` guarda as partes da resposta como vieram (texto contíguo sem assinatura é fundido; parte com assinatura fica à parte; resumo de pensamento sem assinatura é descartado e nunca aparece como texto) e as devolve intactas na volta de ferramenta em andamento — sem isso um Gemini 3 acusa `MISSING_THOUGHT_SIGNATURE`, que o motor trata como erro do motor (volta descartada, nenhuma ferramenta roda). (3) Vários resultados da volta vão juntos num `Content` `user`, os `functionResponse` antes de qualquer texto. (4) Um `STOP` com chamada vira `TOOL_USE` (o Gemini não distingue); `SAFETY`/`RECITATION`/`BLOCKLIST`/`PROHIBITED_CONTENT`/`SPII`/`LANGUAGE` e prompt bloqueado = recusa; `MAX_TOKENS`/`CONTINUATION` = cortada; os tokens de pensamento contam como saída.
+- **Sem teto de saída (`max_output_tokens`/`maxOutputTokens`)** nos dois: o limite de saída muda de modelo para modelo e pedir mais que o do modelo pode ser recusado (cautela do app, **não conferida numa página oficial**); sem o campo vale o limite do próprio modelo (e o `openai-siwc-notes.md` já manda omitir `max_output_tokens` no fluxo do plano). Os outros freios do laço (12 voltas, 8 chamadas por volta, 24 chamadas/min) seguem valendo; o teto de 16 384 do agente (A5) só vale na Anthropic.
+- **Imagem do `tool_result` não vai** (só o texto): a folha de contato do `skin_preview` aparece ao usuário no cartão, mas OpenAI e Google recebem só o relatório. Mandar imagem exige conferir, por modelo, quem aceita (a Gemini 3 tem `FunctionResponse.parts`; na OpenAI o `output` pode ser uma lista) — da AGT-T10, com o modelo de verdade.
+- **Ligação (`AgentBackends`)**: ferramentas na Anthropic, na OpenAI e no Google, **só quando a credencial é uma CHAVE de API** (A1 estendida) e há modelo escolhido; login por assinatura (OAuth), Local, Créditos e Custom seguem no modo só texto, com a nota (o texto da nota passou a "ferramentas disponíveis com Anthropic, OpenAI ou Google por chave de API"; as rotas `agent-keyflow-modo-texto` da galeria mudaram de propósito). O login do Google/OpenAI com ferramentas NÃO foi ligado: o motor do Google aceita o cabeçalho `Authorization: Bearer` (o `AuthorizationProvider` decide), mas o caminho do login não foi validado com ferramentas — ver a conclusão sobre o plano do Google abaixo. Ligar é uma linha em `AgentBackends` (`googleApiKeyConnected`).
+- **O plano do Google (Yan, 2026-10-24) — o que as páginas OFICIAIS dizem** (conferidas hoje):
+  1. A assinatura Google AI Pro/Ultra **não cobre a API**: `ai.google.dev/gemini-api/docs/google-ai-plans` — "Google AI plan benefits for developer usage apply only within the Google AI Studio web interface. Direct use of the Gemini API (such as using API keys or external applications) is billed and managed separately." O agente do KeyFlow é um app externo: usar o plano, no sentido de gastar a cota dele, não é caminho documentado.
+  2. O caminho documentado é uma **chave de API do Google AI Studio** (`ai.google.dev/gemini-api/docs/api-key`): "Google AI Studio creates a default Google Cloud project and API key for new users after they accept the Terms of Service" ("Every Gemini API key is associated with a Google Cloud project"); quem já tem conta Google Cloud importa o projeto antes. A chave vai no cabeçalho `x-goog-api-key` (é o que o app já faz). **Não é preciso criar projeto no Cloud nem conta de faturamento** para a camada gratuita: `…/docs/billing` — "New accounts begin on the Free Tier"; `…/docs/pricing` lista os modelos "Free of charge" (hoje, entre outros, `gemini-3.8-flash`, `gemini-3.6-flash`, `gemini-2.5-pro`, `gemini-2.5-flash`) e os só pagos (`gemini-3.1-pro-preview`, `gemini-4-argon`). A camada paga exige vincular uma conta de faturamento do Cloud (`…/docs/billing`: "The Gemini API uses Cloud Billing accounts"; pré-pago, mínimo US$ 5 segundo a página). O limite é por projeto, não por chave (`…/docs/rate-limits`). O Brasil está na lista de regiões (`…/docs/available-regions`).
+  3. A camada gratuita tem um custo de privacidade (`ai.google.dev/gemini-api/terms`): nos "Unpaid Services" a Google "may use your submitted content and generated responses" para melhorar produtos e "human reviewers may read, annotate, and process your API input and output"; "Do not submit sensitive, confidential, or personal information to the Unpaid Services". Nos "Paid Services" a Google diz que não usa os prompts para melhorar produtos. Para usuários no EEE/Suíça/Reino Unido só vale o pago.
+  4. O **login por assinatura do app** (Continue com Google): o único guia oficial de OAuth do Gemini API (`ai.google.dev/gemini-api/docs/oauth`) exige um **projeto Google Cloud próprio com a Generative Language API ligada, tela de consentimento OAuth (com você como usuário de teste) e um client ID do tipo "Desktop app"**, com os escopos `cloud-platform` e `generative-language.retriever`, e a chamada leva `x-goog-user-project`. O app pede o escopo `https://www.googleapis.com/auth/generative-language`, que **não achei** nesse guia nem no documento de descoberta, e usa o client ID do próprio KeyFlow: se o token do login funciona na `generateContent` (e contra qual projeto/cota ele conta) **não está documentado — só um teste real com a conta do Yan responde** [YAN]. O único produto em que a Google documenta o login com a conta do plano Pro/Ultra é o Gemini CLI (`google-gemini.github.io/gemini-cli/docs/get-started/authentication.html`: "Use this method if you are a Google AI Pro or Google AI Ultra subscriber"), um cliente da própria Google, não uma rota da Gemini API para apps de terceiros.
+- **O que provei**: JVM, MockWebServer, credenciais falsas — **99 testes novos**: `OpenAiAgentEngineTest` 27 (pedido documentado, texto, uma e várias chamadas com os argumentos em seis `delta`, chamada só na lista final do `completed`, raciocínio cifrado indo e voltando como itens, `incomplete` por limite de saída e por filtro, `response.failed`/`error` sem repetir a mensagem do servidor, corte sem `completed`, queda da conexão, 401 com `invalidate`, 429, 400, 503 com pausas 200/400 ms, cancelar a coleta cancela a chamada), `OpenAiAgentWireTest` 17, `GoogleAgentEngineTest` 32 (pedido documentado com `parametersJsonSchema` sem `default`, chamada completa com `STOP`, o exemplo do streaming da doc, ids inventados únicos e o da API preservado, partes com `thoughtSignature` indo e voltando, `functionResponse` com `result`/`error`, resumo de pensamento fora do texto, cada `finishReason`, prompt bloqueado, objeto `error` no meio, corte sem `finishReason`, 401/403/429/400/503, cancelamento), `GoogleAgentWireTest` 16 e 7 novos no `AgentBackendsTest` (OpenAI e Google com chave → ferramentas com o motor e o modelo certos; login, sem modelo, sem motor, chave de outro provedor, Local/Créditos/Custom → texto; o fluxo do modo segue as três credenciais). No recorte local (agent, agenthost, reasoning, i18n, data: 751 testes) **0 falhas** e `:app:lintDebug` "No issues found"; a suíte inteira dos unitários (1673 testes na árvore da T7) rodou uma vez no servidor com 3 falhas, TODAS de teste (dois do `AgentBackendsTest` esperavam a inscrição do fluxo com um `yield` — o `merge` das três credenciais inscreve em corrotinas filhas, agora o teste espera o `subscriptionCount`; e um `getString("type")` no item de mensagem, que não tem `type`) — corrigidas e o recorte repetido; a suíte inteira e os 6 emuladores vão para o CI. Instrumentados no emulador API 34 depois da T7: `KeyflowPanelAgentTest` 12/12 (com o texto novo da nota), `AgentSecretsDeviceTest` 4/4 e `AppToolsDeviceTest` 11/11. Goldens: só as duas rotas da nota (`agent-keyflow-modo-texto`, claro e escuro) mudaram, de propósito (ver "Ligação" acima).
+  **O que NÃO provei**: nenhuma chamada à OpenAI nem ao Google de verdade (os formatos foram conferidos nas páginas e no documento de descoberta, não numa resposta real; fixtures dizem o que é cópia e o que é inventado); o comportamento com Gemini 3 e as assinaturas, nem com os modelos GPT-6 e o raciocínio cifrado; o login (OAuth) com ferramentas; imagem no resultado; que `maxOutputTokens`/`max_output_tokens` ausente seja o certo (é cautela).
+
 ## V1-4 — recorte de abuso do agente (2026-10-23)
 - O `ToolExecutor` centraliza validação, filtro e confirmação; a política de flood também precisa atravessar mensagens do usuário, então a janela móvel monotônica de 60 s mora no executor compartilhado do processo (24 tentativas, inclusive inválidas), não só no `AgentLoop` de cada turno. Teste com relógio falso cobre bloqueio e recuperação.
 - Os testes com motor falso provam as barreiras do app, não a resistência/comportamento do modelo real. Até o Yan autorizar e validar com a chave dele **[YAN]**, o agente não deve ser anunciado como funcional no release: fica **Em breve**.
@@ -2648,3 +2704,273 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
   em 16a7ccd). Fonte idêntico à base 001740f; diferença medida só na linha do link e preservada
   fora do escopo. A captura de onboarding foi bit-idêntica. Comparações durante captura devem
   aguardar o marcador de PNG concluído, pois o arquivo existe antes de terminar de ser gravado.
+
+## 2026-10-24 — V1-3: build de release (R8, AAB, chave de upload, applicationId)
+
+- **Keep rule por classe não basta com JNI.** O `liblitertlm_jni.so` chama de volta `JniMessageCallback.onMessage/onDone/onError`
+  e lê `SamplerConfig.getTopK...` por nome; nenhum Java os chama, então o R8 apagava os métodos da interface (o `mapping.txt` mostrava a
+  classe com o nome original e sem membros) e o Raciocínio local morreria com `NoSuchMethodError`. Vale o pacote inteiro
+  (`-keep class com.google.ai.edge.litertlm.** { *; }`). `scripts/check-release-jni.py` confere no mapping e no DEX (falha no build
+  antigo, passa no novo) e o job do release do CI o roda. Ao subir de versão o LiteRT-LM ou o sherpa-onnx, o CI avisa se algo novo
+  passar a ser chamado só pelo nativo. Componentes do manifesto não precisam de regra: o AAPT2 as gera (`aapt_rules.txt`).
+- **`applicationId` `com.arateki.keyflow`, `namespace` `com.keyflow`.** O id curto de componente (`pkg/.ime.X`) é relativo ao
+  `applicationId`, mas as classes ficam no namespace: `com.arateki.keyflow/.ime.X` aponta para uma classe que não existe. Scripts e
+  testes usam o nome completo (`com.arateki.keyflow/com.keyflow.ime.KeyFlowKeyboardService`). O `instrumentar` descobre o id da
+  worktree (aapt2 no APK de teste ou o `build.gradle.kts`) e serve às branches com `com.keyflow` e às novas.
+- **Chave de upload só no Gradle, fora do git:** `~/.keyflow/android/upload-keystore.properties` ou `KEYFLOW_UPLOAD_*`. Sem ela o release
+  sai `app-release-unsigned.apk` (é o que o CI confere). Com ela, o APK e o AAB saem assinados com o certificado de upload; o
+  SHA-256 público bate com o cadastrado. Release assinado com a chave de upload no emulador impede o `installDebug` seguinte (mesmo
+  id, assinatura diferente): o smoke desinstala no fim.
+- **Smoke de release no emulador (lições):** o app de release tem só ABIs ARM; o emulador x86_64 roda arm64 por tradução. Com a orbe
+  flutuante na tela o `uiautomator dump` comum volta "null root node": use `dump --windows`. Com o KeyFlow habilitado e outro teclado
+  ativo, o app abre o seletor de teclados do sistema ao fim do onboarding e ele cobre tudo: `ime set` antes de abrir. A folha de
+  compra não é um diálogo: o botão Voltar do sistema fecha o app, não a folha (fecha pelo véu ou pelo X). O AdMob serve anúncios de
+  TESTE ("Test Ad") a qualquer emulador, mesmo com IDs de release, então o banner carrega de verdade no smoke. O Billing sem Play Store
+  responde `BILLING_UNAVAILABLE` (3) e a folha mostra o aviso, sem crash.
+- **Tamanho:** o R8 + redução de recursos tira ~10 MB do APK de release (94,3 → 83,8 MB) e ~3,4 MB do AAB (50,3 → 46,8 MB); o peso é de
+  código nativo (sherpa-onnx e LiteRT-LM), que o R8 não toca. O AAB leva o `mapping.txt` (`BUNDLE-METADATA/.../proguard.map`) e o perfil de base.
+
+
+## 2026-10-25 — V1-3: fechamento do smoke e falha nativa no ditado do emulador
+
+- **Smoke padrão do APK assinado:** passou do zero até o fim, com R8 e recursos reduzidos, usando o artefato de upload
+  (`com.arateki.keyflow`, 83.842.560 bytes). Troca Sistema → Ateliê: 15.077 pixels diferentes nas fileiras de letras da
+  prévia, excluindo a orbe e os chips de seleção. Passou por todas as abas, folha de compra e aviso de indisponibilidade,
+  banner com “Test Ad”, teclado de verdade digitando “hi” nos Ajustes e divulgação persistida ao reabrir. Billing indisponível
+  não comprova compra real nem `ProxyBillingActivity`. `PermissionsCheckerTest`: 2/2; APKs debug e de testes recompilados.
+- **Captura de acessibilidade:** o comando `uiautomator dump --windows` do API 34 lançou NPE em `childNafCheck`; houve também
+  dumps só da barra de status e ANRs da System UI, comprovados por foco e screenshot. `--compressed` e a janela ativa não
+  resolveram. `scripts/ReleaseUiDump.java` roda via `app_process`, espera as janelas, renova o cache e tolera filhos nulos;
+  é compilado com o SDK/JDK e enviado/removido sob a trava, sem alterar o APK. Banner passou em três verificações consecutivas.
+  O leitor de log distingue os PIDs do APK, reinícios, subprocessos e tombstones dos processos do capturador/sistema, mantendo
+  o log completo para revisão. Controle com logs reais: NPE do capturador não vira crash do app; três SIGSEGV do app são recusados.
+- **Campo real para o IME:** os Ajustes restauram uma busca anterior. Uma coordenada fixa pode tocar fora do campo e fechar
+  o teclado; o smoke localiza “Search settings”, toca explicitamente o `EditText` e espera o IME correto aparecer. A comparação
+  AE do ImageMagick 7 imprime também a métrica normalizada entre parênteses; usar só o primeiro número, inclusive em notação científica.
+- **Ditado local NÃO aprovado:** o trecho opcional do smoke foi executado isoladamente com `KEYFLOW_SMOKE_DICTATION=1`, modelo
+  Rápido/Whisper base baixado e instalado pelo app e gravação confirmada pelo cronômetro. O processo `:inference` caiu três vezes
+  com SIGSEGV, endereço `0x8`, antes do marcador de modelo carregado; o app apresentou interrupção local e continuou aberto.
+  O release não contém bibliotecas x86_64: o AVD é x86_64, `primaryCpuAbi=arm64-v8a`, ponte `libndk_translation.so`.
+  Naquela rodada não havia sido isolado se o defeito estava na tradução ou no caminho nativo do app; faltava reproduzir em ARM,
+  sem considerar os checks estáticos do JNI como prova de inferência executada. A comparação controlada abaixo encerra essa pendência.
+- **Entrega:** código do smoke em `43bc418`; relatório e evidências em `.equipe/relatorios/v1-3-release.md` e `/tmp/v1-3-fim/`.
+  Travas compartilhadas respeitadas, execução com prioridade 15 e somente `emulator-5554`; nenhum push feito. O coordenador
+  envia os commits e acompanha o CI da PR #20.
+
+
+## 2026-10-25 — V1-3: ditado em ARM aprovado; SIGSEGV isolado na execução traduzida
+
+- **Comparação controlada, com R8 ligado:** cópias de release assinadas com debug, `com.arateki.keyflow.teste`, uma incluindo
+  x86_64 e outra só ARM. O DEX minificado e o mapping são byte a byte idênticos entre elas; todas as bibliotecas arm64 são
+  idênticas às do APK de upload. O build original foi restaurado exatamente; mudanças locais de ABI/id/assinatura não foram
+  commitadas, e a chave de upload não foi lida. O check estático do JNI passou nos dois APKs (122 sherpa, 72 LiteRT-LM, oito contratos).
+- **Sonda do serviço real:** driver separado, sem classes do app, chama o Binder com o contrato AIDL, baixa o Whisper base
+  fixado no catálogo e confere seus SHA-256. Exige callback de preload e transcrição da fixture `speech-en-short.m4a`
+  contendo “nightfall” e “yellow lamps”. Isso exercita carga, JNI, Parcel e decodificação/inferência do APK minificado;
+  não ativa IME nem grava microfone. As medidas abaixo são de uma execução, não um benchmark.
+- **Resultados:** x86_64 nativo **1/1** (carga 1.550 ms, transcrição 4.514 ms de 6.656 ms de áudio); A32 ARM real **1/1**
+  (carga 4.317 ms, transcrição 8.916 ms de 6.720 ms de áudio). O **mesmo APK ARM** no AVD x86_64 por `libndk_translation.so`
+  falhou **0/1**, com SIGSEGV em `0x8` antes de carregar o modelo, reproduzindo o incidente inicial. A falha ficou isolada
+  ao caminho ARM traduzido nesse AVD; os caminhos nativos validam as keep rules existentes. Não foi localizado o defeito
+  interno da ponte, nem alterada uma regra de R8 para contornar o emulador.
+- **Instrumentação também precisa de isolamento:** o runner atual do debug depende de Kotlin/Tracing eliminados ou
+  renomeados no release. Acrescentar a stdlib inteira ao runner causou colisão com a `Function3` minificada (`invoke`/`g`),
+  antes de executar o teste. A prova válida usou APK próprio com AndroidJUnitRunner oficial 1.4.0/JUnit, sem nenhuma referência
+  Kotlin ou classe JNI/serviço/config do app. Não ampliar keep rules de produção para fazer um runner de debug carregar.
+- **A32 preservado:** todas as operações passaram por `scripts/celular.sh` da worktree de celular, com trava e nice 15.
+  `verificar` final aprovado: app pessoal 1.0.0/código 1, permissões e resumo SHA dos dados iguais; lista de IMEs e teclado
+  Samsung iguais aos do início. A cópia `.teste` e seu runner permanecem instalados porque o atalho não autoriza removê-los.
+- **Provas para revisão:** `.equipe/artefatos/v1-3-arm/` preserva os dois APKs, runner, mapping, SHA-256, fonte da sonda,
+  logs dos três ambientes e verificações do A32. Arquivos de trabalho e receita do runner em `/tmp/v1-3-arm/`.
+
+## 2026-10-25 — V1-3: correções da revisão do release
+- **Exclusão do agente pela flag já decidida:** `AGENT_ENABLED=false` precisa proteger o corpo do `lazy` da
+  `SetupActivity` e a chamada do painel em `ConfigScreen`. Proteger apenas a leitura do runtime deixava o inicializador
+  e os ramos da UI no grafo do R8. A flag permanece verdadeira em debug; nenhuma flavor ou regra de keep foi acrescentada.
+- **Prova no binário:** `check-release-agent.py` cruza classes originais → ofuscadas do mapping com definições reais do
+  DEX, reutilizando o leitor de `dexdump` do guard JNI. Recusou o APK anterior por 145 classes do agente definidas no DEX;
+  no novo APK não há nenhuma dos pacotes `agent`/`agenthost`, nem cabeçalhos de classes desses pacotes no mapping. Referências ao tipo original nas assinaturas da UI
+  permanecem como informação de desofuscação; não são definições de classes ou corpos de métodos do agente. O AAB contém o
+  mesmo mapping e os mesmos dois DEX, byte a byte. O guard também roda no CI.
+- **Smoke com mapping obrigatório:** ausência/vazio falha antes do emulador, sem pular JNI. Oito regressões passaram;
+  os dois testes do smoke falham na versão anterior (mapping não obrigatório e segunda chamada com assinatura de debug).
+- **Assinatura:** `keyflowSmokeSigning=true` agora falha na configuração; não existe mais fallback automático no smoke.
+  Configuração parcial também falha, inclusive só a senha opcional ou arquivo presente sem campos completos. Três
+  builds negativos com dados falsos confirmaram a recusa. Sem configuração, o release continua sem assinatura no CI;
+  para smoke sem upload, é preciso fornecer explicitamente APK assinado e mapping. ENVIRONMENT.md foi atualizado.
+- **Artefatos novos:** APK 83.727.872 bytes e AAB 46.534.325 bytes, assinados pelo certificado público de upload
+  `AB:17:29:3A:…:A8:DC`; os três IDs públicos reais do AdMob estão nos recursos. Chave e senhas não foram inspecionadas,
+  copiadas ou versionadas. Gradle utilizou somente a configuração de upload já existente.
+- **Gates:** `testDebugUnitTest` 1.530/1.530, `:app:lintDebug`, `assembleRelease` e `bundleRelease` passaram.
+  `PermissionsCheckerTest` 2/2 e `KeyflowPanelAgentTest` 12/12 passaram no AVD, validando a continuidade do agente em debug.
+- **AVD:** a primeira instalação falhou sem `emulator-5554`; o controle confirmou serviço `failed parado`.
+  Após religar sob a trava, os instrumentados passaram. O logcat de limpeza do smoke agora tem prazo de 20 s para não
+  esperar indefinidamente quando o dispositivo some. Não foi atribuída uma causa à queda do serviço sem logs do host.
+- **Digitação comprovada:** a segunda rodada completa chegou ao anúncio de teste, mas terminou com busca vazia e XML
+  sem IME. Não houve fatal do processo do app; o fatal registrado era do capturador. A reprodução curta capturou a grade
+  real e seus limites. O roteiro passou a exigir os nós `h`/`i`, renovar a árvore antes de cada tecla e guardar XML/PNG
+  anteriores aos toques; removeu o fallback por coordenadas fixas. A reprodução curta digitou `hi` corretamente, e dois
+  testes novos impedem toque sem tecla e exigem nova captura por tecla. A causa exata da transição anterior não foi provada.
+- **Host de texto controlado:** a terceira execução terminou na tela do launcher ao tentar restaurar os Ajustes.
+  O smoke agora compila `ReleaseInputActivity.java` em APK separado (`com.keyflow.smoke.input`), com um EditText vazio,
+  aberto explicitamente a cada rodada. A fixture usa a chave de debug, é instalada somente sob a trava do AVD e removida
+  na limpeza; o APK/AAB de upload não recebe sua classe. A reprodução curta comprovou `hi` nesse editor próprio.
+- **Fechamento:** smoke completo aprovado com código 0 (quarta rodada): abas e Em breve, prévia Sistema → Ateliê
+  com 9.255 pixels diferentes, Billing indisponível, banner Test Ad, `hi` no EditText da fixture e divulgação persistida
+  após force-stop/reabertura. Varredura de PIDs do app sem erro fatal; nenhuma recuperação de ANR do Sistema nesta rodada.
+  Leitura final sob trava confirmou app/fixture desinstalados, Gboard padrão e capturador remoto removido.
+- **Evidências novas para upload/revisão:** `.equipe/artefatos/v1-3-correcoes/` contém APK/AAB corrigidos, mapping,
+  SHA-256, certificados públicos, gates, regressões, tentativas anteriores e execução final. Os artefatos anteriores
+  servem como controle da regressão. Trabalho com nice 15 e travas compartilhadas; sem operações no aparelho físico.
+
+## 2026-10-24 — `OnboardingRoutingTest` instável: laço de quadros contra o DataStore (teste-instavel-onboarding)
+
+- Sintoma: nos dois CI do PR #17 (rodadas 40116791161 e 40117792341, shard 1/6) o teste caía na 1ª tentativa e passava na repetição:
+  `AssertionError: Failed: assertExists … (TestTag = 'disclosure-decline')`, `OnboardingRoutingTest.kt:58`, logo depois do
+  laço de espera; o teste anterior do shard era o `DisclosureUpgradeTest`.
+- Causa (do teste, não do app): com `mainClock.autoAdvance = false` o laço empurrava o relógio no máximo 100 vezes
+  (`pumps++ < 100`). Isso acaba em milissegundos reais, e a divulgação só existe depois da 1ª emissão do `settingsFlow()` da
+  `SetupActivity` (DataStore, migração dos segredos e cofres cifrados, fora da thread principal), que não anda com o relógio do
+  teste. Com o emulador ocupado a emissão chegava depois do 100º quadro e a árvore tinha só o placeholder.
+- Reprodução (emulador de 4 núcleos com 6 laços `dd` ocupando a CPU, para imitar o runner de 2 vCPU; servidor com carga 12–20):
+  antes, o par `DisclosureUpgradeTest` + `OnboardingRoutingTest` falhou 9 de 12 voltas com a mesma mensagem (o
+  `DisclosureUpgradeTest` caiu uma vez no `disclosure-accept`); sem carga, 25 de 25 passaram — por isso nunca aparecia local.
+  Sonda com o laço antigo sob carga: a tela levou 135 e 239 quadros (6 e 7 s) em 2 de 4 voltas.
+- Correção: `FrozenClockPump.kt` (`pumpUntil`/`pumpUntilTag`) espera por tempo REAL, empurra o relógio e dorme 25 ms entre os quadros
+  para dar CPU ao app; no prazo, falha com a árvore. Usado nos quatro testes que lançam a `SetupActivity` com o relógio parado
+  (`OnboardingRoutingTest`, `DisclosureUpgradeTest`, `DisclosureUpdateRoutingTest`, `SetupActivityTest`), inclusive nas esperas
+  depois do clique e na leitura do DataStore. `ArchitectureRulesTest.frozenClockWaitsGoThroughPumpUntil` barra o laço de quadros.
+- Lição: com o relógio de composição congelado, o que depende de outra thread (DataStore, rede, serviço) se espera com prazo em
+  tempo real, nunca por número de quadros; e falha "às vezes" no CI de 2 vCPU se reproduz local com `dd if=/dev/zero of=/dev/null`
+  em laços dentro do emulador (`adb shell`), medindo antes e depois com a mesma carga.
+- Resíduo medido, ainda aberto: sob a mesma carga pesada, depois da correção, o último passo (tocar no chip do microfone na
+  config e esperar a divulgação reabrir) falhou em 1 de 10 voltas (espera de 30 s) e em 3 de 12 (versão de diagnóstico, espera de
+  8 s); nas 2 falhas lidas com reflexão o app tinha `showDisclosure=true` e a tela seguia sem recompor. Coincide com a thread
+  principal ocupada logo depois de `onboardingDone=true` (`startMonetizationIfNeeded`: Billing, AdMob e `EntitlementsRepository`
+  lendo disco na thread principal; `Skipped 568 frames` e `Davey 10 s` no logcat da volta que falhou). Sem carga o passo não falhou
+  (25 de 25 com o código antigo, 1 de 1 com o novo). As esperas do fim do teste foram para 60 s, mas não deu para medir de novo:
+  o emulador caiu várias vezes com o servidor de swap cheio. Se voltar no CI, o passo seguinte é tirar essa inicialização da
+  thread principal.
+
+## 2026-10-24 — Página inicial do site (equipe/site-inicial)
+
+- `website/` é a página inicial (PT em `index.html`, EN em `en.html`): HTML/CSS/JS estáticos, sem
+  build, sem CDN e sem rastreador; fontes Space Grotesk/Space Mono em subconjunto woff2 com as OFL.
+  `scripts/gerar-site.py` junta `website/` às páginas legais e valida links, âncoras, `url()` do CSS,
+  hash da CSP, recursos externos e o orçamento de 400 KB da primeira carga (hoje 126 KB).
+- O `site.yml` mandava `--content-type text/html` para tudo: CSS, fontes e imagens chegariam com o
+  tipo errado no R2. Agora há um `s3 sync` por extensão, com tipo e cache vindos de `gerar-site.py
+  --tipos`; extensão nova precisa entrar em `TIPOS` (a validação recusa o que não conhece).
+- A CSP de `<meta>` bloqueia `<style>`/`style=""` em linha (só o script do tema passa, por hash).
+  Captura que injeta CSS precisa de `bypassCSP`; trocar o script do tema exige recalcular o hash.
+- No container sem fontes do sistema, o Chromium headless gira a 100% sem pintar: o fontconfig vazio
+  trava o renderer. Um `fonts.conf` em `/tmp` apontando para as DejaVu extraídas resolve.
+- `fullPage` do Chromium muda a altura da janela e recompõe trechos com layouts diferentes (`svh`,
+  animações ligadas à rolagem): capturas de página inteira saem melhores costuradas tela a tela,
+  com rolagem `behavior: 'instant'` (o `scroll-behavior: smooth` da página atrasa o `scrollTo`).
+- Brilho desfocado que vaza da coluna (`inset` negativo + `blur`) alargava a página no celular e
+  empurrava o topo fixo para fora da tela; as seções agora usam `overflow-x: clip`.
+
+## 2026-10-24 — Ícone do app (v1-icone)
+
+- Decisão do Yan: a logo do app é a orbe. O ícone é a orbe parada do Ateliê (VoiceOrb.kt: corpo, miolo e ponto de luz,
+  no instante 1234 ms da galeria) sobre um fundo escuro quente (degradê de 3A342B a 211E19, família do `bg` escuro).
+  Skins de pacote (`skin-packs/`) não entram: o ícone usa o visual padrão. Na prancha o Yan aprovou o fundo escuro, o
+  tamanho (orbe a 72% da janela visível) e mandou tirar o brilho externo deslocado da orbe, que lia como sombra esverdeada
+  no escuro; ele sai do foreground, do monochrome, dos PNGs legados e do ícone da loja. O fundo creme segue disponível em
+  `--fundo claro`.
+- Fonte única: `scripts/gerar-icone.py` escreve os três drawables (`ic_launcher_{background,foreground,monochrome}`), os 10
+  PNGs legados e `docs/loja/icone-512.png`. Os XMLs de `mipmap-anydpi-v26/` são fixos. O `android:icon` e o `roundIcon`
+  estão no manifesto. O raio da orbe é 26 dp no canvas de 108: sem o brilho externo o corpo chega a 27,2 dp, dentro dos 33 dp da zona segura.
+- Lição de render: o `Image.radial_gradient` do Pillow vale distância × √2 (255 só no canto), e não distância/raio. Usado
+  cru, o degradê não chega à cor final na borda do raio e deixa uma faixa no corpo da orbe. O script corrige pela
+  constante `RAIO_NO_GRADIENTE`. A forma foi conferida contra `orb-idle-dark.png`: o perfil radial da golden bate com a
+  fórmula em t = 1234 (erro quadrático 0,0065, mínimo exatamente nesse t).
+- O lint do projeto só confere `NewApi` (`checkOnly`), então ele não acusa ícone; as regras de ícone (formato, tamanho,
+  duplicata) foram conferidas à mão. Nenhuma tela do app desenha o ícone, então nenhuma golden muda: amostra de 20 capturas
+  (rotas 0/12, nos dois temas, incluindo `orb-idle`) bit-idêntica, 0 px.
+- O CI acusou o `OverlayPackOrbTest`: o teste conta o `#4E9683` (borda do corpo da orbe Ateliê) no screenshot da TELA INTEIRA
+  e espera zerar quando o pacote assume a orbe. Com o ícone do app (a orbe parada) o launcher atrás do overlay passou a ter
+  esses pixels sozinho: 1.412 px parados, igual nas duas tentativas (um ícone de 156 px do script tem ~2.100 px na mesma
+  tolerância, a mesma ordem). Correção: o teste mede o fundo antes de o serviço subir e conta só o que passa disso (também
+  fecha o falso positivo de "começa com a orbe Ateliê", que passava só com o ícone na tela). Rodada verde depois da correção.
+  Regra: teste que conta cor na tela inteira precisa descontar o fundo, porque o que o launcher mostra muda com o ícone.
+- Ambiente: o `diff-screens.sh` pede o `compare` do ImageMagick no PATH (`/srv/dev/ferramentas/bin`); sem ele todo golden
+  sai como "comparação falhou (dimensões diferentes?)", mensagem que engana.
+
+## 2026-10-25 — CI sob demanda como nó do pool
+
+- `ci rodar` publica somente commits de `equipe/*`, com as mesmas recusas de segredo e push normal de
+  `ci enviar`; usa o mesmo `gh`, sem ampliar credenciais. Entradas são validadas antes da publicação e
+  novamente no workflow, por allowlist de tarefas e nomes de classe/método. Filtro JVM é argumento literal
+  `--tests=...`, nunca uma linha avaliada pelo shell. Inputs chegam aos passos somente por `env`.
+- Até seis emuladores dividem os testes; cada um faz suas até vinte repetições sequencialmente. O preparo
+  vem do Checks: JDK 17, keystore descartável, caches Gradle/sherpa, KVM obrigatório e emulador fixo com
+  swangle. `ci-device-gate.sh selected` reutiliza instalação, logcat e diagnóstico do host.
+- Contar só jobs já visíveis subestima dependências/matrizes que ainda não nasceram. O cliente reserva
+  conservadoramente a rodada inteira e espera o teto de vinte, com trava entre clientes locais. Disparos
+  externos continuam sujeitos à fila global do GitHub; não há reserva atômica entre máquinas diferentes.
+- Rótulo e SHA identificam a rodada; não basta pegar a última da branch. O cliente confere a ponta remota
+  antes de disparar e não repete o dispatch ao esperar. O resumo junta todos os pedaços por repetição,
+  aceita shard vazio, mas falha em classe sem testes, evidência ausente, crash, ADB ou teste falhando.
+- `workflow_dispatch` exige o workflow na branch padrão: integrar esse arquivo na main é o preparo inicial;
+  depois o pedido usa `--ref equipe/...`. A entrega foi conferida sem rede com gh falso e Git local; a
+  primeira rodada real cabe ao coordenador após instalar o comando e publicar os commits.
+- Na estreia, `ci rodar` recusou a branch já integrada: ele exige arquivo diferente da `main`, e o dispatch
+  usa o workflow do `--ref`. Branches anteriores ao `26ee5ce` precisam da `main` mesclada antes do pedido.
+
+## 2026-10-24 — Catálogo de modelos sem pin inventado (equipe/catalogo-real)
+
+- **15 das 20 entradas do `ModelCatalog` eram inventadas** (6 de texto, 5 de visão, 4 de voz; entraram juntas no `629db54`).
+  Cada uma tinha repositório que não existe (o `-litert-lm` do Llama, Gemma 2, SmolLM2, DeepSeek e Phi-3.5; os de OCR/VLM; o
+  `vits-pt-br-neural`; o MeloTTS) ou commit que não existe num repositório real (Piper faber, Kokoro), mais SHA-256 sequenciais
+  (`1a2b3c…`, `a5f6e7…`) ou copiados do Qwen3 com o começo trocado (`777779ff2f4f…`). As 5 reais (Whisper base e small,
+  Parakeet v3, Qwen3 0.6B, Gemma 4 E2B) bateram em tudo: commit, tamanho, SHA-256 (o `lfs.oid` da API; os 3 `tokens.txt` foram
+  baixados e calculados) e pedido de faixa 206. **Nenhum pin real precisou de correção**: as inventadas saíram, não foram
+  "consertadas" — um pin consertado em cima de repositório que não existe seria outro dado fabricado.
+- Em produção, baixar uma falsa falhava em `DOWNLOAD_FAILED` (a API do HF devolve **401**, não 404, para repositório inexistente:
+  sem token, "não existe" e "exige login" são indistinguíveis; commit inexistente em repositório que existe dá 404). O usuário só
+  chegava às falsas pela lista de texto da aba Raciocínio (8 modelos, 6 falsos). A Visão e a Voz são `ComingSoonPanel` no app:
+  `VisaoPanel`/`FalaPanel` só existem em teste e na galeria — por isso os goldens dessas abas são bit-idênticos entre si e não
+  mudam com o catálogo.
+- `ModelCatalog.VISION` e `ModelCatalog.VOICE` agora são `emptyList()` (Visão está na `equipe/visao`, que traz entradas novas na
+  VC-T2a; Voz depende da feature de síntese de fala, e o Piper/Kokoro puxam o eSpeak, GPL). Os painéis continuam existindo:
+  testes e galeria usam `SamplePanelModels` (debug), com URL `.invalid` e SHA-256 zero — nunca no catálogo. As atribuições de
+  licença da Docs dos modelos que saíram também saíram; `DocsSectionsTest` passou a exigir licença na Docs para todo modelo de
+  texto, visão e voz que o catálogo vier a ter.
+- **Nada disso volta sem aviso**: `PinSanityTest` (unitário, sem rede) recusa commit que não tenha 40 hex ou que tenha cara de
+  digitado à mão (corrida de 6+ caracteres iguais, contagem de 1 em 1 ou de 2 em 2, dígito e letra alternados por 20+, repetição
+  periódica, SHA-256 que copia o começo ou o fim de outro); e `scripts/verify-model-catalog.py` confere cada URL, tamanho e
+  SHA-256 contra a API do HF, sem token, e a licença do cartão (roda à mão e no `catalogo-modelos.yml`, que não bloqueia).
+  **Entrada nova no catálogo: rode o script antes de commitar.**
+- Calibragem do detector: cinco caracteres iguais seguidos aparecem em 1 de cada ~1.100 hashes aleatórios (falso alarme demais);
+  o limite é 6 (1 de ~18.000). O `777779ff…` inventado só é pego pela regra do fim compartilhado com o SHA-256 real do Qwen3 —
+  a regra de um hash sozinho não o distingue de um real com cinco 7.
+- Candidatos reais para quando o Yan decidir (conferidos na API em 2026-10-24, nenhum testado no LiteRT-LM do app):
+  `litert-community/SmolLM2-1.7B-Instruct` (Apache-2.0, `SmolLM2-1_7B-Instruct_dynamic_wi8_afp32.litertlm`),
+  `litert-community/DeepSeek-R1-Distill-Qwen-1.5B` (MIT, `…_q8_ekv4096.litertlm`), `litert-community/Phi-3-mini-4k-instruct` e
+  `Phi-4-mini-instruct` (MIT; não existe Phi-3.5 no `litert-community`). Llama 3.2 (`llama3.2`) e Gemma 2 (`gemma`) têm termos próprios
+  e os repositórios do `litert-community` são `gated: auto` — o downloader não tem token.
+
+## 2026-10-25 — Definição do catálogo de modelos e itens adiados
+
+- Decisão do Yan em 25/10/2026 (19:58): A fala da aba Voz usa, por enquanto, só o `android.speech.tts.TextToSpeech` nativo do Android (0 MB e licença do AOSP). Modelos de texto locais no LiteRT-LM adotam imediatamente SmolLM2-1.7B-Instruct (Apache-2.0, ~1,73 GB) e DeepSeek-R1-Distill-Qwen-1.5B (MIT, ~1,83 GB), ambos com download ungated e licença sem restrições comerciais. Phi-3-mini e Phi-4-mini (~3,9 GB) ficam de fora pelo tamanho.
+- Ficam adiados: Llama 3.2 (hospedagem própria no S3/R2 para contornar o gating no HF), Gemma 1 a 3 (termos próprios e gated; o Gemma 4 é Apache-2.0, sem gate, e o E2B já está no catálogo), ML Kit (escrita à mão Digital Ink, estritamente opcional com consentimento e inicialização tardia fora do boot) e vozes offline próprias no sherpa-onnx (VITS Coqui pt-cv por caracteres ou Piper pt_BR com léxico livre para evitar contaminação do eSpeak-ng GPLv3).
+- Descartados em definitivo: MobileLLM (licença não comercial FAIR NC) e Gemini Nano (acesso restrito ao AICore de fábrica em aparelhos topo de linha).
+- Documento de referência técnica completo: `.specs/project/MODELOS-ADIADOS.md`.
+
+## 2026-10-25 — Documentação do app no site (`/doc` e `/docs`)
+
+- Pedido do Yan: a documentação do app também no site, com o mesmo texto e o desenho da página inicial. Fonte única = o
+  Kotlin (`DocsPanel.kt`, com `docsSteps`/`docsSections` e as traduções). O `DocsSiteExportTest` serializa os dois idiomas do
+  site (português e inglês, via `AppLocale.pinned`) em `website/_fonte/doc.json` e **falha se o arquivo versionado não bater**,
+  dizendo como regerar (`KEYFLOW_REGERAR_DOC_SITE=1`). O JSON fica no repositório porque o `site.yml` roda sem Gradle; a pasta
+  `_fonte/` não vai ao ar. O `scripts/gerar-site.py` (com `scripts/site_doc.py`) lê o JSON e gera `doc.html` e `docs.html`.
+- A `DocsPanel` mudou só de onde lê o "Como funciona" e os títulos (`docsHowItWorksTitle`, `docsSteps`, `docsIndexTitle`);
+  o que se desenha é o mesmo, e os goldens `config-docs` seguem bit-idênticos.
+- No site o Feedback não tem os botões do app (abrem o e-mail com o diagnóstico do aparelho): vira o contato do produto. O
+  e-mail pessoal do `FEEDBACK_EMAIL` não aparece no site. O texto de moldura (título, chamada) é do site, em `TEXTOS`.
+- Cuidado com o `scroll-margin-top`: o `html` já tem `scroll-padding-top` para o cabeçalho fixo, e as duas somavam (176 px) —
+  o índice lateral marcava a seção anterior. A `.doc-secao` zera a margem própria.
+- Publicação: `doc.html` e `docs.html` seguem a regra que já serve `/privacidade` e `/privacy` (a Cloudflare serve `/x` a partir de
+  `x.html`); `/doc` e `/docs` não precisam de configuração nova se essa regra valer para todo caminho sem extensão.

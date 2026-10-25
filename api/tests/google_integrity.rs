@@ -26,11 +26,11 @@ async fn decode_returns_parsed_payload_on_success() {
         .await;
 
     Mock::given(method("POST"))
-        .and(path("/v1/com.keyflow:decodeIntegrityToken"))
+        .and(path("/v1/com.arateki.keyflow:decodeIntegrityToken"))
         .and(header("authorization", "Bearer fake-access-token"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
             "tokenPayloadExternal": {
-                "requestDetails": { "requestPackageName": "com.keyflow" },
+                "requestDetails": { "requestPackageName": "com.arateki.keyflow" },
                 "appIntegrity": { "appRecognitionVerdict": "PLAY_RECOGNIZED" },
                 "deviceIntegrity": { "deviceRecognitionVerdict": ["MEETS_DEVICE_INTEGRITY"] }
             }
@@ -41,13 +41,16 @@ async fn decode_returns_parsed_payload_on_success() {
     let client = IntegrityClient::new(
         reqwest::Client::new(),
         google.uri(),
-        "com.keyflow".to_string(),
+        "com.arateki.keyflow".to_string(),
         test_key(format!("{}/token", google.uri())),
     );
 
     let payload = client.decode("fake-integrity-token").await.unwrap();
 
-    assert_eq!(payload.request_details.request_package_name, "com.keyflow");
+    assert_eq!(
+        payload.request_details.request_package_name,
+        "com.arateki.keyflow"
+    );
     assert_eq!(
         payload.app_integrity.app_recognition_verdict,
         "PLAY_RECOGNIZED"
@@ -73,7 +76,7 @@ async fn decode_propagates_error_status_from_google() {
         .await;
 
     Mock::given(method("POST"))
-        .and(path("/v1/com.keyflow:decodeIntegrityToken"))
+        .and(path("/v1/com.arateki.keyflow:decodeIntegrityToken"))
         .respond_with(ResponseTemplate::new(400))
         .mount(&google)
         .await;
@@ -81,7 +84,7 @@ async fn decode_propagates_error_status_from_google() {
     let client = IntegrityClient::new(
         reqwest::Client::new(),
         google.uri(),
-        "com.keyflow".to_string(),
+        "com.arateki.keyflow".to_string(),
         test_key(format!("{}/token", google.uri())),
     );
 

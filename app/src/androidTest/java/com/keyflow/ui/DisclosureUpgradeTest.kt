@@ -3,7 +3,6 @@ package com.keyflow.ui
 import android.Manifest
 import android.content.Context
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollTo
 import com.keyflow.ui.config.tabTag
@@ -44,15 +43,12 @@ class DisclosureUpgradeTest {
     @Test
     fun updateRequiresTheCurrentDisclosureEvenWhenMicrophoneIsAlreadyGranted() {
         compose.mainClock.autoAdvance = false
-        var frames = 0
-        while (compose.onAllNodesWithTag(DISCLOSURE_ACCEPT_TAG).fetchSemanticsNodes().isEmpty() && frames++ < 100) {
-            compose.mainClock.advanceTimeBy(100)
-        }
+        compose.pumpUntilTag(DISCLOSURE_ACCEPT_TAG)
         compose.onNodeWithTag(DISCLOSURE_ACCEPT_TAG).assertExists()
         compose.onNodeWithTag("disclosure-recording-gate-explanation").assertExists()
 
         compose.onNodeWithTag(DISCLOSURE_ACCEPT_TAG).performClick()
-        val deadline = android.os.SystemClock.elapsedRealtime() + 5_000
+        val deadline = android.os.SystemClock.elapsedRealtime() + PUMP_TIMEOUT_MS
         var accepted = false
         while (android.os.SystemClock.elapsedRealtime() < deadline) {
             accepted = runBlocking {
@@ -62,20 +58,14 @@ class DisclosureUpgradeTest {
             android.os.SystemClock.sleep(50)
         }
         assertTrue("o aceite da versão atual deveria ser persistido", accepted)
-        var configFrames = 0
-        while (compose.onAllNodesWithTag(panelTag(ConfigTab.VOZ)).fetchSemanticsNodes().isEmpty() && configFrames++ < 100) {
-            compose.mainClock.advanceTimeBy(100)
-        }
+        compose.pumpUntilTag(panelTag(ConfigTab.VOZ))
         compose.onNodeWithTag(panelTag(ConfigTab.VOZ)).assertExists()
     }
     @Test
     fun reverAvisoERecusarRevogaAceiteAtualComoNaAtualizacao() {
         compose.mainClock.autoAdvance = false
         fun espera(tag: String) {
-            var frames = 0
-            while (compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isEmpty() && frames++ < 100) {
-                compose.mainClock.advanceTimeBy(100)
-            }
+            compose.pumpUntilTag(tag)
             compose.onNodeWithTag(tag).assertExists()
         }
         espera(DISCLOSURE_ACCEPT_TAG)
@@ -94,7 +84,7 @@ class DisclosureUpgradeTest {
         compose.onNodeWithTag(DISCLOSURE_DECLINED_EXPLANATION_TAG).assertExists()
         compose.onNodeWithTag(DISCLOSURE_CONTINUE_TAG).performClick()
         espera(panelTag(ConfigTab.OVERLAY))
-        val deadline = android.os.SystemClock.elapsedRealtime() + 5_000
+        val deadline = android.os.SystemClock.elapsedRealtime() + PUMP_TIMEOUT_MS
         var revoked = false
         while (android.os.SystemClock.elapsedRealtime() < deadline) {
             val saved = runBlocking { SettingsRepository(context).settingsFlow().first() }

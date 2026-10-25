@@ -81,7 +81,11 @@ class AgentLoop(
 ) {
 
     /** [history] precisa terminar numa mensagem do usuário (ou num resultado de ferramenta). A nova mensagem do usuário já vai nele. */
-    fun run(history: List<AgentMessage>, origin: ToolOrigin = ToolOrigin.CHAT): Flow<AgentLoopEvent> = flow {
+    fun run(
+        history: List<AgentMessage>,
+        origin: ToolOrigin = ToolOrigin.CHAT,
+        generation: Long = 0L,
+    ): Flow<AgentLoopEvent> = flow {
         val repaired = AgentHistory.repair(history)
         repaired.added.forEach { emit(AgentLoopEvent.MessageAdded(it)) }
         val last = repaired.messages.lastOrNull()
@@ -135,7 +139,7 @@ class AgentLoop(
                         "Limite de ${limits.maxCallsPerStep} chamadas por passo: esta não foi executada. Peça menos coisas por vez.",
                     )
                 } else {
-                    executor.execute(call, origin) { phase -> emit(AgentLoopEvent.ToolPhaseChanged(call.id, phase)) }
+                    executor.execute(call, origin, generation = generation) { phase -> emit(AgentLoopEvent.ToolPhaseChanged(call.id, phase)) }
                 }
                 // O resultado entra no histórico ANTES de o cartão ser atualizado: se o cancelamento chegar entre os dois, o que importa
                 // (o modelo saber que a ferramenta rodou) já está guardado.

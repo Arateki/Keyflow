@@ -4,7 +4,7 @@
 |---|---|---|
 | Space Grotesk (fonte) | SIL OFL 1.1 | `OFL_SpaceGrotesk.txt` |
 | Space Mono (fonte) | SIL OFL 1.1 | `OFL_SpaceMono.txt` |
-| sherpa-onnx 1.13.8 (AAR, reconhecimento de voz no aparelho) | Apache-2.0 | `Apache-2.0_sherpa-onnx.txt` |
+| sherpa-onnx 1.13.8 (AAR recompilado sem TTS, reconhecimento de voz no aparelho) | Apache-2.0 | `Apache-2.0_sherpa-onnx.txt` |
 | ONNX Runtime (`libonnxruntime.so`, dentro do AAR do sherpa-onnx) | MIT | `MIT_onnxruntime.txt` |
 | Whisper base/small (OpenAI) — modelos baixados sob demanda | MIT (código e pesos, repositório oficial) | `MIT_whisper.txt` |
 | Parakeet TDT 0.6B v3 (NVIDIA) — modelo baixado sob demanda | CC BY 4.0 | `CC-BY-4.0_parakeet-tdt-0.6b-v3.txt` |
@@ -23,3 +23,9 @@ Conferidas em 2026-09-30 (reasoning-models): o `LICENSE` e o `THIRD_PARTY_NOTICE
 NÃO está no catálogo (repositório gated, licença Gemma) — se entrar um dia, precisa dos Termos do Gemma, não da Apache.
 
 Conferida em 2026-10-02 (skin-packs): o `LICENSE` do AndroidSVG vem do repositório (BigBadaboom/androidsvg, Apache-2.0, "Copyright 2013-2018 Cave Rock Software Ltd"); o POM da 1.4 no Maven Central declara a mesma licença. Não há arquivo `NOTICE`.
+
+Conferido em 2026-10-24 (sherpa-onnx sem TTS): o AAR oficial do sherpa-onnx é compilado com `SHERPA_ONNX_ENABLE_TTS=ON`, que embute o
+eSpeak NG (GPL-3.0) nas `libsherpa-onnx-jni.so` e `libsherpa-onnx-c-api.so`. O KeyFlow não usa TTS e não leva nada GPL: o app usa o AAR
+recompilado pelo `.github/workflows/sherpa-sem-tts.yml` (mesma tag v1.13.8, mesmas opções e a mesma ONNX Runtime 1.28.2; só o TTS
+desligado e a API Kotlin de TTS fora), baixado do release do repositório e fixado por SHA-256 no `app/build.gradle.kts`. O
+`SherpaAarSemGplTest` falha se o AAR de `app/libs/` tiver o eSpeak NG.

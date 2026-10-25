@@ -383,7 +383,7 @@ fun ConfigScreen(
                         blockReason(tab)?.let { showToast(it, 2500, navActionFor(tab)) }
                     }
                     when (activeTab) {
-                        ConfigTab.KEYFLOW -> if (agentEnabled) {
+                        ConfigTab.KEYFLOW -> if (com.keyflow.BuildConfig.AGENT_ENABLED && agentEnabled) {
                             KeyflowPanel(
                                 settings = settings,
                                 onSettingsChange = ::recordSettingsChange,

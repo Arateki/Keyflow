@@ -47,6 +47,12 @@ class OverlayPackOrbTest {
     @Before
     fun setUp() {
         shell("appops set ${context.packageName} SYSTEM_ALERT_WINDOW allow")
+        // Orbe de um teste anterior ainda de pé entraria na medida de fundo e esconderia o Ateliê de verdade.
+        if (OverlayService.isRunningForUi) {
+            OverlayService.stop(context)
+            waitUntil("o serviço do overlay não parou") { !OverlayService.isRunningForUi }
+        }
+        atelieBackground = backgroundCount(atelie)
         saved = runBlocking { repo.settingsFlow().first() }
         runBlocking { repo.saveSettings(saved.copy(orbSkin = "atelie", orbSizePx = 195, overlayModeEnabled = true)) }
         OverlayService.start(context, OverlayService.startOverlayIntent(context))
@@ -96,22 +102,47 @@ class OverlayPackOrbTest {
     private val atelie = 0xFF4E9683.toInt() // MainOuter da orbe Ateliê
 
     /**
+     * Quantos px do [atelie] a tela já tem com a orbe FORA dela, medidos antes de o serviço subir. O ícone do app é a orbe parada, e o
+     * `#4E9683` da borda do corpo dela aparece no launcher que fica atrás do overlay (2026-10-24, CI: 1.412 px parados, o mesmo número nas duas
+     * tentativas, e "o Ateliê saiu de cena" nunca chegava). Só o que passa disso é a orbe flutuante.
+     */
+    private var atelieBackground = 0
+
+    /** Os px de [rgb] que a tela tem sem a orbe: espera a tela parar (duas medidas iguais seguidas, até 8 s); o que tiver até lá se não parar. */
+    private fun backgroundCount(rgb: Int): Int {
+        val deadline = System.currentTimeMillis() + 8_000
+        var previous = -1
+        var last = 0
+        while (System.currentTimeMillis() < deadline) {
+            val shot = screenshot()
+            if (shot != null) {
+                last = countNear(shot, rgb)
+                if (last == previous) return last
+                previous = last
+            }
+            Thread.sleep(250)
+        }
+        return last
+    }
+
+    /**
      * Espera o screenshot ter (ou não) pelo menos [min] px de [rgb] — a orbe leva uns quadros para refletir o ajuste, e a PRIMEIRA vez, com o
      * processo recém-aberto (Compose frio, renderização por software), leva muito mais: medido sob carga no host, 7–13 s até o Ateliê aparecer
      * depois de o serviço subir (e 4–5 s no resto). É uma espera por condição, então o limite longo não custa nada quando tudo está rápido.
      */
     private fun waitForColor(rgb: Int, present: Boolean, what: String, min: Int = 6000, timeoutMs: Long = 60_000) {
         val deadline = System.currentTimeMillis() + timeoutMs
+        val background = if (rgb == atelie) atelieBackground else 0
         var last = -1
         while (System.currentTimeMillis() < deadline) {
             val shot = screenshot()
             if (shot != null) {
-                last = countNear(shot, rgb)
+                last = countNear(shot, rgb) - background
                 if ((last >= min) == present && (present || last < 300)) return
             }
             Thread.sleep(250)
         }
-        throw AssertionError("$what: esperava ${if (present) "ter" else "não ter"} #${"%06X".format(rgb and 0xFFFFFF)} na tela; último count=$last")
+        throw AssertionError("$what: esperava ${if (present) "ter" else "não ter"} #${"%06X".format(rgb and 0xFFFFFF)} na tela; último count=$last (fora o fundo de $background)")
     }
 
     @Test

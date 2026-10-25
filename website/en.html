@@ -1,0 +1,422 @@
+<!doctype html>
+<!--
+  KeyFlow — home page (English). Portuguese version: index.html. Source: website/ (no build step);
+  scripts/gerar-site.py merges this folder with the legal pages into build/site/.
+
+  Hero line: data-linha="agente" ("Your personal agent starts with your voice.") or data-linha="ia"
+  ("A new way to use artificial intelligence."). When switching, switch the <title> too (the
+  alternative is commented right below it). The inline <head> script is hashed in the
+  Content-Security-Policy: if it changes, update the hash (gerar-site.py checks it).
+-->
+<html lang="en" data-linha="ia">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-3Q2+v2Y2rE9T3EDX2Vz2NW9nj2r6+FbnIV6qjmrNec8='; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<title>KeyFlow — a new way to use artificial intelligence</title>
+<!-- Alternative (data-linha="agente"): <title>KeyFlow — your personal agent, starting with your voice</title> -->
+<meta name="description" content="Android keyboard with voice dictation on-device or in the cloud with your key. Offline transcription, total privacy, and AI. Coming soon to Google Play.">
+<link rel="canonical" href="https://keyflow.arateki.com/en">
+<link rel="alternate" hreflang="pt-BR" href="https://keyflow.arateki.com/">
+<link rel="alternate" hreflang="en" href="https://keyflow.arateki.com/en">
+<link rel="alternate" hreflang="x-default" href="https://keyflow.arateki.com/">
+<meta name="theme-color" content="#12100d">
+<meta name="color-scheme" content="dark light">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="KeyFlow">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="pt_BR">
+<meta property="og:url" content="https://keyflow.arateki.com/en">
+<meta property="og:title" content="KeyFlow — a new way to use artificial intelligence">
+<meta property="og:description" content="Speak in any app and the text appears. On your phone, offline, or in the cloud with your own key. Coming soon to Google Play.">
+<meta property="og:image" content="https://keyflow.arateki.com/assets/img/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The KeyFlow orb, in sea green, on a warm dark background, with the KeyFlow name.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="assets/img/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
+<link rel="preload" href="assets/fonts/space-grotesk-300.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/space-grotesk-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/css/site.css">
+<script>(function(){try{var t=localStorage.getItem('kf-tema');if(t==='claro'||t==='escuro')document.documentElement.setAttribute('data-theme',t)}catch(e){}})();</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://arateki.com/#organization",
+      "name": "Arateki",
+      "url": "https://arateki.com",
+      "logo": "https://keyflow.arateki.com/favicon.svg",
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "email": "contato@arateki.com",
+        "contactType": "customer support"
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://keyflow.arateki.com/en#website",
+      "url": "https://keyflow.arateki.com/en",
+      "name": "KeyFlow",
+      "description": "Android keyboard with on-device voice dictation and artificial intelligence support.",
+      "publisher": {
+        "@id": "https://arateki.com/#organization"
+      },
+      "inLanguage": ["pt-BR", "en"]
+    },
+    {
+      "@type": "MobileApplication",
+      "@id": "https://keyflow.arateki.com/en#application",
+      "name": "KeyFlow",
+      "operatingSystem": "Android",
+      "applicationCategory": "UtilitiesApplication",
+      "description": "Android keyboard featuring offline on-device voice dictation or cloud transcription with your own key, floating orb, and language model integration.",
+      "inLanguage": ["pt-BR", "en", "es"],
+      "publisher": {
+        "@id": "https://arateki.com/#organization"
+      },
+      "author": {
+        "@id": "https://arateki.com/#organization"
+      }
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://keyflow.arateki.com/en#faq",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Does KeyFlow work offline without an internet connection?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. On-device voice dictation requires a one-time model download during initial setup (with internet). After that, transcription runs completely on your phone with no connection needed, even in airplane mode. You can also optionally connect cloud providers with your own API key."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does KeyFlow send what I type to any server?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Not for regular typing. What you type stays on your phone. The only exception is when you explicitly use a cloud AI feature (such as cloud transcription, reasoning, or agent tools): in that case, that specific prompt or audio is sent directly to the provider you configured, using your own API key."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What languages are supported?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The keyboard includes dedicated layouts for Portuguese (Brazil), English, and Spanish, with native accents and punctuation. Offline voice dictation also transcribes all three languages and dozens more using on-device models like Whisper (99 languages) and Parakeet (25 European languages)."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is KeyFlow available for download now?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "KeyFlow is currently in active development for Android and will be available soon on Google Play. There are no unofficial download links prior to release."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Do I need an account to use KeyFlow?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. KeyFlow requires no account, sign-up, or personal information. API keys and settings are encrypted locally on your device via Android Keystore."
+          }
+        }
+      ]
+    }
+  ]
+}
+</script>
+<script src="assets/js/orbe.js" defer></script>
+<script src="assets/js/site.js" defer></script>
+</head>
+<body>
+<a class="pular" href="#conteudo">Skip to content</a>
+<div class="luz" aria-hidden="true"></div>
+
+<header class="topo">
+  <div class="caixa topo-in">
+    <a class="marca" href="en.html"><span class="marca-orbe" aria-hidden="true"></span>KeyFlow</a>
+    <nav class="nav" aria-label="Sections">
+      <a href="#como">How it works</a>
+      <a href="#recursos">Features</a>
+      <a href="#privacidade">Privacy</a>
+      <a href="#agente">What's next</a>
+      <a href="#faq">FAQ</a>
+      <a href="docs.html">Documentation</a>
+    </nav>
+    <div class="topo-acoes">
+      <a class="docs-atalho" href="docs.html">Docs<span class="so-leitor"> — Documentation</span></a>
+      <a class="idioma" href="index.html" hreflang="pt-BR" lang="pt-BR">PT<span class="so-leitor"> — versão em português</span></a>
+      <button class="tema" type="button" aria-pressed="false" aria-label="Light theme">
+        <svg class="sol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/></svg>
+        <svg class="lua" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.6A8 8 0 0 1 9.4 4a8 8 0 1 0 10.6 10.6Z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="conteudo">
+  <section class="heroi" aria-labelledby="titulo">
+    <div class="caixa heroi-centro">
+      <div class="heroi-orbe" aria-hidden="true">
+        <div class="orbe-brilho"></div>
+        <svg class="orbe-estatica" viewBox="0 0 1000 1000" aria-hidden="true" focusable="false"><defs><radialGradient id="h0" gradientUnits="userSpaceOnUse" cx="436.2" cy="423.4" r="319.2"><stop offset="0" stop-color="#7EB8A8" stop-opacity="0.4"/><stop offset="1" stop-color="#7EB8A8" stop-opacity="0.0"/></radialGradient><radialGradient id="h1" gradientUnits="userSpaceOnUse" cx="443.0" cy="431.6" r="285.0"><stop offset="0" stop-color="#9AD0BF" stop-opacity="1"/><stop offset="1" stop-color="#4E9683" stop-opacity="1"/></radialGradient><radialGradient id="h2" gradientUnits="userSpaceOnUse" cx="462.4" cy="454.9" r="188.1"><stop offset="0" stop-color="#F4ECCF" stop-opacity="1"/><stop offset="1" stop-color="#BFE0D4" stop-opacity="1"/></radialGradient></defs><path d="M750 500C750 514 749 529 747 543C744 558 741 572 737 586C732 600 727 614 722 628C716 642 709 656 701 668C693 681 683 694 672 705C661 716 649 727 635 734C622 742 606 748 591 751C576 755 560 756 545 755C530 755 515 753 500 750C485 748 472 744 458 740C444 736 431 732 417 727C404 723 391 718 377 712C364 706 351 700 339 692C327 684 315 674 305 664C294 653 285 641 277 629C269 616 263 602 257 588C252 574 248 560 245 545C242 530 240 515 240 500C239 485 239 469 242 454C244 440 248 424 253 410C259 396 267 382 275 370C284 358 295 347 305 337C316 327 329 318 341 310C353 302 365 295 378 288C390 281 402 274 416 268C429 262 442 255 456 251C470 246 485 241 500 239C515 237 531 237 546 239C561 241 577 245 591 251C605 257 618 265 631 274C643 283 654 294 664 305C674 315 683 327 692 339C700 351 708 363 715 376C722 388 729 401 734 415C739 428 744 442 746 457C749 471 750 486 750 500Z" fill="url(#h0)" opacity="1.0"/><path d="M733 500C732 513 729 527 726 540C723 553 718 565 713 578C708 590 703 602 696 613C689 624 682 636 674 646C665 656 656 665 646 674C636 682 625 690 613 696C602 702 589 707 577 712C565 716 552 719 539 722C526 725 513 727 500 728C487 729 473 729 460 728C447 726 433 724 420 720C407 716 394 711 382 704C371 697 360 688 351 678C341 668 333 657 326 646C319 635 313 623 308 611C303 599 299 587 295 575C291 563 287 551 284 538C281 526 278 513 277 500C275 487 275 474 276 460C277 447 279 434 282 421C286 408 292 395 298 383C305 372 313 360 321 350C330 340 340 330 350 322C361 313 372 305 383 298C395 291 408 285 420 281C433 277 446 273 460 272C473 270 487 270 500 272C513 273 526 276 539 280C551 284 563 289 575 294C587 299 598 305 609 312C620 318 631 324 641 332C652 339 663 346 673 355C682 364 692 374 700 384C708 395 716 407 721 420C726 432 730 446 732 459C734 473 734 487 733 500Z" fill="url(#h1)" opacity="0.96"/><path d="M654 500C652 509 650 518 647 526C644 534 641 542 637 550C633 558 630 565 626 572C621 580 617 587 612 594C607 601 602 608 596 615C590 621 583 627 576 632C569 637 561 641 552 644C544 647 535 650 527 651C518 652 509 653 500 653C491 653 482 652 473 651C465 649 456 647 448 644C439 641 431 637 424 632C416 628 409 622 403 616C397 609 391 602 387 595C382 588 379 580 375 572C372 564 369 556 367 549C364 541 361 533 359 525C357 517 354 509 353 500C351 491 350 482 350 473C350 465 350 455 352 446C354 437 358 429 363 421C367 413 373 405 379 399C386 392 393 387 401 382C408 377 416 373 424 369C432 365 441 362 449 359C457 357 466 355 474 354C483 352 491 352 500 352C509 352 517 353 526 355C534 357 542 360 550 363C558 366 565 370 573 374C580 378 587 383 594 388C601 392 609 398 615 403C622 409 628 416 634 423C639 430 644 438 647 446C651 455 653 464 654 473C655 482 655 491 654 500Z" fill="url(#h2)" opacity="0.95"/><circle cx="436.2" cy="427.0" r="36.5" fill="#fff" opacity=".3"/></svg>
+        <canvas></canvas>
+      </div>
+      <div class="heroi-texto">
+        <p class="selo"><span class="selo-ponto" aria-hidden="true"></span>Coming soon to Google Play</p>
+        <h1 id="titulo" class="titulo-heroi">
+          <span class="linha" data-linha="agente">Your personal agent <span class="tenue">starts with your voice.</span></span>
+          <span class="linha" data-linha="ia">A new way to use <span class="tenue">artificial intelligence.</span></span>
+        </h1>
+        <p class="lide">An Android keyboard with a floating orb. Speak in any app and the text lands in the field — transcribed on your phone, offline, or in the cloud with your own key.</p>
+        <div class="acoes">
+          <a class="botao botao-baixo" href="#recursos"><span>See what works today</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg></a>
+        </div>
+      </div>
+    </div>
+    <ul class="caixa faixa" aria-label="At a glance">
+      <li>Voice in any app</li>
+      <li>On-device or cloud</li>
+      <li>No sign-up</li>
+      <li>English · Português · Español</li>
+    </ul>
+  </section>
+
+  <section id="como" class="secao como" aria-labelledby="como-titulo">
+    <div class="caixa como-grade">
+      <div>
+        <p class="rotulo">01 — The orb</p>
+        <h2 id="como-titulo" class="titulo-secao revela">Tap. Speak. <span class="tenue">It's written.</span></h2>
+        <ol class="passos">
+          <li class="revela"><span class="passo-n" aria-hidden="true">01</span><div><h3>Tap the orb</h3><p>It floats over any app — or lives in the keyboard's mic key. It only records when you say so.</p></div></li>
+          <li class="revela"><span class="passo-n" aria-hidden="true">02</span><div><h3>Speak your way</h3><p>Pause, resume, cancel or undo with a gesture. The timer runs in the center of the orb.</p></div></li>
+          <li class="revela"><span class="passo-n" aria-hidden="true">03</span><div><h3>The text lands in the field</h3><p>Right where your cursor is: a message, an email, a note or a search.</p></div></li>
+        </ol>
+      </div>
+      <figure class="demo revela" role="img" aria-label="Demo: in a messaging app, the KeyFlow orb listens, transcribes and types “Be there in ten minutes. Can you order me a coffee?” into the text field, above the keyboard.">
+        <div class="demo-tela" aria-hidden="true">
+          <div class="demo-barra"><span>14:32</span><span class="demo-sinais"></span></div>
+          <div class="demo-contato"><span class="demo-avatar"></span>Ana</div>
+          <div class="demo-conversa"><p class="bolha">Are you coming tonight?</p></div>
+          <div class="demo-campo" data-vazio="Message"><span class="demo-texto">Be there in ten minutes. Can you order me a coffee?</span><span class="demo-cursor"></span></div>
+          <img class="demo-teclado" src="assets/img/teclado-sistema.webp" width="720" height="441" alt="" loading="lazy" decoding="async">
+          <div class="demo-orbe"><img src="favicon.svg" alt="" width="64" height="64"><canvas></canvas><span class="demo-tempo">0:00</span></div>
+        </div>
+        <p class="demo-estado" aria-hidden="true" data-toque="Tap the orb" data-ouvindo="Listening" data-transcrevendo="Transcribing" data-pronto="Text inserted">Text inserted</p>
+      </figure>
+    </div>
+  </section>
+
+  <section id="recursos" class="secao recursos" aria-labelledby="recursos-titulo">
+    <div class="caixa">
+      <div class="cabeca">
+        <p class="rotulo">02 — Available now</p>
+        <h2 id="recursos-titulo" class="titulo-secao revela">Ready to use.</h2>
+        <p class="cabeca-texto revela">Everything here ships in the app's first version.</p>
+      </div>
+      <ul class="grade-cartoes">
+        <li class="cartao cartao-largo cartao-com-gestos revela">
+          <div class="cartao-topo"><span class="cartao-n" aria-hidden="true">Orb</span><span class="estado estado-pronto">Available</span></div>
+          <div class="gestos" aria-hidden="true"><img src="favicon.svg" alt="" width="68" height="68"><span class="g-cima">↑ pause</span><span class="g-esq">← cancel</span><span class="g-baixo">↓ settings</span></div>
+          <div class="cartao-corpo">
+            <h3>Floating orb</h3>
+            <p>Dictate in any app without switching keyboards. Drag the orb to pause, cancel or open settings.</p>
+          </div>
+        </li>
+        <li class="cartao cartao-estreito revela">
+          <div class="cartao-topo"><span class="cartao-n" aria-hidden="true">On-device</span><span class="estado estado-pronto">Available</span></div>
+          <div class="cartao-corpo">
+            <h3>On-device transcription</h3>
+            <p>Whisper and Parakeet run on your phone, even in airplane mode. Your audio never leaves it.</p>
+          </div>
+        </li>
+        <li class="cartao cartao-estreito revela">
+          <div class="cartao-topo"><span class="cartao-n" aria-hidden="true">Cloud</span><span class="estado estado-pronto">Available</span></div>
+          <div class="cartao-corpo">
+            <h3>Or the cloud, with your key</h3>
+            <p>OpenAI, Groq or any compatible service. No KeyFlow account.</p>
+          </div>
+        </li>
+        <li class="cartao cartao-largo revela">
+          <div class="cartao-topo"><span class="cartao-n" aria-hidden="true">Keyboard</span><span class="estado estado-pronto">Available</span></div>
+          <div class="cartao-corpo">
+            <h3>A real keyboard</h3>
+            <p>Built from scratch: English, Portuguese and Spanish with accents, on-device spell check and shortcut bars your way.</p>
+            <div class="cartao-detalhe" aria-hidden="true"><span class="tecla">á</span><span class="tecla">ç</span><span class="tecla">ñ</span><span class="tecla">ê</span><span class="tecla tecla-larga">?123</span></div>
+          </div>
+        </li>
+        <li class="cartao revela">
+          <div class="cartao-topo"><span class="cartao-n" aria-hidden="true">AI</span><span class="estado estado-pronto">Available</span></div>
+          <div class="cartao-corpo">
+            <h3>The AI you choose</h3>
+            <p>Connect Gemma and Qwen on your device, or OpenAI, Anthropic and Google with an API key or your subscription login.</p>
+            <div class="cartao-detalhe" aria-hidden="true"><span class="ficha">Gemma</span><span class="ficha">Qwen</span><span class="ficha">OpenAI</span><span class="ficha">Anthropic</span><span class="ficha">Google</span></div>
+          </div>
+        </li>
+        <li class="cartao revela">
+          <div class="cartao-topo"><span class="cartao-n" aria-hidden="true">Looks</span><span class="estado estado-pronto">Available</span></div>
+          <div class="cartao-corpo">
+            <h3>Themes and skins</h3>
+            <p>System and Atelier are free. Aero, Glitch, Rose Gold and the mascot come with the one-time purchase. Or import your own skin as a .zip.</p>
+            <div class="amostras" aria-hidden="true"><span class="amostra amostra-sistema"></span><span class="amostra amostra-atelie"></span><span class="amostra amostra-aero"></span><span class="amostra amostra-glitch"></span><span class="amostra amostra-rose"></span></div>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="aparencia" class="secao aparencia" aria-labelledby="aparencia-titulo">
+    <div class="caixa">
+      <div class="cabeca">
+        <p class="rotulo">03 — Appearance</p>
+        <h2 id="aparencia-titulo" class="titulo-secao revela">Dress your keyboard.</h2>
+        <p class="cabeca-texto revela">Each skin changes the keys and the background; the orb has its own. Switching is instant, nothing to restart.</p>
+      </div>
+    </div>
+    <ul class="caixa galeria" aria-label="Keyboard skins">
+      <li class="peca revela"><figure><img src="assets/img/teclado-sistema.webp" width="720" height="441" loading="lazy" decoding="async" alt="KeyFlow keyboard with the System skin: dark gray keys."><figcaption>System <span class="estado estado-gratis">Free</span></figcaption></figure></li>
+      <li class="peca revela"><figure><img src="assets/img/teclado-aero.webp" width="720" height="441" loading="lazy" decoding="async" alt="KeyFlow keyboard with the Aero skin: glossy turquoise glass keys."><figcaption>Aero <span class="estado estado-pronto">One-time purchase</span></figcaption></figure></li>
+      <li class="peca revela"><figure><img src="assets/img/teclado-glitch.webp" width="720" height="441" loading="lazy" decoding="async" alt="KeyFlow keyboard with the Glitch skin: black keys with cyan and red corners."><figcaption>Glitch <span class="estado estado-pronto">One-time purchase</span></figcaption></figure></li>
+      <li class="peca revela"><figure><img src="assets/img/teclado-rose-gold.webp" width="720" height="441" loading="lazy" decoding="async" alt="KeyFlow keyboard with the Rose Gold skin: rosé satin keys with wine-colored letters."><figcaption>Rose Gold <span class="estado estado-pronto">One-time purchase</span></figcaption></figure></li>
+    </ul>
+    <p class="caixa nota-capturas">Real screenshots from the app. Atelier and the mascot orb are in there too.</p>
+  </section>
+
+  <section id="privacidade" class="secao privacidade" aria-labelledby="privacidade-titulo">
+    <div class="caixa priv-grade">
+      <div class="cabeca">
+        <p class="rotulo">04 — Privacy</p>
+        <h2 id="privacidade-titulo" class="titulo-secao revela">What you type <span class="tenue">stays on your phone.</span></h2>
+        <p class="cabeca-texto revela">A keyboard sees everything. That's why KeyFlow is built to keep the minimum and send out only what you ask for.</p>
+        <a class="link-seta" href="privacy.html">Read the privacy policy <span aria-hidden="true">→</span></a>
+      </div>
+      <ul class="priv-lista">
+        <li class="revela"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg><div><h3>Your keystrokes never leave the phone</h3><p>Typed text goes straight to the app you're using. Nothing is logged or sent.</p></div></li>
+        <li class="revela"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg><div><h3>The mic only listens when you speak</h3><p>Recording starts and stops when you decide.</p></div></li>
+        <li class="revela"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 8.5a14 14 0 0 1 19 0M5.5 12a9.5 9.5 0 0 1 13 0M9 15.5a4.5 4.5 0 0 1 6 0M3 3l18 18"/><circle cx="12" cy="19" r=".9"/></svg><div><h3>Truly offline</h3><p>With on-device models, transcription works in airplane mode.</p></div></li>
+        <li class="revela"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M10.9 12.1 20 3M16 7l2.5 2.5M13.5 9.5 15.5 11.5"/></svg><div><h3>Your keys, protected</h3><p>API keys and logins are encrypted by the Android Keystore. No KeyFlow sign-up.</p></div></li>
+      </ul>
+    </div>
+    <p class="caixa priv-nota">This page too: no cookies, no analytics, no trackers. Everything is served from here.</p>
+  </section>
+
+  <section id="agente" class="secao agente" aria-labelledby="agente-titulo">
+    <div class="caixa">
+      <div class="cabeca">
+        <p class="rotulo">05 — What's next</p>
+        <h2 id="agente-titulo" class="titulo-secao revela">Toward your <span class="tenue">personal agent.</span></h2>
+        <p class="cabeca-texto revela">The keyboard is the way in. Next comes an agent that talks with you, sees what's on your screen and acts — always with your confirmation.</p>
+      </div>
+      <ol class="trilha">
+        <li class="trilha-item revela"><span class="trilha-n" aria-hidden="true">01</span><div><h3>KeyFlow Agent</h3><p>Chat with AI inside the app and let it set KeyFlow up for you, using tools that ask for your confirmation.</p></div><span class="estado estado-breve">Coming soon</span></li>
+        <li class="trilha-item revela"><span class="trilha-n" aria-hidden="true">02</span><div><h3>Vision</h3><p>Select an area of the screen from the orb and copy its text, the image or a translation — all on your device.</p></div><span class="estado estado-breve">Coming soon</span></li>
+        <li class="trilha-item revela"><span class="trilha-n" aria-hidden="true">03</span><div><h3>Flows</h3><p>Chain voice, vision and reasoning: speak, let the AI work and get the result ready.</p></div><span class="estado estado-breve">Coming soon</span></li>
+        <li class="trilha-item revela"><span class="trilha-n" aria-hidden="true">04</span><div><h3>Speech</h3><p>Answers and text read aloud.</p></div><span class="estado estado-breve">Coming soon</span></li>
+        <li class="trilha-item revela"><span class="trilha-n" aria-hidden="true">05</span><div><h3>Computer</h3><p>Local and SSH terminals inside the app, for you and for the agent.</p></div><span class="estado estado-breve">Coming soon</span></li>
+        <li class="trilha-item revela"><span class="trilha-n" aria-hidden="true">06</span><div><h3>Credits</h3><p>Use transcription and AI without an API key of your own.</p></div><span class="estado estado-breve">Coming soon</span></li>
+      </ol>
+      <p class="trilha-nota">Each feature arrives in an app update, when it's ready. No promised dates.</p>
+    </div>
+  </section>
+
+  <section id="faq" class="secao faq" aria-labelledby="faq-titulo">
+    <div class="caixa">
+      <div class="cabeca">
+        <p class="rotulo">06 — Frequently asked questions</p>
+        <h2 id="faq-titulo" class="titulo-secao revela">Answers to common <span class="tenue">questions.</span></h2>
+        <p class="cabeca-texto revela">Straightforward answers about how KeyFlow works, its privacy model, and availability.</p>
+      </div>
+      <ul class="faq-lista">
+        <li class="faq-item revela">
+          <span class="faq-n" aria-hidden="true">01</span>
+          <div>
+            <h3>Does KeyFlow work offline without an internet connection?</h3>
+            <p>Yes. On-device voice dictation requires a one-time model download during initial setup (with internet). After that, transcription runs completely on your phone with no connection needed, even in airplane mode. You can also optionally connect cloud providers with your own API key.</p>
+          </div>
+        </li>
+        <li class="faq-item revela">
+          <span class="faq-n" aria-hidden="true">02</span>
+          <div>
+            <h3>Does KeyFlow send what I type to any server?</h3>
+            <p>Not for regular typing. What you type stays on your phone. The only exception is when you explicitly use a cloud AI feature (such as cloud transcription, reasoning, or agent tools): in that case, that specific prompt or audio is sent directly to the provider you configured, using your own API key.</p>
+          </div>
+        </li>
+        <li class="faq-item revela">
+          <span class="faq-n" aria-hidden="true">03</span>
+          <div>
+            <h3>What languages are supported?</h3>
+            <p>The keyboard includes dedicated layouts for Portuguese (Brazil), English, and Spanish, with native accents and punctuation. Offline voice dictation also transcribes all three languages and dozens more using on-device models like Whisper (99 languages) and Parakeet (25 European languages).</p>
+          </div>
+        </li>
+        <li class="faq-item revela">
+          <span class="faq-n" aria-hidden="true">04</span>
+          <div>
+            <h3>Is KeyFlow available for download now?</h3>
+            <p>KeyFlow is currently in active development for Android and will be available soon on Google Play. There are no unofficial download links prior to release.</p>
+          </div>
+        </li>
+        <li class="faq-item revela">
+          <span class="faq-n" aria-hidden="true">05</span>
+          <div>
+            <h3>Do I need an account to use KeyFlow?</h3>
+            <p>No. KeyFlow requires no account, sign-up, or personal information. API keys and settings are encrypted locally on your device via Android Keystore.</p>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="secao final" aria-labelledby="final-titulo">
+    <div class="caixa">
+      <div class="final-orbe" aria-hidden="true"></div>
+      <h2 id="final-titulo" class="titulo-secao revela">Coming soon to <span class="tenue">Google Play.</span></h2>
+      <p class="cabeca-texto revela">The first version is on its way. Want to know when it lands? Write to us.</p>
+      <div class="acoes"><!--email_off--><a class="botao" href="mailto:contato@arateki.com?subject=KeyFlow"><span>contato@arateki.com</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a><!--/email_off--></div>
+    </div>
+  </section>
+</main>
+
+<footer class="rodape">
+  <div class="caixa rodape-grade">
+    <div class="rodape-marca">
+      <a class="marca" href="en.html"><span class="marca-orbe" aria-hidden="true"></span>KeyFlow</a>
+      <p>A product by <a href="https://arateki.com">Arateki</a>, made in Fortaleza, Brazil.</p>
+    </div>
+    <nav aria-labelledby="rodape-docs">
+      <h2 id="rodape-docs" class="rodape-titulo">Documents</h2>
+      <ul>
+        <li><a href="docs.html">Documentation</a></li>
+        <li><a href="privacy.html">Privacy Policy</a></li>
+        <li><a href="terms.html">Terms of Use</a></li>
+        <li><a href="doc.html" hreflang="pt-BR" lang="pt-BR">Documentação</a></li>
+        <li><a href="privacidade.html" hreflang="pt-BR" lang="pt-BR">Política de Privacidade</a></li>
+        <li><a href="termos.html" hreflang="pt-BR" lang="pt-BR">Termos de Uso</a></li>
+      </ul>
+    </nav>
+    <div>
+      <h2 class="rodape-titulo">Contact</h2>
+      <ul><li><!--email_off--><a href="mailto:contato@arateki.com">contato@arateki.com</a><!--/email_off--></li></ul>
+    </div>
+    <div>
+      <h2 class="rodape-titulo">Language</h2>
+      <ul>
+        <li><a href="en.html" aria-current="page">English</a></li>
+        <li><a href="index.html" hreflang="pt-BR" lang="pt-BR">Português</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="caixa rodape-base">
+    <p>© 2026 Arateki LTDA · CNPJ 45.642.122/0001-10</p>
+    <p>Google Play is a trademark of Google LLC.</p>
+  </div>
+  <p class="rodape-gigante" aria-hidden="true">KeyFlow</p>
+</footer>
+</body>
+</html>

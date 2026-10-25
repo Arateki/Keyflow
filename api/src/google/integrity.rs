@@ -176,18 +176,18 @@ mod tests {
     #[test]
     fn accepts_valid_verdicts() {
         let p = payload(
-            "com.keyflow",
+            "com.arateki.keyflow",
             "PLAY_RECOGNIZED",
             &["MEETS_DEVICE_INTEGRITY"],
         );
-        assert_eq!(verify_verdicts(&p, "com.keyflow", false), Ok(()));
+        assert_eq!(verify_verdicts(&p, "com.arateki.keyflow", false), Ok(()));
     }
 
     #[test]
     fn rejects_wrong_package() {
         let p = payload("com.evil", "PLAY_RECOGNIZED", &["MEETS_DEVICE_INTEGRITY"]);
         assert_eq!(
-            verify_verdicts(&p, "com.keyflow", false),
+            verify_verdicts(&p, "com.arateki.keyflow", false),
             Err(VerdictError::WrongPackage("com.evil".to_string()))
         );
     }
@@ -195,9 +195,9 @@ mod tests {
     #[test]
     fn rejects_device_out_of_integrity() {
         // deviceRecognitionVerdict vazio = "sinais de ataque/root/emulador" (doc oficial).
-        let p = payload("com.keyflow", "PLAY_RECOGNIZED", &[]);
+        let p = payload("com.arateki.keyflow", "PLAY_RECOGNIZED", &[]);
         assert_eq!(
-            verify_verdicts(&p, "com.keyflow", false),
+            verify_verdicts(&p, "com.arateki.keyflow", false),
             Err(VerdictError::DeviceNotTrusted)
         );
     }
@@ -205,12 +205,12 @@ mod tests {
     #[test]
     fn rejects_unrecognized_app_without_relax_flag() {
         let p = payload(
-            "com.keyflow",
+            "com.arateki.keyflow",
             "UNRECOGNIZED_VERSION",
             &["MEETS_DEVICE_INTEGRITY"],
         );
         assert_eq!(
-            verify_verdicts(&p, "com.keyflow", false),
+            verify_verdicts(&p, "com.arateki.keyflow", false),
             Err(VerdictError::AppNotRecognized(
                 "UNRECOGNIZED_VERSION".to_string()
             ))
@@ -220,18 +220,18 @@ mod tests {
     #[test]
     fn accepts_unrecognized_app_with_relax_flag() {
         let p = payload(
-            "com.keyflow",
+            "com.arateki.keyflow",
             "UNRECOGNIZED_VERSION",
             &["MEETS_DEVICE_INTEGRITY"],
         );
-        assert_eq!(verify_verdicts(&p, "com.keyflow", true), Ok(()));
+        assert_eq!(verify_verdicts(&p, "com.arateki.keyflow", true), Ok(()));
     }
 
     #[test]
     fn relax_flag_does_not_bypass_package_or_device_checks() {
         let p = payload("com.evil", "UNRECOGNIZED_VERSION", &[]);
         assert_eq!(
-            verify_verdicts(&p, "com.keyflow", true),
+            verify_verdicts(&p, "com.arateki.keyflow", true),
             Err(VerdictError::WrongPackage("com.evil".to_string()))
         );
     }

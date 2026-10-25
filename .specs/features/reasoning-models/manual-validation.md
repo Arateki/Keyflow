@@ -33,12 +33,12 @@ OpenAI aceitando o KeyFlow, e o callback do login com o app em segundo plano num
 6. **Modo avião ligado**, Leve selecionado → **Testar** funciona (é 100% local).
 7. **Matar o `:reasoning` no meio**: toque Testar e, durante a resposta:
    ```bash
-   adb -s RX8T10DERKW shell run-as com.keyflow kill -9 $(adb -s RX8T10DERKW shell pidof com.keyflow:reasoning)
+   adb -s RX8T10DERKW shell run-as com.arateki.keyflow kill -9 $(adb -s RX8T10DERKW shell pidof com.arateki.keyflow:reasoning)
    ```
    → a área mostra "O motor local foi interrompido — tente de novo", **o teclado e o ditado seguem normais**, e um **novo Testar
    funciona** (o processo sobe de novo).
 8. **Descarregar por ociosidade**: depois de um Testar, deixe ~2 min 30 s sem usar e rode
-   `adb -s RX8T10DERKW shell dumpsys meminfo com.keyflow:reasoning` — o PSS deve **cair** (modelo descarregado) ou o processo
+   `adb -s RX8T10DERKW shell dumpsys meminfo com.arateki.keyflow:reasoning` — o PSS deve **cair** (modelo descarregado) ou o processo
    sumir. Anote quanto tempo levou.
 9. **Apagar** o modelo selecionado → o Testar desliga e diz "Baixe e selecione um modelo para testar."
 
@@ -86,15 +86,15 @@ errado, anote só a mensagem da página e o texto do app.
 ## D. Onde ficam as credenciais (segurança, só olhar)
 
 25. ```bash
-    adb -s RX8T10DERKW shell run-as com.keyflow ls shared_prefs
-    adb -s RX8T10DERKW shell run-as com.keyflow cat shared_prefs/keyflow_auth.xml
+    adb -s RX8T10DERKW shell run-as com.arateki.keyflow ls shared_prefs
+    adb -s RX8T10DERKW shell run-as com.arateki.keyflow cat shared_prefs/keyflow_auth.xml
     ```
     Existe `keyflow_auth.xml` e o conteúdo é **ilegível** (cifrado): não pode conter `sk-`, seu e-mail, nem `eyJ` (o começo de um
-    JWT). Confira também que `files/datastore/` (as Settings) **não** tem nenhuma dessas strings (`adb … run-as com.keyflow grep -rl 'sk-' files shared_prefs` não pode achar nada).
+    JWT). Confira também que `files/datastore/` (as Settings) **não** tem nenhuma dessas strings (`adb … run-as com.arateki.keyflow grep -rl 'sk-' files shared_prefs` não pode achar nada).
 
 ## E. Medições para ajustar (RSN-T19 — `idleUnloadMs`, `recommendedRamMb`)
 
-26. Durante o Testar, rode `adb -s RX8T10DERKW shell dumpsys meminfo com.keyflow:reasoning` e anote o **TOTAL PSS** do Leve e do
+26. Durante o Testar, rode `adb -s RX8T10DERKW shell dumpsys meminfo com.arateki.keyflow:reasoning` e anote o **TOTAL PSS** do Leve e do
     Equilibrado (hoje o catálogo estima 1024 MB e 4096 MB de RAM "recomendada" no aparelho inteiro; a estimativa de trabalho é
     a metade). Diga se o aviso "pesado" apareceu no que devia.
 27. Se o modelo descarrega cedo demais (recarga a cada Testar) ou tarde demais (RAM presa), diga: hoje são **120 s**

@@ -16,7 +16,7 @@ use tower::ServiceExt;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
-const PACKAGE_NAME: &str = "com.keyflow";
+const PACKAGE_NAME: &str = "com.arateki.keyflow";
 const BYTES_PER_SECOND: usize = 8000;
 
 fn provider(url: String, name: &str) -> ResolvedProvider {

@@ -1,0 +1,65 @@
+<!doctype html>
+<!--
+  Fonte da imagem de prévia social (assets/img/og.jpg, 1200×630; capture em PNG e converta para JPEG qualidade 88) e dos ícones PNG. Não vai ao ar: o
+  gerar-site.py ignora pastas que começam com "_". Para regenerar, abra no Chromium em 1200×630 e capture
+  (#og), ou capture #icone-180 e #icone-32; a orbe usa o mesmo assets/js/orbe.js da página.
+-->
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>KeyFlow — prévia social</title>
+<style>
+@font-face { font-family: "Space Grotesk"; src: url("../assets/fonts/space-grotesk-300.woff2") format("woff2"); font-weight: 300; }
+@font-face { font-family: "Space Mono"; src: url("../assets/fonts/space-mono-400.woff2") format("woff2"); font-weight: 400; }
+html, body { margin: 0; background: #0b0a08; }
+#og {
+  position: relative; width: 1200px; height: 630px; overflow: hidden; background: #12100d;
+  font-family: "Space Grotesk", sans-serif; color: #f1e7c9;
+}
+#og::before {
+  content: ""; position: absolute; inset: 0;
+  background-image: linear-gradient(to right, rgba(241,231,201,.07) 1px, transparent 1px);
+  background-size: 150px 100%;
+  -webkit-mask-image: radial-gradient(ellipse 70% 80% at 72% 50%, #000 10%, transparent 80%);
+}
+#og .brilho {
+  position: absolute; left: 820px; top: 315px; width: 620px; height: 620px; margin: -310px 0 0 -310px;
+  border-radius: 50%; background: radial-gradient(circle, rgba(78,150,131,.42), transparent 64%); filter: blur(30px);
+}
+#og canvas { position: absolute; left: 520px; top: 15px; width: 600px; height: 600px; }
+#og .texto { position: absolute; left: 88px; top: 0; bottom: 0; display: flex; flex-direction: column; justify-content: center; }
+#og .marca { font-weight: 300; font-size: 132px; letter-spacing: -.055em; line-height: .9; }
+#og .linha { margin-top: 34px; width: 64px; height: 1px; background: rgba(241,231,201,.35); }
+#og .url { margin-top: 26px; font-family: "Space Mono", monospace; font-size: 20px; letter-spacing: .16em; color: #b6ac8c; text-transform: uppercase; }
+#og .grao { position: absolute; inset: 0; opacity: .06; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .55 0 0 0 0 .5 0 0 0 0 .42 0 0 0 1.2 -.1'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23g)'/%3E%3C/svg%3E"); }
+#icone-180 { width: 180px; height: 180px; background: radial-gradient(circle at 50% 46%, #1f2a24, #12100d 70%); display: grid; place-items: center; }
+#icone-180 img { width: 132px; height: 132px; }
+#icone-32 { width: 32px; height: 32px; background: transparent; }
+#icone-32 img { width: 32px; height: 32px; display: block; }
+.icones { display: flex; gap: 20px; padding: 20px; align-items: flex-start; }
+</style>
+</head>
+<body>
+<div id="og">
+  <div class="brilho"></div>
+  <canvas width="600" height="600"></canvas>
+  <div class="texto">
+    <div class="marca">KeyFlow</div>
+    <div class="linha"></div>
+    <div class="url">keyflow.arateki.com</div>
+  </div>
+  <div class="grao"></div>
+</div>
+<div class="icones">
+  <div id="icone-180"><img src="../favicon.svg" alt=""></div>
+  <div id="icone-32"><img src="../favicon.svg" alt=""></div>
+</div>
+<script src="../assets/js/orbe.js"></script>
+<script>
+  // A orbe ouvindo, num instante bonito e sempre o mesmo.
+  var orbe = KFOrbe.criar(document.querySelector('#og canvas'), { escala: 0.22, realceAneis: 2.2 });
+  orbe.fixar(2350, 'ouvindo');
+  document.body.setAttribute('data-pronto', '1');
+</script>
+</body>
+</html>
