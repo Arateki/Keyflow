@@ -146,6 +146,11 @@ upload interno, o produto de R$15 e a service account. As tasks V1-1..V1-8 não 
   x86_64 nativo 1/1 e ARM real no A32 1/1, na cópia `.teste`; DEX minificado idêntico entre as variantes.
   O mesmo APK ARM reproduziu SIGSEGV `0x8` somente no AVD por `libndk_translation.so` (0/1), isolando a falha ao caminho
   traduzido. Regras de keep inalteradas; app pessoal, dados e teclado Samsung preservados pelo atalho seguro.
+  Revisão corrigida em 2026-10-25: agente ausente dos DEX do APK/AAB, conferido por nomes originais → ofuscados
+  (`check-release-agent.py`); smoke exige mapping e mantém a conferência JNI. Assinatura parcial e o antigo
+  `keyflowSmokeSigning=true` falham antes de gerar artefatos; o smoke recebe APK assinado explicitamente quando necessário.
+  Gates repetidos: JVM 1.530/1.530, lintDebug, APK/AAB de upload, PermissionsCheckerTest 2/2 e painel do agente em debug 12/12.
+  Smoke completo aprovado com editor próprio do roteiro, sem depender da restauração dos Ajustes do sistema.
   Vem depois da V1-10 com fakes, para o AAB já levar a compra e os anúncios. **[YAN]**: criar o app no Console com o id novo,
   cadastrar a chave de upload (SHA-256 `AB:17:29:3A:…:A8:DC`) e subir o AAB na trilha interna, com a permissão de billing, para criar o
   produto de R$15 — antes do e2e real (MZ-T15/API-T14). A conta (decisão 1) trava esse upload. **[YAN]**: configurar/verificar
@@ -459,6 +464,8 @@ abaixo cita monetização entra na V1-10. Créditos continuam fora.
 - [x] **PS-5 — Build de release**: FEITO em 2026-10-24 (V1-3). R8 com keep rules conferidas por `check-release-jni.py`,
       AAB assinado com a chave de upload, `versionCode` 1 / `versionName` 1.0.0, smoke no emulador. Falta **[YAN]**: o app no Console
       com `com.arateki.keyflow`, o upload e o smoke manual no A32 (V1-8).
+      Revisão de 2026-10-25: guard do agente por mapping/DEX no CI, mapping obrigatório no smoke, assinatura de upload
+      sem fallback debug e campos parciais rejeitados; gates e smoke completo repetidos e aprovados.
 - [ ] **PS-6 — Listing**: screenshots (overlay + teclado em uso — reusar galeria), descrição
       ("teclado de voz", "transcrição sob demanda"), categoria Productivity/Tools **[YAN aprova
       textos]**.

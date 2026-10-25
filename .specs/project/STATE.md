@@ -2726,3 +2726,43 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
   Samsung iguais aos do início. A cópia `.teste` e seu runner permanecem instalados porque o atalho não autoriza removê-los.
 - **Provas para revisão:** `.equipe/artefatos/v1-3-arm/` preserva os dois APKs, runner, mapping, SHA-256, fonte da sonda,
   logs dos três ambientes e verificações do A32. Arquivos de trabalho e receita do runner em `/tmp/v1-3-arm/`.
+
+## 2026-10-25 — V1-3: correções da revisão do release
+- **Exclusão do agente pela flag já decidida:** `AGENT_ENABLED=false` precisa proteger o corpo do `lazy` da
+  `SetupActivity` e a chamada do painel em `ConfigScreen`. Proteger apenas a leitura do runtime deixava o inicializador
+  e os ramos da UI no grafo do R8. A flag permanece verdadeira em debug; nenhuma flavor ou regra de keep foi acrescentada.
+- **Prova no binário:** `check-release-agent.py` cruza classes originais → ofuscadas do mapping com definições reais do
+  DEX, reutilizando o leitor de `dexdump` do guard JNI. Recusou o APK anterior por 145 classes do agente definidas no DEX;
+  no novo APK não há nenhuma dos pacotes `agent`/`agenthost`, nem cabeçalhos de classes desses pacotes no mapping. Referências ao tipo original nas assinaturas da UI
+  permanecem como informação de desofuscação; não são definições de classes ou corpos de métodos do agente. O AAB contém o
+  mesmo mapping e os mesmos dois DEX, byte a byte. O guard também roda no CI.
+- **Smoke com mapping obrigatório:** ausência/vazio falha antes do emulador, sem pular JNI. Oito regressões passaram;
+  os dois testes do smoke falham na versão anterior (mapping não obrigatório e segunda chamada com assinatura de debug).
+- **Assinatura:** `keyflowSmokeSigning=true` agora falha na configuração; não existe mais fallback automático no smoke.
+  Configuração parcial também falha, inclusive só a senha opcional ou arquivo presente sem campos completos. Três
+  builds negativos com dados falsos confirmaram a recusa. Sem configuração, o release continua sem assinatura no CI;
+  para smoke sem upload, é preciso fornecer explicitamente APK assinado e mapping. ENVIRONMENT.md foi atualizado.
+- **Artefatos novos:** APK 83.727.872 bytes e AAB 46.534.325 bytes, assinados pelo certificado público de upload
+  `AB:17:29:3A:…:A8:DC`; os três IDs públicos reais do AdMob estão nos recursos. Chave e senhas não foram inspecionadas,
+  copiadas ou versionadas. Gradle utilizou somente a configuração de upload já existente.
+- **Gates:** `testDebugUnitTest` 1.530/1.530, `:app:lintDebug`, `assembleRelease` e `bundleRelease` passaram.
+  `PermissionsCheckerTest` 2/2 e `KeyflowPanelAgentTest` 12/12 passaram no AVD, validando a continuidade do agente em debug.
+- **AVD:** a primeira instalação falhou sem `emulator-5554`; o controle confirmou serviço `failed parado`.
+  Após religar sob a trava, os instrumentados passaram. O logcat de limpeza do smoke agora tem prazo de 20 s para não
+  esperar indefinidamente quando o dispositivo some. Não foi atribuída uma causa à queda do serviço sem logs do host.
+- **Digitação comprovada:** a segunda rodada completa chegou ao anúncio de teste, mas terminou com busca vazia e XML
+  sem IME. Não houve fatal do processo do app; o fatal registrado era do capturador. A reprodução curta capturou a grade
+  real e seus limites. O roteiro passou a exigir os nós `h`/`i`, renovar a árvore antes de cada tecla e guardar XML/PNG
+  anteriores aos toques; removeu o fallback por coordenadas fixas. A reprodução curta digitou `hi` corretamente, e dois
+  testes novos impedem toque sem tecla e exigem nova captura por tecla. A causa exata da transição anterior não foi provada.
+- **Host de texto controlado:** a terceira execução terminou na tela do launcher ao tentar restaurar os Ajustes.
+  O smoke agora compila `ReleaseInputActivity.java` em APK separado (`com.keyflow.smoke.input`), com um EditText vazio,
+  aberto explicitamente a cada rodada. A fixture usa a chave de debug, é instalada somente sob a trava do AVD e removida
+  na limpeza; o APK/AAB de upload não recebe sua classe. A reprodução curta comprovou `hi` nesse editor próprio.
+- **Fechamento:** smoke completo aprovado com código 0 (quarta rodada): abas e Em breve, prévia Sistema → Ateliê
+  com 9.255 pixels diferentes, Billing indisponível, banner Test Ad, `hi` no EditText da fixture e divulgação persistida
+  após force-stop/reabertura. Varredura de PIDs do app sem erro fatal; nenhuma recuperação de ANR do Sistema nesta rodada.
+  Leitura final sob trava confirmou app/fixture desinstalados, Gboard padrão e capturador remoto removido.
+- **Evidências novas para upload/revisão:** `.equipe/artefatos/v1-3-correcoes/` contém APK/AAB corrigidos, mapping,
+  SHA-256, certificados públicos, gates, regressões, tentativas anteriores e execução final. Os artefatos anteriores
+  servem como controle da regressão. Trabalho com nice 15 e travas compartilhadas; sem operações no aparelho físico.
