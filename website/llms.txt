@@ -1,0 +1,26 @@
+# KeyFlow
+
+> KeyFlow is a privacy-first Android keyboard and voice dictation app developed by Arateki LTDA in Fortaleza, Brazil.
+
+## Overview
+- **Platform:** Android (in active development, coming soon to Google Play).
+- **Primary Functionality:** On-device offline voice dictation in any app, customizable on-screen keyboard, floating orb interface, and optional integration with cloud/local AI models.
+- **Privacy Model:** Strict on-device processing. No keystroke recording, no typed text logging, no telemetry on inputs, and no user account or registration required. API keys and settings are encrypted locally using the Android Keystore.
+- **Voice Transcription:**
+  - **On-Device (Offline):** Uses local models (such as Whisper and Parakeet via sherpa-onnx) running completely on the phone, even in airplane mode. Audio is never transmitted.
+  - **Cloud (Optional):** Users can optionally connect cloud transcription providers (e.g. OpenAI, Groq) using their own API keys.
+- **Supported Languages:** Portuguese (Brazil), English, and Spanish. On-device offline transcription supports Portuguese, English, and Spanish (and dozens more via Whisper and Parakeet).
+- **AI Integration:** Supports on-device LLMs (e.g. Gemma, Qwen) and cloud AI providers (e.g. OpenAI, Anthropic, Google) with the user's own credentials.
+
+## Documentation and Canonical Links
+- [Homepage (Portuguese)](https://keyflow.arateki.com/)
+- [Homepage (English)](https://keyflow.arateki.com/en)
+- [Privacy Policy (Portuguese)](https://keyflow.arateki.com/privacidade)
+- [Terms of Use (Portuguese)](https://keyflow.arateki.com/termos)
+- [Privacy Policy (English)](https://keyflow.arateki.com/privacy)
+- [Terms of Use (English)](https://keyflow.arateki.com/terms)
+
+## Developer & Publisher
+- **Publisher:** Arateki LTDA (CNPJ 45.642.122/0001-10)
+- **Website:** https://arateki.com
+- **Contact:** contato@arateki.com

@@ -7,6 +7,7 @@
 #                                              galeria (ROUTE_SHARD), no mesmo emulador;
 #   ci-device-gate.sh suite <índice> <total>   só o pedaço da suíte instrumentada (numShards/shardIndex do
 #                                              AndroidJUnitRunner), com o ponta a ponta do modelo local;
+#   ci-device-gate.sh selected <índice> <total> <repetições>   só CI_CLASSES, com evidência por repetição;
 #   ci-device-gate.sh screens <temas> <k/n>    só um recorte da galeria (THEMES + ROUTE_SHARD do
 #                                              verify-screens.sh, ex.: "light dark" 0/6).
 # O diff contra os goldens é um passo à parte do workflow, sem emulador.
@@ -82,6 +83,10 @@ step() {
 # Fora do Actions (sem GITHUB_RUN_ID) usa os APKs do build local.
 fetch_apks() {
   local deadline=$((SECONDS + 20 * 60)) state="" misses=0
+  if [ "${CI_APKS_READY:-}" = 1 ]; then
+    ls -la "$APP_APK" "$TEST_APK" || { echo "::error::artefato apks baixado incompleto"; return 1; }
+    return 0
+  fi
   if [ -z "${GITHUB_RUN_ID:-}" ]; then
     ls -la "$APP_APK" "$TEST_APK" || { echo "rode antes: ./gradlew assembleDebug assembleDebugAndroidTest" >&2; return 1; }
     return 0
@@ -177,6 +182,32 @@ run_shard() {
         --earlier-failures "$EVIDENCE/failed.txt"
 }
 
+# Execução seletiva sob demanda. O workflow limita o número de shards a seis; repetições ficam
+# sequenciais dentro de cada shard para manter a quantidade total de jobs abaixo do teto do Actions.
+run_selected() {
+  local shard=$1 total=$2 repetitions=$3 rep rc quote_classes
+  local padrao='^[A-Za-z0-9_.$#,.]+$'
+  local out="$EVIDENCE/demand/shard-$shard"
+  mkdir -p "$out"
+  [[ ${CI_CLASSES:-} =~ $padrao && -n ${CI_CLASSES:-} ]] || {
+    echo "::error::CI_CLASSES inválido"; return 2;
+  }
+  quote_classes="'$CI_CLASSES'"
+  local -a shard_args=(-e class "$quote_classes" -e numShards "$total" -e shardIndex "$shard"
+                       -e localModelE2E true -e motionFrames false)
+  for rep in $(seq 1 "$repetitions"); do
+    local log="$out/rep-$rep.txt"
+    echo "Repetição $rep/$repetitions, pedaço $shard/$total, classes: $CI_CLASSES"
+    "$ADB" shell am instrument -w -r "${shard_args[@]}" "$RUNNER" >"$log" 2>&1
+    rc=$?
+    printf '%s\n' "$rc" >"$out/rep-$rep.adb-exit"
+    cat "$log"
+    ((rc == 0)) || status=1
+    grep -qE '^INSTRUMENTATION_CODE: -1[[:space:]]*$' "$log" || status=1
+    if grep -qE '^INSTRUMENTATION_STATUS_CODE: -[12][[:space:]]*$' "$log"; then status=1; fi
+  done
+}
+
 # Galeria num app recém-instalado, como na última `main` verde (o connected* desinstalava o app no fim da suíte).
 reinstall_app() {
   "$ADB" uninstall com.keyflow >/dev/null 2>&1 || true
@@ -215,6 +246,16 @@ case "$MODE" in
       status=1
     fi
     ;;
+  selected)
+    [ $# -eq 4 ] || { echo "uso: $0 selected <índice> <total> <repetições>" >&2; exit 2; }
+    [[ $2 =~ ^[0-5]$ && $3 =~ ^[1-6]$ && $4 =~ ^([1-9]|1[0-9]|20)$ && $2 -lt $3 ]] \
+      || { echo "::error::índice, pedaços ou repetições inválidos"; exit 2; }
+    if fetch_apks && install_apks "$APP_APK" "$TEST_APK"; then
+      run_selected "$2" "$3" "$4" || status=1
+    else
+      status=1
+    fi
+    ;;
   screens)
     [ $# -eq 3 ] || { echo "uso: $0 screens <temas> <k/n>" >&2; exit 2; }
     if fetch_apks && install_apks "$APP_APK"; then
@@ -224,7 +265,7 @@ case "$MODE" in
     fi
     ;;
   *)
-    echo "uso: $0 all <índice> <total> | suite <índice> <total> | screens <temas> <k/n>" >&2
+    echo "uso: $0 all <índice> <total> | suite <índice> <total> | selected <índice> <total> <repetições> | screens <temas> <k/n>" >&2
     status=2
     ;;
 esac

@@ -27,7 +27,7 @@ agent/
   AgentEngine.kt        # fun chat(messages, tools, system): Flow<AgentEvent>  (TextDelta, ToolCall, Done, Error)
   AgentLoop.kt          # envia -> consome -> executa chamadas (política) -> devolve resultados -> repete; limites; cancelamento
   AgentController.kt    # estado do chat (mensagens, cartões de ferramenta, orbe) para a UI; troca de origem
-  providers/AnthropicAgentEngine.kt   # fase 1; OpenAiAgentEngine.kt e GoogleAgentEngine.kt na fase 2
+  providers/AnthropicAgentEngine.kt   # fase 1; OpenAiAgentEngine.kt e GoogleAgentEngine.kt na fase 2 (moram em reasoning/<provedor>/, como o da Anthropic)
   tools/SkinTools.kt    # skin_get_format, skin_list, skin_preview, skin_install, skin_select, skin_remove
   tools/AppTools.kt     # app_status, settings_get, settings_set (lista de permitidos), open_tab
   mcp/McpServer.kt      # fase 3: JSON-RPC 2.0 / HTTP sobre o mesmo ToolRegistry + ToolPolicy
@@ -43,7 +43,7 @@ ui/config/AgentCards.kt, AgentSettingsSection.kt   # cartões de ferramenta, pai
 - **D5 — Filtro de segredos.** Defesa em profundidade: mesmo sem ferramenta que leia segredos, o `SecretFilter` varre resultados e o registro por padrões (`sk-…`, `AIza…`, `Bearer …`, JWT, blocos PEM, valores iguais a qualquer segredo guardado no cofre — comparação sem imprimir). Teste com sentinelas.
 - **D6 — Prompt de sistema.** Fixo, em português, define: papel, que instruções só vêm do usuário no chat, que `tool_result` e texto externo são dados, que ações que alteram algo exigem confirmação, e a lista de ferramentas ativas. Não inclui nenhum segredo.
 - **D7 — Skin criada pelo modelo.** O modelo envia `skin_preview`/`skin_install` com `files` (mapa nome → texto SVG/JSON). O app monta o zip em memória com os **nomes canônicos do vocabulário** e passa pelo `SkinPackReader` (a mesma checagem de segurança do import). A folha de contato é um PNG (4 estados × alguns frames; teclado: faces) gerado por `SvgRender`; mostrada ao usuário e, se o modelo aceitar imagem, anexada ao `tool_result`.
-- **D8 — Histórico neutro.** O app guarda `AgentMessage` neutro; cada adaptador converte para o formato do provedor (Anthropic: blocos `tool_use`/`tool_result`; OpenAI: `tool_calls`/`role=tool`; Google: `functionCall`/`functionResponse`). Trocar de origem no meio da conversa só reconverte.
+- **D8 — Histórico neutro.** O app guarda `AgentMessage` neutro; cada adaptador converte para o formato do provedor (Anthropic: blocos `tool_use`/`tool_result`; OpenAI: itens `function_call`/`function_call_output` da **Responses API** — os modelos GPT-6 exigem a Responses para ferramentas, conferido em 2026-10-24, em vez de `tool_calls`/`role=tool`; Google: `functionCall`/`functionResponse` da `generateContent`). Trocar de origem no meio da conversa só reconverte.
 - **D9 — MCP (fase 3).** Porta de entrada alternativa para o **mesmo** `ToolRegistry`/`ToolPolicy`. Servidor HTTP leve (já há OkHttp; para servir, avaliar `ServerSocket` mínimo ou uma lib — **conferir a spec oficial do MCP e a lib antes**; não presumir). Desligado = nenhuma porta aberta. Foreground service curto (notificação) enquanto ligado, token guardado no cofre `keyflow_secure`.
 - **D10 — Contexto e custo.** Poda do histórico por tamanho aproximado (mantém o prompt de sistema, o início e as últimas voltas; resultados grandes de ferramenta são resumidos); mostrar ao usuário os **tokens usados** na sessão quando o provedor os informa.
 

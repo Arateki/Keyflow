@@ -17,6 +17,7 @@ import argparse
 import base64
 import hashlib
 import html
+import json
 import re
 import shutil
 import sys
@@ -74,7 +75,12 @@ def render_markdown(md_text: str) -> str:
         t = re.sub(r'\*\*([^*]+)\*\*', r'<strong>\1</strong>', t)
         t = re.sub(r'\*([^*]+)\*', r'<em>\1</em>', t)
         t = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'<a href="\2">\1</a>', t)
-        return t
+        # Protege e-mails contra ofuscação pela Cloudflare com <!--email_off-->...<!--/email_off-->
+        t = re.sub(r'<a\s+[^>]*href=["\']mailto:[^"\' >]+["\'][^>]*>.*?</a>', r'<!--email_off-->\g<0><!--/email_off-->', t, flags=re.I)
+        partes = re.split(r'(<!--email_off-->.*?<!--/email_off-->)', t, flags=re.S)
+        for idx in range(0, len(partes), 2):
+            partes[idx] = re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b', r'<!--email_off-->\g<0><!--/email_off-->', partes[idx])
+        return "".join(partes)
 
     i = 0
     while i < len(lines):
@@ -162,8 +168,47 @@ def render_markdown(md_text: str) -> str:
     return '\n'.join(out)
 
 
-def build_page(title: str, lang: str, header_html: str, body_html: str, footer_html: str, skip_text: str = "Pular para o conteúdo") -> str:
+def build_page(
+    title: str,
+    lang: str,
+    canonical_url: str,
+    description: str,
+    pt_url: str,
+    en_url: str,
+    breadcrumb_name: str,
+    header_html: str,
+    body_html: str,
+    footer_html: str,
+    skip_text: str = "Pular para o conteúdo",
+) -> str:
     csp_hash = _sha256_csp(SCRIPT_TEMA)
+    og_locale = "pt_BR" if lang == "pt-BR" else "en_US"
+    og_alt_locale = "en_US" if lang == "pt-BR" else "pt_BR"
+    home_url = "https://keyflow.arateki.com/" if lang == "pt-BR" else "https://keyflow.arateki.com/en"
+
+    breadcrumb_json = json.dumps(
+        {
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+                {
+                    "@type": "ListItem",
+                    "position": 1,
+                    "name": "KeyFlow",
+                    "item": home_url,
+                },
+                {
+                    "@type": "ListItem",
+                    "position": 2,
+                    "name": breadcrumb_name,
+                    "item": canonical_url,
+                },
+            ],
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+
     return f"""<!doctype html>
 <html lang="{lang}">
 <head>
@@ -171,8 +216,25 @@ def build_page(title: str, lang: str, header_html: str, body_html: str, footer_h
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' {csp_hash}; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <title>{html.escape(title)}</title>
+<meta name="description" content="{html.escape(description)}">
+<link rel="canonical" href="{canonical_url}">
+<link rel="alternate" hreflang="pt-BR" href="{pt_url}">
+<link rel="alternate" hreflang="en" href="{en_url}">
+<link rel="alternate" hreflang="x-default" href="{pt_url}">
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#12100d">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="KeyFlow">
+<meta property="og:locale" content="{og_locale}">
+<meta property="og:locale:alternate" content="{og_alt_locale}">
+<meta property="og:url" content="{canonical_url}">
+<meta property="og:title" content="{html.escape(title)}">
+<meta property="og:description" content="{html.escape(description)}">
+<meta property="og:image" content="https://keyflow.arateki.com/assets/img/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="KeyFlow">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="icon" href="assets/img/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
@@ -180,6 +242,9 @@ def build_page(title: str, lang: str, header_html: str, body_html: str, footer_h
 <link rel="preload" href="assets/fonts/space-grotesk-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="assets/css/site.css">
 <script>{SCRIPT_TEMA}</script>
+<script type="application/ld+json">
+{breadcrumb_json}
+</script>
 <script src="assets/js/site.js" defer></script>
 </head>
 <body>
@@ -303,7 +368,7 @@ def generate_site(repo_root: Path, output_dir: Path) -> dict:
     </nav>
     <div>
       <h2 class="rodape-titulo">Contato</h2>
-      <ul><li><a href="mailto:contato@arateki.com">contato@arateki.com</a></li></ul>
+      <ul><li><!--email_off--><a href="mailto:contato@arateki.com">contato@arateki.com</a><!--/email_off--></li></ul>
     </div>
     <div>
       <h2 class="rodape-titulo">Idioma</h2>
@@ -337,7 +402,7 @@ def generate_site(repo_root: Path, output_dir: Path) -> dict:
     </nav>
     <div>
       <h2 class="rodape-titulo">Contact</h2>
-      <ul><li><a href="mailto:contato@arateki.com">contato@arateki.com</a></li></ul>
+      <ul><li><!--email_off--><a href="mailto:contato@arateki.com">contato@arateki.com</a><!--/email_off--></li></ul>
     </div>
     <div>
       <h2 class="rodape-titulo">Language</h2>
@@ -360,7 +425,19 @@ def generate_site(repo_root: Path, output_dir: Path) -> dict:
         raise FileNotFoundError(f"Arquivo não encontrado: {priv_file}")
     pt_priv_body = render_markdown(priv_file.read_text(encoding="utf-8"))
     header_pt_priv = make_header("pt-BR", "privacidade.html")
-    priv_html = build_page("Política de Privacidade — KeyFlow", "pt-BR", header_pt_priv, pt_priv_body, footer_pt, "Pular para o conteúdo")
+    priv_html = build_page(
+        "Política de Privacidade — KeyFlow",
+        "pt-BR",
+        "https://keyflow.arateki.com/privacidade",
+        "Política de privacidade do KeyFlow: o teclado processa voz e digitação no aparelho, sem envio para servidores e sem necessidade de cadastro.",
+        "https://keyflow.arateki.com/privacidade",
+        "https://keyflow.arateki.com/privacy",
+        "Política de Privacidade",
+        header_pt_priv,
+        pt_priv_body,
+        footer_pt,
+        "Pular para o conteúdo",
+    )
     (output_dir / "privacidade.html").write_text(priv_html, encoding="utf-8")
 
     # 2. termos.html
@@ -369,7 +446,19 @@ def generate_site(repo_root: Path, output_dir: Path) -> dict:
         raise FileNotFoundError(f"Arquivo não encontrado: {termos_file}")
     pt_termos_body = render_markdown(termos_file.read_text(encoding="utf-8"))
     header_pt_termos = make_header("pt-BR", "termos.html")
-    termos_html = build_page("Termos de Uso — KeyFlow", "pt-BR", header_pt_termos, pt_termos_body, footer_pt, "Pular para o conteúdo")
+    termos_html = build_page(
+        "Termos de Uso — KeyFlow",
+        "pt-BR",
+        "https://keyflow.arateki.com/termos",
+        "Termos de uso do KeyFlow: licença de uso do teclado, regras do serviço de voz e compromissos de privacidade da Arateki.",
+        "https://keyflow.arateki.com/termos",
+        "https://keyflow.arateki.com/terms",
+        "Termos de Uso",
+        header_pt_termos,
+        pt_termos_body,
+        footer_pt,
+        "Pular para o conteúdo",
+    )
     (output_dir / "termos.html").write_text(termos_html, encoding="utf-8")
 
     # 3. privacy.html
@@ -378,7 +467,19 @@ def generate_site(repo_root: Path, output_dir: Path) -> dict:
         raise FileNotFoundError(f"Arquivo não encontrado: {privacy_file}")
     en_priv_body = render_markdown(privacy_file.read_text(encoding="utf-8"))
     header_en_priv = make_header("en", "privacy.html")
-    privacy_html = build_page("Privacy Policy — KeyFlow", "en", header_en_priv, en_priv_body, footer_en, "Skip to content")
+    privacy_html = build_page(
+        "Privacy Policy — KeyFlow",
+        "en",
+        "https://keyflow.arateki.com/privacy",
+        "KeyFlow Privacy Policy: on-device voice dictation and typing without server logging or required account registration.",
+        "https://keyflow.arateki.com/privacidade",
+        "https://keyflow.arateki.com/privacy",
+        "Privacy Policy",
+        header_en_priv,
+        en_priv_body,
+        footer_en,
+        "Skip to content",
+    )
     (output_dir / "privacy.html").write_text(privacy_html, encoding="utf-8")
 
     # 4. terms.html
@@ -387,7 +488,19 @@ def generate_site(repo_root: Path, output_dir: Path) -> dict:
         raise FileNotFoundError(f"Arquivo não encontrado: {terms_file}")
     en_terms_body = render_markdown(terms_file.read_text(encoding="utf-8"))
     header_en_terms = make_header("en", "terms.html")
-    terms_html = build_page("Terms of Use — KeyFlow", "en", header_en_terms, en_terms_body, footer_en, "Skip to content")
+    terms_html = build_page(
+        "Terms of Use — KeyFlow",
+        "en",
+        "https://keyflow.arateki.com/terms",
+        "KeyFlow Terms of Use: keyboard software license, voice dictation service terms, and Arateki commitments.",
+        "https://keyflow.arateki.com/termos",
+        "https://keyflow.arateki.com/terms",
+        "Terms of Use",
+        header_en_terms,
+        en_terms_body,
+        footer_en,
+        "Skip to content",
+    )
     (output_dir / "terms.html").write_text(terms_html, encoding="utf-8")
 
     return {nome: output_dir / nome for nome in ("index.html", "en.html") + PAGINAS_LEGAIS}
@@ -577,6 +690,196 @@ def verify_generated_site(generated: dict, output_dir: Path):
     total = sum(p.stat().st_size for p in primeira if p.exists())
     if total > ORCAMENTO_PRIMEIRA_CARGA:
         erros.append(f"Primeira carga com {total / 1024:.0f} KB, acima de {ORCAMENTO_PRIMEIRA_CARGA // 1024} KB")
+
+    # 7. SEO e Metadados Estruturados
+    # a) Robots.txt e Sitemap
+    robots_path = output_dir / "robots.txt"
+    if not robots_path.exists():
+        erros.append("robots.txt ausente")
+    else:
+        robots_txt = robots_path.read_text(encoding="utf-8")
+        if "Sitemap: https://keyflow.arateki.com/sitemap.xml" not in robots_txt:
+            erros.append("robots.txt sem a declaração do Sitemap")
+        if "Content-Signal: search=yes, ai-input=yes, ai-train=yes" not in robots_txt:
+            erros.append("robots.txt sem o Content-Signal permitindo treino e busca de IA")
+        if "User-agent: *" not in robots_txt or "Allow: /" not in robots_txt:
+            erros.append("robots.txt deve permitir acesso global (User-agent: * e Allow: /)")
+        if "Disallow:" in robots_txt:
+            erros.append("robots.txt contém regras Disallow proibidas (decisão do projeto é liberar todos os robôs)")
+
+    sitemap_path = output_dir / "sitemap.xml"
+    if not sitemap_path.exists():
+        erros.append("sitemap.xml ausente")
+    else:
+        sitemap_txt = sitemap_path.read_text(encoding="utf-8")
+        urls_sitemap = re.findall(r"<url>(.*?)</url>", sitemap_txt, re.S)
+        if not urls_sitemap:
+            erros.append("sitemap.xml sem tags <url>")
+        for bloco in urls_sitemap:
+            m_loc = re.search(r"<loc>(.*?)</loc>", bloco)
+            m_lastmod = re.search(r"<lastmod>(.*?)</lastmod>", bloco)
+            if not m_loc:
+                erros.append("sitemap.xml: entrada <url> sem <loc>")
+            if not m_lastmod:
+                erros.append(f"sitemap.xml: entrada <url> sem <lastmod> para {m_loc.group(1) if m_loc else 'desconhecido'}")
+            elif not re.match(r"^\d{4}-\d{2}-\d{2}$", m_lastmod.group(1).strip()):
+                erros.append(f"sitemap.xml: <lastmod> com formato inválido '{m_lastmod.group(1)}' (esperado YYYY-MM-DD)")
+
+    # b) 404.html
+    p404 = output_dir / "404.html"
+    if not p404.exists():
+        erros.append("404.html ausente")
+    else:
+        c404 = p404.read_text(encoding="utf-8")
+        if '<meta name="robots" content="noindex">' not in c404:
+            erros.append("404.html sem <meta name=\"robots\" content=\"noindex\">")
+        if 'href="index.html"' not in c404 or 'href="en.html"' not in c404:
+            erros.append("404.html deve ter links para a página inicial em português e inglês")
+
+    # c) SEO, JSON-LD, Imagens e Hierarquia por página HTML
+    titulos_vistos = {}
+    descricoes_vistas = {}
+
+    _JSON_LD = re.compile(r'<script\s+type=["\']application/ld\+json["\']>(.*?)</script>', re.S | re.I)
+    _IMG_TAG = re.compile(r'<img\b[^>]*>', re.I)
+    _ALT_ATTR = re.compile(r'\salt=(?:"[^"]*"|\'[^\']*\')', re.I)
+
+    for pagina in sorted(output_dir.rglob("*.html")):
+        nome = pagina.relative_to(output_dir).as_posix()
+        content = pagina.read_text(encoding="utf-8")
+        content_limpo = re.sub(r"<!--.*?-->", "", content, flags=re.S)
+
+        # Proteção contra ofuscação de e-mail pela Cloudflare
+        # Todo e-mail fora de blocos <script> precisa estar dentro de <!--email_off-->...<!--/email_off-->
+        sem_scripts = re.sub(r"<script\b[^>]*>.*?</script>", "", content, flags=re.S | re.I)
+        sem_emails_protegidos = re.sub(r"<!--email_off-->.*?<!--/email_off-->", "", sem_scripts, flags=re.S)
+        for em in re.findall(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b", sem_emails_protegidos):
+            erros.append(f"{nome}: e-mail '{em}' encontrado fora dos marcadores <!--email_off-->")
+
+        # Título
+        m_tit = re.search(r"<title>([^<]+)</title>", content_limpo)
+        if not m_tit:
+            erros.append(f"{nome}: tag <title> ausente")
+        else:
+            tit = m_tit.group(1).strip()
+            if len(tit) < 10 or len(tit) > 70:
+                erros.append(f"{nome}: título com tamanho inválido ({len(tit)} caracteres: '{tit}'); esperado 10 a 70")
+            if "KeyFlow" not in tit:
+                erros.append(f"{nome}: título sem o nome 'KeyFlow'")
+            if nome != "404.html":
+                if tit in titulos_vistos:
+                    erros.append(f"{nome}: título duplicado com {titulos_vistos[tit]}")
+                titulos_vistos[tit] = nome
+
+        # Meta description
+        m_desc = None
+        for meta_match in re.finditer(r'<meta\b([^>]+)>', content_limpo, re.I):
+            m_attrs = {k.lower(): (v1 or v2) for k, v1, v2 in re.findall(r'([\w:-]+)=(?:"([^"]*)"|\'([^\']*)\')', meta_match.group(1))}
+            if m_attrs.get("name") == "description" and "content" in m_attrs:
+                m_desc = m_attrs["content"].strip()
+                break
+
+        if not m_desc:
+            erros.append(f"{nome}: meta description ausente")
+        else:
+            if len(m_desc) < 50 or len(m_desc) > 180:
+                erros.append(f"{nome}: meta description com tamanho inválido ({len(m_desc)} caracteres); esperado 50 a 180")
+            if nome != "404.html":
+                if m_desc in descricoes_vistas:
+                    erros.append(f"{nome}: meta description duplicada com {descricoes_vistas[m_desc]}")
+                descricoes_vistas[m_desc] = nome
+
+        # Imagens: todas precisam de alt
+        for img in _IMG_TAG.findall(content_limpo):
+            if not _ALT_ATTR.search(img):
+                erros.append(f"{nome}: tag <img> sem atributo alt: {img}")
+
+        # Títulos em hierarquia: exatamente um h1 e sem pular níveis
+        h_levels = [int(m.group(1)) for m in re.finditer(r'<h([1-6])\b', content_limpo, re.I)]
+        if not h_levels:
+            erros.append(f"{nome}: nenhum título (h1-h6) encontrado")
+        else:
+            h1_count = h_levels.count(1)
+            if h1_count != 1:
+                erros.append(f"{nome}: esperado exatamente 1 <h1>, encontrado {h1_count}")
+            prev = h_levels[0]
+            for lvl in h_levels[1:]:
+                if lvl > prev + 1:
+                    erros.append(f"{nome}: pulou nível de cabeçalho de <h{prev}> para <h{lvl}>")
+                prev = lvl
+
+        # Canonical e Hreflang (apenas páginas publicadas do site, exceto 404)
+        if nome != "404.html":
+            can_url = None
+            hreflangs = {}
+            for link_match in re.finditer(r'<link\b([^>]+)>', content, re.I):
+                l_attrs = {k.lower(): (v1 or v2) for k, v1, v2 in re.findall(r'([\w:-]+)=(?:"([^"]*)"|\'([^\']*)\')', link_match.group(1))}
+                if l_attrs.get("rel") == "canonical" and "href" in l_attrs:
+                    can_url = l_attrs["href"].strip()
+                elif l_attrs.get("rel") == "alternate" and "hreflang" in l_attrs and "href" in l_attrs:
+                    hreflangs[l_attrs["hreflang"].strip()] = l_attrs["href"].strip()
+
+            if not can_url:
+                erros.append(f"{nome}: canonical ausente")
+            elif not can_url.startswith("https://keyflow.arateki.com"):
+                erros.append(f"{nome}: canonical deve apontar para https://keyflow.arateki.com (foi '{can_url}')")
+
+            for req_lang in ("pt-BR", "en", "x-default"):
+                if req_lang not in hreflangs:
+                    erros.append(f"{nome}: hreflang '{req_lang}' ausente")
+                else:
+                    h_target = _alvo_local(pagina, hreflangs[req_lang], output_dir)
+                    if h_target is not None and not h_target.is_file():
+                        erros.append(f"{nome}: hreflang '{req_lang}' aponta para arquivo inexistente → {hreflangs[req_lang]}")
+
+        # JSON-LD
+        blocos_jsonld = _JSON_LD.findall(content)
+        if nome in ("index.html", "en.html", "privacidade.html", "termos.html", "privacy.html", "terms.html"):
+            if not blocos_jsonld:
+                erros.append(f"{nome}: bloco de dados estruturados JSON-LD ausente")
+
+        for b_raw in blocos_jsonld:
+            try:
+                dados = json.loads(b_raw)
+            except Exception as e:
+                erros.append(f"{nome}: JSON-LD inválido ({e})")
+                continue
+
+            b_str = json.dumps(dados).lower()
+            if '"offers"' in b_str or '"price"' in b_str or '"pricecurrency"' in b_str:
+                erros.append(f"{nome}: JSON-LD contém campo de preço/offers proibido pela política do projeto")
+
+            itens = dados.get("@graph", [dados]) if isinstance(dados, dict) else []
+            for item in itens:
+                if not isinstance(item, dict):
+                    continue
+                itype = item.get("@type")
+                if not itype:
+                    erros.append(f"{nome}: item no JSON-LD sem @type")
+                    continue
+                if itype == "Organization":
+                    if not item.get("name") or not item.get("url"):
+                        erros.append(f"{nome}: Organization no JSON-LD deve ter name e url")
+                elif itype == "WebSite":
+                    if not item.get("name") or not item.get("url"):
+                        erros.append(f"{nome}: WebSite no JSON-LD deve ter name e url")
+                elif itype in ("SoftwareApplication", "MobileApplication"):
+                    if not item.get("name") or not item.get("operatingSystem") or not item.get("applicationCategory"):
+                        erros.append(f"{nome}: {itype} no JSON-LD deve ter name, operatingSystem e applicationCategory")
+                elif itype == "FAQPage":
+                    perguntas = item.get("mainEntity", [])
+                    if not isinstance(perguntas, list) or not perguntas:
+                        erros.append(f"{nome}: FAQPage no JSON-LD sem perguntas em mainEntity")
+                    for p in perguntas:
+                        if not p.get("name") or not p.get("acceptedAnswer", {}).get("text"):
+                            erros.append(f"{nome}: FAQPage tem pergunta sem name ou acceptedAnswer.text")
+                elif itype == "BreadcrumbList":
+                    elementos = item.get("itemListElement", [])
+                    if not isinstance(elementos, list) or not elementos:
+                        erros.append(f"{nome}: BreadcrumbList no JSON-LD sem elementos")
+                    for el in elementos:
+                        if "position" not in el or not el.get("name") or not el.get("item"):
+                            erros.append(f"{nome}: BreadcrumbList item incompleto (precisa de position, name e item)")
 
     if erros:
         for erro in erros:

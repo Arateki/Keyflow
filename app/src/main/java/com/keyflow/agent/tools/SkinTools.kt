@@ -125,6 +125,11 @@ internal class SkinDraft(private val limits: SkinLimits, private val classify: (
 class SkinTools(private val workshop: SkinWorkshop, private val limits: SkinLimits = SkinLimits()) {
     private val draft = SkinDraft(limits, workshop::classify)
 
+    @Volatile
+    private var draftGen = 0L
+
+    private class DescribedCall(val fingerprint: String, val generation: Long)
+
     val tools: List<AgentTool> = listOf(
         GetFormatTool(),
         ListTool(),
@@ -193,7 +198,10 @@ class SkinTools(private val workshop: SkinWorkshop, private val limits: SkinLimi
 
         @PolicyGated
         override suspend fun run(args: JSONObject, ctx: ToolContext): ToolOutput {
-            val stats = merge(args)
+            if (draftGen > 0L && ctx.generation > 0L && ctx.generation != draftGen) {
+                return ToolOutput.error("Turno cancelado ou substituído.")
+            }
+            val stats = merge(args, ctx.generation)
             if (args.optBoolean("more", false)) {
                 return ToolOutput.ok("Recebi ${stats.received} arquivo(s); o rascunho tem ${stats.total} (${stats.bytes / 1024} KB). Mande o resto e termine chamando skin_preview sem \"more\".")
             }
@@ -205,7 +213,35 @@ class SkinTools(private val workshop: SkinWorkshop, private val limits: SkinLimi
             return ToolOutput.ok("$text\n$shown Para instalar, chame skin_install (os arquivos ficam guardados até o fim desta resposta; mande em `files` só o que quiser trocar).", image = check.sheet)
         }
 
-        override fun turnEnded() = draft.clear()
+        override fun turnStarted(generation: Long) {
+            synchronized(draft) {
+                if (draftGen != 0L && draftGen != generation) {
+                    draft.clear()
+                }
+                draftGen = generation
+            }
+        }
+
+        override fun turnEnded(generation: Long) {
+            synchronized(draft) {
+                if (draftGen == generation || generation == 0L) {
+                    draft.clear()
+                    draftGen = 0L
+                }
+            }
+        }
+
+        override fun turnCancelled(generation: Long) {
+            turnEnded(generation)
+        }
+
+        override fun turnEnded() {
+            turnEnded(0L)
+        }
+
+        override fun turnCancelled() {
+            turnEnded(0L)
+        }
     }
 
     // ── instalar ─────────────────────────────────────────────────────────────
@@ -220,14 +256,17 @@ class SkinTools(private val workshop: SkinWorkshop, private val limits: SkinLimi
         override val inputSchema = filesSchema(limits, withMore = false, filesRequired = false)
 
         /** A impressão digital do que [describe] mostrou ao usuário, por chamada: o que se instala é o que ele confirmou. */
-        private val described = HashMap<String, String>()
+        private val described = HashMap<String, DescribedCall>()
 
         override suspend fun describe(args: JSONObject, ctx: ToolContext): ToolDescription {
-            merge(args)
+            if (draftGen > 0L && ctx.generation > 0L && ctx.generation != draftGen) {
+                throw ToolFailure("Turno cancelado ou substituído.")
+            }
+            merge(args, ctx.generation)
             if (draft.isEmpty()) throw ToolFailure("O rascunho está vazio: mande os arquivos da skin em `files` (ou use skin_preview antes).")
             val check = workshop.check(draft.snapshot())
             if (!check.report.ok) throw ToolFailure("A skin não pode ser instalada. " + reportText(check.name, check.report))
-            synchronized(described) { described[ctx.callId] = draft.fingerprint() }
+            synchronized(described) { described[ctx.callId] = DescribedCall(draft.fingerprint(), ctx.generation) }
             val parts = check.report.installed.joinToString("; ")
             val replace = if (check.replacesInstalled) " " + tr("Já existe uma skin com este nome: ela será SUBSTITUÍDA, e a versão atual não volta.") else ""
             val summary = tr("Instalar a skin «%s» (%s). Ela aparece em «Suas skins»; nada é escolhido sozinho.", check.name ?: "?", parts) + replace
@@ -237,7 +276,16 @@ class SkinTools(private val workshop: SkinWorkshop, private val limits: SkinLimi
 
         @PolicyGated
         override suspend fun run(args: JSONObject, ctx: ToolContext): ToolOutput {
-            val expected = synchronized(described) { described.remove(ctx.callId) }
+            if (draftGen > 0L && ctx.generation > 0L && ctx.generation != draftGen) {
+                return ToolOutput.error("Turno cancelado ou substituído.")
+            }
+            val expected = synchronized(described) {
+                val call = described[ctx.callId]
+                if (call != null && (call.generation == 0L || ctx.generation == 0L || call.generation == ctx.generation)) {
+                    described.remove(ctx.callId)
+                    call.fingerprint
+                } else null
+            }
             // O `describe` já juntou os arquivos: aqui só se confere que nada mudou entre a confirmação e a instalação.
             if (expected == null || expected != draft.fingerprint()) {
                 return ToolOutput.error("Os arquivos da skin mudaram depois do pedido de permissão (ou o pedido se perdeu); nada foi instalado. Chame skin_install de novo.")
@@ -251,9 +299,58 @@ class SkinTools(private val workshop: SkinWorkshop, private val limits: SkinLimi
             return ToolOutput.ok("Skin «${result.name ?: id}» instalada (id: $id).$note Ela aparece em «Suas skins»; ainda NÃO está em uso — chame skin_select se o usuário a quiser no teclado ou na orbe.\n" + reportText(result.name, result.report), undo = undo)
         }
 
+        override fun turnStarted(generation: Long) {
+            synchronized(described) {
+                if (generation > 0L) {
+                    val it = described.entries.iterator()
+                    while (it.hasNext()) {
+                        val entry = it.next()
+                        if (entry.value.generation != 0L && entry.value.generation != generation) {
+                            it.remove()
+                        }
+                    }
+                }
+            }
+            synchronized(draft) {
+                if (draftGen != 0L && draftGen != generation) {
+                    draft.clear()
+                }
+                draftGen = generation
+            }
+        }
+
+        override fun turnEnded(generation: Long) {
+            synchronized(described) {
+                if (generation > 0L) {
+                    val it = described.entries.iterator()
+                    while (it.hasNext()) {
+                        val entry = it.next()
+                        if (entry.value.generation == generation) {
+                            it.remove()
+                        }
+                    }
+                } else {
+                    described.clear()
+                }
+            }
+            synchronized(draft) {
+                if (draftGen == generation || generation == 0L) {
+                    draft.clear()
+                    draftGen = 0L
+                }
+            }
+        }
+
+        override fun turnCancelled(generation: Long) {
+            turnEnded(generation)
+        }
+
         override fun turnEnded() {
-            synchronized(described) { described.clear() }
-            draft.clear()
+            turnEnded(0L)
+        }
+
+        override fun turnCancelled() {
+            turnEnded(0L)
         }
     }
 
@@ -337,16 +434,22 @@ class SkinTools(private val workshop: SkinWorkshop, private val limits: SkinLimi
     // ── comum ────────────────────────────────────────────────────────────────
 
     /** Junta os `files` desta chamada ao rascunho; `reset` o recomeça. */
-    private fun merge(args: JSONObject): SkinDraft.Stats {
-        val incoming = LinkedHashMap<String, String>()
-        args.optJSONObject("files")?.let { files ->
-            val names = files.keys()
-            while (names.hasNext()) {
-                val name = names.next()
-                incoming[name] = files.getString(name)
+    private fun merge(args: JSONObject, generation: Long = 0L): SkinDraft.Stats {
+        synchronized(draft) {
+            if (draftGen > 0L && generation > 0L && generation != draftGen) {
+                val snap = draft.snapshot()
+                return SkinDraft.Stats(0, snap.size, snap.values.sumOf { it.size })
             }
+            val incoming = LinkedHashMap<String, String>()
+            args.optJSONObject("files")?.let { files ->
+                val names = files.keys()
+                while (names.hasNext()) {
+                    val name = names.next()
+                    incoming[name] = files.getString(name)
+                }
+            }
+            return draft.merge(incoming, reset = args.optBoolean("reset", false))
         }
-        return draft.merge(incoming, reset = args.optBoolean("reset", false))
     }
 
     private fun reportText(name: String?, report: SkinReport): String = buildString {

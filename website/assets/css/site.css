@@ -1282,6 +1282,63 @@ main, .rodape { position: relative; z-index: 1; }
   .trilha-item .estado { grid-row: 1; grid-column: 2; justify-self: end; }
 }
 
+/* ── Perguntas frequentes (FAQ) ── */
+.faq-lista {
+  list-style: none;
+  margin: clamp(48px, 6vw, 80px) 0 0;
+  padding: 0;
+  border-top: 1px solid var(--linha);
+}
+.faq-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: baseline;
+  padding: 1.9rem 0;
+  border-bottom: 1px solid var(--linha);
+}
+.faq-item::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--teal-claro), transparent 70%);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.9s var(--suave-saida);
+}
+.faq-item:hover::after { transform: scaleX(1); }
+.faq-n {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  color: var(--tenue);
+}
+.faq-item h3 {
+  font-weight: 400;
+  font-size: clamp(1.2rem, 1rem + 0.6vw, 1.5rem);
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+  color: var(--texto);
+}
+.faq-item p {
+  margin-top: 0.65rem;
+  max-width: 44rem;
+  font-size: clamp(0.95rem, 0.92rem + 0.15vw, 1.05rem);
+  line-height: 1.65;
+  color: var(--suave);
+}
+@media (max-width: 680px) {
+  .faq-item {
+    grid-template-columns: 1fr;
+    gap: 0.4rem;
+    padding: 1.5rem 0;
+  }
+}
+
 /* ── Preço ── */
 .planos {
   display: grid;

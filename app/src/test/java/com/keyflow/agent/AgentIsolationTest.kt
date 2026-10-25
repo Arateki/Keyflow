@@ -8,8 +8,9 @@ import org.junit.Test
 /**
  * O núcleo do agente conferido no código-fonte, como o `AuthIsolationTest`: lê como texto os .kt de `agent/` e falha se alguém
  *  - puser `android.*` no núcleo (tudo roda na JVM, D-núcleo puro);
- *  - importar a UI ou o resto do app — a ÚNICA exceção é `com.keyflow.i18n.tr`: o resumo e a legenda que o USUÁRIO lê (o painel de
- *    confirmação, TLS-02) têm de seguir o idioma da interface (AUI-04), e `tr` é só uma consulta de texto (JVM puro, sem Android);
+ *  - importar a UI ou o resto do app — as ÚNICAS exceções são `com.keyflow.i18n.tr` e `trKey`: o resumo e a legenda que o USUÁRIO lê (o
+ *    painel de confirmação, TLS-02) e o nome de cada ajuste da lista de permitidos têm de seguir o idioma da interface (AUI-04), e
+ *    `tr`/`trKey` são só consultas de texto (JVM puro, sem Android);
  *  - abrir um atalho até `AgentTool.run`: o opt-in `PolicyGated` de CHAMADA só pode existir no [ToolExecutor] (D2, regra de ouro
  *    "a política é o único caminho").
  */
@@ -43,7 +44,7 @@ class AgentIsolationTest {
     @Test
     fun `the agent core knows neither the ui nor the screens`() {
         val found = sources().filter { (path, _) -> path.startsWith("agent/") }
-            .flatMap { (path, lines) -> lines.filter { it.trimStart().startsWith("import com.keyflow.") }.filter { !it.startsWith("import com.keyflow.agent") && !it.startsWith("import com.keyflow.reasoning.ReasoningError") && it.trim() != "import com.keyflow.i18n.tr" }.map { "$path → ${it.trim()}" } }
+            .flatMap { (path, lines) -> lines.filter { it.trimStart().startsWith("import com.keyflow.") }.filter { !it.startsWith("import com.keyflow.agent") && !it.startsWith("import com.keyflow.reasoning.ReasoningError") && it.trim() != "import com.keyflow.i18n.tr" && it.trim() != "import com.keyflow.i18n.trKey" }.map { "$path → ${it.trim()}" } }
         assertWithMessage("o núcleo importa o que não devia:\n${found.joinToString("\n")}").that(found).isEmpty()
     }
 
