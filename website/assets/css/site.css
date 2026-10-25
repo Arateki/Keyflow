@@ -370,9 +370,10 @@ main, .rodape { position: relative; z-index: 1; }
 }
 .marca:hover .marca-orbe { transform: scale(1.12) rotate(-8deg); }
 
-.nav { display: flex; gap: clamp(1.25rem, 2.4vw, 2.25rem); }
+.nav { display: flex; gap: clamp(1rem, 2.2vw, 2.25rem); }
 .nav a {
   position: relative;
+  white-space: nowrap;
   font-size: 0.93rem;
   color: var(--suave);
   text-decoration: none;
@@ -435,7 +436,8 @@ main, .rodape { position: relative; z-index: 1; }
 [data-theme="escuro"] .tema .sol { display: block; }
 [data-theme="escuro"] .tema .lua { display: none; }
 
-@media (max-width: 880px) {
+/* O menu mais largo (o da página inicial em português, com a Documentação) só cabe em uma linha a partir de ~960 px. */
+@media (max-width: 960px) {
   .nav { display: none; }
 }
 
