@@ -15,7 +15,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-3Q2+v2Y2rE9T3EDX2Vz2NW9nj2r6+FbnIV6qjmrNec8='; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <title>KeyFlow — a nova forma de usar inteligência artificial</title>
 <!-- Alternativa (data-linha="agente"): <title>KeyFlow — seu agente pessoal, a começar pela voz</title> -->
-<meta name="description" content="Teclado para Android com ditado por voz em qualquer app. Transcreva no próprio aparelho, sem internet, ou na nuvem com a sua chave, e conecte a IA que você escolher. Em breve no Google Play.">
+<meta name="description" content="Teclado para Android com ditado por voz no aparelho ou na nuvem com sua chave. Transcrição sem internet, privacidade total e IA. Em breve no Google Play.">
 <link rel="canonical" href="https://keyflow.arateki.com/">
 <link rel="alternate" hreflang="pt-BR" href="https://keyflow.arateki.com/">
 <link rel="alternate" hreflang="en" href="https://keyflow.arateki.com/en">
@@ -41,6 +41,97 @@
 <link rel="preload" href="assets/fonts/space-grotesk-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="assets/css/site.css">
 <script>(function(){try{var t=localStorage.getItem('kf-tema');if(t==='claro'||t==='escuro')document.documentElement.setAttribute('data-theme',t)}catch(e){}})();</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://arateki.com/#organization",
+      "name": "Arateki",
+      "url": "https://arateki.com",
+      "logo": "https://keyflow.arateki.com/favicon.svg",
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "email": "contato@arateki.com",
+        "contactType": "customer support"
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://keyflow.arateki.com/#website",
+      "url": "https://keyflow.arateki.com/",
+      "name": "KeyFlow",
+      "description": "Teclado para Android com ditado por voz no aparelho e suporte a inteligência artificial.",
+      "publisher": {
+        "@id": "https://arateki.com/#organization"
+      },
+      "inLanguage": ["pt-BR", "en"]
+    },
+    {
+      "@type": "MobileApplication",
+      "@id": "https://keyflow.arateki.com/#application",
+      "name": "KeyFlow",
+      "operatingSystem": "Android",
+      "applicationCategory": "UtilitiesApplication",
+      "description": "Teclado para Android com ditado por voz offline no aparelho ou na nuvem com chave própria, orbe flutuante e suporte a modelos de linguagem.",
+      "inLanguage": ["pt-BR", "en", "es"],
+      "publisher": {
+        "@id": "https://arateki.com/#organization"
+      },
+      "author": {
+        "@id": "https://arateki.com/#organization"
+      }
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://keyflow.arateki.com/#faq",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "O KeyFlow funciona sem internet?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Sim. O ditado por voz offline requer apenas o download inicial do modelo no primeiro uso (com internet). Depois disso, a transcrição funciona totalmente no próprio aparelho, sem nenhuma conexão, inclusive em modo avião. Você também pode conectar serviços em nuvem com sua chave de API caso prefira."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "O teclado envia o que eu digito para algum servidor?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Não para digitação comum. O texto digitado e as teclas pressionadas não saem do aparelho. A única exceção ocorre quando você escolhe acionar recursos de IA na nuvem (como agente, transcrição em nuvem ou raciocínio): nesse caso, o pedido específico é enviado diretamente ao provedor que você configurou, usando sua própria chave de API."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Quais idiomas são suportados?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "O teclado possui layouts dedicados para português (Brasil), inglês e espanhol, com acentuação e pontuação nativas. O ditado por voz offline também suporta esses três idiomas e dezenas de outros por meio dos modelos Whisper (99 idiomas) e Parakeet (25 idiomas europeus)."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "O KeyFlow já está disponível para baixar?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "O KeyFlow está em desenvolvimento ativo para Android e estará disponível em breve no Google Play. Não há links externos de download antes do lançamento oficial."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Preciso criar uma conta para usar o KeyFlow?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Não. O KeyFlow não exige cadastro, conta nem dados pessoais. Chaves de API e preferências são salvas de forma cifrada no próprio dispositivo pelo Android Keystore."
+          }
+        }
+      ]
+    }
+  ]
+}
+</script>
 <script src="assets/js/orbe.js" defer></script>
 <script src="assets/js/site.js" defer></script>
 </head>
@@ -56,6 +147,7 @@
       <a href="#recursos">Recursos</a>
       <a href="#privacidade">Privacidade</a>
       <a href="#agente">O que vem aí</a>
+      <a href="#faq">Dúvidas</a>
     </nav>
     <div class="topo-acoes">
       <a class="idioma" href="en.html" hreflang="en" lang="en">EN<span class="so-leitor"> — English version</span></a>
@@ -232,12 +324,59 @@
     </div>
   </section>
 
+  <section id="faq" class="secao faq" aria-labelledby="faq-titulo">
+    <div class="caixa">
+      <div class="cabeca">
+        <p class="rotulo">06 — Perguntas frequentes</p>
+        <h2 id="faq-titulo" class="titulo-secao revela">Tire suas <span class="tenue">dúvidas.</span></h2>
+        <p class="cabeca-texto revela">Respostas diretas sobre funcionamento, privacidade e disponibilidade do KeyFlow.</p>
+      </div>
+      <ul class="faq-lista">
+        <li class="faq-item revela">
+          <span class="faq-n" aria-hidden="true">01</span>
+          <div>
+            <h3>O KeyFlow funciona sem internet?</h3>
+            <p>Sim. O ditado por voz offline requer apenas o download inicial do modelo no primeiro uso (com internet). Depois disso, a transcrição funciona totalmente no próprio aparelho, sem nenhuma conexão, inclusive em modo avião. Você também pode conectar serviços em nuvem com sua chave de API caso prefira.</p>
+          </div>
+        </li>
+        <li class="faq-item revela">
+          <span class="faq-n" aria-hidden="true">02</span>
+          <div>
+            <h3>O teclado envia o que eu digito para algum servidor?</h3>
+            <p>Não para digitação comum. O texto digitado e as teclas pressionadas não saem do aparelho. A única exceção ocorre quando você escolhe acionar recursos de IA na nuvem (como agente, transcrição em nuvem ou raciocínio): nesse caso, o pedido específico é enviado diretamente ao provedor que você configurou, usando sua própria chave de API.</p>
+          </div>
+        </li>
+        <li class="faq-item revela">
+          <span class="faq-n" aria-hidden="true">03</span>
+          <div>
+            <h3>Quais idiomas são suportados?</h3>
+            <p>O teclado possui layouts dedicados para português (Brasil), inglês e espanhol, com acentuação e pontuação nativas. O ditado por voz offline também suporta esses três idiomas e dezenas de outros por meio dos modelos Whisper (99 idiomas) e Parakeet (25 idiomas europeus).</p>
+          </div>
+        </li>
+        <li class="faq-item revela">
+          <span class="faq-n" aria-hidden="true">04</span>
+          <div>
+            <h3>O KeyFlow já está disponível para baixar?</h3>
+            <p>O KeyFlow está em desenvolvimento ativo para Android e estará disponível em breve no Google Play. Não há links externos de download antes do lançamento oficial.</p>
+          </div>
+        </li>
+        <li class="faq-item revela">
+          <span class="faq-n" aria-hidden="true">05</span>
+          <div>
+            <h3>Preciso criar uma conta para usar o KeyFlow?</h3>
+            <p>Não. O KeyFlow não exige cadastro, conta nem dados pessoais. Chaves de API e preferências são salvas de forma cifrada no próprio dispositivo pelo Android Keystore.</p>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </section>
+
   <section class="secao final" aria-labelledby="final-titulo">
     <div class="caixa">
       <div class="final-orbe" aria-hidden="true"></div>
       <h2 id="final-titulo" class="titulo-secao revela">Em breve no <span class="tenue">Google Play.</span></h2>
       <p class="cabeca-texto revela">A primeira versão está a caminho. Quer saber quando sair? Escreva para a gente.</p>
-      <div class="acoes"><a class="botao" href="mailto:contato@arateki.com?subject=KeyFlow"><span>contato@arateki.com</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div>
+      <div class="acoes"><!--email_off--><a class="botao" href="mailto:contato@arateki.com?subject=KeyFlow"><span>contato@arateki.com</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a><!--/email_off--></div>
     </div>
   </section>
 </main>
@@ -259,7 +398,7 @@
     </nav>
     <div>
       <h2 class="rodape-titulo">Contato</h2>
-      <ul><li><a href="mailto:contato@arateki.com">contato@arateki.com</a></li></ul>
+      <ul><li><!--email_off--><a href="mailto:contato@arateki.com">contato@arateki.com</a><!--/email_off--></li></ul>
     </div>
     <div>
       <h2 class="rodape-titulo">Idioma</h2>
