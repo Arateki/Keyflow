@@ -142,9 +142,10 @@ upload interno, o produto de R$15 e a service account. As tasks V1-1..V1-8 não 
   (`~/.keyflow/android/upload-keystore.properties`, ver `.specs/codebase/ENVIRONMENT.md`); `applicationId` **`com.arateki.keyflow`**
   (decisão 2); `versionCode` 1 / `versionName` 1.0.0; smoke do APK de release no emulador (`scripts/smoke-release.sh`).
   Fechamento em 2026-10-25: smoke padrão passou (skins, compra indisponível, banner, digitação e persistência),
-  `PermissionsCheckerTest` 2/2. O ditado local foi tentado com modelo instalado, mas o processo `:inference` sofreu SIGSEGV
-  no emulador x86_64 executando o APK ARM por `libndk_translation.so`; a causa ainda não foi isolada. **[YAN]**: validar
-  a inferência do release em ARM antes de considerá-la aprovada; não há prova de que a falha seja apenas da tradução.
+  `PermissionsCheckerTest` 2/2. Ditado com R8 validado por carga do Whisper base e transcrição de fala conhecida:
+  x86_64 nativo 1/1 e ARM real no A32 1/1, na cópia `.teste`; DEX minificado idêntico entre as variantes.
+  O mesmo APK ARM reproduziu SIGSEGV `0x8` somente no AVD por `libndk_translation.so` (0/1), isolando a falha ao caminho
+  traduzido. Regras de keep inalteradas; app pessoal, dados e teclado Samsung preservados pelo atalho seguro.
   Vem depois da V1-10 com fakes, para o AAB já levar a compra e os anúncios. **[YAN]**: criar o app no Console com o id novo,
   cadastrar a chave de upload (SHA-256 `AB:17:29:3A:…:A8:DC`) e subir o AAB na trilha interna, com a permissão de billing, para criar o
   produto de R$15 — antes do e2e real (MZ-T15/API-T14). A conta (decisão 1) trava esse upload. **[YAN]**: configurar/verificar

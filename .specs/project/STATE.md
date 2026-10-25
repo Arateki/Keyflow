@@ -2695,8 +2695,34 @@ Seis ferramentas em `agent/tools/SkinTools.kt` sobre uma porta (`SkinWorkshop`),
   Rápido/Whisper base baixado e instalado pelo app e gravação confirmada pelo cronômetro. O processo `:inference` caiu três vezes
   com SIGSEGV, endereço `0x8`, antes do marcador de modelo carregado; o app apresentou interrupção local e continuou aberto.
   O release não contém bibliotecas x86_64: o AVD é x86_64, `primaryCpuAbi=arm64-v8a`, ponte `libndk_translation.so`.
-  Isso limita a conclusão: não foi isolado se o defeito está na tradução ou no caminho nativo do app. Falta reproduzir em ARM
-  (roteiro do A32), sem considerar os checks estáticos do JNI como prova de inferência executada.
+  Naquela rodada não havia sido isolado se o defeito estava na tradução ou no caminho nativo do app; faltava reproduzir em ARM,
+  sem considerar os checks estáticos do JNI como prova de inferência executada. A comparação controlada abaixo encerra essa pendência.
 - **Entrega:** código do smoke em `43bc418`; relatório e evidências em `.equipe/relatorios/v1-3-release.md` e `/tmp/v1-3-fim/`.
   Travas compartilhadas respeitadas, execução com prioridade 15 e somente `emulator-5554`; nenhum push feito. O coordenador
   envia os commits e acompanha o CI da PR #20.
+
+
+## 2026-10-25 — V1-3: ditado em ARM aprovado; SIGSEGV isolado na execução traduzida
+
+- **Comparação controlada, com R8 ligado:** cópias de release assinadas com debug, `com.arateki.keyflow.teste`, uma incluindo
+  x86_64 e outra só ARM. O DEX minificado e o mapping são byte a byte idênticos entre elas; todas as bibliotecas arm64 são
+  idênticas às do APK de upload. O build original foi restaurado exatamente; mudanças locais de ABI/id/assinatura não foram
+  commitadas, e a chave de upload não foi lida. O check estático do JNI passou nos dois APKs (122 sherpa, 72 LiteRT-LM, oito contratos).
+- **Sonda do serviço real:** driver separado, sem classes do app, chama o Binder com o contrato AIDL, baixa o Whisper base
+  fixado no catálogo e confere seus SHA-256. Exige callback de preload e transcrição da fixture `speech-en-short.m4a`
+  contendo “nightfall” e “yellow lamps”. Isso exercita carga, JNI, Parcel e decodificação/inferência do APK minificado;
+  não ativa IME nem grava microfone. As medidas abaixo são de uma execução, não um benchmark.
+- **Resultados:** x86_64 nativo **1/1** (carga 1.550 ms, transcrição 4.514 ms de 6.656 ms de áudio); A32 ARM real **1/1**
+  (carga 4.317 ms, transcrição 8.916 ms de 6.720 ms de áudio). O **mesmo APK ARM** no AVD x86_64 por `libndk_translation.so`
+  falhou **0/1**, com SIGSEGV em `0x8` antes de carregar o modelo, reproduzindo o incidente inicial. A falha ficou isolada
+  ao caminho ARM traduzido nesse AVD; os caminhos nativos validam as keep rules existentes. Não foi localizado o defeito
+  interno da ponte, nem alterada uma regra de R8 para contornar o emulador.
+- **Instrumentação também precisa de isolamento:** o runner atual do debug depende de Kotlin/Tracing eliminados ou
+  renomeados no release. Acrescentar a stdlib inteira ao runner causou colisão com a `Function3` minificada (`invoke`/`g`),
+  antes de executar o teste. A prova válida usou APK próprio com AndroidJUnitRunner oficial 1.4.0/JUnit, sem nenhuma referência
+  Kotlin ou classe JNI/serviço/config do app. Não ampliar keep rules de produção para fazer um runner de debug carregar.
+- **A32 preservado:** todas as operações passaram por `scripts/celular.sh` da worktree de celular, com trava e nice 15.
+  `verificar` final aprovado: app pessoal 1.0.0/código 1, permissões e resumo SHA dos dados iguais; lista de IMEs e teclado
+  Samsung iguais aos do início. A cópia `.teste` e seu runner permanecem instalados porque o atalho não autoriza removê-los.
+- **Provas para revisão:** `.equipe/artefatos/v1-3-arm/` preserva os dois APKs, runner, mapping, SHA-256, fonte da sonda,
+  logs dos três ambientes e verificações do A32. Arquivos de trabalho e receita do runner em `/tmp/v1-3-arm/`.
