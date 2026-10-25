@@ -2723,3 +2723,22 @@ Dois motores com ferramentas ao lado do da Anthropic: `reasoning/openai/OpenAiAg
   Regra: teste que conta cor na tela inteira precisa descontar o fundo, porque o que o launcher mostra muda com o ícone.
 - Ambiente: o `diff-screens.sh` pede o `compare` do ImageMagick no PATH (`/srv/dev/ferramentas/bin`); sem ele todo golden
   sai como "comparação falhou (dimensões diferentes?)", mensagem que engana.
+
+## 2026-10-25 — CI sob demanda como nó do pool
+
+- `ci rodar` publica somente commits de `equipe/*`, com as mesmas recusas de segredo e push normal de
+  `ci enviar`; usa o mesmo `gh`, sem ampliar credenciais. Entradas são validadas antes da publicação e
+  novamente no workflow, por allowlist de tarefas e nomes de classe/método. Filtro JVM é argumento literal
+  `--tests=...`, nunca uma linha avaliada pelo shell. Inputs chegam aos passos somente por `env`.
+- Até seis emuladores dividem os testes; cada um faz suas até vinte repetições sequencialmente. O preparo
+  vem do Checks: JDK 17, keystore descartável, caches Gradle/sherpa, KVM obrigatório e emulador fixo com
+  swangle. `ci-device-gate.sh selected` reutiliza instalação, logcat e diagnóstico do host.
+- Contar só jobs já visíveis subestima dependências/matrizes que ainda não nasceram. O cliente reserva
+  conservadoramente a rodada inteira e espera o teto de vinte, com trava entre clientes locais. Disparos
+  externos continuam sujeitos à fila global do GitHub; não há reserva atômica entre máquinas diferentes.
+- Rótulo e SHA identificam a rodada; não basta pegar a última da branch. O cliente confere a ponta remota
+  antes de disparar e não repete o dispatch ao esperar. O resumo junta todos os pedaços por repetição,
+  aceita shard vazio, mas falha em classe sem testes, evidência ausente, crash, ADB ou teste falhando.
+- `workflow_dispatch` exige o workflow na branch padrão: integrar esse arquivo na main é o preparo inicial;
+  depois o pedido usa `--ref equipe/...`. A entrega foi conferida sem rede com gh falso e Git local; a
+  primeira rodada real cabe ao coordenador após instalar o comando e publicar os commits.

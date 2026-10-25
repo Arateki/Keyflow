@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# CI do GitHub como mais um nó do pool: roda a suíte inteira (unitários, lint, release e os testes no emulador em 6
+# partes) fora do servidor. O repositório é público: os minutos são gratuitos.
+#
+# Uso, de dentro da worktree da branch:
+#   ci rodar --tarefas assembleDebug --classes PermissionsCheckerTest --pedacos 2 --repetir 3
+#   ci enviar     sobe a branch equipe/* ao GitHub e abre o PR em rascunho (cada push novo dispara o CI sozinho)
+#   ci estado     resumo da última rodada da branch: um job por linha e, nas falhas, o fim do log
+#   ci esperar    espera a rodada acabar (no máximo CI_ESPERA segundos, padrão 45 min) e mostra o resumo
+#                 saída 0 = verde, 1 = falhou, 75 = ainda rodando (chame de novo)
+#
+# Regras: só branches equipe/*; nunca a main; nunca --force (branch reescrita → fale com o coordenador); recusa
+# arquivos e conteúdos com cara de segredo, porque o repositório é público.
+set -uo pipefail
+. /srv/dev/ferramentas/ambiente.sh 2>/dev/null || true
+GH=${CI_GH_BIN:-/srv/dev/ferramentas/bin/gh}
+REPO=Arateki/Keyflow
+cmd=${1:-}
+raiz=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "ci: rode de dentro de uma worktree do KeyFlow" >&2; exit 2; }
+branch=$(git -C "$raiz" branch --show-current)
+[[ $branch =~ ^equipe/[A-Za-z0-9._/-]+$ ]] || { echo "ci: só branches equipe/* (esta é '$branch')" >&2; exit 2; }
+
+ultima_rodada() {
+  "$GH" run list -R "$REPO" -w checks.yml -b "$branch" -L 1 --json databaseId,status,conclusion,headSha,url \
+    -q '.[0] | "\(.databaseId) \(.status) \(.conclusion) \(.headSha) \(.url)"' 2>/dev/null
+}
+
+resumo() {
+  local id=$1
+  "$GH" run view "$id" -R "$REPO" --json jobs \
+    -q '.jobs[] | "  \(if .conclusion == "success" then "ok    " elif .conclusion == "" then "…     " else "FALHOU" end) \(.name)"'
+  if "$GH" run view "$id" -R "$REPO" --json conclusion -q .conclusion | grep -q failure; then
+    echo "— fim do log das falhas —"
+    "$GH" run view "$id" -R "$REPO" --log-failed 2>/dev/null | cut -f3- | grep -v '^\s*$' | tail -40
+  fi
+}
+
+case $cmd in
+  rodar)
+    shift
+    [[ -f $raiz/scripts/ci-rodar.py ]] || { echo "ci: esta branch precisa dos scripts de CI sob demanda" >&2; exit 2; }
+    exec python3 "$raiz/scripts/ci-rodar.py" --gh "$GH" "$@"
+    ;;
+  enviar)
+    git -C "$raiz" fetch -q origin main
+    base=$(git -C "$raiz" merge-base HEAD origin/main)
+    arquivos=$(git -C "$raiz" diff --name-only "$base" HEAD)
+    [[ -n $arquivos ]] || { echo "ci: a branch não tem commits além da main" >&2; exit 2; }
+    if grep -E '(\.jks|\.keystore|\.p12|\.pem|(^|/)\.env(\..*)?|google-services\.json|keystore\.properties|upload-keystore)$' \
+         <<<"$arquivos" | grep -v -E '^api/tests/fixtures/test_service_account_key\.pem$|\.env\.example$'; then
+      echo "ci: recusei — arquivo com cara de segredo na branch (acima). O repositório é público." >&2; exit 3
+    fi
+    if git -C "$raiz" diff "$base" HEAD | grep -E '^\+' | grep -v -E 'test_service_account_key|chave-falsa|fake' \
+         | grep -q -E 'AIza[0-9A-Za-z_-]{35}|sk-ant-[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9]{40,}|xai-[A-Za-z0-9]{40,}|gh[pousr]_[A-Za-z0-9]{36}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----'; then
+      echo "ci: recusei — o diff tem algo com formato de chave ou token. Confira antes de publicar." >&2; exit 3
+    fi
+    git -C "$raiz" diff --quiet HEAD || echo "aviso: há mudanças não commitadas; só os commits sobem."
+    if ! git -C "$raiz" push -q origin "HEAD:refs/heads/$branch" 2>/tmp/ci-push.$$; then
+      cat /tmp/ci-push.$$ >&2; rm -f /tmp/ci-push.$$
+      echo "ci: o push foi recusado (branch reescrita com amend ou rebase?). Nunca uso --force: fale com o coordenador." >&2
+      exit 4
+    fi
+    rm -f /tmp/ci-push.$$
+    pr=$("$GH" pr list -R "$REPO" --head "$branch" --state open --json url -q '.[0].url')
+    if [[ -z $pr ]]; then
+      titulo=$(git -C "$raiz" log -1 --format=%s "$(git -C "$raiz" rev-list --reverse "$base"..HEAD | head -1)")
+      corpo=$(printf 'Rascunho aberto para rodar o CI. Não integrar antes da revisão.\n\nCommits:\n%s\n' \
+        "$(git -C "$raiz" log --reverse --format='- %s' "$base"..HEAD)")
+      pr=$("$GH" pr create -R "$REPO" --draft --base main --head "$branch" --title "$titulo" --body "$corpo") || exit 5
+    fi
+    echo "PR: $pr"
+    echo "O CI começa em alguns segundos. Acompanhe com: ci esperar"
+    ;;
+  estado)
+    r=$(ultima_rodada); [[ -n $r ]] || { echo "ci: nenhuma rodada para $branch (rode: ci enviar)"; exit 2; }
+    read -r id st conc sha url <<<"$r"
+    echo "rodada $id ($st${conc:+ / $conc}) no commit ${sha:0:7}: $url"
+    [[ $sha == "$(git -C "$raiz" rev-parse HEAD)" ]] || echo "aviso: a rodada é de outro commit; o seu HEAD ainda não subiu (ci enviar)."
+    resumo "$id"
+    ;;
+  esperar)
+    limite=$(( SECONDS + ${CI_ESPERA:-2700} ))
+    head=$(git -C "$raiz" rev-parse HEAD)
+    while :; do
+      r=$(ultima_rodada); read -r id st conc sha url <<<"${r:-x x x x x}"
+      if [[ $sha == "$head" && $st == completed ]]; then
+        echo "rodada $id: $conc — $url"; resumo "$id"
+        [[ $conc == success ]] && exit 0 || exit 1
+      fi
+      (( SECONDS >= limite )) && { echo "ci: a rodada ainda não acabou ($st). Chame 'ci esperar' de novo."; exit 75; }
+      sleep 60
+    done
+    ;;
+  *) sed -n '2,13p' "$0"; exit 2 ;;
+esac
