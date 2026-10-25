@@ -12,6 +12,7 @@
 #   3. varre o logcat atrás de ClassNotFoundException, NoSuchMethodError, erro de JNI e de parcel.
 #
 # Ambiente: KEYFLOW_SMOKE_APK=<apk> pula o Gradle (KEYFLOW_SMOKE_MAPPING=<mapping.txt> diz onde está o do R8); KEYFLOW_SMOKE_DICTATION=1 inclui o ditado local; ANDROID_SERIAL (padrão emulator-5554, nunca um aparelho real);
+# KEYFLOW_SMOKE_DEBUG_KEYSTORE altera a chave debug somente do APK de suporte com EditText.
 # SMOKE_LOG e SMOKE_EVIDENCE_DIR (padrão /tmp/keyflow-release) dizem onde ficam o logcat e as capturas.
 # Pede o AdMob do release (KEYFLOW_ADMOB_*, ver .specs/features/monetization/admob-release.md) e segura as travas do
 # Gradle (só na fase 1) e do emulador (só na fase 2).
@@ -59,6 +60,22 @@ if [[ "${KEYFLOW_SMOKE_PHASE:-1}" == 1 ]]; then
     javac --release 17 -cp "$sdk/platforms/android-36/android.jar" -d "$dump_build" scripts/ReleaseUiDump.java
     "$build_tools/d8" --min-api 34 --lib "$sdk/platforms/android-36/android.jar" \
         --output "$evidence/smoke-ui-dump.zip" "$dump_build/ReleaseUiDump.class"
+    # Host de texto próprio, sem depender do estado/restauração dos Ajustes. A assinatura é só desta fixture.
+    javac --release 17 -cp "$sdk/platforms/android-36/android.jar" -d "$dump_build" scripts/ReleaseInputActivity.java
+    mkdir -p "$dump_build/input-dex"
+    "$build_tools/d8" --min-api 34 --lib "$sdk/platforms/android-36/android.jar" \
+        --output "$dump_build/input-dex" "$dump_build/com/keyflow/smoke/ReleaseInputActivity.class"
+    "$aapt2" link -I "$sdk/platforms/android-36/android.jar" --manifest scripts/release-input-manifest.xml \
+        -o "$dump_build/input-unsigned.apk"
+    python3 - "$dump_build/input-unsigned.apk" "$dump_build/input-dex/classes.dex" <<'INPUT_DEX'
+import sys, zipfile
+with zipfile.ZipFile(sys.argv[1], "a") as apk:
+    apk.write(sys.argv[2], "classes.dex")
+INPUT_DEX
+    "$build_tools/zipalign" -f 4 "$dump_build/input-unsigned.apk" "$dump_build/input-aligned.apk"
+    "$apksigner" sign --ks "${KEYFLOW_SMOKE_DEBUG_KEYSTORE:-$HOME/.config/.android/debug.keystore}" \
+        --ks-key-alias androiddebugkey --ks-pass pass:android --key-pass pass:android \
+        --out "$evidence/smoke-input.apk" "$dump_build/input-aligned.apk"
     rm -rf "$dump_build"
     trap - EXIT
 
@@ -104,7 +121,7 @@ if [[ "${KEYFLOW_SMOKE_PHASE:-1}" == 1 ]]; then
     # Fase 2 com a trava do emulador, só agora: o build pode ter esperado minutos na fila do Gradle.
     adb start-server >/dev/null 2>&1
     # O chamador pode agrupar smoke e instrumentados sob a mesma trava, sem tentar pegá-la duas vezes.
-    phase2=(env KEYFLOW_SMOKE_PHASE=2 KEYFLOW_SMOKE_APK="$apk" KEYFLOW_SMOKE_PKG="$pkg" KEYFLOW_SMOKE_UI_DUMP_JAR="$evidence/smoke-ui-dump.zip" "$0" "$@")
+    phase2=(env KEYFLOW_SMOKE_PHASE=2 KEYFLOW_SMOKE_APK="$apk" KEYFLOW_SMOKE_PKG="$pkg" KEYFLOW_SMOKE_UI_DUMP_JAR="$evidence/smoke-ui-dump.zip" KEYFLOW_SMOKE_INPUT_APK="$evidence/smoke-input.apk" "$0" "$@")
     if [[ "${KEYFLOW_SMOKE_LOCKED:-}" == 1 ]]; then exec "${phase2[@]}"; fi
     exec flock /tmp/keyflow-emulator.lock "${phase2[@]}"
 fi
@@ -112,6 +129,7 @@ fi
 # --- Fase 2: emulador -----------------------------------------------------------------------------------------------------
 apk="$KEYFLOW_SMOKE_APK"
 pkg="$KEYFLOW_SMOKE_PKG"
+input_pkg="com.keyflow.smoke.input"
 # O id curto de componente ("pkg/.ui.X") é relativo ao applicationId; as classes ficam em com.keyflow (namespace).
 ime="$pkg/com.keyflow.ime.KeyFlowKeyboardService"
 setup="$pkg/com.keyflow.ui.SetupActivity"
@@ -131,6 +149,7 @@ finish_smoke() {
     if [[ "${KEYFLOW_SMOKE_KEEP:-}" != 1 ]]; then
         adbx shell ime reset >/dev/null 2>&1 || true
         adbx uninstall "$pkg" >/dev/null 2>&1 || true
+        adbx uninstall "$input_pkg" >/dev/null 2>&1 || true
     fi
     if [[ -n "$stay_awake" ]]; then
         if [[ "$stay_awake" == null ]]; then
@@ -167,6 +186,8 @@ adbx shell wm dismiss-keyguard
 # Instalação limpa e do zero: a assinatura do release (upload) difere da de debug de quem instalou antes.
 adbx uninstall "$pkg" >/dev/null 2>&1 || true
 adbx install "$apk"
+adbx uninstall "$input_pkg" >/dev/null 2>&1 || true
+adbx install "$KEYFLOW_SMOKE_INPUT_APK"
 adbx shell appops set "$pkg" SYSTEM_ALERT_WINDOW allow
 adbx shell pm grant "$pkg" android.permission.RECORD_AUDIO
 adbx shell pm grant "$pkg" android.permission.POST_NOTIFICATIONS || true
@@ -411,25 +432,24 @@ PY
     awk -v n="$metric" 'BEGIN { printf "%.0f\n", n }'
 }
 
-# Os Ajustes podem restaurar a busca anterior. Localiza e toca o campo, mesmo nesse caso;
-# uma coordenada fixa no conteúdo pode fechar o IME em vez de abrir a busca.
-open_keyboard_in_search() {
+# Abre sempre uma Activity nova da fixture e aguarda as teclas reais do KeyFlow.
+open_keyboard_in_fixture() {
     local field attempt imm
-    adbx shell am start -a android.settings.SETTINGS >/dev/null
-    sleep 4
-    tap_label 'Search settings' 'Pesquisar configurações' 'Buscar en ajustes'
+    adbx shell am force-stop "$input_pkg"
+    adbx shell am start -W -n "$input_pkg/com.keyflow.smoke.ReleaseInputActivity" >/dev/null
+    sleep 2
     dump_window
     field="$(python3 - "$window_xml" <<'FIELD'
 import sys
 import xml.etree.ElementTree as ET
 root = ET.parse(sys.argv[1]).getroot()
 for node in root.iter("node"):
-    if node.get("class") in ("android.widget.EditText", "android.widget.AutoCompleteTextView"):
+    if node.get("package") == "com.keyflow.smoke.input" and node.get("class") == "android.widget.EditText":
         print(node.get("bounds", ""))
         break
 FIELD
 )"
-    [[ -n "$field" ]] || { echo "campo de busca dos Ajustes não encontrado" >&2; return 1; }
+    [[ -n "$field" ]] || { echo "campo de texto da fixture não encontrado" >&2; return 1; }
     tap_bounds "$field"
     for attempt in {1..15}; do
         imm="$(adbx shell dumpsys input_method | tr -d '\r')"
@@ -508,8 +528,8 @@ assert_label 'Banner de anúncios' 'Ad banner' 'Banner de anuncios'
 assert_label 'Test Ad'
 shot banner
 
-# O teclado do KeyFlow num campo de texto de verdade (a busca dos Ajustes): janela do IME aberta e as teclas digitando.
-open_keyboard_in_search
+# O teclado do KeyFlow no EditText da fixture: janela do IME aberta e as teclas digitando.
+open_keyboard_in_fixture
 # Só toca teclas efetivamente expostas pelo IME; coordenadas fixas poderiam atingir a tela atrás dele.
 for key in h i; do
     dump_window
@@ -522,6 +542,7 @@ for key in h i; do
 done
 dump_window
 [[ -n "$(find_bounds 'hi')" ]] || { echo "o texto digitado no teclado do KeyFlow não chegou ao campo" >&2; cat "$window_xml" >&2; exit 1; }
+cp "$window_xml" "$evidence/smoke-teclado-digitando.xml"
 shot teclado-digitando
 adbx shell input keyevent 4
 adbx shell input keyevent 3
@@ -546,7 +567,7 @@ if [[ "${KEYFLOW_SMOKE_DICTATION:-}" == 1 ]]; then
     [[ -n "$(find_bounds 'Apagar' 'Delete' 'Eliminar')" ]] || { echo "o modelo Rápido não terminou de baixar em 10 min" >&2; exit 1; }
     shot modelo-instalado
     # Preserva também os erros das etapas anteriores para a conferência final de R8/JNI.
-    open_keyboard_in_search
+    open_keyboard_in_fixture
     dump_window
     mic_bounds="$(find_bounds '🎙')"
     [[ -n "$mic_bounds" ]] || { echo "tecla do microfone não achada" >&2; exit 1; }
