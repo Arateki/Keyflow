@@ -239,7 +239,7 @@ class AgentController(
                     if (message != null) appendToBubble("\n[$message]") else addItem(ChatItem.Notice(ids.getAndIncrement(), NoticeKind.GENERATION_ERROR))
                 }
             } finally {
-                if (mine == runNumber) finishRun(cancelled)
+                if (mine == runNumber) finishRun(cancelled) else releaseTurnState(cancelled = true)
             }
         }
     }

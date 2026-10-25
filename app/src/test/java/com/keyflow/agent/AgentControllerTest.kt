@@ -547,6 +547,23 @@ class AgentControllerTest {
     }
 
     @Test
+    fun `when a job dies after clear has bumped runNumber, turn state is still released as cancelled`() {
+        val scoped = ScopedSplit("s")
+        val env = Env(listOf(scoped))
+        val release = CompletableDeferred<Unit>()
+        env.controller.send("x", AgentBackend.TextOnly { flow { release.await(); emit(AgentEvent.Done()) } })
+        assertThat(scoped.cancelled.get()).isEqualTo(0)
+
+        env.controller.clear()
+        // O job cancelado garante que releaseTurnState(cancelled = true) foi chamado
+        assertThat(scoped.cancelled.get()).isAtLeast(1)
+        assertThat(env.controller.isBusy).isFalse()
+
+        env.controller.send("y", env.withTools(ScriptedEngine(text("oi") + done())))
+        assertThat(scoped.ended.get()).isEqualTo(1)
+    }
+
+    @Test
     fun `nothing runs before the policy is ready`() {
         val gate = CompletableDeferred<Unit>()
         val read = FakeTool("r")
