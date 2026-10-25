@@ -48,6 +48,10 @@ if [[ "${KEYFLOW_SMOKE_PHASE:-1}" == 1 ]]; then
         apk="app/build/outputs/apk/release/app-release.apk"
         [[ -f "$apk" ]] || { echo "APK de release assinado ausente: $apk" >&2; exit 2; }
     fi
+    [[ -s "$mapping" ]] || { echo "mapping R8 obrigatório ausente ou vazio: $mapping" >&2; exit 1; }
+    python3 scripts/check-release-agent.py "$mapping" "$apk"
+    python3 scripts/check-release-jni.py "$mapping" "$apk"
+
     # O dump do sistema no API 34 pode lançar NPE em childNafCheck. Este leitor espera as
     # janelas, limpa o cache e tolera filhos removidos durante a consulta, sem alterar o APK.
     dump_build="$(mktemp -d "${TMPDIR:-/tmp}/keyflow-release-dump.XXXXXX")"
@@ -67,11 +71,6 @@ if [[ "${KEYFLOW_SMOKE_PHASE:-1}" == 1 ]]; then
 
     # Varre todas as entradas descomprimidas (resources.arsc usa UTF-16, DEX usa UTF-8).
     python3 scripts/check-release-admob.py "$apk"
-    if [[ -f "$mapping" ]]; then
-        python3 scripts/check-release-jni.py "$mapping" "$apk"
-    else
-        echo "sem $mapping: conferência do JNI ignorada (APK de fora do Gradle)"
-    fi
 
     # O release usa produção e não pode embutir identificador/token de Access, simulador ou agente.
     dex_dump="$(mktemp "${TMPDIR:-/tmp}/keyflow-release-dex.XXXXXX")"

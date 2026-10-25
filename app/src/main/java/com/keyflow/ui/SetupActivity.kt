@@ -193,7 +193,8 @@ class SetupActivity : ComponentActivity() {
     // O agente da aba KeyFlow (agent-harness): as peças vivem no processo; aqui só se escolhe, pela origem de raciocínio, se a próxima
     // mensagem usa ferramentas (Anthropic por chave de API) ou o chat de texto de sempre.
     private val agentRuntime by lazy {
-        AgentHost.of(this).runtime(
+        // A condição precisa estar dentro do lazy: o inicializador também é alcançável pelo R8.
+        if (BuildConfig.AGENT_ENABLED) AgentHost.of(this).runtime(
             AgentBackends(
                 hasTools = { AgentHost.of(this).registry.all().isNotEmpty() },
                 anthropicApiKeyConnected = { auth.store.getApiKey(ProviderIds.ANTHROPIC) != null },
@@ -201,7 +202,7 @@ class SetupActivity : ComponentActivity() {
                 agentEngine = { model -> AnthropicAgentEngine(auth.authorization, auth.http, model) },
                 resolveText = reasoningEngines::resolve,
             ),
-        )
+        ) else null
     }
     private var localSnapshot by mutableStateOf(LocalModelsSnapshot.EMPTY)
     private var localModelsJob: Job? = null
