@@ -175,7 +175,7 @@ peso(agora) ≥ KEEP_ABOVE`. Sem tarefa de fundo: a limpeza acontece ao carregar
 | `Typed(w)` — **renovação** | `w` já vale no aprendido (`conhece(w)`) | +1 (respeita o cooldown; `ultimoUso = agora`): o uso diário nunca expira (LRN-01b) |
 | troca aplicada e **não** desfeita | a original | nada para a original (LRN-06) |
 | troca por **par** aplicada e **não** desfeita | par ativo | par +1 (renova; mesmo cooldown) |
-| `Rejected(original, troca)` — recomitar a mesma palavra após desfazer (REJ-01) ou reescrever a original (REJ-03) | pendência viva | `original` +3; apaga par de `original` |
+| `Rejected(original, troca)` — recomitar a mesma palavra após desfazer (REJ-01) ou reescrever a original (REJ-03) | recusa em espera ainda viva | `original` +3; apaga par de `original` |
 | `Keep(w)` — toque na palavra como digitada na faixa (REJ-02) | elegível | `w` +3; apaga par |
 | `PairTap(d, e)` — toque numa sugestão ≠ digitada (FIX-01) | `d` fora do dicionário e do aprendido | par `d→e` +1; zera a palavra `d` se existir |
 | `Rewrite(original, v)` — `RewriteTracker` (FIX-02) | condições do FIX-02 | par `original→v` +2 |
@@ -188,7 +188,7 @@ vale o ponto de `Typed`; DESCONHECIDO = sem ponto, senão o erro de digitação 
 ganharia +1 e furaria o LRN-05 (custo: a última palavra antes do Enter não pontua; pontua nas próximas vezes). Em
 campo que não troca (ou com "Correção automática" desligada) **nada é aprendido** (PRV-02).
 
-### Recusa pendente e o desfazer
+### Recusa em espera e o desfazer
 
 Hoje `undoCorrection` apaga `corrigida + separador` e faz `commitText(original)`: o texto fica solto,
 sem composição, e o serviço não vê a pessoa confirmar. Mudança (D1): estado do tracker **antes** de mexer
@@ -197,7 +197,7 @@ no campo (lição do Q9: o `onUpdateSelection` chega dentro da chamada), depois
 
 - `finishComposing` com a palavra igual a `original` e com separador → suprime a troca (REJ-05) e envia
   `Rejected`;
-- letra, backspace, troca de campo, troca de idioma, movimento de cursor → limpa a pendência.
+- letra, backspace, troca de campo, troca de idioma, movimento de cursor → limpa a espera.
 
 O teste instrumentado de hoje (`fieldText() == "nao"` após o backspace) continua valendo. ASK e AOSP
 também recompõem a palavra original depois de reverter (ASK por `setComposingRegion`, `context.md` §4).
@@ -374,7 +374,7 @@ fun wordEligible(word: String): Boolean        // LRN-02
 - **Apagar:** `PersonalLexicon.clear()` + apagar os arquivos, numa função só (`LearnedStore.wipe()`), chamada
   (a) pelo botão da aba Teclado, (b) por `onDeleteMyData` **antes** de `deleteRemoteData`; (b) hoje só chama
   a API (`SetupActivity.kt`: `entitlementsRepository.deleteRemoteData { api.deleteAccount() }`).
-- **Texto novo da interface** via `tr("…")`, em pt/en/es; textos novos nas tarefas CA-T15 e CA-T16.
+- **Texto novo da interface** via `tr("…")`, em pt/en/es; textos novos nas tarefas CA-T15, CA-T16, CA-T16b e CA-T18b (a última com revisão do Yan).
 - Nada de rede: o módulo não importa `net/`; um teste de arquitetura (`ArchitectureRulesTest`) confere que
   `ime/keyboard/learning/` não importa `okhttp`/`java.net`. A única saída de dados é a exportação que a pessoa
   pede (§8.1), por `ContentResolver` para o arquivo que ela escolheu.
@@ -532,10 +532,14 @@ O KeyFlow é Apache-2.0, com titular Yan Lucas (`LICENSE` e `NOTICE` na raiz da 
 
 - **Unitários puros:** `LearningPolicyTest` (matriz de `inputType` × flag × opções), `PersonalLexiconTest`
   (relógio injetado: 3 pontos valem, cooldown, decaimento, teto, evidência mais recente vence),
-  `LearnedStoreTest` (ida e volta, diário, compactação, linha torta, versão futura), `RewriteTrackerTest`
-  (sequências de eventos), `SpatialCostsTest` (borda × centro), `TouchBiasTest`, `BigramTest`.
+  `LearnedStoreTest` (ida e volta, diário, compactação, linha torta, versão futura), `LearnedImportReaderTest`
+  (arquivo hostil: peso NaN ou negativo, data futura, palavra inelegível, além dos tetos), `RewriteTrackerTest`
+  (sequências de eventos), `ComposingWordTrackerTest` (toques paralelos às letras), `SpatialCostsTest` (borda ×
+  centro; letra sem toque), `TouchBiasTest`, `BigramTest`, `BackupRulesTest` (agora também `domain="file"`, nas três
+  seções).
 - **Propriedade** (kotest): decaimento monótono; `replay(diário) == estado`; teto sempre respeitado; nenhum
-  peso negativo. **Fuzz:** arquivo com bytes aleatórios nunca derruba e nunca passa dos tetos.
+  peso negativo; uso diário por 400 dias nunca expira (LRN-01); depois de importar qualquer entrada nenhum teto é
+  violado. **Fuzz:** arquivo com bytes aleatórios nunca derruba e nunca passa dos tetos, no `.kfl` e no `KFX1`.
 - **Mutação:** o pacote `learning` entra nos alvos padrão do PIT.
 - **Instrumentados** (`instrumentar KeyFlowKeyboardLearningTest`): desfazer → recomitar vira palavra
   conhecida; recusa cancelada por edição; faixa "manter"; senha, `NO_SUGGESTIONS` e `NO_PERSONALIZED_LEARNING` não gravam;
@@ -548,11 +552,15 @@ O KeyFlow é Apache-2.0, com titular Yan Lucas (`LICENSE` e `NOTICE` na raiz da 
 
 | Risco | Mitigação |
 | ----- | --------- |
-| Aprender erro de digitação | LRN-05/06 + recusa pendente confirmada + 3 pontos + sessões no banco |
-| Recompor a palavra após o desfazer difere por app | Instrumentado em campo real + `Edge Cases`; se um app falhar, cai no `commitText` de hoje e a pendência é descartada |
+| Aprender erro de digitação | LRN-05/06 + recusa em espera confirmada + 3 pontos + sessões no banco |
+| Recompor a palavra após o desfazer difere por app | Instrumentado em campo real + `Edge Cases`; se um app falhar, cai no `commitText` de hoje e a espera é descartada |
 | Coordenada de toque errada (rotação, layout trocado) | Unidade de tecla vinda da geometria viva da grade; sem toque, cai na tabela de vizinhas |
 | σ e custos só bons no sintético | Calibrar com `reais` do A32; o sintético só ordena mudanças |
 | Viés de toque diverge | Prior, teto, só palavras do dicionário, caso adversarial no banco |
-| Perceção de privacidade / ficha da Play | PRV-04/05; tela de palavras; texto jurídico é do Yan |
+| Perceção de privacidade / ficha da Play | PRV-04/05; tela de palavras; textos legais revisados pelo Yan na fase B (CA-T18b), portão antes da Play |
+| O arquivo exportado fica fora da proteção do app | Aviso antes de gravar (inclui nuvem); o app não guarda cópia; texto legal da CA-T18b |
+| Arquivo importado hostil ou corrompido | Leitor puro, 5 MB, linha a linha, limites do aprendizado forçados, fuzz (LST-07) |
+| Hit-test adaptado muda o que o dedo vê | Só debug, opção desligada; o Yan testa no A32 antes de qualquer release (ADP-05) |
 | Goldens mudam | Só aba Teclado e Privacidade; revisão antes de `--approve` |
-| Tempo no A32 estoura | Orçamento PER-01 por tarefa; a espacial só entra com número do A32 |
+| Tempo no A32 estoura | Orçamento PER-01 por tarefa, teto fixado depois da CA-T3; a espacial custou +32–35% no protótipo e só entra com número do A32 |
+| Teste de tempo oscila na máquina compartilhada | Catraca só em métrica determinística; tempo só informativo (BEN-04) |

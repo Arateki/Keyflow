@@ -102,8 +102,8 @@ Duas frentes, na ordem do que dá mais acerto por esforço:
 
 **Como** pessoa, **quero** dizer "não troque isto" uma vez e ser ouvido.
 
-1. **REJ-01**: WHEN o backspace vem logo após a troca THEN o sistema SHALL desfazer (como hoje), **voltar a palavra original à composição** (não como texto solto) e marcar uma **recusa pendente** (original, troca); a recusa **confirma** quando a pessoa comita a **mesma** palavra de novo (espaço, pontuação, enter) sem editá-la; editar a palavra, mover o cursor ou trocar de campo cancela a pendência (um backspace por engano não ensina nada).
-2. **REJ-02**: WHEN a pessoa toca, na faixa, a palavra **como digitada** (a que aparece quando há troca pendente) THEN o sistema SHALL registrar a recusa na hora.
+1. **REJ-01**: WHEN o backspace vem logo após a troca THEN o sistema SHALL desfazer (como hoje), **voltar a palavra original à composição** (não como texto solto) e marcar uma **recusa em espera** (original, troca); a recusa **confirma** quando a pessoa comita a **mesma** palavra de novo (espaço, pontuação, enter) sem editá-la; editar a palavra, mover o cursor ou trocar de campo cancela a espera (um backspace por engano não ensina nada).
+2. **REJ-02**: WHEN a pessoa toca, na faixa, a palavra **como digitada** (a que aparece quando há recusa em espera) THEN o sistema SHALL registrar a recusa na hora.
 3. **REJ-03**: WHEN a pessoa apaga a palavra trocada **e reescreve a original** (RewriteTracker, FIX-02) THEN o efeito SHALL ser o de REJ-01 confirmada.
 4. **REJ-04**: WHEN a recusa confirma THEN a palavra digitada SHALL ganhar 3 pontos (LRN-03), passar a valer (LRN-04), e qualquer par "erro → certo" aprendido para ela SHALL ser apagado (a evidência mais recente vence).
 5. **REJ-05**: WHEN a palavra voltou à composição após o desfazer THEN a próxima troca no espaço SHALL ser suprimida para ela uma vez, mesmo que o aprendizado esteja desligado ou o campo não aprenda.
@@ -124,7 +124,7 @@ Duas frentes, na ordem do que dá mais acerto por esforço:
 
 **Como** pessoa que digita rápido, **quero** que o corretor entenda onde o dedo caiu.
 
-1. **SPA-01**: WHEN uma letra é digitada pela grade THEN o evento SHALL levar o ponto do toque (`KeyTouch`) em **unidades de tecla** (x/largura média da tecla, y/altura da linha), independente do aparelho. O ponto é o do **`press`** da tecla que acaba saindo — o dedo que desceu ou o ponto em que escorregou para a tecla vizinha (`slideTo`) —, guardado por dedo **antes** da soltura, porque o rollover (`releaseEarly`) aciona a tecla sem ponto de soltura; se a soltura decide outra tecla sem ter passado pelo `press`, vale o ponto da soltura. A letra escolhida no **popup de acento** (ç, ã, é, comuns no pt) usa o toque da **tecla-base**, o do `press` que abriu o popup.
+1. **SPA-01**: WHEN uma letra é digitada pela grade THEN o evento SHALL levar o ponto do toque (`KeyTouch`) em **unidades de tecla** (x/largura média da tecla, y/altura da linha), sem depender do aparelho. O ponto é o do **`press`** da tecla que acaba saindo — o dedo que desceu ou o ponto em que escorregou para a tecla vizinha (`slideTo`) —, guardado por dedo **antes** da soltura, porque o rollover (`releaseEarly`) aciona a tecla sem ponto de soltura; se a soltura decide outra tecla sem ter passado pelo `press`, vale o ponto da soltura. A letra escolhida no **popup de acento** (ç, ã, é, comuns no pt) usa o toque da **tecla-base**, o do `press` que abriu o popup.
 2. **SPA-02**: WHEN o corretor compara uma candidata THEN o custo de cada letra SHALL ser a probabilidade do toque dada a tecla da candidata — gaussiana 2D em bits, `d²/(2σ²)·log2 e` limitado —, no lugar de "vizinha custa meia edição"; omissão, inserção e troca de ordem mantêm custo fixo calibrado. Letra acentuada ou com cedilha (ã, ç, é) compara como a letra-base (a, c, e): o acento é decidido pelo popup, não pelo toque, e a diferença de acento segue pelas regras de acento (BAS-03); `ñ` é tecla própria no es.
 3. **SPA-03**: WHEN o custo espacial e a frequência da palavra se combinam THEN o placar SHALL estar em bits (`prior = (255−freq)/8,589` — a escala do dicionário do LatinIME), e os limiares de troca por classe SHALL sair do banco, não de constantes escolhidas à mão.
 4. **SPA-04**: WHEN o toque cai entre duas teclas THEN as duas letras SHALL ser candidatas com custos parecidos (hoje a vizinha custa o mesmo, perto da borda ou no centro da outra tecla).
@@ -186,9 +186,9 @@ Duas frentes, na ordem do que dá mais acerto por esforço:
 ## Edge Cases
 
 - WHEN o app congela o `InputConnection` ou ele é lento THEN o `RewriteTracker` e a confirmação da recusa não leem o campo (só eventos); o desfazer continua conferindo o texto como hoje antes de mexer.
-- WHEN a pessoa troca de idioma (globo) no meio de uma recusa pendente THEN a pendência é cancelada.
+- WHEN a pessoa troca de idioma (globo) no meio de uma recusa em espera THEN a espera é cancelada.
 - WHEN o arquivo do aprendido está corrompido ou de versão futura THEN o corretor SHALL ignorar o conteúdo e seguir só com o dicionário (sem crash), e o arquivo é recriado na próxima gravação.
-- WHEN duas instâncias do teclado (processo reiniciado) gravam ao mesmo tempo THEN o diário é de acréscimos e cada linha é independente; a ordem de leitura resolve.
+- WHEN duas instâncias do teclado (processo reiniciado) gravam ao mesmo tempo THEN o diário é de acréscimos e cada linha vale por si; a ordem de leitura resolve.
 - WHEN o aparelho muda a data para trás THEN o peso não cresce (o decaimento usa `max(0, agora − ultimoUso)`).
 - WHEN a palavra aprendida é ofensiva pela lista do dicionário THEN o aprendido vale só para **não trocar**; ela não é oferecida como completação.
 - WHEN o campo é `TYPE_NULL`/terminal (composição desligada) THEN não há troca, logo não há recusa nem aprendizado.

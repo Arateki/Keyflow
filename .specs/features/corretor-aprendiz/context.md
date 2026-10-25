@@ -294,7 +294,7 @@ número que vale sai da CA-T1 (sintético) e da CA-T2 (digitação real no A32).
 
 ## 8. Perguntas ao Yan e respostas (24/10)
 
-As 12 perguntas foram respondidas pelo Yan em 24/10 e as respostas mandam: nenhuma delas é pendência. O que ainda
+As 12 perguntas foram respondidas pelo Yan em 24/10 e as respostas mandam: nenhuma delas ficou em aberto. O que ainda
 está em aberto fica só no fim desta seção.
 
 | # | Pergunta | Resposta do Yan | Onde entrou |
