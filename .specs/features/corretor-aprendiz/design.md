@@ -124,7 +124,7 @@ abaixo de 95% a classe só sugere (BAS-01).
 | 3+ letras iguais seguidas → sugere | `kkkk`→`Kiko`, `hahaha`→`Havana`, `simm`→`sim` | alongamento é intenção |
 | Existe no en/es → sugere | no dicionário: 881 de 2260 palavras comuns do inglês fora do pt (39%) e 992 de 1575 do espanhol (63%) viram outra palavra | inglês no meio do português |
 | Hífen: partes e conjunto | `faça-o`→`facão` | ênclise |
-| Léxico informal curado | na lista do estudo, 56 das 62 abreviações estão fora do dicionário e 68% delas são trocadas (preliminar) | `scripts/dict-extras/pt.tsv`, lista própria (sem licença externa) |
+| Léxico informal curado | na lista do estudo, 56 das 62 abreviações estão fora do dicionário e 68% delas são trocadas (preliminar) | `scripts/dict-extras/pt.tsv`, lista própria escrita à mão: não se copiam listas de terceiros, e fonte externa só entra com nome, URL e licença registrados (CA-T0) |
 
 **Guarda de outro idioma.** Em vez de carregar `en` e `es` inteiros (2 MB cada em disco, vários MB em
 arrays) no teclado pt, o `build-dictionaries.py` gera `pt.estrangeiras.kfd` com as palavras de

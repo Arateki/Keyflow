@@ -83,7 +83,7 @@ Duas frentes, na ordem do que dá mais acerto por esforço:
 4. **BAS-04**: WHEN a palavra tem 3 ou mais letras iguais seguidas ("kkkk", "simmm", "nãooo", "oiii") ou é só consoantes de até 4 letras ("vc", "tb", "td", "hj", "msg") THEN o corretor SHALL só sugerir.
 5. **BAS-05**: WHEN a palavra digitada existe no dicionário de **outro** idioma instalado (en/es) com frequência ≥ F (calibrada no banco) e o teclado ativo é pt THEN o corretor SHALL só sugerir ("deploy", "push", "the", "you"; no dicionário de hoje, 881 das 2260 palavras comuns do inglês fora do pt — 39% — e 992 das 1575 do espanhol — 63% — viram outra palavra; `context.md` §3).
 6. **BAS-06**: WHEN a palavra tem hífen ("faça-o", "bem-vindo") THEN o corretor SHALL tratar as partes e o conjunto antes de trocar ("faça-o" → "facão" some).
-7. **BAS-07**: WHEN o léxico informal do pt-BR (abreviações, risadas, gírias, anglicismos e marcas de uso comum) entra no dicionário (`scripts/build-dictionaries.py`, lista curada própria `scripts/dict-extras/pt.tsv`) THEN essas palavras SHALL valer como palavra, com frequência baixa o bastante para não virarem candidatas de erro de outras.
+7. **BAS-07**: WHEN o léxico informal do pt-BR (abreviações, risadas, gírias, anglicismos e marcas de uso comum) entra no dicionário (`scripts/build-dictionaries.py`, lista curada própria `scripts/dict-extras/pt.tsv`, escrita à mão: sem copiar listas de terceiros; qualquer fonte externa entra com nome, URL e licença registrados) THEN essas palavras SHALL valer como palavra, com frequência baixa o bastante para não virarem candidatas de erro de outras.
 
 ### Palavras do usuário (`LRN`)
 
@@ -201,20 +201,44 @@ Duas frentes, na ordem do que dá mais acerto por esforço:
 
 ## Requirement Traceability
 
-| ID | Área | Status | Tipo de verificação |
-| --- | ---- | ------ | ------------------- |
-| BEN-01..09 | Banco de avaliação | Pending | unit (o próprio banco + catraca do baseline) + instrumentado (tempo) |
-| BAS-01..07 | Base sem aprendizado | Pending | banco (conjunto "manter" e "erros": trocas indevidas ≤ 10%) + `SuggesterTest`/`RealDictionaryTest` |
-| LRN-01..08 | Palavras do usuário | Pending | unit (`PersonalLexiconTest`, propriedade) + banco (sessões) |
-| REJ-01..06 | Correção recusada | Pending | unit (máquina de recusa) + instrumentado (`KeyFlowKeyboardLearningTest`) |
-| FIX-01..06 | Correção feita pela pessoa | Pending | unit (`RewriteTrackerTest`, pares) + instrumentado |
-| SPA-01..06 | Modelo espacial | Pending | banco (sintético, reais) + unit + instrumentado (tempo no A32) |
-| ADP-01..05 | Adaptação do toque | Pending | banco (sintético com viés e reais) + unit + instrumentado (protótipo) + manual no A32 |
-| CTX-01..04 | Contexto | Pending | unit + banco (conjunto de contexto) |
-| PRV-01..07 | Privacidade | Pending | unit (`LearningPolicyTest`, `BackupRulesTest`) + instrumentado + Compose (apagar) |
-| LST-01..07 | Tela de palavras, exportar e importar | Pending | Compose instrumentado + goldens + `TranslationsTest` |
-| ARM-01..03, PER-01..02 | Armazenamento e desempenho | Pending | unit (arquivo, fuzz) + `StrictModeKeyboardTest` + tempo no A32 |
-| ROL-01..04 | Rollout | Pending | flag de debug + gates |
+| Requisito | Área | Task | Status | Tipo de verificação |
+| --------- | ---- | ---- | ------ | ------------------- |
+| BEN-01..05, 08, 09 | Banco de avaliação | CA-T1 | Pending | unit (o próprio banco, nível rápido, + catraca do baseline) |
+| BEN-06 | Tempo no aparelho | CA-T3 | Pending | instrumentado (emulador e A32) |
+| BEN-07, BEN-02d | Gravador de digitações reais | CA-T20, CA-T2 | Pending | unit (leitor) + instrumentado + manual no A32 |
+| BEN-02e | Sessões | CA-T17 | Pending | unit (banco) |
+| BAS-01..03 | Base sem aprendizado | CA-T4 (calibração na CA-T21) | Pending | banco (manter, erros: trocas indevidas ≤ 10%, meta provisória) + `SuggesterTest`/`RealDictionaryTest` |
+| BAS-04, BAS-06 | Base sem aprendizado | CA-T6 | Pending | banco + unit |
+| BAS-05 | Base sem aprendizado | CA-T7 | Pending | banco + unit |
+| BAS-07 | Léxico informal | CA-T5 | Pending | banco + `RealDictionaryTest` |
+| LRN-01 | Palavras do usuário | CA-T12 | Pending | instrumentado |
+| LRN-02, LRN-08 | Palavras do usuário | CA-T8 | Pending | unit (`LearningPolicyTest`) |
+| LRN-03..07 | Palavras do usuário | CA-T9, CA-T11 | Pending | unit (`PersonalLexiconTest`, propriedade) + banco (sessões, CA-T17) |
+| REJ-01, REJ-04..06 | Correção recusada | CA-T13 | Pending | unit (máquina de recusa) + instrumentado |
+| REJ-02, FIX-01 | Correção recusada e feita | CA-T14 | Pending | unit + instrumentado |
+| REJ-03, FIX-02, FIX-04, FIX-06 | Correção feita pela pessoa | CA-T25 | Pending | unit (`RewriteTrackerTest`) + instrumentado |
+| FIX-03, FIX-05 | Pares | CA-T9, CA-T11 | Pending | unit |
+| SPA-01 | Modelo espacial | CA-T20 | Pending | unit (geometria, `ComposingWordTrackerTest`) + instrumentado (rollover, popup, acessibilidade) |
+| SPA-02..06 | Modelo espacial | CA-T19, CA-T21, CA-T22 | Pending | banco (sintético, reais) + unit + instrumentado (tempo no A32) |
+| ADP-01..04 | Adaptação do toque | CA-T23 | Pending | banco (sintético com viés) + unit |
+| ADP-05 | Hit-test adaptado | CA-T24 | Pending | banco + instrumentado (protótipo debug) + manual no A32 |
+| CTX-01, CTX-02 | Contexto | CA-T27 | Pending | unit + banco (conjunto de contexto) |
+| CTX-03 | Contexto estático | CA-T28 | Pending | banco |
+| CTX-04 | Próximas palavras | CA-T29 | Pending | unit + instrumentado + golden |
+| PRV-01 | Privacidade | CA-T10 (exceção: CA-T16b) | Pending | unit (`BackupRulesTest` com `domain="file"`, `ArchitectureRulesTest`) |
+| PRV-02 | Privacidade | CA-T8 | Pending | unit (`LearningPolicyTest`) |
+| PRV-03, PRV-04, PRV-07 | Privacidade | CA-T15 | Pending | unit + Compose + instrumentado |
+| PRV-05 | Privacidade | CA-T18b | Pending | `TranslationsTest` + revisão do Yan |
+| PRV-06 | Privacidade | CA-T8, CA-T12 (verificação: CA-T18) | Pending | unit + instrumentado |
+| LST-01..05 | Tela de palavras | CA-T16 | Pending | Compose instrumentado + goldens + `TranslationsTest` |
+| LST-06, LST-07 | Exportar e importar | CA-T16b | Pending | unit (ida e volta, fuzz do leitor) + Compose + goldens |
+| ARM-01, PER-02 | Armazenamento | CA-T10 | Pending | unit (arquivo, fuzz) |
+| ARM-02, ARM-03 | Armazenamento | CA-T12 | Pending | `StrictModeKeyboardTest` + `ArchitectureRulesTest` |
+| PER-01 | Desempenho | CA-T3, CA-T22 | Pending | tempo no A32 |
+| ROL-01 | Rollover | CA-T8..T11, CA-T23, CA-T25, CA-T27 (PIT: CA-T30) | Pending | unit + propriedade + fuzz |
+| ROL-02 | Rollover | CA-T18 | Pending | instrumentado |
+| ROL-03 | Rollover | CA-T12 | Pending | unit + instrumentado |
+| ROL-04 | Rollover | CA-T4, CA-T30 | Pending | `RealDictionaryTest`/`SuggesterTest` |
 
 **Status values:** Pending → In Design → In Tasks → Implementing → Verified.
 **Coverage:** ver `tasks.md` (cada requisito aponta para uma ou mais tarefas).

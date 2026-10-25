@@ -311,3 +311,10 @@ está em aberto fica só no fim desta seção.
 | 10 | Bigramas estáticos | Corpus CC0 + histórico pessoal | CTX-03, CA-T28 |
 | 11 | Textos legais | O Yan revisa quando a fase B chegar | PRV-05, CA-T18b |
 | 12 | Modelo neural | Só depois, pelo catálogo sob demanda e com licença compatível (o do FUTO fica fora) | `design.md` §10 |
+
+### Em aberto
+
+**Decisão do Yan em aberto (uma, não bloqueia nenhuma task): o corretor aprendiz entra na v1 ou depois dela?**
+Nada do recorte da v1 (`DEVELOPMENT-ORDER.md`, 2026-10-23) o inclui, e a ordem registrada lá o trata como depois da
+v1. Se ele entrar na v1, a CA-T18b (textos legais, que o Yan revisa) vira portão da V1-7 (listing) e as fases A e B
+entram antes do AAB final; se ficar para depois, o aprendizado não aparece na ficha da Play da v1.

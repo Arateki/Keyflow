@@ -85,7 +85,9 @@ R$15, que também tira os anúncios para sempre. Os anúncios ficam só no app d
   e cobrança fora do Play Billing). A `UnlockSheet` **não sai** — ganha fiação na MZ-T9 (V1-10) e
   cobra o R$15 de verdade.
 - Fica para depois da v1: créditos (MZ-T5–T8 e MZ-T12), `vision-capture`, `theme-system` (spec a
-  revisar — ver Estado atual), fases 2/3 do agente e os motores de Fala/Fluxos/Computador (sem spec).
+  revisar — ver Estado atual), fases 2/3 do agente, os motores de Fala/Fluxos/Computador (sem spec) e o
+  `corretor-aprendiz` (spec pronta; se o Yan o quiser na v1, a V1-7 passa a esperar os textos legais dele — ver
+  Estado atual).
 
 ### Regras da Play que moldam o recorte (lidas na fonte em 2026-10-07)
 
@@ -255,6 +257,7 @@ do e2e da v1.
 | — | `skin-packs` (skins importáveis) + skin mascote | SKP-T1..T9 feitos (motor AndroidSVG, importação nas abas Teclado e Sobrepor, pacote de exemplo, orbe de pacote até 120 fps) e o mascote nativo (quick 018); na `main` local e na **PR #7**. Falta o roteiro no A32 **[YAN]** (pacote dele, orbe animada no Helio G80, IME real) |
 | — | `agent-harness` (agente KeyFlow) | fase 1 (AGT-T1..T5: núcleo, Anthropic, chat, ferramentas de skin, Ajustes; MCP desligado) na `main` local e na **PR #7**. Fase 2 na branch `equipe/agente-fase2` (fora da v1): AGT-T6 (ferramentas de app) e AGT-T7 (OpenAI/Google, só por chave de API) feitas. Pendentes: T8 (skins por modelo), T9 (MCP), T10 (validação real **[YAN]**; abuso automatizado do recorte V1-4 coberto parcialmente) |
 | — | Trabalho do Gemini (abas KeyFlow, Fluxos, Computador, Fala, Visão; provedores Anthropic/Google) | commitado e na PR #7. Provedores e aba KeyFlow funcionam; **Fluxos, Computador, Fala e Visão são só tela + `Settings`, sem motor e sem spec** → "Em breve" na v1 (V1-1). Pendências de segurança/release herdadas → V1-2 |
+| — | `corretor-aprendiz` | spec, design e tasks prontos (PR #19); nada implementado. **Fora do recorte da v1 por padrão**: banco de avaliação, base sem aprendizado, recusa e pares, modelo espacial do toque e bigramas, em fases A–G (`.specs/features/corretor-aprendiz/tasks.md`). Portão **[YAN]**: ele revisa os textos legais (política, aba Privacidade, Data Safety) na fase B, e o aprender ligado por padrão não vai à Play sem isso. Em aberto para o Yan: entra na v1? (`context.md` §8) |
 | — | CI | 2026-10-07: cache do AAR do sherpa-onnx nos dois jobs (um 503 do GitHub derrubou a PR #7 antes dos testes) |
 | — | 2026-10-10..22 | PRs #8 a #11 (estabilidade dos testes, desempenho da abertura do teclado, CI, galeria) — fora da fila da v1 |
 
