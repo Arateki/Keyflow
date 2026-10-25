@@ -369,8 +369,8 @@ fun wordEligible(word: String): Boolean        // LRN-02
   autocorreção e, portanto, sem aprendizado, e há apps que usam a flag como sinal de privacidade. Corrige e sugere
   como hoje; não grava nada ali (PRV-02, alínea b).
 - Arquivo em `files/corretor/` + exclusões explícitas em `backup_rules.xml` e `data_extraction_rules.xml`
-  (`cloud-backup` e `device-transfer`), como `models` e `agent/actions.jsonl`; `BackupRulesTest` passa a
-  cobrir a pasta.
+  (`cloud-backup` e `device-transfer`), como `models` e `agent/actions.jsonl`: as três seções; o `BackupRulesTest`,
+  que hoje só confere `domain="sharedpref"`, passa a conferir também `domain="file"` (CA-T10).
 - **Apagar:** `PersonalLexicon.clear()` + apagar os arquivos, numa função só (`LearnedStore.wipe()`), chamada
   (a) pelo botão da aba Teclado, (b) por `onDeleteMyData` **antes** de `deleteRemoteData`; (b) hoje só chama
   a API (`SetupActivity.kt`: `entitlementsRepository.deleteRemoteData { api.deleteAccount() }`).
@@ -401,8 +401,8 @@ fun wordEligible(word: String): Boolean        // LRN-02
 | **Arquivo próprio** (escolhido) | Código de formato (diário, compactação) | ≈ 0,2 MB sem bigramas (estimativa: 5000 palavras e 2000 pares em linhas de 20–35 B; ver abaixo); lido uma vez para `HashMap`; consulta O(1) sem I/O; diário de acréscimos sobrevive a processo morto; 100% testável na JVM com `TemporaryFolder`; tem precedente no projeto (`agent/actions.jsonl`, `model-downloads.json`); apagar = apagar |
 
 **Tamanho (estimativas minhas, a medir na CA-T10 e na CA-T27).** Sem bigramas: o arquivo fica em ≈ 0,2 MB e o
-`HashMap<String, …>` na ART em ≈ 1 MB (≈ 100–150 B por entrada), dentro dos ≤ 300 KB e ≤ 1,5 MB da spec. **Com** os
-10 000 bigramas da fase F esses dois tetos não valem: o arquivo passa a ≈ 0,5–0,6 MB e a memória a ≈ 2–3 MB; a CA-T27
+`HashMap<String, …>` na ART em ≈ 1 MB (≈ 100–150 B por entrada), dentro dos ≤ 1,5 MB do PER-01. **Com** os
+10 000 bigramas da fase F esse teto e o do arquivo não valem: o arquivo passa a ≈ 0,5–0,6 MB e a memória a ≈ 2–3 MB; a CA-T27
 refaz o orçamento com a medida (estrutura compacta, com ids de palavra no lugar de `String`, se precisar).
 
 **Formato** `files/corretor/<idioma>.kfl` (texto, uma linha por registro, `\t`):
