@@ -153,6 +153,9 @@ fun feedbackIntent(kind: FeedbackKind, diagnostics: FeedbackDiagnostics): Intent
  * Conteúdo da aba, na ordem em que aparece (e em que o índice lista). Seção nova entra aqui e ganha
  * item no índice sozinha. Os textos de gesto repetem as descrições do tour da aba Modo onde elas se
  * sobrepõem — as frases por modo vêm literalmente de [pauseHintFor].
+ *
+ * O site (`/doc`, `/docs`) mostra estes mesmos textos, em português e em inglês: mudou algo aqui, o
+ * `DocsSiteExportTest` falha até o `website/_fonte/doc.json` ser atualizado (a mensagem diz como).
  */
 // Getter, não valor guardado: os textos saem no idioma da hora em que a Docs é aberta.
 val docsSections: List<DocSection> get() = listOf(
@@ -420,6 +423,21 @@ val docsSections: List<DocSection> get() = listOf(
     ),
 )
 
+/** Um passo do "Como funciona" no topo da Docs. */
+data class DocStep(val number: String, val title: String, val body: String)
+
+/**
+ * Cabeçalhos e passos do topo da Docs, como dado: a aba os desenha e o site (`/doc`) os lê do mesmo JSON, gerado
+ * por `DocsSiteExportTest` a partir daqui — texto novo entra uma vez só.
+ */
+val docsHowItWorksTitle: String get() = tr("Como funciona")
+val docsSteps: List<DocStep> get() = listOf(
+    DocStep("01", tr("Fale"), tr("Toque em Gravar no teclado, ou no orbe flutuante.")),
+    DocStep("02", tr("Transcreve"), tr("O áudio vai à origem de voz escolhida e volta como texto.")),
+    DocStep("03", tr("Cola"), tr("O texto entra direto no campo ativo do app.")),
+)
+val docsIndexTitle: String get() = tr("Índice")
+
 /**
  * Aba Docs: "Como funciona" (3 passos), o índice (DOC-02) e as seções de [docsSections], terminando no
  * Feedback (DOC-04). O índice rola até a posição **medida** de cada seção — não a um offset fixo —, então
@@ -479,11 +497,9 @@ fun DocsPanel(
                 .verticalScroll(scroll)
                 .padding(top = 20.dp, bottom = 32.dp),
         ) {
-            SettingsGroup(tr("Como funciona")) {
+            SettingsGroup(docsHowItWorksTitle) {
                 Column(Modifier.padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-                    Step("01", tr("Fale"), tr("Toque em Gravar no teclado, ou no orbe flutuante."))
-                    Step("02", tr("Transcreve"), tr("O áudio vai à origem de voz escolhida e volta como texto."))
-                    Step("03", tr("Cola"), tr("O texto entra direto no campo ativo do app."))
+                    docsSteps.forEach { Step(it.number, it.title, it.body) }
                 }
             }
 
@@ -531,7 +547,7 @@ private fun Context.startFeedbackActivity(intent: Intent) {
 /** Índice (DOC-02): numerado, na ordem da aba; cada item rola até a seção e anuncia o destino. */
 @Composable
 private fun DocsIndex(sections: List<DocSection>, onSelect: (String) -> Unit) {
-    SettingsGroup(tr("Índice"), Modifier.padding(top = GROUP_GAP).testTag(DOCS_INDEX_TAG)) {
+    SettingsGroup(docsIndexTitle, Modifier.padding(top = GROUP_GAP).testTag(DOCS_INDEX_TAG)) {
         // Uma coluna só: em duas, com a navegação lateral, os títulos quebravam e as linhas desalinhavam.
         Column(Modifier.padding(vertical = 6.dp)) {
             sections.forEachIndexed { i, section ->

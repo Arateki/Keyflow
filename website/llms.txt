@@ -15,6 +15,8 @@
 ## Documentation and Canonical Links
 - [Homepage (Portuguese)](https://keyflow.arateki.com/)
 - [Homepage (English)](https://keyflow.arateki.com/en)
+- [Documentation (Portuguese)](https://keyflow.arateki.com/doc)
+- [Documentation (English)](https://keyflow.arateki.com/docs)
 - [Privacy Policy (Portuguese)](https://keyflow.arateki.com/privacidade)
 - [Terms of Use (Portuguese)](https://keyflow.arateki.com/termos)
 - [Privacy Policy (English)](https://keyflow.arateki.com/privacy)

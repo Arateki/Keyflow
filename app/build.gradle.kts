@@ -293,6 +293,12 @@ androidComponents {
 // O teste de unidade que confere que o asset é idêntico ao original lê o arquivo copiado: garante que a cópia existe antes de ele rodar.
 tasks.matching { it.name.endsWith("UnitTest") }.configureEach { dependsOn(copySkinFormat) }
 
+// O DocsSiteExportTest confere o JSON da documentação do site (`website/_fonte/doc.json`) contra a aba Docs do app: o arquivo é entrada
+// da tarefa de teste, então editar só o JSON refaz o teste em vez de o Gradle dá-lo como atual (UP-TO-DATE).
+tasks.withType<Test>().configureEach {
+    inputs.file(rootProject.file("website/_fonte/doc.json")).withPropertyName("docsSiteJson").optional()
+}
+
 // sherpa-onnx (NM-T1): STT on-device. A distribuição Android oficial é só o AAR anexado ao release do
 // GitHub (o `com.github.k2-fsa:sherpa-onnx` do JitPack é o jar Java de desktop, sem .so Android).
 // São ~50 MB — em vez de versionar o binário, o build baixa a versão fixada quando falta em

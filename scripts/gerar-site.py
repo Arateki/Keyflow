@@ -3,7 +3,9 @@
 Monta o site público do KeyFlow (https://keyflow.arateki.com) em build/site/:
 
 - a página inicial e seus arquivos, copiados de website/ (HTML, CSS e JS feitos à mão, sem passo de build);
-- as páginas legais, geradas a partir dos Markdown de docs/loja/ (privacidade, termos, privacy, terms).
+- as páginas legais, geradas a partir dos Markdown de docs/loja/ (privacidade, termos, privacy, terms);
+- as páginas de documentação (/doc em português, /docs em inglês), geradas a partir de website/_fonte/doc.json, que o
+  teste DocsSiteExportTest tira da aba Docs do app (scripts/site_doc.py).
 
 Depois valida tudo: títulos, idiomas, links internos e âncoras, url() do CSS, o hash do script em linha no
 Content-Security-Policy, o orçamento da primeira carga e se cada arquivo tem um content-type conhecido.
@@ -24,6 +26,8 @@ import sys
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
+import site_doc
+
 # Content-type e cache de cada extensão publicada. O site.yml sincroniza um tipo por vez com esta tabela
 # (o `aws s3 sync` sozinho chutaria os tipos, e o woff2 nem sempre é conhecido). Os HTML vão por último, para
 # que a página nova só apareça depois dos arquivos que ela usa. Extensão fora daqui reprova a validação.
@@ -42,6 +46,18 @@ TIPOS = [
 
 # Páginas legais: as URLs são permanentes (o app e a Play apontam para elas) — não renomeie.
 PAGINAS_LEGAIS = ("privacidade.html", "termos.html", "privacy.html", "terms.html")
+
+# Páginas de documentação: geradas de website/_fonte/doc.json. /doc (PT) e /docs (EN) são os mesmos endereços para
+# sempre, como os legais; a Cloudflare serve /x a partir de x.html.
+PAGINAS_DOC = tuple(site_doc.TEXTOS[c]["arquivo"] for c in site_doc.IDIOMAS)
+PAGINAS_GERADAS = PAGINAS_LEGAIS + PAGINAS_DOC
+
+# Par de cada página no outro idioma (o botão PT/EN do cabeçalho).
+OUTRO_IDIOMA = {
+    "privacidade.html": "privacy.html", "privacy.html": "privacidade.html",
+    "termos.html": "terms.html", "terms.html": "termos.html",
+    "doc.html": "docs.html", "docs.html": "doc.html",
+}
 
 # Primeira carga da página inicial (HTML + CSS + JS + fontes + favicon). As capturas do teclado são
 # preguiçosas e ficam de fora.
@@ -180,7 +196,16 @@ def build_page(
     body_html: str,
     footer_html: str,
     skip_text: str = "Pular para o conteúdo",
+    main_html: str = None,
+    luz: bool = False,
 ) -> str:
+    """Página no desenho do site. Sem main_html, o corpo vai num artigo de texto corrido (páginas legais); com ele, o
+    <main> é o que o chamador montou (documentação) e, com luz, a página ganha o brilho que segue o cursor."""
+    if main_html is None:
+        main_html = f"""  <article class="caixa legal-artigo">
+{body_html}
+  </article>"""
+    luz_html = '<div class="luz" aria-hidden="true"></div>\n' if luz else ""
     csp_hash = _sha256_csp(SCRIPT_TEMA)
     og_locale = "pt_BR" if lang == "pt-BR" else "en_US"
     og_alt_locale = "en_US" if lang == "pt-BR" else "pt_BR"
@@ -249,11 +274,9 @@ def build_page(
 </head>
 <body>
 <a class="pular" href="#conteudo">{skip_text}</a>
-{header_html}
+{luz_html}{header_html}
 <main id="conteudo">
-  <article class="caixa legal-artigo">
-{body_html}
-  </article>
+{main_html}
 </main>
 {footer_html}
 </body>
@@ -271,8 +294,8 @@ def copy_website(repo_root: Path, output_dir: Path) -> list:
         relativo = arquivo.relative_to(origem)
         if any(parte.startswith(("_", ".")) for parte in relativo.parts) or arquivo.is_dir():
             continue
-        if relativo.as_posix() in PAGINAS_LEGAIS:
-            raise ValueError(f"website/{relativo} colide com uma página legal gerada")
+        if relativo.as_posix() in PAGINAS_GERADAS:
+            raise ValueError(f"website/{relativo} colide com uma página gerada (legal ou de documentação)")
         destino = output_dir / relativo
         destino.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(arquivo, destino)
@@ -294,47 +317,53 @@ def limpar_saida(repo_root: Path, output_dir: Path):
 
 
 def make_header(lang: str, current_page: str) -> str:
+    alt_url = OUTRO_IDIOMA[current_page]
+
+    def atual(pagina: str) -> str:
+        return ' aria-current="page"' if current_page == pagina else ""
+
     if lang == "pt-BR":
         home_url = "index.html"
         nav_label = "Navegação"
         home_label = "Início"
+        doc_label = "Documentação"
         priv_label = "Política de Privacidade"
         termos_label = "Termos de Uso"
-        alt_url = "privacy.html" if current_page == "privacidade.html" else "terms.html"
         alt_code = "en"
         alt_text = "EN"
         alt_reader = "English version"
         tema_label = "Alternar tema claro/escuro"
-        priv_curr = ' aria-current="page"' if current_page == "privacidade.html" else ""
-        termos_curr = ' aria-current="page"' if current_page == "termos.html" else ""
-        priv_url = "privacidade.html"
-        termos_url = "termos.html"
+        doc_url, priv_url, termos_url = "doc.html", "privacidade.html", "termos.html"
     else:
         home_url = "en.html"
         nav_label = "Navigation"
         home_label = "Home"
+        doc_label = "Documentation"
         priv_label = "Privacy Policy"
         termos_label = "Terms of Use"
-        alt_url = "privacidade.html" if current_page == "privacy.html" else "termos.html"
         alt_code = "pt-BR"
         alt_text = "PT"
         alt_reader = "versão em português"
         tema_label = "Switch light/dark theme"
-        priv_curr = ' aria-current="page"' if current_page == "privacy.html" else ""
-        termos_curr = ' aria-current="page"' if current_page == "terms.html" else ""
-        priv_url = "privacy.html"
-        termos_url = "terms.html"
+        doc_url, priv_url, termos_url = "docs.html", "privacy.html", "terms.html"
+
+    # No celular o menu some; o atalho leva à documentação (a própria página de documentação não precisa dele).
+    atalho_docs = ""
+    if current_page not in PAGINAS_DOC:
+        leitor = "Documentação" if lang == "pt-BR" else "Documentation"
+        atalho_docs = f'<a class="docs-atalho" href="{doc_url}">Docs<span class="so-leitor"> — {leitor}</span></a>\n      '
 
     return f"""<header class="topo">
   <div class="caixa topo-in">
     <a class="marca" href="{home_url}"><span class="marca-orbe" aria-hidden="true"></span>KeyFlow</a>
     <nav class="nav" aria-label="{nav_label}">
       <a href="{home_url}">{home_label}</a>
-      <a href="{priv_url}"{priv_curr}>{priv_label}</a>
-      <a href="{termos_url}"{termos_curr}>{termos_label}</a>
+      <a href="{doc_url}"{atual(doc_url)}>{doc_label}</a>
+      <a href="{priv_url}"{atual(priv_url)}>{priv_label}</a>
+      <a href="{termos_url}"{atual(termos_url)}>{termos_label}</a>
     </nav>
     <div class="topo-acoes">
-      <a class="idioma" href="{alt_url}" hreflang="{alt_code}" lang="{alt_code}">{alt_text}<span class="so-leitor"> — {alt_reader}</span></a>
+      {atalho_docs}<a class="idioma" href="{alt_url}" hreflang="{alt_code}" lang="{alt_code}">{alt_text}<span class="so-leitor"> — {alt_reader}</span></a>
       <button class="tema" type="button" aria-pressed="false" aria-label="{tema_label}">
         <svg class="sol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/></svg>
         <svg class="lua" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.6A8 8 0 0 1 9.4 4a8 8 0 1 0 10.6 10.6Z"/></svg>
@@ -344,14 +373,12 @@ def make_header(lang: str, current_page: str) -> str:
 </header>"""
 
 
-def generate_site(repo_root: Path, output_dir: Path) -> dict:
-    docs_loja = repo_root / "docs" / "loja"
-    limpar_saida(repo_root, output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    copy_website(repo_root, output_dir)
-
-    footer_pt = """<footer class="rodape">
+def make_footer(lang: str, pt_href: str = "index.html", en_href: str = "en.html", atual: str = "") -> str:
+    """Rodapé do site. A coluna Idioma leva à mesma página no outro idioma (pt_href/en_href); `atual` é a que está aberta."""
+    pt_curr = ' aria-current="page"' if atual == pt_href else ""
+    en_curr = ' aria-current="page"' if atual == en_href else ""
+    if lang == "pt-BR":
+        return f"""<footer class="rodape">
   <div class="caixa rodape-grade">
     <div class="rodape-marca">
       <a class="marca" href="index.html"><span class="marca-orbe" aria-hidden="true"></span>KeyFlow</a>
@@ -360,8 +387,10 @@ def generate_site(repo_root: Path, output_dir: Path) -> dict:
     <nav aria-labelledby="rodape-docs">
       <h2 id="rodape-docs" class="rodape-titulo">Documentos</h2>
       <ul>
+        <li><a href="doc.html">Documentação</a></li>
         <li><a href="privacidade.html">Política de Privacidade</a></li>
         <li><a href="termos.html">Termos de Uso</a></li>
+        <li><a href="docs.html" hreflang="en" lang="en">Documentation</a></li>
         <li><a href="privacy.html" hreflang="en" lang="en">Privacy Policy</a></li>
         <li><a href="terms.html" hreflang="en" lang="en">Terms of Use</a></li>
       </ul>
@@ -373,8 +402,8 @@ def generate_site(repo_root: Path, output_dir: Path) -> dict:
     <div>
       <h2 class="rodape-titulo">Idioma</h2>
       <ul>
-        <li><a href="index.html">Português</a></li>
-        <li><a href="en.html" hreflang="en" lang="en">English</a></li>
+        <li><a href="{pt_href}"{pt_curr}>Português</a></li>
+        <li><a href="{en_href}" hreflang="en" lang="en"{en_curr}>English</a></li>
       </ul>
     </div>
   </div>
@@ -384,20 +413,21 @@ def generate_site(repo_root: Path, output_dir: Path) -> dict:
   </div>
   <p class="rodape-gigante" aria-hidden="true">KeyFlow</p>
 </footer>"""
-
-    footer_en = """<footer class="rodape">
+    return f"""<footer class="rodape">
   <div class="caixa rodape-grade">
     <div class="rodape-marca">
       <a class="marca" href="en.html"><span class="marca-orbe" aria-hidden="true"></span>KeyFlow</a>
       <p>A product by <a href="https://arateki.com">Arateki</a>, made in Fortaleza, Brazil.</p>
     </div>
     <nav aria-labelledby="rodape-docs">
-      <h2 id="rodape-docs" class="rodape-titulo">Legal</h2>
+      <h2 id="rodape-docs" class="rodape-titulo">Documents</h2>
       <ul>
-        <li><a href="privacidade.html" hreflang="pt-BR" lang="pt-BR">Política de Privacidade</a></li>
-        <li><a href="termos.html" hreflang="pt-BR" lang="pt-BR">Termos de Uso</a></li>
+        <li><a href="docs.html">Documentation</a></li>
         <li><a href="privacy.html">Privacy Policy</a></li>
         <li><a href="terms.html">Terms of Use</a></li>
+        <li><a href="doc.html" hreflang="pt-BR" lang="pt-BR">Documentação</a></li>
+        <li><a href="privacidade.html" hreflang="pt-BR" lang="pt-BR">Política de Privacidade</a></li>
+        <li><a href="termos.html" hreflang="pt-BR" lang="pt-BR">Termos de Uso</a></li>
       </ul>
     </nav>
     <div>
@@ -407,8 +437,8 @@ def generate_site(repo_root: Path, output_dir: Path) -> dict:
     <div>
       <h2 class="rodape-titulo">Language</h2>
       <ul>
-        <li><a href="index.html" hreflang="pt-BR" lang="pt-BR">Português</a></li>
-        <li><a href="en.html">English</a></li>
+        <li><a href="{en_href}"{en_curr}>English</a></li>
+        <li><a href="{pt_href}" hreflang="pt-BR" lang="pt-BR"{pt_curr}>Português</a></li>
       </ul>
     </div>
   </div>
@@ -418,6 +448,17 @@ def generate_site(repo_root: Path, output_dir: Path) -> dict:
   </div>
   <p class="rodape-gigante" aria-hidden="true">KeyFlow</p>
 </footer>"""
+
+
+def generate_site(repo_root: Path, output_dir: Path) -> dict:
+    docs_loja = repo_root / "docs" / "loja"
+    limpar_saida(repo_root, output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    copy_website(repo_root, output_dir)
+
+    footer_pt = make_footer("pt-BR")
+    footer_en = make_footer("en")
 
     # 1. privacidade.html
     priv_file = docs_loja / "politica-de-privacidade.md"
@@ -503,7 +544,35 @@ def generate_site(repo_root: Path, output_dir: Path) -> dict:
     )
     (output_dir / "terms.html").write_text(terms_html, encoding="utf-8")
 
-    return {nome: output_dir / nome for nome in ("index.html", "en.html") + PAGINAS_LEGAIS}
+    # 5. doc.html e docs.html: a documentação, do mesmo texto da aba Docs do app (website/_fonte/doc.json).
+    dados_doc = site_doc.carregar(repo_root)
+    erros_doc = site_doc.validar(dados_doc)
+    if erros_doc:
+        for erro in erros_doc:
+            print(f"ERRO: {erro}", file=sys.stderr)
+        raise SystemExit(f"{site_doc.ARQUIVO_JSON} inválido: {len(erros_doc)} erro(s).")
+    pt, en = site_doc.TEXTOS["pt"], site_doc.TEXTOS["en"]
+    for chave in site_doc.IDIOMAS:
+        txt = site_doc.TEXTOS[chave]
+        pagina = txt["arquivo"]
+        html_doc = build_page(
+            txt["titulo_pagina"],
+            txt["lang"],
+            txt["url"],
+            txt["descricao"],
+            pt["url"],
+            en["url"],
+            txt["migalha"],
+            make_header(txt["lang"], pagina),
+            "",
+            make_footer(txt["lang"], pt["arquivo"], en["arquivo"], pagina),
+            "Pular para o conteúdo" if chave == "pt" else "Skip to content",
+            main_html=site_doc.renderizar(chave, dados_doc),
+            luz=True,
+        )
+        (output_dir / pagina).write_text(html_doc, encoding="utf-8")
+
+    return {nome: output_dir / nome for nome in ("index.html", "en.html") + PAGINAS_GERADAS}
 
 
 # ── Validação ──────────────────────────────────────────────────────────────────────────────────────
@@ -559,7 +628,7 @@ def _sha256_csp(texto: str) -> str:
     return "'sha256-" + base64.b64encode(hashlib.sha256(texto.encode("utf-8")).digest()).decode() + "'"
 
 
-def verify_generated_site(generated: dict, output_dir: Path):
+def verify_generated_site(generated: dict, output_dir: Path, repo_root: Path):
     erros = []
 
     # 1. Páginas legais: títulos exatos e navegação entre elas (as URLs são permanentes).
@@ -568,18 +637,22 @@ def verify_generated_site(generated: dict, output_dir: Path):
         "termos.html": "Termos de Uso — KeyFlow",
         "privacy.html": "Privacy Policy — KeyFlow",
         "terms.html": "Terms of Use — KeyFlow",
+        "doc.html": "Documentação — KeyFlow",
+        "docs.html": "Documentation — KeyFlow",
     }
     expected_links = {
         "privacidade.html": ["index.html", "termos.html", "privacy.html"],
         "termos.html": ["index.html", "privacidade.html", "terms.html"],
         "privacy.html": ["en.html", "terms.html", "privacidade.html"],
         "terms.html": ["en.html", "privacy.html", "termos.html"],
-        # a página inicial precisa levar às quatro páginas legais e ao outro idioma
-        "index.html": ["privacidade.html", "termos.html", "privacy.html", "terms.html", "en.html"],
-        "en.html": ["privacy.html", "terms.html", "privacidade.html", "termos.html", "index.html"],
+        "doc.html": ["index.html", "docs.html", "privacidade.html", "termos.html"],
+        "docs.html": ["en.html", "doc.html", "privacy.html", "terms.html"],
+        # a página inicial precisa levar à documentação, às quatro páginas legais e ao outro idioma
+        "index.html": ["doc.html", "docs.html", "privacidade.html", "termos.html", "privacy.html", "terms.html", "en.html"],
+        "en.html": ["docs.html", "doc.html", "privacy.html", "terms.html", "privacidade.html", "termos.html", "index.html"],
     }
     expected_lang = {"index.html": "pt-BR", "en.html": "en", "privacidade.html": "pt-BR", "termos.html": "pt-BR",
-                     "privacy.html": "en", "terms.html": "en"}
+                     "privacy.html": "en", "terms.html": "en", "doc.html": "pt-BR", "docs.html": "en"}
     for name, path in generated.items():
         if not path.exists():
             erros.append(f"Arquivo não gerado: {path}")
@@ -599,6 +672,25 @@ def verify_generated_site(generated: dict, output_dir: Path):
         for link in expected_links[name]:
             if f'href="{link}"' not in content:
                 erros.append(f"Link {link} ausente em {name}")
+
+    # 1b. Documentação: cada seção do JSON virou uma <section> com o seu id, entrou nos dois índices (o lateral e o
+    # do celular) e a página fala o idioma certo.
+    dados_doc = site_doc.carregar(repo_root)
+    for chave in site_doc.IDIOMAS:
+        nome = site_doc.TEXTOS[chave]["arquivo"]
+        pagina = output_dir / nome
+        if not pagina.is_file():
+            continue
+        content = pagina.read_text(encoding="utf-8")
+        ids = [sec["id"] for sec in dados_doc["idiomas"][chave]["secoes"]]
+        na_pagina = content.count('class="doc-secao"')
+        if na_pagina != len(ids):
+            erros.append(f"{nome}: {na_pagina} seções na página, {len(ids)} no doc.json")
+        for sec_id in ids:
+            if f'<section id="{sec_id}" class="doc-secao"' not in content:
+                erros.append(f"{nome}: seção '{sec_id}' do doc.json não está na página")
+            if content.count(f'href="#{sec_id}"') != 2:
+                erros.append(f"{nome}: a seção '{sec_id}' deve estar nos dois índices (lateral e do celular)")
 
     # 2. Todo HTML publicado: links e recursos locais existem, âncoras existem, CSP confere com os scripts.
     for pagina in sorted(output_dir.rglob("*.html")):
@@ -834,7 +926,7 @@ def verify_generated_site(generated: dict, output_dir: Path):
 
         # JSON-LD
         blocos_jsonld = _JSON_LD.findall(content)
-        if nome in ("index.html", "en.html", "privacidade.html", "termos.html", "privacy.html", "terms.html"):
+        if nome in ("index.html", "en.html") + PAGINAS_GERADAS:
             if not blocos_jsonld:
                 erros.append(f"{nome}: bloco de dados estruturados JSON-LD ausente")
 
@@ -909,7 +1001,7 @@ def main():
 
     print(f"Montando o site a partir de {repo_root}/website/ e {repo_root}/docs/loja/ em {output_dir}...")
     generated = generate_site(repo_root, output_dir)
-    verify_generated_site(generated, output_dir)
+    verify_generated_site(generated, output_dir, repo_root)
     print("Site gerado com sucesso!")
 
 
