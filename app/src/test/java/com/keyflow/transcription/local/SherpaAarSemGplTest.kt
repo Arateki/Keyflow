@@ -1,7 +1,9 @@
 package com.keyflow.transcription.local
 
 import java.io.File
+import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
+import java.util.zip.ZipOutputStream
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -41,20 +43,46 @@ class SherpaAarSemGplTest {
     @Test
     fun aarDoSherpaNaoLevaTextoDoEspeakNg() {
         for (aar in aars()) {
-            ZipFile(aar).use { zip ->
-                val libs = zip.entries().asSequence().filter { !it.isDirectory && it.name.endsWith(".so") }.toList()
-                assertFalse("${aar.name} não tem nenhum .so", libs.isEmpty())
-                for (entry in libs) {
-                    // Latin-1 mantém um caractere por byte: é o `strings -a` sem o filtro de tamanho.
-                    val conteudo = String(zip.getInputStream(entry).use { it.readBytes() }, Charsets.ISO_8859_1)
-                    val achados = padroesDoEspeak.filter { conteudo.contains(it) }
-                    assertTrue(
-                        "${aar.name}!${entry.name} tem código do eSpeak NG (GPL-3.0): $achados. " +
-                            "É o AAR oficial do sherpa-onnx, compilado com TTS. Use o AAR sem TTS " +
-                            "(.github/workflows/sherpa-sem-tts.yml; URL e SHA-256 em app/build.gradle.kts).",
-                        achados.isEmpty(),
-                    )
-                }
+            val achados = sosComTextoDoEspeak(aar)
+            assertTrue(
+                "${aar.name} tem código do eSpeak NG (GPL-3.0): $achados. " +
+                    "É o AAR oficial do sherpa-onnx, compilado com TTS. Use o AAR sem TTS " +
+                    "(.github/workflows/sherpa-sem-tts.yml; URL e SHA-256 em app/build.gradle.kts).",
+                achados.isEmpty(),
+            )
+        }
+    }
+
+    /** Catraca ao contrário: um .so limpo passa e um com `espeak_ng_` é apontado. */
+    @Test
+    fun detectorApontaSoComTextoDoEspeakNg() {
+        val aar = File.createTempFile("sherpa-falso-", ".aar")
+        try {
+            ZipOutputStream(aar.outputStream()).use { zip ->
+                zip.putNextEntry(ZipEntry("jni/x86_64/limpo.so"))
+                zip.write("sem o texto proibido".toByteArray(Charsets.ISO_8859_1))
+                zip.closeEntry()
+                zip.putNextEntry(ZipEntry("jni/x86_64/libsherpa-onnx-jni.so"))
+                zip.write("prefacio espeak_ng_Initialize sufixo".toByteArray(Charsets.ISO_8859_1))
+                zip.closeEntry()
+            }
+            val achados = sosComTextoDoEspeak(aar)
+            assertEquals(listOf("jni/x86_64/libsherpa-onnx-jni.so"), achados.map { it.substringBefore(':') })
+            assertTrue(achados.single(), achados.single().contains("espeak_ng_"))
+        } finally {
+            aar.delete()
+        }
+    }
+
+    private fun sosComTextoDoEspeak(aar: File): List<String> {
+        ZipFile(aar).use { zip ->
+            val libs = zip.entries().asSequence().filter { !it.isDirectory && it.name.endsWith(".so") }.toList()
+            assertFalse("${aar.name} não tem nenhum .so", libs.isEmpty())
+            return libs.mapNotNull { entry ->
+                // Latin-1 mantém um caractere por byte: é o `strings -a` sem o filtro de tamanho.
+                val conteudo = String(zip.getInputStream(entry).use { it.readBytes() }, Charsets.ISO_8859_1)
+                val achados = padroesDoEspeak.filter { conteudo.contains(it) }
+                if (achados.isEmpty()) null else "${entry.name}: $achados"
             }
         }
     }
