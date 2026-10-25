@@ -95,11 +95,23 @@ class GoogleAgentWireTest {
     }
 
     @Test
-    fun `an older turn is rebuilt without signatures even when it has a state`() {
+    fun `an older turn preserves signatures when it has a matching state`() {
         val state = ProviderState("google", """[{"functionCall":{"name":"skin_list","args":{}},"thoughtSignature":"SIG"}]""")
         val out = contents(
             AgentMessage.User("a"),
             AgentMessage.Assistant("", listOf(AgentToolCall("${GoogleAgentWire.SYNTHETIC_ID_PREFIX}1", "skin_list", "{}")), state),
+            AgentMessage.ToolResult("${GoogleAgentWire.SYNTHETIC_ID_PREFIX}1", "ok"),
+            AgentMessage.Assistant("feito"),
+            AgentMessage.User("e agora?"),
+        )
+        assertThat(out.toString()).contains("SIG")
+    }
+
+    @Test
+    fun `an older turn without provider state is rebuilt without signatures`() {
+        val out = contents(
+            AgentMessage.User("a"),
+            AgentMessage.Assistant("", listOf(AgentToolCall("${GoogleAgentWire.SYNTHETIC_ID_PREFIX}1", "skin_list", "{}"))),
             AgentMessage.ToolResult("${GoogleAgentWire.SYNTHETIC_ID_PREFIX}1", "ok"),
             AgentMessage.Assistant("feito"),
             AgentMessage.User("e agora?"),
