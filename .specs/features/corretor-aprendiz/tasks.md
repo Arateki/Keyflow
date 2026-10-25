@@ -129,12 +129,14 @@
 - **Tests**: unit + instrumentado. **Gate**: `full`.
 
 ### CA-T15 — Opções, "Apagar meus dados" e backup
-- **What**: `Settings.keyboardLearning` (ligado) + `SettingsRepository` + interruptor na aba Teclado; `wipe()` em
+- **What**: `Settings.keyboardLearning` (ligado) + `SettingsRepository` + interruptor "Aprender com o que eu digito" na
+  aba Teclado, com o texto que explica o modo anônimo manual quando desligado (PRV-07); `wipe()` em
   `onDeleteMyData` **antes** da API; texto do diálogo; exclusões em `backup_rules.xml`/`data_extraction_rules.xml`.
 - **Where**: `data/Settings*.kt`, `ui/config/TecladoPanel.kt`, `ui/SetupActivity.kt`, `DeleteMyDataSection.kt`, XMLs.
-- **Depends on**: CA-T10. **Covers**: PRV-01, PRV-03, PRV-04.
+- **Depends on**: CA-T10. **Covers**: PRV-01, PRV-03, PRV-04, PRV-07.
 - **Done when**: `BackupRulesTest` cobre a pasta nas duas regras; apagar sem rede apaga o arquivo; o teste Compose
-  de exclusão confere a ordem; `TranslationsTest` verde (pt/en/es).
+  de exclusão confere a ordem; instrumentado: com o interruptor desligado nada novo é gravado e o aprendido
+  continua valendo (PRV-07); `TranslationsTest` verde (pt/en/es).
 - **Tests**: unit + Compose instrumentado. **Gate**: `full`.
 
 ### CA-T16 — Tela "Palavras aprendidas"
@@ -147,13 +149,20 @@
 - **Tests**: Compose instrumentado + goldens. **Gate**: `full` + `screenshot`.
 
 ### CA-T16b — Exportar e importar o aprendido
-- **What**: "Exportar" e "Importar" no grupo "Aprendizado do corretor": aviso de dados pessoais, seletor do sistema,
-  arquivo de texto versionado por idioma, validação, resumo antes de mesclar, mescla (soma ocorrências; par em conflito
-  fica o mais recente).
-- **Where**: `LearnedStore` (serializar e mesclar), `LearnedWordsPanel.kt`. **Depends on**: CA-T10, CA-T16.
-- **Covers**: LST-06..07.
-- **Done when**: exportar → apagar tudo → importar devolve o mesmo aprendido (teste de ida e volta); arquivo truncado,
-  de versão futura ou > 5 MB é recusado sem mudar nada; nenhuma chamada de rede; goldens do aviso e do resumo.
+- **What**: o desenho de `design.md` §8.1. "Exportar" e "Importar" no grupo "Aprendizado do corretor": aviso de dados
+  pessoais (inclui "pode sair do aparelho se você o guardar numa nuvem"), seletor do sistema
+  (`CreateDocument`/`OpenDocument`), arquivo `KFX1` com uma seção por idioma, `LearnedImportReader` (puro) que valida
+  versão, tamanho e linha e **força os limites do aprendizado** (peso em `[0, WEIGHT_CAP]`, dia ≤ hoje, `wordEligible`,
+  tetos, `|μ| ≤ 0,25`), resumo antes de mesclar, `LearnedStore.merge` (soma ocorrências; par em conflito fica o mais
+  recente), retrato sob a trava curta para exportar.
+- **Where**: `learning/LearnedStore.kt` (retrato e `merge`), `learning/LearnedImportReader.kt`, `ui/config/LearnedWordsPanel.kt`.
+- **Depends on**: CA-T10, CA-T16.
+- **Covers**: LST-06, LST-07.
+- **Done when**: exportar → apagar tudo → importar devolve o mesmo aprendido (teste de ida e volta); arquivo
+  truncado, de versão futura ou > 5 MB é recusado sem mudar nada; arquivo com peso negativo, NaN, data futura,
+  palavra inelegível ou além dos tetos sai dentro dos limites (teste por caso + propriedade: depois de importar
+  qualquer entrada, nenhum teto é violado); nenhuma cópia em `cache/` ou `files/` e nenhuma chamada de rede
+  (`ArchitectureRulesTest`); importar funciona com o interruptor desligado; goldens do aviso e do resumo.
 - **Tests**: unit (ida e volta, mescla, fuzz do leitor) + Compose instrumentado + goldens. **Gate**: `full` + `screenshot`.
 
 ### CA-T17 — Sessões no banco (curva de aprendizado)
@@ -309,7 +318,7 @@
 | LRN-01, ARM-02, ARM-03 | CA-T12 |
 | REJ-01, 04, 05, 06 | CA-T13 |
 | REJ-02, FIX-01 | CA-T14 |
-| PRV-01, 03, 04 | CA-T15 |
+| PRV-01, 03, 04, 07 | CA-T15 |
 | LST-01..05 | CA-T16 |
 | LST-06..07 | CA-T16b |
 | ROL-02 | CA-T18 |

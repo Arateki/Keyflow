@@ -314,7 +314,18 @@ fun wordEligible(word: String): Boolean        // LRN-02
   a API (`SetupActivity.kt`: `entitlementsRepository.deleteRemoteData { api.deleteAccount() }`).
 - **Texto novo da interface** via `tr("…")`, em pt/en/es; textos novos nas tarefas CA-T15 e CA-T16.
 - Nada de rede: o módulo não importa `net/`; um teste de arquitetura (`ArchitectureRulesTest`) confere que
-  `ime/keyboard/learning/` não importa `okhttp`/`java.net`.
+  `ime/keyboard/learning/` não importa `okhttp`/`java.net`. A única saída de dados é a exportação que a pessoa
+  pede (§8.1), por `ContentResolver` para o arquivo que ela escolheu.
+- **Quem não aprende.** Um efeito só, com causas e nomes distintos (PRV-02, PRV-06, PRV-07):
+
+| Situação | Grava (palavra, par, bigrama, viés, recusa confirmada) | Usa o que já foi aprendido |
+| -------- | ------------------------------------------------------ | -------------------------- |
+| Aprender ligado, campo comum | sim | sim |
+| **Modo anônimo manual** (interruptor desligado, PRV-07) | não | sim |
+| App pede `NO_PERSONALIZED_LEARNING` (PRV-06) | não | sim |
+| Campo que não aprende (PRV-02) ou "Correção automática" desligada | não | como a BAS já trata o campo |
+
+  Em todas, apagar (PRV-04), importar (LST-07) e a supressão da troca recusada (REJ-05) seguem valendo.
 
 ---
 
@@ -347,6 +358,48 @@ guardar horário exato de digitação.
 rodam na thread `keyflow-suggest`; a tela de palavras usa um `ReentrantLock` curto sobre as mesmas
 estruturas (operações O(1) ou varredura de ≤ 5000 entradas, < 1 ms). IME e config rodam no mesmo processo
 (só `:inference` e `:reasoning` são outros, `AndroidManifest.xml`).
+
+### 8.1 Exportar e importar (LST-06, LST-07; pedido do Yan, 24/10)
+
+**Arquivo.** Texto UTF-8 versionado, no mesmo formato de linha do `.kfl`, com uma seção por idioma. É o estado
+já compactado (sem linhas `-W`); peso e dia seguem como gravados, o decaimento continua sendo calculado na leitura:
+
+```
+KFX1
+@pt
+W⇥yan⇥3.0⇥20386⇥1
+P⇥vc⇥você⇥2.0⇥20386
+B⇥de⇥casa⇥1.0⇥20386
+T⇥e⇥0.05⇥-0.02⇥12
+@en
+…
+```
+
+**Exportar.** O botão abre o aviso (palavras pessoais; o arquivo fica fora da proteção do app, o KeyFlow não o
+guarda nem o apaga, e pode sair do aparelho se a pessoa o salvar numa nuvem). Confirmado, abre o seletor do
+sistema (`ActivityResultContracts.CreateDocument("text/plain")`, nome sugerido
+`keyflow-aprendizado-AAAA-MM-DD.txt`), que dá acesso só àquele arquivo, sem permissão de armazenamento. Um
+**retrato** do aprendido é tirado sob a trava curta (§8) e escrito fora da main thread direto no `Uri` escolhido
+(`ContentResolver.openOutputStream`); nenhuma cópia em `cache/` ou `files/`, logo nada novo para o backup nem para
+o "Apagar". A tela mostra "N palavras, M pares exportados" ou o erro.
+
+**Importar.** `ActivityResultContracts.OpenDocument` → leitura fora da main thread de, no máximo, 5 MB (um byte
+a mais já recusa) → `LearnedImportReader` (puro, JVM) devolve um `ImportPreview` ou o erro. O arquivo é **entrada
+não confiável**: outra versão que não `KFX1` é recusada; linha longa demais (partida: 256 caracteres) ou com
+campo inválido é ignorada e contada; leem-se no máximo `2 × MAX_*` linhas por seção (partida); seção de idioma
+desconhecido é ignorada; e o que passa é **forçado aos mesmos limites do aprendizado**: peso finito e em
+`[0, WEIGHT_CAP]`, dia ≤ hoje (data futura não pode adiar o decaimento), palavra e par por `wordEligible`
+(LRN-02), viés com `|μ| ≤ 0,25` e `n ≥ 0`. A tela mostra o resumo (palavras, pares, bigramas, vieses por idioma
+e as linhas ignoradas); confirmado, `LearnedStore.merge(preview)` roda na thread `keyflow-suggest` (a única que
+toca nos dados, ARM-03) e grava o resultado como acréscimos do diário.
+
+**Mescla** (pesos já decaídos até hoje): palavra soma os pesos, limitados a `WEIGHT_CAP`, com `ultimoUso = max` e
+`valid = valid₁ ∨ valid₂ ∨ soma ≥ VALID_AT`; par com a mesma escolhida soma, com escolhidas diferentes fica o de
+dia mais recente (e vale o evento mais recente entre par e palavra, FIX-05); bigrama soma; viés é a média
+ponderada por `n`, com `|μ| ≤ 0,25` e `n` até o teto que a CA-T23 definir. Depois da mescla vale o teto
+`MAX_WORDS`/`MAX_PAIRS`/`MAX_BIGRAMS` por idioma pela regra do LRN-07 (sai o de menor peso). "Apagar tudo" e depois
+importar devolve o aprendido do arquivo (teste de ida e volta da CA-T16b). Importar vale com o aprendizado
+desligado, em qualquer tela: é pedido explícito. Só `ContentResolver` e `java.io`: nada de rede.
 
 ---
 

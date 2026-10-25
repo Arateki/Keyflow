@@ -31,7 +31,8 @@ Duas frentes, na ordem do que dá mais acerto por esforço:
 - [ ] A pessoa recusa uma troca **uma vez** (backspace logo após ou escolher a palavra original na faixa) e o corretor não repete.
 - [ ] Palavras novas da pessoa passam a valer sozinhas depois de poucos usos, com contagem que decai; erro de digitação isolado não é aprendido.
 - [ ] Correções que a pessoa faz (tocar numa sugestão, apagar e reescrever) viram pares "erro → certo".
-- [ ] Nada sai do aparelho; não aprende em senha, número, e-mail, URL nem com `IME_FLAG_NO_PERSONALIZED_LEARNING`; "Apagar meus dados" e uma tela própria apagam o aprendido.
+- [ ] Nada sai do aparelho, salvo o arquivo que a pessoa mesma pede ao exportar (LST-06); não aprende em senha, número, e-mail, URL nem com `IME_FLAG_NO_PERSONALIZED_LEARNING`; há um modo anônimo manual (PRV-07); "Apagar meus dados" e uma tela própria apagam o aprendido.
+- [ ] A pessoa exporta e importa o que o corretor aprendeu por arquivo, quando quiser (LST-06, LST-07).
 - [ ] Modelo espacial com a coordenada do toque no lugar da tabela de teclas vizinhas, com o custo de CPU medido no Galaxy A32 (PER-01).
 - [ ] Adaptação ao jeito de tocar (fase D): viés por tecla no modelo e, como pediu o Yan (resposta 9, 24/10), o experimento de deslocar também o alvo do toque, medido no banco e com protótipo só no debug.
 - [ ] Contexto da palavra anterior (bigramas), como fase posterior.
@@ -42,7 +43,8 @@ Duas frentes, na ordem do que dá mais acerto por esforço:
 | ---- | ----- |
 | Modelo neural no aparelho (estilo FUTO) | Resposta 12 do Yan (24/10): só depois, pelo catálogo de modelos sob demanda e com licença compatível (o do FUTO fica fora). Critérios para revisitar em `design.md` §10: 60+ MB, runtime nativo, sem modelo pt-BR aberto e sem medida no A32 |
 | Digitação por deslize (glide) | Outro motor; a coordenada do toque desta spec é só de toque |
-| Sincronizar o aprendido entre aparelhos / nuvem | Contraria "nada sai do aparelho" |
+| Sincronizar o aprendido entre aparelhos / nuvem | Contraria "nada sai do aparelho". A exportação por arquivo (LST-06) não é sincronização: a pessoa move o arquivo, o app nunca |
+| Atalho do modo anônimo no teclado (barra, toque longo) | O modo anônimo manual é o interruptor da aba Teclado (PRV-07); um atalho só se o Yan pedir |
 | Dicionário de contatos (`READ_CONTACTS`) | Resposta 5 do Yan (24/10): sem a permissão; os nomes vêm do uso (LRN) |
 | Corrigir palavra **válida** por contexto ("casa" → "caso") | Sem precisão medida ≥ 99% no banco, só sugerir (já é assim) |
 | Ditado por voz | Esta spec é só do teclado de toque |
@@ -88,7 +90,7 @@ Duas frentes, na ordem do que dá mais acerto por esforço:
 5. **LRN-05**: WHEN uma palavra **seria trocada com confiança** pelo corretor (típico erro de digitação) THEN os usos "digitada como está" SHALL **não** contar (só a recusa explícita); assim o erro isolado nunca vira palavra do usuário.
 6. **LRN-06**: WHEN a troca foi feita e a pessoa **não** desfez THEN a palavra original SHALL **não** ganhar ponto nenhum (era erro de digitação).
 7. **LRN-07**: WHEN o tempo passa THEN o peso SHALL decair com meia-vida de 90 dias (calculado na leitura, sem rodar tarefa): a palavra continua valendo enquanto o peso atual for ≥ 1; sai quando < 0,5; entrada ainda não válida e parada há 30 dias é descartada; teto de 5000 palavras por idioma (sai a de menor peso).
-8. **LRN-08**: WHEN o campo é de senha, número, e-mail, URL, filtro, terminal, ou o app pede `IME_FLAG_NO_PERSONALIZED_LEARNING`, ou "Correção automática" está desligada, ou a pessoa ligou o modo anônimo THEN **nada** SHALL ser aprendido (PRV-02).
+8. **LRN-08**: WHEN o campo é de senha, número, e-mail, URL, filtro, terminal ou outro que não aprende (PRV-02), ou o app pede `IME_FLAG_NO_PERSONALIZED_LEARNING` (PRV-06), ou "Correção automática" está desligada, ou o **modo anônimo manual** está ligado (PRV-07) THEN **nada** SHALL ser aprendido.
 
 ### Correção recusada (`REJ`)
 
@@ -127,7 +129,7 @@ Duas frentes, na ordem do que dá mais acerto por esforço:
 1. **ADP-01**: WHEN uma palavra é comitada **como digitada**, está no dicionário, tem ≥ 3 letras e não foi desfeita THEN o deslocamento de cada toque em relação ao centro da tecla SHALL atualizar, por média móvel com prior em zero (α = 1/(n+20)), o viés (μx, μy) daquela tecla; teto |μ| ≤ 0,25 tecla; 26 teclas × 3 números por layout.
 2. **ADP-02**: WHEN o viés existe THEN o custo espacial SHALL usar o centro deslocado (SPA-02); o **hit-test** da grade não muda por causa disso (deslocar o alvo de toque muda o que a pessoa vê): só o experimento do ADP-05 mexe nele, e só no debug.
 3. **ADP-03**: WHEN a pessoa apaga o aprendido (PRV-04) THEN o viés SHALL voltar a zero.
-4. **ADP-04**: WHEN os toques vêm de modo anônimo ou campo inelegível THEN nenhum viés SHALL ser atualizado.
+4. **ADP-04**: WHEN os toques vêm do modo anônimo manual (PRV-07) ou de campo que não aprende (PRV-02, PRV-06) THEN nenhum viés SHALL ser atualizado.
 5. **ADP-05** (fase D, resposta 9 do Yan, 24/10): WHEN a fase D roda THEN o banco SHALL medir o **teto** de deslocar também o hit-test (erro por letra com e sem compensar o viés conhecido, no sintético com viés e nos toques reais da CA-T2) e SHALL existir um **protótipo só no debug**, atrás de opção desligada por padrão, que desloca o ponto do toque pelo viés da tecla antes de decidir a tecla (a prévia e a letra que sai usam a mesma tecla); o Yan testa no A32. Ligar na release só depois dos números do banco e do teste dele, porque muda o que o dedo vê.
 
 ### Contexto da palavra anterior (`CTX`) — fase posterior
@@ -139,22 +141,23 @@ Duas frentes, na ordem do que dá mais acerto por esforço:
 
 ### Privacidade (`PRV`)
 
-1. **PRV-01**: WHEN algo é aprendido THEN SHALL ficar só neste aparelho: `files/corretor/` (nunca `cache/`), **fora** do backup em nuvem e da transferência entre aparelhos (`backup_rules.xml` e `data_extraction_rules.xml`, conferido pelo `BackupRulesTest`), sem nenhum uso de rede.
+1. **PRV-01**: WHEN algo é aprendido THEN SHALL ficar só neste aparelho: `files/corretor/` (nunca `cache/`), **fora** do backup em nuvem e da transferência entre aparelhos (`backup_rules.xml` e `data_extraction_rules.xml`, conferido pelo `BackupRulesTest`), sem nenhum uso de rede. **Única exceção:** o arquivo que a pessoa pede ao tocar "Exportar" (LST-06), gravado onde ela escolher; o app nunca o envia nem guarda cópia dele.
 2. **PRV-02**: WHEN o campo é elegível para aprender THEN SHALL valer a mesma regra da troca automática (`autoCorrectAllowed`: texto comum, fora de URL, e-mail, senha, filtro e terminal) **e** o app não ter pedido `IME_FLAG_NO_PERSONALIZED_LEARNING` (constante 0x1000000, Android 8+; no 7 nunca aparece) **e** a opção "Aprender com o que eu digito" estar ligada **e** a "Correção automática" estar ligada (o AOSP e o HeliBoard também só aprendem onde corrigem).
-3. **PRV-03**: WHEN a pessoa desliga "Aprender com o que eu digito" (aba Teclado, ligado por padrão) THEN o corretor SHALL continuar corrigindo como na BAS, e o que já foi aprendido SHALL continuar valendo até ser apagado.
+3. **PRV-03**: WHEN a pessoa abre a aba Teclado THEN SHALL haver o interruptor "Aprender com o que eu digito", **ligado por padrão** (resposta 3 do Yan), e desligá-lo liga o modo anônimo manual (PRV-07).
 4. **PRV-04**: WHEN a pessoa usa **"Apagar meus dados"** (aba Privacidade) THEN o aprendido local (palavras, pares, bigramas, vieses) SHALL ser apagado **antes** da chamada à API, sem depender da rede; o texto da confirmação passa a dizer isso. Um botão próprio **"Apagar o que o corretor aprendeu"** faz só isto.
 5. **PRV-05**: WHEN o aprender passa a valer por padrão (fase B) THEN os textos que descrevem dados SHALL já mencionar o aprendizado no aparelho: a política de privacidade (`LegalUrls.privacyPolicy`), o texto da aba Privacidade e a ficha da Play (Data Safety, `PLAYSTORE_CHECKLIST.md` §3, onde hoje consta "Keystrokes / dados digitados: Não coletados"), com a exportação (LST-06) descrita como arquivo que a pessoa guarda onde escolher. O Yan revisa esses textos quando a fase B chegar (resposta 11, 24/10); **a fase B não vai para a Play sem a revisão dele** (CA-T18b).
-6. **PRV-06**: WHEN o app pede `NO_PERSONALIZED_LEARNING` (modo anônimo do Chrome e similares) THEN o aprendido que já existe SHALL continuar valendo para não trocar e para completar (é o que o LatinIME e o HeliBoard fazem: o campo só **não atualiza** o aprendido), e nada novo é gravado — nem palavra, nem par, nem viés de toque.
+6. **PRV-06**: WHEN o app pede `NO_PERSONALIZED_LEARNING` (quem pede é, por exemplo, o modo anônimo do Chrome) THEN o aprendido que já existe SHALL continuar valendo para não trocar e para completar (é o que o LatinIME e o HeliBoard fazem: o campo só **não atualiza** o aprendido), e nada novo é gravado — nem palavra, nem par, nem bigrama, nem viés de toque, nem recusa confirmada.
+7. **PRV-07** (modo anônimo manual, resposta 3 do Yan): WHEN a pessoa desliga o interruptor "Aprender com o que eu digito" (PRV-03) THEN o **modo anônimo manual** SHALL valer: nada novo é gravado (palavra, par, bigrama, viés de toque, recusa confirmada), o que já foi aprendido continua valendo para não trocar e para completar, e a troca e a faixa seguem como na BAS — o mesmo efeito do PRV-06, só que escolhido pela pessoa e para o teclado inteiro. O texto sob o interruptor explica isso (`tr`). Seguem permitidos apagar (PRV-04) e importar (LST-07, pedido explícito); a supressão da troca recusada (REJ-05) também. **Termos**: "modo anônimo manual" é só o do interruptor; o pedido do app é "campo que não aprende" (PRV-06). Não há atalho do modo no teclado nesta spec (Out of Scope).
 
 ### Tela "Palavras aprendidas" (`LST`)
 
-1. **LST-01**: WHEN a pessoa abre a aba Teclado THEN SHALL haver o grupo **"Aprendizado do corretor"** com o interruptor de PRV-03, o número de palavras e pares, e a entrada para a lista.
+1. **LST-01**: WHEN a pessoa abre a aba Teclado THEN SHALL haver o grupo **"Aprendizado do corretor"** com o interruptor de PRV-03 (desligado = modo anônimo manual, PRV-07, dito no texto sob ele), o número de palavras e pares, e a entrada para a lista.
 2. **LST-02**: WHEN a pessoa abre a lista THEN SHALL ver, por idioma (pt/en/es), as palavras que valem, os pares "erro → certo" e a contagem das palavras ainda em observação, cada item com **Remover**, mais "Apagar tudo" (com confirmação).
 3. **LST-03**: WHEN a pessoa remove uma palavra THEN ela SHALL deixar de valer na hora e o corretor SHALL voltar a tratá-la como qualquer palavra fora do dicionário.
 4. **LST-04**: WHEN há texto novo THEN SHALL passar por `tr("…")` com inglês e espanhol (`TranslationsTest`); a tela coleta fluxo por `collectAsStateOnMain`, lê o arquivo fora da thread principal e tem `testTag` por item.
 5. **LST-05**: WHEN as telas estabilizam THEN SHALL haver goldens da aba Teclado (novo grupo), da lista (vazia e com itens) e do diálogo de apagar, claro e escuro; os goldens existentes que não mudam ficam bit-idênticos.
-6. **LST-06**: WHEN a pessoa toca **"Exportar"** no grupo "Aprendizado do corretor" THEN o app SHALL avisar que o arquivo contém palavras pessoais e fica fora da proteção do app, e então gravar o aprendido (palavras, pares, bigramas e vieses de toque, por idioma) num arquivo que ela escolhe pelo seletor do sistema (`ACTION_CREATE_DOCUMENT`), em texto versionado com uma seção por idioma no formato de linha do ARM-01; nada passa pela rede (pedido do Yan, 24/10).
-7. **LST-07**: WHEN a pessoa toca **"Importar"** e escolhe um arquivo (`ACTION_OPEN_DOCUMENT`) THEN o app SHALL validar versão, tamanho (≤ 5 MB) e cada linha, mostrar o resumo (palavras e pares por idioma) e, confirmado, **mesclar** com o aprendido atual (ocorrências somadas; par em conflito fica o mais recente); arquivo inválido não muda nada e mostra o erro; com o aprendizado desligado ou em modo anônimo a importação continua permitida, porque é um pedido explícito.
+6. **LST-06**: WHEN a pessoa toca **"Exportar"** no grupo "Aprendizado do corretor" THEN o app SHALL avisar que o arquivo contém palavras pessoais, fica fora da proteção do app e pode sair do aparelho se ela o guardar numa nuvem, e então gravar o aprendido (palavras, pares, bigramas e vieses de toque, por idioma) num arquivo que ela escolhe pelo seletor do sistema (`ACTION_CREATE_DOCUMENT`), em texto versionado com uma seção por idioma no formato de linha do ARM-01; nada passa pela rede e o app não guarda cópia (pedido do Yan, 24/10; desenho em `design.md` §8.1).
+7. **LST-07**: WHEN a pessoa toca **"Importar"** e escolhe um arquivo (`ACTION_OPEN_DOCUMENT`) THEN o app SHALL validar versão, tamanho (≤ 5 MB) e cada linha, **forçando ao que vem do arquivo os mesmos limites do aprendizado** (peso finito em `[0, WEIGHT_CAP]`, data não futura, palavra elegível pelo LRN-02, tetos `MAX_WORDS`/`MAX_PAIRS`/`MAX_BIGRAMS`, `|μ| ≤ 0,25` no viés), mostrar o resumo (palavras, pares, bigramas e vieses por idioma, mais as linhas ignoradas) e, confirmado, **mesclar** com o aprendido atual (ocorrências somadas; par em conflito fica o mais recente); arquivo inválido não muda nada e mostra o erro; com o aprendizado desligado (modo anônimo manual) a importação continua permitida, porque é um pedido explícito.
 
 ### Armazenamento e desempenho (`ARM`, `PER`)
 
@@ -184,6 +187,8 @@ Duas frentes, na ordem do que dá mais acerto por esforço:
 - WHEN o campo é `TYPE_NULL`/terminal (composição desligada) THEN não há troca, logo não há recusa nem aprendizado.
 - WHEN a pessoa digita em outro idioma com o teclado pt (inglês no meio) THEN as palavras são aprendidas no pt (o que ela digitou nesse teclado), nunca copiadas para o en.
 - WHEN o toque vem de `performClick` de acessibilidade THEN não há coordenada e o corretor usa a tabela de vizinhas.
+- WHEN a pessoa guarda o arquivo exportado numa nuvem pelo seletor do sistema THEN o aviso da exportação já disse que ali ele fica fora da proteção do app; o app não sabe nem controla o destino.
+- WHEN o arquivo importado traz pesos absurdos, datas futuras, palavras inelegíveis ou milhões de linhas THEN o leitor aplica os limites do LST-07 e o resultado nunca passa dos tetos do aprendizado.
 
 ---
 
@@ -199,7 +204,7 @@ Duas frentes, na ordem do que dá mais acerto por esforço:
 | SPA-01..05 | Modelo espacial | Pending | banco (sintético, reais) + unit + instrumentado (tempo no A32) |
 | ADP-01..05 | Adaptação do toque | Pending | banco (sintético com viés e reais) + unit + instrumentado (protótipo) + manual no A32 |
 | CTX-01..04 | Contexto | Pending | unit + banco (conjunto de contexto) |
-| PRV-01..06 | Privacidade | Pending | unit (`LearningPolicyTest`, `BackupRulesTest`) + instrumentado + Compose (apagar) |
+| PRV-01..07 | Privacidade | Pending | unit (`LearningPolicyTest`, `BackupRulesTest`) + instrumentado + Compose (apagar) |
 | LST-01..07 | Tela de palavras, exportar e importar | Pending | Compose instrumentado + goldens + `TranslationsTest` |
 | ARM-01..03, PER-01..02 | Armazenamento e desempenho | Pending | unit (arquivo, fuzz) + `StrictModeKeyboardTest` + tempo no A32 |
 | ROL-01..04 | Rollout | Pending | flag de debug + gates |
