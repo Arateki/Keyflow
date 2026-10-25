@@ -1882,6 +1882,33 @@ suíte. O re-toque do `awaitKeyboardAttached` fica (cobre o toque perdido, caso 
 não mesclada (teste usa `useUnmergedTree`), e a linha de progresso ganhou `mergeDescendants` (leitor de
 tela lê barra e rótulo juntos; o teste lê o "50%" na própria tag).
 
+## sherpa-onnx sem TTS — AAR sem eSpeak NG (2026-10-25)
+
+O AAR oficial 1.13.8 (50.129.134 B, SHA `633c2432…bd96`) vem com `SHERPA_ONNX_ENABLE_TTS=ON` e embute o
+eSpeak NG (GPL-3.0). O app passa a usar o recompilado pelo `.github/workflows/sherpa-sem-tts.yml`
+(rodada 40140437418, 45.875.067 B, SHA `5660e13fb737557be7fbec780606990ca9c10f3f0d6804b8486595c66f98eb45`),
+baixado do release `sherpa-onnx-1.13.8-sem-tts` e recusado se o SHA divergir. `SherpaAarSemGplTest`
+varre todo `.so` do AAR em `app/libs`.
+
+- **NDK r29.** O oficial traz `0x14206865` no `.note.android.ident`. O workflow instala o NDK
+  `29.0.14206865` e recompila a tag `v1.13.8` no commit `11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf`,
+  com as mesmas opções do upstream e `SHERPA_ONNX_ENABLE_TTS=OFF`.
+- **ONNX Runtime idêntica.** As `libonnxruntime.so` (1.28.2) dos quatro ABIs são byte a byte as do
+  AAR oficial. O que muda no nativo é o sherpa sem TTS.
+- **Contagem 2, não 6.** Em cada ABI, `libsherpa-onnx-jni.so` e `libsherpa-onnx-c-api.so` tinham 2
+  textos do eSpeak (`strings -a`); `libsherpa-onnx-cxx-api.so` e `libonnxruntime.so` tinham 0. No AAR
+  novo os quatro estão em 0. O pedido original falava em 6 por `.so`; a medida foi 2.
+- **c-api e cxx-api empacotadas e sem uso.** No arm64-v8a: c-api 3.280.624 B + cxx-api 440.688 B
+  (~3,7 MB). O app não chama essas bibliotecas. A c-api continua exportando as funções C de TTS; o
+  que saiu do JNI foram 9 símbolos de TTS. As classes Kotlin de TTS (14, entre elas `Tts.kt`) não
+  estão no AAR: uso vira erro de compilação.
+- **Catálogo de TTS sem runtime.** `ModelCatalog` ainda lista Piper, Kokoro e MeloTTS com
+  `EngineType.TTS`. `SherpaEngine` recusa esse tipo. TTS local por este sherpa exigiria o
+  `espeak-ng-data`, que é GPL — não entra no app.
+- **Alinhamento.** Todo `PT_LOAD` dos `.so` continua ≥ 16 KB.
+- **Reprodutibilidade.** Cada push que dispara o workflow pode gerar outro binário e outro SHA.
+  Publicar o artefato da rodada citada e conferir o SHA contra `app/build.gradle.kts` antes do release.
+
 ## CI verde — native-voice-models (2026-09-27)
 
 Rodada em 5db6d75: **240/240 instrumentados, 0 pulados, telas 84/84** no limiar. Com o
