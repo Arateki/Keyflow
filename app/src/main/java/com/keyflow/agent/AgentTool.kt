@@ -25,6 +25,8 @@ class ToolContext(
     val origin: ToolOrigin = ToolOrigin.CHAT,
     /** O id da chamada (o `tool_use.id` do modelo), para a ferramenta correlacionar o que mostra ao usuário. */
     val callId: String = "",
+    /** A geração do turno em que esta chamada foi criada (0 quando não rastreada). */
+    val generation: Long = 0L,
 )
 
 /** Uma imagem que o app mostra ao usuário junto do pedido de confirmação (a folha de contato de uma skin, por exemplo). */

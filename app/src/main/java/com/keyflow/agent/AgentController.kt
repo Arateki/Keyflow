@@ -211,11 +211,11 @@ class AgentController(
         val undo = entry.undo ?: return false
         val runner = executor ?: return false
         if (isBusy) return false
-        start(AgentActivity.RUNNING_TOOL) { _ ->
+        start(AgentActivity.RUNNING_TOOL) { run ->
             val call = AgentToolCall("undo-${entry.id}", undo.toolName, undo.argsJson)
             val cardId = ids.getAndIncrement()
             addItem(ChatItem.ToolCard(cardId, call.id, call.name, runner.registry[call.name]?.risk, summary = null, phase = ToolCardPhase.RUNNING))
-            val outcome = runner.execute(call, ToolOrigin.CHAT) { phase -> onPhase(call.id, phase) }
+            val outcome = runner.execute(call, ToolOrigin.CHAT, generation = run) { phase -> onPhase(call.id, phase) }
             finishCard(call.id, outcome)
             if (outcome.status == ToolStatus.OK) actionLog?.clearUndo(entry.id)
         }
@@ -321,7 +321,7 @@ class AgentController(
             currentBubble = null
             history.toList()
         }
-        AgentLoop(backend.engine, runner, limits).run(sent).collect { onLoopEvent(run, it) }
+        AgentLoop(backend.engine, runner, limits).run(sent, generation = run).collect { onLoopEvent(run, it) }
     }
 
     private fun onLoopEvent(run: Long, event: AgentLoopEvent) {

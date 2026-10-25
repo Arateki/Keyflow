@@ -275,6 +275,51 @@ class SkinToolsTest {
         assertThat(out.status).isEqualTo(ToolStatus.OK)
     }
 
+    @Test
+    fun `a delayed turn release from an older turn does not clear described fingerprint of a newer turn`() = blocking {
+        val h = harness()
+        val scoped = skinTools.tools.filterIsInstance<TurnScoped>()
+
+        // Turno A inicia na geração 1
+        scoped.forEach { it.turnStarted(1L) }
+
+        // Turno B inicia na geração 2
+        scoped.forEach { it.turnStarted(2L) }
+
+        // Quando o pedido de confirmação de skin_install do Turno B chega ao usuário,
+        // o finally atrasado do Turno A cancelado roda na geração 1 antes da resposta
+        h.confirmation.answer = {
+            scoped.forEach { it.turnCancelled(1L) }
+            ConfirmationDecision.ALLOW
+        }
+
+        // O Turno B executa skin_install na geração 2
+        val out = h.executor.execute(callOf("skin_install", files(manifest, idle), id = "call-B"), generation = 2L)
+        assertThat(out.status).isEqualTo(ToolStatus.OK)
+    }
+
+    @Test
+    fun `a delayed skin_preview call from an older turn does not overwrite draft of a newer turn`() = blocking {
+        val h = harness()
+        val scoped = skinTools.tools.filterIsInstance<TurnScoped>()
+
+        // Turno A inicia na geração 1
+        scoped.forEach { it.turnStarted(1L) }
+
+        // Turno B inicia na geração 2 e adiciona os arquivos da skin
+        scoped.forEach { it.turnStarted(2L) }
+        val outB = h.executor.execute(callOf("skin_preview", files(manifest), id = "call-B"), generation = 2L)
+        assertThat(outB.status).isEqualTo(ToolStatus.OK)
+
+        // Chamada atrasada do Turno A tenta limpar o rascunho com reset: true na geração 1
+        val outA = h.executor.execute(callOf("skin_preview", JSONObject().put("files", JSONObject()).put("reset", true).toString(), id = "call-A"), generation = 1L)
+        assertThat(outA.status).isEqualTo(ToolStatus.ERROR)
+
+        // O rascunho do Turno B deve permanecer intacto
+        val check = h.executor.execute(callOf("skin_preview", """{"files":{}}""", id = "call-B2"), generation = 2L)
+        assertThat(check.status).isEqualTo(ToolStatus.OK)
+    }
+
     // ── limites (SKL-06) ─────────────────────────────────────────────────────
 
     @Test
