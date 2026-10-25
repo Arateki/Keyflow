@@ -12,13 +12,17 @@
 
 ### CA-T1 — Banco de avaliação offline  `[base, 1ª tarefa]`
 - **What**: `CorretorBenchTest` + `bench/` (casos, gerador sintético `SyntheticTyping`, métricas, JSON,
-  tabela), `manter.tsv` (≥ 300, das 548 do estudo), `erros.tsv` (≥ 300 à mão), esqueleto de `sessoes/`,
-  `corretor-bench-baseline.json` gerado **pelo código de hoje**, `scripts/corretor-bench.sh [ref]`.
+  tabela), `manter-dev.tsv` e `manter-teste.tsv` (≥ 300 no total; traz para o git a lista de 548 palavras do estudo,
+  hoje só em `/tmp/corretor-medicao.tsv` e sem os resultados; o teste é sorteado com semente fixa, por grupo, e nenhuma
+  task de curadoria o lê), `erros.tsv` (≥ 300 à mão), esqueleto de `sessoes/`, `corretor-bench-baseline.json` gerado
+  **pelo código de hoje**, `scripts/corretor-bench.sh [ref]`.
 - **Where**: `app/src/test/java/com/keyflow/ime/keyboard/dictionary/bench/`, `app/src/test/resources/bench/`, `scripts/`.
 - **Covers**: BEN-01..05, BEN-08.
-- **Done when**: o banco roda no `testDebugUnitTest` em < 60 s; o baseline registra o ponto de partida
-  (manter: 51% trocadas; inglês comum 39%; acento restaurado 79%; sintético σ 0,30 com os números de
-  `context.md` §7); piorar uma métrica falha o teste; o script imprime antes × depois.
+- **Done when**: o baseline registra o ponto de partida **medido pelo banco** (por grupo do `manter-dev` e do
+  `manter-teste`: trocadas e indevidas; inglês e espanhol comuns; acento restaurado; sintético por configuração) — não
+  os números preliminares do protótipo, que usou lista montada por agente e 200 amostras por linha; o resultado
+  atualiza a estimativa de `context.md` §3 e a meta do segundo Goal do `spec.md`; piorar uma métrica determinística
+  falha o teste; o script imprime antes × depois. Orçamento de tempo do banco: ver `design.md` §1.
 - **Tests**: unit. **Gate**: `quick`.
 
 ### CA-T2 — Gravador de digitações reais (debug)  `[P com T1, [YAN] digita]`
@@ -35,7 +39,9 @@
 - **What**: `CorretorTempoTest` (instrumentado): ~300 palavras do conjunto de erros, aquece o JIT, grava p50/p95.
 - **Where**: `app/src/androidTest/java/com/keyflow/ime/`.
 - **Covers**: BEN-06, PER-01 (medida).
-- **Done when**: número no emulador (`instrumentar`) e no A32; o baseline de tempo entra em `STATE.md` (~15 ms hoje).
+- **Done when**: número no emulador (`instrumentar`) e no A32, com **p50 e p95 de hoje** (os "~15 ms" do Q9 não dizem
+  o p95); o baseline de tempo entra em `STATE.md`; o teto de 25 ms do PER-01 é confirmado ou refeito a partir deles
+  (15 ms × 1,35 + 1 + 2 ms ≈ 23 ms deixa quase nenhuma folga).
 - **Tests**: instrumentado. **Gate**: `full`.
 
 ### CA-T4 — Decisão por classe de troca
@@ -43,7 +49,10 @@
   maiúsculas, qualquer tamanho) só sugerem; acento digitado nunca se perde (corrige `sameLetters.first()`).
 - **Where**: `dictionary/Suggester.kt`, `dictionary/SwapClass.kt`.
 - **Depends on**: CA-T1. **Covers**: BAS-01..03.
-- **Done when**: no banco, "manter" cai (alvo: ≤ 25% trocadas só com esta task) sem piorar "erros"; as
+- **Done when**: no banco, as trocas indevidas do "manter" caem sem piorar "erros" (alvo desta task sozinha: cerca de
+  31% das palavras fora do dicionário ainda trocadas — 101 de 322 pelas contas de `context.md` §3: 165 − 57 só de
+  caixa − ~7 acentos digitados —, **não** ≤ 25%; a queda até ≤ 10% vem das T5, T6 e T7; números a confirmar com o
+  baseline da T1); as
   expectativas de `RealDictionaryTest` que mudam de propósito (`api`→`API`, resposta 2 do Yan) listadas aqui com o motivo.
 - **Tests**: unit + banco. **Gate**: `quick`.
 
@@ -67,7 +76,10 @@
   `Dictionaries` carrega junto; `Suggester` só sugere quando a palavra está ali.
 - **Where**: `scripts/`, `dictionary/Dictionaries.kt`, `dictionary/Suggester.kt`.
 - **Depends on**: CA-T1. **Covers**: BAS-05.
-- **Done when**: o banco "inglês no meio" cai de 39% para ≤ 5% trocadas; memória +≤ 0,3 MB; carga +≤ 30 ms.
+- **Done when**: no banco, as trocas indevidas do grupo inglês (31% na lista do estudo; 39% das palavras comuns do
+  dicionário en fora do pt) caem para ≤ 5% (meta provisória); tamanho, memória e carga **medidos** (o palpite de
+  20–30 mil palavras estrangeiras daria 0,4–0,6 MB no formato de hoje, ≈ 20 B/palavra, mais que os 0,3 MB: o orçamento
+  é refeito com o número da T7, variando F).
 - **Tests**: unit + banco. **Gate**: `quick` + `assembleDebug`.
 - **Fim da fase A**: "manter" ≤ 10% trocadas, "erros" sem perda (catraca atualizada).
 
@@ -235,7 +247,8 @@
 ### CA-T22 — Tempo no A32 e decisão
 - **What**: `CorretorTempoTest` com toques; relatório: ms/palavra p50/p95, memória; decisão go/no-go da fase C.
 - **Depends on**: CA-T20, CA-T3. **Covers**: PER-01, SPA-05.
-- **Done when**: ≤ 25 ms p95 no A32 **[YAN]**; se estourar, otimiza ou a fase fica atrás de flag.
+- **Done when**: p95 dentro do teto do PER-01 (fixado depois da T3) no A32 **[YAN]**; se estourar, otimiza (o laço
+  custou +32–35% no protótipo) ou a fase fica atrás de flag.
 - **Tests**: instrumentado. **Gate**: `full` + manual.
 
 ## Fase D — Adaptação ao jeito de tocar (~2,5 dias para a T23, mais a T24, a estimar ao fechar a T23)

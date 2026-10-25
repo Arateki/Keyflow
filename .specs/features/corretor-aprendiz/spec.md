@@ -11,13 +11,18 @@
 
 O corretor do KeyFlow (Q9) usa um dicionário fixo de ~100 mil palavras por idioma (listas do AOSP
 LatinIME) e troca a palavra no espaço quando uma candidata ganha com folga. Ele não tem memória:
-desfazer a troca com o backspace volta a palavra, mas na vez seguinte ele troca de novo. Medido hoje
-(`context.md`, 548 digitações de um brasileiro, pt): das 322 palavras que **não** estão no dicionário
-(abreviações, gírias, nomes, marcas, termos técnicos, inglês no meio), **165 (51%) são trocadas** no
-espaço — "vc"→"VC", "td"→"te", "hj"→"um", "Yan"→"Hab", "deploy"→"depois", "push"→"pus", "Ágatha"→"Agatha".
-Das 3000 palavras mais comuns do inglês, 39% viram outra palavra em português. O acerto onde o corretor é
-bom (acento que faltou, tecla vizinha) existe, mas o estrago nas palavras fora do dicionário é o que a
-pessoa percebe, e ele se repete sem parar.
+desfazer a troca com o backspace volta a palavra, mas na vez seguinte ele troca de novo.
+
+**Estimativa preliminar, não digitação real** (`context.md` §3): numa lista de 548 palavras que um agente
+montou por categoria, como um brasileiro digitaria (abreviações, gírias, nomes, marcas, termos técnicos, inglês
+no meio; pt), 322 não estão no dicionário e **165 (51%) são trocadas** no espaço; ~10 dessas trocas são
+legítimas ("nao"→"não"), logo ~155 (**~48%**) são **indevidas**: "vc"→"VC", "td"→"te", "hj"→"um",
+"Yan"→"Hab", "deploy"→"depois", "push"→"pus", "Ágatha"→"Agatha". O percentual depende da mistura de
+grupos que a lista tem; o número que vale sai do banco (CA-T1, sobre a lista versionada) e das ~600 palavras
+que o Yan digita no A32 (CA-T2). Medido no dicionário, não em digitação: das 2260 palavras comuns do inglês
+(entre as 3000 mais frequentes) que não estão no dicionário pt, 881 (39%; 29% das 3000) viram outra palavra em
+português. O acerto onde o corretor é bom (acento que faltou, tecla vizinha) existe, mas o estrago nas palavras
+fora do dicionário é o que a pessoa percebe, e ele se repete sem parar.
 
 Duas frentes, na ordem do que dá mais acerto por esforço:
 
@@ -27,7 +32,7 @@ Duas frentes, na ordem do que dá mais acerto por esforço:
 ## Goals
 
 - [ ] Banco de avaliação offline (JVM) que mede acerto, troca indevida e tempo por palavra — **primeira tarefa**.
-- [ ] Trocas indevidas nas palavras fora do dicionário caem de 51% para ≤ 10% no banco, sem perder acerto nos erros reais.
+- [ ] Trocas **indevidas** nas palavras fora do dicionário caem para ≤ 10% no banco (meta provisória, a confirmar na CA-T1 e nas palavras reais da CA-T2; ponto de partida preliminar ~48%, de uma lista montada por agente), sem perder acerto nos erros reais.
 - [ ] A pessoa recusa uma troca **uma vez** (backspace logo após ou escolher a palavra original na faixa) e o corretor não repete.
 - [ ] Palavras novas da pessoa passam a valer sozinhas depois de poucos usos, com contagem que decai; erro de digitação isolado não é aprendido.
 - [ ] Correções que a pessoa faz (tocar numa sugestão, apagar e reescrever) viram pares "erro → certo".
@@ -59,7 +64,7 @@ Duas frentes, na ordem do que dá mais acerto por esforço:
 **Como** dono do projeto, **quero** ver em números o que cada mudança do corretor melhora ou piora.
 
 1. **BEN-01**: WHEN `testDebugUnitTest` roda THEN o banco SHALL rodar o `Suggester` real com os dicionários `pt` (e `en`/`es` quando o caso pede), na JVM, sem aparelho, determinístico (sementes fixas), e gravar `app/build/bench/corretor.json` e uma tabela legível.
-2. **BEN-02**: WHEN o banco monta os casos THEN SHALL haver cinco conjuntos: (a) **manter** — palavras fora do dicionário que **não** devem ser trocadas (abreviações, risadas, gírias, nomes, marcas, termos técnicos, inglês e espanhol no meio, alongamentos; ≥ 300, começando pelas do estudo); (b) **erros** — erros de digitação reais escritos à mão com a palavra pretendida (≥ 300; omissão, inserção, troca de ordem, tecla vizinha, acento, "ç/ss", "s/z", "x/ch"); (c) **sintético** — palavras do dicionário digitadas com ruído de toque sobre o layout real (`Layouts` + `Geometry`), ruído gaussiano em fração de tecla (σ 0,20 / 0,30 / 0,40), viés por fileira e por usuário, taxas de omissão/inserção/troca de ordem, amostra uniforme e ponderada por frequência, ≥ 2000 por configuração; (d) **reais** — digitações gravadas no aparelho com coordenadas (BEN-07), arquivo local fora do git; (e) **sessões** — uma pessoa simulada digitando um texto longo com palavras fora do dicionário, desfazendo trocas, para medir a curva de aprendizado.
+2. **BEN-02**: WHEN o banco monta os casos THEN SHALL haver cinco conjuntos: (a) **manter** — palavras fora do dicionário que **não** devem ser trocadas (abreviações, risadas, gírias, nomes, marcas, termos técnicos, inglês e espanhol no meio, alongamentos; ≥ 300, começando pelas do estudo), em dois arquivos: `manter-dev` (o que as tasks de curadoria, como o léxico da CA-T5, podem ler) e `manter-teste` (reservado: sorteio com semente fixa, por grupo; nenhuma task de curadoria o lê; a catraca e a meta valem nele); (b) **erros** — erros de digitação reais escritos à mão com a palavra pretendida (≥ 300; omissão, inserção, troca de ordem, tecla vizinha, acento, "ç/ss", "s/z", "x/ch"); (c) **sintético** — palavras do dicionário digitadas com ruído de toque sobre o layout real (`Layouts` + `Geometry`), ruído gaussiano em fração de tecla (σ 0,20 / 0,30 / 0,40), viés por fileira e por usuário, taxas de omissão/inserção/troca de ordem, amostra uniforme e ponderada por frequência, ≥ 2000 por configuração; (d) **reais** — digitações gravadas no aparelho com coordenadas (BEN-07), arquivo local fora do git; (e) **sessões** — uma pessoa simulada digitando um texto longo com palavras fora do dicionário, desfazendo trocas, para medir a curva de aprendizado.
 3. **BEN-03**: WHEN o banco mede THEN SHALL reportar por conjunto: **trocas certas** (troca no espaço = pretendida), **trocas erradas**, **trocas indevidas** (qualquer troca onde o esperado era manter; trocar só a caixa ou tirar um acento digitado conta), **perdidas**, a pretendida na **faixa em 1º** e **nos 3 primeiros**, a parcela de erros que **viram outra palavra válida** (o corretor não toca), **ms por palavra** (p50/p95) e a memória do corretor.
 4. **BEN-04**: WHEN uma métrica piora além da tolerância em relação a `corretor-bench-baseline.json` (versionado, gerado do código atual na CA-T1) THEN o teste SHALL falhar; melhora só entra atualizando o baseline no mesmo commit, com a tabela antes/depois na mensagem (catraca).
 5. **BEN-05**: WHEN `scripts/corretor-bench.sh [ref-git]` roda THEN SHALL imprimir a tabela antes × depois (o baseline, ou o resultado de `ref-git`) para o dono do projeto comparar uma mudança.
@@ -75,7 +80,7 @@ Duas frentes, na ordem do que dá mais acerto por esforço:
 2. **BAS-02**: WHEN a candidata de troca é a **sigla** da palavra digitada (a mesma palavra toda em maiúsculas, de qualquer tamanho: "vc"→"VC", "tb"→"TB", "ok"→"OK", "api"→"API", "url"→"URL") THEN o corretor SHALL só sugerir (resposta 2 do Yan, 24/10: siglas só sugerem, inclusive `api`→`API`; o `RealDictionaryTest` passa a esperar só a sugestão). A troca de caixa que não é sigla ("paulo"→"Paulo", inicial maiúscula de nome próprio) segue a regra da sua classe (BAS-01).
 3. **BAS-03**: WHEN a palavra digitada tem acento ou cedilha que a pessoa digitou THEN o corretor SHALL **nunca** trocá-la por forma com menos acento ("Ágatha"→"Agatha", "Taís"→"Tais", "piá"→"pia", "parça"→"parca"); a escolha de forma entre as de mesmas letras respeita o que foi digitado.
 4. **BAS-04**: WHEN a palavra tem 3 ou mais letras iguais seguidas ("kkkk", "simmm", "nãooo", "oiii") ou é só consoantes de até 4 letras ("vc", "tb", "td", "hj", "msg") THEN o corretor SHALL só sugerir.
-5. **BAS-05**: WHEN a palavra digitada existe no dicionário de **outro** idioma instalado (en/es) com frequência ≥ F (calibrada no banco) e o teclado ativo é pt THEN o corretor SHALL só sugerir ("deploy", "push", "the", "you"; hoje 39% do inglês comum e 63% do espanhol comum viram outra palavra).
+5. **BAS-05**: WHEN a palavra digitada existe no dicionário de **outro** idioma instalado (en/es) com frequência ≥ F (calibrada no banco) e o teclado ativo é pt THEN o corretor SHALL só sugerir ("deploy", "push", "the", "you"; no dicionário de hoje, 881 das 2260 palavras comuns do inglês fora do pt — 39% — e 992 das 1575 do espanhol — 63% — viram outra palavra; `context.md` §3).
 6. **BAS-06**: WHEN a palavra tem hífen ("faça-o", "bem-vindo") THEN o corretor SHALL tratar as partes e o conjunto antes de trocar ("faça-o" → "facão" some).
 7. **BAS-07**: WHEN o léxico informal do pt-BR (abreviações, risadas, gírias, anglicismos e marcas de uso comum) entra no dicionário (`scripts/build-dictionaries.py`, lista curada própria `scripts/dict-extras/pt.tsv`) THEN essas palavras SHALL valer como palavra, com frequência baixa o bastante para não virarem candidatas de erro de outras.
 
@@ -122,7 +127,7 @@ Duas frentes, na ordem do que dá mais acerto por esforço:
 2. **SPA-02**: WHEN o corretor compara uma candidata THEN o custo de cada letra SHALL ser a probabilidade do toque dada a tecla da candidata — gaussiana 2D em bits, `d²/(2σ²)·log2 e` limitado —, no lugar de "vizinha custa meia edição"; omissão, inserção e troca de ordem mantêm custo fixo calibrado.
 3. **SPA-03**: WHEN o custo espacial e a frequência da palavra se combinam THEN o placar SHALL estar em bits (`prior = (255−freq)/8,589` — a escala do dicionário do LatinIME), e os limiares de troca por classe SHALL sair do banco, não de constantes escolhidas à mão.
 4. **SPA-04**: WHEN o toque cai entre duas teclas THEN as duas letras SHALL ser candidatas com custos parecidos (hoje a vizinha custa o mesmo, perto da borda ou no centro da outra tecla).
-5. **SPA-05**: WHEN o modelo roda THEN o custo extra SHALL ser ≤ 2 ms por palavra no A32 e +0 alocação por comparação (a tabela `bits[toque][letra]` é calculada uma vez por palavra).
+5. **SPA-05**: WHEN o modelo roda THEN a tabela espacial SHALL custar ≤ 2 ms por palavra no A32 e +0 alocação por comparação (a tabela `bits[toque][letra]` é calculada uma vez por palavra). O custo do laço da distância (+32% a +35% por palavra no protótipo sem otimizar, `context.md` §7) é a otimizar na CA-T19 e a medir no A32 na CA-T22.
 
 ### Adaptação ao jeito de tocar (`ADP`)
 
@@ -164,7 +169,7 @@ Duas frentes, na ordem do que dá mais acerto por esforço:
 1. **ARM-01**: WHEN o aprendido é guardado THEN SHALL ser em **arquivo próprio** por idioma (`files/corretor/<idioma>.kfl`, texto em linhas com cabeçalho de versão), carregado uma vez por processo fora da main thread, mudanças em memória e **diário de acréscimos** (uma linha por evento) com compactação ao carregar; linha inválida é ignorada; apagar é apagar o arquivo. Por quê Room/DataStore não: `design.md` §8.
 2. **ARM-02**: WHEN o teclado abre THEN o carregamento SHALL ser assíncrono como o do `Dictionaries` e `onStartInputView` SHALL só calcular booleanos (`StrictModeKeyboardTest` segue verde, nenhum `runBlocking` novo).
 3. **ARM-03**: WHEN um evento é registrado THEN SHALL ser executado na thread `keyflow-suggest` (a mesma das sugestões), sem trava entre a thread principal e o disco; a tela de palavras usa a mesma trava curta.
-4. **PER-01**: WHEN uma palavra é sugerida THEN o total SHALL ficar ≤ 25 ms no A32 com o JIT quente (hoje ~15 ms) e o acréscimo do aprendido (consulta + pares + candidatas pessoais) ≤ 1 ms; o carregamento do arquivo (5000 palavras) ≤ 50 ms; memória ≤ 1,5 MB por idioma ativo.
+4. **PER-01**: WHEN uma palavra é sugerida THEN o total SHALL ficar dentro do teto (**provisório: ≤ 25 ms no A32 com o JIT quente**; hoje ~15 ms, mas o p95 de hoje é desconhecido) e o acréscimo do aprendido (consulta + pares + candidatas pessoais) ≤ 1 ms; o carregamento do arquivo (5000 palavras) ≤ 50 ms; memória ≤ 1,5 MB por idioma ativo **sem bigramas** (estimativa, a medir na CA-T10; `design.md` §8). O teto só é fixado depois que a CA-T3 medir o p50/p95 de hoje no A32: 15 ms × 1,35 (o que o modelo espacial custou no protótipo, ainda sem otimizar) + 1 ms + 2 ms (tabela espacial) ≈ 23 ms, quase sem folga.
 5. **PER-02**: WHEN o evento é gravado THEN o custo na thread de sugestões SHALL ser ≤ 0,3 ms; a compactação roda só ao carregar.
 
 ### Testes e rollout (`ROL`)
@@ -216,9 +221,9 @@ Duas frentes, na ordem do que dá mais acerto por esforço:
 
 ## Success Criteria
 
-- [ ] No banco, as palavras fora do dicionário trocadas indevidamente caem de **51%** para **≤ 10%**; os acertos nos erros reais não caem.
+- [ ] **Manter** (`manter-teste` e as palavras reais da CA-T2): as trocas **indevidas** caem da linha de base medida na CA-T1 (preliminar: ~48%, 155 de 322 numa lista montada por agente) para **≤ 10%** (meta provisória, reconfirmada com a medição real); o banco reporta **trocadas** e **indevidas** lado a lado, por grupo; os acertos nos erros reais não caem (catraca).
 - [ ] Recusar uma troca uma vez a faz sumir para sempre (instrumentado no IME real).
-- [ ] No conjunto sintético com σ = 0,40 e com viés de toque, o modelo espacial erra menos trocas e acerta mais que a tabela de vizinhas (o protótipo de `context.md` §7 indica 4,2% → 1,2% de troca errada e 87,6% → 94,2% de troca certa; o número que vale é o do banco e o da digitação real).
+- [ ] Modelo espacial, nas configurações do protótipo de `context.md` §7, **separadas** (200 digitações por linha: poucos eventos; o número que vale é o do banco, ≥ 2000 por configuração, e o da digitação real): (a) σ 0,40 sem viés: erra menos trocas (4,2% → 1,2%, 7 contra 2 eventos) e **não piora o acerto** (82,1% → 81,0%, 2 casos em 168, dentro do ruído); (b) σ 0,30 com viés forte: a troca certa sobe (87,6% → 94,2%, margem ≥ 3 bits) sem trocas erradas a mais (0,7% → 0,0%); (c) σ 0,30 sem viés: iguais (95,1%); (d) σ 0,40 **com** viés: nunca foi medido, a medir na CA-T19 e na CA-T23. Fase D (o viés da pessoa conhecido, B+ do protótipo): pretendida em 1º 97,8% → 99,3%, a medir com o viés **aprendido** de verdade.
 - [ ] Nenhuma palavra é gravada em senha, e-mail, URL, número, campo `NO_SUGGESTIONS`, `NO_PERSONALIZED_LEARNING` ou com a opção desligada; "Apagar meus dados" apaga o aprendido sem rede.
-- [ ] A32: ≤ 25 ms por palavra, abertura do teclado sem trabalho novo na main thread.
+- [ ] A32: p95 por palavra dentro do teto de PER-01 (provisório 25 ms; fixado depois da CA-T3), abertura do teclado sem trabalho novo na main thread.
 - [ ] O Yan lê a tela de palavras e entende o que o teclado guardou.

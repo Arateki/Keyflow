@@ -1,8 +1,9 @@
 # Corretor aprendiz — Design
 
 Arquitetura. Requisitos em `spec.md`; estudo, medidas e licenças em `context.md`. Nada aqui está
-implementado. Os números marcados "medido" vêm de protótipos descartáveis rodados em 2026-10-24
-(`context.md` §3 e §7); os marcados "a medir" dependem do banco (BEN) e do A32.
+implementado. Os números marcados "preliminar" vêm de protótipos descartáveis rodados em 2026-10-24
+(`context.md` §3 e §7): uma lista de palavras escrita por um agente (não digitação real) e 200 amostras por
+linha no sintético; os marcados "a medir" dependem do banco (BEN) e do A32, e é neles que as metas se apoiam.
 
 ## Princípio condutor
 
@@ -48,7 +49,7 @@ Um teste de unidade (`CorretorBenchTest`) que monta casos, roda o `Suggester` e 
 
 | Arquivo | Linhas | Para quê |
 | ------- | ------ | -------- |
-| `manter.tsv` `digitado⇥esperado⇥grupo` | ≥ 300 | Fora do dicionário que **não** se troca (`esperado = digitado`) e as poucas trocas legítimas (`nao⇥não`). Começa nas 548 do estudo, com os grupos: abreviação, risada, gíria, nome, lugar, marca, técnico, inglês, espanhol, alongamento |
+| `manter-dev.tsv` e `manter-teste.tsv` `digitado⇥esperado⇥grupo` | ≥ 300 no total | Fora do dicionário que **não** se troca (`esperado = digitado`) e as poucas trocas legítimas (`nao⇥não`). Começa nas 548 palavras do estudo (a lista que hoje só existe em `/tmp`, montada por um agente, entra no git sem os resultados), com os grupos: abreviação, risada, gíria, nome, lugar, marca, técnico, inglês, espanhol, alongamento. **Treino e teste separados**: o sorteio com semente fixa, por grupo, manda metade para `manter-teste`, que nenhuma task de curadoria lê (a CA-T5 cura o léxico com `manter-dev`); a catraca e a meta valem no teste e nas palavras reais |
 | `erros.tsv` `digitado⇥pretendida⇥tipo` | ≥ 300 | Erros reais à mão: omissão, inserção, troca de ordem, tecla vizinha, acento, "ç/ss", "s/z", "x/ch", "g/j" |
 | gerador `SyntheticTyping` | ≥ 2000 por configuração | Palavra do dicionário digitada com ruído sobre o layout real |
 | `reais.tsv` `pretendida⇥digitada⇥x1,y1;x2,y2;…` | local, **fora do git** | Digitações gravadas no A32 (BEN-07) |
@@ -99,9 +100,9 @@ abaixo de 95% a classe só sugere (BAS-01).
 | Acento digitado não se perde | `Ágatha`→`Agatha`, `Taís`→`Tais`, `piá`→`pia`, `parça`→`parca` | `Suggester.suggest` pega `sameLetters.first()` e ignora os acentos que a pessoa pôs |
 | Só consoantes, ≤ 4 letras → sugere | `td`→`te`, `hj`→`um`, `qdo`→`do`, `tmj`→`TMN` | abreviação sem vogal |
 | 3+ letras iguais seguidas → sugere | `kkkk`→`Kiko`, `hahaha`→`Havana`, `simm`→`sim` | alongamento é intenção |
-| Existe no en/es → sugere | 39% do inglês comum e 63% do espanhol comum viram outra palavra | inglês no meio do português |
+| Existe no en/es → sugere | no dicionário: 881 de 2260 palavras comuns do inglês fora do pt (39%) e 992 de 1575 do espanhol (63%) viram outra palavra | inglês no meio do português |
 | Hífen: partes e conjunto | `faça-o`→`facão` | ênclise |
-| Léxico informal curado | 56 das 62 abreviações estão fora do dicionário e 68% delas são trocadas | `scripts/dict-extras/pt.tsv`, lista própria (sem licença externa) |
+| Léxico informal curado | na lista do estudo, 56 das 62 abreviações estão fora do dicionário e 68% delas são trocadas (preliminar) | `scripts/dict-extras/pt.tsv`, lista própria (sem licença externa) |
 
 **Guarda de outro idioma.** Em vez de carregar `en` e `es` inteiros (2 MB cada em disco, vários MB em
 arrays) no teclado pt, o `build-dictionaries.py` gera `pt.estrangeiras.kfd` com as palavras de
@@ -221,9 +222,10 @@ para elas só com peso ≥ 6 e 1 edição (fase E).
 ### Como o KeyFlow faz hoje
 
 `distance()` em meias-edições: tecla vizinha na tabela QWERTY custa 1, outra 2, ou seja, **toda vizinha
-custa o mesmo**, caia o dedo na borda ou em cima da outra tecla. Medido (`context.md` §7, protótipo): com σ 0,40 o corretor de
-hoje troca errado em 4,2% (B com margem ≥ 3 bits: 1,2%, mesmo acerto) e, com viés de toque, acerta a troca em 87,6%
-(B: 94,2%); com σ 0,30 sem viés a diferença é pequena (95,1% nos dois).
+custa o mesmo**, caia o dedo na borda ou em cima da outra tecla. Preliminar (`context.md` §7, protótipo, 200
+digitações por linha): com σ 0,40 sem viés o corretor de hoje troca errado em 4,2% (B com margem ≥ 3 bits: 1,2%, e
+o acerto fica praticamente igual: 82,1% → 81,0%); com σ 0,30 e viés forte de toque, acerta a troca em 87,6% (B:
+94,2%); com σ 0,30 sem viés a diferença é nula (95,1% nos dois). σ 0,40 com viés nunca foi medido.
 
 ### Proposta
 
@@ -238,8 +240,10 @@ hoje troca errado em 4,2% (B com margem ≥ 3 bits: 1,2%, mesmo acerto) e, com v
    Convertido para **inteiros em 1/16 de bit** para o laço de `Int` que já existe.
 4. **Laço da distância** troca `Keyboard.adjacent(ca, cb)` por `bitsInt[(a−1)·26 + (cb − 'a')]`; omissão,
    inserção e troca de ordem são constantes em bits (partida: 9 / 9 / 7). Letra fora de a..z (hífen,
-   apóstrofo) custa o máximo. **Custo extra de CPU ≈ 0** no laço quente (uma leitura de tabela no lugar de
-   uma leitura de tabela); o custo novo é a tabela por palavra: 26·k contas com 1 divisão, ~µs.
+   apóstrofo) custa o máximo. **CPU: a otimizar.** O protótipo (JVM do servidor, sem otimizar: poda por linha
+   da tabela, 90 mil candidatas) mediu **+32% a +35% por palavra** (A 5,4–6,4 ms → B 7,3–8,6 ms nas três
+   configurações; `context.md` §7); além do laço, o custo novo é a tabela por palavra (26·k contas com 1
+   divisão, ordem de µs). A CA-T19 otimiza e mede antes de a fase C entrar; no A32 vale o que a CA-T22 medir.
 5. **Prior em bits.** `(255 − freq)/8,589` (a escala do `ProbabilityUtils` do LatinIME); a candidata
    pessoal usa `peso → freq` por uma curva monotônica; o bigrama (fase F) entra aqui.
 6. **Decisão.** Ordena por custo total; `troca` quando `melhor.total ≤ T[classe]` e `margem ≥ M[classe]`;
@@ -417,12 +421,12 @@ desligado, em qualquer tela: é pedido explícito. Só `ContentResolver` e `java
 
 | Item | Orçamento | Como se mede |
 | ---- | --------- | ------------ |
-| Sugestão por palavra (JIT quente) | ≤ 25 ms (hoje ~15 ms, Q9) | `CorretorTempoTest` no A32 |
+| Sugestão por palavra (JIT quente) | ≤ 25 ms, **teto provisório**: hoje ~15 ms (Q9, p95 desconhecido) × 1,35 do protótipo + 1 + 2 ms ≈ 23 ms; fixado depois da CA-T3 | `CorretorTempoTest` no A32 (p50/p95) |
 | Consulta ao aprendido por palavra | ≤ 1 ms | idem, com 5000 palavras |
 | Tabela espacial por palavra | ≤ 2 ms | idem |
 | Evento gravado | ≤ 0,3 ms na thread de sugestões | unit com arquivo real |
 | Carga do arquivo (5000 palavras) | ≤ 50 ms, fora da main thread | unit + `StrictModeKeyboardTest` |
-| Memória | ≤ 1,5 MB por idioma ativo (+0,3 MB da lista estrangeira) | `Runtime` no unit |
+| Memória | ≤ 1,5 MB por idioma ativo **sem bigramas** (estimativa, a medir na CA-T10; ver §8); lista estrangeira: orçamento refeito com a medida da CA-T7 | `Runtime` no unit |
 | Abertura do teclado | 0 trabalho novo na main thread | `Trace` `KeyFlow.keyboardOpen` igual ao de hoje |
 
 O dicionário continua em arrays contíguos (`WordList`); o aprendido é um `HashMap` pequeno ao lado, não

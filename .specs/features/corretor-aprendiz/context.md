@@ -32,11 +32,19 @@ repositórios foram lidos em cópias rasas; commits e datas abaixo.
 - "Apagar meus dados" (aba Privacidade) hoje só apaga o registro na API (`SetupActivity.kt` →
   `deleteRemoteData`); o texto diz que as configurações permanecem.
 
-## 3. Medição do corretor de hoje (protótipo descartável, `Suggester` real, dicionário pt do app)
+## 3. Estimativa preliminar do corretor de hoje (protótipo descartável, `Suggester` real, dicionário pt do app)
 
-548 digitações de um brasileiro, sem o acento que uma pessoa rápida não põe, em 9 grupos. 322 não estão no
-dicionário; **165 (51%) são trocadas no espaço**. Dessas, ~10 são trocas legítimas (`nao`→`não`, `voce`,
-`entao`, `tambem`, `sao`, `ja`, `Joao`→`João`, `paulo`→`Paulo`, `simm`→`sim`, `api`→`API`) e ~155 são indevidas.
+> **De onde vêm estes números.** Os 548 itens são uma **lista escrita por um agente**, por categoria, imitando o que
+> um brasileiro digitaria (sem o acento que uma pessoa rápida não põe) — **não é digitação real**. Ela tem
+> repetições por caixa ou grafia (`yan`/`Yan`) e a mistura dos 9 grupos foi escolhida por quem a escreveu, então o
+> "51%" depende dessa mistura. A lista e o resultado só existem em `/tmp/corretor-medicao.tsv`, saída de um teste
+> temporário (`TmpCorretorMedicaoTest`) que não foi commitado. São estimativa para ordenar as fases; o número que
+> vale sai do banco (CA-T1 versiona a lista em `manter-dev`/`manter-teste`) e das ~600 palavras que o Yan digita no
+> A32 (CA-T2).
+
+548 palavras em 9 grupos. 322 não estão no dicionário; **165 (51%) são trocadas no espaço**. Dessas, ~10 são trocas
+legítimas (`nao`→`não`, `voce`, `entao`, `tambem`, `sao`, `ja`, `Joao`→`João`, `paulo`→`Paulo`, `simm`→`sim`,
+`api`→`API`) e ~155 são **indevidas** (~48% das 322).
 
 | Grupo | Digitadas | Fora do dicionário | Trocadas | % das de fora |
 | ----- | --------: | -----------------: | -------: | ------------: |
@@ -68,15 +76,16 @@ pessoa digitou; `ué`→`UE`, `véi`→`VEI`) e **94 trocam por outra palavra**.
 
 **Agregados:**
 
-- Das **3000 palavras mais comuns do inglês** (freq ≥ 100, 3+ letras), 2260 não estão no pt e **881 (39%)** viram outra
-  palavra em português (`the`→`TVE`, `you`→`ou`, `team`→`tem`). Do **espanhol**: 1575 fora do pt, **992 (63%)** trocadas.
+- Das **3000 palavras mais comuns do inglês** (freq ≥ 100, 3+ letras; do dicionário en, não de digitação), 2260 não
+  estão no pt e **881** viram outra palavra em português (`the`→`TVE`, `you`→`ou`, `team`→`tem`): 39% das 2260, ou
+  29% das 3000. Do **espanhol**: 1575 fora do pt, **992 (63% das 1575)** trocadas.
 - **Acento que falta**: 1089 palavras acentuadas comuns (freq ≥ 120) digitadas sem acento: **858 (79%) voltam certas**,
   5 viram outra, **226 (21%) ficam sem acento** porque a forma sem acento também existe no dicionário
   (`agua`, `cafe`, `ate`, `da`…). Só a faixa oferece a acentuada.
 - Zero lugares trocados (as cidades estão no dicionário). Palavras que o dicionário não tem são o problema.
 
 *Como foi medido:* teste JVM temporário (não commitado) sobre `src/main/assets/dict/pt.kfd`, mesmo binário que o app
-carrega; a lista e o resultado completos viram o conjunto "manter" do banco (CA-T1).
+carrega; a lista (sem o resultado) vira o conjunto "manter" do banco, dividido em desenvolvimento e teste (CA-T1).
 
 ## 4. O que cada projeto aberto faz (regra, arquivo, licença)
 
@@ -192,8 +201,9 @@ cada passo; no terminal o custo de língua é `getBigramNodeImprobability · 1,1
 
 **Custo.** O LatinIME faz isto em C++ sobre uma trie com poda (≤ 170/310 nós vivos). No KeyFlow o laço da distância
 já existe em Kotlin sobre buckets; a tabela `bits[toque][letra]` (≤ 26 × 32 floats por palavra) troca uma consulta à
-tabela de vizinhas por outra consulta: **CPU ≈ igual, memória ≈ 0**. O que muda é a plumbing: levar o ponto do
-toque da grade até o corretor.
+tabela de vizinhas por outra consulta, mas o protótipo do §7 mediu **+32% a +35% de CPU por palavra** (sem otimizar;
+a otimizar na CA-T19) e **memória ≈ 0**. O que muda também é a plumbing: levar o ponto do toque da grade até o
+corretor (`design.md` §4).
 
 **Recomendação:** adotar (fase C). É a técnica que mais separa "toque na borda" de "toque no centro da outra tecla".
 
@@ -225,10 +235,10 @@ frase inteira.
 
 | Técnica | Origem | Custo no A32 | Ganho esperado | Decisão |
 | ------- | ------ | ------------ | -------------- | ------- |
-| Decisão por classe de troca, limiares calibrados no banco | esta spec | 0 | **Alto** (51% → ≤ 10% trocas indevidas) | Fase A |
-| Léxico informal pt-BR curado + guarda de outro idioma | medição; HeliBoard (confiança por idioma), AOSP (plausibilidade) | +0,1 MB (léxico) +0,3 MB (lista estrangeira) | **Alto** nas abreviações e no inglês (68% e 39% trocadas hoje) | Fase A |
+| Decisão por classe de troca, limiares calibrados no banco | esta spec | 0 | **Alto** (~48% de trocas indevidas na lista do estudo, preliminar; meta ≤ 10% a confirmar no banco) | Fase A |
+| Léxico informal pt-BR curado + guarda de outro idioma | medição; HeliBoard (confiança por idioma), AOSP (plausibilidade) | +0,1 MB (léxico) +0,3 MB (lista estrangeira) | **Alto** nas abreviações e no inglês (na lista do estudo, 68% das abreviações fora do dicionário e, no dicionário, 39% do inglês comum fora do pt são trocados hoje; preliminar) | Fase A |
 | Aprendizado de palavras, recusa, pares | AOSP, ASK, HeliBoard (ideia) | < 1 ms, < 1,5 MB | Alto para o que a pessoa repete; some a queixa | Fases B e E |
-| Placar em bits calibrado (log-prob) | LatinIME (mesma ideia em outra escala) | 0 | Médio; torna bigrama, aprendizado e toque somáveis | Fase C |
+| Placar em bits calibrado (log-prob) | LatinIME (mesma ideia em outra escala) | CPU a medir (o protótipo espacial custou +32–35%, sem otimizar) | Médio; torna bigrama, aprendizado e toque somáveis | Fase C |
 | Confusões ortográficas do pt-BR (s↔z, ss↔ç, x↔ch, g↔j, e↔i/o↔u finais, h mudo) com custo reduzido | **hipótese minha, não vem de código lido** | 0 | A medir no conjunto "erros" (ortografia não é toque) | Fase C/E, só entra se o banco provar |
 | Espaço faltando/sobrando ("obrigadopor") | LatinIME (`SPACE_OMISSION_COST` 0,1), ASK (`WordsSplitter`) | médio (partições por prefixo) | Baixo/médio | Depois |
 | Índice de deleções (SymSpell, MIT) | literatura | dezenas de MB (não medido) | só velocidade | Não adotar: a busca atual cabe em ~15 ms |
@@ -260,8 +270,9 @@ em que B fica igual ou melhor que A nos dois lados. Sem margem (troca sempre), B
 Leitura:
 
 - **A palavra "frequente com erro de toque" o corretor de hoje já conserta bem** (95% de troca certa em σ 0,30). O que
-  falta é nos toques ruins: com σ 0,40 ele erra 4,2% das trocas, e B com margem ≥ 3 bits erra 1,2% mantendo o acerto.
-  Com viés de toque, o ganho é maior (87,6% → 94,2%). Ou seja: **o modelo espacial é ganho de 2ª ordem para quem
+  falta é nos toques ruins: com σ 0,40 (sem viés) ele erra 4,2% das trocas (7 eventos de 168), e B com margem ≥ 3 bits
+  erra 1,2% (2 eventos) com o acerto praticamente igual (82,1% → 81,0%: dentro do ruído de 200 amostras). Com σ 0,30 e
+  viés forte de toque, o ganho de acerto é maior (87,6% → 94,2%); σ 0,40 **com** viés não foi medido. Ou seja: **o modelo espacial é ganho de 2ª ordem para quem
   digita bem e de 1ª ordem para quem digita torto ou depressa** — por isso entra depois da base e do aprendizado.
 - **Adaptação**: B → B+ (conhecer o viés) vale +1,5 ponto na pretendida em 1º com viés forte (97,8% → 99,3%); compensar o
   viés no hit-test tiraria 30% (relativos) dos erros de letra (19,6% → 13,8%) — o teto do experimento CA-T24.
@@ -270,7 +281,9 @@ Leitura:
 - **Sem erro de letra** (72 / 31 / 60 digitações), nenhuma troca indevida: a regra "palavra do dicionário não se troca"
   segura o lado fácil; o problema da §3 é todo de palavra **fora** do dicionário.
 - **Tempo na JVM do servidor (carga 20)**: A 5,4–6,4 ms/palavra; B 7,3–8,6 ms/palavra sem otimização (poda por linha
-  da tabela, 90 mil candidatas): mesma ordem de grandeza. A medida que vale é no A32 (CA-T3/CA-T22).
+  da tabela, 90 mil candidatas): **+32% a +35%** nas três configurações. Cada linha foi medida numa execução só, e
+  os 5,4–6,4 ms do A variam entre execuções da mesma versão (máquina compartilhada): vale a razão, não os ms. A
+  medida que vale é no A32 (CA-T3/CA-T22).
 
 
 **Limites do protótipo:** ruído gaussiano perfeito (o toque real não é), σ e viés escolhidos por mim, B sem ajuste,
