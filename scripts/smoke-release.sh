@@ -126,7 +126,7 @@ finish_smoke() {
         adbx exec-out screencap -p > "$evidence/smoke-falha.png" 2>/dev/null || true
         cp "$window_xml" "$evidence/smoke-falha.xml" || true
         timeout 20 adb -s "$serial" shell dumpsys window displays > "$evidence/smoke-falha-foco.txt" 2>/dev/null || true
-        adbx logcat -d -v brief > "$log" 2>/dev/null || true
+        timeout 20 adb -s "$serial" logcat -d -v brief > "$log" 2>/dev/null || true
     fi
     if [[ "${KEYFLOW_SMOKE_KEEP:-}" != 1 ]]; then
         adbx shell ime reset >/dev/null 2>&1 || true
