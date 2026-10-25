@@ -103,10 +103,9 @@ saída" deixa passar.
 
 ## CI sob demanda — mais um nó do pool
 
-Use `ci rodar` para lotes grandes, várias classes e repetições que ocupariam o único emulador do servidor.
-Para uma classe curta ou um teste afetado, continue com `instrumentar Classe#metodo` local: evita o preparo
-do runner remoto. A ordem: `pool instrumentar` (servidor ou Deck) para classes curtas; `ci rodar` para lotes
-grandes e repetições. O pedido manual não substitui os sete jobs obrigatórios de `checks.yml` no PR.
+Use `ci rodar` para lotes grandes, várias classes e repetições que ocupariam os emuladores do pool.
+Para uma classe curta ou um teste afetado, use `pool instrumentar Classe#metodo` (servidor ou Deck, o que estiver
+livre): evita o preparo do runner remoto. O pedido manual não substitui os sete jobs obrigatórios de `checks.yml` no PR.
 
 ```sh
 ci rodar --tarefas assembleDebug --classes PermissionsCheckerTest --pedacos 2 --repetir 2
