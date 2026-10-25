@@ -103,9 +103,9 @@ saída" deixa passar.
 
 ## CI sob demanda — mais um nó do pool
 
-Use `ci rodar` para lotes grandes, várias classes e repetições que ocupariam o único emulador do servidor.
-Para uma classe curta ou um teste afetado, continue com `instrumentar Classe#metodo` local: evita o preparo
-do runner remoto. O pedido manual não substitui os sete jobs obrigatórios de `checks.yml` no PR.
+Use `ci rodar` para lotes grandes, várias classes e repetições que ocupariam os emuladores do pool.
+Para uma classe curta ou um teste afetado, use `pool instrumentar Classe#metodo` (servidor ou Deck, o que estiver
+livre): evita o preparo do runner remoto. O pedido manual não substitui os sete jobs obrigatórios de `checks.yml` no PR.
 
 ```sh
 ci rodar --tarefas assembleDebug --classes PermissionsCheckerTest --pedacos 2 --repetir 2
@@ -119,6 +119,9 @@ ci rodar --classes ClasseA,ClasseB#metodo --pedacos 4 --repetir 20 --rotulo lote
 - Só branches `equipe/*`. O cliente confere nomes/conteúdo com cara de segredo, publica commits com push
   normal apenas quando necessário e dispara `ci-sob-demanda.yml` com `--ref` da branch. Nunca force.
   A rodada retornada precisa bater com HEAD e rótulo. Mudanças não commitadas não entram no pedido.
+- A branch precisa conter a `main` com o workflow (do merge `26ee5ce` em diante; se nasceu antes,
+  `git merge origin/main`) e diferir da `main` em pelo menos um arquivo: branch idêntica é recusada antes de
+  publicar, e o GitHub roda o `ci-sob-demanda.yml` da própria branch.
 - `--tarefas` aceita espaços ou vírgulas: `assembleDebug`, `assembleDebugAndroidTest`, `testDebugUnitTest`,
   `:app:lintDebug`, `lintDebug`, `check`. Filtro JVM: `--tests=pacote.Classe[.metodo]` imediatamente depois
   de `testDebugUnitTest`; `*` é aceito como curinga literal. `--classes` aceita nomes curtos/completos e

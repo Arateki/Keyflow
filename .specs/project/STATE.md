@@ -2798,3 +2798,5 @@ Dois motores com ferramentas ao lado do da Anthropic: `reasoning/openai/OpenAiAg
 - `workflow_dispatch` exige o workflow na branch padrão: integrar esse arquivo na main é o preparo inicial;
   depois o pedido usa `--ref equipe/...`. A entrega foi conferida sem rede com gh falso e Git local; a
   primeira rodada real cabe ao coordenador após instalar o comando e publicar os commits.
+- Na estreia, `ci rodar` recusou a branch já integrada: ele exige arquivo diferente da `main`, e o dispatch
+  usa o workflow do `--ref`. Branches anteriores ao `26ee5ce` precisam da `main` mesclada antes do pedido.

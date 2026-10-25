@@ -41,6 +41,11 @@ chave; o `TranslationsTest` confere as traduções.
   sozinho depois de 30 min sem uso (`emulador estado|ligar|desligar` para controle manual). Dentro do container
   o `ANDROID_SERIAL=emulator-5554` já vem definido e as travas de `/tmp` são as mesmas para todos os agentes. Não
   há credencial de git: commite na branch, e quem está no Deck busca com `git fetch servidor`.
+- **Pool**: para compilar ou rodar instrumentados, prefira `/srv/dev/ferramentas/pool/bin/pool compilar <tarefas>` e
+  `pool instrumentar <Classe…>`, que usam o nó livre (servidor ou Deck); `pool estado` mostra os dois. O Deck só aceita
+  `assembleDebug`, `assembleDebugAndroidTest`, `testDebugUnitTest`, `lintDebug`, `compileDebug{,UnitTest,AndroidTest}Kotlin`
+  e `createDebugUnitTestCoverageReport` (com `--tests`, `-Pcoverage`, `--continue`, `--offline`); release, `installDebug`
+  e `connectedAndroidTest` só no servidor. `--destino servidor|deck` força o nó (o Deck ainda pode recusar).
 - **Instrumentados no emulador**: AVD `keyflow_api34`, sempre com `-gpu swangle_indirect` (é o renderizador
   dos goldens e do CI) e sempre com `ANDROID_SERIAL=emulator-5554` — sem ele o Gradle instala em todos os
   aparelhos conectados, inclusive o do Yan.
