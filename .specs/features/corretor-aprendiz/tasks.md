@@ -71,7 +71,7 @@
 - **Tests**: unit + banco. **Gate**: `quick` + `assembleDebug`.
 - **Fim da fase A**: "manter" ≤ 10% trocadas, "erros" sem perda (catraca atualizada).
 
-## Fase B — Palavras do usuário e correção recusada (~8 dias)
+## Fase B — Palavras do usuário e correção recusada (~8 dias, mais a T18b)
 
 ### CA-T8 — `LearningPolicy` e parâmetros
 - **What**: `LearningPolicy` (`fieldAllowsLearning`, `wordEligible`), `LearningParams`; constante
@@ -168,7 +168,21 @@
 - **What**: `KeyFlowKeyboardLearningTest` completo: recusa, faixa, privacidade, apagar.
 - **Depends on**: CA-T13..T16. **Covers**: ROL-02.
 - **Tests**: instrumentado. **Gate**: `full`.
-- **Fim da fase B**: a queixa do Yan resolvida: recusa uma vez e some.
+### CA-T18b — Textos legais do aprendizado  `[portão [YAN]: sem eles a fase B não vai para a Play]`
+- **What**: escrever (pt/en/es, por `tr("…")` quando for texto do app) o que o aprendizado guarda e onde: (a) o
+  parágrafo da política de privacidade publicada (`LegalUrls.privacyPolicy`; localizar o arquivo-fonte no site);
+  (b) a linha "Keystrokes / dados digitados" do Data Safety em `PLAYSTORE_CHECKLIST.md` §3 — conferir na regra
+  oficial da Play se dado que só existe no aparelho, e o arquivo que a pessoa exporta, contam como "coletado"
+  (regra de ouro 8: sem chute); (c) o texto da aba Privacidade e do aviso de exportar (consistente com T15 e T16b);
+  (d) a aba Docs sobre o aprendizado.
+- **Where**: `PLAYSTORE_CHECKLIST.md`, `ui/config/PrivacyPanel.kt`, aba Docs, política no site.
+- **Depends on**: CA-T15, CA-T16b (o que é guardado e exportado tem de estar fechado).
+- **Covers**: PRV-05.
+- **Done when**: cada frase conferida contra o que o código grava (palavras, pares, viés de toque, exportação;
+  bigramas só na fase F); `TranslationsTest` verde; **[YAN] revisa e aprova** os textos — sem a aprovação dele, a
+  build com o aprender ligado por padrão não sobe para a Play (portão da fase B).
+- **Tests**: unit (`TranslationsTest`). **Gate**: `quick` + revisão **[YAN]**.
+- **Fim da fase B**: a queixa do Yan resolvida (recusa uma vez e some) e os textos legais aprovados (T18b).
 
 ## Fase C — Modelo espacial do toque (~5 dias)
 
@@ -251,7 +265,7 @@
 - **What**: `Bigrams` (peso/dia, teto), anterior vinda dos eventos, Witten-Bell no prior em bits, persistência `B⇥…`.
 - **Where**: `learning/Bigrams.kt`, `Suggester.kt`, `LearnedStore`. **Depends on**: CA-T21. **Covers**: CTX-01, CTX-02.
 - **Done when**: no conjunto de contexto do banco, duas candidatas parecidas se desempatam pela palavra anterior;
-  nenhuma piora nos conjuntos manter/erros.
+  nenhuma piora nos conjuntos manter/erros; o texto legal da T18b é revisto para citar os bigramas (**[YAN]** aprova).
 - **Tests**: unit + propriedade + banco. **Gate**: `quick`.
 
 ### CA-T28 — Bigramas estáticos pt-BR  `[opcional, YAN: corpus e licença]`
@@ -268,10 +282,10 @@
 
 ### CA-T30 — Documentos, licenças e mutação
 - **What**: `STATE.md` (decisões e números), atualizar `TESTING.md` (banco, catraca), aviso Apache em
-  `app/licenses/` e nos cabeçalhos, alvos do PIT para `learning`, texto do aviso/política e da ficha da Play
-  **[YAN]**, aba Docs sobre o aprendizado.
-- **Covers**: PRV-05, ROL-01, ROL-03, ROL-04.
-- **Done when**: tudo conferido e o Yan revisou os textos.
+  `app/licenses/` e nos cabeçalhos, alvos do PIT para `learning`. (Os textos legais e a aba Docs já saíram na
+  T18b, antes de o aprender ir para a Play.)
+- **Covers**: ROL-01, ROL-03, ROL-04.
+- **Done when**: tudo conferido.
 - **Gate**: `quick` + `:app:lintDebug` + `assembleDebug`.
 
 ---
@@ -307,4 +321,5 @@
 | CTX-03 | CA-T28 |
 | CTX-04 | CA-T29 |
 | PER-01 | CA-T3, CA-T22 |
-| PRV-05, ROL-01, 03, 04 | CA-T30 |
+| PRV-05 | CA-T18b |
+| ROL-01, 03, 04 | CA-T30 |
