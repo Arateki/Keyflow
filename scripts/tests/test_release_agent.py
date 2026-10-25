@@ -92,5 +92,44 @@ class SmokeMappingTest(unittest.TestCase):
             self.assertNotIn("keyflowSmokeSigning", calls.read_text())
 
 
+class SmokeKeyboardTest(unittest.TestCase):
+    def run_keyboard(self, missing):
+        source = (Path(__file__).resolve().parents[1] / "smoke-release.sh").read_text()
+        snippet = source[source.index("# Só toca teclas"):source.index("# Ditado com o modelo local")]
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            xml = root / "window.xml"
+            xml.write_text("<displays/>")
+            calls = root / "calls"
+            env = dict(os.environ, TEST_XML=str(xml), TEST_EVIDENCE=str(root),
+                       TEST_CALLS=str(calls), TEST_MISSING="1" if missing else "0")
+            preamble = '''
+window_xml=$TEST_XML
+evidence=$TEST_EVIDENCE
+dump_window() { echo dump >> "$TEST_CALLS"; }
+find_bounds() {
+    if [[ "$1" == h && "$TEST_MISSING" == 1 ]]; then return; fi
+    echo "[600,1833][720,1980]"
+}
+tap_bounds() { echo tap >> "$TEST_CALLS"; }
+shot() { :; }
+adbx() { :; }
+sleep() { :; }
+'''
+            result = subprocess.run(["bash", "-c", preamble + snippet], env=env, capture_output=True, text=True)
+            return result, calls.read_text().splitlines()
+
+    def test_tecla_ausente_falha_sem_tocar_coordenadas(self):
+        result, calls = self.run_keyboard(True)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("tecla h ausente", result.stderr)
+        self.assertEqual(["dump"], calls)
+
+    def test_consulta_arvore_antes_de_cada_tecla(self):
+        result, calls = self.run_keyboard(False)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(["dump", "tap", "dump", "tap", "dump"], calls)
+
+
 if __name__ == "__main__":
     unittest.main()

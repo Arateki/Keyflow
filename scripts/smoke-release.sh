@@ -433,7 +433,13 @@ FIELD
     tap_bounds "$field"
     for attempt in {1..15}; do
         imm="$(adbx shell dumpsys input_method | tr -d '\r')"
-        if grep -q "mCurMethodId=$ime" <<< "$imm" && grep -q 'mInputShown=true' <<< "$imm"; then return 0; fi
+        if grep -q "mCurMethodId=$ime" <<< "$imm" && grep -q 'mInputShown=true' <<< "$imm"; then
+            dump_window
+            if [[ -n "$(find_bounds h)" && -n "$(find_bounds i)" ]]; then return 0; fi
+            # O serviço pode anunciar a janela antes de a grade ficar visível. Não toque no conteúdo atrás dela.
+            cp "$window_xml" "$evidence/smoke-teclado-ainda-ausente.xml"
+            tap_bounds "$field"
+        fi
         sleep 2
     done
     printf '%s\n' "$imm" > "$evidence/smoke-input-method-falha.txt"
@@ -504,17 +510,14 @@ shot banner
 
 # O teclado do KeyFlow num campo de texto de verdade (a busca dos Ajustes): janela do IME aberta e as teclas digitando.
 open_keyboard_in_search
-# As teclas do IME aparecem no dump como nós "h" e "i" (content-desc); sem eles, as coordenadas da grade padrão no emulador 1080x2400.
-dump_window
+# Só toca teclas efetivamente expostas pelo IME; coordenadas fixas poderiam atingir a tela atrás dele.
 for key in h i; do
+    dump_window
     key_bounds="$(find_bounds "$key")"
-    if [[ -n "$key_bounds" ]]; then
-        tap_bounds "$key_bounds"
-    elif [[ "$key" == h ]]; then
-        adbx shell input tap 659 1906
-    else
-        adbx shell input tap 810 1760
-    fi
+    [[ -n "$key_bounds" ]] || { echo "tecla $key ausente da janela do KeyFlow" >&2; exit 1; }
+    cp "$window_xml" "$evidence/smoke-teclado-antes-$key.xml"
+    shot "teclado-antes-$key"
+    tap_bounds "$key_bounds"
     sleep 1
 done
 dump_window
