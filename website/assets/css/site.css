@@ -1498,8 +1498,10 @@ main, .rodape { position: relative; z-index: 1; }
   user-select: none;
 }
 @media (max-width: 860px) {
-  .rodape-grade { grid-template-columns: 1fr 1fr; }
+  .rodape-grade { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .rodape-marca { grid-column: 1 / -1; }
+  /* O e-mail do contato é a palavra mais longa do rodapé: nas telas mais estreitas ele quebra em vez de sair da tela. */
+  .rodape-grade a { overflow-wrap: anywhere; }
 }
 
 /* ── Revelações ligadas à rolagem ── */
@@ -1626,6 +1628,7 @@ main, .rodape { position: relative; z-index: 1; }
   text-decoration-color: currentColor;
 }
 .legal-artigo code {
+  overflow-wrap: anywhere;
   background-color: var(--superficie-2);
   padding: 0.15em 0.45em;
   border-radius: 6px;
