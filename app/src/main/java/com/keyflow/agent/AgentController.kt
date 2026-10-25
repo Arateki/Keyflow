@@ -182,15 +182,17 @@ class AgentController(
 
     /** "Limpar conversa": cancela o que estiver rodando, zera o histórico e o chat (volta só a saudação). */
     fun clear() {
-        synchronized(lock) {
+        val cancelledRun = synchronized(lock) {
+            val r = runNumber
             runNumber++
             job?.cancel()
             job = null
             currentBubble = null
             history.clear()
             _state.value = AgentUiState(listOf(ChatItem.Greeting(ids.getAndIncrement())))
+            r
         }
-        releaseTurnState()
+        releaseTurnState(cancelledRun, cancelled = true)
     }
 
     /** O usuário respondeu ao painel de confirmação do pedido [callId]. */
@@ -209,11 +211,11 @@ class AgentController(
         val undo = entry.undo ?: return false
         val runner = executor ?: return false
         if (isBusy) return false
-        start(AgentActivity.RUNNING_TOOL) { _ ->
+        start(AgentActivity.RUNNING_TOOL) { run ->
             val call = AgentToolCall("undo-${entry.id}", undo.toolName, undo.argsJson)
             val cardId = ids.getAndIncrement()
             addItem(ChatItem.ToolCard(cardId, call.id, call.name, runner.registry[call.name]?.risk, summary = null, phase = ToolCardPhase.RUNNING))
-            val outcome = runner.execute(call, ToolOrigin.CHAT) { phase -> onPhase(call.id, phase) }
+            val outcome = runner.execute(call, ToolOrigin.CHAT, generation = run) { phase -> onPhase(call.id, phase) }
             finishCard(call.id, outcome)
             if (outcome.status == ToolStatus.OK) actionLog?.clearUndo(entry.id)
         }
@@ -224,11 +226,14 @@ class AgentController(
 
     private fun start(initial: AgentActivity, block: suspend (run: Long) -> Unit) {
         val mine = synchronized(lock) { ++runNumber }
+        startTurnState(mine)
         setActivity(initial)
         job = scope.launch {
+            var cancelled = false
             try {
                 block(mine)
             } catch (e: CancellationException) {
+                cancelled = true
                 throw e
             } catch (e: Exception) {
                 // Um defeito inesperado vira texto no chat, nunca um crash da aba. A mensagem é a da exceção (como o chat de antes).
@@ -237,13 +242,13 @@ class AgentController(
                     if (message != null) appendToBubble("\n[$message]") else addItem(ChatItem.Notice(ids.getAndIncrement(), NoticeKind.GENERATION_ERROR))
                 }
             } finally {
-                if (mine == runNumber) finishRun()
+                if (mine == runNumber) finishRun(mine, cancelled) else releaseTurnState(mine, cancelled = true)
             }
         }
     }
 
     /** Fim de uma execução (qualquer que seja o motivo): solta o estado do turno, para a atividade e fecha o que ficou em andamento. */
-    private fun finishRun() {
+    private fun finishRun(run: Long, cancelled: Boolean) {
         synchronized(lock) { currentBubble = null }
         _state.update { s ->
             s.copy(
@@ -253,12 +258,25 @@ class AgentController(
                 },
             )
         }
-        releaseTurnState()
+        releaseTurnState(run, cancelled)
     }
 
-    /** As ferramentas que guardam estado enquanto o turno dura (os arquivos de uma skin em lotes) o soltam. */
-    private fun releaseTurnState() {
-        executor?.registry?.all()?.forEach { (it as? TurnScoped)?.turnEnded() }
+    /**
+     * As ferramentas que guardam estado enquanto o turno dura (os arquivos de uma skin em lotes) o soltam; a que tem um efeito só para
+     * quando o turno termina bem (`open_tab`) sabe, por [cancelled], se deve aplicá-lo ou descartá-lo.
+     */
+    private fun releaseTurnState(run: Long, cancelled: Boolean) {
+        executor?.registry?.all()?.forEach { tool ->
+            val scoped = tool as? TurnScoped ?: return@forEach
+            if (cancelled) scoped.turnCancelled(run) else scoped.turnEnded(run)
+        }
+    }
+
+    private fun startTurnState(run: Long) {
+        executor?.registry?.all()?.forEach { tool ->
+            val scoped = tool as? TurnScoped ?: return@forEach
+            scoped.turnStarted(run)
+        }
     }
 
     /** O modo só texto: uma chamada por mensagem, sem histórico — o chat de hoje, com o mesmo fluxo e o mesmo texto de erro. */
@@ -303,7 +321,7 @@ class AgentController(
             currentBubble = null
             history.toList()
         }
-        AgentLoop(backend.engine, runner, limits).run(sent).collect { onLoopEvent(run, it) }
+        AgentLoop(backend.engine, runner, limits).run(sent, generation = run).collect { onLoopEvent(run, it) }
     }
 
     private fun onLoopEvent(run: Long, event: AgentLoopEvent) {

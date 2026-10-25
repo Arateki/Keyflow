@@ -507,6 +507,83 @@ class AgentControllerTest {
         assertThat(scoped.ended.get()).isEqualTo(3)
     }
 
+    private class ScopedSplit(name: String) : AgentTool, TurnScoped {
+        val startedGen = CopyOnWriteArrayList<Long>()
+        val endedGen = CopyOnWriteArrayList<Long>()
+        val cancelledGen = CopyOnWriteArrayList<Long>()
+        val ended = AtomicInteger()
+        val cancelled = AtomicInteger()
+        override val name = name
+        override val description = "x"
+        override val inputSchema: JSONObject = JSONObject(TEXT_SCHEMA)
+        override val risk = ToolRisk.READ
+
+        @PolicyGated
+        override suspend fun run(args: JSONObject, ctx: ToolContext) = ToolOutput.ok("ok")
+
+        override fun turnStarted(generation: Long) {
+            startedGen += generation
+        }
+
+        override fun turnEnded(generation: Long) {
+            endedGen += generation
+            turnEnded()
+        }
+
+        override fun turnCancelled(generation: Long) {
+            cancelledGen += generation
+            turnCancelled()
+        }
+
+        override fun turnEnded() {
+            ended.incrementAndGet()
+        }
+
+        override fun turnCancelled() {
+            cancelled.incrementAndGet()
+        }
+    }
+
+    @Test
+    fun `a tool that tells ended from cancelled hears ended on success and cancelled on cancel and on clear`() {
+        val scoped = ScopedSplit("s")
+        val env = Env(listOf(scoped))
+        env.controller.send("a", env.withTools(ScriptedEngine(text("x") + done())))
+        assertThat(scoped.ended.get()).isEqualTo(1)
+        assertThat(scoped.cancelled.get()).isEqualTo(0)
+
+        val release = CompletableDeferred<Unit>()
+        env.controller.send("b", AgentBackend.TextOnly { flow { release.await(); emit(AgentEvent.Done()) } })
+        env.controller.cancel()
+        assertThat(scoped.ended.get()).isEqualTo(1)
+        assertThat(scoped.cancelled.get()).isEqualTo(1)
+
+        env.controller.clear()
+        assertThat(scoped.ended.get()).isEqualTo(1)
+        assertThat(scoped.cancelled.get()).isEqualTo(2)
+    }
+
+    @Test
+    fun `when a job dies after clear has bumped runNumber, turn state is still released as cancelled`() {
+        val scoped = ScopedSplit("s")
+        val env = Env(listOf(scoped))
+        val release = CompletableDeferred<Unit>()
+        env.controller.send("x", AgentBackend.TextOnly { flow { release.await(); emit(AgentEvent.Done()) } })
+        assertThat(scoped.cancelled.get()).isEqualTo(0)
+
+        env.controller.clear()
+        // O job cancelado garante que releaseTurnState(cancelled = true) foi chamado para a geração 1
+        assertThat(scoped.cancelled.get()).isAtLeast(1)
+        assertThat(scoped.cancelledGen).contains(1L)
+        assertThat(env.controller.isBusy).isFalse()
+
+        env.controller.send("y", env.withTools(ScriptedEngine(text("oi") + done())))
+        assertThat(scoped.ended.get()).isEqualTo(1)
+        // O turno novo (geração 3) conclui e recebe ended(3), e a soltura de 1 nunca tocou em 3
+        assertThat(scoped.endedGen).contains(3L)
+        assertThat(scoped.cancelledGen).doesNotContain(3L)
+    }
+
     @Test
     fun `nothing runs before the policy is ready`() {
         val gate = CompletableDeferred<Unit>()

@@ -210,7 +210,7 @@ internal fun AgentNotice(kind: NoticeKind, modifier: Modifier = Modifier) {
 @Composable
 internal fun AgentModeNote(modifier: Modifier = Modifier) {
     Text(
-        tr("Modo só texto · ferramentas disponíveis com a Anthropic por chave de API"),
+        tr("Modo só texto · ferramentas disponíveis com Anthropic, OpenAI ou Google por chave de API"),
         color = LocalKeyFlowPalette.current.faint,
         fontFamily = SpaceMono,
         fontSize = 9.sp,

@@ -356,7 +356,7 @@ class KeyflowPanelAgentTest {
         val (runtime, _) = runtime()
         show(runtime, settings = Settings(reasoningSource = ReasoningSource.OPENAI, reasoningOpenAiModel = "gpt"))
         waitForTag(AGENT_MODE_NOTE_TAG)
-        rule.onNodeWithText("Modo só texto · ferramentas disponíveis com a Anthropic por chave de API").assertIsDisplayed()
+        rule.onNodeWithText("Modo só texto · ferramentas disponíveis com Anthropic, OpenAI ou Google por chave de API").assertIsDisplayed()
         say("use ler_algo")
         // Texto puro: a ferramenta nem foi oferecida.
         waitForText("Texto puro: use ler_algo")
