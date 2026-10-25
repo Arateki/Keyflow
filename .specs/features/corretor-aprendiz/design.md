@@ -61,18 +61,40 @@ Um teste de unidade (`CorretorBenchTest`) que monta casos, roda o `Suggester` e 
 a mais próxima). σ ∈ {0,20; 0,30; 0,40} (o padrão do gerador de erros do FUTO, `temperature` 0,6 × 80 px sobre teclas de ~143 px, dá ≈ 0,34 na horizontal e ≈ 0,23 na vertical; `TrainingDataGenerator.kt`, só a ideia),
 viés ∈ {nenhum, por fileira do LatinIME (Y: 0, +0,038, +0,088 da altura), forte (+0,12 largura, +0,15
 altura)}. Amostra **uniforme** (testa o dicionário todo) e **ponderada** por `2^(freq/8,589)` (testa o
-que se digita). Taxas fixas de omissão, inserção e troca de ordem entram numa 2ª configuração.
+que se digita). Taxas fixas de omissão, inserção e troca de ordem entram numa 2ª configuração. Total:
+3 σ × 3 vieses × 2 amostras × 2 taxas = 36 configurações. As palavras do sintético são sorteadas **uma vez**
+(semente fixa) do dicionário e versionadas (`sintetico-uniforme.tsv`, `sintetico-ponderada.tsv`): mudar o
+dicionário (CA-T5, CA-T7) muda o resultado do corretor, não a amostra.
+
+**Orçamento e níveis** (BEN-09). A conta do protótipo (`context.md` §7: 5,4–6,4 ms por sugestão no A, 7,3–8,6 ms
+no B):
+
+| Nível | Quando roda | O que roda | Conta |
+| ----- | ----------- | ---------- | ----- |
+| **rápido** | todo `testDebugUnitTest` (a catraca) | `manter-dev`, `manter-teste`, `erros` (≥ 600 palavras) + sintético reduzido: σ 0,30 e 0,40 × viés nenhum e forte × amostra ponderada, 4 configurações de 500 | ≈ 2 600 sugestões × 5,4–8,6 ms ≈ **14–22 s** (+ a carga do dicionário); alvo < 60 s, medido na CA-T1 |
+| **completo** | `scripts/corretor-bench.sh --completo`, à mão: antes de um PR e para calibrar os limiares (CA-T21) | as 36 configurações × ≥ 2000 | 72 000 sugestões × 5,4–8,6 ms = **6,5–10,3 min** numa thread; com N threads, ÷ N (uma instância do `Suggester` por thread, porque ele não é thread-safe; a medir) |
+
+O completo **não** pode ser < 60 s e por isso não roda no `testDebugUnitTest`: o prazo de 60 s da versão anterior
+desta spec ignorava a conta (72 mil sugestões). Tem baseline próprio (`corretor-bench-baseline-completo.json`),
+atualizado à mão com a tabela no PR.
 
 **Métricas** (BEN-03), por conjunto: troca certa, troca errada, **troca indevida** (qualquer troca onde
 se esperava manter; mudar só a caixa ou tirar um acento digitado conta), perdida, pretendida na faixa em
 1º e nos 3 primeiros, parcela de erros que viram outra palavra válida, ms/palavra p50/p95, heap. Uma nota
-única só para ordenar mudanças, com peso declarado: `ganho = certas − 5·indevidas − 3·erradas` (o peso
-é do Yan, `context.md` §8; o JSON guarda as parcelas).
+única só para ordenar mudanças, com o único peso que o Yan aprovou: `ganho = certas − 5·indevidas` (5:1,
+resposta 6 do Yan, 24/10; o JSON guarda as parcelas). Trocas **erradas** (trocou, mas por outra palavra, num erro
+real) ficam fora da nota, sem peso inventado, e entram na catraca como contagem à parte: não podem piorar.
 
-**Catraca.** `corretor-bench-baseline.json` (gerado na CA-T1 pelo código de hoje) e tolerância por
-métrica; `CorretorBenchTest` falha se algo piora; melhora entra atualizando o baseline no mesmo commit.
-`scripts/corretor-bench.sh [ref]` roda o banco no `HEAD` e no `ref` (worktree temporária) e imprime a
-tabela lado a lado.
+**Catraca.** `corretor-bench-baseline.json` (gerado na CA-T1 pelo código de hoje, nível rápido). **Só métricas
+determinísticas entram nela**: as contagens (trocas certas, erradas, indevidas, perdidas) e a posição da
+pretendida (1º, 3 primeiros), que com sementes, listas e dicionário fixos dão o mesmo número em qualquer
+máquina; por isso a tolerância é zero (sem ruído não há o que tolerar), `CorretorBenchTest` falha se uma delas
+piora, e melhora entra atualizando o baseline no mesmo commit, com a tabela antes/depois. **Tempo e memória são
+só informativos**: o banco imprime ms p50/p95 e heap, mas nunca falha por eles, porque na máquina compartilhada o
+mesmo código oscila (5,4–6,4 ms entre execuções, `context.md` §7) e um teste que falha por isso é a "falha
+ambiental" que a regra de ouro 5 proíbe. Para tempo vale a **razão** A × B medida na mesma execução, com as
+versões intercaladas, e o `CorretorTempoTest` no aparelho (CA-T3 e CA-T22). `scripts/corretor-bench.sh [--completo]
+[ref]` roda o banco no `HEAD` e no `ref` (worktree temporária) e imprime a tabela lado a lado.
 
 **Reais.** Debug apenas: a tela de teste do teclado mostra uma frase-guia, o teclado grava (toques em
 unidades de tecla, digitada, pretendida) em `files/bench/reais.tsv` (fora do backup); o Yan puxa por

@@ -14,15 +14,18 @@
 - **What**: `CorretorBenchTest` + `bench/` (casos, gerador sintético `SyntheticTyping`, métricas, JSON,
   tabela), `manter-dev.tsv` e `manter-teste.tsv` (≥ 300 no total; traz para o git a lista de 548 palavras do estudo,
   hoje só em `/tmp/corretor-medicao.tsv` e sem os resultados; o teste é sorteado com semente fixa, por grupo, e nenhuma
-  task de curadoria o lê), `erros.tsv` (≥ 300 à mão), esqueleto de `sessoes/`, `corretor-bench-baseline.json` gerado
-  **pelo código de hoje**, `scripts/corretor-bench.sh [ref]`.
+  task de curadoria o lê), `erros.tsv` (≥ 300 à mão), `sintetico-*.tsv` (palavras sorteadas uma vez), esqueleto de
+  `sessoes/`, `corretor-bench-baseline.json` (nível rápido) gerado **pelo código de hoje**,
+  `scripts/corretor-bench.sh [--completo] [ref]`.
 - **Where**: `app/src/test/java/com/keyflow/ime/keyboard/dictionary/bench/`, `app/src/test/resources/bench/`, `scripts/`.
 - **Covers**: BEN-01..05, BEN-08.
 - **Done when**: o baseline registra o ponto de partida **medido pelo banco** (por grupo do `manter-dev` e do
   `manter-teste`: trocadas e indevidas; inglês e espanhol comuns; acento restaurado; sintético por configuração) — não
   os números preliminares do protótipo, que usou lista montada por agente e 200 amostras por linha; o resultado
-  atualiza a estimativa de `context.md` §3 e a meta do segundo Goal do `spec.md`; piorar uma métrica determinística
-  falha o teste; o script imprime antes × depois. Orçamento de tempo do banco: ver `design.md` §1.
+  atualiza a estimativa de `context.md` §3 e a meta do segundo Goal do `spec.md`; o **nível rápido** (≈ 2 600
+  sugestões, ≈ 14–22 s pela conta) roda no `testDebugUnitTest` em < 60 s, com o tempo real registrado aqui, e o
+  **completo** (72 000 sugestões, 6,5–10,3 min numa thread) só pelo script, com baseline próprio; piorar uma métrica
+  determinística falha o teste, tempo e memória só são impressos; o script imprime antes × depois (BEN-09).
 - **Tests**: unit. **Gate**: `quick`.
 
 ### CA-T2 — Gravador de digitações reais (debug)  `[P com T1, [YAN] digita]`
@@ -225,7 +228,8 @@
 - **Covers**: SPA-02..05.
 - **Done when**: no sintético, a pretendida em 1º e nos 3 primeiros **sobe** sobre o baseline em σ 0,30/0,40 (números
   na catraca); toque na borda custa menos que no centro da vizinha (`SpatialCostsTest`); sem toque = comportamento
-  de hoje; ms/palavra no banco ≤ +10%.
+  de hoje; a razão ms B/A medida na mesma execução é **relatada** (o protótipo deu +32% a +35%) e não derruba o
+  teste; a otimização mira o orçamento do A32 (PER-01), medido na T22.
 - **Tests**: unit + banco. **Gate**: `quick`.
 
 ### CA-T20 — Toque da grade até o corretor
@@ -240,8 +244,9 @@
 ### CA-T21 — Decisão em bits e limiares por classe
 - **What**: placar em bits; `T[classe]`/`M[classe]` calibrados no banco (sintético + reais) no lugar de `40/15/90/30`.
 - **Where**: `Suggester.kt`, `SuggestParams`. **Depends on**: CA-T19, CA-T2 (reais). **Covers**: SPA-03, BAS-01.
-- **Done when**: a curva certa × indevida do banco mostra o ponto escolhido; mais trocas certas com as mesmas
-  indevidas (ou menos indevidas com as mesmas certas) que o baseline, em sintético **e** reais.
+- **Done when**: a curva certa × indevida do **nível completo** mostra o ponto escolhido; mais trocas certas com as
+  mesmas indevidas (ou menos indevidas com as mesmas certas) que o baseline, em sintético **e** reais; baseline
+  do nível rápido atualizado e baseline do completo gravado.
 - **Tests**: unit + banco. **Gate**: `quick`.
 
 ### CA-T22 — Tempo no A32 e decisão
