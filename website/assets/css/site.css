@@ -395,8 +395,7 @@ main, .rodape { position: relative; z-index: 1; }
 .nav a:hover::after { transform: scaleX(1); }
 
 .topo-acoes { display: flex; align-items: center; gap: 0.5rem; }
-.idioma,
-.docs-atalho {
+.idioma {
   font-family: var(--mono);
   font-size: 0.72rem;
   letter-spacing: 0.14em;
@@ -407,10 +406,7 @@ main, .rodape { position: relative; z-index: 1; }
   text-decoration: none;
   transition: border-color 0.3s, background-color 0.3s;
 }
-.idioma:hover,
-.docs-atalho:hover { border-color: var(--linha-forte); background: var(--superficie-2); }
-/* Atalho "Docs": no celular o menu some, e a documentação continua a um toque. */
-.docs-atalho { display: none; text-transform: uppercase; }
+.idioma:hover { border-color: var(--linha-forte); background: var(--superficie-2); }
 .tema {
   display: grid;
   place-items: center;
@@ -440,10 +436,161 @@ main, .rodape { position: relative; z-index: 1; }
 [data-theme="escuro"] .tema .sol { display: block; }
 [data-theme="escuro"] .tema .lua { display: none; }
 
-/* O menu mais largo (o da página inicial em português, com a Documentação) só cabe em uma linha a partir de ~960 px. */
+/* Botão do menu: só existe no celular (veja o bloco abaixo). */
+.menu-botao { display: none; }
+
+/*
+ * Menu do celular. O menu mais largo (o da página inicial em português, com a Documentação) só cabe em uma linha a
+ * partir de 961 px; abaixo disso a marca fica à esquerda, o botão "Menu" no centro e o idioma e o tema à direita, e o
+ * mesmo <nav id="menu-topo"> vira um painel que se abre debaixo do botão. O html ganha a classe "js" do script em
+ * linha do <head> e a classe "menu-aberto" do site.js enquanto o painel está aberto.
+ */
 @media (max-width: 960px) {
-  .nav { display: none; }
-  .docs-atalho { display: inline-block; }
+  .js .topo-in {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 0.5rem;
+  }
+  .js .marca { justify-self: start; }
+  .js .topo-acoes { justify-self: end; }
+
+  .js .menu-botao {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    height: 38px;
+    padding: 0 0.8rem 0 1rem;
+    border: 1px solid var(--linha);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--texto-2);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: border-color 0.3s, background-color 0.3s;
+  }
+  .js .menu-botao:hover,
+  .menu-aberto .menu-botao { border-color: var(--linha-forte); background: var(--superficie-2); }
+  .menu-seta {
+    flex: none;
+    width: 10px;
+    height: 10px;
+    transition: transform 0.4s var(--suave-saida);
+  }
+  .menu-aberto .menu-seta { transform: rotate(180deg); }
+  /* A 320 px a marca, o botão e os dois botões da direita só cabem, com o botão no centro, se tudo apertar um pouco. */
+  @media (max-width: 360px) {
+    .js .topo-in { gap: 0.25rem; }
+    .js .topo .marca { gap: 0.5rem; font-size: 1.04rem; }
+    .js .menu-botao { gap: 0.4rem; padding: 0 0.65rem 0 0.8rem; letter-spacing: 0.1em; }
+  }
+
+  /* O painel: uma caixa com a hairline do site, no centro, debaixo do cabeçalho. */
+  .js .nav {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    width: min(21rem, calc(100vw - 2 * var(--margem)));
+    max-height: calc(100vh - 72px - env(safe-area-inset-top, 0px) - 24px);
+    max-height: calc(100dvh - 72px - env(safe-area-inset-top, 0px) - 24px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0.35rem 0;
+    border: 1px solid var(--linha-forte);
+    border-radius: var(--raio);
+    background: linear-gradient(180deg, var(--superficie-2), var(--superficie)), var(--fundo-2);
+    box-shadow: var(--sombra);
+    opacity: 0;
+    visibility: hidden;
+    transform: translate(-50%, -8px) scale(0.98);
+    transform-origin: 50% 0;
+    transition: opacity 0.28s var(--suave-saida), transform 0.28s var(--suave-saida), visibility 0s linear 0.28s;
+  }
+  .menu-aberto .nav {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(-50%, 0) scale(1);
+    transition-delay: 0s;
+  }
+  .js .nav a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 3rem;
+    padding: 0.7rem 1.2rem;
+    font-size: 1rem;
+    color: var(--texto-2);
+    white-space: normal;
+    transition: color 0.3s, background-color 0.3s;
+  }
+  .js .nav a + a { border-top: 1px solid var(--linha); }
+  .js .nav a:focus-visible { outline-offset: -3px; border-radius: 0; }
+  /* A sublinha do menu do computador vira, aqui, o ponto da página em que se está. */
+  .js .nav a::after {
+    position: static;
+    flex: none;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--teal-texto);
+    transform: scale(0);
+    transition: transform 0.4s var(--suave-saida);
+  }
+  .js .nav a[aria-current="page"] { color: var(--texto); }
+  .js .nav a[aria-current="page"]::after { transform: scale(1); }
+  @media (hover: hover) {
+    .js .nav a:hover { color: var(--texto); background: var(--superficie-2); }
+    .js .nav a:hover::after { transform: scale(0); }
+    .js .nav a[aria-current="page"]:hover::after { transform: scale(1); }
+  }
+
+  /* Pano atrás do painel: escurece a página (o cabeçalho fica por cima, nítido) e recebe o toque que o fecha. */
+  .js .topo::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    height: 100vh;
+    height: 100dvh;
+    z-index: -1;
+    background: color-mix(in srgb, var(--fundo) 68%, transparent);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.28s, visibility 0s linear 0.28s;
+  }
+  .menu-aberto .topo::before { opacity: 1; visibility: visible; transition-delay: 0s; }
+
+  /* Com o painel aberto a página atrás não rola (a barra de rolagem clássica, se houver, continua reservada). */
+  .menu-aberto { overflow: hidden; scrollbar-gutter: stable; }
+
+  /*
+   * Sem JavaScript não há botão: o cabeçalho deixa de ser fixo e a navegação aparece numa faixa que rola de lado,
+   * debaixo da marca e dos botões. O corpo desce a altura da faixa.
+   */
+  html:not(.js) .topo { position: absolute; }
+  html:not(.js) .topo-in { flex-wrap: wrap; align-content: flex-start; height: auto; padding-top: 17px; gap: 6px 1rem; }
+  html:not(.js) .nav {
+    order: 3;
+    flex: 1 0 100%;
+    gap: 1.4rem;
+    padding-bottom: 0.6rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  html:not(.js) .nav::-webkit-scrollbar { display: none; }
+  html:not(.js) .nav a { padding-block: 0.4rem; }
+  html:not(.js) .nav a::after { display: none; }
+  html:not(.js) body { padding-top: 44px; }
+}
+/* Sem movimento: o painel abre e fecha de uma vez (sem a espera do visibility, que a regra geral de redução não zera). */
+@media (max-width: 960px) and (prefers-reduced-motion: reduce) {
+  .menu-botao, .menu-seta, .js .nav, .js .nav a, .js .nav a::after, .js .topo::before { transition: none; }
 }
 
 /* ── Herói ── */
