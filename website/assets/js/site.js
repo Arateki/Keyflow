@@ -1,6 +1,6 @@
 /*
  * Comportamento da página do KeyFlow: tema, cabeçalho, revelações de reserva, luz do cursor,
- * cartões com brilho, botões magnéticos, a orbe do topo e a demonstração do ditado.
+ * cartões com brilho, botões magnéticos, a orbe do topo, a demonstração do ditado e o índice da documentação.
  * Sem dependências, sem rede e sem rastreio. Com prefers-reduced-motion, nada se mexe.
  */
 (function () {
@@ -102,7 +102,7 @@
     }, { passive: true });
     document.documentElement.addEventListener('pointerleave', function () { raiz.classList.remove('ponteiro'); });
 
-    document.querySelectorAll('.cartao, .plano, .peca').forEach(function (el) {
+    document.querySelectorAll('.cartao, .plano, .peca, .doc-cartao').forEach(function (el) {
       el.addEventListener('pointermove', function (e) {
         var c = el.getBoundingClientRect();
         el.style.setProperty('--x', (e.clientX - c.left).toFixed(1) + 'px');
@@ -122,6 +122,42 @@
       });
     });
   }
+
+  /* ── Documentação (/doc, /docs): o índice lateral destaca a seção que está na tela; o do celular fecha ao escolher. ── */
+  var linksIndice = document.querySelectorAll('.doc-indice a[href^="#"]');
+  if (linksIndice.length && 'IntersectionObserver' in window) {
+    var lateral = document.querySelector('.doc-lateral');
+    var linkDaSecao = {};
+    linksIndice.forEach(function (a) { linkDaSecao[a.getAttribute('href').slice(1)] = a; });
+    var secoesDoc = [].slice.call(document.querySelectorAll('.doc-secao'));
+    var naFaixa = [];
+    var marcar = function () {
+      var atual = secoesDoc.filter(function (s) { return naFaixa.indexOf(s) !== -1; })[0];
+      linksIndice.forEach(function (a) { a.removeAttribute('aria-current'); });
+      var link = atual && linkDaSecao[atual.id];
+      if (!link) return;
+      link.setAttribute('aria-current', 'location');
+      if (lateral && (link.offsetTop < lateral.scrollTop || link.offsetTop + link.offsetHeight > lateral.scrollTop + lateral.clientHeight)) {
+        lateral.scrollTop = link.offsetTop - lateral.clientHeight / 2;
+      }
+    };
+    // A faixa vai de logo abaixo do cabeçalho até perto da metade da tela: a seção que a toca é a que se está lendo.
+    var observadorDoc = new IntersectionObserver(function (entradas) {
+      entradas.forEach(function (e) {
+        var i = naFaixa.indexOf(e.target);
+        if (e.isIntersecting && i === -1) naFaixa.push(e.target);
+        else if (!e.isIntersecting && i !== -1) naFaixa.splice(i, 1);
+      });
+      marcar();
+    }, { rootMargin: '-96px 0px -55% 0px' });
+    secoesDoc.forEach(function (s) { observadorDoc.observe(s); });
+  }
+  document.querySelectorAll('.doc-indice-movel a').forEach(function (a) {
+    a.addEventListener('click', function () {
+      var caixa = a.closest('details');
+      if (caixa) caixa.removeAttribute('open');
+    });
+  });
 
   if (calmo || !window.KFOrbe) return;
 

@@ -31,3 +31,4 @@ google-services.json
 
 # Arquivos da coordenação dos agentes (tarefas e relatórios locais)
 .equipe/
+__pycache__/

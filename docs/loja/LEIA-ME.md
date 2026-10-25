@@ -9,6 +9,12 @@ Este diretório contém os textos oficiais da ficha do app na Google Play Store,
 - **Fonte canônica:** Os arquivos Markdown (`.md`) deste diretório (`politica-de-privacidade.md`, `termos-de-uso.md`, `privacy-policy.md`, `terms-of-use.md`) são a única fonte da verdade.
 - **Não edite os HTML das páginas legais manualmente:** As páginas legais disponibilizadas em `https://keyflow.arateki.com` são geradas automaticamente pelo script `scripts/gerar-site.py`.
 - **Página inicial:** o código-fonte da página inicial (`/` em português e `/en` em inglês) fica em `website/` — HTML, CSS e JS feitos à mão, sem passo de build. O `scripts/gerar-site.py` copia essa pasta e gera as páginas legais ao lado, em `build/site/`, e valida tudo (links internos, âncoras, títulos, hash do script no CSP, content-type de cada arquivo e o orçamento de 400 KB da primeira carga). Pastas que começam com `_` (como `website/_fonte/`, de onde saem a imagem de prévia e os ícones PNG) não vão ao ar.
+- **Documentação do app no site (`/doc` em português, `/docs` em inglês):** o texto é o da aba Docs do app, sem cópia à mão.
+  A fonte é o Kotlin (`DocsPanel.kt` e as traduções); o teste `DocsSiteExportTest` gera `website/_fonte/doc.json` e **falha se o
+  arquivo estiver desatualizado**. O `scripts/gerar-site.py` (com `scripts/site_doc.py`) monta as duas páginas a partir desse JSON.
+  Mudou o texto da Docs? Rode `KEYFLOW_REGERAR_DOC_SITE=1 gradle testDebugUnitTest --tests '*DocsSiteExportTest'` (ou copie
+  `app/build/docs-site/doc.json`) e commite o JSON junto. Não edite o texto no site nem o JSON à mão. A moldura da página
+  (título, chamada, aviso do Feedback) é do site e mora em `TEXTOS`, no `site_doc.py`.
 - **Fluxo de alteração:**
   1. Crie uma branch e edite os arquivos `.md` correspondentes em `docs/loja/`;
   2. Teste a geração localmente rodando:

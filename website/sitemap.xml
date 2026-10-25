@@ -2,44 +2,58 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://keyflow.arateki.com/</loc>
-    <lastmod>2026-10-24</lastmod>
+    <lastmod>2026-10-25</lastmod>
     <xhtml:link rel="alternate" hreflang="pt-BR" href="https://keyflow.arateki.com/"/>
     <xhtml:link rel="alternate" hreflang="en" href="https://keyflow.arateki.com/en"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://keyflow.arateki.com/"/>
   </url>
   <url>
     <loc>https://keyflow.arateki.com/en</loc>
-    <lastmod>2026-10-24</lastmod>
+    <lastmod>2026-10-25</lastmod>
     <xhtml:link rel="alternate" hreflang="pt-BR" href="https://keyflow.arateki.com/"/>
     <xhtml:link rel="alternate" hreflang="en" href="https://keyflow.arateki.com/en"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://keyflow.arateki.com/"/>
   </url>
   <url>
     <loc>https://keyflow.arateki.com/privacidade</loc>
-    <lastmod>2026-10-24</lastmod>
+    <lastmod>2026-10-25</lastmod>
     <xhtml:link rel="alternate" hreflang="pt-BR" href="https://keyflow.arateki.com/privacidade"/>
     <xhtml:link rel="alternate" hreflang="en" href="https://keyflow.arateki.com/privacy"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://keyflow.arateki.com/privacidade"/>
   </url>
   <url>
     <loc>https://keyflow.arateki.com/privacy</loc>
-    <lastmod>2026-10-24</lastmod>
+    <lastmod>2026-10-25</lastmod>
     <xhtml:link rel="alternate" hreflang="pt-BR" href="https://keyflow.arateki.com/privacidade"/>
     <xhtml:link rel="alternate" hreflang="en" href="https://keyflow.arateki.com/privacy"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://keyflow.arateki.com/privacidade"/>
   </url>
   <url>
     <loc>https://keyflow.arateki.com/termos</loc>
-    <lastmod>2026-10-24</lastmod>
+    <lastmod>2026-10-25</lastmod>
     <xhtml:link rel="alternate" hreflang="pt-BR" href="https://keyflow.arateki.com/termos"/>
     <xhtml:link rel="alternate" hreflang="en" href="https://keyflow.arateki.com/terms"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://keyflow.arateki.com/termos"/>
   </url>
   <url>
     <loc>https://keyflow.arateki.com/terms</loc>
-    <lastmod>2026-10-24</lastmod>
+    <lastmod>2026-10-25</lastmod>
     <xhtml:link rel="alternate" hreflang="pt-BR" href="https://keyflow.arateki.com/termos"/>
     <xhtml:link rel="alternate" hreflang="en" href="https://keyflow.arateki.com/terms"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://keyflow.arateki.com/termos"/>
+  </url>
+  <url>
+    <loc>https://keyflow.arateki.com/doc</loc>
+    <lastmod>2026-10-25</lastmod>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://keyflow.arateki.com/doc"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://keyflow.arateki.com/docs"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://keyflow.arateki.com/doc"/>
+  </url>
+  <url>
+    <loc>https://keyflow.arateki.com/docs</loc>
+    <lastmod>2026-10-25</lastmod>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://keyflow.arateki.com/doc"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://keyflow.arateki.com/docs"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://keyflow.arateki.com/doc"/>
   </url>
 </urlset>

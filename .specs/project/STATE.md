@@ -2918,3 +2918,19 @@ Dois motores com ferramentas ao lado do da Anthropic: `reasoning/openai/OpenAiAg
   primeira rodada real cabe ao coordenador após instalar o comando e publicar os commits.
 - Na estreia, `ci rodar` recusou a branch já integrada: ele exige arquivo diferente da `main`, e o dispatch
   usa o workflow do `--ref`. Branches anteriores ao `26ee5ce` precisam da `main` mesclada antes do pedido.
+
+## 2026-10-25 — Documentação do app no site (`/doc` e `/docs`)
+
+- Pedido do Yan: a documentação do app também no site, com o mesmo texto e o desenho da página inicial. Fonte única = o
+  Kotlin (`DocsPanel.kt`, com `docsSteps`/`docsSections` e as traduções). O `DocsSiteExportTest` serializa os dois idiomas do
+  site (português e inglês, via `AppLocale.pinned`) em `website/_fonte/doc.json` e **falha se o arquivo versionado não bater**,
+  dizendo como regerar (`KEYFLOW_REGERAR_DOC_SITE=1`). O JSON fica no repositório porque o `site.yml` roda sem Gradle; a pasta
+  `_fonte/` não vai ao ar. O `scripts/gerar-site.py` (com `scripts/site_doc.py`) lê o JSON e gera `doc.html` e `docs.html`.
+- A `DocsPanel` mudou só de onde lê o "Como funciona" e os títulos (`docsHowItWorksTitle`, `docsSteps`, `docsIndexTitle`);
+  o que se desenha é o mesmo, e os goldens `config-docs` seguem bit-idênticos.
+- No site o Feedback não tem os botões do app (abrem o e-mail com o diagnóstico do aparelho): vira o contato do produto. O
+  e-mail pessoal do `FEEDBACK_EMAIL` não aparece no site. O texto de moldura (título, chamada) é do site, em `TEXTOS`.
+- Cuidado com o `scroll-margin-top`: o `html` já tem `scroll-padding-top` para o cabeçalho fixo, e as duas somavam (176 px) —
+  o índice lateral marcava a seção anterior. A `.doc-secao` zera a margem própria.
+- Publicação: `doc.html` e `docs.html` seguem a regra que já serve `/privacidade` e `/privacy` (a Cloudflare serve `/x` a partir de
+  `x.html`); `/doc` e `/docs` não precisam de configuração nova se essa regra valer para todo caminho sem extensão.
