@@ -98,7 +98,7 @@ Em deliberação de 25/10/2026 (19:58), o Yan estabeleceu o escopo imediato e as
 * **O que é**: Síntese de fala neural local rodando no motor `sherpa-onnx` do KeyFlow, permitindo que a aba Voz do agente fale sem depender de motores TTS proprietários do sistema operacional.
 * **Licença e obrigações concretas**:
   - Runtime `sherpa-onnx`: Licença Apache-2.0 permissiva.
-  - Modelos e dados: VITS Coqui pt-cv (Common Voice / CC0 ou CC-BY); vozes Piper pt_BR (cadu, faber: CC0 / MIT).
+  - Modelos e dados: VITS Coqui pt-cv (treinado no Common Voice); vozes Piper pt_BR (cadu, faber). Licença dos pesos e dos dados de cada voz: *não confirmado* — conferir o model card de cada uma antes de adotar.
   - *Armadilha da licença do fonemizador*: O mecanismo padrão de vozes do Piper depende do `eSpeak-ng`, que é distribuído sob **GPL-3.0**. Caso o `eSpeak-ng` seja compilado ou embutido junto ao APK do KeyFlow (via JNI ou linkagem estática), a cláusula de copyleft do GPL-3.0 infecta o app inteiro, violando a regra de ouro de manter o KeyFlow sob licença Apache-2.0 sem copyleft.
 * **O que bloqueia hoje**:
   1. *Complexidade de fonemização sem GPL*: Necessidade de pipeline fonético livre para pt-BR ou de modelo baseado diretamente em caracteres;
@@ -106,13 +106,13 @@ Em deliberação de 25/10/2026 (19:58), o Yan estabeleceu o escopo imediato e as
   3. *Solução nativa suficiente*: A API do sistema `android.speech.tts.TextToSpeech` (AOSP, Apache-2.0) já atende integralmente a aba Voz sem adicionar peso ao APK e sem custos de infraestrutura.
 * **Caminho para adotar**:
   - **Abordagem A (Recomendada — Grapheme-to-Speech / Char-based)**: Adotar o modelo `csukuangfj/vits-coqui-pt-cv` (~71 MB ONNX). Esse modelo foi treinado com `use_phonemes: false` e utiliza o frontend nativo de caracteres (`OfflineTtsCharacterFrontend`) do sherpa-onnx. Ele mapeia caracteres latinos diretamente para IDs de tokens, dispensando completamente o `eSpeak-ng` e qualquer outro fonemizador GPL.
-  - **Abordagem B (Piper com Léxico Livre)**: Utilizar modelos Piper pt_BR (como `vits-piper-pt_BR-cadu-medium`, ~60 MB) alimentando o sherpa-onnx com um léxico fonético aberto em arquivo de texto (ex.: dicionário fonético pt-BR do Grupo FalaBrasil `falabrasil/dicts-br`, licença MIT) ou com um conversor G2P baseado em regras ortográficas do português em Kotlin puro. O sherpa-onnx v2.0+ já removeu a dependência interna de eSpeak-ng e aceita `lexicon.txt` diretamente.
+  - **Abordagem B (Piper com Léxico Livre)**: Utilizar modelos Piper pt_BR (como `vits-piper-pt_BR-cadu-medium`, ~60 MB) alimentando o sherpa-onnx com um léxico fonético aberto em arquivo de texto (ex.: dicionário fonético pt-BR do Grupo FalaBrasil `falabrasil/dicts-br`; licença *não confirmada*) ou com um conversor G2P baseado em regras ortográficas do português em Kotlin puro. Se o sherpa-onnx consegue rodar vozes Piper só com `lexicon.txt`, sem o eSpeak-ng embutido: *não confirmado* — testar antes de adotar.
 * **Custo e tamanho**: ~60 MB a ~75 MB por voz neural instalada (download sob demanda). Zero impacto adicional de bibliotecas binárias no APK (runtime sherpa-onnx já faz parte do app).
 * **Fontes**:
   - [k2-fsa/sherpa-onnx (Offline TTS VITS)](https://github.com/k2-fsa/sherpa-onnx) (consultado em 2026-10-25)
   - [csukuangfj/vits-coqui-pt-cv no Hugging Face](https://huggingface.co/csukuangfj/vits-coqui-pt-cv) (consultado em 2026-10-25)
   - [rhasspy/piper-voices pt_BR](https://github.com/rhasspy/piper-voices) (consultado em 2026-10-25)
-  - [Grupo FalaBrasil Dicionários Fonéticos (MIT)](https://github.com/falabrasil/dicts-br) (consultado em 2026-10-25)
+  - [Grupo FalaBrasil Dicionários Fonéticos (licença não confirmada)](https://github.com/falabrasil/dicts-br) (consultado em 2026-10-25)
 
 ---
 

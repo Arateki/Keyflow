@@ -2954,7 +2954,7 @@ Dois motores com ferramentas ao lado do da Anthropic: `reasoning/openai/OpenAiAg
 
 ## 2026-10-25 — Definição do catálogo de modelos e itens adiados
 
-- Decisão do Yan em 25/10/2026 (19:58): Voz na aba de agente usa exclusivamente o `android.speech.tts.TextToSpeech` nativo do Android (0 MB e licença do AOSP). Modelos de texto locais no LiteRT-LM adotam imediatamente SmolLM2-1.7B-Instruct (Apache-2.0, ~1,73 GB) e DeepSeek-R1-Distill-Qwen-1.5B (MIT, ~1,83 GB), ambos com download ungated e licença sem restrições comerciais. Phi-3-mini e Phi-4-mini (~3,9 GB) ficam de fora pelo tamanho.
+- Decisão do Yan em 25/10/2026 (19:58): A fala da aba Voz usa, por enquanto, só o `android.speech.tts.TextToSpeech` nativo do Android (0 MB e licença do AOSP). Modelos de texto locais no LiteRT-LM adotam imediatamente SmolLM2-1.7B-Instruct (Apache-2.0, ~1,73 GB) e DeepSeek-R1-Distill-Qwen-1.5B (MIT, ~1,83 GB), ambos com download ungated e licença sem restrições comerciais. Phi-3-mini e Phi-4-mini (~3,9 GB) ficam de fora pelo tamanho.
 - Ficam adiados: Llama 3.2 (hospedagem própria no S3/R2 para contornar o gating no HF), Gemma (termos próprios e gated), ML Kit (escrita à mão Digital Ink, estritamente opcional com consentimento e inicialização tardia fora do boot) e vozes offline próprias no sherpa-onnx (VITS Coqui pt-cv por caracteres ou Piper pt_BR com léxico livre para evitar contaminação do eSpeak-ng GPLv3).
 - Descartados em definitivo: MobileLLM (licença não comercial FAIR NC) e Gemini Nano (acesso restrito ao AICore de fábrica em aparelhos topo de linha).
 - Documento de referência técnica completo: `.specs/project/MODELOS-ADIADOS.md`.
