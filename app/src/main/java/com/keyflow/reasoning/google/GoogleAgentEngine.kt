@@ -13,6 +13,7 @@ import com.keyflow.auth.providers.google.GoogleAuthConfig
 import com.keyflow.data.models.Ipv4FirstDns
 import com.keyflow.reasoning.ReasoningError
 import java.io.IOException
+import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
@@ -62,6 +63,13 @@ class GoogleAgentEngine(
         .build()
 
     override fun chat(messages: List<AgentMessage>, tools: List<ToolDefinition>, system: String, maxTokens: Int): Flow<AgentEvent> = channelFlow {
+        val cleanModel = model.trim().removePrefix("models/")
+        if (cleanModel.isEmpty() || !cleanModel.matches(MODEL_NAME_REGEX)) {
+            send(AgentEvent.Error(ReasoningError.ENGINE, "Google Gemini: nome de modelo inválido ($model)"))
+            return@channelFlow
+        }
+        val encodedModel = URLEncoder.encode(cleanModel, "UTF-8").replace("+", "%20")
+
         val headers = try {
             authorization.headers(ProviderIds.GOOGLE)
         } catch (e: AuthException) {
@@ -71,7 +79,7 @@ class GoogleAgentEngine(
 
         val jsonBody = GoogleAgentWire.body(system, messages, tools)
         // Sem o corpo: tem o texto do usuário e o resultado das ferramentas, e o Log.d sai também no release.
-        android.util.Log.d("GoogleAgent", "modelo: $model, mensagens: ${messages.size}, ferramentas: ${tools.size}, corpo: ${jsonBody.length} caracteres")
+        android.util.Log.d("GoogleAgent", "modelo: $cleanModel, mensagens: ${messages.size}, ferramentas: ${tools.size}, corpo: ${jsonBody.length} caracteres")
         val body = jsonBody.toRequestBody("application/json".toMediaType())
         var attempt = 0
 
@@ -79,7 +87,7 @@ class GoogleAgentEngine(
             val call = try {
                 client.newCall(
                     Request.Builder()
-                        .url("$apiBaseUrl/models/$model:streamGenerateContent?alt=sse")
+                        .url("$apiBaseUrl/models/$encodedModel:streamGenerateContent?alt=sse")
                         .apply { headers.forEach { (name, value) -> header(name, value) } }
                         .header("Accept", "text/event-stream")
                         .post(body)
@@ -202,6 +210,7 @@ class GoogleAgentEngine(
     }
 
     private companion object {
+        val MODEL_NAME_REGEX = Regex("[A-Za-z0-9][A-Za-z0-9._-]*")
         const val MAX_ATTEMPTS = 3
         const val BACKOFF_MS = 200L
         const val READ_TIMEOUT_S = 120L

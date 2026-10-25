@@ -270,6 +270,25 @@ class GoogleAgentEngineTest {
     }
 
     @Test
+    fun `the model name strips models prefix and escapes path`() {
+        server.enqueue(sse(GoogleAgentSseFixtures.TEXT_ONLY))
+        events(e = engine(model = "models/gemini-2.5-flash"))
+        assertThat(server.takeRequest().path).isEqualTo("/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse")
+    }
+
+    @Test
+    fun `an invalid model name is rejected before calling the api`() {
+        for (bad in listOf("models/", "models/models/gemini", "gemini/pro", "gemini:flash", "models/gemini:pro", "a/b", "a:b", "")) {
+            val result = events(e = engine(model = bad))
+            assertThat(result).hasSize(1)
+            val error = result.single() as AgentEvent.Error
+            assertThat(error.kind).isEqualTo(ReasoningError.ENGINE)
+            assertThat(error.message).contains("Google Gemini: nome de modelo inválido")
+            assertThat(server.requestCount).isEqualTo(0)
+        }
+    }
+
+    @Test
     fun `a login credential sends the bearer header and nothing else changes`() {
         server.enqueue(sse(GoogleAgentSseFixtures.TEXT_ONLY))
         events(e = engine(RecordingAuth(mapOf("Authorization" to "Bearer test-token"))))

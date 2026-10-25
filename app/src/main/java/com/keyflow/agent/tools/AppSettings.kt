@@ -26,7 +26,7 @@ sealed interface SettingType {
     data object SkinId : SettingType
 
     /** O identificador de um modelo da nuvem ("gpt-4o", "claude-sonnet-5-5"): só caracteres de nome de modelo, nunca um endereço nem um segredo. */
-    data class ModelName(val maxLength: Int = 100) : SettingType
+    data class ModelName(val maxLength: Int = 100, val stripPrefix: String? = null, val singleSegment: Boolean = false) : SettingType
 }
 
 /**
@@ -54,7 +54,11 @@ class AllowedSetting(
         SettingType.Flag -> "true ou false"
         is SettingType.IntRange -> "inteiro de ${type.min} a ${type.max}" + (if (type.step > 1) ", em múltiplos de ${type.step}" else "") + (if (type.unit.isNotEmpty()) " (${type.unit})" else "")
         is SettingType.Choice -> "um destes: ${type.options.joinToString(", ")}"
-        is SettingType.ModelName -> "nome de modelo (letras, dígitos, . _ - e, entre partes, um / ou :; sem endereço; até ${type.maxLength} caracteres)"
+        is SettingType.ModelName -> if (type.singleSegment) {
+            "nome de modelo (letras, dígitos, . _ -; um único segmento; até ${type.maxLength} caracteres)"
+        } else {
+            "nome de modelo (letras, dígitos, . _ - e, entre partes, um / ou :; sem endereço; até ${type.maxLength} caracteres)"
+        }
         SettingType.SkinId -> "id de skin"
     }
 
@@ -81,8 +85,13 @@ class AllowedSetting(
                 SettingValue.Text(option)
             }
             is SettingType.ModelName -> {
-                if (text.isEmpty() || text.length > type.maxLength || text.contains("..") || !MODEL_NAME.matches(text)) throw ToolFailure("«$key» recebe o nome de um modelo (${rangeText()}).")
-                SettingValue.Text(text)
+                var candidate = text
+                if (type.stripPrefix != null) candidate = candidate.removePrefix(type.stripPrefix)
+                val regex = if (type.singleSegment) SINGLE_SEGMENT_MODEL_NAME else MODEL_NAME
+                if (candidate.isEmpty() || candidate.length > type.maxLength || candidate.contains("..") || !regex.matches(candidate)) {
+                    throw ToolFailure("«$key» recebe o nome de um modelo (${rangeText()}).")
+                }
+                SettingValue.Text(candidate)
             }
             // Só leitura: nunca chega aqui (o esquema de `settings_set` não lista a chave); recusar é a defesa se alguém a listar por engano.
             SettingType.SkinId -> throw ToolFailure("«$key» só pode ser lido aqui. ${readOnlyHint ?: ""}".trim())
@@ -119,6 +128,7 @@ class AllowedSetting(
 
     private companion object {
         val INTEGER = Regex("-?[0-9]{1,9}")
+        val SINGLE_SEGMENT_MODEL_NAME = Regex("[A-Za-z0-9][A-Za-z0-9._-]*")
         /**
          * Segmentos de nome de modelo separados por UM `/` ou `:` (ou `::`, o dos modelos ajustados da OpenAI): `gpt-4o`, `models/gemini-pro`,
          * `ft:gpt-4o-mini:org::abc`. Nunca um endereço (`https://…` tem `:` seguido de `/`) nem um caminho que sobe (`..`): o nome do modelo
@@ -161,7 +171,12 @@ object AppSettingsAllowlist {
         ),
         AllowedSetting("reasoningAnthropicModel", SettingType.ModelName(), trKey("Modelo da Anthropic (Raciocínio)"), "Nome do modelo da Anthropic usado na aba Raciocínio e pelo agente."),
         AllowedSetting("reasoningOpenAiModel", SettingType.ModelName(), trKey("Modelo da OpenAI (Raciocínio)"), "Nome do modelo da OpenAI usado na aba Raciocínio."),
-        AllowedSetting("reasoningGoogleModel", SettingType.ModelName(), trKey("Modelo do Google (Raciocínio)"), "Nome do modelo do Google (Gemini) usado na aba Raciocínio."),
+        AllowedSetting(
+            "reasoningGoogleModel",
+            SettingType.ModelName(stripPrefix = "models/", singleSegment = true),
+            trKey("Modelo do Google (Raciocínio)"),
+            "Nome do modelo do Google (Gemini) usado na aba Raciocínio."
+        ),
     )
 
     private val byKey: Map<String, AllowedSetting> = all.associateBy { it.key }

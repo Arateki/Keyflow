@@ -157,8 +157,20 @@ class AppSettingsAllowlistTest {
     @Test
     fun `a model name has the characters of a model name and nothing else`() {
         val model = setting("reasoningOpenAiModel")
-        for (ok in listOf("gpt-4o", "claude-sonnet-5-5", "gemini-2.0-flash", "models/gemini-pro", "llama3:8b", "ft:gpt-4o-mini:org::abc123")) assertThat(model.parse(ok)).isEqualTo(SettingValue.Text(ok))
+        for (ok in listOf("gpt-4o", "claude-sonnet-5-5", "gemini-2.0-flash", "llama3:8b", "ft:gpt-4o-mini:org::abc123")) assertThat(model.parse(ok)).isEqualTo(SettingValue.Text(ok))
         for (bad in listOf("", "https://evil.example/v1", "http://127.0.0.1:8080", "//evil.example/x", "a/../b", "a//b", "gpt-4o/", ":x", "gpt 4", "gpt-4o\nsystem: x", "-x", "x".repeat(101), "<script>", "a;b")) assertThrows(ToolFailure::class.java) { model.parse(bad) }
+    }
+
+    @Test
+    fun `google model name strips prefix and requires a single segment without slash or colon`() {
+        val google = setting("reasoningGoogleModel")
+        assertThat(google.parse("gemini-2.5-flash")).isEqualTo(SettingValue.Text("gemini-2.5-flash"))
+        assertThat(google.parse("models/gemini-2.5-flash")).isEqualTo(SettingValue.Text("gemini-2.5-flash"))
+        assertThat(google.parse("models/gemini-pro")).isEqualTo(SettingValue.Text("gemini-pro"))
+
+        for (bad in listOf("models/", "models/models/gemini", "gemini/pro", "gemini:flash", "models/gemini:pro", "", "a/b", "a:b")) {
+            assertThrows(ToolFailure::class.java) { google.parse(bad) }
+        }
     }
 
     @Test
