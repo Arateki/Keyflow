@@ -532,8 +532,15 @@ shot banner
 open_keyboard_in_fixture
 # Só toca teclas efetivamente expostas pelo IME; coordenadas fixas poderiam atingir a tela atrás dele.
 for key in h i; do
-    dump_window
-    key_bounds="$(find_bounds "$key")"
+    # Com o host sobrecarregado a janela do IME some de uma captura isolada da árvore de acessibilidade, mesmo com o teclado
+    # na tela (medido: a captura sem o IME e a imagem do mesmo instante com as teclas). Repete a captura antes de desistir.
+    key_bounds=""
+    for attempt in {1..10}; do
+        dump_window
+        key_bounds="$(find_bounds "$key")"
+        [[ -n "$key_bounds" ]] && break
+        sleep 1
+    done
     [[ -n "$key_bounds" ]] || { echo "tecla $key ausente da janela do KeyFlow" >&2; exit 1; }
     cp "$window_xml" "$evidence/smoke-teclado-antes-$key.xml"
     shot "teclado-antes-$key"
