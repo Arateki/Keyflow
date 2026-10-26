@@ -131,10 +131,10 @@ class ModelCatalogTest {
     // ── RCAT-02/03: catálogo de texto (LiteRT-LM) ──────────────────────────────────────────────
 
     @Test
-    fun `text catalog has the light and the balanced model, lightest first`() {
-        // Só os dois cujo repositório, commit e SHA-256 existem de verdade na API do Hugging Face (2026-10-24).
+    fun `text catalog has the four models, lightest first`() {
+        // Só os cujo repositório, commit e SHA-256 existem de verdade na API do Hugging Face (2026-10-24 e 2026-10-25).
         assertThat(ModelCatalog.TEXT.map { it.id })
-            .containsExactly("qwen3-0.6b-litertlm", "gemma-4-e2b-litertlm")
+            .containsExactly("qwen3-0.6b-litertlm", "smollm2-1.7b-litertlm", "deepseek-r1-1.5b-litertlm", "gemma-4-e2b-litertlm")
             .inOrder()
         assertThat(ModelCatalog.TEXT.map { it.totalBytes }).isInOrder()
         assertThat(ModelCatalog.TEXT.map { it.recommendedRamMb }).isInOrder()
@@ -156,6 +156,20 @@ class ModelCatalogTest {
         }
     }
 
+    /**
+     * Cada modelo de texto tem um nível em português como nome (o modelo de verdade vai na linha de baixo do cartão, em
+     * `modelName`): nome sem o modelo dentro, que quebrava a linha e deixava "4)" sozinho a 360 dp.
+     */
+    @Test
+    fun `text models are named by level, without the model inside the name`() {
+        assertThat(ModelCatalog.TEXT.map { it.displayName }).containsExactly("Leve", "Intermediário", "Raciocínio", "Equilibrado").inOrder()
+        assertThat(ModelCatalog.TEXT.map { it.displayName }).containsNoDuplicates()
+        ModelCatalog.TEXT.forEach { assertThat(it.displayName).doesNotContain("(") }
+        assertThat(ModelCatalog.TEXT.map { it.modelName })
+            .containsExactly("Qwen3 0.6B", "SmolLM2 1.7B", "DeepSeek R1 1.5B", "Gemma 4 E2B")
+            .inOrder()
+    }
+
     /** RCAT-03: só baixável sem login, e fixado no commit — o SHA do catálogo tem de continuar valendo. */
     @Test
     fun `text urls point to a pinned huggingface commit and end with the file name`() {
@@ -165,12 +179,21 @@ class ModelCatalogTest {
         }
     }
 
-    /** Números lidos da API do Hugging Face em 2026-09-29 e reconferidos em 2026-10-24 (`/api/models/<repo>/tree/<commit>`). */
+    /**
+     * Números lidos da API do Hugging Face em 2026-09-29 e reconferidos em 2026-10-24 (`/api/models/<repo>/tree/<commit>`).
+     * SmolLM2 e DeepSeek: lidos em 2026-10-25 e o SHA-256 conferido baixando o arquivo inteiro.
+     */
     @Test
     fun `text sizes and hashes match the upstream files`() {
         assertThat(ModelCatalog.QWEN3_0_6B.totalBytes).isEqualTo(614_236_160L)
         assertThat(ModelCatalog.QWEN3_0_6B.files.single().sha256)
             .isEqualTo("555579ff2f4fd13379abe69c1c3ab5200f7338bc92471557f1d6614a6e5ab0b4")
+        assertThat(ModelCatalog.SMOLLM2_1_7B.totalBytes).isEqualTo(1_730_949_280L)
+        assertThat(ModelCatalog.SMOLLM2_1_7B.files.single().sha256)
+            .isEqualTo("3c3e693157e2fb92b862b572cff74b7a353f81eb232cef682bf0fcc91855f8f1")
+        assertThat(ModelCatalog.DEEPSEEK_R1_1_5B.totalBytes).isEqualTo(1_833_451_520L)
+        assertThat(ModelCatalog.DEEPSEEK_R1_1_5B.files.single().sha256)
+            .isEqualTo("69b35f01759eed765641ab4af589bbe98131fd2825662a086d9037409b8c1295")
         assertThat(ModelCatalog.GEMMA_4_E2B.totalBytes).isEqualTo(2_588_147_712L)
         assertThat(ModelCatalog.GEMMA_4_E2B.files.single().sha256)
             .isEqualTo("181938105e0eefd105961417e8da75903eacda102c4fce9ce90f50b97139a63c")

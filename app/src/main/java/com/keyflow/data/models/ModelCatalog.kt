@@ -168,11 +168,15 @@ object ModelCatalog {
     // licença Gemma) ficou de fora e o leve é o Qwen3 0.6B. Tamanhos e SHA256 lidos da API do HF em 2026-09-29
     // (`/api/models/<repo>/tree/<commit>`: `lfs.oid` = SHA256, `lfs.size`); as duas URLs responderam 206 a um pedido
     // de faixa, sem token. URLs no COMMIT do repositório, como na fala.
-    // Saíram em 2026-10-24 (repositório `-litert-lm` inexistente, commit e SHA inventados): SmolLM2 1.7B, DeepSeek R1 1.5B,
-    // Phi-3.5 Mini, Llama 3.2 1B/3B e Gemma 2 2B. Llama (Llama 3.2 Community License) e Gemma 2 (Gemma Terms) têm
-    // restrições de uso e os repositórios reais são gated (login): voltam só por decisão do dono do produto.
+    // SmolLM2 1.7B e DeepSeek R1 1.5B entraram em 2026-10-25 (decisão do Yan), cada um com commit, tamanho e SHA-256 lidos
+    // da API do HF e o SHA-256 conferido baixando o arquivo inteiro; ver o STATE.md ("Catálogo com mais dois modelos de texto").
+    // Saíram em 2026-10-24 (repositório `-litert-lm` inexistente, commit e SHA inventados): Phi-3.5 Mini, Llama 3.2 1B/3B e
+    // Gemma 2 2B (e as versões antigas, inventadas, do SmolLM2 e do DeepSeek). Llama (Llama 3.2 Community License) e Gemma 2
+    // (Gemma Terms) têm restrições de uso e os repositórios reais são gated (login): voltam só por decisão do dono do produto.
     private const val GEMMA_4_REPO = "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/b3ca0d2f076785a8f4b2219ddbd2bdb99954eae1"
     private const val QWEN3_REPO = "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/a3c5d805ae362dff7f580bc25f2dfb9a5a7eaa76"
+    private const val SMOLLM2_REPO = "https://huggingface.co/litert-community/SmolLM2-1.7B-Instruct/resolve/c0ee765a9f197467ead8f22b9bf7bbeb4e6307c7"
+    private const val DEEPSEEK_R1_REPO = "https://huggingface.co/litert-community/DeepSeek-R1-Distill-Qwen-1.5B/resolve/9fd875541bb0f277e4b3cefe7d9622c4c1de2fb5"
 
     /** Qwen3 0.6B (Alibaba), INT8 dinâmico, contexto de 4096. Licença Apache 2.0. */
     val QWEN3_0_6B = ModelSpec(
@@ -192,12 +196,59 @@ object ModelCatalog {
     )
 
     /**
+     * SmolLM2 1.7B Instruct (Hugging Face), INT8 dinâmico só nos pesos (`wi8`) com ativações em FP32. Licença Apache 2.0.
+     * Treinado quase só em inglês: em português responde pior que o Qwen3 — por isso o idioma vem declarado no cartão.
+     */
+    val SMOLLM2_1_7B = ModelSpec(
+        id = "smollm2-1.7b-litertlm",
+        displayName = trKey("Intermediário"),
+        summary = trKey("Mais capaz que o Leve, sem o peso do Equilibrado; bom para reescrever e resumir, melhor em inglês."),
+        languages = trKey("Principalmente inglês"),
+        engineType = EngineType.LITERT_LM,
+        acceptsLanguageHint = false,
+        // Estimativa: arquivo de ~1,6 GiB mapeado em memória, ativações em FP32. Revisar com a medição no A32 (RSN-T19).
+        recommendedRamMb = 3072,
+        modelName = "SmolLM2 1.7B",
+        kind = ModelKind.TEXT,
+        files = listOf(
+            ModelFile(
+                FileRole.MODEL, "SmolLM2-1_7B-Instruct_dynamic_wi8_afp32.litertlm", "$SMOLLM2_REPO/SmolLM2-1_7B-Instruct_dynamic_wi8_afp32.litertlm",
+                "3c3e693157e2fb92b862b572cff74b7a353f81eb232cef682bf0fcc91855f8f1", 1_730_949_280L,
+            ),
+        ),
+    )
+
+    /**
+     * DeepSeek-R1-Distill-Qwen 1.5B (DeepSeek), INT8 (`q8`), contexto de 4096 (`ekv4096`). Licença MIT; derivado do
+     * Qwen2.5-Math-1.5B (Apache 2.0). Modelo que "pensa" antes de responder: o `<think>…</think>` sai do texto (canal
+     * "thought" do [LiteRtBackend]), mas o tempo de geração conta. O card do HF mede ~2,2 GB de pico de memória na CPU.
+     */
+    val DEEPSEEK_R1_1_5B = ModelSpec(
+        id = "deepseek-r1-1.5b-litertlm",
+        displayName = trKey("Raciocínio"),
+        summary = trKey("Pensa passo a passo antes de responder; mais lento, bom para lógica e contas."),
+        languages = trKey("Inglês e chinês"),
+        engineType = EngineType.LITERT_LM,
+        acceptsLanguageHint = false,
+        recommendedRamMb = 4096,
+        modelName = "DeepSeek R1 1.5B",
+        kind = ModelKind.TEXT,
+        files = listOf(
+            ModelFile(
+                FileRole.MODEL, "DeepSeek-R1-Distill-Qwen-1.5B_multi-prefill-seq_q8_ekv4096.litertlm",
+                "$DEEPSEEK_R1_REPO/DeepSeek-R1-Distill-Qwen-1.5B_multi-prefill-seq_q8_ekv4096.litertlm",
+                "69b35f01759eed765641ab4af589bbe98131fd2825662a086d9037409b8c1295", 1_833_451_520L,
+            ),
+        ),
+    )
+
+    /**
      * Gemma 4 E2B (Google), arquivo genérico (CPU/GPU) — não as variantes de NPU de fornecedor. Licença Apache 2.0.
      * O README do repositório mede ~1,4–1,7 GB de memória de CPU num S26 Ultra; o A32 é bem mais modesto.
      */
     val GEMMA_4_E2B = ModelSpec(
         id = "gemma-4-e2b-litertlm",
-        displayName = trKey("Equilibrado (Gemma 4)"),
+        displayName = trKey("Equilibrado"),
         summary = trKey("Mais capaz que o Leve; pesado — melhor em aparelhos com bastante memória."),
         languages = trKey("Multilíngue"),
         engineType = EngineType.LITERT_LM,
@@ -216,6 +267,8 @@ object ModelCatalog {
     /** Modelos de texto (aba Raciocínio), do mais leve ao mais pesado. */
     val TEXT: List<ModelSpec> = listOf(
         QWEN3_0_6B,
+        SMOLLM2_1_7B,
+        DEEPSEEK_R1_1_5B,
         GEMMA_4_E2B,
     )
 
