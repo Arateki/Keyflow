@@ -10,6 +10,8 @@ import com.keyflow.reasoning.local.LocalLlmConfig;
 interface IReasoningService {
     /** Carrega o modelo se preciso e gera; `system` pode ser nulo/vazio. Responde em fluxo pelo callback. */
     oneway void generate(in LocalLlmConfig config, @nullable String system, String user, IReasoningCallback cb);
+    /** Pré-carga explícita: onDone apenas depois do aquecimento; sem onDelta. */
+    oneway void preload(in LocalLlmConfig config, IReasoningCallback cb);
     /** Interrompe a geração em curso; depois disso o serviço não fala mais com o callback dela. */
     oneway void cancel();
 }

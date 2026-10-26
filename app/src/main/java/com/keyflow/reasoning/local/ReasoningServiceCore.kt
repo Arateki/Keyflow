@@ -17,6 +17,7 @@ internal class ReasoningServiceCore(
     private val availableMb: () -> Long?,
     private val scheduler: IdleScheduler,
     private val executor: Executor,
+    private val onWarmed: (LlmModel, Long, Throwable?) -> Unit = { _, _, _ -> },
 ) {
     /** Quem recebe a resposta. Depois de um [cancel], nada mais é entregue à geração cancelada. */
     interface Listener {
@@ -38,6 +39,43 @@ internal class ReasoningServiceCore(
 
     fun generate(model: LlmModel, request: ReasoningRequest, listener: Listener) {
         executor.execute { run(model, request, listener) }
+    }
+
+    /** Seleção explícita: carrega e aquece uma vez, antes do primeiro prompt. Mesma fila das gerações. */
+    fun preload(model: LlmModel, listener: Listener) {
+        executor.execute {
+            busy = true
+            idleTimer?.cancel()
+            idleTimer = null
+            useToken++
+            try {
+                val fresh = backend == null || loadedId != model.modelId
+                val active = ensureLoaded(model)
+                if (fresh) {
+                    val started = System.nanoTime()
+                    val failure = try {
+                        active.warmUp()
+                        null
+                    } catch (e: OutOfMemoryError) {
+                        e
+                    } catch (e: Exception) {
+                        e
+                    }
+                    onWarmed(model, (System.nanoTime() - started) / 1_000_000L, failure)
+                }
+                listener.onDone()
+            } catch (e: ReasoningFailure) {
+                listener.onError(e.kind, e.message.orEmpty())
+            } catch (e: OutOfMemoryError) {
+                unloadCurrent()
+                listener.onError(ReasoningErrorKind.OOM, "memória esgotada durante a pré-carga")
+            } catch (e: Exception) {
+                listener.onError(ReasoningErrorKind.ENGINE, e.message ?: e.toString())
+            } finally {
+                busy = false
+                scheduleIdleUnload(model)
+            }
+        }
     }
 
     /** Interrompe a geração em curso (RRUN-06). Sem geração em curso, não faz nada além de silenciar a próxima já enfileirada. */
