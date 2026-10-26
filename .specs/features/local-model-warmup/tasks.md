@@ -2,7 +2,7 @@
 
 ## AQ-T1 — Aquecer o Parakeet na pré-carga (main, fora da v1)
 
-- **Status:** em implementação.
+- **Status:** implementado; falta só a medida no A32 (coordenador).
 - **What/Where:** `InferenceServiceCore`, `InferenceService`, `SherpaEngine`; fila existente,
   inferência descartável de 1 s, uma tentativa por carga e sem resposta visível.
   Pré-carga explícita de texto via AIDL com dois tokens; indicador indeterminado e tempo nos cards selecionados.
