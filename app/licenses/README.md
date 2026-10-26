@@ -11,6 +11,8 @@
 | LiteRT-LM 0.16.1 (Google; AAR, LLM no aparelho — aba Raciocínio) | Apache-2.0 | `Apache-2.0_litert-lm.txt` (+ avisos das dependências nativas em `THIRD-PARTY_litert-lm-notices.txt`) |
 | Gemma 4 E2B (Google) — modelo de texto baixado sob demanda | Apache-2.0 | `Apache-2.0_gemma-4-e2b.txt` |
 | Qwen3 0.6B (Alibaba) — modelo de texto baixado sob demanda | Apache-2.0 | `Apache-2.0_qwen3-0.6b.txt` |
+| SmolLM2 1.7B Instruct (Hugging Face) — modelo de texto baixado sob demanda | Apache-2.0 | `Apache-2.0_smollm2-1.7b.txt` |
+| DeepSeek-R1-Distill-Qwen 1.5B (DeepSeek, derivado do Qwen2.5) — modelo de texto baixado sob demanda | MIT (e Apache-2.0 do Qwen2.5) | `MIT_deepseek-r1-distill-qwen-1.5b.txt` |
 | AndroidSVG 1.4 (AAR, desenha os SVGs das skins importáveis) | Apache-2.0 | `Apache-2.0_androidsvg.txt` |
 
 Fontes das licenças conferidas em 2026-09-25: `LICENSE` do sherpa-onnx na tag v1.13.8, do ONNX Runtime
@@ -29,3 +31,8 @@ eSpeak NG (GPL-3.0) nas `libsherpa-onnx-jni.so` e `libsherpa-onnx-c-api.so`. O K
 recompilado pelo `.github/workflows/sherpa-sem-tts.yml` (mesma tag v1.13.8, mesmas opções e a mesma ONNX Runtime 1.28.2; só o TTS
 desligado e a API Kotlin de TTS fora), baixado do release do repositório e fixado por SHA-256 no `app/build.gradle.kts`. O
 `SherpaAarSemGplTest` falha se o AAR de `app/libs/` tiver o eSpeak NG.
+
+Conferidas em 2026-10-25 (catálogo com mais dois modelos de texto): `license: apache-2.0` no card do `litert-community/SmolLM2-1.7B-Instruct` e
+no do original `HuggingFaceTB/SmolLM2-1.7B-Instruct`; `license: mit` no card do `litert-community/DeepSeek-R1-Distill-Qwen-1.5B` e no
+`LICENSE` do `deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B`, que na seção 7 do README avisa que o 1.5B deriva do Qwen2.5 (Apache 2.0) — por isso o
+arquivo do DeepSeek traz as duas licenças. Os dois repositórios do `litert-community` são `gated: false`.

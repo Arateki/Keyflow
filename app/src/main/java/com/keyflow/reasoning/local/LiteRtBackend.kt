@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicReference
  * Cada geração abre uma [Conversation] nova e a fecha no fim: o Testar e os futuros consumidores são de uma frase, sem
  * histórico. O [Engine] fica carregado até [unload].
  */
-internal class LiteRtBackend(private val cacheDir: String?) : LlmBackend {
+internal class LiteRtBackend(private val cacheDir: String?, private val opensThink: Boolean = false) : LlmBackend {
 
     private var engine: Engine? = null
 
@@ -46,7 +46,8 @@ internal class LiteRtBackend(private val cacheDir: String?) : LlmBackend {
     override fun generate(request: ReasoningRequest, onDelta: (String) -> Unit) {
         val active = checkNotNull(engine) { "o motor não está carregado" }
         cancelled = false
-        val config = LiteRtConfigs.conversation(request.system)
+        val config = LiteRtConfigs.conversation(request.system, opensThink)
+        val stripper = ThoughtStripper(opensThink)
         val conversation = active.createConversation(config)
         this.conversation = conversation
         try {
@@ -56,7 +57,7 @@ internal class LiteRtBackend(private val cacheDir: String?) : LlmBackend {
                 request.user,
                 object : MessageCallback {
                     override fun onMessage(message: Message) {
-                        val text = textOf(message)
+                        val text = stripper.accept(textOf(message))
                         if (text.isNotEmpty() && !cancelled) onDelta(text)
                     }
 
@@ -76,6 +77,10 @@ internal class LiteRtBackend(private val cacheDir: String?) : LlmBackend {
                 }
             }
             failure.get()?.let { if (!cancelled) throw it }
+            // O modelo que abre o `<think>` sozinho nunca fechou o pensamento: o que saiu foi só raciocínio, e ele não é resposta.
+            if (!cancelled && !stripper.closed) {
+                throw ReasoningFailure(ReasoningErrorKind.ENGINE, "o modelo terminou sem dar uma resposta (só raciocínio interno)")
+            }
         } finally {
             this.conversation = null
             runCatching { conversation.close() }
@@ -133,10 +138,11 @@ private object LiteRtConfigs {
      * `enable_thinking=false` do template de chat do Qwen3 (o que de fato o desliga neste modelo) e, como rede de
      * segurança, o canal "thought": se o modelo pensar mesmo assim, o `<think>…</think>` sai do texto da resposta.
      */
-    fun conversation(system: String?): ConversationConfig {
+    fun conversation(system: String?, opensThink: Boolean = false): ConversationConfig {
         val thinking = ThinkingConfig(enableThinking = false, thinkingTokenBudget = 0)
         val context: Map<String, Any> = mapOf("enable_thinking" to false)
-        val channels = listOf(Channel("thought", "<think>", "</think>"))
+        // Modelo cujo prompt já abre o `<think>` (DeepSeek R1): o canal não reconheceria o início; o [ThoughtStripper] cuida disso.
+        val channels = if (opensThink) emptyList() else listOf(Channel("thought", "<think>", "</think>"))
         return if (system != null) {
             ConversationConfig(systemInstruction = Contents.of(system), channels = channels, extraContext = context, thinkingConfig = thinking)
         } else {

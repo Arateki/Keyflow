@@ -114,6 +114,8 @@ class LocalModelsUiTest {
 
     private val qwen = ModelCatalog.QWEN3_0_6B.id
     private val gemma = ModelCatalog.GEMMA_4_E2B.id
+    private val smol = ModelCatalog.SMOLLM2_1_7B.id
+    private val deepseek = ModelCatalog.DEEPSEEK_R1_1_5B.id
 
     private fun textUi(
         installed: Set<String> = emptySet(),
@@ -153,9 +155,16 @@ class LocalModelsUiTest {
 
     @Test
     fun `the heavy warning follows each text model's recommended RAM`() {
-        val ui = textUi(ramMb = 2_000) // entre a recomendação do Qwen (1024) e a do Gemma (4096)
+        val ui = textUi(ramMb = 2_000) // entre a recomendação do Qwen (1024) e as dos outros (3072 a 4096)
         assertThat(ui.item(qwen).heavy).isFalse()
+        assertThat(ui.item(smol).heavy).isTrue()
+        assertThat(ui.item(deepseek).heavy).isTrue()
         assertThat(ui.item(gemma).heavy).isTrue()
+        // 3,5 GB: o Intermediário (3072) cabe; o Raciocínio e o Equilibrado (4096) ainda pesam.
+        val mid = textUi(ramMb = 3_500)
+        assertThat(mid.item(smol).heavy).isFalse()
+        assertThat(mid.item(deepseek).heavy).isTrue()
+        assertThat(mid.item(gemma).heavy).isTrue()
         assertThat(textUi(ramMb = 8_000).items.none { it.heavy }).isTrue()
     }
 

@@ -478,7 +478,7 @@ Spec: `.specs/features/reasoning-models/` (`spec.md` 45 requisitos, `design.md`,
 texto literal da doc da OpenAI). Ordem: RSN-T0 → T1 → … → T19 (uma por vez, um commit por task).
 
 - **Escopo**: só CONECTAR modelos de linguagem + botão Testar. Quem consome o raciocínio (limpar ditado, comandos, resumo)
-  é feature futura. Origens: **Local** (Qwen3 0.6B e Gemma 4 E2B pelo LiteRT-LM, processo `:reasoning`) e provedores
+  é feature futura. Origens: **Local** (Qwen3 0.6B, SmolLM2 1.7B, DeepSeek R1 1.5B e Gemma 4 E2B pelo LiteRT-LM, processo `:reasoning`) e provedores
   **OpenAI, Anthropic e Google** por chave de API ou login por assinatura, conforme disponibilidade da conta.
 - **O login mora em `auth/`** e é trocável: o núcleo não conhece UI, `Settings` nem provedor; cada provedor é uma pasta em
   `auth/providers/` mais uma linha no registro (`AuthProviders`). O `AuthIsolationTest` confere isso lendo os imports.

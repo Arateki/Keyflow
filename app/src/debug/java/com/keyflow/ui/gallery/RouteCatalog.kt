@@ -371,6 +371,15 @@ object RouteCatalog {
                 ready = true,
             )
         },
+        // Os quatro modelos instalados, o Raciocínio selecionado: cada cartão com o botão de seleção, que tira largura do nome
+        // (o pior caso para um nome quebrar em duas linhas a 360 dp).
+        Route("config-raciocinio-local-instalados") {
+            ConfigReasoningRoute(
+                localModelId = ModelCatalog.DEEPSEEK_R1_1_5B.id,
+                localModels = galleryTextModels(installed = ModelCatalog.TEXT.map { it.id }.toSet(), selected = ModelCatalog.DEEPSEEK_R1_1_5B.id),
+                ready = true,
+            )
+        },
         Route("config-raciocinio-openai-desconectado") {
             ConfigReasoningRoute(source = ReasoningSource.OPENAI, auth = GalleryAuth(ConnectionState.Disconnected, storedKey = FakeSettings.OPENAI_API_KEY))
         },

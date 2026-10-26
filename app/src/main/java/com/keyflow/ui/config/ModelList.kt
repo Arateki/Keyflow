@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -198,14 +199,7 @@ private fun ModelCard(
                 if (spec.modelName.isNotBlank()) {
                     Text(spec.modelName, color = palette.muted, fontFamily = SpaceMono, fontWeight = FontWeight.Light, fontSize = 9.5.sp)
                 }
-                Text(
-                    "${formatModelSize(spec.totalBytes)} · ${tr(spec.languages)}",
-                    color = palette.faint,
-                    fontFamily = SpaceMono,
-                    fontWeight = FontWeight.Light,
-                    fontSize = 9.5.sp,
-                    modifier = Modifier.padding(top = 2.dp),
-                )
+                SizeAndLanguage(formatModelSize(spec.totalBytes), tr(spec.languages))
             }
             when (item.status) {
                 LocalModelStatus.AVAILABLE -> CardAction(
@@ -286,6 +280,31 @@ private fun ModelCard(
                 onDismiss = onDismiss,
             )
         }
+    }
+}
+
+/**
+ * "~586 MB · Multilíngue" numa linha só. Se não couber (com o botão de seleção o texto fica mais estreito), o tamanho e o
+ * idioma vão em duas linhas, sem o "·": quebrar a linha no meio deixava o ponto sozinho no fim ou no começo de uma delas.
+ */
+@Composable
+private fun SizeAndLanguage(size: String, languages: String) {
+    val palette = LocalKeyFlowPalette.current
+    var stacked by remember { mutableStateOf(false) }
+    val style = TextStyle(color = palette.faint, fontFamily = SpaceMono, fontWeight = FontWeight.Light, fontSize = 9.5.sp)
+    if (stacked) {
+        Column(Modifier.padding(top = 2.dp)) {
+            Text(size, style = style)
+            Text(languages, style = style)
+        }
+    } else {
+        Text(
+            "$size · $languages",
+            style = style,
+            softWrap = false,
+            onTextLayout = { if (it.hasVisualOverflow) stacked = true },
+            modifier = Modifier.padding(top = 2.dp),
+        )
     }
 }
 
