@@ -3015,3 +3015,16 @@ Dois motores com ferramentas ao lado do da Anthropic: `reasoning/openai/OpenAiAg
 - Limite da prova: o laço de sementes foi interrompido por queda do servidor por falta de memória (JVMs soltos); passaram ~320 sementes
   sem falha com a correção, não as 2000 pedidas. Repetições depois, só pelo `pool`. `OrbMotionArtifactTest` falha/trava também na `main`
   (e deixa o `PartialOverlayServiceTest` falhando se rodar antes no mesmo emulador); não é desta mudança.
+
+## OrbMotionArtifactTest travava no emulador do servidor (2026-10-26)
+
+- Causa: `capture()` e `waitUntil()` chamavam `instrumentation.waitForIdleSync()`. A orbe é um `ComposeView` com animações
+  infinitas (aura, partículas) e, no swangle, cada quadro leva 150–200 ms; a fila da thread principal nunca fica ociosa, então
+  cada chamada só voltava ao estourar o tempo. Medido pelo logcat (`UiDevice: Taking screenshot`): 10–25 s por quadro, ~164
+  quadros no teste, ou seja, mais de 40 min (o pool interrompeu aos 9m40 ainda no cenário `toggle-pause`). Não era trava: era lentidão
+  que parecia trava, e o processo ficava vivo no emulador depois da interrupção, o que contaminava o `PartialOverlayServiceTest`.
+- Por que o CI passava: ele roda com `-e motionFrames false`, e o `@Before` pula a classe. Ela nunca rodou de verdade no CI.
+- Correção: `settle()` (`runOnMainSync { }`) no lugar de `waitForIdleSync()`. Mesmas verificações; o teste fecha em ~5 min (319 s).
+- Lição: com Compose de animação infinita na tela, nunca `waitForIdleSync`; e teste pulado no CI não prova que passa.
+- Prova (pool, servidor): a classe passou 3 vezes seguidas (5m29s, 6m11s, 5m40s) e `OrbMotionArtifactTest` + `PartialOverlayServiceTest`
+  na mesma chamada passou (4 testes, 6m47s). Em aberto: ~2 s por quadro de screenshot no swangle; a classe segue lenta (~5 min).
