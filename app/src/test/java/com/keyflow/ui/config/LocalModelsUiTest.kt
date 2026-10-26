@@ -116,6 +116,7 @@ class LocalModelsUiTest {
     private val gemma = ModelCatalog.GEMMA_4_E2B.id
     private val smol = ModelCatalog.SMOLLM2_1_7B.id
     private val deepseek = ModelCatalog.DEEPSEEK_R1_1_5B.id
+    private val gemmaE4b = ModelCatalog.GEMMA_4_E4B.id
 
     private fun textUi(
         installed: Set<String> = emptySet(),
@@ -165,7 +166,12 @@ class LocalModelsUiTest {
         assertThat(mid.item(smol).heavy).isFalse()
         assertThat(mid.item(deepseek).heavy).isTrue()
         assertThat(mid.item(gemma).heavy).isTrue()
-        assertThat(textUi(ramMb = 8_000).items.none { it.heavy }).isTrue()
+        // 5 GB: o Equilibrado (4096) cabe, o Avançado (8192, pico de CPU de 3,3 GB no README) pesa até num aparelho de 8 GB (~7,4 GB visíveis).
+        val five = textUi(ramMb = 5_000)
+        assertThat(five.item(gemma).heavy).isFalse()
+        assertThat(five.item(gemmaE4b).heavy).isTrue()
+        assertThat(textUi(ramMb = 8_000).items.filter { it.heavy }.map { it.spec.id }).containsExactly(gemmaE4b)
+        assertThat(textUi(ramMb = 12_000).items.none { it.heavy }).isTrue()
     }
 
     @Test

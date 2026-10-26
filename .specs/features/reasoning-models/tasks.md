@@ -517,3 +517,9 @@ Fase A/B (o device é o gargalo: instrumentado serializa).
 - **Saem do gate** (trocar para `validatedOnDevice = true`) depois do roteiro manual no A32, por modelo: baixar, Testar, anotar 1º trecho,
   total e RAM, e conferir que a resposta do DeepSeek não traz o raciocínio (o `ThoughtStripper` descarta até o `</think>`; sem ele, o teste falha
   com "só raciocínio interno"). Ajustar `recommendedRamMb` (3072 e 4096 são estimativas) com a medição.
+
+### Gemma 4 E4B (2026-10-26)
+
+- Mesmo gate dos dois acima: `validatedOnDevice = false` (só debug) até rodar num aparelho de 8 GB ou mais — o A32 (4 GB) não comporta o
+  pico de ~3,3 GB de CPU do README. Ao promover, trocar o flag, medir o PSS e ajustar `recommendedRamMb` (8192 é estimativa); a linha de licença
+  da Docs e do `doc.json` volta sozinha (`unvalidatedTextModelLicenses()`), aí regerar o `doc.json` (`KEYFLOW_REGERAR_DOC_SITE=1`).

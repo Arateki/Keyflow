@@ -131,10 +131,10 @@ class ModelCatalogTest {
     // ── RCAT-02/03: catálogo de texto (LiteRT-LM) ──────────────────────────────────────────────
 
     @Test
-    fun `text catalog has the four models, lightest first`() {
-        // Só os cujo repositório, commit e SHA-256 existem de verdade na API do Hugging Face (2026-10-24 e 2026-10-25).
+    fun `text catalog has the five models, lightest first`() {
+        // Só os cujo repositório, commit e SHA-256 existem de verdade na API do Hugging Face (2026-10-24, 2026-10-25 e 2026-10-26).
         assertThat(ModelCatalog.TEXT.map { it.id })
-            .containsExactly("qwen3-0.6b-litertlm", "smollm2-1.7b-litertlm", "deepseek-r1-1.5b-litertlm", "gemma-4-e2b-litertlm")
+            .containsExactly("qwen3-0.6b-litertlm", "smollm2-1.7b-litertlm", "deepseek-r1-1.5b-litertlm", "gemma-4-e2b-litertlm", "gemma-4-e4b-litertlm")
             .inOrder()
         assertThat(ModelCatalog.TEXT.map { it.totalBytes }).isInOrder()
         assertThat(ModelCatalog.TEXT.map { it.recommendedRamMb }).isInOrder()
@@ -162,16 +162,16 @@ class ModelCatalogTest {
      */
     @Test
     fun `text models are named by level, without the model inside the name`() {
-        assertThat(ModelCatalog.TEXT.map { it.displayName }).containsExactly("Leve", "Intermediário", "Raciocínio", "Equilibrado").inOrder()
+        assertThat(ModelCatalog.TEXT.map { it.displayName }).containsExactly("Leve", "Intermediário", "Raciocínio", "Equilibrado", "Avançado").inOrder()
         assertThat(ModelCatalog.TEXT.map { it.displayName }).containsNoDuplicates()
         ModelCatalog.TEXT.forEach { assertThat(it.displayName).doesNotContain("(") }
         assertThat(ModelCatalog.TEXT.map { it.modelName })
-            .containsExactly("Qwen3 0.6B", "SmolLM2 1.7B", "DeepSeek R1 1.5B", "Gemma 4 E2B")
+            .containsExactly("Qwen3 0.6B", "SmolLM2 1.7B", "DeepSeek R1 1.5B", "Gemma 4 E2B", "Gemma 4 E4B")
             .inOrder()
     }
 
     /**
-     * SmolLM2 e DeepSeek nunca carregaram no LiteRT-LM de um aparelho: ficam só no debug até o roteiro manual no A32.
+     * SmolLM2, DeepSeek e Gemma 4 E4B nunca carregaram no LiteRT-LM de um aparelho: ficam só no debug até o roteiro manual no A32.
      * O release (`debug = false`) lista só os validados, e o DeepSeek é o único cujo prompt abre o `<think>`.
      */
     @Test
@@ -180,7 +180,7 @@ class ModelCatalogTest {
             .containsExactly("qwen3-0.6b-litertlm", "gemma-4-e2b-litertlm").inOrder()
         assertThat(ModelCatalog.visibleIn(ModelCatalog.TEXT_ALL, debug = true)).containsExactlyElementsIn(ModelCatalog.TEXT_ALL).inOrder()
         assertThat(ModelCatalog.TEXT_ALL.filterNot { it.validatedOnDevice }.map { it.id })
-            .containsExactly("smollm2-1.7b-litertlm", "deepseek-r1-1.5b-litertlm")
+            .containsExactly("smollm2-1.7b-litertlm", "deepseek-r1-1.5b-litertlm", "gemma-4-e4b-litertlm")
         assertThat(ModelCatalog.TEXT_ALL.filter { it.promptOpensThink }.map { it.id }).containsExactly("deepseek-r1-1.5b-litertlm")
     }
 
@@ -211,6 +211,10 @@ class ModelCatalogTest {
         assertThat(ModelCatalog.GEMMA_4_E2B.totalBytes).isEqualTo(2_588_147_712L)
         assertThat(ModelCatalog.GEMMA_4_E2B.files.single().sha256)
             .isEqualTo("181938105e0eefd105961417e8da75903eacda102c4fce9ce90f50b97139a63c")
+        // E4B: lido em 2026-10-26 (`/api/models/litert-community/gemma-4-E4B-it-litert-lm/tree/e6a3892a…`) e o SHA-256 conferido baixando o arquivo inteiro.
+        assertThat(ModelCatalog.GEMMA_4_E4B.totalBytes).isEqualTo(3_659_530_240L)
+        assertThat(ModelCatalog.GEMMA_4_E4B.files.single().sha256)
+            .isEqualTo("0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0")
     }
 
     // ── Visão e voz: o que valer para qualquer entrada que entre nessas listas ─────────────────────────────────────

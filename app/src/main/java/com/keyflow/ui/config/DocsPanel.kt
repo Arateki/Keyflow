@@ -434,6 +434,9 @@ private fun unvalidatedTextModelLicenses(): List<DocBlock> = buildList {
     if (ModelCatalog.SMOLLM2_1_7B.validatedOnDevice) {
         add(DocBlock.Labeled("SmolLM2 1.7B", tr("modelo de texto Intermediário — Apache 2.0 (Hugging Face), baixado sob demanda.")))
     }
+    if (ModelCatalog.GEMMA_4_E4B.validatedOnDevice) {
+        add(DocBlock.Labeled("Gemma 4 E4B", tr("modelo de texto Avançado — Apache 2.0 (Google), baixado sob demanda.")))
+    }
     if (ModelCatalog.DEEPSEEK_R1_1_5B.validatedOnDevice) {
         add(
             DocBlock.Labeled(
