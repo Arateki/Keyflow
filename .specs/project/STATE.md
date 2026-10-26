@@ -2989,4 +2989,4 @@ Dois motores com ferramentas ao lado do da Anthropic: `reasoning/openai/OpenAiAg
   lê os dois. O DeepSeek traz no metadado o prompt do modelo `<｜Assistant｜><think>\n`: o `<think>` já vem aberto, então o canal "thought"
   (`<think>…</think>`) do `LiteRtBackend` pode não reconhecer o início e o raciocínio vazar na resposta — conferir no aparelho.
 - `adb exec-in` com arquivo grande trava na ponte do adb; empurre em pedaços com `adb push` + `run-as cat >>`.
-- Idiomas honestos no cartão: SmolLM2 "Principalmente inglês", DeepSeek "Inglês e chinês".
+- Idioma no cartão: os dois dizem só "Inglês" (a linha "tamanho · idioma" quebra com mais de ~21 caracteres quando há o botão de seleção; o ponto agora fica preso ao idioma por NBSP).

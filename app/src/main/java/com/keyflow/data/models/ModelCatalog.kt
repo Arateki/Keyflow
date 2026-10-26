@@ -197,13 +197,13 @@ object ModelCatalog {
 
     /**
      * SmolLM2 1.7B Instruct (Hugging Face), INT8 dinâmico só nos pesos (`wi8`) com ativações em FP32. Licença Apache 2.0.
-     * Treinado quase só em inglês: em português responde pior que o Qwen3 — por isso o idioma vem declarado no cartão.
+     * Treinado quase só em inglês: em português responde pior que o Qwen3 — por isso o idioma vem declarado no cartão ("Inglês").
      */
     val SMOLLM2_1_7B = ModelSpec(
         id = "smollm2-1.7b-litertlm",
         displayName = trKey("Intermediário"),
         summary = trKey("Mais capaz que o Leve, sem o peso do Equilibrado; bom para reescrever e resumir, melhor em inglês."),
-        languages = trKey("Principalmente inglês"),
+        languages = trKey("Inglês"),
         engineType = EngineType.LITERT_LM,
         acceptsLanguageHint = false,
         // Estimativa: arquivo de ~1,6 GiB mapeado em memória, ativações em FP32. Revisar com a medição no A32 (RSN-T19).
@@ -227,7 +227,7 @@ object ModelCatalog {
         id = "deepseek-r1-1.5b-litertlm",
         displayName = trKey("Raciocínio"),
         summary = trKey("Pensa passo a passo antes de responder; mais lento, bom para lógica e contas."),
-        languages = trKey("Inglês e chinês"),
+        languages = trKey("Inglês"),
         engineType = EngineType.LITERT_LM,
         acceptsLanguageHint = false,
         recommendedRamMb = 4096,

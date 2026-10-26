@@ -199,7 +199,7 @@ private fun ModelCard(
                     Text(spec.modelName, color = palette.muted, fontFamily = SpaceMono, fontWeight = FontWeight.Light, fontSize = 9.5.sp)
                 }
                 Text(
-                    "${formatModelSize(spec.totalBytes)} · ${tr(spec.languages)}",
+                    "${formatModelSize(spec.totalBytes)} ·\u00A0${tr(spec.languages)}",
                     color = palette.faint,
                     fontFamily = SpaceMono,
                     fontWeight = FontWeight.Light,
