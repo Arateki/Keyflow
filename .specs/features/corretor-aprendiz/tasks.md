@@ -290,7 +290,10 @@ Play**: a T18b (textos legais, revisados pelo Yan) fecha a fase B; sem ela o apr
 - **Where**: `learning/LearnedStore.kt` (retrato e `merge`), `learning/LearnedImportReader.kt`, `ui/config/LearnedWordsPanel.kt`.
 - **Depends on**: CA-T10, CA-T16.
 - **Covers**: LST-06, LST-07.
-- **Done when**: exportar → apagar tudo → importar devolve o mesmo aprendido (teste de ida e volta); arquivo
+- **Done when**: exportar → apagar tudo → importar devolve o mesmo aprendido (teste de ida e volta, **inclusive com registro antigo**: palavra de peso 3
+  parada há 90 dias exporta com peso 1,5 na leitura e, depois de apagar tudo e importar, continua em 1,5 e valendo —
+  a mescla leva o peso decaído até hoje com `ultimoUso = hoje`, sem decair duas vezes; o mesmo para par e bigrama);
+  arquivo
   truncado, de versão futura ou > 5 MB é recusado sem mudar nada; arquivo com peso negativo, NaN, data futura,
   palavra inelegível ou além dos tetos sai dentro dos limites (teste por caso + propriedade: depois de importar
   qualquer entrada, nenhum teto é violado); nenhuma cópia em `cache/` ou `files/` e nenhuma chamada de rede

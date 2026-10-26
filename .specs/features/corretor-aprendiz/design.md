@@ -460,8 +460,12 @@ desconhecido é ignorada; e o que passa é **forçado aos mesmos limites do apre
 e as linhas ignoradas); confirmado, `LearnedStore.merge(preview)` roda na thread `keyflow-suggest` (a única que
 toca nos dados, ARM-03) e grava o resultado como acréscimos do diário.
 
-**Mescla** (pesos já decaídos até hoje): palavra soma os pesos, limitados a `WEIGHT_CAP`, com `ultimoUso = max` e
-`valid = valid₁ ∨ valid₂ ∨ soma ≥ VALID_AT`; par com a mesma escolhida soma, com escolhidas diferentes fica o de
+**Mescla** (pesos já decaídos até hoje): palavra soma os pesos **já decaídos até hoje**, limitados a `WEIGHT_CAP`, e
+o resultado leva `ultimoUso = hoje`, porque a data de um peso é o marco a partir do qual ele decai: com `max` das
+datas antigas o peso, que já foi decaído, seria decaído de novo na leitura (peso 3 parado há 90 dias: 1,5 antes de
+exportar; apagar e importar com `max` daria 0,75 e a palavra deixaria de valer). Vale o mesmo para pares e
+bigramas. Se a tela precisar mostrar "último uso", ele é um campo separado e **não** entra na conta do decaimento.
+`valid = valid₁ ∨ valid₂ ∨ soma ≥ VALID_AT` (com `conhece(w)` ainda pedindo `peso(agora) ≥ KEEP_ABOVE`); par com a mesma escolhida soma, com escolhidas diferentes fica o de
 dia mais recente (e vale o evento mais recente entre par e palavra, FIX-05); bigrama soma; viés é a média
 ponderada por `n`, com `|μ| ≤ 0,25` e `n` até o teto que a CA-T23 definir. Depois da mescla vale o teto
 `MAX_WORDS`/`MAX_PAIRS`/`MAX_BIGRAMS` por idioma pela regra do LRN-07 (sai o de menor peso). "Apagar tudo" e depois
