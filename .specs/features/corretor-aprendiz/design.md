@@ -219,7 +219,9 @@ qualquer ── Reset | t − t0 > 20 s | backspace além de W | letra sem apaga
 `V = prefixo + resto` vem só dos eventos: as letras novas ficam na composição do serviço e o que sobrou de
 W é texto comitado; o tracker junta os dois sem ler o campo (ARM-03). Valida: `V ≠ W`, `V` está no
 dicionário ou no aprendido, a original não vale como palavra, distância(W, V) ≤ 2 edições (a mesma
-`distance` do `Suggester`). Se `V == orig` e W era uma troca → é uma recusa (REJ-03).
+`distance` do `Suggester`). **Ordem das checagens:** primeiro `V == orig` com W sendo uma troca → é uma recusa (REJ-03): confirma a recusa
+(`Rejected`, +3, par apagado, REJ-04) **sem** passar pelas condições acima, que pediriam `V` válida e a original
+inválida ao mesmo tempo (a recusa seria inalcançável); só depois vêm as condições do par (FIX-02).
 
 ### Pares e candidatas pessoais
 

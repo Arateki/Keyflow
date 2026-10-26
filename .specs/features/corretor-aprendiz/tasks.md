@@ -402,7 +402,9 @@ Play**: a T18b (textos legais, revisados pelo Yan) fecha a fase B; sem ela o apr
 - **What**: máquina de estados pura; serviço a alimenta com eventos; `Rewrite` soma ao par; REJ-03.
 - **Where**: `learning/RewriteTracker.kt`, serviço.
 - **Depends on**: CA-T11, CA-T12, CA-T13, CA-T14 (o `PairTap` da faixa). **Covers**: FIX-02, FIX-04..06, REJ-03.
-- **Done when**: `RewriteTrackerTest` (apagar e reescrever, janela de 20 s, cursor, letra sem apagar); instrumentado:
+- **Done when**: `RewriteTrackerTest` (apagar e reescrever, janela de 20 s, cursor, letra sem apagar; **apagar a
+  corrigida e reescrever um nome fora do dicionário** — `Arateki`, trocado por `Arateky` — emite `Rejected` e não
+  `Rewrite`: a original inválida passa pela recusa antes das condições do par); instrumentado:
   digitar `tmbm`, tocar `também` 2× e a 3ª vez troca no espaço; recusar remove o par.
 - **Tests**: unit + instrumentado. **Gate**: `full`.
 
