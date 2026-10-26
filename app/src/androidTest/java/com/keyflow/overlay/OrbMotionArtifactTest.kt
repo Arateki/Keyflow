@@ -299,10 +299,20 @@ class OrbMotionArtifactTest {
     }
 
     private fun capture(dir: File, index: Int, label: String) {
-        instrumentation.waitForIdleSync()
+        settle()
         Thread.sleep(80)
         val file = File(dir, "frame-%02d-%s.png".format(index, label))
         assertTrue("falha ao capturar ${file.name}", device.takeScreenshot(file))
+    }
+
+    /**
+     * Espera o que já foi postado na thread principal rodar, sem esperar a fila ficar ociosa: a orbe é um `ComposeView` com
+     * animações infinitas (aura, partículas), então a fila nunca fica ociosa e `waitForIdleSync` só volta quando estoura
+     * o tempo (medido: ~15 s por quadro no swangle do servidor, 144 quadros). Um `runOnMainSync` vazio basta: ele só
+     * volta depois que os eventos injetados e a renderização pendente anteriores a ele rodaram.
+     */
+    private fun settle() {
+        instrumentation.runOnMainSync { }
     }
 
     private fun down(view: OrbButtonView) {
@@ -329,7 +339,7 @@ class OrbMotionArtifactTest {
     private fun waitUntil(message: String, timeoutMs: Long = 3000L, condition: () -> Boolean) {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
-            instrumentation.waitForIdleSync()
+            settle()
             if (condition()) return
             Thread.sleep(50)
         }
