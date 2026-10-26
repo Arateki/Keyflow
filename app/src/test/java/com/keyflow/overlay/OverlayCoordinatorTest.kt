@@ -884,6 +884,99 @@ class OverlayCoordinatorTest {
             assertThat(renderedStates.last()).isEqualTo(ButtonState.IDLE_READY)
         }
 
+    /**
+     * Achado do OverlayCoordinatorStateMachineTest (semente 841884305423593078): depois de continuar um áudio retido (a sessão
+     * nova já está aberta, `continuingPendingAudio`), pausar e retomar de novo caía no ramo "há áudio retido" e chamava
+     * `recorder.start()` com a sessão viva. No aparelho o `AudioRecorder.start()` recusa (`check(state == IDLE)`), o
+     * `runCatching` engolia o erro e a tela voltava a RECORDING com o microfone PAUSADO — a fala seguinte se perdia, e o
+     * `timeStart()` ainda zerava o cronômetro e o relógio do limite. A segunda retomada tem de só retomar a mesma sessão.
+     */
+    @Test
+    fun `pausing and resuming again while continuing a retained audio resumes the live session instead of starting another`() =
+        runTest {
+            val segment1 = temporaryFolder.newFile("seg1.m4a").also { it.writeText("seg1") }
+            val segment2 = temporaryFolder.newFile("seg2.m4a").also { it.writeText("seg2") }
+            val recorder = FakeRecorder(listOf(segment1, segment2))
+            val transcriber = CancelableTranscriber(TranscriptionResult.Success("done"))
+            val renderedStates = mutableListOf<ButtonState>()
+            var accumulatedMs = -1L
+            var limitReached = 0
+
+            val coordinator = coordinator(
+                scope = this,
+                recorder = recorder,
+                transcriber = transcriber,
+                render = { renderedStates += it },
+                recordingClockMs = { testScheduler.currentTime },
+                onRecordingTime = { accumulated, _ -> accumulatedMs = accumulated },
+                maxRecordingMs = { 3_000L },
+                onShowLimitReached = { limitReached++ },
+            )
+
+            coordinator.onTap() // RECORDING
+            advanceTimeBy(500)
+            coordinator.onTap() // SENDING (segmento 1: 500 ms)
+            runCurrent()
+            coordinator.onCancel()
+            coordinator.onUndoCancel() // PAUSED, segmento 1 retido
+            coordinator.onIntent(GestureIntent.RESUME) // sessão nova (segmento 2)
+            assertThat(recorder.started).isEqualTo(2)
+
+            advanceTimeBy(1_000)
+            coordinator.onIntent(GestureIntent.PAUSE)
+            assertThat(accumulatedMs).isEqualTo(1_000L)
+            advanceTimeBy(700)
+            coordinator.onIntent(GestureIntent.RESUME) // mesma sessão, não uma terceira
+
+            assertThat(renderedStates.last()).isEqualTo(ButtonState.RECORDING)
+            assertThat(recorder.started).isEqualTo(2)
+            assertThat(recorder.resumed).isEqualTo(1)
+            assertThat(accumulatedMs).isEqualTo(1_000L) // o cronômetro continua de onde parou
+            // O teto de 3 s já tem 500 (retido) + 1000 (esta sessão): o aviso vem 1500 ms depois, não 2500.
+            advanceTimeBy(1_499)
+            runCurrent()
+            assertThat(limitReached).isEqualTo(0)
+            advanceTimeBy(1)
+            runCurrent()
+            assertThat(limitReached).isEqualTo(1)
+            assertThat(renderedStates.last()).isEqualTo(ButtonState.PAUSED)
+        }
+
+    @Test
+    fun `undoing a cancel while continuing a retained audio resumes the live session instead of starting another`() =
+        runTest {
+            val segment1 = temporaryFolder.newFile("seg1.m4a").also { it.writeText("seg1") }
+            val segment2 = temporaryFolder.newFile("seg2.m4a").also { it.writeText("seg2") }
+            val recorder = FakeRecorder(listOf(segment1, segment2))
+            val transcriber = CancelableTranscriber(TranscriptionResult.Success("done"))
+            val renderedStates = mutableListOf<ButtonState>()
+
+            val coordinator = coordinator(
+                scope = this,
+                recorder = recorder,
+                transcriber = transcriber,
+                render = { renderedStates += it },
+                recordingClockMs = { testScheduler.currentTime },
+            )
+
+            coordinator.onTap()
+            advanceTimeBy(500)
+            coordinator.onTap() // SENDING (segmento 1)
+            runCurrent()
+            coordinator.onCancel()
+            coordinator.onUndoCancel()
+            coordinator.onIntent(GestureIntent.RESUME) // sessão nova (segmento 2)
+            advanceTimeBy(500)
+
+            coordinator.onCancel() // cancela a sessão nova
+            coordinator.onUndoCancel() // PAUSED, a sessão nova segue aberta
+            coordinator.onIntent(GestureIntent.RESUME)
+
+            assertThat(renderedStates.last()).isEqualTo(ButtonState.RECORDING)
+            assertThat(recorder.started).isEqualTo(2)
+            assertThat(recorder.resumed).isEqualTo(1)
+        }
+
     @Test
     fun `resuming after a cancel during sending re-shows the limit banner if the retained segment already reached the max`() =
         runTest {
@@ -975,6 +1068,7 @@ class OverlayCoordinatorTest {
         microphoneGranted: () -> Boolean = { true },
         recordingConsentAccepted: () -> Boolean = { true },
         onDisclosureRequired: () -> Unit = {},
+        onRecordingTime: (accumulatedMs: Long, segmentStartMs: Long) -> Unit = { _, _ -> },
     ) = OverlayCoordinator(
         scope = scope,
         configProvider = { completeConfig(configTimeoutMs) },
@@ -998,6 +1092,7 @@ class OverlayCoordinatorTest {
         microphoneGranted = microphoneGranted,
         recordingConsentAccepted = recordingConsentAccepted,
         onDisclosureRequired = onDisclosureRequired,
+        onRecordingTime = onRecordingTime,
     )
 
     private fun completeConfig(timeoutMs: Long = Config.DEFAULT_TIMEOUT_MS): Config = Config(
