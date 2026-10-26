@@ -133,7 +133,7 @@ Duas frentes, na ordem do que dá mais acerto por esforço:
 
 ### Adaptação ao jeito de tocar (`ADP`)
 
-1. **ADP-01**: WHEN uma palavra é comitada **como digitada**, está no dicionário, tem ≥ 3 letras e não foi desfeita THEN o deslocamento de cada toque em relação ao centro da tecla SHALL atualizar, por média móvel com prior em zero (α = 1/(n+20)), o viés (μx, μy) daquela tecla; teto |μ| ≤ 0,25 tecla; 26 teclas × 3 números por layout.
+1. **ADP-01**: WHEN uma palavra é comitada **como digitada**, está no dicionário, tem ≥ 3 letras e não foi desfeita THEN o deslocamento de cada toque em relação ao centro da tecla SHALL atualizar, por média móvel com prior em zero (α = 1/(n+20)), o viés (μx, μy) daquela tecla; teto |μ| ≤ 0,25 tecla; 26 teclas (27 no es, com `ñ`) × 3 números por layout.
 2. **ADP-02**: WHEN o viés existe THEN o custo espacial SHALL usar o centro deslocado (SPA-02); o **hit-test** da grade não muda por causa disso (deslocar o alvo de toque muda o que a pessoa vê): só o experimento do ADP-05 mexe nele, e só no debug.
 3. **ADP-03**: WHEN a pessoa apaga o aprendido (PRV-04) THEN o viés SHALL voltar a zero.
 4. **ADP-04**: WHEN os toques vêm do modo anônimo manual (PRV-07) ou de campo que não aprende (PRV-02, PRV-06) THEN nenhum viés SHALL ser atualizado.

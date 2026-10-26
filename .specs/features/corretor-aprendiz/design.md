@@ -298,7 +298,7 @@ o acerto fica praticamente igual: 82,1% → 81,0%); com σ 0,30 e viés forte de
    inserção e troca de ordem são constantes em bits (partida: 9 / 9 / 7). Letra fora do alfabeto do layout (hífen,
    apóstrofo; `ñ` no pt ou no en) custa o máximo; `ñ` no es **entra** no alfabeto e no buffer. **CPU: a otimizar.** O protótipo (JVM do servidor, sem otimizar: poda por linha
    da tabela, 90 mil candidatas) mediu **+32% a +35% por palavra** (A 5,4–6,4 ms → B 7,3–8,6 ms nas três
-   configurações; `context.md` §7); além do laço, o custo novo é a tabela por palavra (26·k contas com 1
+   configurações; `context.md` §7); além do laço, o custo novo é a tabela por palavra (26·k contas, 27·k no es, com 1
    divisão, ordem de µs). A CA-T19 otimiza e mede antes de a fase C entrar; no A32 vale o que a CA-T22 medir.
 5. **Prior em bits.** `(255 − freq)/8,589` (a escala do `ProbabilityUtils` do LatinIME); a candidata
    pessoal usa `peso → freq` por uma curva monotônica; o bigrama (fase F) entra aqui.
@@ -325,7 +325,7 @@ sem risco de interface:
 1. **Viés no modelo** (ADP-01/02). Por tecla: `(μx, μy, n)`. Quando uma palavra é comitada como digitada,
    está no dicionário, tem ≥ 3 letras e não foi desfeita, cada toque é uma observação do centro da tecla
    que a pessoa **quis**: `μ ← μ + α·(obs − μ)`, `α = 1/(n + 20)` (o prior em zero segura os poucos dados),
-   `|μ| ≤ 0,25` tecla. O custo espacial usa `centro + μ`. 26 × 3 números por layout (≈ 300 bytes);
+   `|μ| ≤ 0,25` tecla. O custo espacial usa `centro + μ`. 26 (27 no es) × 3 números por layout (≈ 300 bytes);
    zero custo na digitação (cada comit atualiza ≤ 10 teclas).
 2. **Hit-test adaptado** (ADP-05, fase D; o Yan mandou entrar na fase D, resposta 9 de 24/10). Deslocar o
    ponto antes de decidir a tecla reduziria os erros de letra pela raiz, mas a tecla sob o dedo passaria a
