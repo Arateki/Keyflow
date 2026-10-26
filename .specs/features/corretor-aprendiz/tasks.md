@@ -72,6 +72,7 @@ Play**: a T18b (textos legais, revisados pelo Yan) fecha a fase B; sem ela o apr
   `sessoes/`, `corretor-bench-baseline.json` (nível rápido) gerado **pelo código de hoje**,
   `scripts/corretor-bench.sh [--completo] [ref]`.
 - **Where**: `app/src/test/java/com/keyflow/ime/keyboard/dictionary/bench/`, `app/src/test/resources/bench/`, `scripts/`.
+- **Depends on**: — (primeira task da fase A; a T0 corre em paralelo).
 - **Covers**: BEN-01..05, BEN-08, BEN-09.
 - **Done when**: o baseline registra o ponto de partida **medido pelo banco** (por grupo do `manter-dev` e do
   `manter-teste`: trocadas e indevidas; inglês e espanhol comuns; acento restaurado; sintético por configuração) — não
@@ -186,7 +187,9 @@ Play**: a T18b (textos legais, revisados pelo Yan) fecha a fase B; sem ela o apr
 - **Status**: Pending
 - **What**: `LearningPolicy` (`fieldAllowsLearning`, `wordEligible`), `LearningParams`; constante
   `IME_FLAG_NO_PERSONALIZED_LEARNING`; `autoCorrectAllowed` continua a base.
-- **Where**: `learning/LearningPolicy.kt`, `learning/LearningParams.kt`. **Covers**: PRV-02, PRV-06 (a política), LRN-02, LRN-08.
+- **Where**: `learning/LearningPolicy.kt`, `learning/LearningParams.kt`.
+- **Depends on**: — (o aprendizado só precisa da T1 no banco; a T8 em si não toca o banco).
+- **Covers**: PRV-02, PRV-06 (a política), LRN-02, LRN-08.
 - **Done when**: matriz de `inputType` × flag × opções, com `NO_SUGGESTIONS` (a busca do Google, `0xa0001`, corrige e
   sugere mas não aprende) e senha/URL/e-mail/número fora; palavras de teste (`kkk`, `API`, `abc123`, `a`, 40 letras).
 - **Tests**: unit. **Gate**: `quick` + `:app:lintDebug` (a constante não pode acusar `NewApi`).
@@ -318,7 +321,14 @@ Play**: a T18b (textos legais, revisados pelo Yan) fecha a fase B; sem ela o apr
 ### CA-T18 — Instrumentados da fase B
 - **Status**: Pending
 - **What**: `KeyFlowKeyboardLearningTest` completo: recusa, faixa, privacidade, apagar.
+- **Where**: `app/src/androidTest/java/com/keyflow/ime/` (`KeyFlowKeyboardLearningTest`).
 - **Depends on**: CA-T13..T16b. **Covers**: ROL-02, PRV-06 (a verificação).
+- **Done when** (um teste por item, no emulador, `instrumentar`): (a) recusa por desfazer + espaço e por desfazer +
+  Enter: a vez seguinte não troca (T13); (b) tocar a digitada na faixa recusa na hora e tocar outra soma ao par
+  (T14); (c) campo de senha, `NO_SUGGESTIONS`, `NO_PERSONALIZED_LEARNING` e interruptor desligado não gravam, e o
+  aprendido existente segue valendo (T12, T15); (d) "Apagar meus dados" e "Apagar o que o corretor aprendeu" limpam
+  o arquivo sem rede (T15); (e) exportar, apagar tudo e importar devolve o mesmo aprendido (T16b); (f)
+  `StrictModeKeyboardTest` verde e nenhum teste da fase mexe nos goldens.
 - **Tests**: instrumentado. **Gate**: `full`.
 
 ### CA-T18b — Textos legais do aprendizado  `[portão [YAN]: sem eles a fase B não vai para a Play]`
@@ -369,6 +379,7 @@ Play**: a T18b (textos legais, revisados pelo Yan) fecha a fase B; sem ela o apr
 ### CA-T22 — Tempo no A32 e decisão
 - **Status**: Pending
 - **What**: `CorretorTempoTest` com toques; relatório: ms/palavra p50/p95, memória; decisão go/no-go da fase C.
+- **Where**: `app/src/androidTest/java/com/keyflow/ime/` (`CorretorTempoTest`), relatório em `STATE.md`.
 - **Depends on**: CA-T19, CA-T21, CA-T20, CA-T3. **Covers**: PER-01, SPA-05.
 - **Done when**: p95 dentro do teto do PER-01 (fixado depois da T3) no A32 **[YAN]**; se estourar, otimiza (o laço
   custou +32–35% no protótipo) ou a fase fica atrás de flag.
@@ -440,6 +451,8 @@ Play**: a T18b (textos legais, revisados pelo Yan) fecha a fase B; sem ela o apr
 - **Status**: Pending
 - **What**: script que gera `pt.bigramas.kfd` (top 30 mil × 8) de corpus CC0 (resposta 10 do Yan; candidato: frases
   do Common Voice, cuja contagem de frases pt ainda não foi verificada, `context.md` §5); medir no banco.
+- **Where**: `scripts/` (gerador do `pt.bigramas.kfd`), `app/src/main/assets/dict/`, `dictionary/Dictionaries.kt`, `NOTICE`.
+- **Depends on**: CA-T27 (o placar com bigramas e o conjunto de contexto do banco).
 - **Covers**: CTX-03. **Tests**: unit + banco. **Gate**: `quick` + `assembleDebug` (+0,75 MB de APK, estimativa).
 - **Done when**: licença e origem do corpus registradas no cabeçalho do script e no `NOTICE`; o ganho no banco
   justifica os ~0,75 MB (a medir); senão fica de fora.
@@ -464,6 +477,8 @@ Play**: a T18b (textos legais, revisados pelo Yan) fecha a fase B; sem ela o apr
 - **What**: `STATE.md` (decisões e números), atualizar `TESTING.md` (banco, catraca), alvos do PIT para `learning`,
   e a conferência final dos avisos de licença (feitos na T0 e junto das constantes adaptadas). (Os textos legais e a
   aba Docs já saíram na T18b, antes de o aprender ir para a Play.)
+- **Where**: `.specs/project/STATE.md`, `.specs/codebase/TESTING.md`, configuração do PIT (alvos `learning`), `NOTICE`.
+- **Depends on**: todas as tasks obrigatórias fechadas (T0–T27) e, **se entrarem**, a T28 (condicional) e a T29 (opcional); se não entrarem, o fechamento registra "não entrou" e segue.
 - **Covers**: ROL-01 (o PIT; os testes puros saem em cada task), ROL-04.
 - **Done when**: tudo conferido; `RealDictionaryTest`/`SuggesterTest` verdes com as únicas mudanças listadas na T4.
 - **Gate**: `quick` + `:app:lintDebug` + `assembleDebug`.

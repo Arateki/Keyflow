@@ -18,7 +18,7 @@ montou por categoria, como um brasileiro digitaria (abreviações, gírias, nome
 no meio; pt), 322 não estão no dicionário e **165 (51%) são trocadas** no espaço; ~10 dessas trocas são
 legítimas ("nao"→"não"), logo ~155 (**~48%**) são **indevidas**: "vc"→"VC", "td"→"te", "hj"→"um",
 "Yan"→"Hab", "deploy"→"depois", "push"→"pus", "Ágatha"→"Agatha". O percentual depende da mistura de
-grupos que a lista tem; o número que vale sai do banco (CA-T1, sobre a lista versionada) e das ~600 palavras
+grupos que a lista tem; o número que vale sai do banco (CA-T1, sobre a lista nova e versionada, não a do estudo, que se perdeu) e das ~600 palavras
 que o Yan digita no A32 (CA-T2). Medido no dicionário, não em digitação: das 2260 palavras comuns do inglês
 (entre as 3000 mais frequentes) que não estão no dicionário pt, 881 (39%; 29% das 3000) viram outra palavra em
 português. O acerto onde o corretor é bom (acento que faltou, tecla vizinha) existe, mas o estrago nas palavras
