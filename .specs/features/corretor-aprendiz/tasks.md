@@ -340,12 +340,14 @@ Play**: a T18b (textos legais, revisados pelo Yan) fecha a fase B; sem ela o apr
 - **Status**: Pending
 - **What**: `LetterGrid` (centros por `Layouts`, unidades de tecla), `SpatialCosts.fill` (bits em 1/16),
   `Suggester.suggest(typed, touches)` com a tabela no lugar de `Keyboard.adjacent`; omissão/inserção/troca fixas;
-  letra sem toque cai no custo da tabela de vizinhas em bits, por posição (SPA-06); letra acentuada pela letra-base.
+  letra sem toque cai no custo da tabela de vizinhas em bits, por posição (SPA-06); letra acentuada pela letra-base; alfabeto por layout (a..z; a..z + `ñ` no es), com o índice de `ñ` no buffer.
 - **Where**: `dictionary/SpatialCosts.kt`, `dictionary/LetterGrid.kt`, `dictionary/Suggester.kt`.
 - **Depends on**: CA-T1, CA-T20 (o tipo `KeyTouch`).
 - **Covers**: SPA-02..06.
 - **Done when**: no sintético, a pretendida em 1º e nos 3 primeiros **sobe** sobre o baseline em σ 0,30/0,40 (números
-  na catraca); toque na borda custa menos que no centro da vizinha (`SpatialCostsTest`); sem toque = comportamento
+  na catraca); toque na borda custa menos que no centro da vizinha (`SpatialCostsTest`); **testes espaciais de espanhol**:
+  toque no centro de `ñ` custa ~0 bits para `ñ`, toque entre `n` e `ñ` dá custos parecidos às duas (SPA-04), `ñ` não
+  cai no índice de outra letra nem no custo máximo, e a mesma palavra com `ñ` no pt cai no custo máximo; sem toque = comportamento
   de hoje; a razão ms B/A medida na mesma execução é **relatada** (o protótipo deu +32% a +35%) e não derruba o
   teste; a otimização mira o orçamento do A32 (PER-01), medido na T22.
 - **Tests**: unit + banco. **Gate**: `quick`.

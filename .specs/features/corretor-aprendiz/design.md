@@ -283,18 +283,20 @@ o acerto fica praticamente igual: 82,1% → 81,0%); com σ 0,30 e viés forte de
      tira o último; `reset` e `onSeparator` limpam). `finishComposing` passa os toques ao `Suggester` e os guarda
      em `Correction(original, corrected, separator)`, para o `restore(original)` do desfazer (CA-T13) devolver a
      palavra **com** os toques; sem eles, vale o custo por letra do item 3.
-2. **`LetterGrid`** (pura): centros das 26 letras a partir de `Layouts` (pesos) em unidades de tecla;
-   `ñ` no es. Um `LetterGrid` por idioma, calculado uma vez.
+2. **`LetterGrid`** (pura): centros das letras a partir de `Layouts` (pesos) em unidades de tecla. O **alfabeto é
+   por layout**: `a..z` no pt e no en (26) e `a..z` + `ñ` no es (27, `ñ` é tecla própria); `LetterGrid.alphabet`
+   guarda a ordem e `indexOf(letra)` dá o índice (−1 fora do alfabeto). Um `LetterGrid` por idioma, calculado uma vez.
 3. **Tabela por palavra.** Antes de comparar candidatas, `SpatialCosts.fill(touches)` calcula
-   `bits[i][c] = min(CAP, ((Δx/σx)² + (Δy/σy)²)/2 · log2 e)` para i = toques e c = a..z: ≤ 26·32 floats
+   `bits[i][c] = min(CAP, ((Δx/σx)² + (Δy/σy)²)/2 · log2 e)` para i = toques e c = o alfabeto do layout (26 ou 27
+   com `ñ`, item 2): ≤ 27·32 floats
    num buffer reaproveitado (o `Suggester` já reaproveita linhas da distância e não é thread-safe).
    Convertido para **inteiros em 1/16 de bit** para o laço de `Int` que já existe. Letra **sem toque** (SPA-06): a
    linha `i` da tabela é preenchida com o custo da tabela de vizinhas de hoje em bits (igual 0; vizinha e outra com
    as constantes `NEIGHBOR_BITS` e `MISS_BITS`, de partida a calibrar na CA-T21), então uma palavra pode misturar
    letras com e sem toque no mesmo laço. Letra acentuada entra pela letra-base.
-4. **Laço da distância** troca `Keyboard.adjacent(ca, cb)` por `bitsInt[(a−1)·26 + (cb − 'a')]`; omissão,
-   inserção e troca de ordem são constantes em bits (partida: 9 / 9 / 7). Letra fora de a..z (hífen,
-   apóstrofo) custa o máximo. **CPU: a otimizar.** O protótipo (JVM do servidor, sem otimizar: poda por linha
+4. **Laço da distância** troca `Keyboard.adjacent(ca, cb)` por `bitsInt[i·N + grid.indexOf(cb)]` (N = tamanho do alfabeto do layout, 26 ou 27); omissão,
+   inserção e troca de ordem são constantes em bits (partida: 9 / 9 / 7). Letra fora do alfabeto do layout (hífen,
+   apóstrofo; `ñ` no pt ou no en) custa o máximo; `ñ` no es **entra** no alfabeto e no buffer. **CPU: a otimizar.** O protótipo (JVM do servidor, sem otimizar: poda por linha
    da tabela, 90 mil candidatas) mediu **+32% a +35% por palavra** (A 5,4–6,4 ms → B 7,3–8,6 ms nas três
    configurações; `context.md` §7); além do laço, o custo novo é a tabela por palavra (26·k contas com 1
    divisão, ordem de µs). A CA-T19 otimiza e mede antes de a fase C entrar; no A32 vale o que a CA-T22 medir.
