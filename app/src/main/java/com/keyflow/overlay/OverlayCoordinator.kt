@@ -402,12 +402,16 @@ class OverlayCoordinator(
                         scheduleLimitJob()
                         render(machine.onResume())
                     }
-                } else if (pendingAudioFile != null) {
+                } else if (pendingAudioFile != null && !continuingPendingAudio) {
                     // Desfez um cancelamento que começou durante SENDING: não há sessão de gravação viva
                     // pra continuar (o recorder já foi liberado no primeiro stop()), mas o Yan pode querer
                     // seguir falando — abre uma NOVA sessão; ao parar de novo, stopAndTranscribe() funde
                     // os dois trechos num arquivo só (AudioConcatenator). Se os trechos já retidos sozinhos
                     // já batem o teto configurado, não deixa continuar sem limite — reabre a decisão.
+                    // `!continuingPendingAudio`: com a sessão nova já aberta (pausar e retomar de novo, ou cancelar e desfazer
+                    // durante ela), o áudio retido continua pendente, mas a retomada é a comum (ramo abaixo). Abrir outra
+                    // sessão aqui fazia o AudioRecorder recusar (já iniciado), o erro era engolido e a tela voltava a gravar
+                    // com o microfone pausado, e o cronômetro e o teto recomeçavam do zero (máquina de estados, 2026-10-25).
                     if (maxRecordingMs() > 0L && priorSegmentsMs >= maxRecordingMs()) {
                         showLimitBanner()
                     } else {
