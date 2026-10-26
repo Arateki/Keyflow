@@ -1,5 +1,5 @@
 /*
- * Comportamento da página do KeyFlow: tema, cabeçalho, revelações de reserva, luz do cursor,
+ * Comportamento da página do KeyFlow: tema, cabeçalho e o menu dele no celular, revelações de reserva, luz do cursor,
  * cartões com brilho, botões magnéticos, a orbe do topo, a demonstração do ditado e o índice da documentação.
  * Sem dependências, sem rede e sem rastreio. Com prefers-reduced-motion, nada se mexe.
  */
@@ -69,6 +69,56 @@
   function aoRolarTopo() { if (topo) topo.classList.toggle('rolou', window.scrollY > 24); }
   window.addEventListener('scroll', aoRolarTopo, { passive: true });
   aoRolarTopo();
+
+  /* ── Menu do celular (abaixo de 961 px): o botão do cabeçalho abre o <nav id="menu-topo"> como um painel. ── */
+  var botaoMenu = document.querySelector('.menu-botao');
+  var painelMenu = document.getElementById('menu-topo');
+  var mediaMenu = window.matchMedia('(max-width: 960px)');
+  if (topo && botaoMenu && painelMenu) {
+    var menuAberto = false;
+
+    // Com o painel aberto a página não rola: o toque fora do painel não leva a lugar nenhum (o iOS ignora o overflow).
+    var travarToque = function (ev) { if (!painelMenu.contains(ev.target)) ev.preventDefault(); };
+
+    var definirMenu = function (abrir, devolverFoco) {
+      if (abrir === menuAberto) return;
+      menuAberto = abrir;
+      raiz.classList.toggle('menu-aberto', abrir);
+      botaoMenu.setAttribute('aria-expanded', String(abrir));
+      if (abrir) document.addEventListener('touchmove', travarToque, { passive: false });
+      else document.removeEventListener('touchmove', travarToque);
+      if (!abrir && devolverFoco) botaoMenu.focus({ preventScroll: true });
+    };
+
+    botaoMenu.addEventListener('click', function () { definirMenu(!menuAberto, false); });
+
+    // Escolher um link fecha o painel (a âncora da mesma página segue o seu caminho).
+    painelMenu.addEventListener('click', function (ev) {
+      if (menuAberto && ev.target.closest && ev.target.closest('a')) definirMenu(false, true);
+    });
+
+    // Toque fora fecha; se caiu num botão ou link, é dele o foco.
+    document.addEventListener('click', function (ev) {
+      if (!menuAberto || painelMenu.contains(ev.target) || botaoMenu.contains(ev.target)) return;
+      definirMenu(false, !(ev.target.closest && ev.target.closest('a, button, input, select, summary, textarea')));
+    });
+
+    document.addEventListener('keydown', function (ev) {
+      if (menuAberto && (ev.key === 'Escape' || ev.key === 'Esc')) { ev.preventDefault(); definirMenu(false, true); }
+    });
+
+    // O foco que sai do cabeçalho (Tab além do último item, por exemplo) fecha o painel sem puxá-lo de volta.
+    document.addEventListener('focusin', function (ev) {
+      if (menuAberto && !topo.contains(ev.target)) definirMenu(false, false);
+    });
+
+    var fecharMenu = function () { definirMenu(false, false); };
+    window.addEventListener('hashchange', fecharMenu);
+    // Voltar pelo histórico traz a página como estava: com o painel aberto, ele não pode reaparecer aberto.
+    window.addEventListener('pageshow', function (ev) { if (ev.persisted) fecharMenu(); });
+    // Ao crescer a janela para o computador, o painel some e a página volta a rolar.
+    if (mediaMenu.addEventListener) mediaMenu.addEventListener('change', function (ev) { if (!ev.matches) fecharMenu(); });
+  }
 
   /* ── Revelações: o CSS usa animation-timeline; aqui fica a reserva para quem não tem. ── */
   var temLinhaDoTempo = window.CSS && CSS.supports && CSS.supports('animation-timeline: view()');
