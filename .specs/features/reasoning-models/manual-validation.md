@@ -19,8 +19,9 @@ OpenAI aceitando o KeyFlow, e o callback do login com o app em segundo plano num
 
 ## A. Modelos locais (RSC, RMD, RRUN)
 
-1. Aba **Raciocínio** (o cérebro de perfil no menu) → origem **Local**. Aparecem **Leve** (Qwen3 0.6B, ~586 MB) e
-   **Equilibrado** (Gemma 4 E2B, ~2,59 GB), com tamanho e idioma; nota de privacidade no fim. **Nenhum modelo de voz** na lista.
+1. Aba **Raciocínio** (o cérebro de perfil no menu) → origem **Local**. Aparecem **Leve** (Qwen3 0.6B, ~586 MB),
+   **Intermediário** (SmolLM2 1.7B, ~1,73 GB), **Raciocínio** (DeepSeek R1 1.5B, ~1,83 GB) e **Equilibrado** (Gemma 4 E2B,
+   ~2,59 GB), com tamanho e idioma; nota de privacidade no fim. **Nenhum modelo de voz** na lista.
 2. Em **Wi-Fi**, "Baixar" no **Leve** → barra com % no card **e** notificação do sistema. Ao terminar, o Leve fica
    **selecionado sozinho**. A aba **Transcrição** continua com o modelo de voz que já tinha (nada mudou lá).
 3. **Testar**. Anote **"Primeiro trecho / total"**. A **1ª vez inclui a carga a frio** do modelo (no emulador x86_64 foram

@@ -48,8 +48,13 @@ class DocsSectionsTest {
     fun licensesAlsoNameTheReasoningEngineAndEveryTextModel() {
         val labels = docsSections.single { it.id == "licencas" }.blocks.filterIsInstance<DocBlock.Labeled>().map { it.label }
         assertTrue("licença do LiteRT-LM ausente", "LiteRT-LM" in labels)
-        com.keyflow.data.models.ModelCatalog.TEXT.forEach { spec ->
+        val catalog = com.keyflow.data.models.ModelCatalog
+        // O que o release oferece (os não validados no aparelho só voltam à Docs quando o roteiro do A32 os promover).
+        catalog.visibleIn(catalog.TEXT_ALL, debug = false).forEach { spec ->
             assertTrue("licença de ${spec.modelName} ausente", labels.any { it.contains(spec.modelName) })
+        }
+        catalog.TEXT_ALL.filterNot { it.validatedOnDevice }.forEach { spec ->
+            assertTrue("${spec.modelName} não está no release: a Docs não pode citá-lo", labels.none { it.contains(spec.modelName) })
         }
     }
 

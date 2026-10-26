@@ -2,6 +2,7 @@ package com.keyflow.reasoning.local
 
 import com.keyflow.BuildConfig
 import com.keyflow.data.models.EngineType
+import com.keyflow.data.models.ModelCatalog
 import com.keyflow.reasoning.ReasoningRequest
 
 /**
@@ -12,7 +13,7 @@ import com.keyflow.reasoning.ReasoningRequest
 internal object ReasoningBackends {
     fun create(model: LlmModel, cacheDir: String?): LlmBackend = when {
         BuildConfig.DEBUG && model.modelId == ECHO_MODEL_ID -> EchoBackend()
-        model.engineType == EngineType.LITERT_LM.name -> LiteRtBackend(cacheDir)
+        model.engineType == EngineType.LITERT_LM.name -> LiteRtBackend(cacheDir, ModelCatalog.byId(model.modelId)?.promptOpensThink == true)
         else -> NotIntegratedBackend(model.engineType)
     }
 }

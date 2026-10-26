@@ -26,22 +26,41 @@ import org.junit.runner.RunWith
 import java.io.File
 
 /**
- * O LLM de verdade (RRUN-08), opt-in: argumento de instrumentação `llmModelE2E=true`. Baixa o Qwen3 0.6B do catálogo pela
+ * O LLM de verdade (RRUN-08), opt-in: argumento de instrumentação `llmModelE2E=true`. Baixa o modelo do catálogo pela
  * fila de downloads do app — o que também confere o tamanho e o SHA-256 do catálogo contra o arquivo real —, instala e
  * gera pelo `:reasoning` de verdade (LiteRT-LM, CPU). Roda em arm64 e x86_64 (as ABIs que a biblioteca publica).
+ *
+ * Outros argumentos (todos opcionais):
+ *  - `llmModelId=<id do catálogo>`: o modelo de texto a provar (padrão: o Qwen3 0.6B). Os de ~1,7–2,6 GB não cabem no
+ *    disco do emulador do pool pelo caminho do downloader (arquivo baixado + cópia da instalação): empurre-os direto para
+ *    `files/models-llm-e2e/<id>/` com `adb exec-in run-as …` e escreva o `manifest.json` ao lado — com o modelo já
+ *    instalado, o teste pula o download.
+ *  - `llmTimeoutMs=<ms>`: tempo máximo de cada geração (padrão 300 000; o DeepSeek R1 "pensa" antes de responder).
+ *  - `llmIgnoreRamGuard=true`: desliga a guarda de RAM do app (o `RamGuard` recusa carregar com menos RAM livre que a
+ *    estimativa do catálogo). O emulador do pool tem 2,5 GB no total e ~0,7 GB livres: sem isto, os modelos de 1,7 GB ou mais
+ *    nem chegam ao motor. Os pesos são mapeados em memória (páginas de arquivo, descartáveis), então carrega — mais devagar.
  */
 @RunWith(AndroidJUnit4::class)
 class LiteRtBackendSmokeTest {
 
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext
-    private val spec = ModelCatalog.QWEN3_0_6B
+    private val args = InstrumentationRegistry.getArguments()
+    private val spec = ModelCatalog.byId(args.getString("llmModelId") ?: ModelCatalog.QWEN3_0_6B.id)
+        ?: error("llmModelId fora do catálogo: ${args.getString("llmModelId")}")
+    private val timeoutMs = args.getString("llmTimeoutMs")?.toLong() ?: 300_000L
+    private val ignoreRamGuard = args.getString("llmIgnoreRamGuard") == "true"
     private val store = ModelStore(File(context.filesDir, "models-llm-e2e"))
     private val connection = ReasoningConnection(context, lingerMs = 60_000)
 
+    /** O modelo do catálogo, descarregado logo após cada geração; sem estimativa de RAM (0) se a guarda for ignorada. */
+    private fun loadedModel() = LlmModels.from(spec, store.dirFor(spec.id)).let {
+        if (ignoreRamGuard) it.copy(idleUnloadMs = 0, ramEstimateMb = 0) else it.copy(idleUnloadMs = 0)
+    }
+
     private fun engine() = LocalReasoningEngine(
         modelId = spec.id,
-        modelFor = { id -> if (id == spec.id) LlmModels.from(spec, store.dirFor(spec.id)).copy(idleUnloadMs = 0) else null },
+        modelFor = { id -> if (id == spec.id) loadedModel() else null },
         connection = connection,
     )
 
@@ -79,7 +98,7 @@ class LiteRtBackendSmokeTest {
     fun theRealModelAnswersInAFlowThroughTheReasoningProcess() = runBlocking {
         val started = System.nanoTime()
         var firstMs = -1L
-        val events = withTimeout(300_000) {
+        val events = withTimeout(timeoutMs) {
             engine().generate(ReasoningRequest(user = "Diga olá em uma frase curta."))
                 .onEach { if (firstMs < 0 && it is ReasoningEvent.Delta) firstMs = (System.nanoTime() - started) / 1_000_000 }
                 .toList()
@@ -93,7 +112,7 @@ class LiteRtBackendSmokeTest {
         assertTrue("a resposta traz o raciocínio interno do modelo: ${text.take(120)}", !text.contains("<think>"))
         assertEquals(ReasoningEvent.Done, events.last())
         // Medição informativa (base da RSN-T19): `adb logcat -s LiteRtSmoke`.
-        android.util.Log.i("LiteRtSmoke", "${Build.SUPPORTED_ABIS.first()} · 1º trecho ${firstMs} ms · total ${totalMs} ms · ${events.size} eventos · \"${text.take(160)}\"")
+        android.util.Log.i("LiteRtSmoke", "${spec.id} · ${Build.SUPPORTED_ABIS.first()} · 1º trecho ${firstMs} ms · total ${totalMs} ms · ${events.size} eventos · \"${text.take(160)}\"")
         // Vários trechos, não um bloco só: é streaming de verdade.
         assertTrue("só ${events.size} evento(s)", events.size > 2)
     }
@@ -102,10 +121,10 @@ class LiteRtBackendSmokeTest {
     @Test
     fun cancellingTheRealGenerationStopsItAndTheNextOneRuns() = runBlocking {
         val e = engine()
-        withTimeout(300_000) {
+        withTimeout(timeoutMs) {
             e.generate(ReasoningRequest(user = "Escreva uma história longa sobre um teclado que aprende a ouvir.")).first()
         }
-        val next = withTimeout(300_000) { e.generate(ReasoningRequest(user = "Diga olá.")).toList() }
+        val next = withTimeout(timeoutMs) { e.generate(ReasoningRequest(user = "Diga olá.")).toList() }
         assertNotNull(next.lastOrNull())
         assertEquals(ReasoningEvent.Done, next.last())
     }

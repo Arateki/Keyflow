@@ -50,9 +50,9 @@ do emulador Android 17 (`.specs/quick/010-suite-no-aparelho/`) existe para achar
 
 #### 1b. Aba Raciocínio — o que a política e o Data Safety também precisam cobrir (RPRV-01)
 
-- **Modelos de texto locais** (Qwen3 0.6B e Gemma 4 E2B, pelo LiteRT-LM): rodam **100% no aparelho**, em processo próprio
+- **Modelos de texto locais** (Qwen3 0.6B, SmolLM2 1.7B, DeepSeek R1 1.5B e Gemma 4 E2B, pelo LiteRT-LM): rodam **100% no aparelho**, em processo próprio
   (`:reasoning`); o texto não sai do dispositivo. Os arquivos são baixados sob demanda do Hugging Face (o app só faz o pedido
-  de download) e somem se o app for desinstalado. Licenças: Apache 2.0 (`app/licenses/`, aba Docs → Licenças).
+  de download) e somem se o app for desinstalado. Licenças: Apache 2.0 e MIT (DeepSeek R1; `app/licenses/`, aba Docs → Licenças).
 - **OpenAI (nuvem — só quando o usuário escolhe essa origem)**: o texto que o usuário manda gerar (hoje, a frase do botão
   Testar) é enviado à OpenAI em `api.openai.com/v1/responses`, com `store: false` (a resposta não fica guardada para consulta
   posterior pelo app — **isso não é "a OpenAI não guarda"**: ela ainda pode reter o conteúdo pelo prazo da política dela, e no

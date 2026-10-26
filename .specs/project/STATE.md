@@ -2974,3 +2974,44 @@ Dois motores com ferramentas ao lado do da Anthropic: `reasoning/openai/OpenAiAg
   o índice lateral marcava a seção anterior. A `.doc-secao` zera a margem própria.
 - Publicação: `doc.html` e `docs.html` seguem a regra que já serve `/privacidade` e `/privacy` (a Cloudflare serve `/x` a partir de
   `x.html`); `/doc` e `/docs` não precisam de configuração nova se essa regra valer para todo caminho sem extensão.
+
+## 2026-10-26 — Catálogo com mais dois modelos de texto (equipe/catalogo-novos)
+
+- Entraram `SmolLM2 1.7B` ("Intermediário", Apache-2.0) e `DeepSeek R1 1.5B` ("Raciocínio", MIT, derivado do Qwen2.5 Apache-2.0).
+  Pins lidos da API do HF e SHA-256 conferido baixando o arquivo inteiro: SmolLM2 `c0ee765a…`, 1.730.949.280 B, `3c3e6931…f8f1`;
+  DeepSeek `9fd87554…`, 1.833.451.520 B, `69b35f01…1295` (arquivo `…_multi-prefill-seq_q8_ekv4096.litertlm`). Repositórios `gated: false`,
+  faixa 206, `scripts/verify-model-catalog.py` passa nos 4 de texto. Nomes por nível (Leve, Intermediário, Raciocínio, Equilibrado): o modelo
+  vai só na linha `modelName` do cartão — "Equilibrado (Gemma 4)" quebrava a linha e deixava "4)" sozinho.
+- **Não provado no emulador**: o do pool tem 2,5 GB de RAM. A guarda do app recusou (729 MB livres, precisa de 1536); com a guarda desligada
+  (`llmIgnoreRamGuard=true` no `LiteRtBackendSmokeTest`, junto com `llmModelId` e `llmTimeoutMs`) o lmkd matou o `:reasoning` (~1,4 GB
+  anônimos) ao carregar o SmolLM2. O DeepSeek não foi tentado. Falta rodar num aparelho com RAM de verdade (A32 pelo roteiro manual).
+- Formato: o SmolLM2 é `.litertlm` 1.6.0 (Qwen3 e Gemma 4 são 1.5.0, o DeepSeek 1.3.0); o `litert-lm-peek` 0.16.1 (a mesma versão do AAR)
+  lê os dois. O DeepSeek traz no metadado o prompt do modelo `<｜Assistant｜><think>\n`: o `<think>` já vem aberto, então o canal "thought"
+  (`<think>…</think>`) do `LiteRtBackend` pode não reconhecer o início e o raciocínio vazar na resposta — conferir no aparelho.
+- `adb exec-in` com arquivo grande trava na ponte do adb; empurre em pedaços com `adb push` + `run-as cat >>`.
+- Idioma no cartão: os dois dizem só "Inglês" (a linha "tamanho · idioma" quebra com mais de ~21 caracteres quando há o botão de seleção; o ponto agora fica preso ao idioma por NBSP).
+- Revisão (2026-10-26): (1) o DeepSeek abre o `<think>` no prompt, então o `ThoughtStripper` descarta tudo até o `</think>` (campo
+  `promptOpensThink`; sem `</think>` vira falha, nunca texto cru) e o canal "thought" fica de fora para esse modelo. (2) SmolLM2 e DeepSeek
+  têm `validatedOnDevice = false`: só no debug, até o roteiro manual no A32 (ver tasks.md do reasoning-models). (3) `recommendedRamMb`
+  dos dois é estimativa declarada. (4) A linha "tamanho · idioma" do cartão vai para duas linhas, sem o "·", quando não cabe.
+- Docs e site (2026-10-26): as linhas de licença de SmolLM2 e DeepSeek saem da aba Docs e do `doc.json` enquanto `validatedOnDevice = false`
+  ("baixado sob demanda" seria falso na loja); `unvalidatedTextModelLicenses()` no `DocsPanel.kt` as devolve sozinha quando o roteiro do A32
+  promover os modelos — aí regerar o `doc.json` (`KEYFLOW_REGERAR_DOC_SITE=1`). Os textos e `app/licenses/` seguem prontos.
+
+## 2026-10-25 — `OverlayCoordinatorStateMachineTest` instável: bug real do coordenador (equipe/overlay-instavel)
+
+- Sintoma: o teste de sequências aleatórias falhava de vez em quando na `main` ("o gravador foi ligado duas vezes"). Semente que
+  reproduz (kotest 6: `-Dkotest.proptest.default.seed=841884305423593078` na JVM do teste; o Gradle não repassa `-D`, use
+  `JAVA_TOOL_OPTIONS`): falha na 2168ª tentativa.
+- Causa (do app, não do teste): depois de cancelar durante o envio, desfazer e retomar (sessão nova, `continuingPendingAudio`),
+  pausar e retomar de novo caía outra vez no ramo "há áudio retido" e chamava `recorder.start()` com a sessão aberta. Sequência
+  mínima: TAP, TAP (envio), CANCEL, UNDO, RESUME, PAUSE, RESUME (o mesmo com CANCEL+UNDO+RESUME na sessão nova). No aparelho o
+  `AudioRecorder.start()` recusa (`check(state == IDLE)`), o `runCatching` engolia o erro e a tela voltava a RECORDING com o
+  microfone pausado (a fala seguinte se perdia), e o `timeStart()` zerava o cronômetro e o relógio do limite.
+- Correção: o ramo vale só com `!continuingPendingAudio`; a retomada com sessão viva usa o `recorder.resume()` comum. Dois testes
+  determinísticos em `OverlayCoordinatorTest` (vermelhos antes, `started` 3 em vez de 2).
+- Lição: ramo escolhido por um campo que não é limpo ao ser consumido ("há áudio retido") reaplica o efeito; e `runCatching` em volta
+  de `recorder.start()` esconde o erro. Medido: no código antigo, 1 de 12 e 1 de ~100 sementes (3000 cenários cada) falhavam.
+- Limite da prova: o laço de sementes foi interrompido por queda do servidor por falta de memória (JVMs soltos); passaram ~320 sementes
+  sem falha com a correção, não as 2000 pedidas. Repetições depois, só pelo `pool`. `OrbMotionArtifactTest` falha/trava também na `main`
+  (e deixa o `PartialOverlayServiceTest` falhando se rodar antes no mesmo emulador); não é desta mudança.

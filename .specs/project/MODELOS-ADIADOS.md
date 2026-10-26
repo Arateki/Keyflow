@@ -12,6 +12,9 @@ Em deliberação de 25/10/2026 (19:58), o Yan estabeleceu o escopo imediato e as
 2. **Modelos de texto locais**: catálogo restrito aos modelos leves, com licença livre permissiva e download público desimpedido (ungated):
    - **SmolLM2-1.7B-Instruct** (licença Apache-2.0, tamanho ~1,73 GB);
    - **DeepSeek-R1-Distill-Qwen-1.5B** (licença MIT, tamanho ~1,83 GB).
+   - **Entraram no `ModelCatalog` em 25/10/2026** (não estão mais pendentes), como "Intermediário" e "Raciocínio" na aba Raciocínio,
+     com commit, tamanho e SHA-256 conferidos na API do HF e no arquivo inteiro (`scripts/verify-model-catalog.py`); o resultado no
+     LiteRT-LM do app está no `STATE.md` ("Catálogo com mais dois modelos de texto").
 3. **Modelos fora do catálogo por tamanho**:
    - **Phi-3-mini-4k-instruct** (MIT, ~3,85 GB) e **Phi-4-mini-instruct** (MIT, ~3,91 GB): descartados do catálogo padrão de teclado devido ao tamanho de download excessivo para dispositivos móveis.
 4. **Itens adiados para o futuro**:
