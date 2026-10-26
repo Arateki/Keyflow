@@ -44,12 +44,14 @@ class LocalPanelTest {
         val downloads = mutableListOf<Pair<String, Boolean>>()
         val cancels = mutableListOf<String>()
         val deletes = mutableListOf<String>()
+        val prepares = mutableListOf<Pair<String, String?>>()
 
         override suspend fun download(spec: ModelSpec, allowMetered: Boolean): StartResult {
             downloads += spec.id to allowMetered
             return if (results.size > 1) results.removeAt(0) else results.first()
         }
 
+        override fun prepare(modelId: String, language: String?) { prepares += modelId to language }
         override fun cancel(modelId: String) { cancels += modelId }
         override fun delete(modelId: String) { deletes += modelId }
     }
@@ -113,7 +115,10 @@ class LocalPanelTest {
 
         rule.onNodeWithTag(localModelTag(small.id)).performScrollTo().performClick()
 
-        rule.runOnIdle { assertEquals(small.id, h.settings.localModelId) }
+        rule.runOnIdle {
+            assertEquals(small.id, h.settings.localModelId)
+            assertEquals(listOf(small.id to h.settings.localLanguage), h.actions.prepares)
+        }
     }
 
     @Test

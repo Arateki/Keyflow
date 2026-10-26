@@ -14,6 +14,7 @@ import com.keyflow.data.EffectiveConfig
 import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.ModelSpec
 import com.keyflow.data.models.ModelStore
+import com.keyflow.data.models.ModelPreparationTracker
 import com.keyflow.overlay.LocalTranscription
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -70,6 +71,7 @@ class LocalModelResolver(
 class LocalTranscriber internal constructor(
     private val context: Context,
     private val resolver: LocalModelResolver,
+    val preparation: ModelPreparationTracker = ModelPreparationTracker(),
 ) : LocalTranscription {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -102,8 +104,10 @@ class LocalTranscriber internal constructor(
     private fun preload(local: EffectiveConfig.Local) {
         val model = resolver.resolve(local) ?: return
         preloaded = local
+        val request = preparation.begin(local.modelId)
         scope.launch {
-            val result = call { engine, cb -> engine.preload(model.toParcel(), cb) }
+            val result = call(mayStart = { preparation.state.value === request }) { engine, cb -> engine.preload(model.toParcel(), cb) }
+            preparation.finish(request, (result as? TranscriptionResult.Error)?.message)
             if (result is TranscriptionResult.Error) {
                 Log.w(TAG, "preload de ${local.modelId} falhou: ${result.message}")
                 // Tenta de novo no próximo sync (ex.: a RAM liberou).
@@ -114,13 +118,19 @@ class LocalTranscriber internal constructor(
 
     /** Solta o bind; uma transcrição em andamento termina antes (o bind só cai com a última resposta). */
     fun release() {
+        preparation.clear()
         preloaded = null
         val current = synchronized(lock) { connection.also { connection = null } } ?: return
         current.retire()
     }
 
-    private suspend fun call(send: (ITranscriptionEngine, IEngineCallback) -> Unit): TranscriptionResult {
+    private suspend fun call(
+        mayStart: () -> Boolean = { true },
+        send: (ITranscriptionEngine, IEngineCallback) -> Unit,
+    ): TranscriptionResult {
         val conn = synchronized(lock) {
+            // release limpa o pedido antes de retirar a conexão: uma pré-carga atrasada não pode recriar o bind.
+            if (!mayStart()) return LocalErrors.error(LocalErrors.PROCESS_DIED)
             connection ?: Connection().also { fresh ->
                 connection = fresh
                 val bound = runCatching {
@@ -164,7 +174,9 @@ class LocalTranscriber internal constructor(
 
     private fun onDied(dead: Connection) {
         val wasCurrent = synchronized(lock) { (connection === dead).also { if (it) connection = null } }
-        if (wasCurrent) preloaded = null
+        if (wasCurrent) {
+            preloaded = null
+        }
         dead.dispose()
     }
 
@@ -213,6 +225,9 @@ class LocalTranscriber internal constructor(
         private const val TAG = "LocalTranscriber"
         private const val BIND_TIMEOUT_MS = 30_000L
 
+        /** Observável sem criar o transcritor nem ler a pasta de modelos na thread da interface. */
+        val modelPreparation = ModelPreparationTracker()
+
         @Volatile
         private var instance: LocalTranscriber? = null
 
@@ -225,10 +240,14 @@ class LocalTranscriber internal constructor(
             if (effective is EffectiveConfig.Local) get(context).sync(effective) else instance?.sync(effective)
         }
 
+        /** Saiu da origem Local na configuração: solta o que existe sem criar cliente nem ler disco. */
+        fun releaseIfCreated() { instance?.release() }
+
         fun get(context: Context): LocalTranscriber = instance ?: synchronized(this) {
             instance ?: LocalTranscriber(
                 context.applicationContext,
                 LocalModelResolver(ModelStore.get(context)),
+                preparation = modelPreparation,
             ).also { instance = it }
         }
     }

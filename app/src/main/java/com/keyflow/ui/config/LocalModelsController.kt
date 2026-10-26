@@ -2,6 +2,11 @@ package com.keyflow.ui.config
 
 import android.app.ActivityManager
 import android.content.Context
+import com.keyflow.data.EffectiveConfig
+import com.keyflow.data.models.ModelCatalog
+import com.keyflow.data.models.ModelKind
+import com.keyflow.reasoning.local.LocalReasoningPreloader
+import com.keyflow.transcription.local.LocalTranscriber
 import com.keyflow.data.models.DownloadFailure
 import com.keyflow.data.models.DownloadProgress
 import com.keyflow.data.models.DownloadState
@@ -70,6 +75,17 @@ class LocalModelsController(context: Context) : LocalModelActions {
 
     override suspend fun download(spec: ModelSpec, allowMetered: Boolean): StartResult =
         downloader.start(spec, allowMetered)
+
+    override fun prepare(modelId: String, language: String?) {
+        io.launch {
+            if (!store.isInstalled(modelId)) return@launch
+            when (ModelCatalog.byId(modelId)?.kind) {
+                ModelKind.SPEECH -> LocalTranscriber.get(app).sync(EffectiveConfig.Local(modelId, language))
+                ModelKind.TEXT -> LocalReasoningPreloader.select(app, modelId)
+                else -> Unit
+            }
+        }
+    }
 
     override fun cancel(modelId: String) {
         io.launch { downloader.cancel(modelId) }

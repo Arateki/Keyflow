@@ -40,7 +40,9 @@ class ReasoningPanelTest {
 
     private class FakeActions : LocalModelActions {
         val deletes = mutableListOf<String>()
+        val prepares = mutableListOf<String>()
         override suspend fun download(spec: ModelSpec, allowMetered: Boolean): StartResult = StartResult.Started
+        override fun prepare(modelId: String, language: String?) { prepares += modelId }
         override fun cancel(modelId: String) = Unit
         override fun delete(modelId: String) { deletes += modelId }
     }
@@ -149,6 +151,7 @@ class ReasoningPanelTest {
 
         rule.runOnIdle {
             assertEquals(qwen.id, h.settings.reasoningLocalModelId)
+            assertEquals(listOf(qwen.id), h.actions.prepares)
             assertEquals(whisper.id, h.settings.localModelId) // a Transcrição não é tocada
         }
     }

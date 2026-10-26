@@ -155,7 +155,10 @@ private fun ReasoningLocal(
         ModelList(
             models = models,
             actions = actions,
-            onSelect = { id -> onSettingsChange(settings.copy(reasoningLocalModelId = id)) },
+            onSelect = { id ->
+                onSettingsChange(settings.copy(reasoningLocalModelId = id))
+                actions.prepare(id)
+            },
             // Apagar o selecionado deixa o Raciocínio sem modelo local escolhido.
             onDeleted = { id -> if (settings.reasoningLocalModelId == id) onSettingsChange(settings.copy(reasoningLocalModelId = null)) },
             tags = ModelListTags.Raciocinio,

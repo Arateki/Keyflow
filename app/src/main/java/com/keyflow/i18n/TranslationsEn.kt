@@ -2,6 +2,10 @@ package com.keyflow.i18n
 
 /** Português → inglês. Chave = o texto exato passado a [tr] (ver `TranslationsTest`). */
 internal val TranslationsEn: Map<String, String> = mapOf(
+    "Preparando modelo… %d s" to "Preparing model… %d s",
+    "Não foi possível preparar o modelo. Tente selecioná-lo de novo." to "Could not prepare the model. Try selecting it again.",
+    "Pouca memória livre agora: o modelo carrega no primeiro uso." to "Low free memory right now: the model loads on first use.",
+
     "Contato" to "Contact",
     "Abrir Privacidade" to "Open Privacy",
     "Aviso do ditado" to "Dictation notice",
