@@ -135,14 +135,16 @@ Play**: a T18b (textos legais, revisados pelo Yan) fecha a fase B; sem ela o apr
 
 ### CA-T4 — Decisão por classe de troca
 - **Status**: Pending
-- **What**: `SwapClass` + `SuggestParams` por classe; `Suggester.suggest` devolve a classe; siglas (candidata toda em
-  maiúsculas, qualquer tamanho) só sugerem; acento digitado nunca se perde (corrige `sameLetters.first()`).
+- **What**: `SwapClass` + `SuggestParams` por classe; `Suggester.suggest` devolve a classe; siglas (**qualquer** candidata toda em
+  maiúsculas, a mesma palavra ou outra, qualquer tamanho) só sugerem; acento digitado nunca se perde (corrige `sameLetters.first()`).
 - **Where**: `dictionary/Suggester.kt`, `dictionary/SwapClass.kt`.
 - **Depends on**: CA-T1. **Covers**: BAS-01..03, ROL-04.
-- **Done when**: no banco, as trocas indevidas do "manter" caem sem piorar "erros" (alvo desta task sozinha: cerca de
-  31% das palavras fora do dicionário ainda trocadas — 101 de 322 pelas contas de `context.md` §3: 165 − 57 só de
-  caixa − ~7 acentos digitados —, **não** ≤ 25%; a queda até ≤ 10% vem das T5, T6 e T7; números a confirmar com o
-  baseline da T1); as expectativas de `RealDictionaryTest` que mudam de propósito (`api`→`API`, resposta 2 do Yan)
+- **Done when**: no banco, as trocas indevidas do "manter" caem sem piorar "erros" (alvo desta task sozinha, **estimativa** a
+  refazer com o baseline da T1: cerca de 35% das palavras fora do dicionário ainda trocadas — ~113 de 322 pelas
+  contas de `context.md` §3: 165 − 45 que viram sigla − ~7 acentos digitados; as outras 12 das 57 trocas de caixa
+  não são sigla, são inicial de nome próprio, que continua permitida (BAS-02) —, **não** ≤ 25%; a queda até ≤ 10%
+  vem das T5, T6 e T7; o número da lista do estudo não é reproduzível, e o alvo vale só depois de medido na T1); teste unitário de BAS-02 com `obg`→`ONG` (candidata sigla que não é a mesma palavra) e `vc`→`VC`: só sugerem, e
+  `paulo`→`Paulo` segue a regra da classe CAPITAL; as expectativas de `RealDictionaryTest` que mudam de propósito (`api`→`API`, resposta 2 do Yan)
   ficam listadas aqui com o motivo.
 - **Tests**: unit + banco. **Gate**: `quick`.
 
@@ -172,7 +174,7 @@ Play**: a T18b (textos legais, revisados pelo Yan) fecha a fase B; sem ela o apr
   `Dictionaries` carrega junto; `Suggester` só sugere quando a palavra está ali.
 - **Where**: `scripts/`, `dictionary/Dictionaries.kt`, `dictionary/Suggester.kt`.
 - **Depends on**: CA-T1. **Covers**: BAS-05.
-- **Done when**: no banco, as trocas indevidas do grupo inglês (31% na lista do estudo; 39% das palavras comuns do
+- **Done when**: no banco, as trocas indevidas do grupo inglês (31% na lista do estudo, não reproduzível; 39% das palavras comuns do
   dicionário en fora do pt) caem para ≤ 5% (meta provisória); tamanho, memória e carga **medidos** (o palpite de
   20–30 mil palavras estrangeiras daria 0,4–0,6 MB no formato de hoje, ≈ 20 B/palavra, mais que os 0,3 MB: o orçamento
   é refeito com o número da T7, variando F).
@@ -188,7 +190,7 @@ Play**: a T18b (textos legais, revisados pelo Yan) fecha a fase B; sem ela o apr
 - **What**: `LearningPolicy` (`fieldAllowsLearning`, `wordEligible`), `LearningParams`; constante
   `IME_FLAG_NO_PERSONALIZED_LEARNING`; `autoCorrectAllowed` continua a base.
 - **Where**: `learning/LearningPolicy.kt`, `learning/LearningParams.kt`.
-- **Depends on**: — (o aprendizado só precisa da T1 no banco; a T8 em si não toca o banco).
+- **Depends on**: — (política pura; não usa o banco nem o toque).
 - **Covers**: PRV-02, PRV-06 (a política), LRN-02, LRN-08.
 - **Done when**: matriz de `inputType` × flag × opções, com `NO_SUGGESTIONS` (a busca do Google, `0xa0001`, corrige e
   sugere mas não aprende) e senha/URL/e-mail/número fora; palavras de teste (`kkk`, `API`, `abc123`, `a`, 40 letras).
@@ -201,7 +203,8 @@ Play**: a T18b (textos legais, revisados pelo Yan) fecha a fase B; sem ela o apr
 - **Where**: `learning/PersonalLexicon.kt`. **Depends on**: CA-T8. **Covers**: LRN-03..07, FIX-03..05 (modelo).
 - **Done when**: 3 pontos valem; recusa vale na hora; "kkk kkk kkk" = 1; 142 dias parada deixa de valer;
   **uso de 1 por dia durante 400 dias nunca expira** (renovação de palavra que vale, LRN-01 (b); o peso para no
-  `WEIGHT_CAP`), e o mesmo para um par usado todo dia; teto 5000 expulsa o menor; propriedade: peso nunca negativo,
+  `WEIGHT_CAP`), e o mesmo para um par usado todo dia; teto 5000 expulsa o menor; **recusa com relógio avançado**: recusa (3 pontos) e 150 dias sem uso
+  → a palavra deixa de valer e volta a ser trocada; com um uso a cada 100 dias continua valendo; propriedade: peso nunca negativo,
   decaimento monótono.
 - **Tests**: unit + propriedade. **Gate**: `quick`.
 

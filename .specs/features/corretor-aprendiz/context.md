@@ -239,8 +239,8 @@ frase inteira.
 | Técnica | Origem | Custo no A32 | Ganho esperado | Decisão |
 | ------- | ------ | ------------ | -------------- | ------- |
 | Decisão por classe de troca, limiares calibrados no banco | esta spec | 0 | **Alto** (~48% de trocas indevidas na lista do estudo, preliminar; meta ≤ 10% a confirmar no banco) | Fase A |
-| Léxico informal pt-BR curado + guarda de outro idioma | medição; HeliBoard (confiança por idioma), AOSP (plausibilidade) | +0,1 MB (léxico) +0,3 MB (lista estrangeira) | **Alto** nas abreviações e no inglês (na lista do estudo, 68% das abreviações fora do dicionário e, no dicionário, 39% do inglês comum fora do pt são trocados hoje; preliminar) | Fase A |
-| Aprendizado de palavras, recusa, pares | AOSP, ASK, HeliBoard (ideia) | < 1 ms, < 1,5 MB | Alto para o que a pessoa repete; some a queixa | Fases B e E |
+| Léxico informal pt-BR curado + guarda de outro idioma | medição; HeliBoard (confiança por idioma), AOSP (plausibilidade) | **estimativa, a medir**: +0,1 MB (léxico, T5) e a lista estrangeira, que **não** é 0,3 MB (revogado: ≈ 0,4–0,6 MB no formato de hoje, `design.md` §2; a T7 mede) | **Alto** nas abreviações e no inglês (na lista do estudo, 68% das abreviações fora do dicionário e, no dicionário, 39% do inglês comum fora do pt são trocados hoje; preliminar) | Fase A |
+| Aprendizado de palavras, recusa, pares | AOSP, ASK, HeliBoard (ideia) | **orçamento, não medida**: < 1 ms por palavra (T22, no A32) e < 1,5 MB (arquivo e memória medidos na T10) | Alto para o que a pessoa repete; some a queixa | Fases B e E |
 | Placar em bits calibrado (log-prob) | LatinIME (mesma ideia em outra escala) | CPU a medir (o protótipo espacial custou +32–35%, sem otimizar) | Médio; torna bigrama, aprendizado e toque somáveis | Fase C |
 | Confusões ortográficas do pt-BR (s↔z, ss↔ç, x↔ch, g↔j, e↔i/o↔u finais, h mudo) com custo reduzido | **hipótese minha, não vem de código lido** | 0 | A medir no conjunto "erros" (ortografia não é toque) | Fase C/E, só entra se o banco provar |
 | Espaço faltando/sobrando ("obrigadopor") | LatinIME (`SPACE_OMISSION_COST` 0,1), ASK (`WordsSplitter`) | médio (partições por prefixo) | Baixo/médio | Depois |
@@ -267,7 +267,8 @@ Resultados (200 digitações por linha; 3 configurações, rodadas sob a fila do
 | σ 0,30, viés forte (+0,12 largura, +0,15 altura) | 19,6% (13,8% se o hit-test compensasse o viés) | 87,6% → **94,2%** (≥ 3 bits) | 0,7% → 0,0% | 93,4% → 97,8% → **99,3%** |
 
 ¹ B tem uma "régua" (margem mínima em bits entre a 1ª e a 2ª candidata) em vez de um limiar fixo; a coluna mostra o ponto
-em que B fica igual ou melhor que A nos dois lados. Sem margem (troca sempre), B acerta 99,2% / 92,3% / 97,8% e erra
+em que B fica, na linha 1 e na 3, igual ou melhor que A nos dois lados; **na linha 2 (σ 0,40) a troca certa cai de
+82,1% para 81,0%** (2 casos em 168) enquanto a errada cai de 4,2% para 1,2%. Sem margem (troca sempre), B acerta 99,2% / 92,3% / 97,8% e erra
 0,8% / 7,7% / 2,2%.
 
 Leitura:
