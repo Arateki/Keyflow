@@ -195,8 +195,12 @@ sem composição, e o serviço não vê a pessoa confirmar. Mudança (D1): estad
 no campo (lição do Q9: o `onUpdateSelection` chega dentro da chamada), depois
 `ic.setComposingText(original, 1)`; guardar `PendingRejection(original, troca, idioma)`. Quem decide:
 
-- `finishComposing` com a palavra igual a `original` e com separador → suprime a troca (REJ-05) e envia
-  `Rejected`;
+- `finishComposing` com a palavra igual a `original` e **com separador** (espaço, pontuação) → suprime a troca
+  (REJ-05) e envia `Rejected`;
+- **Enter** (`KeyAction.Enter` chama `finishComposing(ic)` sem separador, `KeyFlowKeyboardService.kt`) com a palavra
+  igual a `original` → confirmação explícita: envia `Rejected` e comita a original sem troca; o Enter continua sem
+  chamar o `Suggester` e **não** envia `Typed` (DESCONHECIDO) — só a recusa pontua. Colar e atalhos
+  (`finishComposing(ic)` sem separador) **não** confirmam: limpam a espera;
 - letra, backspace, troca de campo, troca de idioma, movimento de cursor → limpa a espera.
 
 O teste instrumentado de hoje (`fieldText() == "nao"` após o backspace) continua valendo. ASK e AOSP

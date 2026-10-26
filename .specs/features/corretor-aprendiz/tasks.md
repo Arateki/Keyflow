@@ -246,7 +246,9 @@ Play**: a T18b (textos legais, revisados pelo Yan) fecha a fase B; sem ela o apr
 - **Where**: `ComposingWordTracker.kt`, `KeyFlowKeyboardService.kt`. **Depends on**: CA-T12.
 - **Covers**: REJ-01, REJ-04..06.
 - **Done when**: instrumentado: `nao␠` → `não␠` → backspace → `nao` → `␠` vira `nao␠` e na vez seguinte **não** troca;
-  editar a palavra após o backspace não ensina nada; o teste atual `fieldText()=="nao"` segue verde.
+  **desfazer → Enter** (`nao␠` → `não␠` → backspace → `nao` → Enter) confirma a recusa e comita `nao` sem troca, e a
+  vez seguinte não troca; o Enter de uma palavra que não é a recusa em espera não pontua `Typed`; editar a palavra
+  após o backspace não ensina nada; o teste atual `fieldText()=="nao"` segue verde.
 - **Tests**: unit (máquina) + instrumentado. **Gate**: `full`.
 
 ### CA-T14 — Faixa: manter e tocar na sugestão
@@ -403,7 +405,7 @@ Play**: a T18b (textos legais, revisados pelo Yan) fecha a fase B; sem ela o apr
 - **Where**: `learning/RewriteTracker.kt`, serviço.
 - **Depends on**: CA-T11, CA-T12, CA-T13, CA-T14 (o `PairTap` da faixa). **Covers**: FIX-02, FIX-04..06, REJ-03.
 - **Done when**: `RewriteTrackerTest` (apagar e reescrever, janela de 20 s, cursor, letra sem apagar; **apagar a
-  corrigida e reescrever um nome fora do dicionário** — `Arateki`, trocado por `Arateky` — emite `Rejected` e não
+  corrigida e reescrever um nome fora do dicionário** — por exemplo `Arateki`, que o corretor trocou por outra palavra — emite `Rejected` e não
   `Rewrite`: a original inválida passa pela recusa antes das condições do par); instrumentado:
   digitar `tmbm`, tocar `também` 2× e a 3ª vez troca no espaço; recusar remove o par.
 - **Tests**: unit + instrumentado. **Gate**: `full`.
