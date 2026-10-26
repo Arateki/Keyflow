@@ -328,28 +328,44 @@ class OrbMotionArtifactTest {
     }
 
     /**
-     * Espera, com prazo, que a janela desenhe DOIS quadros depois do que foi injetado, sem esperar a fila ficar ociosa.
-     * `waitForIdleSync()` não serve aqui: a orbe é um `ComposeView` com animações infinitas (aura, partículas) e, no
-     * swangle, cada quadro leva 150–200 ms; medido no servidor, cada chamada demorava de 10 a 25 s até a fila ficar ociosa
-     * (153 quadros por teste). `runOnMainSync` vazio não basta, pois só espera o `Runnable` terminar, e o `takeScreenshot`
-     * não espera a composição. Um `OnDrawListener` contando dois desenhos garante que a recomposição do estado injetado já
-     * foi aplicada e desenhada (o primeiro desenho pode já estar em curso quando o evento chega).
+     * Espera, com prazo de [DRAW_TIMEOUT_MS], DOIS commits de quadro encadeados da janela depois do evento já processado
+     * pelo `runOnMainSync`, sem esperar a fila ficar ociosa. `waitForIdleSync()` não serve: a orbe é um `ComposeView` com
+     * animações infinitas (aura, partículas) e, no swangle, cada quadro leva 150–200 ms; medido no servidor, cada chamada
+     * ficava de 10 a 25 s até a fila ociosar (153 quadros por teste). `runOnMainSync` vazio só espera o `Runnable`, e o
+     * `takeScreenshot` não espera a composição. `registerFrameCommitCallback` (API 29+) avisa quando o quadro foi
+     * renderizado e submetido; o primeiro commit pode ser de um quadro já em curso antes do evento, e o segundo, registrado
+     * dentro do primeiro, é de um quadro iniciado depois dele, que enxerga o estado já aplicado na árvore. Não prova
+     * pixel a pixel que o compositor já exibiu o quadro; a asserção do estado é feita pelo `waitUntil` que antecede a captura.
+     * Abaixo da API 29 cai no `OnDrawListener` (aviso ANTES do desenho) e na folga do `Thread.sleep` de [capture].
      */
     private fun settle() {
         val decor = harnessRoot ?: run {
             instrumentation.runOnMainSync { }
             return
         }
-        val drawn = CountDownLatch(2)
-        val listener = ViewTreeObserver.OnDrawListener { drawn.countDown() }
-        instrumentation.runOnMainSync {
-            decor.viewTreeObserver.addOnDrawListener(listener)
-            decor.invalidate()
+        val done = CountDownLatch(1)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            instrumentation.runOnMainSync {
+                decor.viewTreeObserver.registerFrameCommitCallback {
+                    decor.viewTreeObserver.registerFrameCommitCallback { done.countDown() }
+                    decor.invalidate()
+                }
+                decor.invalidate()
+            }
+        } else {
+            val draws = CountDownLatch(2)
+            val listener = ViewTreeObserver.OnDrawListener { draws.countDown() }
+            instrumentation.runOnMainSync {
+                decor.viewTreeObserver.addOnDrawListener(listener)
+                decor.invalidate()
+            }
+            if (draws.await(DRAW_TIMEOUT_MS, TimeUnit.MILLISECONDS)) done.countDown()
+            decor.post { decor.viewTreeObserver.removeOnDrawListener(listener) }
         }
-        val ok = drawn.await(DRAW_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-        // Remover dentro do desenho é proibido: posta para depois.
-        decor.post { decor.viewTreeObserver.removeOnDrawListener(listener) }
-        assertTrue("a janela não desenhou dois quadros em ${DRAW_TIMEOUT_MS}ms", ok)
+        assertTrue(
+            "a janela não confirmou dois quadros em ${DRAW_TIMEOUT_MS}ms",
+            done.await(DRAW_TIMEOUT_MS, TimeUnit.MILLISECONDS),
+        )
     }
 
     private fun down(view: OrbButtonView) {
