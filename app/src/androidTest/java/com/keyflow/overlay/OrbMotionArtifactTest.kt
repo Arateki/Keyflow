@@ -7,6 +7,7 @@ import android.os.ParcelFileDescriptor
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewTreeObserver
 import android.widget.FrameLayout
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -29,6 +30,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /**
  * Gera artefatos visuais dos gestos reais da orbe para revisão humana.
@@ -65,10 +68,25 @@ class OrbMotionArtifactTest {
     }
 
     private var scenario: ActivityScenario<ComposeSmokeActivity>? = null
+    private var harnessRoot: FrameLayout? = null
 
     @After
     fun tearDown() {
-        scenario?.close()
+        closeScenario()
+    }
+
+    /**
+     * Desanexa a orbe (e com ela a composição animada) na thread principal ANTES de fechar a Activity: o
+     * `ActivityScenario.close()` chama `waitForIdleSync()` antes de destruí-la, e com a orbe animada anexada a fila só fica
+     * ociosa quando acontece. `runOnMainSync` em vez de `onActivity`, que também espera ociosidade.
+     */
+    private fun closeScenario() {
+        val root = harnessRoot
+        harnessRoot = null
+        if (root != null) instrumentation.runOnMainSync { root.removeAllViews() }
+        val launched = scenario
+        scenario = null
+        launched?.close()
     }
 
     @Test
@@ -248,8 +266,10 @@ class OrbMotionArtifactTest {
                 },
             )
             arrows = DragArrowsView(activity).apply { visibility = View.INVISIBLE }
+            val root = FrameLayout(activity)
+            harnessRoot = root
             activity.setContentView(
-                FrameLayout(activity).apply {
+                root.apply {
                     setBackgroundColor(Color.rgb(244, 236, 207))
                     addView(
                         view,
@@ -267,9 +287,11 @@ class OrbMotionArtifactTest {
             view.render(initialState)
         }
         waitUntil("orbe não foi medida") { view.width > 0 && view.height > 0 }
-        block(view)
-        launched.close()
-        scenario = null
+        try {
+            block(view)
+        } finally {
+            closeScenario()
+        }
     }
 
     private fun createView(
@@ -306,13 +328,28 @@ class OrbMotionArtifactTest {
     }
 
     /**
-     * Espera o que já foi postado na thread principal rodar, sem esperar a fila ficar ociosa: a orbe é um `ComposeView` com
-     * animações infinitas (aura, partículas), então a fila nunca fica ociosa e `waitForIdleSync` só volta quando estoura
-     * o tempo (medido: ~15 s por quadro no swangle do servidor, 144 quadros). Um `runOnMainSync` vazio basta: ele só
-     * volta depois que os eventos injetados e a renderização pendente anteriores a ele rodaram.
+     * Espera, com prazo, que a janela desenhe DOIS quadros depois do que foi injetado, sem esperar a fila ficar ociosa.
+     * `waitForIdleSync()` não serve aqui: a orbe é um `ComposeView` com animações infinitas (aura, partículas) e, no
+     * swangle, cada quadro leva 150–200 ms; medido no servidor, cada chamada demorava de 10 a 25 s até a fila ficar ociosa
+     * (153 quadros por teste). `runOnMainSync` vazio não basta, pois só espera o `Runnable` terminar, e o `takeScreenshot`
+     * não espera a composição. Um `OnDrawListener` contando dois desenhos garante que a recomposição do estado injetado já
+     * foi aplicada e desenhada (o primeiro desenho pode já estar em curso quando o evento chega).
      */
     private fun settle() {
-        instrumentation.runOnMainSync { }
+        val decor = harnessRoot ?: run {
+            instrumentation.runOnMainSync { }
+            return
+        }
+        val drawn = CountDownLatch(2)
+        val listener = ViewTreeObserver.OnDrawListener { drawn.countDown() }
+        instrumentation.runOnMainSync {
+            decor.viewTreeObserver.addOnDrawListener(listener)
+            decor.invalidate()
+        }
+        val ok = drawn.await(DRAW_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        // Remover dentro do desenho é proibido: posta para depois.
+        decor.post { decor.viewTreeObserver.removeOnDrawListener(listener) }
+        assertTrue("a janela não desenhou dois quadros em ${DRAW_TIMEOUT_MS}ms", ok)
     }
 
     private fun down(view: OrbButtonView) {
@@ -403,6 +440,7 @@ class OrbMotionArtifactTest {
 
     private companion object {
         const val ORB_SIZE = 220
+        const val DRAW_TIMEOUT_MS = 10_000L
         const val START_X = ORB_SIZE / 2f
         const val START_Y = ORB_SIZE / 2f
         const val DRAG_DISTANCE = 170f
