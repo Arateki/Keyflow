@@ -2994,3 +2994,6 @@ Dois motores com ferramentas ao lado do da Anthropic: `reasoning/openai/OpenAiAg
   `promptOpensThink`; sem `</think>` vira falha, nunca texto cru) e o canal "thought" fica de fora para esse modelo. (2) SmolLM2 e DeepSeek
   têm `validatedOnDevice = false`: só no debug, até o roteiro manual no A32 (ver tasks.md do reasoning-models). (3) `recommendedRamMb`
   dos dois é estimativa declarada. (4) A linha "tamanho · idioma" do cartão vai para duas linhas, sem o "·", quando não cabe.
+- Docs e site (2026-10-26): as linhas de licença de SmolLM2 e DeepSeek saem da aba Docs e do `doc.json` enquanto `validatedOnDevice = false`
+  ("baixado sob demanda" seria falso na loja); `unvalidatedTextModelLicenses()` no `DocsPanel.kt` as devolve sozinha quando o roteiro do A32
+  promover os modelos — aí regerar o `doc.json` (`KEYFLOW_REGERAR_DOC_SITE=1`). Os textos e `app/licenses/` seguem prontos.

@@ -1,5 +1,6 @@
 package com.keyflow.ui.config
 
+import com.keyflow.data.models.ModelCatalog
 import com.keyflow.i18n.tr
 import com.keyflow.i18n.trKey
 import android.content.ActivityNotFoundException
@@ -405,11 +406,7 @@ val docsSections: List<DocSection> get() = listOf(
             DocBlock.Labeled("Parakeet TDT 0.6B v3", tr("modelo Máxima qualidade — CC BY 4.0 (NVIDIA), convertido para ONNX int8 pelo sherpa-onnx.")),
             DocBlock.Labeled("LiteRT-LM", tr("motor dos modelos de texto da aba Raciocínio, no aparelho — Apache 2.0 (Google).")),
             DocBlock.Labeled("Qwen3 0.6B", tr("modelo de texto Leve — Apache 2.0 (Alibaba), baixado sob demanda.")),
-            DocBlock.Labeled("SmolLM2 1.7B", tr("modelo de texto Intermediário — Apache 2.0 (Hugging Face), baixado sob demanda.")),
-            DocBlock.Labeled(
-                "DeepSeek R1 1.5B",
-                tr("modelo de texto Raciocínio (DeepSeek-R1-Distill-Qwen-1.5B) — MIT (DeepSeek), derivado do Qwen2.5 (Apache 2.0, Alibaba), baixado sob demanda."),
-            ),
+            *unvalidatedTextModelLicenses().toTypedArray(),
             DocBlock.Labeled("AndroidSVG", tr("desenha os SVGs das skins importadas — Apache 2.0 (Cave Rock Software).")),
             DocBlock.Labeled("Gemma 4 E2B", tr("modelo de texto Equilibrado — Apache 2.0 (Google), baixado sob demanda.")),
             DocBlock.Labeled(tr("Dicionários do corretor"), tr("listas de palavras do teclado do Android (AOSP LatinIME) para português, inglês e espanhol — Apache 2.0.")),
@@ -427,6 +424,25 @@ val docsSections: List<DocSection> get() = listOf(
         feedbackActions = true,
     ),
 )
+
+/**
+ * Licenças dos modelos de texto que o release ainda NÃO oferece (`validatedOnDevice = false`): citá-los como "baixados sob demanda"
+ * seria falso na loja. Vazio enquanto não forem promovidos — a Docs (e o `doc.json` do site, que segue o release) só os cita
+ * depois do roteiro manual no A32. Independe do build: debug e release exportam o mesmo texto.
+ */
+private fun unvalidatedTextModelLicenses(): List<DocBlock> = buildList {
+    if (ModelCatalog.SMOLLM2_1_7B.validatedOnDevice) {
+        add(DocBlock.Labeled("SmolLM2 1.7B", tr("modelo de texto Intermediário — Apache 2.0 (Hugging Face), baixado sob demanda.")))
+    }
+    if (ModelCatalog.DEEPSEEK_R1_1_5B.validatedOnDevice) {
+        add(
+            DocBlock.Labeled(
+                "DeepSeek R1 1.5B",
+                tr("modelo de texto Raciocínio (DeepSeek-R1-Distill-Qwen-1.5B) — MIT (DeepSeek), derivado do Qwen2.5 (Apache 2.0, Alibaba), baixado sob demanda."),
+            ),
+        )
+    }
+}
 
 /** Um passo do "Como funciona" no topo da Docs. */
 data class DocStep(val number: String, val title: String, val body: String)
