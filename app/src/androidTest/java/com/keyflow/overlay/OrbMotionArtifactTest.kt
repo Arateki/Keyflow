@@ -334,8 +334,11 @@ class OrbMotionArtifactTest {
      * ficava de 10 a 25 s até a fila ociosar (153 quadros por teste). `runOnMainSync` vazio só espera o `Runnable`, e o
      * `takeScreenshot` não espera a composição. `registerFrameCommitCallback` (API 29+) avisa quando o quadro foi
      * renderizado e submetido; o primeiro commit pode ser de um quadro já em curso antes do evento, e o segundo, registrado
-     * dentro do primeiro, é de um quadro iniciado depois dele, que enxerga o estado já aplicado na árvore. Não prova
-     * pixel a pixel que o compositor já exibiu o quadro; a asserção do estado é feita pelo `waitUntil` que antecede a captura.
+     * dentro do primeiro, é de um quadro iniciado depois dele. Confirma dois quadros renderizados e submetidos depois do
+     * evento, mas NÃO prova que o quadro já mostra a recomposição do estado injetado, nem que o compositor o exibiu: a
+     * espera não está ligada ao estado que a composição aplicou. O `waitUntil` confere `dragKind`/`dragLocked` só em alguns
+     * passos (não antes do quadro "pressed" nem dos passos de aproximação), então o PNG é evidência para revisão humana,
+     * e o que o teste afirma de fato são os intents/config no fim.
      * Abaixo da API 29 cai no `OnDrawListener` (aviso ANTES do desenho) e na folga do `Thread.sleep` de [capture].
      */
     private fun settle() {
@@ -359,8 +362,10 @@ class OrbMotionArtifactTest {
                 decor.viewTreeObserver.addOnDrawListener(listener)
                 decor.invalidate()
             }
-            if (draws.await(DRAW_TIMEOUT_MS, TimeUnit.MILLISECONDS)) done.countDown()
+            val ok = draws.await(DRAW_TIMEOUT_MS, TimeUnit.MILLISECONDS)
             decor.post { decor.viewTreeObserver.removeOnDrawListener(listener) }
+            assertTrue("a janela não desenhou dois quadros em ${DRAW_TIMEOUT_MS}ms", ok)
+            return
         }
         assertTrue(
             "a janela não confirmou dois quadros em ${DRAW_TIMEOUT_MS}ms",
