@@ -2997,3 +2997,21 @@ Dois motores com ferramentas ao lado do da Anthropic: `reasoning/openai/OpenAiAg
 - Docs e site (2026-10-26): as linhas de licença de SmolLM2 e DeepSeek saem da aba Docs e do `doc.json` enquanto `validatedOnDevice = false`
   ("baixado sob demanda" seria falso na loja); `unvalidatedTextModelLicenses()` no `DocsPanel.kt` as devolve sozinha quando o roteiro do A32
   promover os modelos — aí regerar o `doc.json` (`KEYFLOW_REGERAR_DOC_SITE=1`). Os textos e `app/licenses/` seguem prontos.
+
+## 2026-10-25 — `OverlayCoordinatorStateMachineTest` instável: bug real do coordenador (equipe/overlay-instavel)
+
+- Sintoma: o teste de sequências aleatórias falhava de vez em quando na `main` ("o gravador foi ligado duas vezes"). Semente que
+  reproduz (kotest 6: `-Dkotest.proptest.default.seed=841884305423593078` na JVM do teste; o Gradle não repassa `-D`, use
+  `JAVA_TOOL_OPTIONS`): falha na 2168ª tentativa.
+- Causa (do app, não do teste): depois de cancelar durante o envio, desfazer e retomar (sessão nova, `continuingPendingAudio`),
+  pausar e retomar de novo caía outra vez no ramo "há áudio retido" e chamava `recorder.start()` com a sessão aberta. Sequência
+  mínima: TAP, TAP (envio), CANCEL, UNDO, RESUME, PAUSE, RESUME (o mesmo com CANCEL+UNDO+RESUME na sessão nova). No aparelho o
+  `AudioRecorder.start()` recusa (`check(state == IDLE)`), o `runCatching` engolia o erro e a tela voltava a RECORDING com o
+  microfone pausado (a fala seguinte se perdia), e o `timeStart()` zerava o cronômetro e o relógio do limite.
+- Correção: o ramo vale só com `!continuingPendingAudio`; a retomada com sessão viva usa o `recorder.resume()` comum. Dois testes
+  determinísticos em `OverlayCoordinatorTest` (vermelhos antes, `started` 3 em vez de 2).
+- Lição: ramo escolhido por um campo que não é limpo ao ser consumido ("há áudio retido") reaplica o efeito; e `runCatching` em volta
+  de `recorder.start()` esconde o erro. Medido: no código antigo, 1 de 12 e 1 de ~100 sementes (3000 cenários cada) falhavam.
+- Limite da prova: o laço de sementes foi interrompido por queda do servidor por falta de memória (JVMs soltos); passaram ~320 sementes
+  sem falha com a correção, não as 2000 pedidas. Repetições depois, só pelo `pool`. `OrbMotionArtifactTest` falha/trava também na `main`
+  (e deixa o `PartialOverlayServiceTest` falhando se rodar antes no mesmo emulador); não é desta mudança.
