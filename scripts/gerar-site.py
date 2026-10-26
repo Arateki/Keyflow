@@ -63,10 +63,24 @@ OUTRO_IDIOMA = {
 # preguiçosas e ficam de fora.
 ORCAMENTO_PRIMEIRA_CARGA = 400 * 1024
 
-# Script em linha das páginas legais: aplica o tema claro/escuro escolhido (o padrão segue o sistema).
+# Script em linha de todas as páginas (o hash dele vai no Content-Security-Policy; mudou aqui, mude nas três páginas
+# escritas à mão: website/index.html, en.html e 404.html). Marca o <html> com a classe "js" (sem JavaScript o cabeçalho
+# do celular mostra a navegação numa faixa em vez do botão de menu) e aplica o tema claro/escuro escolhido (o padrão
+# segue o sistema).
 SCRIPT_TEMA = (
-    "(function(){try{var t=localStorage.getItem('kf-tema');if(t==='claro'||t==='escuro')"
-    "document.documentElement.setAttribute('data-theme',t)}catch(e){}})();"
+    "(function(){var r=document.documentElement;r.classList.add('js');"
+    "try{var t=localStorage.getItem('kf-tema');if(t==='claro'||t==='escuro')r.setAttribute('data-theme',t)}catch(e){}})();"
+)
+
+
+# Botão do menu do cabeçalho do celular (abaixo de 961 px, só com JavaScript). O site.js liga o aria-expanded e abre o
+# <nav id="menu-topo">. O mesmo HTML está à mão em website/index.html, en.html e 404.html; o teste de cada página confere.
+MENU_BOTAO = (
+    '<button class="menu-botao" type="button" aria-expanded="false" aria-controls="menu-topo">'
+    '<span class="menu-rotulo">{rotulo}</span>'
+    '<svg class="menu-seta" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" '
+    'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2.5 4.5 6 8l3.5-3.5"/></svg>'
+    '</button>'
 )
 
 
@@ -333,6 +347,7 @@ def make_header(lang: str, current_page: str) -> str:
         alt_text = "EN"
         alt_reader = "English version"
         tema_label = "Alternar tema claro/escuro"
+        menu_label = "Menu"
         doc_url, priv_url, termos_url = "doc.html", "privacidade.html", "termos.html"
     else:
         home_url = "en.html"
@@ -345,25 +360,21 @@ def make_header(lang: str, current_page: str) -> str:
         alt_text = "PT"
         alt_reader = "versão em português"
         tema_label = "Switch light/dark theme"
+        menu_label = "Menu"
         doc_url, priv_url, termos_url = "docs.html", "privacy.html", "terms.html"
-
-    # No celular o menu some; o atalho leva à documentação (a própria página de documentação não precisa dele).
-    atalho_docs = ""
-    if current_page not in PAGINAS_DOC:
-        leitor = "Documentação" if lang == "pt-BR" else "Documentation"
-        atalho_docs = f'<a class="docs-atalho" href="{doc_url}">Docs<span class="so-leitor"> — {leitor}</span></a>\n      '
 
     return f"""<header class="topo">
   <div class="caixa topo-in">
     <a class="marca" href="{home_url}"><span class="marca-orbe" aria-hidden="true"></span>KeyFlow</a>
-    <nav class="nav" aria-label="{nav_label}">
+    {MENU_BOTAO.format(rotulo=menu_label)}
+    <nav class="nav" id="menu-topo" aria-label="{nav_label}">
       <a href="{home_url}">{home_label}</a>
       <a href="{doc_url}"{atual(doc_url)}>{doc_label}</a>
       <a href="{priv_url}"{atual(priv_url)}>{priv_label}</a>
       <a href="{termos_url}"{atual(termos_url)}>{termos_label}</a>
     </nav>
     <div class="topo-acoes">
-      {atalho_docs}<a class="idioma" href="{alt_url}" hreflang="{alt_code}" lang="{alt_code}">{alt_text}<span class="so-leitor"> — {alt_reader}</span></a>
+      <a class="idioma" href="{alt_url}" hreflang="{alt_code}" lang="{alt_code}">{alt_text}<span class="so-leitor"> — {alt_reader}</span></a>
       <button class="tema" type="button" aria-pressed="false" aria-label="{tema_label}">
         <svg class="sol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/></svg>
         <svg class="lua" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.6A8 8 0 0 1 9.4 4a8 8 0 1 0 10.6 10.6Z"/></svg>
@@ -672,6 +683,16 @@ def verify_generated_site(generated: dict, output_dir: Path, repo_root: Path):
         for link in expected_links[name]:
             if f'href="{link}"' not in content:
                 erros.append(f"Link {link} ausente em {name}")
+        # Menu do cabeçalho do celular: um botão que nasce fechado e controla o <nav> do próprio cabeçalho.
+        botao = re.search(r'<button class="menu-botao"[^>]*>', content)
+        if content.count('class="menu-botao"') != 1 or not botao:
+            erros.append(f"{name}: o cabeçalho deve ter exatamente um botão de menu (class=\"menu-botao\")")
+        else:
+            alvo = re.search(r'\saria-controls="([^"]+)"', botao.group(0))
+            if 'aria-expanded="false"' not in botao.group(0) or 'type="button"' not in botao.group(0):
+                erros.append(f"{name}: o botão de menu precisa de type=\"button\" e aria-expanded=\"false\"")
+            if not alvo or not re.search(rf'<nav\b[^>]*\sid="{re.escape(alvo.group(1))}"', content):
+                erros.append(f"{name}: o aria-controls do botão de menu não aponta para um <nav> da página")
 
     # 1b. Documentação: cada seção do JSON virou uma <section> com o seu id, entrou nos dois índices (o lateral e o
     # do celular) e a página fala o idioma certo.
