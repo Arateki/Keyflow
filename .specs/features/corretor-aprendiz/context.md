@@ -38,10 +38,12 @@ repositórios foram lidos em cópias rasas; commits e datas abaixo.
 > **De onde vêm estes números.** Os 548 itens são uma **lista escrita por um agente**, por categoria, imitando o que
 > um brasileiro digitaria (sem o acento que uma pessoa rápida não põe) — **não é digitação real**. Ela tem
 > repetições por caixa ou grafia (`yan`/`Yan`) e a mistura dos 9 grupos foi escolhida por quem a escreveu, então o
-> "51%" depende dessa mistura. A lista e o resultado só existem em `/tmp/corretor-medicao.tsv`, saída de um teste
-> temporário (`TmpCorretorMedicaoTest`) que não foi commitado. São estimativa para ordenar as fases; o número que
-> vale sai do banco (CA-T1 versiona a lista em `manter-dev`/`manter-teste`) e das ~600 palavras que o Yan digita no
-> A32 (CA-T2).
+> "51%" depende dessa mistura. A lista e o resultado só existiam em `/tmp/corretor-medicao.tsv`, saída de um teste
+> temporário (`TmpCorretorMedicaoTest`) que não foi commitado; **o arquivo se perdeu e não há gerador nem semente
+> no git, então estes números (548, 322, 165, 51% e as tabelas abaixo) não são reproduzíveis**. Valem só como
+> referência histórica para ordenar as fases. O número que vale sai de uma **coleta nova** na CA-T1 (lista própria,
+> versionada em `manter-dev`/`manter-teste`, com proveniência e semente) e das ~600 palavras que o Yan digita no A32
+> (CA-T2); a CA-T1 não tenta recriar a lista antiga.
 
 548 palavras em 9 grupos. 322 não estão no dicionário; **165 (51%) são trocadas no espaço**. Dessas, ~10 são trocas
 legítimas (`nao`→`não`, `voce`, `entao`, `tambem`, `sao`, `ja`, `Joao`→`João`, `paulo`→`Paulo`, `simm`→`sim`,

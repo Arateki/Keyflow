@@ -63,16 +63,20 @@ Play**: a T18b (textos legais, revisados pelo Yan) fecha a fase B; sem ela o apr
 ### CA-T1 — Banco de avaliação offline  `[base, 1ª tarefa]`
 - **Status**: Pending
 - **What**: `CorretorBenchTest` + `bench/` (casos, gerador sintético `SyntheticTyping`, métricas, JSON,
-  tabela), `manter-dev.tsv` e `manter-teste.tsv` (≥ 300 no total; traz para o git a lista de 548 palavras do estudo,
-  hoje só em `/tmp/corretor-medicao.tsv` e sem os resultados; o teste é sorteado com semente fixa, por grupo, e nenhuma
-  task de curadoria o lê), `erros.tsv` (≥ 300 à mão), `sintetico-*.tsv` (palavras sorteadas uma vez), esqueleto de
+  tabela), `manter-dev.tsv` e `manter-teste.tsv` (≥ 300 no total; **coleta nova**: a lista de 548 palavras do estudo de
+  `context.md` §3 se perdeu — `/tmp/corretor-medicao.tsv` não existe mais e não há gerador no git —, então os
+  números históricos (51%, 165 de 322 etc.) **não são reproduzíveis** e passam a ser só referência; a nova lista
+  cobre os mesmos 9 grupos, é escrita à mão ou por agente **sem nada de usuário real, de conversa ou de segredo**, e
+  traz no cabeçalho do arquivo a proveniência (quem escreveu, quando, como) e a semente do sorteio; o teste é
+  sorteado com semente fixa, por grupo, e nenhuma task de curadoria o lê), `erros.tsv` (≥ 300 à mão), `sintetico-*.tsv` (palavras sorteadas uma vez), esqueleto de
   `sessoes/`, `corretor-bench-baseline.json` (nível rápido) gerado **pelo código de hoje**,
   `scripts/corretor-bench.sh [--completo] [ref]`.
 - **Where**: `app/src/test/java/com/keyflow/ime/keyboard/dictionary/bench/`, `app/src/test/resources/bench/`, `scripts/`.
 - **Covers**: BEN-01..05, BEN-08, BEN-09.
 - **Done when**: o baseline registra o ponto de partida **medido pelo banco** (por grupo do `manter-dev` e do
   `manter-teste`: trocadas e indevidas; inglês e espanhol comuns; acento restaurado; sintético por configuração) — não
-  os números preliminares do protótipo, que usou lista montada por agente e 200 amostras por linha; o resultado
+  os números preliminares do protótipo, que usou lista montada por agente (perdida, não reproduzível) e 200
+  amostras por linha; o resultado
   atualiza a estimativa de `context.md` §3 e a meta do segundo Goal do `spec.md`; o **nível rápido** (≈ 2 600
   sugestões, ≈ 14–22 s pela conta) roda no `testDebugUnitTest` em < 60 s, com o tempo real registrado aqui, e o
   **completo** (72 000 sugestões, 6,5–10,3 min numa thread) só pelo script, com baseline próprio; piorar uma métrica
