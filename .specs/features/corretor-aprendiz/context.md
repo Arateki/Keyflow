@@ -88,7 +88,7 @@ pessoa digitou; `ué`→`UE`, `véi`→`VEI`) e **94 trocam por outra palavra**.
 - Zero lugares trocados (as cidades estão no dicionário). Palavras que o dicionário não tem são o problema.
 
 *Como foi medido:* teste JVM temporário (não commitado) sobre `src/main/assets/dict/pt.kfd`, mesmo binário que o app
-carrega; a lista (sem o resultado) vira o conjunto "manter" do banco, dividido em desenvolvimento e teste (CA-T1).
+carrega; a lista antiga se perdeu (referência histórica); o conjunto "manter" do banco, dividido em desenvolvimento e teste, vem de uma coleta nova na CA-T1.
 
 ## 4. O que cada projeto aberto faz (regra, arquivo, licença)
 

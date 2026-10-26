@@ -201,10 +201,10 @@ Play**: a T18b (textos legais, revisados pelo Yan) fecha a fase B; sem ela o apr
 - **What**: pontos, decaimento na leitura, validade com histerese, cooldown, teto, evidência mais recente vence,
   pares; relógio injetado; eventos `LearnEvent`.
 - **Where**: `learning/PersonalLexicon.kt`. **Depends on**: CA-T8. **Covers**: LRN-03..07, FIX-03..05 (modelo).
-- **Done when**: 3 pontos valem; recusa vale na hora; "kkk kkk kkk" = 1; 142 dias parada deixa de valer;
+- **Done when**: 3 pontos valem; recusa vale na hora; "kkk kkk kkk" = 1; no dia 142 os 3 pontos ainda valem e a partir do dia 143 parada deixa de valer;
   **uso de 1 por dia durante 400 dias nunca expira** (renovação de palavra que vale, LRN-01 (b); o peso para no
-  `WEIGHT_CAP`), e o mesmo para um par usado todo dia; teto 5000 expulsa o menor; **recusa com relógio avançado**: recusa (3 pontos) e 150 dias sem uso
-  → a palavra deixa de valer e volta a ser trocada; com um uso a cada 100 dias continua valendo; propriedade: peso nunca negativo,
+  `WEIGHT_CAP`), e o mesmo para um par usado todo dia; teto 5000 expulsa o menor; **recusa com relógio avançado**: recusa (3 pontos) e 143 dias sem uso
+  → a palavra deixa de valer e volta a ser trocada; com um uso (+1) a cada 60 dias continua valendo (o peso converge para ~2,7, acima de 1; a cada 100 dias não conserva); propriedade: peso nunca negativo,
   decaimento monótono.
 - **Tests**: unit + propriedade. **Gate**: `quick`.
 
