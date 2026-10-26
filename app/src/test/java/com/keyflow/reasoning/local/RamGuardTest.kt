@@ -42,4 +42,10 @@ class RamGuardTest {
         assertThat(RamGuard.enoughForPreload(availableMb = 3_000, estimateMb = 4_096)).isFalse()
         assertThat(RamGuard.enoughForPreload(availableMb = 4_096, estimateMb = 4_096)).isTrue()
     }
+
+    @Test
+    fun `preload without an estimate or unknown memory never blocks`() {
+        assertThat(RamGuard.enoughForPreload(availableMb = 100, estimateMb = 0)).isTrue()
+        assertThat(RamGuard.enoughForPreload(availableMb = null, estimateMb = 4_096)).isTrue()
+    }
 }
