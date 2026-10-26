@@ -2974,3 +2974,19 @@ Dois motores com ferramentas ao lado do da Anthropic: `reasoning/openai/OpenAiAg
   o índice lateral marcava a seção anterior. A `.doc-secao` zera a margem própria.
 - Publicação: `doc.html` e `docs.html` seguem a regra que já serve `/privacidade` e `/privacy` (a Cloudflare serve `/x` a partir de
   `x.html`); `/doc` e `/docs` não precisam de configuração nova se essa regra valer para todo caminho sem extensão.
+
+## 2026-10-26 — Catálogo com mais dois modelos de texto (equipe/catalogo-novos)
+
+- Entraram `SmolLM2 1.7B` ("Intermediário", Apache-2.0) e `DeepSeek R1 1.5B` ("Raciocínio", MIT, derivado do Qwen2.5 Apache-2.0).
+  Pins lidos da API do HF e SHA-256 conferido baixando o arquivo inteiro: SmolLM2 `c0ee765a…`, 1.730.949.280 B, `3c3e6931…f8f1`;
+  DeepSeek `9fd87554…`, 1.833.451.520 B, `69b35f01…1295` (arquivo `…_multi-prefill-seq_q8_ekv4096.litertlm`). Repositórios `gated: false`,
+  faixa 206, `scripts/verify-model-catalog.py` passa nos 4 de texto. Nomes por nível (Leve, Intermediário, Raciocínio, Equilibrado): o modelo
+  vai só na linha `modelName` do cartão — "Equilibrado (Gemma 4)" quebrava a linha e deixava "4)" sozinho.
+- **Não provado no emulador**: o do pool tem 2,5 GB de RAM. A guarda do app recusou (729 MB livres, precisa de 1536); com a guarda desligada
+  (`llmIgnoreRamGuard=true` no `LiteRtBackendSmokeTest`, junto com `llmModelId` e `llmTimeoutMs`) o lmkd matou o `:reasoning` (~1,4 GB
+  anônimos) ao carregar o SmolLM2. O DeepSeek não foi tentado. Falta rodar num aparelho com RAM de verdade (A32 pelo roteiro manual).
+- Formato: o SmolLM2 é `.litertlm` 1.6.0 (Qwen3 e Gemma 4 são 1.5.0, o DeepSeek 1.3.0); o `litert-lm-peek` 0.16.1 (a mesma versão do AAR)
+  lê os dois. O DeepSeek traz no metadado o prompt do modelo `<｜Assistant｜><think>\n`: o `<think>` já vem aberto, então o canal "thought"
+  (`<think>…</think>`) do `LiteRtBackend` pode não reconhecer o início e o raciocínio vazar na resposta — conferir no aparelho.
+- `adb exec-in` com arquivo grande trava na ponte do adb; empurre em pedaços com `adb push` + `run-as cat >>`.
+- Idiomas honestos no cartão: SmolLM2 "Principalmente inglês", DeepSeek "Inglês e chinês".
