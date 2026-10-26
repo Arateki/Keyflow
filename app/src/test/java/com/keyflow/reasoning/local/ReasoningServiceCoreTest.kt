@@ -334,4 +334,29 @@ class ReasoningServiceCoreTest {
         }
         assertThat(log).containsExactly("load:a", "warm:a", "unload:a", "load:a", "warm:a", "unload:a").inOrder()
     }
+
+    @Test
+    fun `pre carga com pouca RAM livre nao carrega nem aquece e o primeiro uso carrega normalmente`() {
+        val a = FakeBackend(log, "a")
+        // 1.500 MB livres: cabe na estimativa do catálogo (100), mas não no piso da pré-carga.
+        val c = core(mapOf("a" to a), availMb = 1_500)
+        val rec = Recorder()
+        c.preload(model("a"), rec)
+        rec.awaitFinish()
+        assertThat(rec.events).containsExactly("error:OOM")
+        assertThat(log).isEmpty()
+        assertThat(run(c, model("a")).events).containsExactly("delta:um", "delta:dois", "done").inOrder()
+        assertThat(log).containsExactly("load:a", "generate:a").inOrder()
+    }
+
+    @Test
+    fun `pre carga com RAM folgada carrega e aquece`() {
+        val a = FakeBackend(log, "a")
+        val c = core(mapOf("a" to a), availMb = 3_000)
+        val rec = Recorder()
+        c.preload(model("a"), rec)
+        rec.awaitFinish()
+        assertThat(rec.events).containsExactly("done")
+        assertThat(log).containsExactly("load:a", "warm:a").inOrder()
+    }
 }

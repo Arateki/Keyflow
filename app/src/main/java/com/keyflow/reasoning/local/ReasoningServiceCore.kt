@@ -50,7 +50,7 @@ internal class ReasoningServiceCore(
             useToken++
             try {
                 val fresh = backend == null || loadedId != model.modelId
-                val active = ensureLoaded(model)
+                val active = ensureLoaded(model, preload = true)
                 if (fresh) {
                     val started = System.nanoTime()
                     val failure = try {
@@ -119,7 +119,7 @@ internal class ReasoningServiceCore(
         }
     }
 
-    private fun ensureLoaded(model: LlmModel): LlmBackend {
+    private fun ensureLoaded(model: LlmModel, preload: Boolean = false): LlmBackend {
         backend?.let { if (loadedId == model.modelId) return it }
         // Libera o anterior antes de medir e carregar: a troca não precisa caber junto com ele.
         unloadCurrent()
@@ -132,6 +132,13 @@ internal class ReasoningServiceCore(
             throw ReasoningFailure(
                 ReasoningErrorKind.OOM,
                 "memória insuficiente para ${model.modelId}: $available MB livres, precisa de ${model.ramEstimateMb} MB",
+            )
+        }
+        // Pré-carga especulativa: com pouca folga não carrega (o lmkd poderia matar mais que o processo do modelo).
+        if (preload && !RamGuard.enoughForPreload(available, model.ramEstimateMb)) {
+            throw ReasoningFailure(
+                ReasoningErrorKind.OOM,
+                "pré-carga de ${model.modelId} adiada: $available MB livres, piso de ${RamGuard.PRELOAD_FLOOR_MB} MB",
             )
         }
         try {
