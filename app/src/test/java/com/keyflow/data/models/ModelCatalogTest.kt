@@ -170,6 +170,20 @@ class ModelCatalogTest {
             .inOrder()
     }
 
+    /**
+     * SmolLM2 e DeepSeek nunca carregaram no LiteRT-LM de um aparelho: ficam só no debug até o roteiro manual no A32.
+     * O release (`debug = false`) lista só os validados, e o DeepSeek é o único cujo prompt abre o `<think>`.
+     */
+    @Test
+    fun `release lists only the text models validated on a device`() {
+        assertThat(ModelCatalog.visibleIn(ModelCatalog.TEXT_ALL, debug = false).map { it.id })
+            .containsExactly("qwen3-0.6b-litertlm", "gemma-4-e2b-litertlm").inOrder()
+        assertThat(ModelCatalog.visibleIn(ModelCatalog.TEXT_ALL, debug = true)).containsExactlyElementsIn(ModelCatalog.TEXT_ALL).inOrder()
+        assertThat(ModelCatalog.TEXT_ALL.filterNot { it.validatedOnDevice }.map { it.id })
+            .containsExactly("smollm2-1.7b-litertlm", "deepseek-r1-1.5b-litertlm")
+        assertThat(ModelCatalog.TEXT_ALL.filter { it.promptOpensThink }.map { it.id }).containsExactly("deepseek-r1-1.5b-litertlm")
+    }
+
     /** RCAT-03: só baixável sem login, e fixado no commit — o SHA do catálogo tem de continuar valendo. */
     @Test
     fun `text urls point to a pinned huggingface commit and end with the file name`() {

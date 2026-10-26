@@ -1,5 +1,6 @@
 package com.keyflow.data.models
 
+import com.keyflow.BuildConfig
 import com.keyflow.i18n.trKey
 
 /** Para que serve o modelo: fala (sherpa-onnx, aba Transcrição), texto (LLM local, aba Raciocínio), visão/OCR (aba Visão) ou voz sintetizada (aba Voz). */
@@ -45,6 +46,16 @@ data class ModelSpec(
     val modelName: String = "",
     /** Default [ModelKind.SPEECH]: nenhum construtor da fala muda (RCAT-01). */
     val kind: ModelKind = ModelKind.SPEECH,
+    /**
+     * O prompt do modelo (metadado do `.litertlm`) já abre o `<think>`: a saída começa dentro do pensamento e só traz o
+     * `</think>`. O `LiteRtBackend` descarta tudo até ele (`ThoughtStripper`).
+     */
+    val promptOpensThink: Boolean = false,
+    /**
+     * Falso = ainda não provado carregando no LiteRT-LM de um aparelho real: o modelo só aparece nos builds de debug
+     * ([ModelCatalog.visibleIn]). Vira verdadeiro depois do roteiro manual no A32.
+     */
+    val validatedOnDevice: Boolean = true,
 ) {
     val totalBytes: Long get() = files.sumOf { it.bytes }
 
@@ -202,14 +213,16 @@ object ModelCatalog {
     val SMOLLM2_1_7B = ModelSpec(
         id = "smollm2-1.7b-litertlm",
         displayName = trKey("Intermediário"),
-        summary = trKey("Mais capaz que o Leve, sem o peso do Equilibrado; bom para reescrever e resumir, melhor em inglês."),
+        summary = trKey("Modelo de uso geral com 1,7 bilhão de parâmetros, treinado sobretudo em inglês; mais pesado que o Leve."),
         languages = trKey("Inglês"),
         engineType = EngineType.LITERT_LM,
         acceptsLanguageHint = false,
-        // Estimativa: arquivo de ~1,6 GiB mapeado em memória, ativações em FP32. Revisar com a medição no A32 (RSN-T19).
+        // ESTIMATIVA, não medida: ~1,6 GiB de arquivo (pesos INT8) mais ativações em FP32; no emulador de 2,5 GB o
+        // `:reasoning` passou de 1,4 GB de RAM e foi morto. 3072 = arquivo + memória de trabalho com folga. A medir no A32 (RSN-T19).
         recommendedRamMb = 3072,
         modelName = "SmolLM2 1.7B",
         kind = ModelKind.TEXT,
+        validatedOnDevice = false,
         files = listOf(
             ModelFile(
                 FileRole.MODEL, "SmolLM2-1_7B-Instruct_dynamic_wi8_afp32.litertlm", "$SMOLLM2_REPO/SmolLM2-1_7B-Instruct_dynamic_wi8_afp32.litertlm",
@@ -226,13 +239,18 @@ object ModelCatalog {
     val DEEPSEEK_R1_1_5B = ModelSpec(
         id = "deepseek-r1-1.5b-litertlm",
         displayName = trKey("Raciocínio"),
-        summary = trKey("Pensa passo a passo antes de responder; mais lento, bom para lógica e contas."),
+        summary = trKey("Escreve um raciocínio passo a passo antes de responder, por isso demora mais; treinado em inglês e chinês."),
         languages = trKey("Inglês"),
         engineType = EngineType.LITERT_LM,
         acceptsLanguageHint = false,
+        // ESTIMATIVA, não medida: o card do HF mede 2221 MB de pico de RSS na CPU de um S24 Ultra (contexto 4096); 4096 = esse pico
+        // mais o que o sistema e os outros apps ocupam num aparelho de 4 GB, e a guarda de RAM do app usa a metade (2048 ≈ o pico).
+        // A medir no A32 (RSN-T19).
         recommendedRamMb = 4096,
         modelName = "DeepSeek R1 1.5B",
         kind = ModelKind.TEXT,
+        promptOpensThink = true,
+        validatedOnDevice = false,
         files = listOf(
             ModelFile(
                 FileRole.MODEL, "DeepSeek-R1-Distill-Qwen-1.5B_multi-prefill-seq_q8_ekv4096.litertlm",
@@ -264,13 +282,22 @@ object ModelCatalog {
     /** Modelos de fala, na ordem em que a aba Transcrição lista: do mais leve ao mais pesado. */
     val SPEECH: List<ModelSpec> = listOf(WHISPER_BASE, WHISPER_SMALL, PARAKEET_V3)
 
-    /** Modelos de texto (aba Raciocínio), do mais leve ao mais pesado. */
-    val TEXT: List<ModelSpec> = listOf(
+    /** Todos os modelos de texto conhecidos, do mais leve ao mais pesado, validados ou não. */
+    val TEXT_ALL: List<ModelSpec> = listOf(
         QWEN3_0_6B,
         SMOLLM2_1_7B,
         DEEPSEEK_R1_1_5B,
         GEMMA_4_E2B,
     )
+
+    /**
+     * O que o build mostra: em release só os [ModelSpec.validatedOnDevice]; em debug, todos. SmolLM2 e DeepSeek saem do
+     * gate depois do roteiro manual no A32 (`.specs/features/reasoning-models/tasks.md`).
+     */
+    fun visibleIn(models: List<ModelSpec>, debug: Boolean): List<ModelSpec> = models.filter { debug || it.validatedOnDevice }
+
+    /** Modelos de texto (aba Raciocínio), do mais leve ao mais pesado, como este build os mostra. */
+    val TEXT: List<ModelSpec> = visibleIn(TEXT_ALL, BuildConfig.DEBUG)
 
     /**
      * Modelos de visão e OCR (aba Visão). Vazia de propósito: as cinco entradas antigas tinham repositório, commit e

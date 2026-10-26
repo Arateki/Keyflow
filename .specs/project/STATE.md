@@ -2990,3 +2990,7 @@ Dois motores com ferramentas ao lado do da Anthropic: `reasoning/openai/OpenAiAg
   (`<think>…</think>`) do `LiteRtBackend` pode não reconhecer o início e o raciocínio vazar na resposta — conferir no aparelho.
 - `adb exec-in` com arquivo grande trava na ponte do adb; empurre em pedaços com `adb push` + `run-as cat >>`.
 - Idioma no cartão: os dois dizem só "Inglês" (a linha "tamanho · idioma" quebra com mais de ~21 caracteres quando há o botão de seleção; o ponto agora fica preso ao idioma por NBSP).
+- Revisão (2026-10-26): (1) o DeepSeek abre o `<think>` no prompt, então o `ThoughtStripper` descarta tudo até o `</think>` (campo
+  `promptOpensThink`; sem `</think>` vira falha, nunca texto cru) e o canal "thought" fica de fora para esse modelo. (2) SmolLM2 e DeepSeek
+  têm `validatedOnDevice = false`: só no debug, até o roteiro manual no A32 (ver tasks.md do reasoning-models). (3) `recommendedRamMb`
+  dos dois é estimativa declarada. (4) A linha "tamanho · idioma" do cartão vai para duas linhas, sem o "·", quando não cabe.
