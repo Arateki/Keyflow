@@ -92,8 +92,9 @@ Não há recomendação de promoção ao catálogo com base apenas em tamanho ou
 
 Os scripts, cabeçalhos, tokenizer SentencePiece extraído da seção `[32768,2681345)` e logs estão em
 `.equipe/artefatos/qwen-sem-pensar/`. A recontagem prevista usa o tokenizer do próprio arquivo, sem
-chamar trechos de streaming de tokens. As sondas temporárias serão retiradas de `androidTest` após limpar
-seus próprios pesos/cache; não devem entrar no CI nem disparar downloads sem opt-in.
+chamar trechos de streaming de tokens. As duas sondas temporárias foram retiradas de `androidTest` e preservadas nos artefatos;
+não entram no CI nem disparam downloads sem opt-in. A consulta de limpeza dos dados próprios
+no emulador ainda aguarda a trava e não faz parte da avaliação das candidatas.
 
 **Dúvida para o coordenador:** consultar `journalctl --user -u emulador-keyflow.service` e o log de kernel
 no host no intervalo 2026-10-27 02:10–03:10 UTC, e disponibilizar um nó de pool estável, com espaço para

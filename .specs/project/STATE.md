@@ -3112,3 +3112,7 @@ Dois motores com ferramentas ao lado do da Anthropic: `reasoning/openai/OpenAiAg
   sem logs do serviço/kernel do host não atribuir causa a OOM ou ao modelo. Histórico Android curto 1/1,
   mas sem registro exato que explique as interrupções. AWS automática ficou no boot, interrompida com
   limpeza pelo pool. Sem correção funcional ou alteração de catálogo; medir antes/depois continua pendente.
+
+- Limpeza de fontes concluída: `QwenMedicaoTemporariaTest.kt` e `QwenLimpezaTemporariaTest.kt`
+  fora de `androidTest`, com cópias em `.equipe/artefatos/qwen-sem-pensar/`. O coordenador assumiu
+  a medição das candidatas nos aparelhos reais; não executar essa etapa no emulador.
