@@ -583,6 +583,9 @@ class OverlayService : Service() {
             // Só alterna se o teclado estiver realmente aberto na tela; senão não faz nada.
             OrbShortcutAction.TOGGLE_KEYBOARD ->
                 if (KeyFlowController.keyboardVisible.value) KeyFlowController.requestToggleKeyboardExpand()
+            // vision-capture: a opção já existe nos atalhos (VC-T1); o fluxo (pausa → consentimento → seleção) entra na
+            // VC-T4. Até lá o toque não faz nada.
+            OrbShortcutAction.VISION_MODE -> Unit
         }
     }
 

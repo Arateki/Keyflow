@@ -3179,7 +3179,7 @@ Dois motores com ferramentas ao lado do da Anthropic: `reasoning/openai/OpenAiAg
 
 - `ModelSpec.vendor: ModelVendor?` (enum no `ModelCatalog.kt`) diz quem FAZ o modelo, não quem hospeda: Whisper = OpenAI, Parakeet = NVIDIA, Qwen3 = Alibaba Qwen,
   SmolLM2 = Hugging Face, DeepSeek R1 = DeepSeek, Gemma 4 = Google. Todo modelo do catálogo declara o seu (`ModelCatalogTest`); o manifesto remoto aceita
-  `"vendor"` opcional e nome desconhecido vira `null` (card sem logo), não manifesto inválido. Visão e Voz seguem vazias: o PaddleOCR (Baidu) entra com a branch da Visão.
+  `"vendor"` opcional e nome desconhecido vira `null` (card sem logo), não manifesto inválido. Visão e Voz seguem vazias: o PaddleOCR (PaddlePaddle/Baidu) entra com a branch da Visão (`ModelVendor.PADDLEPADDLE`, path `paddlepaddle.svg` do Simple Icons, CC0, cor `#0062B0`).
 - Desenho: `ModelVendorLogo` (`ui/config`), 15 dp ao lado do nome, alinhado ao topo. Paths novos em `KfIcons`: NVIDIA, Hugging Face e DeepSeek do Simple Icons
   (CC0), Qwen do lobe-icons (MIT; a Simple Icons não tem a Qwen). Google e OpenAI reaproveitam os dos provedores. Créditos em `app/licenses/README.md`
   (+ `MIT_lobe-icons.txt`) e na seção Licenças da aba Docs (`doc.json` do site regenerado).
@@ -3222,3 +3222,115 @@ Dois motores com ferramentas ao lado do da Anthropic: `reasoning/openai/OpenAiAg
 - Lição: trocar o arquivo de um id já publicado exige que o armazenamento compare com o catálogo; "o pin mudou" não chega ao aparelho sozinho.
   Lição: dois cards do mesmo fabricante quebram `onNodeWithTag("model-vendor-qwen")` (assertExists em nó único); usar `onAllNodesWithTag(...).assertCountEquals`.
 
+## 2026-10-24 — vision-capture VC-T1: atalho VISION_MODE (branch `equipe/visao`)
+
+- `Settings.visionTranslateTarget` (e o resto do bloco `vision*`) **já existia**: o painel Visão anterior o criou, com
+  persistência no `SettingsRepository`. A VC-T1 acrescentou só o `OrbShortcutAction.VISION_MODE` (enum, rótulo, descrição e
+  linha na folha de escolha, PT/EN/ES) e testes; o ramo dele no `OverlayService.handleOrbShortcut` é inerte até a VC-T4 —
+  mapear o atalho hoje não faz nada, de propósito (a exceção de gating durante a gravação também é da VC-T4).
+- O `OrbShortcutAction` é lido por `valueOf` com padrão: um valor desconhecido no disco (um build antigo lendo
+  `VISION_MODE`, ou lixo) cai no padrão do atalho em vez de derrubar a leitura — `SettingsRepositoryTest` confere.
+- O tour de gestos já monta um roteiro por atalho mapeado a partir do rótulo/descrição: a Visão entrou nele sem código
+  novo (só o teste `visionShortcutGetsItsOwnScriptWithTheCaptureLabel`).
+- Armadilha de ferramenta: **`flock /srv/dev/run/keyflow-emulator.lock instrumentar …` trava para sempre**. O
+  `instrumentar` já segura a trava do emulador por dentro (`/tmp/keyflow-emulator.lock` é link para o mesmo arquivo) e o
+  `flock` é por descritor aberto, não por processo: o de fora bloqueia o de dentro (medido: `timeout 3 flock` interno → 124).
+  Rode `instrumentar` direto; use o `flock` de fora só para `adb`/scripts que não o seguram.
+
+## 2026-10-24 — vision-capture: aba Visão existente × spec (para a VC-T11)
+
+O que está no código (commit `629db54`, 2026-10-03, de outra frente) e o que a spec manda:
+
+| | Código atual | Spec (`vision-capture`) |
+| --- | --- | --- |
+| Origem | seletor Créditos · Local · OpenAI · Google · Anthropic · Custom, com chaves e endpoint próprio | **nenhuma**: 100% no aparelho (ML Kit); origens por API são a **fase 2** (fora do MVP) |
+| OCR | catálogo de "modelos de visão" baixáveis (`ModelCatalog.VISION`: OCR rápido/equilibrado, SmolVLM, Florence) | ML Kit Text Recognition **embutido** no APK; nada a baixar; só os pacotes de **tradução** são baixáveis |
+| Ligação | `ConfigScreen` mostra `ComingSoonPanel` para `VISAO`: o `VisaoPanel` **não está no app**, só nos testes | aba real, 6ª aba, gating do overlay |
+| "Testar OCR" | botão com `delay(60)` e texto fixo ("Texto reconhecido com sucesso…") | sem equivalente; o teste real é o `OcrEngine` da VC-T6 |
+| Rede | OpenAI/Google/Anthropic/Custom mandam a captura para fora | "nenhum byte sai do aparelho" (OCR-03, TRD-04) |
+
+- **Dado fabricado**: as entradas de `ModelCatalog.VISION` têm SHA-256 sequenciais (`4a8f9c1e…`, `b1c2d3e4…`), commits de
+  repositório inventados nas URLs do Hugging Face e um "ML Kit OCR Latin" como `.bin` baixável, que não existe (o ML Kit não
+  se distribui assim). Contraria a regra de ouro 8; nenhum download delas funcionaria. Nenhum teste as protege além da forma.
+- **Recomendação (VC-T11)**: reduzir o painel ao que a spec pede — destino da tradução (já persistido), gerenciador de
+  pacotes do ML Kit, nota de privacidade e o cartão "Origem multimodal — em breve" — e levar o seletor de origem por API e o
+  catálogo de VLM para a fase 2, onde a spec os coloca. Remover `ModelCatalog.VISION` falso (ou trocá-lo por dados reais
+  conferidos) e o "Testar OCR" de mentira; os campos `vision*` de Settings que sobrarem sem uso saem junto (o
+  `SettingsRepository` ignora chave desconhecida, então não há migração). Decisão do Yan: se o seletor por API deve existir
+  já no MVP (contraria a spec; a nota da spec diz que foi decisão dele em 2026-07-01 ficar 100% local).
+
+## 2026-10-24 — vision-capture: o ML Kit saiu; modelos abertos sob demanda (branch `equipe/visao`)
+
+Decisão do Yan: todo modelo local vem do nosso catálogo (URL fixa + SHA-256), baixado pelo usuário; nenhum dado nem métrica
+sai do aparelho; nada de GPL/LGPL/AGPL nem licença não comercial. Spec reescrita (`vision-capture`; contexto da síntese de
+fala em `sintese-fala/context.md`). O que ficou de lição:
+
+- **ML Kit fora.** A VC-T2 (deps) foi revertida em `427b3d1`. Medido antes de reverter: +30,0 MB instalados no arm64 (+49%;
+  debug 161,9 → 243,1 MB; release universal ~83,7 → 132,7 MB) e métricas de uso mandadas ao Google (identificador por
+  instalação, dados do aparelho, idiomas), sem opt-out oficial; a tradução do ML Kit só existe embutida. As duas decisões
+  que a VC-T2 deixara em aberto (APK e métricas) ficam resolvidas por esta.
+- **Lingua recusada.** O jar `lingua 1.2.2` tem **80.412.159 B** no Maven Central (HEAD em 2026-10-24) porque embute todos os
+  modelos: contraria "nada embutido no APK". Idioma da origem: pelos dicionários do corretor (`assets/dict/*.kfd`).
+- **eSpeak NG (GPL-3.0) está no AAR do sherpa-onnx 1.13.8** que o app distribui. Prova: `unzip -p app/libs/sherpa-onnx-1.13.8.aar
+  jni/<abi>/libsherpa-onnx-jni.so | strings -a | grep -c 'Empty _dict file\|(expected 0x%x, got 0x%x)\|has not been built
+  into espeak-ng'` → 3 nas três ABIs (frases literais do `dictionary.c`/`error.c` do eSpeak); o `libonnxruntime.so` está
+  limpo. Vem do padrão `SHERPA_ONNX_ENABLE_TTS=ON` do upstream, mesmo o app não usando TTS. Risco de licença para o app
+  inteiro, antes da Play: decisão do Yan; saída técnica = AAR recompilado com TTS desligado (detalhes em `sintese-fala/context.md`).
+  Armadilha: `grep -i espeak` casa "Offline**eSpeak**er" (`OfflineSpeakerDiarization`) e dá falso positivo.
+- **O relatório de pesquisa errou em três pontos** (corrigidos na spec): o repositório `deepghs/paddleocr` declara
+  `license: other`, não Apache-2.0 (o par escolhido é do `monkt/paddleocr-onnx`, Apache-2.0); os pesos do Coqui pt-BR são
+  BSD-3-Clause, não MPL-2.0; `onnxruntime-android` + `pickFirst` custa ~+0,23 MB, não +15 MB (o problema é a divergência de
+  versão: a ORT 1.28.2 do sherpa não existe no Maven Central).
+- **Catálogo com dados fabricados.** Além do `ModelCatalog.VISION`, as quatro entradas de `VOICE` e as de texto de
+  `SMOLLM2_1_7B` a `PHI_3_5_MINI` têm commits e SHA-256 inventados (padrões sequenciais; os de texto repetem o fim do SHA do
+  Qwen3). Só Qwen3 0.6B e Gemma 4 E2B são reais. Nenhuma é baixável: conferir cada uma por download antes de mostrar na UI
+  (regra de ouro 8). A Visão conserta o seu `VISION` na VC-T2a; `VOICE` e as de texto ficam para quem for dono delas.
+
+## 2026-10-27 — vision-capture VC-T2a: entrada do OCR no catálogo (branch `equipe/visao`)
+
+- **Pins refeitos do zero, não herdados do design.** `monkt/paddleocr-onnx`, commit
+  `7b02d0a30a07ba2b92ad1ff5a8941ae2c633de65` (HEAD do repositório em 2026-10-27; `gated: false`). Tamanhos e `lfs.oid` pela API
+  (`/api/models/monkt/paddleocr-onnx/tree/<commit>/<pasta>`), SHA-256 recalculado baixando os arquivos
+  (`curl -sL …/resolve/<commit>/<caminho> | sha256sum`) e `Range: bytes=0-0` → 206 nos três: `detection/v3/det.onnx` 2.429.873 B
+  `ee40e800…`; `languages/latin/rec.onnx` 7.862.832 B `614ffc2d…`; `languages/latin/dict.txt` 1.634 B `3c0a8a79…` (fora do LFS). Total
+  10.294.339 B. Os valores do design §8 batiam. `python3 scripts/verify-model-catalog.py` → "18 arquivos conferidos: 0 falha(s), 0
+  licença(s) a revisar" (inclui `OCR_PADDLE_LATIN` e `monkt/paddleocr-onnx: apache-2.0`).
+- **Licença**: o repositório do `monkt` **não tem arquivo LICENSE**, só `license: apache-2.0` no cartão. A cadeia fecha pela origem:
+  `PaddlePaddle/PaddleOCR` (LICENSE Apache-2.0 no GitHub, "Copyright (c) 2016 PaddlePaddle Authors") e os cartões
+  `PaddlePaddle/latin_PP-OCRv5_mobile_rec` e `PP-OCRv5_mobile_det` (`apache-2.0`). O texto vai em
+  `app/licenses/Apache-2.0_paddleocr.txt` com a nota de que a conversão para ONNX é de terceiro (monkt). Risco aceito: a conversão
+  não tem procedência verificável além do cartão (não há script nem hash do original Paddle).
+- **O par mistura v3 e v5.** O README do `monkt` manda casar detector e reconhecedor da mesma geração; o detector v3 (2,3 MB) com o
+  reconhecedor v5 latino é escolha de peso (o detector v5 tem 84 MB). Quem decide é o CER da VC-T6; se perder por isso, troca-se o
+  dado do catálogo (plano B: `deepghs/paddleocr`, `license: other`).
+- **Indra OCR descartado** (avaliado em 2026-10-27): pesos sob "AI Pubs OpenRAIL-M (Modified)" (proíbe empresas com mais de US$ 20
+  milhões de receita/captação e concorrentes da Datalab; share-alike), pós-processamento só em Python, ganho em documentos/PDF. Ver
+  `vision-capture/context.md` V3.
+- **Entrada nasce escondida do release.** `validatedOnDevice = false` e `ModelCatalog.VISION = visibleIn(VISION_ALL, DEBUG)`, no molde
+  do texto não validado: sem `OcrEngine` (VC-T6) e sem runtime (VC-T2b), oferecer o download na loja seria baixar 10 MB que nada usa.
+  A Docs só cita a licença quando a flag virar `true` (`DocsSectionsTest` cobre os dois lados). Quem promover o OCR muda a flag e
+  confere o `doc.json` do site.
+- As cinco entradas inventadas de `VISION` já tinham saído em 2026-10-24 (a lista estava vazia); nada a remover além de ajustar os
+  testes que assumiam lista vazia. Goldens: `pool telas` com o build desta branch (230 PNGs) e `scripts/diff-screens.sh` (precisa do ImageMagick de `/srv/dev/ferramentas/bin` no PATH) → 230/230 dentro do limiar, todos com 0 px de diferença; nada aprovado, nada a restaurar.
+
+## 2026-10-27 — vision-capture: sem tradução, Gemma 4 e provedores na aba Visão (decisões do Yan, 02:27)
+
+- **Decisões** (`vision-capture/context.md` V11–V13): (1) a Visão **não traduz** — saem a VC-T9, TRD-01..06, o Qwen3 como tradutor, a
+  identificação de idioma e `Settings.visionTranslateTarget` (remoção na VC-T11); (2) modelos locais = PaddleOCR e Gemma 4 E2B/E4B, cada
+  card com a lista de capacidades (`tr("…")`); (3) provedores OpenAI/Anthropic/Google (SSO e API, só modelos com visão) e Custom, com os
+  cards e as conexões que as outras abas já têm. Tasks novas: VC-T2c (capacidades no `ModelSpec`), VC-T15 (motor de visão), VC-T16 (gesto
+  "Perguntar" ⚠️ proposta) e VC-T17 (provedores); VC-T11, T12, T13, T14 reescritas; T9 reservada como removida.
+- **Os dois `.litertlm` do Gemma 4 têm o encoder de visão.** Prova: `curl -r 0-4194303` no arquivo de cada commit do catálogo e `strings`:
+  cabeçalho `LITERTLM` e as seções `tf_lite_vision_encoder`, `tf_lite_vision_adapter`, `tf_lite_end_of_vision` (também áudio:
+  `tf_lite_audio_encoder_hw`, `tf_lite_audio_adapter`), os tokens `<|image>`/`<image|>` e o template com `<|image|>`. O AAR
+  `litertlm-android` 0.16.1 tem `Content.ImageBytes`/`ImageFile` e `EngineConfig.visionBackend`. **Isso não prova que carrega com visão no
+  aparelho**: o `LiteRtBackend` nunca passou `visionBackend`; a VC-T15 prova com o E2B antes de a UI prometer, e o plano se não carregar
+  é tirar os Gemma da lista de visão (dado do catálogo) e seguir só com provedores.
+- **Um `ModelSpec` por arquivo, capacidades como dado.** Duplicar os Gemma com `kind = VISION` quebraria `byId`/`ModelStore` (mesmo `id`) e
+  baixaria 2,6 GB duas vezes; a Visão lista por `capabilities`, a Raciocínio por texto, e "instalado" vale nas duas abas.
+- **A promessa de privacidade muda de escopo.** Com um provedor selecionado a **imagem** sai do aparelho; a regra "nenhum dado sai" passa a
+  valer para a origem Local (padrão) e o provedor é opt-in com nota visível e menção na política de privacidade (PRV-04).
+- **O painel Visão antigo tem dados fictícios** nos cards de provedor (`ssoFiveHourFraction = 0.15f`, "Reseta às 15:30", listas fixas
+  `VISAO_*_MODELS`): a VC-T17 os troca pelos reais das outras abas ou esconde o bloco.
+- **Pendente do Yan**: confirmar o gesto "Perguntar" (ACT-03, único caminho para "Descrever imagem"/"Responder sobre a tela") e a lista
+  curada de modelos com visão (a API dos provedores não informa visão de forma confiável).

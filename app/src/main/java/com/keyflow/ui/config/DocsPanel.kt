@@ -1,5 +1,6 @@
 package com.keyflow.ui.config
 
+import com.keyflow.data.models.ModelCatalog
 import com.keyflow.i18n.tr
 import com.keyflow.i18n.trKey
 import android.content.ActivityNotFoundException
@@ -413,6 +414,7 @@ val docsSections: List<DocSection> get() = listOf(
             ),
             DocBlock.Labeled("Gemma 4 E2B", tr("modelo de texto Equilibrado — Apache 2.0 (Google), baixado sob demanda.")),
             DocBlock.Labeled("Gemma 4 E4B", tr("modelo de texto Avançado — Apache 2.0 (Google), baixado sob demanda.")),
+            *visionModelLicenses().toTypedArray(),
             DocBlock.Labeled("AndroidSVG", tr("desenha os SVGs das skins importadas — Apache 2.0 (Cave Rock Software).")),
             DocBlock.Labeled(tr("Logos dos fabricantes"), tr("desenhos do Simple Icons (CC0) e do lobe-icons (MIT, LobeHub); as marcas são dos donos.")),
             DocBlock.Labeled(tr("Dicionários do corretor"), tr("listas de palavras do teclado do Android (AOSP LatinIME) para português, inglês e espanhol — Apache 2.0.")),
@@ -430,6 +432,16 @@ val docsSections: List<DocSection> get() = listOf(
         feedbackActions = true,
     ),
 )
+
+/**
+ * Licença do modelo de OCR da Visão (`ModelCatalog.VISION_ALL`), no mesmo critério dos de texto: só é citado quando o release o oferece
+ * (`validatedOnDevice`), porque "baixado sob demanda" seria falso na loja enquanto a Visão não chega ao usuário.
+ */
+private fun visionModelLicenses(): List<DocBlock> = buildList {
+    if (ModelCatalog.OCR_PADDLE_LATIN.validatedOnDevice) {
+        add(DocBlock.Labeled("PaddleOCR", tr("modelo de leitura de texto da Visão (PP-OCR em ONNX) — Apache 2.0 (PaddlePaddle), baixado sob demanda.")))
+    }
+}
 
 /** Um passo do "Como funciona" no topo da Docs. */
 data class DocStep(val number: String, val title: String, val body: String)

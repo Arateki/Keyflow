@@ -37,6 +37,7 @@ fun shortcutActionLabel(action: OrbShortcutAction): String = when (action) {
     OrbShortcutAction.NONE -> tr("Nenhuma")
     OrbShortcutAction.TOGGLE_KEYBOARD -> tr("Retrair / expandir teclado")
     OrbShortcutAction.SWITCH_IME -> tr("Trocar teclado do sistema")
+    OrbShortcutAction.VISION_MODE -> tr("Capturar a tela (Visão)")
 }
 
 /** Explicação da ação de atalho — reusada pelo tour de gestos (`ui/tour`) como descrição do roteiro. */
@@ -44,6 +45,8 @@ fun shortcutActionSub(action: OrbShortcutAction): String = when (action) {
     OrbShortcutAction.NONE -> tr("Sem ação para este gesto.")
     OrbShortcutAction.TOGGLE_KEYBOARD -> tr("Encolhe ou expande o teclado KeyFlow na tela.")
     OrbShortcutAction.SWITCH_IME -> tr("Abre o seletor de teclados do sistema.")
+    OrbShortcutAction.VISION_MODE ->
+        tr("Seleciona uma área da tela e copia a imagem, o texto ou a tradução. Vale também durante a gravação: ela pausa e volta como estava.")
 }
 
 /**
@@ -109,6 +112,7 @@ fun ShortcutActionSheet(
                 OrbShortcutAction.NONE,
                 OrbShortcutAction.TOGGLE_KEYBOARD,
                 OrbShortcutAction.SWITCH_IME,
+                OrbShortcutAction.VISION_MODE,
             ).forEach { action ->
                 val blocked = action == OrbShortcutAction.TOGGLE_KEYBOARD && !keyboardAvailable
                 ActionRow(
