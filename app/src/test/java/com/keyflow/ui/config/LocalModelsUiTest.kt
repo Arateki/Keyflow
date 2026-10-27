@@ -156,21 +156,24 @@ class LocalModelsUiTest {
 
     @Test
     fun `the heavy warning follows each text model's recommended RAM`() {
-        val ui = textUi(ramMb = 2_000) // entre a recomendação do Qwen (1024) e as dos outros (3072 a 4096)
-        assertThat(ui.item(qwen).heavy).isFalse()
-        assertThat(ui.item(smol).heavy).isTrue()
-        assertThat(ui.item(deepseek).heavy).isTrue()
-        assertThat(ui.item(gemma).heavy).isTrue()
-        // 3,5 GB: o Intermediário (3072) cabe; o Raciocínio e o Equilibrado (4096) ainda pesam.
-        val mid = textUi(ramMb = 3_500)
-        assertThat(mid.item(smol).heavy).isFalse()
-        assertThat(mid.item(deepseek).heavy).isTrue()
-        assertThat(mid.item(gemma).heavy).isTrue()
-        // 5 GB: o Equilibrado (4096) cabe, o Avançado (8192, pico de CPU de 3,3 GB no README) pesa até num aparelho de 8 GB (~7,4 GB visíveis).
+        // Recomendações (2026-10-27): Leve 3072, Raciocínio e Equilibrado 4096, Intermediário 6144, Avançado 8192.
+        val small = textUi(ramMb = 2_000)
+        assertThat(small.items.all { it.heavy }).isTrue()
+        // 3,6 GB (o A32): o Leve não pesa; Raciocínio e Equilibrado mostram o aviso, mas carregam (a guarda é outra regra: RamGuard).
+        val a32 = textUi(ramMb = 3_600)
+        assertThat(a32.item(qwen).heavy).isFalse()
+        assertThat(a32.item(deepseek).heavy).isTrue()
+        assertThat(a32.item(gemma).heavy).isTrue()
+        assertThat(a32.item(smol).heavy).isTrue()
+        // 5 GB: o Raciocínio e o Equilibrado (4096) cabem; o Intermediário (6144) e o Avançado (8192) ainda pesam.
         val five = textUi(ramMb = 5_000)
+        assertThat(five.item(deepseek).heavy).isFalse()
         assertThat(five.item(gemma).heavy).isFalse()
+        assertThat(five.item(smol).heavy).isTrue()
         assertThat(five.item(gemmaE4b).heavy).isTrue()
-        assertThat(textUi(ramMb = 8_000).items.filter { it.heavy }.map { it.spec.id }).containsExactly(gemmaE4b)
+        // 6,5 GB: só o Avançado pesa. Um aparelho de 8 GB mostra ~7,4 GB e ainda vê o aviso do Avançado (8192).
+        assertThat(textUi(ramMb = 6_500).items.filter { it.heavy }.map { it.spec.id }).containsExactly(gemmaE4b)
+        assertThat(textUi(ramMb = 7_400).items.filter { it.heavy }.map { it.spec.id }).containsExactly(gemmaE4b)
         assertThat(textUi(ramMb = 12_000).items.none { it.heavy }).isTrue()
     }
 
