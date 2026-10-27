@@ -1,6 +1,10 @@
 # KeyFlow — STATE (memória do projeto)
 
 > Decisões, bloqueios, lições e ideias adiadas. Atualizado ao longo das sessões.
+>
+> **Lição, decisão ou bloqueio novo não entra mais aqui** (desde 2026-10-27): vai num arquivo próprio em
+> [`licoes/`](licoes/LEIA-ME.md), `AAAA-MM-DD-assunto.md`, um por assunto. Este arquivo conflitava em quase toda
+> mesclagem de branches paralelas; arquivo novo não conflita. O conteúdo abaixo fica como está, para consulta.
 
 ## Decisões (do grill de 2026-06-26)
 

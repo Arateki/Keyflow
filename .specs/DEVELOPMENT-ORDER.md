@@ -25,11 +25,14 @@
    antes de chamar de ambiental, e prefira `screencap`/`printToLog` a campos de `dumpsys` que
    parecem confirmar o que você quer ouvir.
 6. **Ao terminar cada task**: atualizar o Status no `tasks.md` da feature, a traceability do
-   `spec.md` (Pending→Implemented/Verified) e registrar lições/decisões no
-   `.specs/project/STATE.md`. Commit atômico por task, mensagem em português, **sem citar Claude
-   nem trailers**.
+   `spec.md` (Pending→Implemented/Verified) e registrar lições/decisões **num arquivo novo em
+   `.specs/project/licoes/`** (`AAAA-MM-DD-assunto.md`, um por assunto; ver o `LEIA-ME.md` da pasta).
+   Não acrescente mais nada ao `STATE.md`: ele era o arquivo que mais conflitava entre PRs paralelos
+   (18 de 19 mesclagens com conflito, 20–27/10/2026) e fica só como histórico. Commit atômico por task,
+   mensagem em português, **sem citar Claude nem trailers**.
 7. **Desvio de spec**: se a realidade do código contradisser a task, NÃO desvie em silêncio —
-   documente `SPEC_DEVIATION` no STATE.md e na task (padrão já usado na T19 do redesign).
+   documente `SPEC_DEVIATION` num arquivo de `.specs/project/licoes/` e na task (padrão já usado na T19
+   do redesign, então no STATE.md).
 8. **Nunca fabricar API** (Google/AdMob/Play/sherpa/crates): conferir doc oficial na task
    (Knowledge Verification Chain). Sem certeza → dizer que não sabe, não inventar.
 9. **Portões do Yan**: itens marcados **[YAN]** são decisões/validações manuais dele (device

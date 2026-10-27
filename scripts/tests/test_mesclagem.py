@@ -4,6 +4,7 @@ Sem rede: os repositórios Git são descartáveis, em diretório temporário.
 """
 import os
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 import unittest
@@ -108,6 +109,30 @@ class Union(unittest.TestCase):
         self.assertIn("Texto da a.", estado)
         self.assertIn("Texto da b.", estado)
         self.assertNotIn("<<<<<<<", estado)
+
+
+class Licoes(unittest.TestCase):
+    """Uma lição por arquivo em .specs/project/licoes/ (arquivo novo não conflita)."""
+
+    pasta = RAIZ / ".specs/project/licoes"
+
+    def test_a_pasta_e_o_aviso_no_state_existem(self):
+        self.assertTrue((self.pasta / "LEIA-ME.md").is_file())
+        topo = (RAIZ / ".specs/project/STATE.md").read_text(encoding="utf-8")[:1500]
+        self.assertIn("licoes/", topo, "o STATE.md perdeu o aviso de que lição nova vai para licoes/")
+
+    def test_nomes_no_formato_data_e_assunto(self):
+        nomes = sorted(p.name for p in self.pasta.glob("*.md") if p.name != "LEIA-ME.md")
+        self.assertTrue(nomes, "a pasta de lições está vazia")
+        for nome in nomes:
+            self.assertRegex(nome, r"^\d{4}-\d{2}-\d{2}-[a-z0-9]+(-[a-z0-9]+)*\.md$", f"nome fora do padrão AAAA-MM-DD-assunto.md: {nome}")
+
+    def test_cada_licao_abre_com_a_data_do_nome(self):
+        for arquivo in sorted(self.pasta.glob("*.md")):
+            if arquivo.name == "LEIA-ME.md":
+                continue
+            primeira = arquivo.read_text(encoding="utf-8").splitlines()[0]
+            self.assertTrue(primeira.startswith(f"# {arquivo.name[:10]} — "), f"{arquivo.name}: a 1ª linha deve ser '# AAAA-MM-DD — Título'")
 
 
 if __name__ == "__main__":
