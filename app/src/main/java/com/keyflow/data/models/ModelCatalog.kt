@@ -53,7 +53,7 @@ data class ModelSpec(
     val promptOpensThink: Boolean = false,
     /**
      * Falso = ainda não provado carregando no LiteRT-LM de um aparelho real: o modelo só aparece nos builds de debug
-     * ([ModelCatalog.visibleIn]). Vira verdadeiro depois do roteiro manual no A32.
+     * ([ModelCatalog.visibleIn]). Vira verdadeiro depois de responder num aparelho real.
      */
     val validatedOnDevice: Boolean = true,
 ) {
@@ -198,8 +198,9 @@ object ModelCatalog {
         languages = trKey("Multilíngue"),
         engineType = EngineType.LITERT_LM,
         acceptsLanguageHint = false,
-        // Estimativa: arquivo de ~586 MB. Revisar com a medição no A32 (RSN-T19).
-        recommendedRamMb = 1024,
+        // Medido (2026-10-27, pico de VmRSS do `:reasoning`, pedido curto): 1,66 GB no A32 (3,7 GB) e 1,7–1,9 GB no Tab S10 Lite (5,8 GB) — bem acima
+        // do arquivo (586 MB). 3072 = RAM total em que ele roda sem aviso de "pesado" (o A32 não o mostra); a guarda de carga exige 80% disso (2458 MB).
+        recommendedRamMb = 3072,
         modelName = "Qwen3 0.6B",
         kind = ModelKind.TEXT,
         files = listOf(
@@ -218,12 +219,13 @@ object ModelCatalog {
         languages = trKey("Inglês"),
         engineType = EngineType.LITERT_LM,
         acceptsLanguageHint = false,
-        // ESTIMATIVA, não medida: ~1,6 GiB de arquivo (pesos INT8) mais ativações em FP32; no emulador de 2,5 GB o
-        // `:reasoning` passou de 1,4 GB de RAM e foi morto. 3072 = arquivo + memória de trabalho com folga. A medir no A32 (RSN-T19).
-        recommendedRamMb = 3072,
+        // Medido (2026-10-27, pico de VmRSS do `:reasoning`): 3,3 GB no Tab S10 Lite (5,8 GB, 2,3 GB livres) — o dobro do arquivo, por causa das
+        // ativações em FP32 —, e no A32 (3,7 GB) o lmkd o matou ao passar ~1,7 GB. 6144: a guarda de carga exige 80% (4915 MB), o que barra o
+        // A32 (~3,6–3,8 GB) e libera o tablet de 6 GB (~5,7 GB, que ainda vê o aviso de "pesado"). É por isso o mais pesado em RAM antes do
+        // Gemma 4 E4B, embora a lista siga a ordem de download (tamanho do arquivo).
+        recommendedRamMb = 6144,
         modelName = "SmolLM2 1.7B",
         kind = ModelKind.TEXT,
-        validatedOnDevice = false,
         files = listOf(
             ModelFile(
                 FileRole.MODEL, "SmolLM2-1_7B-Instruct_dynamic_wi8_afp32.litertlm", "$SMOLLM2_REPO/SmolLM2-1_7B-Instruct_dynamic_wi8_afp32.litertlm",
@@ -244,14 +246,13 @@ object ModelCatalog {
         languages = trKey("Inglês"),
         engineType = EngineType.LITERT_LM,
         acceptsLanguageHint = false,
-        // ESTIMATIVA, não medida: o card do HF mede 2221 MB de pico de RSS na CPU de um S24 Ultra (contexto 4096); 4096 = esse pico
-        // mais o que o sistema e os outros apps ocupam num aparelho de 4 GB, e a guarda de RAM do app usa a metade (2048 ≈ o pico).
-        // A medir no A32 (RSN-T19).
+        // Medido (2026-10-27, pico de VmRSS do `:reasoning`): 1,73 GB no A32 (3,7 GB, 1,1–1,5 GB livres) e 1,9–2,5 GB no Tab S10 Lite (5,8 GB);
+        // o card do HF mede 2221 MB num S24 Ultra. 4096: no A32 mostra o aviso de "pesado", mas a guarda de carga exige só 80% (3277 MB) e o
+        // deixa carregar, como funcionou.
         recommendedRamMb = 4096,
         modelName = "DeepSeek R1 1.5B",
         kind = ModelKind.TEXT,
         promptOpensThink = true,
-        validatedOnDevice = false,
         files = listOf(
             ModelFile(
                 FileRole.MODEL, "DeepSeek-R1-Distill-Qwen-1.5B_multi-prefill-seq_q8_ekv4096.litertlm",
@@ -272,6 +273,8 @@ object ModelCatalog {
         languages = trKey("Multilíngue"),
         engineType = EngineType.LITERT_LM,
         acceptsLanguageHint = false,
+        // Medido (2026-10-27, pico de VmRSS do `:reasoning`): 1,72 GB no A32 (3,7 GB), 2,1–2,2 GB no Tab S10 Lite (5,8 GB) e 2,2 GB no Vaio TL10
+        // (7,6 GB). 4096: aviso de "pesado" no A32, onde a guarda de carga (80% = 3277 MB) o deixa carregar, como funcionou.
         recommendedRamMb = 4096,
         modelName = "Gemma 4 E2B",
         kind = ModelKind.TEXT,
@@ -282,8 +285,8 @@ object ModelCatalog {
 
     /**
      * Gemma 4 E4B (Google), arquivo genérico (CPU/GPU) — não as variantes `-gpu`/`-web` nem as de NPU. Licença Apache 2.0 (a mesma do E2B;
-     * o Gemma 4 não usa os Termos do Gemma das versões 1 a 3). Entrou em 2026-10-26, por decisão do Yan, mesmo sem caber no A32: o README do
-     * repositório mede 3283 MB de pico de CPU (`ru_maxrss`, S26 Ultra, contexto de 2048) contra ~1,4–1,7 GB do E2B, e o arquivo tem 3,66 GB.
+     * o Gemma 4 não usa os Termos do Gemma das versões 1 a 3). Entrou em 2026-10-26, por decisão do Yan, mesmo sem caber no A32 (o arquivo tem 3,66 GB);
+     * liberado no release em 2026-10-27, depois de responder num Vaio TL10 de 8 GB.
      */
     val GEMMA_4_E4B = ModelSpec(
         id = "gemma-4-e4b-litertlm",
@@ -292,14 +295,12 @@ object ModelCatalog {
         languages = trKey("Multilíngue"),
         engineType = EngineType.LITERT_LM,
         acceptsLanguageHint = false,
-        // ESTIMATIVA, não medida em aparelho nosso: o pico de CPU do README é 3283 MB (S26 Ultra) contra 1733 MB do E2B (que usa 4096), então
-        // a mesma proporção (~2,4x) dá ~7,7 GB; 8192 é o degrau seguinte. A guarda de RAM do app exige a metade (4096) livre ao carregar — acima
-        // do pico de 3283 MB, como o E2B (2048 para 1733) — e o aviso de "pesado" aparece em todo aparelho com menos de 8192 MB (o A32 e os de 6 GB).
-        // Não cabe no A32 (4 GB); a medir num aparelho de 8 GB ou mais.
+        // Medido (2026-10-27, pico de VmRSS do `:reasoning`): 4,4–4,5 GB no Vaio TL10 (7,6 GB, 4,8 GB livres); o README mede 3283 MB (CPU, S26 Ultra,
+        // contexto 2048). Não tentado no A32. 8192: a guarda de carga exige 80% (6554 MB), o que barra o A32 e o tablet de 6 GB (~5,7 GB) e libera o
+        // de 8 GB (~7,4 GB), que ainda vê o aviso de "pesado".
         recommendedRamMb = 8192,
         modelName = "Gemma 4 E4B",
         kind = ModelKind.TEXT,
-        validatedOnDevice = false,
         files = listOf(
             ModelFile(FileRole.MODEL, "gemma-4-E4B-it.litertlm", "$GEMMA_4_E4B_REPO/gemma-4-E4B-it.litertlm", "0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0", 3_659_530_240L),
         ),
@@ -308,7 +309,7 @@ object ModelCatalog {
     /** Modelos de fala, na ordem em que a aba Transcrição lista: do mais leve ao mais pesado. */
     val SPEECH: List<ModelSpec> = listOf(WHISPER_BASE, WHISPER_SMALL, PARAKEET_V3)
 
-    /** Todos os modelos de texto conhecidos, do mais leve ao mais pesado, validados ou não. */
+    /** Todos os modelos de texto conhecidos, do menor ao maior arquivo (a ordem de download). A de RAM, em `recommendedRamMb`, difere: o SmolLM2 pesa mais que o DeepSeek e o Gemma 4 E2B. */
     val TEXT_ALL: List<ModelSpec> = listOf(
         QWEN3_0_6B,
         SMOLLM2_1_7B,
@@ -318,8 +319,8 @@ object ModelCatalog {
     )
 
     /**
-     * O que o build mostra: em release só os [ModelSpec.validatedOnDevice]; em debug, todos. SmolLM2, DeepSeek e Gemma 4 E4B saem do
-     * gate depois do roteiro manual no A32 (`.specs/features/reasoning-models/tasks.md`).
+     * O que o build mostra: em release só os [ModelSpec.validatedOnDevice]; em debug, todos. Desde 2026-10-27 os cinco modelos de texto
+     * estão validados (responderam em aparelho real); o flag segue como gate para o próximo modelo que entrar sem prova.
      */
     fun visibleIn(models: List<ModelSpec>, debug: Boolean): List<ModelSpec> = models.filter { debug || it.validatedOnDevice }
 
