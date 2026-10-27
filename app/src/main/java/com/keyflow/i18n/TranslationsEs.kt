@@ -625,6 +625,8 @@ internal val TranslationsEs: Map<String, String> = mapOf(
     "Continuar com ElevenLabs" to "Continuar con ElevenLabs",
     // Skins importáveis e Mascote (trazidas na integração com o trabalho dos provedores)
     "desenha os SVGs das skins importadas — Apache 2.0 (Cave Rock Software)." to "dibuja los SVG de las skins importadas — Apache 2.0 (Cave Rock Software).",
+    "Logos dos fabricantes" to "Logos de los fabricantes",
+    "desenhos do Simple Icons (CC0) e do lobe-icons (MIT, LobeHub); as marcas são dos donos." to "dibujos de Simple Icons (CC0) y de lobe-icons (MIT, LobeHub); las marcas son de sus dueños.",
     "manifest.json tem blocos aninhados demais." to "manifest.json tiene demasiados bloques anidados.",
     "manifest.json precisa ser um objeto JSON, entre chaves." to "manifest.json debe ser un objeto JSON, entre llaves.",
     "manifest.json não é um JSON válido: %s" to "manifest.json no es un JSON válido: %s",

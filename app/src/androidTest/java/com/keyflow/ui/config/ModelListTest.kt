@@ -8,6 +8,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -92,6 +94,24 @@ class ModelListTest {
         rule.onNodeWithTag("raciocinio-local-delete-${qwen.id}").assertExists()
         rule.onNodeWithTag("raciocinio-local-download-${gemma.id}").assertExists()
         rule.onNodeWithTag(localModelTag(qwen.id)).assertDoesNotExist()
+    }
+
+    @Test
+    fun everyCardShowsTheLogoOfTheCompanyThatMakesTheModel() {
+        rule.setContent { Host(speech(installed = emptySet()), FakeActions(), ModelListTags.Voz) }
+        // Whisper (os dois) é da OpenAI; o Parakeet, da NVIDIA — o nome da empresa é a descrição para o leitor de tela.
+        rule.onAllNodesWithTag("model-vendor-openai").assertCountEquals(2)
+        rule.onNodeWithTag("model-vendor-nvidia").assertExists()
+        rule.onNodeWithContentDescription("NVIDIA").assertExists()
+    }
+
+    @Test
+    fun theTextCardsCarryTheirOwnVendorLogo() {
+        rule.setContent { Host(text(installed = emptySet()), FakeActions(), ModelListTags.Raciocinio) }
+        rule.onNodeWithTag("model-vendor-qwen").assertExists()
+        rule.onNodeWithTag("model-vendor-hugging_face").assertExists()
+        rule.onNodeWithTag("model-vendor-deepseek").assertExists()
+        rule.onAllNodesWithTag("model-vendor-google").assertCountEquals(2)
     }
 
     @Test

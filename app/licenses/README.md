@@ -15,6 +15,8 @@
 | PaddleOCR PP-OCRv3/v5 em ONNX (PaddlePaddle; conversão de monkt) — modelo de OCR da Visão baixado sob demanda (só no debug até a prova num aparelho) | Apache-2.0 | `Apache-2.0_paddleocr.txt` |
 | SmolLM2 1.7B Instruct (Hugging Face) — modelo de texto baixado sob demanda | Apache-2.0 | `Apache-2.0_smollm2-1.7b.txt` |
 | DeepSeek-R1-Distill-Qwen 1.5B (DeepSeek, derivado do Qwen2.5) — modelo de texto baixado sob demanda | MIT (e Apache-2.0 do Qwen2.5) | `MIT_deepseek-r1-distill-qwen-1.5b.txt` |
+| Logos dos fabricantes de modelo no card (NVIDIA, Hugging Face, DeepSeek): paths de `nvidia.svg`, `huggingface.svg`, `deepseek.svg` do Simple Icons | CC0 1.0 (os desenhos; as marcas são dos donos) | — (domínio público, sem arquivo) |
+| Logo da Qwen no card: path de `packages/static-svg/icons/qwen-color.svg` do lobe-icons (LobeHub) | MIT | `MIT_lobe-icons.txt` |
 | AndroidSVG 1.4 (AAR, desenha os SVGs das skins importáveis) | Apache-2.0 | `Apache-2.0_androidsvg.txt` |
 
 Fontes das licenças conferidas em 2026-09-25: `LICENSE` do sherpa-onnx na tag v1.13.8, do ONNX Runtime
@@ -41,6 +43,11 @@ arquivo do DeepSeek traz as duas licenças. Os dois repositórios do `litert-com
 
 Conferida em 2026-10-26 (Gemma 4 E4B): `license: apache-2.0` e `gated: false` no card do `litert-community/gemma-4-E4B-it-litert-lm` (commit
 e6a3892a8c22cf87ff99583996149cf3cb32452b) e nas tags do original `google/gemma-4-E4B-it`; é a mesma licença do E2B, não os Termos do Gemma.
+
+Conferidos em 2026-10-27 (logos dos fabricantes nos cards de modelo local): os paths do NVIDIA, Hugging Face e DeepSeek vêm do branch `develop` do
+`simple-icons/simple-icons` (`LICENSE.md`: CC0 1.0 Universal); as cores de marca (`76B900`, `FFD21E`, `5786FE`) são as de `data/simple-icons.json`. A Simple
+Icons não tem a Qwen: o path e a cor `#082DFF` vêm de `lobehub/lobe-icons` (licença MIT, "Copyright (c) 2023 LobeHub"). Google e OpenAI reaproveitam os paths
+que o app já trazia nos provedores. Os logos são marcas registradas dos donos e só identificam quem fez o modelo.
 
 Conferido em 2026-10-27 (vision-capture, VC-T2a): `license: apache-2.0` no card do `monkt/paddleocr-onnx` (commit
 `7b02d0a30a07ba2b92ad1ff5a8941ae2c633de65`, repositório `gated: false`, sem arquivo LICENSE) e nos cards

@@ -349,4 +349,23 @@ class ModelCatalogTest {
     fun `ids are unique across all kinds`() {
         assertThat(ModelCatalog.MODELS.map { it.id }).containsNoDuplicates()
     }
+
+    @Test
+    fun `every local model names the company that makes it, for the card logo`() {
+        val without = ModelCatalog.MODELS.filter { it.vendor == null }.map { it.id }
+        assertThat(without).isEmpty()
+    }
+
+    @Test
+    fun `vendors match the model, not the host that serves the file`() {
+        val byId = ModelCatalog.MODELS.associate { it.id to it.vendor }
+        assertThat(byId).containsEntry("whisper-base-int8", ModelVendor.OPENAI)
+        assertThat(byId).containsEntry("whisper-small-int8", ModelVendor.OPENAI)
+        assertThat(byId).containsEntry("parakeet-tdt-0.6b-v3-int8", ModelVendor.NVIDIA)
+        assertThat(byId).containsEntry("qwen3-0.6b-litertlm", ModelVendor.QWEN)
+        assertThat(byId).containsEntry("smollm2-1.7b-litertlm", ModelVendor.HUGGING_FACE)
+        assertThat(byId).containsEntry("deepseek-r1-1.5b-litertlm", ModelVendor.DEEPSEEK)
+        assertThat(byId).containsEntry("gemma-4-e2b-litertlm", ModelVendor.GOOGLE)
+        assertThat(byId).containsEntry("gemma-4-e4b-litertlm", ModelVendor.GOOGLE)
+    }
 }
