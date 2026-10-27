@@ -16,23 +16,23 @@ internal object RamGuard {
     /**
      * Quanto da RAM total o aparelho precisa ter por MB de estimativa do catálogo: `total >= estimativa × 1,6`, isto é,
      * 80% da `recommendedRamMb` (= 2 × estimativa). Os limites resultantes, contra o que foi medido: Qwen3 (3072) exige
-     * 2458 MB, DeepSeek e Gemma 4 E2B (4096) exigem 3277 MB — cabem no A32 (~3,6–3,8 GB); SmolLM2 (6144) exige 4915 MB — barrado
+     * 2458 MB, DeepSeek e Gemma 4 E2B (4096) exigem 3277 MB — cabem no A32 (~3,6–3,8 GB); SmolLM2 (6144) exige 4916 MB — barrado
      * no A32, liberado no tablet de 6 GB (~5,7 GB); Gemma 4 E4B (8192) exige 6554 MB — barrado no tablet, liberado no Vaio de
      * 8 GB (~7,4 GB). Em todos o pico medido fica em até ~70% do mínimo exigido.
      */
     private const val TOTAL_RAM_PER_ESTIMATE_TENTHS = 16L
 
-    /** O aparelho tem RAM total para esse modelo? Sem total ou sem estimativa não se bloqueia. */
+    /** O aparelho tem RAM total para esse modelo? Sem total (nulo, zero ou negativo = dado inválido) ou sem estimativa não se bloqueia. */
     fun fitsDevice(totalMb: Long?, estimateMb: Int): Boolean =
-        totalMb == null || estimateMb <= 0 || totalMb * 10 >= estimateMb * TOTAL_RAM_PER_ESTIMATE_TENTHS
+        totalMb == null || totalMb <= 0 || estimateMb <= 0 || totalMb * 10 >= estimateMb * TOTAL_RAM_PER_ESTIMATE_TENTHS
 
     /**
-     * Com o total conhecido vale [fitsDevice]; sem ele (sistema sem dado), cai na regra antiga da RAM livre. A estimativa zero
+     * Com o total conhecido (positivo) vale [fitsDevice]; sem ele (sistema sem dado), cai na regra antiga da RAM livre. A estimativa zero
      * (motor sem pesos, como o de eco dos testes) nunca bloqueia.
      */
     fun enough(availableMb: Long?, estimateMb: Int, totalMb: Long? = null): Boolean = when {
         estimateMb <= 0 -> true
-        totalMb != null -> fitsDevice(totalMb, estimateMb)
+        totalMb != null && totalMb > 0 -> fitsDevice(totalMb, estimateMb)
         else -> availableMb == null || availableMb >= estimateMb
     }
 

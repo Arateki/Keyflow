@@ -220,7 +220,7 @@ object ModelCatalog {
         engineType = EngineType.LITERT_LM,
         acceptsLanguageHint = false,
         // Medido (2026-10-27, pico de VmRSS do `:reasoning`): 3,3 GB no Tab S10 Lite (5,8 GB, 2,3 GB livres) — o dobro do arquivo, por causa das
-        // ativações em FP32 —, e no A32 (3,7 GB) o lmkd o matou ao passar ~1,7 GB. 6144: a guarda de carga exige 80% (4915 MB), o que barra o
+        // ativações em FP32 —, e no A32 (3,7 GB) o lmkd o matou ao passar ~1,7 GB. 6144: a guarda de carga exige 80% (4916 MB), o que barra o
         // A32 (~3,6–3,8 GB) e libera o tablet de 6 GB (~5,7 GB, que ainda vê o aviso de "pesado"). É por isso o mais pesado em RAM antes do
         // Gemma 4 E4B, embora a lista siga a ordem de download (tamanho do arquivo).
         recommendedRamMb = 6144,

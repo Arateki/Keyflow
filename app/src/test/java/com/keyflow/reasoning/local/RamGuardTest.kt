@@ -98,6 +98,25 @@ class RamGuardTest {
         assertThat(RamGuard.fitsDevice(totalMb = 1, estimateMb = 0)).isTrue()
     }
 
+    /** Total zero ou negativo é dado inválido: vale a regra antiga da RAM livre, como com total nulo. */
+    @Test
+    fun `a non positive total is treated as unknown and falls back to the free memory`() {
+        listOf(0L, -1L).forEach { total ->
+            assertThat(RamGuard.enough(availableMb = 5_000, estimateMb = 2_048, totalMb = total)).isTrue()
+            assertThat(RamGuard.enough(availableMb = 1_000, estimateMb = 2_048, totalMb = total)).isFalse()
+            assertThat(RamGuard.enough(availableMb = null, estimateMb = 2_048, totalMb = total)).isTrue()
+            assertThat(RamGuard.fitsDevice(totalMb = total, estimateMb = 8_192)).isTrue()
+        }
+        assertThat(RamGuard.enoughForPreload(availableMb = 5_000, estimateMb = 3_072, totalMb = 0)).isTrue()
+    }
+
+    @Test
+    fun `the SmolLM2 floor is 4916 MB, rounded up from 80 percent of 6144`() {
+        val estimate = ModelCatalog.SMOLLM2_1_7B.recommendedRamMb / 2
+        assertThat(RamGuard.fitsDevice(totalMb = 4_916, estimateMb = estimate)).isTrue()
+        assertThat(RamGuard.fitsDevice(totalMb = 4_915, estimateMb = estimate)).isFalse()
+    }
+
     /** A pré-carga é especulativa: além de caber no aparelho, exige RAM livre de verdade (piso e estimativa). */
     @Test
     fun `preload also needs the model to fit the device`() {

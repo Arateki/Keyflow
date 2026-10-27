@@ -3110,7 +3110,7 @@ Dois motores com ferramentas ao lado do da Anthropic: `reasoning/openai/OpenAiAg
   (especulativa) mantém a livre (`>= estimativa` e `>= 2048 MB`) e soma o `fitsDevice`.
 - Valores novos de `recommendedRamMb` (mínimo de RAM total exigido pela guarda entre parênteses; o aviso "pesado" usa o próprio valor):
   Qwen3 1024 -> 3072 (2458; A32 sem aviso), DeepSeek 4096 (3277), Gemma 4 E2B 4096 (3277) — carregam no A32 (~3,6–3,8 GB) mas mostram o aviso —,
-  SmolLM2 3072 -> 6144 (4915; barra o A32, libera o tablet de 6 GB ~5,7 GB), Gemma 4 E4B 8192 (6554; barra o tablet, libera o Vaio ~7,4 GB).
+  SmolLM2 3072 -> 6144 (4916; barra o A32, libera o tablet de 6 GB ~5,7 GB), Gemma 4 E4B 8192 (6554; barra o tablet, libera o Vaio ~7,4 GB).
   `ramEstimateMb` segue `recommendedRamMb / 2` (`LlmModels.from`).
 - A ordem da lista segue o tamanho do arquivo; a de RAM não: o SmolLM2 (ativações em FP32) pesa mais que o DeepSeek e o E2B. O
   `ModelCatalogTest` deixou de exigir `recommendedRamMb` em ordem crescente na lista de texto e passou a fixar os valores.
