@@ -424,6 +424,7 @@ internal val TranslationsEs: Map<String, String> = mapOf(
     "Pode ser pesado neste aparelho." to "Puede ser pesado en este dispositivo.",
     "Suporta modo pensamento." to "Admite modo de pensamiento.",
     "Sempre pensa antes de responder." to "Siempre piensa antes de responder.",
+    "Apagar a versão antiga de %s? É preciso baixar de novo para usá-lo." to "¿Borrar la versión anterior de %s? Tendrás que descargarla de nuevo para usarlo.",
     "Atualizar modelo" to "Actualizar modelo",
     "Há uma versão nova deste modelo. Atualize para voltar a usá-lo." to "Hay una versión nueva de este modelo. Actualízalo para volver a usarlo.",
     "Por que pedimos %s" to "Por qué pedimos %s",

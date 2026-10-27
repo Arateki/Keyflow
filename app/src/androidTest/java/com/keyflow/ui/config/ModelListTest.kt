@@ -142,6 +142,28 @@ class ModelListTest {
         rule.onNodeWithTag("raciocinio-local-model-${qwen.id}-outdated").performScrollTo().assertExists()
         rule.onNodeWithTag("raciocinio-local-download-${gemma.id}").performScrollTo().assertTextEquals("Baixar")
         rule.onNodeWithTag("raciocinio-local-model-${gemma.id}-outdated").assertDoesNotExist()
+        rule.onNodeWithTag("raciocinio-local-delete-${gemma.id}").assertDoesNotExist()
+    }
+
+    /** Achado 4 da revisão: quem precisa do espaço da cópia antiga a apaga pelo próprio card desatualizado. */
+    @Test
+    fun anOutdatedCardOffersDeleteAndConfirmsBeforeDeleting() {
+        val ui = LocalModelsUi.compose(
+            catalog = ModelCatalog.TEXT, installed = emptySet(), outdated = setOf(qwen.id), active = null, failures = emptyMap(),
+            selectedId = null, deviceRamMb = 8_000,
+        )
+        val actions = FakeActions()
+        val deleted = mutableListOf<String>()
+        rule.setContent { Host(ui, actions, ModelListTags.Raciocinio, onDeleted = { deleted += it }) }
+
+        rule.onNodeWithTag("raciocinio-local-delete-${qwen.id}").performScrollTo().performClick()
+        rule.onNodeWithTag("raciocinio-local-confirm-${qwen.id}").performScrollTo().assertExists()
+        rule.onNodeWithTag("raciocinio-local-confirm-yes").performScrollTo().performClick()
+
+        rule.runOnIdle {
+            assertEquals(listOf(qwen.id), actions.deletes)
+            assertEquals(listOf(qwen.id), deleted)
+        }
     }
 
     @Test

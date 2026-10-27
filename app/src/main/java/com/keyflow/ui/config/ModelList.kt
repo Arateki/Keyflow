@@ -234,13 +234,26 @@ private fun ModelCard(
             )
         }
         if (item.outdated) {
-            Text(
-                tr("Há uma versão nova deste modelo. Atualize para voltar a usá-lo."),
-                color = palette.terracotta,
-                fontFamily = SpaceGrotesk,
-                fontSize = 10.5.sp,
-                modifier = Modifier.padding(top = 6.dp).testTag("${tags.model(spec.id)}-outdated"),
-            )
+            Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    tr("Há uma versão nova deste modelo. Atualize para voltar a usá-lo."),
+                    color = palette.terracotta,
+                    fontFamily = SpaceGrotesk,
+                    fontSize = 10.5.sp,
+                    modifier = Modifier.weight(1f).testTag("${tags.model(spec.id)}-outdated"),
+                )
+                // A cópia antiga segue no aparelho até a nova chegar: quem precisa do espaço dela apaga daqui (não aparece baixando).
+                if (item.status == LocalModelStatus.AVAILABLE) {
+                    CardAction(
+                        tr("Apagar"),
+                        enabled = pending == null,
+                        tag = tags.delete(spec.id),
+                        onClick = onDelete,
+                        color = palette.terracotta,
+                        modifier = Modifier.padding(start = 10.dp),
+                    )
+                }
+            }
         }
         if (item.heavy) {
             Text(
@@ -297,7 +310,9 @@ private fun ModelCard(
             ConfirmRow(
                 question = when (pending) {
                     is Pending.Metered -> tr("Baixar %s por dados móveis?", formatModelSize(pending.bytes))
-                    is Pending.Delete -> tr("Apagar %s? Libera %s.", tr(spec.displayName), formatModelSize(spec.totalBytes))
+                    is Pending.Delete ->
+                        if (item.outdated) tr("Apagar a versão antiga de %s? É preciso baixar de novo para usá-lo.", tr(spec.displayName))
+                        else tr("Apagar %s? Libera %s.", tr(spec.displayName), formatModelSize(spec.totalBytes))
                 },
                 confirm = if (pending is Pending.Metered) tr("Baixar") else tr("Apagar"),
                 tag = tags.confirm(spec.id),
@@ -341,6 +356,7 @@ private fun CardAction(
     onClick: () -> Unit,
     enabled: Boolean = true,
     color: androidx.compose.ui.graphics.Color = LocalKeyFlowPalette.current.teal,
+    modifier: Modifier = Modifier,
 ) {
     val palette = LocalKeyFlowPalette.current
     val tint = if (enabled) color else palette.faint
@@ -351,7 +367,7 @@ private fun CardAction(
         fontWeight = FontWeight.Medium,
         fontSize = 11.sp,
         letterSpacing = 0.2.sp,
-        modifier = Modifier
+        modifier = modifier
             .clip(RoundedCornerShape(50))
             .border(1.dp, tint.copy(alpha = 0.45f), RoundedCornerShape(50))
             .clickable(enabled = enabled, onClick = onClick)
