@@ -3356,3 +3356,7 @@ O revisor reprovou a primeira versão da migração do Qwen3; cada achado virou 
   enquanto não mandar, o remoto de modelos fica sem efeito (o embutido vale) — comportamento seguro.
 - Merge da main (PR #39, Visão) resolvido mantendo as duas seções do STATE.md e as duas linhas do `app/licenses/README.md`.
 
+
+- Segunda revisão do PR #43: (a) a recuperação de troca interrompida só descarta `.<id>.replaced` se o destino tem manifest íntegro; destino parcial é apagado e a anterior volta.
+  (b) A `version` do `LlmModel` agora vem do manifest instalado (`ModelStore.installedVersion`), não do SHA do catálogo; `ModelStore.isInstalled` compara a identidade lida do disco
+  com o catálogo vigente a cada chamada (não só com a lista do último `refresh`), então a cópia antiga deixa de valer assim que um catálogo novo é aplicado, antes do refresh.
