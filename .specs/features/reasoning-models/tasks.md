@@ -548,3 +548,27 @@ lidos da API do HF (e o SHA-256 recalculado baixando os arquivos, ver `qwen-sem-
 - Goldens: as telas `config-raciocinio-local-*` (cards de texto mudaram: seis modelos, novo tamanho do Qwen3, linha de pensamento) foram regeneradas; o resto
   bit-idêntico. Ver `STATE.md` (2026-10-27, equipe/catalogo-qwen).
 
+
+## Catálogo: Qwen3 4B Instruct-2507 ("Potente") e limpeza da recuperação de troca (2026-10-27)
+
+Status: implementada (branch `equipe/qwen3-4b-card`, sobre `equipe/catalogo-qwen`), por decisão do Yan. RCAT-02/03 e RPRV-02 seguem valendo: commit `4d409771…`, 2659057664 B e
+SHA-256 `9e48b165…` lidos da API do HF (e o SHA-256 recalculado baixando o arquivo, ver `qwen-sem-pensar.md`); `scripts/verify-model-catalog.py` conferiu o pin, a licença
+(`apache-2.0`, `gated: false`) e o `Range` (206).
+
+- **Qwen3 4B Instruct-2507** ("Potente", `qwen3-4b-instruct-2507-litertlm`, vendor QWEN, `thinking = NONE`, multilíngue, contexto de 2048, `validatedOnDevice = true`,
+  `recommendedRamMb = 12288`): lista pelo tamanho do arquivo, entre o Equilibrado (Gemma 4 E2B) e o Avançado (Gemma 4 E4B). Licença em
+  `app/licenses/Apache-2.0_qwen3-4b-instruct-2507.txt` + README, linha na Docs (PT/EN/ES) e `doc.json` do site regenerado; `EMBEDDED_VERSION` subiu para 2026102702.
+- **A prova é na GPU, o app usa a CPU.** Vaio TL10 (Unisoc T616, 7,6 GB): pela CPU o processo passou de 5 GB e o Android o matou por falta de memória (LOW_MEMORY),
+  mesmo com configuração mínima; pela GPU (build de teste, OpenCL) respondeu certo ("Paris"), VmHWM 4,4 GB, carga de 112 s. O autor publica a CPU funcionando num
+  Galaxy S26 com RSS de 4,6 a 6,1 GB. Por isso 12288: a guarda de carga (`RamGuard.fitsDevice`) exige 9831 MB de RAM total e barra os aparelhos de 8 GB (o Vaio inclusive)
+  com "Memória insuficiente" em vez de deixar a carga morrer; um aparelho de 12 GB (~11 GB visíveis) a passa. Até haver a opção de GPU no app, é para aparelhos com muita RAM.
+- **Nome**: "Potente" (par de "Leve"), e não "Máximo": o Avançado (E4B, 3,66 GB) vem depois na lista e é descrito como mais capaz que o Equilibrado; um "Máximo" no penúltimo
+  lugar enganaria. A frase do card não afirma que é o mais capaz da lista.
+- **Recuperação de troca interrompida** (achado menor da revisão do PR #43): `ModelStore.recoverInterruptedSwaps` promovia a cópia guardada (`.<id>.replaced`) mesmo
+  inválida quando o destino não existia, deixando no lugar do modelo um diretório parcial sem manifest (nem instalado nem desatualizado, sem "Apagar" no card). Agora ela é
+  apagada. Testes em `ModelStoreTest` (cópia sem manifest e cópia truncada).
+- Testes ajustados: `ModelCatalogTest` (sete modelos, ordem, RAM, nomes, hash, vendor, pensamento, impressão digital dos pins), `RamGuardTest` (A32, tablet de 6 GB, 8 GB
+  barrado, 12 GB liberado, limite 9831), `LocalModelsUiTest` (aviso de "pesado" do Potente), `PinSanityTest`, `ModelPreparationTest`, `ModelListTest` (logo Qwen x3; sem linha de pensamento).
+- Goldens (`pool telas`, 230 capturas): só `config-raciocinio*` muda. O Potente fica abaixo da dobra na lista inteira, então os dez quadros com a lista (`config-raciocinio`,
+  `-local-baixando`, `-local-pronto`, `-local-instalados`, `-testando`, claro e escuro) mudam só ~100-130 px na barra de rolagem (a lista ficou mais longa); a rota nova
+  `config-raciocinio-local-potente` (debug, claro e escuro) mostra o card sozinho, com o aviso de "pesado" num aparelho de 8 GB. `config-docs` (~5 px) e `tour-keyboard-mic` (0 px) foram restaurados.

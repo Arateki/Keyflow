@@ -328,6 +328,43 @@ class ModelStoreTest {
     }
 
     /**
+     * Sem destino e com a cópia guardada inválida (aqui, sem manifest: a morte foi no meio da gravação): não há o que salvar. Promover o backup deixava
+     * no lugar do modelo um diretório parcial, que não é instalado nem desatualizado e para o qual o card não oferece Apagar.
+     */
+    @Test
+    fun `an interrupted swap with an invalid stored copy and no target leaves nothing behind`() {
+        val root = File(tmp.root, "models")
+        val backup = File(root, ".${spec.id}.replaced")
+        backup.mkdirs()
+        File(backup, "enc.onnx").writeBytes(ByteArray(10))
+
+        val recovered = ModelStore(root)
+
+        assertThat(backup.exists()).isFalse()
+        assertThat(File(root, spec.id).exists()).isFalse()
+        assertThat(recovered.isInstalled(spec.id)).isFalse()
+        assertThat(recovered.installedIds.value).isEmpty()
+        assertThat(recovered.outdatedIds.value).isEmpty()
+    }
+
+    /** Idem com manifest que aponta para um arquivo menor do que o declarado (cópia truncada). */
+    @Test
+    fun `an interrupted swap with a truncated stored copy and no target also leaves nothing behind`() {
+        val root = File(tmp.root, "models")
+        store().install(spec, downloaded())
+        val backup = File(root, ".${spec.id}.replaced")
+        check(File(root, spec.id).renameTo(backup))
+        File(backup, "dec.onnx").writeBytes(ByteArray(3))
+
+        val recovered = ModelStore(root)
+
+        assertThat(backup.exists()).isFalse()
+        assertThat(File(root, spec.id).exists()).isFalse()
+        assertThat(recovered.installedIds.value).isEmpty()
+        assertThat(recovered.outdatedIds.value).isEmpty()
+    }
+
+    /**
      * Janela entre aplicar um catálogo novo e o `refresh`: a cópia antiga já não conta como instalada (compara-se com o catálogo vigente a cada
      * chamada), e a identidade que o motor recebe é a do manifest instalado, não a do catálogo.
      */

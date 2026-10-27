@@ -20,8 +20,9 @@ OpenAI aceitando o KeyFlow, e o callback do login com o app em segundo plano num
 ## A. Modelos locais (RSC, RMD, RRUN)
 
 1. Aba **Raciocínio** (o cérebro de perfil no menu) → origem **Local**. Aparecem **Leve** (Qwen3 0.6B, ~585 MB),
-   **Intermediário** (SmolLM2 1.7B, ~1,73 GB), **Raciocínio** (DeepSeek R1 1.5B, ~1,83 GB), **Equilibrado** (Gemma 4 E2B,
-   ~2,59 GB) e **Avançado** (Gemma 4 E4B, ~3,66 GB), com tamanho e idioma; nota de privacidade no fim. **Nenhum modelo de voz** na lista.
+   **Versátil** (Qwen2.5 1.5B, ~1,60 GB), **Intermediário** (SmolLM2 1.7B, ~1,73 GB), **Raciocínio** (DeepSeek R1 1.5B, ~1,83 GB),
+   **Equilibrado** (Gemma 4 E2B, ~2,59 GB), **Potente** (Qwen3 4B Instruct 2507, ~2,66 GB) e **Avançado** (Gemma 4 E4B, ~3,66 GB), com tamanho e
+   idioma; nota de privacidade no fim. **Nenhum modelo de voz** na lista.
 2. Em **Wi-Fi**, "Baixar" no **Leve** → barra com % no card **e** notificação do sistema. Ao terminar, o Leve fica
    **selecionado sozinho**. A aba **Transcrição** continua com o modelo de voz que já tinha (nada mudou lá).
 3. **Testar**. Anote **"Primeiro trecho / total"**. A **1ª vez inclui a carga a frio** do modelo (no emulador x86_64 foram
@@ -31,6 +32,9 @@ OpenAI aceitando o KeyFlow, e o callback do login com o app em segundo plano num
    marcas de raciocínio, registre.
 5. **Equilibrado**: o card mostra o aviso de **"pesado"**? Baixe (precisa de ~2,6 GB livres — sem espaço, o card avisa antes) e
    **Testar**. Se aparecer "Memória insuficiente…", registre os MB livres que o log mostrar e siga.
+   **Potente** (Qwen3 4B): o card mostra o aviso de "pesado" em qualquer aparelho com menos de 12 GB, e a guarda de carga exige ~9,8 GB de RAM total
+   (o app só usa a CPU): num aparelho de 8 GB, ao tocar em Testar, deve aparecer "Memória insuficiente…" em vez de a carga morrer no meio (no Vaio TL10, a CPU passou de 5 GB
+   e o Android matou o processo; só a GPU, que o app ainda não oferece, o carregou). Só vale tentar o Testar num aparelho de 12 GB ou mais; anote o pico de VmRSS do `:reasoning`.
 6. **Modo avião ligado**, Leve selecionado → **Testar** funciona (é 100% local).
 7. **Matar o `:reasoning` no meio**: toque Testar e, durante a resposta:
    ```bash
