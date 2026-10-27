@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -93,6 +94,20 @@ class VisaoPanelTest {
         rule.onNodeWithTag("visao-local-model-${balancedOcr.id}").performScrollTo().assertIsDisplayed()
         rule.onNodeWithTag(VISAO_LOCAL_PRIVACY_TAG).performScrollTo().assertIsDisplayed()
         rule.onNodeWithTag(VISAO_TRANSLATE_TARGET_TAG).performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun theRealOcrCardShowsThePaddlePaddleLogo() {
+        // O OCR do catálogo é da PaddlePaddle (Baidu), não do repositório que hospeda os arquivos.
+        val real = LocalModelsUi.compose(
+            catalog = listOf(ModelCatalog.OCR_PADDLE_LATIN), installed = emptySet(), active = null, failures = emptyMap(),
+            selectedId = null, deviceRamMb = 8_000,
+        )
+        val h = Harness(Settings(), real)
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag("model-vendor-paddlepaddle").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithContentDescription("PaddlePaddle").assertExists()
     }
 
     @Test

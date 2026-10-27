@@ -3179,7 +3179,7 @@ Dois motores com ferramentas ao lado do da Anthropic: `reasoning/openai/OpenAiAg
 
 - `ModelSpec.vendor: ModelVendor?` (enum no `ModelCatalog.kt`) diz quem FAZ o modelo, não quem hospeda: Whisper = OpenAI, Parakeet = NVIDIA, Qwen3 = Alibaba Qwen,
   SmolLM2 = Hugging Face, DeepSeek R1 = DeepSeek, Gemma 4 = Google. Todo modelo do catálogo declara o seu (`ModelCatalogTest`); o manifesto remoto aceita
-  `"vendor"` opcional e nome desconhecido vira `null` (card sem logo), não manifesto inválido. Visão e Voz seguem vazias: o PaddleOCR (Baidu) entra com a branch da Visão.
+  `"vendor"` opcional e nome desconhecido vira `null` (card sem logo), não manifesto inválido. Visão e Voz seguem vazias: o PaddleOCR (PaddlePaddle/Baidu) entra com a branch da Visão (`ModelVendor.PADDLEPADDLE`, path `paddlepaddle.svg` do Simple Icons, CC0, cor `#0062B0`).
 - Desenho: `ModelVendorLogo` (`ui/config`), 15 dp ao lado do nome, alinhado ao topo. Paths novos em `KfIcons`: NVIDIA, Hugging Face e DeepSeek do Simple Icons
   (CC0), Qwen do lobe-icons (MIT; a Simple Icons não tem a Qwen). Google e OpenAI reaproveitam os dos provedores. Créditos em `app/licenses/README.md`
   (+ `MIT_lobe-icons.txt`) e na seção Licenças da aba Docs (`doc.json` do site regenerado).

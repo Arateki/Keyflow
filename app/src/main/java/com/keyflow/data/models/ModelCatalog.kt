@@ -25,6 +25,7 @@ enum class ModelVendor(val displayName: String) {
     DEEPSEEK("DeepSeek"),
     HUGGING_FACE("Hugging Face"),
     NVIDIA("NVIDIA"),
+    PADDLEPADDLE("PaddlePaddle"),
 }
 
 /**
@@ -383,6 +384,7 @@ object ModelCatalog {
         modelName = "PaddleOCR",
         kind = ModelKind.VISION,
         validatedOnDevice = false,
+        vendor = ModelVendor.PADDLEPADDLE,
         files = listOf(
             ModelFile(
                 FileRole.DETECTOR, "det.onnx", "$OCR_PADDLE_REPO/detection/v3/det.onnx",
