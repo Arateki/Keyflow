@@ -3116,3 +3116,20 @@ Dois motores com ferramentas ao lado do da Anthropic: `reasoning/openai/OpenAiAg
   `ModelCatalogTest` deixou de exigir `recommendedRamMb` em ordem crescente na lista de texto e passou a fixar os valores.
 - Lição: estimativa de RAM de modelo grande tem de ser comparada com o total do aparelho, não com a RAM livre do instante; e o `LocalModelsUiTest`
   que dependia de 1024/3072 precisou ser refeito com os valores medidos.
+
+## 2026-10-27 — Logo do fabricante nos cards de modelo local (equipe/logos-modelos)
+
+- `ModelSpec.vendor: ModelVendor?` (enum no `ModelCatalog.kt`) diz quem FAZ o modelo, não quem hospeda: Whisper = OpenAI, Parakeet = NVIDIA, Qwen3 = Alibaba Qwen,
+  SmolLM2 = Hugging Face, DeepSeek R1 = DeepSeek, Gemma 4 = Google. Todo modelo do catálogo declara o seu (`ModelCatalogTest`); o manifesto remoto aceita
+  `"vendor"` opcional e nome desconhecido vira `null` (card sem logo), não manifesto inválido. Visão e Voz seguem vazias: o PaddleOCR (Baidu) entra com a branch da Visão.
+- Desenho: `ModelVendorLogo` (`ui/config`), 15 dp ao lado do nome, alinhado ao topo. Paths novos em `KfIcons`: NVIDIA, Hugging Face e DeepSeek do Simple Icons
+  (CC0), Qwen do lobe-icons (MIT; a Simple Icons não tem a Qwen). Google e OpenAI reaproveitam os dos provedores. Créditos em `app/licenses/README.md`
+  (+ `MIT_lobe-icons.txt`) e na seção Licenças da aba Docs (`doc.json` do site regenerado).
+- Cor: a de marca da fonte, em qualquer tema, mas `legibleOn` a aproxima da cor do texto só até dar 3:1 contra o fundo do card (WCAG 1.4.11). Efeito: a OpenAI (preta)
+  vira cinza claro no tema escuro, o amarelo da Hugging Face escurece no claro e o azul da Qwen clareia no escuro, sem mudar o desenho.
+- Lição: o logo come largura do nome. No cartão INSTALADO o "Máxima qualidade" já cabia por ~14 dp (radio + botão Apagar); com o logo ele quebra em duas linhas.
+  Por isso o logo fica alinhado ao topo (acompanha a 1ª linha) e o golden de "preparando"/"pronto" do Parakeet instalado mudou de altura de propósito.
+- Lição: o `KfIconsTest` dividia os números do path por espaço e falhava com SVG compacto (`8.776-.231`, `.854.152`); agora usa regex de número, e a folga é de 1 unidade
+  fora do grid 24 (ponto de controle de curva do DeepSeek em -0,231).
+- `pool instrumentar` (63 testes dos painéis de modelo, todos passaram) termina com "Test mechanism: JSONException em `DeviceSettingsSnapshot.restoreOwnerState`" (arquivo do
+  snapshot do dono vazio no emulador). Medido: aparece igual em logs de outras frentes de horas antes (`/tmp/pool-instrumentar.7guu6lzd.log`, `q__ive7s`), então não é desta mudança.

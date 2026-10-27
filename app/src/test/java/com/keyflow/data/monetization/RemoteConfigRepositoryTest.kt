@@ -41,6 +41,7 @@ class RemoteConfigRepositoryTest {
 
         assertThat(first.config.products["credits_20"]?.minutes).isEqualTo(25)
         assertThat(first.models.single().id).isEqualTo("remote-fast")
+        assertThat(first.models.single().vendor).isEqualTo(com.keyflow.data.models.ModelVendor.NVIDIA)
         assertThat(first.configSource).isEqualTo(RemoteDocumentSource.NETWORK)
         assertThat(first.modelsSource).isEqualTo(RemoteDocumentSource.NETWORK)
         assertThat(second.config).isEqualTo(first.config)
@@ -122,6 +123,7 @@ class RemoteConfigRepositoryTest {
             "languages": "PT, EN",
             "engineType": "WHISPER",
             "kind": "SPEECH",
+            "vendor": "NVIDIA",
             "acceptsLanguageHint": true,
             "recommendedRamMb": 512,
             "modelName": "Whisper remoto",

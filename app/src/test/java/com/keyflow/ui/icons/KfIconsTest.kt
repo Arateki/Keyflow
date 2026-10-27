@@ -24,13 +24,16 @@ class KfIconsTest {
     @Test
     fun `absolute coordinates stay inside the 24 grid`() {
         // Só os números logo após comandos absolutos (maiúsculos) são coordenadas absolutas; os de
-        // arcos e relativos são deslocamentos — basta conferir que nada absoluto escapa do grid.
+        // arcos e relativos são deslocamentos — basta conferir que nada absoluto escapa do grid. A folga de 1 é dos pontos de
+        // controle das curvas dos logos de marca (o DeepSeek tem um em -0,231), que podem passar da borda sem o desenho passar.
         val absolute = Regex("""[MLHVC]\s*([-\d.,\s]+)""")
+        // Número SVG compacto: "8.776-.231" são dois, ".854.152" também (o ponto depois de um decimal abre outro).
+        val number = Regex("""-?(?:\d+\.?\d*|\.\d+)""")
         KfIcons.all.forEach { icon ->
             (icon.strokes + icon.fills).forEach { d ->
                 absolute.findAll(d).flatMap { m ->
-                    m.groupValues[1].split(Regex("[,\\s]+")).filter { it.isNotBlank() }.map { it.toFloat() }
-                }.forEach { v -> assertThat(v).isIn(com.google.common.collect.Range.closed(0f, 24f)) }
+                    number.findAll(m.groupValues[1]).map { it.value.toFloat() }
+                }.forEach { v -> assertThat(v).isIn(com.google.common.collect.Range.closed(-1f, 25f)) }
             }
         }
     }
