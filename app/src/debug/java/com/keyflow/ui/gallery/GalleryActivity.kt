@@ -19,6 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import com.keyflow.ui.config.LocalModelPreparationClock
 import com.keyflow.ui.orb.LocalOrbClock
 import com.keyflow.ui.tour.LocalTourClock
 import androidx.core.view.WindowInsetsCompat
@@ -86,6 +87,7 @@ class GalleryActivity : ComponentActivity() {
             CompositionLocalProvider(
                 LocalOrbClock provides { GALLERY_ORB_TIME_MS },
                 LocalTourClock provides { GALLERY_ORB_TIME_MS },
+                LocalModelPreparationClock provides { 5000L },
             ) {
                 KeyFlowTheme(dark = dark) {
                     if (route != null) {

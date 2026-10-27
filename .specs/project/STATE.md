@@ -3049,3 +3049,44 @@ Dois motores com ferramentas ao lado do da Anthropic: `reasoning/openai/OpenAiAg
 - Outros modelos do Google para celular no HF (só listados, nenhum adicionado): Gemma 4 E2B (já no catálogo), 12B (6,9 GB, Apache-2.0), 26B-A4B (15,8 GB),
   EmbeddingGemma-2 (165 a 485 MB, Apache-2.0, repositórios `litert-community/embeddinggemma-2-*-litert-lm`); Gemma 3 1B (584 MB), Gemma 3 270M (304 MB),
   FunctionGemma 270M e EmbeddingGemma-300M ficam sob os Termos do Gemma e são gated (login); Gemma 3n E2B/E4B (3,66 e 4,92 GB) são `google/…-litert-lm`, gated manual.
+
+## Aquecimento de modelos locais — main, fora da v1 (2026-10-26)
+
+- O custo da primeira inferência do Parakeet pode ser antecipado na pré-carga existente: 1 s de silêncio,
+  no mesmo reconhecedor residente, sem texto visível. `InferenceServiceCore` torna a fila verificável na JVM;
+  carga, aquecimento, áudio real e descarga continuam no executor único do processo `:inference`.
+- Testes novos sem o aquecimento: **5 falhas em 8**. Após a implementação, os focados de voz/texto/estado/traduções:
+  **36/36** pelo pool (Deck). Prova de ordem com latches, sem temporização por sleeps; falha descartável/OOM
+  não apaga o modelo nem se repete automaticamente. Pedido real que carrega o modelo não paga inferência extra.
+- Acréscimo explícito do Yan: texto pré-carrega ao ser selecionado e instalado. `IReasoningService.preload`
+  compartilha fila/bind das gerações. Uma conversa LiteRT com "Oi" e `maxOutputToken=2` aquece prefill/decodificação;
+  fecha antes da conversa real, não reaproveita histórico e não limita a resposta real. A API foi conferida no
+  `classes.jar` 0.16.1. DeepSeek não precisa terminar o pensamento interno para concluir esses tokens descartáveis.
+- Whisper base/small ficam sem inferência extra por custo e ausência de ganho medido. Conferindo a fonte oficial
+  1.13.8, o encoder **não tem sempre 3000 quadros**: recebe `min(num_frames + 1000, 3000)` por padrão;
+  um silêncio de 1 s ainda paga ~10 s de padding. Não usar a antiga suposição de janela fixa para estimar custo.
+- O card recebe estado do cliente até o callback, que agora inclui aquecimento. Arco indeterminado + tempo decorrido,
+  sem porcentagem. `ModelPreparationTracker` distingue duas tentativas do mesmo modelo até no mesmo milissegundo;
+  StateFlow conflui valores iguais, portanto somente modelId/horário não bastam para a identidade do pedido.
+  Falha encerra o indicador e mantém aviso traduzido; resposta antiga não apaga o estado da seleção nova.
+- Sem carga de modelo ao só observar o fluxo da tela: observar `LocalTranscriber.modelPreparation` não cria o
+  transcritor nem varre arquivos na thread principal. A seleção explícita prepara em IO; texto mantém descarga após 120 s.
+  Com a pré-carga pela seleção, a configuração também solta o cliente de voz ao sair de Local/apagar a seleção,
+  mesmo com orbe/teclado desligados; pedidos pendentes terminam antes do unbind. Uma pré-carga atrasada
+  confere a identidade do pedido sob a trava da conexão, para não refazer o bind depois dessa liberação.
+- Falha JNI fatal ainda pode matar o processo isolado e pedir nova tentativa; capturar OOM Java não protege de lmkd.
+  Os 64.000 bytes de PCM e dois tokens não descrevem todos os buffers nativos nem medem bateria. Ganho no A32 depende do coordenador.
+- Primeira tentativa de validação adicional foi interrompida antes dos testes por `InsufficientInstanceCapacity`
+  da AWS Spot do pool; reenfileirado com `--sem-aws`, sem selecionar nó. Nenhum Gradle/emulador direto ou A32.
+
+### Pré-carga de texto e RAM (A32, 2026-10-26)
+
+- Medido no Galaxy A32 (3,7 GB, ~1,1–1,5 GB livres) com a guarda desligada: SmolLM2 1.7B morto pelo lmkd acima de ~1,7 GB de RSS
+  (~39 s de carga); DeepSeek R1 1.5B pico 1,74 GB (1º trecho 195 s, total 215 s); Gemma 4 E2B pico 1,73 GB (45 s / 52 s);
+  Qwen3 0.6B pico 1,66 GB (166 s / 173 s, resposta ruim). As estimativas do catálogo (`recommendedRamMb/2`) ficam abaixo desses picos
+  (correção delas é outra tarefa).
+- Lição: pré-carga é especulativa, então não pode usar só a guarda de quem pediu a geração. `RamGuard.enoughForPreload` exige
+  max(estimativa, 2048 MB) de RAM livre; sem isso o `:reasoning` responde OOM sem carregar, o card mostra "Pouca memória livre agora: o
+  modelo carrega no primeiro uso." e o primeiro pedido real segue a guarda comum. Estimativa 0 (motor de eco dos testes) não bloqueia.
+  Na prática, nenhum modelo de texto é pré-carregado no A32; o aquecimento de texto só vale em aparelhos com folga.
+- Instrumentados no Deck estouram o limite de ~9 min com sete classes juntas: rode em lotes (ex.: `LocalReasoningEngineTest ReasoningPanelTest`).

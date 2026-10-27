@@ -34,6 +34,8 @@ class ReasoningServiceCoreTest {
     private class FakeBackend(private val log: MutableList<String>, val id: String, override val requiresModelFile: Boolean = true) : LlmBackend {
         var loadThrows: Throwable? = null
         var generateThrows: Throwable? = null
+        var warmThrows: Throwable? = null
+        var warmHook: () -> Unit = {}
         val hooks = ArrayDeque<() -> Unit>()
         @Volatile var cancelCalled = false
         override fun load(model: LlmModel) { log += "load:$id"; loadThrows?.let { throw it } }
@@ -43,6 +45,7 @@ class ReasoningServiceCoreTest {
             generateThrows?.let { throw it }
             request.user.split(" ").forEach(onDelta)
         }
+        override fun warmUp() { log += "warm:$id"; warmHook(); warmThrows?.let { throw it } }
         override fun cancel() { cancelCalled = true; log += "cancel:$id" }
         override fun unload() { log += "unload:$id" }
     }
@@ -248,5 +251,112 @@ class ReasoningServiceCoreTest {
         run(c, model("a"))
         c.shutdown()
         assertThat(log).contains("unload:a")
+    }
+
+    @Test
+    fun `pre carga aquece uma vez sem entregar deltas e respeita troca de modelo`() {
+        val a = FakeBackend(log, "a")
+        val b = FakeBackend(log, "b")
+        val c = core(mapOf("a" to a, "b" to b))
+        repeat(2) {
+            val rec = Recorder()
+            c.preload(model("a"), rec)
+            rec.awaitFinish()
+            assertThat(rec.events).containsExactly("done")
+        }
+        val other = Recorder()
+        c.preload(model("b"), other)
+        other.awaitFinish()
+        assertThat(log).containsExactly("load:a", "warm:a", "unload:a", "load:b", "warm:b").inOrder()
+    }
+
+    @Test
+    fun `falha no aquecimento de texto inclusive OOM nao impede geracao nem repete tentativa`() {
+        listOf<Throwable>(IllegalStateException("falso"), OutOfMemoryError("falso")).forEach { failure ->
+            log.clear()
+            val a = FakeBackend(log, "a").apply { warmThrows = failure }
+            val c = core(mapOf("a" to a))
+            repeat(2) {
+                val rec = Recorder()
+                c.preload(model("a"), rec)
+                rec.awaitFinish()
+                assertThat(rec.events).containsExactly("done")
+            }
+            assertThat(run(c, model("a")).events).containsExactly("delta:um", "delta:dois", "done").inOrder()
+            assertThat(log).containsExactly("load:a", "warm:a", "generate:a").inOrder()
+        }
+    }
+
+    @Test
+    fun `geracao solicitada durante aquecimento de texto aguarda a mesma fila`() {
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val a = FakeBackend(log, "a").apply {
+            warmHook = { entered.countDown(); check(release.await(5, TimeUnit.SECONDS)) }
+        }
+        val c = core(mapOf("a" to a), executor = pool)
+        try {
+            val preload = Recorder()
+            c.preload(model("a"), preload)
+            assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue()
+            val real = Recorder()
+            c.generate(model("a"), request, real)
+            assertThat(real.events).isEmpty()
+            release.countDown()
+            preload.awaitFinish()
+            real.awaitFinish()
+            assertThat(real.events).containsExactly("delta:um", "delta:dois", "done").inOrder()
+            assertThat(log).containsExactly("load:a", "warm:a", "generate:a").inOrder()
+        } finally { release.countDown() }
+    }
+
+    @Test
+    fun `texto carregado pelo pedido real nao paga aquecimento extra na pre carga seguinte`() {
+        val a = FakeBackend(log, "a")
+        val c = core(mapOf("a" to a))
+        run(c, model("a"))
+        val rec = Recorder()
+        c.preload(model("a"), rec)
+        rec.awaitFinish()
+        assertThat(log).containsExactly("load:a", "generate:a").inOrder()
+    }
+
+    @Test
+    fun `texto descarregado por ociosidade aquece novamente quando selecionado`() {
+        val a = FakeBackend(log, "a")
+        val scheduler = FakeScheduler()
+        val c = core(mapOf("a" to a), sched = scheduler)
+        repeat(2) {
+            val rec = Recorder()
+            c.preload(model("a"), rec)
+            rec.awaitFinish()
+            scheduler.fireLast()
+        }
+        assertThat(log).containsExactly("load:a", "warm:a", "unload:a", "load:a", "warm:a", "unload:a").inOrder()
+    }
+
+    @Test
+    fun `pre carga com pouca RAM livre nao carrega nem aquece e o primeiro uso carrega normalmente`() {
+        val a = FakeBackend(log, "a")
+        // 1.500 MB livres: cabe na estimativa do catálogo (100), mas não no piso da pré-carga.
+        val c = core(mapOf("a" to a), availMb = 1_500)
+        val rec = Recorder()
+        c.preload(model("a"), rec)
+        rec.awaitFinish()
+        assertThat(rec.events).containsExactly("error:OOM")
+        assertThat(log).isEmpty()
+        assertThat(run(c, model("a")).events).containsExactly("delta:um", "delta:dois", "done").inOrder()
+        assertThat(log).containsExactly("load:a", "generate:a").inOrder()
+    }
+
+    @Test
+    fun `pre carga com RAM folgada carrega e aquece`() {
+        val a = FakeBackend(log, "a")
+        val c = core(mapOf("a" to a), availMb = 3_000)
+        val rec = Recorder()
+        c.preload(model("a"), rec)
+        rec.awaitFinish()
+        assertThat(rec.events).containsExactly("done")
+        assertThat(log).containsExactly("load:a", "warm:a").inOrder()
     }
 }

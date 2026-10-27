@@ -256,3 +256,22 @@ volta-N` no commit, com o teste e a 1ª linha do erro — o aviso antecipado. A 
 - Por que no CI e não em laço local: ~15 emuladores ao mesmo tempo (~10× mais voltas por hora), a própria
   máquina onde as falhas apareceram, e o computador do Yan livre. O emulador lento local
   (`systemd-run --user --scope -p CPUQuota=300%`) serve para reproduzir uma falha já achada.
+
+## Aquecimento de modelos locais (main, fora da v1)
+
+Spec: `.specs/features/local-model-warmup/`. Toda execução desta frente usa o pool, sem escolher nó.
+`InferenceServiceCoreTest` e `ReasoningServiceCoreTest` provam uma tentativa por carga, ordem da fila,
+conversa/áudio real após aquecimento e falhas descartáveis, inclusive OOM Java.
+`ModelPreparationTest` cobre seleção repetida, resposta antiga e filtro do card instalado/selecionado.
+
+Instrumentados afetados:
+`pool instrumentar InferenceServiceTest LocalTranscriberDeviceTest LocalReasoningEngineTest LiteRtWarmupTest ModelListTest LocalPanelTest ReasoningPanelTest`.
+`LiteRtWarmupTest` usa as classes reais 0.16.1 no Android (Java 21 não carrega na JVM 17 dos unitários),
+sem baixar pesos: limite de dois tokens só na conversa descartável, sem alterar a conversa real.
+Os testes de painel conferem que selecionar pede preparação; `ModelListTest` confere indicador/tempo e remoção ao ficar pronto.
+
+Rotas novas: `config-voz-local-preparando` e `config-raciocinio-local-preparando`, claro/escuro.
+`GalleryActivity` fixa `LocalModelPreparationClock` em 5000 ms; no app o relógio é monotônico e real.
+Capture por `pool telas` (que chama `scripts/verify-screens.sh`), confira os PNGs, rode `scripts/diff-screens.sh`
+e aprove somente os quatro goldens novos. Goldens anteriores devem continuar bit-idênticos.
+Não comparar tempos de áudios diferentes como se fossem um benchmark; tempo de carga/preparação é separado da primeira inferência.

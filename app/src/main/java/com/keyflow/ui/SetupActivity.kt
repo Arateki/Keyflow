@@ -22,6 +22,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.keyflow.ui.common.collectAsStateOnMain
+import com.keyflow.transcription.local.LocalTranscriber
+import com.keyflow.reasoning.local.LocalReasoningPreloader
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.core.shortcuts.BarsConfig
 import com.keyflow.core.shortcuts.ShortcutGrid
@@ -307,6 +310,9 @@ class SetupActivity : ComponentActivity() {
         activityScope.launch {
             settingsRepository.settingsFlow().collectLatest {
                 settings = it
+                if (it.source != com.keyflow.core.TranscriptionSource.LOCAL || it.localModelId == null) {
+                    LocalTranscriber.releaseIfCreated()
+                }
                 settingsLoaded = true
                 if (it.onboardingDone) startMonetizationIfNeeded()
                 // Primeira abertura: a interface assume o idioma do aparelho (PT/EN/ES; outros → inglês).
@@ -342,6 +348,8 @@ class SetupActivity : ComponentActivity() {
                     // Ler o snapshot aqui faz a composição reagir à chegada do manifesto; o catálogo
                     // global também é atualizado para SettingsRepository/ModelDownloader.
                     val remoteCatalog = remoteSnapshot.models
+                    val speechPreparation by LocalTranscriber.modelPreparation.state.collectAsStateOnMain()
+                    val textPreparation by LocalReasoningPreloader.preparation.state.collectAsStateOnMain()
                     ConfigScreen(
                         settings = settings,
                         permissions = permissions,
@@ -407,6 +415,7 @@ class SetupActivity : ComponentActivity() {
                             active = localSnapshot.active,
                             failures = localSnapshot.failures,
                             selectedId = settings.localModelId,
+                            preparation = speechPreparation,
                             deviceRamMb = localModels.deviceRamMb,
                         ),
                         reasoningModels = LocalModelsUi.compose(
@@ -416,6 +425,7 @@ class SetupActivity : ComponentActivity() {
                             active = localSnapshot.active,
                             failures = localSnapshot.failures,
                             selectedId = settings.reasoningLocalModelId,
+                            preparation = textPreparation,
                             deviceRamMb = localModels.deviceRamMb,
                         ),
                         visionModels = LocalModelsUi.compose(

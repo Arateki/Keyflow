@@ -116,6 +116,25 @@ class LocalReasoningEngineTest {
         assertTrue("a geração cancelada continuou no serviço ($elapsedMs ms)", elapsedMs < 3_000)
     }
 
+    @Test
+    fun preCargaPeloBinderTerminaSemDeltasEPreservaAGeracaoReal() = runBlocking {
+        val service = connection.acquire()
+        val done = java.util.concurrent.CountDownLatch(1)
+        val events = java.util.concurrent.CopyOnWriteArrayList<String>()
+        try {
+            service.preload(echo.toParcel(), object : IReasoningCallback.Stub() {
+                override fun onDelta(text: String) { events += "delta" }
+                override fun onDone() { events += "pronto"; done.countDown() }
+                override fun onError(kind: Int, message: String) { events += "erro:$kind"; done.countDown() }
+            })
+            assertTrue(done.await(20, java.util.concurrent.TimeUnit.SECONDS))
+            assertEquals(listOf("pronto"), events)
+            val real = engine().generate(ReasoningRequest(user = "fala real")).all()
+            assertEquals("fala real", text(real))
+            assertEquals(ReasoningEvent.Done, real.last())
+        } finally { connection.release() }
+    }
+
     private fun killReasoningProcess() {
         val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         val pid = manager.runningAppProcesses.orEmpty()

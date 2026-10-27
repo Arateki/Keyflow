@@ -12,6 +12,9 @@ internal interface LlmBackend {
 
     fun load(model: LlmModel)
 
+    /** Inferência curta e descartável, somente na pré-carga. Sem deltas ou conversa reaproveitada. */
+    fun warmUp() = Unit
+
     /** Bloqueia até acabar, entregando os trechos em [onDelta]. Cancelável por [cancel] de outra thread. */
     fun generate(request: ReasoningRequest, onDelta: (String) -> Unit)
 

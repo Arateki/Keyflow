@@ -22,17 +22,30 @@ class InferenceService : Service() {
     private val executor: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "inference")
     }
-    private val engine by lazy { SherpaEngine() }
+    private val core by lazy {
+        InferenceServiceCore(
+            engine = SherpaEngine(),
+            executor = executor,
+            fileExists = { File(it).isFile },
+            availableBytes = ::availableMemoryBytes,
+            onLoaded = { model, elapsed, available ->
+                Log.i(TAG, "${model.modelId}: carregado em $elapsed ms (${available shr 20} MB livres antes)")
+            },
+            onWarmed = { model, elapsed, failure ->
+                if (failure == null) Log.i(TAG, "${model.modelId}: aquecimento em $elapsed ms")
+                else Log.w(TAG, "${model.modelId}: aquecimento falhou após $elapsed ms; seguindo sem ele", failure)
+            },
+        )
+    }
 
     private val binder = object : ITranscriptionEngine.Stub() {
-        override fun preload(config: LocalModelConfig, cb: IEngineCallback) = submit(cb) {
-            ensureLoaded(EngineModel.fromParcel(config))
-            ""
-        }
+        override fun preload(config: LocalModelConfig, cb: IEngineCallback) =
+            core.preload({ EngineModel.fromParcel(config) }) { deliver(cb, it) }
 
-        override fun transcribe(config: LocalModelConfig, audioPath: String, cb: IEngineCallback) = submit(cb) {
-            val model = EngineModel.fromParcel(config)
-            ensureLoaded(model)
+        override fun transcribe(config: LocalModelConfig, audioPath: String, cb: IEngineCallback) = core.transcribe(
+            model = { EngineModel.fromParcel(config) },
+            reply = { deliver(cb, it) },
+        ) { engine, model ->
             val started = SystemClock.elapsedRealtime()
             val samples = try {
                 AudioDecoder.decodeToMono16k(File(audioPath))
@@ -57,54 +70,15 @@ class InferenceService : Service() {
 
     /** O unload entra na fila: nunca solta o modelo no meio de uma transcrição da thread do executor. */
     override fun onDestroy() {
-        executor.execute { engine.unload() }
+        core.shutdown()
         executor.shutdown()
         super.onDestroy()
-    }
-
-    private fun ensureLoaded(model: EngineModel) {
-        if (engine.isLoaded(model)) return
-        val missing = model.files.filterNot { File(it).isFile }
-        if (missing.isNotEmpty()) {
-            throw EngineFailure(EngineErrorKind.MODEL_MISSING, "faltam arquivos do ${model.modelId}: ${missing.map { File(it).name }}")
-        }
-        // Libera o modelo anterior antes de medir: a troca não precisa caber junto com ele.
-        engine.unload()
-        val available = availableMemoryBytes()
-        if (!MemoryGuard.enoughFor(model.bytes, available)) {
-            throw EngineFailure(
-                EngineErrorKind.OOM,
-                "memória insuficiente para ${model.modelId}: ${available shr 20} MB livres, precisa de " +
-                    "${MemoryGuard.requiredBytes(model.bytes) shr 20} MB",
-            )
-        }
-        try {
-            val started = SystemClock.elapsedRealtime()
-            engine.load(model)
-            Log.i(TAG, "${model.modelId}: carregado em ${SystemClock.elapsedRealtime() - started} ms (${available shr 20} MB livres antes)")
-        } catch (e: IllegalArgumentException) {
-            throw EngineFailure(EngineErrorKind.ENGINE, "o engine recusou ${model.modelId}", e)
-        }
     }
 
     private fun availableMemoryBytes(): Long {
         val info = ActivityManager.MemoryInfo()
         getSystemService(ActivityManager::class.java).getMemoryInfo(info)
         return info.availMem
-    }
-
-    private fun submit(cb: IEngineCallback, work: () -> String) {
-        executor.execute {
-            val outcome: Result<String> = try {
-                Result.success(work())
-            } catch (e: OutOfMemoryError) {
-                engine.unload()
-                Result.failure(EngineFailure(EngineErrorKind.OOM, "memória esgotada durante a transcrição", e))
-            } catch (e: Exception) {
-                Result.failure(e)
-            }
-            deliver(cb, outcome)
-        }
     }
 
     private fun deliver(cb: IEngineCallback, outcome: Result<String>) {

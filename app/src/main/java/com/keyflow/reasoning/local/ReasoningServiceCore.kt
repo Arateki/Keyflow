@@ -17,6 +17,7 @@ internal class ReasoningServiceCore(
     private val availableMb: () -> Long?,
     private val scheduler: IdleScheduler,
     private val executor: Executor,
+    private val onWarmed: (LlmModel, Long, Throwable?) -> Unit = { _, _, _ -> },
 ) {
     /** Quem recebe a resposta. Depois de um [cancel], nada mais é entregue à geração cancelada. */
     interface Listener {
@@ -38,6 +39,43 @@ internal class ReasoningServiceCore(
 
     fun generate(model: LlmModel, request: ReasoningRequest, listener: Listener) {
         executor.execute { run(model, request, listener) }
+    }
+
+    /** Seleção explícita: carrega e aquece uma vez, antes do primeiro prompt. Mesma fila das gerações. */
+    fun preload(model: LlmModel, listener: Listener) {
+        executor.execute {
+            busy = true
+            idleTimer?.cancel()
+            idleTimer = null
+            useToken++
+            try {
+                val fresh = backend == null || loadedId != model.modelId
+                val active = ensureLoaded(model, preload = true)
+                if (fresh) {
+                    val started = System.nanoTime()
+                    val failure = try {
+                        active.warmUp()
+                        null
+                    } catch (e: OutOfMemoryError) {
+                        e
+                    } catch (e: Exception) {
+                        e
+                    }
+                    onWarmed(model, (System.nanoTime() - started) / 1_000_000L, failure)
+                }
+                listener.onDone()
+            } catch (e: ReasoningFailure) {
+                listener.onError(e.kind, e.message.orEmpty())
+            } catch (e: OutOfMemoryError) {
+                unloadCurrent()
+                listener.onError(ReasoningErrorKind.OOM, "memória esgotada durante a pré-carga")
+            } catch (e: Exception) {
+                listener.onError(ReasoningErrorKind.ENGINE, e.message ?: e.toString())
+            } finally {
+                busy = false
+                scheduleIdleUnload(model)
+            }
+        }
     }
 
     /** Interrompe a geração em curso (RRUN-06). Sem geração em curso, não faz nada além de silenciar a próxima já enfileirada. */
@@ -81,7 +119,7 @@ internal class ReasoningServiceCore(
         }
     }
 
-    private fun ensureLoaded(model: LlmModel): LlmBackend {
+    private fun ensureLoaded(model: LlmModel, preload: Boolean = false): LlmBackend {
         backend?.let { if (loadedId == model.modelId) return it }
         // Libera o anterior antes de medir e carregar: a troca não precisa caber junto com ele.
         unloadCurrent()
@@ -94,6 +132,13 @@ internal class ReasoningServiceCore(
             throw ReasoningFailure(
                 ReasoningErrorKind.OOM,
                 "memória insuficiente para ${model.modelId}: $available MB livres, precisa de ${model.ramEstimateMb} MB",
+            )
+        }
+        // Pré-carga especulativa: com pouca folga não carrega (o lmkd poderia matar mais que o processo do modelo).
+        if (preload && !RamGuard.enoughForPreload(available, model.ramEstimateMb)) {
+            throw ReasoningFailure(
+                ReasoningErrorKind.OOM,
+                "pré-carga de ${model.modelId} adiada: $available MB livres, piso de ${RamGuard.PRELOAD_FLOOR_MB} MB",
             )
         }
         try {

@@ -455,7 +455,33 @@ object RouteCatalog {
         Route("onboarding") { OnboardingRoute() },
         // PERM-04: o porquê de uma permissão aberto sob a linha (a do Teclado, que é a que FALTA no mock).
         Route("onboarding-why") { OnboardingRoute(explained = OnboardingPermission.KEYBOARD) },
-    ) + AgentGalleryRoutes.routes // agent-harness (AGT-T3..T5): o chat do agente, o painel de confirmação, os Ajustes e o registro
+    ) + AgentGalleryRoutes.routes + listOf(
+        // Aquecimento (main, fora da v1): dados fixos, sem carregar modelo ou iniciar download.
+        Route("config-voz-local-preparando") {
+            val spec = ModelCatalog.PARAKEET_V3
+            ConfigVozRoute(
+                TranscriptionSource.LOCAL,
+                localModelId = spec.id,
+                localModels = LocalModelsUi.compose(
+                    catalog = listOf(spec), installed = setOf(spec.id), active = null, failures = emptyMap(),
+                    selectedId = spec.id, deviceRamMb = 8192,
+                    preparation = com.keyflow.data.models.ModelPreparation(spec.id, 0),
+                ),
+            )
+        },
+        Route("config-raciocinio-local-preparando") {
+            val spec = ModelCatalog.QWEN3_0_6B
+            ConfigReasoningRoute(
+                localModelId = spec.id,
+                ready = true,
+                localModels = LocalModelsUi.compose(
+                    catalog = listOf(spec), installed = setOf(spec.id), active = null, failures = emptyMap(),
+                    selectedId = spec.id, deviceRamMb = 8192,
+                    preparation = com.keyflow.data.models.ModelPreparation(spec.id, 0),
+                ),
+            )
+        },
+    )
 
     private val byKey: Map<String, Route> = routes.associateBy { it.key }
 
