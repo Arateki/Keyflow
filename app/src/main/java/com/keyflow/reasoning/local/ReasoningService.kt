@@ -27,6 +27,7 @@ class ReasoningService : Service() {
             backendFor = { model -> ReasoningBackends.create(model, cacheDir.path) },
             fileExists = { File(it).isFile },
             availableMb = ::availableMemoryMb,
+            totalMb = ::totalMemoryMb,
             scheduler = object : IdleScheduler {
                 override fun schedule(delayMs: Long, block: () -> Unit): Cancellable {
                     val future = timer.schedule(block, delayMs, TimeUnit.MILLISECONDS)
@@ -63,6 +64,12 @@ class ReasoningService : Service() {
         worker.shutdown()
         timer.shutdownNow()
         super.onDestroy()
+    }
+
+    private fun totalMemoryMb(): Long {
+        val info = ActivityManager.MemoryInfo()
+        getSystemService(ActivityManager::class.java).getMemoryInfo(info)
+        return info.totalMem shr 20
     }
 
     private fun availableMemoryMb(): Long {
