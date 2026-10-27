@@ -157,7 +157,9 @@ Nomes e números de versão da API C **conferidos no `onnxruntime_c_api.h` da 1.
   `languages/latin/rec.onnx` (7.862.832 B, `614ffc2d6d3902d360fad7f1b0dd455ee45e877069d14c4e51a99dc4ef144409`), dicionário
   `languages/latin/dict.txt` (1.634 B, `3c0a8a79b612653c25f765271714f71281e4e955962c153e272b7b8c1d2b13ff`). Total
   10.294.339 B. SHA recalculados baixando os arquivos em 2026-10-24; os três respondem 206 a `Range`. Licença do cartão:
-  Apache-2.0 (pesos do PaddleOCR). Plano B: o par do `deepghs/paddleocr` (context V3). A VC-T2a refaz a conferência.
+  Apache-2.0 (pesos do PaddleOCR). Plano B: o par do `deepghs/paddleocr` (context V3). A VC-T2a refez a conferência em
+  2026-10-27 (valores acima confirmados: commit = HEAD do repositório, `lfs.oid`, download e `Range` 206) e a entrada nasceu com
+  `validatedOnDevice = false` (só no debug até o OCR rodar num aparelho).
 - **Saem** as cinco entradas de `ModelCatalog.VISION` com dados fabricados (SHA sequenciais, commits inventados, "ML Kit
   OCR Latin" como `.bin`): `ocr-fast-latin`, `mobilenet-v4-ocr`, `pp-ocrv4-multilingual`, `florence-2-nano`,
   `smolvlm-500m`. Os VLMs voltam na fase 2 com dados reais.

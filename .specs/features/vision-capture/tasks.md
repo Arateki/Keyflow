@@ -55,7 +55,7 @@ leva à aba Visão e o gesto de texto só funciona de ponta a ponta com o downlo
   (`GestureScriptCatalogTest`), `SettingsRepositoryTest` (persistência do atalho e do destino; valor desconhecido →
   padrão) e `ShortcutActionSheetTest` (instrumentado, Compose).
 
-### VC-T2a — Entrada do OCR no `ModelCatalog` *(substitui a VC-T2 do ML Kit, revertida em `427b3d1`)*
+### VC-T2a — Entrada do OCR no `ModelCatalog` *(substitui a VC-T2 do ML Kit, revertida em `427b3d1`)* ✅ CONCLUÍDA (2026-10-27)
 - **What**: `FileRole` += `DETECTOR`, `RECOGNIZER`, `DICTIONARY`; `ModelCatalog.OCR_PADDLE_LATIN`
   (`id = "ocr-paddle-latin"`, `kind = VISION`, `engineType = OCR`, 3 arquivos) com URLs no commit `7b02d0a3…` do
   `monkt/paddleocr-onnx`, tamanhos e SHA-256 do design §8; licença Apache-2.0 registrada no comentário da entrada;
@@ -69,6 +69,16 @@ leva à aba Visão e o gesto de texto só funciona de ponta a ponta com o downlo
   URL da lista aponta para commit de 40 hex e todo SHA tem 64 hex sem padrão sequencial; `LocalModelsUi` lista só o OCR;
   suíte de unitários verde. Se na VC-T6 o par reprovar, a troca para o plano B (design §8/context V3) é só dado deste arquivo.
 - **Tests**: unit. **Gate**: `build` + `testDebugUnitTest`.
+- **Feito**: `FileRole` += `DETECTOR`/`RECOGNIZER`/`DICTIONARY`; `ModelCatalog.OCR_PADDLE_LATIN` + `VISION_ALL` (as cinco entradas
+  inventadas já tinham saído em 2026-10-24: `VISION` estava vazio). Pins refeitos em 2026-10-27, sem herdar o design: o commit
+  `7b02d0a3…` é o HEAD do `monkt/paddleocr-onnx`; tamanhos e `lfs.oid` da API do HF; os três arquivos baixados e recalculados
+  (`ee40e800…`, `614ffc2d…`, `3c0a8a79…`, batem); `Range` → 206 nos três; `scripts/verify-model-catalog.py` → 18 arquivos, 0 falhas
+  (comando e saída no `STATE.md`). Licença Apache-2.0 no cartão do `monkt` e nos de `PaddlePaddle/*` e no `LICENSE` do PaddleOCR;
+  texto em `app/licenses/Apache-2.0_paddleocr.txt`. **Desvio deliberado**: a entrada nasce com `validatedOnDevice = false` e
+  `VISION = visibleIn(VISION_ALL, DEBUG)` (como o texto não validado), porque nenhum motor roda o modelo ainda — o release não
+  oferece download de um OCR que não faz OCR; a Docs só cita a licença quando ele for promovido (VC-T6/T11 viram a chave). Testes:
+  `ModelCatalogTest` (pins, papéis, release x debug), `LocalModelsUiTest` (`EMPTY_VISION` = só o OCR), `DocsSectionsTest`;
+  `PinSanityTest`, `TranslationsTest` e `ArchitectureRulesTest` seguem verdes.
 
 ### VC-T2b — Runtime ONNX próprio (JNI sobre a `libonnxruntime.so` do AAR do sherpa)
 - **What**: (1) **ambiente**: provisionar NDK e CMake com versões fixas (`ndkVersion` no Gradle) em

@@ -407,6 +407,7 @@ val docsSections: List<DocSection> get() = listOf(
             DocBlock.Labeled("LiteRT-LM", tr("motor dos modelos de texto da aba Raciocínio, no aparelho — Apache 2.0 (Google).")),
             DocBlock.Labeled("Qwen3 0.6B", tr("modelo de texto Leve — Apache 2.0 (Alibaba), baixado sob demanda.")),
             *unvalidatedTextModelLicenses().toTypedArray(),
+            *visionModelLicenses().toTypedArray(),
             DocBlock.Labeled("AndroidSVG", tr("desenha os SVGs das skins importadas — Apache 2.0 (Cave Rock Software).")),
             DocBlock.Labeled("Gemma 4 E2B", tr("modelo de texto Equilibrado — Apache 2.0 (Google), baixado sob demanda.")),
             DocBlock.Labeled(tr("Dicionários do corretor"), tr("listas de palavras do teclado do Android (AOSP LatinIME) para português, inglês e espanhol — Apache 2.0.")),
@@ -444,6 +445,16 @@ private fun unvalidatedTextModelLicenses(): List<DocBlock> = buildList {
                 tr("modelo de texto Raciocínio (DeepSeek-R1-Distill-Qwen-1.5B) — MIT (DeepSeek), derivado do Qwen2.5 (Apache 2.0, Alibaba), baixado sob demanda."),
             ),
         )
+    }
+}
+
+/**
+ * Licença do modelo de OCR da Visão (`ModelCatalog.VISION_ALL`), no mesmo critério dos de texto: só é citado quando o release o oferece
+ * (`validatedOnDevice`), porque "baixado sob demanda" seria falso na loja enquanto a Visão não chega ao usuário.
+ */
+private fun visionModelLicenses(): List<DocBlock> = buildList {
+    if (ModelCatalog.OCR_PADDLE_LATIN.validatedOnDevice) {
+        add(DocBlock.Labeled("PaddleOCR", tr("modelo de leitura de texto da Visão (PP-OCR em ONNX) — Apache 2.0 (PaddlePaddle), baixado sob demanda.")))
     }
 }
 

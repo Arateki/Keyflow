@@ -56,6 +56,15 @@ integração ainda é ferramental útil."
   se o par escolhido reprovar na medição da VC-T6 (a troca é dado do catálogo).
 - Descartados: detector `PP-OCRv5_server_det` (88 MB, pesado demais para o MVP); Tesseract (qualidade pior em tela,
   registrado desde a V3 original).
+- **Descartado em 2026-10-27 (decisão já tomada, não reabrir): Indra OCR (`datalab-to/indra-ocr`).** Os pesos saem sob a "AI Pubs
+  OpenRAIL-M (Modified)", que **proíbe o uso por empresas com mais de US$ 20 milhões de receita/captação ou concorrentes da
+  Datalab** e impõe share-alike: não é licença permissiva, contraria a decisão 3. Além disso o pós-processamento só existe em
+  Python (reescrever para Kotlin/C), e o ganho do modelo é em documentos/PDF, fora do recorte do MVP (screenshots de tela).
+- **Conferência da VC-T2a (2026-10-27)**: o commit `7b02d0a3…` continua sendo o HEAD de `monkt/paddleocr-onnx`; `gated: false`; cartão
+  `license: apache-2.0` (o repositório não tem arquivo LICENSE); a origem `PaddlePaddle/PaddleOCR` é Apache-2.0 (LICENSE no GitHub) e
+  os cartões `PaddlePaddle/latin_PP-OCRv5_mobile_rec` e `PP-OCRv5_mobile_det` também. O README do `monkt` manda casar detector e
+  reconhecedor da mesma geração; o par escolhido mistura v3 (detector, 2,3 MB) e v5 (reconhecedor) de propósito, por peso — a VC-T6
+  mede o CER e, se perder por isso, troca (dado do catálogo).
 
 ## V4 — Captura: MediaProjection, consentimento por acionamento ✅ (decorrência do modo efêmero — V5)
 - Única rota sem AccessibilityService (D2 do projeto veta AccessibilityService).

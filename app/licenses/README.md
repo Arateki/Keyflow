@@ -12,6 +12,7 @@
 | Gemma 4 E2B (Google) — modelo de texto baixado sob demanda | Apache-2.0 | `Apache-2.0_gemma-4-e2b.txt` |
 | Gemma 4 E4B (Google) — modelo de texto baixado sob demanda (só no debug até a prova num aparelho) | Apache-2.0 | `Apache-2.0_gemma-4-e4b.txt` |
 | Qwen3 0.6B (Alibaba) — modelo de texto baixado sob demanda | Apache-2.0 | `Apache-2.0_qwen3-0.6b.txt` |
+| PaddleOCR PP-OCRv3/v5 em ONNX (PaddlePaddle; conversão de monkt) — modelo de OCR da Visão baixado sob demanda (só no debug até a prova num aparelho) | Apache-2.0 | `Apache-2.0_paddleocr.txt` |
 | SmolLM2 1.7B Instruct (Hugging Face) — modelo de texto baixado sob demanda | Apache-2.0 | `Apache-2.0_smollm2-1.7b.txt` |
 | DeepSeek-R1-Distill-Qwen 1.5B (DeepSeek, derivado do Qwen2.5) — modelo de texto baixado sob demanda | MIT (e Apache-2.0 do Qwen2.5) | `MIT_deepseek-r1-distill-qwen-1.5b.txt` |
 | AndroidSVG 1.4 (AAR, desenha os SVGs das skins importáveis) | Apache-2.0 | `Apache-2.0_androidsvg.txt` |
@@ -40,3 +41,8 @@ arquivo do DeepSeek traz as duas licenças. Os dois repositórios do `litert-com
 
 Conferida em 2026-10-26 (Gemma 4 E4B): `license: apache-2.0` e `gated: false` no card do `litert-community/gemma-4-E4B-it-litert-lm` (commit
 e6a3892a8c22cf87ff99583996149cf3cb32452b) e nas tags do original `google/gemma-4-E4B-it`; é a mesma licença do E2B, não os Termos do Gemma.
+
+Conferido em 2026-10-27 (vision-capture, VC-T2a): `license: apache-2.0` no card do `monkt/paddleocr-onnx` (commit
+`7b02d0a30a07ba2b92ad1ff5a8941ae2c633de65`, repositório `gated: false`, sem arquivo LICENSE) e nos cards
+`PaddlePaddle/latin_PP-OCRv5_mobile_rec` e `PaddlePaddle/PP-OCRv5_mobile_det`; o `LICENSE` do `PaddlePaddle/PaddleOCR` no GitHub é
+Apache-2.0 (a API do GitHub devolve `Apache-2.0`). O arquivo `Apache-2.0_paddleocr.txt` traz esse texto.

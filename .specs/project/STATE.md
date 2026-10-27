@@ -3154,3 +3154,31 @@ fala em `sintese-fala/context.md`). O que ficou de lição:
   `SMOLLM2_1_7B` a `PHI_3_5_MINI` têm commits e SHA-256 inventados (padrões sequenciais; os de texto repetem o fim do SHA do
   Qwen3). Só Qwen3 0.6B e Gemma 4 E2B são reais. Nenhuma é baixável: conferir cada uma por download antes de mostrar na UI
   (regra de ouro 8). A Visão conserta o seu `VISION` na VC-T2a; `VOICE` e as de texto ficam para quem for dono delas.
+
+## 2026-10-27 — vision-capture VC-T2a: entrada do OCR no catálogo (branch `equipe/visao`)
+
+- **Pins refeitos do zero, não herdados do design.** `monkt/paddleocr-onnx`, commit
+  `7b02d0a30a07ba2b92ad1ff5a8941ae2c633de65` (HEAD do repositório em 2026-10-27; `gated: false`). Tamanhos e `lfs.oid` pela API
+  (`/api/models/monkt/paddleocr-onnx/tree/<commit>/<pasta>`), SHA-256 recalculado baixando os arquivos
+  (`curl -sL …/resolve/<commit>/<caminho> | sha256sum`) e `Range: bytes=0-0` → 206 nos três: `detection/v3/det.onnx` 2.429.873 B
+  `ee40e800…`; `languages/latin/rec.onnx` 7.862.832 B `614ffc2d…`; `languages/latin/dict.txt` 1.634 B `3c0a8a79…` (fora do LFS). Total
+  10.294.339 B. Os valores do design §8 batiam. `python3 scripts/verify-model-catalog.py` → "18 arquivos conferidos: 0 falha(s), 0
+  licença(s) a revisar" (inclui `OCR_PADDLE_LATIN` e `monkt/paddleocr-onnx: apache-2.0`).
+- **Licença**: o repositório do `monkt` **não tem arquivo LICENSE**, só `license: apache-2.0` no cartão. A cadeia fecha pela origem:
+  `PaddlePaddle/PaddleOCR` (LICENSE Apache-2.0 no GitHub, "Copyright (c) 2016 PaddlePaddle Authors") e os cartões
+  `PaddlePaddle/latin_PP-OCRv5_mobile_rec` e `PP-OCRv5_mobile_det` (`apache-2.0`). O texto vai em
+  `app/licenses/Apache-2.0_paddleocr.txt` com a nota de que a conversão para ONNX é de terceiro (monkt). Risco aceito: a conversão
+  não tem procedência verificável além do cartão (não há script nem hash do original Paddle).
+- **O par mistura v3 e v5.** O README do `monkt` manda casar detector e reconhecedor da mesma geração; o detector v3 (2,3 MB) com o
+  reconhecedor v5 latino é escolha de peso (o detector v5 tem 84 MB). Quem decide é o CER da VC-T6; se perder por isso, troca-se o
+  dado do catálogo (plano B: `deepghs/paddleocr`, `license: other`).
+- **Indra OCR descartado** (avaliado em 2026-10-27): pesos sob "AI Pubs OpenRAIL-M (Modified)" (proíbe empresas com mais de US$ 20
+  milhões de receita/captação e concorrentes da Datalab; share-alike), pós-processamento só em Python, ganho em documentos/PDF. Ver
+  `vision-capture/context.md` V3.
+- **Entrada nasce escondida do release.** `validatedOnDevice = false` e `ModelCatalog.VISION = visibleIn(VISION_ALL, DEBUG)`, no molde
+  do texto não validado: sem `OcrEngine` (VC-T6) e sem runtime (VC-T2b), oferecer o download na loja seria baixar 10 MB que nada usa.
+  A Docs só cita a licença quando a flag virar `true` (`DocsSectionsTest` cobre os dois lados). Quem promover o OCR muda a flag e
+  confere o `doc.json` do site.
+- As cinco entradas inventadas de `VISION` já tinham saído em 2026-10-24 (a lista estava vazia); nada a remover além de ajustar os
+  testes que assumiam lista vazia. Goldens: `pool telas` com o build desta branch (230 PNGs) e `scripts/diff-screens.sh` (precisa do ImageMagick de `/srv/dev/ferramentas/bin` no PATH) → 230/230 dentro do limiar, todos com 0 px de diferença; nada aprovado, nada a restaurar.
+

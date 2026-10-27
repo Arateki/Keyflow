@@ -16,9 +16,10 @@ enum class EngineType { WHISPER, TRANSDUCER, LITERT_LM, OCR, TTS }
 
 /**
  * Papel de cada arquivo no modelo — o engine monta a config por papel, não pelo nome do arquivo.
- * [MODEL] é o arquivo único `.litertlm` dos modelos de texto.
+ * [MODEL] é o arquivo único `.litertlm` dos modelos de texto. [DETECTOR], [RECOGNIZER] e [DICTIONARY] são os três
+ * arquivos do OCR (vision-capture): detector de linhas de texto, reconhecedor CTC e a lista de caracteres dele.
  */
-enum class FileRole { ENCODER, DECODER, JOINER, TOKENS, MODEL }
+enum class FileRole { ENCODER, DECODER, JOINER, TOKENS, MODEL, DETECTOR, RECOGNIZER, DICTIONARY }
 
 data class ModelFile(
     val role: FileRole,
@@ -88,6 +89,8 @@ object ModelCatalog {
     private const val WHISPER_BASE_REPO = "https://huggingface.co/csukuangfj/sherpa-onnx-whisper-base/resolve/bb53ee204431c90d314c1cc08d28d23e5b7927cc"
     private const val WHISPER_SMALL_REPO = "https://huggingface.co/csukuangfj/sherpa-onnx-whisper-small/resolve/8f3c18b358db4d1f2fc1eae49d75cd20989e4309"
     private const val PARAKEET_REPO = "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/2bda32ec70b097a55adaa07d9a7173915b43cc78"
+
+    private const val OCR_PADDLE_REPO = "https://huggingface.co/monkt/paddleocr-onnx/resolve/7b02d0a30a07ba2b92ad1ff5a8941ae2c633de65"
 
     // Os dois Whisper multilíngues usam o mesmo vocabulário: tokens.txt byte a byte igual.
     private const val WHISPER_TOKENS_SHA256 = "b34b360dbb493e781e479794586d661700670d65564001f23024971d1f2fa126"
@@ -327,11 +330,56 @@ object ModelCatalog {
     val TEXT: List<ModelSpec> = visibleIn(TEXT_ALL, BuildConfig.DEBUG)
 
     /**
-     * Modelos de visão e OCR (aba Visão). Vazia de propósito: as cinco entradas antigas tinham repositório, commit e
-     * SHA-256 inventados (nenhum download funcionava) e saíram em 2026-10-24. A Visão está sendo refeita na branch
-     * `equipe/visao` (VC-T2a), que traz entradas novas — só com pin conferido por `scripts/verify-model-catalog.py`.
+     * OCR da Visão (vision-capture, VC-T2a): PaddleOCR em ONNX, par do repositório `monkt/paddleocr-onnx` — detector
+     * PP-OCRv3 mobile (`detection/v3/det.onnx`) + reconhecedor PP-OCRv5 mobile para o alfabeto latino
+     * (`languages/latin/rec.onnx`) + o dicionário dele (`languages/latin/dict.txt`), 10.294.339 B no total.
+     *
+     * Licença: Apache-2.0. O cartão do repositório diz `license: apache-2.0` e a origem, `PaddlePaddle/PaddleOCR` (e os cartões
+     * `PaddlePaddle/latin_PP-OCRv5_mobile_rec`), é Apache-2.0; o texto está em `app/licenses/Apache-2.0_paddleocr.txt`. O
+     * repositório não traz arquivo `LICENSE`. Pins conferidos em 2026-10-27: o commit é o HEAD do repositório, os tamanhos e o
+     * `lfs.oid` vêm da API do HF, os SHA-256 foram recalculados baixando os três arquivos e os três respondem 206 a `Range`
+     * (`scripts/verify-model-catalog.py`). Plano B, se o par reprovar na VC-T6: `deepghs/paddleocr` (`license: other`; ver
+     * `.specs/features/vision-capture/context.md` V3) — a troca é só dado deste arquivo.
+     *
+     * O README do repositório manda casar detector e reconhecedor da mesma geração (v3 com v3, v5 com v5). Este par mistura as duas
+     * de propósito, porque o detector v5 tem 84 MB; se a VC-T6 medir perda de qualidade por causa disso, o par muda.
+     *
+     * `validatedOnDevice = false`: nenhum motor roda o modelo ainda (VC-T2b e VC-T6), então o release não o oferece; só o debug.
      */
-    val VISION: List<ModelSpec> = emptyList()
+    val OCR_PADDLE_LATIN = ModelSpec(
+        id = "ocr-paddle-latin",
+        displayName = trKey("Leitura de texto"),
+        summary = trKey("Lê o texto de uma captura de tela, no aparelho."),
+        languages = trKey("Alfabeto latino"),
+        engineType = EngineType.OCR,
+        acceptsLanguageHint = false,
+        // ESTIMATIVA, não medida: o modelo em disco tem ~10 MB; a meta do design é pico ≤ 250 MB com a tela cheia em faixas. A medir
+        // no A32 (VC-T6).
+        recommendedRamMb = 512,
+        modelName = "PaddleOCR",
+        kind = ModelKind.VISION,
+        validatedOnDevice = false,
+        files = listOf(
+            ModelFile(
+                FileRole.DETECTOR, "det.onnx", "$OCR_PADDLE_REPO/detection/v3/det.onnx",
+                "ee40e80071ba3a320d4efda75f3e22047a7d049e9bf7bcaaf9daea23fc21b935", 2_429_873L,
+            ),
+            ModelFile(
+                FileRole.RECOGNIZER, "rec.onnx", "$OCR_PADDLE_REPO/languages/latin/rec.onnx",
+                "614ffc2d6d3902d360fad7f1b0dd455ee45e877069d14c4e51a99dc4ef144409", 7_862_832L,
+            ),
+            ModelFile(
+                FileRole.DICTIONARY, "dict.txt", "$OCR_PADDLE_REPO/languages/latin/dict.txt",
+                "3c0a8a79b612653c25f765271714f71281e4e955962c153e272b7b8c1d2b13ff", 1_634L,
+            ),
+        ),
+    )
+
+    /** Todos os modelos de visão e OCR conhecidos, validados ou não. As cinco entradas antigas (pins inventados) saíram em 2026-10-24. */
+    val VISION_ALL: List<ModelSpec> = listOf(OCR_PADDLE_LATIN)
+
+    /** Modelos de visão e OCR (aba Visão), como este build os mostra: o OCR só no debug até ser validado (VC-T6). */
+    val VISION: List<ModelSpec> = visibleIn(VISION_ALL, BuildConfig.DEBUG)
 
     /**
      * Modelos de voz e síntese (aba Voz). Vazia de propósito: as quatro entradas antigas tinham pins inventados e

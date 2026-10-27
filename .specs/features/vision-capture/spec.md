@@ -182,7 +182,7 @@ promessa de privacidade e o APK enxuto.
 | OCR-02 | P1-C | VC-T6, VC-T7 | In Tasks |
 | OCR-03 | P1-C | VC-T2b, VC-T6, VC-T14 | In Tasks |
 | OCR-04 | P1-C | VC-T7, VC-T11 | In Tasks |
-| MDL-01 | P1-G | VC-T2a | In Tasks |
+| MDL-01 | P1-G | VC-T2a | Implemented |
 | MDL-02 | P1-G | VC-T7, VC-T11 | In Tasks |
 | MDL-03 | P1-G | VC-T2b, VC-T13 | In Tasks |
 | MDL-04 | P1-G | VC-T6, VC-T9 | In Tasks |
