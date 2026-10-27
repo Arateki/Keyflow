@@ -195,7 +195,11 @@ private fun ModelCard(
                 KfRadio(item.selected, Modifier.padding(end = 12.dp))
             }
             Column(Modifier.weight(1f)) {
-                Text(tr(spec.displayName), color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Normal, fontSize = 13.sp)
+                // Alinhado ao topo: se o nome quebrar (fonte grande, cartão instalado), o logo fica na primeira linha.
+                Row(verticalAlignment = Alignment.Top) {
+                    spec.vendor?.let { ModelVendorLogo(it, size = 15.dp, modifier = Modifier.padding(end = 6.dp, top = 1.dp)) }
+                    Text(tr(spec.displayName), color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Normal, fontSize = 13.sp)
+                }
                 if (spec.modelName.isNotBlank()) {
                     Text(spec.modelName, color = palette.muted, fontFamily = SpaceMono, fontWeight = FontWeight.Light, fontSize = 9.5.sp)
                 }

@@ -175,6 +175,7 @@
             {"tipo": "rotulado", "rotulo": "Gemma 4 E2B", "texto": "modelo de texto Equilibrado — Apache 2.0 (Google), baixado sob demanda."},
             {"tipo": "rotulado", "rotulo": "Gemma 4 E4B", "texto": "modelo de texto Avançado — Apache 2.0 (Google), baixado sob demanda."},
             {"tipo": "rotulado", "rotulo": "AndroidSVG", "texto": "desenha os SVGs das skins importadas — Apache 2.0 (Cave Rock Software)."},
+            {"tipo": "rotulado", "rotulo": "Logos dos fabricantes", "texto": "desenhos do Simple Icons (CC0) e do lobe-icons (MIT, LobeHub); as marcas são dos donos."},
             {"tipo": "rotulado", "rotulo": "Dicionários do corretor", "texto": "listas de palavras do teclado do Android (AOSP LatinIME) para português, inglês e espanhol — Apache 2.0."},
             {"tipo": "rotulado", "rotulo": "Space Grotesk e Space Mono", "texto": "fontes — SIL Open Font License 1.1."}
           ]
@@ -363,6 +364,7 @@
             {"tipo": "rotulado", "rotulo": "Gemma 4 E2B", "texto": "Balanced text model — Apache 2.0 (Google), downloaded on demand."},
             {"tipo": "rotulado", "rotulo": "Gemma 4 E4B", "texto": "Advanced text model — Apache 2.0 (Google), downloaded on demand."},
             {"tipo": "rotulado", "rotulo": "AndroidSVG", "texto": "draws the SVGs of imported skins — Apache 2.0 (Cave Rock Software)."},
+            {"tipo": "rotulado", "rotulo": "Manufacturer logos", "texto": "drawings from Simple Icons (CC0) and lobe-icons (MIT, LobeHub); the trademarks belong to their owners."},
             {"tipo": "rotulado", "rotulo": "Spell checker dictionaries", "texto": "word lists from the Android keyboard (AOSP LatinIME) for Portuguese, English and Spanish — Apache 2.0."},
             {"tipo": "rotulado", "rotulo": "Space Grotesk and Space Mono", "texto": "fonts — SIL Open Font License 1.1."}
           ]
