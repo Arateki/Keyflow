@@ -25,6 +25,23 @@ e do Whisper no GitHub; a do Parakeet no card do Hugging Face (`license: cc-by-4
 Hugging Face dos pesos do Whisper declaram Apache-2.0; o repositório oficial da OpenAI declara MIT para
 código e pesos — vale a atribuição das duas, e a aba Docs cita ambas.
 
+## Candidatas de Raciocínio só no debug (2026-10-27)
+
+Não aparecem na Docs/site enquanto `validatedOnDevice = false`, como o OCR ainda não validado. Licenças registradas mesmo assim:
+
+| Modelo | Licença | Arquivo |
+| --- | --- | --- |
+| FunctionGemma 270M | Termos do Gemma | `Gemma_functiongemma-270m.txt` |
+| Qwen2.5-Coder 1.5B | Apache-2.0 | `Apache-2.0_qwen2.5-coder-1.5b.txt` |
+| SmolLM3 3B | Apache-2.0 | `Apache-2.0_smollm3-3b.txt` |
+| Granite 4.2 3B | Apache-2.0 | `Apache-2.0_granite-4.2-3b.txt` |
+| Nanbeige4.2 3B | Apache-2.0 | `Apache-2.0_nanbeige-4.2-3b.txt` |
+| Qwen3.5 4B | Apache-2.0 | `Apache-2.0_qwen3.5-4b.txt` |
+
+FunctionGemma: [a documentação oficial](https://ai.google.dev/gemma/docs/functiongemma) permite uso comercial responsável, sujeito aos [Termos do Gemma](https://ai.google.dev/gemma/terms) (2026-04-01), com cópia dos termos, aviso e restrições de uso (3.1/3.2); não é Apache-2.0. A política de uso e o NOTICE acompanham o arquivo de licença. Antes de promovê-lo ao release, incorporar as obrigações ao fluxo de distribuição.
+
+IBM: path e cor `#0F62FE` de [lobe-icons, commit 8b7bbc4](https://github.com/lobehub/lobe-icons/blob/8b7bbc433d38437fa2b0cca58ae896917162b812/src/IBM/components/Mono.tsx), MIT; texto em `MIT_lobe-icons.txt`. Nanbeige: sem fonte CC0/MIT de logo encontrada; nenhum símbolo genérico nem marca de outro fabricante foi usado.
+
 Conferidas em 2026-09-30 (reasoning-models): o `LICENSE` e o `THIRD_PARTY_NOTICE.txt` vêm do próprio AAR do LiteRT-LM
 0.16.1; as licenças dos dois modelos de texto, dos cards do Hugging Face (`license: apache-2.0` nos dois). O Gemma 3 1B
 NÃO está no catálogo (repositório gated, licença Gemma) — se entrar um dia, precisa dos Termos do Gemma, não da Apache.

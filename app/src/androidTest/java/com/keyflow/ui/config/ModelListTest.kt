@@ -109,10 +109,11 @@ class ModelListTest {
     @Test
     fun theTextCardsCarryTheirOwnVendorLogo() {
         rule.setContent { Host(text(installed = emptySet()), FakeActions(), ModelListTags.Raciocinio) }
-        rule.onAllNodesWithTag("model-vendor-qwen").assertCountEquals(2)
-        rule.onNodeWithTag("model-vendor-hugging_face").assertExists()
+        rule.onAllNodesWithTag("model-vendor-qwen").assertCountEquals(4)
+        rule.onAllNodesWithTag("model-vendor-hugging_face").assertCountEquals(2)
         rule.onNodeWithTag("model-vendor-deepseek").assertExists()
-        rule.onAllNodesWithTag("model-vendor-google").assertCountEquals(2)
+        rule.onAllNodesWithTag("model-vendor-google").assertCountEquals(3)
+        rule.onNodeWithTag("model-vendor-ibm").assertExists()
     }
 
     /** Só informativo: Qwen3 e Gemma 4 suportam pensamento, o DeepSeek sempre pensa; Qwen2.5 e SmolLM2 não ganham linha. */

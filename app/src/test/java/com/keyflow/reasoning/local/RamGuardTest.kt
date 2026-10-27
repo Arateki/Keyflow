@@ -72,7 +72,7 @@ class RamGuardTest {
     fun `on a 6 GB tablet SmolLM2 loads and the E4B is refused`() {
         val total = 5_700L
         val free = 2_300L
-        ModelCatalog.TEXT_ALL.filter { it != ModelCatalog.GEMMA_4_E4B }.forEach {
+        ModelCatalog.visibleIn(ModelCatalog.TEXT_ALL, debug = false).filter { it != ModelCatalog.GEMMA_4_E4B }.forEach {
             assertThat(RamGuard.enough(free, estimate(it), total)).isTrue()
         }
         assertThat(RamGuard.enough(free, estimate(ModelCatalog.GEMMA_4_E4B), total)).isFalse()
@@ -80,8 +80,10 @@ class RamGuardTest {
 
     /** Vaio TL10 (~7,6 GB; 4,8 GB livres): o E4B rodou a 4,4–4,5 GB. */
     @Test
-    fun `on an 8 GB device every text model loads`() {
-        ModelCatalog.TEXT_ALL.forEach { assertThat(RamGuard.enough(4_800L, estimate(it), 7_400L)).isTrue() }
+    fun `on an 8 GB device every proven text model loads`() {
+        ModelCatalog.visibleIn(ModelCatalog.TEXT_ALL, debug = false).forEach {
+            assertThat(RamGuard.enough(4_800L, estimate(it), 7_400L)).isTrue()
+        }
     }
 
     @Test

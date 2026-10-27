@@ -186,9 +186,10 @@ class LocalModelsUiTest {
         assertThat(five.item(gemma).heavy).isFalse()
         assertThat(five.item(smol).heavy).isTrue()
         assertThat(five.item(gemmaE4b).heavy).isTrue()
-        // 6,5 GB: só o Avançado pesa. Um aparelho de 8 GB mostra ~7,4 GB e ainda vê o aviso do Avançado (8192).
-        assertThat(textUi(ramMb = 6_500).items.filter { it.heavy }.map { it.spec.id }).containsExactly(gemmaE4b)
-        assertThat(textUi(ramMb = 7_400).items.filter { it.heavy }.map { it.spec.id }).containsExactly(gemmaE4b)
+        // 6,5/7,4 GB: o Avançado e as candidatas com estimativa de 8192 MB ainda mostram o aviso.
+        val heaviest = listOf(gemmaE4b, ModelCatalog.NANBEIGE_4_2_3B.id, ModelCatalog.QWEN3_5_4B.id)
+        assertThat(textUi(ramMb = 6_500).items.filter { it.heavy }.map { it.spec.id }).containsExactlyElementsIn(heaviest)
+        assertThat(textUi(ramMb = 7_400).items.filter { it.heavy }.map { it.spec.id }).containsExactlyElementsIn(heaviest)
         assertThat(textUi(ramMb = 12_000).items.none { it.heavy }).isTrue()
     }
 
