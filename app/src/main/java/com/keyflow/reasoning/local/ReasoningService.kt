@@ -34,6 +34,10 @@ class ReasoningService : Service() {
                 }
             },
             executor = worker,
+            onWarmed = { model, elapsed, failure ->
+                if (failure == null) Log.i(TAG, "${model.modelId}: aquecimento em $elapsed ms")
+                else Log.w(TAG, "${model.modelId}: aquecimento falhou após $elapsed ms; seguindo sem ele", failure)
+            },
         )
     }
 
@@ -45,6 +49,9 @@ class ReasoningService : Service() {
                 CallbackListener(cb),
             )
         }
+
+        override fun preload(config: LocalLlmConfig, cb: IReasoningCallback) =
+            core.preload(LlmModel.fromParcel(config), CallbackListener(cb))
 
         override fun cancel() = core.cancel()
     }

@@ -6,6 +6,7 @@ import com.keyflow.data.models.DownloadProgress
 import com.keyflow.data.models.DownloadState
 import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.ModelSpec
+import com.keyflow.data.models.ModelPreparation
 import com.keyflow.data.models.StartResult
 import kotlin.math.roundToInt
 
@@ -23,6 +24,8 @@ data class LocalModelItem(
     val heavy: Boolean = false,
     /** Último download que falhou (DLM-02) — some ao tentar de novo. */
     val failure: DownloadFailure? = null,
+    /** Carga e aquecimento reais, somente no card selecionado e instalado. */
+    val preparation: ModelPreparation? = null,
 )
 
 /** Tudo que o painel Local mostra. Vazio = catálogo sem nada baixado nem em curso. */
@@ -44,6 +47,7 @@ data class LocalModelsUi(
             failures: Map<String, DownloadFailure>,
             selectedId: String?,
             deviceRamMb: Long,
+            preparation: ModelPreparation? = null,
         ): LocalModelsUi = LocalModelsUi(
             catalog.map { spec ->
                 val downloading = active?.modelId == spec.id && active.state != DownloadState.FAILED
@@ -59,6 +63,7 @@ data class LocalModelsUi(
                     progress = active.takeIf { status == LocalModelStatus.DOWNLOADING },
                     heavy = deviceRamMb in 1 until spec.recommendedRamMb,
                     failure = failures[spec.id].takeIf { status == LocalModelStatus.AVAILABLE },
+                    preparation = preparation?.takeIf { status == LocalModelStatus.INSTALLED && spec.id == selectedId && it.modelId == spec.id },
                 )
             },
         )
@@ -88,6 +93,9 @@ interface LocalModelActions {
     suspend fun download(spec: ModelSpec, allowMetered: Boolean): StartResult
     fun cancel(modelId: String)
     fun delete(modelId: String)
+
+    /** Seleção explícita de um instalado: preparar em segundo plano, sem trabalho de disco na UI. */
+    fun prepare(modelId: String, language: String? = null) = Unit
 
     /** Sem gerenciador (galeria, testes de outras abas): nada acontece. */
     object None : LocalModelActions {

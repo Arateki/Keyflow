@@ -4,6 +4,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.SemanticsProperties
+import com.keyflow.data.models.ModelPreparation
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -128,5 +136,39 @@ class ModelListTest {
             assertEquals(emptyList<String>(), actions.deletes)
             assertEquals(emptyList<String>(), deleted)
         }
+    }
+
+    @Test
+    fun preparacaoDeVozMostraTempoNoCardESomeQuandoPronto() {
+        preparationIndicator(ModelListTags.Voz, base)
+    }
+
+    @Test
+    fun preparacaoDeTextoMostraTempoNoCardESomeQuandoPronto() {
+        preparationIndicator(ModelListTags.Raciocinio, qwen)
+    }
+
+    private fun preparationIndicator(tags: ModelListTags, spec: ModelSpec) {
+        val preparing = mutableStateOf(true)
+        rule.setContent {
+            CompositionLocalProvider(LocalModelPreparationClock provides { 5000L }) {
+                Host(
+                    LocalModelsUi.compose(
+                        catalog = listOf(spec), installed = setOf(spec.id), active = null, failures = emptyMap(),
+                        selectedId = spec.id, deviceRamMb = 8192,
+                        preparation = if (preparing.value) ModelPreparation(spec.id, 0) else null,
+                    ),
+                    FakeActions(), tags,
+                )
+            }
+        }
+        rule.onNodeWithTag("${tags.model(spec.id)}-preparation", useUnmergedTree = true).assertExists()
+        rule.onNodeWithText("Preparando modelo… 5 s", useUnmergedTree = true).assertExists()
+        rule.onAllNodes(
+            SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo, ProgressBarRangeInfo.Indeterminate),
+            useUnmergedTree = true,
+        ).assertCountEquals(1)
+        rule.runOnIdle { preparing.value = false }
+        rule.onNodeWithTag("${tags.model(spec.id)}-preparation", useUnmergedTree = true).assertDoesNotExist()
     }
 }

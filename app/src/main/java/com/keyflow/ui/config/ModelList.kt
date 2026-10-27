@@ -257,7 +257,10 @@ private fun ModelCard(
                 )
             }
         }
-        val message = notice ?: item.failure?.let(::failureMessage)
+        item.preparation?.takeIf { it.failure == null }?.let { preparation ->
+            ModelPreparationIndicator(preparation, Modifier.padding(top = 10.dp).testTag("${tags.model(spec.id)}-preparation"))
+        }
+        val message = notice ?: item.preparation?.failure ?: item.failure?.let(::failureMessage)
         if (message != null) {
             Text(
                 message,

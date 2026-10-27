@@ -53,29 +53,29 @@ object SherpaConfigs {
  * Um `OfflineRecognizer` carregado por vez, residente até outro modelo (ou idioma) pedir troca (G10).
  * Só roda no processo `:inference`, sempre na mesma thread do executor do [InferenceService].
  */
-class SherpaEngine(private val numThreads: Int = SherpaConfigs.defaultThreads()) {
+class SherpaEngine(private val numThreads: Int = SherpaConfigs.defaultThreads()) : SpeechEngine {
 
     private var recognizer: OfflineRecognizer? = null
     private var loaded: EngineModel? = null
 
-    fun isLoaded(model: EngineModel): Boolean = loaded == model && recognizer != null
+    override fun isLoaded(model: EngineModel): Boolean = loaded == model && recognizer != null
 
     /** @throws IllegalArgumentException se o sherpa-onnx recusar a config (arquivo inválido etc.). */
-    fun load(model: EngineModel) {
+    override fun load(model: EngineModel) {
         if (isLoaded(model)) return
         unload()
         recognizer = OfflineRecognizer(config = SherpaConfigs.recognizerConfig(model, numThreads))
         loaded = model
     }
 
-    fun unload() {
+    override fun unload() {
         recognizer?.release()
         recognizer = null
         loaded = null
     }
 
     /** PCM mono float em 16 kHz (saída do [AudioDecoder]) → texto. */
-    fun transcribe(samples: FloatArray): String {
+    override fun transcribe(samples: FloatArray): String {
         val model = checkNotNull(loaded) { "nenhum modelo carregado" }
         val active = checkNotNull(recognizer)
         val pieces = if (model.engineType == EngineType.WHISPER) WhisperChunker.split(samples) else listOf(samples)

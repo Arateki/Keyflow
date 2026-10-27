@@ -43,6 +43,15 @@ internal class LiteRtBackend(private val cacheDir: String?, private val opensThi
         }
     }
 
+    override fun warmUp() {
+        val active = checkNotNull(engine) { "o motor não está carregado" }
+        // API 0.16.1 conferida no classes.jar: maxOutputToken é por conversa, não limita pedidos reais.
+        // Dois tokens permitem prefill + um passo de decodificação; não esperamos resposta nem usamos ThoughtStripper.
+        active.createConversation(LiteRtConfigs.warmUp(opensThink)).use {
+            it.sendMessage("Oi")
+        }
+    }
+
     override fun generate(request: ReasoningRequest, onDelta: (String) -> Unit) {
         val active = checkNotNull(engine) { "o motor não está carregado" }
         cancelled = false
@@ -130,7 +139,10 @@ internal class LiteRtBackend(private val cacheDir: String?, private val opensThi
  * aparelho. Se estas constantes ficassem no companion do [LiteRtBackend], criar `ThinkingConfig`/`Channel` (bytecode de
  * Java 21) na inicialização da classe derrubaria os testes unitários, que rodam no JDK 17.
  */
-private object LiteRtConfigs {
+internal object LiteRtConfigs {
+    /** Limite só da conversa descartável; o pensamento interno também consome esse limite de dois tokens. */
+    fun warmUp(opensThink: Boolean) = conversation(null, opensThink).copy(maxOutputToken = 2)
+
     /**
      * Sem o raciocínio interno do modelo: o Testar e os consumidores querem a resposta. Medido com o Qwen3 0.6B no emulador:
      * com o "thinking" ligado (o padrão da biblioteca), "Diga olá" virou 335 trechos de `<think>…` e 69 s. Três camadas:
