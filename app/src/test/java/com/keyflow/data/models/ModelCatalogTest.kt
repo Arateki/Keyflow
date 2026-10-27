@@ -131,13 +131,33 @@ class ModelCatalogTest {
     // ── RCAT-02/03: catálogo de texto (LiteRT-LM) ──────────────────────────────────────────────
 
     @Test
-    fun `text catalog has the five models, lightest first`() {
+    fun `text catalog has the five models, smallest download first`() {
         // Só os cujo repositório, commit e SHA-256 existem de verdade na API do Hugging Face (2026-10-24, 2026-10-25 e 2026-10-26).
         assertThat(ModelCatalog.TEXT.map { it.id })
             .containsExactly("qwen3-0.6b-litertlm", "smollm2-1.7b-litertlm", "deepseek-r1-1.5b-litertlm", "gemma-4-e2b-litertlm", "gemma-4-e4b-litertlm")
             .inOrder()
         assertThat(ModelCatalog.TEXT.map { it.totalBytes }).isInOrder()
-        assertThat(ModelCatalog.TEXT.map { it.recommendedRamMb }).isInOrder()
+    }
+
+    /**
+     * RAM recomendada, medida em 2026-10-27 (pico de VmRSS do `:reasoning`): Qwen3 1,66 GB, Gemma 4 E2B 1,72 GB e DeepSeek 1,73 GB no A32;
+     * SmolLM2 3,3 GB no tablet de 6 GB; Gemma 4 E4B 4,4–4,5 GB no de 8 GB. A lista segue o tamanho do arquivo, mas a RAM do SmolLM2 (ativações
+     * em FP32) passa a do DeepSeek e a do E2B — por isso a ordem de RAM não é a da lista.
+     */
+    @Test
+    fun `recommended RAM follows the measured peaks`() {
+        assertThat(ModelCatalog.TEXT_ALL.associate { it.id to it.recommendedRamMb })
+            .containsExactly(
+                "qwen3-0.6b-litertlm", 3072, "smollm2-1.7b-litertlm", 6144, "deepseek-r1-1.5b-litertlm", 4096,
+                "gemma-4-e2b-litertlm", 4096, "gemma-4-e4b-litertlm", 8192,
+            )
+        // O pior pico medido (em MB, no aparelho mais folgado) fica abaixo da RAM recomendada: a recomendação é de RAM total do aparelho.
+        val peakMb = mapOf(
+            ModelCatalog.QWEN3_0_6B to 1_946, ModelCatalog.DEEPSEEK_R1_1_5B to 2_560, ModelCatalog.GEMMA_4_E2B to 2_253,
+            ModelCatalog.SMOLLM2_1_7B to 3_379, ModelCatalog.GEMMA_4_E4B to 4_608,
+        )
+        peakMb.forEach { (spec, peak) -> assertThat(peak).isLessThan(spec.recommendedRamMb) }
+        assertThat(ModelCatalog.TEXT_ALL.maxBy { it.recommendedRamMb }).isSameInstanceAs(ModelCatalog.GEMMA_4_E4B)
     }
 
     @Test
@@ -171,17 +191,24 @@ class ModelCatalogTest {
     }
 
     /**
-     * SmolLM2, DeepSeek e Gemma 4 E4B nunca carregaram no LiteRT-LM de um aparelho: ficam só no debug até o roteiro manual no A32.
-     * O release (`debug = false`) lista só os validados, e o DeepSeek é o único cujo prompt abre o `<think>`.
+     * Os cinco modelos de texto responderam num aparelho real (decisão do Yan, 2026-10-27): o release lista todos. O DeepSeek continua
+     * o único cujo prompt abre o `<think>`.
      */
     @Test
-    fun `release lists only the text models validated on a device`() {
-        assertThat(ModelCatalog.visibleIn(ModelCatalog.TEXT_ALL, debug = false).map { it.id })
-            .containsExactly("qwen3-0.6b-litertlm", "gemma-4-e2b-litertlm").inOrder()
+    fun `release lists every text model, all validated on a device`() {
+        assertThat(ModelCatalog.visibleIn(ModelCatalog.TEXT_ALL, debug = false)).containsExactlyElementsIn(ModelCatalog.TEXT_ALL).inOrder()
         assertThat(ModelCatalog.visibleIn(ModelCatalog.TEXT_ALL, debug = true)).containsExactlyElementsIn(ModelCatalog.TEXT_ALL).inOrder()
-        assertThat(ModelCatalog.TEXT_ALL.filterNot { it.validatedOnDevice }.map { it.id })
-            .containsExactly("smollm2-1.7b-litertlm", "deepseek-r1-1.5b-litertlm", "gemma-4-e4b-litertlm")
+        assertThat(ModelCatalog.TEXT_ALL.filterNot { it.validatedOnDevice }).isEmpty()
         assertThat(ModelCatalog.TEXT_ALL.filter { it.promptOpensThink }.map { it.id }).containsExactly("deepseek-r1-1.5b-litertlm")
+    }
+
+    /** O gate segue de pé para o próximo modelo que entrar sem prova: o release só lista o validado. */
+    @Test
+    fun `visibleIn hides an unvalidated model from release only`() {
+        val unproven = ModelCatalog.QWEN3_0_6B.copy(id = "sem-prova", validatedOnDevice = false)
+        val all = listOf(ModelCatalog.QWEN3_0_6B, unproven)
+        assertThat(ModelCatalog.visibleIn(all, debug = false)).containsExactly(ModelCatalog.QWEN3_0_6B)
+        assertThat(ModelCatalog.visibleIn(all, debug = true)).containsExactlyElementsIn(all).inOrder()
     }
 
     /** RCAT-03: só baixável sem login, e fixado no commit — o SHA do catálogo tem de continuar valendo. */

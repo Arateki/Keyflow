@@ -3091,6 +3091,32 @@ Dois motores com ferramentas ao lado do da Anthropic: `reasoning/openai/OpenAiAg
   Na prática, nenhum modelo de texto é pré-carregado no A32; o aquecimento de texto só vale em aparelhos com folga.
 - Instrumentados no Deck estouram o limite de ~9 min com sete classes juntas: rode em lotes (ex.: `LocalReasoningEngineTest ReasoningPanelTest`).
 
+## 2026-10-27 — Modelos de texto liberados no release e RAM recalibrada (equipe/liberar-modelos-texto)
+
+- Decisão do Yan: os cinco modelos da aba Raciocínio responderam em aparelho real e passam a aparecer no release. SmolLM2 1.7B, DeepSeek R1 1.5B
+  e Gemma 4 E4B ganharam `validatedOnDevice = true`; a liberação não depende da qualidade na pontuação (cada modelo terá prompt próprio num
+  workflow futuro). O flag e `ModelCatalog.visibleIn` ficam como gate para o próximo modelo sem prova (teste novo com um modelo `validatedOnDevice = false`).
+- Docs e site: `unvalidatedTextModelLicenses()` saiu do `DocsPanel.kt`; as cinco linhas de licença ficam juntas na seção Licenças, e o
+  `website/_fonte/doc.json` foi regerado. `app/licenses/` já tinha os textos; o README de lá perdeu o "só no debug". As traduções
+  EN/ES das linhas já existiam (`TranslationsTest` confere).
+- Medições (pico de VmRSS do `:reasoning`, pedido curto de pontuação): Qwen3 0.6B 1,66 GB no A32 / 1,7–1,9 no Tab S10 Lite; Gemma 4 E2B 1,72 /
+  2,1–2,2 / 2,2 (Vaio TL10); DeepSeek 1,73 / 1,9–2,5; SmolLM2 morto pelo lmkd acima de ~1,7 GB no A32 e 3,3 GB no tablet; Gemma 4 E4B 4,4–4,5 GB
+  no Vaio. Aparelhos: A32 3,7 GB (1,1–1,5 livres), Tab S10 Lite 5,8 GB (~2,3 livres), Vaio 7,6 GB (~4,8 livres).
+- Por que a guarda mudou: a `RamGuard.enough` comparava a RAM LIVRE com `recommendedRamMb/2`. A livre medida antes da carga subestima (o Android
+  derruba apps em segundo plano para dar lugar ao `:reasoning`): no A32 ela é 1,1–1,5 GB, abaixo do pico de 1,73 GB de modelos que funcionaram,
+  e no tablet é 2,3 GB, abaixo dos 3,3 GB do SmolLM2 que também funcionou. Só com a livre não há número que libere os do A32 e o SmolLM2 do tablet e
+  ainda barre o SmolLM2 no A32. Nova regra: a carga pedida compara a RAM TOTAL (`ActivityManager.MemoryInfo.totalMem`, lida no `:reasoning`):
+  `total >= 1,6 × estimativa` (= 80% de `recommendedRamMb`; `RamGuard.fitsDevice`). Sem o total, volta à regra antiga da livre. A pré-carga
+  (especulativa) mantém a livre (`>= estimativa` e `>= 2048 MB`) e soma o `fitsDevice`.
+- Valores novos de `recommendedRamMb` (mínimo de RAM total exigido pela guarda entre parênteses; o aviso "pesado" usa o próprio valor):
+  Qwen3 1024 -> 3072 (2458; A32 sem aviso), DeepSeek 4096 (3277), Gemma 4 E2B 4096 (3277) — carregam no A32 (~3,6–3,8 GB) mas mostram o aviso —,
+  SmolLM2 3072 -> 6144 (4916; barra o A32, libera o tablet de 6 GB ~5,7 GB), Gemma 4 E4B 8192 (6554; barra o tablet, libera o Vaio ~7,4 GB).
+  `ramEstimateMb` segue `recommendedRamMb / 2` (`LlmModels.from`).
+- A ordem da lista segue o tamanho do arquivo; a de RAM não: o SmolLM2 (ativações em FP32) pesa mais que o DeepSeek e o E2B. O
+  `ModelCatalogTest` deixou de exigir `recommendedRamMb` em ordem crescente na lista de texto e passou a fixar os valores.
+- Lição: estimativa de RAM de modelo grande tem de ser comparada com o total do aparelho, não com a RAM livre do instante; e o `LocalModelsUiTest`
+  que dependia de 1024/3072 precisou ser refeito com os valores medidos.
+
 ## Qwen3 0.6B: canal oculto não comprova pensamento desativado (2026-10-27)
 
 - Investigação em `.specs/features/reasoning-models/qwen-sem-pensar.md`: o arquivo do catálogo, pin

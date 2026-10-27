@@ -71,12 +71,14 @@ class ReasoningServiceCoreTest {
         backends: Map<String, FakeBackend>,
         exists: Boolean = true,
         availMb: Long? = null,
+        totalMb: Long? = null,
         sched: IdleScheduler = FakeScheduler(),
         executor: Executor = direct,
     ) = ReasoningServiceCore(
         backendFor = { backends.getValue(it.modelId) },
         fileExists = { exists },
         availableMb = { availMb },
+        totalMb = { totalMb },
         scheduler = sched,
         executor = executor,
     )
@@ -129,6 +131,22 @@ class ReasoningServiceCoreTest {
     fun `insufficient RAM reports OOM without loading`() {
         val a = FakeBackend(log, "a")
         val rec = run(core(mapOf("a" to a), availMb = 50), model("a", ramMb = 2_048))
+        assertThat(rec.events).containsExactly("error:OOM")
+        assertThat(log).doesNotContain("load:a")
+    }
+
+    /** Com a RAM total conhecida ela decide: pouca RAM livre não barra o que cabe no aparelho (o Android libera apps ao carregar). */
+    @Test
+    fun `with the total known a low free memory does not block a model that fits the device`() {
+        val a = FakeBackend(log, "a")
+        val rec = run(core(mapOf("a" to a), availMb = 50, totalMb = 4_000), model("a", ramMb = 2_048))
+        assertThat(rec.events).containsExactly("delta:um", "delta:dois", "done").inOrder()
+    }
+
+    @Test
+    fun `with the total known a model that does not fit the device reports OOM without loading`() {
+        val a = FakeBackend(log, "a")
+        val rec = run(core(mapOf("a" to a), availMb = 6_000, totalMb = 3_000), model("a", ramMb = 2_048))
         assertThat(rec.events).containsExactly("error:OOM")
         assertThat(log).doesNotContain("load:a")
     }

@@ -18,6 +18,7 @@ internal class ReasoningServiceCore(
     private val scheduler: IdleScheduler,
     private val executor: Executor,
     private val onWarmed: (LlmModel, Long, Throwable?) -> Unit = { _, _, _ -> },
+    private val totalMb: () -> Long? = { null },
 ) {
     /** Quem recebe a resposta. Depois de um [cancel], nada mais é entregue à geração cancelada. */
     interface Listener {
@@ -128,14 +129,15 @@ internal class ReasoningServiceCore(
             throw ReasoningFailure(ReasoningErrorKind.MODEL_MISSING, "falta o arquivo do modelo ${model.modelId}")
         }
         val available = availableMb()
-        if (!RamGuard.enough(available, model.ramEstimateMb)) {
+        val total = totalMb()
+        if (!RamGuard.enough(available, model.ramEstimateMb, total)) {
             throw ReasoningFailure(
                 ReasoningErrorKind.OOM,
-                "memória insuficiente para ${model.modelId}: $available MB livres, precisa de ${model.ramEstimateMb} MB",
+                "memória insuficiente para ${model.modelId}: $total MB de RAM total e $available MB livres, estimativa de ${model.ramEstimateMb} MB",
             )
         }
         // Pré-carga especulativa: com pouca folga não carrega (o lmkd poderia matar mais que o processo do modelo).
-        if (preload && !RamGuard.enoughForPreload(available, model.ramEstimateMb)) {
+        if (preload && !RamGuard.enoughForPreload(available, model.ramEstimateMb, total)) {
             throw ReasoningFailure(
                 ReasoningErrorKind.OOM,
                 "pré-carga de ${model.modelId} adiada: $available MB livres, piso de ${RamGuard.PRELOAD_FLOOR_MB} MB",
