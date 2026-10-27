@@ -12,6 +12,7 @@
 | Gemma 4 E2B (Google) — modelo de texto baixado sob demanda | Apache-2.0 | `Apache-2.0_gemma-4-e2b.txt` |
 | Gemma 4 E4B (Google) — modelo de texto baixado sob demanda | Apache-2.0 | `Apache-2.0_gemma-4-e4b.txt` |
 | Qwen3 0.6B (Alibaba) — modelo de texto baixado sob demanda | Apache-2.0 | `Apache-2.0_qwen3-0.6b.txt` |
+| Qwen2.5 1.5B Instruct (Alibaba) — modelo de texto baixado sob demanda | Apache-2.0 | `Apache-2.0_qwen2.5-1.5b.txt` |
 | PaddleOCR PP-OCRv3/v5 em ONNX (PaddlePaddle; conversão de monkt) — modelo de OCR da Visão baixado sob demanda (só no debug até a prova num aparelho) | Apache-2.0 | `Apache-2.0_paddleocr.txt` |
 | SmolLM2 1.7B Instruct (Hugging Face) — modelo de texto baixado sob demanda | Apache-2.0 | `Apache-2.0_smollm2-1.7b.txt` |
 | DeepSeek-R1-Distill-Qwen 1.5B (DeepSeek, derivado do Qwen2.5) — modelo de texto baixado sob demanda | MIT (e Apache-2.0 do Qwen2.5) | `MIT_deepseek-r1-distill-qwen-1.5b.txt` |
@@ -49,6 +50,9 @@ Conferidos em 2026-10-27 (logos dos fabricantes nos cards de modelo local): os p
 Icons não tem a Qwen: o path e a cor `#082DFF` vêm de `lobehub/lobe-icons` (licença MIT, "Copyright (c) 2023 LobeHub"). Google e OpenAI reaproveitam os paths
 que o app já trazia nos provedores. Os logos são marcas registradas dos donos e só identificam quem fez o modelo.
 
+Conferida em 2026-10-27 (Qwen2.5 1.5B Instruct): `license: apache-2.0` e `gated: false` no card do `litert-community/Qwen2.5-1.5B-Instruct` (commit
+2f23bacf8ec78b83dfcd7271c5cb25777b1be5e0) e no do original `Qwen/Qwen2.5-1.5B-Instruct`. O Qwen3 0.6B passou para o commit fed81d17517e6ea64362e917ecf7e5accff12492
+do mesmo repositório (mesma licença, `license: apache-2.0`).
 Conferido em 2026-10-27 (vision-capture, VC-T2a): `license: apache-2.0` no card do `monkt/paddleocr-onnx` (commit
 `7b02d0a30a07ba2b92ad1ff5a8941ae2c633de65`, repositório `gated: false`, sem arquivo LICENSE) e nos cards
 `PaddlePaddle/latin_PP-OCRv5_mobile_rec` e `PaddlePaddle/PP-OCRv5_mobile_det`; o `LICENSE` do `PaddlePaddle/PaddleOCR` no GitHub é

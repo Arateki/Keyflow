@@ -532,3 +532,19 @@ Encerramento ajustado pelo coordenador: entregar com unitários verdes; mediçã
 A primeira prova nativa com sistema passou (1/1); a ampliada não passou (crash durante inicialização
 CPU, sem stack no log). Configs 3/3; rodada configs/IPC 10 testes, 4 falhas; não declarar IPC verificado.
 Fixtures e caminho sem sistema permanecem pendentes de execução bem-sucedida; detalhes na pesquisa.
+
+## Catálogo: Qwen3 no pin novo, Qwen2.5 1.5B e aviso de pensamento (2026-10-27)
+
+Status: implementada (branch `equipe/catalogo-qwen`), por decisão do Yan. RCAT-02/03 seguem valendo: o pin e o card novos têm commit, tamanho e SHA-256
+lidos da API do HF (e o SHA-256 recalculado baixando os arquivos, ver `qwen-sem-pensar.md`).
+
+- **Qwen3 0.6B** (mesmo id): `fed81d17…`, SHA `c5f39b41…`, 613722264 B. Quem tem o arquivo antigo: `ModelStore.outdatedIds` -> card "Atualizar modelo",
+  motor local recusa (`MODEL_NOT_INSTALLED`), `ModelDownloader.start` apaga a cópia velha e baixa a nova. Testes: `ModelStoreTest`, `ModelDownloaderTest`,
+  `LocalModelsUiTest`, `ModelListTest`.
+- **Qwen2.5 1.5B Instruct** ("Versátil", `qwen2.5-1.5b-litertlm`, 1597922856 B, `validatedOnDevice = true`, `recommendedRamMb = 4096`): lista pelo tamanho do
+  arquivo (entre Leve e Intermediário); licença, README de licenças, Docs PT/EN/ES e `doc.json` do site.
+- **Aviso de pensamento**: `ModelSpec.thinking` (NONE/OPTIONAL/ALWAYS), linha discreta no card; manifesto remoto opcional e tolerante. Gemma 4 = OPTIONAL (fonte no
+  `ModelCatalog.kt` e no `STATE.md`).
+- Goldens: as telas `config-raciocinio-local-*` (cards de texto mudaram: seis modelos, novo tamanho do Qwen3, linha de pensamento) foram regeneradas; o resto
+  bit-idêntico. Ver `STATE.md` (2026-10-27, equipe/catalogo-qwen).
+

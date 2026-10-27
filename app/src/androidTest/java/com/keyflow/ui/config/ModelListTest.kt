@@ -8,6 +8,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -108,10 +109,61 @@ class ModelListTest {
     @Test
     fun theTextCardsCarryTheirOwnVendorLogo() {
         rule.setContent { Host(text(installed = emptySet()), FakeActions(), ModelListTags.Raciocinio) }
-        rule.onNodeWithTag("model-vendor-qwen").assertExists()
+        rule.onAllNodesWithTag("model-vendor-qwen").assertCountEquals(2)
         rule.onNodeWithTag("model-vendor-hugging_face").assertExists()
         rule.onNodeWithTag("model-vendor-deepseek").assertExists()
         rule.onAllNodesWithTag("model-vendor-google").assertCountEquals(2)
+    }
+
+    /** Só informativo: Qwen3 e Gemma 4 suportam pensamento, o DeepSeek sempre pensa; Qwen2.5 e SmolLM2 não ganham linha. */
+    @Test
+    fun theTextCardsSayWhetherTheModelThinks() {
+        rule.setContent { Host(text(installed = emptySet()), FakeActions(), ModelListTags.Raciocinio) }
+
+        fun thinking(spec: ModelSpec) = rule.onNodeWithTag("raciocinio-local-model-${spec.id}-thinking")
+        thinking(ModelCatalog.QWEN3_0_6B).performScrollTo().assertTextEquals("Suporta modo pensamento.")
+        thinking(ModelCatalog.GEMMA_4_E2B).performScrollTo().assertTextEquals("Suporta modo pensamento.")
+        thinking(ModelCatalog.GEMMA_4_E4B).performScrollTo().assertTextEquals("Suporta modo pensamento.")
+        thinking(ModelCatalog.DEEPSEEK_R1_1_5B).performScrollTo().assertTextEquals("Sempre pensa antes de responder.")
+        thinking(ModelCatalog.QWEN2_5_1_5B).assertDoesNotExist()
+        thinking(ModelCatalog.SMOLLM2_1_7B).assertDoesNotExist()
+    }
+
+    /** Quem tem o arquivo antigo do modelo vê "Atualizar modelo" (não "Baixar") e o porquê. */
+    @Test
+    fun anOutdatedInstallOffersToUpdateInsteadOfDownload() {
+        val ui = LocalModelsUi.compose(
+            catalog = ModelCatalog.TEXT, installed = emptySet(), outdated = setOf(qwen.id), active = null, failures = emptyMap(),
+            selectedId = qwen.id, deviceRamMb = 8_000,
+        )
+        rule.setContent { Host(ui, FakeActions(), ModelListTags.Raciocinio) }
+
+        rule.onNodeWithTag("raciocinio-local-download-${qwen.id}").performScrollTo().assertTextEquals("Atualizar modelo")
+        rule.onNodeWithTag("raciocinio-local-model-${qwen.id}-outdated").performScrollTo().assertExists()
+        rule.onNodeWithTag("raciocinio-local-download-${gemma.id}").performScrollTo().assertTextEquals("Baixar")
+        rule.onNodeWithTag("raciocinio-local-model-${gemma.id}-outdated").assertDoesNotExist()
+        rule.onNodeWithTag("raciocinio-local-delete-${gemma.id}").assertDoesNotExist()
+    }
+
+    /** Achado 4 da revisão: quem precisa do espaço da cópia antiga a apaga pelo próprio card desatualizado. */
+    @Test
+    fun anOutdatedCardOffersDeleteAndConfirmsBeforeDeleting() {
+        val ui = LocalModelsUi.compose(
+            catalog = ModelCatalog.TEXT, installed = emptySet(), outdated = setOf(qwen.id), active = null, failures = emptyMap(),
+            selectedId = null, deviceRamMb = 8_000,
+        )
+        val actions = FakeActions()
+        val deleted = mutableListOf<String>()
+        rule.setContent { Host(ui, actions, ModelListTags.Raciocinio, onDeleted = { deleted += it }) }
+
+        rule.onNodeWithTag("raciocinio-local-delete-${qwen.id}").performScrollTo().performClick()
+        rule.onNodeWithTag("raciocinio-local-confirm-${qwen.id}").performScrollTo().assertExists()
+        rule.onNodeWithTag("raciocinio-local-confirm-yes").performScrollTo().performClick()
+
+        rule.runOnIdle {
+            assertEquals(listOf(qwen.id), actions.deletes)
+            assertEquals(listOf(qwen.id), deleted)
+        }
     }
 
     @Test

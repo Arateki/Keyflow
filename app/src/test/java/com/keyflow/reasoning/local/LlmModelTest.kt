@@ -12,6 +12,7 @@ class LlmModelTest {
         engineType = "LITERT_LM",
         idleUnloadMs = 120_000,
         ramEstimateMb = 512,
+        version = "c5f39b4191926786c3e6668b62af4d6eb15248dfc7a5348252a9b406f33f2108",
     )
 
     @Test
@@ -27,6 +28,21 @@ class LlmModelTest {
         assertThat(parcel.engineType).isEqualTo("LITERT_LM")
         assertThat(parcel.idleUnloadMs).isEqualTo(120_000L)
         assertThat(parcel.ramEstimateMb).isEqualTo(512)
+        assertThat(parcel.version).isEqualTo(model.version)
+    }
+
+    @Test
+    fun `the model built from the catalog carries the file sha as its version`() {
+        val spec = com.keyflow.data.models.ModelCatalog.QWEN3_0_6B
+        val built = LlmModels.from(spec, java.io.File("/models/${spec.id}"))
+        assertThat(built.version).isEqualTo(spec.files.single().sha256)
+    }
+
+    @Test
+    fun `an explicit installed version wins over the catalog sha`() {
+        val spec = com.keyflow.data.models.ModelCatalog.QWEN3_0_6B
+        val built = LlmModels.from(spec, java.io.File("/models/${spec.id}"), version = "instalado-antigo")
+        assertThat(built.version).isEqualTo("instalado-antigo")
     }
 
     @Test

@@ -406,6 +406,7 @@ val docsSections: List<DocSection> get() = listOf(
             DocBlock.Labeled("Parakeet TDT 0.6B v3", tr("modelo Máxima qualidade — CC BY 4.0 (NVIDIA), convertido para ONNX int8 pelo sherpa-onnx.")),
             DocBlock.Labeled("LiteRT-LM", tr("motor dos modelos de texto da aba Raciocínio, no aparelho — Apache 2.0 (Google).")),
             DocBlock.Labeled("Qwen3 0.6B", tr("modelo de texto Leve — Apache 2.0 (Alibaba), baixado sob demanda.")),
+            DocBlock.Labeled("Qwen2.5 1.5B", tr("modelo de texto Versátil — Apache 2.0 (Alibaba), baixado sob demanda.")),
             DocBlock.Labeled("SmolLM2 1.7B", tr("modelo de texto Intermediário — Apache 2.0 (Hugging Face), baixado sob demanda.")),
             DocBlock.Labeled(
                 "DeepSeek R1 1.5B",

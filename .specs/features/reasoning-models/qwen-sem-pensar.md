@@ -1,5 +1,9 @@
 # Qwen sem pensamento — investigação de 2026-10-27
 
+> **Desfecho (2026-10-27, decisão do Yan):** o catálogo passou o Qwen3 0.6B para `fed81d17…` e ganhou o Qwen2.5 1.5B Instruct; medido no Vaio TL10, o novo
+> Qwen3 responde em 9,8 s e 23,2 s (o antigo, 206 s) e o Qwen2.5 em ~10 s e ~20 s. O texto abaixo é o registro da investigação, escrito antes da troca
+> ("nenhuma adição ao catálogo" vale para aquele momento). Ver `STATE.md`, seção "Qwen3 0.6B no pin novo…".
+
 ## Causa a verificar no motor real
 
 O catálogo fixa o Qwen3 0.6B no commit `a3c5d805ae362dff7f580bc25f2dfb9a5a7eaa76` do

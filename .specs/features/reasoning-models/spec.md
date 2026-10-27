@@ -140,7 +140,7 @@ método quando o provedor mudar e adicionar outros provedores sem mexer no resto
 ### P2-G: Loja, licenças e build (`RPRV`)
 
 1. **RPRV-01**: a política de privacidade (PS-2) e o rascunho do Data Safety (PS-4) SHALL passar a cobrir: modelos de texto locais (no aparelho); OpenAI (texto enviado, login OIDC, credenciais só no aparelho).
-2. **RPRV-02**: licenças dos modelos (Apache 2.0 / Termos do Gemma) e do LiteRT-LM SHALL entrar em `app/licenses/` e na aba Docs. Desde 2026-10-27 isso cobre os cinco modelos de texto (Qwen3, SmolLM2, DeepSeek, Gemma 4 E2B e E4B), todos `validatedOnDevice = true`; a Docs e o `doc.json` do site os citam do catálogo-fonte (`DocsPanel.kt`).
+2. **RPRV-02**: licenças dos modelos (Apache 2.0 / Termos do Gemma) e do LiteRT-LM SHALL entrar em `app/licenses/` e na aba Docs. Desde 2026-10-27 isso cobre os seis modelos de texto (Qwen3, Qwen2.5 1.5B, SmolLM2, DeepSeek, Gemma 4 E2B e E4B), todos `validatedOnDevice = true`; a Docs e o `doc.json` do site os citam do catálogo-fonte (`DocsPanel.kt`).
 3. **RPRV-03**: as bibliotecas nativas do LiteRT-LM SHALL ter **alinhamento de 16 KB** conferido, ABIs suportadas registradas (impacto no emulador x86_64) e o **impacto no tamanho do APK** medido e anotado.
 4. **RPRV-04**: **elegibilidade do login ChatGPT.** A OpenAI restringe o uso do plano a "apps open-source e hospedados localmente" e manda "apps pagos ou hospedados remotamente" para um formulário de interesse. **Decisão do Yan, 2026-10-23:** os logins por assinatura OpenAI, Anthropic e Google entram no release, ciente do risco de política da Anthropic. `enabled = true`; antes da publicação, revisar requisitos/termos aplicáveis. O client OAuth Google do release ainda depende do SHA-1 da chave Play e do `applicationId` definitivo no Console **[YAN]**.
 
@@ -219,3 +219,8 @@ esperam partes tipadas no LiteRT-LM 0.16.1. `LiteRtTextFormatTest` e a reproduç
 local de montagem/renderização. Detalhes em `qwen-sem-pensar.md`; demais gates manuais mantidos.
 Limite da evidência nativa: somente a primeira prova fed81d1 com sistema passou; fixtures dos demais
 templates e a rodada sem sistema permanecem pendentes no Vaio após crash de inicialização no Deck.
+
+Catálogo (2026-10-27, equipe/catalogo-qwen) — RCAT-02/03/04 e RPRV-02: o Qwen3 0.6B passou ao pin `fed81d17…` (template que respeita `enable_thinking`) e o
+**Qwen2.5 1.5B Instruct** ("Versátil") entrou; ambos com URL no commit, tamanho e SHA-256 conferidos e licença Apache-2.0 em `app/licenses/`. RCAT-04 também
+cobre a atualização: o `ModelStore` compara o manifest instalado com o catálogo e trata arquivo de versão antiga como desatualizado (card "Atualizar modelo").
+`ModelSpec.thinking` (NONE/OPTIONAL/ALWAYS) alimenta uma linha informativa nos cards de Raciocínio; não há seletor de pensamento nesta etapa.

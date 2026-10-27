@@ -29,6 +29,14 @@ enum class ModelVendor(val displayName: String) {
 }
 
 /**
+ * Se o modelo de texto "pensa" antes de responder (só informativo, vira uma linha no card). [NONE] é o modelo de instrução comum e o
+ * valor de quem não declara; [OPTIONAL] pensa quando o pedido liga o modo (`enable_thinking`, lido pelo template do `.litertlm`);
+ * [ALWAYS] sempre abre um raciocínio, que o app esconde da resposta mas que conta no tempo de geração. Valor que esta versão do app
+ * não conhece, num manifesto remoto, vale [NONE].
+ */
+enum class ThinkingSupport { NONE, OPTIONAL, ALWAYS }
+
+/**
  * Papel de cada arquivo no modelo — o engine monta a config por papel, não pelo nome do arquivo.
  * [MODEL] é o arquivo único `.litertlm` dos modelos de texto. [DETECTOR], [RECOGNIZER] e [DICTIONARY] são os três
  * arquivos do OCR (vision-capture): detector de linhas de texto, reconhecedor CTC e a lista de caracteres dele.
@@ -73,6 +81,8 @@ data class ModelSpec(
     val validatedOnDevice: Boolean = true,
     /** Quem faz o modelo; `null` só em manifesto remoto sem o campo. Todo modelo do catálogo embutido declara o seu (`ModelCatalogTest`). */
     val vendor: ModelVendor? = null,
+    /** Aviso de modo pensamento no card (só os modelos de texto declaram; o resto fica em [ThinkingSupport.NONE]). */
+    val thinking: ThinkingSupport = ThinkingSupport.NONE,
 ) {
     val totalBytes: Long get() = files.sumOf { it.bytes }
 
@@ -101,6 +111,20 @@ object ModelCatalog {
 
     @Volatile
     private var remoteModels: List<ModelSpec>? = null
+
+    /**
+     * Versão do catálogo embutido, no formato `AAAAMMDDNN`. **Suba-a sempre que um pin (commit, tamanho ou SHA-256) mudar ou um modelo entrar.**
+     * O manifesto remoto (`catalogVersion`) só vale se for maior ou igual a ela: sem isso, um manifesto ou cache antigo substituiria o catálogo
+     * inteiro e devolveria, por exemplo, o SHA legado do Qwen3 (o `ModelCatalogTest` confere a impressão digital dos pins contra esta versão).
+     */
+    const val EMBEDDED_VERSION = 2026102701
+
+    /** Impressão digital dos pins embutidos (id, nome, tamanho e SHA-256 de cada arquivo): muda se um pin mudar sem [EMBEDDED_VERSION] subir. */
+    fun pinsFingerprint(models: List<ModelSpec> = MODELS): String {
+        val lines = models.sortedBy { it.id }.flatMap { m -> m.files.map { "${m.id}:${it.fileName}:${it.bytes}:${it.sha256}" } }
+        return java.security.MessageDigest.getInstance("SHA-256").digest(lines.joinToString("\n").toByteArray())
+            .joinToString("") { "%02x".format(it) }
+    }
 
     private const val WHISPER_BASE_REPO = "https://huggingface.co/csukuangfj/sherpa-onnx-whisper-base/resolve/bb53ee204431c90d314c1cc08d28d23e5b7927cc"
     private const val WHISPER_SMALL_REPO = "https://huggingface.co/csukuangfj/sherpa-onnx-whisper-small/resolve/8f3c18b358db4d1f2fc1eae49d75cd20989e4309"
@@ -208,11 +232,20 @@ object ModelCatalog {
     // (Gemma Terms) têm restrições de uso e os repositórios reais são gated (login): voltam só por decisão do dono do produto.
     private const val GEMMA_4_REPO = "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/b3ca0d2f076785a8f4b2219ddbd2bdb99954eae1"
     private const val GEMMA_4_E4B_REPO = "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/e6a3892a8c22cf87ff99583996149cf3cb32452b"
-    private const val QWEN3_REPO = "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/a3c5d805ae362dff7f580bc25f2dfb9a5a7eaa76"
+    private const val QWEN3_REPO = "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/fed81d17517e6ea64362e917ecf7e5accff12492"
+    private const val QWEN2_5_REPO = "https://huggingface.co/litert-community/Qwen2.5-1.5B-Instruct/resolve/2f23bacf8ec78b83dfcd7271c5cb25777b1be5e0"
     private const val SMOLLM2_REPO = "https://huggingface.co/litert-community/SmolLM2-1.7B-Instruct/resolve/c0ee765a9f197467ead8f22b9bf7bbeb4e6307c7"
     private const val DEEPSEEK_R1_REPO = "https://huggingface.co/litert-community/DeepSeek-R1-Distill-Qwen-1.5B/resolve/9fd875541bb0f277e4b3cefe7d9622c4c1de2fb5"
 
-    /** Qwen3 0.6B (Alibaba), INT8 dinâmico, contexto de 4096. Licença Apache 2.0. */
+    /**
+     * Qwen3 0.6B (Alibaba), INT8 dinâmico, contexto de 4096. Licença Apache 2.0.
+     *
+     * Pin trocado em 2026-10-27 (decisão do Yan; mesmo id) do commit `a3c5d805…` (SHA `555579ff…`, 614236160 B) para `fed81d17…`:
+     * o arquivo antigo trazia só marcadores ChatML, sem o Jinja que consulta `enable_thinking`, e pensava sempre (206 s para uma
+     * resposta curta no Vaio TL10, com o pensamento escondido); o novo respeita `enable_thinking=false` (9,8 s e 23,2 s no mesmo
+     * aparelho). Pico de VmRSS igual (~1,9 GB). Quem tem o arquivo antigo instalado vê o card como "Atualizar modelo" (`ModelStore.outdatedIds`).
+     * Ver `.specs/features/reasoning-models/qwen-sem-pensar.md`.
+     */
     val QWEN3_0_6B = ModelSpec(
         id = "qwen3-0.6b-litertlm",
         displayName = trKey("Leve"),
@@ -221,13 +254,45 @@ object ModelCatalog {
         engineType = EngineType.LITERT_LM,
         acceptsLanguageHint = false,
         // Medido (2026-10-27, pico de VmRSS do `:reasoning`, pedido curto): 1,66 GB no A32 (3,7 GB) e 1,7–1,9 GB no Tab S10 Lite (5,8 GB) — bem acima
-        // do arquivo (586 MB). 3072 = RAM total em que ele roda sem aviso de "pesado" (o A32 não o mostra); a guarda de carga exige 80% disso (2458 MB).
+        // do arquivo (585 MB). 3072 = RAM total em que ele roda sem aviso de "pesado" (o A32 não o mostra); a guarda de carga exige 80% disso (2458 MB).
         recommendedRamMb = 3072,
         modelName = "Qwen3 0.6B",
         kind = ModelKind.TEXT,
         vendor = ModelVendor.QWEN,
+        // Card do Qwen/Qwen3-0.6B: "seamless switching between thinking mode and non-thinking mode"; o template da revisão fed81d17… lê `enable_thinking`.
+        thinking = ThinkingSupport.OPTIONAL,
         files = listOf(
-            ModelFile(FileRole.MODEL, "Qwen3-0.6B.litertlm", "$QWEN3_REPO/Qwen3-0.6B.litertlm", "555579ff2f4fd13379abe69c1c3ab5200f7338bc92471557f1d6614a6e5ab0b4", 614_236_160L),
+            ModelFile(FileRole.MODEL, "Qwen3-0.6B.litertlm", "$QWEN3_REPO/Qwen3-0.6B.litertlm", "c5f39b4191926786c3e6668b62af4d6eb15248dfc7a5348252a9b406f33f2108", 613_722_264L),
+        ),
+    )
+
+    /**
+     * Qwen2.5 1.5B Instruct (Alibaba), INT8 (`q8`), contexto de 4096 (`ekv4096`). Licença Apache 2.0 (cards do original e da conversão, `gated: false`).
+     * Modelo de instrução comum, sem modo de pensamento: responde direto. Entrou em 2026-10-27, por decisão do Yan, como a opção multilíngue
+     * entre o Leve e o Intermediário; commit, tamanho e SHA-256 lidos da API do HF e o SHA-256 conferido baixando o arquivo inteiro
+     * (`.specs/features/reasoning-models/qwen-sem-pensar.md`).
+     */
+    val QWEN2_5_1_5B = ModelSpec(
+        id = "qwen2.5-1.5b-litertlm",
+        displayName = trKey("Versátil"),
+        summary = trKey("Uso geral e multilíngue; responde direto e bem em português."),
+        languages = trKey("Multilíngue"),
+        engineType = EngineType.LITERT_LM,
+        acceptsLanguageHint = false,
+        // Medido (2026-10-27, Vaio TL10, 7,6 GB): resposta quase perfeita em português, ~10 s (curta) e ~20 s (longa), pico de VmRSS do
+        // `:reasoning` de 2,3 GB; o README do conversor mede 2,22 GB (q8, contexto 4096). 4096: o aviso de "pesado" aparece abaixo disso e a guarda
+        // de carga exige 80% (3277 MB), como no DeepSeek (mesma base, mesma quantização e mesmo contexto). Não tentado no A32.
+        recommendedRamMb = 4096,
+        modelName = "Qwen2.5 1.5B",
+        kind = ModelKind.TEXT,
+        vendor = ModelVendor.QWEN,
+        thinking = ThinkingSupport.NONE,
+        files = listOf(
+            ModelFile(
+                FileRole.MODEL, "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.litertlm",
+                "$QWEN2_5_REPO/Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.litertlm",
+                "c4a9b7289365ab80fe599b844b77ad253eb3c53fb0e5d963d699146a6f01255e", 1_597_922_856L,
+            ),
         ),
     )
 
@@ -250,6 +315,7 @@ object ModelCatalog {
         modelName = "SmolLM2 1.7B",
         kind = ModelKind.TEXT,
         vendor = ModelVendor.HUGGING_FACE,
+        thinking = ThinkingSupport.NONE,
         files = listOf(
             ModelFile(
                 FileRole.MODEL, "SmolLM2-1_7B-Instruct_dynamic_wi8_afp32.litertlm", "$SMOLLM2_REPO/SmolLM2-1_7B-Instruct_dynamic_wi8_afp32.litertlm",
@@ -278,6 +344,8 @@ object ModelCatalog {
         kind = ModelKind.TEXT,
         promptOpensThink = true,
         vendor = ModelVendor.DEEPSEEK,
+        // O template abre o `<think>` em toda resposta (por isso o `promptOpensThink`); não há como desligar.
+        thinking = ThinkingSupport.ALWAYS,
         files = listOf(
             ModelFile(
                 FileRole.MODEL, "DeepSeek-R1-Distill-Qwen-1.5B_multi-prefill-seq_q8_ekv4096.litertlm",
@@ -304,6 +372,10 @@ object ModelCatalog {
         modelName = "Gemma 4 E2B",
         kind = ModelKind.TEXT,
         vendor = ModelVendor.GOOGLE,
+        // Pensamento configurável: card do google/gemma-4-E2B-it (huggingface.co/google/gemma-4-E2B-it), "Core Capabilities > Thinking" e "Thinking
+        // Mode Configuration" (liga com `<|think|>` no começo do prompt de sistema; desligado, o E2B/E4B nem emite o canal). O template do próprio
+        // `.litertlm` injeta esse token quando `enable_thinking` é verdadeiro (fixture `gemma-e2b.jinja`, linhas 157-162).
+        thinking = ThinkingSupport.OPTIONAL,
         files = listOf(
             ModelFile(FileRole.MODEL, "gemma-4-E2B-it.litertlm", "$GEMMA_4_REPO/gemma-4-E2B-it.litertlm", "181938105e0eefd105961417e8da75903eacda102c4fce9ce90f50b97139a63c", 2_588_147_712L),
         ),
@@ -328,6 +400,10 @@ object ModelCatalog {
         modelName = "Gemma 4 E4B",
         kind = ModelKind.TEXT,
         vendor = ModelVendor.GOOGLE,
+        // Pensamento configurável: card do google/gemma-4-E4B-it (huggingface.co/google/gemma-4-E4B-it), "Core Capabilities > Thinking" e "Thinking
+        // Mode Configuration" (liga com `<|think|>` no começo do prompt de sistema; desligado, o E2B/E4B nem emite o canal). O template do próprio
+        // `.litertlm` injeta esse token quando `enable_thinking` é verdadeiro (fixture `gemma-e2b.jinja`, linhas 157-162).
+        thinking = ThinkingSupport.OPTIONAL,
         files = listOf(
             ModelFile(FileRole.MODEL, "gemma-4-E4B-it.litertlm", "$GEMMA_4_E4B_REPO/gemma-4-E4B-it.litertlm", "0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0", 3_659_530_240L),
         ),
@@ -339,6 +415,7 @@ object ModelCatalog {
     /** Todos os modelos de texto conhecidos, do menor ao maior arquivo (a ordem de download). A de RAM, em `recommendedRamMb`, difere: o SmolLM2 pesa mais que o DeepSeek e o Gemma 4 E2B. */
     val TEXT_ALL: List<ModelSpec> = listOf(
         QWEN3_0_6B,
+        QWEN2_5_1_5B,
         SMOLLM2_1_7B,
         DEEPSEEK_R1_1_5B,
         GEMMA_4_E2B,

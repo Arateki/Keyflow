@@ -26,6 +26,8 @@ data class LocalModelItem(
     val failure: DownloadFailure? = null,
     /** Carga e aquecimento reais, somente no card selecionado e instalado. */
     val preparation: ModelPreparation? = null,
+    /** O aparelho tem os arquivos de uma versão antiga deste modelo: [status] é AVAILABLE e o card oferece "Atualizar modelo". */
+    val outdated: Boolean = false,
 )
 
 /** Tudo que o painel Local mostra. Vazio = catálogo sem nada baixado nem em curso. */
@@ -48,6 +50,7 @@ data class LocalModelsUi(
             selectedId: String?,
             deviceRamMb: Long,
             preparation: ModelPreparation? = null,
+            outdated: Set<String> = emptySet(),
         ): LocalModelsUi = LocalModelsUi(
             catalog.map { spec ->
                 val downloading = active?.modelId == spec.id && active.state != DownloadState.FAILED
@@ -64,6 +67,7 @@ data class LocalModelsUi(
                     heavy = deviceRamMb in 1 until spec.recommendedRamMb,
                     failure = failures[spec.id].takeIf { status == LocalModelStatus.AVAILABLE },
                     preparation = preparation?.takeIf { status == LocalModelStatus.INSTALLED && spec.id == selectedId && it.modelId == spec.id },
+                    outdated = spec.id in outdated && status != LocalModelStatus.INSTALLED,
                 )
             },
         )

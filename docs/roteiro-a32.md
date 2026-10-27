@@ -167,7 +167,7 @@ adb -s RX8T10DERKW logcat -v time -s \
 
 ### Passo 5.1 — Modelo Local Leve (Qwen3 0.6B)
 - **Ação:** No app KeyFlow → aba **Raciocínio** → Origem **Local**.
-- Baixe o modelo **Leve** (~586 MB via Wi-Fi).
+- Baixe o modelo **Leve** (~585 MB via Wi-Fi).
 - Após baixar, toque no botão **"Testar"**.
 - **O que observar:**
   - **Carga a frio:** A primeira execução carrega os pesos na memória (repare no tempo decorrido até o primeiro trecho).

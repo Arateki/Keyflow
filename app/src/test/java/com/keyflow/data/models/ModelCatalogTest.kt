@@ -131,10 +131,13 @@ class ModelCatalogTest {
     // ── RCAT-02/03: catálogo de texto (LiteRT-LM) ──────────────────────────────────────────────
 
     @Test
-    fun `text catalog has the five models, smallest download first`() {
+    fun `text catalog has the six models, smallest download first`() {
         // Só os cujo repositório, commit e SHA-256 existem de verdade na API do Hugging Face (2026-10-24, 2026-10-25 e 2026-10-26).
         assertThat(ModelCatalog.TEXT.map { it.id })
-            .containsExactly("qwen3-0.6b-litertlm", "smollm2-1.7b-litertlm", "deepseek-r1-1.5b-litertlm", "gemma-4-e2b-litertlm", "gemma-4-e4b-litertlm")
+            .containsExactly(
+                "qwen3-0.6b-litertlm", "qwen2.5-1.5b-litertlm", "smollm2-1.7b-litertlm", "deepseek-r1-1.5b-litertlm", "gemma-4-e2b-litertlm",
+                "gemma-4-e4b-litertlm",
+            )
             .inOrder()
         assertThat(ModelCatalog.TEXT.map { it.totalBytes }).isInOrder()
     }
@@ -148,13 +151,13 @@ class ModelCatalogTest {
     fun `recommended RAM follows the measured peaks`() {
         assertThat(ModelCatalog.TEXT_ALL.associate { it.id to it.recommendedRamMb })
             .containsExactly(
-                "qwen3-0.6b-litertlm", 3072, "smollm2-1.7b-litertlm", 6144, "deepseek-r1-1.5b-litertlm", 4096,
+                "qwen3-0.6b-litertlm", 3072, "qwen2.5-1.5b-litertlm", 4096, "smollm2-1.7b-litertlm", 6144, "deepseek-r1-1.5b-litertlm", 4096,
                 "gemma-4-e2b-litertlm", 4096, "gemma-4-e4b-litertlm", 8192,
             )
         // O pior pico medido (em MB, no aparelho mais folgado) fica abaixo da RAM recomendada: a recomendação é de RAM total do aparelho.
         val peakMb = mapOf(
             ModelCatalog.QWEN3_0_6B to 1_946, ModelCatalog.DEEPSEEK_R1_1_5B to 2_560, ModelCatalog.GEMMA_4_E2B to 2_253,
-            ModelCatalog.SMOLLM2_1_7B to 3_379, ModelCatalog.GEMMA_4_E4B to 4_608,
+            ModelCatalog.SMOLLM2_1_7B to 3_379, ModelCatalog.GEMMA_4_E4B to 4_608, ModelCatalog.QWEN2_5_1_5B to 2_400,
         )
         peakMb.forEach { (spec, peak) -> assertThat(peak).isLessThan(spec.recommendedRamMb) }
         assertThat(ModelCatalog.TEXT_ALL.maxBy { it.recommendedRamMb }).isSameInstanceAs(ModelCatalog.GEMMA_4_E4B)
@@ -182,11 +185,11 @@ class ModelCatalogTest {
      */
     @Test
     fun `text models are named by level, without the model inside the name`() {
-        assertThat(ModelCatalog.TEXT.map { it.displayName }).containsExactly("Leve", "Intermediário", "Raciocínio", "Equilibrado", "Avançado").inOrder()
+        assertThat(ModelCatalog.TEXT.map { it.displayName }).containsExactly("Leve", "Versátil", "Intermediário", "Raciocínio", "Equilibrado", "Avançado").inOrder()
         assertThat(ModelCatalog.TEXT.map { it.displayName }).containsNoDuplicates()
         ModelCatalog.TEXT.forEach { assertThat(it.displayName).doesNotContain("(") }
         assertThat(ModelCatalog.TEXT.map { it.modelName })
-            .containsExactly("Qwen3 0.6B", "SmolLM2 1.7B", "DeepSeek R1 1.5B", "Gemma 4 E2B", "Gemma 4 E4B")
+            .containsExactly("Qwen3 0.6B", "Qwen2.5 1.5B", "SmolLM2 1.7B", "DeepSeek R1 1.5B", "Gemma 4 E2B", "Gemma 4 E4B")
             .inOrder()
     }
 
@@ -226,9 +229,16 @@ class ModelCatalogTest {
      */
     @Test
     fun `text sizes and hashes match the upstream files`() {
-        assertThat(ModelCatalog.QWEN3_0_6B.totalBytes).isEqualTo(614_236_160L)
+        assertThat(ModelCatalog.QWEN3_0_6B.totalBytes).isEqualTo(613_722_264L)
+        // Revisão fed81d17… (2026-10-27): Jinja com `enable_thinking`. O pin antigo, a3c5d805…, pensava sempre.
+        assertThat(ModelCatalog.QWEN3_0_6B.files.single().url).contains("/fed81d17517e6ea64362e917ecf7e5accff12492/")
         assertThat(ModelCatalog.QWEN3_0_6B.files.single().sha256)
-            .isEqualTo("555579ff2f4fd13379abe69c1c3ab5200f7338bc92471557f1d6614a6e5ab0b4")
+            .isEqualTo("c5f39b4191926786c3e6668b62af4d6eb15248dfc7a5348252a9b406f33f2108")
+        // Qwen2.5 1.5B: lido em 2026-10-27 (`/api/models/litert-community/Qwen2.5-1.5B-Instruct/tree/2f23bacf…`) e o SHA-256 conferido baixando o arquivo inteiro.
+        assertThat(ModelCatalog.QWEN2_5_1_5B.totalBytes).isEqualTo(1_597_922_856L)
+        assertThat(ModelCatalog.QWEN2_5_1_5B.files.single().sha256)
+            .isEqualTo("c4a9b7289365ab80fe599b844b77ad253eb3c53fb0e5d963d699146a6f01255e")
+        assertThat(ModelCatalog.QWEN2_5_1_5B.files.single().url).contains("/2f23bacf8ec78b83dfcd7271c5cb25777b1be5e0/")
         assertThat(ModelCatalog.SMOLLM2_1_7B.totalBytes).isEqualTo(1_730_949_280L)
         assertThat(ModelCatalog.SMOLLM2_1_7B.files.single().sha256)
             .isEqualTo("3c3e693157e2fb92b862b572cff74b7a353f81eb232cef682bf0fcc91855f8f1")
@@ -369,5 +379,40 @@ class ModelCatalogTest {
         assertThat(byId).containsEntry("gemma-4-e4b-litertlm", ModelVendor.GOOGLE)
         // PaddleOCR é da PaddlePaddle (Baidu), embora os arquivos ONNX venham de um repositório de terceiros no Hugging Face.
         assertThat(byId).containsEntry("ocr-paddle-latin", ModelVendor.PADDLEPADDLE)
+    }
+
+    /**
+     * Aviso de modo pensamento no card. Fontes: Qwen3, card do `Qwen/Qwen3-0.6B` ("seamless switching between thinking mode and non-thinking
+     * mode"); DeepSeek R1, o prompt abre o `<think>` sempre; Gemma 4, card do `google/gemma-4-E2B-it` e do E4B ("configurable thinking modes",
+     * liga com `<|think|>` no prompt de sistema); Qwen2.5 e SmolLM2 são modelos de instrução comuns.
+     */
+    @Test
+    fun `text models declare whether they think`() {
+        val byId = ModelCatalog.TEXT_ALL.associate { it.id to it.thinking }
+        assertThat(byId).containsExactly(
+            "qwen3-0.6b-litertlm", ThinkingSupport.OPTIONAL,
+            "qwen2.5-1.5b-litertlm", ThinkingSupport.NONE,
+            "smollm2-1.7b-litertlm", ThinkingSupport.NONE,
+            "deepseek-r1-1.5b-litertlm", ThinkingSupport.ALWAYS,
+            "gemma-4-e2b-litertlm", ThinkingSupport.OPTIONAL,
+            "gemma-4-e4b-litertlm", ThinkingSupport.OPTIONAL,
+        )
+        // O modelo que abre o `<think>` no prompt é, por definição, o que sempre pensa.
+        assertThat(ModelCatalog.TEXT_ALL.filter { it.promptOpensThink }.map { it.thinking }.toSet()).containsExactly(ThinkingSupport.ALWAYS)
+        assertThat(ModelCatalog.SPEECH.map { it.thinking }.toSet()).containsExactly(ThinkingSupport.NONE)
+    }
+
+    /**
+     * Trava de versão do catálogo: o manifesto remoto só vale se `catalogVersion >= EMBEDDED_VERSION`, então mexer num pin sem subir a versão deixaria um
+     * manifesto/cache antigo reverter o pin. Mudou um pin ou entrou modelo: suba `ModelCatalog.EMBEDDED_VERSION` e troque a impressão digital abaixo.
+     */
+    @Test
+    fun `changing a catalog pin requires bumping the embedded catalog version`() {
+        assertThat(ModelCatalog.EMBEDDED_VERSION).isEqualTo(2026102701)
+        assertThat(ModelCatalog.pinsFingerprint()).isEqualTo(PINS_FINGERPRINT_2026102701)
+    }
+
+    private companion object {
+        const val PINS_FINGERPRINT_2026102701 = "a81ee61c118ea2386f1106dd777fe053215d52af997ab525b3d26d75080e9890"
     }
 }

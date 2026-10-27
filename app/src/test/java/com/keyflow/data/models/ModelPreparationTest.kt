@@ -36,7 +36,7 @@ class ModelPreparationTest {
     @Test
     fun `preparacao so aparece no modelo instalado e selecionado de qualquer familia`() {
         listOf(ModelCatalog.PARAKEET_V3, ModelCatalog.WHISPER_BASE, ModelCatalog.WHISPER_SMALL,
-            ModelCatalog.QWEN3_0_6B, ModelCatalog.GEMMA_4_E2B, ModelCatalog.SMOLLM2_1_7B, ModelCatalog.DEEPSEEK_R1_1_5B).forEach { spec ->
+            ModelCatalog.QWEN3_0_6B, ModelCatalog.QWEN2_5_1_5B, ModelCatalog.GEMMA_4_E2B, ModelCatalog.SMOLLM2_1_7B, ModelCatalog.DEEPSEEK_R1_1_5B).forEach { spec ->
             fun compose(installed: Set<String>, selected: String?, preparing: String) = LocalModelsUi.compose(
                 catalog = listOf(spec), installed = installed, selectedId = selected, active = null,
                 failures = emptyMap(), deviceRamMb = 8192, preparation = ModelPreparation(preparing, 0),

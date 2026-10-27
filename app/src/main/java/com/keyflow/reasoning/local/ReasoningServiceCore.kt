@@ -29,6 +29,7 @@ internal class ReasoningServiceCore(
 
     private var backend: LlmBackend? = null
     private var loadedId: String? = null
+    private var loadedVersion: String = ""
     private var busy = false
     private var idleTimer: Cancellable? = null
 
@@ -50,7 +51,7 @@ internal class ReasoningServiceCore(
             idleTimer = null
             useToken++
             try {
-                val fresh = backend == null || loadedId != model.modelId
+                val fresh = !isLoaded(model)
                 val active = ensureLoaded(model, preload = true)
                 if (fresh) {
                     val started = System.nanoTime()
@@ -121,7 +122,7 @@ internal class ReasoningServiceCore(
     }
 
     private fun ensureLoaded(model: LlmModel, preload: Boolean = false): LlmBackend {
-        backend?.let { if (loadedId == model.modelId) return it }
+        backend?.let { if (isLoaded(model)) return it }
         // Libera o anterior antes de medir e carregar: a troca não precisa caber junto com ele.
         unloadCurrent()
         val candidate = backendFor(model)
@@ -157,6 +158,7 @@ internal class ReasoningServiceCore(
         }
         backend = candidate
         loadedId = model.modelId
+        loadedVersion = model.version
         return candidate
     }
 
@@ -164,7 +166,11 @@ internal class ReasoningServiceCore(
         backend?.let { runCatching { it.unload() } }
         backend = null
         loadedId = null
+        loadedVersion = ""
     }
+
+    /** O que está carregado é este modelo, desta versão do arquivo (mesmo id com outro SHA não serve). */
+    private fun isLoaded(model: LlmModel): Boolean = backend != null && loadedId == model.modelId && loadedVersion == model.version
 
     private fun scheduleIdleUnload(model: LlmModel) {
         if (model.idleUnloadMs <= 0 || backend == null) return

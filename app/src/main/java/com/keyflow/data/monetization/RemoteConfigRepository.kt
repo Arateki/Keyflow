@@ -4,10 +4,12 @@ import android.content.Context
 import com.keyflow.BuildConfig
 import com.keyflow.data.models.EngineType
 import com.keyflow.data.models.FileRole
+import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.ModelFile
 import com.keyflow.data.models.ModelKind
 import com.keyflow.data.models.ModelSpec
 import com.keyflow.data.models.ModelVendor
+import com.keyflow.data.models.ThinkingSupport
 import com.keyflow.net.KeyFlowHttpClient
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -211,10 +213,19 @@ class RemoteConfigRepository(
             )
         }
 
-        /** Manifesto vazio é o placeholder da API e, por isso, conserva o catálogo embutido. */
+        /**
+         * Manifesto vazio é o placeholder da API e, por isso, conserva o catálogo embutido. Manifesto sem `catalogVersion` ou com versão menor que
+         * [ModelCatalog.EMBEDDED_VERSION] é recusado (o chamador cai no catálogo embutido): o remoto não faz downgrade de pin. O cache passa pela
+         * mesma checagem a cada leitura, então um cache de antes de uma atualização do app também deixa de valer.
+         */
         fun parseModels(body: String): List<ModelSpec> {
-            val array = JSONObject(body).optJSONArray("models") ?: JSONArray()
+            val root = JSONObject(body)
+            val array = root.optJSONArray("models") ?: JSONArray()
             if (array.length() == 0) throw IllegalArgumentException("manifesto sem modelos")
+            val version = root.optInt("catalogVersion", 0)
+            require(version >= ModelCatalog.EMBEDDED_VERSION) {
+                "manifesto de modelos na versão $version, anterior à do catálogo embutido (${ModelCatalog.EMBEDDED_VERSION})"
+            }
             return buildList {
                 for (index in 0 until array.length()) {
                     val model = parseModel(array.getJSONObject(index))
@@ -248,6 +259,8 @@ class RemoteConfigRepository(
                 kind = kind,
                 // Fabricante é só enfeite do card: nome que esta versão não conhece vira "sem logo", não manifesto inválido.
                 vendor = ModelVendor.entries.firstOrNull { it.name == json.optString("vendor", "") },
+                // Idem: aviso informativo; ausente ou desconhecido vira "nenhum aviso".
+                thinking = ThinkingSupport.entries.firstOrNull { it.name == json.optString("thinking", "") } ?: ThinkingSupport.NONE,
             )
         }
 

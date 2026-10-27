@@ -10,6 +10,11 @@ data class LlmModel(
     val engineType: String,
     val idleUnloadMs: Long,
     val ramEstimateMb: Int,
+    /**
+     * Identidade da versão do arquivo (SHA-256 do catálogo). Dois modelos com o mesmo [modelId] e [version] diferentes são
+     * arquivos diferentes: o motor residente não serve (a atualização do catálogo troca o arquivo sob o mesmo id).
+     */
+    val version: String = "",
 ) {
     fun toParcel(): LocalLlmConfig = LocalLlmConfig().also {
         it.modelId = modelId
@@ -17,6 +22,7 @@ data class LlmModel(
         it.engineType = engineType
         it.idleUnloadMs = idleUnloadMs
         it.ramEstimateMb = ramEstimateMb
+        it.version = version
     }
 
     companion object {
@@ -26,6 +32,7 @@ data class LlmModel(
             engineType = config.engineType,
             idleUnloadMs = config.idleUnloadMs,
             ramEstimateMb = config.ramEstimateMb,
+            version = config.version.orEmpty(),
         )
     }
 }

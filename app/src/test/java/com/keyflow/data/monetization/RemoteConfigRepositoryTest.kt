@@ -3,6 +3,7 @@ package com.keyflow.data.monetization
 import com.google.common.truth.Truth.assertThat
 import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.ModelKind
+import com.keyflow.data.models.ThinkingSupport
 import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
@@ -82,6 +83,42 @@ class RemoteConfigRepositoryTest {
         assertThat(ModelCatalog.current(ModelKind.SPEECH)).isEqualTo(original)
     }
 
+    /** O remoto não faz downgrade: sem versão ou mais antigo que o embutido é recusado, e o cache antigo também. */
+    @Test
+    fun `manifesto remoto sem versão ou mais antigo que o embutido é ignorado`() = runTest {
+        val semVersao = modelsJson("legado").replace(Regex("\"catalogVersion\": \\d+,"), "")
+        assertThat(runCatching { RemoteConfigRepository.parseModels(semVersao) }.isFailure).isTrue()
+        val antigo = modelsJson("legado", ModelCatalog.EMBEDDED_VERSION - 1)
+        assertThat(runCatching { RemoteConfigRepository.parseModels(antigo) }.isFailure).isTrue()
+        assertThat(RemoteConfigRepository.parseModels(modelsJson("novo", ModelCatalog.EMBEDDED_VERSION + 1)).single().id).isEqualTo("novo")
+
+        // Rede traz o antigo: nada vira catálogo; o cache de antes de uma atualização do app (versão menor) também não vale.
+        val cache = MemoryCache()
+        cache.write("models", RemoteCacheEntry(antigo, "\"v0\""))
+        server.enqueue(MockResponse().setResponseCode(200).setBody(configJson()))
+        server.enqueue(MockResponse().setResponseCode(200).setBody(antigo))
+        val snapshot = repository(cache).refresh()
+        assertThat(snapshot.models).isEmpty()
+        ModelCatalog.applyRemoteManifest(snapshot.models)
+        assertThat(ModelCatalog.byId("legado")).isNull()
+        assertThat(ModelCatalog.QWEN3_0_6B.files.single().sha256).isEqualTo("c5f39b4191926786c3e6668b62af4d6eb15248dfc7a5348252a9b406f33f2108")
+        assertThat(ModelCatalog.byId(ModelCatalog.QWEN3_0_6B.id)).isSameInstanceAs(ModelCatalog.QWEN3_0_6B)
+    }
+
+    @Test
+    fun `thinking do manifesto é opcional e tolera valor desconhecido`() {
+        fun parse(thinking: String?) = RemoteConfigRepository.parseModels(
+            modelsJson("m").let { json ->
+                if (thinking == null) json else json.replace("\"vendor\": \"NVIDIA\",", "\"vendor\": \"NVIDIA\", \"thinking\": \"$thinking\",")
+            },
+        ).single().thinking
+
+        assertThat(parse(null)).isEqualTo(ThinkingSupport.NONE)
+        assertThat(parse("OPTIONAL")).isEqualTo(ThinkingSupport.OPTIONAL)
+        assertThat(parse("ALWAYS")).isEqualTo(ThinkingSupport.ALWAYS)
+        assertThat(parse("SOMETIMES")).isEqualTo(ThinkingSupport.NONE)
+    }
+
     @Test
     fun `config remota expõe aviso de versão mínima`() {
         val config = RemoteConfigRepository.parseConfig(configJson())
@@ -114,8 +151,9 @@ class RemoteConfigRepositoryTest {
         }
     """.trimIndent()
 
-    private fun modelsJson(id: String) = """
+    private fun modelsJson(id: String, version: Int = ModelCatalog.EMBEDDED_VERSION) = """
         {
+          "catalogVersion": $version,
           "models": [{
             "id": "$id",
             "displayName": "Rápido remoto",
