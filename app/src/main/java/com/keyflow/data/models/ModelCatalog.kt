@@ -205,6 +205,7 @@ object ModelCatalog {
     private const val GEMMA_4_REPO = "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/b3ca0d2f076785a8f4b2219ddbd2bdb99954eae1"
     private const val GEMMA_4_E4B_REPO = "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/e6a3892a8c22cf87ff99583996149cf3cb32452b"
     private const val QWEN3_REPO = "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/fed81d17517e6ea64362e917ecf7e5accff12492"
+    private const val QWEN2_5_REPO = "https://huggingface.co/litert-community/Qwen2.5-1.5B-Instruct/resolve/2f23bacf8ec78b83dfcd7271c5cb25777b1be5e0"
     private const val SMOLLM2_REPO = "https://huggingface.co/litert-community/SmolLM2-1.7B-Instruct/resolve/c0ee765a9f197467ead8f22b9bf7bbeb4e6307c7"
     private const val DEEPSEEK_R1_REPO = "https://huggingface.co/litert-community/DeepSeek-R1-Distill-Qwen-1.5B/resolve/9fd875541bb0f277e4b3cefe7d9622c4c1de2fb5"
 
@@ -232,6 +233,35 @@ object ModelCatalog {
         vendor = ModelVendor.QWEN,
         files = listOf(
             ModelFile(FileRole.MODEL, "Qwen3-0.6B.litertlm", "$QWEN3_REPO/Qwen3-0.6B.litertlm", "c5f39b4191926786c3e6668b62af4d6eb15248dfc7a5348252a9b406f33f2108", 613_722_264L),
+        ),
+    )
+
+    /**
+     * Qwen2.5 1.5B Instruct (Alibaba), INT8 (`q8`), contexto de 4096 (`ekv4096`). Licença Apache 2.0 (cards do original e da conversão, `gated: false`).
+     * Modelo de instrução comum, sem modo de pensamento: responde direto. Entrou em 2026-10-27, por decisão do Yan, como a opção multilíngue
+     * entre o Leve e o Intermediário; commit, tamanho e SHA-256 lidos da API do HF e o SHA-256 conferido baixando o arquivo inteiro
+     * (`.specs/features/reasoning-models/qwen-sem-pensar.md`).
+     */
+    val QWEN2_5_1_5B = ModelSpec(
+        id = "qwen2.5-1.5b-litertlm",
+        displayName = trKey("Versátil"),
+        summary = trKey("Uso geral e multilíngue; responde direto e bem em português."),
+        languages = trKey("Multilíngue"),
+        engineType = EngineType.LITERT_LM,
+        acceptsLanguageHint = false,
+        // Medido (2026-10-27, Vaio TL10, 7,6 GB): resposta quase perfeita em português, ~10 s (curta) e ~20 s (longa), pico de VmRSS do
+        // `:reasoning` de 2,3 GB; o README do conversor mede 2,22 GB (q8, contexto 4096). 4096: o aviso de "pesado" aparece abaixo disso e a guarda
+        // de carga exige 80% (3277 MB), como no DeepSeek (mesma base, mesma quantização e mesmo contexto). Não tentado no A32.
+        recommendedRamMb = 4096,
+        modelName = "Qwen2.5 1.5B",
+        kind = ModelKind.TEXT,
+        vendor = ModelVendor.QWEN,
+        files = listOf(
+            ModelFile(
+                FileRole.MODEL, "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.litertlm",
+                "$QWEN2_5_REPO/Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.litertlm",
+                "c4a9b7289365ab80fe599b844b77ad253eb3c53fb0e5d963d699146a6f01255e", 1_597_922_856L,
+            ),
         ),
     )
 
@@ -343,6 +373,7 @@ object ModelCatalog {
     /** Todos os modelos de texto conhecidos, do menor ao maior arquivo (a ordem de download). A de RAM, em `recommendedRamMb`, difere: o SmolLM2 pesa mais que o DeepSeek e o Gemma 4 E2B. */
     val TEXT_ALL: List<ModelSpec> = listOf(
         QWEN3_0_6B,
+        QWEN2_5_1_5B,
         SMOLLM2_1_7B,
         DEEPSEEK_R1_1_5B,
         GEMMA_4_E2B,

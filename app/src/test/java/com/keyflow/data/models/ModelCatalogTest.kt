@@ -131,10 +131,13 @@ class ModelCatalogTest {
     // ── RCAT-02/03: catálogo de texto (LiteRT-LM) ──────────────────────────────────────────────
 
     @Test
-    fun `text catalog has the five models, smallest download first`() {
+    fun `text catalog has the six models, smallest download first`() {
         // Só os cujo repositório, commit e SHA-256 existem de verdade na API do Hugging Face (2026-10-24, 2026-10-25 e 2026-10-26).
         assertThat(ModelCatalog.TEXT.map { it.id })
-            .containsExactly("qwen3-0.6b-litertlm", "smollm2-1.7b-litertlm", "deepseek-r1-1.5b-litertlm", "gemma-4-e2b-litertlm", "gemma-4-e4b-litertlm")
+            .containsExactly(
+                "qwen3-0.6b-litertlm", "qwen2.5-1.5b-litertlm", "smollm2-1.7b-litertlm", "deepseek-r1-1.5b-litertlm", "gemma-4-e2b-litertlm",
+                "gemma-4-e4b-litertlm",
+            )
             .inOrder()
         assertThat(ModelCatalog.TEXT.map { it.totalBytes }).isInOrder()
     }
@@ -148,13 +151,13 @@ class ModelCatalogTest {
     fun `recommended RAM follows the measured peaks`() {
         assertThat(ModelCatalog.TEXT_ALL.associate { it.id to it.recommendedRamMb })
             .containsExactly(
-                "qwen3-0.6b-litertlm", 3072, "smollm2-1.7b-litertlm", 6144, "deepseek-r1-1.5b-litertlm", 4096,
+                "qwen3-0.6b-litertlm", 3072, "qwen2.5-1.5b-litertlm", 4096, "smollm2-1.7b-litertlm", 6144, "deepseek-r1-1.5b-litertlm", 4096,
                 "gemma-4-e2b-litertlm", 4096, "gemma-4-e4b-litertlm", 8192,
             )
         // O pior pico medido (em MB, no aparelho mais folgado) fica abaixo da RAM recomendada: a recomendação é de RAM total do aparelho.
         val peakMb = mapOf(
             ModelCatalog.QWEN3_0_6B to 1_946, ModelCatalog.DEEPSEEK_R1_1_5B to 2_560, ModelCatalog.GEMMA_4_E2B to 2_253,
-            ModelCatalog.SMOLLM2_1_7B to 3_379, ModelCatalog.GEMMA_4_E4B to 4_608,
+            ModelCatalog.SMOLLM2_1_7B to 3_379, ModelCatalog.GEMMA_4_E4B to 4_608, ModelCatalog.QWEN2_5_1_5B to 2_400,
         )
         peakMb.forEach { (spec, peak) -> assertThat(peak).isLessThan(spec.recommendedRamMb) }
         assertThat(ModelCatalog.TEXT_ALL.maxBy { it.recommendedRamMb }).isSameInstanceAs(ModelCatalog.GEMMA_4_E4B)
@@ -182,11 +185,11 @@ class ModelCatalogTest {
      */
     @Test
     fun `text models are named by level, without the model inside the name`() {
-        assertThat(ModelCatalog.TEXT.map { it.displayName }).containsExactly("Leve", "Intermediário", "Raciocínio", "Equilibrado", "Avançado").inOrder()
+        assertThat(ModelCatalog.TEXT.map { it.displayName }).containsExactly("Leve", "Versátil", "Intermediário", "Raciocínio", "Equilibrado", "Avançado").inOrder()
         assertThat(ModelCatalog.TEXT.map { it.displayName }).containsNoDuplicates()
         ModelCatalog.TEXT.forEach { assertThat(it.displayName).doesNotContain("(") }
         assertThat(ModelCatalog.TEXT.map { it.modelName })
-            .containsExactly("Qwen3 0.6B", "SmolLM2 1.7B", "DeepSeek R1 1.5B", "Gemma 4 E2B", "Gemma 4 E4B")
+            .containsExactly("Qwen3 0.6B", "Qwen2.5 1.5B", "SmolLM2 1.7B", "DeepSeek R1 1.5B", "Gemma 4 E2B", "Gemma 4 E4B")
             .inOrder()
     }
 
@@ -231,6 +234,11 @@ class ModelCatalogTest {
         assertThat(ModelCatalog.QWEN3_0_6B.files.single().url).contains("/fed81d17517e6ea64362e917ecf7e5accff12492/")
         assertThat(ModelCatalog.QWEN3_0_6B.files.single().sha256)
             .isEqualTo("c5f39b4191926786c3e6668b62af4d6eb15248dfc7a5348252a9b406f33f2108")
+        // Qwen2.5 1.5B: lido em 2026-10-27 (`/api/models/litert-community/Qwen2.5-1.5B-Instruct/tree/2f23bacf…`) e o SHA-256 conferido baixando o arquivo inteiro.
+        assertThat(ModelCatalog.QWEN2_5_1_5B.totalBytes).isEqualTo(1_597_922_856L)
+        assertThat(ModelCatalog.QWEN2_5_1_5B.files.single().sha256)
+            .isEqualTo("c4a9b7289365ab80fe599b844b77ad253eb3c53fb0e5d963d699146a6f01255e")
+        assertThat(ModelCatalog.QWEN2_5_1_5B.files.single().url).contains("/2f23bacf8ec78b83dfcd7271c5cb25777b1be5e0/")
         assertThat(ModelCatalog.SMOLLM2_1_7B.totalBytes).isEqualTo(1_730_949_280L)
         assertThat(ModelCatalog.SMOLLM2_1_7B.files.single().sha256)
             .isEqualTo("3c3e693157e2fb92b862b572cff74b7a353f81eb232cef682bf0fcc91855f8f1")

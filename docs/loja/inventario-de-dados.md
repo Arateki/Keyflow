@@ -32,7 +32,7 @@
    - Quando o usuário seleciona a origem de voz **Local**, o áudio é processado inteiramente no dispositivo no processo isolado `:inference`.
    - Nenhum byte de áudio ou texto resultante sai do aparelho (`RoutingTranscriber.kt:23-24`, `LocalTranscriber.kt:70-130`).
 3. **Raciocínio Local (Offline via LiteRT-LM):**
-   - Modelos locais (Gemma 4 E2B, Qwen3 0.6B, SmolLM2 1.7B, DeepSeek R1 1.5B) rodam 100% no dispositivo no processo isolado `:reasoning`.
+   - Modelos locais (Gemma 4 E2B e E4B, Qwen3 0.6B, Qwen2.5 1.5B, SmolLM2 1.7B, DeepSeek R1 1.5B) rodam 100% no dispositivo no processo isolado `:reasoning`.
    - Nenhum texto de entrada ou saída sai do aparelho (`LocalReasoningEngine.kt:34-80`).
 4. **Chaves de API e Credenciais de Autenticação:**
    - Chaves de API e tokens de acesso OAuth são cifrados e protegidos pelo Android Keystore (chave mestra AES-256-GCM) no arquivo `keyflow_auth`.
