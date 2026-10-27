@@ -813,9 +813,12 @@ class SetupActivity : ComponentActivity() {
             remoteSnapshot = snapshot
             remoteConfigLoaded = true
             interstitialPolicy?.updateParams(snapshot.config.ads.toInterstitialPolicyParams())
-            ModelCatalog.applyRemoteManifest(snapshot.models)
-            // O manifest remoto pode trocar o arquivo de um modelo já instalado: reconfere o disco contra o catálogo novo.
-            withContext(Dispatchers.IO) { ModelStore.get(this@SetupActivity).refresh() }
+            // O manifest remoto pode trocar o arquivo de um modelo já instalado: reconfere o disco contra o catálogo novo. `isInstalled` já
+            // compara com o catálogo vigente a cada chamada; o refresh republica as listas da tela.
+            withContext(Dispatchers.IO) {
+                ModelCatalog.applyRemoteManifest(snapshot.models)
+                ModelStore.get(this@SetupActivity).refresh()
+            }
         }
     }
 

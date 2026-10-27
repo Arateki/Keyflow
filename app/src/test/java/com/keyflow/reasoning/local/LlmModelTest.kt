@@ -39,6 +39,13 @@ class LlmModelTest {
     }
 
     @Test
+    fun `an explicit installed version wins over the catalog sha`() {
+        val spec = com.keyflow.data.models.ModelCatalog.QWEN3_0_6B
+        val built = LlmModels.from(spec, java.io.File("/models/${spec.id}"), version = "instalado-antigo")
+        assertThat(built.version).isEqualTo("instalado-antigo")
+    }
+
+    @Test
     fun `error codes are stable and unknown codes read as engine errors`() {
         assertThat(ReasoningErrorKind.entries.map { it.code }).containsExactly(1, 2, 3).inOrder()
         ReasoningErrorKind.entries.forEach { assertThat(ReasoningErrorKind.fromCode(it.code)).isEqualTo(it) }

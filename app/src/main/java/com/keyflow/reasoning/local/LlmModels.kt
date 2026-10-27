@@ -21,7 +21,7 @@ object LlmModels {
      * catálogo — a recomendação é do aparelho inteiro (sistema e outros apps incluídos); estimativa a revisar na RSN-T19.
      * Falta o arquivo do modelo no catálogo → `IllegalArgumentException` (é erro de catálogo, não de uso).
      */
-    fun from(spec: ModelSpec, dir: File): LlmModel {
+    fun from(spec: ModelSpec, dir: File, version: String? = null): LlmModel {
         val file = requireNotNull(spec.file(FileRole.MODEL)) { "${spec.id}: modelo de texto sem arquivo MODEL no catálogo" }
         return LlmModel(
             modelId = spec.id,
@@ -29,13 +29,15 @@ object LlmModels {
             engineType = spec.engineType.name,
             idleUnloadMs = IDLE_UNLOAD_MS,
             ramEstimateMb = spec.recommendedRamMb / 2,
-            version = file.sha256,
+            version = version ?: file.sha256,
         )
     }
 
     /** O modelo instalado com esse id, ou `null` se o catálogo não o conhece ou ele não é de texto. */
     fun forId(context: Context, modelId: String): LlmModel? {
         val spec = ModelCatalog.byId(modelId)?.takeIf { it.files.any { f -> f.role == FileRole.MODEL } } ?: return null
-        return from(spec, ModelStore.get(context).dirFor(spec.id))
+        val store = ModelStore.get(context)
+        // A versão é a da instalação no disco (manifest), não a do catálogo: entre aplicar um catálogo novo e instalar o arquivo novo os bytes ainda são os antigos.
+        return from(spec, store.dirFor(spec.id), version = store.installedVersion(spec.id))
     }
 }
