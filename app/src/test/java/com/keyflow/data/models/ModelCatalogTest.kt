@@ -401,4 +401,18 @@ class ModelCatalogTest {
         assertThat(ModelCatalog.TEXT_ALL.filter { it.promptOpensThink }.map { it.thinking }.toSet()).containsExactly(ThinkingSupport.ALWAYS)
         assertThat(ModelCatalog.SPEECH.map { it.thinking }.toSet()).containsExactly(ThinkingSupport.NONE)
     }
+
+    /**
+     * Trava de versão do catálogo: o manifesto remoto só vale se `catalogVersion >= EMBEDDED_VERSION`, então mexer num pin sem subir a versão deixaria um
+     * manifesto/cache antigo reverter o pin. Mudou um pin ou entrou modelo: suba `ModelCatalog.EMBEDDED_VERSION` e troque a impressão digital abaixo.
+     */
+    @Test
+    fun `changing a catalog pin requires bumping the embedded catalog version`() {
+        assertThat(ModelCatalog.EMBEDDED_VERSION).isEqualTo(2026102701)
+        assertThat(ModelCatalog.pinsFingerprint()).isEqualTo(PINS_FINGERPRINT_2026102701)
+    }
+
+    private companion object {
+        const val PINS_FINGERPRINT_2026102701 = "a81ee61c118ea2386f1106dd777fe053215d52af997ab525b3d26d75080e9890"
+    }
 }

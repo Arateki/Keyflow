@@ -112,6 +112,20 @@ object ModelCatalog {
     @Volatile
     private var remoteModels: List<ModelSpec>? = null
 
+    /**
+     * Versão do catálogo embutido, no formato `AAAAMMDDNN`. **Suba-a sempre que um pin (commit, tamanho ou SHA-256) mudar ou um modelo entrar.**
+     * O manifesto remoto (`catalogVersion`) só vale se for maior ou igual a ela: sem isso, um manifesto ou cache antigo substituiria o catálogo
+     * inteiro e devolveria, por exemplo, o SHA legado do Qwen3 (o `ModelCatalogTest` confere a impressão digital dos pins contra esta versão).
+     */
+    const val EMBEDDED_VERSION = 2026102701
+
+    /** Impressão digital dos pins embutidos (id, nome, tamanho e SHA-256 de cada arquivo): muda se um pin mudar sem [EMBEDDED_VERSION] subir. */
+    fun pinsFingerprint(models: List<ModelSpec> = MODELS): String {
+        val lines = models.sortedBy { it.id }.flatMap { m -> m.files.map { "${m.id}:${it.fileName}:${it.bytes}:${it.sha256}" } }
+        return java.security.MessageDigest.getInstance("SHA-256").digest(lines.joinToString("\n").toByteArray())
+            .joinToString("") { "%02x".format(it) }
+    }
+
     private const val WHISPER_BASE_REPO = "https://huggingface.co/csukuangfj/sherpa-onnx-whisper-base/resolve/bb53ee204431c90d314c1cc08d28d23e5b7927cc"
     private const val WHISPER_SMALL_REPO = "https://huggingface.co/csukuangfj/sherpa-onnx-whisper-small/resolve/8f3c18b358db4d1f2fc1eae49d75cd20989e4309"
     private const val PARAKEET_REPO = "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/2bda32ec70b097a55adaa07d9a7173915b43cc78"
