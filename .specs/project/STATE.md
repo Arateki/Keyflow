@@ -3090,3 +3090,25 @@ Dois motores com ferramentas ao lado do da Anthropic: `reasoning/openai/OpenAiAg
   modelo carrega no primeiro uso." e o primeiro pedido real segue a guarda comum. Estimativa 0 (motor de eco dos testes) não bloqueia.
   Na prática, nenhum modelo de texto é pré-carregado no A32; o aquecimento de texto só vale em aparelhos com folga.
 - Instrumentados no Deck estouram o limite de ~9 min com sete classes juntas: rode em lotes (ex.: `LocalReasoningEngineTest ReasoningPanelTest`).
+
+## Qwen3 0.6B: canal oculto não comprova pensamento desativado (2026-10-27)
+
+- Investigação em `.specs/features/reasoning-models/qwen-sem-pensar.md`: o arquivo do catálogo, pin
+  `a3c5d805ae362dff7f580bc25f2dfb9a5a7eaa76`, tem marcadores ChatML legados, sem Jinja e sem o bloco vazio
+  que o tokenizer Qwen emite para `enable_thinking=false`. A afirmação anterior de que essa variável
+  desligava o pensamento nesse pin era forte demais: ela não é consultada pelo template embutido.
+- No LiteRT-LM 0.16.1, `runtime/core/tasks.cc` só instala `ThinkingBudgetConstraint` com orçamento
+  diferente de zero. Zero desliga o limitador, não é uma barreira independente que força pensamento vazio.
+  `Message.toString()` ignora os canais: provar latência exige medir `Message.channels["thought"]`.
+- O cabeçalho do Qwen recente (`fed81d17517e6ea64362e917ecf7e5accff12492`) já tem Jinja e bloco vazio;
+  não confundir revisões distintas que usam o mesmo nome de arquivo, nem prometer atualizar pesos já instalados
+  apenas alterando o pin do catálogo. A pesquisa não adiciona modelos nem promove flags de validação física.
+- SHA-256 de Qwen2.5 Instruct 1.5B Q8 e Qwen3 Instruct-2507 4B mixed INT4 recalculados lendo todos os
+  bytes anônimos, iguais ao HF. Qwen2.5 0.5B geral não encontrado pronto em `.litertlm`; a conversão
+  encontrada é um ajuste de pesca em inglês. DeepSeek Coder 1.3B tem licença própria, fora de Apache/MIT.
+- Medição bloqueada: três sondas compilaram, conferiram o Qwen e terminaram sem resultado de
+  instrumentação antes de medir geração (uma concluiu carga em 6157 ms). Nem contexto menor/duas threads/
+  cache desativado produziu uma contagem válida. O pool voltou a ligar o emulador e indicou `failed parado`;
+  sem logs do serviço/kernel do host não atribuir causa a OOM ou ao modelo. Histórico Android curto 1/1,
+  mas sem registro exato que explique as interrupções. AWS automática ficou no boot, interrompida com
+  limpeza pelo pool. Sem correção funcional ou alteração de catálogo; medir antes/depois continua pendente.
