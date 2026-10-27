@@ -135,5 +135,33 @@ class Licoes(unittest.TestCase):
             self.assertTrue(primeira.startswith(f"# {arquivo.name[:10]} — "), f"{arquivo.name}: a 1ª linha deve ser '# AAAA-MM-DD — Título'")
 
 
+class ChecksNaFilaDeMesclagem(unittest.TestCase):
+    """O checks.yml roda também na fila de mesclagem (merge_group), onde não existe `github.event.pull_request`."""
+
+    texto = (RAIZ / ".github/workflows/checks.yml").read_text(encoding="utf-8")
+
+    def gatilhos(self):
+        bloco = self.texto.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
+        return set(re.findall(r"^  (\w+):", bloco, re.M))
+
+    def test_roda_no_pr_na_main_na_fila_e_no_manual(self):
+        self.assertEqual(self.gatilhos(), {"pull_request", "push", "merge_group", "workflow_dispatch"})
+
+    def test_nada_depende_do_objeto_do_pr(self):
+        # Na fila esses valores vêm vazios ou nem existem: o passo que os lê quebra só lá, depois do PR aprovado.
+        proibidos = r"github\.event\.pull_request|github\.head_ref|github\.base_ref|GITHUB_HEAD_REF|GITHUB_BASE_REF|GITHUB_EVENT_PATH"
+        self.assertIsNone(re.search(proibidos, self.texto), "checks.yml lê o contexto do PR; use github.sha/github.ref ou um fallback")
+        for nome in sorted(set(re.findall(r"scripts/[\w.-]+", self.texto))):
+            arquivo = RAIZ / nome
+            if arquivo.is_file() and arquivo.suffix in (".sh", ".py"):
+                achado = re.search(proibidos, arquivo.read_text(encoding="utf-8"))
+                self.assertIsNone(achado, f"{nome} lê o contexto do PR, que não existe no merge_group")
+
+    def test_a_fila_nunca_cancela_a_rodada_em_curso(self):
+        # Só o push novo no mesmo PR cancela a rodada anterior; cada entrada da fila tem a sua ref e termina.
+        self.assertIn("cancel-in-progress: ${{ github.event_name == 'pull_request' }}", self.texto)
+        self.assertIn("group: checks-${{ github.ref }}", self.texto)
+
+
 if __name__ == "__main__":
     unittest.main()

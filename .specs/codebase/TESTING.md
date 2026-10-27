@@ -269,6 +269,11 @@ DeckLock (actions fixadas por SHA, `permissions: contents: read`, evidência env
   push forçado nem exclusão, e com os 7 jobs do `checks.yml` verdes (`Unit tests and build` e
   `Device (API 34, i/6)`). Admin pode mesclar um PR vermelho marcando o bypass (`gh pr merge --admin`); push
   direto na `main`, não. O `api.yml` não é obrigatório: ele só roda quando `api/` muda.
+- Fila de mesclagem (merge queue): o gatilho `merge_group` está no `checks.yml` desde o começo, então os 7 jobs rodam
+  também no commit temporário da fila. Nele não existe o contexto do PR (`github.event.pull_request`, `head_ref`,
+  `base_ref`): nenhum passo nem script chamado por ele pode lê-lo, e a concorrência não cancela rodada da fila.
+  `scripts/tests/test_mesclagem.py` trava as duas coisas. Ligar a fila é configuração do repositório (regra da `main`),
+  não código; o nome dos jobs obrigatórios tem de valer igual lá.
 - KVM é requisito dos jobs de device (`test -c /dev/kvm`): sem ele a suíte não cabe — ver
   `ENVIRONMENT.md`, sandbox sem KVM.
 - Artefatos: `unit-evidence` (relatórios JUnit) e `device-evidence-<i>` (saída bruta do `am instrument`
