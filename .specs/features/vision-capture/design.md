@@ -1,19 +1,19 @@
 # Vision Capture — Design
 
-Arquitetura do fluxo Visão (efêmero, no aparelho, com modelos abertos baixados sob demanda). Decisões em
-`context.md` (V1–V10); requisitos em `spec.md`. Feature irmã de `native-voice-models` (catálogo, downloader, processo
-isolado) e de `reasoning-models` (Qwen3 0.6B para traduzir) — o "sentido" é um contrato (pixels→texto); a UX reusa a
-linguagem de gestos que a orbe já tem.
+Arquitetura do fluxo Visão (efêmero; motores locais com modelos abertos baixados sob demanda, mais provedores de nuvem
+opcionais). Decisões em `context.md` (V1–V13; **sem tradução** desde 2026-10-27); requisitos em `spec.md`. Feature irmã de
+`native-voice-models` (catálogo, downloader, processo isolado) e de `reasoning-models` (LiteRT-LM e Gemma 4 como modelos de
+visão; cards e conexões de provedor) — o "sentido" é um contrato (pixels→texto); a UX reusa a linguagem de gestos que a orbe já tem.
 
 ## Princípio condutor
 
 **O fluxo Visão é um "parêntese" sobre a máquina de gravação.** Ele nunca a substitui: pausa a gravação ao abrir (se
 gravando), roda suas fases próprias (seleção → gestos → cópia), e devolve a orbe exatamente ao estado que ficou
-(IDLE/PAUSED). A captura é a fundação; o processamento (OCR/tradução hoje; multimodal na fase 2) é plugável sobre o
+(IDLE/PAUSED). A captura é a fundação; o processamento (OCR local, modelo de visão local ou de provedor) é plugável sobre o
 mesmo bitmap.
 
-**Modelo é dado, não código.** Nada de modelo no APK, nem SDK que baixa modelo por conta própria: o OCR é uma entrada
-do `ModelCatalog` (URL de commit + SHA-256), baixada **só pela aba Visão** com o downloader da voz. O fluxo de captura
+**Modelo é dado, não código.** Nada de modelo no APK, nem SDK que baixa modelo por conta própria: o OCR e os Gemma 4 são entradas
+do `ModelCatalog` (URL de commit + SHA-256), baixadas **só pela aba Visão** com o downloader da voz. O fluxo de captura
 só **consulta** se o modelo está utilizável e, se não está, avisa e aponta para a aba (nunca baixa).
 
 ```
@@ -27,25 +27,25 @@ VisionFlow (NOVO — máquina própria, sobreposta e efêmera)
   │            OK → FGS += type mediaProjection (só durante o fluxo)
   SELECTING  RegionSelectView sobre a TELA VIVA (retângulo + handles + tela-inteira + ✕)
   │            confirmar → ScreenFrameGrabber captura 1 frame (UI própria oculta) + recorte
-  ACTIONS    orbe TRAVADA + VisionDragTargets (padrão DragArrows) — alvos conforme a DISPONIBILIDADE dos modelos:
-  │            🖼 copiar imagem (sempre) · 📋 copiar texto (precisa do OCR) · 🌐 traduzir (OCR + tradução) · tap = cancelar
+  ACTIONS    orbe TRAVADA + VisionDragTargets (padrão DragArrows) — alvos conforme a CAPACIDADE do modelo selecionado e a sua DISPONIBILIDADE:
+  │            🖼 copiar imagem (sempre) · 📋 copiar texto (capacidade "ler texto") · 💬 perguntar ⚠️ (capacidade "responder"; só Gemma/provedor) · tap = cancelar
   │            alvo sem modelo: apagado + selo ⬇; soltar nele → AVISO "não instalado" + [Abrir Visão] → epílogo
-  WORKING    orbe "processando" (OCR em :vision; tradução em :reasoning ou nuvem); tap cancela
+  WORKING    orbe "processando" (OCR em :vision; Gemma 4 em :reasoning; ou provedor de nuvem com a IMAGEM); tap cancela
   COPYING    CopyToast ~3s (texto/preview) — tap no toast → EphemeralInput (editar → re-copiar)
   │            tap na orbe (ícone da ação) → acelera (padrão desfazer/acelerar atual)
   ▼
 fim → FGS -= mediaProjection → cache limpo → orbe restaurada (IDLE ou PAUSED que ficou)
 ```
 
-Processos (nenhum faz rede durante o fluxo):
+Processos (nenhum faz rede durante o fluxo com modelo local):
 
 ```
 principal (overlay/IME)                 :vision (NOVO)                           :reasoning (já existe)
 VisionFlow ── recorte RGBA em cacheDir/vision/ ──► VisionService (AIDL oneway)
    │                                              └ PaddleOcrEngine ─ OnnxSession ─ libkeyflow_ort.so ─dlopen─► libonnxruntime.so (do AAR do sherpa)
    │◄──────────── texto (callback) ───────────────┘
-   └ TranslateEngine ── ReasoningEngine.generate (Qwen3 0.6B) ───────────────────────────────────────────────► ReasoningService
-                     └─ (opt-in) motor de nuvem com a chave do usuário — só o TEXTO
+   └ VisionModelEngine ── LiteRT-LM (Gemma 4 + visionBackend, imagem no Content) ────────────────────────────► ReasoningService
+                      └─ (opt-in) provedor/Custom com a chave do usuário — a IMAGEM sai do aparelho (PRV-04)
 ```
 
 ## Componentes
@@ -86,9 +86,9 @@ No confirmar: oculta seletor + orbe (~2 frames), `VirtualDisplay` + `ImageReader
 
 ### 5. Fase de gestos — `VisionDragTargets` (`ACT-01`, `MODE-05`, `OCR-04`)
 Reusa o padrão **DragArrows** existente (setas/alvos, coords físicas→locais — fix do DRAG-07 já aplicado): orbe travada
-para reposição; arrastar até o alvo e soltar executa — **3 direções**:
-- 🖼 **Copiar imagem** → §10 · 📋 **Copiar texto** → OCR (§6) → clipboard · 🌐 **Traduzir** → OCR + tradução (§11) → clipboard.
-- **Disponibilidade (§9)** lida ao entrar em ACTIONS e reconferida ao soltar: alvo cujo modelo não está `Ready` é
+para reposição; arrastar até o alvo e soltar executa — **2 ou 3 direções** (conforme as capacidades):
+- 🖼 **Copiar imagem** → §10 · 📋 **Copiar texto** → modelo selecionado (OCR §6, ou §11) → clipboard · 💬 **Perguntar** ⚠️ → §11 → toast/clipboard. **Duas** direções com o PaddleOCR (ou sem modelo de visão); **três** com Gemma/provedor.
+- **Capacidade e disponibilidade (§9)** lidas ao entrar em ACTIONS e reconferidas ao soltar: o alvo "Perguntar" só existe se o modelo selecionado tem a capacidade; o alvo cujo modelo não está `Ready` é
   desenhado apagado com selo ⬇ (dado do alvo, não componente novo); soltar nele dispara o aviso (§12), não a ação.
 - **Tap na orbe = cancelar/retornar ao modo de gravação** (epílogo do fluxo → MODE-04).
 - Soltar fora de alvo: nada executa, fase continua (comportamento do DragArrows atual).
@@ -163,49 +163,42 @@ Nomes e números de versão da API C **conferidos no `onnxruntime_c_api.h` da 1.
 - **Saem** as cinco entradas de `ModelCatalog.VISION` com dados fabricados (SHA sequenciais, commits inventados, "ML Kit
   OCR Latin" como `.bin`): `ocr-fast-latin`, `mobilenet-v4-ocr`, `pp-ocrv4-multilingual`, `florence-2-nano`,
   `smolvlm-500m`. Os VLMs voltam na fase 2 com dados reais.
-- A tradução **não** cria entrada: reusa `ModelCatalog.QWEN3_0_6B` (já real). Baixar/apagar o Qwen3 pela aba Visão é o
-  mesmo `ModelStore`/downloader — quem baixou pela Raciocínio já o tem.
+- **Capacidades (`MDL-05/06`, VC-T2c)**: `ModelSpec` ganha `capabilities: Set<ModelCapability>` (`READ_TEXT`, `DESCRIBE_IMAGE`,
+  `ANSWER_ABOUT_SCREEN`, e as de texto que já existem implícitas) e o rótulo de cada uma sai de `tr("…")`; o PaddleOCR declara
+  `READ_TEXT`; `GEMMA_4_E2B` e `GEMMA_4_E4B` ganham as três de visão **sem mudar `kind`, `id` nem arquivos** (uma entrada, uma cópia em
+  disco). `ModelCatalog.visionModels()` = modelos com alguma capacidade de visão (OCR + Gemma); `TEXT` segue listando os de texto. A
+  tradução **não** cria entrada nem reusa o Qwen3 (removida, V11).
 
-### 9. Disponibilidade dos modelos (`OCR-04`, `TRD-02`)
+### 9. Disponibilidade e capacidade dos modelos (`OCR-04`, `MDL-06`)
 `VisionModelAvailability` (puro, injetável): `Ready | Missing | Downloading(pct) | Failed(reason)` por modelo, calculado
 de `ModelStore.isInstalled(id)` (marcador `manifest.json` escrito por último), `ModelDownloader.snapshot/failures`.
-Fonte única para a fase de gestos (§5), o aviso (§12) e a aba Visão (§14). Só leitura — não inicia download.
+Junto com `ModelSpec.capabilities` do modelo selecionado (ou das capacidades do provedor, quando há credencial), é a fonte única para a fase de gestos (§5), o aviso (§12) e a aba Visão (§14). Só leitura — não inicia download.
 
 ### 10. Copiar imagem (`ACT-04`, `CAP-04`, `STO-V02`)
 Bitmap → PNG em `cacheDir/vision/` → `FileProvider` (escopado ao cache) → `ClipData.newUri`. Limpeza no epílogo do fluxo.
 
-### 11. Tradução (`TRD-01..06`)
-`TranslateEngine` = identificação de origem + um `ReasoningEngine`:
-- **Identificação (`LanguageGuesser`, sem modelo novo)**: tokeniza o texto do OCR (`\p{L}+`, ≥ 2 letras, minúsculas),
-  conta palavras presentes em cada dicionário do corretor (`assets/dict/{pt,en,es}.kfd`, ~100 mil palavras, 1,9–2,1 MB
-  cada; via `WordList.foldEquals` + comparação exata com acento), com peso maior para palavra que existe em **um só**
-  idioma (pt e es compartilham muitas) e indício de diacrítico (`ã õ ç` → pt; `ñ ¿ ¡` → es). Decide pelo idioma de
-  maior taxa **se** houver ≥ 3 palavras reconhecidas e margem sobre o segundo; senão `Indeterminado`. Nunca bloqueia:
-  o resultado só (a) evita a chamada quando origem = destino e (b) acrescenta "o texto está em X" ao prompt, o que ajuda o
-  modelo de 0,6B. **Meta calibrada no corpus da VC-T9** (≥ 60 frases: 20 por idioma + 20 de outros idiomas/código):
-  ≥ 95% de acerto quando decide, preferindo abster-se a errar. Custo: carrega as 3 listas na memória do processo do
-  overlay (medir na VC-T9; se pesar, liberar após o uso). Alternativa rejeitada: pedir só ao Qwen "detecte e traduza" —
-  funciona, mas gasta uma geração para um caso (origem = destino) que os dicionários resolvem de graça; **o prompt já
-  cobre o inconclusivo** (TRD-03).
-- **Local (padrão)**: `LocalReasoningEngine` com `LlmModels.config(QWEN3_0_6B)` (`:reasoning`; thinking desligado e
-  descarga por ociosidade de 120 s já no `LiteRtBackend`). `system`: "Você traduz texto copiado de capturas de tela.
-  Responda só com a tradução, mantendo quebras de linha, números, código e nomes próprios. Traduza para {destino}.
-  [O texto está em {origem}.] Se já estiver em {destino}, devolva-o sem mudanças." Texto longo → pedaços por parágrafo
-  (~1.200 caracteres; contexto de 4096 tokens), traduzidos em sequência e juntados; cancelável (cancelar o coletor do
-  `Flow` cancela a geração — RRUN-06).
-- **Nuvem (opt-in, TRD-05)**: o mesmo `ReasoningEngine` resolvido por `ReasoningEngines` para o provedor escolhido na
-  aba Visão (OpenAI/Google/Anthropic/Custom, com a chave do cofre; `CREDITS` fora — créditos não estão na v1); o corpo
-  leva **só o texto**. Sem credencial → indisponível (a aba mostra "Conecte na aba Raciocínio"); em tempo de execução,
-  falha de rede → TRD-06.
-- **Falha** (OOM do `RamGuard`, erro do motor, rede): copia o **original** (o OCR já rodou), avisa e segue para COPYING
-  (TRD-06).
+### 11. Entender a captura — `VisionModelEngine` (`ACT-02/03`, `MDL-05`, `PRV-*`)
+Contrato: `read(imagem) → texto` e `ask(imagem, pedido) → resposta`, resultado `Text | Empty | Unavailable | Failed(kind)` (o mesmo
+formato do `OcrEngine`). Três implementações escolhidas pela origem/modelo selecionado na aba (§14):
+- **`LocalVisionEngine` (Gemma 4 E2B/E4B)**: o `LocalReasoningEngine`/`LiteRtBackend` do `:reasoning` com `EngineConfig.visionBackend`
+  e a imagem como `Content.ImageBytes` (PNG do recorte, reduzido a um lado maior de ~1024 px para caber na memória). Guarda de RAM e
+  descarga por ociosidade de 120 s já existentes; o E4B pede 8 GB e o aviso de "pesado" do `LocalModelsUi` vale aqui. ⚠️ **Falta provar
+  no aparelho** que o `.litertlm` carrega com visão (a seção `tf_lite_vision_encoder` existe nos dois arquivos, conferido em 2026-10-27;
+  o `LiteRtBackend` ainda não passa `visionBackend`) — critério de aceite da VC-T15, com o E2B.
+- **`CloudVisionEngine` (OpenAI/Anthropic/Google)**: o mesmo caminho de nuvem do Raciocínio (`ReasoningEngines`, credencial do cofre),
+  agora com a imagem no corpo (formato de cada provedor), só com modelos da lista curada de visão (PRV-02).
+- **`CustomVisionEngine`**: `POST` `chat/completions` com `image_url` (data URL) no endpoint/header/modelo digitados (PRV-03).
+Pedidos fixos: "Copiar texto" usa "Transcreva exatamente o texto desta imagem, mantendo as quebras de linha; responda só com o
+texto."; "Perguntar" usa o pedido do usuário (padrão "Descreva esta imagem."). O PaddleOCR não implementa `ask` (sem a capacidade).
+Falha (OOM, rede, cota, chave, modelo sem visão) → aviso com a causa, nada copiado, epílogo (PRV-05, MDL-04). Cancelar o coletor do
+`Flow` cancela a geração local (RRUN-06) ou a requisição.
 
-### 12. Avisos de modelo ausente (`OCR-04`, `TRD-02`)
+### 12. Avisos de modelo ausente (`OCR-04`)
 Banner overlay no mesmo estilo/janela do `CopyToast` (~6 s, mais que os 3 s porque tem ação):
 - **OCR ausente**: "Leitura de texto não instalada. Baixe o modelo (≈ 10 MB) na aba Visão e capture de novo." +
   **Abrir Visão**. Variantes: "…ainda está baixando (NN%)…" e "…não passou na verificação; baixe de novo na aba Visão."
-- **Qwen3 ausente** (motor local): "A tradução no aparelho precisa do modelo Qwen3 (≈ 586 MB). Baixe na aba Visão ou use a
-  tradução na nuvem." + **Abrir Visão**. Checado **antes** de rodar o OCR (não gasta o OCR à toa).
+- **Nenhum modelo selecionado/utilizável** (Gemma não instalado, provedor sem credencial): "Escolha e baixe um modelo na aba Visão"
+  / "Conecte um provedor na aba Visão" + **Abrir Visão**, com o mesmo critério e a mesma janela.
 - **Abrir Visão** = `SetupActivity.openAtVisaoIntent(context)` (novo `NAV_TAB_VISAO`, padrão do `openAtVozIntent`).
   Tap na orbe ou o fim do tempo = epílogo; a captura é descartada (o usuário captura de novo depois do download).
 - Todo texto novo via `tr("…")` (PT/EN/ES no `TranslationsTest`).
@@ -220,43 +213,46 @@ Banner overlay no mesmo estilo/janela do `CopyToast` (~6 s, mais que os 3 s porq
   separada e curta).
 - Só ao encerrar o COPYING o epílogo roda e o estado anterior é liberado (ACT-06).
 
-### 14. Aba Visão (`CFG-V01..03`, `MDL-02`, `TRD-05`)
-`ConfigTab.VISAO` já existe na barra (hoje `ComingSoonPanel`); a VC-T11 liga o `VisaoPanel` e o enxuga:
-- **Leitura de texto**: o cartão de modelo de sempre (`LocalModelsUi`/lista de modelos da voz): Baixar / barra + Cancelar /
-  baixado + Apagar, tamanho (~10 MB), licença (Apache-2.0), aviso de RAM.
-- **Tradução**: dropdown idioma-destino (reusa `Dropdown`/`languageLabel`); escolha **No aparelho** × **Nuvem**; no
-  aparelho, o cartão do Qwen3 0.6B (mesmo componente; 586 MB); na nuvem, provedor (os já conectados) e a nota "só o texto
-  reconhecido é enviado ao provedor; a imagem nunca sai".
-- `HelperNote` de privacidade; stub "Origem multimodal — em breve" (fase 2).
-- Sai: seletor de origem por API do painel antigo, catálogo de VLM, "Testar OCR" de mentira. Campos `vision*` de
+### 14. Aba Visão (`CFG-V01..03`, `MDL-02`, `MDL-06`, `PRV-*`)
+`ConfigTab.VISAO` já existe na barra (hoje `ComingSoonPanel`); a VC-T11 liga o `VisaoPanel` e o enxuga, e a VC-T17 acrescenta os provedores:
+- **Origem da visão** (Segmented, como Raciocínio): **Local · OpenAI · Anthropic · Google · Custom** (Créditos "Em breve").
+- **Local**: lista de cards de modelo (o componente de cartão da voz/Raciocínio, `LocalModelsUi`): **PaddleOCR**, **Gemma 4 E2B**,
+  **Gemma 4 E4B** — Baixar / barra + Cancelar / Apagar / **Usar**, tamanho, licença, aviso de RAM e, abaixo do nome, a **lista
+  de capacidades** (MDL-06: uma linha curta por capacidade, `tr("…")`, vinda de `ModelSpec.capabilities`). `visionLocalModelId` (já
+  existe) guarda o "Usar". Os Gemma aparecem instalados se já foram baixados pela Raciocínio.
+- **Provedores**: `UnifiedProviderCard` de OpenAI, Anthropic e Google com as **mesmas** `AuthActions`/conexões das outras abas (sem
+  segunda conexão; sem `ssoFiveHourFraction` fictício — dado real ou o bloco some) e o seletor de modelo filtrado por `VisionModelCatalog`
+  (lista curada id→visão, PRV-02); **Custom** com Endpoint/Header/Valor/Modelo (`ReasoningCustomFields` como molde). Os campos
+  `visionOpenAiModel/GoogleModel/AnthropicModel/Custom*` já existem em `Settings`.
+- **Nota de privacidade** (PRV-04) ao lado da escolha de nuvem: "a imagem da captura é enviada a <provedor>"; origem Local diz que nada sai.
+- `HelperNote` geral ("o download vem do Hugging Face, que vê o endereço IP").
+- Sai: "Testar OCR" de mentira, catálogo de VLM fabricado, destino de tradução (`visionTranslateTarget`, V11). Campos `vision*` de
   `Settings` que ficarem sem uso saem junto (o `SettingsRepository` ignora chave desconhecida — sem migração).
 - Rotas de galeria (debug) + goldens (VC-T12).
 
 ### 15. Dados
-`Settings`: `visionTranslateTarget` (já existe, `"pt"`); o motor da tradução (`LOCAL` padrão | provedor de nuvem) e o
-provedor da nuvem reaproveitam `visionSource`/campos de modelo por provedor que o painel antigo já persistia, no papel
-de "motor da tradução" (`CREDITS` desabilitado); o que não for usado sai (VC-T11). `OrbShortcutAction.VISION_MODE` já
-existe (VC-T1). Catálogo: `OCR_PADDLE_LATIN` no `ModelCatalog` (§8) e três papéis novos em `FileRole`.
+`Settings`: `visionSource` (Local/OpenAI/Google/Anthropic/Custom; `CREDITS` desabilitado), `visionLocalModelId` (o modelo "Usado"), o
+modelo por provedor e os campos Custom — **já existem** (painel antigo) e passam a significar "o modelo que atende os gestos".
+`visionTranslateTarget` **sai** (V11; VC-T11). `OrbShortcutAction.VISION_MODE` já existe (VC-T1). Catálogo: `OCR_PADDLE_LATIN` (§8, VC-T2a),
+`capabilities` em `ModelSpec` e nos Gemma 4 (VC-T2c) e três papéis novos em `FileRole`.
 
 ## O que NÃO muda
 `ButtonStateMachine` (o fluxo só emite o PAUSE já existente e lê o estado p/ restaurar), gravação/transcrição/pendência
 da voz, mic do teclado, notificação, abas existentes, DragArrows da gravação (ganha um modo de alvos, não um fork), o
-AAR do sherpa e o `:inference`, o `:reasoning` e o Qwen3 (só ganham um consumidor).
+AAR do sherpa e o `:inference`, o `:reasoning` e os Gemma 4 (só ganham um consumidor: a Visão), as conexões de provedor das outras abas.
 
-## Fase 2 (registrada, fora do MVP)
-`VisionProcessor` com origem configurável espelhando a Voz: `NATIVE_OCR / MULTIMODAL_LOCAL / OPENAI / GROQ / CUSTOM` —
-multimodal local via gerenciador + processo próprio (runtime MediaPipe/LiteRT), APIs via `chat/completions` com imagem;
-novas ações na fase de gestos (ex. "perguntar sobre a tela"). Vídeo (P3) = mesma infra de projeção gravando. "Colar no
-campo" como ação extra é refinamento futuro (hoje clipboard-only).
+## Fora do MVP (registrado)
+Outros VLMs locais (SmolVLM, Florence — voltam com URL/SHA reais); descrição para acessibilidade; vídeo (P3 = mesma infra de projeção
+gravando); "colar no campo" como ação extra (hoje clipboard-only). A origem multimodal **entrou no MVP** em 2026-10-27 (V12/V13).
 
 ## Plano de testes (TESTING.md)
 
 - **Unit (JVM)**: `VisionFlow` (máquina + guardas MODE-02/03 + restauração MODE-04 + epílogo único) com fakes de
   projeção/engines; `RegionGeometry` (handles/clamp/recorte); **etapas puras do OCR** (normalização, binarização/caixas,
   `unclip`, decodificação CTC, montagem de linhas/blocos, faixas e deduplicação) com tensores sintéticos;
-  `LanguageGuesser` com os `.kfd` reais de `src/main/assets` (corpus de ≥ 60 frases); `VisionModelAvailability`
-  (`Ready/Missing/Downloading/Failed`); orquestração do traduzir (identifica → modelo presente? → traduz; origem = destino;
-  falhas → original); `resolveShortcut` com VISION_MODE; timer do CopyToast (clock injetável); **regra de arquitetura**:
+  `VisionModelAvailability` (`Ready/Missing/Downloading/Failed`) e o mapeamento capacidade → alvos de gesto; `VisionModelCatalog`
+  (lista curada de modelos com visão por provedor); montagem do corpo de imagem de cada provedor/Custom e orquestração do
+  `VisionModelEngine` (modelo ausente → aviso; falha → nada copiado; a imagem só sai pelo engine de nuvem) com fakes de rede; `resolveShortcut` com VISION_MODE; timer do CopyToast (clock injetável); **regra de arquitetura**:
   `com/keyflow/vision/` não menciona `ModelDownloader`/`DownloadGateway`/`ModelDownloadService`.
 - **Instrumented**: `OnnxSession` com um `.onnx` minúsculo versionado (um `Add`) nas ABIs do emulador/A32 e prova de
   uma só `libonnxruntime.so` no APK; `PaddleOcrEngine` com bitmap gerado em teste (texto desenhado em `Canvas`, pt/en/es
@@ -264,9 +260,9 @@ campo" como ação extra é refinamento futuro (hoje clipboard-only).
   `RegionSelectView`; gestos de ação com fakes (alvo apagado → aviso; alvo vivo → ação certa — padrão dos testes de
   DragArrows); `CopyToast`/`EphemeralInput`; integração pause/restauração dirigindo o `OverlayService` real via intents
   (padrão `OverlayServiceCancelTest`); aba Visão (Compose, fakes de `ModelStore`/downloader); StrictMode `detectNetwork` nos
-  processos `:vision`/`:reasoning` durante OCR e tradução local. Consent real: UiAutomator best-effort.
+  processos `:vision`/`:reasoning` durante OCR e Gemma local; Gemma 4 E2B carregando com `visionBackend` e lendo uma imagem de teste (opt-in `assume()`, modelo real). Consent real: UiAutomator best-effort.
 - **Manual (Galaxy A32)**: e2e com consent real (inclusive DURANTE ditação), FLAG_SECURE, revogação, download real dos
-  modelos na aba Visão, tradução com Qwen3 (qualidade, tempo, RAM), nuvem opt-in, print colado em outro app, modo avião.
+  modelos na aba Visão, Gemma 4 E2B lendo/descrevendo a captura (qualidade, tempo, RAM), provedor conectado (SSO e API) e Custom, print colado em outro app, modo avião (origem Local).
 - **Screenshot**: goldens da aba Visão (claro/escuro); overlays efêmeros validados manualmente.
 
 ## Riscos / mitigação
@@ -282,9 +278,17 @@ campo" como ação extra é refinamento futuro (hoje clipboard-only).
 - **Qualidade do OCR em tela de celular** (texto pequeno, fundo escuro, ícones) → corpus fixo na VC-T6, comparando o par
   escolhido com o plano B; limite de CER fixado com a medição (proposta ⚠️: ≤ 5% em texto sintético nítido, ≤ 15% em
   capturas reais do A32).
-- **Qwen3 0.6B traduz mal ou devagar** → aviso de RAM, pedaços por parágrafo, cancelável, nuvem como saída; qualidade e
-  tempo medidos no A32 na VC-T14. Se reprovar, o plano seguinte é um modelo dedicado (OPUS-MT ONNX) numa feature própria.
-- **Identificação por dicionário erra em texto curto** → abstém-se (nunca bloqueia) e o prompt detecta (TRD-03).
+- **Gemma 4 com visão no LiteRT-LM não provado no aparelho** (o `.litertlm` tem o encoder, mas o `LiteRtBackend` nunca passou
+  `visionBackend`) → a VC-T15 prova com o E2B antes de qualquer UI prometer; se não carregar, os Gemma saem da lista de visão e
+  ficam só os provedores + PaddleOCR (a troca é dado do catálogo).
+- **RAM**: E2B pede ~4 GB e o E4B ~8 GB; o A32 (4 GB) não comporta o E4B e o E2B é no limite → aviso de "pesado" (já existe), descarga
+  por ociosidade e `OutOfMemoryError` → aviso (MDL-04).
+- **Lista curada de modelos com visão desatualiza** (provedores lançam modelos) → é dado versionado no app, conferido na VC-T17;
+  o Custom aceita qualquer id; modelo sem visão devolve erro do provedor → PRV-05.
+- **A imagem sai do aparelho com provedor** (muda a promessa de privacidade só nesta origem) → opt-in, padrão Local, nota visível na
+  aba e na política de privacidade (PRV-04, VC-T13).
+- **Cards de provedor com dados fictícios** (limites de uso fixos no painel antigo) → a VC-T17 usa os dados reais das outras abas ou
+  esconde o bloco.
 - **Memória do OCR no A32** → `:vision` isolado, carga sob demanda, descarga por ociosidade (MDL-04).
 - **Mirror dos modelos fora do nosso controle** (Hugging Face de terceiros) → URL no commit + SHA-256: se o arquivo mudar o
   download falha e o app avisa; espelhar na nossa infra é decisão futura do Yan.

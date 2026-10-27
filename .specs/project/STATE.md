@@ -3182,3 +3182,25 @@ fala em `sintese-fala/context.md`). O que ficou de lição:
 - As cinco entradas inventadas de `VISION` já tinham saído em 2026-10-24 (a lista estava vazia); nada a remover além de ajustar os
   testes que assumiam lista vazia. Goldens: `pool telas` com o build desta branch (230 PNGs) e `scripts/diff-screens.sh` (precisa do ImageMagick de `/srv/dev/ferramentas/bin` no PATH) → 230/230 dentro do limiar, todos com 0 px de diferença; nada aprovado, nada a restaurar.
 
+## 2026-10-27 — vision-capture: sem tradução, Gemma 4 e provedores na aba Visão (decisões do Yan, 02:27)
+
+- **Decisões** (`vision-capture/context.md` V11–V13): (1) a Visão **não traduz** — saem a VC-T9, TRD-01..06, o Qwen3 como tradutor, a
+  identificação de idioma e `Settings.visionTranslateTarget` (remoção na VC-T11); (2) modelos locais = PaddleOCR e Gemma 4 E2B/E4B, cada
+  card com a lista de capacidades (`tr("…")`); (3) provedores OpenAI/Anthropic/Google (SSO e API, só modelos com visão) e Custom, com os
+  cards e as conexões que as outras abas já têm. Tasks novas: VC-T2c (capacidades no `ModelSpec`), VC-T15 (motor de visão), VC-T16 (gesto
+  "Perguntar" ⚠️ proposta) e VC-T17 (provedores); VC-T11, T12, T13, T14 reescritas; T9 reservada como removida.
+- **Os dois `.litertlm` do Gemma 4 têm o encoder de visão.** Prova: `curl -r 0-4194303` no arquivo de cada commit do catálogo e `strings`:
+  cabeçalho `LITERTLM` e as seções `tf_lite_vision_encoder`, `tf_lite_vision_adapter`, `tf_lite_end_of_vision` (também áudio:
+  `tf_lite_audio_encoder_hw`, `tf_lite_audio_adapter`), os tokens `<|image>`/`<image|>` e o template com `<|image|>`. O AAR
+  `litertlm-android` 0.16.1 tem `Content.ImageBytes`/`ImageFile` e `EngineConfig.visionBackend`. **Isso não prova que carrega com visão no
+  aparelho**: o `LiteRtBackend` nunca passou `visionBackend`; a VC-T15 prova com o E2B antes de a UI prometer, e o plano se não carregar
+  é tirar os Gemma da lista de visão (dado do catálogo) e seguir só com provedores.
+- **Um `ModelSpec` por arquivo, capacidades como dado.** Duplicar os Gemma com `kind = VISION` quebraria `byId`/`ModelStore` (mesmo `id`) e
+  baixaria 2,6 GB duas vezes; a Visão lista por `capabilities`, a Raciocínio por texto, e "instalado" vale nas duas abas.
+- **A promessa de privacidade muda de escopo.** Com um provedor selecionado a **imagem** sai do aparelho; a regra "nenhum dado sai" passa a
+  valer para a origem Local (padrão) e o provedor é opt-in com nota visível e menção na política de privacidade (PRV-04).
+- **O painel Visão antigo tem dados fictícios** nos cards de provedor (`ssoFiveHourFraction = 0.15f`, "Reseta às 15:30", listas fixas
+  `VISAO_*_MODELS`): a VC-T17 os troca pelos reais das outras abas ou esconde o bloco.
+- **Pendente do Yan**: confirmar o gesto "Perguntar" (ACT-03, único caminho para "Descrever imagem"/"Responder sobre a tela") e a lista
+  curada de modelos com visão (a API dos provedores não informa visão de forma confiável).
+

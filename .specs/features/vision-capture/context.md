@@ -1,8 +1,8 @@
-# Vision Capture — Context (brainstorm 2026-07-01; revisto em 2026-10-24)
+# Vision Capture — Context (brainstorm 2026-07-01; revisto em 2026-10-24 e 2026-10-27)
 
 Decisões sobre o **modo Visão da orbe**. V1/V2/V4/V5 foram decididas pelo Yan no brainstorm de 2026-07-01. Em
 **2026-10-24** o Yan fixou seis decisões que trocam o motor da Visão (V3, V6 e V7–V10 abaixo): o ML Kit sai e tudo o
-que roda no aparelho passa a ser **modelo aberto baixado sob demanda**. O que é proposta minha (a confirmar) vem
+que roda no aparelho passa a ser **modelo aberto baixado sob demanda**. Em **2026-10-27** o Yan fez mais três decisões (V11–V13): sem tradução na Visão, modelos locais PaddleOCR + Gemma 4 com lista de capacidades nos cards, e provedores (SSO/API + Custom) só com modelos de visão — **V8 e V10 ficam superadas**. O que é proposta minha (a confirmar) vem
 marcado com ⚠️.
 
 ## Decisões do Yan de 2026-10-24 (fixas)
@@ -33,7 +33,7 @@ contrato). "Descrição como intermediário para outro modelo" é anti-pattern (
 "Captura de material bruto da tela que poderia ser passado pra um multimodal configurado no futuro; mesmo sem essa
 integração ainda é ferramental útil."
 - **MVP**: capturar a tela → **OCR** (extrair texto) → **copiar / traduzir** + **copiar o print** para a área de
-  transferência. OCR 100% local; tradução local por padrão (V8), nuvem só por opção.
+  transferência. OCR 100% local. (A tradução prevista aqui foi removida em 2026-10-27 — V11.)
 - **Fase 2 (prevista na arquitetura, fora do MVP)**: a captura (imagem bruta) vira insumo de **origem multimodal
   configurável** espelhando a aba Voz — nativos (VLM via gerenciador de modelos + processo próprio) +
   OpenAI/Groq/Custom (`chat/completions` com imagem). "Descrever a tela"/perguntas viram casos dessa fase.
@@ -85,7 +85,7 @@ O "modo" não é persistente — existe só **entre a captura e a ação pós-ca
 2. Consentimento do sistema → **seletor de área** sobre a tela viva.
 3. Confirmar → captura + recorte da área.
 4. A orbe **trava** (sem reposição) e entra na fase de **gestos de arrasto com ícones/setas** — mesmo padrão DragArrows
-   da gravação, com **3 direções**: **Copiar imagem** · **Copiar texto (OCR)** · **Traduzir texto**. **Cancelar = um
+   da gravação, com **3 direções**: **Copiar imagem** · **Copiar texto (OCR)** · **Traduzir texto** *(superado em 2026-10-27, V11/V13: sem Traduzir; a 3ª direção vira "Perguntar", ⚠️ proposta que só aparece com modelo de visão selecionado)*. **Cancelar = um
    toque na orbe** — semanticamente uma ação de **retorno ao modo de gravação** (Yan, 2026-07-01; rejeitada a 4ª direção
    de arrasto).
 5. Ao copiar texto/traduzir → **estado de "cópia"**: toast de ~3 s com o texto; **tocar no toast abre um input
@@ -96,10 +96,10 @@ O "modo" não é persistente — existe só **entre a captura e a ação pós-ca
 - Entrega é **clipboard-only** no MVP (sem "colar no campo").
 - Consentimento negado / cancelar em qualquer fase → aborta com aviso e restaura o estado (item 6).
 - Atalho ignorado durante SENDING/CANCELLING (estados transitórios da voz).
-- **Novo (decisão 5)**: sem o modelo de OCR, soltar em "Copiar texto"/"Traduzir" não faz OCR: mostra o aviso que leva
+- **Novo (decisão 5)**: sem o modelo de OCR, soltar em "Copiar texto" (ou "Traduzir", até 2026-10-27) não faz OCR: mostra o aviso que leva
   à aba Visão e o fluxo encerra pelo epílogo (a captura é descartada; depois de baixar, o usuário captura de novo).
 
-## V6 — Config: a aba Visão ⚠️ (revisto)
+## V6 — Config: a aba Visão ⚠️ (revisto; conteúdo superado pela V12/V13 em 2026-10-27, o gating segue)
 A aba **já existe** na barra (`ConfigTab.VISAO`, grupo Capacidades, hoje com o cartão "Em breve"); a "6ª aba" do
 desenho original ficou para trás quando a barra foi reorganizada em grupos. Conteúdo do MVP: cartão **Leitura de
 texto** (baixar/apagar o modelo de OCR, tamanho, licença), cartão **Tradução** (idioma-destino; motor: no aparelho com o
@@ -119,7 +119,7 @@ existente × spec"): a VC-T11 o reduz ao conteúdo acima.
   importa o downloader). Falta o modelo → aviso + atalho para a aba (OCR-04, TRD-02).
 - Custo de APK da Visão = só o shim nativo do runtime (V9), medido na VC-T2b.
 
-## V8 — Tradução: Qwen3 0.6B local; nuvem opcional ✅ (decisão 4)
+## V8 — ~~Tradução: Qwen3 0.6B local; nuvem opcional~~ **SUPERADA em 2026-10-27 (V11)** — texto abaixo só como histórico
 - **Padrão**: o Qwen3 0.6B do catálogo (`qwen3-0.6b-litertlm`, 614.236.160 B, Apache-2.0, já em `app/licenses/`), pelo
   `ReasoningEngine`/`:reasoning` que a aba Raciocínio já usa (thinking desligado, descarga por ociosidade de 120 s,
   guarda de RAM). Sem modelo novo, sem decodificador autoregressivo próprio.
@@ -136,7 +136,7 @@ O AAR do sherpa-onnx 1.13.8 traz a ORT **1.28.2** (`strings`/`nm -D` na `libonnx
 JNI própria (C, `dlopen`) × `onnxruntime-android` + `pickFirst`. Escolhida a JNI própria: uma só ORT no processo, a do
 sherpa (a transcrição local é o núcleo do produto e não pode quebrar por causa do OCR); custo = NDK/CMake no build.
 
-## V10 — Identificação de idioma: pelos dicionários de correção do app, sem modelo novo ⚠️ (escolha de design)
+## V10 — ~~Identificação de idioma: pelos dicionários de correção do app~~ **SUPERADA em 2026-10-27 (V11, sem tradução)** — texto abaixo só como histórico
 - O app já tem `assets/dict/{pt,en,es}.kfd` (~100 mil palavras cada) do corretor do teclado. A origem é a que tem a
   maior taxa de palavras reconhecidas; poucas palavras ou empate = **indeterminado**, e isso **não bloqueia** a
   tradução: o Qwen recebe "detecte o idioma" (TRD-03).
@@ -146,6 +146,51 @@ sherpa (a transcrição local é o núcleo do produto e não pode quebrar por ca
   (decisão 3) e a licença do artigo é CC-BY-SA 3.0 (não reconferido aqui; descartado de qualquer forma por precisar de
   biblioteca nativa própria e por haver alternativa sem modelo novo).
 - ML Kit Language ID sai junto com o resto do ML Kit.
+
+## Decisões do Yan de 2026-10-27 (fixas; 02:27)
+
+## V11 — Nada de tradução na Visão ✅
+A Visão **não traduz**: saem a ação Traduzir, o cartão Tradução da aba, o Qwen3 0.6B como tradutor (V8), a identificação de
+idioma pelos dicionários (V10), os requisitos TRD-01..06 e a VC-T9. O Qwen3 segue no app como modelo de texto da aba
+Raciocínio, sem papel na Visão. `Settings.visionTranslateTarget` (criado pelo painel antigo; a VC-T1 só testou) fica sem uso:
+**candidato a remoção na VC-T11**. Quem quiser traduzir o texto copiado usa a aba Raciocínio ou outro app.
+
+## V12 — Modelos locais da Visão: PaddleOCR + Gemma 4 (E2B e E4B), cada card com a lista de capacidades ✅ (decisão); ⚠️ detalhes
+- **PaddleOCR** (OCR, VC-T2a) e os **Gemma 4 E2B e E4B** (multimodais, LiteRT-LM): os **mesmos arquivos** que já estão no
+  catálogo de texto (`gemma-4-e2b-litertlm`, `gemma-4-e4b-litertlm`). ⚠️ Escolha de design: um `ModelSpec` só, com um campo de
+  **capacidades** (`capabilities`); a aba Visão lista os modelos que têm capacidade de visão, a Raciocínio os que têm texto — uma
+  cópia em disco, um download, "instalado" vale nas duas abas. Duplicar a entrada com `kind = VISION` quebraria `byId` e o
+  `ModelStore` (mesmo `id`) e baixaria 2,6 GB duas vezes.
+- **Conferido em 2026-10-27 que os dois `.litertlm` têm o encoder de visão.** Leitura por `Range` dos primeiros 4 MiB de cada
+  arquivo (commits do catálogo): cabeçalho `LITERTLM` e seções `tf_lite_vision_encoder`, `tf_lite_vision_adapter`,
+  `tf_lite_end_of_vision` (e, de brinde, `tf_lite_audio_encoder_hw`, `tf_lite_audio_adapter`, `tf_lite_end_of_audio`,
+  `tf_lite_mtp_drafter`), tokens `<|image>`/`<image|>` e o template com `<|image|>`. O README do E2B diz que os modelos de visão e
+  de áudio "são carregados sob demanda" para poupar memória. O AAR `litertlm-android` 0.16.1 do app tem `Content.ImageBytes` e
+  `Content.ImageFile` e `EngineConfig.visionBackend`/`audioBackend`. **Não provado**: carregar o modelo com `visionBackend` e
+  receber uma imagem no aparelho (o `LiteRtBackend` atual não passa `visionBackend`); isso é o "Done when" da VC-T15, com o E2B no
+  emulador/A32. RAM: o E2B pede 4096 MB recomendados e o E4B 8192 (ver `ModelCatalog`); o A32 (4 GB) não comporta o E4B.
+- **Lista de capacidades por card** (texto por `tr("…")`; vem do dado `capabilities`, e os gestos se habilitam por ela): PaddleOCR →
+  "Ler texto da tela"; Gemma 4 → "Ler texto", "Descrever imagem", "Responder sobre a tela". Provedores de nuvem: os modelos de visão
+  também lêem, descrevem e respondem, mas o card de provedor não lista capacidades (a capacidade é do modelo escolhido).
+- Gemma 4 E4B segue `validatedOnDevice = false` (só no debug) até a prova no aparelho; o E2B já é do release como modelo de texto,
+  mas como modelo de **visão** só é oferecido depois da VC-T15.
+
+## V13 — Provedores na aba Visão, só modelos com visão, mais Custom ✅ (decisão); ⚠️ detalhes
+- **Reuso, não cópia**: OpenAI, Anthropic e Google com os mesmos `UnifiedProviderCard` (sub-abas **Assinatura**/SSO e **API**) e as
+  mesmas conexões (`AuthActions` por provedor, cofre `CredentialStore`) das abas Transcrição e Raciocínio; **Custom** =
+  endpoint compatível com `chat/completions` com imagem, no molde do `ReasoningCustomFields`. O painel antigo da Visão já tem
+  esses cards, mas com limites de uso **fictícios** (`ssoFiveHourFraction = 0.15f`, "Reseta às 15:30") e listas fixas de modelos
+  (`VISAO_OPENAI_MODELS`): a VC-T17 os troca pelos dados reais das outras abas.
+- **Só modelos com visão**: ⚠️ a listagem de modelos dos provedores não informa visão de forma confiável, então a lista é curada no
+  app (id → visão), conferida na documentação de cada provedor na VC-T17; modelo desconhecido não aparece, exceto no Custom.
+- **Privacidade (consequência)**: com um provedor selecionado a **imagem** sai do aparelho. A decisão 2 de 2026-10-24 ("nenhum dado
+  sai") passa a valer para a origem **Local** (a padrão); o provedor é opção explícita, com nota visível na aba e na política de
+  privacidade (PRV-04). Isso reverte a regra antiga "OCR/imagem nunca vão para a nuvem" **somente** quando o usuário escolhe um provedor.
+- **Gestos ⚠️ (proposta)**: com a tradução fora, ficam Copiar imagem e Copiar texto; as capacidades "Descrever imagem" e "Responder
+  sobre a tela" precisam de um caminho — proposta: 3ª direção **Perguntar** (ACT-03), que abre o input efêmero com o pedido (padrão
+  "Descreva esta imagem") e põe a resposta no toast/clipboard. Só aparece com um modelo de visão selecionado. **A confirmar com o Yan.**
+- **Qual modelo atende cada gesto**: o selecionado na aba (origem Local: o card "Usar"; nuvem: o modelo do provedor). PaddleOCR →
+  só Copiar texto. Gemma/provedor → Copiar texto (lê o texto pela IA) e Perguntar.
 
 ## Pesquisa de 2026-10-24 — o que foi conferido e o que o relatório errou
 Fonte: `modelos-abertos.md` e `provas.txt` da equipe (gem2), reconferidos:
@@ -161,9 +206,6 @@ Fonte: `modelos-abertos.md` e `provas.txt` da equipe (gem2), reconferidos:
   SDK. A tradução do ML Kit só existe embutida.
 
 ## Fora do MVP (registrado para fase 2/3)
-- Origem multimodal da Visão (nativos VLM + APIs) consumindo a captura bruta — reusa o gerenciador de modelos e um
-  processo próprio (runtime LiteRT/MediaPipe para VLM). Os VLMs que estavam no catálogo (SmolVLM, Florence) tinham dados
-  fabricados e saem na VC-T2a; voltam na fase 2 com URL/SHA reais.
-- Perguntar sobre a tela ("o que é esse erro?") e descrição de acessibilidade.
+- **Entrou no MVP em 2026-10-27 (V12/V13)**: origem multimodal (Gemma 4 local + provedores/Custom) e "perguntar sobre a tela". Continuam fora: outros VLMs locais (SmolVLM, Florence — tinham dados fabricados; voltam com URL/SHA reais) e a descrição para acessibilidade.
 - Gravar vídeo da tela (P3; mesma sessão MediaProjection).
-- OCR por API dedicada (Google Cloud Vision etc.) — mandaria a imagem para fora; sem ganho vs VLM.
+- OCR por API dedicada (Google Cloud Vision etc.) — sem ganho vs os modelos de visão dos provedores da aba.

@@ -1,14 +1,15 @@
 # Vision Capture — Tasks
 
-**Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (V1–V10)
-**Status**: Spec reescrita em 2026-10-24 (branch `equipe/visao`): o **ML Kit saiu** por decisão do Yan (métricas ao Google
-e modelos embutidos no APK); OCR e tradução passam a usar **modelos abertos baixados sob demanda pela aba Visão** (OCR:
-PaddleOCR em ONNX; tradução: Qwen3 0.6B já do catálogo, ou nuvem por opção). A VC-T1 está feita; a VC-T2 antiga (deps do
-ML Kit) foi **revertida** (`427b3d1`) e virou a VC-T2a + VC-T2b; a VC-T6 virou o `OcrEngine` sobre ONNX; a VC-T11 sobe
-na ordem (o aviso de "modelo não instalado" aponta para a aba). Decidido: 3 direções + tap na orbe = cancelar/retorno à
-gravação; propostas ⚠️ restantes: toast sem input p/ imagem; gating da aba; par de modelos do OCR (medido na VC-T6);
-runtime ONNX (design §7). A aba Visão que já existe no app (origem Créditos/Local/OpenAI/…) contradiz a spec: ver
-`STATE.md` › "vision-capture — aba Visão existente × spec" (a VC-T11 a reconcilia).
+**Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md` (V1–V13)
+**Status**: Spec reescrita em 2026-10-24 (branch `equipe/visao`): o **ML Kit saiu** (métricas ao Google, modelos embutidos no APK).
+**Revisão de 2026-10-27 (decisões do Yan, context V11–V13):** (1) **nada de tradução** na Visão — a VC-T9 foi **removida**, com
+TRD-01..06 e o Qwen3 como tradutor; (2) modelos locais = **PaddleOCR** (feito, VC-T2a ✅) e **Gemma 4 E2B/E4B** (mesmos arquivos do
+catálogo de texto, com `capabilities`; **VC-T2c**), cada card com a lista de capacidades; (3) a aba tem **provedores** (OpenAI,
+Anthropic, Google com SSO/API, só modelos com visão, e Custom; **VC-T17**), reusando cards e conexões das outras abas. Entram a
+**VC-T15** (motor de visão: Gemma local + nuvem/Custom) e a **VC-T16** (gesto "Perguntar", ⚠️ proposta). VC-T1 e VC-T2a feitas; a
+VC-T2 antiga (ML Kit) foi revertida (`427b3d1`). Propostas ⚠️ restantes: gesto "Perguntar"; toast sem input p/ imagem; gating da aba;
+par de modelos do OCR (medido na VC-T6); runtime ONNX (design §7); lista curada de modelos com visão. A aba Visão que já existe no app
+(origem Créditos/Local/OpenAI/…) é reconciliada pela VC-T11/VC-T17: ver `STATE.md` › "vision-capture — aba Visão existente × spec".
 
 > Gate no sandbox: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon <task>`
 > (servidor: ver `AGENTS.md`). Instrumentado escopado: `ANDROID_SERIAL=emulator-5554`. Antes de instalar no device do Yan:
@@ -20,19 +21,19 @@ runtime ONNX (design §7). A aba Visão que já existe no app (origem Créditos/
 ## Execution Plan
 
 ```
-Fase A (fundação):   VC-T1 ──┐   VC-T2a ──┐   VC-T2b ──┐
+Fase A (fundação):   VC-T1 ──┐   VC-T2a ✅──┐   VC-T2b ──┐   VC-T2c (T2a) ──┐
 Fase B (fluxo):      VC-T1 → VC-T3 → VC-T4 → VC-T5
 Fase C (OCR):        (T2a, T2b) → VC-T6 [P-unit]
-Fase G (aba):        (T1, T2a) → VC-T11 → VC-T12
+Fase G (aba):        (T1, T2a, T2c) → VC-T11 → VC-T17 → VC-T12
 Fase D (ações):      (T4, T5, T6, T11) → VC-T7 → VC-T8
-Fase E (tradução):   T7 → VC-T9
-Fase F (cópia):      (T7, T9) → VC-T10
-Fase H (loja/valid.): (T3, T6, T8) → VC-T13;  (T10, T11, T12, T13) → VC-T14
+Fase F (cópia):      T7 → VC-T10
+Fase E (entender):   (T2c, T7, T17) → VC-T15 → (T10, T15) → VC-T16     [VC-T9 removida: sem tradução]
+Fase H (loja/valid.): (T3, T6, T8) → VC-T13;  (T10, T12, T13, T16, T17) → VC-T14
 ```
-Ordem prática sequencial: T1 → T2a → T2b → T3 → T4 → T5 → T6 → T11 → T12 → T7 → T8 → T9 → T10 → T13 → T14.
-**`[P]`**: partes unit de T6 podem andar em paralelo com a Fase B; a T11 só precisa de T1 e T2a (pode andar junto da
+Ordem prática sequencial: T1 → T2a → T2b → T2c → T3 → T4 → T5 → T6 → T11 → T17 → T12 → T7 → T8 → T10 → T15 → T16 → T13 → T14.
+**`[P]`**: partes unit de T6 podem andar em paralelo com a Fase B; a T11 só precisa de T1, T2a e T2c (pode andar junto da
 Fase B/C); o resto serializa no device (TESTING.md). A T11 sobe na frente da T7 porque o aviso de "modelo não instalado"
-leva à aba Visão e o gesto de texto só funciona de ponta a ponta com o download dela.
+leva à aba Visão e o gesto de texto só funciona de ponta a ponta com o download dela; a T17 (provedores) vem logo depois da T11 porque a T15 precisa de modelos de nuvem para testar.
 
 ---
 
@@ -79,6 +80,21 @@ leva à aba Visão e o gesto de texto só funciona de ponta a ponta com o downlo
   oferece download de um OCR que não faz OCR; a Docs só cita a licença quando ele for promovido (VC-T6/T11 viram a chave). Testes:
   `ModelCatalogTest` (pins, papéis, release x debug), `LocalModelsUiTest` (`EMPTY_VISION` = só o OCR), `DocsSectionsTest`;
   `PinSanityTest`, `TranslationsTest` e `ArchitectureRulesTest` seguem verdes.
+
+### VC-T2c — Capacidades no `ModelSpec` + Gemma 4 como modelos da Visão *(nova, 2026-10-27; V12)*
+- **What**: `ModelCapability` (enum: `READ_TEXT`, `DESCRIBE_IMAGE`, `ANSWER_ABOUT_SCREEN` + rótulos `tr("…")`: "Ler texto da tela",
+  "Descrever imagem", "Responder sobre a tela") e `ModelSpec.capabilities: Set<ModelCapability> = emptySet()`; `OCR_PADDLE_LATIN` =
+  `{READ_TEXT}`; `GEMMA_4_E2B` e `GEMMA_4_E4B` ganham `{READ_TEXT, DESCRIBE_IMAGE, ANSWER_ABOUT_SCREEN}` **sem mudar `id`, `kind` nem
+  arquivos** (uma entrada, uma cópia em disco; MDL-05); `ModelCatalog.visionModels()` (OCR + Gemma, respeitando `visibleIn`/
+  `validatedOnDevice`) alimenta a lista da Visão; `LocalModelsUi` ganha o campo de capacidades por item (a UI do card é da VC-T11).
+  Registrar no `STATE.md` a conferência de que os dois `.litertlm` têm `tf_lite_vision_encoder`/`vision_adapter` (feita em
+  2026-10-27: leitura por `Range` dos primeiros 4 MiB; context V12) e que o `LiteRtBackend` ainda não passa `visionBackend`.
+- **Where**: `data/models/ModelCatalog.kt`, `ui/config/LocalModels.kt`, `i18n/Translations*.kt`, testes de catálogo.
+- **Depends on**: VC-T2a. **Requirement**: MDL-05, MDL-06 (dado).
+- **Done when**: unit: PaddleOCR só `READ_TEXT`; Gemma com as três e `kind == TEXT`; `visionModels()` = OCR + Gemma (E4B só no debug
+  enquanto `validatedOnDevice = false`); `TEXT`/Raciocínio inalterados (nenhum teste de texto muda); `byId` resolve os mesmos
+  objetos; `TranslationsTest` cobre os rótulos; `PinSanityTest` e `verify-model-catalog.py` verdes (nenhum pin novo).
+- **Tests**: unit. **Gate**: `build` + `testDebugUnitTest`.
 
 ### VC-T2b — Runtime ONNX próprio (JNI sobre a `libonnxruntime.so` do AAR do sherpa)
 - **What**: (1) **ambiente**: provisionar NDK e CMake com versões fixas (`ndkVersion` no Gradle) em
@@ -174,18 +190,18 @@ leva à aba Visão e o gesto de texto só funciona de ponta a ponta com o downlo
 ## Fase D — Ações por gesto
 
 ### VC-T7 — Fase de gestos (`VisionDragTargets`) + Copiar texto + aviso de modelo ausente
-- **What**: reusar o componente DragArrows (alvos/setas com ícones — dados, não fork), **3
-  direções**: 🖼 imagem · 📋 texto · 🌐 traduzir; **tap na orbe = cancelar/retorno à gravação**
+- **What**: reusar o componente DragArrows (alvos/setas com ícones — dados, não fork), **2 direções** nesta task:
+  🖼 imagem · 📋 texto (o alvo 💬 "Perguntar" entra na VC-T16, por capacidade); **tap na orbe = cancelar/retorno à gravação**
   (epílogo → MODE-04); orbe travada p/ reposição (MODE-05); soltar no alvo executa; fora de alvo
   → continua. **Disponibilidade** (`VisionModelAvailability`, design §9): alvo sem modelo utilizável aparece apagado com selo
   ⬇ (ACT-01); soltar nele mostra o **aviso** de OCR-04 (design §12) com **Abrir Visão** (`SetupActivity.openAtVisaoIntent`,
   novo `NAV_TAB_VISAO`) e encerra pelo epílogo, **sem OCR e sem download**. **Copiar texto**: OCR (T6) → clipboard (ACT-02);
-  `Empty` → aviso + epílogo (OCR-02). Regra de arquitetura: `com/keyflow/vision/` não menciona o downloader (MDL-02). Ações
-  imagem/traduzir chegam em T8/T9 (alvos presentes, fiação depois).
+  `Empty` → aviso + epílogo (OCR-02). Regra de arquitetura: `com/keyflow/vision/` não menciona o downloader (MDL-02). Ação
+  imagem chega na T8 (alvo presente, fiação depois); com o PaddleOCR selecionado o texto sai da T6, com Gemma/provedor da T15.
 - **Where**: `overlay/DragArrowsView.kt` (modo de alvos), `vision/VisionFlow.kt`, `vision/VisionModelAvailability.kt`,
   `ui/SetupActivity.kt`, `ArchitectureRulesTest.kt`, `i18n/Translations*.kt`.
 - **Depends on**: VC-T4, VC-T5, VC-T6, VC-T11 (o aviso aponta para a aba Visão).
-- **Requirement**: ACT-01, ACT-02, MODE-05, MODE-04 (aviso), OCR-02 (fluxo), OCR-04, MDL-02.
+- **Requirement**: ACT-01 (parcial), ACT-02 (parcial: PaddleOCR), MODE-05, MODE-04 (aviso), OCR-02 (fluxo), OCR-04, MDL-02.
 - **Done when**: unit do mapeamento direção→ação, do travamento e da disponibilidade (`Ready/Missing/Downloading/Failed`) →
   alvo apagado/aviso certo; regra de arquitetura verde (e vermelha se alguém importar o downloader); instrumented: arrasto
   sintético até cada alvo dispara a ação certa (padrão dos testes de gesto existentes); sem modelo (fake do store) o aviso
@@ -202,25 +218,43 @@ leva à aba Visão e o gesto de texto só funciona de ponta a ponta com o downlo
   limpa `cacheDir/vision/`.
 - **Tests**: instrumented. **Gate**: `full`.
 
-## Fase E — Tradução
+## Fase E — Entender a captura (multimodal) *(substitui a Fase "Tradução", removida em 2026-10-27)*
 
-### VC-T9 — `LanguageGuesser` + `TranslateEngine` + ação Traduzir *(antes: ML Kit Language ID/Translate)*
-- **What**: `LanguageGuesser` sobre os dicionários do corretor (`assets/dict/*.kfd`, design §11): taxa de palavras
-  reconhecidas por idioma, peso por palavra exclusiva, indício de diacrítico, `Indeterminado` com poucas palavras/empate;
-  `TranslateEngine`: (a) **checagem prévia** de disponibilidade (Qwen3 ausente → aviso TRD-02 com **Abrir Visão**, antes de rodar
-  o OCR); (b) origem = destino → "Já está em …" sem chamar o modelo, original no clipboard (TRD-03); (c) **local**: Qwen3
-  0.6B pelo `LocalReasoningEngine`, prompt do design §11, texto longo em pedaços por parágrafo, cancelável; (d) **nuvem**
-  (opt-in): `ReasoningEngines` com o provedor escolhido e a chave do cofre, **só o texto** (TRD-05); (e) falha (OOM, rede,
-  motor) → copia o **original**, avisa e segue para COPYING (TRD-06, MDL-04). Fia a direção 🌐 do `VisionFlow` (ACT-03).
-- **Where**: `vision/LanguageGuesser.kt`, `vision/TranslateEngine.kt`, `vision/VisionFlow.kt`, `i18n/Translations*.kt`.
-- **Depends on**: VC-T7. **Requirement**: ACT-03, TRD-01, TRD-02, TRD-03, TRD-04, TRD-05, TRD-06, MDL-04.
-- **Done when**: unit do `LanguageGuesser` com os `.kfd` reais (corpus de ≥ 60 frases — 20 por idioma + 20 de outros
-  idiomas/código; meta ≥ 95% de acerto quando decide, abstendo-se em vez de errar; carga de memória das 3 listas medida);
-  unit da orquestração com fakes (modelo ausente; origem = destino; inconclusivo → prompt com "detecte"; pedaços; nuvem manda
-  só texto — o fake de rede verifica que nenhum byte de imagem sai; falha → original); instrumented com Qwen3 instalado
-  ou opt-in (`assume()`): EN→PT curto traduz e a geração cancela; **nenhum socket** em `:reasoning` no caminho local
-  (StrictMode); qualidade/tempo/RAM reais no A32 = **manual** (VC-T14).
+### VC-T9 — ~~LanguageGuesser + TranslateEngine + ação Traduzir~~ **REMOVIDA (2026-10-27)**
+Decisão do Yan: a Visão não traduz (context V11). Saem `LanguageGuesser`, `TranslateEngine`, o alvo 🌐, o aviso do Qwen3 e TRD-01..06.
+O ID fica reservado (não reutilizar) para que commits e referências antigas não apontem para outra coisa.
+
+### VC-T15 — `VisionModelEngine`: Gemma 4 local + nuvem/Custom *(nova; V12/V13)*
+- **What**: contrato `VisionModelEngine` (`read`/`ask` → `Text | Empty | Unavailable | Failed`, design §11) com três implementações:
+  (a) **`LocalVisionEngine`** — Gemma 4 pelo `LocalReasoningEngine`/`LiteRtBackend` no `:reasoning`: `EngineConfig.visionBackend` + imagem como
+  `Content.ImageBytes` (recorte reduzido a ~1024 px), guarda de RAM, descarga por ociosidade; **primeiro passo: provar no aparelho que o
+  E2B carrega com visão e lê uma imagem** (hoje o `LiteRtBackend` não passa `visionBackend`); (b) **`CloudVisionEngine`** — OpenAI/
+  Anthropic/Google pelos caminhos de nuvem do Raciocínio (`ReasoningEngines`, credencial do cofre) com a imagem no corpo; (c)
+  **`CustomVisionEngine`** — `chat/completions` com `image_url` (data URL). Pedidos fixos do design §11; escolha do engine pelo
+  modelo/origem selecionado; falha → aviso com a causa e nada copiado (PRV-05, MDL-04). Fia **Copiar texto** com Gemma/provedor (ACT-02).
+- **Where**: `vision/VisionModelEngine.kt`, `vision/LocalVisionEngine.kt`, `vision/CloudVisionEngine.kt`, `reasoning/local/LiteRtBackend.kt`
+  (parâmetro de visão, sem mudar o caminho de texto), `i18n/Translations*.kt`.
+- **Depends on**: VC-T2c, VC-T7, VC-T17 (modelos de nuvem selecionáveis). **Requirement**: ACT-02, ACT-03 (motor), MDL-04, MDL-05, PRV-03, PRV-05, OCR-03 (local).
+- **Done when**: unit com fakes (modelo ausente → `Unavailable`; falha de rede/cota/chave → `Failed(kind)` e nada copiado; o corpo de cada
+  provedor leva a imagem no formato certo; **só o `CloudVisionEngine`/`CustomVisionEngine` tocam rede** — regra de arquitetura);
+  instrumented com o E2B real (`assume()`): carrega com `visionBackend` e devolve texto para uma imagem de teste (texto desenhado em
+  `Canvas`), a geração cancela, e **nenhum socket** em `:reasoning` no caminho local (StrictMode); se o `.litertlm` não carregar com
+  visão, registrar no `STATE.md`, tirar os Gemma da lista de visão (`capabilities` vazio) e seguir só com provedores (design §Riscos);
+  qualidade/tempo/RAM reais no A32 = **manual** (VC-T14).
 - **Tests**: unit + instrumented (+manual). **Gate**: `full` + manual.
+
+### VC-T16 — Gesto 💬 **Perguntar** ⚠️ (proposta) *(nova)*
+- **What**: terceiro alvo do `VisionDragTargets`, **só quando o modelo selecionado tem `ANSWER_ABOUT_SCREEN`** (Gemma ou provedor com
+  credencial); soltar abre o `EphemeralInput` (T10) com o pedido (padrão "Descreva esta imagem."), envia a captura ao
+  `VisionModelEngine.ask` (T15) e põe a **resposta** no `CopyToast`/clipboard (ACT-03); sem modelo utilizável → aviso OCR-04 com "Abrir
+  Visão". Se o Yan não confirmar a proposta, a task vira "removida" e as capacidades "Descrever/Responder" ficam só informativas.
+- **Where**: `overlay/DragArrowsView.kt` (alvo por capacidade), `vision/VisionFlow.kt`, `vision/EphemeralInput.kt`, `i18n/Translations*.kt`.
+- **Depends on**: VC-T10, VC-T15. **Requirement**: ACT-01 (3ª direção), ACT-03.
+- **Done when**: unit: alvo 💬 só com a capacidade; arrasto sintético até ele abre o input e chama o engine fake; resposta vai ao
+  clipboard; com PaddleOCR selecionado o alvo não existe; `TranslationsTest` cobre os textos.
+- **Tests**: unit + instrumented. **Gate**: `full`.
+
+---
 
 ## Fase F — Estado de "cópia"
 
@@ -232,7 +266,7 @@ leva à aba Visão e o gesto de texto só funciona de ponta a ponta com o downlo
   (re-copia) + fechar. O banner de aviso de modelo (design §12) reusa a mesma janela. Só ao encerrar o COPYING
   roda o epílogo (ACT-06 → MODE-04).
 - **Where**: `vision/CopyToast.kt`, `vision/EphemeralInput.kt`, `vision/VisionFlow.kt`.
-- **Depends on**: VC-T7, VC-T9.
+- **Depends on**: VC-T7.
 - **Requirement**: ACT-05, ACT-06, MODE-04 (liberação).
 - **Done when**: unit do timer/aceleração; instrumented: toast aparece pós-cópia; tap na orbe
   encerra antes dos 3 s e restaura o estado; tap no toast abre o input; editar+Copiar atualiza o
@@ -242,28 +276,47 @@ leva à aba Visão e o gesto de texto só funciona de ponta a ponta com o downlo
 
 ## Fase G — Config + goldens
 
-### VC-T11 — Aba Visão (`ConfigTab.VISAO` → `VisaoPanel`) *(antes: pacotes de idioma do ML Kit)*
-- **What**: ligar o `VisaoPanel` na aba que já existe (hoje `ComingSoonPanel` em `ConfigScreen`), **sem gating por modo**
-  (⚠️ design §14). Conteúdo: cartão **Leitura de texto** (modelo do OCR: Baixar / progresso + Cancelar / Apagar, tamanho,
-  licença, aviso de RAM — mesmo componente de cartão de modelo da voz e do raciocínio); cartão **Tradução** (dropdown
-  idioma-destino que persiste; **No aparelho** × **Nuvem**; no aparelho, o cartão do Qwen3 0.6B (586 MB); na nuvem, provedor entre
-  os conectados + nota "só o texto reconhecido é enviado; a imagem nunca sai"; sem provedor → "Conecte na aba Raciocínio");
-  `HelperNote` de privacidade (inclui "o download vem do Hugging Face, que vê o endereço IP"); stub "Origem multimodal — em
-  breve". **Remover** do painel antigo o seletor de origem por API, o catálogo de VLM e o "Testar OCR" de mentira; apagar os
-  campos `vision*` de `Settings` que sobrarem sem uso. `NAV_TAB_VISAO` já usado pela T7 passa a cair no painel real.
-- **Where**: `ui/config/ConfigScreen.kt`, `ConfigTab.kt` (texto de "Em breve"), `VisaoPanel.kt`, `LocalModels.kt`,
+### VC-T11 — Aba Visão: origem Local (PaddleOCR + Gemma 4 com capacidades) *(reescrita em 2026-10-27; antes cartões Leitura de texto + Tradução)*
+- **What**: ligar o `VisaoPanel` na aba que já existe (hoje `ComingSoonPanel` em `ConfigScreen`), **sem gating por modo** (⚠️ design §14).
+  Seletor **Origem da visão** (Local · OpenAI · Anthropic · Google · Custom; Créditos "Em breve" — as quatro de nuvem ficam para a
+  T17, aqui só o seletor e o Local). Origem **Local**: lista de cards **PaddleOCR / Gemma 4 E2B / Gemma 4 E4B**
+  (`ModelCatalog.visionModels()`, T2c) com Baixar / progresso + Cancelar / Apagar / **Usar** (`visionLocalModelId`), tamanho, licença,
+  aviso de RAM e a **lista de capacidades** do card (`tr("…")`, MDL-06); os Gemma aparecem instalados se já baixados pela Raciocínio.
+  `HelperNote` de privacidade (origem Local: nada sai; o download vem do Hugging Face, que vê o endereço IP). **Remover** do painel
+  antigo o "Testar OCR" de mentira, o catálogo de VLM fabricado e o **destino de tradução**; **apagar `Settings.visionTranslateTarget`**
+  (candidato a remoção, V11) com o resto dos campos `vision*` que sobrarem sem uso (sem migração: o repositório ignora chave
+  desconhecida) e ajustar `SettingsShortcutTest`/`SettingsRepositoryTest` que o citam (VC-T1). `NAV_TAB_VISAO` (T7) cai no painel real.
+- **Where**: `ui/config/ConfigScreen.kt`, `ConfigTab.kt`, `VisaoPanel.kt`, `LocalModels.kt`, `ModelList.kt` (linha de capacidades),
   `data/Settings.kt`, `data/SettingsRepository.kt`, `ui/SetupActivity.kt`, `i18n/Translations*.kt`.
-- **Depends on**: VC-T1, VC-T2a. **Requirement**: CFG-V01, CFG-V02, MDL-02, OCR-04 (destino do aviso), TRD-02 (gerência), TRD-05 (UI).
-- **Done when**: instrumented Compose (fakes de `ModelStore`/downloader): baixar → progresso → instalado → apagar volta a
-  "Baixar"; destino persiste; **Nuvem** sem provedor mostra a pista; com provedor, a nota de privacidade aparece; a aba abre sem
-  gating; suíte de config existente verde; `TranslationsTest` cobre os textos; `SettingsRepositoryTest` sem os campos removidos.
+- **Depends on**: VC-T1, VC-T2a, VC-T2c. **Requirement**: CFG-V01, CFG-V02 (Local), MDL-02, MDL-06, OCR-04 (destino do aviso).
+- **Done when**: instrumented Compose (fakes de `ModelStore`/downloader): baixar → progresso → instalado → "Usar" persiste → apagar volta a
+  "Baixar"; cada card mostra as capacidades certas (PaddleOCR 1 linha; Gemma 3); a aba abre sem gating; suíte de config existente
+  verde; `TranslationsTest` cobre os textos; `SettingsRepositoryTest` sem os campos removidos.
 - **Tests**: unit (estado da lista) + instrumented (camada `ui`). **Gate**: `full`.
 
+### VC-T17 — Aba Visão: provedores (OpenAI, Anthropic, Google) e Custom, só modelos com visão *(nova; V13)*
+- **What**: no `VisaoPanel`, as origens de nuvem **reusando** `UnifiedProviderCard` e as mesmas `AuthActions`/conexões/cofre das abas
+  Transcrição e Raciocínio (olhar como `OpenAiPanel`/`AnthropicPanel`/`GooglePanel` da Raciocínio as montam e extrair o que for comum em vez
+  de copiar; conectar numa aba vale nas outras — PRV-01). `VisionModelCatalog`: **lista curada id→visão** por provedor, **conferida na
+  documentação oficial de cada um** (registrar fonte e data no `STATE.md`), usada no seletor de modelo das duas sub-abas (Assinatura/API);
+  modelo guardado que deixou de ter visão → cai para o padrão da lista (PRV-02). **Custom**: Endpoint/Header/Valor/Modelo no molde do
+  `ReasoningCustomFields`, com a pista de "compatível com `chat/completions` com imagem" (PRV-03). **Nota de privacidade** de PRV-04
+  ao lado do seletor. **Trocar os dados fictícios do painel antigo** (`ssoFiveHourFraction = 0.15f`, "Reseta às 15:30", listas
+  `VISAO_*_MODELS`) pelos reais das outras abas, ou esconder o bloco.
+- **Where**: `ui/config/VisaoPanel.kt`, `vision/VisionModelCatalog.kt`, `ui/config/AuthActions.kt`/`UnifiedProviderCard.kt` (só se precisar de
+  parâmetro), `data/Settings.kt` (campos `vision*` por provedor que já existem), `i18n/Translations*.kt`.
+- **Depends on**: VC-T11. **Requirement**: PRV-01, PRV-02, PRV-03, PRV-04, PRV-05 (pista sem credencial), CFG-V02 (nuvem).
+- **Done when**: unit do `VisionModelCatalog` (cada id da lista aparece no seletor; id sem visão não aparece; padrão válido); instrumented
+  Compose com `AuthActions` falsos: conectado numa aba aparece conectado aqui (mesmo fake compartilhado), seletor só com modelos de visão,
+  Custom persiste e a nota de privacidade aparece quando a nuvem está selecionada; nenhum arquivo de provedor da Raciocínio duplicado
+  (revisão de diff); suíte de config verde.
+- **Tests**: unit + instrumented (camada `ui`). **Gate**: `full`.
+
 ### VC-T12 — Rotas de galeria + goldens
-- **What**: rotas `config-visao` / `config-visao-traducao` (claro/escuro, fakes determinísticos; estados: sem modelo,
-  baixando, instalado, nuvem escolhida); regenerar + aprovar goldens; espelhar em `/tmp/keyflow-prints/`.
+- **What**: rotas `config-visao` (Local: sem modelo, baixando, instalado com capacidades), `config-visao-provedor` (conectado, seletor só
+  com visão) e `config-visao-custom` (claro/escuro, fakes determinísticos); regenerar + aprovar goldens; espelhar em `/tmp/keyflow-prints/`.
 - **Where**: `RouteCatalog.kt` (debug), `verification/golden/`.
-- **Depends on**: VC-T11. **Requirement**: CFG-V03.
+- **Depends on**: VC-T11, VC-T17. **Requirement**: CFG-V03.
 - **Done when**: `verify-screens.sh` + `diff-screens.sh` verdes (existentes bit-idênticos; o `--approve` copia tudo — restaurar
   com `git checkout -- verification/golden/…` o que não é desta mudança).
 - **Tests**: screenshot. **Gate**: `screenshot`.
@@ -272,27 +325,27 @@ leva à aba Visão e o gesto de texto só funciona de ponta a ponta com o downlo
 
 ### VC-T13 — Prontidão de loja (manifest/licenças/Docs)
 - **What**: revisão final: permissão + FGS type `mediaProjection`, FileProvider escopado, `android:process=":vision"` sem
-  permissão nova; licenças/atribuições na Docs e em `app/licenses/` (PaddleOCR Apache-2.0 — **texto novo**
-  `Apache-2.0_paddleocr.txt`; ONNX Runtime MIT e Qwen3 Apache-2.0 já listados); política de privacidade cita o download dos
-  modelos do Hugging Face; delta final de APK da Visão (só o shim) registrado; smoke no emulador Android 14
+  permissão nova; licenças/atribuições na Docs e em `app/licenses/` (PaddleOCR Apache-2.0 — `Apache-2.0_paddleocr.txt`
+  já criado na T2a, falta a Docs citá-lo quando `validatedOnDevice` virar `true`; ONNX Runtime MIT e Gemma 4 Apache-2.0 já listados);
+  política de privacidade cita o download dos modelos do Hugging Face **e o envio da imagem ao provedor escolhido (PRV-04)**; delta final de APK da Visão (só o shim) registrado; smoke no emulador Android 14
   (consent→type sem exceção).
 - **Where**: `AndroidManifest.xml`, `ui/config/DocsPanel.kt`, `app/licenses/`.
-- **Depends on**: VC-T3, VC-T6, VC-T8. **Requirement**: STO-V01, STO-V02, STO-V03, MDL-03.
+- **Depends on**: VC-T3, VC-T6, VC-T8. **Requirement**: STO-V01, STO-V02, STO-V03, MDL-03, PRV-04 (política).
 - **Done when**: `build` verde; smoke ok; Docs cita PaddleOCR e o runtime; `unzip -l` confirma uma só `libonnxruntime.so` por ABI.
 - **Tests**: none (config; smoke coberto). **Gate**: `build` + manual (smoke).
 
 ### VC-T14 — Validação manual no Galaxy A32 + traceability
 - **What**: roteiro e2e: (a) ditando por Toggle → atalho → pausa → selecionar → copiar texto →
   toast → acelerar pela orbe → PAUSED restaurado → retomar e transcrever (clipboard sobrescrito —
-  esperado); (b) idem em PTT; (c) **sem modelo**: gesto de texto → aviso → "Abrir Visão" → baixar o OCR → capturar de novo →
-  funciona; (d) traduzir EN→PT com o Qwen3 baixado (qualidade, tempo, RAM) e sem ele (aviso TRD-02); (e) copiar print e
-  colar em outro app; (f) input efêmero: editar e re-copiar; (g) negar consent / FLAG_SECURE / revogar
-  no meio → aviso + estado restaurado; (h) **modo avião** (OCR + tradução no aparelho; zero rede); (i) nuvem opt-in com a chave
-  do Yan (só o texto sai). Registrar CER/tempo/RAM reais do OCR e a qualidade do Qwen3; se o Qwen3 0.6B reprovar, abrir a
-  decisão do modelo dedicado. Atualizar traceability do `spec.md` → Verified.
+  esperado); (b) idem em PTT; (c) **sem modelo**: gesto de texto → aviso → "Abrir Visão" → baixar o PaddleOCR → capturar de novo →
+  funciona; (d) **Gemma 4 E2B** baixado na aba: ler texto, descrever e perguntar (qualidade, tempo, RAM; E4B só para registrar o
+  aviso de peso no A32); (e) copiar print e colar em outro app; (f) input efêmero: editar e re-copiar; (g) negar consent / FLAG_SECURE /
+  revogar no meio → aviso + estado restaurado; (h) **modo avião** (PaddleOCR e Gemma no aparelho; zero rede); (i) **provedor** (SSO e API)
+  e **Custom** com a conta/chave do Yan: o seletor só lista modelos com visão, a imagem sai só aqui e a nota de privacidade aparece.
+  Registrar CER/tempo/RAM reais do OCR e a qualidade/RAM do Gemma; atualizar traceability do `spec.md` → Verified.
 - **Where**: device físico (RX8T10DERKW); `spec.md`.
-- **Depends on**: VC-T10, VC-T11, VC-T12, VC-T13.
-- **Requirement**: OCR-03/TRD-04 (modo avião), success criteria.
+- **Depends on**: VC-T10, VC-T12, VC-T13, VC-T16, VC-T17.
+- **Requirement**: OCR-03 (modo avião), PRV-*, success criteria.
 - **Done when**: roteiro completo documentado; gate `full` fresco verde; requisitos → Verified. **[YAN]** (device físico).
 - **Tests**: manual. **Gate**: `full` + manual.
 
@@ -306,18 +359,22 @@ leva à aba Visão e o gesto de texto só funciona de ponta a ponta com o downlo
 | T1 | — | raiz A | ✅ |
 | T2a | — | raiz A | ✅ |
 | T2b | — | raiz A | ✅ |
+| T2c | T2a | T2a→T2c | ✅ |
 | T3 | T1 | T1→T3 | ✅ |
 | T4 | T3 | T3→T4 | ✅ |
 | T5 | T4 | T4→T5 | ✅ |
 | T6 | T2a, T2b | (T2a,T2b)→T6 | ✅ |
 | T7 | T4, T5, T6, T11 | (T4,T5,T6,T11)→T7 | ✅ |
 | T8 | T7 | T7→T8 | ✅ |
-| T9 | T7 | T7→T9 | ✅ |
-| T10 | T7, T9 | (T7,T9)→T10 | ✅ |
-| T11 | T1, T2a | (T1,T2a)→T11 | ✅ |
-| T12 | T11 | T11→T12 | ✅ |
+| T9 | — (removida) | — | n/a |
+| T10 | T7 | T7→T10 | ✅ |
+| T11 | T1, T2a, T2c | (T1,T2a,T2c)→T11 | ✅ |
+| T12 | T11, T17 | (T11,T17)→T12 | ✅ |
 | T13 | T3, T6, T8 | (T3,T6,T8)→T13 | ✅ |
-| T14 | T10, T11, T12, T13 | →T14 | ✅ |
+| T14 | T10, T12, T13, T16, T17 | →T14 | ✅ |
+| T15 | T2c, T7, T17 | (T2c,T7,T17)→T15 | ✅ |
+| T16 | T10, T15 | (T10,T15)→T16 | ✅ |
+| T17 | T11 | T11→T17 | ✅ |
 
 ### Test co-location (matriz TESTING.md)
 | Task | Camada | Matriz exige | Task diz | ✓ |
@@ -325,20 +382,25 @@ leva à aba Visão e o gesto de texto só funciona de ponta a ponta com o downlo
 | T1 | `data`/core | instrumented (+unit) | unit+instrumented | ✅ |
 | T2a | catálogo (`data/models`) | unit | unit | ✅ |
 | T2b | nativo + engine | instrumented (+unit) | unit+instrumented + medição de APK | ✅ |
+| T2c | catálogo (`data/models`) | unit | unit | ✅ |
 | T3 | `overlay/service` | instrumented+manual | unit+instrumented+manual | ✅ |
 | T4 | `overlay` service+lógica | instrumented+manual / unit | unit+instrumented+manual | ✅ |
 | T5 | `overlay` view+lógica pura | instrumented / unit | unit+instrumented | ✅ |
 | T6 | engine (lógica+device) + serviço | instrumented / unit | unit+instrumented | ✅ |
 | T7 | `overlay` gesto+lógica | instrumented / unit | unit+instrumented | ✅ |
 | T8 | `overlay`/files | instrumented | instrumented | ✅ |
-| T9 | engine | instrumented / unit | unit+instrumented+manual | ✅ |
+| T9 | — (removida) | — | — | n/a |
 | T10 | `overlay`+IME-adjacente | instrumented (+manual no T14) | unit+instrumented | ✅ |
 | T11 | `ui` + `data` | instrumented (Compose) | unit+instrumented | ✅ |
 | T12 | screenshot | screenshot | screenshot | ✅ |
 | T13 | manifest/docs | — | none (build+smoke) | ✅ |
 | T14 | e2e device | manual | manual | ✅ |
+| T15 | engine (lógica+device) + rede | instrumented / unit | unit+instrumented+manual | ✅ |
+| T16 | `overlay` gesto | instrumented / unit | unit+instrumented | ✅ |
+| T17 | `ui` | instrumented (Compose) | unit+instrumented | ✅ |
 
-**Saída**: fluxo Visão efêmero na orbe — pausa a ditação, seleciona área na tela viva, captura, e por gesto de arrasto
-copia imagem/texto/tradução com estado de "cópia" manipulável — OCR e tradução no aparelho com modelos abertos baixados
-pela aba Visão (aviso que leva a ela quando faltam), nada embutido no APK além do shim do runtime, estado da orbe sempre
-restaurado, e a captura bruta pronta p/ a origem multimodal (fase 2).
+**Saída**: fluxo Visão efêmero na orbe — pausa a ditação, seleciona área na tela viva, captura, e por gesto de arrasto copia a
+imagem, copia o texto (PaddleOCR, Gemma 4 no aparelho ou modelo de visão de um provedor) e, com um modelo que entende imagens,
+responde sobre a tela (⚠️) — com estado de "cópia" manipulável. **Sem tradução.** Modelos locais baixados pela aba Visão (aviso que
+leva a ela quando faltam), cada card com as suas capacidades; provedores e Custom opcionais (a imagem só sai por eles); nada embutido
+no APK além do shim do runtime; estado da orbe sempre restaurado.
