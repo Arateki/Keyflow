@@ -186,8 +186,9 @@ class ModelDownloader(
         )
         if (blocked != null) return blocked
 
-        // Atualização de um modelo cujo arquivo mudou no catálogo: o antigo não serve mais e ocuparia o espaço da instalação.
-        store.discardOutdated(spec.id)
+        // Atualização de um modelo cujo arquivo mudou no catálogo: a cópia antiga fica até a nova ser baixada e verificada
+        // (o `ModelStore.install` troca no fim, sem janela sem modelo). O espaço dela já não está em `freeInternal`; quem
+        // precisar dele apaga o modelo antigo pelo card.
         val dir = File(root, spec.id)
         dir.deleteRecursively()
         dir.mkdirs()

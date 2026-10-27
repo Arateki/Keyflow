@@ -29,6 +29,12 @@ class ModelStore(
 
     constructor(context: Context) : this(File(context.filesDir, MODELS_DIR), ModelCatalog::byId)
 
+    /**
+     * Serializa tudo que lê o disco para publicar estado ou o muda: [install], [delete], [refresh] e [discardOutdated]. Sem isso um `refresh`
+     * que leu o manifest da versão A publicava "desatualizado" depois de a B terminar de instalar, e o descarte apagava a B íntegra.
+     */
+    private val lock = Any()
+
     private val _installedIds = MutableStateFlow(emptySet<String>())
     private val _outdatedIds = MutableStateFlow(emptySet<String>())
 
@@ -57,7 +63,7 @@ class ModelStore(
      *
      * @throws IllegalArgumentException se faltar arquivo ou o tamanho não bater com o catálogo.
      */
-    fun install(spec: ModelSpec, sourceDir: File) {
+    fun install(spec: ModelSpec, sourceDir: File): Unit = synchronized(lock) {
         spec.files.forEach { file ->
             val source = File(sourceDir, file.fileName)
             require(source.isFile) { "${spec.id}: falta ${file.fileName}" }
@@ -72,26 +78,48 @@ class ModelStore(
         try {
             spec.files.forEach { file -> File(sourceDir, file.fileName).copyTo(File(staging, file.fileName)) }
             File(staging, MANIFEST).writeText(manifestFor(spec).toString())
-            val target = dirFor(spec.id)
-            target.deleteRecursively()
-            check(staging.renameTo(target)) { "${spec.id}: não consegui mover a instalação para $target" }
+            swapIn(spec.id, staging)
         } finally {
             staging.deleteRecursively()
         }
         refresh()
     }
 
+    /**
+     * Põe [staging] no lugar da instalação de [id] sem nunca ficar sem nenhuma: a antiga vai para um diretório oculto, a nova entra e só então a
+     * antiga é apagada; se a nova não entrar, a antiga volta. Atualização que falha no meio não pode custar o modelo que funcionava.
+     */
+    private fun swapIn(id: String, staging: File) {
+        val target = dirFor(id)
+        val backup = File(root, ".$id$REPLACED_SUFFIX")
+        backup.deleteRecursively()
+        val hadOld = target.exists()
+        if (hadOld) check(target.renameTo(backup)) { "$id: não consegui guardar a instalação anterior" }
+        if (!staging.renameTo(target)) {
+            if (hadOld) backup.renameTo(target)
+            error("$id: não consegui mover a instalação para $target")
+        }
+        backup.deleteRecursively()
+    }
+
     /** Apaga a instalação antiga de [id] se ela está desatualizada (o espaço volta antes de baixar a nova); devolve se apagou. */
-    fun discardOutdated(id: String): Boolean {
-        if (id !in _outdatedIds.value) return false
+    fun discardOutdated(id: String): Boolean = synchronized(lock) {
+        // Revalida no disco, sob o lock: a lista publicada pode ser de antes de uma instalação que acabou de terminar.
+        val dir = dirFor(id)
+        val manifest = intactManifest(dir) ?: return false
+        if (matchesCatalog(id, manifest)) {
+            refresh()
+            return false
+        }
         delete(id)
         return true
     }
 
     /** Apaga o diretório inteiro — o espaço volta na hora (DLM-03, MGR-04). */
-    fun delete(id: String) {
+    fun delete(id: String): Unit = synchronized(lock) {
         dirFor(id).deleteRecursively()
         File(root, ".$id$STAGING_SUFFIX").deleteRecursively()
+        File(root, ".$id$REPLACED_SUFFIX").deleteRecursively()
         refresh()
     }
 
@@ -102,7 +130,8 @@ class ModelStore(
     }
 
     /** Relê o disco — útil se outro componente mexeu nos arquivos. */
-    fun refresh() {
+    fun refresh(): Unit = synchronized(lock) {
+        recoverInterruptedSwaps()
         val dirs = root.listFiles { f -> f.isDirectory && !f.name.startsWith(".") }.orEmpty()
         val installed = mutableSetOf<String>()
         val outdated = mutableSetOf<String>()
@@ -112,6 +141,14 @@ class ModelStore(
         }
         _installedIds.value = installed
         _outdatedIds.value = outdated
+    }
+
+    /** O processo morreu no meio de [swapIn]: sem instalação nova, a anterior volta; com ela, a cópia guardada sobra e sai. */
+    private fun recoverInterruptedSwaps() {
+        root.listFiles { f -> f.isDirectory && f.name.startsWith(".") && f.name.endsWith(REPLACED_SUFFIX) }.orEmpty().forEach { backup ->
+            val target = File(root, backup.name.removePrefix(".").removeSuffix(REPLACED_SUFFIX))
+            if (target.exists()) backup.deleteRecursively() else backup.renameTo(target)
+        }
     }
 
     /** O manifest do diretório se tudo que ele lista está no disco com o tamanho certo; senão null. */
@@ -155,6 +192,7 @@ class ModelStore(
         const val MODELS_DIR = "models"
         const val MANIFEST = "manifest.json"
         private const val STAGING_SUFFIX = ".installing"
+        private const val REPLACED_SUFFIX = ".replaced"
 
         @Volatile
         private var instance: ModelStore? = null

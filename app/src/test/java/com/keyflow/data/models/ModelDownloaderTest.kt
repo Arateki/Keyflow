@@ -258,7 +258,7 @@ class ModelDownloaderTest {
 
     /** O catálogo trocou o SHA do arquivo de um modelo já instalado: baixar de novo substitui a cópia antiga e o modelo volta a valer. */
     @Test
-    fun `updating a model whose catalog pin changed discards the old copy and installs the new one`() {
+    fun `updating a model whose catalog pin changed keeps the old copy until the new one is installed`() {
         val old = real.copy(files = real.files.map { it.copy(sha256 = "e".repeat(64)) })
         val source = tmp.newFolder().also { dir -> contents.forEach { (name, text) -> File(dir, name).writeText(text) } }
         ModelStore(File(tmp.root, "models")).install(old, source)
@@ -271,12 +271,65 @@ class ModelDownloaderTest {
         )
 
         assertThat(downloader.start(real, allowMetered = false)).isEqualTo(StartResult.Started)
-        assertThat(updating.dirFor("real").exists()).isFalse()
+        // A cópia antiga fica até a nova ser baixada e verificada; só não conta como instalada.
+        assertThat(updating.dirFor("real").exists()).isTrue()
+        assertThat(updating.isInstalled("real")).isFalse()
         deliver(downloader)
 
         assertThat(downloader.finish("real")).isEqualTo(CompletionResult.Installed)
         assertThat(updating.isInstalled("real")).isTrue()
         assertThat(updating.outdatedIds.value).isEmpty()
+    }
+
+    private fun outdatedStore(): ModelStore {
+        val old = real.copy(files = real.files.map { it.copy(sha256 = "e".repeat(64)) })
+        val source = tmp.newFolder().also { dir -> contents.forEach { (name, text) -> File(dir, name).writeText(text) } }
+        ModelStore(File(tmp.root, "models")).install(old, source)
+        return ModelStore(File(tmp.root, "models")) { real.takeIf { s -> s.id == it } }
+    }
+
+    /** Achado 2 da revisão: atualização que falha ou é cancelada não pode custar a cópia que funcionava. */
+    @Test
+    fun `a failing enqueue during an update keeps the previous copy`() {
+        val updating = outdatedStore()
+        val failing = object : DownloadGateway by gateway {
+            override fun enqueue(url: String, destination: File, title: String, allowMetered: Boolean): Long = error("DownloadManager recusou")
+        }
+        val downloader = ModelDownloader(failing, File(tmp.root, "model-tmp"), updating, { false }, volumes, catalog = { real })
+
+        runCatching { downloader.start(real, allowMetered = false) }
+
+        assertThat(File(updating.dirFor("real"), "dec.onnx").isFile).isTrue()
+        assertThat(updating.outdatedIds.value).containsExactly("real")
+    }
+
+    @Test
+    fun `cancelling an update keeps the previous copy`() {
+        val updating = outdatedStore()
+        val downloader = ModelDownloader(gateway, File(tmp.root, "model-tmp"), updating, { false }, volumes, catalog = { real })
+
+        assertThat(downloader.start(real, allowMetered = false)).isEqualTo(StartResult.Started)
+        downloader.cancel("real")
+
+        assertThat(File(updating.dirFor("real"), "dec.onnx").isFile).isTrue()
+        assertThat(updating.outdatedIds.value).containsExactly("real")
+    }
+
+    @Test
+    fun `a corrupted update download keeps the previous copy`() {
+        val updating = outdatedStore()
+        val downloader = ModelDownloader(gateway, File(tmp.root, "model-tmp"), updating, { false }, volumes, catalog = { real })
+        downloader.start(real, allowMetered = false)
+        val dir = downloader.tmpDirFor("real")!!
+        downloader.readRecord("real")!!.forEach { (name, id) ->
+            File(dir, name).writeText(if (name == "dec.onnx") "DECODER!" else contents.getValue(name))
+            gateway.rows[id] = DownloadRow(id, RowStatus.SUCCESSFUL, 0)
+        }
+
+        assertThat(downloader.finish("real")).isEqualTo(CompletionResult.Failed(DownloadFailure.CORRUPTED))
+
+        assertThat(File(updating.dirFor("real"), "dec.onnx").isFile).isTrue()
+        assertThat(updating.outdatedIds.value).containsExactly("real")
     }
 
     @Test
