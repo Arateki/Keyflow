@@ -113,3 +113,70 @@ emulador. Nenhuma correção funcional foi aplicada sem medir o efeito. O histó
 latência, eficácia de `/no_think` ou quantidade de tokens de pensamento: essas provas ficaram para a
 avaliação física. O log do serviço/kernel do host continua sendo a fonte necessária para explicar os
 reinícios, caso se retome a investigação do ambiente.
+
+## Correção de conteúdo perdido pelo Jinja (2026-10-27)
+
+O Testar envia a frase como `ReasoningRequest.user`; o serviço não a troca por sistema. O defeito está
+entre `Message.user` e o Jinja: [Qwen3DataProcessor::MessageToTemplateInput, v0.16.1](https://github.com/google-ai-edge/LiteRT-LM/blob/v0.16.1/runtime/conversation/model_data_processor/qwen3_data_processor.cc#L46)
+converte uma lista com um `Content.Text` em string. Os templates embutidos no Qwen3 fed81d1 e no
+Qwen2.5 2f23bac percorrem `content` procurando objetos com `type == 'text'`: sobre uma string,
+produzem texto vazio. Isso também descarta `systemInstruction`; não é problema de canal nem da
+chave `enable_thinking`. A revisão fed81d1 usa essa chave para acrescentar `<think>\n\n</think>`.
+
+`LiteRtTextFormat` inspeciona o renderizador real uma vez após carregar os pesos, sem geração.
+Prefere uma parte; só usa `[texto, ""]` se a primeira forma perder o marcador e a segunda o preservar.
+A segunda parte vazia impede o colapso no runtime, preservando cada caractere, papel e instrução.
+A escolha depende do arquivo carregado, não do id do catálogo; vale para sistema, pedido e aquecimento.
+Se os dois formatos descartarem o marcador, carregar falha em vez de gerar sem o pedido.
+`LiteRtTextFormatTest` cobre seleção, erro e Unicode; `LiteRtWarmupTest` confere a montagem da API
+Android. `LiteRtTemplateDeviceTest#qwenFed81d1PreservaSistemaEPedidoEGeraResposta` é opt-in por seleção
+explícita do método, baixa e confere a revisão fixa, compara o prompt perdido ao preservado e gera.
+
+Primeira prova pelo pool no Deck, x86_64, CPU/2 threads, contexto 1024, sem cache: arquivo conferido
+com 613722264 bytes e SHA c5f39b4191926786c3e6668b62af4d6eb15248dfc7a5348252a9b406f33f2108;
+carga 8603 ms; primeiro trecho 11316 ms; total 71376 ms. Uma parte renderizou `user` vazio;
+duas preservaram pedido e sistema. Resposta: “Oi João, tudo bem. Amanhã a gente se vê às três da
+tarde no escritório, pode ser.” A pontuação ainda merece o gate de qualidade do Yan; não confundir
+esta medição x86_64 com os 9,6 s observados por ele no Vaio com pedido vazio ou os 85–130 s do legado.
+
+O Qwen3 4B 4d40977 tem outro contrato: seu Jinja aceita string e descarta listas. A correção preserva
+uma parte nesse caso. Seu tokenizador HF embutido tem vocabulário, merges e tokens especiais iguais
+aos do checkpoint original: três casos (incluindo a frase completa, 66 tokens) produziram os mesmos
+IDs, decode e round-trip; diferenças de flags ByteLevel/offsets não alteraram esses casos.
+[O autor relata CPU/XNNPACK correto em 0.16.0 no Galaxy S26](https://huggingface.co/litert-community/Qwen3-4B-Instruct-2507#galaxy-s26--gpu-vs-cpu-litert-lm-0160-community-measurement):
+8,4–9,2 tok/s e RSS 4582–6093 MB. Os tags oficiais 0.16.0/0.16.1 apontam ao mesmo commit
+`924e79c91542761242244e4f1651851f822e4cbb` ([comparação](https://github.com/google-ai-edge/LiteRT-LM/compare/v0.16.0...v0.16.1)).
+Isso não compara os binários publicados nem prova compatibilidade no Vaio, e não permite atribuir o
+lixo de tokens à perda de conteúdo ou declarar INT4 incompatível com CPU. Causa específica do 4B
+continua sem prova; não promover essa variante nem mudar backend/quantização por hipótese.
+
+Proposta: fed81d1 é candidata a substituir o Qwen legado após repetir o Testar corrigido nos aparelhos
+reais e avaliar PT/EN. Ela elimina o bloco de pensamento e agora recebe o pedido, mas esta rodada
+não é benchmark pareado com o legado nem prova qualidade suficiente de pontuação. Pin mantido.
+
+Cuidado na troca manual sob o mesmo id: `ReasoningServiceCore.ensureBackend` reutiliza o motor pelo
+`loadedId`, sem reler pesos já carregados. Além disso, [GetFileCacheIdentifier v0.16.1](https://github.com/google-ai-edge/LiteRT-LM/blob/v0.16.1/runtime/util/file_util.cc#L97)
+memoiza tamanho/mtime pelo caminho durante o processo, e o XNNPACK usa esse identificador no nome
+do cache. Reiniciar o processo do app antes de cada troca física evita reutilizar motor/cache anteriores.
+Não foi informado se houve esse reinício no Vaio: é hipótese adicional para o 4B, não causa confirmada.
+
+### Limites da rodada ampliada e encerramento
+
+A primeira prova válida acima usava sistema explícito e não incluía as fixtures. A classe ampliada
+(também sem sistema, mais fixtures Gemma/Qwen legado/4B/2.5) compilou, mas não passou: no Deck,
+`instrumentar.log` registra arquivo conferido e `Process crashed` antes de concluir a inicialização
+CPU e antes da seleção de formato. Não há sinal, stack nativa, tombstone ou logcat nos artefatos
+retornados; a causa exata do crash não é determinável desse log. Não atribuir a OOM ou à correção.
+Não repetir sem diagnóstico: o coordenador assumiu a medição que falta no Vaio.
+
+Gates: `pool compilar testDebugUnitTest` 1739/1739 (regressão antes: 4/6 falhas; depois: 6/6);
+`pool compilar :app:lintDebug` passou. A rodada curta de configs/IPC no servidor teve 10 testes,
+4 falhas (timeout Binder, MODEL_MISSING virou LOCAL, rebind vazio, restauração JSON sem conteúdo);
+os três testes de configs passaram. Os casos de eco não chegam ao LiteRT alterado. Não há gate IPC
+verde nessa rodada. Duas chamadas posteriores ficaram na trava do emulador e foram interrompidas
+por PID no encerramento; não ficaram jobs próprios pendentes. Uma tentativa com APK do servidor
+no Deck foi recusada por assinatura debug diferente; não executou testes.
+
+Falta no Vaio: classe ampliada, regressão de renderização dos demais templates, Testar sem sistema,
+aquecimento, qualidade PT/EN, latência e RSS em comparação pareada com o Qwen legado. Também
+explicar separadamente o 4B, reiniciando o processo entre trocas manuais sob o mesmo id/caminho.

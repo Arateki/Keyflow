@@ -3123,3 +3123,28 @@ Dois motores com ferramentas ao lado do da Anthropic: `reasoning/openai/OpenAiAg
   alterado; Etapa 2 de medição das candidatas assumida pelo coordenador nos aparelhos reais.
   Consulta de limpeza dos dados próprios do emulador cancelada na fila; remoção desses dados não
   confirmada. Fontes das sondas removidas, cópias preservadas e nenhum job deixado ativo.
+
+### 2026-10-27 — Jinja do Qwen recebia pedido vazio no LiteRT-LM 0.16.1
+
+- A frase chega como usuário ao backend, mas `Qwen3DataProcessor::MessageToTemplateInput` converte
+  uma única parte de texto em string. Os Jinja fed81d1/Qwen2.5 esperam lista de objetos tipados e
+  descartam esse conteúdo, inclusive o sistema. Prova nativa no Deck: `user` vazio com uma parte;
+  `[texto, ""]` conserva sistema/pedido. O modelo respondeu ao ditado: primeiro trecho 11316 ms,
+  total 71376 ms, carga 8603 ms (x86_64, CPU/2 threads, contexto 1024, sem cache).
+- Não generalizar duas partes para todo modelo: Qwen 4B espera string. O backend detecta o formato
+  por renderização uma vez por carga, dá preferência ao formato antigo e falha se ambos perdem texto.
+  Sistema, usuário e aquecimento usam o mesmo resultado; nenhum pin alterado. Suíte JVM 1739/1739.
+- O 4B não tem o mesmo template defeituoso; vocabulário/merges/tokens especiais batem com a origem,
+  três round-trips geram IDs iguais (prompt completo: 66 tokens). Autor mediu CPU correta em 0.16.0
+  (RSS 4,6–6,1 GB); tags 0.16.0/0.16.1 têm fonte idêntica (924e79c). Sem prova no Vaio,
+  não declarar quantização incompatível nem inventar
+  causa para os tokens ruins. Fonte e limites em reasoning-models/qwen-sem-pensar.md.
+- fed81d1 é candidata para nova medição física com o pedido corrigido; comparar qualidade PT/EN e
+  latência com o legado no mesmo aparelho antes de trocar o catálogo. O orçamento zero não força
+  pensamento vazio em 0.16.1; é o Jinja que consulta `enable_thinking`.
+- Encerramento autorizado sem nova medição no emulador: suíte JVM 1739/1739 e lintDebug verde;
+  primeira prova nativa fed81d1 com sistema 1/1. A classe ampliada (sem sistema e fixtures) compilou,
+  mas sofreu `Process crashed` no Deck depois do SHA e antes de terminar a inicialização CPU,
+  portanto antes da seleção de formato. O log não informa sinal/stack/causa: não atribuir a OOM.
+  Configs 3/3 no servidor; rodada agregada configs/IPC 10 testes, 4 falhas (Binder/rebind/restauração).
+  Sem gate IPC verde; repetições esperando emulador encerradas por PID. Yan mede o restante no Vaio.

@@ -523,3 +523,14 @@ Fase A/B (o device é o gargalo: instrumentado serializa).
 - Mesmo gate dos dois acima: `validatedOnDevice = false` (só debug) até rodar num aparelho de 8 GB ou mais — o A32 (4 GB) não comporta o
   pico de ~3,3 GB de CPU do README. Ao promover, trocar o flag, medir o PSS e ajustar `recommendedRamMb` (8192 é estimativa); a linha de licença
   da Docs e do `doc.json` volta sozinha (`unvalidatedTextModelLicenses()`), aí regerar o `doc.json` (`KEYFLOW_REGERAR_DOC_SITE=1`).
+
+## Correção pós-RSN-T5/T10: conteúdo em templates LiteRT (2026-10-27)
+
+Status: implementada; suíte JVM completa 1739/1739; reprodução nativa fed81d1 1/1 pelo pool no Deck.
+A seleção de conteúdo é feita pelo renderizador real e compartilhada entre sistema, usuário e aquecimento.
+Regressões complementares de montagem/cliente e fixtures são registradas na entrega qwen-template.
+RRUN-08/RTS-01: escopo desta correção verificado; não encerra a validação manual RSN-T19 [YAN].
+Encerramento ajustado pelo coordenador: entregar com unitários verdes; medição ampliada fica no Vaio.
+A primeira prova nativa com sistema passou (1/1); a ampliada não passou (crash durante inicialização
+CPU, sem stack no log). Configs 3/3; rodada configs/IPC 10 testes, 4 falhas; não declarar IPC verificado.
+Fixtures e caminho sem sistema permanecem pendentes de execução bem-sucedida; detalhes na pesquisa.

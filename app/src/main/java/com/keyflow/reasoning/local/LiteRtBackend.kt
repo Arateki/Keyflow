@@ -3,6 +3,7 @@ package com.keyflow.reasoning.local
 import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.Channel
 import com.google.ai.edge.litertlm.Contents
+import com.google.ai.edge.litertlm.Content
 import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.ThinkingConfig
 import com.google.ai.edge.litertlm.Conversation
@@ -26,6 +27,7 @@ import java.util.concurrent.atomic.AtomicReference
 internal class LiteRtBackend(private val cacheDir: String?, private val opensThink: Boolean = false) : LlmBackend {
 
     private var engine: Engine? = null
+    private var textFormat = LiteRtTextFormat.SINGLE
 
     @Volatile private var conversation: Conversation? = null
     @Volatile private var cancelled = false
@@ -36,6 +38,7 @@ internal class LiteRtBackend(private val cacheDir: String?, private val opensThi
             created = Engine(EngineConfig(modelPath = model.modelPath, backend = Backend.CPU(), cacheDir = cacheDir))
             // Pode levar segundos (a doc fala em até ~10 s): estamos na thread de trabalho do serviço, não na da tela.
             created.initialize()
+            textFormat = LiteRtConfigs.textFormat(created, opensThink)
             engine = created
         } catch (t: Throwable) {
             runCatching { created?.close() }
@@ -47,15 +50,15 @@ internal class LiteRtBackend(private val cacheDir: String?, private val opensThi
         val active = checkNotNull(engine) { "o motor não está carregado" }
         // API 0.16.1 conferida no classes.jar: maxOutputToken é por conversa, não limita pedidos reais.
         // Dois tokens permitem prefill + um passo de decodificação; não esperamos resposta nem usamos ThoughtStripper.
-        active.createConversation(LiteRtConfigs.warmUp(opensThink)).use {
-            it.sendMessage("Oi")
+        active.createConversation(LiteRtConfigs.warmUp(opensThink, textFormat)).use {
+            it.sendMessage(LiteRtConfigs.user("Oi", textFormat))
         }
     }
 
     override fun generate(request: ReasoningRequest, onDelta: (String) -> Unit) {
         val active = checkNotNull(engine) { "o motor não está carregado" }
         cancelled = false
-        val config = LiteRtConfigs.conversation(request.system, opensThink)
+        val config = LiteRtConfigs.conversation(request.system, opensThink, textFormat)
         val stripper = ThoughtStripper(opensThink)
         val conversation = active.createConversation(config)
         this.conversation = conversation
@@ -63,7 +66,7 @@ internal class LiteRtBackend(private val cacheDir: String?, private val opensThi
             val finished = CountDownLatch(1)
             val failure = AtomicReference<Throwable?>(null)
             conversation.sendMessageAsync(
-                request.user,
+                LiteRtConfigs.user(request.user, textFormat),
                 object : MessageCallback {
                     override fun onMessage(message: Message) {
                         val text = stripper.accept(textOf(message))
@@ -104,6 +107,7 @@ internal class LiteRtBackend(private val cacheDir: String?, private val opensThi
     override fun unload() {
         runCatching { engine?.close() }
         engine = null
+        textFormat = LiteRtTextFormat.SINGLE
     }
 
     companion object {
@@ -140,23 +144,34 @@ internal class LiteRtBackend(private val cacheDir: String?, private val opensThi
  * Java 21) na inicialização da classe derrubaria os testes unitários, que rodam no JDK 17.
  */
 internal object LiteRtConfigs {
+    fun contents(text: String, format: LiteRtTextFormat = LiteRtTextFormat.SINGLE): Contents =
+        Contents.of(format.parts(text).map { Content.Text(it) })
+
+    fun user(text: String, format: LiteRtTextFormat = LiteRtTextFormat.SINGLE): Message = Message.user(contents(text, format))
+
+    @OptIn(com.google.ai.edge.litertlm.ExperimentalApi::class)
+    fun textFormat(engine: Engine, opensThink: Boolean = false): LiteRtTextFormat = LiteRtTextFormat.detect { parts ->
+        engine.createConversation(conversation(null, opensThink)).use {
+            it.renderMessageIntoString(Message.user(Contents.of(parts.map { text -> Content.Text(text) })))
+        }
+    }
+
     /** Limite só da conversa descartável; o pensamento interno também consome esse limite de dois tokens. */
-    fun warmUp(opensThink: Boolean) = conversation(null, opensThink).copy(maxOutputToken = 2)
+    fun warmUp(opensThink: Boolean, format: LiteRtTextFormat = LiteRtTextFormat.SINGLE) =
+        conversation(null, opensThink, format).copy(maxOutputToken = 2)
 
     /**
-     * Sem o raciocínio interno do modelo: o Testar e os consumidores querem a resposta. Medido com o Qwen3 0.6B no emulador:
-     * com o "thinking" ligado (o padrão da biblioteca), "Diga olá" virou 335 trechos de `<think>…` e 69 s. Três camadas:
-     * o orçamento zero da doc do LiteRT-LM (`thinkingTokenBudget = 0`; -1 = ilimitado, o padrão), a variável
-     * `enable_thinking=false` do template de chat do Qwen3 (o que de fato o desliga neste modelo) e, como rede de
-     * segurança, o canal "thought": se o modelo pensar mesmo assim, o `<think>…</think>` sai do texto da resposta.
+     * `enable_thinking=false` só desliga o pensamento se o template o consultar (ex.: Qwen3 fed81d1).
+     * Em 0.16.1 o orçamento zero desativa o limitador, não impõe geração sem pensamento; o Qwen legado o ignora.
+     * O canal e o ThoughtStripper apenas removem pensamento da resposta, sem economizar sua geração.
      */
-    fun conversation(system: String?, opensThink: Boolean = false): ConversationConfig {
+    fun conversation(system: String?, opensThink: Boolean = false, format: LiteRtTextFormat = LiteRtTextFormat.SINGLE): ConversationConfig {
         val thinking = ThinkingConfig(enableThinking = false, thinkingTokenBudget = 0)
         val context: Map<String, Any> = mapOf("enable_thinking" to false)
         // Modelo cujo prompt já abre o `<think>` (DeepSeek R1): o canal não reconheceria o início; o [ThoughtStripper] cuida disso.
         val channels = if (opensThink) emptyList() else listOf(Channel("thought", "<think>", "</think>"))
         return if (system != null) {
-            ConversationConfig(systemInstruction = Contents.of(system), channels = channels, extraContext = context, thinkingConfig = thinking)
+            ConversationConfig(systemInstruction = contents(system, format), channels = channels, extraContext = context, thinkingConfig = thinking)
         } else {
             ConversationConfig(channels = channels, extraContext = context, thinkingConfig = thinking)
         }
