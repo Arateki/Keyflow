@@ -248,7 +248,7 @@ do e2e da v1.
 | — | `gesture-tour` | GT-T1..T10 feitos (2026-09-24); falta só o manual do GT-T8 no A32 **[YAN]** |
 | — | `native-voice-models` | ✅ código completo (NM-T1..T12, T14..T17 + núcleo da T18; PR #3). CI verde em `5db6d75`: 240/240 instrumentados, telas 84/84. Desde o PR #5 o download é da fila do app (IPv4 primeiro), não do DownloadManager — desvio da G6 no design. Faltam os roteiros manuais T13/T18 no A32 **[YAN]** (`manual-validation.md`) |
 | — | Teclado pós-uso no A32 (PR #5) | ✅ fluidez (sem chamada síncrona por letra, escorregar, rollover, vibração, prévia na janela), acentos no jeito do Samsung, fileira de 56 dp, cores "Sistema" padrão, corretor próprio com troca no espaço (Q9), cursor no meio do texto |
-| — | `vision-capture` | spec/design/tasks prontos — nada do motor implementado; fora da v1. ⚠️ A aba Visão do trabalho do Gemini já existe com "Origem da visão" (Créditos/endpoint próprio), contra a spec ("nenhum byte sai do aparelho") — decidir antes da VC-T11 |
+| — | `vision-capture` | spec/design/tasks prontos — nada do motor implementado; fora da v1. ⚠️ A aba Visão do trabalho do Gemini já existe com "Origem da visão" (Créditos/endpoint próprio), contra a spec ("nenhum byte sai do aparelho") — a spec reescrita (2026-10-24) a reduz na VC-T11 (sem origem por API; ML Kit fora) |
 | M7 | `keyflow-api` | API-T1..T12 ✅ + T13 parcial (Dockerfile + `api/docs/deploy.md`), **na `main` desde 2026-09-28** (PR #4); T13 parou nas credenciais/staging **[YAN]**. A v1 exige staging e produção na AWS (V1-9); plano em `api/docs/aws.md`. API-T11 e API-T12 ficam desligadas na v1 |
 | M7 | `monetization` | spec/design/tasks prontos — nada implementado. **Parte entra na v1** (V1-10: MZ-T1, T2, T3, T4, T9, T10, T11, T13, T14, T15). MZ-T3/T9 com fakes depois do staging; o e2e real (MZ-T15/API-T14) espera o upload interno e as decisões 1 e 2. Créditos (T5–T8) e o rewarded (T12) ficam para depois |
 | M8 | `theme-system` | spec de 2026-07-04, nada implementado — **defasada**: Aero, Glitch e Rose Gold saíram por fora (quick 013/015/016, pintores no IME como `KeySurface`/`RoseGoldPainter`) e as skins por pacote existem; não há `ThemeRegistry`. Revisar a spec antes de executar. Fora da v1 |
@@ -392,7 +392,8 @@ manuais da T18 e da T13 no A32 **[YAN]** — `.specs/features/native-voice-model
 ## Bloco 5 — `vision-capture` (copiar texto/imagem/tradução da tela)
 
 Spec: `.specs/features/vision-capture/`. Ordem sequencial do `tasks.md`:
-VC-T1 → T2 → ... → T13 → T14 (**[YAN]** validação A32).
+VC-T1 → T2a → T2b → T3 → T4 → T5 → T6 → T11 → T12 → T7 → T8 → T9 → T10 → T13 → T14 (**[YAN]** validação A32).
+O ML Kit saiu (decisão do Yan, 2026-10-24): OCR e tradução usam modelos abertos baixados pela aba Visão.
 
 **Status (2026-09-27)**: nada implementado — é o próximo bloco da Frente A.
 

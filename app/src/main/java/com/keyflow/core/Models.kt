@@ -41,8 +41,10 @@ enum class ThemeMode { LIGHT, DARK }
  * Ação mapeável aos atalhos de toque da orbe (2 e 3 toques), acionados só em idle/pause.
  * - [TOGGLE_KEYBOARD]: retrai/expande o teclado KeyFlow (requer o KeyFlow como teclado ativo).
  * - [SWITCH_IME]: abre o seletor de teclados do sistema.
+ * - [VISION_MODE]: abre o fluxo Visão (vision-capture): seleciona uma área da tela e copia a imagem, o texto ou a
+ *   tradução. É a única ação que vale também durante a gravação (a pausa e a devolve ao estado em que estava).
  */
-enum class OrbShortcutAction { NONE, TOGGLE_KEYBOARD, SWITCH_IME }
+enum class OrbShortcutAction { NONE, TOGGLE_KEYBOARD, SWITCH_IME, VISION_MODE }
 
 /**
  * O que fazer quando o nº de toques passa do máximo configurado (>3):

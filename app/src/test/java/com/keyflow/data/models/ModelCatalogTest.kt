@@ -249,15 +249,48 @@ class ModelCatalogTest {
     // a conferência de pin está no `PinSanityTest` (forma) e no `scripts/verify-model-catalog.py` (API do HF).
 
     @Test
-    fun `vision specs, when there are any, are vision kind with a model file`() {
+    fun `vision specs are vision kind on the OCR engine with detector, recognizer and dictionary`() {
         ModelCatalog.VISION.forEach { model ->
             assertThat(model.kind).isEqualTo(ModelKind.VISION)
-            assertThat(model.files.map { it.role }).contains(FileRole.MODEL)
+            assertThat(model.engineType).isEqualTo(EngineType.OCR)
+            assertThat(model.files.map { it.role }).containsExactly(FileRole.DETECTOR, FileRole.RECOGNIZER, FileRole.DICTIONARY).inOrder()
             assertThat(model.recommendedRamMb).isGreaterThan(0)
             assertThat(model.modelName).isNotEmpty()
         }
         assertThat(ModelCatalog.VISION.map { it.totalBytes }).isInOrder()
         assertThat(ModelCatalog.VISION.map { it.recommendedRamMb }).isInOrder()
+    }
+
+    /**
+     * VC-T2a: o OCR é o par do `monkt/paddleocr-onnx` no commit conferido em 2026-10-27 (tamanhos e SHA-256 do `lfs.oid` da API do HF e
+     * recalculados baixando os arquivos). Os cinco pins inventados antigos não voltam: o catálogo de visão tem só esta entrada.
+     */
+    @Test
+    fun `the vision catalog is the paddleocr pair pinned at the verified commit`() {
+        assertThat(ModelCatalog.VISION_ALL.map { it.id }).containsExactly("ocr-paddle-latin")
+        assertThat(ModelCatalog.VISION).containsExactly(ModelCatalog.OCR_PADDLE_LATIN) // o teste roda no debug
+        assertThat(ModelCatalog.byId("ocr-paddle-latin")).isSameInstanceAs(ModelCatalog.OCR_PADDLE_LATIN)
+        val ocr = ModelCatalog.OCR_PADDLE_LATIN
+        val repo = "https://huggingface.co/monkt/paddleocr-onnx/resolve/7b02d0a30a07ba2b92ad1ff5a8941ae2c633de65"
+        assertThat(ocr.file(FileRole.DETECTOR)!!.url).isEqualTo("$repo/detection/v3/det.onnx")
+        assertThat(ocr.file(FileRole.RECOGNIZER)!!.url).isEqualTo("$repo/languages/latin/rec.onnx")
+        assertThat(ocr.file(FileRole.DICTIONARY)!!.url).isEqualTo("$repo/languages/latin/dict.txt")
+        assertThat(ocr.files.map { it.bytes }).containsExactly(2_429_873L, 7_862_832L, 1_634L).inOrder()
+        assertThat(ocr.totalBytes).isEqualTo(10_294_339L)
+        assertThat(ocr.files.map { it.sha256 }).containsExactly(
+            "ee40e80071ba3a320d4efda75f3e22047a7d049e9bf7bcaaf9daea23fc21b935",
+            "614ffc2d6d3902d360fad7f1b0dd455ee45e877069d14c4e51a99dc4ef144409",
+            "3c0a8a79b612653c25f765271714f71281e4e955962c153e272b7b8c1d2b13ff",
+        ).inOrder()
+        ocr.files.forEach { assertThat(it.url).endsWith("/${it.fileName}") }
+    }
+
+    /** Nenhum motor roda o OCR ainda (VC-T2b/VC-T6): o release não o oferece até a prova num aparelho. */
+    @Test
+    fun `release does not offer the ocr model until it is validated on a device`() {
+        assertThat(ModelCatalog.OCR_PADDLE_LATIN.validatedOnDevice).isFalse()
+        assertThat(ModelCatalog.visibleIn(ModelCatalog.VISION_ALL, debug = false)).isEmpty()
+        assertThat(ModelCatalog.visibleIn(ModelCatalog.VISION_ALL, debug = true)).containsExactlyElementsIn(ModelCatalog.VISION_ALL)
     }
 
     @Test
@@ -334,5 +367,7 @@ class ModelCatalogTest {
         assertThat(byId).containsEntry("deepseek-r1-1.5b-litertlm", ModelVendor.DEEPSEEK)
         assertThat(byId).containsEntry("gemma-4-e2b-litertlm", ModelVendor.GOOGLE)
         assertThat(byId).containsEntry("gemma-4-e4b-litertlm", ModelVendor.GOOGLE)
+        // PaddleOCR é da PaddlePaddle (Baidu), embora os arquivos ONNX venham de um repositório de terceiros no Hugging Face.
+        assertThat(byId).containsEntry("ocr-paddle-latin", ModelVendor.PADDLEPADDLE)
     }
 }

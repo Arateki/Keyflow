@@ -70,4 +70,37 @@ class SettingsShortcutTest {
         val s = settings.copy(shortcutOverflow = ShortcutOverflow.CANCEL)
         assertThat(s.resolveShortcut(4)).isEqualTo(OrbShortcutAction.NONE)
     }
+
+    // ── VISION_MODE (MODE-01) ─────────────────────────────────────────────────
+
+    @Test
+    fun `VISION_MODE can be mapped to any burst of 1 to 3 taps`() {
+        for (taps in 1..3) {
+            val s = Settings(shortcut1Tap = OrbShortcutAction.NONE, shortcut2Tap = OrbShortcutAction.NONE, shortcut3Tap = OrbShortcutAction.NONE)
+            val mapped = when (taps) {
+                1 -> s.copy(shortcut1Tap = OrbShortcutAction.VISION_MODE)
+                2 -> s.copy(shortcut2Tap = OrbShortcutAction.VISION_MODE)
+                else -> s.copy(shortcut3Tap = OrbShortcutAction.VISION_MODE)
+            }
+            assertThat(mapped.shortcutForTaps(taps)).isEqualTo(OrbShortcutAction.VISION_MODE)
+            assertThat(mapped.resolveShortcut(taps)).isEqualTo(OrbShortcutAction.VISION_MODE)
+        }
+    }
+
+    @Test
+    fun `overflow NEAREST_DOWN falls back to VISION_MODE when it is the 3-tap action`() {
+        val s = settings.copy(shortcut3Tap = OrbShortcutAction.VISION_MODE, shortcutOverflow = ShortcutOverflow.NEAREST_DOWN)
+        assertThat(s.resolveShortcut(4)).isEqualTo(OrbShortcutAction.VISION_MODE)
+    }
+
+    @Test
+    fun `overflow CANCEL never triggers VISION_MODE`() {
+        val s = settings.copy(shortcut3Tap = OrbShortcutAction.VISION_MODE, shortcutOverflow = ShortcutOverflow.CANCEL)
+        assertThat(s.resolveShortcut(4)).isEqualTo(OrbShortcutAction.NONE)
+    }
+
+    @Test
+    fun `the translation target defaults to Portuguese`() {
+        assertThat(Settings().visionTranslateTarget).isEqualTo("pt")
+    }
 }

@@ -30,6 +30,7 @@ internal fun ModelVendor.logo(): VendorLogo = when (this) {
     ModelVendor.DEEPSEEK -> VendorLogo(KfIcons.LogoDeepSeek, Color(0xFF5786FE))
     ModelVendor.HUGGING_FACE -> VendorLogo(KfIcons.LogoHuggingFace, Color(0xFFFFD21E))
     ModelVendor.NVIDIA -> VendorLogo(KfIcons.LogoNvidia, Color(0xFF76B900))
+    ModelVendor.PADDLEPADDLE -> VendorLogo(KfIcons.LogoPaddlePaddle, Color(0xFF0062B0))
 }
 
 /** Contraste mínimo (WCAG 1.4.11, componentes gráficos) do logo contra o fundo do card. */

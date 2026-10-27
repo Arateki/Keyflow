@@ -219,6 +219,13 @@ class LocalModelsUiTest {
         assertThat(visionUi().items.map { it.spec.id }).containsNoneOf(base, small, parakeet, qwen, gemma)
     }
 
+    /** VC-T2a: a lista da Visão traz só o OCR (PaddleOCR), baixável e ainda não instalado. */
+    @Test
+    fun `EMPTY_VISION lists only the ocr model, available to download`() {
+        assertThat(LocalModelsUi.EMPTY_VISION.items.map { it.spec.id }).containsExactly("ocr-paddle-latin")
+        assertThat(LocalModelsUi.EMPTY_VISION.items.single().status).isEqualTo(LocalModelStatus.AVAILABLE)
+    }
+
     @Test
     fun `EMPTY_VISION lists the vision catalog and never speech or text`() {
         assertThat(LocalModelsUi.EMPTY_VISION.items.map { it.spec.id })
