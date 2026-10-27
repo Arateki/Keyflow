@@ -8,6 +8,7 @@ import com.keyflow.data.models.ModelFile
 import com.keyflow.data.models.ModelKind
 import com.keyflow.data.models.ModelSpec
 import com.keyflow.data.models.ModelVendor
+import com.keyflow.data.models.ThinkingSupport
 import com.keyflow.net.KeyFlowHttpClient
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -248,6 +249,8 @@ class RemoteConfigRepository(
                 kind = kind,
                 // Fabricante é só enfeite do card: nome que esta versão não conhece vira "sem logo", não manifesto inválido.
                 vendor = ModelVendor.entries.firstOrNull { it.name == json.optString("vendor", "") },
+                // Idem: aviso informativo; ausente ou desconhecido vira "nenhum aviso".
+                thinking = ThinkingSupport.entries.firstOrNull { it.name == json.optString("thinking", "") } ?: ThinkingSupport.NONE,
             )
         }
 

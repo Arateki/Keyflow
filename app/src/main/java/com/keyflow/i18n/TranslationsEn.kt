@@ -421,6 +421,8 @@ internal val TranslationsEn: Map<String, String> = mapOf(
     "Personalize o teclado e o overlay com temas. Libere as skins para sempre." to "Customize the keyboard and the overlay with themes. Unlock the skins forever.",
     "Personalize os botões da barra do teclado — mic, atalhos, gatilhos de grade." to "Customize the keyboard bar buttons — mic, shortcuts, grid triggers.",
     "Pode ser pesado neste aparelho." to "May be heavy on this device.",
+    "Suporta modo pensamento." to "Supports thinking mode.",
+    "Sempre pensa antes de responder." to "Always thinks before answering.",
     "Atualizar modelo" to "Update model",
     "Há uma versão nova deste modelo. Atualize para voltar a usá-lo." to "There is a new version of this model. Update it to use it again.",
     "Por que pedimos %s" to "Why we ask for %s",

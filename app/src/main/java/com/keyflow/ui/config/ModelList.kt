@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import com.keyflow.data.Settings
 import com.keyflow.data.models.ModelSpec
 import com.keyflow.data.models.StartResult
+import com.keyflow.data.models.ThinkingSupport
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
 import com.keyflow.ui.theme.SpaceMono
@@ -223,6 +224,15 @@ private fun ModelCard(
             }
         }
         SettingSub(tr(spec.summary), Modifier.padding(top = 10.dp))
+        thinkingNotice(spec.thinking)?.let { notice ->
+            Text(
+                notice,
+                color = palette.muted,
+                fontFamily = SpaceGrotesk,
+                fontSize = 10.5.sp,
+                modifier = Modifier.padding(top = 6.dp).testTag("${tags.model(spec.id)}-thinking"),
+            )
+        }
         if (item.outdated) {
             Text(
                 tr("Há uma versão nova deste modelo. Atualize para voltar a usá-lo."),
@@ -371,4 +381,11 @@ private fun ConfirmRow(question: String, confirm: String, tag: String, tags: Mod
             CardAction(confirm, tag = tags.confirmYes, onClick = onConfirm)
         }
     }
+}
+
+/** A linha de modo pensamento do card (só informativa); nenhuma para o modelo comum. */
+internal fun thinkingNotice(thinking: ThinkingSupport): String? = when (thinking) {
+    ThinkingSupport.NONE -> null
+    ThinkingSupport.OPTIONAL -> tr("Suporta modo pensamento.")
+    ThinkingSupport.ALWAYS -> tr("Sempre pensa antes de responder.")
 }

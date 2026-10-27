@@ -3191,3 +3191,34 @@ Dois motores com ferramentas ao lado do da Anthropic: `reasoning/openai/OpenAiAg
   fora do grid 24 (ponto de controle de curva do DeepSeek em -0,231).
 - `pool instrumentar` (63 testes dos painéis de modelo, todos passaram) termina com "Test mechanism: JSONException em `DeviceSettingsSnapshot.restoreOwnerState`" (arquivo do
   snapshot do dono vazio no emulador). Medido: aparece igual em logs de outras frentes de horas antes (`/tmp/pool-instrumentar.7guu6lzd.log`, `q__ive7s`), então não é desta mudança.
+
+## 2026-10-27 — Qwen3 0.6B no pin novo, Qwen2.5 1.5B no catálogo e aviso de pensamento (equipe/catalogo-qwen)
+
+- Decisão do Yan: `ModelCatalog.QWEN3_0_6B` (mesmo id `qwen3-0.6b-litertlm`) passa do commit `a3c5d805…` (SHA `555579ff…`, 614236160 B) para
+  `fed81d17517e6ea64362e917ecf7e5accff12492` (SHA `c5f39b41…`, 613722264 B). O Jinja do arquivo novo consulta `enable_thinking`; com o pedido
+  corrigido (PR #41) o Vaio TL10 responde em 9,8 s e 23,2 s contra 206 s do antigo (que pensava sempre, escondido). Pico de VmRSS ~1,9 GB, igual.
+  O card passa a mostrar ~585 MB (era ~586).
+- **Migração de quem tem o arquivo antigo.** Antes não havia: o `ModelStore` só conferia nome e tamanho do manifest contra o disco, nunca contra o
+  catálogo; trocar SHA/pin de um id já instalado deixava o card "Apagar", o motor carregando o arquivo velho (o resolver só perguntava `isInstalled`)
+  e nenhum caminho para baixar o novo. Agora `ModelStore(root, catalog)` (o do app usa `ModelCatalog::byId`) compara o manifest instalado com a entrada
+  atual (nome, bytes e SHA-256 de cada arquivo): divergente vira `outdatedIds`, e `installedIds` não o inclui. Efeitos: o card mostra "Atualizar modelo" +
+  "Há uma versão nova deste modelo…" (`LocalModelItem.outdated`), o `ReasoningEngines.resolve` devolve `MODEL_NOT_INSTALLED`, a pré-carga recusa, e
+  `ModelDownloader.start` apaga a cópia velha (`discardOutdated`) antes de baixar, para o pico de disco não ser 3 cópias. Id que o catálogo não conhece
+  continua valendo pelo manifest. O manifesto remoto aplicado depois (`SetupActivity`) chama `ModelStore.refresh()`, porque o catálogo efetivo muda.
+  Provas: `ModelStoreTest` (inclui um manifest real do pin antigo contra o `ModelCatalog`), `ModelDownloaderTest` (atualização de ponta a ponta),
+  `LocalModelsUiTest`, `ModelListTest#anOutdatedInstallOffersToUpdateInsteadOfDownload`. Vale para qualquer modelo no futuro, não só o Qwen.
+- Qwen2.5 1.5B Instruct (`qwen2.5-1.5b-litertlm`, nome "Versátil", vendor QWEN, Apache-2.0, `litert-community/Qwen2.5-1.5B-Instruct` @ `2f23bacf…`,
+  `…q8_ekv4096.litertlm`, 1597922856 B, SHA `c4a9b728…`) entra com `validatedOnDevice = true` e `recommendedRamMb = 4096` (Vaio: boa resposta em PT,
+  ~10/~20 s, pico 2,3 GB; mesma base e quantização do DeepSeek, que usa 4096). Posição na lista: pelo tamanho do arquivo, como os outros (entre o Leve
+  e o Intermediário); a ordem de RAM continua diferindo, como já documentado. Licença em `app/licenses/Apache-2.0_qwen2.5-1.5b.txt`, README de lá,
+  Docs (PT/EN/ES) e `doc.json` regenerado; `docs/loja/inventario-de-dados.md` e `PLAYSTORE_CHECKLIST.md` listam o modelo.
+- `ModelSpec.thinking: ThinkingSupport` (NONE, OPTIONAL, ALWAYS), só informativo (o seletor fica para os fluxos futuros). Qwen3 0.6B e Gemma 4 E2B/E4B =
+  OPTIONAL; DeepSeek R1 = ALWAYS; Qwen2.5 e SmolLM2 = NONE (sem linha no card). Manifesto remoto: `"thinking"` opcional, ausente ou desconhecido = NONE.
+  **Gemma 4 tem pensamento configurável**: o card oficial `google/gemma-4-E2B-it` (e o do E4B) diz "configurable thinking modes" e, em "Thinking Mode
+  Configuration", que liga com o token `<|think|>` no começo do prompt de sistema; o template do próprio `.litertlm` do E2B (fixture
+  `gemma-e2b.jinja`, linhas 157-162) injeta esse token quando `enable_thinking` é verdadeiro. Hoje o app sempre pede `enable_thinking=false`.
+- O CI "Catalog pins vs Hugging Face" (`.github/workflows/catalogo-modelos.yml` + `scripts/verify-model-catalog.py`) lê o `ModelCatalog.kt`; não precisou de
+  mudança: o pin novo e o card novo entram sozinhos (a URL no commit, tamanho, SHA e licença são conferidos contra a API pública).
+- Lição: trocar o arquivo de um id já publicado exige que o armazenamento compare com o catálogo; "o pin mudou" não chega ao aparelho sozinho.
+  Lição: dois cards do mesmo fabricante quebram `onNodeWithTag("model-vendor-qwen")` (assertExists em nó único); usar `onAllNodesWithTag(...).assertCountEquals`.
+

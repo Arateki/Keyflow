@@ -345,4 +345,25 @@ class ModelCatalogTest {
         assertThat(byId).containsEntry("gemma-4-e2b-litertlm", ModelVendor.GOOGLE)
         assertThat(byId).containsEntry("gemma-4-e4b-litertlm", ModelVendor.GOOGLE)
     }
+
+    /**
+     * Aviso de modo pensamento no card. Fontes: Qwen3, card do `Qwen/Qwen3-0.6B` ("seamless switching between thinking mode and non-thinking
+     * mode"); DeepSeek R1, o prompt abre o `<think>` sempre; Gemma 4, card do `google/gemma-4-E2B-it` e do E4B ("configurable thinking modes",
+     * liga com `<|think|>` no prompt de sistema); Qwen2.5 e SmolLM2 são modelos de instrução comuns.
+     */
+    @Test
+    fun `text models declare whether they think`() {
+        val byId = ModelCatalog.TEXT_ALL.associate { it.id to it.thinking }
+        assertThat(byId).containsExactly(
+            "qwen3-0.6b-litertlm", ThinkingSupport.OPTIONAL,
+            "qwen2.5-1.5b-litertlm", ThinkingSupport.NONE,
+            "smollm2-1.7b-litertlm", ThinkingSupport.NONE,
+            "deepseek-r1-1.5b-litertlm", ThinkingSupport.ALWAYS,
+            "gemma-4-e2b-litertlm", ThinkingSupport.OPTIONAL,
+            "gemma-4-e4b-litertlm", ThinkingSupport.OPTIONAL,
+        )
+        // O modelo que abre o `<think>` no prompt é, por definição, o que sempre pensa.
+        assertThat(ModelCatalog.TEXT_ALL.filter { it.promptOpensThink }.map { it.thinking }.toSet()).containsExactly(ThinkingSupport.ALWAYS)
+        assertThat(ModelCatalog.SPEECH.map { it.thinking }.toSet()).containsExactly(ThinkingSupport.NONE)
+    }
 }

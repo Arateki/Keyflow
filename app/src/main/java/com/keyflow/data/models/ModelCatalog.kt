@@ -28,6 +28,14 @@ enum class ModelVendor(val displayName: String) {
 }
 
 /**
+ * Se o modelo de texto "pensa" antes de responder (só informativo, vira uma linha no card). [NONE] é o modelo de instrução comum e o
+ * valor de quem não declara; [OPTIONAL] pensa quando o pedido liga o modo (`enable_thinking`, lido pelo template do `.litertlm`);
+ * [ALWAYS] sempre abre um raciocínio, que o app esconde da resposta mas que conta no tempo de geração. Valor que esta versão do app
+ * não conhece, num manifesto remoto, vale [NONE].
+ */
+enum class ThinkingSupport { NONE, OPTIONAL, ALWAYS }
+
+/**
  * Papel de cada arquivo no modelo — o engine monta a config por papel, não pelo nome do arquivo.
  * [MODEL] é o arquivo único `.litertlm` dos modelos de texto.
  */
@@ -71,6 +79,8 @@ data class ModelSpec(
     val validatedOnDevice: Boolean = true,
     /** Quem faz o modelo; `null` só em manifesto remoto sem o campo. Todo modelo do catálogo embutido declara o seu (`ModelCatalogTest`). */
     val vendor: ModelVendor? = null,
+    /** Aviso de modo pensamento no card (só os modelos de texto declaram; o resto fica em [ThinkingSupport.NONE]). */
+    val thinking: ThinkingSupport = ThinkingSupport.NONE,
 ) {
     val totalBytes: Long get() = files.sumOf { it.bytes }
 
@@ -231,6 +241,8 @@ object ModelCatalog {
         modelName = "Qwen3 0.6B",
         kind = ModelKind.TEXT,
         vendor = ModelVendor.QWEN,
+        // Card do Qwen/Qwen3-0.6B: "seamless switching between thinking mode and non-thinking mode"; o template da revisão fed81d17… lê `enable_thinking`.
+        thinking = ThinkingSupport.OPTIONAL,
         files = listOf(
             ModelFile(FileRole.MODEL, "Qwen3-0.6B.litertlm", "$QWEN3_REPO/Qwen3-0.6B.litertlm", "c5f39b4191926786c3e6668b62af4d6eb15248dfc7a5348252a9b406f33f2108", 613_722_264L),
         ),
@@ -256,6 +268,7 @@ object ModelCatalog {
         modelName = "Qwen2.5 1.5B",
         kind = ModelKind.TEXT,
         vendor = ModelVendor.QWEN,
+        thinking = ThinkingSupport.NONE,
         files = listOf(
             ModelFile(
                 FileRole.MODEL, "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.litertlm",
@@ -284,6 +297,7 @@ object ModelCatalog {
         modelName = "SmolLM2 1.7B",
         kind = ModelKind.TEXT,
         vendor = ModelVendor.HUGGING_FACE,
+        thinking = ThinkingSupport.NONE,
         files = listOf(
             ModelFile(
                 FileRole.MODEL, "SmolLM2-1_7B-Instruct_dynamic_wi8_afp32.litertlm", "$SMOLLM2_REPO/SmolLM2-1_7B-Instruct_dynamic_wi8_afp32.litertlm",
@@ -312,6 +326,8 @@ object ModelCatalog {
         kind = ModelKind.TEXT,
         promptOpensThink = true,
         vendor = ModelVendor.DEEPSEEK,
+        // O template abre o `<think>` em toda resposta (por isso o `promptOpensThink`); não há como desligar.
+        thinking = ThinkingSupport.ALWAYS,
         files = listOf(
             ModelFile(
                 FileRole.MODEL, "DeepSeek-R1-Distill-Qwen-1.5B_multi-prefill-seq_q8_ekv4096.litertlm",
@@ -338,6 +354,10 @@ object ModelCatalog {
         modelName = "Gemma 4 E2B",
         kind = ModelKind.TEXT,
         vendor = ModelVendor.GOOGLE,
+        // Pensamento configurável: card do google/gemma-4-E2B-it (huggingface.co/google/gemma-4-E2B-it), "Core Capabilities > Thinking" e "Thinking
+        // Mode Configuration" (liga com `<|think|>` no começo do prompt de sistema; desligado, o E2B/E4B nem emite o canal). O template do próprio
+        // `.litertlm` injeta esse token quando `enable_thinking` é verdadeiro (fixture `gemma-e2b.jinja`, linhas 157-162).
+        thinking = ThinkingSupport.OPTIONAL,
         files = listOf(
             ModelFile(FileRole.MODEL, "gemma-4-E2B-it.litertlm", "$GEMMA_4_REPO/gemma-4-E2B-it.litertlm", "181938105e0eefd105961417e8da75903eacda102c4fce9ce90f50b97139a63c", 2_588_147_712L),
         ),
@@ -362,6 +382,10 @@ object ModelCatalog {
         modelName = "Gemma 4 E4B",
         kind = ModelKind.TEXT,
         vendor = ModelVendor.GOOGLE,
+        // Pensamento configurável: card do google/gemma-4-E4B-it (huggingface.co/google/gemma-4-E4B-it), "Core Capabilities > Thinking" e "Thinking
+        // Mode Configuration" (liga com `<|think|>` no começo do prompt de sistema; desligado, o E2B/E4B nem emite o canal). O template do próprio
+        // `.litertlm` injeta esse token quando `enable_thinking` é verdadeiro (fixture `gemma-e2b.jinja`, linhas 157-162).
+        thinking = ThinkingSupport.OPTIONAL,
         files = listOf(
             ModelFile(FileRole.MODEL, "gemma-4-E4B-it.litertlm", "$GEMMA_4_E4B_REPO/gemma-4-E4B-it.litertlm", "0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0", 3_659_530_240L),
         ),

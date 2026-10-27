@@ -3,6 +3,7 @@ package com.keyflow.data.monetization
 import com.google.common.truth.Truth.assertThat
 import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.ModelKind
+import com.keyflow.data.models.ThinkingSupport
 import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
@@ -80,6 +81,20 @@ class RemoteConfigRepositoryTest {
         assertThat(runCatching { RemoteConfigRepository.parseModels("{\"models\":[{\"id\":\"x\"}]}") }.isFailure).isTrue()
         ModelCatalog.applyRemoteManifest(emptyList())
         assertThat(ModelCatalog.current(ModelKind.SPEECH)).isEqualTo(original)
+    }
+
+    @Test
+    fun `thinking do manifesto é opcional e tolera valor desconhecido`() {
+        fun parse(thinking: String?) = RemoteConfigRepository.parseModels(
+            modelsJson("m").let { json ->
+                if (thinking == null) json else json.replace("\"vendor\": \"NVIDIA\",", "\"vendor\": \"NVIDIA\", \"thinking\": \"$thinking\",")
+            },
+        ).single().thinking
+
+        assertThat(parse(null)).isEqualTo(ThinkingSupport.NONE)
+        assertThat(parse("OPTIONAL")).isEqualTo(ThinkingSupport.OPTIONAL)
+        assertThat(parse("ALWAYS")).isEqualTo(ThinkingSupport.ALWAYS)
+        assertThat(parse("SOMETIMES")).isEqualTo(ThinkingSupport.NONE)
     }
 
     @Test
