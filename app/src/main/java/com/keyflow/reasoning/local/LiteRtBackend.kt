@@ -9,6 +9,7 @@ import com.google.ai.edge.litertlm.ThinkingConfig
 import com.google.ai.edge.litertlm.Conversation
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
+import com.google.ai.edge.litertlm.ExperimentalApi
 import com.google.ai.edge.litertlm.Message
 import com.google.ai.edge.litertlm.MessageCallback
 import com.keyflow.reasoning.ReasoningRequest
@@ -149,7 +150,7 @@ internal object LiteRtConfigs {
 
     fun user(text: String, format: LiteRtTextFormat = LiteRtTextFormat.SINGLE): Message = Message.user(contents(text, format))
 
-    @OptIn(com.google.ai.edge.litertlm.ExperimentalApi::class)
+    @OptIn(ExperimentalApi::class)
     fun textFormat(engine: Engine, opensThink: Boolean = false): LiteRtTextFormat = LiteRtTextFormat.detect { parts ->
         engine.createConversation(conversation(null, opensThink)).use {
             it.renderMessageIntoString(Message.user(Contents.of(parts.map { text -> Content.Text(text) })))

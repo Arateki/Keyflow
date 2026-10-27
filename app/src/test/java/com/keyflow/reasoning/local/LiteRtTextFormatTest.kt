@@ -22,8 +22,19 @@ class LiteRtTextFormatTest {
         assertThat(format).isEqualTo(LiteRtTextFormat.PARTS)
     }
 
-    @Test fun `nao aceita template que descarta os dois formatos`() {
-        assertThrows(IllegalStateException::class.java) { LiteRtTextFormat.detect { "<user></user>" } }
+    @Test fun `template que descarta os dois formatos volta a uma parte sem derrubar a carga`() {
+        assertThat(LiteRtTextFormat.detect { "<user></user>" }).isEqualTo(LiteRtTextFormat.SINGLE)
+    }
+
+    @Test fun `sonda que lanca nos dois formatos volta a uma parte`() {
+        assertThat(LiteRtTextFormat.detect { throw IllegalStateException("renderizador indisponível") })
+            .isEqualTo(LiteRtTextFormat.SINGLE)
+        assertThat(LiteRtTextFormat.detect { throw NoSuchMethodError("renderMessageIntoString") })
+            .isEqualTo(LiteRtTextFormat.SINGLE)
+    }
+
+    @Test fun `interrupcao da sonda nao e engolida`() {
+        assertThrows(InterruptedException::class.java) { LiteRtTextFormat.detect { throw InterruptedException() } }
     }
 
     @Test fun `montagem preserva todos os caracteres sem separar pares Unicode`() {

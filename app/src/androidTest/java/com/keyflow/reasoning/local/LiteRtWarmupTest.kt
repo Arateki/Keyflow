@@ -45,5 +45,4 @@ class LiteRtWarmupTest {
             assertEquals(2, LiteRtConfigs.warmUp(false, format).maxOutputToken)
         }
     }
-
 }

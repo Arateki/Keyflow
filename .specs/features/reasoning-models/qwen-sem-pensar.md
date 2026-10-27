@@ -127,7 +127,7 @@ chave `enable_thinking`. A revisão fed81d1 usa essa chave para acrescentar `<th
 Prefere uma parte; só usa `[texto, ""]` se a primeira forma perder o marcador e a segunda o preservar.
 A segunda parte vazia impede o colapso no runtime, preservando cada caractere, papel e instrução.
 A escolha depende do arquivo carregado, não do id do catálogo; vale para sistema, pedido e aquecimento.
-Se os dois formatos descartarem o marcador, carregar falha em vez de gerar sem o pedido.
+A sonda nunca derruba a carga: se o renderizador lançar ou os dois formatos descartarem o marcador, registra um aviso e usa uma parte (o comportamento anterior).
 `LiteRtTextFormatTest` cobre seleção, erro e Unicode; `LiteRtWarmupTest` confere a montagem da API
 Android. `LiteRtTemplateDeviceTest#qwenFed81d1PreservaSistemaEPedidoEGeraResposta` é opt-in por seleção
 explícita do método, baixa e confere a revisão fixa, compara o prompt perdido ao preservado e gera.
