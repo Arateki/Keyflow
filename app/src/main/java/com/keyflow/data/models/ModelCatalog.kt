@@ -204,11 +204,19 @@ object ModelCatalog {
     // (Gemma Terms) têm restrições de uso e os repositórios reais são gated (login): voltam só por decisão do dono do produto.
     private const val GEMMA_4_REPO = "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/b3ca0d2f076785a8f4b2219ddbd2bdb99954eae1"
     private const val GEMMA_4_E4B_REPO = "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/e6a3892a8c22cf87ff99583996149cf3cb32452b"
-    private const val QWEN3_REPO = "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/a3c5d805ae362dff7f580bc25f2dfb9a5a7eaa76"
+    private const val QWEN3_REPO = "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/fed81d17517e6ea64362e917ecf7e5accff12492"
     private const val SMOLLM2_REPO = "https://huggingface.co/litert-community/SmolLM2-1.7B-Instruct/resolve/c0ee765a9f197467ead8f22b9bf7bbeb4e6307c7"
     private const val DEEPSEEK_R1_REPO = "https://huggingface.co/litert-community/DeepSeek-R1-Distill-Qwen-1.5B/resolve/9fd875541bb0f277e4b3cefe7d9622c4c1de2fb5"
 
-    /** Qwen3 0.6B (Alibaba), INT8 dinâmico, contexto de 4096. Licença Apache 2.0. */
+    /**
+     * Qwen3 0.6B (Alibaba), INT8 dinâmico, contexto de 4096. Licença Apache 2.0.
+     *
+     * Pin trocado em 2026-10-27 (decisão do Yan; mesmo id) do commit `a3c5d805…` (SHA `555579ff…`, 614236160 B) para `fed81d17…`:
+     * o arquivo antigo trazia só marcadores ChatML, sem o Jinja que consulta `enable_thinking`, e pensava sempre (206 s para uma
+     * resposta curta no Vaio TL10, com o pensamento escondido); o novo respeita `enable_thinking=false` (9,8 s e 23,2 s no mesmo
+     * aparelho). Pico de VmRSS igual (~1,9 GB). Quem tem o arquivo antigo instalado vê o card como "Atualizar modelo" (`ModelStore.outdatedIds`).
+     * Ver `.specs/features/reasoning-models/qwen-sem-pensar.md`.
+     */
     val QWEN3_0_6B = ModelSpec(
         id = "qwen3-0.6b-litertlm",
         displayName = trKey("Leve"),
@@ -217,13 +225,13 @@ object ModelCatalog {
         engineType = EngineType.LITERT_LM,
         acceptsLanguageHint = false,
         // Medido (2026-10-27, pico de VmRSS do `:reasoning`, pedido curto): 1,66 GB no A32 (3,7 GB) e 1,7–1,9 GB no Tab S10 Lite (5,8 GB) — bem acima
-        // do arquivo (586 MB). 3072 = RAM total em que ele roda sem aviso de "pesado" (o A32 não o mostra); a guarda de carga exige 80% disso (2458 MB).
+        // do arquivo (585 MB). 3072 = RAM total em que ele roda sem aviso de "pesado" (o A32 não o mostra); a guarda de carga exige 80% disso (2458 MB).
         recommendedRamMb = 3072,
         modelName = "Qwen3 0.6B",
         kind = ModelKind.TEXT,
         vendor = ModelVendor.QWEN,
         files = listOf(
-            ModelFile(FileRole.MODEL, "Qwen3-0.6B.litertlm", "$QWEN3_REPO/Qwen3-0.6B.litertlm", "555579ff2f4fd13379abe69c1c3ab5200f7338bc92471557f1d6614a6e5ab0b4", 614_236_160L),
+            ModelFile(FileRole.MODEL, "Qwen3-0.6B.litertlm", "$QWEN3_REPO/Qwen3-0.6B.litertlm", "c5f39b4191926786c3e6668b62af4d6eb15248dfc7a5348252a9b406f33f2108", 613_722_264L),
         ),
     )
 

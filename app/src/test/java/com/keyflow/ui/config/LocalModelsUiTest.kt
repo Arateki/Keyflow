@@ -38,6 +38,20 @@ class LocalModelsUiTest {
     }
 
     @Test
+    fun `an outdated install is available with the update flag, never selected`() {
+        val ui = LocalModelsUi.compose(
+            installed = setOf(base), outdated = setOf(small, base), active = null, failures = emptyMap(), selectedId = small, deviceRamMb = 8_000,
+        )
+
+        assertThat(ui.item(small).status).isEqualTo(LocalModelStatus.AVAILABLE)
+        assertThat(ui.item(small).outdated).isTrue()
+        assertThat(ui.item(small).selected).isFalse()
+        // Instalado vale mais que a marca (o store nunca os dá juntos; a composição não deve mostrar "Atualizar" num instalado).
+        assertThat(ui.item(base).outdated).isFalse()
+        assertThat(ui.item(parakeet).outdated).isFalse()
+    }
+
+    @Test
     fun `installed and selected`() {
         val ui = ui(installed = setOf(base, small), selected = small)
 

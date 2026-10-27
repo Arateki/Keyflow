@@ -49,6 +49,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Job
 import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.ModelKind
@@ -412,6 +413,7 @@ class SetupActivity : ComponentActivity() {
                             catalog = remoteCatalog.filter { it.kind == ModelKind.SPEECH }
                                 .ifEmpty { ModelCatalog.current(ModelKind.SPEECH) },
                             installed = localSnapshot.installed,
+                            outdated = localSnapshot.outdated,
                             active = localSnapshot.active,
                             failures = localSnapshot.failures,
                             selectedId = settings.localModelId,
@@ -422,6 +424,7 @@ class SetupActivity : ComponentActivity() {
                             catalog = remoteCatalog.filter { it.kind == ModelKind.TEXT }
                                 .ifEmpty { ModelCatalog.current(ModelKind.TEXT) },
                             installed = localSnapshot.installed,
+                            outdated = localSnapshot.outdated,
                             active = localSnapshot.active,
                             failures = localSnapshot.failures,
                             selectedId = settings.reasoningLocalModelId,
@@ -432,6 +435,7 @@ class SetupActivity : ComponentActivity() {
                             catalog = remoteCatalog.filter { it.kind == ModelKind.VISION }
                                 .ifEmpty { ModelCatalog.current(ModelKind.VISION) },
                             installed = localSnapshot.installed,
+                            outdated = localSnapshot.outdated,
                             active = localSnapshot.active,
                             failures = localSnapshot.failures,
                             selectedId = settings.visionLocalModelId,
@@ -441,6 +445,7 @@ class SetupActivity : ComponentActivity() {
                             catalog = remoteCatalog.filter { it.kind == ModelKind.VOICE }
                                 .ifEmpty { ModelCatalog.current(ModelKind.VOICE) },
                             installed = localSnapshot.installed,
+                            outdated = localSnapshot.outdated,
                             active = localSnapshot.active,
                             failures = localSnapshot.failures,
                             selectedId = settings.falaLocalModelId,
@@ -809,6 +814,8 @@ class SetupActivity : ComponentActivity() {
             remoteConfigLoaded = true
             interstitialPolicy?.updateParams(snapshot.config.ads.toInterstitialPolicyParams())
             ModelCatalog.applyRemoteManifest(snapshot.models)
+            // O manifest remoto pode trocar o arquivo de um modelo já instalado: reconfere o disco contra o catálogo novo.
+            withContext(Dispatchers.IO) { ModelStore.get(this@SetupActivity).refresh() }
         }
     }
 

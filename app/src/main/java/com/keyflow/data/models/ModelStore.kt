@@ -13,17 +13,34 @@ import java.io.File
  * e um `manifest.json` escrito **por último** — é o marcador de "instalado íntegro". Diretório sem
  * manifest (ou com manifest que não bate com os arquivos) não conta como instalado.
  *
- * Não confere SHA: quem instala é o downloader, depois de verificar (NM-T7). Aqui só se garante que
+ * Não confere SHA dos bytes: quem instala é o downloader, depois de verificar (NM-T7). Aqui só se garante que
  * nada meio-copiado aparece como instalado.
+ *
+ * Com [catalog], o manifest também tem de bater com a entrada atual do catálogo (nome, tamanho e SHA-256 de cada
+ * arquivo): quando o catálogo troca o arquivo de um modelo sem trocar o id (Qwen3 0.6B, 2026-10-27), quem tinha o
+ * arquivo antigo fica com o modelo em [outdatedIds] — não instalado, para o card oferecer baixar a versão nova em vez
+ * de carregar o arquivo que o catálogo já não conhece. Id que o catálogo não conhece (modelo que saiu, teste) segue
+ * valendo pelo manifest.
  */
-class ModelStore(private val root: File) {
+class ModelStore(
+    private val root: File,
+    private val catalog: (String) -> ModelSpec? = { null },
+) {
 
-    constructor(context: Context) : this(File(context.filesDir, MODELS_DIR))
+    constructor(context: Context) : this(File(context.filesDir, MODELS_DIR), ModelCatalog::byId)
 
-    private val _installedIds = MutableStateFlow(scan())
+    private val _installedIds = MutableStateFlow(emptySet<String>())
+    private val _outdatedIds = MutableStateFlow(emptySet<String>())
 
-    /** Ids instalados íntegros; atualiza após [install] e [delete]. */
+    init {
+        refresh()
+    }
+
+    /** Ids instalados íntegros e iguais ao catálogo; atualiza após [install] e [delete]. */
     val installedIds: StateFlow<Set<String>> = _installedIds.asStateFlow()
+
+    /** Ids com arquivos íntegros no disco, mas de uma versão que o catálogo atual já não é (ver o cabeçalho). */
+    val outdatedIds: StateFlow<Set<String>> = _outdatedIds.asStateFlow()
 
     fun isInstalled(id: String): Boolean = id in _installedIds.value
 
@@ -64,6 +81,13 @@ class ModelStore(private val root: File) {
         refresh()
     }
 
+    /** Apaga a instalação antiga de [id] se ela está desatualizada (o espaço volta antes de baixar a nova); devolve se apagou. */
+    fun discardOutdated(id: String): Boolean {
+        if (id !in _outdatedIds.value) return false
+        delete(id)
+        return true
+    }
+
     /** Apaga o diretório inteiro — o espaço volta na hora (DLM-03, MGR-04). */
     fun delete(id: String) {
         dirFor(id).deleteRecursively()
@@ -79,25 +103,41 @@ class ModelStore(private val root: File) {
 
     /** Relê o disco — útil se outro componente mexeu nos arquivos. */
     fun refresh() {
-        _installedIds.value = scan()
+        val dirs = root.listFiles { f -> f.isDirectory && !f.name.startsWith(".") }.orEmpty()
+        val installed = mutableSetOf<String>()
+        val outdated = mutableSetOf<String>()
+        dirs.forEach { dir ->
+            val manifest = intactManifest(dir) ?: return@forEach
+            if (matchesCatalog(dir.name, manifest)) installed += dir.name else outdated += dir.name
+        }
+        _installedIds.value = installed
+        _outdatedIds.value = outdated
     }
 
-    private fun scan(): Set<String> {
-        val dirs = root.listFiles { f -> f.isDirectory && !f.name.startsWith(".") } ?: return emptySet()
-        return dirs.filter { isIntact(it) }.map { it.name }.toSet()
-    }
-
-    private fun isIntact(dir: File): Boolean {
+    /** O manifest do diretório se tudo que ele lista está no disco com o tamanho certo; senão null. */
+    private fun intactManifest(dir: File): JSONObject? {
         val manifestFile = File(dir, MANIFEST)
-        if (!manifestFile.isFile) return false
-        val manifest = runCatching { JSONObject(manifestFile.readText()) }.getOrNull() ?: return false
-        if (manifest.optString("id") != dir.name) return false
-        val files = manifest.optJSONArray("files") ?: return false
-        return (0 until files.length()).all { i ->
+        if (!manifestFile.isFile) return null
+        val manifest = runCatching { JSONObject(manifestFile.readText()) }.getOrNull() ?: return null
+        if (manifest.optString("id") != dir.name) return null
+        val files = manifest.optJSONArray("files") ?: return null
+        val intact = (0 until files.length()).all { i ->
             val entry = files.getJSONObject(i)
             val onDisk = File(dir, entry.getString("name"))
             onDisk.isFile && onDisk.length() == entry.getLong("bytes")
         }
+        return manifest.takeIf { intact }
+    }
+
+    /** O manifest descreve exatamente os arquivos que o catálogo atual pede para [id] (nome, bytes e SHA-256). */
+    private fun matchesCatalog(id: String, manifest: JSONObject): Boolean {
+        val spec = catalog(id) ?: return true
+        val files = manifest.getJSONArray("files")
+        val installed = (0 until files.length()).associate { i ->
+            val entry = files.getJSONObject(i)
+            entry.getString("name") to (entry.optString("sha256") to entry.getLong("bytes"))
+        }
+        return installed.size == spec.files.size && spec.files.all { installed[it.fileName] == (it.sha256 to it.bytes) }
     }
 
     private fun manifestFor(spec: ModelSpec): JSONObject = JSONObject()

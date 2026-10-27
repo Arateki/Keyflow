@@ -256,6 +256,29 @@ class ModelDownloaderTest {
         assertThat(installedEvents).containsExactly("real")
     }
 
+    /** O catálogo trocou o SHA do arquivo de um modelo já instalado: baixar de novo substitui a cópia antiga e o modelo volta a valer. */
+    @Test
+    fun `updating a model whose catalog pin changed discards the old copy and installs the new one`() {
+        val old = real.copy(files = real.files.map { it.copy(sha256 = "e".repeat(64)) })
+        val source = tmp.newFolder().also { dir -> contents.forEach { (name, text) -> File(dir, name).writeText(text) } }
+        ModelStore(File(tmp.root, "models")).install(old, source)
+        val updating = ModelStore(File(tmp.root, "models")) { real.takeIf { s -> s.id == it } }
+        assertThat(updating.isInstalled("real")).isFalse()
+        assertThat(updating.outdatedIds.value).containsExactly("real")
+        val downloader = ModelDownloader(
+            gateway, File(tmp.root, "model-tmp"), updating, { false }, volumes,
+            catalog = { if (it == real.id) real else null },
+        )
+
+        assertThat(downloader.start(real, allowMetered = false)).isEqualTo(StartResult.Started)
+        assertThat(updating.dirFor("real").exists()).isFalse()
+        deliver(downloader)
+
+        assertThat(downloader.finish("real")).isEqualTo(CompletionResult.Installed)
+        assertThat(updating.isInstalled("real")).isTrue()
+        assertThat(updating.outdatedIds.value).isEmpty()
+    }
+
     @Test
     fun `a file with the right size but another sha is discarded as corrupted`() {
         val downloader = realDownloader()

@@ -127,4 +127,96 @@ class ModelStoreTest {
         assertThat(File(store.dirFor(spec.id), "stale.bin").exists()).isFalse()
         assertThat(store.isInstalled("fake-whisper")).isTrue()
     }
+
+    // ── catálogo que troca o arquivo de um modelo sem trocar o id ───────────────────────────────────────
+
+    /** A mesma entrada com um SHA-256 novo (o catálogo trocou o pin do arquivo). */
+    private val newer = spec.copy(files = spec.files.map { if (it.role == FileRole.DECODER) it.copy(sha256 = "d".repeat(64)) else it })
+
+    @Test
+    fun `an install whose manifest differs from the catalog is outdated, not installed`() {
+        store().install(spec, downloaded())
+
+        val store = ModelStore(File(tmp.root, "models")) { newer.takeIf { s -> s.id == it } }
+
+        assertThat(store.isInstalled(spec.id)).isFalse()
+        assertThat(store.installedIds.value).isEmpty()
+        assertThat(store.outdatedIds.value).containsExactly(spec.id)
+    }
+
+    @Test
+    fun `an install that matches the catalog is installed and not outdated`() {
+        store().install(spec, downloaded())
+
+        val store = ModelStore(File(tmp.root, "models")) { spec.takeIf { s -> s.id == it } }
+
+        assertThat(store.isInstalled(spec.id)).isTrue()
+        assertThat(store.outdatedIds.value).isEmpty()
+    }
+
+    @Test
+    fun `a size change in the catalog also makes the install outdated`() {
+        store().install(spec, downloaded())
+        val bigger = spec.copy(files = spec.files.map { if (it.role == FileRole.TOKENS) it.copy(bytes = 6) else it })
+
+        val store = ModelStore(File(tmp.root, "models")) { bigger.takeIf { s -> s.id == it } }
+
+        assertThat(store.outdatedIds.value).containsExactly(spec.id)
+    }
+
+    @Test
+    fun `refresh picks up a catalog that changed after the store was created`() {
+        store().install(spec, downloaded())
+        var current = spec
+        val store = ModelStore(File(tmp.root, "models")) { current.takeIf { s -> s.id == it } }
+        assertThat(store.isInstalled(spec.id)).isTrue()
+
+        current = newer
+        store.refresh()
+
+        assertThat(store.isInstalled(spec.id)).isFalse()
+        assertThat(store.outdatedIds.value).containsExactly(spec.id)
+    }
+
+    @Test
+    fun `installing the new version replaces the outdated one`() {
+        store().install(spec, downloaded())
+        val store = ModelStore(File(tmp.root, "models")) { newer.takeIf { s -> s.id == it } }
+
+        store.install(newer, downloaded())
+
+        assertThat(store.isInstalled(spec.id)).isTrue()
+        assertThat(store.outdatedIds.value).isEmpty()
+    }
+
+    @Test
+    fun `discardOutdated deletes only an outdated install`() {
+        store().install(spec, downloaded())
+        val current = ModelStore(File(tmp.root, "models")) { spec.takeIf { s -> s.id == it } }
+        assertThat(current.discardOutdated(spec.id)).isFalse()
+        assertThat(current.dirFor(spec.id).exists()).isTrue()
+
+        val outdated = ModelStore(File(tmp.root, "models")) { newer.takeIf { s -> s.id == it } }
+        assertThat(outdated.discardOutdated(spec.id)).isTrue()
+        assertThat(outdated.dirFor(spec.id).exists()).isFalse()
+        assertThat(outdated.outdatedIds.value).isEmpty()
+    }
+
+    /** Quem instalou o Qwen3 0.6B antes de 2026-10-27 tem o manifest com o SHA e o tamanho do pin `a3c5d805…`. */
+    @Test
+    fun `the Qwen3 installed before the pin change shows up as outdated against the real catalog`() {
+        val root = File(tmp.root, "models")
+        val id = ModelCatalog.QWEN3_0_6B.id
+        File(root, id).mkdirs()
+        val oldBytes = 614_236_160L
+        java.io.RandomAccessFile(File(root, "$id/Qwen3-0.6B.litertlm"), "rw").use { it.setLength(oldBytes) }
+        File(root, "$id/${ModelStore.MANIFEST}").writeText(
+            """{"id":"$id","files":[{"name":"Qwen3-0.6B.litertlm","sha256":"555579ff2f4fd13379abe69c1c3ab5200f7338bc92471557f1d6614a6e5ab0b4","bytes":$oldBytes}]}""",
+        )
+
+        val store = ModelStore(root, ModelCatalog::byId)
+
+        assertThat(store.isInstalled(id)).isFalse()
+        assertThat(store.outdatedIds.value).containsExactly(id)
+    }
 }

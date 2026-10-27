@@ -3,7 +3,7 @@ Licença: Apache License 2.0 (`license: apache-2.0` no card do Hugging Face, con
 https://huggingface.co/Qwen/Qwen3-0.6B
 
 Versão usada pelo KeyFlow: conversão `.litertlm` (LiteRT-LM, INT8 dinâmico, contexto de 4096) publicada pela comunidade
-LiteRT em https://huggingface.co/litert-community/Qwen3-0.6B (commit a3c5d805ae362dff7f580bc25f2dfb9a5a7eaa76,
+LiteRT em https://huggingface.co/litert-community/Qwen3-0.6B (commit fed81d17517e6ea64362e917ecf7e5accff12492,
 arquivo Qwen3-0.6B.litertlm). Alterações em relação ao original: conversão de formato e quantização, feitas pela
 comunidade LiteRT.
 

@@ -207,7 +207,7 @@ private fun ModelCard(
             }
             when (item.status) {
                 LocalModelStatus.AVAILABLE -> CardAction(
-                    tr("Baixar"),
+                    if (item.outdated) tr("Atualizar modelo") else tr("Baixar"),
                     enabled = !downloadBlocked && pending == null,
                     tag = tags.download(spec.id),
                     onClick = onDownload,
@@ -223,6 +223,15 @@ private fun ModelCard(
             }
         }
         SettingSub(tr(spec.summary), Modifier.padding(top = 10.dp))
+        if (item.outdated) {
+            Text(
+                tr("Há uma versão nova deste modelo. Atualize para voltar a usá-lo."),
+                color = palette.terracotta,
+                fontFamily = SpaceGrotesk,
+                fontSize = 10.5.sp,
+                modifier = Modifier.padding(top = 6.dp).testTag("${tags.model(spec.id)}-outdated"),
+            )
+        }
         if (item.heavy) {
             Text(
                 tr("Pode ser pesado neste aparelho."),
@@ -291,7 +300,7 @@ private fun ModelCard(
 }
 
 /**
- * "~586 MB · Multilíngue" numa linha só. Se não couber (com o botão de seleção o texto fica mais estreito), o tamanho e o
+ * "~585 MB · Multilíngue" numa linha só. Se não couber (com o botão de seleção o texto fica mais estreito), o tamanho e o
  * idioma vão em duas linhas, sem o "·": quebrar a linha no meio deixava o ponto sozinho no fim ou no começo de uma delas.
  */
 @Composable

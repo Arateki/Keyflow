@@ -226,9 +226,11 @@ class ModelCatalogTest {
      */
     @Test
     fun `text sizes and hashes match the upstream files`() {
-        assertThat(ModelCatalog.QWEN3_0_6B.totalBytes).isEqualTo(614_236_160L)
+        assertThat(ModelCatalog.QWEN3_0_6B.totalBytes).isEqualTo(613_722_264L)
+        // Revisão fed81d17… (2026-10-27): Jinja com `enable_thinking`. O pin antigo, a3c5d805…, pensava sempre.
+        assertThat(ModelCatalog.QWEN3_0_6B.files.single().url).contains("/fed81d17517e6ea64362e917ecf7e5accff12492/")
         assertThat(ModelCatalog.QWEN3_0_6B.files.single().sha256)
-            .isEqualTo("555579ff2f4fd13379abe69c1c3ab5200f7338bc92471557f1d6614a6e5ab0b4")
+            .isEqualTo("c5f39b4191926786c3e6668b62af4d6eb15248dfc7a5348252a9b406f33f2108")
         assertThat(ModelCatalog.SMOLLM2_1_7B.totalBytes).isEqualTo(1_730_949_280L)
         assertThat(ModelCatalog.SMOLLM2_1_7B.files.single().sha256)
             .isEqualTo("3c3e693157e2fb92b862b572cff74b7a353f81eb232cef682bf0fcc91855f8f1")

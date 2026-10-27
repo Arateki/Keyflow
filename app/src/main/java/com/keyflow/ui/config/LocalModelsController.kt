@@ -30,6 +30,8 @@ data class LocalModelsSnapshot(
     val installed: Set<String>,
     val active: DownloadProgress?,
     val failures: Map<String, DownloadFailure>,
+    /** Instalados de uma versão que o catálogo já não é (ver [ModelStore.outdatedIds]): o card oferece atualizar. */
+    val outdated: Set<String> = emptySet(),
 ) {
     companion object {
         val EMPTY = LocalModelsSnapshot(emptySet(), null, emptyMap())
@@ -58,7 +60,9 @@ class LocalModelsController(context: Context) : LocalModelActions {
      * depende do broadcast chegar.
      */
     fun snapshots(): Flow<LocalModelsSnapshot> =
-        combine(store.installedIds, activeProgress(), downloader.failures, ::LocalModelsSnapshot)
+        combine(store.installedIds, activeProgress(), downloader.failures, store.outdatedIds) { installed, active, failures, outdated ->
+            LocalModelsSnapshot(installed, active, failures, outdated)
+        }
 
     private fun activeProgress(): Flow<DownloadProgress?> = flow {
         downloader.reconcile()

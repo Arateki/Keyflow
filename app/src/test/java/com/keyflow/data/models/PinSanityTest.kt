@@ -145,6 +145,8 @@ class PinSanityTest {
             "2bda32ec70b097a55adaa07d9a7173915b43cc78",
             "b3ca0d2f076785a8f4b2219ddbd2bdb99954eae1",
             "a3c5d805ae362dff7f580bc25f2dfb9a5a7eaa76",
+            "fed81d17517e6ea64362e917ecf7e5accff12492",
+            "c5f39b4191926786c3e6668b62af4d6eb15248dfc7a5348252a9b406f33f2108",
             realQwenSha,
             "181938105e0eefd105961417e8da75903eacda102c4fce9ce90f50b97139a63c",
             "acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247",
