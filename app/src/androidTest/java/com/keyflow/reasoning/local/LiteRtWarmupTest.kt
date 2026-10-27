@@ -31,4 +31,18 @@ class LiteRtWarmupTest {
             assertEquals(if (opensThink) 0 else 1, real.channels.orEmpty().size)
         }
     }
+    @Test
+    fun sistemaEPedidoMantemPapeisETextoNosDoisFormatos() {
+        LiteRtTextFormat.entries.forEach { format ->
+            val system = "Instrução: ação 👋"
+            val user = "  oi João\namanhã às três  "
+            val config = LiteRtConfigs.conversation(system, format = format)
+            val message = LiteRtConfigs.user(user, format)
+            assertEquals(com.google.ai.edge.litertlm.Role.USER, message.role)
+            assertEquals(system, config.systemInstruction.toString())
+            assertEquals(user, message.toString())
+            assertEquals(false, config.extraContext!!["enable_thinking"])
+            assertEquals(2, LiteRtConfigs.warmUp(false, format).maxOutputToken)
+        }
+    }
 }

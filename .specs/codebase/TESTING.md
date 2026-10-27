@@ -275,3 +275,10 @@ Rotas novas: `config-voz-local-preparando` e `config-raciocinio-local-preparando
 Capture por `pool telas` (que chama `scripts/verify-screens.sh`), confira os PNGs, rode `scripts/diff-screens.sh`
 e aprove somente os quatro goldens novos. Goldens anteriores devem continuar bit-idênticos.
 Não comparar tempos de áudios diferentes como se fossem um benchmark; tempo de carga/preparação é separado da primeira inferência.
+
+Regressão de templates LiteRT (2026-10-27): `pool instrumentar
+com.keyflow.reasoning.local.LiteRtTemplateDeviceTest#qwenFed81d1PreservaSistemaEPedidoEGeraResposta`.
+Apenas a seleção explícita desse método habilita download do Qwen3 fed81d1 (614 MB, SHA fixo),
+renderização comparada e inferência CPU; a suíte comum ignora esse teste. Usa diretório próprio e o
+remove no fim. Fixtures verificam Jinja de Gemma/Qwen legado/4B/2.5 no mesmo processador Qwen;
+não são benchmarks nem inferência desses outros modelos. `LiteRtWarmupTest` testa configs sem pesos.

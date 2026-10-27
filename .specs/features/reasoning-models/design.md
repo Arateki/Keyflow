@@ -369,3 +369,12 @@ teclado, abas Transcrição/Visão/Teclado/Sobrepor.
 - **A32 lento ou sem RAM para o Gemma 4** → aviso de peso + guarda de RAM + modelo leve; medir (R8).
 - **Backup restaurando cofre sem chave** → §9 (alias próprio + exclusão + teste de regras).
 - **Login muda de novo** → é exatamente o cenário do desenho: editar `OpenAiAuthConfig` ou trocar o `AuthFlow`.
+
+### Compatibilidade dos templates LiteRT (RRUN-08 / RTS-01, 2026-10-27)
+
+O backend inspeciona a renderização ao carregar o arquivo (`LiteRtTextFormat`), sem inferência e sem
+consultar o id do catálogo. Usa uma parte de texto quando o template a preserva; nos Jinja que esperam
+conteúdo tipado e perdem a string convertida pelo runtime 0.16.1, usa duas partes `[texto, ""]`.
+Sistema, pedido e aquecimento compartilham esse formato. Se nenhum formato preserva o texto, recusa
+carregar. Os templates string do Qwen legado e Gemma conservam o envio de uma parte. Evidências,
+limites da medição e variante 4B em `qwen-sem-pensar.md`; não muda os pins dos modelos.
