@@ -88,5 +88,12 @@
             android:process=":reasoning"
             android:exported="false" />
 
+        <!-- OCR local da Visão (vision-capture, VC-T6): processo próprio — o modelo de fala fica residente no :inference e um crash
+             nativo do OCR não pode derrubá-lo. Sem rede (o StrictMode do debug mata o processo se tentar). -->
+        <service
+            android:name=".vision.service.VisionService"
+            android:process=":vision"
+            android:exported="false" />
+
     </application>
 </manifest>
