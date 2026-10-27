@@ -3334,3 +3334,25 @@ fala em `sintese-fala/context.md`). O que ficou de lição:
   `VISAO_*_MODELS`): a VC-T17 os troca pelos reais das outras abas ou esconde o bloco.
 - **Pendente do Yan**: confirmar o gesto "Perguntar" (ACT-03, único caminho para "Descrever imagem"/"Responder sobre a tela") e a lista
   curada de modelos com visão (a API dos provedores não informa visão de forma confiável).
+
+## 2026-10-27 — Correções da revisão do PR #43 (atualização de modelo no mesmo id)
+
+O revisor reprovou a primeira versão da migração do Qwen3; cada achado virou teste de unidade que falha sem a correção:
+- **Corrida refresh x install/delete** (`ModelStoreTest`): `ModelStore` tem um lock só para `refresh`, `install`, `delete` e `discardOutdated`; a instalação espera
+  o refresh em andamento. `discardOutdated` revalida o manifest no disco, sob o lock, antes de apagar (o estado publicado pode ser de antes).
+- **Perda da cópia funcional** (`ModelDownloaderTest`): `ModelDownloader.start` não apaga mais a instalação antiga. Ela fica no disco, marcada como desatualizada
+  (não carrega, o card oferece "Atualizar modelo"), até o download novo passar tamanho e SHA-256; só então o `install` a troca. A troca é por rename
+  (antiga -> `.<id>.replaced`, nova entra, antiga sai); morte no meio devolve a antiga no próximo `refresh`. Enqueue com falha, cancelamento e download corrompido
+  deixam o modelo anterior.
+- **Motor residente com o mesmo id** (`ReasoningServiceCoreTest`, `LlmModelTest`): `LlmModel`/`LocalLlmConfig` têm `version` (SHA-256 do arquivo no catálogo);
+  o núcleo do `:reasoning` só reaproveita o motor se id e versão batem, senão descarrega e recarrega.
+- **Espaço** (`ModelListTest#anOutdatedCardOffersDeleteAndConfirmsBeforeDeleting`): o card desatualizado ganhou "Apagar" (com confirmação própria). A pré-checagem de
+  espaço segue honesta: a cópia antiga está no disco, então o livre já a desconta; quem precisa do espaço dela a apaga. Com o rename no mesmo volume o pico real é
+  antiga + download + cópia nova.
+- **Remoto sem downgrade** (`RemoteConfigRepositoryTest`, `ModelCatalogTest`): `ModelCatalog.EMBEDDED_VERSION` (AAAAMMDDNN, hoje 2026102701) e `catalogVersion` no
+  manifesto de `/v1/models`. `parseModels` recusa manifesto sem versão ou menor que a embutida; o cache passa pelo mesmo parser a cada leitura, então um cache de antes
+  de uma atualização do app também deixa de valer e o catálogo embutido prevalece. **Regra: ao mudar um pin ou incluir um modelo, suba `EMBEDDED_VERSION`**; o
+  `ModelCatalogTest` compara a impressão digital dos pins (`pinsFingerprint`) com a versão e falha lembrando disso. A API (`/v1/models`) precisa passar a mandar `catalogVersion`;
+  enquanto não mandar, o remoto de modelos fica sem efeito (o embutido vale) — comportamento seguro.
+- Merge da main (PR #39, Visão) resolvido mantendo as duas seções do STATE.md e as duas linhas do `app/licenses/README.md`.
+
