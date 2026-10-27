@@ -20,6 +20,8 @@ api/target/
 # Chaves e credenciais: nunca versionar (o repositório é público). A chave de upload da Play e os keystores ficam FORA do repositório (~/.keyflow/android/, ver .specs/codebase/ENVIRONMENT.md).
 *.jks
 *.keystore
+# exceção: a chave de debug é pública de propósito (assinatura igual em toda máquina; não serve para a loja)
+!app/debug.keystore
 *.p12
 *.pem
 upload-keystore.properties

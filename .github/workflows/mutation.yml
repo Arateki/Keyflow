@@ -33,14 +33,10 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      # O mesmo preparo do job de unidade do checks.yml (caminho do JDK e keystore de debug fixos no build).
-      - name: JDK path and debug keystore
+      # O mesmo preparo do job de unidade do checks.yml (caminho do JDK).
+      - name: JDK path
         run: |
           sudo ln -sfn "$JAVA_HOME" /usr/lib/jvm/java-17-openjdk
-          mkdir -p ~/.config/.android
-          keytool -genkeypair -keystore ~/.config/.android/debug.keystore -storepass android \
-            -keypass android -alias androiddebugkey -dname "CN=Android Debug,O=Android,C=US" \
-            -keyalg RSA -keysize 2048 -validity 10000
       - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
       - name: sherpa-onnx AAR version
         id: sherpa
