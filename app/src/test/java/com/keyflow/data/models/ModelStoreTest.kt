@@ -292,4 +292,65 @@ class ModelStoreTest {
         assertThat(store.dirFor(spec.id).exists()).isFalse()
         assertThat(store.outdatedIds.value).isEmpty()
     }
+
+    // ── segunda revisão do PR #43 ───────────────────────────────────────────────────────────────────────
+
+    /** Backup íntegro e destino parcial: a recuperação não pode apagar a única cópia boa. */
+    @Test
+    fun `an interrupted swap with a partial new install restores the previous one`() {
+        val root = File(tmp.root, "models")
+        store().install(spec, downloaded())
+        val dir = File(root, spec.id)
+        check(dir.renameTo(File(root, ".${spec.id}.replaced")))
+        // O destino tem manifest de um arquivo maior do que o que está no disco.
+        dir.mkdirs()
+        File(dir, "enc.onnx").writeBytes(ByteArray(3))
+        File(dir, ModelStore.MANIFEST).writeText(
+            """{"id":"${spec.id}","files":[{"name":"enc.onnx","sha256":"${"a".repeat(64)}","bytes":10}]}""",
+        )
+
+        val recovered = ModelStore(root)
+
+        assertThat(recovered.isInstalled(spec.id)).isTrue()
+        assertThat(File(root, spec.id + "/dec.onnx").isFile).isTrue()
+        assertThat(File(root, ".${spec.id}.replaced").exists()).isFalse()
+    }
+
+    @Test
+    fun `an interrupted swap with a complete new install drops the stored copy`() {
+        val root = File(tmp.root, "models")
+        store().install(spec, downloaded())
+        File(root, ".${spec.id}.replaced").mkdirs()
+        File(root, ".${spec.id}.replaced/lixo.bin").writeBytes(ByteArray(1))
+
+        assertThat(ModelStore(root).isInstalled(spec.id)).isTrue()
+        assertThat(File(root, ".${spec.id}.replaced").exists()).isFalse()
+    }
+
+    /**
+     * Janela entre aplicar um catálogo novo e o `refresh`: a cópia antiga já não conta como instalada (compara-se com o catálogo vigente a cada
+     * chamada), e a identidade que o motor recebe é a do manifest instalado, não a do catálogo.
+     */
+    @Test
+    fun `a new catalog invalidates the install at once and the version comes from the installed manifest`() {
+        store().install(spec, downloaded())
+        var current = spec
+        val store = ModelStore(File(tmp.root, "models")) { current.takeIf { s -> s.id == it } }
+        val before = store.installedVersion(spec.id)
+        assertThat(store.isInstalled(spec.id)).isTrue()
+        assertThat(before).contains("a".repeat(64))
+
+        current = newer // catálogo novo aplicado, sem refresh ainda
+
+        assertThat(store.isInstalled(spec.id)).isFalse()
+        assertThat(store.installedVersion(spec.id)).isEqualTo(before)
+        assertThat(store.installedVersion(spec.id)).doesNotContain("d".repeat(64))
+
+        store.install(newer, downloaded())
+
+        assertThat(store.isInstalled(spec.id)).isTrue()
+        assertThat(store.installedVersion(spec.id)).isNotEqualTo(before)
+        assertThat(store.installedVersion(spec.id)).contains("d".repeat(64))
+        assertThat(ModelStore(File(tmp.root, "models")).installedVersion("nao-existe")).isNull()
+    }
 }
