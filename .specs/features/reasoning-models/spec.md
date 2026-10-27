@@ -212,3 +212,10 @@ Status: Pending → In Design → In Tasks → Implementing → Verified. As tas
 - [ ] **Provedor fake** percorre o ciclo de autenticação inteiro em teste unitário (AUTH-06).
 - [ ] Goldens da Transcrição e das demais telas **bit-idênticos**; só mudam os da aba Raciocínio e o ícone da barra lateral.
 - [ ] Gate `full` verde; requisitos → Verified.
+
+RRUN-08 / RTS-01 — evidência complementar (2026-10-27): corrigido o envio de texto aos Jinja que
+esperam partes tipadas no LiteRT-LM 0.16.1. `LiteRtTextFormatTest` e a reprodução opt-in
+`LiteRtTemplateDeviceTest#qwenFed81d1PreservaSistemaEPedidoEGeraResposta` verificam o contrato
+local de montagem/renderização. Detalhes em `qwen-sem-pensar.md`; demais gates manuais mantidos.
+Limite da evidência nativa: somente a primeira prova fed81d1 com sistema passou; fixtures dos demais
+templates e a rodada sem sistema permanecem pendentes no Vaio após crash de inicialização no Deck.

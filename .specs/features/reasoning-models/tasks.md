@@ -521,3 +521,14 @@ Fase A/B (o device é o gargalo: instrumentado serializa).
 - O flag e o gate seguem no código para o próximo modelo que entrar sem prova. As linhas de licença de SmolLM2, DeepSeek e Gemma 4 E4B estão
   na aba Docs e no `doc.json` do site (o `unvalidatedTextModelLicenses()` saiu); `recommendedRamMb` foi recalibrado e a guarda de carga passou
   a comparar com a RAM total (`RamGuard.fitsDevice`) — ver a lição de 2026-10-27 no `STATE.md`.
+
+## Correção pós-RSN-T5/T10: conteúdo em templates LiteRT (2026-10-27)
+
+Status: implementada; suíte JVM completa 1739/1739; reprodução nativa fed81d1 1/1 pelo pool no Deck.
+A seleção de conteúdo é feita pelo renderizador real e compartilhada entre sistema, usuário e aquecimento.
+Regressões complementares de montagem/cliente e fixtures são registradas na entrega qwen-template.
+RRUN-08/RTS-01: escopo desta correção verificado; não encerra a validação manual RSN-T19 [YAN].
+Encerramento ajustado pelo coordenador: entregar com unitários verdes; medição ampliada fica no Vaio.
+A primeira prova nativa com sistema passou (1/1); a ampliada não passou (crash durante inicialização
+CPU, sem stack no log). Configs 3/3; rodada configs/IPC 10 testes, 4 falhas; não declarar IPC verificado.
+Fixtures e caminho sem sistema permanecem pendentes de execução bem-sucedida; detalhes na pesquisa.
