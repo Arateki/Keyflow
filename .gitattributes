@@ -1,0 +1,8 @@
+# Regras de mesclagem do repositório. Medição e contexto: .specs/codebase/TESTING.md › Conflitos de mesclagem.
+#
+# `merge=union` mantém os dois lados quando duas branches acrescentam texto no mesmo ponto, em vez de parar com
+# marcadores de conflito. Só vale para arquivo de anotação que cresce por acréscimo, onde linha repetida ou ordem
+# trocada não quebra nada. Nunca em arquivo gerado (doc.json, goldens), em tabela de status editada no meio
+# (tasks.md, spec.md, DEVELOPMENT-ORDER.md) nem em código. A lista é travada por scripts/tests/test_mesclagem.py.
+.specs/project/STATE.md   merge=union
+app/licenses/README.md    merge=union
