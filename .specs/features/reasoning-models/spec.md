@@ -224,3 +224,5 @@ Catálogo (2026-10-27, equipe/catalogo-qwen) — RCAT-02/03/04 e RPRV-02: o Qwen
 **Qwen2.5 1.5B Instruct** ("Versátil") entrou; ambos com URL no commit, tamanho e SHA-256 conferidos e licença Apache-2.0 em `app/licenses/`. RCAT-04 também
 cobre a atualização: o `ModelStore` compara o manifest instalado com o catálogo e trata arquivo de versão antiga como desatualizado (card "Atualizar modelo").
 `ModelSpec.thinking` (NONE/OPTIONAL/ALWAYS) alimenta uma linha informativa nos cards de Raciocínio; não há seletor de pensamento nesta etapa.
+
+Candidatas de debug (2026-10-27, modelos-novos) — RCAT-02/03/05 e RPRV-02: seis entradas com metadados LFS congelados, `validatedOnDevice = false` e licenças locais; release/Docs/site preservam as seis entradas validadas. Spark 1.7B/4B excluídos pelo mínimo 0.17.0. Cadastro e gates descritos em `modelos-novos.md`; pendências: fabricante Nanbeige e medições nativas do Yan, sem promover validação de aparelho.

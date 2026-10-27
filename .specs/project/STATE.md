@@ -3360,3 +3360,14 @@ O revisor reprovou a primeira versão da migração do Qwen3; cada achado virou 
 - Segunda revisão do PR #43: (a) a recuperação de troca interrompida só descarta `.<id>.replaced` se o destino tem manifest íntegro; destino parcial é apagado e a anterior volta.
   (b) A `version` do `LlmModel` agora vem do manifest instalado (`ModelStore.installedVersion`), não do SHA do catálogo; `ModelStore.isInstalled` compara a identidade lida do disco
   com o catálogo vigente a cada chamada (não só com a lista do último `refresh`), então a cópia antiga deixa de valer assim que um catálogo novo é aplicado, antes do refresh.
+
+## 2026-10-27 — Candidatas de Raciocínio (equipe/modelos-novos)
+
+- Seis candidatas só no debug: FunctionGemma 270M, Qwen2.5-Coder 1.5B, SmolLM3 3B, Granite 4.2 3B, Nanbeige4.2 3B e Qwen3.5 4B. Pins vêm de `siblings[].lfs.sha256/size` da API do HF, não de valores fabricados. Arquivos públicos responderam 206 a 64 KiB; não houve download integral.
+- Spark 1.7B/4B: os manifests fixados pedem 0.17.0, embora citem medições 0.16.0. Não cadastrar contra o runtime 0.16.1 sem resolver a divergência. FunctionGemma não declara mínimo, e o SmolLM3 foi reexportado depois das medições 0.16.1: registrar o limite da evidência, sem dizer que a carga exata já foi provada.
+- Logo IBM vem do lobe-icons MIT, com commit e cor da fonte. Nanbeige segue sem fonte CC0/MIT de logo: a tarefa manda reportar a dúvida e deixar o teste apontar, então não foi criada exceção à regra de fabricante nem usado símbolo genérico.
+- Candidatas não entram na Docs/site; `DocsSectionsTest` já cobra esse critério do release. Termos do Gemma permitem uso comercial responsável do FunctionGemma, com obrigações de redistribuição e restrições de uso: snapshot, NOTICE e política acompanham a licença local.
+- RAM nova é estimativa derivada dos cards; testes de RAM dos aparelhos medidos só devem afirmar o comportamento dos modelos já validados. O catálogo passou a 2026102702 com impressão digital nova.
+- Gate completo: 1799/1800 unitários, única falha da regra de fabricante Nanbeige (sem exceção); lint sem ocorrências. Interface: ModelListTest + ReasoningPanelTest, 23/23 no servidor. Goldens: 230/230 capturas dentro do limiar sem fuzz, com dez PNGs de Raciocínio aprovados e os outros 220 originais preservados.
+- No pool, `--sem-build` no servidor também pula a instalação: não confiar na instalação deixada por outra tarefa. APKs de debug do servidor e do Deck usam assinaturas diferentes; levar um para o outro pode dar `INSTALL_FAILED_UPDATE_INCOMPATIBLE` antes de rodar qualquer teste.
+- Detalhes em `.specs/features/reasoning-models/modelos-novos.md`; integração aguarda decisão sobre o logo.

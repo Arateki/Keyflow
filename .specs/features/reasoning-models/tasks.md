@@ -548,3 +548,11 @@ lidos da API do HF (e o SHA-256 recalculado baixando os arquivos, ver `qwen-sem-
 - Goldens: as telas `config-raciocinio-local-*` (cards de texto mudaram: seis modelos, novo tamanho do Qwen3, linha de pensamento) foram regeneradas; o resto
   bit-idêntico. Ver `STATE.md` (2026-10-27, equipe/catalogo-qwen).
 
+
+## Candidatas só no debug (2026-10-27, modelos-novos)
+
+Status: cadastro implementado; integração pendente do logo Nanbeige. Gate JVM: 1799/1800 (única falha: fabricante Nanbeige); lint sem ocorrências; instrumentados afetados 23/23. Goldens: 230/230 capturas dentro do limiar sem fuzz, com dez PNGs de Raciocínio aprovados e os outros 220 originais preservados.
+Seis candidatas, URL por commit + LFS/bytes conferidos, licenças, traduções dos cards e logo IBM MIT.
+Release mantém seis modelos e não publica as licenças das candidatas em Docs/site. Spark 1.7B/4B aguardam runtime compatível (mínimo formal 0.17.0).
+Evidências, estimativas de RAM, diferenças entre versões de runtime e limitações em `modelos-novos.md`.
+O teste de fabricante permanece sem exceção para indicar a decisão pendente; o Yan avalia carga, qualidade, aquecimento e RSS nos aparelhos.
