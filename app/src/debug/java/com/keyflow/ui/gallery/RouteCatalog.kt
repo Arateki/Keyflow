@@ -311,18 +311,18 @@ object RouteCatalog {
             ConfigVisaoRoute(
                 localModels = galleryVisionModels(
                     active = DownloadProgress(
-                        ModelCatalog.OCR_FAST.id,
+                        SamplePanelModels.VISION_LIGHT.id,
                         DownloadState.RUNNING,
-                        bytesDone = ModelCatalog.OCR_FAST.totalBytes * 42 / 100,
-                        totalBytes = ModelCatalog.OCR_FAST.totalBytes,
+                        bytesDone = SamplePanelModels.VISION_LIGHT.totalBytes * 42 / 100,
+                        totalBytes = SamplePanelModels.VISION_LIGHT.totalBytes,
                     ),
                 ),
             )
         },
         Route("config-visao-local-pronto") {
             ConfigVisaoRoute(
-                localModelId = ModelCatalog.OCR_FAST.id,
-                localModels = galleryVisionModels(installed = setOf(ModelCatalog.OCR_FAST.id), selected = ModelCatalog.OCR_FAST.id),
+                localModelId = SamplePanelModels.VISION_LIGHT.id,
+                localModels = galleryVisionModels(installed = setOf(SamplePanelModels.VISION_LIGHT.id), selected = SamplePanelModels.VISION_LIGHT.id),
             )
         },
         Route("config-visao-google") { ConfigVisaoRoute(source = VisionSource.GOOGLE, googleKey = "AIzaSyMockKeyForScreenshots") },
@@ -333,18 +333,18 @@ object RouteCatalog {
             ConfigFalaRoute(
                 localModels = galleryVoiceModels(
                     active = DownloadProgress(
-                        ModelCatalog.VOICE_FAST.id,
+                        SamplePanelModels.VOICE_LIGHT.id,
                         DownloadState.RUNNING,
-                        bytesDone = ModelCatalog.VOICE_FAST.totalBytes * 42 / 100,
-                        totalBytes = ModelCatalog.VOICE_FAST.totalBytes,
+                        bytesDone = SamplePanelModels.VOICE_LIGHT.totalBytes * 42 / 100,
+                        totalBytes = SamplePanelModels.VOICE_LIGHT.totalBytes,
                     ),
                 ),
             )
         },
         Route("config-fala-local-pronto") {
             ConfigFalaRoute(
-                localModelId = ModelCatalog.VOICE_FAST.id,
-                localModels = galleryVoiceModels(installed = setOf(ModelCatalog.VOICE_FAST.id), selected = ModelCatalog.VOICE_FAST.id),
+                localModelId = SamplePanelModels.VOICE_LIGHT.id,
+                localModels = galleryVoiceModels(installed = setOf(SamplePanelModels.VOICE_LIGHT.id), selected = SamplePanelModels.VOICE_LIGHT.id),
             )
         },
         Route("config-fala-elevenlabs") { ConfigFalaRoute(source = FalaSource.ELEVENLABS, elevenLabsKey = "eleven_mock_key") },
@@ -368,6 +368,15 @@ object RouteCatalog {
             ConfigReasoningRoute(
                 localModelId = ModelCatalog.QWEN3_0_6B.id,
                 localModels = galleryTextModels(installed = setOf(ModelCatalog.QWEN3_0_6B.id), selected = ModelCatalog.QWEN3_0_6B.id),
+                ready = true,
+            )
+        },
+        // Os quatro modelos instalados, o Raciocínio selecionado: cada cartão com o botão de seleção, que tira largura do nome
+        // (o pior caso para um nome quebrar em duas linhas a 360 dp).
+        Route("config-raciocinio-local-instalados") {
+            ConfigReasoningRoute(
+                localModelId = ModelCatalog.DEEPSEEK_R1_1_5B.id,
+                localModels = galleryTextModels(installed = ModelCatalog.TEXT.map { it.id }.toSet(), selected = ModelCatalog.DEEPSEEK_R1_1_5B.id),
                 ready = true,
             )
         },
@@ -446,7 +455,33 @@ object RouteCatalog {
         Route("onboarding") { OnboardingRoute() },
         // PERM-04: o porquê de uma permissão aberto sob a linha (a do Teclado, que é a que FALTA no mock).
         Route("onboarding-why") { OnboardingRoute(explained = OnboardingPermission.KEYBOARD) },
-    ) + AgentGalleryRoutes.routes // agent-harness (AGT-T3..T5): o chat do agente, o painel de confirmação, os Ajustes e o registro
+    ) + AgentGalleryRoutes.routes + listOf(
+        // Aquecimento (main, fora da v1): dados fixos, sem carregar modelo ou iniciar download.
+        Route("config-voz-local-preparando") {
+            val spec = ModelCatalog.PARAKEET_V3
+            ConfigVozRoute(
+                TranscriptionSource.LOCAL,
+                localModelId = spec.id,
+                localModels = LocalModelsUi.compose(
+                    catalog = listOf(spec), installed = setOf(spec.id), active = null, failures = emptyMap(),
+                    selectedId = spec.id, deviceRamMb = 8192,
+                    preparation = com.keyflow.data.models.ModelPreparation(spec.id, 0),
+                ),
+            )
+        },
+        Route("config-raciocinio-local-preparando") {
+            val spec = ModelCatalog.QWEN3_0_6B
+            ConfigReasoningRoute(
+                localModelId = spec.id,
+                ready = true,
+                localModels = LocalModelsUi.compose(
+                    catalog = listOf(spec), installed = setOf(spec.id), active = null, failures = emptyMap(),
+                    selectedId = spec.id, deviceRamMb = 8192,
+                    preparation = com.keyflow.data.models.ModelPreparation(spec.id, 0),
+                ),
+            )
+        },
+    )
 
     private val byKey: Map<String, Route> = routes.associateBy { it.key }
 
@@ -490,10 +525,10 @@ object RouteCatalog {
             catalog = ModelCatalog.TEXT, installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_192,
         )
 
-    /** Estado fixo da lista de modelos de VISÃO/OCR (RAM de sobra, como a de voz). */
+    /** Estado fixo da lista de modelos de VISÃO/OCR (RAM de sobra, como a de voz), com os modelos de amostra: o catálogo real está vazio. */
     private fun galleryVisionModels(installed: Set<String> = emptySet(), active: DownloadProgress? = null, selected: String? = null) =
         LocalModelsUi.compose(
-            catalog = ModelCatalog.VISION, installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_192,
+            catalog = SamplePanelModels.VISION, installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_192,
         )
 
     /** Aba Visão: a origem, a lista local e o seletor de tradução num estado fixo. */
@@ -537,7 +572,7 @@ object RouteCatalog {
         selected: String? = null,
     ): LocalModelsUi =
         LocalModelsUi.compose(
-            catalog = ModelCatalog.VOICE, installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_192,
+            catalog = SamplePanelModels.VOICE, installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_192,
         )
 
     /** Aba Voz (Fala): a origem, a lista local e os controles de voz num estado fixo. */

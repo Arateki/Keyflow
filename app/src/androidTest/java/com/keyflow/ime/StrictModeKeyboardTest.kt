@@ -78,7 +78,7 @@ class StrictModeKeyboardTest {
     }
 
     private companion object {
-        const val IME = "com.keyflow/.ime.KeyFlowKeyboardService"
+        const val IME = "com.arateki.keyflow/com.keyflow.ime.KeyFlowKeyboardService"
         const val TIMEOUT = 5000L
 
         /** O código do teclado e o que ele usa: violação de outro canto do processo (o probe, o app) não conta aqui. */

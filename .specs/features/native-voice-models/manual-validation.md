@@ -23,7 +23,7 @@ carga `"<modelo>: carregado em Z ms (M MB livres antes)"`.
 4. Desligue o Wi-Fi (dados móveis ligados) → "Baixar" no **Equilibrado** → o próprio card pergunta
    "Baixar ~358 MB por dados móveis?". Cancelar não baixa; confirmar baixa.
 5. Durante esse download, "Cancelar" → o card volta a disponível, a notificação some, e
-   `adb shell ls /sdcard/Android/data/com.keyflow/files/model-tmp` fica vazio.
+   `adb shell ls /sdcard/Android/data/com.arateki.keyflow/files/model-tmp` fica vazio.
 
 ## B. Transcrição local (NAT, PRV)
 
@@ -34,7 +34,7 @@ carga `"<modelo>: carregado em Z ms (M MB livres antes)"`.
    (modelo residente). Troque para Inglês e dite: recarrega uma vez (idioma faz parte do modelo).
 8. **Matar o `:inference` no meio**: dite ~20 s e, logo depois de enviar:
    ```bash
-   adb -s RX8T10DERKW shell run-as com.keyflow kill -9 $(adb -s RX8T10DERKW shell pidof com.keyflow:inference)
+   adb -s RX8T10DERKW shell run-as com.arateki.keyflow kill -9 $(adb -s RX8T10DERKW shell pidof com.arateki.keyflow:inference)
    ```
    → erro "A transcrição local foi interrompida" no X da orbe; orbe e teclado continuam de pé; a
    próxima ditada funciona (recarrega).

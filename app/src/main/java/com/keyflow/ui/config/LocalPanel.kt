@@ -39,7 +39,10 @@ internal fun LocalPanel(
         ModelList(
             models = models,
             actions = actions,
-            onSelect = { id -> onSettingsChange(settings.copy(localModelId = id)) },
+            onSelect = { id ->
+                onSettingsChange(settings.copy(localModelId = id))
+                actions.prepare(id, settings.localLanguage)
+            },
             // MGR-04: apagar o selecionado deixa a origem sem modelo (→ CONFIG_MISSING).
             onDeleted = { id -> if (settings.localModelId == id) onSettingsChange(settings.copy(localModelId = null)) },
             tags = ModelListTags.Voz,

@@ -19,6 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import com.keyflow.ui.config.LocalModelPreparationClock
 import com.keyflow.ui.orb.LocalOrbClock
 import com.keyflow.ui.tour.LocalTourClock
 import androidx.core.view.WindowInsetsCompat
@@ -33,7 +34,7 @@ import kotlin.coroutines.resume
  * Harness de verificação (VERIFY-01/02). Renderiza **uma** rota do [RouteCatalog] isolada, em tela
  * cheia imersiva (barras de sistema escondidas), com clock fixo e dados mock, de forma determinística.
  *
- *   adb shell am start -n com.keyflow/.ui.gallery.GalleryActivity --es route orb-idle --ez dark false
+ *   adb shell am start -n com.arateki.keyflow/com.keyflow.ui.gallery.GalleryActivity --es route orb-idle --ez dark false
  *
  * Sai em português, qualquer que seja o idioma do aparelho; `--es lang en` (ou `es`) mostra a tradução.
  *
@@ -86,6 +87,7 @@ class GalleryActivity : ComponentActivity() {
             CompositionLocalProvider(
                 LocalOrbClock provides { GALLERY_ORB_TIME_MS },
                 LocalTourClock provides { GALLERY_ORB_TIME_MS },
+                LocalModelPreparationClock provides { 5000L },
             ) {
                 KeyFlowTheme(dark = dark) {
                     if (route != null) {

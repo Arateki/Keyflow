@@ -4,7 +4,7 @@
     python3 scripts/ime-placement.py --ime keyflow|gboard [--probe remoto|local] [--openings 12] [--seconds 4] [--cold]
 
 Mesma comparação do ImeWindowPlacementTest (sistema de entrada × gerenciador de janelas, `dumpsys`), mas pelo adb, do
-computador. Lá a medição rodava dentro do processo com.keyflow — o mesmo do teclado do KeyFlow e do UiAutomator —, e
+computador. Lá a medição rodava dentro do processo com.arateki.keyflow — o mesmo do teclado do KeyFlow e do UiAutomator —, e
 competia com a thread principal do KeyFlow e não com a do Gboard (esteira de instabilidade, 2026-10-10).
 
 Abertura deslocada = 2 leituras seguidas com a janela visível na tela e diferente do gerenciador de janelas. Sai com 1 se
@@ -17,7 +17,7 @@ Cada abertura diz também em quantos segundos o teclado ficou visível e no luga
 "0 deslocadas" de um teclado que nem apareceu na janela de observação não quer dizer nada — foi assim que o Gboard a frio
 pareceu melhor que o KeyFlow (2026-10-10): no emulador lento ele leva ~3,3 s para aparecer e a janela era de 4 s. A frio, use
 --seconds 12 ou mais. Para comparar com um app de sistema, compile o KeyFlow antes (`cmd package compile -m speed -f
-com.keyflow`, como o gate faz): o APK de debug recém-instalado roda interpretado.
+com.arateki.keyflow`, como o gate faz): o APK de debug recém-instalado roda interpretado.
 """
 import argparse
 import re
@@ -26,12 +26,12 @@ import subprocess
 import sys
 import time
 
-PACKAGES = {"keyflow": "com.keyflow", "gboard": "com.google.android.inputmethod.latin"}
+PACKAGES = {"keyflow": "com.arateki.keyflow", "gboard": "com.google.android.inputmethod.latin"}
 IMES = {
-    "keyflow": "com.keyflow/.ime.KeyFlowKeyboardService",
+    "keyflow": "com.arateki.keyflow/com.keyflow.ime.KeyFlowKeyboardService",
     "gboard": "com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME",
 }
-PROBES = {"remoto": "com.keyflow/.ui.ImeProbeRemoteActivity", "local": "com.keyflow/.ui.ImeProbeActivity"}
+PROBES = {"remoto": "com.arateki.keyflow/com.keyflow.ui.ImeProbeRemoteActivity", "local": "com.arateki.keyflow/com.keyflow.ui.ImeProbeActivity"}
 FRAME = re.compile(r"frame=(\[[^\]]*\]\[[^\]]*\])")
 # Uma chamada ao aparelho por leitura: a linha da janela do IME no InputDispatcher e o bloco dela no WindowManager.
 SAMPLE = (

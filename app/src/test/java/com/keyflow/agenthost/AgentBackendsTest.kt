@@ -147,9 +147,113 @@ class AgentBackendsTest {
         )
         val seen = CopyOnWriteArrayList<AgentMode>()
         val job = launch { b.modeFlow(anthropic()).take(2).collect { seen += it } }
-        kotlinx.coroutines.yield()
+        // O fluxo junta as três credenciais (merge): a inscrição acontece em corrotinas filhas, então se espera por ela em vez de contar com um `yield`.
+        withTimeout(5_000) { changes.subscriptionCount.first { it > 0 } }
         apiKey = true
         changes.emit(Unit)
+        withTimeout(5_000) { job.join() }
+        assertThat(seen).containsExactly(AgentMode.TEXT_ONLY, AgentMode.TOOLS).inOrder()
+    }
+
+    // --- OpenAI e Google (AGT-T7): ferramentas só com a chave de API ---
+
+    private val openAiModels = CopyOnWriteArrayList<String>()
+    private val googleModels = CopyOnWriteArrayList<String>()
+
+    private fun withAll(
+        openAiKey: Boolean = true,
+        googleKey: Boolean = true,
+        openAiChanges: Flow<Unit> = emptyFlow(),
+        googleChanges: Flow<Unit> = emptyFlow(),
+    ) = AgentBackends(
+        hasTools = { true },
+        anthropicApiKeyConnected = { true },
+        agentEngine = { model -> models += model; FakeAgent(model) },
+        resolveText = { ready },
+        openAiApiKeyConnected = { openAiKey },
+        openAiCredentialChanges = openAiChanges,
+        openAiAgentEngine = { model -> openAiModels += model; FakeAgent(model) },
+        googleApiKeyConnected = { googleKey },
+        googleCredentialChanges = googleChanges,
+        googleAgentEngine = { model -> googleModels += model; FakeAgent(model) },
+    )
+
+    private fun openAi(model: String = "gpt-6-astra") = Settings(reasoningSource = ReasoningSource.OPENAI, reasoningOpenAiModel = model)
+
+    private fun google(model: String = "gemini-3.8-flash") = Settings(reasoningSource = ReasoningSource.GOOGLE, reasoningGoogleModel = model)
+
+    @Test
+    fun `openai and google with an api key and a model - the agent with tools, each with its own engine and model`() {
+        val b = withAll()
+        assertThat(b.mode(openAi())).isEqualTo(AgentMode.TOOLS)
+        assertThat(b.resolve(openAi("gpt-5.6-terra"))).isInstanceOf(AgentBackend.WithTools::class.java)
+        assertThat(b.mode(google())).isEqualTo(AgentMode.TOOLS)
+        assertThat(b.resolve(google("gemini-2.5-flash"))).isInstanceOf(AgentBackend.WithTools::class.java)
+        assertThat(openAiModels).containsExactly("gpt-5.6-terra")
+        assertThat(googleModels).containsExactly("gemini-2.5-flash")
+        assertThat(models).isEmpty() // o da Anthropic não foi tocado
+    }
+
+    @Test
+    fun `openai and google by login, not an api key - text only, with the note`() {
+        val b = withAll(openAiKey = false, googleKey = false)
+        for (settings in listOf(openAi(), google())) {
+            assertThat(b.mode(settings)).isEqualTo(AgentMode.TEXT_ONLY)
+            assertThat(b.resolve(settings)).isInstanceOf(AgentBackend.TextOnly::class.java)
+        }
+        assertThat(openAiModels).isEmpty()
+        assertThat(googleModels).isEmpty()
+    }
+
+    @Test
+    fun `a key of another provider does not turn tools on - each origin checks its own credential`() {
+        val b = withAll(openAiKey = true, googleKey = false)
+        assertThat(b.mode(google())).isEqualTo(AgentMode.TEXT_ONLY)
+        assertThat(b.mode(openAi())).isEqualTo(AgentMode.TOOLS)
+    }
+
+    @Test
+    fun `no model chosen on openai or google - text only`() {
+        val b = withAll()
+        assertThat(b.mode(openAi(model = ""))).isEqualTo(AgentMode.TEXT_ONLY)
+        assertThat(b.mode(google(model = "  "))).isEqualTo(AgentMode.TEXT_ONLY)
+    }
+
+    @Test
+    fun `without an engine for the origin it stays text only even with a key`() {
+        val b = AgentBackends(hasTools = { true }, anthropicApiKeyConnected = { true }, agentEngine = { FakeAgent(it) }, resolveText = { ready }, openAiApiKeyConnected = { true }, googleApiKeyConnected = { true })
+        assertThat(b.mode(openAi())).isEqualTo(AgentMode.TEXT_ONLY)
+        assertThat(b.mode(google())).isEqualTo(AgentMode.TEXT_ONLY)
+    }
+
+    @Test
+    fun `local, credits and custom stay text only whatever keys are stored`() {
+        val b = withAll()
+        for (source in listOf(ReasoningSource.LOCAL, ReasoningSource.CREDITS, ReasoningSource.CUSTOM)) {
+            assertThat(b.mode(Settings(reasoningSource = source, reasoningOpenAiModel = "gpt-6-astra", reasoningGoogleModel = "gemini-3.8-flash"))).isEqualTo(AgentMode.TEXT_ONLY)
+        }
+    }
+
+    @Test
+    fun `the mode flow follows the openai and the google credential too`() = runBlocking {
+        val openAiChanges = MutableSharedFlow<Unit>(extraBufferCapacity = 4)
+        val googleChanges = MutableSharedFlow<Unit>(extraBufferCapacity = 4)
+        var googleKey = false
+        val b = AgentBackends(
+            hasTools = { true },
+            anthropicApiKeyConnected = { true },
+            agentEngine = { FakeAgent(it) },
+            resolveText = { ready },
+            googleApiKeyConnected = { googleKey },
+            googleCredentialChanges = googleChanges,
+            googleAgentEngine = { FakeAgent(it) },
+            openAiCredentialChanges = openAiChanges,
+        )
+        val seen = CopyOnWriteArrayList<AgentMode>()
+        val job = launch { b.modeFlow(google()).take(2).collect { seen += it } }
+        withTimeout(5_000) { googleChanges.subscriptionCount.first { it > 0 } }
+        googleKey = true
+        googleChanges.emit(Unit)
         withTimeout(5_000) { job.join() }
         assertThat(seen).containsExactly(AgentMode.TEXT_ONLY, AgentMode.TOOLS).inOrder()
     }

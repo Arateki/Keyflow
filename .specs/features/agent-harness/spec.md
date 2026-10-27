@@ -36,7 +36,7 @@ modelo não consegue olhar nem mexer em nada do app, e o usuário tem de ir às 
 
 ## Assunções (o Yan veta ou ajusta)
 
-- **A1** — O 1º provedor com ferramentas é a **Anthropic por chave de API** (a API `messages` tem `tools`/`tool_use`/`tool_result` estáveis e o motor de texto dela já existe). OpenAI e Google entram na fase 2.
+- **A1** — O 1º provedor com ferramentas é a **Anthropic por chave de API** (a API `messages` tem `tools`/`tool_use`/`tool_result` estáveis e o motor de texto dela já existe). OpenAI e Google entram na fase 2 (AGT-T7, só por chave de API; a OpenAI pela Responses API, ver o `design.md` D8).
 - **A2** — Confirmação **padrão = perguntar sempre** para toda ferramenta que altera algo; as de leitura rodam sem perguntar. O Yan pode afrouxar por ferramenta em Ajustes.
 - **A3** — O servidor MCP, quando ligado, escuta **só neste aparelho** por padrão (o PC chega por `adb forward`); "rede local" é uma opção separada, com **token obrigatório**; desliga sozinho após inatividade e mostra uma notificação enquanto está no ar.
 - **A4** — A pré-visualização da skin é uma **folha de contato** (frames/estados em PNG) renderizada pelo próprio app, mostrada ao usuário; vai ao modelo como imagem só se o provedor/modelo aceitar visão.
@@ -110,20 +110,20 @@ modelo não consegue olhar nem mexer em nada do app, e o usuário tem de ir às 
 | ID | Área | Status |
 | --- | ---- | ------ |
 | AGT-01 | Histórico com poda | Implemented — histórico neutro e poda (AGT-T1) + o `AgentController` que o guarda e o envia a cada volta (AGT-T3; teste: o motor recebe o histórico acumulado, inclusive o resultado sintético depois de um cancelamento) |
-| AGT-02 | Contrato `AgentEngine` | Implemented (JVM) — AGT-T1/T2; `ReasoningEngine` intocado |
+| AGT-02 | Contrato `AgentEngine` | Implemented (JVM) — AGT-T1/T2/T7 (Anthropic, OpenAI e Google); `ReasoningEngine` intocado |
 | AGT-03 | Laço enviar → ferramentas → repetir | Implemented (JVM) — `AgentLoop`, 12 passos |
 | AGT-04 | Cancelar sem estado pela metade | Implemented (JVM) — o conserto do histórico é do núcleo; a atomicidade da instalação é do AGT-T4 |
-| AGT-05 | Queda para o modo só texto | Implemented — `AgentBackends`: ferramentas só na Anthropic por chave de API; Local/OpenAI/Google/login/Créditos/sem credencial caem no texto de hoje, com a nota e a mensagem de credencial ausente (AGT-T3) |
+| AGT-05 | Queda para o modo só texto | Implemented — `AgentBackends`: ferramentas na Anthropic, na OpenAI e no Google, só com CHAVE de API (AGT-T3 + AGT-T7); Local/login/Créditos/Custom/sem credencial caem no texto de hoje, com a nota e a mensagem de credencial ausente |
 | AGT-06 | Erros do `ReasoningError` e ferramenta que falha | Implemented (JVM) — motor Anthropic (401/429/5xx/529/corte) e laço |
 | TLS-01 | Esquema, risco, validação antes de `run` | Implemented (JVM) |
 | TLS-02 | Confirmação com resumo do app | Implemented — núcleo, `ConfirmationGate`, painel com resumo e prévia do app (AGT-T3) e o resumo/folha de contato das ferramentas de skin (AGT-T4) |
-| TLS-03 | Sem segredos; filtro; lista de permitidos | Parcial — `SecretFilter` ligado aos cofres `keyflow_secure` e `auth/` (AGT-T3, provado no aparelho com sentinelas); argumentos recusam segredos; lista de permitidos de ajustes é do AGT-T6 |
+| TLS-03 | Sem segredos; filtro; lista de permitidos | Implemented — `SecretFilter` ligado aos cofres `keyflow_secure` e `auth/` (AGT-T3, provado no aparelho com sentinelas); argumentos recusam segredos; a lista de permitidos de ajustes é a tabela `AppSettingsAllowlist` (AGT-T6), com o teste que FALHA se um campo de `SettingsSecrets`, um endereço ou um nome com cara de credencial entrar nela, e o repositório só grava as chaves da tabela `AgentSettingKeys` |
 | TLS-04 | Resultado é dado | Implemented (JVM) — prompt de sistema + suíte de abuso; injeções em resultado/ditado nunca contornam a confirmação |
 | TLS-05 | Registro de ações, desfazer | Implemented — `FileActionLog` (arquivo com teto, rotação e filtro de segredos, fora do backup) e Desfazer nos Ajustes pelo mesmo executor (AGT-T5) |
 | TLS-06 | Tempo limite, fora da thread principal | Implemented (JVM) |
 | AGT-T10 (recorte V1-4) | Abuso e flood | Parcial — teste JVM de injeção, segredos, argumentos, flood (8 chamadas por passo/12 passos), resultado e cancelamento; executor limita ainda a 24 tentativas por janela móvel de 60 s. Instrumentados conferem os cofres cifrados e o chat. Validação com a Anthropic real pendente **[YAN]**; decisão de release desta V1: **Em breve** até essa validação. |
 | SKL-01..06 | Ferramentas de skin | Implemented — as 6 ferramentas, prévia sem nada em disco, instalação com confirmação (relatório e folha de contato), lotes e limites; verificado no aparelho com o `exemplo-neon` real (`SkinToolsDeviceTest` 13/13) (AGT-T4). Pendência: o direito de skins pagas no `skin_select` (MZ-T9) |
-| APP-01..03 | Ferramentas de app | Pending (AGT-T6) |
+| APP-01..03 | Ferramentas de app | Implemented — `app_status`, `settings_get/set` (antes → depois e desfazer) e `open_tab` (abre ao fim da resposta); provado no aparelho com o DataStore e o cofre de verdade (AGT-T6) |
 | AUI-01, AUI-02, AUI-04 | Cartões, painel de confirmação, textos `tr()` e orbe | Implemented (AGT-T3; instrumentado 12/12 + rotas de galeria) |
 | AUI-03 | Seção "Ferramentas do agente" nos Ajustes | Implemented — `AgentSettingsSection` + configuração persistida no DataStore próprio; MCP desligado e desabilitado (AGT-T5) |
 | MCP-01 | Servidor MCP desligado por padrão | Implemented — a linha existe nos Ajustes, desligada e desabilitada; nenhuma porta é aberta (não há servidor) |

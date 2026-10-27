@@ -3,14 +3,18 @@ name: site
 on:
   pull_request:
     paths:
+      - "website/**"
       - "docs/loja/**"
       - "scripts/gerar-site.py"
+      - "scripts/site_doc.py"
       - ".github/workflows/site.yml"
   push:
     branches: [main]
     paths:
+      - "website/**"
       - "docs/loja/**"
       - "scripts/gerar-site.py"
+      - "scripts/site_doc.py"
       - ".github/workflows/site.yml"
   workflow_dispatch:
 
@@ -19,7 +23,7 @@ permissions:
 
 concurrency:
   group: site-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   site:
@@ -31,7 +35,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Gerar e validar páginas estáticas
+      - name: Montar e validar o site (website/ + páginas legais)
         run: python3 scripts/gerar-site.py
 
       - name: Publicar site no Cloudflare R2
@@ -41,9 +45,28 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SITE_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: auto
           R2_ENDPOINT: ${{ secrets.R2_SITE_ENDPOINT }}
+        # Um sync por extensão, cada um com o content-type certo (a tabela TIPOS do gerar-site.py; o HTML vai
+        # por último). Primeiro sincroniza tudo sem apagar nada; depois uma segunda passada com --delete só
+        # para remover arquivos excluídos, garantindo que o HTML antigo nunca aponte para assets que sumiram.
         run: |
-          aws s3 sync build/site s3://keyflow-site \
-            --endpoint-url "$R2_ENDPOINT" \
-            --delete \
-            --content-type "text/html; charset=utf-8" \
-            --cache-control "public, max-age=300"
+          set -euo pipefail
+          tipos=$(python3 scripts/gerar-site.py --tipos)
+          echo "$tipos" | while IFS=$'\t' read -r ext tipo cache; do
+            echo "Publicando *.$ext como $tipo"
+            aws s3 sync build/site s3://keyflow-site \
+              --endpoint-url "$R2_ENDPOINT" \
+              --exclude "*" \
+              --include "*.$ext" \
+              --content-type "$tipo" \
+              --cache-control "$cache" < /dev/null
+          done
+          echo "$tipos" | while IFS=$'\t' read -r ext tipo cache; do
+            echo "Limpando *.$ext excluídos"
+            aws s3 sync build/site s3://keyflow-site \
+              --endpoint-url "$R2_ENDPOINT" \
+              --delete \
+              --exclude "*" \
+              --include "*.$ext" \
+              --content-type "$tipo" \
+              --cache-control "$cache" < /dev/null
+          done

@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicReference
  * Cada geração abre uma [Conversation] nova e a fecha no fim: o Testar e os futuros consumidores são de uma frase, sem
  * histórico. O [Engine] fica carregado até [unload].
  */
-internal class LiteRtBackend(private val cacheDir: String?) : LlmBackend {
+internal class LiteRtBackend(private val cacheDir: String?, private val opensThink: Boolean = false) : LlmBackend {
 
     private var engine: Engine? = null
 
@@ -43,10 +43,20 @@ internal class LiteRtBackend(private val cacheDir: String?) : LlmBackend {
         }
     }
 
+    override fun warmUp() {
+        val active = checkNotNull(engine) { "o motor não está carregado" }
+        // API 0.16.1 conferida no classes.jar: maxOutputToken é por conversa, não limita pedidos reais.
+        // Dois tokens permitem prefill + um passo de decodificação; não esperamos resposta nem usamos ThoughtStripper.
+        active.createConversation(LiteRtConfigs.warmUp(opensThink)).use {
+            it.sendMessage("Oi")
+        }
+    }
+
     override fun generate(request: ReasoningRequest, onDelta: (String) -> Unit) {
         val active = checkNotNull(engine) { "o motor não está carregado" }
         cancelled = false
-        val config = LiteRtConfigs.conversation(request.system)
+        val config = LiteRtConfigs.conversation(request.system, opensThink)
+        val stripper = ThoughtStripper(opensThink)
         val conversation = active.createConversation(config)
         this.conversation = conversation
         try {
@@ -56,7 +66,7 @@ internal class LiteRtBackend(private val cacheDir: String?) : LlmBackend {
                 request.user,
                 object : MessageCallback {
                     override fun onMessage(message: Message) {
-                        val text = textOf(message)
+                        val text = stripper.accept(textOf(message))
                         if (text.isNotEmpty() && !cancelled) onDelta(text)
                     }
 
@@ -76,6 +86,10 @@ internal class LiteRtBackend(private val cacheDir: String?) : LlmBackend {
                 }
             }
             failure.get()?.let { if (!cancelled) throw it }
+            // O modelo que abre o `<think>` sozinho nunca fechou o pensamento: o que saiu foi só raciocínio, e ele não é resposta.
+            if (!cancelled && !stripper.closed) {
+                throw ReasoningFailure(ReasoningErrorKind.ENGINE, "o modelo terminou sem dar uma resposta (só raciocínio interno)")
+            }
         } finally {
             this.conversation = null
             runCatching { conversation.close() }
@@ -125,7 +139,10 @@ internal class LiteRtBackend(private val cacheDir: String?) : LlmBackend {
  * aparelho. Se estas constantes ficassem no companion do [LiteRtBackend], criar `ThinkingConfig`/`Channel` (bytecode de
  * Java 21) na inicialização da classe derrubaria os testes unitários, que rodam no JDK 17.
  */
-private object LiteRtConfigs {
+internal object LiteRtConfigs {
+    /** Limite só da conversa descartável; o pensamento interno também consome esse limite de dois tokens. */
+    fun warmUp(opensThink: Boolean) = conversation(null, opensThink).copy(maxOutputToken = 2)
+
     /**
      * Sem o raciocínio interno do modelo: o Testar e os consumidores querem a resposta. Medido com o Qwen3 0.6B no emulador:
      * com o "thinking" ligado (o padrão da biblioteca), "Diga olá" virou 335 trechos de `<think>…` e 69 s. Três camadas:
@@ -133,10 +150,11 @@ private object LiteRtConfigs {
      * `enable_thinking=false` do template de chat do Qwen3 (o que de fato o desliga neste modelo) e, como rede de
      * segurança, o canal "thought": se o modelo pensar mesmo assim, o `<think>…</think>` sai do texto da resposta.
      */
-    fun conversation(system: String?): ConversationConfig {
+    fun conversation(system: String?, opensThink: Boolean = false): ConversationConfig {
         val thinking = ThinkingConfig(enableThinking = false, thinkingTokenBudget = 0)
         val context: Map<String, Any> = mapOf("enable_thinking" to false)
-        val channels = listOf(Channel("thought", "<think>", "</think>"))
+        // Modelo cujo prompt já abre o `<think>` (DeepSeek R1): o canal não reconheceria o início; o [ThoughtStripper] cuida disso.
+        val channels = if (opensThink) emptyList() else listOf(Channel("thought", "<think>", "</think>"))
         return if (system != null) {
             ConversationConfig(systemInstruction = Contents.of(system), channels = channels, extraContext = context, thinkingConfig = thinking)
         } else {

@@ -14,7 +14,7 @@ use tower::ServiceExt;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
-const PACKAGE_NAME: &str = "com.keyflow";
+const PACKAGE_NAME: &str = "com.arateki.keyflow";
 
 async fn mock_google_ok() -> MockServer {
     let google = MockServer::start().await;

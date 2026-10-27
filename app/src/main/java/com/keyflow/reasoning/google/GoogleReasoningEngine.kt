@@ -12,6 +12,7 @@ import com.keyflow.reasoning.ReasoningError
 import com.keyflow.reasoning.ReasoningEvent
 import com.keyflow.reasoning.ReasoningRequest
 import java.io.IOException
+import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
@@ -52,6 +53,13 @@ class GoogleReasoningEngine(
         .build()
 
     override fun generate(request: ReasoningRequest): Flow<ReasoningEvent> = channelFlow {
+        val cleanModel = model.trim().removePrefix("models/")
+        if (cleanModel.isEmpty() || !cleanModel.matches(MODEL_NAME_REGEX)) {
+            send(ReasoningEvent.Error(ReasoningError.ENGINE, "Google Gemini: nome de modelo inválido ($model)"))
+            return@channelFlow
+        }
+        val encodedModel = URLEncoder.encode(cleanModel, "UTF-8").replace("+", "%20")
+
         val headers = try {
             authorization.headers(ProviderIds.GOOGLE)
         } catch (e: AuthException) {
@@ -66,7 +74,7 @@ class GoogleReasoningEngine(
             val call = try {
                 client.newCall(
                     Request.Builder()
-                        .url("$apiBaseUrl/models/$model:streamGenerateContent?alt=sse")
+                        .url("$apiBaseUrl/models/$encodedModel:streamGenerateContent?alt=sse")
                         .apply { headers.forEach { (name, value) -> header(name, value) } }
                         .header("Accept", "text/event-stream")
                         .post(body)
@@ -244,6 +252,7 @@ class GoogleReasoningEngine(
     }.toString()
 
     private companion object {
+        val MODEL_NAME_REGEX = Regex("[A-Za-z0-9][A-Za-z0-9._-]*")
         const val MAX_ATTEMPTS = 3
         const val BACKOFF_MS = 200L
         const val READ_TIMEOUT_S = 120L

@@ -1,0 +1,237 @@
+name: sherpa-onnx sem TTS
+
+# O AAR oficial do sherpa-onnx é compilado com SHERPA_ONNX_ENABLE_TTS=ON, que embute o eSpeak NG (GPL-3.0)
+# nas libsherpa-onnx-jni.so e libsherpa-onnx-c-api.so. O KeyFlow não usa TTS e nada GPL pode ir junto com o
+# app (bloqueia a Play Store). Este workflow recompila o sherpa-onnx na MESMA tag, com as MESMAS opções e a
+# MESMA ONNX Runtime do release oficial (as receitas são as do upstream: android.yaml + build-android-*.sh +
+# android/SherpaOnnxAar), só com SHERPA_ONNX_ENABLE_TTS=OFF, e monta o AAR com o mesmo layout.
+#
+# O resultado é o artefato `sherpa-onnx-sem-tts-aar` da rodada: o .aar, o .sha256 e o relatório da conferência
+# (scripts/verificar-aar-sherpa.sh). Quem publica é uma pessoa: `gh run download` + `gh release create`
+# (comando no fim deste arquivo); o app/build.gradle.kts baixa esse release e confere o SHA-256.
+#
+# Falha se qualquer .so ainda tiver texto do eSpeak NG, se algum segmento PT_LOAD ficar abaixo de 16 KB,
+# se a libonnxruntime.so não for a mesma do AAR oficial ou se algo além do TTS mudar em relação a ele.
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/sherpa-sem-tts.yml"
+      - "scripts/verificar-aar-sherpa.sh"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sherpa-sem-tts-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  SHERPA_VERSION: "1.13.8"
+  # Commit da tag v1.13.8 de k2-fsa/sherpa-onnx (fixado por SHA: tag se move, commit não).
+  SHERPA_COMMIT: 11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf
+  # ONNX Runtime do script de build do upstream (SHERPA_ONNX_ONNXRUNTIME_VERSION padrão) e SHA-256 do zip
+  # do csukuangfj/onnxruntime-libs; as libonnxruntime.so de dentro são idênticas às do AAR oficial.
+  ORT_VERSION: "1.28.2"
+  ORT_SHA256: 01518867f78241138b6aa25925802e843a4fa9085af8d303d49e35bbb52aff4d
+  # O AAR oficial foi compilado com o NDK r29 (0x14206865 no .note.android.ident); o runner traz esta versão.
+  NDK_VERSION: "29.0.14206865"
+  # AAR oficial (só para comparar): o mesmo SHA-256 que o app/build.gradle.kts fixava antes desta troca.
+  AAR_OFICIAL_SHA256: 633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96
+  # gradle-8.6-bin.zip, o do wrapper do projeto do AAR (services.gradle.org/distributions/….zip.sha256).
+  GRADLE_DIST_SHA256: 9631d53cf3e74bfa726893aee1f8994fee4e060c401335946dba2156f440f24c
+
+jobs:
+  nativo:
+    name: Nativo ${{ matrix.abi }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - abi: arm64-v8a
+            script: build-android-arm64-v8a.sh
+            saida: build-android-arm64-v8a
+          - abi: armeabi-v7a
+            script: build-android-armv7-eabi.sh
+            saida: build-android-armv7-eabi
+          - abi: x86
+            script: build-android-x86.sh
+            saida: build-android-x86
+          - abi: x86_64
+            script: build-android-x86-64.sh
+            saida: build-android-x86-64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: k2-fsa/sherpa-onnx
+          ref: ${{ env.SHERPA_COMMIT }}
+          path: sherpa-onnx
+          persist-credentials: false
+
+      - name: ONNX Runtime ${{ env.ORT_VERSION }} (a mesma do AAR oficial)
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 5 --retry-delay 10 -o "$RUNNER_TEMP/ort.zip" \
+            "https://github.com/csukuangfj/onnxruntime-libs/releases/download/v${ORT_VERSION}/onnxruntime-android-${ORT_VERSION}.zip"
+          echo "$ORT_SHA256  $RUNNER_TEMP/ort.zip" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/ort"
+          unzip -q "$RUNNER_TEMP/ort.zip" -d "$RUNNER_TEMP/ort"
+          # Os build-android-*.sh leem esta variável e apontam para jni/<abi>/ e headers/ lá dentro.
+          echo "SHERPA_ONNX_ONNXRUNTIME_ROOT=$RUNNER_TEMP/ort" >> "$GITHUB_ENV"
+
+      - name: NDK ${{ env.NDK_VERSION }}
+        run: |
+          set -euo pipefail
+          ndk="$ANDROID_HOME/ndk/$NDK_VERSION"
+          if [ ! -d "$ndk" ]; then
+            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$NDK_VERSION" > /dev/null
+          fi
+          test -f "$ndk/build/cmake/android.toolchain.cmake"
+          echo "ANDROID_NDK=$ndk" >> "$GITHUB_ENV"
+
+      # O ccache deixa barato refazer a rodada quando só um passo adiante falhou.
+      - name: ccache
+        run: sudo apt-get install -y --no-install-recommends ccache
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.ccache-sherpa
+          key: ccache-sherpa-${{ matrix.abi }}-${{ env.SHERPA_COMMIT }}-${{ github.run_id }}
+          restore-keys: |
+            ccache-sherpa-${{ matrix.abi }}-${{ env.SHERPA_COMMIT }}-
+
+      - name: Compilar sem TTS
+        working-directory: sherpa-onnx
+        run: |
+          set -euo pipefail
+          # Igual ao android.yaml do upstream: atualiza versão e sha1/data do version.cc na tag.
+          ./new-release.sh
+          export CCACHE_DIR="$HOME/.ccache-sherpa" CCACHE_MAXSIZE=1G
+          export CMAKE_C_COMPILER_LAUNCHER=ccache CMAKE_CXX_COMPILER_LAUNCHER=ccache
+          # Igual ao oficial (SHERPA_ONNX_ENABLE_C_API=ON); a única opção diferente é o TTS.
+          export SHERPA_ONNX_ENABLE_C_API=ON
+          export SHERPA_ONNX_ENABLE_TTS=OFF
+          ./${{ matrix.script }}
+          ccache -s || true
+
+      - name: Conferir que o TTS ficou de fora
+        working-directory: sherpa-onnx
+        run: |
+          set -euo pipefail
+          grep -E '^SHERPA_ONNX_ENABLE_(TTS|C_API|JNI|SPEAKER_DIARIZATION):' "${{ matrix.saida }}/CMakeCache.txt"
+          grep -qx 'SHERPA_ONNX_ENABLE_TTS:BOOL=OFF' "${{ matrix.saida }}/CMakeCache.txt"
+          ls -l "${{ matrix.saida }}/install/lib/"
+          falhou=0
+          for so in "${{ matrix.saida }}"/install/lib/*.so; do
+            n=$(strings -a "$so" | grep -c -E 'has not been built into espeak-ng|Empty _dict file|espeak_ng_' || true)
+            echo "$so: $n"
+            [ "$n" -eq 0 ] || falhou=1
+          done
+          exit $falhou
+
+      - name: Reunir os .so
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/jniLibs/${{ matrix.abi }}"
+          cp -v sherpa-onnx/${{ matrix.saida }}/install/lib/*.so "$RUNNER_TEMP/jniLibs/${{ matrix.abi }}/"
+          readelf -lW "$RUNNER_TEMP/jniLibs/${{ matrix.abi }}/libsherpa-onnx-jni.so" | grep -E 'LOAD|Type'
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: jniLibs-${{ matrix.abi }}
+          path: ${{ runner.temp }}/jniLibs
+          if-no-files-found: error
+          retention-days: 7
+
+  aar:
+    name: AAR sem TTS
+    needs: nativo
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: keyflow
+          sparse-checkout: scripts
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: k2-fsa/sherpa-onnx
+          ref: ${{ env.SHERPA_COMMIT }}
+          path: sherpa-onnx
+          persist-credentials: false
+      # O android.yaml do upstream monta o AAR com o JDK 21 e o Gradle 8.6 do wrapper do projeto.
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: jniLibs-*
+          merge-multiple: true
+          path: jniLibs
+
+      - name: AAR oficial (só para comparar)
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 5 --retry-delay 10 -o "$RUNNER_TEMP/oficial.aar" \
+            "https://github.com/k2-fsa/sherpa-onnx/releases/download/v${SHERPA_VERSION}/sherpa-onnx-${SHERPA_VERSION}.aar"
+          echo "$AAR_OFICIAL_SHA256  $RUNNER_TEMP/oficial.aar" | sha256sum -c -
+
+      - name: Preparar o projeto do AAR
+        run: |
+          set -euo pipefail
+          proj=sherpa-onnx/android/SherpaOnnxAar
+          # O KeyFlow não usa TTS: sem a classe Kotlin, quem tentar usá-lo falha ao compilar (e não com
+          # UnsatisfiedLinkError em execução, já que a .so não tem os métodos nativos). Tts.kt não é
+          # referenciado por nenhum outro arquivo do AAR; se fosse, o Kotlin falharia aqui.
+          rm -v "$proj/sherpa_onnx/src/main/java/com/k2fsa/sherpa/onnx/Tts.kt"
+          for abi in arm64-v8a armeabi-v7a x86 x86_64; do
+            cp -v "jniLibs/$abi/"*.so "$proj/sherpa_onnx/src/main/jniLibs/$abi/"
+          done
+          # O wrapper do upstream não fixa o SHA-256 da distribuição do Gradle: fixamos aqui.
+          printf '\ndistributionSha256Sum=%s\n' "$GRADLE_DIST_SHA256" >> "$proj/gradle/wrapper/gradle-wrapper.properties"
+
+      - name: Montar o AAR
+        working-directory: sherpa-onnx/android/SherpaOnnxAar
+        run: bash ./gradlew --no-daemon --console=plain :sherpa_onnx:assembleRelease
+
+      - name: Conferir e nomear
+        run: |
+          set -euo pipefail
+          mkdir -p saida
+          nome="sherpa-onnx-${SHERPA_VERSION}-sem-tts.aar"
+          cp sherpa-onnx/android/SherpaOnnxAar/sherpa_onnx/build/outputs/aar/sherpa_onnx-release.aar "saida/$nome"
+          (cd saida && sha256sum "$nome" | tee "$nome.sha256")
+          ls -l saida "$RUNNER_TEMP/oficial.aar"
+          unzip -l "saida/$nome"
+          # Falha se sobrar eSpeak, 16 KB, ONNX Runtime diferente ou qualquer mudança além do TTS.
+          bash keyflow/scripts/verificar-aar-sherpa.sh "saida/$nome" "$RUNNER_TEMP/oficial.aar" | tee saida/verificacao.txt
+          {
+            echo "### AAR sem TTS"
+            echo
+            echo '```'
+            cat "saida/$nome.sha256"
+            echo '```'
+            echo
+            echo '```'
+            cat saida/verificacao.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Sobe mesmo com a conferência falhando: o relatório é a evidência.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: sherpa-onnx-sem-tts-aar
+          path: saida
+          if-no-files-found: error
+          retention-days: 90
+
+# Publicação (feita por uma pessoa, depois da rodada verde da main ou da branch):
+#   gh run download <id> -R Arateki/Keyflow -n sherpa-onnx-sem-tts-aar -D /tmp/aar-sem-tts
+#   (cd /tmp/aar-sem-tts && sha256sum -c sherpa-onnx-1.13.8-sem-tts.aar.sha256)
+#   gh release create sherpa-onnx-1.13.8-sem-tts -R Arateki/Keyflow --target main --latest=false \
+#     --title "sherpa-onnx 1.13.8 sem TTS (sem eSpeak NG)" --notes "…" \
+#     /tmp/aar-sem-tts/sherpa-onnx-1.13.8-sem-tts.aar /tmp/aar-sem-tts/sherpa-onnx-1.13.8-sem-tts.aar.sha256

@@ -1,0 +1,6 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.keyflow.smoke.input">
+    <uses-sdk android:minSdkVersion="34" android:targetSdkVersion="36" />
+    <application android:theme="@android:style/Theme.Material.Light.NoActionBar" android:allowBackup="false">
+        <activity android:name="com.keyflow.smoke.ReleaseInputActivity" android:exported="true" />
+    </application>
+</manifest>

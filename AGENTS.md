@@ -38,15 +38,25 @@ chave; o `TranslationsTest` confere as traduções.
   instrumentados: `instrumentar <Classe | Classe#metodo | pacote ...>` da sua worktree — liga o emulador
   (`keyflow_api34`, o mesmo AVD, no host) se precisar, segura as travas, instala e roda `am instrument` só no
   pedido (~1 min com o emulador ligado). Rode os afetados antes de entregar; não espere o CI. O emulador desliga
-  sozinho depois de 30 min sem uso (`emulador estado|ligar|desligar` para controle manual). Dentro do container
+  sozinho depois de 30 min sem uso (`emulador estado|ligar|soltar|desligar` para controle manual). `emulador ligar`
+  reserva o emulador no seu nome: ninguém mais instala nele até você rodar `emulador soltar` (ou `desligar`) — solte
+  ao terminar. Reserva de outro agente só sai com `--forcar` e cai sozinha quando o emulador desliga. Dentro do container
   o `ANDROID_SERIAL=emulator-5554` já vem definido e as travas de `/tmp` são as mesmas para todos os agentes. Não
   há credencial de git: commite na branch, e quem está no Deck busca com `git fetch servidor`.
+- **Pool**: para compilar ou rodar instrumentados, prefira `/srv/dev/ferramentas/pool/bin/pool compilar <tarefas>` e
+  `pool instrumentar <Classe…>`, que usam o nó livre (servidor ou Deck); `pool estado` mostra os dois. O Deck só aceita
+  `assembleDebug`, `assembleDebugAndroidTest`, `testDebugUnitTest`, `lintDebug`, `compileDebug{,UnitTest,AndroidTest}Kotlin`
+  e `createDebugUnitTestCoverageReport` (com `--tests`, `-Pcoverage`, `--continue`, `--offline`); release, `installDebug`
+  e `connectedAndroidTest` só no servidor. `--destino servidor|deck` força o nó (o Deck ainda pode recusar).
+  Com o servidor e o Deck ocupados, o pool usa sozinho uma máquina AWS Spot (até 3 ao mesmo tempo, 10 automáticas
+  por dia); `--sem-aws` evita, `--destino aws` força, `pool aws estado` mostra. Ligar e desligar a AWS é do
+  coordenador.
 - **Instrumentados no emulador**: AVD `keyflow_api34`, sempre com `-gpu swangle_indirect` (é o renderizador
   dos goldens e do CI) e sempre com `ANDROID_SERIAL=emulator-5554` — sem ele o Gradle instala em todos os
   aparelhos conectados, inclusive o do Yan.
 - **Aparelho do Yan (Galaxy A32, `RX8T10DERKW`)**: nunca `connectedAndroidTest` — ele desinstala o app ao
   terminar e o KeyFlow deixa de ser o teclado do Yan. Use `installDebug installDebugAndroidTest` e
-  `adb -s RX8T10DERKW shell am instrument -w -r [-e class …] com.keyflow.test/androidx.test.runner.AndroidJUnitRunner`.
+  `adb -s RX8T10DERKW shell am instrument -w -r [-e class …] com.arateki.keyflow.test/androidx.test.runner.AndroidJUnitRunner`.
   Antes de qualquer `adb install -r`, rode `installDebug` ou `assembleDebug` — nunca só `compileDebugKotlin`
   (não gera APK novo).
 - **Goldens**: `verification/golden/` é a fonte de verdade. Fluxo `scripts/verify-screens.sh` →

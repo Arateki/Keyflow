@@ -440,7 +440,7 @@ EOSQL
 # Ambiente de PRODUÇÃO da KeyFlow API (gerado por provisionar.sh — modo 0600, nunca imprimir).
 DATABASE_URL=postgres://keyflow_prod:${pass_prod}@127.0.0.1:5432/keyflow_prod
 BIND_ADDR=127.0.0.1:8080
-PACKAGE_NAME=com.keyflow
+PACKAGE_NAME=com.arateki.keyflow
 GOOGLE_SERVICE_ACCOUNT_JSON_PATH=/etc/keyflow/google-sa-prod.json
 INTEGRITY_RELAXED=false
 REGISTER_RATE_LIMIT_PER_MINUTE=5
@@ -475,7 +475,7 @@ EOF
 # Ambiente de STAGING da KeyFlow API (gerado por provisionar.sh — modo 0600, nunca imprimir).
 DATABASE_URL=postgres://keyflow_staging:${pass_staging}@127.0.0.1:5432/keyflow_staging
 BIND_ADDR=127.0.0.1:8081
-PACKAGE_NAME=com.keyflow
+PACKAGE_NAME=com.arateki.keyflow
 GOOGLE_SERVICE_ACCOUNT_JSON_PATH=/etc/keyflow/google-sa-staging.json
 INTEGRITY_RELAXED=true
 REGISTER_RATE_LIMIT_PER_MINUTE=10

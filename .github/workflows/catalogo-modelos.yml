@@ -1,0 +1,48 @@
+name: Catálogo de modelos
+# Confere cada URL, tamanho e SHA-256 do ModelCatalog.kt contra a API pública do Hugging Face
+# (scripts/verify-model-catalog.py, sem token — como o app baixa). Existe porque 15 entradas do catálogo chegaram com
+# repositório, commit e SHA-256 inventados e nenhum download funcionava (2026-10-24).
+#
+# Não bloqueia PR e não faz parte da regra da main: depende de rede e do Hugging Face estar no ar, e um Hugging Face fora
+# do ar não pode travar ninguém. O que bloqueia, sem rede, é o PinSanityTest do job de unidade (forma dos pins).
+# Quem mexer no catálogo vê aqui o resultado; o resumo do job traz a saída do script.
+#
+# Rodar: toda segunda de manhã sozinho (pega um repositório que sumiu ou ficou gated), em todo PR que toca o catálogo
+# ou o script, ou Actions → Catálogo de modelos → Run workflow.
+on:
+  schedule:
+    - cron: '0 8 * * 1'
+  pull_request:
+    paths:
+      - app/src/main/java/com/keyflow/data/models/ModelCatalog.kt
+      - scripts/verify-model-catalog.py
+      - .github/workflows/catalogo-modelos.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: catalogo-modelos-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  catalogo:
+    name: Catalog pins vs Hugging Face
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # O workflow não falha por causa deste job: é um aviso, não um portão.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify the catalog against the Hugging Face API
+        run: |
+          status=0
+          python3 -I scripts/verify-model-catalog.py > catalogo.txt 2>&1 || status=$?
+          cat catalogo.txt
+          {
+            echo '### Catálogo de modelos × Hugging Face'
+            echo '```'
+            cat catalogo.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"

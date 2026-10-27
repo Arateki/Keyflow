@@ -22,6 +22,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.keyflow.ui.common.collectAsStateOnMain
+import com.keyflow.transcription.local.LocalTranscriber
+import com.keyflow.reasoning.local.LocalReasoningPreloader
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.core.shortcuts.BarsConfig
 import com.keyflow.core.shortcuts.ShortcutGrid
@@ -64,6 +67,8 @@ import com.keyflow.ui.config.DirectApiKeyActions
 import com.keyflow.reasoning.openai.OpenAiModels
 import com.keyflow.reasoning.openai.OpenAiReasoningEngine
 import com.keyflow.reasoning.anthropic.AnthropicAgentEngine
+import com.keyflow.reasoning.google.GoogleAgentEngine
+import com.keyflow.reasoning.openai.OpenAiAgentEngine
 import com.keyflow.reasoning.anthropic.AnthropicModels
 import com.keyflow.agenthost.AgentBackends
 import com.keyflow.agenthost.AgentHost
@@ -193,15 +198,23 @@ class SetupActivity : ComponentActivity() {
     // O agente da aba KeyFlow (agent-harness): as peças vivem no processo; aqui só se escolhe, pela origem de raciocínio, se a próxima
     // mensagem usa ferramentas (Anthropic por chave de API) ou o chat de texto de sempre.
     private val agentRuntime by lazy {
-        AgentHost.of(this).runtime(
+        // A condição precisa estar dentro do lazy: o inicializador também é alcançável pelo R8.
+        if (BuildConfig.AGENT_ENABLED) AgentHost.of(this).runtime(
             AgentBackends(
                 hasTools = { AgentHost.of(this).registry.all().isNotEmpty() },
                 anthropicApiKeyConnected = { auth.store.getApiKey(ProviderIds.ANTHROPIC) != null },
                 anthropicCredentialChanges = auth.store.changes(ProviderIds.ANTHROPIC).map { },
                 agentEngine = { model -> AnthropicAgentEngine(auth.authorization, auth.http, model) },
                 resolveText = reasoningEngines::resolve,
+                // OpenAI e Google (AGT-T7): ferramentas só com a CHAVE de API, como a Anthropic (o login por assinatura segue no texto).
+                openAiApiKeyConnected = { auth.store.getApiKey(ProviderIds.OPENAI) != null },
+                openAiCredentialChanges = auth.store.changes(ProviderIds.OPENAI).map { },
+                openAiAgentEngine = { model -> OpenAiAgentEngine(auth.authorization, auth.http, model) },
+                googleApiKeyConnected = { auth.store.getApiKey(ProviderIds.GOOGLE) != null },
+                googleCredentialChanges = auth.store.changes(ProviderIds.GOOGLE).map { },
+                googleAgentEngine = { model -> GoogleAgentEngine(auth.authorization, auth.http, model) },
             ),
-        )
+        ) else null
     }
     private var localSnapshot by mutableStateOf(LocalModelsSnapshot.EMPTY)
     private var localModelsJob: Job? = null
@@ -291,10 +304,15 @@ class SetupActivity : ComponentActivity() {
         settingsRepository = SettingsRepository(this)
         showDisclosure = intent.getBooleanExtra(EXTRA_REQUIRE_DISCLOSURE, false)
         handleNavIntent(intent)
+        // `open_tab` do agente (APP-03): a aba pedida abre como qualquer navegação por intent (o mesmo `requestedTab` do clique num erro).
+        if (BuildConfig.AGENT_ENABLED) AgentHost.tabNavigator.attach(openTabForAgent)
 
         activityScope.launch {
             settingsRepository.settingsFlow().collectLatest {
                 settings = it
+                if (it.source != com.keyflow.core.TranscriptionSource.LOCAL || it.localModelId == null) {
+                    LocalTranscriber.releaseIfCreated()
+                }
                 settingsLoaded = true
                 if (it.onboardingDone) startMonetizationIfNeeded()
                 // Primeira abertura: a interface assume o idioma do aparelho (PT/EN/ES; outros → inglês).
@@ -330,6 +348,8 @@ class SetupActivity : ComponentActivity() {
                     // Ler o snapshot aqui faz a composição reagir à chegada do manifesto; o catálogo
                     // global também é atualizado para SettingsRepository/ModelDownloader.
                     val remoteCatalog = remoteSnapshot.models
+                    val speechPreparation by LocalTranscriber.modelPreparation.state.collectAsStateOnMain()
+                    val textPreparation by LocalReasoningPreloader.preparation.state.collectAsStateOnMain()
                     ConfigScreen(
                         settings = settings,
                         permissions = permissions,
@@ -395,6 +415,7 @@ class SetupActivity : ComponentActivity() {
                             active = localSnapshot.active,
                             failures = localSnapshot.failures,
                             selectedId = settings.localModelId,
+                            preparation = speechPreparation,
                             deviceRamMb = localModels.deviceRamMb,
                         ),
                         reasoningModels = LocalModelsUi.compose(
@@ -404,6 +425,7 @@ class SetupActivity : ComponentActivity() {
                             active = localSnapshot.active,
                             failures = localSnapshot.failures,
                             selectedId = settings.reasoningLocalModelId,
+                            preparation = textPreparation,
                             deviceRamMb = localModels.deviceRamMb,
                         ),
                         visionModels = LocalModelsUi.compose(
@@ -556,6 +578,14 @@ class SetupActivity : ComponentActivity() {
         setIntent(intent)
         if (intent.getBooleanExtra(EXTRA_REQUIRE_DISCLOSURE, false)) showDisclosure = true
         handleNavIntent(intent)
+    }
+
+    /** O `open_tab` do agente: chamado de qualquer thread, abre a aba na principal pelo mesmo caminho da navegação por intent. */
+    private val openTabForAgent: (ConfigTab) -> Unit = { tab ->
+        runOnUiThread {
+            requestedTab = tab
+            requestedTabKey++
+        }
     }
 
     /** Lê extras de navegação: pular para a aba Transcrição, Sobrepor ou Teclado (clique num erro clicável). */
@@ -713,6 +743,7 @@ class SetupActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        if (BuildConfig.AGENT_ENABLED) AgentHost.tabNavigator.detach(openTabForAgent)
         monetizationJobs.forEach(Job::cancel)
         entitlementsRepository?.close()
         remoteConfigRepository?.close()

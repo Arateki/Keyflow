@@ -1,0 +1,11 @@
+KeyFlow
+Copyright 2026 Yan Lucas
+
+Este produto é distribuído sob a Apache License 2.0 (arquivo LICENSE).
+
+Os dicionários do corretor (app/src/main/assets/dict/) derivam das listas de palavras do
+LatinIME, do Android Open Source Project (Copyright The Android Open Source Project),
+distribuídas sob a Apache License 2.0. Ver scripts/build-dictionaries.py.
+
+Bibliotecas, modelos e demais componentes de terceiros mantêm as próprias licenças,
+indicadas nos respectivos arquivos e dependências.

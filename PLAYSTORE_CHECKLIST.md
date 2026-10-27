@@ -50,9 +50,9 @@ do emulador Android 17 (`.specs/quick/010-suite-no-aparelho/`) existe para achar
 
 #### 1b. Aba Raciocínio — o que a política e o Data Safety também precisam cobrir (RPRV-01)
 
-- **Modelos de texto locais** (Qwen3 0.6B e Gemma 4 E2B, pelo LiteRT-LM): rodam **100% no aparelho**, em processo próprio
+- **Modelos de texto locais** (Qwen3 0.6B, SmolLM2 1.7B, DeepSeek R1 1.5B e Gemma 4 E2B, pelo LiteRT-LM): rodam **100% no aparelho**, em processo próprio
   (`:reasoning`); o texto não sai do dispositivo. Os arquivos são baixados sob demanda do Hugging Face (o app só faz o pedido
-  de download) e somem se o app for desinstalado. Licenças: Apache 2.0 (`app/licenses/`, aba Docs → Licenças).
+  de download) e somem se o app for desinstalado. Licenças: Apache 2.0 e MIT (DeepSeek R1; `app/licenses/`, aba Docs → Licenças).
 - **OpenAI (nuvem — só quando o usuário escolhe essa origem)**: o texto que o usuário manda gerar (hoje, a frase do botão
   Testar) é enviado à OpenAI em `api.openai.com/v1/responses`, com `store: false` (a resposta não fica guardada para consulta
   posterior pelo app — **isso não é "a OpenAI não guarda"**: ela ainda pode reter o conteúdo pelo prazo da política dela, e no
@@ -131,6 +131,7 @@ Ao criar o app listing, preencher a seção **"Data safety"** declarando:
 | 3. Data Safety Form | ⏳ depende do Play Console, não do código |
 | 4. Política e Data Safety cobrem a aba Raciocínio (seção 1b) | ⏳ texto pronto (2026-09-30); entra junto com PS-2/PS-4 |
 | 5. Login ChatGPT (seção 1c) | ⏸ desligado no release (`enabled = BuildConfig.DEBUG`) — **[YAN] decidir a elegibilidade; NÃO publicar ligado** |
+| 6. Build de release (PS-5, V1-3) | ✅ 2026-10-24: R8 + redução de recursos ligados, `bundleRelease` gera o AAB assinado com a chave de upload (lida de fora do repositório), `versionCode` 1 / `versionName` 1.0.0, `applicationId` `com.arateki.keyflow`; smoke do APK de release no emulador (`scripts/smoke-release.sh`). Falta **[YAN]**: criar o app no Console com esse id, cadastrar a chave de upload (SHA-256 `AB:17:29:3A:…:A8:DC`), o client OAuth Google com o pacote novo e subir o AAB na trilha interna. Detalhes: `.specs/codebase/ENVIRONMENT.md` › "Release". |
 
 ## Estado atual do código relevante
 

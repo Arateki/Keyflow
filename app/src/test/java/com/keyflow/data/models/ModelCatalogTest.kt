@@ -131,18 +131,10 @@ class ModelCatalogTest {
     // ── RCAT-02/03: catálogo de texto (LiteRT-LM) ──────────────────────────────────────────────
 
     @Test
-    fun `text catalog has the light and the balanced model, lightest first`() {
+    fun `text catalog has the five models, lightest first`() {
+        // Só os cujo repositório, commit e SHA-256 existem de verdade na API do Hugging Face (2026-10-24, 2026-10-25 e 2026-10-26).
         assertThat(ModelCatalog.TEXT.map { it.id })
-            .containsExactly(
-                "qwen3-0.6b-litertlm",
-                "smollm2-1.7b-litertlm",
-                "llama-3.2-1b-litertlm",
-                "deepseek-r1-1.5b-litertlm",
-                "gemma-2-2b-litertlm",
-                "gemma-4-e2b-litertlm",
-                "llama-3.2-3b-litertlm",
-                "phi-3.5-mini-litertlm",
-            )
+            .containsExactly("qwen3-0.6b-litertlm", "smollm2-1.7b-litertlm", "deepseek-r1-1.5b-litertlm", "gemma-4-e2b-litertlm", "gemma-4-e4b-litertlm")
             .inOrder()
         assertThat(ModelCatalog.TEXT.map { it.totalBytes }).isInOrder()
         assertThat(ModelCatalog.TEXT.map { it.recommendedRamMb }).isInOrder()
@@ -164,6 +156,34 @@ class ModelCatalogTest {
         }
     }
 
+    /**
+     * Cada modelo de texto tem um nível em português como nome (o modelo de verdade vai na linha de baixo do cartão, em
+     * `modelName`): nome sem o modelo dentro, que quebrava a linha e deixava "4)" sozinho a 360 dp.
+     */
+    @Test
+    fun `text models are named by level, without the model inside the name`() {
+        assertThat(ModelCatalog.TEXT.map { it.displayName }).containsExactly("Leve", "Intermediário", "Raciocínio", "Equilibrado", "Avançado").inOrder()
+        assertThat(ModelCatalog.TEXT.map { it.displayName }).containsNoDuplicates()
+        ModelCatalog.TEXT.forEach { assertThat(it.displayName).doesNotContain("(") }
+        assertThat(ModelCatalog.TEXT.map { it.modelName })
+            .containsExactly("Qwen3 0.6B", "SmolLM2 1.7B", "DeepSeek R1 1.5B", "Gemma 4 E2B", "Gemma 4 E4B")
+            .inOrder()
+    }
+
+    /**
+     * SmolLM2, DeepSeek e Gemma 4 E4B nunca carregaram no LiteRT-LM de um aparelho: ficam só no debug até o roteiro manual no A32.
+     * O release (`debug = false`) lista só os validados, e o DeepSeek é o único cujo prompt abre o `<think>`.
+     */
+    @Test
+    fun `release lists only the text models validated on a device`() {
+        assertThat(ModelCatalog.visibleIn(ModelCatalog.TEXT_ALL, debug = false).map { it.id })
+            .containsExactly("qwen3-0.6b-litertlm", "gemma-4-e2b-litertlm").inOrder()
+        assertThat(ModelCatalog.visibleIn(ModelCatalog.TEXT_ALL, debug = true)).containsExactlyElementsIn(ModelCatalog.TEXT_ALL).inOrder()
+        assertThat(ModelCatalog.TEXT_ALL.filterNot { it.validatedOnDevice }.map { it.id })
+            .containsExactly("smollm2-1.7b-litertlm", "deepseek-r1-1.5b-litertlm", "gemma-4-e4b-litertlm")
+        assertThat(ModelCatalog.TEXT_ALL.filter { it.promptOpensThink }.map { it.id }).containsExactly("deepseek-r1-1.5b-litertlm")
+    }
+
     /** RCAT-03: só baixável sem login, e fixado no commit — o SHA do catálogo tem de continuar valendo. */
     @Test
     fun `text urls point to a pinned huggingface commit and end with the file name`() {
@@ -173,103 +193,57 @@ class ModelCatalogTest {
         }
     }
 
-    /** Números lidos da API do Hugging Face em 2026-09-29 (`/api/models/<repo>/tree/<commit>`). */
+    /**
+     * Números lidos da API do Hugging Face em 2026-09-29 e reconferidos em 2026-10-24 (`/api/models/<repo>/tree/<commit>`).
+     * SmolLM2 e DeepSeek: lidos em 2026-10-25 e o SHA-256 conferido baixando o arquivo inteiro.
+     */
     @Test
     fun `text sizes and hashes match the upstream files`() {
         assertThat(ModelCatalog.QWEN3_0_6B.totalBytes).isEqualTo(614_236_160L)
         assertThat(ModelCatalog.QWEN3_0_6B.files.single().sha256)
             .isEqualTo("555579ff2f4fd13379abe69c1c3ab5200f7338bc92471557f1d6614a6e5ab0b4")
+        assertThat(ModelCatalog.SMOLLM2_1_7B.totalBytes).isEqualTo(1_730_949_280L)
+        assertThat(ModelCatalog.SMOLLM2_1_7B.files.single().sha256)
+            .isEqualTo("3c3e693157e2fb92b862b572cff74b7a353f81eb232cef682bf0fcc91855f8f1")
+        assertThat(ModelCatalog.DEEPSEEK_R1_1_5B.totalBytes).isEqualTo(1_833_451_520L)
+        assertThat(ModelCatalog.DEEPSEEK_R1_1_5B.files.single().sha256)
+            .isEqualTo("69b35f01759eed765641ab4af589bbe98131fd2825662a086d9037409b8c1295")
         assertThat(ModelCatalog.GEMMA_4_E2B.totalBytes).isEqualTo(2_588_147_712L)
         assertThat(ModelCatalog.GEMMA_4_E2B.files.single().sha256)
             .isEqualTo("181938105e0eefd105961417e8da75903eacda102c4fce9ce90f50b97139a63c")
+        // E4B: lido em 2026-10-26 (`/api/models/litert-community/gemma-4-E4B-it-litert-lm/tree/e6a3892a…`) e o SHA-256 conferido baixando o arquivo inteiro.
+        assertThat(ModelCatalog.GEMMA_4_E4B.totalBytes).isEqualTo(3_659_530_240L)
+        assertThat(ModelCatalog.GEMMA_4_E4B.files.single().sha256)
+            .isEqualTo("0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0")
     }
 
-    // ── Catálogo de visão e OCR (vision-capture) ──────────────────────────────────────────────────
+    // ── Visão e voz: o que valer para qualquer entrada que entre nessas listas ─────────────────────────────────────
+    // As entradas antigas tinham pins inventados e saíram (2026-10-24). Aqui só vão regras que valem para as futuras;
+    // a conferência de pin está no `PinSanityTest` (forma) e no `scripts/verify-model-catalog.py` (API do HF).
 
     @Test
-    fun `vision catalog has fast, balanced and multimodal models, lightest first`() {
-        assertThat(ModelCatalog.VISION.map { it.id })
-            .containsExactly(
-                "ocr-fast-latin",
-                "mobilenet-v4-ocr",
-                "pp-ocrv4-multilingual",
-                "florence-2-nano",
-                "smolvlm-500m",
-            )
-            .inOrder()
+    fun `vision specs, when there are any, are vision kind with a model file`() {
+        ModelCatalog.VISION.forEach { model ->
+            assertThat(model.kind).isEqualTo(ModelKind.VISION)
+            assertThat(model.files.map { it.role }).contains(FileRole.MODEL)
+            assertThat(model.recommendedRamMb).isGreaterThan(0)
+            assertThat(model.modelName).isNotEmpty()
+        }
         assertThat(ModelCatalog.VISION.map { it.totalBytes }).isInOrder()
         assertThat(ModelCatalog.VISION.map { it.recommendedRamMb }).isInOrder()
     }
 
     @Test
-    fun `vision specs have valid kind, real sha256 and size`() {
-        ModelCatalog.VISION.forEach { model ->
-            assertThat(model.kind).isEqualTo(ModelKind.VISION)
-            val file = model.files.single()
-            assertThat(file.role).isEqualTo(FileRole.MODEL)
-            assertThat(file.sha256).matches("[0-9a-f]{64}")
-            assertThat(file.bytes).isGreaterThan(0L)
-            assertThat(model.recommendedRamMb).isGreaterThan(0)
-            assertThat(model.acceptsLanguageHint).isFalse()
-            assertThat(model.modelName).isNotEmpty()
-        }
-    }
-
-    @Test
-    fun `vision sizes and hashes match`() {
-        assertThat(ModelCatalog.OCR_FAST.totalBytes).isEqualTo(4_404_019L)
-        assertThat(ModelCatalog.OCR_FAST.files.single().sha256)
-            .isEqualTo("4a8f9c1e2b3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f")
-        assertThat(ModelCatalog.OCR_BALANCED.totalBytes).isEqualTo(26_633_830L)
-        assertThat(ModelCatalog.OCR_BALANCED.files.single().sha256)
-            .isEqualTo("b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2")
-        assertThat(ModelCatalog.VLM_MULTIMODAL.totalBytes).isEqualTo(587_202_560L)
-        assertThat(ModelCatalog.VLM_MULTIMODAL.files.single().sha256)
-            .isEqualTo("c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4")
-    }
-
-    // ── Catálogo de voz e síntese de fala (speech-synthesis) ──────────────────────────────────────
-
-    @Test
-    fun `voice catalog has fast, balanced and quality models, lightest first`() {
-        assertThat(ModelCatalog.VOICE.map { it.id })
-            .containsExactly(
-                "vits-pt-br-google-neural",
-                "piper-pt-br",
-                "kokoro-v0_19",
-                "melotts-multilingual",
-            )
-            .inOrder()
-        assertThat(ModelCatalog.VOICE.map { it.totalBytes }).isInOrder()
-        assertThat(ModelCatalog.VOICE.map { it.recommendedRamMb }).isInOrder()
-    }
-
-    @Test
-    fun `voice specs have valid kind, real sha256 and size`() {
+    fun `voice specs, when there are any, are voice kind on the TTS engine with a model file`() {
         ModelCatalog.VOICE.forEach { model ->
             assertThat(model.kind).isEqualTo(ModelKind.VOICE)
             assertThat(model.engineType).isEqualTo(EngineType.TTS)
-            val file = model.files.single()
-            assertThat(file.role).isEqualTo(FileRole.MODEL)
-            assertThat(file.sha256).matches("[0-9a-f]{64}")
-            assertThat(file.bytes).isGreaterThan(0L)
+            assertThat(model.files.map { it.role }).contains(FileRole.MODEL)
             assertThat(model.recommendedRamMb).isGreaterThan(0)
-            assertThat(model.acceptsLanguageHint).isFalse()
             assertThat(model.modelName).isNotEmpty()
         }
-    }
-
-    @Test
-    fun `voice sizes and hashes match`() {
-        assertThat(ModelCatalog.VOICE_FAST.totalBytes).isEqualTo(63_248_120L)
-        assertThat(ModelCatalog.VOICE_FAST.files.single().sha256)
-            .isEqualTo("d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5")
-        assertThat(ModelCatalog.VOICE_BALANCED.totalBytes).isEqualTo(86_507_520L)
-        assertThat(ModelCatalog.VOICE_BALANCED.files.single().sha256)
-            .isEqualTo("e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6")
-        assertThat(ModelCatalog.VOICE_QUALITY.totalBytes).isEqualTo(142_606_336L)
-        assertThat(ModelCatalog.VOICE_QUALITY.files.single().sha256)
-            .isEqualTo("f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7")
+        assertThat(ModelCatalog.VOICE.map { it.totalBytes }).isInOrder()
+        assertThat(ModelCatalog.VOICE.map { it.recommendedRamMb }).isInOrder()
     }
 
     // ── Provisionamento dinâmico e suporte à API em Rust / Hust ───────────────────────────────────

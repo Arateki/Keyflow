@@ -48,8 +48,13 @@ class DocsSectionsTest {
     fun licensesAlsoNameTheReasoningEngineAndEveryTextModel() {
         val labels = docsSections.single { it.id == "licencas" }.blocks.filterIsInstance<DocBlock.Labeled>().map { it.label }
         assertTrue("licença do LiteRT-LM ausente", "LiteRT-LM" in labels)
-        com.keyflow.data.models.ModelCatalog.TEXT.forEach { spec ->
+        val catalog = com.keyflow.data.models.ModelCatalog
+        // O que o release oferece (os não validados no aparelho só voltam à Docs quando o roteiro do A32 os promover).
+        catalog.visibleIn(catalog.TEXT_ALL, debug = false).forEach { spec ->
             assertTrue("licença de ${spec.modelName} ausente", labels.any { it.contains(spec.modelName) })
+        }
+        catalog.TEXT_ALL.filterNot { it.validatedOnDevice }.forEach { spec ->
+            assertTrue("${spec.modelName} não está no release: a Docs não pode citá-lo", labels.none { it.contains(spec.modelName) })
         }
     }
 
@@ -100,19 +105,15 @@ class DocsSectionsTest {
         assertTrue(body.indexOf(FeedbackKind.BUG.prompt) < body.indexOf("KeyFlow 0.1.0"))
     }
 
+    /**
+     * Visão e Voz estão sem entradas no catálogo desde 2026-10-24 (os pins eram inventados). Quando voltarem, cada modelo
+     * novo tem de ser atribuído na Docs — o texto vem do catálogo, sem lista paralela, como no teste dos modelos de texto.
+     */
     @Test
-    fun licensesAlsoNameVisionModels() {
+    fun licensesAlsoNameEveryVisionAndVoiceModelOfTheCatalog() {
         val labels = docsSections.single { it.id == "licencas" }.blocks.filterIsInstance<DocBlock.Labeled>().map { it.label }
-        listOf("ML Kit Text Recognition", "PP-OCR v4", "SmolVLM 500M").forEach {
-            assertTrue("licença de $it ausente", it in labels)
-        }
-    }
-
-    @Test
-    fun licensesAlsoNameVoiceModels() {
-        val labels = docsSections.single { it.id == "licencas" }.blocks.filterIsInstance<DocBlock.Labeled>().map { it.label }
-        listOf("Piper TTS", "Kokoro", "MeloTTS").forEach {
-            assertTrue("licença de $it ausente", it in labels)
+        (com.keyflow.data.models.ModelCatalog.VISION + com.keyflow.data.models.ModelCatalog.VOICE).forEach { spec ->
+            assertTrue("licença de ${spec.modelName} ausente", labels.any { it.contains(spec.modelName) })
         }
     }
 

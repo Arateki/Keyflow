@@ -31,7 +31,7 @@ pub struct Config {
     pub bind_addr: SocketAddr,
     /// Caminho do JSON de credencial da service account do Google (Play Integrity/Developer API).
     pub google_service_account_json_path: String,
-    /// Package name do app Android (`com.keyflow`) — conferido contra `requestPackageName`.
+    /// Package name do app Android (`com.arateki.keyflow`) — conferido contra `requestPackageName`.
     pub package_name: String,
     /// Relaxa `appRecognitionVerdict` != PLAY_RECOGNIZED (builds de teste/interno, design
     /// §Identidade) — nunca relaxa pacote nem device.
@@ -520,7 +520,7 @@ mod tests {
             "GOOGLE_SERVICE_ACCOUNT_JSON_PATH",
             "/secrets/google-sa.json",
         ),
-        ("PACKAGE_NAME", "com.keyflow"),
+        ("PACKAGE_NAME", "com.arateki.keyflow"),
         (
             "TRANSCRIPTION_PROVIDERS_JSON",
             r#"[{"name":"primary","url":"https://p1.example/transcribe","authHeaderName":"Authorization","authValueEnv":"TEST_PROVIDER_KEY","model":"whisper-1"}]"#,
@@ -570,7 +570,7 @@ mod tests {
             config.google_service_account_json_path,
             "/secrets/google-sa.json"
         );
-        assert_eq!(config.package_name, "com.keyflow");
+        assert_eq!(config.package_name, "com.arateki.keyflow");
         assert!(!config.integrity_relaxed);
         assert_eq!(
             config.register_rate_limit_per_minute.get(),
@@ -712,7 +712,7 @@ mod tests {
                 "DATABASE_URL",
                 "postgres://keyflow:keyflow@localhost/keyflow_api",
             ),
-            ("PACKAGE_NAME", "com.keyflow"),
+            ("PACKAGE_NAME", "com.arateki.keyflow"),
         ]))
         .unwrap_err();
 
@@ -767,7 +767,7 @@ mod tests {
                 "GOOGLE_SERVICE_ACCOUNT_JSON_PATH",
                 "/secrets/google-sa.json",
             ),
-            ("PACKAGE_NAME", "com.keyflow"),
+            ("PACKAGE_NAME", "com.arateki.keyflow"),
             ("TRANSCRIBE_ENABLED", "true"),
         ]))
         .unwrap_err();
@@ -944,7 +944,7 @@ mod tests {
                 "GOOGLE_SERVICE_ACCOUNT_JSON_PATH",
                 "/secrets/google-sa.json",
             ),
-            ("PACKAGE_NAME", "com.keyflow"),
+            ("PACKAGE_NAME", "com.arateki.keyflow"),
         ]);
 
         let config = Config::from_map(&base).unwrap();

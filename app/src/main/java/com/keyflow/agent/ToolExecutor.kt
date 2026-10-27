@@ -84,6 +84,7 @@ class ToolExecutor(
     suspend fun execute(
         call: AgentToolCall,
         origin: ToolOrigin = ToolOrigin.CHAT,
+        generation: Long = 0L,
         onPhase: suspend (ToolPhase) -> Unit = {},
     ): ToolOutcome {
         if (!admitCall()) {
@@ -104,7 +105,7 @@ class ToolExecutor(
             return refuse(ToolStatus.ERROR, "Chamada recusada: os argumentos parecem conter um segredo (chave, token ou senha). Nenhuma ferramenta aceita segredos.")
         }
 
-        val ctx = ToolContext(origin, call.id)
+        val ctx = ToolContext(origin, call.id, generation = generation)
         val changes = tool.risk != ToolRisk.READ
         var summary: String? = null
 

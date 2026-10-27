@@ -1,5 +1,6 @@
 package com.keyflow.ui.config
 
+import com.keyflow.data.models.ModelCatalog
 import com.keyflow.i18n.tr
 import com.keyflow.i18n.trKey
 import android.content.ActivityNotFoundException
@@ -153,6 +154,9 @@ fun feedbackIntent(kind: FeedbackKind, diagnostics: FeedbackDiagnostics): Intent
  * Conteúdo da aba, na ordem em que aparece (e em que o índice lista). Seção nova entra aqui e ganha
  * item no índice sozinha. Os textos de gesto repetem as descrições do tour da aba Modo onde elas se
  * sobrepõem — as frases por modo vêm literalmente de [pauseHintFor].
+ *
+ * O site (`/doc`, `/docs`) mostra estes mesmos textos, em português e em inglês: mudou algo aqui, o
+ * `DocsSiteExportTest` falha até o `website/_fonte/doc.json` ser atualizado (a mensagem diz como).
  */
 // Getter, não valor guardado: os textos saem no idioma da hora em que a Docs é aberta.
 val docsSections: List<DocSection> get() = listOf(
@@ -252,7 +256,7 @@ val docsSections: List<DocSection> get() = listOf(
             ),
             DocBlock.Labeled(
                 tr("Origem"),
-                tr("Local (modelos no aparelho como Gemma, Qwen, Llama e DeepSeek, sem internet) ou Nuvem (OpenAI e Anthropic Claude via SSO ou chave de API)."),
+                tr("Local (modelos no aparelho como Gemma e Qwen, sem internet) ou Nuvem (OpenAI e Anthropic Claude via SSO ou chave de API)."),
             ),
             DocBlock.Labeled(
                 tr("Testar"),
@@ -402,22 +406,9 @@ val docsSections: List<DocSection> get() = listOf(
             DocBlock.Labeled("Parakeet TDT 0.6B v3", tr("modelo Máxima qualidade — CC BY 4.0 (NVIDIA), convertido para ONNX int8 pelo sherpa-onnx.")),
             DocBlock.Labeled("LiteRT-LM", tr("motor dos modelos de texto da aba Raciocínio, no aparelho — Apache 2.0 (Google).")),
             DocBlock.Labeled("Qwen3 0.6B", tr("modelo de texto Leve — Apache 2.0 (Alibaba), baixado sob demanda.")),
+            *unvalidatedTextModelLicenses().toTypedArray(),
             DocBlock.Labeled("AndroidSVG", tr("desenha os SVGs das skins importadas — Apache 2.0 (Cave Rock Software).")),
-            DocBlock.Labeled("SmolLM2 1.7B", tr("modelo de linguagem leve e eficiente — Apache 2.0 (Hugging Face).")),
-            DocBlock.Labeled("Llama 3.2 1B", tr("modelo de linguagem ágil para dispositivos móveis — Llama 3.2 Community License (Meta).")),
-            DocBlock.Labeled("DeepSeek R1 Distill 1.5B", tr("modelo de raciocínio passo a passo destilado — MIT License (DeepSeek).")),
-            DocBlock.Labeled("Gemma 2 2B", tr("modelo de linguagem compacto de alto raciocínio — Google Gemma Terms / Apache 2.0.")),
             DocBlock.Labeled("Gemma 4 E2B", tr("modelo de texto Equilibrado — Apache 2.0 (Google), baixado sob demanda.")),
-            DocBlock.Labeled("Llama 3.2 3B", tr("modelo de linguagem avançado para dispositivos móveis — Llama 3.2 Community License (Meta).")),
-            DocBlock.Labeled("Phi-3.5 Mini", tr("modelo de raciocínio analítico — MIT License (Microsoft).")),
-            DocBlock.Labeled("ML Kit Text Recognition", tr("reconhecimento óptico de caracteres (OCR) no aparelho — Google.")),
-            DocBlock.Labeled("PP-OCR v4", tr("reconhecimento óptico de caracteres (OCR) multilíngue — Apache 2.0 (PaddlePaddle).")),
-            DocBlock.Labeled("MobileNetV4", tr("reconhecimento óptico ultrarrápido para imagens e capturas — Apache 2.0.")),
-            DocBlock.Labeled("Florence-2", tr("modelo visual-linguagem para documentos e OCR — MIT License (Microsoft).")),
-            DocBlock.Labeled("SmolVLM 500M", tr("modelo multimodal de visão e linguagem — Apache 2.0 (Hugging Face).")),
-            DocBlock.Labeled("Piper TTS", tr("síntese de voz rápida no aparelho — MIT (rhasspy).")),
-            DocBlock.Labeled("Kokoro", tr("modelo de síntese de voz de alta fidelidade — Apache 2.0 (hexgrad).")),
-            DocBlock.Labeled("MeloTTS", tr("síntese de voz multilíngue — MIT (MyShell).")),
             DocBlock.Labeled(tr("Dicionários do corretor"), tr("listas de palavras do teclado do Android (AOSP LatinIME) para português, inglês e espanhol — Apache 2.0.")),
             DocBlock.Labeled(tr("Space Grotesk e Space Mono"), tr("fontes — SIL Open Font License 1.1.")),
         ),
@@ -433,6 +424,43 @@ val docsSections: List<DocSection> get() = listOf(
         feedbackActions = true,
     ),
 )
+
+/**
+ * Licenças dos modelos de texto que o release ainda NÃO oferece (`validatedOnDevice = false`): citá-los como "baixados sob demanda"
+ * seria falso na loja. Vazio enquanto não forem promovidos — a Docs (e o `doc.json` do site, que segue o release) só os cita
+ * depois do roteiro manual no A32. Independe do build: debug e release exportam o mesmo texto.
+ */
+private fun unvalidatedTextModelLicenses(): List<DocBlock> = buildList {
+    if (ModelCatalog.SMOLLM2_1_7B.validatedOnDevice) {
+        add(DocBlock.Labeled("SmolLM2 1.7B", tr("modelo de texto Intermediário — Apache 2.0 (Hugging Face), baixado sob demanda.")))
+    }
+    if (ModelCatalog.GEMMA_4_E4B.validatedOnDevice) {
+        add(DocBlock.Labeled("Gemma 4 E4B", tr("modelo de texto Avançado — Apache 2.0 (Google), baixado sob demanda.")))
+    }
+    if (ModelCatalog.DEEPSEEK_R1_1_5B.validatedOnDevice) {
+        add(
+            DocBlock.Labeled(
+                "DeepSeek R1 1.5B",
+                tr("modelo de texto Raciocínio (DeepSeek-R1-Distill-Qwen-1.5B) — MIT (DeepSeek), derivado do Qwen2.5 (Apache 2.0, Alibaba), baixado sob demanda."),
+            ),
+        )
+    }
+}
+
+/** Um passo do "Como funciona" no topo da Docs. */
+data class DocStep(val number: String, val title: String, val body: String)
+
+/**
+ * Cabeçalhos e passos do topo da Docs, como dado: a aba os desenha e o site (`/doc`) os lê do mesmo JSON, gerado
+ * por `DocsSiteExportTest` a partir daqui — texto novo entra uma vez só.
+ */
+val docsHowItWorksTitle: String get() = tr("Como funciona")
+val docsSteps: List<DocStep> get() = listOf(
+    DocStep("01", tr("Fale"), tr("Toque em Gravar no teclado, ou no orbe flutuante.")),
+    DocStep("02", tr("Transcreve"), tr("O áudio vai à origem de voz escolhida e volta como texto.")),
+    DocStep("03", tr("Cola"), tr("O texto entra direto no campo ativo do app.")),
+)
+val docsIndexTitle: String get() = tr("Índice")
 
 /**
  * Aba Docs: "Como funciona" (3 passos), o índice (DOC-02) e as seções de [docsSections], terminando no
@@ -493,11 +521,9 @@ fun DocsPanel(
                 .verticalScroll(scroll)
                 .padding(top = 20.dp, bottom = 32.dp),
         ) {
-            SettingsGroup(tr("Como funciona")) {
+            SettingsGroup(docsHowItWorksTitle) {
                 Column(Modifier.padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-                    Step("01", tr("Fale"), tr("Toque em Gravar no teclado, ou no orbe flutuante."))
-                    Step("02", tr("Transcreve"), tr("O áudio vai à origem de voz escolhida e volta como texto."))
-                    Step("03", tr("Cola"), tr("O texto entra direto no campo ativo do app."))
+                    docsSteps.forEach { Step(it.number, it.title, it.body) }
                 }
             }
 
@@ -545,7 +571,7 @@ private fun Context.startFeedbackActivity(intent: Intent) {
 /** Índice (DOC-02): numerado, na ordem da aba; cada item rola até a seção e anuncia o destino. */
 @Composable
 private fun DocsIndex(sections: List<DocSection>, onSelect: (String) -> Unit) {
-    SettingsGroup(tr("Índice"), Modifier.padding(top = GROUP_GAP).testTag(DOCS_INDEX_TAG)) {
+    SettingsGroup(docsIndexTitle, Modifier.padding(top = GROUP_GAP).testTag(DOCS_INDEX_TAG)) {
         // Uma coluna só: em duas, com a navegação lateral, os títulos quebravam e as linhas desalinhavam.
         Column(Modifier.padding(vertical = 6.dp)) {
             sections.forEachIndexed { i, section ->

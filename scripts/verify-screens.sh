@@ -18,8 +18,8 @@
 # a GalleryActivity leva 3–8 s para abrir a frio no emulador de 2 núcleos; 10 s não bastaram.
 set -euo pipefail
 
-PKG="com.keyflow"
-ACT="$PKG/.ui.gallery.GalleryActivity"
+PKG="com.arateki.keyflow"
+ACT="$PKG/com.keyflow.ui.gallery.GalleryActivity"
 FILES_DIR="/sdcard/Android/data/$PKG/files"
 READY="$FILES_DIR/gallery_ready"
 ROUTES_FILE="$FILES_DIR/gallery_routes"

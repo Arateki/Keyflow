@@ -3,7 +3,7 @@
 O debug sempre usa os três IDs oficiais de teste do Google, mesmo com IDs reais configurados.
 O release (inclusive variantes derivadas de perfil de base) exige IDs próprios: não existe fallback
 para anúncios de teste. Valores ausentes, formato errado ou publisher de teste impedem a geração
-dos recursos do release. `keyflowSmokeSigning` apenas assina; não relaxa esta validação.
+dos recursos do release. O antigo `keyflowSmokeSigning` foi removido e é recusado pelo Gradle.
 
 Configure fora do git, no `$GRADLE_USER_HOME/gradle.properties` (o caminho usado pelo `kgradle`
 no servidor é `/srv/dev/keyflow/.gradle/gradle.properties`), ou em `local.properties` ignorado:

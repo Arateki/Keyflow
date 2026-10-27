@@ -1,5 +1,6 @@
 package com.keyflow.data.models
 
+import com.keyflow.BuildConfig
 import com.keyflow.i18n.trKey
 
 /** Para que serve o modelo: fala (sherpa-onnx, aba Transcrição), texto (LLM local, aba Raciocínio), visão/OCR (aba Visão) ou voz sintetizada (aba Voz). */
@@ -45,6 +46,16 @@ data class ModelSpec(
     val modelName: String = "",
     /** Default [ModelKind.SPEECH]: nenhum construtor da fala muda (RCAT-01). */
     val kind: ModelKind = ModelKind.SPEECH,
+    /**
+     * O prompt do modelo (metadado do `.litertlm`) já abre o `<think>`: a saída começa dentro do pensamento e só traz o
+     * `</think>`. O `LiteRtBackend` descarta tudo até ele (`ThoughtStripper`).
+     */
+    val promptOpensThink: Boolean = false,
+    /**
+     * Falso = ainda não provado carregando no LiteRT-LM de um aparelho real: o modelo só aparece nos builds de debug
+     * ([ModelCatalog.visibleIn]). Vira verdadeiro depois do roteiro manual no A32.
+     */
+    val validatedOnDevice: Boolean = true,
 ) {
     val totalBytes: Long get() = files.sumOf { it.bytes }
 
@@ -53,15 +64,21 @@ data class ModelSpec(
 
 /**
  * Catálogo curado embutido (CAT-02, G3/G4/G5). Pesos baixados arquivo a arquivo dos repositórios que
- * o próprio sherpa-onnx publica no HuggingFace (csukuangfj).
+ * o próprio sherpa-onnx publica no HuggingFace (csukuangfj) e dos modelos de texto do `litert-community`.
  *
  * Tamanhos e SHA256 conferidos na API do HF em 2026-09-24 (`/api/models/<repo>/tree/<commit>`: o `oid`
- * do LFS é o SHA256 do conteúdo — confirmado baixando o decoder do Parakeet). Os `tokens.txt` não
- * estão no LFS: SHA calculado baixando o arquivo. Todas as URLs responderam 206 a um pedido de faixa,
- * que é o que a retomada da fila de downloads usa (`Range`).
+ * do LFS é o SHA256 do conteúdo — confirmado baixando o decoder do Parakeet) e reconferidos em 2026-10-24 por
+ * `scripts/verify-model-catalog.py`. Os `tokens.txt` não estão no LFS: SHA calculado baixando o arquivo. Todas as
+ * URLs responderam 206 a um pedido de faixa, que é o que a retomada da fila de downloads usa (`Range`).
  *
  * As URLs apontam para o **commit** do repositório, não para `main`: se o upstream mexer num arquivo,
  * o app publicado continua baixando exatamente a versão cujo SHA conhece (mitiga o risco aceito na G5).
+ *
+ * **Só entra entrada conferida.** Em 2026-10-24 achou-se que 15 entradas (6 de texto, 5 de visão, 4 de voz) tinham
+ * repositório, commit e SHA-256 inventados — o download falhava em produção. Para isso não voltar: o `PinSanityTest`
+ * recusa pin com cara de sequência (sem rede) e o `scripts/verify-model-catalog.py` confere cada URL, tamanho e
+ * SHA-256 contra a API do HF. Entrada nova: rode o script antes de commitar e só use modelo com licença sem
+ * GPL/AGPL/LGPL e sem cláusula "não comercial", baixável sem login.
  */
 object ModelCatalog {
 
@@ -162,8 +179,16 @@ object ModelCatalog {
     // licença Gemma) ficou de fora e o leve é o Qwen3 0.6B. Tamanhos e SHA256 lidos da API do HF em 2026-09-29
     // (`/api/models/<repo>/tree/<commit>`: `lfs.oid` = SHA256, `lfs.size`); as duas URLs responderam 206 a um pedido
     // de faixa, sem token. URLs no COMMIT do repositório, como na fala.
+    // SmolLM2 1.7B e DeepSeek R1 1.5B entraram em 2026-10-25 (decisão do Yan), cada um com commit, tamanho e SHA-256 lidos
+    // da API do HF e o SHA-256 conferido baixando o arquivo inteiro; ver o STATE.md ("Catálogo com mais dois modelos de texto").
+    // Saíram em 2026-10-24 (repositório `-litert-lm` inexistente, commit e SHA inventados): Phi-3.5 Mini, Llama 3.2 1B/3B e
+    // Gemma 2 2B (e as versões antigas, inventadas, do SmolLM2 e do DeepSeek). Llama (Llama 3.2 Community License) e Gemma 2
+    // (Gemma Terms) têm restrições de uso e os repositórios reais são gated (login): voltam só por decisão do dono do produto.
     private const val GEMMA_4_REPO = "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/b3ca0d2f076785a8f4b2219ddbd2bdb99954eae1"
+    private const val GEMMA_4_E4B_REPO = "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/e6a3892a8c22cf87ff99583996149cf3cb32452b"
     private const val QWEN3_REPO = "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/a3c5d805ae362dff7f580bc25f2dfb9a5a7eaa76"
+    private const val SMOLLM2_REPO = "https://huggingface.co/litert-community/SmolLM2-1.7B-Instruct/resolve/c0ee765a9f197467ead8f22b9bf7bbeb4e6307c7"
+    private const val DEEPSEEK_R1_REPO = "https://huggingface.co/litert-community/DeepSeek-R1-Distill-Qwen-1.5B/resolve/9fd875541bb0f277e4b3cefe7d9622c4c1de2fb5"
 
     /** Qwen3 0.6B (Alibaba), INT8 dinâmico, contexto de 4096. Licença Apache 2.0. */
     val QWEN3_0_6B = ModelSpec(
@@ -183,12 +208,66 @@ object ModelCatalog {
     )
 
     /**
+     * SmolLM2 1.7B Instruct (Hugging Face), INT8 dinâmico só nos pesos (`wi8`) com ativações em FP32. Licença Apache 2.0.
+     * Treinado quase só em inglês: em português responde pior que o Qwen3 — por isso o idioma vem declarado no cartão ("Inglês").
+     */
+    val SMOLLM2_1_7B = ModelSpec(
+        id = "smollm2-1.7b-litertlm",
+        displayName = trKey("Intermediário"),
+        summary = trKey("Modelo de uso geral com 1,7 bilhão de parâmetros, treinado sobretudo em inglês; mais pesado que o Leve."),
+        languages = trKey("Inglês"),
+        engineType = EngineType.LITERT_LM,
+        acceptsLanguageHint = false,
+        // ESTIMATIVA, não medida: ~1,6 GiB de arquivo (pesos INT8) mais ativações em FP32; no emulador de 2,5 GB o
+        // `:reasoning` passou de 1,4 GB de RAM e foi morto. 3072 = arquivo + memória de trabalho com folga. A medir no A32 (RSN-T19).
+        recommendedRamMb = 3072,
+        modelName = "SmolLM2 1.7B",
+        kind = ModelKind.TEXT,
+        validatedOnDevice = false,
+        files = listOf(
+            ModelFile(
+                FileRole.MODEL, "SmolLM2-1_7B-Instruct_dynamic_wi8_afp32.litertlm", "$SMOLLM2_REPO/SmolLM2-1_7B-Instruct_dynamic_wi8_afp32.litertlm",
+                "3c3e693157e2fb92b862b572cff74b7a353f81eb232cef682bf0fcc91855f8f1", 1_730_949_280L,
+            ),
+        ),
+    )
+
+    /**
+     * DeepSeek-R1-Distill-Qwen 1.5B (DeepSeek), INT8 (`q8`), contexto de 4096 (`ekv4096`). Licença MIT; derivado do
+     * Qwen2.5-Math-1.5B (Apache 2.0). Modelo que "pensa" antes de responder: o `<think>…</think>` sai do texto (canal
+     * "thought" do [LiteRtBackend]), mas o tempo de geração conta. O card do HF mede ~2,2 GB de pico de memória na CPU.
+     */
+    val DEEPSEEK_R1_1_5B = ModelSpec(
+        id = "deepseek-r1-1.5b-litertlm",
+        displayName = trKey("Raciocínio"),
+        summary = trKey("Escreve um raciocínio passo a passo antes de responder, por isso demora mais; treinado em inglês e chinês."),
+        languages = trKey("Inglês"),
+        engineType = EngineType.LITERT_LM,
+        acceptsLanguageHint = false,
+        // ESTIMATIVA, não medida: o card do HF mede 2221 MB de pico de RSS na CPU de um S24 Ultra (contexto 4096); 4096 = esse pico
+        // mais o que o sistema e os outros apps ocupam num aparelho de 4 GB, e a guarda de RAM do app usa a metade (2048 ≈ o pico).
+        // A medir no A32 (RSN-T19).
+        recommendedRamMb = 4096,
+        modelName = "DeepSeek R1 1.5B",
+        kind = ModelKind.TEXT,
+        promptOpensThink = true,
+        validatedOnDevice = false,
+        files = listOf(
+            ModelFile(
+                FileRole.MODEL, "DeepSeek-R1-Distill-Qwen-1.5B_multi-prefill-seq_q8_ekv4096.litertlm",
+                "$DEEPSEEK_R1_REPO/DeepSeek-R1-Distill-Qwen-1.5B_multi-prefill-seq_q8_ekv4096.litertlm",
+                "69b35f01759eed765641ab4af589bbe98131fd2825662a086d9037409b8c1295", 1_833_451_520L,
+            ),
+        ),
+    )
+
+    /**
      * Gemma 4 E2B (Google), arquivo genérico (CPU/GPU) — não as variantes de NPU de fornecedor. Licença Apache 2.0.
      * O README do repositório mede ~1,4–1,7 GB de memória de CPU num S26 Ultra; o A32 é bem mais modesto.
      */
     val GEMMA_4_E2B = ModelSpec(
         id = "gemma-4-e2b-litertlm",
-        displayName = trKey("Equilibrado (Gemma 4)"),
+        displayName = trKey("Equilibrado"),
         summary = trKey("Mais capaz que o Leve; pesado — melhor em aparelhos com bastante memória."),
         languages = trKey("Multilíngue"),
         engineType = EngineType.LITERT_LM,
@@ -201,283 +280,65 @@ object ModelCatalog {
         ),
     )
 
-    private const val GEMMA_2_REPO = "https://huggingface.co/litert-community/gemma-2-2b-it-litert-lm/resolve/c1b2a3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0"
-    private const val LLAMA_REPO = "https://huggingface.co/litert-community/Llama-3.2-1B-Instruct-litert-lm/resolve/d2c3b4a5f6e7d8c9b0a1f2e3d4c5b6a7f8e9d0c1"
-    private const val LLAMA3_3B_REPO = "https://huggingface.co/litert-community/Llama-3.2-3B-Instruct-litert-lm/resolve/e3d4c5b6a7f8e9d0c1b2a3f4e5d6c7b8a9f0e1d2"
-    private const val SMOLLM2_REPO = "https://huggingface.co/litert-community/SmolLM2-1.7B-Instruct-litert-lm/resolve/f4e5d6c7b8a9f0e1d2c3b4a5f6e7d8c9b0a1f2e3"
-    private const val DEEPSEEK_REPO = "https://huggingface.co/litert-community/DeepSeek-R1-Distill-Qwen-1.5B-litert-lm/resolve/a5f6e7d8c9b0a1f2e3d4c5b6a7f8e9d0c1b2a3f4"
-    private const val PHI_REPO = "https://huggingface.co/litert-community/Phi-3.5-mini-instruct-litert-lm/resolve/b6a7f8e9d0c1b2a3f4e5d6c7b8a9f0e1d2c3b4a5"
-
-    val SMOLLM2_1_7B = ModelSpec(
-        id = "smollm2-1.7b-litertlm",
-        displayName = trKey("Ultra-rápido"),
-        summary = trKey("Compacto e ultra-eficiente da Hugging Face; consome pouca bateria e memória."),
-        languages = trKey("Multilíngue"),
-        engineType = EngineType.LITERT_LM,
-        acceptsLanguageHint = false,
-        recommendedRamMb = 1536,
-        modelName = "SmolLM2 1.7B",
-        kind = ModelKind.TEXT,
-        files = listOf(
-            ModelFile(FileRole.MODEL, "SmolLM2-1.7B-Instruct.litertlm", "$SMOLLM2_REPO/SmolLM2-1.7B-Instruct.litertlm", "777779ff2f4fd13379abe69c1c3ab5200f7338bc92471557f1d6614a6e5ab0b4", 1_048_576_000L),
-        ),
-    )
-
-    val LLAMA_3_2_1B = ModelSpec(
-        id = "llama-3.2-1b-litertlm",
-        displayName = trKey("Ágil"),
-        summary = trKey("Modelo da Meta ultra-otimizado para dispositivos móveis; rápido e com alta coerência."),
-        languages = trKey("8 idiomas"),
-        engineType = EngineType.LITERT_LM,
-        acceptsLanguageHint = false,
-        recommendedRamMb = 2048,
-        modelName = "Llama 3.2 1B",
-        kind = ModelKind.TEXT,
-        files = listOf(
-            ModelFile(FileRole.MODEL, "Llama-3.2-1B-Instruct.litertlm", "$LLAMA_REPO/Llama-3.2-1B-Instruct.litertlm", "666679ff2f4fd13379abe69c1c3ab5200f7338bc92471557f1d6614a6e5ab0b4", 1_280_000_000L),
-        ),
-    )
-
-    val DEEPSEEK_R1_1_5B = ModelSpec(
-        id = "deepseek-r1-1.5b-litertlm",
-        displayName = trKey("Raciocínio R1"),
-        summary = trKey("Especializado em cadeia de pensamento (chain-of-thought), lógica e matemática on-device."),
-        languages = trKey("Multilíngue"),
-        engineType = EngineType.LITERT_LM,
-        acceptsLanguageHint = false,
-        recommendedRamMb = 2048,
-        modelName = "DeepSeek R1 Distill 1.5B",
-        kind = ModelKind.TEXT,
-        files = listOf(
-            ModelFile(FileRole.MODEL, "DeepSeek-R1-Distill-Qwen-1.5B.litertlm", "$DEEPSEEK_REPO/DeepSeek-R1-Distill-Qwen-1.5B.litertlm", "888879ff2f4fd13379abe69c1c3ab5200f7338bc92471557f1d6614a6e5ab0b4", 1_572_864_000L),
-        ),
-    )
-
-    val GEMMA_2_2B = ModelSpec(
-        id = "gemma-2-2b-litertlm",
-        displayName = trKey("Equilibrado (Gemma 2)"),
-        summary = trKey("Modelo oficial do Google de 2.6B parâmetros; raciocínio refinado para aparelhos modernos."),
-        languages = trKey("Multilíngue"),
-        engineType = EngineType.LITERT_LM,
-        acceptsLanguageHint = false,
-        recommendedRamMb = 3072,
-        modelName = "Gemma 2 2B",
-        kind = ModelKind.TEXT,
-        files = listOf(
-            ModelFile(FileRole.MODEL, "gemma-2-2b-it.litertlm", "$GEMMA_2_REPO/gemma-2-2b-it.litertlm", "999979ff2f4fd13379abe69c1c3ab5200f7338bc92471557f1d6614a6e5ab0b4", 2_097_152_000L),
-        ),
-    )
-
-    val LLAMA_3_2_3B = ModelSpec(
-        id = "llama-3.2-3b-litertlm",
+    /**
+     * Gemma 4 E4B (Google), arquivo genérico (CPU/GPU) — não as variantes `-gpu`/`-web` nem as de NPU. Licença Apache 2.0 (a mesma do E2B;
+     * o Gemma 4 não usa os Termos do Gemma das versões 1 a 3). Entrou em 2026-10-26, por decisão do Yan, mesmo sem caber no A32: o README do
+     * repositório mede 3283 MB de pico de CPU (`ru_maxrss`, S26 Ultra, contexto de 2048) contra ~1,4–1,7 GB do E2B, e o arquivo tem 3,66 GB.
+     */
+    val GEMMA_4_E4B = ModelSpec(
+        id = "gemma-4-e4b-litertlm",
         displayName = trKey("Avançado"),
-        summary = trKey("Modelo de 3B parâmetros da Meta com alta precisão e capacidade instrucional."),
-        languages = trKey("8 idiomas"),
+        summary = trKey("Mais capaz que o Equilibrado; bem pesado — só para aparelhos com muita memória."),
+        languages = trKey("Multilíngue"),
         engineType = EngineType.LITERT_LM,
         acceptsLanguageHint = false,
-        recommendedRamMb = 4096,
-        modelName = "Llama 3.2 3B",
+        // ESTIMATIVA, não medida em aparelho nosso: o pico de CPU do README é 3283 MB (S26 Ultra) contra 1733 MB do E2B (que usa 4096), então
+        // a mesma proporção (~2,4x) dá ~7,7 GB; 8192 é o degrau seguinte. A guarda de RAM do app exige a metade (4096) livre ao carregar — acima
+        // do pico de 3283 MB, como o E2B (2048 para 1733) — e o aviso de "pesado" aparece em todo aparelho com menos de 8192 MB (o A32 e os de 6 GB).
+        // Não cabe no A32 (4 GB); a medir num aparelho de 8 GB ou mais.
+        recommendedRamMb = 8192,
+        modelName = "Gemma 4 E4B",
         kind = ModelKind.TEXT,
+        validatedOnDevice = false,
         files = listOf(
-            ModelFile(FileRole.MODEL, "Llama-3.2-3B-Instruct.litertlm", "$LLAMA3_3B_REPO/Llama-3.2-3B-Instruct.litertlm", "aaaa79ff2f4fd13379abe69c1c3ab5200f7338bc92471557f1d6614a6e5ab0b4", 3_145_728_000L),
-        ),
-    )
-
-    val PHI_3_5_MINI = ModelSpec(
-        id = "phi-3.5-mini-litertlm",
-        displayName = trKey("Máxima qualidade"),
-        summary = trKey("Modelo de 3.8B da Microsoft com capacidade analítica profunda em celulares potentes."),
-        languages = trKey("Multilíngue"),
-        engineType = EngineType.LITERT_LM,
-        acceptsLanguageHint = false,
-        recommendedRamMb = 6144,
-        modelName = "Phi-3.5 Mini",
-        kind = ModelKind.TEXT,
-        files = listOf(
-            ModelFile(FileRole.MODEL, "Phi-3.5-mini-instruct.litertlm", "$PHI_REPO/Phi-3.5-mini-instruct.litertlm", "bbbb79ff2f4fd13379abe69c1c3ab5200f7338bc92471557f1d6614a6e5ab0b4", 3_984_588_800L),
-        ),
-    )
-
-    // ── Modelos de visão e OCR (vision-capture) ────────────────────────────────────────────────────────
-    private const val MLKIT_OCR_REPO = "https://huggingface.co/csukuangfj/sherpa-onnx-ocr/resolve/6a2b8e3d0c4f1e5a8b7c9d0e2f4a6b8c0d2e4f6a"
-    private const val PP_OCR_REPO = "https://huggingface.co/csukuangfj/sherpa-onnx-paddleocr-v4/resolve/7b3c9d1e5a8b2f4c6e0d8a4f2b6c9e1a3d5f7b9c"
-    private const val SMOLVLM_REPO = "https://huggingface.co/litert-community/SmolVLM-500M-Instruct/resolve/8c4e0f2b6a9d3e1f5b7c8a0d2e4f6a8b1c3d5e7f"
-
-    val OCR_FAST = ModelSpec(
-        id = "ocr-fast-latin",
-        displayName = trKey("Rápido"),
-        summary = trKey("Reconhecimento de texto instantâneo e offline no aparelho; ideal para capturas rápidas e documentos."),
-        languages = trKey("Latin (PT, EN, ES...)"),
-        engineType = EngineType.OCR,
-        acceptsLanguageHint = false,
-        recommendedRamMb = 256,
-        modelName = "ML Kit OCR Latin",
-        kind = ModelKind.VISION,
-        files = listOf(
-            ModelFile(FileRole.MODEL, "mlkit-text-latin.bin", "$MLKIT_OCR_REPO/mlkit-text-latin.bin", "4a8f9c1e2b3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f", 4_404_019L),
-        ),
-    )
-
-    val OCR_BALANCED = ModelSpec(
-        id = "pp-ocrv4-multilingual",
-        displayName = trKey("Equilibrado"),
-        summary = trKey("Maior precisão e suporte a caracteres especiais, símbolos e múltiplos alfabetos."),
-        languages = trKey("Multilíngue"),
-        engineType = EngineType.OCR,
-        acceptsLanguageHint = false,
-        recommendedRamMb = 512,
-        modelName = "PP-OCR v4",
-        kind = ModelKind.VISION,
-        files = listOf(
-            ModelFile(FileRole.MODEL, "pp-ocrv4-multilingual.onnx", "$PP_OCR_REPO/pp-ocrv4-multilingual.onnx", "b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2", 26_633_830L),
-        ),
-    )
-
-    val VLM_MULTIMODAL = ModelSpec(
-        id = "smolvlm-500m",
-        displayName = trKey("Multimodal"),
-        summary = trKey("Compreensão visual profunda e leitura de tela complexa com modelo multimodal on-device."),
-        languages = trKey("Multilíngue"),
-        engineType = EngineType.LITERT_LM,
-        acceptsLanguageHint = false,
-        recommendedRamMb = 2048,
-        modelName = "SmolVLM 500M",
-        kind = ModelKind.VISION,
-        files = listOf(
-            ModelFile(FileRole.MODEL, "smolvlm-500m-instruct.litertlm", "$SMOLVLM_REPO/smolvlm-500m-instruct.litertlm", "c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4", 587_202_560L),
-        ),
-    )
-
-    private const val MOBILENET_OCR_REPO = "https://huggingface.co/csukuangfj/sherpa-onnx-mobilenetv4-ocr/resolve/1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b"
-    private const val FLORENCE_REPO = "https://huggingface.co/litert-community/Florence-2-nano-litert-lm/resolve/2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c"
-
-    val MOBILENET_V4_OCR = ModelSpec(
-        id = "mobilenet-v4-ocr",
-        displayName = trKey("Ultrarrápido"),
-        summary = trKey("Detecção e OCR instantâneo de texto em fotos e capturas com baixíssimo uso de CPU."),
-        languages = trKey("Multilíngue"),
-        engineType = EngineType.OCR,
-        acceptsLanguageHint = false,
-        recommendedRamMb = 256,
-        modelName = "MobileNetV4 OCR",
-        kind = ModelKind.VISION,
-        files = listOf(
-            ModelFile(FileRole.MODEL, "mobilenet-v4-ocr.onnx", "$MOBILENET_OCR_REPO/mobilenet-v4-ocr.onnx", "3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b", 18_450_000L),
-        ),
-    )
-
-    val FLORENCE_2_NANO = ModelSpec(
-        id = "florence-2-nano",
-        displayName = trKey("Multimodal Avançado"),
-        summary = trKey("Modelo visual e de linguagem da Microsoft para leitura minuciosa de documentos e tabelas."),
-        languages = trKey("Multilíngue"),
-        engineType = EngineType.LITERT_LM,
-        acceptsLanguageHint = false,
-        recommendedRamMb = 2048,
-        modelName = "Florence-2 Nano",
-        kind = ModelKind.VISION,
-        files = listOf(
-            ModelFile(FileRole.MODEL, "florence-2-nano.litertlm", "$FLORENCE_REPO/florence-2-nano.litertlm", "4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c", 230_000_000L),
-        ),
-    )
-
-    // ── Modelos de voz e síntese de fala (speech-synthesis) ──────────────────────────────────────────
-    private const val PIPER_REPO = "https://huggingface.co/csukuangfj/vits-piper-pt_BR-faber-medium/resolve/9d1e5a8b2f4c6e0d8a4f2b6c9e1a3d5f7b9c1e3a"
-    private const val KOKORO_REPO = "https://huggingface.co/hexgrad/Kokoro-82M/resolve/0e2f4a6b8c0d2e4f6a8b1c3d5e7f9a1b3c5d7e9f"
-    private const val MELOTTS_REPO = "https://huggingface.co/myshell-ai/MeloTTS-Multilingual/resolve/1f3a5c7e9b0d2f4a6c8e0b2d4f6a8c0e2b4d6f8a"
-    private const val GOOGLE_VITS_REPO = "https://huggingface.co/csukuangfj/vits-pt-br-neural/resolve/5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d"
-
-    val VOICE_FAST = ModelSpec(
-        id = "piper-pt-br",
-        displayName = trKey("Rápido"),
-        summary = trKey("Voz natural e sintetizada com baixa latência no aparelho; ideal para respostas rápidas."),
-        languages = trKey("Português (Brasil)"),
-        engineType = EngineType.TTS,
-        acceptsLanguageHint = false,
-        recommendedRamMb = 256,
-        modelName = "Piper TTS (pt_BR)",
-        kind = ModelKind.VOICE,
-        files = listOf(
-            ModelFile(FileRole.MODEL, "piper-pt-br.onnx", "$PIPER_REPO/piper-pt-br.onnx", "d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5", 63_248_120L),
-        ),
-    )
-
-    val VOICE_GOOGLE_NEURAL = ModelSpec(
-        id = "vits-pt-br-google-neural",
-        displayName = trKey("Neural pt-BR"),
-        summary = trKey("Voz neural compacta em português brasileiro com entonação expressiva e ágil."),
-        languages = trKey("Português (Brasil)"),
-        engineType = EngineType.TTS,
-        acceptsLanguageHint = false,
-        recommendedRamMb = 256,
-        modelName = "VITS Neural pt-BR",
-        kind = ModelKind.VOICE,
-        files = listOf(
-            ModelFile(FileRole.MODEL, "vits-pt-br-neural.onnx", "$GOOGLE_VITS_REPO/vits-pt-br-neural.onnx", "6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e", 52_100_000L),
-        ),
-    )
-
-    val VOICE_BALANCED = ModelSpec(
-        id = "kokoro-v0_19",
-        displayName = trKey("Equilibrado"),
-        summary = trKey("Voz de alta fidelidade e entonação natural para leitura contínua e assistente."),
-        languages = trKey("Multilíngue (PT, EN, ES...)"),
-        engineType = EngineType.TTS,
-        acceptsLanguageHint = false,
-        recommendedRamMb = 512,
-        modelName = "Kokoro 82M",
-        kind = ModelKind.VOICE,
-        files = listOf(
-            ModelFile(FileRole.MODEL, "kokoro-v0_19.onnx", "$KOKORO_REPO/kokoro-v0_19.onnx", "e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6", 86_507_520L),
-        ),
-    )
-
-    val VOICE_QUALITY = ModelSpec(
-        id = "melotts-multilingual",
-        displayName = trKey("Máxima qualidade"),
-        summary = trKey("Síntese expressiva multilíngue com controle de velocidade e sotaques."),
-        languages = trKey("Multilíngue"),
-        engineType = EngineType.TTS,
-        acceptsLanguageHint = false,
-        recommendedRamMb = 1024,
-        modelName = "MeloTTS",
-        kind = ModelKind.VOICE,
-        files = listOf(
-            ModelFile(FileRole.MODEL, "melotts-multilingual.onnx", "$MELOTTS_REPO/melotts-multilingual.onnx", "f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7", 142_606_336L),
+            ModelFile(FileRole.MODEL, "gemma-4-E4B-it.litertlm", "$GEMMA_4_E4B_REPO/gemma-4-E4B-it.litertlm", "0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0", 3_659_530_240L),
         ),
     )
 
     /** Modelos de fala, na ordem em que a aba Transcrição lista: do mais leve ao mais pesado. */
     val SPEECH: List<ModelSpec> = listOf(WHISPER_BASE, WHISPER_SMALL, PARAKEET_V3)
 
-    /** Modelos de texto (aba Raciocínio), do mais leve ao mais pesado. */
-    val TEXT: List<ModelSpec> = listOf(
+    /** Todos os modelos de texto conhecidos, do mais leve ao mais pesado, validados ou não. */
+    val TEXT_ALL: List<ModelSpec> = listOf(
         QWEN3_0_6B,
         SMOLLM2_1_7B,
-        LLAMA_3_2_1B,
         DEEPSEEK_R1_1_5B,
-        GEMMA_2_2B,
         GEMMA_4_E2B,
-        LLAMA_3_2_3B,
-        PHI_3_5_MINI,
+        GEMMA_4_E4B,
     )
 
-    /** Modelos de visão e OCR (aba Visão), do mais leve ao mais pesado. */
-    val VISION: List<ModelSpec> = listOf(
-        OCR_FAST,
-        MOBILENET_V4_OCR,
-        OCR_BALANCED,
-        FLORENCE_2_NANO,
-        VLM_MULTIMODAL,
-    )
+    /**
+     * O que o build mostra: em release só os [ModelSpec.validatedOnDevice]; em debug, todos. SmolLM2, DeepSeek e Gemma 4 E4B saem do
+     * gate depois do roteiro manual no A32 (`.specs/features/reasoning-models/tasks.md`).
+     */
+    fun visibleIn(models: List<ModelSpec>, debug: Boolean): List<ModelSpec> = models.filter { debug || it.validatedOnDevice }
 
-    /** Modelos de voz e síntese (aba Voz), do mais leve ao mais pesado. */
-    val VOICE: List<ModelSpec> = listOf(
-        VOICE_GOOGLE_NEURAL,
-        VOICE_FAST,
-        VOICE_BALANCED,
-        VOICE_QUALITY,
-    )
+    /** Modelos de texto (aba Raciocínio), do mais leve ao mais pesado, como este build os mostra. */
+    val TEXT: List<ModelSpec> = visibleIn(TEXT_ALL, BuildConfig.DEBUG)
+
+    /**
+     * Modelos de visão e OCR (aba Visão). Vazia de propósito: as cinco entradas antigas tinham repositório, commit e
+     * SHA-256 inventados (nenhum download funcionava) e saíram em 2026-10-24. A Visão está sendo refeita na branch
+     * `equipe/visao` (VC-T2a), que traz entradas novas — só com pin conferido por `scripts/verify-model-catalog.py`.
+     */
+    val VISION: List<ModelSpec> = emptyList()
+
+    /**
+     * Modelos de voz e síntese (aba Voz). Vazia de propósito: as quatro entradas antigas tinham pins inventados e
+     * saíram em 2026-10-24; as vozes do Piper (e o Kokoro) dependem do eSpeak (GPL) e o app ainda não sintetiza fala.
+     * A entrada nova vem com a feature de síntese de fala, já conferida.
+     */
+    val VOICE: List<ModelSpec> = emptyList()
 
     /** Todos, para quem só resolve por id ([byId]) — o downloader e o store não sabem de tipo. */
     val MODELS: List<ModelSpec> = SPEECH + TEXT + VISION + VOICE
