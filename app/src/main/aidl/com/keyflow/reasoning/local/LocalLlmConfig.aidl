@@ -14,4 +14,6 @@ parcelable LocalLlmConfig {
     long idleUnloadMs;
     /** Memória livre estimada para carregar, em MB — base da guarda de RAM (RRUN-04). */
     int ramEstimateMb;
+    /** Identidade da versão do arquivo (SHA-256 do catálogo): trocar o arquivo sob o mesmo [modelId] descarrega o motor residente. */
+    String version;
 }

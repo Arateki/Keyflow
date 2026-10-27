@@ -102,6 +102,26 @@ class ReasoningServiceCoreTest {
         assertThat(log.count { it == "generate:a" }).isEqualTo(3)
     }
 
+    /** Atualização do catálogo com o processo vivo: o mesmo id com outro SHA é outro arquivo, o motor residente não serve. */
+    @Test
+    fun `the same model id with another file version reloads the resident engine`() {
+        val first = FakeBackend(log, "a1")
+        val second = FakeBackend(log, "a2")
+        val queue = ArrayDeque(listOf(first, second))
+        val c = ReasoningServiceCore(
+            backendFor = { queue.removeFirst() }, fileExists = { true }, availableMb = { null }, totalMb = { null },
+            scheduler = FakeScheduler(), executor = direct,
+        )
+        run(c, model("a").copy(version = "sha-antigo"))
+        run(c, model("a").copy(version = "sha-antigo"))
+        assertThat(log.count { it == "load:a1" }).isEqualTo(1)
+
+        val rec = run(c, model("a").copy(version = "sha-novo"))
+
+        assertThat(rec.events).contains("done")
+        assertThat(log).containsAtLeast("unload:a1", "load:a2", "generate:a2").inOrder()
+    }
+
     @Test
     fun `switching model unloads the previous one before loading the next`() {
         val backends = mapOf("a" to FakeBackend(log, "a"), "b" to FakeBackend(log, "b"))

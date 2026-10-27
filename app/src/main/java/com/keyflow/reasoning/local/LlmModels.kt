@@ -29,6 +29,7 @@ object LlmModels {
             engineType = spec.engineType.name,
             idleUnloadMs = IDLE_UNLOAD_MS,
             ramEstimateMb = spec.recommendedRamMb / 2,
+            version = file.sha256,
         )
     }
 
