@@ -509,17 +509,26 @@ Fase A/B (o device é o gargalo: instrumentado serializa).
 | RTS-01..04 | T10 | | RPRV-04 | T18 |
 | AUTH-01 | T11, T13 | | AUTH-02 | T11 |
 
-## Pendência no gate da RSN-T19 (2026-10-26): SmolLM2 1.7B e DeepSeek R1 1.5B
+## Gate da RSN-T19 — modelos de texto fora do release (2026-10-26) — FECHADO em 2026-10-27
 
-- Entraram no `ModelCatalog` com pin conferido, mas **nunca carregaram no LiteRT-LM de um aparelho real** (o emulador do pool tem 2,5 GB e
-  o lmkd matou o `:reasoning`). Por isso `validatedOnDevice = false`: só aparecem nos builds de **debug** (`ModelCatalog.visibleIn`;
-  o release não os lista, teste em `ModelCatalogTest`).
-- **Saem do gate** (trocar para `validatedOnDevice = true`) depois do roteiro manual no A32, por modelo: baixar, Testar, anotar 1º trecho,
-  total e RAM, e conferir que a resposta do DeepSeek não traz o raciocínio (o `ThoughtStripper` descarta até o `</think>`; sem ele, o teste falha
-  com "só raciocínio interno"). Ajustar `recommendedRamMb` (3072 e 4096 são estimativas) com a medição.
+- SmolLM2 1.7B, DeepSeek R1 1.5B e Gemma 4 E4B entraram no `ModelCatalog` com `validatedOnDevice = false` (só no debug; `ModelCatalog.visibleIn`)
+  porque nunca tinham carregado no LiteRT-LM de um aparelho real (o emulador do pool tem 2,5 GB e o lmkd matou o `:reasoning`).
+- **Promovidos em 2026-10-27**, por decisão do Yan, depois de os cinco modelos responderem em aparelho real (pico de VmRSS do `:reasoning`,
+  pedido curto de pontuação): Qwen3 0.6B 1,66 GB (A32) e 1,7–1,9 GB (Tab S10 Lite); Gemma 4 E2B 1,72 / 2,1–2,2 / 2,2 GB (A32 / tablet / Vaio TL10);
+  DeepSeek R1 1.5B 1,73 / 1,9–2,5 GB (A32 / tablet); SmolLM2 1.7B morto pelo lmkd acima de ~1,7 GB no A32 e 3,3 GB no tablet;
+  Gemma 4 E4B 4,4–4,5 GB no Vaio TL10 (8 GB). A liberação não depende da qualidade na pontuação; cada modelo ganhará prompt próprio
+  num workflow futuro.
+- O flag e o gate seguem no código para o próximo modelo que entrar sem prova. As linhas de licença de SmolLM2, DeepSeek e Gemma 4 E4B estão
+  na aba Docs e no `doc.json` do site (o `unvalidatedTextModelLicenses()` saiu); `recommendedRamMb` foi recalibrado e a guarda de carga passou
+  a comparar com a RAM total (`RamGuard.fitsDevice`) — ver a lição de 2026-10-27 no `STATE.md`.
 
-### Gemma 4 E4B (2026-10-26)
+## Correção pós-RSN-T5/T10: conteúdo em templates LiteRT (2026-10-27)
 
-- Mesmo gate dos dois acima: `validatedOnDevice = false` (só debug) até rodar num aparelho de 8 GB ou mais — o A32 (4 GB) não comporta o
-  pico de ~3,3 GB de CPU do README. Ao promover, trocar o flag, medir o PSS e ajustar `recommendedRamMb` (8192 é estimativa); a linha de licença
-  da Docs e do `doc.json` volta sozinha (`unvalidatedTextModelLicenses()`), aí regerar o `doc.json` (`KEYFLOW_REGERAR_DOC_SITE=1`).
+Status: implementada; suíte JVM completa 1739/1739; reprodução nativa fed81d1 1/1 pelo pool no Deck.
+A seleção de conteúdo é feita pelo renderizador real e compartilhada entre sistema, usuário e aquecimento.
+Regressões complementares de montagem/cliente e fixtures são registradas na entrega qwen-template.
+RRUN-08/RTS-01: escopo desta correção verificado; não encerra a validação manual RSN-T19 [YAN].
+Encerramento ajustado pelo coordenador: entregar com unitários verdes; medição ampliada fica no Vaio.
+A primeira prova nativa com sistema passou (1/1); a ampliada não passou (crash durante inicialização
+CPU, sem stack no log). Configs 3/3; rodada configs/IPC 10 testes, 4 falhas; não declarar IPC verificado.
+Fixtures e caminho sem sistema permanecem pendentes de execução bem-sucedida; detalhes na pesquisa.
