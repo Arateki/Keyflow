@@ -21,9 +21,18 @@ O [Qwen documenta `/no_think`](https://huggingface.co/Qwen/Qwen3-0.6B#advanced-u
 que pode produzir um bloco de pensamento vazio. É um controle por prompt, sujeito ao comportamento do modelo.
 
 A revisão recente do mesmo repo, `fed81d17517e6ea64362e917ecf7e5accff12492`, tem Jinja de verdade,
-com `enable_thinking` e emissão do bloco vazio. Isso foi conferido apenas no cabeçalho por HTTP Range;
-o SHA-256 completo dessa revisão não foi recalculado e ela não substitui silenciosamente o arquivo instalado.
-O diagnóstico se refere ao pin do catálogo, não a todos os arquivos que levam o nome Qwen3 0.6B.
+com `enable_thinking` e emissão do bloco vazio. Após o ajuste de rumo do coordenador, o arquivo foi
+baixado integralmente e o SHA-256 recalculado tanto durante o download quanto lendo de novo o arquivo
+salvo. O diagnóstico anterior se refere ao pin do catálogo, não a todos os arquivos chamados Qwen3 0.6B.
+Nenhum pin do catálogo ou arquivo instalado pelo app foi alterado.
+
+- [URL exata com commit](https://huggingface.co/litert-community/Qwen3-0.6B/resolve/fed81d17517e6ea64362e917ecf7e5accff12492/Qwen3-0.6B.litertlm).
+- Arquivo preparado para o coordenador: `/tmp/qwen3-fed81d1/Qwen3-0.6B.litertlm`.
+- Tamanho efetivamente lido: **613722264 bytes**.
+- SHA-256: `c5f39b4191926786c3e6668b62af4d6eb15248dfc7a5348252a9b406f33f2108`.
+- `sha256sum -c /tmp/qwen3-fed81d1/SHA256SUMS` executado dentro da pasta: **OK**.
+- Cabeçalho do arquivo salvo idêntico ao trecho Jinja já decodificado; metadados e manifesto de verificação
+  ao lado do arquivo e copiados em `.equipe/artefatos/qwen-sem-pensar/`.
 
 ## Variantes conferidas
 
@@ -59,7 +68,7 @@ O menor Instruct-2507 encontrado é 4B, sem 0.6B/1.5B oficial correspondente.
   não há uma variante Instruct sem raciocínio homônima documentada pelo autor. Qwen2.5 Instruct 1.5B é
   uma alternativa distinta para avaliar, não uma versão do DeepSeek.
 
-## Medição bloqueada — sem alteração funcional
+## Histórico das tentativas — sem alteração funcional
 
 Comandos sempre pelo `/srv/dev/ferramentas/pool/bin/pool`, sem destino forçado e sem aparelhos físicos:
 
@@ -94,11 +103,13 @@ Os scripts, cabeçalhos, tokenizer SentencePiece extraído da seção `[32768,26
 `.equipe/artefatos/qwen-sem-pensar/`. A recontagem prevista usa o tokenizer do próprio arquivo, sem
 chamar trechos de streaming de tokens. As duas sondas temporárias foram retiradas de `androidTest` e preservadas nos artefatos;
 não entram no CI nem disparam downloads sem opt-in. A consulta de limpeza dos dados próprios
-no emulador ainda aguarda a trava e não faz parte da avaliação das candidatas.
+no emulador foi cancelada enquanto aguardava a trava; a remoção de `files/qwen-investigacao`
+não foi confirmada. Nenhuma sonda ou job de instrumentação permanece ativo.
 
-**Dúvida para o coordenador:** consultar `journalctl --user -u emulador-keyflow.service` e o log de kernel
-no host no intervalo 2026-10-27 02:10–03:10 UTC, e disponibilizar um nó de pool estável, com espaço para
-as candidatas. Depois repetir a matriz antes/depois e só então implementar uma correção. `/no_think`
-é documentado pelo Qwen, mas a eficácia neste pin ainda não foi medida nesta tarefa. Nenhum comportamento
-em produção, catálogo ou flag de validação física foi alterado; testes de unidade da eventual correção
-continuam pendentes porque ela não foi implementada.
+**Ajuste de rumo do coordenador:** a entrega desta investigação termina com as sondas fora de
+`androidTest`, cópias nos artefatos e o arquivo Qwen3 com Jinja pronto em `/tmp/qwen3-fed81d1/`.
+A etapa de medir as candidatas será feita pelo coordenador nos aparelhos reais; não executá-la no
+emulador. Nenhuma correção funcional foi aplicada sem medir o efeito. O histórico acima não comprova
+latência, eficácia de `/no_think` ou quantidade de tokens de pensamento: essas provas ficaram para a
+avaliação física. O log do serviço/kernel do host continua sendo a fonte necessária para explicar os
+reinícios, caso se retome a investigação do ambiente.

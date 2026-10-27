@@ -3116,3 +3116,10 @@ Dois motores com ferramentas ao lado do da Anthropic: `reasoning/openai/OpenAiAg
 - Limpeza de fontes concluída: `QwenMedicaoTemporariaTest.kt` e `QwenLimpezaTemporariaTest.kt`
   fora de `androidTest`, com cópias em `.equipe/artefatos/qwen-sem-pensar/`. O coordenador assumiu
   a medição das candidatas nos aparelhos reais; não executar essa etapa no emulador.
+- Ajuste final do coordenador: Qwen3 `fed81d17517e6ea64362e917ecf7e5accff12492` baixado integralmente
+  em `/tmp/qwen3-fed81d1/Qwen3-0.6B.litertlm`: 613722264 bytes, SHA-256
+  `c5f39b4191926786c3e6668b62af4d6eb15248dfc7a5348252a9b406f33f2108`, igual ao HF e à leitura
+  independente do arquivo salvo (`sha256sum -c`: OK). A URL fixa está na pesquisa. Nenhum catálogo
+  alterado; Etapa 2 de medição das candidatas assumida pelo coordenador nos aparelhos reais.
+  Consulta de limpeza dos dados próprios do emulador cancelada na fila; remoção desses dados não
+  confirmada. Fontes das sondas removidas, cópias preservadas e nenhum job deixado ativo.
