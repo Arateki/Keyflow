@@ -430,6 +430,8 @@ class SetupActivity : ComponentActivity() {
                             selectedId = settings.reasoningLocalModelId,
                             preparation = textPreparation,
                             deviceRamMb = localModels.deviceRamMb,
+                            backendPrefs = localSnapshot.backends,
+                            gpuAvailable = localSnapshot.gpuAvailable,
                         ),
                         visionModels = LocalModelsUi.compose(
                             catalog = remoteCatalog.filter { it.kind == ModelKind.VISION }

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.keyflow.core.ComputeBackend
 import com.keyflow.core.OrbShortcutAction
 import com.keyflow.core.OverlaySide
 import com.keyflow.core.FalaSource
@@ -264,6 +265,37 @@ class SettingsRepositoryTest {
         assertEquals(ReasoningSource.LOCAL, restored.reasoningSource)
         assertEquals(VisionSource.LOCAL, restored.visionSource)
         assertEquals(FalaSource.LOCAL, restored.falaSource)
+    }
+
+    /** O backend de cada modelo de texto local (CPU/GPU): chave própria, padrão CPU, escrita atômica que não toca nas Settings. */
+    @Test
+    fun theLocalBackendChoiceIsPerModelPersistedAndNeverTouchesTheSettings() = runTest {
+        val repository = newRepository()
+        repository.saveSettings(Settings(reasoningLocalModelId = "qwen3-0.6b-litertlm"))
+        assertEquals(ComputeBackend.CPU, repository.localBackendFor("qwen3-0.6b-litertlm"))
+        assertEquals(LocalBackendPrefs.EMPTY, repository.localBackendPrefsFlow().first())
+
+        repository.updateLocalBackendPrefs { it.choose("qwen3-0.6b-litertlm", ComputeBackend.GPU) }
+
+        assertEquals(ComputeBackend.GPU, repository.localBackendFor("qwen3-0.6b-litertlm"))
+        assertEquals(ComputeBackend.CPU, repository.localBackendFor("gemma-4-e2b-litertlm"))
+        assertEquals(ComputeBackend.GPU, newRepository().localBackendPrefsFlow().first().backendFor("qwen3-0.6b-litertlm")) // sobrevive a um repositório novo
+        assertEquals("qwen3-0.6b-litertlm", repository.settingsFlow().first().reasoningLocalModelId) // as Settings seguem como estavam
+    }
+
+    @Test
+    fun aFallbackWrittenByTheMainProcessBecomesTheCpuChoiceAndTheCardNotice() = runTest {
+        val repository = newRepository()
+        repository.updateLocalBackendPrefs { it.choose("qwen3-0.6b-litertlm", ComputeBackend.GPU) }
+
+        repository.updateLocalBackendPrefs { it.fellBack("qwen3-0.6b-litertlm", ComputeBackend.GPU) }
+
+        val read = repository.localBackendPrefsFlow().first()
+        assertEquals(ComputeBackend.CPU, read.backendFor("qwen3-0.6b-litertlm"))
+        assertEquals(ComputeBackend.GPU, read.fellBackFrom("qwen3-0.6b-litertlm"))
+        // Voltar ao padrão apaga a chave inteira: nada fica gravado sem uso.
+        repository.updateLocalBackendPrefs { it.forget("qwen3-0.6b-litertlm") }
+        assertEquals(LocalBackendPrefs.EMPTY, repository.localBackendPrefsFlow().first())
     }
 
     /** MGR-03 e o análogo do Raciocínio: quando um modelo instala e nenhum daquele tipo está escolhido, ele é escolhido. */

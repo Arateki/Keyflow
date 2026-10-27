@@ -1,5 +1,6 @@
 package com.keyflow.reasoning.local
 
+import com.keyflow.core.ComputeBackend
 import com.keyflow.reasoning.ReasoningRequest
 
 /** Id do modelo falso que só existe em build de debug: o teste de IPC roda sem modelo de GB (RSN-T5/T6). */
@@ -15,7 +16,15 @@ internal class EchoBackend : LlmBackend {
 
     @Volatile private var cancelled = false
 
-    override fun load(model: LlmModel) = Unit
+    /**
+     * Só a CPU carrega: o eco finge um aparelho cuja GPU recusa o modelo. É o que permite provar, no emulador e sem modelo de GB, a
+     * volta para a CPU de ponta a ponta (núcleo, AIDL, preferência gravada, aviso no card).
+     */
+    override fun load(model: LlmModel) {
+        if (model.backend != ComputeBackend.CPU) {
+            throw ReasoningFailure(ReasoningErrorKind.ENGINE, "a ${model.backend} simulada do eco não carrega o modelo")
+        }
+    }
 
     override fun generate(request: ReasoningRequest, onDelta: (String) -> Unit) {
         cancelled = false

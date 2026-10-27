@@ -1,5 +1,6 @@
 package com.keyflow.reasoning.local
 
+import com.keyflow.core.ComputeBackend
 import com.keyflow.reasoning.ReasoningRequest
 import java.util.concurrent.Executor
 
@@ -7,6 +8,12 @@ import java.util.concurrent.Executor
  * O núcleo do processo `:reasoning`, sem Android (RRUN-02/03/04/06): uma geração por vez, o modelo carrega sob demanda,
  * trocar de modelo descarrega o anterior, a guarda de RAM barra o que não cabe e um modelo ocioso é descarregado.
  * Backend, memória, relógio de ociosidade e executor entram por parâmetro — é isso que o torna testável na JVM.
+ *
+ * **Onde o modelo roda** ([LlmModel.backend]) é parte da identidade do que está carregado: pedir GPU com o modelo carregado na
+ * CPU (ou o contrário) descarrega e recarrega. Se a carga na GPU falhar, o núcleo recarrega o mesmo modelo na CPU sem perder o pedido
+ * em curso, avisa por [Listener.onBackendFallback] e lembra a falha (modelo, versão, backend) enquanto o processo vive, para os pedidos
+ * seguintes que ainda trazem a escolha antiga não repetirem uma carga de minutos que já falhou; só a seleção explícita ([preload])
+ * tenta a GPU de novo.
  *
  * O estado (`backend`, `loadedId`, `busy`…) é tocado só na thread do [executor] (que precisa ser de uma thread só);
  * [cancel] é a única entrada de outra thread.
@@ -25,11 +32,20 @@ internal class ReasoningServiceCore(
         fun onDelta(text: String)
         fun onDone()
         fun onError(kind: ReasoningErrorKind, message: String)
+
+        /** A carga em [failed] falhou ([reason] é para o log) e o modelo seguiu na CPU; vem antes dos trechos da mesma geração. */
+        fun onBackendFallback(failed: ComputeBackend, reason: String) = Unit
     }
 
     private var backend: LlmBackend? = null
     private var loadedId: String? = null
     private var loadedVersion: String = ""
+
+    /** Onde o que está carregado de fato roda — pode ser a CPU mesmo com a GPU pedida (depois de uma volta). */
+    private var loadedBackend: ComputeBackend = ComputeBackend.CPU
+
+    /** Cargas que falharam num backend que não é a CPU: `modelo|versão|backend`. Só a seleção explícita limpa a entrada. */
+    private val failedLoads = mutableSetOf<String>()
     private var busy = false
     private var idleTimer: Cancellable? = null
 
@@ -51,8 +67,10 @@ internal class ReasoningServiceCore(
             idleTimer = null
             useToken++
             try {
+                // Seleção explícita (o usuário escolheu o modelo ou o backend agora): tenta de novo o que tinha falhado.
+                failedLoads.remove(failureKey(model))
                 val fresh = !isLoaded(model)
-                val active = ensureLoaded(model, preload = true)
+                val active = ensureLoaded(model, listener, preload = true)
                 if (fresh) {
                     val started = System.nanoTime()
                     val failure = try {
@@ -102,7 +120,7 @@ internal class ReasoningServiceCore(
         idleTimer = null
         useToken++
         try {
-            val active = ensureLoaded(model)
+            val active = ensureLoaded(model, listener)
             if (cancelled) return
             running = active
             active.generate(request) { text -> if (!cancelled) listener.onDelta(text) }
@@ -121,29 +139,61 @@ internal class ReasoningServiceCore(
         }
     }
 
-    private fun ensureLoaded(model: LlmModel, preload: Boolean = false): LlmBackend {
-        backend?.let { if (isLoaded(model)) return it }
+    private fun ensureLoaded(model: LlmModel, listener: Listener, preload: Boolean = false): LlmBackend {
+        // Um pedido automático que ainda traz o backend que já falhou neste processo vai direto para a CPU (e quem pediu fica sabendo,
+        // para a preferência gravada acompanhar a CPU e a geração não contar como "GPU pronta").
+        val remembered = failureKey(model) in failedLoads
+        val wanted = if (remembered) model.copy(backend = ComputeBackend.CPU) else model
+        if (remembered) listener.onBackendFallback(model.backend, "a carga já falhou neste processo")
+        backend?.let { if (isLoaded(wanted)) return it }
         // Libera o anterior antes de medir e carregar: a troca não precisa caber junto com ele.
         unloadCurrent()
+        var target = wanted
+        var candidate = open(target, preload)
+        try {
+            load(candidate, target)
+        } catch (failure: ReasoningFailure) {
+            if (target.backend == ComputeBackend.CPU) throw failure
+            // Falha na GPU: o pedido não se perde — o mesmo modelo recarrega na CPU, sob a guarda de RAM da CPU.
+            failedLoads += failureKey(model)
+            listener.onBackendFallback(target.backend, failure.message.orEmpty())
+            target = target.copy(backend = ComputeBackend.CPU)
+            candidate = open(target, preload)
+            load(candidate, target)
+        }
+        backend = candidate
+        loadedId = target.modelId
+        loadedVersion = target.version
+        loadedBackend = target.backend
+        return candidate
+    }
+
+    /** Cria o backend do [model] e confere o que o impede de carregar: o arquivo e a RAM do backend pedido. Nada é carregado aqui. */
+    private fun open(model: LlmModel, preload: Boolean): LlmBackend {
         val candidate = backendFor(model)
         if (candidate.requiresModelFile && !fileExists(model.modelPath)) {
             throw ReasoningFailure(ReasoningErrorKind.MODEL_MISSING, "falta o arquivo do modelo ${model.modelId}")
         }
         val available = availableMb()
         val total = totalMb()
-        if (!RamGuard.enough(available, model.ramEstimateMb, total)) {
+        if (!RamGuard.enoughFor(model.backend, available, model.ramEstimateMb, total)) {
             throw ReasoningFailure(
                 ReasoningErrorKind.OOM,
                 "memória insuficiente para ${model.modelId}: $total MB de RAM total e $available MB livres, estimativa de ${model.ramEstimateMb} MB",
             )
         }
         // Pré-carga especulativa: com pouca folga não carrega (o lmkd poderia matar mais que o processo do modelo).
-        if (preload && !RamGuard.enoughForPreload(available, model.ramEstimateMb, total)) {
+        if (preload && !RamGuard.enoughForPreloadOn(model.backend, available, model.ramEstimateMb, total)) {
             throw ReasoningFailure(
                 ReasoningErrorKind.OOM,
                 "pré-carga de ${model.modelId} adiada: $available MB livres, piso de ${RamGuard.PRELOAD_FLOOR_MB} MB",
             )
         }
+        return candidate
+    }
+
+    /** Carrega; qualquer falha vira [ReasoningFailure] e deixa o [candidate] descarregado. */
+    private fun load(candidate: LlmBackend, model: LlmModel) {
         try {
             candidate.load(model)
         } catch (e: OutOfMemoryError) {
@@ -156,21 +206,21 @@ internal class ReasoningServiceCore(
             runCatching { candidate.unload() }
             throw ReasoningFailure(ReasoningErrorKind.ENGINE, "o motor recusou ${model.modelId}: ${e.message}", e)
         }
-        backend = candidate
-        loadedId = model.modelId
-        loadedVersion = model.version
-        return candidate
     }
+
+    private fun failureKey(model: LlmModel) = "${model.modelId}|${model.version}|${model.backend.name}"
 
     private fun unloadCurrent() {
         backend?.let { runCatching { it.unload() } }
         backend = null
         loadedId = null
         loadedVersion = ""
+        loadedBackend = ComputeBackend.CPU
     }
 
-    /** O que está carregado é este modelo, desta versão do arquivo (mesmo id com outro SHA não serve). */
-    private fun isLoaded(model: LlmModel): Boolean = backend != null && loadedId == model.modelId && loadedVersion == model.version
+    /** O que está carregado é este modelo, desta versão do arquivo (mesmo id com outro SHA não serve), neste backend. */
+    private fun isLoaded(model: LlmModel): Boolean =
+        backend != null && loadedId == model.modelId && loadedVersion == model.version && loadedBackend == model.backend
 
     private fun scheduleIdleUnload(model: LlmModel) {
         if (model.idleUnloadMs <= 0 || backend == null) return

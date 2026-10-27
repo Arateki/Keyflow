@@ -8,12 +8,16 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.SemanticsProperties
+import com.keyflow.core.ComputeBackend
+import com.keyflow.data.LocalBackendPrefs
 import com.keyflow.data.models.ModelPreparation
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -42,9 +46,11 @@ class ModelListTest {
 
     private class FakeActions : LocalModelActions {
         val deletes = mutableListOf<String>()
+        val backends = mutableListOf<Triple<String, ComputeBackend, Boolean>>()
         override suspend fun download(spec: ModelSpec, allowMetered: Boolean): StartResult = StartResult.Started
         override fun cancel(modelId: String) = Unit
         override fun delete(modelId: String) { deletes += modelId }
+        override fun chooseBackend(modelId: String, backend: ComputeBackend, prepare: Boolean) { backends += Triple(modelId, backend, prepare) }
     }
 
     private val base = ModelCatalog.WHISPER_BASE
@@ -58,6 +64,16 @@ class ModelListTest {
 
     private fun text(installed: Set<String>, selected: String? = null) = LocalModelsUi.compose(
         catalog = ModelCatalog.TEXT, installed = installed, active = null, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_000,
+    )
+
+    private fun textWithGpu(
+        installed: Set<String>,
+        selected: String? = null,
+        prefs: LocalBackendPrefs = LocalBackendPrefs.EMPTY,
+        gpu: Boolean = true,
+    ) = LocalModelsUi.compose(
+        catalog = ModelCatalog.TEXT, installed = installed, active = null, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_000,
+        backendPrefs = prefs, gpuAvailable = gpu,
     )
 
     @Composable
@@ -164,6 +180,101 @@ class ModelListTest {
             assertEquals(listOf(qwen.id), actions.deletes)
             assertEquals(listOf(qwen.id), deleted)
         }
+    }
+
+    // ── seletor "Roda em" (CPU · GPU) ─────────────────────────────────────────────────────────────
+
+    @Test
+    fun anInstalledTextCardOnADeviceWithAGpuOffersCpuAndGpuWithTheCpuSelected() {
+        rule.setContent { Host(textWithGpu(installed = setOf(qwen.id), selected = qwen.id), FakeActions(), ModelListTags.Raciocinio) }
+
+        rule.onNodeWithTag("raciocinio-local-model-${qwen.id}-backend-cpu").performScrollTo().assertIsSelected()
+        rule.onNodeWithTag("raciocinio-local-model-${qwen.id}-backend-gpu").performScrollTo().assertIsNotSelected()
+        rule.onNodeWithText("Roda em").assertExists()
+        rule.onNodeWithTag("raciocinio-local-model-${qwen.id}-backend-hint", useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun withoutAGpuTheSelectorIsNotShown() {
+        rule.setContent { Host(textWithGpu(installed = setOf(qwen.id), selected = qwen.id, gpu = false), FakeActions(), ModelListTags.Raciocinio) }
+
+        rule.onNodeWithTag("raciocinio-local-model-${qwen.id}-backend-cpu").assertDoesNotExist()
+        rule.onNodeWithTag("raciocinio-local-model-${qwen.id}-backend-gpu").assertDoesNotExist()
+        rule.onNodeWithText("Roda em").assertDoesNotExist()
+    }
+
+    @Test
+    fun onlyInstalledTextCardsShowTheSelector() {
+        rule.setContent {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                KeyFlowTheme(dark = false) {
+                    ModelList(textWithGpu(installed = setOf(qwen.id)), FakeActions(), {}, {}, ModelListTags.Raciocinio)
+                    ModelList(speech(installed = setOf(base.id)), FakeActions(), {}, {}, ModelListTags.Voz)
+                }
+            }
+        }
+
+        rule.onNodeWithTag("raciocinio-local-model-${qwen.id}-backend-gpu").assertExists()
+        rule.onNodeWithTag("raciocinio-local-model-${gemma.id}-backend-gpu").assertDoesNotExist()   // não baixado
+        rule.onNodeWithTag("voz-local-model-${base.id}-backend-gpu").assertDoesNotExist()           // fala nunca tem GPU
+    }
+
+    @Test
+    fun tappingGpuOnTheSelectedModelChoosesItAndAsksToPrepareIt() {
+        val actions = FakeActions()
+        rule.setContent { Host(textWithGpu(installed = setOf(qwen.id), selected = qwen.id), actions, ModelListTags.Raciocinio) }
+
+        rule.onNodeWithTag("raciocinio-local-model-${qwen.id}-backend-gpu").performScrollTo().performClick()
+
+        rule.runOnIdle { assertEquals(listOf(Triple(qwen.id, ComputeBackend.GPU, true)), actions.backends) }
+    }
+
+    /** Escolher o processador de um modelo instalado que não é o selecionado só grava: não há por que carregá-lo agora. */
+    @Test
+    fun tappingGpuOnAnInstalledModelThatIsNotSelectedDoesNotAskToPrepare() {
+        val actions = FakeActions()
+        val selectedIds = mutableListOf<String>()
+        rule.setContent {
+            Host(textWithGpu(installed = setOf(qwen.id, gemma.id), selected = qwen.id), actions, ModelListTags.Raciocinio, onSelect = { selectedIds += it })
+        }
+
+        rule.onNodeWithTag("raciocinio-local-model-${gemma.id}-backend-gpu").performScrollTo().performClick()
+
+        rule.runOnIdle {
+            assertEquals(listOf(Triple(gemma.id, ComputeBackend.GPU, false)), actions.backends)
+            assertEquals("o toque no seletor não seleciona o card", emptyList<String>(), selectedIds)
+        }
+    }
+
+    @Test
+    fun theGpuChoiceShowsSelectedAndWarnsTheFirstLoadTakesMinutes() {
+        val prefs = LocalBackendPrefs.EMPTY.choose(qwen.id, ComputeBackend.GPU)
+        rule.setContent { Host(textWithGpu(installed = setOf(qwen.id), selected = qwen.id, prefs = prefs), FakeActions(), ModelListTags.Raciocinio) }
+
+        rule.onNodeWithTag("raciocinio-local-model-${qwen.id}-backend-gpu").performScrollTo().assertIsSelected()
+        // O card instalado é um item de seleção (junta os filhos): o texto avulso só existe na árvore sem junção.
+        rule.onNodeWithTag("raciocinio-local-model-${qwen.id}-backend-hint", useUnmergedTree = true)
+            .assertTextEquals("Na GPU, a primeira carga pode levar alguns minutos.")
+    }
+
+    @Test
+    fun onceTheGpuHasLoadedTheModelTheWarningIsGone() {
+        val prefs = LocalBackendPrefs.EMPTY.choose(qwen.id, ComputeBackend.GPU).markGpuReady(qwen.id)
+        rule.setContent { Host(textWithGpu(installed = setOf(qwen.id), selected = qwen.id, prefs = prefs), FakeActions(), ModelListTags.Raciocinio) }
+
+        rule.onNodeWithTag("raciocinio-local-model-${qwen.id}-backend-gpu").performScrollTo().assertIsSelected()
+        rule.onNodeWithTag("raciocinio-local-model-${qwen.id}-backend-hint", useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun aGpuThatFellBackShowsTheNoticeWithTheCpuSelected() {
+        val prefs = LocalBackendPrefs.EMPTY.choose(qwen.id, ComputeBackend.GPU).fellBack(qwen.id, ComputeBackend.GPU)
+        rule.setContent { Host(textWithGpu(installed = setOf(qwen.id), selected = qwen.id, prefs = prefs), FakeActions(), ModelListTags.Raciocinio) }
+
+        rule.onNodeWithTag("raciocinio-local-model-${qwen.id}-backend-cpu").performScrollTo().assertIsSelected()
+        rule.onNodeWithTag("raciocinio-local-model-${qwen.id}-backend-notice", useUnmergedTree = true)
+            .assertTextEquals("A GPU não funcionou neste aparelho; usando a CPU.")
+        rule.onNodeWithTag("raciocinio-local-model-${qwen.id}-backend-hint", useUnmergedTree = true).assertDoesNotExist()
     }
 
     @Test

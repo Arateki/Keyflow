@@ -1,6 +1,7 @@
 package com.keyflow.reasoning.local
 
 import com.google.common.truth.Truth.assertThat
+import com.keyflow.core.ComputeBackend
 import com.keyflow.reasoning.ReasoningRequest
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
@@ -28,6 +29,7 @@ class ReasoningServiceCoreTest {
         override fun onDelta(text: String) { events += "delta:$text" }
         override fun onDone() { events += "done"; finished.countDown() }
         override fun onError(kind: ReasoningErrorKind, message: String) { events += "error:$kind"; finished.countDown() }
+        override fun onBackendFallback(failed: ComputeBackend, reason: String) { events += "fallback:$failed" }
         fun awaitFinish() = assertThat(finished.await(5, TimeUnit.SECONDS)).isTrue()
     }
 
@@ -396,5 +398,198 @@ class ReasoningServiceCoreTest {
         rec.awaitFinish()
         assertThat(rec.events).containsExactly("done")
         assertThat(log).containsExactly("load:a", "warm:a").inOrder()
+    }
+
+    // ── onde o modelo roda (CPU/GPU): identidade do motor, volta para a CPU e guarda de RAM ─────────────────────────────
+
+    private fun gpu(m: LlmModel) = m.copy(backend = ComputeBackend.GPU)
+
+    /** Um backend por (modelo, backend): o log mostra qual deles carregou, descarregou e gerou. */
+    private fun coreByBackend(
+        cpu: FakeBackend,
+        gpu: FakeBackend,
+        availMb: Long? = null,
+        totalMb: Long? = null,
+        sched: IdleScheduler = FakeScheduler(),
+    ) = ReasoningServiceCore(
+        backendFor = { if (it.backend == ComputeBackend.GPU) gpu else cpu },
+        fileExists = { true },
+        availableMb = { availMb },
+        totalMb = { totalMb },
+        scheduler = sched,
+        executor = direct,
+    )
+
+    @Test
+    fun `the same model on the same backend loads once`() {
+        val cpu = FakeBackend(log, "cpu"); val gpu = FakeBackend(log, "gpu")
+        val c = coreByBackend(cpu, gpu)
+        run(c, gpu(model("a"))); run(c, gpu(model("a"))); run(c, gpu(model("a")))
+        assertThat(log.count { it == "load:gpu" }).isEqualTo(1)
+        assertThat(log).doesNotContain("load:cpu")
+    }
+
+    /** Trocar de CPU para GPU no card: o motor residente na CPU não serve, descarrega e recarrega na GPU (e o contrário também). */
+    @Test
+    fun `switching the backend of the loaded model unloads it and reloads on the other one`() {
+        val cpu = FakeBackend(log, "cpu"); val gpu = FakeBackend(log, "gpu")
+        val c = coreByBackend(cpu, gpu)
+        run(c, model("a"))
+        val onGpu = run(c, gpu(model("a")))
+        run(c, model("a"))
+        assertThat(onGpu.events).containsExactly("delta:um", "delta:dois", "done").inOrder()
+        assertThat(log.filter { it.startsWith("load:") || it.startsWith("unload:") })
+            .containsExactly("load:cpu", "unload:cpu", "load:gpu", "unload:gpu", "load:cpu").inOrder()
+    }
+
+    @Test
+    fun `the backend reaches the engine in the model it is asked to load`() {
+        val seen = mutableListOf<ComputeBackend>()
+        val loading = object : LlmBackend {
+            override fun load(model: LlmModel) { seen += model.backend }
+            override fun generate(request: ReasoningRequest, onDelta: (String) -> Unit) = Unit
+            override fun cancel() = Unit
+            override fun unload() = Unit
+        }
+        val c = ReasoningServiceCore({ loading }, { true }, { null }, FakeScheduler(), direct)
+        run(c, model("a")); run(c, gpu(model("a")))
+        assertThat(seen).containsExactly(ComputeBackend.CPU, ComputeBackend.GPU).inOrder()
+    }
+
+    @Test
+    fun `a GPU load that fails falls back to the CPU in the same request, tells why and keeps the answer`() {
+        val cpu = FakeBackend(log, "cpu")
+        val gpu = FakeBackend(log, "gpu").also { it.loadThrows = IllegalStateException("OpenCL indisponível") }
+        val rec = run(coreByBackend(cpu, gpu), gpu(model("a")))
+        assertThat(rec.events).containsExactly("fallback:GPU", "delta:um", "delta:dois", "done").inOrder()
+        assertThat(log).containsAtLeast("load:gpu", "unload:gpu", "load:cpu", "generate:cpu").inOrder()
+        assertThat(log).doesNotContain("generate:gpu")
+    }
+
+    @Test
+    fun `the fallback reason carries the engine message`() {
+        val reasons = mutableListOf<String>()
+        val gpu = FakeBackend(log, "gpu").also { it.loadThrows = IllegalStateException("OpenCL indisponível") }
+        val c = coreByBackend(FakeBackend(log, "cpu"), gpu)
+        val rec = object : ReasoningServiceCore.Listener {
+            override fun onDelta(text: String) = Unit
+            override fun onDone() = Unit
+            override fun onError(kind: ReasoningErrorKind, message: String) = Unit
+            override fun onBackendFallback(failed: ComputeBackend, reason: String) { reasons += reason }
+        }
+        c.generate(gpu(model("a")), request, rec)
+        assertThat(reasons.single()).contains("OpenCL indisponível")
+    }
+
+    @Test
+    fun `an out of memory error loading on the GPU also falls back to the CPU`() {
+        val cpu = FakeBackend(log, "cpu")
+        val gpu = FakeBackend(log, "gpu").also { it.loadThrows = OutOfMemoryError("gpu") }
+        val rec = run(coreByBackend(cpu, gpu), gpu(model("a")))
+        assertThat(rec.events).containsExactly("fallback:GPU", "delta:um", "delta:dois", "done").inOrder()
+    }
+
+    @Test
+    fun `a CPU load that fails is an error, never a fallback`() {
+        val cpu = FakeBackend(log, "cpu").also { it.loadThrows = IllegalStateException("boom") }
+        val rec = run(coreByBackend(cpu, FakeBackend(log, "gpu")), model("a"))
+        assertThat(rec.events).containsExactly("error:ENGINE")
+        assertThat(log).doesNotContain("load:gpu")
+    }
+
+    @Test
+    fun `when the CPU fallback fails too the request ends with the CPU error`() {
+        val cpu = FakeBackend(log, "cpu").also { it.loadThrows = IllegalStateException("cpu falhou") }
+        val gpu = FakeBackend(log, "gpu").also { it.loadThrows = IllegalStateException("gpu falhou") }
+        val rec = run(coreByBackend(cpu, gpu), gpu(model("a")))
+        assertThat(rec.events).containsExactly("fallback:GPU", "error:ENGINE").inOrder()
+    }
+
+    /** Depois da volta, a CPU carregada serve o pedido seguinte que ainda traz a GPU: não repete uma carga de minutos que já falhou. */
+    @Test
+    fun `after a fallback the next automatic request with the old GPU choice does not retry the GPU`() {
+        val cpu = FakeBackend(log, "cpu")
+        val gpu = FakeBackend(log, "gpu").also { it.loadThrows = IllegalStateException("falhou") }
+        val c = coreByBackend(cpu, gpu)
+        run(c, gpu(model("a")))
+        log.clear()
+        val again = run(c, gpu(model("a")))
+        assertThat(again.events).containsExactly("fallback:GPU", "delta:um", "delta:dois", "done").inOrder()
+        assertThat(log).containsExactly("generate:cpu")
+    }
+
+    @Test
+    fun `an explicit selection tries the GPU again after it failed`() {
+        val cpu = FakeBackend(log, "cpu")
+        val gpu = FakeBackend(log, "gpu").also { it.loadThrows = IllegalStateException("falhou") }
+        val c = coreByBackend(cpu, gpu)
+        run(c, gpu(model("a")))
+        gpu.loadThrows = null            // o driver foi atualizado, o usuário tenta de novo no card
+        log.clear()
+        val rec = Recorder()
+        c.preload(gpu(model("a")), rec)
+        rec.awaitFinish()
+        assertThat(rec.events).containsExactly("done")
+        assertThat(log).containsAtLeast("unload:cpu", "load:gpu", "warm:gpu").inOrder()
+        assertThat(run(c, gpu(model("a"))).events).doesNotContain("fallback:GPU")
+    }
+
+    @Test
+    fun `a preload on the GPU that fails warms the CPU engine and tells the listener`() {
+        val cpu = FakeBackend(log, "cpu")
+        val gpu = FakeBackend(log, "gpu").also { it.loadThrows = IllegalStateException("falhou") }
+        val rec = Recorder()
+        coreByBackend(cpu, gpu).preload(gpu(model("a")), rec)
+        rec.awaitFinish()
+        assertThat(rec.events).containsExactly("fallback:GPU", "done").inOrder()
+        assertThat(log).containsAtLeast("load:cpu", "warm:cpu").inOrder()
+    }
+
+    /** O fallback não descarrega o que não é dele: o motor carregado é o da CPU e o próximo pedido na CPU o reaproveita. */
+    @Test
+    fun `a request on the CPU reuses the engine left by the fallback`() {
+        val cpu = FakeBackend(log, "cpu")
+        val gpu = FakeBackend(log, "gpu").also { it.loadThrows = IllegalStateException("falhou") }
+        val c = coreByBackend(cpu, gpu)
+        run(c, gpu(model("a")))
+        log.clear()
+        run(c, model("a"))
+        assertThat(log).containsExactly("generate:cpu")
+    }
+
+    // RamGuard por backend: a CPU segue a regra de sempre; a GPU não é barrada pela estimativa de CPU (o Qwen3 4B só cabe na GPU).
+
+    @Test
+    fun `a model that does not fit the device on the CPU still loads when asked for the GPU`() {
+        val cpu = FakeBackend(log, "cpu"); val gpu = FakeBackend(log, "gpu")
+        val big = model("a", ramMb = 4_096)
+        val c = coreByBackend(cpu, gpu, availMb = 500, totalMb = 3_000)
+        assertThat(run(c, big).events).containsExactly("error:OOM")
+        assertThat(log).doesNotContain("load:cpu")
+        assertThat(run(c, gpu(big)).events).containsExactly("delta:um", "delta:dois", "done").inOrder()
+        assertThat(log).contains("load:gpu")
+    }
+
+    @Test
+    fun `the CPU fallback is still held by the CPU RAM guard`() {
+        val cpu = FakeBackend(log, "cpu")
+        val gpu = FakeBackend(log, "gpu").also { it.loadThrows = IllegalStateException("falhou") }
+        val rec = run(coreByBackend(cpu, gpu, availMb = 500, totalMb = 3_000), gpu(model("a", ramMb = 4_096)))
+        assertThat(rec.events).containsExactly("fallback:GPU", "error:OOM").inOrder()
+        assertThat(log).doesNotContain("load:cpu")
+    }
+
+    @Test
+    fun `the GPU preload keeps the free RAM floor and ignores the CPU estimate`() {
+        val cpu = FakeBackend(log, "cpu"); val gpu = FakeBackend(log, "gpu")
+        val big = model("a", ramMb = 4_096)
+        val low = Recorder()
+        coreByBackend(cpu, gpu, availMb = 1_500).preload(gpu(big), low)
+        low.awaitFinish()
+        assertThat(low.events).containsExactly("error:OOM")
+        val enough = Recorder()
+        coreByBackend(cpu, gpu, availMb = 2_100).preload(gpu(big), enough)
+        enough.awaitFinish()
+        assertThat(enough.events).containsExactly("done")
     }
 }

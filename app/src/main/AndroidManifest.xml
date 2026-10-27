@@ -88,5 +88,11 @@
             android:process=":reasoning"
             android:exported="false" />
 
+        <!-- GPU do Raciocínio local (LiteRT-LM, backend OpenCL): do Android 12 em diante o app só enxerga a libOpenCL.so do fabricante
+             se a declarar aqui. required=false: aparelho sem ela instala igual e segue só na CPU. Vale no release (não é patch de teste). -->
+        <uses-native-library
+            android:name="libOpenCL.so"
+            android:required="false" />
+
     </application>
 </manifest>

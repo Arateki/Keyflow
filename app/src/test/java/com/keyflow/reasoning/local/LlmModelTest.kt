@@ -1,6 +1,7 @@
 package com.keyflow.reasoning.local
 
 import com.google.common.truth.Truth.assertThat
+import com.keyflow.core.ComputeBackend
 import org.junit.Test
 
 /** RRUN-02: o que atravessa o AIDL — o config em Kotlin puro e os códigos de erro estáveis. */
@@ -43,6 +44,33 @@ class LlmModelTest {
         val spec = com.keyflow.data.models.ModelCatalog.QWEN3_0_6B
         val built = LlmModels.from(spec, java.io.File("/models/${spec.id}"), version = "instalado-antigo")
         assertThat(built.version).isEqualTo("instalado-antigo")
+    }
+
+    @Test
+    fun `the backend crosses the AIDL parcelable and defaults to the CPU`() {
+        assertThat(model.backend).isEqualTo(ComputeBackend.CPU)
+        assertThat(model.toParcel().backend).isEqualTo("CPU")
+        val onGpu = model.copy(backend = ComputeBackend.GPU)
+        assertThat(onGpu.toParcel().backend).isEqualTo("GPU")
+        assertThat(LlmModel.fromParcel(onGpu.toParcel())).isEqualTo(onGpu)
+        assertThat(LlmModel.fromParcel(onGpu.toParcel())).isNotEqualTo(model)
+    }
+
+    @Test
+    fun `a parcel with no or an unknown backend reads as the CPU`() {
+        val parcel = model.toParcel()
+        parcel.backend = null
+        assertThat(LlmModel.fromParcel(parcel).backend).isEqualTo(ComputeBackend.CPU)
+        parcel.backend = "NPU"
+        assertThat(LlmModel.fromParcel(parcel).backend).isEqualTo(ComputeBackend.CPU)
+    }
+
+    @Test
+    fun `the model built from the catalog carries the chosen backend`() {
+        val spec = com.keyflow.data.models.ModelCatalog.QWEN3_0_6B
+        val dir = java.io.File("/models/${spec.id}")
+        assertThat(LlmModels.from(spec, dir).backend).isEqualTo(ComputeBackend.CPU)
+        assertThat(LlmModels.from(spec, dir, backend = ComputeBackend.GPU).backend).isEqualTo(ComputeBackend.GPU)
     }
 
     @Test

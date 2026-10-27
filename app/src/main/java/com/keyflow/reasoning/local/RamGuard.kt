@@ -1,5 +1,7 @@
 package com.keyflow.reasoning.local
 
+import com.keyflow.core.ComputeBackend
+
 /**
  * Guarda de RAM antes de carregar um modelo de texto (RRUN-04). A estimativa vem do catálogo (metade de `recommendedRamMb`;
  * os pesos do LiteRT-LM são mapeados em memória); sem dado do sistema não se bloqueia — o `OutOfMemoryError` do load ainda
@@ -48,4 +50,26 @@ internal object RamGuard {
     fun enoughForPreload(availableMb: Long?, estimateMb: Int, totalMb: Long? = null): Boolean =
         estimateMb <= 0 || availableMb == null ||
             (fitsDevice(totalMb, estimateMb) && availableMb >= estimateMb && availableMb >= PRELOAD_FLOOR_MB)
+
+    /**
+     * A guarda de carga de cada backend. **CPU: a regra de sempre** ([enough]). **GPU: não bloqueia pela estimativa de CPU** — a estimativa
+     * do catálogo (`recommendedRamMb / 2`) e os limites de [fitsDevice] foram medidos com o pico de VmRSS do `:reasoning` rodando na CPU
+     * (pesos mapeados em memória + KV); na GPU os pesos vão para buffers do OpenCL e o pico é outro, ainda sem medida por modelo. O caso
+     * que motivou a decisão: no Vaio TL10 (8 GB) o Qwen3 4B só rodou na GPU (a CPU morreu por memória), e a guarda de CPU o barraria
+     * antes de a GPU tentar. O que protege a GPU é o que ela já tem: o `OutOfMemoryError`/falha da carga vira volta para a CPU (que
+     * então passa pela guarda de CPU), e o lmkd que mata o processo inteiro é o risco aceito até haver medida (anotado no STATE.md).
+     */
+    fun enoughFor(backend: ComputeBackend, availableMb: Long?, estimateMb: Int, totalMb: Long? = null): Boolean = when (backend) {
+        ComputeBackend.CPU -> enough(availableMb, estimateMb, totalMb)
+        ComputeBackend.GPU -> true
+    }
+
+    /**
+     * A pré-carga na GPU só não força o Android a derrubar apps quando há RAM livre de fato: mantém o [PRELOAD_FLOOR_MB] (a RAM é a
+     * mesma, compartilhada com a GPU no celular) e dispensa só a comparação com a estimativa de CPU. Na CPU, [enoughForPreload].
+     */
+    fun enoughForPreloadOn(backend: ComputeBackend, availableMb: Long?, estimateMb: Int, totalMb: Long? = null): Boolean = when (backend) {
+        ComputeBackend.CPU -> enoughForPreload(availableMb, estimateMb, totalMb)
+        ComputeBackend.GPU -> estimateMb <= 0 || availableMb == null || availableMb >= PRELOAD_FLOOR_MB
+    }
 }

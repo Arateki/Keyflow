@@ -82,3 +82,20 @@ enum class ErrorKind {
  * (StatusChip.pulsing).
  */
 enum class ErrorNavTarget { NONE, VOZ, MIC }
+
+/**
+ * Onde um modelo de texto local roda (aba Raciocínio, seletor "Roda em" do card). [CPU] é o padrão e sempre existe;
+ * [GPU] usa o backend OpenCL do LiteRT-LM e só é oferecida quando o aparelho tem a `libOpenCL.so` (`ComputeSupport`).
+ * Nomes próprios, iguais em todos os idiomas. NPU não entra: exige biblioteca do fabricante e um `.litertlm` compilado
+ * para cada SoC, e nenhum modelo do catálogo tem essa variante.
+ */
+enum class ComputeBackend {
+    CPU,
+    GPU,
+    ;
+
+    companion object {
+        /** O backend de um nome gravado (DataStore, AIDL, manifesto); desconhecido ou vazio vale [CPU]. */
+        fun fromName(name: String?): ComputeBackend = entries.firstOrNull { it.name == name } ?: CPU
+    }
+}

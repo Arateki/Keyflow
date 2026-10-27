@@ -1,5 +1,7 @@
 package com.keyflow.reasoning.local
 
+import com.keyflow.core.ComputeBackend
+
 /**
  * O modelo de texto como o processo `:reasoning` o vê: caminho absoluto e limites já resolvidos. Igualdade e
  * [modelId] decidem se o que está carregado serve; trocar de modelo descarrega o anterior (RRUN-03).
@@ -15,6 +17,8 @@ data class LlmModel(
      * arquivos diferentes: o motor residente não serve (a atualização do catálogo troca o arquivo sob o mesmo id).
      */
     val version: String = "",
+    /** Onde o modelo roda. Faz parte da identidade do motor residente: trocar de CPU para GPU descarrega e recarrega. */
+    val backend: ComputeBackend = ComputeBackend.CPU,
 ) {
     fun toParcel(): LocalLlmConfig = LocalLlmConfig().also {
         it.modelId = modelId
@@ -23,6 +27,7 @@ data class LlmModel(
         it.idleUnloadMs = idleUnloadMs
         it.ramEstimateMb = ramEstimateMb
         it.version = version
+        it.backend = backend.name
     }
 
     companion object {
@@ -33,6 +38,7 @@ data class LlmModel(
             idleUnloadMs = config.idleUnloadMs,
             ramEstimateMb = config.ramEstimateMb,
             version = config.version.orEmpty(),
+            backend = ComputeBackend.fromName(config.backend),
         )
     }
 }

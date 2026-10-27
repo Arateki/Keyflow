@@ -31,6 +31,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.keyflow.core.ComputeBackend
 import com.keyflow.data.Settings
 import com.keyflow.data.models.ModelSpec
 import com.keyflow.data.models.StartResult
@@ -57,6 +58,11 @@ internal data class ModelListTags(
     val confirm: (String) -> String,
     val confirmYes: String,
     val confirmNo: String,
+    /** O chip de um backend no seletor "Roda em" do card; só o Raciocínio mostra o seletor, mas o padrão vale para qualquer aba. */
+    val backend: (String, ComputeBackend) -> String = { id, option -> "${model(id)}-backend-${option.name.lowercase()}" },
+    /** O aviso de "a primeira carga na GPU pode levar minutos" e o de "voltou para a CPU", sob o seletor. */
+    val backendHint: (String) -> String = { id -> "${model(id)}-backend-hint" },
+    val backendNotice: (String) -> String = { id -> "${model(id)}-backend-notice" },
 ) {
     companion object {
         /** As tags da aba Transcrição — os testes existentes dependem delas, não mudam. */
@@ -135,6 +141,7 @@ internal fun ModelList(
             pending = pending?.takeIf { it.spec.id == item.spec.id },
             notice = notices[item.spec.id],
             onSelect = { onSelect(item.spec.id) },
+            onBackend = { actions.chooseBackend(item.spec.id, it, prepare = item.selected) },
             onDownload = { download(item.spec, allowMetered = false) },
             onCancel = { actions.cancel(item.spec.id) },
             onDelete = { pending = Pending.Delete(item.spec) },
@@ -162,6 +169,7 @@ private fun ModelCard(
     pending: Pending?,
     notice: String?,
     onSelect: () -> Unit,
+    onBackend: (ComputeBackend) -> Unit,
     onDownload: () -> Unit,
     onCancel: () -> Unit,
     onDelete: () -> Unit,
@@ -232,6 +240,9 @@ private fun ModelCard(
                 fontSize = 10.5.sp,
                 modifier = Modifier.padding(top = 6.dp).testTag("${tags.model(spec.id)}-thinking"),
             )
+        }
+        if (item.showsBackendChooser) {
+            BackendChooser(item, tags, onBackend)
         }
         if (item.outdated) {
             Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -321,6 +332,66 @@ private fun ModelCard(
                 onDismiss = onDismiss,
             )
         }
+    }
+}
+
+/**
+ * O seletor "Roda em  [CPU | GPU]" do card do modelo de texto local: pequeno e na cor do resto do card, só com os backends que o
+ * aparelho oferece (o chamador só o desenha com mais de um). Escolher a GPU pela primeira vez avisa que a primeira carga pode levar
+ * minutos (compila os programas da GPU; as seguintes usam o cache); se a carga na GPU falhou e o app voltou para a CPU, o card diz.
+ */
+@Composable
+private fun BackendChooser(item: LocalModelItem, tags: ModelListTags, onBackend: (ComputeBackend) -> Unit) {
+    val palette = LocalKeyFlowPalette.current
+    val id = item.spec.id
+    Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            tr("Roda em"),
+            color = palette.muted,
+            fontFamily = SpaceGrotesk,
+            fontWeight = FontWeight.Light,
+            fontSize = 10.5.sp,
+            modifier = Modifier.weight(1f),
+        )
+        Row(
+            Modifier.clip(RoundedCornerShape(10.dp)).background(palette.panel).padding(2.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            item.backendOptions.forEach { option ->
+                val active = option == item.backend
+                Text(
+                    option.name,
+                    color = if (active) palette.fg else palette.muted,
+                    fontFamily = SpaceGrotesk,
+                    fontWeight = if (active) FontWeight.Medium else FontWeight.Normal,
+                    fontSize = 11.sp,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .then(if (active) Modifier.background(raisedFill(palette)).border(1.dp, palette.line, RoundedCornerShape(8.dp)) else Modifier)
+                        .selectable(selected = active, onClick = { onBackend(option) }, role = Role.RadioButton)
+                        .padding(horizontal = 14.dp, vertical = 5.dp)
+                        .testTag(tags.backend(id, option)),
+                )
+            }
+        }
+    }
+    if (item.gpuFirstLoad && item.backendFellBackFrom == null) {
+        Text(
+            tr("Na GPU, a primeira carga pode levar alguns minutos."),
+            color = palette.muted,
+            fontFamily = SpaceGrotesk,
+            fontSize = 10.5.sp,
+            modifier = Modifier.padding(top = 6.dp).testTag(tags.backendHint(id)),
+        )
+    }
+    if (item.backendFellBackFrom != null) {
+        Text(
+            tr("A GPU não funcionou neste aparelho; usando a CPU."),
+            color = palette.terracotta,
+            fontFamily = SpaceGrotesk,
+            fontSize = 10.5.sp,
+            modifier = Modifier.padding(top = 6.dp).testTag(tags.backendNotice(id)),
+        )
     }
 }
 
