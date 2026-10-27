@@ -185,6 +185,7 @@ object ModelCatalog {
     // Gemma 2 2B (e as versões antigas, inventadas, do SmolLM2 e do DeepSeek). Llama (Llama 3.2 Community License) e Gemma 2
     // (Gemma Terms) têm restrições de uso e os repositórios reais são gated (login): voltam só por decisão do dono do produto.
     private const val GEMMA_4_REPO = "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/b3ca0d2f076785a8f4b2219ddbd2bdb99954eae1"
+    private const val GEMMA_4_E4B_REPO = "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/e6a3892a8c22cf87ff99583996149cf3cb32452b"
     private const val QWEN3_REPO = "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/a3c5d805ae362dff7f580bc25f2dfb9a5a7eaa76"
     private const val SMOLLM2_REPO = "https://huggingface.co/litert-community/SmolLM2-1.7B-Instruct/resolve/c0ee765a9f197467ead8f22b9bf7bbeb4e6307c7"
     private const val DEEPSEEK_R1_REPO = "https://huggingface.co/litert-community/DeepSeek-R1-Distill-Qwen-1.5B/resolve/9fd875541bb0f277e4b3cefe7d9622c4c1de2fb5"
@@ -279,6 +280,31 @@ object ModelCatalog {
         ),
     )
 
+    /**
+     * Gemma 4 E4B (Google), arquivo genérico (CPU/GPU) — não as variantes `-gpu`/`-web` nem as de NPU. Licença Apache 2.0 (a mesma do E2B;
+     * o Gemma 4 não usa os Termos do Gemma das versões 1 a 3). Entrou em 2026-10-26, por decisão do Yan, mesmo sem caber no A32: o README do
+     * repositório mede 3283 MB de pico de CPU (`ru_maxrss`, S26 Ultra, contexto de 2048) contra ~1,4–1,7 GB do E2B, e o arquivo tem 3,66 GB.
+     */
+    val GEMMA_4_E4B = ModelSpec(
+        id = "gemma-4-e4b-litertlm",
+        displayName = trKey("Avançado"),
+        summary = trKey("Mais capaz que o Equilibrado; bem pesado — só para aparelhos com muita memória."),
+        languages = trKey("Multilíngue"),
+        engineType = EngineType.LITERT_LM,
+        acceptsLanguageHint = false,
+        // ESTIMATIVA, não medida em aparelho nosso: o pico de CPU do README é 3283 MB (S26 Ultra) contra 1733 MB do E2B (que usa 4096), então
+        // a mesma proporção (~2,4x) dá ~7,7 GB; 8192 é o degrau seguinte. A guarda de RAM do app exige a metade (4096) livre ao carregar — acima
+        // do pico de 3283 MB, como o E2B (2048 para 1733) — e o aviso de "pesado" aparece em todo aparelho com menos de 8192 MB (o A32 e os de 6 GB).
+        // Não cabe no A32 (4 GB); a medir num aparelho de 8 GB ou mais.
+        recommendedRamMb = 8192,
+        modelName = "Gemma 4 E4B",
+        kind = ModelKind.TEXT,
+        validatedOnDevice = false,
+        files = listOf(
+            ModelFile(FileRole.MODEL, "gemma-4-E4B-it.litertlm", "$GEMMA_4_E4B_REPO/gemma-4-E4B-it.litertlm", "0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0", 3_659_530_240L),
+        ),
+    )
+
     /** Modelos de fala, na ordem em que a aba Transcrição lista: do mais leve ao mais pesado. */
     val SPEECH: List<ModelSpec> = listOf(WHISPER_BASE, WHISPER_SMALL, PARAKEET_V3)
 
@@ -288,10 +314,11 @@ object ModelCatalog {
         SMOLLM2_1_7B,
         DEEPSEEK_R1_1_5B,
         GEMMA_4_E2B,
+        GEMMA_4_E4B,
     )
 
     /**
-     * O que o build mostra: em release só os [ModelSpec.validatedOnDevice]; em debug, todos. SmolLM2 e DeepSeek saem do
+     * O que o build mostra: em release só os [ModelSpec.validatedOnDevice]; em debug, todos. SmolLM2, DeepSeek e Gemma 4 E4B saem do
      * gate depois do roteiro manual no A32 (`.specs/features/reasoning-models/tasks.md`).
      */
     fun visibleIn(models: List<ModelSpec>, debug: Boolean): List<ModelSpec> = models.filter { debug || it.validatedOnDevice }

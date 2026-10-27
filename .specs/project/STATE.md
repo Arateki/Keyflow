@@ -3032,6 +3032,24 @@ Dois motores com ferramentas ao lado do da Anthropic: `reasoning/openai/OpenAiAg
 - Prova (pool, servidor): a classe passou 3 vezes seguidas (5m29s, 6m11s, 5m40s) e `OrbMotionArtifactTest` + `PartialOverlayServiceTest`
   na mesma chamada passou (4 testes, 6m47s). Em aberto: ~2 s por quadro de screenshot no swangle; a classe segue lenta (~5 min).
 
+## 2026-10-26 — Gemma 4 E4B no catálogo de texto (equipe/gemma-e4b)
+
+- Entrou `Gemma 4 E4B` ("Avançado", Apache-2.0, `modelName` "Gemma 4 E4B") com `validatedOnDevice = false` (só debug, como SmolLM2/DeepSeek):
+  nunca carregou em aparelho nosso e não cabe no A32. Repositório `litert-community/gemma-4-E4B-it-litert-lm`, `gated: false`, `license: apache-2.0`
+  (a mesma do E2B e do original `google/gemma-4-E4B-it`; o Gemma 4 não usa os Termos do Gemma, que valem só para o Gemma 1 a 3 e o 3n).
+  Commit `e6a3892a…`, arquivo `gemma-4-E4B-it.litertlm` (o genérico CPU/GPU; os `-gpu`/`-web` são variantes), 3.659.530.240 B,
+  SHA-256 `0b2a8980…d52e0` (`lfs.oid` da API, conferido baixando o arquivo inteiro), faixa 206.
+- `recommendedRamMb = 8192` (estimativa declarada): o README mede 3283 MB de pico de CPU (`ru_maxrss`, S26 Ultra, contexto 2048) contra 1733 MB do E2B
+  (que usa 4096); a mesma proporção dá ~7,7 GB, e 8192 é o degrau seguinte. A guarda de RAM usa a metade (4096 livres), acima do pico, como no E2B (2048
+  para 1733). O aviso de "pesado" aparece em todo aparelho com menos de 8192 MB visíveis. Na GPU o pico cai para ~710 MB, mas o app roda na CPU.
+  Atenção: o dado "~2,5 GB no celular" não está no README do E4B; o que está é 3283 MB (CPU) / 710 MB (GPU), e 2800 MB com decodificação especulativa.
+- Docs: a linha de licença só aparece quando o flag for promovido (`unvalidatedTextModelLicenses()`); `app/licenses/Apache-2.0_gemma-4-e4b.txt` e o
+  README de lá já estão prontos. O teste `DocsSectionsTest` garante que nenhum modelo não validado vira texto da Docs.
+- Lição: o `LocalModelsUiTest` afirmava "ninguém é pesado com 8000 MB"; com um modelo de 8192 isso deixou de valer (um aparelho de 8 GB mostra ~7,4 GB).
+- Outros modelos do Google para celular no HF (só listados, nenhum adicionado): Gemma 4 E2B (já no catálogo), 12B (6,9 GB, Apache-2.0), 26B-A4B (15,8 GB),
+  EmbeddingGemma-2 (165 a 485 MB, Apache-2.0, repositórios `litert-community/embeddinggemma-2-*-litert-lm`); Gemma 3 1B (584 MB), Gemma 3 270M (304 MB),
+  FunctionGemma 270M e EmbeddingGemma-300M ficam sob os Termos do Gemma e são gated (login); Gemma 3n E2B/E4B (3,66 e 4,92 GB) são `google/…-litert-lm`, gated manual.
+
 ## Aquecimento de modelos locais — main, fora da v1 (2026-10-26)
 
 - O custo da primeira inferência do Parakeet pode ser antecipado na pré-carga existente: 1 s de silêncio,
