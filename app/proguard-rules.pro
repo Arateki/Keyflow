@@ -21,6 +21,11 @@
 # noutra classe) e o Raciocínio local morreria com NoSuchMethodError. O pacote todo (~50 classes, custo desprezível).
 -keep class com.google.ai.edge.litertlm.** { *; }
 
+# ONNX Runtime Java (AAR sem regras; só o classes.jar entra, ver prepareOrtJava no app/build.gradle.kts): o libonnxruntime4j_jni.so
+# faz FindClass/GetFieldID/GetMethodID por nome (OnnxTensor, OrtSession, OrtException, SessionOptions...) e devolve objetos
+# construídos por JNI. Renomeado ou podado, o OCR local morre com NoSuchFieldError/NoSuchMethodError no :vision.
+-keep class ai.onnxruntime.** { *; }
+
 # Settings.toString() identifica segredos pelo nome do campo, e não pelo valor.
 -keepclassmembernames class com.keyflow.data.Settings { <fields>; }
 
@@ -32,9 +37,10 @@
     public <init>();
 }
 
-# AIDL e Parcelable para IPC entre o processo principal e os serviços :inference e :reasoning.
+# AIDL e Parcelable para IPC entre o processo principal e os serviços :inference, :reasoning e :vision.
 -keep class com.keyflow.transcription.local.**$Stub { *; }
 -keep class com.keyflow.reasoning.local.**$Stub { *; }
+-keep class com.keyflow.vision.service.**$Stub { *; }
 -keep class * implements android.os.Parcelable {
     public static final android.os.Parcelable$Creator *;
 }
