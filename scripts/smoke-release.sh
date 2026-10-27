@@ -73,7 +73,7 @@ with zipfile.ZipFile(sys.argv[1], "a") as apk:
     apk.write(sys.argv[2], "classes.dex")
 INPUT_DEX
     "$build_tools/zipalign" -f 4 "$dump_build/input-unsigned.apk" "$dump_build/input-aligned.apk"
-    "$apksigner" sign --ks "${KEYFLOW_SMOKE_DEBUG_KEYSTORE:-$HOME/.config/.android/debug.keystore}" \
+    "$apksigner" sign --ks "${KEYFLOW_SMOKE_DEBUG_KEYSTORE:-$(dirname "$0")/../app/debug.keystore}" \
         --ks-key-alias androiddebugkey --ks-pass pass:android --key-pass pass:android \
         --out "$evidence/smoke-input.apk" "$dump_build/input-aligned.apk"
     rm -rf "$dump_build"
