@@ -87,6 +87,7 @@ class ConfigScreenTest {
         var agentEnabled = true
         var interstitialPolicy: InterstitialPolicy? = null
         var interstitialPolicyChanges = 0
+        var reasoningAuth: AuthActions = AuthActions.None
 
         @Composable
         fun Content() {
@@ -123,6 +124,7 @@ class ConfigScreenTest {
                     showUpdateWarning = showUpdateWarning,
                     monetizationDisabled = monetizationDisabled,
                     agentEnabled = agentEnabled,
+                    reasoningAuth = reasoningAuth,
                     interstitialPolicy = interstitialPolicy,
                     onInterstitialPolicyChanged = { interstitialPolicyChanges++ },
                     modifier = Modifier.fillMaxSize(),
@@ -261,7 +263,6 @@ class ConfigScreenTest {
         rule.setContent { h.Content() }
 
         val tabs = listOf(
-            ConfigTab.VISAO to "Visão",
             ConfigTab.FALA to "Voz",
             ConfigTab.FLUXOS to "Fluxos",
             ConfigTab.COMPUTADOR to "Computador",
@@ -314,6 +315,40 @@ class ConfigScreenTest {
 
         rule.onNodeWithTag(HEADER_TAB_HELP_TAG).performClick()
         rule.onNodeWithTag(TAB_HELP_TAG).assertTextContains("Conecta um modelo de linguagem", substring = true)
+    }
+
+    /** CFG-V01: a Visão deixou de ser o cartão "Em breve": mostra o painel, sem gating por modo (como a Transcrição e o Raciocínio). */
+    @Test
+    fun visionTabShowsItsPanelInsteadOfComingSoon() {
+        val h = Harness() // nenhum modo ligado: a Visão abre mesmo assim, para baixar o modelo antes de ligar a orbe
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(tabTag(ConfigTab.VISAO)).performClick()
+        rule.onNodeWithTag(panelTag(ConfigTab.VISAO)).assertIsDisplayed()
+        rule.onNodeWithTag(HEADER_TAB_TITLE_TAG).assertTextEquals("Visão")
+        rule.onAllNodesWithTag(COMING_SOON_PANEL_TAG).assertCountEquals(0)
+        rule.onNodeWithTag(visionSourceTag(com.keyflow.core.VisionSource.LOCAL)).assertIsDisplayed()
+        rule.onNodeWithTag(VISAO_TEST_BUTTON_TAG).performScrollTo().assertIsDisplayed()
+    }
+
+    /** PRV-01: o provedor conectado no Raciocínio aparece conectado na Visão — uma conexão só, entregue às duas abas. */
+    @Test
+    fun aProviderConnectedForReasoningShowsConnectedInTheVisionTab() {
+        val h = Harness().also {
+            it.settings = Settings(
+                reasoningSource = com.keyflow.core.ReasoningSource.OPENAI, visionSource = com.keyflow.core.VisionSource.OPENAI,
+            )
+            it.reasoningAuth = object : AuthActions by AuthActions.None {
+                override fun apiKeyFlow() = kotlinx.coroutines.flow.flowOf<String?>("sk-••3b")
+            }
+        }
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(tabTag(ConfigTab.RACIOCINIO)).performClick()
+        rule.onNodeWithTag(OPENAI_STATUS_TAG).performScrollTo().assertTextEquals("Chave de API ativa")
+
+        rule.onNodeWithTag(tabTag(ConfigTab.VISAO)).performClick()
+        rule.onNodeWithTag("visao-openai-status").performScrollTo().assertTextEquals("Chave de API ativa")
     }
 
     @Test

@@ -99,8 +99,9 @@ class SettingsShortcutTest {
         assertThat(s.resolveShortcut(4)).isEqualTo(OrbShortcutAction.NONE)
     }
 
+    /** A Visão não traduz (decisão do Yan, 2026-10-27): o campo do idioma de destino saiu das Settings. */
     @Test
-    fun `the translation target defaults to Portuguese`() {
-        assertThat(Settings().visionTranslateTarget).isEqualTo("pt")
+    fun `settings carry no translation target for vision`() {
+        assertThat(Settings::class.java.declaredFields.map { it.name }.filter { it.contains("ranslat") }).isEmpty()
     }
 }

@@ -53,13 +53,14 @@ data class Settings(
     val reasoningCustomHeaderName: String = "Authorization",
     val reasoningCustomHeaderValue: String = "",
     val reasoningCustomModel: String = "",
-    // Visão (vision-capture): a origem, o modelo local escolhido, destino da tradução e configurações em nuvem/custom.
+    // Visão (vision-capture): a origem, o modelo local escolhido e, por provedor, o modelo de nuvem. Vazio no modelo de um provedor = ainda
+    // não escolhido: vale o padrão da lista curada de modelos com visão (`VisionModelCatalog`), que também substitui um modelo guardado que
+    // deixou de ter visão (PRV-02).
     val visionSource: VisionSource = VisionSource.LOCAL,
     val visionLocalModelId: String? = null,
-    val visionTranslateTarget: String = "pt",
-    val visionOpenAiModel: String = "gpt-4o",
-    val visionGoogleModel: String = "gemini-2.0-flash",
-    val visionAnthropicModel: String = "claude-3-5-sonnet-latest",
+    val visionOpenAiModel: String = "",
+    val visionGoogleModel: String = "",
+    val visionAnthropicModel: String = "",
     val visionCustomEndpoint: String = "",
     val visionCustomHeaderName: String = "Authorization",
     val visionCustomHeaderValue: String = "",
@@ -190,6 +191,15 @@ data class Settings(
         reasoningSource = if (reasoningSource == ReasoningSource.CREDITS) ReasoningSource.LOCAL else reasoningSource,
         visionSource = if (visionSource == VisionSource.CREDITS) VisionSource.LOCAL else visionSource,
         falaSource = if (falaSource == FalaSource.CREDITS) FalaSource.LOCAL else falaSource,
+    )
+
+    /**
+     * Apagar o arquivo de [id] tira o modelo de quem o escolhia: a Visão e o Raciocínio compartilham os Gemma 4 (uma entrada, uma cópia em disco),
+     * então os dois campos esquecem a escolha — senão a outra aba ficaria apontando para um modelo que já não existe.
+     */
+    fun withoutLocalModel(id: String): Settings = copy(
+        visionLocalModelId = visionLocalModelId.takeUnless { it == id },
+        reasoningLocalModelId = reasoningLocalModelId.takeUnless { it == id },
     )
 
     /**

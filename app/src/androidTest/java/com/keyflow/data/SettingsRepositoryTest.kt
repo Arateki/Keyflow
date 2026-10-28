@@ -168,9 +168,9 @@ class SettingsRepositoryTest {
         assertEquals("Bearer sk-openai", repository.flow().first().authHeaderValue)
     }
 
-    /** VC-T1 (MODE-01): o atalho da Visão e o idioma de destino da tradução sobrevivem ao disco; valor desconhecido volta ao padrão. */
+    /** VC-T1 (MODE-01): o atalho da Visão sobrevive ao disco; valor desconhecido volta ao padrão. */
     @Test
-    fun visionShortcutAndTranslateTargetPersist() = runTest {
+    fun visionShortcutPersists() = runTest {
         val repository = newRepository()
 
         repository.saveSettings(
@@ -178,7 +178,6 @@ class SettingsRepositoryTest {
                 shortcut1Tap = OrbShortcutAction.VISION_MODE,
                 shortcut2Tap = OrbShortcutAction.NONE,
                 shortcut3Tap = OrbShortcutAction.VISION_MODE,
-                visionTranslateTarget = "en",
             ),
         )
 
@@ -186,7 +185,37 @@ class SettingsRepositoryTest {
         assertEquals(OrbShortcutAction.VISION_MODE, restored.shortcut1Tap)
         assertEquals(OrbShortcutAction.NONE, restored.shortcut2Tap)
         assertEquals(OrbShortcutAction.VISION_MODE, restored.shortcut3Tap)
-        assertEquals("en", restored.visionTranslateTarget)
+    }
+
+    /** VC-T11/T17: a origem, o modelo local, o modelo de cada provedor e o Custom da Visão sobrevivem ao disco; modelo de provedor nunca escolhido volta vazio. */
+    @Test
+    fun visionSourceModelsAndCustomFieldsPersist() = runTest {
+        val repository = newRepository()
+        val fresh = repository.settingsFlow().first()
+        assertEquals("", fresh.visionOpenAiModel)
+        assertEquals("", fresh.visionAnthropicModel)
+        assertEquals("", fresh.visionGoogleModel)
+
+        repository.saveSettings(
+            Settings(
+                visionSource = VisionSource.ANTHROPIC,
+                visionLocalModelId = "gemma-4-e2b-litertlm",
+                visionOpenAiModel = "gpt-6-luna",
+                visionAnthropicModel = "claude-opus-5-5",
+                visionGoogleModel = "gemini-3.8-flash",
+                visionCustomEndpoint = "https://self.host/v1/chat/completions",
+                visionCustomModel = "llama-3.2-vision",
+            ),
+        )
+
+        val restored = repository.settingsFlow().first()
+        assertEquals(VisionSource.ANTHROPIC, restored.visionSource)
+        assertEquals("gemma-4-e2b-litertlm", restored.visionLocalModelId)
+        assertEquals("gpt-6-luna", restored.visionOpenAiModel)
+        assertEquals("claude-opus-5-5", restored.visionAnthropicModel)
+        assertEquals("gemini-3.8-flash", restored.visionGoogleModel)
+        assertEquals("https://self.host/v1/chat/completions", restored.visionCustomEndpoint)
+        assertEquals("llama-3.2-vision", restored.visionCustomModel)
     }
 
     @Test

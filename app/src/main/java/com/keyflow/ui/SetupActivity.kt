@@ -51,6 +51,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Job
+import com.keyflow.data.models.EngineType
 import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.ModelKind
 import com.keyflow.data.models.ModelStore
@@ -89,6 +90,7 @@ import com.keyflow.data.monetization.StorePurchaseState
 import com.keyflow.data.monetization.RemoteConfigRepository
 import com.keyflow.data.monetization.RemoteConfigSnapshot
 import com.keyflow.ui.config.UnlockPurchaseState
+import com.keyflow.ui.config.VisionOcrTester
 import com.android.billingclient.api.BillingClient
 import com.keyflow.ads.AdsController
 import com.keyflow.ads.DataStoreInterstitialPolicyStore
@@ -137,6 +139,9 @@ class SetupActivity : ComponentActivity() {
 
     // Modelos de voz locais (native-voice-models, NM-T10).
     private val localModels by lazy { LocalModelsController(this) }
+
+    /** O Testar da aba Visão: lê uma imagem de exemplo com o OCR local pelo `:vision` de verdade. */
+    private val ocrTester by lazy { VisionOcrTester(applicationContext) }
 
     // Autenticação dos provedores de nuvem (módulo `auth/`): cofre próprio, registro, controlador da tela e quem entrega os
     // cabeçalhos ao motor. A UI só conhece o registro e o `AuthController` — nada de provedor concreto.
@@ -351,6 +356,7 @@ class SetupActivity : ComponentActivity() {
                     val remoteCatalog = remoteSnapshot.models
                     val speechPreparation by LocalTranscriber.modelPreparation.state.collectAsStateOnMain()
                     val textPreparation by LocalReasoningPreloader.preparation.state.collectAsStateOnMain()
+                    val reasoningLocalSupported = LocalLlmSupport.isSupported(android.os.Build.SUPPORTED_ABIS)
                     ConfigScreen(
                         settings = settings,
                         permissions = permissions,
@@ -434,8 +440,9 @@ class SetupActivity : ComponentActivity() {
                             gpuAvailable = localSnapshot.gpuAvailable,
                         ),
                         visionModels = LocalModelsUi.compose(
-                            catalog = remoteCatalog.filter { it.kind == ModelKind.VISION }
-                                .ifEmpty { ModelCatalog.current(ModelKind.VISION) },
+                            // O OCR e os Gemma 4 que declaram visão (os mesmos arquivos do Raciocínio); o Gemma não roda em 32 bits.
+                            catalog = (if (remoteCatalog.isEmpty()) ModelCatalog.visionModels() else ModelCatalog.visionModels(remoteCatalog))
+                                .filter { it.engineType != EngineType.LITERT_LM || reasoningLocalSupported },
                             installed = localSnapshot.installed,
                             outdated = localSnapshot.outdated,
                             active = localSnapshot.active,
@@ -460,7 +467,8 @@ class SetupActivity : ComponentActivity() {
                         transcriptionOpenAiAuth = openAiAuth,
                         transcriptionGroqAuth = groqAuth,
                         falaElevenLabsAuth = elevenLabsAuth,
-                        reasoningLocalSupported = LocalLlmSupport.isSupported(android.os.Build.SUPPORTED_ABIS),
+                        reasoningLocalSupported = reasoningLocalSupported,
+                        ocrTester = ocrTester,
                         localActions = localModels,
                         agentEnabled = BuildConfig.AGENT_ENABLED,
                         agent = if (BuildConfig.AGENT_ENABLED) agentRuntime else null,
