@@ -18,7 +18,8 @@ data class OcrModelFiles(val detector: String, val recognizer: String, val dicti
  * por [openSession]/[runtimeAvailable], então a JVM testa o pipeline inteiro com sessões falsas.
  *
  * Ciclo de vida: as sessões carregam na 1ª chamada e ficam até [close] (quem decide a descarga por ociosidade é o serviço do
- * `:vision`). Não é seguro chamar [recognize] de duas threads ao mesmo tempo; [cancel] pode vir de qualquer thread.
+ * `:vision`). Não é seguro chamar [recognize] de duas threads ao mesmo tempo. O cancelamento é o token que cada [recognize] recebe
+ * (ver [OcrEngine]); o motor não guarda estado de cancelamento entre chamadas.
  */
 class PaddleOcrEngine(
     private val files: OcrModelFiles,
@@ -32,8 +33,6 @@ class PaddleOcrEngine(
     private var recognizer: OnnxSession? = null
     private var decoder: CtcDecoder? = null
 
-    @Volatile private var cancelled = false
-
     /** Medidas da última execução (para o log e a medição da VC-T6). */
     @Volatile override var lastStats: OcrStats = OcrStats()
         private set
@@ -41,23 +40,20 @@ class PaddleOcrEngine(
     /** As sessões estão carregadas (a memória do modelo está em uso)? */
     val isLoaded: Boolean get() = detector != null
 
-    override fun cancel() {
-        cancelled = true
-    }
-
     private class Cancelled : Exception()
 
-    override fun recognize(image: RgbaImage): OcrResult {
-        cancelled = false
+    override fun recognize(image: RgbaImage, cancelled: () -> Boolean): OcrResult {
         val started = nowNanos()
         if (!runtimeAvailable()) return OcrResult.Unavailable
         if (files.missing().isNotEmpty()) return OcrResult.Unavailable
         return try {
+            // Cancelado antes de começar: nem carrega as sessões.
+            checkCancelled(cancelled)
             val loadStart = nowNanos()
             val fresh = !isLoaded
             load()
             val loadMs = if (fresh) ms(nowNanos() - loadStart) else 0L
-            run(image, loadMs, started)
+            run(image, loadMs, started, cancelled)
         } catch (e: Cancelled) {
             OcrResult.Failed(OcrFailure.CANCELLED, "cancelado")
         } catch (e: OutOfMemoryError) {
@@ -93,11 +89,11 @@ class PaddleOcrEngine(
         decoder = null
     }
 
-    private fun checkCancelled() {
-        if (cancelled) throw Cancelled()
+    private fun checkCancelled(cancelled: () -> Boolean) {
+        if (cancelled()) throw Cancelled()
     }
 
-    private fun run(image: RgbaImage, loadMs: Long, started: Long): OcrResult {
+    private fun run(image: RgbaImage, loadMs: Long, started: Long, cancelled: () -> Boolean): OcrResult {
         val det = detector ?: error("detector não carregado")
         val rec = recognizer ?: error("reconhecedor não carregado")
         val ctc = decoder ?: error("dicionário não carregado")
@@ -106,15 +102,15 @@ class PaddleOcrEngine(
         val strips = StripPlanner.plan(image.width, image.height, params)
         val perStrip = ArrayList<Pair<Strip, List<TextBox>>>(strips.size)
         for (strip in strips) {
-            checkCancelled()
+            checkCancelled(cancelled)
             perStrip += strip to DbPostprocess.boxesFor(strip, detectMap(det, strip, image), image.width, image.height, params)
         }
         val boxes = DbPostprocess.mergeStrips(perStrip)
         val detectMs = ms(nowNanos() - detStart)
-        checkCancelled()
+        checkCancelled(cancelled)
 
         val recStart = nowNanos()
-        val recognized = recognizeBoxes(rec, ctc, image, boxes)
+        val recognized = recognizeBoxes(rec, ctc, image, boxes, cancelled)
         val recognizeMs = ms(nowNanos() - recStart)
 
         val text = LineAssembler.assemble(recognized)
@@ -142,7 +138,9 @@ class PaddleOcrEngine(
 
     private class Crop(val box: TextBox, val width: Int)
 
-    private fun recognizeBoxes(rec: OnnxSession, ctc: CtcDecoder, image: RgbaImage, boxes: List<TextBox>): List<RecognizedBox> {
+    private fun recognizeBoxes(
+        rec: OnnxSession, ctc: CtcDecoder, image: RgbaImage, boxes: List<TextBox>, cancelled: () -> Boolean = { false },
+    ): List<RecognizedBox> {
         if (boxes.isEmpty()) return emptyList()
         val h = params.recHeight
         // Largura proporcional à altura fixa; lotes por largura (menos preenchimento).
@@ -152,7 +150,7 @@ class PaddleOcrEngine(
         }.sortedBy { it.width }
         val out = ArrayList<RecognizedBox>(crops.size)
         for (batch in crops.chunked(params.recBatch)) {
-            checkCancelled()
+            checkCancelled(cancelled)
             val batchW = batch.maxOf { it.width }
             val plane = h * batchW
             val data = FloatArray(batch.size * 3 * plane) // o preenchimento à direita é 0, depois da normalização

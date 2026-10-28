@@ -190,16 +190,53 @@ class PaddleOcrEngineTest {
         assertTrue(h.engine.isLoaded)
     }
 
+    private fun manyStrips() = imageWithBands(300, 2000, intArrayOf(40, 90, 260, 110, 0), intArrayOf(40, 1500, 260, 1520, 0))
+
     @Test
-    fun cancelarNoMeioDevolveCancelledSemTexto() {
-        val image = imageWithBands(300, 2000, intArrayOf(40, 90, 260, 110, 0), intArrayOf(40, 1500, 260, 1520, 0))
-        lateinit var engine: PaddleOcrEngine
-        val det = inkDetector { engine.cancel() } // cancela durante a 1ª faixa
-        val h = harness(det, recognizer { _, _ -> "OK" })
-        engine = h.engine
-        val r = engine.recognize(image) as OcrResult.Failed
+    fun cancelarAntesDoRecognizeNaoRodaNadaNemCarregaAsSessoes() {
+        // O token já vale quando o motor começa (o cancel() chegou entre a conferência de quem chama e o início): 0 inferências.
+        val det = inkDetector()
+        val rec = recognizer { _, _ -> "OK" }
+        val h = harness(det, rec)
+        val r = h.engine.recognize(manyStrips()) { true } as OcrResult.Failed
         assertEquals(OcrFailure.CANCELLED, r.kind)
-        assertEquals("o detector não roda as faixas seguintes", 1, det.runs)
+        assertEquals("o detector não roda", 0, det.runs)
+        assertEquals("o reconhecedor não roda", 0, rec.runs)
+        assertTrue("nem abre as sessões", h.opened.isEmpty() && !h.engine.isLoaded)
+    }
+
+    @Test
+    fun cancelarDuranteODetectorParaEntreAsFaixas() {
+        var cancelled = false
+        val det = inkDetector { cancelled = true } // o cancelamento chega durante a 1ª faixa
+        val rec = recognizer { _, _ -> "OK" }
+        val h = harness(det, rec)
+        val r = h.engine.recognize(manyStrips()) { cancelled } as OcrResult.Failed
+        assertEquals(OcrFailure.CANCELLED, r.kind)
+        assertEquals("a faixa em curso termina; as seguintes não rodam", 1, det.runs)
+        assertEquals("e o reconhecedor nem começa", 0, rec.runs)
+    }
+
+    @Test
+    fun cancelarDuranteOReconhecedorParaEntreAsCaixas() {
+        var cancelled = false
+        val rec = recognizer { _, _ -> "OK" }
+        val spy = FakeSession(listOf("x"), listOf("y")) { inputs -> cancelled = true; rec.run(inputs) } // cancela na 1ª caixa
+        val h = harness(inkDetector(), spy)
+        val r = h.engine.recognize(imageWithBands(400, 520, *eightBands())) { cancelled } as OcrResult.Failed
+        assertEquals(OcrFailure.CANCELLED, r.kind)
+        assertEquals("1 das 8 caixas; as outras 7 não rodam", 1, spy.runs)
+    }
+
+    @Test
+    fun oPedidoSeguinteComOutroTokenRodaNormalDepoisDeUmCancelado() {
+        val det = inkDetector()
+        val h = harness(det, recognizer { _, _ -> "OK" })
+        val image = imageWithBands(200, 100, intArrayOf(20, 30, 180, 50, 0))
+        assertEquals(OcrFailure.CANCELLED, (h.engine.recognize(image) { true } as OcrResult.Failed).kind)
+        // O motor não guarda cancelamento entre chamadas: o token do pedido seguinte decide.
+        assertEquals("OK", (h.engine.recognize(image) { false } as OcrResult.Text).text)
+        assertEquals("OK", (h.engine.recognize(image) as OcrResult.Text).text)
     }
 
     @Test

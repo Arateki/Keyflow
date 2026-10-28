@@ -119,12 +119,15 @@ data class OcrStats(
 
 /**
  * O motor de OCR dentro do processo que o hospeda (`:vision`). Bloqueante: o chamador não é a thread principal.
- * [cancel] pode vir de outra thread e faz o [recognize] em curso voltar logo com `Failed(CANCELLED)`.
+ *
+ * Cancelamento POR PEDIDO: [cancelled] é o token deste [recognize] (quem chama passa uma função que olha a ficha dele), e o motor o
+ * consulta entre as etapas — antes de carregar, entre as faixas do detector e entre as caixas do reconhecedor — e devolve
+ * `Failed(CANCELLED)` assim que ele vale. Um flag do motor zerado no início de cada chamada apagava o cancelamento que chegou entre a
+ * conferência de quem chama e o início do trabalho (revisão do PR #48). Uma inferência já em andamento termina (a ORT não é
+ * interrompível); o que o token evita é a próxima.
  */
 interface OcrEngine : AutoCloseable {
-    fun recognize(image: RgbaImage): OcrResult
-
-    fun cancel()
+    fun recognize(image: RgbaImage, cancelled: () -> Boolean = { false }): OcrResult
 
     /** Medidas da última execução de [recognize]. */
     val lastStats: OcrStats get() = OcrStats()

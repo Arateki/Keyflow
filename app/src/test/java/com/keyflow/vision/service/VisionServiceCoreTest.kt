@@ -22,17 +22,19 @@ class VisionServiceCoreTest {
 
     private class FakeEngine(var next: () -> OcrResult = { OcrResult.Text("ok") }) : OcrEngine {
         var closed = false
-        var cancelled = false
         var calls = 0
+        var sawCancelled = false
         var onRecognize: () -> Unit = {}
         override var lastStats: OcrStats = OcrStats(loadMs = 5, detectMs = 7, recognizeMs = 11, totalMs = 30, strips = 2, boxes = 4, lines = 3)
-        override fun recognize(image: RgbaImage): OcrResult {
+        override fun recognize(image: RgbaImage, cancelled: () -> Boolean): OcrResult {
             calls++
             onRecognize()
+            // Como o PaddleOcrEngine: consulta o token da chamada entre as etapas.
+            if (cancelled()) {
+                sawCancelled = true
+                return OcrResult.Failed(OcrFailure.CANCELLED, "cancelado")
+            }
             return next()
-        }
-        override fun cancel() {
-            cancelled = true
         }
         override fun close() {
             closed = true
@@ -244,7 +246,7 @@ class VisionServiceCoreTest {
         engine.onRecognize = { c.cancel() }
         c = core(engineFor = { engine })
         c.recognize(model, "/c", 4, 4, rec)
-        assertTrue(engine.cancelled)
+        assertTrue("o token chegou ao motor", engine.sawCancelled)
         assertTrue("depois de cancelar nada é entregue ao callback: ${rec.results}", rec.results.isEmpty())
         assertTrue(rec.stats.isEmpty())
     }
@@ -307,7 +309,56 @@ class VisionServiceCoreTest {
         queue.drain()
         assertTrue("nada chega a callback nenhum: ${a.results} ${b.results}", a.results.isEmpty() && b.results.isEmpty())
         assertEquals("o motor roda uma vez só", 1, engine.calls)
-        assertTrue(engine.cancelled)
+        assertTrue(engine.sawCancelled)
+    }
+
+    /** Sessão falsa que só conta as execuções (o detector e o reconhecedor do PaddleOcrEngine real). */
+    private class CountingSession : com.keyflow.onnx.OnnxSession {
+        var runs = 0
+        override val inputNames = listOf("x")
+        override val outputNames = listOf("y")
+        override fun run(inputs: List<com.keyflow.onnx.Tensor>): List<com.keyflow.onnx.Tensor> {
+            runs++
+            val t = inputs.single() as com.keyflow.onnx.FloatTensor
+            // Detector: mapa todo preto (nada de texto). Reconhecedor nunca chega a rodar sem caixas.
+            return listOf(com.keyflow.onnx.FloatTensor(longArrayOf(1, 1, t.shape[2], t.shape[3]), FloatArray((t.shape[2] * t.shape[3]).toInt())))
+        }
+        override fun close() = Unit
+    }
+
+    @Test
+    fun cancelEntreAChecagemDaFichaEOReconhecimentoNaoRodaInferenciaNenhuma() {
+        // A intercalação da revisão do PR #48: o cancel() conclui durante o resetPeak (depois de o núcleo conferir a ficha, antes de o
+        // motor começar). Com o PaddleOcrEngine REAL: 0 execuções do detector, nenhum callback, e o pedido seguinte roda normal.
+        val detector = CountingSession()
+        val recognizer = CountingSession()
+        val queue = QueuedExecutor()
+        var cancelInReset = true
+        lateinit var svc: VisionServiceCore
+        svc = VisionServiceCore(
+            engineFor = { m ->
+                com.keyflow.vision.ocr.PaddleOcrEngine(
+                    m.files,
+                    openSession = { path, _ -> if (path.endsWith("det.onnx")) detector else recognizer },
+                    runtimeAvailable = { true },
+                )
+            },
+            availableMb = { 1_000 }, scheduler = scheduler, executor = queue,
+            checkCrop = { _, _, _ -> },
+            readCrop = { _, w, h -> RgbaImage(w, h, ByteArray(w * h * 4) { 0xFF.toByte() }) },
+            resetPeak = { if (cancelInReset) { cancelInReset = false; svc.cancel() } },
+        )
+        val cancelled = Recorder()
+        val next = Recorder()
+        svc.recognize(model, "/c1", 4, 2400, cancelled) // 4x2400: 3 faixas se rodasse
+        queue.drain()
+        assertEquals("nenhuma execução do detector", 0, detector.runs)
+        assertTrue("nenhum callback do pedido cancelado: ${cancelled.results}", cancelled.results.isEmpty() && cancelled.stats.isEmpty())
+        // O pedido seguinte roda normal (em branco → Empty), com o detector nas 3 faixas.
+        svc.recognize(model, "/c2", 4, 2400, next)
+        queue.drain()
+        assertEquals(listOf<OcrResult>(OcrResult.Empty), next.results)
+        assertTrue("o detector rodou no pedido seguinte: ${detector.runs}", detector.runs >= 1)
     }
 
     @Test

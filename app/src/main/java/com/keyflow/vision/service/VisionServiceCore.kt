@@ -24,7 +24,7 @@ internal fun interface Cancellable {
  * ociosidade e executor entram por parâmetro — é isso que o torna testável na JVM. Segue o [com.keyflow.reasoning.local.ReasoningServiceCore].
  *
  * O estado (`engine`, `loadedId`, `busy`…) é tocado só na thread do [executor] (de uma thread só); [cancel] é a única entrada de
- * outra thread. O arquivo do recorte NÃO é apagado aqui: quem o escreveu o apaga no epílogo do fluxo (CAP-04).
+ * outra thread e só mexe num contador atômico. O arquivo do recorte NÃO é apagado aqui: quem o escreveu o apaga no epílogo do fluxo (CAP-04).
  */
 internal class VisionServiceCore(
     private val engineFor: (VisionModel) -> OcrEngine,
@@ -59,7 +59,6 @@ internal class VisionServiceCore(
      */
     private val tickets = AtomicLong()
     private val cancelledUpTo = AtomicLong()
-    @Volatile private var running: OcrEngine? = null
 
     private fun isCancelled(ticket: Long) = ticket <= cancelledUpTo.get()
 
@@ -68,10 +67,12 @@ internal class VisionServiceCore(
         executor.execute { process(ticket, model, cropPath, width, height, listener) }
     }
 
-    /** Interrompe o reconhecimento em curso e descarta os já enfileirados (nenhum deles roda nem chama o callback); o pedido seguinte não é afetado. */
+    /**
+     * Cancela os pedidos já entregues: os da fila não rodam nem chamam o callback e o que está rodando para na próxima checagem do
+     * motor (a ficha vai ao motor como token, [OcrEngine.recognize]); o pedido que chegar depois não é afetado.
+     */
     fun cancel() {
         cancelledUpTo.accumulateAndGet(tickets.get()) { a, b -> maxOf(a, b) }
-        running?.cancel()
     }
 
     /** Descarrega na fila do executor: nunca solta o motor no meio de um reconhecimento. */
@@ -123,11 +124,11 @@ internal class VisionServiceCore(
                 if (!isCancelled(ticket)) listener.onResult(OcrResult.Failed(OcrFailure.BAD_INPUT, "não li o recorte: ${e.message}"))
                 return
             }
-            running = active
-            // Um cancel() que chegou antes de `running` valer não viu o motor: confere de novo para não rodar à toa.
             if (isCancelled(ticket)) return
             resetPeak()
-            val result = active.recognize(image)
+            // O token vai ao motor: um cancel() que chegar a qualquer momento daqui em diante é visto na próxima checagem dele (e um que
+            // chegou durante o resetPeak, antes da primeira, derruba o pedido sem nenhuma inferência).
+            val result = active.recognize(image) { isCancelled(ticket) }
             if (isCancelled(ticket)) return
             listener.onStats(active.lastStats.copy(peakRssKb = peakRssKb()))
             listener.onResult(result)
@@ -137,7 +138,6 @@ internal class VisionServiceCore(
         } catch (e: Exception) {
             if (!isCancelled(ticket)) listener.onResult(OcrResult.Failed(OcrFailure.ENGINE, e.message ?: e.toString()))
         } finally {
-            running = null
             busy = false
             scheduleIdleUnload(model)
         }
