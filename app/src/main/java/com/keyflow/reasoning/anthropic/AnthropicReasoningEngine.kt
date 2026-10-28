@@ -138,7 +138,7 @@ class AnthropicReasoningEngine(
         response.use { r ->
             if (!r.isSuccessful) {
                 val errorBody = r.body?.string().orEmpty()
-                if (BuildConfig.DEBUG) android.util.Log.e("AnthropicReasoning", "HTTP ${r.code}: $errorBody")
+                if (BuildConfig.DEBUG) android.util.Log.e("AnthropicReasoning", "HTTP ${r.code}")
                 val failure = httpFailure(r.code, errorBody)
                 if (failure.retry) return Outcome.Retry(failure.event)
                 if (r.code == 401) authorization.invalidate(ProviderIds.ANTHROPIC)

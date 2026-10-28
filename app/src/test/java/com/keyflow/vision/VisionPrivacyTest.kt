@@ -19,6 +19,9 @@ class VisionPrivacyTest {
     @Test fun falhasDoMotorNaoGravamMensagensBrutasEmLog() {
         val logs = File("src/main/java/com/keyflow/reasoning/local/ReasoningService.kt").readLines().filter { "Log." in it }
         assertFalse("a falha pode incluir o conteúdo da imagem", logs.any { "\$message" in it || "\$reason" in it })
+        val anthropic = File("src/main/java/com/keyflow/reasoning/anthropic/AnthropicReasoningEngine.kt")
+            .readLines().filter { "Log." in it }
+        assertFalse("o corpo HTTP pode devolver pixels ou credenciais", anthropic.any { "\$errorBody" in it })
     }
 
 }
