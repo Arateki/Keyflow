@@ -224,46 +224,46 @@ Status: Pending → In Design → In Tasks → Implementing → Verified. As tas
 | BNC-06 | P1-A | BNC-T13, BNC-T15 | In Tasks |
 | BNC-07 | P1-A | BNC-T22 | In Tasks |
 | BNC-08 | P1-A | BNC-T20, BNC-T24 | In Tasks |
-| BCP-01 | P1-B | BNC-T2 | In Tasks |
-| BCP-02 | P1-B | BNC-T1, BNC-T2 | In Tasks |
-| BCP-03 | P1-B | BNC-T2 | In Tasks |
-| BCP-04 | P1-B | BNC-T2, BNC-T7, BNC-T20 | In Tasks |
-| BCP-05 | P1-B | BNC-T7 | In Tasks |
-| BCP-06 | P1-B | BNC-T2, BNC-T6 | In Tasks |
-| BCP-07 | P1-B | BNC-T2, BNC-T7 | In Tasks |
+| BCP-01 | P1-B | BNC-T2 | Verified |
+| BCP-02 | P1-B | BNC-T1, BNC-T2 | Implementing |
+| BCP-03 | P1-B | BNC-T2 | Verified |
+| BCP-04 | P1-B | BNC-T2, BNC-T7, BNC-T20 | Implementing |
+| BCP-05 | P1-B | BNC-T7 | Verified |
+| BCP-06 | P1-B | BNC-T2, BNC-T6 | Verified |
+| BCP-07 | P1-B | BNC-T2, BNC-T7 | Verified |
 | BCP-08 | P1-B | BNC-T1, BNC-T20 | In Tasks |
-| BEX-01 | P1-C | BNC-T11 | In Tasks |
-| BEX-02 | P1-C | BNC-T1, BNC-T8, BNC-T9, BNC-T10 | In Tasks |
-| BEX-03 | P1-C | BNC-T11 | In Tasks |
+| BEX-01 | P1-C | BNC-T11 | Verified |
+| BEX-02 | P1-C | BNC-T1, BNC-T8, BNC-T9, BNC-T10 | Implementing |
+| BEX-03 | P1-C | BNC-T11 | Verified |
 | BEX-04 | P1-C | BNC-T1, BNC-T9, BNC-T28 | In Tasks |
 | BEX-05 | P1-C | BNC-T1, BNC-T10 | In Tasks |
-| BEX-06 | P1-C | BNC-T11 | In Tasks |
-| BEX-07 | P1-C | BNC-T11 | In Tasks |
+| BEX-06 | P1-C | BNC-T11 | Verified |
+| BEX-07 | P1-C | BNC-T11 | Verified |
 | BEX-08 | P1-C | BNC-T16 | In Tasks |
-| BEX-09 | P1-C | BNC-T11, BNC-T20, BNC-T24 | In Tasks |
-| BEX-10 | P1-C | BNC-T12, BNC-T15 | In Tasks |
-| BPT-01 | P1-D | BNC-T3 | In Tasks |
-| BPT-02 | P1-D | BNC-T4 | In Tasks |
-| BPT-03 | P1-D | BNC-T4 | In Tasks |
+| BEX-09 | P1-C | BNC-T11, BNC-T20, BNC-T24 | Implementing |
+| BEX-10 | P1-C | BNC-T12, BNC-T15 | Implementing |
+| BPT-01 | P1-D | BNC-T3 | Verified |
+| BPT-02 | P1-D | BNC-T4 | Verified |
+| BPT-03 | P1-D | BNC-T4 | Verified |
 | BPT-04 | P1-D | BNC-T21 | In Tasks |
-| BPT-05 | P1-D | BNC-T4 | In Tasks |
-| BPT-06 | P1-D | BNC-T5 | In Tasks |
-| BPT-07 | P1-D | BNC-T5 | In Tasks |
+| BPT-05 | P1-D | BNC-T4 | Verified |
+| BPT-06 | P1-D | BNC-T5 | Verified |
+| BPT-07 | P1-D | BNC-T5 | Verified |
 | BPT-08 | P1-D | BNC-T20 | In Tasks |
 | BPT-09 | P1-D | BNC-T24 | In Tasks |
-| BPT-10 | P1-D | BNC-T3 | In Tasks |
-| BPT-11 | P1-D | BNC-T3, BNC-T4, BNC-T5 | In Tasks |
-| BHS-01 | P1-E | BNC-T6, BNC-T12 | In Tasks |
-| BHS-02 | P1-E | BNC-T6 | In Tasks |
-| BHS-03 | P1-E | BNC-T12 | In Tasks |
-| BHS-04 | P1-E | BNC-T6, BNC-T15 | In Tasks |
-| BHS-05 | P1-E | BNC-T6, BNC-T14 | In Tasks |
-| BHS-06 | P1-E | BNC-T12, BNC-T14 | In Tasks |
+| BPT-10 | P1-D | BNC-T3 | Verified |
+| BPT-11 | P1-D | BNC-T3, BNC-T4, BNC-T5 | Verified |
+| BHS-01 | P1-E | BNC-T6, BNC-T12 | Verified |
+| BHS-02 | P1-E | BNC-T6 | Verified |
+| BHS-03 | P1-E | BNC-T12 | Verified |
+| BHS-04 | P1-E | BNC-T6, BNC-T15 | Implementing |
+| BHS-05 | P1-E | BNC-T6, BNC-T14 | Implementing |
+| BHS-06 | P1-E | BNC-T12, BNC-T14 | Implementing |
 | BON-01 | P1-F | BNC-T14 | In Tasks |
 | BON-02 | P1-F | BNC-T14 | In Tasks |
-| BON-03 | P1-F | BNC-T6, BNC-T10 | In Tasks |
+| BON-03 | P1-F | BNC-T6, BNC-T10 | Implementing |
 | BON-04 | P1-F | BNC-T22 | In Tasks |
-| BON-05 | P1-F | BNC-T11 | In Tasks |
+| BON-05 | P1-F | BNC-T11 | Implementing |
 | BAU-01 | P1-G | BNC-T16 | In Tasks |
 | BAU-02 | P1-G | BNC-T17 | In Tasks |
 | BAU-03 | P1-G | BNC-T17 | In Tasks |

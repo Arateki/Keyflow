@@ -1,7 +1,7 @@
 # Bancada de modelos — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md`
-**Status**: Draft com as decisões do Yan de 2026-10-28 (D1–D5; D6 aberta). Nenhuma task começou. **Fora da v1**: só `main`, release seguinte.
+**Status**: Draft com as decisões do Yan de 2026-10-28 (D1–D5; D6 aberta). **Em implementação** desde 2026-10-28 (PR 1 do núcleo: T2–T8, T11, T12; PR 2 da interface: T13–T15). T1, T9 e T10 (fatos das APIs, opções e métricas nos motores) e as fases D e E ainda não começaram. **Fora da v1**: só `main`, release seguinte.
 
 > **Para o agente executor**: leia `spec.md` + `design.md` + este arquivo e `.specs/codebase/TESTING.md`. Uma task por vez,
 > na ordem prática abaixo, **testes primeiro**, gate verde antes de avançar.
@@ -60,6 +60,7 @@ e o emulador são o gargalo: instrumentados serializam). T19 é o marco: **sem b
 ## Fase A — Núcleo puro (JVM)
 
 ### BNC-T2 — Esquema do corpus, carregador e teste de integridade `[P]`
+- **Status**: Concluída (PR 1, `equipe/bancada-p1`, 2026-10-28). `CorpusIntegrityTest` pega o byte alterado, a licença GPL e o id repetido.
 - **What**: `bancada/corpus/` com `Caso`, `TesteDef` (prompt, capacidade, versão, casos), `Manifesto`, `CorpusLoader` (assets e diretório de
   teste). `CorpusIntegrityTest`: hash do manifesto bate com o arquivo, licença ∈ lista permitida (sem GPL/AGPL/LGPL/NC), ids únicos, esquema
   válido, tamanho total ≤ orçamento, `SecretFilter` limpo. Corpus de brinquedo em `src/test/resources/bancada/v0/`.
@@ -68,6 +69,7 @@ e o emulador são o gargalo: instrumentados serializam). T19 é o marco: **sem b
 - **Depends on**: —. **Requirement**: BCP-01, BCP-02, BCP-03, BCP-04, BCP-06, BCP-07. **Gate**: `quick`. **Commit**: `feat(bancada): esquema do corpus, carregador e integridade`.
 
 ### BNC-T3 — Normalização, distâncias e contratos de pontuação `[P]`
+- **Status**: Concluída (PR 1, 2026-10-28). `BancadaIsolationTest` cobre o núcleo e a proibição de executar saída de modelo.
 - **What**: `Normalizacao`, Levenshtein genérico, `Wer`/`Cer`, `ChrF`, `F1`, e os contratos `Pontuador`/`Pontuacao`/`Marca`.
 - **Where**: `bancada/pontuacao/`; testes com vetores conhecidos (ex.: WER de pares escritos à mão) e `kotest-property`
   (nota ∈ [0,1]; igual = 1; vazio = 0; simetria onde couber).
@@ -75,18 +77,21 @@ e o emulador são o gargalo: instrumentados serializam). T19 é o marco: **sem b
 - **Depends on**: —. **Requirement**: BPT-01, BPT-10, BPT-11. **Gate**: `quick`. **Commit**: `feat(bancada): normalização, WER/CER, chrF e contratos de pontuação`.
 
 ### BNC-T4 — Pontuadores `pontuacao`, `reescrita`, `json` `[P]`
+- **Status**: Concluída (PR 1, 2026-10-28). Tabela de bordas em `PontuadoresTest`.
 - **What**: os três pontuadores do `design.md` §3, com pesos vindos do caso.
 - **Done when**: tabela de casos de borda por pontuador (saída vazia, com prefixo "Claro!", número inventado, JSON com texto em volta, campo
   extra/faltante) com a nota esperada escrita à mão; a mesma saída pontuada 2× dá a mesma nota.
 - **Depends on**: T3. **Requirement**: BPT-02, BPT-03, BPT-05, BPT-11. **Gate**: `quick`. **Commit**: `feat(bancada): pontuadores de pontuação, reescrita e JSON`.
 
 ### BNC-T5 — Pontuadores `acoes` e `contexto` `[P]`
+- **Status**: Concluída (PR 1, 2026-10-28). Cerca ```json, argumento trocado, recusa, 2 chamadas e `ToolRegistry` ↔ corpus cobertos.
 - **What**: `acoes` (JSON canônico `{nome, args}`, recusa, chamada espúria, JSON ilegível) e `contexto` (valor exato, distratores); a função
   `ToolRegistry`→lista de nomes para o cruzamento do BCP-05.
 - **Done when**: casos de borda verdes (resposta com cerca \`\`\`json, ferramenta certa com argumento trocado, recusa correta, 2 chamadas).
 - **Depends on**: T3. **Requirement**: BPT-06, BPT-07, BPT-11. **Gate**: `quick`. **Commit**: `feat(bancada): pontuadores de ações e contexto`.
 
 ### BNC-T6 — Resultado, chave de comparabilidade e JSON `bancada-resultado/1` `[P]`
+- **Status**: Concluída (PR 1, 2026-10-28). Chave de comparabilidade com o campo `perfil` a mais (ver `licoes/2026-10-28-bancada-p1.md`). A constante única da versão do LiteRT-LM em `app/build.gradle.kts` fica para a T9 (o campo `motor.versao` já existe no esquema).
 - **What**: modelos `Execucao`/`ResultadoTeste`/`ResultadoCaso`, serializador/leitor `org.json`, `ChaveDeComparabilidade`, versão do LiteRT-LM
   numa constante única de `app/build.gradle.kts` usada pela dependência **e** por `BuildConfig`.
 - **Done when**: ida e volta sem perda; esquema validado; uma execução com chave de API falsa no ambiente não a contém serializada
@@ -94,6 +99,7 @@ e o emulador são o gargalo: instrumentados serializam). T19 é o marco: **sem b
 - **Depends on**: T2. **Requirement**: BHS-01, BHS-02, BHS-04 (esquema), BHS-05, BON-03, BCP-06. **Gate**: `quick` + `build`. **Commit**: `feat(bancada): modelo de resultado e exportação JSON`.
 
 ### BNC-T7 — Corpus v1 de texto (P1) e janela de contexto do modelo `[P]`
+- **Status**: Concluída (PR 1, 2026-10-28): corpus de texto (12/10/10/20/12) e `ModelSpec.contextTokens` nos 4 modelos cujo nome de arquivo traz `ekvN`. Falta o FunctionGemma com prompt próprio (variante, fora da P1).
 - **What**: `assets/bancada/v1/` com `pontuacao` (12), `reescrita` (10), `json` (10), `acoes` (20, de `ToolRegistry`), `contexto` (12) e o
   `manifesto.json`; `ModelSpec.contextTokens` (opcional) preenchido nos modelos de texto a partir do card/nome do arquivo.
 - **Done when**: `CorpusIntegrityTest` verde no corpus real; todo `ToolRegistry.all()` tem ≥ 1 caso e todo caso cita ferramenta existente; ≥ 4 casos de
@@ -103,11 +109,13 @@ e o emulador são o gargalo: instrumentados serializam). T19 é o marco: **sem b
 ## Fase B — Executor
 
 ### BNC-T8 — `GenerationOptions` e `ReasoningEvent.Metrics` (contrato, sem mudar comportamento)
+- **Status**: Concluída (PR 1, 2026-10-28). Nenhum teste existente foi editado; o corpo de cada motor online com opções nulas é o de hoje.
 - **What**: `ReasoningRequest.options` (default vazio) e o evento `Metrics`; os `when` exaustivos existentes ganham um ramo que ignora.
 - **Done when**: todos os testes de `reasoning/` e do agente passam **sem edição**; teste novo prova que opções nulas não mudam o corpo de nenhum motor.
 - **Depends on**: —. **Requirement**: BEX-02. **Gate**: `quick` + `build`. **Commit**: `refactor(raciocínio): opções de geração e métricas no contrato do motor`.
 
 ### BNC-T11 — `ExecutorBancada` (máquina de execução)
+- **Status**: Concluída (PR 1, 2026-10-28). `ExecutorBancadaTest` + `BancadaRunnerTest` com motor falso e relógio virtual.
 - **What**: `bancada/executor/` com o executor do `design.md` §2 sobre um `MotorDeCapacidade` injetado, relógio, térmico e bateria por lambda:
   ordem, determinismo (2 casos repetidos), timeout, estados do caso, pausa térmica/bateria, cancelamento, parciais `incompleta`; `BancadaRunner` (escopo do processo).
 - **Done when**: `ExecutorBancadaTest` com motor falso cobre: caso OK; OOM/queda/timeout local = nota 0; rede/limite online = inválido fora da média e `RATE_LIMIT`
@@ -115,6 +123,7 @@ e o emulador são o gargalo: instrumentados serializam). T19 é o marco: **sem b
 - **Depends on**: T3, T6, T8. **Requirement**: BEX-01, BEX-03, BEX-06, BEX-07, BEX-09, BON-05. **Gate**: `quick`. **Commit**: `feat(bancada): executor com validade, pausa e cancelamento`.
 
 ### BNC-T12 — `RepositorioDeExecucoes`
+- **Status**: Concluída (PR 1, 2026-10-28). Regras de backup conferidas por teste.
 - **What**: gravação atômica em `filesDir/bancada/execucoes/`, listagem por modelo+backend, retenção (20; `incompleta` > 7 dias), apagar, recuperação de execução sem marca de fim,
   e `bancada/` nas regras de backup (`backup_rules.xml`, `data_extraction_rules.xml`).
 - **Done when**: testes de unidade com diretório temporário (escrita interrompida não corrompe; 21ª execução apaga a mais antiga; reabrir marca `incompleta`); regras de backup conferidas por teste.
