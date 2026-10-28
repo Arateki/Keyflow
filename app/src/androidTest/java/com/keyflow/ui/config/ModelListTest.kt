@@ -202,7 +202,8 @@ class ModelListTest {
     fun theVendorLogoIsBigAndSitsBesideTheName() {
         rule.setContent { Host(text(installed = emptySet()), FakeActions(), ModelListTags.Raciocinio) }
 
-        val logo = rule.onNodeWithTag("model-vendor-qwen", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        // Os três cards da Qwen têm o logo; o de cima é o do Leve (Qwen3 0.6B), o primeiro da lista pelo tamanho do arquivo.
+        val logo = rule.onAllNodesWithTag("model-vendor-qwen", useUnmergedTree = true)[0].fetchSemanticsNode().boundsInRoot
         val density = rule.density.density
         assertTrue("logo de ${logo.width / density} dp", logo.width / density >= 28f && logo.width / density <= 32f)
         val card = rule.onNodeWithTag("raciocinio-local-model-${qwen.id}").fetchSemanticsNode().boundsInRoot
