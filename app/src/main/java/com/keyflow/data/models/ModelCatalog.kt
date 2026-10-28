@@ -27,6 +27,7 @@ enum class ModelVendor(val displayName: String) {
     NVIDIA("NVIDIA"),
     PADDLEPADDLE("PaddlePaddle"),
     IBM("IBM"),
+    NANBEIGE("Nanbeige"),
 }
 
 /**
@@ -522,8 +523,7 @@ object ModelCatalog {
         modelName = "Nanbeige4.2 3B",
         kind = ModelKind.TEXT,
         validatedOnDevice = false,
-        // Pendente: não achei logo Nanbeige com fonte CC0/MIT. A regra de fabricante segue falhando; sem logo genérico.
-        vendor = null,
+        vendor = ModelVendor.NANBEIGE,
         thinking = ThinkingSupport.ALWAYS,
         promptOpensThink = true,
         files = listOf(

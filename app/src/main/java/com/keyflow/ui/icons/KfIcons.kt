@@ -472,6 +472,16 @@ object KfIcons {
         ),
     )
 
+    /** Redesenho vetorial do avatar da Nanbeige no Hugging Face; referência e atribuição em `app/licenses/README.md`.
+     * Barra curva, faixa larga e cinco blocos no grid 24×24; marca verde-petróleo #0B4A45. */
+    val LogoNanbeige = KfIconSpec(
+        "logo-nanbeige",
+        emptyList(),
+        fills = listOf(
+            "M3.6 6.24Q11.22 6.78 18.84 6.24V9Q11.22 9.48 3.6 9zM0 10.56Q12 11.04 24 10.56v2.76Q12 12.84 0 13.32zM1.08 14.64h2.76v4.2H1.08zM5.4 14.64h2.88v4.2H5.4zM9.84 14.64h2.76v4.2H9.84zM14.16 14.64h2.88v4.2h-2.88zM18.6 14.64h2.88v4.2H18.6z",
+        ),
+    )
+
     val Exit = KfIconSpec(
         "exit",
         listOf(
@@ -508,7 +518,7 @@ object KfIcons {
         TabKeyflow, TabModo, TabVoz, TabVisao, TabRaciocinio, TabBoca, TabNotificacao, TabTeclado, TabSobrepor,
         TabFluxos, TabComputador, TabProvedores, TabDocs, Infinity,
         LogoAnthropic, LogoOpenAi, LogoGoogle, LogoGroq, LogoElevenLabs,
-        LogoNvidia, LogoHuggingFace, LogoDeepSeek, LogoQwen, LogoPaddlePaddle, LogoIbm,
+        LogoNvidia, LogoHuggingFace, LogoDeepSeek, LogoQwen, LogoPaddlePaddle, LogoIbm, LogoNanbeige,
     )
 }
 

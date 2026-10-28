@@ -382,6 +382,7 @@ class ModelCatalogTest {
         assertThat(byId).containsEntry("gemma-4-e2b-litertlm", ModelVendor.GOOGLE)
         assertThat(byId).containsEntry("gemma-4-e4b-litertlm", ModelVendor.GOOGLE)
         assertThat(byId).containsEntry("granite-4.2-3b-litertlm", ModelVendor.IBM)
+        assertThat(byId).containsEntry("nanbeige-4.2-3b-litertlm", ModelVendor.NANBEIGE)
         // PaddleOCR é da PaddlePaddle (Baidu), embora os arquivos ONNX venham de um repositório de terceiros no Hugging Face.
         assertThat(byId).containsEntry("ocr-paddle-latin", ModelVendor.PADDLEPADDLE)
     }
