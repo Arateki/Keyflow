@@ -6,7 +6,20 @@ import kotlinx.coroutines.flow.Flow
  * O que se pede a um modelo de linguagem. Texto → texto: sem histórico de conversa (YAGNI — o Testar é uma frase).
  * [system] é a instrução de comportamento; [user] é o pedido.
  */
-data class ReasoningRequest(val system: String? = null, val user: String)
+data class ReasoningRequest(val system: String? = null, val user: String, val image: ReasoningImage? = null)
+
+/** Imagem já reduzida e codificada. Nunca inclui os bytes no texto de diagnóstico do pedido. */
+class ReasoningImage(bytes: ByteArray, val mimeType: String = "image/png") {
+    val bytes: ByteArray = bytes.copyOf()
+    init {
+        require(bytes.isNotEmpty() && bytes.size <= MAX_BYTES) { "imagem fora do limite" }
+        require(mimeType in setOf("image/png", "image/jpeg", "image/webp")) { "formato de imagem não suportado" }
+    }
+    fun base64(): String = okio.ByteString.of(*bytes).base64()
+    fun dataUrl(): String = "data:$mimeType;base64,${base64()}"
+    override fun toString(): String = "ReasoningImage($mimeType, ${bytes.size} bytes)"
+    companion object { const val MAX_BYTES = 8 * 1024 * 1024 }
+}
 
 /** O que um [ReasoningEngine] emite enquanto responde: trechos, e no fim [Done] **ou** [Error]. */
 sealed interface ReasoningEvent {

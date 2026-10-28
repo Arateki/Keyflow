@@ -239,7 +239,11 @@ class GoogleReasoningEngine(
         val userPart = JSONObject().put("text", request.user)
         val userContent = JSONObject().apply {
             put("role", "user")
-            put("parts", JSONArray().put(userPart))
+            put("parts", JSONArray().apply {
+                request.image?.let { image -> put(JSONObject().put("inlineData", JSONObject()
+                    .put("mimeType", image.mimeType).put("data", image.base64()))) }
+                put(userPart)
+            })
         }
         put("contents", JSONArray().put(userContent))
 

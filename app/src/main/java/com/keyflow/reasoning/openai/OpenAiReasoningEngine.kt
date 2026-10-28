@@ -240,7 +240,12 @@ class OpenAiReasoningEngine(
 
     private fun bodyOf(request: ReasoningRequest): String = JSONObject().apply {
         put("model", model)
-        put("input", org.json.JSONArray().put(JSONObject().put("role", "user").put("content", request.user)))
+        val content: Any = request.image?.let { image ->
+            org.json.JSONArray()
+                .put(JSONObject().put("type", "input_text").put("text", request.user))
+                .put(JSONObject().put("type", "input_image").put("image_url", image.dataUrl()))
+        } ?: request.user
+        put("input", org.json.JSONArray().put(JSONObject().put("role", "user").put("content", content)))
         put("store", false)
         put("stream", true)
         request.system?.let { put("instructions", it) }

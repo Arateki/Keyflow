@@ -238,7 +238,12 @@ class AnthropicReasoningEngine(
         put("model", resolvedModel)
         put("max_tokens", 1024)
         put("stream", true)
-        val msg = JSONObject().put("role", "user").put("content", request.user)
+        val content: Any = request.image?.let { image ->
+            JSONArray().put(JSONObject().put("type", "image").put("source", JSONObject()
+                .put("type", "base64").put("media_type", image.mimeType).put("data", image.base64())))
+                .put(JSONObject().put("type", "text").put("text", request.user))
+        } ?: request.user
+        val msg = JSONObject().put("role", "user").put("content", content)
         put("messages", JSONArray().put(msg))
         val systemPrompt = if (isOAuth) {
             val prefix = "You are Claude Code, Anthropic's official CLI for Claude."
