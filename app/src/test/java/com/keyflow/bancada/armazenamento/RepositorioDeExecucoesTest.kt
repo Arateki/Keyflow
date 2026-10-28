@@ -118,6 +118,16 @@ class RepositorioDeExecucoesTest {
     }
 
     @Test
+    fun `a run that this process just started is never recovered as interrupted`() {
+        val r = repo()
+        r.gravar(execucaoDeExemplo(id = "velha", estado = EstadoExecucao.EM_ANDAMENTO, iniciada = quando(60_000)))
+        r.gravar(execucaoDeExemplo(id = "agora", estado = EstadoExecucao.EM_ANDAMENTO, iniciada = quando(0)))
+        assertThat(r.recuperarInterrompidas(antesDeMs = agora - 1_000)).isEqualTo(1)
+        assertThat(r.lerPorId("velha")!!.estado).isEqualTo(EstadoExecucao.INCOMPLETA)
+        assertThat(r.lerPorId("agora")!!.estado).isEqualTo(EstadoExecucao.EM_ANDAMENTO)
+    }
+
+    @Test
     fun `delete one run, the history of a model, or everything`() {
         val r = repo()
         r.gravar(execucaoDeExemplo(id = "a", modelo = "qwen", iniciada = quando(1 * dia)))

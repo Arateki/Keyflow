@@ -69,15 +69,17 @@ class RepositorioDeExecucoes(
 
     /**
      * Regrava como `incompleta` o que ficou `em-andamento` sem estar em [ativas] (os ids de execuções que ESTE processo ainda roda), e apaga
-     * os `.tmp` órfãos de uma escrita interrompida. Devolve quantas execuções recuperou.
+     * os `.tmp` órfãos de uma escrita interrompida. Só olha o que começou antes de [antesDeMs] (o instante em que este processo nasceu): uma
+     * execução que o processo atual acabou de começar nunca é "interrompida". Devolve quantas execuções recuperou.
      */
     @Synchronized
-    fun recuperarInterrompidas(ativas: Set<String> = emptySet()): Int {
+    fun recuperarInterrompidas(ativas: Set<String> = emptySet(), antesDeMs: Long = Long.MAX_VALUE): Int {
         diretorio.listFiles { f -> f.name.endsWith(SUFIXO_TEMPORARIO) }?.forEach { it.delete() }
         var recuperadas = 0
         for (arquivo in arquivos()) {
             val execucao = ler(arquivo) ?: continue
-            if (execucao.estado == EstadoExecucao.EM_ANDAMENTO && execucao.id !in ativas) {
+            val comecou = epochDeIso(execucao.iniciada) ?: 0L
+            if (execucao.estado == EstadoExecucao.EM_ANDAMENTO && execucao.id !in ativas && comecou < antesDeMs) {
                 gravar(execucao.copy(estado = EstadoExecucao.INCOMPLETA, motivo = MotivoIncompleta.INTERROMPIDA))
                 recuperadas++
             }

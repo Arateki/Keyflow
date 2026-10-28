@@ -262,6 +262,22 @@ val docsSections: List<DocSection> get() = listOf(
                 tr("Testar"),
                 tr("manda uma frase ao modelo e mostra a resposta chegando, com o tempo até o primeiro trecho."),
             ),
+            DocBlock.Labeled(
+                tr("Testes por tarefa"),
+                tr("ao lado do teste rápido, uma sub-aba por tarefa mede o que importa: Pontuação (põe pontuação e maiúsculas num ditado sem trocar palavras), Reescrita (encurta, corrige ou formaliza sem inventar nada), JSON (extrai campos num JSON válido), Ações (escolhe a ferramenta do agente e os argumentos certos, ou recusa o que nenhuma ferramenta faz) e Contexto (acha um detalhe num documento longo). A nota vai de 0 a 1, é calculada por regras e nunca por outro modelo."),
+            ),
+            DocBlock.Labeled(
+                tr("Histórico"),
+                tr("cada rodada fica guardada neste aparelho, até 20 por modelo. A variação só compara rodadas com o mesmo corpus, opções e backend; uma rodada incompleta aparece marcada e não entra na comparação. O resultado pode ser exportado em JSON."),
+            ),
+            DocBlock.Labeled(
+                tr("Rodar a bateria"),
+                tr("roda em sequência todos os testes que o modelo suporta. Parar guarda o que já foi medido, e o aparelho quente ou com bateria baixa pausa a rodada."),
+            ),
+            DocBlock.Labeled(
+                tr("Modelo da nuvem"),
+                tr("antes de qualquer chamada o app mostra quantas serão feitas e o teto de tokens, e só roda depois que você confirmar. No login por assinatura a rodada reduzida (2 casos por teste) vem primeiro e consome o limite do seu plano."),
+            ),
         ),
     ),
     DocSection(
