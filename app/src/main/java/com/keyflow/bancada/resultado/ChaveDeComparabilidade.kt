@@ -49,9 +49,10 @@ data class Variacao(val anterior: ResultadoTeste, val delta: Double)
 object Historico {
     /**
      * O resultado anterior **comparável** de [teste] para comparar com [atual]: o mais recente entre [anteriores] (do mais novo ao mais
-     * antigo) que está completo e tem a mesma chave. `null` se não há — a tela não mostra variação. Execução incompleta nunca entra (BHS-06).
+     * antigo) que está completo e tem a mesma chave. `null` se não há — a tela não mostra variação. Execução incompleta nunca entra, nem como anterior nem como atual (BHS-06).
      */
     fun variacao(atual: Execucao, teste: String, anteriores: List<Execucao>): Variacao? {
+        if (!atual.comparavel) return null // a atual incompleta (cancelada, térmica…) tem nota parcial: não se compara (BHS-06)
         val resultado = atual.testes.firstOrNull { it.teste == teste } ?: return null
         val nota = resultado.nota ?: return null
         val chave = ChaveDeComparabilidade.de(atual, resultado)
