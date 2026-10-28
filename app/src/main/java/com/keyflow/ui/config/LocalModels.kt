@@ -108,9 +108,9 @@ data class LocalModelsUi(
             catalog = ModelCatalog.TEXT, installed = emptySet(), active = null, failures = emptyMap(), selectedId = null, deviceRamMb = 0,
         )
 
-        /** O vazio da Visão: lista os modelos de VISÃO/OCR. */
+        /** O vazio da Visão: lista os modelos que leem imagem — o OCR e os Gemma 4 (`ModelCatalog.visionModels`). */
         val EMPTY_VISION: LocalModelsUi = compose(
-            catalog = ModelCatalog.VISION, installed = emptySet(), active = null, failures = emptyMap(), selectedId = null, deviceRamMb = 0,
+            catalog = ModelCatalog.visionModels(), installed = emptySet(), active = null, failures = emptyMap(), selectedId = null, deviceRamMb = 0,
         )
 
         /** O vazio da Voz (Fala): lista os modelos de VOZ/TTS. */

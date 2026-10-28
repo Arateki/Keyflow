@@ -78,6 +78,8 @@ internal data class ModelListTags(
     val downloaded: (String) -> String = { id -> "${model(id)}-downloaded" },
     /** Uma etiqueta do card (idioma, pensamento, capacidade, RAM): `chave` é [CardTag.key]. */
     val tag: (String, String) -> String = { id, key -> "${model(id)}-tag-$key" },
+    /** Quais etiquetas a aba mostra: o mesmo modelo (Gemma 4) fala de texto no Raciocínio e de imagem na Visão. */
+    val tagScope: CardTagScope = CardTagScope.ALL,
 ) {
     companion object {
         /** As tags da aba Transcrição — os testes existentes dependem delas, não mudam. */
@@ -92,6 +94,7 @@ internal data class ModelListTags(
             { "raciocinio-local-delete-$it" }, { "raciocinio-local-progress-$it" }, { "raciocinio-local-heavy-$it" },
             { "raciocinio-local-notice-$it" }, { "raciocinio-local-confirm-$it" },
             "raciocinio-local-confirm-yes", "raciocinio-local-confirm-no",
+            tagScope = CardTagScope.REASONING,
         )
 
         /** As tags da aba Visão. */
@@ -100,6 +103,7 @@ internal data class ModelListTags(
             { "visao-local-delete-$it" }, { "visao-local-progress-$it" }, { "visao-local-heavy-$it" },
             { "visao-local-notice-$it" }, { "visao-local-confirm-$it" },
             "visao-local-confirm-yes", "visao-local-confirm-no",
+            tagScope = CardTagScope.VISION,
         )
 
         /** As tags da aba Voz (Fala). */
@@ -244,7 +248,7 @@ private fun ModelCard(
             }
         }
         // Etiquetas (idioma, pensamento, capacidades, RAM) e, no fim da última linha, a ação do card (quebra para a linha de baixo se não couber).
-        val cardTags = modelTags(spec)
+        val cardTags = modelTags(spec, tags.tagScope)
         val action: @Composable () -> Unit = {
             when (item.status) {
                 LocalModelStatus.AVAILABLE -> CardAction(

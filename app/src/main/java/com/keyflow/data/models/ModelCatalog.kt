@@ -41,8 +41,8 @@ enum class ThinkingSupport { NONE, OPTIONAL, ALWAYS }
 /**
  * O que o modelo faz de verificado, além do que o tipo e o idioma já dizem; vira etiqueta no card e **não inventa nada**: só entra o que o
  * fabricante declara (ou o que foi conferido) e a fonte fica no comentário de cada entrada do catálogo. [READ_TEXT] lê o texto de uma captura de
- * tela (OCR); [DESCRIBE_IMAGE] e [ANSWER_ABOUT_SCREEN] são as capacidades de visão dos Gemma 4 — ainda NÃO declaradas, porque falta provar no
- * aparelho que o `.litertlm` carrega com visão (VC-T15 da Visão); [TOOLS] ("Ferramentas"): o fabricante declara chamada de funções/uso de
+ * tela (OCR); [DESCRIBE_IMAGE] e [ANSWER_ABOUT_SCREEN] são as capacidades de visão dos Gemma 4 — declaradas desde a aba Visão (VC-T2c/T11), mas
+ * o motor que as usa ainda falta provar no aparelho (VC-T15; ver [ModelCatalog.visionModels]); [TOOLS] ("Ferramentas"): o fabricante declara chamada de funções/uso de
  * ferramentas no modelo (não quer dizer que o app já o use como agente: é o que o modelo sabe fazer); [NATIVE_PORTUGUESE]: o fabricante
  * lista o português entre os idiomas de treino (Parakeet TDT 0.6B v3). Valor que esta versão do app não conhece, num manifesto remoto, é
  * ignorado.
@@ -402,8 +402,13 @@ object ModelCatalog {
         // `.litertlm` injeta esse token quando `enable_thinking` é verdadeiro (fixture `gemma-e2b.jinja`, linhas 157-162).
         thinking = ThinkingSupport.OPTIONAL,
         // Ferramentas: a doc oficial "Function calling with Gemma 4" (ai.google.dev/gemma/docs/capabilities/text/function-calling-gemma4) e o card
-        // `google/gemma-4-E2B-it` ("native function-calling support"). Visão NÃO declarada (VC-T15). Conferido em 2026-10-27.
-        capabilities = setOf(ModelCapability.TOOLS),
+        // `google/gemma-4-E2B-it` ("native function-calling support"). Conferido em 2026-10-27.
+        // Visão (aba Visão, VC-T2c): o card `google/gemma-4-E2B-it` o descreve como multimodal (texto e imagem) e o `.litertlm` deste commit traz as seções
+        // `tf_lite_vision_encoder`/`tf_lite_vision_adapter` (conferido por `Range` em 2026-10-27, `vision-capture/context.md` V12). O que NÃO está provado é
+        // carregar com `visionBackend` no aparelho (VC-T15): até lá a aba Visão só lista este modelo no debug ([ModelCatalog.VISION_PROVEN_IDS]).
+        capabilities = setOf(
+            ModelCapability.TOOLS, ModelCapability.READ_TEXT, ModelCapability.DESCRIBE_IMAGE, ModelCapability.ANSWER_ABOUT_SCREEN,
+        ),
         files = listOf(
             ModelFile(FileRole.MODEL, "gemma-4-E2B-it.litertlm", "$GEMMA_4_REPO/gemma-4-E2B-it.litertlm", "181938105e0eefd105961417e8da75903eacda102c4fce9ce90f50b97139a63c", 2_588_147_712L),
         ),
@@ -469,8 +474,11 @@ object ModelCatalog {
         // Mode Configuration" (liga com `<|think|>` no começo do prompt de sistema; desligado, o E2B/E4B nem emite o canal). O template do próprio
         // `.litertlm` injeta esse token quando `enable_thinking` é verdadeiro (fixture `gemma-e2b.jinja`, linhas 157-162).
         thinking = ThinkingSupport.OPTIONAL,
-        // Ferramentas: a mesma doc oficial do Gemma 4 e o card `google/gemma-4-E4B-it`. Visão NÃO declarada (VC-T15). Conferido em 2026-10-27.
-        capabilities = setOf(ModelCapability.TOOLS),
+        // Ferramentas: a mesma doc oficial do Gemma 4 e o card `google/gemma-4-E4B-it`. Conferido em 2026-10-27.
+        // Visão (aba Visão, VC-T2c): mesmo caso do E2B — card multimodal e seções `tf_lite_vision_*` no `.litertlm` deste commit; carregar com visão no aparelho = VC-T15.
+        capabilities = setOf(
+            ModelCapability.TOOLS, ModelCapability.READ_TEXT, ModelCapability.DESCRIBE_IMAGE, ModelCapability.ANSWER_ABOUT_SCREEN,
+        ),
         files = listOf(
             ModelFile(FileRole.MODEL, "gemma-4-E4B-it.litertlm", "$GEMMA_4_E4B_REPO/gemma-4-E4B-it.litertlm", "0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0", 3_659_530_240L),
         ),
@@ -703,6 +711,29 @@ object ModelCatalog {
 
     /** Modelos de visão e OCR (aba Visão), como este build os mostra: o OCR só no debug até ser validado (VC-T6). */
     val VISION: List<ModelSpec> = visibleIn(VISION_ALL, BuildConfig.DEBUG)
+
+    /**
+     * Ids de modelos de TEXTO (os Gemma 4) cuja visão já foi **provada** carregando e lendo uma imagem num aparelho (VC-T15). Vazio de propósito: os
+     * Gemma 4 declaram as capacidades de visão (ver [ModelCapability]), mas até a prova a aba Visão só os lista no debug — como o OCR, que também
+     * espera a validação. A VC-T15 coloca aqui o id que passar (ou tira a capacidade do `ModelSpec` se o `.litertlm` não carregar com visão).
+     */
+    private val VISION_PROVEN_IDS: Set<String> = emptySet()
+
+    /** O modelo lê imagem: tem alguma capacidade de visão ([ModelCapability.READ_TEXT], [ModelCapability.DESCRIBE_IMAGE], [ModelCapability.ANSWER_ABOUT_SCREEN]). */
+    val VISION_CAPABILITIES: Set<ModelCapability> =
+        setOf(ModelCapability.READ_TEXT, ModelCapability.DESCRIBE_IMAGE, ModelCapability.ANSWER_ABOUT_SCREEN)
+
+    /**
+     * Os modelos locais da aba Visão (vision-capture, VC-T2c/T11), do menor ao maior arquivo: o OCR (`kind = VISION`) e os modelos de texto que
+     * declaram visão (Gemma 4). Os Gemma são **as mesmas entradas** do catálogo de texto — um `id`, uma cópia em disco, um download: instalado
+     * numa aba aparece instalado na outra. O release só mostra o que está validado no aparelho ([visibleIn]) e, dos de texto, só o que a visão já
+     * provou ([VISION_PROVEN_IDS]); o debug mostra tudo.
+     */
+    fun visionModels(from: List<ModelSpec> = effectiveModels(), debug: Boolean = BuildConfig.DEBUG): List<ModelSpec> =
+        from.filter { spec ->
+            val sees = spec.kind == ModelKind.VISION || (spec.kind == ModelKind.TEXT && spec.capabilities.any { it in VISION_CAPABILITIES })
+            sees && (debug || (spec.validatedOnDevice && (spec.kind == ModelKind.VISION || spec.id in VISION_PROVEN_IDS)))
+        }.sortedBy { it.totalBytes }
 
     /**
      * Modelos de voz e síntese (aba Voz). Vazia de propósito: as quatro entradas antigas tinham pins inventados e
