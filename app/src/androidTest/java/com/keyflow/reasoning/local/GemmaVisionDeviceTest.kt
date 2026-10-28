@@ -11,6 +11,10 @@ import com.keyflow.data.models.ModelCatalog
 import com.keyflow.reasoning.ReasoningRequest
 import com.keyflow.ui.config.VisionTestImage
 import com.keyflow.vision.VisionImage
+import com.keyflow.vision.LocalVisionEngine
+import com.keyflow.vision.VisionResult
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import java.io.File
 import java.net.URL
 import java.security.MessageDigest
@@ -89,6 +93,18 @@ class GemmaVisionDeviceTest {
             note("primeiro trecho=$firstMs ms; geração=${(System.nanoTime() - start) / 1_000_000} ms; resposta sintética=$response")
             assertTrue("resposta vazia", response.isNotBlank())
             assertTrue("não leu a palavra na imagem sintética: $response", response.toString().replace(" ", "").contains("KeyFlow", ignoreCase = true))
+            // Confere também a composição de produção: arquivo de imagem, AIDL, guarda e StrictMode do :reasoning.
+            backend.unload()
+            val connection = ReasoningConnection(context, lingerMs = 0)
+            try {
+                val transport = LocalReasoningEngine(spec.id, { model }, connection,
+                    imageDirectory = File(context.cacheDir, "reasoning-images"))
+                val ipcStart = System.nanoTime()
+                val actual = runBlocking { withTimeout(300_000) { LocalVisionEngine(transport).ask(image, prompt) } }
+                note("pipeline :reasoning com StrictMode de rede; total=${(System.nanoTime() - ipcStart) / 1_000_000} ms; resposta sintética=$actual")
+                assertTrue("motor de produção não respondeu: $actual", actual is VisionResult.Text)
+                assertTrue((actual as VisionResult.Text).text.replace(" ", "").contains("KeyFlow", ignoreCase = true))
+            } finally { connection.close() }
         } finally {
             backend.cancel(); worker.shutdownNow(); worker.awaitTermination(5, TimeUnit.SECONDS)
             backend.unload(); root.deleteRecursively()
