@@ -91,7 +91,7 @@ e o emulador são o gargalo: instrumentados serializam). T19 é o marco: **sem b
 - **Depends on**: T3. **Requirement**: BPT-06, BPT-07, BPT-11. **Gate**: `quick`. **Commit**: `feat(bancada): pontuadores de ações e contexto`.
 
 ### BNC-T6 — Resultado, chave de comparabilidade e JSON `bancada-resultado/1` `[P]`
-- **Status**: Concluída (PR 1, 2026-10-28). Chave de comparabilidade com o campo `perfil` a mais (ver `licoes/2026-10-28-bancada-p1.md`). A constante única da versão do LiteRT-LM em `app/build.gradle.kts` fica para a T9 (o campo `motor.versao` já existe no esquema).
+- **Status**: Concluída (PR 1, 2026-10-28). Chave de comparabilidade com o campo `perfil` a mais (ver `licoes/2026-10-28-bancada-p1.md`). A constante única da versão do LiteRT-LM (`litertLmVersion` em `app/build.gradle.kts`, usada pela dependência e por `BuildConfig.LITERT_LM_VERSION`) entrou na PR 2; o executor grava o valor em `motor.versao`.
 - **What**: modelos `Execucao`/`ResultadoTeste`/`ResultadoCaso`, serializador/leitor `org.json`, `ChaveDeComparabilidade`, versão do LiteRT-LM
   numa constante única de `app/build.gradle.kts` usada pela dependência **e** por `BuildConfig`.
 - **Done when**: ida e volta sem perda; esquema validado; uma execução com chave de API falsa no ambiente não a contém serializada
