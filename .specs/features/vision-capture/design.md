@@ -188,16 +188,18 @@ Contrato: `read(imagem) → texto` e `ask(imagem, pedido) → resposta`, resulta
 formato do `OcrEngine`). Três implementações escolhidas pela origem/modelo selecionado na aba (§14):
 - **`LocalVisionEngine` (Gemma 4 E2B/E4B)**: o `LocalReasoningEngine`/`LiteRtBackend` do `:reasoning` com `EngineConfig.visionBackend`
   e a imagem como `Content.ImageBytes` (PNG do recorte, reduzido a um lado maior de ~1024 px para caber na memória). Guarda de RAM e
-  descarga por ociosidade de 120 s já existentes; o E4B pede 8 GB e o aviso de "pesado" do `LocalModelsUi` vale aqui. ⚠️ **Falta provar
-  no aparelho** que o `.litertlm` carrega com visão (a seção `tf_lite_vision_encoder` existe nos dois arquivos, conferido em 2026-10-27;
+  descarga por ociosidade de 120 s já existentes; o E4B pede 8 GB e o aviso de "pesado" do `LocalModelsUi` vale aqui. ⚠️ A prova funcional é feita explicitamente na CPU do emulador; qualidade/tempo/RAM no aparelho ficam na VC-T14. A prova usa o mesmo backend de produção. Falta medir no aparelho como o `.litertlm` carrega com visão (a seção `tf_lite_vision_encoder` existe nos dois arquivos, conferido em 2026-10-27;
   o `LiteRtBackend` ainda não passa `visionBackend`) — critério de aceite da VC-T15, com o E2B.
 - **`CloudVisionEngine` (OpenAI/Anthropic/Google)**: o mesmo caminho de nuvem do Raciocínio (`ReasoningEngines`, credencial do cofre),
   agora com a imagem no corpo (formato de cada provedor), só com modelos da lista curada de visão (PRV-02).
 - **`CustomVisionEngine`**: `POST` `chat/completions` com `image_url` (data URL) no endpoint/header/modelo digitados (PRV-03).
 Pedidos fixos: "Copiar texto" usa "Transcreva exatamente o texto desta imagem, mantendo as quebras de linha; responda só com o
 texto."; "Perguntar" usa o pedido do usuário (padrão "Descreva esta imagem."). O PaddleOCR não implementa `ask` (sem a capacidade).
-Falha (OOM, rede, cota, chave, modelo sem visão) → aviso com a causa, nada copiado, epílogo (PRV-05, MDL-04). Cancelar o coletor do
-`Flow` cancela a geração local (RRUN-06) ou a requisição.
+Falha (OOM, rede, cota, chave, modelo sem visão) → aviso com a causa, nada copiado, epílogo (PRV-05, MDL-04). Cancelar a corrotina cancela o coletor do `Flow` e, com ele, a geração local por id ou a chamada HTTP. `VisionResult.Failed` conserva a causa (`ReasoningError`), sem corpo de erro nem texto parcial.
+
+Implementação VC-T15: `ReasoningRequest.image` leva PNG/JPEG/WebP de até 8 MiB; `VisionImage.encode` reduz a imagem a 1024 px no lado maior. No local, `LocalReasoningEngine` grava um arquivo privado único em `cacheDir/reasoning-images` (bytes fora do binder) e o apaga no epílogo; o `:reasoning` valida o caminho/teto e só lê depois da guarda de RAM. A identidade residente inclui `vision` além de id/versão/backend; texto e visão não reutilizam um encoder ausente. `generateRequest`/`cancelRequest` usam ids únicos, inclusive enquanto enfileirados; a preparação do backend precede sua publicação como cancelável, evitando perder cancelamento na entrada de `generate`. A política StrictMode do trabalhador detecta rede no processo local.
+
+Nuvem reutiliza os clientes e a autorização do Raciocínio: Responses `input_image` (OpenAI), bloco `image` base64 (Anthropic) e `inlineData` (Google). Custom usa `chat/completions` com data URL, somente seu header configurado e sem redirecionamento. Os clientes de texto preservam o corpo anterior quando não há imagem. O Testar usa a mesma imagem de Canvas do OCR, resposta completa e tempo; troca de origem/modelo/conexão cancela o pedido anterior. Os portões de liberação `VISION_PROVEN_IDS`/`validatedOnDevice` continuam dependendo da validação física.
 
 ### 12. Avisos de modelo ausente (`OCR-04`)
 Banner overlay no mesmo estilo/janela do `CopyToast` (~6 s, mais que os 3 s porque tem ação):

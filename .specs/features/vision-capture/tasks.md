@@ -262,8 +262,7 @@ O ID fica reservado (não reutilizar) para que commits e referências antigas n�
 ### VC-T15 — `VisionModelEngine`: Gemma 4 local + nuvem/Custom *(nova; V12/V13)*
 - **What**: contrato `VisionModelEngine` (`read`/`ask` → `Text | Empty | Unavailable | Failed`, design §11) com três implementações:
   (a) **`LocalVisionEngine`** — Gemma 4 pelo `LocalReasoningEngine`/`LiteRtBackend` no `:reasoning`: `EngineConfig.visionBackend` + imagem como
-  `Content.ImageBytes` (recorte reduzido a ~1024 px), guarda de RAM, descarga por ociosidade; **primeiro passo: provar no aparelho que o
-  E2B carrega com visão e lê uma imagem** (hoje o `LiteRtBackend` não passa `visionBackend`); (b) **`CloudVisionEngine`** — OpenAI/
+  `Content.ImageBytes` (recorte reduzido a ~1024 px), guarda de RAM, descarga por ociosidade; **prova funcional: E2B na CPU do emulador, em teste instrumentado opt-in explícito; qualidade/tempo/RAM físicos ficam para a bancada do coordenador** (hoje o `LiteRtBackend` não passa `visionBackend`); (b) **`CloudVisionEngine`** — OpenAI/
   Anthropic/Google pelos caminhos de nuvem do Raciocínio (`ReasoningEngines`, credencial do cofre) com a imagem no corpo; (c)
   **`CustomVisionEngine`** — `chat/completions` com `image_url` (data URL). Pedidos fixos do design §11; escolha do engine pelo
   modelo/origem selecionado; falha → aviso com a causa e nada copiado (PRV-05, MDL-04). Fia **Copiar texto** com Gemma/provedor (ACT-02).
@@ -277,6 +276,10 @@ O ID fica reservado (não reutilizar) para que commits e referências antigas n�
   visão, registrar no `STATE.md`, tirar os Gemma da lista de visão (`capabilities` vazio) e seguir só com provedores (design §Riscos);
   qualidade/tempo/RAM reais no A32 = **manual** (VC-T14).
 - **Tests**: unit + instrumented (+manual). **Gate**: `full` + manual.
+
+Status (2026-10-28): motor e Testar implementados na branch `equipe/visao-motor`; validação em andamento.
+Contrato e seleção puros, provedores compartilhados, Custom com imagem, arquivo privado para o AIDL e cancelamento por pedido.
+O fluxo de captura/gestos não faz parte desta entrega. `GemmaVisionDeviceTest#e2bNaCpuLeAImagemDeExemplo` é opt-in por método explícito, baixa o E2B do catálogo e verifica SHA/tamanho; a suíte comum usa eco/fakes. Resultados finais na lição `licoes/2026-10-28-visao-motor.md`. `VISION_PROVEN_IDS` e `validatedOnDevice` permanecem inalterados até a validação física.
 
 ### VC-T16 — Gesto 💬 **Perguntar** ⚠️ (proposta) *(nova)*
 - **What**: terceiro alvo do `VisionDragTargets`, **só quando o modelo selecionado tem `ANSWER_ABOUT_SCREEN`** (Gemma ou provedor com
