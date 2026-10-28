@@ -88,6 +88,8 @@ import com.keyflow.data.models.DownloadProgress
 import com.keyflow.auth.AuthMethod
 import com.keyflow.auth.ConnectionState
 import com.keyflow.core.ReasoningSource
+import com.keyflow.core.ComputeBackend
+import com.keyflow.data.LocalBackendPrefs
 import com.keyflow.reasoning.ReasoningEngine
 import com.keyflow.reasoning.ReasoningError
 import com.keyflow.reasoning.ReasoningEvent
@@ -380,6 +382,25 @@ object RouteCatalog {
                 ready = true,
             )
         },
+        // O seletor "Roda em" (CPU · GPU) do card: o aparelho da galeria não tem OpenCL, então a rota simula um que tem. Leve selecionado com
+        // a GPU escolhida e ainda sem nenhuma carga (aviso de primeira carga demorada); Versátil que voltou para a CPU (aviso no card);
+        // Intermediário na GPU que já carregou (sem aviso).
+        Route("config-raciocinio-local-gpu") {
+            val prefs = LocalBackendPrefs.EMPTY
+                .choose(ModelCatalog.QWEN3_0_6B.id, ComputeBackend.GPU)
+                .fellBack(ModelCatalog.QWEN2_5_1_5B.id, ComputeBackend.GPU)
+                .choose(ModelCatalog.SMOLLM2_1_7B.id, ComputeBackend.GPU).markGpuReady(ModelCatalog.SMOLLM2_1_7B.id)
+            ConfigReasoningRoute(
+                localModelId = ModelCatalog.QWEN3_0_6B.id,
+                localModels = galleryTextModels(
+                    installed = setOf(ModelCatalog.QWEN3_0_6B.id, ModelCatalog.QWEN2_5_1_5B.id, ModelCatalog.SMOLLM2_1_7B.id),
+                    selected = ModelCatalog.QWEN3_0_6B.id,
+                    backendPrefs = prefs,
+                    gpuAvailable = true,
+                ),
+                ready = true,
+            )
+        },
         Route("config-raciocinio-openai-desconectado") {
             ConfigReasoningRoute(source = ReasoningSource.OPENAI, auth = GalleryAuth(ConnectionState.Disconnected, storedKey = FakeSettings.OPENAI_API_KEY))
         },
@@ -520,10 +541,16 @@ object RouteCatalog {
         LocalModelsUi.compose(installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_192)
 
     /** Estado fixo da lista de modelos de TEXTO do Raciocínio (RAM de sobra, como a de voz). */
-    private fun galleryTextModels(installed: Set<String> = emptySet(), active: DownloadProgress? = null, selected: String? = null) =
-        LocalModelsUi.compose(
-            catalog = ModelCatalog.TEXT, installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_192,
-        )
+    private fun galleryTextModels(
+        installed: Set<String> = emptySet(),
+        active: DownloadProgress? = null,
+        selected: String? = null,
+        backendPrefs: LocalBackendPrefs = LocalBackendPrefs.EMPTY,
+        gpuAvailable: Boolean = false,
+    ) = LocalModelsUi.compose(
+        catalog = ModelCatalog.TEXT, installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_192,
+        backendPrefs = backendPrefs, gpuAvailable = gpuAvailable,
+    )
 
     /** Estado fixo da lista de modelos de VISÃO/OCR (RAM de sobra, como a de voz), com os modelos de amostra: o catálogo real está vazio. */
     private fun galleryVisionModels(installed: Set<String> = emptySet(), active: DownloadProgress? = null, selected: String? = null) =

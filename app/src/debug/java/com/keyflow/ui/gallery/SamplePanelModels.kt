@@ -2,6 +2,7 @@ package com.keyflow.ui.gallery
 
 import com.keyflow.data.models.EngineType
 import com.keyflow.data.models.FileRole
+import com.keyflow.data.models.ModelCapability
 import com.keyflow.data.models.ModelFile
 import com.keyflow.data.models.ModelKind
 import com.keyflow.data.models.ModelSpec
@@ -15,7 +16,15 @@ import com.keyflow.data.models.ModelSpec
  */
 object SamplePanelModels {
 
-    private fun spec(id: String, name: String, kind: ModelKind, engine: EngineType, ramMb: Int, bytes: Long) = ModelSpec(
+    private fun spec(
+        id: String,
+        name: String,
+        kind: ModelKind,
+        engine: EngineType,
+        ramMb: Int,
+        bytes: Long,
+        capabilities: Set<ModelCapability> = emptySet(),
+    ) = ModelSpec(
         id = id,
         displayName = name,
         summary = "Modelo de amostra para a galeria e os testes",
@@ -25,12 +34,23 @@ object SamplePanelModels {
         recommendedRamMb = ramMb,
         modelName = name,
         kind = kind,
+        capabilities = capabilities,
         files = listOf(ModelFile(FileRole.MODEL, "$id.bin", "https://amostra.invalid/$id.bin", "0".repeat(64), bytes)),
     )
 
-    val VISION_LIGHT = spec("amostra-visao-leve", "Amostra de visão leve", ModelKind.VISION, EngineType.OCR, 256, 4_000_000L)
-    val VISION_BALANCED = spec("amostra-visao-media", "Amostra de visão média", ModelKind.VISION, EngineType.OCR, 512, 27_000_000L)
-    val VISION_HEAVY = spec("amostra-visao-pesada", "Amostra de visão pesada", ModelKind.VISION, EngineType.LITERT_LM, 2048, 590_000_000L)
+    // As capacidades das amostras só existem para a galeria mostrar etiquetas de uma, duas e três capacidades; não são catálogo.
+    val VISION_LIGHT = spec(
+        "amostra-visao-leve", "Amostra de visão leve", ModelKind.VISION, EngineType.OCR, 256, 4_000_000L,
+        setOf(ModelCapability.READ_TEXT),
+    )
+    val VISION_BALANCED = spec(
+        "amostra-visao-media", "Amostra de visão média", ModelKind.VISION, EngineType.OCR, 512, 27_000_000L,
+        setOf(ModelCapability.READ_TEXT, ModelCapability.DESCRIBE_IMAGE),
+    )
+    val VISION_HEAVY = spec(
+        "amostra-visao-pesada", "Amostra de visão pesada", ModelKind.VISION, EngineType.LITERT_LM, 2048, 590_000_000L,
+        setOf(ModelCapability.READ_TEXT, ModelCapability.DESCRIBE_IMAGE, ModelCapability.ANSWER_ABOUT_SCREEN),
+    )
 
     val VOICE_LIGHT = spec("amostra-voz-leve", "Amostra de voz leve", ModelKind.VOICE, EngineType.TTS, 256, 52_000_000L)
     val VOICE_BALANCED = spec("amostra-voz-media", "Amostra de voz média", ModelKind.VOICE, EngineType.TTS, 512, 87_000_000L)

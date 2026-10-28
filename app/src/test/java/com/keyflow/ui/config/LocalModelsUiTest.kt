@@ -8,7 +8,6 @@ import com.keyflow.data.models.DownloadProgress
 import com.keyflow.data.models.DownloadState
 import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.StartResult
-import com.keyflow.data.models.ThinkingSupport
 import com.keyflow.ui.gallery.SamplePanelModels
 import org.junit.Test
 
@@ -293,12 +292,6 @@ class LocalModelsUiTest {
         assertThat(LocalModelsUi.EMPTY_VISION.items.map { it.spec.id }).containsNoneOf(piper, kokoro, melo)
     }
 
-    @Test
-    fun `the thinking line exists only for models that think`() {
-        assertThat(thinkingNotice(ThinkingSupport.NONE)).isNull()
-        assertThat(thinkingNotice(ThinkingSupport.OPTIONAL)).isEqualTo("Suporta modo pensamento.")
-        assertThat(thinkingNotice(ThinkingSupport.ALWAYS)).isEqualTo("Sempre pensa antes de responder.")
-    }
 
     // ── seletor "Roda em" (CPU · GPU) do card de texto local ────────────────────────────────────────────
 

@@ -3,6 +3,7 @@ package com.keyflow.data.monetization
 import com.google.common.truth.Truth.assertThat
 import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.ModelKind
+import com.keyflow.data.models.ModelCapability
 import com.keyflow.data.models.ThinkingSupport
 import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
@@ -117,6 +118,22 @@ class RemoteConfigRepositoryTest {
         assertThat(parse("OPTIONAL")).isEqualTo(ThinkingSupport.OPTIONAL)
         assertThat(parse("ALWAYS")).isEqualTo(ThinkingSupport.ALWAYS)
         assertThat(parse("SOMETIMES")).isEqualTo(ThinkingSupport.NONE)
+    }
+
+    @Test
+    fun `capabilities do manifesto são opcionais e toleram valor desconhecido ou mal formado`() {
+        fun parse(capabilities: String?) = RemoteConfigRepository.parseModels(
+            modelsJson("m").let { json ->
+                if (capabilities == null) json else json.replace("\"vendor\": \"NVIDIA\",", "\"vendor\": \"NVIDIA\", \"capabilities\": $capabilities,")
+            },
+        ).single().capabilities
+
+        assertThat(parse(null)).isEmpty()
+        assertThat(parse("[]")).isEmpty()
+        assertThat(parse("[\"READ_TEXT\", \"TOOLS\", \"NATIVE_PORTUGUESE\"]"))
+            .containsExactly(ModelCapability.READ_TEXT, ModelCapability.TOOLS, ModelCapability.NATIVE_PORTUGUESE)
+        assertThat(parse("[\"READ_TEXT\", \"VOAR\", 7, null]")).containsExactly(ModelCapability.READ_TEXT)
+        assertThat(parse("\"READ_TEXT\"")).isEmpty()
     }
 
     @Test

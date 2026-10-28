@@ -7,7 +7,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertTextEquals
@@ -30,6 +33,7 @@ import com.keyflow.data.models.ModelSpec
 import com.keyflow.data.models.StartResult
 import com.keyflow.ui.theme.KeyFlowTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -131,18 +135,91 @@ class ModelListTest {
         rule.onAllNodesWithTag("model-vendor-google").assertCountEquals(2)
     }
 
-    /** Só informativo: Qwen3 e Gemma 4 suportam pensamento, o DeepSeek sempre pensa; Qwen2.5 e SmolLM2 não ganham linha. */
+    /** O card não mostra mais o resumo: o que o modelo é vem em etiquetas (idioma, pensamento, RAM, capacidades). */
     @Test
-    fun theTextCardsSayWhetherTheModelThinks() {
+    fun theCardShowsTagsAndNoLongerTheSummary() {
         rule.setContent { Host(text(installed = emptySet()), FakeActions(), ModelListTags.Raciocinio) }
 
-        fun thinking(spec: ModelSpec) = rule.onNodeWithTag("raciocinio-local-model-${spec.id}-thinking")
-        thinking(ModelCatalog.QWEN3_0_6B).performScrollTo().assertTextEquals("Suporta modo pensamento.")
-        thinking(ModelCatalog.GEMMA_4_E2B).performScrollTo().assertTextEquals("Suporta modo pensamento.")
-        thinking(ModelCatalog.GEMMA_4_E4B).performScrollTo().assertTextEquals("Suporta modo pensamento.")
-        thinking(ModelCatalog.DEEPSEEK_R1_1_5B).performScrollTo().assertTextEquals("Sempre pensa antes de responder.")
-        thinking(ModelCatalog.QWEN2_5_1_5B).assertDoesNotExist()
-        thinking(ModelCatalog.SMOLLM2_1_7B).assertDoesNotExist()
+        fun tag(spec: ModelSpec, key: String) = rule.onNodeWithTag("raciocinio-local-model-${spec.id}-tag-$key")
+        tag(ModelCatalog.QWEN3_0_6B, "language").performScrollTo().assertTextEquals("Multilíngue")
+        tag(ModelCatalog.QWEN3_0_6B, "thinking").assertTextEquals("Pensamento opcional")
+        tag(ModelCatalog.QWEN3_0_6B, "capability_tools").assertTextEquals("Ferramentas")
+        tag(ModelCatalog.QWEN3_0_6B, "ram").assertTextEquals("≥ 3 GB de RAM")
+        tag(ModelCatalog.DEEPSEEK_R1_1_5B, "thinking").performScrollTo().assertTextEquals("Sempre pensa")
+        tag(ModelCatalog.SMOLLM2_1_7B, "language").performScrollTo().assertTextEquals("Inglês")
+        tag(ModelCatalog.DEEPSEEK_R1_1_5B, "capability_tools").assertDoesNotExist()
+        tag(ModelCatalog.QWEN2_5_1_5B, "thinking").assertDoesNotExist()
+        tag(ModelCatalog.SMOLLM2_1_7B, "thinking").assertDoesNotExist()
+        ModelCatalog.TEXT.forEach { rule.onNodeWithText(it.summary).assertDoesNotExist() }
+    }
+
+    @Test
+    fun theSpeechAndVisionCardsTagTheirOwnDifferentials() {
+        rule.setContent {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                KeyFlowTheme(dark = false) {
+                    ModelList(speech(installed = emptySet()), FakeActions(), {}, {}, ModelListTags.Voz)
+                    ModelList(
+                        LocalModelsUi.compose(
+                            catalog = listOf(ModelCatalog.OCR_PADDLE_LATIN), installed = emptySet(), active = null, failures = emptyMap(),
+                            selectedId = null, deviceRamMb = 8_000,
+                        ),
+                        FakeActions(), {}, {}, ModelListTags.Visao,
+                    )
+                }
+            }
+        }
+
+        rule.onNodeWithTag("voz-local-model-${ModelCatalog.PARAKEET_V3.id}-tag-native_portuguese").performScrollTo().assertTextEquals("Português nativo")
+        rule.onNodeWithTag("voz-local-model-${ModelCatalog.PARAKEET_V3.id}-tag-language").assertTextEquals("25 idiomas europeus")
+        rule.onNodeWithTag("voz-local-model-${base.id}-tag-native_portuguese").assertDoesNotExist()
+        rule.onNodeWithTag("visao-local-model-${ModelCatalog.OCR_PADDLE_LATIN.id}-tag-capability_read_text").performScrollTo()
+            .assertTextEquals("Ler texto da tela")
+    }
+
+    /** Os três estados se distinguem sem depender de cor: não baixado (só "Baixar"), baixado (o check) e selecionado (o item de rádio marcado). */
+    @Test
+    fun notDownloadedDownloadedAndSelectedAreThreeDistinctStates() {
+        rule.setContent { Host(text(installed = setOf(qwen.id, gemma.id), selected = gemma.id), FakeActions(), ModelListTags.Raciocinio) }
+
+        fun mark(spec: ModelSpec) = rule.onNodeWithTag("raciocinio-local-model-${spec.id}-downloaded", useUnmergedTree = true)
+        // Não baixado: nenhum check, o botão é "Baixar" e o card nem é item de seleção (sem estado de seleção).
+        mark(ModelCatalog.SMOLLM2_1_7B).assertDoesNotExist()
+        rule.onNodeWithTag("raciocinio-local-download-${ModelCatalog.SMOLLM2_1_7B.id}").performScrollTo().assertTextEquals("Baixar")
+        rule.onNodeWithTag("raciocinio-local-model-${ModelCatalog.SMOLLM2_1_7B.id}").assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Selected))
+        // Baixado e não selecionado: o check "Baixado" e o item de rádio desmarcado.
+        mark(qwen).performScrollTo().assertContentDescriptionEquals("Baixado")
+        rule.onNodeWithTag("raciocinio-local-model-${qwen.id}").assertIsNotSelected()
+        rule.onNodeWithTag("raciocinio-local-delete-${qwen.id}").assertTextEquals("Apagar")
+        // Baixado e selecionado: o mesmo check, mais o item de rádio marcado.
+        mark(gemma).performScrollTo().assertContentDescriptionEquals("Baixado")
+        rule.onNodeWithTag("raciocinio-local-model-${gemma.id}").assertIsSelected()
+    }
+
+    /** O logo do fabricante é grande o bastante para reconhecer a marca (era 15 dp, no topo) e fica à esquerda do nome. */
+    @Test
+    fun theVendorLogoIsBigAndSitsBesideTheName() {
+        rule.setContent { Host(text(installed = emptySet()), FakeActions(), ModelListTags.Raciocinio) }
+
+        val logo = rule.onNodeWithTag("model-vendor-qwen", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val density = rule.density.density
+        assertTrue("logo de ${logo.width / density} dp", logo.width / density >= 28f && logo.width / density <= 32f)
+        val card = rule.onNodeWithTag("raciocinio-local-model-${qwen.id}").fetchSemanticsNode().boundsInRoot
+        assertTrue("o logo fica no começo do card", logo.left - card.left < 24f * density)
+    }
+
+    @Test
+    fun theParakeetNameStaysOnOneLineWithTheDownloadedMark() {
+        val ui = LocalModelsUi.compose(
+            catalog = listOf(ModelCatalog.PARAKEET_V3), installed = setOf(ModelCatalog.PARAKEET_V3.id), active = null, failures = emptyMap(),
+            selectedId = ModelCatalog.PARAKEET_V3.id, deviceRamMb = 8_000,
+        )
+        rule.setContent { Host(ui, FakeActions(), ModelListTags.Voz) }
+
+        rule.onNodeWithText("Máxima qualidade", useUnmergedTree = true).assertIsDisplayed()
+        val name = rule.onNodeWithText("Máxima qualidade", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        // Uma linha de 13 sp tem menos de 24 dp de altura; duas linhas passariam de 30.
+        assertTrue("o nome quebrou: ${name.height / rule.density.density} dp", name.height / rule.density.density < 24f)
     }
 
     /** Quem tem o arquivo antigo do modelo vê "Atualizar modelo" (não "Baixar") e o porquê. */

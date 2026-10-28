@@ -403,6 +403,35 @@ class ModelCatalogTest {
     }
 
     /**
+     * Etiquetas de capacidade do card: só o que o fabricante declara, com a fonte no comentário de cada entrada. "Ferramentas": Qwen3 0.6B (card, "Agentic
+     * Use"), Qwen2.5 1.5B (chat template com `tools`/`<tool_call>`), SmolLM2 1.7B (card, "function calling") e os dois Gemma 4 (doc oficial "Function
+     * calling with Gemma 4" e card); o DeepSeek R1 Distill não declara, fica sem a etiqueta. Os Gemma 4 NÃO declaram visão (descrever imagem, responder
+     * sobre a tela): falta provar no aparelho que o `.litertlm` carrega com visão (VC-T15 da Visão). Parakeet: português entre os idiomas de treino.
+     */
+    @Test
+    fun `capabilities declare only what the maker states`() {
+        val tools = setOf(ModelCapability.TOOLS)
+        val byId = ModelCatalog.MODELS.associate { it.id to it.capabilities }
+        assertThat(byId).containsExactly(
+            "whisper-base-int8", emptySet<ModelCapability>(),
+            "whisper-small-int8", emptySet<ModelCapability>(),
+            "parakeet-tdt-0.6b-v3-int8", setOf(ModelCapability.NATIVE_PORTUGUESE),
+            "qwen3-0.6b-litertlm", tools,
+            "qwen2.5-1.5b-litertlm", tools,
+            "smollm2-1.7b-litertlm", tools,
+            "deepseek-r1-1.5b-litertlm", emptySet<ModelCapability>(),
+            "gemma-4-e2b-litertlm", tools,
+            "gemma-4-e4b-litertlm", tools,
+            "ocr-paddle-latin", setOf(ModelCapability.READ_TEXT),
+        )
+        ModelCatalog.MODELS.forEach {
+            assertThat(it.capabilities).containsNoneOf(ModelCapability.DESCRIBE_IMAGE, ModelCapability.ANSWER_ABOUT_SCREEN)
+        }
+        assertThat(ModelCapability.entries.map { it.name })
+            .containsExactly("READ_TEXT", "DESCRIBE_IMAGE", "ANSWER_ABOUT_SCREEN", "TOOLS", "NATIVE_PORTUGUESE").inOrder()
+    }
+
+    /**
      * Trava de versão do catálogo: o manifesto remoto só vale se `catalogVersion >= EMBEDDED_VERSION`, então mexer num pin sem subir a versão deixaria um
      * manifesto/cache antigo reverter o pin. Mudou um pin ou entrou modelo: suba `ModelCatalog.EMBEDDED_VERSION` e troque a impressão digital abaixo.
      */

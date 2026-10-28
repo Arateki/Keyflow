@@ -8,6 +8,7 @@ import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.ModelFile
 import com.keyflow.data.models.ModelKind
 import com.keyflow.data.models.ModelSpec
+import com.keyflow.data.models.ModelCapability
 import com.keyflow.data.models.ModelVendor
 import com.keyflow.data.models.ThinkingSupport
 import com.keyflow.net.KeyFlowHttpClient
@@ -261,7 +262,18 @@ class RemoteConfigRepository(
                 vendor = ModelVendor.entries.firstOrNull { it.name == json.optString("vendor", "") },
                 // Idem: aviso informativo; ausente ou desconhecido vira "nenhum aviso".
                 thinking = ThinkingSupport.entries.firstOrNull { it.name == json.optString("thinking", "") } ?: ThinkingSupport.NONE,
+                // Idem: etiquetas opcionais; ausente, mal formado ou nome desconhecido vira "sem essa etiqueta", nunca manifesto inválido.
+                capabilities = parseCapabilities(json.optJSONArray("capabilities")),
             )
+        }
+
+        private fun parseCapabilities(array: org.json.JSONArray?): Set<ModelCapability> {
+            if (array == null) return emptySet()
+            return buildSet {
+                for (index in 0 until array.length()) {
+                    ModelCapability.entries.firstOrNull { it.name == array.optString(index, "") }?.let(::add)
+                }
+            }
         }
 
         private fun parseFile(json: JSONObject, modelId: String): ModelFile {
