@@ -38,7 +38,8 @@ internal class LiteRtBackend(private val cacheDir: String?, private val opensThi
     override fun load(model: LlmModel) {
         var created: Engine? = null
         try {
-            created = Engine(EngineConfig(modelPath = model.modelPath, backend = LiteRtConfigs.backend(model.backend), cacheDir = cacheDir))
+            created = Engine(EngineConfig(modelPath = model.modelPath, backend = LiteRtConfigs.backend(model.backend),
+                visionBackend = if (model.vision) LiteRtConfigs.backend(model.backend) else null, cacheDir = cacheDir))
             // Pode levar segundos (a doc fala em até ~10 s): estamos na thread de trabalho do serviço, não na da tela.
             created.initialize()
             textFormat = LiteRtConfigs.textFormat(created, opensThink)
@@ -69,7 +70,7 @@ internal class LiteRtBackend(private val cacheDir: String?, private val opensThi
             val finished = CountDownLatch(1)
             val failure = AtomicReference<Throwable?>(null)
             conversation.sendMessageAsync(
-                LiteRtConfigs.user(request.user, textFormat),
+                LiteRtConfigs.user(request.user, textFormat, request.image),
                 object : MessageCallback {
                     override fun onMessage(message: Message) {
                         val text = stripper.accept(textOf(message))
@@ -156,7 +157,11 @@ internal object LiteRtConfigs {
     fun contents(text: String, format: LiteRtTextFormat = LiteRtTextFormat.SINGLE): Contents =
         Contents.of(format.parts(text).map { Content.Text(it) })
 
-    fun user(text: String, format: LiteRtTextFormat = LiteRtTextFormat.SINGLE): Message = Message.user(contents(text, format))
+    fun user(text: String, format: LiteRtTextFormat = LiteRtTextFormat.SINGLE,
+        image: com.keyflow.reasoning.ReasoningImage? = null,
+    ): Message = if (image == null) Message.user(contents(text, format)) else Message.user(Contents.of(
+        listOf(Content.ImageBytes(image.bytes)) + format.parts(text).map { Content.Text(it) },
+    ))
 
     @OptIn(ExperimentalApi::class)
     fun textFormat(engine: Engine, opensThink: Boolean = false): LiteRtTextFormat = LiteRtTextFormat.detect { parts ->

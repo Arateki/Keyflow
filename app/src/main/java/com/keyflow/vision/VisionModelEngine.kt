@@ -27,7 +27,7 @@ interface VisionModelEngine {
 }
 
 /** Compartilha o transporte, autenticação e cancelamento do Raciocínio. Não troca de provedor em caso de falha. */
-open class CloudVisionEngine(private val engine: ReasoningEngine) : VisionModelEngine {
+abstract class ReasoningVisionEngine(private val engine: ReasoningEngine) : VisionModelEngine {
     override suspend fun ask(image: ReasoningImage, instruction: String): VisionResult {
         val text = StringBuilder()
         return try {
@@ -47,7 +47,9 @@ open class CloudVisionEngine(private val engine: ReasoningEngine) : VisionModelE
 }
 
 /** Mesmo contrato, mas o transporte é o binder local: sem cliente HTTP neste caminho. */
-class LocalVisionEngine(engine: ReasoningEngine) : CloudVisionEngine(engine)
+class LocalVisionEngine(engine: ReasoningEngine) : ReasoningVisionEngine(engine)
 
 /** Chat Completions do endpoint digitado; as credenciais dos outros provedores não entram aqui. */
-class CustomVisionEngine(engine: ReasoningEngine) : CloudVisionEngine(engine)
+class CustomVisionEngine(engine: ReasoningEngine) : ReasoningVisionEngine(engine)
+
+class CloudVisionEngine(engine: ReasoningEngine) : ReasoningVisionEngine(engine)

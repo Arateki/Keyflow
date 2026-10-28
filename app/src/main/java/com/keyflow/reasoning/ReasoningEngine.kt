@@ -1,6 +1,7 @@
 package com.keyflow.reasoning
 
 import kotlinx.coroutines.flow.Flow
+import okio.ByteString.Companion.toByteString
 
 /**
  * O que se pede a um modelo de linguagem. Texto → texto: sem histórico de conversa (YAGNI — o Testar é uma frase).
@@ -15,7 +16,7 @@ class ReasoningImage(bytes: ByteArray, val mimeType: String = "image/png") {
         require(bytes.isNotEmpty() && bytes.size <= MAX_BYTES) { "imagem fora do limite" }
         require(mimeType in setOf("image/png", "image/jpeg", "image/webp")) { "formato de imagem não suportado" }
     }
-    fun base64(): String = okio.ByteString.of(*bytes).base64()
+    fun base64(): String = bytes.toByteString().base64()
     fun dataUrl(): String = "data:$mimeType;base64,${base64()}"
     override fun toString(): String = "ReasoningImage($mimeType, ${bytes.size} bytes)"
     companion object { const val MAX_BYTES = 8 * 1024 * 1024 }

@@ -592,4 +592,50 @@ class ReasoningServiceCoreTest {
         enough.awaitFinish()
         assertThat(enough.events).containsExactly("done")
     }
+    @Test fun `cancelar pedido na fila não carrega imagem nem cancela o vizinho`() {
+        val queue = mutableListOf<Runnable>()
+        val a = FakeBackend(log, "a")
+        val c = core(mapOf("a" to a), executor = Executor { queue += it })
+        val first = Recorder(); val second = Recorder()
+        c.generate(model("a"), request, first, "visao") { error("pedido cancelado leu imagem") }
+        c.generate(model("a"), request, second, "texto")
+        c.cancel("visao")
+        queue.toList().forEach { it.run() }
+        assertThat(first.events).isEmpty()
+        assertThat(second.events).containsExactly("delta:um", "delta:dois", "done").inOrder()
+        assertThat(a.cancelCalled).isFalse()
+    }
+
+    @Test fun `cancelamento atrasado de um pedido terminado não atinge o próximo`() {
+        val a = FakeBackend(log, "a")
+        val c = core(mapOf("a" to a))
+        c.generate(model("a"), request, Recorder(), "antigo")
+        a.hooks += { c.cancel("antigo") }
+        val second = Recorder()
+        c.generate(model("a"), request, second, "atual")
+        assertThat(a.cancelCalled).isFalse()
+        assertThat(second.events).contains("done")
+    }
+
+    @Test fun `modelo de texto e modelo com encoder de visão têm identidades residentes distintas`() {
+        val a = FakeBackend(log, "a")
+        val c = core(mapOf("a" to a))
+        run(c, model("a")); run(c, model("a").copy(vision = true)); run(c, model("a").copy(vision = true))
+        assertThat(log.count { it == "load:a" }).isEqualTo(2)
+        assertThat(log.count { it == "unload:a" }).isEqualTo(1)
+    }
+
+    @Test fun `guarda de CPU recusa visão antes de ler a imagem e aceita o que cabe sem piso extra`() {
+        val a = FakeBackend(log, "a")
+        val denied = core(mapOf("a" to a), availMb = 1_100, totalMb = 3_700)
+        val rec = Recorder()
+        denied.generate(model("a", ramMb = 4_096).copy(vision = true), request, rec, "grande") {
+            error("guarda leu a imagem antes de recusar")
+        }
+        assertThat(rec.events).containsExactly("error:OOM")
+        assertThat(log).isEmpty()
+        val allowed = core(mapOf("a" to a), availMb = 1_100, totalMb = 3_700)
+        assertThat(run(allowed, model("a", ramMb = 2_048).copy(vision = true)).events).contains("done")
+    }
+
 }

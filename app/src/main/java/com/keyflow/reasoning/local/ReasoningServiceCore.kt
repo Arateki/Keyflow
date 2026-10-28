@@ -40,6 +40,7 @@ internal class ReasoningServiceCore(
     private var backend: LlmBackend? = null
     private var loadedId: String? = null
     private var loadedVersion: String = ""
+    private var loadedVision = false
 
     /** Onde o que está carregado de fato roda — pode ser a CPU mesmo com a GPU pedida (depois de uma volta). */
     private var loadedBackend: ComputeBackend = ComputeBackend.CPU
@@ -52,11 +53,34 @@ internal class ReasoningServiceCore(
     /** Sobe a cada uso; um timer de ociosidade só vale se ainda tem o número da última vez que o modelo foi usado. */
     private var useToken = 0L
 
-    @Volatile private var cancelled = false
-    @Volatile private var running: LlmBackend? = null
+    /** Cancelar uma ficha não toca em outra geração, nem apaga cancelamento recebido enquanto ela aguardava a fila. */
+    private class Pending {
+        @Volatile var cancelled = false
+            private set
+        private var active: LlmBackend? = null
+        @Synchronized fun start(backend: LlmBackend): Boolean {
+            if (cancelled) return false
+            active = backend
+            return true
+        }
+        @Synchronized fun cancel() { cancelled = true; active?.cancel() }
+        @Synchronized fun finish() { active = null }
+    }
+    private val requests = java.util.concurrent.ConcurrentHashMap<String, Pending>()
 
-    fun generate(model: LlmModel, request: ReasoningRequest, listener: Listener) {
-        executor.execute { run(model, request, listener) }
+    fun generate(model: LlmModel, request: ReasoningRequest, listener: Listener,
+        requestId: String = java.util.UUID.randomUUID().toString(),
+        requestFor: () -> ReasoningRequest = { request },
+    ) {
+        val pending = Pending()
+        if (requests.putIfAbsent(requestId, pending) != null) {
+            listener.onError(ReasoningErrorKind.ENGINE, "pedido repetido")
+            return
+        }
+        executor.execute {
+            try { run(model, requestFor, listener, pending) }
+            finally { pending.finish(); requests.remove(requestId, pending) }
+        }
     }
 
     /** Seleção explícita: carrega e aquece uma vez, antes do primeiro prompt. Mesma fila das gerações. */
@@ -100,9 +124,10 @@ internal class ReasoningServiceCore(
 
     /** Interrompe a geração em curso (RRUN-06). Sem geração em curso, não faz nada além de silenciar a próxima já enfileirada. */
     fun cancel() {
-        cancelled = true
-        running?.cancel()
+        requests.values.forEach { it.cancel() }
     }
+
+    fun cancel(requestId: String) { requests[requestId]?.cancel() }
 
     /** Descarrega o modelo na fila do executor: nunca solta o modelo no meio de uma geração. */
     fun shutdown() {
@@ -113,27 +138,26 @@ internal class ReasoningServiceCore(
         }
     }
 
-    private fun run(model: LlmModel, request: ReasoningRequest, listener: Listener) {
-        cancelled = false
+    private fun run(model: LlmModel, requestFor: () -> ReasoningRequest, listener: Listener, pending: Pending) {
+        if (pending.cancelled) return
         busy = true
         idleTimer?.cancel()
         idleTimer = null
         useToken++
         try {
             val active = ensureLoaded(model, listener)
-            if (cancelled) return
-            running = active
-            active.generate(request) { text -> if (!cancelled) listener.onDelta(text) }
-            if (!cancelled) listener.onDone()
+            if (!pending.start(active)) return
+            active.generate(requestFor()) { text -> if (!pending.cancelled) listener.onDelta(text) }
+            if (!pending.cancelled) listener.onDone()
         } catch (e: ReasoningFailure) {
-            if (!cancelled) listener.onError(e.kind, e.message.orEmpty())
+            if (!pending.cancelled) listener.onError(e.kind, e.message.orEmpty())
         } catch (e: OutOfMemoryError) {
             unloadCurrent()
-            if (!cancelled) listener.onError(ReasoningErrorKind.OOM, "memória esgotada durante a geração")
+            if (!pending.cancelled) listener.onError(ReasoningErrorKind.OOM, "memória esgotada durante a geração")
         } catch (e: Exception) {
-            if (!cancelled) listener.onError(ReasoningErrorKind.ENGINE, e.message ?: e.toString())
+            if (!pending.cancelled) listener.onError(ReasoningErrorKind.ENGINE, e.message ?: e.toString())
         } finally {
-            running = null
+            pending.finish()
             busy = false
             scheduleIdleUnload(model)
         }
@@ -164,6 +188,7 @@ internal class ReasoningServiceCore(
         backend = candidate
         loadedId = target.modelId
         loadedVersion = target.version
+        loadedVision = target.vision
         loadedBackend = target.backend
         return candidate
     }
@@ -215,12 +240,13 @@ internal class ReasoningServiceCore(
         backend = null
         loadedId = null
         loadedVersion = ""
+        loadedVision = false
         loadedBackend = ComputeBackend.CPU
     }
 
     /** O que está carregado é este modelo, desta versão do arquivo (mesmo id com outro SHA não serve), neste backend. */
     private fun isLoaded(model: LlmModel): Boolean =
-        backend != null && loadedId == model.modelId && loadedVersion == model.version && loadedBackend == model.backend
+        backend != null && loadedId == model.modelId && loadedVersion == model.version && loadedBackend == model.backend && loadedVision == model.vision
 
     private fun scheduleIdleUnload(model: LlmModel) {
         if (model.idleUnloadMs <= 0 || backend == null) return
