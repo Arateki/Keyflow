@@ -128,6 +128,7 @@ class VisaoPanelTest {
         val anthropic: FakeAuth = FakeAuth(),
         val google: FakeAuth = FakeAuth(),
         val tester: OcrTester = OcrTester.None,
+        val visionTester: VisionTester? = null,
     ) {
         var settings by mutableStateOf(initial)
         var installed by mutableStateOf(installed)
@@ -151,6 +152,7 @@ class VisaoPanelTest {
                     actions = actions,
                     localSupported = localSupported,
                     tester = tester,
+                    visionTester = visionTester,
                     openAiAuth = openAi,
                     anthropicAuth = anthropic,
                     googleAuth = google,
@@ -501,18 +503,47 @@ class VisaoPanelTest {
         node(VISAO_TEST_BUTTON_TAG).assertTextEquals("Testar")
     }
 
-    /** O Gemma 4 e os provedores ainda não têm motor de visão: o botão fica desligado e diz por quê, sem fingir um teste. */
     @Test
-    fun theGemmaAndTheCloudSourcesCannotBeTestedYetAndTheScreenSaysSo() {
+    fun GemmaInstaladoPodeTestarEProvedorDesconectadoPedeCredencial() {
         val h = Harness(Settings(visionLocalModelId = e2b.id), installed = setOf(e2b.id))
         show(h)
-
-        node(VISAO_TEST_BUTTON_TAG).assertIsNotEnabled()
-        node(VISAO_TEST_REASON_TAG).assertTextContains("ainda não pode ser testado", substring = true)
-
+        node(VISAO_TEST_BUTTON_TAG).assertIsEnabled()
+        rule.onNodeWithTag(VISAO_TEST_REASON_TAG).assertDoesNotExist()
         node(visionSourceTag(VisionSource.OPENAI)).performClick()
-        rule.runOnIdle { assertTrue(h.settings.visionSource == VisionSource.OPENAI) }
         node(VISAO_TEST_BUTTON_TAG).assertIsNotEnabled()
-        node(VISAO_TEST_REASON_TAG).assertTextContains("ainda não pode ser testado", substring = true)
+        node(VISAO_TEST_REASON_TAG).assertTextContains("Conecte a conta", substring = true)
+    }
+
+    @Test
+    fun testeDoProvedorRecebeASelacaoMostraRespostaTempoENotaDeEnvio() {
+        val seen = mutableListOf<Settings>()
+        val auth = FakeAuth(ConnectionState.Connected("conta falsa", AuthMethod.API_KEY))
+        val h = Harness(Settings(visionSource = VisionSource.OPENAI), openAi = auth,
+            visionTester = VisionTester { seen += it; com.keyflow.vision.VisionResult.Text("Texto da imagem") })
+        show(h)
+        node(VISAO_TEST_BUTTON_TAG).assertIsEnabled().performClick()
+        rule.waitUntil(5_000) { rule.onAllNodesWithTag(VISAO_TEST_RESPONSE_TAG).fetchSemanticsNodes().isNotEmpty() }
+        node(VISAO_TEST_RESPONSE_TAG).assertTextContains("Texto da imagem", substring = true)
+        node(VISAO_TEST_TIMES_TAG).assertTextContains("Tempo de reconhecimento", substring = true)
+        rule.runOnIdle { assertEquals(VisionSource.OPENAI, seen.single().visionSource) }
+        rule.onNodeWithText("O teste envia esta imagem de exemplo ao provedor escolhido.").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun trocarAOrigemCancelaOTesteEmAndamento() {
+        val entered = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val stopped = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val h = Harness(Settings(visionLocalModelId = e2b.id), installed = setOf(e2b.id),
+            visionTester = VisionTester {
+                try { entered.complete(Unit); kotlinx.coroutines.awaitCancellation() }
+                finally { stopped.complete(Unit) }
+            })
+        show(h)
+        node(VISAO_TEST_BUTTON_TAG).performClick()
+        rule.waitUntil(5_000) { entered.isCompleted }
+        node(visionSourceTag(VisionSource.GOOGLE)).performClick()
+        rule.waitUntil(5_000) { stopped.isCompleted }
+        node(VISAO_TEST_BUTTON_TAG).assertTextEquals("Testar").assertIsNotEnabled()
+        rule.onNodeWithTag(VISAO_TEST_RESPONSE_TAG).assertDoesNotExist()
     }
 }

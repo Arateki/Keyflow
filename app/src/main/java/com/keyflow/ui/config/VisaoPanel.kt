@@ -51,6 +51,7 @@ fun VisaoPanel(
     openAiAuth: AuthActions = AuthActions.None,
     anthropicAuth: AuthActions = AuthActions.None,
     googleAuth: AuthActions = AuthActions.None,
+    visionTester: VisionTester? = null,
 ) {
     val palette = LocalKeyFlowPalette.current
     val scroll = rememberScrollState()
@@ -58,9 +59,15 @@ fun VisaoPanel(
     // Lido AQUI, no corpo do painel: quando a conexão muda, tudo abaixo recompõe (como no Raciocínio).
     val connection by remember(openAiAuth) { openAiAuth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
     val openAi = openAiPanelState(connection, openAiAuth.flows)
-    val availability = remember(activeSettings.visionSource, activeSettings.visionLocalModelId, models) {
-        visionTestAvailability(activeSettings, models)
+    val anthropicConnection by remember(anthropicAuth) { anthropicAuth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
+    val googleConnection by remember(googleAuth) { googleAuth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
+    val selectedConnection = when (activeSettings.visionSource) {
+        VisionSource.OPENAI -> connection
+        VisionSource.ANTHROPIC -> anthropicConnection
+        VisionSource.GOOGLE -> googleConnection
+        else -> ConnectionState.Disconnected
     }
+    val availability = visionTestAvailability(activeSettings, models, selectedConnection is ConnectionState.Connected)
     Column(
         modifier
             .fillMaxWidth()
@@ -93,7 +100,13 @@ fun VisaoPanel(
         }
         SettingsGroup(tr("Testar")) {
             Column(Modifier.padding(vertical = 16.dp)) {
-                VisaoTestArea(availability, tester, initialState = initialTest)
+                VisaoTestArea(availability, tester, initialState = initialTest,
+                    modelTester = visionTester?.let { current -> { current.run(activeSettings) } },
+                    remote = activeSettings.visionSource != VisionSource.LOCAL,
+                    requestKey = listOf(activeSettings.visionSource, activeSettings.visionLocalModelId,
+                        activeSettings.visionOpenAiModel, activeSettings.visionAnthropicModel, activeSettings.visionGoogleModel,
+                        activeSettings.visionCustomEndpoint, activeSettings.visionCustomModel, selectedConnection),
+                )
             }
         }
     }

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,7 +53,7 @@ const val VISAO_TEST_ERROR_TAG = "visao-erro"
 const val VISAO_TEST_IMAGE_TAG = "visao-imagem-teste"
 
 /** Por que a pergunta do Testar não saiu da imagem de teste: o que o aviso da tela diz. */
-enum class VisionTestError { EMPTY, UNAVAILABLE, OUT_OF_MEMORY, FAILED, INTERRUPTED }
+enum class VisionTestError { EMPTY, UNAVAILABLE, OUT_OF_MEMORY, FAILED, INTERRUPTED, UNAUTHORIZED, NETWORK, RATE_LIMIT, NOT_ELIGIBLE }
 
 /** O que a área do Testar mostra num instante. [durationMs] é o tempo do reconhecimento, `null` enquanto não houve. */
 data class VisionTestState(
@@ -72,6 +73,8 @@ enum class VisionTestUnavailable {
 
     /** O modelo ou a origem não tem teste ainda: o Gemma 4 e os provedores dependem do motor de visão (VC-T15). */
     NOT_YET,
+    NOT_CONNECTED,
+    NO_MODEL_CHOSEN,
 }
 
 /** O Testar pode rodar com estas Settings? Decidido numa função pura ([visionTestAvailability]) para a tela só desenhar. */
@@ -84,14 +87,20 @@ sealed interface VisionTestAvailability {
  * O Testar da Visão lê uma imagem pequena e nossa com o **OCR local instalado e escolhido** (o único motor de visão que existe hoje). O Gemma 4
  * e os provedores/Custom só ganham teste com o motor de visão (VC-T15); até lá o botão fica desligado com o motivo escrito, como no Raciocínio.
  */
-fun visionTestAvailability(settings: Settings, models: LocalModelsUi): VisionTestAvailability {
-    if (settings.visionSource != VisionSource.LOCAL) return VisionTestAvailability.Unavailable(VisionTestUnavailable.NOT_YET)
+fun visionTestAvailability(settings: Settings, models: LocalModelsUi, connected: Boolean = false): VisionTestAvailability {
+    if (settings.visionSource == VisionSource.CREDITS) return VisionTestAvailability.Unavailable(VisionTestUnavailable.NOT_YET)
+    if (settings.visionSource == VisionSource.CUSTOM) return when {
+        settings.visionCustomEndpoint.isBlank() -> VisionTestAvailability.Unavailable(VisionTestUnavailable.NOT_CONNECTED)
+        settings.visionCustomModel.isBlank() -> VisionTestAvailability.Unavailable(VisionTestUnavailable.NO_MODEL_CHOSEN)
+        else -> VisionTestAvailability.Ready
+    }
+    if (settings.visionSource != VisionSource.LOCAL) return if (connected) VisionTestAvailability.Ready
+        else VisionTestAvailability.Unavailable(VisionTestUnavailable.NOT_CONNECTED)
     val id = settings.visionLocalModelId ?: return VisionTestAvailability.Unavailable(VisionTestUnavailable.NO_LOCAL_MODEL)
     val item = models.items.firstOrNull { it.spec.id == id }
     if (item == null || item.status != LocalModelStatus.INSTALLED) {
         return VisionTestAvailability.Unavailable(VisionTestUnavailable.MODEL_NOT_INSTALLED)
     }
-    if (item.spec.engineType != EngineType.OCR) return VisionTestAvailability.Unavailable(VisionTestUnavailable.NOT_YET)
     return VisionTestAvailability.Ready
 }
 
@@ -173,12 +182,18 @@ object VisionTestMessages {
         VisionTestError.UNAVAILABLE -> tr("O modelo de leitura não está disponível neste aparelho — baixe de novo na lista acima.")
         VisionTestError.OUT_OF_MEMORY -> tr("Memória insuficiente para ler a imagem — feche outros apps e tente de novo.")
         VisionTestError.FAILED -> tr("O modelo falhou ao ler a imagem de teste.")
+        VisionTestError.UNAUTHORIZED -> ReasoningTestMessages.error(com.keyflow.reasoning.ReasoningError.UNAUTHORIZED)
+        VisionTestError.NETWORK -> ReasoningTestMessages.error(com.keyflow.reasoning.ReasoningError.NETWORK)
+        VisionTestError.RATE_LIMIT -> ReasoningTestMessages.error(com.keyflow.reasoning.ReasoningError.RATE_LIMIT)
+        VisionTestError.NOT_ELIGIBLE -> ReasoningTestMessages.error(com.keyflow.reasoning.ReasoningError.NOT_ELIGIBLE)
         VisionTestError.INTERRUPTED -> tr("O motor de leitura foi interrompido — tente de novo.")
     }
 
     fun unavailable(reason: VisionTestUnavailable): String = when (reason) {
         VisionTestUnavailable.NO_LOCAL_MODEL -> tr("Baixe e selecione um modelo para testar.")
         VisionTestUnavailable.MODEL_NOT_INSTALLED -> tr("O modelo selecionado não está instalado — baixe de novo.")
+        VisionTestUnavailable.NOT_CONNECTED -> ReasoningTestMessages.unavailable(com.keyflow.reasoning.UnavailableReason.NOT_CONNECTED)
+        VisionTestUnavailable.NO_MODEL_CHOSEN -> ReasoningTestMessages.unavailable(com.keyflow.reasoning.UnavailableReason.NO_MODEL_CHOSEN)
         VisionTestUnavailable.NOT_YET -> tr("Este modelo ainda não pode ser testado aqui — o teste chega junto com a captura da tela.")
     }
 }
@@ -200,6 +215,26 @@ internal fun visionTestStateFor(result: OcrResult, elapsedMs: Long): VisionTestS
     )
 }
 
+/** A causa do motor fica legível sem apresentar corpo HTTP, imagem ou exceção. */
+internal fun visionTestStateFor(result: com.keyflow.vision.VisionResult, elapsedMs: Long): VisionTestState {
+    val error = when (result) {
+        is com.keyflow.vision.VisionResult.Text -> return VisionTestState(text = result.text, durationMs = elapsedMs)
+        com.keyflow.vision.VisionResult.Empty -> VisionTestError.EMPTY
+        com.keyflow.vision.VisionResult.Unavailable -> VisionTestError.UNAVAILABLE
+        is com.keyflow.vision.VisionResult.Failed -> when (result.kind) {
+            com.keyflow.reasoning.ReasoningError.OOM -> VisionTestError.OUT_OF_MEMORY
+            com.keyflow.reasoning.ReasoningError.MODEL_MISSING -> VisionTestError.UNAVAILABLE
+            com.keyflow.reasoning.ReasoningError.LOCAL -> VisionTestError.INTERRUPTED
+            com.keyflow.reasoning.ReasoningError.UNAUTHORIZED -> VisionTestError.UNAUTHORIZED
+            com.keyflow.reasoning.ReasoningError.NETWORK -> VisionTestError.NETWORK
+            com.keyflow.reasoning.ReasoningError.RATE_LIMIT -> VisionTestError.RATE_LIMIT
+            com.keyflow.reasoning.ReasoningError.NOT_ELIGIBLE -> VisionTestError.NOT_ELIGIBLE
+            com.keyflow.reasoning.ReasoningError.ENGINE -> VisionTestError.FAILED
+        }
+    }
+    return VisionTestState(durationMs = elapsedMs, error = error)
+}
+
 /**
  * O botão Testar: lê a imagem de teste com o OCR escolhido, mostra o texto que saiu e o tempo, e vira "Parar" enquanto lê. Sem motor pronto
  * o botão fica desabilitado com o motivo escrito ao lado (o desenho da área do Testar do Raciocínio). [initialState] é só para a galeria
@@ -212,18 +247,24 @@ fun VisaoTestArea(
     modifier: Modifier = Modifier,
     initialState: VisionTestState = VisionTestState(),
     clock: () -> Long = { System.nanoTime() / 1_000_000 },
+    modelTester: (suspend () -> com.keyflow.vision.VisionResult)? = null,
+    remote: Boolean = false,
+    requestKey: Any? = null,
 ) {
     val palette = LocalKeyFlowPalette.current
     // Main explícito: o resultado volta de outro processo numa thread de binder e é o dispatcher do coletor que decide onde o estado muda.
     val scope = rememberCoroutineScope { Dispatchers.Main.immediate }
-    var state by remember { mutableStateOf(initialState) }
-    var job by remember { mutableStateOf<Job?>(null) }
+    var state by remember(requestKey) { mutableStateOf(initialState) }
+    var job by remember(requestKey) { mutableStateOf<Job?>(null) }
+    val generation = remember(requestKey) { java.util.concurrent.atomic.AtomicLong() }
+    DisposableEffect(requestKey) { onDispose { generation.incrementAndGet(); job?.cancel() } }
     val unavailable = (availability as? VisionTestAvailability.Unavailable)?.reason
     val bitmap = remember(unavailable == null) { if (unavailable == null) VisionTestImage.bitmap() else null }
 
     Column(modifier.fillMaxWidth()) {
         if (bitmap != null) {
-            SettingSub(tr("O teste lê esta imagem de exemplo, no aparelho."), Modifier.padding(bottom = 10.dp))
+            SettingSub(if (remote) tr("O teste envia esta imagem de exemplo ao provedor escolhido.")
+                else tr("O teste lê esta imagem de exemplo, no aparelho."), Modifier.padding(bottom = 10.dp))
             Image(
                 bitmap = bitmap.asImageBitmap(),
                 contentDescription = tr("Imagem de exemplo do teste"),
@@ -241,21 +282,24 @@ fun VisaoTestArea(
             enabled = state.running || unavailable == null,
             onClick = {
                 if (state.running) {
+                    generation.incrementAndGet()
                     job?.cancel()
                     job = null
                     state = state.copy(running = false)
                 } else {
+                    val mine = generation.incrementAndGet()
                     state = VisionTestState(running = true)
                     job = scope.launch {
                         val startedAt = clock()
                         try {
-                            val result = tester.run()
-                            state = visionTestStateFor(result, clock() - startedAt)
+                            val result = if (modelTester != null) visionTestStateFor(modelTester(), clock() - startedAt)
+                                else visionTestStateFor(tester.run(), clock() - startedAt)
+                            if (mine == generation.get()) state = result
                         } catch (e: CancellationException) {
                             throw e
                         } catch (_: Exception) {
                             // Um tester que lança vira aviso na tela: este escopo é o da UI e uma exceção solta derrubaria o app.
-                            state = VisionTestState(error = VisionTestError.FAILED)
+                            if (mine == generation.get()) state = VisionTestState(error = VisionTestError.FAILED)
                         }
                     }
                 }

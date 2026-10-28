@@ -201,6 +201,37 @@ class SetupActivity : ComponentActivity() {
             google = { GoogleReasoningEngine(auth.authorization, auth.http, it) },
         )
     }
+    private val visionEngines by lazy {
+        com.keyflow.vision.VisionModelEngines(
+            isInstalled = { ModelStore.get(this).isInstalled(it) },
+            isLocalVision = { id -> com.keyflow.data.models.ModelCatalog.visionModels().any {
+                it.id == id && it.engineType == com.keyflow.data.models.EngineType.LITERT_LM
+            } },
+            hasCredential = { provider ->
+                val id = when (provider) {
+                    com.keyflow.vision.VisionProvider.OPENAI -> ProviderIds.OPENAI
+                    com.keyflow.vision.VisionProvider.ANTHROPIC -> ProviderIds.ANTHROPIC
+                    com.keyflow.vision.VisionProvider.GOOGLE -> ProviderIds.GOOGLE
+                }
+                auth.store.getApiKey(id) != null || auth.store.getOAuth(id)?.isSkeleton == false
+            },
+            local = { com.keyflow.vision.LocalVisionEngine(LocalReasoningEngine.create(this, it, vision = true)) },
+            cloud = { provider, model ->
+                val engine = when (provider) {
+                    com.keyflow.vision.VisionProvider.OPENAI -> OpenAiReasoningEngine(auth.authorization, auth.http, model)
+                    com.keyflow.vision.VisionProvider.ANTHROPIC -> AnthropicReasoningEngine(auth.authorization, auth.http, model)
+                    com.keyflow.vision.VisionProvider.GOOGLE -> GoogleReasoningEngine(auth.authorization, auth.http, model)
+                }
+                com.keyflow.vision.CloudVisionEngine(engine)
+            },
+            custom = { current -> com.keyflow.vision.CustomVisionEngine(com.keyflow.vision.CustomVisionTransport(
+                auth.http, current.visionCustomEndpoint, current.visionCustomModel,
+                current.visionCustomHeaderName, current.visionCustomHeaderValue,
+            )) },
+        )
+    }
+    private val visionTester by lazy { com.keyflow.ui.config.VisionModelTester(applicationContext, visionEngines::resolve, ocrTester) }
+
     // O agente da aba KeyFlow (agent-harness): as peças vivem no processo; aqui só se escolhe, pela origem de raciocínio, se a próxima
     // mensagem usa ferramentas (Anthropic por chave de API) ou o chat de texto de sempre.
     private val agentRuntime by lazy {
@@ -469,6 +500,7 @@ class SetupActivity : ComponentActivity() {
                         falaElevenLabsAuth = elevenLabsAuth,
                         reasoningLocalSupported = reasoningLocalSupported,
                         ocrTester = ocrTester,
+                        visionTester = visionTester,
                         localActions = localModels,
                         agentEnabled = BuildConfig.AGENT_ENABLED,
                         agent = if (BuildConfig.AGENT_ENABLED) agentRuntime else null,
