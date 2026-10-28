@@ -116,10 +116,10 @@ O padrão (Restaurar, e todo modelo sem registro) SHALL reproduzir o app de hoje
 
 | Id | Pergunta | O que a spec faz enquanto isso |
 | -- | -------- | ------------------------------ |
-| D1 | Quer um padrão numérico **por modelo** (os cards não publicam)? | Um só padrão: o comportamento de hoje, igual para todos |
-| D2 | Os tetos da tela (temperatura 2, top-k 128) ficam bons? O motor aceita temperatura maior e top-k maior | Salvar fora desses tetos é recusado |
-| D3 | Modelo sem janela declarada: teto de 1024 tokens ou esconder o limite até o catálogo ter `contextTokens` conferido? | Mostra o limite com teto 1024 |
-| D4 | Além da semente fixa, quer "sortear a cada pedido"? | Só semente fixa, ou o padrão do motor |
+| D1 | **Decidido (Yan, 28/10):** padrões atuais, por modelo — o modal abre com o comportamento de hoje de cada modelo | — |
+| D2 | **Decidido (Yan, 28/10):** tetos ok — temperatura 2, top-k 128 | Salvar fora desses tetos é recusado |
+| D3 | **Decidido (Yan, 28/10):** limites ok — modelo sem janela declarada mostra o limite com teto de 1024 tokens | — |
+| D4 | **Decidido (Yan, 28/10):** semente fixa; sem "sortear a cada pedido" | — |
 
 ## Pendência explícita
 
