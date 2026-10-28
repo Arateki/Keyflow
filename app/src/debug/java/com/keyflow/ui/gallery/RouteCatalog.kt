@@ -491,6 +491,13 @@ object RouteCatalog {
                 ),
             )
         },
+        // As candidatas ficam abaixo da dobra na lista: cada quadro permite revisar o card e seu fabricante nos dois temas.
+        Route("config-raciocinio-local-functiongemma") { CandidateReasoningRoute(ModelCatalog.FUNCTIONGEMMA_270M) },
+        Route("config-raciocinio-local-codigo") { CandidateReasoningRoute(ModelCatalog.QWEN2_5_CODER_1_5B) },
+        Route("config-raciocinio-local-aberto") { CandidateReasoningRoute(ModelCatalog.SMOLLM3_3B) },
+        Route("config-raciocinio-local-analitico") { CandidateReasoningRoute(ModelCatalog.GRANITE_4_2_3B) },
+        Route("config-raciocinio-local-profundo") { CandidateReasoningRoute(ModelCatalog.NANBEIGE_4_2_3B) },
+        Route("config-raciocinio-local-hibrido") { CandidateReasoningRoute(ModelCatalog.QWEN3_5_4B) },
     )
 
     private val byKey: Map<String, Route> = routes.associateBy { it.key }
@@ -498,6 +505,16 @@ object RouteCatalog {
     fun route(key: String): Route? = byKey[key]
 
     val keys: List<String> get() = routes.map { it.key }
+
+    @Composable
+    private fun CandidateReasoningRoute(spec: com.keyflow.data.models.ModelSpec) {
+        ConfigReasoningRoute(
+            localModels = LocalModelsUi.compose(
+                catalog = listOf(spec), installed = emptySet(), active = null, failures = emptyMap(),
+                selectedId = null, deviceRamMb = 8192,
+            ),
+        )
+    }
 
     /** Scaffold de configuração na aba padrão (Transcrição), com modos ligados — base do menu aberto. */
     @Composable

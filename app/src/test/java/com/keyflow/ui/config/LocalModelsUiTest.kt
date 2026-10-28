@@ -187,9 +187,10 @@ class LocalModelsUiTest {
         assertThat(five.item(gemma).heavy).isFalse()
         assertThat(five.item(smol).heavy).isTrue()
         assertThat(five.item(gemmaE4b).heavy).isTrue()
-        // 6,5 GB: só o Avançado e o Potente pesam. Um aparelho de 8 GB mostra ~7,4 GB e ainda vê o aviso dos dois (8192 e 12288).
-        assertThat(textUi(ramMb = 6_500).items.filter { it.heavy }.map { it.spec.id }).containsExactly(qwen4b, gemmaE4b)
-        assertThat(textUi(ramMb = 7_400).items.filter { it.heavy }.map { it.spec.id }).containsExactly(qwen4b, gemmaE4b)
+        // 6,5/7,4 GB: o Potente, o Avançado e as candidatas com estimativa de 8192 MB ainda mostram o aviso.
+        val heaviest = listOf(qwen4b, gemmaE4b, ModelCatalog.NANBEIGE_4_2_3B.id, ModelCatalog.QWEN3_5_4B.id)
+        assertThat(textUi(ramMb = 6_500).items.filter { it.heavy }.map { it.spec.id }).containsExactlyElementsIn(heaviest)
+        assertThat(textUi(ramMb = 7_400).items.filter { it.heavy }.map { it.spec.id }).containsExactlyElementsIn(heaviest)
         // 12 GB de RAM anunciada mostram ~11 GB: o Avançado deixa de pesar, o Potente (12288) ainda mostra o aviso, como o Avançado nos 8 GB.
         assertThat(textUi(ramMb = 11_200).items.filter { it.heavy }.map { it.spec.id }).containsExactly(qwen4b)
         assertThat(textUi(ramMb = 12_288).items.none { it.heavy }).isTrue()

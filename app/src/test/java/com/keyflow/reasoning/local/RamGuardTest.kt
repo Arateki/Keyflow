@@ -74,7 +74,7 @@ class RamGuardTest {
         val total = 5_700L
         val free = 2_300L
         val big = setOf(ModelCatalog.GEMMA_4_E4B, ModelCatalog.QWEN3_4B)
-        ModelCatalog.TEXT_ALL.filter { it !in big }.forEach {
+        ModelCatalog.visibleIn(ModelCatalog.TEXT_ALL, debug = false).filter { it !in big }.forEach {
             assertThat(RamGuard.enough(free, estimate(it), total)).isTrue()
         }
         big.forEach { assertThat(RamGuard.enough(free, estimate(it), total)).isFalse() }
@@ -86,7 +86,7 @@ class RamGuardTest {
      */
     @Test
     fun `on an 8 GB device every text model loads but Qwen3 4B`() {
-        ModelCatalog.TEXT_ALL.filter { it != ModelCatalog.QWEN3_4B }.forEach {
+        ModelCatalog.visibleIn(ModelCatalog.TEXT_ALL, debug = false).filter { it != ModelCatalog.QWEN3_4B }.forEach {
             assertThat(RamGuard.enough(4_800L, estimate(it), 7_400L)).isTrue()
         }
         assertThat(RamGuard.enough(4_800L, estimate(ModelCatalog.QWEN3_4B), 7_400L)).isFalse()
@@ -95,7 +95,7 @@ class RamGuardTest {
     /** Um aparelho de 12 GB mostra ~11 GB de RAM total: carrega o Qwen3 4B (RSS de 4,6–6,1 GB na CPU, segundo o autor) mesmo com pouca RAM livre. */
     @Test
     fun `on a 12 GB device every text model loads`() {
-        ModelCatalog.TEXT_ALL.forEach { assertThat(RamGuard.enough(3_000L, estimate(it), 11_200L)).isTrue() }
+        ModelCatalog.visibleIn(ModelCatalog.TEXT_ALL, debug = false).forEach { assertThat(RamGuard.enough(3_000L, estimate(it), 11_200L)).isTrue() }
     }
 
     @Test

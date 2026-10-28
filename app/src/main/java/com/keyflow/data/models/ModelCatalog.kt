@@ -26,6 +26,8 @@ enum class ModelVendor(val displayName: String) {
     HUGGING_FACE("Hugging Face"),
     NVIDIA("NVIDIA"),
     PADDLEPADDLE("PaddlePaddle"),
+    IBM("IBM"),
+    NANBEIGE("Nanbeige"),
 }
 
 /**
@@ -117,7 +119,7 @@ object ModelCatalog {
      * O manifesto remoto (`catalogVersion`) só vale se for maior ou igual a ela: sem isso, um manifesto ou cache antigo substituiria o catálogo
      * inteiro e devolveria, por exemplo, o SHA legado do Qwen3 (o `ModelCatalogTest` confere a impressão digital dos pins contra esta versão).
      */
-    const val EMBEDDED_VERSION = 2026102702
+    const val EMBEDDED_VERSION = 2026102801
 
     /** Impressão digital dos pins embutidos (id, nome, tamanho e SHA-256 de cada arquivo): muda se um pin mudar sem [EMBEDDED_VERSION] subir. */
     fun pinsFingerprint(models: List<ModelSpec> = MODELS): String {
@@ -448,6 +450,151 @@ object ModelCatalog {
     /** Modelos de fala, na ordem em que a aba Transcrição lista: do mais leve ao mais pesado. */
     val SPEECH: List<ModelSpec> = listOf(WHISPER_BASE, WHISPER_SMALL, PARAKEET_V3)
 
+    /** Candidata de debug: Card sem mínimo declarado; README do LiteRT-LM v0.16.1 referencia oficialmente FunctionGemma/Mobile Actions; validação nativa desta conversão pendente. Fonte: README e API /api/models/litert-community/functiongemma-mobile-actions_q8_ekv1024.litertlm?blobs=true, commit abaixo. */
+    val FUNCTIONGEMMA_270M = ModelSpec(
+        id = "functiongemma-270m-mobile-actions-litertlm",
+        displayName = trKey("Ações"),
+        summary = trKey("Pequeno e especializado em ações de celular; candidato para testar comandos."),
+        languages = trKey("Inglês"),
+        engineType = EngineType.LITERT_LM,
+        acceptsLanguageHint = false,
+        // Estimativa de RAM total: Q8 de 284 MB e contexto de 1024; reserva conservadora para execução e aquecimento, sem pico declarado no card; a medir no aparelho do Yan.
+        recommendedRamMb = 2048,
+        modelName = "FunctionGemma 270M",
+        kind = ModelKind.TEXT,
+        validatedOnDevice = false,
+        vendor = ModelVendor.GOOGLE,
+        thinking = ThinkingSupport.NONE,
+        files = listOf(
+            ModelFile(
+                FileRole.MODEL, "mobile-actions_q8_ekv1024.litertlm",
+                "https://huggingface.co/litert-community/functiongemma-mobile-actions_q8_ekv1024.litertlm/resolve/5683618019f1025f4dd567d26f58dc0ebb6244f2/mobile-actions_q8_ekv1024.litertlm",
+                "92109695f911d1872fa8ae07c1e3ff0ed70f2c3d1690d410ec6db8587c2ab409", 284_426_240L,
+            ),
+        ),
+    )
+
+    /** Candidata de debug: Manifest min_runtime_version 0.16; benchmark CPU 0.16.1. Fonte: README e API /api/models/litert-community/Qwen2.5-Coder-1.5B-Instruct?blobs=true, commit abaixo. */
+    val QWEN2_5_CODER_1_5B = ModelSpec(
+        id = "qwen2.5-coder-1.5b-litertlm",
+        displayName = trKey("Código"),
+        summary = trKey("Especializado em programação; candidato para gerar e ajustar trechos de código."),
+        languages = trKey("Multilíngue"),
+        engineType = EngineType.LITERT_LM,
+        acceptsLanguageHint = false,
+        // Estimativa de RAM total: card mede 1,8 GB de pico CPU no Raspberry Pi 5 e 1566 MB no Galaxy S26; margem para o sistema; a medir no aparelho do Yan.
+        recommendedRamMb = 4096,
+        modelName = "Qwen2.5-Coder 1.5B",
+        kind = ModelKind.TEXT,
+        validatedOnDevice = false,
+        vendor = ModelVendor.QWEN,
+        thinking = ThinkingSupport.NONE,
+        files = listOf(
+            ModelFile(
+                FileRole.MODEL, "Qwen2.5-Coder-1.5B-Instruct_int4.litertlm",
+                "https://huggingface.co/litert-community/Qwen2.5-Coder-1.5B-Instruct/resolve/7840209bfd393408ef028cf55921d831baa1e4bf/Qwen2.5-Coder-1.5B-Instruct_int4.litertlm",
+                "273ecc7771ba2dd5fe1bb6d4d4726ad0353102f04ad094082ccf59bca9f21213", 1_117_385_648L,
+            ),
+        ),
+    )
+
+    /** Candidata de debug: Card documenta benchmark CPU 0.16.1; revisão de grafo recente testada em 0.17.1, pesos idênticos. Fonte: README e API /api/models/litert-community/SmolLM3-3B?blobs=true, commit abaixo. */
+    val SMOLLM3_3B = ModelSpec(
+        id = "smollm3-3b-litertlm",
+        displayName = trKey("Aberto"),
+        summary = trKey("Modelo aberto e multilíngue; candidato de 3 bilhões de parâmetros."),
+        languages = trKey("Multilíngue"),
+        engineType = EngineType.LITERT_LM,
+        acceptsLanguageHint = false,
+        // Estimativa de RAM total: card mede 3,12 GB de pico CPU no Galaxy S26 e 3,1 GB no Raspberry Pi 5; margem para o sistema; a medir no aparelho do Yan.
+        recommendedRamMb = 6144,
+        modelName = "SmolLM3 3B",
+        kind = ModelKind.TEXT,
+        validatedOnDevice = false,
+        vendor = ModelVendor.HUGGING_FACE,
+        thinking = ThinkingSupport.OPTIONAL,
+        files = listOf(
+            ModelFile(
+                FileRole.MODEL, "SmolLM3-3B_q4_block32_ekv4096.litertlm",
+                "https://huggingface.co/litert-community/SmolLM3-3B/resolve/076e556bbbeb613fcbdb7308e771e503f390f094/SmolLM3-3B_q4_block32_ekv4096.litertlm",
+                "bdd7eb05b6764fb5a5173bdbdd59354a26f66e4c20b040f0d3da3532071d18f6", 2_004_633_520L,
+            ),
+        ),
+    )
+
+    /** Candidata de debug: Manifest min_runtime_version 0.16.0; benchmark CPU 0.16.1. Fonte: README e API /api/models/litert-community/granite-4.2-3b?blobs=true, commit abaixo. */
+    val GRANITE_4_2_3B = ModelSpec(
+        id = "granite-4.2-3b-litertlm",
+        displayName = trKey("Analítico"),
+        summary = trKey("Modelo da IBM para raciocínio; candidato de uso geral com pensamento opcional."),
+        languages = trKey("Multilíngue"),
+        engineType = EngineType.LITERT_LM,
+        acceptsLanguageHint = false,
+        // Estimativa de RAM total: card mede 3,4 GB de pico CPU no Raspberry Pi 5; margem para o sistema; a medir no aparelho do Yan.
+        recommendedRamMb = 6144,
+        modelName = "Granite 4.2 3B",
+        kind = ModelKind.TEXT,
+        validatedOnDevice = false,
+        vendor = ModelVendor.IBM,
+        thinking = ThinkingSupport.OPTIONAL,
+        files = listOf(
+            ModelFile(
+                FileRole.MODEL, "granite-4.2-3b_int4.litertlm",
+                "https://huggingface.co/litert-community/granite-4.2-3b/resolve/31108eaab3f9625f5c8580837cf3952931979052/granite-4.2-3b_int4.litertlm",
+                "9859901f6050df5c4616e31462643b76d0aa2bd395a8863cb6162495c1ef517d", 2_190_708_656L,
+            ),
+        ),
+    )
+
+    /** Candidata de debug: Manifest min_runtime_version 0.15.0; benchmark CPU 0.16.1; este arquivo é CPU-only. Fonte: README e API /api/models/litert-community/Nanbeige4.2-3B?blobs=true, commit abaixo. */
+    val NANBEIGE_4_2_3B = ModelSpec(
+        id = "nanbeige-4.2-3b-litertlm",
+        displayName = trKey("Profundo"),
+        summary = trKey("Pensa antes de responder; camadas repetidas aumentam o tempo de execução."),
+        languages = trKey("Inglês e chinês"),
+        engineType = EngineType.LITERT_LM,
+        acceptsLanguageHint = false,
+        // Estimativa de RAM total: card mede 4,2 GB de pico CPU; camadas executadas duas vezes por token; margem para o sistema; a medir no aparelho do Yan.
+        recommendedRamMb = 8192,
+        modelName = "Nanbeige4.2 3B",
+        kind = ModelKind.TEXT,
+        validatedOnDevice = false,
+        vendor = ModelVendor.NANBEIGE,
+        thinking = ThinkingSupport.ALWAYS,
+        promptOpensThink = true,
+        files = listOf(
+            ModelFile(
+                FileRole.MODEL, "model.litertlm",
+                "https://huggingface.co/litert-community/Nanbeige4.2-3B/resolve/6a0654c309fe4590bb700f364faa3e9b1b175b8d/model.litertlm",
+                "565a806e59938ab15fd099e9e0a9bc02f3ca5b618422e53481292378679cc04e", 2_579_277_808L,
+            ),
+        ),
+    )
+
+    /** Candidata de debug: Manifest min_runtime_version 0.15.0; card verifica tokenizer CPU 0.15.0. Alerta do card: Engine novo por conversa. Fonte: README e API /api/models/litert-community/Qwen3.5-4B?blobs=true, commit abaixo. */
+    val QWEN3_5_4B = ModelSpec(
+        id = "qwen3.5-4b-litertlm",
+        displayName = trKey("Híbrido"),
+        summary = trKey("Combina atenção linear e completa; candidato de 4 bilhões de parâmetros."),
+        languages = trKey("Multilíngue"),
+        engineType = EngineType.LITERT_LM,
+        acceptsLanguageHint = false,
+        // Estimativa de RAM total: card mede 4,43 GB de pico CPU no Pixel 8a; margem para o sistema; a medir no aparelho do Yan.
+        recommendedRamMb = 8192,
+        modelName = "Qwen3.5 4B",
+        kind = ModelKind.TEXT,
+        validatedOnDevice = false,
+        vendor = ModelVendor.QWEN,
+        thinking = ThinkingSupport.OPTIONAL,
+        files = listOf(
+            ModelFile(
+                FileRole.MODEL, "Qwen3.5-4B_mixed_int4.litertlm",
+                "https://huggingface.co/litert-community/Qwen3.5-4B/resolve/190cd3223e7701c271c927fe84f1fa66b498f79d/Qwen3.5-4B_mixed_int4.litertlm",
+                "7243c33c9c6192150ab6da7ac13a9efdc24ff1a653eabc93b2757de4b44b012a", 2_754_070_624L,
+            ),
+        ),
+    )
+
     /** Todos os modelos de texto conhecidos, do menor ao maior arquivo (a ordem de download). A de RAM, em `recommendedRamMb`, difere: o SmolLM2 pesa mais que o DeepSeek e o Gemma 4 E2B, e o Qwen3 4B (12288) mais que todos, o Gemma 4 E4B inclusive. */
     val TEXT_ALL: List<ModelSpec> = listOf(
         QWEN3_0_6B,
@@ -457,11 +604,17 @@ object ModelCatalog {
         GEMMA_4_E2B,
         QWEN3_4B,
         GEMMA_4_E4B,
-    )
+        FUNCTIONGEMMA_270M,
+        QWEN2_5_CODER_1_5B,
+        SMOLLM3_3B,
+        GRANITE_4_2_3B,
+        NANBEIGE_4_2_3B,
+        QWEN3_5_4B,
+    ).sortedBy { it.totalBytes }
 
     /**
-     * O que o build mostra: em release só os [ModelSpec.validatedOnDevice]; em debug, todos. Desde 2026-10-27 os modelos de texto
-     * estão validados (responderam em aparelho real); o flag segue como gate para o próximo modelo que entrar sem prova.
+     * O que o build mostra: em release só os [ModelSpec.validatedOnDevice]; em debug, todos. Os sete modelos já validados continuam no release;
+     * as candidatas de `modelos-novos` aguardam a avaliação do Yan e aparecem somente no debug.
      */
     fun visibleIn(models: List<ModelSpec>, debug: Boolean): List<ModelSpec> = models.filter { debug || it.validatedOnDevice }
 

@@ -8,6 +8,7 @@ class ModelCatalogTest {
 
     // Estas checagens são do catálogo de FALA (papéis do sherpa-onnx, repositórios csukuangfj); o de texto tem as suas.
     private val models = ModelCatalog.SPEECH
+    private val releasedText = ModelCatalog.visibleIn(ModelCatalog.TEXT_ALL, debug = false)
 
     @Test
     fun `catalog has the three curated models with unique ids`() {
@@ -131,9 +132,9 @@ class ModelCatalogTest {
     // ── RCAT-02/03: catálogo de texto (LiteRT-LM) ──────────────────────────────────────────────
 
     @Test
-    fun `text catalog has the seven models, smallest download first`() {
-        // Só os cujo repositório, commit e SHA-256 existem de verdade na API do Hugging Face (2026-10-24, 2026-10-25, 2026-10-26 e 2026-10-27).
-        assertThat(ModelCatalog.TEXT.map { it.id })
+    fun `release keeps the seven proven models and debug is ordered by download size`() {
+        // Só os cujo repositório, commit e SHA-256 existem de verdade na API do Hugging Face (2026-10-24, 2026-10-25 e 2026-10-26).
+        assertThat(releasedText.map { it.id })
             .containsExactly(
                 "qwen3-0.6b-litertlm", "qwen2.5-1.5b-litertlm", "smollm2-1.7b-litertlm", "deepseek-r1-1.5b-litertlm", "gemma-4-e2b-litertlm",
                 "qwen3-4b-instruct-2507-litertlm", "gemma-4-e4b-litertlm",
@@ -150,7 +151,7 @@ class ModelCatalogTest {
      */
     @Test
     fun `recommended RAM follows the measured peaks`() {
-        assertThat(ModelCatalog.TEXT_ALL.associate { it.id to it.recommendedRamMb })
+        assertThat(releasedText.associate { it.id to it.recommendedRamMb })
             .containsExactly(
                 "qwen3-0.6b-litertlm", 3072, "qwen2.5-1.5b-litertlm", 4096, "smollm2-1.7b-litertlm", 6144, "deepseek-r1-1.5b-litertlm", 4096,
                 "gemma-4-e2b-litertlm", 4096, "qwen3-4b-instruct-2507-litertlm", 12288, "gemma-4-e4b-litertlm", 8192,
@@ -188,10 +189,10 @@ class ModelCatalogTest {
      */
     @Test
     fun `text models are named by level, without the model inside the name`() {
-        assertThat(ModelCatalog.TEXT.map { it.displayName }).containsExactly("Leve", "Versátil", "Intermediário", "Raciocínio", "Equilibrado", "Potente", "Avançado").inOrder()
+        assertThat(releasedText.map { it.displayName }).containsExactly("Leve", "Versátil", "Intermediário", "Raciocínio", "Equilibrado", "Potente", "Avançado").inOrder()
         assertThat(ModelCatalog.TEXT.map { it.displayName }).containsNoDuplicates()
         ModelCatalog.TEXT.forEach { assertThat(it.displayName).doesNotContain("(") }
-        assertThat(ModelCatalog.TEXT.map { it.modelName })
+        assertThat(releasedText.map { it.modelName })
             .containsExactly("Qwen3 0.6B", "Qwen2.5 1.5B", "SmolLM2 1.7B", "DeepSeek R1 1.5B", "Gemma 4 E2B", "Qwen3 4B Instruct 2507", "Gemma 4 E4B")
             .inOrder()
     }
@@ -201,11 +202,14 @@ class ModelCatalogTest {
      * não na CPU que o app usa (ver o comentário do catálogo). O DeepSeek continua o único cujo prompt abre o `<think>`.
      */
     @Test
-    fun `release lists every text model, all validated on a device`() {
-        assertThat(ModelCatalog.visibleIn(ModelCatalog.TEXT_ALL, debug = false)).containsExactlyElementsIn(ModelCatalog.TEXT_ALL).inOrder()
+    fun `release keeps proven models while debug includes candidates`() {
+        assertThat(releasedText).containsExactly(
+            ModelCatalog.QWEN3_0_6B, ModelCatalog.QWEN2_5_1_5B, ModelCatalog.SMOLLM2_1_7B,
+            ModelCatalog.DEEPSEEK_R1_1_5B, ModelCatalog.GEMMA_4_E2B, ModelCatalog.QWEN3_4B, ModelCatalog.GEMMA_4_E4B,
+        ).inOrder()
         assertThat(ModelCatalog.visibleIn(ModelCatalog.TEXT_ALL, debug = true)).containsExactlyElementsIn(ModelCatalog.TEXT_ALL).inOrder()
-        assertThat(ModelCatalog.TEXT_ALL.filterNot { it.validatedOnDevice }).isEmpty()
-        assertThat(ModelCatalog.TEXT_ALL.filter { it.promptOpensThink }.map { it.id }).containsExactly("deepseek-r1-1.5b-litertlm")
+        assertThat(ModelCatalog.TEXT_ALL.filterNot { it.validatedOnDevice }).hasSize(6)
+        assertThat(ModelCatalog.TEXT_ALL.filter { it.promptOpensThink }.map { it.id }).containsExactly("deepseek-r1-1.5b-litertlm", "nanbeige-4.2-3b-litertlm")
     }
 
     /** O gate segue de pé para o próximo modelo que entrar sem prova: o release só lista o validado. */
@@ -386,6 +390,8 @@ class ModelCatalogTest {
         assertThat(byId).containsEntry("deepseek-r1-1.5b-litertlm", ModelVendor.DEEPSEEK)
         assertThat(byId).containsEntry("gemma-4-e2b-litertlm", ModelVendor.GOOGLE)
         assertThat(byId).containsEntry("gemma-4-e4b-litertlm", ModelVendor.GOOGLE)
+        assertThat(byId).containsEntry("granite-4.2-3b-litertlm", ModelVendor.IBM)
+        assertThat(byId).containsEntry("nanbeige-4.2-3b-litertlm", ModelVendor.NANBEIGE)
         // PaddleOCR é da PaddlePaddle (Baidu), embora os arquivos ONNX venham de um repositório de terceiros no Hugging Face.
         assertThat(byId).containsEntry("ocr-paddle-latin", ModelVendor.PADDLEPADDLE)
     }
@@ -407,6 +413,12 @@ class ModelCatalogTest {
             "gemma-4-e2b-litertlm", ThinkingSupport.OPTIONAL,
             "qwen3-4b-instruct-2507-litertlm", ThinkingSupport.NONE,
             "gemma-4-e4b-litertlm", ThinkingSupport.OPTIONAL,
+            "functiongemma-270m-mobile-actions-litertlm", ThinkingSupport.NONE,
+            "qwen2.5-coder-1.5b-litertlm", ThinkingSupport.NONE,
+            "smollm3-3b-litertlm", ThinkingSupport.OPTIONAL,
+            "granite-4.2-3b-litertlm", ThinkingSupport.OPTIONAL,
+            "nanbeige-4.2-3b-litertlm", ThinkingSupport.ALWAYS,
+            "qwen3.5-4b-litertlm", ThinkingSupport.OPTIONAL,
         )
         // O modelo que abre o `<think>` no prompt é, por definição, o que sempre pensa.
         assertThat(ModelCatalog.TEXT_ALL.filter { it.promptOpensThink }.map { it.thinking }.toSet()).containsExactly(ThinkingSupport.ALWAYS)
@@ -419,11 +431,11 @@ class ModelCatalogTest {
      */
     @Test
     fun `changing a catalog pin requires bumping the embedded catalog version`() {
-        assertThat(ModelCatalog.EMBEDDED_VERSION).isEqualTo(2026102702)
-        assertThat(ModelCatalog.pinsFingerprint()).isEqualTo(PINS_FINGERPRINT_2026102702)
+        assertThat(ModelCatalog.EMBEDDED_VERSION).isEqualTo(2026102801)
+        assertThat(ModelCatalog.pinsFingerprint()).isEqualTo(PINS_FINGERPRINT_2026102801)
     }
 
     private companion object {
-        const val PINS_FINGERPRINT_2026102702 = "5e1592e1d2cfc5622ccf34221b2f698e53fa63ab7f68e081e44284c0345ba4e3"
+        const val PINS_FINGERPRINT_2026102801 = "d73c549bf91248e8e1ed6737bb3252cf7313409f00e6bd0853b3d5b01ce6e4b1"
     }
 }
