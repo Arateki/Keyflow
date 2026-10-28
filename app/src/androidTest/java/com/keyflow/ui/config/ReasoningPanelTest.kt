@@ -13,6 +13,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.keyflow.core.ComputeBackend
 import com.keyflow.core.ReasoningSource
 import com.keyflow.core.TranscriptionSource
 import com.keyflow.data.Settings
@@ -41,8 +42,10 @@ class ReasoningPanelTest {
     private class FakeActions : LocalModelActions {
         val deletes = mutableListOf<String>()
         val prepares = mutableListOf<String>()
+        val backends = mutableListOf<Triple<String, ComputeBackend, Boolean>>()
         override suspend fun download(spec: ModelSpec, allowMetered: Boolean): StartResult = StartResult.Started
         override fun prepare(modelId: String, language: String?) { prepares += modelId }
+        override fun chooseBackend(modelId: String, backend: ComputeBackend, prepare: Boolean) { backends += Triple(modelId, backend, prepare) }
         override fun cancel(modelId: String) = Unit
         override fun delete(modelId: String) { deletes += modelId }
     }
@@ -71,6 +74,29 @@ class ReasoningPanelTest {
     private fun textUi(installed: Set<String> = emptySet(), selected: String? = null) = LocalModelsUi.compose(
         catalog = ModelCatalog.TEXT, installed = installed, active = null, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_000,
     )
+
+    /** O seletor "Roda em" do card: escolher a GPU no modelo selecionado grava a preferência e recarrega nele, sem mexer nas Settings. */
+    @Test
+    fun choosingTheGpuOnTheSelectedModelRecordsTheChoiceAndLeavesTheSettingsAlone() {
+        val ui = LocalModelsUi.compose(
+            catalog = ModelCatalog.TEXT, installed = setOf(qwen.id, gemma.id), active = null, failures = emptyMap(),
+            selectedId = qwen.id, deviceRamMb = 8_000, gpuAvailable = true,
+        )
+        val h = Harness(Settings(reasoningLocalModelId = qwen.id), ui)
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag("raciocinio-local-model-${qwen.id}-backend-gpu").performScrollTo().performClick()
+        rule.onNodeWithTag("raciocinio-local-model-${gemma.id}-backend-gpu").performScrollTo().performClick()
+
+        rule.runOnIdle {
+            assertEquals(
+                listOf(Triple(qwen.id, ComputeBackend.GPU, true), Triple(gemma.id, ComputeBackend.GPU, false)),
+                h.actions.backends,
+            )
+            assertEquals(Settings(reasoningLocalModelId = qwen.id), h.settings)
+            assertEquals("o seletor não seleciona nem prepara por conta própria", emptyList<String>(), h.actions.prepares)
+        }
+    }
 
     /** Review, Important 7: aparelho de 32 bits — sem lista de download, com o motivo escrito. */
     @Test

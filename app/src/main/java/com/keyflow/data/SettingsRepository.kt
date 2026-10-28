@@ -20,6 +20,7 @@ import com.keyflow.auth.CredentialStore
 import com.keyflow.auth.CredentialVaultLock
 import com.keyflow.auth.ProviderIds
 import com.keyflow.auth.SecureCredentialStore
+import com.keyflow.core.ComputeBackend
 import com.keyflow.core.FalaSource
 import com.keyflow.core.OrbShortcutAction
 import com.keyflow.core.OverlaySide
@@ -40,6 +41,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -358,6 +360,37 @@ class SettingsRepository(
 
     suspend fun saveShortcutGrids(grids: List<ShortcutGrid>) {
         dataStore.edit { it[SHORTCUT_GRIDS_JSON] = ShortcutCodec.encodeGrids(grids) }
+    }
+
+    /** Onde cada modelo de texto local roda, ao vivo — o seletor "Roda em" do card (chave própria, fora de [Settings]). */
+    fun localBackendPrefsFlow(): Flow<LocalBackendPrefs> =
+        dataStore.data.map { LocalBackendPrefs.decode(it[REASONING_LOCAL_BACKENDS]) }.distinctUntilChanged()
+
+    /**
+     * O backend do [modelId] agora: leitura leve só do DataStore (sem cofre), chamada a cada geração local para a troca no card valer
+     * já na próxima. Sem escolha, CPU.
+     */
+    suspend fun localBackendFor(modelId: String): ComputeBackend =
+        LocalBackendPrefs.decode(dataStore.data.first()[REASONING_LOCAL_BACKENDS]).backendFor(modelId)
+
+    /** O backend e a ficha da escolha do [modelId] numa só leitura: quem pede uma carga leva os dois juntos (ver [LocalBackendPrefs.ticketFor]). */
+    suspend fun localBackendChoiceFor(modelId: String): LocalBackendChoice {
+        val prefs = LocalBackendPrefs.decode(dataStore.data.first()[REASONING_LOCAL_BACKENDS])
+        return LocalBackendChoice(prefs.backendFor(modelId), prefs.ticketFor(modelId))
+    }
+
+    /**
+     * Muda a tabela de backends numa escrita atômica só dessa chave: não disputa com o auto-save da tela, que regrava as Settings
+     * inteiras (mesma razão de [selectInstalledModelIfNone]). Devolve o que ficou gravado.
+     */
+    suspend fun updateLocalBackendPrefs(change: (LocalBackendPrefs) -> LocalBackendPrefs): LocalBackendPrefs {
+        var result = LocalBackendPrefs.EMPTY
+        dataStore.edit { prefs ->
+            result = change(LocalBackendPrefs.decode(prefs[REASONING_LOCAL_BACKENDS]))
+            val text = result.encode()
+            if (text.isEmpty()) prefs.remove(REASONING_LOCAL_BACKENDS) else prefs[REASONING_LOCAL_BACKENDS] = text
+        }
+        return result
     }
 
     fun flow(): Flow<Config> = settingsFlow().map { settings ->
@@ -839,6 +872,8 @@ class SettingsRepository(
         // Trabalho 3 (shortcut-bars): barras personalizáveis + teclados de atalhos, como JSON.
         val BARS_CONFIG_JSON = stringPreferencesKey("bars_config_json")
         val SHORTCUT_GRIDS_JSON = stringPreferencesKey("shortcut_grids_json")
+        // Raciocínio local: onde cada modelo roda (CPU/GPU), o aviso de volta para a CPU e a GPU já pronta — ver [LocalBackendPrefs].
+        val REASONING_LOCAL_BACKENDS = stringPreferencesKey("reasoning_local_backends")
 
         fun createSecurePrefs(
             context: Context,

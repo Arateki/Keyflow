@@ -146,6 +146,25 @@ método quando o provedor mudar e adicionar outros provedores sem mexer no resto
 
 ---
 
+### P2-H: Onde o modelo local roda — CPU · GPU (`RPRC`) e o card do modelo (`RCARD`)
+
+**Como** usuário de um aparelho com GPU, **quero** escolher no card de cada modelo local se ele roda na CPU ou na GPU, **para** usar a que
+funciona melhor nele (medido no Vaio TL10, Mali-G57: o Qwen3 4B só rodou na GPU; o Gemma 4 E2B respondeu igual nas duas, com a 1ª carga na GPU ~117 s
+e as seguintes ~21 s). NPU **fora** (decisão do Yan, 2026-10-27): exige biblioteca do fabricante e um `.litertlm` compilado por SoC, e nenhum modelo do
+catálogo tem essa variante.
+
+1. **RPRC-01**: o aparelho SHALL oferecer a CPU sempre e a GPU só quando há a `libOpenCL.so` do fabricante visível ao app (`ComputeSupport`: existência do arquivo nos caminhos de 64 bits; sem carregar a biblioteca no processo do teclado); o manifesto SHALL declarar `uses-native-library libOpenCL.so` com `required=false` (vale no release).
+2. **RPRC-02**: o card de um modelo de texto **instalado** SHALL mostrar o seletor "Roda em  CPU · GPU" só com as opções que o aparelho oferece e **só com mais de uma**; fala, visão e voz nunca o mostram.
+3. **RPRC-03**: a escolha SHALL ser por modelo, padrão CPU, persistida numa chave própria do DataStore (`LocalBackendPrefs`, fora de `Settings`) e lida a cada geração; apagar o modelo esquece a escolha.
+4. **RPRC-04**: o backend SHALL fazer parte da identidade do motor residente no `:reasoning` (id + versão + backend): trocar de CPU para GPU (ou o contrário) descarrega e recarrega; mesmo backend reaproveita.
+5. **RPRC-05**: WHEN a carga na GPU falha THEN o `:reasoning` SHALL recarregar o mesmo modelo na CPU **no mesmo pedido** (a resposta do usuário não se perde), avisar pelo callback, e o app SHALL gravar a CPU como escolha e mostrar no card "A GPU não funcionou neste aparelho; usando a CPU."; só a seleção explícita (escolher o modelo ou o backend no card) tenta a GPU de novo; o motivo vai para o log.
+6. **RPRC-06**: a guarda de RAM SHALL seguir a regra de sempre na CPU (inclusive na volta do fallback) e **não** barrar a GPU pela estimativa de CPU (decisão e risco em `STATE.md`); a pré-carga na GPU mantém só o piso de RAM livre.
+7. **RPRC-07**: ao escolher a GPU pela primeira vez num modelo, o card SHALL avisar que a primeira carga pode levar alguns minutos, até a GPU carregar o modelo uma vez.
+8. **RCARD-01**: o card de modelo local (Transcrição, Raciocínio, Visão — o mesmo) SHALL trocar o resumo por **etiquetas** derivadas do catálogo (idioma, "Português nativo", "Pensamento opcional"/"Sempre pensa", capacidades declaradas pelo fabricante — "Ferramentas", "Ler texto da tela" —, RAM recomendada), por `tr()` com EN/ES; o resumo continua no `ModelSpec`, mas não aparece. `ModelSpec.capabilities` é opcional e tolerante no manifesto remoto; só entra capacidade que o fabricante declara, com a fonte no comentário da entrada ("Ferramentas": Qwen3 0.6B, Qwen2.5 1.5B, SmolLM2 1.7B e os Gemma 4; **não** o DeepSeek R1 Distill); a visão dos Gemma 4 segue **não declarada** (VC-T15) e não existe etiqueta "Agente".
+9. **RCARD-02**: o logo do fabricante SHALL ficar à esquerda do bloco de texto, centralizado, com ~30 dp (contraste 3:1 e descrição mantidos); o card instalado SHALL mostrar o check "Baixado" ao lado do nome, de modo que **não baixado, baixado e selecionado** sejam três estados distintos, inclusive para o leitor de tela.
+
+---
+
 ## Requirement Traceability
 
 Status: Pending → In Design → In Tasks → Implementing → Verified. As tasks estão em `tasks.md` (RSN-T*).
@@ -197,6 +216,8 @@ Status: Pending → In Design → In Tasks → Implementing → Verified. As tas
 | RPRV-02 | P2-G | RSN-T7, RSN-T18 | In Tasks |
 | RPRV-03 | P2-G | RSN-T7 | In Tasks |
 | RPRV-04 | P2-G | RSN-T18 | In Tasks |
+| RPRC-01..07 | P2-H | RSN-T20 | Verified (unitários e instrumentados; GPU real a confirmar pelo Yan) |
+| RCARD-01, RCARD-02 | P2-H | RSN-T21 | Verified (instrumentados e goldens) |
 
 **Coverage:** 45 requisitos, 45 mapeados em tasks (`tasks.md`, RSN-T1..T19).
 
@@ -223,12 +244,17 @@ templates e a rodada sem sistema permanecem pendentes no Vaio após crash de ini
 Catálogo (2026-10-27, equipe/catalogo-qwen) — RCAT-02/03/04 e RPRV-02: o Qwen3 0.6B passou ao pin `fed81d17…` (template que respeita `enable_thinking`) e o
 **Qwen2.5 1.5B Instruct** ("Versátil") entrou; ambos com URL no commit, tamanho e SHA-256 conferidos e licença Apache-2.0 em `app/licenses/`. RCAT-04 também
 cobre a atualização: o `ModelStore` compara o manifest instalado com o catálogo e trata arquivo de versão antiga como desatualizado (card "Atualizar modelo").
-`ModelSpec.thinking` (NONE/OPTIONAL/ALWAYS) alimenta uma linha informativa nos cards de Raciocínio; não há seletor de pensamento nesta etapa.
+`ModelSpec.thinking` (NONE/OPTIONAL/ALWAYS) alimenta uma etiqueta informativa nos cards de Raciocínio ("Pensamento opcional"/"Sempre pensa"); não há seletor de pensamento nesta etapa.
 
 Catálogo (2026-10-27, equipe/qwen3-4b-card) — RCAT-02/03 e RPRV-02: o **Qwen3 4B Instruct-2507** ("Potente", `recommendedRamMb = 12288`, sem modo pensamento) entrou, com URL no commit,
 tamanho e SHA-256 conferidos e licença Apache-2.0 em `app/licenses/`. Provado na GPU do Vaio TL10; a CPU, que o app usa, passou de 5 GB lá e o Android matou o processo, então
 a guarda de carga o barra abaixo de ~9,8 GB de RAM total (ver `tasks.md`).
 
+Revisão 2 do PR #49 (2026-10-28), RPRC-03/05/07: implementada a invalidação de cargas anteriores também ao selecionar novamente o mesmo card e a conferência da versão instalada dentro da transformação do DataStore. A pré-carga usa backend/ficha do snapshot renovado; provas determinísticas cobrem edição suspensa e retry GPU após falha antiga. Verificado: 1882/1882 unitários, lint sem ocorrências e 84/84 instrumentados afetados; CI obrigatório acompanhado no PR. Sem mudança visual nesta correção; decisões em `licoes/2026-10-28-corridas-selecao-backend.md`.
+
 Candidatas de debug (2026-10-27, modelos-novos) — RCAT-02/03/05 e RPRV-02: seis entradas com metadados LFS congelados, `validatedOnDevice = false` e licenças locais; release/Docs/site preservam as sete entradas validadas após integrar o Qwen3 4B. Spark 1.7B/4B excluídos pelo mínimo 0.17.0. Cadastro e gates descritos em `modelos-novos.md`; fabricante Nanbeige identificado por redesenho vetorial atribuído ao avatar oficial; pendentes apenas as medições nativas do Yan, sem promover validação de aparelho.
 
 Integração das candidatas (2026-10-28) — RCAT-02/03/05 e RPRV-02: Qwen3 4B da main preservado, versão `2026102801` com fingerprint regenerado e fabricante Nanbeige atribuído ao avatar oficial. Verificado no recorte do cadastro: 1804/1804 unitários, lint sem ocorrências, 23/23 instrumentados afetados e 244/244 capturas dentro do limiar; somente 22 PNGs de Raciocínio aprovados após revisão dos dois temas. CI obrigatório acompanhado no PR. Decisões em `licoes/2026-10-28-modelos-novos.md`; a validação nativa dos seis pesos continua pendente com o Yan.
+
+Mescla do seletor com os PRs #50/#48 (2026-10-28) — RPRC-01..07, RCARD-01/02 e RCAT-02/03/05 preservados no catálogo combinado `2026102802`: seis candidatas só no debug, capacidades dos modelos anteriores intactas e `:vision` junto da biblioteca OpenCL opcional no manifesto. As seis cenas individuais mostram o card instalado com seletor; teste instrumentado cobre essa combinação. Decisões e validação em `licoes/2026-10-28-mescla-seletor-catalogo.md`.
+Validação local da mescla: 1987/1987 unitários, lint sem ocorrências, 85/85 instrumentados e 246/246 capturas no diff oficial; 36 goldens das rotas afetadas aprovados e os demais 210 preservados. A validação nativa das candidatas e da GPU segue com o Yan.

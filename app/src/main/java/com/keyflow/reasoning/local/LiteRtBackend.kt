@@ -12,6 +12,7 @@ import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.ExperimentalApi
 import com.google.ai.edge.litertlm.Message
 import com.google.ai.edge.litertlm.MessageCallback
+import com.keyflow.core.ComputeBackend
 import com.keyflow.reasoning.ReasoningRequest
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -19,8 +20,9 @@ import java.util.concurrent.atomic.AtomicReference
 
 /**
  * O LiteRT-LM (Google) atrás do [LlmBackend] (RRUN-08). Só existe dentro do processo `:reasoning`; nem o AIDL nem o resto
- * do app conhecem a biblioteca. CPU de propósito: o backend de GPU exige `uses-native-library` no manifesto e o A32 é
- * modesto — quem quiser GPU mede antes (RSN-T19).
+ * do app conhecem a biblioteca. O backend vem de [LlmModel.backend]: CPU (padrão) ou GPU (OpenCL; o manifesto declara
+ * `uses-native-library libOpenCL.so`). Quem decide se a GPU é oferecida é o `ComputeSupport`; se a carga nela falhar, o
+ * `ReasoningServiceCore` recarrega na CPU.
  *
  * Cada geração abre uma [Conversation] nova e a fecha no fim: o Testar e os futuros consumidores são de uma frase, sem
  * histórico. O [Engine] fica carregado até [unload].
@@ -36,7 +38,7 @@ internal class LiteRtBackend(private val cacheDir: String?, private val opensThi
     override fun load(model: LlmModel) {
         var created: Engine? = null
         try {
-            created = Engine(EngineConfig(modelPath = model.modelPath, backend = Backend.CPU(), cacheDir = cacheDir))
+            created = Engine(EngineConfig(modelPath = model.modelPath, backend = LiteRtConfigs.backend(model.backend), cacheDir = cacheDir))
             // Pode levar segundos (a doc fala em até ~10 s): estamos na thread de trabalho do serviço, não na da tela.
             created.initialize()
             textFormat = LiteRtConfigs.textFormat(created, opensThink)
@@ -145,6 +147,12 @@ internal class LiteRtBackend(private val cacheDir: String?, private val opensThi
  * Java 21) na inicialização da classe derrubaria os testes unitários, que rodam no JDK 17.
  */
 internal object LiteRtConfigs {
+    /** O backend do LiteRT-LM de cada [ComputeBackend] (0.16.1: `Backend.CPU()` e `Backend.GPU()`, ambos sem argumento obrigatório). */
+    fun backend(backend: ComputeBackend): Backend = when (backend) {
+        ComputeBackend.CPU -> Backend.CPU()
+        ComputeBackend.GPU -> Backend.GPU()
+    }
+
     fun contents(text: String, format: LiteRtTextFormat = LiteRtTextFormat.SINGLE): Contents =
         Contents.of(format.parts(text).map { Content.Text(it) })
 

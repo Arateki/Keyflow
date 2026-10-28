@@ -1,6 +1,7 @@
 package com.keyflow.reasoning.local
 
 import com.google.common.truth.Truth.assertThat
+import com.keyflow.core.ComputeBackend
 import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.ModelSpec
 import org.junit.Test
@@ -144,5 +145,30 @@ class RamGuardTest {
         assertThat(RamGuard.enoughForPreload(availableMb = 5_000, estimateMb = 3_072, totalMb = 4_000)).isFalse()
         assertThat(RamGuard.enoughForPreload(availableMb = 5_000, estimateMb = 3_072, totalMb = 5_700)).isTrue()
         assertThat(RamGuard.enoughForPreload(availableMb = 1_200, estimateMb = 2_048, totalMb = 3_700)).isFalse()
+    }
+
+    // ── por backend ─────────────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `the CPU guard by backend is the same rule as always`() {
+        assertThat(RamGuard.enoughFor(ComputeBackend.CPU, availableMb = 1_000, estimateMb = 2_048)).isFalse()
+        assertThat(RamGuard.enoughFor(ComputeBackend.CPU, availableMb = 50, estimateMb = 2_048, totalMb = 4_000)).isTrue()
+        assertThat(RamGuard.enoughFor(ComputeBackend.CPU, availableMb = 6_000, estimateMb = 2_048, totalMb = 3_000)).isFalse()
+        assertThat(RamGuard.enoughForPreloadOn(ComputeBackend.CPU, availableMb = 1_500, estimateMb = 512)).isFalse()
+    }
+
+    /** O Qwen3 4B só rodou na GPU (a CPU morreu por memória): a estimativa de CPU não pode barrar a GPU. */
+    @Test
+    fun `the GPU is never blocked by the CPU estimate`() {
+        assertThat(RamGuard.enoughFor(ComputeBackend.GPU, availableMb = 100, estimateMb = 4_096, totalMb = 1_000)).isTrue()
+        assertThat(RamGuard.enoughFor(ComputeBackend.GPU, availableMb = null, estimateMb = 4_096)).isTrue()
+    }
+
+    @Test
+    fun `the GPU preload keeps only the free RAM floor`() {
+        assertThat(RamGuard.enoughForPreloadOn(ComputeBackend.GPU, availableMb = 2_047, estimateMb = 4_096)).isFalse()
+        assertThat(RamGuard.enoughForPreloadOn(ComputeBackend.GPU, availableMb = 2_048, estimateMb = 4_096, totalMb = 1_000)).isTrue()
+        assertThat(RamGuard.enoughForPreloadOn(ComputeBackend.GPU, availableMb = null, estimateMb = 4_096)).isTrue()
+        assertThat(RamGuard.enoughForPreloadOn(ComputeBackend.GPU, availableMb = 100, estimateMb = 0)).isTrue()
     }
 }

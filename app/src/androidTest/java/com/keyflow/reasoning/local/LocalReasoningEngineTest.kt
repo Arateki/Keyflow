@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Process
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.keyflow.core.ComputeBackend
 import com.keyflow.reasoning.ReasoningError
 import com.keyflow.reasoning.ReasoningEvent
 import com.keyflow.reasoning.ReasoningRequest
@@ -126,12 +127,70 @@ class LocalReasoningEngineTest {
                 override fun onDelta(text: String) { events += "delta" }
                 override fun onDone() { events += "pronto"; done.countDown() }
                 override fun onError(kind: Int, message: String) { events += "erro:$kind"; done.countDown() }
+                override fun onBackendFallback(failed: String, reason: String) { events += "volta:$failed" }
             })
             assertTrue(done.await(20, java.util.concurrent.TimeUnit.SECONDS))
             assertEquals(listOf("pronto"), events)
             val real = engine().generate(ReasoningRequest(user = "fala real")).all()
             assertEquals("fala real", text(real))
             assertEquals(ReasoningEvent.Done, real.last())
+        } finally { connection.release() }
+    }
+
+    private class RecordingReports : BackendReports {
+        val fallbacks = java.util.concurrent.CopyOnWriteArrayList<Pair<LlmModel, ComputeBackend>>()
+        val loaded = java.util.concurrent.CopyOnWriteArrayList<LlmModel>()
+        override fun fellBack(model: LlmModel, failed: ComputeBackend, reason: String) { fallbacks += model to failed }
+        override fun loaded(model: LlmModel) { loaded += model }
+    }
+
+    /**
+     * A GPU que não carrega, de ponta a ponta: o eco de debug recusa qualquer backend que não seja a CPU, o `:reasoning` volta
+     * para a CPU no mesmo pedido, a resposta chega inteira e o app é avisado (é daí que sai a preferência gravada e o aviso do card).
+     */
+    @Test
+    fun aGpuThatRefusesTheModelFallsBackToTheCpuKeepingTheAnswerAndTellsTheApp() = runBlocking {
+        val reports = RecordingReports()
+        // A ficha da escolha (42) viaja com o pedido: é por ela que o app descarta aviso vencido.
+        val onGpu = LocalReasoningEngine(ECHO_MODEL_ID, { echo.copy(backend = ComputeBackend.GPU, ticket = 42L) }, connection, reports)
+
+        val events = onGpu.generate(ReasoningRequest(user = "a resposta nao se perde")).all()
+
+        assertEquals("a resposta nao se perde", text(events))
+        assertEquals(ReasoningEvent.Done, events.last())
+        assertEquals(listOf(ECHO_MODEL_ID), reports.fallbacks.map { it.first.modelId })
+        assertEquals(listOf(ComputeBackend.GPU), reports.fallbacks.map { it.second })
+        assertEquals("o aviso leva a ficha da escolha que pediu a carga", listOf(42L), reports.fallbacks.map { it.first.ticket })
+        assertTrue("uma geração que voltou para a CPU não conta como GPU pronta", reports.loaded.isEmpty())
+    }
+
+    @Test
+    fun aGenerationOnTheCpuReportsNoFallbackAndNoGpuReady() = runBlocking {
+        val reports = RecordingReports()
+        val onCpu = LocalReasoningEngine(ECHO_MODEL_ID, { echo }, connection, reports)
+
+        assertEquals("tudo certo", text(onCpu.generate(ReasoningRequest(user = "tudo certo")).all()))
+
+        assertTrue(reports.fallbacks.isEmpty())
+        assertEquals(listOf(ECHO_MODEL_ID), reports.loaded.map { it.modelId })
+        assertEquals(listOf(ComputeBackend.CPU), reports.loaded.map { it.backend })
+    }
+
+    /** O backend atravessa o AIDL: pré-carga na GPU com o eco avisa a volta antes do `onDone`. */
+    @Test
+    fun aPreloadOnTheGpuTellsTheFallbackBeforeDone() = runBlocking {
+        val service = connection.acquire()
+        val done = java.util.concurrent.CountDownLatch(1)
+        val events = java.util.concurrent.CopyOnWriteArrayList<String>()
+        try {
+            service.preload(echo.copy(backend = ComputeBackend.GPU).toParcel(), object : IReasoningCallback.Stub() {
+                override fun onDelta(text: String) { events += "delta" }
+                override fun onDone() { events += "pronto"; done.countDown() }
+                override fun onError(kind: Int, message: String) { events += "erro:$kind"; done.countDown() }
+                override fun onBackendFallback(failed: String, reason: String) { events += "volta:$failed" }
+            })
+            assertTrue(done.await(20, java.util.concurrent.TimeUnit.SECONDS))
+            assertEquals(listOf("volta:GPU", "pronto"), events.toList())
         } finally { connection.release() }
     }
 

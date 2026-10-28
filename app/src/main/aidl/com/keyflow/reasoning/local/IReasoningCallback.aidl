@@ -8,4 +8,9 @@ interface IReasoningCallback {
     oneway void onDelta(String text);
     oneway void onDone();
     oneway void onError(int kind, String message);
+    /**
+     * A carga no backend pedido (hoje só "GPU") falhou e o modelo seguiu na CPU: `failed` é o nome do ComputeBackend que falhou, `reason` o
+     * motivo (para o log). Vem antes de onDelta/onDone da mesma geração, que continua normalmente.
+     */
+    oneway void onBackendFallback(String failed, String reason);
 }

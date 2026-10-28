@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.IBinder
 import android.os.RemoteException
 import android.util.Log
+import com.keyflow.core.ComputeBackend
 import com.keyflow.reasoning.ReasoningRequest
 import java.io.File
 import java.util.concurrent.Executors
@@ -85,6 +86,11 @@ class ReasoningService : Service() {
         override fun onError(kind: ReasoningErrorKind, message: String) {
             Log.w(TAG, "falha $kind: $message")
             safely { cb.onError(kind.code, message) }
+        }
+
+        override fun onBackendFallback(failed: ComputeBackend, reason: String) {
+            Log.w(TAG, "a carga na $failed falhou; seguindo na CPU: $reason")
+            safely { cb.onBackendFallback(failed.name, reason) }
         }
 
         private inline fun safely(call: () -> Unit) {

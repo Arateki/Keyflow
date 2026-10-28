@@ -2,9 +2,13 @@ package com.keyflow.ui.config
 
 import android.app.ActivityManager
 import android.content.Context
+import com.keyflow.core.ComputeBackend
 import com.keyflow.data.EffectiveConfig
+import com.keyflow.data.LocalBackendPrefs
+import com.keyflow.data.SettingsRepository
 import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.ModelKind
+import com.keyflow.reasoning.local.ComputeSupport
 import com.keyflow.reasoning.local.LocalReasoningPreloader
 import com.keyflow.transcription.local.LocalTranscriber
 import com.keyflow.data.models.DownloadFailure
@@ -32,6 +36,10 @@ data class LocalModelsSnapshot(
     val failures: Map<String, DownloadFailure>,
     /** Instalados de uma versão que o catálogo já não é (ver [ModelStore.outdatedIds]): o card oferece atualizar. */
     val outdated: Set<String> = emptySet(),
+    /** Onde cada modelo de texto roda (CPU/GPU), o aviso de volta para a CPU e a GPU já pronta — ver [LocalBackendPrefs]. */
+    val backends: LocalBackendPrefs = LocalBackendPrefs.EMPTY,
+    /** O aparelho oferece a GPU (a `libOpenCL.so` do fabricante está lá) — ver [ComputeSupport]. */
+    val gpuAvailable: Boolean = false,
 ) {
     companion object {
         val EMPTY = LocalModelsSnapshot(emptySet(), null, emptyMap())
@@ -48,6 +56,7 @@ class LocalModelsController(context: Context) : LocalModelActions {
     private val store = ModelStore.get(app)
     private val downloader = ModelDownloader.get(app)
     private val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val settings = SettingsRepository(app)
 
     /** RAM total do aparelho, para o aviso de peso (CAT-03). */
     val deviceRamMb: Long = ActivityManager.MemoryInfo()
@@ -60,9 +69,12 @@ class LocalModelsController(context: Context) : LocalModelActions {
      * depende do broadcast chegar.
      */
     fun snapshots(): Flow<LocalModelsSnapshot> =
-        combine(store.installedIds, activeProgress(), downloader.failures, store.outdatedIds) { installed, active, failures, outdated ->
-            LocalModelsSnapshot(installed, active, failures, outdated)
-        }
+        combine(
+            store.installedIds, activeProgress(), downloader.failures, store.outdatedIds, settings.localBackendPrefsFlow(),
+        ) { installed, active, failures, outdated, backends ->
+            // A 1ª leitura do `stat` da libOpenCL.so é disco: este bloco roda no IO (flowOn abaixo), não na principal.
+            LocalModelsSnapshot(installed, active, failures, outdated, backends, ComputeSupport.device.gpuAvailable)
+        }.flowOn(Dispatchers.IO)
 
     private fun activeProgress(): Flow<DownloadProgress?> = flow {
         downloader.reconcile()
@@ -91,12 +103,24 @@ class LocalModelsController(context: Context) : LocalModelActions {
         }
     }
 
+    override fun chooseBackend(modelId: String, backend: ComputeBackend, prepare: Boolean) {
+        io.launch {
+            // Grava antes de preparar: a pré-carga lê a preferência do DataStore.
+            settings.updateLocalBackendPrefs { it.choose(modelId, backend) }
+            if (prepare && store.isInstalled(modelId)) LocalReasoningPreloader.select(app, modelId)
+        }
+    }
+
     override fun cancel(modelId: String) {
         io.launch { downloader.cancel(modelId) }
     }
 
     override fun delete(modelId: String) {
-        io.launch { store.delete(modelId) }
+        io.launch {
+            store.delete(modelId)
+            // Uma cópia nova do modelo não herda a escolha, o aviso nem a "GPU pronta" da antiga.
+            settings.updateLocalBackendPrefs { it.forget(modelId) }
+        }
     }
 
     private companion object {

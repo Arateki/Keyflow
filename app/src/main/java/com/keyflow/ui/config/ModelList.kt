@@ -7,11 +7,17 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,15 +32,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.keyflow.core.ComputeBackend
 import com.keyflow.data.Settings
 import com.keyflow.data.models.ModelSpec
 import com.keyflow.data.models.StartResult
-import com.keyflow.data.models.ThinkingSupport
+import com.keyflow.ui.icons.KfIcon
+import com.keyflow.ui.icons.KfIcons
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
 import com.keyflow.ui.theme.SpaceMono
@@ -57,6 +69,15 @@ internal data class ModelListTags(
     val confirm: (String) -> String,
     val confirmYes: String,
     val confirmNo: String,
+    /** O chip de um backend no seletor "Roda em" do card; só o Raciocínio mostra o seletor, mas o padrão vale para qualquer aba. */
+    val backend: (String, ComputeBackend) -> String = { id, option -> "${model(id)}-backend-${option.name.lowercase()}" },
+    /** O aviso de "a primeira carga na GPU pode levar minutos" e o de "voltou para a CPU", sob o seletor. */
+    val backendHint: (String) -> String = { id -> "${model(id)}-backend-hint" },
+    val backendNotice: (String) -> String = { id -> "${model(id)}-backend-notice" },
+    /** A marca de "baixado" (check) do card instalado. */
+    val downloaded: (String) -> String = { id -> "${model(id)}-downloaded" },
+    /** Uma etiqueta do card (idioma, pensamento, capacidade, RAM): `chave` é [CardTag.key]. */
+    val tag: (String, String) -> String = { id, key -> "${model(id)}-tag-$key" },
 ) {
     companion object {
         /** As tags da aba Transcrição — os testes existentes dependem delas, não mudam. */
@@ -135,6 +156,7 @@ internal fun ModelList(
             pending = pending?.takeIf { it.spec.id == item.spec.id },
             notice = notices[item.spec.id],
             onSelect = { onSelect(item.spec.id) },
+            onBackend = { actions.chooseBackend(item.spec.id, it, prepare = item.selected) },
             onDownload = { download(item.spec, allowMetered = false) },
             onCancel = { actions.cancel(item.spec.id) },
             onDelete = { pending = Pending.Delete(item.spec) },
@@ -162,6 +184,7 @@ private fun ModelCard(
     pending: Pending?,
     notice: String?,
     onSelect: () -> Unit,
+    onBackend: (ComputeBackend) -> Unit,
     onDownload: () -> Unit,
     onCancel: () -> Unit,
     onDelete: () -> Unit,
@@ -172,12 +195,19 @@ private fun ModelCard(
     val spec = item.spec
     val installed = item.status == LocalModelStatus.INSTALLED
     val shape = RoundedCornerShape(16.dp)
+    // Três estados que se distinguem: não baixado (fio neutro e "Baixar"), baixado (fio teal suave e o check "Baixado") e selecionado
+    // (fio teal cheio, mais grosso, e o rádio preenchido). O leitor de tela lê "Baixado" e "selecionado" separados.
+    val outline = when {
+        item.selected -> palette.teal
+        installed -> palette.teal.copy(alpha = 0.4f)
+        else -> palette.line2
+    }
     Column(
         Modifier
             .fillMaxWidth()
             .padding(top = 12.dp)
             .clip(shape)
-            .border(1.dp, if (item.selected) palette.teal else palette.line2, shape)
+            .border(if (item.selected) 1.5.dp else 1.dp, outline, shape)
             // Dentro do cartão do grupo "Origem": cada modelo é um bloco recuado (papel do fundo).
             .background(palette.bg)
             // Instalado = opção de rádio: o leitor de tela anuncia "selecionado" no card inteiro.
@@ -191,21 +221,31 @@ private fun ModelCard(
             .padding(start = 16.dp, end = 12.dp, top = 15.dp, bottom = 15.dp)
             .testTag(tags.model(spec.id)),
     ) {
+        // Cabeçalho: [rádio] [logo do fabricante] nome ✓ / modelo · tamanho. O botão de ação desce para a linha das etiquetas: com ele
+        // aqui o nome (ex.: "Máxima qualidade") quebrava em duas linhas no card instalado.
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (installed) {
                 KfRadio(item.selected, Modifier.padding(end = 12.dp))
             }
+            spec.vendor?.let { ModelVendorLogo(it, size = VENDOR_LOGO_SIZE, modifier = Modifier.padding(end = 12.dp)) }
             Column(Modifier.weight(1f)) {
-                // Alinhado ao topo: se o nome quebrar (fonte grande, cartão instalado), o logo fica na primeira linha.
-                Row(verticalAlignment = Alignment.Top) {
-                    spec.vendor?.let { ModelVendorLogo(it, size = 15.dp, modifier = Modifier.padding(end = 6.dp, top = 1.dp)) }
-                    Text(tr(spec.displayName), color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Normal, fontSize = 13.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        tr(spec.displayName),
+                        color = palette.fg,
+                        fontFamily = SpaceGrotesk,
+                        fontWeight = FontWeight.Normal,
+                        fontSize = 13.sp,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (installed) DownloadedMark(tags.downloaded(spec.id), Modifier.padding(start = 6.dp))
                 }
-                if (spec.modelName.isNotBlank()) {
-                    Text(spec.modelName, color = palette.muted, fontFamily = SpaceMono, fontWeight = FontWeight.Light, fontSize = 9.5.sp)
-                }
-                SizeAndLanguage(formatModelSize(spec.totalBytes), tr(spec.languages))
+                ModelMeta(spec.modelName, formatModelSize(spec.totalBytes))
             }
+        }
+        // Etiquetas (idioma, pensamento, capacidades, RAM) e, no fim da última linha, a ação do card (quebra para a linha de baixo se não couber).
+        val cardTags = modelTags(spec)
+        val action: @Composable () -> Unit = {
             when (item.status) {
                 LocalModelStatus.AVAILABLE -> CardAction(
                     if (item.outdated) tr("Atualizar modelo") else tr("Baixar"),
@@ -223,15 +263,9 @@ private fun ModelCard(
                 )
             }
         }
-        SettingSub(tr(spec.summary), Modifier.padding(top = 10.dp))
-        thinkingNotice(spec.thinking)?.let { notice ->
-            Text(
-                notice,
-                color = palette.muted,
-                fontFamily = SpaceGrotesk,
-                fontSize = 10.5.sp,
-                modifier = Modifier.padding(top = 6.dp).testTag("${tags.model(spec.id)}-thinking"),
-            )
+        ModelTagRow(cardTags, tags, spec.id, Modifier.padding(top = 12.dp), trailing = action)
+        if (item.showsBackendChooser) {
+            BackendChooser(item, tags, onBackend)
         }
         if (item.outdated) {
             Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -325,27 +359,153 @@ private fun ModelCard(
 }
 
 /**
- * "~585 MB · Multilíngue" numa linha só. Se não couber (com o botão de seleção o texto fica mais estreito), o tamanho e o
- * idioma vão em duas linhas, sem o "·": quebrar a linha no meio deixava o ponto sozinho no fim ou no começo de uma delas.
+ * O seletor "Roda em  [CPU | GPU]" do card do modelo de texto local: pequeno e na cor do resto do card, só com os backends que o
+ * aparelho oferece (o chamador só o desenha com mais de um). Escolher a GPU pela primeira vez avisa que a primeira carga pode levar
+ * minutos (compila os programas da GPU; as seguintes usam o cache); se a carga na GPU falhou e o app voltou para a CPU, o card diz.
  */
 @Composable
-private fun SizeAndLanguage(size: String, languages: String) {
+private fun BackendChooser(item: LocalModelItem, tags: ModelListTags, onBackend: (ComputeBackend) -> Unit) {
+    val palette = LocalKeyFlowPalette.current
+    val id = item.spec.id
+    Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            tr("Roda em"),
+            color = palette.muted,
+            fontFamily = SpaceGrotesk,
+            fontWeight = FontWeight.Light,
+            fontSize = 10.5.sp,
+            modifier = Modifier.weight(1f),
+        )
+        Row(
+            Modifier.clip(RoundedCornerShape(10.dp)).background(palette.panel).padding(2.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            item.backendOptions.forEach { option ->
+                val active = option == item.backend
+                Text(
+                    option.name,
+                    color = if (active) palette.fg else palette.muted,
+                    fontFamily = SpaceGrotesk,
+                    fontWeight = if (active) FontWeight.Medium else FontWeight.Normal,
+                    fontSize = 11.sp,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .then(if (active) Modifier.background(raisedFill(palette)).border(1.dp, palette.line, RoundedCornerShape(8.dp)) else Modifier)
+                        .selectable(selected = active, onClick = { onBackend(option) }, role = Role.RadioButton)
+                        .padding(horizontal = 14.dp, vertical = 5.dp)
+                        .testTag(tags.backend(id, option)),
+                )
+            }
+        }
+    }
+    if (item.gpuFirstLoad && item.backendFellBackFrom == null) {
+        Text(
+            tr("Na GPU, a primeira carga pode levar alguns minutos."),
+            color = palette.muted,
+            fontFamily = SpaceGrotesk,
+            fontSize = 10.5.sp,
+            modifier = Modifier.padding(top = 6.dp).testTag(tags.backendHint(id)),
+        )
+    }
+    if (item.backendFellBackFrom != null) {
+        Text(
+            tr("A GPU não funcionou neste aparelho; usando a CPU."),
+            color = palette.terracotta,
+            fontFamily = SpaceGrotesk,
+            fontSize = 10.5.sp,
+            modifier = Modifier.padding(top = 6.dp).testTag(tags.backendNotice(id)),
+        )
+    }
+}
+
+/** Tamanho do logo do fabricante no cabeçalho do card: grande o bastante para ler a marca, centralizado no bloco de texto. */
+private val VENDOR_LOGO_SIZE = 30.dp
+
+/**
+ * "Qwen3 0.6B · ~585 MB" numa linha só. Se não couber, o modelo e o tamanho vão em duas linhas, sem o "·": quebrar a linha no meio
+ * deixava o ponto sozinho no fim ou no começo de uma delas.
+ */
+@Composable
+private fun ModelMeta(modelName: String, size: String) {
     val palette = LocalKeyFlowPalette.current
     var stacked by remember { mutableStateOf(false) }
     val style = TextStyle(color = palette.faint, fontFamily = SpaceMono, fontWeight = FontWeight.Light, fontSize = 9.5.sp)
-    if (stacked) {
+    if (modelName.isBlank()) {
+        Text(size, style = style, modifier = Modifier.padding(top = 2.dp))
+    } else if (stacked) {
         Column(Modifier.padding(top = 2.dp)) {
+            Text(modelName, style = style.copy(color = palette.muted))
             Text(size, style = style)
-            Text(languages, style = style)
         }
     } else {
         Text(
-            "$size · $languages",
+            buildAnnotatedString {
+                withStyle(SpanStyle(color = palette.muted)) { append(modelName) }
+                append(" · $size")
+            },
             style = style,
             softWrap = false,
             onTextLayout = { if (it.hasVisualOverflow) stacked = true },
             modifier = Modifier.padding(top = 2.dp),
         )
+    }
+}
+
+/** O check de "baixado" ao lado do nome do card instalado; o leitor de tela diz "Baixado". */
+@Composable
+private fun DownloadedMark(tag: String, modifier: Modifier = Modifier) {
+    val palette = LocalKeyFlowPalette.current
+    val description = tr("Baixado")
+    Box(
+        modifier
+            .size(15.dp)
+            .clip(CircleShape)
+            .background(palette.teal.copy(alpha = 0.16f))
+            .border(1.dp, palette.teal.copy(alpha = 0.55f), CircleShape)
+            .semantics { contentDescription = description }
+            .testTag(tag),
+        contentAlignment = Alignment.Center,
+    ) {
+        KfIcon(KfIcons.Check, tint = palette.teal, modifier = Modifier.size(10.dp), strokeWidth = 3.2f)
+    }
+}
+
+/**
+ * As etiquetas do modelo em linhas que quebram: o que ele é, no que difere dos outros e o que pede do aparelho. O [trailing] (a ação do
+ * card) fecha a última linha, encostado na direita; se não couber ali, desce para uma linha própria, também à direita.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ModelTagRow(
+    cardTags: List<CardTag>,
+    tags: ModelListTags,
+    modelId: String,
+    modifier: Modifier = Modifier,
+    trailing: @Composable () -> Unit,
+) {
+    val palette = LocalKeyFlowPalette.current
+    FlowRow(
+        modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        cardTags.forEach { tag ->
+            Text(
+                tag.text,
+                color = palette.muted,
+                fontFamily = SpaceGrotesk,
+                fontWeight = FontWeight.Normal,
+                fontSize = 10.sp,
+                modifier = Modifier
+                    .align(Alignment.CenterVertically)
+                    .clip(RoundedCornerShape(50))
+                    .background(palette.panel)
+                    .padding(horizontal = 9.dp, vertical = 4.dp)
+                    .then(tag.description?.let { d -> Modifier.semantics { contentDescription = d } } ?: Modifier)
+                    .testTag(tags.tag(modelId, tag.key)),
+            )
+        }
+        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End) { trailing() }
     }
 }
 
@@ -397,11 +557,4 @@ private fun ConfirmRow(question: String, confirm: String, tag: String, tags: Mod
             CardAction(confirm, tag = tags.confirmYes, onClick = onConfirm)
         }
     }
-}
-
-/** A linha de modo pensamento do card (só informativa); nenhuma para o modelo comum. */
-internal fun thinkingNotice(thinking: ThinkingSupport): String? = when (thinking) {
-    ThinkingSupport.NONE -> null
-    ThinkingSupport.OPTIONAL -> tr("Suporta modo pensamento.")
-    ThinkingSupport.ALWAYS -> tr("Sempre pensa antes de responder.")
 }

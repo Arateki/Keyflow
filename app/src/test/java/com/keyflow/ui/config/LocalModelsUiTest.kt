@@ -1,12 +1,13 @@
 package com.keyflow.ui.config
 
 import com.google.common.truth.Truth.assertThat
+import com.keyflow.core.ComputeBackend
+import com.keyflow.data.LocalBackendPrefs
 import com.keyflow.data.models.DownloadFailure
 import com.keyflow.data.models.DownloadProgress
 import com.keyflow.data.models.DownloadState
 import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.StartResult
-import com.keyflow.data.models.ThinkingSupport
 import com.keyflow.ui.gallery.SamplePanelModels
 import org.junit.Test
 
@@ -295,10 +296,89 @@ class LocalModelsUiTest {
         assertThat(LocalModelsUi.EMPTY_VISION.items.map { it.spec.id }).containsNoneOf(piper, kokoro, melo)
     }
 
+
+    // ── seletor "Roda em" (CPU · GPU) do card de texto local ────────────────────────────────────────────
+
+    private fun backendUi(
+        installed: Set<String> = setOf(qwen),
+        selected: String? = qwen,
+        prefs: LocalBackendPrefs = LocalBackendPrefs.EMPTY,
+        gpu: Boolean = true,
+        catalog: List<com.keyflow.data.models.ModelSpec> = ModelCatalog.TEXT,
+    ) = LocalModelsUi.compose(
+        catalog = catalog, installed = installed, active = null, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_000,
+        backendPrefs = prefs, gpuAvailable = gpu,
+    )
+
     @Test
-    fun `the thinking line exists only for models that think`() {
-        assertThat(thinkingNotice(ThinkingSupport.NONE)).isNull()
-        assertThat(thinkingNotice(ThinkingSupport.OPTIONAL)).isEqualTo("Suporta modo pensamento.")
-        assertThat(thinkingNotice(ThinkingSupport.ALWAYS)).isEqualTo("Sempre pensa antes de responder.")
+    fun `a device with a GPU offers CPU and GPU on an installed text model`() {
+        val item = backendUi().item(qwen)
+        assertThat(item.backendOptions).containsExactly(ComputeBackend.CPU, ComputeBackend.GPU).inOrder()
+        assertThat(item.showsBackendChooser).isTrue()
+        assertThat(item.backend).isEqualTo(ComputeBackend.CPU)
+    }
+
+    @Test
+    fun `with only one option the selector is not shown`() {
+        val item = backendUi(gpu = false).item(qwen)
+        assertThat(item.backendOptions).containsExactly(ComputeBackend.CPU)
+        assertThat(item.showsBackendChooser).isFalse()
+    }
+
+    @Test
+    fun `a model that is not installed never shows the selector`() {
+        val ui = backendUi(installed = emptySet(), selected = null)
+        assertThat(ui.items.none { it.showsBackendChooser }).isTrue()
+    }
+
+    @Test
+    fun `speech vision and voice models never offer the GPU`() {
+        val speech = LocalModelsUi.compose(
+            catalog = ModelCatalog.SPEECH, installed = setOf(base), active = null, failures = emptyMap(), selectedId = base, deviceRamMb = 8_000,
+            backendPrefs = LocalBackendPrefs.EMPTY.choose(base, ComputeBackend.GPU), gpuAvailable = true,
+        )
+        assertThat(speech.item(base).backendOptions).containsExactly(ComputeBackend.CPU)
+        assertThat(speech.item(base).backend).isEqualTo(ComputeBackend.CPU)
+        assertThat(speech.items.none { it.showsBackendChooser }).isTrue()
+        val vision = backendUi(installed = setOf(SamplePanelModels.VISION_HEAVY.id), selected = null, catalog = SamplePanelModels.VISION)
+        assertThat(vision.items.none { it.showsBackendChooser }).isTrue()
+    }
+
+    @Test
+    fun `the saved choice shows as selected, and a choice the device no longer offers reads as the CPU`() {
+        val prefs = LocalBackendPrefs.EMPTY.choose(qwen, ComputeBackend.GPU)
+        assertThat(backendUi(prefs = prefs).item(qwen).backend).isEqualTo(ComputeBackend.GPU)
+        assertThat(backendUi(prefs = prefs, gpu = false).item(qwen).backend).isEqualTo(ComputeBackend.CPU)
+        assertThat(backendUi(prefs = prefs).item(gemma).backend).isEqualTo(ComputeBackend.CPU) // por modelo
+    }
+
+    @Test
+    fun `the first GPU load warning shows until the GPU has loaded the model once`() {
+        val chosen = LocalBackendPrefs.EMPTY.choose(qwen, ComputeBackend.GPU, ticket = 7L)
+        assertThat(backendUi(prefs = chosen).item(qwen).gpuFirstLoad).isTrue()
+        assertThat(backendUi(prefs = chosen.markGpuReady(qwen, 7L)).item(qwen).gpuFirstLoad).isFalse()
+        assertThat(backendUi().item(qwen).gpuFirstLoad).isFalse() // na CPU não há o que avisar
+    }
+
+    @Test
+    fun `the fallback notice shows only on the installed model that fell back`() {
+        val fell = LocalBackendPrefs.EMPTY
+            .choose(qwen, ComputeBackend.GPU, ticket = 7L).fellBack(qwen, ComputeBackend.GPU, 7L)
+            .choose(gemma, ComputeBackend.GPU, ticket = 8L).fellBack(gemma, ComputeBackend.GPU, 8L)
+        val ui = backendUi(prefs = fell, installed = setOf(qwen))
+        assertThat(ui.item(qwen).backendFellBackFrom).isEqualTo(ComputeBackend.GPU)
+        assertThat(ui.item(qwen).backend).isEqualTo(ComputeBackend.CPU)
+        assertThat(ui.item(gemma).backendFellBackFrom).isNull() // não instalado
+        assertThat(backendUi(prefs = LocalBackendPrefs.EMPTY).item(qwen).backendFellBackFrom).isNull()
+    }
+
+    /** O estado de antes do seletor (sem preferência, sem GPU) é o de sempre: nenhum card da galeria muda sem o aparelho oferecer a GPU. */
+    @Test
+    fun `without a GPU and without a preference the list is exactly what it was before the selector`() {
+        assertThat(backendUi(gpu = false)).isEqualTo(
+            LocalModelsUi.compose(
+                catalog = ModelCatalog.TEXT, installed = setOf(qwen), active = null, failures = emptyMap(), selectedId = qwen, deviceRamMb = 8_000,
+            ),
+        )
     }
 }

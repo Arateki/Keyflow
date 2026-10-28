@@ -548,7 +548,6 @@ lidos da API do HF (e o SHA-256 recalculado baixando os arquivos, ver `qwen-sem-
 - Goldens: as telas `config-raciocinio-local-*` (cards de texto mudaram: seis modelos, novo tamanho do Qwen3, linha de pensamento) foram regeneradas; o resto
   bit-idêntico. Ver `STATE.md` (2026-10-27, equipe/catalogo-qwen).
 
-
 ## Catálogo: Qwen3 4B Instruct-2507 ("Potente") e limpeza da recuperação de troca (2026-10-27)
 
 Status: implementada (branch `equipe/qwen3-4b-card`, sobre `equipe/catalogo-qwen`), por decisão do Yan. RCAT-02/03 e RPRV-02 seguem valendo: commit `4d409771…`, 2659057664 B e
@@ -573,6 +572,32 @@ SHA-256 `9e48b165…` lidos da API do HF (e o SHA-256 recalculado baixando o arq
   `-local-baixando`, `-local-pronto`, `-local-instalados`, `-testando`, claro e escuro) mudam só ~100-130 px na barra de rolagem (a lista ficou mais longa); a rota nova
   `config-raciocinio-local-potente` (debug, claro e escuro) mostra o card sozinho, com o aviso de "pesado" num aparelho de 8 GB. `config-docs` (~5 px) e `tour-keyboard-mic` (0 px) foram restaurados.
 
+## Onde o modelo local roda (CPU · GPU) e o card redesenhado (2026-10-27, `equipe/seletor-processador`)
+
+Pedido do Yan: um segundo seletor no card de cada modelo local de Raciocínio para escolher onde ele roda; NPU **fora** (só CPU · GPU). Depois, o mesmo
+arquivo (`ModelList.kt`) ganhou o redesenho do card (etiquetas no lugar do resumo, logo maior, estado "baixado"), para não gerar conflito entre branches.
+
+### RSN-T20 — Seletor CPU · GPU ✅ (RPRC-01..07)
+- **What**: `ComputeBackend { CPU, GPU }` (`core/Models.kt`); `ComputeSupport` (existência da `libOpenCL.so` em `/vendor/lib64`, `/system/vendor/lib64`, `/system/lib64`);
+  `LocalBackendPrefs` (escolha por modelo, aviso de volta para a CPU e "GPU pronta"; chave `reasoning_local_backends` do DataStore, API `SettingsRepository.localBackendPrefsFlow/localBackendFor/updateLocalBackendPrefs`);
+  `LlmModel.backend` + `LocalLlmConfig.backend` (AIDL) e `IReasoningCallback.onBackendFallback`; `LiteRtConfigs.backend` (`Backend.CPU()`/`Backend.GPU()` do LiteRT-LM 0.16.1); `RamGuard.enoughFor/enoughForPreloadOn`;
+  `ReasoningServiceCore` com identidade id+versão+backend, volta para a CPU e memória das cargas que falharam; `BackendReports` (o app grava a preferência a partir do que o `:reasoning` conta);
+  `<uses-native-library libOpenCL.so required=false>` no manifesto principal; o seletor e os avisos no `ModelCard`; `LocalModelActions.chooseBackend`.
+- **Tests**: `ComputeSupportTest`, `LocalBackendPrefsTest`, `ReasoningServiceCoreTest` (recarga por troca, volta para a CPU, guarda por backend), `RamGuardTest`, `LlmModelTest`,
+  `LocalModelsUiTest` (unit); `ModelListTest`, `ReasoningPanelTest`, `LocalReasoningEngineTest` (a GPU simulada do eco volta para a CPU de ponta a ponta), `SettingsRepositoryTest`, `LiteRtBackendMappingTest` (instrumentados).
+- **Fica de fora**: NPU; falha de **geração** (não de carga) na GPU já carregada não volta sozinha (aparece como erro; o usuário troca para CPU no card); morte do processo pelo lmkd durante a carga na GPU não tem volta (o `:reasoning` morre inteiro).
+- **Medição na GPU de verdade**: com o Yan (aparelho real). O emulador do pool não tem OpenCL, então lá o seletor nem aparece; a rota de galeria `config-raciocinio-local-gpu` simula um aparelho que tem.
+
+### RSN-T21 — Card de modelo redesenhado ✅ (RCARD-01, RCARD-02)
+- **What**: sem o `summary` no card; etiquetas por `modelTags(spec)` (`ModelCardTags.kt`); `ModelSpec.capabilities: Set<ModelCapability>` (opcional, tolerante no manifesto; hoje `NATIVE_PORTUGUESE` no Parakeet,
+  `READ_TEXT` no PaddleOCR e `TOOLS` — "Ferramentas", autorizada pelo Yan — em Qwen3 0.6B, Qwen2.5 1.5B, SmolLM2 1.7B e Gemma 4 E2B/E4B, cada uma com a fonte oficial no comentário da entrada; o DeepSeek R1 Distill não declara e fica sem; o card do Qwen3 4B herda o campo); logo de 30 dp à esquerda; check "Baixado" ao lado do nome; o botão de ação desce para a linha das etiquetas (com ele no cabeçalho, "Máxima qualidade" quebrava em duas linhas no card instalado).
+- **Tests**: `ModelCardTagsTest`, `ModelCatalogTest`, `RemoteConfigRepositoryTest` (unit); `ModelListTest` (instrumentado). Goldens: 22 quadros mudaram (`config-voz-local*`, `config-raciocinio*`, claro e escuro) e a rota `config-raciocinio-local-gpu` entrou; ver `licoes/2026-10-28-card-de-modelo-etiquetas.md` e `licoes/2026-10-28-seletor-cpu-gpu.md`.
+
+
+### Revisão 2 do PR #49 — fichas da seleção e versão no commit
+
+Status: verificado em 2026-10-28: `pool compilar testDebugUnitTest :app:lintDebug` passou 1882/1882 em 173 suítes, sem ignorados e sem ocorrências de lint; `pool instrumentar ModelListTest ReasoningPanelTest LocalReasoningEngineTest SettingsRepositoryTest LiteRtBackendMappingTest` passou 84/84 no servidor (sem filtros de nó/AWS nos dois comandos). CI obrigatório acompanhado no PR. RPRC-03/05/07: toda seleção explícita do card renova a ficha dentro da edição e usa o snapshot devolvido na pré-carga; avisos de carga conferem versão instalada e ficha dentro da transformação atômica. Regressões em `BackendReportCommitRaceTest`, `BackendReportsRaceTest` e `LocalBackendSelectionTest`. Prova anterior: 3 falhas reproduzidas de 5 testes na janela da edição. Lição: `licoes/2026-10-28-corridas-selecao-backend.md`.
+
 ## Candidatas só no debug (2026-10-27, modelos-novos)
 
 Status: cadastro e logo Nanbeige implementados; main sincronizada, 1804/1804 unitários, lint sem ocorrências e 23/23 instrumentados afetados. Captura final 244/244; comparação oficial e sem fuzz dentro do limiar após aprovar só 22 PNGs de Raciocínio (dez existentes e 12 novos), com os demais 222 bit-idênticos. Os seis cards foram revisados em claro/escuro; CI obrigatório acompanhado no PR. Lição: `licoes/2026-10-28-modelos-novos.md`. Histórico da primeira rodada: Gate JVM: 1799/1800 (única falha: fabricante Nanbeige); lint sem ocorrências; instrumentados afetados 23/23. Goldens: 230/230 capturas dentro do limiar sem fuzz, com dez PNGs de Raciocínio aprovados e os outros 220 originais preservados.
@@ -580,3 +605,9 @@ Seis candidatas, URL por commit + LFS/bytes conferidos, licenças, traduções d
 Release mantém os sete modelos validados após a integração do Qwen3 4B e não publica as licenças das candidatas em Docs/site. Spark 1.7B/4B aguardam runtime compatível (mínimo formal 0.17.0).
 Evidências, estimativas de RAM, diferenças entre versões de runtime e limitações em `modelos-novos.md`.
 O teste de fabricante permanece sem exceção, agora com `ModelVendor.NANBEIGE`; o Yan avalia carga, qualidade, aquecimento e RSS nos aparelhos.
+
+### Mescla do seletor com o catálogo novo e o OCR — 2026-10-28
+
+Integração dos PRs #50/#48 na branch do seletor: specs combinadas, manifesto com OpenCL e `:vision`, catálogo `2026102802` com os seis candidatos e as capacidades anteriores preservadas. As cenas individuais e `ModelListTest` verificam as candidatas instaladas com seletor e etiquetas; a validação está registrada em `licoes/2026-10-28-mescla-seletor-catalogo.md`.
+
+Status: verificado localmente — 1987/1987 unitários, lint sem ocorrências, 85/85 instrumentados e 10/10 convenções de mesclagem. Capturas 246/246 e diff oficial dentro do limiar; aprovados 36 PNGs de Raciocínio/Transcrição local, com os outros 210 bit-idênticos à main. CI obrigatório acompanhado no PR #49; GPU real permanece com o Yan.

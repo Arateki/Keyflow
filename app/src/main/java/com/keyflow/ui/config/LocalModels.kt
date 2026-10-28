@@ -1,10 +1,15 @@
 package com.keyflow.ui.config
 
+import com.keyflow.core.ComputeBackend
+import com.keyflow.data.LocalBackendPrefs
 import com.keyflow.i18n.tr
+import com.keyflow.reasoning.local.ComputeSupport
 import com.keyflow.data.models.DownloadFailure
 import com.keyflow.data.models.DownloadProgress
 import com.keyflow.data.models.DownloadState
 import com.keyflow.data.models.ModelCatalog
+import com.keyflow.data.models.EngineType
+import com.keyflow.data.models.ModelKind
 import com.keyflow.data.models.ModelSpec
 import com.keyflow.data.models.ModelPreparation
 import com.keyflow.data.models.StartResult
@@ -28,7 +33,18 @@ data class LocalModelItem(
     val preparation: ModelPreparation? = null,
     /** O aparelho tem os arquivos de uma versão antiga deste modelo: [status] é AVAILABLE e o card oferece "Atualizar modelo". */
     val outdated: Boolean = false,
-)
+    /** Onde o modelo roda (só o texto local escolhe; os outros ficam em CPU). Sempre um dos [backendOptions]. */
+    val backend: ComputeBackend = ComputeBackend.CPU,
+    /** Onde o aparelho deixa este modelo rodar: sempre a CPU; a GPU quando o aparelho a oferece. */
+    val backendOptions: List<ComputeBackend> = listOf(ComputeBackend.CPU),
+    /** A carga neste backend falhou e o app voltou para a CPU: o card avisa até o usuário escolher de novo. */
+    val backendFellBackFrom: ComputeBackend? = null,
+    /** GPU escolhida e ainda sem nenhuma carga bem-sucedida: a primeira compila os programas da GPU e pode levar minutos. */
+    val gpuFirstLoad: Boolean = false,
+) {
+    /** O seletor "Roda em" só aparece num modelo instalado e quando há mais de uma opção de verdade. */
+    val showsBackendChooser: Boolean get() = status == LocalModelStatus.INSTALLED && backendOptions.size > 1
+}
 
 /** Tudo que o painel Local mostra. Vazio = catálogo sem nada baixado nem em curso. */
 data class LocalModelsUi(
@@ -51,8 +67,17 @@ data class LocalModelsUi(
             deviceRamMb: Long,
             preparation: ModelPreparation? = null,
             outdated: Set<String> = emptySet(),
+            backendPrefs: LocalBackendPrefs = LocalBackendPrefs.EMPTY,
+            gpuAvailable: Boolean = false,
         ): LocalModelsUi = LocalModelsUi(
             catalog.map { spec ->
+                // Só o texto local (LiteRT-LM) escolhe onde roda; a escolha gravada que o aparelho não oferece (mais) vale CPU.
+                val options = if (spec.kind == ModelKind.TEXT && spec.engineType == EngineType.LITERT_LM) {
+                    ComputeSupport.backendsFor(gpuAvailable)
+                } else {
+                    ComputeSupport.backendsFor(gpuAvailable = false)
+                }
+                val backend = backendPrefs.backendFor(spec.id).takeIf { it in options } ?: ComputeBackend.CPU
                 val downloading = active?.modelId == spec.id && active.state != DownloadState.FAILED
                 val status = when {
                     spec.id in installed -> LocalModelStatus.INSTALLED
@@ -68,6 +93,10 @@ data class LocalModelsUi(
                     failure = failures[spec.id].takeIf { status == LocalModelStatus.AVAILABLE },
                     preparation = preparation?.takeIf { status == LocalModelStatus.INSTALLED && spec.id == selectedId && it.modelId == spec.id },
                     outdated = spec.id in outdated && status != LocalModelStatus.INSTALLED,
+                    backend = backend,
+                    backendOptions = options,
+                    backendFellBackFrom = backendPrefs.fellBackFrom(spec.id).takeIf { status == LocalModelStatus.INSTALLED },
+                    gpuFirstLoad = backend == ComputeBackend.GPU && !backendPrefs.gpuReady(spec.id),
                 )
             },
         )
@@ -100,6 +129,12 @@ interface LocalModelActions {
 
     /** Seleção explícita de um instalado: preparar em segundo plano, sem trabalho de disco na UI. */
     fun prepare(modelId: String, language: String? = null) = Unit
+
+    /**
+     * O usuário escolheu onde o modelo de texto [modelId] roda. Grava a preferência; com [prepare] (o modelo está selecionado) já
+     * recarrega nele, em segundo plano. Sem gerenciador (galeria, testes de outras abas): nada acontece.
+     */
+    fun chooseBackend(modelId: String, backend: ComputeBackend, prepare: Boolean) = Unit
 
     /** Sem gerenciador (galeria, testes de outras abas): nada acontece. */
     object None : LocalModelActions {

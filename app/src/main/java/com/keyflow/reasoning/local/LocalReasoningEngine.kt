@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.IBinder
 import android.os.RemoteException
 import android.util.Log
+import com.keyflow.data.SettingsRepository
 import com.keyflow.reasoning.ReasoningEngine
 import com.keyflow.reasoning.ReasoningError
 import com.keyflow.reasoning.ReasoningEvent
@@ -33,8 +34,9 @@ internal fun ReasoningErrorKind.toReasoningError(): ReasoningError = when (this)
  */
 class LocalReasoningEngine internal constructor(
     private val modelId: String,
-    private val modelFor: (String) -> LlmModel?,
+    private val modelFor: suspend (String) -> LlmModel?,
     private val connection: ReasoningConnection,
+    private val reports: BackendReports = BackendReports.None,
 ) : ReasoningEngine {
 
     override fun generate(request: ReasoningRequest): Flow<ReasoningEvent> = callbackFlow<ReasoningEvent> {
@@ -52,6 +54,8 @@ class LocalReasoningEngine internal constructor(
         }
 
         val finished = AtomicBoolean(false)
+        // O que esta carga conta sobre o backend (voltou para a CPU, ou carregou) só vale se a escolha e a instalação que a pediram ainda são as de agora.
+        val loadReport = LoadReport(model, reports)
         val binder: IBinder = service.asBinder()
         val death = IBinder.DeathRecipient {
             if (finished.compareAndSet(false, true)) {
@@ -64,8 +68,11 @@ class LocalReasoningEngine internal constructor(
                 if (!finished.get()) trySend(ReasoningEvent.Delta(text))
             }
 
+            override fun onBackendFallback(failed: String, reason: String) = loadReport.onBackendFallback(failed, reason)
+
             override fun onDone() {
                 if (finished.compareAndSet(false, true)) {
+                    loadReport.onDone()
                     trySend(ReasoningEvent.Done)
                     close()
                 }
@@ -106,10 +113,19 @@ class LocalReasoningEngine internal constructor(
         private const val TAG = "LocalReasoningEngine"
 
         /** O motor do modelo [modelId] (id do catálogo `TEXT`), com a conexão compartilhada do processo. */
-        fun create(context: Context, modelId: String): LocalReasoningEngine = LocalReasoningEngine(
-            modelId = modelId,
-            modelFor = { LlmModels.forId(context.applicationContext, it) },
-            connection = ReasoningConnection.get(context),
-        )
+        fun create(context: Context, modelId: String): LocalReasoningEngine {
+            val app = context.applicationContext
+            return LocalReasoningEngine(
+                modelId = modelId,
+                // O backend é lido a cada geração (só do DataStore, leve): trocar CPU/GPU no card vale já na próxima resposta.
+                modelFor = { id ->
+                    // Backend e ficha numa leitura só: a ficha diz de qual escolha esta carga veio.
+                    val choice = SettingsRepository(app).localBackendChoiceFor(id)
+                    LlmModels.forId(app, id, choice.backend, choice.ticket)
+                },
+                connection = ReasoningConnection.get(context),
+                reports = BackendReports.persisted(app),
+            )
+        }
     }
 }

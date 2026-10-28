@@ -39,6 +39,17 @@ enum class ModelVendor(val displayName: String) {
 enum class ThinkingSupport { NONE, OPTIONAL, ALWAYS }
 
 /**
+ * O que o modelo faz de verificado, além do que o tipo e o idioma já dizem; vira etiqueta no card e **não inventa nada**: só entra o que o
+ * fabricante declara (ou o que foi conferido) e a fonte fica no comentário de cada entrada do catálogo. [READ_TEXT] lê o texto de uma captura de
+ * tela (OCR); [DESCRIBE_IMAGE] e [ANSWER_ABOUT_SCREEN] são as capacidades de visão dos Gemma 4 — ainda NÃO declaradas, porque falta provar no
+ * aparelho que o `.litertlm` carrega com visão (VC-T15 da Visão); [TOOLS] ("Ferramentas"): o fabricante declara chamada de funções/uso de
+ * ferramentas no modelo (não quer dizer que o app já o use como agente: é o que o modelo sabe fazer); [NATIVE_PORTUGUESE]: o fabricante
+ * lista o português entre os idiomas de treino (Parakeet TDT 0.6B v3). Valor que esta versão do app não conhece, num manifesto remoto, é
+ * ignorado.
+ */
+enum class ModelCapability { READ_TEXT, DESCRIBE_IMAGE, ANSWER_ABOUT_SCREEN, TOOLS, NATIVE_PORTUGUESE }
+
+/**
  * Papel de cada arquivo no modelo — o engine monta a config por papel, não pelo nome do arquivo.
  * [MODEL] é o arquivo único `.litertlm` dos modelos de texto. [DETECTOR], [RECOGNIZER] e [DICTIONARY] são os três
  * arquivos do OCR (vision-capture): detector de linhas de texto, reconhecedor CTC e a lista de caracteres dele.
@@ -83,8 +94,10 @@ data class ModelSpec(
     val validatedOnDevice: Boolean = true,
     /** Quem faz o modelo; `null` só em manifesto remoto sem o campo. Todo modelo do catálogo embutido declara o seu (`ModelCatalogTest`). */
     val vendor: ModelVendor? = null,
-    /** Aviso de modo pensamento no card (só os modelos de texto declaram; o resto fica em [ThinkingSupport.NONE]). */
+    /** Etiqueta de modo pensamento no card (só os modelos de texto declaram; o resto fica em [ThinkingSupport.NONE]). */
     val thinking: ThinkingSupport = ThinkingSupport.NONE,
+    /** O que o modelo faz de verificado, em etiquetas do card; vazio = nenhuma além do idioma, do pensamento e da RAM (ver [ModelCapability]). */
+    val capabilities: Set<ModelCapability> = emptySet(),
 ) {
     val totalBytes: Long get() = files.sumOf { it.bytes }
 
@@ -119,7 +132,7 @@ object ModelCatalog {
      * O manifesto remoto (`catalogVersion`) só vale se for maior ou igual a ela: sem isso, um manifesto ou cache antigo substituiria o catálogo
      * inteiro e devolveria, por exemplo, o SHA legado do Qwen3 (o `ModelCatalogTest` confere a impressão digital dos pins contra esta versão).
      */
-    const val EMBEDDED_VERSION = 2026102801
+    const val EMBEDDED_VERSION = 2026102802
 
     /** Impressão digital dos pins embutidos (id, nome, tamanho e SHA-256 de cada arquivo): muda se um pin mudar sem [EMBEDDED_VERSION] subir. */
     fun pinsFingerprint(models: List<ModelSpec> = MODELS): String {
@@ -201,6 +214,8 @@ object ModelCatalog {
         recommendedRamMb = 2048,
         modelName = "Parakeet TDT 0.6B v3",
         vendor = ModelVendor.NVIDIA,
+        // O card dizia "com português nativo" no resumo: o português está entre os 25 idiomas de treino do modelo.
+        capabilities = setOf(ModelCapability.NATIVE_PORTUGUESE),
         files = listOf(
             ModelFile(
                 FileRole.ENCODER, "encoder.int8.onnx", "$PARAKEET_REPO/encoder.int8.onnx",
@@ -264,6 +279,8 @@ object ModelCatalog {
         vendor = ModelVendor.QWEN,
         // Card do Qwen/Qwen3-0.6B: "seamless switching between thinking mode and non-thinking mode"; o template da revisão fed81d17… lê `enable_thinking`.
         thinking = ThinkingSupport.OPTIONAL,
+        // Ferramentas: o card `Qwen/Qwen3-0.6B` ("Agentic Use": "Qwen3 excels in tool calling capabilities"). Conferido em 2026-10-27.
+        capabilities = setOf(ModelCapability.TOOLS),
         files = listOf(
             ModelFile(FileRole.MODEL, "Qwen3-0.6B.litertlm", "$QWEN3_REPO/Qwen3-0.6B.litertlm", "c5f39b4191926786c3e6668b62af4d6eb15248dfc7a5348252a9b406f33f2108", 613_722_264L),
         ),
@@ -290,6 +307,8 @@ object ModelCatalog {
         kind = ModelKind.TEXT,
         vendor = ModelVendor.QWEN,
         thinking = ThinkingSupport.NONE,
+        // Ferramentas: o chat template oficial do `Qwen/Qwen2.5-1.5B-Instruct` (tokenizer_config.json) tem o bloco `tools` e as marcas `<tool_call>`. Conferido em 2026-10-27.
+        capabilities = setOf(ModelCapability.TOOLS),
         files = listOf(
             ModelFile(
                 FileRole.MODEL, "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.litertlm",
@@ -319,6 +338,8 @@ object ModelCatalog {
         kind = ModelKind.TEXT,
         vendor = ModelVendor.HUGGING_FACE,
         thinking = ThinkingSupport.NONE,
+        // Ferramentas: o card `HuggingFaceTB/SmolLM2-1.7B-Instruct` ("supports ... function calling"; seção "Function calling": 27% no BFCL). Conferido em 2026-10-27.
+        capabilities = setOf(ModelCapability.TOOLS),
         files = listOf(
             ModelFile(
                 FileRole.MODEL, "SmolLM2-1_7B-Instruct_dynamic_wi8_afp32.litertlm", "$SMOLLM2_REPO/SmolLM2-1_7B-Instruct_dynamic_wi8_afp32.litertlm",
@@ -349,6 +370,7 @@ object ModelCatalog {
         vendor = ModelVendor.DEEPSEEK,
         // O template abre o `<think>` em toda resposta (por isso o `promptOpensThink`); não há como desligar.
         thinking = ThinkingSupport.ALWAYS,
+        // Sem etiqueta de Ferramentas: o card `deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B` não declara chamada de funções (conferido em 2026-10-27).
         files = listOf(
             ModelFile(
                 FileRole.MODEL, "DeepSeek-R1-Distill-Qwen-1.5B_multi-prefill-seq_q8_ekv4096.litertlm",
@@ -379,6 +401,9 @@ object ModelCatalog {
         // Mode Configuration" (liga com `<|think|>` no começo do prompt de sistema; desligado, o E2B/E4B nem emite o canal). O template do próprio
         // `.litertlm` injeta esse token quando `enable_thinking` é verdadeiro (fixture `gemma-e2b.jinja`, linhas 157-162).
         thinking = ThinkingSupport.OPTIONAL,
+        // Ferramentas: a doc oficial "Function calling with Gemma 4" (ai.google.dev/gemma/docs/capabilities/text/function-calling-gemma4) e o card
+        // `google/gemma-4-E2B-it` ("native function-calling support"). Visão NÃO declarada (VC-T15). Conferido em 2026-10-27.
+        capabilities = setOf(ModelCapability.TOOLS),
         files = listOf(
             ModelFile(FileRole.MODEL, "gemma-4-E2B-it.litertlm", "$GEMMA_4_REPO/gemma-4-E2B-it.litertlm", "181938105e0eefd105961417e8da75903eacda102c4fce9ce90f50b97139a63c", 2_588_147_712L),
         ),
@@ -411,6 +436,8 @@ object ModelCatalog {
         vendor = ModelVendor.QWEN,
         // O Instruct-2507 não pensa (card do Qwen/Qwen3-4B-Instruct-2507: "supports only non-thinking mode").
         thinking = ThinkingSupport.NONE,
+        // Ferramentas: o card `Qwen/Qwen3-4B-Instruct-2507` ("Agentic Use": "Qwen3 excels in tool calling capabilities"; "tool usage" entre as melhorias). Conferido em 2026-10-28.
+        capabilities = setOf(ModelCapability.TOOLS),
         files = listOf(
             ModelFile(
                 FileRole.MODEL, "qwen3_4b_instruct_2507_mixed_int4.litertlm", "$QWEN3_4B_REPO/qwen3_4b_instruct_2507_mixed_int4.litertlm",
@@ -442,6 +469,8 @@ object ModelCatalog {
         // Mode Configuration" (liga com `<|think|>` no começo do prompt de sistema; desligado, o E2B/E4B nem emite o canal). O template do próprio
         // `.litertlm` injeta esse token quando `enable_thinking` é verdadeiro (fixture `gemma-e2b.jinja`, linhas 157-162).
         thinking = ThinkingSupport.OPTIONAL,
+        // Ferramentas: a mesma doc oficial do Gemma 4 e o card `google/gemma-4-E4B-it`. Visão NÃO declarada (VC-T15). Conferido em 2026-10-27.
+        capabilities = setOf(ModelCapability.TOOLS),
         files = listOf(
             ModelFile(FileRole.MODEL, "gemma-4-E4B-it.litertlm", "$GEMMA_4_E4B_REPO/gemma-4-E4B-it.litertlm", "0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0", 3_659_530_240L),
         ),
@@ -652,6 +681,7 @@ object ModelCatalog {
         kind = ModelKind.VISION,
         validatedOnDevice = false,
         vendor = ModelVendor.PADDLEPADDLE,
+        capabilities = setOf(ModelCapability.READ_TEXT),
         files = listOf(
             ModelFile(
                 FileRole.DETECTOR, "det.onnx", "$OCR_PADDLE_REPO/detection/v3/det.onnx",

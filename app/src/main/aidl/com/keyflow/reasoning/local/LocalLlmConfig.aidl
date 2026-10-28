@@ -16,4 +16,6 @@ parcelable LocalLlmConfig {
     int ramEstimateMb;
     /** Identidade da versão do arquivo (SHA-256 do catálogo): trocar o arquivo sob o mesmo [modelId] descarrega o motor residente. */
     String version;
+    /** Nome de com.keyflow.core.ComputeBackend onde carregar: "CPU" (padrão; vazio ou desconhecido também) ou "GPU". Troca de backend recarrega o modelo. */
+    String backend;
 }
