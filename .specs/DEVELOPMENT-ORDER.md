@@ -262,6 +262,7 @@ do e2e da v1.
 | — | Trabalho do Gemini (abas KeyFlow, Fluxos, Computador, Fala, Visão; provedores Anthropic/Google) | commitado e na PR #7. Provedores e aba KeyFlow funcionam; **Fluxos, Computador, Fala e Visão são só tela + `Settings`, sem motor e sem spec** → "Em breve" na v1 (V1-1). Pendências de segurança/release herdadas → V1-2 |
 | — | `corretor-aprendiz` | spec, design e tasks prontos (PR #19); nada implementado. **Fora do recorte da v1 por padrão**: banco de avaliação, base sem aprendizado, recusa e pares, modelo espacial do toque e bigramas, em fases A–G (`.specs/features/corretor-aprendiz/tasks.md`). Portão **[YAN]**: ele revisa os textos legais (política, aba Privacidade, Data Safety) na fase B, e o aprender ligado por padrão não vai à Play sem isso. Em aberto para o Yan: entra na v1? (`context.md` §8) |
 | — | `local-model-warmup` | Main, fora da v1: aquecimento do Parakeet, pré-carga explícita e aquecimento de texto, estado de preparação nos cards; ver spec/design/tasks. Em validação. |
+| — | `bancada` (bancada de modelos) | Spec, design e tasks em rascunho (2026-10-28, PR de spec), nada implementado. Main, fora da v1 (recorte congelado); não toma a vez de nada em andamento. É a régua que precede a atualização do LiteRT-LM (0.16.1 → 0.18.x) e a promoção de candidatas. Decisões abertas do Yan na spec: D1 (versionamento de releases e gatilho), D2..D6 |
 | — | CI | 2026-10-07: cache do AAR do sherpa-onnx nos dois jobs (um 503 do GitHub derrubou a PR #7 antes dos testes) |
 | — | 2026-10-10..22 | PRs #8 a #11 (estabilidade dos testes, desempenho da abertura do teclado, CI, galeria) — fora da fila da v1 |
 
@@ -498,6 +499,21 @@ texto literal da doc da OpenAI). Ordem: RSN-T0 → T1 → … → T19 (uma por v
 - **Não faz parte do bloco**: a aceitação REAL do registro dinâmico pela OpenAI não é provada por teste nenhum daqui — só a conta
   de plano no aparelho prova (RSN-T19).
 
+## Bloco 11 — `bancada` (bancada de modelos) — main, fora da v1
+
+Spec: `.specs/features/bancada/` (`spec.md` 66 requisitos, `design.md`, `tasks.md` BNC-T1..T29). Ordem prática: ver o `tasks.md`.
+
+- **Escopo**: sub-abas por teste na área Testar, para qualquer modelo (local ou online), com corpus fixo versionado, pontuação objetiva,
+  histórico e exportação JSON; os testes são etapas encadeáveis nos fluxos (voz, visão, agente); a mesma bateria roda nos 3 aparelhos de
+  teste (A32, Tab S10 Lite, Vaio TL10) por script, com comparador antes/depois.
+- **Prioridade**: **depois** das frentes abertas e fora do recorte da v1 (v1 só correção). Pré-requisito do Yan para atualizar o
+  LiteRT-LM: o baseline da BNC-T19 vem antes de qualquer troca de motor.
+- **Independe** dos outros blocos; reusa o `ReasoningEngine`, o `LocalTranscriber`, o `ToolRegistry` e o catálogo. Depende do
+  `OcrEngine` (VC-T6) só para o teste de OCR e o fluxo de visão (BNC-T24/T25).
+- **[YAN]**: (1) decidir D1 (versionamento de releases e quando a bancada roda), D2 (fonte do áudio), D3 (teste de código),
+  D4 (automação online), D5 (tradução/terminal) — ver "Decisões abertas" na spec; (2) liberar o A32 para a campanha da BNC-T19;
+  (3) definir o limiar mínimo (D6) depois do baseline.
+
 ---
 
 ## Resumo da fila (visão de uma linha)
@@ -508,7 +524,7 @@ feito: Q1..Q11 → SB → GT → NM → RSN → SKP → AGT fase 1 (faltam só m
 agora: (V1-10 fakes e V1-3 feitas) → upload interno → e2e MZ-T15/API-T14 → V1-4 → … → V1-8
 em paralelo: V1-9 (API-T13 na AWS) — fakes esperam o staging; o e2e real espera conta, applicationId e o upload
 depois: créditos (MZ-T5..T8, T12) e ligar API-T11/T12 · VC (visão) · TS (temas, spec a revisar) ·
-       AGT fases 2/3 · Fala/Fluxos/Computador (sem spec; ideias em
+       bancada de modelos (régua do motor LiteRT-LM; Bloco 11) · AGT fases 2/3 · Fala/Fluxos/Computador (sem spec; ideias em
        .specs/features/computer-terminal/ideias.md)
 ```
 
