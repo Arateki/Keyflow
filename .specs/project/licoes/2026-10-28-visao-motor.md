@@ -6,7 +6,7 @@ O Testar da aba Visão recebe a mesma imagem nossa desenhada em Canvas para Padd
 
 O AAR `com.google.ai.edge.litertlm:litertlm-android:0.16.1` foi inspecionado com `javap`: `Content.ImageBytes(byte[])`, `EngineConfig.visionBackend` e `Conversation.sendMessageAsync(Message, MessageCallback, ...)`. Os bytes do PNG viram `Content.ImageBytes`, junto da instrução; nenhum upgrade do motor. As classes são Java 21: os testes JVM usam backends falsos; os instrumentados conferem as classes reais.
 
-`VisionModelEngine.read/ask` devolve `Text`, `Empty`, `Unavailable` ou `Failed(ReasoningError)`. Um erro descarta os deltas parciais e a UI apresenta somente a causa, sem corpo HTTP ou exceção. PNG/JPEG/WebP limitados a 8 MiB; o bitmap é reduzido a 1024 px no lado maior. Nenhuma imagem/chave entra em log de produção.
+`VisionModelEngine.read/ask` devolve `Text`, `Empty`, `Unavailable` ou `Failed(ReasoningError)`. Um erro descarta os deltas parciais e a UI apresenta somente a causa, sem corpo HTTP ou exceção. PNG/JPEG/WebP limitados a 8 MiB; o bitmap é reduzido a 1024 px no lado maior. Nenhuma imagem/chave entra em log de produção. O erro HTTP da Anthropic registra só o status, inclusive em debug: o corpo devolvido pelo servidor pode ecoar o pedido. Nos pedidos com imagem, Anthropic e Google exigem confirmação do fim e rejeitam limite de geração; EOF prematuro descarta o texto parcial (`VisionModelEngineTest`).
 
 ## Processo e cancelamento
 
