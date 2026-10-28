@@ -50,12 +50,15 @@ val GOOGLE_API_KEY_MODELS = listOf(
 
 val GOOGLE_MODELS_DEFAULT = GoogleModels.DEFAULT_MODELS.map { AccountModel(it.id, it.displayName) }
 
+/** O painel do Google, compartilhado pelo Raciocínio e pela Visão (ver [OpenAiPanel] e [ProviderModelSlot]). */
 @Composable
 internal fun GooglePanel(
     settings: Settings,
     onSettingsChange: (Settings) -> Unit,
     actions: AuthActions,
+    slot: ProviderModelSlot = ReasoningGoogleSlot,
 ) {
+    val tags = slot.tags
     val connection by remember(actions) { actions.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
     var refresh by remember { mutableIntStateOf(0) }
     var remoteModels by remember { mutableStateOf<List<AccountModel>>(emptyList()) }
@@ -67,8 +70,9 @@ internal fun GooglePanel(
         }
     }
 
-    val ssoModels = if (remoteModels.isNotEmpty()) remoteModels else GOOGLE_SSO_MODELS
-    val chosenModel = settings.reasoningGoogleModel.ifEmpty { "gemini-2.0-flash" }
+    val chosenModel = slot.selectedModel(settings, remoteModels, onSettingsChange)
+    val ssoModels = slot.ssoOptions(remoteModels, chosenModel)
+    val apiKeyModels = slot.apiKeyOptions(remoteModels, chosenModel)
 
     val apiKey = remember(actions) { actions.apiKeyFlow() }.collectAsStateOnMain(null).value.orEmpty()
 
@@ -85,7 +89,7 @@ internal fun GooglePanel(
         onSelectAuthMode = { onSettingsChange(settings.copy(providerGoogleAuthMode = it)) },
         ssoModels = ssoModels,
         selectedSsoModel = chosenModel,
-        onSelectSsoModel = { onSettingsChange(settings.copy(reasoningGoogleModel = it)) },
+        onSelectSsoModel = { onSettingsChange(slot.choose(settings, it)) },
         ssoFiveHourFraction = 0.10f,
         ssoFiveHourResetText = tr("Reseta às 18:00"),
         ssoWeeklyFraction = 0.20f,
@@ -98,19 +102,21 @@ internal fun GooglePanel(
         getKeyUrl = GOOGLE_AI_STUDIO_URL,
         onOpenGetKeyUrl = { actions.openUrl(GOOGLE_AI_STUDIO_URL) },
         getKeyButtonLabel = tr("Obter chave no Google AI Studio"),
-        apiKeyModels = GOOGLE_API_KEY_MODELS,
+        apiKeyModels = apiKeyModels,
         selectedApiKeyModel = chosenModel,
-        onSelectApiKeyModel = { onSettingsChange(settings.copy(reasoningGoogleModel = it)) },
-        tagPrefix = "raciocinio-google",
-        statusTag = GOOGLE_STATUS_TAG,
-        loginTag = GOOGLE_LOGIN_TAG,
-        keyTag = GOOGLE_KEY_TAG,
-        getKeyTag = "raciocinio-google-obter-chave",
-        disconnectTag = GOOGLE_DISCONNECT_TAG,
-        refreshTag = GOOGLE_MODELS_REFRESH_TAG,
-        ssoModelTag = GOOGLE_MODEL_TAG,
-        apiKeyModelTag = GOOGLE_MODEL_TAG,
-        privacyTag = GOOGLE_PRIVACY_TAG,
+        onSelectApiKeyModel = { onSettingsChange(slot.choose(settings, it)) },
+        tagPrefix = tags.prefix,
+        statusTag = tags.status,
+        loginTag = tags.login,
+        keyTag = tags.key,
+        getKeyTag = tags.getKey,
+        disconnectTag = tags.disconnect,
+        refreshTag = tags.refresh,
+        ssoModelTag = tags.model,
+        apiKeyModelTag = tags.model,
+        privacyTag = tags.privacy,
+        privacyNote = slot.privacyNote(),
+        showLimits = slot.showsUsageLimits,
         ssoOffered = actions.flows.any { it.method == AuthMethod.OAUTH },
         modifier = Modifier.padding(top = 8.dp),
     )

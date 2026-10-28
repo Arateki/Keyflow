@@ -188,19 +188,19 @@ promessa de privacidade e o APK enxuto.
 | OCR-03 | P1-C | VC-T2b, VC-T6, VC-T14, VC-T15 | Implemented p/ OCR (StrictMode + regra de arquitetura); modo avião em VC-T14 |
 | OCR-04 | P1-C | VC-T7, VC-T11 | In Tasks |
 | MDL-01 | P1-G | VC-T2a | Implemented |
-| MDL-02 | P1-G | VC-T7, VC-T11 | In Tasks |
+| MDL-02 | P1-G | VC-T7, VC-T11 | Parcial: baixar/apagar só pela aba Visão (VC-T11, `licoes/2026-10-28-visao-aba.md`); regra de arquitetura do fluxo em VC-T7 |
 | MDL-03 | P1-G | VC-T2b, VC-T13 | Implemented, SPEC_DEVIATION (JNI do onnxruntime-android, ≈ 0,24 MB/ABI) |
 | MDL-04 | P1-G | VC-T6, VC-T15 | Implemented p/ OCR; Gemma em VC-T15 |
-| MDL-05 | P1-G | VC-T2c, VC-T15 | In Tasks |
-| MDL-06 | P1-G | VC-T2c, VC-T11 | In Tasks |
-| PRV-01 | P2-D | VC-T17 | In Tasks |
-| PRV-02 | P2-D | VC-T17 | In Tasks |
-| PRV-03 | P2-D | VC-T15, VC-T17 | In Tasks |
-| PRV-04 | P2-D | VC-T13, VC-T17 | In Tasks |
-| PRV-05 | P2-D | VC-T15, VC-T17 | In Tasks |
-| CFG-V01 | P2-E | VC-T11 | In Tasks |
-| CFG-V02 | P2-E | VC-T11, VC-T17 | In Tasks |
-| CFG-V03 | P2-E | VC-T12 | In Tasks |
+| MDL-05 | P1-G | VC-T2c, VC-T15 | Implementado p/ lista e seleção (VC-T2c/T11: Gemma 4 com `capabilities`, mesma entrada e mesmo arquivo); rodar com visão em VC-T15 |
+| MDL-06 | P1-G | VC-T2c, VC-T11 | Implemented (etiquetas de capacidade por aba, `CardTagScope`) |
+| PRV-01 | P2-D | VC-T17 | Implemented (mesmos painéis e mesmas `AuthActions` do Raciocínio) |
+| PRV-02 | P2-D | VC-T17 | Implemented (`VisionModelCatalog`, lista efetiva da conta e escolha persistida; `ProviderModelSlotTest`/`VisaoPanelTest`; fontes conferidas em 2026-10-28) |
+| PRV-03 | P2-D | VC-T15, VC-T17 | Campos Custom implementados (VC-T17, commit ao sair preserva Settings atuais; `SettingsEditorTest`/`VisaoPanelTest`); chamada com imagem em VC-T15 |
+| PRV-04 | P2-D | VC-T13, VC-T17 | Nota na aba implementada (VC-T17); política de privacidade em VC-T13 |
+| PRV-05 | P2-D | VC-T15, VC-T17 | Parcial: o seletor só oferece modelos com visão (VC-T17); aviso de falha em tempo de execução e alvo apagado em VC-T15/T7 |
+| CFG-V01 | P2-E | VC-T11 | Implemented |
+| CFG-V02 | P2-E | VC-T11, VC-T17 | Implemented (Local, OpenAI, Anthropic, Google, Custom; Créditos "Em breve") |
+| CFG-V03 | P2-E | VC-T12 | Implemented (rotas `config-visao*` e goldens claro/escuro) |
 | STO-V01 | P2-F | VC-T3, VC-T13 | In Tasks |
 | STO-V02 | P2-F | VC-T8, VC-T13 | In Tasks |
 | STO-V03 | P2-F | VC-T2a, VC-T13 | In Tasks |

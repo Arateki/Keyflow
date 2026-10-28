@@ -12,6 +12,8 @@ import com.keyflow.vision.service.VisionModel
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
 import kotlin.coroutines.resume
@@ -37,15 +39,24 @@ class VisionOcrClient internal constructor(
         val service = try {
             connection.acquire()
         } catch (e: Exception) {
+            // Um timeout interno do bind vira falha; cancelamento do chamador continua sendo cancelamento.
+            currentCoroutineContext().ensureActive()
             Log.w(TAG, "não consegui ligar ao :vision", e)
             return OcrResult.Failed(OcrFailure.TIMEOUT, "o OCR não iniciou")
         }
         val binder: IBinder = service.asBinder()
         val finished = AtomicBoolean(false)
+        val requestLock = Any()
+        var submitted = false
+        fun cancelRequest() = synchronized(requestLock) {
+            if (finished.compareAndSet(false, true) && submitted) runCatching { service.cancel() }
+        }
         var death: IBinder.DeathRecipient? = null
         try {
             return withTimeout(timeoutMs) {
                 suspendCancellableCoroutine { cont ->
+                    // O cancelamento sai antes de job.cancel() retornar; o finally pode rodar depois do próximo pedido.
+                    cont.invokeOnCancellation { cancelRequest() }
                     fun finish(result: OcrResult) {
                         if (finished.compareAndSet(false, true) && cont.isActive) cont.resume(result)
                     }
@@ -66,8 +77,13 @@ class VisionOcrClient internal constructor(
                             finish(OcrResult.Failed(OcrFailure.fromCode(kind), message))
                     }
                     try {
-                        binder.linkToDeath(recipient, 0)
-                        service.recognize(model.toParcel(), crop.absolutePath, width, height, callback)
+                        synchronized(requestLock) {
+                            if (cont.isActive && !finished.get()) {
+                                binder.linkToDeath(recipient, 0)
+                                submitted = true
+                                service.recognize(model.toParcel(), crop.absolutePath, width, height, callback)
+                            }
+                        }
                     } catch (e: RemoteException) {
                         finish(OcrResult.Failed(OcrFailure.PROCESS_DIED, "o processo do OCR não respondeu"))
                     }
@@ -77,7 +93,7 @@ class VisionOcrClient internal constructor(
             return OcrResult.Failed(OcrFailure.TIMEOUT, "o OCR não respondeu em ${timeoutMs / 1000} s")
         } finally {
             // Cancelado no meio, com tempo esgotado ou depois do fim: avisa o serviço só se ainda havia reconhecimento em curso.
-            if (finished.compareAndSet(false, true)) runCatching { service.cancel() }
+            cancelRequest()
             death?.let { runCatching { binder.unlinkToDeath(it, 0) } }
             connection.release()
         }

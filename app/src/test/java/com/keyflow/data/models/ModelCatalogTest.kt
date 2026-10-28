@@ -428,12 +428,14 @@ class ModelCatalogTest {
     /**
      * Etiquetas de capacidade do card: só o que o fabricante declara, com a fonte no comentário de cada entrada. "Ferramentas": Qwen3 0.6B (card, "Agentic
      * Use"), Qwen2.5 1.5B (chat template com `tools`/`<tool_call>`), SmolLM2 1.7B (card, "function calling") e os dois Gemma 4 (doc oficial "Function
-     * calling with Gemma 4" e card); o DeepSeek R1 Distill não declara, fica sem a etiqueta. Os Gemma 4 NÃO declaram visão (descrever imagem, responder
-     * sobre a tela): falta provar no aparelho que o `.litertlm` carrega com visão (VC-T15 da Visão). Parakeet: português entre os idiomas de treino.
+     * calling with Gemma 4" e card); o DeepSeek R1 Distill não declara, fica sem a etiqueta. Os Gemma 4 declaram também a visão (ler texto, descrever
+     * imagem, responder sobre a tela — card multimodal e seções `tf_lite_vision_*` no `.litertlm`, VC-T2c); o que falta provar no aparelho é carregar
+     * com visão (VC-T15), e por isso a aba Visão só os lista no debug (ver `visionModels`). Parakeet: português entre os idiomas de treino.
      */
     @Test
     fun `capabilities declare only what the maker states`() {
         val tools = setOf(ModelCapability.TOOLS)
+        val toolsAndVision = tools + ModelCatalog.VISION_CAPABILITIES
         val byId = ModelCatalog.MODELS.associate { it.id to it.capabilities }
         assertThat(byId).containsExactly(
             "whisper-base-int8", emptySet<ModelCapability>(),
@@ -444,8 +446,8 @@ class ModelCatalogTest {
             "qwen3-4b-instruct-2507-litertlm", tools,
             "smollm2-1.7b-litertlm", tools,
             "deepseek-r1-1.5b-litertlm", emptySet<ModelCapability>(),
-            "gemma-4-e2b-litertlm", tools,
-            "gemma-4-e4b-litertlm", tools,
+            "gemma-4-e2b-litertlm", toolsAndVision,
+            "gemma-4-e4b-litertlm", toolsAndVision,
             "ocr-paddle-latin", setOf(ModelCapability.READ_TEXT),
             "functiongemma-270m-mobile-actions-litertlm", emptySet<ModelCapability>(),
             "qwen2.5-coder-1.5b-litertlm", emptySet<ModelCapability>(),
@@ -454,11 +456,48 @@ class ModelCatalogTest {
             "nanbeige-4.2-3b-litertlm", emptySet<ModelCapability>(),
             "qwen3.5-4b-litertlm", emptySet<ModelCapability>(),
         )
-        ModelCatalog.MODELS.forEach {
-            assertThat(it.capabilities).containsNoneOf(ModelCapability.DESCRIBE_IMAGE, ModelCapability.ANSWER_ABOUT_SCREEN)
-        }
+        // Visão só nos que a declaram: o OCR (ler texto) e os dois Gemma 4.
+        val seeing = ModelCatalog.MODELS.filter { m -> m.capabilities.any { it in ModelCatalog.VISION_CAPABILITIES } }.map { it.id }
+        assertThat(seeing).containsExactly("gemma-4-e2b-litertlm", "gemma-4-e4b-litertlm", "ocr-paddle-latin")
         assertThat(ModelCapability.entries.map { it.name })
             .containsExactly("READ_TEXT", "DESCRIBE_IMAGE", "ANSWER_ABOUT_SCREEN", "TOOLS", "NATIVE_PORTUGUESE").inOrder()
+    }
+
+    // ── VC-T2c / VC-T11: o que a aba Visão lista ─────────────────────────────────────────────────────────────────
+
+    /** O OCR e os Gemma 4 (mesmos objetos do catálogo de texto), do menor ao maior arquivo; nada de fala nem de texto sem visão. */
+    @Test
+    fun `the vision list is the ocr plus the Gemma 4 that declare vision, smallest file first`() {
+        val vision = ModelCatalog.visionModels(debug = true)
+        assertThat(vision.map { it.id }).containsExactly("ocr-paddle-latin", "gemma-4-e2b-litertlm", "gemma-4-e4b-litertlm").inOrder()
+        assertThat(vision.map { it.totalBytes }).isInOrder()
+        // Uma entrada, uma cópia em disco: o Gemma da Visão É o do Raciocínio (mesmo objeto, mesmo id, mesmo tipo, mesmos arquivos).
+        assertThat(vision[1]).isSameInstanceAs(ModelCatalog.GEMMA_4_E2B)
+        assertThat(vision[2]).isSameInstanceAs(ModelCatalog.GEMMA_4_E4B)
+        listOf(ModelCatalog.GEMMA_4_E2B, ModelCatalog.GEMMA_4_E4B).forEach {
+            assertThat(it.kind).isEqualTo(ModelKind.TEXT)
+            assertThat(ModelCatalog.TEXT).contains(it)
+            assertThat(it.capabilities).containsAtLeastElementsIn(ModelCatalog.VISION_CAPABILITIES)
+        }
+        assertThat(ModelCatalog.OCR_PADDLE_LATIN.capabilities).containsExactly(ModelCapability.READ_TEXT)
+        assertThat(ModelCatalog.SPEECH.map { it.id } + ModelCatalog.QWEN3_0_6B.id).containsNoneIn(vision.map { it.id })
+    }
+
+    /** O release só lista o que já foi provado num aparelho: o OCR espera a validação e a visão do Gemma, a VC-T15. */
+    @Test
+    fun `the release lists no vision model until each one is proven on a device`() {
+        assertThat(ModelCatalog.visionModels(debug = false)).isEmpty()
+        assertThat(ModelCatalog.visionModels(ModelCatalog.MODELS, debug = false)).isEmpty()
+    }
+
+    @Test
+    fun `a model that declares vision joins the list and one that does not stays out`() {
+        val seeing = ModelCatalog.QWEN3_0_6B.copy(id = "remoto-visao", capabilities = setOf(ModelCapability.DESCRIBE_IMAGE))
+        val blind = ModelCatalog.QWEN3_0_6B.copy(id = "remoto-texto", capabilities = setOf(ModelCapability.TOOLS))
+        assertThat(ModelCatalog.visionModels(listOf(blind, seeing, ModelCatalog.WHISPER_BASE), debug = true).map { it.id })
+            .containsExactly("remoto-visao")
+        // Sem a prova da visão num aparelho, nem um modelo de texto validado entra no release.
+        assertThat(ModelCatalog.visionModels(listOf(seeing), debug = false)).isEmpty()
     }
 
     /**
@@ -466,12 +505,17 @@ class ModelCatalogTest {
      * manifesto/cache antigo reverter o pin. Mudou um pin ou entrou modelo: suba `ModelCatalog.EMBEDDED_VERSION` e troque a impressão digital abaixo.
      */
     @Test
+    fun `as capacidades de visão invalidam a versão anterior do catálogo`() {
+        assertThat(ModelCatalog.EMBEDDED_VERSION).isGreaterThan(2026102802)
+    }
+
+    @Test
     fun `changing a catalog pin requires bumping the embedded catalog version`() {
-        assertThat(ModelCatalog.EMBEDDED_VERSION).isEqualTo(2026102802)
-        assertThat(ModelCatalog.pinsFingerprint()).isEqualTo(PINS_FINGERPRINT_2026102802)
+        assertThat(ModelCatalog.EMBEDDED_VERSION).isEqualTo(2026102803)
+        assertThat(ModelCatalog.pinsFingerprint()).isEqualTo(PINS_FINGERPRINT_2026102803)
     }
 
     private companion object {
-        const val PINS_FINGERPRINT_2026102802 = "d73c549bf91248e8e1ed6737bb3252cf7313409f00e6bd0853b3d5b01ce6e4b1"
+        const val PINS_FINGERPRINT_2026102803 = "d73c549bf91248e8e1ed6737bb3252cf7313409f00e6bd0853b3d5b01ce6e4b1"
     }
 }

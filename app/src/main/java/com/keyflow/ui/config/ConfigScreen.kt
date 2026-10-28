@@ -153,6 +153,11 @@ fun ConfigScreen(
     falaElevenLabsAuth: AuthActions = AuthActions.None,
     initialReasoningTest: TestState = TestState(),
     reasoningLocalSupported: Boolean = true,
+    // A aba Visão usa as MESMAS conexões de provedor do Raciocínio (`reasoning*Auth`): conectar numa aba vale na outra (PRV-01).
+    // `ocrTester` lê a imagem do Testar; sem ele (galeria, testes) o botão responde "indisponível".
+    ocrTester: OcrTester = OcrTester.None,
+    initialVisionTest: VisionTestState = VisionTestState(),
+    visionLocalSupported: Boolean = true,
     // O agente com ferramentas da aba KeyFlow (agent-harness); `null` = o chat de texto de sempre.
     agent: com.keyflow.agenthost.AgentRuntime? = null,
     agentEnabled: Boolean = true,
@@ -474,7 +479,18 @@ fun ConfigScreen(
                             initialTest = initialReasoningTest,
                             localSupported = reasoningLocalSupported,
                         )
-                        ConfigTab.VISAO,
+                        ConfigTab.VISAO -> VisaoPanel(
+                            settings = settings,
+                            onSettingsChange = ::recordSettingsChange,
+                            models = visionModels,
+                            actions = localActions,
+                            localSupported = visionLocalSupported,
+                            tester = ocrTester,
+                            initialTest = initialVisionTest,
+                            openAiAuth = reasoningAuth,
+                            anthropicAuth = reasoningAnthropicAuth,
+                            googleAuth = reasoningGoogleAuth,
+                        )
                         ConfigTab.FALA,
                         ConfigTab.FLUXOS,
                         ConfigTab.COMPUTADOR,

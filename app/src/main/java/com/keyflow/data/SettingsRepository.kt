@@ -445,10 +445,9 @@ class SettingsRepository(
             reasoningCustomModel = prefs[REASONING_CUSTOM_MODEL].orEmpty(),
             visionSource = prefs[VISION_SOURCE].toVisionSource(),
             visionLocalModelId = prefs[VISION_LOCAL_MODEL_ID]?.takeIf { it.isNotBlank() },
-            visionTranslateTarget = prefs[VISION_TRANSLATE_TARGET] ?: "pt",
-            visionOpenAiModel = prefs[VISION_OPENAI_MODEL] ?: "gpt-4o",
-            visionGoogleModel = prefs[VISION_GOOGLE_MODEL] ?: "gemini-2.0-flash",
-            visionAnthropicModel = prefs[VISION_ANTHROPIC_MODEL] ?: "claude-3-5-sonnet-latest",
+            visionOpenAiModel = prefs[VISION_OPENAI_MODEL].orEmpty(),
+            visionGoogleModel = prefs[VISION_GOOGLE_MODEL].orEmpty(),
+            visionAnthropicModel = prefs[VISION_ANTHROPIC_MODEL].orEmpty(),
             visionCustomEndpoint = prefs[VISION_CUSTOM_ENDPOINT].orEmpty(),
             visionCustomHeaderName = prefs[VISION_CUSTOM_HEADER_NAME] ?: "Authorization",
             visionCustomHeaderValue = secret(SettingsCredentialKeys.VISION_CUSTOM_HEADER),
@@ -564,7 +563,6 @@ class SettingsRepository(
             prefs[REASONING_CUSTOM_MODEL] = persisted.reasoningCustomModel
             prefs[VISION_SOURCE] = persisted.visionSource.name
             persisted.visionLocalModelId.putOrRemove(prefs, VISION_LOCAL_MODEL_ID)
-            prefs[VISION_TRANSLATE_TARGET] = persisted.visionTranslateTarget
             prefs[VISION_OPENAI_MODEL] = persisted.visionOpenAiModel
             prefs[VISION_GOOGLE_MODEL] = persisted.visionGoogleModel
             prefs[VISION_ANTHROPIC_MODEL] = persisted.visionAnthropicModel
@@ -802,7 +800,6 @@ class SettingsRepository(
         val REASONING_GOOGLE_MODEL = stringPreferencesKey("reasoning_google_model")
         val VISION_SOURCE = stringPreferencesKey("vision_source")
         val VISION_LOCAL_MODEL_ID = stringPreferencesKey("vision_local_model_id")
-        val VISION_TRANSLATE_TARGET = stringPreferencesKey("vision_translate_target")
         val VISION_OPENAI_MODEL = stringPreferencesKey("vision_openai_model")
         val VISION_GOOGLE_MODEL = stringPreferencesKey("vision_google_model")
         val VISION_ANTHROPIC_MODEL = stringPreferencesKey("vision_anthropic_model")

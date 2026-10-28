@@ -71,6 +71,10 @@ val OPENAI_API_KEY_MODELS = listOf(
 
 val OPENAI_MODELS_DEFAULT = OpenAiModels.DEFAULT_MODELS.map { AccountModel(it.id, it.displayName) }
 
+/**
+ * O painel da OpenAI, compartilhado pelo Raciocínio e pela Visão: a conexão (login com o plano ou chave) e o card são os mesmos; o [slot] diz
+ * qual campo das Settings guarda o modelo, de onde vem a lista do seletor e quais tags o painel usa.
+ */
 @Composable
 internal fun OpenAiPanel(
     settings: Settings,
@@ -78,7 +82,9 @@ internal fun OpenAiPanel(
     actions: AuthActions,
     state: OpenAiPanelState,
     connection: ConnectionState,
+    slot: ProviderModelSlot = ReasoningOpenAiSlot,
 ) {
+    val tags = slot.tags
     var welcome by remember { mutableStateOf(false) }
     var refresh by remember { mutableIntStateOf(0) }
     var remoteModels by remember { mutableStateOf<List<AccountModel>>(emptyList()) }
@@ -97,13 +103,9 @@ internal fun OpenAiPanel(
         modelsFailed = remote.isEmpty() && connection is ConnectionState.Connected
     }
 
-    // Vazio = ainda não escolhido (RCL-06): o motor só responde com um modelo escolhido, então o seletor não finge um padrão.
-    val chosenModel = settings.reasoningOpenAiModel
-    // O modelo já escolhido continua na lista mesmo que a conta não o devolva agora (falha de rede, ou modelo que saiu).
-    fun withChosen(models: List<AccountModel>) =
-        if (chosenModel.isNotEmpty() && models.none { it.id == chosenModel }) listOf(AccountModel(chosenModel, chosenModel)) + models else models
-    val ssoModels = withChosen(remoteModels.ifEmpty { OPENAI_SSO_MODELS })
-    val apiKeyModels = withChosen(remoteModels.ifEmpty { OPENAI_API_KEY_MODELS })
+    val chosenModel = slot.selectedModel(settings, remoteModels, onSettingsChange)
+    val ssoModels = slot.ssoOptions(remoteModels, chosenModel)
+    val apiKeyModels = slot.apiKeyOptions(remoteModels, chosenModel)
     val login = state.login
 
     UnifiedProviderCard(
@@ -118,7 +120,7 @@ internal fun OpenAiPanel(
         onSelectAuthMode = { onSettingsChange(settings.copy(providerOpenAiAuthMode = it)) },
         ssoModels = ssoModels,
         selectedSsoModel = chosenModel,
-        onSelectSsoModel = { onSettingsChange(settings.copy(reasoningOpenAiModel = it)) },
+        onSelectSsoModel = { onSettingsChange(slot.choose(settings, it)) },
         ssoFiveHourFraction = 0.15f,
         ssoFiveHourResetText = tr("Reseta às 15:30"),
         ssoWeeklyFraction = 0.30f,
@@ -131,15 +133,15 @@ internal fun OpenAiPanel(
         ssoOffered = actions.flows.any { it.method == AuthMethod.OAUTH },
         ssoLoginEnabled = login?.enabled ?: true,
         ssoLoginDisabledReason = login?.disabledReason?.let { openAiUnavailableMessage(it) },
-        loginReasonTag = OPENAI_LOGIN_REASON_TAG,
+        loginReasonTag = tags.loginReason,
         ssoNotice = tr("O login voltou sem permissão para usar o seu plano do ChatGPT. Entre de novo autorizando o uso do plano ou use uma chave de API.")
             .takeIf { state.planMissing },
-        ssoNoticeTag = OPENAI_PLAN_MISSING_TAG,
+        ssoNoticeTag = tags.planMissing,
         showLoginWhenConnected = state.planMissing,
         showDisconnect = state.showDisconnect,
         onRefreshApiModels = { refresh++ },
         modelsNote = tr("Não foi possível carregar os modelos da conta.").takeIf { modelsFailed },
-        modelsNoteTag = OPENAI_MODELS_EMPTY_TAG,
+        modelsNoteTag = tags.modelsEmpty,
         apiKey = remember(actions) { actions.apiKeyFlow() }.collectAsStateOnMain(null).value.orEmpty(),
         onApiKeyChange = {
             actions.saveApiKey(it)
@@ -149,37 +151,39 @@ internal fun OpenAiPanel(
         getKeyButtonLabel = tr("Obter chave na OpenAI"),
         apiKeyModels = apiKeyModels,
         selectedApiKeyModel = chosenModel,
-        onSelectApiKeyModel = { onSettingsChange(settings.copy(reasoningOpenAiModel = it)) },
+        onSelectApiKeyModel = { onSettingsChange(slot.choose(settings, it)) },
         onCancel = if (state.showCancel) { { actions.cancel() } } else null,
         errorMessage = state.error?.let { openAiErrorMessage(it) },
-        tagPrefix = "raciocinio-openai",
-        statusTag = OPENAI_STATUS_TAG,
-        loginTag = OPENAI_LOGIN_TAG,
-        cancelTag = OPENAI_CANCEL_TAG,
-        keyTag = OPENAI_KEY_TAG,
-        getKeyTag = "raciocinio-openai-obter-chave",
-        disconnectTag = OPENAI_DISCONNECT_TAG,
-        refreshTag = OPENAI_MODELS_REFRESH_TAG,
-        ssoModelTag = OPENAI_MODEL_TAG,
-        apiKeyModelTag = OPENAI_MODEL_TAG,
-        planTag = OPENAI_PLAN_TAG,
-        limitsTag = "raciocinio-openai-limites",
-        manageUsageTag = OPENAI_MANAGE_USAGE_TAG,
-        planNoteTag = OPENAI_PLAN_NOTE_TAG,
-        privacyTag = RACIOCINIO_OPENAI_PRIVACY_TAG,
-        errorTag = OPENAI_ERROR_TAG,
+        tagPrefix = tags.prefix,
+        statusTag = tags.status,
+        loginTag = tags.login,
+        cancelTag = tags.cancel,
+        keyTag = tags.key,
+        getKeyTag = tags.getKey,
+        disconnectTag = tags.disconnect,
+        refreshTag = tags.refresh,
+        ssoModelTag = tags.model,
+        apiKeyModelTag = tags.model,
+        planTag = tags.plan,
+        limitsTag = tags.limits,
+        manageUsageTag = tags.manageUsage,
+        planNoteTag = tags.planNote,
+        privacyTag = tags.privacy,
+        errorTag = tags.error,
         modifier = Modifier.padding(top = 8.dp),
+        privacyNote = slot.privacyNote(),
+        showLimits = slot.showsUsageLimits,
     )
 
     if (welcome) {
         ConfigModal(
             title = WELCOME_TITLE,
             onDismiss = { welcome = false },
-            closeTag = OPENAI_WELCOME_CLOSE_TAG,
-            cardTag = OPENAI_WELCOME_TAG,
+            closeTag = tags.welcomeClose,
+            cardTag = tags.welcome,
         ) {
             SettingSub(tr("O KeyFlow usa o seu plano do ChatGPT para gerar as respostas. Esse uso conta no limite do seu plano — não é uma cobrança do KeyFlow."))
-            PrimaryButton(WELCOME_GOT_IT, OPENAI_WELCOME_GOT_IT_TAG, { welcome = false }, Modifier.padding(top = 18.dp))
+            PrimaryButton(WELCOME_GOT_IT, tags.welcomeGotIt, { welcome = false }, Modifier.padding(top = 18.dp))
         }
     }
 }

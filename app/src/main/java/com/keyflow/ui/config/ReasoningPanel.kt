@@ -12,8 +12,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.Row
-import androidx.compose.ui.text.input.KeyboardType
 import com.keyflow.auth.ConnectionState
 import com.keyflow.core.ReasoningSource
 import com.keyflow.data.Settings
@@ -55,6 +53,7 @@ fun ReasoningPanel(
     val palette = LocalKeyFlowPalette.current
     val scroll = rememberScrollState()
     val activeSettings = settings.withoutCredits()
+    val editor = rememberSettingsEditor(activeSettings, onSettingsChange)
     // Lido AQUI, no corpo do painel: quando a conexão muda, tudo abaixo — inclusive o "pronto para testar" — recompõe.
     val connection by remember(auth) { auth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
     val anthropicConnection by remember(anthropicAuth) { anthropicAuth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
@@ -77,7 +76,7 @@ fun ReasoningPanel(
                     selected = activeSettings.reasoningSource,
                     label = ::reasoningSourceLabel,
                     tag = ::reasoningSourceTag,
-                    onSelect = { onSettingsChange(activeSettings.copy(reasoningSource = it)) },
+                    onSelect = { source -> editor.edit { it.copy(reasoningSource = source) } },
                     disabled = { it == ReasoningSource.CREDITS },
                     disabledLabel = { if (it == ReasoningSource.CREDITS) tr("Em breve") else null },
                 )
@@ -88,7 +87,7 @@ fun ReasoningPanel(
                     ReasoningSource.OPENAI -> OpenAiPanel(activeSettings, onSettingsChange, auth, openAi, connection)
                     ReasoningSource.ANTHROPIC -> AnthropicPanel(activeSettings, onSettingsChange, anthropicAuth)
                     ReasoningSource.GOOGLE -> GooglePanel(activeSettings, onSettingsChange, googleAuth)
-                    ReasoningSource.CUSTOM -> ReasoningCustomFields(activeSettings, onSettingsChange)
+                    ReasoningSource.CUSTOM -> ReasoningCustomFields(activeSettings, editor::edit)
                 }
             }
         }
@@ -113,34 +112,19 @@ private fun reasoningSourceLabel(source: ReasoningSource): String = when (source
 }
 
 @Composable
-private fun ReasoningCustomFields(settings: Settings, onSettingsChange: (Settings) -> Unit) {
-    Column(Modifier.padding(top = 20.dp)) {
-        AutoSaveField(
-            tr("Endpoint"), settings.reasoningCustomEndpoint,
-            { onSettingsChange(settings.copy(reasoningCustomEndpoint = it)) }, "raciocinio-custom-endpoint",
-            keyboardType = KeyboardType.Uri,
-        )
-        Row(Modifier.fillMaxWidth().padding(top = 13.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            AutoSaveField(
-                tr("Header"), settings.reasoningCustomHeaderName,
-                { onSettingsChange(settings.copy(reasoningCustomHeaderName = it)) }, "raciocinio-custom-header-name", Modifier.weight(1f),
-            )
-            AutoSaveField(
-                tr("Valor"), settings.reasoningCustomHeaderValue,
-                { onSettingsChange(settings.copy(reasoningCustomHeaderValue = it)) }, "raciocinio-custom-header-value", Modifier.weight(1.3f),
-                keyboardType = KeyboardType.Password,
-            )
-        }
-        AutoSaveField(
-            tr("Modelo"), settings.reasoningCustomModel,
-            { onSettingsChange(settings.copy(reasoningCustomModel = it)) }, "raciocinio-custom-model",
-            modifier = Modifier.padding(top = 13.dp),
-        )
-        SettingSub(
-            tr("Padrão compatível com OpenAI Chat Completions — informe o endpoint e credenciais do seu serviço."),
-            Modifier.padding(top = 16.dp),
-        )
-    }
+private fun ReasoningCustomFields(settings: Settings, onEdit: ((Settings) -> Settings) -> Unit) {
+    CustomProviderFields(
+        tagPrefix = "raciocinio",
+        endpoint = settings.reasoningCustomEndpoint,
+        headerName = settings.reasoningCustomHeaderName,
+        headerValue = settings.reasoningCustomHeaderValue,
+        model = settings.reasoningCustomModel,
+        onEndpoint = { onEdit { current -> current.copy(reasoningCustomEndpoint = it) } },
+        onHeaderName = { onEdit { current -> current.copy(reasoningCustomHeaderName = it) } },
+        onHeaderValue = { onEdit { current -> current.copy(reasoningCustomHeaderValue = it) } },
+        onModel = { onEdit { current -> current.copy(reasoningCustomModel = it) } },
+        hints = listOf(tr("Padrão compatível com OpenAI Chat Completions — informe o endpoint e credenciais do seu serviço.")),
+    )
 }
 
 @Composable
@@ -159,8 +143,8 @@ private fun ReasoningLocal(
                 onSettingsChange(settings.copy(reasoningLocalModelId = id))
                 actions.prepare(id)
             },
-            // Apagar o selecionado deixa o Raciocínio sem modelo local escolhido.
-            onDeleted = { id -> if (settings.reasoningLocalModelId == id) onSettingsChange(settings.copy(reasoningLocalModelId = null)) },
+            // Apagar o selecionado deixa o Raciocínio sem modelo local escolhido (e a Visão também, se ela usava o mesmo Gemma 4).
+            onDeleted = { id -> if (settings.reasoningLocalModelId == id || settings.visionLocalModelId == id) onSettingsChange(settings.withoutLocalModel(id)) },
             tags = ModelListTags.Raciocinio,
         )
         SettingSub(

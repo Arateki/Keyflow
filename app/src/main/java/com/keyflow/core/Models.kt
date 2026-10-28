@@ -16,10 +16,11 @@ enum class TranscriptionSource { CREDITS, OPENAI, GROQ, CUSTOM, LOCAL }
 enum class ReasoningSource { CREDITS, LOCAL, OPENAI, ANTHROPIC, GOOGLE, CUSTOM }
 
 /**
- * Origem da visão (aba Visão, vision-capture). CREDITS é uma opção legada, desabilitada nesta versão; LOCAL = OCR e modelos visuais no aparelho
- * (100% offline); OPENAI = nuvem GPT-4o; GOOGLE = Google Gemini Vision; ANTHROPIC = Claude Vision; CUSTOM = API personalizada.
+ * Origem da visão (aba Visão, vision-capture). CREDITS é uma opção legada, desabilitada nesta versão; LOCAL = PaddleOCR e Gemma 4 no aparelho
+ * (100% offline); OPENAI/ANTHROPIC/GOOGLE = nuvem, só com modelos que leem imagem; CUSTOM = API personalizada. A ordem é a do seletor e a mesma
+ * do Raciocínio ([ReasoningSource]); a escolha é gravada pelo nome, então reordenar não muda o que está salvo.
  */
-enum class VisionSource { CREDITS, LOCAL, OPENAI, GOOGLE, ANTHROPIC, CUSTOM }
+enum class VisionSource { CREDITS, LOCAL, OPENAI, ANTHROPIC, GOOGLE, CUSTOM }
 
 /**
  * Origem da voz / síntese de fala (aba Voz, FALA). CREDITS é uma opção legada, desabilitada nesta versão; LOCAL = modelos de voz no aparelho
