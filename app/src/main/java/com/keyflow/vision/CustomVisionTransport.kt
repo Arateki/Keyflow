@@ -73,8 +73,9 @@ class CustomVisionTransport(
                         val json = JSONObject(data)
                         if (json.has("error")) { send(ReasoningEvent.Error(ReasoningError.ENGINE, null)); return@withContext }
                         val choice = json.optJSONArray("choices")?.optJSONObject(0) ?: continue
-                        choice.optJSONObject("delta")?.optString("content")?.takeIf { it.isNotEmpty() }
-                            ?.let { send(ReasoningEvent.Delta(it)) }
+                        // No org.json do Android, optString de JSON null pode virar a palavra "null".
+                        val delta = choice.optJSONObject("delta")?.opt("content") as? String
+                        if (!delta.isNullOrEmpty()) send(ReasoningEvent.Delta(delta))
                         val finish = choice.optString("finish_reason", "")
                         if (finish.isNotEmpty() && finish != "null") {
                             if (finish != "stop") { send(ReasoningEvent.Error(ReasoningError.ENGINE, null)); return@withContext }

@@ -188,8 +188,7 @@ Contrato: `read(imagem) → texto` e `ask(imagem, pedido) → resposta`, resulta
 formato do `OcrEngine`). Três implementações escolhidas pela origem/modelo selecionado na aba (§14):
 - **`LocalVisionEngine` (Gemma 4 E2B/E4B)**: o `LocalReasoningEngine`/`LiteRtBackend` do `:reasoning` com `EngineConfig.visionBackend`
   e a imagem como `Content.ImageBytes` (PNG do recorte, reduzido a um lado maior de ~1024 px para caber na memória). Guarda de RAM e
-  descarga por ociosidade de 120 s já existentes; o E4B pede 8 GB e o aviso de "pesado" do `LocalModelsUi` vale aqui. ⚠️ A prova funcional é feita explicitamente na CPU do emulador; qualidade/tempo/RAM no aparelho ficam na VC-T14. A prova usa o mesmo backend de produção. Falta medir no aparelho como o `.litertlm` carrega com visão (a seção `tf_lite_vision_encoder` existe nos dois arquivos, conferido em 2026-10-27;
-  o `LiteRtBackend` ainda não passa `visionBackend`) — critério de aceite da VC-T15, com o E2B.
+  descarga por ociosidade de 120 s já existentes; o E4B pede 8 GB e o aviso de "pesado" do `LocalModelsUi` vale aqui. ⚠️ A prova funcional é feita explicitamente na CPU do emulador; qualidade/tempo/RAM no aparelho ficam na VC-T14. A prova usa o mesmo backend de produção, que agora configura `visionBackend`; as seções de visão dos arquivos já haviam sido conferidas em 2026-10-27. A liberação física permanece pendente.
 - **`CloudVisionEngine` (OpenAI/Anthropic/Google)**: o mesmo caminho de nuvem do Raciocínio (`ReasoningEngines`, credencial do cofre),
   agora com a imagem no corpo (formato de cada provedor), só com modelos da lista curada de visão (PRV-02).
 - **`CustomVisionEngine`**: `POST` `chat/completions` com `image_url` (data URL) no endpoint/header/modelo digitados (PRV-03).

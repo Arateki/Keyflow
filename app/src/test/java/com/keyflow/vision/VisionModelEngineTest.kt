@@ -77,7 +77,7 @@ class VisionModelEngineTest {
                     "openai" -> "data: {\"type\":\"response.output_text.delta\",\"delta\":\"resposta\"}\n\ndata: {\"type\":\"response.completed\"}\n\n"
                     "anthropic" -> "data: {\"type\":\"content_block_delta\",\"delta\":{\"text\":\"resposta\"}}\n\ndata: {\"type\":\"message_stop\"}\n\n"
                     "google" -> "data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"resposta\"}]},\"finishReason\":\"STOP\"}]}\n\n"
-                    else -> "data: {\"choices\":[{\"delta\":{\"content\":\"resposta\"}}]}\n\ndata: [DONE]\n\n"
+                    else -> "data: {\"choices\":[{\"delta\":{\"role\":\"assistant\",\"content\":null}}]}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\"resposta\"}}]}\n\ndata: [DONE]\n\n"
                 }
                 server.enqueue(MockResponse().setHeader("Content-Type", "text/event-stream").setBody(sse))
                 assertThat(withTimeout(5_000) { CloudVisionEngine(transport).ask(image, "Leia") })
