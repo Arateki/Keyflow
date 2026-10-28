@@ -35,3 +35,9 @@ detecção de SoC nem campo de variante NPU no catálogo ou no manifesto remoto.
 - **Teste de ponta a ponta no emulador, sem GPU**: o `EchoBackend` (debug) recusa qualquer backend que não seja a CPU, o que reproduz "a GPU não carrega" no
   `:reasoning` de verdade (`LocalReasoningEngineTest`: o pedido na GPU responde inteiro pela CPU e o app é avisado).
 - **Fica de fora**: NPU; voltar para a CPU quando a **geração** (não a carga) falha numa GPU já carregada; proteção contra o ciclo "GPU mata o processo toda vez".
+- **Correção da revisão do PR #49: o que uma carga conta só vale para a escolha e a instalação que a pediram.** Os avisos "voltou para a CPU" e "GPU pronta" gravavam só por id: com uma carga na GPU em curso
+  (minutos), o aviso da carga antiga sobrescrevia a escolha nova (CPU e GPU de novo → a carga velha falha → CPU por cima), e apagar o modelo durante a carga deixava o aviso recriar a linha. Agora cada escolha
+  explícita grava uma **ficha** (`LocalBackendPrefs.ticketFor`, número aleatório); o pedido de carga leva backend + ficha lidos juntos (`LlmModel.ticket`, só no processo principal, não atravessa o AIDL) e o
+  aviso só se aplica se a ficha ainda é a do modelo, **conferido dentro da própria gravação atômica** do DataStore. Apagar remove a linha e a ficha, então nada que chega depois a recria; a versão instalada
+  também é conferida (`PersistedBackendReports`), o que pega o arquivo atualizado durante a carga. Modelo sem linha (CPU padrão) não tem ficha e nada vindo de fora o cria. Testes: `LocalBackendPrefsTest`
+  e `BackendReportsRaceTest` (as três sondas da revisão rodando o núcleo do `:reasoning` de verdade contra a tabela em memória).
