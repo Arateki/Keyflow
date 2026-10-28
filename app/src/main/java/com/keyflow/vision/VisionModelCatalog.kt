@@ -69,10 +69,13 @@ object VisionModelCatalog {
     fun isVision(provider: VisionProvider, id: String): Boolean = models(provider).any { it.id == id }
 
     /**
-     * O modelo que vale para [stored], o que as Settings guardam (PRV-02): o próprio se ainda tem visão; senão o padrão — vazio (nunca
-     * escolhido) ou um modelo que saiu da lista, como o `gpt-4o` das versões antigas, que não lê captura nem deveria ser chamado.
+     * O modelo que vale para [stored] (PRV-02): o próprio se estiver na lista efetiva da conta; senão o primeiro dessa lista.
+     * Sem lista da conta, vale a curada. Vazio ou id legado também cai no primeiro disponível.
      */
-    fun resolve(provider: VisionProvider, stored: String): String = stored.takeIf { isVision(provider, it) } ?: default(provider)
+    fun resolve(provider: VisionProvider, stored: String, account: List<String> = emptyList()): String {
+        val available = options(provider, account)
+        return stored.takeIf { id -> available.any { it.id == id } } ?: available.first().id
+    }
 
     /**
      * O que o seletor de [provider] oferece. [account] é a lista que a conta devolveu (vazia = não veio, ou a rede falhou): com ela, só os

@@ -103,7 +103,7 @@ internal fun OpenAiPanel(
         modelsFailed = remote.isEmpty() && connection is ConnectionState.Connected
     }
 
-    val chosenModel = slot.chosen(settings)
+    val chosenModel = slot.selectedModel(settings, remoteModels, onSettingsChange)
     val ssoModels = slot.ssoOptions(remoteModels, chosenModel)
     val apiKeyModels = slot.apiKeyOptions(remoteModels, chosenModel)
     val login = state.login

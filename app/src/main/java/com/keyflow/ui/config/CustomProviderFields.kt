@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import com.keyflow.data.Settings
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -43,3 +45,26 @@ internal fun CustomProviderFields(
         }
     }
 }
+
+/** Mantém os commits pendentes sobre as Settings atuais, inclusive quando o campo sai da composição. */
+internal class SettingsEditor(settings: Settings, onChange: (Settings) -> Unit) {
+    private var current = settings
+    private var commit = onChange
+
+    fun refresh(settings: Settings, onChange: (Settings) -> Unit) {
+        current = settings
+        commit = onChange
+    }
+
+    fun edit(transform: (Settings) -> Settings) {
+        val next = transform(current)
+        if (next != current) {
+            current = next
+            commit(next)
+        }
+    }
+}
+
+@Composable
+internal fun rememberSettingsEditor(settings: Settings, onChange: (Settings) -> Unit): SettingsEditor =
+    remember { SettingsEditor(settings, onChange) }.also { it.refresh(settings, onChange) }

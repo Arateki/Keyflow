@@ -18,6 +18,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.keyflow.auth.ApiKeyFlow
@@ -459,6 +460,35 @@ class VisaoPanelTest {
         node("visao-custom-header-value").assertIsDisplayed()
         node(VISAO_CUSTOM_PRIVACY_TAG).assertTextContains("A imagem da captura é enviada ao endpoint", substring = true)
         rule.onNodeWithText("Padrão compatível com OpenAI Chat Completions com imagem", substring = true).assertExists()
+    }
+
+    @Test
+    fun sairDoCustomSalvaAEdicaoPendenteSemRestaurarAOrigemAntiga() {
+        val h = Harness(Settings(visionSource = VisionSource.CUSTOM))
+        show(h)
+        // Um caractere não aciona o salvamento de colagem: fica pendente até perder foco ou sair da composição.
+        node("visao-custom-model").performTextInput("x")
+        node(visionSourceTag(VisionSource.LOCAL)).performClick()
+        rule.runOnIdle {
+            assertEquals(VisionSource.LOCAL, h.settings.visionSource)
+            assertEquals("x", h.settings.visionCustomModel)
+        }
+        node(model(ocr.id)).assertIsDisplayed()
+    }
+
+    @Test
+    fun contaSemOPadraoMostraEPersisteSeuModeloTantoNaAssinaturaQuantoNaApi() {
+        val auth = FakeAuth(
+            ConnectionState.Connected("voce@exemplo.com", AuthMethod.OAUTH, planUsage = true),
+            models = listOf(AccountModel("gpt-6-luna", "GPT-6-Luna")),
+        )
+        val h = Harness(Settings(visionSource = VisionSource.OPENAI, visionOpenAiModel = "gpt-6.1-sol"), openAi = auth)
+        show(h)
+        rule.waitUntil(3_000) { h.settings.visionOpenAiModel == "gpt-6-luna" }
+        node("visao-openai-modelo").assertTextContains("GPT-6-Luna", substring = true)
+        node("visao-openai-tab-api").performClick()
+        node("visao-openai-modelo").assertTextContains("GPT-6-Luna", substring = true)
+        rule.runOnIdle { assertEquals("gpt-6-luna", h.settings.visionOpenAiModel) }
     }
 
     // ── Testar ────────────────────────────────────────────────────────────────────────────────────

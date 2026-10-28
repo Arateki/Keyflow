@@ -113,6 +113,27 @@ class ProviderModelSlotTest {
         assertThat(chosen.reasoningAnthropicModel).isEqualTo(Settings().reasoningAnthropicModel)
     }
 
+    @Test
+    fun `escolha e persistência usam a lista efetiva nas duas formas de autenticação`() {
+        val slots = listOf(VisionCloudSlot.OpenAi, VisionCloudSlot.Anthropic, VisionCloudSlot.Google)
+        VisionProvider.entries.zip(slots).forEach { (provider, slot) ->
+            val available = VisionModelCatalog.models(provider).last().id
+            val account = listOf(AccountModel(available, available), AccountModel("sem-visão", "Sem visão"))
+            listOf("", "legado", VisionModelCatalog.default(provider), available).forEach { stored ->
+                val initial = slot.choose(Settings(), stored)
+                val chosen = slot.chosen(initial, account)
+                assertThat(chosen).isEqualTo(available)
+                assertThat(slot.ssoOptions(account, chosen).map { it.id }).contains(chosen)
+                assertThat(slot.apiKeyOptions(account, chosen).map { it.id }).contains(chosen)
+                assertThat(slot.normalizeChoice(initial, account)).isEqualTo(slot.choose(initial, available))
+                assertThat(slot.normalizeChoice(initial, emptyList())).isEqualTo(initial)
+            }
+        }
+        val reasoning = Settings(reasoningOpenAiModel = "guardado")
+        assertThat(ReasoningOpenAiSlot.chosen(reasoning, emptyList())).isEqualTo("guardado")
+        assertThat(ReasoningOpenAiSlot.normalizeChoice(reasoning, emptyList())).isEqualTo(reasoning)
+    }
+
     /** PRV-04: a nota diz que a IMAGEM sai, e o bloco de limites (que só tem valores de exemplo) não aparece na Visão. */
     @Test
     fun `the vision cards say the image leaves the device and show no sample usage numbers`() {
