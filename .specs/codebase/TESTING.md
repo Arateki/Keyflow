@@ -224,6 +224,15 @@ DeckLock (actions fixadas por SHA, `permissions: contents: read`, evidência env
   emulador enquanto ele compila, e então baixam o artefato `apks` da própria rodada (`gh run download`).
   Não há Gradle no runner do emulador. Se o job de unitários falhar, eles param logo.
 - A galeria roda **depois** da suíte, no mesmo emulador (um emulador por pedaço, não dois).
+- Antes do gate, `ci-emulator-profile.sh` ativa explicitamente os overlays Android/SystemUI do Pixel 6
+  e guarda seus estados antes/depois, a dimensão da status bar e o display. O perfil do `avdmanager`
+  sozinho não garantiu os recursos do aparelho numa rodada fria: popups completos apareceram deslocados
+  33–34 px, com faixa superior de 63 px contra 128 px no golden (run 40604896142, pedaço 4/6).
+- Falha no download/boot/preparo tem **uma** nova tentativa, apenas se `gate-started` ainda não existe.
+  O marcador é criado ao entrar em `ci-device-gate.sh`, antes de instalar/rodar testes; qualquer falha
+  posterior mantém o job vermelho. A primeira tentativa deixa de ser fatal só se a segunda passar.
+  Sem `verification/routes.txt`, o passo do diff explica que não houve captura e preserva a falha anterior.
+
 - A `GalleryActivity` só compõe a rota depois de a janela confirmar o foco, e só grava o marcador de
   pronta depois de o quadro chegar à tela. Sem isso, no emulador do CI o 1º quadro das rotas mais
   pesadas (`config-overlay-travado`, `config-overlay-skins-importadas`) compilava shaders no swiftshader
