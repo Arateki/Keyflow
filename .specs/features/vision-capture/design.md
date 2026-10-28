@@ -144,6 +144,12 @@ versão virar `OnnxRuntime.available == false` em vez de `UnsatisfiedLinkError`.
 **Contingência**: se o NDK/CMake não puder ser provisionado no servidor e no CI dentro da VC-T2b, cair em B com (1)
 `onnxruntime-android:1.28.0` fixo, (2) um teste instrumentado que falha se a `libonnxruntime.so` empacotada não for a do
 sherpa (hash) e (3) `SPEC_DEVIATION` no STATE.md.
+**Aplicada em 2026-10-28 (VC-T2b), com uma variante**: os nós do pool não têm NDK (build mínimo falhou: "NDK not configured"), então valeu a
+contingência, mas **sem `pickFirst`**: do `onnxruntime-android` só entram o `classes.jar` e a `libonnxruntime4j_jni.so`, com a etiqueta de versão
+do símbolo (`VERS_1.28.0`) remendada no build para a que a `.so` do sherpa define (`VERS_1.28.2`) — sem o remendo o linker do Android recusa a
+carga. Há UMA só `libonnxruntime.so` por ABI (a do sherpa), travada por hash em teste de unidade e instrumentado. Medições, delta de APK e
+`SPEC_DEVIATION`: `.specs/project/licoes/2026-10-28-runtime-onnx-sem-ndk.md`. Parâmetros do pipeline (§6) e números de CER/tempo/RAM:
+`.specs/project/licoes/2026-10-28-ocr-paddle-medicao.md`.
 
 Superfície Kotlin (`com.keyflow.onnx`, compartilhável com a síntese de fala): `OnnxRuntime.available`,
 `OnnxSession.open(modelPath, threads)`, `run(List<OnnxTensor>) → List<OnnxTensor>` com tensores `Float`/`Long`.
