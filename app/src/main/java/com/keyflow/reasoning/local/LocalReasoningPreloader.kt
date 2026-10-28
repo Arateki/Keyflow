@@ -14,13 +14,13 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
 
-/** Pré-carga somente ao selecionar um modelo de texto instalado. Usa o mesmo bind das gerações reais. */
+/** Pré-carga ao selecionar um modelo de texto instalado ou trocar seu backend. Mesmo bind e guarda de RAM das gerações reais. */
 object LocalReasoningPreloader {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val preparation = ModelPreparationTracker()
 
     private val failedNotice get() = tr("Não foi possível preparar o modelo. Tente selecioná-lo de novo.")
-    /** Guarda de RAM da pré-carga (RamGuard.enoughForPreload): não é erro, o primeiro uso carrega o modelo. */
+    /** Recusa pela guarda normal por backend (RamGuard.enoughFor) ou OOM na carga: o aviso permanece no card. */
     private val lowMemoryNotice get() = tr("Pouca memória livre agora: o modelo carrega no primeiro uso.")
 
     /**

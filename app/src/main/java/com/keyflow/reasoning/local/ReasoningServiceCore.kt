@@ -59,7 +59,7 @@ internal class ReasoningServiceCore(
         executor.execute { run(model, request, listener) }
     }
 
-    /** Seleção explícita: carrega e aquece uma vez, antes do primeiro prompt. Mesma fila das gerações. */
+    /** Seleção explícita: carrega e aquece uma vez, antes do primeiro prompt. Mesma fila e guarda de RAM das gerações. */
     fun preload(model: LlmModel, listener: Listener) {
         executor.execute {
             busy = true
@@ -70,7 +70,7 @@ internal class ReasoningServiceCore(
                 // Seleção explícita (o usuário escolheu o modelo ou o backend agora): tenta de novo o que tinha falhado.
                 failedLoads.remove(failureKey(model))
                 val fresh = !isLoaded(model)
-                val active = ensureLoaded(model, listener, preload = true)
+                val active = ensureLoaded(model, listener)
                 if (fresh) {
                     val started = System.nanoTime()
                     val failure = try {
@@ -139,7 +139,7 @@ internal class ReasoningServiceCore(
         }
     }
 
-    private fun ensureLoaded(model: LlmModel, listener: Listener, preload: Boolean = false): LlmBackend {
+    private fun ensureLoaded(model: LlmModel, listener: Listener): LlmBackend {
         // Um pedido automático que ainda traz o backend que já falhou neste processo vai direto para a CPU (e quem pediu fica sabendo,
         // para a preferência gravada acompanhar a CPU e a geração não contar como "GPU pronta").
         val remembered = failureKey(model) in failedLoads
@@ -149,7 +149,7 @@ internal class ReasoningServiceCore(
         // Libera o anterior antes de medir e carregar: a troca não precisa caber junto com ele.
         unloadCurrent()
         var target = wanted
-        var candidate = open(target, preload)
+        var candidate = open(target)
         try {
             load(candidate, target)
         } catch (failure: ReasoningFailure) {
@@ -158,7 +158,7 @@ internal class ReasoningServiceCore(
             failedLoads += failureKey(model)
             listener.onBackendFallback(target.backend, failure.message.orEmpty())
             target = target.copy(backend = ComputeBackend.CPU)
-            candidate = open(target, preload)
+            candidate = open(target)
             load(candidate, target)
         }
         backend = candidate
@@ -169,7 +169,7 @@ internal class ReasoningServiceCore(
     }
 
     /** Cria o backend do [model] e confere o que o impede de carregar: o arquivo e a RAM do backend pedido. Nada é carregado aqui. */
-    private fun open(model: LlmModel, preload: Boolean): LlmBackend {
+    private fun open(model: LlmModel): LlmBackend {
         val candidate = backendFor(model)
         if (candidate.requiresModelFile && !fileExists(model.modelPath)) {
             throw ReasoningFailure(ReasoningErrorKind.MODEL_MISSING, "falta o arquivo do modelo ${model.modelId}")
@@ -180,13 +180,6 @@ internal class ReasoningServiceCore(
             throw ReasoningFailure(
                 ReasoningErrorKind.OOM,
                 "memória insuficiente para ${model.modelId}: $total MB de RAM total e $available MB livres, estimativa de ${model.ramEstimateMb} MB",
-            )
-        }
-        // Pré-carga especulativa: com pouca folga não carrega (o lmkd poderia matar mais que o processo do modelo).
-        if (preload && !RamGuard.enoughForPreloadOn(model.backend, available, model.ramEstimateMb, total)) {
-            throw ReasoningFailure(
-                ReasoningErrorKind.OOM,
-                "pré-carga de ${model.modelId} adiada: $available MB livres, piso de ${RamGuard.PRELOAD_FLOOR_MB} MB",
             )
         }
         return candidate

@@ -7,8 +7,8 @@ import com.keyflow.core.ComputeBackend
  * os pesos do LiteRT-LM são mapeados em memória); sem dado do sistema não se bloqueia — o `OutOfMemoryError` do load ainda
  * é capturado depois.
  *
- * Carga pedida pelo usuário: o que decide é a RAM TOTAL do aparelho ([fitsDevice]), não a livre. A livre medida antes da
- * carga subestima — o Android derruba apps em segundo plano para dar lugar ao `:reasoning` — e não separava os casos
+ * Na CPU, tanto na carga normal quanto na pré-carga ao selecionar ou trocar de backend, o que decide é a RAM TOTAL do
+ * aparelho ([fitsDevice]), não a livre. A livre medida antes da carga subestima — o Android derruba apps em segundo plano para dar lugar ao `:reasoning` — e não separava os casos
  * medidos (pico de VmRSS do `:reasoning`): no A32 (3,7 GB, 1,1–1,5 GB livres) Qwen3 0.6B, Gemma 4 E2B e DeepSeek R1 1.5B
  * rodaram a 1,66–1,73 GB, enquanto o SmolLM2 1.7B foi morto pelo lmkd acima de ~1,7 GB; no tablet de 6 GB (2,3 GB livres) o
  * SmolLM2 rodou a 3,3 GB; no Vaio de 8 GB (4,8 GB livres) o Gemma 4 E4B rodou a 4,4–4,5 GB. Só a RAM livre (1,1–1,5 GB no A32
@@ -40,37 +40,17 @@ internal object RamGuard {
     }
 
     /**
-     * Piso de RAM livre para a pré-carga ao selecionar (sem pedido do usuário). Medido no Galaxy A32 (3,7 GB, 1,1–1,5 GB
-     * livres): DeepSeek R1 1.5B, Gemma 4 E2B e Qwen3 0.6B chegam a 1,66–1,74 GB de RSS e o SmolLM2 1.7B foi morto pelo
-     * lmkd acima de ~1,7 GB. Como a pré-carga é especulativa, o Android não pode ser forçado a derrubar apps por ela: ela só
-     * roda com a RAM LIVRE de fato acima da estimativa e do piso (estimativa zero = motor sem pesos, como o de eco dos testes:
-     * não bloqueia); senão o modelo carrega no primeiro uso, que tem a guarda comum.
-     */
-    const val PRELOAD_FLOOR_MB = 2_048L
-
-    fun enoughForPreload(availableMb: Long?, estimateMb: Int, totalMb: Long? = null): Boolean =
-        estimateMb <= 0 || availableMb == null ||
-            (fitsDevice(totalMb, estimateMb) && availableMb >= estimateMb && availableMb >= PRELOAD_FLOOR_MB)
-
-    /**
      * A guarda de carga de cada backend. **CPU: a regra de sempre** ([enough]). **GPU: não bloqueia pela estimativa de CPU** — a estimativa
      * do catálogo (`recommendedRamMb / 2`) e os limites de [fitsDevice] foram medidos com o pico de VmRSS do `:reasoning` rodando na CPU
      * (pesos mapeados em memória + KV); na GPU os pesos vão para buffers do OpenCL e o pico é outro, ainda sem medida por modelo. O caso
      * que motivou a decisão: no Vaio TL10 (8 GB) o Qwen3 4B só rodou na GPU (a CPU morreu por memória), e a guarda de CPU o barraria
      * antes de a GPU tentar. O que protege a GPU é o que ela já tem: o `OutOfMemoryError`/falha da carga vira volta para a CPU (que
      * então passa pela guarda de CPU), e o lmkd que mata o processo inteiro é o risco aceito até haver medida (anotado no STATE.md).
+     * Pré-carga e geração usam esta mesma guarda: o Android liberar outros apps em segundo plano é esperado também ao selecionar
+     * o modelo ou trocar CPU/GPU. Decisão em `.specs/project/licoes/2026-10-28-preload-sem-piso.md`.
      */
     fun enoughFor(backend: ComputeBackend, availableMb: Long?, estimateMb: Int, totalMb: Long? = null): Boolean = when (backend) {
         ComputeBackend.CPU -> enough(availableMb, estimateMb, totalMb)
         ComputeBackend.GPU -> true
-    }
-
-    /**
-     * A pré-carga na GPU só não força o Android a derrubar apps quando há RAM livre de fato: mantém o [PRELOAD_FLOOR_MB] (a RAM é a
-     * mesma, compartilhada com a GPU no celular) e dispensa só a comparação com a estimativa de CPU. Na CPU, [enoughForPreload].
-     */
-    fun enoughForPreloadOn(backend: ComputeBackend, availableMb: Long?, estimateMb: Int, totalMb: Long? = null): Boolean = when (backend) {
-        ComputeBackend.CPU -> enoughForPreload(availableMb, estimateMb, totalMb)
-        ComputeBackend.GPU -> estimateMb <= 0 || availableMb == null || availableMb >= PRELOAD_FLOOR_MB
     }
 }

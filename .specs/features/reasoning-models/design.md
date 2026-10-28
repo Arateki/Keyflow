@@ -89,8 +89,11 @@ LocalLlmConfig (Parcelable): modelId, modelPath, engineType, idleUnloadMs, ramEs
 - `ReasoningService` (`android:process=":reasoning"`, `exported=false`): executor único (1 geração por vez),
   guarda o backend carregado, agenda o **descarregamento por ociosidade** (`idleUnloadMs`, R8) e trata troca
   de modelo (descarrega o anterior).
-- **Guarda de RAM** (RRUN-04): antes do load, `ActivityManager.MemoryInfo.availMem` × estimativa do modelo;
-  insuficiente ou `OutOfMemoryError` → `onError(OOM)`, backend descarregado.
+- **Guarda de RAM** (RRUN-04, RPRC-06): toda carga, inclusive a pré-carga ao selecionar ou trocar CPU/GPU, passa por
+  `RamGuard.enoughFor`. Na CPU vale RAM total ≥ 1,6 × estimativa; sem total válido, compara RAM livre à estimativa.
+  A GPU não usa a estimativa de CPU; se falhar, a volta à CPU passa pela guarda de CPU. Não há piso adicional de RAM livre
+  para a pré-carga: o Android liberar apps em segundo plano é esperado. Recusa ou `OutOfMemoryError` → `onError(OOM)`,
+  backend descarregado; o aviso de memória do card permanece. Decisão em `licoes/2026-10-28-preload-sem-piso.md`.
 
 ### 4. `LlmBackend` e `LiteRtBackend` (RRUN-08)
 ```kotlin
@@ -108,7 +111,8 @@ internal interface LlmBackend {
 
 ### 5. `LocalReasoningEngine` (client, processo principal)
 `bind` sob demanda → chama AIDL → converte callback em `Flow`; `DeathRecipient` → `Error(LOCAL)` (RRUN-05);
-religa no próximo uso. Sem preload (R8) — diferente do `LocalTranscriber`.
+religa no próximo uso. `LocalReasoningPreloader` usa o mesmo bind para carregar e aquecer ao selecionar um modelo
+instalado ou trocar seu backend, sob a mesma guarda da carga normal (RPRC-06); a ociosidade ainda descarrega o motor (R8).
 
 ## Autenticação — pacote `auth/` (AUTH-01..11) ⭐
 
