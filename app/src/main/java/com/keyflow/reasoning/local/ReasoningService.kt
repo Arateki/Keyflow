@@ -102,12 +102,12 @@ class ReasoningService : Service() {
         override fun onDelta(text: String) = safely { cb.onDelta(text) }
         override fun onDone() = safely { cb.onDone() }
         override fun onError(kind: ReasoningErrorKind, message: String) {
-            Log.w(TAG, "falha $kind: $message")
+            Log.w(TAG, "falha $kind")
             safely { cb.onError(kind.code, message) }
         }
 
         override fun onBackendFallback(failed: ComputeBackend, reason: String) {
-            Log.w(TAG, "a carga na $failed falhou; seguindo na CPU: $reason")
+            Log.w(TAG, "a carga na $failed falhou; seguindo na CPU")
             safely { cb.onBackendFallback(failed.name, reason) }
         }
 
