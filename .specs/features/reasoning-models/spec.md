@@ -140,7 +140,7 @@ método quando o provedor mudar e adicionar outros provedores sem mexer no resto
 ### P2-G: Loja, licenças e build (`RPRV`)
 
 1. **RPRV-01**: a política de privacidade (PS-2) e o rascunho do Data Safety (PS-4) SHALL passar a cobrir: modelos de texto locais (no aparelho); OpenAI (texto enviado, login OIDC, credenciais só no aparelho).
-2. **RPRV-02**: licenças dos modelos (Apache 2.0 / Termos do Gemma) e do LiteRT-LM SHALL entrar em `app/licenses/` e na aba Docs. Desde 2026-10-27 isso cobre os seis modelos de texto (Qwen3, Qwen2.5 1.5B, SmolLM2, DeepSeek, Gemma 4 E2B e E4B), todos `validatedOnDevice = true`; a Docs e o `doc.json` do site os citam do catálogo-fonte (`DocsPanel.kt`).
+2. **RPRV-02**: licenças dos modelos (Apache 2.0 / Termos do Gemma) e do LiteRT-LM SHALL entrar em `app/licenses/` e na aba Docs. Desde 2026-10-27 isso cobre os sete modelos de texto (Qwen3 0.6B, Qwen2.5 1.5B, SmolLM2, DeepSeek, Gemma 4 E2B, Qwen3 4B Instruct 2507 e Gemma 4 E4B), todos `validatedOnDevice = true`; a Docs e o `doc.json` do site os citam do catálogo-fonte (`DocsPanel.kt`).
 3. **RPRV-03**: as bibliotecas nativas do LiteRT-LM SHALL ter **alinhamento de 16 KB** conferido, ABIs suportadas registradas (impacto no emulador x86_64) e o **impacto no tamanho do APK** medido e anotado.
 4. **RPRV-04**: **elegibilidade do login ChatGPT.** A OpenAI restringe o uso do plano a "apps open-source e hospedados localmente" e manda "apps pagos ou hospedados remotamente" para um formulário de interesse. **Decisão do Yan, 2026-10-23:** os logins por assinatura OpenAI, Anthropic e Google entram no release, ciente do risco de política da Anthropic. `enabled = true`; antes da publicação, revisar requisitos/termos aplicáveis. O client OAuth Google do release ainda depende do SHA-1 da chave Play e do `applicationId` definitivo no Console **[YAN]**.
 
@@ -225,4 +225,8 @@ Catálogo (2026-10-27, equipe/catalogo-qwen) — RCAT-02/03/04 e RPRV-02: o Qwen
 cobre a atualização: o `ModelStore` compara o manifest instalado com o catálogo e trata arquivo de versão antiga como desatualizado (card "Atualizar modelo").
 `ModelSpec.thinking` (NONE/OPTIONAL/ALWAYS) alimenta uma linha informativa nos cards de Raciocínio; não há seletor de pensamento nesta etapa.
 
-Candidatas de debug (2026-10-27, modelos-novos) — RCAT-02/03/05 e RPRV-02: seis entradas com metadados LFS congelados, `validatedOnDevice = false` e licenças locais; release/Docs/site preservam as seis entradas validadas. Spark 1.7B/4B excluídos pelo mínimo 0.17.0. Cadastro e gates descritos em `modelos-novos.md`; pendências: fabricante Nanbeige e medições nativas do Yan, sem promover validação de aparelho.
+Catálogo (2026-10-27, equipe/qwen3-4b-card) — RCAT-02/03 e RPRV-02: o **Qwen3 4B Instruct-2507** ("Potente", `recommendedRamMb = 12288`, sem modo pensamento) entrou, com URL no commit,
+tamanho e SHA-256 conferidos e licença Apache-2.0 em `app/licenses/`. Provado na GPU do Vaio TL10; a CPU, que o app usa, passou de 5 GB lá e o Android matou o processo, então
+a guarda de carga o barra abaixo de ~9,8 GB de RAM total (ver `tasks.md`).
+
+Candidatas de debug (2026-10-27, modelos-novos) — RCAT-02/03/05 e RPRV-02: seis entradas com metadados LFS congelados, `validatedOnDevice = false` e licenças locais; release/Docs/site preservam as sete entradas validadas após integrar o Qwen3 4B. Spark 1.7B/4B excluídos pelo mínimo 0.17.0. Cadastro e gates descritos em `modelos-novos.md`; fabricante Nanbeige identificado por redesenho vetorial atribuído ao avatar oficial; pendentes apenas as medições nativas do Yan, sem promover validação de aparelho.

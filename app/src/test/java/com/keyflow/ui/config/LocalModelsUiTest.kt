@@ -132,6 +132,7 @@ class LocalModelsUiTest {
     private val smol = ModelCatalog.SMOLLM2_1_7B.id
     private val deepseek = ModelCatalog.DEEPSEEK_R1_1_5B.id
     private val gemmaE4b = ModelCatalog.GEMMA_4_E4B.id
+    private val qwen4b = ModelCatalog.QWEN3_4B.id
 
     private fun textUi(
         installed: Set<String> = emptySet(),
@@ -171,7 +172,7 @@ class LocalModelsUiTest {
 
     @Test
     fun `the heavy warning follows each text model's recommended RAM`() {
-        // Recomendações (2026-10-27): Leve 3072, Raciocínio e Equilibrado 4096, Intermediário 6144, Avançado 8192.
+        // Recomendações (2026-10-27): Leve 3072, Versátil, Raciocínio e Equilibrado 4096, Intermediário 6144, Avançado 8192, Potente 12288.
         val small = textUi(ramMb = 2_000)
         assertThat(small.items.all { it.heavy }).isTrue()
         // 3,6 GB (o A32): o Leve não pesa; Raciocínio e Equilibrado mostram o aviso, mas carregam (a guarda é outra regra: RamGuard).
@@ -186,11 +187,13 @@ class LocalModelsUiTest {
         assertThat(five.item(gemma).heavy).isFalse()
         assertThat(five.item(smol).heavy).isTrue()
         assertThat(five.item(gemmaE4b).heavy).isTrue()
-        // 6,5/7,4 GB: o Avançado e as candidatas com estimativa de 8192 MB ainda mostram o aviso.
-        val heaviest = listOf(gemmaE4b, ModelCatalog.NANBEIGE_4_2_3B.id, ModelCatalog.QWEN3_5_4B.id)
+        // 6,5/7,4 GB: o Potente, o Avançado e as candidatas com estimativa de 8192 MB ainda mostram o aviso.
+        val heaviest = listOf(qwen4b, gemmaE4b, ModelCatalog.NANBEIGE_4_2_3B.id, ModelCatalog.QWEN3_5_4B.id)
         assertThat(textUi(ramMb = 6_500).items.filter { it.heavy }.map { it.spec.id }).containsExactlyElementsIn(heaviest)
         assertThat(textUi(ramMb = 7_400).items.filter { it.heavy }.map { it.spec.id }).containsExactlyElementsIn(heaviest)
-        assertThat(textUi(ramMb = 12_000).items.none { it.heavy }).isTrue()
+        // 12 GB de RAM anunciada mostram ~11 GB: o Avançado deixa de pesar, o Potente (12288) ainda mostra o aviso, como o Avançado nos 8 GB.
+        assertThat(textUi(ramMb = 11_200).items.filter { it.heavy }.map { it.spec.id }).containsExactly(qwen4b)
+        assertThat(textUi(ramMb = 12_288).items.none { it.heavy }).isTrue()
     }
 
     @Test

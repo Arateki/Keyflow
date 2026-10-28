@@ -1,7 +1,7 @@
 # Candidatas de Raciocínio só no debug — 2026-10-27
 
 Decisão do Yan em `.equipe/tarefas/modelos-novos.md`. Branch `equipe/modelos-novos`.
-Nenhuma candidata foi promovida a `validatedOnDevice = true`. O release mantém os seis modelos já provados.
+Nenhuma candidata foi promovida a `validatedOnDevice = true`. Após sincronizar com a main, o release mantém os sete modelos já validados, incluindo o Qwen3 4B.
 Os dois Spark ficam fora porque os manifests das revisões consultadas declaram `min_runtime_version = 0.17.0`, acima do LiteRT-LM **0.16.1** do app.
 Os cards também citam medições em 0.16.0: a evidência é contraditória, então prevalece o mínimo formal; não se atualiza o runtime nesta tarefa.
 
@@ -40,15 +40,15 @@ Nanbeige precisa de amostragem, raciocina com camadas repetidas e o arquivo esco
 Cada candidata tem arquivo em `app/licenses/` e linha no README. Como todas ficam fora do release, o teste de Docs exige que não entrem em `DocsPanel.kt`/`website/_fonte/doc.json`; esses arquivos não mudam.
 [FunctionGemma permite uso comercial responsável](https://ai.google.dev/gemma/docs/functiongemma), sujeito aos [Termos do Gemma](https://ai.google.dev/gemma/terms), não Apache-2.0. O snapshot dos termos, política de uso e NOTICE está em `Gemma_functiongemma-270m.txt`; incorporar obrigações ao fluxo de distribuição antes de promovê-lo.
 IBM usa desenho e cor do [lobe-icons (MIT), commit 8b7bbc4](https://github.com/lobehub/lobe-icons/blob/8b7bbc433d38437fa2b0cca58ae896917162b812/src/IBM/components/Mono.tsx); atribuição completa em `MIT_lobe-icons.txt` e README.
-**Nanbeige: pendência explícita.** Não foi encontrado logo CC0/MIT em Simple Icons/lobe-icons (incluindo busca de PR) ou no material do fabricante. `vendor = null` deixa a regra existente `every local model names the company that makes it, for the card logo` apontar o problema, conforme a tarefa. Nenhuma marca de outro fabricante nem logo genérico foi inserido. O Yan precisa fornecer fonte permitida ou decidir outro tratamento.
+**Nanbeige (2026-10-28):** o tratamento autorizado pelo Yan é um redesenho vetorial do [avatar oficial no Hugging Face](https://cdn-avatars.huggingface.co/v1/production/uploads/646f0d118ff94af23bc44aab/GXHCollpMRgvYqUXQ2BQ7.png), com barra curva, faixa larga e cinco blocos no grid 24×24. `vendor = NANBEIGE`, marca `#0B4A45` e adaptação de contraste já existente nos dois temas. Referência e ressalva sobre a licença do avatar em `app/licenses/README.md`; o PNG não é distribuído. O teste de fabricante segue sem exceções.
 
 ## Critério de liberação
 
-Catálogo embutido sobe para `2026102702`, com impressão digital atualizada. A fixture externa confere os nomes dos arquivos, URLs por commit, bytes e SHA contra a evidência pública congelada; o status 206 registrado documenta as sondas anônimas. O gate de release continua excluindo todas as candidatas.
+Catálogo combinado com a main sobe para `2026102801`, acima da versão `2026102702` que as duas branches haviam usado; impressão digital regenerada `d73c549bf91248e8e1ed6737bb3252cf7313409f00e6bd0853b3d5b01ce6e4b1`. A fixture externa confere os nomes dos arquivos, URLs por commit, bytes e SHA contra a evidência pública congelada; o status 206 registrado documenta as sondas anônimas. O gate de release continua excluindo todas as candidatas.
 As expectativas de RAM dos aparelhos já medidos ficam restritas aos modelos validados; os valores novos são estimativas para triagem, não resultados de teste nem recomendação comprovada.
-Não declarar a tarefa pronta para integração enquanto o teste do fabricante Nanbeige estiver vermelho; registrar o resultado no relatório da equipe.
+A integração exige o teste de fabricante Nanbeige, a suíte JVM, lint e goldens verdes; a validação nativa de pesos permanece com o Yan.
 
-## Validação da entrega
+## Validação anterior à integração final
 
 - `pool compilar --sem-aws testDebugUnitTest :app:lintDebug --continue`: **1799 de 1800** unitários passaram, em 168 suítes; nenhum ignorado. Lint sem ocorrências. Única falha: a regra existente de fabricante acusa Nanbeige, conforme a pendência autorizada pela tarefa. Não declarar gate verde nem integração pronta.
 - A fixture externa `NewReasoningCandidatesTest` passou 2/2, e os testes de exportação da Docs confirmam o recorte de release.

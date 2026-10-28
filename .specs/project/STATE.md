@@ -1,6 +1,10 @@
 # KeyFlow — STATE (memória do projeto)
 
 > Decisões, bloqueios, lições e ideias adiadas. Atualizado ao longo das sessões.
+>
+> **Lição, decisão ou bloqueio novo não entra mais aqui** (desde 2026-10-27): vai num arquivo próprio em
+> [`licoes/`](licoes/LEIA-ME.md), `AAAA-MM-DD-assunto.md`, um por assunto. Este arquivo conflitava em quase toda
+> mesclagem de branches paralelas; arquivo novo não conflita. O conteúdo abaixo fica como está, para consulta.
 
 ## Decisões (do grill de 2026-06-26)
 
@@ -3371,3 +3375,30 @@ O revisor reprovou a primeira versão da migração do Qwen3; cada achado virou 
 - Gate completo: 1799/1800 unitários, única falha da regra de fabricante Nanbeige (sem exceção); lint sem ocorrências. Interface: ModelListTest + ReasoningPanelTest, 23/23 no servidor. Goldens: 230/230 capturas dentro do limiar sem fuzz, com dez PNGs de Raciocínio aprovados e os outros 220 originais preservados.
 - No pool, `--sem-build` no servidor também pula a instalação: não confiar na instalação deixada por outra tarefa. APKs de debug do servidor e do Deck usam assinaturas diferentes; levar um para o outro pode dar `INSTALL_FAILED_UPDATE_INCOMPATIBLE` antes de rodar qualquer teste.
 - Detalhes em `.specs/features/reasoning-models/modelos-novos.md`; integração aguarda decisão sobre o logo.
+## 2026-10-27 — Qwen3 4B Instruct-2507 ("Potente") no catálogo (equipe/qwen3-4b-card)
+
+- Decisão do Yan: `ModelCatalog.QWEN3_4B` (`qwen3-4b-instruct-2507-litertlm`, nome "Potente", vendor QWEN, Apache-2.0, `thinking = NONE`, multilíngue, contexto de 2048) entra no catálogo
+  de Raciocínio e no release (`validatedOnDevice = true`). `litert-community/Qwen3-4B-Instruct-2507` @ `4d409771…`, `qwen3_4b_instruct_2507_mixed_int4.litertlm`, 2659057664 B, SHA-256
+  `9e48b165…` (API do HF, SHA recalculado baixando o arquivo, `scripts/verify-model-catalog.py` sem divergência, 206 a `Range`, `gated: false`). Fica entre o Equilibrado (Gemma 4 E2B) e o
+  Avançado (Gemma 4 E4B), pelo tamanho do arquivo. `EMBEDDED_VERSION` = 2026102702 (a regra do PR #43: o `ModelCatalogTest` obriga a subir junto com a impressão digital dos pins).
+- **O que foi e o que não foi provado.** Vaio TL10 (Unisoc T616, 7,6 GB): pela CPU o processo passou de 5 GB e o Android o matou por falta de memória (LOW_MEMORY), mesmo com a configuração
+  mínima; pela GPU (build de teste, OpenCL) respondeu certo ("Paris"), VmHWM 4,4 GB, carga de 112 s. O autor da conversão publica a CPU funcionando num Galaxy S26 com RSS de 4,6 a 6,1 GB.
+  O app só usa `Backend.CPU()`. O `validatedOnDevice = true` é decisão do Yan e a prova foi na GPU; o comentário do catálogo diz isso. `recommendedRamMb = 12288`: a guarda de carga
+  (`RamGuard.fitsDevice`, 80% da recomendada) exige 9831 MB de RAM total, então o Vaio (~7,4 GB) e o tablet de 6 GB recebem "Memória insuficiente" em vez de uma carga que morre; um aparelho de 12 GB
+  (~11 GB visíveis) passa. O aviso de "pesado" do card (RAM total < 12288) aparece também nos de 12 GB, como o do Avançado nos de 8 GB. Quando houver a opção de GPU no app, a recomendação deve ser revista.
+- **Nome**: "Potente" (par de "Leve") em vez de "Máximo"/"Expert": o Avançado (E4B) vem depois na lista e é descrito como mais capaz que o Equilibrado, e a revisão 2507 do 4B não foi comparada com
+  o E4B; um "Máximo" no penúltimo lugar enganaria. O resumo do card não afirma que é o mais capaz: "Responde direto, sem pensar; exige muita memória — melhor em aparelhos com 12 GB ou mais."
+- Licença: `app/licenses/Apache-2.0_qwen3-4b-instruct-2507.txt` + README, linha na Docs (PT/EN/ES), `doc.json` do site regenerado (`DocsSiteExportTest` grava `app/build/docs-site/doc.json`; copiado para
+  `website/_fonte/doc.json`), `PLAYSTORE_CHECKLIST.md` e `docs/loja/inventario-de-dados.md`. `manual-validation.md` ganhou a lista completa de cards (faltava o Versátil) e o passo do Potente.
+  O `roteiro-a32.md` só cita o Leve (passo 5.1), não a lista: sem mudança.
+- **Recuperação de troca interrompida** (achado menor da revisão do PR #43): `ModelStore.recoverInterruptedSwaps` promovia a cópia guardada `.<id>.replaced` mesmo inválida quando o destino não existia, deixando um
+  diretório parcial sem manifest (nem instalado nem desatualizado, sem "Apagar" no card). Agora a cópia inválida é apagada. Dois testes novos em `ModelStoreTest` (cópia sem manifest e cópia truncada).
+- Testes: unitários 1802/1802 e `:app:lintDebug` verdes no pool (`testDebugUnitTest`, a suíte inteira). Ajustados: `ModelCatalogTest`, `RamGuardTest`, `LocalModelsUiTest`, `PinSanityTest`,
+  `ModelPreparationTest`, `ModelListTest` (androidTest).
+- Goldens: 230 capturas pelo `pool telas`; mudam só as `config-raciocinio*` (10 quadros com a lista: ~100-130 px na barra de rolagem, porque o card novo fica abaixo da dobra) e entram os dois da rota
+  nova `config-raciocinio-local-potente` (claro e escuro). `config-docs` (~5 px de jitter) e `tour-keyboard-mic` (0 px) restaurados. Os quadros novos foram vistos nos dois temas: nome, `Qwen3 4B Instruct 2507`,
+  `~2536 MB · Multilíngue`, a frase e o aviso "Pode ser pesado neste aparelho." cabem sem quebrar o nome.
+- Armadilha: `pool instrumentar --sem-build` reaproveita o APK que estiver no emulador, que é compartilhado: veio o de outra frente (testes de GPU que não existem aqui, 2 falhas). Rodar sem `--sem-build`
+  (32 testes verdes). E com o servidor a carga 28-35 o emulador caiu duas vezes (`failed parado`); repetir quando a carga baixa resolveu, sem mexer em nada.
+- Lição: um modelo cuja prova foi noutro backend não herda o `validatedOnDevice` do restante do catálogo sem dizer no comentário; e a `recommendedRamMb` é a que decide, pela guarda de carga, quem
+  chega a tentar carregar. Lição: `RamGuardTest` e `LocalModelsUiTest` enumeravam "todos os modelos de texto" em aparelhos de 8 GB; um modelo que só cabe em 12 GB quebra essas enumerações de propósito.
