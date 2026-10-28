@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -19,7 +20,9 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextInputSelection
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.text.TextRange
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.keyflow.auth.ApiKeyFlow
 import com.keyflow.auth.AuthFlow
@@ -136,6 +139,8 @@ class VisaoPanelTest {
         var active by mutableStateOf<DownloadProgress?>(null)
         var localSupported by mutableStateOf(true)
         var catalog by mutableStateOf(ModelCatalog.visionModels(debug = true))
+        // Falso: o anfitrião não devolve as Settings novas à tela (o Testar não pode ficar sem resposta por isso).
+        var acceptsChanges = true
 
         val models: LocalModelsUi
             get() = LocalModelsUi.compose(
@@ -148,7 +153,7 @@ class VisaoPanelTest {
             KeyFlowTheme(dark = false) {
                 VisaoPanel(
                     settings = settings,
-                    onSettingsChange = { settings = it },
+                    onSettingsChange = { if (acceptsChanges) settings = it },
                     models = models,
                     actions = actions,
                     localSupported = localSupported,
@@ -557,6 +562,97 @@ class VisaoPanelTest {
         node(VISAO_TEST_TIMES_TAG).assertTextContains("Tempo de reconhecimento", substring = true)
         rule.runOnIdle { assertEquals(VisionSource.OPENAI, seen.single().visionSource) }
         rule.onNodeWithText("O teste envia esta imagem de exemplo ao provedor escolhido.").performScrollTo().assertIsDisplayed()
+    }
+
+    private val customSaved = Settings(
+        visionSource = VisionSource.CUSTOM, visionCustomEndpoint = "https://a.test/v1", visionCustomModel = "modelo-salvo",
+        visionCustomHeaderName = "H", visionCustomHeaderValue = "V",
+    )
+
+    /** Seleciona só o "a" de `https://a.test/v1` e digita "b": o campo mostra o endpoint novo, que ainda não foi salvo (sem Done nem desfoque). */
+    @OptIn(ExperimentalTestApi::class)
+    private fun typeBInsteadOfAInTheEndpoint() {
+        val endpoint = node("visao-custom-endpoint")
+        endpoint.performTextInputSelection(TextRange(8, 9))
+        endpoint.performTextInput("b")
+        endpoint.assertTextContains("https://b.test/v1")
+    }
+
+    @Test
+    fun tocarEmTestarConfirmaOEndpointPendenteDoCustomSemDoneEUsaAsSettingsResultantes() {
+        val seen = mutableListOf<Settings>()
+        val h = Harness(customSaved, visionTester = VisionTester { seen += it; com.keyflow.vision.VisionResult.Text("Texto do Custom") })
+        show(h)
+        typeBInsteadOfAInTheEndpoint()
+        rule.runOnIdle { assertEquals("https://a.test/v1", h.settings.visionCustomEndpoint) }
+
+        node(VISAO_TEST_BUTTON_TAG).assertIsEnabled().performClick()
+
+        // O teste parte uma vez só, já com o endpoint novo, e o resultado aparece: confirmar as Settings não cancela o teste que acabou de partir.
+        rule.waitUntil(5_000) { rule.onAllNodesWithTag(VISAO_TEST_RESPONSE_TAG).fetchSemanticsNodes().isNotEmpty() }
+        node(VISAO_TEST_RESPONSE_TAG).assertTextContains("Texto do Custom", substring = true)
+        rule.runOnIdle {
+            assertEquals("https://b.test/v1", seen.single().visionCustomEndpoint)
+            assertEquals("modelo-salvo", seen.single().visionCustomModel)
+            assertEquals("https://b.test/v1", h.settings.visionCustomEndpoint)
+        }
+        node(VISAO_TEST_BUTTON_TAG).assertTextEquals("Testar")
+    }
+
+    @Test
+    fun tocarEmTestarConfirmaTodosOsCamposPendentesDoCustomJuntos() {
+        val seen = mutableListOf<Settings>()
+        val h = Harness(customSaved, visionTester = VisionTester { seen += it; com.keyflow.vision.VisionResult.Text("ok") })
+        show(h)
+        typeBInsteadOfAInTheEndpoint()
+        // Um caractere a mais por campo: acrescentar mais que isso é colagem, que salva na hora e não fica pendente.
+        node("visao-custom-header-name").performTextReplacement("HX")
+        node("visao-custom-header-value").performTextReplacement("Vs")
+        node("visao-custom-model").performTextReplacement("modelo-salvo!")
+
+        node(VISAO_TEST_BUTTON_TAG).performClick()
+
+        rule.waitUntil(5_000) { rule.onAllNodesWithTag(VISAO_TEST_RESPONSE_TAG).fetchSemanticsNodes().isNotEmpty() }
+        rule.runOnIdle {
+            val tested = seen.single()
+            assertEquals("https://b.test/v1", tested.visionCustomEndpoint)
+            assertEquals("HX", tested.visionCustomHeaderName)
+            assertEquals("Vs", tested.visionCustomHeaderValue)
+            assertEquals("modelo-salvo!", tested.visionCustomModel)
+            assertEquals(tested, h.settings)
+        }
+    }
+
+    @Test
+    fun testarDepoisDoDoneUsaAsSettingsJaSalvas() {
+        val seen = mutableListOf<Settings>()
+        val h = Harness(customSaved, visionTester = VisionTester { seen += it; com.keyflow.vision.VisionResult.Text("ok") })
+        show(h)
+        typeBInsteadOfAInTheEndpoint()
+        node("visao-custom-endpoint").performImeAction()
+        rule.runOnIdle { assertEquals("https://b.test/v1", h.settings.visionCustomEndpoint) }
+
+        node(VISAO_TEST_BUTTON_TAG).performClick()
+
+        rule.waitUntil(5_000) { rule.onAllNodesWithTag(VISAO_TEST_RESPONSE_TAG).fetchSemanticsNodes().isNotEmpty() }
+        rule.runOnIdle { assertEquals("https://b.test/v1", seen.single().visionCustomEndpoint) }
+    }
+
+    @Test
+    fun seOAnfitriaoNaoDevolveAsSettingsOTesteParteAssimMesmoComOQueFoiConfirmado() {
+        val seen = mutableListOf<Settings>()
+        val h = Harness(customSaved, visionTester = VisionTester { seen += it; com.keyflow.vision.VisionResult.Text("ok") })
+        h.acceptsChanges = false
+        show(h)
+        typeBInsteadOfAInTheEndpoint()
+
+        node(VISAO_TEST_BUTTON_TAG).performClick()
+
+        rule.waitUntil(8_000) { rule.onAllNodesWithTag(VISAO_TEST_RESPONSE_TAG).fetchSemanticsNodes().isNotEmpty() }
+        rule.runOnIdle {
+            assertEquals("https://b.test/v1", seen.single().visionCustomEndpoint)
+            assertEquals("https://a.test/v1", h.settings.visionCustomEndpoint)
+        }
     }
 
     @Test

@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,6 +47,7 @@ import com.keyflow.vision.ocr.RgbaImage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -55,6 +57,9 @@ const val VISAO_TEST_TIMES_TAG = "visao-tempos"
 const val VISAO_TEST_REASON_TAG = "visao-testar-motivo"
 const val VISAO_TEST_ERROR_TAG = "visao-erro"
 const val VISAO_TEST_IMAGE_TAG = "visao-imagem-teste"
+
+/** Quanto o Testar espera as Settings confirmadas chegarem à tela antes de partir assim mesmo. */
+private const val START_ON_ARRIVAL_TIMEOUT_MS = 2_000L
 
 /** Por que a pergunta do Testar não saiu da imagem de teste: o que o aviso da tela diz. */
 enum class VisionTestError { EMPTY, UNAVAILABLE, OUT_OF_MEMORY, FAILED, INTERRUPTED, UNAUTHORIZED, NETWORK, RATE_LIMIT, NOT_ELIGIBLE }
@@ -254,6 +259,7 @@ fun VisaoTestArea(
     modelTester: (suspend () -> VisionResult)? = null,
     remote: Boolean = false,
     requestKey: Any? = null,
+    confirmPending: (() -> Boolean)? = null,
 ) {
     val palette = LocalKeyFlowPalette.current
     // Main explícito: o resultado volta de outro processo numa thread de binder e é o dispatcher do coletor que decide onde o estado muda.
@@ -264,6 +270,40 @@ fun VisaoTestArea(
     DisposableEffect(requestKey) { onDispose { generation.incrementAndGet(); job?.cancel() } }
     val unavailable = (availability as? VisionTestAvailability.Unavailable)?.reason
     val bitmap = remember(unavailable == null) { if (unavailable == null) VisionTestImage.bitmap() else null }
+    // Fora da chave de propósito: é a troca da chave, trazendo as Settings que o toque confirmou, que refaz a área e deixa o teste partir nela.
+    var startOnArrival by remember { mutableStateOf(false) }
+
+    val start: () -> Unit = {
+        val mine = generation.incrementAndGet()
+        state = VisionTestState(running = true)
+        job = scope.launch {
+            val startedAt = clock()
+            try {
+                val result = if (modelTester != null) visionTestStateFor(modelTester(), clock() - startedAt)
+                    else visionTestStateFor(tester.run(), clock() - startedAt)
+                if (mine == generation.get()) state = result
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Um tester que lança vira aviso na tela: este escopo é o da UI e uma exceção solta derrubaria o app.
+                if (mine == generation.get()) state = VisionTestState(error = VisionTestError.FAILED)
+            }
+        }
+    }
+    LaunchedEffect(requestKey) {
+        if (startOnArrival) {
+            startOnArrival = false
+            if (unavailable == null) start()
+        }
+    }
+    // Se as Settings confirmadas não chegarem a trocar a chave, o toque não pode ficar sem resposta.
+    LaunchedEffect(startOnArrival) {
+        if (startOnArrival) {
+            delay(START_ON_ARRIVAL_TIMEOUT_MS)
+            startOnArrival = false
+            if (unavailable == null) start()
+        }
+    }
 
     Column(modifier.fillMaxWidth()) {
         if (bitmap != null) {
@@ -290,22 +330,11 @@ fun VisaoTestArea(
                     job?.cancel()
                     job = null
                     state = state.copy(running = false)
+                } else if (confirmPending?.invoke() == true) {
+                    // Havia texto por confirmar num campo: o teste usa as Settings que saem dele, não as desta composição.
+                    startOnArrival = true
                 } else {
-                    val mine = generation.incrementAndGet()
-                    state = VisionTestState(running = true)
-                    job = scope.launch {
-                        val startedAt = clock()
-                        try {
-                            val result = if (modelTester != null) visionTestStateFor(modelTester(), clock() - startedAt)
-                                else visionTestStateFor(tester.run(), clock() - startedAt)
-                            if (mine == generation.get()) state = result
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (_: Exception) {
-                            // Um tester que lança vira aviso na tela: este escopo é o da UI e uma exceção solta derrubaria o app.
-                            if (mine == generation.get()) state = VisionTestState(error = VisionTestError.FAILED)
-                        }
-                    }
+                    start()
                 }
             },
         )

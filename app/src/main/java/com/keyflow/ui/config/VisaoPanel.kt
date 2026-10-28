@@ -95,14 +95,16 @@ fun VisaoPanel(
                     VisionSource.OPENAI -> OpenAiPanel(activeSettings, onSettingsChange, openAiAuth, openAi, connection, VisionCloudSlot.OpenAi)
                     VisionSource.ANTHROPIC -> AnthropicPanel(activeSettings, onSettingsChange, anthropicAuth, VisionCloudSlot.Anthropic)
                     VisionSource.GOOGLE -> GooglePanel(activeSettings, onSettingsChange, googleAuth, VisionCloudSlot.Google)
-                    VisionSource.CUSTOM -> VisaoCustomFields(activeSettings, editor::edit)
+                    VisionSource.CUSTOM -> VisaoCustomFields(activeSettings, editor::edit, editor.pending)
                 }
             }
         }
         SettingsGroup(tr("Testar")) {
             Column(Modifier.padding(vertical = 16.dp)) {
                 VisaoTestArea(availability, tester, initialState = initialTest,
-                    modelTester = visionTester?.let { current -> { current.run(activeSettings) } },
+                    // Lidas no toque, depois de confirmar o texto dos campos: as Settings desta composição podem ser anteriores à edição.
+                    modelTester = visionTester?.let { current -> { current.run(editor.settings) } },
+                    confirmPending = editor::confirmPending,
                     remote = activeSettings.visionSource != VisionSource.LOCAL,
                     requestKey = listOf(activeSettings.visionSource, activeSettings.visionLocalModelId,
                         activeSettings.visionOpenAiModel, activeSettings.visionAnthropicModel, activeSettings.visionGoogleModel,
@@ -125,7 +127,7 @@ private fun visionSourceLabel(source: VisionSource): String = when (source) {
 }
 
 @Composable
-private fun VisaoCustomFields(settings: Settings, onEdit: ((Settings) -> Settings) -> Unit) {
+private fun VisaoCustomFields(settings: Settings, onEdit: ((Settings) -> Settings) -> Unit, pending: PendingEdits) {
     Column {
         CustomProviderFields(
             tagPrefix = "visao",
@@ -140,6 +142,7 @@ private fun VisaoCustomFields(settings: Settings, onEdit: ((Settings) -> Setting
             hints = listOf(
                 tr("Padrão compatível com OpenAI Chat Completions com imagem — informe o endpoint e credenciais do seu serviço."),
             ),
+            pending = pending,
         )
         // PRV-04: a imagem da captura sai do aparelho para o endpoint digitado.
         SettingSub(
