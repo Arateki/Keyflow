@@ -69,7 +69,7 @@ internal class LoadReport(private val model: LlmModel, private val reports: Back
 /**
  * [update] aplica uma mudança à tabela de preferências numa gravação atômica; [installedVersion] diz a versão do modelo instalado agora (nulo =
  * não instalado). A ficha da escolha confere **dentro** da gravação ([LocalBackendPrefs.fellBack], [LocalBackendPrefs.markGpuReady]); a versão
- * instalada confere antes, e pega o modelo apagado ou atualizado (outro arquivo) durante a carga.
+ * instalada também confere dentro da transformação: a instalação pode mudar enquanto a edição espera sua vez.
  */
 internal class PersistedBackendReports(
     private val update: suspend ((LocalBackendPrefs) -> LocalBackendPrefs) -> Unit,
@@ -80,14 +80,14 @@ internal class PersistedBackendReports(
     override fun fellBack(model: LlmModel, failed: ComputeBackend, reason: String) {
         Log.w(TAG, "${model.modelId}: a carga na $failed falhou; voltou para a CPU: $reason")
         scope.launch {
-            if (stillTheInstalledFile(model)) update { it.fellBack(model.modelId, failed, model.ticket) }
+            update { prefs -> if (stillTheInstalledFile(model)) prefs.fellBack(model.modelId, failed, model.ticket) else prefs }
         }
     }
 
     override fun loaded(model: LlmModel) {
         if (model.backend != ComputeBackend.GPU) return
         scope.launch {
-            if (stillTheInstalledFile(model)) update { it.markGpuReady(model.modelId, model.ticket) }
+            update { prefs -> if (stillTheInstalledFile(model)) prefs.markGpuReady(model.modelId, model.ticket) else prefs }
         }
     }
 

@@ -54,6 +54,13 @@ class LocalBackendPrefs private constructor(private val byModel: Map<String, Ent
     fun choose(modelId: String, backend: ComputeBackend, ticket: Long = newTicket()): LocalBackendPrefs =
         update(modelId) { it.copy(backend = backend, fellBackFrom = null, ticket = ticket) }
 
+    /** Selecionar o card de novo invalida as cargas antigas sem trocar o backend nem apagar seus avisos. */
+    fun renewSelection(modelId: String): LocalBackendPrefs {
+        var ticket = newTicket()
+        while (ticket == ticketFor(modelId)) ticket = newTicket()
+        return update(modelId) { it.copy(ticket = ticket) }
+    }
+
     /**
      * A carga em [failed] falhou e o motor seguiu na CPU: grava a CPU como escolha e lembra do aviso — **só se [ticket] ainda é a ficha do modelo**
      * (a carga que falhou foi pedida pela escolha que está valendo e o modelo continua com linha). Aviso vencido não muda nada.

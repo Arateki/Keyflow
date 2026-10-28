@@ -249,3 +249,5 @@ cobre a atualização: o `ModelStore` compara o manifest instalado com o catálo
 Catálogo (2026-10-27, equipe/qwen3-4b-card) — RCAT-02/03 e RPRV-02: o **Qwen3 4B Instruct-2507** ("Potente", `recommendedRamMb = 12288`, sem modo pensamento) entrou, com URL no commit,
 tamanho e SHA-256 conferidos e licença Apache-2.0 em `app/licenses/`. Provado na GPU do Vaio TL10; a CPU, que o app usa, passou de 5 GB lá e o Android matou o processo, então
 a guarda de carga o barra abaixo de ~9,8 GB de RAM total (ver `tasks.md`).
+
+Revisão 2 do PR #49 (2026-10-28), RPRC-03/05/07: implementada a invalidação de cargas anteriores também ao selecionar novamente o mesmo card e a conferência da versão instalada dentro da transformação do DataStore. A pré-carga usa backend/ficha do snapshot renovado; provas determinísticas cobrem edição suspensa e retry GPU após falha antiga. Verificado: 1882/1882 unitários, lint sem ocorrências e 84/84 instrumentados afetados; CI obrigatório acompanhado no PR. Sem mudança visual nesta correção; decisões em `licoes/2026-10-28-corridas-selecao-backend.md`.

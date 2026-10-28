@@ -34,7 +34,7 @@ object LocalReasoningPreloader {
             val connection = ReasoningConnection.get(app)
             var acquired = false
             val failure = try {
-                val choice = SettingsRepository(app).localBackendChoiceFor(modelId)
+                val choice = backendChoiceForSelection(modelId, SettingsRepository(app)::updateLocalBackendPrefs)
                 val model = LlmModels.forId(app, modelId, choice.backend, choice.ticket)
                 check(model != null && ModelStore.get(app).isInstalled(modelId))
                 val service = connection.acquire()

@@ -2,6 +2,7 @@ package com.keyflow.reasoning.local
 
 import com.google.common.truth.Truth.assertThat
 import com.keyflow.core.ComputeBackend
+import com.keyflow.data.LocalBackendChoice
 import com.keyflow.data.LocalBackendPrefs
 import com.keyflow.reasoning.ReasoningRequest
 import java.util.concurrent.CountDownLatch
@@ -9,6 +10,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Test
 
@@ -28,7 +30,10 @@ class BackendReportsRaceTest {
     /** A tabela do DataStore em memória: a mesma gravação atômica (uma mudança por vez sobre o valor atual). */
     private class MemoryPrefs {
         @Volatile var prefs = LocalBackendPrefs.EMPTY
-        @Synchronized fun update(change: (LocalBackendPrefs) -> LocalBackendPrefs) { prefs = change(prefs) }
+        @Synchronized fun update(change: (LocalBackendPrefs) -> LocalBackendPrefs): LocalBackendPrefs {
+            prefs = change(prefs)
+            return prefs
+        }
     }
 
     /** Um motor cuja carga espera [gate] e então falha ([failure]) ou passa. */
@@ -66,11 +71,15 @@ class BackendReportsRaceTest {
         )
 
         /** O que o app faz com uma pré-carga: leva a escolha atual (backend + ficha) e repassa o que o `:reasoning` contar. */
-        fun preload(version: String = "v1"): CountDownLatch {
-            val choice = store.prefs
+        suspend fun selectAndPreload(): CountDownLatch = preload(choice = backendChoiceForSelection("qwen3-0.6b-litertlm") { store.update(it) })
+
+        fun preload(
+            version: String = "v1",
+            choice: LocalBackendChoice = LocalBackendChoice(store.prefs.backendFor("qwen3-0.6b-litertlm"), store.prefs.ticketFor("qwen3-0.6b-litertlm")),
+        ): CountDownLatch {
             val model = LlmModel(
                 modelId = "qwen3-0.6b-litertlm", modelPath = "/models/qwen.litertlm", engineType = "LITERT_LM", idleUnloadMs = 0, ramEstimateMb = 0,
-                version = version, backend = choice.backendFor("qwen3-0.6b-litertlm"), ticket = choice.ticketFor("qwen3-0.6b-litertlm"),
+                version = version, backend = choice.backend, ticket = choice.ticket,
             )
             val report = LoadReport(model, reports)
             val done = CountDownLatch(1)
@@ -115,6 +124,32 @@ class BackendReportsRaceTest {
         assertThat(prefs.fellBackFrom(qwen)).isNull()
         assertThat(prefs.gpuReady(qwen)).isTrue()
         assertThat(prefs.ticketFor(qwen)).isEqualTo(3L)
+    }
+
+    /** Selecionar o mesmo card, sem alternar CPU/GPU, também torna vencido o fallback da pré-carga anterior. */
+    @Test
+    fun `selecionar o mesmo card de novo preserva a GPU do retry quando a carga antiga falha`() = runTest {
+        val gate = gate()
+        try {
+            val old = SlowBackend(gate, IllegalStateException("falha antiga"))
+            val h = Harness(pool, listOf(old, SlowBackend(null, null)), mutableMapOf(qwen to "v1"))
+            h.store.update { it.choose(qwen, ComputeBackend.GPU, 1L) }
+            val first = h.selectAndPreload()
+            assertThat(old.started.await(5, TimeUnit.SECONDS)).isTrue()
+            val firstTicket = h.store.prefs.ticketFor(qwen)
+            val second = h.selectAndPreload()
+            val secondTicket = h.store.prefs.ticketFor(qwen)
+            assertThat(secondTicket).isNotEqualTo(firstTicket)
+            gate.countDown()
+            assertThat(first.await(5, TimeUnit.SECONDS)).isTrue()
+            assertThat(second.await(5, TimeUnit.SECONDS)).isTrue()
+            assertThat(h.store.prefs.backendFor(qwen)).isEqualTo(ComputeBackend.GPU)
+            assertThat(h.store.prefs.ticketFor(qwen)).isEqualTo(secondTicket)
+            assertThat(h.store.prefs.gpuReady(qwen)).isTrue()
+            assertThat(h.store.prefs.fellBackFrom(qwen)).isNull()
+        } finally {
+            gate.countDown()
+        }
     }
 
     /** Sonda 2: apagar durante a carga e a carga antiga falha → o aviso não recria a linha `CPU/GPU/0` do modelo apagado. */
