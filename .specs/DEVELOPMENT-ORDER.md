@@ -262,7 +262,7 @@ do e2e da v1.
 | — | Trabalho do Gemini (abas KeyFlow, Fluxos, Computador, Fala, Visão; provedores Anthropic/Google) | commitado e na PR #7. Provedores e aba KeyFlow funcionam; **Fluxos, Computador, Fala e Visão são só tela + `Settings`, sem motor e sem spec** → "Em breve" na v1 (V1-1). Pendências de segurança/release herdadas → V1-2 |
 | — | `corretor-aprendiz` | spec, design e tasks prontos (PR #19); nada implementado. **Fora do recorte da v1 por padrão**: banco de avaliação, base sem aprendizado, recusa e pares, modelo espacial do toque e bigramas, em fases A–G (`.specs/features/corretor-aprendiz/tasks.md`). Portão **[YAN]**: ele revisa os textos legais (política, aba Privacidade, Data Safety) na fase B, e o aprender ligado por padrão não vai à Play sem isso. Em aberto para o Yan: entra na v1? (`context.md` §8) |
 | — | `local-model-warmup` | Main, fora da v1: aquecimento do Parakeet, pré-carga explícita e aquecimento de texto, estado de preparação nos cards; ver spec/design/tasks. Em validação. |
-| — | `bancada` (bancada de modelos) | Spec, design e tasks em rascunho (2026-10-28, PR de spec), nada implementado. Main, fora da v1 (recorte congelado); não toma a vez de nada em andamento. É a régua que precede a atualização do LiteRT-LM (0.16.1 → 0.18.x) e a promoção de candidatas. Decisões do Yan de 28/10 incorporadas: tag `app-vX.Y.Z` na `main` (semântica, a partir de `app-v0.1.0`) com a bancada como etapa manual antes dela; áudio do Common Voice (CC0); testes de Código e Terminal cortados por ora; online só pela interface (a automação não roda online). Aberta: D6 (limiar, depois do baseline) |
+| — | `bancada` (bancada de modelos) | Spec, design e tasks em rascunho (2026-10-28, PR de spec), nada implementado. Main, fora da v1 (recorte congelado); não toma a vez de nada em andamento. É a régua que precede a atualização do LiteRT-LM (0.16.1 → 0.18.x) e a promoção de candidatas. Decisões do Yan de 28/10 incorporadas: tag `app-vX.Y.Z` na `main` (semântica; a v1 é a `app-v0.1.0`) com a bancada como etapa manual antes dela; áudio do Common Voice (CC0); testes de Código e Terminal cortados por ora; online só pela interface (a automação não roda online). Aberta: D6 (limiar, depois do baseline) |
 | — | CI | 2026-10-07: cache do AAR do sherpa-onnx nos dois jobs (um 503 do GitHub derrubou a PR #7 antes dos testes) |
 | — | 2026-10-10..22 | PRs #8 a #11 (estabilidade dos testes, desempenho da abertura do teclado, CI, galeria) — fora da fila da v1 |
 
@@ -511,7 +511,8 @@ Spec: `.specs/features/bancada/` (`spec.md` 68 requisitos, `design.md`, `tasks.m
 - **Independe** dos outros blocos; reusa o `ReasoningEngine`, o `LocalTranscriber`, o `ToolRegistry` e o catálogo. Depende do
   `OcrEngine` (VC-T6) só para o teste de OCR e o fluxo de visão (BNC-T24/T25).
 - **Decidido pelo Yan (2026-10-28)**: versionamento opção A (tag `app-vX.Y.Z`, semântica a partir de `app-v0.1.0`; a bancada é a etapa manual antes da tag;
-  o `versionName` passa a seguir a tag e o `versionCode`, que nunca diminui, deriva dela — BNC-T30, fora da bancada); áudio do Common Voice (CC0); Código e Terminal fora por ora; online só pela interface.
+  o `versionName` passa a seguir a tag e o `versionCode`, que nunca diminui, deriva dela — BNC-T30, fora da bancada). **A v1 que aguarda o DUNS sai como
+  `app-v0.1.0`** (só o Yan tem o app instalado: sem risco de "nome voltar"; aparelhos de teste sobem de versão sem desinstalar, código 1 → 1000) e a `main` continua em 0.1.x/0.2.0; áudio do Common Voice (CC0); Código e Terminal fora por ora; online só pela interface.
 - **[YAN]**: (1) liberar o A32 para a campanha da BNC-T19; (2) definir o limiar mínimo (D6) depois do baseline.
 
 ---
