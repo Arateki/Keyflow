@@ -39,10 +39,14 @@ class GemmaVisionDeviceTest {
         fun note(message: String) = instrumentation.sendStatus(0, Bundle().apply {
             putString("stream", "\nGemmaVision: $message\n")
         })
-        val root = File(context.filesDir, "gemma-visao-optin").apply { mkdirs() }
+        val root = File(context.filesDir, "gemma-visao-optin").apply {
+            if (exists()) check(deleteRecursively())
+            check(mkdirs())
+        }
         val spec = ModelCatalog.GEMMA_4_E2B
         val source = checkNotNull(spec.file(FileRole.MODEL))
-        val file = File(root, source.fileName)
+        val cachePrefix = "gemma-visao-prova-${android.os.Process.myPid()}"
+        val file = File(root, "$cachePrefix.litertlm")
         val backend = LiteRtBackend(File(root, "cache").apply { mkdirs() }.path)
         val worker = Executors.newSingleThreadExecutor()
         try {
@@ -72,7 +76,7 @@ class GemmaVisionDeviceTest {
             assertEquals(source.bytes, file.length())
             assertEquals(source.sha256, digest.digest().joinToString("") { "%02x".format(it) })
             note("arquivo conferido; download ${(System.nanoTime() - downloadStart) / 1_000_000} ms; inicializando encoder e modelo na CPU")
-            val model = LlmModels.from(spec, root, backend = ComputeBackend.CPU).copy(vision = true)
+            val model = LlmModels.from(spec, root, backend = ComputeBackend.CPU).copy(modelPath = file.path, vision = true)
             val loadStart = System.nanoTime()
             backend.load(model)
             note("carga fria ${(System.nanoTime() - loadStart) / 1_000_000} ms")
@@ -95,6 +99,11 @@ class GemmaVisionDeviceTest {
             assertTrue("não leu a palavra na imagem sintética: $response", response.toString().replace(" ", "").contains("KeyFlow", ignoreCase = true))
             // Confere também a composição de produção: arquivo de imagem, AIDL, guarda e StrictMode do :reasoning.
             backend.unload()
+            val directCache = File(root, "cache")
+            val cacheBytes = directCache.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+            note("cache da fase direta=$cacheBytes bytes; espaço livre antes=${root.usableSpace} bytes")
+            assertTrue("não liberou o cache temporário da fase direta", directCache.deleteRecursively())
+            note("espaço livre após liberar o cache da fase direta=${root.usableSpace} bytes")
             val connection = ReasoningConnection(context, lingerMs = 0)
             try {
                 val transport = LocalReasoningEngine(spec.id, { model }, connection,
@@ -108,6 +117,8 @@ class GemmaVisionDeviceTest {
         } finally {
             backend.cancel(); worker.shutdownNow(); worker.awaitTermination(5, TimeUnit.SECONDS)
             backend.unload(); root.deleteRecursively()
+            // Só o cache de pesos desta prova (nome único), nunca os caches de modelos instalados pelo usuário.
+            context.cacheDir.listFiles().orEmpty().filter { it.name.startsWith(cachePrefix) }.forEach { it.deleteRecursively() }
         }
     }
 }
