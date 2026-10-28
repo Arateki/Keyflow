@@ -81,7 +81,7 @@ leva à aba Visão e o gesto de texto só funciona de ponta a ponta com o downlo
   `ModelCatalogTest` (pins, papéis, release x debug), `LocalModelsUiTest` (`EMPTY_VISION` = só o OCR), `DocsSectionsTest`;
   `PinSanityTest`, `TranslationsTest` e `ArchitectureRulesTest` seguem verdes.
 
-### VC-T2c — Capacidades no `ModelSpec` + Gemma 4 como modelos da Visão *(nova, 2026-10-27; V12)*
+### VC-T2c — Capacidades no `ModelSpec` + Gemma 4 como modelos da Visão *(nova, 2026-10-27; V12)* ✅ IMPLEMENTADA (2026-10-28, branch `equipe/visao-aba`)
 - **What**: `ModelCapability` (enum: `READ_TEXT`, `DESCRIBE_IMAGE`, `ANSWER_ABOUT_SCREEN` + rótulos `tr("…")`: "Ler texto da tela",
   "Descrever imagem", "Responder sobre a tela") e `ModelSpec.capabilities: Set<ModelCapability> = emptySet()`; `OCR_PADDLE_LATIN` =
   `{READ_TEXT}`; `GEMMA_4_E2B` e `GEMMA_4_E4B` ganham `{READ_TEXT, DESCRIBE_IMAGE, ANSWER_ABOUT_SCREEN}` **sem mudar `id`, `kind` nem
@@ -95,6 +95,11 @@ leva à aba Visão e o gesto de texto só funciona de ponta a ponta com o downlo
   enquanto `validatedOnDevice = false`); `TEXT`/Raciocínio inalterados (nenhum teste de texto muda); `byId` resolve os mesmos
   objetos; `TranslationsTest` cobre os rótulos; `PinSanityTest` e `verify-model-catalog.py` verdes (nenhum pin novo).
 - **Tests**: unit. **Gate**: `build` + `testDebugUnitTest`.
+- **Feito** (2026-10-28; decisões em `licoes/2026-10-28-visao-aba.md`): o campo `ModelSpec.capabilities` e o enum já existiam (card de modelo, PR #49); aqui os dois Gemma 4 passaram a declarar `READ_TEXT`, `DESCRIBE_IMAGE` e
+  `ANSWER_ABOUT_SCREEN` (sem mudar `id`, `kind` nem arquivos; fonte e conferência dos `.litertlm` no comentário da entrada) e `ModelCatalog.visionModels()` (OCR + os modelos de texto que declaram visão, do menor ao maior arquivo)
+  alimenta a lista da Visão (`LocalModelsUi.EMPTY_VISION`). **Desvio de `visionModels()` do texto acima**: o release só lista o que está provado num aparelho — o OCR espera `validatedOnDevice` e os Gemma esperam a VC-T15
+  (`ModelCatalog.VISION_PROVEN_IDS`, vazio); o debug lista os três. O E4B deixou de ser "só debug": já é `validatedOnDevice = true` como modelo de texto. O card mostra só as etiquetas da aba (`CardTagScope`): a Visão
+  não anuncia pensamento nem ferramentas, o Raciocínio não anuncia visão — o card do Raciocínio ficou bit-idêntico. Testes: `ModelCatalogTest` (lista, capacidades, release vazio), `LocalModelsUiTest`, `ModelCardTagsTest`.
 
 ### VC-T2b — Runtime ONNX próprio (JNI sobre a `libonnxruntime.so` do AAR do sherpa) ✅ IMPLEMENTADA (2026-10-28, branch `equipe/visao-ocr`) — contingência do design §7; falta rodar no A32
 - **What**: (1) **ambiente**: provisionar NDK e CMake com versões fixas (`ndkVersion` no Gradle) em
@@ -306,7 +311,7 @@ O ID fica reservado (não reutilizar) para que commits e referências antigas n�
 
 ## Fase G — Config + goldens
 
-### VC-T11 — Aba Visão: origem Local (PaddleOCR + Gemma 4 com capacidades) *(reescrita em 2026-10-27; antes cartões Leitura de texto + Tradução)*
+### VC-T11 — Aba Visão: origem Local (PaddleOCR + Gemma 4 com capacidades) *(reescrita em 2026-10-27; antes cartões Leitura de texto + Tradução)* ✅ IMPLEMENTADA (2026-10-28, branch `equipe/visao-aba`)
 - **What**: ligar o `VisaoPanel` na aba que já existe (hoje `ComingSoonPanel` em `ConfigScreen`), **sem gating por modo** (⚠️ design §14).
   Seletor **Origem da visão** (Local · OpenAI · Anthropic · Google · Custom; Créditos "Em breve" — as quatro de nuvem ficam para a
   T17, aqui só o seletor e o Local). Origem **Local**: lista de cards **PaddleOCR / Gemma 4 E2B / Gemma 4 E4B**
@@ -323,8 +328,14 @@ O ID fica reservado (não reutilizar) para que commits e referências antigas n�
   "Baixar"; cada card mostra as capacidades certas (PaddleOCR 1 linha; Gemma 3); a aba abre sem gating; suíte de config existente
   verde; `TranslationsTest` cobre os textos; `SettingsRepositoryTest` sem os campos removidos.
 - **Tests**: unit (estado da lista) + instrumented (camada `ui`). **Gate**: `full`.
+- **Feito** (2026-10-28; `licoes/2026-10-28-visao-aba.md`): `ConfigTab.VISAO` mostra o `VisaoPanel`, no desenho do `ReasoningPanel` (seletor de origem com Créditos "Em breve", lista de cards no mesmo `ModelList`, grupo
+  **Testar**), sem gating por modo. Local: PaddleOCR + Gemma 4 E2B/E4B com Baixar/progresso/Cancelar/Apagar/Usar, tamanho, aviso de RAM, logo e as etiquetas de capacidade; escolher grava `visionLocalModelId` e **não** carrega
+  o modelo (isso é do motor, VC-T15). Os Gemma são o mesmo arquivo do Raciocínio — apagar numa aba esquece a escolha nas duas (`Settings.withoutLocalModel`). Notas: "100% neste aparelho" e "o download vem do Hugging Face, que vê o
+  IP". **Testar real**: lê uma imagem de exemplo desenhada em `Canvas` com o PaddleOCR pelo `:vision` de verdade (`VisionOcrTester`) e mostra o texto e o tempo; com o Gemma 4 e os provedores o botão fica desligado, com o
+  motivo escrito, até a VC-T15. Saíram o "Testar OCR" de mentira, o destino da tradução e `Settings.visionTranslateTarget`; os modelos de provedor das Settings passaram a vazio por padrão (vale o padrão da lista curada). Testes:
+  `VisaoPanelTest` (instrumentado, 22), `ConfigScreenTest`, `VisaoTestTest`, `ProviderModelSlotTest` (unidade), `SettingsRepositoryTest`. **Fica de fora**: `NAV_TAB_VISAO` (VC-T7) e o aviso de modelo ausente (VC-T7).
 
-### VC-T17 — Aba Visão: provedores (OpenAI, Anthropic, Google) e Custom, só modelos com visão *(nova; V13)*
+### VC-T17 — Aba Visão: provedores (OpenAI, Anthropic, Google) e Custom, só modelos com visão *(nova; V13)* ✅ IMPLEMENTADA (2026-10-28, branch `equipe/visao-aba`)
 - **What**: no `VisaoPanel`, as origens de nuvem **reusando** `UnifiedProviderCard` e as mesmas `AuthActions`/conexões/cofre das abas
   Transcrição e Raciocínio (olhar como `OpenAiPanel`/`AnthropicPanel`/`GooglePanel` da Raciocínio as montam e extrair o que for comum em vez
   de copiar; conectar numa aba vale nas outras — PRV-01). `VisionModelCatalog`: **lista curada id→visão** por provedor, **conferida na
@@ -341,8 +352,13 @@ O ID fica reservado (não reutilizar) para que commits e referências antigas n�
   Custom persiste e a nota de privacidade aparece quando a nuvem está selecionada; nenhum arquivo de provedor da Raciocínio duplicado
   (revisão de diff); suíte de config verde.
 - **Tests**: unit + instrumented (camada `ui`). **Gate**: `full`.
+- **Feito** (2026-10-28; fontes e datas em `licoes/2026-10-28-visao-aba.md`): nada de painel copiado — `OpenAiPanel`, `AnthropicPanel` e `GooglePanel` do Raciocínio viraram compartilhados, parametrizados por um
+  `ProviderModelSlot` (qual campo das Settings guarda o modelo, de onde vem a lista, as tags e a nota de privacidade) e as mesmas `AuthActions` do Raciocínio (`ConfigScreen` entrega `reasoning*Auth` às duas abas: conectar
+  numa vale na outra). `VisionModelCatalog` é a lista curada id→visão por provedor, conferida na documentação oficial em 2026-10-28; o modelo guardado sem visão cai no padrão da lista (`gpt-4o` e `gemini-2.0-flash`,
+  antigos padrões, estão deprecado/desligado); com a lista da conta, o seletor mostra a interseção. Custom: `CustomProviderFields` (compartilhado com o Raciocínio). Nota de PRV-04 em cada card e no Custom. Os limites de uso fictícios
+  não aparecem na Visão (`showLimits = false`; o Raciocínio mantém os dele, que continuam de exemplo). Testes: `VisionModelCatalogTest`, `ProviderModelSlotTest`, `VisaoPanelTest`, `ConfigScreenTest`.
 
-### VC-T12 — Rotas de galeria + goldens
+### VC-T12 — Rotas de galeria + goldens ✅ IMPLEMENTADA (2026-10-28, branch `equipe/visao-aba`)
 - **What**: rotas `config-visao` (Local: sem modelo, baixando, instalado com capacidades), `config-visao-provedor` (conectado, seletor só
   com visão) e `config-visao-custom` (claro/escuro, fakes determinísticos); regenerar + aprovar goldens; espelhar em `/tmp/keyflow-prints/`.
 - **Where**: `RouteCatalog.kt` (debug), `verification/golden/`.
@@ -350,6 +366,10 @@ O ID fica reservado (não reutilizar) para que commits e referências antigas n�
 - **Done when**: `verify-screens.sh` + `diff-screens.sh` verdes (existentes bit-idênticos; o `--approve` copia tudo — restaurar
   com `git checkout -- verification/golden/…` o que não é desta mudança).
 - **Tests**: screenshot. **Gate**: `screenshot`.
+- **Feito** (2026-10-28; `licoes/2026-10-28-visao-aba.md`): dez rotas, claro e escuro (20 goldens): `config-visao` (Local, nada baixado: OCR e os dois Gemma 4 com as capacidades), `-local-baixando` (Gemma 42%), `-local-pronto` (OCR escolhido e
+  Gemma baixado pelo Raciocínio), `-local-teste` (só o OCR na lista: a imagem de exemplo e o botão Testar na primeira tela), `-local-gemma` (Gemma escolhido: Testar desligado com o motivo), `-provedor` (OpenAI conectada pelo plano; a conta devolve
+  modelos com e sem visão e o seletor mostra só os que leem imagem), `-openai-desconectado`, `-google` (chave de API e modelo antigo que cai no padrão), `-anthropic` (conectada) e `-custom`. As rotas antigas `config-visao*` (Local, baixando,
+  pronto, Google, Anthropic) e o `config-visao` (o cartão "Em breve") mudaram de propósito; dos 246 goldens anteriores os outros 236 ficaram a 0 px (exceto o `config-docs`, 5 px de ruído de antialiasing, abaixo do limiar, não aprovado).
 
 ## Fase H — Loja + validação
 
