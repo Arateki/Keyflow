@@ -235,7 +235,7 @@ scripts/bancada-comparar.py ANTES.json DEPOIS.json [--tol-nota 0.05 --tol-tempo 
   `verification/bancada/vX.Y.Z/{a32,tab,vaio}.json` e um `atestado.json` (rótulo, `versionName`, commit testado, corpus, motor,
   aparelhos, data). `scripts/bancada-atestado.py vX.Y.Z` o valida (esquema, 3 aparelhos, `versionName` = rótulo, nenhuma mudança em
   `app/src/main` entre o commit testado e o que vai receber a tag, `bancada-comparar.py` sem regressão contra a versão anterior).
-  A tag é criada à mão, depois. O `versionName` seguir a tag é a dependência BNC-T30 (hoje fixo em 1.0.0).
+  A tag é criada à mão, depois. O `versionName` seguir a tag é a dependência BNC-T30: semântica a partir de `app-v0.1.0`, com o `versionCode` derivado da tag (`MAJOR×1 000 000 + MINOR×1 000 + PATCH`), porque ele nunca pode diminuir.
 - Os seriais dos aparelhos ficam num arquivo de configuração **local, fora do git** (`.equipe/` não vai para o repositório); os de
   depuração sem fio entram por `adb connect <ip>:<porta>`, que muda a cada sessão — o script aceita `--serial nome=ip:porta`.
 - O A32 é o teclado do Yan: rodar **só combinado e carregando** — o `am instrument` reinicia o processo do app (o teclado some

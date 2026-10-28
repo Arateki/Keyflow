@@ -37,7 +37,7 @@ Fase B (executor):   T8 → T11 → T12                  T9 (local; T8)   T10 (o
 Fase C (UI):         T13 → T14 → T15                 (T12 + T11)
 Fase D (automação):  T16 → T17 → T18 → T19           (T9, T11, T12, T15)
 Fase E (resto):      T20 → T22 → T23 → T21 → T24 → T25 → T26 → T27 → T28 → T29
-Dependência:         T30 (versionName segue a tag app-vX.Y.Z; fora da bancada; necessária antes da 1ª tag, não antes do baseline)
+Dependência:         T30 (versionName/versionCode seguem a tag app-vX.Y.Z, a partir de app-v0.1.0; fora da bancada; necessária antes da 1ª tag, não antes do baseline)
 ```
 Ordem prática: **T1 → T2 → T3 → T4 → T5 → T6 → T8 → T11 → T12 → T7 → T9 → T10 → T13 → T14 → T15 → T16 → T17 → T18 → T19 →
 T20 → T22 → T23 → T21 → T24 → T25 → T26 → T27 → T28 → T29** (T30 quando a 1ª tag de app for planejada). `[P]` = só JVM, pode andar em paralelo com a fase B/C (o aparelho
@@ -235,9 +235,14 @@ e o emulador são o gargalo: instrumentados serializam). T19 é o marco: **sem b
 ## Dependência (fora da bancada)
 
 ### BNC-T30 — `versionName` segue a tag `app-vX.Y.Z` *(D1; registrada aqui, não implementada neste PR)*
-- **What**: definir e implementar como o `versionName`/`versionCode` do app passam a acompanhar a tag de release (hoje fixos em `1.0.0`/`1` em `app/build.gradle.kts`):
-  de onde vem o número (arquivo de versão, propriedade do Gradle ou derivado da tag), regra do `versionCode` monótono e a conferência de que o APK testado tem o `versionName` do rótulo.
+- **What**: fazer o `versionName`/`versionCode` do app acompanharem a tag de release (hoje fixos em `1.0.0`/`1` em `app/build.gradle.kts`). **Decidido pelo Yan (2026-10-28): versionamento
+  semântico começando em `app-v0.1.0`.** Consequências a tratar: (1) a primeira tag **rebaixa** o `versionName` de `1.0.0` para `0.1.0` — o nome é só rótulo, mas quem tem o app com `1.0.0`
+  (ex.: a `release/v1`, se chegar a sair) vê o nome "voltar" numa atualização; (2) o `versionCode` **nunca pode diminuir** (o Android recusa instalar por cima com código menor, `INSTALL_FAILED_VERSION_DOWNGRADE`,
+  e a Play recusa o upload), então ele não pode acompanhar o `versionName` por baixo. **Regra proposta**: `versionCode = MAJOR × 1 000 000 + MINOR × 1 000 + PATCH` (MINOR e PATCH < 1000), calculada
+  da tag pelo Gradle: `0.1.0` → `1000` (> `1` de hoje), `0.2.0` → `2000`, `1.0.0` → `1 000 000`; a conferir contra o teto de `versionCode` da Play na hora de implementar. O `bancada-atestado.py`
+  e o procedimento pré-tag recusam tag cujo código não supere o da anterior.
   Pode virar spec própria; a bancada só consome o resultado.
-- **Done when**: o APK de debug/release de um commit candidato informa `versionName` = rótulo (`vX.Y.Z` sem o prefixo `app-`), e `bancada-atestado.py` aceita o par; `versionCode` nunca diminui entre tags.
-- **Depends on**: decisão do Yan sobre o esquema de numeração (semântico, a partir de qual número). **Requirement**: BAU-11. **Gate**: `build` + teste do script. **Commit**: `build: versionName segue a tag de release`.
+- **Done when**: o APK de debug/release de um commit candidato informa `versionName` = rótulo (`X.Y.Z`, sem o prefixo `app-v`) e o `versionCode` da regra; teste do cálculo (`0.1.0` → 1000, `0.1.1` → 1001, `1.0.0` → 1 000 000, tag fora do padrão recusada);
+  `bancada-atestado.py` aceita o par; o `adb install -r` de um APK da primeira tag por cima do atual (código 1) funciona sem `-d`.
+- **Depends on**: nenhuma decisão pendente. **Requirement**: BAU-11. **Gate**: `build` + teste do script. **Commit**: `build: versionName segue a tag de release`.
 
