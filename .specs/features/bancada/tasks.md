@@ -1,7 +1,7 @@
 # Bancada de modelos — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md`
-**Status**: Draft com as decisões do Yan de 2026-10-28 (D1–D5; D6 aberta). **Em implementação** desde 2026-10-28 (PR 1 do núcleo: T2–T8, T11, T12; PR 2 da interface: T13–T15). T1, T9 e T10 (fatos das APIs, opções e métricas nos motores) e as fases D e E ainda não começaram. **Fora da v1**: só `main`, release seguinte.
+**Status**: Draft com as decisões do Yan de 2026-10-28 (D1–D5; D6 aberta). **Em implementação** desde 2026-10-28 (PR 1 do núcleo: T2–T8, T11, T12; PR 2 da interface: T13–T15). T1, T9 e T10 (fatos das APIs, opções e métricas nos motores) e as fases D e E ainda não começaram: sem elas a interface roda, mas o resultado grava as opções pedidas como ignoradas. **Fora da v1**: só `main`, release seguinte.
 
 > **Para o agente executor**: leia `spec.md` + `design.md` + este arquivo e `.specs/codebase/TESTING.md`. Uma task por vez,
 > na ordem prática abaixo, **testes primeiro**, gate verde antes de avançar.
@@ -146,6 +146,7 @@ e o emulador são o gargalo: instrumentados serializam). T19 é o marco: **sem b
 ## Fase C — UI
 
 ### BNC-T13 — Faixa de sub-abas no Testar (Rápido preservado)
+- **Status**: Concluída (PR 2, `equipe/bancada-p1-ui`, 2026-10-28). `ReasoningTestAreaTest`, `ReasoningPanelTest` e `OpenAiPanelTest` passaram sem edição; `BancadaTestAreaTest` cobre a faixa, o Rápido preservado e os motivos. Goldens: 30 capturas `config-raciocinio*` (15 rotas × 2 temas) aprovadas depois de ver claro e escuro, o resto restaurado (ver a lição).
 - **What**: `BancadaSubAbas` + `BancadaTestArea` no grupo "Testar" do `ReasoningPanel`; "Rápido" = `ReasoningTestArea` de hoje; demais sub-abas listam os testes do corpus,
   desabilitadas com motivo (sem modelo/credencial, capacidade ausente, janela menor).
 - **Done when**: `ReasoningTestAreaTest`, `ReasoningPanelTest` e `OpenAiPanelTest` passam (ajuste de asserção só com o motivo registrado em `licoes/`); teste novo cobre a faixa e os motivos; `pool telas` +
@@ -153,6 +154,7 @@ e o emulador são o gargalo: instrumentados serializam). T19 é o marco: **sem b
 - **Depends on**: T7, T11, T12. **Requirement**: BNC-01, BNC-03, BNC-05, BNC-06. **Gate**: `full`. **Commit**: `feat(bancada): sub-abas na área Testar`.
 
 ### BNC-T14 — Sub-aba de teste: rodar, progresso, resultado, histórico e custo
+- **Status**: Concluída (PR 2, 2026-10-28). Instrumentado com motor falso: rodar → nota → histórico; variação só entre chaves iguais; incompleta marcada e fora da comparação; aviso de custo antes de qualquer chamada online; Parar cancela o fluxo do motor; sem preço informado nenhum valor em dinheiro aparece.
 - **What**: botão Rodar/Parar, progresso, cartão do último resultado, histórico (últimas 10, variação sobre a anterior **comparável**), detalhe por caso, diálogo de custo/aviso
   para origem online (e perfil reduzido no login por assinatura).
 - **Done when**: instrumentado com motor falso: rodar atualiza progresso e nota; histórico mostra variação só entre chaves iguais; execução `incompleta` aparece marcada e não compara;
@@ -160,6 +162,7 @@ e o emulador são o gargalo: instrumentados serializam). T19 é o marco: **sem b
 - **Depends on**: T13. **Requirement**: BNC-02, BHS-05, BHS-06, BON-01, BON-02. **Gate**: `full`. **Commit**: `feat(bancada): resultado, histórico e aviso de custo por teste`.
 
 ### BNC-T15 — Rodar a bateria, exportar e textos
+- **Status**: Concluída (PR 2, 2026-10-28). Bateria percorre os testes aplicáveis e cancela mantendo parciais; JSON exportado valida contra o esquema e não leva a chave de mentira; reabrir marca a execução interrompida como `incompleta`; Docs e `website/_fonte/doc.json` atualizados.
 - **What**: "Rodar a bateria" com estimativa de duração, exportar JSON pelo `CreateDocument`, textos em `tr`/EN/ES, seção na Docs (e `website/_fonte/doc.json` regerado) com o que cada teste mede.
 - **Done when**: instrumentado: bateria com motor falso percorre todos os testes aplicáveis e cancela mantendo parciais; o JSON exportado valida contra o esquema; `TranslationsTest`
   e `DocsSiteExportTest` verdes (`KEYFLOW_REGERAR_DOC_SITE=1` se preciso); o teste reabrindo o app marca a execução interrompida como `incompleta`.

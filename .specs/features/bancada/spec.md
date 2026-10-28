@@ -216,12 +216,12 @@ Status: Pending → In Design → In Tasks → Implementing → Verified. As tas
 
 | Requirement | Story | Task | Status |
 | ----------- | ----- | ---- | ------ |
-| BNC-01 | P1-A | BNC-T13 | In Tasks |
-| BNC-02 | P1-A | BNC-T14 | In Tasks |
-| BNC-03 | P1-A | BNC-T13 | In Tasks |
-| BNC-04 | P1-A | BNC-T15 | In Tasks |
-| BNC-05 | P1-A | BNC-T13 | In Tasks |
-| BNC-06 | P1-A | BNC-T13, BNC-T15 | In Tasks |
+| BNC-01 | P1-A | BNC-T13 | Verified |
+| BNC-02 | P1-A | BNC-T14 | Verified |
+| BNC-03 | P1-A | BNC-T13 | Verified |
+| BNC-04 | P1-A | BNC-T15 | Verified |
+| BNC-05 | P1-A | BNC-T13 | Verified |
+| BNC-06 | P1-A | BNC-T13, BNC-T15 | Implementing |
 | BNC-07 | P1-A | BNC-T22 | In Tasks |
 | BNC-08 | P1-A | BNC-T20, BNC-T24 | In Tasks |
 | BCP-01 | P1-B | BNC-T2 | Verified |
@@ -241,7 +241,7 @@ Status: Pending → In Design → In Tasks → Implementing → Verified. As tas
 | BEX-07 | P1-C | BNC-T11 | Verified |
 | BEX-08 | P1-C | BNC-T16 | In Tasks |
 | BEX-09 | P1-C | BNC-T11, BNC-T20, BNC-T24 | Implementing |
-| BEX-10 | P1-C | BNC-T12, BNC-T15 | Implementing |
+| BEX-10 | P1-C | BNC-T12, BNC-T15 | Verified |
 | BPT-01 | P1-D | BNC-T3 | Verified |
 | BPT-02 | P1-D | BNC-T4 | Verified |
 | BPT-03 | P1-D | BNC-T4 | Verified |
@@ -256,14 +256,14 @@ Status: Pending → In Design → In Tasks → Implementing → Verified. As tas
 | BHS-01 | P1-E | BNC-T6, BNC-T12 | Verified |
 | BHS-02 | P1-E | BNC-T6 | Verified |
 | BHS-03 | P1-E | BNC-T12 | Verified |
-| BHS-04 | P1-E | BNC-T6, BNC-T15 | Implementing |
-| BHS-05 | P1-E | BNC-T6, BNC-T14 | Implementing |
-| BHS-06 | P1-E | BNC-T12, BNC-T14 | Implementing |
-| BON-01 | P1-F | BNC-T14 | In Tasks |
-| BON-02 | P1-F | BNC-T14 | In Tasks |
+| BHS-04 | P1-E | BNC-T6, BNC-T15 | Verified |
+| BHS-05 | P1-E | BNC-T6, BNC-T14 | Verified |
+| BHS-06 | P1-E | BNC-T12, BNC-T14 | Verified |
+| BON-01 | P1-F | BNC-T14 | Verified |
+| BON-02 | P1-F | BNC-T14 | Verified |
 | BON-03 | P1-F | BNC-T6, BNC-T10 | Implementing |
 | BON-04 | P1-F | BNC-T22 | In Tasks |
-| BON-05 | P1-F | BNC-T11 | Implementing |
+| BON-05 | P1-F | BNC-T11 | Verified |
 | BAU-01 | P1-G | BNC-T16 | In Tasks |
 | BAU-02 | P1-G | BNC-T17 | In Tasks |
 | BAU-03 | P1-G | BNC-T17 | In Tasks |
