@@ -92,7 +92,7 @@ class AnthropicReasoningEngine(
                 return@channelFlow
             }
 
-            val outcome = attemptOnce(call)
+            val outcome = attemptOnce(call, request.image != null)
             if (outcome !is Outcome.Retry) return@channelFlow
             attempt++
             if (attempt >= MAX_ATTEMPTS) {
@@ -108,7 +108,7 @@ class AnthropicReasoningEngine(
         class Retry(val error: ReasoningEvent.Error) : Outcome
     }
 
-    private suspend fun ProducerScope<ReasoningEvent>.attemptOnce(call: Call): Outcome {
+    private suspend fun ProducerScope<ReasoningEvent>.attemptOnce(call: Call, image: Boolean): Outcome {
         var finished = false
         val watcher = launch(start = CoroutineStart.UNDISPATCHED) {
             try {
@@ -119,14 +119,14 @@ class AnthropicReasoningEngine(
             }
         }
         try {
-            return withContext(Dispatchers.IO) { execute(call) { send(it) } }
+            return withContext(Dispatchers.IO) { execute(call, image) { send(it) } }
         } finally {
             finished = true
             watcher.cancel()
         }
     }
 
-    private suspend fun execute(call: Call, send: suspend (ReasoningEvent) -> Unit): Outcome {
+    private suspend fun execute(call: Call, image: Boolean, send: suspend (ReasoningEvent) -> Unit): Outcome {
         val response = try {
             call.execute()
         } catch (e: IOException) {
@@ -146,7 +146,7 @@ class AnthropicReasoningEngine(
                 return Outcome.Finished
             }
             try {
-                readStream(r.body!!.source(), send)
+                readStream(r.body!!.source(), image, send)
             } catch (e: IOException) {
                 if (call.isCanceled()) throw CancellationException("cancelado")
                 send(ReasoningEvent.Error(ReasoningError.NETWORK, "o fluxo SSE da Anthropic foi interrompido"))
@@ -155,7 +155,7 @@ class AnthropicReasoningEngine(
         return Outcome.Finished
     }
 
-    private suspend fun readStream(source: BufferedSource, send: suspend (ReasoningEvent) -> Unit) {
+    private suspend fun readStream(source: BufferedSource, image: Boolean, send: suspend (ReasoningEvent) -> Unit) {
         val data = StringBuilder()
         var eventName: String? = null
         var completed = false
@@ -165,7 +165,7 @@ class AnthropicReasoningEngine(
             when {
                 line.isEmpty() -> {
                     if (data.isNotEmpty()) {
-                        val terminal = handleEvent(eventName, data.toString(), send)
+                        val terminal = handleEvent(eventName, data.toString(), image, send)
                         if (terminal) completed = true
                         data.clear()
                         eventName = null
@@ -180,16 +180,18 @@ class AnthropicReasoningEngine(
         }
 
         if (data.isNotEmpty()) {
-            val terminal = handleEvent(eventName, data.toString(), send)
+            val terminal = handleEvent(eventName, data.toString(), image, send)
             if (terminal) completed = true
         }
 
         if (!completed) {
-            send(ReasoningEvent.Done)
+            // A visão só entrega o recorte transcrito quando o provedor confirma o fim.
+            send(if (image) ReasoningEvent.Error(ReasoningError.NETWORK, "o fluxo da imagem terminou sem message_stop")
+                else ReasoningEvent.Done)
         }
     }
 
-    private suspend fun handleEvent(eventName: String?, data: String, send: suspend (ReasoningEvent) -> Unit): Boolean {
+    private suspend fun handleEvent(eventName: String?, data: String, image: Boolean, send: suspend (ReasoningEvent) -> Unit): Boolean {
         val json = try {
             JSONObject(data)
         } catch (e: JSONException) {
@@ -203,6 +205,13 @@ class AnthropicReasoningEngine(
                 val text = delta?.optString("text").orEmpty()
                 if (text.isNotEmpty()) {
                     send(ReasoningEvent.Delta(text))
+                }
+            }
+            "message_delta" -> {
+                val reason = json.optJSONObject("delta")?.optString("stop_reason").orEmpty()
+                if (image && reason.isNotEmpty() && reason != "null" && reason !in setOf("end_turn", "stop_sequence")) {
+                    send(ReasoningEvent.Error(ReasoningError.ENGINE, "resposta da imagem incompleta"))
+                    return true
                 }
             }
             "message_stop" -> {

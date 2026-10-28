@@ -112,6 +112,28 @@ class VisionModelEngineTest {
         }
     }
 
+    @Test fun `provedores não entregam imagem com fluxo interrompido ou limite de geração`() = runBlocking {
+        val server = MockWebServer(); server.start()
+        try {
+            val auth = object : AuthorizationProvider { override suspend fun headers(provider: ProviderId) = emptyMap<String, String>() }
+            val base = server.url("/v1").toString().trimEnd('/')
+            val anthropic = CloudVisionEngine(AnthropicReasoningEngine(auth, OkHttpClient(), "modelo", base))
+            val google = CloudVisionEngine(GoogleReasoningEngine(auth, OkHttpClient(), "gemini-teste", base))
+            val anthroDelta = "data: {\"type\":\"content_block_delta\",\"delta\":{\"text\":\"parcial\"}}\n\n"
+            val googleDelta = "data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"parcial\"}]}}]}\n\n"
+            for ((engine, body, kind) in listOf(
+                Triple(anthropic, anthroDelta, ReasoningError.NETWORK),
+                Triple(google, googleDelta, ReasoningError.NETWORK),
+                Triple(anthropic, anthroDelta + "data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"max_tokens\"}}\n\ndata: {\"type\":\"message_stop\"}\n\n", ReasoningError.ENGINE),
+                Triple(google, "data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"parcial\"}]},\"finishReason\":\"MAX_TOKENS\"}]}\n\n", ReasoningError.ENGINE),
+            )) {
+                server.enqueue(MockResponse().setHeader("Content-Type", "text/event-stream").setBody(body))
+                assertThat(withTimeout(5_000) { engine.read(image) }).isEqualTo(VisionResult.Failed(kind))
+                server.takeRequest()
+            }
+        } finally { server.shutdown() }
+    }
+
     @Test fun `custom cancela o socket ao parar e mapeia erro sem expor corpo`() = runBlocking {
         val server = MockWebServer(); server.start()
         try {

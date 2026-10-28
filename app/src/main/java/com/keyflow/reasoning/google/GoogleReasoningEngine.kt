@@ -88,7 +88,7 @@ class GoogleReasoningEngine(
                 return@channelFlow
             }
 
-            val outcome = attemptOnce(call)
+            val outcome = attemptOnce(call, request.image != null)
             if (outcome !is Outcome.Retry) return@channelFlow
             attempt++
             if (attempt >= MAX_ATTEMPTS) {
@@ -104,7 +104,7 @@ class GoogleReasoningEngine(
         class Retry(val error: ReasoningEvent.Error) : Outcome
     }
 
-    private suspend fun ProducerScope<ReasoningEvent>.attemptOnce(call: Call): Outcome {
+    private suspend fun ProducerScope<ReasoningEvent>.attemptOnce(call: Call, image: Boolean): Outcome {
         var finished = false
         val watcher = launch(start = CoroutineStart.UNDISPATCHED) {
             try {
@@ -115,14 +115,14 @@ class GoogleReasoningEngine(
             }
         }
         try {
-            return withContext(Dispatchers.IO) { execute(call) { send(it) } }
+            return withContext(Dispatchers.IO) { execute(call, image) { send(it) } }
         } finally {
             finished = true
             watcher.cancel()
         }
     }
 
-    private suspend fun execute(call: Call, send: suspend (ReasoningEvent) -> Unit): Outcome {
+    private suspend fun execute(call: Call, image: Boolean, send: suspend (ReasoningEvent) -> Unit): Outcome {
         val response = try {
             call.execute()
         } catch (e: IOException) {
@@ -140,7 +140,7 @@ class GoogleReasoningEngine(
                 return Outcome.Finished
             }
             try {
-                readStream(r.body!!.source(), send)
+                readStream(r.body!!.source(), image, send)
             } catch (e: IOException) {
                 if (call.isCanceled()) throw CancellationException("cancelado")
                 send(ReasoningEvent.Error(ReasoningError.NETWORK, "o fluxo SSE do Gemini foi interrompido"))
@@ -149,7 +149,7 @@ class GoogleReasoningEngine(
         return Outcome.Finished
     }
 
-    private suspend fun readStream(source: BufferedSource, send: suspend (ReasoningEvent) -> Unit) {
+    private suspend fun readStream(source: BufferedSource, image: Boolean, send: suspend (ReasoningEvent) -> Unit) {
         val data = StringBuilder()
         var completed = false
 
@@ -158,7 +158,7 @@ class GoogleReasoningEngine(
             when {
                 line.isEmpty() -> {
                     if (data.isNotEmpty()) {
-                        val terminal = handleData(data.toString(), send)
+                        val terminal = handleData(data.toString(), image, send)
                         if (terminal) completed = true
                         data.clear()
                     }
@@ -171,16 +171,17 @@ class GoogleReasoningEngine(
         }
 
         if (data.isNotEmpty()) {
-            val terminal = handleData(data.toString(), send)
+            val terminal = handleData(data.toString(), image, send)
             if (terminal) completed = true
         }
 
         if (!completed) {
-            send(ReasoningEvent.Done)
+            send(if (image) ReasoningEvent.Error(ReasoningError.NETWORK, "o fluxo da imagem terminou sem confirmação")
+                else ReasoningEvent.Done)
         }
     }
 
-    private suspend fun handleData(data: String, send: suspend (ReasoningEvent) -> Unit): Boolean {
+    private suspend fun handleData(data: String, image: Boolean, send: suspend (ReasoningEvent) -> Unit): Boolean {
         if (data.trim() == "[DONE]") {
             send(ReasoningEvent.Done)
             return true
@@ -211,6 +212,10 @@ class GoogleReasoningEngine(
         }
 
         val finishReason = firstCandidate.optString("finishReason")
+        if (image && finishReason.isNotEmpty() && finishReason != "null" && finishReason != "STOP") {
+            send(ReasoningEvent.Error(ReasoningError.ENGINE, "resposta da imagem incompleta"))
+            return true
+        }
         if (finishReason == "STOP" || finishReason == "MAX_TOKENS") {
             send(ReasoningEvent.Done)
             return true
