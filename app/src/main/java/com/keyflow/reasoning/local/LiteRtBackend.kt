@@ -61,7 +61,7 @@ internal class LiteRtBackend(private val cacheDir: String?, private val opensThi
 
     override fun generate(request: ReasoningRequest, onDelta: (String) -> Unit) {
         val active = checkNotNull(engine) { "o motor não está carregado" }
-        cancelled = false
+        if (cancelled) return
         val config = LiteRtConfigs.conversation(request.system, opensThink, textFormat)
         val stripper = ThoughtStripper(opensThink)
         val conversation = active.createConversation(config)
@@ -85,9 +85,11 @@ internal class LiteRtBackend(private val cacheDir: String?, private val opensThi
                     }
                 },
             )
+            if (cancelled) runCatching { conversation.cancelProcess() }
             // Espera o fim; se pedirem cancelamento e a biblioteca não avisar, não fica preso para sempre.
             while (!finished.await(WAIT_SLICE_MS, TimeUnit.MILLISECONDS)) {
                 if (cancelled) {
+                    runCatching { conversation.cancelProcess() }
                     finished.await(CANCEL_GRACE_MS, TimeUnit.MILLISECONDS)
                     break
                 }
@@ -102,6 +104,8 @@ internal class LiteRtBackend(private val cacheDir: String?, private val opensThi
             runCatching { conversation.close() }
         }
     }
+
+    override fun prepareGeneration() { cancelled = false }
 
     override fun cancel() {
         cancelled = true

@@ -105,7 +105,8 @@ fun VisaoPanel(
                     remote = activeSettings.visionSource != VisionSource.LOCAL,
                     requestKey = listOf(activeSettings.visionSource, activeSettings.visionLocalModelId,
                         activeSettings.visionOpenAiModel, activeSettings.visionAnthropicModel, activeSettings.visionGoogleModel,
-                        activeSettings.visionCustomEndpoint, activeSettings.visionCustomModel, selectedConnection),
+                        activeSettings.visionCustomEndpoint, activeSettings.visionCustomModel,
+                        activeSettings.visionCustomHeaderName, activeSettings.visionCustomHeaderValue, selectedConnection, availability),
                 )
             }
         }

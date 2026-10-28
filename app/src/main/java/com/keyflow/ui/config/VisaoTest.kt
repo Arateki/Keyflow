@@ -1,5 +1,9 @@
 package com.keyflow.ui.config
 
+import com.keyflow.vision.VisionResult
+import com.keyflow.reasoning.ReasoningError
+import com.keyflow.reasoning.UnavailableReason
+
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -71,7 +75,7 @@ enum class VisionTestUnavailable {
     /** O modelo escolhido não está (mais) instalado. */
     MODEL_NOT_INSTALLED,
 
-    /** O modelo ou a origem não tem teste ainda: o Gemma 4 e os provedores dependem do motor de visão (VC-T15). */
+    /** Origem não habilitada (Créditos). */
     NOT_YET,
     NOT_CONNECTED,
     NO_MODEL_CHOSEN,
@@ -84,8 +88,8 @@ sealed interface VisionTestAvailability {
 }
 
 /**
- * O Testar da Visão lê uma imagem pequena e nossa com o **OCR local instalado e escolhido** (o único motor de visão que existe hoje). O Gemma 4
- * e os provedores/Custom só ganham teste com o motor de visão (VC-T15); até lá o botão fica desligado com o motivo escrito, como no Raciocínio.
+ * O Testar usa a imagem nossa com OCR, Gemma ou o provedor escolhido. Local exige instalação; nuvem exige conexão.
+ * Os modelos de nuvem vêm da lista curada e o Custom exige endpoint e modelo.
  */
 fun visionTestAvailability(settings: Settings, models: LocalModelsUi, connected: Boolean = false): VisionTestAvailability {
     if (settings.visionSource == VisionSource.CREDITS) return VisionTestAvailability.Unavailable(VisionTestUnavailable.NOT_YET)
@@ -182,18 +186,18 @@ object VisionTestMessages {
         VisionTestError.UNAVAILABLE -> tr("O modelo de leitura não está disponível neste aparelho — baixe de novo na lista acima.")
         VisionTestError.OUT_OF_MEMORY -> tr("Memória insuficiente para ler a imagem — feche outros apps e tente de novo.")
         VisionTestError.FAILED -> tr("O modelo falhou ao ler a imagem de teste.")
-        VisionTestError.UNAUTHORIZED -> ReasoningTestMessages.error(com.keyflow.reasoning.ReasoningError.UNAUTHORIZED)
-        VisionTestError.NETWORK -> ReasoningTestMessages.error(com.keyflow.reasoning.ReasoningError.NETWORK)
-        VisionTestError.RATE_LIMIT -> ReasoningTestMessages.error(com.keyflow.reasoning.ReasoningError.RATE_LIMIT)
-        VisionTestError.NOT_ELIGIBLE -> ReasoningTestMessages.error(com.keyflow.reasoning.ReasoningError.NOT_ELIGIBLE)
+        VisionTestError.UNAUTHORIZED -> ReasoningTestMessages.error(ReasoningError.UNAUTHORIZED)
+        VisionTestError.NETWORK -> ReasoningTestMessages.error(ReasoningError.NETWORK)
+        VisionTestError.RATE_LIMIT -> ReasoningTestMessages.error(ReasoningError.RATE_LIMIT)
+        VisionTestError.NOT_ELIGIBLE -> ReasoningTestMessages.error(ReasoningError.NOT_ELIGIBLE)
         VisionTestError.INTERRUPTED -> tr("O motor de leitura foi interrompido — tente de novo.")
     }
 
     fun unavailable(reason: VisionTestUnavailable): String = when (reason) {
         VisionTestUnavailable.NO_LOCAL_MODEL -> tr("Baixe e selecione um modelo para testar.")
         VisionTestUnavailable.MODEL_NOT_INSTALLED -> tr("O modelo selecionado não está instalado — baixe de novo.")
-        VisionTestUnavailable.NOT_CONNECTED -> ReasoningTestMessages.unavailable(com.keyflow.reasoning.UnavailableReason.NOT_CONNECTED)
-        VisionTestUnavailable.NO_MODEL_CHOSEN -> ReasoningTestMessages.unavailable(com.keyflow.reasoning.UnavailableReason.NO_MODEL_CHOSEN)
+        VisionTestUnavailable.NOT_CONNECTED -> ReasoningTestMessages.unavailable(UnavailableReason.NOT_CONNECTED)
+        VisionTestUnavailable.NO_MODEL_CHOSEN -> ReasoningTestMessages.unavailable(UnavailableReason.NO_MODEL_CHOSEN)
         VisionTestUnavailable.NOT_YET -> tr("Este modelo ainda não pode ser testado aqui — o teste chega junto com a captura da tela.")
     }
 }
@@ -216,20 +220,20 @@ internal fun visionTestStateFor(result: OcrResult, elapsedMs: Long): VisionTestS
 }
 
 /** A causa do motor fica legível sem apresentar corpo HTTP, imagem ou exceção. */
-internal fun visionTestStateFor(result: com.keyflow.vision.VisionResult, elapsedMs: Long): VisionTestState {
+internal fun visionTestStateFor(result: VisionResult, elapsedMs: Long): VisionTestState {
     val error = when (result) {
-        is com.keyflow.vision.VisionResult.Text -> return VisionTestState(text = result.text, durationMs = elapsedMs)
-        com.keyflow.vision.VisionResult.Empty -> VisionTestError.EMPTY
-        com.keyflow.vision.VisionResult.Unavailable -> VisionTestError.UNAVAILABLE
-        is com.keyflow.vision.VisionResult.Failed -> when (result.kind) {
-            com.keyflow.reasoning.ReasoningError.OOM -> VisionTestError.OUT_OF_MEMORY
-            com.keyflow.reasoning.ReasoningError.MODEL_MISSING -> VisionTestError.UNAVAILABLE
-            com.keyflow.reasoning.ReasoningError.LOCAL -> VisionTestError.INTERRUPTED
-            com.keyflow.reasoning.ReasoningError.UNAUTHORIZED -> VisionTestError.UNAUTHORIZED
-            com.keyflow.reasoning.ReasoningError.NETWORK -> VisionTestError.NETWORK
-            com.keyflow.reasoning.ReasoningError.RATE_LIMIT -> VisionTestError.RATE_LIMIT
-            com.keyflow.reasoning.ReasoningError.NOT_ELIGIBLE -> VisionTestError.NOT_ELIGIBLE
-            com.keyflow.reasoning.ReasoningError.ENGINE -> VisionTestError.FAILED
+        is VisionResult.Text -> return VisionTestState(text = result.text, durationMs = elapsedMs)
+        VisionResult.Empty -> VisionTestError.EMPTY
+        VisionResult.Unavailable -> VisionTestError.UNAVAILABLE
+        is VisionResult.Failed -> when (result.kind) {
+            ReasoningError.OOM -> VisionTestError.OUT_OF_MEMORY
+            ReasoningError.MODEL_MISSING -> VisionTestError.UNAVAILABLE
+            ReasoningError.LOCAL -> VisionTestError.INTERRUPTED
+            ReasoningError.UNAUTHORIZED -> VisionTestError.UNAUTHORIZED
+            ReasoningError.NETWORK -> VisionTestError.NETWORK
+            ReasoningError.RATE_LIMIT -> VisionTestError.RATE_LIMIT
+            ReasoningError.NOT_ELIGIBLE -> VisionTestError.NOT_ELIGIBLE
+            ReasoningError.ENGINE -> VisionTestError.FAILED
         }
     }
     return VisionTestState(durationMs = elapsedMs, error = error)
@@ -247,7 +251,7 @@ fun VisaoTestArea(
     modifier: Modifier = Modifier,
     initialState: VisionTestState = VisionTestState(),
     clock: () -> Long = { System.nanoTime() / 1_000_000 },
-    modelTester: (suspend () -> com.keyflow.vision.VisionResult)? = null,
+    modelTester: (suspend () -> VisionResult)? = null,
     remote: Boolean = false,
     requestKey: Any? = null,
 ) {

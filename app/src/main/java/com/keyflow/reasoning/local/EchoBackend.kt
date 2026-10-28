@@ -27,13 +27,14 @@ internal class EchoBackend : LlmBackend {
     }
 
     override fun generate(request: ReasoningRequest, onDelta: (String) -> Unit) {
-        cancelled = false
         request.user.split(" ").filter { it.isNotEmpty() }.forEachIndexed { index, word ->
             if (cancelled) return
             onDelta(if (index == 0) word else " $word")
             Thread.sleep(ECHO_DELAY_MS)
         }
     }
+
+    override fun prepareGeneration() { cancelled = false }
 
     override fun cancel() {
         cancelled = true

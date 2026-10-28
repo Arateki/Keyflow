@@ -4,7 +4,7 @@ import kotlinx.coroutines.flow.Flow
 import okio.ByteString.Companion.toByteString
 
 /**
- * O que se pede a um modelo de linguagem. Texto → texto: sem histórico de conversa (YAGNI — o Testar é uma frase).
+ * O que se pede a um modelo de linguagem: texto e uma imagem opcional, sem histórico de conversa.
  * [system] é a instrução de comportamento; [user] é o pedido.
  */
 data class ReasoningRequest(val system: String? = null, val user: String, val image: ReasoningImage? = null)

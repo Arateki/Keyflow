@@ -122,7 +122,7 @@ internal class ReasoningServiceCore(
         }
     }
 
-    /** Interrompe a geração em curso (RRUN-06). Sem geração em curso, não faz nada além de silenciar a próxima já enfileirada. */
+    /** Compatibilidade: cancela as gerações já entregues. O cliente de produção usa a sobrecarga por pedido. */
     fun cancel() {
         requests.values.forEach { it.cancel() }
     }
@@ -146,6 +146,7 @@ internal class ReasoningServiceCore(
         useToken++
         try {
             val active = ensureLoaded(model, listener)
+            active.prepareGeneration()
             if (!pending.start(active)) return
             active.generate(requestFor()) { text -> if (!pending.cancelled) listener.onDelta(text) }
             if (!pending.cancelled) listener.onDone()
@@ -233,7 +234,7 @@ internal class ReasoningServiceCore(
         }
     }
 
-    private fun failureKey(model: LlmModel) = "${model.modelId}|${model.version}|${model.backend.name}"
+    private fun failureKey(model: LlmModel) = "${model.modelId}|${model.version}|${model.backend.name}|${model.vision}"
 
     private fun unloadCurrent() {
         backend?.let { runCatching { it.unload() } }

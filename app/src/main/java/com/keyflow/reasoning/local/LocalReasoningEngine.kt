@@ -32,7 +32,7 @@ internal fun ReasoningErrorKind.toReasoningError(): ReasoningError = when (this)
  * O motor local no processo principal (RRUN-05/06/07): liga ao `:reasoning`, pede a geração e converte o callback do
  * AIDL num [Flow]. Sem rede em nenhum ponto do caminho.
  *
- * - **Cancelar o coletor** manda `cancel()` ao serviço — sem isso a geração cancelada seguiria ocupando o motor e a
+ * - **Cancelar o coletor** manda `cancelRequest(id)` ao serviço — sem isso a geração cancelada seguiria ocupando o motor e a
  *   próxima esperaria na fila.
  * - **Morte do processo** no meio (o SO matou por memória, crash nativo): quem gerava recebe `Error(LOCAL)` e a conexão
  *   é esquecida; o próximo uso liga de novo.
