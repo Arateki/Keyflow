@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -38,7 +39,9 @@ class CustomVisionTransport(
                 .put("image_url", JSONObject().put("url", it.dataUrl()))) }
             val body = JSONObject().put("model", model).put("stream", true)
                 .put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", content)))
-            val url = endpoint.trimEnd('/').let { if (it.endsWith("/chat/completions")) it else "$it/chat/completions" }
+            val original = endpoint.toHttpUrl()
+            val url = if (original.encodedPath.trimEnd('/').endsWith("/chat/completions")) original
+                else original.newBuilder().addPathSegments("chat/completions").build()
             client.newCall(Request.Builder().url(url).apply {
                 if (headerName.isNotBlank() && headerValue.isNotBlank()) header(headerName, headerValue)
             }.header("Accept", "text/event-stream").post(body.toString().toRequestBody("application/json".toMediaType())).build())

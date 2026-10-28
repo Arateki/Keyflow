@@ -68,11 +68,14 @@ class GoogleReasoningEngine(
         }
 
         val body = bodyOf(request).toRequestBody("application/json".toMediaType())
+        // Imagem só vai à origem escolhida: redirecionamentos não reenviam os pixels a outro host.
+        val transport = if (request.image == null) client else client.newBuilder()
+            .followRedirects(false).followSslRedirects(false).build()
         var attempt = 0
 
         while (true) {
             val call = try {
-                client.newCall(
+                transport.newCall(
                     Request.Builder()
                         .url("$apiBaseUrl/models/$encodedModel:streamGenerateContent?alt=sse")
                         .apply { headers.forEach { (name, value) -> header(name, value) } }

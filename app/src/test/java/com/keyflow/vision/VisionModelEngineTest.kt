@@ -126,4 +126,32 @@ class VisionModelEngineTest {
             withTimeout(5_000) { job.cancelAndJoin() }
         } finally { server.shutdown() }
     }
+    @Test fun `OOM do backend vira causa de memória sem entregar texto`() = runBlocking {
+        val fake = object : ReasoningEngine {
+            override fun generate(request: ReasoningRequest) = flow<ReasoningEvent> { throw OutOfMemoryError("simulado") }
+        }
+        assertThat(LocalVisionEngine(fake).read(image)).isEqualTo(VisionResult.Failed(ReasoningError.OOM))
+    }
+
+    @Test fun `redirecionamento não envia a imagem para outra origem`() = runBlocking {
+        val source = MockWebServer(); val other = MockWebServer(); source.start(); other.start()
+        try {
+            val auth = object : AuthorizationProvider { override suspend fun headers(provider: ProviderId) = emptyMap<String, String>() }
+            val http = OkHttpClient(); val base = source.url("/v1").toString().trimEnd('/')
+            val engines = listOf(
+                OpenAiReasoningEngine(auth, http, "modelo", base),
+                AnthropicReasoningEngine(auth, http, "modelo", base),
+                GoogleReasoningEngine(auth, http, "gemini-teste", base),
+                CustomVisionTransport(http, base, "modelo", "", ""),
+            )
+            for (engine in engines) {
+                source.enqueue(MockResponse().setResponseCode(307).setHeader("Location", other.url("/roubar")))
+                other.enqueue(MockResponse().setResponseCode(400))
+                assertThat(withTimeout(5_000) { CloudVisionEngine(engine).read(image) }).isInstanceOf(VisionResult.Failed::class.java)
+            }
+            assertThat(source.requestCount).isEqualTo(4)
+            assertThat(other.requestCount).isEqualTo(0)
+        } finally { source.shutdown(); other.shutdown() }
+    }
+
 }

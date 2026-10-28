@@ -33,7 +33,8 @@ class VisionModelTester(
                 }
             }
             when (val resolution = resolve(settings)) {
-                is VisionResolution.Unavailable -> VisionResult.Unavailable
+                is VisionResolution.Unavailable -> if (resolution.reason == com.keyflow.reasoning.UnavailableReason.NOT_CONNECTED)
+                    VisionResult.Failed(ReasoningError.UNAUTHORIZED) else VisionResult.Unavailable
                 is VisionResolution.Ready -> {
                     val bitmap = VisionTestImage.bitmap()
                     try { resolution.engine.read(VisionImage.encode(bitmap)) } finally { bitmap.recycle() }

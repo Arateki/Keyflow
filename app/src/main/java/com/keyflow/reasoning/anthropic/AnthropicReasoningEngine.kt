@@ -72,11 +72,14 @@ class AnthropicReasoningEngine(
         // Sem o corpo: é o texto do usuário (ditado, prompt), e o Log.d sai também no release.
         android.util.Log.d("AnthropicReasoning", "Outgoing model: $resolvedModel, isOAuth: $isOAuth, corpo: ${jsonBody.length} caracteres")
         val body = jsonBody.toRequestBody("application/json".toMediaType())
+        // Imagem só vai à origem escolhida: redirecionamentos não reenviam os pixels a outro host.
+        val transport = if (request.image == null) client else client.newBuilder()
+            .followRedirects(false).followSslRedirects(false).build()
         var attempt = 0
 
         while (true) {
             val call = try {
-                client.newCall(
+                transport.newCall(
                     Request.Builder()
                         .url("$apiBaseUrl/messages")
                         .apply { headers.forEach { (name, value) -> header(name, value) } }
