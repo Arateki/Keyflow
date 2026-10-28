@@ -14,6 +14,13 @@ import java.nio.LongBuffer
  *
  * [run] pode ser chamado de várias threads (a ORT permite), mas o OCR roda numa só.
  */
+/**
+ * Como abrir a sessão. Os padrões são os de menor RAM (sem arena nem plano de memória por forma): foram o ponto de partida do OCR, em que
+ * a forma muda a cada chamada. [cpuArena] liga o alocador em arena da ORT (reaproveita os buffers entre operações: mais rápido, mais RSS);
+ * [memoryPattern] liga o plano de memória por forma (só ajuda com forma fixa). A escolha do OCR vem da medição (STATE.md/licoes VC-T6).
+ */
+data class OnnxOptions(val threads: Int = 2, val cpuArena: Boolean = false, val memoryPattern: Boolean = false)
+
 interface OnnxSession : AutoCloseable {
     val inputNames: List<String>
     val outputNames: List<String>
@@ -22,8 +29,11 @@ interface OnnxSession : AutoCloseable {
     fun run(inputs: List<Tensor>): List<Tensor>
 
     companion object {
+        /** Abre [modelPath] na ORT do app com as [options] dadas. */
+        fun open(modelPath: String, options: OnnxOptions): OnnxSession = OrtOnnxSession.open(modelPath, options)
+
         /** Abre [modelPath] na ORT do app. [threads] = threads de cálculo intra-operador. */
-        fun open(modelPath: String, threads: Int = DEFAULT_THREADS): OnnxSession = OrtOnnxSession.open(modelPath, threads)
+        fun open(modelPath: String, threads: Int = DEFAULT_THREADS): OnnxSession = open(modelPath, OnnxOptions(threads))
 
         const val DEFAULT_THREADS = 2
     }
@@ -88,17 +98,15 @@ internal class OrtOnnxSession private constructor(
     }
 
     companion object {
-        fun open(modelPath: String, threads: Int): OnnxSession {
+        fun open(modelPath: String, o: OnnxOptions): OnnxSession {
             val env = OnnxRuntime.environment()
             var options: OrtSession.SessionOptions? = null
             try {
                 options = OrtSession.SessionOptions().apply {
-                    setIntraOpNumThreads(threads.coerceAtLeast(1))
+                    setIntraOpNumThreads(o.threads.coerceAtLeast(1))
                     setInterOpNumThreads(1)
-                    // Forma dinâmica (largura do texto, altura da faixa): o plano de memória por forma e a arena que só cresce só
-                    // custam RAM no :vision (medido na VC-T6).
-                    setMemoryPatternOptimization(false)
-                    setCPUArenaAllocator(false)
+                    setMemoryPatternOptimization(o.memoryPattern)
+                    setCPUArenaAllocator(o.cpuArena)
                 }
                 return OrtOnnxSession(env, options, env.createSession(modelPath, options))
             } catch (e: OrtException) {

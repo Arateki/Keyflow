@@ -2,6 +2,7 @@ package com.keyflow.vision.ocr
 
 import com.keyflow.onnx.FloatTensor
 import com.keyflow.onnx.OnnxException
+import com.keyflow.onnx.OnnxOptions
 import com.keyflow.onnx.OnnxRuntime
 import com.keyflow.onnx.OnnxSession
 import java.io.File
@@ -22,7 +23,7 @@ data class OcrModelFiles(val detector: String, val recognizer: String, val dicti
 class PaddleOcrEngine(
     private val files: OcrModelFiles,
     private val params: OcrParams = OcrParams(),
-    private val openSession: (path: String, threads: Int) -> OnnxSession = { path, threads -> OnnxSession.open(path, threads) },
+    private val openSession: (path: String, options: OnnxOptions) -> OnnxSession = { path, options -> OnnxSession.open(path, options) },
     private val runtimeAvailable: () -> Boolean = { OnnxRuntime.available },
     private val nowNanos: () -> Long = System::nanoTime,
 ) : OcrEngine {
@@ -76,8 +77,8 @@ class PaddleOcrEngine(
         close()
         try {
             decoder = CtcDecoder.fromDictionary(File(files.dictionary).readText(Charsets.UTF_8))
-            detector = openSession(files.detector, params.threads)
-            recognizer = openSession(files.recognizer, params.threads)
+            detector = openSession(files.detector, params.onnxOptions)
+            recognizer = openSession(files.recognizer, params.onnxOptions)
         } catch (e: Throwable) {
             close()
             throw e

@@ -27,8 +27,8 @@ import org.junit.runner.RunWith
  * (tag `OcrMeasure`). Não afirma nada além de rodar: é a fonte dos números do STATE.md, não um portão.
  *
  * Fases: (A) normalização do detector; (B) limiar de caixa x `unclip`; (C) normalização do reconhecedor e descarte por pontuação;
- * (D) CER por estilo; (E) tempo de tela cheia / ¼ de tela / 1080x2400 e threads; (F) RAM do `:vision`; (G) o plano B (`ocrAltDir=<pasta>`,
- * o par do deepghs), (H) capturas reais (`ocrRealDir=<pasta com .png e .txt>`).
+ * (D) CER por estilo; (E) tempo de tela cheia / ¼ de tela / 1080x2400, threads, arena e lote; (F) RAM do `:vision`; (G) o plano B (`ocrAltDir=<pasta>`
+ * ou baixado, o par do deepghs, uma avaliação), (H) capturas reais (`ocrRealDir=<pasta com .png e .txt>`).
  *
  * Para rodar num aparelho real (A32, tablet, Vaio): `STATE.md` › "VC-T6" (`installDebug installDebugAndroidTest` e `am instrument -w -e class
  * com.keyflow.vision.ocr.OcrMeasurementTest …` pelo adb do aparelho — nunca `connectedAndroidTest`).
@@ -52,7 +52,7 @@ class OcrMeasurementTest {
 
     /** Detector e reconhecedor abertos UMA vez; os mapas do detector guardados por normalização para não refazer a inferência. */
     private inner class Bench(val name: String, val files: OcrModelFiles, val corpus: List<OcrTestSupport.Sample>, threads: Int) : AutoCloseable {
-        val sessions = OcrTestSupport.SharedSessions(files, threads)
+        val sessions = OcrTestSupport.SharedSessions(files, com.keyflow.onnx.OnnxOptions(threads, cpuArena = true))
         private val maps = HashMap<String, List<List<Pair<Strip, FloatArray>>>>()
 
         fun engine(params: OcrParams) = PaddleOcrEngine(files, params, openSession = sessions.opener())
@@ -99,7 +99,7 @@ class OcrMeasurementTest {
         log("(B) limiar de caixa x unclip (detector ${bestDet.name})")
         var best = OcrParams(detNormalization = bestDet)
         var bestEval: Eval? = null
-        for (box in listOf(0.5f, 0.6f, 0.7f)) for (unclip in listOf(1.5f, 1.8f, 2.0f)) {
+        for (box in listOf(0.5f, 0.6f)) for (unclip in listOf(1.5f, 2.0f)) {
             val p = OcrParams(detNormalization = bestDet, boxThreshold = box, unclipRatio = unclip)
             val e = bench.evaluate("caixa $box unclip $unclip", p).also(bench::logEval)
             if (bestEval == null || e.mean < bestEval.mean - 1e-9) { bestEval = e; best = p }
@@ -111,7 +111,7 @@ class OcrMeasurementTest {
         best = best.copy(recNormalization = Normalization.RECOGNIZER_CANDIDATES[c.indexOf(c.minBy { it.mean })])
         log("  → reconhecedor: ${best.recNormalization.name}")
         log("(C) descarte por pontuação do reconhecedor")
-        val d = listOf(0.3f, 0.5f, 0.7f).map { s -> s to bench.evaluate("minRecScore $s", best.copy(minRecScore = s)).also(bench::logEval) }
+        val d = listOf(0.3f, 0.5f).map { s -> s to bench.evaluate("minRecScore $s", best.copy(minRecScore = s)).also(bench::logEval) }
         best = best.copy(minRecScore = d.minBy { it.second.mean }.first)
         val final = bench.evaluate("ESCOLHIDO", best)
         log("  → descarte < ${best.minRecScore}")
@@ -152,22 +152,32 @@ class OcrMeasurementTest {
         }
 
         // (E) tempo e (F) memória com o pipeline completo e os parâmetros escolhidos.
-        log("(E) tempo (média de 3 execuções depois de 1 de aquecimento; sessões já carregadas)")
+        log("(E) tempo (média de 2 execuções depois de 1 de aquecimento; sessões já carregadas; detector e reconhecedor com os parâmetros escolhidos)")
         val screens = listOf(
             "¼ de tela 360x800" to OcrTestSupport.screen(360, 800),
             "tela cheia 720x1600 (A32)" to OcrTestSupport.screen(720, 1600),
             "tela cheia 1080x2400" to OcrTestSupport.screen(1080, 2400),
         )
-        for (threads in listOf(1, 2, 4)) {
-            PaddleOcrEngine(files, chosen.copy(threads = threads)).use { engine ->
+        val variants = listOf(
+            "arena, 1 thread, lote 1" to chosen.copy(threads = 1, cpuArena = true, recBatch = 1),
+            "arena, 2 threads, lote 1" to chosen.copy(threads = 2, cpuArena = true, recBatch = 1),
+            "arena, 4 threads, lote 1" to chosen.copy(threads = 4, cpuArena = true, recBatch = 1),
+            "arena, 2 threads, lote 6" to chosen.copy(threads = 2, cpuArena = true, recBatch = 6),
+            "SEM arena, 2 threads, lote 1" to chosen.copy(threads = 2, cpuArena = false, recBatch = 1),
+        )
+        for ((variant, params) in variants) {
+            PaddleOcrEngine(files, params).use { engine ->
+                // As variantes de comparação só medem a tela do A32 (a sem arena leva ~40 s por execução).
+                val onlyA32 = !variant.startsWith("arena, 1") && !variant.startsWith("arena, 2 threads, lote 1") && !variant.startsWith("arena, 4")
                 for ((label, screen) in screens) {
+                    if (onlyA32 && !label.contains("720x1600")) continue
                     engine.recognize(screen.image) // aquecimento (carrega as sessões na 1ª)
-                    val runs = (1..3).map { engine.recognize(screen.image).let { r -> engine.lastStats to r } }
+                    val runs = (1..2).map { engine.recognize(screen.image).let { r -> engine.lastStats to r } }
                     val total = runs.map { it.first.totalMs }.average()
                     val det = runs.map { it.first.detectMs }.average()
                     val rec = runs.map { it.first.recognizeMs }.average()
                     val text = (runs.last().second as? OcrResult.Text)?.text.orEmpty()
-                    log("  $threads thread(s) · $label: total ${"%.0f".format(total)} ms (detector ${"%.0f".format(det)} + reconhecedor ${"%.0f".format(rec)}) · " +
+                    log("  $variant · $label: total ${"%.0f".format(total)} ms (detector ${"%.0f".format(det)} + reconhecedor ${"%.0f".format(rec)}) · " +
                         "faixas ${runs.last().first.strips} · caixas ${runs.last().first.boxes} · CER ${"%.3f".format(OcrTestSupport.cer(text, screen.expected))}")
                 }
             }
@@ -208,9 +218,11 @@ class OcrMeasurementTest {
         }
 
         OcrTestSupport.alternativeModel(context)?.let { alt ->
+            // Uma avaliação só, com as convenções de referência do PaddleOCR (BGR + ImageNet no detector, BGR + 0,5 no reconhecedor): o plano B
+            // só entra se o par do catálogo reprovar, e o detector v4 deste par leva minutos por avaliação no emulador.
             Bench("plano B (deepghs: PP-OCRv4 det + PP-OCRv3 latino rec)", alt, corpus, 2).use { bench ->
-                val p = tune(bench)
-                log("  plano B escolhido: det ${p.detNormalization.name}, rec ${p.recNormalization.name}, caixa ${p.boxThreshold}, unclip ${p.unclipRatio}")
+                log("(G) plano B, parâmetros padrão do app")
+                bench.logEval(bench.evaluate("plano B", chosen))
             }
         } ?: log("(G) plano B não medido (sem ocrAltDir e sem rede para os arquivos do deepghs)")
 

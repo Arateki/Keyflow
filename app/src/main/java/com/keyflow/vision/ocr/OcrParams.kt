@@ -49,8 +49,8 @@ class Normalization(val name: String, val bgr: Boolean, val mean: FloatArray, va
 }
 
 /**
- * Tudo que se pode ajustar no pipeline do PaddleOCR. Os padrões são os do código de referência (detector DB: limiar 0,3, caixa 0,6,
- * `unclip` 1,5; reconhecedor: altura 48, lote 6, descarte abaixo de 0,5); o que a medição da VC-T6 escolher entra aqui como padrão.
+ * Tudo que se pode ajustar no pipeline do PaddleOCR. Os padrões saem da medição da VC-T6 (STATE: `.specs/project/licoes/2026-10-28-ocr-paddle-medicao.md`) sobre o código de referência do
+ * PaddleOCR (detector DB: limiar 0,3, caixa 0,6; reconhecedor: altura 48, descarte abaixo de 0,5): `unclip` 2,0, lote 1, arena ligada.
  */
 data class OcrParams(
     // Faixas do detector (design §6.2): a tela alta vira faixas, não é encolhida.
@@ -64,7 +64,8 @@ data class OcrParams(
     val detNormalization: Normalization = Normalization.IMAGENET_BGR,
     val binaryThreshold: Float = 0.3f,
     val boxThreshold: Float = 0.6f,
-    val unclipRatio: Float = 1.5f,
+    /** 2,0: o `unclip` do DBPostProcess do PaddleOCR; menor CER que o 1,5 do config do PP-OCRv3 no corpus (0,0020 contra 0,0028) e caixa mais alta, logo menos ampliação (e menos largura) no reconhecedor. */
+    val unclipRatio: Float = 2.0f,
     /** Menor lado de caixa aceito no mapa de probabilidade (px do mapa); depois do `unclip` vale este + 2, como no PaddleOCR. */
     val minBoxSide: Int = 3,
     val maxBoxes: Int = 1000,
@@ -72,12 +73,17 @@ data class OcrParams(
     val recHeight: Int = 48,
     val recMaxWidth: Int = 3200,
     val recMinWidth: Int = 32,
-    val recBatch: Int = 6,
+    /** Caixas por chamada do reconhecedor. 1: o lote não ganha tempo por pixel (medido: 0,27–0,33 ms/px em lote ou não) e o preenchimento à direita e as ativações x6 custam RAM. */
+    val recBatch: Int = 1,
     val recNormalization: Normalization = Normalization.HALF_BGR,
     val minRecScore: Float = 0.5f,
     /** Threads de cálculo da ORT por sessão. */
     val threads: Int = 2,
+    /** Alocador em arena da ORT: 2 a 3 vezes mais rápido no reconhecedor (medido) e ~+160 MB de RSS; descarregar o motor devolve tudo. */
+    val cpuArena: Boolean = true,
 ) {
+    val onnxOptions: com.keyflow.onnx.OnnxOptions get() = com.keyflow.onnx.OnnxOptions(threads = threads, cpuArena = cpuArena)
+
     init {
         require(stripLength >= 64 && stripOverlap in 0 until stripLength / 2) { "faixa inválida: $stripLength/$stripOverlap" }
         require(crossLimit >= 64 && recHeight >= 8 && recBatch >= 1 && threads >= 1)

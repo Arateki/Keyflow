@@ -235,23 +235,35 @@ class PaddleOcrEngineTest {
         assertEquals(OcrFailure.ENGINE, r.kind)
     }
 
+    private fun eightBands() = (0 until 8).map { i -> intArrayOf(10, 20 + i * 60, 60 + i * 20, 40 + i * 60, 0) }.toTypedArray()
+
+    private fun shapeSpy(seen: MutableList<LongArray>) = FakeSession(listOf("x"), listOf("y")) { inputs ->
+        val t = inputs.single() as FloatTensor
+        seen += t.shape
+        val n = t.shape[0].toInt()
+        listOf(FloatTensor(longArrayOf(n.toLong(), 4, (letters.size + 2).toLong()), FloatArray(n * 4 * (letters.size + 2))))
+    }
+
     @Test
     fun lotesDeSeisComLarguraProporcionalEPreenchimentoZero() {
         // 8 faixas de larguras diferentes → lotes de 6 e 2; a entrada do reconhecedor é [n, 3, 48, larguraDoLote] com o resto em 0.
         val seen = ArrayList<LongArray>()
-        val rec = FakeSession(listOf("x"), listOf("y")) { inputs ->
-            val t = inputs.single() as FloatTensor
-            seen += t.shape
-            val n = t.shape[0].toInt()
-            listOf(FloatTensor(longArrayOf(n.toLong(), 4, (letters.size + 2).toLong()), FloatArray(n * 4 * (letters.size + 2))))
-        }
-        val bands = (0 until 8).map { i -> intArrayOf(10, 20 + i * 60, 60 + i * 20, 40 + i * 60, 0) }.toTypedArray()
-        val image = imageWithBands(400, 520, *bands)
-        val h = harness(inkDetector(), rec)
-        h.engine.recognize(image)
+        val h = harness(inkDetector(), shapeSpy(seen), OcrParams(recBatch = 6))
+        h.engine.recognize(imageWithBands(400, 520, *eightBands()))
         assertEquals(listOf(6L, 2L), seen.map { it[0] })
         assertTrue(seen.all { it[1] == 3L && it[2] == 48L })
         // Largura do lote 1 ≤ largura do lote 2 (ordenados por largura).
         assertTrue(seen[0][3] <= seen[1][3])
+    }
+
+    @Test
+    fun padraoEUmaCaixaPorChamadaSemPreenchimento() {
+        // Medido: lote não ganha tempo por pixel e custa RAM; o padrão chama o reconhecedor uma vez por caixa, na largura própria dela.
+        val seen = ArrayList<LongArray>()
+        val h = harness(inkDetector(), shapeSpy(seen))
+        h.engine.recognize(imageWithBands(400, 520, *eightBands()))
+        assertEquals(8, seen.size)
+        assertTrue(seen.all { it[0] == 1L && it[1] == 3L && it[2] == 48L })
+        assertEquals("da mais estreita à mais larga", seen.map { it[3] }.sorted(), seen.map { it[3] })
     }
 }

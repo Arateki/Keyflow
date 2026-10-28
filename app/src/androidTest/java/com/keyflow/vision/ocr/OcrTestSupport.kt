@@ -14,6 +14,7 @@ import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.ModelDownloader
 import com.keyflow.data.models.ModelStore
 import com.keyflow.data.models.StartResult
+import com.keyflow.onnx.OnnxOptions
 import com.keyflow.onnx.OnnxSession
 import com.keyflow.onnx.Tensor
 import com.keyflow.vision.client.VisionModels
@@ -87,19 +88,38 @@ object OcrTestSupport {
     private fun render(group: String, style: Style, lines: List<String>, width: Int): Sample {
         val margin = 16
         val lineHeight = (style.sizePx * 1.5f).toInt()
-        val height = margin * 2 + lineHeight * lines.size
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        canvas.drawColor(if (style.dark) Color.parseColor("#121212") else Color.WHITE)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             textSize = style.sizePx
             typeface = typefaceFor(group, style)
             color = if (style.dark) Color.parseColor("#E8E8E8") else Color.parseColor("#111111")
         }
-        lines.forEachIndexed { i, line ->
+        // Quebra em palavras para nenhuma linha passar da largura (a 32 px a frase inteira não cabe em 720 px; cortada na borda, a
+        // verdade do corpus deixaria de ser o que está desenhado). A verdade segue sendo as frases, em ordem, separadas por espaço.
+        val drawn = lines.flatMap { wrap(it, paint, (width - 2 * margin).toFloat()) }
+        val height = margin * 2 + lineHeight * drawn.size
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        canvas.drawColor(if (style.dark) Color.parseColor("#121212") else Color.WHITE)
+        drawn.forEachIndexed { i, line ->
             canvas.drawText(line, margin.toFloat(), margin + lineHeight * (i + 0.75f), paint)
         }
         return Sample("$group-${style.name}", group, toRgba(bitmap), lines.joinToString(" "))
+    }
+
+    private fun wrap(text: String, paint: Paint, maxWidth: Float): List<String> {
+        val out = ArrayList<String>()
+        var current = StringBuilder()
+        for (word in text.split(' ')) {
+            val candidate = if (current.isEmpty()) word else "$current $word"
+            if (current.isNotEmpty() && paint.measureText(candidate) > maxWidth) {
+                out += current.toString()
+                current = StringBuilder(word)
+            } else {
+                current = StringBuilder(candidate)
+            }
+        }
+        if (current.isNotEmpty()) out += current.toString()
+        return out
     }
 
     /** Uma "tela" de [width]x[height]: as linhas do corpus repetidas em colunas de texto de [sizePx] px, de cima a baixo. */
@@ -117,12 +137,15 @@ object OcrTestSupport {
         var y = 48f
         var i = 0
         while (y < height - 32) {
-            val line = all[i % all.size]
-            // Um parágrafo de 4 linhas, depois uma lacuna de 2 linhas (bloco).
-            canvas.drawText(line, 24f, y, paint)
-            drawn += line
+            // Um parágrafo de 4 frases, depois uma lacuna de 2 linhas (bloco); a frase que não cabe na largura quebra em palavras.
+            for (line in wrap(all[i % all.size], paint, width - 48f)) {
+                if (y >= height - 32) break
+                canvas.drawText(line, 24f, y, paint)
+                drawn += line
+                y += lineHeight
+            }
             i++
-            y += lineHeight + if (i % 4 == 0) lineHeight * 2 else 0
+            if (i % 4 == 0) y += lineHeight * 2
         }
         return Sample("tela-${width}x$height", "screen", toRgba(bitmap), drawn.joinToString(" "))
     }
@@ -267,9 +290,9 @@ object OcrTestSupport {
         )
 
     /** Sessões abertas uma vez e emprestadas a vários motores com parâmetros diferentes (o `close` do motor não as fecha). */
-    class SharedSessions(private val files: OcrModelFiles, threads: Int) : AutoCloseable {
-        private val det = OnnxSession.open(files.detector, threads)
-        private val rec = OnnxSession.open(files.recognizer, threads)
+    class SharedSessions(private val files: OcrModelFiles, options: OnnxOptions) : AutoCloseable {
+        private val det = OnnxSession.open(files.detector, options)
+        private val rec = OnnxSession.open(files.recognizer, options)
 
         private class Borrowed(private val inner: OnnxSession) : OnnxSession {
             override val inputNames get() = inner.inputNames
@@ -278,7 +301,7 @@ object OcrTestSupport {
             override fun close() = Unit
         }
 
-        fun opener(): (String, Int) -> OnnxSession = { path, _ -> Borrowed(if (path == files.detector) det else rec) }
+        fun opener(): (String, OnnxOptions) -> OnnxSession = { path, _ -> Borrowed(if (path == files.detector) det else rec) }
 
         override fun close() {
             det.close()
