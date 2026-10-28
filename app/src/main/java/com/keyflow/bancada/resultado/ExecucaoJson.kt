@@ -209,7 +209,11 @@ object ExecucaoJson {
         }
         if (raiz.optString("esquema") != ESQUEMA) problemas += "esquema: esperava $ESQUEMA"
         for (c in listOf("id", "iniciada", "estado", "perfil")) exigir(raiz, "", c, "string")
-        exigir(raiz, "", "motivo", "string", anulavel = true)
+        if (exigir(raiz, "", "motivo", "string", anulavel = true) && !raiz.isNull("motivo") &&
+            runCatching { MotivoIncompleta.valueOf(raiz.getString("motivo")) }.isFailure
+        ) {
+            problemas += "motivo: valor desconhecido"
+        }
         exigir(raiz, "", "corpus", "int")
         if (exigir(raiz, "", "estado", "string") && runCatching { EstadoExecucao.deId(raiz.getString("estado")) }.isFailure) problemas += "estado: valor desconhecido"
         if (exigir(raiz, "", "aparelho", "objeto")) raiz.getJSONObject("aparelho").let { a ->

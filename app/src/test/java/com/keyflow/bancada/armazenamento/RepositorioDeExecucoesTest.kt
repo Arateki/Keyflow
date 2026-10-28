@@ -2,6 +2,7 @@ package com.keyflow.bancada.armazenamento
 
 import com.google.common.truth.Truth.assertThat
 import com.keyflow.bancada.resultado.EstadoExecucao
+import com.keyflow.bancada.resultado.ExecucaoJson
 import com.keyflow.bancada.resultado.MotivoIncompleta
 import com.keyflow.bancada.resultado.execucaoDeExemplo
 import com.keyflow.bancada.resultado.isoUtc
@@ -169,5 +170,24 @@ class RepositorioDeExecucoesTest {
         val transfer = extracao.substringAfter("<device-transfer>").substringBefore("</device-transfer>")
         assertThat(cloud).contains("""<exclude domain="file" path="bancada" />""")
         assertThat(transfer).contains("""<exclude domain="file" path="bancada" />""")
+    }
+
+    @Test
+    fun `a file with an unknown reason does not take the good history down`() {
+        val r = repo()
+        r.gravar(execucaoDeExemplo(id = "a"))
+        val ruim = ExecucaoJson.escrever(execucaoDeExemplo(id = "b", estado = EstadoExecucao.INCOMPLETA, motivo = MotivoIncompleta.CANCELADA))
+            .replace("\"CANCELADA\"", "\"MARCIANO\"")
+        File(File(pasta.root, "execucoes"), "ruim.json").writeText(ruim)
+        assertThat(r.listar().map { it.id }).containsExactly("a")
+    }
+
+    @Test
+    fun `a run born in the same second as the process but after it is not recovered`() {
+        val r = repo()
+        val nascimento = agora - agora % 1000 + 200 // processo nasceu em xx:xx:xx.200
+        r.gravar(execucaoDeExemplo(id = "nasceu-depois", estado = EstadoExecucao.EM_ANDAMENTO, iniciada = isoUtc(nascimento + 300)))
+        assertThat(r.recuperarInterrompidas(antesDeMs = nascimento)).isEqualTo(0)
+        assertThat(r.lerPorId("nasceu-depois")!!.estado).isEqualTo(EstadoExecucao.EM_ANDAMENTO)
     }
 }

@@ -75,11 +75,14 @@ class RepositorioDeExecucoes(
     @Synchronized
     fun recuperarInterrompidas(ativas: Set<String> = emptySet(), antesDeMs: Long = Long.MAX_VALUE): Int {
         diretorio.listFiles { f -> f.name.endsWith(SUFIXO_TEMPORARIO) }?.forEach { it.delete() }
+        // `iniciada` tem precisão de segundos e [antesDeMs] de milissegundos: sem arredondar, uma rodada que nasceu no mesmo segundo
+        // do processo (e depois dele) pareceria anterior.
+        val limiteNascimento = antesDeMs.let { if (it == Long.MAX_VALUE) it else it / 1000 * 1000 }
         var recuperadas = 0
         for (arquivo in arquivos()) {
             val execucao = ler(arquivo) ?: continue
             val comecou = epochDeIso(execucao.iniciada) ?: 0L
-            if (execucao.estado == EstadoExecucao.EM_ANDAMENTO && execucao.id !in ativas && comecou < antesDeMs) {
+            if (execucao.estado == EstadoExecucao.EM_ANDAMENTO && execucao.id !in ativas && comecou < limiteNascimento) {
                 gravar(execucao.copy(estado = EstadoExecucao.INCOMPLETA, motivo = MotivoIncompleta.INTERROMPIDA))
                 recuperadas++
             }
@@ -114,6 +117,8 @@ class RepositorioDeExecucoes(
         null
     } catch (e: java.io.IOException) {
         null
+    } catch (e: RuntimeException) {
+        null // um arquivo estranho nunca derruba o histórico bom
     }
 
     private fun arquivoDe(e: Execucao): File {

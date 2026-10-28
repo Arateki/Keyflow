@@ -3,6 +3,7 @@ package com.keyflow.bancada.resultado
 import com.google.common.truth.Truth.assertThat
 import com.keyflow.bancada.redacao.RedatorDeSegredos
 import org.json.JSONObject
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 /** BNC-T6 / BHS-01/02/04/05/06, BON-03: o JSON `bancada-resultado/1` vai e volta sem perda, valida, não vaza e define a comparabilidade. */
@@ -162,5 +163,20 @@ class ExecucaoJsonTest {
         assertThat(isoUtc(1_793_196_191_000L)).isEqualTo("2026-10-28T14:03:11Z")
         assertThat(epochDeIso("2026-10-28T14:03:11Z")).isEqualTo(1_793_196_191_000L)
         assertThat(epochDeIso("ontem")).isNull()
+    }
+
+    @Test
+    fun `a cancelled current run is never compared with a complete one`() {
+        val atual = execucaoDeExemplo(id = "atual", estado = EstadoExecucao.INCOMPLETA, motivo = MotivoIncompleta.CANCELADA, nota = 0.9)
+        val anteriores = listOf(execucaoDeExemplo(id = "completa", nota = 0.2))
+        assertThat(Historico.variacao(atual, "pontuacao", anteriores)).isNull()
+    }
+
+    @Test
+    fun `an unknown reason fails validation instead of throwing`() {
+        val texto = ExecucaoJson.escrever(execucaoDeExemplo(estado = EstadoExecucao.INCOMPLETA, motivo = MotivoIncompleta.CANCELADA))
+            .replace("\"CANCELADA\"", "\"MARCIANO\"")
+        assertThat(ExecucaoJson.validar(texto)).contains("motivo: valor desconhecido")
+        assertThrows(ExecucaoInvalidaException::class.java) { ExecucaoJson.ler(texto) }
     }
 }
