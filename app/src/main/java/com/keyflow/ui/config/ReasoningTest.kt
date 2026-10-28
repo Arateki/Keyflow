@@ -148,7 +148,8 @@ internal fun formatTestDuration(ms: Long): String =
  * O botão Testar (RTS-01..04): manda uma frase à origem ativa, mostra a resposta chegando, vira "Parar" enquanto gera e,
  * no fim, os tempos. Sem motor pronto o botão fica desabilitado com o motivo escrito ao lado. [onManageUsage] não nulo faz do
  * limite de uso atingido um botão principal "Manage usage" (a doc da OpenAI: é a ação que resolve o limite do plano).
- * [initialState] é só para a galeria de verificação mostrar a área já em andamento (como `initialTab` no ConfigScreen).
+ * [initialState] é só para a galeria de verificação mostrar a área já em andamento (como `initialTab` no ConfigScreen). [resolveOnStart], quando
+ * existe, escolhe o motor no momento do toque, depois de confirmar os campos de texto pendentes.
  */
 @Composable
 fun ReasoningTestArea(
@@ -156,6 +157,7 @@ fun ReasoningTestArea(
     modifier: Modifier = Modifier,
     onManageUsage: (() -> Unit)? = null,
     initialState: TestState = TestState(),
+    resolveOnStart: (() -> ReasoningResolution)? = null,
 ) {
     val palette = LocalKeyFlowPalette.current
     // Main explícito: o motor local entrega os pedaços numa thread de binder, e é o dispatcher do coletor que decide
@@ -172,7 +174,8 @@ fun ReasoningTestArea(
             text = if (state.running) tr("Parar") else tr("Testar"),
             tag = REASONING_TEST_BUTTON_TAG,
             enabled = state.running || unavailable == null,
-            onClick = { if (state.running) runner.stop() else runner.start(resolution, ReasoningRequest(user = prompt)) },
+            // O motor sai do que está nos campos no toque (com o texto ainda não confirmado), não da resolução da última composição.
+            onClick = { if (state.running) runner.stop() else runner.start(resolveOnStart?.invoke() ?: resolution, ReasoningRequest(user = prompt)) },
         )
         if (unavailable != null) {
             SettingSub(ReasoningTestMessages.unavailable(unavailable), Modifier.padding(top = 10.dp).testTag(REASONING_TEST_REASON_TAG))
