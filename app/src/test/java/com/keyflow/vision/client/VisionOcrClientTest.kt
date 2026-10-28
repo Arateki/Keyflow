@@ -1,6 +1,8 @@
 package com.keyflow.vision.client
 
 import android.content.ContextWrapper
+import android.content.Intent
+import android.content.ServiceConnection
 import com.google.common.truth.Truth.assertThat
 import com.keyflow.vision.ocr.OcrModelFiles
 import com.keyflow.vision.ocr.OcrResult
@@ -27,6 +29,37 @@ class VisionOcrClientTest {
             pending += cb
         }
         override fun cancel() { calls += "cancelar"; pending.clear() }
+    }
+
+    private fun pendingConnection() = VisionConnection(object : ContextWrapper(null) {
+        override fun bindService(intent: Intent, connection: ServiceConnection, flags: Int) = true
+        override fun unbindService(connection: ServiceConnection) = Unit
+    }, bindTimeoutMs = 10)
+
+    @Test
+    fun `timeout do bind retorna falha sem cancelar o chamador`() = runTest {
+        val connection = pendingConnection()
+        val model = VisionModel("ocr", OcrModelFiles("/det", "/rec", "/dict"), 0, 0, 1)
+        try {
+            val result = VisionOcrClient({ model }, connection).recognize(File("/recorte"), 1, 1)
+            assertThat(result).isInstanceOf(OcrResult.Failed::class.java)
+            assertThat((result as OcrResult.Failed).kind).isEqualTo(com.keyflow.vision.ocr.OcrFailure.TIMEOUT)
+        } finally { connection.close() }
+    }
+
+    @Test
+    fun `cancelamento durante bind é propagado ao chamador`() = runTest {
+        val connection = pendingConnection()
+        val model = VisionModel("ocr", OcrModelFiles("/det", "/rec", "/dict"), 0, 0, 1)
+        var returned = false
+        try {
+            val request = async { VisionOcrClient({ model }, connection).recognize(File("/recorte"), 1, 1); returned = true }
+            runCurrent()
+            request.cancel()
+            runCurrent()
+            assertThat(request.isCancelled).isTrue()
+            assertThat(returned).isFalse()
+        } finally { connection.close() }
     }
 
     @Test

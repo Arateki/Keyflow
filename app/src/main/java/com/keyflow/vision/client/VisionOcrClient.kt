@@ -11,8 +11,9 @@ import com.keyflow.vision.service.IVisionCallback
 import com.keyflow.vision.service.VisionModel
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
 import kotlin.coroutines.resume
@@ -37,9 +38,9 @@ class VisionOcrClient internal constructor(
         val model = modelFor() ?: return OcrResult.Unavailable
         val service = try {
             connection.acquire()
-        } catch (e: CancellationException) {
-            throw e
         } catch (e: Exception) {
+            // Um timeout interno do bind vira falha; cancelamento do chamador continua sendo cancelamento.
+            currentCoroutineContext().ensureActive()
             Log.w(TAG, "não consegui ligar ao :vision", e)
             return OcrResult.Failed(OcrFailure.TIMEOUT, "o OCR não iniciou")
         }
