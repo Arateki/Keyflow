@@ -354,3 +354,5 @@ Manutenção de VERIFY-01/02/04 (2026-10-28): o CI configura explicitamente os o
 repete somente falhas anteriores ao início do gate e só compara com o catálogo presente.
 Requisitos continuam Verified; nenhuma referência visual mudou. Evidência e causa provável:
 [CI-ESTABILIDADE.md](../../codebase/CI-ESTABILIDADE.md).
+
+Lição desta manutenção: `licoes/2026-10-28-ci-estabilidade.md`.

@@ -481,6 +481,16 @@ object RouteCatalog {
                 ),
             )
         },
+        // O Potente (Qwen3 4B) fica abaixo da dobra na lista inteira, então ganha o seu próprio quadro: sozinho na lista, num aparelho de 8 GB, onde o
+        // aviso de "pesado" aparece (a recomendação é de 12 GB).
+        Route("config-raciocinio-local-potente") {
+            ConfigReasoningRoute(
+                localModels = LocalModelsUi.compose(
+                    catalog = listOf(ModelCatalog.QWEN3_4B), installed = emptySet(), active = null, failures = emptyMap(),
+                    selectedId = null, deviceRamMb = 8192,
+                ),
+            )
+        },
     )
 
     private val byKey: Map<String, Route> = routes.associateBy { it.key }

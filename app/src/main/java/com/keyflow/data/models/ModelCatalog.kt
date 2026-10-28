@@ -117,7 +117,7 @@ object ModelCatalog {
      * O manifesto remoto (`catalogVersion`) só vale se for maior ou igual a ela: sem isso, um manifesto ou cache antigo substituiria o catálogo
      * inteiro e devolveria, por exemplo, o SHA legado do Qwen3 (o `ModelCatalogTest` confere a impressão digital dos pins contra esta versão).
      */
-    const val EMBEDDED_VERSION = 2026102701
+    const val EMBEDDED_VERSION = 2026102702
 
     /** Impressão digital dos pins embutidos (id, nome, tamanho e SHA-256 de cada arquivo): muda se um pin mudar sem [EMBEDDED_VERSION] subir. */
     fun pinsFingerprint(models: List<ModelSpec> = MODELS): String {
@@ -234,6 +234,7 @@ object ModelCatalog {
     private const val GEMMA_4_E4B_REPO = "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/e6a3892a8c22cf87ff99583996149cf3cb32452b"
     private const val QWEN3_REPO = "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/fed81d17517e6ea64362e917ecf7e5accff12492"
     private const val QWEN2_5_REPO = "https://huggingface.co/litert-community/Qwen2.5-1.5B-Instruct/resolve/2f23bacf8ec78b83dfcd7271c5cb25777b1be5e0"
+    private const val QWEN3_4B_REPO = "https://huggingface.co/litert-community/Qwen3-4B-Instruct-2507/resolve/4d409771b414d86b270ca54d27ffc45032a81142"
     private const val SMOLLM2_REPO = "https://huggingface.co/litert-community/SmolLM2-1.7B-Instruct/resolve/c0ee765a9f197467ead8f22b9bf7bbeb4e6307c7"
     private const val DEEPSEEK_R1_REPO = "https://huggingface.co/litert-community/DeepSeek-R1-Distill-Qwen-1.5B/resolve/9fd875541bb0f277e4b3cefe7d9622c4c1de2fb5"
 
@@ -382,6 +383,41 @@ object ModelCatalog {
     )
 
     /**
+     * Qwen3 4B Instruct-2507 (Alibaba), INT4 misto (TorchAO: pesos em blocos de 32; embeddings em INT8), contexto de 2048. Licença Apache 2.0 (`license: apache-2.0` e
+     * `gated: false` no card da conversão e no do original). A revisão 2507 do Instruct só tem o modo sem pensamento (o template não consulta `enable_thinking`).
+     * Entrou em 2026-10-27, por decisão do Yan; commit, tamanho e SHA-256 lidos da API do HF e o SHA-256 conferido baixando o arquivo inteiro
+     * (`.specs/features/reasoning-models/qwen-sem-pensar.md`).
+     *
+     * **Pede muita memória, e o app só usa a CPU hoje.** Medido em 2026-10-27 no Vaio TL10 (Unisoc T616, 7,6 GB): pela CPU o processo passou de 5 GB e o Android o
+     * matou por falta de memória (LOW_MEMORY), mesmo com a configuração mínima; pela GPU (build de teste, OpenCL) respondeu certo ("Paris"), com VmHWM de 4,4 GB e
+     * carga de 112 s. O autor da conversão publica a CPU funcionando num Galaxy S26 com RSS de 4,6 a 6,1 GB. `validatedOnDevice = true` por decisão do Yan: a prova
+     * de que o modelo responde foi na GPU do Vaio; na CPU ele precisa de bem mais RAM, por isso `recommendedRamMb = 12288` e a guarda de carga (80%, 9831 MB de RAM
+     * total) o barra nos aparelhos de 8 GB. Até existir a opção de GPU no app, é um modelo para aparelhos com muita memória.
+     */
+    val QWEN3_4B = ModelSpec(
+        id = "qwen3-4b-instruct-2507-litertlm",
+        displayName = trKey("Potente"),
+        summary = trKey("Responde direto, sem pensar; exige muita memória — melhor em aparelhos com 12 GB ou mais."),
+        languages = trKey("Multilíngue"),
+        engineType = EngineType.LITERT_LM,
+        acceptsLanguageHint = false,
+        // 12288: o autor mede 4,6–6,1 GB de RSS na CPU (Galaxy S26) e no Vaio de 7,6 GB a CPU passou de 5 GB e o processo morreu; então a RAM total
+        // exigida (80%, 9831 MB) deixa de fora os aparelhos de 8 GB e libera os de 12 GB. Não medido na CPU de um aparelho que o rode.
+        recommendedRamMb = 12288,
+        modelName = "Qwen3 4B Instruct 2507",
+        kind = ModelKind.TEXT,
+        vendor = ModelVendor.QWEN,
+        // O Instruct-2507 não pensa (card do Qwen/Qwen3-4B-Instruct-2507: "supports only non-thinking mode").
+        thinking = ThinkingSupport.NONE,
+        files = listOf(
+            ModelFile(
+                FileRole.MODEL, "qwen3_4b_instruct_2507_mixed_int4.litertlm", "$QWEN3_4B_REPO/qwen3_4b_instruct_2507_mixed_int4.litertlm",
+                "9e48b165836256f5344d9d044930607b9c47f6ef34e27f82e96881664f3ba2fd", 2_659_057_664L,
+            ),
+        ),
+    )
+
+    /**
      * Gemma 4 E4B (Google), arquivo genérico (CPU/GPU) — não as variantes `-gpu`/`-web` nem as de NPU. Licença Apache 2.0 (a mesma do E2B;
      * o Gemma 4 não usa os Termos do Gemma das versões 1 a 3). Entrou em 2026-10-26, por decisão do Yan, mesmo sem caber no A32 (o arquivo tem 3,66 GB);
      * liberado no release em 2026-10-27, depois de responder num Vaio TL10 de 8 GB.
@@ -412,18 +448,19 @@ object ModelCatalog {
     /** Modelos de fala, na ordem em que a aba Transcrição lista: do mais leve ao mais pesado. */
     val SPEECH: List<ModelSpec> = listOf(WHISPER_BASE, WHISPER_SMALL, PARAKEET_V3)
 
-    /** Todos os modelos de texto conhecidos, do menor ao maior arquivo (a ordem de download). A de RAM, em `recommendedRamMb`, difere: o SmolLM2 pesa mais que o DeepSeek e o Gemma 4 E2B. */
+    /** Todos os modelos de texto conhecidos, do menor ao maior arquivo (a ordem de download). A de RAM, em `recommendedRamMb`, difere: o SmolLM2 pesa mais que o DeepSeek e o Gemma 4 E2B, e o Qwen3 4B (12288) mais que todos, o Gemma 4 E4B inclusive. */
     val TEXT_ALL: List<ModelSpec> = listOf(
         QWEN3_0_6B,
         QWEN2_5_1_5B,
         SMOLLM2_1_7B,
         DEEPSEEK_R1_1_5B,
         GEMMA_4_E2B,
+        QWEN3_4B,
         GEMMA_4_E4B,
     )
 
     /**
-     * O que o build mostra: em release só os [ModelSpec.validatedOnDevice]; em debug, todos. Desde 2026-10-27 os cinco modelos de texto
+     * O que o build mostra: em release só os [ModelSpec.validatedOnDevice]; em debug, todos. Desde 2026-10-27 os modelos de texto
      * estão validados (responderam em aparelho real); o flag segue como gate para o próximo modelo que entrar sem prova.
      */
     fun visibleIn(models: List<ModelSpec>, debug: Boolean): List<ModelSpec> = models.filter { debug || it.validatedOnDevice }

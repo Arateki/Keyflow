@@ -4,6 +4,8 @@ on:
     branches: [main]
   push:
     branches: [main]
+  # Fila de mesclagem do GitHub: os mesmos jobs rodam no commit temporário (main + PR). Ali o contexto do PR
+  # não existe (nem o número, nem head_ref/base_ref): nenhum passo pode lê-lo (scripts/tests/test_mesclagem.py confere).
   merge_group:
   workflow_dispatch:
 permissions:

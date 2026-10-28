@@ -109,13 +109,13 @@ class ModelListTest {
     @Test
     fun theTextCardsCarryTheirOwnVendorLogo() {
         rule.setContent { Host(text(installed = emptySet()), FakeActions(), ModelListTags.Raciocinio) }
-        rule.onAllNodesWithTag("model-vendor-qwen").assertCountEquals(2)
+        rule.onAllNodesWithTag("model-vendor-qwen").assertCountEquals(3)
         rule.onNodeWithTag("model-vendor-hugging_face").assertExists()
         rule.onNodeWithTag("model-vendor-deepseek").assertExists()
         rule.onAllNodesWithTag("model-vendor-google").assertCountEquals(2)
     }
 
-    /** Só informativo: Qwen3 e Gemma 4 suportam pensamento, o DeepSeek sempre pensa; Qwen2.5 e SmolLM2 não ganham linha. */
+    /** Só informativo: Qwen3 0.6B e Gemma 4 suportam pensamento, o DeepSeek sempre pensa; Qwen2.5, SmolLM2 e Qwen3 4B Instruct-2507 não ganham linha. */
     @Test
     fun theTextCardsSayWhetherTheModelThinks() {
         rule.setContent { Host(text(installed = emptySet()), FakeActions(), ModelListTags.Raciocinio) }
@@ -126,6 +126,7 @@ class ModelListTest {
         thinking(ModelCatalog.GEMMA_4_E4B).performScrollTo().assertTextEquals("Suporta modo pensamento.")
         thinking(ModelCatalog.DEEPSEEK_R1_1_5B).performScrollTo().assertTextEquals("Sempre pensa antes de responder.")
         thinking(ModelCatalog.QWEN2_5_1_5B).assertDoesNotExist()
+        thinking(ModelCatalog.QWEN3_4B).assertDoesNotExist()
         thinking(ModelCatalog.SMOLLM2_1_7B).assertDoesNotExist()
     }
 

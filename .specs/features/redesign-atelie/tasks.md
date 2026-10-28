@@ -439,3 +439,5 @@ Fase 8:  T27
 | T1,T2,T3 | build/config | none | none | ✅ |
 
 Sem ❌ — pronto para revisão.
+
+Lição desta manutenção: `licoes/2026-10-28-ci-estabilidade.md`.
