@@ -1,9 +1,11 @@
 import com.keyflow.admob.AdMobIds
+import com.keyflow.onnxbuild.ElfVersionTags
 import com.android.build.api.variant.ResValue
 import java.io.File
 import java.net.URI
 import java.security.MessageDigest
 import java.util.Properties
+import java.util.zip.ZipFile
 
 plugins {
     id("com.android.application")
@@ -359,6 +361,120 @@ if (!sherpaOnnxAar.isFile || sha256Of(sherpaOnnxAar) != sherpaOnnxSha256) {
     partial.renameTo(sherpaOnnxAar)
 }
 
+
+// ONNX Runtime Java (vision-capture VC-T2b): o PaddleOCR roda na MESMA `libonnxruntime.so` do sherpa-onnx (uma só ORT por ABI —
+// a transcrição local é o núcleo do produto e não pode depender de qual `.so` ganha um `pickFirst`). Contingência do design §7:
+// não há NDK/CMake nos nós do pool (servidor, Deck, AWS; medido em 2026-10-27, "NDK not configured"), então a ponte JNI vem pronta
+// do `onnxruntime-android` (MIT). Dele só entram o `classes.jar` e o `libonnxruntime4j_jni.so`; a `libonnxruntime.so` do AAR (+6,4 MB
+// no arm64) nunca chega ao APK. A JNI de 1.28.0 pede `OrtGetApiBase@VERS_1.28.0` e a `.so` do sherpa (1.28.2; a 1.28.2 não existe no
+// Maven Central) define `@@VERS_1.28.2`: o linker do Android recusa ("cannot locate symbol", medido no emulador). A API C é a mesma
+// (ORT_API_VERSION 28), só a etiqueta difere, então a tarefa abaixo troca a etiqueta exigida pela JNI pela que a `.so` do sherpa
+// define (mesmo comprimento, no lugar) e falha alto se as séries (1.28) divergirem. Detalhes e a medição: STATE.md › VC-T2b.
+// Subir a versão do sherpa ou da JNI = conferir isto de novo (o `OnnxRuntimeTagsTest` e o `OnnxSessionTest` pegam o descasamento).
+val ortJavaVersion = "1.28.0"
+val ortJavaSha256 = "f351a0638696f54b35184290dbc001d66daae17281ad0b548d2c70347d53b8a9"
+val ortJavaAar: Configuration = configurations.create("ortJavaAar") {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    isTransitive = false
+}
+
+abstract class PrepareOrtJavaTask : DefaultTask() {
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val ortAar: ConfigurableFileCollection
+
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val sherpaAar: RegularFileProperty
+
+    @get:Input
+    abstract val ortAarSha256: Property<String>
+
+    @get:OutputFile
+    abstract val classesJar: RegularFileProperty
+
+    @get:OutputDirectory
+    abstract val jniDir: DirectoryProperty
+
+    @TaskAction
+    fun prepare() {
+        val aar = ortAar.singleFile
+        val digest = MessageDigest.getInstance("SHA-256")
+        aar.inputStream().use { input ->
+            val buffer = ByteArray(1 shl 16)
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                digest.update(buffer, 0, read)
+            }
+        }
+        val actual = digest.digest().joinToString("") { "%02x".format(it) }
+        if (actual != ortAarSha256.get()) {
+            throw GradleException("onnxruntime-android: SHA256 $actual não bate com o fixado (${ortAarSha256.get()})")
+        }
+        val out = jniDir.get().asFile
+        out.deleteRecursively()
+        out.mkdirs()
+        ZipFile(aar).use { ort ->
+            ZipFile(sherpaAar.get().asFile).use { sherpa ->
+                val jar = classesJar.get().asFile
+                jar.parentFile.mkdirs()
+                ort.getInputStream(ort.getEntry("classes.jar")).use { input -> jar.outputStream().use { input.copyTo(it) } }
+                for (abi in listOf("arm64-v8a", "armeabi-v7a", "x86_64")) {
+                    val sherpaRuntime = sherpa.getEntry("jni/$abi/libonnxruntime.so")
+                        ?: throw GradleException("o AAR do sherpa-onnx não tem jni/$abi/libonnxruntime.so")
+                    val defined = ElfVersionTags.parse(sherpa.getInputStream(sherpaRuntime).use { it.readBytes() })
+                        .definedVersions().filter { it.startsWith("VERS_") }
+                    if (defined.size != 1) {
+                        throw GradleException("a libonnxruntime.so do sherpa ($abi) define ${defined.size} versões VERS_*, esperava 1: $defined")
+                    }
+                    val jniEntry = ort.getEntry("jni/$abi/libonnxruntime4j_jni.so")
+                        ?: throw GradleException("o onnxruntime-android não tem jni/$abi/libonnxruntime4j_jni.so")
+                    val jni = ElfVersionTags.parse(ort.getInputStream(jniEntry).use { it.readBytes() })
+                    val needed = jni.neededVersions().filter { it.file() == "libonnxruntime.so" && it.version().startsWith("VERS_") }
+                        .map { it.version() }.distinct()
+                    if (needed.size != 1) {
+                        throw GradleException("o libonnxruntime4j_jni.so ($abi) exige ${needed.size} versões VERS_* da libonnxruntime.so, esperava 1: $needed")
+                    }
+                    // Mesma série (maior.menor) = mesma ORT_API_VERSION da API C; patch (1.28.0 → 1.28.2) não muda a API.
+                    if (needed[0].substringBeforeLast('.') != defined[0].substringBeforeLast('.')) {
+                        throw GradleException(
+                            "a JNI do onnxruntime-android ($abi) é da série ${needed[0]} e a libonnxruntime.so do sherpa é ${defined[0]}: " +
+                                "a API C difere; troque o onnxruntime-android para a série do sherpa (ou use o shim próprio, design §7 A).",
+                        )
+                    }
+                    jni.retarget("libonnxruntime.so", "VERS_", defined[0])
+                    val target = File(out, "$abi/libonnxruntime4j_jni.so")
+                    target.parentFile.mkdirs()
+                    target.writeBytes(jni.bytes())
+                }
+            }
+        }
+    }
+}
+
+val prepareOrtJava = tasks.register<PrepareOrtJavaTask>("prepareOrtJava") {
+    ortAar.from(ortJavaAar)
+    sherpaAar.set(sherpaOnnxAar)
+    ortAarSha256.set(ortJavaSha256)
+    classesJar.set(layout.buildDirectory.file("ortjava/onnxruntime-classes.jar"))
+    jniDir.set(layout.buildDirectory.dir("ortjava/jni"))
+}
+
+// A JNI remendada entra como biblioteca gerada do app (nada de pickFirst: a `libonnxruntime.so` do onnxruntime-android não é uma
+// dependência do build, então só existe a do sherpa); o `jniLibs.srcDir` cobre o sync do IDE e os testes de unidade leem a pasta.
+androidComponents {
+    onVariants { variant ->
+        variant.sources.jniLibs?.addGeneratedSourceDirectory(prepareOrtJava, PrepareOrtJavaTask::jniDir)
+    }
+}
+
+// Os testes de unidade conferem as etiquetas contra o AAR do sherpa e a JNI remendada (OnnxRuntimeTagsTest): precisam da pasta pronta.
+tasks.withType<Test>().configureEach {
+    dependsOn(prepareOrtJava)
+}
+
 dependencies {
     // UI
     implementation("androidx.core:core-ktx:1.13.1")
@@ -382,6 +498,10 @@ dependencies {
 
     // STT on-device (NM-T1) — ver o bloco sherpa-onnx acima do `dependencies`.
     implementation(files(sherpaOnnxAar))
+
+    // OCR local (VC-T2b/VC-T6): só as classes Java do onnxruntime-android; a JNI remendada vem da tarefa `prepareOrtJava`.
+    add("ortJavaAar", "com.microsoft.onnxruntime:onnxruntime-android:$ortJavaVersion@aar")
+    implementation(files(prepareOrtJava.flatMap { it.classesJar }))
 
     // HTTP — upload multipart para API Whisper
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
