@@ -591,5 +591,5 @@ arquivo (`ModelList.kt`) ganhou o redesenho do card (etiquetas no lugar do resum
 ### RSN-T21 — Card de modelo redesenhado ✅ (RCARD-01, RCARD-02)
 - **What**: sem o `summary` no card; etiquetas por `modelTags(spec)` (`ModelCardTags.kt`); `ModelSpec.capabilities: Set<ModelCapability>` (opcional, tolerante no manifesto; hoje `NATIVE_PORTUGUESE` no Parakeet,
   `READ_TEXT` no PaddleOCR e `TOOLS` — "Ferramentas", autorizada pelo Yan — em Qwen3 0.6B, Qwen2.5 1.5B, SmolLM2 1.7B e Gemma 4 E2B/E4B, cada uma com a fonte oficial no comentário da entrada; o DeepSeek R1 Distill não declara e fica sem; o card do Qwen3 4B herda o campo); logo de 30 dp à esquerda; check "Baixado" ao lado do nome; o botão de ação desce para a linha das etiquetas (com ele no cabeçalho, "Máxima qualidade" quebrava em duas linhas no card instalado).
-- **Tests**: `ModelCardTagsTest`, `ModelCatalogTest`, `RemoteConfigRepositoryTest` (unit); `ModelListTest` (instrumentado). Goldens: ver o `STATE.md`.
+- **Tests**: `ModelCardTagsTest`, `ModelCatalogTest`, `RemoteConfigRepositoryTest` (unit); `ModelListTest` (instrumentado). Goldens: 22 quadros mudaram (`config-voz-local*`, `config-raciocinio*`, claro e escuro) e a rota `config-raciocinio-local-gpu` entrou; ver `licoes/2026-10-28-card-de-modelo-etiquetas.md` e `licoes/2026-10-28-seletor-cpu-gpu.md`.
 

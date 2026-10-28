@@ -324,3 +324,16 @@ Apenas a seleção explícita desse método habilita download do Qwen3 fed81d1 (
 renderização comparada e inferência CPU; a suíte comum ignora esse teste. Usa diretório próprio e o
 remove no fim. Fixtures verificam Jinja de Gemma/Qwen legado/4B/2.5 no mesmo processador Qwen;
 não são benchmarks nem inferência desses outros modelos. `LiteRtWarmupTest` testa configs sem pesos.
+
+## Seletor CPU · GPU e card de modelo redesenhado (2026-10-28)
+
+Spec: `.specs/features/reasoning-models/spec.md` › P2-H; lições em `.specs/project/licoes/2026-10-28-seletor-cpu-gpu.md` e `2026-10-28-card-de-modelo-etiquetas.md`.
+Unitários: `ComputeSupportTest`, `LocalBackendPrefsTest`, `ReasoningServiceCoreTest` (recarga por troca de backend, volta para a CPU, guarda por backend), `RamGuardTest`, `LlmModelTest`,
+`LocalModelsUiTest`, `ModelCardTagsTest`, `ModelCatalogTest` e `RemoteConfigRepositoryTest` (capacidades). Instrumentados afetados:
+`pool instrumentar ModelListTest ReasoningPanelTest LocalPanelTest VisaoPanelTest FalaPanelTest LocalReasoningEngineTest SettingsRepositoryTest LiteRtBackendMappingTest`.
+O emulador do pool não tem OpenCL: lá o seletor não aparece sozinho; a rota de galeria `config-raciocinio-local-gpu` (claro/escuro) simula um aparelho com GPU, e o
+`EchoBackend` de debug (que só carrega na CPU) prova a volta para a CPU de ponta a ponta no `:reasoning` real. As abas Visão e Voz ainda mostram o cartão "Em breve" nos goldens,
+então o card da Visão só é visto pelos instrumentados. `pool telas` mudou 22 quadros (todos `config-voz-local*` e `config-raciocinio*`); o resto, bit-idêntico.
+Nota de ambiente: depois do PR #46 (chave de debug versionada) um emulador que ainda tem o app instalado com a chave antiga recusa a instalação
+(`INSTALL_FAILED_UPDATE_INCOMPATIBLE`); o pool não desinstala sozinho — a segunda tentativa caiu num nó limpo (AWS) e a terceira no servidor já com a chave nova.
+

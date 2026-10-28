@@ -24,3 +24,12 @@ Visão — troca o resumo por etiquetas, ganha um logo maior e deixa claro que o
 - **Logo do fabricante**: 30 dp (era 15, alinhado ao topo), à esquerda do bloco de texto e centralizado na altura dele; contraste 3:1 e descrição mantidos (`ModelVendorLogoTest` segue verde).
   `ModelListTest#theVendorLogoIsBigAndSitsBesideTheName` trava 28–32 dp.
 - **Card instalado é um nó mesclado** (`selectable`): o texto avulso (aviso do seletor, etiquetas) só se acha na árvore sem junção (`useUnmergedTree = true`); dois testes do seletor falharam por isso na primeira rodada.
+- **Goldens (`pool telas`, 234 capturas, claro e escuro)**: mudaram 22 quadros — todos os `config-voz-local*` (Transcrição) e `config-raciocinio*` (inclusive `-local-potente`, `-testando` e `-preparando`); os outros 208
+  seguem bit-idênticos e a rota nova `config-raciocinio-local-gpu` entrou (simula um aparelho com GPU). O que se vê: logo de ~30 dp à esquerda, centrado na altura de nome + "modelo · tamanho"; o check
+  teal "Baixado" ao lado do nome; etiquetas em pílulas (idioma, "Pensamento opcional", "Ferramentas", "≥ 3 GB de RAM") com o botão "Apagar"/"Baixar" no fim da última linha delas (desce para a linha de
+  baixo quando as etiquetas já ocupam a largura); o card instalado e não selecionado com contorno teal suave e o selecionado com contorno teal cheio, mais grosso, e o rádio marcado, nos dois temas.
+  O Parakeet "Máxima qualidade" cabe numa linha. **As abas Visão e Voz ainda são o cartão "Em breve"** nos goldens, então o card da Visão (PaddleOCR, com "Ler texto da tela") só é provado pelos
+  instrumentados (`ModelListTest#theSpeechAndVisionCardsTagTheirOwnDifferentials`, `VisaoPanelTest`).
+- **Lição de ambiente**: depois do PR #46 (chave de debug versionada) o emulador do servidor ainda tinha o app com a chave antiga e recusou a instalação (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`); o pool
+  não desinstala sozinho. A 2ª tentativa foi para um nó limpo (AWS) e deu verde; a 3ª, no servidor, já instalou. Se aparecer de novo: rode de novo (o pool muda de nó) ou peça ao coordenador para
+  desinstalar `com.arateki.keyflow` do emulador do servidor.
