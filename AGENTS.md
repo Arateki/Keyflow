@@ -15,7 +15,8 @@ Leia antes de mexer (só o que a tarefa pede):
 - `.specs/codebase/TESTING.md` — gates, CI, emulador, goldens e as convenções que os testes cobram;
 - `.specs/codebase/ENVIRONMENT.md` — toolchain e comandos;
 - `.specs/features/<feature>/` — spec, design e tasks, quando a tarefa for de uma feature;
-- `.specs/project/STATE.md` — decisões e lições. É grande: procure pelo assunto, não leia inteiro.
+- `.specs/project/licoes/` — decisões e lições novas, um arquivo por assunto (`AAAA-MM-DD-assunto.md`);
+- `.specs/project/STATE.md` — decisões e lições até 2026-10-27. É grande: procure pelo assunto, não leia inteiro.
 
 ## Idioma
 
@@ -76,8 +77,12 @@ chave; o `TranslationsTest` confere as traduções.
   `main`, nunca `--force`.
 - A árvore principal pode ter trabalho não commitado de outra frente: não sobrescreva, não faça stash e não
   apague o que não é seu.
-- Ao fechar uma task de feature: Status no `tasks.md`, traceability no `spec.md` e lições no `STATE.md`
-  (regra de ouro 6).
+- Ao fechar uma task de feature: Status no `tasks.md`, traceability no `spec.md` e as lições num arquivo novo em
+  `.specs/project/licoes/` (regra de ouro 6). **Não acrescente nada ao `STATE.md`**: ele conflitava em quase toda
+  mesclagem de branches paralelas; arquivo novo nunca conflita.
+- Conflito ao sincronizar com a `main`: `STATE.md` e `app/licenses/README.md` mesclam sozinhos (`merge=union`);
+  arquivo gerado (`doc.json`, goldens) se regera em vez de resolver à mão. Detalhes e a receita da primeira
+  sincronização de branch antiga: `.specs/codebase/TESTING.md` › Conflitos de mesclagem.
 
 ## Segredos
 

@@ -176,9 +176,7 @@ avdmanager create avd -n keyflow_api34 -k "system-images;android-34;google_apis;
 # libs do emulador + ImageMagick (diff-screens.sh)
 apt-get install -y libpulse0 libnss3 libxcomposite1 libxcursor1 libxdamage1 libxi6 libxtst6 \
   libasound2t64 libgl1 libegl1 libxkbfile1 libdrm2 libgbm1 imagemagick
-# keystore debug no caminho fixado pelo app/build.gradle.kts
-keytool -genkeypair -keystore ~/.config/.android/debug.keystore -storepass android -keypass android \
-  -alias androiddebugkey -dname "CN=Android Debug,O=Android,C=US" -keyalg RSA -validity 10000
+# keystore de debug: versionada em app/debug.keystore (desde 2026-10-27), nada a gerar
 echo "sdk.dir=/root/Android/Sdk" > local.properties   # (+ .git/info/exclude)
 ```
 
