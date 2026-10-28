@@ -1,0 +1,15 @@
+# 2026-10-28 — Mescla do seletor com o catálogo novo e o OCR (equipe/seletor-processador)
+
+A branch do seletor incorpora a main `14cd67c`, que já contém as seis candidatas do PR #50 e o OCR do PR #48. Os conflitos das specs eram acréscimos independentes: os dois históricos e os requisitos do seletor permanecem. No manifesto, a declaração opcional de `libOpenCL.so` convive com o serviço isolado `:vision`; escolher somente um lado perderia uma das funcionalidades.
+
+O catálogo combinado usa `EMBEDDED_VERSION = 2026102802`, acima de `2026102801` da main. O teste recalcula a fingerprint `d73c549bf91248e8e1ed6737bb3252cf7313409f00e6bd0853b3d5b01ce6e4b1`: ela permanece igual à da main porque os arquivos, tamanhos e SHA-256 não mudaram. A versão também avança para que um manifesto anterior não retire as capacidades combinadas. O release mantém sete modelos validados; o debug oferece os seis candidatos adicionais. As capacidades já declaradas pelo seletor são preservadas, e o teste contempla também as seis entradas novas sem acrescentar capacidades não conferidas.
+
+As cenas individuais das candidatas simulam instalação e disponibilidade de OpenCL, com CPU selecionada. Isso permite revisar nome, logo, etiquetas, estado baixado e seletor juntos nos dois temas, sem instalar pesos nem declarar GPU validada. O teste de integração percorre as seis candidatas instaladas, confere etiquetas e as duas opções, e verifica o id enviado ao escolher GPU.
+
+Goldens binários conflitantes partem da main e são regenerados pelo aplicativo. A aprovação fica restrita às rotas de Raciocínio e aos cards locais da Transcrição; os outros arquivos continuam bit-idênticos à main. O comparador oficial usa ImageMagick extraído exclusivamente em `/tmp`, sem alterar ferramentas do projeto ou o sistema.
+
+Validação local: 1987/1987 unitários em 185 suítes, sem falhas/erros/ignorados; lint sem ocorrências; 85/85 instrumentados (ModelList 25, ReasoningPanel 12, LocalReasoningEngine 10, SettingsRepository 36, LiteRtBackendMapping 2). As convenções de mesclagem passaram 10/10. A primeira rodada instrumentada marcou 84/85: a consulta da etiqueta de RAM no teste novo precisava da árvore semântica não mesclada do card selecionado; a busca foi corrigida e a rodada completa passou.
+
+`pool telas` concluiu 246/246 capturas. Foram revisados os seis cards instalados com seletor, os estados GPU e a Transcrição em claro/escuro. Aprovação seletiva: 36 PNGs de 18 rotas (34 alterados e dois novos), somente `config-raciocinio*` com modelos e `config-voz-local*`; os demais 210 arquivos são bit-idênticos à main `14cd67c`. O diff oficial passou 246/246 dentro do limiar após a aprovação.
+
+Uma sessão do pool terminou com 143 depois de `BUILD SUCCESSFUL`, já com 1987/1987 e lint limpo nos relatórios; a origem do SIGTERM não foi identificada. A confirmação com cache terminou com saída 0 em 54 s. Logs e relatórios das duas execuções, da falha do teste e da rodada corrigida estão preservados em `/tmp/seletor-mescla-main/`. O CI obrigatório é acompanhado no PR #49; a GPU real continua para o Yan.

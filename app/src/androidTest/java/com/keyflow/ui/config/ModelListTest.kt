@@ -129,10 +129,12 @@ class ModelListTest {
     @Test
     fun theTextCardsCarryTheirOwnVendorLogo() {
         rule.setContent { Host(text(installed = emptySet()), FakeActions(), ModelListTags.Raciocinio) }
-        rule.onAllNodesWithTag("model-vendor-qwen").assertCountEquals(3)
-        rule.onNodeWithTag("model-vendor-hugging_face").assertExists()
+        rule.onAllNodesWithTag("model-vendor-qwen").assertCountEquals(5)
+        rule.onAllNodesWithTag("model-vendor-hugging_face").assertCountEquals(2)
         rule.onNodeWithTag("model-vendor-deepseek").assertExists()
-        rule.onAllNodesWithTag("model-vendor-google").assertCountEquals(2)
+        rule.onAllNodesWithTag("model-vendor-google").assertCountEquals(3)
+        rule.onNodeWithTag("model-vendor-ibm").assertExists()
+        rule.onNodeWithTag("model-vendor-nanbeige").assertExists()
     }
 
     /** O card não mostra mais o resumo: o que o modelo é vem em etiquetas (idioma, pensamento, RAM, capacidades). */
@@ -271,6 +273,27 @@ class ModelListTest {
         rule.onNodeWithTag("raciocinio-local-model-${qwen.id}-backend-gpu").performScrollTo().assertIsNotSelected()
         rule.onNodeWithText("Roda em").assertExists()
         rule.onNodeWithTag("raciocinio-local-model-${qwen.id}-backend-hint", useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    /** Integração do catálogo novo com o seletor: cada candidata instalada mantém suas etiquetas e envia seu próprio id. */
+    @Test
+    fun candidatasInstaladasMantemEtiquetasESeletorDoBackend() {
+        val candidates = ModelCatalog.TEXT.filterNot { it.validatedOnDevice }
+        assertEquals(6, candidates.size)
+        val selected = candidates.first().id
+        val actions = FakeActions()
+        rule.setContent {
+            Host(textWithGpu(installed = candidates.map { it.id }.toSet(), selected = selected), actions, ModelListTags.Raciocinio)
+        }
+        candidates.forEach { spec ->
+            val prefix = "raciocinio-local-model-${spec.id}"
+            rule.onNodeWithTag("$prefix-backend-cpu").performScrollTo().assertIsSelected()
+            rule.onNodeWithTag("$prefix-backend-gpu").performScrollTo().assertIsNotSelected().performClick()
+            rule.onNodeWithTag("$prefix-tag-ram", useUnmergedTree = true).performScrollTo().assertExists()
+        }
+        rule.runOnIdle {
+            assertEquals(candidates.map { Triple(it.id, ComputeBackend.GPU, it.id == selected) }, actions.backends)
+        }
     }
 
     @Test

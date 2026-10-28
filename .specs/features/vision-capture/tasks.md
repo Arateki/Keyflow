@@ -8,7 +8,7 @@ catálogo de texto, com `capabilities`; **VC-T2c**), cada card com a lista de ca
 Anthropic, Google com SSO/API, só modelos com visão, e Custom; **VC-T17**), reusando cards e conexões das outras abas. Entram a
 **VC-T15** (motor de visão: Gemma local + nuvem/Custom) e a **VC-T16** (gesto "Perguntar", ⚠️ proposta). VC-T1 e VC-T2a feitas; a
 VC-T2 antiga (ML Kit) foi revertida (`427b3d1`). Propostas ⚠️ restantes: gesto "Perguntar"; toast sem input p/ imagem; gating da aba;
-par de modelos do OCR (medido na VC-T6); runtime ONNX (design §7); lista curada de modelos com visão. A aba Visão que já existe no app
+par de modelos do OCR (**medido na VC-T6: o do catálogo fica**); runtime ONNX (design §7: **contingência aplicada na VC-T2b**); lista curada de modelos com visão. A aba Visão que já existe no app
 (origem Créditos/Local/OpenAI/…) é reconciliada pela VC-T11/VC-T17: ver `STATE.md` › "vision-capture — aba Visão existente × spec".
 
 > Gate no sandbox: `GRADLE_USER_HOME=/home/yan/Projects/keyflow/.gradle /home/yan/.local/gradle/current/bin/gradle --no-daemon <task>`
@@ -96,7 +96,7 @@ leva à aba Visão e o gesto de texto só funciona de ponta a ponta com o downlo
   objetos; `TranslationsTest` cobre os rótulos; `PinSanityTest` e `verify-model-catalog.py` verdes (nenhum pin novo).
 - **Tests**: unit. **Gate**: `build` + `testDebugUnitTest`.
 
-### VC-T2b — Runtime ONNX próprio (JNI sobre a `libonnxruntime.so` do AAR do sherpa)
+### VC-T2b — Runtime ONNX próprio (JNI sobre a `libonnxruntime.so` do AAR do sherpa) ✅ IMPLEMENTADA (2026-10-28, branch `equipe/visao-ocr`) — contingência do design §7; falta rodar no A32
 - **What**: (1) **ambiente**: provisionar NDK e CMake com versões fixas (`ndkVersion` no Gradle) em
   `/srv/dev/ferramentas/android-sdk` (hoje ausentes), documentar no `ENVIRONMENT.md` e garantir no CI (`ubuntu-24.04`:
   confirmar a versão da imagem e fixar); (2) `app/src/main/cpp/` com `CMakeLists.txt`, shim em C (`dlopen("libonnxruntime.so")`
@@ -115,6 +115,16 @@ leva à aba Visão e o gesto de texto só funciona de ponta a ponta com o downlo
 - **Contingência** (design §7): se o NDK/CMake não puder ser provisionado, `onnxruntime-android:1.28.0` + `pickFirsts` com o
   teste de hash da `.so` empacotada e `SPEC_DEVIATION` no `STATE.md`.
 - **Tests**: unit (carregamento/erros com fake) + instrumented (camada `onnx`). **Gate**: `full` + medição de APK.
+- **Feito** (2026-10-28; `SPEC_DEVIATION`, detalhes e medições em `licoes/2026-10-28-runtime-onnx-sem-ndk.md`): **não há NDK/CMake nos nós do pool**
+  (build mínimo pelo pool: "NDK not configured"), então vale a contingência, numa variante sem `pickFirst`: `prepareOrtJava` baixa o
+  `onnxruntime-android:1.28.0` (SHA-256 fixado), usa só o `classes.jar` e as `libonnxruntime4j_jni.so` e troca no build a etiqueta de versão de símbolo
+  que a JNI exige (`VERS_1.28.0`) pela que a `.so` do sherpa define (`VERS_1.28.2`) — sem isso o linker do Android recusa (medido no emulador). Uma só
+  `libonnxruntime.so` por ABI, a do sherpa, travada por hash. `com.keyflow.onnx`: `OnnxRuntime.available` (sonda que nunca lança), `OnnxSession`
+  com `OnnxOptions` (threads, arena) e tensores `Float`/`Long`. Provas: unidade `OnnxRuntimeTagsTest` + `OnnxRuntimeTest`; instrumentados (emulador
+  x86_64) `OnnxSessionTest` (7) e `OnnxPackagingTest` (2) verdes; a suíte de transcrição local do sherpa (`AudioDecoderTest`, `InferenceServiceTest`,
+  `LocalTranscriberDeviceTest`; o `LocalEngineEndToEndTest` é opt-in e não rodou) segue verde. **APK**: `assembleRelease` +262.352 B no total
+  (`.so` da JNI +111.648 B arm64 / +81.584 B v7, dex +137.988 B): ≈ 0,24 / 0,21 MB por ABI, dentro do ≤ 0,3 MB; alinhamento de 16 KB e zero símbolos de
+  rede conferidos. **Falta**: rodar `OnnxSessionTest`/`OnnxPackagingTest` no A32 (arm64) e o release no aparelho.
 
 ## Fase B — Fluxo efêmero
 
@@ -165,7 +175,7 @@ leva à aba Visão e o gesto de texto só funciona de ponta a ponta com o downlo
 
 ## Fase C — OCR
 
-### VC-T6 — `OcrEngine` sobre ONNX + processo `:vision` `[P-unit]` *(antes: ML Kit)*
+### VC-T6 — `OcrEngine` sobre ONNX + processo `:vision` `[P-unit]` *(antes: ML Kit)* ✅ IMPLEMENTADA e medida no emulador (2026-10-28, branch `equipe/visao-ocr`); falta a medição nos aparelhos reais
 - **What**: `vision/ocr/` com o contrato `OcrEngine` (`recognize` → `Text | Empty | Unavailable | Failed`) e o
   `PaddleOcrEngine` (design §6): pré-processamento do detector (múltiplos de 32, **faixas** para áreas altas, normalização),
   pós-processamento DB (binarização, componentes conexos, caixa mínima, `unclip`), recorte/redimensionamento do reconhecedor,
@@ -186,6 +196,26 @@ leva à aba Visão e o gesto de texto só funciona de ponta a ponta com o downlo
   StrictMode `detectNetwork` no `:vision` sem violação; meta provisória ⚠️: tela cheia ≤ 5 s e pico ≤ 250 MB no A32 (se
   estourar, registrar e ajustar faixas/threads — não esconder).
 - **Tests**: unit + instrumented. **Gate**: `full`.
+- **Feito** (2026-10-28; números e tabela de escolhas em `licoes/2026-10-28-ocr-paddle-medicao.md`): `vision/ocr/` (Kotlin puro, sem `android.*`):
+  `OcrEngine`/`OcrResult`, `StripPlanner` (faixas de 960 px com 64 px de sobreposição no eixo maior; o dono do trecho é a faixa onde está o centro da
+  caixa, em vez de deduplicar texto), `Resampler` (filtro triangular, BGR/RGB), `DbPostprocess` (binariza, componentes conexos, caixa, `unclip`),
+  `CtcDecoder` (branco 0, dicionário, espaço ao fim: 502 + 2 = 504 classes), `LineAssembler` (linhas e blocos) e `PaddleOcrEngine`.
+  `vision/service/`: `VisionService` em `:vision` (`IVisionService.aidl` `oneway` + `IVisionCallback`; recorte por arquivo RGBA em `cacheDir/vision/`;
+  carga sob demanda, descarga por ociosidade de 30 s, guarda de RAM de 250 MB, `OutOfMemoryError` → `Failed(OOM)`; não lê Settings; StrictMode de rede
+  no debug). `vision/client/`: `VisionOcrClient` (bind com linger, `DeathRecipient` → `Failed(PROCESS_DIED)`, cancelar a corrotina cancela no
+  serviço, 60 s de teto), `VisionModels` (consulta o `ModelStore`, nunca baixa), `VisionCache.clear` (epílogo, CAP-04).
+  **Medição no emulador** (30 imagens em `Canvas`, pt/en/es/código/interface, 12–32 px, claro e escuro): **CER 0,20%** (limite provisório ≤ 5%);
+  normalização escolhida = a de referência do PaddleOCR (detector BGR + ImageNet, reconhecedor BGR ±1); `unclip` 2,0; arena da ORT ligada e 1 caixa por
+  chamada. Tela 720x1600: 39,7 s (linha de base) → **10,8 s**; ¼ de tela 3,1 s; pico do `:vision` 213 MB (¼) a 362 MB (1080x2400) de RSS, +91 a +237 MB
+  sobre o processo ocioso (119 MB). **A meta provisória "tela cheia ≤ 5 s" NÃO fecha no emulador** (registrado, não escondido); o limite de RAM
+  fecha como acréscimo e não como RSS total. Plano B (`deepghs`) medido com uma avaliação: CER 3,3% — o par do catálogo fica. Testes: unidade
+  `StripPlannerTest`, `DbPostprocessTest`, `CtcDecoderTest`, `LineAssemblerTest`, `ResamplerTest`, `PaddleOcrEngineTest` (pipeline inteiro com sessões
+  falsas: faixas sem duplicar, em branco → `Empty`, runtime/arquivos ausentes → `Unavailable`, OOM, cancelar, classes que não batem),
+  `VisionServiceCoreTest`, `VisionRulesTest` (sem rede, sem `android.*` no OCR, `:vision` sem Settings/catálogo, Visão sem downloader, manifest);
+  instrumentados (emulador) `VisionServiceTest` (processo separado, `BadInput`, RAM, e com o modelo real: texto sem rede, **matar o `:vision`**
+  no meio e religar, cancelar) e `PaddleOcrEngineDeviceTest` (CER, acentos, em branco, tela em faixas). `OcrMeasurementTest`/`OcrSpeedProbeTest`
+  ficam prontos para os aparelhos (opt-in só pelo pedido da classe). **Falta**: A32, Tab S10 Lite e Vaio (tempo, RAM, `threads`/arena) e
+  capturas reais (≤ 15%); promover `validatedOnDevice` do `OCR_PADDLE_LATIN` só depois (a VC-T11 liga a aba).
 
 ## Fase D — Ações por gesto
 

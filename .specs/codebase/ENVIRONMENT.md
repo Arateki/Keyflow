@@ -142,6 +142,15 @@ Decisão 2 do Yan (2026-10-24), no debug e no release. No app é **uma linha**: 
 - Play Console/Google **[YAN]**: o app e o produto de R$15; o client OAuth Google com o pacote novo e o SHA-1 da chave de
   assinatura da Play; o vínculo do Play Integrity (projeto na nuvem); o app no AdMob (`app-ads.txt` e os IDs).
 
+## Código nativo (NDK/CMake): não há nos nós do pool
+
+Medido em 2026-10-27 (VC-T2b): o servidor (`/srv/dev/ferramentas/android-sdk`), o Deck e a AWS **não têm NDK nem CMake**, e o Gradle do pool
+roda com `android.builder.sdkDownload=false` (não baixa pacote do SDK). Um `externalNativeBuild { cmake { … } }` mínimo no `:app` falhou
+na configuração com `NDK not configured. Download it with SDK manager. Preferred NDK version is '28.2.13676358'`. Consequência: o app **não compila
+C/C++ próprio**. A ponte JNI do ONNX Runtime vem pronta do `onnxruntime-android` e é ajustada em Java no build (`prepareOrtJava` no
+`app/build.gradle.kts`; `STATE.md` › "VC-T2b"). Provisionar o NDK (~1 GB, instalar no SDK compartilhado e nos nós) é decisão do Yan; com ele
+o shim próprio do design da Visão (§7 A) volta a ser possível.
+
 ## Notas / pegadinhas
 
 - **Smoke build**: um app Android trivial compilou e gerou APK (Gradle 9.6.1 + AGP 9.2.0 + JDK 17 + SDK). A fundação está provada; o projeto descartável ficou no scratchpad temporário, fora do repo.

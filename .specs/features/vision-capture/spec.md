@@ -107,7 +107,7 @@ promessa de privacidade e o APK enxuto.
 
 1. **MDL-01**: o modelo de OCR SHALL ser uma entrada real do `ModelCatalog` (`kind = VISION`, `engineType = OCR`, um arquivo por papel: detector, reconhecedor, dicionário) com URL de **commit** fixo, SHA-256 e tamanho **conferidos por download**, licença permissiva registrada no comentário da entrada; nenhuma entrada fabricada (regra de ouro 8) — as entradas antigas de `ModelCatalog.VISION` saem.
 2. **MDL-02**: o download/remoção dos modelos da Visão SHALL acontecer **somente pela aba Visão** (mesmo downloader e `ModelStore` da voz: retomável, SHA conferido); o fluxo de captura SHALL NÃO importar o downloader (regra executável em `ArchitectureRulesTest`).
-3. **MDL-03**: nenhum modelo SHALL ir no APK; o único acréscimo nativo é o shim do runtime ONNX (≤ 0,3 MB por ABI, medido) — sem segunda cópia da ORT.
+3. **MDL-03**: nenhum modelo SHALL ir no APK; o único acréscimo nativo é o shim do runtime ONNX (≤ 0,3 MB por ABI, medido) — sem segunda cópia da ORT. *(2026-10-28, SPEC_DEVIATION: sem NDK nos nós do pool, o "shim" é a JNI do `onnxruntime-android` com a etiqueta de versão remendada no build + o `classes.jar`: ≈ 0,24 MB (arm64) / 0,21 MB (v7) medidos, ainda ≤ 0,3 MB; uma só `libonnxruntime.so` por ABI, a do sherpa — `licoes/2026-10-28-runtime-onnx-sem-ndk.md`.)*
 4. **MDL-04**: os motores SHALL carregar sob demanda e liberar a memória por ociosidade (OCR em `:vision`; Gemma 4 em `:reasoning`, 120 s); RAM insuficiente ou `OutOfMemoryError` SHALL virar aviso amigável, nunca crash.
 5. **MDL-05 (novo; decisão do Yan 2026-10-27)**: os modelos locais da aba Visão SHALL ser o **PaddleOCR** e os **Gemma 4 E2B e E4B**; os Gemma são os **mesmos arquivos** do catálogo de texto (`gemma-4-e2b-litertlm`, `gemma-4-e4b-litertlm`, `kind = TEXT`): uma cópia em disco, um download, instalado numa aba aparece instalado na outra. A Visão os lista por uma **capacidade de visão** no `ModelSpec`, não por cópia da entrada. Conferido em 2026-10-27: os dois `.litertlm` trazem as seções `tf_lite_vision_encoder`, `tf_lite_vision_adapter` e `tf_lite_end_of_vision` e os tokens `<|image>`/`<image|>`; o LiteRT-LM 0.16.1 do app expõe `Content.ImageBytes/ImageFile` e `EngineConfig.visionBackend`. Falta provar **no aparelho** que o modelo carrega com visão (VC-T15).
 6. **MDL-06 (novo)**: cada card de modelo da Visão SHALL mostrar uma **breve lista de capacidades**, por `tr("…")` (PaddleOCR: "Ler texto da tela"; Gemma 4: "Ler texto", "Descrever imagem", "Responder sobre a tela"). A lista vem de dados do `ModelSpec` (`capabilities`), não de texto solto na tela, e os gestos (ACT-01) se habilitam por ela.
@@ -175,7 +175,7 @@ promessa de privacidade e o APK enxuto.
 | CAP-01 | P1-B | VC-T3 | In Tasks |
 | CAP-02 | P1-B | VC-T5 | In Tasks |
 | CAP-03 | P1-B | VC-T4, VC-T5 | In Tasks |
-| CAP-04 | P1-B | VC-T4, VC-T6, VC-T8 | In Tasks |
+| CAP-04 | P1-B | VC-T4, VC-T6, VC-T8 | Parcial: `VisionCache.clear` pronto (VC-T6); epílogo em VC-T4 |
 | ACT-01 | P1-C | VC-T7, VC-T16 | In Tasks |
 | ACT-02 | P1-C | VC-T7, VC-T15 | In Tasks |
 | ACT-03 | P1-C | VC-T15, VC-T16 (⚠️ proposta) | In Tasks |
@@ -183,14 +183,14 @@ promessa de privacidade e o APK enxuto.
 | ACT-05 | P1-C | VC-T10 | In Tasks |
 | ACT-06 | P1-C | VC-T10 | In Tasks |
 | ACT-07 | P1-C | — (comportamento aceito; sem código) | N/A |
-| OCR-01 | P1-C | VC-T2b, VC-T6 | In Tasks |
-| OCR-02 | P1-C | VC-T6, VC-T7 | In Tasks |
-| OCR-03 | P1-C | VC-T2b, VC-T6, VC-T14, VC-T15 | In Tasks |
+| OCR-01 | P1-C | VC-T2b, VC-T6 | Implemented (emulador; falta A32) |
+| OCR-02 | P1-C | VC-T6 (`Empty`), VC-T7 (aviso) | Engine implemented; aviso em VC-T7 |
+| OCR-03 | P1-C | VC-T2b, VC-T6, VC-T14, VC-T15 | Implemented p/ OCR (StrictMode + regra de arquitetura); modo avião em VC-T14 |
 | OCR-04 | P1-C | VC-T7, VC-T11 | In Tasks |
 | MDL-01 | P1-G | VC-T2a | Implemented |
 | MDL-02 | P1-G | VC-T7, VC-T11 | In Tasks |
-| MDL-03 | P1-G | VC-T2b, VC-T13 | In Tasks |
-| MDL-04 | P1-G | VC-T6, VC-T15 | In Tasks |
+| MDL-03 | P1-G | VC-T2b, VC-T13 | Implemented, SPEC_DEVIATION (JNI do onnxruntime-android, ≈ 0,24 MB/ABI) |
+| MDL-04 | P1-G | VC-T6, VC-T15 | Implemented p/ OCR; Gemma em VC-T15 |
 | MDL-05 | P1-G | VC-T2c, VC-T15 | In Tasks |
 | MDL-06 | P1-G | VC-T2c, VC-T11 | In Tasks |
 | PRV-01 | P2-D | VC-T17 | In Tasks |

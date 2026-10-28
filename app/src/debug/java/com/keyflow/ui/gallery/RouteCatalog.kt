@@ -512,6 +512,13 @@ object RouteCatalog {
                 ),
             )
         },
+        // As candidatas ficam abaixo da dobra na lista: cada quadro permite revisar o card e seu fabricante nos dois temas.
+        Route("config-raciocinio-local-functiongemma") { CandidateReasoningRoute(ModelCatalog.FUNCTIONGEMMA_270M) },
+        Route("config-raciocinio-local-codigo") { CandidateReasoningRoute(ModelCatalog.QWEN2_5_CODER_1_5B) },
+        Route("config-raciocinio-local-aberto") { CandidateReasoningRoute(ModelCatalog.SMOLLM3_3B) },
+        Route("config-raciocinio-local-analitico") { CandidateReasoningRoute(ModelCatalog.GRANITE_4_2_3B) },
+        Route("config-raciocinio-local-profundo") { CandidateReasoningRoute(ModelCatalog.NANBEIGE_4_2_3B) },
+        Route("config-raciocinio-local-hibrido") { CandidateReasoningRoute(ModelCatalog.QWEN3_5_4B) },
     )
 
     private val byKey: Map<String, Route> = routes.associateBy { it.key }
@@ -519,6 +526,19 @@ object RouteCatalog {
     fun route(key: String): Route? = byKey[key]
 
     val keys: List<String> get() = routes.map { it.key }
+
+    @Composable
+    private fun CandidateReasoningRoute(spec: com.keyflow.data.models.ModelSpec) {
+        // Instalação e OpenCL simulados: confere o card novo junto do seletor, sem carregar os pesos da candidata.
+        ConfigReasoningRoute(
+            localModelId = spec.id,
+            localModels = LocalModelsUi.compose(
+                catalog = listOf(spec), installed = setOf(spec.id), active = null, failures = emptyMap(),
+                selectedId = spec.id, deviceRamMb = 8192, gpuAvailable = true,
+            ),
+            ready = true,
+        )
+    }
 
     /** Scaffold de configuração na aba padrão (Transcrição), com modos ligados — base do menu aberto. */
     @Composable

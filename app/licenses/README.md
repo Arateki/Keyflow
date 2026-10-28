@@ -18,6 +18,7 @@
 | SmolLM2 1.7B Instruct (Hugging Face) — modelo de texto baixado sob demanda | Apache-2.0 | `Apache-2.0_smollm2-1.7b.txt` |
 | DeepSeek-R1-Distill-Qwen 1.5B (DeepSeek, derivado do Qwen2.5) — modelo de texto baixado sob demanda | MIT (e Apache-2.0 do Qwen2.5) | `MIT_deepseek-r1-distill-qwen-1.5b.txt` |
 | Logos dos fabricantes de modelo no card (NVIDIA, Hugging Face, DeepSeek, PaddlePaddle): paths de `nvidia.svg`, `huggingface.svg`, `deepseek.svg`, `paddlepaddle.svg` do Simple Icons | CC0 1.0 (os desenhos; as marcas são dos donos) | — (domínio público, sem arquivo) |
+| Logo da Nanbeige no card: redesenho vetorial do avatar oficial no Hugging Face | Desenho próprio; a marca e o avatar de referência pertencem à Nanbeige (sem licença aberta declarada para o avatar) | Referência e atribuição abaixo |
 | Logo da Qwen no card: path de `packages/static-svg/icons/qwen-color.svg` do lobe-icons (LobeHub) | MIT | `MIT_lobe-icons.txt` |
 | AndroidSVG 1.4 (AAR, desenha os SVGs das skins importáveis) | Apache-2.0 | `Apache-2.0_androidsvg.txt` |
 
@@ -25,6 +26,23 @@ Fontes das licenças conferidas em 2026-09-25: `LICENSE` do sherpa-onnx na tag v
 e do Whisper no GitHub; a do Parakeet no card do Hugging Face (`license: cc-by-4.0`). Os cards do
 Hugging Face dos pesos do Whisper declaram Apache-2.0; o repositório oficial da OpenAI declara MIT para
 código e pesos — vale a atribuição das duas, e a aba Docs cita ambas.
+
+## Candidatas de Raciocínio só no debug (2026-10-27)
+
+Não aparecem na Docs/site enquanto `validatedOnDevice = false`, como o OCR ainda não validado. Licenças registradas mesmo assim:
+
+| Modelo | Licença | Arquivo |
+| --- | --- | --- |
+| FunctionGemma 270M | Termos do Gemma | `Gemma_functiongemma-270m.txt` |
+| Qwen2.5-Coder 1.5B | Apache-2.0 | `Apache-2.0_qwen2.5-coder-1.5b.txt` |
+| SmolLM3 3B | Apache-2.0 | `Apache-2.0_smollm3-3b.txt` |
+| Granite 4.2 3B | Apache-2.0 | `Apache-2.0_granite-4.2-3b.txt` |
+| Nanbeige4.2 3B | Apache-2.0 | `Apache-2.0_nanbeige-4.2-3b.txt` |
+| Qwen3.5 4B | Apache-2.0 | `Apache-2.0_qwen3.5-4b.txt` |
+
+FunctionGemma: [a documentação oficial](https://ai.google.dev/gemma/docs/functiongemma) permite uso comercial responsável, sujeito aos [Termos do Gemma](https://ai.google.dev/gemma/terms) (2026-04-01), com cópia dos termos, aviso e restrições de uso (3.1/3.2); não é Apache-2.0. A política de uso e o NOTICE acompanham o arquivo de licença. Antes de promovê-lo ao release, incorporar as obrigações ao fluxo de distribuição.
+
+IBM: path e cor `#0F62FE` de [lobe-icons, commit 8b7bbc4](https://github.com/lobehub/lobe-icons/blob/8b7bbc433d38437fa2b0cca58ae896917162b812/src/IBM/components/Mono.tsx), MIT; texto em `MIT_lobe-icons.txt`. Nanbeige: redesenho vetorial próprio do [avatar publicado pela Nanbeige no Hugging Face](https://cdn-avatars.huggingface.co/v1/production/uploads/646f0d118ff94af23bc44aab/GXHCollpMRgvYqUXQ2BQ7.png), conferido em 2026-10-28: barra curva superior, faixa larga e cinco blocos, normalizados no grid 24×24. O PNG de referência não é distribuído no app; o path e a cor `#0B4A45` ficam em `KfIcons.LogoNanbeige` e `ModelVendorLogo`. A marca identifica o fabricante e não indica afiliação ou endosso. Não foi encontrada licença aberta do avatar; a licença Apache-2.0 dos pesos não é atribuída à marca.
 
 Conferidas em 2026-09-30 (reasoning-models): o `LICENSE` e o `THIRD_PARTY_NOTICE.txt` vêm do próprio AAR do LiteRT-LM
 0.16.1; as licenças dos dois modelos de texto, dos cards do Hugging Face (`license: apache-2.0` nos dois). O Gemma 3 1B

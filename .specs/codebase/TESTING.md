@@ -345,4 +345,3 @@ O emulador do pool não tem OpenCL: lá o seletor não aparece sozinho; a rota d
 então o card da Visão só é visto pelos instrumentados. `pool telas` mudou 22 quadros (todos `config-voz-local*` e `config-raciocinio*`); o resto, bit-idêntico.
 Nota de ambiente: depois do PR #46 (chave de debug versionada) um emulador que ainda tem o app instalado com a chave antiga recusa a instalação
 (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`); o pool não desinstala sozinho — a segunda tentativa caiu num nó limpo (AWS) e a terceira no servidor já com a chave nova.
-

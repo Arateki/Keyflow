@@ -597,3 +597,17 @@ arquivo (`ModelList.kt`) ganhou o redesenho do card (etiquetas no lugar do resum
 ### Revisão 2 do PR #49 — fichas da seleção e versão no commit
 
 Status: verificado em 2026-10-28: `pool compilar testDebugUnitTest :app:lintDebug` passou 1882/1882 em 173 suítes, sem ignorados e sem ocorrências de lint; `pool instrumentar ModelListTest ReasoningPanelTest LocalReasoningEngineTest SettingsRepositoryTest LiteRtBackendMappingTest` passou 84/84 no servidor (sem filtros de nó/AWS nos dois comandos). CI obrigatório acompanhado no PR. RPRC-03/05/07: toda seleção explícita do card renova a ficha dentro da edição e usa o snapshot devolvido na pré-carga; avisos de carga conferem versão instalada e ficha dentro da transformação atômica. Regressões em `BackendReportCommitRaceTest`, `BackendReportsRaceTest` e `LocalBackendSelectionTest`. Prova anterior: 3 falhas reproduzidas de 5 testes na janela da edição. Lição: `licoes/2026-10-28-corridas-selecao-backend.md`.
+
+## Candidatas só no debug (2026-10-27, modelos-novos)
+
+Status: cadastro e logo Nanbeige implementados; main sincronizada, 1804/1804 unitários, lint sem ocorrências e 23/23 instrumentados afetados. Captura final 244/244; comparação oficial e sem fuzz dentro do limiar após aprovar só 22 PNGs de Raciocínio (dez existentes e 12 novos), com os demais 222 bit-idênticos. Os seis cards foram revisados em claro/escuro; CI obrigatório acompanhado no PR. Lição: `licoes/2026-10-28-modelos-novos.md`. Histórico da primeira rodada: Gate JVM: 1799/1800 (única falha: fabricante Nanbeige); lint sem ocorrências; instrumentados afetados 23/23. Goldens: 230/230 capturas dentro do limiar sem fuzz, com dez PNGs de Raciocínio aprovados e os outros 220 originais preservados.
+Seis candidatas, URL por commit + LFS/bytes conferidos, licenças, traduções dos cards e logo IBM MIT.
+Release mantém os sete modelos validados após a integração do Qwen3 4B e não publica as licenças das candidatas em Docs/site. Spark 1.7B/4B aguardam runtime compatível (mínimo formal 0.17.0).
+Evidências, estimativas de RAM, diferenças entre versões de runtime e limitações em `modelos-novos.md`.
+O teste de fabricante permanece sem exceção, agora com `ModelVendor.NANBEIGE`; o Yan avalia carga, qualidade, aquecimento e RSS nos aparelhos.
+
+### Mescla do seletor com o catálogo novo e o OCR — 2026-10-28
+
+Integração dos PRs #50/#48 na branch do seletor: specs combinadas, manifesto com OpenCL e `:vision`, catálogo `2026102802` com os seis candidatos e as capacidades anteriores preservadas. As cenas individuais e `ModelListTest` verificam as candidatas instaladas com seletor e etiquetas; a validação está registrada em `licoes/2026-10-28-mescla-seletor-catalogo.md`.
+
+Status: verificado localmente — 1987/1987 unitários, lint sem ocorrências, 85/85 instrumentados e 10/10 convenções de mesclagem. Capturas 246/246 e diff oficial dentro do limiar; aprovados 36 PNGs de Raciocínio/Transcrição local, com os outros 210 bit-idênticos à main. CI obrigatório acompanhado no PR #49; GPU real permanece com o Yan.
