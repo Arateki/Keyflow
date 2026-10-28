@@ -259,10 +259,10 @@ leva à aba Visão e o gesto de texto só funciona de ponta a ponta com o downlo
 Decisão do Yan: a Visão não traduz (context V11). Saem `LanguageGuesser`, `TranslateEngine`, o alvo 🌐, o aviso do Qwen3 e TRD-01..06.
 O ID fica reservado (não reutilizar) para que commits e referências antigas não apontem para outra coisa.
 
-### VC-T15 — `VisionModelEngine`: Gemma 4 local + nuvem/Custom *(nova; V12/V13)*
+### VC-T15 — `VisionModelEngine`: Gemma 4 local + nuvem/Custom *(V12/V13)* ✅ IMPLEMENTADA; prova funcional no emulador (2026-10-28), validação física pendente
 - **What**: contrato `VisionModelEngine` (`read`/`ask` → `Text | Empty | Unavailable | Failed`, design §11) com três implementações:
   (a) **`LocalVisionEngine`** — Gemma 4 pelo `LocalReasoningEngine`/`LiteRtBackend` no `:reasoning`: `EngineConfig.visionBackend` + imagem como
-  `Content.ImageBytes` (recorte reduzido a ~1024 px), guarda de RAM, descarga por ociosidade; **prova funcional: E2B na CPU do emulador, em teste instrumentado opt-in explícito; qualidade/tempo/RAM físicos ficam para a bancada do coordenador** (hoje o `LiteRtBackend` não passa `visionBackend`); (b) **`CloudVisionEngine`** — OpenAI/
+  `Content.ImageBytes` (recorte reduzido a ~1024 px), guarda de RAM, descarga por ociosidade; **prova funcional: E2B na CPU do emulador, em teste instrumentado opt-in explícito; qualidade/tempo/RAM físicos ficam para a bancada do coordenador** (o backend agora configura `visionBackend`); (b) **`CloudVisionEngine`** — OpenAI/
   Anthropic/Google pelos caminhos de nuvem do Raciocínio (`ReasoningEngines`, credencial do cofre) com a imagem no corpo; (c)
   **`CustomVisionEngine`** — `chat/completions` com `image_url` (data URL). Pedidos fixos do design §11; escolha do engine pelo
   modelo/origem selecionado; falha → aviso com a causa e nada copiado (PRV-05, MDL-04). Fia **Copiar texto** com Gemma/provedor (ACT-02).
@@ -277,9 +277,9 @@ O ID fica reservado (não reutilizar) para que commits e referências antigas n�
   qualidade/tempo/RAM reais no A32 = **manual** (VC-T14).
 - **Tests**: unit + instrumented (+manual). **Gate**: `full` + manual.
 
-Status (2026-10-28): motor e Testar implementados na branch `equipe/visao-motor`; validação em andamento.
+Status (2026-10-28): motor e Testar implementados na branch `equipe/visao-motor`; 78/78 instrumentados afetados e 20/20 capturas da Visão aprovados. E2B real na CPU do emulador: carga fria 7.900 ms, resposta “KeyFlow” em 37.114 ms de geração; pelo serviço de produção, 44.768 ms incluindo carga. Métricas apenas de funcionamento; qualidade/tempo/RAM físicos pendentes.
 Contrato e seleção puros, provedores compartilhados, Custom com imagem, arquivo privado para o AIDL e cancelamento por pedido.
-O fluxo de captura/gestos não faz parte desta entrega. `GemmaVisionDeviceTest#e2bNaCpuLeAImagemDeExemplo` é opt-in por método explícito, baixa o E2B do catálogo e verifica SHA/tamanho; a suíte comum usa eco/fakes. Resultados finais na lição `licoes/2026-10-28-visao-motor.md`. `VISION_PROVEN_IDS` e `validatedOnDevice` permanecem inalterados até a validação física.
+O fluxo de captura/gestos não faz parte desta entrega. `GemmaVisionDeviceTest#e2bNaCpuLeAImagemDeExemplo` é opt-in por método explícito, baixa o E2B do catálogo e verifica SHA/tamanho; a suíte comum usa eco/fakes. Evidências e limites na lição `licoes/2026-10-28-visao-motor.md`. `VISION_PROVEN_IDS` e `validatedOnDevice` permanecem inalterados até a validação física.
 
 ### VC-T16 — Gesto 💬 **Perguntar** ⚠️ (proposta) *(nova)*
 - **What**: terceiro alvo do `VisionDragTargets`, **só quando o modelo selecionado tem `ANSWER_ABOUT_SCREEN`** (Gemma ou provedor com
