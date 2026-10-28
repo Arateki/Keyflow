@@ -132,7 +132,7 @@ object ModelCatalog {
      * O manifesto remoto (`catalogVersion`) só vale se for maior ou igual a ela: sem isso, um manifesto ou cache antigo substituiria o catálogo
      * inteiro e devolveria, por exemplo, o SHA legado do Qwen3 (o `ModelCatalogTest` confere a impressão digital dos pins contra esta versão).
      */
-    const val EMBEDDED_VERSION = 2026102802
+    const val EMBEDDED_VERSION = 2026102803
 
     /** Impressão digital dos pins embutidos (id, nome, tamanho e SHA-256 de cada arquivo): muda se um pin mudar sem [EMBEDDED_VERSION] subir. */
     fun pinsFingerprint(models: List<ModelSpec> = MODELS): String {

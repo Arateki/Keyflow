@@ -9,6 +9,8 @@ import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import org.json.JSONArray
+import org.json.JSONObject
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -134,6 +136,48 @@ class RemoteConfigRepositoryTest {
             .containsExactly(ModelCapability.READ_TEXT, ModelCapability.TOOLS, ModelCapability.NATIVE_PORTUGUESE)
         assertThat(parse("[\"READ_TEXT\", \"VOAR\", 7, null]")).containsExactly(ModelCapability.READ_TEXT)
         assertThat(parse("\"READ_TEXT\"")).isEmpty()
+    }
+
+    @Test
+    fun `validação remota falsa ou ausente não libera o OCR no release`() {
+        for (validated in listOf(null, false, "inválido")) {
+            val model = RemoteConfigRepository.parseModels(ocrJson(validated)).single()
+            assertThat(model.validatedOnDevice).isFalse()
+            assertThat(ModelCatalog.visionModels(listOf(model), debug = false)).isEmpty()
+            assertThat(ModelCatalog.visionModels(listOf(model), debug = true).map { it.id }).containsExactly(ModelCatalog.OCR_PADDLE_LATIN.id)
+        }
+        assertThat(RemoteConfigRepository.parseModels(ocrJson(true)).single().validatedOnDevice).isTrue()
+    }
+
+    @Test
+    fun `cache anterior às capacidades de visão é recusado e preserva o Gemma instalado`() = runTest {
+        val cache = MemoryCache()
+        cache.write("models", RemoteCacheEntry(modelsJson("legado-sem-visão", 2026102802), "\"anterior\""))
+        server.enqueue(MockResponse().setResponseCode(503))
+        server.enqueue(MockResponse().setResponseCode(304))
+        val snapshot = repository(cache).refresh()
+        assertThat(snapshot.models).isEmpty()
+        ModelCatalog.applyRemoteManifest(snapshot.models)
+        val gemma = ModelCatalog.GEMMA_4_E2B
+        val models = com.keyflow.ui.config.LocalModelsUi.compose(
+            catalog = ModelCatalog.visionModels(debug = true), installed = setOf(gemma.id), active = null,
+            failures = emptyMap(), selectedId = gemma.id, deviceRamMb = 8_000,
+        )
+        assertThat(models.items.map { it.spec.id }).containsExactly(ModelCatalog.OCR_PADDLE_LATIN.id, gemma.id, ModelCatalog.GEMMA_4_E4B.id)
+        assertThat(models.items.single { it.spec.id == gemma.id }.selected).isTrue()
+    }
+
+    private fun ocrJson(validated: Any?): String {
+        val spec = ModelCatalog.OCR_PADDLE_LATIN
+        val model = JSONObject().put("id", spec.id).put("displayName", spec.displayName).put("summary", spec.summary)
+            .put("languages", spec.languages).put("kind", spec.kind.name).put("engineType", spec.engineType.name)
+            .put("recommendedRamMb", spec.recommendedRamMb)
+            .put("capabilities", JSONArray(spec.capabilities.map { it.name }))
+            .put("files", JSONArray(spec.files.map { f -> JSONObject()
+                .put("role", f.role.name).put("fileName", f.fileName).put("url", f.url).put("sha256", f.sha256).put("bytes", f.bytes)
+            }))
+        if (validated != null) model.put("validatedOnDevice", validated)
+        return JSONObject().put("catalogVersion", ModelCatalog.EMBEDDED_VERSION).put("models", JSONArray().put(model)).toString()
     }
 
     @Test
