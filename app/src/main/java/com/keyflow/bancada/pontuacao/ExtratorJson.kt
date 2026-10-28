@@ -25,7 +25,7 @@ object ExtratorJson {
     }
 
     /** Os valores JSON de nível mais alto ([JSONObject] ou [JSONArray]), na ordem em que aparecem, e como vieram. */
-    class Extracao(val valores: List<Any>, val forma: Forma) {
+    class Extracao(val valores: List<Any>, val forma: Forma, val truncada: Boolean = false) {
         val primeiroObjeto: JSONObject? get() = valores.firstOrNull() as? JSONObject
     }
 
@@ -36,18 +36,20 @@ object ExtratorJson {
     const val TAMANHO_MAXIMO = 20_000
 
     fun extrair(saida: String): Extracao {
-        val texto = saida.trim().take(TAMANHO_MAXIMO)
+        val inteiro = saida.trim()
+        val truncada = inteiro.length > TAMANHO_MAXIMO
+        val texto = inteiro.take(TAMANHO_MAXIMO)
         if (texto.isEmpty()) return Extracao(emptyList(), Forma.NENHUM)
         val achados = varrer(texto)
-        if (achados.isEmpty()) return Extracao(emptyList(), Forma.NENHUM)
+        if (achados.isEmpty()) return Extracao(emptyList(), Forma.NENHUM, truncada)
         val valores = achados.map { it.valor }
         val unico = achados.singleOrNull()
         val forma = when {
-            unico != null && unico.inicio == 0 && unico.fim == texto.length -> Forma.LIMPO
+            unico != null && unico.inicio == 0 && unico.fim == texto.length && !truncada -> Forma.LIMPO
             unico != null && naCercaSozinho(texto, unico) -> Forma.CERCA
             else -> Forma.EM_VOLTA
         }
-        return Extracao(valores, forma)
+        return Extracao(valores, forma, truncada)
     }
 
     private class Achado(val valor: Any, val inicio: Int, val fim: Int)
@@ -104,7 +106,7 @@ object ExtratorJson {
         return -1
     }
 
-    private fun parse(trecho: String): Any? = try {
+    private fun parse(trecho: String): Any? = if (!JsonEstrito.valido(trecho)) null else try {
         if (trecho.startsWith("{")) JSONObject(trecho) else JSONArray(trecho)
     } catch (e: JSONException) {
         null

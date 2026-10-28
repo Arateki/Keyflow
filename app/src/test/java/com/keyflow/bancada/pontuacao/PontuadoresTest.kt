@@ -289,4 +289,28 @@ class PontuadoresTest {
         assertThat(Pontuadores.testes).containsExactly("pontuacao", "reescrita", "json", "acoes", "contexto")
         assertThat(Pontuadores.de("rapido")).isNull()
     }
+
+    @Test
+    fun `acoes - invalid json syntax is not a valid call`() {
+        val p = PontuadorAcoes.pontuar(caso(esperado = obj("""{"nome":"skin_list","args":{}}""")), "{nome:'skin_list'}")
+        assertNota(p, 0.0)
+        assertThat(p.marcas).contains(Marca.JSON_ILEGIVEL)
+    }
+
+    @Test
+    fun `acoes - null args are invalid arguments, not an empty object`() {
+        val c = caso(esperado = obj("""{"nome":"skin_list","args":{}}"""))
+        assertNota(PontuadorAcoes.pontuar(c, """{"nome":"skin_list","args":null}"""), 0.4)
+        assertNota(PontuadorAcoes.pontuar(c, """{"nome":"skin_list","args":"x"}"""), 0.4)
+        assertNota(PontuadorAcoes.pontuar(c, """{"nome":"skin_list"}"""), 1.0)
+        assertNota(PontuadorAcoes.pontuar(c, """{"nome":"skin_list","args":{}}"""), 1.0)
+    }
+
+    @Test
+    fun `acoes - a second call hidden past the read limit does not earn a full mark`() {
+        val c = caso(esperado = obj("""{"nome":"skin_list","args":{}}"""))
+        val p = PontuadorAcoes.pontuar(c, """{"nome":"skin_list","args":{}}""" + " ".repeat(20_000) + """{"nome":"skin_apply","args":{}}""")
+        assertNota(p, 0.0)
+        assertThat(p.marcas).contains(Marca.MULTIPLAS_CHAMADAS)
+    }
 }

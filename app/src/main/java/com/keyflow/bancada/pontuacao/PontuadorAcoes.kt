@@ -28,6 +28,8 @@ object PontuadorAcoes : Pontuador {
             else -> Unit
         }
         val chamadas = objetos(extracao.valores)
+        // Saída maior que o limite de leitura: o resto não foi visto, então não se garante que haja uma só chamada.
+        if (extracao.truncada) return Pontuacao.zero(*(marcas + Marca.MULTIPLAS_CHAMADAS).toTypedArray())
         if (chamadas.size != 1) return Pontuacao.zero(*(marcas + (if (chamadas.isEmpty()) Marca.JSON_ILEGIVEL else Marca.MULTIPLAS_CHAMADAS)).toTypedArray())
         val chamada = chamadas.single()
         val nome = chamada.opt("nome") as? String
@@ -45,8 +47,10 @@ object PontuadorAcoes : Pontuador {
         if (nome == null) return Pontuacao.zero(*(marcas + Marca.JSON_ILEGIVEL).toTypedArray())
 
         val ferramentaCerta = nome.trim() == chamadaEsperada.getString("nome")
-        val argumentosCertos = ferramentaCerta &&
-            Canonico.de(chamada.optJSONObject("args") ?: JSONObject()) == Canonico.de(chamadaEsperada.optJSONObject("args") ?: JSONObject())
+        // `args` ausente vale {}; presente, precisa ser objeto (`null`, texto ou array são argumentos inválidos).
+        val argsDaChamada = if (chamada.has("args")) chamada.optJSONObject("args") else JSONObject()
+        val argumentosCertos = ferramentaCerta && argsDaChamada != null &&
+            Canonico.de(argsDaChamada) == Canonico.de(chamadaEsperada.optJSONObject("args") ?: JSONObject())
         if (!ferramentaCerta) marcas += Marca.FERRAMENTA_ERRADA else if (!argumentosCertos) marcas += Marca.ARGUMENTOS_ERRADOS
         return Pontuacao.ponderada(
             mapOf(FERRAMENTA to if (ferramentaCerta) 1.0 else 0.0, ARGUMENTOS to if (argumentosCertos) 1.0 else 0.0),

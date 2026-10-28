@@ -49,4 +49,18 @@ class ExtratorJsonTest {
         assertThat(ExtratorJson.extrair("[".repeat(10_000)).forma).isEqualTo(ExtratorJson.Forma.NENHUM)
         assertThat(ExtratorJson.extrair("{\"a\":".repeat(5_000)).forma).isEqualTo(ExtratorJson.Forma.NENHUM)
     }
+
+    @Test
+    fun `syntax that is not strict json does not count as json`() {
+        for (saida in listOf("{nome:'Ana'}", "{'nome': 'Ana'}", """{"a": 1,}""", """{"a": 1; "b": 2}""", "[1, 2,]", """{"a": 01}""")) {
+            assertThat(ExtratorJson.extrair(saida).valores).isEmpty()
+        }
+        assertThat(ExtratorJson.extrair("""{"a": [1, -2.5e3, true, null, "x\u00e9"]}""").valores).hasSize(1)
+    }
+
+    @Test
+    fun `an output longer than the limit is flagged as truncated`() {
+        assertThat(ExtratorJson.extrair("""{"a": 1}""").truncada).isFalse()
+        assertThat(ExtratorJson.extrair("""{"a": 1}""" + " ".repeat(20_000) + """{"b": 2}""").truncada).isTrue()
+    }
 }
