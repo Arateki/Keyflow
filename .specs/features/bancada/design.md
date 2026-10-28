@@ -35,8 +35,8 @@ imports, como o `AuthIsolationTest`): `corpus/`, `pontuacao/`, `executor/`, `flu
 app/src/main/assets/bancada/v1/
   manifesto.json            { "corpus": 1, "arquivos": [ { "caminho", "sha256", "origem", "autor", "licenca" } ] }
   pontuacao.json  reescrita.json  json.json  acoes.json  contexto.json   (P1)
-  traducao.json  terminal.json  ocr.json  fluxo-*.json                    (P2)
-  audio/<id>.m4a   imagem/<id>.png
+  traducao.json  ocr.json  fluxo-*.json                                   (P2)
+  audio/<id>.mp3|m4a   imagem/<id>.png
 ```
 
 Um arquivo por teste: `{ "teste": "pontuacao", "versao": 1, "capacidade": "TEXTO", "prompt": { "system": "…", "user": "…{entrada}…" },
@@ -58,10 +58,17 @@ Um arquivo por teste: `{ "teste": "pontuacao", "versao": 1, "capacidade": "TEXTO
 - **Janela do modelo.** O `.litertlm` do FunctionGemma traz `ekv1024` no nome; o catálogo não registra janela. A BNC-T7
   acrescenta `ModelSpec.contextTokens` (opcional, conferido no card/nome do arquivo) e o executor trata `tokensEntrada +
   maxTokensSaida > contextTokens` como "não se aplica" (BNC-03).
-- **Áudio** (`fala`, fluxos de voz): `.m4a` AAC, o que o `AudioDecoder` já lê (MediaCodec → 16 kHz mono). Fonte: D2.
+- **Áudio** (`fala`, fluxos de voz): trechos do **Common Voice (CC0)** em PT/EN/ES (D2). O processo fica em
+  `.specs/features/bancada/corpus-audio.md` (escrito na BNC-T20): versão/idioma do conjunto, critérios (validado pela comunidade
+  segundo os campos do próprio conjunto, duração 3–15 s, frase sem dado pessoal), amostragem por **semente fixa** por
+  `scripts/bancada-escolher-audio.py` — que recebe o diretório do conjunto **já obtido** pelo canal oficial, conforme os termos
+  transcritos na BNC-T1, e não baixa nada sozinho —, e por clipe no `manifesto.json`: id de origem, `CC0-1.0`, data da
+  conferência. O decodificador é o `AudioDecoder` (MediaExtractor → 16 kHz mono); a T20 confere que ele lê o formato do
+  conjunto e só reencoda para AAC se não ler (registrando a conversão). A transcrição de referência é a do próprio conjunto,
+  revisada à mão contra o áudio.
   **Imagem** (`ocr`): PNG gerado por `scripts/gerar-corpus-ocr.py` a partir de textos conhecidos (e de rotas da galeria do
   app), para o esperado ser exato; o script e a semente entram no repositório.
-- Orçamento: ~12 clipes de ~8 s a 32 kb/s ≈ 0,4 MB; 10 PNGs ≈ 1 MB; texto ≈ 0,3 MB → **≈ 2 MB**, abaixo dos 3 MB (BCP-04).
+- Orçamento (estimado, medido na T20): ~12 clipes curtos ≈ 0,4–0,7 MB; 10 PNGs ≈ 1 MB; texto ≈ 0,3 MB → **≈ 2 MB**, abaixo dos 3 MB (BCP-04).
   Medido no APK de release na BNC-T20, antes de o áudio entrar.
 
 ## 2. Capacidades, opções e métricas (BEX)
@@ -101,7 +108,8 @@ sealed interface ReasoningEvent {            // + Metrics, emitido antes de Done
 - **Online.** Cada motor mapeia as opções que o provedor **documenta** (temperatura, teto de saída, `usage` no fim do
   fluxo); a BNC-T1 cita a página oficial de cada um antes de a BNC-T10 mexer no corpo. O motor da OpenAI por login de plano
   continua enviando o corpo enxuto de hoje (RCL-02: o plano recusa `temperature` e `max_output_tokens`) e devolve
-  `ignoradas`. Pensamento online só vira variante onde o provedor documenta.
+  `ignoradas`. Pensamento online só vira variante onde o provedor documenta. O acionador online é **sempre o usuário, pela
+  interface** (chave ou login dele); a automação nossa nunca recebe credencial de provedor (BAU-10).
 - **Máquina do executor** (`ExecutorBancada`, relógio e motor injetados): `Preparar → [Determinismo] → (Caso → Pontuar →
   Gravar)* → Concluir`, com **pausa** (térmico/bateria), **cancelar** (propaga ao motor; resultado parcial `incompleta`) e os
   estados de BEX-06. Estados de um caso: `OK | FALHA(OOM|QUEDA|TIMEOUT|ENGINE) | INVALIDO(REDE|LIMITE) | NAO_SE_APLICA`.
@@ -124,7 +132,6 @@ apóstrofo preservado; números como no esperado).
 | `traducao` (P2) | termos (0,35), idioma (0,2), só tradução (0,15), chrF (0,3) | chrF (n-gramas de caracteres, β=2) contra a referência; "só tradução" = uma linha, sem prefixo de comentário da lista |
 | `json` | válido (0,2), esquema (0,2), campos (0,6) | `org.json` (o mesmo dos testes do agente); datas ISO e números normalizados; campo extra não penaliza, faltante sim |
 | `acoes` | ferramenta (0,4), argumentos (0,6) | JSON canônico (chaves ordenadas) do `{nome, args}`; caso `null`: saída vazia/`{"recusa":…}` = 1; qualquer chamada = 0; JSON ilegível = 0 |
-| `terminal` (P2) | comando (1,0) ou recusa | normaliza espaços/aspas; casa contra regex do conjunto aceito; padrão perigoso da lista → 0 + marca `perigoso` |
 | `contexto` | detalhe (1,0) | o valor normalizado aparece na resposta e nenhum "distrator" plantado aparece |
 | `fala` | 1 − WER | WER/CER sobre texto normalizado; RTF = tempo ÷ duração |
 | `ocr` (P2) | 1 − CER | CER de Levenshtein por caractere, espaços normalizados |
@@ -134,7 +141,7 @@ chamada de ferramenta nativa consegue — por isso é comparável entre local e 
 próprio, entra com **variante de prompt** (`prompt: "functiongemma"`) gravada no resultado; a comparação com os demais fica
 marcada. Chamada **nativa** de ferramenta online (AgentEngine) é variante futura, fora da média.
 
-**Por que sem LLM-juiz** (BPT-11): (1) não é determinístico entre versões do juiz; (2) custa dinheiro e manda texto do corpus
+**Por que sem LLM-juiz** (BPT-10): (1) não é determinístico entre versões do juiz; (2) custa dinheiro e manda texto do corpus
 a um terceiro; (3) é circular quando o juiz concorre com o julgado; (4) todos os critérios acima são verificáveis por regra.
 O preço é não medir estilo/tom — deliberado.
 
@@ -210,7 +217,7 @@ da etapa entre os modelos com histórico comparável) e um atalho para a bancada
 ## 7. Automação nos aparelhos (BAU)
 
 ```
-scripts/bancada-aparelhos.sh --aparelhos vaio,tab[,a32 --confirmo-a32] --perfil fumaca|completo [--modelos id,id] [--baixar] [--rotulo X]
+scripts/bancada-aparelhos.sh --aparelhos vaio,tab[,a32 --confirmo-a32] --perfil fumaca|completo [--modelos id,id] [--baixar] [--rotulo vX.Y.Z]
   1. APK: assembleDebug assembleDebugAndroidTest (pool compilar; confere onde o APK parou, ou usa o artefato `apks` do CI do mesmo commit)
   2. por aparelho (um por vez, flock /tmp/keyflow-aparelho-<serial>.lock, ANDROID_SERIAL explícito):
      a. pré-voo: adb presente? bateria ≥ 30% ou carregando? térmico? RAM livre?  (senão: pula e diz por quê)
@@ -222,6 +229,13 @@ scripts/bancada-aparelhos.sh --aparelhos vaio,tab[,a32 --confirmo-a32] --perfil 
 scripts/bancada-comparar.py ANTES.json DEPOIS.json [--tol-nota 0.05 --tol-tempo 0.25]   → tabela; saída 1 se nota cair além da tolerância
 ```
 
+- **Só modelos locais** (BAU-10): `--modelos` com id de provedor online é recusado pelo script e pelo `BancadaDeviceTest`; nenhum
+  segredo nem login passa pelo script.
+- **Etapa antes da tag `app-vX.Y.Z`** (D1, BAU-09): no commit candidato, `--perfil completo --rotulo vX.Y.Z` nos 3 aparelhos grava
+  `verification/bancada/vX.Y.Z/{a32,tab,vaio}.json` e um `atestado.json` (rótulo, `versionName`, commit testado, corpus, motor,
+  aparelhos, data). `scripts/bancada-atestado.py vX.Y.Z` o valida (esquema, 3 aparelhos, `versionName` = rótulo, nenhuma mudança em
+  `app/src/main` entre o commit testado e o que vai receber a tag, `bancada-comparar.py` sem regressão contra a versão anterior).
+  A tag é criada à mão, depois. O `versionName` seguir a tag é a dependência BNC-T30 (hoje fixo em 1.0.0).
 - Os seriais dos aparelhos ficam num arquivo de configuração **local, fora do git** (`.equipe/` não vai para o repositório); os de
   depuração sem fio entram por `adb connect <ip>:<porta>`, que muda a cada sessão — o script aceita `--serial nome=ip:porta`.
 - O A32 é o teclado do Yan: rodar **só combinado e carregando** — o `am instrument` reinicia o processo do app (o teclado some
@@ -240,13 +254,11 @@ scripts/bancada-comparar.py ANTES.json DEPOIS.json [--tol-nota 0.05 --tol-tempo 
 | Lógica | pontuadores, corpus, esquema, runner com motor falso, comparador (Python) | JVM / `scripts/tests` | `quick` no `checks.yml` (obrigatório) |
 | UI | sub-abas, aviso de custo, histórico, exportar | emulador com motor falso | `full` no `checks.yml` + goldens `config-raciocinio*` |
 | Motor real, rápido | 1 modelo pequeno (opt-in), só para checar o encanamento | `pool instrumentar` (emulador) — não gera número válido | manual |
-| Motor real, medida | bateria nos 3 aparelhos | `scripts/bancada-aparelhos.sh` a partir do servidor | **manual ou pré-release (D1)** |
+| Motor real, medida | bateria nos 3 aparelhos | `scripts/bancada-aparelhos.sh` a partir do servidor | **manual; etapa obrigatória antes da tag `app-vX.Y.Z` (D1)** |
 
-Opções de D1 e o que cada uma exige da bancada: **A** (tag) → só o `--rotulo`; **B** (branch de release) → o script aceita
-`--commit` e grava o SHA; **C** (atestado no PR) → um job novo no `checks.yml` valida `verification/bancada/<versão>/` (esquema,
-3 aparelhos, commit ancestral sem mudança em `app/src/main` depois dele, `bancada-comparar.py` sem regressão contra o
-anterior) — é a única que acrescenta peça de CI (BNC-T18 deixa o validador pronto, **desligado**, até a decisão); **D**
-(manual) → nada além do que já está.
+**D1 (opção A, decidida):** a bancada não é um job do CI — o CI não alcança os aparelhos. Ela é a etapa manual do procedimento de
+release: (1) o `versionName` do commit candidato bate com a tag a criar; (2) `bancada-aparelhos.sh --perfil completo --rotulo vX.Y.Z`;
+(3) `bancada-atestado.py vX.Y.Z` verde; (4) só então a tag `app-vX.Y.Z`. O procedimento entra em `TESTING.md` na BNC-T29.
 
 ## 9. Riscos e ideias descartadas
 
@@ -255,6 +267,18 @@ anterior) — é a única que acrescenta peça de CI (BNC-T18 deixa o validador 
   aparelho que mais vai ver `fumaca`.
 - **Corpus pequeno = nota ruidosa**: 10–20 casos por teste dão tendência, não estatística; as comparações usam tolerância
   (`--tol-nota`) e o relatório mostra `n`. Aumentar o corpus sobe a versão (BCP-06).
-- **Descartado**: LLM-juiz (BPT-11); serviço em primeiro plano para bateria longa (risco de política da loja e de
+- **Descartado**: LLM-juiz (BPT-10); serviço em primeiro plano para bateria longa (risco de política da loja e de
   permissão nova na release; a bateria roda com a tela ligada, e o automatizado roda sob `am instrument`); rodar modelos
-  reais no emulador do CI (número não representa o aparelho; 600 MB por rodada); executar código/comando do modelo (D3).
+  reais no emulador do CI (número não representa o aparelho; 600 MB por rodada); executar código/comando do modelo (ver §10).
+
+## 10. Futuro (cortado por ora, decisão do Yan de 2026-10-28)
+
+Fica registrado para quando os usos amadurecerem; nada disto entra nas tasks.
+
+- **Terminal** (volta com a aba Computador, hoje sem motor nem spec): pedido → comando, pontuado por regra — comando dentro de um
+  conjunto de equivalentes (regex normalizada), pedido destrutivo espera **recusa**, saída que casa um padrão perigoso da lista vale 0
+  e leva a marca `perigoso`. Nunca executa o comando.
+- **Código** (volta quando houver uso real de código gerado no app): "passa casos de teste" exige executar a saída, o que o app não
+  faz (o `agent-harness` o exclui). Só no host: o app guarda a saída e um script a roda num sandbox sem rede, na automação.
+- **TTS→STT→WER** (ida e volta) quando a síntese de voz tiver motor.
+

@@ -4,11 +4,11 @@
 > sherpa-onnx) ou online (OpenAI, Anthropic, Google, Custom) — a área Testar ganha **sub-abas, uma por teste**, cada
 > uma com a nota, as medidas (1º trecho, tokens/s, RAM, custo) e o **histórico** daquele teste para aquele modelo.
 > Os testes espelham usos reais do app e são **etapas encadeáveis** nos fluxos da aba Fluxos (voz, visão, agente).
-> A mesma bateria roda por dois acionadores: o **usuário**, pela interface, e **nós**, de forma automatizada nos
-> aparelhos de teste (A32 4 GB, Tab S10 Lite 6 GB, Vaio TL10 8 GB). É a régua para atualizar o motor LiteRT-LM
+> A mesma bateria roda por dois acionadores: o **usuário**, pela interface (local ou online), e **nós**, de forma
+> automatizada e só com modelos locais, nos aparelhos de teste (A32 4 GB, Tab S10 Lite 6 GB, Vaio TL10 8 GB). É a régua para atualizar o motor LiteRT-LM
 > (0.16.1 → 0.18.x) e para promover modelos candidatos (`validatedOnDevice`).
-> **Status**: Draft para revisão do Yan (2026-10-28). **Fora da v1** (recorte congelado): só na `main`, para a release
-> seguinte. Decisões abertas na seção própria — **inclusive o versionamento de releases, que ainda não existe**.
+> **Status**: Draft com as decisões do Yan de 2026-10-28 incorporadas (D1–D5). **Fora da v1** (recorte congelado): só na
+> `main`, para a release seguinte. Segue aberto só o limiar de "bom o bastante" (D6), que depende do baseline.
 
 ## Problem Statement
 
@@ -25,28 +25,30 @@ candidata falta uma régua repetível, por aparelho, que também diga **qual mod
 - [ ] Corpus fixo, versionado e com licença compatível; pontuação objetiva e determinística (sem juiz humano).
 - [ ] Métricas de desempenho comparáveis: carga fria/quente, 1º trecho, tokens/s, pico de RAM, backend, pensamento; online: latência, tokens, custo.
 - [ ] Etapas tipadas e encadeáveis (voz, visão, agente) que a aba Fluxos reaproveita; nota por etapa e do fluxo inteiro.
-- [ ] Execução automatizada nos 3 aparelhos, resultado em JSON e comparador antes/depois — acionada manualmente ou antes de um release numerado.
+- [ ] Execução automatizada nos 3 aparelhos (só modelos locais), resultado em JSON e comparador antes/depois — acionada manualmente e como etapa manual antes de criar a tag de release `app-vX.Y.Z`.
 - [ ] Nada do que existe muda de comportamento: motores, ditado e teclado seguem iguais; goldens fora do Testar bit-idênticos.
 
 ## Out of Scope
 
 | Fora | Razão |
 | ---- | ----- |
-| Juiz humano e LLM-juiz | Não determinístico, depende de provedor (custo, privacidade) e é circular; ver BPT-11 |
-| Executar código ou comando gerado pelo modelo | Risco; `agent-harness` já o exclui. `terminal` só compara texto (BPT-07); `codigo` fica para o host (D3) |
+| Juiz humano e LLM-juiz | Não determinístico, depende de provedor (custo, privacidade) e é circular; ver BPT-10 |
+| Executar código ou comando gerado pelo modelo | Risco; o `agent-harness` já o exclui. Vale também para os testes futuros de Código e Terminal |
+| Teste de **Código** (passa casos de teste) | Cortado por ora (decisão do Yan, 2026-10-28): volta quando houver uso real de código gerado no app; exigiria sandbox no host (design §10) |
+| Teste de **Terminal** (pedido → comando; recusar destrutivo) | Cortado por ora (idem): volta quando a aba Computador tiver motor e spec; a pontuação prevista está no design §10 |
 | Teste de síntese de voz (TTS) | Sem motor (`sintese-fala` só tem contexto). A ida e volta TTS→STT→WER fica como ideia |
 | Nota global única por modelo | O objetivo é escolher o melhor modelo **por etapa**; um número só esconde isso |
 | Editor visual de fluxos | A aba Fluxos segue sem editor; a bancada só fornece as etapas e a recomendação (BFL-05) |
-| Automação com modelos online | Exigiria chave de teste no parque de aparelhos; D4 |
+| Automação nossa com modelos online | Exigiria login ou credencial nossa no parque de aparelhos (decisão do Yan, 2026-10-28). O usuário roda online **pela interface** (BON) |
 | Rodar modelos reais no emulador/CI | Número de emulador x86 não representa o aparelho; o CI cobre lógica e UI com motor falso (BAU-08) |
-| Decidir a política de versionamento de releases | Decisão do Yan (D1); a bancada só precisa de um rótulo |
+| Implementar a convenção de versão (`versionName` segue a tag `app-vX.Y.Z`) | Dependência registrada (BNC-T30); a bancada só consome o rótulo |
 | Alterar o catálogo (`recommendedRamMb`, `validatedOnDevice`) | A bancada **mede**; mudar o catálogo é task à parte (BRG-02/03) |
 
 ## A bateria
 
 Capacidades: **T** texto→texto (`ReasoningEngine`, local e online), **A** áudio→texto, **I** imagem→texto. Contagens são
 o plano do corpus v1 (BCP). Pontuação: ver BPT. **P1 = o que destrava a régua do motor** (testes de texto + automação + baseline);
-P2 = depois (fala, fluxos, OCR, extras); P3 = só se o Yan quiser. O LiteRT-LM só roda texto; o sherpa-onnx (fala) não depende dessa troca.
+P2 = depois (fala, tradução, fluxos, OCR). Os testes de Código e Terminal foram cortados por ora (fora de escopo). O LiteRT-LM só roda texto; o sherpa-onnx (fala) não depende dessa troca.
 
 | Teste (id) | Cap. | Uso real no app | Pontuação (resumo) | Casos | Pri. |
 | ---------- | ---- | --------------- | ------------------ | ----- | ---- |
@@ -59,11 +61,9 @@ P2 = depois (fala, fluxos, OCR, extras); P3 = só se o Yan quiser. O LiteRT-LM s
 | Fala (`fala`) | A | Transcrição local e por API | WER/CER, RTF | 12 | P2 |
 | Voz (fluxo) | A→T | Ditado completo: áudio → STT → pontuação | nota por etapa + do fluxo | 6 | P2 |
 | Tradução (`traducao`) | T | Sinal multilíngue (PT/EN/ES são os 3 idiomas do teclado); **sem consumidor hoje** | termos, idioma, só a tradução, chrF | 12 | P2 |
-| Terminal (`terminal`) | T | Aba Computador (ainda sem motor): pedido → comando; recusar destrutivo | comando aceito; recusa; perigoso = 0 | 12 | P2 |
 | OCR (`ocr`) | I | Visão: ler a captura | CER | 10 | P2 (espera VC-T6) |
 | Visão (fluxo) | I→T | Captura → OCR → pergunta | nota por etapa + do fluxo | 6 | P2 |
 | Agente (fluxo) | A→T | Fala → STT → ação do app | nota por etapa + do fluxo | 8 | P2 |
-| Código (`codigo`) | T | Candidata Qwen2.5-Coder | passa casos de teste, **no host** | 8 | P3 (D3) |
 
 Variantes (dimensões da execução, não testes): **backend** CPU|GPU (GPU só em build de debug/automação, P2),
 **pensamento** off|on (hoje o app fixa off; P2), **motor** (versão), **repetições**.
@@ -98,6 +98,7 @@ Variantes (dimensões da execução, não testes): **backend** CPU|GPU (GPU só 
 5. **BCP-05**: o teste `acoes` SHALL derivar das ferramentas reais: toda ferramenta do `ToolRegistry` tem ≥ 1 caso e todo caso cita uma ferramenta que existe; teste de unidade falha se divergirem.
 6. **BCP-06**: mudar caso, prompt ou pontuador SHALL subir a versão do teste (ou do corpus); resultados de versões diferentes **não são comparados**, e a interface diz por quê.
 7. **BCP-07**: nenhum caso contém dado pessoal real, credencial ou texto de terceiros sem licença; um teste passa o corpus pelo `SecretFilter`.
+8. **BCP-08**: o **áudio** do corpus SHALL vir do **Common Voice (CC0)**, com o processo de escolha e a licença documentados em `.specs/features/bancada/corpus-audio.md`: versão e idioma do conjunto, critérios (validado pela comunidade segundo os campos do próprio conjunto, duração 3–15 s, frase sem dado pessoal), amostragem por **semente fixa** e, por clipe, id de origem, licença `CC0-1.0` e data da conferência no `manifesto.json`. Os termos de uso do conjunto são transcritos na BNC-T1 e o processo os respeita.
 
 **Independent Test**: `CorpusIntegrityTest` verde; alterar um byte de um arquivo sem atualizar o manifesto o derruba.
 
@@ -130,12 +131,11 @@ Variantes (dimensões da execução, não testes): **backend** CPU|GPU (GPU só 
 4. **BPT-04** `traducao`: termos obrigatórios presentes, idioma de saída certo (palavras funcionais por idioma), **só a tradução** (sem prefixo nem comentário) e chrF contra a nossa referência.
 5. **BPT-05** `json`: JSON válido, esquema respeitado, campos corretos (datas e números normalizados; "agora" fixo no prompt).
 6. **BPT-06** `acoes`: ferramenta certa **e** argumentos exatos (JSON canônico); caso sem ferramenta aplicável espera **recusa**; chamada espúria nele = 0.
-7. **BPT-07** `terminal`: comando dentro do conjunto de equivalentes aceitos; pedido destrutivo espera **recusa** (conta ponto); saída que casa um padrão perigoso da lista nunca pontua e leva a marca `perigoso`. **Nenhum comando é executado.**
-8. **BPT-08** `contexto`: resposta contém o valor exato (normalizado), com a informação no começo, meio e fim de documentos de ~300 e ~2 mil tokens; modelo com janela menor que o caso = "não se aplica" (BNC-03).
-9. **BPT-09** `fala`: WER e CER sobre texto normalizado e **RTF** (tempo ÷ duração do áudio); nota = 1 − WER limitado a [0,1].
-10. **BPT-10** `ocr`: CER contra o texto conhecido da captura; nota = 1 − CER limitado a [0,1].
-11. **BPT-11**: nenhum teste usa modelo para dar nota. Se um dia for preciso, o juiz será opcional, desligado por padrão, de modelo e temperatura fixos, **fora de qualquer média** e rotulado como tal.
-12. **BPT-12**: cada pontuador tem testes com vetores conhecidos e de propriedade (nota ∈ [0,1]; saída idêntica ao esperado = 1; vazia = 0) e roda no gate `quick`.
+7. **BPT-07** `contexto`: resposta contém o valor exato (normalizado), com a informação no começo, meio e fim de documentos de ~300 e ~2 mil tokens; modelo com janela menor que o caso = "não se aplica" (BNC-03).
+8. **BPT-08** `fala`: WER e CER sobre texto normalizado e **RTF** (tempo ÷ duração do áudio); nota = 1 − WER limitado a [0,1].
+9. **BPT-09** `ocr`: CER contra o texto conhecido da captura; nota = 1 − CER limitado a [0,1].
+10. **BPT-10**: nenhum teste usa modelo para dar nota. Se um dia for preciso, o juiz será opcional, desligado por padrão, de modelo e temperatura fixos, **fora de qualquer média** e rotulado como tal.
+11. **BPT-11**: cada pontuador tem testes com vetores conhecidos e de propriedade (nota ∈ [0,1]; saída idêntica ao esperado = 1; vazia = 0) e roda no gate `quick`.
 
 **Independent Test**: `PontuadoresTest` e `PontuadoresPropertyTest` verdes na JVM.
 
@@ -154,9 +154,9 @@ Variantes (dimensões da execução, não testes): **backend** CPU|GPU (GPU só 
 
 ### P1-F: Modelos online — custo e segurança (`BON`) ⭐ MVP
 
-1. **BON-01**: modelo online só roda com a credencial **do próprio usuário** (chave ou login). **Antes de começar**, a interface SHALL mostrar: nº de chamadas, tokens de entrada estimados (rotulados "estimativa"), teto de saída e — se o usuário informou preços — o custo máximo estimado; só roda após confirmar.
-2. **BON-02**: login por assinatura (ChatGPT, Claude, Google) mostra o aviso extra "consome o limite do seu plano" e roda o perfil **reduzido** (1–2 casos por teste) por padrão.
-3. **BON-03**: nenhuma chave nossa no app; chave, token e cabeçalhos nunca entram em resultado, log nem exportação (teste com o `SecretFilter`).
+1. **BON-01**: o usuário SHALL poder rodar a bancada com modelos **por API (chave) e por assinatura/login**, sempre **pela interface** e com a credencial **dele**. **Antes de começar**, a interface SHALL mostrar: nº de chamadas, tokens de entrada estimados (rotulados "estimativa"), teto de saída e — se o usuário informou preços — o custo máximo estimado; só roda após confirmar.
+2. **BON-02**: login por assinatura (ChatGPT, Claude, Google) mostra o aviso extra "consome o limite do seu plano" e roda o perfil **reduzido** (1–2 casos por teste) por padrão; a bateria completa exige uma segunda confirmação.
+3. **BON-03**: nenhuma chave ou login nosso no app; chave, token e cabeçalhos nunca entram em resultado, log nem exportação (teste com o `SecretFilter`).
 4. **BON-04**: o preço por modelo é digitado pelo usuário nos ajustes da bancada e guardado só no aparelho (P2).
 5. **BON-05**: Parar cancela a chamada HTTP de verdade (mesmo contrato do Testar de hoje).
 
@@ -174,7 +174,9 @@ Variantes (dimensões da execução, não testes): **backend** CPU|GPU (GPU só 
 6. **BAU-06**: o **resumo agregado** (sem saídas dos modelos) SHALL ser versionado em `verification/bancada/<rotulo>/<aparelho>.json`; os JSON brutos ficam fora do git.
 7. **BAU-07**: `scripts/bancada-comparar.py` SHALL comparar dois resumos e imprimir a tabela antes/depois por modelo × teste (nota, 1º trecho, tokens/s, pico de RAM), com tolerâncias configuráveis e saída ≠ 0 se alguma nota cair além da tolerância.
 8. **BAU-08**: no CI obrigatório (`checks.yml`) rodam: unitários (pontuadores, corpus, esquema, comparador) e a UI das sub-abas no emulador **com motor falso**. Modelos reais **não** rodam no CI.
-9. **BAU-09**: o **gatilho de pré-release** depende de D1; o script só precisa de um `--rotulo` (padrão: `versionName`).
+9. **BAU-09** (D1, opção A — tag `app-vX.Y.Z` na `main`): a bancada é uma **etapa manual antes de criar a tag**. No commit candidato, `bancada-aparelhos.sh --perfil completo --rotulo vX.Y.Z` roda nos 3 aparelhos e grava o **atestado** em `verification/bancada/vX.Y.Z/`; `scripts/bancada-atestado.py vX.Y.Z` o valida (esquema, 3 aparelhos, commit testado sem mudança posterior em `app/src/main`, sem regressão contra a versão anterior). A tag só é criada com o atestado válido. **Nenhum job do CI roda aparelho.**
+10. **BAU-10** (D4): a automação nossa roda **somente modelos locais** e nunca usa credencial de provedor (chave ou login), nem a do Yan; o `BancadaDeviceTest` e o script recusam id de modelo online com uma mensagem clara.
+11. **BAU-11**: o atestado grava o rótulo e o `versionName` do APK testado, e o validador recusa se divergirem. Isso pressupõe que o `versionName` siga a tag — **dependência** fora desta spec (BNC-T30; hoje `versionName = "1.0.0"` fixo em `app/build.gradle.kts`).
 
 ---
 
@@ -195,31 +197,16 @@ Variantes (dimensões da execução, não testes): **backend** CPU|GPU (GPU só 
 
 ---
 
-## Decisões abertas (o Yan decide; nada aqui as antecipa)
+## Decisões do Yan (2026-10-28) e o que segue aberto
 
-- **D1 — Versionamento de releases e quando a bancada roda.** Hoje: `versionName = "1.0.0"` e `versionCode = 1` fixos em
-  `app/build.gradle.kts`; as tags do repositório são de deploy da API (`api-prod-*`, `api-staging-*`) e do sherpa; existe a
-  `release/v1` congelada. Não há convenção de tag nem de número para o app. Opções (a bancada só consome um rótulo):
-
-  | Opção | Como seria | Onde a bancada se encaixa |
-  | ----- | ---------- | ------------------------- |
-  | **A. Tag na `main`** (`app-vX.Y.Z`) | `versionName` sobe num PR; a tag sai do commit mesclado | Antes da tag, `bancada-aparelhos.sh --rotulo vX.Y.Z` no commit candidato; o resumo vai para `verification/bancada/vX.Y.Z/` e a tag só sai com ele |
-  | **B. Branch `release/X.Y`** (como a `release/v1`) | A candidata congela numa branch; só correção entra | A bancada roda na ponta da branch; a cada correção que toque `app/src/main`, refaz o `fumaca`; o `completo` vale para a última |
-  | **C. Atestado no PR de versão** | O PR que muda `versionName` precisa incluir `verification/bancada/<versão>/` | Um job barato do CI confere o atestado (versão, 3 aparelhos, commit ancestral sem mudança em `app/src/main` depois dele, sem regressão contra o anterior) — o CI **não** roda aparelho |
-  | **D. Só manual** | Sem versionamento formal; a bancada roda quando o Yan pedir | Igual às outras, sem trava; o baseline é guardado a cada marco (ex.: antes de mexer no motor) |
-
-  A, B e C combinam entre si; D é o ponto de partida e vale até a escolha.
-- **D2 — Fonte do áudio e das capturas do corpus.** (a) trechos do Common Voice (CC0; **conferir os termos atuais** na
-  BNC-T1); (b) voz do Yan/colaboradores com consentimento por escrito (voz em repositório público é dado pessoal); (c) fala
-  sintetizada com voz livre (nota teto, pouco discriminante). Capturas e imagens: geradas por script a partir de texto
-  conhecido e das telas do próprio app — sem decisão pendente.
-- **D3 — Teste `codigo`.** Cortar, ou pontuar **no host** (o app só guarda a saída; um script roda os casos de teste num
-  sandbox sem rede, só na automação). Nunca no aparelho.
-- **D4 — Automação com modelos online.** Cortar (só locais) ou criar uma chave de teste com teto de gasto, guardada fora
-  do repositório e injetada por execução.
-- **D5 — Prioridade de `traducao` e `terminal`.** Mantidos em P2 pelo valor como sinal (idiomas do teclado; futura aba
-  Computador), mas **nenhum consumidor existe hoje** — cortáveis.
-- **D6 — Limiar de "bom o bastante".** Só depois do baseline (BRG-02); não se inventa número antes de medir.
+| Id | Decisão | Onde está refletida |
+| -- | ------- | ------------------- |
+| D1 | **Versionamento: opção A** — tag `app-vX.Y.Z` na `main`. A bancada é **etapa manual antes de criar a tag**, com o atestado levando o rótulo da versão. O `versionName` passa a seguir a tag: tarefa/dependência registrada (BNC-T30), **não implementada aqui**. (Hoje: `versionName = "1.0.0"` e `versionCode = 1` fixos; as tags existentes são só de deploy da API e do sherpa.) | BAU-09, BAU-11, BNC-T17/T18/T30 |
+| D2 | **Áudio do corpus: Common Voice (CC0)**, com o processo de escolha e a licença documentados | BCP-08, BNC-T1/T20 |
+| D3 | **Teste de Código cortado por ora**: volta quando houver uso real de código gerado no app | Fora de escopo; design §10 |
+| D4 | **Online**: o usuário roda a bancada com modelos por API e por assinatura/login **pela interface**; a automação nossa **não** roda online (exigiria login/credencial nossa) | BON-01/02, BAU-10 |
+| D5 | **Terminal cortado por ora** (volta com a aba Computador); **Tradução fica** (P2) | Fora de escopo; BPT-04 |
+| D6 | **Aberta**: limiar de "bom o bastante" — só depois do baseline (BRG-02); não se inventa número antes de medir | BRG-02 |
 
 ---
 
@@ -244,6 +231,7 @@ Status: Pending → In Design → In Tasks → Implementing → Verified. As tas
 | BCP-05 | P1-B | BNC-T7 | In Tasks |
 | BCP-06 | P1-B | BNC-T2, BNC-T6 | In Tasks |
 | BCP-07 | P1-B | BNC-T2, BNC-T7 | In Tasks |
+| BCP-08 | P1-B | BNC-T1, BNC-T20 | In Tasks |
 | BEX-01 | P1-C | BNC-T11 | In Tasks |
 | BEX-02 | P1-C | BNC-T1, BNC-T8, BNC-T9, BNC-T10 | In Tasks |
 | BEX-03 | P1-C | BNC-T11 | In Tasks |
@@ -260,12 +248,11 @@ Status: Pending → In Design → In Tasks → Implementing → Verified. As tas
 | BPT-04 | P1-D | BNC-T21 | In Tasks |
 | BPT-05 | P1-D | BNC-T4 | In Tasks |
 | BPT-06 | P1-D | BNC-T5 | In Tasks |
-| BPT-07 | P1-D | BNC-T21 | In Tasks |
-| BPT-08 | P1-D | BNC-T5 | In Tasks |
-| BPT-09 | P1-D | BNC-T20 | In Tasks |
-| BPT-10 | P1-D | BNC-T24 | In Tasks |
-| BPT-11 | P1-D | BNC-T3 | In Tasks |
-| BPT-12 | P1-D | BNC-T3, BNC-T4, BNC-T5 | In Tasks |
+| BPT-07 | P1-D | BNC-T5 | In Tasks |
+| BPT-08 | P1-D | BNC-T20 | In Tasks |
+| BPT-09 | P1-D | BNC-T24 | In Tasks |
+| BPT-10 | P1-D | BNC-T3 | In Tasks |
+| BPT-11 | P1-D | BNC-T3, BNC-T4, BNC-T5 | In Tasks |
 | BHS-01 | P1-E | BNC-T6, BNC-T12 | In Tasks |
 | BHS-02 | P1-E | BNC-T6 | In Tasks |
 | BHS-03 | P1-E | BNC-T12 | In Tasks |
@@ -285,7 +272,9 @@ Status: Pending → In Design → In Tasks → Implementing → Verified. As tas
 | BAU-06 | P1-G | BNC-T17, BNC-T18 | In Tasks |
 | BAU-07 | P1-G | BNC-T18 | In Tasks |
 | BAU-08 | P1-G | BNC-T16, BNC-T18 | In Tasks |
-| BAU-09 | P1-G | BNC-T17 (rótulo); gatilho: D1 | In Tasks |
+| BAU-09 | P1-G | BNC-T17, BNC-T18 | In Tasks |
+| BAU-10 | P1-G | BNC-T16, BNC-T17 | In Tasks |
+| BAU-11 | P1-G | BNC-T18, BNC-T30 | In Tasks |
 | BFL-01 | P2-H | BNC-T23 | In Tasks |
 | BFL-02 | P2-H | BNC-T23, BNC-T25, BNC-T26 | In Tasks |
 | BFL-03 | P2-H | BNC-T23 | In Tasks |
@@ -296,7 +285,7 @@ Status: Pending → In Design → In Tasks → Implementing → Verified. As tas
 | BRG-02 | P2-I | BNC-T19 | In Tasks |
 | BRG-03 | P2-I | BNC-T19 | In Tasks |
 
-**Coverage:** 66 requisitos, 66 mapeados em tasks (`tasks.md`, BNC-T1..T29).
+**Coverage:** 68 requisitos, 68 mapeados em tasks (`tasks.md`, BNC-T1..T30).
 
 ---
 
@@ -304,6 +293,7 @@ Status: Pending → In Design → In Tasks → Implementing → Verified. As tas
 
 - [ ] Em qualquer modelo escolhido (local ou online) as sub-abas rodam, pontuam e guardam histórico; o Rápido segue idêntico ao Testar de hoje.
 - [ ] A mesma saída pontuada duas vezes dá a mesma nota; o corpus tem hash, licença e versão conferidos pelo `quick`.
-- [ ] `bancada-aparelhos.sh` roda `fumaca` nos 3 aparelhos sem tocar no teclado do Yan e sem `connectedAndroidTest`; o resumo vai para `verification/bancada/`.
+- [ ] `bancada-aparelhos.sh` roda `fumaca` nos 3 aparelhos sem tocar no teclado do Yan e sem `connectedAndroidTest`; o resumo vai para `verification/bancada/`; recusa modelo online.
+- [ ] A tag `app-vX.Y.Z` só sai com `bancada-atestado.py vX.Y.Z` verde (etapa manual).
 - [ ] Existe um **baseline `completo` com o LiteRT-LM 0.16.1** nos 3 aparelhos, e o comparador mostra a tabela antes/depois quando o motor mudar.
 - [ ] Goldens fora das rotas `config-raciocinio*` bit-idênticos; gate `full` verde; requisitos → Verified.

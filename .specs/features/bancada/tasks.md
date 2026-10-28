@@ -1,7 +1,7 @@
 # Bancada de modelos — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md`
-**Status**: Draft (aguardando revisão do Yan; nenhuma task começou). **Fora da v1**: só `main`, release seguinte.
+**Status**: Draft com as decisões do Yan de 2026-10-28 (D1–D5; D6 aberta). Nenhuma task começou. **Fora da v1**: só `main`, release seguinte.
 
 > **Para o agente executor**: leia `spec.md` + `design.md` + este arquivo e `.specs/codebase/TESTING.md`. Uma task por vez,
 > na ordem prática abaixo, **testes primeiro**, gate verde antes de avançar.
@@ -37,9 +37,10 @@ Fase B (executor):   T8 → T11 → T12                  T9 (local; T8)   T10 (o
 Fase C (UI):         T13 → T14 → T15                 (T12 + T11)
 Fase D (automação):  T16 → T17 → T18 → T19           (T9, T11, T12, T15)
 Fase E (resto):      T20 → T22 → T23 → T21 → T24 → T25 → T26 → T27 → T28 → T29
+Dependência:         T30 (versionName segue a tag app-vX.Y.Z; fora da bancada; necessária antes da 1ª tag, não antes do baseline)
 ```
 Ordem prática: **T1 → T2 → T3 → T4 → T5 → T6 → T8 → T11 → T12 → T7 → T9 → T10 → T13 → T14 → T15 → T16 → T17 → T18 → T19 →
-T20 → T22 → T23 → T21 → T24 → T25 → T26 → T27 → T28 → T29**. `[P]` = só JVM, pode andar em paralelo com a fase B/C (o aparelho
+T20 → T22 → T23 → T21 → T24 → T25 → T26 → T27 → T28 → T29** (T30 quando a 1ª tag de app for planejada). `[P]` = só JVM, pode andar em paralelo com a fase B/C (o aparelho
 e o emulador são o gargalo: instrumentados serializam). T19 é o marco: **sem baseline não se mexe no motor** (BRG-01).
 
 ---
@@ -51,10 +52,10 @@ e o emulador são o gargalo: instrumentados serializam). T19 é o marco: **sem b
   `ConversationConfig.maxOutputToken`, `ThinkingConfig`, `Backend.GPU`/`CPU(threadCount)`, `Conversation.getBenchmarkInfo()` e a flag
   `ExperimentalFlags.enableBenchmark` (conferidos no AAR em 2026-10-28; falta a doc e o efeito em tempo de execução); (b) docs oficiais
   de **temperatura, teto de saída, `usage` e pensamento** da Anthropic Messages, OpenAI Responses (chave de API) e Google
-  `generateContent`; (c) termos atuais do Common Voice (D2) e de qualquer outra fonte de áudio; (d) `PowerManager.getCurrentThermalStatus`
+  `generateContent`; (c) **Common Voice (D2)**: termos de uso do conjunto transcritos (inclusive o que dizem sobre identificar quem fala, se disserem), licença CC0 do áudio e das frases, como o conjunto é obtido pelo canal oficial e que campos de validação/duração ele traz — fonte nenhuma além dessa entra no corpus de áudio; (d) `PowerManager.getCurrentThermalStatus`
   (API 29) e se `clear_refs` é permitido ao próprio app; (e) `run-as` nos 3 aparelhos.
 - **Done when**: cada item tem citação ou "não documentado" explícito; divergência com o `design.md` vira `SPEC_DEVIATION` em `licoes/`.
-- **Depends on**: —. **Requirement**: BEX-02, BEX-04, BEX-05, BCP-02. **Gate**: nenhum. **Commit**: `docs(bancada): notas de verificação das APIs e dos termos`.
+- **Depends on**: —. **Requirement**: BEX-02, BEX-04, BEX-05, BCP-02, BCP-08. **Gate**: nenhum. **Commit**: `docs(bancada): notas de verificação das APIs e dos termos`.
 
 ## Fase A — Núcleo puro (JVM)
 
@@ -70,20 +71,20 @@ e o emulador são o gargalo: instrumentados serializam). T19 é o marco: **sem b
 - **What**: `Normalizacao`, Levenshtein genérico, `Wer`/`Cer`, `ChrF`, `F1`, e os contratos `Pontuador`/`Pontuacao`/`Marca`.
 - **Where**: `bancada/pontuacao/`; testes com vetores conhecidos (ex.: WER de pares escritos à mão) e `kotest-property`
   (nota ∈ [0,1]; igual = 1; vazio = 0; simetria onde couber).
-- **Done when**: testes verdes na JVM; nenhum acesso a Android no pacote (`BancadaIsolationTest` começa aqui).
-- **Depends on**: —. **Requirement**: BPT-01, BPT-11, BPT-12. **Gate**: `quick`. **Commit**: `feat(bancada): normalização, WER/CER, chrF e contratos de pontuação`.
+- **Done when**: testes verdes na JVM; nenhum acesso a Android no pacote e **nenhum caminho que execute a saída de um modelo** (`BancadaIsolationTest` proíbe `ProcessBuilder`/`Runtime.exec` e imports de Android/UI/`Settings` em `bancada/` fora dos adaptadores).
+- **Depends on**: —. **Requirement**: BPT-01, BPT-10, BPT-11. **Gate**: `quick`. **Commit**: `feat(bancada): normalização, WER/CER, chrF e contratos de pontuação`.
 
 ### BNC-T4 — Pontuadores `pontuacao`, `reescrita`, `json` `[P]`
 - **What**: os três pontuadores do `design.md` §3, com pesos vindos do caso.
 - **Done when**: tabela de casos de borda por pontuador (saída vazia, com prefixo "Claro!", número inventado, JSON com texto em volta, campo
   extra/faltante) com a nota esperada escrita à mão; a mesma saída pontuada 2× dá a mesma nota.
-- **Depends on**: T3. **Requirement**: BPT-02, BPT-03, BPT-05, BPT-12. **Gate**: `quick`. **Commit**: `feat(bancada): pontuadores de pontuação, reescrita e JSON`.
+- **Depends on**: T3. **Requirement**: BPT-02, BPT-03, BPT-05, BPT-11. **Gate**: `quick`. **Commit**: `feat(bancada): pontuadores de pontuação, reescrita e JSON`.
 
 ### BNC-T5 — Pontuadores `acoes` e `contexto` `[P]`
 - **What**: `acoes` (JSON canônico `{nome, args}`, recusa, chamada espúria, JSON ilegível) e `contexto` (valor exato, distratores); a função
   `ToolRegistry`→lista de nomes para o cruzamento do BCP-05.
 - **Done when**: casos de borda verdes (resposta com cerca \`\`\`json, ferramenta certa com argumento trocado, recusa correta, 2 chamadas).
-- **Depends on**: T3. **Requirement**: BPT-06, BPT-08, BPT-12. **Gate**: `quick`. **Commit**: `feat(bancada): pontuadores de ações e contexto`.
+- **Depends on**: T3. **Requirement**: BPT-06, BPT-07, BPT-11. **Gate**: `quick`. **Commit**: `feat(bancada): pontuadores de ações e contexto`.
 
 ### BNC-T6 — Resultado, chave de comparabilidade e JSON `bancada-resultado/1` `[P]`
 - **What**: modelos `Execucao`/`ResultadoTeste`/`ResultadoCaso`, serializador/leitor `org.json`, `ChaveDeComparabilidade`, versão do LiteRT-LM
@@ -159,24 +160,24 @@ e o emulador são o gargalo: instrumentados serializam). T19 é o marco: **sem b
 
 ### BNC-T16 — `BancadaDeviceTest` (opt-in) e motor falso no CI
 - **What**: `app/src/androidTest/…/bancada/BancadaDeviceTest.kt` lê `bancada.*`, roda o `BancadaRunner` sem UI e escreve o JSON; sem `bancada.executar=true` faz `assumeTrue` e sai
-  (como o `LiteRtTemplateDeviceTest`). Variante com **motor falso** roda no emulador do CI. Teste de rede: zero chamadas HTTP durante uma execução local.
+  (como o `LiteRtTemplateDeviceTest`). Variante com **motor falso** roda no emulador do CI. Teste de rede: zero chamadas HTTP durante uma execução local. Recusa id de modelo online (BAU-10).
 - **Done when**: `pool instrumentar BancadaDeviceTest` no emulador, sem argumentos, termina ignorado e a suíte do `checks.yml` não conta falha; com `-e bancada.executar true -e bancada.motor falso`
-  gera o JSON esperado; o contador de chamadas do cliente HTTP fica em 0 numa execução local.
-- **Depends on**: T9, T11, T12, T15. **Requirement**: BAU-01, BAU-05, BAU-08, BEX-08. **Gate**: `full`. **Commit**: `test(bancada): execução sem interface e motor falso no CI`.
+  gera o JSON esperado; o contador de chamadas do cliente HTTP fica em 0 numa execução local; `-e bancada.modelos <id de provedor online>` falha com mensagem clara, sem tocar em credencial.
+- **Depends on**: T9, T11, T12, T15. **Requirement**: BAU-01, BAU-05, BAU-08, BAU-10, BEX-08. **Gate**: `full`. **Commit**: `test(bancada): execução sem interface e motor falso no CI`.
 
 ### BNC-T17 — `scripts/bancada-aparelhos.sh`
 - **What**: o script do `design.md` §7: pré-voo, trava por aparelho, instalar (`-r`), `am instrument`, recolher JSON, agregar em `verification/bancada/<rotulo>/<aparelho>.json`; `--baixar`,
-  `--perfil`, `--modelos`, `--rotulo`, `--serial nome=ip:porta`, `--confirmo-a32`; arquivo de combinações STT×LLM (BFL-06) versionado.
-- **Done when**: `--ajuda` documenta as regras; com aparelho ausente pula e diz por quê; recusa o A32 sem a flag; **nunca** chama `connectedAndroidTest` nem desinstala (teste do script com `adb` falso em
+  `--perfil`, `--modelos`, `--rotulo vX.Y.Z`, `--serial nome=ip:porta`, `--confirmo-a32`; arquivo de combinações STT×LLM (BFL-06) versionado; **só modelos locais**; com `--perfil completo --rotulo vX.Y.Z` grava também o `atestado.json` (rótulo, `versionName`, commit testado, corpus, motor, aparelhos).
+- **Done when**: `--ajuda` documenta as regras; com aparelho ausente pula e diz por quê; recusa o A32 sem a flag e recusa id de modelo online; **nunca** chama `connectedAndroidTest` nem desinstala (teste do script com `adb` falso em
   `scripts/tests`); primeira execução `fumaca` real no Vaio com o Qwen3 0.6B grava o resumo (sem saídas).
-- **Depends on**: T16. **Requirement**: BAU-02, BAU-03, BAU-04, BAU-06, BAU-09, BFL-06. **Gate**: testes Python + execução real no Vaio. **Commit**: `feat(bancada): script de execução nos aparelhos de teste`.
+- **Depends on**: T16. **Requirement**: BAU-02, BAU-03, BAU-04, BAU-06, BAU-09, BAU-10, BFL-06. **Gate**: testes Python + execução real no Vaio. **Commit**: `feat(bancada): script de execução nos aparelhos de teste`.
 
 ### BNC-T18 — Comparador antes/depois e validador de atestado `[P]`
 - **What**: `scripts/bancada-comparar.py` (tabela modelo × teste: nota, 1º trecho, tokens/s, pico de RAM, tolerâncias, saída 1 em regressão; recusa chaves de comparabilidade diferentes
-  dizendo qual campo difere) e `scripts/bancada-atestado.py` (valida `verification/bancada/<versão>/`: esquema, aparelhos, commit ancestral sem mudança em `app/src/main`, sem regressão) —
-  **sem ligar** nenhum job: a ligação ao CI depende de D1.
-- **Done when**: testes em `scripts/tests/` com resumos sintéticos (regressão, melhora, motor diferente permitido, corpus diferente recusado); rodam em `python3 -I -m unittest`.
-- **Depends on**: T6. **Requirement**: BAU-06, BAU-07, BAU-08. **Gate**: testes Python. **Commit**: `feat(bancada): comparador de resultados e validador de atestado`.
+  dizendo qual campo difere) e `scripts/bancada-atestado.py vX.Y.Z` (valida `verification/bancada/vX.Y.Z/`: esquema, 3 aparelhos, `versionName` = rótulo, nenhuma mudança em `app/src/main` entre o commit testado e o da tag,
+  sem regressão contra a versão anterior). **Nenhum job de CI** (D1: etapa manual antes da tag; o CI não alcança aparelho).
+- **Done when**: testes em `scripts/tests/` com resumos sintéticos (regressão, melhora, motor diferente permitido, corpus diferente recusado; atestado com `versionName` diferente do rótulo, com aparelho faltando e com `app/src/main` alterado depois do commit testado recusados); rodam em `python3 -I -m unittest`.
+- **Depends on**: T6. **Requirement**: BAU-06, BAU-07, BAU-08, BAU-09, BAU-11. **Gate**: testes Python. **Commit**: `feat(bancada): comparador de resultados e validador de atestado`.
 
 ### BNC-T19 — Campanha de baseline (LiteRT-LM 0.16.1) **[YAN]** no A32
 - **What**: `completo` nos 3 aparelhos com todos os modelos validados (e as candidatas que couberem), 0.16.1; resumo em `verification/bancada/baseline-0.16.1/`; propor constantes (timeouts, térmico, bateria)
@@ -187,9 +188,9 @@ e o emulador são o gargalo: instrumentados serializam). T19 é o marco: **sem b
 ## Fase E — Fala, outros testes e fluxos
 
 ### BNC-T20 — `fala` (STT) e faixa na Transcrição
-- **What**: corpus de áudio (fonte por D2) + pontuador WER/CER/RTF + adaptador `Transcritor` (local e por API) + faixa na Transcrição; `BancadaIsolationTest` cobre o adaptador.
-- **Done when**: WER de pares conhecidos; instrumentado com transcritor falso; orçamento de 3 MB medido no APK de release; goldens só da Transcrição (rotas `config-voz*`) revisados.
-- **Depends on**: D2, T15. **Requirement**: BNC-08, BPT-09, BEX-09, BCP-04. **Gate**: `full`. **Commit**: `feat(bancada): teste de fala na Transcrição`.
+- **What**: corpus de áudio do **Common Voice (CC0)** — `corpus-audio.md` (processo, critérios, semente, licença) e `scripts/bancada-escolher-audio.py` (recebe o conjunto já obtido; amostra por semente fixa; preenche o `manifesto.json` por clipe) — + pontuador WER/CER/RTF + adaptador `Transcritor` (local e por API) + faixa na Transcrição; `BancadaIsolationTest` cobre o adaptador.
+- **Done when**: `corpus-audio.md` reproduz a escolha (mesma semente → mesmos clipes; `CorpusIntegrityTest` exige id de origem, `CC0-1.0` e data por clipe); o `AudioDecoder` lê o formato escolhido (senão, reencodado e registrado); WER de pares conhecidos; instrumentado com transcritor falso; orçamento de 3 MB medido no APK de release; goldens só da Transcrição (rotas `config-voz*`) revisados.
+- **Depends on**: T1, T15. **Requirement**: BNC-08, BPT-08, BEX-09, BCP-04, BCP-08. **Gate**: `full`. **Commit**: `feat(bancada): teste de fala na Transcrição`.
 
 ### BNC-T22 — Comparar modelos neste aparelho e preço por modelo
 - **What**: visão `BancadaComparar` (modelos × testes, melhor por coluna) e o campo de preço por milhão de tokens (entrada/saída) por modelo online, só no aparelho.
@@ -201,15 +202,15 @@ e o emulador são o gargalo: instrumentados serializam). T19 é o marco: **sem b
 - **Done when**: `FluxoRunnerTest` com etapas falsas: entrada ideal × real gravadas, perda calculada, 2º modelo só carrega após descarregar o 1º quando a RAM não cobre; a automação usa o arquivo de combinações.
 - **Depends on**: T11, T20. **Requirement**: BFL-01, BFL-02, BFL-03, BFL-04, BFL-06. **Gate**: `quick`. **Commit**: `feat(bancada): etapas encadeáveis e fluxo de voz`.
 
-### BNC-T21 — `traducao` e `terminal` (P2, cortáveis — D5)
-- **What**: corpora (12 + 12), pontuadores (`chrF`, idioma, "só tradução"; comando aceito, recusa, `perigoso`) e sub-abas.
-- **Done when**: casos de borda verdes; lista de padrões perigosos testada; **nenhum** caminho de código executa a saída (`BancadaIsolationTest` proíbe `ProcessBuilder`/`Runtime.exec` no pacote).
-- **Depends on**: T7. **Requirement**: BPT-04, BPT-07. **Gate**: `quick` + `full`. **Commit**: `feat(bancada): testes de tradução e terminal`.
+### BNC-T21 — `traducao` (P2)
+- **What**: corpus (12 casos PT↔EN↔ES, termos obrigatórios, referência nossa), pontuador (termos, idioma por palavras funcionais, "só a tradução", `chrF`) e a sub-aba.
+- **Done when**: casos de borda verdes (prefixo "Aqui está a tradução:", idioma errado, termo trocado); a mesma saída pontuada 2× dá a mesma nota; corpus sob o `CorpusIntegrityTest`.
+- **Depends on**: T7. **Requirement**: BPT-04. **Gate**: `quick` + `full`. **Commit**: `feat(bancada): teste de tradução`.
 
 ### BNC-T24 — `ocr` e faixa na Visão (espera VC-T6)
 - **What**: imagens geradas por `scripts/gerar-corpus-ocr.py`, adaptador `Reconhecedor` sobre o `OcrEngine`, pontuador CER e a faixa na Visão no lugar do "Testar OCR" simulado.
 - **Done when**: CER de pares conhecidos; imagens reproduzíveis pela semente; goldens só da Visão revisados. **Bloqueada** até o `OcrEngine` existir.
-- **Depends on**: VC-T6, T15. **Requirement**: BNC-08, BPT-10, BEX-09. **Gate**: `full`. **Commit**: `feat(bancada): teste de OCR na Visão`.
+- **Depends on**: VC-T6, T15. **Requirement**: BNC-08, BPT-09, BEX-09. **Gate**: `full`. **Commit**: `feat(bancada): teste de OCR na Visão`.
 
 ### BNC-T25 — Fluxo de visão · BNC-T26 — Fluxo do agente
 - **What**: `visao` (captura → OCR → pergunta) e `agente` (fala → STT → ação do app) sobre `FluxoRunner`.
@@ -228,5 +229,15 @@ e o emulador são o gargalo: instrumentados serializam). T19 é o marco: **sem b
 
 ### BNC-T29 — Fechamento
 - **What**: Status das tasks, traceability do `spec.md` → Verified, lições em `licoes/`, `DEVELOPMENT-ORDER.md` (Bloco 11 atualizado) e `TESTING.md` (seção "Bancada de modelos": o que roda onde).
-- **Done when**: gates `quick` e `full` verdes; D1/D3/D4/D5 registradas como decididas ou ainda abertas.
+- **Done when**: gates `quick` e `full` verdes; o procedimento pré-tag (D1) escrito em `TESTING.md`; D6 registrada como decidida ou ainda aberta.
 - **Depends on**: tudo que o Yan mantiver. **Gate**: `quick` + `full`. **Commit**: `docs(bancada): fecha a feature`.
+
+## Dependência (fora da bancada)
+
+### BNC-T30 — `versionName` segue a tag `app-vX.Y.Z` *(D1; registrada aqui, não implementada neste PR)*
+- **What**: definir e implementar como o `versionName`/`versionCode` do app passam a acompanhar a tag de release (hoje fixos em `1.0.0`/`1` em `app/build.gradle.kts`):
+  de onde vem o número (arquivo de versão, propriedade do Gradle ou derivado da tag), regra do `versionCode` monótono e a conferência de que o APK testado tem o `versionName` do rótulo.
+  Pode virar spec própria; a bancada só consome o resultado.
+- **Done when**: o APK de debug/release de um commit candidato informa `versionName` = rótulo (`vX.Y.Z` sem o prefixo `app-`), e `bancada-atestado.py` aceita o par; `versionCode` nunca diminui entre tags.
+- **Depends on**: decisão do Yan sobre o esquema de numeração (semântico, a partir de qual número). **Requirement**: BAU-11. **Gate**: `build` + teste do script. **Commit**: `build: versionName segue a tag de release`.
+
