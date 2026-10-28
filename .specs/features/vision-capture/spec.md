@@ -194,8 +194,8 @@ promessa de privacidade e o APK enxuto.
 | MDL-05 | P1-G | VC-T2c, VC-T15 | Implementado p/ lista e seleção (VC-T2c/T11: Gemma 4 com `capabilities`, mesma entrada e mesmo arquivo); rodar com visão em VC-T15 |
 | MDL-06 | P1-G | VC-T2c, VC-T11 | Implemented (etiquetas de capacidade por aba, `CardTagScope`) |
 | PRV-01 | P2-D | VC-T17 | Implemented (mesmos painéis e mesmas `AuthActions` do Raciocínio) |
-| PRV-02 | P2-D | VC-T17 | Implemented (`VisionModelCatalog`, fontes conferidas em 2026-10-28) |
-| PRV-03 | P2-D | VC-T15, VC-T17 | Campos Custom implementados (VC-T17); chamada com imagem em VC-T15 |
+| PRV-02 | P2-D | VC-T17 | Implemented (`VisionModelCatalog`, lista efetiva da conta e escolha persistida; `ProviderModelSlotTest`/`VisaoPanelTest`; fontes conferidas em 2026-10-28) |
+| PRV-03 | P2-D | VC-T15, VC-T17 | Campos Custom implementados (VC-T17, commit ao sair preserva Settings atuais; `SettingsEditorTest`/`VisaoPanelTest`); chamada com imagem em VC-T15 |
 | PRV-04 | P2-D | VC-T13, VC-T17 | Nota na aba implementada (VC-T17); política de privacidade em VC-T13 |
 | PRV-05 | P2-D | VC-T15, VC-T17 | Parcial: o seletor só oferece modelos com visão (VC-T17); aviso de falha em tempo de execução e alvo apagado em VC-T15/T7 |
 | CFG-V01 | P2-E | VC-T11 | Implemented |
