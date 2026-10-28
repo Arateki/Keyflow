@@ -97,6 +97,15 @@ class VisionServiceTest {
     }
 
     @Test
+    fun tamanhoDeclaradoAbsurdoEBadInputSemLerNemCarregarNada() = runBlocking {
+        // 100 mil x 100 mil px (40 GB de RGBA) com um arquivo pequeno: o :vision recusa pela conta, antes do readBytes e da guarda de RAM.
+        val (file, _) = blankCrop()
+        val r = client(OcrTestSupport.visionModel(dummyFiles())).recognize(file, 100_000, 100_000) as OcrResult.Failed
+        assertEquals(OcrFailure.BAD_INPUT, r.kind)
+        assertTrue(r.message, r.message.contains("teto"))
+    }
+
+    @Test
     fun semRamParaAEstimativaEFailedOomSemCarregarNada() = runBlocking {
         val (file, image) = blankCrop()
         val model = OcrTestSupport.visionModel(dummyFiles(), ramEstimateMb = Int.MAX_VALUE)

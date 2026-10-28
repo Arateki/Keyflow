@@ -7,6 +7,7 @@ import com.keyflow.vision.ocr.OcrStats
 import com.keyflow.vision.ocr.RgbaImage
 import java.io.File
 import java.util.concurrent.Executor
+import java.util.concurrent.atomic.AtomicLong
 
 /** Agenda a descarga por ociosidade (MDL-04). Falso em teste; `ScheduledExecutorService` no serviço. */
 internal interface IdleScheduler {
@@ -30,6 +31,8 @@ internal class VisionServiceCore(
     private val availableMb: () -> Long?,
     private val scheduler: IdleScheduler,
     private val executor: Executor,
+    /** Confere o recorte SEM lê-lo (teto de pixels e tamanho do arquivo): roda antes da guarda de RAM e do `readCrop`. */
+    private val checkCrop: (path: String, width: Int, height: Int) -> Unit = { path, w, h -> RgbaImage.checkRaw(File(path), w, h) },
     private val readCrop: (path: String, width: Int, height: Int) -> RgbaImage = { path, w, h -> RgbaImage.readRaw(File(path), w, h) },
     /** Pico de RSS do processo (kB) desde o último [resetPeak]; 0 se o sistema não informa. */
     private val peakRssKb: () -> Long = { 0L },
@@ -49,16 +52,25 @@ internal class VisionServiceCore(
     /** Sobe a cada uso; um timer de ociosidade só vale se ainda tem o número da última vez que o motor foi usado. */
     private var useToken = 0L
 
-    @Volatile private var cancelled = false
+    /**
+     * Cancelamento por ficha: cada [recognize] ganha um número na ordem de chegada (na thread de quem chama) e [cancel] cancela TODAS as
+     * fichas já entregues — as que ainda esperam o executor (o trabalho nem começa e nada é entregue) e a que está rodando. Um
+     * `cancelled` único, zerado quando o pedido começa, apagava o cancelamento recebido enquanto o pedido ainda estava na fila.
+     */
+    private val tickets = AtomicLong()
+    private val cancelledUpTo = AtomicLong()
     @Volatile private var running: OcrEngine? = null
 
+    private fun isCancelled(ticket: Long) = ticket <= cancelledUpTo.get()
+
     fun recognize(model: VisionModel, cropPath: String, width: Int, height: Int, listener: Listener) {
-        executor.execute { process(model, cropPath, width, height, listener) }
+        val ticket = tickets.incrementAndGet()
+        executor.execute { process(ticket, model, cropPath, width, height, listener) }
     }
 
-    /** Interrompe o reconhecimento em curso. Sem nenhum em curso, só silencia o próximo já enfileirado. */
+    /** Interrompe o reconhecimento em curso e descarta os já enfileirados (nenhum deles roda nem chama o callback); o pedido seguinte não é afetado. */
     fun cancel() {
-        cancelled = true
+        cancelledUpTo.accumulateAndGet(tickets.get()) { a, b -> maxOf(a, b) }
         running?.cancel()
     }
 
@@ -71,29 +83,28 @@ internal class VisionServiceCore(
         }
     }
 
-    private fun process(model: VisionModel, cropPath: String, width: Int, height: Int, listener: Listener) {
-        cancelled = false
+    private fun process(ticket: Long, model: VisionModel, cropPath: String, width: Int, height: Int, listener: Listener) {
+        // Cancelado enquanto esperava na fila: não toca em motor, arquivo nem callback.
+        if (isCancelled(ticket)) return
         busy = true
         idleTimer?.cancel()
         idleTimer = null
         useToken++
         try {
             if (model.files.missing().isNotEmpty()) {
-                if (!cancelled) listener.onResult(OcrResult.Unavailable)
+                if (!isCancelled(ticket)) listener.onResult(OcrResult.Unavailable)
                 return
             }
-            val image = try {
-                readCrop(cropPath, width, height)
+            // 1) confere o recorte sem lê-lo; 2) guarda de RAM; 3) só então lê os bytes.
+            try {
+                checkCrop(cropPath, width, height)
             } catch (e: IllegalArgumentException) {
-                if (!cancelled) listener.onResult(OcrResult.Failed(OcrFailure.BAD_INPUT, e.message.orEmpty()))
-                return
-            } catch (e: java.io.IOException) {
-                if (!cancelled) listener.onResult(OcrResult.Failed(OcrFailure.BAD_INPUT, "não li o recorte: ${e.message}"))
+                if (!isCancelled(ticket)) listener.onResult(OcrResult.Failed(OcrFailure.BAD_INPUT, e.message.orEmpty()))
                 return
             }
             val active = ensureEngine(model)
             if (active == null) {
-                if (!cancelled) {
+                if (!isCancelled(ticket)) {
                     listener.onResult(
                         OcrResult.Failed(
                             OcrFailure.OOM,
@@ -103,18 +114,28 @@ internal class VisionServiceCore(
                 }
                 return
             }
-            if (cancelled) return
+            val image = try {
+                readCrop(cropPath, width, height)
+            } catch (e: IllegalArgumentException) {
+                if (!isCancelled(ticket)) listener.onResult(OcrResult.Failed(OcrFailure.BAD_INPUT, e.message.orEmpty()))
+                return
+            } catch (e: java.io.IOException) {
+                if (!isCancelled(ticket)) listener.onResult(OcrResult.Failed(OcrFailure.BAD_INPUT, "não li o recorte: ${e.message}"))
+                return
+            }
             running = active
+            // Um cancel() que chegou antes de `running` valer não viu o motor: confere de novo para não rodar à toa.
+            if (isCancelled(ticket)) return
             resetPeak()
             val result = active.recognize(image)
-            if (cancelled) return
+            if (isCancelled(ticket)) return
             listener.onStats(active.lastStats.copy(peakRssKb = peakRssKb()))
             listener.onResult(result)
         } catch (e: OutOfMemoryError) {
             unloadCurrent()
-            if (!cancelled) listener.onResult(OcrResult.Failed(OcrFailure.OOM, "memória esgotada no OCR"))
+            if (!isCancelled(ticket)) listener.onResult(OcrResult.Failed(OcrFailure.OOM, "memória esgotada no OCR"))
         } catch (e: Exception) {
-            if (!cancelled) listener.onResult(OcrResult.Failed(OcrFailure.ENGINE, e.message ?: e.toString()))
+            if (!isCancelled(ticket)) listener.onResult(OcrResult.Failed(OcrFailure.ENGINE, e.message ?: e.toString()))
         } finally {
             running = null
             busy = false

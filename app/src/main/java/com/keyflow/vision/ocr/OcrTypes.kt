@@ -20,11 +20,29 @@ class RgbaImage(val width: Int, val height: Int, val rgba: ByteArray) {
     }
 
     companion object {
-        /** Lê o arquivo cru que o processo principal escreveu. Tamanho que não bate com [width]x[height] é entrada ruim. */
-        fun readRaw(file: File, width: Int, height: Int): RgbaImage {
+        /**
+         * Teto de pixels de um recorte (12 MP = 48 MB de RGBA: cobre uma tela 4K, 8,3 MP). O arquivo cru vem de fora do processo
+         * (`:vision` recebe só o caminho e o tamanho): sem teto, um tamanho declarado absurdo faria o `readBytes` alocar tudo antes de
+         * qualquer guarda de RAM.
+         */
+        const val MAX_PIXELS = 12_000_000L
+
+        /**
+         * Confere o arquivo cru SEM lê-lo: tamanho declarado dentro do teto e `file.length()` igual a largura x altura x 4. Devolve o
+         * número de bytes esperado. Entrada ruim é `IllegalArgumentException` (o serviço a devolve como `BAD_INPUT`).
+         */
+        fun checkRaw(file: File, width: Int, height: Int): Long {
             require(width > 0 && height > 0) { "imagem vazia: ${width}x$height" }
-            val expected = width.toLong() * height * 4
+            val pixels = width.toLong() * height
+            require(pixels <= MAX_PIXELS) { "recorte de ${width}x$height (${pixels / 1_000_000} MP) passa do teto de ${MAX_PIXELS / 1_000_000} MP" }
+            val expected = pixels * 4
             require(file.length() == expected) { "${file.name}: ${file.length()} bytes, esperava $expected para ${width}x$height RGBA" }
+            return expected
+        }
+
+        /** Lê o arquivo cru que o processo principal escreveu, depois de [checkRaw] (teto e tamanho exato). */
+        fun readRaw(file: File, width: Int, height: Int): RgbaImage {
+            checkRaw(file, width, height)
             return RgbaImage(width, height, file.readBytes())
         }
     }

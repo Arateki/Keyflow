@@ -68,12 +68,17 @@ class VisionServiceCoreTest {
     private var peak = 123_456L
     private var peakReset = 0
     private val crops = ArrayList<Triple<String, Int, Int>>()
+    private val checks = ArrayList<Triple<String, Int, Int>>()
 
-    private fun core(engineFor: (VisionModel) -> OcrEngine = { FakeEngine().also(engines::add) }) = VisionServiceCore(
+    private fun core(
+        executor: Executor = direct,
+        engineFor: (VisionModel) -> OcrEngine = { FakeEngine().also(engines::add) },
+    ) = VisionServiceCore(
         engineFor = engineFor,
         availableMb = { availableMb },
         scheduler = scheduler,
-        executor = direct,
+        executor = executor,
+        checkCrop = { path, w, h -> checks += Triple(path, w, h) },
         readCrop = { path, w, h -> crops += Triple(path, w, h); RgbaImage(w, h, ByteArray(w * h * 4)) },
         peakRssKb = { peak },
         resetPeak = { peakReset++ },
@@ -116,16 +121,45 @@ class VisionServiceCoreTest {
     }
 
     @Test
-    fun recorteQueNaoEUmaImagemRgbaDoTamanhoDeclaradoEBadInput() {
+    fun recorteQueNaoEUmaImagemRgbaDoTamanhoDeclaradoEBadInputSemMotorNemLeitura() {
         val rec = Recorder()
         val c = VisionServiceCore(
             engineFor = { FakeEngine().also(engines::add) }, availableMb = { 1_000 }, scheduler = scheduler, executor = direct,
-            readCrop = { _, _, _ -> throw IllegalArgumentException("tamanho não bate") },
+            checkCrop = { _, _, _ -> throw IllegalArgumentException("tamanho não bate") },
+            readCrop = { path, w, h -> crops += Triple(path, w, h); RgbaImage(w, h, ByteArray(w * h * 4)) },
         )
         c.recognize(model, "/c", 4, 4, rec)
         val r = rec.results.single() as OcrResult.Failed
         assertEquals(OcrFailure.BAD_INPUT, r.kind)
-        assertTrue(engines.isEmpty())
+        assertTrue("nem motor nem leitura dos bytes", engines.isEmpty() && crops.isEmpty())
+    }
+
+    @Test
+    fun falhaAoLerOsBytesDepoisDaConferenciaTambemEBadInput() {
+        val rec = Recorder()
+        val c = VisionServiceCore(
+            engineFor = { FakeEngine().also(engines::add) }, availableMb = { 1_000 }, scheduler = scheduler, executor = direct,
+            checkCrop = { _, _, _ -> },
+            readCrop = { _, _, _ -> throw java.io.IOException("sumiu") },
+        )
+        c.recognize(model, "/c", 4, 4, rec)
+        assertEquals(OcrFailure.BAD_INPUT, (rec.results.single() as OcrResult.Failed).kind)
+    }
+
+    @Test
+    fun tamanhoDeclaradoAbsurdoCaiAntesDeLerDeVerdadeNoPadrao() {
+        // O padrão do núcleo é o RgbaImage.checkRaw: 100 mil x 100 mil px (40 GB de RGBA) é recusado sem ler o arquivo nem criar motor.
+        val file = File(dir, "crop.rgba").also { it.writeBytes(ByteArray(16)) }
+        val rec = Recorder()
+        val c = VisionServiceCore(
+            engineFor = { FakeEngine().also(engines::add) }, availableMb = { 1_000 }, scheduler = scheduler, executor = direct,
+            readCrop = { path, w, h -> crops += Triple(path, w, h); RgbaImage(1, 1, ByteArray(4)) },
+        )
+        c.recognize(model, file.path, 100_000, 100_000, rec)
+        val r = rec.results.single() as OcrResult.Failed
+        assertEquals(OcrFailure.BAD_INPUT, r.kind)
+        assertTrue(r.message, r.message.contains("teto"))
+        assertTrue(engines.isEmpty() && crops.isEmpty())
     }
 
     @Test
@@ -137,6 +171,7 @@ class VisionServiceCoreTest {
         assertEquals(OcrFailure.OOM, r.kind)
         assertTrue(r.message.contains("100"))
         assertTrue(engines.isEmpty())
+        assertTrue("a guarda de RAM vem antes de ler os bytes do recorte", crops.isEmpty())
     }
 
     @Test
@@ -151,7 +186,7 @@ class VisionServiceCoreTest {
     fun outOfMemoryNoMotorDescarregaEAvisa() {
         val engine = FakeEngine { throw OutOfMemoryError("x") }
         val rec = Recorder()
-        core { engine }.recognize(model, "/c", 4, 4, rec)
+        core(engineFor = { engine }).recognize(model, "/c", 4, 4, rec)
         assertEquals(OcrFailure.OOM, (rec.results.single() as OcrResult.Failed).kind)
         assertTrue(engine.closed)
     }
@@ -159,7 +194,7 @@ class VisionServiceCoreTest {
     @Test
     fun excecaoInesperadaDoMotorViraFailedEngine() {
         val rec = Recorder()
-        core { FakeEngine { throw IllegalStateException("boom") } }.recognize(model, "/c", 4, 4, rec)
+        core(engineFor = { FakeEngine { throw IllegalStateException("boom") } }).recognize(model, "/c", 4, 4, rec)
         val r = rec.results.single() as OcrResult.Failed
         assertEquals(OcrFailure.ENGINE, r.kind)
         assertEquals("boom", r.message)
@@ -207,11 +242,72 @@ class VisionServiceCoreTest {
         lateinit var c: VisionServiceCore
         // A thread do binder chama cancel() enquanto o motor reconhece.
         engine.onRecognize = { c.cancel() }
-        c = core { engine }
+        c = core(engineFor = { engine })
         c.recognize(model, "/c", 4, 4, rec)
         assertTrue(engine.cancelled)
         assertTrue("depois de cancelar nada é entregue ao callback: ${rec.results}", rec.results.isEmpty())
         assertTrue(rec.stats.isEmpty())
+    }
+
+    /** Executor que guarda os pedidos até alguém drenar: é o que acontece no `:vision` com o worker ocupado. */
+    private class QueuedExecutor : Executor {
+        private val queue = ArrayDeque<Runnable>()
+        override fun execute(command: Runnable) {
+            queue.addLast(command)
+        }
+        fun drain() {
+            while (queue.isNotEmpty()) queue.removeFirst().run()
+        }
+    }
+
+    @Test
+    fun cancelarOQueAindaEstaNaFilaNaoCarregaNemReconheceNemChamaOCallback() {
+        val queue = QueuedExecutor()
+        val rec = Recorder()
+        val c = core(executor = queue)
+        c.recognize(model, "/c", 4, 4, rec)
+        c.cancel()
+        queue.drain()
+        assertTrue("nenhum motor criado", engines.isEmpty())
+        assertTrue("nem conferido nem lido o recorte", checks.isEmpty() && crops.isEmpty())
+        assertTrue("nenhum callback: ${rec.results} ${rec.stats}", rec.results.isEmpty() && rec.stats.isEmpty())
+        assertTrue("nada agendado para descarregar", scheduler.pending.isEmpty())
+    }
+
+    @Test
+    fun cancelarDescartaTodosOsPedidosEnfileiradosMasNaoOQueChegaDepois() {
+        val queue = QueuedExecutor()
+        val first = Recorder()
+        val second = Recorder()
+        val after = Recorder()
+        val c = core(executor = queue)
+        c.recognize(model, "/c1", 4, 4, first)
+        c.recognize(model, "/c2", 4, 4, second)
+        c.cancel()
+        c.recognize(model, "/c3", 4, 4, after) // chegou depois do cancel: é um pedido novo
+        queue.drain()
+        assertTrue(first.results.isEmpty() && second.results.isEmpty())
+        assertEquals(listOf<OcrResult>(OcrResult.Text("ok")), after.results)
+        assertEquals(listOf("/c3"), crops.map { it.first })
+        assertEquals(1, engines.size)
+        assertEquals(1, engines[0].calls)
+    }
+
+    @Test
+    fun cancelarNoMeioDeUmCobreTambemOQueJaEstavaNaFila() {
+        val queue = QueuedExecutor()
+        val a = Recorder()
+        val b = Recorder()
+        val engine = FakeEngine()
+        lateinit var svc: VisionServiceCore
+        svc = core(executor = queue, engineFor = { engine })
+        engine.onRecognize = { svc.cancel() } // o 1º é cancelado enquanto roda; o 2º já estava na fila
+        svc.recognize(model, "/c1", 4, 4, a)
+        svc.recognize(model, "/c2", 4, 4, b)
+        queue.drain()
+        assertTrue("nada chega a callback nenhum: ${a.results} ${b.results}", a.results.isEmpty() && b.results.isEmpty())
+        assertEquals("o motor roda uma vez só", 1, engine.calls)
+        assertTrue(engine.cancelled)
     }
 
     @Test

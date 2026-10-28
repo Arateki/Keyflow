@@ -90,4 +90,30 @@ class VisionRulesTest {
         assertEquals(":vision", vision.getAttributeNS(ns, "process"))
         assertEquals("false", vision.getAttributeNS(ns, "exported"))
     }
+
+    /**
+     * O `Application.onCreate()` roda em todo processo, `:vision` inclusive. Ele abre cofres e coleta Settings/DataStore; no `:vision` (que
+     * recebe tudo pelo AIDL, design §6) nada disso pode rodar. A guarda por nome de processo tem de vir ANTES de qualquer acesso.
+     */
+    @Test
+    fun appCreateSaiAntesDeAbrirCofresEConfiguracaoNoProcessoVision() {
+        val code = File(main, "com/keyflow/App.kt").readLines().filterNot { it.trim().startsWith("//") || it.trim().startsWith("*") || it.trim().startsWith("/*") || it.trim().startsWith("import ") }
+        val guard = code.indexOfFirst { "VisionProcess.isCurrent()" in it }
+        assertTrue("App.onCreate precisa da guarda VisionProcess.isCurrent()", guard >= 0)
+        assertTrue("a guarda sai do onCreate (return)", "return" in code[guard])
+        val accesses = listOf("SettingsRepository(", "secretVault", "authServices.store", "cleanupStaleRecordings", "StrictModeGuard.install")
+        val early = code.withIndex().filter { (i, line) -> i < guard && accesses.any { it in line } }.map { it.value.trim() }
+        assertEquals("nada de cofre/Settings antes da guarda do :vision: $early", emptyList<String>(), early)
+        // E o inverso: a guarda existe porque o manifest declara serviço no :vision (se o processo sumir, a regra pode sair junto).
+        val manifest = File("src/main/AndroidManifest.xml").readText()
+        assertTrue(":vision" in manifest)
+    }
+
+    @Test
+    fun reconheceOProcessoVisionPeloNome() {
+        assertTrue(com.keyflow.vision.service.VisionProcess.isVision("com.arateki.keyflow:vision"))
+        for (other in listOf("com.arateki.keyflow", "com.arateki.keyflow:inference", "com.arateki.keyflow:reasoning", "com.arateki.keyflow:visionx", ":vision", "", null)) {
+            assertTrue("$other não é o :vision", !com.keyflow.vision.service.VisionProcess.isVision(other))
+        }
+    }
 }
