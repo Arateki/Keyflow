@@ -14,6 +14,7 @@ import com.keyflow.reasoning.UnavailableReason
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onStart
 
@@ -102,11 +103,12 @@ class AgentBackends(
 
         /** O chat de antes: uma chamada por mensagem ao motor de texto, sem histórico, traduzida para os eventos do agente. */
         fun textOnly(engine: ReasoningEngine): AgentBackend.TextOnly = AgentBackend.TextOnly { prompt ->
-            engine.generate(ReasoningRequest(system = TEXT_ONLY_SYSTEM, user = prompt)).map { event ->
+            engine.generate(ReasoningRequest(system = TEXT_ONLY_SYSTEM, user = prompt)).mapNotNull { event ->
                 when (event) {
                     is ReasoningEvent.Delta -> AgentEvent.TextDelta(event.text)
                     ReasoningEvent.Done -> AgentEvent.Done()
                     is ReasoningEvent.Error -> AgentEvent.Error(event.kind, event.message)
+                    is ReasoningEvent.Metrics -> null // o chat não pede opções: nada a mostrar
                 }
             }
         }
