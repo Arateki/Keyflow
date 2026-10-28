@@ -1,6 +1,6 @@
 package com.keyflow.bancada.corpus
 
-import com.keyflow.agent.SecretFilter
+import com.keyflow.bancada.redacao.RedatorDeSegredos
 
 /**
  * A conferência de integridade do corpus (BCP-02/03/04/07), sem ler o resto do app: devolve a lista de problemas (vazia = íntegro).
@@ -19,7 +19,7 @@ object CorpusValidador {
 
     val IDIOMAS: Set<String> = setOf("pt", "en", "es")
 
-    fun validar(fonte: FonteDoCorpus, filtro: SecretFilter = SecretFilter(), orcamentoBytes: Long = ORCAMENTO_BYTES): List<String> {
+    fun validar(fonte: FonteDoCorpus, filtro: RedatorDeSegredos = RedatorDeSegredos(), orcamentoBytes: Long = ORCAMENTO_BYTES): List<String> {
         val problemas = ArrayList<String>()
         val manifesto = try {
             CorpusLoader.lerManifesto(fonte)
@@ -62,7 +62,7 @@ object CorpusValidador {
         return problemas
     }
 
-    private fun validarTeste(caminho: String, teste: TesteDef, ids: MutableSet<String>, filtro: SecretFilter): List<String> {
+    private fun validarTeste(caminho: String, teste: TesteDef, ids: MutableSet<String>, filtro: RedatorDeSegredos): List<String> {
         val problemas = ArrayList<String>()
         fun erro(texto: String) {
             problemas += "$caminho: $texto"
@@ -73,7 +73,7 @@ object CorpusValidador {
         if (TesteDef.PLACEHOLDER_ENTRADA !in teste.prompt.user) erro("o prompt do usuário não tem ${TesteDef.PLACEHOLDER_ENTRADA}")
         if (teste.casos.isEmpty()) erro("sem casos")
         val textosDoPrompt = listOfNotNull(teste.prompt.system, teste.prompt.user, teste.ferramentas)
-        if (textosDoPrompt.any(filtro::containsSecret)) erro("o prompt contém algo que o SecretFilter removeria")
+        if (textosDoPrompt.any(filtro::containsSecret)) erro("o prompt contém algo que o filtro de segredos removeria")
         for (caso in teste.casos) {
             if (!ids.add(caso.id)) erro("id de caso repetido: ${caso.id}")
             if (caso.id.isBlank()) erro("caso sem id")
@@ -81,7 +81,7 @@ object CorpusValidador {
             if (caso.entrada.isBlank()) erro("${caso.id}: entrada vazia")
             if (caso.maxTokensSaida <= 0) erro("${caso.id}: maxTokensSaida precisa ser positivo")
             if (caso.tokensEntrada < 0) erro("${caso.id}: tokensEntrada negativo")
-            if (filtro.containsSecret(caso.bruto.toString())) erro("${caso.id}: contém algo que o SecretFilter removeria (BCP-07)")
+            if (filtro.containsSecret(caso.bruto.toString())) erro("${caso.id}: contém algo que o filtro de segredos removeria (BCP-07)")
         }
         return problemas
     }

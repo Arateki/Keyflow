@@ -10,7 +10,7 @@ class ExecucaoInvalidaException(message: String) : Exception(message)
 /**
  * O esquema `bancada-resultado/1` (BHS-01/04): a execução em JSON, ida e volta sem perda. É o formato do arquivo do histórico, da
  * exportação pelo seletor de documentos e do resumo de `verification/bancada/`. O texto livre (saída do modelo, motivos) passa pelo
- * [redigir] — o `SecretFilter` do app — antes de ser gravado: nenhuma chave de API sai daqui, mesmo que o modelo a repita (BON-03).
+ * [redigir] — o `RedatorDeSegredos` do app — antes de ser gravado: nenhuma chave de API sai daqui, mesmo que o modelo a repita (BON-03).
  */
 object ExecucaoJson {
     const val ESQUEMA = "bancada-resultado/1"

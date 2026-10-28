@@ -23,7 +23,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.keyflow.agent.SecretFilter
+import com.keyflow.bancada.redacao.RedatorDeSegredos
 import com.keyflow.bancada.adaptadores.BancadaServicos
 import com.keyflow.bancada.armazenamento.RepositorioDeExecucoes
 import com.keyflow.bancada.corpus.Caso
@@ -384,7 +384,7 @@ class BancadaTestAreaTest {
     fun theBatteryRunsEveryApplicableTestAndTheJsonExportedValidates() {
         // Um segredo de mentira na saída do modelo não pode chegar ao arquivo exportado (BON-03).
         servicos.runner.parar()
-        servicos = criarServicos(redigir = SecretFilter()::redact)
+        servicos = criarServicos(redigir = RedatorDeSegredos()::redact)
         val motor = MotorFalso(resposta = { perfeita(it) + " sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789" }) // chave fake
         mostrar(ReasoningResolution.Ready(motor), local)
         abrir("pontuacao")
@@ -402,7 +402,7 @@ class BancadaTestAreaTest {
         val texto = saida.toString(Charsets.UTF_8.name())
         assertEquals(emptyList<String>(), ExecucaoJson.validar(texto))
         assertFalse("a chave de mentira vazou para o JSON exportado", texto.contains("sk-ant-api03"))
-        assertTrue(texto.contains(SecretFilter.MARKER))
+        assertTrue(texto.contains(RedatorDeSegredos.MARKER))
         assertEquals(execucao.id, ExecucaoJson.ler(texto).id)
         esperarTag(BANCADA_EXPORTAR_TAG)
         rule.onNodeWithTag(BANCADA_EXPORTAR_TAG).performScrollTo().assertIsDisplayed()

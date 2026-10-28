@@ -1,7 +1,7 @@
 package com.keyflow.bancada.resultado
 
 import com.google.common.truth.Truth.assertThat
-import com.keyflow.agent.SecretFilter
+import com.keyflow.bancada.redacao.RedatorDeSegredos
 import org.json.JSONObject
 import org.junit.Test
 
@@ -51,12 +51,12 @@ class ExecucaoJsonTest {
     @Test
     fun `a fake api key in the environment never reaches the serialized run`() {
         val chave = "chave-falsa-de-api-0123456789"
-        val filtro = SecretFilter { listOf(chave) }
+        val filtro = RedatorDeSegredos { listOf(chave) }
         val execucao = execucaoDeExemplo(saida = "claro, use a chave $chave ou sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789") // chave fake
         val texto = ExecucaoJson.escrever(execucao) { filtro.redact(it) }
         assertThat(texto).doesNotContain(chave)
         assertThat(texto).doesNotContain("sk-ant-api03")
-        assertThat(texto).contains(SecretFilter.MARKER)
+        assertThat(texto).contains(RedatorDeSegredos.MARKER)
         // sem filtro, o texto passaria — o filtro é o que protege
         assertThat(ExecucaoJson.escrever(execucao)).contains(chave)
         // o motivo de um caso também passa pelo filtro

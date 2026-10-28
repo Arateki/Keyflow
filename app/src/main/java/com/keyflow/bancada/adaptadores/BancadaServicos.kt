@@ -3,8 +3,6 @@ package com.keyflow.bancada.adaptadores
 import android.content.Context
 import android.os.SystemClock
 import com.keyflow.App
-import com.keyflow.agent.SecretFilter
-import com.keyflow.agenthost.AgentSecretSource
 import com.keyflow.auth.CredentialVaultLock
 import com.keyflow.bancada.armazenamento.RepositorioDeExecucoes
 import com.keyflow.bancada.corpus.Corpus
@@ -23,6 +21,7 @@ import com.keyflow.bancada.resultado.AppInfo
 import com.keyflow.bancada.resultado.Execucao
 import com.keyflow.bancada.resultado.ExecucaoJson
 import com.keyflow.bancada.resultado.MotorInfo
+import com.keyflow.bancada.redacao.RedatorDeSegredos
 import com.keyflow.bancada.resultado.isoUtc
 import com.keyflow.data.SettingsRepository
 import com.keyflow.reasoning.ReasoningEngine
@@ -102,12 +101,13 @@ class BancadaServicos(
 
         private fun criar(app: Context): BancadaServicos {
             val repositorioDeAjustes = SettingsRepository(app)
-            val segredos = AgentSecretSource(
+            val segredos = SegredosDoAparelho(
                 vaultProvider = repositorioDeAjustes::secretVault,
                 credentials = (app as App).authServices.store,
-                vaultSnapshot = { cofre -> CredentialVaultLock.withLock(app) { cofre.all.values.toList() } },
+                // A fonte antiga pode ser migrada por outro processo enquanto o filtro roda: a leitura do cofre espera só a cópia síncrona.
+                valoresDoCofre = { cofre -> CredentialVaultLock.withLock(app) { cofre.all.values.toList() } },
             )
-            val filtro = SecretFilter(segredos)
+            val filtro = RedatorDeSegredos(segredos)
             val repositorio = RepositorioDeExecucoes(RepositorioDeExecucoes.pasta(app.filesDir), redigir = filtro::redact)
             val nascimento = System.currentTimeMillis()
             val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)

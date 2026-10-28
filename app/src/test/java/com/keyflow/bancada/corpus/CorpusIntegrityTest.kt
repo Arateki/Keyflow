@@ -2,7 +2,7 @@ package com.keyflow.bancada.corpus
 
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
-import com.keyflow.agent.SecretFilter
+import com.keyflow.bancada.redacao.RedatorDeSegredos
 import com.keyflow.bancada.pontuacao.Pontuadores
 import java.io.File
 import org.json.JSONObject
@@ -20,7 +20,7 @@ class CorpusIntegrityTest {
     /** O brinquedo na memória, para adulterar um arquivo sem tocar no disco. */
     private fun brinquedoNaMemoria(): MutableMap<String, ByteArray> = brinquedo.listar().associateWith { brinquedo.ler(it)!! }.toMutableMap()
 
-    private fun validar(arquivos: Map<String, ByteArray>, filtro: SecretFilter = SecretFilter(), orcamento: Long = CorpusValidador.ORCAMENTO_BYTES) =
+    private fun validar(arquivos: Map<String, ByteArray>, filtro: RedatorDeSegredos = RedatorDeSegredos(), orcamento: Long = CorpusValidador.ORCAMENTO_BYTES) =
         CorpusValidador.validar(MapaFonte(arquivos), filtro, orcamento)
 
     // ── a conferência pega o defeito ─────────────────────────────────────────────────────
@@ -119,13 +119,13 @@ class CorpusIntegrityTest {
         teste.getJSONArray("casos").getJSONObject(0).put("entrada", "minha chave é sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789") // chave fake
         arquivos["pontuacao.json"] = teste.toString().toByteArray()
         recalcularHash(arquivos)
-        assertThat(validar(arquivos).joinToString()).contains("SecretFilter")
+        assertThat(validar(arquivos).joinToString()).contains("filtro de segredos")
         val registrado = brinquedoNaMemoria()
         val comValor = JSONObject(registrado.getValue("pontuacao.json").toString(Charsets.UTF_8))
         comValor.getJSONObject("prompt").put("system", "use a senha segredo-super-longo-123 aqui")
         registrado["pontuacao.json"] = comValor.toString().toByteArray()
         recalcularHash(registrado)
-        assertThat(validar(registrado, SecretFilter { listOf("segredo-super-longo-123") }).joinToString()).contains("SecretFilter")
+        assertThat(validar(registrado, RedatorDeSegredos { listOf("segredo-super-longo-123") }).joinToString()).contains("filtro de segredos")
     }
 
     @Test

@@ -41,6 +41,7 @@ class BancadaIsolationTest {
             "import android.", "import androidx.", "import com.keyflow.ui.", "import com.keyflow.data.", "import com.keyflow.App",
             "import com.keyflow.reasoning.openai", "import com.keyflow.reasoning.anthropic", "import com.keyflow.reasoning.google",
             "import com.keyflow.reasoning.local", "import com.keyflow.auth.", "import com.keyflow.transcription.", "import com.keyflow.onnx.",
+            "import com.keyflow.agent.", "import com.keyflow.agenthost.",
         )
         val achados = nucleo().flatMap { (caminho, linhas) ->
             linhas.filter { l -> l.trimStart().startsWith("import ") && proibidos.any { l.trimStart().startsWith(it) } }.map { "$caminho → ${it.trim()}" }
@@ -49,10 +50,10 @@ class BancadaIsolationTest {
     }
 
     @Test
-    fun `the core only knows the reasoning contract and the secret filter from the rest of the app`() {
+    fun `the core only knows the reasoning contract from the rest of the app`() {
         val permitidos = setOf(
             "com.keyflow.reasoning.ReasoningEngine", "com.keyflow.reasoning.ReasoningEvent", "com.keyflow.reasoning.ReasoningRequest",
-            "com.keyflow.reasoning.ReasoningError", "com.keyflow.reasoning.GenerationOptions", "com.keyflow.agent.SecretFilter",
+            "com.keyflow.reasoning.ReasoningError", "com.keyflow.reasoning.GenerationOptions",
         )
         val achados = nucleo().flatMap { (caminho, linhas) ->
             linhas.map { it.trim() }
@@ -60,6 +61,22 @@ class BancadaIsolationTest {
                 .map { "$caminho → $it" }
         }
         assertWithMessage("importações fora do contrato:\n${achados.joinToString("\n")}").that(achados).isEmpty()
+    }
+
+    /**
+     * O release não leva o agente (V1: "Em breve"; `scripts/check-release-agent.py` recusa `com.keyflow.agent.*` e `agenthost.*` no DEX) e a bancada roda no release:
+     * nada em `bancada/` — núcleo ou adaptador — pode importá-lo, senão o R8 o mantém. O filtro de segredos tem cópia própria (`redacao/`), com teste de paridade.
+     */
+    @Test
+    fun `no file of bancada imports the agent, which does not ship in the release`() {
+        val achados = fontes().flatMap { (caminho, linhas) ->
+            linhas.map { it.trim() }.filter { it.startsWith("import com.keyflow.agent.") || it.startsWith("import com.keyflow.agenthost.") }.map { "$caminho → $it" }
+        }
+        assertWithMessage("a bancada importa o agente:\n${achados.joinToString("\n")}").that(achados).isEmpty()
+        val ui = File(root, "ui/config").listFiles { f -> f.name.startsWith("Bancada") && f.extension == "kt" }.orEmpty()
+        val daUi = ui.flatMap { f -> f.readLines().map { it.trim() }.filter { it.startsWith("import com.keyflow.agent") }.map { "${f.name} → $it" } }
+        assertWithMessage("a interface da bancada importa o agente:\n${daUi.joinToString("\n")}").that(daUi).isEmpty()
+        assertThat(ui).isNotEmpty()
     }
 
     @Test

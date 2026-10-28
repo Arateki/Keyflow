@@ -212,7 +212,9 @@ class AnthropicKeyFlowTest {
 
         // Testar: dispara geração de raciocínio via token OAuth
         rule.onNodeWithTag(REASONING_TEST_BUTTON_TAG).performScrollTo().performClick()
-        rule.waitUntil(15_000) { runCatching { rule.onNodeWithTag(REASONING_TEST_TIMES_TAG).assertIsDisplayed() }.isSuccess }
+        // Espera existir e rola até ele, como os testes irmãos (OpenAI e Google): com a faixa de sub-abas da bancada acima do botão, o resultado cai abaixo da tela.
+        rule.waitUntil(15_000) { runCatching { rule.onNodeWithTag(REASONING_TEST_TIMES_TAG).assertExists() }.isSuccess }
+        rule.onNodeWithTag(REASONING_TEST_TIMES_TAG).performScrollTo().assertIsDisplayed()
         rule.onNodeWithTag(REASONING_TEST_RESPONSE_TAG).assertTextContains("Olá da Claude!", substring = true)
 
         // Servidor recebeu o cabeçalho Authorization: Bearer e o anthropic-beta do login (oauth-2025-04-20 mais o da identidade

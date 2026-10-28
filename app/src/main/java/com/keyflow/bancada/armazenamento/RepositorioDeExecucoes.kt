@@ -18,7 +18,7 @@ import java.io.FileOutputStream
  * - **Recuperação**: uma execução que ficou `em-andamento` no disco sem ninguém rodando (o processo morreu) é regravada como
  *   `incompleta`/`INTERROMPIDA` ([recuperarInterrompidas]).
  *
- * Não conhece UI nem motor. [redigir] é o `SecretFilter` do app: o texto livre passa por ele ao gravar (BON-03).
+ * Não conhece UI nem motor. [redigir] é o filtro de segredos do app (`RedatorDeSegredos`): o texto livre passa por ele ao gravar (BON-03).
  */
 class RepositorioDeExecucoes(
     private val diretorio: File,
