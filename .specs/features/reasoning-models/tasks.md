@@ -575,7 +575,7 @@ SHA-256 `9e48b165…` lidos da API do HF (e o SHA-256 recalculado baixando o arq
 
 ## Candidatas só no debug (2026-10-27, modelos-novos)
 
-Status: cadastro e logo Nanbeige implementados; sincronização com a main concluída no código, gates e goldens finais em validação. Histórico da primeira rodada: Gate JVM: 1799/1800 (única falha: fabricante Nanbeige); lint sem ocorrências; instrumentados afetados 23/23. Goldens: 230/230 capturas dentro do limiar sem fuzz, com dez PNGs de Raciocínio aprovados e os outros 220 originais preservados.
+Status: cadastro e logo Nanbeige implementados; main sincronizada, 1804/1804 unitários, lint sem ocorrências e 23/23 instrumentados afetados. Captura final 244/244; comparação oficial e sem fuzz dentro do limiar após aprovar só 22 PNGs de Raciocínio (dez existentes e 12 novos), com os demais 222 bit-idênticos. Os seis cards foram revisados em claro/escuro; CI obrigatório acompanhado no PR. Lição: `licoes/2026-10-28-modelos-novos.md`. Histórico da primeira rodada: Gate JVM: 1799/1800 (única falha: fabricante Nanbeige); lint sem ocorrências; instrumentados afetados 23/23. Goldens: 230/230 capturas dentro do limiar sem fuzz, com dez PNGs de Raciocínio aprovados e os outros 220 originais preservados.
 Seis candidatas, URL por commit + LFS/bytes conferidos, licenças, traduções dos cards e logo IBM MIT.
 Release mantém os sete modelos validados após a integração do Qwen3 4B e não publica as licenças das candidatas em Docs/site. Spark 1.7B/4B aguardam runtime compatível (mínimo formal 0.17.0).
 Evidências, estimativas de RAM, diferenças entre versões de runtime e limitações em `modelos-novos.md`.

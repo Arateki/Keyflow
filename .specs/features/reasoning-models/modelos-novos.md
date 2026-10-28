@@ -60,3 +60,12 @@ A integração exige o teste de fabricante Nanbeige, a suíte JVM, lint e golden
 - Commits de implementação: `e9aed3a` (catálogo/licenças/testes) e `5fdb6c0` (goldens).
 
 Fontes brutas, metadados LFS, licenças consultadas e logs ficam em `.equipe/artefatos/modelos-novos/` nesta worktree (pasta não versionada).
+
+## Fechamento da integração — 2026-10-28
+
+- Main sincronizada até #47, preservando #45 e #46; logo Nanbeige vetorial com origem/atribuição. Versão combinada `2026102801`, fingerprint acima.
+- Gate exato `pool compilar testDebugUnitTest :app:lintDebug`, sem filtro de nó/AWS: **1804/1804** unitários em 168 suítes, zero ignorados; lint sem ocorrências. Contagem conferida nos XMLs.
+- `ModelListTest` **12/12** e `ReasoningPanelTest` **11/11** no Deck: **23/23**, 116,452 s; nenhuma inferência dos seis pesos.
+- `pool telas` compilou e instalou o APK no Deck e concluiu **244/244** PNGs (122 rotas × dois temas). Seis cards individuais e dez quadros da lista revisados; Nanbeige legível em claro/escuro.
+- Aprovação restrita a **22** PNGs de Raciocínio: dez existentes e 12 novos. Os outros **222** goldens permanecem bit-idênticos; diferenças pequenas de Docs (49/49 pixels) e tutorial do microfone (74/75) ficam abaixo do limiar sem fuzz. Comparação oficial e contagem estrita nos artefatos.
+- Spec, tasks e lições atualizadas em arquivos próprios (`licoes/2026-10-28-modelos-novos.md` e `licoes/2026-10-28-assinatura-debug-avd.md`); nenhum acréscimo novo ao STATE. O CI e o PR ficam registrados no relatório de entrega.
