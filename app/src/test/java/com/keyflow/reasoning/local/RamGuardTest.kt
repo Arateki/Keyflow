@@ -58,7 +58,7 @@ class RamGuardTest {
 
     /** A32 (~3,7 GB; 1,1–1,5 GB livres): Qwen, Gemma E2B e DeepSeek rodaram a 1,66–1,73 GB; o SmolLM2 foi morto pelo lmkd. */
     @Test
-    fun `on the A32 the three measured models load and SmolLM2 and the E4B are refused`() {
+    fun `on the A32 the three measured models load and SmolLM2, the E4B and Qwen3 4B are refused`() {
         val total = 3_700L
         val free = 1_200L // a RAM livre subestima: o Android libera apps em segundo plano ao carregar
         assertThat(RamGuard.enough(free, estimate(ModelCatalog.QWEN3_0_6B), total)).isTrue()
@@ -66,23 +66,44 @@ class RamGuardTest {
         assertThat(RamGuard.enough(free, estimate(ModelCatalog.DEEPSEEK_R1_1_5B), total)).isTrue()
         assertThat(RamGuard.enough(free, estimate(ModelCatalog.SMOLLM2_1_7B), total)).isFalse()
         assertThat(RamGuard.enough(free, estimate(ModelCatalog.GEMMA_4_E4B), total)).isFalse()
+        assertThat(RamGuard.enough(free, estimate(ModelCatalog.QWEN3_4B), total)).isFalse()
     }
 
-    /** Tab S10 Lite (~5,8 GB; 2,3 GB livres): SmolLM2 rodou a 3,3 GB; o E4B (4,4–4,5 GB) não cabe. */
+    /** Tab S10 Lite (~5,8 GB; 2,3 GB livres): SmolLM2 rodou a 3,3 GB; o E4B (4,4–4,5 GB) e o Qwen3 4B (4,6–6,1 GB na CPU) não cabem. */
     @Test
-    fun `on a 6 GB tablet SmolLM2 loads and the E4B is refused`() {
+    fun `on a 6 GB tablet SmolLM2 loads and the two big models are refused`() {
         val total = 5_700L
         val free = 2_300L
-        ModelCatalog.TEXT_ALL.filter { it != ModelCatalog.GEMMA_4_E4B }.forEach {
+        val big = setOf(ModelCatalog.GEMMA_4_E4B, ModelCatalog.QWEN3_4B)
+        ModelCatalog.TEXT_ALL.filter { it !in big }.forEach {
             assertThat(RamGuard.enough(free, estimate(it), total)).isTrue()
         }
-        assertThat(RamGuard.enough(free, estimate(ModelCatalog.GEMMA_4_E4B), total)).isFalse()
+        big.forEach { assertThat(RamGuard.enough(free, estimate(it), total)).isFalse() }
     }
 
-    /** Vaio TL10 (~7,6 GB; 4,8 GB livres): o E4B rodou a 4,4–4,5 GB. */
+    /**
+     * Vaio TL10 (~7,6 GB; 4,8 GB livres): o E4B rodou a 4,4–4,5 GB. O Qwen3 4B não: pela CPU o processo passou de 5 GB e o Android o matou por falta de
+     * memória (só a GPU, que o app não usa, o carregou, com 4,4 GB) — a guarda o barra em vez de deixar o usuário esperar a carga morrer.
+     */
     @Test
-    fun `on an 8 GB device every text model loads`() {
-        ModelCatalog.TEXT_ALL.forEach { assertThat(RamGuard.enough(4_800L, estimate(it), 7_400L)).isTrue() }
+    fun `on an 8 GB device every text model loads but Qwen3 4B`() {
+        ModelCatalog.TEXT_ALL.filter { it != ModelCatalog.QWEN3_4B }.forEach {
+            assertThat(RamGuard.enough(4_800L, estimate(it), 7_400L)).isTrue()
+        }
+        assertThat(RamGuard.enough(4_800L, estimate(ModelCatalog.QWEN3_4B), 7_400L)).isFalse()
+    }
+
+    /** Um aparelho de 12 GB mostra ~11 GB de RAM total: carrega o Qwen3 4B (RSS de 4,6–6,1 GB na CPU, segundo o autor) mesmo com pouca RAM livre. */
+    @Test
+    fun `on a 12 GB device every text model loads`() {
+        ModelCatalog.TEXT_ALL.forEach { assertThat(RamGuard.enough(3_000L, estimate(it), 11_200L)).isTrue() }
+    }
+
+    @Test
+    fun `the Qwen3 4B floor is 9831 MB, rounded up from 80 percent of 12288`() {
+        val estimate = ModelCatalog.QWEN3_4B.recommendedRamMb / 2
+        assertThat(RamGuard.fitsDevice(totalMb = 9_831, estimateMb = estimate)).isTrue()
+        assertThat(RamGuard.fitsDevice(totalMb = 9_830, estimateMb = estimate)).isFalse()
     }
 
     @Test

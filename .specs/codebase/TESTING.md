@@ -142,6 +142,43 @@ ci rodar --classes ClasseA,ClasseB#metodo --pedacos 4 --repetir 20 --rotulo lote
 - Regressões sem rede: `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests -v`.
   Usam `CI_GH_BIN` falso, remotos Git locais descartáveis e logs sintéticos; não disparam Actions.
 
+## Conflitos de mesclagem entre branches paralelas
+
+**Medição (2026-10-27, mesclagens da `main` desde 20/10)**: dos 59 merges, os 32 "Merge pull request" não conflitaram
+(a branch já tinha sincronizado antes). Dos 27 de sincronização (`main` → branch), **19 pararam em conflito (70%) e 18
+deles em `.specs/project/STATE.md`**: sempre dois blocos acrescentados no fim, nunca edição do mesmo trecho. Os outros
+arquivos, por frequência: `DocsPanel.kt` 3, `app/licenses/README.md` 2, `monetization/spec.md` 2,
+`scripts/smoke-release.sh` 2 e, uma vez cada, `reasoning-models/tasks.md`, `monetization/tasks.md`, `DEVELOPMENT-ORDER.md`,
+`.gitignore`, `api/deploy/LEIA-ME.md`, as traduções e o código da integração da V1-10. Refeitas com o `.gitattributes`
+abaixo, 20 das 27 mesclagens passam sem conflito; as 7 que sobram são `DocsPanel.kt`, `tasks.md`/`spec.md` da mesma
+feature, `.gitignore`, `api/deploy/LEIA-ME.md` e a integração da V1-10 (edição do mesmo trecho: conflito de verdade).
+
+O que o repositório faz:
+
+- **Lição ou decisão nova vai num arquivo próprio**, `.specs/project/licoes/AAAA-MM-DD-assunto.md` (ver o `LEIA-ME.md`
+  da pasta). Arquivo novo não conflita com ninguém. O `STATE.md` antigo fica como está, só para consulta.
+- **`merge=union` no `.gitattributes`** para `STATE.md` e `app/licenses/README.md`: quando duas branches acrescentam texto
+  no mesmo ponto, o Git mantém os dois lados em vez de parar com marcadores. É driver embutido: não precisa de
+  configuração e vale também para `rebase` e `cherry-pick`. Efeitos esperados: o seu lado vem antes do da `main`; pode
+  faltar uma linha em branco entre os dois blocos; e, se um lado **edita** uma linha antiga e o outro acrescenta junto
+  dela, a linha antiga fica duplicada sem aviso (olhe o diff da mesclagem desses dois arquivos). Quando nenhuma branch
+  aberta acrescentar mais nada ao `STATE.md`, a linha dele pode sair.
+- **Branch aberta antes do `.gitattributes`**: o Git lê as regras do que já está no seu diretório, não do que a
+  mesclagem traz; então a **primeira** sincronização com a `main` ainda conflitaria. Faça essa assim (vale também para
+  `rebase`); depois dela, `git merge origin/main` normal:
+  `git show origin/main:.gitattributes > /tmp/ga-keyflow && git -c core.attributesFile=/tmp/ga-keyflow merge origin/main`
+- **Sem union, de propósito**: tabelas de status editadas no meio (`tasks.md`, `spec.md`, `DEVELOPMENT-ORDER.md`), código,
+  traduções (`TranslationsEn.kt`, `TranslationsEs.kt`), `.gitignore` (a ordem dos padrões com `!` importa) e arquivo
+  gerado. Para pôr outro arquivo na lista, confirme que ele só cresce por acréscimo e atualize o
+  `scripts/tests/test_mesclagem.py`, que trava a lista.
+
+**Arquivo gerado nunca se resolve à mão**: escolha qualquer lado, resolva o conflito da **fonte** e gere de novo.
+
+| Gerado | Fonte | Como regerar depois de resolver a fonte |
+| ------ | ----- | ---------------------------------------- |
+| `website/_fonte/doc.json` | `DocsPanel.kt` e as traduções do app | `KEYFLOW_REGERAR_DOC_SITE=1 flock /tmp/keyflow-gradle.lock <gradle do AGENTS.md> testDebugUnitTest --tests '*DocsSiteExportTest'` (direto, não pelo `pool`: ele pode rodar o teste em outro nó, e o arquivo regerado ficaria lá). O teste regrava o arquivo; todo `testDebugUnitTest` também deixa uma cópia em `app/build/docs-site/doc.json`. Confira com `git diff --stat website/_fonte/doc.json` e commite junto com a fonte. |
+| `verification/golden/*.png` | `scripts/verify-screens.sh` | PNG não tem merge: pegue o da `main` (`git checkout origin/main -- <png>`), refaça `verify-screens.sh` → `diff-screens.sh` e só aprove o que a **sua** mudança alterou. |
+
 ## CI (GitHub Actions) — `.github/workflows/checks.yml`
 
 Roda em PR para `main`, push em `main`, merge queue e manual (`workflow_dispatch`), no padrão do
@@ -232,6 +269,11 @@ DeckLock (actions fixadas por SHA, `permissions: contents: read`, evidência env
   push forçado nem exclusão, e com os 7 jobs do `checks.yml` verdes (`Unit tests and build` e
   `Device (API 34, i/6)`). Admin pode mesclar um PR vermelho marcando o bypass (`gh pr merge --admin`); push
   direto na `main`, não. O `api.yml` não é obrigatório: ele só roda quando `api/` muda.
+- Fila de mesclagem (merge queue): o gatilho `merge_group` está no `checks.yml` desde o começo, então os 7 jobs rodam
+  também no commit temporário da fila. Nele não existe o contexto do PR (`github.event.pull_request`, `head_ref`,
+  `base_ref`): nenhum passo nem script chamado por ele pode lê-lo, e a concorrência não cancela rodada da fila.
+  `scripts/tests/test_mesclagem.py` trava as duas coisas. Ligar a fila é configuração do repositório (regra da `main`),
+  não código; o nome dos jobs obrigatórios tem de valer igual lá.
 - KVM é requisito dos jobs de device (`test -c /dev/kvm`): sem ele a suíte não cabe — ver
   `ENVIRONMENT.md`, sandbox sem KVM.
 - Artefatos: `unit-evidence` (relatórios JUnit) e `device-evidence-<i>` (saída bruta do `am instrument`

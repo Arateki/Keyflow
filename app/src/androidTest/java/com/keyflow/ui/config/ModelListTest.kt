@@ -129,7 +129,7 @@ class ModelListTest {
     @Test
     fun theTextCardsCarryTheirOwnVendorLogo() {
         rule.setContent { Host(text(installed = emptySet()), FakeActions(), ModelListTags.Raciocinio) }
-        rule.onAllNodesWithTag("model-vendor-qwen").assertCountEquals(2)
+        rule.onAllNodesWithTag("model-vendor-qwen").assertCountEquals(3)
         rule.onNodeWithTag("model-vendor-hugging_face").assertExists()
         rule.onNodeWithTag("model-vendor-deepseek").assertExists()
         rule.onAllNodesWithTag("model-vendor-google").assertCountEquals(2)
@@ -149,6 +149,7 @@ class ModelListTest {
         tag(ModelCatalog.SMOLLM2_1_7B, "language").performScrollTo().assertTextEquals("Inglês")
         tag(ModelCatalog.DEEPSEEK_R1_1_5B, "capability_tools").assertDoesNotExist()
         tag(ModelCatalog.QWEN2_5_1_5B, "thinking").assertDoesNotExist()
+        tag(ModelCatalog.QWEN3_4B, "thinking").assertDoesNotExist()
         tag(ModelCatalog.SMOLLM2_1_7B, "thinking").assertDoesNotExist()
         ModelCatalog.TEXT.forEach { rule.onNodeWithText(it.summary).assertDoesNotExist() }
     }

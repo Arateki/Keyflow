@@ -75,7 +75,8 @@ class ModelCardTagsTest {
     @Test
     fun `the tools tag follows what the maker declares`() {
         listOf(
-            ModelCatalog.QWEN3_0_6B, ModelCatalog.QWEN2_5_1_5B, ModelCatalog.SMOLLM2_1_7B, ModelCatalog.GEMMA_4_E2B, ModelCatalog.GEMMA_4_E4B,
+            ModelCatalog.QWEN3_0_6B, ModelCatalog.QWEN2_5_1_5B, ModelCatalog.QWEN3_4B, ModelCatalog.SMOLLM2_1_7B, ModelCatalog.GEMMA_4_E2B,
+            ModelCatalog.GEMMA_4_E4B,
         ).forEach { assertThat(tag(it, "capability_tools")).isEqualTo("Ferramentas") }
         assertThat(keys(ModelCatalog.DEEPSEEK_R1_1_5B)).doesNotContain("capability_tools")
         (ModelCatalog.SPEECH + ModelCatalog.VISION_ALL).forEach { assertThat(keys(it)).doesNotContain("capability_tools") }

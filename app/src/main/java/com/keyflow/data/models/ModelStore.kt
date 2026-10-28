@@ -174,13 +174,14 @@ class ModelStore(
             when {
                 // A nova entrou inteira: a cópia guardada sobra.
                 target.exists() && intactManifest(target, id) != null -> backup.deleteRecursively()
-                // A nova está parcial ou inválida: a anterior, se íntegra, volta; senão não há o que salvar e o backup sai.
+                // A nova está parcial ou inválida: a anterior, se íntegra, volta.
                 intactManifest(backup, id) != null -> {
                     target.deleteRecursively()
                     backup.renameTo(target)
                 }
-                target.exists() -> backup.deleteRecursively()
-                else -> backup.renameTo(target)
+                // Nenhuma das duas serve: a cópia guardada inválida sai, não é promovida. Promovê-la deixava no destino ausente um conteúdo parcial
+                // sem manifest, que não é instalado nem desatualizado, e o card não oferecia Apagar.
+                else -> backup.deleteRecursively()
             }
         }
     }

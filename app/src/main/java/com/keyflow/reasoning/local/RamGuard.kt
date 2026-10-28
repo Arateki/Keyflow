@@ -20,7 +20,8 @@ internal object RamGuard {
      * 80% da `recommendedRamMb` (= 2 × estimativa). Os limites resultantes, contra o que foi medido: Qwen3 (3072) exige
      * 2458 MB, DeepSeek e Gemma 4 E2B (4096) exigem 3277 MB — cabem no A32 (~3,6–3,8 GB); SmolLM2 (6144) exige 4916 MB — barrado
      * no A32, liberado no tablet de 6 GB (~5,7 GB); Gemma 4 E4B (8192) exige 6554 MB — barrado no tablet, liberado no Vaio de
-     * 8 GB (~7,4 GB). Em todos o pico medido fica em até ~70% do mínimo exigido.
+     * 8 GB (~7,4 GB). Em todos o pico medido fica em até ~70% do mínimo exigido. Qwen3 4B (12288) exige 9831 MB — barrado também no Vaio de
+     * 8 GB, onde a CPU passou de 5 GB e o Android matou o processo; só aparelhos de 12 GB (~11 GB visíveis) o liberam.
      */
     private const val TOTAL_RAM_PER_ESTIMATE_TENTHS = 16L
 

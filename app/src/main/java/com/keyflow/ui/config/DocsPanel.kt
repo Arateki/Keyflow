@@ -413,6 +413,7 @@ val docsSections: List<DocSection> get() = listOf(
                 tr("modelo de texto Raciocínio (DeepSeek-R1-Distill-Qwen-1.5B) — MIT (DeepSeek), derivado do Qwen2.5 (Apache 2.0, Alibaba), baixado sob demanda."),
             ),
             DocBlock.Labeled("Gemma 4 E2B", tr("modelo de texto Equilibrado — Apache 2.0 (Google), baixado sob demanda.")),
+            DocBlock.Labeled("Qwen3 4B Instruct 2507", tr("modelo de texto Potente — Apache 2.0 (Alibaba), baixado sob demanda.")),
             DocBlock.Labeled("Gemma 4 E4B", tr("modelo de texto Avançado — Apache 2.0 (Google), baixado sob demanda.")),
             *visionModelLicenses().toTypedArray(),
             DocBlock.Labeled("AndroidSVG", tr("desenha os SVGs das skins importadas — Apache 2.0 (Cave Rock Software).")),

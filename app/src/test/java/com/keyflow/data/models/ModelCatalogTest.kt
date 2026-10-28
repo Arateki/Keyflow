@@ -131,12 +131,12 @@ class ModelCatalogTest {
     // ── RCAT-02/03: catálogo de texto (LiteRT-LM) ──────────────────────────────────────────────
 
     @Test
-    fun `text catalog has the six models, smallest download first`() {
-        // Só os cujo repositório, commit e SHA-256 existem de verdade na API do Hugging Face (2026-10-24, 2026-10-25 e 2026-10-26).
+    fun `text catalog has the seven models, smallest download first`() {
+        // Só os cujo repositório, commit e SHA-256 existem de verdade na API do Hugging Face (2026-10-24, 2026-10-25, 2026-10-26 e 2026-10-27).
         assertThat(ModelCatalog.TEXT.map { it.id })
             .containsExactly(
                 "qwen3-0.6b-litertlm", "qwen2.5-1.5b-litertlm", "smollm2-1.7b-litertlm", "deepseek-r1-1.5b-litertlm", "gemma-4-e2b-litertlm",
-                "gemma-4-e4b-litertlm",
+                "qwen3-4b-instruct-2507-litertlm", "gemma-4-e4b-litertlm",
             )
             .inOrder()
         assertThat(ModelCatalog.TEXT.map { it.totalBytes }).isInOrder()
@@ -145,22 +145,25 @@ class ModelCatalogTest {
     /**
      * RAM recomendada, medida em 2026-10-27 (pico de VmRSS do `:reasoning`): Qwen3 1,66 GB, Gemma 4 E2B 1,72 GB e DeepSeek 1,73 GB no A32;
      * SmolLM2 3,3 GB no tablet de 6 GB; Gemma 4 E4B 4,4–4,5 GB no de 8 GB. A lista segue o tamanho do arquivo, mas a RAM do SmolLM2 (ativações
-     * em FP32) passa a do DeepSeek e a do E2B — por isso a ordem de RAM não é a da lista.
+     * em FP32) passa a do DeepSeek e a do E2B — por isso a ordem de RAM não é a da lista. O Qwen3 4B (INT4, arquivo menor que o E4B) pede a maior RAM de
+     * todas: na CPU o autor mede 4,6–6,1 GB (Galaxy S26) e no Vaio de 7,6 GB o processo passou de 5 GB e foi morto (RAM total exigida: 9831 MB).
      */
     @Test
     fun `recommended RAM follows the measured peaks`() {
         assertThat(ModelCatalog.TEXT_ALL.associate { it.id to it.recommendedRamMb })
             .containsExactly(
                 "qwen3-0.6b-litertlm", 3072, "qwen2.5-1.5b-litertlm", 4096, "smollm2-1.7b-litertlm", 6144, "deepseek-r1-1.5b-litertlm", 4096,
-                "gemma-4-e2b-litertlm", 4096, "gemma-4-e4b-litertlm", 8192,
+                "gemma-4-e2b-litertlm", 4096, "qwen3-4b-instruct-2507-litertlm", 12288, "gemma-4-e4b-litertlm", 8192,
             )
         // O pior pico medido (em MB, no aparelho mais folgado) fica abaixo da RAM recomendada: a recomendação é de RAM total do aparelho.
         val peakMb = mapOf(
             ModelCatalog.QWEN3_0_6B to 1_946, ModelCatalog.DEEPSEEK_R1_1_5B to 2_560, ModelCatalog.GEMMA_4_E2B to 2_253,
             ModelCatalog.SMOLLM2_1_7B to 3_379, ModelCatalog.GEMMA_4_E4B to 4_608, ModelCatalog.QWEN2_5_1_5B to 2_400,
+            // Não medido por nós na CPU de um aparelho que o rode: 6.093 MB é o maior RSS que o autor da conversão publica (CPU, Galaxy S26).
+            ModelCatalog.QWEN3_4B to 6_093,
         )
         peakMb.forEach { (spec, peak) -> assertThat(peak).isLessThan(spec.recommendedRamMb) }
-        assertThat(ModelCatalog.TEXT_ALL.maxBy { it.recommendedRamMb }).isSameInstanceAs(ModelCatalog.GEMMA_4_E4B)
+        assertThat(ModelCatalog.TEXT_ALL.maxBy { it.recommendedRamMb }).isSameInstanceAs(ModelCatalog.QWEN3_4B)
     }
 
     @Test
@@ -185,17 +188,17 @@ class ModelCatalogTest {
      */
     @Test
     fun `text models are named by level, without the model inside the name`() {
-        assertThat(ModelCatalog.TEXT.map { it.displayName }).containsExactly("Leve", "Versátil", "Intermediário", "Raciocínio", "Equilibrado", "Avançado").inOrder()
+        assertThat(ModelCatalog.TEXT.map { it.displayName }).containsExactly("Leve", "Versátil", "Intermediário", "Raciocínio", "Equilibrado", "Potente", "Avançado").inOrder()
         assertThat(ModelCatalog.TEXT.map { it.displayName }).containsNoDuplicates()
         ModelCatalog.TEXT.forEach { assertThat(it.displayName).doesNotContain("(") }
         assertThat(ModelCatalog.TEXT.map { it.modelName })
-            .containsExactly("Qwen3 0.6B", "Qwen2.5 1.5B", "SmolLM2 1.7B", "DeepSeek R1 1.5B", "Gemma 4 E2B", "Gemma 4 E4B")
+            .containsExactly("Qwen3 0.6B", "Qwen2.5 1.5B", "SmolLM2 1.7B", "DeepSeek R1 1.5B", "Gemma 4 E2B", "Qwen3 4B Instruct 2507", "Gemma 4 E4B")
             .inOrder()
     }
 
     /**
-     * Os cinco modelos de texto responderam num aparelho real (decisão do Yan, 2026-10-27): o release lista todos. O DeepSeek continua
-     * o único cujo prompt abre o `<think>`.
+     * Os modelos de texto responderam num aparelho real (decisão do Yan, 2026-10-27): o release lista todos. O Qwen3 4B respondeu na GPU do Vaio,
+     * não na CPU que o app usa (ver o comentário do catálogo). O DeepSeek continua o único cujo prompt abre o `<think>`.
      */
     @Test
     fun `release lists every text model, all validated on a device`() {
@@ -252,6 +255,11 @@ class ModelCatalogTest {
         assertThat(ModelCatalog.GEMMA_4_E4B.totalBytes).isEqualTo(3_659_530_240L)
         assertThat(ModelCatalog.GEMMA_4_E4B.files.single().sha256)
             .isEqualTo("0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0")
+        // Qwen3 4B Instruct-2507: lido em 2026-10-27 (`/api/models/litert-community/Qwen3-4B-Instruct-2507/tree/4d409771…`) e o SHA-256 conferido baixando o arquivo inteiro.
+        assertThat(ModelCatalog.QWEN3_4B.totalBytes).isEqualTo(2_659_057_664L)
+        assertThat(ModelCatalog.QWEN3_4B.files.single().sha256)
+            .isEqualTo("9e48b165836256f5344d9d044930607b9c47f6ef34e27f82e96881664f3ba2fd")
+        assertThat(ModelCatalog.QWEN3_4B.files.single().url).contains("/4d409771b414d86b270ca54d27ffc45032a81142/")
     }
 
     // ── Visão e voz: o que valer para qualquer entrada que entre nessas listas ─────────────────────────────────────
@@ -373,6 +381,7 @@ class ModelCatalogTest {
         assertThat(byId).containsEntry("whisper-small-int8", ModelVendor.OPENAI)
         assertThat(byId).containsEntry("parakeet-tdt-0.6b-v3-int8", ModelVendor.NVIDIA)
         assertThat(byId).containsEntry("qwen3-0.6b-litertlm", ModelVendor.QWEN)
+        assertThat(byId).containsEntry("qwen3-4b-instruct-2507-litertlm", ModelVendor.QWEN)
         assertThat(byId).containsEntry("smollm2-1.7b-litertlm", ModelVendor.HUGGING_FACE)
         assertThat(byId).containsEntry("deepseek-r1-1.5b-litertlm", ModelVendor.DEEPSEEK)
         assertThat(byId).containsEntry("gemma-4-e2b-litertlm", ModelVendor.GOOGLE)
@@ -384,7 +393,8 @@ class ModelCatalogTest {
     /**
      * Aviso de modo pensamento no card. Fontes: Qwen3, card do `Qwen/Qwen3-0.6B` ("seamless switching between thinking mode and non-thinking
      * mode"); DeepSeek R1, o prompt abre o `<think>` sempre; Gemma 4, card do `google/gemma-4-E2B-it` e do E4B ("configurable thinking modes",
-     * liga com `<|think|>` no prompt de sistema); Qwen2.5 e SmolLM2 são modelos de instrução comuns.
+     * liga com `<|think|>` no prompt de sistema); Qwen2.5, SmolLM2 e Qwen3 4B Instruct-2507 são modelos de instrução comuns (o card do 2507 diz
+     * "supports only non-thinking mode").
      */
     @Test
     fun `text models declare whether they think`() {
@@ -395,6 +405,7 @@ class ModelCatalogTest {
             "smollm2-1.7b-litertlm", ThinkingSupport.NONE,
             "deepseek-r1-1.5b-litertlm", ThinkingSupport.ALWAYS,
             "gemma-4-e2b-litertlm", ThinkingSupport.OPTIONAL,
+            "qwen3-4b-instruct-2507-litertlm", ThinkingSupport.NONE,
             "gemma-4-e4b-litertlm", ThinkingSupport.OPTIONAL,
         )
         // O modelo que abre o `<think>` no prompt é, por definição, o que sempre pensa.
@@ -418,6 +429,7 @@ class ModelCatalogTest {
             "parakeet-tdt-0.6b-v3-int8", setOf(ModelCapability.NATIVE_PORTUGUESE),
             "qwen3-0.6b-litertlm", tools,
             "qwen2.5-1.5b-litertlm", tools,
+            "qwen3-4b-instruct-2507-litertlm", tools,
             "smollm2-1.7b-litertlm", tools,
             "deepseek-r1-1.5b-litertlm", emptySet<ModelCapability>(),
             "gemma-4-e2b-litertlm", tools,
@@ -437,11 +449,11 @@ class ModelCatalogTest {
      */
     @Test
     fun `changing a catalog pin requires bumping the embedded catalog version`() {
-        assertThat(ModelCatalog.EMBEDDED_VERSION).isEqualTo(2026102701)
-        assertThat(ModelCatalog.pinsFingerprint()).isEqualTo(PINS_FINGERPRINT_2026102701)
+        assertThat(ModelCatalog.EMBEDDED_VERSION).isEqualTo(2026102702)
+        assertThat(ModelCatalog.pinsFingerprint()).isEqualTo(PINS_FINGERPRINT_2026102702)
     }
 
     private companion object {
-        const val PINS_FINGERPRINT_2026102701 = "a81ee61c118ea2386f1106dd777fe053215d52af997ab525b3d26d75080e9890"
+        const val PINS_FINGERPRINT_2026102702 = "5e1592e1d2cfc5622ccf34221b2f698e53fa63ab7f68e081e44284c0345ba4e3"
     }
 }
