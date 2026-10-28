@@ -60,6 +60,12 @@ class VisionService : Service() {
         override fun cancel() = core.cancel()
     }
 
+    override fun onCreate() {
+        super.onCreate()
+        // Só no debug, como na thread de trabalho: rede na thread principal do :vision também mata o processo.
+        if (BuildConfig.DEBUG) StrictMode.setThreadPolicy(StrictMode.ThreadPolicy.Builder().detectNetwork().penaltyDeath().build())
+    }
+
     override fun onBind(intent: Intent): IBinder = binder
 
     override fun onDestroy() {

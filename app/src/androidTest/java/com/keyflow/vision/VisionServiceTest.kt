@@ -31,7 +31,7 @@ import org.junit.runner.RunWith
 /**
  * O cliente de verdade contra o `:vision` de verdade (OCR-03, MDL-04, CAP-04). Sem modelo (arquivos de mentira) cobre o processo
  * separado, o AIDL, o recorte por arquivo, a recusa por entrada ruim e por RAM, e o modelo ausente. Com o modelo real (opt-in:
- * `ocrModelDir=<pasta>` ou `ocrModelDownload=true`, ver [OcrTestSupport.primaryModel]) cobre o texto de ponta a ponta, a morte do
+ * pedir a classe em `-e class`, ou `-e ocrModelE2E true` / `ocrModelDir=<pasta>`, ver [OcrTestSupport.optedIn]) cobre o texto de ponta a ponta, a morte do
  * processo no meio e o cancelamento. No debug o `:vision` roda com StrictMode `detectNetwork` + `penaltyDeath`: uma violação mata o
  * processo e o teste do texto acusa `PROCESS_DIED`.
  */
@@ -117,8 +117,8 @@ class VisionServiceTest {
 
     @Test
     fun textoDeVerdadePeloProcessoVisionSemRedeEComPicoDeMemoria() = runBlocking {
-        val files = OcrTestSupport.primaryModel(context)
-        assumeNotNull("opt-in: ocrModelDir=<pasta> ou ocrModelDownload=true", files)
+        val files = OcrTestSupport.primaryModel(context, VisionServiceTest::class.java)
+        assumeNotNull("opt-in: peça a classe em -e class, ou -e ocrModelE2E true / ocrModelDir=<pasta>", files)
         val sample = OcrTestSupport.synthetic().first { it.name == "pt-20px-claro" }
         val file = VisionCache.writeCrop(context, sample.image)
         val c = client(OcrTestSupport.visionModel(files!!, idleUnloadMs = 30_000))
@@ -132,8 +132,8 @@ class VisionServiceTest {
 
     @Test
     fun matarOProcessoNoMeioDevolvePROCESS_DIEDEODemaisUsoLigaDeNovo() = runBlocking {
-        val files = OcrTestSupport.primaryModel(context)
-        assumeNotNull("opt-in: ocrModelDir=<pasta> ou ocrModelDownload=true", files)
+        val files = OcrTestSupport.primaryModel(context, VisionServiceTest::class.java)
+        assumeNotNull("opt-in: peça a classe em -e class, ou -e ocrModelE2E true / ocrModelDir=<pasta>", files)
         val model = OcrTestSupport.visionModel(files!!)
         val big = OcrTestSupport.screen(720, 1600)
         val file = VisionCache.writeCrop(context, big.image)
@@ -161,8 +161,8 @@ class VisionServiceTest {
 
     @Test
     fun cancelarACorrotinaMandaCancelAoServicoEOProximoUsoFunciona() = runBlocking {
-        val files = OcrTestSupport.primaryModel(context)
-        assumeNotNull("opt-in: ocrModelDir=<pasta> ou ocrModelDownload=true", files)
+        val files = OcrTestSupport.primaryModel(context, VisionServiceTest::class.java)
+        assumeNotNull("opt-in: peça a classe em -e class, ou -e ocrModelE2E true / ocrModelDir=<pasta>", files)
         val c = client(OcrTestSupport.visionModel(files!!))
         val big = OcrTestSupport.screen(1080, 2400)
         val file = VisionCache.writeCrop(context, big.image)
