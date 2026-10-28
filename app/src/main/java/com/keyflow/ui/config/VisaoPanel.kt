@@ -56,6 +56,7 @@ fun VisaoPanel(
     val palette = LocalKeyFlowPalette.current
     val scroll = rememberScrollState()
     val activeSettings = settings.withoutCredits()
+    val editor = rememberSettingsEditor(activeSettings, onSettingsChange)
     // Lido AQUI, no corpo do painel: quando a conexão muda, tudo abaixo recompõe (como no Raciocínio).
     val connection by remember(openAiAuth) { openAiAuth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
     val openAi = openAiPanelState(connection, openAiAuth.flows)
@@ -83,7 +84,7 @@ fun VisaoPanel(
                     selected = activeSettings.visionSource,
                     label = ::visionSourceLabel,
                     tag = ::visionSourceTag,
-                    onSelect = { onSettingsChange(activeSettings.copy(visionSource = it)) },
+                    onSelect = { source -> editor.edit { it.copy(visionSource = source) } },
                     disabled = { it == VisionSource.CREDITS },
                     disabledLabel = { if (it == VisionSource.CREDITS) tr("Em breve") else null },
                 )
@@ -94,7 +95,7 @@ fun VisaoPanel(
                     VisionSource.OPENAI -> OpenAiPanel(activeSettings, onSettingsChange, openAiAuth, openAi, connection, VisionCloudSlot.OpenAi)
                     VisionSource.ANTHROPIC -> AnthropicPanel(activeSettings, onSettingsChange, anthropicAuth, VisionCloudSlot.Anthropic)
                     VisionSource.GOOGLE -> GooglePanel(activeSettings, onSettingsChange, googleAuth, VisionCloudSlot.Google)
-                    VisionSource.CUSTOM -> VisaoCustomFields(activeSettings, onSettingsChange)
+                    VisionSource.CUSTOM -> VisaoCustomFields(activeSettings, editor::edit)
                 }
             }
         }
@@ -124,7 +125,7 @@ private fun visionSourceLabel(source: VisionSource): String = when (source) {
 }
 
 @Composable
-private fun VisaoCustomFields(settings: Settings, onSettingsChange: (Settings) -> Unit) {
+private fun VisaoCustomFields(settings: Settings, onEdit: ((Settings) -> Settings) -> Unit) {
     Column {
         CustomProviderFields(
             tagPrefix = "visao",
@@ -132,10 +133,10 @@ private fun VisaoCustomFields(settings: Settings, onSettingsChange: (Settings) -
             headerName = settings.visionCustomHeaderName,
             headerValue = settings.visionCustomHeaderValue,
             model = settings.visionCustomModel,
-            onEndpoint = { onSettingsChange(settings.copy(visionCustomEndpoint = it)) },
-            onHeaderName = { onSettingsChange(settings.copy(visionCustomHeaderName = it)) },
-            onHeaderValue = { onSettingsChange(settings.copy(visionCustomHeaderValue = it)) },
-            onModel = { onSettingsChange(settings.copy(visionCustomModel = it)) },
+            onEndpoint = { onEdit { current -> current.copy(visionCustomEndpoint = it) } },
+            onHeaderName = { onEdit { current -> current.copy(visionCustomHeaderName = it) } },
+            onHeaderValue = { onEdit { current -> current.copy(visionCustomHeaderValue = it) } },
+            onModel = { onEdit { current -> current.copy(visionCustomModel = it) } },
             hints = listOf(
                 tr("Padrão compatível com OpenAI Chat Completions com imagem — informe o endpoint e credenciais do seu serviço."),
             ),

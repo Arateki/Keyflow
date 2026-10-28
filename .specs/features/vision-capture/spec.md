@@ -194,8 +194,8 @@ promessa de privacidade e o APK enxuto.
 | MDL-05 | P1-G | VC-T2c, VC-T15 | Implementado p/ lista e seleção (VC-T2c/T11: mesma entrada/arquivo); motor VC-T15 provado com E2B + imagem na CPU do emulador; liberação física pendente |
 | MDL-06 | P1-G | VC-T2c, VC-T11 | Implemented (etiquetas de capacidade por aba, `CardTagScope`) |
 | PRV-01 | P2-D | VC-T17 | Implemented (mesmos painéis e mesmas `AuthActions` do Raciocínio) |
-| PRV-02 | P2-D | VC-T17 | Implemented (`VisionModelCatalog`, fontes conferidas em 2026-10-28) |
-| PRV-03 | P2-D | VC-T15, VC-T17 | Motor e Testar implementados na VC-T15; fluxo de captura pendente |
+| PRV-02 | P2-D | VC-T17 | Implemented (`VisionModelCatalog`, lista efetiva da conta e escolha persistida; `ProviderModelSlotTest`/`VisaoPanelTest`; fontes conferidas em 2026-10-28) |
+| PRV-03 | P2-D | VC-T15, VC-T17 | Motor e Testar com imagem implementados na VC-T15; Custom preserva Settings atuais (VC-T17, `SettingsEditorTest`/`VisaoPanelTest`); fluxo de captura pendente |
 | PRV-04 | P2-D | VC-T13, VC-T17 | Nota na aba implementada (VC-T17); política de privacidade em VC-T13 |
 | PRV-05 | P2-D | VC-T15, VC-T17 | Motor e Testar implementados na VC-T15; fluxo de captura pendente |
 | CFG-V01 | P2-E | VC-T11 | Implemented |

@@ -53,6 +53,7 @@ fun ReasoningPanel(
     val palette = LocalKeyFlowPalette.current
     val scroll = rememberScrollState()
     val activeSettings = settings.withoutCredits()
+    val editor = rememberSettingsEditor(activeSettings, onSettingsChange)
     // Lido AQUI, no corpo do painel: quando a conexão muda, tudo abaixo — inclusive o "pronto para testar" — recompõe.
     val connection by remember(auth) { auth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
     val anthropicConnection by remember(anthropicAuth) { anthropicAuth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
@@ -75,7 +76,7 @@ fun ReasoningPanel(
                     selected = activeSettings.reasoningSource,
                     label = ::reasoningSourceLabel,
                     tag = ::reasoningSourceTag,
-                    onSelect = { onSettingsChange(activeSettings.copy(reasoningSource = it)) },
+                    onSelect = { source -> editor.edit { it.copy(reasoningSource = source) } },
                     disabled = { it == ReasoningSource.CREDITS },
                     disabledLabel = { if (it == ReasoningSource.CREDITS) tr("Em breve") else null },
                 )
@@ -86,7 +87,7 @@ fun ReasoningPanel(
                     ReasoningSource.OPENAI -> OpenAiPanel(activeSettings, onSettingsChange, auth, openAi, connection)
                     ReasoningSource.ANTHROPIC -> AnthropicPanel(activeSettings, onSettingsChange, anthropicAuth)
                     ReasoningSource.GOOGLE -> GooglePanel(activeSettings, onSettingsChange, googleAuth)
-                    ReasoningSource.CUSTOM -> ReasoningCustomFields(activeSettings, onSettingsChange)
+                    ReasoningSource.CUSTOM -> ReasoningCustomFields(activeSettings, editor::edit)
                 }
             }
         }
@@ -111,17 +112,17 @@ private fun reasoningSourceLabel(source: ReasoningSource): String = when (source
 }
 
 @Composable
-private fun ReasoningCustomFields(settings: Settings, onSettingsChange: (Settings) -> Unit) {
+private fun ReasoningCustomFields(settings: Settings, onEdit: ((Settings) -> Settings) -> Unit) {
     CustomProviderFields(
         tagPrefix = "raciocinio",
         endpoint = settings.reasoningCustomEndpoint,
         headerName = settings.reasoningCustomHeaderName,
         headerValue = settings.reasoningCustomHeaderValue,
         model = settings.reasoningCustomModel,
-        onEndpoint = { onSettingsChange(settings.copy(reasoningCustomEndpoint = it)) },
-        onHeaderName = { onSettingsChange(settings.copy(reasoningCustomHeaderName = it)) },
-        onHeaderValue = { onSettingsChange(settings.copy(reasoningCustomHeaderValue = it)) },
-        onModel = { onSettingsChange(settings.copy(reasoningCustomModel = it)) },
+        onEndpoint = { onEdit { current -> current.copy(reasoningCustomEndpoint = it) } },
+        onHeaderName = { onEdit { current -> current.copy(reasoningCustomHeaderName = it) } },
+        onHeaderValue = { onEdit { current -> current.copy(reasoningCustomHeaderValue = it) } },
+        onModel = { onEdit { current -> current.copy(reasoningCustomModel = it) } },
         hints = listOf(tr("Padrão compatível com OpenAI Chat Completions — informe o endpoint e credenciais do seu serviço.")),
     )
 }

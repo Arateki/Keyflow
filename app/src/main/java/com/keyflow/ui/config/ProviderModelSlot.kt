@@ -1,5 +1,7 @@
 package com.keyflow.ui.config
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import com.keyflow.data.Settings
 import com.keyflow.i18n.tr
 import com.keyflow.vision.VisionModelCatalog
@@ -43,6 +45,8 @@ internal interface ProviderModelSlot {
 
     /** O modelo a mostrar escolhido. Vazio = ainda não escolhido (o seletor diz "Escolha um modelo"). */
     fun chosen(settings: Settings): String
+    fun chosen(settings: Settings, account: List<AccountModel>): String = chosen(settings)
+    fun normalizeChoice(settings: Settings, account: List<AccountModel>): Settings = settings
     fun choose(settings: Settings, id: String): Settings
 
     /** Os modelos do seletor da aba Assinatura. [account] é a lista que a conta devolveu (vazia = não veio). */
@@ -93,7 +97,7 @@ internal object ReasoningGoogleSlot : ProviderModelSlot {
 
 /**
  * O seletor da Visão para um provedor: a lista é a curada de [VisionModelCatalog] (cruzada com a da conta, quando ela veio), e o modelo
- * guardado que deixou de ter visão cai para o padrão da lista. A nota de privacidade diz que a IMAGEM sai do aparelho (PRV-04).
+ * guardado que não está na lista efetiva cai para o primeiro disponível. A nota de privacidade diz que a IMAGEM sai do aparelho (PRV-04).
  */
 internal class VisionCloudSlot(
     private val provider: VisionProvider,
@@ -103,6 +107,10 @@ internal class VisionCloudSlot(
     private val privacy: () -> String,
 ) : ProviderModelSlot {
     override fun chosen(settings: Settings) = VisionModelCatalog.resolve(provider, read(settings))
+    override fun chosen(settings: Settings, account: List<AccountModel>) =
+        VisionModelCatalog.resolve(provider, read(settings), account.map { it.id })
+    override fun normalizeChoice(settings: Settings, account: List<AccountModel>): Settings =
+        if (account.isEmpty()) settings else choose(settings, chosen(settings, account))
     override fun choose(settings: Settings, id: String) = write(settings, id)
     override fun ssoOptions(account: List<AccountModel>, chosen: String) = options(account)
     override fun apiKeyOptions(account: List<AccountModel>, chosen: String) = options(account)
@@ -129,4 +137,16 @@ internal class VisionCloudSlot(
             { tr("A imagem da captura é enviada ao Google; as credenciais ficam só neste aparelho.") },
         )
     }
+}
+
+/** A lista efetiva resolve também o valor persistido, sem sobrescrever outras edições da tela. */
+@Composable
+internal fun ProviderModelSlot.selectedModel(
+    settings: Settings,
+    account: List<AccountModel>,
+    onSettingsChange: (Settings) -> Unit,
+): String {
+    val editor = rememberSettingsEditor(settings, onSettingsChange)
+    LaunchedEffect(this, account) { editor.edit { normalizeChoice(it, account) } }
+    return chosen(settings, account)
 }

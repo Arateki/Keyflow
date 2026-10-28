@@ -336,7 +336,9 @@ O fluxo de captura/gestos não faz parte desta entrega. `GemmaVisionDeviceTest#e
   o modelo (isso é do motor, VC-T15). Os Gemma são o mesmo arquivo do Raciocínio — apagar numa aba esquece a escolha nas duas (`Settings.withoutLocalModel`). Notas: "100% neste aparelho" e "o download vem do Hugging Face, que vê o
   IP". **Testar real**: lê uma imagem de exemplo desenhada em `Canvas` com o PaddleOCR pelo `:vision` de verdade (`VisionOcrTester`) e mostra o texto e o tempo; com o Gemma 4 e os provedores o botão fica desligado, com o
   motivo escrito, até a VC-T15. Saíram o "Testar OCR" de mentira, o destino da tradução e `Settings.visionTranslateTarget`; os modelos de provedor das Settings passaram a vazio por padrão (vale o padrão da lista curada). Testes:
-  `VisaoPanelTest` (instrumentado, 22), `ConfigScreenTest`, `VisaoTestTest`, `ProviderModelSlotTest` (unidade), `SettingsRepositoryTest`. **Fica de fora**: `NAV_TAB_VISAO` (VC-T7) e o aviso de modelo ausente (VC-T7).
+  `VisaoPanelTest` (instrumentado), `ConfigScreenTest`, `VisaoTestTest`, `ProviderModelSlotTest` (unidade), `SettingsRepositoryTest`. **Fica de fora**: `NAV_TAB_VISAO` (VC-T7) e o aviso de modelo ausente (VC-T7).
+
+Revisão do PR #54: catálogo `2026102803` invalida cache anterior às capacidades; parser remoto preserva a validação explícita e usa falso quando ausente. `RemoteConfigRepositoryTest` prova release vazio e Gemma instalado preservado. Correção herdada do cancelamento do cliente OCR coberta por `VisionOcrClientTest` e `VisionServiceTest`; detalhes na lição da aba.
 
 ### VC-T17 — Aba Visão: provedores (OpenAI, Anthropic, Google) e Custom, só modelos com visão *(nova; V13)* ✅ IMPLEMENTADA (2026-10-28, branch `equipe/visao-aba`)
 - **What**: no `VisaoPanel`, as origens de nuvem **reusando** `UnifiedProviderCard` e as mesmas `AuthActions`/conexões/cofre das abas
@@ -360,6 +362,8 @@ O fluxo de captura/gestos não faz parte desta entrega. `GemmaVisionDeviceTest#e
   numa vale na outra). `VisionModelCatalog` é a lista curada id→visão por provedor, conferida na documentação oficial em 2026-10-28; o modelo guardado sem visão cai no padrão da lista (`gpt-4o` e `gemini-2.0-flash`,
   antigos padrões, estão deprecado/desligado); com a lista da conta, o seletor mostra a interseção. Custom: `CustomProviderFields` (compartilhado com o Raciocínio). Nota de PRV-04 em cada card e no Custom. Os limites de uso fictícios
   não aparecem na Visão (`showLimits = false`; o Raciocínio mantém os dele, que continuam de exemplo). Testes: `VisionModelCatalogTest`, `ProviderModelSlotTest`, `VisaoPanelTest`, `ConfigScreenTest`.
+
+Revisão do PR #54: escolha de nuvem resolvida/persistida pela lista efetiva da conta (SSO/API); commits de Custom ao sair usam Settings atuais. Regressões em `ProviderModelSlotTest`, `SettingsEditorTest`, `VisaoPanelTest` e `ReasoningPanelTest`.
 
 ### VC-T12 — Rotas de galeria + goldens ✅ IMPLEMENTADA (2026-10-28, branch `equipe/visao-aba`)
 - **What**: rotas `config-visao` (Local: sem modelo, baixando, instalado com capacidades), `config-visao-provedor` (conectado, seletor só

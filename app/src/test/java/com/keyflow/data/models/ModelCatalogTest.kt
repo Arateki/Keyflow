@@ -505,12 +505,17 @@ class ModelCatalogTest {
      * manifesto/cache antigo reverter o pin. Mudou um pin ou entrou modelo: suba `ModelCatalog.EMBEDDED_VERSION` e troque a impressão digital abaixo.
      */
     @Test
+    fun `as capacidades de visão invalidam a versão anterior do catálogo`() {
+        assertThat(ModelCatalog.EMBEDDED_VERSION).isGreaterThan(2026102802)
+    }
+
+    @Test
     fun `changing a catalog pin requires bumping the embedded catalog version`() {
-        assertThat(ModelCatalog.EMBEDDED_VERSION).isEqualTo(2026102802)
-        assertThat(ModelCatalog.pinsFingerprint()).isEqualTo(PINS_FINGERPRINT_2026102802)
+        assertThat(ModelCatalog.EMBEDDED_VERSION).isEqualTo(2026102803)
+        assertThat(ModelCatalog.pinsFingerprint()).isEqualTo(PINS_FINGERPRINT_2026102803)
     }
 
     private companion object {
-        const val PINS_FINGERPRINT_2026102802 = "d73c549bf91248e8e1ed6737bb3252cf7313409f00e6bd0853b3d5b01ce6e4b1"
+        const val PINS_FINGERPRINT_2026102803 = "d73c549bf91248e8e1ed6737bb3252cf7313409f00e6bd0853b3d5b01ce6e4b1"
     }
 }
