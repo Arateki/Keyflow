@@ -52,7 +52,7 @@ class ExecucaoJsonTest {
     fun `a fake api key in the environment never reaches the serialized run`() {
         val chave = "chave-falsa-de-api-0123456789"
         val filtro = SecretFilter { listOf(chave) }
-        val execucao = execucaoDeExemplo(saida = "claro, use a chave $chave ou sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789")
+        val execucao = execucaoDeExemplo(saida = "claro, use a chave $chave ou sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789") // chave fake
         val texto = ExecucaoJson.escrever(execucao) { filtro.redact(it) }
         assertThat(texto).doesNotContain(chave)
         assertThat(texto).doesNotContain("sk-ant-api03")

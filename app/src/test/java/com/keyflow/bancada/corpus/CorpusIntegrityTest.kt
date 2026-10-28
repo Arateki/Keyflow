@@ -116,7 +116,7 @@ class CorpusIntegrityTest {
     fun `a secret in a case or in the prompt is refused`() {
         val arquivos = brinquedoNaMemoria()
         val teste = JSONObject(arquivos.getValue("pontuacao.json").toString(Charsets.UTF_8))
-        teste.getJSONArray("casos").getJSONObject(0).put("entrada", "minha chave é sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789")
+        teste.getJSONArray("casos").getJSONObject(0).put("entrada", "minha chave é sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789") // chave fake
         arquivos["pontuacao.json"] = teste.toString().toByteArray()
         recalcularHash(arquivos)
         assertThat(validar(arquivos).joinToString()).contains("SecretFilter")
