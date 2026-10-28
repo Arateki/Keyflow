@@ -353,15 +353,17 @@ class LocalModelsUiTest {
 
     @Test
     fun `the first GPU load warning shows until the GPU has loaded the model once`() {
-        val chosen = LocalBackendPrefs.EMPTY.choose(qwen, ComputeBackend.GPU)
+        val chosen = LocalBackendPrefs.EMPTY.choose(qwen, ComputeBackend.GPU, ticket = 7L)
         assertThat(backendUi(prefs = chosen).item(qwen).gpuFirstLoad).isTrue()
-        assertThat(backendUi(prefs = chosen.markGpuReady(qwen)).item(qwen).gpuFirstLoad).isFalse()
+        assertThat(backendUi(prefs = chosen.markGpuReady(qwen, 7L)).item(qwen).gpuFirstLoad).isFalse()
         assertThat(backendUi().item(qwen).gpuFirstLoad).isFalse() // na CPU não há o que avisar
     }
 
     @Test
     fun `the fallback notice shows only on the installed model that fell back`() {
-        val fell = LocalBackendPrefs.EMPTY.fellBack(qwen, ComputeBackend.GPU).fellBack(gemma, ComputeBackend.GPU)
+        val fell = LocalBackendPrefs.EMPTY
+            .choose(qwen, ComputeBackend.GPU, ticket = 7L).fellBack(qwen, ComputeBackend.GPU, 7L)
+            .choose(gemma, ComputeBackend.GPU, ticket = 8L).fellBack(gemma, ComputeBackend.GPU, 8L)
         val ui = backendUi(prefs = fell, installed = setOf(qwen))
         assertThat(ui.item(qwen).backendFellBackFrom).isEqualTo(ComputeBackend.GPU)
         assertThat(ui.item(qwen).backend).isEqualTo(ComputeBackend.CPU)

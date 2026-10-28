@@ -36,10 +36,10 @@ object LlmModels {
     }
 
     /** O modelo instalado com esse id (rodando em [backend]), ou `null` se o catálogo não o conhece ou ele não é de texto. */
-    fun forId(context: Context, modelId: String, backend: ComputeBackend = ComputeBackend.CPU): LlmModel? {
+    fun forId(context: Context, modelId: String, backend: ComputeBackend = ComputeBackend.CPU, ticket: Long = 0L): LlmModel? {
         val spec = ModelCatalog.byId(modelId)?.takeIf { it.files.any { f -> f.role == FileRole.MODEL } } ?: return null
         val store = ModelStore.get(context)
         // A versão é a da instalação no disco (manifest), não a do catálogo: entre aplicar um catálogo novo e instalar o arquivo novo os bytes ainda são os antigos.
-        return from(spec, store.dirFor(spec.id), version = store.installedVersion(spec.id), backend = backend)
+        return from(spec, store.dirFor(spec.id), version = store.installedVersion(spec.id), backend = backend).copy(ticket = ticket)
     }
 }

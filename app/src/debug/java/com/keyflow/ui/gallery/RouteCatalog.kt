@@ -387,9 +387,9 @@ object RouteCatalog {
         // Intermediário na GPU que já carregou (sem aviso).
         Route("config-raciocinio-local-gpu") {
             val prefs = LocalBackendPrefs.EMPTY
-                .choose(ModelCatalog.QWEN3_0_6B.id, ComputeBackend.GPU)
-                .fellBack(ModelCatalog.QWEN2_5_1_5B.id, ComputeBackend.GPU)
-                .choose(ModelCatalog.SMOLLM2_1_7B.id, ComputeBackend.GPU).markGpuReady(ModelCatalog.SMOLLM2_1_7B.id)
+                .choose(ModelCatalog.QWEN3_0_6B.id, ComputeBackend.GPU, ticket = 1L)
+                .choose(ModelCatalog.QWEN2_5_1_5B.id, ComputeBackend.GPU, ticket = 2L).fellBack(ModelCatalog.QWEN2_5_1_5B.id, ComputeBackend.GPU, 2L)
+                .choose(ModelCatalog.SMOLLM2_1_7B.id, ComputeBackend.GPU, ticket = 3L).markGpuReady(ModelCatalog.SMOLLM2_1_7B.id, 3L)
             ConfigReasoningRoute(
                 localModelId = ModelCatalog.QWEN3_0_6B.id,
                 localModels = galleryTextModels(

@@ -2,7 +2,6 @@ package com.keyflow.reasoning.local
 
 import android.content.Context
 import android.os.IBinder
-import com.keyflow.core.ComputeBackend
 import com.keyflow.data.SettingsRepository
 import com.keyflow.data.models.ModelPreparationTracker
 import com.keyflow.data.models.ModelStore
@@ -35,7 +34,8 @@ object LocalReasoningPreloader {
             val connection = ReasoningConnection.get(app)
             var acquired = false
             val failure = try {
-                val model = LlmModels.forId(app, modelId, SettingsRepository(app).localBackendFor(modelId))
+                val choice = SettingsRepository(app).localBackendChoiceFor(modelId)
+                val model = LlmModels.forId(app, modelId, choice.backend, choice.ticket)
                 check(model != null && ModelStore.get(app).isInstalled(modelId))
                 val service = connection.acquire()
                 acquired = true
@@ -60,16 +60,13 @@ object LocalReasoningPreloader {
                 runCatching { binder.unlinkToDeath(death, 0) }
                 if (finished.compareAndSet(false, true)) cont.resume(failure)
             }
-            val fellBack = AtomicBoolean(false)
+            val loadReport = LoadReport(model, reports)
             val callback = object : IReasoningCallback.Stub() {
                 override fun onDelta(text: String) = Unit
-                override fun onBackendFallback(failed: String, reason: String) {
-                    fellBack.set(true)
-                    reports.fellBack(model.modelId, ComputeBackend.fromName(failed), reason)
-                }
+                override fun onBackendFallback(failed: String, reason: String) = loadReport.onBackendFallback(failed, reason)
 
                 override fun onDone() {
-                    if (!fellBack.get()) reports.loaded(model.modelId, model.backend)
+                    loadReport.onDone()
                     finish(null)
                 }
                 override fun onError(kind: Int, message: String) = finish(

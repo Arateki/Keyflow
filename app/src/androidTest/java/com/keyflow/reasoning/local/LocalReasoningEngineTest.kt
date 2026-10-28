@@ -138,10 +138,10 @@ class LocalReasoningEngineTest {
     }
 
     private class RecordingReports : BackendReports {
-        val fallbacks = java.util.concurrent.CopyOnWriteArrayList<Pair<String, ComputeBackend>>()
-        val loaded = java.util.concurrent.CopyOnWriteArrayList<Pair<String, ComputeBackend>>()
-        override fun fellBack(modelId: String, failed: ComputeBackend, reason: String) { fallbacks += modelId to failed }
-        override fun loaded(modelId: String, backend: ComputeBackend) { loaded += modelId to backend }
+        val fallbacks = java.util.concurrent.CopyOnWriteArrayList<Pair<LlmModel, ComputeBackend>>()
+        val loaded = java.util.concurrent.CopyOnWriteArrayList<LlmModel>()
+        override fun fellBack(model: LlmModel, failed: ComputeBackend, reason: String) { fallbacks += model to failed }
+        override fun loaded(model: LlmModel) { loaded += model }
     }
 
     /**
@@ -151,13 +151,16 @@ class LocalReasoningEngineTest {
     @Test
     fun aGpuThatRefusesTheModelFallsBackToTheCpuKeepingTheAnswerAndTellsTheApp() = runBlocking {
         val reports = RecordingReports()
-        val onGpu = LocalReasoningEngine(ECHO_MODEL_ID, { echo.copy(backend = ComputeBackend.GPU) }, connection, reports)
+        // A ficha da escolha (42) viaja com o pedido: é por ela que o app descarta aviso vencido.
+        val onGpu = LocalReasoningEngine(ECHO_MODEL_ID, { echo.copy(backend = ComputeBackend.GPU, ticket = 42L) }, connection, reports)
 
         val events = onGpu.generate(ReasoningRequest(user = "a resposta nao se perde")).all()
 
         assertEquals("a resposta nao se perde", text(events))
         assertEquals(ReasoningEvent.Done, events.last())
-        assertEquals(listOf(ECHO_MODEL_ID to ComputeBackend.GPU), reports.fallbacks.toList())
+        assertEquals(listOf(ECHO_MODEL_ID), reports.fallbacks.map { it.first.modelId })
+        assertEquals(listOf(ComputeBackend.GPU), reports.fallbacks.map { it.second })
+        assertEquals("o aviso leva a ficha da escolha que pediu a carga", listOf(42L), reports.fallbacks.map { it.first.ticket })
         assertTrue("uma geração que voltou para a CPU não conta como GPU pronta", reports.loaded.isEmpty())
     }
 
@@ -169,7 +172,8 @@ class LocalReasoningEngineTest {
         assertEquals("tudo certo", text(onCpu.generate(ReasoningRequest(user = "tudo certo")).all()))
 
         assertTrue(reports.fallbacks.isEmpty())
-        assertEquals(listOf(ECHO_MODEL_ID to ComputeBackend.CPU), reports.loaded.toList())
+        assertEquals(listOf(ECHO_MODEL_ID), reports.loaded.map { it.modelId })
+        assertEquals(listOf(ComputeBackend.CPU), reports.loaded.map { it.backend })
     }
 
     /** O backend atravessa o AIDL: pré-carga na GPU com o eco avisa a volta antes do `onDone`. */

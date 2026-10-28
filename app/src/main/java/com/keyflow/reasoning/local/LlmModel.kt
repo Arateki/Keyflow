@@ -19,6 +19,12 @@ data class LlmModel(
     val version: String = "",
     /** Onde o modelo roda. Faz parte da identidade do motor residente: trocar de CPU para GPU descarrega e recarrega. */
     val backend: ComputeBackend = ComputeBackend.CPU,
+    /**
+     * A ficha da escolha de backend que pediu esta carga (`LocalBackendPrefs.ticketFor`). Só o processo principal a usa, para o que a carga contar
+     * depois não sobrescrever uma escolha mais nova nem recriar a preferência de um modelo apagado; **não atravessa o AIDL** (o `:reasoning` não
+     * precisa dela e `fromParcel` devolve [com.keyflow.data.LocalBackendPrefs.NO_TICKET]).
+     */
+    val ticket: Long = 0L,
 ) {
     fun toParcel(): LocalLlmConfig = LocalLlmConfig().also {
         it.modelId = modelId

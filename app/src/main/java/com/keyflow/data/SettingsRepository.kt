@@ -373,6 +373,12 @@ class SettingsRepository(
     suspend fun localBackendFor(modelId: String): ComputeBackend =
         LocalBackendPrefs.decode(dataStore.data.first()[REASONING_LOCAL_BACKENDS]).backendFor(modelId)
 
+    /** O backend e a ficha da escolha do [modelId] numa só leitura: quem pede uma carga leva os dois juntos (ver [LocalBackendPrefs.ticketFor]). */
+    suspend fun localBackendChoiceFor(modelId: String): LocalBackendChoice {
+        val prefs = LocalBackendPrefs.decode(dataStore.data.first()[REASONING_LOCAL_BACKENDS])
+        return LocalBackendChoice(prefs.backendFor(modelId), prefs.ticketFor(modelId))
+    }
+
     /**
      * Muda a tabela de backends numa escrita atômica só dessa chave: não disputa com o auto-save da tela, que regrava as Settings
      * inteiras (mesma razão de [selectInstalledModelIfNone]). Devolve o que ficou gravado.

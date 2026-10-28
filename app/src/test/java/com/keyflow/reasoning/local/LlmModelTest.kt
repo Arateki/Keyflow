@@ -73,6 +73,15 @@ class LlmModelTest {
         assertThat(LlmModels.from(spec, dir, backend = ComputeBackend.GPU).backend).isEqualTo(ComputeBackend.GPU)
     }
 
+    /** A ficha da escolha de backend é do processo principal: não atravessa o AIDL, e o `:reasoning` a recebe zerada. */
+    @Test
+    fun `the backend ticket stays in the main process and does not cross the AIDL`() {
+        val withTicket = model.copy(backend = ComputeBackend.GPU, ticket = 42L)
+        val received = LlmModel.fromParcel(withTicket.toParcel())
+        assertThat(received.ticket).isEqualTo(0L)
+        assertThat(received).isEqualTo(withTicket.copy(ticket = 0L))
+    }
+
     @Test
     fun `error codes are stable and unknown codes read as engine errors`() {
         assertThat(ReasoningErrorKind.entries.map { it.code }).containsExactly(1, 2, 3).inOrder()

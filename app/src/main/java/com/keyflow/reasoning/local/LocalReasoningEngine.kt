@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.IBinder
 import android.os.RemoteException
 import android.util.Log
-import com.keyflow.core.ComputeBackend
 import com.keyflow.data.SettingsRepository
 import com.keyflow.reasoning.ReasoningEngine
 import com.keyflow.reasoning.ReasoningError
@@ -55,8 +54,8 @@ class LocalReasoningEngine internal constructor(
         }
 
         val finished = AtomicBoolean(false)
-        // A carga no backend pedido falhou e o modelo seguiu na CPU: a geração continua, mas não conta como "GPU pronta".
-        val fellBack = AtomicBoolean(false)
+        // O que esta carga conta sobre o backend (voltou para a CPU, ou carregou) só vale se a escolha e a instalação que a pediram ainda são as de agora.
+        val loadReport = LoadReport(model, reports)
         val binder: IBinder = service.asBinder()
         val death = IBinder.DeathRecipient {
             if (finished.compareAndSet(false, true)) {
@@ -69,14 +68,11 @@ class LocalReasoningEngine internal constructor(
                 if (!finished.get()) trySend(ReasoningEvent.Delta(text))
             }
 
-            override fun onBackendFallback(failed: String, reason: String) {
-                fellBack.set(true)
-                reports.fellBack(model.modelId, ComputeBackend.fromName(failed), reason)
-            }
+            override fun onBackendFallback(failed: String, reason: String) = loadReport.onBackendFallback(failed, reason)
 
             override fun onDone() {
                 if (finished.compareAndSet(false, true)) {
-                    if (!fellBack.get()) reports.loaded(model.modelId, model.backend)
+                    loadReport.onDone()
                     trySend(ReasoningEvent.Done)
                     close()
                 }
@@ -122,7 +118,11 @@ class LocalReasoningEngine internal constructor(
             return LocalReasoningEngine(
                 modelId = modelId,
                 // O backend é lido a cada geração (só do DataStore, leve): trocar CPU/GPU no card vale já na próxima resposta.
-                modelFor = { id -> LlmModels.forId(app, id, SettingsRepository(app).localBackendFor(id)) },
+                modelFor = { id ->
+                    // Backend e ficha numa leitura só: a ficha diz de qual escolha esta carga veio.
+                    val choice = SettingsRepository(app).localBackendChoiceFor(id)
+                    LlmModels.forId(app, id, choice.backend, choice.ticket)
+                },
                 connection = ReasoningConnection.get(context),
                 reports = BackendReports.persisted(app),
             )

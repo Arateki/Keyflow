@@ -275,7 +275,7 @@ class SettingsRepositoryTest {
         assertEquals(ComputeBackend.CPU, repository.localBackendFor("qwen3-0.6b-litertlm"))
         assertEquals(LocalBackendPrefs.EMPTY, repository.localBackendPrefsFlow().first())
 
-        repository.updateLocalBackendPrefs { it.choose("qwen3-0.6b-litertlm", ComputeBackend.GPU) }
+        repository.updateLocalBackendPrefs { it.choose("qwen3-0.6b-litertlm", ComputeBackend.GPU, ticket = 11L) }
 
         assertEquals(ComputeBackend.GPU, repository.localBackendFor("qwen3-0.6b-litertlm"))
         assertEquals(ComputeBackend.CPU, repository.localBackendFor("gemma-4-e2b-litertlm"))
@@ -286,9 +286,9 @@ class SettingsRepositoryTest {
     @Test
     fun aFallbackWrittenByTheMainProcessBecomesTheCpuChoiceAndTheCardNotice() = runTest {
         val repository = newRepository()
-        repository.updateLocalBackendPrefs { it.choose("qwen3-0.6b-litertlm", ComputeBackend.GPU) }
+        repository.updateLocalBackendPrefs { it.choose("qwen3-0.6b-litertlm", ComputeBackend.GPU, ticket = 11L) }
 
-        repository.updateLocalBackendPrefs { it.fellBack("qwen3-0.6b-litertlm", ComputeBackend.GPU) }
+        repository.updateLocalBackendPrefs { it.fellBack("qwen3-0.6b-litertlm", ComputeBackend.GPU, 11L) }
 
         val read = repository.localBackendPrefsFlow().first()
         assertEquals(ComputeBackend.CPU, read.backendFor("qwen3-0.6b-litertlm"))

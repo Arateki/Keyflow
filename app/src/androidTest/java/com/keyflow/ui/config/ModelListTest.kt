@@ -338,7 +338,7 @@ class ModelListTest {
 
     @Test
     fun onceTheGpuHasLoadedTheModelTheWarningIsGone() {
-        val prefs = LocalBackendPrefs.EMPTY.choose(qwen.id, ComputeBackend.GPU).markGpuReady(qwen.id)
+        val prefs = LocalBackendPrefs.EMPTY.choose(qwen.id, ComputeBackend.GPU, ticket = 7L).markGpuReady(qwen.id, 7L)
         rule.setContent { Host(textWithGpu(installed = setOf(qwen.id), selected = qwen.id, prefs = prefs), FakeActions(), ModelListTags.Raciocinio) }
 
         rule.onNodeWithTag("raciocinio-local-model-${qwen.id}-backend-gpu").performScrollTo().assertIsSelected()
@@ -347,7 +347,7 @@ class ModelListTest {
 
     @Test
     fun aGpuThatFellBackShowsTheNoticeWithTheCpuSelected() {
-        val prefs = LocalBackendPrefs.EMPTY.choose(qwen.id, ComputeBackend.GPU).fellBack(qwen.id, ComputeBackend.GPU)
+        val prefs = LocalBackendPrefs.EMPTY.choose(qwen.id, ComputeBackend.GPU, ticket = 7L).fellBack(qwen.id, ComputeBackend.GPU, 7L)
         rule.setContent { Host(textWithGpu(installed = setOf(qwen.id), selected = qwen.id, prefs = prefs), FakeActions(), ModelListTags.Raciocinio) }
 
         rule.onNodeWithTag("raciocinio-local-model-${qwen.id}-backend-cpu").performScrollTo().assertIsSelected()
