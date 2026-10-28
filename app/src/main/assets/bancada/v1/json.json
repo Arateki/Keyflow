@@ -1,0 +1,177 @@
+{
+  "teste": "json",
+  "versao": 1,
+  "capacidade": "TEXTO",
+  "descricao": "Mede se o modelo extrai campos de um texto e responde só com um JSON válido, no esquema e com os valores certos.",
+  "prompt": {
+    "system": "Você extrai informações de um texto e responde SOMENTE com um objeto JSON válido, sem explicações e sem cercas de código. Use exatamente as chaves pedidas. Datas no formato AAAA-MM-DD e horas no formato HH:MM (24 h). Hoje é 2026-10-28, uma quarta-feira. Se a informação não aparece no texto, use null.",
+    "user": "{entrada}"
+  },
+  "casos": [
+    {
+      "id": "js-01",
+      "idioma": "pt",
+      "entrada": "Campos: nome, telefone, cidade (todos texto)\n\nTexto: Meu nome é Carla Mendes, moro em Curitiba e meu telefone é (41) 99876-5432.",
+      "esperado": {
+        "nome": "Carla Mendes",
+        "telefone": "(41) 99876-5432",
+        "cidade": "Curitiba"
+      },
+      "esquema": {
+        "nome": "string",
+        "telefone": "string",
+        "cidade": "string"
+      },
+      "maxTokensSaida": 96,
+      "tokensEntrada": 108
+    },
+    {
+      "id": "js-02",
+      "idioma": "en",
+      "entrada": "Campos: nome, email (texto) e quantidade (inteiro)\n\nTexto: Please ship 3 units to Mark Taylor, mark.taylor@example.com.",
+      "esperado": {
+        "nome": "Mark Taylor",
+        "email": "mark.taylor@example.com",
+        "quantidade": 3
+      },
+      "esquema": {
+        "nome": "string",
+        "email": "string",
+        "quantidade": "integer"
+      },
+      "maxTokensSaida": 96,
+      "tokensEntrada": 105
+    },
+    {
+      "id": "js-03",
+      "idioma": "es",
+      "entrada": "Campos: nome, idade (inteiro), cidade\n\nTexto: Me llamo Lucía Fernández, tengo 34 años y vivo en Sevilla.",
+      "esperado": {
+        "nome": "Lucía Fernández",
+        "idade": 34,
+        "cidade": "Sevilla"
+      },
+      "esquema": {
+        "nome": "string",
+        "idade": "integer",
+        "cidade": "string"
+      },
+      "maxTokensSaida": 96,
+      "tokensEntrada": 102
+    },
+    {
+      "id": "js-04",
+      "idioma": "pt",
+      "entrada": "Campos: data (AAAA-MM-DD) e hora (HH:MM)\n\nTexto: A consulta com a dentista ficou marcada para amanhã às 15h30.",
+      "esperado": {
+        "data": "2026-10-29",
+        "hora": "15:30"
+      },
+      "esquema": {
+        "data": "date",
+        "hora": "string"
+      },
+      "maxTokensSaida": 96,
+      "tokensEntrada": 103
+    },
+    {
+      "id": "js-05",
+      "idioma": "pt",
+      "entrada": "Campos: valor (número, sem moeda), vencimento (AAAA-MM-DD), pago (verdadeiro ou falso)\n\nTexto: A fatura de R$ 1.250,90 vence em 05/11/2026 e ainda não foi paga.",
+      "esperado": {
+        "valor": 1250.9,
+        "vencimento": "2026-11-05",
+        "pago": false
+      },
+      "esquema": {
+        "valor": "number",
+        "vencimento": "date",
+        "pago": "boolean"
+      },
+      "maxTokensSaida": 96,
+      "tokensEntrada": 116
+    },
+    {
+      "id": "js-06",
+      "idioma": "en",
+      "entrada": "Campos: data (AAAA-MM-DD) e hora (HH:MM, 24 h)\n\nTexto: The team dinner is this Friday at 7:30 PM.",
+      "esperado": {
+        "data": "2026-10-30",
+        "hora": "19:30"
+      },
+      "esquema": {
+        "data": "date",
+        "hora": "string"
+      },
+      "maxTokensSaida": 96,
+      "tokensEntrada": 100
+    },
+    {
+      "id": "js-07",
+      "idioma": "pt",
+      "entrada": "Campos: itens (lista de textos) e total_itens (inteiro)\n\nTexto: Na lista de compras anotei arroz, feijão, café e sabão em pó.",
+      "esperado": {
+        "itens": [
+          "arroz",
+          "feijão",
+          "café",
+          "sabão em pó"
+        ],
+        "total_itens": 4
+      },
+      "esquema": {
+        "itens": "array",
+        "total_itens": "integer"
+      },
+      "maxTokensSaida": 96,
+      "tokensEntrada": 107
+    },
+    {
+      "id": "js-08",
+      "idioma": "pt",
+      "entrada": "Campos: nome e telefone (null se o telefone não aparece)\n\nTexto: Aqui é o Rafael, pode me ligar depois do almoço.",
+      "esperado": {
+        "nome": "Rafael",
+        "telefone": null
+      },
+      "esquema": {
+        "nome": "string",
+        "telefone": "string?"
+      },
+      "maxTokensSaida": 96,
+      "tokensEntrada": 104
+    },
+    {
+      "id": "js-09",
+      "idioma": "en",
+      "entrada": "Campos: inicio (AAAA-MM-DDTHH:MM) e duracao_minutos (inteiro)\n\nTexto: The call is on November 4th at 14:15 and will last 45 minutes.",
+      "esperado": {
+        "inicio": "2026-11-04T14:15",
+        "duracao_minutos": 45
+      },
+      "esquema": {
+        "inicio": "datetime",
+        "duracao_minutos": "integer"
+      },
+      "maxTokensSaida": 96,
+      "tokensEntrada": 109
+    },
+    {
+      "id": "js-10",
+      "idioma": "pt",
+      "entrada": "Campos: produto (nome do item no singular, em minúsculas), quantidade (inteiro) e preco_unitario (número, sem moeda)\n\nTexto: Pedido: 12 canetas azuis a R$ 2,50 cada.",
+      "esperado": {
+        "produto": "caneta",
+        "quantidade": 12,
+        "preco_unitario": 2.5
+      },
+      "esquema": {
+        "produto": "string",
+        "quantidade": "integer",
+        "preco_unitario": "number"
+      },
+      "maxTokensSaida": 96,
+      "tokensEntrada": 117
+    }
+  ]
+}
