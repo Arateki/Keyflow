@@ -124,7 +124,7 @@ jobs:
     # e "Unit tests and build". Nome que some da lista deixa todo PR esperando para sempre.
     name: Device (API 34, ${{ matrix.shard }}/${{ strategy.job-total }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 55
+    timeout-minutes: 70
     strategy:
       fail-fast: false
       matrix:
@@ -175,31 +175,47 @@ jobs:
       # mudaram só na suavização de borda e foram reaprovados.
       - name: Device gate on the emulator
         id: gate
-        # Abaixo do job, para o diff e a evidência subirem mesmo num estouro. O job mais lento levou 28 min
-        # sem repetição (2026-10-10); se o processo do app cai cedo, a repetição do script roda quase o
-        # shard inteiro de novo.
+        continue-on-error: true
+        # Deixa tempo para uma nova inicialização e para publicar a evidência.
         timeout-minutes: 45
         env:
           GH_TOKEN: ${{ github.token }}
-        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        uses: ./.github/actions/device-emulator
         with:
-          api-level: 34
-          emulator-build: 15917651
-          target: google_apis
-          arch: x86_64
-          profile: pixel_6
-          cores: 2
-          ram-size: 4096M
-          disk-size: 6G
-          emulator-options: -no-window -gpu swangle_indirect -no-snapshot -no-boot-anim -camera-back none
-          disable-animations: true
-          script: scripts/ci-device-gate.sh all ${{ matrix.shard }} ${{ strategy.job-total }}
-      # Roda mesmo com teste falhando na suíte (o passo do gate fica vermelho, mas as capturas existem).
+          shard: ${{ matrix.shard }}
+          shards: ${{ strategy.job-total }}
+      # O marcador nasce ANTES de qualquer teste: falha da suíte/captura nunca repete o emulador.
+      - name: Prepare another emulator startup
+        id: startup_cleanup
+        if: ${{ !cancelled() && steps.gate.outcome == 'failure' && hashFiles('app/build/ci-evidence/gate-started') == '' }}
+        run: scripts/ci-reset-emulator.sh
+      - name: Retry emulator startup
+        id: startup_retry
+        if: ${{ !cancelled() && steps.startup_cleanup.outcome == 'success' }}
+        timeout-minutes: 45
+        env:
+          GH_TOKEN: ${{ github.token }}
+        uses: ./.github/actions/device-emulator
+        with:
+          shard: ${{ matrix.shard }}
+          shards: ${{ strategy.job-total }}
+      # continue-on-error só permite recuperar o preparo; preserva toda falha depois do início do gate.
+      - name: Require device gate success
+        if: ${{ !cancelled() && steps.gate.outcome != 'success' && steps.startup_retry.outcome != 'success' }}
+        run: |
+          echo '::error::Gate de device falhou; consulte a inicialização ou a evidência dos testes.'
+          exit 1
+      # Roda mesmo com teste falhando na suíte, desde que a galeria tenha produzido seu catálogo.
       - name: Diff against the goldens
-        if: ${{ !cancelled() && steps.gate.outcome != 'skipped' }}
+        if: ${{ !cancelled() }}
         env:
           ROUTE_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
-        run: scripts/diff-screens.sh
+        run: |
+          if [ -s verification/routes.txt ]; then
+            scripts/diff-screens.sh
+          else
+            echo '::notice::Sem capturas: verify-screens não produziu routes.txt; consulte a falha anterior do gate.'
+          fi
       - name: Device evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

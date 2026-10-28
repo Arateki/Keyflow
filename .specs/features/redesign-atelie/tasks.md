@@ -154,6 +154,11 @@ gatilho, `overlaySide`, `orbSize`, `onboardingDone` e `effectiveConfigFor(source
 - [x] Gate: `screenshot` → 8 PNGs gerados.
 **Tests**: screenshot · **Gate**: screenshot · **Commit**: `feat(verify): script de captura no emulador headless`  ✅
 
+**Manutenção do CI (2026-10-28)**: preparo explícito dos overlays do Pixel 6, repetição de inicialização
+somente antes dos testes e diff condicionado ao catálogo. Sem alteração de rotas/goldens.
+Investigação e limites em `.specs/codebase/CI-ESTABILIDADE.md`; validação da rodada na entrega da tarefa.
+
+
 ### T10: ConfigScreen scaffold (header + abas + auto-save + toast)
 **What**: Activity Compose com header (orbe, idioma inerte, toggle tema), `TabBar(5)` com gating e infra de auto-save + toast.
 **Where**: `ui/config/{ConfigScreen,TabBar}.kt`, `ui/SetupActivity.kt` (→ ComponentActivity), `ui/common/SaveToast.kt`

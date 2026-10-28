@@ -24,6 +24,8 @@ cd "$(dirname "$0")/.." || exit 1
 MODE="${1:-}"
 EVIDENCE=app/build/ci-evidence
 mkdir -p "$EVIDENCE"
+# A repetição do workflow só é permitida antes de entrar neste script, nunca após uma falha de teste.
+touch "$EVIDENCE/gate-started"
 ADB="${ANDROID_HOME:+$ANDROID_HOME/platform-tools/}adb"
 # Mesmo lugar do build local: os caminhos abaixo valem com ou sem o artefato.
 APK_DIR=app/build/outputs/apk

@@ -348,3 +348,9 @@ OVL=overlay, REC=pausa/gravação, NOTIF=notificação, ONB=onboarding, VERIFY=h
 - [x] `verification/` populado com 1 PNG determinístico por rota; rodar 2× produz prints idênticos. *(T7/T8; golden T26)*
 - [x] Gates `testDebugUnitTest` + `connectedDebugAndroidTest` verdes; nenhuma regressão funcional do MVP. *(55 instrumentados, 0 falhas)*
 - [x] `poc/` removido; `minSdk 24`; fontes empacotadas; sem Downloadable Fonts. *(T1–T3)*
+
+
+Manutenção de VERIFY-01/02/04 (2026-10-28): o CI configura explicitamente os overlays do Pixel 6,
+repete somente falhas anteriores ao início do gate e só compara com o catálogo presente.
+Requisitos continuam Verified; nenhuma referência visual mudou. Evidência e causa provável:
+[CI-ESTABILIDADE.md](../../codebase/CI-ESTABILIDADE.md).
