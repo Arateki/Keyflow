@@ -46,8 +46,7 @@ Requisitos (CMP-NN) e decisões em `spec.md`; tarefas em `tasks.md`. Feature irm
 | `ui/terminal/{TerminalScreen,AbasDeSessao,BarraDeEstado,TeclasExtras,MapaTecladoFisico,AbaAgente,FaixaAgente,BotaoParar}.kt` | a tela do terminal | Compose |
 | `i18n/{en,es}/Computador.kt` | traduções (registradas em `TranslationsEn/Es`) | — |
 
-`ArchitectureRulesTest` (CMP-62): `computador/**` **exceto** `computador/app/**` e `agent/tools/Terminal*` não importam `android.*`, `androidx.compose.*` nem `org.connectbot.terminal`; só `computador/ssh/ConexaoCbssh.kt` importa
-`org.connectbot.sshlib`; só `computador/app/**` e `ui/terminal/**` importam o termlib; `ComputadorPanel` não importa `kotlinx.coroutines.delay`.
+`ArchitectureRulesTest` (CMP-62): o pacote `com.keyflow.computador` (**exceto** `computador/app/**`) **e** `agent/tools/Terminal*` são JVM puro — não importam `android.*`, `androidx.compose.*` nem `org.connectbot.terminal`; só `computador/ssh/ConexaoCbssh.kt` importa `org.connectbot.sshlib`; só `computador/app/**` e `ui/terminal/**` importam o termlib; `ComputadorPanel` não importa `kotlinx.coroutines.delay`.
 
 ## 2. Dependências e toolchain (CMP-01..03)
 
@@ -71,11 +70,11 @@ Versões publicadas medidas no levantamento: termlib **0.3.14** (Maven, 21/10/20
 - **Sixel sem tocar no C++:** o libvterm do termlib ignora DCS (`.dcs = nullptr`). O `TranscodificadorDeFluxo` fica entre o cbssh e o `writeInput` (§9.3): retém `ESC P … q … ST`, decodifica com o `DecodificadorSixel` (Kotlin JVM puro), reencoda como imagem **kitty** (PNG em `m=1`) e deixa o termlib desenhar. No sentido contrário reescreve o DA1.
 - O que o termlib não faz e queremos (anunciar sixel, separar tecla de resposta, limites) é resolvido **na borda**, não no termlib.
 
-### 2.3 Plano A2: fork com JNI no CI (só se a CMP-T1 decidir)
+### 2.3 Plano A2: fork com JNI no CI (só se a CMP-T1 medir que mouse ou scrollback pedem C++)
 
 Vendoriza `third_party/termlib/` (Apache-2.0 + libvterm MIT, commit-base e patches em `UPSTREAM.md`), módulo Gradle `:termlib` compilado com o toolchain do app; o C++ sai de um workflow (`termlib-jni.yml`: NDK do runner, actions fixadas por SHA,
-releases com `.sha256`) e o `app/build.gradle.kts` baixa e **confere o SHA-256**, como faz com o sherpa (`sherpaOnnxSha256`). Patches previstos: `.dcs` do libvterm para sixel e o atributo 4 no DA1 (`state.c`); **mouse reporting** (o termlib 0.3.14 não o expõe: ligar `vterm_mouse_move/button` e a propriedade de modo ao Kotlin); **scrollback** configurável (hoje a constante privada `maxScrollbackLines = 1000`, em Kotlin — esta parte nem pede C++); `TermlibNativoTest` reprova `.so` fora do SHA, GPL ou ABI faltando.
-Só entra se a CMP-T1 mostrar que o transcodificador (A1) **ou** a falta de mouse/scrollback não se resolvem na borda — e o Yan decide (Q1).
+releases com `.sha256`) e o `app/build.gradle.kts` baixa e **confere o SHA-256**, como faz com o sherpa (`sherpaOnnxSha256`). Patches previstos, **só o que a CMP-T1 medir que não sai na borda**: **mouse reporting** (o termlib 0.3.14 não o expõe: ligar `vterm_mouse_move/button` e a propriedade de modo ao Kotlin); **scrollback** configurável (hoje a constante privada `maxScrollbackLines = 1000`, em Kotlin — esta parte nem pede C++). O sixel **não** entra no fork: fica no transcodificador do app (D12). `TermlibNativoTest` reprova `.so` fora do SHA, GPL ou ABI faltando.
+O Yan **já aceitou** este fork se a CMP-T1 mostrar que mouse ou scrollback maior exigem C++ (D12). Se os dois se resolvem na borda, a CMP-T3 fecha como dispensada.
 
 ### 2.4 Plano B (contingência): fork preso ao toolchain atual
 
@@ -120,11 +119,14 @@ Escrita **atômica sobre o valor atual** (`atualizarHosts { }` dentro de `dataSt
 
 ### 4.1 Que chave em que aparelho
 
+O usuário escolhe o tipo na geração (D13). As três primeiras linhas são o caminho do **ed25519**. O ECDSA P-256 não usa envelope.
+
 | Situação | O que acontece | Proteção mostrada |
 | -------- | -------------- | ----------------- |
 | API ≥ 33 e a sonda passa, `KeyInfo.securityLevel` = TEE/StrongBox | chave Ed25519 **nativa** no Keystore | "Protegida pelo hardware do aparelho" |
 | API ≥ 33 e a sonda passa, nível = software | nativa no Keystore (isolada do app, mas por software) | "Protegida pelo Keystore (por software)" |
 | API < 33, ou sonda falha (exceção, P-256, assinatura inválida) | **envelope**: semente Ed25519 de 32 bytes (Tink do cbssh) cifrada com AES-256-GCM de uma chave do Keystore (API 24+, hardware quando existe) | "Guardada cifrada no cofre do aparelho" |
+| Usuário escolhe ECDSA P-256 | chave **P-256** (`secp256r1` / `prime256v1`, `DIGEST_SHA256`) **no Keystore**, em qualquer API ≥ 24 (hardware desde a API 23). Sem envelope. A pública sai como `ecdsa-sha2-nistp256` | "Protegida pelo hardware do aparelho" ou "Protegida pelo Keystore (por software)", conforme o `KeyInfo` |
 | Chave importada | envelope, com a semente/PKCS8 do arquivo (a passphrase original some) | idem |
 
 A tabela real por aparelho vem da **CMP-T2** (emulador API 34, A32, Tab S10 Lite, Vaio TL10) e **corrige esta tabela** se o medido divergir. Ficam registradas as armadilhas dos relatos de terceiros, para a CMP-T2 reproduzir:
@@ -141,7 +143,7 @@ interface Assinador {                               // liga ao AuthHandler.onSig
     suspend fun assinar(dados: ByteArray): ByteArray? // null = o usuário cancelou a biometria; o cbssh pula esta chave
 }
 interface ProvedorDeChaves {
-    suspend fun gerar(nome: String, exigeBiometria: Boolean): Resultado<ChaveSsh>
+    suspend fun gerar(nome: String, tipo: TipoDeChave, exigeBiometria: Boolean): Resultado<ChaveSsh> // ED25519 | ECDSA_P256 (D13)
     suspend fun importar(pem: String, passphrase: CharArray?, nome: String): Resultado<ChaveSsh>
     fun assinador(id: String): Assinador
     suspend fun excluir(id: String)
@@ -151,12 +153,15 @@ interface ProvedorDeChaves {
 `ConexaoCbssh` implementa `AuthHandler`: `onPublicKeysNeeded() = listOf(assinador.chavePublica())`; `onSignatureRequest(key, dados) = assinador.assinar(dados)`; o cbssh escreve os bytes devolvidos no `USERAUTH_REQUEST` sem reempacotar
 (contrato lido no código). **A chave nativa assina sem o material sair do Keystore**; o envelope decifra a semente, assina com Tink e **zera** o array.
 
-### 4.3 Biometria (CMP-14)
+### 4.3 Biometria (CMP-14, D14)
 
-- Nativa: `KeyGenParameterSpec.setUserAuthenticationRequired(true)` (+ `setUserAuthenticationParameters(0, AUTH_BIOMETRIC_STRONG or AUTH_DEVICE_CREDENTIAL)` na API 30+; `-1`/por uso antes), `BiometricPrompt` com `CryptoObject(Signature)`; `setInvalidatedByBiometricEnrollment(true)`.
-- Envelope: a chave AES-GCM do envelope é a que exige autenticação; `CryptoObject(Cipher)` decifra a semente. Mesmo comportamento para o usuário.
-- `androidx.biometric` (Apache-2.0): versão e requisito de Kotlin/Compose **a conferir na CMP-T1** (a antiga 1.1.0 é estável e não depende de Compose). Em API < 30 a combinação `DEVICE_CREDENTIAL` com `CryptoObject` não é aceita pelo `BiometricPrompt`: só biometria forte (**a verificar**, CMP-T2).
+Janela de **5 minutos** (300 s), não a cada uso. Chave com duração > 0 **não** entra em `CryptoObject`: o prompt autentica o usuário e, durante a janela, `KeyStore.getKey` assina sem novo prompt.
+
+- Nativa e P-256: `KeyGenParameterSpec.setUserAuthenticationRequired(true)`. API 30+: `setUserAuthenticationParameters(300, AUTH_BIOMETRIC_STRONG)` (`AUTH_DEVICE_CREDENTIAL` junto só se a CMP-T2 confirmar). API 24–29: `setUserAuthenticationValidityDurationSeconds(300)`. `setInvalidatedByBiometricEnrollment(true)`.
+- Envelope (só ed25519): a chave AES-GCM do envelope é a que exige autenticação, com a **mesma janela de 300 s**. O ECDSA P-256 não usa envelope.
+- `androidx.biometric` (Apache-2.0): versão e requisito de Kotlin/Compose **a conferir na CMP-T1** (a antiga 1.1.0 é estável e não depende de Compose). Em API < 30 a combinação `DEVICE_CREDENTIAL` com `CryptoObject` não é aceita pelo `BiometricPrompt`: só biometria forte (**a verificar**, CMP-T2). A CMP-T2 também registra se, na API 24–29, a janela de 300 s pede biometria ou só o desbloqueio do aparelho.
 - Sem digital cadastrada → opção desligada com o motivo. Prompt cancelado → `assinar` devolve `null`, a sessão falha com `BIOMETRIA` e **não** tenta de novo sozinha.
+- Reconexão: **dentro** da janela segue sem prompt; **fora** emite `PrecisaDoUsuario` e a notificação "toque para reconectar" — o `BiometricPrompt` não abre em segundo plano.
 
 ### 4.4 Importação (CMP-12)
 
@@ -192,7 +197,7 @@ interface ConexaoSsh {
 
 ### 5.3 Reconexão e keepalive (CMP-22)
 
-`Reconexao` (pura, relógio injetável): backoff `1·2·4·8·16·30 s`, até 10 tentativas ou 10 min; só tenta com `ConnectivityManager` dizendo que há rede (callback `onAvailable`); cada tentativa é uma conexão nova + autenticação nova. Chave com biometria: emite `PrecisaDoUsuario` → a notificação "toque para reconectar".
+`Reconexao` (pura, relógio injetável): backoff `1·2·4·8·16·30 s`, até 10 tentativas ou 10 min; só tenta com `ConnectivityManager` dizendo que há rede (callback `onAvailable`); cada tentativa é uma conexão nova + autenticação nova. Chave com biometria **fora da janela de 5 minutos**: emite `PrecisaDoUsuario` → a notificação "toque para reconectar" (o prompt não abre sozinho). **Dentro** da janela a reconexão autentica sem novo prompt (D14).
 Ao reabrir, `BufferDeTexto` recebe `\n— conexão reiniciada —\n` e a tela mostra a dica de `tmux`. O emulador ganha o mesmo separador (escrito localmente, **não** enviado ao servidor).
 
 ## 6. Sessão e gerenciador (CMP-22, 29, 34, 36)
@@ -271,7 +276,7 @@ O termlib devolve **tudo** (teclas do usuário e respostas do emulador) por `onK
 
 ### 8.5 Tela e abas
 
-`TerminalActivity` (`exported=false`, `launchMode` `singleTask`, `windowSoftInputMode=adjustResize`, tema do app; `FLAG_SECURE` se a opção estiver ligada). Layout (esboço):
+`TerminalActivity` (`exported=false`, `launchMode` `singleTask`, `windowSoftInputMode=adjustResize`, tema do app). **Não** pede `FLAG_SECURE` e não há opção que ligue (D17): a Visão precisa capturar o terminal. Um teste falha se a activity pedir a flag. Fonte: monoespaçada com glifos Nerd, embutida se a licença for OFL ou compatível com Apache-2.0 (D16); a CMP-T13 confere a licença e, se não servir, usa a monoespaçada do sistema e registra a substituta. Sem seletor de fonte. Layout (esboço):
 
 ```
 ┌ dev-server · ed25519 ·  ⟳ Reconectando… ───────────── ✕ ┐
@@ -301,7 +306,7 @@ O diálogo mostra protocolo (`KITTY`/`ITERM2`/`SIXEL`), dimensões e tamanho dec
 `InlineImageLimits` do app: `decodedBytes` 16 MB e `encodedBytes` 8 MB por sessão (o padrão do termlib é 32/16 MB), `maxImages` 256, `maxPlacements` 1 024, `maxFrames` 512, `maxDimension` 4 096. O `OrcamentoDeImagens` soma as sessões (teto **64 MB**) e, passando, pede o descarte das imagens da sessão **mais antiga fora da tela** (trocar a política para `Off` e de volta a `On` esvazia o `InlineImageStore`; se o termlib expuser um `clear` próprio, usa-se esse). Números de partida, **a medir** no A32 (CMP-T1/T21).
 `onTrimMemory(≥ TRIM_MEMORY_UI_HIDDEN)` libera as imagens das sessões fora da tela mantendo o texto. `OutOfMemoryError` no desenho/decodificação é capturado e vira o marcador.
 
-### 9.3 Sixel (A1, padrão)
+### 9.3 Sixel (D12: transcodificador no app)
 
 ```
 cbssh.saida ─► TranscodificadorDeFluxo ──(bytes, sixel trocado por kitty)──► emulador.writeInput
@@ -314,7 +319,7 @@ cbssh.saida ─► TranscodificadorDeFluxo ──(bytes, sixel trocado por kitty
 - **Estado do transcodificador:** `PASSANDO → ESC → DCS(params) → SIXEL(dados) → ESC(\) → PASSANDO`. Tudo fora de um DCS-sixel passa **byte a byte idêntico** (propriedade testada). Um DCS que não é sixel (`q` ausente) é repassado inteiro.
 - **Limites:** o sixel acima de 8 MB, 4 096 px de lado ou 16 M px é descartado; o transcodificador emite o marcador `[imagem sixel muito grande]` em texto e segue. O tamanho não depende da política: a política *Perguntar* é aplicada pelo termlib sobre a imagem **kitty** que o transcodificador entrega (o diálogo mostra "sixel", porque o transcodificador marca o `name` da imagem).
 - **Cursor:** o kitty `a=T` posiciona no cursor e avança como o termlib já faz (CHANGELOG 0.3.14: "advance the cursor to the last row of Kitty image placements without an extra linefeed"); o xterm termina o sixel na linha de baixo — a CMP-T26 confere por golden e ajusta com `C=1` + `CR/LF` se divergir.
-- **A2** (fork): o mesmo fica em C++/Kotlin no módulo `:termlib`. A decisão A1 × A2 sai da CMP-T1.
+- **Fork (D12):** o sixel **permanece** neste transcodificador. O fork da CMP-T3, se a CMP-T1 medir que mouse ou scrollback pedem C++, não leva o DCS sixel nem o atributo 4 do DA1.
 
 ### 9.4 kitty, placeholders e iTerm2
 
@@ -441,12 +446,12 @@ Convenções: `collectAsStateOnMain`, sem `Thread.sleep` (espera por estado), se
 
 | Risco | Efeito | Mitigação |
 | ----- | ------ | --------- |
-| O termlib 0.3.14 não tem mouse reporting e fixa o scrollback em 1 000 linhas | TUIs sem clique/rolagem por toque; histórico curto | meta condicionada (CMP-25); fork A2 só se o Yan aceitar (Q1); o buffer de texto do agente (5 000) não depende disso |
+| O termlib 0.3.14 não tem mouse reporting e fixa o scrollback em 1 000 linhas | TUIs sem clique/rolagem por toque; histórico curto | meta condicionada (CMP-25); o Yan já aceitou o fork com JNI no CI se a CMP-T1 medir que isso pede C++ (D12); o scrollback é constante Kotlin e pode sair sem fork; o buffer de texto do agente (5 000) não depende disso |
 | Frente de toolchain atrasa ou trava | nada de F1 | CMP-T0 como portão; plano B documentado (§2.4), decisão do Yan |
 | Ed25519 do Keystore se comporta diferente por aparelho (crash, P-256, assinatura inválida) | chave não gera | sonda + envelope (CMP-11); tabela da CMP-T2 |
 | O termlib não separa tecla de resposta em `onKeyboardInput` | respostas hostis vazam | filtro por lista de permitidos na saída; se inviável, fork (A2) |
 | Duplicação/composição no IME KeyFlow dentro do terminal | digitação quebra | CMP-T1/T14 antes de tudo; ajuste mínimo no IME com `SPEC_DEVIATION` |
-| Sixel transcodificado fica feio ou com cursor errado | imagem/linha deslocada | goldens da CMP-T26; A2 como plano B |
+| Sixel transcodificado fica feio ou com cursor errado | imagem/linha deslocada | goldens da CMP-T26 ajustam `C=1` + `CR/LF`; o sixel não volta para o C++ (D12) |
 | RAM no A32 de 4 GB com 3 sessões e imagens | OOM | orçamento 16/64 MB, `onTrimMemory`, medir na CMP-T1/T21 |
 | `specialUse` não aceito pela Play | serviço rejeitado | justificativa redigida; reconexão automática já é parte do produto; plano: `foregroundServiceType` alternativo só com o Yan |
 | Doze derruba a conexão com a tela apagada | sessão cai | reconexão (CMP-22), `tmux` sugerido, `WakeLock` opcional (Q10) |

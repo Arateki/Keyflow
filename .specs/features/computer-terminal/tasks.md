@@ -8,13 +8,13 @@
 > `i18n/en/Computador.kt` e `i18n/es/Computador.kt`). Desvio da spec: registrar na task e em `.specs/project/licoes/`, não em silêncio.
 > **Nada de F1 entra na `main` antes da CMP-T0** (o toolchain precisa ter subido); os spikes da Fase 0 rodam em branch descartável.
 
-**Goal**: a aba Computador deixa o "Em breve" com um terminal SSH de verdade: hosts, chaves (ed25519 no Keystore quando o aparelho deixa),
+**Goal**: a aba Computador deixa o "Em breve" com um terminal SSH de verdade: hosts, chaves (ed25519 no Keystore quando o aparelho deixa, ou ECDSA P-256 no Keystore — o usuário escolhe),
 known_hosts com confirmação da impressão digital, sessões que sobrevivem em segundo plano, imagens (kitty, iTerm2, sixel) e um agente que
 só age em hosts marcados e em sessões dele.
 
 **Tech**: Kotlin · Compose · `org.connectbot:termlib` (Apache-2.0; libvterm MIT) · `org.connectbot.sshlib:sshlib` (cbssh, Apache-2.0) ·
 `androidx.biometric` (a conferir no spike) · `org.json` · DataStore · coroutines. Servidor de teste em JVM (Apache MINA SSHD, só em teste).
-**Versões exatas, licenças das transitivas e a escolha A1/A2 do sixel saem da CMP-T1** (nenhum número de versão deste arquivo é definitivo).
+**Versões exatas e licenças das transitivas saem da CMP-T1** (nenhum número de versão deste arquivo é definitivo). O sixel é transcodificado no app (D12); a T1 só mede se mouse ou scrollback maior pedem o fork.
 
 ## Global Constraints
 
@@ -36,8 +36,8 @@ só age em hosts marcados e em sessões dele.
 ## Execution Plan
 
 ```
-Fase 0  pré-requisito e spikes:   T0 (frente de toolchain, fora desta spec) ──► T1 ──► T3 (condicional)
-                                   T1 ──► T2 [P]            T4 [P: JVM, sem dependência]
+Fase 0  pré-requisito e spikes:   T0 ──► T1 ──► T3 (condicional; o Yan já aceitou o fork se mouse/scrollback pedirem C++)
+                                   T2 [P: em paralelo com T0]     T0 ──► T4
 Fase 1  SSH + terminal de texto:
   A  modelo e dados (JVM):         T0 ──► T5 [P]      T0 ──► T6 [P]      T0 ──► T7 [P]      (T2, T7) ──► T8
   B  conexão e sessão (JVM):       (T4, T6, T7) ──► T9 ──► T10
@@ -72,29 +72,28 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
   (2) `.so` do termlib em arm64-v8a, armeabi-v7a e x86_64 com `scripts/check-16kb-alignment.py`; (3) licenças de **todas** as transitivas (Ktor, kstatemachine, Tink, kyber, keccak, jbcrypt, slf4j) — nenhuma GPL/LGPL/AGPL;
   (4) kitty (`kitten icat`), iTerm2 (`imgcat`) e **placeholders** unicode contra uma gravação do Herdr; o que o termlib faz com `t=f/t=t/t=s`;
   (5) **quais bytes saem por `onKeyboardInput`**: digitação do usuário × respostas do emulador (DA1 `?1;2c`, kitty `a=q`, DSR, cores, título) e se dá para separar as duas origens (flag dentro de `writeInput`);
-  (6) KeyFlow IME, Gboard, teclado físico e **ditado da orbe** num terminal real: caractere duplicado? composição? Enter automático? (campo `TYPE_NULL` do "bug do Termius", Bloco 1 › Q3 do `DEVELOPMENT-ORDER.md`); (6b) **mouse reporting** e **scrollback** (o termlib 0.3.14 não expõe o primeiro e fixa o segundo em 1 000 linhas): dá para suprir fora do termlib ou exige patch (A2)?;
-  (7) **A1 × A2**: um transcodificador de fluxo em Kotlin (sixel → PNG → kitty) mais a reescrita do DA1 funciona e fica bonito? ou o conjunto (sixel, mouse, scrollback) pede patch no libvterm/termlib (A2)?
-- **Where**: branch `equipe/computador-spike` (descartável); resultado em `.specs/project/licoes/AAAA-MM-DD-computador-spike.md` (tabela medida) e atualização da tabela "Toolchain" e da decisão A1/A2 no `design.md`.
+  (6) KeyFlow IME, Gboard, teclado físico e **ditado da orbe** num terminal real: caractere duplicado? composição? Enter automático? (campo `TYPE_NULL` do "bug do Termius", Bloco 1 › Q3 do `DEVELOPMENT-ORDER.md`); (6b) **mouse reporting** e **scrollback** (o termlib 0.3.14 não expõe o primeiro e fixa o segundo em 1 000 linhas, constante privada em Kotlin): dá para suprir fora do termlib? O scrollback pode não pedir C++; o mouse reporting pede se não houver borda;
+  (7) o **sixel** já está decidido (D12): transcodificador no app (sixel → PNG → kitty) e reescrita do DA1. A T1 só mede se o transcodificador desenha direito. **Não** decide fork por causa do sixel. Se (6b) mostrar que mouse ou scrollback maior não saem na borda, a decisão é o fork (D12) e a CMP-T3 deixa de ser condicional.
+- **Where**: branch `equipe/computador-spike` (descartável); resultado em `.specs/project/licoes/AAAA-MM-DD-computador-spike.md` (tabela medida) e atualização da tabela "Toolchain" e do resultado de mouse/scrollback (D12) no `design.md`.
 - **Depends on**: T0 (o spike pode rodar na branch da frente de toolchain enquanto ela não mescla; nada dele vai à `main`).
 - **Requirement**: CMP-02, CMP-03.
-- **Done when**: a lição traz a tabela medida dos 7 itens, com a **decisão** (Maven puro + transcodificador **ou** fork com JNI no CI) e a lista de licenças; `check-16kb-alignment.py` verde nas 3 ABIs; o que não foi medido está escrito como "não medido".
-  Se a decisão for fork, a CMP-T3 deixa de ser condicional.
+- **Done when**: a lição traz a tabela medida dos 7 itens. O sixel fica no transcodificador (D12), com a qualidade medida ou escrita como "não medido". A lição diz se mouse e scrollback maior saem na borda; se não saem, a decisão é o fork e a CMP-T3 deixa de ser condicional. Lista de licenças; `check-16kb-alignment.py` verde nas 3 ABIs; o que não foi medido está escrito como "não medido".
 - **Tests**: manual no emulador (`pool instrumentar` do que for automatizável) e em aparelho **sem** tocar no A32 sem `--confirmo-a32`. **Gate**: manual + `build`. **Commit**: nenhum na `main` (só a lição).
 
 ### CMP-T2 — Spike B: Ed25519 no Android Keystore, aparelho a aparelho — **Status: pendente**
 - **What**: `ProbeEd25519` (debug) que, em cada aparelho: gera a chave pelo `KeyPairGenerator` **EC** com a curva `ed25519` e `DIGEST_NONE` (a API do `getInstance("Ed25519")` sem curva gera P-256 — relato de terceiros, a reproduzir);
   confere que a chave pública é mesmo Ed25519 (SPKI de 44 bytes, prefixo `302a300506032b6570032100`); assina e verifica; lê `KeyInfo` (`securityLevel` na API 31+, `isInsideSecureHardware` antes);
-  testa `BiometricPrompt.CryptoObject(Signature)` com `setUserAuthenticationRequired(true)`; descobre o **nome do algoritmo** de `Signature` que o provedor aceita (`Ed25519`? `EdDSA`?). Roda nos aparelhos que temos: emulador API 34, A32, Tab S10 Lite, Vaio TL10.
+  testa a janela de biometria de 300 s (D14): `setUserAuthenticationValidityDurationSeconds(300)` antes da API 30 e `setUserAuthenticationParameters(300, AUTH_BIOMETRIC_STRONG)` na API 30+; em API < 30, `DEVICE_CREDENTIAL` com `CryptoObject` continua **a verificar**; descobre o **nome do algoritmo** de `Signature` que o provedor aceita (`Ed25519`? `EdDSA`?). Também gera **ECDSA P-256** (`ECGenParameterSpec("secp256r1")`, `DIGEST_SHA256`), assina e confirma que a assinatura verifica — esperado em API 24+. Os fatos do Ed25519 de relatos de terceiros continuam **a reproduzir**. Roda nos aparelhos que temos: emulador API 34, A32, Tab S10 Lite, Vaio TL10.
 - **Where**: `app/src/debug/java/com/keyflow/computador/ProbeEd25519.kt`; resultado em `licoes/AAAA-MM-DD-computador-keystore-ed25519.md`: tabela aparelho × API × resultado × proteção.
-- **Depends on**: — (não precisa do toolchain novo).
+- **Depends on**: — (não precisa do toolchain novo; corre em paralelo com a T0).
 - **Requirement**: CMP-11, CMP-14.
 - **Done when**: a tabela existe com o nível de proteção (hardware/TEE/StrongBox/software) e o nome do algoritmo de assinatura **medidos**; a lição diz a partir de qual API/aparelho o Keystore serve e confirma (ou corrige) a premissa P1 da spec; o plano de fallback do `design.md` §4 é ajustado ao medido.
 - **Tests**: manual/instrumentado de sonda. **Gate**: `pool instrumentar` (emulador) + A32/Tab/Vaio manuais com `--confirmo-a32`. **Commit**: `spike(computador): sonda do Ed25519 no Keystore` (só o debug).
 
 ### CMP-T3 — (condicional) Fork do termlib com JNI compilado no CI e SHA fixado — **Status: pendente**
-- **What**: **só se a CMP-T1 decidir fork (A2) ou o plano B valer.** Código do termlib vendorizado em `third_party/termlib/` (Apache-2.0 + libvterm MIT; `UPSTREAM.md` com o commit-base e os patches), módulo Gradle `:termlib` compilado
+- **What**: **só se a CMP-T1 medir que mouse reporting ou scrollback maior não saem na borda, ou se o plano B valer.** O Yan já aceitou o fork nesse caso (D12). O sixel não é motivo para manter esta task aberta. Código do termlib vendorizado em `third_party/termlib/` (Apache-2.0 + libvterm MIT; `UPSTREAM.md` com o commit-base e os patches), módulo Gradle `:termlib` compilado
   com o toolchain do app; o C++ vira `libtermlib.so` por ABI num workflow `.github/workflows/termlib-jni.yml` (NDK do runner, actions fixadas por SHA, padrão `sherpa-sem-tts.yml`) que publica um release com `.sha256`;
-  o `app/build.gradle.kts` baixa e **confere o SHA-256** como faz com o sherpa (sem NDK nos nós do pool). Patches (conforme a T1): DCS sixel e DA1 com atributo 4 no libvterm; **mouse reporting** (`vterm_mouse_*` + modo) e **scrollback** configurável.
+  o `app/build.gradle.kts` baixa e **confere o SHA-256** como faz com o sherpa (sem NDK nos nós do pool). Patches (conforme a T1 medir): **mouse reporting** (`vterm_mouse_*` + modo) e **scrollback** configurável. O DCS sixel e o atributo 4 do DA1 **não** entram no C++: ficam no app (D12).
 - **Where**: `third_party/termlib/`, `.github/workflows/termlib-jni.yml`, `app/build.gradle.kts`, `app/licenses/`, `NOTICE`; teste `TermlibNativoTest` (padrão `SherpaAarSemGplTest`).
 - **Depends on**: T1.
 - **Requirement**: CMP-03.
@@ -105,8 +104,9 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
 - **What**: `SshFixtureServer` (Apache MINA SSHD, `testImplementation`, Apache-2.0; versão estável a fixar na T1) com host key fixa de teste, usuários `teste` (chave `ed25519` de teste) e `senha` (senha falsa), um `ShellFactory` que **toca bytes gravados** na abertura do canal
   (prompt, cores, `kitten icat`, `imgcat`, `img2sixel`, `chafa`, placeholders do Herdr) e ecoa a entrada, registra os pedidos `pty-req`/`window-change`/`env`, e um modo "cair no meio" (fecha o socket). `scripts/ssh-fixture.sh` sobe o mesmo servidor fora do processo e faz `adb reverse`
   para o instrumentado. Pasta `app/src/test/resources/computador/gravacoes/` com as saídas de ferramentas **reais** (imagens pequenas, ≤ 64 KB cada, licença livre ou geradas por nós) e um README com o comando que gerou cada uma.
+  O servidor MINA, as gravações e o `scripts/ssh-fixture.sh` **podem nascer antes** da toolchain nova. O teste unitário que conecta o `SshClient` do cbssh **só fecha depois da T0** (o cbssh ≥ 0.4.0 traz metadados Kotlin 2.4, que o Kotlin 2.2.10 não lê).
 - **Where**: `app/src/test/java/com/keyflow/computador/fixture/`, `scripts/ssh-fixture.sh`, `app/src/test/resources/computador/gravacoes/`.
-- **Depends on**: —.
+- **Depends on**: T0 (o teste que conecta o `SshClient`; MINA e gravações podem começar antes).
 - **Requirement**: CMP-04, CMP-63.
 - **Done when**: um teste unitário conecta um `SshClient` do cbssh (JVM) ao servidor e lê o prompt gravado; auth por chave e por senha funcionam, com senha errada recusada; `window-change` é visto pelo servidor; "cair no meio" derruba a conexão; `ssh-fixture.sh` sobe e derruba limpo; as gravações têm README e nenhuma contém dado pessoal.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `test(computador): servidor SSH de teste e gravações de terminal`.
@@ -139,7 +139,7 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
 
 ### CMP-T7 — Chaves: modelo, importação e assinatura abstrata `[P]` — **Status: pendente**
 - **What**: `ChaveSsh` (id, nome, tipo, impressão, `Protecao {HARDWARE, KEYSTORE_ENVELOPE, SOFTWARE_COFRE}`, `exigeBiometria`, criada em — **sem material secreto**; `toString` mascara), interface `Assinador { chavePublica(): AuthPublicKey; suspend assinar(dados): ByteArray? }` (liga ao `AuthHandler.onSignatureRequest` do cbssh),
-  `ImportadorDeChave` (OpenSSH e PEM PKCS#8/PKCS#1 pelo `SshKeys.decodePemPrivateKey`; passphrase pedida na hora, nunca guardada; rejeita DSA e RSA < 2048 com o motivo), formatador da chave pública (`ssh-ed25519 AAAA… keyflow@<aparelho>`), `AgenteSegredos.valores()` ampliado para o `SecretFilter`.
+  `ImportadorDeChave` (OpenSSH e PEM PKCS#8/PKCS#1 pelo `SshKeys.decodePemPrivateKey`; passphrase pedida na hora, nunca guardada; rejeita DSA e RSA < 2048 com o motivo), formatador da chave pública (`ssh-ed25519 AAAA…` ou `ecdsa-sha2-nistp256 AAAA…`, comentário `keyflow@<aparelho>`), `AgenteSegredos.valores()` ampliado para o `SecretFilter`.
   Tudo sobre portas (`CofreDeSegredos`, `RelogioDeChaves`), com fakes.
 - **Where**: `computador/chaves/*.kt`; testes `ImportadorDeChaveTest`, `ChaveSshSemSegredoTest`, `ChavePublicaTest`.
 - **Depends on**: T0.
@@ -149,14 +149,14 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(computador): modelo de chaves, importação e assinatura abstrata`.
 
 ### CMP-T8 — Chaves no Android: Keystore, envelope e biometria — **Status: pendente**
-- **What**: `ProvedorDeChavesAndroid` sobre o resultado da T2: gerar Ed25519 no Keystore (API 33+ e sonda aprovada) com `ProbeEd25519` de produção; **fallback** — Ed25519 em software (a semente de 32 bytes gerada pelo Tink do cbssh) guardada **cifrada** por uma chave AES-256-GCM do Keystore (API 24+) no cofre do app, zerada da memória logo após assinar;
-  importadas entram do mesmo jeito. Biometria opcional por chave: `BiometricPrompt` com `CryptoObject` (Signature para a chave nativa; Cipher para o envelope), `setUserAuthenticationRequired(true)`, `setInvalidatedByBiometricEnrollment(true)` com aviso antes de ligar; sem biometria cadastrada a opção fica desligada com o motivo.
+- **What**: `ProvedorDeChavesAndroid` sobre o resultado da T2. `gerar(nome, tipo, exigeBiometria)`: **Ed25519** no Keystore (API 33+ e sonda aprovada) com `ProbeEd25519` de produção, ou **fallback** — Ed25519 em software (a semente de 32 bytes gerada pelo Tink do cbssh) guardada **cifrada** por uma chave AES-256-GCM do Keystore (API 24+) no cofre do app, zerada da memória logo após assinar; **ECDSA P-256** (`secp256r1`, `DIGEST_SHA256`) sempre no Keystore, sem envelope (D13).
+  Importadas entram no envelope. Biometria opcional por chave, janela de **5 minutos** (D14): API 24–29 `setUserAuthenticationValidityDurationSeconds(300)`; API 30+ `setUserAuthenticationParameters(300, AUTH_BIOMETRIC_STRONG)`; duração > 0 **não** usa `CryptoObject`. `setUserAuthenticationRequired(true)`, `setInvalidatedByBiometricEnrollment(true)` com aviso antes de ligar; sem biometria cadastrada a opção fica desligada com o motivo. O prompt autentica o usuário; dentro dos 300 s a assinatura segue sem novo prompt.
   Exclusão apaga Keystore e cofre. Fora do backup (`data_extraction_rules.xml`/`backup_rules`).
 - **Where**: `computador/app/{ProvedorDeChavesAndroid,EnvelopeDeChave,BiometriaAndroid}.kt`, `AndroidManifest`/regras de backup, `build.gradle.kts` (`androidx.biometric`, licença em `app/licenses/`); teste instrumentado `ChavesAndroidTest`.
 - **Depends on**: T2, T7.
 - **Requirement**: CMP-10, CMP-11, CMP-13, CMP-14, CMP-16.
-- **Done when**: instrumentado (emulador API 34) — a chave gerada assina e a assinatura **verifica** com a pública exportada; a pública tem o formato Ed25519; reiniciar o processo e reler assina de novo; o envelope (forçado por flag de teste) assina igual e a semente não aparece em `SharedPreferences`/arquivos (varredura por sentinela);
-  `BiometricPrompt` cancelado → `Assinador` devolve `null` sem exceção; chave invalidada → estado `INVALIDADA` com a mensagem; excluir apaga o alias e o cofre; a sonda reprova o provedor quando devolve P-256 (injeção de falha) e cai no envelope **sem aviso silencioso** (a tela diz a proteção). Aparelhos físicos: manual (A32, Tab, Vaio) na T21.
+- **Done when**: instrumentado (emulador API 34) — as duas chaves geradas (ed25519 e P-256) assinam e a assinatura **verifica** com a pública exportada; a pública do ed25519 tem o formato Ed25519 e a do P-256 sai como `ecdsa-sha2-nistp256`; o P-256 não cai no envelope; reiniciar o processo e reler assina de novo; o envelope do ed25519 (forçado por flag de teste) assina igual e a semente não aparece em `SharedPreferences`/arquivos (varredura por sentinela);
+  prompt uma vez e a segunda assinatura dentro de 5 minutos **sem** novo prompt; depois da janela, prompt de novo; `BiometricPrompt` cancelado → `Assinador` devolve `null` sem exceção; chave invalidada → estado `INVALIDADA` com a mensagem; excluir apaga o alias e o cofre; a sonda reprova o provedor quando devolve P-256 no lugar de Ed25519 (injeção de falha) e o ed25519 cai no envelope **sem aviso silencioso** (a tela diz a proteção). Aparelhos físicos: manual (A32, Tab, Vaio) na T21.
 - **Tests**: instrumentado. **Gate**: `pool instrumentar com.keyflow.computador.app.ChavesAndroidTest`. **Commit**: `feat(computador): chaves no Keystore com envelope e biometria`.
 
 ### Fase 1B — Conexão e sessão
@@ -174,12 +174,12 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
 
 ### CMP-T10 — Sessão, gerenciador, reconexão e buffer — **Status: pendente**
 - **What**: `SessaoTerminal` (máquina de estados `Conectando · AguardandoServidor · Autenticando · Aberta · Reconectando · Encerrada(motivo) · Falhou(causa)`; `dono: USUARIO | AGENTE`, `compartilhada`), `GerenciadorDeSessoes` (abrir/fechar, **8 sessões no total, 3 do agente**, ociosidade configurável), `Reconexao`
-  (backoff 1·2·4·8·16·30 s, no máximo 10 tentativas ou 10 min; só com rede; chave que exige biometria **não** reconecta sozinha — emite `PrecisaDoUsuario`), `BufferDeTexto` (anel de linhas de texto puro alimentado pelo mesmo fluxo de bytes, para o agente e para busca; **só em memória**) e `PortaDoEmulador` (interface que a tela implementa).
+  (backoff 1·2·4·8·16·30 s, no máximo 10 tentativas ou 10 min; só com rede; chave com biometria **fora da janela de 5 minutos** emite `PrecisaDoUsuario` e não abre o prompt sozinha; **dentro** da janela reconecta sem novo prompt — D14), `BufferDeTexto` (anel de linhas de texto puro alimentado pelo mesmo fluxo de bytes, para o agente e para busca; **só em memória**) e `PortaDoEmulador` (interface que a tela implementa).
 - **Where**: `computador/sessao/*.kt`; testes `SessaoTerminalTest`, `GerenciadorDeSessoesTest`, `ReconexaoTest`, `BufferDeTextoTest` (relógio virtual).
 - **Depends on**: T9.
-- **Requirement**: CMP-22, CMP-29, CMP-34, CMP-36.
+- **Requirement**: CMP-14, CMP-22, CMP-29, CMP-34, CMP-36.
 - **Done when**: unit — todas as transições da máquina (sequência aleatória sem estado impossível); queda no meio → `Reconectando` → `Aberta` com a linha-separadora no buffer; 11ª tentativa → `Falhou`; 9ª sessão recusada com o motivo; 4ª sessão do agente recusada; sessão do agente ociosa por 10 min fecha, a do usuário não;
-  biometria exigida → `PrecisaDoUsuario` e nenhuma tentativa automática; `BufferDeTexto` remove ANSI/OSC/APC, não cresce além do teto e nunca vai a disco (teste de arquivos); fechar a última sessão emite `SemSessoes`.
+  biometria exigida e janela vencida → `PrecisaDoUsuario` e nenhuma tentativa automática; dentro da janela a reconexão autentica sem prompt; `BufferDeTexto` remove ANSI/OSC/APC, não cresce além do teto e nunca vai a disco (teste de arquivos); fechar a última sessão emite `SemSessoes`.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(computador): sessões, gerenciador, reconexão e buffer de texto`.
 
 ### Fase 1C — Integração Android
@@ -207,12 +207,12 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
 
 ### CMP-T13 — O terminal na tela: `TerminalActivity`, emulador, abas e segurança das sequências — **Status: pendente**
 - **What**: `TerminalActivity` (própria, `exported=false`, sem anúncios, `adjustResize`, borda a borda) e `TerminalScreen` (Compose) com o `Terminal` do termlib; `LigacaoEmulador` (bytes do cbssh → `writeInput`; `onKeyboardInput` → `escrever`; `onResize` → `resizeTerminal` com pixels), abas de sessão (`[Terminal 1][Agente 2 ●][+]`), barra de estado da conexão (Conectando… / Reconectando… / Caiu), zoom por pinça, seleção, colar (`pasteText`), links OSC 8 com confirmação;
-  **segurança**: respostas do emulador limitadas à lista de permitidos (CMP-35), OSC 52 e título tratados, colar com várias linhas pede confirmação sem bracketed paste e remove `ESC[201~`, sem FLAG_SECURE por padrão (opção). Scrollback conforme a CMP-T1 (hoje 1 000 linhas no termlib).
-- **Where**: `computador/app/{TerminalActivity,LigacaoEmulador,FiltroDeRespostas}.kt`, `ui/terminal/{TerminalScreen,AbasDeSessao,BarraDeEstado}.kt`; testes `LigacaoEmuladorTest`, `FiltroDeRespostasTest`, `SequenciasHostisTest` (JVM com a gravação "hostil"), `TerminalScreenTest` (instrumentado).
+  **segurança**: respostas do emulador limitadas à lista de permitidos (CMP-35), OSC 52 e título tratados, colar com várias linhas pede confirmação sem bracketed paste e remove `ESC[201~`. A activity **não** pede `FLAG_SECURE` e não há opção que ligue (D17); um teste falha se pedir. Fonte com glifos Nerd (D16): licença conferida, OFL aceitável; se não for OFL nem compatível com Apache-2.0, **não entra** e a task registra a monoespaçada do sistema. Scrollback conforme a CMP-T1 (hoje 1 000 linhas no termlib).
+- **Where**: `computador/app/{TerminalActivity,LigacaoEmulador,FiltroDeRespostas}.kt`, `ui/terminal/{TerminalScreen,AbasDeSessao,BarraDeEstado}.kt`, fonte em `res/font/` com a licença em `app/licenses/` (ou a monoespaçada do sistema, se a licença não servir); testes `LigacaoEmuladorTest`, `FiltroDeRespostasTest`, `SequenciasHostisTest` (JVM com a gravação "hostil"), `TerminalScreenTest` (instrumentado).
 - **Depends on**: T10, T11 (T12 para a notificação).
 - **Requirement**: CMP-23, CMP-24, CMP-25, CMP-28, CMP-29, CMP-30, CMP-35, CMP-36.
 - **Done when**: instrumentado — a gravação "texto + cores 256/truecolor + alt screen" desenha como esperado (consulta ao estado do emulador, não só captura); girar/abrir o teclado envia `window-change` com cols/rows novos; `SequenciasHostisTest` — OSC 52 de leitura não gera byte de saída, de escrita pede consentimento (padrão negar), `CSI 21 t`/título/DECRQSS/`ENQ` não são respondidos, DA1/DA2/DSR/CPR/kitty `a=q`/cores são respondidos, link `javascript:`/`file:` recusado, colar `a\nb` abre a confirmação e `ESC[201~` é removido;
-  `Back` sai da activity **sem** fechar as sessões; fechar a aba fecha a sessão; 9ª sessão mostra o motivo; `onTrimMemory` com a activity invisível não perde o scrollback de texto.
+  `Back` sai da activity **sem** fechar as sessões; fechar a aba fecha a sessão; 9ª sessão mostra o motivo; `onTrimMemory` com a activity invisível não perde o scrollback de texto; um teste falha se a activity pedir `FLAG_SECURE`; a fonte embutida tem glifos Nerd e licença OFL ou compatível com Apache-2.0, ou a lição registra a monoespaçada do sistema.
 - **Tests**: unit + instrumentado. **Gate**: `quick` + `pool instrumentar com.keyflow.ui.terminal.TerminalScreenTest com.keyflow.computador.app.LigacaoEmuladorTest`. **Commit**: `feat(computador): terminal na tela com abas e proteção contra sequências do servidor`.
 
 ### CMP-T14 — Entrada: KeyFlow IME, Gboard, teclado físico, teclas extras e ditado — **Status: pendente**
@@ -238,12 +238,12 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
 - **Tests**: instrumentado (Compose + servidor de teste). **Gate**: `quick` + `pool instrumentar com.keyflow.ui.config.ComputadorHostsTest`. **Commit**: `feat(computador): painel de hosts com teste de conexão real`.
 
 ### CMP-T16 — Painel Chaves e os diálogos de confiança, senha e biometria — **Status: pendente**
-- **What**: `ComputadorChaves` (lista com tipo, impressão, proteção — "Protegida pelo hardware do aparelho" / "Guardada cifrada no cofre do aparelho" —, biometria, hosts que usam), "Gerar chave", "Importar" (arquivo pelo seletor do sistema ou colar; passphrase em diálogo), "Copiar chave pública", ligar/desligar biometria com o aviso da nova digital, renomear, excluir;
+- **What**: `ComputadorChaves` (lista com tipo, impressão, proteção — "Protegida pelo hardware do aparelho" / "Protegida pelo Keystore (por software)" / "Guardada cifrada no cofre do aparelho" —, biometria, hosts que usam), "Gerar chave" **pergunta o tipo** (Ed25519 ou ECDSA P-256, D13), "Importar" (arquivo pelo seletor do sistema ou colar; passphrase em diálogo), "Copiar chave pública", ligar/desligar biometria com o aviso da nova digital e a janela de 5 minutos (D14), renomear, excluir;
   diálogos `ConfirmarServidor` (Nova: host:porta, algoritmo, `SHA256:…`, botões **Confiar e continuar** / **Cancelar**), `ServidorMudou` (alerta, impressão antiga × nova, **Cancelar** em destaque, **Substituir e continuar** em segundo passo), `PedirSenha`, `CodigoDeVerificacao` (keyboard-interactive) e a mensagem de cada `CausaSsh`.
 - **Where**: `ui/config/{ComputadorChaves,ComputadorDialogos}.kt`, `i18n/{en,es}/Computador.kt`; testes `ComputadorChavesTest`, `ComputadorDialogosTest`.
 - **Depends on**: T8, T15.
 - **Requirement**: CMP-10, CMP-11, CMP-12, CMP-13, CMP-14, CMP-15, CMP-18, CMP-20, CMP-21, CMP-61.
-- **Done when**: instrumentado — gerar chave mostra a proteção real do aparelho (fake injetável para os dois casos); importar com passphrase errada mostra o erro e **limpa** o campo; a privada não aparece em nenhuma tela nem em `semantics` (varredura); copiar a pública coloca `ssh-ed25519 …` na área de transferência;
+- **Done when**: instrumentado — gerar chave pergunta o tipo e mostra a proteção real do aparelho (fake injetável para hardware, Keystore por software e envelope); importar com passphrase errada mostra o erro e **limpa** o campo; a privada não aparece em nenhuma tela nem em `semantics` (varredura); copiar a pública coloca `ssh-ed25519 …` ou `ecdsa-sha2-nistp256 …` na área de transferência;
   primeira conexão abre `ConfirmarServidor` e só prossegue em **Confiar**; chave diferente abre `ServidorMudou` e **Cancelar** é o padrão; senha digitada não aparece em texto puro nem no `semantics`; biometria ligada mostra o aviso antes de gravar; excluir chave em uso lista os hosts.
 - **Tests**: instrumentado. **Gate**: `pool instrumentar com.keyflow.ui.config.ComputadorChavesTest com.keyflow.ui.config.ComputadorDialogosTest`. **Commit**: `feat(computador): chaves e diálogos de confiança, senha e biometria`.
 
@@ -268,11 +268,11 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
 
 ### CMP-T19 — Docs, política de privacidade e declaração do serviço — **Status: pendente**
 - **What**: seção `aba-computador` na `DocsPanel` (hosts, chaves e o que cada proteção significa, confirmação do servidor, sessões e por que há uma notificação, o que o app **não** faz: Mosh, SFTP, terminal local; como o `kitten icat`/`chafa` detectam imagem); `docsSectionFor(COMPUTADOR)`; traduções; `website/_fonte/doc.json` regenerado;
-  rascunho da política de privacidade (conexões SSH saem do aparelho para servidores **do usuário**; nada passa por nós) e do Data Safety; o texto da declaração do serviço em primeiro plano. **[YAN]** aprova os textos legais e preenche o Console.
+  rascunho da política de privacidade e do Data Safety: conexões SSH saem do aparelho para servidores **do usuário** (nada passa por nós); o **registro de 30 dias** guarda o **comando literal** e a **saída que o agente leu** (≤ 4 000 caracteres por entrada, depois do filtro) e esse texto **vai ao provedor do modelo** (D18). O texto da declaração do serviço em primeiro plano. **[YAN]** aprova os textos legais e preenche o Console.
 - **Where**: `ui/config/DocsPanel.kt` (+ arquivo de seções), `i18n/{en,es}/Docs.kt`, `website/_fonte/doc.json`, `PLAYSTORE_CHECKLIST.md`.
 - **Depends on**: T17.
-- **Requirement**: CMP-33, CMP-65.
-- **Done when**: `DocsSectionsTest`, `DocsSiteExportTest` (com `KEYFLOW_REGERAR_DOC_SITE=1` uma vez) e `TranslationsTest` verdes; o "?" do cabeçalho da aba abre a seção; o texto não promete terminal local, Mosh, agente nem imagens antes de existirem (a seção cresce nas T28 e T36).
+- **Requirement**: CMP-33, CMP-57, CMP-65.
+- **Done when**: `DocsSectionsTest`, `DocsSiteExportTest` (com `KEYFLOW_REGERAR_DOC_SITE=1` uma vez) e `TranslationsTest` verdes; o "?" do cabeçalho da aba abre a seção; o rascunho de privacidade e do Data Safety diz que o registro de 30 dias guarda o comando literal e a saída lida (≤ 4 000, depois do filtro) e que esse texto vai ao provedor do modelo; o texto não promete terminal local, Mosh, agente nem imagens antes de existirem (a seção cresce nas T28 e T36).
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `docs(computador): seção da aba Computador na Docs e rascunho legal`.
 
 ### CMP-T20 — Instrumentados ponta a ponta da Fase 1 — **Status: pendente**
@@ -285,12 +285,12 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
 - **Tests**: instrumentado. **Gate**: `pool instrumentar com.keyflow.computador.ComputadorEndToEndTest`. **Commit**: `test(computador): fluxo completo de hosts, chave e sessão com servidor de teste`.
 
 ### CMP-T21 — Validação manual da Fase 1 **[YAN]** — **Status: pendente**
-- **What**: roteiro `manual-validation.md` nesta pasta: (1) A32, Tab S10 Lite e Vaio: gerar chave ed25519, ver a proteção de cada um, autorizar no servidor de desenvolvimento e conectar; (2) importar a chave do Yan com passphrase; (3) biometria a cada conexão e o aviso da nova digital (**sem** cadastrar digital nova no A32 sem ele pedir);
-  (4) 2 h com a tela apagada: o que cai no Doze, e o que a reconexão faz; (5) `htop`, `vim`, `tmux` e `claude` (Claude Code) no terminal; (6) KeyFlow IME e ditado; (7) trocar o IP/chave do servidor e ver o bloqueio; (8) RAM com 3 sessões no A32 de 4 GB. Resultados e as dúvidas Q1..Q13 registrados.
+- **What**: roteiro `manual-validation.md` nesta pasta: (1) A32, Tab S10 Lite e Vaio: gerar **os dois tipos** (ed25519 e ECDSA P-256) e ver a proteção de cada um, autorizar no servidor de desenvolvimento e conectar; (2) importar a chave do Yan com passphrase; (3) biometria na **janela de 5 minutos** (a segunda assinatura dentro da janela não pede de novo; fora dela, notificação "toque para reconectar", sem prompt sozinho) e o aviso da nova digital (**sem** cadastrar digital nova no A32 sem ele pedir);
+  (4) 2 h com a tela apagada: o que cai no Doze, e o que a reconexão faz; (5) `htop`, `vim`, `tmux` e `claude` (Claude Code) no terminal; (6) KeyFlow IME e ditado; (7) trocar o IP/chave do servidor e ver o bloqueio; (8) RAM com 3 sessões no A32 de 4 GB. Resultados e as dúvidas que restam (Q8, Q9, Q10, Q11, Q13) registrados. Q1–Q7 e Q12 já foram respondidas em 29/10.
 - **Where**: `.specs/features/computer-terminal/manual-validation.md`, `.specs/project/licoes/`.
 - **Depends on**: T20.
 - **Requirement**: Success Criteria (F1) da spec.
-- **Done when**: o Yan assina o roteiro (ou lista os desvios); Q1..Q13 respondidas ou transformadas em task.
+- **Done when**: o Yan assina o roteiro (ou lista os desvios); Q8, Q9, Q10, Q11 e Q13 respondidas ou transformadas em task.
 - **Tests**: manual. **Gate**: manual. **Commit**: `docs(computador): roteiro de validação manual da Fase 1`.
 
 ---
@@ -329,9 +329,9 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
 - **Done when**: unit — as gravações decodificam para o raster de referência (comparação pixel a pixel com a imagem de origem, tolerância de quantização declarada); repetição e `-` somam as alturas certas; HLS convertido ao RGB esperado; fundo transparente deixa alfa 0; entrada truncada, registrador fora da faixa e `!` gigante nunca lançam nem estouram memória (fuzz ~10 mil entradas); o PNG gerado abre no decodificador do JDK (`ImageIO`) com o mesmo raster.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(computador): decodificador de sixel em JVM puro`.
 
-### CMP-T26 — Sixel na tela: transcodificação (A1) ou patch (A2) e o anúncio de suporte — **Status: pendente**
-- **What**: conforme a decisão da T1. **A1 (padrão)**: `TranscodificadorDeFluxo` entre o cbssh e o `writeInput`: copia tudo, **retém** `ESC P … q … ST` (também `ESC P` partido entre pacotes, e `C2 90`), decodifica (T25) e injeta `ESC _ G a=T,f=100,…;<PNG base64> ESC \` (em pedaços `m=1`) na posição do cursor; no sentido contrário, reescreve a resposta DA1 `ESC[?1;2c` para `ESC[?1;2;4c` e responde `XTSMGRAPHICS` (registradores e geometria) **só com imagens ligadas** e política ≠ DESLIGADO.
-  **A2**: o mesmo no libvterm/termlib do fork (T3). Em ambos: o consentimento e os limites são os da T22 (sixel pergunta como os outros).
+### CMP-T26 — Sixel na tela: transcodificação para kitty e o anúncio de suporte — **Status: pendente**
+- **What**: caminho decidido (D12), não condicionado à T1. `TranscodificadorDeFluxo` entre o cbssh e o `writeInput`: copia tudo, **retém** `ESC P … q … ST` (também `ESC P` partido entre pacotes, e `C2 90`), decodifica (T25) e injeta `ESC _ G a=T,f=100,…;<PNG base64> ESC \` (em pedaços `m=1`) na posição do cursor; no sentido contrário, reescreve a resposta DA1 `ESC[?1;2c` para `ESC[?1;2;4c` e responde `XTSMGRAPHICS` (registradores e geometria) **só com imagens ligadas** e política ≠ DESLIGADO.
+  **Não** há variante no libvterm: o fork da T3, se existir, não leva o sixel. O consentimento e os limites são os da T22 (sixel pergunta como os outros).
 - **Where**: `computador/imagens/{TranscodificadorDeFluxo,RespostasSixel}.kt` (puro) + ligação em `computador/app/LigacaoEmulador.kt`; testes `TranscodificadorDeFluxoTest`, `RespostasSixelTest`, `ImagensSixelTest` (instrumentado).
 - **Depends on**: T23, T24, T25.
 - **Requirement**: CMP-42.

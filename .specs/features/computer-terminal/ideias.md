@@ -1,7 +1,7 @@
 # Aba Computador — ideias antes da spec
 
 > Semente da spec. **A spec de verdade agora existe**: `spec.md`, `design.md` e `tasks.md` desta pasta (rascunho de 2026-10-29, fora da v1; `DEVELOPMENT-ORDER.md` › Bloco 16).
-> Este arquivo fica como histórico do que o Yan pediu em 22/10 e **marca o que ele decidiu em 29/10** (D1..D11 do `spec.md`). Onde houver divergência, vale a spec.
+> Este arquivo fica como histórico do que o Yan pediu em 22/10 e **marca o que ele decidiu em 29/10** (D1..D19 do `spec.md`). Onde houver divergência, vale a spec.
 
 ## Onde estamos
 
@@ -14,7 +14,7 @@ A aba existe (`app/src/main/java/com/keyflow/ui/config/ComputadorPanel.kt`, do t
 1. **Terminais dentro do app.** A aba libera um ou vários terminais — local ou por SSH — que o **agente** e o
    **usuário** usam dentro do KeyFlow.
    - **Decidido (29/10, D1): agora só SSH.** O terminal **local** fica para depois e está registrado como fora de escopo. Ideia futura do Yan: algo como o **Termux**, idealmente reaproveitando-o — **anotado que a licença do
-     `terminal-emulator`/`terminal-view` do Termux é ambígua (repositório "GPLv3 only"; `LICENSE.md` declara Apache-2.0 para os dois módulos, mas sem arquivo de licença nem cabeçalho neles) e exige parecer antes de qualquer reaproveitamento** (Q12 do `spec.md`).
+     `terminal-emulator`/`terminal-view` do Termux é ambígua (repositório "GPLv3 only"; `LICENSE.md` declara Apache-2.0 para os dois módulos, mas sem arquivo de licença nem cabeçalho neles) e o parecer jurídico só é pedido quando a frente do terminal local chegar** (D19 do `spec.md`). Até lá, tratar como NÃO.
 2. **Imagens no terminal, em todos os protocolos.** O terminal do app desenha imagens nos três protocolos em uso:
    - **kitty graphics protocol**, completo: envio em pedaços, PNG e RGB/RGBA, posicionamento, apagar, animação e
      os *unicode placeholders* (o Herdr usa esse formato para repassar imagens);
@@ -58,7 +58,15 @@ A aba existe (`app/src/main/java/com/keyflow/ui/config/ComputadorPanel.kt`, do t
 - **D4 — `minSdk 24`** continua.
 - **D7 — gratuita** como o resto do app (sem anúncio na aba nem no terminal — A11).
 - **D9 — Serviço em primeiro plano `specialUse`** para manter as conexões (justificativa da Play redigida na spec).
-- **D10 — Chave SSH moderna:** ed25519 gerada no aparelho (Keystore quando possível; envelope cifrado quando não), importação, biometria opcional, `known_hosts` com confirmação da impressão digital.
+- **D10 — Chave SSH moderna:** o usuário escolhe ed25519 (Keystore quando a sonda passa; envelope quando não) ou ECDSA P-256 no Keystore (D13), importação, biometria por janela de 5 minutos (D14), `known_hosts` com confirmação da impressão digital.
+- **D12 — Sixel no app** (sixel → kitty). Fork do termlib com JNI no CI só se mouse ou scrollback maior pedirem C++ (já aceito).
+- **D13 — Tipo na geração:** ed25519 (envelope em API 24–32, Keystore em 33+) ou ECDSA P-256 no Keystore; o usuário escolhe.
+- **D14 — Biometria** por janela de 5 minutos.
+- **D15 — Lembrar senha** no cofre, opcional.
+- **D16 — Fonte com glifos Nerd** (OFL ok; senão, monoespaçada do sistema).
+- **D17 — Sem `FLAG_SECURE`** no terminal (a Visão precisa ler).
+- **D18 — Privacidade:** o registro de 30 dias (comando e saída lida) entra no texto.
+- **D19 — Parecer do Termux** só quando a frente do terminal local chegar.
 
 ## Fica para depois (não está na spec)
 
