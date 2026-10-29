@@ -1,6 +1,5 @@
 package com.keyflow.data.models
 
-import com.keyflow.BuildConfig
 import com.keyflow.i18n.trKey
 
 /** Para que serve o modelo: fala (sherpa-onnx, aba Transcrição), texto (LLM local, aba Raciocínio), visão/OCR (aba Visão) ou voz sintetizada (aba Voz). */
@@ -97,8 +96,8 @@ data class ModelSpec(
      */
     val promptOpensThink: Boolean = false,
     /**
-     * Falso = ainda não provado carregando no LiteRT-LM de um aparelho real: o modelo só aparece nos builds de debug
-     * ([ModelCatalog.visibleIn]). Vira verdadeiro depois de responder num aparelho real.
+     * Falso = ainda não provado carregando num aparelho real. É só informação (a loja e a documentação a usam para não prometer o que
+     * não foi visto): NÃO esconde o modelo, que aparece igual no debug e no release. Vira verdadeiro depois de responder num aparelho real.
      */
     val validatedOnDevice: Boolean = true,
     /** Quem faz o modelo; `null` só em manifesto remoto sem o campo. Todo modelo do catálogo embutido declara o seu (`ModelCatalogTest`). */
@@ -424,7 +423,7 @@ object ModelCatalog {
         // `google/gemma-4-E2B-it` ("native function-calling support"). Conferido em 2026-10-27.
         // Visão (aba Visão, VC-T2c): o card `google/gemma-4-E2B-it` o descreve como multimodal (texto e imagem) e o `.litertlm` deste commit traz as seções
         // `tf_lite_vision_encoder`/`tf_lite_vision_adapter` (conferido por `Range` em 2026-10-27, `vision-capture/context.md` V12). O que NÃO está provado é
-        // carregar com `visionBackend` no aparelho (VC-T15): até lá a aba Visão só lista este modelo no debug ([ModelCatalog.VISION_PROVEN_IDS]).
+        // carregar com `visionBackend` no aparelho (VC-T15); a aba Visão o lista mesmo assim, para o Yan testar.
         capabilities = setOf(
             ModelCapability.TOOLS, ModelCapability.READ_TEXT, ModelCapability.DESCRIBE_IMAGE, ModelCapability.ANSWER_ABOUT_SCREEN,
         ),
@@ -672,14 +671,8 @@ object ModelCatalog {
         QWEN3_5_4B,
     ).sortedBy { it.totalBytes }
 
-    /**
-     * O que o build mostra: em release só os [ModelSpec.validatedOnDevice]; em debug, todos. Os sete modelos já validados continuam no release;
-     * as candidatas de `modelos-novos` aguardam a avaliação do Yan e aparecem somente no debug.
-     */
-    fun visibleIn(models: List<ModelSpec>, debug: Boolean): List<ModelSpec> = models.filter { debug || it.validatedOnDevice }
-
     /** Modelos de texto (aba Raciocínio), do mais leve ao mais pesado, como este build os mostra. */
-    val TEXT: List<ModelSpec> = visibleIn(TEXT_ALL, BuildConfig.DEBUG)
+    val TEXT: List<ModelSpec> = TEXT_ALL
 
     /**
      * OCR da Visão (vision-capture, VC-T2a): PaddleOCR em ONNX, par do repositório `monkt/paddleocr-onnx` — detector
@@ -696,7 +689,7 @@ object ModelCatalog {
      * O README do repositório manda casar detector e reconhecedor da mesma geração (v3 com v3, v5 com v5). Este par mistura as duas
      * de propósito, porque o detector v5 tem 84 MB; se a VC-T6 medir perda de qualidade por causa disso, o par muda.
      *
-     * `validatedOnDevice = false`: nenhum motor roda o modelo ainda (VC-T2b e VC-T6), então o release não o oferece; só o debug.
+     * `validatedOnDevice = false`: nenhum motor roda o modelo ainda (VC-T2b e VC-T6), então o modelo aparece em todos os builds, sem filtro.
      */
     val OCR_PADDLE_LATIN = ModelSpec(
         id = "ocr-paddle-latin",
@@ -732,15 +725,8 @@ object ModelCatalog {
     /** Todos os modelos de visão e OCR conhecidos, validados ou não. As cinco entradas antigas (pins inventados) saíram em 2026-10-24. */
     val VISION_ALL: List<ModelSpec> = listOf(OCR_PADDLE_LATIN)
 
-    /** Modelos de visão e OCR (aba Visão), como este build os mostra: o OCR só no debug até ser validado (VC-T6). */
-    val VISION: List<ModelSpec> = visibleIn(VISION_ALL, BuildConfig.DEBUG)
-
-    /**
-     * Ids de modelos de TEXTO (os Gemma 4) cuja visão já foi **provada** carregando e lendo uma imagem num aparelho (VC-T15). Vazio de propósito: os
-     * Gemma 4 declaram as capacidades de visão (ver [ModelCapability]), mas até a prova a aba Visão só os lista no debug — como o OCR, que também
-     * espera a validação. A VC-T15 coloca aqui o id que passar (ou tira a capacidade do `ModelSpec` se o `.litertlm` não carregar com visão).
-     */
-    private val VISION_PROVEN_IDS: Set<String> = emptySet()
+    /** Modelos de visão e OCR (aba Visão): todos, validados ou não, em qualquer build. */
+    val VISION: List<ModelSpec> = VISION_ALL
 
     /** O modelo lê imagem: tem alguma capacidade de visão ([ModelCapability.READ_TEXT], [ModelCapability.DESCRIBE_IMAGE], [ModelCapability.ANSWER_ABOUT_SCREEN]). */
     val VISION_CAPABILITIES: Set<ModelCapability> =
@@ -749,13 +735,11 @@ object ModelCatalog {
     /**
      * Os modelos locais da aba Visão (vision-capture, VC-T2c/T11), do menor ao maior arquivo: o OCR (`kind = VISION`) e os modelos de texto que
      * declaram visão (Gemma 4). Os Gemma são **as mesmas entradas** do catálogo de texto — um `id`, uma cópia em disco, um download: instalado
-     * numa aba aparece instalado na outra. O release só mostra o que está validado no aparelho ([visibleIn]) e, dos de texto, só o que a visão já
-     * provou ([VISION_PROVEN_IDS]); o debug mostra tudo.
+     * numa aba aparece instalado na outra. Debug e release mostram a mesma lista, validada ou não.
      */
-    fun visionModels(from: List<ModelSpec> = effectiveModels(), debug: Boolean = BuildConfig.DEBUG): List<ModelSpec> =
+    fun visionModels(from: List<ModelSpec> = effectiveModels()): List<ModelSpec> =
         from.filter { spec ->
-            val sees = spec.kind == ModelKind.VISION || (spec.kind == ModelKind.TEXT && spec.capabilities.any { it in VISION_CAPABILITIES })
-            sees && (debug || (spec.validatedOnDevice && (spec.kind == ModelKind.VISION || spec.id in VISION_PROVEN_IDS)))
+            spec.kind == ModelKind.VISION || (spec.kind == ModelKind.TEXT && spec.capabilities.any { it in VISION_CAPABILITIES })
         }.sortedBy { it.totalBytes }
 
     private const val SUPERTONIC_REPO =
@@ -768,7 +752,7 @@ object ModelCatalog {
      * (MPL-2.0) não entra. Uma voz, 22.050 Hz, caracteres (`use_phonemes=false`). Português genérico do Common Voice,
      * não pt-BR: o nome na tela é "português". SHA-256 e tamanho rebaixados em 2026-10-29 do commit
      * `9092b0c5e3717b6c61ae563cfd98dc86cc536b3a` (`model.onnx` é LFS; `tokens.txt` foi baixado e hasheado).
-     * `validatedOnDevice = false`: o motor (FAL-T11) ainda não falou num aparelho, então o release não oferece.
+     * `validatedOnDevice = false`: o motor (FAL-T11) ainda não falou num aparelho; o modelo aparece em todos os builds.
      * RAM: pico de 225 MiB medido no servidor, 1 thread — a recomendação arredonda para 256.
      */
     val VITS_COQUI_PT = ModelSpec(
@@ -850,12 +834,12 @@ object ModelCatalog {
 
     /**
      * Os dois modelos de voz desta leva, do mais leve ao mais pesado. Kokoro, Piper, Matcha, MMS, F5 e o
-     * ONNX quantizado do Supertonic ficam de fora. O release só mostra o que já foi validado no aparelho.
+     * ONNX quantizado do Supertonic ficam de fora. Debug e release mostram os dois.
      */
     val VOICE_ALL: List<ModelSpec> = listOf(VITS_COQUI_PT, SUPERTONIC_3)
 
-    /** O que este build mostra na aba Voz. No debug, as duas entradas; no release, nenhuma até o motor provar. */
-    val VOICE: List<ModelSpec> = visibleIn(VOICE_ALL, BuildConfig.DEBUG)
+    /** O que a aba Voz mostra: as duas entradas, em qualquer build. */
+    val VOICE: List<ModelSpec> = VOICE_ALL
 
     /** Todos, para quem só resolve por id ([byId]) — o downloader e o store não sabem de tipo. */
     val MODELS: List<ModelSpec> = SPEECH + TEXT + VISION + VOICE

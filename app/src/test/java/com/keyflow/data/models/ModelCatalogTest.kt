@@ -8,7 +8,7 @@ class ModelCatalogTest {
 
     // Estas checagens são do catálogo de FALA (papéis do sherpa-onnx, repositórios csukuangfj); o de texto tem as suas.
     private val models = ModelCatalog.SPEECH
-    private val releasedText = ModelCatalog.visibleIn(ModelCatalog.TEXT_ALL, debug = false)
+    private val releasedText = ModelCatalog.TEXT_ALL.filter { it.validatedOnDevice }
 
     @Test
     fun `catalog has the three curated models with unique ids`() {
@@ -202,23 +202,23 @@ class ModelCatalogTest {
      * não na CPU que o app usa (ver o comentário do catálogo). O DeepSeek continua o único cujo prompt abre o `<think>`.
      */
     @Test
-    fun `release keeps proven models while debug includes candidates`() {
+    fun `the validated models keep their order and the list shows every model in any build`() {
         assertThat(releasedText).containsExactly(
             ModelCatalog.QWEN3_0_6B, ModelCatalog.QWEN2_5_1_5B, ModelCatalog.SMOLLM2_1_7B,
             ModelCatalog.DEEPSEEK_R1_1_5B, ModelCatalog.GEMMA_4_E2B, ModelCatalog.QWEN3_4B, ModelCatalog.GEMMA_4_E4B,
         ).inOrder()
-        assertThat(ModelCatalog.visibleIn(ModelCatalog.TEXT_ALL, debug = true)).containsExactlyElementsIn(ModelCatalog.TEXT_ALL).inOrder()
+        assertThat(ModelCatalog.TEXT).containsExactlyElementsIn(ModelCatalog.TEXT_ALL).inOrder()
         assertThat(ModelCatalog.TEXT_ALL.filterNot { it.validatedOnDevice }).hasSize(6)
         assertThat(ModelCatalog.TEXT_ALL.filter { it.promptOpensThink }.map { it.id }).containsExactly("deepseek-r1-1.5b-litertlm", "nanbeige-4.2-3b-litertlm")
     }
 
-    /** O gate segue de pé para o próximo modelo que entrar sem prova: o release só lista o validado. */
+    /** Decisão do Yan (2026-10-29): o release mostra tudo; `validatedOnDevice` é só informação e não esconde nenhuma aba. */
     @Test
-    fun `visibleIn hides an unvalidated model from release only`() {
-        val unproven = ModelCatalog.QWEN3_0_6B.copy(id = "sem-prova", validatedOnDevice = false)
-        val all = listOf(ModelCatalog.QWEN3_0_6B, unproven)
-        assertThat(ModelCatalog.visibleIn(all, debug = false)).containsExactly(ModelCatalog.QWEN3_0_6B)
-        assertThat(ModelCatalog.visibleIn(all, debug = true)).containsExactlyElementsIn(all).inOrder()
+    fun `every tab lists the unvalidated models too`() {
+        assertThat(ModelCatalog.TEXT.filterNot { it.validatedOnDevice }).hasSize(6)
+        assertThat(ModelCatalog.VISION).containsExactlyElementsIn(ModelCatalog.VISION_ALL)
+        assertThat(ModelCatalog.VOICE).containsExactlyElementsIn(ModelCatalog.VOICE_ALL)
+        assertThat((ModelCatalog.VISION + ModelCatalog.VOICE).none { it.validatedOnDevice }).isTrue()
     }
 
     /** RCAT-03: só baixável sem login, e fixado no commit — o SHA do catálogo tem de continuar valendo. */
@@ -307,20 +307,18 @@ class ModelCatalogTest {
         ocr.files.forEach { assertThat(it.url).endsWith("/${it.fileName}") }
     }
 
-    /** Nenhum motor roda o OCR ainda (VC-T2b/VC-T6): o release não o oferece até a prova num aparelho. */
+    /** O OCR ainda não foi provado num aparelho (VC-T6), mas a aba Visão o lista em todos os builds. */
     @Test
-    fun `release does not offer the ocr model until it is validated on a device`() {
+    fun `the ocr model is listed even though it is not validated on a device`() {
         assertThat(ModelCatalog.OCR_PADDLE_LATIN.validatedOnDevice).isFalse()
-        assertThat(ModelCatalog.visibleIn(ModelCatalog.VISION_ALL, debug = false)).isEmpty()
-        assertThat(ModelCatalog.visibleIn(ModelCatalog.VISION_ALL, debug = true)).containsExactlyElementsIn(ModelCatalog.VISION_ALL)
+        assertThat(ModelCatalog.VISION).containsExactlyElementsIn(ModelCatalog.VISION_ALL)
     }
 
-    /** FAL-T8/T10: VITS (mais leve) e Supertonic 3, pins reais. Release esconde até o motor provar no aparelho. */
+    /** FAL-T8/T10: VITS (mais leve) e Supertonic 3, pins reais. A aba Voz lista os dois em todos os builds. */
     @Test
     fun `voice specs are the vits portuguese entry and the official supertonic`() {
         assertThat(ModelCatalog.VOICE_ALL.map { it.id }).containsExactly("vits-coqui-pt", "supertonic-3").inOrder()
         assertThat(ModelCatalog.VOICE.map { it.id }).containsExactly("vits-coqui-pt", "supertonic-3").inOrder()
-        assertThat(ModelCatalog.visibleIn(ModelCatalog.VOICE_ALL, debug = false)).isEmpty()
         val vits = ModelCatalog.VITS_COQUI_PT
         val supertonic = ModelCatalog.SUPERTONIC_3
         listOf(vits, supertonic).forEach { model ->
@@ -496,7 +494,7 @@ class ModelCatalogTest {
     /** O OCR e os Gemma 4 (mesmos objetos do catálogo de texto), do menor ao maior arquivo; nada de fala nem de texto sem visão. */
     @Test
     fun `the vision list is the ocr plus the Gemma 4 that declare vision, smallest file first`() {
-        val vision = ModelCatalog.visionModels(debug = true)
+        val vision = ModelCatalog.visionModels()
         assertThat(vision.map { it.id }).containsExactly("ocr-paddle-latin", "gemma-4-e2b-litertlm", "gemma-4-e4b-litertlm").inOrder()
         assertThat(vision.map { it.totalBytes }).isInOrder()
         // Uma entrada, uma cópia em disco: o Gemma da Visão É o do Raciocínio (mesmo objeto, mesmo id, mesmo tipo, mesmos arquivos).
@@ -511,21 +509,21 @@ class ModelCatalogTest {
         assertThat(ModelCatalog.SPEECH.map { it.id } + ModelCatalog.QWEN3_0_6B.id).containsNoneIn(vision.map { it.id })
     }
 
-    /** O release só lista o que já foi provado num aparelho: o OCR espera a validação e a visão do Gemma, a VC-T15. */
+    /** Sem filtro por build: a lista da Visão com o catálogo todo traz o OCR e os dois Gemma, validados ou não. */
     @Test
-    fun `the release lists no vision model until each one is proven on a device`() {
-        assertThat(ModelCatalog.visionModels(debug = false)).isEmpty()
-        assertThat(ModelCatalog.visionModels(ModelCatalog.MODELS, debug = false)).isEmpty()
+    fun `the vision list over the whole catalog has the ocr and both Gemma`() {
+        assertThat(ModelCatalog.visionModels(ModelCatalog.MODELS).map { it.id })
+            .containsExactly("ocr-paddle-latin", "gemma-4-e2b-litertlm", "gemma-4-e4b-litertlm").inOrder()
     }
 
     @Test
     fun `a model that declares vision joins the list and one that does not stays out`() {
         val seeing = ModelCatalog.QWEN3_0_6B.copy(id = "remoto-visao", capabilities = setOf(ModelCapability.DESCRIBE_IMAGE))
         val blind = ModelCatalog.QWEN3_0_6B.copy(id = "remoto-texto", capabilities = setOf(ModelCapability.TOOLS))
-        assertThat(ModelCatalog.visionModels(listOf(blind, seeing, ModelCatalog.WHISPER_BASE), debug = true).map { it.id })
+        assertThat(ModelCatalog.visionModels(listOf(blind, seeing, ModelCatalog.WHISPER_BASE)).map { it.id })
             .containsExactly("remoto-visao")
-        // Sem a prova da visão num aparelho, nem um modelo de texto validado entra no release.
-        assertThat(ModelCatalog.visionModels(listOf(seeing), debug = false)).isEmpty()
+        // Validado ou não, quem declara visão entra.
+        assertThat(ModelCatalog.visionModels(listOf(seeing.copy(validatedOnDevice = false))).map { it.id }).containsExactly("remoto-visao")
     }
 
     /**

@@ -50,7 +50,7 @@ class DocsSectionsTest {
         assertTrue("licença do LiteRT-LM ausente", "LiteRT-LM" in labels)
         val catalog = com.keyflow.data.models.ModelCatalog
         // O que o release oferece: desde 2026-10-27 são os cinco modelos de texto, todos citados na Docs.
-        catalog.visibleIn(catalog.TEXT_ALL, debug = false).forEach { spec ->
+        catalog.TEXT_ALL.filter { it.validatedOnDevice }.forEach { spec ->
             assertTrue("licença de ${spec.modelName} ausente", labels.any { it.contains(spec.modelName) })
         }
         catalog.TEXT_ALL.filterNot { it.validatedOnDevice }.forEach { spec ->
@@ -114,7 +114,7 @@ class DocsSectionsTest {
         val labels = docsSections.single { it.id == "licencas" }.blocks.filterIsInstance<DocBlock.Labeled>().map { it.label }
         val catalog = com.keyflow.data.models.ModelCatalog
         // O que o release oferece; o OCR (PaddleOCR) só entra na Docs quando for validado no aparelho (VC-T6), como os modelos de texto.
-        (catalog.visibleIn(catalog.VISION_ALL, debug = false) + catalog.VOICE.filter { it.validatedOnDevice }).forEach { spec ->
+        (catalog.VISION_ALL.filter { it.validatedOnDevice } + catalog.VOICE.filter { it.validatedOnDevice }).forEach { spec ->
             assertTrue("licença de ${spec.modelName} ausente", labels.any { it.contains(spec.modelName) })
         }
         catalog.VOICE.filterNot { it.validatedOnDevice }.forEach { spec ->

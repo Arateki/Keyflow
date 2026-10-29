@@ -15,7 +15,7 @@ class VisaoTestTest {
     private val gemma = ModelCatalog.GEMMA_4_E2B
 
     private fun models(installed: Set<String>) = LocalModelsUi.compose(
-        catalog = ModelCatalog.visionModels(debug = true), installed = installed, active = null, failures = emptyMap(),
+        catalog = ModelCatalog.visionModels(), installed = installed, active = null, failures = emptyMap(),
         selectedId = null, deviceRamMb = 8_000,
     )
 

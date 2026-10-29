@@ -656,7 +656,7 @@ object RouteCatalog {
     /** Estado fixo da lista de modelos da VISÃO (RAM de sobra, como a de voz): o OCR e os Gemma 4, do catálogo real. */
     private fun galleryVisionModels(installed: Set<String> = emptySet(), active: DownloadProgress? = null, selected: String? = null) =
         LocalModelsUi.compose(
-            catalog = ModelCatalog.visionModels(debug = true), installed = installed, active = active, failures = emptyMap(),
+            catalog = ModelCatalog.visionModels(), installed = installed, active = active, failures = emptyMap(),
             selectedId = selected, deviceRamMb = 8_192,
         )
 
