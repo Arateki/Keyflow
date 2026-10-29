@@ -259,3 +259,10 @@ e o emulador são o gargalo: instrumentados serializam). T19 é o marco: **sem b
   `bancada-atestado.py` aceita o par; o `adb install -r` de um APK da `app-v0.1.0` por cima do atual (código 1) funciona sem `-d` nem desinstalar.
 - **Depends on**: nenhuma decisão pendente. **Requirement**: BAU-11. **Gate**: `build` + teste do script. **Commit**: `build: versionName segue a tag de release`.
 
+
+
+### BNC-T31 — Reconhecimento de objetos na bancada de Visão
+- **Status**: Em implementação.
+- **What**: corpus versionado de imagens de objetos e rótulos canônicos com sinônimos pt/en; pontuador determinístico por precisão, revocação e F1; adaptador imagem → texto pelo motor de visão selecionado; integração à faixa e às etapas encadeáveis.
+- **Done when**: integridade de licença e hash; testes de sinônimos, falsos positivos, omissões e vazio; UI e cancelamento com motores falsos; prova opt-in de objeto em modelo local se couber no emulador; goldens de Visão revisados.
+- **Depends on**: VC-T15, BNC-T24. **Requirement**: BPT-12, BCP-09, BNC-09, BFL-07. **Gate**: `quick` + `full` + prova opt-in.
