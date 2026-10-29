@@ -219,9 +219,10 @@ e o emulador são o gargalo: instrumentados serializam). T19 é o marco: **sem b
 - **Done when**: casos de borda verdes (prefixo "Aqui está a tradução:", idioma errado, termo trocado); a mesma saída pontuada 2× dá a mesma nota; corpus sob o `CorpusIntegrityTest`.
 - **Depends on**: T7. **Requirement**: BPT-04. **Gate**: `quick` + `full`. **Commit**: `feat(bancada): teste de tradução`.
 
-### BNC-T24 — `ocr` e faixa na Visão (espera VC-T6)
+### BNC-T24 — `ocr` e faixa na Visão
+- **Status**: Concluída (2026-10-29).
 - **What**: imagens geradas por `scripts/gerar-corpus-ocr.py`, adaptador `Reconhecedor` sobre o `OcrEngine`, pontuador CER e a faixa na Visão no lugar do "Testar OCR" simulado.
-- **Done when**: CER de pares conhecidos; imagens reproduzíveis pela semente; goldens só da Visão revisados. **Bloqueada** até o `OcrEngine` existir.
+- **Done when**: CER de pares conhecidos; imagens reproduzíveis pela semente; goldens só da Visão revisados; OCR real em três imagens do corpus no emulador.
 - **Depends on**: VC-T6, T15. **Requirement**: BNC-08, BPT-09, BEX-09. **Gate**: `full`. **Commit**: `feat(bancada): teste de OCR na Visão`.
 
 ### BNC-T25 — Fluxo de visão · BNC-T26 — Fluxo do agente
@@ -262,7 +263,7 @@ e o emulador são o gargalo: instrumentados serializam). T19 é o marco: **sem b
 
 
 ### BNC-T31 — Reconhecimento de objetos na bancada de Visão
-- **Status**: Em implementação.
+- **Status**: Concluída (2026-10-29); prova real condicionada à capacidade do emulador.
 - **What**: corpus versionado de imagens de objetos e rótulos canônicos com sinônimos pt/en; pontuador determinístico por precisão, revocação e F1; adaptador imagem → texto pelo motor de visão selecionado; integração à faixa e às etapas encadeáveis.
 - **Done when**: integridade de licença e hash; testes de sinônimos, falsos positivos, omissões e vazio; UI e cancelamento com motores falsos; prova opt-in de objeto em modelo local se couber no emulador; goldens de Visão revisados.
 - **Depends on**: VC-T15, BNC-T24. **Requirement**: BPT-12, BCP-09, BNC-09, BFL-07. **Gate**: `quick` + `full` + prova opt-in.

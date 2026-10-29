@@ -228,7 +228,7 @@ Status: Pending → In Design → In Tasks → Implementing → Verified. As tas
 | BNC-05 | P1-A | BNC-T13 | Verified |
 | BNC-06 | P1-A | BNC-T13, BNC-T15 | Implementing |
 | BNC-07 | P1-A | BNC-T22 | In Tasks |
-| BNC-08 | P1-A | BNC-T20, BNC-T24 | In Tasks |
+| BNC-08 | P1-A | BNC-T20, BNC-T24 | Implementing (Visão verificada; Transcrição pendente) |
 | BCP-01 | P1-B | BNC-T2 | Verified |
 | BCP-02 | P1-B | BNC-T1, BNC-T2 | Implementing |
 | BCP-03 | P1-B | BNC-T2 | Verified |
@@ -255,11 +255,11 @@ Status: Pending → In Design → In Tasks → Implementing → Verified. As tas
 | BPT-06 | P1-D | BNC-T5 | Verified |
 | BPT-07 | P1-D | BNC-T5 | Verified |
 | BPT-08 | P1-D | BNC-T20 | In Tasks |
-| BPT-09 | P1-D | BNC-T24 | In Tasks |
-| BPT-12 | P1-D | BNC-T31 | In Tasks |
-| BCP-09 | P1-B | BNC-T24, BNC-T31 | In Tasks |
-| BNC-09 | P1-A | BNC-T24, BNC-T31 | In Tasks |
-| BFL-07 | P2-H | BNC-T24, BNC-T31 | In Tasks |
+| BPT-09 | P1-D | BNC-T24 | Verified |
+| BPT-12 | P1-D | BNC-T31 | Verified |
+| BCP-09 | P1-B | BNC-T24, BNC-T31 | Verified |
+| BNC-09 | P1-A | BNC-T24, BNC-T31 | Verified |
+| BFL-07 | P2-H | BNC-T24, BNC-T31 | Verified |
 | BPT-10 | P1-D | BNC-T3 | Verified |
 | BPT-11 | P1-D | BNC-T3, BNC-T4, BNC-T5 | Verified |
 | BHS-01 | P1-E | BNC-T6, BNC-T12 | Verified |
