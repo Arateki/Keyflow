@@ -695,7 +695,7 @@ class VisaoPanelTest {
 
         node(VISAO_TEST_BUTTON_TAG).performClick()
         // Outra preferência muda e a tela volta a receber o endpoint antigo.
-        rule.runOnIdle { h.settings = h.settings.copy(visionOpenAiModel = "outro") }
+        rule.runOnIdle { h.settings = h.settings.copy(autoPasteOnFocus = false) }
         rule.mainClock.advanceTimeBy(3_000)
         rule.waitForIdle()
 
