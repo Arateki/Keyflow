@@ -183,7 +183,7 @@ class KeyFlowKeyboardService : InputMethodService() {
         // teclado (trocar de campo/app) — igual o padrão acima, reconstrói na hora quando um dos 3 muda.
         serviceScope.launch {
             val repo = SettingsRepository(this@KeyFlowKeyboardService)
-            combine(
+            combine<Any, LiveKeyboardConfig>(
                 repo.themeDarkFlow(),
                 repo.keyboardScalePercentFlow(),
                 repo.keyboardLanguageFlow(),
