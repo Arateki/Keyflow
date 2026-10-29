@@ -49,7 +49,7 @@ chave; o `TranslationsTest` confere as traduções.
   `assembleDebug`, `assembleDebugAndroidTest`, `testDebugUnitTest`, `lintDebug`, `compileDebug{,UnitTest,AndroidTest}Kotlin`
   e `createDebugUnitTestCoverageReport` (com `--tests`, `-Pcoverage`, `--continue`, `--offline`); release, `installDebug`
   e `connectedAndroidTest` só no servidor. `--destino servidor|deck` força o nó (o Deck ainda pode recusar).
-  Com o servidor e o Deck ocupados, o pool usa sozinho uma máquina AWS Spot (até 3 ao mesmo tempo, 10 automáticas
+  Com o servidor e o Deck ocupados, o pool usa sozinho uma máquina AWS Spot (até 3 ao mesmo tempo, 30 automáticas
   por dia); `--sem-aws` evita, `--destino aws` força, `pool aws estado` mostra. Ligar e desligar a AWS é do
   coordenador.
 - **Instrumentados no emulador**: AVD `keyflow_api34`, sempre com `-gpu swangle_indirect` (é o renderizador
