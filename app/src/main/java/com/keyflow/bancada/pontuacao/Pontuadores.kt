@@ -8,6 +8,8 @@ object Pontuadores {
         "json" to PontuadorJson,
         "acoes" to PontuadorAcoes,
         "contexto" to PontuadorContexto,
+        "ocr" to PontuadorOcr,
+        "objetos" to PontuadorObjetos,
     )
 
     fun de(teste: String): Pontuador? = POR_TESTE[teste]

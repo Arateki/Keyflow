@@ -557,6 +557,9 @@ class SetupActivity : ComponentActivity() {
                         reasoningLocalSupported = reasoningLocalSupported,
                         ocrTester = ocrTester,
                         visionTester = visionTester,
+                        visionMotor = { snapshot -> com.keyflow.bancada.executor.MotorDeImagem(
+                            com.keyflow.bancada.adaptadores.ReconhecedorVisao(applicationContext, snapshot, visionEngines::resolve),
+                        ) },
                         localActions = localModels,
                         agentEnabled = BuildConfig.AGENT_ENABLED,
                         agent = if (BuildConfig.AGENT_ENABLED) agentRuntime else null,

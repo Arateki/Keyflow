@@ -455,7 +455,12 @@ def manifesto():
     arquivos = []
     for nome in ["pontuacao", "reescrita", "json", "acoes", "contexto"]:
         arquivos.append({"caminho": f"{nome}.json", "sha256": sha256(DESTINO / f"{nome}.json"), "origem": ORIGEM, "autor": AUTOR, "licenca": LICENCA})
-    escrever(DESTINO / "manifesto.json", {"corpus": CORPUS, "arquivos": arquivos})
+    atual = DESTINO / "manifesto.json"
+    if atual.exists():
+        existentes = json.loads(atual.read_text(encoding="utf-8"))["arquivos"]
+        arquivos.extend(item | {"sha256": sha256(DESTINO / item["caminho"])} for item in existentes
+                        if item["caminho"] not in {a["caminho"] for a in arquivos})
+    escrever(atual, {"corpus": CORPUS, "arquivos": arquivos})
 
 
 def main():
@@ -478,7 +483,7 @@ def main():
         escrever(DESTINO / "acoes.json", teste_acoes(ferramentas))
         escrever(DESTINO / "contexto.json", teste_contexto())
     manifesto()
-    total = sum(f.stat().st_size for f in DESTINO.iterdir())
+    total = sum(f.stat().st_size for f in DESTINO.rglob("*") if f.is_file())
     print(f"corpus v{CORPUS}: {len(list(DESTINO.iterdir()))} arquivos, {total} bytes em {DESTINO.relative_to(RAIZ)}")
 
 

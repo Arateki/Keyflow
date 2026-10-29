@@ -44,7 +44,7 @@ import com.keyflow.bancada.resultado.ResultadoTeste
 import com.keyflow.bancada.resultado.Variacao
 import com.keyflow.bancada.resultado.epochDeIso
 import com.keyflow.i18n.tr
-import com.keyflow.reasoning.ReasoningEngine
+import com.keyflow.bancada.executor.MotorDeCapacidade
 import com.keyflow.ui.common.collectAsStateOnMain
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
@@ -83,7 +83,7 @@ fun bancadaHistoricoLinhaTag(id: String) = "bancada-historico-$id"
 fun bancadaCasoTag(id: String) = "bancada-caso-$id"
 
 /** O que o usuário pediu e ainda não confirmou (só a nuvem confirma, BON-01): quais testes e se a confirmação "completo" já foi dada. */
-private data class RodadaPendente(val testes: List<String>, val confirmandoCompleto: Boolean = false)
+private data class RodadaPendente(val testes: List<String>, val motor: MotorDeCapacidade, val modelo: ModeloEscolhido, val confirmandoCompleto: Boolean = false)
 
 /**
  * O conteúdo de uma sub-aba de teste (BNC-02): o que o teste mede, Rodar/Parar, o progresso, o último resultado, o histórico deste modelo e o
@@ -98,15 +98,16 @@ internal fun BancadaTesteConteudo(
     def: TesteDef,
     abas: List<BancadaSubAba>,
     motivo: String?,
-    engine: ReasoningEngine?,
+    motor: MotorDeCapacidade?,
     modelo: ModeloEscolhido?,
     servicos: BancadaServicos,
     modifier: Modifier = Modifier,
+    preparar: (() -> Pair<MotorDeCapacidade, ModeloEscolhido>?)? = null,
 ) {
     val palette = LocalKeyFlowPalette.current
     val estado by servicos.runner.estado.collectAsStateOnMain()
     val rodando = estado is EstadoBancada.Rodando
-    val pronto = motivo == null && engine != null && modelo != null
+    val pronto = motivo == null && motor != null && modelo != null
 
     // O histórico vem de arquivos: lido fora da thread principal e relido quando uma rodada acaba ou o modelo muda.
     var historico by remember(modelo?.id, modelo?.backend) { mutableStateOf<List<Execucao>>(emptyList()) }
@@ -124,14 +125,19 @@ internal fun BancadaTesteConteudo(
     val testesDaBateria = abas.filter { it.id != BANCADA_SUBABA_RAPIDO && it.habilitada }.map { it.id }
 
     fun pedir(testes: List<String>) {
-        val e = engine ?: return
-        val m = modelo ?: return
-        // Local: roda direto. Nuvem: o aviso de custo vem antes de qualquer chamada.
-        if (m.online) pendente = RodadaPendente(testes) else servicos.iniciar(e, m, testes, Perfil.COMPLETO)
+        val preparado = if (preparar != null) preparar() else if (motor != null && modelo != null) motor to modelo else null
+        val (e, m) = preparado ?: return
+        // A confirmação guarda o mesmo motor e modelo que serão usados após o aviso.
+        if (m.online) pendente = RodadaPendente(testes, e, m) else servicos.iniciar(e, m, testes, Perfil.COMPLETO)
     }
 
     Column(modifier.fillMaxWidth()) {
-        SettingSub(def.descricao, Modifier.testTag(BANCADA_DESCRICAO_TAG))
+        val descricao = when (def.id) {
+            "ocr" -> tr("Mede a leitura de texto em imagens.")
+            "objetos" -> tr("Mede a identificação de objetos em imagens.")
+            else -> tr(def.descricao)
+        }
+        SettingSub(descricao, Modifier.testTag(BANCADA_DESCRICAO_TAG))
         if (motivo != null) {
             SettingSub(motivo, Modifier.padding(top = 10.dp).testTag(BANCADA_MOTIVO_TAG))
         }
@@ -176,16 +182,16 @@ internal fun BancadaTesteConteudo(
     }
 
     val aviso = pendente
-    if (aviso != null && modelo != null && engine != null) {
+    if (aviso != null) {
         AvisoDeCusto(
-            modelo = modelo,
+            modelo = aviso.modelo,
             aviso = aviso,
             servicos = servicos,
             onSegundaConfirmacao = { pendente = aviso.copy(confirmandoCompleto = true) },
             onVoltar = { pendente = aviso.copy(confirmandoCompleto = false) },
             onRodar = { perfil ->
                 pendente = null
-                servicos.iniciar(engine, modelo, aviso.testes, perfil)
+                servicos.iniciar(aviso.motor, aviso.modelo, aviso.testes, perfil)
             },
             onCancelar = { pendente = null },
         )

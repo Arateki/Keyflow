@@ -326,7 +326,10 @@ class ExecutorBancada(
 
         /** Uma chamada ao motor, com o prazo do caso. Cancelar propaga (a exceção sobe); o resto vira [Tentativa]. */
         private suspend fun tentar(def: TesteDef, caso: Caso, opcoes: GenerationOptions): Tentativa {
-            val entrada = EntradaDoMotor(def.montar(caso), opcoes)
+            val imagem = if (def.capacidade == com.keyflow.bancada.corpus.Capacidade.IMAGEM) {
+                ImagemDoCorpus(requireNotNull(caso.texto("imagem")) { "caso ${caso.id} sem imagem" })
+            } else null
+            val entrada = EntradaDoMotor(def.montar(caso), opcoes, imagem)
             val inicio = relogio()
             val texto = StringBuilder()
             var primeiro: Long? = null

@@ -154,9 +154,9 @@ class CorpusIntegrityTest {
 
     @Test
     fun `the real corpus has the planned number of cases per test`() {
-        val previsto = mapOf("pontuacao" to 12, "reescrita" to 10, "json" to 10, "acoes" to 20, "contexto" to 12)
+        val previsto = mapOf("pontuacao" to 12, "reescrita" to 10, "json" to 10, "acoes" to 20, "contexto" to 12, "ocr" to 10, "objetos" to 10)
         assertThat(corpus.testes.mapValues { it.value.casos.size }).containsExactlyEntriesIn(previsto)
-        assertThat(corpus.testes.values.map { it.capacidade }.toSet()).containsExactly(Capacidade.TEXTO)
+        assertThat(corpus.testes.values.map { it.capacidade }.toSet()).containsExactly(Capacidade.TEXTO, Capacidade.IMAGEM)
     }
 
     @Test
@@ -228,5 +228,18 @@ class CorpusIntegrityTest {
     fun `no case is hard to tell apart from another by id`() {
         val ids = corpus.testes.values.flatMap { t -> t.casos.map { it.id } }
         assertThat(ids).containsNoDuplicates()
+    }
+
+    @Test
+    fun `as imagens dos casos estao no manifesto e sua adulteracao e detectada`() {
+        val imagens = corpus.testes.values.filter { it.capacidade == Capacidade.IMAGEM }.flatMap { it.casos }.map { it.texto("imagem")!! }
+        assertThat(imagens).hasSize(20)
+        assertThat(imagens.toSet()).hasSize(20)
+        assertThat(corpus.manifesto.arquivos.map { it.caminho }).containsAtLeastElementsIn(imagens)
+        val arquivos = real.listar().associateWith { real.ler(it)!! }.toMutableMap()
+        val original = arquivos.getValue(imagens.first()).copyOf()
+        original[original.lastIndex] = (original.last().toInt() xor 1).toByte()
+        arquivos[imagens.first()] = original
+        assertThat(CorpusValidador.validar(MapaFonte(arquivos)).joinToString()).contains("SHA-256")
     }
 }

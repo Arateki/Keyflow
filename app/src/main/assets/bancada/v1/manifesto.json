@@ -35,6 +35,160 @@
       "origem": "Escrito para a bancada de modelos do KeyFlow",
       "autor": "Equipe KeyFlow",
       "licenca": "Apache-2.0"
+    },
+    {
+      "caminho": "imagens/ocr-01.png",
+      "sha256": "78160a41c5ae799cfd8f4e0578cda58856fddde8082923b05c0fa70681ace092",
+      "origem": "Gerado proceduralmente por scripts/gerar-corpus-ocr.py, semente 20261029; fonte Space Mono SIL OFL 1.1: https://github.com/google/fonts/tree/main/ofl/spacemono; SHA-256 95837e182baeeada83368f7748db28357f0a1b75c6b84ff7065b5edf933c8e18",
+      "autor": "Equipe KeyFlow",
+      "licenca": "Apache-2.0"
+    },
+    {
+      "caminho": "imagens/ocr-02.png",
+      "sha256": "8ddd5a6384921299f43c78cdf1f3266ed69c3176643e55b3dc3143260e80fb1c",
+      "origem": "Gerado proceduralmente por scripts/gerar-corpus-ocr.py, semente 20261029; fonte Space Mono SIL OFL 1.1: https://github.com/google/fonts/tree/main/ofl/spacemono; SHA-256 95837e182baeeada83368f7748db28357f0a1b75c6b84ff7065b5edf933c8e18",
+      "autor": "Equipe KeyFlow",
+      "licenca": "Apache-2.0"
+    },
+    {
+      "caminho": "imagens/ocr-03.png",
+      "sha256": "9009695919b58b46387f7d364f1252573fd66ea7f14741247f660a411f159dbf",
+      "origem": "Gerado proceduralmente por scripts/gerar-corpus-ocr.py, semente 20261029; fonte Space Mono SIL OFL 1.1: https://github.com/google/fonts/tree/main/ofl/spacemono; SHA-256 95837e182baeeada83368f7748db28357f0a1b75c6b84ff7065b5edf933c8e18",
+      "autor": "Equipe KeyFlow",
+      "licenca": "Apache-2.0"
+    },
+    {
+      "caminho": "imagens/ocr-04.png",
+      "sha256": "5b2bc24d206380a5195e53ea51f9df4d28fdb79c0b25150a263958b32fdcf5c1",
+      "origem": "Gerado proceduralmente por scripts/gerar-corpus-ocr.py, semente 20261029; fonte Space Mono SIL OFL 1.1: https://github.com/google/fonts/tree/main/ofl/spacemono; SHA-256 95837e182baeeada83368f7748db28357f0a1b75c6b84ff7065b5edf933c8e18",
+      "autor": "Equipe KeyFlow",
+      "licenca": "Apache-2.0"
+    },
+    {
+      "caminho": "imagens/ocr-05.png",
+      "sha256": "5d63762ce13d22dd0c2f5785bc9f27a39d3a95589b83bce38d2b8c2c45fb43d7",
+      "origem": "Gerado proceduralmente por scripts/gerar-corpus-ocr.py, semente 20261029; fonte Space Mono SIL OFL 1.1: https://github.com/google/fonts/tree/main/ofl/spacemono; SHA-256 95837e182baeeada83368f7748db28357f0a1b75c6b84ff7065b5edf933c8e18",
+      "autor": "Equipe KeyFlow",
+      "licenca": "Apache-2.0"
+    },
+    {
+      "caminho": "imagens/ocr-06.png",
+      "sha256": "8b6ac807564850729cbb8da1168945c358f771568d81c27abd1c71446d67f397",
+      "origem": "Gerado proceduralmente por scripts/gerar-corpus-ocr.py, semente 20261029; fonte Space Mono SIL OFL 1.1: https://github.com/google/fonts/tree/main/ofl/spacemono; SHA-256 95837e182baeeada83368f7748db28357f0a1b75c6b84ff7065b5edf933c8e18",
+      "autor": "Equipe KeyFlow",
+      "licenca": "Apache-2.0"
+    },
+    {
+      "caminho": "imagens/ocr-07.png",
+      "sha256": "aef6697e079c6b017cee171fa51056ace874f10558718e2e888e1ddc12db0158",
+      "origem": "Gerado proceduralmente por scripts/gerar-corpus-ocr.py, semente 20261029; fonte Space Mono SIL OFL 1.1: https://github.com/google/fonts/tree/main/ofl/spacemono; SHA-256 95837e182baeeada83368f7748db28357f0a1b75c6b84ff7065b5edf933c8e18",
+      "autor": "Equipe KeyFlow",
+      "licenca": "Apache-2.0"
+    },
+    {
+      "caminho": "imagens/ocr-08.png",
+      "sha256": "d7446a39f0878b11acf1ad21b47c17ce934ac79a52a197d6278a04a7749ded0d",
+      "origem": "Gerado proceduralmente por scripts/gerar-corpus-ocr.py, semente 20261029; fonte Space Mono SIL OFL 1.1: https://github.com/google/fonts/tree/main/ofl/spacemono; SHA-256 95837e182baeeada83368f7748db28357f0a1b75c6b84ff7065b5edf933c8e18",
+      "autor": "Equipe KeyFlow",
+      "licenca": "Apache-2.0"
+    },
+    {
+      "caminho": "imagens/ocr-09.png",
+      "sha256": "c1250844064008acb5f355207138cdeae20d8659348d205c08d8263e454d753c",
+      "origem": "Gerado proceduralmente por scripts/gerar-corpus-ocr.py, semente 20261029; fonte Space Mono SIL OFL 1.1: https://github.com/google/fonts/tree/main/ofl/spacemono; SHA-256 95837e182baeeada83368f7748db28357f0a1b75c6b84ff7065b5edf933c8e18",
+      "autor": "Equipe KeyFlow",
+      "licenca": "Apache-2.0"
+    },
+    {
+      "caminho": "imagens/ocr-10.png",
+      "sha256": "e79bbe8172a430e62520ca4fadb4b436d20aef12a2c016108e75a371af74c4dd",
+      "origem": "Gerado proceduralmente por scripts/gerar-corpus-ocr.py, semente 20261029; fonte Space Mono SIL OFL 1.1: https://github.com/google/fonts/tree/main/ofl/spacemono; SHA-256 95837e182baeeada83368f7748db28357f0a1b75c6b84ff7065b5edf933c8e18",
+      "autor": "Equipe KeyFlow",
+      "licenca": "Apache-2.0"
+    },
+    {
+      "caminho": "imagens/objetos-01.png",
+      "sha256": "c6d447b4ff73ddc0fb3ed5560ce894bc5eca9ae445be0da6b882fffd474afe8a",
+      "origem": "Gerado proceduralmente por scripts/gerar-corpus-ocr.py, semente 20261029",
+      "autor": "Equipe KeyFlow",
+      "licenca": "Apache-2.0"
+    },
+    {
+      "caminho": "imagens/objetos-02.png",
+      "sha256": "5ee8647d640e632826a254a06d403b8f9dc2ec4e6d93da6b71ac49397de5ec9e",
+      "origem": "Gerado proceduralmente por scripts/gerar-corpus-ocr.py, semente 20261029",
+      "autor": "Equipe KeyFlow",
+      "licenca": "Apache-2.0"
+    },
+    {
+      "caminho": "imagens/objetos-03.png",
+      "sha256": "e3b7cb6815f817aea70086e538f10d2cd5d8471aceaf23f3bb95fdd65eba0148",
+      "origem": "Gerado proceduralmente por scripts/gerar-corpus-ocr.py, semente 20261029",
+      "autor": "Equipe KeyFlow",
+      "licenca": "Apache-2.0"
+    },
+    {
+      "caminho": "imagens/objetos-04.png",
+      "sha256": "ec382c8f8c4787a8016d2433e61701cd1da2c0699fded146bf0f3cf5b66bd0cd",
+      "origem": "Gerado proceduralmente por scripts/gerar-corpus-ocr.py, semente 20261029",
+      "autor": "Equipe KeyFlow",
+      "licenca": "Apache-2.0"
+    },
+    {
+      "caminho": "imagens/objetos-05.png",
+      "sha256": "cdb67b3bf780dd1bdab41b8de5d6742aaea22f396f2378aaccb6d26eb9186fb3",
+      "origem": "Gerado proceduralmente por scripts/gerar-corpus-ocr.py, semente 20261029",
+      "autor": "Equipe KeyFlow",
+      "licenca": "Apache-2.0"
+    },
+    {
+      "caminho": "imagens/objetos-06.png",
+      "sha256": "88bbb08002e9b5884aac74a40fd0d6d11dac0cd1a584178c49789f9f70e3d113",
+      "origem": "Gerado proceduralmente por scripts/gerar-corpus-ocr.py, semente 20261029",
+      "autor": "Equipe KeyFlow",
+      "licenca": "Apache-2.0"
+    },
+    {
+      "caminho": "imagens/objetos-07.png",
+      "sha256": "0da4cb589881171bc4a72cb0fa96811a13fa4bde320b3f2a17d8c8587721526a",
+      "origem": "Gerado proceduralmente por scripts/gerar-corpus-ocr.py, semente 20261029",
+      "autor": "Equipe KeyFlow",
+      "licenca": "Apache-2.0"
+    },
+    {
+      "caminho": "imagens/objetos-08.png",
+      "sha256": "e03ac9a8141cda0585db691cb9b5da4279dc614a55a24b6d2daa10099f212385",
+      "origem": "Gerado proceduralmente por scripts/gerar-corpus-ocr.py, semente 20261029",
+      "autor": "Equipe KeyFlow",
+      "licenca": "Apache-2.0"
+    },
+    {
+      "caminho": "imagens/objetos-09.png",
+      "sha256": "2f65977f1852cc17f32591a94b176309e1dd99e5bf5edc528086daf08fadd6f2",
+      "origem": "Gerado proceduralmente por scripts/gerar-corpus-ocr.py, semente 20261029",
+      "autor": "Equipe KeyFlow",
+      "licenca": "Apache-2.0"
+    },
+    {
+      "caminho": "imagens/objetos-10.png",
+      "sha256": "8f860777bdbabe3c6ad9f298f7891ea7292dcbfcf12ef727d255da4b69101eec",
+      "origem": "Gerado proceduralmente por scripts/gerar-corpus-ocr.py, semente 20261029",
+      "autor": "Equipe KeyFlow",
+      "licenca": "Apache-2.0"
+    },
+    {
+      "caminho": "ocr.json",
+      "sha256": "5acede4a10db544ee7eade0897ebcc891053d9706374294efc088be67fd131f0",
+      "origem": "Gerado proceduralmente por scripts/gerar-corpus-ocr.py, semente 20261029",
+      "autor": "Equipe KeyFlow",
+      "licenca": "Apache-2.0"
+    },
+    {
+      "caminho": "objetos.json",
+      "sha256": "2a1a0bf001b1a40b66e4b56036c368047407c0ec60b7be15dcc736d1b986b17d",
+      "origem": "Gerado proceduralmente por scripts/gerar-corpus-ocr.py, semente 20261029",
+      "autor": "Equipe KeyFlow",
+      "licenca": "Apache-2.0"
     }
   ]
 }

@@ -4,6 +4,7 @@ import com.google.common.truth.Truth.assertThat
 import com.keyflow.bancada.corpus.Capacidade
 import com.keyflow.bancada.corpus.Caso
 import com.keyflow.bancada.corpus.Prompt
+import com.keyflow.bancada.corpus.PromptMontado
 import com.keyflow.bancada.corpus.TesteDef
 import com.keyflow.bancada.pontuacao.Pontuacao
 import com.keyflow.bancada.pontuacao.Pontuador
@@ -438,5 +439,40 @@ class ExecutorBancadaTest {
         val semPontuador = ExecutorBancada(MotorFalso { _, _ -> resposta("1") }, { currentTime }, local, pontuadores = { null })
         val erro = runCatching { semPontuador.executar(plano(Origem.ONLINE, casos(1))) }.exceptionOrNull()
         assertThat(erro).isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Test
+    fun `o executor entrega a imagem e o prompt ao reconhecedor de imagem`() = runTest {
+        val c = caso(id = "imagem-01", entrada = "Descreva a imagem", esperado = "1", campos = arrayOf("imagem" to "imagens/caso.png"))
+        val def = TesteDef("objetos", 1, Capacidade.IMAGEM, "d", Prompt(null, "{entrada}"), listOf(c))
+        val chamadas = mutableListOf<Pair<EntradaImagem, PromptMontado>>()
+        val motor = MotorDeImagem { imagem, prompt ->
+            chamadas += imagem to prompt
+            kotlinx.coroutines.flow.flowOf(ReasoningEvent.Delta("1"), ReasoningEvent.Done)
+        }
+        val resultado = executor(motor, online).executar(PlanoDeExecucao(cabecalho, Origem.ONLINE, listOf(TesteNoPlano(def, listOf(c)))))
+        assertThat(chamadas).hasSize(1)
+        assertThat((chamadas.single().first as ImagemDoCorpus).caminho).isEqualTo("imagens/caso.png")
+        assertThat(chamadas.single().second.user).isEqualTo("Descreva a imagem")
+        assertThat(resultado.testes.single().nota).isEqualTo(1.0)
+    }
+
+    @Test
+    fun `referencia de imagem recusa caminhos fora do corpus`() {
+        for (caminho in listOf("", "/imagem.png", "../imagem.png", "imagens/../segredo")) {
+            assertThat(runCatching { ImagemDoCorpus(caminho) }.isFailure).isTrue()
+        }
+    }
+
+    @Test
+    fun `imagem de outra etapa copia bytes e nao vaza conteudo no diagnostico`() {
+        val bytes = byteArrayOf(1, 2, 3)
+        val imagem = ImagemEmMemoria(bytes, "image/png")
+        bytes[0] = 9
+        assertThat(imagem.bytes().toList()).containsExactly(1.toByte(), 2.toByte(), 3.toByte()).inOrder()
+        imagem.bytes()[1] = 9
+        assertThat(imagem.bytes()[1]).isEqualTo(2.toByte())
+        assertThat(imagem.toString()).doesNotContain("[1, 2, 3]")
+        assertThat(runCatching { ImagemEmMemoria(byteArrayOf()) }.isFailure).isTrue()
     }
 }

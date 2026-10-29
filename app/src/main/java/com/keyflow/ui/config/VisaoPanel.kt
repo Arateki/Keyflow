@@ -52,6 +52,7 @@ fun VisaoPanel(
     anthropicAuth: AuthActions = AuthActions.None,
     googleAuth: AuthActions = AuthActions.None,
     visionTester: VisionTester? = null,
+    visionMotor: ((Settings) -> com.keyflow.bancada.executor.MotorDeCapacidade)? = null,
 ) {
     val palette = LocalKeyFlowPalette.current
     val scroll = rememberScrollState()
@@ -102,6 +103,22 @@ fun VisaoPanel(
         }
         SettingsGroup(tr("Testar")) {
             Column(Modifier.padding(vertical = 16.dp)) {
+                BancadaVisaoArea(
+                    settings = activeSettings,
+                    models = models,
+                    availability = availability,
+                    connection = selectedConnection,
+                    motor = visionMotor?.invoke(activeSettings),
+                    preparar = {
+                        editor.confirmPending()
+                        val snapshot = editor.settings
+                        val con = connectionFor(snapshot.visionSource)
+                        val dispo = visionTestAvailability(snapshot, models, con is ConnectionState.Connected)
+                        val modelo = modeloDeVisao(snapshot, models, con)
+                        val motor = visionMotor?.invoke(snapshot)
+                        if (dispo is VisionTestAvailability.Ready && modelo != null && motor != null) motor to modelo else null
+                    },
+                ) {
                 VisaoTestArea(availability, tester, initialState = initialTest,
                     // Montado no toque, depois de confirmar o texto dos campos: as Settings desta composição podem ser anteriores à edição.
                     prepare = visionTester?.let { current ->
@@ -119,6 +136,7 @@ fun VisaoPanel(
                     remote = activeSettings.visionSource != VisionSource.LOCAL,
                     requestKey = visionRequestKey(activeSettings, selectedConnection, availability, editor.editEpoch),
                 )
+                }
             }
         }
     }

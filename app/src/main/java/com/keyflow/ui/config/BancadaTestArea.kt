@@ -15,7 +15,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.keyflow.bancada.adaptadores.BancadaServicos
 import com.keyflow.bancada.executor.ModeloEscolhido
-import com.keyflow.reasoning.ReasoningEngine
+import com.keyflow.bancada.executor.MotorDeTexto
 import com.keyflow.reasoning.ReasoningResolution
 
 /** Os serviços da bancada que a interface usa. Nulo = os do processo ([BancadaServicos.of]); os testes de interface injetam os seus, com motor falso. */
@@ -51,12 +51,12 @@ fun BancadaTestArea(
                 ReasoningTestArea(resolution, onManageUsage = onManageUsage, initialState = initialState, resolveOnStart = resolveOnStart)
             } else {
                 val servicos = remember(injetados) { injetados ?: BancadaServicos.of(context.applicationContext) }
-                val engine: ReasoningEngine? = (resolution as? ReasoningResolution.Ready)?.engine
+                val motor = (resolution as? ReasoningResolution.Ready)?.engine?.let(::MotorDeTexto)
                 BancadaTesteConteudo(
                     def = corpus.testes.getValue(atual.id),
                     abas = abas,
                     motivo = atual.motivo,
-                    engine = engine,
+                    motor = motor,
                     modelo = modelo,
                     servicos = servicos,
                 )
