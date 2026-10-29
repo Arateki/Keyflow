@@ -4,7 +4,7 @@
 **Status**: rascunho. Nenhuma task começou. **Fora da v1**. Não toma a vez de frente aberta.
 
 > **Para o agente executor**: leia `spec.md` + `design.md` + este arquivo e `.specs/codebase/TESTING.md`. Uma task por vez,
-> na ordem abaixo, testes primeiro, gate verde antes de avançar. FAL-T8 espera o Yan (D1).
+> na ordem abaixo, testes primeiro, gate verde antes de avançar. O VITS espera a escuta (D1). O Supertonic não espera.
 
 **Goal**: a aba Voz no molde da Visão, com Testar que reproduz áudio e um `SpeechEngine` que um fluxo futuro pode chamar.
 
@@ -23,14 +23,15 @@
 ## Execution Plan
 
 ```
-T1 (contrato, JVM) → T2 (frontend, JVM) → T3 (:speech, sem modelo no catálogo)
+T1 (contrato, JVM) → T3 (:speech) → T9 (motor Supertonic)
                  ↘ T4 (painel) → T7 (goldens)
                  ↘ T5 (nuvem e Custom, JVM + cliente)
                  ↘ T6 (sistema)
-T8 pin do catálogo — bloqueada por D1, não começa com as outras
+T2 (frontend do VITS) — não trava as outras; o VITS no catálogo espera D1
+T8 (pin do Supertonic + aceite) — não espera D1
 ```
 
-T4, T5 e T6 dependem só de T1. T3 depende de T2. T7 depende de T4.
+T4, T5 e T6 dependem só de T1. T3 depende de T1 (a sessão ORT); T2 é o frontend do VITS e não trava T3 nem T9. T7 depende de T4. T9 depende de T3. T8 pode seguir em paralelo com T4.
 
 ---
 
@@ -47,7 +48,7 @@ T4, T5 e T6 dependem só de T1. T3 depende de T2. T7 depende de T4.
 - **Gate**: `pool compilar testDebugUnitTest`.
 
 ### FAL-T3 — Processo `:speech`
-- **What**: serviço `exported=false`, AIDL, sessão ORT preguiçosa, ociosidade de 120 s, sem `OfflineTts` e sem segunda `libonnxruntime.so` (FLOC-04, FLOC-05, FLOC-06, FPRV-02). Sem entrada no catálogo, `speak` local devolve `MODEL_MISSING` e não abre socket.
+- **What**: serviço `exported=false`, AIDL, sessão ORT preguiçosa, ociosidade de 120 s, sem `OfflineTts` e sem segunda `libonnxruntime.so` (FLOC-04, FLOC-05, FLOC-06, FPRV-02). Sem arquivo de modelo, `speak` local devolve `MODEL_MISSING` e não abre socket.
 - **Where**: manifest, `app/src/main/aidl/`, `com.keyflow.speech.local`.
 - **Done when**: `assembleDebug` gera o processo; teste de arquitetura falha se o módulo de fala importar `OfflineTts` ou o downloader; teste com backend falso não abre rede no caminho local. Não editar a URL do sherpa. Gate `quick` + `build`.
 - **Gate**: `pool compilar testDebugUnitTest assembleDebug`.
@@ -75,7 +76,13 @@ T4, T5 e T6 dependem só de T1. T3 depende de T2. T7 depende de T4.
 - **Done when**: `pool telas` e `diff-screens.sh`. As outras abas ficam bit-idênticas. A rota `config-fala-testar` está parada, sem áudio.
 - **Gate**: `pool telas`.
 
-### FAL-T8 — Pin do catálogo `[P]` — bloqueada
-- **What**: uma entrada real em `ModelCatalog.VOICE` (FLOC-01, FLOC-02), só depois do Yan registrar a escuta (D1). Baixar de novo, conferir SHA-256 e tamanho, licença no comentário e em `app/licenses/`. Não copiar o prefixo do `context.md` como se fosse o hash completo.
-- **Done when**: o id escolhido baixa, o SHA confere e o Testar Local nesse modelo emite áudio no aparelho de teste. Sem decisão D1, esta task não começa e o catálogo segue vazio.
-- **Gate**: `quick` + `build`. Escuta no A32 só com `--confirmo-a32`.
+### FAL-T8 — Pin do Supertonic e aceite `[P]`
+- **What**: uma entrada real do Supertonic 3 em `ModelCatalog.VOICE` (FLOC-01, FLOC-02, FPRV-03). Baixar de novo o ONNX oficial, gravar SHA-256 e tamanho completos, licença no comentário e em `app/licenses/`. Não copiar o prefixo do `context.md` como se fosse o hash. Diálogo de aceite (licença + Attachment A) antes do download; sem aceite, o downloader não é chamado. Não acrescentar o VITS: isso continua pendente de D1.
+- **Done when**: o id do Supertonic baixa só depois do aceite, o SHA confere e o catálogo não lista VITS, Kokoro, Piper nem ONNX quantizado. Gate `quick` + `build`.
+- **Gate**: `pool compilar testDebugUnitTest assembleDebug`.
+
+### FAL-T9 — Motor Supertonic
+- **What**: síntese no `:speech` com os quatro ONNX e o índice Unicode, a partir do código MIT oficial, idioma `pt` (FLOC-03, FLOC-04). Sem `OfflineTts`.
+- **Where**: `com.keyflow.speech.local`.
+- **Done when**: texto de teste com o índice falso produz ids; arquivo ausente emite `MODEL_MISSING` sem socket; a velocidade da aba chega ao fator `speed`. O modelo de ~398 MB não entra no teste de JVM. Gate `quick`.
+- **Gate**: `pool compilar testDebugUnitTest`.

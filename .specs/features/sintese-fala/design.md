@@ -9,7 +9,7 @@ Um pedido de fala é texto mais velocidade. Quem fala é o `SpeechEngine` da ori
 ```
 FalaPanel (Testar)  ── SpeechRequest ──►  SpeechEngine
 passo de Fluxos     ── (mesmo tipo)  ──►      │
-                                              ├ LOCAL    :speech  → frontend de caracteres → OnnxSession → PCM
+                                              ├ LOCAL    :speech  → Supertonic (4 ONNX, código MIT) → PCM
                                               ├ SYSTEM   TextToSpeech do aparelho → PCM ou onStart/onDone
                                               ├ OPENAI / ELEVENLABS / GOOGLE / CUSTOM  → HTTP → PCM
                                               └ eventos: Audio…, FirstAudio, Done | Error
@@ -55,9 +55,11 @@ Sessão ONNX sob demanda. 120 s sem `speak` fecha a sessão. Uma `libonnxruntime
 
 O IME não sintetiza no thread principal. O `AudioTrack` do Testar fica no processo principal, lendo o fluxo. Síntese longa não desenha o teclado.
 
-## Frontend local (VITS de caracteres)
+## Frontend local
 
-Só entra em jogo quando FAL-T8 gravar uma entrada. Até lá o serviço responde `MODEL_MISSING` sem abrir sessão.
+O primeiro modelo é o Supertonic 3 (D2). O processo carrega os quatro ONNX oficiais e o índice Unicode, no molde do pacote MIT `supertonic` (idioma `pt`, estilo de voz que vier no catálogo). Sem o arquivo no disco, ou sem o aceite da FPRV-03, `speak` devolve `MODEL_MISSING` ou `NOT_READY` e não abre sessão. A velocidade da aba entra no fator `speed` desse pipeline.
+
+O VITS de caracteres só entra se o Yan aceitar a escuta (D1). Até lá o serviço não procura esse arquivo.
 
 Para o VITS Coqui (metadados no próprio onnx: `frontend=characters`, `add_blank`, `blank_id`, `sample_rate` 22050):
 
@@ -66,7 +68,7 @@ Para o VITS Coqui (metadados no próprio onnx: `frontend=characters`, `add_blank
 3. Cada caractere vira id pelo `tokens.txt`. Desconhecido é pulado. Se `add_blank`, o id de blank entra entre os caracteres.
 4. `length_scale = 1 / speed`. Saída float do modelo vira PCM 16-bit mono na `sample_rate` do metadado.
 
-O léxico do MeloTTS (inglês) é outro frontend, e só se o Yan escolher esse modelo em D1. Não misturar os dois no primeiro código: FAL-T2 implementa o de caracteres. O de léxico fica descrito aqui e sem task até a decisão.
+O léxico do MeloTTS (inglês) é outro frontend e não entra nesta leva. FAL-T2 deixa o frontend de caracteres pronto, sem colocar o VITS no catálogo.
 
 ## Nuvem e Custom
 
@@ -109,6 +111,10 @@ Testar: campo, botão, motivo, linha de tempos. Estado inicial da galeria não d
 - Goldens: `pool telas` nas rotas do FUX-08. `--approve` só do que for desta aba.
 - Aparelho: escuta do candidato (D1) é manual, no A32, com `--confirmo-a32`. Não é gate das tasks T1–T7.
 
+## Licença do Supertonic
+
+O diálogo de baixar esse card é o acordo da cláusula 4.a: inclui o Attachment A como texto exigível, avisa que o modelo está sujeito ao parágrafo 5 e oferece a licença inteira (4.b). O aceite fica gravado por modelo. Cancelar não baixa. `app/licenses/` guarda a mesma cópia e o aviso MIT do código. O card não diz que a Supertone endossa o KeyFlow (cláusula 8).
+
 ## O que não entra
 
-Editor de Fluxos, Realtime, Gemini TTS, Supertonic, recompilar sherpa, segundo `libonnxruntime.so`, cota fictícia, frase de sucesso sem áudio.
+Editor de Fluxos, Realtime, Gemini TTS, ONNX quantizado do Supertonic, VITS no catálogo antes da escuta, recompilar sherpa, segundo `libonnxruntime.so`, cota fictícia, frase de sucesso sem áudio.

@@ -1,6 +1,6 @@
 # Síntese de fala (aba Voz) — Context (2026-10-24)
 
-A spec, o design e as tasks estão em `spec.md`, `design.md` e `tasks.md` (rascunho, 2026-10-29). Este arquivo continua sendo
+A spec, o design e as tasks estão em `spec.md`, `design.md` e `tasks.md` (rascunho, 2026-10-29). Em 29/10 o Yan decidiu: Supertonic 3 é o modelo local inicial da tela (aceite da licença só no download); o primeiro corte de cards inclui Sistema; o card da OpenAI leva o aviso de 2027-01-06. O VITS continua pendente da escuta. Este arquivo continua sendo
 o histórico da decisão do Yan, do achado do eSpeak e dos pins. A seção "recompilar o AAR" abaixo **não é trabalho aberto**:
 na main o app já depende do AAR `sherpa-onnx-1.13.8-sem-tts` (`app/build.gradle.kts`, `SherpaAarSemGplTest`). Kokoro em pt
 foi reconferido em 2026-10-29: o G2P dessa língua exige eSpeak (GPL) — continua fora. Pesquisa do dia:
