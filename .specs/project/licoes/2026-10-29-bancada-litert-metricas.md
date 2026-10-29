@@ -1,4 +1,4 @@
-# LiteRT-LM: métricas e repetição na CPU x86_64
+# 2026-10-29 — LiteRT-LM: métricas e repetição na CPU x86_64
 
 Em 2026-10-29, `pool instrumentar` executou no emulador API 34 x86_64 com KVM, CPU de 2 threads e Qwen3 0.6B (arquivo de 613722264 bytes, SHA-256 `c5f39b4191926786c3e6668b62af4d6eb15248dfc7a5348252a9b406f33f2108`). O teste é opt-in, baixa o peso oficial e apaga a cópia depois.
 

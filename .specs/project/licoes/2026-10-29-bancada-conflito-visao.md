@@ -1,4 +1,4 @@
-# Bancada: integração com visão e foco no teste
+# 2026-10-29 — Bancada: integração com visão e foco no teste
 
 A main passou a ter pedidos com imagem e cancelamento por ficha durante o desenvolvimento da bancada. A integração preserva o cancelamento, o cache privado de imagem e o bloqueio de redirecionamento das imagens; as opções seguem junto no AIDL e as métricas voltam antes do término.
 

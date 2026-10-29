@@ -1,4 +1,4 @@
-# Bancada: opções e uso dos provedores
+# 2026-10-29 — Bancada: opções e uso dos provedores
 
 Em 2026-10-29, a Responses com chave passou a enviar os campos documentados; login de plano conserva o corpo enxuto e relata opções como ignoradas. `AuthorizedHeaders` reúne o tipo e os cabeçalhos da mesma credencial, sem imprimir seus valores. `seed` de Chat Completions não é parâmetro de Responses. Em Anthropic e Gemini, recursos que variam por modelo são aplicados apenas nos casos identificados; as opções restantes são registradas como ignoradas. Na Anthropic, o pensamento explícito de 3.7 e das variantes manuais 4 a 4.5 precisa de orçamento 1024 menor que o teto e não pode combinar com temperatura. No Custom, capacidades seguem o contrato Chat Completions, mas um serviço compatível pode ter limitações próprias.
 
