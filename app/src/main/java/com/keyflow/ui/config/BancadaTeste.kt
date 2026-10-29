@@ -132,7 +132,12 @@ internal fun BancadaTesteConteudo(
     }
 
     Column(modifier.fillMaxWidth()) {
-        SettingSub(tr(def.descricao), Modifier.testTag(BANCADA_DESCRICAO_TAG))
+        val descricao = when (def.id) {
+            "ocr" -> tr("Mede a leitura de texto em imagens.")
+            "objetos" -> tr("Mede a identificação de objetos em imagens.")
+            else -> tr(def.descricao)
+        }
+        SettingSub(descricao, Modifier.testTag(BANCADA_DESCRICAO_TAG))
         if (motivo != null) {
             SettingSub(motivo, Modifier.padding(top = 10.dp).testTag(BANCADA_MOTIVO_TAG))
         }
