@@ -61,7 +61,8 @@ P2 = depois (fala, tradução, fluxos, OCR). Os testes de Código e Terminal for
 | Fala (`fala`) | A | Transcrição local e por API | WER/CER, RTF | 12 | P2 |
 | Voz (fluxo) | A→T | Ditado completo: áudio → STT → pontuação | nota por etapa + do fluxo | 6 | P2 |
 | Tradução (`traducao`) | T | Sinal multilíngue (PT/EN/ES são os 3 idiomas do teclado); **sem consumidor hoje** | termos, idioma, só a tradução, chrF | 12 | P2 |
-| OCR (`ocr`) | I | Visão: ler a captura | CER | 10 | P2 (espera VC-T6) |
+| OCR (`ocr`) | I | Visão: ler a captura | CER | 10 | P2 |
+| Objetos (`objetos`) | I | Visão: identificar objetos conhecidos | precisão, revocação e F1 por rótulo | 10 | P2 |
 | Visão (fluxo) | I→T | Captura → OCR → pergunta | nota por etapa + do fluxo | 6 | P2 |
 | Agente (fluxo) | A→T | Fala → STT → ação do app | nota por etapa + do fluxo | 8 | P2 |
 
@@ -136,6 +137,10 @@ Variantes (dimensões da execução, não testes): **backend** CPU|GPU (GPU só 
 9. **BPT-09** `ocr`: CER contra o texto conhecido da captura; nota = 1 − CER limitado a [0,1].
 10. **BPT-10**: nenhum teste usa modelo para dar nota. Se um dia for preciso, o juiz será opcional, desligado por padrão, de modelo e temperatura fixos, **fora de qualquer média** e rotulado como tal.
 11. **BPT-11**: cada pontuador tem testes com vetores conhecidos e de propriedade (nota ∈ [0,1]; saída idêntica ao esperado = 1; vazia = 0) e roda no gate `quick`.
+12. **BPT-12** `objetos`: a resposta lista rótulos de objetos; sinônimos em português e inglês são normalizados para rótulos canônicos. Precisão e revocação são calculadas por conjuntos, e a nota é F1; rótulos desconhecidos contam como falsos positivos. Saída vazia vale 0 quando há objetos esperados.
+13. **BCP-09**: imagens de OCR e objetos são geradas proceduralmente ou obtidas de fonte CC0/domínio público, com origem, licença e SHA-256 registrados no manifesto; o teste de integridade confere cada arquivo.
+14. **BNC-09**: a aba Visão oferece OCR e Objetos conforme a capacidade do modelo selecionado; objetos não fica habilitado em motor que apenas lê texto. Os testes usam as mesmas regras de consentimento para origem online.
+15. **BFL-07**: as duas capacidades de imagem expõem etapas reutilizáveis imagem → texto, independentes da interface, com cancelamento e erro preservados.
 
 **Independent Test**: `PontuadoresTest` e `PontuadoresPropertyTest` verdes na JVM.
 
@@ -223,7 +228,7 @@ Status: Pending → In Design → In Tasks → Implementing → Verified. As tas
 | BNC-05 | P1-A | BNC-T13 | Verified |
 | BNC-06 | P1-A | BNC-T13, BNC-T15 | Implementing |
 | BNC-07 | P1-A | BNC-T22 | In Tasks |
-| BNC-08 | P1-A | BNC-T20, BNC-T24 | In Tasks |
+| BNC-08 | P1-A | BNC-T20, BNC-T24 | Implementing (Visão verificada; Transcrição pendente) |
 | BCP-01 | P1-B | BNC-T2 | Verified |
 | BCP-02 | P1-B | BNC-T1, BNC-T2 | Implementing |
 | BCP-03 | P1-B | BNC-T2 | Verified |
@@ -233,10 +238,10 @@ Status: Pending → In Design → In Tasks → Implementing → Verified. As tas
 | BCP-07 | P1-B | BNC-T2, BNC-T7 | Verified |
 | BCP-08 | P1-B | BNC-T1, BNC-T20 | In Tasks |
 | BEX-01 | P1-C | BNC-T11 | Verified |
-| BEX-02 | P1-C | BNC-T1, BNC-T8, BNC-T9, BNC-T10 | Implementing |
+| BEX-02 | P1-C | BNC-T1, BNC-T8, BNC-T9, BNC-T10 | Verified |
 | BEX-03 | P1-C | BNC-T11 | Verified |
-| BEX-04 | P1-C | BNC-T1, BNC-T9, BNC-T28 | In Tasks |
-| BEX-05 | P1-C | BNC-T1, BNC-T10 | In Tasks |
+| BEX-04 | P1-C | BNC-T1, BNC-T9, BNC-T28 | Implementing (T9 implementada; T28 pendente) |
+| BEX-05 | P1-C | BNC-T1, BNC-T10 | Verified |
 | BEX-06 | P1-C | BNC-T11 | Verified |
 | BEX-07 | P1-C | BNC-T11 | Verified |
 | BEX-08 | P1-C | BNC-T16 | In Tasks |
@@ -250,7 +255,11 @@ Status: Pending → In Design → In Tasks → Implementing → Verified. As tas
 | BPT-06 | P1-D | BNC-T5 | Verified |
 | BPT-07 | P1-D | BNC-T5 | Verified |
 | BPT-08 | P1-D | BNC-T20 | In Tasks |
-| BPT-09 | P1-D | BNC-T24 | In Tasks |
+| BPT-09 | P1-D | BNC-T24 | Verified |
+| BPT-12 | P1-D | BNC-T31 | Verified |
+| BCP-09 | P1-B | BNC-T24, BNC-T31 | Verified |
+| BNC-09 | P1-A | BNC-T24, BNC-T31 | Verified |
+| BFL-07 | P2-H | BNC-T24, BNC-T31 | Verified |
 | BPT-10 | P1-D | BNC-T3 | Verified |
 | BPT-11 | P1-D | BNC-T3, BNC-T4, BNC-T5 | Verified |
 | BHS-01 | P1-E | BNC-T6, BNC-T12 | Verified |
@@ -261,7 +270,7 @@ Status: Pending → In Design → In Tasks → Implementing → Verified. As tas
 | BHS-06 | P1-E | BNC-T12, BNC-T14 | Verified |
 | BON-01 | P1-F | BNC-T14 | Verified |
 | BON-02 | P1-F | BNC-T14 | Verified |
-| BON-03 | P1-F | BNC-T6, BNC-T10 | Implementing |
+| BON-03 | P1-F | BNC-T6, BNC-T10 | Verified |
 | BON-04 | P1-F | BNC-T22 | In Tasks |
 | BON-05 | P1-F | BNC-T11 | Verified |
 | BAU-01 | P1-G | BNC-T16 | In Tasks |

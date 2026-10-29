@@ -10,6 +10,11 @@ import kotlinx.coroutines.withContext
  * Quem entrega os cabeçalhos de credencial a um cliente de API (AUTH-04). O cliente pede [headers] e nunca vê a renovação
  * nem o token cru fora do cabeçalho.
  */
+/** Cabeçalhos e tipo da MESMA credencial, para escolher os campos aceitos pelo plano. */
+data class AuthorizedHeaders(val headers: Map<String, String>, val apiKey: Boolean) {
+    override fun toString(): String = "AuthorizedHeaders(apiKey=$apiKey)"
+}
+
 interface AuthorizationProvider {
     /**
      * Cabeçalhos prontos, renovando o token antes de expirar. Falha com [AuthException]: `NOT_CONNECTED` (nada guardado),
@@ -23,6 +28,9 @@ interface AuthorizationProvider {
      * quando não há nada guardado.
      */
     fun invalidate(provider: ProviderId) {}
+
+    /** Sem informação de tipo, usa o corpo conservador aceito pelo login de plano. */
+    suspend fun authorizedHeaders(provider: ProviderId): AuthorizedHeaders = AuthorizedHeaders(headers(provider), false)
 }
 
 /**
@@ -49,7 +57,9 @@ class DefaultAuthorizationProvider(
     private fun skeletonOf(current: Credential.OAuth) =
         current.copy(accessToken = "", refreshToken = null, expiresAtMs = 0, earliestRefreshAtMs = null, scopes = emptySet())
 
-    override suspend fun headers(provider: ProviderId): Map<String, String> {
+    override suspend fun headers(provider: ProviderId): Map<String, String> = authorizedHeaders(provider).headers
+
+    override suspend fun authorizedHeaders(provider: ProviderId): AuthorizedHeaders {
         val entry = requireNotNull(registry.firstOrNull { it.id == provider }) { "provedor não registrado: ${provider.value}" }
         var credential = store.forAuthorization(provider) ?: throw AuthException(AuthErrorKind.NOT_CONNECTED, "sem credencial guardada")
         if (credential is Credential.OAuth && needsRefresh(credential)) {
@@ -60,7 +70,7 @@ class DefaultAuthorizationProvider(
                 if (current is Credential.OAuth && needsRefresh(current)) withContext(NonCancellable) { refresh(entry, current) } else current
             }
         }
-        return entry.headersFor(credential)
+        return AuthorizedHeaders(entry.headersFor(credential), credential is Credential.ApiKey)
     }
 
     /** Perto de expirar, sem passar antes do `earliest_refresh_at` — a não ser que o token já tenha expirado. */

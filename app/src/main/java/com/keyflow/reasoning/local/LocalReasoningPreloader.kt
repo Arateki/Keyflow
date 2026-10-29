@@ -62,6 +62,7 @@ object LocalReasoningPreloader {
             }
             val loadReport = LoadReport(model, reports)
             val callback = object : IReasoningCallback.Stub() {
+                override fun onMetrics(json: String) = Unit
                 override fun onDelta(text: String) = Unit
                 override fun onBackendFallback(failed: String, reason: String) = loadReport.onBackendFallback(failed, reason)
 

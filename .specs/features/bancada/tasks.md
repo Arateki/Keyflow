@@ -48,6 +48,7 @@ e o emulador são o gargalo: instrumentados serializam). T19 é o marco: **sem b
 ## Fase 0 — Fatos
 
 ### BNC-T1 — Notas de verificação (APIs, termos, limites) `[P]`
+- **Status**: Concluída em 2026-10-29; ver `apis-notas.md`. Termos e medições de plataforma ainda pendentes estão explicitados ali.
 - **What**: criar `.specs/features/bancada/apis-notas.md` com trecho literal, URL e data de: (a) LiteRT-LM 0.16.1 — `SamplerConfig`,
   `ConversationConfig.maxOutputToken`, `ThinkingConfig`, `Backend.GPU`/`CPU(threadCount)`, `Conversation.getBenchmarkInfo()` e a flag
   `ExperimentalFlags.enableBenchmark` (conferidos no AAR em 2026-10-28; falta a doc e o efeito em tempo de execução); (b) docs oficiais
@@ -130,6 +131,7 @@ e o emulador são o gargalo: instrumentados serializam). T19 é o marco: **sem b
 - **Depends on**: T6. **Requirement**: BHS-01, BHS-03, BHS-06, BEX-10. **Gate**: `quick` + `build`. **Commit**: `feat(bancada): histórico local de execuções`.
 
 ### BNC-T9 — Local: opções, `BenchmarkInfo`, RAM e carga fria/quente
+- **Status**: Concluída em 2026-10-29; `ReasoningServiceCoreTest` 45/45 e instrumentados 71/71, incluindo a prova opt-in no Qwen3 x86_64 (ver lição).
 - **What**: `LocalGenOptions` no AIDL (`generate`) e `onMetrics` no callback; `LiteRtBackend` aplica `SamplerConfig`/`maxOutputToken`/`ThinkingConfig` quando
   pedido e lê `BenchmarkInfo`; `unload()` e `restart()` no serviço; sonda de RAM (`VmHWM`/`VmRSS`); `LocalReasoningEngine` traduz para `Metrics`.
 - **Done when**: `ReasoningServiceCoreTest` (backend falso) cobre opções repassadas e métricas; instrumentado sem pesos (`LiteRtWarmupTest`-style) cobre as configs;
@@ -137,6 +139,8 @@ e o emulador são o gargalo: instrumentados serializam). T19 é o marco: **sem b
 - **Depends on**: T1, T8. **Requirement**: BEX-02, BEX-04. **Gate**: `quick` + `pool instrumentar` (afetados) + medição manual no Vaio. **Commit**: `feat(raciocínio): opções de geração, métricas e carga fria no motor local`.
 
 ### BNC-T10 — Online: opções e `usage` por provedor
+- **Status**: Concluída em 2026-10-29; MockWebServer por provedor, 2209 unitários e lint verdes, instrumentados afetados 70/70 e bancada 13/13.
+- **SPEC_DEVIATION** (Yan, 2026-10-29): Custom passa a usar o endpoint configurado e Chat Completions; só nele o corpo sem opções muda. Ver lição `2026-10-29-bancada-custom-endpoint.md`.
 - **What**: Anthropic, OpenAI (chave de API; o login de plano mantém o corpo enxuto), Google e Custom enviam só o que a T1 confirmou, devolvem `aplicadas`/`ignoradas`
   e emitem `Metrics` com os tokens do `usage` quando o provedor os dá.
 - **Done when**: MockWebServer por provedor: com opções, o corpo leva exatamente os campos confirmados; sem opções, o corpo é **byte a byte o de hoje**; `usage` ausente → `null`;
@@ -219,9 +223,10 @@ e o emulador são o gargalo: instrumentados serializam). T19 é o marco: **sem b
 - **Done when**: casos de borda verdes (prefixo "Aqui está a tradução:", idioma errado, termo trocado); a mesma saída pontuada 2× dá a mesma nota; corpus sob o `CorpusIntegrityTest`.
 - **Depends on**: T7. **Requirement**: BPT-04. **Gate**: `quick` + `full`. **Commit**: `feat(bancada): teste de tradução`.
 
-### BNC-T24 — `ocr` e faixa na Visão (espera VC-T6)
+### BNC-T24 — `ocr` e faixa na Visão
+- **Status**: Concluída (2026-10-29).
 - **What**: imagens geradas por `scripts/gerar-corpus-ocr.py`, adaptador `Reconhecedor` sobre o `OcrEngine`, pontuador CER e a faixa na Visão no lugar do "Testar OCR" simulado.
-- **Done when**: CER de pares conhecidos; imagens reproduzíveis pela semente; goldens só da Visão revisados. **Bloqueada** até o `OcrEngine` existir.
+- **Done when**: CER de pares conhecidos; imagens reproduzíveis pela semente; goldens só da Visão revisados; OCR real em três imagens do corpus no emulador.
 - **Depends on**: VC-T6, T15. **Requirement**: BNC-08, BPT-09, BEX-09. **Gate**: `full`. **Commit**: `feat(bancada): teste de OCR na Visão`.
 
 ### BNC-T25 — Fluxo de visão · BNC-T26 — Fluxo do agente
@@ -259,3 +264,10 @@ e o emulador são o gargalo: instrumentados serializam). T19 é o marco: **sem b
   `bancada-atestado.py` aceita o par; o `adb install -r` de um APK da `app-v0.1.0` por cima do atual (código 1) funciona sem `-d` nem desinstalar.
 - **Depends on**: nenhuma decisão pendente. **Requirement**: BAU-11. **Gate**: `build` + teste do script. **Commit**: `build: versionName segue a tag de release`.
 
+
+
+### BNC-T31 — Reconhecimento de objetos na bancada de Visão
+- **Status**: Concluída (2026-10-29); prova real condicionada à capacidade do emulador.
+- **What**: corpus versionado de imagens de objetos e rótulos canônicos com sinônimos pt/en; pontuador determinístico por precisão, revocação e F1; adaptador imagem → texto pelo motor de visão selecionado; integração à faixa e às etapas encadeáveis.
+- **Done when**: integridade de licença e hash; testes de sinônimos, falsos positivos, omissões e vazio; UI e cancelamento com motores falsos; prova opt-in de objeto em modelo local se couber no emulador; goldens de Visão revisados.
+- **Depends on**: VC-T15, BNC-T24. **Requirement**: BPT-12, BCP-09, BNC-09, BFL-07. **Gate**: `quick` + `full` + prova opt-in.

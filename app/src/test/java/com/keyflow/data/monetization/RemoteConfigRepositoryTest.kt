@@ -155,12 +155,11 @@ class RemoteConfigRepositoryTest {
     }
 
     @Test
-    fun `validação remota falsa ou ausente não libera o OCR no release`() {
+    fun `validação remota falsa ou ausente não esconde o OCR, só o marca como não validado`() {
         for (validated in listOf(null, false, "inválido")) {
             val model = RemoteConfigRepository.parseModels(ocrJson(validated)).single()
             assertThat(model.validatedOnDevice).isFalse()
-            assertThat(ModelCatalog.visionModels(listOf(model), debug = false)).isEmpty()
-            assertThat(ModelCatalog.visionModels(listOf(model), debug = true).map { it.id }).containsExactly(ModelCatalog.OCR_PADDLE_LATIN.id)
+            assertThat(ModelCatalog.visionModels(listOf(model)).map { it.id }).containsExactly(ModelCatalog.OCR_PADDLE_LATIN.id)
         }
         assertThat(RemoteConfigRepository.parseModels(ocrJson(true)).single().validatedOnDevice).isTrue()
     }
@@ -176,7 +175,7 @@ class RemoteConfigRepositoryTest {
         ModelCatalog.applyRemoteManifest(snapshot.models)
         val gemma = ModelCatalog.GEMMA_4_E2B
         val models = com.keyflow.ui.config.LocalModelsUi.compose(
-            catalog = ModelCatalog.visionModels(debug = true), installed = setOf(gemma.id), active = null,
+            catalog = ModelCatalog.visionModels(), installed = setOf(gemma.id), active = null,
             failures = emptyMap(), selectedId = gemma.id, deviceRamMb = 8_000,
         )
         assertThat(models.items.map { it.spec.id }).containsExactly(ModelCatalog.OCR_PADDLE_LATIN.id, gemma.id, ModelCatalog.GEMMA_4_E4B.id)

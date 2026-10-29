@@ -451,8 +451,8 @@ val docsSections: List<DocSection> get() = listOf(
 )
 
 /**
- * Licença do modelo de OCR da Visão (`ModelCatalog.VISION_ALL`), no mesmo critério dos de texto: só é citado quando o release o oferece
- * (`validatedOnDevice`), porque "baixado sob demanda" seria falso na loja enquanto a Visão não chega ao usuário.
+ * Licença do modelo de OCR da Visão (`ModelCatalog.VISION_ALL`), no mesmo critério dos de texto: só é citado quando já foi validado
+ * (`validatedOnDevice`), embora a Visão o liste em todos os builds, porque "baixado sob demanda" seria falso na loja enquanto a Visão não chega ao usuário.
  */
 private fun visionModelLicenses(): List<DocBlock> = buildList {
     if (ModelCatalog.OCR_PADDLE_LATIN.validatedOnDevice) {

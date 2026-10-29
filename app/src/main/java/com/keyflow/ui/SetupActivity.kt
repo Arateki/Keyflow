@@ -64,12 +64,21 @@ import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.ModelKind
 import com.keyflow.data.models.ModelStore
 import com.keyflow.reasoning.ReasoningEngines
+import com.keyflow.reasoning.custom.CustomReasoningEngine
 import com.keyflow.reasoning.local.LocalLlmSupport
 import com.keyflow.reasoning.local.LocalReasoningEngine
 import com.keyflow.auth.AuthController
 import com.keyflow.App
 import com.keyflow.BuildConfig
 import com.keyflow.auth.ProviderIds
+import android.speech.tts.TextToSpeech
+import com.keyflow.i18n.AppLocale
+import com.keyflow.speech.AudioTrackPlayer
+import com.keyflow.speech.SpeechDeps
+import com.keyflow.speech.cloud.MediaCodecAudioDecoder
+import com.keyflow.speech.system.AndroidSystemTts
+import com.keyflow.speech.system.SystemSpeechEngine
+import com.keyflow.ui.config.SpeechTester
 import com.keyflow.ui.config.AccountModel
 import com.keyflow.ui.config.AuthActions
 import com.keyflow.ui.config.ControllerAuthActions
@@ -166,6 +175,38 @@ class SetupActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * O Testar da aba Voz: o motor da origem gravada (`SpeechEngines.forSource`) com o ambiente real — chaves do cofre lidas na hora da chamada
+     * (fora da main), o `TextToSpeech` do aparelho e o `AudioTrack`. Os modelos locais ainda não têm motor (outra frente): Local instalado dá `NOT_READY`.
+     */
+    private val speechTester by lazy {
+        val deps = SpeechDeps(
+            http = auth.http,
+            apiKey = {
+                val id = when (it) {
+                    SpeechDeps.Provider.OPENAI -> ProviderIds.OPENAI
+                    SpeechDeps.Provider.ELEVENLABS -> ProviderIds.ELEVENLABS
+                    SpeechDeps.Provider.GOOGLE -> ProviderIds.GOOGLE
+                }
+                auth.store.getApiKey(id)?.value
+            },
+            isModelInstalled = { ModelStore.get(this).isInstalled(it) },
+            system = {
+                SystemSpeechEngine(
+                    open = { AndroidSystemTts(applicationContext) },
+                    interfaceLocale = { AppLocale.current.let { if (it == AppLanguage.PT) java.util.Locale("pt", "BR") else java.util.Locale(it.code) } },
+                    release = { (it as? AndroidSystemTts)?.shutdown() },
+                )
+            },
+            decoder = MediaCodecAudioDecoder(),
+        )
+        SpeechTester.of(deps, ::AudioTrackPlayer, installTtsData = {
+            runCatching {
+                startActivity(Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+        })
+    }
+
     private val groqAuth by lazy { DirectApiKeyActions(auth.store, ProviderIds.GROQ, activityScope) }
     private val elevenLabsAuth by lazy { DirectApiKeyActions(auth.store, ProviderIds.ELEVENLABS, activityScope) }
 
@@ -207,6 +248,12 @@ class SetupActivity : ComponentActivity() {
             openAi = { OpenAiReasoningEngine(auth.authorization, auth.http, it) },
             anthropic = { AnthropicReasoningEngine(auth.authorization, auth.http, it) },
             google = { GoogleReasoningEngine(auth.authorization, auth.http, it) },
+            custom = { settings ->
+                CustomReasoningEngine(settings.reasoningCustomEndpoint, settings.reasoningCustomModel, auth.http) {
+                    if (settings.reasoningCustomHeaderName.isBlank() || settings.reasoningCustomHeaderValue.isBlank()) emptyMap()
+                    else mapOf(settings.reasoningCustomHeaderName to settings.reasoningCustomHeaderValue)
+                }
+            },
         )
     }
     private val visionEngines by lazy {
@@ -506,9 +553,13 @@ class SetupActivity : ComponentActivity() {
                         transcriptionOpenAiAuth = openAiAuth,
                         transcriptionGroqAuth = groqAuth,
                         falaElevenLabsAuth = elevenLabsAuth,
+                        speechTester = speechTester,
                         reasoningLocalSupported = reasoningLocalSupported,
                         ocrTester = ocrTester,
                         visionTester = visionTester,
+                        visionMotor = { snapshot -> com.keyflow.bancada.executor.MotorDeImagem(
+                            com.keyflow.bancada.adaptadores.ReconhecedorVisao(applicationContext, snapshot, visionEngines::resolve),
+                        ) },
                         localActions = localModels,
                         agentEnabled = BuildConfig.AGENT_ENABLED,
                         agent = if (BuildConfig.AGENT_ENABLED) agentRuntime else null,

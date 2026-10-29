@@ -7,6 +7,8 @@ import com.keyflow.auth.HttpErrorMessage
 import com.keyflow.auth.ProviderIds
 import com.keyflow.auth.providers.google.GoogleAuthConfig
 import com.keyflow.data.models.Ipv4FirstDns
+import com.keyflow.reasoning.OnlineMetrics
+import com.keyflow.reasoning.GenerationOptions
 import com.keyflow.reasoning.ReasoningEngine
 import com.keyflow.reasoning.ReasoningError
 import com.keyflow.reasoning.ReasoningEvent
@@ -67,10 +69,10 @@ class GoogleReasoningEngine(
             return@channelFlow
         }
 
-        val body = bodyOf(request).toRequestBody("application/json".toMediaType())
-        // Imagem só vai à origem escolhida: redirecionamentos não reenviam os pixels a outro host.
-        val transport = if (request.image == null) client else client.newBuilder()
-            .followRedirects(false).followSslRedirects(false).build()
+        val supported = supportedOptions(request.options)
+        val metrics = OnlineMetrics(request.options, supported)
+        val body = bodyOf(request, supported).toRequestBody("application/json".toMediaType())
+        val transport = if (request.image == null) client else client.newBuilder().followRedirects(false).followSslRedirects(false).build()
         var attempt = 0
 
         while (true) {
@@ -88,7 +90,7 @@ class GoogleReasoningEngine(
                 return@channelFlow
             }
 
-            val outcome = attemptOnce(call, request.image != null)
+            val outcome = attemptOnce(call, metrics, request.image != null)
             if (outcome !is Outcome.Retry) return@channelFlow
             attempt++
             if (attempt >= MAX_ATTEMPTS) {
@@ -104,7 +106,7 @@ class GoogleReasoningEngine(
         class Retry(val error: ReasoningEvent.Error) : Outcome
     }
 
-    private suspend fun ProducerScope<ReasoningEvent>.attemptOnce(call: Call, image: Boolean): Outcome {
+    private suspend fun ProducerScope<ReasoningEvent>.attemptOnce(call: Call, metrics: OnlineMetrics, image: Boolean): Outcome {
         var finished = false
         val watcher = launch(start = CoroutineStart.UNDISPATCHED) {
             try {
@@ -115,14 +117,14 @@ class GoogleReasoningEngine(
             }
         }
         try {
-            return withContext(Dispatchers.IO) { execute(call, image) { send(it) } }
+            return withContext(Dispatchers.IO) { execute(call, metrics, image) { send(it) } }
         } finally {
             finished = true
             watcher.cancel()
         }
     }
 
-    private suspend fun execute(call: Call, image: Boolean, send: suspend (ReasoningEvent) -> Unit): Outcome {
+    private suspend fun execute(call: Call, metrics: OnlineMetrics, image: Boolean, send: suspend (ReasoningEvent) -> Unit): Outcome {
         val response = try {
             call.execute()
         } catch (e: IOException) {
@@ -140,7 +142,7 @@ class GoogleReasoningEngine(
                 return Outcome.Finished
             }
             try {
-                readStream(r.body!!.source(), image, send)
+                readStream(r.body!!.source(), metrics, image, send)
             } catch (e: IOException) {
                 if (call.isCanceled()) throw CancellationException("cancelado")
                 send(ReasoningEvent.Error(ReasoningError.NETWORK, "o fluxo SSE do Gemini foi interrompido"))
@@ -149,16 +151,24 @@ class GoogleReasoningEngine(
         return Outcome.Finished
     }
 
-    private suspend fun readStream(source: BufferedSource, image: Boolean, send: suspend (ReasoningEvent) -> Unit) {
+    private suspend fun readStream(source: BufferedSource, metrics: OnlineMetrics, image: Boolean, send: suspend (ReasoningEvent) -> Unit) {
         val data = StringBuilder()
         var completed = false
+        var failed = false
+        val forward: suspend (ReasoningEvent) -> Unit = { event ->
+            when (event) {
+                ReasoningEvent.Done -> completed = true
+                is ReasoningEvent.Error -> { failed = true; send(metrics.event()); send(event) }
+                else -> if (!completed && !failed) send(event)
+            }
+        }
 
         while (true) {
             val line = source.readUtf8Line() ?: break
             when {
                 line.isEmpty() -> {
                     if (data.isNotEmpty()) {
-                        val terminal = handleData(data.toString(), image, send)
+                        val terminal = handleData(data.toString(), metrics, image, forward)
                         if (terminal) completed = true
                         data.clear()
                     }
@@ -171,17 +181,17 @@ class GoogleReasoningEngine(
         }
 
         if (data.isNotEmpty()) {
-            val terminal = handleData(data.toString(), image, send)
+            val terminal = handleData(data.toString(), metrics, image, forward)
             if (terminal) completed = true
         }
 
-        if (!completed) {
-            send(if (image) ReasoningEvent.Error(ReasoningError.NETWORK, "o fluxo da imagem terminou sem confirmação")
-                else ReasoningEvent.Done)
+        if (!failed) {
+            send(metrics.event())
+            send(if (image && !completed) ReasoningEvent.Error(ReasoningError.NETWORK, "o fluxo da imagem terminou sem STOP") else ReasoningEvent.Done)
         }
     }
 
-    private suspend fun handleData(data: String, image: Boolean, send: suspend (ReasoningEvent) -> Unit): Boolean {
+    private suspend fun handleData(data: String, metrics: OnlineMetrics, image: Boolean, send: suspend (ReasoningEvent) -> Unit): Boolean {
         if (data.trim() == "[DONE]") {
             send(ReasoningEvent.Done)
             return true
@@ -194,6 +204,12 @@ class GoogleReasoningEngine(
             return true
         }
 
+        json.optJSONObject("usageMetadata")?.let { usage ->
+            if (usage.has("promptTokenCount") && !usage.isNull("promptTokenCount")) metrics.inputTokens = usage.optInt("promptTokenCount")
+            if (usage.has("candidatesTokenCount") && !usage.isNull("candidatesTokenCount")) {
+                metrics.outputTokens = usage.optInt("candidatesTokenCount") + if (usage.has("thoughtsTokenCount") && !usage.isNull("thoughtsTokenCount")) usage.optInt("thoughtsTokenCount") else 0
+            }
+        }
         val candidates = json.optJSONArray("candidates") ?: return false
         if (candidates.length() == 0) return false
 
@@ -204,7 +220,7 @@ class GoogleReasoningEngine(
         if (parts != null) {
             for (i in 0 until parts.length()) {
                 val part = parts.optJSONObject(i)
-                val text = part?.optString("text").orEmpty()
+                val text = if (part?.optBoolean("thought") == true) "" else part?.optString("text").orEmpty()
                 if (text.isNotEmpty()) {
                     send(ReasoningEvent.Delta(text))
                 }
@@ -243,7 +259,16 @@ class GoogleReasoningEngine(
         else -> ReasoningError.UNAUTHORIZED
     }
 
-    private fun bodyOf(request: ReasoningRequest): String = JSONObject().apply {
+    private fun supportedOptions(options: GenerationOptions): Set<String> = buildSet {
+        add(GenerationOptions.TEMPERATURE)
+        if (!model.contains("gemini-3.6")) add(GenerationOptions.TOP_K)
+        if (!model.contains("gemini-3.6")) add(GenerationOptions.TOP_P)
+        add(GenerationOptions.SEED)
+        add(GenerationOptions.MAX_OUTPUT_TOKENS)
+        if (model.contains("gemini-2.5-flash") || (model.contains("gemini-2.5-pro") && options.thinking == true)) add(GenerationOptions.THINKING)
+    }
+
+    private fun bodyOf(request: ReasoningRequest, supported: Set<String>): String = JSONObject().apply {
         val userPart = JSONObject().put("text", request.user)
         val userContent = JSONObject().apply {
             put("role", "user")
@@ -255,6 +280,17 @@ class GoogleReasoningEngine(
         }
         put("contents", JSONArray().put(userContent))
 
+        val o = request.options
+        if (!o.isDefault) {
+            val config = JSONObject()
+            if (GenerationOptions.TEMPERATURE in supported) o.temperature?.let { config.put("temperature", it) }
+            if (GenerationOptions.TOP_K in supported) o.topK?.let { config.put("topK", it) }
+            if (GenerationOptions.TOP_P in supported) o.topP?.let { config.put("topP", it) }
+            if (GenerationOptions.SEED in supported) o.seed?.let { config.put("seed", it) }
+            if (GenerationOptions.MAX_OUTPUT_TOKENS in supported) o.maxOutputTokens?.let { config.put("maxOutputTokens", it) }
+            if (GenerationOptions.THINKING in supported) o.thinking?.let { config.put("thinkingConfig", JSONObject().put("thinkingBudget", if (it) -1 else 0)) }
+            if (config.length() > 0) put("generationConfig", config)
+        }
         request.system?.let { sysPrompt ->
             val sysPart = JSONObject().put("text", sysPrompt)
             put("systemInstruction", JSONObject().apply {

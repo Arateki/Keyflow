@@ -421,6 +421,9 @@ object RouteCatalog {
             )
         },
         Route("config-fala-elevenlabs") { ConfigFalaRoute(source = FalaSource.ELEVENLABS, elevenLabsKey = "eleven_mock_key") },
+        Route("config-fala-sistema") { ConfigFalaRoute(source = FalaSource.SYSTEM) },
+        Route("config-fala-custom") { ConfigFalaRoute(source = FalaSource.CUSTOM) },
+        Route("config-fala-openai") { ConfigFalaRoute(source = FalaSource.OPENAI) },
         Route("config-fala-google") { ConfigFalaRoute(source = FalaSource.GOOGLE, googleKey = "AIzaSyMockGoogleVoiceKey") },
         // Raciocínio: `config-raciocinio` é a origem Local sem nenhum modelo baixado; as outras cobrem baixando, pronto, a nuvem
         // (desconectada, conectada com o plano) e a área do Testar em andamento e no limite de uso.
@@ -670,7 +673,7 @@ object RouteCatalog {
     /** Estado fixo da lista de modelos da VISÃO (RAM de sobra, como a de voz): o OCR e os Gemma 4, do catálogo real. */
     private fun galleryVisionModels(installed: Set<String> = emptySet(), active: DownloadProgress? = null, selected: String? = null) =
         LocalModelsUi.compose(
-            catalog = ModelCatalog.visionModels(debug = true), installed = installed, active = active, failures = emptyMap(),
+            catalog = ModelCatalog.visionModels(), installed = installed, active = active, failures = emptyMap(),
             selectedId = selected, deviceRamMb = 8_192,
         )
 

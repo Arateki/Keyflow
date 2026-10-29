@@ -87,6 +87,20 @@ class DefaultAuthorizationProviderTest {
     }
 
     @Test
+    fun `o tipo corresponde aos cabecalhos da credencial ativa e nao revela o segredo`() = runTest {
+        store.put(provider, Credential.ApiKey("chave-falsa"))
+        val api = authorization().authorizedHeaders(provider)
+        assertThat(api.apiKey).isTrue()
+        assertThat(api.headers["Authorization"]).isEqualTo("Bearer chave-falsa")
+        assertThat(api.toString()).doesNotContain("chave-falsa")
+        store.put(provider, oauth(expiresAtMs = 3_600_000))
+        val login = authorization().authorizedHeaders(provider)
+        assertThat(login.apiKey).isFalse()
+        assertThat(login.headers["Authorization"]).isEqualTo("Bearer access1")
+        assertThat(login.toString()).doesNotContain("access1")
+    }
+
+    @Test
     fun `a valid token is not refreshed`() = runTest {
         store.put(provider, oauth(expiresAtMs = 3_600_000))
         val headers = authorization().headers(provider)

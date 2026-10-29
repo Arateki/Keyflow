@@ -96,6 +96,7 @@ class ExecutorBancada(
         private val pedidas = LinkedHashSet<String>()
         private val aplicadas = LinkedHashMap<String, String>()
         private val ignoradasPeloMotor = LinkedHashSet<String>()
+        private var ramPicoMb: Int? = null
         private var naoDeterministico = false
         private val previos = HashMap<String, List<ResultadoCaso>>()
         private var progressoAtual = Progresso("", 0, plano.testes.size, 0, 0)
@@ -109,6 +110,7 @@ class ExecutorBancada(
             estado = estado,
             motivo = motivo,
             opcoes = opcoesRegistradas(),
+            cargas = if (ramPicoMb != null) (plano.cabecalho.cargas ?: com.keyflow.bancada.resultado.Cargas(null, null, null, null)).copy(ramPicoMb = ramPicoMb) else plano.cabecalho.cargas,
             testes = concluidos + listOfNotNull(emAndamento),
         )
 
@@ -301,6 +303,14 @@ class ExecutorBancada(
         /** Tokens e tokens/s: os do motor quando ele os dá; senão uma estimativa (caracteres ÷ 4) marcada como tal (BEX-04). */
         private fun medidas(r: ResultadoCaso, t: Tentativa.Concluiu, caso: Caso): ResultadoCaso {
             val m = t.metricas
+            if (plano.origem == Origem.ONLINE) {
+                val output = m?.outputTokens
+                val elapsed = t.primeiroMs?.let { t.totalMs - it }
+                val rate = m?.tokensPerSecond ?: if (output != null && output > 1 && elapsed != null && elapsed > 0) {
+                    (output - 1) * 1000.0 / elapsed
+                } else null
+                return r.copy(tokensEntrada = m?.inputTokens, tokensSaida = output, tokensPorSegundo = rate?.takeIf { it.isFinite() })
+            }
             val tokensSaida = m?.outputTokens ?: ceil(t.texto.length / 4.0).toInt()
             val estimados = m?.outputTokens == null
             val corrido = t.primeiroMs?.let { t.totalMs - it }
@@ -316,7 +326,10 @@ class ExecutorBancada(
 
         /** Uma chamada ao motor, com o prazo do caso. Cancelar propaga (a exceção sobe); o resto vira [Tentativa]. */
         private suspend fun tentar(def: TesteDef, caso: Caso, opcoes: GenerationOptions): Tentativa {
-            val entrada = EntradaDoMotor(def.montar(caso), opcoes)
+            val imagem = if (def.capacidade == com.keyflow.bancada.corpus.Capacidade.IMAGEM) {
+                ImagemDoCorpus(requireNotNull(caso.texto("imagem")) { "caso ${caso.id} sem imagem" })
+            } else null
+            val entrada = EntradaDoMotor(def.montar(caso), opcoes, imagem)
             val inicio = relogio()
             val texto = StringBuilder()
             var primeiro: Long? = null
@@ -333,7 +346,10 @@ class ExecutorBancada(
                                     if (primeiro == null) primeiro = relogio() - inicio
                                     texto.append(evento.text)
                                 }
-                                is ReasoningEvent.Metrics -> metricas = evento
+                                is ReasoningEvent.Metrics -> {
+                                    metricas = evento
+                                    evento.peakMemoryMb?.let { ramPicoMb = maxOf(ramPicoMb ?: 0, it) }
+                                }
                                 ReasoningEvent.Done, is ReasoningEvent.Error -> fim = evento
                             }
                         }

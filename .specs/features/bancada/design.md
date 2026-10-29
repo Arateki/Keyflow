@@ -282,3 +282,10 @@ Fica registrado para quando os usos amadurecerem; nada disto entra nas tasks.
   faz (o `agent-harness` o exclui). Só no host: o app guarda a saída e um script a roda num sandbox sem rede, na automação.
 - **TTS→STT→WER** (ida e volta) quando a síntese de voz tiver motor.
 
+
+
+## Imagens e reconhecimento de objetos (BNC-T24/T31)
+
+O corpus usa imagens reproduzíveis, com o caminho, origem, licença e SHA-256 no manifesto; os arquivos não são enviados a provedores até a confirmação da rodada. O teste OCR compara o texto reconhecido com a referência por CER. O teste Objetos pede uma lista de rótulos, normaliza sinônimos pt/en para um vocabulário fixado no corpus e mede precisão, revocação e F1 por conjuntos; cada rótulo desconhecido conta como falso positivo. As imagens procedurais e suas referências são versionadas juntas.
+
+As etapas de imagem recebem bytes e metadados tipados e retornam texto ou erro, sem depender da UI. O adaptador OCR utiliza o motor local; o adaptador de visão utiliza `VisionModelEngine` para o modelo local ou o provedor selecionado. O executor conserva o cancelamento e nunca muda de origem como fallback. A faixa da Visão mostra apenas capacidades suportadas e preserva o teste rápido.
