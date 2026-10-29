@@ -454,7 +454,7 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 | FLX-57 | P2-I | FLX-T1, FLX-T2, FLX-T5, FLX-T20 | Pending |
 | FLX-58 | P2-I | FLX-T28, NTF-T20 | Pending (depende da feature `notification`) |
 | FLX-59 | P2-I | FLX-T29 | Pending (bloqueada: a orbe do teclado não tem spec) |
-| FLX-60 | P2-I | FLX-T5, FLX-T28 | Pending |
+| FLX-60 | P2-I | FLX-T5, FLX-T28, FLX-T29 | Pending (a parte do teclado, FLX-T29, está bloqueada: a orbe do teclado não tem spec) |
 
 **Coverage:** 60 requisitos, 60 mapeados em tasks, 0 sem task.
 **Status values:** Pending → In Design → In Tasks → Implementing → Verified.
