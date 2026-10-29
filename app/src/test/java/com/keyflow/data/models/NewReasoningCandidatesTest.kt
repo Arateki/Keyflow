@@ -9,14 +9,14 @@ class NewReasoningCandidatesTest {
     private val evidence = JSONObject(checkNotNull(javaClass.getResource("/modelos-novos.json")).readText())
 
     @Test
-    fun `candidate files match the pinned upstream LFS evidence and stay out of release`() {
+    fun `candidate files match the pinned upstream LFS evidence and are listed in every build though unvalidated`() {
         val entries = evidence.getJSONArray("models")
-        val release = ModelCatalog.visibleIn(ModelCatalog.TEXT_ALL, debug = false).map { it.id }
+        val listed = ModelCatalog.TEXT.map { it.id }
         repeat(entries.length()) { i ->
             val upstream = entries.getJSONObject(i)
             val model = checkNotNull(ModelCatalog.byId(upstream.getString("id")))
             assertThat(model.validatedOnDevice).isFalse()
-            assertThat(release).doesNotContain(model.id)
+            assertThat(listed).contains(model.id)
             val file = model.files.single()
             assertThat(file.fileName).isEqualTo(upstream.getString("file"))
             assertThat(file.bytes).isEqualTo(upstream.getLong("bytes"))

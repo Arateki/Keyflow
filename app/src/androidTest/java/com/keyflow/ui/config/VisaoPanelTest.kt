@@ -138,7 +138,7 @@ class VisaoPanelTest {
         var installed by mutableStateOf(installed)
         var active by mutableStateOf<DownloadProgress?>(null)
         var localSupported by mutableStateOf(true)
-        var catalog by mutableStateOf(ModelCatalog.visionModels(debug = true))
+        var catalog by mutableStateOf(ModelCatalog.visionModels())
         // Falso: o anfitrião não devolve as Settings novas à tela (o Testar não pode ficar sem resposta por isso).
         var acceptsChanges = true
         // O que o anfitrião recebeu e ainda não devolveu à tela (retorno atrasado, como na SetupActivity real).
