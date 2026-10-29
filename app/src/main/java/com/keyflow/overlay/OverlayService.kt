@@ -131,7 +131,7 @@ class OverlayService : Service() {
             }) },
             showSelector = ::showVisionSelector,
             cleanup = ::cleanupVision,
-            onState = { floatingButton?.setVisionState(it) },
+            onState = { floatingButton?.updateVisionState(it) },
             onResult = { bitmap ->
                 // O consumidor de ações será ligado na VC-T7; a etapa devolve o bitmap ao callback.
                 visionCaptureResultForTest?.invoke(bitmap)

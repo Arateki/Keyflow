@@ -137,7 +137,7 @@ class OrbButtonView(
 
     private var visionState by mutableStateOf(VisionFlowState.NONE)
 
-    fun setVisionState(state: VisionFlowState) { visionState = state }
+    fun updateVisionState(state: VisionFlowState) { visionState = state }
 
     private var orbUi by mutableStateOf(OrbButtonUi(OrbState.Idle, OrbCenter.None))
     private var currentOrbStyle by mutableStateOf(orbStyle)
