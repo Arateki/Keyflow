@@ -147,8 +147,12 @@ class OverlayServiceVisionTest {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             val probe = ActivityScenario.launch<com.keyflow.ui.ImeProbeActivity>(intent)
             try {
-                assertNotNull(device.wait(Until.findObject(By.desc("ime_probe_field")), 15_000))
-                device.findObject(By.desc("ime_probe_field")).click()
+                probe.onActivity { activity ->
+                    val field = activity.currentFocus
+                    assertTrue("o campo real do probe precisa ter foco", field is android.widget.EditText)
+                    assertEquals("ime_probe_field", field?.contentDescription)
+                    assertTrue(field!!.requestFocus())
+                }
                 withTimeout(15_000) { KeyFlowController.keyboardVisible.first { it } }
                 awaitWindow(true, "abertura inicial")
                 screenshot("VISIVEL")
