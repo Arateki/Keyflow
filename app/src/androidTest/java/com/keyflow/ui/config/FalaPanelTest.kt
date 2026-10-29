@@ -214,6 +214,32 @@ class FalaPanelTest {
     }
 
     @Test
+    fun enquadrarTestarNaGaleriaMantemFrasePadraoSemSinteseNemAudio() {
+        val recorder = Recorder(twoBuffers)
+        val spec = ModelCatalog.VITS_COQUI_PT
+        val models = LocalModelsUi.compose(
+            catalog = ModelCatalog.VOICE, installed = setOf(spec.id), active = null,
+            failures = emptyMap(), selectedId = spec.id, deviceRamMb = 8_192,
+        )
+        rule.setContent {
+            KeyFlowTheme(dark = false) {
+                FalaPanel(
+                    settings = Settings(falaLocalModelId = spec.id), onSettingsChange = {},
+                    models = models, tester = recorder.tester, showInitialTest = true,
+                )
+            }
+        }
+        rule.onNodeWithTag(FALA_TEST_TEXT_TAG).assertIsDisplayed().assertTextEquals("Olá. Esta é a voz do KeyFlow.")
+        rule.onNodeWithTag(FALA_TEST_BUTTON_TAG).assertIsDisplayed().assertIsEnabled().assertTextEquals("Testar")
+        rule.onNodeWithTag(FALA_TEST_TIMES_TAG).assertDoesNotExist()
+        rule.runOnIdle {
+            assertTrue(recorder.engineSettings.isEmpty())
+            assertTrue(recorder.requests.isEmpty())
+            assertTrue(recorder.played.isEmpty())
+        }
+    }
+
+    @Test
     fun creditsIsDisabledAndNotSelectable() {
         val h = Harness(Settings(), voiceUi())
         rule.setContent { h.Content() }

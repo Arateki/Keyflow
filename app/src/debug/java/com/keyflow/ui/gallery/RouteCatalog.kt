@@ -81,6 +81,7 @@ import com.keyflow.ui.orb.OrbStyle
 import com.keyflow.ui.orb.glitchBurstMidMs
 import com.keyflow.ui.orb.VoiceOrb
 import com.keyflow.ui.theme.LocalKeyFlowPalette
+import com.keyflow.ui.config.VoiceLicenseDialog
 import com.keyflow.ui.config.LocalModelsUi
 import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.DownloadState
@@ -400,24 +401,41 @@ object RouteCatalog {
                 },
             )
         },
-        // Voz (Fala): `config-fala` é a origem Local sem nenhum modelo baixado; as outras cobrem baixando e pronto.
+        // Voz: catálogo real, estados fixos e área do Testar parada, sem sintetizar áudio.
         Route("config-fala") { ConfigFalaRoute() },
         Route("config-fala-local-baixando") {
             ConfigFalaRoute(
                 localModels = galleryVoiceModels(
                     active = DownloadProgress(
-                        SamplePanelModels.VOICE_LIGHT.id,
+                        ModelCatalog.VITS_COQUI_PT.id,
                         DownloadState.RUNNING,
-                        bytesDone = SamplePanelModels.VOICE_LIGHT.totalBytes * 42 / 100,
-                        totalBytes = SamplePanelModels.VOICE_LIGHT.totalBytes,
+                        bytesDone = ModelCatalog.VITS_COQUI_PT.totalBytes * 42 / 100,
+                        totalBytes = ModelCatalog.VITS_COQUI_PT.totalBytes,
                     ),
                 ),
             )
         },
         Route("config-fala-local-pronto") {
             ConfigFalaRoute(
-                localModelId = SamplePanelModels.VOICE_LIGHT.id,
-                localModels = galleryVoiceModels(installed = setOf(SamplePanelModels.VOICE_LIGHT.id), selected = SamplePanelModels.VOICE_LIGHT.id),
+                localModelId = ModelCatalog.VITS_COQUI_PT.id,
+                localModels = galleryVoiceModels(installed = setOf(ModelCatalog.VITS_COQUI_PT.id), selected = ModelCatalog.VITS_COQUI_PT.id),
+            )
+        },
+        Route("config-fala-supertonic-licenca") {
+            ConfigFalaRoute()
+            VoiceLicenseDialog(onAccept = {}, onDismiss = {})
+        },
+        Route("config-fala-supertonic-pronto") {
+            ConfigFalaRoute(
+                localModelId = ModelCatalog.SUPERTONIC_3.id,
+                localModels = galleryVoiceModels(installed = ModelCatalog.VOICE.map { it.id }.toSet(), selected = ModelCatalog.SUPERTONIC_3.id),
+            )
+        },
+        Route("config-fala-testar") {
+            ConfigFalaRoute(
+                localModelId = ModelCatalog.VITS_COQUI_PT.id,
+                localModels = galleryVoiceModels(installed = setOf(ModelCatalog.VITS_COQUI_PT.id), selected = ModelCatalog.VITS_COQUI_PT.id),
+                showTest = true,
             )
         },
         Route("config-fala-elevenlabs") { ConfigFalaRoute(source = FalaSource.ELEVENLABS, elevenLabsKey = "eleven_mock_key") },
@@ -727,7 +745,7 @@ object RouteCatalog {
         selected: String? = null,
     ): LocalModelsUi =
         LocalModelsUi.compose(
-            catalog = SamplePanelModels.VOICE, installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_192,
+            catalog = ModelCatalog.VOICE, installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_192,
         )
 
     /** Aba Voz (Fala): a origem, a lista local e os controles de voz num estado fixo. */
@@ -738,6 +756,7 @@ object RouteCatalog {
         localModels: LocalModelsUi = galleryVoiceModels(),
         elevenLabsKey: String = "",
         googleKey: String = "",
+        showTest: Boolean = false,
     ) {
         ConfigScreen(
             settings = FakeSettings.settings.copy(
@@ -745,6 +764,9 @@ object RouteCatalog {
                 falaLocalModelId = localModelId,
             ),
             falaModels = localModels,
+            showInitialFalaTest = showTest,
+            falaElevenLabsAuth = GalleryAuth(ConnectionState.Disconnected, storedKey = elevenLabsKey),
+            reasoningGoogleAuth = GalleryAuth(ConnectionState.Disconnected, storedKey = googleKey),
             permissions = PermissionStatus(
                 microphoneGranted = true,
                 overlayGranted = true,

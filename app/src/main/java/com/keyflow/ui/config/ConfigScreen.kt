@@ -153,6 +153,7 @@ fun ConfigScreen(
     falaElevenLabsAuth: AuthActions = AuthActions.None,
     // O Testar da aba Voz: o motor da origem e o `AudioTrack`. Sem ele (galeria, testes) o botão responde "indisponível".
     speechTester: SpeechTester = SpeechTester.None,
+    showInitialFalaTest: Boolean = false,
     initialReasoningTest: TestState = TestState(),
     reasoningLocalSupported: Boolean = true,
     // A aba Visão usa as MESMAS conexões de provedor do Raciocínio (`reasoning*Auth`): conectar numa aba vale na outra (PRV-01).
@@ -503,6 +504,7 @@ fun ConfigScreen(
                             models = falaModels,
                             actions = localActions,
                             tester = speechTester,
+                            showInitialTest = showInitialFalaTest,
                             openAiAuth = reasoningAuth,
                             googleAuth = reasoningGoogleAuth,
                             elevenLabsAuth = falaElevenLabsAuth,
