@@ -521,7 +521,7 @@ Spec: `.specs/features/model-params/` (lápis no card baixado; Raciocínio e, na
 
 ## Bloco 13 — `sintese-fala` (aba Voz, síntese) — rascunho, fora da v1
 
-Spec: `.specs/features/sintese-fala/` (origem Local, Sistema, OpenAI, ElevenLabs, Google e Custom; Testar reproduz áudio). Rascunho para o Yan. Não toma a vez da v1 nem da bancada. Modelo local inicial: Supertonic 3 (D2, 29/10); o VITS continua pendente da escuta (D1).
+Spec: `.specs/features/sintese-fala/` (origem Local, Sistema, OpenAI, ElevenLabs, Google e Custom; Testar reproduz áudio). Rascunho para o Yan. Não toma a vez da v1 nem da bancada. Modelos locais iniciais: Supertonic 3 (D2) e VITS Coqui pt com o nome "português" (D1, 29/10; sem esperar a escuta).
 
 ---
 

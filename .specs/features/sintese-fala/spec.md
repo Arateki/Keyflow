@@ -34,7 +34,7 @@ inventados). Não há motor: nem ORT, nem `TextToSpeech`, nem chamada de nuvem.
 | Recompilar o AAR do sherpa | Já está na main, sem TTS. Ver FPRV-02 |
 | Embutir Kokoro, Kitten, Piper, Matcha ou MMS | eSpeak/GPL ou não comercial |
 | Quantizar o Supertonic (int8 ou outro derivado) | O primeiro pin é o ONNX oficial, sem alteração (cláusula 4.c). Ver FPRV-03 |
-| Colocar o VITS Coqui pt no catálogo | A escuta no A32 continua pendente (D1) |
+| Chamar o VITS de pt-BR | É português genérico do Common Voice. O nome no catálogo é "português" (D1) |
 
 ---
 
@@ -77,16 +77,16 @@ inventados). Não há motor: nem ORT, nem `TextToSpeech`, nem chamada de nuvem.
 
 **Como** dono do produto, **quero** uma voz no aparelho sem GPL e sem rede, **para** cumprir a mesma promessa da Visão.
 
-O modelo local **inicial**, para testar a tela, é o Supertonic 3 (D2): pesos OpenRAIL-M, código de inferência MIT, ONNX oficial sem eSpeak, idioma `pt`. O VITS Coqui pt (`context.md`: `csukuangfj/vits-coqui-pt-cv`, pesos BSD-3, `use_phonemes=false`, ~71 MB, uma voz, português genérico, **não** rotulado pt-BR) continua só como candidato de escuta (D1) e **não** entra no catálogo enquanto o Yan não ouvir. Espanhol no mesmo molde (VITS Coqui es) e o MeloTTS em inglês ficam de fora desta leva.
+Entram agora no catálogo, lado a lado: o Supertonic 3 (D2; pesos OpenRAIL-M, código de inferência MIT, ONNX oficial sem eSpeak, idioma `pt`) e o VITS Coqui pt (D1; `context.md`: `csukuangfj/vits-coqui-pt-cv`, pesos BSD-3, `use_phonemes=false`, ~71 MB, uma voz). O nome visível do VITS é **português**, não "pt-BR": o Common Voice desse modelo não separa o Brasil. Se a escuta não agradar, a entrada sai depois; não se espera a escuta para publicar o card. Espanhol no mesmo molde (VITS Coqui es) e o MeloTTS em inglês ficam de fora desta leva.
 
-1. **FLOC-01**: a primeira entrada de `ModelCatalog.VOICE` SHALL ser o Supertonic 3, com URL de commit, SHA-256 e tamanho **obtidos de novo no download**, licença no comentário. Proibido pin fabricado ou copiado só do prefixo do `context.md`. O VITS não ganha entrada nesta task.
-2. **FLOC-02**: ficam de fora do catálogo: Kokoro (pt exige eSpeak), KittenTTS (eSpeak), Piper, Matcha com phonemizer GPL, MMS (`cc-by-nc-4.0`), F5 (tamanho e licenças de peso irregulares) e qualquer ONNX quantizado do Supertonic. O Supertonic 3 oficial entra (D2).
-3. **FLOC-03**: o motor inicial SHALL seguir o código oficial MIT do Supertonic (índice Unicode, quatro ONNX: duração, texto, estimador e vocoder; voz e idioma `pt`). O frontend do VITS de caracteres fica para o dia em que D1 o aceitar: Kotlin no estilo do `offline-tts-character-frontend.cc` (minúsculas, mapa caractere→id, `blank` entre os caracteres, corte em `. : ? !`) e um normalizador de dígitos da língua do modelo, porque o `tokens.txt` não tem dígitos. Não é um normalizador geral de texto.
-4. **FLOC-04**: a síntese local SHALL rodar num processo `:speech` (`exported=false`), com a mesma `libonnxruntime.so` do AAR do sherpa (uma cópia por ABI). SHALL NOT usar `OfflineTts` nem puxar o AAR com TTS. No Supertonic, a velocidade da aba é o fator `speed` do pipeline oficial. No VITS, se um dia entrar, 1,0 = `length_scale` do modelo e outra velocidade usa `length_scale = 1 / speed`. Ocioso ~120 s descarrega a sessão. `OutOfMemoryError` vira `ENGINE` com frase amigável.
+1. **FLOC-01**: `ModelCatalog.VOICE` SHALL ter duas entradas reais: Supertonic 3 e VITS Coqui pt. Cada uma traz URL de commit, SHA-256 e tamanho **obtidos de novo no download**, licença no comentário. O nome do VITS na tela é `tr("português")`. Proibido pin fabricado, nome "pt-BR", ou SHA copiado só do prefixo do `context.md`.
+2. **FLOC-02**: ficam de fora do catálogo: Kokoro (pt exige eSpeak), KittenTTS (eSpeak), Piper, Matcha com phonemizer GPL, MMS (`cc-by-nc-4.0`), F5 (tamanho e licenças de peso irregulares) e qualquer ONNX quantizado do Supertonic. Entram o Supertonic 3 oficial (D2) e o VITS Coqui pt (D1).
+3. **FLOC-03**: o Supertonic SHALL seguir o código oficial MIT (índice Unicode, quatro ONNX: duração, texto, estimador e vocoder; voz e idioma `pt`). O VITS SHALL ter frontend de caracteres em Kotlin, no estilo do `offline-tts-character-frontend.cc`: minúsculas, mapa caractere→id, `blank` entre os caracteres, corte em `. : ? !`, mais um normalizador de dígitos em português (o `tokens.txt` não tem dígitos). Caractere fora do vocabulário é descartado. Não é um normalizador geral de texto.
+4. **FLOC-04**: a síntese local SHALL rodar num processo `:speech` (`exported=false`), com a mesma `libonnxruntime.so` do AAR do sherpa (uma cópia por ABI). SHALL NOT usar `OfflineTts` nem puxar o AAR com TTS. No Supertonic, a velocidade da aba é o fator `speed` do pipeline oficial. No VITS, 1,0 = `length_scale` do modelo e outra velocidade usa `length_scale = 1 / speed`. Ocioso ~120 s descarrega a sessão. `OutOfMemoryError` vira `ENGINE` com frase amigável.
 5. **FLOC-05**: nenhum peso no APK. Download, seleção e apagar só pela aba, pelo downloader e `ModelStore` já usados na Visão. No caminho Local, nenhum socket: a promessa "nada sai do aparelho" vale **só** para Local (teste de arquitetura / processo sem rede na síntese). O download em si continua saindo ao Hugging Face, e a nota da aba diz isso, como na Visão.
 6. **FLOC-06**: aparelho sem RAM para o modelo mostra o aviso que a aba já tem ("Este aparelho não suporta os modelos locais de voz.") e não seleciona Sistema no lugar.
 
-**Independent Test**: o catálogo de voz aponta só o Supertonic, com SHA conferido no teste contra o valor gravado na entrada (não um prefixo). Serviço sem o arquivo emite `MODEL_MISSING` e não abre socket. O normalizador do VITS continua testável na JVM, sem o modelo de 71 MB.
+**Independent Test**: o catálogo de voz lista o Supertonic e o VITS com o nome "português", cada SHA conferido contra o valor gravado na entrada (não um prefixo). Serviço sem o arquivo daquele id emite `MODEL_MISSING` e não abre socket. O normalizador do VITS é testável na JVM, sem o modelo de 71 MB.
 
 ---
 
@@ -134,7 +134,7 @@ O modelo local **inicial**, para testar a tela, é o Supertonic 3 (D2): pesos Op
 
 | Id | Pergunta | O que a spec faz enquanto isso |
 | -- | -------- | ------------------------------ |
-| D1 | O VITS Coqui pt entra no catálogo depois da escuta no A32? Amostras em `/sdcard/Download/keyflow-voz/vits-1.wav` … `vits-3.wav`. Não chamar de pt-BR | **Pendente (Yan, 29/10).** Não entra. O modelo local inicial da tela é o Supertonic (D2) |
+| D1 | **Decidido (Yan, 29/10):** o VITS Coqui pt entra no catálogo agora, ao lado do Supertonic 3, sem esperar a escuta. Se não agradar, sai depois. O nome na tela é "português", não "pt-BR" | FLOC-01 e FAL-T10 |
 | D2 | **Decidido (Yan, 29/10):** o Supertonic 3 entra como modelo local inicial para testar a tela de Voz. Licença e restrições aparecem e são aceitas só quando a pessoa baixa ou usa esse modelo | FLOC-01 e FPRV-03 |
 | D3 | **Decidido (Yan, 29/10):** o primeiro corte de cards é OpenAI, ElevenLabs, Google, Custom e Sistema | FCLD-01 e FSYS. Gemini e os outros ficam de fora |
 | D4 | **Decidido (Yan, 29/10):** o card da OpenAI leva o aviso de que os modelos de voz desligam em 2027-01-06 | FCLD-02. Sem Realtime |
@@ -146,8 +146,8 @@ O modelo local **inicial**, para testar a tela, é o Supertonic 3 (D2): pesos Op
 | --------- | ---- | ------ |
 | FUX-01..09 | FAL-T4, FAL-T7 | Pending |
 | FENG-01..06 | FAL-T1, FAL-T4 | Pending |
-| FLOC-01..02 | FAL-T8 | Pending |
-| FLOC-03..06 | FAL-T2, FAL-T3, FAL-T9 | Pending |
+| FLOC-01..02 | FAL-T8, FAL-T10 | Pending |
+| FLOC-03..06 | FAL-T2, FAL-T3, FAL-T9, FAL-T11 | Pending |
 | FCLD-01..07 | FAL-T5 | Pending |
 | FSYS-01..05 | FAL-T6 | Pending |
 | FPRV-01..02 | FAL-T2, FAL-T3 | Pending |

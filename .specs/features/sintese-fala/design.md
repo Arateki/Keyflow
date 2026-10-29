@@ -9,7 +9,7 @@ Um pedido de fala é texto mais velocidade. Quem fala é o `SpeechEngine` da ori
 ```
 FalaPanel (Testar)  ── SpeechRequest ──►  SpeechEngine
 passo de Fluxos     ── (mesmo tipo)  ──►      │
-                                              ├ LOCAL    :speech  → Supertonic (4 ONNX, código MIT) → PCM
+                                              ├ LOCAL    :speech  → Supertonic (4 ONNX) ou VITS de caracteres → PCM
                                               ├ SYSTEM   TextToSpeech do aparelho → PCM ou onStart/onDone
                                               ├ OPENAI / ELEVENLABS / GOOGLE / CUSTOM  → HTTP → PCM
                                               └ eventos: Audio…, FirstAudio, Done | Error
@@ -57,9 +57,9 @@ O IME não sintetiza no thread principal. O `AudioTrack` do Testar fica no proce
 
 ## Frontend local
 
-O primeiro modelo é o Supertonic 3 (D2). O processo carrega os quatro ONNX oficiais e o índice Unicode, no molde do pacote MIT `supertonic` (idioma `pt`, estilo de voz que vier no catálogo). Sem o arquivo no disco, ou sem o aceite da FPRV-03, `speak` devolve `MODEL_MISSING` ou `NOT_READY` e não abre sessão. A velocidade da aba entra no fator `speed` desse pipeline.
+Os dois modelos locais desta leva são o Supertonic 3 (D2) e o VITS Coqui pt (D1). O Supertonic carrega os quatro ONNX oficiais e o índice Unicode, no molde do pacote MIT `supertonic` (idioma `pt`, estilo de voz que vier no catálogo). Sem o arquivo no disco, ou sem o aceite da FPRV-03, `speak` devolve `MODEL_MISSING` ou `NOT_READY` e não abre sessão. A velocidade da aba entra no fator `speed` desse pipeline.
 
-O VITS de caracteres só entra se o Yan aceitar a escuta (D1). Até lá o serviço não procura esse arquivo.
+O VITS entra no mesmo catálogo, com o nome "português". O serviço usa o frontend de caracteres abaixo. Sem o arquivo, `speak` desse id devolve `MODEL_MISSING`.
 
 Para o VITS Coqui (metadados no próprio onnx: `frontend=characters`, `add_blank`, `blank_id`, `sample_rate` 22050):
 
@@ -68,7 +68,7 @@ Para o VITS Coqui (metadados no próprio onnx: `frontend=characters`, `add_blank
 3. Cada caractere vira id pelo `tokens.txt`. Desconhecido é pulado. Se `add_blank`, o id de blank entra entre os caracteres.
 4. `length_scale = 1 / speed`. Saída float do modelo vira PCM 16-bit mono na `sample_rate` do metadado.
 
-O léxico do MeloTTS (inglês) é outro frontend e não entra nesta leva. FAL-T2 deixa o frontend de caracteres pronto, sem colocar o VITS no catálogo.
+O léxico do MeloTTS (inglês) é outro frontend e não entra nesta leva. FAL-T2 faz o frontend de caracteres; FAL-T10 coloca o VITS no catálogo com o nome "português".
 
 ## Nuvem e Custom
 
@@ -109,7 +109,7 @@ Testar: campo, botão, motivo, linha de tempos. Estado inicial da galeria não d
 - Arquitetura: `:speech` não importa downloader nem UI; síntese local não referencia `OfflineTts`.
 - Instrumentado: painel com motor falso (Testar emite a linha de tempos; Local sem modelo deixa o botão desligado; Sistema mostra a nota). `TextToSpeech` de verdade não é gate de CI.
 - Goldens: `pool telas` nas rotas do FUX-08. `--approve` só do que for desta aba.
-- Aparelho: escuta do candidato (D1) é manual, no A32, com `--confirmo-a32`. Não é gate das tasks T1–T7.
+- Aparelho: ouvir as duas vozes no A32 é manual e não segura o catálogo. Se o VITS não agradar, a entrada sai depois (D1).
 
 ## Licença do Supertonic
 
@@ -117,4 +117,4 @@ O diálogo de baixar esse card é o acordo da cláusula 4.a: inclui o Attachment
 
 ## O que não entra
 
-Editor de Fluxos, Realtime, Gemini TTS, ONNX quantizado do Supertonic, VITS no catálogo antes da escuta, recompilar sherpa, segundo `libonnxruntime.so`, cota fictícia, frase de sucesso sem áudio.
+Editor de Fluxos, Realtime, Gemini TTS, ONNX quantizado do Supertonic, chamar o VITS de pt-BR, recompilar sherpa, segundo `libonnxruntime.so`, cota fictícia, frase de sucesso sem áudio.

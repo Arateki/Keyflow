@@ -4,7 +4,7 @@
 **Status**: rascunho. Nenhuma task começou. **Fora da v1**. Não toma a vez de frente aberta.
 
 > **Para o agente executor**: leia `spec.md` + `design.md` + este arquivo e `.specs/codebase/TESTING.md`. Uma task por vez,
-> na ordem abaixo, testes primeiro, gate verde antes de avançar. O VITS espera a escuta (D1). O Supertonic não espera.
+> na ordem abaixo, testes primeiro, gate verde antes de avançar. Supertonic e VITS entram no catálogo nesta leva (D1 e D2). O nome do VITS é "português", nunca "pt-BR".
 
 **Goal**: a aba Voz no molde da Visão, com Testar que reproduz áudio e um `SpeechEngine` que um fluxo futuro pode chamar.
 
@@ -24,14 +24,14 @@
 
 ```
 T1 (contrato, JVM) → T3 (:speech) → T9 (motor Supertonic)
+                 ↘ T2 (frontend do VITS) → T11 (motor VITS)
                  ↘ T4 (painel) → T7 (goldens)
                  ↘ T5 (nuvem e Custom, JVM + cliente)
                  ↘ T6 (sistema)
-T2 (frontend do VITS) — não trava as outras; o VITS no catálogo espera D1
-T8 (pin do Supertonic + aceite) — não espera D1
+T8 (pin do Supertonic + aceite) e T10 (pin do VITS, nome "português") — não esperam escuta
 ```
 
-T4, T5 e T6 dependem só de T1. T3 depende de T1 (a sessão ORT); T2 é o frontend do VITS e não trava T3 nem T9. T7 depende de T4. T9 depende de T3. T8 pode seguir em paralelo com T4.
+T4, T5 e T6 dependem só de T1. T3 depende de T1. T2 não trava T3 nem T9. T11 depende de T2 e T3. T7 depende de T4. T9 depende de T3. T8 e T10 podem seguir em paralelo com T4.
 
 ---
 
@@ -42,7 +42,7 @@ T4, T5 e T6 dependem só de T1. T3 depende de T1 (a sessão ORT); T2 é o fronte
 - **Gate**: `pool compilar testDebugUnitTest`.
 
 ### FAL-T2 — Frontend de caracteres `[P]`
-- **What**: normalizador de dígitos e frontend VITS (FLOC-03, FPRV-01). `tokens.txt` de teste, minúsculo, no `src/test`. Não baixar o modelo de 71 MB.
+- **What**: normalizador de dígitos em português e frontend VITS de caracteres (FLOC-03, FPRV-01). `tokens.txt` de teste, minúsculo, no `src/test`. Não baixar o modelo de 71 MB. O rótulo do modelo, quando a task de pin o mostrar, é "português".
 - **Where**: `com.keyflow.speech.local`.
 - **Done when**: "2" em pt vira a palavra combinada; caractere fora do mapa some; com `add_blank` o id de blank fica entre os outros; frase corta em `.`. Nenhum arquivo do teste cita eSpeak. Gate `quick`.
 - **Gate**: `pool compilar testDebugUnitTest`.
@@ -77,12 +77,23 @@ T4, T5 e T6 dependem só de T1. T3 depende de T1 (a sessão ORT); T2 é o fronte
 - **Gate**: `pool telas`.
 
 ### FAL-T8 — Pin do Supertonic e aceite `[P]`
-- **What**: uma entrada real do Supertonic 3 em `ModelCatalog.VOICE` (FLOC-01, FLOC-02, FPRV-03). Baixar de novo o ONNX oficial, gravar SHA-256 e tamanho completos, licença no comentário e em `app/licenses/`. Não copiar o prefixo do `context.md` como se fosse o hash. Diálogo de aceite (licença + Attachment A) antes do download; sem aceite, o downloader não é chamado. Não acrescentar o VITS: isso continua pendente de D1.
-- **Done when**: o id do Supertonic baixa só depois do aceite, o SHA confere e o catálogo não lista VITS, Kokoro, Piper nem ONNX quantizado. Gate `quick` + `build`.
+- **What**: uma entrada real do Supertonic 3 em `ModelCatalog.VOICE` (FLOC-01, FLOC-02, FPRV-03). Baixar de novo o ONNX oficial, gravar SHA-256 e tamanho completos, licença no comentário e em `app/licenses/`. Não copiar o prefixo do `context.md` como se fosse o hash. Diálogo de aceite (licença + Attachment A) antes do download; sem aceite, o downloader não é chamado. O VITS é a FAL-T10, não esta task.
+- **Done when**: o id do Supertonic baixa só depois do aceite, o SHA confere e o catálogo não lista Kokoro, Piper nem ONNX quantizado. Gate `quick` + `build`.
 - **Gate**: `pool compilar testDebugUnitTest assembleDebug`.
 
 ### FAL-T9 — Motor Supertonic
 - **What**: síntese no `:speech` com os quatro ONNX e o índice Unicode, a partir do código MIT oficial, idioma `pt` (FLOC-03, FLOC-04). Sem `OfflineTts`.
 - **Where**: `com.keyflow.speech.local`.
 - **Done when**: texto de teste com o índice falso produz ids; arquivo ausente emite `MODEL_MISSING` sem socket; a velocidade da aba chega ao fator `speed`. O modelo de ~398 MB não entra no teste de JVM. Gate `quick`.
+- **Gate**: `pool compilar testDebugUnitTest`.
+
+### FAL-T10 — Pin do VITS `[P]`
+- **What**: entrada real do VITS Coqui pt em `ModelCatalog.VOICE`, ao lado do Supertonic (FLOC-01, D1). Nome visível `tr("português")` — não "pt-BR". Baixar de novo, gravar SHA-256 e tamanho completos, licença BSD-3 no comentário e em `app/licenses/`. Não copiar o prefixo do `context.md`.
+- **Done when**: as duas entradas existem; o nome do VITS é "português"; o SHA confere; Kokoro e Piper continuam de fora. Gate `quick` + `build`.
+- **Gate**: `pool compilar testDebugUnitTest assembleDebug`.
+
+### FAL-T11 — Motor VITS
+- **What**: síntese no `:speech` com o frontend da FAL-T2 e o `model.onnx` de caracteres (FLOC-03, FLOC-04). `length_scale = 1 / speed`. Sem `OfflineTts`. Sem chamar o modelo de pt-BR.
+- **Where**: `com.keyflow.speech.local`.
+- **Done when**: o normalizador + frontend da T2 alimentam a sessão; arquivo ausente emite `MODEL_MISSING` sem socket; velocidade 1,0 usa `length_scale` 1. O modelo de 71 MB não entra no teste de JVM. Gate `quick`.
 - **Gate**: `pool compilar testDebugUnitTest`.
