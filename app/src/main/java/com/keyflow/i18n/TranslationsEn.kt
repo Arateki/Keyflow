@@ -967,4 +967,7 @@ internal val TranslationsEn: Map<String, String> = mapOf(
     "roda em sequência todos os testes que o modelo suporta. Parar guarda o que já foi medido, e o aparelho quente ou com bateria baixa pausa a rodada." to "runs every test the model supports, one after another. Stop keeps what was already measured, and a hot device or a low battery pauses the run.",
     "Modelo da nuvem" to "Cloud model",
     "antes de qualquer chamada o app mostra quantas serão feitas e o teto de tokens, e só roda depois que você confirmar. No login por assinatura a rodada reduzida (2 casos por teste) vem primeiro e consome o limite do seu plano." to "before any call the app shows how many will be made and the token cap, and only runs after you confirm. With a subscription login the reduced run (2 cases per test) comes first and it uses your plan’s limit.",
+    "O texto é longo demais para %s (máximo de %d caracteres)." to "The text is too long for %s (maximum of %d characters).",
+    "A chave do Google não vale para a Cloud Text-to-Speech. Habilite essa API na chave (Google Cloud) e tente de novo." to "The Google key isn't valid for Cloud Text-to-Speech. Enable that API on the key (Google Cloud) and try again.",
+    "A ElevenLabs aceita no máximo 1,2x; o teste usa 1,2x." to "ElevenLabs accepts at most 1.2x; the test uses 1.2x.",
 )

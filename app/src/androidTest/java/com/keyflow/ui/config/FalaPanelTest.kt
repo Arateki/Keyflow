@@ -424,4 +424,79 @@ class FalaPanelTest {
             assertEquals(FalaSource.LOCAL, h.settings.falaSource) // não trocou para Sistema
         }
     }
+
+    // ── Revisão do PR #61: o Testar enxerga o que foi digitado em todos os campos, e o resultado só some num novo Testar ──────
+
+    @Test
+    fun aVoiceIdTypedKeyByKeyInElevenLabsIsUsedAtTheTap() {
+        val rec = Recorder(twoBuffers)
+        val h = Harness(Settings(falaSource = FalaSource.ELEVENLABS), voiceUi(), tester = rec.tester, elevenLabsAuth = keyed("k"))
+        rule.setContent { h.Content() }
+
+        val id = "abcdefghij0123456789"
+        id.forEach { rule.onNodeWithTag(FALA_ELEVENLABS_VOICE_TAG).performScrollTo().performTextInput(it.toString()) } // sem colar, sem Done
+        rule.onNodeWithTag(FALA_TEST_BUTTON_TAG).performScrollTo().performClick()
+        rule.waitForIdle()
+        rule.runOnIdle {
+            assertEquals(id, rec.engineSettings.singleOrNull()?.falaElevenLabsVoice)
+            assertEquals(id, h.settings.falaElevenLabsVoice)
+        }
+    }
+
+    @Test
+    fun aGoogleVoiceChosenAfterTheTapInterruptsTheRunningTest() {
+        var cancelled = false
+        val rec = Recorder { _ -> flow { try { awaitCancellation() } finally { cancelled = true } } }
+        val h = Harness(Settings(falaSource = FalaSource.GOOGLE), voiceUi(), tester = rec.tester, googleAuth = keyed("AIza-falso"))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(FALA_TEST_BUTTON_TAG).performScrollTo().performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag(FALA_GOOGLE_VOICE_TAG).performScrollTo().performClick()
+        rule.onNodeWithText("pt-BR-Neural2-B").performClick()
+        rule.waitForIdle()
+        rule.runOnIdle {
+            assertTrue(cancelled)
+            assertEquals("pt-BR-Neural2-B", h.settings.falaGoogleVoice)
+        }
+    }
+
+    @Test
+    fun theSnapshotCarriesAGoogleVoiceChosenBeforeTheTap() {
+        val rec = Recorder(twoBuffers)
+        val h = Harness(Settings(falaSource = FalaSource.GOOGLE), voiceUi(), tester = rec.tester, googleAuth = keyed("AIza-falso"))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(FALA_GOOGLE_VOICE_TAG).performScrollTo().performClick()
+        rule.onNodeWithText("pt-BR-Wavenet-A").performClick()
+        rule.onNodeWithTag(FALA_TEST_BUTTON_TAG).performScrollTo().performClick()
+        rule.waitForIdle()
+        rule.runOnIdle { assertEquals("pt-BR-Wavenet-A", rec.engineSettings.single().falaGoogleVoice) }
+    }
+
+    @Test
+    fun aFinishedTestKeepsItsResultWhenTheUserEditsLater() {
+        val rec = Recorder(twoBuffers)
+        val h = Harness(Settings(falaSource = FalaSource.SYSTEM), voiceUi(), tester = rec.tester)
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(FALA_TEST_BUTTON_TAG).performScrollTo().performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag(FALA_TEST_TIMES_TAG).performScrollTo().assertIsDisplayed()
+        rule.onNodeWithTag(FALA_SPEED_TAG).performScrollTo().performClick()
+        rule.onNodeWithText("1.5x").performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag(FALA_TEST_TIMES_TAG).performScrollTo().assertIsDisplayed()
+        rule.runOnIdle { assertEquals(1.5f, h.settings.falaSpeed) }
+    }
+
+    @Test
+    fun elevenLabsWarnsWhenTheSpeedIsAboveWhatItAccepts() {
+        val h = Harness(Settings(falaSource = FalaSource.ELEVENLABS, falaSpeed = 1.5f), voiceUi())
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(FALA_SPEED_NOTE_TAG).performScrollTo().assertIsDisplayed()
+        rule.runOnIdle { h.settings = h.settings.copy(falaSource = FalaSource.SYSTEM) }
+        rule.onNodeWithTag(FALA_SPEED_NOTE_TAG).assertDoesNotExist()
+    }
 }

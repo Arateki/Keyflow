@@ -60,6 +60,7 @@ const val FALA_LOCAL_DOWNLOAD_NOTE_TAG = "fala-local-download-note"
 const val FALA_LOCAL_EMPTY_TAG = "fala-local-empty"
 const val FALA_LOCAL_UNSUPPORTED_TAG = "fala-local-unsupported"
 const val FALA_SPEED_TAG = "fala-speed"
+const val FALA_SPEED_NOTE_TAG = "fala-speed-note"
 const val FALA_CLOUD_VOICE_TAG = "fala-cloud-voice"
 const val FALA_TEST_BUTTON_TAG = "fala-testar"
 const val FALA_TEST_TEXT_TAG = "fala-texto"
@@ -163,11 +164,11 @@ fun FalaPanel(
                 when (active.falaSource) {
                     FalaSource.CREDITS -> Unit
                     FalaSource.LOCAL ->
-                        if (localSupported) FalaLocal(active, onSettingsChange, models, actions) else LocalUnsupported()
+                        if (localSupported) FalaLocal(active, editor, models, actions) else LocalUnsupported()
                     FalaSource.SYSTEM -> FalaSystem()
-                    FalaSource.OPENAI -> FalaOpenAi(active, onSettingsChange, openAiAuth)
-                    FalaSource.ELEVENLABS -> FalaElevenLabs(active, onSettingsChange, elevenLabsAuth, editor.pending)
-                    FalaSource.GOOGLE -> FalaGoogle(active, onSettingsChange, googleAuth)
+                    FalaSource.OPENAI -> FalaOpenAi(active, editor, openAiAuth)
+                    FalaSource.ELEVENLABS -> FalaElevenLabs(active, editor, elevenLabsAuth)
+                    FalaSource.GOOGLE -> FalaGoogle(active, editor, googleAuth)
                     FalaSource.CUSTOM -> FalaCustomFields(active, editor::edit, editor.pending)
                 }
             }
@@ -187,6 +188,13 @@ fun FalaPanel(
                     tr("Velocidade em que as respostas e leituras são faladas em voz alta."),
                     Modifier.padding(top = 8.dp),
                 )
+                // A ElevenLabs aceita até 1,2x: a tela avisa em vez de cortar calada.
+                if (active.falaSource == FalaSource.ELEVENLABS && active.falaSpeed > 1.2f) {
+                    SettingSub(
+                        tr("A ElevenLabs aceita no máximo 1,2x; o teste usa 1,2x."),
+                        Modifier.padding(top = 8.dp).testTag(FALA_SPEED_NOTE_TAG),
+                    )
+                }
             }
         }
 
@@ -276,7 +284,7 @@ private fun parseSpeed(label: String): Float = when (label) {
 @Composable
 private fun FalaLocal(
     settings: Settings,
-    onSettingsChange: (Settings) -> Unit,
+    editor: SettingsEditor,
     models: LocalModelsUi,
     actions: LocalModelActions,
 ) {
@@ -292,8 +300,8 @@ private fun FalaLocal(
         ModelList(
             models = models,
             actions = actions,
-            onSelect = { id -> onSettingsChange(settings.copy(falaLocalModelId = id)) },
-            onDeleted = { id -> if (settings.falaLocalModelId == id) onSettingsChange(settings.copy(falaLocalModelId = null)) },
+            onSelect = { id -> editor.edit { it.copy(falaLocalModelId = id) } },
+            onDeleted = { id -> if (settings.falaLocalModelId == id) editor.edit { it.copy(falaLocalModelId = null) } },
             tags = ModelListTags.Fala,
         )
         SettingSub(
@@ -323,10 +331,9 @@ private fun FalaSystem() {
 @Composable
 private fun FalaOpenAi(
     settings: Settings,
-    onSettingsChange: (Settings) -> Unit,
+    editor: SettingsEditor,
     auth: AuthActions,
 ) {
-    val editor = rememberSettingsEditor(settings, onSettingsChange)
     Column(Modifier.testTag(FALA_OPENAI_INFO_TAG)) {
         val models = FALA_CLOUD_VOICES.map { AccountModel(it, it) }
         val chosen = settings.falaCloudVoice.ifEmpty { "alloy" }
@@ -370,11 +377,9 @@ private fun FalaOpenAi(
 @Composable
 private fun FalaElevenLabs(
     settings: Settings,
-    onSettingsChange: (Settings) -> Unit,
+    editor: SettingsEditor,
     auth: AuthActions,
-    pending: PendingEdits,
 ) {
-    val editor = rememberSettingsEditor(settings, onSettingsChange)
     val models = FALA_ELEVENLABS_MODELS.map { AccountModel(it, it) }
     val chosen = settings.falaElevenLabsModel.ifEmpty { "eleven_multilingual_v2" }
     val apiKey = remember(auth) { auth.apiKeyFlow() }.collectAsStateOnMain(null).value.orEmpty()
@@ -410,7 +415,7 @@ private fun FalaElevenLabs(
         AutoSaveField(
             tr("ID da voz"), settings.falaElevenLabsVoice,
             { v -> editor.edit { it.copy(falaElevenLabsVoice = v.trim()) } }, FALA_ELEVENLABS_VOICE_TAG,
-            modifier = Modifier.padding(top = 16.dp), pending = pending,
+            modifier = Modifier.padding(top = 16.dp), pending = editor.pending,
         )
     }
 }
@@ -418,10 +423,9 @@ private fun FalaElevenLabs(
 @Composable
 private fun FalaGoogle(
     settings: Settings,
-    onSettingsChange: (Settings) -> Unit,
+    editor: SettingsEditor,
     auth: AuthActions,
 ) {
-    val editor = rememberSettingsEditor(settings, onSettingsChange)
     val models = FALA_GOOGLE_VOICES.map { AccountModel(it, it) }
     val chosen = settings.falaGoogleVoice.ifEmpty { "pt-BR-Neural2-A" }
     val connection by remember(auth) { auth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
@@ -547,8 +551,12 @@ fun FalaTestArea(
                                         state = FalaTestState(running = true, firstAudioMs = firstAudio ?: event.firstAudioMs, durationMs = event.durationMs)
                                         player.finish()
                                         state = state.copy(running = false)
+                                        run = null
                                     }
-                                    is SpeechEvent.Error -> state = FalaTestState(error = event.message, errorKind = event.kind)
+                                    is SpeechEvent.Error -> {
+                                        state = FalaTestState(error = event.message, errorKind = event.kind)
+                                        run = null
+                                    }
                                 }
                             }
                         } finally {
