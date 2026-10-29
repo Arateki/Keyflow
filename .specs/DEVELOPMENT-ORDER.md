@@ -264,6 +264,7 @@ do e2e da v1.
 | — | `local-model-warmup` | Main, fora da v1: aquecimento do Parakeet, pré-carga explícita e aquecimento de texto, estado de preparação nos cards; ver spec/design/tasks. Em validação. |
 | — | `bancada` (bancada de modelos) | Spec, design e tasks em rascunho (2026-10-28, PR de spec), nada implementado. Main, fora da v1 (recorte congelado); não toma a vez de nada em andamento. É a régua que precede a atualização do LiteRT-LM (0.16.1 → 0.18.x) e a promoção de candidatas. Decisões do Yan de 28/10 incorporadas: tag `app-vX.Y.Z` na `main` (semântica; a v1 é a `app-v0.1.0`) com a bancada como etapa manual antes dela; áudio do Common Voice (CC0); testes de Código e Terminal cortados por ora; online só pela interface (a automação não roda online). Aberta: D6 (limiar, depois do baseline) |
 | — | `flows` (aba Fluxos) | Spec, design e tasks em rascunho (2026-10-29, FLX-T1..T27), nada implementado. Main, fora da v1 (recorte congelado); não toma a vez de nada em andamento. Lista de cards + modal com editor de etapas em lista vertical, executor que chama os motores das abas (Transcrição, Visão, Raciocínio, Voz, agente), 2/3 toques da orbe e botões da barra como gatilhos, 3 fluxos padrão e "Restaurar fluxos padrão" sem atalhos. Decisões do Yan de 29/10 incorporadas (D1..D8 do `spec.md`). Aberto: Q1..Q7 do `spec.md` (agente com conversa própria?, Ditar em PTT, atalho que sombreia, "Rodar agora", bancada consumindo os tipos) |
+| — | `notification` (aba Notificação) | Spec, design e tasks em rascunho (2026-10-29, NTF-01..NTF-47, NTF-T1..T20), nada implementado. Main, fora da v1 (recorte congelado), **depois de Fluxos**; não toma a vez de nada em andamento. A notificação vira **só a orbe** (40 dp, 48 dp recolhidos do Android 12+), na skin escolhida (Ateliê, Sistema, pagas e pacotes com a seção `notification`), com 1/2/3 toques; "copiar a configuração da orbe principal"; tela bloqueada só com a opção ligada (padrão desligada); dispensar não mexe em configuração. Decisões do Yan de 29/10 incorporadas (D1..D10 do `spec.md`). A NTF-T1 prova a altura nos aparelhos antes de tudo. Aberto: Q1..Q10 do `spec.md` (inclui a **orbe do teclado**, que ainda não tem spec) |
 | — | CI | 2026-10-07: cache do AAR do sherpa-onnx nos dois jobs (um 503 do GitHub derrubou a PR #7 antes dos testes) |
 | — | 2026-10-10..22 | PRs #8 a #11 (estabilidade dos testes, desempenho da abertura do teclado, CI, galeria) — fora da fila da v1 |
 
@@ -537,6 +538,21 @@ Spec: `.specs/features/flows/` (`spec.md` 56 requisitos FLX-01..FLX-56, `design.
 - **Pré-requisito técnico**: FLX-T9 extrai a composição dos motores da `SetupActivity` para um objeto por processo (o `OverlayService`, que executa o fluxo, não os enxerga hoje); sem mudança visual.
 - **[YAN]**: (1) responder Q1..Q7 do `spec.md`; (2) FLX-T26: rodar o roteiro no A32 e no Vaio (RAM do fluxo 100% local no A32 de 4 GB; confirmação do agente sobre outro app; Ditar com a orbe em PTT).
 
+## Bloco 15 — `notification` (aba Notificação) — rascunho, main, fora da v1
+
+Spec: `.specs/features/notification/` (`spec.md` 47 requisitos NTF-01..NTF-47 e os limites do Android L1..L12, `design.md`, `tasks.md` NTF-T1..NTF-T20). Ordem: ver o plano de execução do `tasks.md` (0 prova de altura → A modelo e dados → B aparência → C integração → D telas → E fechamento).
+
+- **Escopo**: a aba Notificação deixa o "Em breve" e a notificação do serviço em primeiro plano passa a ser **só a orbe**, que recebe os mesmos tipos de interação da orbe flutuante dentro do que uma notificação permite (**1, 2 e 3 toques**; segurar e arrastar não existem):
+  1 toque grava/envia; 2 e 3 toques fazem a ação escolhida por interação (catálogo nativo: retrair/expandir o teclado, trocar o teclado, ler a tela, pausar/retomar, cancelar/desfazer); "copiar a configuração da orbe principal" (padrão ligado) traz a skin e as ações da orbe flutuante e a tela lista o que é ignorado.
+  Tela bloqueada: só controla com a opção ligada (padrão **desligada**), conferida no `KeyguardManager` a cada toque; nunca há texto ditado. Dispensar (Android 14+) **não altera configuração**; a notificação volta na próxima necessidade ou ao abrir a aba; com "mostrar" desligado vale a **notificação mínima** que o Android exige.
+  Skins: Ateliê, Sistema, as pagas (renderizadas em bitmap, com o limite de bitmaps de `RemoteViews`) e pacotes com a seção `notification` (aditiva, `schemaVersion` fica em 1; qualquer combinação de orbe, teclado e notificação). Segue o claro/escuro do sistema. Sem tile, sem notificação padrão de reserva.
+- **Prioridade**: **depois** de Fluxos (Bloco 14) e fora do recorte da v1 (v1 só correção). Não toma a vez de nada. "Rodar fluxo" na notificação só entra com Fluxos (NTF-T20 ↔ FLX-T28).
+- **Depende de** (todas na `main`): `orb-gestures` (a orbe e a máquina de estados), `skin-packs` (o pacote; o `FORMAT.md` só muda junto com o parser, NTF-T8), `shortcut-bars` (a folha de ações) e `monetization` (`skinsUnlocked` para as skins pagas).
+  **Convive com**: `flows` (o gatilho `Orbe(lugar, toques)`, `LugarDaOrbe` compartilhado; `OverlayService` mexido pelas duas frentes) e a **orbe do teclado** (D1 do Yan; **spec ainda por escrever**, usa o mesmo modelo de interações).
+- **Pré-requisito técnico**: NTF-T6 torna o desenho da orbe (e dos glifos) utilizável fora do Compose, para renderizar as skins pagas em bitmap; a orbe flutuante e os goldens existentes ficam bit-idênticos.
+- **Muda de propósito**: o layout `notif_recording.xml`, os goldens `notification-*` e `config-notificacao`, `RecordingNotification` e seu teste, e o texto da Docs sobre a notificação (substitui NOTIFCTL-01/02/03 da `orb-gestures`).
+- **[YAN]**: (1) responder Q1..Q10 do `spec.md` (padrão de "copiar" e pausar/cancelar, 1 toque fixo, tempo no centro, plano B se os 48 dp cortarem, quem escreve a orbe do teclado); (2) NTF-T18: rodar o roteiro no A32 (bloqueio com o PIN dele, dispensar, skins pagas e pacote, latência do 1 toque). A NTF-T1 usa o A32 (`--confirmo-a32`) e **nunca** mexe no bloqueio de tela dele.
+
 ---
 
 ## Resumo da fila (visão de uma linha)
@@ -547,7 +563,7 @@ feito: Q1..Q11 → SB → GT → NM → RSN → SKP → AGT fase 1 (faltam só m
 agora: (V1-10 fakes e V1-3 feitas) → upload interno → e2e MZ-T15/API-T14 → V1-4 → … → V1-8
 em paralelo: V1-9 (API-T13 na AWS) — fakes esperam o staging; o e2e real espera conta, applicationId e o upload
 depois: créditos (MZ-T5..T8, T12) e ligar API-T11/T12 · VC (visão) · TS (temas, spec a revisar) ·
-       bancada de modelos (régua do motor LiteRT-LM; Bloco 11) · parâmetros dos modelos locais (Bloco 12) · AGT fases 2/3 · síntese de fala (aba Voz, rascunho, Bloco 13) · Fluxos (aba Fluxos, spec em rascunho, Bloco 14) ·
+       bancada de modelos (régua do motor LiteRT-LM; Bloco 11) · parâmetros dos modelos locais (Bloco 12) · AGT fases 2/3 · síntese de fala (aba Voz, rascunho, Bloco 13) · Fluxos (aba Fluxos, spec em rascunho, Bloco 14) · Notificação (aba Notificação, spec em rascunho, Bloco 15, depois de Fluxos) ·
        Computador (sem spec; ideias em .specs/features/computer-terminal/ideias.md)
 ```
 
