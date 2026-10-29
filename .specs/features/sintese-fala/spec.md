@@ -147,11 +147,11 @@ Entram agora no catálogo, lado a lado: o Supertonic 3 (D2; pesos OpenRAIL-M, c�
 | FUX-01..07, FUX-09 | FAL-T4 | Implemented (galeria/goldens FUX-08: FAL-T7 pendente) |
 | FENG-01..06 | FAL-T1, FAL-T4 | Implemented |
 | FLOC-01..02 | FAL-T8, FAL-T10 | Done (2026-10-29) — pins no catálogo |
-| FLOC-03 | FAL-T2, FAL-T11 | Implemented — frontend de caracteres e o motor VITS |
-| FLOC-04 | FAL-T3, FAL-T11 | Partial — `:speech` e VITS feitos; Supertonic (FAL-T9) pendente |
-| FLOC-05..06 | FAL-T3 | Implemented — local sem socket; o aviso de RAM já estava na aba |
+| FLOC-03 | FAL-T2, FAL-T9, FAL-T11 | Implemented — caracteres/VITS e Unicode/quatro ONNX Supertonic (`pt`, M1); prova real em FAL-T9 |
+| FLOC-04 | FAL-T3, FAL-T9, FAL-T11 | Implemented — dois motores no `:speech`, ORT única, speed, cancelamento e descarga por ociosidade |
+| FLOC-05..06 | FAL-T3, FAL-T9 | Implemented — local sem socket, guarda de arquivos/aceite e RAM; medição Supertonic no emulador |
 | FCLD-01..07 | FAL-T5 | Implemented (JVM + servidor falso; sem chamada real) |
 | FSYS-01..05 | FAL-T6 | Implemented (seletor de voz do motor adiado) |
 | FPRV-01 | FAL-T2 | Done (2026-10-29) — normalizador e frontend |
 | FPRV-02 | FAL-T3 | Implemented — a URL do sherpa não foi reaberta |
-| FPRV-03 | FAL-T8 | Done (2026-10-29) — aceite da OpenRAIL-M no download do Supertonic |
+| FPRV-03 | FAL-T8, FAL-T9 | Done (2026-10-29) — aceite da OpenRAIL-M no download e exigido antes de sintetizar |
