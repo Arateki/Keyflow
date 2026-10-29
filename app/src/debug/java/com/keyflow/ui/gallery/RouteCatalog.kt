@@ -591,7 +591,18 @@ object RouteCatalog {
         Route("config-raciocinio-local-profundo") { CandidateReasoningRoute(ModelCatalog.NANBEIGE_4_2_3B) },
         Route("config-raciocinio-local-hibrido") { CandidateReasoningRoute(ModelCatalog.QWEN3_5_4B) },
         Route("visao-selecao") {
-            AndroidView(factory = { context -> com.keyflow.vision.RegionSelectView(context, {}, {}) }, modifier = Modifier.fillMaxSize())
+            Box(Modifier.fillMaxSize()) {
+                route("config-visao")!!.content()
+                AndroidView(factory = { context -> com.keyflow.vision.RegionSelectView(context, {}, {}) }, modifier = Modifier.fillMaxSize())
+            }
+        },
+        Route("visao-fases") {
+            val palette = LocalKeyFlowPalette.current
+            Column(Modifier.fillMaxSize().background(palette.bg).padding(24.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+                com.keyflow.vision.VisionFlowState.entries.filter { it != com.keyflow.vision.VisionFlowState.NONE }.forEach {
+                    com.keyflow.ui.orb.VisionPhaseBadge(it, palette)
+                }
+            }
         },
     )
 

@@ -34,9 +34,29 @@ class RegionSelectViewTest {
         assertTrue(cancelled)
     }
 
-    @Test fun arrastaCantoSemSairDaTela() {
-        val initial = Rect(100, 100, 900, 900)
-        assertEquals(Rect(0, 0, 900, 900), RegionGeometry.move(initial, RegionGeometry.Corner.TOP_LEFT, -10f, -20f, 1000, 1000, 40))
-        assertEquals(Rect(860, 860, 900, 900), RegionGeometry.move(initial, RegionGeometry.Corner.TOP_LEFT, 990f, 990f, 1000, 1000, 40))
+    @Test fun arrastaHandleEConfirmaCoordenadasDaTela() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        var chosen: Rect? = null
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val view = RegionSelectView(context, { chosen = it }, {})
+            view.layout(0, 0, 1000, 1000)
+            for ((action, point) in listOf(MotionEvent.ACTION_DOWN to (200f to 200f),
+                MotionEvent.ACTION_MOVE to (150f to 175f), MotionEvent.ACTION_UP to (150f to 175f),
+                MotionEvent.ACTION_DOWN to (500f to 990f), MotionEvent.ACTION_UP to (500f to 990f))) {
+                val event = MotionEvent.obtain(0, 0, action, point.first, point.second, 0)
+                try { view.onTouchEvent(event) } finally { event.recycle() }
+            }
+        }
+        assertEquals(Rect(150, 175, 800, 800), chosen)
+    }
+
+    @Test fun resizeCancelaCoordenadasAntigas() {
+        var resized = false
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val view = RegionSelectView(ApplicationProvider.getApplicationContext(), {}, {}, { resized = true })
+            view.layout(0, 0, 1000, 1000)
+            view.layout(0, 0, 800, 600)
+        }
+        assertTrue(resized)
     }
 }

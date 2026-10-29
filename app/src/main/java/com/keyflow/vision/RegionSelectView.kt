@@ -10,15 +10,14 @@ import android.graphics.RectF
 import android.view.MotionEvent
 import android.view.View
 import com.keyflow.i18n.tr
-import kotlin.math.hypot
 
 /** Seletor transparente sobre a tela viva; cancelar em resize impede usar coordenadas antigas. */
 @SuppressLint("ViewConstructor", "ClickableViewAccessibility")
-class RegionSelectView(context: Context, private val confirm: (Rect) -> Unit, private val cancel: () -> Unit) : View(context) {
+class RegionSelectView(context: Context, private val confirm: (Rect) -> Unit, private val cancel: () -> Unit, private val resized: () -> Unit = cancel) : View(context) {
     init { contentDescription = tr("Selecione a área da tela."); isClickable = true }
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private var area = Rect()
+    private var area = ScreenRegion(0, 0, 0, 0)
     private var selected: RegionGeometry.Corner? = null
     private var initialized = false
     private val d = resources.displayMetrics.density
@@ -26,7 +25,7 @@ class RegionSelectView(context: Context, private val confirm: (Rect) -> Unit, pr
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        if (initialized && (w != oldw || h != oldh)) { cancel(); return }
+        if (initialized && (w != oldw || h != oldh)) { resized(); return }
         if (w > 0 && h > 0) { area = RegionGeometry.initial(w, h); initialized = true }
     }
 
@@ -38,9 +37,9 @@ class RegionSelectView(context: Context, private val confirm: (Rect) -> Unit, pr
         canvas.drawRect(0f, area.top.toFloat(), area.left.toFloat(), area.bottom.toFloat(), paint)
         canvas.drawRect(area.right.toFloat(), area.top.toFloat(), width.toFloat(), area.bottom.toFloat(), paint)
         paint.color = Color.WHITE; paint.style = Paint.Style.STROKE; paint.strokeWidth = 2 * d
-        canvas.drawRect(RectF(area), paint)
+        canvas.drawRect(RectF(area.left.toFloat(), area.top.toFloat(), area.right.toFloat(), area.bottom.toFloat()), paint)
         paint.style = Paint.Style.FILL
-        corners().forEach { (_, p) -> canvas.drawCircle(p.first, p.second, 9 * d, paint) }
+        RegionGeometry.corners(area).forEach { (_, p) -> canvas.drawCircle(p.first, p.second, 9 * d, paint) }
         paint.color = 0xcc202020.toInt()
         canvas.drawRoundRect(0f, 0f, width.toFloat(), margin * 1.25f, 8 * d, 8 * d, paint)
         canvas.drawRoundRect(0f, height - margin * 1.25f, width.toFloat(), height.toFloat(), 8 * d, 8 * d, paint)
@@ -53,8 +52,8 @@ class RegionSelectView(context: Context, private val confirm: (Rect) -> Unit, pr
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                selected = if (event.y < margin * 1.25f || event.y > height - margin * 1.25f) null else corners().minByOrNull { (_, p) -> hypot(event.x - p.first, event.y - p.second) }
-                    ?.takeIf { (_, p) -> hypot(event.x - p.first, event.y - p.second) <= 32 * d }?.first
+                selected = if (event.y < margin * 1.25f || event.y > height - margin * 1.25f) null
+                    else RegionGeometry.hit(area, event.x, event.y, 32 * d)
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
@@ -65,7 +64,7 @@ class RegionSelectView(context: Context, private val confirm: (Rect) -> Unit, pr
                 if (selected == null) when {
                     event.y < margin * 1.25f && event.x < width / 2 -> cancel()
                     event.y < margin * 1.25f -> { area = RegionGeometry.full(width, height); invalidate() }
-                    event.y > height - margin * 1.25f -> confirm(Rect(area))
+                    event.y > height - margin * 1.25f -> confirm(Rect(area.left, area.top, area.right, area.bottom))
                 }
                 selected = null; return true
             }
@@ -74,10 +73,4 @@ class RegionSelectView(context: Context, private val confirm: (Rect) -> Unit, pr
         return true
     }
 
-    private fun corners() = listOf(
-        RegionGeometry.Corner.TOP_LEFT to (area.left.toFloat() to area.top.toFloat()),
-        RegionGeometry.Corner.TOP_RIGHT to (area.right.toFloat() to area.top.toFloat()),
-        RegionGeometry.Corner.BOTTOM_LEFT to (area.left.toFloat() to area.bottom.toFloat()),
-        RegionGeometry.Corner.BOTTOM_RIGHT to (area.right.toFloat() to area.bottom.toFloat()),
-    )
 }
