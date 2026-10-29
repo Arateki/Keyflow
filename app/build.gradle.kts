@@ -47,6 +47,10 @@ fun buildConfigString(value: String): String {
 // código e do `R` — e continua `com.keyflow`. Quem mais depende do id está em .specs/codebase/ENVIRONMENT.md › "applicationId".
 val keyflowApplicationId = "com.arateki.keyflow"
 
+// A versão do LiteRT-LM num lugar só: a dependência (mais abaixo) e o `BuildConfig.LITERT_LM_VERSION`, que a bancada grava em cada resultado
+// (motor.versao). Subir de versão aqui sobe nos dois — e a régua da bancada (BRG-01) mostra o que mudou.
+val litertLmVersion = "0.16.1"
+
 // Chave de upload da Play (Play App Signing): o keystore e as senhas ficam FORA do repositório. Fontes, nesta ordem:
 //  1. variáveis de ambiente KEYFLOW_UPLOAD_STORE_FILE, KEYFLOW_UPLOAD_STORE_PASSWORD, KEYFLOW_UPLOAD_KEY_ALIAS e
 //     KEYFLOW_UPLOAD_KEY_PASSWORD (esta é opcional: sem ela vale a senha do keystore);
@@ -137,6 +141,7 @@ android {
         buildConfigField("String", "KEYFLOW_STAGING_ACCESS_CLIENT_SECRET", "\"\"")
         buildConfigField("String", "KEYFLOW_SIMULATED_PURCHASE_HMAC_SECRET", "\"\"")
         buildConfigField("boolean", "AGENT_ENABLED", "false")
+        buildConfigField("String", "LITERT_LM_VERSION", "\"$litertLmVersion\"")
         buildConfigField(
             "long",
             "KEYFLOW_INTEGRITY_CLOUD_PROJECT_NUMBER",
@@ -539,7 +544,7 @@ dependencies {
     //  - API usada (Kotlin, conferida no classes.jar): Engine(EngineConfig(modelPath, backend, cacheDir)).initialize(),
     //    Engine.createConversation(ConversationConfig(systemInstruction)), Conversation.sendMessageAsync(texto,
     //    MessageCallback{onMessage,onDone,onError}), Conversation.cancelProcess(), Message.toString() = o texto.
-    implementation("com.google.ai.edge.litertlm:litertlm-android:0.16.1")
+    implementation("com.google.ai.edge.litertlm:litertlm-android:$litertLmVersion")
 
     // Skins importáveis (skin-packs, SKP-T1): AndroidSVG desenha os SVGs dos pacotes de skin. Conferido em 2026-10-02 no
     // Maven Central (maven-metadata.xml): só existem 1.3 e 1.4; a 1.4 (2019-05-28) é a `release` e a `latest`. Apache-2.0

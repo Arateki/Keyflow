@@ -18,6 +18,9 @@ internal interface LlmBackend {
     /** Bloqueia até acabar, entregando os trechos em [onDelta]. Cancelável por [cancel] de outra thread. */
     fun generate(request: ReasoningRequest, onDelta: (String) -> Unit)
 
+    /** Limpa a tentativa anterior ANTES de o núcleo publicar este backend como cancelável pelo novo pedido. */
+    fun prepareGeneration() = Unit
+
     /** Pode ser chamado de qualquer thread, durante [generate]; a geração deve voltar logo. */
     fun cancel()
 

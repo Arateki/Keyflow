@@ -1,0 +1,12 @@
+{
+  "corpus": 0,
+  "arquivos": [
+    {
+      "caminho": "pontuacao.json",
+      "sha256": "e32a496ce6e5ace314fb922fc18bd0a7bcb5f37b7b213d479adfea937596c17f",
+      "origem": "Brinquedo dos testes do KeyFlow",
+      "autor": "Equipe KeyFlow",
+      "licenca": "Apache-2.0"
+    }
+  ]
+}

@@ -69,10 +69,13 @@ class OpenAiReasoningEngine(
             return@channelFlow
         }
         val body = bodyOf(request).toRequestBody("application/json".toMediaType())
+        // Imagem só vai à origem escolhida: redirecionamentos não reenviam os pixels a outro host.
+        val transport = if (request.image == null) client else client.newBuilder()
+            .followRedirects(false).followSslRedirects(false).build()
         var attempt = 0
         while (true) {
             val call = try {
-                client.newCall(
+                transport.newCall(
                     Request.Builder().url("$apiBaseUrl/responses")
                         .apply { headers.forEach { (name, value) -> header(name, value) } }
                         .header("Accept", "text/event-stream")
@@ -240,7 +243,12 @@ class OpenAiReasoningEngine(
 
     private fun bodyOf(request: ReasoningRequest): String = JSONObject().apply {
         put("model", model)
-        put("input", org.json.JSONArray().put(JSONObject().put("role", "user").put("content", request.user)))
+        val content: Any = request.image?.let { image ->
+            org.json.JSONArray()
+                .put(JSONObject().put("type", "input_text").put("text", request.user))
+                .put(JSONObject().put("type", "input_image").put("image_url", image.dataUrl()))
+        } ?: request.user
+        put("input", org.json.JSONArray().put(JSONObject().put("role", "user").put("content", content)))
         put("store", false)
         put("stream", true)
         request.system?.let { put("instructions", it) }

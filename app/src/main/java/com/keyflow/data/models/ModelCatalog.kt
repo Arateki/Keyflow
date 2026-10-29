@@ -107,6 +107,12 @@ data class ModelSpec(
     val thinking: ThinkingSupport = ThinkingSupport.NONE,
     /** O que o modelo faz de verificado, em etiquetas do card; vazio = nenhuma além do idioma, do pensamento e da RAM (ver [ModelCapability]). */
     val capabilities: Set<ModelCapability> = emptySet(),
+    /**
+     * A janela de contexto do arquivo (entrada + saída, em tokens), quando se **sabe**: vem do nome do `.litertlm` (`…_ekv4096`) ou do card.
+     * `null` = não registrada (a bancada não corta nenhum caso por janela). Só os modelos de texto; a bancada trata um caso maior que ela como
+     * "não se aplica" (BNC-03), nunca como nota 0.
+     */
+    val contextTokens: Int? = null,
 ) {
     val totalBytes: Long get() = files.sumOf { it.bytes }
 
@@ -315,6 +321,8 @@ object ModelCatalog {
         modelName = "Qwen2.5 1.5B",
         kind = ModelKind.TEXT,
         vendor = ModelVendor.QWEN,
+        // Janela do nome do arquivo (`…_q8_ekv4096`).
+        contextTokens = 4096,
         thinking = ThinkingSupport.NONE,
         // Ferramentas: o chat template oficial do `Qwen/Qwen2.5-1.5B-Instruct` (tokenizer_config.json) tem o bloco `tools` e as marcas `<tool_call>`. Conferido em 2026-10-27.
         capabilities = setOf(ModelCapability.TOOLS),
@@ -377,6 +385,8 @@ object ModelCatalog {
         kind = ModelKind.TEXT,
         promptOpensThink = true,
         vendor = ModelVendor.DEEPSEEK,
+        // Janela do nome do arquivo (`…_q8_ekv4096`).
+        contextTokens = 4096,
         // O template abre o `<think>` em toda resposta (por isso o `promptOpensThink`); não há como desligar.
         thinking = ThinkingSupport.ALWAYS,
         // Sem etiqueta de Ferramentas: o card `deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B` não declara chamada de funções (conferido em 2026-10-27).
@@ -510,6 +520,8 @@ object ModelCatalog {
         kind = ModelKind.TEXT,
         validatedOnDevice = false,
         vendor = ModelVendor.GOOGLE,
+        // Janela do nome do arquivo (`mobile-actions_q8_ekv1024`).
+        contextTokens = 1024,
         thinking = ThinkingSupport.NONE,
         files = listOf(
             ModelFile(
@@ -558,6 +570,8 @@ object ModelCatalog {
         kind = ModelKind.TEXT,
         validatedOnDevice = false,
         vendor = ModelVendor.HUGGING_FACE,
+        // Janela do nome do arquivo (`…_q4_block32_ekv4096`).
+        contextTokens = 4096,
         thinking = ThinkingSupport.OPTIONAL,
         files = listOf(
             ModelFile(
