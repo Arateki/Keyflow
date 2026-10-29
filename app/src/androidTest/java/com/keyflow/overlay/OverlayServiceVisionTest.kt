@@ -87,7 +87,7 @@ class OverlayServiceVisionTest {
         val context = instrumentation.targetContext
         val device = UiDevice.getInstance(instrumentation)
         val userSettings = com.keyflow.ime.UserSettingsGuard(context)
-        suspend fun awaitWindow(visible: Boolean) {
+        suspend fun awaitWindow(visible: Boolean, stage: String) {
             val ready = kotlinx.coroutines.CompletableDeferred<Unit>()
             var observer: android.view.ViewTreeObserver? = null
             val listener = android.view.ViewTreeObserver.OnWindowVisibilityChangeListener { visibility ->
@@ -107,15 +107,24 @@ class OverlayServiceVisionTest {
             if (visible && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                 // A janela pode estar visível antes de enviar seu primeiro desenho ao compositor.
                 val drawn = kotlinx.coroutines.CompletableDeferred<Unit>()
+                val frames = java.util.concurrent.atomic.AtomicInteger()
                 instrumentation.runOnMainSync {
                     val view = checkNotNull(com.keyflow.ime.KeyFlowKeyboardService.activeViewForTest)
                     view.viewTreeObserver.registerFrameCommitCallback {
-                        view.viewTreeObserver.registerFrameCommitCallback { drawn.complete(Unit) }
-                        view.invalidate()
+                        frames.incrementAndGet()
+                        view.viewTreeObserver.registerFrameCommitCallback { frames.incrementAndGet(); drawn.complete(Unit) }
+                        view.postInvalidateOnAnimation()
                     }
-                    view.invalidate()
+                    view.postInvalidateOnAnimation()
                 }
-                withTimeout(10_000) { drawn.await() }
+                try { withTimeout(10_000) { drawn.await() } } catch (error: kotlinx.coroutines.TimeoutCancellationException) {
+                    var state = ""
+                    instrumentation.runOnMainSync {
+                        val view = checkNotNull(com.keyflow.ime.KeyFlowKeyboardService.activeViewForTest)
+                        state = "window=${view.windowVisibility}, shown=${view.isShown}, attached=${view.isAttachedToWindow}, hardware=${view.isHardwareAccelerated}, size=${view.width}x${view.height}"
+                    }
+                    throw AssertionError("IME não desenhou em $stage: ${frames.get()} quadros, $state", error)
+                }
             }
         }
         fun screenshot(name: String) {
@@ -141,7 +150,7 @@ class OverlayServiceVisionTest {
                 assertNotNull(device.wait(Until.findObject(By.desc("ime_probe_field")), 15_000))
                 device.findObject(By.desc("ime_probe_field")).click()
                 withTimeout(15_000) { KeyFlowController.keyboardVisible.first { it } }
-                awaitWindow(true)
+                awaitWindow(true, "abertura inicial")
                 screenshot("VISIVEL")
                 for (failClose in listOf(false, true)) {
                     OverlayService.visionSessionCloseForTest = if (failClose) {
@@ -149,11 +158,11 @@ class OverlayServiceVisionTest {
                     } else null
                     instrumentation.runOnMainSync { service.hideVisionViews(emptyList()) }
                     withTimeout(10_000) { KeyFlowController.keyboardVisible.first { !it } }
-                    awaitWindow(false)
+                    awaitWindow(false, "ocultação $failClose")
                     if (!failClose) screenshot("OCULTO")
                     instrumentation.runOnMainSync { service.cleanupVision() }
                     withTimeout(10_000) { KeyFlowController.keyboardVisible.first { it } }
-                    awaitWindow(true)
+                    awaitWindow(true, "restauração da limpeza $failClose")
                 }
                 OverlayService.visionSessionCloseForTest = null
                 OverlayService.start(context, OverlayService.actionIntent(context, OverlayService.ACTION_VISION))
@@ -163,12 +172,12 @@ class OverlayServiceVisionTest {
                 deny!!.click()
                 withTimeout(15_000) { OverlayService.visionFlowStateForTest.first { it == VisionFlowState.NONE } }
                 withTimeout(15_000) { KeyFlowController.keyboardVisible.first { it } }
-                awaitWindow(true)
+                awaitWindow(true, "restauração após negação")
                 screenshot("RESTAURADO")
                 assertEquals(ButtonState.PAUSED, KeyFlowController.buttonState.value)
                 device.pressBack()
                 withTimeout(10_000) { KeyFlowController.keyboardVisible.first { !it } }
-                awaitWindow(false)
+                awaitWindow(false, "ocultação por voltar")
                 instrumentation.runOnMainSync {
                     val restore = KeyFlowController.hideKeyboardForCapture()
                     try { assertNull("captura não deve reabrir um teclado antes oculto", restore) }
