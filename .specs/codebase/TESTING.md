@@ -41,6 +41,17 @@ Estratégia escolhida: **cobertura completa** (unit + instrumented). Greenfield 
 
 ## Convenções
 
+- Texto novo da interface vai em `tr("…")` (português como chave) e nos dois arquivos da funcionalidade:
+  `app/src/main/java/com/keyflow/i18n/en/<Funcionalidade>.kt` e `es/<Funcionalidade>.kt`. Não se acrescenta no
+  mapa único: `TranslationsEn` e `TranslationsEs` só juntam. A chave entra em ordem crescente do português
+  (a comparação de `String` do Kotlin), não no fim do arquivo — assim duas frentes não caem na mesma linha.
+  Se o texto já é usado por outra funcionalidade, ou passa a ser, ele fica em `Comum.kt`. O `TranslationsTest`
+  exige inglês, espanhol, os mesmos `%s`/`%d`, nenhuma chave repetida e essa ordem.
+  Bancada (`bancada/`, `ui/config/Bancada*`); Visao (`vision/`, `ui/config/Visao*`); Voz (`speech/`, `ui/config/Fala*`);
+  Transcricao (`transcription/`, `audio/`, `VozPanel`); Raciocinio (`reasoning/`, `agent/`, painéis de provedor);
+  Teclado (`ime/`, `TecladoPanel`, barras e grades); Sobrepor (`overlay/`, `ui/orb/`, `OverlayPanel`);
+  Skins; Privacidade (legal, onboarding, anúncios); Conta (login e compra); Docs; Fluxos; Modelos (catálogo e
+  download); Tour; Keyflow (aba principal e a casca da configuração).
 - Unit: JUnit4 + `kotlinx-coroutines-test` + `MockWebServer` (OkHttp) + Truth/AssertJ.
 - Instrumented: AndroidX Test (`androidx.test.ext:junit`, `core-ktx`) + Espresso (UI) + UiAutomator (interações de sistema, ex.: conceder overlay).
 - "Test count" em cada gate previne deleção silenciosa de testes.

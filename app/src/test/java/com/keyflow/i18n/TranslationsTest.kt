@@ -46,6 +46,28 @@ class TranslationsTest {
         assertWithMessage("espanhol sobrando").that(TranslationsEs.keys - keys).isEmpty()
     }
 
+    /** Cada funcionalidade tem o seu arquivo; a mesma chave nos dois seria a linha que volta a conflitar. */
+    @Test
+    fun `a key is translated only once, in alphabetical order`() {
+        val entry = Regex(""""((?:[^"\\]|\\.)*)"\s+to\s+"""")
+        for (lang in listOf("en", "es")) {
+            val dir = File("src/main/java/com/keyflow/i18n/$lang")
+            val seen = HashMap<String, String>()
+            val files = dir.walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
+            assertWithMessage("arquivos de $lang").that(files).isNotEmpty()
+            for (file in files) {
+                val found = entry.findAll(file.readText()).map { unescape(it.groupValues[1]) }.toList()
+                assertWithMessage("ordem em ${file.name} ($lang)").that(found).isEqualTo(found.sorted())
+                for (key in found) {
+                    val previous = seen.put(key, file.name)
+                    assertWithMessage("chave repetida em $lang: %s", key).that(previous).isNull()
+                }
+            }
+            val combined = if (lang == "en") TranslationsEn else TranslationsEs
+            assertWithMessage("mapa $lang").that(combined.size).isEqualTo(seen.size)
+        }
+    }
+
     private fun placeholders(text: String): List<String> = Regex("%[sd%]").findAll(text).map { it.value }.toList()
 
     private fun unescape(literal: String): String {
