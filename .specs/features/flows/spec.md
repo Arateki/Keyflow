@@ -428,7 +428,7 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 | FLX-30 | P1-D | FLX-T7, FLX-T17 | Pending |
 | FLX-31 | P1-D | FLX-T6 | Pending |
 | FLX-32 | P1-D | FLX-T14, FLX-T16 | Pending |
-| FLX-33 | P1-E | FLX-T1, FLX-T2, FLX-T5 | Implementing (T1 feita) |
+| FLX-33 | P1-E | FLX-T1, FLX-T2, FLX-T5 | Implementing (T1, T2 feitas) |
 | FLX-34 | P1-E | FLX-T5, FLX-T15, FLX-T25 | Pending |
 | FLX-35 | P1-E | FLX-T5, FLX-T20, FLX-T21, FLX-T28 | Pending |
 | FLX-36 | P1-E | FLX-T16, FLX-T20 | Pending |
@@ -440,9 +440,9 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 | FLX-42 | P1-F | FLX-T3 | Pending |
 | FLX-43 | P1-F | FLX-T3 | Pending |
 | FLX-44 | P1-F | FLX-T3 | Pending |
-| FLX-45 | P1-G | FLX-T2, FLX-T4 | Pending |
-| FLX-46 | P1-G | FLX-T2 | Pending |
-| FLX-47 | P1-G | FLX-T2 | Pending |
+| FLX-45 | P1-G | FLX-T2, FLX-T4 | Implementing (T2 feita) |
+| FLX-46 | P1-G | FLX-T2 | Implementing (T2 feita) |
+| FLX-47 | P1-G | FLX-T2 | Implementing (T2 feita) |
 | FLX-48 | P1-G | FLX-T4 | Pending |
 | FLX-49 | P1-G | FLX-T4, FLX-T14 | Pending |
 | FLX-50 | P1-G | FLX-T4, FLX-T5 | Pending |
@@ -452,7 +452,7 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 | FLX-54 | P2-H | FLX-T17, FLX-T18 | Pending |
 | FLX-55 | P2-H | FLX-T24 | Pending |
 | FLX-56 | P2-H | FLX-T22 | Pending |
-| FLX-57 | P2-I | FLX-T1, FLX-T2, FLX-T5, FLX-T20 | Implementing (T1 feita) |
+| FLX-57 | P2-I | FLX-T1, FLX-T2, FLX-T5, FLX-T20 | Implementing (T1, T2 feitas) |
 | FLX-58 | P2-I | FLX-T28, NTF-T20 | Pending (depende da feature `notification`) |
 | FLX-59 | P2-I | FLX-T29 | Pending (bloqueada: a orbe do teclado não tem spec) |
 | FLX-60 | P2-I | FLX-T5, FLX-T28, FLX-T29 | Pending (a parte do teclado, FLX-T29, está bloqueada: a orbe do teclado não tem spec) |

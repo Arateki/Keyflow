@@ -65,7 +65,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
   `Desconhecida` invalida; `compativeis(null/TEXTO/IMAGEM)` devolve os conjuntos e motivos da spec; fluxo que termina em Perguntar é válido **com aviso**; `Orbe(FLUTUANTE, 2)` e `Orbe(NOTIFICACAO, 2)` são superfícies diferentes (igualdade); a regra de arquitetura falha se um arquivo de `fluxos/` ou `fluxos/execucao/` importar `android.` (e não falha com `fluxos/app/`).
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(fluxos): modelo de dados e validação`.
 
-### FLX-T2 — Codec JSON de fluxos e gatilhos — **Status: pendente**
+### FLX-T2 — Codec JSON de fluxos e gatilhos — **Status: feita**
 - **What**: `CodecFluxos` (`org.json`): `decodificarFluxos/codificarFluxos`, `decodificarGatilhos/codificarGatilhos`, esquema `v:1` (spec › Modelo de dados), `ModeloRef` como `{source, model}`,
   superfícies `orb:<lugar>:N` (`flutuante`, `teclado`, `notificacao`; N em {2, 3}) e `bar:<id>`; tolerância do FLX-47 (ausente → semente é da T3/T4; malformado → semente; item ruim descartado; desconhecido ignorado/`Desconhecida`; cortes; duplicatas; nunca lança).
 - **Where**: `fluxos/CodecFluxos.kt`; testes `CodecFluxosTest`, `CodecFluxosPropertyTest` (kotest-property), `CodecFluxosFuzzTest`, `FluxoSemSegredoTest`.
@@ -73,6 +73,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 - **Done when**: round-trip com todas as etapas, as superfícies (a orbe nos **três lugares** e a barra), acentos/aspas/quebra de linha nas instruções; propriedade `decodificar(codificar(c)) == c` com gerador que respeita as normalizações;
   fuzz (JSON mutado, aninhamento fundo, ~10 mil entradas) nunca lança; `FluxoSemSegredoTest` falha se o JSON de um fluxo completo contiver `key`, `token`, `endpoint`, `header`, `secret` ou o valor de um segredo plantado nas `Settings`.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(fluxos): codec JSON tolerante`.
+- **Registro (Fase A)**: `CodecFluxos.decodificarFluxos` devolve `null` para chave ausente, em branco ou malformada (e `[]` é vazia de verdade); `decodificarConfig(flowsJson, triggersJson, semente)` aplica a semente (T4 passa `PadroesFluxo::semear`) e ignora gatilho solto sem `flows_json` (FLX-40). Campos de texto só valem se forem `String` no JSON (o `optString` do Android e o do Maven divergem em `null`). Etapa sem `type` legível é descartada; `type` desconhecido vira `Desconhecida`. A Visão grava `instruction` (a spec só nomeia `system`). Gatilho órfão é lido como está: a limpeza (FLX-50) é da gravação.
 
 ### FLX-T3 — Fluxos padrão e restaurar — **Status: pendente**
 - **What**: `PadroesFluxo` (catálogo dos 3, dica informativa de atalho por `builtinId` — D15, sem gatilho automático, `trKey`, `PADROES_VERSAO`, `semear()` com ids `s-<builtinId>`), `RestauradorFluxos.restaurar(config)` e `previa(config)` (design §4); `idNovo()` injetável.
