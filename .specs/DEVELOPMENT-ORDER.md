@@ -88,7 +88,7 @@ R$15, que também tira os anúncios para sempre. Os anúncios ficam só no app d
   e cobrança fora do Play Billing). A `UnlockSheet` **não sai** — ganha fiação na MZ-T9 (V1-10) e
   cobra o R$15 de verdade.
 - Fica para depois da v1: créditos (MZ-T5–T8 e MZ-T12), `vision-capture`, `theme-system` (spec a
-  revisar — ver Estado atual), fases 2/3 do agente, os motores de Fala (`sintese-fala`), Fluxos (`flows`) e Computador (este sem spec) e o
+  revisar — ver Estado atual), fases 2/3 do agente, os motores de Fala (`sintese-fala`), Fluxos (`flows`) e Computador (`computer-terminal`, spec em rascunho — Bloco 16) e o
   `corretor-aprendiz` (spec pronta; se o Yan o quiser na v1, a V1-7 passa a esperar os textos legais dele — ver
   Estado atual).
 
@@ -264,6 +264,7 @@ do e2e da v1.
 | — | `local-model-warmup` | Main, fora da v1: aquecimento do Parakeet, pré-carga explícita e aquecimento de texto, estado de preparação nos cards; ver spec/design/tasks. Em validação. |
 | — | `bancada` (bancada de modelos) | Spec, design e tasks em rascunho (2026-10-28, PR de spec), nada implementado. Main, fora da v1 (recorte congelado); não toma a vez de nada em andamento. É a régua que precede a atualização do LiteRT-LM (0.16.1 → 0.18.x) e a promoção de candidatas. Decisões do Yan de 28/10 incorporadas: tag `app-vX.Y.Z` na `main` (semântica; a v1 é a `app-v0.1.0`) com a bancada como etapa manual antes dela; áudio do Common Voice (CC0); testes de Código e Terminal cortados por ora; online só pela interface (a automação não roda online). Aberta: D6 (limiar, depois do baseline) |
 | — | `flows` (aba Fluxos) | Spec, design e tasks em rascunho (2026-10-29, FLX-T1..T27), nada implementado. Main, fora da v1 (recorte congelado); não toma a vez de nada em andamento. Lista de cards + modal com editor de etapas em lista vertical, executor que chama os motores das abas (Transcrição, Visão, Raciocínio, Voz, agente), 2/3 toques da orbe e botões da barra como gatilhos, 3 fluxos padrão e "Restaurar fluxos padrão" sem atalhos. Decisões do Yan de 29/10 incorporadas (D1..D8 do `spec.md`). Aberto: Q1..Q7 do `spec.md` (agente com conversa própria?, Ditar em PTT, atalho que sombreia, "Rodar agora", bancada consumindo os tipos) |
+| — | `computer-terminal` (aba Computador, terminal SSH) | Spec, design e tasks em rascunho (2026-10-29, CMP-01..CMP-66, CMP-T0..T38), nada implementado. Main, fora da v1 (recorte congelado); não toma a vez de nada em andamento. **Só SSH** (terminal local fica para depois): hosts, chaves ed25519 no Keystore (ou envelope cifrado), `known_hosts` com confirmação da impressão digital, terminal com abas sobre termlib + cbssh, serviço em primeiro plano `specialUse`, imagens kitty/iTerm2/**sixel** e o agente com `terminal_*` só em hosts marcados. **Depende da frente (separada) de atualização do toolchain** (Kotlin/Compose/coroutines). Decisões do Yan de 29/10 incorporadas (D1..D11 do `spec.md`). Aberto: Q1..Q13 do `spec.md` |
 | — | CI | 2026-10-07: cache do AAR do sherpa-onnx nos dois jobs (um 503 do GitHub derrubou a PR #7 antes dos testes) |
 | — | 2026-10-10..22 | PRs #8 a #11 (estabilidade dos testes, desempenho da abertura do teclado, CI, galeria) — fora da fila da v1 |
 
@@ -537,6 +538,22 @@ Spec: `.specs/features/flows/` (`spec.md` 56 requisitos FLX-01..FLX-56, `design.
 - **Pré-requisito técnico**: FLX-T9 extrai a composição dos motores da `SetupActivity` para um objeto por processo (o `OverlayService`, que executa o fluxo, não os enxerga hoje); sem mudança visual.
 - **[YAN]**: (1) responder Q1..Q7 do `spec.md`; (2) FLX-T26: rodar o roteiro no A32 e no Vaio (RAM do fluxo 100% local no A32 de 4 GB; confirmação do agente sobre outro app; Ditar com a orbe em PTT).
 
+## Bloco 16 — `computer-terminal` (aba Computador, terminal SSH) — rascunho, main, fora da v1
+
+Spec: `.specs/features/computer-terminal/` (`spec.md` 66 requisitos CMP-01..CMP-66, `design.md`, `tasks.md` CMP-T0..CMP-T38). Ordem: ver o plano de execução do `tasks.md` (Fase 0 pré-requisito e spikes → Fase 1 SSH + terminal de texto + hosts + chaves → Fase 2 imagens → Fase 3 agente).
+*(O número 15 está reservado à feature `notification`, PR #73.)*
+
+- **Escopo**: a aba Computador deixa o "Em breve" com um **terminal SSH**: lista de hosts com "Testar conexão" de verdade, chaves **ed25519 geradas no aparelho** (Android Keystore quando o aparelho deixa; envelope cifrado quando não) ou importadas, biometria opcional,
+  `known_hosts` com **confirmação da impressão digital** e bloqueio quando o servidor muda, terminal com abas (KeyFlow IME e ditado funcionando), **serviço em primeiro plano `specialUse`** (justificativa da Play redigida na spec) e, na Fase 2, imagens **kitty, iTerm2 e sixel** (consentimento por host) com a TUI do **Herdr** compatível.
+  Fase 3: ferramentas `terminal_*` do agente **só em hosts marcados "pode ser usado pelo agente"** (padrão não), sessões separadas do usuário (compartilháveis), sem "permitir sempre" no `send`, senha/sudo só do usuário, nada via MCP externo, **registro de 30 dias**. Gratuita; `minSdk 24` mantido.
+  **Fora**: terminal local (Termux/PRoot — a licença do `terminal-emulator` do Termux é ambígua e pede parecer), SFTP, port forwarding, agent forwarding, Mosh, cliente do Herdr.
+- **Prioridade**: **depois** das frentes abertas e fora do recorte da v1 (v1 só correção). Não toma a vez de nada.
+- **Depende de**: a **frente de atualização do toolchain** (spike próprio, fora desta spec): o termlib ≥ 0.2.0 e o cbssh ≥ 0.4.0 exigem Kotlin 2.3/2.4, Compose 1.11 e coroutines 1.11 (hoje 2.2.10 / BOM 2024.09.03 / 1.8.1). A CMP-T0 é o portão; o **fork preso é só contingência** (design §2.4).
+  Na `main`: `agent-harness` fase 1 (as ferramentas), `shortcut-bars`/teclado (o IME no terminal), `monetization` (sem anúncio aqui). **Convive com**: `flows` (a etapa Computador entra depois, sem mexer no catálogo `sealed`), `notification` (outro serviço e outra notificação; o `OverlayService` não é tocado) e a atualização do LiteRT-LM (mesmo travamento de toolchain).
+- **Pré-requisito técnico**: servidor SSH de teste em JVM (CMP-T4) — o container não tem `sshd`; spikes CMP-T1 (termlib + cbssh + IME + sixel A1×A2) e CMP-T2 (Ed25519 no Keystore, aparelho a aparelho) decidem o desenho antes da Fase 1.
+- **Emenda ao `agent-harness`**: o texto (AGT-E1..E6) já está no `agent-harness/spec.md`, aprovado pelo Yan em 29/10 **só para SSH**; o código (`alwaysAllowable`, retenção por ferramenta, grupo não exportável) é a CMP-T30, em commit à parte.
+- **[YAN]**: (1) responder Q1..Q13 do `spec.md`; (2) declarar o serviço `specialUse` no Console (**Policy > App content**) e aprovar os textos de privacidade/Data Safety (CMP-T19); (3) CMP-T21, T29 e T37: rodar os roteiros no A32, Tab S10 Lite e Vaio (nunca `connectedAndroidTest` no A32) e, na Fase 3, com a chave de API real do agente (junto da AGT-T10).
+
 ---
 
 ## Resumo da fila (visão de uma linha)
@@ -548,7 +565,7 @@ agora: (V1-10 fakes e V1-3 feitas) → upload interno → e2e MZ-T15/API-T14 →
 em paralelo: V1-9 (API-T13 na AWS) — fakes esperam o staging; o e2e real espera conta, applicationId e o upload
 depois: créditos (MZ-T5..T8, T12) e ligar API-T11/T12 · VC (visão) · TS (temas, spec a revisar) ·
        bancada de modelos (régua do motor LiteRT-LM; Bloco 11) · parâmetros dos modelos locais (Bloco 12) · AGT fases 2/3 · síntese de fala (aba Voz, rascunho, Bloco 13) · Fluxos (aba Fluxos, spec em rascunho, Bloco 14) ·
-       Computador (sem spec; ideias em .specs/features/computer-terminal/ideias.md)
+       Computador (terminal SSH, spec em rascunho, Bloco 16; ideias em .specs/features/computer-terminal/ideias.md)
 ```
 
 **Posição atual (2026-10-23)**: o próximo marco é a **v1** (recorte no topo). V1-0, V1-1, V1-2 e
