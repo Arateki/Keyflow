@@ -14,6 +14,7 @@ import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.json.JSONObject
+import org.json.JSONArray
 import org.junit.After
 import org.junit.Test
 
@@ -36,10 +37,10 @@ class GenerationOptionsTest {
     private val sse = "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"text\":\"x\"}}\n\n" +
         "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
 
-    private fun bodyOf(engine: ReasoningEngine, request: ReasoningRequest): JSONObject {
+    private fun bodyRaw(engine: ReasoningEngine, request: ReasoningRequest): String {
         server.enqueue(MockResponse().setResponseCode(200).setHeader("Content-Type", "text/event-stream").setBody(sse))
         runBlocking { withTimeout(10_000) { engine.generate(request).toList() } }
-        return JSONObject(server.takeRequest().body.readUtf8())
+        return server.takeRequest().body.readUtf8()
     }
 
     private fun keysOf(json: String): Set<String> = JSONObject(json).keys().asSequence().toSet()
@@ -68,15 +69,19 @@ class GenerationOptionsTest {
             override suspend fun headers(provider: ProviderId) = mapOf("x-api-key" to "test-anthropic-key")
         }
         val engine = AnthropicReasoningEngine(keyAuth, client, "claude-x", apiBaseUrl = base)
-        val today = bodyOf(engine, withSystem)
+        val rawToday = bodyRaw(engine, withSystem)
+        val today = JSONObject(rawToday)
         // org.json guarda as chaves num HashMap: a ordem não é do contrato, o conjunto de campos e os valores são.
         assertThat(today.keys().asSequence().toSet()).containsExactly("model", "max_tokens", "stream", "messages", "system")
+        val original = JSONObject().put("model", "claude-x").put("max_tokens", 1024).put("stream", true)
+            .put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", "olá"))).put("system", "sistema")
+        assertThat(rawToday).isEqualTo(original.toString())
         assertThat(today.getString("model")).isEqualTo("claude-x")
         assertThat(today.getInt("max_tokens")).isEqualTo(1024)
         assertThat(today.getBoolean("stream")).isTrue()
         assertThat(today.getString("system")).isEqualTo("sistema")
         assertThat(today.getJSONArray("messages").toString()).isEqualTo("""[{"role":"user","content":"olá"}]""")
-        assertThat(bodyOf(engine, withSystem.copy(options = GenerationOptions())).toString()).isEqualTo(today.toString())
+        assertThat(bodyRaw(engine, withSystem.copy(options = GenerationOptions()))).isEqualTo(rawToday)
     }
 
     @Test
@@ -90,6 +95,10 @@ class GenerationOptionsTest {
             return server.takeRequest().body.readUtf8()
         }
         val today = body(request)
+        val original = JSONObject().put("model", "modelo-x")
+            .put("input", JSONArray().put(JSONObject().put("role", "user").put("content", "olá")))
+            .put("store", false).put("stream", true).put("instructions", "sistema").toString()
+        assertThat(today).isEqualTo(original)
         assertThat(keysOf(today)).containsExactly("model", "input", "store", "stream", "instructions")
         assertThat(body(request.copy(options = GenerationOptions()))).isEqualTo(today)
     }
@@ -105,6 +114,10 @@ class GenerationOptionsTest {
             return server.takeRequest().body.readUtf8()
         }
         val today = body(request)
+        val original = JSONObject().put("contents", JSONArray().put(JSONObject().put("role", "user")
+            .put("parts", JSONArray().put(JSONObject().put("text", "olá")))))
+            .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", "sistema")))).toString()
+        assertThat(today).isEqualTo(original)
         assertThat(keysOf(today)).containsExactly("contents", "systemInstruction")
         assertThat(body(request.copy(options = GenerationOptions()))).isEqualTo(today)
     }

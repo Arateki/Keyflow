@@ -50,6 +50,6 @@ class CustomReasoningEngineTest {
         assertThat(messages.getJSONObject(0).getString("content")).isEqualTo("sistema")
         assertThat(messages.getJSONObject(1).getString("role")).isEqualTo("user")
         assertThat(messages.getJSONObject(1).getString("content")).isEqualTo("pedido")
-        assertThat(events).containsExactly(ReasoningEvent.Delta("olá"), ReasoningEvent.Done).inOrder()
+        assertThat(events.filterNot { it is ReasoningEvent.Metrics }).containsExactly(ReasoningEvent.Delta("olá"), ReasoningEvent.Done).inOrder()
     }
 }

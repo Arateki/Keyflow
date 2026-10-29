@@ -7,6 +7,8 @@ import com.keyflow.auth.HttpErrorMessage
 import com.keyflow.auth.ProviderIds
 import com.keyflow.auth.providers.openai.OpenAiAuthConfig
 import com.keyflow.data.models.Ipv4FirstDns
+import com.keyflow.reasoning.OnlineMetrics
+import com.keyflow.reasoning.GenerationOptions
 import com.keyflow.reasoning.ReasoningEngine
 import com.keyflow.reasoning.ReasoningError
 import com.keyflow.reasoning.ReasoningEvent
@@ -62,13 +64,16 @@ class OpenAiReasoningEngine(
         .build()
 
     override fun generate(request: ReasoningRequest): Flow<ReasoningEvent> = channelFlow {
-        val headers = try {
-            authorization.headers(ProviderIds.OPENAI)
+        val authorized = try {
+            authorization.authorizedHeaders(ProviderIds.OPENAI)
         } catch (e: AuthException) {
             send(ReasoningEvent.Error(authError(e.kind), "autenticação: ${e.kind}"))
             return@channelFlow
         }
-        val body = bodyOf(request).toRequestBody("application/json".toMediaType())
+        val headers = authorized.headers
+        val supported = if (authorized.apiKey) supportedOptions(request.options) else emptySet()
+        val metrics = OnlineMetrics(request.options, supported)
+        val body = bodyOf(request, supported).toRequestBody("application/json".toMediaType())
         var attempt = 0
         while (true) {
             val call = try {
@@ -84,7 +89,7 @@ class OpenAiReasoningEngine(
                 send(ReasoningEvent.Error(ReasoningError.UNAUTHORIZED, "a credencial tem caracteres que não podem ser enviados"))
                 return@channelFlow
             }
-            val outcome = attemptOnce(call)
+            val outcome = attemptOnce(call, metrics)
             if (outcome !is Outcome.Retry) return@channelFlow
             attempt++
             if (attempt >= MAX_ATTEMPTS) {
@@ -104,7 +109,7 @@ class OpenAiReasoningEngine(
      * Uma tentativa. Um "vigia" cancela a chamada HTTP quando a corrotina é cancelada — a leitura bloqueante em `Dispatchers.IO`
      * só volta quando o socket cai. Ele só cancela por cancelamento de verdade, não quando a tentativa termina sozinha.
      */
-    private suspend fun ProducerScope<ReasoningEvent>.attemptOnce(call: Call): Outcome {
+    private suspend fun ProducerScope<ReasoningEvent>.attemptOnce(call: Call, metrics: OnlineMetrics): Outcome {
         var finished = false
         val watcher = launch(start = CoroutineStart.UNDISPATCHED) {
             try {
@@ -115,14 +120,14 @@ class OpenAiReasoningEngine(
             }
         }
         try {
-            return withContext(Dispatchers.IO) { execute(call) { send(it) } }
+            return withContext(Dispatchers.IO) { execute(call, metrics) { send(it) } }
         } finally {
             finished = true
             watcher.cancel()
         }
     }
 
-    private suspend fun execute(call: Call, send: suspend (ReasoningEvent) -> Unit): Outcome {
+    private suspend fun execute(call: Call, metrics: OnlineMetrics, send: suspend (ReasoningEvent) -> Unit): Outcome {
         val response = try {
             call.execute()
         } catch (e: IOException) {
@@ -140,7 +145,7 @@ class OpenAiReasoningEngine(
                 return Outcome.Finished
             }
             try {
-                readStream(r.body!!.source(), send)
+                readStream(r.body!!.source(), metrics, send)
             } catch (e: IOException) {
                 if (call.isCanceled()) throw CancellationException("cancelado")
                 send(ReasoningEvent.Error(ReasoningError.NETWORK, "o fluxo foi interrompido"))
@@ -150,14 +155,14 @@ class OpenAiReasoningEngine(
     }
 
     /** SSE: linhas `event:`/`data:` e uma linha em branco fecham cada evento. Termina no `Done`/`Error`, ou no fim do corpo. */
-    private suspend fun readStream(source: BufferedSource, send: suspend (ReasoningEvent) -> Unit) {
+    private suspend fun readStream(source: BufferedSource, metrics: OnlineMetrics, send: suspend (ReasoningEvent) -> Unit) {
         val data = StringBuilder()
         var eventName: String? = null
         while (true) {
             val line = source.readUtf8Line() ?: break
             when {
                 line.isEmpty() -> {
-                    if (data.isNotEmpty() && handle(eventName, data.toString(), send)) return
+                    if (data.isNotEmpty() && handle(eventName, data.toString(), metrics, send)) return
                     data.clear()
                     eventName = null
                 }
@@ -169,13 +174,13 @@ class OpenAiReasoningEngine(
                 // `:` (comentário/keep-alive) e qualquer outra coisa: ignorado.
             }
         }
-        if (data.isNotEmpty() && handle(eventName, data.toString(), send)) return
+        if (data.isNotEmpty() && handle(eventName, data.toString(), metrics, send)) return
         // O corpo acabou e nunca veio `response.completed`: NÃO é sucesso (a doc), mas o texto que chegou continua valendo.
         send(ReasoningEvent.Error(ReasoningError.NETWORK, "o fluxo terminou sem response.completed"))
     }
 
     /** Trata um evento; devolve `true` se foi terminal (já mandou `Done` ou `Error`). */
-    private suspend fun handle(eventName: String?, data: String, send: suspend (ReasoningEvent) -> Unit): Boolean {
+    private suspend fun handle(eventName: String?, data: String, metrics: OnlineMetrics, send: suspend (ReasoningEvent) -> Unit): Boolean {
         val json = try {
             JSONObject(data)
         } catch (e: JSONException) {
@@ -185,16 +190,28 @@ class OpenAiReasoningEngine(
         when (json.optString("type").ifEmpty { eventName.orEmpty() }) {
             "response.output_text.delta" -> json.optString("delta").takeIf { it.isNotEmpty() }?.let { send(ReasoningEvent.Delta(it)) }
             "response.completed" -> {
+                val usage = json.optJSONObject("response")?.optJSONObject("usage")
+                if (usage != null) {
+                    if (usage.has("input_tokens") && !usage.isNull("input_tokens")) metrics.inputTokens = usage.optInt("input_tokens")
+                    if (usage.has("output_tokens") && !usage.isNull("output_tokens")) metrics.outputTokens = usage.optInt("output_tokens")
+                }
+                send(metrics.event())
                 send(ReasoningEvent.Done)
                 return true
             }
             "response.failed" -> {
+                send(metrics.event())
                 val code = json.optJSONObject("response")?.optJSONObject("error")?.optString("code").orEmpty()
                 if (code == "subscription_sharing_invalid_user") authorization.invalidate(ProviderIds.OPENAI)
                 send(ReasoningEvent.Error(failedError(code), "a resposta falhou ($code)"))
                 return true
             }
             "response.incomplete" -> {
+                json.optJSONObject("response")?.optJSONObject("usage")?.let { usage ->
+                    if (usage.has("input_tokens") && !usage.isNull("input_tokens")) metrics.inputTokens = usage.optInt("input_tokens")
+                    if (usage.has("output_tokens") && !usage.isNull("output_tokens")) metrics.outputTokens = usage.optInt("output_tokens")
+                }
+                send(metrics.event())
                 val reason = json.optJSONObject("response")?.optJSONObject("incomplete_details")?.optString("reason").orEmpty()
                 send(ReasoningEvent.Error(ReasoningError.ENGINE, "a resposta ficou incompleta ($reason)"))
                 return true
@@ -238,12 +255,26 @@ class OpenAiReasoningEngine(
         else -> ReasoningError.UNAUTHORIZED
     }
 
-    private fun bodyOf(request: ReasoningRequest): String = JSONObject().apply {
+    private fun supportedOptions(options: GenerationOptions): Set<String> = buildSet {
+        add(GenerationOptions.TEMPERATURE)
+        add(GenerationOptions.TOP_P)
+        add(GenerationOptions.MAX_OUTPUT_TOKENS)
+        // Effort é documentado apenas para modelos de raciocínio, com suporte a "none" variável por modelo.
+        if (options.thinking == true && (model.startsWith("gpt-5") || model.startsWith("gpt-6") || model.startsWith("o"))) add(GenerationOptions.THINKING)
+        if (options.thinking == false && (model.startsWith("gpt-5.1") || model.startsWith("gpt-5.2") || model.startsWith("gpt-5.4") || model.startsWith("gpt-5.5") || model.startsWith("gpt-6-sol") || model.startsWith("gpt-6-luna"))) add(GenerationOptions.THINKING)
+    }
+
+    private fun bodyOf(request: ReasoningRequest, supported: Set<String>): String = JSONObject().apply {
         put("model", model)
         put("input", org.json.JSONArray().put(JSONObject().put("role", "user").put("content", request.user)))
         put("store", false)
         put("stream", true)
         request.system?.let { put("instructions", it) }
+        val o = request.options
+        if (GenerationOptions.TEMPERATURE in supported) o.temperature?.let { put("temperature", it) }
+        if (GenerationOptions.TOP_P in supported) o.topP?.let { put("top_p", it) }
+        if (GenerationOptions.MAX_OUTPUT_TOKENS in supported) o.maxOutputTokens?.let { put("max_output_tokens", it) }
+        if (GenerationOptions.THINKING in supported) o.thinking?.let { put("reasoning", JSONObject().put("effort", if (it) "medium" else "none")) }
     }.toString()
 
     private companion object {

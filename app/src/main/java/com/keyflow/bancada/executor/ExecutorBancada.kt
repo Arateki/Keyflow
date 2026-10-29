@@ -303,6 +303,14 @@ class ExecutorBancada(
         /** Tokens e tokens/s: os do motor quando ele os dá; senão uma estimativa (caracteres ÷ 4) marcada como tal (BEX-04). */
         private fun medidas(r: ResultadoCaso, t: Tentativa.Concluiu, caso: Caso): ResultadoCaso {
             val m = t.metricas
+            if (plano.origem == Origem.ONLINE) {
+                val output = m?.outputTokens
+                val elapsed = t.primeiroMs?.let { t.totalMs - it }
+                val rate = m?.tokensPerSecond ?: if (output != null && output > 1 && elapsed != null && elapsed > 0) {
+                    (output - 1) * 1000.0 / elapsed
+                } else null
+                return r.copy(tokensEntrada = m?.inputTokens, tokensSaida = output, tokensPorSegundo = rate?.takeIf { it.isFinite() })
+            }
             val tokensSaida = m?.outputTokens ?: ceil(t.texto.length / 4.0).toInt()
             val estimados = m?.outputTokens == null
             val corrido = t.primeiroMs?.let { t.totalMs - it }

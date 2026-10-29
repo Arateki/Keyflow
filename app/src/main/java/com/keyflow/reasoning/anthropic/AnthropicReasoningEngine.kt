@@ -8,6 +8,8 @@ import com.keyflow.auth.HttpErrorMessage
 import com.keyflow.auth.ProviderIds
 import com.keyflow.auth.providers.anthropic.AnthropicAuthConfig
 import com.keyflow.data.models.Ipv4FirstDns
+import com.keyflow.reasoning.OnlineMetrics
+import com.keyflow.reasoning.GenerationOptions
 import com.keyflow.reasoning.ReasoningEngine
 import com.keyflow.reasoning.ReasoningError
 import com.keyflow.reasoning.ReasoningEvent
@@ -71,7 +73,9 @@ class AnthropicReasoningEngine(
         }
 
         val isOAuth = headers["Authorization"]?.startsWith("Bearer ") == true
-        val jsonBody = bodyOf(request, isOAuth)
+        val supported = supportedOptions(request.options)
+        val metrics = OnlineMetrics(request.options, supported)
+        val jsonBody = bodyOf(request, isOAuth, supported)
         // Sem o corpo: é o texto do usuário (ditado, prompt), e o Log.d sai também no release.
         android.util.Log.d("AnthropicReasoning", "Outgoing model: $resolvedModel, isOAuth: $isOAuth, corpo: ${jsonBody.length} caracteres")
         val body = jsonBody.toRequestBody("application/json".toMediaType())
@@ -92,7 +96,7 @@ class AnthropicReasoningEngine(
                 return@channelFlow
             }
 
-            val outcome = attemptOnce(call)
+            val outcome = attemptOnce(call, metrics)
             if (outcome !is Outcome.Retry) return@channelFlow
             attempt++
             if (attempt >= MAX_ATTEMPTS) {
@@ -108,7 +112,7 @@ class AnthropicReasoningEngine(
         class Retry(val error: ReasoningEvent.Error) : Outcome
     }
 
-    private suspend fun ProducerScope<ReasoningEvent>.attemptOnce(call: Call): Outcome {
+    private suspend fun ProducerScope<ReasoningEvent>.attemptOnce(call: Call, metrics: OnlineMetrics): Outcome {
         var finished = false
         val watcher = launch(start = CoroutineStart.UNDISPATCHED) {
             try {
@@ -119,14 +123,14 @@ class AnthropicReasoningEngine(
             }
         }
         try {
-            return withContext(Dispatchers.IO) { execute(call) { send(it) } }
+            return withContext(Dispatchers.IO) { execute(call, metrics) { send(it) } }
         } finally {
             finished = true
             watcher.cancel()
         }
     }
 
-    private suspend fun execute(call: Call, send: suspend (ReasoningEvent) -> Unit): Outcome {
+    private suspend fun execute(call: Call, metrics: OnlineMetrics, send: suspend (ReasoningEvent) -> Unit): Outcome {
         val response = try {
             call.execute()
         } catch (e: IOException) {
@@ -146,7 +150,7 @@ class AnthropicReasoningEngine(
                 return Outcome.Finished
             }
             try {
-                readStream(r.body!!.source(), send)
+                readStream(r.body!!.source(), metrics, send)
             } catch (e: IOException) {
                 if (call.isCanceled()) throw CancellationException("cancelado")
                 send(ReasoningEvent.Error(ReasoningError.NETWORK, "o fluxo SSE da Anthropic foi interrompido"))
@@ -155,7 +159,7 @@ class AnthropicReasoningEngine(
         return Outcome.Finished
     }
 
-    private suspend fun readStream(source: BufferedSource, send: suspend (ReasoningEvent) -> Unit) {
+    private suspend fun readStream(source: BufferedSource, metrics: OnlineMetrics, send: suspend (ReasoningEvent) -> Unit) {
         val data = StringBuilder()
         var eventName: String? = null
         var completed = false
@@ -165,7 +169,7 @@ class AnthropicReasoningEngine(
             when {
                 line.isEmpty() -> {
                     if (data.isNotEmpty()) {
-                        val terminal = handleEvent(eventName, data.toString(), send)
+                        val terminal = handleEvent(eventName, data.toString(), metrics, send)
                         if (terminal) completed = true
                         data.clear()
                         eventName = null
@@ -180,16 +184,17 @@ class AnthropicReasoningEngine(
         }
 
         if (data.isNotEmpty()) {
-            val terminal = handleEvent(eventName, data.toString(), send)
+            val terminal = handleEvent(eventName, data.toString(), metrics, send)
             if (terminal) completed = true
         }
 
         if (!completed) {
+            send(metrics.event())
             send(ReasoningEvent.Done)
         }
     }
 
-    private suspend fun handleEvent(eventName: String?, data: String, send: suspend (ReasoningEvent) -> Unit): Boolean {
+    private suspend fun handleEvent(eventName: String?, data: String, metrics: OnlineMetrics, send: suspend (ReasoningEvent) -> Unit): Boolean {
         val json = try {
             JSONObject(data)
         } catch (e: JSONException) {
@@ -197,6 +202,11 @@ class AnthropicReasoningEngine(
         }
 
         val type = json.optString("type").ifEmpty { eventName.orEmpty() }
+        val usage = if (type == "message_start") json.optJSONObject("message")?.optJSONObject("usage") else json.optJSONObject("usage")
+        if (usage != null) {
+            if (usage.has("input_tokens") && !usage.isNull("input_tokens")) metrics.inputTokens = usage.optInt("input_tokens")
+            if (usage.has("output_tokens") && !usage.isNull("output_tokens")) metrics.outputTokens = usage.optInt("output_tokens")
+        }
         when (type) {
             "content_block_delta" -> {
                 val delta = json.optJSONObject("delta")
@@ -206,10 +216,12 @@ class AnthropicReasoningEngine(
                 }
             }
             "message_stop" -> {
+                send(metrics.event())
                 send(ReasoningEvent.Done)
                 return true
             }
             "error" -> {
+                send(metrics.event())
                 if (BuildConfig.DEBUG) android.util.Log.e("AnthropicReasoning", "SSE error recebido")
                 send(ReasoningEvent.Error(ReasoningError.ENGINE, "erro no fluxo SSE da Anthropic"))
                 return true
@@ -237,9 +249,23 @@ class AnthropicReasoningEngine(
         else -> ReasoningError.UNAUTHORIZED
     }
 
-    private fun bodyOf(request: ReasoningRequest, isOAuth: Boolean = false): String = JSONObject().apply {
+    private fun supportedOptions(options: GenerationOptions): Set<String> = buildSet {
+        add(GenerationOptions.MAX_OUTPUT_TOKENS)
+        val manual4 = Regex("^claude-(sonnet|opus|haiku)-4(?:-(?:0|1|5))?(?:-(?:latest|20[0-9]{6}))?$").matches(resolvedModel)
+        val older = resolvedModel.startsWith("claude-3-") || manual4
+        val manualThinking = resolvedModel.startsWith("claude-3-7") || manual4
+        val supportsThinking = manualThinking && (options.thinking == false || (options.maxOutputTokens ?: MAX_TOKENS_DE_SAIDA) > 1024)
+        if (older && !(supportsThinking && options.thinking == true)) {
+            if (options.temperature == null || options.temperature in 0.0..1.0) add(GenerationOptions.TEMPERATURE)
+            add(GenerationOptions.TOP_K)
+            if (options.temperature == null) add(GenerationOptions.TOP_P)
+        }
+        if (supportsThinking) add(GenerationOptions.THINKING)
+    }
+
+    private fun bodyOf(request: ReasoningRequest, isOAuth: Boolean = false, supported: Set<String>): String = JSONObject().apply {
         put("model", resolvedModel)
-        put("max_tokens", MAX_TOKENS_DE_SAIDA)
+        put("max_tokens", if (GenerationOptions.MAX_OUTPUT_TOKENS in supported) request.options.maxOutputTokens ?: MAX_TOKENS_DE_SAIDA else MAX_TOKENS_DE_SAIDA)
         put("stream", true)
         val msg = JSONObject().put("role", "user").put("content", request.user)
         put("messages", JSONArray().put(msg))
@@ -250,6 +276,13 @@ class AnthropicReasoningEngine(
             request.system
         }
         systemPrompt?.let { put("system", it) }
+        val o = request.options
+        if (GenerationOptions.TEMPERATURE in supported) o.temperature?.let { put("temperature", it) }
+        if (GenerationOptions.TOP_K in supported) o.topK?.let { put("top_k", it) }
+        if (GenerationOptions.TOP_P in supported) o.topP?.let { put("top_p", it) }
+        if (GenerationOptions.THINKING in supported) o.thinking?.let {
+            put("thinking", if (it) JSONObject().put("type", "enabled").put("budget_tokens", 1024) else JSONObject().put("type", "disabled"))
+        }
     }.toString()
 
     private companion object {

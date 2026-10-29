@@ -233,10 +233,10 @@ Status: Pending → In Design → In Tasks → Implementing → Verified. As tas
 | BCP-07 | P1-B | BNC-T2, BNC-T7 | Verified |
 | BCP-08 | P1-B | BNC-T1, BNC-T20 | In Tasks |
 | BEX-01 | P1-C | BNC-T11 | Verified |
-| BEX-02 | P1-C | BNC-T1, BNC-T8, BNC-T9, BNC-T10 | Implementing |
+| BEX-02 | P1-C | BNC-T1, BNC-T8, BNC-T9, BNC-T10 | Verified |
 | BEX-03 | P1-C | BNC-T11 | Verified |
 | BEX-04 | P1-C | BNC-T1, BNC-T9, BNC-T28 | Implementing (T9 implementada; T28 pendente) |
-| BEX-05 | P1-C | BNC-T1, BNC-T10 | In Tasks |
+| BEX-05 | P1-C | BNC-T1, BNC-T10 | Verified |
 | BEX-06 | P1-C | BNC-T11 | Verified |
 | BEX-07 | P1-C | BNC-T11 | Verified |
 | BEX-08 | P1-C | BNC-T16 | In Tasks |
@@ -261,7 +261,7 @@ Status: Pending → In Design → In Tasks → Implementing → Verified. As tas
 | BHS-06 | P1-E | BNC-T12, BNC-T14 | Verified |
 | BON-01 | P1-F | BNC-T14 | Verified |
 | BON-02 | P1-F | BNC-T14 | Verified |
-| BON-03 | P1-F | BNC-T6, BNC-T10 | Implementing |
+| BON-03 | P1-F | BNC-T6, BNC-T10 | Verified |
 | BON-04 | P1-F | BNC-T22 | In Tasks |
 | BON-05 | P1-F | BNC-T11 | Verified |
 | BAU-01 | P1-G | BNC-T16 | In Tasks |

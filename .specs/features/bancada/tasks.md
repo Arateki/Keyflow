@@ -131,7 +131,7 @@ e o emulador são o gargalo: instrumentados serializam). T19 é o marco: **sem b
 - **Depends on**: T6. **Requirement**: BHS-01, BHS-03, BHS-06, BEX-10. **Gate**: `quick` + `build`. **Commit**: `feat(bancada): histórico local de execuções`.
 
 ### BNC-T9 — Local: opções, `BenchmarkInfo`, RAM e carga fria/quente
-- **Status**: Implementada em 2026-10-29; `ReasoningServiceCoreTest` 45/45 e instrumentados 71/71, incluindo a prova opt-in no Qwen3 x86_64 (ver lição).
+- **Status**: Concluída em 2026-10-29; `ReasoningServiceCoreTest` 45/45 e instrumentados 71/71, incluindo a prova opt-in no Qwen3 x86_64 (ver lição).
 - **What**: `LocalGenOptions` no AIDL (`generate`) e `onMetrics` no callback; `LiteRtBackend` aplica `SamplerConfig`/`maxOutputToken`/`ThinkingConfig` quando
   pedido e lê `BenchmarkInfo`; `unload()` e `restart()` no serviço; sonda de RAM (`VmHWM`/`VmRSS`); `LocalReasoningEngine` traduz para `Metrics`.
 - **Done when**: `ReasoningServiceCoreTest` (backend falso) cobre opções repassadas e métricas; instrumentado sem pesos (`LiteRtWarmupTest`-style) cobre as configs;
@@ -139,6 +139,8 @@ e o emulador são o gargalo: instrumentados serializam). T19 é o marco: **sem b
 - **Depends on**: T1, T8. **Requirement**: BEX-02, BEX-04. **Gate**: `quick` + `pool instrumentar` (afetados) + medição manual no Vaio. **Commit**: `feat(raciocínio): opções de geração, métricas e carga fria no motor local`.
 
 ### BNC-T10 — Online: opções e `usage` por provedor
+- **Status**: Concluída em 2026-10-29; MockWebServer por provedor, 2209 unitários e lint verdes, instrumentados afetados 70/70 e bancada 13/13.
+- **SPEC_DEVIATION** (Yan, 2026-10-29): Custom passa a usar o endpoint configurado e Chat Completions; só nele o corpo sem opções muda. Ver lição `2026-10-29-bancada-custom-endpoint.md`.
 - **What**: Anthropic, OpenAI (chave de API; o login de plano mantém o corpo enxuto), Google e Custom enviam só o que a T1 confirmou, devolvem `aplicadas`/`ignoradas`
   e emitem `Metrics` com os tokens do `usage` quando o provedor os dá.
 - **Done when**: MockWebServer por provedor: com opções, o corpo leva exatamente os campos confirmados; sem opções, o corpo é **byte a byte o de hoje**; `usage` ausente → `null`;
