@@ -1,7 +1,11 @@
 # Síntese de fala (aba Voz) — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md`
+<<<<<<< HEAD
+**Status**: FAL-T1, T4, T5 e T6 feitas na branch `equipe/voz-aba` (lição: `../../project/licoes/2026-10-29-voz-aba-contrato-e-nuvem.md`); as outras seguem pendentes. **Fora da v1**. Não toma a vez de frente aberta.
+=======
 **Status**: rascunho. FAL-T2, FAL-T8 e FAL-T10 feitas em 2026-10-29. O resto não começou. **Fora da v1**. Não toma a vez de frente aberta.
+>>>>>>> origin/main
 
 > **Para o agente executor**: leia `spec.md` + `design.md` + este arquivo e `.specs/codebase/TESTING.md`. Uma task por vez,
 > na ordem abaixo, testes primeiro, gate verde antes de avançar. Supertonic e VITS entram no catálogo nesta leva (D1 e D2). O nome do VITS é "português", nunca "pt-BR".
@@ -35,7 +39,7 @@ T4, T5 e T6 dependem só de T1. T3 depende de T1. T2 não trava T3 nem T9. T11 d
 
 ---
 
-### FAL-T1 — Contrato `[P]`
+### FAL-T1 — Contrato `[P]` — **Status: feita (equipe/voz-aba, 2026-10-29)**
 - **What**: `SpeechRequest`, `SpeechEvent`, `SpeechEngine`, `SpeechEngines.forSource` (FENG-01, FENG-02, FENG-05 no nível do motor).
 - **Where**: `app/src/main/java/com/keyflow/speech/`, teste `app/src/test/.../speech/SpeechEngineTest.kt`.
 - **Done when**: motor falso emite `Audio`, `FirstAudio` no primeiro buffer e `Done` com a duração das amostras; cancelar não emite `Done`; origem Local sem id de modelo emite `MODEL_MISSING` e não troca a origem. Gate `quick`.
@@ -54,19 +58,19 @@ T4, T5 e T6 dependem só de T1. T3 depende de T1. T2 não trava T3 nem T9. T11 d
 - **Done when**: `assembleDebug` gera o processo; teste de arquitetura falha se o módulo de fala importar `OfflineTts` ou o downloader; teste com backend falso não abre rede no caminho local. Não editar a URL do sherpa. Gate `quick` + `build`.
 - **Gate**: `pool compilar testDebugUnitTest assembleDebug`.
 
-### FAL-T4 — Painel
+### FAL-T4 — Painel — **Status: feita (equipe/voz-aba, 2026-10-29)**
 - **What**: `SYSTEM` no enum; Créditos desligado; tirar cota fictícia e o `delay(60)`; Custom via `CustomProviderFields` mais voz e formato; campo, Testar/Parar e a linha de tempos ligados a um `SpeechEngine` injetável (FUX-01..07, FUX-09, FENG-03..06). A aba só sai de "Em breve" se T3 e T5 (ou T6) já estiverem no mesmo app — senão deixar o gating e anotar.
 - **Where**: `FalaPanel.kt`, `Models.kt`, `CustomProviderFields.kt` (parâmetros opcionais), `Settings` se faltar chave de voz/formato do Custom.
 - **Done when**: instrumentado com motor falso mostra a linha de tempos; Local sem modelo desliga o botão e mostra o motivo; Sistema mostra a nota de privacidade; OpenAI do painel não recebe `ssoFiveHourFraction`; Visão e Raciocínio seguem sem os campos voz/formato. `TranslationsTest` verde.
 - **Gate**: `quick` + `pool instrumentar com.keyflow.ui.config.FalaPanelTest`. `lintDebug` se entrar API nova.
 
-### FAL-T5 — Nuvem e Custom
+### FAL-T5 — Nuvem e Custom — **Status: feita (equipe/voz-aba, 2026-10-29)**
 - **What**: clientes OpenAI, ElevenLabs, Google Cloud TTS e Custom (FCLD-01..07). Conferir na doc do dia o path da ElevenLabs e o corpo do `text:synthesize` antes de gravar. Nota da OpenAI com a data 2027-01-06.
 - **Where**: `com.keyflow.speech.cloud`.
 - **Done when**: HTTP falso — JSON da OpenAI com `pcm` e sem leitura de cota; 401 vira `UNAUTHORIZED` sem o corpo cru; Custom na URL de speech da Groq usa o mesmo corpo; resposta que não é áudio vira `ENGINE` com a frase da spec. Gate `quick`.
 - **Gate**: `pool compilar testDebugUnitTest`.
 
-### FAL-T6 — Sistema
+### FAL-T6 — Sistema — **Status: feita (equipe/voz-aba, 2026-10-29)**
 - **What**: `SystemSpeechEngine` sobre um `TextToSpeech` injetável (FSYS-01..05). O instrumento não depende do motor do emulador.
 - **Where**: `com.keyflow.speech.system`.
 - **Done when**: `onStart` produz `FirstAudio`; idioma ausente produz `TTS_DATA_MISSING`; a origem padrão do `Settings` novo continua `LOCAL`. Gate `quick`.

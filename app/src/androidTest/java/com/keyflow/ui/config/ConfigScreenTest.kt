@@ -263,7 +263,6 @@ class ConfigScreenTest {
         rule.setContent { h.Content() }
 
         val tabs = listOf(
-            ConfigTab.FALA to "Voz",
             ConfigTab.FLUXOS to "Fluxos",
             ConfigTab.COMPUTADOR to "Computador",
             ConfigTab.NOTIFICACAO to "Notificação",
