@@ -8,7 +8,7 @@ import ai.onnxruntime.OrtEnvironment
  * [available] antes: a carga das bibliotecas nativas falha (ABI sem a `.so`, JNI de outra série, etiqueta de versão
  * recusada pelo linker) e isso tem de virar "sem OCR", não crash.
  *
- * Só o processo `:vision` carrega a JNI; o `:inference` (sherpa) nunca toca neste objeto.
+ * Os processos `:vision` e `:speech` carregam a JNI; o `:inference` (sherpa) nunca toca neste objeto.
  */
 object OnnxRuntime {
 

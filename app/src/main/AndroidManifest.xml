@@ -106,5 +106,12 @@
             android:process=":vision"
             android:exported="false" />
 
+        <!-- Síntese local (sintese-fala, FAL-T3): processo próprio — o modelo de fala do ditado fica no :inference
+             e um crash nativo da voz não pode derrubá-lo. Sem rede (o StrictMode do debug mata o processo se tentar). -->
+        <service
+            android:name=".speech.local.SpeechService"
+            android:process=":speech"
+            android:exported="false" />
+
     </application>
 </manifest>

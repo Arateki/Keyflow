@@ -25,6 +25,9 @@ interface OnnxSession : AutoCloseable {
     val inputNames: List<String>
     val outputNames: List<String>
 
+    /** Metadados custom do ONNX (o VITS traz `sample_rate`, `add_blank`, `frontend`). Vazio se o modelo não declara. */
+    val metadata: Map<String, String> get() = emptyMap()
+
     /** Executa o modelo. Falha de forma/tipo/memória nativa vira [OnnxException]. */
     fun run(inputs: List<Tensor>): List<Tensor>
 
@@ -48,6 +51,11 @@ internal class OrtOnnxSession private constructor(
 
     override val inputNames: List<String> = session.inputNames.toList()
     override val outputNames: List<String> = session.outputNames.toList()
+    override val metadata: Map<String, String> = try {
+        session.metadata.customMetadata.toMap()
+    } catch (e: OrtException) {
+        emptyMap()
+    }
 
     override fun run(inputs: List<Tensor>): List<Tensor> {
         if (inputs.size != inputNames.size) {
