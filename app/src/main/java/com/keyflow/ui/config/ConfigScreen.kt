@@ -151,6 +151,8 @@ fun ConfigScreen(
     transcriptionOpenAiAuth: AuthActions = AuthActions.None,
     transcriptionGroqAuth: AuthActions = AuthActions.None,
     falaElevenLabsAuth: AuthActions = AuthActions.None,
+    // O Testar da aba Voz: o motor da origem e o `AudioTrack`. Sem ele (galeria, testes) o botão responde "indisponível".
+    speechTester: SpeechTester = SpeechTester.None,
     initialReasoningTest: TestState = TestState(),
     reasoningLocalSupported: Boolean = true,
     // A aba Visão usa as MESMAS conexões de provedor do Raciocínio (`reasoning*Auth`): conectar numa aba vale na outra (PRV-01).
@@ -491,7 +493,16 @@ fun ConfigScreen(
                             anthropicAuth = reasoningAnthropicAuth,
                             googleAuth = reasoningGoogleAuth,
                         )
-                        ConfigTab.FALA,
+                        ConfigTab.FALA -> FalaPanel(
+                            settings = settings,
+                            onSettingsChange = ::recordSettingsChange,
+                            models = falaModels,
+                            actions = localActions,
+                            tester = speechTester,
+                            openAiAuth = reasoningAuth,
+                            googleAuth = reasoningGoogleAuth,
+                            elevenLabsAuth = falaElevenLabsAuth,
+                        )
                         ConfigTab.FLUXOS,
                         ConfigTab.COMPUTADOR,
                         ConfigTab.NOTIFICACAO -> ComingSoonPanel()
