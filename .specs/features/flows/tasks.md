@@ -300,3 +300,16 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 - **Depends on**: T26. **Requirement**: regra de ouro 6.
 - **Done when**: gate `full` verde (unit + instrumentados afetados + goldens 0 divergências além das rotas novas); `ArchitectureRulesTest`, `TranslationsTest` e `lintDebug` verdes; requisitos → Verified (ou Parcial com o motivo).
 - **Tests**: gate completo. **Gate**: `full`. **Commit**: `docs(fluxos): fecha a frente de Fluxos`.
+
+---
+
+## Ponte — FLX-T29 aponta para a orbe do teclado
+
+Na `main` deste arquivo os Fluxos vão até a FLX-T27. A **FLX-T29** (gatilhos da orbe do teclado) entra com a branch `equipe/notificacao-spec`, onde ainda está escrita como **bloqueada: a orbe do teclado não tem spec** (ponta `c4bb407f`, dúvida Q8). Essa spec existe agora: `.specs/features/keyboard-orb/`. Quando as branches se encontrarem, o texto bloqueado é **substituído** pelo de baixo — não se cria uma segunda T29.
+
+### FLX-T29 — Gatilhos da orbe do teclado — **Status: pendente** (spec: `.specs/features/keyboard-orb/`)
+- **What**: o mesmo da T28 para `TECLADO` (FLX-59). A spec da orbe do teclado responde a Q8: o teclado suporta as sete interações (KBO-12); gatilho de fluxo continua **só 2 e 3 toques** (FLX-57). Segurar e arrastar não viram superfície. "Copiar" é `ConfigOrbeTeclado.copiarDaOrbePrincipal` (KBO-19, KBO-31, FLX-60): com ela ligada, os gatilhos lidos são os da orbe flutuante e os próprios `Orbe(TECLADO, n)` ficam guardados. O grupo "Orbe do teclado" no modal e o disparo `fluxoHost.disparar(fluxo, Orbe(TECLADO, n))` só começam depois que a orbe estiver entregue (KBO-T3 e KBO-T5). O gancho do lado do teclado, até lá, é nulo (KBO-30) — não há ciclo.
+- **Where**: `ui/config/FluxosAtalhos.kt`, `fluxos/app/FluxoHost.kt`, a orbe em `ime/` chama o roteador. Spec: `.specs/features/keyboard-orb/`.
+- **Depends on**: T5, T14, T20, **KBO-T3**, **KBO-T5**. **Requirement**: FLX-59, FLX-60 (a parte do teclado).
+- **Done when**: critérios análogos aos da T28, no teclado real: ligar o 2 toques do teclado a um fluxo avisa nomeando o lugar e só liga ao confirmar; o 2 toques da flutuante não muda; com "copiar" ligado o grupo some e `resolverToques(TECLADO, …)` devolve o gatilho da flutuante; desligar "copiar" reativa o gatilho próprio (a lista não muda ao copiar); 1 toque não consulta o roteador. Instrumentado com `pool instrumentar` no emulador. **Nunca** `connectedAndroidTest` no A32. Goldens do teclado bit-idênticos, salvo rota nova aprovada de propósito.
+- **Tests**: instrumentado + goldens. **Gate**: `pool instrumentar` das classes de atalho de Fluxos e `com.keyflow.ime.OrbeDoTecladoGestureTest`. **Commit**: `feat(fluxos): orbe do teclado dispara fluxos`.

@@ -536,6 +536,20 @@ Spec: `.specs/features/flows/` (`spec.md` 56 requisitos FLX-01..FLX-56, `design.
   **Convive com**: VC-T7 (consumidor de gestos do `VisionFlow`, não muda), `bancada` BNC-T23/T27 (`Etapa`/`Fluxo` e a linha "melhor medido" nos cards; Q7) e a fase 2 do agente (o fluxo só chama o `AgentController`).
 - **Pré-requisito técnico**: FLX-T9 extrai a composição dos motores da `SetupActivity` para um objeto por processo (o `OverlayService`, que executa o fluxo, não os enxerga hoje); sem mudança visual.
 - **[YAN]**: (1) responder Q1..Q7 do `spec.md`; (2) FLX-T26: rodar o roteiro no A32 e no Vaio (RAM do fluxo 100% local no A32 de 4 GB; confirmação do agente sobre outro app; Ditar com a orbe em PTT).
+- A orbe do teclado como gatilho **não** está neste texto da `main` (aqui os Fluxos vão até a FLX-56 / FLX-T27). A FLX-T29, que espera essa orbe, entra com a branch `equipe/notificacao-spec`. A spec já existe: `.specs/features/keyboard-orb/` (Bloco 16). A ponte no fim de `flows/tasks.md` é o texto da FLX-T29 a partir de agora.
+
+---
+
+## Bloco 16 — `keyboard-orb` (orbe dentro do teclado) — rascunho, main, fora da v1
+
+Spec: `.specs/features/keyboard-orb/` (`spec.md` 37 requisitos KBO-01..KBO-37, `design.md`, `tasks.md` KBO-T1..KBO-T11). Ordem: o plano de execução do `tasks.md` (A modelo JVM → B IME e aba Teclado → C goldens e gestos no emulador).
+
+O **Bloco 15** não está nesta `main`: é a aba Notificação, na branch `equipe/notificacao-spec`. Esta frente não espera o código dela. Espera o modelo de lugares quando essa branch entrar; até lá, a KBO-T1 cria `com.keyflow.orbe` com a tabela inteira (flutuante e teclado com as sete interações, notificação só com toques).
+
+- **Escopo**: a orbe no encaixe do microfone da barra. Ociosa, cabe no botão. Gravando (e nos outros estados que mostram tempo ou glifo), sobressai **36 dp acima** do teclado, na janela do IME, sem cobrir tecla e sem o app de trás contar esses 36 dp como teclado. Gestos iguais aos da orbe flutuante. "Copiar a configuração da orbe principal" vem ligado. O seletor de chips do mic sai.
+- **Prioridade**: **depois** de Fluxos no que for gatilho (a FLX-T29 depende da orbe entregue; a orbe em si não depende de Fluxos) e **fora** do recorte da v1. Não toma a vez de nada.
+- **Depende de** (na `main`): `shortcut-bars` (o encaixe `Mic`, que continua no JSON) e `orb-gestures` (os limiares e o mapa visual). **Convive com**: `flows` (gatilho `Orbe(TECLADO, 2|3)` só na FLX-T29; esta frente só deixa o gancho) e `notification` (o mesmo `LugarDaOrbe`, quando a branch entrar).
+- **[YAN]**: responder Q1..Q6 do `spec.md` (altura dos 36 dp, mic extra, arrastar fixo, copiar o modo segurar-para-falar, fluxo no único toque de gravar, pele animada).
 
 ---
 
@@ -548,6 +562,7 @@ agora: (V1-10 fakes e V1-3 feitas) → upload interno → e2e MZ-T15/API-T14 →
 em paralelo: V1-9 (API-T13 na AWS) — fakes esperam o staging; o e2e real espera conta, applicationId e o upload
 depois: créditos (MZ-T5..T8, T12) e ligar API-T11/T12 · VC (visão) · TS (temas, spec a revisar) ·
        bancada de modelos (régua do motor LiteRT-LM; Bloco 11) · parâmetros dos modelos locais (Bloco 12) · AGT fases 2/3 · síntese de fala (aba Voz, rascunho, Bloco 13) · Fluxos (aba Fluxos, spec em rascunho, Bloco 14) ·
+       orbe do teclado (rascunho, Bloco 16, fora da v1; o Bloco 15 da notificação está na branch equipe/notificacao-spec) ·
        Computador (sem spec; ideias em .specs/features/computer-terminal/ideias.md)
 ```
 
