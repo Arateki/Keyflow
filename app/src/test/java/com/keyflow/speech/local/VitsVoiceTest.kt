@@ -89,4 +89,19 @@ class VitsVoiceTest {
         assertTrue(!ran)
         assertTrue(session.runs.isEmpty())
     }
+
+    @Test
+    fun fraseVaziaNaoDescartaOResto() {
+        val runs = ArrayList<List<Tensor>>()
+        val session = FakeSession(
+            inputNames = listOf("input", "input_lengths", "scales"),
+            metadata = mapOf("frontend" to "characters", "add_blank" to "1", "sample_rate" to "22050"),
+            runs = runs,
+        )
+        val voice = VitsVoice({ _, _ -> listOf(intArrayOf(), intArrayOf(3, 4, 3)) }) { session }
+        var chunks = 0
+        voice.synthesize(File.createTempFile("modelo", ".onnx"), tokens(), "a", 1f, { false }) { _, _ -> chunks++ }
+        assertEquals(1, runs.size)
+        assertTrue(chunks > 0)
+    }
 }
