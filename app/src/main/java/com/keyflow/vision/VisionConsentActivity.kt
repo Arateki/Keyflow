@@ -4,6 +4,8 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.media.projection.MediaProjectionManager
+import android.media.projection.MediaProjectionConfig
+import android.os.Build
 import android.os.Bundle
 
 /** Consentimento efêmero: cada solicitação abre o diálogo do sistema e usa seu resultado uma vez. */
@@ -18,8 +20,12 @@ class VisionConsentActivity : Activity() {
             launched = true
             try {
                 val manager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+                val request = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    // O seletor usa coordenadas da tela viva; uma janela isolada teria outra geometria.
+                    manager.createScreenCaptureIntent(MediaProjectionConfig.createConfigForDefaultDisplay())
+                } else manager.createScreenCaptureIntent()
                 @Suppress("DEPRECATION")
-                startActivityForResult(manager.createScreenCaptureIntent(), REQUEST_CAPTURE)
+                startActivityForResult(request, REQUEST_CAPTURE)
             } catch (_: RuntimeException) {
                 finishWith(null)
             }
