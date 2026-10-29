@@ -45,7 +45,7 @@ Fase D  telas:                     (T3, T4, T7) ──► T17 ──► T18 ─�
                                     (T17..T21) ──► T22
 Fase E  fechamento:                (T17..T21) ──► T23       T22 ──► T24
                                     (T14, T15, T16) ──► T25 ──► T26 [YAN] ──► T27
-Fase F  outras orbes (dependentes): (T5, T14, T15, T20, NTF-T13) ──► T28      T29 [bloqueada: orbe do teclado sem spec]
+Fase F  outras orbes (dependentes): (T5, T14, T15, T20, NTF-T13) ──► T28      T29 [bloqueada: orbe do teclado, spec em outra frente]
 ```
 
 `[P]` = pode andar em paralelo com a fase anterior (só unit/refatoração sem comportamento novo). Tudo que usa o emulador serializa (TESTING.md). A Fase A+B
@@ -97,7 +97,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 - **Where**: `fluxos/{RoteadorGatilhos,PoliticaGatilhos}.kt`; testes `RoteadorGatilhosTest`, `PoliticaGatilhosTest`.
 - **Depends on**: T1. **Requirement**: FLX-33, FLX-34, FLX-35, FLX-37, FLX-38, FLX-50, FLX-57 (roteador), FLX-60.
 - **Done when**: unit — 2 e 3 toques ligados rodam e a ação do `Settings` não; sem gatilho a ação roda; 4 toques com `NEAREST_DOWN` cai no 3 ligado a fluxo, e no 2 se o 3 está livre e sem ação; `CANCEL` não faz nada;
-  1 toque nunca é gatilho; fluxo inválido → `Incompleto` (e a ação sombreada **não** roda); `ligar` numa superfície ocupada tira do outro e nunca deixa dois; `excluir` devolve os `botaoId`;
+  1 toque nunca é gatilho na flutuante (e é gatilho em `NOTIFICACAO`, onde é remapeável); fluxo inválido → `Incompleto` (e a ação sombreada **não** roda); `ligar` numa superfície ocupada tira do outro e nunca deixa dois; `excluir` devolve os `botaoId`;
   o mesmo gesto em lugares diferentes são gatilhos diferentes (`Orbe(FLUTUANTE, 2)` ≠ `Orbe(NOTIFICACAO, 2)`); `NOTIFICACAO`/`TECLADO` sem gatilho → `AcaoDoLugar(n)`; com `copiaDaPrincipal` os gatilhos lidos são os da flutuante e a lista de gatilhos **não muda** (propriedade: ligar/desligar "copiar" é só uma consulta);
   `avisoDeSubstituicao` usa o rótulo de `shortcutActionLabel`, diz "não tinha ação" para `NONE` e nomeia o lugar quando há mais de um.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(fluxos): roteamento de gatilhos e política de ligação`.
@@ -319,8 +319,8 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
   O teste **ponta a ponta** de rodar o fluxo pelo toque na notificação (inclusive a recusa com a tela bloqueada e o cancelar no toque) mora na **NTF-T20**.
 - **Tests**: instrumentado + goldens. **Gate**: `pool instrumentar com.keyflow.ui.config.FluxosAtalhosTest com.keyflow.overlay.OverlayServiceFluxoTest com.keyflow.overlay.OverlayServiceNotificacaoTest` + `pool telas`. **Commit**: `feat(fluxos): orbe da notificação dispara fluxos`.
 
-### FLX-T29 — Gatilhos da orbe do teclado — **Status: pendente (BLOQUEADA: a orbe do teclado não tem spec)**
-- **What**: o mesmo da T28 para `TECLADO` (FLX-59): grupo "Orbe do teclado" no modal, consulta do `copiaDaPrincipal`/`temAcaoPropria` da orbe do teclado, disparo pelo mesmo `FluxoHost`. **Só começa depois** que existir a spec da orbe do teclado (dúvida Q8) e que a orbe do teclado esteja entregue; a spec dela diz quais interações o teclado suporta e se algo além de 2 e 3 toques vira gatilho (nesse caso, nova linha de requisito aqui).
+### FLX-T29 — Gatilhos da orbe do teclado — **Status: pendente (BLOQUEADA: depende da orbe do teclado, cuja spec está em outra frente)**
+- **What**: o mesmo da T28 para `TECLADO` (FLX-59): grupo "Orbe do teclado" no modal, consulta do `copiaDaPrincipal`/`temAcaoPropria` da orbe do teclado, disparo pelo mesmo `FluxoHost`. **Só começa depois** que a spec da orbe do teclado (outra frente, em andamento — Q8 respondida) esteja pronta e a orbe do teclado entregue; a spec dela diz quais interações o teclado suporta e se algo além de 2 e 3 toques vira gatilho (nesse caso, nova linha de requisito aqui).
 - **Where**: a definir com a spec da orbe do teclado (`ime/`, `ui/config/FluxosAtalhos.kt`).
 - **Depends on**: T5, T14, T20 e a feature da orbe do teclado. **Requirement**: FLX-59, FLX-60.
 - **Done when**: critérios análogos aos da T28, no teclado real (instrumentado `KeyFlowKeyboard…` da orbe do teclado) e nos goldens do teclado.
