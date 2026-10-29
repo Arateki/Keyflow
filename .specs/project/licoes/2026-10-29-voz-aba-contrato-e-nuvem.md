@@ -35,5 +35,8 @@ enquanto o catálogo está vazio, e o Testar em Local sem modelo fica desligado 
 - **A chave não é decifrada na composição.** A disponibilidade do Testar lê a chave pelos fluxos `apiKeyFlow()` das `AuthActions` (fora da main), não pelo `CredentialStore`.
 - **OpenAI só por chave de API**: o login ChatGPT (assinatura) não chama `audio/speech`, então o card da Voz esconde a aba Assinatura (`ssoOffered = false`).
 - **SPEC_DEVIATION (pequeno)**: a spec pede o seletor opcional de voz do motor do Sistema; ficou só o texto "Voz padrão do motor" (listar vozes exige o `TextToSpeech` inicializado dentro da composição).
-- **A aba continua em "Em breve"** no `ConfigScreen` (FUX-09): faltam o `:speech` e os modelos locais (T3/T8–T11) e a fiação do `SpeechDeps` real (cofre, `AndroidSystemTts`, `AudioTrackPlayer`) no
-  `SetupActivity`. Por isso as rotas de galeria existentes não mudam e nenhum golden foi aprovado (FAL-T7 é depois).
+- **A aba saiu do "Em breve"** (FUX-09, pedido do Yan): o `SetupActivity` monta o `SpeechDeps` real (chave do cofre lida na chamada, `AndroidSystemTts`, `AudioTrackPlayer`, `MediaCodecAudioDecoder`). Local instalado sem motor
+  responde `NOT_READY`; a lista local diz que os modelos chegam depois (catálogo vazio, outra frente).
+- **Goldens** (`pool telas`, claro e escuro): as 10 capturas `config-fala*` existentes mudaram de propósito (antes eram o cartão "Em breve") e 6 entraram (`-sistema`, `-custom`, `-openai`). Só essas foram aprovadas. `config-docs` e
+  `tour-keyboard-mic` deram diferença de bytes (ruído de antialiasing, como na lição da Visão) e **não** foram aprovados. A rota `config-fala-testar` não foi criada: o Testar fica abaixo da dobra e é coberto pelo `FalaPanelTest`.
+  O `diff-screens.sh` não roda no servidor (sem ImageMagick): a comparação foi por bytes.
