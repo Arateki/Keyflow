@@ -118,6 +118,7 @@ class OverlayService : Service() {
     private var visionProjection: VisionProjectionSession? = null
     private var visionMediaProjection: MediaProjection? = null
     private var visionSelector: RegionSelectView? = null
+    private var visionDisplayListener: android.hardware.display.DisplayManager.DisplayListener? = null
     private var visionRestartDialog: android.app.AlertDialog? = null
     private val visionGrabber = ScreenFrameGrabber()
     private val visionHiddenViews = mutableMapOf<View, Int>()
@@ -287,20 +288,63 @@ class OverlayService : Service() {
         session?.close()
     }
 
+    @Suppress("DEPRECATION")
     private fun showVisionSelector() {
         if (!OverlayPermission.canDrawOverlays(this)) { visionFlow.finish(); return }
-        val selector = RegionSelectView(this, ::captureVisionRegion, cancel = { visionFlow.finish() }, resized = {
-            visionFlow.finish()
-            showVisionRestart()
+        lateinit var selector: RegionSelectView
+        selector = RegionSelectView(this, ::captureVisionRegion, cancel = { visionFlow.finish() }, resized = {
+            if (visionSelector === selector) restartForDisplayChange()
         })
         val config = OverlayWindowConfig.forSdk()
-        val params = WindowManager.LayoutParams(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT,
+        val metrics = DisplayMetrics()
+        val display = windowManager.defaultDisplay
+        display.getRealMetrics(metrics)
+        // MATCH_PARENT segue os insets da Activity que sai do consentimento e causa um resize falso.
+        val params = WindowManager.LayoutParams(metrics.widthPixels, metrics.heightPixels,
             config.type, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, PixelFormat.TRANSLUCENT)
-        try { windowManager.addView(selector, params); visionSelector = selector } catch (error: RuntimeException) {
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, PixelFormat.TRANSLUCENT).apply {
+            gravity = Gravity.TOP or Gravity.START
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                setFitInsetsTypes(0)
+                layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            } else {
+                systemUiVisibility = View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                    View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                }
+            }
+        }
+        try {
+            windowManager.addView(selector, params)
+            visionSelector = selector
+            val rotation = display.rotation
+            val listener = object : android.hardware.display.DisplayManager.DisplayListener {
+                override fun onDisplayAdded(displayId: Int) = Unit
+                override fun onDisplayRemoved(displayId: Int) {
+                    if (displayId == display.displayId && visionSelector === selector) restartForDisplayChange()
+                }
+                override fun onDisplayChanged(displayId: Int) {
+                    if (displayId != display.displayId || visionSelector !== selector) return
+                    val current = DisplayMetrics()
+                    display.getRealMetrics(current)
+                    if (display.rotation != rotation || current.widthPixels != metrics.widthPixels ||
+                        current.heightPixels != metrics.heightPixels) restartForDisplayChange()
+                }
+            }
+            visionDisplayListener = listener
+            getSystemService(android.hardware.display.DisplayManager::class.java).registerDisplayListener(
+                listener, android.os.Handler(android.os.Looper.getMainLooper()),
+            )
+        } catch (error: RuntimeException) {
             android.util.Log.w("KeyFlowVision", "Falha ao abrir o seletor", error)
             visionFlow.finish()
         }
+    }
+
+    private fun restartForDisplayChange() {
+        visionFlow.finish()
+        showVisionRestart()
     }
 
     /** Uma mudança de coordenadas exige nova autorização; o token anterior já foi descartado. */
@@ -345,6 +389,8 @@ class OverlayService : Service() {
     }
 
     private fun cleanupVision() {
+        visionDisplayListener?.let { getSystemService(android.hardware.display.DisplayManager::class.java).unregisterDisplayListener(it) }
+        visionDisplayListener = null
         visionRestartDialog?.dismiss()
         visionRestartDialog = null
         visionGrabber.close()

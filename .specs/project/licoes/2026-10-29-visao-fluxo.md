@@ -69,3 +69,10 @@ separação dos estados sem deixar uma gravação pausada para a próxima classe
 A segunda prova passou os seis testes de consentimento/pausa/View, mas mediu recorte com 612 px onde o gesto pedia
 608 px: o último MOVE do swipe fica antes do ponto de soltura. O seletor atualiza o canto também no ACTION_UP; o teste
 isolado agora usa MOVE e UP em pontos diferentes. A prova real exige o tamanho pedido, sem afrouxar a tolerância.
+
+
+A prova do Deck encontrou um resize falso: o fechamento do consentimento muda os insets das barras do sistema, e
+`MATCH_PARENT` variava a altura do seletor. A janela agora usa dimensões reais fixas e origem da tela; os controles respeitam
+os insets sem mexer no recorte. Um `DisplayListener` cancela por rotação/dimensões reais, e a View mantém a guarda para
+resize efetivo. `RegionSelectViewTest` alterna barras visíveis/ocultas sem invalidar a seleção; a prova real verifica o ciclo
+completo de consentimento que expôs o defeito. A correção não depende de esperar um prazo para as barras assentarem.

@@ -89,7 +89,7 @@ class VisionCaptureDeviceTest {
             assertTrue(device.takeScreenshot(screenshot))
             evidence("SELETOR", screenshot.readBytes())
             screenshot.delete()
-            device.click(bounds.centerX(), bounds.bottom - 35)
+            device.click(bounds.centerX(), bounds.bottom - (54 * context.resources.displayMetrics.density).toInt())
             assertTrue("bitmap recortado não chegou", result.await(30, TimeUnit.SECONDS))
             assertEquals(bounds.width() * 4 / 5 - newLeft, w)
             assertEquals(bounds.height() * 4 / 5 - newTop, h)

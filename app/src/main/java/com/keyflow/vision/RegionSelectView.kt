@@ -7,6 +7,8 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
+import android.os.Build
+import android.view.WindowInsets
 import android.view.MotionEvent
 import android.view.View
 import com.keyflow.i18n.tr
@@ -22,6 +24,23 @@ class RegionSelectView(context: Context, private val confirm: (Rect) -> Unit, pr
     private var initialized = false
     private val d = resources.displayMetrics.density
     private val margin get() = 48f * d
+    private var safeTop = 0
+    private var safeBottom = 0
+    private val controlsBottom get() = height - safeBottom.toFloat()
+
+    @Suppress("DEPRECATION")
+    override fun onApplyWindowInsets(insets: WindowInsets): WindowInsets {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
+            safeTop = bars.top
+            safeBottom = bars.bottom
+        } else {
+            safeTop = insets.systemWindowInsetTop
+            safeBottom = insets.systemWindowInsetBottom
+        }
+        invalidate()
+        return insets
+    }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
@@ -41,18 +60,18 @@ class RegionSelectView(context: Context, private val confirm: (Rect) -> Unit, pr
         paint.style = Paint.Style.FILL
         RegionGeometry.corners(area).forEach { (_, p) -> canvas.drawCircle(p.first, p.second, 9 * d, paint) }
         paint.color = 0xcc202020.toInt()
-        canvas.drawRoundRect(0f, 0f, width.toFloat(), margin * 1.25f, 8 * d, 8 * d, paint)
-        canvas.drawRoundRect(0f, height - margin * 1.25f, width.toFloat(), height.toFloat(), 8 * d, 8 * d, paint)
+        canvas.drawRoundRect(0f, safeTop.toFloat(), width.toFloat(), safeTop + margin * 1.25f, 8 * d, 8 * d, paint)
+        canvas.drawRoundRect(0f, controlsBottom - margin * 1.25f, width.toFloat(), controlsBottom, 8 * d, 8 * d, paint)
         paint.color = Color.WHITE; paint.textSize = 16 * d
-        canvas.drawText(tr("Cancelar"), 12 * d, margin * .8f, paint)
-        val full = tr("Tela inteira"); canvas.drawText(full, width - paint.measureText(full) - 12 * d, margin * .8f, paint)
-        val ok = tr("Confirmar"); canvas.drawText(ok, (width - paint.measureText(ok)) / 2, height - margin * .4f, paint)
+        canvas.drawText(tr("Cancelar"), 12 * d, safeTop + margin * .8f, paint)
+        val full = tr("Tela inteira"); canvas.drawText(full, width - paint.measureText(full) - 12 * d, safeTop + margin * .8f, paint)
+        val ok = tr("Confirmar"); canvas.drawText(ok, (width - paint.measureText(ok)) / 2, controlsBottom - margin * .4f, paint)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                selected = if (event.y < margin * 1.25f || event.y > height - margin * 1.25f) null
+                selected = if (event.y < safeTop + margin * 1.25f || event.y > controlsBottom - margin * 1.25f) null
                     else RegionGeometry.hit(area, event.x, event.y, 32 * d)
                 return true
             }
@@ -66,9 +85,9 @@ class RegionSelectView(context: Context, private val confirm: (Rect) -> Unit, pr
                     invalidate()
                 }
                 if (selected == null) when {
-                    event.y < margin * 1.25f && event.x < width / 2 -> cancel()
-                    event.y < margin * 1.25f -> { area = RegionGeometry.full(width, height); invalidate() }
-                    event.y > height - margin * 1.25f -> {
+                    event.y < safeTop + margin * 1.25f && event.x < width / 2 -> cancel()
+                    event.y < safeTop + margin * 1.25f -> { area = RegionGeometry.full(width, height); invalidate() }
+                    event.y > controlsBottom - margin * 1.25f && event.y <= controlsBottom -> {
                         val origin = IntArray(2)
                         getLocationOnScreen(origin)
                         confirm(Rect(area.left + origin[0], area.top + origin[1], area.right + origin[0], area.bottom + origin[1]))

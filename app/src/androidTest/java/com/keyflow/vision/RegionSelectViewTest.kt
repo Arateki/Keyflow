@@ -8,6 +8,9 @@ import com.keyflow.ui.gallery.GalleryActivity
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import android.graphics.Rect
+import android.graphics.Insets
+import android.view.WindowInsets
+import androidx.test.filters.SdkSuppress
 import android.view.MotionEvent
 import android.view.View
 import androidx.test.core.app.ApplicationProvider
@@ -79,6 +82,23 @@ class RegionSelectViewTest {
                 try { selector.onTouchEvent(event) } finally { event.recycle() }
             }
             assertEquals(Rect(120 + origin[0], 180 + origin[1], 480 + origin[0], 720 + origin[1]), chosen)
+        }
+    }
+
+    @SdkSuppress(minSdkVersion = 30)
+    @Test fun barrasDoSistemaNaoInvalidamASelecaoEControlesEvitamOsInsets() {
+        var chosen: Rect? = null
+        var cancelled = false
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val view = RegionSelectView(ApplicationProvider.getApplicationContext(), { chosen = it }, { cancelled = true })
+            view.layout(0, 0, 1000, 1000)
+            view.dispatchApplyWindowInsets(WindowInsets.Builder().setInsets(WindowInsets.Type.systemBars(), Insets.of(0, 80, 0, 120)).build())
+            val event = MotionEvent.obtain(0, 0, MotionEvent.ACTION_UP, 500f, 870f, 0)
+            try { view.onTouchEvent(event) } finally { event.recycle() }
+            assertEquals(Rect(200, 200, 800, 800), chosen)
+            assertTrue(!cancelled)
+            view.dispatchApplyWindowInsets(WindowInsets.Builder().setInsets(WindowInsets.Type.systemBars(), Insets.NONE).build())
+            assertTrue(!cancelled)
         }
     }
 
