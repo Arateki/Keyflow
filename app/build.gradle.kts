@@ -98,7 +98,7 @@ val uploadSigning = resolveUploadSigning()
 
 android {
     namespace = "com.keyflow"
-    compileSdk = 36
+    compileSdk = 37
 
     // Keystore de debug VERSIONADA (app/debug.keystore, senhas padrão do Android): toda máquina — servidor, Deck, AWS, CI —
     // assina o debug igual. Com uma chave por máquina, o APK de outro nó era recusado pelo app já instalado e o Android exigia
@@ -487,8 +487,8 @@ dependencies {
     // ExploreByTouchHelper (KC-T8/A11Y-01..02): nós virtuais de acessibilidade na grade Canvas.
     implementation("androidx.customview:customview:1.1.0")
 
-    // Jetpack Compose (BOM 2024.09.03 → Compose 1.7.x, compatível com compileSdk 34)
-    val composeBom = platform("androidx.compose:compose-bom:2024.09.03")
+    // Prova da toolchain: BOM estável 2026.09.00 → Compose 1.12.1; exige compileSdk 37.
+    val composeBom = platform("androidx.compose:compose-bom:2026.09.00")
     implementation(composeBom)
     androidTestImplementation(composeBom)
     implementation("androidx.compose.ui:ui")
@@ -496,7 +496,7 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.activity:activity-compose:1.9.3")
+    implementation("androidx.activity:activity-compose:1.13.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
@@ -531,16 +531,16 @@ dependencies {
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
     // Raciocínio local (reasoning-models, RSN-T7): LiteRT-LM, o motor de LLM do Google (Kotlin + JNI), só dentro do
     // processo `:reasoning`. Conferido em 2026-09-30 no próprio AAR (`dl.google.com/dl/android/maven2`):
     //  - minSdk 24 (igual ao do app); ABIs publicadas: SÓ arm64-v8a e x86_64 (liblitertlm_jni.so ~21,5 MB e ~25,6 MB).
     //    NÃO há armeabi-v7a: num aparelho ARM de 32 bits o load falha com UnsatisfiedLinkError, que o LiteRtBackend
     //    traduz numa mensagem clara. O x86_64 só entra no debug (emulador), como o do sherpa-onnx.
-    //  - FIXADO em 0.16.1: as 0.17.x foram compiladas com Kotlin 2.4 (metadados 2.4.0 + kotlin-reflect 2.4.0 e
-    //    coroutines 1.11.0 nas dependências) e o projeto usa o Kotlin 2.2.10 embutido no AGP 9.2; a 0.16.1 tem metadados
-    //    2.3.0 (o compilador lê até +1) e dependências 2.2.21/1.9.0. Subir de versão = conferir isto de novo.
+    //  - FIXADO em 0.16.1: historicamente, as 0.17.x (metadados Kotlin 2.4.0, reflect 2.4.0 e coroutines 1.11.0)
+    //    excediam o Kotlin 2.2.10 do projeto; a 0.16.1 tem metadados 2.3.0 e dependências 2.2.21/1.9.0.
+    //    A análise da toolchain mede a resolução nova numa sonda isolada; este experimento não adota outro runtime.
     //  - API usada (Kotlin, conferida no classes.jar): Engine(EngineConfig(modelPath, backend, cacheDir)).initialize(),
     //    Engine.createConversation(ConversationConfig(systemInstruction)), Conversation.sendMessageAsync(texto,
     //    MessageCallback{onMessage,onDone,onError}), Conversation.cancelProcess(), Message.toString() = o texto.
@@ -561,7 +561,7 @@ dependencies {
     // --- Testes ---
     // Unit
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     testImplementation("com.google.truth:truth:1.4.4")
     // org.json real p/ os unit tests JVM (o android.jar mockado lança em JSONObject/JSONArray); o app usa
@@ -577,7 +577,7 @@ dependencies {
     androidTestImplementation("androidx.test:rules:1.7.0")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
     androidTestImplementation("androidx.test.uiautomator:uiautomator:2.4.0")
-    androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     // Servidor HTTP local para o DownloadManager real baixar no instrumentado (NM-T6/T7).
     androidTestImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
 }

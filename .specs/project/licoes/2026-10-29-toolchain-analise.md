@@ -32,3 +32,7 @@ O grafo `debugRuntimeClasspath` confirma coroutines 1.9.0 e Lifecycle 2.8.3, ape
 ## Provas restantes
 
 Concluir gates da pilha atualizada, contar os pixels dos 272 goldens sem aprovação, rodar a amostra Android e compilar usos mínimos das bibliotecas bloqueadas numa branch isolada. Resultados serão acrescentados após a medição.
+
+## Pilha de UI e plataforma de compilação
+
+A segunda etapa eleva somente BOM, Activity Compose, coroutines (app e dois escopos de testes) e compileSdk. O Gradle instalou automaticamente Android SDK Platform 37.0, revisão 2, com a licença já aceita; os workers precisam dessa plataforma ou do download inicial. `assembleDebug` passou sem outra mudança de produção. O APK debug cresceu de 156.375.921 para 160.638.087 bytes (+4.262.166; aproximadamente 2,73%), mantendo o runtime LiteRT-LM 0.16.1. A coleta dos goldens usa esse APK por hash, sem compilar novamente nem aprovar referências.
