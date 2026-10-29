@@ -34,6 +34,9 @@ import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 
+/** O `max_tokens` que a requisição da Anthropic leva: fixo, a bancada não o muda (a bancada o mostra no aviso de custo). */
+internal const val MAX_TOKENS_DE_SAIDA = 1024
+
 /**
  * Motor de raciocínio para Anthropic Claude usando a API v1/messages com streaming SSE.
  */
@@ -248,7 +251,7 @@ class AnthropicReasoningEngine(
 
     private fun bodyOf(request: ReasoningRequest, isOAuth: Boolean = false): String = JSONObject().apply {
         put("model", resolvedModel)
-        put("max_tokens", 1024)
+        put("max_tokens", MAX_TOKENS_DE_SAIDA)
         put("stream", true)
         val content: Any = request.image?.let { image ->
             JSONArray().put(JSONObject().put("type", "image").put("source", JSONObject()

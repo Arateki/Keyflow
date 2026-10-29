@@ -1,0 +1,160 @@
+{
+  "teste": "reescrita",
+  "versao": 1,
+  "capacidade": "TEXTO",
+  "descricao": "Mede se o modelo obedece um comando sobre um texto (encurtar, corrigir, formalizar) sem perder fatos nem inventar nada.",
+  "prompt": {
+    "system": "Você reescreve textos seguindo o comando do usuário. Mantenha todos os fatos (nomes, números, datas, horários e lugares) exatamente como no texto original, não invente nenhuma informação nova e mantenha o idioma do texto original. Responda só com o texto reescrito, sem explicações.",
+    "user": "{entrada}"
+  },
+  "casos": [
+    {
+      "id": "rw-01",
+      "idioma": "pt",
+      "entrada": "Comando: Encurte o texto em no máximo 15 palavras.\n\nTexto: Olá equipe, estou escrevendo para avisar que a reunião de planejamento que estava marcada para quinta-feira às 14h foi remarcada para sexta-feira às 10h na sala 3 por causa da viagem do diretor.",
+      "esperado": "A reunião de planejamento foi remarcada para sexta-feira às 10h, sala 3.",
+      "maxTokensSaida": 128,
+      "tokensEntrada": 134,
+      "fatosObrigatorios": [
+        "sexta-feira",
+        "10h",
+        "sala 3"
+      ],
+      "maxPalavras": 15
+    },
+    {
+      "id": "rw-02",
+      "idioma": "pt",
+      "entrada": "Comando: Corrija os erros de ortografia e de gramática sem mudar o sentido.\n\nTexto: Ontem eu fui no mercado e comprei tres kilos de maçã, porém esqueci de pegar o troco de dez reais.",
+      "esperado": "Ontem eu fui ao mercado e comprei três quilos de maçã, porém esqueci de pegar o troco de dez reais.",
+      "maxTokensSaida": 128,
+      "tokensEntrada": 116,
+      "fatosObrigatorios": [
+        "três quilos",
+        "maçã",
+        "dez reais"
+      ]
+    },
+    {
+      "id": "rw-03",
+      "idioma": "pt",
+      "entrada": "Comando: Torne o texto mais formal, sem gírias.\n\nTexto: E aí, tudo certo? Preciso que vc mande o contrato assinado até quarta, tá? Valeu!",
+      "esperado": "Prezado, tudo bem? Solicito que envie o contrato assinado até quarta-feira. Agradeço.",
+      "maxTokensSaida": 128,
+      "tokensEntrada": 105,
+      "fatosObrigatorios": [
+        "contrato",
+        "quarta"
+      ],
+      "proibidos": [
+        "vc",
+        "valeu",
+        "tá",
+        "e aí",
+        "blz"
+      ]
+    },
+    {
+      "id": "rw-04",
+      "idioma": "en",
+      "entrada": "Comando: Shorten the text to at most 12 words.\n\nTexto: Hello everyone, I am writing to let you know that the quarterly report is now ready and has been uploaded to the shared drive in the Finance folder.",
+      "esperado": "The quarterly report is ready in the shared drive's Finance folder.",
+      "maxTokensSaida": 128,
+      "tokensEntrada": 122,
+      "fatosObrigatorios": [
+        "quarterly report",
+        "Finance folder"
+      ],
+      "maxPalavras": 12
+    },
+    {
+      "id": "rw-05",
+      "idioma": "en",
+      "entrada": "Comando: Make the text more formal.\n\nTexto: Hey, can u send me the invoice for order 4821 asap? thx",
+      "esperado": "Hello, could you please send me the invoice for order 4821 at your earliest convenience? Thank you.",
+      "maxTokensSaida": 128,
+      "tokensEntrada": 96,
+      "fatosObrigatorios": [
+        "invoice",
+        "order 4821"
+      ],
+      "proibidos": [
+        "u",
+        "asap",
+        "thx",
+        "hey"
+      ]
+    },
+    {
+      "id": "rw-06",
+      "idioma": "es",
+      "entrada": "Comando: Acorta el texto a un máximo de 14 palabras.\n\nTexto: Hola a todos, les escribo para informarles que la entrega del pedido 5530 se retrasó hasta el martes 12 de noviembre debido a un problema con el transportista.",
+      "esperado": "El pedido 5530 se retrasó hasta el martes 12 de noviembre.",
+      "maxTokensSaida": 128,
+      "tokensEntrada": 126,
+      "fatosObrigatorios": [
+        "pedido 5530",
+        "martes 12 de noviembre"
+      ],
+      "maxPalavras": 14
+    },
+    {
+      "id": "rw-07",
+      "idioma": "es",
+      "entrada": "Comando: Corrige la ortografía y la gramática sin cambiar el sentido.\n\nTexto: Ayer fui a la tienda y compre dos botellas de agua, pero se me olvido pagar la bolsa de papel.",
+      "esperado": "Ayer fui a la tienda y compré dos botellas de agua, pero se me olvidó pagar la bolsa de papel.",
+      "maxTokensSaida": 128,
+      "tokensEntrada": 114,
+      "fatosObrigatorios": [
+        "dos botellas de agua",
+        "bolsa de papel"
+      ]
+    },
+    {
+      "id": "rw-08",
+      "idioma": "pt",
+      "entrada": "Comando: Resuma em uma frase de no máximo 20 palavras, mantendo nomes e valores.\n\nTexto: A Ana Souza aprovou o orçamento de R$ 12.500 para a reforma da recepção, e o início das obras ficou marcado para 3 de março com prazo de 45 dias.",
+      "esperado": "Ana Souza aprovou R$ 12.500 para a reforma da recepção; obras começam em 3 de março, por 45 dias.",
+      "maxTokensSaida": 128,
+      "tokensEntrada": 129,
+      "fatosObrigatorios": [
+        "Ana Souza",
+        "12.500",
+        "3 de março",
+        "45 dias"
+      ],
+      "maxPalavras": 20
+    },
+    {
+      "id": "rw-09",
+      "idioma": "en",
+      "entrada": "Comando: Fix the spelling and grammar without changing the meaning.\n\nTexto: Their going to launch the new app on Thursday, and we has already tested it on 3 phones.",
+      "esperado": "They're going to launch the new app on Thursday, and we have already tested it on 3 phones.",
+      "maxTokensSaida": 128,
+      "tokensEntrada": 112,
+      "fatosObrigatorios": [
+        "Thursday",
+        "3 phones"
+      ]
+    },
+    {
+      "id": "rw-10",
+      "idioma": "pt",
+      "entrada": "Comando: Reescreva em tom profissional, em até 25 palavras.\n\nTexto: Cara, o servidor caiu de novo hoje às 9h e eu não consegui entregar o relatório pro Pedro. Foi mal.",
+      "esperado": "O servidor ficou indisponível hoje às 9h e não consegui entregar o relatório ao Pedro. Peço desculpas.",
+      "maxTokensSaida": 128,
+      "tokensEntrada": 113,
+      "fatosObrigatorios": [
+        "servidor",
+        "9h",
+        "Pedro"
+      ],
+      "proibidos": [
+        "cara",
+        "foi mal",
+        "pro"
+      ],
+      "maxPalavras": 25
+    }
+  ]
+}

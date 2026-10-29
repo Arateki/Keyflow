@@ -32,27 +32,7 @@ class RamGuardTest {
         assertThat(RamGuard.enough(availableMb = 1, estimateMb = -5)).isTrue()
     }
 
-    /** Medido no A32: 1,1–1,5 GB livres e picos de 1,66–1,74 GB nos modelos de texto; a estimativa do catálogo sozinha deixaria passar. */
-    @Test
-    fun `preload needs headroom over the measured peak even when the estimate fits`() {
-        assertThat(RamGuard.enoughForPreload(availableMb = 1_500, estimateMb = 512)).isFalse()
-        assertThat(RamGuard.enoughForPreload(availableMb = 2_047, estimateMb = 512)).isFalse()
-        assertThat(RamGuard.enoughForPreload(availableMb = 2_048, estimateMb = 512)).isTrue()
-    }
-
-    @Test
-    fun `preload still respects an estimate above the floor`() {
-        assertThat(RamGuard.enoughForPreload(availableMb = 3_000, estimateMb = 4_096)).isFalse()
-        assertThat(RamGuard.enoughForPreload(availableMb = 4_096, estimateMb = 4_096)).isTrue()
-    }
-
-    @Test
-    fun `preload without an estimate or unknown memory never blocks`() {
-        assertThat(RamGuard.enoughForPreload(availableMb = 100, estimateMb = 0)).isTrue()
-        assertThat(RamGuard.enoughForPreload(availableMb = null, estimateMb = 4_096)).isTrue()
-    }
-
-    // ── RAM total: o que decide a carga pedida (medições de pico de VmRSS do `:reasoning`, 2026-10-27) ──────────────────
+    // ── RAM total: o que decide a carga e a pré-carga (medições de pico de VmRSS do `:reasoning`, 2026-10-27) ──────────────────
 
     private fun estimate(spec: ModelSpec) = spec.recommendedRamMb / 2
 
@@ -129,7 +109,6 @@ class RamGuardTest {
             assertThat(RamGuard.enough(availableMb = null, estimateMb = 2_048, totalMb = total)).isTrue()
             assertThat(RamGuard.fitsDevice(totalMb = total, estimateMb = 8_192)).isTrue()
         }
-        assertThat(RamGuard.enoughForPreload(availableMb = 5_000, estimateMb = 3_072, totalMb = 0)).isTrue()
     }
 
     @Test
@@ -139,14 +118,6 @@ class RamGuardTest {
         assertThat(RamGuard.fitsDevice(totalMb = 4_915, estimateMb = estimate)).isFalse()
     }
 
-    /** A pré-carga é especulativa: além de caber no aparelho, exige RAM livre de verdade (piso e estimativa). */
-    @Test
-    fun `preload also needs the model to fit the device`() {
-        assertThat(RamGuard.enoughForPreload(availableMb = 5_000, estimateMb = 3_072, totalMb = 4_000)).isFalse()
-        assertThat(RamGuard.enoughForPreload(availableMb = 5_000, estimateMb = 3_072, totalMb = 5_700)).isTrue()
-        assertThat(RamGuard.enoughForPreload(availableMb = 1_200, estimateMb = 2_048, totalMb = 3_700)).isFalse()
-    }
-
     // ── por backend ─────────────────────────────────────────────────────────────────────────────
 
     @Test
@@ -154,7 +125,7 @@ class RamGuardTest {
         assertThat(RamGuard.enoughFor(ComputeBackend.CPU, availableMb = 1_000, estimateMb = 2_048)).isFalse()
         assertThat(RamGuard.enoughFor(ComputeBackend.CPU, availableMb = 50, estimateMb = 2_048, totalMb = 4_000)).isTrue()
         assertThat(RamGuard.enoughFor(ComputeBackend.CPU, availableMb = 6_000, estimateMb = 2_048, totalMb = 3_000)).isFalse()
-        assertThat(RamGuard.enoughForPreloadOn(ComputeBackend.CPU, availableMb = 1_500, estimateMb = 512)).isFalse()
+        assertThat(RamGuard.enoughFor(ComputeBackend.CPU, availableMb = 1_500, estimateMb = 512)).isTrue()
     }
 
     /** O Qwen3 4B só rodou na GPU (a CPU morreu por memória): a estimativa de CPU não pode barrar a GPU. */
@@ -164,11 +135,14 @@ class RamGuardTest {
         assertThat(RamGuard.enoughFor(ComputeBackend.GPU, availableMb = null, estimateMb = 4_096)).isTrue()
     }
 
+    /** RPRC-06: a mesma guarda vale ao selecionar o modelo, trocar CPU/GPU ou gerar uma resposta. */
     @Test
-    fun `the GPU preload keeps only the free RAM floor`() {
-        assertThat(RamGuard.enoughForPreloadOn(ComputeBackend.GPU, availableMb = 2_047, estimateMb = 4_096)).isFalse()
-        assertThat(RamGuard.enoughForPreloadOn(ComputeBackend.GPU, availableMb = 2_048, estimateMb = 4_096, totalMb = 1_000)).isTrue()
-        assertThat(RamGuard.enoughForPreloadOn(ComputeBackend.GPU, availableMb = null, estimateMb = 4_096)).isTrue()
-        assertThat(RamGuard.enoughForPreloadOn(ComputeBackend.GPU, availableMb = 100, estimateMb = 0)).isTrue()
+    fun `a CPU permite os modelos que cabem no A32 mesmo com 1,1 a 1,5 GB livres`() {
+        for (free in listOf(1_100L, 1_500L)) {
+            for (spec in listOf(ModelCatalog.QWEN3_0_6B, ModelCatalog.GEMMA_4_E2B, ModelCatalog.DEEPSEEK_R1_1_5B)) {
+                assertThat(RamGuard.enoughFor(ComputeBackend.CPU, free, estimate(spec), 3_700)).isTrue()
+            }
+            assertThat(RamGuard.enoughFor(ComputeBackend.CPU, free, estimate(ModelCatalog.SMOLLM2_1_7B), 3_700)).isFalse()
+        }
     }
 }

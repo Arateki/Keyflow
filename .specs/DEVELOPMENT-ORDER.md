@@ -515,6 +515,10 @@ Spec: `.specs/features/bancada/` (`spec.md` 68 requisitos, `design.md`, `tasks.m
   `app-v0.1.0`** (só o Yan tem o app instalado: sem risco de "nome voltar"; aparelhos de teste sobem de versão sem desinstalar, código 1 → 1000) e a `main` continua em 0.1.x/0.2.0; áudio do Common Voice (CC0); Código e Terminal fora por ora; online só pela interface.
 - **[YAN]**: (1) liberar o A32 para a campanha da BNC-T19; (2) definir o limiar mínimo (D6) depois do baseline.
 
+## Bloco 12 — `model-params` (parâmetros dos modelos locais) — main, fora da v1
+
+Spec: `.specs/features/model-params/` (lápis no card baixado; Raciocínio e, na Visão, só Gemma com visão). Não toma a vez de nada: depois da bancada, que já prevê `GenerationOptions`. Pendência explícita: parâmetros de OpenAI, Anthropic, Google e API Custom.
+
 ---
 
 ## Resumo da fila (visão de uma linha)
@@ -525,7 +529,7 @@ feito: Q1..Q11 → SB → GT → NM → RSN → SKP → AGT fase 1 (faltam só m
 agora: (V1-10 fakes e V1-3 feitas) → upload interno → e2e MZ-T15/API-T14 → V1-4 → … → V1-8
 em paralelo: V1-9 (API-T13 na AWS) — fakes esperam o staging; o e2e real espera conta, applicationId e o upload
 depois: créditos (MZ-T5..T8, T12) e ligar API-T11/T12 · VC (visão) · TS (temas, spec a revisar) ·
-       bancada de modelos (régua do motor LiteRT-LM; Bloco 11) · AGT fases 2/3 · Fala/Fluxos/Computador (sem spec; ideias em
+       bancada de modelos (régua do motor LiteRT-LM; Bloco 11) · parâmetros dos modelos locais (Bloco 12) · AGT fases 2/3 · Fala/Fluxos/Computador (sem spec; ideias em
        .specs/features/computer-terminal/ideias.md)
 ```
 

@@ -376,28 +376,50 @@ class ReasoningServiceCoreTest {
     }
 
     @Test
-    fun `pre carga com pouca RAM livre nao carrega nem aquece e o primeiro uso carrega normalmente`() {
-        val a = FakeBackend(log, "a")
-        // 1.500 MB livres: cabe na estimativa do catálogo (100), mas não no piso da pré-carga.
-        val c = core(mapOf("a" to a), availMb = 1_500)
-        val rec = Recorder()
-        c.preload(model("a"), rec)
-        rec.awaitFinish()
-        assertThat(rec.events).containsExactly("error:OOM")
-        assertThat(log).isEmpty()
-        assertThat(run(c, model("a")).events).containsExactly("delta:um", "delta:dois", "done").inOrder()
-        assertThat(log).containsExactly("load:a", "generate:a").inOrder()
+    fun `pré-carga com pouca RAM livre carrega e aquece se o modelo cabe no aparelho`() {
+        for (free in listOf(1_100L, 1_500L)) {
+            val a = FakeBackend(log, "a")
+            val selected = model("a", ramMb = 2_048)
+            val c = core(mapOf("a" to a), availMb = free, totalMb = 3_700)
+            val rec = Recorder()
+            c.preload(selected, rec)
+            rec.awaitFinish()
+            assertThat(rec.events).containsExactly("done")
+            assertThat(run(c, selected).events).containsExactly("delta:um", "delta:dois", "done").inOrder()
+            assertThat(log).containsExactly("load:a", "warm:a", "generate:a").inOrder()
+            c.shutdown()
+            log.clear()
+        }
     }
 
     @Test
-    fun `pre carga com RAM folgada carrega e aquece`() {
+    fun `pré-carga e geração recusam o modelo que não cabe na RAM total`() {
         val a = FakeBackend(log, "a")
-        val c = core(mapOf("a" to a), availMb = 3_000)
+        val selected = model("a", ramMb = 3_072)
+        val c = core(mapOf("a" to a), availMb = 1_500, totalMb = 3_700)
         val rec = Recorder()
-        c.preload(model("a"), rec)
+        c.preload(selected, rec)
         rec.awaitFinish()
-        assertThat(rec.events).containsExactly("done")
-        assertThat(log).containsExactly("load:a", "warm:a").inOrder()
+        assertThat(rec.events).containsExactly("error:OOM")
+        assertThat(run(c, selected).events).containsExactly("error:OOM")
+        assertThat(log).isEmpty()
+    }
+
+    @Test
+    fun `pré-carga sem RAM total usa a mesma estimativa e RAM livre da geração`() {
+        for ((free, allowed) in listOf(1_499L to false, 1_500L to true, null to true)) {
+            val a = FakeBackend(log, "a")
+            val selected = model("a", ramMb = 1_500)
+            val c = core(mapOf("a" to a), availMb = free)
+            val rec = Recorder()
+            c.preload(selected, rec)
+            rec.awaitFinish()
+            assertThat(rec.events).containsExactly(if (allowed) "done" else "error:OOM")
+            if (allowed) assertThat(log).containsExactly("load:a", "warm:a").inOrder()
+            else assertThat(log).isEmpty()
+            c.shutdown()
+            log.clear()
+        }
     }
 
     // ── onde o modelo roda (CPU/GPU): identidade do motor, volta para a CPU e guarda de RAM ─────────────────────────────
@@ -580,17 +602,38 @@ class ReasoningServiceCoreTest {
     }
 
     @Test
-    fun `the GPU preload keeps the free RAM floor and ignores the CPU estimate`() {
+    fun `pré-carga na GPU ignora o piso antigo e a estimativa da CPU`() {
         val cpu = FakeBackend(log, "cpu"); val gpu = FakeBackend(log, "gpu")
-        val big = model("a", ramMb = 4_096)
-        val low = Recorder()
-        coreByBackend(cpu, gpu, availMb = 1_500).preload(gpu(big), low)
-        low.awaitFinish()
-        assertThat(low.events).containsExactly("error:OOM")
-        val enough = Recorder()
-        coreByBackend(cpu, gpu, availMb = 2_100).preload(gpu(big), enough)
-        enough.awaitFinish()
-        assertThat(enough.events).containsExactly("done")
+        val rec = Recorder()
+        coreByBackend(cpu, gpu, availMb = 1_100, totalMb = 3_700)
+            .preload(gpu(model("a", ramMb = 4_096)), rec)
+        rec.awaitFinish()
+        assertThat(rec.events).containsExactly("done")
+        assertThat(log).containsExactly("load:gpu", "warm:gpu").inOrder()
+    }
+
+    @Test
+    fun `pré-carga que volta da GPU aquece a CPU mesmo com pouca RAM livre`() {
+        val cpu = FakeBackend(log, "cpu")
+        val gpu = FakeBackend(log, "gpu").also { it.loadThrows = IllegalStateException("falhou") }
+        val rec = Recorder()
+        coreByBackend(cpu, gpu, availMb = 1_100, totalMb = 3_700)
+            .preload(gpu(model("a", ramMb = 2_048)), rec)
+        rec.awaitFinish()
+        assertThat(rec.events).containsExactly("fallback:GPU", "done").inOrder()
+        assertThat(log).containsExactly("load:gpu", "unload:gpu", "load:cpu", "warm:cpu").inOrder()
+    }
+
+    @Test
+    fun `pré-carga que volta da GPU ainda recusa a CPU se o modelo não cabe`() {
+        val cpu = FakeBackend(log, "cpu")
+        val gpu = FakeBackend(log, "gpu").also { it.loadThrows = IllegalStateException("falhou") }
+        val rec = Recorder()
+        coreByBackend(cpu, gpu, availMb = 1_100, totalMb = 3_700)
+            .preload(gpu(model("a", ramMb = 4_096)), rec)
+        rec.awaitFinish()
+        assertThat(rec.events).containsExactly("fallback:GPU", "error:OOM").inOrder()
+        assertThat(log).containsExactly("load:gpu", "unload:gpu").inOrder()
     }
     @Test fun `cancelar pedido na fila não carrega imagem nem cancela o vizinho`() {
         val queue = mutableListOf<Runnable>()

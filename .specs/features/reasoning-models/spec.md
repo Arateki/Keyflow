@@ -158,7 +158,7 @@ catálogo tem essa variante.
 3. **RPRC-03**: a escolha SHALL ser por modelo, padrão CPU, persistida numa chave própria do DataStore (`LocalBackendPrefs`, fora de `Settings`) e lida a cada geração; apagar o modelo esquece a escolha.
 4. **RPRC-04**: o backend SHALL fazer parte da identidade do motor residente no `:reasoning` (id + versão + backend): trocar de CPU para GPU (ou o contrário) descarrega e recarrega; mesmo backend reaproveita.
 5. **RPRC-05**: WHEN a carga na GPU falha THEN o `:reasoning` SHALL recarregar o mesmo modelo na CPU **no mesmo pedido** (a resposta do usuário não se perde), avisar pelo callback, e o app SHALL gravar a CPU como escolha e mostrar no card "A GPU não funcionou neste aparelho; usando a CPU."; só a seleção explícita (escolher o modelo ou o backend no card) tenta a GPU de novo; o motivo vai para o log.
-6. **RPRC-06**: a guarda de RAM SHALL seguir a regra de sempre na CPU (inclusive na volta do fallback) e **não** barrar a GPU pela estimativa de CPU (decisão e risco em `STATE.md`); a pré-carga na GPU mantém só o piso de RAM livre.
+6. **RPRC-06**: a guarda de RAM SHALL seguir a regra de sempre na CPU (inclusive na volta do fallback) e **não** barrar a GPU pela estimativa de CPU (decisão e risco em `STATE.md`); a pré-carga ao selecionar o modelo ou trocar CPU/GPU SHALL usar a mesma guarda da carga normal por backend (`RamGuard.enoughFor`), sem piso adicional de RAM livre. Na CPU, com RAM total válida, SHALL valer `total >= 1,6 × estimativa`; sem total válido, vale a regra da RAM livre × estimativa. Se essa guarda recusar o modelo, o aviso no card SHALL continuar. O Android liberar outros apps em segundo plano durante a pré-carga é esperado (decisão do Yan, 2026-10-28; `licoes/2026-10-28-preload-sem-piso.md`).
 7. **RPRC-07**: ao escolher a GPU pela primeira vez num modelo, o card SHALL avisar que a primeira carga pode levar alguns minutos, até a GPU carregar o modelo uma vez.
 8. **RCARD-01**: o card de modelo local (Transcrição, Raciocínio, Visão — o mesmo) SHALL trocar o resumo por **etiquetas** derivadas do catálogo (idioma, "Português nativo", "Pensamento opcional"/"Sempre pensa", capacidades declaradas pelo fabricante — "Ferramentas", "Ler texto da tela" —, RAM recomendada), por `tr()` com EN/ES; o resumo continua no `ModelSpec`, mas não aparece. `ModelSpec.capabilities` é opcional e tolerante no manifesto remoto; só entra capacidade que o fabricante declara, com a fonte no comentário da entrada ("Ferramentas": Qwen3 0.6B, Qwen2.5 1.5B, SmolLM2 1.7B e os Gemma 4; **não** o DeepSeek R1 Distill); a visão dos Gemma 4 segue **não declarada** (VC-T15) e não existe etiqueta "Agente".
 9. **RCARD-02**: o logo do fabricante SHALL ficar à esquerda do bloco de texto, centralizado, com ~30 dp (contraste 3:1 e descrição mantidos); o card instalado SHALL mostrar o check "Baixado" ao lado do nome, de modo que **não baixado, baixado e selecionado** sejam três estados distintos, inclusive para o leitor de tela.
@@ -216,7 +216,8 @@ Status: Pending → In Design → In Tasks → Implementing → Verified. As tas
 | RPRV-02 | P2-G | RSN-T7, RSN-T18 | In Tasks |
 | RPRV-03 | P2-G | RSN-T7 | In Tasks |
 | RPRV-04 | P2-G | RSN-T18 | In Tasks |
-| RPRC-01..07 | P2-H | RSN-T20 | Verified (unitários e instrumentados; GPU real a confirmar pelo Yan) |
+| RPRC-01..05, RPRC-07 | P2-H | RSN-T20 | Verified (unitários e instrumentados; GPU real a confirmar pelo Yan) |
+| RPRC-06 | P2-H | RSN-T20; pré-carga sem piso | Verified (1.986 unitários, lint sem ocorrências; 48 instrumentados afetados; `licoes/2026-10-28-preload-sem-piso.md`) |
 | RCARD-01, RCARD-02 | P2-H | RSN-T21 | Verified (instrumentados e goldens) |
 
 **Coverage:** 45 requisitos, 45 mapeados em tasks (`tasks.md`, RSN-T1..T19).

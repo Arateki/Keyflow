@@ -433,6 +433,24 @@ class ModelListTest {
         preparationIndicator(ModelListTags.Raciocinio, qwen)
     }
 
+    @Test
+    fun avisoDeMemóriaNaPreparaçãoContinuaNoCardSelecionado() {
+        val warning = "Pouca memória livre agora: o modelo carrega no primeiro uso."
+        rule.setContent {
+            Host(
+                LocalModelsUi.compose(
+                    catalog = listOf(qwen), installed = setOf(qwen.id), active = null, failures = emptyMap(),
+                    selectedId = qwen.id, deviceRamMb = 3_700,
+                    preparation = ModelPreparation(qwen.id, 0, failure = warning),
+                ),
+                FakeActions(), ModelListTags.Raciocinio,
+            )
+        }
+        rule.onNodeWithText(warning, useUnmergedTree = true).assertExists()
+        rule.onNodeWithTag("${ModelListTags.Raciocinio.model(qwen.id)}-preparation", useUnmergedTree = true)
+            .assertDoesNotExist()
+    }
+
     private fun preparationIndicator(tags: ModelListTags, spec: ModelSpec) {
         val preparing = mutableStateOf(true)
         rule.setContent {

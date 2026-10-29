@@ -92,6 +92,7 @@ class TestRunner(
                                 ReasoningEvent.Done -> _state.update { it.copy(running = false, totalMs = clock() - startedAt) }
                                 is ReasoningEvent.Error ->
                                     _state.update { it.copy(running = false, error = event.kind, totalMs = clock() - startedAt) }
+                                is ReasoningEvent.Metrics -> Unit // o Testar de uma frase não pede opções
                             }
                         }
                         // O fluxo acabou sem Done nem Error: não deixa a tela presa em "Parar".

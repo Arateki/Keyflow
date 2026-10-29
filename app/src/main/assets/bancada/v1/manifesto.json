@@ -1,0 +1,40 @@
+{
+  "corpus": 1,
+  "arquivos": [
+    {
+      "caminho": "pontuacao.json",
+      "sha256": "5f75999d9611d198635f57fdef54ae81fb3b0a77620851b9c237390bcbe069f8",
+      "origem": "Escrito para a bancada de modelos do KeyFlow",
+      "autor": "Equipe KeyFlow",
+      "licenca": "Apache-2.0"
+    },
+    {
+      "caminho": "reescrita.json",
+      "sha256": "98251067fee9b3d63e2d17bef3c56dea5c378fcf428e49e29d2d463898bae534",
+      "origem": "Escrito para a bancada de modelos do KeyFlow",
+      "autor": "Equipe KeyFlow",
+      "licenca": "Apache-2.0"
+    },
+    {
+      "caminho": "json.json",
+      "sha256": "c014be5d932e068900ef07693583d94be23480832ad720458210ad19709b4e01",
+      "origem": "Escrito para a bancada de modelos do KeyFlow",
+      "autor": "Equipe KeyFlow",
+      "licenca": "Apache-2.0"
+    },
+    {
+      "caminho": "acoes.json",
+      "sha256": "8fb7563f0406f116407c717fbfbaa34da47214bf5ea90aa82e1dfb6654fba0ff",
+      "origem": "Escrito para a bancada de modelos do KeyFlow",
+      "autor": "Equipe KeyFlow",
+      "licenca": "Apache-2.0"
+    },
+    {
+      "caminho": "contexto.json",
+      "sha256": "417bcccbf1f89974804b1e8e90b5a3115db32cb4563634f4a5bac3872d790a83",
+      "origem": "Escrito para a bancada de modelos do KeyFlow",
+      "autor": "Equipe KeyFlow",
+      "licenca": "Apache-2.0"
+    }
+  ]
+}

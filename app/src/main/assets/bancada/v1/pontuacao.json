@@ -1,0 +1,108 @@
+{
+  "teste": "pontuacao",
+  "versao": 1,
+  "capacidade": "TEXTO",
+  "descricao": "Mede se o modelo põe pontuação e maiúsculas num ditado sem trocar nenhuma palavra (português, inglês e espanhol).",
+  "prompt": {
+    "system": "Você é um corretor de ditado. Receba o texto ditado, sem pontuação e sem maiúsculas, e devolva o MESMO texto com a pontuação e as maiúsculas corretas. Não troque, não acrescente e não remova nenhuma palavra. Não traduza. Responda só com o texto corrigido, sem explicações.",
+    "user": "{entrada}"
+  },
+  "casos": [
+    {
+      "id": "pt-01",
+      "idioma": "pt",
+      "entrada": "oi pessoal tudo bem eu queria confirmar a reunião de amanhã às duas da tarde",
+      "esperado": "Oi, pessoal, tudo bem? Eu queria confirmar a reunião de amanhã às duas da tarde.",
+      "maxTokensSaida": 96,
+      "tokensEntrada": 87
+    },
+    {
+      "id": "en-01",
+      "idioma": "en",
+      "entrada": "hi john thanks for the update i will review the document tonight and send my comments",
+      "esperado": "Hi John, thanks for the update. I will review the document tonight and send my comments.",
+      "maxTokensSaida": 96,
+      "tokensEntrada": 90
+    },
+    {
+      "id": "es-01",
+      "idioma": "es",
+      "entrada": "hola carlos mañana llego tarde a la oficina porque tengo cita con el médico",
+      "esperado": "Hola, Carlos. Mañana llego tarde a la oficina porque tengo cita con el médico.",
+      "maxTokensSaida": 96,
+      "tokensEntrada": 87
+    },
+    {
+      "id": "pt-02",
+      "idioma": "pt",
+      "entrada": "não esqueça de comprar leite pão e ovos no mercado antes de voltar para casa",
+      "esperado": "Não esqueça de comprar leite, pão e ovos no mercado antes de voltar para casa.",
+      "maxTokensSaida": 96,
+      "tokensEntrada": 87
+    },
+    {
+      "id": "en-02",
+      "idioma": "en",
+      "entrada": "can you call me when you get to the airport",
+      "esperado": "Can you call me when you get to the airport?",
+      "maxTokensSaida": 96,
+      "tokensEntrada": 79
+    },
+    {
+      "id": "es-02",
+      "idioma": "es",
+      "entrada": "qué hora es la reunión con el equipo de ventas",
+      "esperado": "¿Qué hora es la reunión con el equipo de ventas?",
+      "maxTokensSaida": 96,
+      "tokensEntrada": 80
+    },
+    {
+      "id": "pt-03",
+      "idioma": "pt",
+      "entrada": "maria você já enviou o relatório para o cliente ou ainda está revisando",
+      "esperado": "Maria, você já enviou o relatório para o cliente ou ainda está revisando?",
+      "maxTokensSaida": 96,
+      "tokensEntrada": 86
+    },
+    {
+      "id": "en-03",
+      "idioma": "en",
+      "entrada": "we need three things a laptop a charger and a notebook",
+      "esperado": "We need three things: a laptop, a charger, and a notebook.",
+      "maxTokensSaida": 96,
+      "tokensEntrada": 82
+    },
+    {
+      "id": "es-03",
+      "idioma": "es",
+      "entrada": "compré manzanas naranjas y plátanos en el mercado",
+      "esperado": "Compré manzanas, naranjas y plátanos en el mercado.",
+      "maxTokensSaida": 96,
+      "tokensEntrada": 81
+    },
+    {
+      "id": "pt-04",
+      "idioma": "pt",
+      "entrada": "o pedido chegou hoje de manhã mas a caixa estava amassada então vou pedir a troca",
+      "esperado": "O pedido chegou hoje de manhã, mas a caixa estava amassada, então vou pedir a troca.",
+      "maxTokensSaida": 96,
+      "tokensEntrada": 89
+    },
+    {
+      "id": "en-04",
+      "idioma": "en",
+      "entrada": "the meeting moved to friday but the deadline is still monday",
+      "esperado": "The meeting moved to Friday, but the deadline is still Monday.",
+      "maxTokensSaida": 96,
+      "tokensEntrada": 83
+    },
+    {
+      "id": "es-04",
+      "idioma": "es",
+      "entrada": "ya terminé el informe pero todavía falta revisar las cifras",
+      "esperado": "Ya terminé el informe, pero todavía falta revisar las cifras.",
+      "maxTokensSaida": 96,
+      "tokensEntrada": 83
+    }
+  ]
+}

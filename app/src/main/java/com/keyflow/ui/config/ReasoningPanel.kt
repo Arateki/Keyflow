@@ -12,6 +12,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.keyflow.auth.AuthMethod
 import com.keyflow.auth.ConnectionState
 import com.keyflow.core.ReasoningSource
 import com.keyflow.data.Settings
@@ -95,8 +96,17 @@ fun ReasoningPanel(
             Column(Modifier.padding(vertical = 16.dp)) {
                 // "Manage usage" só faz sentido quando quem responde é o PLANO do ChatGPT (não a chave de API).
                 val manageUsage = auth.usageUrl?.takeIf { activeSettings.reasoningSource == ReasoningSource.OPENAI && openAi.status == OpenAiStatus.CONNECTED_LOGIN }
-                ReasoningTestArea(
+                // Login de plano (e não chave de API) na origem ativa: o aviso de custo da bancada fala do limite do plano (BON-02).
+                val porAssinatura = when (activeSettings.reasoningSource) {
+                    ReasoningSource.OPENAI -> openAi.status == OpenAiStatus.CONNECTED_LOGIN
+                    ReasoningSource.ANTHROPIC -> (anthropicConnection as? ConnectionState.Connected)?.method == AuthMethod.OAUTH
+                    ReasoningSource.GOOGLE -> (googleConnection as? ConnectionState.Connected)?.method == AuthMethod.OAUTH
+                    else -> false
+                }
+                val modelo = remember(activeSettings, models, porAssinatura) { modeloEscolhido(activeSettings, models, porAssinatura) }
+                BancadaTestArea(
                     resolution,
+                    modelo,
                     onManageUsage = manageUsage?.let { url -> { auth.openUrl(url) } },
                     initialState = initialTest,
                     // Tocar em Testar não tira o foco do campo Custom: confirma o texto pendente e resolve o motor com as Settings que saem dele.
