@@ -34,24 +34,32 @@ class SpeechDeps(
 object SpeechEngines {
     const val OPENAI_MODEL = "gpt-4o-mini-tts"
 
-    fun availability(settings: Settings, deps: SpeechDeps): SpeechAvailability = when (settings.falaSource) {
+    fun availability(settings: Settings, deps: SpeechDeps): SpeechAvailability =
+        availability(settings, { !deps.apiKey(it).isNullOrBlank() }, deps.isModelInstalled)
+
+    /** [hasKey] e [isModelInstalled] entram por lambda: a tela sabe da chave pelos fluxos do cofre, sem decifrar nada na composição. */
+    fun availability(
+        settings: Settings,
+        hasKey: (SpeechDeps.Provider) -> Boolean,
+        isModelInstalled: (modelId: String) -> Boolean,
+    ): SpeechAvailability = when (settings.falaSource) {
         FalaSource.CREDITS -> SpeechAvailability.NOT_CONNECTED
         FalaSource.LOCAL -> {
             val id = settings.falaLocalModelId
             when {
                 id == null -> SpeechAvailability.NO_LOCAL_MODEL
-                !deps.isModelInstalled(id) -> SpeechAvailability.MODEL_NOT_INSTALLED
+                !isModelInstalled(id) -> SpeechAvailability.MODEL_NOT_INSTALLED
                 else -> SpeechAvailability.READY
             }
         }
         FalaSource.SYSTEM -> SpeechAvailability.READY
-        FalaSource.OPENAI -> if (deps.apiKey(SpeechDeps.Provider.OPENAI).isNullOrBlank()) SpeechAvailability.NOT_CONNECTED else SpeechAvailability.READY
+        FalaSource.OPENAI -> if (hasKey(SpeechDeps.Provider.OPENAI)) SpeechAvailability.READY else SpeechAvailability.NOT_CONNECTED
         FalaSource.ELEVENLABS -> when {
-            deps.apiKey(SpeechDeps.Provider.ELEVENLABS).isNullOrBlank() -> SpeechAvailability.NOT_CONNECTED
+            !hasKey(SpeechDeps.Provider.ELEVENLABS) -> SpeechAvailability.NOT_CONNECTED
             !ElevenLabsSpeechEngine.isVoiceId(settings.falaElevenLabsVoice) -> SpeechAvailability.NO_VOICE
             else -> SpeechAvailability.READY
         }
-        FalaSource.GOOGLE -> if (deps.apiKey(SpeechDeps.Provider.GOOGLE).isNullOrBlank()) SpeechAvailability.NOT_CONNECTED else SpeechAvailability.READY
+        FalaSource.GOOGLE -> if (hasKey(SpeechDeps.Provider.GOOGLE)) SpeechAvailability.READY else SpeechAvailability.NOT_CONNECTED
         FalaSource.CUSTOM -> if (settings.falaCustomEndpoint.isBlank()) SpeechAvailability.NO_ENDPOINT else SpeechAvailability.READY
     }
 

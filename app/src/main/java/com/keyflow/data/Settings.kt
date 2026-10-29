@@ -70,7 +70,7 @@ data class Settings(
     val falaLocalModelId: String? = null,
     val falaSpeed: Float = 1.0f,
     val falaCloudVoice: String = "alloy",
-    val falaElevenLabsVoice: String = "Rachel",
+    val falaElevenLabsVoice: String = "",
     val falaElevenLabsModel: String = "eleven_multilingual_v2",
     val falaGoogleVoice: String = "pt-BR-Neural2-A",
     val falaCustomEndpoint: String = "",

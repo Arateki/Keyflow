@@ -456,7 +456,7 @@ class SettingsRepository(
             falaLocalModelId = prefs[FALA_LOCAL_MODEL_ID]?.takeIf { it.isNotBlank() },
             falaSpeed = prefs[FALA_SPEED] ?: 1.0f,
             falaCloudVoice = prefs[FALA_CLOUD_VOICE] ?: "alloy",
-            falaElevenLabsVoice = prefs[FALA_ELEVENLABS_VOICE] ?: "Rachel",
+            falaElevenLabsVoice = prefs[FALA_ELEVENLABS_VOICE]?.takeIf { it != "Rachel" }.orEmpty(),
             falaElevenLabsModel = prefs[FALA_ELEVENLABS_MODEL] ?: "eleven_multilingual_v2",
             falaGoogleVoice = prefs[FALA_GOOGLE_VOICE] ?: "pt-BR-Neural2-A",
             falaCustomEndpoint = prefs[FALA_CUSTOM_ENDPOINT].orEmpty(),

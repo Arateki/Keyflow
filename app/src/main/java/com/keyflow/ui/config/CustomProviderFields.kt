@@ -14,7 +14,7 @@ import androidx.compose.ui.unit.dp
 import com.keyflow.i18n.tr
 
 /**
- * Os campos da origem Custom — Endpoint, Header, Valor e Modelo —, os mesmos no Raciocínio e na Visão. [tagPrefix] (`raciocinio`, `visao`) dá
+ * Os campos da origem Custom — Endpoint, Header, Valor e Modelo —, os mesmos no Raciocínio, na Visão e na Voz (que acrescenta Voz e Formato). [tagPrefix] (`raciocinio`, `visao`) dá
  * as tags (`<prefixo>-custom-endpoint`…); [hints] são as linhas de pista abaixo (o que o endpoint precisa falar, e o que sai do aparelho).
  */
 @Composable
@@ -29,6 +29,12 @@ internal fun CustomProviderFields(
     onHeaderValue: (String) -> Unit,
     onModel: (String) -> Unit,
     hints: List<String>,
+    // Só a Voz: voz e formato de áudio do esquema `audio/speech`. Nulos = ocultos (Raciocínio e Visão não mudam).
+    voice: String? = null,
+    onVoice: (String) -> Unit = {},
+    format: String? = null,
+    formatOptions: List<String> = emptyList(),
+    onFormat: (String) -> Unit = {},
 ) {
     Column(Modifier.padding(top = 20.dp)) {
         AutoSaveField(tr("Endpoint"), endpoint, onEndpoint, "$tagPrefix-custom-endpoint", keyboardType = KeyboardType.Uri)
@@ -40,6 +46,15 @@ internal fun CustomProviderFields(
             )
         }
         AutoSaveField(tr("Modelo"), model, onModel, "$tagPrefix-custom-model", modifier = Modifier.padding(top = 13.dp))
+        if (voice != null) {
+            AutoSaveField(tr("Voz"), voice, onVoice, "$tagPrefix-custom-voice", modifier = Modifier.padding(top = 13.dp))
+        }
+        if (format != null) {
+            Dropdown(
+                label = tr("Formato do áudio"), options = formatOptions, selected = format, onSelect = onFormat,
+                tag = "$tagPrefix-custom-format", modifier = Modifier.padding(top = 13.dp),
+            )
+        }
         hints.forEachIndexed { index, hint ->
             SettingSub(hint, Modifier.padding(top = if (index == 0) 16.dp else 8.dp))
         }
