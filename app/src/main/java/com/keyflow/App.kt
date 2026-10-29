@@ -6,6 +6,7 @@ import com.keyflow.auth.AuthServices
 import com.keyflow.data.SettingsRepository
 import com.keyflow.i18n.AppLanguage
 import com.keyflow.i18n.AppLocale
+import com.keyflow.speech.local.SpeechProcess
 import com.keyflow.vision.service.VisionProcess
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,7 +27,7 @@ class App : Application() {
         super.onCreate()
         // O :vision recebe tudo pelo AIDL e não abre cofre, Settings nem DataStore (design da Visão §6): este onCreate roda em todo
         // processo do app, então a guarda vem antes de qualquer acesso (VisionRulesTest trava a ordem).
-        if (VisionProcess.isCurrent()) return
+        if (VisionProcess.isCurrent() || SpeechProcess.isCurrent()) return
         // Disco/rede na thread principal e recursos não fechados, só no debug — ver StrictModeGuard.
         if (BuildConfig.DEBUG) StrictModeGuard.install()
         authWarmupScope.launch {
