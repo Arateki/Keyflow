@@ -9,6 +9,7 @@ import android.os.Bundle
 /** Consentimento efêmero: cada solicitação abre o diálogo do sistema e usa seu resultado uma vez. */
 class VisionConsentActivity : Activity() {
     private var launched = false
+    private val requestId get() = intent.getLongExtra(EXTRA_REQUEST, -1)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,29 +38,26 @@ class VisionConsentActivity : Activity() {
     }
 
     private fun finishWith(data: Intent?) {
-        val callback = pending
-        pending = null
-        callback?.invoke(data)
-        finish()
+        try { requests.complete(requestId, data) } finally { finish() }
     }
 
     companion object {
         private const val REQUEST_CAPTURE = 718
-        private var pending: ((Intent?) -> Unit)? = null
+        private const val EXTRA_REQUEST = "vision_request"
+        private val requests = VisionConsentRequest<Intent>()
 
         /** Uma solicitação por vez, sempre na thread principal. O callback recebe null se negado. */
         fun request(context: Context, result: (Intent?) -> Unit): Boolean {
-            if (pending != null) return false
-            pending = result
+            val id = requests.begin(result) ?: return false
             return try {
-                context.startActivity(Intent(context, VisionConsentActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                context.startActivity(Intent(context, VisionConsentActivity::class.java).putExtra(EXTRA_REQUEST, id).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 true
             } catch (_: RuntimeException) {
-                pending = null
+                requests.cancel()
                 false
             }
         }
 
-        fun cancel() { pending = null }
+        fun cancel() { requests.cancel() }
     }
 }
