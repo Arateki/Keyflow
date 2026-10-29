@@ -26,7 +26,7 @@ class ReasoningEngines(
     private val openAi: (model: String) -> ReasoningEngine,
     private val anthropic: (model: String) -> ReasoningEngine = { openAi(it) },
     private val google: (model: String) -> ReasoningEngine = { openAi(it) },
-    private val custom: (endpoint: String, model: String) -> ReasoningEngine = { _, m -> openAi(m) },
+    private val custom: (settings: Settings) -> ReasoningEngine = { openAi(it.reasoningCustomModel) },
 ) {
     fun resolve(settings: Settings): ReasoningResolution = when (settings.reasoningSource) {
         ReasoningSource.CREDITS -> ReasoningResolution.Unavailable(UnavailableReason.NOT_CONNECTED)
@@ -56,7 +56,7 @@ class ReasoningEngines(
         ReasoningSource.CUSTOM -> when {
             settings.reasoningCustomEndpoint.isBlank() -> ReasoningResolution.Unavailable(UnavailableReason.NOT_CONNECTED)
             settings.reasoningCustomModel.isBlank() -> ReasoningResolution.Unavailable(UnavailableReason.NO_MODEL_CHOSEN)
-            else -> ReasoningResolution.Ready(custom(settings.reasoningCustomEndpoint, settings.reasoningCustomModel))
+            else -> ReasoningResolution.Ready(custom(settings))
         }
     }
 }
