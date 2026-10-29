@@ -64,7 +64,11 @@ class RegionSelectView(context: Context, private val confirm: (Rect) -> Unit, pr
                 if (selected == null) when {
                     event.y < margin * 1.25f && event.x < width / 2 -> cancel()
                     event.y < margin * 1.25f -> { area = RegionGeometry.full(width, height); invalidate() }
-                    event.y > height - margin * 1.25f -> confirm(Rect(area.left, area.top, area.right, area.bottom))
+                    event.y > height - margin * 1.25f -> {
+                        val origin = IntArray(2)
+                        getLocationOnScreen(origin)
+                        confirm(Rect(area.left + origin[0], area.top + origin[1], area.right + origin[0], area.bottom + origin[1]))
+                    }
                 }
                 selected = null; return true
             }

@@ -1,6 +1,12 @@
 package com.keyflow.vision
 
 import android.content.Context
+import android.content.Intent
+import android.widget.FrameLayout
+import androidx.test.core.app.ActivityScenario
+import com.keyflow.ui.gallery.GalleryActivity
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import android.graphics.Rect
 import android.view.MotionEvent
 import android.view.View
@@ -48,6 +54,32 @@ class RegionSelectViewTest {
             }
         }
         assertEquals(Rect(150, 175, 800, 800), chosen)
+    }
+
+    @Test fun confirmaEmCoordenadasDaTelaMesmoComJanelaDeslocada() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val ready = CountDownLatch(1)
+        var origin = IntArray(2)
+        var chosen: Rect? = null
+        ActivityScenario.launch<GalleryActivity>(Intent(context, GalleryActivity::class.java).putExtra("route", "config-visao")).use { scenario ->
+            lateinit var selector: RegionSelectView
+            scenario.onActivity { activity ->
+                val root = FrameLayout(activity)
+                selector = RegionSelectView(activity, { chosen = it }, {})
+                root.addView(selector, FrameLayout.LayoutParams(600, 900).apply { leftMargin = 60; topMargin = 80 })
+                selector.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+                    selector.getLocationOnScreen(origin)
+                    ready.countDown()
+                }
+                activity.setContentView(root)
+            }
+            assertTrue(ready.await(10, TimeUnit.SECONDS))
+            scenario.onActivity {
+                val event = MotionEvent.obtain(0, 0, MotionEvent.ACTION_UP, 300f, 890f, 0)
+                try { selector.onTouchEvent(event) } finally { event.recycle() }
+            }
+            assertEquals(Rect(120 + origin[0], 180 + origin[1], 480 + origin[0], 720 + origin[1]), chosen)
+        }
     }
 
     @Test fun resizeCancelaCoordenadasAntigas() {
