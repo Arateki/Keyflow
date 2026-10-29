@@ -111,6 +111,7 @@ object SuporteDeInteracoes {
 
 ```kotlin
 sealed interface AcaoDaOrbe {
+    data object GravarEnviar : AcaoDaOrbe
     data object Nenhuma : AcaoDaOrbe
     data object RetrairExpandirTeclado : AcaoDaOrbe
     data object TrocarTeclado : AcaoDaOrbe
@@ -126,28 +127,30 @@ data class ConfigNotificacao(
     val permitirComTelaBloqueada: Boolean = false,
     val copiarDaOrbePrincipal: Boolean = true,
     val skin: String = "atelie",                  // id de skin: "sistema" | OrbStyle.id | "pack:<id>"
+    val acao1Toque: AcaoDaOrbe = GravarEnviar,
     val acao2Toques: AcaoDaOrbe = RetrairExpandirTeclado,
     val acao3Toques: AcaoDaOrbe = TrocarTeclado,
 )
 
 /** O que vale agora: com `copiar`, a skin e as ações vêm das Settings da orbe principal. */
 data class ConfigEfetiva(
-    val skin: String, val acao2: AcaoDaOrbe, val acao3: AcaoDaOrbe,
+    val skin: String, val acao1: AcaoDaOrbe, val acao2: AcaoDaOrbe, val acao3: AcaoDaOrbe,
     val copiado: Boolean, val ignoradas: List<Interacao>,   // SuporteDeInteracoes.naoSuportadas(NOTIFICACAO) ∩ o que a orbe principal usa
 )
 fun efetiva(config: ConfigNotificacao, settings: Settings): ConfigEfetiva
 ```
 
+- Com copiar ligado: `acao1 = GravarEnviar` no Alternar; no PTT, `shortcut1Tap` pelo mapa abaixo (inclusive Nenhuma). `acao2/3` vêm de `shortcut2Tap/3Tap`; sem copiar usa as três ações próprias. Não há fallback que imponha GravarEnviar (NTF-10/12).
 - Mapa `OrbShortcutAction` → `AcaoDaOrbe`: `NONE → Nenhuma`, `TOGGLE_KEYBOARD → RetrairExpandirTeclado`, `SWITCH_IME → TrocarTeclado`,
   `VISION_MODE → LerTela`. `PausarRetomar` e `CancelarDesfazer` só existem na configuração **própria** da notificação (A2).
 - **JSON** `notification_config_json`, ao lado de `bars_config_json` (`SettingsRepository.kt:876`):
 
 ```json
 { "v": 1, "show": true, "lockscreen": false, "copy": true, "skin": "atelie",
-  "taps": { "2": "toggle_keyboard", "3": "switch_ime" } }
+  "taps": { "1": "record_send", "2": "toggle_keyboard", "3": "switch_ime" } }
 ```
 
-  Ids de ação: `none`, `toggle_keyboard`, `switch_ime`, `vision`, `pause_resume`, `cancel_undo`, `flow:<id>`; qualquer outro vira
+  Ids de ação: `record_send`, `none`, `toggle_keyboard`, `switch_ime`, `vision`, `pause_resume`, `cancel_undo`, `flow:<id>`; qualquer outro vira
   `Desconhecida(id)` e volta igual ao regravar.
 - **API no repositório** (no estilo de `barsConfigFlow/Once` e `saveBarsConfig`, `SettingsRepository.kt:186-214`, `:357`; o de Fluxos
   segue o mesmo molde):
@@ -161,7 +164,7 @@ suspend fun atualizarNotificacao(f: (ConfigNotificacao) -> ConfigNotificacao): C
   `atualizarNotificacao` lê **e** escreve dentro do mesmo `dataStore.edit` (NTF-36): o auto-save das `Settings` regrava as `Settings`
   inteiras e jamais encosta nesta chave. É por isso que "mostrar", "tela bloqueada" e a skin **não** são campos de `Settings`.
 - Codec tolerante (NTF-37), `org.json`: chave ausente → padrões; malformado → padrões; campo desconhecido ignorado; `skin` que não
-  existe → `atelie`; `taps` com número fora de 2..3 ignorado.
+  existe → `atelie`; `taps` com número fora de 1..3 ignorado; `taps.1` ausente em JSON anterior → GravarEnviar, Nenhuma/desconhecida explícita permanece sem ação. Não há mínimo/máximo de toques que gravam.
 - **Quando "copiar" é desligado**, a primeira escrita grava como valores próprios o que estava sendo copiado (a tela não "zera").
 
 ## 5. O toque: da notificação à ação (`NTF-09..11`, `NTF-14`, `NTF-16`)
@@ -184,9 +187,9 @@ segundo plano. O corpo usa `contentIntent` (`getActivity`, o mesmo lançamento d
 class RajadaDeToques { fun toque(): Int; fun fechar(): Int }                  // puro; o relógio é o do serviço
 
 sealed interface Comando {
-    data object GravarEnviar : Comando                    // 1 toque (NTF-10): a semântica de handleKeyboardMicTap
-    data object EncerrarVisao : Comando                   // 1 toque com a Visão ativa
-    data class Executar(val acao: AcaoDaOrbe) : Comando   // 2/3 toques
+    data object GravarEnviar : Comando                    // ação GravarEnviar em qualquer toque (NTF-10)
+    data object EncerrarVisao : Comando                   // ação GravarEnviar com a Visão ativa
+    data class Executar(val acao: AcaoDaOrbe) : Comando   // ação atribuída a 1/2/3 toques
     data class RodarFluxo(val fluxoId: String) : Comando  // reservado (NTF-39)
     data object FluxoIncompleto : Comando                 // reservado: aviso, não executa a ação por baixo
     data object Nada : Comando
@@ -201,9 +204,9 @@ fun resolver(
 Regras de `resolver` (todas testadas na JVM):
 
 - `toques ≥ 4`: `CANCEL → Nada`; `NEAREST_DOWN` → o maior `n ∈ {3, 2}` cuja ação (ou fluxo) não é `Nenhuma`; nenhum → `Nada`.
-- `toques == 1` → `visaoAtiva ? EncerrarVisao : GravarEnviar`. (Dentro de `GravarEnviar` o host chama `handleKeyboardMicTap`, que já distingue
-  ocioso/gravando/pausado/cancelando/pendente/erro.)
-- `toques ∈ {2, 3}` com `visaoAtiva` → `Nada`.
+- Resolve a ação efetiva de `toques ∈ {1, 2, 3}`; só 2/3 consultam o gancho de fluxo (NTF-39), sem alargar as superfícies de Fluxos.
+- Com Visão ativa: ação `GravarEnviar` → `EncerrarVisao`; qualquer outra → `Nada`.
+- Ação `GravarEnviar` sem Visão → comando `GravarEnviar`, que reusa `handleKeyboardMicTap` para distinguir ocioso/gravando/pausado/cancelando/pendente/erro. Nenhuma ação é inventada quando todos os toques são Nenhuma.
 - Senão a ação da interação, com os portões de estado: `PausarRetomar` só em `RECORDING/PAUSED`; `CancelarDesfazer` em
   `RECORDING/PAUSED` cancela, em `CANCELLING` desfaz, nos outros `Nada`; `RetrairExpandirTeclado` só com `tecladoVisivel`;
   `Desconhecida`/`RodarFluxo` sem Fluxos → `Nada`.
@@ -242,14 +245,14 @@ pagas deixam o fundo do sistema. O `Chronometer` usa `setChronometer(base, null,
 
 | `ButtonState` | Aparência (`OrbState`) | Glifo no bitmap | `Chronometer` | Descrição (`tr`) |
 | ------------- | ---------------------- | --------------- | ------------- | ---------------- |
-| `IDLE_READY`, `IDLE_NO_FIELD` | Idle | — | oculto | "KeyFlow pronto. Toque para gravar" |
-| `RECORDING` | Listening | — | **correndo**, no centro | "KeyFlow gravando. Toque para enviar" |
-| `PAUSED` | Paused | pausa (acima) | **parado**, miúdo abaixo | "KeyFlow pausado. Toque para enviar" |
+| `IDLE_READY`, `IDLE_NO_FIELD` | Idle | — | oculto | "KeyFlow pronto" |
+| `RECORDING` | Listening | — | **correndo**, no centro | "KeyFlow gravando" |
+| `PAUSED` | Paused | pausa (acima) | **parado**, miúdo abaixo | "KeyFlow pausado" |
 | `SENDING` | Transcribing | — | oculto | "KeyFlow transcrevendo" |
-| `CANCELLING` | Paused | lixeira (acima) | **parado**, miúdo abaixo | "Gravação cancelada. Toque para descartar agora" |
-| `ERROR` | Idle | X | oculto | "KeyFlow com erro. Toque para dispensar" |
-| `PENDING_PASTE` | Idle | — | oculto | "Texto pendente. Toque para colar" |
-| Visão ativa (`visionFlow.state != NONE`) | Idle | olho | oculto | "Ler a tela em andamento. Toque para encerrar" |
+| `CANCELLING` | Paused | lixeira (acima) | **parado**, miúdo abaixo | "Gravação cancelada" |
+| `ERROR` | Idle | X | oculto | "KeyFlow com erro" |
+| `PENDING_PASTE` | Idle | — | oculto | "Texto pendente" |
+| Visão ativa (`visionFlow.state != NONE`) | Idle | olho | oculto | "Ler a tela em andamento" |
 
 Os glifos (pausa, lixeira, X, olho) existem hoje como `@Composable` (`PauseGlyph`, `CancelGlyph`, `ErrorGlyph`); a NTF-T6 extrai o
 traçado para funções de `DrawScope` compartilhadas sem mudar a orbe flutuante (goldens bit-idênticos). O texto da descrição vai por
@@ -477,7 +480,7 @@ Tema/paleta da aba (`LocalKeyFlowPalette`, `SpaceGrotesk`), `verticalScrollbar`,
  │  Copiar a configuração da orbe principal [on] │   on: skin e ações abaixo somente leitura ("Copiado da orbe principal")
  │  Skin  ( ) Sistema (•) Ateliê ( ) Aero … ( ) <pacotes>   [Importar skin]
  │ INTERAÇÕES                                    │
- │  1 toque       Gravar / enviar        (fixo)  │
+ │  1 toque       [ Gravar / enviar          ▾] │
  │  2 toques      [ Retrair/expandir o teclado ▾]│
  │  3 toques      [ Trocar o teclado          ▾] │
  │  Não existem na notificação: segurar · arrastar ↑ · ← → · ↓ — "Uma notificação só recebe toques"
@@ -502,6 +505,8 @@ Tema/paleta da aba (`LocalKeyFlowPalette`, `SpaceGrotesk`), `verticalScrollbar`,
 `-vision` (a `RemoteViews` inflada, claro e escuro, tempo congelado) — estas **substituem** `notification-recording`/`notification-paused`
 (`RouteCatalog.kt:257-258`). `config-notificacao` já existe como o cartão "Em breve": o golden dele muda de propósito.
 
+**Substituição de ações (D11, NTF-11/12):** antes de persistir alteração de toque ou de copiar que mude ações atribuídas, comparar ações efetivas atuais e propostas e pedir confirmação nomeando cada ação anterior, nova ação, toque e lugar. Cancelar conserva a config; escolher a mesma ação ou atribuir ação a uma interação antes livre (Nenhuma) não avisa perda. Trocar ação atribuída por Nenhuma também pede confirmação. O rótulo de fluxo ocupado é "Fluxo: <nome>" (edição pelo modal de Fluxos); gravar segue exatamente a mesma regra que qualquer ação. Não há validação exigindo GravarEnviar. Mudanças já confirmadas na origem chegam ao vivo sem diálogo em segundo plano.
+
 ## 14. Testes (`TESTING.md`: unit onde é lógica pura; instrumentado onde há Android)
 
 | Camada | Teste | O que prova | Tipo |
@@ -510,7 +515,7 @@ Tema/paleta da aba (`LocalKeyFlowPalette`, `SpaceGrotesk`), `verticalScrollbar`,
 | Modelo | `ConfigNotificacaoTest` | `efetiva` com e sem "copiar"; mapa `OrbShortcutAction → AcaoDaOrbe`; `ignoradas`; desligar "copiar" fixa os valores | unit |
 | Codec | `CodecNotificacaoTest`, `CodecNotificacaoPropertyTest`, `CodecNotificacaoFuzzTest` | padrões; round-trip (inclusive `flow:` e ação desconhecida); malformado → padrões; nunca lança; ida e volta | unit |
 | Toques | `RajadaDeToquesTest` | 1/2/3/5 toques; a janela reinicia; fecha uma vez | unit (relógio virtual) |
-| Resolução | `ResolvedorDeInteracaoTest` | 1 toque por estado e Visão; 2/3 por ação e portão de estado; overflow `CANCEL`/`NEAREST_DOWN`; ação desconhecida/`RodarFluxo` sem Fluxos → `Nada` | unit |
+| Resolução | `ResolvedorDeInteracaoTest` | 1/2/3 remapeados por ação/estado; GravarEnviar/Visão em qualquer toque; zero ou vários GravarEnviar aceitos; overflow `CANCEL`/`NEAREST_DOWN`; ação desconhecida/`RodarFluxo` sem Fluxos → `Nada` | unit |
 | Tela bloqueada | `PortaoDeToqueTest` | tabela de §10 | unit |
 | Presença | `VisibilidadeDaNotificacaoTest` | tabela de §9; dispensada não posta em mudança comum; volta nos eventos; propriedade: nunca posta em `DISPENSADA` fora de `Necessaria`/`AbaAberta` | unit |
 | Aparência | `EstadoVisualTest`, `OrcamentoDeBitmapsTest` | tabela de §6; lado/bytes; soma ≤ 1 MB em todas as densidades | unit |
@@ -521,7 +526,7 @@ Tema/paleta da aba (`LocalKeyFlowPalette`, `SpaceGrotesk`), `verticalScrollbar`,
 | Construtor | `NotificacaoDaOrbeTest` | `PRIVATE` + `publicVersion`; um clique na orbe; `contentIntent`/`deleteIntent`; sem `bigContentView`; descrição por estado; soma de bitmaps; **sem texto** (`NotificacaoSemTextoTest`) | instrumentado |
 | Serviço | `OverlayServiceNotificacaoTest` | toque → 1/2/3 toques executam a ação certa (portas e relógio injetados); bloqueada recusa; "dispensada" não re-posta; volta em gravação e na aba; mínima com `mostrar = false`; `startForeground` nunca nulo; troca de skin/modo noturno re-posta | instrumentado |
 | Provas | `NotificacaoAlturaTest`, `NotificacaoTelaBloqueadaTest`, `NotificacaoDispensarTest` (§12) | os critérios de §12 | instrumentado/UiAutomator |
-| UI | `NotificacaoPanelTest` | seções, permissão, interruptores, copiar (somente leitura + lista de ignoradas), ações de 2/3 toques, skins (paga travada), prévia por estado | instrumentado (Compose) |
+| UI | `NotificacaoPanelTest` | seções, permissão, interruptores, copiar (somente leitura + lista de ignoradas), ações de 1/2/3 toques, configuração sem GravarEnviar válida, aviso ao substituir qualquer ação (inclusive por Nenhuma), cancelar sem escrita, copiar PTT sem fallback, skins (paga travada), prévia por estado | instrumentado (Compose) |
 | Aba | `ConfigScreenTest` (ajustado) | `deferredTabsShowComingSoonCardWithoutControls` sem `NOTIFICACAO`; a aba mostra `NOTIFICACAO_PANEL_TAG` | instrumentado |
 | Goldens | rotas de §13 × claro/escuro | `pool telas`; `--approve` só destas | screenshot |
 | Manual [YAN] | `manual-validation.md` (NTF-T18) | A32: bloqueio com PIN, skins pagas e pacote, dispensar, latência | manual |
