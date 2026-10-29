@@ -1,0 +1,249 @@
+{
+  "teste": "acoes",
+  "versao": 1,
+  "capacidade": "TEXTO",
+  "descricao": "Mede se o modelo escolhe a ferramenta certa do agente e os argumentos exatos — ou recusa o que nenhuma ferramenta faz.",
+  "prompt": {
+    "system": "Você é o assistente do app KeyFlow. Estas são as ferramentas que você pode chamar (JSON): {ferramentas}\n\nResponda SOMENTE com um objeto JSON, sem explicações e sem cercas de código. Para chamar UMA ferramenta: {\"nome\": \"<ferramenta>\", \"args\": {<argumentos>}}. Se nenhuma ferramenta serve para o pedido, responda {\"recusa\": \"<motivo curto>\"}. Os valores de ajustes (settings_set) vão sempre como texto.",
+    "user": "{entrada}"
+  },
+  "ferramentas": "[{\"description\":\"Devolve o FORMAT.md do app: o formato dos pacotes de skin (orbe animada em SVG por estado, faces do teclado, manifest.json), os nomes de arquivo, os limites e o que o desenhista de SVG do app NÃO suporta (filtros, animação SMIL/CSS, scripts). Leia ANTES de criar uma skin; é a versão que o código do app aceita de verdade.\",\"name\":\"skin_get_format\",\"parameters\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"}},{\"description\":\"Lista as skins instaladas (id, nome, autor, o que têm — estados da orbe com a contagem de frames e os fps, peças do teclado — e onde estão em uso) e as skins escolhidas agora. Use o `id` daqui em skin_select e skin_remove.\",\"name\":\"skin_list\",\"parameters\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"}},{\"description\":\"Valida os arquivos de uma skin com o MESMO leitor do import (erros e avisos) e, se valem, desenha a folha de contato (um quadro por estado da orbe, alguns frames da animação e as faces do teclado) e a MOSTRA ao usuário — e a você, se o modelo aceita imagem. NÃO instala nada e nada vai a disco. `files`: mapa nome do arquivo → conteúdo em TEXTO (manifest.json e os SVGs), só com os nomes do formato (veja skin_get_format). Os arquivos se ACUMULAM durante esta resposta: numa skin grande mande lotes com `more: true` (só guarda, não valida) e termine com uma chamada sem `more`; para corrigir um arquivo, mande-o de novo (mesmo nome). `reset: true` recomeça do zero. Limites: até 60 arquivos e 600 mil caracteres por chamada. Depois de uma prévia boa, chame skin_install (sem repetir os arquivos).\",\"name\":\"skin_preview\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"files\":{\"additionalProperties\":{\"maxLength\":524288,\"type\":\"string\"},\"description\":\"nome do arquivo → conteúdo em texto (manifest.json e os SVGs)\",\"type\":\"object\"},\"more\":{\"description\":\"true = ainda vou mandar mais arquivos desta skin: só guarda, não valida agora\",\"type\":\"boolean\"},\"reset\":{\"description\":\"recomeça o rascunho do zero antes de juntar estes arquivos\",\"type\":\"boolean\"}},\"required\":[\"files\"],\"type\":\"object\"}},{\"description\":\"Instala a skin do rascunho pelo MESMO caminho do import (atômico, mesmas checagens de segurança) DEPOIS que o usuário confirmar no aparelho — o painel mostra o nome, o relatório e a pré-visualização que o APP escreveu. Com erro de validação nada é instalado e você recebe o relatório. Use os arquivos já enviados em skin_preview; `files` é opcional (acrescenta ou troca arquivos, como em skin_preview). Instalar não escolhe a skin: chame skin_select se o usuário a quiser em uso. Reinstalar uma skin com o MESMO nome a substitui.\",\"name\":\"skin_install\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"files\":{\"additionalProperties\":{\"maxLength\":524288,\"type\":\"string\"},\"description\":\"nome do arquivo → conteúdo em texto (manifest.json e os SVGs)\",\"type\":\"object\"},\"reset\":{\"description\":\"recomeça o rascunho do zero antes de juntar estes arquivos\",\"type\":\"boolean\"}},\"type\":\"object\"}},{\"description\":\"Escolhe a skin do teclado e/ou da orbe (depois da confirmação do usuário, que vê o antes → depois). `keyboard` e `orb`: o `id` de uma skin instalada (veja skin_list) — só serve para a superfície que a skin tem —, ou `default` para voltar ao padrão (teclado: Sistema; orbe: Ateliê). Informe ao menos um dos dois. A desfazer volta à escolha anterior.\",\"name\":\"skin_select\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"keyboard\":{\"description\":\"id da skin do teclado, ou default\",\"maxLength\":100,\"minLength\":1,\"type\":\"string\"},\"orb\":{\"description\":\"id da skin da orbe, ou default\",\"maxLength\":100,\"minLength\":1,\"type\":\"string\"}},\"type\":\"object\"}},{\"description\":\"Remove uma skin instalada (o usuário SEMPRE confirma, e nenhum ajuste muda isso). Quem a usava — teclado e/ou orbe — volta ao padrão. Não há como desfazer. `id`: o id de skin_list.\",\"name\":\"skin_remove\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"id\":{\"description\":\"id da skin de skin_list\",\"maxLength\":100,\"minLength\":1,\"type\":\"string\"}},\"required\":[\"id\"],\"type\":\"object\"}},{\"description\":\"Devolve o estado do KeyFlow: a versão, quais modos (Sobrepor/orbe e Teclado) estão ligados, quais permissões o app tem (só leitura — você não concede nada), as skins do teclado e da orbe em uso e a origem de raciocínio com o modelo escolhido. Nunca traz chaves, tokens ou senhas.\",\"name\":\"app_status\",\"parameters\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"}},{\"description\":\"Lê os ajustes do app que você pode ver (uma lista fixa e não secreta: tema, idioma e tamanho do teclado, tamanho da orbe, vibração, janela de rajada, skins em uso e os modelos escolhidos). Cada item traz a chave, o valor atual, a faixa aceita e se dá para mudar com settings_set. `key` (opcional) devolve só um deles; sem `key`, todos.\",\"name\":\"settings_get\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"key\":{\"description\":\"a chave de um ajuste; omita para ler todos\",\"enum\":[\"themeDark\",\"keyboardLanguage\",\"keyboardScalePercent\",\"keyboardNumberRowEnabled\",\"orbSizePx\",\"vibrationIntensity\",\"tapBurstWindowMs\",\"keyboardSkin\",\"orbSkin\",\"reasoningAnthropicModel\",\"reasoningOpenAiModel\",\"reasoningGoogleModel\"],\"type\":\"string\"}},\"type\":\"object\"}},{\"description\":\"Muda UM ajuste da lista de settings_get, depois da confirmação do usuário (o painel mostra o antes → depois que o app escreveu). `key`: a chave; `value`: o valor novo, SEMPRE como texto (\\\"true\\\"/\\\"false\\\", \\\"220\\\", \\\"pt\\\", \\\"gpt-4o\\\") dentro da faixa que settings_get informa. Só os ajustes marcados como graváveis: as skins mudam por skin_select. Não existe ajuste de chave, token, senha ou endereço — não tente. O desfazer volta ao valor anterior.\",\"name\":\"settings_set\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"key\":{\"description\":\"a chave do ajuste\",\"enum\":[\"themeDark\",\"keyboardLanguage\",\"keyboardScalePercent\",\"keyboardNumberRowEnabled\",\"orbSizePx\",\"vibrationIntensity\",\"tapBurstWindowMs\",\"reasoningAnthropicModel\",\"reasoningOpenAiModel\",\"reasoningGoogleModel\"],\"type\":\"string\"},\"value\":{\"description\":\"o valor novo, como texto\",\"maxLength\":100,\"minLength\":1,\"type\":\"string\"}},\"required\":[\"key\",\"value\"],\"type\":\"object\"}},{\"description\":\"Abre uma aba do app para o usuário olhar — não muda nenhum dado. A aba abre quando você TERMINAR esta resposta (não no meio), então avise o usuário e feche a resposta. Abas: keyflow (KeyFlow); teclado (Teclado); overlay (Sobrepor); notificacao (Notificação); fluxos (Fluxos); voz (Transcrição); visao (Visão); raciocinio (Raciocínio); fala (Voz); computador (Computador); privacidade (Privacidade); docs (Docs).\",\"name\":\"open_tab\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"tab\":{\"description\":\"o id da aba\",\"enum\":[\"keyflow\",\"teclado\",\"overlay\",\"notificacao\",\"fluxos\",\"voz\",\"visao\",\"raciocinio\",\"fala\",\"computador\",\"privacidade\",\"docs\"],\"type\":\"string\"}},\"required\":[\"tab\"],\"type\":\"object\"}}]",
+  "casos": [
+    {
+      "id": "ac-01",
+      "idioma": "pt",
+      "entrada": "Quais skins eu tenho instaladas?",
+      "esperado": {
+        "nome": "skin_list",
+        "args": {}
+      },
+      "maxTokensSaida": 128,
+      "tokensEntrada": 1841
+    },
+    {
+      "id": "ac-17",
+      "idioma": "pt",
+      "entrada": "Qual é a previsão do tempo para amanhã em Curitiba?",
+      "esperado": null,
+      "maxTokensSaida": 128,
+      "tokensEntrada": 1845
+    },
+    {
+      "id": "ac-02",
+      "idioma": "pt",
+      "entrada": "Me mostra o estado do app.",
+      "esperado": {
+        "nome": "app_status",
+        "args": {}
+      },
+      "maxTokensSaida": 128,
+      "tokensEntrada": 1839
+    },
+    {
+      "id": "ac-03",
+      "idioma": "pt",
+      "entrada": "Abra a aba do teclado.",
+      "esperado": {
+        "nome": "open_tab",
+        "args": {
+          "tab": "teclado"
+        }
+      },
+      "maxTokensSaida": 128,
+      "tokensEntrada": 1838
+    },
+    {
+      "id": "ac-04",
+      "idioma": "pt",
+      "entrada": "Qual é o tamanho atual do teclado?",
+      "esperado": {
+        "nome": "settings_get",
+        "args": {
+          "key": "keyboardScalePercent"
+        }
+      },
+      "maxTokensSaida": 128,
+      "tokensEntrada": 1841
+    },
+    {
+      "id": "ac-05",
+      "idioma": "pt",
+      "entrada": "Deixe o teclado com 120% do tamanho.",
+      "esperado": {
+        "nome": "settings_set",
+        "args": {
+          "key": "keyboardScalePercent",
+          "value": "120"
+        }
+      },
+      "maxTokensSaida": 128,
+      "tokensEntrada": 1842
+    },
+    {
+      "id": "ac-06",
+      "idioma": "pt",
+      "entrada": "Ative o tema escuro.",
+      "esperado": {
+        "nome": "settings_set",
+        "args": {
+          "key": "themeDark",
+          "value": "true"
+        }
+      },
+      "maxTokensSaida": 128,
+      "tokensEntrada": 1838
+    },
+    {
+      "id": "ac-07",
+      "idioma": "pt",
+      "entrada": "Troque a skin do teclado para neon-aaaa1111.",
+      "esperado": {
+        "nome": "skin_select",
+        "args": {
+          "keyboard": "neon-aaaa1111"
+        }
+      },
+      "maxTokensSaida": 128,
+      "tokensEntrada": 1844
+    },
+    {
+      "id": "ac-08",
+      "idioma": "pt",
+      "entrada": "Remova a skin neon-aaaa1111.",
+      "esperado": {
+        "nome": "skin_remove",
+        "args": {
+          "id": "neon-aaaa1111"
+        }
+      },
+      "maxTokensSaida": 128,
+      "tokensEntrada": 1840
+    },
+    {
+      "id": "ac-09",
+      "idioma": "pt",
+      "entrada": "Como é o formato de skin que o app aceita?",
+      "esperado": {
+        "nome": "skin_get_format",
+        "args": {}
+      },
+      "maxTokensSaida": 128,
+      "tokensEntrada": 1843
+    },
+    {
+      "id": "ac-10",
+      "idioma": "pt",
+      "entrada": "Volte a orbe para a skin padrão.",
+      "esperado": {
+        "nome": "skin_select",
+        "args": {
+          "orb": "default"
+        }
+      },
+      "maxTokensSaida": 128,
+      "tokensEntrada": 1841
+    },
+    {
+      "id": "ac-18",
+      "idioma": "pt",
+      "entrada": "Me mostre a minha chave de API da OpenAI.",
+      "esperado": null,
+      "maxTokensSaida": 128,
+      "tokensEntrada": 1843
+    },
+    {
+      "id": "ac-11",
+      "idioma": "en",
+      "entrada": "Show me all the settings you can read.",
+      "esperado": {
+        "nome": "settings_get",
+        "args": {}
+      },
+      "maxTokensSaida": 128,
+      "tokensEntrada": 1842
+    },
+    {
+      "id": "ac-12",
+      "idioma": "en",
+      "entrada": "Turn on the number row on the keyboard.",
+      "esperado": {
+        "nome": "settings_set",
+        "args": {
+          "key": "keyboardNumberRowEnabled",
+          "value": "true"
+        }
+      },
+      "maxTokensSaida": 128,
+      "tokensEntrada": 1842
+    },
+    {
+      "id": "ac-13",
+      "idioma": "en",
+      "entrada": "Open the Docs tab.",
+      "esperado": {
+        "nome": "open_tab",
+        "args": {
+          "tab": "docs"
+        }
+      },
+      "maxTokensSaida": 128,
+      "tokensEntrada": 1837
+    },
+    {
+      "id": "ac-14",
+      "idioma": "en",
+      "entrada": "Preview a skin made of a single file, manifest.json, whose content is exactly: {}",
+      "esperado": {
+        "nome": "skin_preview",
+        "args": {
+          "files": {
+            "manifest.json": "{}"
+          }
+        }
+      },
+      "maxTokensSaida": 128,
+      "tokensEntrada": 1853
+    },
+    {
+      "id": "ac-15",
+      "idioma": "en",
+      "entrada": "Install the skin I just previewed.",
+      "esperado": {
+        "nome": "skin_install",
+        "args": {}
+      },
+      "maxTokensSaida": 128,
+      "tokensEntrada": 1841
+    },
+    {
+      "id": "ac-19",
+      "idioma": "en",
+      "entrada": "Send an email to my boss saying I will be late.",
+      "esperado": null,
+      "maxTokensSaida": 128,
+      "tokensEntrada": 1844
+    },
+    {
+      "id": "ac-16",
+      "idioma": "es",
+      "entrada": "Cambia el idioma del teclado a inglés.",
+      "esperado": {
+        "nome": "settings_set",
+        "args": {
+          "key": "keyboardLanguage",
+          "value": "en"
+        }
+      },
+      "maxTokensSaida": 128,
+      "tokensEntrada": 1842
+    },
+    {
+      "id": "ac-20",
+      "idioma": "es",
+      "entrada": "Borra todas mis aplicaciones.",
+      "esperado": null,
+      "maxTokensSaida": 128,
+      "tokensEntrada": 1840
+    }
+  ]
+}

@@ -166,9 +166,9 @@ fun FalaPanel(
                         if (localSupported) FalaLocal(active, onSettingsChange, models, actions) else LocalUnsupported()
                     FalaSource.SYSTEM -> FalaSystem()
                     FalaSource.OPENAI -> FalaOpenAi(active, onSettingsChange, openAiAuth)
-                    FalaSource.ELEVENLABS -> FalaElevenLabs(active, onSettingsChange, elevenLabsAuth)
+                    FalaSource.ELEVENLABS -> FalaElevenLabs(active, onSettingsChange, elevenLabsAuth, editor.pending)
                     FalaSource.GOOGLE -> FalaGoogle(active, onSettingsChange, googleAuth)
-                    FalaSource.CUSTOM -> FalaCustomFields(active, editor::edit)
+                    FalaSource.CUSTOM -> FalaCustomFields(active, editor::edit, editor.pending)
                 }
             }
         }
@@ -192,7 +192,28 @@ fun FalaPanel(
 
         SettingsGroup(tr("Testar voz")) {
             Column(Modifier.padding(vertical = 16.dp)) {
-                FalaTestArea(settings = active, availability = availability, tester = tester, initialState = initialTest)
+                FalaTestArea(
+                    settings = active,
+                    availability = availability,
+                    tester = tester,
+                    // Tocar no botão não tira o foco dos campos: confirma o texto digitado e devolve as Settings confirmadas (o instantâneo do toque).
+                    confirmSettings = { editor.confirmPending(); editor.settings },
+                    availabilityFor = { snapshot ->
+                        SpeechEngines.availability(
+                            snapshot,
+                            hasKey = {
+                                when (it) {
+                                    SpeechDeps.Provider.OPENAI -> openAiKey.isNotBlank()
+                                    SpeechDeps.Provider.ELEVENLABS -> elevenLabsKey.isNotBlank()
+                                    SpeechDeps.Provider.GOOGLE -> googleKey.isNotBlank()
+                                }
+                            },
+                            isModelInstalled = { id -> models.items.any { it.spec.id == id && it.status == LocalModelStatus.INSTALLED } },
+                        )
+                    },
+                    editEpoch = editor.editEpoch,
+                    initialState = initialTest,
+                )
             }
         }
     }
@@ -209,7 +230,7 @@ private fun falaSourceLabel(source: FalaSource): String = when (source) {
 }
 
 @Composable
-private fun FalaCustomFields(settings: Settings, onEdit: ((Settings) -> Settings) -> Unit) {
+private fun FalaCustomFields(settings: Settings, onEdit: ((Settings) -> Settings) -> Unit, pending: PendingEdits) {
     Column {
         CustomProviderFields(
             tagPrefix = "fala",
@@ -229,6 +250,7 @@ private fun FalaCustomFields(settings: Settings, onEdit: ((Settings) -> Settings
             format = SpeechFormat.of(settings.falaCustomFormat).wire,
             formatOptions = SpeechFormat.wires,
             onFormat = { onEdit { current -> current.copy(falaCustomFormat = it) } },
+            pending = pending,
         )
         SettingSub(
             tr("O texto do teste é enviado ao endpoint que você informar; as credenciais ficam só neste aparelho."),
@@ -350,6 +372,7 @@ private fun FalaElevenLabs(
     settings: Settings,
     onSettingsChange: (Settings) -> Unit,
     auth: AuthActions,
+    pending: PendingEdits,
 ) {
     val editor = rememberSettingsEditor(settings, onSettingsChange)
     val models = FALA_ELEVENLABS_MODELS.map { AccountModel(it, it) }
@@ -387,7 +410,7 @@ private fun FalaElevenLabs(
         AutoSaveField(
             tr("ID da voz"), settings.falaElevenLabsVoice,
             { v -> editor.edit { it.copy(falaElevenLabsVoice = v.trim()) } }, FALA_ELEVENLABS_VOICE_TAG,
-            modifier = Modifier.padding(top = 16.dp),
+            modifier = Modifier.padding(top = 16.dp), pending = pending,
         )
     }
 }
@@ -450,7 +473,7 @@ private fun reasonFor(availability: SpeechAvailability): String? = when (availab
 }
 
 /** Um teste em andamento: o [snapshot] das Settings confirmadas no toque é a identidade dele — não o que as Settings valem depois. */
-private class FalaTestRun(val job: Job, val snapshot: Settings)
+private class FalaTestRun(val job: Job, val epoch: Int)
 
 /**
  * O Testar (FENG-03/04): o campo de texto, o botão Testar/Parar e o resultado. O motor sai de [SpeechTester.engineFor] com um **instantâneo
@@ -462,6 +485,11 @@ fun FalaTestArea(
     availability: SpeechAvailability,
     tester: SpeechTester,
     modifier: Modifier = Modifier,
+    // O instantâneo do toque: confirma o que está digitado e devolve as Settings confirmadas. Padrão: as da composição.
+    confirmSettings: () -> Settings = { settings },
+    availabilityFor: (Settings) -> SpeechAvailability = { availability },
+    // Conta as edições explícitas do usuário; mudou durante a fala = o teste é de outra configuração.
+    editEpoch: Int = 0,
     initialState: FalaTestState = FalaTestState(),
 ) {
     val palette = LocalKeyFlowPalette.current
@@ -470,13 +498,17 @@ fun FalaTestArea(
     var text by remember { mutableStateOf(defaultPhrase) }
     var state by remember { mutableStateOf(initialState) }
     var run by remember { mutableStateOf<FalaTestRun?>(null) }
-    val reason = reasonFor(availability)
+    var tapReason by remember { mutableStateOf<String?>(null) }
+    val reason = tapReason ?: reasonFor(availability)
+    // Campos de texto (endpoint, ID da voz) só valem depois de confirmados: o botão fica ligado e o toque confere de novo.
+    val needsConfirm = availability == SpeechAvailability.NO_ENDPOINT || availability == SpeechAvailability.NO_VOICE
 
     DisposableEffect(Unit) { onDispose { run?.job?.cancel() } }
     // Mudou a configuração que o teste em andamento usa: ele é de outra configuração. Cancela e zera.
-    LaunchedEffect(settings) {
+    LaunchedEffect(editEpoch) {
         val current = run
-        if (current != null && current.snapshot != settings) {
+        tapReason = null
+        if (current != null && current.epoch != editEpoch) {
             current.job.cancel()
             run = null
             state = FalaTestState()
@@ -488,7 +520,7 @@ fun FalaTestArea(
         PrimaryButton(
             text = if (state.running) tr("Parar") else tr("Testar"),
             tag = FALA_TEST_BUTTON_TAG,
-            enabled = state.running || reason == null,
+            enabled = state.running || reasonFor(availability) == null || needsConfirm,
             modifier = Modifier.padding(top = 14.dp),
             onClick = {
                 if (state.running) {
@@ -496,7 +528,10 @@ fun FalaTestArea(
                     run = null
                     state = FalaTestState()
                 } else {
-                    val snapshot = settings
+                    val snapshot = confirmSettings()
+                    val blocked = reasonFor(availabilityFor(snapshot))
+                    tapReason = blocked
+                    if (blocked != null) return@PrimaryButton
                     val phrase = text.ifBlank { defaultPhrase }
                     val engine = tester.engineFor(snapshot)
                     val player = tester.newPlayer()
@@ -520,7 +555,7 @@ fun FalaTestArea(
                             player.stop()
                         }
                     }
-                    run = FalaTestRun(job, snapshot)
+                    run = FalaTestRun(job, editEpoch)
                 }
             },
         )

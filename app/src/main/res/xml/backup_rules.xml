@@ -21,4 +21,6 @@
     <exclude domain="external" path="model-tmp" />
     <!-- O registro de ações do agente (agent-harness): é deste aparelho — as chamadas de "desfazer" apontam para skins daqui. Não guarda segredo. -->
     <exclude domain="file" path="agent/actions.jsonl" />
+    <!-- O histórico da bancada de modelos (bancada/execucoes): medidas deste aparelho; de outro, não valem — como `models/`. -->
+    <exclude domain="file" path="bancada" />
 </full-backup-content>

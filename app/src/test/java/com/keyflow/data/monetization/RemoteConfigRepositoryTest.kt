@@ -123,6 +123,22 @@ class RemoteConfigRepositoryTest {
     }
 
     @Test
+    fun `contextTokens do manifesto vale, e o ausente mantém o do catálogo embutido`() {
+        fun parse(id: String, contextTokens: String?) = RemoteConfigRepository.parseModels(
+            modelsJson(id).let { json ->
+                if (contextTokens == null) json else json.replace("\"vendor\": \"NVIDIA\",", "\"vendor\": \"NVIDIA\", \"contextTokens\": $contextTokens,")
+            },
+        ).single().contextTokens
+
+        val comJanela = ModelCatalog.TEXT_ALL.first { it.contextTokens != null }
+        assertThat(parse("m", null)).isNull()
+        assertThat(parse("m", "2048")).isEqualTo(2048)
+        assertThat(parse("m", "-5")).isNull()
+        assertThat(parse(comJanela.id, null)).isEqualTo(comJanela.contextTokens)
+        assertThat(parse(comJanela.id, "8192")).isEqualTo(8192)
+    }
+
+    @Test
     fun `capabilities do manifesto são opcionais e toleram valor desconhecido ou mal formado`() {
         fun parse(capabilities: String?) = RemoteConfigRepository.parseModels(
             modelsJson("m").let { json ->

@@ -18,4 +18,6 @@ parcelable LocalLlmConfig {
     String version;
     /** Nome de com.keyflow.core.ComputeBackend onde carregar: "CPU" (padrão; vazio ou desconhecido também) ou "GPU". Troca de backend recarrega o modelo. */
     String backend;
+    /** Carrega também o encoder de imagem; faz parte da identidade residente. */
+    boolean vision;
 }

@@ -51,6 +51,7 @@ fun VisaoPanel(
     openAiAuth: AuthActions = AuthActions.None,
     anthropicAuth: AuthActions = AuthActions.None,
     googleAuth: AuthActions = AuthActions.None,
+    visionTester: VisionTester? = null,
 ) {
     val palette = LocalKeyFlowPalette.current
     val scroll = rememberScrollState()
@@ -59,9 +60,16 @@ fun VisaoPanel(
     // Lido AQUI, no corpo do painel: quando a conexão muda, tudo abaixo recompõe (como no Raciocínio).
     val connection by remember(openAiAuth) { openAiAuth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
     val openAi = openAiPanelState(connection, openAiAuth.flows)
-    val availability = remember(activeSettings.visionSource, activeSettings.visionLocalModelId, models) {
-        visionTestAvailability(activeSettings, models)
+    val anthropicConnection by remember(anthropicAuth) { anthropicAuth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
+    val googleConnection by remember(googleAuth) { googleAuth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
+    fun connectionFor(source: VisionSource): ConnectionState = when (source) {
+        VisionSource.OPENAI -> connection
+        VisionSource.ANTHROPIC -> anthropicConnection
+        VisionSource.GOOGLE -> googleConnection
+        else -> ConnectionState.Disconnected
     }
+    val selectedConnection = connectionFor(activeSettings.visionSource)
+    val availability = visionTestAvailability(activeSettings, models, selectedConnection is ConnectionState.Connected)
     Column(
         modifier
             .fillMaxWidth()
@@ -88,17 +96,38 @@ fun VisaoPanel(
                     VisionSource.OPENAI -> OpenAiPanel(activeSettings, onSettingsChange, openAiAuth, openAi, connection, VisionCloudSlot.OpenAi)
                     VisionSource.ANTHROPIC -> AnthropicPanel(activeSettings, onSettingsChange, anthropicAuth, VisionCloudSlot.Anthropic)
                     VisionSource.GOOGLE -> GooglePanel(activeSettings, onSettingsChange, googleAuth, VisionCloudSlot.Google)
-                    VisionSource.CUSTOM -> VisaoCustomFields(activeSettings, editor::edit)
+                    VisionSource.CUSTOM -> VisaoCustomFields(activeSettings, editor::edit, editor.pending)
                 }
             }
         }
         SettingsGroup(tr("Testar")) {
             Column(Modifier.padding(vertical = 16.dp)) {
-                VisaoTestArea(availability, tester, initialState = initialTest)
+                VisaoTestArea(availability, tester, initialState = initialTest,
+                    // Montado no toque, depois de confirmar o texto dos campos: as Settings desta composição podem ser anteriores à edição.
+                    prepare = visionTester?.let { current ->
+                        {
+                            editor.confirmPending()
+                            val snapshot = editor.settings
+                            val connected = connectionFor(snapshot.visionSource) is ConnectionState.Connected
+                            val snapshotAvailability = visionTestAvailability(snapshot, models, connected)
+                            PreparedVisionTest(
+                                key = visionRequestKey(snapshot, connectionFor(snapshot.visionSource), snapshotAvailability, editor.editEpoch),
+                                run = if (snapshotAvailability is VisionTestAvailability.Ready) ({ current.run(snapshot) }) else null,
+                            )
+                        }
+                    },
+                    remote = activeSettings.visionSource != VisionSource.LOCAL,
+                    requestKey = visionRequestKey(activeSettings, selectedConnection, availability, editor.editEpoch),
+                )
             }
         }
     }
 }
+
+/** O que, nas Settings, na conexão e nas edições explícitas ([epoch]: voltar a um valor antigo também conta), faz o resultado do Testar deixar de valer. */
+private fun visionRequestKey(s: Settings, connection: ConnectionState, availability: VisionTestAvailability, epoch: Int): List<Any?> =
+    listOf(s.visionSource, s.visionLocalModelId, s.visionOpenAiModel, s.visionAnthropicModel, s.visionGoogleModel,
+        s.visionCustomEndpoint, s.visionCustomModel, s.visionCustomHeaderName, s.visionCustomHeaderValue, connection, availability, epoch)
 
 // "Local", "OpenAI", "Anthropic", "Google" e "Custom" são nomes próprios/técnicos.
 private fun visionSourceLabel(source: VisionSource): String = when (source) {
@@ -111,7 +140,7 @@ private fun visionSourceLabel(source: VisionSource): String = when (source) {
 }
 
 @Composable
-private fun VisaoCustomFields(settings: Settings, onEdit: ((Settings) -> Settings) -> Unit) {
+private fun VisaoCustomFields(settings: Settings, onEdit: ((Settings) -> Settings) -> Unit, pending: PendingEdits) {
     Column {
         CustomProviderFields(
             tagPrefix = "visao",
@@ -126,6 +155,7 @@ private fun VisaoCustomFields(settings: Settings, onEdit: ((Settings) -> Setting
             hints = listOf(
                 tr("Padrão compatível com OpenAI Chat Completions com imagem — informe o endpoint e credenciais do seu serviço."),
             ),
+            pending = pending,
         )
         // PRV-04: a imagem da captura sai do aparelho para o endpoint digitado.
         SettingSub(

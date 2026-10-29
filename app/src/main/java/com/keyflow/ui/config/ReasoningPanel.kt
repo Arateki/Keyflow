@@ -12,6 +12,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.keyflow.auth.AuthMethod
 import com.keyflow.auth.ConnectionState
 import com.keyflow.core.ReasoningSource
 import com.keyflow.data.Settings
@@ -87,7 +88,7 @@ fun ReasoningPanel(
                     ReasoningSource.OPENAI -> OpenAiPanel(activeSettings, onSettingsChange, auth, openAi, connection)
                     ReasoningSource.ANTHROPIC -> AnthropicPanel(activeSettings, onSettingsChange, anthropicAuth)
                     ReasoningSource.GOOGLE -> GooglePanel(activeSettings, onSettingsChange, googleAuth)
-                    ReasoningSource.CUSTOM -> ReasoningCustomFields(activeSettings, editor::edit)
+                    ReasoningSource.CUSTOM -> ReasoningCustomFields(activeSettings, editor::edit, editor.pending)
                 }
             }
         }
@@ -95,7 +96,22 @@ fun ReasoningPanel(
             Column(Modifier.padding(vertical = 16.dp)) {
                 // "Manage usage" só faz sentido quando quem responde é o PLANO do ChatGPT (não a chave de API).
                 val manageUsage = auth.usageUrl?.takeIf { activeSettings.reasoningSource == ReasoningSource.OPENAI && openAi.status == OpenAiStatus.CONNECTED_LOGIN }
-                ReasoningTestArea(resolution, onManageUsage = manageUsage?.let { url -> { auth.openUrl(url) } }, initialState = initialTest)
+                // Login de plano (e não chave de API) na origem ativa: o aviso de custo da bancada fala do limite do plano (BON-02).
+                val porAssinatura = when (activeSettings.reasoningSource) {
+                    ReasoningSource.OPENAI -> openAi.status == OpenAiStatus.CONNECTED_LOGIN
+                    ReasoningSource.ANTHROPIC -> (anthropicConnection as? ConnectionState.Connected)?.method == AuthMethod.OAUTH
+                    ReasoningSource.GOOGLE -> (googleConnection as? ConnectionState.Connected)?.method == AuthMethod.OAUTH
+                    else -> false
+                }
+                val modelo = remember(activeSettings, models, porAssinatura) { modeloEscolhido(activeSettings, models, porAssinatura) }
+                BancadaTestArea(
+                    resolution,
+                    modelo,
+                    onManageUsage = manageUsage?.let { url -> { auth.openUrl(url) } },
+                    initialState = initialTest,
+                    // Tocar em Testar não tira o foco do campo Custom: confirma o texto pendente e resolve o motor com as Settings que saem dele.
+                    resolveOnStart = { editor.confirmPending(); resolve(editor.settings) },
+                )
             }
         }
     }
@@ -112,7 +128,7 @@ private fun reasoningSourceLabel(source: ReasoningSource): String = when (source
 }
 
 @Composable
-private fun ReasoningCustomFields(settings: Settings, onEdit: ((Settings) -> Settings) -> Unit) {
+private fun ReasoningCustomFields(settings: Settings, onEdit: ((Settings) -> Settings) -> Unit, pending: PendingEdits) {
     CustomProviderFields(
         tagPrefix = "raciocinio",
         endpoint = settings.reasoningCustomEndpoint,
@@ -124,6 +140,7 @@ private fun ReasoningCustomFields(settings: Settings, onEdit: ((Settings) -> Set
         onHeaderValue = { onEdit { current -> current.copy(reasoningCustomHeaderValue = it) } },
         onModel = { onEdit { current -> current.copy(reasoningCustomModel = it) } },
         hints = listOf(tr("Padrão compatível com OpenAI Chat Completions — informe o endpoint e credenciais do seu serviço.")),
+        pending = pending,
     )
 }
 

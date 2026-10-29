@@ -279,15 +279,29 @@ class FalaPanelTest {
     }
 
     @Test
-    fun customWithoutEndpointDisablesTestAndWithOneEnablesIt() {
-        val h = Harness(Settings(falaSource = FalaSource.CUSTOM), voiceUi())
+    fun customWithoutEndpointRefusesTheTapWithTheReasonAndNeverCallsTheEngine() {
+        val rec = Recorder(twoBuffers)
+        val h = Harness(Settings(falaSource = FalaSource.CUSTOM), voiceUi(), tester = rec.tester)
         rule.setContent { h.Content() }
 
-        rule.onNodeWithTag(FALA_TEST_BUTTON_TAG).performScrollTo().assertIsNotEnabled()
+        rule.onNodeWithTag(FALA_TEST_BUTTON_TAG).performScrollTo().performClick()
         rule.onNodeWithTag(FALA_TEST_REASON_TAG).performScrollTo().assertTextContains("Informe o endpoint", substring = true)
-        rule.runOnIdle { h.settings = h.settings.copy(falaCustomEndpoint = "https://exemplo.test/v1/audio/speech") }
-        rule.onNodeWithTag(FALA_TEST_BUTTON_TAG).assertIsEnabled()
-        rule.onNodeWithTag(FALA_TEST_REASON_TAG).assertDoesNotExist()
+        rule.runOnIdle { assertTrue(rec.engineSettings.isEmpty()) }
+    }
+
+    @Test
+    fun anEndpointTypedButNotConfirmedIsUsedByTheTestAtTheTap() {
+        val rec = Recorder(twoBuffers)
+        val h = Harness(Settings(falaSource = FalaSource.CUSTOM), voiceUi(), tester = rec.tester)
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag("fala-custom-endpoint").performScrollTo().performTextInput("https://exemplo.test/v1/audio/speech")
+        rule.onNodeWithTag(FALA_TEST_BUTTON_TAG).performScrollTo().performClick() // sem Done nem perda de foco
+        rule.waitForIdle()
+        rule.runOnIdle {
+            assertEquals("https://exemplo.test/v1/audio/speech", rec.engineSettings.single().falaCustomEndpoint)
+            assertEquals("https://exemplo.test/v1/audio/speech", h.settings.falaCustomEndpoint)
+        }
     }
 
     @Test
@@ -362,7 +376,7 @@ class FalaPanelTest {
 
         rule.onNodeWithTag(FALA_TEST_BUTTON_TAG).performScrollTo().performClick()
         rule.waitForIdle()
-        rule.runOnIdle { h.settings = h.settings.copy(falaSource = FalaSource.LOCAL) }
+        rule.onNodeWithTag(falaSourceTag(FalaSource.LOCAL)).performScrollTo().performClick() // edição explícita
         rule.waitForIdle()
 
         rule.runOnIdle { assertTrue(cancelled) }
