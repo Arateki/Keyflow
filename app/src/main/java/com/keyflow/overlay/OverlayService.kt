@@ -21,7 +21,9 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
 import android.os.Build
@@ -119,6 +121,7 @@ class OverlayService : Service() {
     private var visionProjection: VisionProjectionSession? = null
     private var visionMediaProjection: MediaProjection? = null
     private var visionSelector: RegionSelectView? = null
+    private var visionSelectorConfiguration: Configuration? = null
     private var visionDisplayListener: android.hardware.display.DisplayManager.DisplayListener? = null
     private var visionRestartDialog: android.app.AlertDialog? = null
     private val visionGrabber = ScreenFrameGrabber()
@@ -321,6 +324,7 @@ class OverlayService : Service() {
         try {
             windowManager.addView(selector, params)
             visionSelector = selector
+            visionSelectorConfiguration = Configuration(resources.configuration)
             val rotation = display.rotation
             val listener = object : android.hardware.display.DisplayManager.DisplayListener {
                 override fun onDisplayAdded(displayId: Int) = Unit
@@ -343,6 +347,14 @@ class OverlayService : Service() {
             android.util.Log.w("KeyFlowVision", "Falha ao abrir o seletor", error)
             visionFlow.finish()
         }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        val previous = visionSelectorConfiguration ?: return
+        val geometry = ActivityInfo.CONFIG_ORIENTATION or ActivityInfo.CONFIG_SCREEN_SIZE or ActivityInfo.CONFIG_DENSITY
+        // O callback de display pode chegar antes de os Resources refletirem a rotação.
+        if (visionSelector != null && previous.diff(newConfig) and geometry != 0) restartForDisplayChange()
     }
 
     private fun restartForDisplayChange() {
@@ -417,6 +429,7 @@ class OverlayService : Service() {
             releaseVisionResource { visionGrabber.close() }
             releaseVisionResource { visionSelector?.let { windowManager.removeViewImmediate(it) } }
             visionSelector = null
+            visionSelectorConfiguration = null
             visionMediaProjection = null
         } finally {
             try { endVisionProjection() } catch (error: Exception) {
