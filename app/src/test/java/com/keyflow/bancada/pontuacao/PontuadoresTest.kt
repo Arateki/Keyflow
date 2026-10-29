@@ -286,7 +286,7 @@ class PontuadoresTest {
 
     @Test
     fun `the registry knows the five tests and nothing else`() {
-        assertThat(Pontuadores.testes).containsExactly("pontuacao", "reescrita", "json", "acoes", "contexto")
+        assertThat(Pontuadores.testes).containsExactly("pontuacao", "reescrita", "json", "acoes", "contexto", "ocr", "objetos")
         assertThat(Pontuadores.de("rapido")).isNull()
     }
 

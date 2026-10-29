@@ -52,6 +52,8 @@ internal fun rotuloDoTeste(id: String): String = when (id) {
     "json" -> "JSON"
     "acoes" -> tr("Ações")
     "contexto" -> tr("Contexto")
+    "ocr" -> "OCR"
+    "objetos" -> tr("Objetos")
     else -> id
 }
 
@@ -67,6 +69,7 @@ internal fun bancadaSubAbas(corpus: Corpus?, resolution: ReasoningResolution, mo
     val semMotor = (resolution as? ReasoningResolution.Unavailable)?.let { ReasoningTestMessages.unavailable(it.reason) }
     for (id in Pontuadores.testes.filter { it in corpus.testes }) {
         val teste = corpus.testes.getValue(id)
+        if (teste.capacidade != Capacidade.TEXTO) continue
         val janela = modelo?.contextTokens
         val motivo = when {
             semMotor != null -> semMotor

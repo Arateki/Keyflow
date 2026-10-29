@@ -939,4 +939,9 @@ internal val TranslationsEs: Map<String, String> = mapOf(
     "roda em sequência todos os testes que o modelo suporta. Parar guarda o que já foi medido, e o aparelho quente ou com bateria baixa pausa a rodada." to "ejecuta en secuencia todas las pruebas que el modelo admite. Detener conserva lo ya medido, y un dispositivo caliente o con batería baja pausa la ronda.",
     "Modelo da nuvem" to "Modelo en la nube",
     "antes de qualquer chamada o app mostra quantas serão feitas e o teto de tokens, e só roda depois que você confirmar. No login por assinatura a rodada reduzida (2 casos por teste) vem primeiro e consome o limite do seu plano." to "antes de cualquier llamada la app muestra cuántas se harán y el tope de tokens, y solo ejecuta después de que confirmes. Con inicio de sesión de suscripción la ronda reducida (2 casos por prueba) va primero y consume el límite de tu plan.",
+    "Objetos" to "Objetos",
+    "As imagens de teste serão enviadas ao provedor." to "Las imágenes de prueba se enviarán al proveedor.",
+    "Mede a leitura de texto em imagens." to "Mide la lectura de texto en imágenes.",
+    "Mede a identificação de objetos em imagens." to "Mide la identificación de objetos en imágenes.",
+    "A estimativa não inclui os tokens das imagens." to "La estimación no incluye los tokens de las imágenes.",
 )

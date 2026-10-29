@@ -121,4 +121,62 @@ class GemmaVisionDeviceTest {
             context.cacheDir.listFiles().orEmpty().filter { it.name.startsWith(cachePrefix) }.forEach { it.deleteRecursively() }
         }
     }
+
+    /** Prova opt-in da etapa de objetos com a imagem versionada, sem alterar os modelos instalados. */
+    @Test fun e2bNaCpuDescreveObjetosDoCorpus() {
+        val selected = InstrumentationRegistry.getArguments().getString("class").orEmpty().split(',')
+        assumeTrue("selecione explicitamente o método", selected.any {
+            it.endsWith("GemmaVisionDeviceTest#e2bNaCpuDescreveObjetosDoCorpus")
+        })
+        val instrumentacao = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentacao.targetContext
+        fun note(message: String) = instrumentacao.sendStatus(0, Bundle().apply { putString("stream", "\nBancada objetos: $message\n") })
+        val spec = ModelCatalog.GEMMA_4_E2B
+        val source = checkNotNull(spec.file(FileRole.MODEL))
+        val memory = ActivityManager.MemoryInfo()
+        (context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).getMemoryInfo(memory)
+        assumeTrue("modelo não cabe segundo a guarda normal", RamGuard.enoughFor(ComputeBackend.CPU,
+            memory.availMem / 1048576, spec.recommendedRamMb / 2, memory.totalMem / 1048576))
+        assumeTrue("espaço insuficiente", context.filesDir.usableSpace > source.bytes + 1_400_000_000L)
+        val prefixo = "bancada-objetos-${android.os.Process.myPid()}"
+        val root = File(context.filesDir, prefixo).apply { check(mkdirs()) }
+        val file = File(root, "$prefixo.litertlm")
+        val backend = LiteRtBackend(File(root, "cache").apply { mkdirs() }.path)
+        val worker = Executors.newSingleThreadExecutor()
+        try {
+            val digest = MessageDigest.getInstance("SHA-256")
+            var recebido = 0L
+            URL(source.url).openConnection().apply { connectTimeout = 30_000; readTimeout = 120_000 }.getInputStream().use { entrada ->
+                file.outputStream().use { saida ->
+                    val buffer = ByteArray(256 * 1024)
+                    while (true) {
+                        val n = entrada.read(buffer)
+                        if (n < 0) break
+                        recebido += n
+                        check(recebido <= source.bytes)
+                        digest.update(buffer, 0, n)
+                        saida.write(buffer, 0, n)
+                    }
+                }
+            }
+            assertEquals(source.bytes, file.length())
+            assertEquals(source.sha256, digest.digest().joinToString("") { "%02x".format(it) })
+            val model = LlmModels.from(spec, root, backend = ComputeBackend.CPU).copy(modelPath = file.path, vision = true)
+            backend.load(model)
+            val caso = checkNotNull(com.keyflow.bancada.adaptadores.BancadaServicos.carregarCorpus(context)).teste("objetos")!!.casos.first()
+            val bytes = context.assets.open("bancada/v1/${caso.texto("imagem")}").use { it.readBytes() }
+            val image = com.keyflow.reasoning.ReasoningImage(bytes)
+            val resposta = StringBuilder()
+            val inicio = System.nanoTime()
+            val futuro = worker.submit { backend.generate(ReasoningRequest(user = caso.entrada, image = image)) { resposta.append(it) } }
+            try { futuro.get(10, TimeUnit.MINUTES) } finally { if (!futuro.isDone) backend.cancel() }
+            val nota = com.keyflow.bancada.pontuacao.PontuadorObjetos.pontuar(caso, resposta.toString())
+            note("caso=${caso.id}; esperado=${caso.esperado}; resposta=$resposta; F1=${nota.nota}; critérios=${nota.criterios}; tempo=${(System.nanoTime()-inicio)/1_000_000}ms")
+            assertTrue("o modelo não respondeu", resposta.isNotBlank())
+        } finally {
+            backend.cancel(); worker.shutdownNow(); worker.awaitTermination(5, TimeUnit.SECONDS)
+            backend.unload(); root.deleteRecursively()
+            context.cacheDir.listFiles().orEmpty().filter { it.name.startsWith(prefixo) }.forEach { it.deleteRecursively() }
+        }
+    }
 }
