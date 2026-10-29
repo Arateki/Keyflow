@@ -22,15 +22,15 @@ class ReleaseAgentTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             mapping = Path(tmp) / "mapping.txt"
             mapping.write_text(self.MAPPING)
-            problems = CHECK(mapping, {"Ly8;"})
+            problems = CHECK(mapping, {"La9;"})
             self.assertEqual(1, len(problems))
-            self.assertIn("AgentHost -> a9", problems[0])
+            self.assertIn("AgentController -> y8", problems[0])
 
     def test_agente_ausente_do_mapping_falha(self):
         with tempfile.TemporaryDirectory() as tmp:
             mapping = Path(tmp) / "mapping.txt"
             mapping.write_text("com.keyflow.ui.SetupActivity -> a:\n")
-            self.assertEqual(2, len(CHECK(mapping, {"La;"})))
+            self.assertEqual(1, len(CHECK(mapping, {"La;"})))
 
     def test_mapping_ausente_vazio_ou_invalido_falha(self):
         with tempfile.TemporaryDirectory() as tmp:

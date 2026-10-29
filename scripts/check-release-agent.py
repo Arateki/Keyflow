@@ -2,7 +2,7 @@
 """Exige as classes do agente no DEX do release, mesmo renomeadas pelo R8.
 
 Desde 2026-10-29 o agente vai em todos os builds (decisão do Yan); a conferência virou o inverso da antiga: se o R8 tirar
-`AgentController` ou `AgentHost`, a aba KeyFlow ficaria sem o agente sem ninguém perceber.
+`AgentController` (o `AgentHost`, objeto pequeno, o R8 incorpora aos chamadores e some do mapping), a aba KeyFlow ficaria sem o agente sem ninguém perceber.
 
 Uso: check-release-agent.py <mapping.txt> <APK> [<dexdump>]. O mapping é obrigatório.
 A conferência usa definições de classes, não referências ou strings soltas no DEX.
@@ -12,7 +12,7 @@ import runpy
 import sys
 from pathlib import Path
 
-REQUIRED = ("com.keyflow.agent.AgentController", "com.keyflow.agenthost.AgentHost")
+REQUIRED = ("com.keyflow.agent.AgentController",)
 MAPPING_LINE = re.compile(r"^(\S+) -> (\S+):$")
 
 
@@ -51,7 +51,7 @@ def main():
     problems = check_agent(mapping, descriptors)
     if problems:
         sys.exit("\n".join(problems))
-    print("R8: AgentController e AgentHost estão definidos no DEX (mapping conferido).")
+    print("R8: AgentController está definido no DEX (mapping conferido).")
 
 
 if __name__ == "__main__":
