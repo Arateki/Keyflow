@@ -1,7 +1,11 @@
 # Síntese de fala (aba Voz) — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md`
+<<<<<<< HEAD
 **Status**: FAL-T1, T4, T5 e T6 feitas na branch `equipe/voz-aba` (lição: `../../project/licoes/2026-10-29-voz-aba-contrato-e-nuvem.md`); as outras seguem pendentes. **Fora da v1**. Não toma a vez de frente aberta.
+=======
+**Status**: rascunho. FAL-T2, FAL-T8 e FAL-T10 feitas em 2026-10-29. O resto não começou. **Fora da v1**. Não toma a vez de frente aberta.
+>>>>>>> origin/main
 
 > **Para o agente executor**: leia `spec.md` + `design.md` + este arquivo e `.specs/codebase/TESTING.md`. Uma task por vez,
 > na ordem abaixo, testes primeiro, gate verde antes de avançar. Supertonic e VITS entram no catálogo nesta leva (D1 e D2). O nome do VITS é "português", nunca "pt-BR".
@@ -41,9 +45,10 @@ T4, T5 e T6 dependem só de T1. T3 depende de T1. T2 não trava T3 nem T9. T11 d
 - **Done when**: motor falso emite `Audio`, `FirstAudio` no primeiro buffer e `Done` com a duração das amostras; cancelar não emite `Done`; origem Local sem id de modelo emite `MODEL_MISSING` e não troca a origem. Gate `quick`.
 - **Gate**: `pool compilar testDebugUnitTest`.
 
-### FAL-T2 — Frontend de caracteres `[P]`
+### FAL-T2 — Frontend de caracteres
+- **Status**: feito (2026-10-29). O pacote ficou `com.keyflow.speech.frontend` (esta task dizia `speech.local`; o pedido da frente fixou `frontend`).
 - **What**: normalizador de dígitos em português e frontend VITS de caracteres (FLOC-03, FPRV-01). `tokens.txt` de teste, minúsculo, no `src/test`. Não baixar o modelo de 71 MB. O rótulo do modelo, quando a task de pin o mostrar, é "português".
-- **Where**: `com.keyflow.speech.local`.
+- **Where**: `com.keyflow.speech.frontend`.
 - **Done when**: "2" em pt vira a palavra combinada; caractere fora do mapa some; com `add_blank` o id de blank fica entre os outros; frase corta em `.`. Nenhum arquivo do teste cita eSpeak. Gate `quick`.
 - **Gate**: `pool compilar testDebugUnitTest`.
 
@@ -76,7 +81,8 @@ T4, T5 e T6 dependem só de T1. T3 depende de T1. T2 não trava T3 nem T9. T11 d
 - **Done when**: `pool telas` e `diff-screens.sh`. As outras abas ficam bit-idênticas. A rota `config-fala-testar` está parada, sem áudio.
 - **Gate**: `pool telas`.
 
-### FAL-T8 — Pin do Supertonic e aceite `[P]`
+### FAL-T8 — Pin do Supertonic e aceite
+- **Status**: feito (2026-10-29). O diálogo ficou no `ModelList` compartilhado, não no `FalaPanel` (esse painel é de outra frente). No release a entrada some até o motor provar (`validatedOnDevice = false`).
 - **What**: uma entrada real do Supertonic 3 em `ModelCatalog.VOICE` (FLOC-01, FLOC-02, FPRV-03). Baixar de novo o ONNX oficial, gravar SHA-256 e tamanho completos, licença no comentário e em `app/licenses/`. Não copiar o prefixo do `context.md` como se fosse o hash. Diálogo de aceite (licença + Attachment A) antes do download; sem aceite, o downloader não é chamado. O VITS é a FAL-T10, não esta task.
 - **Done when**: o id do Supertonic baixa só depois do aceite, o SHA confere e o catálogo não lista Kokoro, Piper nem ONNX quantizado. Gate `quick` + `build`.
 - **Gate**: `pool compilar testDebugUnitTest assembleDebug`.
@@ -87,7 +93,8 @@ T4, T5 e T6 dependem só de T1. T3 depende de T1. T2 não trava T3 nem T9. T11 d
 - **Done when**: texto de teste com o índice falso produz ids; arquivo ausente emite `MODEL_MISSING` sem socket; a velocidade da aba chega ao fator `speed`. O modelo de ~398 MB não entra no teste de JVM. Gate `quick`.
 - **Gate**: `pool compilar testDebugUnitTest`.
 
-### FAL-T10 — Pin do VITS `[P]`
+### FAL-T10 — Pin do VITS
+- **Status**: feito (2026-10-29). Nome na tela "português". No release a entrada some até o motor provar, como o Supertonic.
 - **What**: entrada real do VITS Coqui pt em `ModelCatalog.VOICE`, ao lado do Supertonic (FLOC-01, D1). Nome visível `tr("português")` — não "pt-BR". Baixar de novo, gravar SHA-256 e tamanho completos, licença BSD-3 no comentário e em `app/licenses/`. Não copiar o prefixo do `context.md`.
 - **Done when**: as duas entradas existem; o nome do VITS é "português"; o SHA confere; Kokoro e Piper continuam de fora. Gate `quick` + `build`.
 - **Gate**: `pool compilar testDebugUnitTest assembleDebug`.

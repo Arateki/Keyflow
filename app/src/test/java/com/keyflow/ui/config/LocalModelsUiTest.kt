@@ -116,6 +116,7 @@ class LocalModelsUiTest {
         assertThat(startProblem(StartResult.StorageUnavailable)).isNotNull()
         assertThat(startProblem(StartResult.Started)).isNull()
         assertThat(startProblem(StartResult.NeedsMeteredConfirmation(1))).isNull()
+        assertThat(startProblem(StartResult.NeedsLicenseAcceptance("supertonic-3"))).isNull()
     }
 
     @Test

@@ -970,4 +970,14 @@ internal val TranslationsEs: Map<String, String> = mapOf(
     "O texto é longo demais para %s (máximo de %d caracteres)." to "El texto es demasiado largo para %s (máximo de %d caracteres).",
     "A chave do Google não vale para a Cloud Text-to-Speech. Habilite essa API na chave (Google Cloud) e tente de novo." to "La clave de Google no vale para Cloud Text-to-Speech. Habilita esa API en la clave (Google Cloud) e inténtalo de nuevo.",
     "A ElevenLabs aceita no máximo 1,2x; o teste usa 1,2x." to "ElevenLabs acepta como máximo 1,2x; la prueba usa 1,2x.",
+
+    // Aba Voz (catálogo local e o aceite da OpenRAIL-M do Supertonic)
+    "português" to "portugués",
+    "Uma voz em português, leve, no aparelho." to "Una voz en portugués, ligera, en el dispositivo.",
+    "Várias línguas" to "Varios idiomas",
+    "Voz em vários idiomas, inclusive português, no aparelho." to "Una voz en varios idiomas, incluido el portugués, en el dispositivo.",
+    "31 idiomas" to "31 idiomas",
+    "Licença do Supertonic" to "Licencia del Supertonic",
+    "Os pesos deste modelo são OpenRAIL-M. O parágrafo 5 e o Attachment A valem para quem baixa ou usa o modelo. O código de inferência é MIT. A Supertone não endossa o KeyFlow." to "Los pesos de este modelo son OpenRAIL-M. El párrafo 5 y el Attachment A valen para quien descarga o usa el modelo. El código de inferencia es MIT. Supertone no respalda KeyFlow.",
+    "Li e aceito" to "Leí y acepto",
 )
