@@ -6,7 +6,7 @@
 # O que o R8 costuma quebrar sem avisar (reflexão, JNI, classes por nome) só aparece rodando o app. Este script:
 #   1. gera o APK de release com a chave de upload já configurada fora do repositório (ou recebe um APK assinado explícito)
 #      e confere, sem emulador, o que dá para ver no APK: nenhum ID de teste do AdMob, nenhum caminho
-#      de staging/compra simulada/agente, classes protegidas e o que o JNI acessa por nome (check-release-jni.py);
+#      de staging/compra simulada, o agente presente (check-release-agent.py), classes protegidas e o que o JNI acessa por nome (check-release-jni.py);
 #   2. instala no emulador, aceita a divulgação, percorre as abas, troca a skin do teclado, abre a folha de compra (Billing),
 #      espera o banner do AdMob, habilita o KeyFlow como teclado e o abre num campo de texto de verdade;
 #   3. varre o logcat atrás de ClassNotFoundException, NoSuchMethodError, erro de JNI e de parcel.
@@ -89,12 +89,12 @@ INPUT_DEX
     # Varre todas as entradas descomprimidas (resources.arsc usa UTF-16, DEX usa UTF-8).
     python3 scripts/check-release-admob.py "$apk"
 
-    # O release usa produção e não pode embutir identificador/token de Access, simulador ou agente.
+    # O release usa produção e não pode embutir identificador/token de Access nem simulador (o agente vai no release desde 2026-10-29).
     dex_dump="$(mktemp "${TMPDIR:-/tmp}/keyflow-release-dex.XXXXXX")"
     trap 'rm -f "$dex_dump"' EXIT
     unzip -p "$apk" 'classes*.dex' > "$dex_dump"
-    if grep -aEq 'keyflowStagingAccess|keyflow-api-staging\.arateki\.com|KEYFLOW_SIMULATED_PURCHASE|SimulatedPurchase|simulated_purchase|/v1/test/purchases|kfsim1|com/keyflow/agenthost/AgentHost|com/keyflow/agent/AgentController|com/keyflow/ui/config/KeyflowPanel' "$dex_dump"; then
-        echo "release contém caminho de staging, compra simulada ou chat do agente" >&2
+    if grep -aEq 'keyflowStagingAccess|keyflow-api-staging\.arateki\.com|KEYFLOW_SIMULATED_PURCHASE|SimulatedPurchase|simulated_purchase|/v1/test/purchases|kfsim1' "$dex_dump"; then
+        echo "release contém caminho de staging, compra simulada" >&2
         exit 1
     fi
     for symbol in 'androidx/work/impl/WorkDatabase_Impl' 'com/keyflow/transcription/local/ITranscriptionEngine$Stub' 'com/caverock/androidsvg/SVG'; do
@@ -473,13 +473,8 @@ if assert_label 'Aceitar e continuar' 'Accept and continue' 'Aceptar y continuar
     tap_label 'Pular por agora' 'Skip for now' 'Omitir por ahora'
 fi
 
-# Passa pelas abas principais; a de KeyFlow deve ser apenas Em breve no release.
+# Passa pelas abas principais; a de KeyFlow (o agente) abre no release desde 2026-10-29.
 tap_label 'KeyFlow'
-assert_label 'Em breve' 'Coming soon' 'Próximamente'
-if rg -qi 'Olá! Sou o agente KeyFlow|Hello! I am the KeyFlow agent|chat-input|Permitir ferramenta|Allow tool' "$window_xml"; then
-    echo "a árvore do release expõe o chat do agente" >&2
-    exit 1
-fi
 tap_label 'Teclado' 'Keyboard'
 tap_label 'Sobrepor' 'Overlay' 'Superposición'
 tap_label 'Notificação' 'Notification' 'Notificación'

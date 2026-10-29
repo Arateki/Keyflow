@@ -1,4 +1,4 @@
-"""Regressões do guard do agente: nomes ofuscados, classes removidas e mapping obrigatório."""
+"""Regressões do guard do agente: ele tem de estar no DEX (nomes ofuscados), mapping obrigatório."""
 import os
 import subprocess
 import runpy
@@ -10,19 +10,27 @@ CHECK = runpy.run_path(str(Path(__file__).resolve().parents[1] / "check-release-
 
 
 class ReleaseAgentTest(unittest.TestCase):
-    def test_agente_ofuscado_da_revisao_falha(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            mapping = Path(tmp) / "mapping.txt"
-            mapping.write_text("com.keyflow.agent.AgentController -> y8:\ncom.keyflow.agenthost.AgentHost -> a9:\n")
-            problems = CHECK(mapping, {"Ly8;", "La9;"})
-            self.assertEqual(2, len(problems))
-            self.assertIn("AgentController -> y8", problems[0])
+    MAPPING = "com.keyflow.agent.AgentController -> y8:\ncom.keyflow.agenthost.AgentHost -> a9:\n"
 
-    def test_classe_otimizada_fora_do_dex_nao_e_falso_positivo(self):
+    def test_agente_ofuscado_presente_no_dex_passa(self):
         with tempfile.TemporaryDirectory() as tmp:
             mapping = Path(tmp) / "mapping.txt"
-            mapping.write_text("com.keyflow.agent.AgentController -> y8:\ncom.keyflow.ui.SetupActivity -> a:\n")
-            self.assertEqual([], CHECK(mapping, {"La;"}))
+            mapping.write_text(self.MAPPING)
+            self.assertEqual([], CHECK(mapping, {"Ly8;", "La9;"}))
+
+    def test_classe_do_agente_removida_do_dex_falha(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            mapping = Path(tmp) / "mapping.txt"
+            mapping.write_text(self.MAPPING)
+            problems = CHECK(mapping, {"Ly8;"})
+            self.assertEqual(1, len(problems))
+            self.assertIn("AgentHost -> a9", problems[0])
+
+    def test_agente_ausente_do_mapping_falha(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            mapping = Path(tmp) / "mapping.txt"
+            mapping.write_text("com.keyflow.ui.SetupActivity -> a:\n")
+            self.assertEqual(2, len(CHECK(mapping, {"La;"})))
 
     def test_mapping_ausente_vazio_ou_invalido_falha(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -32,12 +40,11 @@ class ReleaseAgentTest(unittest.TestCase):
                 mapping.write_text(content)
                 self.assertTrue(CHECK(mapping, {"La;"}))
 
-    def test_original_sem_mapping_e_apk_sem_classes_falham(self):
+    def test_apk_sem_classes_falha(self):
         with tempfile.TemporaryDirectory() as tmp:
             mapping = Path(tmp) / "mapping.txt"
-            mapping.write_text("com.keyflow.ui.SetupActivity -> a:\n")
-            self.assertTrue(CHECK(mapping, {"Lcom/keyflow/agenthost/AgentHost;"}))
-            self.assertTrue(CHECK(mapping, set()))
+            mapping.write_text(self.MAPPING)
+            self.assertIn("APK sem definições de classes DEX", CHECK(mapping, set()))
 
 
 class SmokeMappingTest(unittest.TestCase):

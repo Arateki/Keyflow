@@ -140,7 +140,8 @@ android {
         buildConfigField("String", "KEYFLOW_STAGING_ACCESS_CLIENT_ID", "\"\"")
         buildConfigField("String", "KEYFLOW_STAGING_ACCESS_CLIENT_SECRET", "\"\"")
         buildConfigField("String", "KEYFLOW_SIMULATED_PURCHASE_HMAC_SECRET", "\"\"")
-        buildConfigField("boolean", "AGENT_ENABLED", "false")
+        // O agente com ferramentas vai em todos os builds (decisão do Yan, 2026-10-29); o aceite da divulgação segue obrigatório.
+        buildConfigField("boolean", "AGENT_ENABLED", "true")
         buildConfigField("String", "LITERT_LM_VERSION", "\"$litertLmVersion\"")
         buildConfigField(
             "long",
@@ -154,7 +155,6 @@ android {
         // ABIs do sherpa-onnx (STO-02): celulares ARM de 64 e 32 bits; x86_64 só no debug, para o
         // emulador. O x86 de 32 bits que vem no AAR não entra em nenhum.
         debug {
-            buildConfigField("boolean", "AGENT_ENABLED", "true")
             if (!providers.gradleProperty("keyflowApiBaseUrl").isPresent) {
                 buildConfigField(
                     "String",

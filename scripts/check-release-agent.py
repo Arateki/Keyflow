@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Recusa classes do agente no DEX do release, mesmo renomeadas pelo R8.
+"""Exige as classes do agente no DEX do release, mesmo renomeadas pelo R8.
+
+Desde 2026-10-29 o agente vai em todos os builds (decisão do Yan); a conferência virou o inverso da antiga: se o R8 tirar
+`AgentController` ou `AgentHost`, a aba KeyFlow ficaria sem o agente sem ninguém perceber.
 
 Uso: check-release-agent.py <mapping.txt> <APK> [<dexdump>]. O mapping é obrigatório.
 A conferência usa definições de classes, não referências ou strings soltas no DEX.
@@ -9,7 +12,7 @@ import runpy
 import sys
 from pathlib import Path
 
-PREFIXES = ("com.keyflow.agent.", "com.keyflow.agenthost.")
+REQUIRED = ("com.keyflow.agent.AgentController", "com.keyflow.agenthost.AgentHost")
 MAPPING_LINE = re.compile(r"^(\S+) -> (\S+):$")
 
 
@@ -22,13 +25,13 @@ def check_agent(mapping_path, descriptors):
     if not pairs:
         return ["mapping R8 sem classes"]
     problems = []
-    for original, target in pairs:
-        if original.startswith(PREFIXES) and "L" + target.replace(".", "/") + ";" in descriptors:
-            problems.append(f"agente no DEX: {original} -> {target}")
-    # Também recusa classes originais que um mapping incorreto/recortado tenha omitido.
-    for descriptor in descriptors:
-        if descriptor[1:-1].replace("/", ".").startswith(PREFIXES):
-            problems.append(f"agente no DEX: {descriptor}")
+    targets = dict(pairs)
+    for original in REQUIRED:
+        target = targets.get(original)
+        if target is None:
+            problems.append(f"agente ausente do mapping: {original}")
+        elif "L" + target.replace(".", "/") + ";" not in descriptors:
+            problems.append(f"agente fora do DEX: {original} -> {target}")
     if not descriptors:
         problems.append("APK sem definições de classes DEX")
     return problems
@@ -48,7 +51,7 @@ def main():
     problems = check_agent(mapping, descriptors)
     if problems:
         sys.exit("\n".join(problems))
-    print("R8: nenhum com.keyflow.agent.* ou com.keyflow.agenthost.* definido no DEX (mapping conferido).")
+    print("R8: AgentController e AgentHost estão definidos no DEX (mapping conferido).")
 
 
 if __name__ == "__main__":
