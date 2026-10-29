@@ -167,15 +167,15 @@ promessa de privacidade e o APK enxuto.
 | Requirement | Story | Task | Status |
 | ----------- | ----- | ---- | ------ |
 | MODE-01 | P1-A | VC-T1 | Implemented |
-| MODE-02 | P1-A | VC-T4 | In Tasks |
-| MODE-03 | P1-A | VC-T4 | In Tasks |
-| MODE-04 | P1-A | VC-T4, VC-T7, VC-T10 | In Tasks |
-| MODE-05 | P1-A | VC-T4, VC-T7 | In Tasks |
-| MODE-06 | P1-A | VC-T3, VC-T4 | In Tasks |
-| CAP-01 | P1-B | VC-T3 | In Tasks |
-| CAP-02 | P1-B | VC-T5 | In Tasks |
-| CAP-03 | P1-B | VC-T4, VC-T5 | In Tasks |
-| CAP-04 | P1-B | VC-T4, VC-T6, VC-T8 | Parcial: `VisionCache.clear` pronto (VC-T6); epílogo em VC-T4 |
+| MODE-02 | P1-A | VC-T4 | Implemented (VC-T3/T4/T5; gates e prova no relatório do PR #63) |
+| MODE-03 | P1-A | VC-T4 | Implemented (VC-T3/T4/T5; gates e prova no relatório do PR #63) |
+| MODE-04 | P1-A | VC-T4, VC-T7, VC-T10 | Parcial: epílogo e preservação de voz implementados (VC-T4); ações/cópia em VC-T7/T10 |
+| MODE-05 | P1-A | VC-T4, VC-T7 | Parcial: glifos e acentos por fase com paleta (VC-T4); gestos em VC-T7 |
+| MODE-06 | P1-A | VC-T3, VC-T4 | Implemented (VC-T3/T4/T5; gates e prova no relatório do PR #63) |
+| CAP-01 | P1-B | VC-T3 | Implemented (VC-T3/T4/T5; gates e prova no relatório do PR #63) |
+| CAP-02 | P1-B | VC-T5 | Implemented (VC-T3/T4/T5; gates e prova no relatório do PR #63) |
+| CAP-03 | P1-B | VC-T4, VC-T5 | Implemented (VC-T3/T4/T5; gates e prova no relatório do PR #63) |
+| CAP-04 | P1-B | VC-T4, VC-T6, VC-T8 | Parcial: `VisionCache.clear` ligado ao epílogo e captura efêmera (VC-T4/T6); arquivos das ações em VC-T8 |
 | ACT-01 | P1-C | VC-T7, VC-T16 | In Tasks |
 | ACT-02 | P1-C | VC-T7, VC-T15 | Motor implementado na VC-T15; fluxo depende da VC-T7 |
 | ACT-03 | P1-C | VC-T15, VC-T16 (⚠️ proposta) | Motor `ask` implementado; gesto depende da VC-T16 |
@@ -201,7 +201,7 @@ promessa de privacidade e o APK enxuto.
 | CFG-V01 | P2-E | VC-T11 | Implemented |
 | CFG-V02 | P2-E | VC-T11, VC-T17 | Implemented (Local, OpenAI, Anthropic, Google, Custom; Créditos "Em breve") |
 | CFG-V03 | P2-E | VC-T12 | Implemented (rotas `config-visao*` e goldens claro/escuro) |
-| STO-V01 | P2-F | VC-T3, VC-T13 | In Tasks |
+| STO-V01 | P2-F | VC-T3, VC-T13 | Parcial: consentimento novo por acionamento, token não persistido e type efêmero (VC-T3); privacidade em VC-T13 |
 | STO-V02 | P2-F | VC-T8, VC-T13 | In Tasks |
 | STO-V03 | P2-F | VC-T2a, VC-T13 | In Tasks |
 

@@ -134,6 +134,11 @@ leva à aba Visão e o gesto de texto só funciona de ponta a ponta com o downlo
 ## Fase B — Fluxo efêmero
 
 ### VC-T3 — Consent + FGS type `mediaProjection` por acionamento
+- **Status (2026-10-29, PR #63): Implementada.** `VisionConsentActivity` + correlação de pedidos; autorização nova por
+  acionamento, superfície da tela inteira na API 34+, `VisionProjectionSession` soma/remove o type e trata revogação.
+  Testes: `VisionConsentRequestTest`, `VisionFlowTest`, `ManifestWiringTest`, `OverlayServiceVisionTest` e prova real
+  `VisionCaptureDeviceTest#capturaRegiaoNoEmulador` (inclui tipos observados pelo Android e segunda autorização).
+  Gates e evidências: relatório `.equipe/relatorios/visao-fluxo.md`; validação física segue com o Yan (regra de ouro 9).
 - **What**: `VisionConsentActivity` transparente (`createScreenCaptureIntent` → resultado);
   no `OverlayService`: consent OK → re-`startForeground` com `MICROPHONE or MEDIA_PROJECTION`
   (**ordem Android 14+**, guardas p/ minSdk 24) → `getMediaProjection` + callback de revogação;
@@ -147,6 +152,12 @@ leva à aba Visão e o gesto de texto só funciona de ponta a ponta com o downlo
 - **Tests**: unit + instrumented (camada `overlay/service`) + manual. **Gate**: `full` + manual.
 
 ### VC-T4 — `VisionFlow` (orquestrador) + pause/restauração + `ScreenFrameGrabber`
+- **Status (2026-10-29, PR #63): Implementada.** `VisionFlow<T>` recebe `VisionFlowRequest` e entrega saída tipada;
+  entrada por `ACTION_VISION` ou atalho, pausa antes do consentimento, guardas de voz e epílogo idempotente. O capturador
+  usa uma projeção/VirtualDisplay por acionamento e oculta a UI própria por callbacks de composição, sem sleep.
+  Testes: `VisionFlowTest` (todos os epílogos e exceções), `OverlayServiceVisionTest` (áudio real Toggle/PTT), prova real
+  de bitmap/FGS/cache/revogação e regressões de cancelar/orbe/parcial. Indicador: `VisionPhaseBadge`, tokens da paleta;
+  goldens novos `visao-fases` claro/escuro. O consumidor de ações será ligado na VC-T7; gates no relatório da equipe.
 - **What**: máquina efêmera `VisionFlowState {NONE, CONSENT, SELECTING, ACTIONS, WORKING, COPYING}`
   sobreposta ao `ButtonState` (nunca o altera além do PAUSE): atalho em RECORDING →
   `onIntent(PAUSE)` e abre (MODE-02; TOGGLE e PTT); SENDING/CANCELLING → ignora (MODE-03);
@@ -167,6 +178,11 @@ leva à aba Visão e o gesto de texto só funciona de ponta a ponta com o downlo
 - **Tests**: unit + instrumented + manual. **Gate**: `full` + manual.
 
 ### VC-T5 — `RegionSelectView` (seleção sobre a tela viva)
+- **Status (2026-10-29, PR #63): Implementada.** `ScreenRegion`/`RegionGeometry` puros; quatro handles, máscara,
+  tela inteira, cancelar e confirmar em coordenadas absolutas da tela. Resize encerra e oferece nova autorização.
+  `RegionGeometryTest` cobre limites/hit-test/tamanho mínimo; `RegionSelectViewTest` cobre arrasto (inclusive UP diferente
+  do último MOVE), janela deslocada, tela inteira, confirmação, cancelamento e resize. Prova real arrasta o handle e
+  confere o bitmap; goldens novos `visao-selecao` claro/escuro. Gates e provas no relatório da equipe.
 - **What**: overlay fullscreen transparente sobre a tela real: retângulo com 4 handles + máscara
   escura fora + ⛶ tela-inteira + ✕ cancelar; geometria/hit-test/clamp puros
   (`RegionGeometry.kt`); confirmar → `Rect` de tela p/ o `VisionFlow`; rotação/resize → cancela

@@ -65,6 +65,12 @@ restauração:
 - **Não importa o downloader** (`ModelDownloader`, `DownloadGateway`, `ModelDownloadService`): só lê a disponibilidade
   (§9). Regra executável no `ArchitectureRulesTest` (MDL-02).
 
+Implementação da Fase B (2026-10-29): `VisionFlow<T>` é uma etapa reutilizável com `VisionFlowRequest`, adaptadores
+injetados e saída tipada; o serviço a dispara por `ACTION_VISION` ou atalho. O bitmap é entregue e reciclado nessa
+integração até a VC-T7 conectar o consumidor de ações. `VisionConsentRequest` correlaciona respostas por acionamento;
+`ScreenRegion`/`RegionGeometry` mantêm geometria e hit-test sem dependências Android. Resize oferece nova autorização.
+Detalhes e evidências: `licoes/2026-10-29-visao-fluxo.md` e relatório da equipe.
+
 ### 2. Consent + FGS (`CAP-01`, `STO-V01`)
 - `VisionConsentActivity` transparente (`excludeFromRecents`): `createScreenCaptureIntent()` → resultado ao `VisionFlow`
   via callback/controller. **A cada acionamento** (efêmero; Android 15 não cacheia token — V4; fricção aceita).
