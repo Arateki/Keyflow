@@ -134,7 +134,10 @@ class OverlayService : Service() {
             }) },
             showSelector = ::showVisionSelector,
             cleanup = ::cleanupVision,
-            onState = { floatingButton?.updateVisionState(it, cachedSettings.themeDark) },
+            onState = {
+                floatingButton?.updateVisionState(it, cachedSettings.themeDark)
+                visionFlowStateForTest.value = it
+            },
             onResult = { bitmap ->
                 // O consumidor de ações será ligado na VC-T7; a etapa devolve o bitmap ao callback.
                 try { visionCaptureResultForTest?.invoke(bitmap) } finally { bitmap.recycle() }
@@ -264,7 +267,8 @@ class OverlayService : Service() {
                     { recordingNotification.build(coordinator.currentState(), dark = cachedSettings.themeDark) }, onAbort,
                     { visionProjectionTypeForTest?.invoke(it) })
                 visionProjection = session
-                try { onGranted(session.start(data)) } catch (_: Exception) {
+                try { onGranted(session.start(data)) } catch (error: Exception) {
+                    android.util.Log.w("KeyFlowVision", "Falha ao iniciar a projeção", error)
                     visionProjection = null
                     session.close()
                     onAbort()
@@ -291,7 +295,10 @@ class OverlayService : Service() {
         val params = WindowManager.LayoutParams(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT,
             config.type, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                 WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, PixelFormat.TRANSLUCENT)
-        try { windowManager.addView(selector, params); visionSelector = selector } catch (_: RuntimeException) { visionFlow.finish() }
+        try { windowManager.addView(selector, params); visionSelector = selector } catch (error: RuntimeException) {
+            android.util.Log.w("KeyFlowVision", "Falha ao abrir o seletor", error)
+            visionFlow.finish()
+        }
     }
 
     /** Uma mudança de coordenadas exige nova autorização; o token anterior já foi descartado. */
@@ -1121,6 +1128,7 @@ class OverlayService : Service() {
     }
 
     companion object {
+        internal val visionFlowStateForTest = kotlinx.coroutines.flow.MutableStateFlow(VisionFlowState.NONE)
         internal var visionCaptureResultForTest: ((Bitmap) -> Unit)? = null
         internal var visionProjectionStartedForTest: ((MediaProjection) -> Unit)? = null
         internal var visionProjectionTypeForTest: ((Int) -> Unit)? = null

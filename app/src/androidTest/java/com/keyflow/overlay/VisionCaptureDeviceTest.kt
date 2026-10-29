@@ -58,18 +58,25 @@ class VisionCaptureDeviceTest {
         val scenario = ActivityScenario.launch<GalleryActivity>(Intent(context, GalleryActivity::class.java).putExtra("route", "config-visao"))
         fun requestAndAccept() {
             OverlayService.start(context, OverlayService.actionIntent(context, OverlayService.ACTION_VISION))
-            val chooser = device.wait(Until.findObject(By.text(Pattern.compile("(?i).*single app.*|.*um aplicativo.*|.*um app.*"))), 2_000)
-            chooser?.click()
-            if (chooser != null) device.wait(Until.findObject(By.text(Pattern.compile("(?i).*entire screen.*|.*tela inteira.*"))), 2_000)?.click()
-            val accept = device.wait(Until.findObject(By.text(Pattern.compile("(?i).*start now.*|.*iniciar agora.*"))), 15_000)
-            assertNotNull("novo diálogo de consentimento não apareceu", accept)
-            accept!!.click()
+            val acceptPattern = Pattern.compile("(?i).*start now.*|.*iniciar agora.*")
+            assertNotNull("novo diálogo de consentimento não apareceu",
+                device.wait(Until.findObject(By.text(acceptPattern)), 15_000))
+            val chooser = device.findObject(By.text(Pattern.compile("(?i).*single app.*|.*um aplicativo.*|.*um app.*")))
+            if (chooser != null) {
+                chooser.click()
+                val entire = device.wait(Until.findObject(By.text(Pattern.compile("(?i).*entire screen.*|.*tela inteira.*"))), 5_000)
+                assertNotNull("opção de tela inteira não apareceu", entire)
+                entire!!.click()
+            }
+            device.findObject(By.text(acceptPattern)).click()
             assertTrue("seletor não apareceu", device.wait(Until.hasObject(By.desc("Selecione a área da tela.")), 15_000))
         }
         fun evidence(name: String, bytes: ByteArray) {
             instrumentation.sendStatus(0, Bundle().apply { putString("stream", "\nKEYFLOW_VISION_$name:${Base64.encodeToString(bytes, Base64.NO_WRAP)}\n") })
         }
         try {
+            val cache = com.keyflow.vision.client.VisionCache.dir(context).apply { mkdirs() }
+            File(cache, "epilogo.txt").writeText("dado sintético")
             requestAndAccept()
             val bounds = device.findObject(By.desc("Selecione a área da tela.")).visibleBounds
             // Arrasta o handle superior esquerdo; a confirmação deve entregar exatamente esse recorte.
@@ -87,6 +94,8 @@ class VisionCaptureDeviceTest {
             assertEquals(bounds.width() * 4 / 5 - newLeft, w)
             assertEquals(bounds.height() * 4 / 5 - newTop, h)
             assertTrue("FGS não removeu mediaProjection", closed.await(10, TimeUnit.SECONDS))
+            instrumentation.waitForIdleSync()
+            assertTrue("cache de Visão não foi limpo", cache.listFiles().orEmpty().isEmpty())
             assertEquals(listOf(combined, microphone), types)
             evidence("BITMAP", png)
             // Uma segunda sessão exige autorização nova; revogar a projeção fecha a seleção e o tipo.
@@ -100,6 +109,15 @@ class VisionCaptureDeviceTest {
             instrumentation.sendStatus(0, Bundle().apply {
                 putString("stream", "\nVisão: bitmap ${w}x${h}; handle +40,+60; FGS $combined → $microphone; segunda autorização e revogação confirmadas.\n")
             })
+        } catch (failure: Throwable) {
+            val hierarchy = File(context.cacheDir, "vision-failure.xml")
+            device.dumpWindowHierarchy(hierarchy)
+            instrumentation.sendStatus(0, Bundle().apply {
+                putString("stream", "\nEstado da Visão: ${OverlayService.visionFlowStateForTest.value}\n${hierarchy.readText()}\n${device.executeShellCommand("logcat -d -t 100 -s KeyFlowVision:W")}\n")
+            })
+            val screenshot = File(context.cacheDir, "vision-failure.png")
+            if (device.takeScreenshot(screenshot)) evidence("FALHA", screenshot.readBytes())
+            throw failure
         } finally {
             OverlayService.visionCaptureResultForTest = null
             OverlayService.visionProjectionStartedForTest = null

@@ -15,6 +15,7 @@ import com.keyflow.core.RecordingMode
 import com.keyflow.data.SettingsRepository
 import com.keyflow.ui.gallery.GalleryActivity
 import com.keyflow.ui.onboarding.DISCLOSURE_VERSION
+import com.keyflow.vision.VisionFlowState
 import java.util.regex.Pattern
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -52,16 +53,31 @@ class OverlayServiceVisionTest {
             assertNotNull("consentimento não apareceu", deny)
             deny!!.click()
             device.wait(Until.gone(By.pkg("com.android.systemui").text(Pattern.compile("(?i).*start now.*|.*iniciar agora.*"))), 15_000)
+            withTimeout(15_000) { OverlayService.visionFlowStateForTest.first { it == VisionFlowState.NONE } }
             instrumentation.waitForIdleSync()
             assertEquals(ButtonState.PAUSED, KeyFlowController.buttonState.value)
             // Nova chamada pede consentimento de novo; gesto de voz cancela só a Visão e mantém PAUSED.
             OverlayService.start(context, OverlayService.actionIntent(context, OverlayService.ACTION_VISION))
             assertNotNull(device.wait(Until.findObject(By.text(Pattern.compile("(?i)cancel|cancelar"))), 15_000))
             OverlayService.start(context, OverlayService.actionIntent(context, RecordingNotification.ACTION_CANCEL))
+            withTimeout(15_000) { OverlayService.visionFlowStateForTest.first { it == VisionFlowState.NONE } }
             instrumentation.waitForIdleSync()
             device.pressBack()
             assertEquals(ButtonState.PAUSED, KeyFlowController.buttonState.value)
         } finally {
+            // Encerra o fluxo e descarta a gravação de teste pelo caminho público antes de parar o serviço.
+            if (OverlayService.visionFlowStateForTest.value != VisionFlowState.NONE) {
+                OverlayService.start(context, OverlayService.actionIntent(context, RecordingNotification.ACTION_CANCEL))
+                withTimeout(15_000) { OverlayService.visionFlowStateForTest.first { it == VisionFlowState.NONE } }
+            }
+            if (KeyFlowController.buttonState.value in listOf(ButtonState.PAUSED, ButtonState.RECORDING)) {
+                OverlayService.start(context, OverlayService.actionIntent(context, RecordingNotification.ACTION_CANCEL))
+                withTimeout(15_000) { KeyFlowController.buttonState.first { it == ButtonState.CANCELLING } }
+            }
+            if (KeyFlowController.buttonState.value == ButtonState.CANCELLING) {
+                OverlayService.start(context, OverlayService.actionIntent(context, OverlayService.ACTION_COMMIT_CANCEL))
+                withTimeout(15_000) { KeyFlowController.buttonState.first { it == ButtonState.IDLE_READY || it == ButtonState.IDLE_NO_FIELD } }
+            }
             OverlayService.stop(context)
             instrumentation.waitForIdleSync()
             repository.saveSettings(saved)
