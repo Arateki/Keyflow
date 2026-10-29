@@ -6,8 +6,9 @@ import org.junit.Test
 
 class DisclosureConsentTest {
     @Test
-    fun `agent is enabled only in debug variant`() {
-        assertThat(BuildConfig.AGENT_ENABLED).isEqualTo(BuildConfig.DEBUG)
+    fun `agent is enabled in every variant, with the disclosure still required`() {
+        assertThat(BuildConfig.AGENT_ENABLED).isTrue()
+        assertThat(DisclosureConsent.fromStoredVersion(0).isAcceptedForCurrentVersion()).isFalse()
     }
 
     @Test

@@ -22,6 +22,7 @@ class ManifestWiringTest {
             "android.permission.RECORD_AUDIO",
             "android.permission.FOREGROUND_SERVICE",
             "android.permission.FOREGROUND_SERVICE_MICROPHONE",
+            "android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION",
             "android.permission.POST_NOTIFICATIONS",
         )
     }
@@ -38,7 +39,10 @@ class ManifestWiringTest {
 
         val overlay = services.single { it.androidAttr("name") == ".overlay.OverlayService" }
         assertThat(overlay.androidAttr("exported")).isEqualTo("false")
-        assertThat(overlay.androidAttr("foregroundServiceType")).isEqualTo("microphone")
+        assertThat(overlay.androidAttr("foregroundServiceType")).isEqualTo("microphone|mediaProjection")
+
+        val consent = application.elements("activity").single { it.androidAttr("name") == ".vision.VisionConsentActivity" }
+        assertThat(consent.androidAttr("exported")).isEqualTo("false")
 
         assertThat(application.androidAttr("networkSecurityConfig"))
             .isEqualTo("@xml/network_security_config")

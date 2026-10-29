@@ -159,6 +159,7 @@ fun ConfigScreen(
     // `ocrTester` lê a imagem do Testar; sem ele (galeria, testes) o botão responde "indisponível".
     ocrTester: OcrTester = OcrTester.None,
     visionTester: VisionTester? = null,
+    visionMotor: ((Settings) -> com.keyflow.bancada.executor.MotorDeCapacidade)? = null,
     initialVisionTest: VisionTestState = VisionTestState(),
     visionLocalSupported: Boolean = true,
     // O agente com ferramentas da aba KeyFlow (agent-harness); `null` = o chat de texto de sempre.
@@ -490,6 +491,7 @@ fun ConfigScreen(
                             localSupported = visionLocalSupported,
                             tester = ocrTester,
                             visionTester = visionTester,
+                            visionMotor = visionMotor,
                             initialTest = initialVisionTest,
                             openAiAuth = reasoningAuth,
                             anthropicAuth = reasoningAnthropicAuth,

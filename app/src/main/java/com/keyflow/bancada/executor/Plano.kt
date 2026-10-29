@@ -50,8 +50,31 @@ class PlanoDeExecucao(
     }
 }
 
-/** O que o motor recebe: o prompt montado e as opções. */
-data class EntradaDoMotor(val prompt: PromptMontado, val opcoes: GenerationOptions)
+/** Entrada de uma etapa de visão, vinda do corpus ou de outro fluxo. */
+sealed interface EntradaImagem
+
+/** Referência a uma imagem do corpus, resolvida pelo adaptador da capacidade de imagem. */
+data class ImagemDoCorpus(val caminho: String) : EntradaImagem {
+    init {
+        require(caminho.isNotBlank() && !caminho.startsWith("/") && caminho.split('/').none { it == ".." || it.isEmpty() }) {
+            "caminho de imagem inválido"
+        }
+    }
+}
+
+/** Imagem efêmera de outra etapa; o conteúdo não aparece no texto de diagnóstico. */
+class ImagemEmMemoria(bytes: ByteArray, val mimeType: String = "image/png") : EntradaImagem {
+    init {
+        require(bytes.isNotEmpty() && bytes.size <= 8 * 1024 * 1024) { "imagem fora do limite" }
+        require(mimeType in setOf("image/png", "image/jpeg", "image/webp")) { "formato não suportado" }
+    }
+    private val conteudo = bytes.copyOf()
+    fun bytes(): ByteArray = conteudo.copyOf()
+    override fun toString(): String = "ImagemEmMemoria($mimeType, ${conteudo.size} bytes)"
+}
+
+/** O que o motor recebe: prompt, opções e imagem quando a capacidade a exige. */
+data class EntradaDoMotor(val prompt: PromptMontado, val opcoes: GenerationOptions, val imagem: EntradaImagem? = null)
 
 /**
  * Quem responde, para uma [capacidade] (BEX-01/09): o executor não sabe se é o `:reasoning` local, uma API ou um transcritor. Texto usa
@@ -114,4 +137,16 @@ data class Progresso(
     val fase: Fase = Fase.RODANDO,
 ) {
     enum class Fase { DETERMINISMO, RODANDO, PAUSADO_TERMICO, PAUSADO_BATERIA }
+}
+
+/** Etapa reutilizável de imagem para texto; a implementação é fornecida pelo motor escolhido. */
+fun interface ReconhecedorDeImagem {
+    fun reconhecer(imagem: EntradaImagem, prompt: PromptMontado): Flow<ReasoningEvent>
+}
+
+/** Adaptador do reconhecedor de imagem ao executor, independente de tela e provedor. */
+class MotorDeImagem(private val reconhecedor: ReconhecedorDeImagem) : MotorDeCapacidade {
+    override val capacidade = Capacidade.IMAGEM
+    override fun executar(entrada: EntradaDoMotor): Flow<ReasoningEvent> =
+        reconhecedor.reconhecer(requireNotNull(entrada.imagem) { "caso sem imagem" }, entrada.prompt)
 }

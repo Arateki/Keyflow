@@ -13,6 +13,7 @@ import com.keyflow.bancada.executor.ConfigExecutor
 import com.keyflow.bancada.executor.ExecutorBancada
 import com.keyflow.bancada.executor.ModeloEscolhido
 import com.keyflow.bancada.executor.MotorDeTexto
+import com.keyflow.bancada.executor.MotorDeCapacidade
 import com.keyflow.bancada.executor.Perfil
 import com.keyflow.bancada.executor.PlanoDeExecucao
 import com.keyflow.bancada.executor.Planos
@@ -66,9 +67,14 @@ class BancadaServicos(
 
     /** Começa a rodada; `false` se já há uma em curso ou não há corpus. */
     fun iniciar(engine: ReasoningEngine, modelo: ModeloEscolhido, testes: List<String>, perfil: Perfil): Boolean {
+        return iniciar(MotorDeTexto(engine), modelo, testes, perfil)
+    }
+
+    /** Roda uma capacidade fornecida pelo adaptador, com o mesmo histórico e cancelamento. */
+    fun iniciar(motor: MotorDeCapacidade, modelo: ModeloEscolhido, testes: List<String>, perfil: Perfil): Boolean {
         val plano = planejar(modelo, testes, perfil) ?: return false
         val executor = ExecutorBancada(
-            motor = MotorDeTexto(engine),
+            motor = motor,
             relogio = relogio,
             config = if (modelo.online) configOnline else configLocal,
             ambiente = ambiente(),

@@ -58,6 +58,13 @@ object CorpusValidador {
                 continue
             }
             problemas += validarTeste(arquivo.caminho, teste, ids, filtro)
+            if (teste.capacidade == Capacidade.IMAGEM) for (caso in teste.casos) {
+                val imagem = caso.texto("imagem")
+                if (imagem == null || imagem !in noManifesto || !imagem.startsWith("imagens/") ||
+                    imagem.split('/').any { it == ".." || it.isEmpty() }) {
+                    problemas += "${caso.id}: imagem ausente ou fora do manifesto"
+                }
+            }
         }
         return problemas
     }

@@ -1,0 +1,102 @@
+{
+  "teste": "ocr",
+  "versao": 1,
+  "capacidade": "IMAGEM",
+  "descricao": "Mede a leitura de texto em imagens.",
+  "prompt": {
+    "system": null,
+    "user": "{entrada}"
+  },
+  "casos": [
+    {
+      "id": "ocr-pt-01",
+      "idioma": "pt",
+      "entrada": "Leia o texto da imagem.",
+      "imagem": "imagens/ocr-01.png",
+      "esperado": "Texto de teste do KeyFlow",
+      "maxTokensSaida": 96,
+      "tokensEntrada": 6
+    },
+    {
+      "id": "ocr-pt-02",
+      "idioma": "pt",
+      "entrada": "Leia o texto da imagem.",
+      "imagem": "imagens/ocr-02.png",
+      "esperado": "A reunião será às 14:30.",
+      "maxTokensSaida": 96,
+      "tokensEntrada": 6
+    },
+    {
+      "id": "ocr-pt-03",
+      "idioma": "pt",
+      "entrada": "Leia o texto da imagem.",
+      "imagem": "imagens/ocr-03.png",
+      "esperado": "Código: 731-204",
+      "maxTokensSaida": 96,
+      "tokensEntrada": 6
+    },
+    {
+      "id": "ocr-pt-04",
+      "idioma": "pt",
+      "entrada": "Leia o texto da imagem.",
+      "imagem": "imagens/ocr-04.png",
+      "esperado": "Olá, mundo!",
+      "maxTokensSaida": 96,
+      "tokensEntrada": 6
+    },
+    {
+      "id": "ocr-pt-05",
+      "idioma": "pt",
+      "entrada": "Leia o texto da imagem.",
+      "imagem": "imagens/ocr-05.png",
+      "esperado": "Valor total: R$ 42,50",
+      "maxTokensSaida": 96,
+      "tokensEntrada": 6
+    },
+    {
+      "id": "ocr-pt-06",
+      "idioma": "pt",
+      "entrada": "Leia o texto da imagem.",
+      "imagem": "imagens/ocr-06.png",
+      "esperado": "Entrada liberada",
+      "maxTokensSaida": 96,
+      "tokensEntrada": 6
+    },
+    {
+      "id": "ocr-pt-07",
+      "idioma": "pt",
+      "entrada": "Leia o texto da imagem.",
+      "imagem": "imagens/ocr-07.png",
+      "esperado": "Segunda-feira, 28 de outubro",
+      "maxTokensSaida": 96,
+      "tokensEntrada": 6
+    },
+    {
+      "id": "ocr-pt-08",
+      "idioma": "pt",
+      "entrada": "Leia o texto da imagem.",
+      "imagem": "imagens/ocr-08.png",
+      "esperado": "A senha não está nesta imagem.",
+      "maxTokensSaida": 96,
+      "tokensEntrada": 6
+    },
+    {
+      "id": "ocr-pt-09",
+      "idioma": "pt",
+      "entrada": "Leia o texto da imagem.",
+      "imagem": "imagens/ocr-09.png",
+      "esperado": "Linha um\nLinha dois",
+      "maxTokensSaida": 96,
+      "tokensEntrada": 6
+    },
+    {
+      "id": "ocr-pt-10",
+      "idioma": "pt",
+      "entrada": "Leia o texto da imagem.",
+      "imagem": "imagens/ocr-10.png",
+      "esperado": "Rua das Flores, 17",
+      "maxTokensSaida": 96,
+      "tokensEntrada": 6
+    }
+  ]
+}

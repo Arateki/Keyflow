@@ -1,0 +1,332 @@
+{
+  "teste": "objetos",
+  "versao": 1,
+  "capacidade": "IMAGEM",
+  "descricao": "Mede a identificação de objetos em imagens.",
+  "prompt": {
+    "system": null,
+    "user": "{entrada}"
+  },
+  "casos": [
+    {
+      "id": "obj-pt-01",
+      "idioma": "pt",
+      "entrada": "Liste os objetos da imagem, um por linha, sem explicação.",
+      "imagem": "imagens/objetos-01.png",
+      "esperado": [
+        "sol",
+        "árvore"
+      ],
+      "sinonimos": {
+        "sol": [
+          "sun"
+        ],
+        "árvore": [
+          "arvore",
+          "tree"
+        ],
+        "relógio": [
+          "relogio",
+          "clock"
+        ],
+        "livro": [
+          "book"
+        ],
+        "copo": [
+          "glass",
+          "cup"
+        ]
+      },
+      "maxTokensSaida": 96,
+      "tokensEntrada": 15
+    },
+    {
+      "id": "obj-pt-02",
+      "idioma": "pt",
+      "entrada": "Liste os objetos da imagem, um por linha, sem explicação.",
+      "imagem": "imagens/objetos-02.png",
+      "esperado": [
+        "árvore",
+        "relógio"
+      ],
+      "sinonimos": {
+        "sol": [
+          "sun"
+        ],
+        "árvore": [
+          "arvore",
+          "tree"
+        ],
+        "relógio": [
+          "relogio",
+          "clock"
+        ],
+        "livro": [
+          "book"
+        ],
+        "copo": [
+          "glass",
+          "cup"
+        ]
+      },
+      "maxTokensSaida": 96,
+      "tokensEntrada": 15
+    },
+    {
+      "id": "obj-pt-03",
+      "idioma": "pt",
+      "entrada": "Liste os objetos da imagem, um por linha, sem explicação.",
+      "imagem": "imagens/objetos-03.png",
+      "esperado": [
+        "relógio",
+        "livro"
+      ],
+      "sinonimos": {
+        "sol": [
+          "sun"
+        ],
+        "árvore": [
+          "arvore",
+          "tree"
+        ],
+        "relógio": [
+          "relogio",
+          "clock"
+        ],
+        "livro": [
+          "book"
+        ],
+        "copo": [
+          "glass",
+          "cup"
+        ]
+      },
+      "maxTokensSaida": 96,
+      "tokensEntrada": 15
+    },
+    {
+      "id": "obj-pt-04",
+      "idioma": "pt",
+      "entrada": "Liste os objetos da imagem, um por linha, sem explicação.",
+      "imagem": "imagens/objetos-04.png",
+      "esperado": [
+        "livro",
+        "copo"
+      ],
+      "sinonimos": {
+        "sol": [
+          "sun"
+        ],
+        "árvore": [
+          "arvore",
+          "tree"
+        ],
+        "relógio": [
+          "relogio",
+          "clock"
+        ],
+        "livro": [
+          "book"
+        ],
+        "copo": [
+          "glass",
+          "cup"
+        ]
+      },
+      "maxTokensSaida": 96,
+      "tokensEntrada": 15
+    },
+    {
+      "id": "obj-pt-05",
+      "idioma": "pt",
+      "entrada": "Liste os objetos da imagem, um por linha, sem explicação.",
+      "imagem": "imagens/objetos-05.png",
+      "esperado": [
+        "copo",
+        "sol"
+      ],
+      "sinonimos": {
+        "sol": [
+          "sun"
+        ],
+        "árvore": [
+          "arvore",
+          "tree"
+        ],
+        "relógio": [
+          "relogio",
+          "clock"
+        ],
+        "livro": [
+          "book"
+        ],
+        "copo": [
+          "glass",
+          "cup"
+        ]
+      },
+      "maxTokensSaida": 96,
+      "tokensEntrada": 15
+    },
+    {
+      "id": "obj-pt-06",
+      "idioma": "pt",
+      "entrada": "Liste os objetos da imagem, um por linha, sem explicação.",
+      "imagem": "imagens/objetos-06.png",
+      "esperado": [
+        "sol",
+        "árvore"
+      ],
+      "sinonimos": {
+        "sol": [
+          "sun"
+        ],
+        "árvore": [
+          "arvore",
+          "tree"
+        ],
+        "relógio": [
+          "relogio",
+          "clock"
+        ],
+        "livro": [
+          "book"
+        ],
+        "copo": [
+          "glass",
+          "cup"
+        ]
+      },
+      "maxTokensSaida": 96,
+      "tokensEntrada": 15
+    },
+    {
+      "id": "obj-pt-07",
+      "idioma": "pt",
+      "entrada": "Liste os objetos da imagem, um por linha, sem explicação.",
+      "imagem": "imagens/objetos-07.png",
+      "esperado": [
+        "árvore",
+        "relógio"
+      ],
+      "sinonimos": {
+        "sol": [
+          "sun"
+        ],
+        "árvore": [
+          "arvore",
+          "tree"
+        ],
+        "relógio": [
+          "relogio",
+          "clock"
+        ],
+        "livro": [
+          "book"
+        ],
+        "copo": [
+          "glass",
+          "cup"
+        ]
+      },
+      "maxTokensSaida": 96,
+      "tokensEntrada": 15
+    },
+    {
+      "id": "obj-pt-08",
+      "idioma": "pt",
+      "entrada": "Liste os objetos da imagem, um por linha, sem explicação.",
+      "imagem": "imagens/objetos-08.png",
+      "esperado": [
+        "relógio",
+        "livro"
+      ],
+      "sinonimos": {
+        "sol": [
+          "sun"
+        ],
+        "árvore": [
+          "arvore",
+          "tree"
+        ],
+        "relógio": [
+          "relogio",
+          "clock"
+        ],
+        "livro": [
+          "book"
+        ],
+        "copo": [
+          "glass",
+          "cup"
+        ]
+      },
+      "maxTokensSaida": 96,
+      "tokensEntrada": 15
+    },
+    {
+      "id": "obj-pt-09",
+      "idioma": "pt",
+      "entrada": "Liste os objetos da imagem, um por linha, sem explicação.",
+      "imagem": "imagens/objetos-09.png",
+      "esperado": [
+        "livro",
+        "copo"
+      ],
+      "sinonimos": {
+        "sol": [
+          "sun"
+        ],
+        "árvore": [
+          "arvore",
+          "tree"
+        ],
+        "relógio": [
+          "relogio",
+          "clock"
+        ],
+        "livro": [
+          "book"
+        ],
+        "copo": [
+          "glass",
+          "cup"
+        ]
+      },
+      "maxTokensSaida": 96,
+      "tokensEntrada": 15
+    },
+    {
+      "id": "obj-pt-10",
+      "idioma": "pt",
+      "entrada": "Liste os objetos da imagem, um por linha, sem explicação.",
+      "imagem": "imagens/objetos-10.png",
+      "esperado": [
+        "copo",
+        "sol"
+      ],
+      "sinonimos": {
+        "sol": [
+          "sun"
+        ],
+        "árvore": [
+          "arvore",
+          "tree"
+        ],
+        "relógio": [
+          "relogio",
+          "clock"
+        ],
+        "livro": [
+          "book"
+        ],
+        "copo": [
+          "glass",
+          "cup"
+        ]
+      },
+      "maxTokensSaida": 96,
+      "tokensEntrada": 15
+    }
+  ]
+}

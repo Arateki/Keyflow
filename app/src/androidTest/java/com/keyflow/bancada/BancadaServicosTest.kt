@@ -70,8 +70,8 @@ class BancadaServicosTest {
         val corpus = BancadaServicos.carregarCorpus(contexto)
         assertNotNull(corpus)
         assertEquals(1, corpus!!.versao)
-        assertEquals(listOf("pontuacao", "reescrita", "json", "acoes", "contexto"), corpus.testes.keys.toList())
-        assertEquals(listOf(12, 10, 10, 20, 12), corpus.testes.values.map { it.casos.size })
+        assertEquals(listOf("pontuacao", "reescrita", "json", "acoes", "contexto", "ocr", "objetos"), corpus.testes.keys.toList())
+        assertEquals(listOf(12, 10, 10, 20, 12, 10, 10), corpus.testes.values.map { it.casos.size })
     }
 
     @Test
