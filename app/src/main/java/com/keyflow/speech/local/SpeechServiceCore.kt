@@ -111,6 +111,10 @@ internal class SpeechServiceCore(
             if (!isCancelled(ticket)) listener.onError(SpeechProtocol.OUT_OF_MEMORY, "oom")
         } catch (e: Exception) {
             if (!isCancelled(ticket)) listener.onError(SpeechProtocol.ENGINE, e.message ?: e.javaClass.simpleName)
+        } catch (e: Throwable) {
+            // Error (UnsatisfiedLinkError e afins) não pode matar a thread: o cliente ficaria sem resposta.
+            runCatching { voice.close() }
+            if (!isCancelled(ticket)) listener.onError(SpeechProtocol.ENGINE, e.message ?: e.javaClass.simpleName)
         } finally {
             busy = false
             scheduleIdle()

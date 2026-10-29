@@ -1,5 +1,7 @@
 package com.keyflow.speech.local
 
+import android.os.IInterface
+import android.os.RemoteException
 import java.io.File
 import java.util.concurrent.Executor
 import org.junit.Assert.assertEquals
@@ -77,7 +79,7 @@ class SpeechServiceCoreTest {
         return model to tokens
     }
 
-    private fun core(voice: FakeVoice, scheduler: FakeScheduler, available: Long? = 1000L, executor: Executor = direct) =
+    private fun core(voice: LocalVoice, scheduler: FakeScheduler, available: Long? = 1000L, executor: Executor = direct) =
         SpeechServiceCore(
             voice = voice,
             availableMb = { available },
@@ -149,5 +151,58 @@ class SpeechServiceCoreTest {
         assertEquals(0, voice.calls)
         assertTrue(listener.errors.isEmpty())
         assertEquals(0, listener.done)
+    }
+
+    @Test
+    fun erroNativoViraEngineENaoEscapa() {
+        val voice = FakeVoice().apply { boom = UnsatisfiedLinkError("libonnxruntime") }
+        val (model, tokens) = files(true)
+        val listener = Recorder()
+        core(voice, FakeScheduler()).speak(SpeechJob(model.path, tokens.path, "oi", 1f, 256), listener)
+        assertEquals(listOf(SpeechProtocol.ENGINE), listener.errors)
+        assertEquals(1, voice.closed)
+        assertEquals(0, listener.done)
+    }
+
+    @Test
+    fun remoteExceptionNoPedacoCancelaOResto() {
+        val voice = object : LocalVoice {
+            var calls = 0
+            var emitted = 0
+            override fun synthesize(
+                model: File,
+                tokens: File,
+                text: String,
+                speed: Float,
+                cancelled: () -> Boolean,
+                emit: (pcm: ByteArray, sampleRate: Int) -> Unit,
+            ) {
+                calls++
+                emit(byteArrayOf(1, 0), 22050)
+                emitted++
+                if (cancelled()) return
+                emit(byteArrayOf(2, 0), 22050)
+                emitted++
+            }
+            override fun close() = Unit
+        }
+        val (model, tokens) = files(true)
+        lateinit var service: SpeechServiceCore
+        val callback = object : ISpeechCallback.Stub() {
+            var done = 0
+            override fun queryLocalInterface(descriptor: String): IInterface = this
+            override fun onPcm(pcm: ByteArray, sampleRate: Int) {
+                throw RemoteException("buffer cheio")
+            }
+            override fun onDone(peakRssKb: Long) {
+                done++
+            }
+            override fun onError(kind: Int, message: String) = Unit
+        }
+        val listener = SpeechCallbackListener(callback) { service.cancel() }
+        service = core(voice, FakeScheduler())
+        service.speak(SpeechJob(model.path, tokens.path, "oi", 1f, 256), listener)
+        assertEquals(1, voice.emitted)
+        assertEquals(0, callback.done)
     }
 }

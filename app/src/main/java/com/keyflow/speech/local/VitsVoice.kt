@@ -87,6 +87,7 @@ internal object VitsTensors {
  * `libonnxruntime.so` do sherpa — esta classe não carrega outra.
  */
 internal class VitsVoice(
+    private val sentencesOf: (VitsCharacterFrontend, String) -> List<IntArray> = { frontend, text -> frontend.sentences(text) },
     private val open: (String) -> OnnxSession = { path ->
         OnnxSession.open(path, OnnxOptions(threads = OnnxSession.DEFAULT_THREADS, cpuArena = false))
     },
@@ -109,9 +110,10 @@ internal class VitsVoice(
     ) {
         val active = ensure(model, tokens)
         val scale = VitsPace.lengthScale(speed, modelScale)
-        val sentences = frontend!!.sentences(text)
+        val sentences = sentencesOf(frontend!!, text)
         for (ids in sentences) {
-            if (cancelled() || ids.isEmpty()) return
+            if (cancelled()) return
+            if (ids.isEmpty()) continue
             val audio = active.run(VitsTensors.inputs(active.inputNames, ids.map { it.toLong() }.toLongArray(), scale, noiseScale, noiseScaleW))
             val wave = (audio.firstOrNull() as? FloatTensor)?.data ?: throw OnnxException("o VITS não devolveu áudio float")
             if (wave.isEmpty()) continue
