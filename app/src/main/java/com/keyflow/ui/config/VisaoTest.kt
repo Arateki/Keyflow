@@ -286,7 +286,7 @@ fun VisaoTestArea(
     val unavailable = (availability as? VisionTestAvailability.Unavailable)?.reason
     val bitmap = remember(unavailable == null) { if (unavailable == null) VisionTestImage.bitmap() else null }
 
-    val start: (suspend () -> VisionResult)? -> Unit = { run ->
+    val start: ((suspend () -> VisionResult)?) -> Unit = { run ->
         val mine = generation.incrementAndGet()
         state = VisionTestState(running = true)
         job = scope.launch {
