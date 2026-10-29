@@ -47,7 +47,6 @@ import com.keyflow.vision.ocr.RgbaImage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -58,8 +57,12 @@ const val VISAO_TEST_REASON_TAG = "visao-testar-motivo"
 const val VISAO_TEST_ERROR_TAG = "visao-erro"
 const val VISAO_TEST_IMAGE_TAG = "visao-imagem-teste"
 
-/** Quanto o Testar espera as Settings confirmadas chegarem à tela antes de partir assim mesmo. */
-private const val START_ON_ARRIVAL_TIMEOUT_MS = 2_000L
+/**
+ * O pedido do Testar montado no toque, depois de confirmar os campos pendentes: [key] é a chave de [VisaoTestArea.requestKey] que as Settings
+ * confirmadas terão quando chegarem à tela, e [run] lê só o snapshot imutável dessas Settings (`null`: com elas o teste não está disponível).
+ * O que a recomposição ou um refresh entregar depois não muda o pedido em curso.
+ */
+class PreparedVisionTest(val key: Any?, val run: (suspend () -> VisionResult)?)
 
 /** Por que a pergunta do Testar não saiu da imagem de teste: o que o aviso da tela diz. */
 enum class VisionTestError { EMPTY, UNAVAILABLE, OUT_OF_MEMORY, FAILED, INTERRUPTED, UNAUTHORIZED, NETWORK, RATE_LIMIT, NOT_ELIGIBLE }
@@ -259,27 +262,37 @@ fun VisaoTestArea(
     modelTester: (suspend () -> VisionResult)? = null,
     remote: Boolean = false,
     requestKey: Any? = null,
-    confirmPending: (() -> Boolean)? = null,
+    prepare: (() -> PreparedVisionTest)? = null,
 ) {
     val palette = LocalKeyFlowPalette.current
     // Main explícito: o resultado volta de outro processo numa thread de binder e é o dispatcher do coletor que decide onde o estado muda.
     val scope = rememberCoroutineScope { Dispatchers.Main.immediate }
-    var state by remember(requestKey) { mutableStateOf(initialState) }
-    var job by remember(requestKey) { mutableStateOf<Job?>(null) }
-    val generation = remember(requestKey) { java.util.concurrent.atomic.AtomicLong() }
-    DisposableEffect(requestKey) { onDispose { generation.incrementAndGet(); job?.cancel() } }
+    var state by remember { mutableStateOf(initialState) }
+    var job by remember { mutableStateOf<Job?>(null) }
+    val generation = remember { java.util.concurrent.atomic.AtomicLong() }
+    DisposableEffect(Unit) { onDispose { generation.incrementAndGet(); job?.cancel() } }
+    // As chaves sob as quais o resultado na tela ainda vale. Tocar em Testar acrescenta a das Settings confirmadas: a chegada tardia delas, ou
+    // uma recomposição ainda com as anteriores, não cancela nem apaga o teste. Qualquer outra chave (o usuário mexeu na configuração) zera a área.
+    var validKeys by remember { mutableStateOf(setOf(requestKey)) }
+    LaunchedEffect(requestKey) {
+        if (requestKey !in validKeys) {
+            generation.incrementAndGet()
+            job?.cancel()
+            job = null
+            state = initialState
+            validKeys = setOf(requestKey)
+        }
+    }
     val unavailable = (availability as? VisionTestAvailability.Unavailable)?.reason
     val bitmap = remember(unavailable == null) { if (unavailable == null) VisionTestImage.bitmap() else null }
-    // Fora da chave de propósito: é a troca da chave, trazendo as Settings que o toque confirmou, que refaz a área e deixa o teste partir nela.
-    var startOnArrival by remember { mutableStateOf(false) }
 
-    val start: () -> Unit = {
+    val start: (suspend () -> VisionResult)? -> Unit = { run ->
         val mine = generation.incrementAndGet()
         state = VisionTestState(running = true)
         job = scope.launch {
             val startedAt = clock()
             try {
-                val result = if (modelTester != null) visionTestStateFor(modelTester(), clock() - startedAt)
+                val result = if (run != null) visionTestStateFor(run(), clock() - startedAt)
                     else visionTestStateFor(tester.run(), clock() - startedAt)
                 if (mine == generation.get()) state = result
             } catch (e: CancellationException) {
@@ -288,20 +301,6 @@ fun VisaoTestArea(
                 // Um tester que lança vira aviso na tela: este escopo é o da UI e uma exceção solta derrubaria o app.
                 if (mine == generation.get()) state = VisionTestState(error = VisionTestError.FAILED)
             }
-        }
-    }
-    LaunchedEffect(requestKey) {
-        if (startOnArrival) {
-            startOnArrival = false
-            if (unavailable == null) start()
-        }
-    }
-    // Se as Settings confirmadas não chegarem a trocar a chave, o toque não pode ficar sem resposta.
-    LaunchedEffect(startOnArrival) {
-        if (startOnArrival) {
-            delay(START_ON_ARRIVAL_TIMEOUT_MS)
-            startOnArrival = false
-            if (unavailable == null) start()
         }
     }
 
@@ -330,11 +329,13 @@ fun VisaoTestArea(
                     job?.cancel()
                     job = null
                     state = state.copy(running = false)
-                } else if (confirmPending?.invoke() == true) {
-                    // Havia texto por confirmar num campo: o teste usa as Settings que saem dele, não as desta composição.
-                    startOnArrival = true
+                } else if (prepare != null) {
+                    // O pedido sai do snapshot confirmado no toque, não das Settings desta composição (podem ser anteriores à edição).
+                    val prepared = prepare()
+                    validKeys = validKeys + prepared.key
+                    if (prepared.run != null) start(prepared.run)
                 } else {
-                    start()
+                    start(modelTester)
                 }
             },
         )

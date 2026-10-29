@@ -141,6 +141,9 @@ class VisaoPanelTest {
         var catalog by mutableStateOf(ModelCatalog.visionModels(debug = true))
         // Falso: o anfitrião não devolve as Settings novas à tela (o Testar não pode ficar sem resposta por isso).
         var acceptsChanges = true
+        // O que o anfitrião recebeu e ainda não devolveu à tela (retorno atrasado, como na SetupActivity real).
+        var held: Settings? = null
+        var holdChanges = false
 
         val models: LocalModelsUi
             get() = LocalModelsUi.compose(
@@ -153,7 +156,7 @@ class VisaoPanelTest {
             KeyFlowTheme(dark = false) {
                 VisaoPanel(
                     settings = settings,
-                    onSettingsChange = { if (acceptsChanges) settings = it },
+                    onSettingsChange = { if (holdChanges) held = it else if (acceptsChanges) settings = it },
                     models = models,
                     actions = actions,
                     localSupported = localSupported,
@@ -639,7 +642,7 @@ class VisaoPanelTest {
     }
 
     @Test
-    fun seOAnfitriaoNaoDevolveAsSettingsOTesteParteAssimMesmoComOQueFoiConfirmado() {
+    fun seOAnfitriaoNaoDevolveAsSettingsOTesteParteNoToqueComOQueFoiConfirmado() {
         val seen = mutableListOf<Settings>()
         val h = Harness(customSaved, visionTester = VisionTester { seen += it; com.keyflow.vision.VisionResult.Text("ok") })
         h.acceptsChanges = false
@@ -648,11 +651,56 @@ class VisaoPanelTest {
 
         node(VISAO_TEST_BUTTON_TAG).performClick()
 
-        rule.waitUntil(8_000) { rule.onAllNodesWithTag(VISAO_TEST_RESPONSE_TAG).fetchSemanticsNodes().isNotEmpty() }
+        rule.waitUntil(5_000) { rule.onAllNodesWithTag(VISAO_TEST_RESPONSE_TAG).fetchSemanticsNodes().isNotEmpty() }
         rule.runOnIdle {
             assertEquals("https://b.test/v1", seen.single().visionCustomEndpoint)
             assertEquals("https://a.test/v1", h.settings.visionCustomEndpoint)
         }
+    }
+
+    /** Revisão 2, P2 nº 1: a chegada tardia das próprias Settings confirmadas não cancela nem apaga o teste que já partiu. */
+    @Test
+    fun aChegadaTardiaDasSettingsConfirmadasPreservaOTesteEmAndamento() {
+        val entered = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val seen = mutableListOf<Settings>()
+        val h = Harness(customSaved, visionTester = VisionTester { seen += it; entered.complete(Unit); gate.await(); com.keyflow.vision.VisionResult.Text("Texto tardio") })
+        h.holdChanges = true
+        show(h)
+        typeBInsteadOfAInTheEndpoint()
+
+        node(VISAO_TEST_BUTTON_TAG).performClick()
+        rule.waitUntil(5_000) { entered.isCompleted }
+        // Passado o prazo antigo de 2 s, o retorno finalmente chega.
+        rule.mainClock.advanceTimeBy(3_000)
+        rule.runOnIdle { h.settings = checkNotNull(h.held) }
+        rule.waitForIdle()
+        gate.complete(Unit)
+
+        rule.waitUntil(5_000) { rule.onAllNodesWithTag(VISAO_TEST_RESPONSE_TAG).fetchSemanticsNodes().isNotEmpty() }
+        node(VISAO_TEST_RESPONSE_TAG).assertTextContains("Texto tardio", substring = true)
+        rule.runOnIdle {
+            assertEquals("https://b.test/v1", seen.single().visionCustomEndpoint)
+        }
+    }
+
+    /** Revisão 2, P2 nº 2: um refresh com outra preferência que ainda tem o endpoint antigo não troca o pedido confirmado. */
+    @Test
+    fun umRefreshComOEndpointAntigoNaoTrocaOPedidoConfirmado() {
+        val seen = mutableListOf<Settings>()
+        val h = Harness(customSaved, visionTester = VisionTester { seen += it; com.keyflow.vision.VisionResult.Text("ok") })
+        h.holdChanges = true
+        show(h)
+        typeBInsteadOfAInTheEndpoint()
+
+        node(VISAO_TEST_BUTTON_TAG).performClick()
+        // Outra preferência muda e a tela volta a receber o endpoint antigo.
+        rule.runOnIdle { h.settings = h.settings.copy(visionOpenAiModel = "outro") }
+        rule.mainClock.advanceTimeBy(3_000)
+        rule.waitForIdle()
+
+        rule.waitUntil(5_000) { rule.onAllNodesWithTag(VISAO_TEST_RESPONSE_TAG).fetchSemanticsNodes().isNotEmpty() }
+        rule.runOnIdle { assertEquals("https://b.test/v1", seen.single().visionCustomEndpoint) }
     }
 
     @Test

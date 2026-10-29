@@ -62,12 +62,13 @@ fun VisaoPanel(
     val openAi = openAiPanelState(connection, openAiAuth.flows)
     val anthropicConnection by remember(anthropicAuth) { anthropicAuth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
     val googleConnection by remember(googleAuth) { googleAuth.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
-    val selectedConnection = when (activeSettings.visionSource) {
+    fun connectionFor(source: VisionSource): ConnectionState = when (source) {
         VisionSource.OPENAI -> connection
         VisionSource.ANTHROPIC -> anthropicConnection
         VisionSource.GOOGLE -> googleConnection
         else -> ConnectionState.Disconnected
     }
+    val selectedConnection = connectionFor(activeSettings.visionSource)
     val availability = visionTestAvailability(activeSettings, models, selectedConnection is ConnectionState.Connected)
     Column(
         modifier
@@ -102,19 +103,31 @@ fun VisaoPanel(
         SettingsGroup(tr("Testar")) {
             Column(Modifier.padding(vertical = 16.dp)) {
                 VisaoTestArea(availability, tester, initialState = initialTest,
-                    // Lidas no toque, depois de confirmar o texto dos campos: as Settings desta composição podem ser anteriores à edição.
-                    modelTester = visionTester?.let { current -> { current.run(editor.settings) } },
-                    confirmPending = editor::confirmPending,
+                    // Montado no toque, depois de confirmar o texto dos campos: as Settings desta composição podem ser anteriores à edição.
+                    prepare = visionTester?.let { current ->
+                        {
+                            editor.confirmPending()
+                            val snapshot = editor.settings
+                            val connected = connectionFor(snapshot.visionSource) is ConnectionState.Connected
+                            val snapshotAvailability = visionTestAvailability(snapshot, models, connected)
+                            PreparedVisionTest(
+                                key = visionRequestKey(snapshot, connectionFor(snapshot.visionSource), snapshotAvailability),
+                                run = if (snapshotAvailability is VisionTestAvailability.Ready) ({ current.run(snapshot) }) else null,
+                            )
+                        }
+                    },
                     remote = activeSettings.visionSource != VisionSource.LOCAL,
-                    requestKey = listOf(activeSettings.visionSource, activeSettings.visionLocalModelId,
-                        activeSettings.visionOpenAiModel, activeSettings.visionAnthropicModel, activeSettings.visionGoogleModel,
-                        activeSettings.visionCustomEndpoint, activeSettings.visionCustomModel,
-                        activeSettings.visionCustomHeaderName, activeSettings.visionCustomHeaderValue, selectedConnection, availability),
+                    requestKey = visionRequestKey(activeSettings, selectedConnection, availability),
                 )
             }
         }
     }
 }
+
+/** O que, nas Settings e na conexão, faz o resultado do Testar deixar de valer. */
+private fun visionRequestKey(s: Settings, connection: ConnectionState, availability: VisionTestAvailability): List<Any?> =
+    listOf(s.visionSource, s.visionLocalModelId, s.visionOpenAiModel, s.visionAnthropicModel, s.visionGoogleModel,
+        s.visionCustomEndpoint, s.visionCustomModel, s.visionCustomHeaderName, s.visionCustomHeaderValue, connection, availability)
 
 // "Local", "OpenAI", "Anthropic", "Google" e "Custom" são nomes próprios/técnicos.
 private fun visionSourceLabel(source: VisionSource): String = when (source) {
