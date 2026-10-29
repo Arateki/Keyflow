@@ -47,7 +47,7 @@ class RegionSelectViewTest {
             val view = RegionSelectView(context, { chosen = it }, {})
             view.layout(0, 0, 1000, 1000)
             for ((action, point) in listOf(MotionEvent.ACTION_DOWN to (200f to 200f),
-                MotionEvent.ACTION_MOVE to (150f to 175f), MotionEvent.ACTION_UP to (150f to 175f),
+                MotionEvent.ACTION_MOVE to (170f to 185f), MotionEvent.ACTION_UP to (150f to 175f),
                 MotionEvent.ACTION_DOWN to (500f to 990f), MotionEvent.ACTION_UP to (500f to 990f))) {
                 val event = MotionEvent.obtain(0, 0, action, point.first, point.second, 0)
                 try { view.onTouchEvent(event) } finally { event.recycle() }

@@ -61,6 +61,10 @@ class RegionSelectView(context: Context, private val confirm: (Rect) -> Unit, pr
                 return true
             }
             MotionEvent.ACTION_UP -> {
+                selected?.let {
+                    area = RegionGeometry.move(area, it, event.x, event.y, width, height, (32 * d).toInt())
+                    invalidate()
+                }
                 if (selected == null) when {
                     event.y < margin * 1.25f && event.x < width / 2 -> cancel()
                     event.y < margin * 1.25f -> { area = RegionGeometry.full(width, height); invalidate() }
