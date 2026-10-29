@@ -60,7 +60,11 @@
           "blocos": [
             {"tipo": "paragrafo", "texto": "Conecta um modelo de linguagem — no aparelho ou na nuvem — e deixa você testar se ele responde. O ditado e os comandos ainda não o usam: isso vem depois."},
             {"tipo": "rotulado", "rotulo": "Origem", "texto": "Local (modelos no aparelho como Gemma e Qwen, sem internet) ou Nuvem (OpenAI e Anthropic Claude via SSO ou chave de API)."},
-            {"tipo": "rotulado", "rotulo": "Testar", "texto": "manda uma frase ao modelo e mostra a resposta chegando, com o tempo até o primeiro trecho."}
+            {"tipo": "rotulado", "rotulo": "Testar", "texto": "manda uma frase ao modelo e mostra a resposta chegando, com o tempo até o primeiro trecho."},
+            {"tipo": "rotulado", "rotulo": "Testes por tarefa", "texto": "ao lado do teste rápido, uma sub-aba por tarefa mede o que importa: Pontuação (põe pontuação e maiúsculas num ditado sem trocar palavras), Reescrita (encurta, corrige ou formaliza sem inventar nada), JSON (extrai campos num JSON válido), Ações (escolhe a ferramenta do agente e os argumentos certos, ou recusa o que nenhuma ferramenta faz) e Contexto (acha um detalhe num documento longo). A nota vai de 0 a 1, é calculada por regras e nunca por outro modelo."},
+            {"tipo": "rotulado", "rotulo": "Histórico", "texto": "cada rodada fica guardada neste aparelho, até 20 por modelo. A variação só compara rodadas com o mesmo corpus, opções e backend; uma rodada incompleta aparece marcada e não entra na comparação. O resultado pode ser exportado em JSON."},
+            {"tipo": "rotulado", "rotulo": "Rodar a bateria", "texto": "roda em sequência todos os testes que o modelo suporta. Parar guarda o que já foi medido, e o aparelho quente ou com bateria baixa pausa a rodada."},
+            {"tipo": "rotulado", "rotulo": "Modelo da nuvem", "texto": "antes de qualquer chamada o app mostra quantas serão feitas e o teto de tokens, e só roda depois que você confirmar. No login por assinatura a rodada reduzida (2 casos por teste) vem primeiro e consome o limite do seu plano."}
           ]
         },
         {
@@ -251,7 +255,11 @@
           "blocos": [
             {"tipo": "paragrafo", "texto": "Connects a language model — on the device or in the cloud — and lets you test whether it answers. Dictation and commands don't use it yet: that comes later."},
             {"tipo": "rotulado", "rotulo": "Source", "texto": "Local (models on device such as Gemma and Qwen, without internet) or Cloud (OpenAI and Anthropic Claude via SSO or API key)."},
-            {"tipo": "rotulado", "rotulo": "Test", "texto": "sends a sentence to the model and shows the answer arriving, with the time to the first piece."}
+            {"tipo": "rotulado", "rotulo": "Test", "texto": "sends a sentence to the model and shows the answer arriving, with the time to the first piece."},
+            {"tipo": "rotulado", "rotulo": "Tests by task", "texto": "next to the quick test, one sub-tab per task measures what matters: Punctuation (adds punctuation and capitals to a dictation without changing words), Rewriting (shortens, fixes or formalizes without inventing anything), JSON (extracts fields into valid JSON), Actions (picks the agent’s tool and the right arguments, or refuses what no tool does) and Context (finds a detail in a long document). The score runs from 0 to 1, is computed by rules and never by another model."},
+            {"tipo": "rotulado", "rotulo": "History", "texto": "each run is kept on this device, up to 20 per model. The change only compares runs with the same corpus, options and backend; an incomplete run is marked and is left out of the comparison. The result can be exported as JSON."},
+            {"tipo": "rotulado", "rotulo": "Run the full battery", "texto": "runs every test the model supports, one after another. Stop keeps what was already measured, and a hot device or a low battery pauses the run."},
+            {"tipo": "rotulado", "rotulo": "Cloud model", "texto": "before any call the app shows how many will be made and the token cap, and only runs after you confirm. With a subscription login the reduced run (2 cases per test) comes first and it uses your plan’s limit."}
           ]
         },
         {

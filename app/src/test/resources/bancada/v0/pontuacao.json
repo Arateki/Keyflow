@@ -1,0 +1,28 @@
+{
+  "teste": "pontuacao",
+  "versao": 1,
+  "capacidade": "TEXTO",
+  "descricao": "Corpus de brinquedo: dois casos para os testes de integridade.",
+  "prompt": {
+    "system": "Ponha a pontuação. Responda só com o texto.",
+    "user": "{entrada}"
+  },
+  "casos": [
+    {
+      "id": "v0-pt-01",
+      "idioma": "pt",
+      "entrada": "oi tudo bem",
+      "esperado": "Oi, tudo bem?",
+      "maxTokensSaida": 32,
+      "tokensEntrada": 12
+    },
+    {
+      "id": "v0-en-01",
+      "idioma": "en",
+      "entrada": "hello how are you",
+      "esperado": "Hello, how are you?",
+      "maxTokensSaida": 32,
+      "tokensEntrada": 12
+    }
+  ]
+}
