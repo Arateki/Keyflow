@@ -15,8 +15,8 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Processo `:speech` (FLOC-04). Tudo chega pelo AIDL: aqui não se lê Settings, DataStore, catálogo nem cofre,
- * e nada faz rede (no debug, o StrictMode mata o processo se tentar). A sessão entra pelo [LocalVoice];
- * o motor concreto chega em seguida. Uma `libonnxruntime.so`, a que o app já tem.
+ * e nada faz rede (no debug, o StrictMode mata o processo se tentar). A sessão é o [VitsVoice], preguiçosa,
+ * na `libonnxruntime.so` que o app já tem.
  */
 class SpeechService : Service() {
 
@@ -32,20 +32,7 @@ class SpeechService : Service() {
 
     private val core by lazy {
         SpeechServiceCore(
-            voice = object : LocalVoice {
-                override fun synthesize(
-                    model: File,
-                    tokens: File,
-                    text: String,
-                    speed: Float,
-                    cancelled: () -> Boolean,
-                    emit: (pcm: ByteArray, sampleRate: Int) -> Unit,
-                ) {
-                    throw IllegalStateException("sem motor de voz")
-                }
-
-                override fun close() = Unit
-            },
+            voice = VitsVoice(),
             availableMb = ::availableMemoryMb,
             scheduler = object : SpeechIdleScheduler {
                 override fun schedule(delayMs: Long, block: () -> Unit): SpeechCancellable {

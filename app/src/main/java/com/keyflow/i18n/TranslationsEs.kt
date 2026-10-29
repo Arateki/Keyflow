@@ -109,6 +109,8 @@ internal val TranslationsEs: Map<String, String> = mapOf(
     "Baixar" to "Descargar",
     "Baixar %s por dados móveis?" to "¿Descargar %s con datos móviles?",
     "Baixe e selecione um modelo para testar." to "Descarga y selecciona un modelo para probar.",
+    "Não consegui gerar a voz neste aparelho." to "No pude generar la voz en este dispositivo.",
+    "Não consegui gerar a voz: faltou memória." to "No pude generar la voz: faltó memoria.",
     "Bem-vindo ao KeyFlow" to "Bienvenido a KeyFlow",
     "Privacidade do ditado" to "Privacidad del dictado",
     "O microfone só grava quando você toca nele. O áudio é transcrito no aparelho, sem sair dele, ou enviado ao provedor que você configurar. O texto transcrito vai para o campo em que você digita (ou para a área de transferência se não houver campo ativo); o KeyFlow não envia o que você digita. O app de configuração mostra anúncios do AdMob, sujeitos ao consentimento do Google UMP." to "El micrófono solo graba cuando lo tocas. El audio se transcribe en el dispositivo sin salir de él, o se envía al proveedor que configures. El texto transcrito va al campo donde escribes (o al portapapeles si no hay un campo activo); KeyFlow no envía lo que escribes. La app de ajustes muestra anuncios de AdMob, sujetos al consentimiento de Google UMP.",

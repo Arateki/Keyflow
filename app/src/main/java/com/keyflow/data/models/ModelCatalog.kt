@@ -752,7 +752,8 @@ object ModelCatalog {
      * (MPL-2.0) não entra. Uma voz, 22.050 Hz, caracteres (`use_phonemes=false`). Português genérico do Common Voice,
      * não pt-BR: o nome na tela é "português". SHA-256 e tamanho rebaixados em 2026-10-29 do commit
      * `9092b0c5e3717b6c61ae563cfd98dc86cc536b3a` (`model.onnx` é LFS; `tokens.txt` foi baixado e hasheado).
-     * `validatedOnDevice = false`: o motor (FAL-T11) ainda não falou num aparelho; o modelo aparece em todos os builds.
+     * `validatedOnDevice = false` continua só como informação (Yan, 2026-10-29: o release mostra o catálogo
+     * inteiro). O motor VITS fala no `:speech`; a Docs ainda não cita a voz.
      * RAM: pico de 225 MiB medido no servidor, 1 thread — a recomendação arredonda para 256.
      */
     val VITS_COQUI_PT = ModelSpec(

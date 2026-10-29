@@ -60,6 +60,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Job
 import com.keyflow.data.models.EngineType
+import com.keyflow.data.models.FileRole
 import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.ModelKind
 import com.keyflow.data.models.ModelStore
@@ -76,6 +77,9 @@ import com.keyflow.i18n.AppLocale
 import com.keyflow.speech.AudioTrackPlayer
 import com.keyflow.speech.SpeechDeps
 import com.keyflow.speech.cloud.MediaCodecAudioDecoder
+import com.keyflow.speech.local.AidlSpeechEndpoint
+import com.keyflow.speech.local.LocalSpeechEngine
+import com.keyflow.speech.local.SpeechConnection
 import com.keyflow.speech.system.AndroidSystemTts
 import com.keyflow.speech.system.SystemSpeechEngine
 import com.keyflow.ui.config.SpeechTester
@@ -177,7 +181,7 @@ class SetupActivity : ComponentActivity() {
 
     /**
      * O Testar da aba Voz: o motor da origem gravada (`SpeechEngines.forSource`) com o ambiente real — chaves do cofre lidas na hora da chamada
-     * (fora da main), o `TextToSpeech` do aparelho e o `AudioTrack`. Os modelos locais ainda não têm motor (outra frente): Local instalado dá `NOT_READY`.
+     * (fora da main), o `TextToSpeech` do aparelho, o VITS no `:speech` e o `AudioTrack`. O Supertonic ainda não tem motor.
      */
     private val speechTester by lazy {
         val deps = SpeechDeps(
@@ -191,6 +195,19 @@ class SetupActivity : ComponentActivity() {
                 auth.store.getApiKey(id)?.value
             },
             isModelInstalled = { ModelStore.get(this).isInstalled(it) },
+            local = { id ->
+                val spec = ModelCatalog.VITS_COQUI_PT
+                if (id != spec.id) null
+                else LocalSpeechEngine(
+                    files = {
+                        val store = ModelStore.get(this)
+                        val model = store.fileFor(spec, FileRole.MODEL)
+                        val tokens = store.fileFor(spec, FileRole.TOKENS)
+                        if (model == null || tokens == null) null else model to tokens
+                    },
+                    endpoint = AidlSpeechEndpoint(SpeechConnection.get(this), spec.recommendedRamMb),
+                )
+            },
             system = {
                 SystemSpeechEngine(
                     open = { AndroidSystemTts(applicationContext) },

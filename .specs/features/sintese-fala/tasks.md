@@ -1,11 +1,7 @@
 # Síntese de fala (aba Voz) — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md`
-<<<<<<< HEAD
-**Status**: FAL-T1, T4, T5 e T6 feitas na branch `equipe/voz-aba` (lição: `../../project/licoes/2026-10-29-voz-aba-contrato-e-nuvem.md`); as outras seguem pendentes. **Fora da v1**. Não toma a vez de frente aberta.
-=======
-**Status**: rascunho. FAL-T2, FAL-T8 e FAL-T10 feitas em 2026-10-29. O resto não começou. **Fora da v1**. Não toma a vez de frente aberta.
->>>>>>> origin/main
+**Status**: FAL-T1 a T6, T8 e T10 feitas (2026-10-29). FAL-T3 e FAL-T11 feitas nesta branch (`equipe/voz-motor-vits`; lição: `../../project/licoes/2026-10-29-voz-motor-vits.md`). FAL-T7 e FAL-T9 seguem. **Fora da v1**. Não toma a vez de frente aberta. O marcador de conflito que a main tinha neste status foi resolvido juntando as duas frases.
 
 > **Para o agente executor**: leia `spec.md` + `design.md` + este arquivo e `.specs/codebase/TESTING.md`. Uma task por vez,
 > na ordem abaixo, testes primeiro, gate verde antes de avançar. Supertonic e VITS entram no catálogo nesta leva (D1 e D2). O nome do VITS é "português", nunca "pt-BR".
@@ -52,7 +48,7 @@ T4, T5 e T6 dependem só de T1. T3 depende de T1. T2 não trava T3 nem T9. T11 d
 - **Done when**: "2" em pt vira a palavra combinada; caractere fora do mapa some; com `add_blank` o id de blank fica entre os outros; frase corta em `.`. Nenhum arquivo do teste cita eSpeak. Gate `quick`.
 - **Gate**: `pool compilar testDebugUnitTest`.
 
-### FAL-T3 — Processo `:speech`
+### FAL-T3 — Processo `:speech` — **Status: feita (equipe/voz-motor-vits, 2026-10-29)**
 - **What**: serviço `exported=false`, AIDL, sessão ORT preguiçosa, ociosidade de 120 s, sem `OfflineTts` e sem segunda `libonnxruntime.so` (FLOC-04, FLOC-05, FLOC-06, FPRV-02). Sem arquivo de modelo, `speak` local devolve `MODEL_MISSING` e não abre socket.
 - **Where**: manifest, `app/src/main/aidl/`, `com.keyflow.speech.local`.
 - **Done when**: `assembleDebug` gera o processo; teste de arquitetura falha se o módulo de fala importar `OfflineTts` ou o downloader; teste com backend falso não abre rede no caminho local. Não editar a URL do sherpa. Gate `quick` + `build`.
@@ -99,7 +95,7 @@ T4, T5 e T6 dependem só de T1. T3 depende de T1. T2 não trava T3 nem T9. T11 d
 - **Done when**: as duas entradas existem; o nome do VITS é "português"; o SHA confere; Kokoro e Piper continuam de fora. Gate `quick` + `build`.
 - **Gate**: `pool compilar testDebugUnitTest assembleDebug`.
 
-### FAL-T11 — Motor VITS
+### FAL-T11 — Motor VITS — **Status: feita (equipe/voz-motor-vits, 2026-10-29)**
 - **What**: síntese no `:speech` com o frontend da FAL-T2 e o `model.onnx` de caracteres (FLOC-03, FLOC-04). `length_scale = 1 / speed`. Sem `OfflineTts`. Sem chamar o modelo de pt-BR.
 - **Where**: `com.keyflow.speech.local`.
 - **Done when**: o normalizador + frontend da T2 alimentam a sessão; arquivo ausente emite `MODEL_MISSING` sem socket; velocidade 1,0 usa `length_scale` 1. O modelo de 71 MB não entra no teste de JVM. Gate `quick`.
