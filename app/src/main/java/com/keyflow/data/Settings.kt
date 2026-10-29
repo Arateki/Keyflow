@@ -77,6 +77,8 @@ data class Settings(
     val falaCustomHeaderName: String = "Authorization",
     val falaCustomHeaderValue: String = "",
     val falaCustomModel: String = "",
+    val falaCustomVoice: String = "alloy",
+    val falaCustomFormat: String = "wav",
     // Computador (acesso SSH remoto e shell local)
     val computerMode: String = "ssh",
     val computerSshHost: String = "",

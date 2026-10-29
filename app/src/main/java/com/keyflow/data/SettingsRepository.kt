@@ -463,6 +463,8 @@ class SettingsRepository(
             falaCustomHeaderName = prefs[FALA_CUSTOM_HEADER_NAME] ?: "Authorization",
             falaCustomHeaderValue = secret(SettingsCredentialKeys.FALA_CUSTOM_HEADER),
             falaCustomModel = prefs[FALA_CUSTOM_MODEL].orEmpty(),
+            falaCustomVoice = prefs[FALA_CUSTOM_VOICE] ?: "alloy",
+            falaCustomFormat = prefs[FALA_CUSTOM_FORMAT] ?: "wav",
             computerMode = prefs[COMPUTER_MODE] ?: "ssh",
             computerSshHost = prefs[COMPUTER_SSH_HOST].orEmpty(),
             computerSshPort = prefs[COMPUTER_SSH_PORT] ?: 22,
@@ -579,6 +581,8 @@ class SettingsRepository(
             prefs[FALA_CUSTOM_ENDPOINT] = persisted.falaCustomEndpoint
             prefs[FALA_CUSTOM_HEADER_NAME] = persisted.falaCustomHeaderName
             prefs[FALA_CUSTOM_MODEL] = persisted.falaCustomModel
+            prefs[FALA_CUSTOM_VOICE] = persisted.falaCustomVoice
+            prefs[FALA_CUSTOM_FORMAT] = persisted.falaCustomFormat
             prefs[COMPUTER_MODE] = persisted.computerMode
             prefs[COMPUTER_SSH_HOST] = persisted.computerSshHost
             prefs[COMPUTER_SSH_PORT] = persisted.computerSshPort
@@ -819,6 +823,8 @@ class SettingsRepository(
         val FALA_CUSTOM_ENDPOINT = stringPreferencesKey("fala_custom_endpoint")
         val FALA_CUSTOM_HEADER_NAME = stringPreferencesKey("fala_custom_header_name")
         val FALA_CUSTOM_MODEL = stringPreferencesKey("fala_custom_model")
+        val FALA_CUSTOM_VOICE = stringPreferencesKey("fala_custom_voice")
+        val FALA_CUSTOM_FORMAT = stringPreferencesKey("fala_custom_format")
         val COMPUTER_MODE = stringPreferencesKey("computer_mode")
         val COMPUTER_SSH_HOST = stringPreferencesKey("computer_ssh_host")
         val COMPUTER_SSH_PORT = intPreferencesKey("computer_ssh_port")
