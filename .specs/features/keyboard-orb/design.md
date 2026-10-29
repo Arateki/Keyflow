@@ -87,7 +87,7 @@ Regras (KBO-09):
 1. `sobressairPx` é 0 se não há encaixe; senão `round(36 dp)`. Não depende do estado.
 2. `contentTop = visibleTop = gridOverscanPx + sobressairPx`.
 3. Grade em arrasto → `JanelaInteira` (não mexer no que `gridDragActive` já acerta).
-4. Orbe sobressalente e grade parada → `ConteudoMaisCirculo`. O serviço faz `region.set(conteudo)` e une o **disco** (`Region.setPath` do círculo, ou o equivalente que não preencha o retângulo), recortado à janela. `region.op(retanguloDelimitador, UNION)` é o bug: o ponto (1, 1) do contraexemplo (faixa 36, encaixe 64×28, centro (32, 32), raio 32, distância² 1922 > 1024) cairia na região e o IME receberia o toque. Devolver falso depois não o entrega ao app. Os cantos do retângulo fora do disco também ficam de fora; um ponto do disco na faixa entra.
+4. Orbe sobressalente e grade parada → `ConteudoMaisCirculo`. O serviço faz `region.set(conteudo)` e une o **disco** (`Region.setPath` do círculo, ou o equivalente que não preencha o retângulo), recortado à janela. `region.op(retanguloDelimitador, UNION)` é o bug: o ponto (1, 1) do contraexemplo (faixa 36, encaixe 64×28, centro (32, 32), raio 32, distância² 1922 > 1024) cairia na região e o IME receberia o toque. Devolver falso depois não o entrega ao app. Os cantos do retângulo fora do disco **e** fora do conteúdo também ficam de fora; um canto fora do disco que caia no conteúdo continua na região. Um ponto do disco na faixa entra.
 5. Orbe ociosa → `SoConteudo`. A faixa inteira atravessa.
 6. Proibido o early-return atual quando o overscan é 0 e a faixa de 36 dp não é (`:302`).
 
@@ -102,7 +102,7 @@ A orbe não é uma view do tamanho do teclado. O pai (`KeyFlowKeyboardView`) per
 - dentro do círculo, ou dentro do encaixe com a orbe ociosa → a orbe consome;
 - senão → `BarView` / grade, como hoje.
 
-Isso evita o erro de um `onTouchEvent` em camada de cima que, ao devolver falso, **não** entrega o evento para a tecla. O pai despacha o que a janela **já recebeu**. Os cantos do retângulo fora do disco nem chegam aqui: a `touchableRegion` (KBO-09) é que os entrega ao app.
+Isso evita o erro de um `onTouchEvent` em camada de cima que, ao devolver falso, **não** entrega o evento para a tecla. O pai despacha o que a janela **já recebeu**. Os cantos do retângulo fora do disco **e** fora do conteúdo nem chegam aqui: a `touchableRegion` (KBO-09) é que os entrega ao app. Canto fora do disco dentro do conteúdo continua sendo toque do teclado.
 
 A classificação do gesto é JVM, com relógio injetado (`RajadaDeToques`, `ClassificadorDeGesto`). Não se instancia `OrbButtonView` nem `GestureInterpreter` (este chama `SystemClock`). Os números são os mesmos, citados na spec (KBO-13). O resultado é uma `Interacao`. `ResolvedorDaOrbeDoTeclado` devolve um `Comando`. O serviço executa.
 
