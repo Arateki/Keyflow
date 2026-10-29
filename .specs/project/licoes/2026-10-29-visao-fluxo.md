@@ -47,7 +47,7 @@ retomada, junto dos unitários e do lint, sempre pelo pool sem escolher nó.
 
 A prova opt-in `VisionCaptureDeviceTest#capturaRegiaoNoEmulador` usa o diálogo real, arrasta um handle e confere as
 dimensões exatas do bitmap entregue. Observa `Service.foregroundServiceType`, exige o retorno ao microfone e abre uma
-segunda autorização para provar revogação. Salva PNGs do seletor e do recorte no log da instrumentação (Base64), extraídos
+segunda autorização para provar revogação e uma terceira para testar rotação real e oferta de recomeço. Salva PNGs do seletor e do recorte no log da instrumentação (Base64), extraídos
 para `.equipe/provas/`; esses arquivos locais não entram no git. Os goldens novos são `visao-selecao` e `visao-fases`, nos
 dois temas. Nenhum golden anterior deve ser alterado.
 

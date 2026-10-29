@@ -106,8 +106,18 @@ class VisionCaptureDeviceTest {
             assertTrue("revogação não fechou o seletor", device.wait(Until.gone(By.desc("Selecione a área da tela.")), 15_000))
             instrumentation.waitForIdleSync()
             assertEquals(listOf(combined, microphone), types)
+            // A rotação real invalida o retângulo e oferece recomeçar, sem reutilizar a autorização.
+            types.clear()
+            requestAndAccept()
+            device.setOrientationLeft()
+            assertTrue("rotação não ofereceu recomeço", device.wait(Until.hasObject(
+                By.text("A tela mudou de tamanho. Deseja recomeçar a captura?")), 15_000))
+            device.findObject(By.text("Cancelar")).click()
+            instrumentation.waitForIdleSync()
+            assertEquals(listOf(combined, microphone), types)
+            device.setOrientationNatural()
             instrumentation.sendStatus(0, Bundle().apply {
-                putString("stream", "\nVisão: bitmap ${w}x${h}; handle +40,+60; FGS $combined → $microphone; segunda autorização e revogação confirmadas.\n")
+                putString("stream", "\nVisão: bitmap ${w}x${h}; handle +40,+60; FGS $combined → $microphone; novas autorizações, revogação e rotação confirmadas.\n")
             })
         } catch (failure: Throwable) {
             val hierarchy = File(context.cacheDir, "vision-failure.xml")
@@ -119,6 +129,8 @@ class VisionCaptureDeviceTest {
             if (device.takeScreenshot(screenshot)) evidence("FALHA", screenshot.readBytes())
             throw failure
         } finally {
+            device.setOrientationNatural()
+            device.unfreezeRotation()
             OverlayService.visionCaptureResultForTest = null
             OverlayService.visionProjectionStartedForTest = null
             OverlayService.visionProjectionTypeForTest = null
