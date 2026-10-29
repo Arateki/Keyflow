@@ -12,6 +12,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.keyflow.core.ComputeBackend
 import com.keyflow.core.ReasoningSource
@@ -74,6 +75,18 @@ class ReasoningPanelTest {
     private fun textUi(installed: Set<String> = emptySet(), selected: String? = null) = LocalModelsUi.compose(
         catalog = ModelCatalog.TEXT, installed = installed, active = null, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_000,
     )
+
+    @Test
+    fun sairDoCustomPreservaAOrigemLocalAoSalvarOCampoPendente() {
+        val h = Harness(Settings(reasoningSource = ReasoningSource.CUSTOM), textUi())
+        rule.setContent { h.Content() }
+        rule.onNodeWithTag("raciocinio-custom-model").performScrollTo().performTextInput("x")
+        rule.onNodeWithTag(reasoningSourceTag(ReasoningSource.LOCAL)).performScrollTo().performClick()
+        rule.runOnIdle {
+            assertEquals(ReasoningSource.LOCAL, h.settings.reasoningSource)
+            assertEquals("x", h.settings.reasoningCustomModel)
+        }
+    }
 
     /** O seletor "Roda em" do card: escolher a GPU no modelo selecionado grava a preferência e recarrega nele, sem mexer nas Settings. */
     @Test

@@ -51,12 +51,15 @@ val ANTHROPIC_API_KEY_MODELS = listOf(
 
 val ANTHROPIC_MODELS_DEFAULT = AnthropicModels.DEFAULT_MODELS.map { AccountModel(it.id, it.displayName) }
 
+/** O painel da Anthropic, compartilhado pelo Raciocínio e pela Visão (ver [OpenAiPanel] e [ProviderModelSlot]). */
 @Composable
 internal fun AnthropicPanel(
     settings: Settings,
     onSettingsChange: (Settings) -> Unit,
     actions: AuthActions,
+    slot: ProviderModelSlot = ReasoningAnthropicSlot,
 ) {
+    val tags = slot.tags
     val connection by remember(actions) { actions.state() }.collectAsStateOnMain(ConnectionState.Disconnected)
     var refresh by remember { mutableIntStateOf(0) }
     var remoteModels by remember { mutableStateOf<List<AccountModel>>(emptyList()) }
@@ -68,8 +71,9 @@ internal fun AnthropicPanel(
         }
     }
 
-    val ssoModels = if (remoteModels.isNotEmpty()) remoteModels else ANTHROPIC_SSO_MODELS
-    val chosenModel = settings.reasoningAnthropicModel.ifEmpty { "claude-sonnet-4-6" }
+    val chosenModel = slot.selectedModel(settings, remoteModels, onSettingsChange)
+    val ssoModels = slot.ssoOptions(remoteModels, chosenModel)
+    val apiKeyModels = slot.apiKeyOptions(remoteModels, chosenModel)
 
     val apiKey = remember(actions) { actions.apiKeyFlow() }.collectAsStateOnMain(null).value.orEmpty()
     val ssoOffered = actions.flows.any { it.method == AuthMethod.OAUTH }
@@ -88,7 +92,7 @@ internal fun AnthropicPanel(
         onSelectAuthMode = { onSettingsChange(settings.copy(providerAnthropicAuthMode = it)) },
         ssoModels = ssoModels,
         selectedSsoModel = chosenModel,
-        onSelectSsoModel = { onSettingsChange(settings.copy(reasoningAnthropicModel = it)) },
+        onSelectSsoModel = { onSettingsChange(slot.choose(settings, it)) },
         ssoFiveHourFraction = 0.25f,
         ssoFiveHourResetText = tr("Reseta às 16:45"),
         ssoWeeklyFraction = 0.40f,
@@ -101,19 +105,21 @@ internal fun AnthropicPanel(
         getKeyUrl = "https://console.anthropic.com/settings/keys",
         onOpenGetKeyUrl = { actions.openUrl("https://console.anthropic.com/settings/keys") },
         getKeyButtonLabel = tr("Obter chave na Anthropic"),
-        apiKeyModels = ANTHROPIC_API_KEY_MODELS,
+        apiKeyModels = apiKeyModels,
         selectedApiKeyModel = chosenModel,
-        onSelectApiKeyModel = { onSettingsChange(settings.copy(reasoningAnthropicModel = it)) },
-        tagPrefix = "raciocinio-anthropic",
-        statusTag = ANTHROPIC_STATUS_TAG,
-        loginTag = ANTHROPIC_LOGIN_TAG,
-        keyTag = ANTHROPIC_KEY_TAG,
-        getKeyTag = "raciocinio-anthropic-obter-chave",
-        disconnectTag = ANTHROPIC_DISCONNECT_TAG,
-        refreshTag = ANTHROPIC_MODELS_REFRESH_TAG,
-        ssoModelTag = ANTHROPIC_MODEL_TAG,
-        apiKeyModelTag = ANTHROPIC_MODEL_TAG,
-        privacyTag = ANTHROPIC_PRIVACY_TAG,
+        onSelectApiKeyModel = { onSettingsChange(slot.choose(settings, it)) },
+        tagPrefix = tags.prefix,
+        statusTag = tags.status,
+        loginTag = tags.login,
+        keyTag = tags.key,
+        getKeyTag = tags.getKey,
+        disconnectTag = tags.disconnect,
+        refreshTag = tags.refresh,
+        ssoModelTag = tags.model,
+        apiKeyModelTag = tags.model,
+        privacyTag = tags.privacy,
+        privacyNote = slot.privacyNote(),
+        showLimits = slot.showsUsageLimits,
         ssoOffered = ssoOffered,
         modifier = Modifier.padding(top = 8.dp),
     )

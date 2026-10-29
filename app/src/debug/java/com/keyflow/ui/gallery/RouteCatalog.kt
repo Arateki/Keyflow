@@ -99,6 +99,7 @@ import com.keyflow.reasoning.UnavailableReason
 import com.keyflow.ui.config.AccountModel
 import com.keyflow.ui.config.AuthActions
 import com.keyflow.ui.config.TestState
+import com.keyflow.ui.config.VisionTestState
 import com.keyflow.ads.AdsController
 import com.keyflow.ads.AdsRuntime
 import com.keyflow.ads.ConsentRequester
@@ -307,28 +308,98 @@ object RouteCatalog {
         Route("config-teclado-skins-remover") { SkinsRoute(orb = false, imported = true, confirming = true) },
         Route("skin-pack-relatorio") { SkinReportRoute(errors = false) },
         Route("skin-pack-relatorio-erro") { SkinReportRoute(errors = true) },
-        // Visão: `config-visao` é a origem Local sem nenhum modelo baixado; as outras cobrem baixando e pronto.
+        // Visão: `config-visao` é a origem Local sem nenhum modelo baixado (o OCR e os dois Gemma 4, com as capacidades de cada um); as outras
+        // cobrem baixando, pronto (OCR escolhido e o Gemma 4 já baixado pelo Raciocínio), o Testar com resultado, os provedores (só com modelos
+        // que leem imagem) e o Custom.
         Route("config-visao") { ConfigVisaoRoute() },
         Route("config-visao-local-baixando") {
             ConfigVisaoRoute(
                 localModels = galleryVisionModels(
                     active = DownloadProgress(
-                        SamplePanelModels.VISION_LIGHT.id,
+                        ModelCatalog.GEMMA_4_E2B.id,
                         DownloadState.RUNNING,
-                        bytesDone = SamplePanelModels.VISION_LIGHT.totalBytes * 42 / 100,
-                        totalBytes = SamplePanelModels.VISION_LIGHT.totalBytes,
+                        bytesDone = ModelCatalog.GEMMA_4_E2B.totalBytes * 42 / 100,
+                        totalBytes = ModelCatalog.GEMMA_4_E2B.totalBytes,
                     ),
                 ),
             )
         },
         Route("config-visao-local-pronto") {
             ConfigVisaoRoute(
-                localModelId = SamplePanelModels.VISION_LIGHT.id,
-                localModels = galleryVisionModels(installed = setOf(SamplePanelModels.VISION_LIGHT.id), selected = SamplePanelModels.VISION_LIGHT.id),
+                localModelId = ModelCatalog.OCR_PADDLE_LATIN.id,
+                localModels = galleryVisionModels(
+                    installed = setOf(ModelCatalog.OCR_PADDLE_LATIN.id, ModelCatalog.GEMMA_4_E2B.id),
+                    selected = ModelCatalog.OCR_PADDLE_LATIN.id,
+                ),
             )
         },
-        Route("config-visao-google") { ConfigVisaoRoute(source = VisionSource.GOOGLE, googleKey = "AIzaSyMockKeyForScreenshots") },
-        Route("config-visao-anthropic") { ConfigVisaoRoute(source = VisionSource.ANTHROPIC, anthropicKey = "sk-ant-api-mock-key") },
+        // O Testar pronto (o OCR escolhido e instalado): a imagem de exemplo e o botão. Só o OCR na lista, para a área do Testar subir para a
+        // primeira tela em vez de ficar abaixo dos três cards; o resultado do teste cai abaixo da dobra e é coberto pelo `VisaoPanelTest`.
+        Route("config-visao-local-teste") {
+            ConfigVisaoRoute(
+                localModelId = ModelCatalog.OCR_PADDLE_LATIN.id,
+                localModels = LocalModelsUi.compose(
+                    catalog = listOf(ModelCatalog.OCR_PADDLE_LATIN), installed = setOf(ModelCatalog.OCR_PADDLE_LATIN.id), active = null,
+                    failures = emptyMap(), selectedId = ModelCatalog.OCR_PADDLE_LATIN.id, deviceRamMb = 8_192,
+                ),
+            )
+        },
+        // O Gemma 4 escolhido e baixado: o Testar ainda não tem como ler com ele (motor de visão), e o aviso diz isso.
+        Route("config-visao-local-gemma") {
+            ConfigVisaoRoute(
+                localModelId = ModelCatalog.GEMMA_4_E2B.id,
+                localModels = galleryVisionModels(installed = setOf(ModelCatalog.GEMMA_4_E2B.id), selected = ModelCatalog.GEMMA_4_E2B.id),
+            )
+        },
+        // Provedor conectado pelo plano: a conta devolve modelos com e sem visão (e um que o app não conhece); o seletor mostra só os com visão.
+        Route("config-visao-provedor") {
+            ConfigVisaoRoute(
+                source = VisionSource.OPENAI,
+                openAiAuth = GalleryAuth(
+                    ConnectionState.Connected("voce@exemplo.com", AuthMethod.OAUTH, planUsage = true),
+                    models = listOf(
+                        AccountModel("gpt-6.1-sol", "GPT-6.1-Sol"),
+                        AccountModel("gpt-6-luna", "GPT-6-Luna"),
+                        AccountModel("gpt-3.5-turbo", "GPT-3.5 Turbo"),
+                        AccountModel("gpt-realtime-2", "GPT Realtime 2"),
+                    ),
+                    storedKey = FakeSettings.OPENAI_API_KEY,
+                ),
+            )
+        },
+        Route("config-visao-openai-desconectado") {
+            ConfigVisaoRoute(
+                source = VisionSource.OPENAI,
+                openAiAuth = GalleryAuth(ConnectionState.Disconnected, storedKey = FakeSettings.OPENAI_API_KEY),
+            )
+        },
+        // Chave de API guardada e um modelo antigo (sem visão) ainda salvo: o seletor cai no padrão da lista (PRV-02).
+        Route("config-visao-google") {
+            ConfigVisaoRoute(
+                source = VisionSource.GOOGLE,
+                googleAuth = GalleryAuth(ConnectionState.Disconnected, storedKey = "AIzaSyMockKeyForScreenshots"),
+                adjust = { it.copy(providerGoogleAuthMode = "api_key", visionGoogleModel = "gemini-2.0-flash") },
+            )
+        },
+        Route("config-visao-anthropic") {
+            ConfigVisaoRoute(
+                source = VisionSource.ANTHROPIC,
+                anthropicAuth = GalleryAuth(ConnectionState.Connected("claude@exemplo.com", AuthMethod.OAUTH)),
+                adjust = { it.copy(visionAnthropicModel = "claude-opus-5-5") },
+            )
+        },
+        Route("config-visao-custom") {
+            ConfigVisaoRoute(
+                source = VisionSource.CUSTOM,
+                adjust = {
+                    it.copy(
+                        visionCustomEndpoint = "https://self.host/v1/chat/completions",
+                        visionCustomHeaderValue = "Bearer galeria-0000",
+                        visionCustomModel = "llama-3.2-vision",
+                    )
+                },
+            )
+        },
         // Voz (Fala): `config-fala` é a origem Local sem nenhum modelo baixado; as outras cobrem baixando e pronto.
         Route("config-fala") { ConfigFalaRoute() },
         Route("config-fala-local-baixando") {
@@ -582,27 +653,37 @@ object RouteCatalog {
         backendPrefs = backendPrefs, gpuAvailable = gpuAvailable,
     )
 
-    /** Estado fixo da lista de modelos de VISÃO/OCR (RAM de sobra, como a de voz), com os modelos de amostra: o catálogo real está vazio. */
+    /** Estado fixo da lista de modelos da VISÃO (RAM de sobra, como a de voz): o OCR e os Gemma 4, do catálogo real. */
     private fun galleryVisionModels(installed: Set<String> = emptySet(), active: DownloadProgress? = null, selected: String? = null) =
         LocalModelsUi.compose(
-            catalog = SamplePanelModels.VISION, installed = installed, active = active, failures = emptyMap(), selectedId = selected, deviceRamMb = 8_192,
+            catalog = ModelCatalog.visionModels(debug = true), installed = installed, active = active, failures = emptyMap(),
+            selectedId = selected, deviceRamMb = 8_192,
         )
 
-    /** Aba Visão: a origem, a lista local e o seletor de tradução num estado fixo. */
+    /** Aba Visão: a origem, a lista local, os provedores e a área do Testar num estado fixo. [adjust] mexe nas Settings do quadro. */
     @Composable
     private fun ConfigVisaoRoute(
         source: VisionSource = VisionSource.LOCAL,
         localModelId: String? = null,
         localModels: LocalModelsUi = galleryVisionModels(),
-        googleKey: String = "",
-        anthropicKey: String = "",
+        openAiAuth: AuthActions = AuthActions.None,
+        anthropicAuth: AuthActions = AuthActions.None,
+        googleAuth: AuthActions = AuthActions.None,
+        adjust: (Settings) -> Settings = { it },
+        test: VisionTestState = VisionTestState(),
     ) {
         ConfigScreen(
-            settings = FakeSettings.settings.copy(
-                visionSource = source,
-                visionLocalModelId = localModelId,
+            settings = adjust(
+                FakeSettings.settings.copy(
+                    visionSource = source,
+                    visionLocalModelId = localModelId,
+                ),
             ),
             visionModels = localModels,
+            reasoningAuth = openAiAuth,
+            reasoningAnthropicAuth = anthropicAuth,
+            reasoningGoogleAuth = googleAuth,
+            initialVisionTest = test,
             permissions = PermissionStatus(
                 microphoneGranted = true,
                 overlayGranted = true,

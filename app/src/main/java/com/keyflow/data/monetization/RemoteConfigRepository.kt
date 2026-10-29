@@ -264,6 +264,7 @@ class RemoteConfigRepository(
                 thinking = ThinkingSupport.entries.firstOrNull { it.name == json.optString("thinking", "") } ?: ThinkingSupport.NONE,
                 // Idem: etiquetas opcionais; ausente, mal formado ou nome desconhecido vira "sem essa etiqueta", nunca manifesto inválido.
                 capabilities = parseCapabilities(json.optJSONArray("capabilities")),
+                validatedOnDevice = json.optBoolean("validatedOnDevice", false),
                 // Janela do arquivo: manifesto sem o campo mantém a do catálogo embutido (não vira "sem janela"); valor inválido idem.
                 contextTokens = json.optInt("contextTokens", 0).takeIf { it > 0 } ?: ModelCatalog.TEXT_ALL.firstOrNull { it.id == id }?.contextTokens,
             )

@@ -580,7 +580,7 @@ arquivo (`ModelList.kt`) ganhou o redesenho do card (etiquetas no lugar do resum
 ### RSN-T20 — Seletor CPU · GPU ✅ (RPRC-01..07)
 - **What**: `ComputeBackend { CPU, GPU }` (`core/Models.kt`); `ComputeSupport` (existência da `libOpenCL.so` em `/vendor/lib64`, `/system/vendor/lib64`, `/system/lib64`);
   `LocalBackendPrefs` (escolha por modelo, aviso de volta para a CPU e "GPU pronta"; chave `reasoning_local_backends` do DataStore, API `SettingsRepository.localBackendPrefsFlow/localBackendFor/updateLocalBackendPrefs`);
-  `LlmModel.backend` + `LocalLlmConfig.backend` (AIDL) e `IReasoningCallback.onBackendFallback`; `LiteRtConfigs.backend` (`Backend.CPU()`/`Backend.GPU()` do LiteRT-LM 0.16.1); `RamGuard.enoughFor/enoughForPreloadOn`;
+  `LlmModel.backend` + `LocalLlmConfig.backend` (AIDL) e `IReasoningCallback.onBackendFallback`; `LiteRtConfigs.backend` (`Backend.CPU()`/`Backend.GPU()` do LiteRT-LM 0.16.1); `RamGuard.enoughFor`;
   `ReasoningServiceCore` com identidade id+versão+backend, volta para a CPU e memória das cargas que falharam; `BackendReports` (o app grava a preferência a partir do que o `:reasoning` conta);
   `<uses-native-library libOpenCL.so required=false>` no manifesto principal; o seletor e os avisos no `ModelCard`; `LocalModelActions.chooseBackend`.
 - **Tests**: `ComputeSupportTest`, `LocalBackendPrefsTest`, `ReasoningServiceCoreTest` (recarga por troca, volta para a CPU, guarda por backend), `RamGuardTest`, `LlmModelTest`,
@@ -611,3 +611,14 @@ O teste de fabricante permanece sem exceção, agora com `ModelVendor.NANBEIGE`;
 Integração dos PRs #50/#48 na branch do seletor: specs combinadas, manifesto com OpenCL e `:vision`, catálogo `2026102802` com os seis candidatos e as capacidades anteriores preservadas. As cenas individuais e `ModelListTest` verificam as candidatas instaladas com seletor e etiquetas; a validação está registrada em `licoes/2026-10-28-mescla-seletor-catalogo.md`.
 
 Status: verificado localmente — 1987/1987 unitários, lint sem ocorrências, 85/85 instrumentados e 10/10 convenções de mesclagem. Capturas 246/246 e diff oficial dentro do limiar; aprovados 36 PNGs de Raciocínio/Transcrição local, com os outros 210 bit-idênticos à main. CI obrigatório acompanhado no PR #49; GPU real permanece com o Yan.
+
+### Pré-carga sem piso adicional — RPRC-06 (2026-10-28)
+
+Status: verificado em 2026-10-28: `pool compilar testDebugUnitTest :app:lintDebug` passou 1.986/1.986 unitários em 185 suítes no Deck, sem ignorados e sem ocorrências de lint;
+`pool instrumentar LocalReasoningEngineTest ModelListTest ReasoningPanelTest` passou 48/48 na AWS. Ambos sem escolher nó ou desabilitar AWS. CI obrigatório acompanhado no PR.
+Decisão do Yan aplicada: a pré-carga usa a mesma guarda por backend da carga normal. Removidos `PRELOAD_FLOOR_MB`, `enoughForPreload`, `enoughForPreloadOn` e o parâmetro de carga que só selecionava essa restrição.
+Preservados a guarda de CPU, inclusive na volta da GPU, e o aviso de memória no card quando a carga é recusada.
+Regressões: `RamGuardTest`, `ReasoningServiceCoreTest` (1,1–1,5 GB livres com total de 3,7 GB; total desconhecido;
+modelo que não cabe; GPU e volta para CPU), `ModelListTest` (aviso de preparação).
+Gate: `pool compilar testDebugUnitTest :app:lintDebug`; `pool instrumentar LocalReasoningEngineTest ModelListTest ReasoningPanelTest`.
+Sem alteração visual de componentes ou textos; goldens existentes preservados. Lição: `licoes/2026-10-28-preload-sem-piso.md`.

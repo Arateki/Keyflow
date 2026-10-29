@@ -99,7 +99,8 @@ fun UnifiedProviderCard(
     planNoteTag: String = "$tagPrefix-plan-note",
     privacyTag: String = "$tagPrefix-privacy",
     errorTag: String = "$tagPrefix-error",
-    privacyNote: String = tr("O texto do teste é enviado à %s; as credenciais ficam só neste aparelho.", providerName),
+    // `null`: a nota do Testar das abas de texto; a Visão manda a sua (é a imagem que sai, PRV-04).
+    privacyNote: String? = null,
     // O que o provedor e o registro de autenticação decidem (AUTH-03/09, RCL-06/07) — o padrão é o comportamento genérico.
     // `false`: o registro não oferece login, então só existe a aba API (sem sub-abas).
     ssoOffered: Boolean = false,
@@ -116,6 +117,9 @@ fun UnifiedProviderCard(
     manageUsageLabel: String? = null,
     planNote: String? = null,
     limitsTag: String = planTag,
+    // `false`: sem o bloco de limites de 5 h e semanal. Hoje ele mostra valores de exemplo (não há leitura real do uso do plano), então a
+    // aba que não quer exibir número inventado o desliga (a Visão).
+    showLimits: Boolean = true,
     // `true`: Desconectar também com a sessão expirada ou em erro (a credencial ainda está no cofre) e, na aba API, com uma chave
     // guardada (apaga a chave); `null`: só na aba Assinatura, com algo conectado.
     showDisconnect: Boolean? = null,
@@ -369,7 +373,7 @@ fun UnifiedProviderCard(
                         if (planNote != null) SettingSub(planNote, Modifier.testTag(planNoteTag))
                     }
                     // Bloco compacto de limites de uso (mesmo tamanho do botão); sem o uso do plano não há limite a mostrar.
-                    if (ssoNotice == null) Box(
+                    if (ssoNotice == null && showLimits) Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
@@ -614,7 +618,7 @@ fun UnifiedProviderCard(
 
         // Rodapé de privacidade
         SettingSub(
-            privacyNote,
+            privacyNote ?: tr("O texto do teste é enviado à %s; as credenciais ficam só neste aparelho.", providerName),
             Modifier.padding(top = 4.dp).testTag(privacyTag),
         )
     }

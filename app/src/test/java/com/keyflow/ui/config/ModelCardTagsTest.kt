@@ -64,11 +64,43 @@ class ModelCardTagsTest {
     }
 
     @Test
-    fun `the OCR lists what it does and the Gemma models claim no vision`() {
+    fun `the OCR lists what it does and the Gemma models list the three vision capabilities`() {
         assertThat(tag(ModelCatalog.OCR_PADDLE_LATIN, "capability_read_text")).isEqualTo("Ler texto da tela")
+        assertThat(keys(ModelCatalog.OCR_PADDLE_LATIN)).containsNoneOf("capability_describe_image", "capability_answer_about_screen")
         listOf(ModelCatalog.GEMMA_4_E2B, ModelCatalog.GEMMA_4_E4B).forEach {
-            assertThat(keys(it)).containsNoneOf("capability_describe_image", "capability_answer_about_screen")
+            assertThat(tag(it, "capability_read_text")).isEqualTo("Ler texto da tela")
+            assertThat(tag(it, "capability_describe_image")).isEqualTo("Descrever imagem")
+            assertThat(tag(it, "capability_answer_about_screen")).isEqualTo("Responder sobre a tela")
         }
+    }
+
+    /**
+     * O MESMO Gemma 4 aparece no Raciocínio e na Visão e cada aba fala do que importa nela: o Raciocínio nunca anuncia a visão (o card dele fica
+     * como era) e a Visão não anuncia pensamento nem ferramentas. A Transcrição e a Voz veem tudo o que o modelo declara.
+     */
+    @Test
+    fun `the tab decides which tags a shared model shows`() {
+        fun keys(spec: ModelSpec, scope: CardTagScope) = modelTags(spec, scope).map { it.key }
+        val gemma = ModelCatalog.GEMMA_4_E2B
+        assertThat(keys(gemma, CardTagScope.REASONING)).containsExactly("language", "thinking", "capability_tools", "ram").inOrder()
+        assertThat(keys(gemma, CardTagScope.VISION))
+            .containsExactly("language", "capability_read_text", "capability_describe_image", "capability_answer_about_screen", "ram").inOrder()
+        assertThat(keys(gemma, CardTagScope.ALL)).containsAtLeastElementsIn(keys(gemma, CardTagScope.REASONING))
+        assertThat(keys(gemma, CardTagScope.ALL)).containsAtLeastElementsIn(keys(gemma, CardTagScope.VISION))
+        // O que nenhuma outra aba vê continua igual: o card do Raciocínio dos demais modelos de texto e o do Parakeet na Transcrição.
+        ModelCatalog.TEXT.filter { it.capabilities.none { c -> c in ModelCatalog.VISION_CAPABILITIES } }.forEach {
+            assertThat(keys(it, CardTagScope.REASONING)).isEqualTo(keys(it, CardTagScope.ALL))
+        }
+        assertThat(keys(ModelCatalog.PARAKEET_V3, CardTagScope.ALL)).containsExactly("language", "native_portuguese", "ram").inOrder()
+        // O OCR na Visão: idioma, a capacidade e a RAM.
+        assertThat(keys(ModelCatalog.OCR_PADDLE_LATIN, CardTagScope.VISION)).containsExactly("language", "capability_read_text", "ram").inOrder()
+    }
+
+    @Test
+    fun `each tab's list carries its own tag scope`() {
+        assertThat(ModelListTags.Voz.tagScope).isEqualTo(CardTagScope.ALL)
+        assertThat(ModelListTags.Raciocinio.tagScope).isEqualTo(CardTagScope.REASONING)
+        assertThat(ModelListTags.Visao.tagScope).isEqualTo(CardTagScope.VISION)
     }
 
     /** "Ferramentas" só nos modelos em que o fabricante declara chamada de funções; o DeepSeek R1 Distill e os de fala não ganham. */

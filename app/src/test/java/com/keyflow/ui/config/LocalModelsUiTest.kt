@@ -239,24 +239,36 @@ class LocalModelsUiTest {
         assertThat(visionUi().items.map { it.spec.id }).containsNoneOf(base, small, parakeet, qwen, gemma)
     }
 
-    /** VC-T2a: a lista da Visão traz só o OCR (PaddleOCR), baixável e ainda não instalado. */
+    /** A lista da Visão traz o OCR (PaddleOCR) e os dois Gemma 4, todos baixáveis e ainda não instalados. */
     @Test
-    fun `EMPTY_VISION lists only the ocr model, available to download`() {
-        assertThat(LocalModelsUi.EMPTY_VISION.items.map { it.spec.id }).containsExactly("ocr-paddle-latin")
-        assertThat(LocalModelsUi.EMPTY_VISION.items.single().status).isEqualTo(LocalModelStatus.AVAILABLE)
+    fun `EMPTY_VISION lists the ocr and the Gemma 4 models, available to download`() {
+        assertThat(LocalModelsUi.EMPTY_VISION.items.map { it.spec.id })
+            .containsExactly("ocr-paddle-latin", "gemma-4-e2b-litertlm", "gemma-4-e4b-litertlm").inOrder()
+        assertThat(LocalModelsUi.EMPTY_VISION.items.map { it.status }.toSet()).containsExactly(LocalModelStatus.AVAILABLE)
     }
 
     @Test
-    fun `EMPTY_VISION lists the vision catalog and never speech or text`() {
+    fun `EMPTY_VISION lists the vision models and never speech or text-only ones`() {
         assertThat(LocalModelsUi.EMPTY_VISION.items.map { it.spec.id })
-            .containsExactlyElementsIn(ModelCatalog.VISION.map { it.id })
+            .containsExactlyElementsIn(ModelCatalog.visionModels().map { it.id })
             .inOrder()
         assertThat(LocalModelsUi.EMPTY_VISION).isEqualTo(
-            LocalModelsUi.compose(catalog = ModelCatalog.VISION, installed = emptySet(), active = null, failures = emptyMap(), selectedId = null, deviceRamMb = 0),
+            LocalModelsUi.compose(catalog = ModelCatalog.visionModels(), installed = emptySet(), active = null, failures = emptyMap(), selectedId = null, deviceRamMb = 0),
         )
-        assertThat(LocalModelsUi.EMPTY_VISION.items.map { it.spec.id }).containsNoneOf(base, small, parakeet, qwen, gemma)
+        assertThat(LocalModelsUi.EMPTY_VISION.items.map { it.spec.id }).containsNoneOf(base, small, parakeet, qwen)
         assertThat(LocalModelsUi.EMPTY.items.map { it.spec.id }).containsNoneOf(fastOcr, balancedOcr, smolVlm)
         assertThat(LocalModelsUi.EMPTY_TEXT.items.map { it.spec.id }).containsNoneOf(fastOcr, balancedOcr, smolVlm)
+    }
+
+    /** Os Gemma 4 são os mesmos arquivos nas duas abas: o que um download instalou aparece instalado na Visão e no Raciocínio. */
+    @Test
+    fun `a Gemma 4 installed from either tab shows installed in both lists`() {
+        val installed = setOf(ModelCatalog.GEMMA_4_E2B.id)
+        fun status(catalog: List<com.keyflow.data.models.ModelSpec>) = LocalModelsUi.compose(
+            catalog = catalog, installed = installed, active = null, failures = emptyMap(), selectedId = null, deviceRamMb = 8_000,
+        ).items.first { it.spec.id == ModelCatalog.GEMMA_4_E2B.id }.status
+        assertThat(status(ModelCatalog.visionModels())).isEqualTo(LocalModelStatus.INSTALLED)
+        assertThat(status(ModelCatalog.TEXT)).isEqualTo(LocalModelStatus.INSTALLED)
     }
 
     // ── o catálogo de voz (aba Voz / Fala) ─────────────────────────────────────────────────────────
