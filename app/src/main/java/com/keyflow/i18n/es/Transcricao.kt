@@ -1,0 +1,32 @@
+package com.keyflow.i18n.es
+
+/** Transcrição (ditado). Chaves em ordem crescente do português. */
+internal val Transcricao: Map<String, String> = mapOf(
+    "A chave fica apenas neste dispositivo. O áudio é enviado direto ao provedor." to "La clave queda solo en este dispositivo. El audio se envía directo al proveedor.",
+    "A transcrição local foi interrompida — tente de novo." to "La transcripción local se interrumpió — inténtalo de nuevo.",
+    "API KEY" to "API KEY",
+    "Ao atingir o limite, a gravação pausa e pergunta se quer enviar ou descartar. No infinito, grava sem limite." to "Al llegar al límite, la grabación se pausa y pregunta si quieres enviar o descartar. En infinito, graba sin límite.",
+    "Arquivos do modelo local sumiram — baixe de novo na aba Transcrição." to "Faltan los archivos del modelo local — descárgalo de nuevo en la pestaña Transcripción.",
+    "Automático" to "Automático",
+    "Cada pausa já transcreve o trecho gravado; o envio final fica quase instantâneo." to "Cada pausa ya transcribe el tramo grabado; el envío final queda casi instantáneo.",
+    "Duração máxima de gravação" to "Duración máxima de grabación",
+    "Fechar transcrição parcial" to "Cerrar la transcripción parcial",
+    "Geral" to "General",
+    "Memória insuficiente para o modelo local — feche outros apps ou escolha um modelo menor." to "Memoria insuficiente para el modelo local — cierra otras apps o elige un modelo más pequeño.",
+    "Não foi possível iniciar a transcrição local." to "No se pudo iniciar la transcripción local.",
+    "Não foi possível ler o áudio gravado." to "No se pudo leer el audio grabado.",
+    "O modelo local falhou ao transcrever." to "El modelo local falló al transcribir.",
+    "Origem da transcrição" to "Origen de la transcripción",
+    "Padrão compatível com Whisper — modelo e idioma usam os valores esperados desse padrão." to "Estándar compatible con Whisper — modelo e idioma usan los valores que ese estándar espera.",
+    "Parcial · editando" to "Parcial · editando",
+    "Parcial · toque no texto para editar" to "Parcial · toca el texto para editar",
+    "Sem limite" to "Sin límite",
+    "Tempo limite de resposta" to "Tiempo límite de respuesta",
+    "Tempo máximo de espera pela transcrição antes de mostrar erro. No infinito, espera o quanto for preciso." to "Tiempo máximo de espera de la transcripción antes de mostrar un error. En infinito, espera lo que haga falta.",
+    "Texto parcial" to "Texto parcial",
+    "Token de acesso · %s" to "Token de acceso · %s",
+    "Toque no aviso junto à orbe pausada para ver e corrigir o texto antes de enviar." to "Toca el aviso junto al orbe en pausa para ver y corregir el texto antes de enviar.",
+    "Transcrever parcialmente ao pausar" to "Transcribir parcialmente al pausar",
+    "Transcrição parcial" to "Transcripción parcial",
+    "Visualizar e editar transcrição parcial" to "Ver y editar la transcripción parcial",
+)

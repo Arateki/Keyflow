@@ -1,0 +1,32 @@
+package com.keyflow.i18n.en
+
+/** Transcrição (ditado). Chaves em ordem crescente do português. */
+internal val Transcricao: Map<String, String> = mapOf(
+    "A chave fica apenas neste dispositivo. O áudio é enviado direto ao provedor." to "The key stays only on this device. The audio is sent straight to the provider.",
+    "A transcrição local foi interrompida — tente de novo." to "Local transcription was interrupted — try again.",
+    "API KEY" to "API KEY",
+    "Ao atingir o limite, a gravação pausa e pergunta se quer enviar ou descartar. No infinito, grava sem limite." to "When the limit is reached, recording pauses and asks whether to send or discard. On infinity, it records with no limit.",
+    "Arquivos do modelo local sumiram — baixe de novo na aba Transcrição." to "The local model's files are gone — download it again in the Transcription tab.",
+    "Automático" to "Automatic",
+    "Cada pausa já transcreve o trecho gravado; o envio final fica quase instantâneo." to "Each pause already transcribes the recorded stretch; the final send becomes almost instant.",
+    "Duração máxima de gravação" to "Maximum recording length",
+    "Fechar transcrição parcial" to "Close partial transcription",
+    "Geral" to "General",
+    "Memória insuficiente para o modelo local — feche outros apps ou escolha um modelo menor." to "Not enough memory for the local model — close other apps or pick a smaller model.",
+    "Não foi possível iniciar a transcrição local." to "Couldn't start local transcription.",
+    "Não foi possível ler o áudio gravado." to "Couldn't read the recorded audio.",
+    "O modelo local falhou ao transcrever." to "The local model failed to transcribe.",
+    "Origem da transcrição" to "Transcription source",
+    "Padrão compatível com Whisper — modelo e idioma usam os valores esperados desse padrão." to "Whisper-compatible standard — model and language use the values that standard expects.",
+    "Parcial · editando" to "Partial · editing",
+    "Parcial · toque no texto para editar" to "Partial · tap the text to edit",
+    "Sem limite" to "No limit",
+    "Tempo limite de resposta" to "Response timeout",
+    "Tempo máximo de espera pela transcrição antes de mostrar erro. No infinito, espera o quanto for preciso." to "Maximum wait for the transcription before showing an error. On infinity, it waits as long as it takes.",
+    "Texto parcial" to "Partial text",
+    "Token de acesso · %s" to "Access token · %s",
+    "Toque no aviso junto à orbe pausada para ver e corrigir o texto antes de enviar." to "Tap the notice next to the paused orb to see and fix the text before sending.",
+    "Transcrever parcialmente ao pausar" to "Transcribe partially on pause",
+    "Transcrição parcial" to "Partial transcription",
+    "Visualizar e editar transcrição parcial" to "View and edit partial transcription",
+)
