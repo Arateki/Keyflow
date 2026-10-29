@@ -435,11 +435,11 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 | FLX-37 | P1-E | FLX-T5, FLX-T20 | Pending |
 | FLX-38 | P1-E | FLX-T5, FLX-T20 | Pending |
 | FLX-39 | P1-E | FLX-T14, FLX-T15, FLX-T25 | Pending |
-| FLX-40 | P1-F | FLX-T3, FLX-T18 | Pending |
-| FLX-41 | P1-F | FLX-T3, FLX-T17 | Pending |
-| FLX-42 | P1-F | FLX-T3 | Pending |
-| FLX-43 | P1-F | FLX-T3 | Pending |
-| FLX-44 | P1-F | FLX-T3 | Pending |
+| FLX-40 | P1-F | FLX-T3, FLX-T18 | Implementing (T3 feita) |
+| FLX-41 | P1-F | FLX-T3, FLX-T17 | Implementing (T3 feita) |
+| FLX-42 | P1-F | FLX-T3 | Implementing (T3 feita) |
+| FLX-43 | P1-F | FLX-T3 | Implementing (T3 feita) |
+| FLX-44 | P1-F | FLX-T3 | Implementing (T3 feita) |
 | FLX-45 | P1-G | FLX-T2, FLX-T4 | Implementing (T2 feita) |
 | FLX-46 | P1-G | FLX-T2 | Implementing (T2 feita) |
 | FLX-47 | P1-G | FLX-T2 | Implementing (T2 feita) |

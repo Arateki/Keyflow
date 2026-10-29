@@ -75,7 +75,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(fluxos): codec JSON tolerante`.
 - **Registro (Fase A)**: `CodecFluxos.decodificarFluxos` devolve `null` para chave ausente, em branco ou malformada (e `[]` é vazia de verdade); `decodificarConfig(flowsJson, triggersJson, semente)` aplica a semente (T4 passa `PadroesFluxo::semear`) e ignora gatilho solto sem `flows_json` (FLX-40). Campos de texto só valem se forem `String` no JSON (o `optString` do Android e o do Maven divergem em `null`). Etapa sem `type` legível é descartada; `type` desconhecido vira `Desconhecida`. A Visão grava `instruction` (a spec só nomeia `system`). Gatilho órfão é lido como está: a limpeza (FLX-50) é da gravação.
 
-### FLX-T3 — Fluxos padrão e restaurar — **Status: pendente**
+### FLX-T3 — Fluxos padrão e restaurar — **Status: feita**
 - **What**: `PadroesFluxo` (catálogo dos 3, dica informativa de atalho por `builtinId` — D15, sem gatilho automático, `trKey`, `PADROES_VERSAO`, `semear()` com ids `s-<builtinId>`), `RestauradorFluxos.restaurar(config)` e `previa(config)` (design §4); `idNovo()` injetável.
 - **Where**: `fluxos/{PadroesFluxo,RestauradorFluxos}.kt`; testes `RestauradorFluxosTest`, `RestauradorPropertyTest`.
 - **Depends on**: T1 (T2 para o gerador de propriedade). **Requirement**: FLX-40, FLX-41 (prévia), FLX-42, FLX-43, FLX-44.
@@ -83,6 +83,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
   fluxo da pessoa idêntico e na mesma ordem relativa; idempotência (`restaurar(restaurar(c)) == restaurar(c)`); propriedade: `restaurar(c).gatilhos == c.gatilhos` para qualquer `c`; a semente tem 3 fluxos válidos, 0 gatilhos
   e `previa(semente)` vazia; os três padrão passam no `ValidadorFluxo`.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(fluxos): fluxos padrão e restaurar sem tocar nos atalhos`.
+- **Registro (Fase A)**: O catálogo traz a dica de atalho de cada padrão como `DicaDeAtalho` (D15: dois toques, três toques, botão do teclado), sem gatilho; o texto "Sugestão: …" é da T18. `PadroesFluxo.nomeExibido` traduz só o padrão não renomeado. O sistema do Perguntar de "Ouvir e responder" fica em português por ser dado do fluxo (o Restaurar o compara). **Decisão que a spec não cobria**: com 20 fluxos o padrão apagado não é recriado (recriar além do limite faria o codec cortar fluxos da pessoa na leitura seguinte); a `PreviaRestaurar.semEspaco` lista os que ficaram de fora e a T17 mostra isso na confirmação. `Ids.fluxo()` gera os 8 hex; `RestauradorFluxos.restaurar` aceita o gerador de id (e nunca repete um id em uso).
 
 ### FLX-T4 — Persistência no repositório — **Status: pendente**
 - **What**: chaves `flows_json` e `flow_triggers_json` ao lado de `BARS_CONFIG_JSON` (`SettingsRepository.kt:876`); `configFluxosFlow()`, `configFluxosOnce()` (leitura leve, sem cofre), `atualizarFluxos(f)` e
