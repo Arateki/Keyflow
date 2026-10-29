@@ -1,7 +1,7 @@
 # Síntese de fala (aba Voz) — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md`
-**Status**: FAL-T1 a T6, T8 e T10 feitas (2026-10-29). FAL-T3 e FAL-T11 feitas nesta branch (`equipe/voz-motor-vits`; lição: `../../project/licoes/2026-10-29-voz-motor-vits.md`). FAL-T7 e FAL-T9 seguem. **Fora da v1**. Não toma a vez de frente aberta. O marcador de conflito que a main tinha neste status foi resolvido juntando as duas frases.
+**Status**: FAL-T1 a T11 feitas (2026-10-29). FAL-T3 e FAL-T11: `equipe/voz-motor-vits`; FAL-T9: `equipe/voz-motor-supertonic`; FAL-T7: `equipe/voz-goldens` (lição: `../../project/licoes/2026-10-29-voz-goldens.md`). **Fora da v1**. Não toma a vez de frente aberta.
 
 > **Para o agente executor**: leia `spec.md` + `design.md` + este arquivo e `.specs/codebase/TESTING.md`. Uma task por vez,
 > na ordem abaixo, testes primeiro, gate verde antes de avançar. Supertonic e VITS entram no catálogo nesta leva (D1 e D2). O nome do VITS é "português", nunca "pt-BR".
@@ -72,18 +72,24 @@ T4, T5 e T6 dependem só de T1. T3 depende de T1. T2 não trava T3 nem T9. T11 d
 - **Done when**: `onStart` produz `FirstAudio`; idioma ausente produz `TTS_DATA_MISSING`; a origem padrão do `Settings` novo continua `LOCAL`. Gate `quick`.
 - **Gate**: `pool compilar testDebugUnitTest`.
 
-### FAL-T7 — Goldens
+### FAL-T7 — Goldens — **Status: feita (equipe/voz-goldens, 2026-10-29)**
 - **What**: rotas do FUX-08 no `RouteCatalog`. Aprovar só o que for da aba Voz.
 - **Done when**: `pool telas` e `diff-screens.sh`. As outras abas ficam bit-idênticas. A rota `config-fala-testar` está parada, sem áudio.
-- **Gate**: `pool telas`.
+- **Gate**: `pool telas` (136 rotas, 272 PNGs) e `scripts/diff-screens.sh`; 22 imagens da Voz revisadas, 250 goldens das outras abas preservados por SHA-256. `pool compilar testDebugUnitTest :app:lintDebug` e 28 instrumentados de `FalaPanelTest` verdes.
 
 ### FAL-T8 — Pin do Supertonic e aceite
-- **Status**: feito (2026-10-29). O diálogo ficou no `ModelList` compartilhado, não no `FalaPanel` (esse painel é de outra frente). No release a entrada some até o motor provar (`validatedOnDevice = false`).
+- **Status**: feito (2026-10-29). O diálogo ficou no `ModelList` compartilhado, não no `FalaPanel` (esse painel é de outra frente). O catálogo mostra a entrada em todos os builds; `validatedOnDevice` é informativo, sem impedir o motor.
 - **What**: uma entrada real do Supertonic 3 em `ModelCatalog.VOICE` (FLOC-01, FLOC-02, FPRV-03). Baixar de novo o ONNX oficial, gravar SHA-256 e tamanho completos, licença no comentário e em `app/licenses/`. Não copiar o prefixo do `context.md` como se fosse o hash. Diálogo de aceite (licença + Attachment A) antes do download; sem aceite, o downloader não é chamado. O VITS é a FAL-T10, não esta task.
 - **Done when**: o id do Supertonic baixa só depois do aceite, o SHA confere e o catálogo não lista Kokoro, Piper nem ONNX quantizado. Gate `quick` + `build`.
 - **Gate**: `pool compilar testDebugUnitTest assembleDebug`.
 
 ### FAL-T9 — Motor Supertonic
+- **Status: feita (2026-10-29, PR #68).** Frontend Unicode e quatro ONNX no runtime próprio, idioma `pt`, M1 e `speed`
+  na duração. Sem aceite/instalação/qualquer arquivo, `MODEL_MISSING` antes da sessão; troca de motor fecha o anterior.
+  Prova real no emulador API 34: 1º PCM 8.104 ms, áudio 3.075 ms, parede 8.133 ms, RTF 2,645, pico do `:speech`
+  606.700 KiB (≈592,5 MiB), WAV 44.100 Hz mono/16-bit. Instrumentados afetados: 40/40, incluindo a prova opt-in.
+  Testes JVM usam índice e sessões falsos; `SupertonicTextDeviceTest` cobre a ICU real do Android. WAV/log em
+  `.equipe/provas/`; resultados finais dos gates/CI no relatório da equipe. Escuta no A32 continua com o Yan.
 - **What**: síntese no `:speech` com os quatro ONNX e o índice Unicode, a partir do código MIT oficial, idioma `pt` (FLOC-03, FLOC-04). Sem `OfflineTts`.
 - **Where**: `com.keyflow.speech.local`.
 - **Done when**: texto de teste com o índice falso produz ids; arquivo ausente emite `MODEL_MISSING` sem socket; a velocidade da aba chega ao fator `speed`. O modelo de ~398 MB não entra no teste de JVM. Gate `quick`.

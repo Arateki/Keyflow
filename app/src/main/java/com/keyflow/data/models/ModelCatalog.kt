@@ -784,10 +784,11 @@ object ModelCatalog {
      * Supertonic 3 (FAL-T8, D2). Quatro ONNX oficiais fp32, o índice Unicode, o `tts.json` e o estilo M1
      * (a voz da amostra). Sem int8: quantizar seria derivado e cairia na cláusula 4.c. Pesos OpenRAIL-M
      * (`app/licenses/OpenRAIL-M_supertonic-3.txt`, com Attachment A); o download só segue depois do aceite.
-     * Código de inferência MIT (`MIT_supertonic.txt`), não copiado. SHA-256 e tamanho rebaixados em 2026-10-29
+     * Código de inferência MIT (`MIT_supertonic.txt`), adaptado no frontend e motor Kotlin. SHA-256 e tamanho rebaixados em 2026-10-29
      * do commit `3cadd1ee6394adea1bd021217a0e650ede09a323`. Os quatro ONNX são LFS (o oid é o SHA-256);
      * `unicode_indexer.json`, `tts.json` e `M1.json` foram baixados e hasheados. Os outros estilos ficam de fora
-     * deste pin. `validatedOnDevice = false` até o motor (FAL-T9). RAM: pico de 503 MiB no servidor — recomendação 512.
+     * deste pin. FAL-T9: motor medido no emulador, sem trava de build; validação física segue separada.
+     * RAM: 503 MiB no servidor, pico total de 592,5 MiB no :speech do emulador (inclui o processo). Recomendação 512 de memória disponível.
      */
     val SUPERTONIC_3 = ModelSpec(
         id = VoiceLicenseGate.SUPERTONIC_ID,

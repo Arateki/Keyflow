@@ -1,8 +1,8 @@
 Aviso de copyright do código de inferência do Supertonic (Supertone Inc.).
 
-O KeyFlow não redistribui o repositório https://github.com/supertone-inc/supertonic.
-O frontend e o motor, quando existirem, seguem o algoritmo desse código (MIT) e são
-escritos no app. Os pesos são outra licença: OpenRAIL-M, em `OpenRAIL-M_supertonic-3.txt`,
+O frontend e o motor Supertonic do KeyFlow são uma adaptação em Kotlin do código MIT de
+https://github.com/supertone-inc/supertonic, commit 1e9799e964ea4c0dad7cde993b65c3c813a7b373
+(py/helper.py). O código completo do repositório não é redistribuído. Os pesos são outra licença: OpenRAIL-M, em `OpenRAIL-M_supertonic-3.txt`,
 com aceite no download. Este aviso não é endosso da Supertone (cláusula 8 da OpenRAIL-M).
 
 Texto abaixo copiado do LICENSE do GitHub em 2026-10-29 (Copyright (c) 2025 Supertone Inc.).

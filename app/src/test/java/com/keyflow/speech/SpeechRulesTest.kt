@@ -56,7 +56,7 @@ class SpeechRulesTest {
         val forbidden = listOf(
             "com.keyflow.data.", "androidx.datastore", "SharedPreferences", "ModelStore", "ModelCatalog", "SettingsRepository",
         )
-        val service = kotlinFiles("com/keyflow/speech/local").filter { it.name == "SpeechService.kt" || it.name == "SpeechServiceCore.kt" || it.name == "VitsVoice.kt" }
+        val service = kotlinFiles("com/keyflow/speech/local").filter { it.name == "SpeechService.kt" || it.name == "SpeechServiceCore.kt" || it.name == "VitsVoice.kt" || it.name == "SupertonicVoice.kt" }
         val found = offenders(service) { code -> forbidden.any { it in code } }
         assertEquals("o :speech recebe caminhos pelo AIDL: $found", emptyList<String>(), found)
     }

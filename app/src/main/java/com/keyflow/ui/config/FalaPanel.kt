@@ -119,12 +119,17 @@ fun FalaPanel(
     localSupported: Boolean = true,
     tester: SpeechTester = SpeechTester.None,
     initialTest: FalaTestState = FalaTestState(),
+    showInitialTest: Boolean = false,
     openAiAuth: AuthActions = AuthActions.None,
     googleAuth: AuthActions = AuthActions.None,
     elevenLabsAuth: AuthActions = AuthActions.None,
 ) {
     val palette = LocalKeyFlowPalette.current
     val scroll = rememberScrollState()
+    // A galeria pode enquadrar os controles parados depois que o conteúdo ganha tamanho.
+    LaunchedEffect(showInitialTest, scroll.maxValue) {
+        if (showInitialTest && scroll.maxValue > 0) scroll.scrollTo(scroll.maxValue)
+    }
     val active = settings.withoutCredits()
     val editor = rememberSettingsEditor(active, onSettingsChange)
     // As chaves vêm dos fluxos do cofre (fora da main): a composição nunca decifra nada.

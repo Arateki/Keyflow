@@ -18,6 +18,7 @@ internal fun interface SpeechCancellable {
  * [cancelled] passa a valer no meio da frase; a implementação para na próxima checagem.
  */
 internal interface LocalVoice : AutoCloseable {
+    fun available(model: File, tokens: File): Boolean = model.isFile && tokens.isFile
     fun synthesize(
         model: File,
         tokens: File,
@@ -91,7 +92,7 @@ internal class SpeechServiceCore(
         try {
             val model = File(job.modelPath)
             val tokens = File(job.tokensPath)
-            if (!model.isFile || !tokens.isFile) {
+            if (!voice.available(model, tokens)) {
                 if (!isCancelled(ticket)) listener.onError(SpeechProtocol.MODEL_MISSING, "arquivo ausente")
                 return
             }

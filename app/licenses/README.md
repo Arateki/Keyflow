@@ -15,7 +15,7 @@
 | Qwen2.5 1.5B Instruct (Alibaba) — modelo de texto baixado sob demanda | Apache-2.0 | `Apache-2.0_qwen2.5-1.5b.txt` |
 | Qwen3 4B Instruct-2507 (Alibaba) — modelo de texto baixado sob demanda | Apache-2.0 | `Apache-2.0_qwen3-4b-instruct-2507.txt` |
 | PaddleOCR PP-OCRv3/v5 em ONNX (PaddlePaddle; conversão de monkt) — modelo de OCR da Visão baixado sob demanda (só no debug até a prova num aparelho) | Apache-2.0 | `Apache-2.0_paddleocr.txt` |
-| Supertonic 3 (Supertone) — voz baixada sob demanda (só no debug até o motor falar) | OpenRAIL-M nos pesos (com Attachment A; aceite no download) e MIT na inferência, que não é redistribuída | `OpenRAIL-M_supertonic-3.txt`, `MIT_supertonic.txt` |
+| Supertonic 3 (Supertone) — voz baixada sob demanda (só no debug até o motor falar) | OpenRAIL-M nos pesos (com Attachment A; aceite no download) e MIT no frontend e na inferência adaptados para Kotlin | `OpenRAIL-M_supertonic-3.txt`, `MIT_supertonic.txt` |
 | VITS Coqui pt (espelho `csukuangfj/vits-coqui-pt-cv`; origem `neongeckocom/tts-vits-cv-pt`) — voz baixada sob demanda (só no debug até o motor falar) | BSD-3-Clause nos pesos; o código Coqui (MPL-2.0) não entra | `BSD-3-Clause_vits-coqui-pt.txt` |
 | Monogramas Supertone e Coqui no card | Desenho próprio; não são os logos oficiais e não indicam endosso | — |
 | SmolLM2 1.7B Instruct (Hugging Face) — modelo de texto baixado sob demanda | Apache-2.0 | `Apache-2.0_smollm2-1.7b.txt` |

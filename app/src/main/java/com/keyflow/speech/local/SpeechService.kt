@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Processo `:speech` (FLOC-04). Tudo chega pelo AIDL: aqui não se lê Settings, DataStore, catálogo nem cofre,
- * e nada faz rede (no debug, o StrictMode mata o processo se tentar). A sessão é o [VitsVoice], preguiçosa,
+ * e nada faz rede (no debug, o StrictMode mata o processo se tentar). A sessão é escolhida pelo [LocalVoiceRouter], preguiçosa,
  * na `libonnxruntime.so` que o app já tem.
  */
 class SpeechService : Service() {
@@ -33,7 +33,7 @@ class SpeechService : Service() {
 
     private val core by lazy {
         SpeechServiceCore(
-            voice = VitsVoice(),
+            voice = LocalVoiceRouter(),
             availableMb = ::availableMemoryMb,
             scheduler = object : SpeechIdleScheduler {
                 override fun schedule(delayMs: Long, block: () -> Unit): SpeechCancellable {
