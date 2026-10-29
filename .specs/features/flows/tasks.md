@@ -19,7 +19,7 @@
 - **Goldens**: `pool telas` (`verify-screens.sh` → `diff-screens.sh`). `--approve` copia **tudo**: restaure com `git checkout -- verification/golden/…` o que não for desta mudança.
   Golden existente fica bit-idêntico, salvo as telas de Sobrepor/barra da T20/T21 e as rotas novas.
 - **Aparelho do Yan (A32)**: nunca `connectedAndroidTest`. Teste manual só na T26 e com `--confirmo-a32`.
-- **Convenções**: `collectAsStateOnMain`; nada de `runBlocking` novo; texto novo por `tr("…")`; pacotes `fluxos` e `fluxos.execucao` **sem `android.*`**;
+- **Convenções**: `collectAsStateOnMain`; nada de `runBlocking` novo; texto novo por `tr("…")`; `com.keyflow.fluxos` e `fluxos/execucao` **sem `android.*`** (Android só em `fluxos/app`, excluído da regra);
   o executor **não** importa o downloader nem o cofre. Nada de segredo em fluxo.
 - **Não alterar** a `ButtonStateMachine`, o módulo `agent/` nem o formato de `bars_config_json` além do caso `flow`.
 - **Commit** em português, um por assunto, sem citar agentes de IA e sem trailers. Ao fechar a task: `Status` aqui, traceability no `spec.md`, lição em `.specs/project/licoes/` e o `STATE.md` (T27).
@@ -38,7 +38,7 @@ Fase C  integração Android:        T9 [P: refatoração sem dependência]
                                     T6 ──► T11            T6 ──► T12            (T6, T9) ──► T13
                                     (T4, T5, T10, T11, T12, T13) ──► T14 ──► T15
                                     (T1, T2) ──► T16  (liga ao serviço na T14)
-Fase D  telas:                     (T3, T4) ──► T17 ──► T18 ──► T19
+Fase D  telas:                     (T3, T4, T7) ──► T17 ──► T18 ──► T19
                                     (T5, T16, T18) ──► T20 ──► T21
                                     (T17..T21) ──► T22
 Fase E  fechamento:                (T17..T21) ──► T23       T22 ──► T24
@@ -54,11 +54,11 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 
 ### FLX-T1 — Modelo de domínio, limites e validação `[P]` — **Status: pendente**
 - **What**: `Tipo`, `ModeloRef`, `Etapa` (sealed, com `entrada`/`saida`/`usaModelo`), `Fluxo`, `Superficie`, `Gatilho`, `ConfigFluxos`, `LIMITES` (20/8/40/500/64) e
-  `ValidadorFluxo` (`validar`, `compativeis(ultimaSaida)` com motivo, aviso "sem saída"). Regra no `ArchitectureRulesTest`: `fluxos/` sem `android.*`/compose/downloader/cofre.
+  `ValidadorFluxo` (`validar`, `compativeis(ultimaSaida)` com motivo, aviso "sem saída"). Regra no `ArchitectureRulesTest`: `fluxos/*.kt` e `fluxos/execucao/**`, **excluindo `fluxos/app/**`**, sem `android.*`/compose/downloader/cofre.
 - **Where**: `app/src/main/java/com/keyflow/fluxos/{Modelo,ValidadorFluxo}.kt`; testes em `app/src/test/.../fluxos/`.
 - **Depends on**: —. **Requirement**: FLX-13, FLX-14, FLX-15, FLX-33 (modelo), FLX-52.
 - **Done when**: unit — Ditar/Capturar só passam na posição 0; cadeia de tipos (Capturar → Perguntar inválida com o motivo certo; Capturar → Visão → Inserir válida); 0 etapas e 9 etapas inválidas;
-  `Desconhecida` invalida; `compativeis(null/TEXTO/IMAGEM)` devolve os conjuntos e motivos da spec; fluxo que termina em Perguntar é válido **com aviso**; a regra de arquitetura falha se um arquivo de `fluxos/` importar `android.`.
+  `Desconhecida` invalida; `compativeis(null/TEXTO/IMAGEM)` devolve os conjuntos e motivos da spec; fluxo que termina em Perguntar é válido **com aviso**; a regra de arquitetura falha se um arquivo de `fluxos/` ou `fluxos/execucao/` importar `android.` (e não falha com `fluxos/app/`).
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(fluxos): modelo de dados e validação`.
 
 ### FLX-T2 — Codec JSON de fluxos e gatilhos — **Status: pendente**
@@ -105,7 +105,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 ### FLX-T6 — Executor, estados, erros e tempos — **Status: pendente**
 - **What**: `Valor`, `ImagemHandle`, `ResultadoEtapa`, `ErroEtapa`/`CausaErro`/`DestinoAba`, `EstadoExecucao`, as interfaces das portas (`Portas`), `Limites` (Perguntar/Visão 180 s; Falar/Agente 10 min) e `ExecutorFluxo`
   (laço, um por vez, falha para sem parcial, cancelar, `finally` que libera imagem/player). `KeyFlowController.fluxo: StateFlow<EstadoExecucao>`.
-- **Where**: `fluxos/execucao/*.kt`, `core/KeyFlowController.kt`; teste `ExecutorFluxoTest` (portas falsas, `TestCoroutineScheduler`). Regra de arquitetura: `fluxos/execucao` sem `android.*`/downloader/cofre.
+- **Where**: `fluxos/execucao/*.kt`, `core/KeyFlowController.kt`; teste `ExecutorFluxoTest` (portas falsas, `TestCoroutineScheduler`). Regra de arquitetura: `fluxos/execucao` sem `android.*`/downloader/cofre (`fluxos/app/**` fora da regra).
 - **Depends on**: T1. **Requirement**: FLX-17, FLX-27, FLX-28, FLX-29, FLX-31, FLX-52.
 - **Done when**: unit — "Ditar → Perguntar → Falar" passa o texto de uma porta à outra; `Falha` na etapa 2 impede a 3 e deixa `Falhou(indice = 1)` com a causa; `Cancelada` → `Cancelado`; segundo `executar` durante um em curso é recusado e não cancela o
   primeiro; estouro de tempo → `Falha(TEMPO)` com relógio virtual; `Valor.Imagem` é liberada em sucesso, falha e cancelamento; cancelar a `Job` cancela a porta em curso; `Concluido` volta a `Ocioso`.
@@ -194,7 +194,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 - **Tests**: instrumentado. **Gate**: `pool instrumentar com.keyflow.overlay.OverlayServiceFluxoTest com.keyflow.overlay.OrbButtonViewTest`. **Commit**: `feat(fluxos): 2 e 3 toques da orbe disparam fluxos`.
 
 ### FLX-T16 — Botão da barra do teclado `RunFlow` — **Status: pendente**
-- **What**: `BarButton.RunFlow(botaoId)` e todos os `when` exaustivos (design §5.2): `ShortcutCodec` (`"type":"flow"`), `BarGeometry`, `BarView.draw/perform` + callback `onRunFlow`, `BarIcons` (`KfIcons.TabFluxos`), `BarsEditor.buttonLabel`
+- **What**: `BarButton.RunFlow(botaoId)` e todos os `when` exaustivos (design §5.2): `ShortcutCodec` (`"type":"flow"`), `BarGeometry`, `BarView.draw/perform` + callback `onRunFlow`, `BarIcons` (`KfIcons.TabFluxos`), `BarsEditor.barButtonName`
   ("Fluxo: <nome>"; listar/mover/remover; **fora** do catálogo de adicionar); o `KeyFlowKeyboardService` liga o callback ao `ACTION_RUN_FLOW` e passa à `BarView` os `botaoId` com gatilho válido (desabilitado quando órfão) e o estado de `KeyFlowController.fluxo` (o botão do fluxo em execução fica aceso).
 - **Where**: `core/shortcuts/{ShortcutModels,ShortcutCodec}.kt`, `ime/bars/{BarGeometry,BarView,BarIcons}.kt`, `ime/KeyFlowKeyboardService.kt`, `ui/config/BarsEditor.kt`.
 - **Depends on**: T1, T2, T6 (T14 para o disparo ponta a ponta). **Requirement**: FLX-36, FLX-32 (botão em execução).
@@ -295,7 +295,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 
 ### FLX-T27 — Fechamento — **Status: pendente**
 - **What**: Status de todas as tasks neste arquivo, traceability do `spec.md` (Pending → Verified), lições em `.specs/project/licoes/` (RAM em fluxo local, gancho do coordinator, destino do `VisionFlow`), `STATE.md`, `DEVELOPMENT-ORDER.md` (Bloco 14 → concluído) e a nota para a bancada (Q7:
-  BNC-T23/T27 passam a consumir `fluxos.modelo`).
+  BNC-T23/T27 passam a consumir `com.keyflow.fluxos`).
 - **Where**: `.specs/features/flows/*`, `.specs/DEVELOPMENT-ORDER.md`, `.specs/project/STATE.md`, `.specs/project/licoes/`.
 - **Depends on**: T26. **Requirement**: regra de ouro 6.
 - **Done when**: gate `full` verde (unit + instrumentados afetados + goldens 0 divergências além das rotas novas); `ArchitectureRulesTest`, `TranslationsTest` e `lintDebug` verdes; requisitos → Verified (ou Parcial com o motivo).

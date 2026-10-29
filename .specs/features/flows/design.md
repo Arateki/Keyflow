@@ -61,7 +61,7 @@ saída de uma na entrada da seguinte. Por isso:
 | `ui/config/FluxosPanel.kt` (reescrito), `FluxosModal.kt`, `FluxosEtapas.kt`, `FluxosSeletorModelo.kt`, `FluxosAtalhos.kt` | as telas | Compose |
 | `i18n/en/Fluxos.kt`, `i18n/es/Fluxos.kt` | traduções (já existem; trocam de conteúdo) | — |
 
-`ArchitectureRulesTest` (FLX-52): `fluxos/` e `fluxos/execucao/` não importam `android.*`, `androidx.compose.*`,
+`ArchitectureRulesTest` (FLX-52): os arquivos de `fluxos/` (Modelo.kt etc.) e de `fluxos/execucao/`, **com `fluxos/app/**` excluído**, não importam `android.*`, `androidx.compose.*`,
 `com.keyflow.data.models.ModelDownloader`/`DownloadGateway`/`ModelDownloadService` nem o cofre (`auth`); `fluxos/app/` é o
 único que enxerga os dois lados.
 
@@ -185,7 +185,7 @@ que o auto-save da tela não desfaz nada. Custo: dois lugares dizem o que o gest
 - Novo caso `BarButton.RunFlow(botaoId: String)` em `ShortcutModels.kt` (`data class`); `botaoId` = 6 hex aleatórios gerados pelo modal.
   Pontos exaustivos a atualizar (todos têm `when` sobre o `sealed`): `ShortcutCodec.buttonJson/buttonFrom` (`"type":"flow"`),
   `BarGeometry` (largura 1f), `BarView.draw` (rótulo/ícone) e `BarView.perform` (`:645`), `BarIcons` (`KfIcons.TabFluxos`),
-  `BarsEditor.buttonLabel` (`:114`, rótulo "Fluxo: <nome>").
+  `BarsEditor.barButtonName` (`:112`, rótulo "Fluxo: <nome>").
 - `BarView` ganha o callback `onRunFlow(botaoId)`; o `KeyFlowKeyboardService` o liga a
   `startForegroundService(OverlayService.actionIntent(ctx, ACTION_RUN_FLOW).putExtra(EXTRA_BOTAO_ID, id))` — o mesmo caminho do
   `ACTION_KEYBOARD_MIC`. O IME **não** conhece o fluxo: o serviço resolve `Barra(botaoId)` → fluxo pelo `cachedFluxos`.
@@ -528,7 +528,7 @@ quando `canAlwaysAllow`). Título pequeno acima: "Fluxo “Pedir ao agente e col
 | Coordinator | `OverlayCoordinatorStateMachineTest` (estendido) + `DitadoDeFluxoTest` | destino liberado exatamente uma vez por sessão; o desfazer não libera; `insertOrHold` não é chamado com destino; microfone só em RECORDING | unit |
 | Barras | `ShortcutCodecTest`, `ShortcutCodecPropertyTest`, `BarGeometryTest`, `BarIconsTest` (estendidos) | `RunFlow` ida e volta; largura; ícone; JSON antigo igual | unit |
 | Barras | `KeyFlowKeyboardBarsTest`, `BarViewAccessibilityTest`, `BarsEditorTest` (estendidos) | botão desenhado e tocável; desabilitado quando órfão; o editor lista/move/remove e não oferece para adicionar | instrumentado |
-| Arquitetura | `ArchitectureRulesTest` | `fluxos/**` sem `android.*`/compose/downloader/cofre; `collectAsStateOnMain` nas telas novas; sem `runBlocking` novo | unit |
+| Arquitetura | `ArchitectureRulesTest` | `fluxos/*.kt` e `fluxos/execucao/**` (excluindo `fluxos/app/**`) sem `android.*`/compose/downloader/cofre; `collectAsStateOnMain` nas telas novas; sem `runBlocking` novo | unit |
 | Persistência | `FluxosRepositoryTest` | semeadura sem escrever; `atualizarFluxos` atômico e sobre o valor atual (duas edições concorrentes); `atualizarFluxosEBarras` numa transação; não regrava as `Settings` | instrumentado |
 | Serviço | `OverlayServiceFluxoTest` | com portas falsas: gesto 2 toques roda o fluxo e **não** a ação sombreada; sem gatilho a ação roda; `ACTION_RUN_FLOW` do botão; precondições; `maybeStopWhenIdle` não encerra; cancelar pela orbe; falha → banner com destino | instrumentado |
 | Ditar | `FluxoDitadoTest` | com o gravador falso do `OverlayServiceVisionTest`: o texto não é inserido, vai à porta; PTT forçado a alternar; cancelar → `Cancelada` | instrumentado |
@@ -554,7 +554,7 @@ Os goldens existentes ficam bit-idênticos; os de Sobrepor/barra só mudam onde 
 | Injeção por conteúdo de tela no Agente (Capturar → Visão → Agente) | o texto lido é dado; ferramentas que escrevem continuam pedindo confirmação (D5); "Permitir sempre" segue só para `WRITE` e não vale para chamadas sem janela visível |
 | `ConfirmationGate` é único e nega o segundo pedido | só um fluxo e uma execução do agente por vez (FLX-17, FLX-24) |
 | Conflito com a fase 2 do agente (`equipe/agente-fase2`, AGT-T8..T10) em `AgentController` | o fluxo só **chama** `send/cancel/respond/state`; nenhuma mudança no módulo do agente |
-| Tipos paralelos à bancada (`Capacidade`, `Etapa`/`Fluxo` do BFL-01) | Q7: a bancada passaria a consumir `fluxos.modelo`; até lá os nomes `Etapa`/`Fluxo` coincidem de propósito e os pacotes são distintos (`bancada.fluxo`) |
+| Tipos paralelos à bancada (`Capacidade`, `Etapa`/`Fluxo` do BFL-01) | Q7: a bancada passaria a consumir `com.keyflow.fluxos`; até lá os nomes `Etapa`/`Fluxo` coincidem de propósito e os pacotes são distintos (`bancada.fluxo`) |
 | `release/v1` congelada | tudo só na `main`; sem flag de build (A13) |
 
 ## O que NÃO muda

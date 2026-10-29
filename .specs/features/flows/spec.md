@@ -196,7 +196,7 @@ alavanca e grade (`ShortcutModels.kt`). Nada liga a saída de uma capacidade na 
 ### P2-H: Qualidade (`QLD`)
 
 1. **FLX-51**: todo texto novo da interface SHALL passar por `tr("…")` (português como chave), com as traduções em `i18n/en/Fluxos.kt` e `i18n/es/Fluxos.kt` (ordem crescente do português); as chaves do `FluxosPanel` antigo que ficarem sem uso saem. `TranslationsTest` verde.
-2. **FLX-52**: os pacotes `fluxos.modelo` e `fluxos.execucao` SHALL ser **JVM puro** (sem `android.*`, sem `Context`, sem Compose) e o executor SHALL **não importar** o downloader de modelos nem o cofre; `ArchitectureRulesTest` confere. A tela usa `collectAsStateOnMain`; nada de `runBlocking` novo.
+2. **FLX-52**: o pacote `com.keyflow.fluxos` (modelo, codec, validação, restaurar, roteamento) e o subpacote `fluxos/execucao` SHALL ser **JVM puro** (sem `android.*`, sem `Context`, sem Compose); o código Android fica só em `fluxos/app`, que a regra exclui e o executor SHALL **não importar** o downloader de modelos nem o cofre; `ArchitectureRulesTest` confere. A tela usa `collectAsStateOnMain`; nada de `runBlocking` novo.
 3. **FLX-53**: goldens claro/escuro das telas novas (lista com os 3 padrão; lista com atalhos e um card Incompleto; vazia; modal; seletor de etapa; seletor de modelo; aviso de substituir; confirmação de restaurar; confirmação de excluir; barra do teclado com botão de fluxo; Sobrepor com gesto ligado). Goldens existentes ficam bit-idênticos, salvo a barra/Sobrepor onde a mudança é intencional.
 4. **FLX-54**: acessibilidade: alvos de toque ≥ 48 dp; cada ação tem `contentDescription`; toda reordenação por arrastar tem a alternativa por botão (FLX-12); o estado "Em execução" e "Incompleto" não depende só de cor.
 5. **FLX-55**: a aba **Docs** SHALL ganhar a seção "aba-fluxos" (o que é um fluxo, as etapas, os padrão, atalhos, restaurar, o que sai do aparelho) e o `docsSectionFor(FLUXOS)` passa a apontar para ela; `website/_fonte/doc.json` é regenerado (`DocsSiteExportTest`).
@@ -356,7 +356,7 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 - **Q4** — Quer um botão **"Rodar agora"** no modal na V1? Ele ajuda a testar, mas Capturar/Inserir dependem do app em foco.
 - **Q5** — Disparo com a **gravação em andamento** (RECORDING/PAUSED) num fluxo com Ditar: recusar (FLX-18) ou pausar/guardar a gravação?
 - **Q6** — Os 3 padrão ficam **sem atalho** na primeira abertura (FLX-40). Quer uma *dica* escrita no modal de cada um ("Sugestão: 2 toques"), sem ligar nada?
-- **Q7** — Coordenação com a **bancada**: `Capacidade{TEXTO,AUDIO,IMAGEM}` e `Etapa/Fluxo` do BFL-01 são parentes destes tipos. A bancada deve **consumir** os tipos de `fluxos.modelo` (a BNC-T23 passaria a depender da FLX-T1)?
+- **Q7** — Coordenação com a **bancada**: `Capacidade{TEXTO,AUDIO,IMAGEM}` e `Etapa/Fluxo` do BFL-01 são parentes destes tipos. A bancada deve **consumir** os tipos de `com.keyflow.fluxos` (a BNC-T23 passaria a depender da FLX-T1)?
 
 ---
 
