@@ -27,7 +27,7 @@ enum class VisionSource { CREDITS, LOCAL, OPENAI, ANTHROPIC, GOOGLE, CUSTOM }
  * (100% offline, TTS); OPENAI = síntese via OpenAI TTS; ELEVENLABS = vozes ultra-realistas ElevenLabs;
  * GOOGLE = síntese neural Google Cloud TTS; CUSTOM = API de voz personalizada.
  */
-enum class FalaSource { CREDITS, LOCAL, OPENAI, ELEVENLABS, GOOGLE, CUSTOM }
+enum class FalaSource { CREDITS, LOCAL, SYSTEM, OPENAI, ELEVENLABS, GOOGLE, CUSTOM }
 
 /** Lado inicial do overlay (OVL-05). */
 enum class OverlaySide { LEFT, RIGHT }

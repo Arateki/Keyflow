@@ -421,6 +421,9 @@ object RouteCatalog {
             )
         },
         Route("config-fala-elevenlabs") { ConfigFalaRoute(source = FalaSource.ELEVENLABS, elevenLabsKey = "eleven_mock_key") },
+        Route("config-fala-sistema") { ConfigFalaRoute(source = FalaSource.SYSTEM) },
+        Route("config-fala-custom") { ConfigFalaRoute(source = FalaSource.CUSTOM) },
+        Route("config-fala-openai") { ConfigFalaRoute(source = FalaSource.OPENAI) },
         Route("config-fala-google") { ConfigFalaRoute(source = FalaSource.GOOGLE, googleKey = "AIzaSyMockGoogleVoiceKey") },
         // Raciocínio: `config-raciocinio` é a origem Local sem nenhum modelo baixado; as outras cobrem baixando, pronto, a nuvem
         // (desconectada, conectada com o plano) e a área do Testar em andamento e no limite de uso.
