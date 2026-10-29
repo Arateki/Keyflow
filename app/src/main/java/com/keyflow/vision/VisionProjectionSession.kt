@@ -18,6 +18,7 @@ class VisionProjectionSession(
     private val notificationId: Int,
     private val notification: () -> Notification,
     private val onRevoked: () -> Unit,
+    private val observeType: (Int) -> Unit = {},
 ) {
     private var projection: MediaProjection? = null
     private var callback: MediaProjection.Callback? = null
@@ -30,6 +31,7 @@ class VisionProjectionSession(
                 service.startForeground(notificationId, notification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
                 promoted = true
+                observeType(service.foregroundServiceType)
             }
             val manager = service.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             val instance = checkNotNull(manager.getMediaProjection(Activity.RESULT_OK, result))
@@ -63,6 +65,7 @@ class VisionProjectionSession(
             promoted = false
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 service.startForeground(notificationId, notification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+                observeType(service.foregroundServiceType)
             }
         }
     }

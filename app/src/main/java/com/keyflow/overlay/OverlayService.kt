@@ -118,24 +118,26 @@ class OverlayService : Service() {
     private var visionProjection: VisionProjectionSession? = null
     private var visionMediaProjection: MediaProjection? = null
     private var visionSelector: RegionSelectView? = null
+    private var visionRestartDialog: android.app.AlertDialog? = null
     private val visionGrabber = ScreenFrameGrabber()
+    private val visionHiddenViews = mutableMapOf<View, Int>()
     private val visionFlow: VisionFlow<Bitmap> by lazy {
         VisionFlow<Bitmap>(
             pause = { coordinator.onIntent(GestureIntent.PAUSE) },
             requestConsent = { requestVisionProjection({ projection ->
                 visionMediaProjection = projection
                 visionFlow.consentGranted()
+                visionProjectionStartedForTest?.invoke(projection)
             }, {
                 Toast.makeText(this, tr("Captura de tela cancelada."), Toast.LENGTH_SHORT).show()
                 visionFlow.finish()
             }) },
             showSelector = ::showVisionSelector,
             cleanup = ::cleanupVision,
-            onState = { floatingButton?.updateVisionState(it) },
+            onState = { floatingButton?.updateVisionState(it, cachedSettings.themeDark) },
             onResult = { bitmap ->
                 // O consumidor de ações será ligado na VC-T7; a etapa devolve o bitmap ao callback.
-                visionCaptureResultForTest?.invoke(bitmap)
-                bitmap.recycle()
+                try { visionCaptureResultForTest?.invoke(bitmap) } finally { bitmap.recycle() }
             },
         )
     }
@@ -259,7 +261,8 @@ class OverlayService : Service() {
                 onAbort()
             } else {
                 val session = VisionProjectionSession(this, NOTIFICATION_ID,
-                    { recordingNotification.build(coordinator.currentState(), dark = cachedSettings.themeDark) }, onAbort)
+                    { recordingNotification.build(coordinator.currentState(), dark = cachedSettings.themeDark) }, onAbort,
+                    { visionProjectionTypeForTest?.invoke(it) })
                 visionProjection = session
                 try { onGranted(session.start(data)) } catch (_: Exception) {
                     visionProjection = null
@@ -280,12 +283,29 @@ class OverlayService : Service() {
 
     private fun showVisionSelector() {
         if (!OverlayPermission.canDrawOverlays(this)) { visionFlow.finish(); return }
-        val selector = RegionSelectView(this, ::captureVisionRegion) { visionFlow.finish() }
+        val selector = RegionSelectView(this, ::captureVisionRegion, cancel = { visionFlow.finish() }, resized = {
+            visionFlow.finish()
+            showVisionRestart()
+        })
         val config = OverlayWindowConfig.forSdk()
         val params = WindowManager.LayoutParams(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT,
             config.type, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                 WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, PixelFormat.TRANSLUCENT)
         try { windowManager.addView(selector, params); visionSelector = selector } catch (_: RuntimeException) { visionFlow.finish() }
+    }
+
+    /** Uma mudança de coordenadas exige nova autorização; o token anterior já foi descartado. */
+    private fun showVisionRestart() {
+        val dialog = android.app.AlertDialog.Builder(this)
+            .setMessage(tr("A tela mudou de tamanho. Deseja recomeçar a captura?"))
+            .setNegativeButton(tr("Cancelar"), null)
+            .setPositiveButton(tr("Recomeçar")) { _, _ ->
+                visionFlow.start(VisionFlowRequest(coordinator.currentState()))
+            }.create()
+        dialog.window?.setType(OverlayWindowConfig.forSdk().type)
+        visionRestartDialog = dialog
+        dialog.setOnDismissListener { if (visionRestartDialog === dialog) visionRestartDialog = null }
+        dialog.show()
     }
 
     @Suppress("DEPRECATION")
@@ -294,7 +314,11 @@ class OverlayService : Service() {
         val projection = visionMediaProjection ?: return
         visionFlow.selected()
         selector.visibility = View.INVISIBLE
-        floatingButton?.visibility = View.INVISIBLE
+        listOfNotNull(floatingButton, errorBanner, cancelBanner, limitBanner, dragArrowsView).forEach {
+            visionHiddenViews[it] = it.visibility
+            it.visibility = View.INVISIBLE
+        }
+        partialOverlay?.remove()
         // Espera dois quadros de composição, sem depender de prazo arbitrário.
         selector.postOnAnimation { selector.postOnAnimation {
             if (visionFlow.state != VisionFlowState.WORKING) return@postOnAnimation
@@ -302,7 +326,7 @@ class OverlayService : Service() {
             windowManager.defaultDisplay.getRealMetrics(metrics)
             try {
                 visionGrabber.capture(projection, metrics.widthPixels, metrics.heightPixels, metrics.densityDpi, rect) { result ->
-                    result.fold({ visionFlow.captured(it) }, {
+                    result.fold({ if (visionFlow.state == VisionFlowState.WORKING) visionFlow.captured(it) else it.recycle() }, {
                         Toast.makeText(this, tr("Não foi possível capturar esta tela."), Toast.LENGTH_SHORT).show()
                         visionFlow.finish()
                     })
@@ -312,13 +336,17 @@ class OverlayService : Service() {
     }
 
     private fun cleanupVision() {
+        visionRestartDialog?.dismiss()
+        visionRestartDialog = null
         visionGrabber.close()
         visionSelector?.let { runCatching { windowManager.removeViewImmediate(it) } }
         visionSelector = null
         visionMediaProjection = null
         endVisionProjection()
         VisionCache.clear(this)
-        floatingButton?.visibility = View.VISIBLE
+        visionHiddenViews.forEach { (view, visibility) -> view.visibility = visibility }
+        visionHiddenViews.clear()
+        refreshPartialUi()
     }
 
     /**
@@ -326,6 +354,7 @@ class OverlayService : Service() {
      * teclado), ancora no canto de cima — a notificação de gravação continua sendo o controle.
      */
     private fun refreshPartialUi() {
+        if (visionFlow.state == VisionFlowState.WORKING) { partialOverlay?.remove(); return }
         if (PartialUi.closesOpened(lastButtonState)) partialOpened = PartialUiMode.HIDDEN
         val mode = PartialUi.resolve(partialOpened, lastButtonState, partialSnapshot, cachedSettings.partialViewEdit)
         if (mode == PartialUiMode.HIDDEN && partialOverlay == null) return
@@ -368,7 +397,7 @@ class OverlayService : Service() {
      * serviço — assim não fica notificação de FGS quando ocioso no modo só-teclado.
      */
     private fun maybeStopWhenIdle(state: ButtonState) {
-        if (overlayActive || !isForeground) return
+        if (overlayActive || !isForeground || visionFlow.state != VisionFlowState.NONE || visionRestartDialog != null) return
         val idle = state == ButtonState.IDLE_READY || state == ButtonState.IDLE_NO_FIELD
         if (idle) {
             stopForeground(STOP_FOREGROUND_REMOVE)
@@ -378,6 +407,7 @@ class OverlayService : Service() {
     }
 
     private fun handlePauseResume() {
+        if (visionFlow.state != VisionFlowState.NONE) { visionFlow.finish(); return }
         if (!::coordinator.isInitialized) return
         when (coordinator.currentState()) {
             ButtonState.RECORDING -> coordinator.onIntent(GestureIntent.PAUSE)
@@ -387,6 +417,7 @@ class OverlayService : Service() {
     }
 
     private fun handleStopPaste() {
+        if (visionFlow.state != VisionFlowState.NONE) { visionFlow.finish(); return }
         if (!::coordinator.isInitialized) return
         val state = coordinator.currentState()
         if (state == ButtonState.RECORDING || state == ButtonState.PAUSED) {
@@ -396,12 +427,14 @@ class OverlayService : Service() {
 
     /** Cancelar pela notificação: mesmo fluxo do gesto (retém áudio + janela de desfazer). */
     private fun handleCancel() {
+        if (visionFlow.state != VisionFlowState.NONE) { visionFlow.finish(); return }
         if (!::coordinator.isInitialized) return
         coordinator.onCancel()
     }
 
     /** Tap do mic do teclado: ocioso inicia; gravando/pausado envia (o "modo" é só da orbe). */
     private fun handleKeyboardMicTap() {
+        if (visionFlow.state != VisionFlowState.NONE) { visionFlow.finish(); return }
         when (coordinator.currentState()) {
             ButtonState.RECORDING, ButtonState.PAUSED -> coordinator.onIntent(GestureIntent.STOP)
             ButtonState.CANCELLING -> coordinator.onCommitCancel() // toque conclui o cancelamento na hora
@@ -416,6 +449,8 @@ class OverlayService : Service() {
 
     override fun onDestroy() {
         if (visionFlow.state != VisionFlowState.NONE) visionFlow.finish()
+        visionRestartDialog?.dismiss()
+        visionRestartDialog = null
         endVisionProjection()
         isRunningForUi = false
         foregroundPending = false
@@ -593,7 +628,7 @@ class OverlayService : Service() {
             controller = gestureController,
             mode = { cachedSettings.overlayRecordingMode },
             side = { cachedSettings.overlaySide },
-            onIntent = { intent -> coordinator.onIntent(intent) },
+            onIntent = { intent -> if (visionFlow.state != VisionFlowState.NONE) visionFlow.finish() else coordinator.onIntent(intent) },
             orbSizePx = cachedSettings.orbSizePx,
             orbStyle = com.keyflow.ui.orb.orbStyleFor(cachedSettings.orbSkin, skinsUnlocked),
             orbPack = openOrbPack(cachedSettings.orbSkin),
@@ -639,7 +674,9 @@ class OverlayService : Service() {
             }
         }
         serviceScope.launch {
-            KeyFlowController.tapRequest.collect { coordinator.onTap() }
+            KeyFlowController.tapRequest.collect {
+                if (visionFlow.state != VisionFlowState.NONE) visionFlow.finish() else coordinator.onTap()
+            }
         }
     }
 
@@ -1085,6 +1122,8 @@ class OverlayService : Service() {
 
     companion object {
         internal var visionCaptureResultForTest: ((Bitmap) -> Unit)? = null
+        internal var visionProjectionStartedForTest: ((MediaProjection) -> Unit)? = null
+        internal var visionProjectionTypeForTest: ((Int) -> Unit)? = null
 
         private const val NOTIFICATION_CHANNEL_ID = "keyflow_overlay"
         private const val NOTIFICATION_ID = 1001

@@ -15,7 +15,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.ComposeView
 import com.keyflow.vision.VisionFlowState
 import com.keyflow.core.ButtonState
@@ -137,7 +136,9 @@ class OrbButtonView(
 
     private var visionState by mutableStateOf(VisionFlowState.NONE)
 
-    fun updateVisionState(state: VisionFlowState) { visionState = state }
+    private var visionDark by mutableStateOf(false)
+
+    fun updateVisionState(state: VisionFlowState, dark: Boolean = false) { visionState = state; visionDark = dark }
 
     private var orbUi by mutableStateOf(OrbButtonUi(OrbState.Idle, OrbCenter.None))
     private var currentOrbStyle by mutableStateOf(orbStyle)
@@ -205,18 +206,7 @@ class OrbButtonView(
                         dragHint = ui.dragHint,
                         style = currentOrbStyle,
                     )
-                    if (visionState != VisionFlowState.NONE) {
-                        androidx.compose.material3.Text(
-                            text = when (visionState) {
-                                VisionFlowState.CONSENT -> "?"
-                                VisionFlowState.SELECTING -> "⊡"
-                                VisionFlowState.WORKING -> "◌"
-                                else -> "◉"
-                            },
-                            color = androidx.compose.ui.graphics.Color.White,
-                            fontSize = 22.sp,
-                        )
-                    }
+                    com.keyflow.ui.orb.VisionPhaseBadge(visionState, com.keyflow.ui.theme.paletteFor(visionDark))
                     }
                 }
             }

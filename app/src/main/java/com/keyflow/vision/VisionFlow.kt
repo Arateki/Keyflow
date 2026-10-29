@@ -25,14 +25,14 @@ class VisionFlow<T>(
             request.recordingState == ButtonState.CANCELLING) return false
         if (request.recordingState == ButtonState.RECORDING) pause()
         set(VisionFlowState.CONSENT)
-        requestConsent()
+        try { requestConsent() } catch (e: Exception) { finish(); throw e }
         return true
     }
 
     fun consentGranted() {
         if (state != VisionFlowState.CONSENT) return
         set(VisionFlowState.SELECTING)
-        showSelector()
+        try { showSelector() } catch (e: Exception) { finish(); throw e }
     }
 
     fun selected() {

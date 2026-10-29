@@ -572,6 +572,8 @@ internal val TranslationsEn: Map<String, String> = mapOf(
     "Verificando" to "Checking",
     "Vibração" to "Vibration",
     "Visualizar e editar transcrição parcial" to "View and edit partial transcription",
+    "Recomeçar" to "Start again",
+    "A tela mudou de tamanho. Deseja recomeçar a captura?" to "The screen size changed. Start the capture again?",
     "Visão" to "Vision",
     "Voz" to "Voice",
     "Voz no aparelho" to "On-device voice",
