@@ -187,7 +187,9 @@ class OverlayService : Service() {
             ACTION_UNDO_CANCEL -> { if (::coordinator.isInitialized) coordinator.onUndoCancel() }
             ACTION_COMMIT_CANCEL -> { if (::coordinator.isInitialized) coordinator.onCommitCancel() }
             ACTION_RECORD -> {
-                if (settingsReady) {
+                if (visionFlow.state != VisionFlowState.NONE) {
+                    visionFlow.finish()
+                } else if (settingsReady) {
                     if (ensureForeground() && ::coordinator.isInitialized) coordinator.onTap() // ocioso → inicia (inclui tela de bloqueio)
                 } else {
                     pendingRecord = true

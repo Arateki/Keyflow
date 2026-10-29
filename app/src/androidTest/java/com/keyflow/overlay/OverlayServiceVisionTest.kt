@@ -59,7 +59,8 @@ class OverlayServiceVisionTest {
             // Nova chamada pede consentimento de novo; gesto de voz cancela só a Visão e mantém PAUSED.
             OverlayService.start(context, OverlayService.actionIntent(context, OverlayService.ACTION_VISION))
             assertNotNull(device.wait(Until.findObject(By.text(Pattern.compile("(?i)cancel|cancelar"))), 15_000))
-            OverlayService.start(context, OverlayService.actionIntent(context, RecordingNotification.ACTION_CANCEL))
+            val voiceAction = if (mode == RecordingMode.TOGGLE) OverlayService.ACTION_RECORD else RecordingNotification.ACTION_CANCEL
+            OverlayService.start(context, OverlayService.actionIntent(context, voiceAction))
             withTimeout(15_000) { OverlayService.visionFlowStateForTest.first { it == VisionFlowState.NONE } }
             instrumentation.waitForIdleSync()
             device.pressBack()
