@@ -1,6 +1,9 @@
 package com.keyflow.overlay
 
 import com.keyflow.i18n.tr
+import com.keyflow.vision.VisionConsentActivity
+import com.keyflow.vision.VisionProjectionSession
+import android.media.projection.MediaProjection
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -103,6 +106,7 @@ class OverlayService : Service() {
     // demanda (só durante a gravação). `overlayActive` = há orbe; `isForeground` = já em primeiro plano.
     private var overlayActive = false
     private var isForeground = false
+    private var visionProjection: VisionProjectionSession? = null
 
     // Settings em cache: o modo de gravação é lido a cada gesto (pode mudar na config).
     @Volatile
@@ -214,6 +218,33 @@ class OverlayService : Service() {
         }
     }
 
+    /** Inicia o consentimento sempre de novo; o chamador recebe a projeção ou uma saída de aborto. */
+    private fun requestVisionProjection(onGranted: (MediaProjection) -> Unit, onAbort: () -> Unit) {
+        if (!ensureForeground()) { onAbort(); return }
+        val requested = VisionConsentActivity.request(this) { data ->
+            if (data == null) {
+                onAbort()
+            } else {
+                val session = VisionProjectionSession(this, NOTIFICATION_ID,
+                    { recordingNotification.build(coordinator.currentState(), dark = cachedSettings.themeDark) }, onAbort)
+                visionProjection = session
+                try { onGranted(session.start(data)) } catch (_: Exception) {
+                    visionProjection = null
+                    session.close()
+                    onAbort()
+                }
+            }
+        }
+        if (!requested) onAbort()
+    }
+
+    private fun endVisionProjection() {
+        VisionConsentActivity.cancel()
+        val session = visionProjection
+        visionProjection = null
+        session?.close()
+    }
+
     /**
      * Indicador/visualização/edição do parcial junto à orbe (PAR-04/05). Sem orbe (sessão só do
      * teclado), ancora no canto de cima — a notificação de gravação continua sendo o controle.
@@ -308,6 +339,7 @@ class OverlayService : Service() {
     }
 
     override fun onDestroy() {
+        endVisionProjection()
         isRunningForUi = false
         foregroundPending = false
         stopRequested = false

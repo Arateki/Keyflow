@@ -8,6 +8,7 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <!-- Download dos modelos de voz em primeiro plano (ModelDownloadService). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -62,11 +63,15 @@
             android:taskAffinity=""
             android:excludeFromRecents="true" />
 
+        <activity android:name=".vision.VisionConsentActivity" android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" android:taskAffinity=""
+            android:excludeFromRecents="true" />
+
         <!-- Production overlay + microphone foreground service -->
         <service
             android:name=".overlay.OverlayService"
             android:exported="false"
-            android:foregroundServiceType="microphone" />
+            android:foregroundServiceType="microphone|mediaProjection" />
 
         <!-- Download dos modelos de voz: notificação de progresso e processo vivo com o app fechado. -->
         <service
