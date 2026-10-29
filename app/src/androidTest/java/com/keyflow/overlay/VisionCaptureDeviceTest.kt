@@ -13,6 +13,7 @@ import androidx.test.uiautomator.Until
 import com.keyflow.ui.gallery.GalleryActivity
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.regex.Pattern
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Rule
@@ -38,10 +39,10 @@ class VisionCaptureDeviceTest {
         val scenario = ActivityScenario.launch<GalleryActivity>(launch)
         try {
             OverlayService.start(context, OverlayService.actionIntent(context, OverlayService.ACTION_VISION))
-            val chooser = device.wait(Until.findObject(By.textMatches("(?i).*single app.*|.*um aplicativo.*|.*um app.*")), 15_000)
+            val chooser = device.wait(Until.findObject(By.text(Pattern.compile("(?i).*single app.*|.*um aplicativo.*|.*um app.*"))), 15_000)
             chooser?.click()
-            device.wait(Until.findObject(By.textMatches("(?i).*entire screen.*|.*tela inteira.*")), 2_000)?.click()
-            val accept = device.wait(Until.findObject(By.textMatches("(?i).*start now.*|.*iniciar agora.*")), 15_000)
+            device.wait(Until.findObject(By.text(Pattern.compile("(?i).*entire screen.*|.*tela inteira.*"))), 2_000)?.click()
+            val accept = device.wait(Until.findObject(By.text(Pattern.compile("(?i).*start now.*|.*iniciar agora.*"))), 15_000)
             assertTrue("diálogo de consentimento não apareceu", accept != null)
             accept!!.click()
             // O seletor é uma View Canvas: aguarda sua janela real antes de tocar em Confirmar.
