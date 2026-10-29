@@ -35,6 +35,7 @@ import com.keyflow.ui.common.verticalScrollbar
 import com.keyflow.ui.icons.KfIcons
 import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
@@ -540,7 +541,7 @@ fun FalaTestArea(
                     val engine = tester.engineFor(snapshot)
                     val player = tester.newPlayer()
                     state = FalaTestState(running = true)
-                    val job = scope.launch {
+                    val job = scope.launch(start = CoroutineStart.LAZY) {
                         var firstAudio: Long? = null
                         try {
                             engine.speak(SpeechRequest(phrase, snapshot.falaSpeed)).collect { event ->
@@ -563,7 +564,9 @@ fun FalaTestArea(
                             player.stop()
                         }
                     }
+                    // Registra antes de largar: um motor que termina na hora não pode ser sobrescrito por um registro tardio.
                     run = FalaTestRun(job, editEpoch)
+                    job.start()
                 }
             },
         )
