@@ -88,7 +88,7 @@ R$15, que também tira os anúncios para sempre. Os anúncios ficam só no app d
   e cobrança fora do Play Billing). A `UnlockSheet` **não sai** — ganha fiação na MZ-T9 (V1-10) e
   cobra o R$15 de verdade.
 - Fica para depois da v1: créditos (MZ-T5–T8 e MZ-T12), `vision-capture`, `theme-system` (spec a
-  revisar — ver Estado atual), fases 2/3 do agente, os motores de Fala/Fluxos/Computador (sem spec) e o
+  revisar — ver Estado atual), fases 2/3 do agente, os motores de Fala (`sintese-fala`), Fluxos (`flows`) e Computador (este sem spec) e o
   `corretor-aprendiz` (spec pronta; se o Yan o quiser na v1, a V1-7 passa a esperar os textos legais dele — ver
   Estado atual).
 
@@ -263,6 +263,7 @@ do e2e da v1.
 | — | `corretor-aprendiz` | spec, design e tasks prontos (PR #19); nada implementado. **Fora do recorte da v1 por padrão**: banco de avaliação, base sem aprendizado, recusa e pares, modelo espacial do toque e bigramas, em fases A–G (`.specs/features/corretor-aprendiz/tasks.md`). Portão **[YAN]**: ele revisa os textos legais (política, aba Privacidade, Data Safety) na fase B, e o aprender ligado por padrão não vai à Play sem isso. Em aberto para o Yan: entra na v1? (`context.md` §8) |
 | — | `local-model-warmup` | Main, fora da v1: aquecimento do Parakeet, pré-carga explícita e aquecimento de texto, estado de preparação nos cards; ver spec/design/tasks. Em validação. |
 | — | `bancada` (bancada de modelos) | Spec, design e tasks em rascunho (2026-10-28, PR de spec), nada implementado. Main, fora da v1 (recorte congelado); não toma a vez de nada em andamento. É a régua que precede a atualização do LiteRT-LM (0.16.1 → 0.18.x) e a promoção de candidatas. Decisões do Yan de 28/10 incorporadas: tag `app-vX.Y.Z` na `main` (semântica; a v1 é a `app-v0.1.0`) com a bancada como etapa manual antes dela; áudio do Common Voice (CC0); testes de Código e Terminal cortados por ora; online só pela interface (a automação não roda online). Aberta: D6 (limiar, depois do baseline) |
+| — | `flows` (aba Fluxos) | Spec, design e tasks em rascunho (2026-10-29, FLX-T1..T27), nada implementado. Main, fora da v1 (recorte congelado); não toma a vez de nada em andamento. Lista de cards + modal com editor de etapas em lista vertical, executor que chama os motores das abas (Transcrição, Visão, Raciocínio, Voz, agente), 2/3 toques da orbe e botões da barra como gatilhos, 3 fluxos padrão e "Restaurar fluxos padrão" sem atalhos. Decisões do Yan de 29/10 incorporadas (D1..D8 do `spec.md`). Aberto: Q1..Q7 do `spec.md` (agente com conversa própria?, Ditar em PTT, atalho que sombreia, "Rodar agora", bancada consumindo os tipos) |
 | — | CI | 2026-10-07: cache do AAR do sherpa-onnx nos dois jobs (um 503 do GitHub derrubou a PR #7 antes dos testes) |
 | — | 2026-10-10..22 | PRs #8 a #11 (estabilidade dos testes, desempenho da abertura do teclado, CI, galeria) — fora da fila da v1 |
 
@@ -523,6 +524,19 @@ Spec: `.specs/features/model-params/` (lápis no card baixado; Raciocínio e, na
 
 Spec: `.specs/features/sintese-fala/` (origem Local, Sistema, OpenAI, ElevenLabs, Google e Custom; Testar reproduz áudio). Rascunho para o Yan. Não toma a vez da v1 nem da bancada. Modelos locais iniciais: Supertonic 3 (D2) e VITS Coqui pt com o nome "português" (D1, 29/10; sem esperar a escuta).
 
+## Bloco 14 — `flows` (aba Fluxos) — rascunho, main, fora da v1
+
+Spec: `.specs/features/flows/` (`spec.md` 56 requisitos FLX-01..FLX-56, `design.md`, `tasks.md` FLX-T1..FLX-T27). Ordem: ver o plano de execução do `tasks.md` (A modelo e dados → B executor → C integração → D telas → E fechamento).
+
+- **Escopo**: a aba Fluxos deixa o "Em breve": lista de cards, modal por fluxo (modelos de cada etapa + atalhos), editor de etapas em **lista vertical** reordenável (sem grafo), executor que encadeia Ditar, Capturar,
+  Visão, Perguntar, Falar, Inserir e Agente com os **motores que as abas já têm**, 3 fluxos padrão e "Restaurar fluxos padrão" (recria/reescreve os padrão **sem atalhos**; não toca os da pessoa nem os gatilhos).
+  Gatilhos: **2 e 3 toques** da orbe e **botões da barra do teclado**; ligar um gesto substitui a ação dele com aviso (a ação do `Settings` não é alterada, só sombreada). Notificação fica prevista no modelo e fora da V1.
+- **Prioridade**: **depois** das frentes abertas e fora do recorte da v1 (v1 só correção). Não toma a vez de nada.
+- **Depende de** (todas na `main`): `sintese-fala` (Falar), `reasoning-models` (Perguntar), `agent-harness` fase 1 (Agente), `vision-capture` VC-T4/T5/T6/T11/T15 (Capturar e Visão), `shortcut-bars` e `orb-gestures` (gatilhos).
+  **Convive com**: VC-T7 (consumidor de gestos do `VisionFlow`, não muda), `bancada` BNC-T23/T27 (`Etapa`/`Fluxo` e a linha "melhor medido" nos cards; Q7) e a fase 2 do agente (o fluxo só chama o `AgentController`).
+- **Pré-requisito técnico**: FLX-T9 extrai a composição dos motores da `SetupActivity` para um objeto por processo (o `OverlayService`, que executa o fluxo, não os enxerga hoje); sem mudança visual.
+- **[YAN]**: (1) responder Q1..Q7 do `spec.md`; (2) FLX-T26: rodar o roteiro no A32 e no Vaio (RAM do fluxo 100% local no A32 de 4 GB; confirmação do agente sobre outro app; Ditar com a orbe em PTT).
+
 ---
 
 ## Resumo da fila (visão de uma linha)
@@ -533,8 +547,8 @@ feito: Q1..Q11 → SB → GT → NM → RSN → SKP → AGT fase 1 (faltam só m
 agora: (V1-10 fakes e V1-3 feitas) → upload interno → e2e MZ-T15/API-T14 → V1-4 → … → V1-8
 em paralelo: V1-9 (API-T13 na AWS) — fakes esperam o staging; o e2e real espera conta, applicationId e o upload
 depois: créditos (MZ-T5..T8, T12) e ligar API-T11/T12 · VC (visão) · TS (temas, spec a revisar) ·
-       bancada de modelos (régua do motor LiteRT-LM; Bloco 11) · parâmetros dos modelos locais (Bloco 12) · AGT fases 2/3 · síntese de fala (aba Voz, rascunho, Bloco 13) · Fluxos/Computador (sem spec; ideias em
-       .specs/features/computer-terminal/ideias.md)
+       bancada de modelos (régua do motor LiteRT-LM; Bloco 11) · parâmetros dos modelos locais (Bloco 12) · AGT fases 2/3 · síntese de fala (aba Voz, rascunho, Bloco 13) · Fluxos (aba Fluxos, spec em rascunho, Bloco 14) ·
+       Computador (sem spec; ideias em .specs/features/computer-terminal/ideias.md)
 ```
 
 **Posição atual (2026-10-23)**: o próximo marco é a **v1** (recorte no topo). V1-0, V1-1, V1-2 e
