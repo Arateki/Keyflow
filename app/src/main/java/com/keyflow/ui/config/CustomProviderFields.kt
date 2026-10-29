@@ -81,9 +81,15 @@ internal class SettingsEditor(settings: Settings, onChange: (Settings) -> Unit) 
     /** Confirma o texto pendente dos campos e diz se as Settings mudaram — então as novas ainda estão a caminho da tela. */
     fun confirmPending(): Boolean {
         val before = current
-        pending.confirm()
+        confirming = true
+        try { pending.confirm() } finally { confirming = false }
         return current != before
     }
+
+    /** Conta as edições explícitas do usuário (Done, perda de foco, escolhas); a confirmação a pedido do Testar não conta. */
+    var editEpoch = 0
+        private set
+    private var confirming = false
 
     fun refresh(settings: Settings, onChange: (Settings) -> Unit) {
         current = settings
@@ -94,6 +100,7 @@ internal class SettingsEditor(settings: Settings, onChange: (Settings) -> Unit) 
         val next = transform(current)
         if (next != current) {
             current = next
+            if (!confirming) editEpoch++
             commit(next)
         }
     }

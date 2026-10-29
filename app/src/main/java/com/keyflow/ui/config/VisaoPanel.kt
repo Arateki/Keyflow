@@ -111,23 +111,23 @@ fun VisaoPanel(
                             val connected = connectionFor(snapshot.visionSource) is ConnectionState.Connected
                             val snapshotAvailability = visionTestAvailability(snapshot, models, connected)
                             PreparedVisionTest(
-                                key = visionRequestKey(snapshot, connectionFor(snapshot.visionSource), snapshotAvailability),
+                                key = visionRequestKey(snapshot, connectionFor(snapshot.visionSource), snapshotAvailability, editor.editEpoch),
                                 run = if (snapshotAvailability is VisionTestAvailability.Ready) ({ current.run(snapshot) }) else null,
                             )
                         }
                     },
                     remote = activeSettings.visionSource != VisionSource.LOCAL,
-                    requestKey = visionRequestKey(activeSettings, selectedConnection, availability),
+                    requestKey = visionRequestKey(activeSettings, selectedConnection, availability, editor.editEpoch),
                 )
             }
         }
     }
 }
 
-/** O que, nas Settings e na conexão, faz o resultado do Testar deixar de valer. */
-private fun visionRequestKey(s: Settings, connection: ConnectionState, availability: VisionTestAvailability): List<Any?> =
+/** O que, nas Settings, na conexão e nas edições explícitas ([epoch]: voltar a um valor antigo também conta), faz o resultado do Testar deixar de valer. */
+private fun visionRequestKey(s: Settings, connection: ConnectionState, availability: VisionTestAvailability, epoch: Int): List<Any?> =
     listOf(s.visionSource, s.visionLocalModelId, s.visionOpenAiModel, s.visionAnthropicModel, s.visionGoogleModel,
-        s.visionCustomEndpoint, s.visionCustomModel, s.visionCustomHeaderName, s.visionCustomHeaderValue, connection, availability)
+        s.visionCustomEndpoint, s.visionCustomModel, s.visionCustomHeaderName, s.visionCustomHeaderValue, connection, availability, epoch)
 
 // "Local", "OpenAI", "Anthropic", "Google" e "Custom" são nomes próprios/técnicos.
 private fun visionSourceLabel(source: VisionSource): String = when (source) {

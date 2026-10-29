@@ -703,6 +703,28 @@ class VisaoPanelTest {
         rule.runOnIdle { assertEquals("https://b.test/v1", seen.single().visionCustomEndpoint) }
     }
 
+    /** Revisão 3: editar de propósito de volta ao valor antigo (A→B→A) cancela o teste e zera a resposta de B. */
+    @Test
+    fun editarDeVoltaParaOValorAntigoCancelaOTesteDeB() {
+        val entered = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val h = Harness(customSaved, visionTester = VisionTester { entered.complete(Unit); gate.await(); com.keyflow.vision.VisionResult.Text("Resposta de B") })
+        show(h)
+        typeBInsteadOfAInTheEndpoint()
+        node(VISAO_TEST_BUTTON_TAG).performClick()
+        rule.waitUntil(5_000) { entered.isCompleted }
+        rule.runOnIdle { assertEquals("https://b.test/v1", h.settings.visionCustomEndpoint) }
+
+        node("visao-custom-endpoint").performTextReplacement("https://a.test/v1")
+        node("visao-custom-endpoint").performImeAction()
+        rule.runOnIdle { assertEquals("https://a.test/v1", h.settings.visionCustomEndpoint) }
+        gate.complete(Unit)
+        rule.waitForIdle()
+
+        node(VISAO_TEST_BUTTON_TAG).assertTextEquals("Testar")
+        rule.onNodeWithTag(VISAO_TEST_RESPONSE_TAG).assertDoesNotExist()
+    }
+
     @Test
     fun trocarAOrigemCancelaOTesteEmAndamento() {
         val entered = kotlinx.coroutines.CompletableDeferred<Unit>()
