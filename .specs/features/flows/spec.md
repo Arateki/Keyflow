@@ -1,12 +1,14 @@
 # Fluxos (aba Fluxos) — Specification
 
-> **Encadear as capacidades do KeyFlow em fluxos que a pessoa dispara com um gesto da orbe ou um botão do teclado.** A aba
+> **Encadear as capacidades do KeyFlow em fluxos que a pessoa dispara com uma interação da orbe — a flutuante, a do teclado ou a da
+> notificação — ou com um botão do teclado.** A aba
 > Fluxos vira uma **lista de cards**; tocar num card abre um **modal** com os modelos de cada etapa e os atalhos ligados.
 > A pessoa cria fluxos novos encaixando **etapas** (ditar, capturar a tela, ler a imagem, perguntar, falar, inserir, agente)
 > numa **lista vertical** reordenável, edita e exclui qualquer um. Três fluxos padrão vêm prontos, **sem atalho**, e o botão
 > "Restaurar fluxos padrão" os recria sem mexer no que a pessoa fez. Cada etapa reusa o motor que a aba da capacidade já
 > tem (Transcrição, Visão, Raciocínio, Voz, Agente): o fluxo só escolhe o modelo e liga a saída de uma na entrada da outra.
-> **Status**: rascunho para o Yan revisar (2026-10-29). **Fora da v1** (só `main`). Decisões do Yan de 29/10 em "Decisões".
+> **Status**: rascunho para o Yan revisar (2026-10-29). **Fora da v1** (só `main`). Decisões do Yan de 29/10 em "Decisões" (a **D9**, do fim do dia,
+> troca o modelo de gatilhos: as superfícies passam a ser as interações da orbe em **três lugares**; a D3 foi substituída).
 > Levantamento de origem: relatório da equipe `fluxos-levantamento.md` (fora do git; código com arquivo:linha, referências de produto e proposta).
 
 ## Problem Statement
@@ -30,7 +32,7 @@ alavanca e grade (`ShortcutModels.kt`). Nada liga a saída de uma capacidade na 
 - [ ] **Editor em lista vertical**: encaixar etapas por tipo (entrada/saída), reordenar arrastando (com alternativa por botão) e remover.
 - [ ] **Executor** de fluxo: etapas em sequência, saída → entrada, uma execução por vez, cancelável, que **para e avisa** ao falhar.
 - [ ] **Três fluxos padrão** (Ouvir e responder · Ler a tela e colar · Pedir ao agente e colar) e **Restaurar fluxos padrão** sem atalhos.
-- [ ] **Gatilhos**: 2 toques e 3 toques da orbe e botões da barra do teclado disparam um fluxo; um atalho dispara no máximo um fluxo; ligar um gesto **substitui** a ação dele, com aviso do que era antes. A notificação fica prevista no modelo, sem efeito.
+- [ ] **Gatilhos**: 2 e 3 toques da orbe — **flutuante**, **do teclado** e **da notificação** (D9) — e botões da barra do teclado disparam um fluxo; um atalho dispara no máximo um fluxo; ligar um gesto **substitui** a ação dele, com aviso do que era antes. O modelo já traz os três lugares; o editor entrega a orbe flutuante e o botão da barra, e a orbe da notificação e a do teclado entram nas tasks dependentes (FLX-T28, FLX-T29).
 - [ ] Cada etapa usa o **modelo da aba** quando a pessoa não escolheu outro; o fluxo **não guarda chave**, endpoint nem token.
 - [ ] Persistência em dois JSON no DataStore `keyflow_settings` (padrão `bars_config_json`), tolerante a dado ruim.
 - [ ] Texto novo em `tr("…")` (PT/EN/ES), goldens claro/escuro das telas novas, sem dependência nova de licença não permissiva.
@@ -41,9 +43,9 @@ alavanca e grade (`ShortcutModels.kt`). Nada liga a saída de uma capacidade na 
 | ---- | ----- |
 | Editor de grafo / nós e conexões | Decisão do Yan (29/10): a V1 é **lista vertical** de etapas. O modelo (lista de etapas tipadas) não impede um grafo depois |
 | Variáveis nomeadas, mais de uma entrada por etapa, ramos (se/senão), repetição | Lista linear: a saída de uma etapa é a entrada da seguinte. Atalhos/Tasker/Zapier fazem o mesmo na forma simples |
-| Notificação como gatilho | Decisão do Yan (29/10): depois, junto do levantamento da aba Notificação. O modelo guarda a superfície `NOTIFICACAO` e a preserva ao gravar; nada a dispara nem a mostra |
+| Orbe da notificação e orbe do teclado como gatilho **na entrega do editor** (FLX-T1..T27) | D9 (29/10) os inclui no modelo, mas a notificação é a feature `notification` (spec própria) e a orbe do teclado ainda não tem spec. O modelo, o codec e o roteador já tratam os três lugares (FLX-57); o grupo de atalhos de cada lugar só aparece quando o lugar existe, nas tasks FLX-T28 (notificação) e FLX-T29 (teclado) |
 | Etapa Computador / SSH | Sem motor; a aba Computador segue "Em breve". O catálogo de etapas é `sealed`: o caso entra depois sem mexer no executor |
-| Outros gatilhos (arrastar para cima, 1 toque, comando do teclado, evento do sistema, agendamento) | O arrastar para cima **pausa** a gravação (`orb-gestures`, DRAG); 1 toque é gesto nativo do modo. Só 2 toques, 3 toques e botão da barra |
+| Outros gatilhos (segurar, arrastar, 1 toque, comando do teclado, evento do sistema, agendamento) | O arrastar para cima **pausa** a gravação (`orb-gestures`, DRAG); 1 toque é gesto nativo do modo (na notificação, gravar/enviar, fixo). A orbe da notificação **só tem toques** (segurar e arrastar não existem numa notificação). Só 2 toques, 3 toques (em cada lugar da orbe) e botão da barra |
 | Botão "Rodar agora" / "Testar fluxo" no modal | Capturar e Inserir dependem do app que está na frente; fica para depois (dúvida Q4) |
 | Importar, exportar ou compartilhar fluxos; galeria de modelos | Pós-validação de uso real |
 | Chave de API, endpoint, header ou token dentro do fluxo | Decisão do Yan: o fluxo guarda só **qual** modelo; a credencial é a do cofre/aba |
@@ -61,12 +63,13 @@ alavanca e grade (`ShortcutModels.kt`). Nada liga a saída de uma capacidade na 
 | - | ------- | --------- |
 | D1 | A V1 do editor é **lista vertical** de etapas (reordenar arrastando), não grafo | FLX-11..FLX-16 |
 | D2 | **2 toques, 3 toques** da orbe e **botões da barra** podem disparar fluxos; a escolha é feita **no modal do fluxo**; ligar um fluxo a um gesto **substitui** a ação atual dele, **com aviso do que era antes** | FLX-33..FLX-38 |
-| D3 | **Notificação** como gatilho: depois (levantamento próprio); a superfície fica **prevista no modelo**, fora da V1 | FLX-33 |
+| D3 | ~~**Notificação** como gatilho: depois (levantamento próprio); a superfície fica prevista no modelo, fora da V1~~ — **substituída pela D9** (29/10, fim do dia) | — |
 | D4 | Etapa **sem modelo escolhido** usa o modelo da aba correspondente (Raciocínio, Visão, Voz, Transcrição); o fluxo **não guarda chave de API** | FLX-08, FLX-26, FLX-46 |
 | D5 | **Agente** dentro do fluxo **pede confirmação das ferramentas como hoje** | FLX-25 |
 | D6 | **Falha numa etapa** (rede, modelo ausente): o fluxo **para e avisa**; nunca segue com resultado parcial | FLX-27, FLX-28 |
 | D7 | **Um atalho dispara no máximo um fluxo** (um fluxo pode ter vários atalhos) | FLX-33, FLX-37 |
 | D8 | Lista de cards; tocar abre modal (modelos de cada etapa + atalhos); criar de forma intuitiva encaixando etapas e modelos; editar e excluir **qualquer** fluxo; **3 padrão** de exemplo; "+" no fim; "Restaurar fluxos padrão" recria os apagados e reescreve os editados, **sem atalhos** (nunca religa nem rouba gatilho; não mexe nos gatilhos ligados; fluxos criados pela pessoa não são tocados) | FLX-01..FLX-10, FLX-40..FLX-44 |
+| D9 | *(29/10, depois da D1..D8; substitui a D3)* **A orbe é a interface única** e as **superfícies de gatilho passam a ser as interações da orbe em três lugares**: **orbe flutuante**, **orbe do teclado** e **orbe da notificação** — a da notificação só tem 1, 2 e 3 toques (segurar e arrastar não existem numa notificação; spec `notification`). Os **botões da barra continuam** como gatilho. Teclado e notificação têm a opção "copiar a configuração da orbe principal" (os gatilhos também são copiados) | FLX-33, FLX-34, FLX-57..FLX-60 |
 
 ---
 
@@ -142,17 +145,17 @@ alavanca e grade (`ShortcutModels.kt`). Nada liga a saída de uma capacidade na 
 
 ### P1-E: Gatilhos — gestos da orbe e botões do teclado (`TRG`) ⭐ MVP
 
-**Como** usuário, **quero** disparar um fluxo com 2 toques, 3 toques ou um botão do teclado, escolhendo isso no próprio fluxo.
+**Como** usuário, **quero** disparar um fluxo com 2 toques, 3 toques da orbe (flutuante, do teclado ou da notificação) ou um botão do teclado, escolhendo isso no próprio fluxo.
 
-1. **FLX-33**: o **gatilho** SHALL ligar uma **superfície** a **um fluxo**: `ORBE(2)`, `ORBE(3)`, `BARRA(botaoId)` e, **reservada**, `NOTIFICACAO(acaoId)`. Cada superfície aponta para **no máximo um** fluxo (D7); um fluxo pode ter **vários** gatilhos. A superfície `NOTIFICACAO` SHALL ser lida e regravada sem perda, e SHALL NOT ser exibida nem disparada na V1.
-2. **FLX-34**: `OverlayService.handleOrbShortcut(count)` SHALL consultar os gatilhos **antes** da ação do `Settings`: se `ORBE(count efetivo)` aponta para um fluxo válido, roda o fluxo e **não** executa a ação; senão segue como hoje. O **overflow** (mais de 3 toques, política `NEAREST_DOWN`) SHALL contar um gesto ligado a fluxo como "ativo", como conta uma ação diferente de `NONE`; com `CANCEL` nada acontece, como hoje. 1 toque não é gatilho.
-3. **FLX-35**: ligar um fluxo a um gesto **substitui a ação atual dele**. A tela SHALL mostrar, **antes de confirmar**, o aviso com o que era antes ("Isto substitui “Retrair / expandir teclado” neste gesto.") ou, se o gesto está livre ("Nenhuma"), "Este gesto não tinha ação." A ação em `Settings.shortcut2Tap/3Tap` **não é alterada**: o gatilho a **sombreia**. Desligar o gatilho (ou excluir o fluxo) SHALL devolver a ação anterior sem a pessoa configurar nada. A aba Sobrepor → Atalhos SHALL mostrar o gesto ligado como "Fluxo: <nome>", tocar nele explica e leva à aba Fluxos, e o tour de gestos descreve o fluxo, não a ação sombreada.
+1. **FLX-33**: o **gatilho** SHALL ligar uma **superfície** a **um fluxo**: `ORBE(lugar, 2)`, `ORBE(lugar, 3)` — com `lugar ∈ {FLUTUANTE, TECLADO, NOTIFICACAO}` (D9) — e `BARRA(botaoId)`. Cada superfície aponta para **no máximo um** fluxo (D7); um fluxo pode ter **vários** gatilhos. O mesmo gesto em lugares diferentes são superfícies **diferentes** (`ORBE(FLUTUANTE, 2)` e `ORBE(NOTIFICACAO, 2)` podem apontar para fluxos distintos). As superfícies de `TECLADO` e `NOTIFICACAO` SHALL ser lidas e regravadas sem perda desde a V1; exibi-las e dispará-las é do FLX-57..FLX-59.
+2. **FLX-34**: `OverlayService.handleOrbShortcut(count)` (orbe **flutuante**) SHALL consultar os gatilhos **antes** da ação do `Settings`: se `ORBE(FLUTUANTE, count efetivo)` aponta para um fluxo válido, roda o fluxo e **não** executa a ação; senão segue como hoje. O **overflow** (mais de 3 toques, política `NEAREST_DOWN`) SHALL contar um gesto ligado a fluxo como "ativo", como conta uma ação diferente de `NONE`; com `CANCEL` nada acontece, como hoje. 1 toque não é gatilho, em nenhum lugar. O **mesmo roteador puro** serve os outros lugares (FLX-58, FLX-59), com a política de overflow (`Settings.shortcutOverflow`) da orbe principal.
+3. **FLX-35**: ligar um fluxo a um gesto **substitui a ação atual dele**. A tela SHALL mostrar, **antes de confirmar**, o aviso com o que era antes ("Isto substitui “Retrair / expandir teclado” neste gesto.") ou, se o gesto está livre ("Nenhuma"), "Este gesto não tinha ação." Com mais de um lugar de orbe disponível o aviso nomeia o lugar ("… neste gesto da orbe da notificação."). A ação em `Settings.shortcut2Tap/3Tap` (orbe flutuante) ou a ação própria do lugar (a da notificação mora na config da aba Notificação) **não é alterada**: o gatilho a **sombreia**. Desligar o gatilho (ou excluir o fluxo) SHALL devolver a ação anterior sem a pessoa configurar nada. A aba Sobrepor → Atalhos SHALL mostrar o gesto ligado como "Fluxo: <nome>", tocar nele explica e leva à aba Fluxos, e o tour de gestos descreve o fluxo, não a ação sombreada (a orbe flutuante; a aba Notificação faz o mesmo para o lugar dela, NTF-T20).
 4. **FLX-36**: **botão da barra**: um novo caso `BarButton.RunFlow(botaoId)` (id estável gerado na criação) SHALL ser desenhado pela `BarView` com o ícone de fluxo, disparar o fluxo pelo mesmo serviço do mic (`startForegroundService` com `ACTION_RUN_FLOW`) e aparecer **desabilitado** quando não há gatilho para o id ou o fluxo é inválido (mesma regra do `GridTrigger` órfão). Quem **cria** o botão é o modal do fluxo ("Adicionar à barra do teclado": acrescenta o botão ao fim da barra principal, nos dois modos se as barras não são espelhadas, e liga o gatilho); o editor de barras SHALL listar, mover e remover o botão, mas **não** o oferece no catálogo de adicionar. Remover o botão no editor de barras desliga o gatilho; excluir o fluxo remove o botão.
 5. **FLX-37**: ligar uma superfície **já ocupada por outro fluxo** SHALL pedir confirmação ("Isto tira este atalho de “<outro fluxo>”.") e, ao confirmar, mover o gatilho; nunca fica um atalho em dois fluxos (D7). O **Restaurar** nunca faz isso (FLX-43).
 6. **FLX-38**: **fluxo inválido** (Incompleto) não liga atalho (as linhas de atalho ficam desligadas, com o motivo). Um fluxo ligado que **fica** inválido deixa o atalho sem efeito: disparar mostra "Fluxo incompleto: abra a aba Fluxos" e **não** executa a ação sombreada.
 7. **FLX-39**: **disparo**: antes de rodar, o serviço SHALL conferir (a) nenhum outro fluxo rodando (FLX-17); (b) para fluxos que começam com Ditar, a gravação ociosa (FLX-18); (c) para fluxos que começam com Capturar, as guardas do `VisionFlow` (FLX-19); (d) permissão de microfone para Ditar e de sobreposição/consentimento para Capturar, com os mesmos avisos que o app já usa. Falhou a conferência: aviso curto e nada acontece (a ação sombreada **não** roda no lugar).
 
-**Independent Test**: 2 toques ligado a "Ouvir e responder" → o fluxo roda, o teclado **não** retrai; desligar → 2 toques volta a retrair; ligar a mesma superfície em outro fluxo pede confirmação; o botão do teclado criado pelo modal aparece desabilitado se o fluxo ficar incompleto; 4 toques com `NEAREST_DOWN` cai no 3 toques ligado a fluxo.
+**Independent Test**: 2 toques da orbe flutuante ligado a "Ouvir e responder" → o fluxo roda, o teclado **não** retrai; desligar → 2 toques volta a retrair; ligar a mesma superfície em outro fluxo pede confirmação; o botão do teclado criado pelo modal aparece desabilitado se o fluxo ficar incompleto; 4 toques com `NEAREST_DOWN` cai no 3 toques ligado a fluxo; o 2 toques da **notificação** ligado a um fluxo não muda o 2 toques da flutuante (superfícies diferentes).
 
 ---
 
@@ -189,7 +192,7 @@ alavanca e grade (`ShortcutModels.kt`). Nada liga a saída de uma capacidade na 
 5. **FLX-49**: o serviço e o IME leem os fluxos por **leitura leve** do DataStore (sem inicializar o cofre cifrado) e observam as mudanças ao vivo (trocar o gatilho vale no gesto seguinte, sem reiniciar o serviço).
 6. **FLX-50**: um gatilho que aponta para um fluxo inexistente ou para um botão de barra que não existe mais SHALL ser ignorado no disparo e **removido** na próxima gravação.
 
-**Independent Test**: round-trip de uma config com todas as etapas, os 3 tipos de superfície (inclusive `NOTIFICACAO`) e instruções com acentos e aspas; JSON malformado → padrão; duas escritas concorrentes (modal e barra) não se sobrescrevem.
+**Independent Test**: round-trip de uma config com todas as etapas, as superfícies (a orbe nos **três lugares** e a barra) e instruções com acentos e aspas; JSON malformado → padrão; duas escritas concorrentes (modal e barra) não se sobrescrevem.
 
 ---
 
@@ -201,6 +204,19 @@ alavanca e grade (`ShortcutModels.kt`). Nada liga a saída de uma capacidade na 
 4. **FLX-54**: acessibilidade: alvos de toque ≥ 48 dp; cada ação tem `contentDescription`; toda reordenação por arrastar tem a alternativa por botão (FLX-12); o estado "Em execução" e "Incompleto" não depende só de cor.
 5. **FLX-55**: a aba **Docs** SHALL ganhar a seção "aba-fluxos" (o que é um fluxo, as etapas, os padrão, atalhos, restaurar, o que sai do aparelho) e o `docsSectionFor(FLUXOS)` passa a apontar para ela; `website/_fonte/doc.json` é regenerado (`DocsSiteExportTest`).
 6. **FLX-56**: a aba sai do "Em breve" só na task que liga o painel (FLX-T22); antes disso o `ConfigScreen` continua com o cartão (`deferredTabsShowComingSoonCardWithoutControls` muda nessa task). Sem flag de build: a `release/v1` está congelada e a `main` é a release seguinte.
+
+---
+
+### P2-I: A orbe em três lugares (`LUG`) — entrega dependente de outras features
+
+**Como** usuário, **quero** que a orbe da notificação e a orbe do teclado também disparem fluxos, do mesmo jeito que a flutuante.
+
+1. **FLX-57**: o **modelo** SHALL tratar `ORBE(lugar, toques)` com `lugar ∈ {FLUTUANTE, TECLADO, NOTIFICACAO}` (`LugarDaOrbe`, do pacote compartilhado `com.keyflow.orbe`) e `toques ∈ {2, 3}` desde a FLX-T1 (codec, roteador e política de ligação já os conhecem). A orbe da notificação só tem toques (spec `notification`, L1); a da flutuante e a do teclado ficam em 2 e 3 toques na V1 (segurar e arrastar seguem fora, ver Fora de escopo). O modal, na seção **Atalhos**, SHALL agrupar as linhas por lugar — "Orbe flutuante", "Orbe da notificação", "Orbe do teclado" e "Botão do teclado" — e **o grupo de um lugar só aparece quando o lugar existe** (a aba Notificação ligada; a orbe do teclado entregue); nenhum grupo mostra um lugar que ainda não faz nada.
+2. **FLX-58**: **orbe da notificação como gatilho**: depois que a notificação resolve uma rajada de 2 ou 3 toques (NTF-09), o serviço SHALL consultar `RoteadorGatilhos.resolverToques(NOTIFICACAO, n, …)` **antes** da ação própria da notificação: fluxo válido → roda e **não** executa a ação; fluxo inválido → "Fluxo incompleto: abra a aba Fluxos" (a ação por baixo não roda); sem gatilho → a ação da notificação. A tela bloqueada recusa antes de qualquer fluxo (NTF-16); o disparo segue as precondições do FLX-39. Vale com "copiar" **desligado** (FLX-60). Entregue pela FLX-T28 (lado de Fluxos) e pela NTF-T20 (lado da notificação).
+3. **FLX-59**: **orbe do teclado como gatilho**: o mesmo roteamento para `TECLADO`, quando a orbe do teclado existir (feature ainda **sem spec**; dúvida Q8). A FLX-T29 fica **bloqueada** até lá.
+4. **FLX-60**: **copiar a configuração da orbe principal**: quando o lugar (`TECLADO` ou `NOTIFICACAO`) está com "copiar" ligado, os gatilhos dele SHALL ser os da orbe **flutuante** (`ORBE(FLUTUANTE, n)`), e o modal SHALL **não** oferecer o grupo desse lugar (mostra "Copiando da orbe principal"). Os gatilhos **próprios** `ORBE(lugar, n)` já gravados são **preservados** (nunca apagados por copiar) e ignorados enquanto se copia; voltam a valer quando "copiar" é desligado. Interações que o lugar não suporta ficam de fora (`SuporteDeInteracoes`). A cópia vale ao vivo.
+
+**Independent Test**: com a notificação ligada e "copiar" desligado, ligar o 2 toques da notificação a "Ouvir e responder" → 2 toques na notificação roda o fluxo e 2 toques na flutuante segue retraindo o teclado; ligar "copiar" → o 2 toques da notificação passa a rodar o que a flutuante faz (a ação ou o fluxo dela) e o grupo some do modal; desligar "copiar" → o gatilho próprio volta a valer; round-trip do JSON com `orb:teclado:2` e `orb:notificacao:3` sem perda.
 
 ---
 
@@ -247,10 +263,12 @@ data class Fluxo(
     val etapas: List<Etapa>,     // 0..8
 )
 
+/** Onde há uma orbe (D9). Vive em `com.keyflow.orbe`, compartilhado com a feature `notification`. */
+enum class LugarDaOrbe { FLUTUANTE, TECLADO, NOTIFICACAO }
+
 sealed interface Superficie {
-    data class Orbe(val toques: Int) : Superficie          // 2 ou 3
+    data class Orbe(val lugar: LugarDaOrbe, val toques: Int) : Superficie   // toques: 2 ou 3
     data class Barra(val botaoId: String) : Superficie
-    data class Notificacao(val acaoId: String) : Superficie // reservada; preservada, sem efeito na V1
 }
 data class Gatilho(val superficie: Superficie, val fluxoId: String)
 data class ConfigFluxos(val fluxos: List<Fluxo>, val gatilhos: List<Gatilho>)
@@ -271,10 +289,13 @@ Custom: ignorado. **Falar** — Local: id do catálogo; OpenAI/ElevenLabs/Google
       { "type": "falar" } ] } ] }
 
 { "v": 1, "triggers": [
-  { "surface": "orb:2",       "flow": "a1b2c3d4" },
-  { "surface": "bar:b81f02",  "flow": "a1b2c3d4" },
-  { "surface": "notif:pausar","flow": "a1b2c3d4" } ] }
+  { "surface": "orb:flutuante:2",   "flow": "a1b2c3d4" },
+  { "surface": "orb:notificacao:3", "flow": "a1b2c3d4" },
+  { "surface": "orb:teclado:2",     "flow": "a1b2c3d4" },
+  { "surface": "bar:b81f02",        "flow": "a1b2c3d4" } ] }
 ```
+
+Superfícies: `orb:<lugar>:<toques>` (lugar em minúsculas: `flutuante`, `teclado`, `notificacao`; toques 2 ou 3) e `bar:<botaoId>`. O rascunho anterior (`orb:2`, `notif:<acaoId>`) nunca foi implementado, então não há migração.
 
 Limites: 20 fluxos; 8 etapas por fluxo; nome 40; instrução e sistema 500; gatilhos 64. Tudo acima é cortado ao ler (FLX-47).
 
@@ -327,6 +348,10 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 - WHEN o JSON traz uma etapa de uma versão mais nova THEN o fluxo aparece Incompleto ("Etapa desconhecida"), não roda e permite remover a etapa.
 - WHEN o processo do app morre no meio THEN o fluxo some (sem retomar); a gravação em curso segue as regras já existentes.
 - WHEN o idioma da interface muda THEN nomes de padrão não renomeados e rótulos de etapa trocam ao vivo; nomes que a pessoa digitou ficam como estão.
+- WHEN a notificação (ou a orbe do teclado) está com "copiar" ligado THEN o modal não mostra o grupo do lugar e o gatilho próprio gravado fica preservado e inativo (FLX-60); desligar "copiar" o reativa.
+- WHEN a pessoa liga um fluxo ao 2 toques da notificação com a tela bloqueada e "permitir com a tela bloqueada" desligado THEN o toque é recusado pela notificação (NTF-16) e o fluxo não roda.
+- WHEN a orbe da notificação toca durante a execução de um fluxo THEN o toque cancela o fluxo (FLX-29), não conta como início de outro; o aviso "Já há um fluxo em andamento" vale para disparar um segundo.
+- WHEN o JSON traz um gatilho de um lugar que ainda não existe no app (`orb:teclado:2` antes da orbe do teclado) THEN ele é lido e regravado sem perda, sem aparecer nem disparar.
 
 ---
 
@@ -347,6 +372,10 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 | A11 | Excluir um fluxo remove também os **botões de barra** que o modal criou para ele | botão sem fluxo é botão que não faz nada | deixar desabilitado |
 | A12 | Tempos máximos por etapa (FLX-31) | nenhuma etapa pode travar a fila "um fluxo por vez" | sem teto |
 | A13 | Aba sai do "Em breve" sem flag de build (FLX-56) | `release/v1` congelada; padrão do `AGENT_ENABLED` hoje (ligado em todos os builds) | `BuildConfig.FLOWS_ENABLED` |
+| A14 | A superfície é `ORBE(lugar, toques)` num tipo só, com `LugarDaOrbe` compartilhado (`com.keyflow.orbe`) | um modelo para os três lugares, sem tipo novo por lugar; a feature `notification` usa o mesmo enum | `Superficie.OrbeFlutuante/OrbeTeclado/OrbeNotificacao` separadas |
+| A15 | O modelo, o codec e o roteador já aceitam os três lugares na FLX-T1/T2/T5; a **tela** só mostra o lugar que existe | evita mudar o formato depois e evita prometer atalho que não faz nada | formato só da flutuante e migração depois |
+| A16 | "Copiar a configuração da orbe principal" também copia os **gatilhos** (FLX-60), e o gatilho próprio gravado fica preservado | copiar é copiar tudo o que a orbe principal faz, e desligar "copiar" não pode apagar escolhas | copiar só as ações; ou apagar os gatilhos próprios |
+| A17 | Na notificação, 1 toque é gravar/enviar (fixo) e **não** é gatilho; só 2 e 3 toques ligam fluxo | sem botões, é o único jeito garantido de gravar pela notificação (NTF-10) | 1 toque remapeável (dúvida Q2 da `notification`) |
 
 ### Dúvidas para o Yan
 
@@ -357,6 +386,8 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 - **Q5** — Disparo com a **gravação em andamento** (RECORDING/PAUSED) num fluxo com Ditar: recusar (FLX-18) ou pausar/guardar a gravação?
 - **Q6** — Os 3 padrão ficam **sem atalho** na primeira abertura (FLX-40). Quer uma *dica* escrita no modal de cada um ("Sugestão: 2 toques"), sem ligar nada?
 - **Q7** — Coordenação com a **bancada**: `Capacidade{TEXTO,AUDIO,IMAGEM}` e `Etapa/Fluxo` do BFL-01 são parentes destes tipos. A bancada deve **consumir** os tipos de `com.keyflow.fluxos` (a BNC-T23 passaria a depender da FLX-T1)?
+- **Q8** — A **orbe do teclado** (D9/D1 da `notification`) ainda não tem spec: o gatilho dela já está no modelo (FLX-57) e a FLX-T29 espera por ela. Quem escreve a spec da orbe do teclado, e entra antes ou depois de Fluxos? Ela decide quais interações o teclado suporta (toques, segurar, arrastar?) — e se alguma além de 2 e 3 toques vira gatilho.
+- **Q9** — Os gatilhos da orbe da **notificação** e do **teclado** com "copiar" ligado seguem a orbe flutuante (FLX-60, A16). É o que você espera, ou prefere que "copiar" leve só as ações e cada lugar tenha seus gatilhos?
 
 ---
 
@@ -396,9 +427,9 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 | FLX-30 | P1-D | FLX-T7, FLX-T17 | Pending |
 | FLX-31 | P1-D | FLX-T6 | Pending |
 | FLX-32 | P1-D | FLX-T14, FLX-T16 | Pending |
-| FLX-33 | P1-E | FLX-T1, FLX-T5 | Pending |
+| FLX-33 | P1-E | FLX-T1, FLX-T2, FLX-T5 | Pending |
 | FLX-34 | P1-E | FLX-T5, FLX-T15, FLX-T25 | Pending |
-| FLX-35 | P1-E | FLX-T5, FLX-T20, FLX-T21 | Pending |
+| FLX-35 | P1-E | FLX-T5, FLX-T20, FLX-T21, FLX-T28 | Pending |
 | FLX-36 | P1-E | FLX-T16, FLX-T20 | Pending |
 | FLX-37 | P1-E | FLX-T5, FLX-T20 | Pending |
 | FLX-38 | P1-E | FLX-T5, FLX-T20 | Pending |
@@ -420,8 +451,12 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 | FLX-54 | P2-H | FLX-T17, FLX-T18 | Pending |
 | FLX-55 | P2-H | FLX-T24 | Pending |
 | FLX-56 | P2-H | FLX-T22 | Pending |
+| FLX-57 | P2-I | FLX-T1, FLX-T2, FLX-T5, FLX-T20 | Pending |
+| FLX-58 | P2-I | FLX-T28, NTF-T20 | Pending (depende da feature `notification`) |
+| FLX-59 | P2-I | FLX-T29 | Pending (bloqueada: a orbe do teclado não tem spec) |
+| FLX-60 | P2-I | FLX-T5, FLX-T28, FLX-T29 | Pending (a parte do teclado, FLX-T29, está bloqueada: a orbe do teclado não tem spec) |
 
-**Coverage:** 56 requisitos, 56 mapeados em tasks, 0 sem task.
+**Coverage:** 60 requisitos, 60 mapeados em tasks, 0 sem task.
 **Status values:** Pending → In Design → In Tasks → Implementing → Verified.
 
 ---
@@ -436,5 +471,6 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 - [ ] Cancelar (toque na orbe depois do Ditar; gesto de cancelar da gravação durante o Ditar) deixa a orbe no estado anterior, sem áudio tocando e sem captura em cache.
 - [ ] Restaurar: apaga-se um padrão que tinha atalho, edita-se outro que tinha atalho, cria-se um fluxo próprio → restaurar recria o primeiro **sem** atalho, desfaz a edição do segundo **mantendo** o atalho e não toca o terceiro.
 - [ ] Barra do teclado: o botão criado pelo modal dispara o fluxo e some quando o fluxo é excluído.
+- [ ] Orbe em três lugares: os JSON guardam `orb:flutuante:2`, `orb:notificacao:3` e `orb:teclado:2` sem perda; **(depende da `notification`)** o 2 toques da notificação roda um fluxo sem mexer no 2 toques da flutuante, e com "copiar" ligado ela segue a flutuante.
 - [ ] Os dois JSON não contêm chave, token, endpoint nem header; goldens claro/escuro aprovados; `TranslationsTest` e `ArchitectureRulesTest` verdes.
 - [ ] Gate `full` verde; requisitos → Verified.
