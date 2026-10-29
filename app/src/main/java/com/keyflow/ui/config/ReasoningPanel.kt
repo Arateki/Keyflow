@@ -88,7 +88,7 @@ fun ReasoningPanel(
                     ReasoningSource.OPENAI -> OpenAiPanel(activeSettings, onSettingsChange, auth, openAi, connection)
                     ReasoningSource.ANTHROPIC -> AnthropicPanel(activeSettings, onSettingsChange, anthropicAuth)
                     ReasoningSource.GOOGLE -> GooglePanel(activeSettings, onSettingsChange, googleAuth)
-                    ReasoningSource.CUSTOM -> ReasoningCustomFields(activeSettings, editor::edit)
+                    ReasoningSource.CUSTOM -> ReasoningCustomFields(activeSettings, editor::edit, editor.pending)
                 }
             }
         }
@@ -109,6 +109,8 @@ fun ReasoningPanel(
                     modelo,
                     onManageUsage = manageUsage?.let { url -> { auth.openUrl(url) } },
                     initialState = initialTest,
+                    // Tocar em Testar não tira o foco do campo Custom: confirma o texto pendente e resolve o motor com as Settings que saem dele.
+                    resolveOnStart = { editor.confirmPending(); resolve(editor.settings) },
                 )
             }
         }
@@ -126,7 +128,7 @@ private fun reasoningSourceLabel(source: ReasoningSource): String = when (source
 }
 
 @Composable
-private fun ReasoningCustomFields(settings: Settings, onEdit: ((Settings) -> Settings) -> Unit) {
+private fun ReasoningCustomFields(settings: Settings, onEdit: ((Settings) -> Settings) -> Unit, pending: PendingEdits) {
     CustomProviderFields(
         tagPrefix = "raciocinio",
         endpoint = settings.reasoningCustomEndpoint,
@@ -138,6 +140,7 @@ private fun ReasoningCustomFields(settings: Settings, onEdit: ((Settings) -> Set
         onHeaderValue = { onEdit { current -> current.copy(reasoningCustomHeaderValue = it) } },
         onModel = { onEdit { current -> current.copy(reasoningCustomModel = it) } },
         hints = listOf(tr("Padrão compatível com OpenAI Chat Completions — informe o endpoint e credenciais do seu serviço.")),
+        pending = pending,
     )
 }
 

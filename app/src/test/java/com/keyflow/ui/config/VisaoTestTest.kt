@@ -41,14 +41,15 @@ class VisaoTestTest {
             .isEqualTo(VisionTestAvailability.Unavailable(VisionTestUnavailable.MODEL_NOT_INSTALLED))
     }
 
-    /** O Gemma 4 e os provedores ainda não têm motor de visão (VC-T15): o botão fica desligado e diz por quê, sem fingir um teste. */
-    @Test
-    fun `the Gemma 4 and the cloud sources are not testable yet`() {
-        val notYet = VisionTestAvailability.Unavailable(VisionTestUnavailable.NOT_YET)
-        assertThat(availability(Settings(visionSource = VisionSource.LOCAL, visionLocalModelId = gemma.id), installed = setOf(gemma.id))).isEqualTo(notYet)
-        listOf(VisionSource.OPENAI, VisionSource.ANTHROPIC, VisionSource.GOOGLE, VisionSource.CUSTOM).forEach {
-            assertThat(availability(Settings(visionSource = it, visionLocalModelId = ocr.id), installed = setOf(ocr.id))).isEqualTo(notYet)
+    @Test fun `Gemma instalado e provedor conectado podem testar imagem`() {
+        assertThat(availability(Settings(visionLocalModelId = gemma.id), setOf(gemma.id))).isEqualTo(VisionTestAvailability.Ready)
+        for (source in listOf(VisionSource.OPENAI, VisionSource.ANTHROPIC, VisionSource.GOOGLE)) {
+            val settings = Settings(visionSource = source)
+            assertThat(visionTestAvailability(settings, models(emptySet()), connected = true)).isEqualTo(VisionTestAvailability.Ready)
+            assertThat(availability(settings)).isEqualTo(VisionTestAvailability.Unavailable(VisionTestUnavailable.NOT_CONNECTED))
         }
+        assertThat(availability(Settings(visionSource = VisionSource.CUSTOM, visionCustomEndpoint = "https://exemplo.test/v1", visionCustomModel = "visao")))
+            .isEqualTo(VisionTestAvailability.Ready)
     }
 
     @Test

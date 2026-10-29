@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -19,7 +20,9 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextInputSelection
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.text.TextRange
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.keyflow.auth.ApiKeyFlow
 import com.keyflow.auth.AuthFlow
@@ -129,12 +132,18 @@ class VisaoPanelTest {
         val anthropic: FakeAuth = FakeAuth(),
         val google: FakeAuth = FakeAuth(),
         val tester: OcrTester = OcrTester.None,
+        val visionTester: VisionTester? = null,
     ) {
         var settings by mutableStateOf(initial)
         var installed by mutableStateOf(installed)
         var active by mutableStateOf<DownloadProgress?>(null)
         var localSupported by mutableStateOf(true)
         var catalog by mutableStateOf(ModelCatalog.visionModels(debug = true))
+        // Falso: o anfitrião não devolve as Settings novas à tela (o Testar não pode ficar sem resposta por isso).
+        var acceptsChanges = true
+        // O que o anfitrião recebeu e ainda não devolveu à tela (retorno atrasado, como na SetupActivity real).
+        var held: Settings? = null
+        var holdChanges = false
 
         val models: LocalModelsUi
             get() = LocalModelsUi.compose(
@@ -147,11 +156,12 @@ class VisaoPanelTest {
             KeyFlowTheme(dark = false) {
                 VisaoPanel(
                     settings = settings,
-                    onSettingsChange = { settings = it },
+                    onSettingsChange = { if (holdChanges) held = it else if (acceptsChanges) settings = it },
                     models = models,
                     actions = actions,
                     localSupported = localSupported,
                     tester = tester,
+                    visionTester = visionTester,
                     openAiAuth = openAi,
                     anthropicAuth = anthropic,
                     googleAuth = google,
@@ -531,18 +541,205 @@ class VisaoPanelTest {
         node(VISAO_TEST_BUTTON_TAG).assertTextEquals("Testar")
     }
 
-    /** O Gemma 4 e os provedores ainda não têm motor de visão: o botão fica desligado e diz por quê, sem fingir um teste. */
     @Test
-    fun theGemmaAndTheCloudSourcesCannotBeTestedYetAndTheScreenSaysSo() {
+    fun GemmaInstaladoPodeTestarEProvedorDesconectadoPedeCredencial() {
         val h = Harness(Settings(visionLocalModelId = e2b.id), installed = setOf(e2b.id))
         show(h)
-
-        node(VISAO_TEST_BUTTON_TAG).assertIsNotEnabled()
-        node(VISAO_TEST_REASON_TAG).assertTextContains("ainda não pode ser testado", substring = true)
-
+        node(VISAO_TEST_BUTTON_TAG).assertIsEnabled()
+        rule.onNodeWithTag(VISAO_TEST_REASON_TAG).assertDoesNotExist()
         node(visionSourceTag(VisionSource.OPENAI)).performClick()
-        rule.runOnIdle { assertTrue(h.settings.visionSource == VisionSource.OPENAI) }
         node(VISAO_TEST_BUTTON_TAG).assertIsNotEnabled()
-        node(VISAO_TEST_REASON_TAG).assertTextContains("ainda não pode ser testado", substring = true)
+        node(VISAO_TEST_REASON_TAG).assertTextContains("Conecte a conta", substring = true)
+    }
+
+    @Test
+    fun testeDoProvedorRecebeASelacaoMostraRespostaTempoENotaDeEnvio() {
+        val seen = mutableListOf<Settings>()
+        val auth = FakeAuth(ConnectionState.Connected("conta falsa", AuthMethod.API_KEY))
+        val h = Harness(Settings(visionSource = VisionSource.OPENAI), openAi = auth,
+            visionTester = VisionTester { seen += it; com.keyflow.vision.VisionResult.Text("Texto da imagem") })
+        show(h)
+        node(VISAO_TEST_BUTTON_TAG).assertIsEnabled().performClick()
+        rule.waitUntil(5_000) { rule.onAllNodesWithTag(VISAO_TEST_RESPONSE_TAG).fetchSemanticsNodes().isNotEmpty() }
+        node(VISAO_TEST_RESPONSE_TAG).assertTextContains("Texto da imagem", substring = true)
+        node(VISAO_TEST_TIMES_TAG).assertTextContains("Tempo de reconhecimento", substring = true)
+        rule.runOnIdle { assertEquals(VisionSource.OPENAI, seen.single().visionSource) }
+        rule.onNodeWithText("O teste envia esta imagem de exemplo ao provedor escolhido.").performScrollTo().assertIsDisplayed()
+    }
+
+    private val customSaved = Settings(
+        visionSource = VisionSource.CUSTOM, visionCustomEndpoint = "https://a.test/v1", visionCustomModel = "modelo-salvo",
+        visionCustomHeaderName = "H", visionCustomHeaderValue = "V",
+    )
+
+    /** Seleciona só o "a" de `https://a.test/v1` e digita "b": o campo mostra o endpoint novo, que ainda não foi salvo (sem Done nem desfoque). */
+    @OptIn(ExperimentalTestApi::class)
+    private fun typeBInsteadOfAInTheEndpoint() {
+        val endpoint = node("visao-custom-endpoint")
+        endpoint.performTextInputSelection(TextRange(8, 9))
+        endpoint.performTextInput("b")
+        endpoint.assertTextContains("https://b.test/v1")
+    }
+
+    @Test
+    fun tocarEmTestarConfirmaOEndpointPendenteDoCustomSemDoneEUsaAsSettingsResultantes() {
+        val seen = mutableListOf<Settings>()
+        val h = Harness(customSaved, visionTester = VisionTester { seen += it; com.keyflow.vision.VisionResult.Text("Texto do Custom") })
+        show(h)
+        typeBInsteadOfAInTheEndpoint()
+        rule.runOnIdle { assertEquals("https://a.test/v1", h.settings.visionCustomEndpoint) }
+
+        node(VISAO_TEST_BUTTON_TAG).assertIsEnabled().performClick()
+
+        // O teste parte uma vez só, já com o endpoint novo, e o resultado aparece: confirmar as Settings não cancela o teste que acabou de partir.
+        rule.waitUntil(5_000) { rule.onAllNodesWithTag(VISAO_TEST_RESPONSE_TAG).fetchSemanticsNodes().isNotEmpty() }
+        node(VISAO_TEST_RESPONSE_TAG).assertTextContains("Texto do Custom", substring = true)
+        rule.runOnIdle {
+            assertEquals("https://b.test/v1", seen.single().visionCustomEndpoint)
+            assertEquals("modelo-salvo", seen.single().visionCustomModel)
+            assertEquals("https://b.test/v1", h.settings.visionCustomEndpoint)
+        }
+        node(VISAO_TEST_BUTTON_TAG).assertTextEquals("Testar")
+    }
+
+    @Test
+    fun tocarEmTestarConfirmaTodosOsCamposPendentesDoCustomJuntos() {
+        val seen = mutableListOf<Settings>()
+        val h = Harness(customSaved, visionTester = VisionTester { seen += it; com.keyflow.vision.VisionResult.Text("ok") })
+        show(h)
+        typeBInsteadOfAInTheEndpoint()
+        // Um caractere a mais por campo: acrescentar mais que isso é colagem, que salva na hora e não fica pendente.
+        node("visao-custom-header-name").performTextReplacement("HX")
+        node("visao-custom-header-value").performTextReplacement("Vs")
+        node("visao-custom-model").performTextReplacement("modelo-salvo!")
+
+        node(VISAO_TEST_BUTTON_TAG).performClick()
+
+        rule.waitUntil(5_000) { rule.onAllNodesWithTag(VISAO_TEST_RESPONSE_TAG).fetchSemanticsNodes().isNotEmpty() }
+        rule.runOnIdle {
+            val tested = seen.single()
+            assertEquals("https://b.test/v1", tested.visionCustomEndpoint)
+            assertEquals("HX", tested.visionCustomHeaderName)
+            assertEquals("Vs", tested.visionCustomHeaderValue)
+            assertEquals("modelo-salvo!", tested.visionCustomModel)
+            assertEquals(tested, h.settings)
+        }
+    }
+
+    @Test
+    fun testarDepoisDoDoneUsaAsSettingsJaSalvas() {
+        val seen = mutableListOf<Settings>()
+        val h = Harness(customSaved, visionTester = VisionTester { seen += it; com.keyflow.vision.VisionResult.Text("ok") })
+        show(h)
+        typeBInsteadOfAInTheEndpoint()
+        node("visao-custom-endpoint").performImeAction()
+        rule.runOnIdle { assertEquals("https://b.test/v1", h.settings.visionCustomEndpoint) }
+
+        node(VISAO_TEST_BUTTON_TAG).performClick()
+
+        rule.waitUntil(5_000) { rule.onAllNodesWithTag(VISAO_TEST_RESPONSE_TAG).fetchSemanticsNodes().isNotEmpty() }
+        rule.runOnIdle { assertEquals("https://b.test/v1", seen.single().visionCustomEndpoint) }
+    }
+
+    @Test
+    fun seOAnfitriaoNaoDevolveAsSettingsOTesteParteNoToqueComOQueFoiConfirmado() {
+        val seen = mutableListOf<Settings>()
+        val h = Harness(customSaved, visionTester = VisionTester { seen += it; com.keyflow.vision.VisionResult.Text("ok") })
+        h.acceptsChanges = false
+        show(h)
+        typeBInsteadOfAInTheEndpoint()
+
+        node(VISAO_TEST_BUTTON_TAG).performClick()
+
+        rule.waitUntil(5_000) { rule.onAllNodesWithTag(VISAO_TEST_RESPONSE_TAG).fetchSemanticsNodes().isNotEmpty() }
+        rule.runOnIdle {
+            assertEquals("https://b.test/v1", seen.single().visionCustomEndpoint)
+            assertEquals("https://a.test/v1", h.settings.visionCustomEndpoint)
+        }
+    }
+
+    /** Revisão 2, P2 nº 1: a chegada tardia das próprias Settings confirmadas não cancela nem apaga o teste que já partiu. */
+    @Test
+    fun aChegadaTardiaDasSettingsConfirmadasPreservaOTesteEmAndamento() {
+        val entered = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val seen = mutableListOf<Settings>()
+        val h = Harness(customSaved, visionTester = VisionTester { seen += it; entered.complete(Unit); gate.await(); com.keyflow.vision.VisionResult.Text("Texto tardio") })
+        h.holdChanges = true
+        show(h)
+        typeBInsteadOfAInTheEndpoint()
+
+        node(VISAO_TEST_BUTTON_TAG).performClick()
+        rule.waitUntil(5_000) { entered.isCompleted }
+        // Passado o prazo antigo de 2 s, o retorno finalmente chega.
+        rule.mainClock.advanceTimeBy(3_000)
+        rule.runOnIdle { h.settings = checkNotNull(h.held) }
+        rule.waitForIdle()
+        gate.complete(Unit)
+
+        rule.waitUntil(5_000) { rule.onAllNodesWithTag(VISAO_TEST_RESPONSE_TAG).fetchSemanticsNodes().isNotEmpty() }
+        node(VISAO_TEST_RESPONSE_TAG).assertTextContains("Texto tardio", substring = true)
+        rule.runOnIdle {
+            assertEquals("https://b.test/v1", seen.single().visionCustomEndpoint)
+        }
+    }
+
+    /** Revisão 2, P2 nº 2: um refresh com outra preferência que ainda tem o endpoint antigo não troca o pedido confirmado. */
+    @Test
+    fun umRefreshComOEndpointAntigoNaoTrocaOPedidoConfirmado() {
+        val seen = mutableListOf<Settings>()
+        val h = Harness(customSaved, visionTester = VisionTester { seen += it; com.keyflow.vision.VisionResult.Text("ok") })
+        h.holdChanges = true
+        show(h)
+        typeBInsteadOfAInTheEndpoint()
+
+        node(VISAO_TEST_BUTTON_TAG).performClick()
+        // Outra preferência muda e a tela volta a receber o endpoint antigo.
+        rule.runOnIdle { h.settings = h.settings.copy(autoPasteOnFocus = false) }
+        rule.mainClock.advanceTimeBy(3_000)
+        rule.waitForIdle()
+
+        rule.waitUntil(5_000) { rule.onAllNodesWithTag(VISAO_TEST_RESPONSE_TAG).fetchSemanticsNodes().isNotEmpty() }
+        rule.runOnIdle { assertEquals("https://b.test/v1", seen.single().visionCustomEndpoint) }
+    }
+
+    /** Revisão 3: editar de propósito de volta ao valor antigo (A→B→A) cancela o teste e zera a resposta de B. */
+    @Test
+    fun editarDeVoltaParaOValorAntigoCancelaOTesteDeB() {
+        val entered = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val h = Harness(customSaved, visionTester = VisionTester { entered.complete(Unit); gate.await(); com.keyflow.vision.VisionResult.Text("Resposta de B") })
+        show(h)
+        typeBInsteadOfAInTheEndpoint()
+        node(VISAO_TEST_BUTTON_TAG).performClick()
+        rule.waitUntil(5_000) { entered.isCompleted }
+        rule.runOnIdle { assertEquals("https://b.test/v1", h.settings.visionCustomEndpoint) }
+
+        node("visao-custom-endpoint").performTextReplacement("https://a.test/v1")
+        node("visao-custom-endpoint").performImeAction()
+        rule.runOnIdle { assertEquals("https://a.test/v1", h.settings.visionCustomEndpoint) }
+        gate.complete(Unit)
+        rule.waitForIdle()
+
+        node(VISAO_TEST_BUTTON_TAG).assertTextEquals("Testar")
+        rule.onNodeWithTag(VISAO_TEST_RESPONSE_TAG).assertDoesNotExist()
+    }
+
+    @Test
+    fun trocarAOrigemCancelaOTesteEmAndamento() {
+        val entered = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val stopped = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val h = Harness(Settings(visionLocalModelId = e2b.id), installed = setOf(e2b.id),
+            visionTester = VisionTester {
+                try { entered.complete(Unit); kotlinx.coroutines.awaitCancellation() }
+                finally { stopped.complete(Unit) }
+            })
+        show(h)
+        node(VISAO_TEST_BUTTON_TAG).performClick()
+        rule.waitUntil(5_000) { entered.isCompleted }
+        node(visionSourceTag(VisionSource.GOOGLE)).performClick()
+        rule.waitUntil(5_000) { stopped.isCompleted }
+        node(VISAO_TEST_BUTTON_TAG).assertTextEquals("Testar").assertIsNotEnabled()
+        rule.onNodeWithTag(VISAO_TEST_RESPONSE_TAG).assertDoesNotExist()
     }
 }

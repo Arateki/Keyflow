@@ -1,6 +1,7 @@
 package com.keyflow.reasoning
 
 import kotlinx.coroutines.flow.Flow
+import okio.ByteString.Companion.toByteString
 
 /**
  * Como gerar, quando quem pede quer controlar (a bancada de testes: temperatura 0 e semente fixa). **Tudo nulo = o padrão do motor =
@@ -50,10 +51,28 @@ data class GenerationOptions(
 }
 
 /**
- * O que se pede a um modelo de linguagem. Texto → texto: sem histórico de conversa (YAGNI — o Testar é uma frase).
+ * O que se pede a um modelo de linguagem: texto e uma imagem opcional, sem histórico de conversa.
  * [system] é a instrução de comportamento; [user] é o pedido; [options] só a bancada preenche (nulo = padrão do motor).
  */
-data class ReasoningRequest(val system: String? = null, val user: String, val options: GenerationOptions = GenerationOptions())
+data class ReasoningRequest(
+    val system: String? = null,
+    val user: String,
+    val image: ReasoningImage? = null,
+    val options: GenerationOptions = GenerationOptions(),
+)
+
+/** Imagem já reduzida e codificada. Nunca inclui os bytes no texto de diagnóstico do pedido. */
+class ReasoningImage(bytes: ByteArray, val mimeType: String = "image/png") {
+    init {
+        require(bytes.isNotEmpty() && bytes.size <= MAX_BYTES) { "imagem fora do limite" }
+        require(mimeType in setOf("image/png", "image/jpeg", "image/webp")) { "formato de imagem não suportado" }
+    }
+    val bytes: ByteArray = bytes.copyOf()
+    fun base64(): String = bytes.toByteString().base64()
+    fun dataUrl(): String = "data:$mimeType;base64,${base64()}"
+    override fun toString(): String = "ReasoningImage($mimeType, ${bytes.size} bytes)"
+    companion object { const val MAX_BYTES = 8 * 1024 * 1024 }
+}
 
 /** O que um [ReasoningEngine] emite enquanto responde: trechos, e no fim [Done] **ou** [Error]. */
 sealed interface ReasoningEvent {

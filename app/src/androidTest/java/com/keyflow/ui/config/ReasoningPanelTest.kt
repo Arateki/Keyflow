@@ -4,15 +4,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextInputSelection
+import androidx.compose.ui.text.TextRange
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.keyflow.core.ComputeBackend
 import com.keyflow.core.ReasoningSource
@@ -21,9 +25,14 @@ import com.keyflow.data.Settings
 import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.ModelSpec
 import com.keyflow.data.models.StartResult
+import com.keyflow.reasoning.ReasoningEngine
+import com.keyflow.reasoning.ReasoningEvent
+import com.keyflow.reasoning.ReasoningRequest
 import com.keyflow.reasoning.ReasoningResolution
 import com.keyflow.reasoning.UnavailableReason
 import com.keyflow.ui.theme.KeyFlowTheme
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -85,6 +94,40 @@ class ReasoningPanelTest {
         rule.runOnIdle {
             assertEquals(ReasoningSource.LOCAL, h.settings.reasoningSource)
             assertEquals("x", h.settings.reasoningCustomModel)
+        }
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun tocarEmTestarConfirmaOEndpointPendenteDoCustomSemDoneEResolveOMotorComEle() {
+        val tested = mutableListOf<Settings>()
+        val resolve = { settings: Settings ->
+            ReasoningResolution.Ready(object : ReasoningEngine {
+                override fun generate(request: ReasoningRequest): Flow<ReasoningEvent> {
+                    tested += settings
+                    return flowOf(ReasoningEvent.Delta("Olá do Custom"), ReasoningEvent.Done)
+                }
+            })
+        }
+        val h = Harness(
+            Settings(reasoningSource = ReasoningSource.CUSTOM, reasoningCustomEndpoint = "https://a.test/v1", reasoningCustomModel = "modelo-salvo"),
+            textUi(), resolve = resolve,
+        )
+        rule.setContent { h.Content() }
+        val endpoint = rule.onNodeWithTag("raciocinio-custom-endpoint").performScrollTo()
+        endpoint.performTextInputSelection(TextRange(8, 9))
+        endpoint.performTextInput("b")
+        endpoint.assertTextContains("https://b.test/v1")
+        rule.runOnIdle { assertEquals("https://a.test/v1", h.settings.reasoningCustomEndpoint) }
+
+        rule.onNodeWithTag(REASONING_TEST_BUTTON_TAG).performScrollTo().performClick()
+
+        rule.waitUntil(5_000) { rule.onAllNodesWithTag(REASONING_TEST_RESPONSE_TAG).fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithTag(REASONING_TEST_RESPONSE_TAG).assertTextContains("Olá do Custom", substring = true)
+        rule.runOnIdle {
+            assertEquals("https://b.test/v1", tested.single().reasoningCustomEndpoint)
+            assertEquals("modelo-salvo", tested.single().reasoningCustomModel)
+            assertEquals("https://b.test/v1", h.settings.reasoningCustomEndpoint)
         }
     }
 

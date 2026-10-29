@@ -14,4 +14,8 @@ interface IReasoningService {
     oneway void preload(in LocalLlmConfig config, IReasoningCallback cb);
     /** Interrompe a geração em curso; depois disso o serviço não fala mais com o callback dela. */
     oneway void cancel();
+    /** Texto ou imagem em cache privado: os bytes não atravessam o binder. Cada pedido tem seu cancelamento. */
+    oneway void generateRequest(in LocalLlmConfig config, @nullable String system, String user,
+        @nullable String imagePath, String requestId, IReasoningCallback cb);
+    oneway void cancelRequest(String requestId);
 }

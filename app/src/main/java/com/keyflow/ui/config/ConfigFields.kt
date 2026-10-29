@@ -787,7 +787,7 @@ private fun StepperButton(symbol: String, enabled: Boolean, tag: String, onClick
 /**
  * Campo de texto com auto-save (CFG-05): [label] em mono + valor com underline; persiste via [onCommit]
  * **no desfoque (se mudou)** e também no ImeAction Done. O estado externo [value] reseta o texto após o
- * round-trip de persistência.
+ * round-trip de persistência. Com [pending], o texto ainda não confirmado também sai a pedido (o Testar).
  */
 @Composable
 internal fun AutoSaveField(
@@ -798,6 +798,7 @@ internal fun AutoSaveField(
     modifier: Modifier = Modifier,
     keyboardType: KeyboardType = KeyboardType.Text,
     masked: Boolean = false,
+    pending: PendingEdits? = null,
 ) {
     val palette = LocalKeyFlowPalette.current
     val focusManager = LocalFocusManager.current
@@ -812,6 +813,13 @@ internal fun AutoSaveField(
         if (masked && text.isBlank() && !maskedEditDirty) {
             text = value
         } else if (text != value) onCommit(text)
+    }
+
+    // Quem age sobre o que está na tela (o Testar) pode pedir o texto ainda não confirmado, sem esperar o desfoque.
+    val confirmNow by rememberUpdatedState({ commitIfChanged() })
+    DisposableEffect(pending) {
+        val untrack = pending?.track { confirmNow() }
+        onDispose { untrack?.invoke() }
     }
 
     // Salva ao sair de cena (ex.: trocar de aba) se o valor mudou — rede de segurança do focus-out.
