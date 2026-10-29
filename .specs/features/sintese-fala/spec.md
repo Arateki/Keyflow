@@ -146,9 +146,11 @@ Entram agora no catálogo, lado a lado: o Supertonic 3 (D2; pesos OpenRAIL-M, c�
 | --------- | ---- | ------ |
 | FUX-01..09 | FAL-T4, FAL-T7 | Pending |
 | FENG-01..06 | FAL-T1, FAL-T4 | Pending |
-| FLOC-01..02 | FAL-T8, FAL-T10 | Pending |
-| FLOC-03..06 | FAL-T2, FAL-T3, FAL-T9, FAL-T11 | Pending |
+| FLOC-01..02 | FAL-T8, FAL-T10 | Done (2026-10-29) — pins no catálogo; o motor ainda não fala |
+| FLOC-03 | FAL-T2 | Done (2026-10-29) — frontend de caracteres |
+| FLOC-04..06 | FAL-T3, FAL-T9, FAL-T11 | Pending |
 | FCLD-01..07 | FAL-T5 | Pending |
 | FSYS-01..05 | FAL-T6 | Pending |
-| FPRV-01..02 | FAL-T2, FAL-T3 | Pending |
-| FPRV-03 | FAL-T8 | Pending |
+| FPRV-01 | FAL-T2 | Done (2026-10-29) — normalizador e frontend |
+| FPRV-02 | FAL-T3 | Pending — a URL do sherpa não foi reaberta |
+| FPRV-03 | FAL-T8 | Done (2026-10-29) — aceite da OpenRAIL-M no download do Supertonic |
