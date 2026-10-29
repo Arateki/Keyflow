@@ -20,6 +20,8 @@ internal interface LlmBackend {
 
     /** Métricas da última geração; nulo quando o backend não as fornece. */
     fun metrics(): com.keyflow.reasoning.ReasoningEvent.Metrics? = null
+    /** Limpa a tentativa anterior ANTES de o núcleo publicar este backend como cancelável pelo novo pedido. */
+    fun prepareGeneration() = Unit
 
     /** Pode ser chamado de qualquer thread, durante [generate]; a geração deve voltar logo. */
     fun cancel()

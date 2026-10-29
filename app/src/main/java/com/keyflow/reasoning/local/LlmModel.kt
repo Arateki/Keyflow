@@ -25,6 +25,7 @@ data class LlmModel(
      * precisa dela e `fromParcel` devolve [com.keyflow.data.LocalBackendPrefs.NO_TICKET]).
      */
     val ticket: Long = 0L,
+    val vision: Boolean = false,
 ) {
     fun toParcel(): LocalLlmConfig = LocalLlmConfig().also {
         it.modelId = modelId
@@ -34,6 +35,7 @@ data class LlmModel(
         it.ramEstimateMb = ramEstimateMb
         it.version = version
         it.backend = backend.name
+        it.vision = vision
     }
 
     companion object {
@@ -45,6 +47,7 @@ data class LlmModel(
             ramEstimateMb = config.ramEstimateMb,
             version = config.version.orEmpty(),
             backend = ComputeBackend.fromName(config.backend),
+            vision = config.vision,
         )
     }
 }

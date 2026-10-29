@@ -45,7 +45,8 @@ internal class LiteRtBackend(private val cacheDir: String?, private val opensThi
         var created: Engine? = null
         try {
             ExperimentalFlags.enableBenchmark = true
-            created = Engine(EngineConfig(modelPath = model.modelPath, backend = LiteRtConfigs.backend(model.backend), cacheDir = cacheDir))
+            created = Engine(EngineConfig(modelPath = model.modelPath, backend = LiteRtConfigs.backend(model.backend),
+                visionBackend = if (model.vision) LiteRtConfigs.backend(model.backend) else null, cacheDir = cacheDir))
             // Pode levar segundos (a doc fala em até ~10 s): estamos na thread de trabalho do serviço, não na da tela.
             created.initialize()
             textFormat = LiteRtConfigs.textFormat(created, opensThink)
@@ -68,7 +69,7 @@ internal class LiteRtBackend(private val cacheDir: String?, private val opensThi
     @OptIn(ExperimentalApi::class)
     override fun generate(request: ReasoningRequest, onDelta: (String) -> Unit) {
         val active = checkNotNull(engine) { "o motor não está carregado" }
-        cancelled = false
+        if (cancelled) return
         lastMetrics = null
         val config = LiteRtConfigs.conversation(request.system, opensThink, textFormat, request.options)
         val stripper = ThoughtStripper(opensThink)
@@ -78,7 +79,7 @@ internal class LiteRtBackend(private val cacheDir: String?, private val opensThi
             val finished = CountDownLatch(1)
             val failure = AtomicReference<Throwable?>(null)
             conversation.sendMessageAsync(
-                LiteRtConfigs.user(request.user, textFormat),
+                LiteRtConfigs.user(request.user, textFormat, request.image),
                 object : MessageCallback {
                     override fun onMessage(message: Message) {
                         val text = stripper.accept(textOf(message))
@@ -93,9 +94,11 @@ internal class LiteRtBackend(private val cacheDir: String?, private val opensThi
                     }
                 },
             )
+            if (cancelled) runCatching { conversation.cancelProcess() }
             // Espera o fim; se pedirem cancelamento e a biblioteca não avisar, não fica preso para sempre.
             while (!finished.await(WAIT_SLICE_MS, TimeUnit.MILLISECONDS)) {
                 if (cancelled) {
+                    runCatching { conversation.cancelProcess() }
                     finished.await(CANCEL_GRACE_MS, TimeUnit.MILLISECONDS)
                     break
                 }
@@ -122,6 +125,7 @@ internal class LiteRtBackend(private val cacheDir: String?, private val opensThi
     }
 
     override fun metrics(): ReasoningEvent.Metrics? = lastMetrics
+    override fun prepareGeneration() { cancelled = false }
 
     override fun cancel() {
         cancelled = true
@@ -177,7 +181,11 @@ internal object LiteRtConfigs {
     fun contents(text: String, format: LiteRtTextFormat = LiteRtTextFormat.SINGLE): Contents =
         Contents.of(format.parts(text).map { Content.Text(it) })
 
-    fun user(text: String, format: LiteRtTextFormat = LiteRtTextFormat.SINGLE): Message = Message.user(contents(text, format))
+    fun user(text: String, format: LiteRtTextFormat = LiteRtTextFormat.SINGLE,
+        image: com.keyflow.reasoning.ReasoningImage? = null,
+    ): Message = if (image == null) Message.user(contents(text, format)) else Message.user(Contents.of(
+        listOf(Content.ImageBytes(image.bytes)) + format.parts(text).map { Content.Text(it) },
+    ))
 
     @OptIn(ExperimentalApi::class)
     fun textFormat(engine: Engine, opensThink: Boolean = false): LiteRtTextFormat = LiteRtTextFormat.detect { parts ->

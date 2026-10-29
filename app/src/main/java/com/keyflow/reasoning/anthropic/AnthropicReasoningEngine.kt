@@ -36,7 +36,7 @@ import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 
-/** O `max_tokens` que a requisição da Anthropic leva: fixo, a bancada não o muda (a bancada o mostra no aviso de custo). */
+/** Teto padrão da Anthropic, mantido quando o pedido não especifica outro valor. */
 internal const val MAX_TOKENS_DE_SAIDA = 1024
 
 /**
@@ -79,11 +79,14 @@ class AnthropicReasoningEngine(
         // Sem o corpo: é o texto do usuário (ditado, prompt), e o Log.d sai também no release.
         android.util.Log.d("AnthropicReasoning", "Outgoing model: $resolvedModel, isOAuth: $isOAuth, corpo: ${jsonBody.length} caracteres")
         val body = jsonBody.toRequestBody("application/json".toMediaType())
+        // Imagem só vai à origem escolhida: redirecionamentos não reenviam os pixels a outro host.
+        val transport = if (request.image == null) client else client.newBuilder()
+            .followRedirects(false).followSslRedirects(false).build()
         var attempt = 0
 
         while (true) {
             val call = try {
-                client.newCall(
+                transport.newCall(
                     Request.Builder()
                         .url("$apiBaseUrl/messages")
                         .apply { headers.forEach { (name, value) -> header(name, value) } }
@@ -96,7 +99,7 @@ class AnthropicReasoningEngine(
                 return@channelFlow
             }
 
-            val outcome = attemptOnce(call, metrics)
+            val outcome = attemptOnce(call, metrics, request.image != null)
             if (outcome !is Outcome.Retry) return@channelFlow
             attempt++
             if (attempt >= MAX_ATTEMPTS) {
@@ -112,7 +115,7 @@ class AnthropicReasoningEngine(
         class Retry(val error: ReasoningEvent.Error) : Outcome
     }
 
-    private suspend fun ProducerScope<ReasoningEvent>.attemptOnce(call: Call, metrics: OnlineMetrics): Outcome {
+    private suspend fun ProducerScope<ReasoningEvent>.attemptOnce(call: Call, metrics: OnlineMetrics, image: Boolean): Outcome {
         var finished = false
         val watcher = launch(start = CoroutineStart.UNDISPATCHED) {
             try {
@@ -123,14 +126,14 @@ class AnthropicReasoningEngine(
             }
         }
         try {
-            return withContext(Dispatchers.IO) { execute(call, metrics) { send(it) } }
+            return withContext(Dispatchers.IO) { execute(call, metrics, image) { send(it) } }
         } finally {
             finished = true
             watcher.cancel()
         }
     }
 
-    private suspend fun execute(call: Call, metrics: OnlineMetrics, send: suspend (ReasoningEvent) -> Unit): Outcome {
+    private suspend fun execute(call: Call, metrics: OnlineMetrics, image: Boolean, send: suspend (ReasoningEvent) -> Unit): Outcome {
         val response = try {
             call.execute()
         } catch (e: IOException) {
@@ -142,7 +145,7 @@ class AnthropicReasoningEngine(
         response.use { r ->
             if (!r.isSuccessful) {
                 val errorBody = r.body?.string().orEmpty()
-                if (BuildConfig.DEBUG) android.util.Log.e("AnthropicReasoning", "HTTP ${r.code}: $errorBody")
+                if (BuildConfig.DEBUG) android.util.Log.e("AnthropicReasoning", "HTTP ${r.code}")
                 val failure = httpFailure(r.code, errorBody)
                 if (failure.retry) return Outcome.Retry(failure.event)
                 if (r.code == 401) authorization.invalidate(ProviderIds.ANTHROPIC)
@@ -150,7 +153,7 @@ class AnthropicReasoningEngine(
                 return Outcome.Finished
             }
             try {
-                readStream(r.body!!.source(), metrics, send)
+                readStream(r.body!!.source(), metrics, image, send)
             } catch (e: IOException) {
                 if (call.isCanceled()) throw CancellationException("cancelado")
                 send(ReasoningEvent.Error(ReasoningError.NETWORK, "o fluxo SSE da Anthropic foi interrompido"))
@@ -159,7 +162,7 @@ class AnthropicReasoningEngine(
         return Outcome.Finished
     }
 
-    private suspend fun readStream(source: BufferedSource, metrics: OnlineMetrics, send: suspend (ReasoningEvent) -> Unit) {
+    private suspend fun readStream(source: BufferedSource, metrics: OnlineMetrics, image: Boolean, send: suspend (ReasoningEvent) -> Unit) {
         val data = StringBuilder()
         var eventName: String? = null
         var completed = false
@@ -169,7 +172,7 @@ class AnthropicReasoningEngine(
             when {
                 line.isEmpty() -> {
                     if (data.isNotEmpty()) {
-                        val terminal = handleEvent(eventName, data.toString(), metrics, send)
+                        val terminal = handleEvent(eventName, data.toString(), metrics, image, send)
                         if (terminal) completed = true
                         data.clear()
                         eventName = null
@@ -184,17 +187,17 @@ class AnthropicReasoningEngine(
         }
 
         if (data.isNotEmpty()) {
-            val terminal = handleEvent(eventName, data.toString(), metrics, send)
+            val terminal = handleEvent(eventName, data.toString(), metrics, image, send)
             if (terminal) completed = true
         }
 
         if (!completed) {
             send(metrics.event())
-            send(ReasoningEvent.Done)
+            send(if (image) ReasoningEvent.Error(ReasoningError.NETWORK, "o fluxo da imagem terminou sem message_stop") else ReasoningEvent.Done)
         }
     }
 
-    private suspend fun handleEvent(eventName: String?, data: String, metrics: OnlineMetrics, send: suspend (ReasoningEvent) -> Unit): Boolean {
+    private suspend fun handleEvent(eventName: String?, data: String, metrics: OnlineMetrics, image: Boolean, send: suspend (ReasoningEvent) -> Unit): Boolean {
         val json = try {
             JSONObject(data)
         } catch (e: JSONException) {
@@ -213,6 +216,13 @@ class AnthropicReasoningEngine(
                 val text = delta?.optString("text").orEmpty()
                 if (text.isNotEmpty()) {
                     send(ReasoningEvent.Delta(text))
+                }
+            }
+            "message_delta" -> {
+                val reason = json.optJSONObject("delta")?.optString("stop_reason").orEmpty()
+                if (image && reason.isNotEmpty() && reason != "null" && reason !in setOf("end_turn", "stop_sequence")) {
+                    send(ReasoningEvent.Error(ReasoningError.ENGINE, "resposta da imagem incompleta"))
+                    return true
                 }
             }
             "message_stop" -> {
@@ -267,7 +277,12 @@ class AnthropicReasoningEngine(
         put("model", resolvedModel)
         put("max_tokens", if (GenerationOptions.MAX_OUTPUT_TOKENS in supported) request.options.maxOutputTokens ?: MAX_TOKENS_DE_SAIDA else MAX_TOKENS_DE_SAIDA)
         put("stream", true)
-        val msg = JSONObject().put("role", "user").put("content", request.user)
+        val content: Any = request.image?.let { image ->
+            JSONArray().put(JSONObject().put("type", "image").put("source", JSONObject()
+                .put("type", "base64").put("media_type", image.mimeType).put("data", image.base64())))
+                .put(JSONObject().put("type", "text").put("text", request.user))
+        } ?: request.user
+        val msg = JSONObject().put("role", "user").put("content", content)
         put("messages", JSONArray().put(msg))
         val systemPrompt = if (isOAuth) {
             val prefix = "You are Claude Code, Anthropic's official CLI for Claude."

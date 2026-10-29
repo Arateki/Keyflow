@@ -20,7 +20,10 @@ import java.util.concurrent.TimeUnit
  */
 class ReasoningService : Service() {
 
-    private val worker = Executors.newSingleThreadExecutor { Thread(it, "reasoning") }
+    private val worker = Executors.newSingleThreadExecutor { work -> Thread({
+        android.os.StrictMode.setThreadPolicy(android.os.StrictMode.ThreadPolicy.Builder().detectNetwork().penaltyDeathOnNetwork().build())
+        work.run()
+    }, "reasoning") }
     private val timer: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor { Thread(it, "reasoning-idle") }
 
     private val core by lazy {
@@ -59,10 +62,24 @@ class ReasoningService : Service() {
         override fun cancel() = core.cancel()
 
         override fun unload() = core.unload()
-
         override fun restart() {
             core.shutdown()
             worker.execute { android.os.Process.killProcess(android.os.Process.myPid()) }
+        }
+
+        override fun cancelRequest(requestId: String) = core.cancel(requestId)
+
+        override fun generateRequest(config: LocalLlmConfig, system: String?, user: String,
+            imagePath: String?, requestId: String, options: LocalGenOptions, cb: IReasoningCallback,
+        ) {
+            val model = LlmModel.fromParcel(config)
+            val request = ReasoningRequest(system = system?.takeIf { it.isNotBlank() }, user = user, options = options.toOptions())
+            core.generate(model, request, CallbackListener(cb), requestId) {
+                if (imagePath == null) request else {
+                    require(model.vision) { "o pedido de imagem exige um motor de visão" }
+                    request.copy(image = ReasoningImageCache.read(File(cacheDir, "reasoning-images"), imagePath))
+                }
+            }
         }
     }
 
@@ -93,12 +110,12 @@ class ReasoningService : Service() {
         override fun onDelta(text: String) = safely { cb.onDelta(text) }
         override fun onDone() = safely { cb.onDone() }
         override fun onError(kind: ReasoningErrorKind, message: String) {
-            Log.w(TAG, "falha $kind: $message")
+            Log.w(TAG, "falha $kind")
             safely { cb.onError(kind.code, message) }
         }
 
         override fun onBackendFallback(failed: ComputeBackend, reason: String) {
-            Log.w(TAG, "a carga na $failed falhou; seguindo na CPU: $reason")
+            Log.w(TAG, "a carga na $failed falhou; seguindo na CPU")
             safely { cb.onBackendFallback(failed.name, reason) }
         }
 

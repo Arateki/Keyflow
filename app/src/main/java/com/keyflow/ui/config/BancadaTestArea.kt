@@ -35,6 +35,7 @@ fun BancadaTestArea(
     modifier: Modifier = Modifier,
     onManageUsage: (() -> Unit)? = null,
     initialState: TestState = TestState(),
+    resolveOnStart: (() -> ReasoningResolution)? = null,
 ) {
     val context = LocalContext.current
     val injetados = LocalBancadaServicos.current
@@ -47,7 +48,7 @@ fun BancadaTestArea(
         BancadaSubAbas(abas, atual.id, onSelect = { selecionada = it })
         Column(Modifier.padding(top = 14.dp)) {
             if (atual.id == BANCADA_SUBABA_RAPIDO || corpus == null) {
-                ReasoningTestArea(resolution, onManageUsage = onManageUsage, initialState = initialState)
+                ReasoningTestArea(resolution, onManageUsage = onManageUsage, initialState = initialState, resolveOnStart = resolveOnStart)
             } else {
                 val servicos = remember(injetados) { injetados ?: BancadaServicos.of(context.applicationContext) }
                 val engine: ReasoningEngine? = (resolution as? ReasoningResolution.Ready)?.engine

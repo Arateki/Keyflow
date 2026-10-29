@@ -35,11 +35,11 @@ import org.json.JSONException
 import org.json.JSONObject
 
 /**
- * A Responses API da OpenAI (RCL-02/03/05), para o login ChatGPT e para a chave de API com o MESMO corpo e a mesma base de URL.
+ * A Responses API da OpenAI (RCL-02/03/05), para o login ChatGPT e para a chave de API na mesma base de URL.
  * Tudo abaixo vem do texto literal da documentação (`openai-siwc-notes.md`):
  *
  * - corpo **enxuto** — `model`, `input`, `store:false`, `stream:true` e, só quando há system, `instructions` (item `system` em
- *   `input` é rejeitado) —, sem `max_output_tokens`, `temperature`, `top_p`, `user`… que o fluxo de plano recusa;
+ *   `input` é rejeitado). No login de plano não envia `max_output_tokens`, `temperature`, `top_p`, `user`…; a chave de API pode receber opções explícitas;
  * - o fluxo SSE é lido linha a linha (sem dependência nova); **só `response.completed` é sucesso** — fim sem ele é erro, e o
  *   que já chegou continua valendo;
  * - cada erro documentado vira um [ReasoningError] preservando o motivo; **nunca** troca para outra forma de cobrança;
@@ -74,10 +74,11 @@ class OpenAiReasoningEngine(
         val supported = if (authorized.apiKey) supportedOptions(request.options) else emptySet()
         val metrics = OnlineMetrics(request.options, supported)
         val body = bodyOf(request, supported).toRequestBody("application/json".toMediaType())
+        val transport = if (request.image == null) client else client.newBuilder().followRedirects(false).followSslRedirects(false).build()
         var attempt = 0
         while (true) {
             val call = try {
-                client.newCall(
+                transport.newCall(
                     Request.Builder().url("$apiBaseUrl/responses")
                         .apply { headers.forEach { (name, value) -> header(name, value) } }
                         .header("Accept", "text/event-stream")
@@ -266,7 +267,12 @@ class OpenAiReasoningEngine(
 
     private fun bodyOf(request: ReasoningRequest, supported: Set<String>): String = JSONObject().apply {
         put("model", model)
-        put("input", org.json.JSONArray().put(JSONObject().put("role", "user").put("content", request.user)))
+        val content: Any = request.image?.let { image ->
+            org.json.JSONArray()
+                .put(JSONObject().put("type", "input_text").put("text", request.user))
+                .put(JSONObject().put("type", "input_image").put("image_url", image.dataUrl()))
+        } ?: request.user
+        put("input", org.json.JSONArray().put(JSONObject().put("role", "user").put("content", content)))
         put("store", false)
         put("stream", true)
         request.system?.let { put("instructions", it) }

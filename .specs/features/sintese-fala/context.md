@@ -1,8 +1,13 @@
 # Síntese de fala (aba Voz) — Context (2026-10-24)
 
-Só o contexto: a feature ainda não tem spec, design nem tasks. A aba **Voz** (`ConfigTab.FALA`, `Settings.falaSource`) hoje é
-tela + `Settings`, sem motor ("Em breve" na v1). Este arquivo guarda a decisão do Yan, o achado do eSpeak e os modelos
-candidatos, para a spec não partir do zero. Tudo conferido em 2026-10-24; o que é proposta vem com ⚠️.
+A spec, o design e as tasks estão em `spec.md`, `design.md` e `tasks.md` (rascunho, 2026-10-29). Em 29/10 o Yan decidiu: Supertonic 3 e o VITS Coqui pt entram juntos no catálogo (o VITS com o nome "português", sem esperar a escuta; se não agradar, sai depois); o aceite da licença do Supertonic é só no download; o primeiro corte de cards inclui Sistema; o card da OpenAI leva o aviso de 2027-01-06. Este arquivo continua sendo
+o histórico da decisão do Yan, do achado do eSpeak e dos pins. A seção "recompilar o AAR" abaixo **não é trabalho aberto**:
+na main o app já depende do AAR `sherpa-onnx-1.13.8-sem-tts` (`app/build.gradle.kts`, `SherpaAarSemGplTest`). Kokoro em pt
+foi reconferido em 2026-10-29: o G2P dessa língua exige eSpeak (GPL) — continua fora. Pesquisa do dia:
+`.equipe/relatorios/fala-pesquisa.md` (não vai para o git).
+
+A aba **Voz** (`ConfigTab.FALA`, `Settings.falaSource`) hoje é tela + `Settings`, sem motor ("Em breve" na v1). Tudo abaixo
+foi conferido em 2026-10-24, salvo a nota de 2026-10-29 acima; o que é proposta vem com ⚠️.
 
 ## Decisão do Yan (fixa)
 - **Padrão = modelo neural no aparelho**, não o TTS do Android. O **TTS do sistema** (`android.speech.tts`) e a **nuvem**

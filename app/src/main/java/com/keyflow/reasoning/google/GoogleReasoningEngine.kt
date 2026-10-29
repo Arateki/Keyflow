@@ -72,11 +72,12 @@ class GoogleReasoningEngine(
         val supported = supportedOptions(request.options)
         val metrics = OnlineMetrics(request.options, supported)
         val body = bodyOf(request, supported).toRequestBody("application/json".toMediaType())
+        val transport = if (request.image == null) client else client.newBuilder().followRedirects(false).followSslRedirects(false).build()
         var attempt = 0
 
         while (true) {
             val call = try {
-                client.newCall(
+                transport.newCall(
                     Request.Builder()
                         .url("$apiBaseUrl/models/$encodedModel:streamGenerateContent?alt=sse")
                         .apply { headers.forEach { (name, value) -> header(name, value) } }
@@ -89,7 +90,7 @@ class GoogleReasoningEngine(
                 return@channelFlow
             }
 
-            val outcome = attemptOnce(call, metrics)
+            val outcome = attemptOnce(call, metrics, request.image != null)
             if (outcome !is Outcome.Retry) return@channelFlow
             attempt++
             if (attempt >= MAX_ATTEMPTS) {
@@ -105,7 +106,7 @@ class GoogleReasoningEngine(
         class Retry(val error: ReasoningEvent.Error) : Outcome
     }
 
-    private suspend fun ProducerScope<ReasoningEvent>.attemptOnce(call: Call, metrics: OnlineMetrics): Outcome {
+    private suspend fun ProducerScope<ReasoningEvent>.attemptOnce(call: Call, metrics: OnlineMetrics, image: Boolean): Outcome {
         var finished = false
         val watcher = launch(start = CoroutineStart.UNDISPATCHED) {
             try {
@@ -116,14 +117,14 @@ class GoogleReasoningEngine(
             }
         }
         try {
-            return withContext(Dispatchers.IO) { execute(call, metrics) { send(it) } }
+            return withContext(Dispatchers.IO) { execute(call, metrics, image) { send(it) } }
         } finally {
             finished = true
             watcher.cancel()
         }
     }
 
-    private suspend fun execute(call: Call, metrics: OnlineMetrics, send: suspend (ReasoningEvent) -> Unit): Outcome {
+    private suspend fun execute(call: Call, metrics: OnlineMetrics, image: Boolean, send: suspend (ReasoningEvent) -> Unit): Outcome {
         val response = try {
             call.execute()
         } catch (e: IOException) {
@@ -141,7 +142,7 @@ class GoogleReasoningEngine(
                 return Outcome.Finished
             }
             try {
-                readStream(r.body!!.source(), metrics, send)
+                readStream(r.body!!.source(), metrics, image, send)
             } catch (e: IOException) {
                 if (call.isCanceled()) throw CancellationException("cancelado")
                 send(ReasoningEvent.Error(ReasoningError.NETWORK, "o fluxo SSE do Gemini foi interrompido"))
@@ -150,7 +151,7 @@ class GoogleReasoningEngine(
         return Outcome.Finished
     }
 
-    private suspend fun readStream(source: BufferedSource, metrics: OnlineMetrics, send: suspend (ReasoningEvent) -> Unit) {
+    private suspend fun readStream(source: BufferedSource, metrics: OnlineMetrics, image: Boolean, send: suspend (ReasoningEvent) -> Unit) {
         val data = StringBuilder()
         var completed = false
         var failed = false
@@ -167,7 +168,7 @@ class GoogleReasoningEngine(
             when {
                 line.isEmpty() -> {
                     if (data.isNotEmpty()) {
-                        val terminal = handleData(data.toString(), metrics, forward)
+                        val terminal = handleData(data.toString(), metrics, image, forward)
                         if (terminal) completed = true
                         data.clear()
                     }
@@ -180,17 +181,17 @@ class GoogleReasoningEngine(
         }
 
         if (data.isNotEmpty()) {
-            val terminal = handleData(data.toString(), metrics, forward)
+            val terminal = handleData(data.toString(), metrics, image, forward)
             if (terminal) completed = true
         }
 
         if (!failed) {
             send(metrics.event())
-            send(ReasoningEvent.Done)
+            send(if (image && !completed) ReasoningEvent.Error(ReasoningError.NETWORK, "o fluxo da imagem terminou sem STOP") else ReasoningEvent.Done)
         }
     }
 
-    private suspend fun handleData(data: String, metrics: OnlineMetrics, send: suspend (ReasoningEvent) -> Unit): Boolean {
+    private suspend fun handleData(data: String, metrics: OnlineMetrics, image: Boolean, send: suspend (ReasoningEvent) -> Unit): Boolean {
         if (data.trim() == "[DONE]") {
             send(ReasoningEvent.Done)
             return true
@@ -227,6 +228,10 @@ class GoogleReasoningEngine(
         }
 
         val finishReason = firstCandidate.optString("finishReason")
+        if (image && finishReason.isNotEmpty() && finishReason != "null" && finishReason != "STOP") {
+            send(ReasoningEvent.Error(ReasoningError.ENGINE, "resposta da imagem incompleta"))
+            return true
+        }
         if (finishReason == "STOP" || finishReason == "MAX_TOKENS") {
             send(ReasoningEvent.Done)
             return true
@@ -267,7 +272,11 @@ class GoogleReasoningEngine(
         val userPart = JSONObject().put("text", request.user)
         val userContent = JSONObject().apply {
             put("role", "user")
-            put("parts", JSONArray().put(userPart))
+            put("parts", JSONArray().apply {
+                request.image?.let { image -> put(JSONObject().put("inlineData", JSONObject()
+                    .put("mimeType", image.mimeType).put("data", image.base64()))) }
+                put(userPart)
+            })
         }
         put("contents", JSONArray().put(userContent))
 
