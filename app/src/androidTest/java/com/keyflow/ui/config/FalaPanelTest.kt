@@ -275,7 +275,7 @@ class FalaPanelTest {
         rule.setContent { h.Content() }
 
         rule.onNodeWithTag(FALA_TEST_BUTTON_TAG).performScrollTo().assertIsNotEnabled()
-        rule.onNodeWithTag(FALA_TEST_REASON_TAG).performScrollTo().assertTextContains("Conecte nesta aba")
+        rule.onNodeWithTag(FALA_TEST_REASON_TAG).performScrollTo().assertTextContains("Conecte nesta aba", substring = true)
     }
 
     @Test
@@ -284,7 +284,7 @@ class FalaPanelTest {
         rule.setContent { h.Content() }
 
         rule.onNodeWithTag(FALA_TEST_BUTTON_TAG).performScrollTo().assertIsNotEnabled()
-        rule.onNodeWithTag(FALA_TEST_REASON_TAG).performScrollTo().assertTextContains("Informe o endpoint")
+        rule.onNodeWithTag(FALA_TEST_REASON_TAG).performScrollTo().assertTextContains("Informe o endpoint", substring = true)
         rule.runOnIdle { h.settings = h.settings.copy(falaCustomEndpoint = "https://exemplo.test/v1/audio/speech") }
         rule.onNodeWithTag(FALA_TEST_BUTTON_TAG).assertIsEnabled()
         rule.onNodeWithTag(FALA_TEST_REASON_TAG).assertDoesNotExist()
@@ -307,7 +307,7 @@ class FalaPanelTest {
             assertEquals(FalaSource.SYSTEM, rec.engineSettings.single().falaSource)
             assertTrue(rec.stopped >= 1) // o player é liberado no fim
         }
-        rule.onNodeWithTag(FALA_TEST_TIMES_TAG).performScrollTo().assertTextContains("1º áudio: 120 ms")
+        rule.onNodeWithTag(FALA_TEST_TIMES_TAG).performScrollTo().assertTextContains("1º áudio: 120 ms", substring = true)
         rule.onNodeWithTag(FALA_TEST_TIMES_TAG).assertTextContains("duração: 2.5 s", substring = true)
     }
 
@@ -341,7 +341,7 @@ class FalaPanelTest {
 
         rule.onNodeWithTag(FALA_TEST_BUTTON_TAG).performScrollTo().performClick()
         rule.waitForIdle()
-        rule.onNodeWithTag(FALA_TEST_BUTTON_TAG).assertTextContains("Parar")
+        rule.onNodeWithTag(FALA_TEST_BUTTON_TAG).assertTextContains("Parar", substring = true)
         rule.onNodeWithTag(FALA_TEST_BUTTON_TAG).performClick()
         rule.waitForIdle()
 
@@ -349,7 +349,7 @@ class FalaPanelTest {
             assertTrue(cancelled)
             assertTrue(rec.stopped >= 1)
         }
-        rule.onNodeWithTag(FALA_TEST_BUTTON_TAG).assertTextContains("Testar")
+        rule.onNodeWithTag(FALA_TEST_BUTTON_TAG).assertTextContains("Testar", substring = true)
         rule.onNodeWithTag(FALA_TEST_TIMES_TAG).assertDoesNotExist()
     }
 
@@ -366,7 +366,7 @@ class FalaPanelTest {
         rule.waitForIdle()
 
         rule.runOnIdle { assertTrue(cancelled) }
-        rule.onNodeWithTag(FALA_TEST_BUTTON_TAG).assertTextContains("Testar")
+        rule.onNodeWithTag(FALA_TEST_BUTTON_TAG).assertTextContains("Testar", substring = true)
     }
 
     @Test
@@ -393,7 +393,7 @@ class FalaPanelTest {
         rule.onNodeWithTag(FALA_TEST_BUTTON_TAG).performScrollTo().performClick()
         rule.waitForIdle()
 
-        rule.onNodeWithTag(FALA_TEST_RESPONSE_TAG).performScrollTo().assertTextContains("Faltam os dados")
+        rule.onNodeWithTag(FALA_TEST_RESPONSE_TAG).performScrollTo().assertTextContains("Faltam os dados", substring = true)
         rule.onNodeWithTag(FALA_INSTALL_DATA_TAG).performScrollTo().assertIsDisplayed()
         rule.onNodeWithTag(FALA_TEST_TIMES_TAG).assertDoesNotExist()
     }
