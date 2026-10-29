@@ -213,8 +213,8 @@ class SetupActivity : ComponentActivity() {
                             java.io.File(filesDir, "voice-license-accepted.txt")).isAccepted(id)
                         val model = store.fileFor(spec, if (supertonic) FileRole.TTS_CONFIG else FileRole.MODEL)
                         val tokens = store.fileFor(spec, if (supertonic) FileRole.UNICODE_INDEX else FileRole.TOKENS)
-                        if (!accepted || !store.isInstalled(id) || model == null || tokens == null ||
-                            (supertonic && !com.keyflow.speech.local.SupertonicFiles.complete(model, tokens))) null else model to tokens
+                        if (supertonic) com.keyflow.speech.local.SupertonicFiles.acceptedPair(model, tokens, accepted, store.isInstalled(id))
+                        else if (!store.isInstalled(id) || model == null || tokens == null) null else model to tokens
                     },
                     endpoint = AidlSpeechEndpoint(SpeechConnection.get(this), spec.recommendedRamMb),
                 )

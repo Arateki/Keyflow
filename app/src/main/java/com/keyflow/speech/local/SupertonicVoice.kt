@@ -15,6 +15,9 @@ import org.json.JSONObject
 object SupertonicFiles {
     val names = listOf("duration_predictor.onnx", "text_encoder.onnx", "vector_estimator.onnx", "vocoder.onnx",
         "unicode_indexer.json", "tts.json", "M1.json")
+    fun acceptedPair(config: File?, index: File?, accepted: Boolean, installed: Boolean): Pair<File, File>? =
+        if (accepted && installed && config != null && index != null && complete(config, index)) config to index else null
+
     fun complete(config: File, index: File): Boolean = config.name == "tts.json" && index.name == "unicode_indexer.json" &&
         config.parentFile == index.parentFile && names.all { File(config.parentFile, it).let { f -> f.isFile && f.length() > 0 } }
 }

@@ -99,6 +99,13 @@ class SupertonicVoiceTest {
         assertEquals(0, sessions.opened)
     }
 
+    @Test fun semAceiteOuInstalacaoMesmoComArquivosNaoEntregaCaminhosAoMotor() {
+        val (config, index) = files()
+        assertNull(SupertonicFiles.acceptedPair(config, index, accepted = false, installed = true))
+        assertNull(SupertonicFiles.acceptedPair(config, index, accepted = true, installed = false))
+        assertEquals(config to index, SupertonicFiles.acceptedPair(config, index, accepted = true, installed = true))
+    }
+
     @Test fun falhaAoAbrirFechaAsSessoesJaCriadas() {
         val (config, index) = files(); val sessions = Sessions()
         val voice = SupertonicVoice({ path -> if (path.endsWith("vocoder.onnx")) error("simulada") else sessions.open(path) })
