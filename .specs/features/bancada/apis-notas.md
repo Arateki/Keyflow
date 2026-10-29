@@ -10,7 +10,7 @@ Fonte: [Config.kt, tag v0.16.1](https://github.com/google-ai-edge/LiteRT-LM/blob
 - `maxOutputToken`: “must be positive or null”; nulo usa o padrão do modelo ou motor.
 - `ThinkingConfig`: `enableThinking = true`, `thinkingTokenBudget = -1`; “infinite budget” para -1. Efeito de zero: pendente de verificação em execução.
 - `Backend.CPU(threadCount = null)`: “default value from the native engine”; `numOfThreads` é obsoleto. `Backend.GPU()` não tem argumentos.
-- `Conversation.getBenchmarkInfo()` e `ExperimentalFlags.enableBenchmark`: assinaturas levantadas no AAR 0.16.1 nas notas do pesquisador. Fonte oficial e efeito da flag em execução: **pendentes**; não presumir que as métricas são produzidas sem a flag.
+- [`Conversation.getBenchmarkInfo()`](https://github.com/google-ai-edge/LiteRT-LM/blob/v0.16.1/kotlin/java/com/google/ai/edge/litertlm/Conversation.kt): “throws LiteRtLmJniException if benchmark is not enabled”. [`ExperimentalFlags.enableBenchmark`](https://github.com/google-ai-edge/LiteRT-LM/blob/v0.16.1/kotlin/java/com/google/ai/edge/litertlm/ExperimentalFlags.kt) nasce `false`; a flag é lida na criação do motor. A prova em execução com peso real permanece na T9.
 
 ## Serviços online
 

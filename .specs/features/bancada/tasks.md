@@ -48,6 +48,7 @@ e o emulador são o gargalo: instrumentados serializam). T19 é o marco: **sem b
 ## Fase 0 — Fatos
 
 ### BNC-T1 — Notas de verificação (APIs, termos, limites) `[P]`
+- **Status**: Concluída em 2026-10-29; ver `apis-notas.md`. Termos e medições de plataforma ainda pendentes estão explicitados ali.
 - **What**: criar `.specs/features/bancada/apis-notas.md` com trecho literal, URL e data de: (a) LiteRT-LM 0.16.1 — `SamplerConfig`,
   `ConversationConfig.maxOutputToken`, `ThinkingConfig`, `Backend.GPU`/`CPU(threadCount)`, `Conversation.getBenchmarkInfo()` e a flag
   `ExperimentalFlags.enableBenchmark` (conferidos no AAR em 2026-10-28; falta a doc e o efeito em tempo de execução); (b) docs oficiais
