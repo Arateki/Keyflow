@@ -94,7 +94,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
   grava barras e gatilho numa só transação; `saveSettings` das `Settings` **não** toca as duas chaves e vice-versa; gatilho de fluxo/botão inexistente some na gravação seguinte.
 - **Tests**: instrumentado. **Gate**: `pool instrumentar com.keyflow.data.FluxosRepositoryTest`. **Commit**: `feat(fluxos): persistência dos fluxos e gatilhos`.
 
-### FLX-T5 — Roteador de gatilhos e política de ligação — **Status: pendente**
+### FLX-T5 — Roteador de gatilhos e política de ligação — **Status: feita**
 - **What**: `RoteadorGatilhos.resolverToques(lugar, toques, config, politica, settings) → Resolucao {Rodar, Incompleto, AcaoDoSettings, AcaoDoLugar, Nada}` (design §5.1 e §5.3: por lugar da orbe, inclusive overflow e "copiar" — `PoliticaDoLugar`) e `PoliticaGatilhos`
   (`ligar`, `desligar`, `excluir`, `limpar`, `avisoDeSubstituicao` com o nome do lugar). Helper `acaoEfetivaDoGesto(toques, settings, config)` para Sobrepor/Tour (orbe flutuante).
 - **Where**: `fluxos/{RoteadorGatilhos,PoliticaGatilhos}.kt`; testes `RoteadorGatilhosTest`, `PoliticaGatilhosTest`.
@@ -104,6 +104,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
   o mesmo gesto em lugares diferentes são gatilhos diferentes (`Orbe(FLUTUANTE, 2)` ≠ `Orbe(NOTIFICACAO, 2)`); `NOTIFICACAO`/`TECLADO` sem gatilho → `AcaoDoLugar(n)`; com `copiaDaPrincipal` os gatilhos lidos são os da flutuante e a lista de gatilhos **não muda** (propriedade: ligar/desligar "copiar" é só uma consulta);
   `avisoDeSubstituicao` nomeia ação/fluxo efetivo anterior e toque/gesto/botão/lugar para qualquer substituição; não privilegia gravar. `NONE`/mesma ação não gera aviso de perda; fluxo já ligado usa seu nome, não a ação sombreada.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(fluxos): roteamento de gatilhos e política de ligação`.
+- **Registro (Fase A)**: Feita **antes** da T4 (a T4 usa o `PoliticaGatilhos.limpar`). `PoliticaDoLugar` ganhou `rotuloDaAcaoPropria` (o nome da ação do lugar para n toques, para o aviso) e `daFlutuante(settings, rotuloDaAcao)` recebe o rótulo da tela (`shortcutActionLabel`): o pacote não conhece a interface. `acaoEfetivaDoGesto` mora no `RoteadorGatilhos` e devolve `DaConfig`/`DeFluxo`. `ligar` recusa fluxo inexistente, incompleto ou além de 64 gatilhos (`recusaDe` diz por quê). `limpar(config, botoesDaBarra: Set<String>?)`: `null` = não sei quais botões a barra tem e os gatilhos de barra ficam (a T16 passa os ids dos `RunFlow`). O aviso (D17) é `avisoDeSubstituicao(config, superficie, fluxoNovoId, politica): String?`: nulo para superfície livre ou o mesmo fluxo; nomeia o fluxo anterior ("Fluxo: <nome>", que sombreia a ação) ou a ação do lugar, e sempre a superfície: "neste gesto da orbe flutuante|do teclado|da notificação" ou "neste botão do teclado" — mesma frase para qualquer ação, gravar inclusive. O texto da spec para superfície ocupada era "neste atalho"; ficou o da superfície, como o resto da D17 pede.
 
 ---
 
