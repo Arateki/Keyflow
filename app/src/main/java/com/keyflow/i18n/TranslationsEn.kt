@@ -166,6 +166,7 @@ internal val TranslationsEn: Map<String, String> = mapOf(
     "Configure um provedor de voz na aba Transcrição." to "Set up a voice provider in the Transcription tab.",
     "Captura de tela cancelada." to "Screen capture cancelled.",
     "Não foi possível capturar esta tela." to "Unable to capture this screen.",
+    "Selecione a área da tela." to "Select the screen area.",
     "Tela inteira" to "Full screen",
     "Confirmar" to "Confirm",
     "Conte o que aconteceu e o que você esperava:" to "Tell us what happened and what you expected:",

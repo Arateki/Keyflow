@@ -15,6 +15,8 @@ import kotlin.math.hypot
 /** Seletor transparente sobre a tela viva; cancelar em resize impede usar coordenadas antigas. */
 @SuppressLint("ViewConstructor", "ClickableViewAccessibility")
 class RegionSelectView(context: Context, private val confirm: (Rect) -> Unit, private val cancel: () -> Unit) : View(context) {
+    init { contentDescription = tr("Selecione a área da tela."); isClickable = true }
+
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private var area = Rect()
     private var selected: RegionGeometry.Corner? = null
@@ -51,7 +53,7 @@ class RegionSelectView(context: Context, private val confirm: (Rect) -> Unit, pr
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                selected = corners().minByOrNull { (_, p) -> hypot(event.x - p.first, event.y - p.second) }
+                selected = if (event.y < margin * 1.25f || event.y > height - margin * 1.25f) null else corners().minByOrNull { (_, p) -> hypot(event.x - p.first, event.y - p.second) }
                     ?.takeIf { (_, p) -> hypot(event.x - p.first, event.y - p.second) <= 32 * d }?.first
                 return true
             }

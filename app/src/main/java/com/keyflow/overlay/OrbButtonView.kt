@@ -15,7 +15,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.ComposeView
+import com.keyflow.vision.VisionFlowState
 import com.keyflow.core.ButtonState
 import com.keyflow.core.ErrorNavTarget
 import com.keyflow.core.KeyFlowController
@@ -133,6 +135,10 @@ class OrbButtonView(
         windowParams?.let { updateWindowLayout?.invoke(it) }
     }
 
+    private var visionState by mutableStateOf(VisionFlowState.NONE)
+
+    fun setVisionState(state: VisionFlowState) { visionState = state }
+
     private var orbUi by mutableStateOf(OrbButtonUi(OrbState.Idle, OrbCenter.None))
     private var currentOrbStyle by mutableStateOf(orbStyle)
     private var currentOrbPack by mutableStateOf(orbPack)
@@ -191,6 +197,7 @@ class OrbButtonView(
             setContent {
                 val ui = orbUi
                 androidx.compose.runtime.CompositionLocalProvider(LocalOrbPack provides currentOrbPack) {
+                    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
                     VoiceOrb(
                         state = ui.state,
                         modifier = Modifier.fillMaxSize(),
@@ -198,6 +205,19 @@ class OrbButtonView(
                         dragHint = ui.dragHint,
                         style = currentOrbStyle,
                     )
+                    if (visionState != VisionFlowState.NONE) {
+                        androidx.compose.material3.Text(
+                            text = when (visionState) {
+                                VisionFlowState.CONSENT -> "?"
+                                VisionFlowState.SELECTING -> "⊡"
+                                VisionFlowState.WORKING -> "◌"
+                                else -> "◉"
+                            },
+                            color = androidx.compose.ui.graphics.Color.White,
+                            fontSize = 22.sp,
+                        )
+                    }
+                    }
                 }
             }
         })

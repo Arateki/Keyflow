@@ -590,6 +590,9 @@ object RouteCatalog {
         Route("config-raciocinio-local-analitico") { CandidateReasoningRoute(ModelCatalog.GRANITE_4_2_3B) },
         Route("config-raciocinio-local-profundo") { CandidateReasoningRoute(ModelCatalog.NANBEIGE_4_2_3B) },
         Route("config-raciocinio-local-hibrido") { CandidateReasoningRoute(ModelCatalog.QWEN3_5_4B) },
+        Route("visao-selecao") {
+            AndroidView(factory = { context -> com.keyflow.vision.RegionSelectView(context, {}, {}) }, modifier = Modifier.fillMaxSize())
+        },
     )
 
     private val byKey: Map<String, Route> = routes.associateBy { it.key }

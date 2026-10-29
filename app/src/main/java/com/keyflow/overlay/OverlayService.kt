@@ -131,6 +131,7 @@ class OverlayService : Service() {
             }) },
             showSelector = ::showVisionSelector,
             cleanup = ::cleanupVision,
+            onState = { floatingButton?.setVisionState(it) },
             onResult = { bitmap ->
                 // O consumidor de ações será ligado na VC-T7; a etapa devolve o bitmap ao callback.
                 visionCaptureResultForTest?.invoke(bitmap)
@@ -188,6 +189,7 @@ class OverlayService : Service() {
                 }
             }
             ACTION_OPEN_CONFIG -> openKeyFlowApp()
+            ACTION_VISION -> if (::coordinator.isInitialized) visionFlow.start(VisionFlowRequest(coordinator.currentState()))
         }
         return START_STICKY
     }
@@ -1092,6 +1094,7 @@ class OverlayService : Service() {
         const val ACTION_UNDO_CANCEL = "com.keyflow.overlay.UNDO_CANCEL"
         const val ACTION_COMMIT_CANCEL = "com.keyflow.overlay.COMMIT_CANCEL"
         const val ACTION_RECORD = "com.keyflow.overlay.RECORD"
+        const val ACTION_VISION = "com.keyflow.overlay.VISION"
         const val ACTION_OPEN_CONFIG = "com.keyflow.overlay.OPEN_CONFIG"
 
         @Volatile
