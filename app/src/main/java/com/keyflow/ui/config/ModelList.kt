@@ -138,16 +138,20 @@ internal fun ModelList(
 ) {
     val scope = rememberCoroutineScope()
     var pending by remember { mutableStateOf<Pending?>(null) }
+    var license by remember { mutableStateOf<ModelSpec?>(null) }
     val notices = remember { mutableStateMapOf<String, String>() }
 
-    fun download(spec: ModelSpec, allowMetered: Boolean) {
+    fun download(spec: ModelSpec, allowMetered: Boolean, recordAcceptance: Boolean = false) {
         notices.remove(spec.id)
         scope.launch {
-            val result = withContext(Dispatchers.IO) { actions.download(spec, allowMetered) }
-            if (result is StartResult.NeedsMeteredConfirmation) {
-                pending = Pending.Metered(spec, result.bytes)
-            } else {
-                startProblem(result)?.let { notices[spec.id] = it }
+            val result = withContext(Dispatchers.IO) {
+                if (recordAcceptance) actions.acceptVoiceLicense(spec.id)
+                actions.download(spec, allowMetered)
+            }
+            when (result) {
+                is StartResult.NeedsMeteredConfirmation -> pending = Pending.Metered(spec, result.bytes)
+                is StartResult.NeedsLicenseAcceptance -> license = spec
+                else -> startProblem(result)?.let { notices[spec.id] = it }
             }
         }
     }
@@ -176,6 +180,16 @@ internal fun ModelList(
                 pending = null
             },
             onDismiss = { pending = null },
+        )
+    }
+    if (license != null) {
+        VoiceLicenseDialog(
+            onAccept = {
+                val spec = license ?: return@VoiceLicenseDialog
+                license = null
+                download(spec, allowMetered = false, recordAcceptance = true)
+            },
+            onDismiss = { license = null },
         )
     }
 }

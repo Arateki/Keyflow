@@ -482,6 +482,18 @@ object KfIcons {
         ),
     )
 
+    /** Monograma "S" próprio, grid 24. Não é o logo da Supertone. */
+    val LogoSupertone = KfIconSpec(
+        "logo-supertone",
+        listOf("M16.5 8.2c0 -2.4 -2 -3.7 -4.5 -3.7s-4.5 1.4 -4.5 3.4 2.2 3 4.5 3.8 4.5 1.6 4.5 3.6 -2 3.6 -4.5 3.6 -4.5 -1.6 -4.5 -3.8"),
+    )
+
+    /** Monograma "C" próprio, grid 24. Não é o logo da Coqui. */
+    val LogoCoqui = KfIconSpec(
+        "logo-coqui",
+        listOf("M16.2 7.4a6.2 6.2 0 1 0 0 9.2"),
+    )
+
     val Exit = KfIconSpec(
         "exit",
         listOf(
@@ -519,6 +531,7 @@ object KfIcons {
         TabFluxos, TabComputador, TabProvedores, TabDocs, Infinity,
         LogoAnthropic, LogoOpenAi, LogoGoogle, LogoGroq, LogoElevenLabs,
         LogoNvidia, LogoHuggingFace, LogoDeepSeek, LogoQwen, LogoPaddlePaddle, LogoIbm, LogoNanbeige,
+        LogoSupertone, LogoCoqui,
     )
 }
 

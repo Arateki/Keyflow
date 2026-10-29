@@ -28,6 +28,10 @@ enum class ModelVendor(val displayName: String) {
     PADDLEPADDLE("PaddlePaddle"),
     IBM("IBM"),
     NANBEIGE("Nanbeige"),
+    /** Quem faz o Supertonic. O monograma do card é desenho nosso: não é o logo da Supertone nem endosso (OpenRAIL-M, cláusula 8). */
+    SUPERTONE("Supertone"),
+    /** Quem fez os pesos do VITS português. O monograma do card é desenho nosso, não o logo da Coqui. */
+    COQUI("Coqui"),
 }
 
 /**
@@ -53,8 +57,13 @@ enum class ModelCapability { READ_TEXT, DESCRIBE_IMAGE, ANSWER_ABOUT_SCREEN, TOO
  * Papel de cada arquivo no modelo — o engine monta a config por papel, não pelo nome do arquivo.
  * [MODEL] é o arquivo único `.litertlm` dos modelos de texto. [DETECTOR], [RECOGNIZER] e [DICTIONARY] são os três
  * arquivos do OCR (vision-capture): detector de linhas de texto, reconhecedor CTC e a lista de caracteres dele.
+ * [DURATION], [TEXT_ENCODER], [VECTOR_ESTIMATOR], [VOCODER], [UNICODE_INDEX], [TTS_CONFIG] e [VOICE_STYLE]
+ * são os arquivos do Supertonic 3. O VITS de caracteres usa [MODEL] e [TOKENS].
  */
-enum class FileRole { ENCODER, DECODER, JOINER, TOKENS, MODEL, DETECTOR, RECOGNIZER, DICTIONARY }
+enum class FileRole {
+    ENCODER, DECODER, JOINER, TOKENS, MODEL, DETECTOR, RECOGNIZER, DICTIONARY,
+    DURATION, TEXT_ENCODER, VECTOR_ESTIMATOR, VOCODER, UNICODE_INDEX, TTS_CONFIG, VOICE_STYLE,
+}
 
 data class ModelFile(
     val role: FileRole,
@@ -132,7 +141,7 @@ object ModelCatalog {
      * O manifesto remoto (`catalogVersion`) só vale se for maior ou igual a ela: sem isso, um manifesto ou cache antigo substituiria o catálogo
      * inteiro e devolveria, por exemplo, o SHA legado do Qwen3 (o `ModelCatalogTest` confere a impressão digital dos pins contra esta versão).
      */
-    const val EMBEDDED_VERSION = 2026102803
+    const val EMBEDDED_VERSION = 2026102901
 
     /** Impressão digital dos pins embutidos (id, nome, tamanho e SHA-256 de cada arquivo): muda se um pin mudar sem [EMBEDDED_VERSION] subir. */
     fun pinsFingerprint(models: List<ModelSpec> = MODELS): String {
@@ -735,12 +744,104 @@ object ModelCatalog {
             sees && (debug || (spec.validatedOnDevice && (spec.kind == ModelKind.VISION || spec.id in VISION_PROVEN_IDS)))
         }.sortedBy { it.totalBytes }
 
+    private const val SUPERTONIC_REPO =
+        "https://huggingface.co/Supertone/supertonic-3/resolve/3cadd1ee6394adea1bd021217a0e650ede09a323"
+    private const val VITS_PT_REPO =
+        "https://huggingface.co/csukuangfj/vits-coqui-pt-cv/resolve/9092b0c5e3717b6c61ae563cfd98dc86cc536b3a"
+
     /**
-     * Modelos de voz e síntese (aba Voz). Vazia de propósito: as quatro entradas antigas tinham pins inventados e
-     * saíram em 2026-10-24; as vozes do Piper (e o Kokoro) dependem do eSpeak (GPL) e o app ainda não sintetiza fala.
-     * A entrada nova vem com a feature de síntese de fala, já conferida.
+     * VITS Coqui pt (FAL-T10, D1). Pesos BSD-3 (`app/licenses/BSD-3-Clause_vits-coqui-pt.txt`); o código Coqui
+     * (MPL-2.0) não entra. Uma voz, 22.050 Hz, caracteres (`use_phonemes=false`). Português genérico do Common Voice,
+     * não pt-BR: o nome na tela é "português". SHA-256 e tamanho rebaixados em 2026-10-29 do commit
+     * `9092b0c5e3717b6c61ae563cfd98dc86cc536b3a` (`model.onnx` é LFS; `tokens.txt` foi baixado e hasheado).
+     * `validatedOnDevice = false`: o motor (FAL-T11) ainda não falou num aparelho, então o release não oferece.
+     * RAM: pico de 225 MiB medido no servidor, 1 thread — a recomendação arredonda para 256.
      */
-    val VOICE: List<ModelSpec> = emptyList()
+    val VITS_COQUI_PT = ModelSpec(
+        id = "vits-coqui-pt",
+        displayName = trKey("português"),
+        summary = trKey("Uma voz em português, leve, no aparelho."),
+        languages = trKey("português"),
+        engineType = EngineType.TTS,
+        acceptsLanguageHint = false,
+        recommendedRamMb = 256,
+        modelName = "VITS Coqui",
+        kind = ModelKind.VOICE,
+        validatedOnDevice = false,
+        vendor = ModelVendor.COQUI,
+        files = listOf(
+            ModelFile(
+                FileRole.MODEL, "model.onnx", "$VITS_PT_REPO/model.onnx",
+                "fcc22bb219ccda42df47546d0e9ea7b078b9c5a2ebf90ef7ec589c995ecbc736", 71_024_123L,
+            ),
+            ModelFile(
+                FileRole.TOKENS, "tokens.txt", "$VITS_PT_REPO/tokens.txt",
+                "4b4ba3385bf661b87735835de24365e25623d250be0621bc184dff050df4c2fb", 1_410L,
+            ),
+        ),
+    )
+
+    /**
+     * Supertonic 3 (FAL-T8, D2). Quatro ONNX oficiais fp32, o índice Unicode, o `tts.json` e o estilo M1
+     * (a voz da amostra). Sem int8: quantizar seria derivado e cairia na cláusula 4.c. Pesos OpenRAIL-M
+     * (`app/licenses/OpenRAIL-M_supertonic-3.txt`, com Attachment A); o download só segue depois do aceite.
+     * Código de inferência MIT (`MIT_supertonic.txt`), não copiado. SHA-256 e tamanho rebaixados em 2026-10-29
+     * do commit `3cadd1ee6394adea1bd021217a0e650ede09a323`. Os quatro ONNX são LFS (o oid é o SHA-256);
+     * `unicode_indexer.json`, `tts.json` e `M1.json` foram baixados e hasheados. Os outros estilos ficam de fora
+     * deste pin. `validatedOnDevice = false` até o motor (FAL-T9). RAM: pico de 503 MiB no servidor — recomendação 512.
+     */
+    val SUPERTONIC_3 = ModelSpec(
+        id = VoiceLicenseGate.SUPERTONIC_ID,
+        displayName = trKey("Várias línguas"),
+        summary = trKey("Voz em vários idiomas, inclusive português, no aparelho."),
+        languages = trKey("31 idiomas"),
+        engineType = EngineType.TTS,
+        acceptsLanguageHint = false,
+        recommendedRamMb = 512,
+        modelName = "Supertonic 3",
+        kind = ModelKind.VOICE,
+        validatedOnDevice = false,
+        vendor = ModelVendor.SUPERTONE,
+        files = listOf(
+            ModelFile(
+                FileRole.DURATION, "duration_predictor.onnx", "$SUPERTONIC_REPO/onnx/duration_predictor.onnx",
+                "c3eb91414d5ff8a7a239b7fe9e34e7e2bf8a8140d8375ffb14718b1c639325db", 3_700_147L,
+            ),
+            ModelFile(
+                FileRole.TEXT_ENCODER, "text_encoder.onnx", "$SUPERTONIC_REPO/onnx/text_encoder.onnx",
+                "c7befd5ea8c3119769e8a6c1486c4edc6a3bc8365c67621c881bbb774b9902ff", 36_416_150L,
+            ),
+            ModelFile(
+                FileRole.VECTOR_ESTIMATOR, "vector_estimator.onnx", "$SUPERTONIC_REPO/onnx/vector_estimator.onnx",
+                "883ac868ea0275ef0e991524dc64f16b3c0376efd7c320af6b53f5b780d7c61c", 256_534_781L,
+            ),
+            ModelFile(
+                FileRole.VOCODER, "vocoder.onnx", "$SUPERTONIC_REPO/onnx/vocoder.onnx",
+                "085de76dd8e8d5836d6ca66826601f615939218f90e519f70ee8a36ed2a4c4ba", 101_424_195L,
+            ),
+            ModelFile(
+                FileRole.UNICODE_INDEX, "unicode_indexer.json", "$SUPERTONIC_REPO/onnx/unicode_indexer.json",
+                "9bf7346e43883a81f8645c81224f786d43c5b57f3641f6e7671a7d6c493cb24f", 277_676L,
+            ),
+            ModelFile(
+                FileRole.TTS_CONFIG, "tts.json", "$SUPERTONIC_REPO/onnx/tts.json",
+                "42078d3aef1cd43ab43021f3c54f47d2d75ceb4e75f627f118890128b06a0d09", 8_253L,
+            ),
+            ModelFile(
+                FileRole.VOICE_STYLE, "M1.json", "$SUPERTONIC_REPO/voice_styles/M1.json",
+                "e35604687f5d23694b8e91593a93eec0e4eca6c0b02bb8ed69139ab2ea6b0a5b", 291_748L,
+            ),
+        ),
+    )
+
+    /**
+     * Os dois modelos de voz desta leva, do mais leve ao mais pesado. Kokoro, Piper, Matcha, MMS, F5 e o
+     * ONNX quantizado do Supertonic ficam de fora. O release só mostra o que já foi validado no aparelho.
+     */
+    val VOICE_ALL: List<ModelSpec> = listOf(VITS_COQUI_PT, SUPERTONIC_3)
+
+    /** O que este build mostra na aba Voz. No debug, as duas entradas; no release, nenhuma até o motor provar. */
+    val VOICE: List<ModelSpec> = visibleIn(VOICE_ALL, BuildConfig.DEBUG)
 
     /** Todos, para quem só resolve por id ([byId]) — o downloader e o store não sabem de tipo. */
     val MODELS: List<ModelSpec> = SPEECH + TEXT + VISION + VOICE

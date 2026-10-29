@@ -8,9 +8,8 @@ import com.keyflow.data.models.ModelKind
 import com.keyflow.data.models.ModelSpec
 
 /**
- * Modelos de AMOSTRA para a galeria e para os testes dos painéis de Visão e de Voz. Não são catálogo: o
- * `ModelCatalog.VISION`/`VOICE` está vazio desde 2026-10-24 (as entradas antigas tinham pins inventados), mas os painéis
- * continuam existindo e precisam de uma lista para desenhar baixando, instalado e selecionado. Existe só no build de
+ * Modelos de AMOSTRA para a galeria e para os testes dos painéis de Visão e de Voz. Não são o catálogo:
+ * a galeria desenha estas entradas e não o `ModelCatalog.VOICE` real. Existe só no build de
  * debug; a URL é `.invalid` e o SHA-256 é zero, de propósito — ninguém baixa isto, e o `PinSanityTest` só olha o catálogo
  * real.
  */
