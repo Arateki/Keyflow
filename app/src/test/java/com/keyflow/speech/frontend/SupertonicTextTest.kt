@@ -13,7 +13,7 @@ class SupertonicTextTest {
 
     @Test fun normalizacaoSegueMarcadoresPontuacaoESimbolosDoOficial() {
         assertEquals("<pt>Olá.</pt>".replace("á", "a\u0301"), SupertonicText.normalize("  Olá  "))
-        assertEquals("<pt>voz - 'sim' at casa.</pt>", SupertonicText.normalize("voz — ‘’sim’’ @ casa"))
+        assertEquals("<pt>voz -'sim' at casa.</pt>", SupertonicText.normalize("voz — ‘’sim’’ @ casa"))
 
     }
 

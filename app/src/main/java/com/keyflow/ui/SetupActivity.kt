@@ -181,7 +181,7 @@ class SetupActivity : ComponentActivity() {
 
     /**
      * O Testar da aba Voz: o motor da origem gravada (`SpeechEngines.forSource`) com o ambiente real — chaves do cofre lidas na hora da chamada
-     * (fora da main), o `TextToSpeech` do aparelho, o VITS no `:speech` e o `AudioTrack`. O Supertonic ainda não tem motor.
+     * (fora da main), o `TextToSpeech` do aparelho, o VITS no `:speech` Supertonic e o `AudioTrack`.
      */
     private val speechTester by lazy {
         val deps = SpeechDeps(
@@ -194,16 +194,27 @@ class SetupActivity : ComponentActivity() {
                 }
                 auth.store.getApiKey(id)?.value
             },
-            isModelInstalled = { ModelStore.get(this).isInstalled(it) },
+            isModelInstalled = { id ->
+                ModelStore.get(this).isInstalled(id) && (!com.keyflow.data.models.VoiceLicenseGate.requiresAcceptance(id) ||
+                    com.keyflow.data.models.VoiceLicenseAcceptance(java.io.File(filesDir, "voice-license-accepted.txt")).isAccepted(id))
+            },
             local = { id ->
-                val spec = ModelCatalog.VITS_COQUI_PT
-                if (id != spec.id) null
+                val spec = when (id) {
+                    ModelCatalog.VITS_COQUI_PT.id -> ModelCatalog.VITS_COQUI_PT
+                    ModelCatalog.SUPERTONIC_3.id -> ModelCatalog.SUPERTONIC_3
+                    else -> null
+                }
+                if (spec == null) null
                 else LocalSpeechEngine(
                     files = {
                         val store = ModelStore.get(this)
-                        val model = store.fileFor(spec, FileRole.MODEL)
-                        val tokens = store.fileFor(spec, FileRole.TOKENS)
-                        if (model == null || tokens == null) null else model to tokens
+                        val supertonic = id == ModelCatalog.SUPERTONIC_3.id
+                        val accepted = !supertonic || com.keyflow.data.models.VoiceLicenseAcceptance(
+                            java.io.File(filesDir, "voice-license-accepted.txt")).isAccepted(id)
+                        val model = store.fileFor(spec, if (supertonic) FileRole.TTS_CONFIG else FileRole.MODEL)
+                        val tokens = store.fileFor(spec, if (supertonic) FileRole.UNICODE_INDEX else FileRole.TOKENS)
+                        if (!accepted || !store.isInstalled(id) || model == null || tokens == null ||
+                            (supertonic && !com.keyflow.speech.local.SupertonicFiles.complete(model, tokens))) null else model to tokens
                     },
                     endpoint = AidlSpeechEndpoint(SpeechConnection.get(this), spec.recommendedRamMb),
                 )
