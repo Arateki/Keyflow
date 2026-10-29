@@ -64,6 +64,10 @@ class LocalReasoningEngine internal constructor(
             }
         }
         val callback = object : IReasoningCallback.Stub() {
+            override fun onMetrics(json: String) {
+                if (!finished.get()) trySend(LocalMetricsCodec.decode(json))
+            }
+
             override fun onDelta(text: String) {
                 if (!finished.get()) trySend(ReasoningEvent.Delta(text))
             }
@@ -88,7 +92,7 @@ class LocalReasoningEngine internal constructor(
 
         try {
             binder.linkToDeath(death, 0)
-            service.generate(model.toParcel(), request.system, request.user, callback)
+            service.generate(model.toParcel(), request.system, request.user, request.options.toParcel(), callback)
         } catch (e: RemoteException) {
             if (finished.compareAndSet(false, true)) {
                 trySend(ReasoningEvent.Error(ReasoningError.LOCAL, "o processo do motor local não respondeu"))

@@ -26,10 +26,12 @@ internal class ReasoningServiceCore(
     private val executor: Executor,
     private val onWarmed: (LlmModel, Long, Throwable?) -> Unit = { _, _, _ -> },
     private val totalMb: () -> Long? = { null },
+    private val ramProbe: (() -> RamProbe)? = null,
 ) {
     /** Quem recebe a resposta. Depois de um [cancel], nada mais é entregue à geração cancelada. */
     interface Listener {
         fun onDelta(text: String)
+        fun onMetrics(metrics: com.keyflow.reasoning.ReasoningEvent.Metrics) = Unit
         fun onDone()
         fun onError(kind: ReasoningErrorKind, message: String)
 
@@ -113,18 +115,27 @@ internal class ReasoningServiceCore(
         }
     }
 
+    fun unload() = shutdown()
+
     private fun run(model: LlmModel, request: ReasoningRequest, listener: Listener) {
         cancelled = false
         busy = true
         idleTimer?.cancel()
         idleTimer = null
         useToken++
+        val probe = ramProbe?.invoke()?.also { it.start() }
+        var peak: Int? = null
         try {
             val active = ensureLoaded(model, listener)
             if (cancelled) return
             running = active
             active.generate(request) { text -> if (!cancelled) listener.onDelta(text) }
-            if (!cancelled) listener.onDone()
+            if (!cancelled) {
+                peak = probe?.stop()
+                val metrics = active.metrics() ?: if (!request.options.isDefault) com.keyflow.reasoning.ReasoningEvent.Metrics(ignored = request.options.requestedNames().toSet()) else null
+                (metrics ?: peak?.let { com.keyflow.reasoning.ReasoningEvent.Metrics() })?.copy(peakMemoryMb = peak)?.let(listener::onMetrics)
+                listener.onDone()
+            }
         } catch (e: ReasoningFailure) {
             if (!cancelled) listener.onError(e.kind, e.message.orEmpty())
         } catch (e: OutOfMemoryError) {
@@ -133,6 +144,7 @@ internal class ReasoningServiceCore(
         } catch (e: Exception) {
             if (!cancelled) listener.onError(ReasoningErrorKind.ENGINE, e.message ?: e.toString())
         } finally {
+            if (peak == null) probe?.stop()
             running = null
             busy = false
             scheduleIdleUnload(model)

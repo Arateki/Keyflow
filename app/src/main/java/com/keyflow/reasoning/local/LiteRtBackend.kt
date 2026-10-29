@@ -6,6 +6,8 @@ import com.google.ai.edge.litertlm.Contents
 import com.google.ai.edge.litertlm.Content
 import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.ThinkingConfig
+import com.google.ai.edge.litertlm.SamplerConfig
+import com.google.ai.edge.litertlm.ExperimentalFlags
 import com.google.ai.edge.litertlm.Conversation
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
@@ -14,6 +16,8 @@ import com.google.ai.edge.litertlm.Message
 import com.google.ai.edge.litertlm.MessageCallback
 import com.keyflow.core.ComputeBackend
 import com.keyflow.reasoning.ReasoningRequest
+import com.keyflow.reasoning.GenerationOptions
+import com.keyflow.reasoning.ReasoningEvent
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
@@ -31,13 +35,16 @@ internal class LiteRtBackend(private val cacheDir: String?, private val opensThi
 
     private var engine: Engine? = null
     private var textFormat = LiteRtTextFormat.SINGLE
+    private var lastMetrics: ReasoningEvent.Metrics? = null
 
     @Volatile private var conversation: Conversation? = null
     @Volatile private var cancelled = false
 
+    @OptIn(ExperimentalApi::class)
     override fun load(model: LlmModel) {
         var created: Engine? = null
         try {
+            ExperimentalFlags.enableBenchmark = true
             created = Engine(EngineConfig(modelPath = model.modelPath, backend = LiteRtConfigs.backend(model.backend), cacheDir = cacheDir))
             // Pode levar segundos (a doc fala em até ~10 s): estamos na thread de trabalho do serviço, não na da tela.
             created.initialize()
@@ -58,10 +65,12 @@ internal class LiteRtBackend(private val cacheDir: String?, private val opensThi
         }
     }
 
+    @OptIn(ExperimentalApi::class)
     override fun generate(request: ReasoningRequest, onDelta: (String) -> Unit) {
         val active = checkNotNull(engine) { "o motor não está carregado" }
         cancelled = false
-        val config = LiteRtConfigs.conversation(request.system, opensThink, textFormat)
+        lastMetrics = null
+        val config = LiteRtConfigs.conversation(request.system, opensThink, textFormat, request.options)
         val stripper = ThoughtStripper(opensThink)
         val conversation = active.createConversation(config)
         this.conversation = conversation
@@ -92,6 +101,16 @@ internal class LiteRtBackend(private val cacheDir: String?, private val opensThi
                 }
             }
             failure.get()?.let { if (!cancelled) throw it }
+            if (!cancelled) {
+                val info = runCatching { conversation.getBenchmarkInfo() }.getOrNull()
+                lastMetrics = ReasoningEvent.Metrics(
+                    applied = LiteRtConfigs.applied(request.options),
+                    inputTokens = info?.lastPrefillTokenCount,
+                    outputTokens = info?.lastDecodeTokenCount,
+                    tokensPerSecond = info?.lastDecodeTokensPerSecond?.takeIf { it.isFinite() && it > 0 },
+                    engineFirstTokenMs = info?.timeToFirstTokenInSecond?.takeIf { it.isFinite() && it >= 0 }?.let { (it * 1000).toLong() },
+                )
+            }
             // O modelo que abre o `<think>` sozinho nunca fechou o pensamento: o que saiu foi só raciocínio, e ele não é resposta.
             if (!cancelled && !stripper.closed) {
                 throw ReasoningFailure(ReasoningErrorKind.ENGINE, "o modelo terminou sem dar uma resposta (só raciocínio interno)")
@@ -101,6 +120,8 @@ internal class LiteRtBackend(private val cacheDir: String?, private val opensThi
             runCatching { conversation.close() }
         }
     }
+
+    override fun metrics(): ReasoningEvent.Metrics? = lastMetrics
 
     override fun cancel() {
         cancelled = true
@@ -165,6 +186,17 @@ internal object LiteRtConfigs {
         }
     }
 
+    /** O construtor exige os quatro valores juntos: informa também os valores preenchidos pelo app. */
+    fun applied(options: GenerationOptions): Map<String, String> = buildMap {
+        putAll(options.requestedValues())
+        if (options.temperature != null || options.topK != null || options.topP != null || options.seed != null) {
+            put(GenerationOptions.TEMPERATURE, (options.temperature ?: 1.0).toString())
+            put(GenerationOptions.TOP_K, (options.topK ?: 40).toString())
+            put(GenerationOptions.TOP_P, (options.topP ?: 1.0).toString())
+            put(GenerationOptions.SEED, (options.seed ?: 0).toString())
+        }
+    }
+
     /** Limite só da conversa descartável; o pensamento interno também consome esse limite de dois tokens. */
     fun warmUp(opensThink: Boolean, format: LiteRtTextFormat = LiteRtTextFormat.SINGLE) =
         conversation(null, opensThink, format).copy(maxOutputToken = 2)
@@ -174,15 +206,19 @@ internal object LiteRtConfigs {
      * Em 0.16.1 o orçamento zero desativa o limitador, não impõe geração sem pensamento; o Qwen legado o ignora.
      * O canal e o ThoughtStripper apenas removem pensamento da resposta, sem economizar sua geração.
      */
-    fun conversation(system: String?, opensThink: Boolean = false, format: LiteRtTextFormat = LiteRtTextFormat.SINGLE): ConversationConfig {
-        val thinking = ThinkingConfig(enableThinking = false, thinkingTokenBudget = 0)
-        val context: Map<String, Any> = mapOf("enable_thinking" to false)
+    fun conversation(system: String?, opensThink: Boolean = false, format: LiteRtTextFormat = LiteRtTextFormat.SINGLE, options: GenerationOptions = GenerationOptions()): ConversationConfig {
+        val enabled = options.thinking == true
+        val thinking = ThinkingConfig(enableThinking = enabled, thinkingTokenBudget = if (enabled) -1 else 0)
+        val context: Map<String, Any> = mapOf("enable_thinking" to enabled)
+        val sampler = if (options.temperature != null || options.topK != null || options.topP != null || options.seed != null) {
+            SamplerConfig(options.topK ?: 40, options.topP ?: 1.0, options.temperature ?: 1.0, options.seed ?: 0)
+        } else null
         // Modelo cujo prompt já abre o `<think>` (DeepSeek R1): o canal não reconheceria o início; o [ThoughtStripper] cuida disso.
         val channels = if (opensThink) emptyList() else listOf(Channel("thought", "<think>", "</think>"))
         return if (system != null) {
-            ConversationConfig(systemInstruction = contents(system, format), channels = channels, extraContext = context, thinkingConfig = thinking)
+            ConversationConfig(systemInstruction = contents(system, format), channels = channels, extraContext = context, thinkingConfig = thinking, samplerConfig = sampler, maxOutputToken = options.maxOutputTokens)
         } else {
-            ConversationConfig(channels = channels, extraContext = context, thinkingConfig = thinking)
+            ConversationConfig(channels = channels, extraContext = context, thinkingConfig = thinking, samplerConfig = sampler, maxOutputToken = options.maxOutputTokens)
         }
     }
 }

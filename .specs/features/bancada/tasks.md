@@ -131,6 +131,7 @@ e o emulador são o gargalo: instrumentados serializam). T19 é o marco: **sem b
 - **Depends on**: T6. **Requirement**: BHS-01, BHS-03, BHS-06, BEX-10. **Gate**: `quick` + `build`. **Commit**: `feat(bancada): histórico local de execuções`.
 
 ### BNC-T9 — Local: opções, `BenchmarkInfo`, RAM e carga fria/quente
+- **Status**: Implementada em 2026-10-29; `ReasoningServiceCoreTest` 45/45 e instrumentados 71/71, incluindo a prova opt-in no Qwen3 x86_64 (ver lição).
 - **What**: `LocalGenOptions` no AIDL (`generate`) e `onMetrics` no callback; `LiteRtBackend` aplica `SamplerConfig`/`maxOutputToken`/`ThinkingConfig` quando
   pedido e lê `BenchmarkInfo`; `unload()` e `restart()` no serviço; sonda de RAM (`VmHWM`/`VmRSS`); `LocalReasoningEngine` traduz para `Metrics`.
 - **Done when**: `ReasoningServiceCoreTest` (backend falso) cobre opções repassadas e métricas; instrumentado sem pesos (`LiteRtWarmupTest`-style) cobre as configs;

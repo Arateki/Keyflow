@@ -18,6 +18,9 @@ internal interface LlmBackend {
     /** Bloqueia até acabar, entregando os trechos em [onDelta]. Cancelável por [cancel] de outra thread. */
     fun generate(request: ReasoningRequest, onDelta: (String) -> Unit)
 
+    /** Métricas da última geração; nulo quando o backend não as fornece. */
+    fun metrics(): com.keyflow.reasoning.ReasoningEvent.Metrics? = null
+
     /** Pode ser chamado de qualquer thread, durante [generate]; a geração deve voltar logo. */
     fun cancel()
 

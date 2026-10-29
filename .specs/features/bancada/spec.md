@@ -235,7 +235,7 @@ Status: Pending → In Design → In Tasks → Implementing → Verified. As tas
 | BEX-01 | P1-C | BNC-T11 | Verified |
 | BEX-02 | P1-C | BNC-T1, BNC-T8, BNC-T9, BNC-T10 | Implementing |
 | BEX-03 | P1-C | BNC-T11 | Verified |
-| BEX-04 | P1-C | BNC-T1, BNC-T9, BNC-T28 | In Tasks |
+| BEX-04 | P1-C | BNC-T1, BNC-T9, BNC-T28 | Implementing (T9 implementada; T28 pendente) |
 | BEX-05 | P1-C | BNC-T1, BNC-T10 | In Tasks |
 | BEX-06 | P1-C | BNC-T11 | Verified |
 | BEX-07 | P1-C | BNC-T11 | Verified |

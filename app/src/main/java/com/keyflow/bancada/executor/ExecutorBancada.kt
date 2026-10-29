@@ -96,6 +96,7 @@ class ExecutorBancada(
         private val pedidas = LinkedHashSet<String>()
         private val aplicadas = LinkedHashMap<String, String>()
         private val ignoradasPeloMotor = LinkedHashSet<String>()
+        private var ramPicoMb: Int? = null
         private var naoDeterministico = false
         private val previos = HashMap<String, List<ResultadoCaso>>()
         private var progressoAtual = Progresso("", 0, plano.testes.size, 0, 0)
@@ -109,6 +110,7 @@ class ExecutorBancada(
             estado = estado,
             motivo = motivo,
             opcoes = opcoesRegistradas(),
+            cargas = if (ramPicoMb != null) (plano.cabecalho.cargas ?: com.keyflow.bancada.resultado.Cargas(null, null, null, null)).copy(ramPicoMb = ramPicoMb) else plano.cabecalho.cargas,
             testes = concluidos + listOfNotNull(emAndamento),
         )
 
@@ -333,7 +335,10 @@ class ExecutorBancada(
                                     if (primeiro == null) primeiro = relogio() - inicio
                                     texto.append(evento.text)
                                 }
-                                is ReasoningEvent.Metrics -> metricas = evento
+                                is ReasoningEvent.Metrics -> {
+                                    metricas = evento
+                                    evento.peakMemoryMb?.let { ramPicoMb = maxOf(ramPicoMb ?: 0, it) }
+                                }
                                 ReasoningEvent.Done, is ReasoningEvent.Error -> fim = evento
                             }
                         }

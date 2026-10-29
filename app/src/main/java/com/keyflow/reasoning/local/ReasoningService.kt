@@ -29,6 +29,7 @@ class ReasoningService : Service() {
             fileExists = { File(it).isFile },
             availableMb = ::availableMemoryMb,
             totalMb = ::totalMemoryMb,
+            ramProbe = ::RamProbe,
             scheduler = object : IdleScheduler {
                 override fun schedule(delayMs: Long, block: () -> Unit): Cancellable {
                     val future = timer.schedule(block, delayMs, TimeUnit.MILLISECONDS)
@@ -44,10 +45,10 @@ class ReasoningService : Service() {
     }
 
     private val binder = object : IReasoningService.Stub() {
-        override fun generate(config: LocalLlmConfig, system: String?, user: String, cb: IReasoningCallback) {
+        override fun generate(config: LocalLlmConfig, system: String?, user: String, options: LocalGenOptions, cb: IReasoningCallback) {
             core.generate(
                 LlmModel.fromParcel(config),
-                ReasoningRequest(system = system?.takeIf { it.isNotBlank() }, user = user),
+                ReasoningRequest(system = system?.takeIf { it.isNotBlank() }, user = user, options = options.toOptions()),
                 CallbackListener(cb),
             )
         }
@@ -56,6 +57,13 @@ class ReasoningService : Service() {
             core.preload(LlmModel.fromParcel(config), CallbackListener(cb))
 
         override fun cancel() = core.cancel()
+
+        override fun unload() = core.unload()
+
+        override fun restart() {
+            core.shutdown()
+            worker.execute { android.os.Process.killProcess(android.os.Process.myPid()) }
+        }
     }
 
     override fun onBind(intent: Intent): IBinder = binder
@@ -81,6 +89,7 @@ class ReasoningService : Service() {
 
     /** Liga o núcleo ao callback do AIDL; quem pediu pode ter morrido — aí não há a quem responder. */
     private class CallbackListener(private val cb: IReasoningCallback) : ReasoningServiceCore.Listener {
+        override fun onMetrics(metrics: com.keyflow.reasoning.ReasoningEvent.Metrics) = safely { cb.onMetrics(LocalMetricsCodec.encode(metrics)) }
         override fun onDelta(text: String) = safely { cb.onDelta(text) }
         override fun onDone() = safely { cb.onDone() }
         override fun onError(kind: ReasoningErrorKind, message: String) {

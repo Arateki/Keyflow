@@ -75,6 +75,8 @@ sealed interface ReasoningEvent {
         val tokensPerSecond: Double? = null,
         /** Tempo até o 1º trecho medido PELO motor (o LiteRT-LM o informa); a bancada mede o seu por fora. */
         val engineFirstTokenMs: Long? = null,
+        /** Pico de RAM do processo local durante a geração, em MiB; nulo quando indisponível. */
+        val peakMemoryMb: Int? = null,
     ) : ReasoningEvent
 
     /** A resposta terminou com sucesso. Nada mais é emitido depois. */
