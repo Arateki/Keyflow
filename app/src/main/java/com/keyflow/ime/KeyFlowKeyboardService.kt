@@ -126,8 +126,52 @@ class KeyFlowKeyboardService : InputMethodService() {
     @Volatile
     private var showWithHardKeyboard = true
 
+    private data class CaptureEditor(val packageName: String?, val fieldId: Int, val inputType: Int)
+    private var visionKeyboardHidden = false
+    private var visionKeyboardDestroyed = false
+    private var visionEditorToRestore: CaptureEditor? = null
+    private val visionKeyboardHider: () -> (() -> Unit)? = ::hideKeyboardForVision
+
+    /** Fecha a janela de verdade; o retorno só restaura um teclado que estava visível. */
+    private fun hideKeyboardForVision(): (() -> Unit)? {
+        if (visionKeyboardDestroyed) return null
+        if (visionKeyboardHidden) { hideWindow(); return null }
+        if (!KeyFlowController.keyboardVisible.value || keyboardView == null) return null
+        val info = currentInputEditorInfo ?: return null
+        val editor = CaptureEditor(info.packageName, info.fieldId, info.inputType)
+        visionKeyboardHidden = true
+        try { hideWindow() } catch (error: RuntimeException) { visionKeyboardHidden = false; throw error }
+        var restored = false
+        return {
+            if (!restored) {
+                restored = true
+                visionKeyboardHidden = false
+                if (!visionKeyboardDestroyed) {
+                    visionEditorToRestore = editor
+                    restoreVisionKeyboardIfReady()
+                }
+            }
+        }
+    }
+
+    private fun restoreVisionKeyboardIfReady() {
+        if (visionKeyboardDestroyed || visionKeyboardHidden) return
+        val expected = visionEditorToRestore ?: return
+        val info = currentInputEditorInfo ?: return
+        val actual = CaptureEditor(info.packageName, info.fieldId, info.inputType)
+        if (actual != expected) {
+            // O consentimento pode ainda estar fechando; outro editor de verdade encerra a restauração.
+            if (info.inputType != InputType.TYPE_NULL) visionEditorToRestore = null
+            return
+        }
+        if (currentInputConnection == null) return
+        // Mantém o pedido até onWindowShown: se a Activity do consentimento ainda tem foco, onStartInput tenta de novo.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) requestShowSelf(0) else showWindow(true)
+    }
+
     override fun onCreate() {
         super.onCreate()
+        KeyFlowController.registerCaptureKeyboardHider(visionKeyboardHider)
         // As preferências do teclado (expandido/encolhido) abertas fora da thread principal: abrir um SharedPreferences lê o
         // disco, e o onStartInputView, que as lê, é o caminho que o Android cronometra (StrictModeKeyboardTest).
         serviceScope.launch(Dispatchers.IO) { uiPrefs.getBoolean(KEY_EXPANDED, true) }
@@ -275,6 +319,11 @@ class KeyFlowKeyboardService : InputMethodService() {
 
     override fun onWindowShown() {
         super.onWindowShown()
+        if (visionKeyboardHidden) {
+            mainHandler.post { if (visionKeyboardHidden) hideWindow() }
+            return
+        }
+        visionEditorToRestore = null
         KeyFlowController.setKeyboardVisible(true)
         // Sincroniza o estado a cada exibição (o onCreateInputView pode não re-rodar com a view reusada).
         keyboardView?.updateMicState(KeyFlowController.buttonState.value)
@@ -308,6 +357,9 @@ class KeyFlowKeyboardService : InputMethodService() {
     }
 
     override fun onDestroy() {
+        visionKeyboardDestroyed = true
+        visionEditorToRestore = null
+        KeyFlowController.unregisterCaptureKeyboardHider(visionKeyboardHider)
         KeyFlowController.setKeyboardVisible(false)
         if (activeViewForTest === keyboardView) activeViewForTest = null
         cancelSuggestions()
@@ -324,7 +376,7 @@ class KeyFlowKeyboardService : InputMethodService() {
      * ditado isso apaga o mic junto, então quem decide é o app — ligado por padrão, desmarcável na aba
      * Teclado. Desmarcado, delega de volta ao comportamento do sistema.
      */
-    override fun onEvaluateInputViewShown() = showWithHardKeyboard || super.onEvaluateInputViewShown()
+    override fun onEvaluateInputViewShown() = !visionKeyboardHidden && (showWithHardKeyboard || super.onEvaluateInputViewShown())
 
     /**
      * Gira o device (retrato↔paisagem) muda a altura disponível de verdade — sem recriar a view, o
@@ -558,6 +610,7 @@ class KeyFlowKeyboardService : InputMethodService() {
         ) {
             requestShowSelf(0)
         }
+        restoreVisionKeyboardIfReady()
     }
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
@@ -605,6 +658,7 @@ class KeyFlowKeyboardService : InputMethodService() {
 
     override fun onFinishInput() {
         Log.d(TAG, "onFinishInput")
+        if (!visionKeyboardHidden) visionEditorToRestore = null
         KeyFlowController.clearInserter()
         wordTracker.reset()
         cancelSuggestions()

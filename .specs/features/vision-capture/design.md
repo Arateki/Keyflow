@@ -71,6 +71,9 @@ integração até a VC-T7 conectar o consumidor de ações. `VisionConsentReques
 `ScreenRegion`/`RegionGeometry` mantêm geometria e hit-test sem dependências Android. Resize oferece nova autorização.
 Detalhes e evidências: `licoes/2026-10-29-visao-fluxo.md` e relatório da equipe.
 
+Revisão P3: o serviço obtém do IME KeyFlow uma restauração idempotente ao ocultar sua janela, antes de abrir o consentimento. O IME suprime novas exibições enquanto a captura está ativa; o caminho de captura confirma a ocultação novamente. O epílogo devolve a visibilidade apenas ao editor anterior, inclusive se fechar a projeção falhar. A janela é controlada pelo próprio `InputMethodService`, sem comandos de shell no produto. `VisionFlowTest` confere ações e fases; a preservação real de gravação segue nos instrumentados do serviço.
+
+
 ### 2. Consent + FGS (`CAP-01`, `STO-V01`)
 - `VisionConsentActivity` transparente (`excludeFromRecents`): `createScreenCaptureIntent()` → resultado ao `VisionFlow`
   via callback/controller. **A cada acionamento** (efêmero; Android 15 não cacheia token — V4; fricção aceita).
