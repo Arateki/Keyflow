@@ -16,6 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
+import com.keyflow.vision.VisionFlowState
 import com.keyflow.core.ButtonState
 import com.keyflow.core.ErrorNavTarget
 import com.keyflow.core.KeyFlowController
@@ -133,6 +134,12 @@ class OrbButtonView(
         windowParams?.let { updateWindowLayout?.invoke(it) }
     }
 
+    private var visionState by mutableStateOf(VisionFlowState.NONE)
+
+    private var visionDark by mutableStateOf(false)
+
+    fun updateVisionState(state: VisionFlowState, dark: Boolean = false) { visionState = state; visionDark = dark }
+
     private var orbUi by mutableStateOf(OrbButtonUi(OrbState.Idle, OrbCenter.None))
     private var currentOrbStyle by mutableStateOf(orbStyle)
     private var currentOrbPack by mutableStateOf(orbPack)
@@ -191,6 +198,7 @@ class OrbButtonView(
             setContent {
                 val ui = orbUi
                 androidx.compose.runtime.CompositionLocalProvider(LocalOrbPack provides currentOrbPack) {
+                    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
                     VoiceOrb(
                         state = ui.state,
                         modifier = Modifier.fillMaxSize(),
@@ -198,6 +206,8 @@ class OrbButtonView(
                         dragHint = ui.dragHint,
                         style = currentOrbStyle,
                     )
+                    com.keyflow.ui.orb.VisionPhaseBadge(visionState, com.keyflow.ui.theme.paletteFor(visionDark))
+                    }
                 }
             }
         })
