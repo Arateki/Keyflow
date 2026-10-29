@@ -1,7 +1,7 @@
 # Síntese de fala (aba Voz) — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md` · **Contexto**: `context.md`
-**Status**: FAL-T1 a T6, T8 e T10 feitas (2026-10-29). FAL-T3 e FAL-T11 feitas nesta branch (`equipe/voz-motor-vits`; lição: `../../project/licoes/2026-10-29-voz-motor-vits.md`). FAL-T9 feita em `equipe/voz-motor-supertonic`; FAL-T7 segue. **Fora da v1**. Não toma a vez de frente aberta. O marcador de conflito que a main tinha neste status foi resolvido juntando as duas frases.
+**Status**: FAL-T1 a T11 feitas (2026-10-29). FAL-T3 e FAL-T11: `equipe/voz-motor-vits`; FAL-T9: `equipe/voz-motor-supertonic`; FAL-T7: `equipe/voz-goldens` (lição: `../../project/licoes/2026-10-29-voz-goldens.md`). **Fora da v1**. Não toma a vez de frente aberta.
 
 > **Para o agente executor**: leia `spec.md` + `design.md` + este arquivo e `.specs/codebase/TESTING.md`. Uma task por vez,
 > na ordem abaixo, testes primeiro, gate verde antes de avançar. Supertonic e VITS entram no catálogo nesta leva (D1 e D2). O nome do VITS é "português", nunca "pt-BR".
@@ -72,10 +72,10 @@ T4, T5 e T6 dependem só de T1. T3 depende de T1. T2 não trava T3 nem T9. T11 d
 - **Done when**: `onStart` produz `FirstAudio`; idioma ausente produz `TTS_DATA_MISSING`; a origem padrão do `Settings` novo continua `LOCAL`. Gate `quick`.
 - **Gate**: `pool compilar testDebugUnitTest`.
 
-### FAL-T7 — Goldens
+### FAL-T7 — Goldens — **Status: feita (equipe/voz-goldens, 2026-10-29)**
 - **What**: rotas do FUX-08 no `RouteCatalog`. Aprovar só o que for da aba Voz.
 - **Done when**: `pool telas` e `diff-screens.sh`. As outras abas ficam bit-idênticas. A rota `config-fala-testar` está parada, sem áudio.
-- **Gate**: `pool telas`.
+- **Gate**: `pool telas` (136 rotas, 272 PNGs) e `scripts/diff-screens.sh`; 22 imagens da Voz revisadas, 250 goldens das outras abas preservados por SHA-256. `pool compilar testDebugUnitTest :app:lintDebug` e 28 instrumentados de `FalaPanelTest` verdes.
 
 ### FAL-T8 — Pin do Supertonic e aceite
 - **Status**: feito (2026-10-29). O diálogo ficou no `ModelList` compartilhado, não no `FalaPanel` (esse painel é de outra frente). O catálogo mostra a entrada em todos os builds; `validatedOnDevice` é informativo, sem impedir o motor.

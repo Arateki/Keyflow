@@ -144,7 +144,8 @@ Entram agora no catálogo, lado a lado: o Supertonic 3 (D2; pesos OpenRAIL-M, c�
 
 | Requisito | Task | Status |
 | --------- | ---- | ------ |
-| FUX-01..07, FUX-09 | FAL-T4 | Implemented (galeria/goldens FUX-08: FAL-T7 pendente) |
+| FUX-01..07, FUX-09 | FAL-T4 | Implemented |
+| FUX-08 | FAL-T7 | Done (2026-10-29) — 11 rotas claro/escuro; VITS/português, licença Supertonic, pronto e Testar parado sem áudio; 22 goldens e FalaPanelTest |
 | FENG-01..06 | FAL-T1, FAL-T4 | Implemented |
 | FLOC-01..02 | FAL-T8, FAL-T10 | Done (2026-10-29) — pins no catálogo |
 | FLOC-03 | FAL-T2, FAL-T9, FAL-T11 | Implemented — caracteres/VITS e Unicode/quatro ONNX Supertonic (`pt`, M1); prova real em FAL-T9 |
