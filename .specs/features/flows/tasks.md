@@ -24,7 +24,7 @@
   o executor **não** importa o downloader nem o cofre. Nada de segredo em fluxo.
 - **Não alterar** a `ButtonStateMachine`, o módulo `agent/` nem o formato de `bars_config_json` além do caso `flow`.
 - **Commit** em português, um por assunto, sem citar agentes de IA e sem trailers. Ao fechar a task: `Status` aqui, traceability no `spec.md`, lição em `.specs/project/licoes/` e o `STATE.md` (T27).
-- **Coordenação**: VC-T7 (consumidor de gestos do `VisionFlow`) e BNC-T23/T27 (`Etapa`/`Fluxo` da bancada) são de outras frentes; a T12 e a Q7 do spec dizem como convivem.
+- **Coordenação**: VC-T7 (consumidor de gestos do `VisionFlow`) e BNC-T23/T27 (`Etapa`/`Fluxo` da bancada) são de outras frentes; a T12 e a D16 (Q7 respondida em 29/10) do spec dizem como convivem. A bancada passa a consumir os tipos de Fluxos quando for mexida; sem task/dependência nova agora.
   A feature `notification` (NTF-T*) compartilha `com.keyflow.orbe.LugarDaOrbe` (a T1 cria o arquivo se chegar primeiro) e mexe no mesmo `OverlayService`; a T28 depende da NTF-T13.
 
 ## Execution Plan
@@ -41,6 +41,7 @@ Fase C  integração Android:        T9 [P: refatoração sem dependência]
                                     (T4, T5, T10, T11, T12, T13) ──► T14 ──► T15
                                     (T1, T2) ──► T16  (liga ao serviço na T14)
 Fase D  telas:                     (T3, T4, T7) ──► T17 ──► T18 ──► T19
+                                    T14 ────────────────► T18 (Rodar agora)
                                     (T5, T16, T18) ──► T20 ──► T21
                                     (T17..T21) ──► T22
 Fase E  fechamento:                (T17..T21) ──► T23       T22 ──► T24
@@ -74,7 +75,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(fluxos): codec JSON tolerante`.
 
 ### FLX-T3 — Fluxos padrão e restaurar — **Status: pendente**
-- **What**: `PadroesFluxo` (catálogo dos 3, `trKey`, `PADROES_VERSAO`, `semear()` com ids `s-<builtinId>`), `RestauradorFluxos.restaurar(config)` e `previa(config)` (design §4); `idNovo()` injetável.
+- **What**: `PadroesFluxo` (catálogo dos 3, dica informativa de atalho por `builtinId` — D15, sem gatilho automático, `trKey`, `PADROES_VERSAO`, `semear()` com ids `s-<builtinId>`), `RestauradorFluxos.restaurar(config)` e `previa(config)` (design §4); `idNovo()` injetável.
 - **Where**: `fluxos/{PadroesFluxo,RestauradorFluxos}.kt`; testes `RestauradorFluxosTest`, `RestauradorPropertyTest`.
 - **Depends on**: T1 (T2 para o gerador de propriedade). **Requirement**: FLX-40, FLX-41 (prévia), FLX-42, FLX-43, FLX-44.
 - **Done when**: unit — padrão apagado volta **sem gatilho**, com id novo e posição pelo catálogo; padrão editado volta ao original mantendo id, posição e **gatilhos**; igual → config idêntica;
@@ -99,7 +100,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 - **Done when**: unit — 2 e 3 toques ligados rodam e a ação do `Settings` não; sem gatilho a ação roda; 4 toques com `NEAREST_DOWN` cai no 3 ligado a fluxo, e no 2 se o 3 está livre e sem ação; `CANCEL` não faz nada;
   1 toque nunca é gatilho; fluxo inválido → `Incompleto` (e a ação sombreada **não** roda); `ligar` numa superfície ocupada tira do outro e nunca deixa dois; `excluir` devolve os `botaoId`;
   o mesmo gesto em lugares diferentes são gatilhos diferentes (`Orbe(FLUTUANTE, 2)` ≠ `Orbe(NOTIFICACAO, 2)`); `NOTIFICACAO`/`TECLADO` sem gatilho → `AcaoDoLugar(n)`; com `copiaDaPrincipal` os gatilhos lidos são os da flutuante e a lista de gatilhos **não muda** (propriedade: ligar/desligar "copiar" é só uma consulta);
-  `avisoDeSubstituicao` usa o rótulo de `shortcutActionLabel`, diz "não tinha ação" para `NONE` e nomeia o lugar quando há mais de um.
+  `avisoDeSubstituicao` nomeia ação/fluxo efetivo anterior e toque/gesto/botão/lugar para qualquer substituição; não privilegia gravar. `NONE`/mesma ação não gera aviso de perda; fluxo já ligado usa seu nome, não a ação sombreada.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(fluxos): roteamento de gatilhos e política de ligação`.
 
 ---
@@ -172,20 +173,20 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 - **Tests**: unit + instrumentado. **Gate**: `quick` + `pool instrumentar com.keyflow.overlay.OverlayServiceVisionTest`. **Commit**: `feat(fluxos): captura de tela como etapa de fluxo`.
 
 ### FLX-T13 — Agente e a janela de confirmação — **Status: pendente**
-- **What**: `PortaAgenteApp` (design §7.3): `AgentController.send(texto, backends.resolve(settingsDoPasso))`, observa o estado até `IDLE`, pega a última `AssistantMessage`, `Notice` → `Falha(MOTOR)`, ocupado → `Falha(MOTOR)`; cancelar → `controller.cancel()`.
+- **What**: sessão por execução separada do chat (D10), com controlador, gate, executor e scope próprios, reusando catálogo/política/registro sanitizado via `AgentHost.assemble` ou equivalente; libera em todo fim. `PortaAgenteApp` (design §7.3): `AgentController.send(texto, backends.resolve(settingsDoPasso))`, observa o estado até `IDLE`, pega a última `AssistantMessage`, `Notice` → `Falha(MOTOR)`, ocupado → `Falha(MOTOR)`; cancelar → `controller.cancel()`.
   `FluxoConfirmacaoActivity` (manifest: `exported=false`, `taskAffinity=""`, `excludeFromRecents`, tema translúcido) com o `AgentConfirmationPanel`; o host a abre quando `gate.pending` fica não nulo durante a etapa; sair sem resposta nega.
 - **Where**: `fluxos/app/{PortaAgenteApp,FluxoConfirmacaoActivity}.kt`, `AndroidManifest.xml`; testes `PortaAgenteAppTest` (JVM com `AgentController` e `AgentEngine` falsos), `FluxoConfirmacaoActivityTest` (instrumentado).
 - **Depends on**: T6, T9. **Requirement**: FLX-24, FLX-25.
-- **Done when**: unit — resposta final do assistente é a saída; `send` devolvendo `false` → falha "agente ocupado"; limite de passos → falha com a frase do aviso; cancelar o fluxo cancela o agente;
+- **Done when**: unit — chat com mensagens e execução em andamento permanece intacto; o pedido do fluxo não inclui histórico do chat; segunda execução começa vazia; cancelar fluxo não cancela chat; gates distintos não recebem respostas cruzadas; resposta final do assistente é a saída; `send` devolvendo `false` → falha "agente ocupado"; limite de passos → falha com a frase do aviso; cancelar o fluxo cancela o agente;
   instrumentado — o pedido de confirmação de uma ferramenta de escrita aparece na activity, **Permitir** continua e **Negar**/voltar/`onStop` nega e termina `Cancelada`; sem a activity visível nenhuma ferramenta que pede confirmação roda.
 - **Tests**: unit + instrumentado. **Gate**: `quick` + `pool instrumentar com.keyflow.fluxos.app.FluxoConfirmacaoActivityTest`. **Commit**: `feat(fluxos): etapa do agente com confirmação fora do app`.
 
 ### FLX-T14 — `FluxoHost` no serviço — **Status: pendente**
-- **What**: `ACTION_RUN_FLOW` + `EXTRA_BOTAO_ID`; `FluxoHost.disparar(fluxo, superficie)` com as precondições (design §10), `ensureForeground`, `maybeStopWhenIdle` respeitando `fluxoHost.ativo`, glifo da etapa na orbe
+- **What**: `ACTION_RUN_FLOW` + `EXTRA_BOTAO_ID` e origem manual com id do fluxo para Rodar agora (sem persistir gatilho/superfície); `FluxoHost.disparar` com as precondições (design §10), `ensureForeground`, `maybeStopWhenIdle` respeitando `fluxoHost.ativo`, glifo da etapa na orbe
   (`updateFluxoEtapa`), toque na orbe cancela fora do Ditar, avisos de falha com destino de aba (`SetupActivity.openAtTabIntent`), `cachedFluxos` observado ao vivo, `onDestroy` cancela.
 - **Where**: `overlay/OverlayService.kt`, `overlay/OrbButtonView.kt`, `ui/SetupActivity.kt` (intent genérico), `fluxos/app/FluxoHost.kt`.
-- **Depends on**: T4, T5, T10, T11, T12, T13. **Requirement**: FLX-17, FLX-27, FLX-28, FLX-29, FLX-32, FLX-39, FLX-49.
-- **Done when**: instrumentado com portas falsas — `ACTION_RUN_FLOW` roda o fluxo; segundo disparo é recusado com o aviso e não cancela o primeiro; Ditar com a gravação em curso é recusado ("Termine a gravação atual…"); o serviço no modo só-teclado
+- **Depends on**: T4, T5, T10, T11, T12, T13. **Requirement**: FLX-06 (acionamento manual), FLX-17, FLX-19 (recusa durante gravação), FLX-27, FLX-28, FLX-29, FLX-32, FLX-39, FLX-49.
+- **Done when**: instrumentado com portas falsas — `ACTION_RUN_FLOW` roda o fluxo; segundo disparo é recusado com o aviso e não cancela o primeiro; Ditar e Capturar com RECORDING/PAUSED são recusados com aviso ("Termine a gravação atual…"), sem mudar estado/áudio nem abrir captura; Rodar agora usa as mesmas guardas e não cria gatilho; o serviço no modo só-teclado
   **não encerra** entre as etapas; falha numa etapa mostra o banner "O fluxo parou em “X”: …" cujo toque abre a aba certa; toque na orbe em Perguntar cancela e a orbe volta ao estado anterior; `onDestroy` cancela a execução.
 - **Tests**: instrumentado. **Gate**: `pool instrumentar com.keyflow.overlay.OverlayServiceFluxoTest`. **Commit**: `feat(fluxos): execução dos fluxos no serviço da orbe`.
 
@@ -221,11 +222,11 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 
 ### FLX-T18 — Modal do fluxo e editor de etapas — **Status: pendente**
 - **What**: `FluxosModal` (`ConfigModal`) com nome (1..40, vazio volta), lista de etapas (ícone, nome, tipo, campo próprio da Visão/Perguntar até 500), "+ Etapa" (seletor agrupado com itens incompatíveis esmaecidos e o motivo — T1),
-  reordenar por arrastar (`detectDragGesturesAfterLongPress`) **e** por ▲▼, remover, validação ao vivo (Incompleto, aviso "sem saída"), gravação na hora por `atualizarFluxos`. Função pura `reordenar(etapas, de, para)`.
+  reordenar por arrastar (`detectDragGesturesAfterLongPress`) **e** por ▲▼, remover, validação ao vivo (Incompleto, aviso "sem saída"), gravação na hora por `atualizarFluxos`; **Rodar agora** pelo host da T14, sem criar atalho (D13); dica de atalho dos padrão sem ligá-la (D15). Função pura `reordenar(etapas, de, para)`.
 - **Where**: `ui/config/{FluxosModal,FluxosEtapas}.kt`; testes `FluxosModalTest`, `ReordenarEtapasTest` (unit).
-- **Depends on**: T17. **Requirement**: FLX-06, FLX-07, FLX-11, FLX-12, FLX-13, FLX-14, FLX-15, FLX-16, FLX-51, FLX-54.
+- **Depends on**: T17, T14. **Requirement**: FLX-06, FLX-07, FLX-11, FLX-12, FLX-13, FLX-14, FLX-15, FLX-16, FLX-39, FLX-40 (dicas), FLX-51, FLX-54.
 - **Done when**: instrumentado — fluxo novo abre com o texto-guia e só Ditar/Capturar habilitadas; depois de Ditar a Visão está esmaecida com "Precisa de uma imagem antes"; ▲▼ reordena e o card atrás reflete; remover a etapa do meio deixa o fluxo Incompleto com a etapa destacada;
-  8 etapas desligam o "+ Etapa"; nome vazio ao sair volta ao anterior; arrastar reordena (função pura testada na JVM); fechar não perde nada.
+  8 etapas desligam o "+ Etapa"; nome vazio ao sair volta ao anterior; arrastar reordena (função pura testada na JVM); fechar não perde nada; Rodar agora chama o host uma vez com o fluxo atual e nenhum gatilho é gravado, Incompleto/outro fluxo ativo desabilita com motivo; abrir os três padrão mostra a sugestão correta sem mudar DataStore/Settings/barras; restaurar continua com gatilhos intactos.
 - **Tests**: unit + instrumentado. **Gate**: `quick` + `pool instrumentar com.keyflow.ui.config.FluxosModalTest`. **Commit**: `feat(fluxos): modal e editor de etapas em lista`.
 
 ### FLX-T19 — Seletor de modelo por etapa — **Status: pendente**
@@ -242,7 +243,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
   quando o fluxo é Incompleto; **Excluir fluxo** com confirmação (remove fluxo, gatilhos e botões criados, cancela se estiver rodando).
 - **Where**: `ui/config/FluxosAtalhos.kt`, `ui/config/FluxosModal.kt`; testes `FluxosAtalhosTest`.
 - **Depends on**: T5, T16, T18. **Requirement**: FLX-10, FLX-35, FLX-36, FLX-37, FLX-38, FLX-51, FLX-57 (modal).
-- **Done when**: instrumentado — ligar o 2 toques mostra "Isto substitui “Retrair / expandir teclado” neste gesto." e só liga ao confirmar; `Settings.shortcut2Tap` **continua** `TOGGLE_KEYBOARD`; desligar não mexe nas `Settings`; ligar uma superfície ocupada mostra "tira este atalho de “X”";
+- **Done when**: instrumentado — ligar o 2 toques mostra "Isto substitui “Retrair / expandir teclado” neste gesto da orbe flutuante." e só liga ao confirmar; `Settings.shortcut2Tap` **continua** `TOGGLE_KEYBOARD`; desligar não mexe nas `Settings`; ligar uma superfície ocupada nomeia "Fluxo: X" no aviso de substituição; trocar uma ação qualquer, inclusive gravar, mostra o mesmo aviso genérico; cancelar preserva os dados, superfície livre/ação igual não gera aviso de perda; o mesmo vale ao reatribuir botão ocupado;
   "Adicionar à barra" cria o botão no fim da barra principal (nos dois modos se não espelhadas) e o gatilho numa transação; excluir remove tudo e a lista atrás atualiza; fluxo Incompleto não liga; `lugaresDisponiveis()` só devolve `FLUTUANTE` e a modal **não** mostra os grupos da notificação nem do teclado.
 - **Tests**: instrumentado (Compose + repositório). **Gate**: `pool instrumentar com.keyflow.ui.config.FluxosAtalhosTest`. **Commit**: `feat(fluxos): atalhos, botão do teclado e exclusão no modal`.
 
@@ -283,23 +284,22 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 
 ### FLX-T25 — Instrumentados ponta a ponta com motores falsos — **Status: pendente**
 - **What**: `FluxosEndToEndTest` no serviço real (não nas portas): "Ouvir e responder" com gravador/STT/LLM/voz falsos, "Ler a tela e colar" com o `VisionFlow` de prova do `OverlayServiceVisionTest`, "Pedir ao agente e colar" com agente falso e a janela de confirmação;
-  falha no meio, cancelar em cada etapa, 2 toques e botão do teclado como gatilho, restaurar não mexendo nos gatilhos (com o DataStore real).
+  falha no meio, cancelar em cada etapa, 2 toques, botão do teclado e **Rodar agora**, restaurar não mexendo nos gatilhos (com o DataStore real); chat separado intacto e sessão nova na execução seguinte; recusa de Ditar/Capturar em RECORDING/PAUSED sem efeitos na gravação.
 - **Where**: `app/src/androidTest/.../fluxos/FluxosEndToEndTest.kt`.
-- **Depends on**: T14, T15, T16 (T22 para o caminho da tela). **Requirement**: FLX-17, FLX-27, FLX-29, FLX-34, FLX-39 (e confirma FLX-18..25 juntos).
+- **Depends on**: T14, T15, T16 (T22 para o caminho da tela). **Requirement**: FLX-06, FLX-17, FLX-19, FLX-24, FLX-27, FLX-29, FLX-34, FLX-39 (e confirma FLX-18..25 juntos).
 - **Done when**: os cenários acima verdes no emulador; nenhum `Thread.sleep` (espera por estado/`KeyFlowController.fluxo`); janela alongada por gancho `…ForTest` onde houver prazo do produto; o serviço é parado no `@After` (regra do `ArchitectureRulesTest`).
 - **Tests**: instrumentado. **Gate**: `pool instrumentar com.keyflow.fluxos.FluxosEndToEndTest`. **Commit**: `test(fluxos): fluxos de ponta a ponta com motores falsos`.
 
 ### FLX-T26 — Validação manual **[YAN]** — **Status: pendente**
 - **What**: roteiro `manual-validation.md` nesta pasta: (1) os 3 padrão ligados a 2 toques / botão do teclado no **A32** e no **Vaio** (`--confirmo-a32`); (2) **RAM** do "Ouvir e responder" com modelos 100% locais no A32 de 4 GB (Parakeet + Gemma + VITS/Supertonic): anotar OOM/tempo/ociosidade;
-  (3) confirmação do agente sobre outro app; (4) Ditar com a orbe em Push-to-talk (A5); (5) cancelar em cada etapa; (6) modo avião no Perguntar em nuvem. Resultados e decisões Q1–Q7 registrados.
+  (3) confirmação do agente sobre outro app; (4) Ditar com a orbe em Push-to-talk (A5); (5) cancelar em cada etapa; (6) modo avião no Perguntar em nuvem. Resultados comparados às decisões D10–D16 (Q1–Q7 já respondidas em 29/10); incluir Rodar agora, conversa separada e recusa com gravação em curso.
 - **Where**: `.specs/features/flows/manual-validation.md`, `.specs/project/STATE.md`.
 - **Depends on**: T25. **Requirement**: Success Criteria da spec.
-- **Done when**: o Yan assina o roteiro (ou lista os desvios); Q1–Q7 respondidas ou transformadas em task.
+- **Done when**: o Yan assina o roteiro (ou lista os desvios); comportamento confere com D10–D16; não reabrir Q1–Q7 como pendências.
 - **Tests**: manual. **Gate**: manual. **Commit**: `docs(fluxos): roteiro de validação manual e resultados`.
 
 ### FLX-T27 — Fechamento — **Status: pendente**
-- **What**: Status de todas as tasks neste arquivo, traceability do `spec.md` (Pending → Verified), lições em `.specs/project/licoes/` (RAM em fluxo local, gancho do coordinator, destino do `VisionFlow`), `STATE.md`, `DEVELOPMENT-ORDER.md` (Bloco 14 → concluído) e a nota para a bancada (Q7:
-  BNC-T23/T27 passam a consumir `com.keyflow.fluxos`).
+- **What**: Status de todas as tasks neste arquivo, traceability do `spec.md` (Pending → Verified), lições em `.specs/project/licoes/` (RAM em fluxo local, gancho do coordinator, destino do `VisionFlow`), `STATE.md`, `DEVELOPMENT-ORDER.md` (Bloco 14 → concluído) e a nota para a bancada (D16: consumir `com.keyflow.fluxos` quando for mexida; sem criar task/dependência agora).
 - **Where**: `.specs/features/flows/*`, `.specs/DEVELOPMENT-ORDER.md`, `.specs/project/STATE.md`, `.specs/project/licoes/`.
 - **Depends on**: T26. **Requirement**: regra de ouro 6.
 - **Done when**: gate `full` verde (unit + instrumentados afetados + goldens 0 divergências além das rotas novas); `ArchitectureRulesTest`, `TranslationsTest` e `lintDebug` verdes; requisitos → Verified (ou Parcial com o motivo); **FLX-58, FLX-59 e FLX-60 ficam Pending/Parcial** com o motivo "depende da T28/T29" até essas tasks fecharem.
