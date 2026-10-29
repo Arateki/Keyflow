@@ -576,6 +576,8 @@ class VisaoPanelTest {
     @OptIn(ExperimentalTestApi::class)
     private fun typeBInsteadOfAInTheEndpoint() {
         val endpoint = node("visao-custom-endpoint")
+        // A seleção precisa ser feita com o campo já focado; o foco adquirido ao digitar pode reposicionar o cursor.
+        endpoint.performClick()
         endpoint.performTextInputSelection(TextRange(8, 9))
         endpoint.performTextInput("b")
         endpoint.assertTextContains("https://b.test/v1")
