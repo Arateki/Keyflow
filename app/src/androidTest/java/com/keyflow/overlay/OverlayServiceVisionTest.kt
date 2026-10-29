@@ -35,6 +35,84 @@ class OverlayServiceVisionTest {
     @Test fun togglePausaAntesDoConsentimentoENegacaoPreservaAudio() = exercise(RecordingMode.TOGGLE)
     @Test fun pttPausaAntesDoConsentimentoENegacaoPreservaAudio() = exercise(RecordingMode.PUSH_TO_TALK)
 
+    @Test fun janelaRecusadaEncerraFluxoSemDerrubarServico() = withReadyService { service ->
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val device = UiDevice.getInstance(instrumentation)
+        OverlayService.start(context, OverlayService.actionIntent(context, OverlayService.ACTION_VISION))
+        withTimeout(15_000) { OverlayService.visionFlowStateForTest.first { it == VisionFlowState.CONSENT } }
+        assertNotNull(device.wait(Until.findObject(By.text(Pattern.compile("(?i).*start now.*|.*iniciar agora.*"))), 15_000))
+        OverlayService.visionRestartShowForTest = { throw android.view.WindowManager.BadTokenException("permissão revogada entre criar e mostrar") }
+        try {
+            instrumentation.runOnMainSync { service.showVisionRestart() }
+            withTimeout(15_000) { OverlayService.visionFlowStateForTest.first { it == VisionFlowState.NONE } }
+            assertTrue(device.wait(Until.gone(By.text(Pattern.compile("(?i).*start now.*|.*iniciar agora.*"))), 15_000))
+            assertEquals(ButtonState.PAUSED, KeyFlowController.buttonState.value)
+        } finally { OverlayService.visionRestartShowForTest = null }
+    }
+
+    @Test fun falhaAoFecharProjecaoAindaLimpaCacheERestauraViews() = withReadyService { service ->
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val cache = com.keyflow.vision.client.VisionCache.dir(instrumentation.targetContext).apply { mkdirs() }
+        java.io.File(cache, "regressao.txt").writeText("dado sintético")
+        val visible = android.view.View(instrumentation.targetContext)
+        val gone = android.view.View(instrumentation.targetContext).apply { visibility = android.view.View.GONE }
+        OverlayService.visionSessionCloseForTest = { throw SecurityException("microfone revogado ao restaurar FGS") }
+        try {
+            instrumentation.runOnMainSync {
+                service.hideVisionViews(listOf(visible, gone))
+                service.cleanupVision()
+                assertEquals(android.view.View.VISIBLE, visible.visibility)
+                assertEquals(android.view.View.GONE, gone.visibility)
+            }
+            assertTrue("cache retido após falha na sessão", cache.listFiles().orEmpty().isEmpty())
+        } finally { OverlayService.visionSessionCloseForTest = null }
+    }
+
+    @Test fun destruirServicoNaoSolicitaRestauracaoDoForeground() {
+        val closed = java.util.concurrent.CountDownLatch(1)
+        var restore = true
+        try {
+            withReadyService {
+                OverlayService.visionSessionCloseForTest = { requested -> restore = requested; closed.countDown() }
+            }
+            assertTrue(closed.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            assertEquals(false, restore)
+        } finally { OverlayService.visionSessionCloseForTest = null }
+    }
+
+    private fun withReadyService(block: suspend (OverlayService) -> Unit) = runBlocking {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val repository = SettingsRepository(context)
+        val saved = repository.settingsFlow().first()
+        val scenario = ActivityScenario.launch<GalleryActivity>(Intent(context, GalleryActivity::class.java).putExtra("route", "config-visao"))
+        instrumentation.uiAutomation.executeShellCommand("appops set ${context.packageName} SYSTEM_ALERT_WINDOW allow").close()
+        try {
+            repository.saveDisclosureConsent(DISCLOSURE_VERSION, false)
+            OverlayService.start(context, OverlayService.actionIntent(context, OverlayService.ACTION_RECORD))
+            withTimeout(15_000) { KeyFlowController.buttonState.first { it == ButtonState.RECORDING } }
+            block(checkNotNull(OverlayService.instanceForVisionTest))
+        } finally {
+            if (OverlayService.visionFlowStateForTest.value != VisionFlowState.NONE) {
+                OverlayService.start(context, OverlayService.actionIntent(context, RecordingNotification.ACTION_CANCEL))
+                withTimeout(15_000) { OverlayService.visionFlowStateForTest.first { it == VisionFlowState.NONE } }
+            }
+            if (KeyFlowController.buttonState.value in listOf(ButtonState.PAUSED, ButtonState.RECORDING)) {
+                OverlayService.start(context, OverlayService.actionIntent(context, RecordingNotification.ACTION_CANCEL))
+                withTimeout(15_000) { KeyFlowController.buttonState.first { it == ButtonState.CANCELLING } }
+            }
+            if (KeyFlowController.buttonState.value == ButtonState.CANCELLING) {
+                OverlayService.start(context, OverlayService.actionIntent(context, OverlayService.ACTION_COMMIT_CANCEL))
+                withTimeout(15_000) { KeyFlowController.buttonState.first { it == ButtonState.IDLE_READY || it == ButtonState.IDLE_NO_FIELD } }
+            }
+            OverlayService.stop(context)
+            instrumentation.waitForIdleSync()
+            repository.saveSettings(saved)
+            scenario.close()
+        }
+    }
+
     private fun exercise(mode: RecordingMode) = runBlocking {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
