@@ -97,4 +97,11 @@ class BancadaSubAbasTest {
         assertThat(modeloEscolhido(Settings(reasoningSource = ReasoningSource.CUSTOM, reasoningCustomModel = "meu"), vazio, false)!!.id).isEqualTo("custom/meu")
         assertThat(modeloEscolhido(Settings(reasoningSource = ReasoningSource.OPENAI, reasoningOpenAiModel = "  "), vazio, false)).isNull()
     }
+
+    @Test
+    fun `the consent only promises the output cap the request really carries`() {
+        // a Anthropic envia max_tokens=1024 sempre; os outros motores não mandam teto (a prova pedia 96 e a requisição levava 1024)
+        assertThat(tetoEfetivoDeSaidaNaNuvem("anthropic")).isEqualTo(1024)
+        for (origem in listOf("openai", "google", "custom")) assertThat(tetoEfetivoDeSaidaNaNuvem(origem)).isNull()
+    }
 }

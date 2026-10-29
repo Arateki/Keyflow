@@ -390,8 +390,13 @@ private fun AvisoDeCusto(
             if (estimativa != null) {
                 SettingTitle(tr("%s · %s", provedorLegivel(modelo.origem), modelo.nome))
                 SettingSub(tr("Faz %d chamadas com a sua credencial.", estimativa.chamadas), Modifier.padding(top = 6.dp))
+                val teto = tetoEfetivoDeSaidaNaNuvem(modelo.origem)
                 SettingSub(
-                    tr("Entrada: cerca de %d tokens (estimativa) · teto de saída: %d tokens.", estimativa.tokensEntradaEstimados, estimativa.tetoDeTokensDeSaida),
+                    if (teto != null) {
+                        tr("Entrada: cerca de %d tokens (estimativa) · teto de saída: %d tokens por chamada.", estimativa.tokensEntradaEstimados, teto)
+                    } else {
+                        tr("Entrada: cerca de %d tokens (estimativa) · sem teto de saída: vale o limite do modelo.", estimativa.tokensEntradaEstimados)
+                    },
                     Modifier.padding(top = 4.dp),
                 )
             }

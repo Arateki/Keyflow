@@ -33,3 +33,9 @@ internal fun modeloEscolhido(settings: Settings, models: LocalModelsUi, porAssin
         ReasoningSource.CUSTOM -> nuvem("custom", settings.reasoningCustomModel)
     }
 }
+
+/**
+ * O teto de saída que a requisição REALMENTE leva por chamada, ou `null` se o motor da [origem] não manda teto (vale o limite do próprio
+ * modelo). O `teto de saída` do corpus não chega à nuvem (BEX-02: opção ignorada, gravada como tal); prometê-lo no consentimento seria mentir.
+ */
+internal fun tetoEfetivoDeSaidaNaNuvem(origem: String): Int? = if (origem == "anthropic") com.keyflow.reasoning.anthropic.MAX_TOKENS_DE_SAIDA else null
