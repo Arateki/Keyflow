@@ -26,6 +26,8 @@ sealed interface StartResult {
     data class AnotherDownloadActive(val modelId: String) : StartResult
     /** DLM-04: em rede medida, a UI confirma com o tamanho e chama de novo com `allowMetered = true`. */
     data class NeedsMeteredConfirmation(val bytes: Long) : StartResult
+    /** OpenRAIL-M do Supertonic (FPRV-03): o diálogo aceita a licença e só então o download é pedido de novo. */
+    data class NeedsLicenseAcceptance(val modelId: String) : StartResult
     /** DLM-05. */
     data class NotEnoughSpace(val requiredBytes: Long, val freeBytes: Long) : StartResult
     /** Armazenamento externo do app indisponível — é lá que os downloads ficam até a instalação. */

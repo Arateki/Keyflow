@@ -862,7 +862,6 @@ internal val TranslationsEs: Map<String, String> = mapOf(
     "O modelo falhou ao ler a imagem de teste." to "El modelo falló al leer la imagen de prueba.",
     "O motor de leitura foi interrompido — tente de novo." to "El motor de lectura se interrumpió — inténtelo de nuevo.",
     "Este modelo ainda não pode ser testado aqui — o teste chega junto com a captura da tela." to "Este modelo aún no se puede probar aquí — la prueba llega junto con la captura de pantalla.",
-
     // Bancada de modelos (sub-abas do Testar)
     "1º trecho %s" to "1.º fragmento %s",
     "Ainda não há resultado deste teste para este modelo." to "Aún no hay resultado de esta prueba para este modelo.",
@@ -944,4 +943,14 @@ internal val TranslationsEs: Map<String, String> = mapOf(
     "Mede a leitura de texto em imagens." to "Mide la lectura de texto en imágenes.",
     "Mede a identificação de objetos em imagens." to "Mide la identificación de objetos en imágenes.",
     "A estimativa não inclui os tokens das imagens." to "La estimación no incluye los tokens de las imágenes.",
+
+    // Aba Voz (catálogo local e o aceite da OpenRAIL-M do Supertonic)
+    "português" to "portugués",
+    "Uma voz em português, leve, no aparelho." to "Una voz en portugués, ligera, en el dispositivo.",
+    "Várias línguas" to "Varios idiomas",
+    "Voz em vários idiomas, inclusive português, no aparelho." to "Una voz en varios idiomas, incluido el portugués, en el dispositivo.",
+    "31 idiomas" to "31 idiomas",
+    "Licença do Supertonic" to "Licencia del Supertonic",
+    "Os pesos deste modelo são OpenRAIL-M. O parágrafo 5 e o Attachment A valem para quem baixa ou usa o modelo. O código de inferência é MIT. A Supertone não endossa o KeyFlow." to "Los pesos de este modelo son OpenRAIL-M. El párrafo 5 y el Attachment A valen para quien descarga o usa el modelo. El código de inferencia es MIT. Supertone no respalda KeyFlow.",
+    "Li e aceito" to "Leí y acepto",
 )

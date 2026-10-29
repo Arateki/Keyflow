@@ -136,6 +136,9 @@ interface LocalModelActions {
      */
     fun chooseBackend(modelId: String, backend: ComputeBackend, prepare: Boolean) = Unit
 
+    /** Grava o aceite da licença daquele modelo. O download seguinte é que chama o downloader. */
+    fun acceptVoiceLicense(modelId: String) = Unit
+
     /** Sem gerenciador (galeria, testes de outras abas): nada acontece. */
     object None : LocalModelActions {
         override suspend fun download(spec: ModelSpec, allowMetered: Boolean): StartResult = StartResult.StorageUnavailable
@@ -153,7 +156,7 @@ fun startProblem(result: StartResult): String? = when (result) {
         tr("Espaço insuficiente: precisa de %s livres, há %s.", formatModelSize(result.requiredBytes), formatModelSize(result.freeBytes))
     is StartResult.AnotherDownloadActive -> tr("Espere o download em andamento terminar.")
     StartResult.StorageUnavailable -> tr("Armazenamento indisponível para baixar agora.")
-    StartResult.Started, StartResult.AlreadyInstalled, is StartResult.NeedsMeteredConfirmation -> null
+    StartResult.Started, StartResult.AlreadyInstalled, is StartResult.NeedsMeteredConfirmation, is StartResult.NeedsLicenseAcceptance -> null
 }
 
 fun failureMessage(failure: DownloadFailure): String = when (failure) {

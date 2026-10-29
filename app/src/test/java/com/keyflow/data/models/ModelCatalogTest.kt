@@ -315,17 +315,43 @@ class ModelCatalogTest {
         assertThat(ModelCatalog.visibleIn(ModelCatalog.VISION_ALL, debug = true)).containsExactlyElementsIn(ModelCatalog.VISION_ALL)
     }
 
+    /** FAL-T8/T10: VITS (mais leve) e Supertonic 3, pins reais. Release esconde até o motor provar no aparelho. */
     @Test
-    fun `voice specs, when there are any, are voice kind on the TTS engine with a model file`() {
-        ModelCatalog.VOICE.forEach { model ->
+    fun `voice specs are the vits portuguese entry and the official supertonic`() {
+        assertThat(ModelCatalog.VOICE_ALL.map { it.id }).containsExactly("vits-coqui-pt", "supertonic-3").inOrder()
+        assertThat(ModelCatalog.VOICE.map { it.id }).containsExactly("vits-coqui-pt", "supertonic-3").inOrder()
+        assertThat(ModelCatalog.visibleIn(ModelCatalog.VOICE_ALL, debug = false)).isEmpty()
+        val vits = ModelCatalog.VITS_COQUI_PT
+        val supertonic = ModelCatalog.SUPERTONIC_3
+        listOf(vits, supertonic).forEach { model ->
             assertThat(model.kind).isEqualTo(ModelKind.VOICE)
             assertThat(model.engineType).isEqualTo(EngineType.TTS)
-            assertThat(model.files.map { it.role }).contains(FileRole.MODEL)
             assertThat(model.recommendedRamMb).isGreaterThan(0)
             assertThat(model.modelName).isNotEmpty()
+            assertThat(model.validatedOnDevice).isFalse()
+            assertThat(model.files.map { it.fileName }.joinToString(" ")).doesNotContain("int8")
+            assertThat(model.id).doesNotContain("pt-BR")
+            assertThat(model.displayName).doesNotContain("pt-BR")
         }
+        assertThat(vits.displayName).isEqualTo("português")
+        assertThat(vits.vendor).isEqualTo(ModelVendor.COQUI)
+        assertThat(vits.files.map { it.role }).containsExactly(FileRole.MODEL, FileRole.TOKENS).inOrder()
+        assertThat(vits.file(FileRole.MODEL)!!.sha256).isEqualTo("fcc22bb219ccda42df47546d0e9ea7b078b9c5a2ebf90ef7ec589c995ecbc736")
+        assertThat(vits.file(FileRole.MODEL)!!.bytes).isEqualTo(71_024_123L)
+        assertThat(vits.file(FileRole.TOKENS)!!.sha256).isEqualTo("4b4ba3385bf661b87735835de24365e25623d250be0621bc184dff050df4c2fb")
+        assertThat(vits.file(FileRole.TOKENS)!!.bytes).isEqualTo(1_410L)
+        assertThat(supertonic.vendor).isEqualTo(ModelVendor.SUPERTONE)
+        assertThat(supertonic.files.map { it.role }).containsExactly(
+            FileRole.DURATION, FileRole.TEXT_ENCODER, FileRole.VECTOR_ESTIMATOR, FileRole.VOCODER,
+            FileRole.UNICODE_INDEX, FileRole.TTS_CONFIG, FileRole.VOICE_STYLE,
+        ).inOrder()
+        assertThat(supertonic.file(FileRole.VECTOR_ESTIMATOR)!!.bytes).isEqualTo(256_534_781L)
+        assertThat(supertonic.files.map { it.fileName }).doesNotContain("int8")
+        assertThat(ModelCatalog.VOICE_ALL.map { it.id }.joinToString(" ")).doesNotContain("kokoro")
+        assertThat(ModelCatalog.VOICE_ALL.map { it.id }.joinToString(" ")).doesNotContain("piper")
         assertThat(ModelCatalog.VOICE.map { it.totalBytes }).isInOrder()
         assertThat(ModelCatalog.VOICE.map { it.recommendedRamMb }).isInOrder()
+        assertThat(vits.totalBytes).isLessThan(supertonic.totalBytes)
     }
 
     // ── Provisionamento dinâmico e suporte à API em Rust / Hust ───────────────────────────────────
@@ -455,6 +481,8 @@ class ModelCatalogTest {
             "granite-4.2-3b-litertlm", emptySet<ModelCapability>(),
             "nanbeige-4.2-3b-litertlm", emptySet<ModelCapability>(),
             "qwen3.5-4b-litertlm", emptySet<ModelCapability>(),
+            "vits-coqui-pt", emptySet<ModelCapability>(),
+            "supertonic-3", emptySet<ModelCapability>(),
         )
         // Visão só nos que a declaram: o OCR (ler texto) e os dois Gemma 4.
         val seeing = ModelCatalog.MODELS.filter { m -> m.capabilities.any { it in ModelCatalog.VISION_CAPABILITIES } }.map { it.id }
@@ -511,11 +539,11 @@ class ModelCatalogTest {
 
     @Test
     fun `changing a catalog pin requires bumping the embedded catalog version`() {
-        assertThat(ModelCatalog.EMBEDDED_VERSION).isEqualTo(2026102803)
-        assertThat(ModelCatalog.pinsFingerprint()).isEqualTo(PINS_FINGERPRINT_2026102803)
+        assertThat(ModelCatalog.EMBEDDED_VERSION).isEqualTo(2026102901)
+        assertThat(ModelCatalog.pinsFingerprint()).isEqualTo(PINS_FINGERPRINT_2026102901)
     }
 
     private companion object {
-        const val PINS_FINGERPRINT_2026102803 = "d73c549bf91248e8e1ed6737bb3252cf7313409f00e6bd0853b3d5b01ce6e4b1"
+        const val PINS_FINGERPRINT_2026102901 = "49f7380fc950ed2f88a1dc26a08dcfa68f8526fbc8f45c90f44adaa2b4ff9191"
     }
 }

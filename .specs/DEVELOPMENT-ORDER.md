@@ -519,6 +519,10 @@ Spec: `.specs/features/bancada/` (`spec.md` 68 requisitos, `design.md`, `tasks.m
 
 Spec: `.specs/features/model-params/` (lápis no card baixado; Raciocínio e, na Visão, só Gemma com visão). Não toma a vez de nada: depois da bancada, que já prevê `GenerationOptions`. Pendência explícita: parâmetros de OpenAI, Anthropic, Google e API Custom.
 
+## Bloco 13 — `sintese-fala` (aba Voz, síntese) — rascunho, fora da v1
+
+Spec: `.specs/features/sintese-fala/` (origem Local, Sistema, OpenAI, ElevenLabs, Google e Custom; Testar reproduz áudio). Rascunho para o Yan. Não toma a vez da v1 nem da bancada. Modelos locais iniciais: Supertonic 3 (D2) e VITS Coqui pt com o nome "português" (D1, 29/10; sem esperar a escuta).
+
 ---
 
 ## Resumo da fila (visão de uma linha)
@@ -529,7 +533,7 @@ feito: Q1..Q11 → SB → GT → NM → RSN → SKP → AGT fase 1 (faltam só m
 agora: (V1-10 fakes e V1-3 feitas) → upload interno → e2e MZ-T15/API-T14 → V1-4 → … → V1-8
 em paralelo: V1-9 (API-T13 na AWS) — fakes esperam o staging; o e2e real espera conta, applicationId e o upload
 depois: créditos (MZ-T5..T8, T12) e ligar API-T11/T12 · VC (visão) · TS (temas, spec a revisar) ·
-       bancada de modelos (régua do motor LiteRT-LM; Bloco 11) · parâmetros dos modelos locais (Bloco 12) · AGT fases 2/3 · Fala/Fluxos/Computador (sem spec; ideias em
+       bancada de modelos (régua do motor LiteRT-LM; Bloco 11) · parâmetros dos modelos locais (Bloco 12) · AGT fases 2/3 · síntese de fala (aba Voz, rascunho, Bloco 13) · Fluxos/Computador (sem spec; ideias em
        .specs/features/computer-terminal/ideias.md)
 ```
 
