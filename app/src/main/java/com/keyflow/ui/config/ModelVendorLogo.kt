@@ -33,6 +33,9 @@ internal fun ModelVendor.logo(): VendorLogo = when (this) {
     ModelVendor.IBM -> VendorLogo(KfIcons.LogoIbm, Color(0xFF0F62FE))
     ModelVendor.PADDLEPADDLE -> VendorLogo(KfIcons.LogoPaddlePaddle, Color(0xFF0062B0))
     ModelVendor.NANBEIGE -> VendorLogo(KfIcons.LogoNanbeige, Color(0xFF0B4A45))
+    // Monogramas nossos. Identificam quem fez o modelo e não são o logo oficial (OpenRAIL-M, cláusula 8).
+    ModelVendor.SUPERTONE -> VendorLogo(KfIcons.LogoSupertone, Color(0xFF1F2937))
+    ModelVendor.COQUI -> VendorLogo(KfIcons.LogoCoqui, Color(0xFFC2410C))
 }
 
 /** Contraste mínimo (WCAG 1.4.11, componentes gráficos) do logo contra o fundo do card. */

@@ -1,0 +1,9 @@
+# 2026-10-29 — Modelos de voz no catálogo (equipe/voz-modelos)
+
+FAL-T8, FAL-T10 e FAL-T2. O VITS Coqui pt (`csukuangfj/vits-coqui-pt-cv`, commit `9092b0c5e3717b6c61ae563cfd98dc86cc536b3a`) e o Supertonic 3 oficial fp32 (`Supertone/supertonic-3`, commit `3cadd1ee6394adea1bd021217a0e650ede09a323`) entram em `ModelCatalog.VOICE_ALL`, do mais leve ao mais pesado. Os SHA-256 foram recalculados baixando os arquivos neste dia; os ONNX grandes batem com o `lfs.oid` da API. O nome do arquivo no catálogo é plano: o downloader grava `File(dir, fileName)` e não cria a subpasta da URL.
+
+`validatedOnDevice = false` nos dois. O release não oferece uma voz que ainda não fala; no debug as duas entradas aparecem. O painel da aba (FAL-T4) é de outra frente. O diálogo da OpenRAIL-M ficou no `ModelList` compartilhado, então quem usar essa lista recebe o aceite. O `FalaPanel` não foi editado.
+
+O aceite é só do id `supertonic-3`: `voice-license-accepted.txt` no diretório do app, um id por linha. O texto é a LICENSE daquele commit, com o Attachment A, igual em `app/licenses/` e em `assets/licenses/`. A inferência MIT da Supertone não foi copiada para o app. O aviso do diálogo diz que a Supertone não endossa o KeyFlow. Os monogramas do card são desenhos nossos (cláusula 8).
+
+O frontend de caracteres ficou em `com.keyflow.speech.frontend` (a task dizia `speech.local`). Os testes JVM comparam os ids com o sherpa-onnx no `tokens.txt` real, sem o ONNX de 71 MB. Inteiro simples vira cardinal pt-BR porque o vocabulário não tem dígitos; "ONU" não é soletrada, porque as letras já estão no mapa. O motor (`:speech`, FAL-T3, FAL-T9, FAL-T11) não entrou nesta branch. O `scripts/verify-model-catalog.py` continua marcando OpenRAIL-M como revisar: o clique é que a aceita, e a origem do VITS aponta para o cartão BSD-3.

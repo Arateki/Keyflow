@@ -18,6 +18,8 @@ import com.keyflow.data.models.ModelDownloader
 import com.keyflow.data.models.ModelSpec
 import com.keyflow.data.models.ModelStore
 import com.keyflow.data.models.StartResult
+import com.keyflow.data.models.VoiceLicenseAcceptance
+import com.keyflow.data.models.VoiceLicenseGate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -57,6 +59,7 @@ class LocalModelsController(context: Context) : LocalModelActions {
     private val downloader = ModelDownloader.get(app)
     private val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val settings = SettingsRepository(app)
+    private val voiceLicenses = VoiceLicenseAcceptance(java.io.File(app.filesDir, "voice-license-accepted.txt"))
 
     /** RAM total do aparelho, para o aviso de peso (CAT-03). */
     val deviceRamMb: Long = ActivityManager.MemoryInfo()
@@ -90,7 +93,11 @@ class LocalModelsController(context: Context) : LocalModelActions {
     }.distinctUntilChanged().flowOn(Dispatchers.IO)
 
     override suspend fun download(spec: ModelSpec, allowMetered: Boolean): StartResult =
-        downloader.start(spec, allowMetered)
+        VoiceLicenseGate.begin(spec.id, voiceLicenses.isAccepted(spec.id)) { downloader.start(spec, allowMetered) }
+
+    override fun acceptVoiceLicense(modelId: String) {
+        voiceLicenses.accept(modelId)
+    }
 
     override fun prepare(modelId: String, language: String?) {
         io.launch {

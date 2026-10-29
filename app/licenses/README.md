@@ -15,6 +15,9 @@
 | Qwen2.5 1.5B Instruct (Alibaba) — modelo de texto baixado sob demanda | Apache-2.0 | `Apache-2.0_qwen2.5-1.5b.txt` |
 | Qwen3 4B Instruct-2507 (Alibaba) — modelo de texto baixado sob demanda | Apache-2.0 | `Apache-2.0_qwen3-4b-instruct-2507.txt` |
 | PaddleOCR PP-OCRv3/v5 em ONNX (PaddlePaddle; conversão de monkt) — modelo de OCR da Visão baixado sob demanda (só no debug até a prova num aparelho) | Apache-2.0 | `Apache-2.0_paddleocr.txt` |
+| Supertonic 3 (Supertone) — voz baixada sob demanda (só no debug até o motor falar) | OpenRAIL-M nos pesos (com Attachment A; aceite no download) e MIT na inferência, que não é redistribuída | `OpenRAIL-M_supertonic-3.txt`, `MIT_supertonic.txt` |
+| VITS Coqui pt (espelho `csukuangfj/vits-coqui-pt-cv`; origem `neongeckocom/tts-vits-cv-pt`) — voz baixada sob demanda (só no debug até o motor falar) | BSD-3-Clause nos pesos; o código Coqui (MPL-2.0) não entra | `BSD-3-Clause_vits-coqui-pt.txt` |
+| Monogramas Supertone e Coqui no card | Desenho próprio; não são os logos oficiais e não indicam endosso | — |
 | SmolLM2 1.7B Instruct (Hugging Face) — modelo de texto baixado sob demanda | Apache-2.0 | `Apache-2.0_smollm2-1.7b.txt` |
 | DeepSeek-R1-Distill-Qwen 1.5B (DeepSeek, derivado do Qwen2.5) — modelo de texto baixado sob demanda | MIT (e Apache-2.0 do Qwen2.5) | `MIT_deepseek-r1-distill-qwen-1.5b.txt` |
 | Logos dos fabricantes de modelo no card (NVIDIA, Hugging Face, DeepSeek, PaddlePaddle): paths de `nvidia.svg`, `huggingface.svg`, `deepseek.svg`, `paddlepaddle.svg` do Simple Icons | CC0 1.0 (os desenhos; as marcas são dos donos) | — (domínio público, sem arquivo) |
@@ -81,3 +84,12 @@ Conferido em 2026-10-27 (vision-capture, VC-T2a): `license: apache-2.0` no card 
 `7b02d0a30a07ba2b92ad1ff5a8941ae2c633de65`, repositório `gated: false`, sem arquivo LICENSE) e nos cards
 `PaddlePaddle/latin_PP-OCRv5_mobile_rec` e `PaddlePaddle/PP-OCRv5_mobile_det`; o `LICENSE` do `PaddlePaddle/PaddleOCR` no GitHub é
 Apache-2.0 (a API do GitHub devolve `Apache-2.0`). O arquivo `Apache-2.0_paddleocr.txt` traz esse texto.
+
+Conferido em 2026-10-29 (aba Voz, FAL-T8 e FAL-T10): o `LICENSE` do `Supertone/supertonic-3` no commit
+`3cadd1ee6394adea1bd021217a0e650ede09a323` é OpenRAIL-M, com Attachment A e a cláusula 8 (sem endosso). A cópia em
+`OpenRAIL-M_supertonic-3.txt` é esse arquivo, sem edição, e a mesma vai para `assets/licenses/` — o diálogo de download
+mostra o texto inteiro. O repositório `supertone-inc/supertonic` no GitHub é MIT ("Copyright (c) 2025 Supertone Inc.");
+o README do Hugging Face também cita 2026. O código de inferência não é copiado para o app; `MIT_supertonic.txt` só
+registra isso. O cartão de `csukuangfj/vits-coqui-pt-cv` (commit `9092b0c5e3717b6c61ae563cfd98dc86cc536b3a`) não declara
+licença; o de origem `neongeckocom/tts-vits-cv-pt` declara `bsd-3-clause`. `BSD-3-Clause_vits-coqui-pt.txt` cita essa
+origem e o texto BSD-3 com "Copyright (c) Coqui GmbH", sem ano inventado. Os monogramas do card são desenhos nossos.

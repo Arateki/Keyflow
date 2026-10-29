@@ -862,7 +862,6 @@ internal val TranslationsEn: Map<String, String> = mapOf(
     "O modelo falhou ao ler a imagem de teste." to "The model failed to read the test image.",
     "O motor de leitura foi interrompido — tente de novo." to "The reading engine was interrupted — try again.",
     "Este modelo ainda não pode ser testado aqui — o teste chega junto com a captura da tela." to "This model can't be tested here yet — the test arrives together with screen capture.",
-
     // Bancada de modelos (sub-abas do Testar)
     "1º trecho %s" to "1st chunk %s",
     "Ainda não há resultado deste teste para este modelo." to "There is no result for this test and this model yet.",
@@ -939,4 +938,14 @@ internal val TranslationsEn: Map<String, String> = mapOf(
     "roda em sequência todos os testes que o modelo suporta. Parar guarda o que já foi medido, e o aparelho quente ou com bateria baixa pausa a rodada." to "runs every test the model supports, one after another. Stop keeps what was already measured, and a hot device or a low battery pauses the run.",
     "Modelo da nuvem" to "Cloud model",
     "antes de qualquer chamada o app mostra quantas serão feitas e o teto de tokens, e só roda depois que você confirmar. No login por assinatura a rodada reduzida (2 casos por teste) vem primeiro e consome o limite do seu plano." to "before any call the app shows how many will be made and the token cap, and only runs after you confirm. With a subscription login the reduced run (2 cases per test) comes first and it uses your plan’s limit.",
+
+    // Aba Voz (catálogo local e o aceite da OpenRAIL-M do Supertonic)
+    "português" to "Portuguese",
+    "Uma voz em português, leve, no aparelho." to "A light Portuguese voice, on the device.",
+    "Várias línguas" to "Several languages",
+    "Voz em vários idiomas, inclusive português, no aparelho." to "A voice in several languages, including Portuguese, on the device.",
+    "31 idiomas" to "31 languages",
+    "Licença do Supertonic" to "Supertonic license",
+    "Os pesos deste modelo são OpenRAIL-M. O parágrafo 5 e o Attachment A valem para quem baixa ou usa o modelo. O código de inferência é MIT. A Supertone não endossa o KeyFlow." to "This model's weights are OpenRAIL-M. Paragraph 5 and Attachment A apply to anyone who downloads or uses the model. The inference code is MIT. Supertone does not endorse KeyFlow.",
+    "Li e aceito" to "I have read and I accept",
 )

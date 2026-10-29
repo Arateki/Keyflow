@@ -41,11 +41,14 @@ URL_RE = re.compile(r"^https://huggingface\.co/([^/\s]+/[^/\s]+)/resolve/([0-9a-
 # Licença proibida pela regra do produto: copyleft forte/fraco ou "não comercial".
 LICENCA_PROIBIDA = re.compile(r"(^|[-_])(a|l)?gpl|(^|[-_])nc([-_]|$)|non-?commercial|noncommercial", re.I)
 LICENCA_LIVRE = re.compile(r"^(apache-2\.0|mit|bsd-[0-9]-clause|isc|cc0-1\.0|cc-by-4\.0|cc-by-sa-4\.0|unlicense|zlib)$", re.I)
+# OpenRAIL-M (pesos do Supertonic) fica "revisar" de propósito: o produto só a aceita com o clique da
+# licença e do Attachment A no download (FPRV-03). Não entra em LICENCA_LIVRE.
 # Repositórios de conversão do sherpa-onnx não trazem licença no cartão: vale a do modelo original.
 ORIGEM_DA_LICENCA = {
     "csukuangfj/sherpa-onnx-whisper-base": "openai/whisper-base",
     "csukuangfj/sherpa-onnx-whisper-small": "openai/whisper-small",
     "csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8": "nvidia/parakeet-tdt-0.6b-v3",
+    "csukuangfj/vits-coqui-pt-cv": "neongeckocom/tts-vits-cv-pt",
 }
 
 

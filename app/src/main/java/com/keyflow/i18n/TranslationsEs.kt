@@ -862,7 +862,6 @@ internal val TranslationsEs: Map<String, String> = mapOf(
     "O modelo falhou ao ler a imagem de teste." to "El modelo falló al leer la imagen de prueba.",
     "O motor de leitura foi interrompido — tente de novo." to "El motor de lectura se interrumpió — inténtelo de nuevo.",
     "Este modelo ainda não pode ser testado aqui — o teste chega junto com a captura da tela." to "Este modelo aún no se puede probar aquí — la prueba llega junto con la captura de pantalla.",
-
     // Bancada de modelos (sub-abas do Testar)
     "1º trecho %s" to "1.º fragmento %s",
     "Ainda não há resultado deste teste para este modelo." to "Aún no hay resultado de esta prueba para este modelo.",
@@ -939,4 +938,14 @@ internal val TranslationsEs: Map<String, String> = mapOf(
     "roda em sequência todos os testes que o modelo suporta. Parar guarda o que já foi medido, e o aparelho quente ou com bateria baixa pausa a rodada." to "ejecuta en secuencia todas las pruebas que el modelo admite. Detener conserva lo ya medido, y un dispositivo caliente o con batería baja pausa la ronda.",
     "Modelo da nuvem" to "Modelo en la nube",
     "antes de qualquer chamada o app mostra quantas serão feitas e o teto de tokens, e só roda depois que você confirmar. No login por assinatura a rodada reduzida (2 casos por teste) vem primeiro e consome o limite do seu plano." to "antes de cualquier llamada la app muestra cuántas se harán y el tope de tokens, y solo ejecuta después de que confirmes. Con inicio de sesión de suscripción la ronda reducida (2 casos por prueba) va primero y consume el límite de tu plan.",
+
+    // Aba Voz (catálogo local e o aceite da OpenRAIL-M do Supertonic)
+    "português" to "portugués",
+    "Uma voz em português, leve, no aparelho." to "Una voz en portugués, ligera, en el dispositivo.",
+    "Várias línguas" to "Varios idiomas",
+    "Voz em vários idiomas, inclusive português, no aparelho." to "Una voz en varios idiomas, incluido el portugués, en el dispositivo.",
+    "31 idiomas" to "31 idiomas",
+    "Licença do Supertonic" to "Licencia del Supertonic",
+    "Os pesos deste modelo são OpenRAIL-M. O parágrafo 5 e o Attachment A valem para quem baixa ou usa o modelo. O código de inferência é MIT. A Supertone não endossa o KeyFlow." to "Los pesos de este modelo son OpenRAIL-M. El párrafo 5 y el Attachment A valen para quien descarga o usa el modelo. El código de inferencia es MIT. Supertone no respalda KeyFlow.",
+    "Li e aceito" to "Leí y acepto",
 )
