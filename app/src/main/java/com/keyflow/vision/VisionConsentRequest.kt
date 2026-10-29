@@ -19,5 +19,7 @@ internal class VisionConsentRequest<T> {
         current.second(value)
     }
 
+    fun isPending(id: Long): Boolean = pending?.first == id
+
     fun cancel() { pending = null }
 }

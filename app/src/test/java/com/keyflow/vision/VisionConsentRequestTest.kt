@@ -20,7 +20,9 @@ class VisionConsentRequestTest {
         val results = mutableListOf<String?>()
         val old = requests.begin { results += "antigo" }!!
         requests.cancel()
+        assertThat(requests.isPending(old)).isFalse()
         val current = requests.begin { results += it }!!
+        assertThat(requests.isPending(current)).isTrue()
         requests.complete(old, "token antigo")
         assertThat(results).isEmpty()
         requests.complete(current, "token novo")

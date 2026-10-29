@@ -22,6 +22,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -63,7 +64,9 @@ class OverlayServiceVisionTest {
             OverlayService.start(context, OverlayService.actionIntent(context, voiceAction))
             withTimeout(15_000) { OverlayService.visionFlowStateForTest.first { it == VisionFlowState.NONE } }
             instrumentation.waitForIdleSync()
-            device.pressBack()
+            assertTrue("cancelar a etapa deixou o diálogo de captura aberto", device.wait(
+                Until.gone(By.pkg("com.android.systemui").text(Pattern.compile("(?i).*start now.*|.*iniciar agora.*"))), 15_000,
+            ))
             assertEquals(ButtonState.PAUSED, KeyFlowController.buttonState.value)
         } finally {
             // Encerra o fluxo e descarta a gravação de teste pelo caminho público antes de parar o serviço.

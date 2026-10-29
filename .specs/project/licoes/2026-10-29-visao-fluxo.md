@@ -12,7 +12,9 @@ FGS de microfone e chama `getMediaProjection`; a sessão registra `MediaProjecti
 `VirtualDisplay`. Nenhum token fica salvo. Negação, revogação, cancelamento e erro convergem em `finish`: fecha display e
 reader, encerra projeção, remove o type adicional, limpa `cacheDir/vision/` e devolve a UI ao estado de voz preservado.
 `VisionConsentRequest` identifica os pedidos: uma resposta atrasada de um diálogo cancelado não pode autorizar a sessão
-seguinte. Os testes cobrem também resposta duplicada e pedido concorrente.
+seguinte. Cancelar também fecha a Activity de consentimento; uma Activity criada depois do cancelamento verifica o id
+antes de abrir qualquer diálogo. Os testes cobrem resposta duplicada, pedido concorrente e fechamento real da autorização
+pelos controles de voz, sem usar Voltar para esconder um diálogo abandonado.
 
 Fontes oficiais conferidas:
 [MediaProjection](https://developer.android.com/media/grow/media-projection) e
