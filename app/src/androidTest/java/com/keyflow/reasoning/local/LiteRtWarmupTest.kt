@@ -2,6 +2,7 @@ package com.keyflow.reasoning.local
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.keyflow.data.models.ModelCatalog
+import com.keyflow.reasoning.GenerationOptions
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
@@ -20,6 +21,23 @@ class LiteRtWarmupTest {
             assertNull(model.id, config.systemInstruction)
             assertEquals(false, config.thinkingConfig!!.enableThinking)
         }
+    }
+
+    @Test
+    fun opcoesSaoAplicadasSomenteNaConversaReal() {
+        val options = GenerationOptions(temperature = 0.0, topK = 13, topP = 0.5, seed = 42, maxOutputTokens = 64, thinking = true)
+        val config = LiteRtConfigs.conversation(null, options = options)
+        assertEquals(0.0, config.samplerConfig!!.temperature, 0.0)
+        assertEquals(13, config.samplerConfig!!.topK)
+        assertEquals(0.5, config.samplerConfig!!.topP, 0.0)
+        assertEquals(42, config.samplerConfig!!.seed)
+        assertEquals(64, config.maxOutputToken)
+        assertEquals(true, config.thinkingConfig!!.enableThinking)
+        assertEquals(-1, config.thinkingConfig!!.thinkingTokenBudget)
+        assertEquals(true, config.extraContext!!["enable_thinking"])
+        assertNull(LiteRtConfigs.conversation(null).samplerConfig)
+        assertNull(LiteRtConfigs.conversation(null).maxOutputToken)
+        assertNull(LiteRtConfigs.warmUp(false).samplerConfig)
     }
 
     @Test

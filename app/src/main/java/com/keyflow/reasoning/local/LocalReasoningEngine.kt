@@ -70,6 +70,7 @@ class LocalReasoningEngine internal constructor(
             death = recipient
             binder = active.asBinder()
             val callback = object : IReasoningCallback.Stub() {
+                override fun onMetrics(json: String) { if (!finished.get()) trySend(LocalMetricsCodec.decode(json)) }
                 override fun onDelta(text: String) { if (!finished.get()) trySend(ReasoningEvent.Delta(text)) }
                 override fun onBackendFallback(failed: String, reason: String) {
                     if (!finished.get()) loadReport.onBackendFallback(failed, reason)
@@ -86,7 +87,7 @@ class LocalReasoningEngine internal constructor(
                 }
             }
             binder.linkToDeath(recipient, 0)
-            active.generateRequest(model.toParcel(), request.system, request.user, imageFile?.absolutePath, requestId, callback)
+            active.generateRequest(model.toParcel(), request.system, request.user, imageFile?.absolutePath, requestId, request.options.toParcel(), callback)
             awaitClose { }
         } catch (e: CancellationException) { throw e
         } catch (_: OutOfMemoryError) { fail(ReasoningError.OOM, "sem memória para a imagem")

@@ -64,6 +64,7 @@ import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.ModelKind
 import com.keyflow.data.models.ModelStore
 import com.keyflow.reasoning.ReasoningEngines
+import com.keyflow.reasoning.custom.CustomReasoningEngine
 import com.keyflow.reasoning.local.LocalLlmSupport
 import com.keyflow.reasoning.local.LocalReasoningEngine
 import com.keyflow.auth.AuthController
@@ -247,6 +248,12 @@ class SetupActivity : ComponentActivity() {
             openAi = { OpenAiReasoningEngine(auth.authorization, auth.http, it) },
             anthropic = { AnthropicReasoningEngine(auth.authorization, auth.http, it) },
             google = { GoogleReasoningEngine(auth.authorization, auth.http, it) },
+            custom = { settings ->
+                CustomReasoningEngine(settings.reasoningCustomEndpoint, settings.reasoningCustomModel, auth.http) {
+                    if (settings.reasoningCustomHeaderName.isBlank() || settings.reasoningCustomHeaderValue.isBlank()) emptyMap()
+                    else mapOf(settings.reasoningCustomHeaderName to settings.reasoningCustomHeaderValue)
+                }
+            },
         )
     }
     private val visionEngines by lazy {

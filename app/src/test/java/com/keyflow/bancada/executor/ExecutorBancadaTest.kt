@@ -125,13 +125,24 @@ class ExecutorBancadaTest {
     }
 
     @Test
-    fun `tokens without engine metrics are estimated and marked as such`() = runTest {
+    fun `tokens locais sem metricas sao estimados e marcados`() = runTest {
         val r = executor(MotorFalso { _, _ -> resposta("1234567890123456", primeiro = 100, total = 1_100) }, local.copy(timeoutCasoMs = 10_000))
-            .executar(plano(Origem.ONLINE, casos(1)))
+            .executar(plano(Origem.LOCAL, casos(1)))
         val c = r.testes.single().casos.single()
         assertThat(c.tokensEstimados).isTrue()
         assertThat(c.tokensSaida).isEqualTo(4)
         assertThat(c.tokensPorSegundo).isWithin(1e-9).of(3.0) // (4-1) tokens em 1000 ms
+    }
+
+    @Test
+    fun `tokens online ausentes permanecem nulos e nao inventam taxa`() = runTest {
+        val r = executor(MotorFalso { _, _ -> resposta("1234567890123456", primeiro = 100, total = 1_100) }, local.copy(timeoutCasoMs = 10_000))
+            .executar(plano(Origem.ONLINE, casos(1)))
+        val c = r.testes.single().casos.single()
+        assertThat(c.tokensEntrada).isNull()
+        assertThat(c.tokensSaida).isNull()
+        assertThat(c.tokensPorSegundo).isNull()
+        assertThat(c.tokensEstimados).isFalse()
     }
 
     @Test

@@ -3,6 +3,8 @@ package com.keyflow.reasoning.local
 import com.google.common.truth.Truth.assertThat
 import com.keyflow.core.ComputeBackend
 import com.keyflow.reasoning.ReasoningRequest
+import com.keyflow.reasoning.GenerationOptions
+import com.keyflow.reasoning.ReasoningEvent
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
@@ -25,6 +27,8 @@ class ReasoningServiceCoreTest {
 
     private class Recorder : ReasoningServiceCore.Listener {
         val events = CopyOnWriteArrayList<String>()
+        val metrics = CopyOnWriteArrayList<ReasoningEvent.Metrics>()
+        override fun onMetrics(metrics: ReasoningEvent.Metrics) { this.metrics += metrics; events += "metrics" }
         private val finished = CountDownLatch(1)
         override fun onDelta(text: String) { events += "delta:$text" }
         override fun onDone() { events += "done"; finished.countDown() }
@@ -34,6 +38,9 @@ class ReasoningServiceCoreTest {
     }
 
     private class FakeBackend(private val log: MutableList<String>, val id: String, override val requiresModelFile: Boolean = true) : LlmBackend {
+        val requests = mutableListOf<ReasoningRequest>()
+        var measured: ReasoningEvent.Metrics? = null
+        override fun metrics() = measured
         var loadThrows: Throwable? = null
         var generateThrows: Throwable? = null
         var warmThrows: Throwable? = null
@@ -42,6 +49,7 @@ class ReasoningServiceCoreTest {
         @Volatile var cancelCalled = false
         override fun load(model: LlmModel) { log += "load:$id"; loadThrows?.let { throw it } }
         override fun generate(request: ReasoningRequest, onDelta: (String) -> Unit) {
+            requests += request
             log += "generate:$id"
             hooks.removeFirstOrNull()?.invoke()
             generateThrows?.let { throw it }
@@ -87,6 +95,19 @@ class ReasoningServiceCoreTest {
 
     private fun run(core: ReasoningServiceCore, model: LlmModel): Recorder =
         Recorder().also { core.generate(model, request, it); it.awaitFinish() }
+
+    @Test
+    fun `repassa opcoes ao backend e entrega suas metricas antes de terminar`() {
+        val backend = FakeBackend(log, "a")
+        val options = GenerationOptions(temperature = 0.0, seed = 42, maxOutputTokens = 32, thinking = true)
+        backend.measured = ReasoningEvent.Metrics(applied = options.requestedValues(), inputTokens = 8, outputTokens = 9, tokensPerSecond = 2.5)
+        val listener = Recorder()
+        core(mapOf("a" to backend)).generate(model("a"), request.copy(options = options), listener)
+        listener.awaitFinish()
+        assertThat(backend.requests.single().options).isEqualTo(options)
+        assertThat(listener.metrics.single()).isEqualTo(backend.measured)
+        assertThat(listener.events.takeLast(2)).containsExactly("metrics", "done").inOrder()
+    }
 
     @Test
     fun `streams the deltas in order and then done`() {

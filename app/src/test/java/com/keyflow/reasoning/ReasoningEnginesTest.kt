@@ -106,6 +106,19 @@ class ReasoningEnginesTest {
         assertThat(ready(engines(googleConnected = true).resolve(settings)).label).isEqualTo("google:gemini-2.0-flash")
     }
 
+    @Test
+    fun `custom usa a configuracao confirmada para a mesma requisicao`() {
+        val s = Settings(reasoningSource = ReasoningSource.CUSTOM, reasoningCustomEndpoint = "https://exemplo.test/v1/chat/completions",
+            reasoningCustomModel = "modelo", reasoningCustomHeaderName = "X-Teste", reasoningCustomHeaderValue = "segredo-falso")
+        var recebido: Settings? = null
+        val resolvedor = ReasoningEngines(isModelInstalled = { false }, hasOpenAiCredential = { false },
+            local = { FakeEngine("local") }, openAi = { FakeEngine("openai") }, custom = { recebido = it; FakeEngine("custom") })
+        assertThat(ready(resolvedor.resolve(s)).label).isEqualTo("custom")
+        assertThat(recebido).isSameInstanceAs(s)
+        assertThat(recebido!!.reasoningCustomEndpoint).isEqualTo("https://exemplo.test/v1/chat/completions")
+        assertThat(recebido!!.reasoningCustomHeaderValue).isEqualTo("segredo-falso")
+    }
+
     /** Uma origem nunca "vaza" para a outra: credencial da OpenAI não faz o local ficar pronto e vice-versa. */
     @Test
     fun `the chosen source decides, not what happens to be available`() {

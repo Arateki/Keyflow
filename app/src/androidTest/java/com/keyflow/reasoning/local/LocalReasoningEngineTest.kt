@@ -9,6 +9,7 @@ import com.keyflow.core.ComputeBackend
 import com.keyflow.reasoning.ReasoningError
 import com.keyflow.reasoning.ReasoningEvent
 import com.keyflow.reasoning.ReasoningRequest
+import com.keyflow.reasoning.GenerationOptions
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.toList
@@ -55,7 +56,17 @@ class LocalReasoningEngineTest {
         val events = engine().generate(ReasoningRequest(user = "um dois três")).all()
         assertEquals("um dois três", text(events))
         assertEquals(ReasoningEvent.Done, events.last())
-        assertTrue(events.dropLast(1).all { it is ReasoningEvent.Delta })
+        assertTrue(events.dropLast(1).all { it is ReasoningEvent.Delta || it is ReasoningEvent.Metrics })
+    }
+
+    @Test
+    fun opcoesERegistramMetricasAtravessamOProcesso() = runBlocking {
+        val options = GenerationOptions(temperature = 0.0, seed = 42)
+        val events = engine().generate(ReasoningRequest(user = "oi", options = options)).all()
+        val metrics = events.filterIsInstance<ReasoningEvent.Metrics>().single()
+        assertEquals(options.requestedNames().toSet(), metrics.ignored)
+        assertTrue((metrics.peakMemoryMb ?: 0) > 0)
+        assertEquals(ReasoningEvent.Done, events.last())
     }
 
     @Test
@@ -124,6 +135,7 @@ class LocalReasoningEngineTest {
         val events = java.util.concurrent.CopyOnWriteArrayList<String>()
         try {
             service.preload(echo.toParcel(), object : IReasoningCallback.Stub() {
+                override fun onMetrics(json: String) = Unit
                 override fun onDelta(text: String) { events += "delta" }
                 override fun onDone() { events += "pronto"; done.countDown() }
                 override fun onError(kind: Int, message: String) { events += "erro:$kind"; done.countDown() }
@@ -184,6 +196,7 @@ class LocalReasoningEngineTest {
         val events = java.util.concurrent.CopyOnWriteArrayList<String>()
         try {
             service.preload(echo.copy(backend = ComputeBackend.GPU).toParcel(), object : IReasoningCallback.Stub() {
+                override fun onMetrics(json: String) = Unit
                 override fun onDelta(text: String) { events += "delta" }
                 override fun onDone() { events += "pronto"; done.countDown() }
                 override fun onError(kind: Int, message: String) { events += "erro:$kind"; done.countDown() }

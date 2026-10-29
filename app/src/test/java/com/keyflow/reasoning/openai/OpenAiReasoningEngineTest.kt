@@ -55,7 +55,7 @@ class OpenAiReasoningEngineTest {
     }
 
     private fun events(request: ReasoningRequest = ReasoningRequest(user = "oi"), e: OpenAiReasoningEngine = engine()): List<ReasoningEvent> =
-        runBlocking { withTimeout(20_000) { e.generate(request).toList() } }
+        runBlocking { withTimeout(20_000) { e.generate(request).toList().filterNot { it is ReasoningEvent.Metrics } } }
 
     // ── fixtures SSE ──────────────────────────────────────────────────────────────────────
 

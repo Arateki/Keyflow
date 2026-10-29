@@ -2,6 +2,7 @@ package com.keyflow.reasoning.local;
 
 import com.keyflow.reasoning.local.IReasoningCallback;
 import com.keyflow.reasoning.local.LocalLlmConfig;
+import com.keyflow.reasoning.local.LocalGenOptions;
 
 /**
  * Fronteira do processo :reasoning (RRUN-02). oneway + callback: quem chama nunca bloqueia no binder.
@@ -9,13 +10,15 @@ import com.keyflow.reasoning.local.LocalLlmConfig;
  */
 interface IReasoningService {
     /** Carrega o modelo se preciso e gera; `system` pode ser nulo/vazio. Responde em fluxo pelo callback. */
-    oneway void generate(in LocalLlmConfig config, @nullable String system, String user, IReasoningCallback cb);
+    oneway void generate(in LocalLlmConfig config, @nullable String system, String user, in LocalGenOptions options, IReasoningCallback cb);
     /** Pré-carga explícita: onDone apenas depois do aquecimento; sem onDelta. */
     oneway void preload(in LocalLlmConfig config, IReasoningCallback cb);
     /** Interrompe a geração em curso; depois disso o serviço não fala mais com o callback dela. */
     oneway void cancel();
+    oneway void unload();
+    oneway void restart();
     /** Texto ou imagem em cache privado: os bytes não atravessam o binder. Cada pedido tem seu cancelamento. */
     oneway void generateRequest(in LocalLlmConfig config, @nullable String system, String user,
-        @nullable String imagePath, String requestId, IReasoningCallback cb);
+        @nullable String imagePath, String requestId, in LocalGenOptions options, IReasoningCallback cb);
     oneway void cancelRequest(String requestId);
 }
