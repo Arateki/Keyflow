@@ -3,6 +3,15 @@ package com.keyflow.overlay
 import com.keyflow.i18n.tr
 import com.keyflow.vision.VisionConsentActivity
 import com.keyflow.vision.VisionProjectionSession
+import com.keyflow.vision.VisionFlow
+import com.keyflow.vision.VisionFlowRequest
+import com.keyflow.vision.VisionFlowState
+import com.keyflow.vision.RegionSelectView
+import com.keyflow.vision.ScreenFrameGrabber
+import com.keyflow.vision.client.VisionCache
+import android.graphics.Bitmap
+import android.graphics.Rect
+import android.util.DisplayMetrics
 import android.media.projection.MediaProjection
 import android.Manifest
 import android.app.NotificationChannel
@@ -107,6 +116,28 @@ class OverlayService : Service() {
     private var overlayActive = false
     private var isForeground = false
     private var visionProjection: VisionProjectionSession? = null
+    private var visionMediaProjection: MediaProjection? = null
+    private var visionSelector: RegionSelectView? = null
+    private val visionGrabber = ScreenFrameGrabber()
+    private val visionFlow: VisionFlow<Bitmap> by lazy {
+        VisionFlow<Bitmap>(
+            pause = { coordinator.onIntent(GestureIntent.PAUSE) },
+            requestConsent = { requestVisionProjection({ projection ->
+                visionMediaProjection = projection
+                visionFlow.consentGranted()
+            }, {
+                Toast.makeText(this, tr("Captura de tela cancelada."), Toast.LENGTH_SHORT).show()
+                visionFlow.finish()
+            }) },
+            showSelector = ::showVisionSelector,
+            cleanup = ::cleanupVision,
+            onResult = { bitmap ->
+                // O consumidor de ações será ligado na VC-T7; a etapa devolve o bitmap ao callback.
+                visionCaptureResultForTest?.invoke(bitmap)
+                bitmap.recycle()
+            },
+        )
+    }
 
     // Settings em cache: o modo de gravação é lido a cada gesto (pode mudar na config).
     @Volatile
@@ -245,6 +276,49 @@ class OverlayService : Service() {
         session?.close()
     }
 
+    private fun showVisionSelector() {
+        if (!OverlayPermission.canDrawOverlays(this)) { visionFlow.finish(); return }
+        val selector = RegionSelectView(this, ::captureVisionRegion) { visionFlow.finish() }
+        val config = OverlayWindowConfig.forSdk()
+        val params = WindowManager.LayoutParams(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT,
+            config.type, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, PixelFormat.TRANSLUCENT)
+        try { windowManager.addView(selector, params); visionSelector = selector } catch (_: RuntimeException) { visionFlow.finish() }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun captureVisionRegion(rect: Rect) {
+        val selector = visionSelector ?: return
+        val projection = visionMediaProjection ?: return
+        visionFlow.selected()
+        selector.visibility = View.INVISIBLE
+        floatingButton?.visibility = View.INVISIBLE
+        // Espera dois quadros de composição, sem depender de prazo arbitrário.
+        selector.postOnAnimation { selector.postOnAnimation {
+            if (visionFlow.state != VisionFlowState.WORKING) return@postOnAnimation
+            val metrics = DisplayMetrics()
+            windowManager.defaultDisplay.getRealMetrics(metrics)
+            try {
+                visionGrabber.capture(projection, metrics.widthPixels, metrics.heightPixels, metrics.densityDpi, rect) { result ->
+                    result.fold({ visionFlow.captured(it) }, {
+                        Toast.makeText(this, tr("Não foi possível capturar esta tela."), Toast.LENGTH_SHORT).show()
+                        visionFlow.finish()
+                    })
+                }
+            } catch (_: Exception) { visionFlow.finish() }
+        } }
+    }
+
+    private fun cleanupVision() {
+        visionGrabber.close()
+        visionSelector?.let { runCatching { windowManager.removeViewImmediate(it) } }
+        visionSelector = null
+        visionMediaProjection = null
+        endVisionProjection()
+        VisionCache.clear(this)
+        floatingButton?.visibility = View.VISIBLE
+    }
+
     /**
      * Indicador/visualização/edição do parcial junto à orbe (PAR-04/05). Sem orbe (sessão só do
      * teclado), ancora no canto de cima — a notificação de gravação continua sendo o controle.
@@ -339,6 +413,7 @@ class OverlayService : Service() {
     }
 
     override fun onDestroy() {
+        if (visionFlow.state != VisionFlowState.NONE) visionFlow.finish()
         endVisionProjection()
         isRunningForUi = false
         foregroundPending = false
@@ -615,9 +690,7 @@ class OverlayService : Service() {
             // Só alterna se o teclado estiver realmente aberto na tela; senão não faz nada.
             OrbShortcutAction.TOGGLE_KEYBOARD ->
                 if (KeyFlowController.keyboardVisible.value) KeyFlowController.requestToggleKeyboardExpand()
-            // vision-capture: a opção já existe nos atalhos (VC-T1); o fluxo (pausa → consentimento → seleção) entra na
-            // VC-T4. Até lá o toque não faz nada.
-            OrbShortcutAction.VISION_MODE -> Unit
+            OrbShortcutAction.VISION_MODE -> visionFlow.start(VisionFlowRequest(coordinator.currentState()))
         }
     }
 
@@ -1009,6 +1082,8 @@ class OverlayService : Service() {
     }
 
     companion object {
+        internal var visionCaptureResultForTest: ((Bitmap) -> Unit)? = null
+
         private const val NOTIFICATION_CHANNEL_ID = "keyflow_overlay"
         private const val NOTIFICATION_ID = 1001
 

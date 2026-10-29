@@ -1,5 +1,6 @@
 package com.keyflow.vision
 
+import android.graphics.Canvas
 import android.graphics.Bitmap
 import android.graphics.PixelFormat
 import android.graphics.Rect
@@ -31,7 +32,8 @@ class ScreenFrameGrabber {
                     val padded = Bitmap.createBitmap(paddedWidth, height, Bitmap.Config.ARGB_8888)
                     try {
                         padded.copyPixelsFromBuffer(plane.buffer)
-                        val crop = Bitmap.createBitmap(padded, rect.left, rect.top, rect.width(), rect.height())
+                        val crop = Bitmap.createBitmap(rect.width(), rect.height(), Bitmap.Config.ARGB_8888)
+                        Canvas(crop).drawBitmap(padded, -rect.left.toFloat(), -rect.top.toFloat(), null)
                         val black = (0 until 16).all { n ->
                             val color = crop.getPixel((n % 4) * (crop.width - 1) / 3, (n / 4) * (crop.height - 1) / 3)
                             color and 0x00ffffff == 0
