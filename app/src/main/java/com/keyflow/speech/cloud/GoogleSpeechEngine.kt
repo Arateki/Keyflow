@@ -21,7 +21,7 @@ class GoogleSpeechEngine(
     private val baseUrl: String = "https://texttospeech.googleapis.com",
     nowMs: () -> Long = { System.nanoTime() / 1_000_000 },
 ) : SpeechEngine {
-    private val cloud = CloudSpeech(http, "Google", nowMs)
+    private val cloud = CloudSpeech(http, "Google", nowMs, mapError = ::keyProblem)
 
     override fun speak(request: SpeechRequest): Flow<SpeechEvent> = cloud.run(
         build = {
@@ -51,6 +51,20 @@ class GoogleSpeechEngine(
     )
 
     companion object {
+        /**
+         * Chave inválida volta como 400 `INVALID_ARGUMENT`/`API_KEY_INVALID`, e a chave do Gemini sem a Cloud Text-to-Speech como 403 `SERVICE_DISABLED`
+         * (ou `API_KEY_SERVICE_BLOCKED`): nos dois casos a saída é a mesma, habilitar a API nessa chave.
+         */
+        internal fun keyProblem(status: Int, body: String): SpeechEvent.Error? {
+            val invalid = status == 400 && (body.contains("API_KEY_INVALID") || body.contains("API key not valid"))
+            val disabled = status == 403 && (body.contains("SERVICE_DISABLED") || body.contains("API_KEY_SERVICE_BLOCKED"))
+            if (!invalid && !disabled) return null
+            return SpeechEvent.Error(
+                com.keyflow.speech.SpeechError.UNAUTHORIZED,
+                com.keyflow.i18n.tr("A chave do Google não vale para a Cloud Text-to-Speech. Habilite essa API na chave (Google Cloud) e tente de novo."),
+            )
+        }
+
         private const val RATE = 24_000
 
         /** `pt-BR-Neural2-A` → `pt-BR`. Voz sem prefixo de idioma (as Journey antigas) cai em `en-US`. */

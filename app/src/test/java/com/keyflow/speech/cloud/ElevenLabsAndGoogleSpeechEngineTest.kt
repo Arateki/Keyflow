@@ -88,4 +88,40 @@ class ElevenLabsAndGoogleSpeechEngineTest {
         assertThat(GoogleSpeechEngine.languageOf("en-US-Journey-F")).isEqualTo("en-US")
         assertThat(GoogleSpeechEngine.languageOf("Journey-F")).isEqualTo("en-US")
     }
+
+    @Test
+    fun `elevenlabs text above 5000 characters is refused before any request`() {
+        val e = ElevenLabsSpeechEngine(OkHttpClient(), { "k" }, voiceId, "m", base).collect("a".repeat(5001)).single() as SpeechEvent.Error
+        assertThat(e.message).contains("5000")
+        assertThat(server.requestCount).isEqualTo(0)
+    }
+
+    @Test
+    fun `google invalid key and disabled service say to enable the text-to-speech api`() {
+        server.enqueue(MockResponse().setResponseCode(400).setBody("""{"error":{"code":400,"message":"API key not valid.","status":"INVALID_ARGUMENT","details":[{"reason":"API_KEY_INVALID"}]}}"""))
+        server.enqueue(MockResponse().setResponseCode(403).setBody("""{"error":{"code":403,"status":"PERMISSION_DENIED","details":[{"reason":"SERVICE_DISABLED"}]}}"""))
+        val engine = GoogleSpeechEngine(OkHttpClient(), { "AIza-falso" }, "pt-BR-Neural2-A", base)
+        repeat(2) {
+            val e = engine.collect().single() as SpeechEvent.Error
+            assertThat(e.kind).isEqualTo(SpeechError.UNAUTHORIZED)
+            assertThat(e.message).contains("Cloud Text-to-Speech")
+            assertThat(e.message).doesNotContain("HTTP")
+        }
+    }
+
+    @Test
+    fun `custom headers are not sent to a redirect target`() {
+        val other = MockWebServer().also { it.start() }
+        try {
+            server.enqueue(MockResponse().setResponseCode(302).setHeader("Location", other.url("/x").toString()))
+            val engine = CustomSpeechEngine(
+                OkHttpClient(), server.url("/v1/audio/speech").toString(), "Authorization", "Bearer falso", "m", "v",
+                com.keyflow.speech.SpeechFormat.WAV, CompressedAudioDecoder.Unsupported,
+            )
+            assertThat((engine.collect().single() as SpeechEvent.Error).kind).isEqualTo(SpeechError.ENGINE)
+            assertThat(other.requestCount).isEqualTo(0)
+        } finally {
+            other.shutdown()
+        }
+    }
 }

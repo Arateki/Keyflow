@@ -50,6 +50,7 @@ class OpenAiSpeechEngine(
         build = {
             val key = apiKey()?.trim().orEmpty()
             if (key.isEmpty()) return@run missingKey()
+            tooLong("OpenAI", request.text, MAX_CHARS)?.let { return@run it }
             try {
                 BuiltRequest.Ready(
                     Request.Builder().url("$baseUrl/v1/audio/speech")
@@ -63,6 +64,11 @@ class OpenAiSpeechEngine(
         },
         body = AudioBody.RawPcm(OPENAI_PCM_RATE),
     )
+
+    companion object {
+        /** Limite de `input` da doc do `audio/speech`. */
+        const val MAX_CHARS = 4096
+    }
 }
 
 internal val JSON = "application/json".toMediaType()

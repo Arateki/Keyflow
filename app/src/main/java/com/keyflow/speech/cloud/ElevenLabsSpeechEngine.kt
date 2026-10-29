@@ -28,6 +28,7 @@ class ElevenLabsSpeechEngine(
         build = {
             val key = apiKey()?.trim().orEmpty()
             if (key.isEmpty()) return@run missingKey()
+            tooLong("ElevenLabs", request.text, MAX_CHARS)?.let { return@run it }
             val body = JSONObject().apply {
                 put("text", request.text)
                 put("model_id", model)
@@ -49,6 +50,10 @@ class ElevenLabsSpeechEngine(
 
     companion object {
         private const val RATE = 24_000
+        const val MAX_CHARS = 5000
+
+        /** A tela avisa quando a velocidade passa disso (o seletor tem 1,25x e 1,5x). */
+        const val MAX_SPEED = 1.2f
 
         /** O `voice_id` da ElevenLabs: 20 letras e dígitos. Um nome ("Rachel", valor antigo) não serve de id. */
         fun isVoiceId(value: String): Boolean = value.length == 20 && value.all { it.isLetterOrDigit() && it.code < 128 }

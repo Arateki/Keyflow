@@ -53,8 +53,13 @@ internal class CloudSpeech(
     http: OkHttpClient,
     private val service: String,
     private val nowMs: () -> Long,
+    // Um provedor reconhece erros próprios (ex.: chave sem a API habilitada) antes do mapa genérico de status.
+    private val mapError: (status: Int, body: String) -> SpeechEvent.Error? = { _, _ -> null },
 ) {
+    // Sem seguir redirecionamento: a chave vai em cabeçalho e não pode ir parar em outro host.
     private val client: OkHttpClient = http.newBuilder()
+        .followRedirects(false)
+        .followSslRedirects(false)
         .dns(Ipv4FirstDns())
         .callTimeout(0, TimeUnit.MILLISECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
@@ -155,6 +160,7 @@ internal class CloudSpeech(
     private fun httpError(r: Response): SpeechEvent.Error {
         // O corpo só serve para o código curto de HttpErrorMessage (e o detalhe no debug); nunca vai inteiro para a tela.
         val raw = runCatching { r.body?.string().orEmpty() }.getOrDefault("")
+        mapError(r.code, raw)?.let { return it }
         return when (r.code) {
             401, 403 -> SpeechEvent.Error(SpeechError.UNAUTHORIZED, tr("%s recusou a chave ou as credenciais.", service))
             429 -> SpeechEvent.Error(SpeechError.RATE_LIMIT, tr("Limite de uso de %s atingido. Tente mais tarde.", service))
@@ -175,3 +181,8 @@ internal fun badCredentials(): BuiltRequest.Failed =
 
 /** Limita a velocidade ao intervalo que a API aceita, sem virar erro. */
 internal fun Float.clampTo(min: Float, max: Float): Float = coerceIn(min, max)
+
+/** O texto passa do limite do provedor: erro claro antes de sair, em vez de um "HTTP 400" genérico. */
+internal fun tooLong(service: String, text: String, max: Int): BuiltRequest.Failed? =
+    if (text.length <= max) null
+    else BuiltRequest.Failed(SpeechEvent.Error(SpeechError.ENGINE, tr("O texto é longo demais para %s (máximo de %d caracteres).", service, max)))

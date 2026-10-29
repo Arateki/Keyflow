@@ -106,4 +106,26 @@ class OpenAiSpeechEngineTest {
         assertThat(SpeechFormat.PCM.wire).isEqualTo("pcm")
         assertThat(com.keyflow.speech.SpeechEngines.OPENAI_MODEL).isEqualTo("gpt-4o-mini-tts")
     }
+
+    @Test
+    fun `text above the openai limit is refused before any request`() {
+        val e = engine().collect("a".repeat(4097)).single() as SpeechEvent.Error
+        assertThat(e.kind).isEqualTo(SpeechError.ENGINE)
+        assertThat(e.message).contains("4096")
+        assertThat(server.requestCount).isEqualTo(0)
+    }
+
+    @Test
+    fun `a redirect is not followed and the key never reaches another host`() {
+        val other = MockWebServer().also { it.start() }
+        try {
+            other.enqueue(pcmResponse(100))
+            server.enqueue(MockResponse().setResponseCode(307).setHeader("Location", other.url("/steal").toString()))
+            val e = engine().collect().single() as SpeechEvent.Error
+            assertThat(e.kind).isEqualTo(SpeechError.ENGINE)
+            assertThat(other.requestCount).isEqualTo(0)
+        } finally {
+            other.shutdown()
+        }
+    }
 }
