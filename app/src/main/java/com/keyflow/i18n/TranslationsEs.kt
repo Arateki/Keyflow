@@ -954,4 +954,5 @@ internal val TranslationsEs: Map<String, String> = mapOf(
     "Licença do Supertonic" to "Licencia del Supertonic",
     "Os pesos deste modelo são OpenRAIL-M. O parágrafo 5 e o Attachment A valem para quem baixa ou usa o modelo. O código de inferência é MIT. A Supertone não endossa o KeyFlow." to "Los pesos de este modelo son OpenRAIL-M. El párrafo 5 y el Attachment A valen para quien descarga o usa el modelo. El código de inferencia es MIT. Supertone no respalda KeyFlow.",
     "Li e aceito" to "Leí y acepto",
+    "A captura não recebeu uma imagem da tela. Tente novamente." to "La captura no recibió una imagen de la pantalla. Inténtelo de nuevo.",
 )

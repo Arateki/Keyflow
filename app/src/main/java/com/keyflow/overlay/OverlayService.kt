@@ -114,6 +114,7 @@ class OverlayService : Service() {
     // Ciclo de vida desacoplado (Fase 1): a orbe mantém o serviço persistente; o teclado o sobe sob
     // demanda (só durante a gravação). `overlayActive` = há orbe; `isForeground` = já em primeiro plano.
     private var overlayActive = false
+    private var destroying = false
     private var isForeground = false
     private var visionProjection: VisionProjectionSession? = null
     private var visionMediaProjection: MediaProjection? = null
@@ -170,6 +171,7 @@ class OverlayService : Service() {
         observeSettings()
         observeControllerState()
         observeOverlayPosition()
+        instanceForVisionTest = this
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -273,8 +275,9 @@ class OverlayService : Service() {
                 try { onGranted(session.start(data)) } catch (error: Exception) {
                     android.util.Log.w("KeyFlowVision", "Falha ao iniciar a projeção", error)
                     visionProjection = null
-                    session.close()
-                    onAbort()
+                    try { session.close(restoreForeground = !destroying) } catch (closeError: Exception) {
+                        android.util.Log.w("KeyFlowVision", "Falha ao encerrar a projeção", closeError)
+                    } finally { onAbort() }
                 }
             }
         }
@@ -285,7 +288,7 @@ class OverlayService : Service() {
         VisionConsentActivity.cancel()
         val session = visionProjection
         visionProjection = null
-        session?.close()
+        try { visionSessionCloseForTest?.invoke(!destroying) } finally { session?.close(restoreForeground = !destroying) }
     }
 
     @Suppress("DEPRECATION")
@@ -348,17 +351,26 @@ class OverlayService : Service() {
     }
 
     /** Uma mudança de coordenadas exige nova autorização; o token anterior já foi descartado. */
-    private fun showVisionRestart() {
-        val dialog = android.app.AlertDialog.Builder(this)
-            .setMessage(tr("A tela mudou de tamanho. Deseja recomeçar a captura?"))
-            .setNegativeButton(tr("Cancelar"), null)
-            .setPositiveButton(tr("Recomeçar")) { _, _ ->
-                visionFlow.start(VisionFlowRequest(coordinator.currentState()))
-            }.create()
-        dialog.window?.setType(OverlayWindowConfig.forSdk().type)
-        visionRestartDialog = dialog
-        dialog.setOnDismissListener { if (visionRestartDialog === dialog) visionRestartDialog = null }
-        dialog.show()
+    internal fun showVisionRestart() {
+        if (destroying || !OverlayPermission.canDrawOverlays(this)) { visionFlow.finish(); return }
+        try {
+            val dialog = android.app.AlertDialog.Builder(this)
+                .setMessage(tr("A tela mudou de tamanho. Deseja recomeçar a captura?"))
+                .setNegativeButton(tr("Cancelar"), null)
+                .setPositiveButton(tr("Recomeçar")) { _, _ ->
+                    visionFlow.start(VisionFlowRequest(coordinator.currentState()))
+                }.create()
+            dialog.window?.setType(OverlayWindowConfig.forSdk().type)
+            visionRestartDialog = dialog
+            dialog.setOnDismissListener { if (visionRestartDialog === dialog) visionRestartDialog = null }
+            val show = visionRestartShowForTest
+            if (show != null) show(dialog) else dialog.show()
+        } catch (error: RuntimeException) {
+            android.util.Log.w("KeyFlowVision", "Não foi possível oferecer o recomeço da captura", error)
+            runCatching { visionRestartDialog?.dismiss() }
+            visionRestartDialog = null
+            visionFlow.finish()
+        }
     }
 
     @Suppress("DEPRECATION")
@@ -367,10 +379,7 @@ class OverlayService : Service() {
         val projection = visionMediaProjection ?: return
         visionFlow.selected()
         selector.visibility = View.INVISIBLE
-        listOfNotNull(floatingButton, errorBanner, cancelBanner, limitBanner, dragArrowsView).forEach {
-            visionHiddenViews[it] = it.visibility
-            it.visibility = View.INVISIBLE
-        }
+        hideVisionViews(listOfNotNull(floatingButton, errorBanner, cancelBanner, limitBanner, dragArrowsView))
         partialOverlay?.remove()
         // Espera dois quadros de composição, sem depender de prazo arbitrário.
         selector.postOnAnimation { selector.postOnAnimation {
@@ -379,8 +388,10 @@ class OverlayService : Service() {
             windowManager.defaultDisplay.getRealMetrics(metrics)
             try {
                 visionGrabber.capture(projection, metrics.widthPixels, metrics.heightPixels, metrics.densityDpi, rect) { result ->
-                    result.fold({ if (visionFlow.state == VisionFlowState.WORKING) visionFlow.captured(it) else it.recycle() }, {
-                        Toast.makeText(this, tr("Não foi possível capturar esta tela."), Toast.LENGTH_SHORT).show()
+                    result.fold({ if (visionFlow.state == VisionFlowState.WORKING) visionFlow.captured(it) else it.recycle() }, { error ->
+                        val message = if (error is java.util.concurrent.TimeoutException) tr("A captura não recebeu uma imagem da tela. Tente novamente.")
+                            else tr("Não foi possível capturar esta tela.")
+                        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
                         visionFlow.finish()
                     })
                 }
@@ -388,20 +399,42 @@ class OverlayService : Service() {
         } }
     }
 
-    private fun cleanupVision() {
-        visionDisplayListener?.let { getSystemService(android.hardware.display.DisplayManager::class.java).unregisterDisplayListener(it) }
-        visionDisplayListener = null
-        visionRestartDialog?.dismiss()
-        visionRestartDialog = null
-        visionGrabber.close()
-        visionSelector?.let { runCatching { windowManager.removeViewImmediate(it) } }
-        visionSelector = null
-        visionMediaProjection = null
-        endVisionProjection()
-        VisionCache.clear(this)
-        visionHiddenViews.forEach { (view, visibility) -> view.visibility = visibility }
-        visionHiddenViews.clear()
-        refreshPartialUi()
+    internal fun hideVisionViews(views: List<View>) {
+        views.forEach {
+            visionHiddenViews[it] = it.visibility
+            it.visibility = View.INVISIBLE
+        }
+    }
+
+    internal fun cleanupVision() {
+        try {
+            releaseVisionResource {
+                visionDisplayListener?.let { getSystemService(android.hardware.display.DisplayManager::class.java).unregisterDisplayListener(it) }
+            }
+            visionDisplayListener = null
+            releaseVisionResource { visionRestartDialog?.dismiss() }
+            visionRestartDialog = null
+            releaseVisionResource { visionGrabber.close() }
+            releaseVisionResource { visionSelector?.let { windowManager.removeViewImmediate(it) } }
+            visionSelector = null
+            visionMediaProjection = null
+        } finally {
+            try { endVisionProjection() } catch (error: Exception) {
+                android.util.Log.w("KeyFlowVision", "Falha ao encerrar a projeção", error)
+            } finally {
+                try { releaseVisionResource { VisionCache.clear(this) } } finally {
+                    visionHiddenViews.forEach { (view, visibility) -> view.visibility = visibility }
+                    visionHiddenViews.clear()
+                    if (!destroying) releaseVisionResource { refreshPartialUi() }
+                }
+            }
+        }
+    }
+
+    private inline fun releaseVisionResource(action: () -> Unit) {
+        try { action() } catch (error: Exception) {
+            android.util.Log.w("KeyFlowVision", "Falha ao liberar recurso da captura", error)
+        }
     }
 
     /**
@@ -503,10 +536,14 @@ class OverlayService : Service() {
     }
 
     override fun onDestroy() {
+        destroying = true
+        instanceForVisionTest = null
         if (visionFlow.state != VisionFlowState.NONE) visionFlow.finish()
         visionRestartDialog?.dismiss()
         visionRestartDialog = null
-        endVisionProjection()
+        try { endVisionProjection() } catch (error: Exception) {
+            android.util.Log.w("KeyFlowVision", "Falha ao encerrar a projeção na destruição", error)
+        }
         isRunningForUi = false
         foregroundPending = false
         stopRequested = false
@@ -1176,6 +1213,9 @@ class OverlayService : Service() {
     }
 
     companion object {
+        internal var instanceForVisionTest: OverlayService? = null
+        internal var visionRestartShowForTest: ((android.app.AlertDialog) -> Unit)? = null
+        internal var visionSessionCloseForTest: ((Boolean) -> Unit)? = null
         internal val visionFlowStateForTest = kotlinx.coroutines.flow.MutableStateFlow(VisionFlowState.NONE)
         internal var visionCaptureResultForTest: ((Bitmap) -> Unit)? = null
         internal var visionProjectionStartedForTest: ((MediaProjection) -> Unit)? = null

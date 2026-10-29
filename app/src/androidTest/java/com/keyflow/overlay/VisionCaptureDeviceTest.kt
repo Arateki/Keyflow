@@ -116,6 +116,19 @@ class VisionCaptureDeviceTest {
             instrumentation.waitForIdleSync()
             assertEquals(listOf(combined, microphone), types)
             device.setOrientationNatural()
+            // Destruir uma sessão ativa libera a projeção sem promover novamente o serviço.
+            types.clear()
+            requestAndAccept()
+            val destroyed = CountDownLatch(1)
+            OverlayService.visionSessionCloseForTest = { restore ->
+                assertTrue("startForeground solicitado durante onDestroy", !restore)
+                destroyed.countDown()
+            }
+            OverlayService.stop(context)
+            assertTrue("sessão não foi fechada na destruição", destroyed.await(10, TimeUnit.SECONDS))
+            instrumentation.waitForIdleSync()
+            assertEquals(listOf(combined), types)
+            OverlayService.visionSessionCloseForTest = null
             instrumentation.sendStatus(0, Bundle().apply {
                 putString("stream", "\nVisão: bitmap ${w}x${h}; handle +40,+60; FGS $combined → $microphone; novas autorizações, revogação e rotação confirmadas.\n")
             })
@@ -131,6 +144,7 @@ class VisionCaptureDeviceTest {
         } finally {
             device.setOrientationNatural()
             device.unfreezeRotation()
+            OverlayService.visionSessionCloseForTest = null
             OverlayService.visionCaptureResultForTest = null
             OverlayService.visionProjectionStartedForTest = null
             OverlayService.visionProjectionTypeForTest = null

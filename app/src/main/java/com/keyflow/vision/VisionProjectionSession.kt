@@ -55,17 +55,20 @@ class VisionProjectionSession(
     }
 
     /** Idempotente; a revogação também é encerrada pelo mesmo caminho. */
-    fun close() {
+    fun close(restoreForeground: Boolean = true) {
         val current = projection
         projection = null
-        callback?.let { current?.unregisterCallback(it) }
+        val previousCallback = callback
         callback = null
-        current?.stop()
-        if (promoted) {
-            promoted = false
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                service.startForeground(notificationId, notification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
-                observeType(service.foregroundServiceType)
+        try {
+            try { previousCallback?.let { current?.unregisterCallback(it) } } finally { current?.stop() }
+        } finally {
+            if (promoted) {
+                promoted = false
+                if (restoreForeground && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    service.startForeground(notificationId, notification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+                    observeType(service.foregroundServiceType)
+                }
             }
         }
     }
