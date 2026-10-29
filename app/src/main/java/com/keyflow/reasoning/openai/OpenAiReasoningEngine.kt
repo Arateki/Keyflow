@@ -261,7 +261,7 @@ class OpenAiReasoningEngine(
         add(GenerationOptions.TOP_P)
         add(GenerationOptions.MAX_OUTPUT_TOKENS)
         // Effort é documentado apenas para modelos de raciocínio, com suporte a "none" variável por modelo.
-        if (options.thinking == true && (model.startsWith("gpt-5") || model.startsWith("gpt-6") || model.startsWith("o"))) add(GenerationOptions.THINKING)
+        if (options.thinking == true && (model.startsWith("gpt-5") || model.startsWith("gpt-6") || model.matches(Regex("^o[1-9](?:[-.].*)?$")))) add(GenerationOptions.THINKING)
         if (options.thinking == false && (model.startsWith("gpt-5.1") || model.startsWith("gpt-5.2") || model.startsWith("gpt-5.4") || model.startsWith("gpt-5.5") || model.startsWith("gpt-6-sol") || model.startsWith("gpt-6-luna"))) add(GenerationOptions.THINKING)
     }
 

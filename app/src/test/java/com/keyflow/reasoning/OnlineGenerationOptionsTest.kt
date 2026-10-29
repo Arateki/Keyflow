@@ -49,6 +49,14 @@ class OnlineGenerationOptionsTest {
         assertThat(m.outputTokens).isEqualTo(7)
     }
 
+    @Test fun `openai nao confunde outro modelo com a serie o de raciocinio`() {
+        val o = GenerationOptions(thinking = true)
+        val (body, m) = run(OpenAiReasoningEngine(auth(true), http, "outro-modelo", base), o,
+            "event: response.completed\ndata: {\"type\":\"response.completed\"}\n\n")
+        assertThat(body.has("reasoning")).isFalse()
+        assertThat(m.ignored).containsExactly("thinking")
+    }
+
     @Test fun `openai plano ignora opcoes e usage ausente fica nulo`() {
         val o = GenerationOptions(temperature = 0.0, maxOutputTokens = 90)
         val (body, m) = run(OpenAiReasoningEngine(auth(false), http, "modelo", base), o,
