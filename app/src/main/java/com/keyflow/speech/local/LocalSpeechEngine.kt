@@ -17,6 +17,7 @@ import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.InternalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -28,8 +29,20 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
+
+// A reserva atômica do resultado evita a janela entre isActive e resume em callbacks Binder concorrentes.
+// Opt-in isolado: o projeto fixa kotlinx.coroutines 1.8.1 e testa morte, cancelamento e terminais atrasados.
+@OptIn(InternalCoroutinesApi::class)
+private fun <T> CancellableContinuation<T>.completeOnce(value: T) {
+    val token = tryResume(value) ?: return
+    completeResume(token)
+}
+
+@OptIn(InternalCoroutinesApi::class)
+private fun <T> CancellableContinuation<T>.failOnce(error: Throwable) {
+    val token = tryResumeWithException(error) ?: return
+    completeResume(token)
+}
 
 /**
  * O que o processo principal pede ao `:speech`. Implementação de teste não abre binder. Arquivo ausente não chega aqui:
@@ -129,12 +142,12 @@ class AidlSpeechEndpoint(
 
                     override fun onDone(peakRssKb: Long) {
                         connection.untrack(cont)
-                        if (cont.isActive) cont.resume(SpeechOutcome.Ok(peakRssKb))
+                        cont.completeOnce(SpeechOutcome.Ok(peakRssKb))
                     }
 
                     override fun onError(kind: Int, message: String) {
                         connection.untrack(cont)
-                        if (cont.isActive) cont.resume(SpeechOutcome.Err(kind, message))
+                        cont.completeOnce(SpeechOutcome.Err(kind, message))
                     }
                 }
                 // O cancelamento já ativo dispara o handler aqui, antes do speak. Sem o isActive, o
@@ -159,8 +172,8 @@ class AidlSpeechEndpoint(
                         binder = e
                     }
                 }
-                if (binder != null && cont.isActive) {
-                    cont.resume(SpeechOutcome.Err(SpeechProtocol.ENGINE, binder?.message ?: "binder"))
+                if (binder != null) {
+                    cont.completeOnce(SpeechOutcome.Err(SpeechProtocol.ENGINE, binder?.message ?: "binder"))
                 }
             }
         } finally {
@@ -184,17 +197,17 @@ class SpeechConnection(
     private var service: ISpeechService? = null
     private var serviceConnection: ServiceConnection? = null
     private var death: Pair<IBinder, IBinder.DeathRecipient>? = null
-    private var active: CancellableContinuation<SpeechOutcome>? = null
+    private val active = linkedSetOf<CancellableContinuation<SpeechOutcome>>()
     private var uses = 0
     private var lingerJob: Job? = null
 
-    /** A fala em curso. A morte do `:speech` retoma esta continuação; sem isso o Testar não termina. */
+    /** Todas as falas em curso: nenhuma pode ficar pendurada se a conexão morrer. */
     internal fun track(cont: CancellableContinuation<SpeechOutcome>) {
-        synchronized(lock) { active = cont }
+        synchronized(lock) { active += cont }
     }
 
     internal fun untrack(cont: CancellableContinuation<SpeechOutcome>) {
-        synchronized(lock) { if (active === cont) active = null }
+        synchronized(lock) { active -= cont }
     }
 
     suspend fun acquire(): ISpeechService {
@@ -220,7 +233,7 @@ class SpeechConnection(
                 lingerJob?.cancel()
                 lingerJob = scope.launch {
                     delay(lingerMs)
-                    val pending = synchronized(lock) { if (uses == 0) unbindLocked() else null }
+                    val pending = synchronized(lock) { if (uses == 0) unbindLocked() else emptyList() }
                     resumeDead(pending)
                 }
             }
@@ -237,9 +250,9 @@ class SpeechConnection(
     }
 
     /** Solta o binder. A continuação da fala sai daqui para ser retomada fora do lock. */
-    private fun unbindLocked(): CancellableContinuation<SpeechOutcome>? {
-        val pending = active
-        active = null
+    private fun unbindLocked(): List<CancellableContinuation<SpeechOutcome>> {
+        val pending = active.toList()
+        active.clear()
         val recipient = death
         death = null
         val conn = serviceConnection
@@ -250,10 +263,8 @@ class SpeechConnection(
         return pending
     }
 
-    private fun resumeDead(cont: CancellableContinuation<SpeechOutcome>?) {
-        if (cont != null && cont.isActive) {
-            cont.resume(SpeechOutcome.Err(SpeechProtocol.ENGINE, "o :speech morreu"))
-        }
+    private fun resumeDead(pending: List<CancellableContinuation<SpeechOutcome>>) {
+        pending.forEach { it.completeOnce(SpeechOutcome.Err(SpeechProtocol.ENGINE, "o :speech morreu")) }
     }
 
     private suspend fun bind(): ISpeechService = suspendCancellableCoroutine { cont ->
@@ -261,14 +272,14 @@ class SpeechConnection(
             override fun onServiceConnected(name: ComponentName, binder: IBinder) {
                 val connected = ISpeechService.Stub.asInterface(binder)
                 val recipient = IBinder.DeathRecipient {
-                    val pending = synchronized(lock) { if (service === connected) unbindLocked() else null }
+                    val pending = synchronized(lock) { if (service === connected) unbindLocked() else emptyList() }
                     resumeDead(pending)
                 }
                 try {
                     binder.linkToDeath(recipient, 0)
                 } catch (e: RemoteException) {
                     runCatching { context.unbindService(this) }
-                    if (cont.isActive) cont.resumeWithException(e)
+                    cont.failOnce(e)
                     return
                 }
                 synchronized(lock) {
@@ -276,29 +287,29 @@ class SpeechConnection(
                     serviceConnection = this
                     death = binder to recipient
                 }
-                if (cont.isActive) cont.resume(connected)
+                cont.completeOnce(connected)
             }
 
             override fun onServiceDisconnected(name: ComponentName) {
-                val pending = synchronized(lock) { if (serviceConnection === this) unbindLocked() else null }
+                val pending = synchronized(lock) { if (serviceConnection === this) unbindLocked() else emptyList() }
                 resumeDead(pending)
             }
 
             override fun onBindingDied(name: ComponentName) {
-                val pending = synchronized(lock) { if (serviceConnection === this) unbindLocked() else null }
-                if (cont.isActive) cont.resumeWithException(IllegalStateException("o :speech morreu ao ligar"))
+                val pending = synchronized(lock) { if (serviceConnection === this) unbindLocked() else emptyList() }
+                cont.failOnce(IllegalStateException("o :speech morreu ao ligar"))
                 resumeDead(pending)
             }
 
             override fun onNullBinding(name: ComponentName) {
-                if (cont.isActive) cont.resumeWithException(IllegalStateException("o :speech não devolveu binder"))
+                cont.failOnce(IllegalStateException("o :speech não devolveu binder"))
             }
         }
         val bound = runCatching {
             context.bindService(Intent(context, SpeechService::class.java), connection, Context.BIND_AUTO_CREATE)
         }.getOrDefault(false)
         if (!bound) {
-            cont.resumeWithException(IllegalStateException("bindService recusado para o :speech"))
+            cont.failOnce(IllegalStateException("bindService recusado para o :speech"))
             return@suspendCancellableCoroutine
         }
         cont.invokeOnCancellation { runCatching { context.unbindService(connection) } }
