@@ -54,12 +54,14 @@ class SpeechSupertonicProofTest {
                 calls++
                 val result = delegate.speak(model, tokens, text, speed, onPcm)
                 if (result is SpeechOutcome.Ok) peak = result.peakRssKb
+                if (result is SpeechOutcome.Err) status("Falha técnica da prova: ${result.kind}: ${result.detail}")
                 return result
             }
         }
         val engine = LocalSpeechEngine(files = {
             SupertonicFiles.acceptedPair(config, index, acceptance.isAccepted(spec.id), verified)
         }, endpoint = endpoint)
+        var completed = false
         try {
             // Sem aceite/instalação, nem binder nem download. O aceite abaixo pertence só à fixture autorizada desta prova.
             File(dir, "aceite-fixture.txt").delete()
@@ -99,10 +101,11 @@ class SpeechSupertonicProofTest {
             File(context.cacheDir, "supertonic-prova.wav").writeBytes(wav)
             Base64.encodeToString(wav, Base64.NO_WRAP).chunked(32_768).forEachIndexed { i, chunk -> status("SUPERTONIC_WAV_$i:$chunk") }
             status("Supertonic: primeiroMs=${first.latencyMs}; duracaoMs=${done.durationMs}; paredeMs=$wall; rtf=${wall.toDouble() / done.durationMs}; picoRssKb=$peak; taxa=44100; amostras=${pcm.size / 2}; idioma=pt; speed=1.0")
+            completed = true
         } finally {
             connection.close()
             // Somente os arquivos desta fixture, no cache do emulador; não toca modelos de outras provas.
-            dir.deleteRecursively()
+            if (completed) dir.deleteRecursively()
         }
     }
 

@@ -29,7 +29,7 @@ class SupertonicText(private val index: IntArray) {
                 .replace("@", " at ").replace("e.g.,", "for example, ").replace("i.e.,", "that is, ")
                 .replace(Regex(" ([,.!?;:'])"), "$1")
                 .replace(Regex("\"+"), "\"").replace(Regex("'+"), "'")
-                .replace(Regex("(?U)\\s+"), " ").trim()
+                .replace(Regex("[\\s\\p{Z}\\u0085\\u001c-\\u001f]+"), " ").trim()
             if (!Regex("[.!?;:,'\")\\]\\}…。」』】〉》›»]$").containsMatchIn(text)) text += "."
             return "<pt>$text</pt>"
         }
