@@ -5,12 +5,12 @@
 > 36 dp que a janela do teclado já sabe reservar sem contar como altura do teclado para os outros apps e **sem
 > cobrir tecla**. Os tipos de interação são os da orbe flutuante (1, 2 e 3 toques, segurar, arrastar). O que cada
 > toque faz é configurável, com a opção **"copiar a configuração da orbe principal"**.
-> **Status**: rascunho para o Yan revisar (2026-10-29). **Fora da v1** (só `main`). Decisões do Yan de 29/10 em "Decisões".
+> **Status**: rascunho (2026-10-29), com as decisões do Yan de 29/10 (22:45 e 22:57). **Fora da v1** (só `main`).
 
-A notificação (branch `equipe/notificacao-spec`, ainda fora desta `main`) e os Fluxos dessa mesma branch tratam a orbe
-como interface única em três lugares. Esta spec é o lugar `TECLADO`. Os ids FLX-57..60 e a FLX-T29 citados abaixo estão
-**nessa branch** (ponta `c4bb407f`), não no texto de Fluxos que está na `main` (FLX-01..56, FLX-T1..T27). A ponte no
-`flows/tasks.md` desta branch é o texto que substitui o "bloqueada" da FLX-T29 quando as duas se encontrarem.
+A notificação e os Fluxos (FLX-57..60, FLX-T28 e FLX-T29) estão na `main`. Esta spec é o lugar `TECLADO`. A FLX-T29
+deixou de estar bloqueada por falta de spec: o texto bloqueado foi **substituído** (não duplicado) em `flows/tasks.md`.
+Ela continua dependendo da entrega de KBO-T3 e KBO-T5; nenhuma task desta frente depende dela. O código da notificação
+pode ainda não estar implementado — esta frente não o importa.
 
 ## Problem Statement
 
@@ -35,7 +35,7 @@ orbe e claro/escuro do teclado, e sem um botão de microfone ao lado.
 
 - [ ] Uma orbe no encaixe do microfone, ociosa dentro da barra e **sobressalente para cima** ao gravar, pausar, cancelar, transcrever ou errar, sem interseção com tecla.
 - [ ] Os sete tipos de interação da orbe flutuante, no mesmo relógio (`tapBurstWindowMs`) e nos mesmos limiares de segurar e arrastar.
-- [ ] Toque simples **remapeável**; gravar/enviar pode estar em 1, 2 ou 3 toques. Sem seletor de chips e sem segundo microfone.
+- [ ] Toque simples **remapeável**; gravar/enviar **pode** estar em 1, 2 ou 3 toques, e também pode não estar em nenhum (não é obrigatório). Sem seletor de chips e sem segundo microfone.
 - [ ] **"Copiar a configuração da orbe principal"** (padrão ligado): skin, modo e ações dos toques, ao vivo; a config própria fica guardada.
 - [ ] Skins da orbe (Ateliê, pagas, pacote), claro/escuro **do teclado**.
 - [ ] Gatilho de Fluxos só em `Orbe(TECLADO, 2)` e `Orbe(TECLADO, 3)`, no contrato da FLX-59/60. Segurar e arrastar não viram gatilho.
@@ -61,10 +61,16 @@ orbe e claro/escuro do teclado, e sem um botão de microfone ao lado.
 
 | # | Decisão | Onde vale |
 | - | ------- | --------- |
-| D1 | A orbe é a interface única nas três superfícies. O que cada interação faz é **por interação**. Não há botão de microfone separado. O toque simples é remapeável; gravar pode ficar em 1, 2 ou 3 toques | KBO-05, KBO-14, KBO-15 |
+| D1 | A orbe é a interface única nas três superfícies. O que cada interação faz é **por interação**. Não há botão de microfone separado. O toque simples é remapeável; gravar **pode** ficar em 1, 2 ou 3 toques (possibilidade, não exigência) | KBO-05, KBO-14, KBO-15 |
 | D2 | No teclado a orbe é pequena; ao mudar de estado e precisar mostrar tempo ou estado, **sobressai um pouco acima do teclado**, maior, **sem cobrir nenhuma tecla** | KBO-07, KBO-08, KBO-09 |
 | D3 | As skins da orbe valem aqui. Claro/escuro como o **teclado** | KBO-21, KBO-22 |
 | D4 | Fluxos dispara com `Orbe(lugar=TECLADO, toques)`. A notificação usa o mesmo modelo de lugares | KBO-12, KBO-30, KBO-31 |
+| D5 | A faixa sobressalente é **36 dp**, provisória até ver no aparelho (29/10, 22:45). Mais alto que a largura do encaixe cobriria o vizinho, a menos que a faixa também alargue o encaixe — isso não entra | KBO-08, KBO-09 |
+| D6 | Mic extra já salvo fica no JSON, **não é desenhado** e **não é tocável** (29/10, 22:45). Confirma A6 | KBO-06 |
+| D7 | Arrastar fica **fixo** (↑ pausa, lateral cancela, ↓ abre o app), fora do catálogo dos toques (29/10, 22:45). Confirma A4 | KBO-18 |
+| D8 | Com "copiar" ligado, o modo da orbe flutuante vale no teclado, **inclusive segurar-para-falar** (29/10, 22:45). A alternativa de manter o toque-de-mic quando a flutuante está em segurar-para-falar foi recusada | KBO-19 |
+| D9 | Gravar não é o foco do app: é só uma das ações. Não há exigência de que algum toque grave, nem fallback que recoloque gravar. Sempre que uma configuração **substituir** uma ação já atribuída (a um toque, gesto ou botão), a tela avisa o que foi substituído. Nada mais (29/10, 22:57). A resposta das 22:45 à antiga Q5 ("só aviso") fica coberta por esta | KBO-15, KBO-28 |
+| D10 | A pele animada (Ouvi, Glitch) **corre no teclado real** e fica **parada só na prévia e nos goldens** (`motionTimeMs`) (29/10, 22:45) | KBO-23 |
 
 ---
 
@@ -91,11 +97,11 @@ orbe e claro/escuro do teclado, e sem um botão de microfone ao lado.
 2. **KBO-06**: o **encaixe** SHALL ser o primeiro `BarButton.Mic` da barra visível mais alta que tenha um. O nome no editor de barras passa a **"Orbe"**; o símbolo no JSON das barras **continua `mic`** (o formato de `bars_config_json` não muda). A fábrica segue com um encaixe no início de cada modo (`ShortcutModels.kt:121-145`). Um segundo `Mic` já gravado SHALL ser preservado no JSON, **não desenhado** e **não tocável**. O editor não oferece adicionar outro.
 3. **KBO-07**: **ociosa** (`IDLE_READY`, `IDLE_NO_FIELD`, `PENDING_PASTE`) a orbe SHALL caber inteira no encaixe: diâmetro = o menor lado do miolo do botão. Nada entra na faixa acima do teclado. O peso 1,5 do encaixe não muda entre ociosa e gravando (os vizinhos não pulam).
 4. **KBO-08**: **sobressalente** (`RECORDING`, `PAUSED`, `CANCELLING`, `SENDING`, `ERROR`, e Visão ativa) a orbe SHALL crescer **só para cima**. O fundo do círculo é o fundo do encaixe. O diâmetro é o mínimo entre a **largura** do encaixe e a altura do encaixe **mais 36 dp**. A interseção do círculo com o retângulo de **qualquer tecla** SHALL ser vazia. Botões da **mesma** barra, fora do encaixe, também ficam fora do círculo (o limite é a largura do encaixe). Uma barra que esteja **acima** do encaixe pode ser coberta pelo círculo; o toque nessa interseção é da orbe.
-5. **KBO-09**: a janela do IME SHALL reservar **sempre** 36 dp transparentes entre o overscan da grade e o conteúdo do teclado (`KeyFlowKeyboardView.kt:124-136` e `:182-187` já fazem isso para a grade, com a raiz transparente em `:226-228`). `contentTopInsets` e `visibleTopInsets` SHALL ser `gridOverscanPx + 36 dp`, nos dois, para o app de trás **não** tratar a faixa como altura de teclado (a regressão do Termux em `KeyFlowKeyboardService.kt:288-307`). `touchableInsets` continua `TOUCHABLE_INSETS_REGION`. Sem arrasto de grade e com a orbe ociosa, a região tocável começa **abaixo** dos 36 dp (o toque na faixa vai para o app). Com a orbe sobressalente, a região é o conteúdo **unido** ao retângulo do círculo. Com grade em arrasto (`gridDragActive`), a região volta a ser a janela inteira, como hoje (`:306-307`). O early-return `if (overscan <= 0) return` (`:302`) SHALL NOT pular a faixa de 36 dp.
+5. **KBO-09**: a janela do IME SHALL reservar **sempre** 36 dp transparentes entre o overscan da grade e o conteúdo do teclado (`KeyFlowKeyboardView.kt:124-136` e `:182-187` já fazem isso para a grade, com a raiz transparente em `:226-228`). As três semânticas do `InputMethodService.Insets` ficam distintas: `contentTopInsets` (resize/pan) e `visibleTopInsets` (área visível/pan) SHALL ser `gridOverscanPx + 36 dp`, nos dois, para o app de trás **não** tratar a faixa como altura de teclado (a regressão do Termux em `KeyFlowKeyboardService.kt:288-307`); `touchableInsets` continua `TOUCHABLE_INSETS_REGION`, e a `touchableRegion` é o que a janela recebe — devolver falso num hit-test interno **não** entrega o toque ao app. Sem arrasto de grade e com a orbe ociosa, a região tocável começa **abaixo** dos 36 dp (o toque na faixa vai para o app). Com a orbe sobressalente, a região é o conteúdo **unido ao disco do círculo** (centro e raio; **não** o retângulo que o circunscreve), recortada à janela. Pontos do retângulo delimitador fora do disco e fora do conteúdo não entram: o app de trás os recebe. Contraexemplo em densidade 1: faixa 36, encaixe 64×28, centro (32, 32), raio 32; (1, 1) está no retângulo (distância² 1922 > 1024) e acima do conteúdo (y mínimo 36), então fica de fora, assim como os cantos desse retângulo que caem fora do disco. Com grade em arrasto (`gridDragActive`), a região volta a ser a janela inteira, como hoje (`:306-307`). O early-return `if (overscan <= 0) return` (`:302`) SHALL NOT pular a faixa de 36 dp.
 6. **KBO-10**: os 36 dp SHALL entrar na reserva de altura da grade (`GridSizing.keyboardContentReservePx`, `:61-89`), junto com barras e fileiras, para uma grade grande não estourar a janela em paisagem (a mesma classe de bug de 2026-07-06).
 7. **KBO-11**: a orbe SHALL acompanhar a rolagem horizontal da barra. Com o encaixe fora da área visível, a orbe sai junto e SHALL NOT ficar parada sobre as teclas. O hit-test é uma função pura: ponto no círculo → orbe; senão → a barra ou a tecla. A view da orbe não é uma camada do tamanho do teclado que consuma o toque das teclas.
 
-**Independent Test**: ociosa, os 36 dp não recebem toque (o app de trás recebe) e nenhuma tecla muda de retângulo; gravando, o círculo cruza a borda de cima do teclado, o toque nele é da orbe, o toque ao lado na faixa segue para o app, e a interseção com cada tecla é vazia. `contentTopInsets == visibleTopInsets == overscan + 36 dp`.
+**Independent Test**: ociosa, os 36 dp não recebem toque (o app de trás recebe) e nenhuma tecla muda de retângulo; gravando, o círculo cruza a borda de cima do teclado, o toque no disco é da orbe, e o toque ao lado na faixa — inclusive (1, 1) e os cantos do retângulo delimitador fora do disco — é **recebido pelo app de trás** porque a `touchableRegion` os exclui, não porque um hit-test posterior devolveu falso. A interseção com cada tecla é vazia. `contentTopInsets == visibleTopInsets == overscan + 36 dp` é necessário e não basta: o app hospedeiro, em adjustResize e adjustPan, retrato e paisagem, com e sem overscan, não perde 36 dp e o campo focado continua visível.
 
 ---
 
@@ -106,12 +112,12 @@ orbe e claro/escuro do teclado, e sem um botão de microfone ao lado.
 1. **KBO-12**: `SuporteDeInteracoes` SHALL marcar no lugar `TECLADO` as sete interações: `TOQUE_1`, `TOQUE_2`, `TOQUE_3`, `SEGURAR`, `ARRASTAR_CIMA`, `ARRASTAR_LADO`, `ARRASTAR_BAIXO`. `FLUTUANTE` continua com as sete. `NOTIFICACAO` continua só com os três toques (NTF-08). O tipo mora em `com.keyflow.orbe`; quem chegar primeiro cria o arquivo, e esta frente alarga o `TECLADO` se ele tiver nascido só com toques.
 2. **KBO-13**: a rajada de toques SHALL usar a janela `Settings.tapBurstWindowMs` (padrão 250, `Settings.kt:121`), reiniciada a cada toque, resolvida **uma vez** quando assenta. Mais de 3 toques seguem `Settings.shortcutOverflow` (`NEAREST_DOWN` ou `CANCEL`). O relógio é injetável. Os limiares de segurar e arrastar são os da orbe flutuante: segurar = janela + 150 ms (`OrbButtonView.kt:717`), ativar o arrasto = 0,7 × o diâmetro **atual** da orbe (`:719`), começar a arrastar = 10 px (`GestureInterpreter.kt:83`).
 3. **KBO-14**: **1 toque é remapeável** (diferente da notificação, onde o 1 toque é fixo). A fábrica da config **própria** SHALL ser gravar/enviar no 1 toque, com a semântica de `handleKeyboardMicTap` (`OverlayService.kt:537-543`): ocioso inicia; gravando ou pausado envia; cancelando conclui o descarte; texto pendente cola; erro dispensa e, se houver destino, abre a aba já usada hoje (`KeyFlowKeyboardService.kt:396-404`).
-4. **KBO-15**: na config própria, **exatamente uma** entre 1, 2 e 3 toques SHALL ser gravar/enviar. A tela não deixa salvar sem essa ação, nem com ela em dois toques. Segurar não conta para essa conta: segurar é o modo (KBO-18), não um terceiro "gravar" ao lado de um toque.
+4. **KBO-15**: sempre que uma configuração **substituir** uma ação já atribuída a um toque, gesto ou botão, a tela SHALL avisar **o que foi substituído**. Nada mais é exigido. Gravar/enviar é uma ação como as outras: a config **pode** ter zero, uma ou várias, no Alternar e no segurar-para-falar. A tela SHALL NOT recusar salvar por falta ou excesso de gravar/enviar, e SHALL NOT recolocar gravar/enviar num toque que a pessoa, um fluxo ou uma ação desconhecida tenha deixado sem essa ação. A fábrica ainda nasce com gravar/enviar no 1 toque (KBO-14); isso é o ponto de partida, não uma invariante. Segurar continua sendo o modo (KBO-18): no segurar-para-falar ele grava, e isso não cria obrigação de um toque de gravar.
 5. **KBO-16**: o catálogo de um toque SHALL ser: **Gravar/enviar** · **Nenhuma** · **Retrair/expandir o teclado** · **Trocar o teclado** · **Ler a tela (Visão)** · **Pausar/retomar** · **Cancelar/desfazer**. "Pausar/retomar" só age gravando ou pausado. "Cancelar/desfazer" cancela gravando ou pausado (janela de desfazer) e desfaz durante o cancelamento. "Retrair/expandir" só age com o teclado KeyFlow visível. "Trocar o teclado" reusa `OverlayService.showInputMethodPicker()`.
 6. **KBO-17**: a fábrica SHALL ser 2 toques = Retrair/expandir e 3 toques = Trocar o teclado — os mesmos padrões de `shortcut2Tap` / `shortcut3Tap` (`Settings.kt:125-126`).
 7. **KBO-18**: **segurar e arrastar não são remapeáveis** nesta frente (na orbe flutuante também não são). No modo **Alternar**, segurar entra no modo-arrasto e **não move** a orbe: ↑ pausa (ou retoma, se já pausada), para o centro da tela cancela, ↓ abre o app. No modo **segurar-para-falar**, segurar grava e soltar fora de uma zona abre a janela de envio, como na orbe flutuante; ↑ pausa, lateral cancela, ↓ abre o app sem enviar na hora. As setas são desenhadas **na própria faixa** (não numa janela extra do tamanho da tela: DRAG-06 existe para a orbe flutuante não pular de lugar; aqui o lugar já é fixo). Durante `SENDING`, só o lateral (cancelar) age.
 
-**Independent Test**: ociosa, 1 toque na fábrica inicia depois da janela e o segundo envia; mudar gravar para 2 toques faz o 1 toque não gravar; 4 toques com `CANCEL` não fazem nada; segurar no Alternar não desloca o encaixe; o círculo gravando não intersecta tecla.
+**Independent Test**: ociosa, 1 toque na fábrica inicia depois da janela e o segundo envia; mudar gravar para 2 toques faz o 1 toque não gravar; uma config com zero gravar/enviar salva no Alternar e no segurar-para-falar; substituir o toque que tinha gravar avisa o que saiu e não recoloca gravar em outro toque; 4 toques com `CANCEL` não fazem nada; segurar no Alternar não desloca o encaixe; o círculo gravando não intersecta tecla.
 
 ---
 
@@ -119,7 +125,7 @@ orbe e claro/escuro do teclado, e sem um botão de microfone ao lado.
 
 **Como** usuário, **quero** que o teclado acompanhe a orbe que eu já configurei, até eu pedir o contrário.
 
-1. **KBO-19**: com copiar ligado, a orbe do teclado SHALL usar, ao vivo, a **skin** (`Settings.orbSkin`), o **modo** (`Settings.overlayRecordingMode`) e as **ações de 1, 2 e 3 toques** (`shortcut1Tap` no 1 toque só quando o modo da orbe principal já o usa; no Alternar o 1 toque copiado continua sendo gravar/enviar, porque na orbe flutuante o 1 toque do Alternar é o gesto nativo, não `shortcut1Tap`). Não copia `overlaySide`, `orbSizePx` nem a posição. O teclado suporta segurar e arrastar, então **não há lista de interações ignoradas** (a notificação tem; o teclado não).
+1. **KBO-19**: com copiar ligado, a orbe do teclado SHALL usar, ao vivo, a **skin** (`Settings.orbSkin`), o **modo** (`Settings.overlayRecordingMode`, inclusive segurar-para-falar — D8) e as **ações de 1, 2 e 3 toques** (`shortcut1Tap` no 1 toque só quando o modo da orbe principal já o usa; no Alternar o 1 toque copiado continua sendo gravar/enviar, porque na orbe flutuante o 1 toque do Alternar é o gesto nativo, não `shortcut1Tap` — é copiar a orbe principal, não um fallback que reponha gravar quando a pessoa o tirou da config própria). Não copia `overlaySide`, `orbSizePx` nem a posição. O teclado suporta segurar e arrastar, então **não há lista de interações ignoradas** (a notificação tem; o teclado não).
 2. **KBO-20**: ligar ou desligar copiar SHALL NOT criar, apagar ou reescrever gatilho `Orbe(TECLADO, n)` nem a config própria. É o contrato da FLX-60: copiar só muda **qual lista é lida**. Os gatilhos próprios voltam quando copiar é desligado.
 3. **KBO-21**: claro/escuro SHALL ser o `dark` que o teclado já usa (`themeDark` via `themeDarkFlow`, `KeyFlowKeyboardService.kt:187-195`), **não** o `uiMode` do sistema (esse é o da notificação, NTF-28) e **não** um interruptor novo. Trocar o tema do teclado redesenha a orbe junto com as teclas.
 
@@ -151,7 +157,7 @@ orbe e claro/escuro do teclado, e sem um botão de microfone ao lado.
 ### P1-G: Dados (`DAT`)
 
 1. **KBO-27**: a config própria SHALL ficar num JSON, `keyboard_orb_config_json` (`"v": 1`), no DataStore `keyflow_settings`, ao lado de `bars_config_json`. Campos: `copy`, `skin`, `mode` (`toggle` | `ptt`), `taps` (`"1"`, `"2"`, `"3"`). A escrita SHALL ser atômica sobre o valor atual (`dataStore.edit`), para o auto-save das `Settings` não desfazer a seção e a seção não regravar as `Settings`.
-2. **KBO-28**: o codec SHALL ser tolerante: chave ausente → padrões (copiar ligado, skin Ateliê, modo Alternar, 1 = gravar/enviar, 2 = retrair/expandir, 3 = trocar o teclado); JSON malformado → padrões; campo desconhecido ignorado; ação desconhecida (`flow:<id>` ou nome novo) **preservada** ao regravar e tratada como "Nenhuma" no disparo, **exceto** se isso deixasse a config sem gravar/enviar — nesse caso o 1 toque efetivo volta a gravar/enviar **só na execução**, e o JSON não é reescrito sozinho. Nunca lança.
+2. **KBO-28**: o codec SHALL ser tolerante: chave ausente → padrões (copiar ligado, skin Ateliê, modo Alternar, 1 = gravar/enviar, 2 = retrair/expandir, 3 = trocar o teclado); JSON malformado → padrões; campo desconhecido ignorado; ação desconhecida (`flow:<id>` ou nome novo) **preservada** ao regravar e tratada como "Nenhuma" no disparo. O JSON não é reescrito para pôr gravar/enviar no 1 toque. Nunca lança.
 3. **KBO-29**: o IME SHALL ler por leitura leve (só DataStore, sem o cofre) e observar ao vivo. Trocar skin, modo, ação ou copiar vale no próximo gesto, sem reiniciar o processo. O JSON não contém segredo nem texto ditado.
 
 **Independent Test**: round-trip com skin de pacote e uma ação `flow:…`; JSON ruim → padrões; gravar as `Settings` não altera a chave; duas escritas concorrentes não se perdem.
@@ -186,42 +192,40 @@ orbe e claro/escuro do teclado, e sem um botão de microfone ao lado.
 - WHEN a largura do encaixe é menor que a altura + 36 dp THEN o diâmetro é a largura e a orbe sobressai menos que 36 dp. A faixa reservada continua 36 dp (a janela não muda de tamanho no meio da gravação).
 - WHEN a pessoa rola a barra no meio da gravação THEN a orbe vai com o encaixe (KBO-11) e o plano de insets é recalculado no mesmo frame.
 - WHEN uma grade efêmera está em arrasto THEN a região tocável é a janela inteira (KBO-09) e o popup da grade, que já é uma janela acima, ganha o toque. A orbe não cria uma segunda janela.
-- WHEN o modo copiado é segurar-para-falar THEN o 1 toque **não** inicia gravação (quem inicia é o segurar). A regra do "exatamente um gravar/enviar" (KBO-15) vale para a config **própria** no modo Alternar. No modo segurar-para-falar, nenhum toque é gravar/enviar; o 1 toque da fábrica própria nesse modo é "Nenhuma".
-- WHEN a ação efetiva de um toque é desconhecida e os três ficariam sem gravar/enviar THEN a execução trata o 1 toque como gravar/enviar e não regrava o JSON (KBO-28).
+- WHEN o modo é segurar-para-falar, próprio ou copiado THEN nenhum toque precisa ser gravar/enviar. O 1 toque copiado é `shortcut1Tap` mapeado (pode ser "Nenhuma"); quem grava é o segurar (KBO-18, KBO-19). A fábrica própria nesse modo nasce com 1 toque "Nenhuma". Salvar com zero gravar/enviar é aceito nos dois modos (KBO-15).
+- WHEN a ação efetiva de um toque é desconhecida THEN o disparo trata como "Nenhuma" e o JSON não é reescrito (KBO-28). Não se põe gravar/enviar no 1 toque para completar a config.
+- WHEN a pessoa substitui uma ação já atribuída (toque, gesto ou botão) THEN a tela avisa o que foi substituído e grava a nova ação. Não exige que outro toque fique com gravar/enviar (KBO-15, D9).
 - WHEN o teclado abre no meio de uma gravação já começada pela orbe flutuante THEN a orbe do teclado nasce sobressalente, no estado atual (`updateMicState` já sincroniza isso em `KeyFlowKeyboardService.kt:429`).
 - WHEN "copiar" está ligado e `orbSkin` é um pacote só de teclado THEN a orbe mostra Ateliê (KBO-23).
 
 ## Success Criteria
 
 - [ ] No emulador, gravar pelo teclado mostra a orbe acima da borda do teclado, o `m:ss` no centro, e nenhuma tecla coberta; soltar o dedo numa tecla ao lado ainda escreve.
-- [ ] O app de trás não ganha 36 dp de teclado (inset de conteúdo igual ao de hoje + a faixa, descontada).
-- [ ] Copiar ligado acompanha a Sobrepor; desligado, a config própria volta intacta.
+- [ ] O app de trás não perde 36 dp: comparação antes/depois da faixa, em adjustResize e adjustPan, retrato e paisagem, com e sem overscan; o campo focado continua visível. `contentTopInsets == visibleTopInsets` é necessário e não basta sozinho.
+- [ ] Com a orbe sobressalente, o app de trás recebe o toque dos cantos do retângulo delimitador que ficam fora do disco.
+- [ ] Substituir uma ação já atribuída avisa o que saiu; uma config sem gravar/enviar salva, no Alternar e no segurar-para-falar.
+- [ ] Copiar ligado acompanha a Sobrepor, inclusive o segurar-para-falar; desligado, a config própria volta intacta.
 - [ ] Um fluxo em `Orbe(TECLADO, 2)` só passa a disparar na FLX-T29, sem ciclo com esta frente.
 - [ ] Goldens fora dos que desenham o mic permanecem bit-idênticos.
 
-## Decisões do autor desta spec (a confirmar pelo Yan)
+## Decisões do autor desta spec
 
 | # | Decisão | Por quê | Alternativa |
 | - | ------- | ------- | ----------- |
-| A1 | A faixa é de **36 dp**, sempre reservada, **entre** o overscan da grade e as barras — não se reusa o overscan da grade como lugar da orbe | O overscan é 0 sem grade e, com grade, é do tamanho da maior grade e precisa continuar deixando o toque passar. 36 dp + a altura da barra (~28 dp) dá um círculo de ~64 dp, que ainda cabe na largura do encaixe de peso 1,5 na fábrica | Crescer a janela só enquanto grava (pula de tamanho a cada estado); ou desenhar dentro do overscan da grade |
+| A1 | A faixa é de **36 dp**, sempre reservada, **entre** o overscan da grade e as barras — não se reusa o overscan da grade como lugar da orbe. **Provisória até ver no aparelho** (D5, 29/10): não é medida fechada | O overscan é 0 sem grade e, com grade, é do tamanho da maior grade e precisa continuar deixando o toque passar. 36 dp + a altura da barra (~28 dp) dá um círculo de ~64 dp, que ainda cabe na largura do encaixe de peso 1,5 na fábrica | Crescer a janela só enquanto grava (pula de tamanho a cada estado); ou desenhar dentro do overscan da grade |
 | A2 | O círculo sobressalente tem o **fundo no fundo do encaixe** e o diâmetro limitado à **largura** do encaixe | É o que impede cobrir tecla (abaixo) e vizinho (ao lado). Para cima não há tecla | Centralizar no encaixe e deixar o círculo invadir a primeira fileira |
-| A3 | "Copiar" vem **ligado**, como na notificação (NTF-12) | Quem não mexe em nada continua com uma orbe só. A config própria nasce igual à fábrica da flutuante, então ligar ou desligar no primeiro dia não muda o gesto | Vir desligado, para o teclado manter o toque-de-mic de hoje mesmo quando a orbe flutuante está em segurar-para-falar |
-| A4 | Segurar e arrastar ficam **fixos**, como na orbe flutuante. O que se remapeia são os três toques | Um segundo catálogo só no teclado divergiria da orbe que o Yan chamou de interface única | Arrastar também escolhível na seção |
+| A3 | "Copiar" vem **ligado**, como na notificação (NTF-12), e **inclui o segurar-para-falar** (D8, 29/10) | Quem não mexe em nada continua com uma orbe só. A config própria nasce igual à fábrica da flutuante, então ligar ou desligar no primeiro dia não muda o gesto | Recusada: vir desligado, ou manter o toque-de-mic mesmo quando a orbe flutuante está em segurar-para-falar |
+| A4 | Segurar e arrastar ficam **fixos**, como na orbe flutuante (D7, 29/10). O que se remapeia são os três toques | Um segundo catálogo só no teclado divergiria da orbe que o Yan chamou de interface única | Arrastar também escolhível na seção |
 | A5 | A orbe **não se move**. O lateral é em direção ao **centro da tela**, a partir do centro da orbe, não o `overlaySide` | O encaixe pode estar à esquerda (fábrica) ou no meio, se a pessoa reordenar a barra. O lado da orbe flutuante não descreve isso | Usar `overlaySide` mesmo com a orbe fixa na barra |
-| A6 | `BarButton.Mic` continua no JSON; o editor só troca o rótulo para "Orbe". Mic extra fica no JSON e some do desenho | Mudar o formato da barra bate na frente de Fluxos, que só pode acrescentar o caso `flow` | Migrar `mic` → `orb` na leitura e apagar os extras |
+| A6 | `BarButton.Mic` continua no JSON; o editor só troca o rótulo para "Orbe". Mic extra fica no JSON, some do desenho e não é tocável (D6, 29/10) | Mudar o formato da barra bate na frente de Fluxos, que só pode acrescentar o caso `flow` | Migrar `mic` → `orb` na leitura e apagar os extras |
 | A7 | O modo da config própria, com copiar desligado, nasce **Alternar** (toque grava), não herda sozinho o modo da flutuante | É o comportamento do teclado hoje (`Settings.kt:105-107`). Herdar o modo só com "copiar" ligado deixa a escolha explícita | Teclado sem modo próprio: ou copia, ou é sempre toque |
 | A8 | O `FORMAT.md` não muda | O teste do formato quebra se o documento divergir do parser. Os quadros `orb_*` já vestem esta orbe | Seção `keyboardOrb` agora, com `schemaVersion` 1 e campo desconhecido |
-| A9 | Bloco **16** no `DEVELOPMENT-ORDER` | O bloco 15 é a notificação, na branch `equipe/notificacao-spec`, ainda fora da `main`. Numerar esta frente como 15 colidiria na integração | Bloco 15 aqui e renumerar depois |
+| A9 | Bloco **17** no `DEVELOPMENT-ORDER` | O bloco 15 é a notificação, já na `main`. O bloco 16 fica com a spec de Computador (`equipe/computador-spec`). Numerar esta frente como 16 colidiria com ela | Bloco 16 aqui e renumerar o Computador |
 | A10 | A seção mora na aba **Teclado**, não numa aba nova | A orbe é parte do teclado. A notificação precisou de aba porque não tinha uma | Aba "Orbe do teclado" no grupo Capacidades |
 
 ### Dúvidas para o Yan
 
-- **Q1** — 36 dp de sobressalente basta, ou você quer a orbe gravando mais perto do tamanho da flutuante (o padrão dela é 195 px)? Mais alto que a largura do encaixe passa a cobrir o botão vizinho, a menos que a faixa também alargue o encaixe.
-- **Q2** — Mic extra já salvo na barra: deixo no JSON sem desenhar (A6), ou apago na próxima leitura?
-- **Q3** — Arrastar fica fixo (↑ pausa, lateral cancela, ↓ abre o app), ou entra no mesmo catálogo dos toques?
-- **Q4** — Com "copiar" ligado (padrão), se a orbe flutuante estiver em segurar-para-falar o teclado também fica. É isso, ou o teclado deve continuar "toque grava / toque envia" mesmo copiando o resto?
-- **Q5** — Se um fluxo de 2 toques ocupar o único toque de gravar/enviar, o aviso de substituir basta, ou a tela deve obrigar outro toque a ficar com gravar?
-- **Q6** — A pele animada (Ouvi, Glitch) mexe no teclado de verdade e fica parada nos goldens (A, no desenho). Prefere tudo parado, como a notificação é obrigada a ser?
+Respondidas em 29/10 (D5–D10). Nenhuma em aberto.
 
 ## Requirement Traceability
 
@@ -235,7 +239,7 @@ orbe e claro/escuro do teclado, e sem um botão de microfone ao lado.
 | KBO-06 | P1-B | KBO-T5, KBO-T6 | Pending |
 | KBO-07 | P1-B | KBO-T1, KBO-T5 | Pending |
 | KBO-08 | P1-B | KBO-T1, KBO-T5 | Pending |
-| KBO-09 | P1-B | KBO-T4, KBO-T5 | Pending |
+| KBO-09 | P1-B | KBO-T4, KBO-T5, KBO-T10 | Pending |
 | KBO-10 | P1-B | KBO-T4, KBO-T5 | Pending |
 | KBO-11 | P1-B | KBO-T1, KBO-T5 | Pending |
 | KBO-12 | P1-C | KBO-T1 | Pending |
@@ -265,4 +269,4 @@ orbe e claro/escuro do teclado, e sem um botão de microfone ao lado.
 | KBO-36 | P2-I | KBO-T10 | Pending |
 | KBO-37 | P2-I | KBO-T8 | Pending |
 
-A FLX-59 e a parte de teclado da FLX-60 **não** estão nesta tabela: continuam na FLX-T29 (texto na ponte de `flows/tasks.md`), que depende de KBO-T3 e KBO-T5 e não é dependência deles.
+A FLX-59 e a parte de teclado da FLX-60 **não** estão nesta tabela: continuam na FLX-T29 (texto que substituiu o bloqueado em `flows/tasks.md`), que depende de KBO-T3 e KBO-T5 e não é dependência deles.

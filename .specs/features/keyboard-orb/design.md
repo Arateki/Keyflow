@@ -73,9 +73,11 @@ data class PlanoDeInsets(
     val visibleTopPx: Int,          // igual ao contentTop — os dois juntos, senão o Termux volta
     val regiao: RegiaoToque,        // o que vira touchableRegion
 )
+data class Circulo(val centroX: Int, val centroY: Int, val raio: Int)
+
 sealed interface RegiaoToque {
     data object SoConteudo : RegiaoToque          // y de contentTop até o fim
-    data class ConteudoMaisCirculo(val circulo: Retangulo) : RegiaoToque
+    data class ConteudoMaisCirculo(val circulo: Circulo) : RegiaoToque  // o disco, não o retângulo
     data object JanelaInteira : RegiaoToque       // arrasto de grade, como hoje
 }
 ```
@@ -85,7 +87,7 @@ Regras (KBO-09):
 1. `sobressairPx` é 0 se não há encaixe; senão `round(36 dp)`. Não depende do estado.
 2. `contentTop = visibleTop = gridOverscanPx + sobressairPx`.
 3. Grade em arrasto → `JanelaInteira` (não mexer no que `gridDragActive` já acerta).
-4. Orbe sobressalente e grade parada → `ConteudoMaisCirculo`. O serviço faz `region.set(conteudo)` e `region.op(circulo, UNION)`. O retângulo do círculo inclui o pedaço que está nos 36 dp; o resto da faixa continua de fora, e o toque ali atravessa.
+4. Orbe sobressalente e grade parada → `ConteudoMaisCirculo`. O serviço faz `region.set(conteudo)` e une o **disco** (`Region.setPath` do círculo, ou o equivalente que não preencha o retângulo), recortado à janela. `region.op(retanguloDelimitador, UNION)` é o bug: o ponto (1, 1) do contraexemplo (faixa 36, encaixe 64×28, centro (32, 32), raio 32, distância² 1922 > 1024) cairia na região e o IME receberia o toque. Devolver falso depois não o entrega ao app. Os cantos do retângulo fora do disco também ficam de fora; um ponto do disco na faixa entra.
 5. Orbe ociosa → `SoConteudo`. A faixa inteira atravessa.
 6. Proibido o early-return atual quando o overscan é 0 e a faixa de 36 dp não é (`:302`).
 
@@ -100,7 +102,7 @@ A orbe não é uma view do tamanho do teclado. O pai (`KeyFlowKeyboardView`) per
 - dentro do círculo, ou dentro do encaixe com a orbe ociosa → a orbe consome;
 - senão → `BarView` / grade, como hoje.
 
-Isso evita o erro de um `onTouchEvent` em camada de cima que, ao devolver falso, **não** entrega o evento para a tecla. O pai despacha.
+Isso evita o erro de um `onTouchEvent` em camada de cima que, ao devolver falso, **não** entrega o evento para a tecla. O pai despacha o que a janela **já recebeu**. Os cantos do retângulo fora do disco nem chegam aqui: a `touchableRegion` (KBO-09) é que os entrega ao app.
 
 A classificação do gesto é JVM, com relógio injetado (`RajadaDeToques`, `ClassificadorDeGesto`). Não se instancia `OrbButtonView` nem `GestureInterpreter` (este chama `SystemClock`). Os números são os mesmos, citados na spec (KBO-13). O resultado é uma `Interacao`. `ResolvedorDaOrbeDoTeclado` devolve um `Comando`. O serviço executa.
 
@@ -152,7 +154,7 @@ data class ConfigOrbeTeclado(
 
 - copiar ligado e modo da orbe principal = Alternar → skin = `orbSkin`; modo = Alternar; toque 1 = gravar/enviar (o 1 toque do Alternar na flutuante é nativo, não `shortcut1Tap`); toques 2 e 3 = `shortcut2Tap` / `shortcut3Tap` mapeados para o catálogo (NONE, TOGGLE_KEYBOARD, SWITCH_IME, VISION_MODE). Ação da flutuante que não existe no catálogo vira "Nenhuma".
 - copiar ligado e modo = segurar-para-falar → toque 1 = `shortcut1Tap` mapeado (pode ser "Nenhuma"); quem grava é o segurar.
-- copiar desligado → os campos guardados. `validar` recusa zero ou dois "gravar/enviar" no modo Alternar.
+- copiar desligado → os campos guardados. Não há `validar` que recuse zero ou vários gravar/enviar, no Alternar ou no segurar-para-falar. Substituir uma ação já atribuída avisa o que saiu (KBO-15, D9) e grava. Ação desconhecida permanece e dispara como Nenhuma, sem reescrever o 1 toque para gravar/enviar.
 
 JSON `keyboard_orb_config_json`:
 
@@ -163,7 +165,7 @@ JSON `keyboard_orb_config_json`:
 
 Ids: `record`, `none`, `toggle_keyboard`, `switch_ime`, `vision`, `pause_resume`, `cancel_undo`, `flow:<id>`. Outro id → `Desconhecida`, regravado igual.
 
-API no `SettingsRepository`, no molde de `barsConfigFlow` / `saveBarsConfig` (`:186`, `:357`):
+API no `SettingsRepository`, no molde de `barsConfigFlow` / `saveBarsConfig` (`:213`, `:357`):
 
 ```kotlin
 fun configOrbeTecladoFlow(): Flow<ConfigOrbeTeclado>
@@ -181,7 +183,7 @@ O IME **não** ganha `ComposeView`. `VoiceOrb` é `DrawScope`; a task extrai o p
 
 O encaixe na `BarView` deixa de chamar `drawMic` e deixa de abrir o seletor. O slot continua ocupando peso 1,5 e recebendo o contentDescription da orbe (o pai é quem acerta o foco, porque o desenho mora na view de cima do encaixe). `micLabelForTest` passa a ler o estado da orbe, para os testes de barra que olham o rótulo não mentirem.
 
-Movimento (Ouvi, Glitch): no teclado real, o relógio é o de `KeyboardMotion` (`motionEnabled`). Prévia e golden passam `motionTimeMs` e não agendam frame. A notificação não pode fazer isso (RemoteViews); aqui pode.
+Movimento (Ouvi, Glitch): no teclado real, o relógio é o de `KeyboardMotion` (`motionEnabled`) — confirmado em 29/10 (D10). Prévia e golden passam `motionTimeMs` e não agendam frame. A notificação não pode fazer isso (RemoteViews); aqui pode.
 
 ## 7. Modelo compartilhado e Fluxos
 
@@ -198,10 +200,10 @@ Contrato único, para não nascerem dois enums:
 Não há ciclo:
 
 - KBO-T3 deixa o gancho `consultarFluxo(lugar, toques): Resolucao?`. Sem Fluxos, devolve nulo e a ação do lugar corre. A ação `flow:` guardada não dispara.
-- A FLX-T29 (ponte em `flows/tasks.md`) é quem liga `RoteadorGatilhos.resolverToques(TECLADO, n, …)` e o grupo no modal. Depende de KBO-T3 e KBO-T5. Nenhuma task KBO depende da FLX-T29.
-- A notificação não é dependência de código. O JSON e o pacote dela podem não estar na `main`. Esta frente não os importa.
+- A FLX-T29 (texto que substituiu o bloqueado em `flows/tasks.md`) é quem liga `RoteadorGatilhos.resolverToques(TECLADO, n, …)` e o grupo no modal. Depende de KBO-T3 e KBO-T5. Nenhuma task KBO depende da FLX-T29.
+- A notificação não é dependência de código. A spec dela está na `main`; o código pode ainda não estar implementado. Esta frente não importa o pacote dela.
 
-Resposta à Q8 de Fluxos, para a FLX-T29 não ficar em aberto: o teclado suporta as sete interações; **gatilho de fluxo continua só 2 e 3 toques**. Segurar e arrastar não ganham `Superficie` nova. Se o Yan quiser o contrário (dúvida Q3 / Q5), aí sim a FLX-T29 ganha linha nova — não antes.
+Resposta à Q8 de Fluxos: o teclado suporta as sete interações; **gatilho de fluxo continua só 2 e 3 toques**. Segurar e arrastar não ganham `Superficie` nova. Q3 e Q5 foram respondidas em 29/10 (D7, D9): arrastar fica fixo; substituir uma ação só avisa. A FLX-T29 não ganha superfície nova.
 
 `lugaresDisponiveis()` passa a incluir `TECLADO` quando KBO-T5 tiver entregue a orbe. Quem implementa essa função é a FLX-T29, lendo "a orbe do teclado existe", não um flag de build.
 
@@ -221,11 +223,11 @@ Docs e o tour (`tour-keyboard-mic`) passam a mostrar a orbe e a faixa. Texto nov
 | Prova | Onde | Tipo |
 | ----- | ---- | ---- |
 | Círculo ocioso dentro do encaixe; sobressalente disjunto das teclas; diâmetro limitado à largura | `GeometriaDaOrbeTest` | unit |
-| Plano de insets nos seis casos (sem encaixe, ociosa, sobressalente, grade em arrasto, overscan 0, união do círculo) | `PlanoDeInsetsTest` | unit |
+| Plano de insets nos seis casos (sem encaixe, ociosa, sobressalente, grade em arrasto, overscan 0, união do disco — (1, 1) e os cantos fora) | `PlanoDeInsetsTest` | unit |
 | `TECLADO` suporta as sete; `NOTIFICACAO` só três | `SuporteDeInteracoesTest` | unit |
-| Rajada, overflow, exatamente um gravar/enviar, Visão, copiar não grava, gatilho não consultado no 1 toque | `ResolvedorDaOrbeDoTecladoTest` | unit |
-| Codec: round-trip, malformado, `flow:` preservado, sem segredo | `CodecOrbeTecladoTest` | unit |
-| No emulador: toque grava e envia, segurar não move, círculo não cobre tecla, toque na faixa ao lado atravessa, grade em arrasto ainda ancora | `OrbeDoTecladoGestureTest` | `pool instrumentar` |
+| Rajada, overflow, zero gravar/enviar salva nos dois modos, ação desconhecida não vira gravar, substituir uma ação avisa, Visão, copiar não grava, PTT próprio e copiado, gatilho não consultado no 1 toque | `ResolvedorDaOrbeDoTecladoTest` | unit |
+| Codec: round-trip, malformado, `flow:` preservado, sem segredo, ação desconhecida não reescrita para gravar | `CodecOrbeTecladoTest` | unit |
+| No emulador: toque grava e envia, segurar não move, círculo não cobre tecla, cantos do retângulo fora do disco são recebidos pelo app de trás, faixa antes/depois em resize e pan, grade em arrasto ainda ancora | `OrbeDoTecladoGestureTest` | `pool instrumentar` |
 | Goldens da KBO-35 | `pool telas` | golden |
 
 Nunca `connectedAndroidTest` no A32. O aparelho `RX8T10DERKW` não entra nesta frente.
@@ -234,7 +236,7 @@ Nunca `connectedAndroidTest` no A32. O aparelho `RX8T10DERKW` não entra nesta f
 
 | Risco | Defesa |
 | ----- | ------ |
-| A faixa de 36 dp vazar para o inset que o app vê | Os dois insets (content e visible) andam juntos, como o comentário de `:288-296` exige. Teste unitário trava a igualdade |
+| A faixa de 36 dp vazar para o inset que o app vê | `contentTopInsets` e `visibleTopInsets` andam juntos (necessário, não suficiente: os dois podem estar errados por igual). A prova é no app hospedeiro (T5 e T10): antes e depois da faixa, adjustResize e adjustPan, retrato e paisagem, com e sem overscan; o campo focado continua visível e o conteúdo não perde 36 dp |
 | Early-return com overscan 0 ignorar a faixa | KBO-09 o cita. O teste com overscan 0 e sobressair > 0 falha se o plano vier vazio |
 | Grade grande + 36 dp sumir o teclado em paisagem | KBO-10 soma na reserva antes do encaixe da célula |
 | View da orbe engolir o toque das teclas | Hit-test no pai; a view não é match-parent clicável |

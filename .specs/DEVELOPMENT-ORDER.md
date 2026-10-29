@@ -263,7 +263,8 @@ do e2e da v1.
 | — | `corretor-aprendiz` | spec, design e tasks prontos (PR #19); nada implementado. **Fora do recorte da v1 por padrão**: banco de avaliação, base sem aprendizado, recusa e pares, modelo espacial do toque e bigramas, em fases A–G (`.specs/features/corretor-aprendiz/tasks.md`). Portão **[YAN]**: ele revisa os textos legais (política, aba Privacidade, Data Safety) na fase B, e o aprender ligado por padrão não vai à Play sem isso. Em aberto para o Yan: entra na v1? (`context.md` §8) |
 | — | `local-model-warmup` | Main, fora da v1: aquecimento do Parakeet, pré-carga explícita e aquecimento de texto, estado de preparação nos cards; ver spec/design/tasks. Em validação. |
 | — | `bancada` (bancada de modelos) | Spec, design e tasks em rascunho (2026-10-28, PR de spec), nada implementado. Main, fora da v1 (recorte congelado); não toma a vez de nada em andamento. É a régua que precede a atualização do LiteRT-LM (0.16.1 → 0.18.x) e a promoção de candidatas. Decisões do Yan de 28/10 incorporadas: tag `app-vX.Y.Z` na `main` (semântica; a v1 é a `app-v0.1.0`) com a bancada como etapa manual antes dela; áudio do Common Voice (CC0); testes de Código e Terminal cortados por ora; online só pela interface (a automação não roda online). Aberta: D6 (limiar, depois do baseline) |
-| — | `flows` (aba Fluxos) | Spec, design e tasks em rascunho (2026-10-29, FLX-T1..T27), nada implementado. Main, fora da v1 (recorte congelado); não toma a vez de nada em andamento. Lista de cards + modal com editor de etapas em lista vertical, executor que chama os motores das abas (Transcrição, Visão, Raciocínio, Voz, agente), 2/3 toques da orbe e botões da barra como gatilhos, 3 fluxos padrão e "Restaurar fluxos padrão" sem atalhos. Decisões do Yan de 29/10 incorporadas (D1..D8 do `spec.md`). Aberto: Q1..Q7 do `spec.md` (agente com conversa própria?, Ditar em PTT, atalho que sombreia, "Rodar agora", bancada consumindo os tipos) |
+| — | `flows` (aba Fluxos) | Spec, design e tasks em rascunho (2026-10-29, FLX-T1..T29), nada implementado. Main, fora da v1 (recorte congelado); não toma a vez de nada em andamento. Lista de cards + modal com editor de etapas em lista vertical, executor que chama os motores das abas (Transcrição, Visão, Raciocínio, Voz, agente), 2/3 toques da orbe — nos três lugares: flutuante, teclado e notificação — e botões da barra como gatilhos, 3 fluxos padrão e "Restaurar fluxos padrão" sem atalhos. Decisões do Yan de 29/10 incorporadas (D1..D9 do `spec.md`; a D9 substitui a D3: a orbe é a interface única e os gatilhos são as interações dela em três lugares). Aberto: Q1..Q7 e Q9 do `spec.md` (a Q8 está respondida pela spec da orbe do teclado, Bloco 17: sete interações, gatilho só em 2 e 3 toques) |
+| — | `notification` (aba Notificação) | Spec, design e tasks em rascunho (2026-10-29, NTF-01..NTF-47, NTF-T1..T20), nada implementado. Main, fora da v1 (recorte congelado), **depois de Fluxos**; não toma a vez de nada em andamento. A notificação vira **só a orbe** (40 dp, 48 dp recolhidos do Android 12+), na skin escolhida (Ateliê, Sistema, pagas e pacotes com a seção `notification`), com 1/2/3 toques; "copiar a configuração da orbe principal"; tela bloqueada só com a opção ligada (padrão desligada); dispensar não mexe em configuração. Decisões do Yan de 29/10 incorporadas (D1..D10 do `spec.md`). A NTF-T1 prova a altura nos aparelhos antes de tudo. Aberto: Q1..Q10 do `spec.md` (a orbe do teclado já tem spec, Bloco 17) |
 | — | CI | 2026-10-07: cache do AAR do sherpa-onnx nos dois jobs (um 503 do GitHub derrubou a PR #7 antes dos testes) |
 | — | 2026-10-10..22 | PRs #8 a #11 (estabilidade dos testes, desempenho da abertura do teclado, CI, galeria) — fora da fila da v1 |
 
@@ -526,30 +527,47 @@ Spec: `.specs/features/sintese-fala/` (origem Local, Sistema, OpenAI, ElevenLabs
 
 ## Bloco 14 — `flows` (aba Fluxos) — rascunho, main, fora da v1
 
-Spec: `.specs/features/flows/` (`spec.md` 56 requisitos FLX-01..FLX-56, `design.md`, `tasks.md` FLX-T1..FLX-T27). Ordem: ver o plano de execução do `tasks.md` (A modelo e dados → B executor → C integração → D telas → E fechamento).
+Spec: `.specs/features/flows/` (`spec.md` 60 requisitos FLX-01..FLX-60, `design.md`, `tasks.md` FLX-T1..FLX-T29). Ordem: ver o plano de execução do `tasks.md` (A modelo e dados → B executor → C integração → D telas → E fechamento).
 
 - **Escopo**: a aba Fluxos deixa o "Em breve": lista de cards, modal por fluxo (modelos de cada etapa + atalhos), editor de etapas em **lista vertical** reordenável (sem grafo), executor que encadeia Ditar, Capturar,
   Visão, Perguntar, Falar, Inserir e Agente com os **motores que as abas já têm**, 3 fluxos padrão e "Restaurar fluxos padrão" (recria/reescreve os padrão **sem atalhos**; não toca os da pessoa nem os gatilhos).
-  Gatilhos: **2 e 3 toques** da orbe e **botões da barra do teclado**; ligar um gesto substitui a ação dele com aviso (a ação do `Settings` não é alterada, só sombreada). Notificação fica prevista no modelo e fora da V1.
+  Gatilhos (D9, 29/10): **2 e 3 toques da orbe em três lugares — flutuante, teclado e notificação** (esta só tem toques) — e **botões da barra do teclado**; ligar um gesto substitui a ação dele com aviso (a ação do `Settings`, ou a da notificação, não é alterada, só sombreada).
+  O modelo e o roteador já trazem os três lugares; o editor entrega a orbe flutuante e o botão da barra, a orbe da notificação vem na FLX-T28 (com a NTF-T20 da feature `notification`, Bloco 15) e a do teclado na FLX-T29. A spec da orbe do teclado existe (Bloco 17): a FLX-T29 deixou de estar bloqueada por falta de spec e espera a entrega de KBO-T3 e KBO-T5. "Copiar a configuração da orbe principal" também copia os gatilhos.
 - **Prioridade**: **depois** das frentes abertas e fora do recorte da v1 (v1 só correção). Não toma a vez de nada.
 - **Depende de** (todas na `main`): `sintese-fala` (Falar), `reasoning-models` (Perguntar), `agent-harness` fase 1 (Agente), `vision-capture` VC-T4/T5/T6/T11/T15 (Capturar e Visão), `shortcut-bars` e `orb-gestures` (gatilhos).
   **Convive com**: VC-T7 (consumidor de gestos do `VisionFlow`, não muda), `bancada` BNC-T23/T27 (`Etapa`/`Fluxo` e a linha "melhor medido" nos cards; Q7) e a fase 2 do agente (o fluxo só chama o `AgentController`).
 - **Pré-requisito técnico**: FLX-T9 extrai a composição dos motores da `SetupActivity` para um objeto por processo (o `OverlayService`, que executa o fluxo, não os enxerga hoje); sem mudança visual.
-- **[YAN]**: (1) responder Q1..Q7 do `spec.md`; (2) FLX-T26: rodar o roteiro no A32 e no Vaio (RAM do fluxo 100% local no A32 de 4 GB; confirmação do agente sobre outro app; Ditar com a orbe em PTT).
-- A orbe do teclado como gatilho **não** está neste texto da `main` (aqui os Fluxos vão até a FLX-56 / FLX-T27). A FLX-T29, que espera essa orbe, entra com a branch `equipe/notificacao-spec`. A spec já existe: `.specs/features/keyboard-orb/` (Bloco 16). A ponte no fim de `flows/tasks.md` é o texto da FLX-T29 a partir de agora.
+- **[YAN]**: (1) responder Q1..Q7 e Q9 do `spec.md` (a Q8 está respondida pela spec da orbe do teclado, Bloco 17: o teclado tem as sete interações e o gatilho de fluxo continua só 2 e 3 toques); (2) FLX-T26: rodar o roteiro no A32 e no Vaio (RAM do fluxo 100% local no A32 de 4 GB; confirmação do agente sobre outro app; Ditar com a orbe em PTT).
 
----
+## Bloco 15 — `notification` (aba Notificação) — rascunho, main, fora da v1
 
-## Bloco 16 — `keyboard-orb` (orbe dentro do teclado) — rascunho, main, fora da v1
+Spec: `.specs/features/notification/` (`spec.md` 47 requisitos NTF-01..NTF-47 e os limites do Android L1..L12, `design.md`, `tasks.md` NTF-T1..NTF-T20). Ordem: ver o plano de execução do `tasks.md` (0 prova de altura → A modelo e dados → B aparência → C integração → D telas → E fechamento).
+
+- **Escopo**: a aba Notificação deixa o "Em breve" e a notificação do serviço em primeiro plano passa a ser **só a orbe**, que recebe os mesmos tipos de interação da orbe flutuante dentro do que uma notificação permite (**1, 2 e 3 toques**; segurar e arrastar não existem):
+  1 toque grava/envia; 2 e 3 toques fazem a ação escolhida por interação (catálogo nativo: retrair/expandir o teclado, trocar o teclado, ler a tela, pausar/retomar, cancelar/desfazer); "copiar a configuração da orbe principal" (padrão ligado) traz a skin e as ações da orbe flutuante e a tela lista o que é ignorado.
+  Tela bloqueada: só controla com a opção ligada (padrão **desligada**), conferida no `KeyguardManager` a cada toque; nunca há texto ditado. Dispensar (Android 14+) **não altera configuração**; a notificação volta na próxima necessidade ou ao abrir a aba; com "mostrar" desligado vale a **notificação mínima** que o Android exige.
+  Skins: Ateliê, Sistema, as pagas (renderizadas em bitmap, com o limite de bitmaps de `RemoteViews`) e pacotes com a seção `notification` (aditiva, `schemaVersion` fica em 1; qualquer combinação de orbe, teclado e notificação). Segue o claro/escuro do sistema. Sem tile, sem notificação padrão de reserva.
+- **Prioridade**: **depois** de Fluxos (Bloco 14) e fora do recorte da v1 (v1 só correção). Não toma a vez de nada. "Rodar fluxo" na notificação só entra com Fluxos (NTF-T20 ↔ FLX-T28).
+- **Depende de** (todas na `main`): `orb-gestures` (a orbe e a máquina de estados), `skin-packs` (o pacote; o `FORMAT.md` só muda junto com o parser, NTF-T8), `shortcut-bars` (a folha de ações) e `monetization` (`skinsUnlocked` para as skins pagas).
+  **Convive com**: `flows` (o gatilho `Orbe(lugar, toques)`, `LugarDaOrbe` compartilhado; `OverlayService` mexido pelas duas frentes) e a **orbe do teclado** (D1 do Yan; spec em `.specs/features/keyboard-orb/`, Bloco 17; usa o mesmo modelo de interações).
+- **Pré-requisito técnico**: NTF-T6 torna o desenho da orbe (e dos glifos) utilizável fora do Compose, para renderizar as skins pagas em bitmap; a orbe flutuante e os goldens existentes ficam bit-idênticos.
+- **Muda de propósito**: o layout `notif_recording.xml`, os goldens `notification-*` e `config-notificacao`, `RecordingNotification` e seu teste, e o texto da Docs sobre a notificação (substitui NOTIFCTL-01/02/03 da `orb-gestures`).
+- **[YAN]**: (1) responder Q1..Q10 do `spec.md` (padrão de "copiar" e pausar/cancelar, 1 toque fixo, tempo no centro, plano B se os 48 dp cortarem; a orbe do teclado já tem spec, Bloco 17); (2) NTF-T18: rodar o roteiro no A32 (bloqueio com o PIN dele, dispensar, skins pagas e pacote, latência do 1 toque). A NTF-T1 usa o A32 (`--confirmo-a32`) e **nunca** mexe no bloqueio de tela dele.
+
+## Bloco 16 — `computer-terminal` (Computador) — reservado
+
+A spec está na branch `equipe/computador-spec` (`.specs/features/computer-terminal/`). Este número fica com ela. O texto não é copiado para esta branch.
+
+## Bloco 17 — `keyboard-orb` (orbe dentro do teclado) — rascunho, main, fora da v1
 
 Spec: `.specs/features/keyboard-orb/` (`spec.md` 37 requisitos KBO-01..KBO-37, `design.md`, `tasks.md` KBO-T1..KBO-T11). Ordem: o plano de execução do `tasks.md` (A modelo JVM → B IME e aba Teclado → C goldens e gestos no emulador).
 
-O **Bloco 15** não está nesta `main`: é a aba Notificação, na branch `equipe/notificacao-spec`. Esta frente não espera o código dela. Espera o modelo de lugares quando essa branch entrar; até lá, a KBO-T1 cria `com.keyflow.orbe` com a tabela inteira (flutuante e teclado com as sete interações, notificação só com toques).
+A notificação (Bloco 15) está na `main`. Esta frente não espera o código dela. O modelo de lugares é o de `com.keyflow.orbe` (flutuante e teclado com as sete interações, notificação só com toques).
 
-- **Escopo**: a orbe no encaixe do microfone da barra. Ociosa, cabe no botão. Gravando (e nos outros estados que mostram tempo ou glifo), sobressai **36 dp acima** do teclado, na janela do IME, sem cobrir tecla e sem o app de trás contar esses 36 dp como teclado. Gestos iguais aos da orbe flutuante. "Copiar a configuração da orbe principal" vem ligado. O seletor de chips do mic sai.
-- **Prioridade**: **depois** de Fluxos no que for gatilho (a FLX-T29 depende da orbe entregue; a orbe em si não depende de Fluxos) e **fora** do recorte da v1. Não toma a vez de nada.
-- **Depende de** (na `main`): `shortcut-bars` (o encaixe `Mic`, que continua no JSON) e `orb-gestures` (os limiares e o mapa visual). **Convive com**: `flows` (gatilho `Orbe(TECLADO, 2|3)` só na FLX-T29; esta frente só deixa o gancho) e `notification` (o mesmo `LugarDaOrbe`, quando a branch entrar).
-- **[YAN]**: responder Q1..Q6 do `spec.md` (altura dos 36 dp, mic extra, arrastar fixo, copiar o modo segurar-para-falar, fluxo no único toque de gravar, pele animada).
+- **Escopo**: a orbe no encaixe do microfone da barra. Ociosa, cabe no botão. Gravando (e nos outros estados que mostram tempo ou glifo), sobressai **36 dp acima** do teclado (provisório até ver no aparelho, D5), na janela do IME, sem cobrir tecla e sem o app de trás contar esses 36 dp como teclado. A região tocável sobressalente é o conteúdo unido ao **disco** do círculo, não ao retângulo que o circunscreve. Gestos iguais aos da orbe flutuante. "Copiar a configuração da orbe principal" vem ligado e inclui o segurar-para-falar. Gravar é uma ação como as outras: substituir uma ação já atribuída só avisa. O seletor de chips do mic sai.
+- **Prioridade**: **depois** de Fluxos no que for gatilho (a FLX-T29 depende da orbe entregue, KBO-T3 e KBO-T5; a orbe em si não depende de Fluxos) e **fora** do recorte da v1. Não toma a vez de nada.
+- **Depende de** (na `main`): `shortcut-bars` (o encaixe `Mic`, que continua no JSON) e `orb-gestures` (os limiares e o mapa visual). **Convive com**: `flows` (gatilho `Orbe(TECLADO, 2|3)` na FLX-T29, já desbloqueada quanto à spec; esta frente só deixa o gancho) e `notification` (o mesmo `LugarDaOrbe`).
+- **[YAN]**: Q1..Q6 respondidas em 29/10 (D5..D10 do `spec.md`). Nada em aberto nesta frente.
 
 ---
 
@@ -561,9 +579,8 @@ feito: Q1..Q11 → SB → GT → NM → RSN → SKP → AGT fase 1 (faltam só m
 agora: (V1-10 fakes e V1-3 feitas) → upload interno → e2e MZ-T15/API-T14 → V1-4 → … → V1-8
 em paralelo: V1-9 (API-T13 na AWS) — fakes esperam o staging; o e2e real espera conta, applicationId e o upload
 depois: créditos (MZ-T5..T8, T12) e ligar API-T11/T12 · VC (visão) · TS (temas, spec a revisar) ·
-       bancada de modelos (régua do motor LiteRT-LM; Bloco 11) · parâmetros dos modelos locais (Bloco 12) · AGT fases 2/3 · síntese de fala (aba Voz, rascunho, Bloco 13) · Fluxos (aba Fluxos, spec em rascunho, Bloco 14) ·
-       orbe do teclado (rascunho, Bloco 16, fora da v1; o Bloco 15 da notificação está na branch equipe/notificacao-spec) ·
-       Computador (sem spec; ideias em .specs/features/computer-terminal/ideias.md)
+       bancada de modelos (régua do motor LiteRT-LM; Bloco 11) · parâmetros dos modelos locais (Bloco 12) · AGT fases 2/3 · síntese de fala (aba Voz, rascunho, Bloco 13) · Fluxos (aba Fluxos, spec em rascunho, Bloco 14) · Notificação (aba Notificação, spec em rascunho, Bloco 15, depois de Fluxos) ·
+       Computador (Bloco 16, spec na branch equipe/computador-spec) · orbe do teclado (rascunho, Bloco 17, fora da v1) ·
 ```
 
 **Posição atual (2026-10-23)**: o próximo marco é a **v1** (recorte no topo). V1-0, V1-1, V1-2 e

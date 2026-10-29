@@ -2,13 +2,14 @@
 
 **Spec**: `spec.md` · **Design**: `design.md`
 **Status**: spec e design em rascunho (2026-10-29), tasks **todas pendentes**. **Fora da v1** (só `main`, release seguinte). Não toma a vez de frente aberta.
+**Revisão de 29/10 (D9)**: os gatilhos de gesto passam a ser `Orbe(lugar, toques)` nos três lugares da orbe (flutuante, teclado, notificação). A T1/T2/T5 já os modelam; a tela e o disparo da notificação e do teclado são as tasks **T28** e **T29** (dependentes). As T1..T27 seguem como estavam, exceto onde o texto abaixo cita o lugar.
 
 > **Para o agente executor**: leia `spec.md` + `design.md` + este arquivo e `.specs/codebase/TESTING.md`. Uma task por vez, na ordem do plano,
 > testes primeiro, gate verde antes de avançar. Cada task é verificável sozinha. Os textos de UI que ela criar vão com ela (`tr("…")` + `i18n/en/Fluxos.kt` e
 > `i18n/es/Fluxos.kt`). Desvio da spec: registrar na task, não em silêncio.
 
 **Goal**: a aba Fluxos como lista de cards + modal com editor de etapas em lista vertical, um executor que chama os motores das abas, gatilhos nos
-2 e 3 toques e em botões da barra, três fluxos padrão e "Restaurar fluxos padrão" sem atalhos.
+2 e 3 toques da orbe (modelo nos três lugares; flutuante na V1 do editor) e em botões da barra, três fluxos padrão e "Restaurar fluxos padrão" sem atalhos.
 
 **Tech**: Kotlin · Compose · `org.json` (já no projeto) · DataStore · coroutines. **Nenhuma dependência nova** (o reordenar usa o padrão do `BarsEditor`).
 
@@ -24,6 +25,7 @@
 - **Não alterar** a `ButtonStateMachine`, o módulo `agent/` nem o formato de `bars_config_json` além do caso `flow`.
 - **Commit** em português, um por assunto, sem citar agentes de IA e sem trailers. Ao fechar a task: `Status` aqui, traceability no `spec.md`, lição em `.specs/project/licoes/` e o `STATE.md` (T27).
 - **Coordenação**: VC-T7 (consumidor de gestos do `VisionFlow`) e BNC-T23/T27 (`Etapa`/`Fluxo` da bancada) são de outras frentes; a T12 e a Q7 do spec dizem como convivem.
+  A feature `notification` (NTF-T*) compartilha `com.keyflow.orbe.LugarDaOrbe` (a T1 cria o arquivo se chegar primeiro) e mexe no mesmo `OverlayService`; a T28 depende da NTF-T13.
 
 ## Execution Plan
 
@@ -43,6 +45,7 @@ Fase D  telas:                     (T3, T4, T7) ──► T17 ──► T18 ─�
                                     (T17..T21) ──► T22
 Fase E  fechamento:                (T17..T21) ──► T23       T22 ──► T24
                                     (T14, T15, T16) ──► T25 ──► T26 [YAN] ──► T27
+Fase F  outras orbes (dependentes): (T5, T14, T15, T20, NTF-T13) ──► T28      (T5, T14, T20, KBO-T3, KBO-T5) ──► T29
 ```
 
 `[P]` = pode andar em paralelo com a fase anterior (só unit/refatoração sem comportamento novo). Tudo que usa o emulador serializa (TESTING.md). A Fase A+B
@@ -53,20 +56,20 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 ## Fase A — Modelo e dados (JVM puro)
 
 ### FLX-T1 — Modelo de domínio, limites e validação `[P]` — **Status: pendente**
-- **What**: `Tipo`, `ModeloRef`, `Etapa` (sealed, com `entrada`/`saida`/`usaModelo`), `Fluxo`, `Superficie`, `Gatilho`, `ConfigFluxos`, `LIMITES` (20/8/40/500/64) e
+- **What**: `Tipo`, `ModeloRef`, `Etapa` (sealed, com `entrada`/`saida`/`usaModelo`), `Fluxo`, `Superficie` (`Orbe(lugar, toques)` e `Barra`, com `LugarDaOrbe { FLUTUANTE, TECLADO, NOTIFICACAO }` em `com.keyflow.orbe` — D9), `Gatilho`, `ConfigFluxos`, `LIMITES` (20/8/40/500/64) e
   `ValidadorFluxo` (`validar`, `compativeis(ultimaSaida)` com motivo, aviso "sem saída"). Regra no `ArchitectureRulesTest`: `fluxos/*.kt` e `fluxos/execucao/**`, **excluindo `fluxos/app/**`**, sem `android.*`/compose/downloader/cofre.
-- **Where**: `app/src/main/java/com/keyflow/fluxos/{Modelo,ValidadorFluxo}.kt`; testes em `app/src/test/.../fluxos/`.
-- **Depends on**: —. **Requirement**: FLX-13, FLX-14, FLX-15, FLX-33 (modelo), FLX-52.
+- **Where**: `app/src/main/java/com/keyflow/fluxos/{Modelo,ValidadorFluxo}.kt`, `app/src/main/java/com/keyflow/orbe/Interacoes.kt` (só o `LugarDaOrbe`; a `notification` o completa); testes em `app/src/test/.../fluxos/`.
+- **Depends on**: —. **Requirement**: FLX-13, FLX-14, FLX-15, FLX-33 (modelo), FLX-52, FLX-57 (modelo).
 - **Done when**: unit — Ditar/Capturar só passam na posição 0; cadeia de tipos (Capturar → Perguntar inválida com o motivo certo; Capturar → Visão → Inserir válida); 0 etapas e 9 etapas inválidas;
-  `Desconhecida` invalida; `compativeis(null/TEXTO/IMAGEM)` devolve os conjuntos e motivos da spec; fluxo que termina em Perguntar é válido **com aviso**; a regra de arquitetura falha se um arquivo de `fluxos/` ou `fluxos/execucao/` importar `android.` (e não falha com `fluxos/app/`).
+  `Desconhecida` invalida; `compativeis(null/TEXTO/IMAGEM)` devolve os conjuntos e motivos da spec; fluxo que termina em Perguntar é válido **com aviso**; `Orbe(FLUTUANTE, 2)` e `Orbe(NOTIFICACAO, 2)` são superfícies diferentes (igualdade); a regra de arquitetura falha se um arquivo de `fluxos/` ou `fluxos/execucao/` importar `android.` (e não falha com `fluxos/app/`).
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(fluxos): modelo de dados e validação`.
 
 ### FLX-T2 — Codec JSON de fluxos e gatilhos — **Status: pendente**
 - **What**: `CodecFluxos` (`org.json`): `decodificarFluxos/codificarFluxos`, `decodificarGatilhos/codificarGatilhos`, esquema `v:1` (spec › Modelo de dados), `ModeloRef` como `{source, model}`,
-  superfícies `orb:N`, `bar:<id>`, `notif:<id>`; tolerância do FLX-47 (ausente → semente é da T3/T4; malformado → semente; item ruim descartado; desconhecido ignorado/`Desconhecida`; cortes; duplicatas; nunca lança).
+  superfícies `orb:<lugar>:N` (`flutuante`, `teclado`, `notificacao`; N em {2, 3}) e `bar:<id>`; tolerância do FLX-47 (ausente → semente é da T3/T4; malformado → semente; item ruim descartado; desconhecido ignorado/`Desconhecida`; cortes; duplicatas; nunca lança).
 - **Where**: `fluxos/CodecFluxos.kt`; testes `CodecFluxosTest`, `CodecFluxosPropertyTest` (kotest-property), `CodecFluxosFuzzTest`, `FluxoSemSegredoTest`.
-- **Depends on**: T1. **Requirement**: FLX-45, FLX-46, FLX-47.
-- **Done when**: round-trip com todas as etapas, as 3 superfícies (inclusive `notif:`), acentos/aspas/quebra de linha nas instruções; propriedade `decodificar(codificar(c)) == c` com gerador que respeita as normalizações;
+- **Depends on**: T1. **Requirement**: FLX-45, FLX-46, FLX-47, FLX-57 (codec).
+- **Done when**: round-trip com todas as etapas, as superfícies (a orbe nos **três lugares** e a barra), acentos/aspas/quebra de linha nas instruções; propriedade `decodificar(codificar(c)) == c` com gerador que respeita as normalizações;
   fuzz (JSON mutado, aninhamento fundo, ~10 mil entradas) nunca lança; `FluxoSemSegredoTest` falha se o JSON de um fluxo completo contiver `key`, `token`, `endpoint`, `header`, `secret` ou o valor de um segredo plantado nas `Settings`.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(fluxos): codec JSON tolerante`.
 
@@ -89,13 +92,14 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 - **Tests**: instrumentado. **Gate**: `pool instrumentar com.keyflow.data.FluxosRepositoryTest`. **Commit**: `feat(fluxos): persistência dos fluxos e gatilhos`.
 
 ### FLX-T5 — Roteador de gatilhos e política de ligação — **Status: pendente**
-- **What**: `RoteadorGatilhos.resolverToques(toques, config, settings) → Resolucao {Rodar, Incompleto, AcaoDoSettings, Nada}` (design §5.1, inclusive overflow) e `PoliticaGatilhos`
-  (`ligar`, `desligar`, `excluir`, `limpar`, `avisoDeSubstituicao`). Helper `acaoEfetivaDoGesto(toques, settings, config)` para Sobrepor/Tour.
+- **What**: `RoteadorGatilhos.resolverToques(lugar, toques, config, politica, settings) → Resolucao {Rodar, Incompleto, AcaoDoSettings, AcaoDoLugar, Nada}` (design §5.1 e §5.3: por lugar da orbe, inclusive overflow e "copiar" — `PoliticaDoLugar`) e `PoliticaGatilhos`
+  (`ligar`, `desligar`, `excluir`, `limpar`, `avisoDeSubstituicao` com o nome do lugar). Helper `acaoEfetivaDoGesto(toques, settings, config)` para Sobrepor/Tour (orbe flutuante).
 - **Where**: `fluxos/{RoteadorGatilhos,PoliticaGatilhos}.kt`; testes `RoteadorGatilhosTest`, `PoliticaGatilhosTest`.
-- **Depends on**: T1. **Requirement**: FLX-33, FLX-34, FLX-35, FLX-37, FLX-38, FLX-50.
+- **Depends on**: T1. **Requirement**: FLX-33, FLX-34, FLX-35, FLX-37, FLX-38, FLX-50, FLX-57 (roteador), FLX-60.
 - **Done when**: unit — 2 e 3 toques ligados rodam e a ação do `Settings` não; sem gatilho a ação roda; 4 toques com `NEAREST_DOWN` cai no 3 ligado a fluxo, e no 2 se o 3 está livre e sem ação; `CANCEL` não faz nada;
-  1 toque nunca é gatilho; fluxo inválido → `Incompleto` (e a ação sombreada **não** roda); `ligar` numa superfície ocupada tira do outro e nunca deixa dois; `excluir` devolve os `botaoId`; `Notificacao` é ignorada;
-  `avisoDeSubstituicao` usa o rótulo de `shortcutActionLabel` e diz "não tinha ação" para `NONE`.
+  1 toque nunca é gatilho; fluxo inválido → `Incompleto` (e a ação sombreada **não** roda); `ligar` numa superfície ocupada tira do outro e nunca deixa dois; `excluir` devolve os `botaoId`;
+  o mesmo gesto em lugares diferentes são gatilhos diferentes (`Orbe(FLUTUANTE, 2)` ≠ `Orbe(NOTIFICACAO, 2)`); `NOTIFICACAO`/`TECLADO` sem gatilho → `AcaoDoLugar(n)`; com `copiaDaPrincipal` os gatilhos lidos são os da flutuante e a lista de gatilhos **não muda** (propriedade: ligar/desligar "copiar" é só uma consulta);
+  `avisoDeSubstituicao` usa o rótulo de `shortcutActionLabel`, diz "não tinha ação" para `NONE` e nomeia o lugar quando há mais de um.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(fluxos): roteamento de gatilhos e política de ligação`.
 
 ---
@@ -186,7 +190,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 - **Tests**: instrumentado. **Gate**: `pool instrumentar com.keyflow.overlay.OverlayServiceFluxoTest`. **Commit**: `feat(fluxos): execução dos fluxos no serviço da orbe`.
 
 ### FLX-T15 — Roteamento da orbe (2 e 3 toques) — **Status: pendente**
-- **What**: `handleOrbShortcut` (`OverlayService.kt:829`) passa por `RoteadorGatilhos.resolverToques` antes do `when` de hoje (design §5.1); `Incompleto` mostra "Fluxo incompleto: abra a aba Fluxos" e não roda a ação sombreada.
+- **What**: `handleOrbShortcut` (`OverlayService.kt:829`) passa por `RoteadorGatilhos.resolverToques(FLUTUANTE, …)` antes do `when` de hoje (design §5.1); `Incompleto` mostra "Fluxo incompleto: abra a aba Fluxos" e não roda a ação sombreada.
 - **Where**: `overlay/OverlayService.kt`; teste `OverlayServiceFluxoTest` (estendido).
 - **Depends on**: T5, T14. **Requirement**: FLX-34, FLX-39.
 - **Done when**: instrumentado — com 2 toques ligado ao fluxo (portas falsas) o fluxo roda e `requestToggleKeyboardExpand` **não** é chamado; sem gatilho o comportamento de hoje (retrair/expandir, trocar IME, Visão) é idêntico e `OrbButtonViewTest`/`SettingsShortcutTest` seguem verdes;
@@ -234,12 +238,12 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 - **Tests**: unit + instrumentado. **Gate**: `quick` + `pool instrumentar com.keyflow.ui.config.FluxosSeletorModeloTest`. **Commit**: `feat(fluxos): escolha de modelo por etapa`.
 
 ### FLX-T20 — Atalhos no modal, botão da barra e excluir — **Status: pendente**
-- **What**: seção Atalhos (design §11.4): "2 toques", "3 toques" (liga/desliga com o aviso do que era antes — `avisoDeSubstituicao`), confirmação ao tirar de outro fluxo, "Botão do teclado" (adiciona/remove `RunFlow` por `atualizarFluxosEBarras`), linhas desligadas
+- **What**: seção Atalhos (design §11.4), **agrupada por lugar** (FLX-57; só os lugares que existem — na entrega desta task, a orbe flutuante e o botão do teclado; os grupos da notificação e do teclado entram na T28/T29): "2 toques", "3 toques" (liga/desliga com o aviso do que era antes — `avisoDeSubstituicao`), confirmação ao tirar de outro fluxo, "Botão do teclado" (adiciona/remove `RunFlow` por `atualizarFluxosEBarras`), linhas desligadas
   quando o fluxo é Incompleto; **Excluir fluxo** com confirmação (remove fluxo, gatilhos e botões criados, cancela se estiver rodando).
 - **Where**: `ui/config/FluxosAtalhos.kt`, `ui/config/FluxosModal.kt`; testes `FluxosAtalhosTest`.
-- **Depends on**: T5, T16, T18. **Requirement**: FLX-10, FLX-35, FLX-36, FLX-37, FLX-38, FLX-51.
+- **Depends on**: T5, T16, T18. **Requirement**: FLX-10, FLX-35, FLX-36, FLX-37, FLX-38, FLX-51, FLX-57 (modal).
 - **Done when**: instrumentado — ligar o 2 toques mostra "Isto substitui “Retrair / expandir teclado” neste gesto." e só liga ao confirmar; `Settings.shortcut2Tap` **continua** `TOGGLE_KEYBOARD`; desligar não mexe nas `Settings`; ligar uma superfície ocupada mostra "tira este atalho de “X”";
-  "Adicionar à barra" cria o botão no fim da barra principal (nos dois modos se não espelhadas) e o gatilho numa transação; excluir remove tudo e a lista atrás atualiza; fluxo Incompleto não liga.
+  "Adicionar à barra" cria o botão no fim da barra principal (nos dois modos se não espelhadas) e o gatilho numa transação; excluir remove tudo e a lista atrás atualiza; fluxo Incompleto não liga; `lugaresDisponiveis()` só devolve `FLUTUANTE` e a modal **não** mostra os grupos da notificação nem do teclado.
 - **Tests**: instrumentado (Compose + repositório). **Gate**: `pool instrumentar com.keyflow.ui.config.FluxosAtalhosTest`. **Commit**: `feat(fluxos): atalhos, botão do teclado e exclusão no modal`.
 
 ### FLX-T21 — Sobrepor e Tour mostram o gesto ligado a fluxo — **Status: pendente**
@@ -298,18 +302,26 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
   BNC-T23/T27 passam a consumir `com.keyflow.fluxos`).
 - **Where**: `.specs/features/flows/*`, `.specs/DEVELOPMENT-ORDER.md`, `.specs/project/STATE.md`, `.specs/project/licoes/`.
 - **Depends on**: T26. **Requirement**: regra de ouro 6.
-- **Done when**: gate `full` verde (unit + instrumentados afetados + goldens 0 divergências além das rotas novas); `ArchitectureRulesTest`, `TranslationsTest` e `lintDebug` verdes; requisitos → Verified (ou Parcial com o motivo).
+- **Done when**: gate `full` verde (unit + instrumentados afetados + goldens 0 divergências além das rotas novas); `ArchitectureRulesTest`, `TranslationsTest` e `lintDebug` verdes; requisitos → Verified (ou Parcial com o motivo); **FLX-58, FLX-59 e FLX-60 ficam Pending/Parcial** com o motivo "depende da T28/T29" até essas tasks fecharem.
 - **Tests**: gate completo. **Gate**: `full`. **Commit**: `docs(fluxos): fecha a frente de Fluxos`.
 
 ---
 
-## Ponte — FLX-T29 aponta para a orbe do teclado
+## Fase F — Outras orbes como gatilho (dependentes; não bloqueiam o fechamento da T27)
 
-Na `main` deste arquivo os Fluxos vão até a FLX-T27. A **FLX-T29** (gatilhos da orbe do teclado) entra com a branch `equipe/notificacao-spec`, onde ainda está escrita como **bloqueada: a orbe do teclado não tem spec** (ponta `c4bb407f`, dúvida Q8). Essa spec existe agora: `.specs/features/keyboard-orb/`. Quando as branches se encontrarem, o texto bloqueado é **substituído** pelo de baixo — não se cria uma segunda T29.
+### FLX-T28 — Gatilhos da orbe da notificação — **Status: pendente (depende da feature `notification`)**
+- **What**: o lado de Fluxos do FLX-58/FLX-60: `lugaresDisponiveis()` passa a incluir `NOTIFICACAO` quando a aba Notificação está ligada; o modal ganha o grupo **"Orbe da notificação"** (2 e 3 toques, mesmo aviso de substituir nomeando o lugar; com "copiar" ligado vira a linha somente leitura "Copiando da orbe principal" que leva à aba Notificação);
+  `RoteadorGatilhos` já resolve o lugar (T5) — esta task liga a **consulta real** do `copiaDaPrincipal`/`temAcaoPropria` à `ConfigNotificacao` e o disparo (`fluxoHost.disparar(fluxo, Orbe(NOTIFICACAO, n))`) com as precondições do FLX-39; o toque na orbe da notificação durante o fluxo o cancela (FLX-29).
+  O lado da notificação (resolução da rajada, catálogo "Rodar fluxo") é a **NTF-T20**; as duas se entregam juntas.
+- **Where**: `ui/config/FluxosAtalhos.kt`, `fluxos/app/FluxoHost.kt`, `fluxos/app/LugaresDisponiveis.kt`; testes `FluxosAtalhosTest` (estendido), `OverlayServiceFluxoTest` (estendido) e a rota `config-fluxos-atalhos-lugares` (claro/escuro).
+- **Depends on**: T5, T14, T15, T20 e **NTF-T13** (aba Notificação ligada) e **NTF-T10** (rajada de toques da notificação). **Requirement**: FLX-58, FLX-60, FLX-35 (aviso por lugar).
+- **Done when**: instrumentado — ligar o 2 toques da notificação a um fluxo mostra "… neste gesto da orbe da notificação." e só liga ao confirmar; o 2 toques da **flutuante** não muda; com "copiar" ligado o grupo some do modal e `resolverToques(NOTIFICACAO, …)` devolve o gatilho da flutuante; desligar "copiar" reativa o gatilho próprio gravado (a lista de gatilhos nunca muda ao copiar); `lugaresDisponiveis()` inclui `NOTIFICACAO` só com a aba ligada; goldens existentes bit-idênticos (a rota nova é aprovada).
+  O teste **ponta a ponta** de rodar o fluxo pelo toque na notificação (inclusive a recusa com a tela bloqueada e o cancelar no toque) mora na **NTF-T20**.
+- **Tests**: instrumentado + goldens. **Gate**: `pool instrumentar com.keyflow.ui.config.FluxosAtalhosTest com.keyflow.overlay.OverlayServiceFluxoTest com.keyflow.overlay.OverlayServiceNotificacaoTest` + `pool telas`. **Commit**: `feat(fluxos): orbe da notificação dispara fluxos`.
 
 ### FLX-T29 — Gatilhos da orbe do teclado — **Status: pendente** (spec: `.specs/features/keyboard-orb/`)
-- **What**: o mesmo da T28 para `TECLADO` (FLX-59). A spec da orbe do teclado responde a Q8: o teclado suporta as sete interações (KBO-12); gatilho de fluxo continua **só 2 e 3 toques** (FLX-57). Segurar e arrastar não viram superfície. "Copiar" é `ConfigOrbeTeclado.copiarDaOrbePrincipal` (KBO-19, KBO-31, FLX-60): com ela ligada, os gatilhos lidos são os da orbe flutuante e os próprios `Orbe(TECLADO, n)` ficam guardados. O grupo "Orbe do teclado" no modal e o disparo `fluxoHost.disparar(fluxo, Orbe(TECLADO, n))` só começam depois que a orbe estiver entregue (KBO-T3 e KBO-T5). O gancho do lado do teclado, até lá, é nulo (KBO-30) — não há ciclo.
+- **What**: o mesmo da T28 para `TECLADO` (FLX-59). A spec da orbe do teclado responde a Q8: o teclado suporta as sete interações (KBO-12); gatilho de fluxo continua **só 2 e 3 toques** (FLX-57). Segurar e arrastar não viram superfície. "Copiar" é `ConfigOrbeTeclado.copiarDaOrbePrincipal` (KBO-19, KBO-31, FLX-60): com ela ligada, os gatilhos lidos são os da orbe flutuante e os próprios `Orbe(TECLADO, n)` ficam guardados. O grupo "Orbe do teclado" no modal e o disparo `fluxoHost.disparar(fluxo, Orbe(TECLADO, n))` só começam depois que a orbe estiver entregue (KBO-T3 e KBO-T5). O gancho do lado do teclado, até lá, é nulo (KBO-30) — não há ciclo. Não se cria uma segunda T29.
 - **Where**: `ui/config/FluxosAtalhos.kt`, `fluxos/app/FluxoHost.kt`, a orbe em `ime/` chama o roteador. Spec: `.specs/features/keyboard-orb/`.
 - **Depends on**: T5, T14, T20, **KBO-T3**, **KBO-T5**. **Requirement**: FLX-59, FLX-60 (a parte do teclado).
-- **Done when**: critérios análogos aos da T28, no teclado real: ligar o 2 toques do teclado a um fluxo avisa nomeando o lugar e só liga ao confirmar; o 2 toques da flutuante não muda; com "copiar" ligado o grupo some e `resolverToques(TECLADO, …)` devolve o gatilho da flutuante; desligar "copiar" reativa o gatilho próprio (a lista não muda ao copiar); 1 toque não consulta o roteador. Instrumentado com `pool instrumentar` no emulador. **Nunca** `connectedAndroidTest` no A32. Goldens do teclado bit-idênticos, salvo rota nova aprovada de propósito.
+- **Done when**: critérios análogos aos da T28, no teclado real: ligar o 2 toques do teclado a um fluxo avisa nomeando o lugar e o que foi substituído, e só liga ao confirmar; o 2 toques da flutuante não muda; com "copiar" ligado o grupo some e `resolverToques(TECLADO, …)` devolve o gatilho da flutuante; desligar "copiar" reativa o gatilho próprio (a lista não muda ao copiar); 1 toque não consulta o roteador. Instrumentado com `pool instrumentar` no emulador. **Nunca** `connectedAndroidTest` no A32. Goldens do teclado bit-idênticos, salvo rota nova aprovada de propósito.
 - **Tests**: instrumentado + goldens. **Gate**: `pool instrumentar` das classes de atalho de Fluxos e `com.keyflow.ime.OrbeDoTecladoGestureTest`. **Commit**: `feat(fluxos): orbe do teclado dispara fluxos`.

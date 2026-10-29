@@ -3,7 +3,8 @@
 Arquitetura da aba Fluxos: modelo de dados, persistência, executor, portas para os motores que já existem, roteamento
 gatilho → fluxo e as telas. Requisitos (FLX-NN) e decisões em `spec.md`; tarefas em `tasks.md`. Feature irmã de
 `vision-capture` (a etapa Capturar é o `VisionFlow`), `sintese-fala` (Falar é o `SpeechEngine`), `reasoning-models`
-(Perguntar), `agent-harness` (Agente), `shortcut-bars` (botão da barra) e `orb-gestures` (2 e 3 toques). Aparelhos, gates e
+(Perguntar), `agent-harness` (Agente), `shortcut-bars` (botão da barra), `orb-gestures` (2 e 3 toques da orbe flutuante) e `notification` (a orbe da notificação
+como gatilho; `LugarDaOrbe` é compartilhado). Aparelhos, gates e
 convenções: `AGENTS.md` e `.specs/codebase/TESTING.md`.
 
 ## Princípio condutor
@@ -28,27 +29,29 @@ saída de uma na entrada da seguinte. Por isso:
 ```
  Gatilhos                       Roteamento                 Executor (JVM puro)               Portas (Android)            Motores que já existem
  ───────                        ──────────                 ───────────────────               ───────────────             ──────────────────────
- orbe: 2 / 3 toques ─┐                                     ExecutorFluxo.executar(fluxo)     PortaDitar     ──────────►  OverlayCoordinator (gravador, orbe,
+ orbe flutuante 2/3 ─┐                                     ExecutorFluxo.executar(fluxo)     PortaDitar     ──────────►  OverlayCoordinator (gravador, orbe,
  botão da barra ─────┼─► OverlayService ─► RoteadorGatilhos   para cada etapa:                                              RoutingTranscriber)
- (notificação*)      │   ACTION_RUN_FLOW      (puro)           entrada ─► porta ─► saída      PortaCapturar  ──────────►  VisionFlow<Bitmap> (consent, seletor)
+ orbe da notif. 2/3* ┤   ACTION_RUN_FLOW      (puro)           entrada ─► porta ─► saída      PortaCapturar  ──────────►  VisionFlow<Bitmap> (consent, seletor)
+ orbe do teclado 2/3*┤   (lugar + toques)
                      │                           │             estado ─► KeyFlowController   PortaVisao     ──────────►  VisionModelEngine / OCR local
                      │                           ▼             falha/cancela ─► encerra      PortaPerguntar ──────────►  ReasoningEngine
                      │                    FluxoHost (serviço)                                PortaFalar     ──────────►  SpeechEngine + AudioTrackPlayer
                      │                    precondições, FGS,                                 PortaInserir   ──────────►  KeyFlowController.insertOrHold
                      │                    orbe, avisos                                       PortaAgente    ──────────►  AgentController (+ janela de confirmação)
-                     └─ * superfície reservada: lida e gravada, sem efeito na V1
+                     └─ * lugares da orbe entregues por FLX-T28 (notificação) e FLX-T29 (teclado); o modelo já os traz
 ```
 
 ## 1. Pacotes e arquivos
 
 | Pacote / arquivo | Conteúdo | Puro? |
 | ---------------- | -------- | ----- |
-| `com.keyflow.fluxos` — `Modelo.kt` | `Tipo`, `ModeloRef`, `Etapa`, `Fluxo`, `Superficie`, `Gatilho`, `ConfigFluxos`, limites (`LIMITES`) | JVM |
+| `com.keyflow.fluxos` — `Modelo.kt` | `Tipo`, `ModeloRef`, `Etapa`, `Fluxo`, `Superficie` (`Orbe(lugar, toques)` e `Barra`), `Gatilho`, `ConfigFluxos`, limites (`LIMITES`) | JVM |
+| `com.keyflow.orbe` — `Interacoes.kt` | `LugarDaOrbe { FLUTUANTE, TECLADO, NOTIFICACAO }` (D9), compartilhado com a feature `notification` (que acrescenta `Interacao` e `SuporteDeInteracoes`); quem chegar primeiro cria o arquivo | JVM |
 | `fluxos/ValidadorFluxo.kt` | `validar(fluxo) → Validacao { valido, problemas[etapa, motivo], avisos }`, `compativeis(ultimaSaida)` para o seletor de etapa | JVM |
 | `fluxos/CodecFluxos.kt` | `decodificarFluxos(json)`, `codificarFluxos`, `decodificarGatilhos`, `codificarGatilhos` (org.json) | JVM |
 | `fluxos/PadroesFluxo.kt` | catálogo dos 3 padrão (`trKey`), `semear()`, `PADROES_VERSAO` | JVM |
 | `fluxos/RestauradorFluxos.kt` | `restaurar(config) → config`, `previa(config) → PreviaRestaurar` | JVM |
-| `fluxos/RoteadorGatilhos.kt` | `resolverToques(toques, config, settings) → Resolucao`; `PoliticaGatilhos` (ligar, desligar, tirar de outro, excluir fluxo, limpar órfãos) | JVM |
+| `fluxos/RoteadorGatilhos.kt` | `resolverToques(lugar, toques, config, politica, settings) → Resolucao` (por lugar da orbe, com "copiar"); `PoliticaGatilhos` (ligar, desligar, tirar de outro, excluir fluxo, limpar órfãos) | JVM |
 | `fluxos/ModeloPorEtapa.kt` | `aplicar(settings, etapa) → Settings` (cópia em memória), `efetivo(settings, etapa) → Efetivo(origem, modelo, nuvem?, provedor?)` para o selo | JVM |
 | `fluxos/execucao/ExecutorFluxo.kt` | o laço; `EstadoExecucao`; `ResultadoEtapa`; `ErroEtapa`/`CausaErro`; tempos | JVM |
 | `fluxos/execucao/Portas.kt` | as interfaces das portas e `Valor` (`Nada`/`Texto`/`Imagem(handle)`) | JVM |
@@ -111,7 +114,7 @@ suspend fun atualizarFluxosEBarras(f: (ConfigFluxos, BarsConfig) -> Pair<ConfigF
   Sem `flows_json`, `flow_triggers_json` é ignorado (FLX-40).
 - **Codec tolerante (FLX-47).** `org.json` (como `ShortcutCodec`). Regras: ignora campo desconhecido; descarta o fluxo malformado e
   mantém os outros; etapa de tipo desconhecido → `Etapa.Desconhecida`; corta nome (40), instrução/sistema (500), etapas (8),
-  fluxos (20), gatilhos (64); ids repetidos → o primeiro; gatilho com `surface` ilegível é descartado; `orb:N` fora de {2,3}
+  fluxos (20), gatilhos (64); ids repetidos → o primeiro; gatilho com `surface` ilegível é descartado; `orb:<lugar>:N` com lugar desconhecido ou N fora de {2,3}
   descartado; superfície duplicada → mantém a primeira (D7). Nunca lança.
 - **Sem segredo (FLX-46).** O codec só escreve os campos do esquema; não existe campo para chave/endpoint/header. O teste varre o
   JSON de um fluxo com todas as etapas (ver §10).
@@ -154,7 +157,7 @@ return config.copy(fluxos = resultado)          // gatilhos: a MESMA lista, sem 
 
 ## 5. Gatilhos e roteamento (`FLX-33..39`)
 
-### 5.1 Orbe: 2 e 3 toques
+### 5.1 Orbe flutuante: 2 e 3 toques
 
 Hoje: `OverlayService.handleOrbShortcut(count)` (`OverlayService.kt:829`) faz `when (cachedSettings.resolveShortcut(count))`. A
 `Settings.resolveShortcut` (`Settings.kt:270`) aplica o overflow (>3 toques: `CANCEL` ou o ativo mais próximo de 3 para 2).
@@ -162,18 +165,20 @@ Hoje: `OverlayService.handleOrbShortcut(count)` (`OverlayService.kt:829`) faz `w
 Novo, **antes** do `when`:
 
 ```kotlin
-when (val r = RoteadorGatilhos.resolverToques(count, cachedFluxos, cachedSettings)) {
-    is Resolucao.Rodar    -> fluxoHost.disparar(r.fluxo, Superficie.Orbe(r.toques))
+when (val r = RoteadorGatilhos.resolverToques(LugarDaOrbe.FLUTUANTE, count, cachedFluxos, PoliticaDoLugar.daFlutuante(cachedSettings), cachedSettings)) {
+    is Resolucao.Rodar    -> fluxoHost.disparar(r.fluxo, Superficie.Orbe(LugarDaOrbe.FLUTUANTE, r.toques))
     is Resolucao.Incompleto -> avisar(tr("Fluxo incompleto: abra a aba Fluxos"))      // não roda a ação sombreada
     is Resolucao.AcaoDoSettings -> /* o when de hoje, com r.acao */
+    is Resolucao.AcaoDoLugar -> Unit        // só TECLADO e NOTIFICACAO (§5.3); a flutuante nunca recebe
     Resolucao.Nada -> Unit
 }
 ```
 
-`resolverToques(count, config, settings)`:
-1. `n = count` se 2..3; se `count > 3`: `CANCEL` → `Nada`; `NEAREST_DOWN` → o maior `n ∈ {3, 2}` tal que `gatilho(Orbe(n)) != null || settings.shortcutForTaps(n) != NONE` (um gesto ligado a fluxo — válido ou não — conta como ativo); nenhum → `Nada`. `count < 2` → `AcaoDoSettings(shortcutForTaps(count))` (1 toque nunca é gatilho).
-2. Se `gatilho(Orbe(n))` existe: fluxo válido → `Rodar`; inválido ou sumido → `Incompleto`.
-3. Senão → `AcaoDoSettings(settings.shortcutForTaps(n))`.
+`resolverToques(lugar, count, config, politica, settings)` (puro; o mesmo para os três lugares, §5.3):
+1. **Lugar efetivo**: `lugarDosGatilhos = if (lugar != FLUTUANTE && politica.copiaDaPrincipal) FLUTUANTE else lugar` (FLX-60). Os gatilhos **próprios** do lugar que copia não são lidos nem apagados.
+2. `n = count` se 2..3; se `count > 3`: `CANCEL` → `Nada`; `NEAREST_DOWN` → o maior `n ∈ {3, 2}` tal que `gatilho(Orbe(lugarDosGatilhos, n)) != null || politica.temAcaoPropria(n)` (um gesto ligado a fluxo — válido ou não — conta como ativo; para a flutuante `temAcaoPropria = { settings.shortcutForTaps(it) != NONE }`); nenhum → `Nada`. `count < 2` → a ação própria (1 toque nunca é gatilho).
+3. Se `gatilho(Orbe(lugarDosGatilhos, n))` existe: fluxo válido → `Rodar`; inválido ou sumido → `Incompleto`.
+4. Senão → `AcaoDoSettings(settings.shortcutForTaps(n))` para a flutuante e `AcaoDoLugar(n)` para os outros (o lugar executa a ação dele: a notificação, a da config dela).
 
 **O gatilho sombreia, não sobrescreve (A3).** `Settings.shortcut2Tap/3Tap` ficam como estão; é por isso que desligar/excluir devolve a ação de graça e
 que o auto-save da tela não desfaz nada. Custo: dois lugares dizem o que o gesto faz; mitigado por (a) `OverlayPanel.ShortcutRow`
@@ -197,21 +202,41 @@ que o auto-save da tela não desfaz nada. Custo: dois lugares dizem o que o gest
   `BarsEditor` (`:575-577`) **não** ganha o caso (A4); mover/remover funcionam como em qualquer botão; remover desliga o gatilho
   no próximo `atualizarFluxos*` (limpeza de órfãos).
 
-### 5.3 Notificação (reservada, D3)
+### 5.3 Orbe da notificação e orbe do teclado (D9, FLX-57..60)
 
-`Superficie.Notificacao(acaoId)` existe no modelo e no codec (`notif:<id>`): lida, regravada, ignorada por `resolver*` e invisível na
-UI. Quando a aba Notificação tiver levantamento, o gatilho entra como mais um caso de `resolver*` e uma linha em "Atalhos" do modal;
-`RecordingNotification` (`:165-166`) ganha a ação — nada do formato muda.
+A orbe é a interface única (D9): os gatilhos de gesto são **`Orbe(lugar, toques)`**, e o roteador do §5.1 atende os três lugares com a
+mesma função pura. Nada do formato muda quando um lugar passa a existir — o modelo e o codec já os têm desde a FLX-T1/T2.
+
+```kotlin
+data class PoliticaDoLugar(
+    val overflow: ShortcutOverflow,                 // sempre o Settings.shortcutOverflow da orbe principal
+    val copiaDaPrincipal: Boolean,                  // false para a flutuante
+    val temAcaoPropria: (Int) -> Boolean,           // a ação do lugar para n toques é diferente de "Nenhuma"
+)
+```
+
+- **Orbe da notificação** (feature `notification`; só toques — 1/2/3, dos quais 2 e 3 são gatilho): depois que a rajada de toques assenta
+  (NTF-09), o `ResolvedorDeInteracao` da notificação chama `resolverToques(NOTIFICACAO, n, cachedFluxos, política)`; `Rodar` →
+  `fluxoHost.disparar(fluxo, Superficie.Orbe(NOTIFICACAO, n))`; `Incompleto` → aviso e a ação por baixo **não** roda; `AcaoDoLugar(n)` →
+  a ação da notificação. A **tela bloqueada** recusa antes de qualquer coisa (NTF-16) e o disparo passa pelas precondições do FLX-39.
+  O toque na orbe durante a execução do fluxo o cancela (FLX-29); a notificação mostra a orbe em `Transcrevendo` (detalhe: NTF-T20).
+- **Orbe do teclado** (spec `.specs/features/keyboard-orb/`; Q8 respondida): a mesma chamada com `TECLADO`. O teclado suporta as sete interações; na V1 de Fluxos só 2 e 3 toques são gatilho. A FLX-T29 espera KBO-T3 e KBO-T5.
+- **"Copiar a configuração da orbe principal"** (FLX-60, A16): com a opção ligada no lugar, `lugarDosGatilhos = FLUTUANTE`. O modal esconde o
+  grupo do lugar ("Copiando da orbe principal"); os gatilhos próprios gravados ficam intactos e voltam a valer ao desligar a opção. O estado
+  de "copiar" é da feature do lugar (`ConfigNotificacao.copiarDaOrbePrincipal`); o modal o lê, não o grava.
+- **Disponibilidade do lugar** (A15): `lugaresDisponiveis(): Set<LugarDaOrbe>` (camada Android) devolve `FLUTUANTE` sempre, `NOTIFICACAO` quando a aba
+  Notificação está ligada e `TECLADO` quando a orbe do teclado existir. Só o modal e a Sobrepor/aba do lugar a consultam; o roteador, o codec e a
+  política de ligação **não** (eles aceitam os três lugares sempre).
 
 ### 5.4 Política de ligação (`PoliticaGatilhos`, puro)
 
 | Operação | Efeito |
 | -------- | ------ |
 | `ligar(config, fluxoId, superficie)` | só se o fluxo é válido; se a superfície já tem outro fluxo → remove esse gatilho (a UI já confirmou, FLX-37); grava o novo |
-| `desligar(config, superficie)` | remove o gatilho; o gesto volta à ação do `Settings` |
+| `desligar(config, superficie)` | remove o gatilho; o gesto volta à ação do lugar (do `Settings` na flutuante; da config da aba no lugar) |
 | `excluir(config, fluxoId)` | remove o fluxo e **todos** os gatilhos dele; devolve os `botaoId` para a UI/barra removerem os botões |
 | `limpar(config, botoesDaBarra)` | tira gatilhos órfãos (FLX-50) |
-| `avisoDeSubstituicao(superficie, settings)` | texto "Isto substitui “<ação>” neste gesto." (ou "Este gesto não tinha ação.") — a ação vem de `shortcutActionLabel` |
+| `avisoDeSubstituicao(superficie, settings, configDoLugar)` | texto "Isto substitui “<ação>” neste gesto." (ou "Este gesto não tinha ação."), nomeando o lugar quando há mais de um ("… neste gesto da orbe da notificação.") — a ação vem de `shortcutActionLabel` (flutuante) ou do rótulo da ação da notificação |
 
 ## 6. Executor (`FLX-17`, `FLX-26..32`)
 
@@ -493,6 +518,21 @@ da capacidade usa (catálogo local instalado, `VisionModelCatalog`, modelos da c
 Linhas de atalho ficam desligadas quando o fluxo é Incompleto ("Complete o fluxo para ligar atalhos"). "Botão do teclado": "Adicionar à
 barra" (cria `RunFlow` + gatilho) / "Na barra · Remover". Vários botões do mesmo fluxo aparecem em lista.
 
+A seção **Atalhos** é agrupada por lugar (FLX-57), só com os lugares que existem (`lugaresDisponiveis()`, §5.3):
+
+```
+ ATALHOS
+  Orbe flutuante          2 toques [ Ligar ]  hoje: Retrair / expandir teclado
+                          3 toques [ Ligar ]  hoje: Trocar teclado do sistema
+  Orbe da notificação     2 toques [ Ligar ]  hoje: Nenhuma          ← só com a aba Notificação ligada e "copiar" desligado
+                          3 toques [ Ligar ]  hoje: Nenhuma             (com "copiar": "Copiando da orbe principal")
+  Orbe do teclado         …                                          ← só quando a orbe do teclado existir
+  Botão do teclado        [ Adicionar à barra ]
+```
+
+O aviso de substituir nomeia o lugar quando há mais de um ("Isto substitui “…” neste gesto da orbe da notificação."). O grupo de um lugar com
+"copiar" ligado vira uma linha de texto somente leitura que leva à aba do lugar.
+
 ### 11.5 Restaurar e excluir
 
 ```
@@ -514,13 +554,13 @@ quando `canAlwaysAllow`). Título pequeno acima: "Fluxo “Pedir ao agente e col
 | Camada | Teste | O que prova | Tipo |
 | ------ | ----- | ----------- | ---- |
 | Modelo | `ValidadorFluxoTest` | cadeia de tipos, entrada só na posição 0, limites, `compativeis` com motivo, aviso "sem saída" | unit |
-| Codec | `CodecFluxosTest` | round-trip com todas as etapas, os 3 tipos de superfície (inclusive `notif:`), acentos e aspas; ausente → semente; `[]` → vazio; malformado → semente; fluxo ruim descartado; etapa desconhecida; cortes; duplicatas | unit |
+| Codec | `CodecFluxosTest` | round-trip com todas as etapas, as superfícies (`orb:<lugar>:N` com lugar flutuante, teclado ou notificacao e `bar:<id>`), acentos e aspas; lugar desconhecido e `orb:flutuante:4` descartados; ausente → semente; `[]` → vazio; malformado → semente; fluxo ruim descartado; etapa desconhecida; cortes; duplicatas | unit |
 | Codec | `CodecFluxosPropertyTest` (kotest-property) | `decodificar(codificar(c)) == c` para qualquer config gerada (respeitando as normalizações) | unit |
 | Codec | `CodecFluxosFuzzTest` | entrada hostil/mutada nunca lança e sempre devolve uma `ConfigFluxos` válida | unit |
 | Segredo | `FluxoSemSegredoTest` | JSON de um fluxo completo não contém chave/token/endpoint/header; `Settings` com segredos e override → o override não leva nenhum ao fluxo | unit |
 | Padrão | `RestauradorFluxosTest` | recria o apagado sem gatilho; reescreve o editado mantendo id/posição/gatilhos; igual → nada; fluxo da pessoa idêntico e na mesma ordem; idempotência; posição pelo catálogo | unit |
 | Padrão | `RestauradorPropertyTest` | `restaurar(c).gatilhos == c.gatilhos` e `fluxos(padrao == null)` iguais, para qualquer `c` | unit |
-| Roteamento | `RoteadorGatilhosTest` | 2 e 3 toques; overflow com `NEAREST_DOWN`/`CANCEL`; gesto ligado conta como ativo; 1 toque nunca; fluxo inválido → `Incompleto`; sem gatilho → ação do `Settings` | unit |
+| Roteamento | `RoteadorGatilhosTest` | 2 e 3 toques; overflow com `NEAREST_DOWN`/`CANCEL`; gesto ligado conta como ativo; 1 toque nunca; fluxo inválido → `Incompleto`; sem gatilho → ação do `Settings` (flutuante) ou `AcaoDoLugar`; **por lugar**: o mesmo gesto em lugares diferentes são gatilhos diferentes; com "copiar" os gatilhos vêm da flutuante e os próprios do lugar ficam intactos (propriedade: ligar/desligar "copiar" nunca altera a lista de gatilhos) | unit |
 | Roteamento | `PoliticaGatilhosTest` | ligar tira de outro fluxo; desligar devolve; excluir limpa gatilhos e devolve botões; órfãos | unit |
 | Executor | `ExecutorFluxoTest` | ordem e passagem de valor; `Ok/Falha/Cancelada`; falha impede as seguintes; sem parcial; um por vez; tempo máximo com relógio virtual; `liberar()` da imagem em todo fim; cancelar corta a porta | unit (portas falsas) |
 | Modelo da etapa | `ModeloPorEtapaTest` | override só nos campos da tabela; Custom usa a aba; origem inválida → `INDISPONIVEL`; selo no aparelho/nuvem; `settings` original intacto | unit |
@@ -540,7 +580,7 @@ quando `canAlwaysAllow`). Título pequeno acima: "Fluxo “Pedir ao agente e col
 **Rotas de galeria** (`RouteCatalog`): `config-fluxos` (3 padrão, sem atalho); `config-fluxos-atalhos` (chips ligados, selo de nuvem e um card
 Incompleto); `config-fluxos-vazio`; `config-fluxos-restaurar`; `config-fluxos-modal`; `config-fluxos-modal-etapa-nova`; `config-fluxos-modal-modelo`;
 `config-fluxos-modal-incompleto`; `config-fluxos-atalho-substitui`; `config-fluxos-atalho-ocupado`; `config-fluxos-excluir`;
-`keyboard-barra-fluxo` (botão ligado e botão desligado); `config-sobrepor-atalho-fluxo`. Nenhuma rota de execução (estado "rodando" não é golden).
+`keyboard-barra-fluxo` (botão ligado e botão desligado); `config-sobrepor-atalho-fluxo`; `config-fluxos-atalhos-lugares` (a seção Atalhos agrupada por lugar, com o grupo da notificação — fixture da FLX-T28). Nenhuma rota de execução (estado "rodando" não é golden).
 Os goldens existentes ficam bit-idênticos; os de Sobrepor/barra só mudam onde há um gesto/botão de fluxo no fixture.
 
 ## 13. Riscos e coordenação
@@ -556,10 +596,12 @@ Os goldens existentes ficam bit-idênticos; os de Sobrepor/barra só mudam onde 
 | Conflito com a fase 2 do agente (`equipe/agente-fase2`, AGT-T8..T10) em `AgentController` | o fluxo só **chama** `send/cancel/respond/state`; nenhuma mudança no módulo do agente |
 | Tipos paralelos à bancada (`Capacidade`, `Etapa`/`Fluxo` do BFL-01) | Q7: a bancada passaria a consumir `com.keyflow.fluxos`; até lá os nomes `Etapa`/`Fluxo` coincidem de propósito e os pacotes são distintos (`bancada.fluxo`) |
 | `release/v1` congelada | tudo só na `main`; sem flag de build (A13) |
+| **Dois lugares da orbe dependem de outras features** (notificação: spec `notification`, código ainda por implementar; teclado: spec `keyboard-orb`) | o modelo/codec/roteador aceitam os três desde a FLX-T1/T2/T5 (nenhuma mudança de formato depois); a tela só mostra o lugar que existe (A15); FLX-T28 espera a NTF-T13 e FLX-T29 espera KBO-T3 e KBO-T5 (a spec já existe; Q8 respondida) |
+| `OverlayService` mexido por Fluxos (FLX-T11..T15) e pela Notificação (NTF-T9..T11) | cada uma extrai o que precisa em função pequena (`executarAcaoDeAtalho`, `FluxoHost`, `NotificacaoHost`); rebase curto; `LugarDaOrbe` compartilhado |
 
 ## O que NÃO muda
 
-`ButtonStateMachine`; gravação/transcrição/pendência da voz; mic do teclado e notificação; `Settings.shortcut1Tap/2Tap/3Tap` e a política de overflow
+`ButtonStateMachine`; gravação/transcrição/pendência da voz; mic do teclado e a notificação (que a feature `notification` redesenha por conta própria); `Settings.shortcut1Tap/2Tap/3Tap` e a política de overflow
 (o gatilho só **antecede**); o módulo do agente (`agent/`); `VisionFlow` além do destino do pedido; `SpeechEngine`, `ReasoningEngine` e
 `VisionModelEngine`; o downloader e o catálogo de modelos; as abas Transcrição, Visão, Raciocínio e Voz; as barras existentes e o catálogo de
 adicionar do editor; o formato do `bars_config_json` (o caso `flow` é só mais um `type`).
