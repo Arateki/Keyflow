@@ -56,7 +56,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 
 ## Fase A — Modelo e dados (JVM puro)
 
-### FLX-T1 — Modelo de domínio, limites e validação `[P]` — **Status: pendente**
+### FLX-T1 — Modelo de domínio, limites e validação `[P]` — **Status: feita**
 - **What**: `Tipo`, `ModeloRef`, `Etapa` (sealed, com `entrada`/`saida`/`usaModelo`), `Fluxo`, `Superficie` (`Orbe(lugar, toques)` e `Barra`, com `LugarDaOrbe { FLUTUANTE, TECLADO, NOTIFICACAO }` em `com.keyflow.orbe` — D9), `Gatilho`, `ConfigFluxos`, `LIMITES` (20/8/40/500/64) e
   `ValidadorFluxo` (`validar`, `compativeis(ultimaSaida)` com motivo, aviso "sem saída"). Regra no `ArchitectureRulesTest`: `fluxos/*.kt` e `fluxos/execucao/**`, **excluindo `fluxos/app/**`**, sem `android.*`/compose/downloader/cofre.
 - **Where**: `app/src/main/java/com/keyflow/fluxos/{Modelo,ValidadorFluxo}.kt`, `app/src/main/java/com/keyflow/orbe/Interacoes.kt` (só o `LugarDaOrbe`; a `notification` o completa); testes em `app/src/test/.../fluxos/`.

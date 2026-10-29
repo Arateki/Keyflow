@@ -408,9 +408,9 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 | FLX-10 | P1-B | FLX-T20 | Pending |
 | FLX-11 | P1-C | FLX-T18 | Pending |
 | FLX-12 | P1-C | FLX-T18 | Pending |
-| FLX-13 | P1-C | FLX-T1 | Pending |
-| FLX-14 | P1-C | FLX-T1, FLX-T18 | Pending |
-| FLX-15 | P1-C | FLX-T1, FLX-T18 | Pending |
+| FLX-13 | P1-C | FLX-T1 | Implementing (T1 feita) |
+| FLX-14 | P1-C | FLX-T1, FLX-T18 | Implementing (T1 feita) |
+| FLX-15 | P1-C | FLX-T1, FLX-T18 | Implementing (T1 feita) |
 | FLX-16 | P1-C | FLX-T18 | Pending |
 | FLX-17 | P1-D | FLX-T6, FLX-T14, FLX-T25 | Pending |
 | FLX-18 | P1-D | FLX-T11 | Pending |
@@ -428,7 +428,7 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 | FLX-30 | P1-D | FLX-T7, FLX-T17 | Pending |
 | FLX-31 | P1-D | FLX-T6 | Pending |
 | FLX-32 | P1-D | FLX-T14, FLX-T16 | Pending |
-| FLX-33 | P1-E | FLX-T1, FLX-T2, FLX-T5 | Pending |
+| FLX-33 | P1-E | FLX-T1, FLX-T2, FLX-T5 | Implementing (T1 feita) |
 | FLX-34 | P1-E | FLX-T5, FLX-T15, FLX-T25 | Pending |
 | FLX-35 | P1-E | FLX-T5, FLX-T20, FLX-T21, FLX-T28 | Pending |
 | FLX-36 | P1-E | FLX-T16, FLX-T20 | Pending |
@@ -447,12 +447,12 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 | FLX-49 | P1-G | FLX-T4, FLX-T14 | Pending |
 | FLX-50 | P1-G | FLX-T4, FLX-T5 | Pending |
 | FLX-51 | P2-H | FLX-T17..T21 (cada uma traz os seus textos) | Pending |
-| FLX-52 | P2-H | FLX-T1, FLX-T6, FLX-T10 | Pending |
+| FLX-52 | P2-H | FLX-T1, FLX-T6, FLX-T10 | Implementing (T1 feita) |
 | FLX-53 | P2-H | FLX-T23 | Pending |
 | FLX-54 | P2-H | FLX-T17, FLX-T18 | Pending |
 | FLX-55 | P2-H | FLX-T24 | Pending |
 | FLX-56 | P2-H | FLX-T22 | Pending |
-| FLX-57 | P2-I | FLX-T1, FLX-T2, FLX-T5, FLX-T20 | Pending |
+| FLX-57 | P2-I | FLX-T1, FLX-T2, FLX-T5, FLX-T20 | Implementing (T1 feita) |
 | FLX-58 | P2-I | FLX-T28, NTF-T20 | Pending (depende da feature `notification`) |
 | FLX-59 | P2-I | FLX-T29 | Pending (bloqueada: a orbe do teclado não tem spec) |
 | FLX-60 | P2-I | FLX-T5, FLX-T28, FLX-T29 | Pending (a parte do teclado, FLX-T29, está bloqueada: a orbe do teclado não tem spec) |
