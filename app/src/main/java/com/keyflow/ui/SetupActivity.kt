@@ -1,11 +1,5 @@
 package com.keyflow.ui
 
-import com.keyflow.vision.VisionModelEngines
-import com.keyflow.vision.VisionProvider
-import com.keyflow.vision.CloudVisionEngine
-import com.keyflow.vision.CustomVisionEngine
-import com.keyflow.vision.CustomVisionTransport
-import com.keyflow.vision.LocalVisionEngine
 import com.keyflow.ui.config.VisionModelTester
 
 import com.keyflow.i18n.tr
@@ -60,45 +54,27 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Job
 import com.keyflow.data.models.EngineType
-import com.keyflow.data.models.FileRole
 import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.ModelKind
 import com.keyflow.data.models.ModelStore
-import com.keyflow.reasoning.ReasoningEngines
-import com.keyflow.reasoning.custom.CustomReasoningEngine
 import com.keyflow.reasoning.local.LocalLlmSupport
-import com.keyflow.reasoning.local.LocalReasoningEngine
 import com.keyflow.auth.AuthController
 import com.keyflow.App
 import com.keyflow.BuildConfig
 import com.keyflow.auth.ProviderIds
 import android.speech.tts.TextToSpeech
-import com.keyflow.i18n.AppLocale
 import com.keyflow.speech.AudioTrackPlayer
-import com.keyflow.speech.SpeechDeps
-import com.keyflow.speech.cloud.MediaCodecAudioDecoder
-import com.keyflow.speech.local.AidlSpeechEndpoint
-import com.keyflow.speech.local.LocalSpeechEngine
-import com.keyflow.speech.local.SpeechConnection
-import com.keyflow.speech.system.AndroidSystemTts
-import com.keyflow.speech.system.SystemSpeechEngine
 import com.keyflow.ui.config.SpeechTester
 import com.keyflow.ui.config.AccountModel
 import com.keyflow.ui.config.AuthActions
 import com.keyflow.ui.config.ControllerAuthActions
 import com.keyflow.ui.config.DirectApiKeyActions
 import com.keyflow.reasoning.openai.OpenAiModels
-import com.keyflow.reasoning.openai.OpenAiReasoningEngine
-import com.keyflow.reasoning.anthropic.AnthropicAgentEngine
-import com.keyflow.reasoning.google.GoogleAgentEngine
-import com.keyflow.reasoning.openai.OpenAiAgentEngine
 import com.keyflow.reasoning.anthropic.AnthropicModels
-import com.keyflow.agenthost.AgentBackends
+import com.keyflow.fluxos.app.AmbienteMotores
 import com.keyflow.agenthost.AgentHost
 import kotlinx.coroutines.flow.map
-import com.keyflow.reasoning.anthropic.AnthropicReasoningEngine
 import com.keyflow.reasoning.google.GoogleModels
-import com.keyflow.reasoning.google.GoogleReasoningEngine
 import com.keyflow.ui.config.LocalModelsUi
 import com.keyflow.ui.config.LocalModelsSnapshot
 import com.keyflow.ui.config.LocalModelsController
@@ -180,55 +156,12 @@ class SetupActivity : ComponentActivity() {
     }
 
     /**
-     * O Testar da aba Voz: o motor da origem gravada (`SpeechEngines.forSource`) com o ambiente real — chaves do cofre lidas na hora da chamada
-     * (fora da main), o `TextToSpeech` do aparelho, o VITS no `:speech` Supertonic e o `AudioTrack`.
+     * O Testar da aba Voz: o motor da origem gravada (`SpeechEngines.forSource`) com o ambiente real — as dependências vêm do
+     * [AmbienteMotores] (chaves do cofre lidas na hora da chamada, o `TextToSpeech` do aparelho, o VITS no `:speech` e o
+     * `AudioTrack`); daqui só o que depende da tela: abrir a instalação dos dados do TTS.
      */
     private val speechTester by lazy {
-        val deps = SpeechDeps(
-            http = auth.http,
-            apiKey = {
-                val id = when (it) {
-                    SpeechDeps.Provider.OPENAI -> ProviderIds.OPENAI
-                    SpeechDeps.Provider.ELEVENLABS -> ProviderIds.ELEVENLABS
-                    SpeechDeps.Provider.GOOGLE -> ProviderIds.GOOGLE
-                }
-                auth.store.getApiKey(id)?.value
-            },
-            isModelInstalled = { id ->
-                ModelStore.get(this).isInstalled(id) && (!com.keyflow.data.models.VoiceLicenseGate.requiresAcceptance(id) ||
-                    com.keyflow.data.models.VoiceLicenseAcceptance(java.io.File(filesDir, "voice-license-accepted.txt")).isAccepted(id))
-            },
-            local = { id ->
-                val spec = when (id) {
-                    ModelCatalog.VITS_COQUI_PT.id -> ModelCatalog.VITS_COQUI_PT
-                    ModelCatalog.SUPERTONIC_3.id -> ModelCatalog.SUPERTONIC_3
-                    else -> null
-                }
-                if (spec == null) null
-                else LocalSpeechEngine(
-                    files = {
-                        val store = ModelStore.get(this)
-                        val supertonic = id == ModelCatalog.SUPERTONIC_3.id
-                        val accepted = !supertonic || com.keyflow.data.models.VoiceLicenseAcceptance(
-                            java.io.File(filesDir, "voice-license-accepted.txt")).isAccepted(id)
-                        val model = store.fileFor(spec, if (supertonic) FileRole.TTS_CONFIG else FileRole.MODEL)
-                        val tokens = store.fileFor(spec, if (supertonic) FileRole.UNICODE_INDEX else FileRole.TOKENS)
-                        if (supertonic) com.keyflow.speech.local.SupertonicFiles.acceptedPair(model, tokens, accepted, store.isInstalled(id))
-                        else if (!store.isInstalled(id) || model == null || tokens == null) null else model to tokens
-                    },
-                    endpoint = AidlSpeechEndpoint(SpeechConnection.get(this), spec.recommendedRamMb),
-                )
-            },
-            system = {
-                SystemSpeechEngine(
-                    open = { AndroidSystemTts(applicationContext) },
-                    interfaceLocale = { AppLocale.current.let { if (it == AppLanguage.PT) java.util.Locale("pt", "BR") else java.util.Locale(it.code) } },
-                    release = { (it as? AndroidSystemTts)?.shutdown() },
-                )
-            },
-            decoder = MediaCodecAudioDecoder(),
-        )
-        SpeechTester.of(deps, ::AudioTrackPlayer, installTtsData = {
+        SpeechTester.of(ambiente.speechDeps, ::AudioTrackPlayer, installTtsData = {
             runCatching {
                 startActivity(Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }
@@ -264,77 +197,17 @@ class SetupActivity : ComponentActivity() {
         }
     }
 
-    // O motor do Raciocínio: local pelo :reasoning; OpenAI, Anthropic e Google por APIs na nuvem com as credenciais do cofre.
-    private val reasoningEngines by lazy {
-        ReasoningEngines(
-            isModelInstalled = { ModelStore.get(this).isInstalled(it) },
-            // Um login sem tokens (o "esqueleto" da renovação que falhou) não é credencial: pede entrar de novo.
-            hasOpenAiCredential = { auth.store.getApiKey(ProviderIds.OPENAI) != null || auth.store.getOAuth(ProviderIds.OPENAI)?.isSkeleton == false },
-            hasAnthropicCredential = { auth.store.getApiKey(ProviderIds.ANTHROPIC) != null || auth.store.getOAuth(ProviderIds.ANTHROPIC)?.isSkeleton == false },
-            hasGoogleCredential = { auth.store.getApiKey(ProviderIds.GOOGLE) != null || auth.store.getOAuth(ProviderIds.GOOGLE)?.isSkeleton == false },
-            local = { LocalReasoningEngine.create(this, it) },
-            openAi = { OpenAiReasoningEngine(auth.authorization, auth.http, it) },
-            anthropic = { AnthropicReasoningEngine(auth.authorization, auth.http, it) },
-            google = { GoogleReasoningEngine(auth.authorization, auth.http, it) },
-            custom = { settings ->
-                CustomReasoningEngine(settings.reasoningCustomEndpoint, settings.reasoningCustomModel, auth.http) {
-                    if (settings.reasoningCustomHeaderName.isBlank() || settings.reasoningCustomHeaderValue.isBlank()) emptyMap()
-                    else mapOf(settings.reasoningCustomHeaderName to settings.reasoningCustomHeaderValue)
-                }
-            },
-        )
-    }
-    private val visionEngines by lazy {
-        VisionModelEngines(
-            isInstalled = { ModelStore.get(this).isInstalled(it) },
-            isLocalVision = { id -> ModelCatalog.visionModels().any {
-                it.id == id && it.engineType == EngineType.LITERT_LM
-            } },
-            hasCredential = { provider ->
-                val id = when (provider) {
-                    VisionProvider.OPENAI -> ProviderIds.OPENAI
-                    VisionProvider.ANTHROPIC -> ProviderIds.ANTHROPIC
-                    VisionProvider.GOOGLE -> ProviderIds.GOOGLE
-                }
-                auth.store.getApiKey(id) != null || auth.store.getOAuth(id)?.isSkeleton == false
-            },
-            local = { LocalVisionEngine(LocalReasoningEngine.create(this, it, vision = true)) },
-            cloud = { provider, model ->
-                val engine = when (provider) {
-                    VisionProvider.OPENAI -> OpenAiReasoningEngine(auth.authorization, auth.http, model)
-                    VisionProvider.ANTHROPIC -> AnthropicReasoningEngine(auth.authorization, auth.http, model)
-                    VisionProvider.GOOGLE -> GoogleReasoningEngine(auth.authorization, auth.http, model)
-                }
-                CloudVisionEngine(engine)
-            },
-            custom = { current -> CustomVisionEngine(CustomVisionTransport(
-                auth.http, current.visionCustomEndpoint, current.visionCustomModel,
-                current.visionCustomHeaderName, current.visionCustomHeaderValue,
-            )) },
-        )
-    }
+    // Os motores do Raciocínio e da Visão vivem no processo, não na tela: o serviço da orbe usa os mesmos nos fluxos (FLX-26).
+    private val ambiente by lazy { AmbienteMotores.of(this) }
+    private val reasoningEngines get() = ambiente.reasoning
+    private val visionEngines get() = ambiente.vision
     private val visionTester by lazy { VisionModelTester(applicationContext, visionEngines::resolve, ocrTester) }
 
     // O agente da aba KeyFlow (agent-harness): as peças vivem no processo; aqui só se escolhe, pela origem de raciocínio, se a próxima
     // mensagem usa ferramentas (Anthropic por chave de API) ou o chat de texto de sempre.
     private val agentRuntime by lazy {
         // A condição precisa estar dentro do lazy: o inicializador também é alcançável pelo R8.
-        if (BuildConfig.AGENT_ENABLED) AgentHost.of(this).runtime(
-            AgentBackends(
-                hasTools = { AgentHost.of(this).registry.all().isNotEmpty() },
-                anthropicApiKeyConnected = { auth.store.getApiKey(ProviderIds.ANTHROPIC) != null },
-                anthropicCredentialChanges = auth.store.changes(ProviderIds.ANTHROPIC).map { },
-                agentEngine = { model -> AnthropicAgentEngine(auth.authorization, auth.http, model) },
-                resolveText = reasoningEngines::resolve,
-                // OpenAI e Google (AGT-T7): ferramentas só com a CHAVE de API, como a Anthropic (o login por assinatura segue no texto).
-                openAiApiKeyConnected = { auth.store.getApiKey(ProviderIds.OPENAI) != null },
-                openAiCredentialChanges = auth.store.changes(ProviderIds.OPENAI).map { },
-                openAiAgentEngine = { model -> OpenAiAgentEngine(auth.authorization, auth.http, model) },
-                googleApiKeyConnected = { auth.store.getApiKey(ProviderIds.GOOGLE) != null },
-                googleCredentialChanges = auth.store.changes(ProviderIds.GOOGLE).map { },
-                googleAgentEngine = { model -> GoogleAgentEngine(auth.authorization, auth.http, model) },
-            ),
-        ) else null
+        if (BuildConfig.AGENT_ENABLED) ambiente.agentBackends?.let { AgentHost.of(this).runtime(it) } else null
     }
     private var localSnapshot by mutableStateOf(LocalModelsSnapshot.EMPTY)
     private var localModelsJob: Job? = null

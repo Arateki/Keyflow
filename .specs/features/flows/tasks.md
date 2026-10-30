@@ -142,7 +142,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 
 ## Fase C — Integração com o app
 
-### FLX-T9 — Composição dos motores por processo (refatoração) `[P]` — **Status: pendente**
+### FLX-T9 — Composição dos motores por processo (refatoração) `[P]` — **Status: feita**
 - **What**: extrair de `SetupActivity` (`:187`, `:269`, `:288`, `:322`) a montagem de `ReasoningEngines`, `VisionModelEngines`, `SpeechDeps` e `AgentBackends` para `AmbienteMotores.of(context)` (singleton preguiçoso, como `AgentHost.of`),
   e extrair `configDe(settings)` do `SettingsRepository.flow()` (`:396`). A `SetupActivity` passa a usá-los; **sem mudança de comportamento ou de tela**.
 - **Where**: `fluxos/app/AmbienteMotores.kt`, `ui/SetupActivity.kt`, `data/SettingsRepository.kt`.
@@ -150,6 +150,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 - **Done when**: `assembleDebug` + `testDebugUnitTest` verdes; `ConfigScreenTest`, `VozPanelTest`, `VisaoPanelTest`, `FalaPanelTest` e `ReasoningPanelTest` verdes; `scripts/verify-screens.sh` → `diff-screens.sh` com **0 divergências**;
   `configDe(settings)` tem teste unitário (mesmo `Config` que o `flow()` para o mesmo `Settings`).
 - **Tests**: unit + instrumentado das telas afetadas + goldens. **Gate**: `build` + `quick` + `pool instrumentar` das classes citadas + `pool telas`. **Commit**: `refactor: motores compostos por processo em vez de dentro da SetupActivity`.
+- **Registro (Fase A)**: `fluxos/app/AmbienteMotores.of(context)` (singleton por processo, como o `AgentHost.of`, tudo `lazy`): `reasoning`, `vision`, `speechDeps` e `agentBackends`, movidos da `SetupActivity` sem mudar o corpo (só `this` → contexto da aplicação). A tela continua montando o `SpeechTester` (abrir a instalação dos dados do TTS é da Activity), o `VisionModelTester` e o `agentRuntime`. `agentBackends` é `null` quando o agente está desligado no build: a condição `BuildConfig.AGENT_ENABLED` fica dentro do `lazy` (o R8 alcança o inicializador). `configDe(settings, credenciais)` saiu do `SettingsRepository.flow()` (que o chama): mesma `Settings`, mesma `Config`, testado por origem em `ConfigDeSettingsTest`. O `AmbienteMotores.settings` do desenho ficou para a T10 (nada o usa ainda).
 
 ### FLX-T10 — Portas Perguntar, Visão, Falar e Inserir — **Status: pendente**
 - **What**: as quatro portas reais (design §7): `PortaPerguntar` (acumula `Delta`, só `Done` entrega), `PortaVisao` (`VisionImage.encode`, `VisionModelEngines`/OCR local, `Empty → VAZIO`), `PortaFalar` (`SpeechEngines`, `DivisorDeFala`,
