@@ -98,7 +98,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 - **Where**: `fluxos/{RoteadorGatilhos,PoliticaGatilhos}.kt`; testes `RoteadorGatilhosTest`, `PoliticaGatilhosTest`.
 - **Depends on**: T1. **Requirement**: FLX-33, FLX-34, FLX-35, FLX-37, FLX-38, FLX-50, FLX-57 (roteador), FLX-60.
 - **Done when**: unit — 2 e 3 toques ligados rodam e a ação do `Settings` não; sem gatilho a ação roda; 4 toques com `NEAREST_DOWN` cai no 3 ligado a fluxo, e no 2 se o 3 está livre e sem ação; `CANCEL` não faz nada;
-  1 toque nunca é gatilho; fluxo inválido → `Incompleto` (e a ação sombreada **não** roda); `ligar` numa superfície ocupada tira do outro e nunca deixa dois; `excluir` devolve os `botaoId`;
+  1 toque nunca é gatilho na flutuante (e é gatilho em `NOTIFICACAO`, onde é remapeável); fluxo inválido → `Incompleto` (e a ação sombreada **não** roda); `ligar` numa superfície ocupada tira do outro e nunca deixa dois; `excluir` devolve os `botaoId`;
   o mesmo gesto em lugares diferentes são gatilhos diferentes (`Orbe(FLUTUANTE, 2)` ≠ `Orbe(NOTIFICACAO, 2)`); `NOTIFICACAO`/`TECLADO` sem gatilho → `AcaoDoLugar(n)`; com `copiaDaPrincipal` os gatilhos lidos são os da flutuante e a lista de gatilhos **não muda** (propriedade: ligar/desligar "copiar" é só uma consulta);
   `avisoDeSubstituicao` nomeia ação/fluxo efetivo anterior e toque/gesto/botão/lugar para qualquer substituição; não privilegia gravar. `NONE`/mesma ação não gera aviso de perda; fluxo já ligado usa seu nome, não a ação sombreada.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(fluxos): roteamento de gatilhos e política de ligação`.
@@ -310,7 +310,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 ## Fase F — Outras orbes como gatilho (dependentes; não bloqueiam o fechamento da T27)
 
 ### FLX-T28 — Gatilhos da orbe da notificação — **Status: pendente (depende da feature `notification`)**
-- **What**: o lado de Fluxos do FLX-58/FLX-60: `lugaresDisponiveis()` passa a incluir `NOTIFICACAO` quando a aba Notificação está ligada; o modal ganha o grupo **"Orbe da notificação"** (2 e 3 toques, mesmo aviso de substituir nomeando o lugar; com "copiar" ligado vira a linha somente leitura "Copiando da orbe principal" que leva à aba Notificação);
+- **What**: o lado de Fluxos do FLX-58/FLX-60: `lugaresDisponiveis()` passa a incluir `NOTIFICACAO` quando a aba Notificação está ligada; o modal ganha o grupo **"Orbe da notificação"** (1, 2 e 3 toques, mesmo aviso de substituir nomeando o lugar; com "copiar" ligado vira a linha somente leitura "Copiando da orbe principal" que leva à aba Notificação);
   `RoteadorGatilhos` já resolve o lugar (T5) — esta task liga a **consulta real** do `copiaDaPrincipal`/`temAcaoPropria` à `ConfigNotificacao` e o disparo (`fluxoHost.disparar(fluxo, Orbe(NOTIFICACAO, n))`) com as precondições do FLX-39; o toque na orbe da notificação durante o fluxo o cancela (FLX-29).
   O lado da notificação (resolução da rajada, catálogo "Rodar fluxo") é a **NTF-T20**; as duas se entregam juntas.
 - **Where**: `ui/config/FluxosAtalhos.kt`, `fluxos/app/FluxoHost.kt`, `fluxos/app/LugaresDisponiveis.kt`; testes `FluxosAtalhosTest` (estendido), `OverlayServiceFluxoTest` (estendido) e a rota `config-fluxos-atalhos-lugares` (claro/escuro).
