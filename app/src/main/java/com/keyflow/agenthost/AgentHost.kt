@@ -35,6 +35,23 @@ class AgentParts internal constructor(
     val secretFilter: SecretFilter,
 ) {
     fun runtime(backends: AgentBackends) = AgentRuntime(controller, registry, policy, actionLog, backends)
+
+    /**
+     * Uma sessão **exclusiva** para uma execução de fluxo (FLX-24, D10): controlador, [ConfirmationGate], [ToolPolicy] e executor
+     * novos, ligados entre si, sobre o **mesmo** catálogo, a mesma configuração de política, o mesmo registro e o mesmo filtro de
+     * segredos do chat. O chat da aba (controlador, histórico e painel) não é tocado: o pedido do fluxo não leva o histórico dele,
+     * cancelar um não cancela o outro e as confirmações não se cruzam. Quem chama é dono de [scope] e o cancela ao terminar.
+     */
+    fun novaSessao(scope: CoroutineScope, clock: () -> Long = System::currentTimeMillis): AgentParts {
+        val sessionGate = ConfirmationGate()
+        val toolPolicy = ToolPolicy(
+            config = { policy.config.value },
+            onAlwaysAllow = { name -> policy.update { it.copy(alwaysAllowed = it.alwaysAllowed + name) } },
+        )
+        val sessionExecutor = ToolExecutor(registry, toolPolicy, sessionGate, secretFilter, actionLog, clock)
+        val sessionController = AgentController(scope, sessionExecutor, sessionGate, actionLog, awaitReady = policy::awaitLoaded)
+        return AgentParts(sessionController, registry, policy, actionLog, sessionExecutor, sessionGate, secretFilter)
+    }
 }
 
 /**
