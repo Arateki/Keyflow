@@ -70,6 +70,16 @@ class DivisorDeFalaTest {
     }
 
     @Test
+    fun `reticencias terminam a frase como o ponto`() {
+        val texto = "Espera… Talvez sim… Talvez não."
+        // Com as reticências como fim de frase são três frases; sem elas seria uma só, de 31 caracteres, cortada no espaço.
+        assertThat(DivisorDeFala.dividir(texto, max = 15)).containsExactly("Espera…", "Talvez sim…", "Talvez não.").inOrder()
+        assertThat(DivisorDeFala.dividir("Pois é… Ainda assim. Fim.", max = 12)).containsExactly("Pois é…", "Ainda assim.", "Fim.").inOrder()
+        // e três pontos seguidos também
+        assertThat(DivisorDeFala.dividir("Espera... Talvez sim... Talvez não.", max = 15)).containsExactly("Espera...", "Talvez sim...", "Talvez não.").inOrder()
+    }
+
+    @Test
     fun `ponto no meio de um numero nao e fim de frase`() {
         // Se o "3." valesse como fim de frase, o primeiro trecho acabaria nele (21 caracteres cabem em 21).
         val texto = "a".repeat(18) + " 3.14 fim"
