@@ -69,6 +69,14 @@ class FluxoHost(
         return true
     }
 
+    /** O botão aceso cancela o seu fluxo fora do Ditar; novos disparos continuam passando pelas guardas. */
+    fun cancelarPeloBotao(fluxoId: String?): Boolean {
+        val estado = executor.estado.value as? EstadoExecucao.Rodando ?: return false
+        if (!ativo || estado.fluxoId != fluxoId || estado.etapa == TipoEtapa.DITAR) return false
+        cancelar()
+        return true
+    }
+
     fun cancelar() {
         executor.cancelar()
         job?.cancel()

@@ -207,6 +207,8 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 
 - **Correção da revisão C2 (2026-10-30, arrasto)**: `REPOSITION_ONLY` não cancela uma execução ativa; o caminho sem fluxo fica como antes. Três regressões enviam MotionEvent DOWN/MOVE/UP em Perguntar, Falar e Agente, conferem deslocamento, etapa/estado preservados e conclusão. As três falharam antes da correção por cancelamento indevido; depois, host e orbe passaram 31/31. Lição: `licoes/2026-10-30-fluxos-reposicionamento.md`.
 
+- **Correção da revisão C2 (2026-10-30, botão aceso)**: o serviço identifica pedidos da barra e `FluxoHost.cancelarPeloBotao` compara o id do fluxo em execução, fora do Ditar. Cancela também se a execução começou manualmente; botão de outro fluxo, novo pedido manual e retocar durante Ditar continuam recusados. O teste do IME injeta dois toques no mesmo botão e confere a porta cancelada, sem executar Inserir. Antes da correção, os dois cancelamentos falharam e as três recusas passaram (3/5). Depois, regressão 52/52, unitários 2663/2663 e lint verdes. Lição: `licoes/2026-10-30-fluxos-botao-cancelamento.md`.
+
 ### FLX-T15 — Roteamento da orbe (2 e 3 toques) — **Status: feita (2026-10-30; equipe/fluxos-fase-c2)**
 - **What**: `handleOrbShortcut` (`OverlayService.kt:829`) passa por `RoteadorGatilhos.resolverToques(FLUTUANTE, …)` antes do `when` de hoje (design §5.1); `Incompleto` mostra "Fluxo incompleto: abra a aba Fluxos" e não roda a ação sombreada.
 - **Where**: `overlay/OverlayService.kt`; teste `OverlayServiceFluxoTest` (estendido).

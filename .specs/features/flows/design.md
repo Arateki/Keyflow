@@ -194,6 +194,7 @@ que o auto-save da tela não desfaz nada. Custo: dois lugares dizem o que o gest
 - `BarView` ganha o callback `onRunFlow(botaoId)`; o `KeyFlowKeyboardService` o liga a
   `startForegroundService(OverlayService.actionIntent(ctx, ACTION_RUN_FLOW).putExtra(EXTRA_BOTAO_ID, id))` — o mesmo caminho do
   `ACTION_KEYBOARD_MIC`. O IME **não** conhece o fluxo: o serviço resolve `Barra(botaoId)` → fluxo pelo `cachedFluxos`.
+  Fora do Ditar, o botão ligado ao fluxo ativo o cancela, inclusive quando iniciado por Rodar agora ou pela orbe; a comparação é pelo id do fluxo. Botão de outro fluxo, novo disparo manual e gatilho da orbe continuam recusados enquanto há execução. Durante Ditar, retocar o botão de fluxo também recusa; os controles da gravação permanecem os de sempre.
 - **Desabilitado quando órfão** (como `GridTrigger` com `gridId` órfão): o IME recebe `ConfigFluxos` no mesmo `combine` que já
   junta `barsConfigFlow()` e `shortcutGridsFlow()` (`KeyFlowKeyboardService.kt:175`) e passa à `BarView` o conjunto de `botaoId` com
   gatilho válido.

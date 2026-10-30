@@ -766,10 +766,11 @@ class OverlayService : Service() {
         if (!settingsReady || !fluxosReady || destroying) return
         val pedido = pendingRunFlow ?: return
         pendingRunFlow = null
-        val id = pedido.getStringExtra(EXTRA_FLUXO_ID) ?: pedido.getStringExtra(EXTRA_BOTAO_ID)?.let {
-            cachedFluxos.gatilho(Superficie.Barra(it))?.fluxoId
-        }
-        fluxoHost.disparar(cachedFluxos.fluxos.firstOrNull { it.id == id })
+        val idManual = pedido.getStringExtra(EXTRA_FLUXO_ID)
+        val botaoId = pedido.getStringExtra(EXTRA_BOTAO_ID)
+        val id = idManual ?: botaoId?.let { cachedFluxos.gatilho(Superficie.Barra(it))?.fluxoId }
+        val cancelou = idManual == null && botaoId != null && fluxoHost.cancelarPeloBotao(id)
+        if (!cancelou) fluxoHost.disparar(cachedFluxos.fluxos.firstOrNull { it.id == id })
         maybeStopWhenIdle(coordinator.currentState())
     }
 

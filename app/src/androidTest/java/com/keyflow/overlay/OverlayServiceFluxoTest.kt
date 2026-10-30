@@ -130,9 +130,9 @@ class OverlayServiceFluxoTest {
         }
     }
 
-    private fun disparar(manual: Boolean = false, fluxoId: String = fluxo.id) = OverlayService.start(context,
+    private fun disparar(manual: Boolean = false, fluxoId: String = fluxo.id, botaoId: String = "b-servico") = OverlayService.start(context,
         OverlayService.actionIntent(context, "com.keyflow.overlay.RUN_FLOW")
-            .putExtra(if (manual) "fluxo_id" else "botao_id", if (manual) fluxoId else "b-servico"))
+            .putExtra(if (manual) "fluxo_id" else "botao_id", if (manual) fluxoId else botaoId))
 
     @Test fun actionRunFlowExecutaAsEtapasEmOrdem() = runBlocking {
         disparar()
@@ -160,13 +160,73 @@ class OverlayServiceFluxoTest {
         bloquearPerguntar(pronto, fim, cancelou)
         disparar(manual = true)
         withTimeout(15_000) { pronto.await() }
-        disparar()
+        disparar(manual = true)
         aguardar("segundo disparo não avisou") { avisos.contains(tr("Já há um fluxo em andamento")) }
         assertEquals(listOf(TipoEtapa.DITAR, TipoEtapa.PERGUNTAR), chamadas.toList())
         assertFalse(cancelou.isCompleted)
         assertEquals(antes, repo.configFluxosOnce())
         fim.complete(Unit)
         aguardar("primeiro fluxo foi interrompido") { chamadas.size == 3 }
+    }
+
+    @Test fun botaoDoFluxoIniciadoManualmenteCancelaSemAviso() = runBlocking {
+        val pronto = CompletableDeferred<Unit>()
+        val cancelou = CompletableDeferred<Unit>()
+        bloquearPerguntar(pronto, CompletableDeferred(), cancelou)
+        disparar(manual = true)
+        withTimeout(15_000) { pronto.await() }
+        disparar()
+        withTimeout(15_000) { cancelou.await() }
+        aguardar("o botão do fluxo não publicou Cancelado") { KeyFlowController.fluxo.value is EstadoExecucao.Cancelado }
+        assertEquals(listOf(TipoEtapa.DITAR, TipoEtapa.PERGUNTAR), chamadas.toList())
+        assertTrue(avisos.isEmpty())
+        aguardar("cancelar pelo botão não liberou o serviço") { OverlayService.instanceForVisionTest == null }
+    }
+
+    @Test fun outroBotaoRecusaSemCancelarFluxoAtivo() = runBlocking {
+        val outro = fluxo.copy(id = "f-outro", nome = "Outro fluxo")
+        repo.atualizarFluxosEBarras { config, barras ->
+            config.copy(fluxos = config.fluxos + outro,
+                gatilhos = config.gatilhos + Gatilho(Superficie.Barra("b-outro"), outro.id)) to
+                barras.copy(collapsed = listOf(com.keyflow.core.shortcuts.BarDef(listOf(
+                    com.keyflow.core.shortcuts.BarButton.RunFlow("b-servico"),
+                    com.keyflow.core.shortcuts.BarButton.RunFlow("b-outro")))))
+        }
+        val pronto = CompletableDeferred<Unit>()
+        val fim = CompletableDeferred<Unit>()
+        val cancelou = CompletableDeferred<Unit>()
+        bloquearPerguntar(pronto, fim, cancelou)
+        disparar()
+        withTimeout(15_000) { pronto.await() }
+        disparar(botaoId = "b-outro")
+        aguardar("outro botão não avisou") { avisos.contains(tr("Já há um fluxo em andamento")) }
+        assertFalse(cancelou.isCompleted)
+        assertEquals(fluxo.id, (KeyFlowController.fluxo.value as EstadoExecucao.Rodando).fluxoId)
+        assertEquals(listOf(TipoEtapa.DITAR, TipoEtapa.PERGUNTAR), chamadas.toList())
+        fim.complete(Unit)
+        aguardar("outro botão interrompeu a execução original") { chamadas.size == 3 }
+    }
+
+    @Test fun retocarBotaoDuranteDitarRecusaSemCancelar() = runBlocking {
+        val pronto = CompletableDeferred<Unit>()
+        val fim = CompletableDeferred<Unit>()
+        val cancelou = CompletableDeferred<Unit>()
+        corpo = { etapa, _ ->
+            chamadas += etapa.tipo
+            if (etapa is Etapa.Ditar) {
+                pronto.complete(Unit)
+                try { fim.await() } finally { if (!fim.isCompleted) cancelou.complete(Unit) }
+            }
+            ResultadoEtapa.Ok(Valor.Texto("texto"))
+        }
+        disparar()
+        withTimeout(15_000) { pronto.await() }
+        disparar()
+        aguardar("retocar durante Ditar não avisou") { avisos.contains(tr("Já há um fluxo em andamento")) }
+        assertFalse(cancelou.isCompleted)
+        assertEquals(TipoEtapa.DITAR, (KeyFlowController.fluxo.value as EstadoExecucao.Rodando).etapa)
+        fim.complete(Unit)
+        aguardar("retocar durante Ditar interrompeu o fluxo") { chamadas.size == 3 }
     }
 
     @Test fun modoSoTecladoMantemForegroundEntreEtapasEAoFimEncerra() = runBlocking {
