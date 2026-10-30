@@ -16,3 +16,14 @@ de Markus Kuhn (2007) tem permissão expressa de uso, cópia, modificação e di
 O JNI inclui runtimes estáticos libc++, libc++abi, libunwind e compiler-rt do Android NDK,
 sob Apache-2.0 com exceção LLVM, com os avisos históricos preservados.
 Textos completos em app/licenses/ e origem/patches em third_party/termlib/UPSTREAM.md.
+
+A conexão SSH usa ConnectBot sshlib/protocol 0.6.6 (Apache-2.0). O grafo real do
+terminal inclui 126 componentes, inventariados em app/licenses/Computador-transitivas.md
+e computador-dependencias.json, com os avisos fornecidos nos artefatos preservados
+em app/licenses/computador/. Além de Apache-2.0, há MIT (Kaitai/SLF4J),
+Boost Software License 1.0 (kstatemachine), ISC (jbcrypt) e BSD-3-Clause (protobuf).
+Nenhum código dos geradores kitty, imgcat, Chafa ou Herdr integra o aplicativo.
+
+O cbssh também preserva trechos do Bouncy Castle, Copyright (c) 2000-2026
+The Legion of the Bouncy Castle Inc., sob MIT; aviso completo em
+app/licenses/MIT_bouncycastle-cbssh.txt.

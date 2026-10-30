@@ -1,7 +1,7 @@
 # Computador (terminal SSH) — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md`
-**Status**: spec e design em rascunho (2026-10-29), CMP-T0 verificada; demais tasks pendentes. **Fora da v1** (só `main`, release seguinte). Não toma a vez de frente aberta.
+**Status**: spec e design em rascunho (2026-10-29), CMP-T0, CMP-T1 e CMP-T3 verificadas; CMP-T4 pendente. **Fora da v1** (só `main`, release seguinte). Não toma a vez de frente aberta.
 
 > **Para o agente executor**: leia `spec.md` + `design.md` + este arquivo e `.specs/codebase/TESTING.md`. Uma task por vez, na ordem do plano,
 > testes primeiro, gate verde antes de avançar. Cada task é verificável sozinha. Os textos de UI que ela criar vão com ela (`tr("…")` +
@@ -72,7 +72,12 @@ Gates completos do mesmo SHA: [Checks 41073156978](https://github.com/Arateki/Ke
   **Contingência (plano B, só se a frente de toolchain travar ou for adiada)**: ver `design.md` §2.4 — fork preso ao toolchain atual (CMP-T3 deixa de ser condicional). O plano B **não** é o caminho padrão.
 - **Tests**: — (portão). **Gate**: `quick` + `build` + `lint` + `pool telas` na `main` atualizada. **Commit**: nenhum (registro em `licoes/`).
 
-### CMP-T1 — Spike A: termlib + cbssh no toolchain novo, imagens e entrada — **Status: em andamento; diagnóstico estático registrado em 2026-10-30**
+### CMP-T1 — Spike A: termlib + cbssh no toolchain novo, imagens e entrada — **Status: concluída em 2026-10-30**
+
+Retomada: build/lint verdes, 2.709/2.709 JVM e 20/20 instrumentados. Tabela medida dos sete itens na lição.
+**SPEC_DEVIATION:** bancada nesta branch; Herdr usa a=t/a=p nesta captura e placeholders são testados à parte.
+Duplicação no caminho duplo e composição sem bytes são achados, não entrada de produção aprovada.
+KeyFlow/Gboard/orbe físicos e qualidade do transcodificador sixel permanecem **não medidos**, como permitido no spike.
 
 A [lição](../../project/licoes/2026-10-30-computador-a.md) registra a ausência de mouse na API/JNI 0.3.14, scrollback privado de 1.000 linhas e
 callbacks nativos adiados. **SPEC_DEVIATION:** inspeção inicial na branch `equipe/computador-a`, sem Activity descartável;

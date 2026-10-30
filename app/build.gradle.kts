@@ -1,8 +1,15 @@
 import com.keyflow.admob.AdMobIds
 import com.keyflow.onnxbuild.ElfVersionTags
 import com.android.build.api.variant.ResValue
+import groovy.json.JsonOutput
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+import org.gradle.api.artifacts.component.ProjectComponentIdentifier
+import org.gradle.api.artifacts.result.ResolvedComponentResult
+import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import java.io.File
 import java.net.URI
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
@@ -240,6 +247,7 @@ android {
         getByName("test") { java.srcDir("../buildSrc/src/main/java") }
         getByName("androidTest") {
             assets.srcDir("../skin-packs")
+            assets.srcDir("src/test/resources")
         }
     }
 }
@@ -545,6 +553,9 @@ tasks.withType<Test>().configureEach {
 
 dependencies {
     implementation(project(":termlib"))
+    // CMP-T1: versões exatas; grafo, hashes e licenças auditados juntos.
+    implementation("org.connectbot.sshlib:sshlib:0.6.6")
+    implementation("org.connectbot.sshlib:protocol:0.6.6")
     // UI
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
@@ -704,4 +715,82 @@ tasks.register<JavaExec>("pitest") {
             "--timeoutConst=8000",
         )
     })
+}
+
+// A auditoria parte do grafo realmente selecionado pelo release, inclusive overrides do BOM do app.
+val grafoTerminal = layout.buildDirectory.file("reports/computador/dependencias-terminal.json")
+val gerarGrafoTerminal = tasks.register("gerarGrafoTerminal") {
+    outputs.file(grafoTerminal)
+    // Uma mudança no grafo precisa ser observada mesmo com o relatório antigo presente.
+    outputs.upToDateWhen { false }
+    doLast {
+        val config = configurations.getByName("releaseRuntimeClasspath")
+        val componentes = linkedMapOf<String, ResolvedComponentResult>()
+        val visitados = mutableSetOf<String>()
+        fun visitar(componente: ResolvedComponentResult) {
+            if (!visitados.add(componente.id.displayName)) return
+            val id = componente.id
+            if (id is ModuleComponentIdentifier) componentes["${id.group}:${id.module}:${id.version}"] = componente
+            componente.dependencies.filterIsInstance<ResolvedDependencyResult>().filter { !it.isConstraint }.forEach { visitar(it.selected) }
+        }
+        val raizes = config.incoming.resolutionResult.rootComponent.get().dependencies
+            .filterIsInstance<ResolvedDependencyResult>().filter {
+                val id = it.selected.id
+                (id is ProjectComponentIdentifier && id.projectPath == ":termlib") ||
+                    (id is ModuleComponentIdentifier && id.group == "org.connectbot.sshlib")
+            }
+        check(raizes.size >= 2) { "Não achei termlib e cbssh no grafo do release" }
+        raizes.forEach { visitar(it.selected) }
+        val artefatos = config.incoming.artifactView {
+            componentFilter { it is ModuleComponentIdentifier }
+        }.artifacts.artifacts.groupBy { it.id.componentIdentifier.displayName }
+        val dados = componentes.keys.sorted().map { id ->
+            mapOf("coordinate" to id, "artifacts" to artefatos[id].orEmpty().sortedBy { it.file.name }.map {
+                mapOf("name" to it.file.name, "sha256" to sha256Of(it.file), "file" to it.file.absolutePath)
+            })
+        }
+        val alvo = grafoTerminal.get().asFile
+        alvo.parentFile.mkdirs()
+        alvo.writeText(JsonOutput.prettyPrint(JsonOutput.toJson(dados)) + "\n")
+        logger.lifecycle("Terminal: ${dados.size} componentes resolvidos para auditoria")
+    }
+}
+tasks.withType<Test>().configureEach {
+    dependsOn(gerarGrafoTerminal)
+    inputs.file(grafoTerminal)
+    inputs.file(layout.projectDirectory.file("licenses/computador-dependencias.json"))
+    inputs.file(rootProject.file("third_party/termlib/native-manifest.json"))
+    inputs.dir(rootProject.file("third_party/termlib/src/main/cpp"))
+    inputs.file(layout.projectDirectory.file("libs/termlib-jni-$termlibNativoVersion.zip"))
+}
+
+// CMP-T1: devolve as medidas mesmo se o pool descartar o worker e não transportar o APK.
+val medirApkTerminal = tasks.register("medirApkTerminal") {
+    doLast {
+        val apk = layout.buildDirectory.file("outputs/apk/debug/app-debug.apk").get().asFile
+        check(apk.isFile) { "APK debug ausente para medição" }
+        val dex = linkedMapOf<String, Int>()
+        ZipFile(apk).use { zip ->
+            zip.entries().asSequence().filter { Regex("""classes\d*\.dex""").matches(it.name) }.forEach { entrada ->
+                val header = zip.getInputStream(entrada).use { it.readNBytes(112) }
+                check(header.size == 112 && String(header, 0, 3, Charsets.US_ASCII) == "dex")
+                dex[entrada.name] = ByteBuffer.wrap(header).order(ByteOrder.LITTLE_ENDIAN).getInt(0x58)
+            }
+        }
+        val dados = mapOf("bytes" to apk.length(), "sha256" to sha256Of(apk), "metodos_dex_referencias" to dex.values.sum(), "dex" to dex)
+        val alvo = layout.buildDirectory.file("reports/computador/apk-debug.json").get().asFile
+        alvo.parentFile.mkdirs()
+        alvo.writeText(JsonOutput.prettyPrint(JsonOutput.toJson(dados)) + "\n")
+        logger.lifecycle("Terminal: APK ${apk.length()} bytes, ${dex.values.sum()} referências de métodos DEX")
+    }
+}
+tasks.matching { it.name == "assembleDebug" }.configureEach { finalizedBy(medirApkTerminal) }
+
+// AndroidX Security já traz tink-android. O core JVM do cbssh duplicaria as mesmas classes.
+configurations.configureEach {
+    resolutionStrategy.dependencySubstitution {
+        substitute(module("com.google.crypto.tink:tink"))
+            .using(module("com.google.crypto.tink:tink-android:1.24.0"))
+            .because("Uma única variante Tink no APK, incluindo a integração Android usada pelo cofre")
+    }
 }

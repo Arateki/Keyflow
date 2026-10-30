@@ -1,8 +1,8 @@
-# 2026-10-30 — Portão do toolchain e interrupção do spike do Computador
+# 2026-10-30 — Toolchain, JNI e bancada do Computador
 
 Branch `equipe/computador-a`, base `c1480992366c8dce6f0fa021ae833c0e9db0d4f8` da `origin/main`.
-Neste registro inicial não há dependência nova de terminal, fork nem servidor. O diagnóstico e a retomada
-autorizada da CMP-T3 serão registrados separadamente.
+As seções iniciais preservam o diagnóstico que motivou a CMP-T3. Os resultados da retomada autorizada
+estão nas seções finais; as medições iniciais não representam o estado final da branch.
 
 ## CMP-T0 — Toolchain
 
@@ -151,4 +151,80 @@ publicada com `--force`. A task permanece em andamento até os gates do módulo 
 - A primeira catraca do fonte encontrou ordens diferentes (caminho inteiro versus componentes). A ordem
   canônica por componentes foi alinhada ao empacotador, sem mudar o hash nem o binário aprovado.
 - O lint adicional do módulo estava habilitando regras não triadas. Foi alinhado ao `NewApi` do app;
-  a análise anterior foi interrompida depois dos gates requeridos e a repetição está registrada separadamente.
+  a análise anterior foi interrompida depois dos gates requeridos; a repetição passou em 12min30s
+  (`t3-empacotamento-lint.log`), incluindo `:app:lintDebug`.
+
+
+## CMP-T1 — Bancada integrada após o fork
+
+Versões efetivamente resolvidas: termlib 0.3.14 com os patches da CMP-T3; sshlib e protocol **0.6.6**.
+O inventário reproduzível fica em `app/licenses/computador-dependencias.json` e a tabela legível em
+`app/licenses/Computador-transitivas.md`: **126 componentes**, hashes dos artefatos e dos POMs, fontes
+primárias e licenças Apache-2.0, MIT, ISC e BSL-1.0. Preservados também os avisos incorporados:
+Bouncy Castle (MIT, dentro do cbssh) e **539 classes Protobuf sombreadas** (BSD-3-Clause, dentro do Tink Android).
+`LicencasTransitivasTest` compara o grafo Gradle efetivo ao inventário, recusa componente novo/hash diferente
+e testa a rejeição explícita de GPL, LGPL, AGPL e CC-BY-NC. O auditor preserva LICENSE/NOTICE dos JARs/AARs.
+
+A primeira compilação integrada encontrou classes duplicadas: AndroidX Security trazia `tink-android:1.8.0`,
+enquanto o cbssh trazia `tink:1.24.0`. Substituir **tink JVM por tink-android:1.24.0** unifica as classes e mantém
+as integrações Android do cofre. Isso exige repetir `SecureCredentialStoreTest` e `SecurePrefsRecoveryTest`,
+além dos testes novos. Não foi resolvido excluindo a criptografia do cofre.
+
+Bancada somente debug, sem `FLAG_SECURE`, com `TerminalEmulatorFactory.create`, terminal 80×24, fontes 6 sp,
+entrada habilitada e limites de imagens explícitos. As gravações são saídas de geradores reais sobre uma
+imagem própria; README, comandos e hashes em `app/src/test/resources/computador/gravacoes/`.
+**SPEC_DEVIATION:** a bancada fica nesta branch, como pediu o coordenador, em vez de outra branch descartável.
+**SPEC_DEVIATION:** Herdr 0.9.5 emitiu `a=t` + `a=p`, sem placeholders Unicode nesta captura. O caso Unicode
+é uma gravação separada de `kitten icat --unicode-placeholder`, sem atribuí-la ao Herdr.
+
+As validações físicas com KeyFlow, Gboard, teclado e ditado da orbe são **não medidas**: não houve acesso ao A32.
+O teste automatizado exercita o InputConnection real, inclusive commit UTF-8, composição e o caminho duplo
+sendKeyEvent/dispatchKeyEvent, mas não substitui esses testes manuais. O transcodificador sixel→PNG→kitty
+é **não medido** e continua na CMP-T25/T26; aceitar o DCS bruto sem crash não prova imagem sixel.
+AndroidX Biometric não foi acrescentado: escolha e comportamento por aparelho seguem na CMP-T2/T8.
+
+
+Gates integrados da retomada: `assembleDebug testDebugUnitTest :app:lintDebug assembleDebugAndroidTest`,
+**8min31s**, **2.709/2.709 JVM**, 262 classes, zero falhas/erros/ignorados; 4/4 catracas de licenças.
+Os sete jobs do Checks do commit anterior (CMP-T3), execução **41116973031**, também ficaram verdes.
+O APK integrado mantém ELF/ZIP de 16 KB e os três hashes nativos aprovados.
+
+| Métrica debug | Base c1480992 (APK do Checks 41073156978) | Bancada integrada | Delta |
+| --- | ---: | ---: | ---: |
+| Bytes de APK | 158.665.852 | 167.372.244 | +8.706.392 (+5,49%) |
+| Referências de métodos DEX, soma de method_ids_size | 290.384 | 327.615 | +37.231 (+12,82%) |
+
+A contagem DEX inclui referências repetidas entre arquivos, não métodos únicos. Comparação debug, sem R8;
+a base é o artefato do CI do SHA exato e a bancada foi compilada pelo pool no servidor, com a configuração
+local de debug. O delta inclui termlib/JNI, cbssh, atualização do Tink e Activity de bancada; não é projeção
+do tamanho do release. SHA-256 da bancada: `acae7306361977becc66727193eea3dcd38390d725605ca77b4772cfc9dc2d58`.
+
+
+Primeiro lote instrumentado: **18/20** passaram, incluindo **10/10 do cofre** com Tink Android 1.24.0.
+A imagem kitty minúscula ficou sob o cursor sólido; a captura preservada mostra o cursor cobrindo os
+quadrantes esquerdos (vermelho/azul). A repetição oculta o cursor com CSI `?25l`, sem mudar a gravação real
+nem reduzir a exigência de quatro cores. O teste de entrada encontrou **`aa`** quando o mesmo evento
+foi entregue por InputConnection **e** View. Isso é um diagnóstico do upstream, não aprovação da integração:
+o teste de bancada passa a exigir exatamente o resultado observado, e a CMP-T13 precisa deduplicar/escolher
+uma origem. KeyFlow/Gboard/orbe reais continuam não medidos. Nenhuma correção de produção foi simulada.
+
+
+### Tabela final dos sete itens da CMP-T1
+
+Lote final: **20/20 instrumentados** no emulador API 34 (10 da bancada + 10 do cofre), **2min14s**;
+compilação pelo pool antes da instalação. Provas: `t1-medidas-final/medidas.json`, cinco PNGs e logs em
+`.equipe/provas/computador-a/`. Kitty e Herdr também inspecionados visualmente. Nenhum golden alterado.
+
+| Item | Resultado medido e limite |
+| --- | --- |
+| 1 — Integração, APK/DEX/RAM | Build/JVM/lint verdes; deltas na tabela anterior. PSS final a 5k/20k linhas: **195.063/218.355 KiB**; heap máximo 201.326.592 bytes. Deltas PSS **−1.255/+23.228 KiB**, heap **−1.270.984/+23.669.104 bytes**. Processo compartilhado com testes anteriores e GC: o delta negativo de 5k é ruído de coleta, **não** ganho de memória. Primeiro lote: +881/+25.240 KiB. Não é custo isolado do objeto nem benchmark estatístico. |
+| 2 — Nativo | arm64-v8a, armeabi-v7a e x86_64 presentes, ELF/ZIP 16 KB e hashes do JNI do CI iguais. |
+| 3 — Licenças | 126 componentes resolvidos, POMs/hashes e avisos incorporados; Apache-2.0/MIT/ISC/BSL-1.0, Protobuf BSD-3-Clause. Nenhuma licença proibida encontrada; quatro testes de auditoria verdes. Biometric ainda não escolhido. |
+| 4 — Imagens | Quatro cores reais verificadas em kitty, iTerm2, placeholders Unicode do kitten e Herdr. Contagens mínimas por cor: **16/324/72/143 pixels**, respectivamente. `t=f/t=t/t=s` respondem **ENOTSUP:only stream transport is supported**. Herdr não usou placeholders nesta captura. |
+| 5 — Callbacks | DA1 `1b5b3f313b3263`, DSR `1b5b306e`, CPR `1b5b313b3152`; kitty `ESC_Gi=50;OK ST`. Todos chegaram com `dentro_write=false`; a flag é insuficiente. Consultas OSC 10/11 e título não geraram bytes. |
+| 6 — Entrada | `commitText` enviou **ação e voz** em UTF-8, sem CR/LF. Mesmo KeyEvent pelos dois caminhos produziu **aa**, não deduplicado. `setComposingText` + `finishComposingText` não enviaram bytes. EditorInfo.inputType=**524432** (classe NULL). Esses riscos ficam em CMP-T13/T14; IMEs físicos e orbe **não medidos**. |
+| 6b — Mouse/histórico | Modo 1000/1006 publica 1; clique linha 2/coluna 4 gera `ESC[<0;5;3M` / `ESC[<0;5;3m`; desligar publica 0 e não envia clique. Retidas exatamente **5.000/20.000 linhas** após transbordo, sem reflexão. Fork necessário e agora funcional. |
+| 7 — Sixel | Gravação real de img2sixel passa sem crash. **Qualidade do transcodificador não medida**: implementação futura CMP-T25/T26, sem alterar DA1/nativo nesta task. |
+
+**SPEC_DEVIATION:** os testes da bancada exigem o comportamento observado de duplicação; não são aceitação
+da futura entrada de produção. O gate verde confirma a medição reproduzível, e os defeitos permanecem explícitos.

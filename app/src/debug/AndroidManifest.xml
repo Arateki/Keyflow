@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <application>
+        <!-- CMP-T1: bancada do terminal real, sem entrada no release ou no launcher. -->
+        <activity android:name="com.keyflow.computador.app.TerminalSpikeActivity" android:exported="false" />
         <activity android:name=".DebugSimulatedPurchaseActivity" android:exported="false" />
         <!-- Smoke de fundação (T1), só em debug, não exportado, sem launcher. -->
         <activity
