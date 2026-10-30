@@ -9,7 +9,7 @@ on:
       - 'scripts/empacotar-termlib.py'
       - '.github/workflows/termlib-jni.yml'
   push:
-    branches: ['equipe/computador-a']
+    branches: ['main']
     paths:
       - 'third_party/termlib/src/main/cpp/**'
       - 'third_party/termlib/licenses/**'
