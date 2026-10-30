@@ -247,6 +247,43 @@ class ArchitectureRulesTest {
         assertEquals(emptyList<Int>(), fluxosOptStringViolations("com/keyflow/fluxos/X.kt", listOf("val optStringy = 1", "fun myoptString() = 2")))
     }
 
+    /**
+     * `com.keyflow.orbe` (lugares, suporte, geometria, plano de insets, rajada, resolução, codec) é JVM puro (KBO-32): sem
+     * `android.*`, sem `androidx.*` (Compose, DataStore…) e sem o cofre (`auth`). O desenho e o `MotionEvent` ficam em
+     * `com.keyflow.ime`.
+     */
+    private val orbeForbidden = listOf(
+        Regex("""^\s*import\s+android\."""),
+        Regex("""^\s*import\s+androidx\."""),
+        Regex("""^\s*import\s+com\.keyflow\.auth\."""),
+    )
+
+    /** Linhas (1-based) de [code] que a regra de `orbe/` proíbe, para o arquivo em [relPath] (relativo a `src/main/java`). */
+    private fun orbeViolations(relPath: String, code: List<String>): List<Int> {
+        val norm = relPath.replace('\\', '/')
+        if (!norm.startsWith("com/keyflow/orbe/")) return emptyList()
+        return code.mapIndexedNotNull { i, line -> if (orbeForbidden.any { it.containsMatchIn(line) }) i + 1 else null }
+    }
+
+    @Test
+    fun orbePackageIsPureJvm() {
+        val offenders = kotlinFiles(main).flatMap { file ->
+            orbeViolations(file.rel(main), codeLines(file)).map { "${file.rel(main)}:$it" }
+        }
+        assertEquals("com.keyflow.orbe é JVM puro: sem android.*, androidx.* nem cofre", emptyList<String>(), offenders)
+    }
+
+    @Test
+    fun orbeRuleCatchesAndroidAndComposeImports() {
+        val bad = listOf("package com.keyflow.orbe", "import android.graphics.Rect")
+        assertEquals(listOf(2), orbeViolations("com/keyflow/orbe/GeometriaDaOrbe.kt", bad))
+        assertEquals(listOf(1), orbeViolations("com/keyflow/orbe/Interacoes.kt", listOf("import android.content.Context")))
+        assertEquals(listOf(1), orbeViolations("com/keyflow/orbe/X.kt", listOf("import androidx.compose.runtime.Composable")))
+        assertEquals(listOf(1), orbeViolations("com/keyflow/orbe/X.kt", listOf("import com.keyflow.auth.SecureCredentialStore")))
+        assertEquals(emptyList<Int>(), orbeViolations("com/keyflow/ime/OrbeDoTecladoView.kt", bad))
+        assertEquals(emptyList<Int>(), orbeViolations("com/keyflow/orbe/X.kt", listOf("import com.keyflow.data.Settings")))
+    }
+
     /** O texto de uma string Kotlin entre aspas como o programa o vê (`\\` vira `\`, `\"` vira `"`). */
     private fun unescapeKotlin(literal: String): String = buildString {
         var i = 0

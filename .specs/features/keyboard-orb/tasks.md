@@ -1,7 +1,7 @@
 # Orbe do teclado — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md`
-**Status**: spec e design em rascunho (2026-10-29), tasks **todas pendentes**. **Fora da v1** (só `main`, release seguinte). Não toma a vez de frente aberta.
+**Status**: spec e design em rascunho (2026-10-29), **KBO-T1..T3 feitas (2026-10-30)**, o resto pendente. **Fora da v1** (só `main`, release seguinte). Não toma a vez de frente aberta.
 
 > **Para o agente executor**: leia `spec.md` + `design.md` + este arquivo e `.specs/codebase/TESTING.md`. Uma task por vez, na ordem do plano,
 > testes primeiro, gate verde antes de avançar. Cada task é verificável sozinha. Os textos de UI que ela criar vão com ela (`tr("…")` +
@@ -46,21 +46,21 @@ A Fase A inteira é JVM: pode ser entregue e revisada antes de qualquer pixel.
 
 ## Fase A — Modelo (JVM puro)
 
-### KBO-T1 — Lugares, geometria e hit-test — **Status: pendente**
+### KBO-T1 — Lugares, geometria e hit-test — **Status: concluída**
 - **What**: `LugarDaOrbe`, `Interacao` e `SuporteDeInteracoes` com a tabela do design §7 (`TECLADO` = as sete; `NOTIFICACAO` = três toques; `FLUTUANTE` = as sete). Se o arquivo já existir, só alargar `TECLADO` — não criar um segundo enum. `GeometriaDaOrbe` (ociosa, sobressalente, diâmetro, fundo no fundo do encaixe) e `HitDaOrbe`. Regra no `ArchitectureRulesTest`: `orbe/**` sem `android.*`.
 - **Where**: `app/src/main/java/com/keyflow/orbe/{Interacoes,GeometriaDaOrbe}.kt`; testes em `app/src/test/.../orbe/`.
 - **Depends on**: —. **Requirement**: KBO-07, KBO-08, KBO-11, KBO-12, KBO-32.
 - **Done when**: unit — ociosa cabe no encaixe e não intersecta a faixa de 36 dp; sobressalente é disjunta de uma tecla logo abaixo do encaixe e de um botão vizinho na mesma barra; diâmetro nunca passa da largura do encaixe; encaixe estreito sobressai menos que 36 dp; ponto no círculo é da orbe e ponto na tecla não é; `HitDaOrbe` rejeita (1, 1) do contraexemplo (faixa 36, encaixe 64×28, centro (32, 32), raio 32); a regra de arquitetura falha se um arquivo de `orbe/` importar `android.`.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(orbe-teclado): geometria da orbe e lugares`.
 
-### KBO-T2 — Codec e repositório — **Status: pendente**
+### KBO-T2 — Codec e repositório — **Status: concluída**
 - **What**: `CodecOrbeTeclado` e a chave `keyboard_orb_config_json` (`design` §5), com `configOrbeTecladoFlow/Once` e `atualizarOrbeTeclado`. Tolerância da KBO-28. A escrita não passa pelo auto-save das `Settings`.
 - **Where**: `orbe/CodecOrbeTeclado.kt`; `data/SettingsRepository.kt` (só a chave nova); testes `CodecOrbeTecladoTest`.
 - **Depends on**: T1. **Requirement**: KBO-03, KBO-17, KBO-20, KBO-27, KBO-28, KBO-29.
 - **Done when**: unit — round-trip com pacote, modo `ptt` e `flow:abc`; JSON ausente, malformado e com campo desconhecido; ação desconhecida volta igual no `codificar` e **não** é reescrita para gravar/enviar no 1 toque; ligar/desligar `copy` não muda `taps`; um JSON completo não contém `key`, `token`, `endpoint` nem texto de ditado; gravar `Settings` no mesmo DataStore não altera a chave.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(orbe-teclado): config da orbe no DataStore`.
 
-### KBO-T3 — Rajada, classificador e resolvedor — **Status: pendente**
+### KBO-T3 — Rajada, classificador e resolvedor — **Status: concluída**
 - **What**: `RajadaDeToques` e `ClassificadorDeGesto` com relógio injetado e os limiares da KBO-13. `ResolvedorDaOrbeDoTeclado`: config efetiva (KBO-19), aviso ao substituir ação já atribuída e zero gravar/enviar válido nos dois modos (KBO-15, D9), catálogo (KBO-16), Visão (KBO-25), gancho de fluxo que por padrão devolve nulo (KBO-30, KBO-31). Sem chamada a Fluxos e sem `android.*`. Ação desconhecida dispara como Nenhuma e não introduz gravar.
 - **Where**: `orbe/{RajadaDeToques,ResolvedorDaOrbeDoTeclado}.kt`; testes `ResolvedorDaOrbeDoTecladoTest`.
 - **Depends on**: T1. **Requirement**: KBO-04, KBO-13, KBO-14, KBO-15, KBO-16, KBO-17, KBO-18, KBO-19, KBO-20, KBO-25, KBO-30, KBO-31.
