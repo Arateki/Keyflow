@@ -35,3 +35,14 @@ tela ou agrupada) — o Yan confere nos aparelhos como a notificação convive c
 **Para a T9:** o `notif_orb.xml` do design §6 serve como está; manter os botões `INVISIBLE`; não prometer centro de pixel da linha.
 **Para quem repetir a medição:** `UiDevice.openNotification()` + `By.desc(...)`, `takeScreenshot` e varredura de cor; o filtro de cor
 (soma das diferenças RGB < 60) acha o círculo com ±1 px.
+
+## NTF-T2 — Interações, configuração e "copiar"
+
+- `Interacoes.kt` já existia (da orbe do teclado): ganhou só `SuporteDeInteracoes.motivo(lugar, interacao)`; `Modelo.kt` traz `AcaoDaOrbe`,
+  `ConfigNotificacao`, `ConfigEfetiva`, `efetiva(config, settings)`, `desligarCopia` (a primeira escrita sem "copiar" grava como próprio o que
+  era copiado) e `avisosDeSubstituicao` (aviso, não trava, reaproveitando o `AvisoDeSubstituicao` da orbe do teclado; `Nenhuma` conta como vazia).
+- **Decisão**: `ConfigEfetiva.naoTem` é `List<Interacao>` (como no design) e o destino de cada uma sai de `destinoNaNotificacao(interacao)`
+  (chave de `tr`), em vez de um par dentro da lista.
+- A regra `orbePackageIsPureJvm` do `ArchitectureRulesTest` passou a cobrir também `notificacao/` (menos `notificacao/app/`).
+- Textos novos em `i18n/{en,es}/Notificacao.kt` (as chaves vão por `trKey` no código puro; o `TranslationsTest` as cobra).
+- **Mutação**: o PTT copiando `GravarEnviar` em vez de `shortcut1Tap` derruba "copiar no PTT … sem inventar gravação" e "desligar a cópia".

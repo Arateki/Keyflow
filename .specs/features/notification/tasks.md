@@ -64,7 +64,7 @@ T8 depende de T7 (a interface da fonte de orbe).
 
 ## Fase A — Modelo e dados (JVM puro)
 
-### NTF-T2 — Interações da orbe, configuração e "copiar" `[P]` — **Status: pendente**
+### NTF-T2 — Interações da orbe, configuração e "copiar" `[P]` — **Status: concluída (2026-10-30)**
 - **What**: `com.keyflow.orbe` (`LugarDaOrbe`, `Interacao`, `SuporteDeInteracoes` com `suporta`/`naoSuportadas`/`motivo`); `com.keyflow.notificacao.Modelo.kt` (`AcaoDaOrbe` com `GravarEnviar`, `ConfigNotificacao` com `acao1Toque/2Toques/3Toques`, `ConfigEfetiva` com `iniciaGravacao`, `efetiva(config, settings)`, mapa `OrbShortcutAction → AcaoDaOrbe`).
   Regra no `ArchitectureRulesTest`: `orbe/` e `notificacao/` (menos `notificacao/app/**`) sem `android.*`/compose/cofre.
 - **Where**: `app/src/main/java/com/keyflow/orbe/Interacoes.kt`, `app/src/main/java/com/keyflow/notificacao/Modelo.kt`; testes em `app/src/test/.../orbe/` e `.../notificacao/`.
