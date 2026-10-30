@@ -414,25 +414,25 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 | FLX-15 | P1-C | FLX-T1, FLX-T18 | Implementing (T1 feita) |
 | FLX-16 | P1-C | FLX-T18 | Pending |
 | FLX-17 | P1-D | FLX-T6, FLX-T14, FLX-T25 | Implementing (T6 feita) |
-| FLX-18 | P1-D | FLX-T11 | Pending |
-| FLX-19 | P1-D | FLX-T12, FLX-T14, FLX-T25 | Pending |
-| FLX-20 | P1-D | FLX-T10 | Pending |
-| FLX-21 | P1-D | FLX-T10 | Pending |
-| FLX-22 | P1-D | FLX-T8, FLX-T10 | Implementing (T8 feita) |
-| FLX-23 | P1-D | FLX-T10 | Pending |
-| FLX-24 | P1-D | FLX-T13, FLX-T25 | Pending |
-| FLX-25 | P1-D | FLX-T13 | Pending |
-| FLX-26 | P1-D | FLX-T7, FLX-T9 | Implementing (T7, T9 feitas) |
+| FLX-18 | P1-D | FLX-T11 | Implementing (T11 feita) |
+| FLX-19 | P1-D | FLX-T12, FLX-T14, FLX-T25 | Implementing (T12 feita) |
+| FLX-20 | P1-D | FLX-T10 | Implementing (T10 feita) |
+| FLX-21 | P1-D | FLX-T10 | Implementing (T10 feita) |
+| FLX-22 | P1-D | FLX-T8, FLX-T10 | Implementing (T8, T10 feitas) |
+| FLX-23 | P1-D | FLX-T10 | Implementing (T10 feita) |
+| FLX-24 | P1-D | FLX-T13, FLX-T25 | Implementing (T13 feita) |
+| FLX-25 | P1-D | FLX-T13 | Implementing (T13 feita) |
+| FLX-26 | P1-D | FLX-T7, FLX-T9 | Implementing (T7, T9 feitas; T10 aplica nas portas) |
 | FLX-27 | P1-D | FLX-T6, FLX-T14, FLX-T25 | Implementing (T6 feita) |
 | FLX-28 | P1-D | FLX-T6, FLX-T14 | Implementing (T6 feita) |
 | FLX-29 | P1-D | FLX-T6, FLX-T14, FLX-T25 | Implementing (T6 feita) |
 | FLX-30 | P1-D | FLX-T7, FLX-T17 | Implementing (T7 feita) |
 | FLX-31 | P1-D | FLX-T6 | Implementing (T6 feita) |
-| FLX-32 | P1-D | FLX-T14, FLX-T16 | Pending |
+| FLX-32 | P1-D | FLX-T14, FLX-T16 | Implementing (T16 feita: botão aceso; falta o serviço, T14) |
 | FLX-33 | P1-E | FLX-T1, FLX-T2, FLX-T5 | Implementing (T1, T2, T5 feitas) |
 | FLX-34 | P1-E | FLX-T5, FLX-T15, FLX-T25 | Implementing (T5 feita) |
 | FLX-35 | P1-E | FLX-T5, FLX-T20, FLX-T21, FLX-T28 | Implementing (T5 feita) |
-| FLX-36 | P1-E | FLX-T16, FLX-T20 | Pending |
+| FLX-36 | P1-E | FLX-T16, FLX-T20 | Implementing (T16 feita; o disparo é da T14) |
 | FLX-37 | P1-E | FLX-T5, FLX-T20 | Implementing (T5 feita) |
 | FLX-38 | P1-E | FLX-T5, FLX-T20 | Implementing (T5 feita) |
 | FLX-39 | P1-E | FLX-T14, FLX-T15, FLX-T25 | Pending |
@@ -446,9 +446,9 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 | FLX-47 | P1-G | FLX-T2 | Implementing (T2 feita) |
 | FLX-48 | P1-G | FLX-T4 | Implementing (T4 feita) |
 | FLX-49 | P1-G | FLX-T4, FLX-T14 | Implementing (T4 feita) |
-| FLX-50 | P1-G | FLX-T4, FLX-T5 | Implementing (T4, T5 feitas) |
+| FLX-50 | P1-G | FLX-T4, FLX-T5, FLX-T16 | Implementing (T4, T5, T16 feitas) |
 | FLX-51 | P2-H | FLX-T17..T21 (cada uma traz os seus textos) | Pending |
-| FLX-52 | P2-H | FLX-T1, FLX-T6, FLX-T10 | Implementing (T1, T6 feitas) |
+| FLX-52 | P2-H | FLX-T1, FLX-T6, FLX-T10 | Implementing (T1, T6, T10 feitas) |
 | FLX-53 | P2-H | FLX-T23 | Pending |
 | FLX-54 | P2-H | FLX-T17, FLX-T18 | Pending |
 | FLX-55 | P2-H | FLX-T24 | Pending |
