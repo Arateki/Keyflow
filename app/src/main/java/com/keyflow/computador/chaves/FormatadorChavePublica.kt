@@ -1,7 +1,6 @@
 package com.keyflow.computador.chaves
 
 import java.nio.ByteBuffer
-import java.util.Base64
 
 /** Escreve a chave pública como o `authorized_keys`: `ssh-ed25519 AAAA… keyflow@aparelho` (CMP-13). */
 object FormatadorChavePublica {
@@ -9,7 +8,7 @@ object FormatadorChavePublica {
 
     fun linha(blob: ByteArray, aparelho: String): String {
         val tipo = tipoDoBlob(blob) ?: error("blob de chave pública inválido")
-        return "$tipo ${Base64.getEncoder().encodeToString(blob)} keyflow@${comentarioSeguro(aparelho)}"
+        return "$tipo ${com.keyflow.computador.Base64Puro.codificar(blob)} keyflow@${comentarioSeguro(aparelho)}"
     }
 
     /** O nome do aparelho vira comentário: sem espaço, sem controle e com tamanho limitado. */

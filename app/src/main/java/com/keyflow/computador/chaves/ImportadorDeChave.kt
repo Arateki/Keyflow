@@ -4,7 +4,6 @@ import com.keyflow.computador.ImpressaoDigital
 import java.nio.ByteBuffer
 import java.security.KeyPair
 import java.security.interfaces.RSAPrivateKey
-import java.util.Base64
 import org.connectbot.sshlib.SshKeys
 import org.connectbot.sshlib.SshSigning
 
@@ -109,11 +108,7 @@ class ImportadorDeChave {
 
     private fun inspecionarOpenSsh(texto: String): Inspecao {
         val corpo = texto.lineSequence().map { it.trim() }.dropWhile { !it.startsWith("-----BEGIN") }.drop(1).takeWhile { !it.startsWith("-----END") }.joinToString("")
-        val dados = try {
-            Base64.getDecoder().decode(corpo)
-        } catch (e: IllegalArgumentException) {
-            return Inspecao.Recusa(ErroChave.FORMATO)
-        }
+        val dados = com.keyflow.computador.Base64Puro.decodificar(corpo) ?: return Inspecao.Recusa(ErroChave.FORMATO)
         val magico = "openssh-key-v1\u0000".toByteArray(Charsets.US_ASCII)
         if (dados.size < magico.size || !dados.copyOfRange(0, magico.size).contentEquals(magico)) return Inspecao.Recusa(ErroChave.FORMATO)
         return try {

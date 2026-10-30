@@ -6,7 +6,7 @@ import android.security.keystore.KeyInfo
 import android.security.keystore.KeyPermanentlyInvalidatedException
 import android.security.keystore.KeyProperties
 import android.security.keystore.UserNotAuthenticatedException
-import com.keyflow.computador.ImpressaoDigital
+import com.keyflow.computador.Base64Puro
 import com.keyflow.computador.chaves.Assinador
 import com.keyflow.computador.chaves.AssinadorSoftware
 import com.keyflow.computador.chaves.AvaliadorDaSonda
@@ -103,7 +103,7 @@ class ProvedorDeChavesAndroid(
                 try {
                     if (exigeBiometria && !autenticarParaCriar(id)) return Resultado.Falha(ErroChave.CANCELADA)
                     envelope.cifrar(id, m, exigeBiometria)
-                    cofre.gravar("$PREFIXO_PUBLICA$id", java.util.Base64.getEncoder().encodeToString(r.valor.publica.blob))
+                    cofre.gravar("$PREFIXO_PUBLICA$id", Base64Puro.codificar(r.valor.publica.blob))
                     Resultado.Ok(ChaveSsh(id, nome, r.valor.tipo, r.valor.impressao, Protecao.KEYSTORE_ENVELOPE, exigeBiometria, relogio.agoraMs()))
                 } catch (e: Exception) {
                     excluirArtefatos(id)
@@ -184,7 +184,7 @@ class ProvedorDeChavesAndroid(
         try {
             envelope.cifrar(id, g.material, exigeBiometria)
             // O envelope guarda a pública junto da semente: o Keystore não a conhece.
-            cofre.gravar("$PREFIXO_PUBLICA$id", java.util.Base64.getEncoder().encodeToString(g.publica.blob))
+            cofre.gravar("$PREFIXO_PUBLICA$id", Base64Puro.codificar(g.publica.blob))
             return Resultado.Ok(ChaveSsh(id, nome, TipoDeChave.ED25519, g.publica.impressao, Protecao.KEYSTORE_ENVELOPE, exigeBiometria, relogio.agoraMs()))
         } finally {
             g.material.zerar()
@@ -193,7 +193,7 @@ class ProvedorDeChavesAndroid(
 
     private fun publicaGuardada(id: String): ChavePublicaSsh? {
         val b64 = cofre.ler("$PREFIXO_PUBLICA$id") ?: return null
-        val blob = java.util.Base64.getDecoder().decode(b64)
+        val blob = Base64Puro.decodificar(b64) ?: return null
         val tipo = FormatadorChavePublica.tipoDoBlob(blob) ?: return null
         return ChavePublicaSsh(if (tipo == "ssh-rsa") "rsa-sha2-256" else tipo, blob)
     }

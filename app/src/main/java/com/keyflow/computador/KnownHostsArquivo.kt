@@ -1,6 +1,5 @@
 package com.keyflow.computador
 
-import java.util.Base64
 
 /**
  * O arquivo `known_hosts` no formato do OpenSSH, sem hash de hostname (limite do cbssh): `host algoritmo base64` para a porta 22 e
@@ -40,7 +39,7 @@ class KnownHostsArquivo private constructor(private val linhas: List<Linha>) {
     fun comChave(host: String, porta: Int, chave: ChaveDoServidor): KnownHostsArquivo {
         val alvo = Padrao(normalizar(host), porta)
         val sem = removerAlvo(linhas, alvo) { it.algoritmo == chave.algoritmo }
-        val b64 = Base64.getEncoder().encodeToString(chave.blob)
+        val b64 = Base64Puro.codificar(chave.blob)
         return KnownHostsArquivo(sem + Linha.Entrada(listOf(alvo), chave.algoritmo, b64, ""))
     }
 
@@ -94,11 +93,7 @@ class KnownHostsArquivo private constructor(private val linhas: List<Linha>) {
         /** Nome de host é case-insensitive; o endereço do modelo pode vir com colchetes (IPv6), que o arquivo não usa dentro do padrão. */
         private fun normalizar(host: String) = host.removePrefix("[").removeSuffix("]").lowercase()
 
-        private fun decodificar(b64: String): ByteArray? = try {
-            Base64.getDecoder().decode(b64).takeIf { it.isNotEmpty() }
-        } catch (e: IllegalArgumentException) {
-            null
-        }
+        private fun decodificar(b64: String): ByteArray? = Base64Puro.decodificar(b64)?.takeIf { it.isNotEmpty() }
     }
 }
 

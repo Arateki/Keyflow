@@ -1,7 +1,6 @@
 package com.keyflow.computador
 
 import java.security.MessageDigest
-import java.util.Base64
 
 /** Uma chave pública de servidor: nome do algoritmo SSH (`ssh-ed25519`…) e o blob no formato de fio, como no `known_hosts`. */
 class ChaveDoServidor(val algoritmo: String, val blob: ByteArray) {
@@ -14,7 +13,7 @@ class ChaveDoServidor(val algoritmo: String, val blob: ByteArray) {
 
 /** Impressão digital como o OpenSSH mostra: `SHA256:` + base64 sem padding do SHA-256 do blob (`ssh-keygen -lf`). */
 class ImpressaoDigital private constructor(val sha256: ByteArray) {
-    val texto: String get() = "SHA256:" + Base64.getEncoder().withoutPadding().encodeToString(sha256)
+    val texto: String get() = "SHA256:" + Base64Puro.codificar(sha256, comPadding = false)
 
     /**
      * A "arte aleatória" (`ssh-keygen -lv`, algoritmo do bispo bêbado de 17×9) para o usuário comparar de relance.
