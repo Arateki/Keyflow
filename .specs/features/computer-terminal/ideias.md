@@ -1,7 +1,7 @@
 # Aba Computador — ideias antes da spec
 
 > Semente da spec. **A spec de verdade agora existe**: `spec.md`, `design.md` e `tasks.md` desta pasta (rascunho de 2026-10-29, fora da v1; `DEVELOPMENT-ORDER.md` › Bloco 16).
-> Este arquivo fica como histórico do que o Yan pediu em 22/10 e **marca o que ele decidiu em 29/10** (D1..D19 do `spec.md`). Onde houver divergência, vale a spec.
+> Este arquivo fica como histórico do que o Yan pediu em 22/10 e **marca o que ele decidiu em 29/10** (D1..D24 do `spec.md`). Onde houver divergência, vale a spec.
 
 ## Onde estamos
 
@@ -44,7 +44,7 @@ A aba existe (`app/src/main/java/com/keyflow/ui/config/ComputadorPanel.kt`, do t
 - **Agente com terminal × TLS-03.** A spec do agente (`agent-harness`) proíbe ferramenta que toque em segredo,
   inclusive chave SSH. O desenho provável: a chave fica no cofre e só o app abre a sessão; o agente recebe a
   sessão aberta, nunca a chave. Precisa virar requisito explícito.
-  - **Resolvido (29/10, D5):** emenda aprovada, escrita no `agent-harness/spec.md` (AGT-E1..E6) e especificada em CMP-46..58. Cada host tem "pode ser usado pelo agente" (padrão **não**); só o app abre a sessão; senha/sudo só o usuário digita; **sem "permitir sempre" para `send`**; nada via MCP externo; registro de **30 dias** (D8).
+  - **Resolvido (29/10, D5):** emenda aprovada, escrita no `agent-harness/spec.md` (AGT-E1..E6) e especificada em CMP-46..58. Cada host tem "pode ser usado pelo agente" (padrão **não**); só o app abre a sessão; senha/sudo só o usuário digita; **sem "permitir sempre" para `send`** (D20: `key` e `open` também nunca; só `close` pode); nada via MCP externo; registro de **30 dias** (D8).
 - **O próprio teclado no terminal.** O terminal do app é um campo `TYPE_NULL`; o KeyFlow já comita letra a letra
   nesses campos (Q3, bug do Termius). O terminal novo precisa funcionar bem com o KeyFlow e com teclados físicos.
   - **Em spec:** CMP-26..28 (teclas extras, teclado físico, KeyFlow IME e ditado sem duplicar nem dar Enter); provado na CMP-T1/T14.
@@ -67,7 +67,12 @@ A aba existe (`app/src/main/java/com/keyflow/ui/config/ComputadorPanel.kt`, do t
 - **D17 — Sem `FLAG_SECURE`** no terminal (a Visão precisa ler).
 - **D18 — Privacidade:** o registro de 30 dias (comando e saída lida) entra no texto.
 - **D19 — Parecer do Termux** só quando a frente do terminal local chegar.
+- **D20 — "Permitir sempre" só em `terminal_close`.** `send`, `key` e `open` nunca.
+- **D21 — Sessão do usuário** fica até ele fechar (sem ociosidade). A do agente fecha em 10 min.
+- **D22 — Opção "manter conectado com a tela apagada"** (`WakeLock` parcial, aviso de bateria), desligada por padrão.
+- **D23 — Etapa Computador nos Fluxos** entra depois desta feature; sem task agora.
+- **D24 — Gravação do Herdr** (CMP-T27) no servidor de desenvolvimento da equipe, com a versão que estiver lá.
 
 ## Fica para depois (não está na spec)
 
-Terminal local (Termux/PRoot), SFTP, port forwarding, agent forwarding, jump hosts, importar `~/.ssh/config`, snippets, Mosh (GPL-3.0), cliente do Herdr, captura do terminal como imagem para o modelo, etapa Computador nos Fluxos.
+Terminal local (Termux/PRoot), SFTP, port forwarding, agent forwarding, jump hosts, importar `~/.ssh/config`, snippets, Mosh (GPL-3.0), cliente do Herdr, captura do terminal como imagem para o modelo, etapa Computador nos Fluxos (D23: decidido em 29/10, entra depois, sem task agora).
