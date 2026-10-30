@@ -20,9 +20,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
-import androidx.compose.ui.test.performTextInputSelection
 import androidx.compose.ui.test.performTextReplacement
-import androidx.compose.ui.text.TextRange
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.keyflow.auth.ApiKeyFlow
 import com.keyflow.auth.AuthFlow
@@ -576,10 +574,10 @@ class VisaoPanelTest {
     @OptIn(ExperimentalTestApi::class)
     private fun typeBInsteadOfAInTheEndpoint() {
         val endpoint = node("visao-custom-endpoint")
-        // A seleção precisa ser feita com o campo já focado; o foco adquirido ao digitar pode reposicionar o cursor.
+        // Muda só um caractere, sem aumentar o tamanho: AutoSaveField mantém a edição pendente.
+        // A substituição evita disputar a seleção com o reposicionamento assíncrono do cursor pelo IME.
         endpoint.performClick()
-        endpoint.performTextInputSelection(TextRange(8, 9))
-        endpoint.performTextInput("b")
+        endpoint.performTextReplacement("https://b.test/v1")
         endpoint.assertTextContains("https://b.test/v1")
     }
 
