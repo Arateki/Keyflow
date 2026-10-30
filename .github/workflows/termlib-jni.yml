@@ -1,0 +1,126 @@
+name: termlib JNI
+
+on:
+  pull_request:
+    paths:
+      - 'third_party/termlib/src/main/cpp/**'
+      - 'third_party/termlib/licenses/**'
+      - 'third_party/termlib/NATIVE_VERSION'
+      - 'scripts/empacotar-termlib.py'
+      - '.github/workflows/termlib-jni.yml'
+  push:
+    branches: ['main']
+    paths:
+      - 'third_party/termlib/src/main/cpp/**'
+      - 'third_party/termlib/licenses/**'
+      - 'third_party/termlib/NATIVE_VERSION'
+      - 'scripts/empacotar-termlib.py'
+      - '.github/workflows/termlib-jni.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: termlib-jni-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NDK_VERSION: '29.0.14206865'
+
+jobs:
+  nativo:
+    name: JNI ${{ matrix.abi }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a, armeabi-v7a, x86_64]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: NDK fixado
+        run: |
+          set -euo pipefail
+          ndk="$ANDROID_HOME/ndk/$NDK_VERSION"
+          if [ ! -d "$ndk" ]; then
+            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;$NDK_VERSION" > /dev/null
+          fi
+          echo "ANDROID_NDK=$ndk" >> "$GITHUB_ENV"
+      - name: Compilar somente a ponte e o libvterm auditados
+        env:
+          ABI: ${{ matrix.abi }}
+        run: |
+          set -euo pipefail
+          cmake -S third_party/termlib/src/main/cpp -B "$RUNNER_TEMP/nativo" \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI="$ABI" -DANDROID_PLATFORM=android-24 -DANDROID_STL=c++_static \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_FLAGS="-ffile-prefix-map=$GITHUB_WORKSPACE=." \
+            -DCMAKE_CXX_FLAGS="-ffile-prefix-map=$GITHUB_WORKSPACE=."
+          cmake --build "$RUNNER_TEMP/nativo" --target termlib --parallel 2
+          "$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip" \
+            --strip-debug "$RUNNER_TEMP/nativo/libtermlib.so"
+          mkdir -p "saida/$ABI"
+          cp "$RUNNER_TEMP/nativo/libtermlib.so" "saida/$ABI/"
+          readelf -lW "saida/$ABI/libtermlib.so"
+          readelf -dW "saida/$ABI/libtermlib.so"
+          # Preserva a identidade real do toolchain para a auditoria dos runtimes estáticos.
+          cp "$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/clang_source_info.md" \
+            "saida/$ABI/clang_source_info.md"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: termlib-${{ matrix.abi }}
+          path: saida
+          if-no-files-found: error
+          retention-days: 14
+
+  pacote:
+    name: Pacote auditado e release imutável
+    needs: nativo
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: termlib-*
+          merge-multiple: true
+          path: nativo
+      - name: Conferir ABIs, licenças, bibliotecas ligadas e alinhamento ELF
+        run: python3 scripts/empacotar-termlib.py nativo saida
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: termlib-jni-auditado
+          path: |
+            saida
+            nativo/*/clang_source_info.md
+          if-no-files-found: error
+          retention-days: 90
+      # PR só gera evidência. A publicação autorizada vem de push desta branch ou dispatch.
+      # Um release existente é comparado, nunca sobrescrito: trocar código exige outra versão.
+      - name: Publicar prerelease sem substituir assets existentes
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          versao=$(cat third_party/termlib/NATIVE_VERSION)
+          tag="termlib-jni-$versao"
+          if gh release view "$tag" > /dev/null 2>&1; then
+            mkdir anterior
+            gh release download "$tag" --pattern '*.zip.sha256' --dir anterior
+            cmp "anterior/termlib-jni-$versao.zip.sha256" "saida/termlib-jni-$versao.zip.sha256"
+          else
+            gh release create "$tag" --target "$GITHUB_SHA" --latest=false --prerelease \
+              --title "termlib $versao — JNI auditado" \
+              --notes 'Ponte do termlib e libvterm, ABIs arm64-v8a/armeabi-v7a/x86_64, ELF 16 KB. Licenças e hashes no pacote.' \
+              saida/*.zip saida/*.sha256 saida/manifest.json
+          fi

@@ -1,0 +1,18 @@
+{
+  "libraries": {
+    "jni/arm64-v8a/libtermlib.so": "5ac6efd42f40997573e3f08a0a591d3048f9b0cf8a259d45125622d2994a66c9",
+    "jni/armeabi-v7a/libtermlib.so": "9a4700e3f6168632f70b17fe9a9a813585a47e218956103d8a0d3d2f03c0848d",
+    "jni/x86_64/libtermlib.so": "44b5b295864ddfe9b5ef841f7950a560b83424bd06a43697c920b62e2503db42"
+  },
+  "licenses": {
+    "compiler-rt": "Apache-2.0 WITH LLVM-exception",
+    "libc++": "Apache-2.0 WITH LLVM-exception",
+    "libc++abi": "Apache-2.0 WITH LLVM-exception",
+    "libunwind": "Apache-2.0 WITH LLVM-exception",
+    "libvterm": "MIT",
+    "termlib": "Apache-2.0",
+    "wcwidth": "permissiva-Markus-Kuhn"
+  },
+  "source_sha256": "0542a598ce04e9a1d35696863a44d8400425652113c3caea42622ad0839fd611",
+  "version": "0.3.14-keyflow.1"
+}

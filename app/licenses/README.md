@@ -93,3 +93,22 @@ o README do Hugging Face também cita 2026. O código de inferência não é cop
 registra isso. O cartão de `csukuangfj/vits-coqui-pt-cv` (commit `9092b0c5e3717b6c61ae563cfd98dc86cc536b3a`) não declara
 licença; o de origem `neongeckocom/tts-vits-cv-pt` declara `bsd-3-clause`. `BSD-3-Clause_vits-coqui-pt.txt` cita essa
 origem e o texto BSD-3 com "Copyright (c) Coqui GmbH", sem ano inventado. Os monogramas do card são desenhos nossos.
+
+## Computador — termlib e JNI (CMP-T3)
+
+Origem fixada em `third_party/termlib/UPSTREAM.md`. termlib/ponte JNI: Apache-2.0;
+libvterm: MIT; wcwidth de Markus Kuhn: permissão expressa, sem restrição comercial.
+Runtimes libc++, libc++abi, libunwind e compiler-rt: Apache-2.0 com exceção LLVM,
+textos `Apache-2.0-LLVM_*.txt` e `Permissiva_wcwidth.txt` nesta pasta.
+O CI confere as três ABIs, hashes, ELF 16 KB e dependências dinâmicas; não inclui código
+GPL/AGPL/LGPL, sixel nativo nem bibliotecas C++ compartilhadas externas.
+
+A auditoria CMP-T1 de sshlib/protocol **0.6.6** e do módulo termlib está em
+[Computador-transitivas.md](Computador-transitivas.md) (126 componentes do grafo real).
+`computador-dependencias.json` fixa também os SHA-256 dos artefatos selecionados;
+`LicencasTransitivasTest` recusa componente/hash sem auditoria e licença fora da lista permitida.
+Os avisos recebidos nos AARs/JARs estão em `computador/`, sem remover copyright.
+
+Aviso embutido adicional: o cbssh conserva trechos Bouncy Castle sob MIT
+(`MIT_bouncycastle-cbssh.txt`). Textos completos das licenças não Apache também em
+`MIT_kaitai.txt`, `ISC_jbcrypt.txt`, `BSL-1.0_kstatemachine.txt` e `BSD-3-Clause_protobuf.txt`.

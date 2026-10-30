@@ -102,7 +102,7 @@ Fontes: levantamento (artefatos medidos em 2026-10-29), os repositórios do term
 | P7 | O cbssh tem **AuthHandler.onSignatureRequest** (gancho para assinar fora da biblioteca, sem a chave sair do Keystore); `HostKeyVerifier` é obrigatório; `KnownHostsVerifier` **não** suporta hostname hasheado; `SshSession.resizeTerminal`; `SshClientConfig.keepAliveIntervalMs`; `SshKeys.decodePemPrivateKey`; conserto para Android ≤ 12 na 0.6.5 (`BigInteger` da API 33) | A chave do Keystore assina **sem** sair do Keystore; o `known_hosts` próprio é nosso; testar em Android real o que o cbssh só testa na JVM | código e CHANGELOG lidos hoje |
 | P8 | **Sem NDK** nos nós do pool; o `.so` de terceiros vem pronto ou é compilado **no CI com SHA fixado** (precedente `sherpa-sem-tts.yml`); o Play exige `.so` com páginas de **16 KB** (`scripts/check-16kb-alignment.py` roda no CI) | Se o artefato Maven do termlib basta (A1), não há NDK; se for preciso patch no C++, o JNI sai de um workflow (CMP-T3). Os `.so` do termlib estão alinhados a 16 KB (**medido** no levantamento; a CMP-T1 repete) | `ENVIRONMENT.md` › "Código nativo"; levantamento |
 | P9 | O container de desenvolvimento **não tem `sshd`** (só o cliente `ssh`) | Servidor SSH de teste em **JVM** (Apache MINA SSHD, Apache-2.0, só em teste) | medido hoje (`which sshd` vazio) |
-| P10 | O KeyFlow é **Apache-2.0** (`LICENSE`); termlib e cbssh são Apache-2.0, libvterm MIT. As transitivas do cbssh (Ktor, Tink, kstatemachine, kyber, keccak, jbcrypt) **não tiveram a licença conferida** | CMP-02 exige inventário de licenças e teste que reprova GPL/LGPL/AGPL | `LICENSE`, `libs.versions.toml` do cbssh; licenças das transitivas: **a verificar na CMP-T1** |
+| P10 | O KeyFlow é **Apache-2.0** (`LICENSE`); termlib e cbssh são Apache-2.0, libvterm MIT. As 126 transitivas resolvidas do conjunto terminal/SSH foram auditadas na CMP-T1, inclusive avisos incorporados Bouncy Castle e Protobuf | Inventário com POMs/hashes e testes que reprovam GPL/LGPL/AGPL, licença não comercial e componente novo | `app/licenses/Computador-transitivas.md`, `computador-dependencias.json` e `LicencasTransitivasTest` |
 
 ---
 
@@ -382,10 +382,10 @@ Nenhuma. Q1–Q13 foram respondidas em 29/10 (D12–D24). Q8, Q9, Q10, Q11 e Q13
 
 | Requirement | Story | Task | Status |
 | ----------- | ----- | ---- | ------ |
-| CMP-01 | P0 | CMP-T0 | Pending |
-| CMP-02 | P0 | CMP-T1 | Pending |
-| CMP-03 | P0 | CMP-T1, CMP-T3 | Pending |
-| CMP-04 | P0 | CMP-T4 | Pending |
+| CMP-01 | P0 | CMP-T0 | Verified — base `c1480992`, Checks 41073156978; [evidências e desvio do pool](../../project/licoes/2026-10-30-computador-a.md) |
+| CMP-02 | P0 | CMP-T1 | Verified — termlib 0.3.14/fork e cbssh 0.6.6; 126 componentes com POMs/hashes/licenças e 4/4 catracas; build/lint, 2.709 JVM e 20 instrumentados verdes; limites e riscos na [lição](../../project/licoes/2026-10-30-computador-a.md) |
+| CMP-03 | P0 | CMP-T1, CMP-T3 | Verified — JNI do CI com SHA fixado; 3 ABIs no APK, ELF/ZIP 16 KB e hashes conferidos, 6/6 catracas; [lição](../../project/licoes/2026-10-30-computador-a.md) |
+| CMP-04 | P0 | CMP-T4 | Verified (2026-10-30) |
 | CMP-05 | P1-A | CMP-T5, CMP-T11, CMP-T15 | Pending |
 | CMP-06 | P1-A | CMP-T5, CMP-T11 | Pending |
 | CMP-07 | P1-A | CMP-T11, CMP-T15 | Pending |
@@ -444,7 +444,7 @@ Nenhuma. Q1–Q13 foram respondidas em 29/10 (D12–D24). Q8, Q9, Q10, Q11 e Q13
 | CMP-60 | P2-I | CMP-T17 | Pending |
 | CMP-61 | P2-I | CMP-T15, CMP-T16, CMP-T33 | Pending |
 | CMP-62 | P2-I | CMP-T5, CMP-T31 | Pending |
-| CMP-63 | P2-I | CMP-T4, CMP-T20 | Pending |
+| CMP-63 | P2-I | CMP-T4, CMP-T20 | Partial (T4 verificada; T20 pendente) |
 | CMP-64 | P2-I | CMP-T18, CMP-T28, CMP-T36 | Pending |
 | CMP-65 | P2-I | CMP-T19, CMP-T28, CMP-T36 | Pending |
 | CMP-66 | P2-I | CMP-T38 | Pending |
