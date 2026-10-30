@@ -41,7 +41,7 @@ jobs:
           sudo ln -sfn "$JAVA_HOME" /usr/lib/jvm/java-17-openjdk
       - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
       - name: Android SDK 37
-        run: sdkmanager "platforms;android-37" "build-tools;36.0.0"
+        run: sdkmanager "platforms;android-37.0" "build-tools;36.0.0"
       # app/build.gradle.kts baixa o AAR do sherpa-onnx (~50 MB) do release do GitHub quando ele falta
       # em app/libs/ (ignorado no git). Sem cache, todo job baixava de novo: em 2026-10-03 o GitHub
       # respondeu 503 e derrubou a PR #7 antes de qualquer teste. A chave é a versão e o SHA256 fixados

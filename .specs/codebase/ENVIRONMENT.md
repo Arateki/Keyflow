@@ -157,7 +157,7 @@ o shim próprio do design da Visão (§7 A) volta a ser possível.
 ## Notas / pegadinhas
 
 - **Smoke build**: um app Android trivial compilou e gerou APK (Gradle 9.6.1 + AGP 9.2.0 + JDK 17 + SDK). A fundação está provada; o projeto descartável ficou no scratchpad temporário, fora do repo.
-- **compileSdk 37**: instalar `sdkmanager "platforms;android-37" "build-tools;36.0.0"`. CI instala explicitamente; a imagem AWS inclui a plataforma, e o arranque de imagens antigas instala só o pacote ausente. O Deck monta o SDK do Yan somente para leitura: até ele instalar a plataforma e atualizar o instalador que anuncia `sdk_37=sim`, o pool recusa builds desta branch com **falta SDK 37**. APKs prontos continuam aceitos com `--sem-build`.
+- **compileSdk 37**: instalar `sdkmanager "platforms;android-37.0" "build-tools;36.0.0"`. CI instala explicitamente; a imagem AWS inclui a plataforma, e o arranque de imagens antigas instala só o pacote ausente. O Deck monta o SDK do Yan somente para leitura: até ele instalar a plataforma e atualizar o instalador que anuncia `sdk_37=sim`, o pool recusa builds desta branch com **falta SDK 37**. APKs prontos continuam aceitos com `--sem-build`.
 - **Warning XML v4** no `avdmanager`/`sdkmanager` é benigno (cmdline-tools ligeiramente atrás do repositório). Para silenciar: `sdkmanager --install "cmdline-tools;latest"`.
 - **Disco**: ~14 GB livres após o setup (partição em 91%). Atenção ao crescimento de `~/.gradle` e snapshots do emulador.
 - **adb duplicado**: há `/usr/bin/adb` (sistema) e o do SDK (`platform-tools/adb`, 36.0.2). Prefira o do SDK e evite servers concorrentes (`adb kill-server` se houver conflito).
@@ -173,7 +173,7 @@ container é reciclado; refazer a cada sessão nova (~10 min + boot do emulador)
 apt-get install -y openjdk-17-jdk-headless
 ln -sfn /usr/lib/jvm/java-17-openjdk-amd64 /usr/lib/jvm/java-17-openjdk
 # SDK: cmdline-tools de dl.google.com em /root/Android/Sdk/cmdline-tools/latest, depois
-sdkmanager "platform-tools" "platforms;android-37" "build-tools;36.0.0" "emulator" \
+sdkmanager "platform-tools" "platforms;android-37.0" "build-tools;36.0.0" "emulator" \
   "system-images;android-34;google_apis;x86_64"
 avdmanager create avd -n keyflow_api34 -k "system-images;android-34;google_apis;x86_64" -d pixel_6
 # libs do emulador + ImageMagick (diff-screens.sh)
