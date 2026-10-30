@@ -123,6 +123,7 @@ fun ConfigScreen(
     barsConfig: BarsConfig = BarsConfig.DEFAULT,
     onBarsConfigChange: (BarsConfig) -> Unit = {},
     shortcutGrids: List<ShortcutGrid> = emptyList(),
+    nomesDeFluxo: Map<String, String> = emptyMap(),
     onShortcutGridsChange: (List<ShortcutGrid>) -> Unit = {},
     modifier: Modifier = Modifier,
     initialTab: ConfigTab = ConfigTab.VOZ,
@@ -423,6 +424,7 @@ fun ConfigScreen(
                             barsConfig = barsConfig,
                             onBarsConfigChange = onBarsConfigChange,
                             shortcutGrids = shortcutGrids,
+                            nomesDeFluxo = nomesDeFluxo,
                             onShortcutGridsChange = onShortcutGridsChange,
                             modeCard = {
                                 KeyboardModeCard(

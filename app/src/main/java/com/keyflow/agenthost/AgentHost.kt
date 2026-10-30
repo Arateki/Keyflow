@@ -33,8 +33,28 @@ class AgentParts internal constructor(
     val executor: ToolExecutor,
     val gate: ConfirmationGate,
     val secretFilter: SecretFilter,
+    private val novasFerramentas: () -> List<AgentTool>,
 ) {
     fun runtime(backends: AgentBackends) = AgentRuntime(controller, registry, policy, actionLog, backends)
+
+    /**
+     * Uma sessão **exclusiva** para uma execução de fluxo (FLX-24, D10): controlador, [ConfirmationGate], [ToolPolicy] e executor
+     * novos, ligados entre si, com o mesmo catálogo de nomes e adaptadores, mas ferramentas com estado próprias de cada controlador.
+     * Compartilha a configuração de política, o registro e o filtro de
+     * segredos do chat. O chat da aba (controlador, histórico e painel) não é tocado: o pedido do fluxo não leva o histórico dele,
+     * cancelar um não cancela o outro e as confirmações não se cruzam. Quem chama é dono de [scope] e o cancela ao terminar.
+     */
+    fun novaSessao(scope: CoroutineScope, clock: () -> Long = System::currentTimeMillis): AgentParts {
+        val sessionRegistry = ToolRegistry(novasFerramentas())
+        val sessionGate = ConfirmationGate()
+        val toolPolicy = ToolPolicy(
+            config = { policy.config.value },
+            onAlwaysAllow = { name -> policy.update { it.copy(alwaysAllowed = it.alwaysAllowed + name) } },
+        )
+        val sessionExecutor = ToolExecutor(sessionRegistry, toolPolicy, sessionGate, secretFilter, actionLog, clock)
+        val sessionController = AgentController(scope, sessionExecutor, sessionGate, actionLog, awaitReady = policy::awaitLoaded)
+        return AgentParts(sessionController, sessionRegistry, policy, actionLog, sessionExecutor, sessionGate, secretFilter, novasFerramentas)
+    }
 }
 
 /**
@@ -65,6 +85,12 @@ object AgentHost {
         actionLog: ActionLog,
         secrets: () -> Collection<String>,
         clock: () -> Long = System::currentTimeMillis,
+        novasFerramentas: () -> List<AgentTool> = {
+            require(tools.none { it is com.keyflow.agent.TurnScoped }) {
+                "Ferramentas com estado de turno precisam de uma fábrica por sessão"
+            }
+            tools
+        },
     ): AgentParts {
         val filter = SecretFilter(secrets)
         val gate = ConfirmationGate()
@@ -76,7 +102,7 @@ object AgentHost {
         )
         val executor = ToolExecutor(registry, toolPolicy, gate, filter, actionLog, clock)
         val controller = AgentController(scope, executor, gate, actionLog, awaitReady = policy::awaitLoaded)
-        return AgentParts(controller, registry, policy, actionLog, executor, gate, filter)
+        return AgentParts(controller, registry, policy, actionLog, executor, gate, filter, novasFerramentas)
     }
 
     private fun create(app: Context): AgentParts {
@@ -95,13 +121,17 @@ object AgentHost {
             io,
         )
         val log = FileActionLog(File(app.filesDir, ACTION_LOG_FILE), sanitize = SecretFilter(secrets)::redact)
+        // Só os adaptadores são compartilhados: rascunhos e navegação pendente pertencem ao controlador.
+        val workshop = AndroidSkinWorkshop(app, SkinPackStore.of(app), RepositorySkinSelection(repository))
+        val control = AndroidAppControl(app, repository, tabNavigator)
+        val novasFerramentas = { SkinTools(workshop).tools + AppTools(control).tools }
         return assemble(
             // Fora da thread principal: o filtro decifra o cofre, o executor roda ferramentas e o motor fala com a rede; a tela só observa o StateFlow.
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
             // As ferramentas de skin (SKL-01..06) sobre o mesmo SkinPackStore do import e da tela, e as duas chaves de skin dos ajustes;
             // e as de app (APP-01..03): o estado, a lista de permitidos de ajustes e a navegação.
-            tools = SkinTools(AndroidSkinWorkshop(app, SkinPackStore.of(app), RepositorySkinSelection(repository))).tools +
-                AppTools(AndroidAppControl(app, repository, tabNavigator)).tools,
+            tools = novasFerramentas(),
+            novasFerramentas = novasFerramentas,
             policy = policy,
             actionLog = log,
             secrets = secrets,

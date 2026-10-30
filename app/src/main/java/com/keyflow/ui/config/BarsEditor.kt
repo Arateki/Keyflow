@@ -109,7 +109,7 @@ fun gridModeHint(mode: GridTriggerMode): String = when (mode) {
 }
 
 /** Nome por extenso do botão, para as frases dos avisos (o glifo não se lê em texto corrido). */
-private fun barButtonName(button: BarButton): String = when (button) {
+internal fun barButtonName(button: BarButton, nomesDeFluxo: Map<String, String> = emptyMap()): String = when (button) {
     BarButton.Mic -> "microfone"
     BarButton.ConfigBtn -> "config"
     BarButton.ToggleExpand -> "colapsar/expandir"
@@ -118,6 +118,8 @@ private fun barButtonName(button: BarButton): String = when (button) {
     BarButton.Joystick -> "alavanca"
     is BarButton.SingleKey -> button.key.label
     is BarButton.GridTrigger -> button.label.ifBlank { tr("grade") }
+    // "Fluxo: <nome>" (FLX-36); sem gatilho (botão órfão) ou sem o nome à mão, só "Fluxo".
+    is BarButton.RunFlow -> nomesDeFluxo[button.botaoId]?.let { tr("Fluxo: %s", it) } ?: tr("Fluxo")
 }
 
 /**
@@ -125,7 +127,7 @@ private fun barButtonName(button: BarButton): String = when (button) {
  * sempre). A barra só rola a partir de um botão de TOQUE — ver [BarGeometry.scrollAnchors] —, e quem
  * monta a barra não tem como adivinhar isso olhando os chips (Yan, 2026-09-08).
  */
-private fun scrollWarningFor(buttons: List<BarButton>): String? {
+private fun scrollWarningFor(buttons: List<BarButton>, nomesDeFluxo: Map<String, String> = emptyMap()): String? {
     if (buttons.size < SCROLL_WARNING_MIN_BUTTONS) return null
     val apoios = BarGeometry.scrollAnchors(buttons)
     val motivos = tr("o microfone, a alavanca e a grade usam o arrasto nos próprios gestos, e a faixa de sugestões rola as palavras dela")
@@ -135,7 +137,7 @@ private fun scrollWarningFor(buttons: List<BarButton>): String? {
             motivos,
         )
     } else {
-        val nomes = apoios.map(::barButtonName).distinct()
+        val nomes = apoios.map { barButtonName(it, nomesDeFluxo) }.distinct()
         val lista = when (nomes.size) {
             1 -> nomes.first()
             else -> nomes.dropLast(1).joinToString(", ") + tr(" e ") + nomes.last()
@@ -213,6 +215,8 @@ fun BarsEditor(
     modifier: Modifier = Modifier,
     // Galeria: já abre no formulário de gatilho de grade, com este gatilho como botão novo da barra 0.
     initialGridForm: BarButton.GridTrigger? = null,
+    // `botaoId → nome do fluxo` (FLX-36): o nome que o botão de fluxo mostra no editor ("Fluxo: <nome>").
+    nomesDeFluxo: Map<String, String> = emptyMap(),
 ) {
     val palette = LocalKeyFlowPalette.current
     var viewingExpanded by remember { mutableStateOf(false) }
@@ -348,7 +352,7 @@ fun BarsEditor(
                     }
                 }
 
-                scrollWarningFor(barDef.buttons)?.let { aviso ->
+                scrollWarningFor(barDef.buttons, nomesDeFluxo)?.let { aviso ->
                     InfoNote(aviso, BARS_EDITOR_SCROLL_WARNING_TAG, Modifier.padding(top = 10.dp))
                 }
             }
@@ -396,6 +400,7 @@ fun BarsEditor(
             )
             is BarsEditorSheet.SimpleEdit -> SimpleEditSheet(
                 button = current.button,
+                nomesDeFluxo = nomesDeFluxo,
                 onRemove = {
                     removeButtonAt(current.barIndex, current.buttonIndex)
                     sheet = null
@@ -633,12 +638,13 @@ private class CatalogOption(val label: String, val tag: String, val help: String
 @Composable
 private fun SimpleEditSheet(
     button: BarButton,
+    nomesDeFluxo: Map<String, String>,
     onRemove: () -> Unit,
     onChangeKey: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     ConfigModal(
-        title = barButtonName(button).replaceFirstChar { it.uppercase() },
+        title = barButtonName(button, nomesDeFluxo).replaceFirstChar { it.uppercase() },
         onDismiss = onDismiss,
         closeTag = BARS_EDITOR_EDIT_CLOSE_TAG,
         cardTag = BARS_EDITOR_EDIT_SHEET_TAG,

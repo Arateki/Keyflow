@@ -186,6 +186,19 @@ class ArchitectureRulesTest {
         assertEquals("com.keyflow.fluxos (fora de fluxos/app) é JVM puro: sem android.*, Compose, downloader nem cofre", emptyList<String>(), offenders)
     }
 
+    /**
+     * Uma etapa de fluxo nunca baixa um modelo (FLX-26, FLX-52): modelo ausente é falha `INDISPONIVEL` com a frase da aba. Mesmo em
+     * `fluxos/app`, que enxerga o Android, nada importa o downloader nem o serviço de download.
+     */
+    @Test
+    fun fluxosAppNeverDownloadsAModel() {
+        val downloader = Regex("""^\s*import\s+com\.keyflow\.data\.models\.(ModelDownloader|DownloadGateway|ModelDownloadService|HttpDownloadGateway)\b""")
+        val offenders = kotlinFiles(main).filter { it.rel(main).replace('\\', '/').startsWith("com/keyflow/fluxos/") }.flatMap { file ->
+            codeLines(file).mapIndexedNotNull { i, line -> if (downloader.containsMatchIn(line)) "${file.rel(main)}:${i + 1}" else null }
+        }
+        assertEquals("fluxos nunca baixa modelo", emptyList<String>(), offenders)
+    }
+
     @Test
     fun fluxosRuleCatchesAndroidOutsideAppButNotInsideIt() {
         val bad = listOf("package x", "import android.os.Bundle")

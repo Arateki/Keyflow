@@ -15,6 +15,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -47,7 +48,7 @@ class BarsEditorTest {
 
     private val grid1 = ShortcutGrid(id = "g1", name = "Grade 1", rows = 2, cols = 2)
 
-    private inner class Harness(initial: BarsConfig, val grids: List<ShortcutGrid> = emptyList()) {
+    private inner class Harness(initial: BarsConfig, val grids: List<ShortcutGrid> = emptyList(), val nomes: Map<String, String> = emptyMap()) {
         var barsConfig by mutableStateOf(initial)
 
         @Composable
@@ -57,6 +58,7 @@ class BarsEditorTest {
                     barsConfig = barsConfig,
                     onBarsConfigChange = { barsConfig = it },
                     grids = grids,
+                    nomesDeFluxo = nomes,
                 )
             }
         }
@@ -200,6 +202,44 @@ class BarsEditorTest {
         rule.runOnIdle {
             assertEquals(emptyList<BarButton>(), h.barsConfig.collapsed[0].buttons)
         }
+    }
+
+    // ── botão de fluxo (FLX-36): lista, move e remove; nunca é oferecido para adicionar ──
+
+    @Test
+    fun theFlowButtonIsListedNamedAndRemovedButNeverOfferedInTheCatalog() {
+        val h = Harness(
+            BarsConfig(
+                mirrored = false,
+                collapsed = listOf(BarDef(listOf(BarButton.RunFlow("a1b2c3"), BarButton.Mic))),
+                expanded = listOf(BarDef(emptyList())),
+            ),
+            nomes = mapOf("a1b2c3" to "Ouvir e responder"),
+        )
+        rule.setContent { h.Content() }
+
+        // Listado: o chip existe e o toque abre a folha com o nome "Fluxo: <nome>".
+        rule.onNodeWithTag(barChipTag(0, 0)).assertIsDisplayed().performClick()
+        rule.onNodeWithTag(BARS_EDITOR_EDIT_SHEET_TAG).assertTextContains("Fluxo: Ouvir e responder", substring = true)
+        rule.onNodeWithTag(BARS_EDITOR_EDIT_REMOVE_TAG).performClick()
+        rule.runOnIdle { assertEquals(listOf<BarButton>(BarButton.Mic), h.barsConfig.collapsed[0].buttons) }
+
+        // O catálogo de adicionar não tem o botão de fluxo: só o modal do fluxo o cria.
+        rule.onNodeWithTag(barAddButtonTag(0)).performClick()
+        rule.onNodeWithTag(BARS_EDITOR_CATALOG_TAG).assertIsDisplayed()
+        rule.onAllNodesWithText("Fluxo", substring = true).assertCountEquals(0)
+    }
+
+    @Test
+    fun theFlowButtonMovesLikeAnyOther() {
+        val moved = reorderedButtons(listOf(BarButton.RunFlow("a1b2c3"), BarButton.Mic, BarButton.Paste), fromIndex = 0, toIndex = 2)
+        assertEquals(listOf(BarButton.Mic, BarButton.Paste, BarButton.RunFlow("a1b2c3")), moved)
+    }
+
+    @Test
+    fun theFlowButtonNameFallsBackToPlainFlowWithoutAName() {
+        assertEquals("Fluxo", barButtonName(BarButton.RunFlow("zzzzzz")))
+        assertEquals("Fluxo: X", barButtonName(BarButton.RunFlow("a1b2c3"), mapOf("a1b2c3" to "X")))
     }
 
     @Test

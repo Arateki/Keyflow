@@ -7,6 +7,11 @@ import com.keyflow.agenthost.AgentBackends
 import com.keyflow.agenthost.AgentHost
 import com.keyflow.auth.AuthServices
 import com.keyflow.auth.ProviderIds
+import com.keyflow.data.Config
+import com.keyflow.data.Settings
+import com.keyflow.data.SettingsCredentialValues
+import com.keyflow.data.configDe
+import com.keyflow.data.SettingsRepository
 import com.keyflow.data.models.EngineType
 import com.keyflow.data.models.FileRole
 import com.keyflow.data.models.ModelCatalog
@@ -35,7 +40,10 @@ import com.keyflow.vision.CustomVisionTransport
 import com.keyflow.vision.LocalVisionEngine
 import com.keyflow.vision.VisionModelEngines
 import com.keyflow.vision.VisionProvider
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 
 /**
  * A composição dos motores das capacidades **por processo**, fora das telas (FLX-26, design §9). Até aqui os motores do Raciocínio, da
@@ -49,6 +57,26 @@ import kotlinx.coroutines.flow.map
 class AmbienteMotores private constructor(context: Context) {
     private val app: Context = context.applicationContext
     private val auth: AuthServices get() = (app as App).authServices
+
+    /**
+     * As `Settings` **deste instante**, lidas do DataStore a cada pedido (FLX-26): a etapa nunca guarda cópia e sempre vê o que a pessoa
+     * mudou na aba até agora. Não toca no cofre — os segredos saem de lá na hora da chamada, pelos lambdas dos motores.
+     */
+    suspend fun settingsAgora(): Settings = SettingsRepository(app).settingsFlow().first()
+
+    /**
+     * A [Config] da transcrição para estas Settings (as da etapa Ditar com modelo próprio), com os tokens do cofre lidos **agora**,
+     * fora da main: a mesma função que o `SettingsRepository.flow()` aplica às Settings da aba.
+     */
+    suspend fun configDaTranscricao(settings: Settings): Config = withContext(Dispatchers.IO) {
+        configDe(
+            settings,
+            SettingsCredentialValues(
+                openaiToken = auth.store.getApiKey(ProviderIds.OPENAI)?.value.orEmpty(),
+                groqToken = auth.store.getApiKey(ProviderIds.GROQ)?.value.orEmpty(),
+            ),
+        )
+    }
 
     /** O motor do Raciocínio: local pelo `:reasoning`; OpenAI, Anthropic e Google por APIs na nuvem com as credenciais do cofre. */
     val reasoning: ReasoningEngines by lazy {

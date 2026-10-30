@@ -67,6 +67,7 @@ open class KeyFlowKeyboardService : InputMethodService() {
     // mudança real (o flow re-emite a cada write do DataStore, mesmo de chaves alheias).
     private var appliedBarsConfig: BarsConfig? = null
     private var appliedGrids: List<ShortcutGrid>? = null
+    private var appliedBotoesDeFluxo: Map<String, String>? = null
 
     // Tema/tamanho/idioma/fileira de números aplicados (pedido do Yan, 2026-07-03): mesmo padrão de
     // appliedBarsConfig — reconstrói a view só quando um deles muda de verdade, sem exigir reabrir o
@@ -187,6 +188,10 @@ open class KeyFlowKeyboardService : InputMethodService() {
                 keyboardView?.updateMicState(state)
             }
         }
+        // O botão do fluxo em execução fica aceso (FLX-32).
+        serviceScope.launch {
+            KeyFlowController.fluxo.collect { estado -> keyboardView?.updateFluxo(estado) }
+        }
         // Mantém os flags de cola automática sincronizados com as Settings.
         serviceScope.launch {
             SettingsRepository(this@KeyFlowKeyboardService).settingsFlow().collect {
@@ -223,10 +228,10 @@ open class KeyFlowKeyboardService : InputMethodService() {
         // da troca de subtype. Compara com a config aplicada — o DataStore re-emite em qualquer write.
         serviceScope.launch {
             val repo = SettingsRepository(this@KeyFlowKeyboardService)
-            combine(repo.barsConfigFlow(), repo.shortcutGridsFlow()) { bars, grids -> bars to grids }
+            combine(repo.barsConfigFlow(), repo.shortcutGridsFlow(), repo.botoesDeFluxoFlow()) { bars, grids, fluxos -> Triple(bars, grids, fluxos) }
                 .distinctUntilChanged()
-                .collect { (bars, grids) ->
-                    val changed = bars != appliedBarsConfig || grids != appliedGrids
+                .collect { (bars, grids, fluxos) ->
+                    val changed = bars != appliedBarsConfig || grids != appliedGrids || fluxos != appliedBotoesDeFluxo
                     if (keyboardView != null && changed) recreateInputView("barras/grades mudaram")
                 }
         }
@@ -439,6 +444,7 @@ open class KeyFlowKeyboardService : InputMethodService() {
         val vibration = snapshot.vibration
         appliedBarsConfig = barsConfig
         appliedGrids = grids
+        appliedBotoesDeFluxo = snapshot.botoesDeFluxo
         val readsDoneNs = System.nanoTime()
         val view = KeyFlowKeyboardView(
             context = this,
@@ -478,6 +484,8 @@ open class KeyFlowKeyboardService : InputMethodService() {
             onShortcut = ::emitShortcut,
             vibrationIntensity = vibration,
             motionEnabled = true,
+            flowButtons = snapshot.botoesDeFluxo,
+            onRunFlow = ::runFlow,
         )
         keyboardView = view
         activeViewForTest = view
@@ -486,6 +494,7 @@ open class KeyFlowKeyboardService : InputMethodService() {
         // estava (ex.) pausada quando o teclado abriu, a view nasceria dessincronizada (ex.: trocar de
         // teclado por atalho com o overlay pausado).
         view.updateMicState(KeyFlowController.buttonState.value)
+        view.updateFluxo(KeyFlowController.fluxo.value)
         Log.d(
             TAG,
             "onCreateInputView: ${(System.nanoTime() - createStartedNs) / 1_000_000} ms " +
@@ -560,6 +569,15 @@ open class KeyFlowKeyboardService : InputMethodService() {
      * KeyFlow é o teclado ativo, o IME tem isenção para iniciar o FGS em background. Funciona mesmo com
      * o Modo Sobrepor desligado — teclado e overlay são independentes (Fase 1).
      */
+    /**
+     * Toque num botão de fluxo da barra. O IME não conhece o fluxo; quem resolve `botaoId → fluxo` e dispara é o `FluxoHost` do
+     * serviço da orbe, pelo mesmo caminho do mic (`startForegroundService` com `ACTION_RUN_FLOW`). **Ainda não ligado**: isso é
+     * da FLX-T14 — até lá o toque chega aqui e nada acontece (nenhum botão existe antes de o modal da T22 criá-lo).
+     */
+    private fun runFlow(botaoId: String) {
+        Log.d(TAG, "runFlow: botão $botaoId (disparo ligado na FLX-T14)")
+    }
+
     private fun startMicSession() {
         try {
             OverlayService.start(this, OverlayService.keyboardMicIntent(this))

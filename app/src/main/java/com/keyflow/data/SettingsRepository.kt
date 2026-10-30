@@ -36,6 +36,7 @@ import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.ModelKind
 import com.keyflow.data.models.ModelProvisioning
 import com.keyflow.fluxos.CodecFluxos
+import com.keyflow.fluxos.BotoesDeFluxo
 import com.keyflow.fluxos.ConfigFluxos
 import com.keyflow.fluxos.PadroesFluxo
 import com.keyflow.fluxos.PoliticaGatilhos
@@ -202,6 +203,7 @@ class SettingsRepository(
      * instabilidade, 2026-10-10). Mesmos padrões das leituras avulsas ([themeDarkOnce] e companhia).
      */
     suspend fun keyboardSnapshotOnce(): KeyboardSnapshot = dataStore.data.first().let { prefs ->
+        val barras = ShortcutCodec.decodeBars(prefs[BARS_CONFIG_JSON])
         KeyboardSnapshot(
             dark = prefs[THEME_DARK] ?: false,
             scalePercent = prefs[KEYBOARD_SCALE_PERCENT] ?: 100,
@@ -209,11 +211,20 @@ class SettingsRepository(
             numberRowEnabled = prefs[KEYBOARD_NUMBER_ROW_ENABLED] ?: false,
             skin = prefs[KEYBOARD_SKIN] ?: "system",
             skinsUnlocked = prefs[SKINS_UNLOCKED] ?: false,
-            bars = ShortcutCodec.decodeBars(prefs[BARS_CONFIG_JSON]),
+            bars = barras,
             grids = ShortcutCodec.decodeGrids(prefs[SHORTCUT_GRIDS_JSON]),
             vibration = prefs[VIBRATION_INTENSITY] ?: (if (prefs[HAPTIC_FEEDBACK] == false) 0 else 60),
+            botoesDeFluxo = prefs.botoesDeFluxoDe(barras),
         )
     }
+
+    /** Os botões `RunFlow` da barra com gatilho válido (`botaoId → fluxoId`). Barra sem botão de fluxo: nem decodifica os fluxos. */
+    private fun Preferences.botoesDeFluxoDe(barras: BarsConfig): Map<String, String> =
+        if (barras.botoesDeFluxo().isEmpty()) emptyMap() else BotoesDeFluxo.validos(configFluxos())
+
+    /** Ao vivo: o IME recria a barra quando um botão de fluxo ganha, perde ou muda o gatilho, ou o fluxo fica (in)válido. */
+    fun botoesDeFluxoFlow(): Flow<Map<String, String>> =
+        dataStore.data.map { it.botoesDeFluxoDe(ShortcutCodec.decodeBars(it[BARS_CONFIG_JSON])) }.distinctUntilChanged()
 
     /** Observação ao vivo (BAR-07): o service recria a view do teclado quando a config muda. */
     fun barsConfigFlow(): Flow<BarsConfig> =
@@ -367,7 +378,13 @@ class SettingsRepository(
     }
 
     suspend fun saveBarsConfig(config: BarsConfig) {
-        dataStore.edit { it[BARS_CONFIG_JSON] = ShortcutCodec.encodeBars(config) }
+        dataStore.edit { prefs ->
+            prefs[BARS_CONFIG_JSON] = ShortcutCodec.encodeBars(config)
+            // Remover o botão de um fluxo no editor de barras desliga o gatilho dele (FLX-36, FLX-50). Só regrava os fluxos se algum
+            // gatilho ficou órfão: salvar as barras não "adota" a semente dos fluxos.
+            val atual = prefs.configFluxos()
+            if (PoliticaGatilhos.limpar(atual, config.botoesDeFluxo()).gatilhos != atual.gatilhos) prefs.gravarFluxos(atual, config)
+        }
     }
 
     suspend fun saveShortcutGrids(grids: List<ShortcutGrid>) {
@@ -404,7 +421,7 @@ class SettingsRepository(
     suspend fun atualizarFluxosEBarras(alterar: (ConfigFluxos, BarsConfig) -> Pair<ConfigFluxos, BarsConfig>): ConfigFluxos =
         dataStore.edit { prefs ->
             val (fluxos, barras) = alterar(prefs.configFluxos(), ShortcutCodec.decodeBars(prefs[BARS_CONFIG_JSON]))
-            prefs.gravarFluxos(fluxos)
+            prefs.gravarFluxos(fluxos, barras)
             prefs[BARS_CONFIG_JSON] = ShortcutCodec.encodeBars(barras)
         }.configFluxos()
 
@@ -412,11 +429,11 @@ class SettingsRepository(
      * Grava os dois JSON de [nova] depois de tirar os gatilhos órfãos; se o que está gravado já é exatamente isso, não regrava
      * (um JSON malformado, que a leitura trata como a semente, é consertado na primeira gravação).
      *
-     * Os gatilhos de botão da barra ainda não são conferidos contra a barra (`botoesDaBarra = null`): o botão `RunFlow` só passa a
-     * existir na FLX-T16, que então passa aqui os ids dos botões que a barra tem (FLX-50).
+     * Os gatilhos de botão da barra também são conferidos contra os botões `RunFlow` que a barra tem (FLX-50): [barras] são as que
+     * valem depois desta gravação (as novas, quando a mesma transação as grava; senão as já gravadas).
      */
-    private fun MutablePreferences.gravarFluxos(nova: ConfigFluxos) {
-        val limpa = PoliticaGatilhos.limpar(nova, botoesDaBarra = null)
+    private fun MutablePreferences.gravarFluxos(nova: ConfigFluxos, barras: BarsConfig = ShortcutCodec.decodeBars(this[BARS_CONFIG_JSON])) {
+        val limpa = PoliticaGatilhos.limpar(nova, botoesDaBarra = barras.botoesDeFluxo())
         val fluxosJson = CodecFluxos.codificarFluxos(limpa.fluxos)
         val gatilhosJson = CodecFluxos.codificarGatilhos(limpa.gatilhos)
         if (this[FLOWS_JSON] == fluxosJson && this[FLOW_TRIGGERS_JSON] == gatilhosJson) return
@@ -1017,6 +1034,8 @@ data class KeyboardSnapshot(
     val grids: List<ShortcutGrid>,
     val vibration: Int,
     val skinsUnlocked: Boolean = false,
+    /** `botaoId → fluxoId` dos botões `RunFlow` da barra com gatilho válido; os demais renderizam desabilitados (FLX-36). */
+    val botoesDeFluxo: Map<String, String> = emptyMap(),
 )
 
 /**

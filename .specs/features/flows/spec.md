@@ -137,13 +137,13 @@ alavanca e grade (`ShortcutModels.kt`). Nada liga a saída de uma capacidade na 
 5. **FLX-21**: **Perguntar** SHALL chamar o `ReasoningEngine` com o texto de entrada (e o sistema da etapa, se houver) e entregar a resposta **inteira** só depois do `Done`; `Error` ou resposta em branco para o fluxo; um trecho parcial **nunca** segue adiante.
 6. **FLX-22**: **Falar** SHALL falar o texto de entrada com o `SpeechEngine` da Voz e **devolver o mesmo texto** (passagem), para a etapa seguinte poder usá-lo. Texto longo SHALL ser dividido em trechos por frase (≤ 800 caracteres cada) e falado em sequência; cancelar corta o som na hora. Reprodução em `AudioTrack` (o mesmo player do Testar da aba Voz).
 7. **FLX-23**: **Inserir** SHALL entregar o texto com `KeyFlowController.insertOrHold` (campo focado → cola; senão guarda para colar ao focar ou fica na área de transferência — as regras do auto-colar de hoje) e **devolver o mesmo texto**. Quando `insertOrHold` devolve `Held` o texto vai também para a área de transferência, como o ditado faz.
-8. **FLX-24**: **Agente** SHALL enviar o texto de entrada a uma **conversa separada** da aba KeyFlow (D10), com controlador, histórico e confirmação próprios da execução, reutilizando o motor e a política de ferramentas. A conversa começa vazia por execução; etapas Agente da mesma execução podem usar essa sessão. Não lê, limpa nem acrescenta mensagens ao chat da aba, e não mistura confirmações. Entrega a **última resposta do assistente** da etapa quando ela terminar; se o controlador da sessão está ocupado, falha com "O agente está ocupado". Cancelar o fluxo cancela só sua sessão; todo fim libera a sessão e descarta o histórico em memória. O estado/conversa de uma execução não passa à próxima.
+8. **FLX-24**: **Agente** SHALL enviar o texto de entrada a uma **conversa separada** da aba KeyFlow (D10), com controlador, histórico e confirmação próprios da execução, reutilizando o motor e a política de ferramentas. O catálogo de nomes e os adaptadores são os mesmos; rascunhos de skin e navegação pendente pertencem a cada controlador. A conversa começa vazia por execução; etapas Agente da mesma execução podem usar essa sessão. Não lê, limpa nem acrescenta mensagens ao chat da aba, e não mistura confirmações. Entrega a **última resposta do assistente** da etapa quando ela terminar; se o controlador da sessão está ocupado, falha com "O agente está ocupado". Cancelar o fluxo cancela só sua sessão; todo fim libera a sessão e descarta o histórico em memória. O estado/conversa de uma execução não passa à próxima.
 9. **FLX-25**: as **ferramentas do agente** SHALL pedir confirmação **como hoje** (mesma política, mesmo painel de confirmação, mesmo "Permitir sempre" só para `WRITE`). Como o fluxo roda sobre qualquer app, o pedido SHALL aparecer numa **janela translúcida do KeyFlow** por cima do app em uso, com o `AgentConfirmationPanel` existente; sair dela sem responder **nega** (falha fechada) e cancela a etapa. Sem a janela visível nenhuma ferramenta que peça confirmação roda.
 10. **FLX-26**: o **modelo de cada etapa** SHALL ser resolvido **no início da etapa**, de um instantâneo das `Settings` do momento: `ModeloRef` nulo → o que a aba tem agora; `ModeloRef` preenchido → o instantâneo com **só** a origem/modelo daquela etapa trocados, **em memória** (as `Settings` gravadas não mudam). A credencial vem do cofre na hora da chamada. O fluxo **nunca** troca de origem por conta própria (sem fallback silencioso entre local e nuvem).
 11. **FLX-27**: **falha numa etapa** (modelo ausente ou não selecionado, provedor desconectado, rede, tempo esgotado, autenticação, limite de uso, memória, motor, resultado vazio) SHALL **parar o fluxo**: nenhuma etapa seguinte roda e nada mais é inserido ou falado. O aviso SHALL dizer **qual etapa** parou e **por quê** em linguagem simples ("O fluxo parou em “Perguntar”: sem conexão de rede.") e, quando a causa se resolve numa aba, levar a ela (tocar no aviso abre a aba da etapa). As causas e mensagens estão na tabela "Erros". O que etapas **anteriores** já fizeram (ex.: Inserir no meio) não é desfeito e o aviso não promete o contrário.
 12. **FLX-28**: nenhum erro de etapa SHALL derrubar o app: `OutOfMemoryError`, exceção do motor e processo `:reasoning`/`:vision`/`:speech` morto viram `Falhou` com a causa `MEMORIA`/`MOTOR`. O executor libera imagem, player e gravação em **todo** fim (sucesso, falha, cancelamento).
 13. **FLX-29**: **cancelar**. Fora da gravação do Ditar, **tocar na orbe** (ou no botão do fluxo no teclado, ou no card em execução) cancela o fluxo: interrompe a geração/chamada em curso, corta o áudio, descarta a captura e devolve a orbe ao estado em que estava. **Durante a gravação do Ditar** o toque na orbe é o de sempre (envia o áudio, FLX-18); ali, cancelar é pelo gesto de cancelar da gravação (arrastar para o lado, com a janela de desfazer), pelo mic do teclado ou pela notificação — e, concluído o cancelamento, o fluxo termina `Cancelado`. Em qualquer caminho o estado final é `Cancelado`, sem aviso de falha.
-14. **FLX-30**: **privacidade e transparência**. O card e o modal SHALL mostrar, por etapa e para o fluxo todo, onde roda: **No aparelho** (origem Local/Sistema, Capturar, Inserir) ou **Nuvem · <provedor>** (o que sai: áudio na Transcrição por nuvem, texto no Raciocínio/Agente/Voz por nuvem, imagem na Visão por nuvem). O selo é calculado com o modelo **efetivo** (o da etapa ou o da aba agora). Fluxo 100% local: "100% no aparelho". O fluxo **não grava** áudio, imagem nem texto intermediário em disco; log e diagnóstico não contêm o conteúdo das etapas.
+14. **FLX-30**: **privacidade e transparência**. O card e o modal SHALL mostrar, por etapa e para o fluxo todo, onde roda: **No aparelho** (origem Local/Sistema, Capturar, Inserir) ou **Nuvem · <provedor>** (o que sai: áudio na Transcrição por nuvem, texto no Raciocínio/Agente/Voz por nuvem, imagem na Visão por nuvem). O selo é calculado com o modelo **efetivo** (o da etapa ou o da aba agora). Fluxo 100% local: "100% no aparelho". O fluxo **não grava** áudio, imagem nem texto intermediário em disco; log e diagnóstico não contêm o conteúdo das etapas. **Exceção documentada (FLX-T10)**: o PaddleOCR local usa o transporte existente do processo `:vision`, com recorte RGBA temporário em `cacheDir/vision`, apagado em `finally` inclusive no cancelamento. Eliminar esse arquivo exige mudar o transporte do `:vision`, fora desta fase; os demais motores não usam essa exceção.
 15. **FLX-31**: tempos máximos por etapa (o fluxo falha com `TEMPO`, não trava): Perguntar e Visão 180 s; Falar 10 min; Agente 10 min (inclui esperar confirmação); Ditar vale o limite de gravação e o tempo de transcrição já existentes. Os valores são constantes nomeadas e testadas com relógio virtual.
 16. **FLX-32**: enquanto um fluxo roda, o `OverlayService` SHALL permanecer em primeiro plano (a regra de encerrar ocioso no modo só-teclado, `maybeStopWhenIdle`, não vale durante o fluxo) e a orbe SHALL mostrar o **glifo da etapa em curso** (microfone, olho, balão, alto-falante, robô…). Sem orbe (modo só-teclado), o botão de fluxo da barra mostra "em execução" e erros saem por `Toast`.
 
@@ -414,25 +414,25 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 | FLX-15 | P1-C | FLX-T1, FLX-T18 | Implementing (T1 feita) |
 | FLX-16 | P1-C | FLX-T18 | Pending |
 | FLX-17 | P1-D | FLX-T6, FLX-T14, FLX-T25 | Implementing (T6 feita) |
-| FLX-18 | P1-D | FLX-T11 | Pending |
-| FLX-19 | P1-D | FLX-T12, FLX-T14, FLX-T25 | Pending |
-| FLX-20 | P1-D | FLX-T10 | Pending |
-| FLX-21 | P1-D | FLX-T10 | Pending |
-| FLX-22 | P1-D | FLX-T8, FLX-T10 | Implementing (T8 feita) |
-| FLX-23 | P1-D | FLX-T10 | Pending |
-| FLX-24 | P1-D | FLX-T13, FLX-T25 | Pending |
-| FLX-25 | P1-D | FLX-T13 | Pending |
-| FLX-26 | P1-D | FLX-T7, FLX-T9 | Implementing (T7, T9 feitas) |
+| FLX-18 | P1-D | FLX-T11 | Implementing (T11 feita) |
+| FLX-19 | P1-D | FLX-T12, FLX-T14, FLX-T25 | Implementing (T12 feita) |
+| FLX-20 | P1-D | FLX-T10 | Implementing (T10 feita) |
+| FLX-21 | P1-D | FLX-T10 | Implementing (T10 feita) |
+| FLX-22 | P1-D | FLX-T8, FLX-T10 | Implementing (T8, T10 feitas) |
+| FLX-23 | P1-D | FLX-T10 | Implementing (T10 feita) |
+| FLX-24 | P1-D | FLX-T13, FLX-T25 | Implementing (T13 feita) |
+| FLX-25 | P1-D | FLX-T13 | Implementing (T13 feita) |
+| FLX-26 | P1-D | FLX-T7, FLX-T9 | Implementing (T7, T9 feitas; T10 aplica nas portas) |
 | FLX-27 | P1-D | FLX-T6, FLX-T14, FLX-T25 | Implementing (T6 feita) |
 | FLX-28 | P1-D | FLX-T6, FLX-T14 | Implementing (T6 feita) |
 | FLX-29 | P1-D | FLX-T6, FLX-T14, FLX-T25 | Implementing (T6 feita) |
 | FLX-30 | P1-D | FLX-T7, FLX-T17 | Implementing (T7 feita) |
 | FLX-31 | P1-D | FLX-T6 | Implementing (T6 feita) |
-| FLX-32 | P1-D | FLX-T14, FLX-T16 | Pending |
+| FLX-32 | P1-D | FLX-T14, FLX-T16 | Implementing (T16 feita: botão aceso; falta o serviço, T14) |
 | FLX-33 | P1-E | FLX-T1, FLX-T2, FLX-T5 | Implementing (T1, T2, T5 feitas) |
 | FLX-34 | P1-E | FLX-T5, FLX-T15, FLX-T25 | Implementing (T5 feita) |
 | FLX-35 | P1-E | FLX-T5, FLX-T20, FLX-T21, FLX-T28 | Implementing (T5 feita) |
-| FLX-36 | P1-E | FLX-T16, FLX-T20 | Pending |
+| FLX-36 | P1-E | FLX-T16, FLX-T20 | Implementing (T16 feita; o disparo é da T14) |
 | FLX-37 | P1-E | FLX-T5, FLX-T20 | Implementing (T5 feita) |
 | FLX-38 | P1-E | FLX-T5, FLX-T20 | Implementing (T5 feita) |
 | FLX-39 | P1-E | FLX-T14, FLX-T15, FLX-T25 | Pending |
@@ -446,9 +446,9 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 | FLX-47 | P1-G | FLX-T2 | Implementing (T2 feita) |
 | FLX-48 | P1-G | FLX-T4 | Implementing (T4 feita) |
 | FLX-49 | P1-G | FLX-T4, FLX-T14 | Implementing (T4 feita) |
-| FLX-50 | P1-G | FLX-T4, FLX-T5 | Implementing (T4, T5 feitas) |
+| FLX-50 | P1-G | FLX-T4, FLX-T5, FLX-T16 | Implementing (T4, T5, T16 feitas) |
 | FLX-51 | P2-H | FLX-T17..T21 (cada uma traz os seus textos) | Pending |
-| FLX-52 | P2-H | FLX-T1, FLX-T6, FLX-T10 | Implementing (T1, T6 feitas) |
+| FLX-52 | P2-H | FLX-T1, FLX-T6, FLX-T10 | Implementing (T1, T6, T10 feitas) |
 | FLX-53 | P2-H | FLX-T23 | Pending |
 | FLX-54 | P2-H | FLX-T17, FLX-T18 | Pending |
 | FLX-55 | P2-H | FLX-T24 | Pending |

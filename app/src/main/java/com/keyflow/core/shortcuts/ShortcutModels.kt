@@ -78,6 +78,13 @@ sealed interface BarButton {
         val mode: GridTriggerMode = GridTriggerMode.OPEN_ONLY,
         val label: String = "⌗",
     ) : BarButton
+
+    /**
+     * Dispara um fluxo da aba Fluxos (FLX-36). [botaoId] é o id estável gerado na criação (6 hex), que o gatilho
+     * `Barra(botaoId)` liga a **um** fluxo; sem gatilho válido o botão renderiza desabilitado, como um [GridTrigger] órfão.
+     * Quem o cria é o modal do fluxo — o editor de barras só lista, move e remove.
+     */
+    data class RunFlow(val botaoId: String) : BarButton
 }
 
 /** Uma barra: lista ordenada de botões (esquerda → direita). */
@@ -101,6 +108,12 @@ data class BarsConfig(
     fun referencedGridIds(): Set<String> =
         (collapsed + expanded).flatMap { bar -> bar.buttons.filterIsInstance<BarButton.GridTrigger>() }
             .map { it.gridId }
+            .toSet()
+
+    /** Ids dos botões de fluxo ([BarButton.RunFlow]) nas duas listas: o que a limpeza de gatilhos órfãos confere (FLX-50). */
+    fun botoesDeFluxo(): Set<String> =
+        (collapsed + expanded).flatMap { bar -> bar.buttons.filterIsInstance<BarButton.RunFlow>() }
+            .map { it.botaoId }
             .toSet()
 
     /** Modo sem barra nenhuma cai na principal de fábrica — mic/config/colapsar nunca somem (edge case). */

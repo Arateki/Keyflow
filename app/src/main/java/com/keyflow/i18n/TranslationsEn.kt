@@ -5,6 +5,7 @@ import com.keyflow.i18n.en.Comum
 import com.keyflow.i18n.en.Conta
 import com.keyflow.i18n.en.Docs
 import com.keyflow.i18n.en.Fluxos
+import com.keyflow.i18n.en.FluxosExecucao
 import com.keyflow.i18n.en.Keyflow
 import com.keyflow.i18n.en.Modelos
 import com.keyflow.i18n.en.Privacidade
@@ -27,6 +28,7 @@ internal val TranslationsEn: Map<String, String> = translationMap(
     Conta,
     Docs,
     Fluxos,
+    FluxosExecucao,
     Keyflow,
     Modelos,
     Privacidade,

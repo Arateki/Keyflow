@@ -179,7 +179,7 @@ class FluxosRepositoryTest {
         try {
             repo.atualizarFluxosEBarras { config, bars ->
                 PoliticaGatilhos.ligar(config, "a", Superficie.Barra("b81f02")) to
-                    bars.copy(collapsed = bars.collapsed + BarDef(listOf(BarButton.Paste)))
+                    bars.copy(collapsed = bars.collapsed + BarDef(listOf(BarButton.Paste, BarButton.RunFlow("b81f02"))))
             }
             withTimeout(10_000) { while (vistos.none { it[BARS_CONFIG_JSON] != null }) delay(20) }
         } finally {
@@ -248,5 +248,49 @@ class FluxosRepositoryTest {
             coleta.cancel()
         }
         assertEquals("regravou sem mudança", 1, vistos.size) // só a leitura inicial
+    }
+
+    @Test
+    fun aBarTriggerWithoutItsButtonIsDroppedOnTheNextWrite() = runBlocking {
+        val repo = repositorioSemCofre()
+        repo.atualizarFluxos { it.copy(fluxos = it.fluxos + fluxo("a")) }
+        // Gatilho de botão que a barra não tem (FLX-50): vale só enquanto o RunFlow existir.
+        plantar(FLOW_TRIGGERS_JSON to CodecFluxos.codificarGatilhos(listOf(Gatilho(Superficie.Barra("c0ffee"), "a"), Gatilho(flut2, "a"))))
+        repo.atualizarFluxos { it }
+        assertEquals(listOf(Gatilho(flut2, "a")), repo.configFluxosOnce().gatilhos)
+    }
+
+    @Test
+    fun removingTheFlowButtonInTheBarsEditorSwitchesItsTriggerOff() = runBlocking {
+        val repo = repositorioSemCofre()
+        repo.atualizarFluxosEBarras { config, bars ->
+            PoliticaGatilhos.ligar(config.copy(fluxos = config.fluxos + fluxo("a")), "a", Superficie.Barra("b81f02")) to
+                bars.copy(collapsed = bars.collapsed + BarDef(listOf(BarButton.RunFlow("b81f02"))))
+        }
+        assertEquals(listOf(Gatilho(Superficie.Barra("b81f02"), "a")), repo.configFluxosOnce().gatilhos)
+        // O editor de barras grava as barras sem o botão: o gatilho sai junto, e o fluxo e os outros gatilhos ficam.
+        repo.saveBarsConfig(repo.barsConfigOnce().let { it.copy(collapsed = it.collapsed.map { b -> BarDef(b.buttons.filterNot { x -> x is BarButton.RunFlow }) }) })
+        assertTrue(repo.configFluxosOnce().gatilhos.isEmpty())
+        assertNotNull(repo.configFluxosOnce().fluxo("a"))
+    }
+
+    @Test
+    fun savingTheBarsDoesNotAdoptTheSeedOfTheFlows() = runBlocking {
+        val repo = repositorioSemCofre()
+        repo.saveBarsConfig(repo.barsConfigOnce())
+        assertNull(prefs()[FLOWS_JSON])
+        assertNull(prefs()[FLOW_TRIGGERS_JSON])
+    }
+
+    @Test
+    fun theKeyboardSnapshotCarriesOnlyTheEnabledFlowButtons() = runBlocking {
+        val repo = repositorioSemCofre()
+        repo.atualizarFluxosEBarras { config, bars ->
+            PoliticaGatilhos.ligar(config.copy(fluxos = config.fluxos + fluxo("a")), "a", Superficie.Barra("b81f02")) to
+                bars.copy(collapsed = bars.collapsed + BarDef(listOf(BarButton.RunFlow("b81f02"), BarButton.RunFlow("deadbe"))))
+        }
+        // "deadbe" não tem gatilho: o IME o desenha desabilitado; "b81f02" aponta para um fluxo válido.
+        assertEquals(mapOf("b81f02" to "a"), repo.keyboardSnapshotOnce().botoesDeFluxo)
+        assertEquals(mapOf("b81f02" to "a"), repo.botoesDeFluxoFlow().first())
     }
 }
