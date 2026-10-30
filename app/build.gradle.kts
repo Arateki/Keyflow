@@ -635,6 +635,9 @@ dependencies {
     // --- Testes ---
     // Unit
     testImplementation("junit:junit:4.13.2")
+    // CMP-T4: somente JVM de teste, nunca empacotados no APK.
+    testImplementation("org.apache.sshd:sshd-core:2.20.1")
+    testImplementation("net.i2p.crypto:eddsa:0.3.0")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     testImplementation("com.google.truth:truth:1.4.4")
@@ -792,5 +795,44 @@ configurations.configureEach {
         substitute(module("com.google.crypto.tink:tink"))
             .using(module("com.google.crypto.tink:tink-android:1.24.0"))
             .because("Uma única variante Tink no APK, incluindo a integração Android usada pelo cofre")
+    }
+}
+
+
+// JAR portátil da fixture: o pool também o devolve no diretório de relatórios.
+val sshFixtureRuntime = configurations.create("sshFixtureRuntime") {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    attributes {
+        attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage.JAVA_RUNTIME))
+        attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category.LIBRARY))
+        attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.JAR))
+    }
+}
+dependencies {
+    add(sshFixtureRuntime.name, "org.apache.sshd:sshd-core:2.20.1")
+    add(sshFixtureRuntime.name, "net.i2p.crypto:eddsa:0.3.0")
+    add(sshFixtureRuntime.name, "org.slf4j:slf4j-simple:2.0.20")
+    add(sshFixtureRuntime.name, "org.jetbrains.kotlin:kotlin-stdlib:2.4.21")
+}
+tasks.register<Jar>("prepararFixtureSsh") {
+    dependsOn("compileDebugUnitTestKotlin", "compileDebugUnitTestJavaWithJavac", "processDebugUnitTestJavaRes")
+    archiveFileName.set("ssh-fixture.jar")
+    destinationDirectory.set(layout.buildDirectory.dir("reports/computador"))
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    manifest { attributes["Main-Class"] = "com.keyflow.computador.fixture.SshFixtureMainKt" }
+    from(provider { tasks.named<Test>("testDebugUnitTest").get().testClassesDirs.files }) {
+        include("com/keyflow/computador/fixture/**")
+        exclude("**/*Test*")
+    }
+    from("src/test/resources") { include("computador/gravacoes/**") }
+    from(provider { sshFixtureRuntime.files.map { zipTree(it) } }) {
+        exclude("META-INF/MANIFEST.MF", "META-INF/*.SF", "META-INF/*.RSA", "META-INF/*.DSA", "**/module-info.class")
+        eachFile {
+            if (name.matches(Regex("(?i)(LICENSE|LICENCE|NOTICE|COPYING)([._-].*)?"))) {
+                // Nenhum aviso de um JAR pode sobrescrever o aviso de outro.
+                path = "META-INF/fixture-licencas/" + file.parentFile.parentFile.name + "/" + path
+            }
+        }
     }
 }

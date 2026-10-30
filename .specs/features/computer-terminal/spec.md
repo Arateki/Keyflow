@@ -385,7 +385,7 @@ Nenhuma. Q1–Q13 foram respondidas em 29/10 (D12–D24). Q8, Q9, Q10, Q11 e Q13
 | CMP-01 | P0 | CMP-T0 | Verified — base `c1480992`, Checks 41073156978; [evidências e desvio do pool](../../project/licoes/2026-10-30-computador-a.md) |
 | CMP-02 | P0 | CMP-T1 | Verified — termlib 0.3.14/fork e cbssh 0.6.6; 126 componentes com POMs/hashes/licenças e 4/4 catracas; build/lint, 2.709 JVM e 20 instrumentados verdes; limites e riscos na [lição](../../project/licoes/2026-10-30-computador-a.md) |
 | CMP-03 | P0 | CMP-T1, CMP-T3 | Verified — JNI do CI com SHA fixado; 3 ABIs no APK, ELF/ZIP 16 KB e hashes conferidos, 6/6 catracas; [lição](../../project/licoes/2026-10-30-computador-a.md) |
-| CMP-04 | P0 | CMP-T4 | Pending |
+| CMP-04 | P0 | CMP-T4 | Verified (2026-10-30) |
 | CMP-05 | P1-A | CMP-T5, CMP-T11, CMP-T15 | Pending |
 | CMP-06 | P1-A | CMP-T5, CMP-T11 | Pending |
 | CMP-07 | P1-A | CMP-T11, CMP-T15 | Pending |
@@ -444,7 +444,7 @@ Nenhuma. Q1–Q13 foram respondidas em 29/10 (D12–D24). Q8, Q9, Q10, Q11 e Q13
 | CMP-60 | P2-I | CMP-T17 | Pending |
 | CMP-61 | P2-I | CMP-T15, CMP-T16, CMP-T33 | Pending |
 | CMP-62 | P2-I | CMP-T5, CMP-T31 | Pending |
-| CMP-63 | P2-I | CMP-T4, CMP-T20 | Pending |
+| CMP-63 | P2-I | CMP-T4, CMP-T20 | Partial (T4 verificada; T20 pendente) |
 | CMP-64 | P2-I | CMP-T18, CMP-T28, CMP-T36 | Pending |
 | CMP-65 | P2-I | CMP-T19, CMP-T28, CMP-T36 | Pending |
 | CMP-66 | P2-I | CMP-T38 | Pending |

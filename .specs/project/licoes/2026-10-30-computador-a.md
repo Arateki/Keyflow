@@ -228,3 +228,20 @@ compilação pelo pool antes da instalação. Provas: `t1-medidas-final/medidas.
 
 **SPEC_DEVIATION:** os testes da bancada exigem o comportamento observado de duplicação; não são aceitação
 da futura entrada de produção. O gate verde confirma a medição reproduzível, e os defeitos permanecem explícitos.
+
+### CMP-T4 — servidor SSH de teste
+
+`SshFixtureServer` (Apache MINA SSHD 2.20.1, Apache-2.0, `testImplementation`; `net.i2p.crypto:eddsa` 0.3.0, CC0, só para a chave Ed25519 de teste)
+sobe em `127.0.0.1` com host key fixa (derivada de uma semente de teste), usuários `teste` (Ed25519 falsa) e `senha` (senha falsa), toca as
+gravações reais na abertura do shell, ecoa a entrada e registra `pty-req`, `env` e `window-change`; `cairNoMeio` fecha o transporte.
+`SshFixtureServerTest` conecta o `SshClient` do cbssh 0.6.6: **6/6** (senha, chave, senha errada, usuário errado, host não confiável, queda, hashes das gravações).
+`scripts/ssh-fixture.sh subir|parar|estado` roda o mesmo servidor fora do processo (JAR de `:app:prepararFixtureSsh`), faz `adb reverse` e para limpo, sem processo solto.
+
+Lições medidas:
+- No MINA 2.20 o `channelFactories` é `ChannelFactory.createChannel(session)`, não mais `NamedFactory<Channel>`.
+- O cbssh escolhe `android.util.Base64` por reflexão quando a classe existe; no JVM de teste o `android.jar` devolve `null` e a leitura da chave quebra com
+  NPE. Um `android.util.Base64` real em `src/test/java` resolve só no teste (a produção não é tocada).
+- O cbssh só lê a chave privada em formato OpenSSH (`openssh-key-v1`) ou PEM clássico; o PKCS#8 do `eddsa` não serve. O teste monta o `openssh-key-v1` à mão.
+- Depois de uma falha de senha, a mesma conexão não serve para testar outro usuário: o teste usa conexão nova.
+- Tarefa `Jar` que lê saídas de `compileDebugUnitTest*` precisa declarar `dependsOn` de cada uma (o Gradle 9 recusa dependência implícita).
+- O pool devolve o JAR em `--saida`; o diretório pode ser limpo depois, então use o caminho padrão `app/build/reports/computador/ssh-fixture.jar` no mesmo nó.

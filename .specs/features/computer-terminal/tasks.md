@@ -1,7 +1,7 @@
 # Computador (terminal SSH) — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md`
-**Status**: spec e design em rascunho (2026-10-29), CMP-T0, CMP-T1 e CMP-T3 verificadas; CMP-T4 pendente. **Fora da v1** (só `main`, release seguinte). Não toma a vez de frente aberta.
+**Status**: spec e design em rascunho (2026-10-29), CMP-T0, CMP-T1, CMP-T3 e CMP-T4 verificadas. **Fora da v1** (só `main`, release seguinte). Não toma a vez de frente aberta.
 
 > **Para o agente executor**: leia `spec.md` + `design.md` + este arquivo e `.specs/codebase/TESTING.md`. Uma task por vez, na ordem do plano,
 > testes primeiro, gate verde antes de avançar. Cada task é verificável sozinha. Os textos de UI que ela criar vão com ela (`tr("…")` +
@@ -125,7 +125,7 @@ para permitir essa verificação sem reescrever a branch; detalhes na [lição](
 - **Done when**: o workflow gera as 3 ABIs; `check-16kb-alignment.py` verde; `TermlibNativoTest` falha se o `.so` não bate com o SHA fixado, se alguma lib tiver texto de licença GPL/LGPL ou se faltar uma ABI do app; `assembleDebug` num nó sem NDK verde. Se a decisão for **Maven puro**, esta task fecha como **"dispensada"** com a razão (Status e lição).
 - **Tests**: unit + CI. **Gate**: `quick` + `build` + o workflow. **Commit**: `build(computador): termlib vendorizado com JNI compilado no CI`.
 
-### CMP-T4 — Servidor SSH de teste e gravações de terminal `[P]` — **Status: pendente**
+### CMP-T4 — Servidor SSH de teste e gravações de terminal `[P]` — **Status: concluída em 2026-10-30**
 - **What**: `SshFixtureServer` (Apache MINA SSHD, `testImplementation`, Apache-2.0; versão estável a fixar na T1) com host key fixa de teste, usuários `teste` (chave `ed25519` de teste) e `senha` (senha falsa), um `ShellFactory` que **toca bytes gravados** na abertura do canal
   (prompt, cores, `kitten icat`, `imgcat`, `img2sixel`, `chafa`, placeholders do Herdr) e ecoa a entrada, registra os pedidos `pty-req`/`window-change`/`env`, e um modo "cair no meio" (fecha o socket). `scripts/ssh-fixture.sh` sobe o mesmo servidor fora do processo e faz `adb reverse`
   para o instrumentado. Pasta `app/src/test/resources/computador/gravacoes/` com as saídas de ferramentas **reais** (imagens pequenas, ≤ 64 KB cada, licença livre ou geradas por nós) e um README com o comando que gerou cada uma.
