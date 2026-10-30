@@ -289,3 +289,9 @@ Fica registrado para quando os usos amadurecerem; nada disto entra nas tasks.
 O corpus usa imagens reproduzíveis, com o caminho, origem, licença e SHA-256 no manifesto; os arquivos não são enviados a provedores até a confirmação da rodada. O teste OCR compara o texto reconhecido com a referência por CER. O teste Objetos pede uma lista de rótulos, normaliza sinônimos pt/en para um vocabulário fixado no corpus e mede precisão, revocação e F1 por conjuntos; cada rótulo desconhecido conta como falso positivo. As imagens procedurais e suas referências são versionadas juntas.
 
 As etapas de imagem recebem bytes e metadados tipados e retornam texto ou erro, sem depender da UI. O adaptador OCR utiliza o motor local; o adaptador de visão utiliza `VisionModelEngine` para o modelo local ou o provedor selecionado. O executor conserva o cancelamento e nunca muda de origem como fallback. A faixa da Visão mostra apenas capacidades suportadas e preserva o teste rápido.
+
+## Revisão P3 — Compatibilidade do teto no Custom
+
+O corpo começa com `max_completion_tokens`, campo atual de Chat Completions. Só um HTTP 400 cujo JSON identifica a rejeição desse parâmetro permite repetir com `max_tokens`; o valor não muda, os dois campos nunca vão juntos e não há terceira tentativa. A inspeção do erro fica limitada a 8 KiB e seu texto não é exibido nem registrado. Outros códigos, parâmetros ou valores inválidos preservam o erro original.
+
+O padrão sem opções não ganha nenhum campo nem negociação. O Call ativo é publicado atomicamente ao observador de cancelamento antes de executar cada tentativa, e a corrotina confere cancelamento novamente antes do envio. Endpoint, cabeçalhos, streaming e métricas da resposta mantêm o contrato da BEX-02. Fonte e provas em `../../project/licoes/2026-10-29-p3-custom-limite.md`.

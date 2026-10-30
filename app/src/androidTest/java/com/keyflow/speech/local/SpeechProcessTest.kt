@@ -6,6 +6,8 @@ import com.keyflow.speech.SpeechError
 import com.keyflow.speech.SpeechEvent
 import com.keyflow.speech.SpeechRequest
 import java.io.File
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -43,28 +45,24 @@ class SpeechProcessTest {
     }
 
     @Test
-    fun servicoSemArquivoRespondeModelMissing() = runBlocking {
+    fun chamadasConcorrentesSemArquivoRespondemModelMissing() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val connection = SpeechConnection(context)
-        val service = withTimeout(15_000) { connection.acquire() }
+        val endpoint = AidlSpeechEndpoint(connection, ramEstimateMb = 256)
         try {
-            val kind = withTimeout(15_000) {
-                kotlinx.coroutines.suspendCancellableCoroutine { cont ->
-                    val cb = object : ISpeechCallback.Stub() {
-                        override fun onPcm(pcm: ByteArray, sampleRate: Int) = Unit
-                        override fun onDone(peakRssKb: Long) {
-                            if (cont.isActive) cont.resumeWith(Result.success(-1))
-                        }
-                        override fun onError(kind: Int, message: String) {
-                            if (cont.isActive) cont.resumeWith(Result.success(kind))
-                        }
+            val outcomes = withTimeout(15_000) {
+                List(2) { n ->
+                    async {
+                        endpoint.speak(File("/nao/existe/model.onnx"), File("/nao/existe/tokens.txt"),
+                            "fala $n", 1f) { _, _ -> }
                     }
-                    service.speak("/nao/existe/model.onnx", "/nao/existe/tokens.txt", "oi", 1f, 256, cb)
-                }
+                }.awaitAll()
             }
-            assertEquals(SpeechProtocol.MODEL_MISSING, kind)
+            assertEquals(2, outcomes.size)
+            outcomes.forEach { assertEquals(SpeechProtocol.MODEL_MISSING, (it as SpeechOutcome.Err).kind) }
         } finally {
             connection.close()
         }
     }
+
 }

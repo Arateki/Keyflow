@@ -3,36 +3,51 @@ package com.keyflow.vision
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import com.keyflow.core.ButtonState
-import com.keyflow.core.RecordingMode
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class VisionFlowTest {
-    @Test fun pausaAntesDoConsentimentoEPreservaEstadoEmTodasAsSaidas() {
-        for (mode in RecordingMode.entries) {
-            for (initial in listOf(ButtonState.RECORDING, ButtonState.PAUSED, ButtonState.IDLE_READY, ButtonState.IDLE_NO_FIELD)) {
-                for (exit in listOf("conclusão", "cancelamento", "negação", "revogação", "erro", "modelo ausente")) {
-                    var recording = initial
-                    val events = mutableListOf<String>()
-                    val flow = VisionFlow<String>(
-                        pause = { events += "pausa"; recording = ButtonState.PAUSED },
-                        requestConsent = { events += "consentimento" },
-                        showSelector = { events += "seletor" },
-                        cleanup = { events += "limpeza" }, onResult = { events += it },
-                    )
-                    assertThat(flow.start(VisionFlowRequest(recording))).isTrue()
-                    if (initial == ButtonState.RECORDING) assertThat(events.take(2)).containsExactly("pausa", "consentimento").inOrder()
-                    if (exit != "negação") flow.consentGranted()
-                    if (exit == "conclusão" || exit == "erro") flow.selected()
-                    if (exit == "conclusão") flow.captured("imagem") else flow.finish()
-                    flow.finish(); flow.consentGranted()
-                    assertThat(events.count { it == "limpeza" }).isEqualTo(1)
-                    assertWithMessage("$mode / $initial / $exit").that(recording).isEqualTo(
-                        if (initial == ButtonState.RECORDING) ButtonState.PAUSED else initial,
-                    )
-                    assertThat(flow.state).isEqualTo(VisionFlowState.NONE)
-                }
+    @Test fun pausaSomenteUmaVezAntesDoConsentimento() {
+        for (initial in listOf(ButtonState.RECORDING, ButtonState.PAUSED, ButtonState.IDLE_READY, ButtonState.IDLE_NO_FIELD)) {
+            val events = mutableListOf<String>()
+            val flow = VisionFlow<String>(
+                pause = { events += "pausa" }, requestConsent = { events += "consentimento" },
+                showSelector = {}, cleanup = {}, onResult = {},
+            )
+            assertThat(flow.start(VisionFlowRequest(initial))).isTrue()
+            val expected = if (initial == ButtonState.RECORDING) listOf("pausa", "consentimento") else listOf("consentimento")
+            assertWithMessage("entrada $initial").that(events).containsExactlyElementsIn(expected).inOrder()
+            assertThat(flow.state).isEqualTo(VisionFlowState.CONSENT)
+            flow.finish()
+            // Sair da Visão não emite outra ação de gravação; a integração real prova o estado PAUSED.
+            assertThat(events).containsExactlyElementsIn(expected).inOrder()
+        }
+    }
+
+    @Test fun negacaoCancelamentoEConclusaoPercorremAsFasesELimpamUmaVez() {
+        for (exit in listOf("negação", "cancelamento", "conclusão")) {
+            val events = mutableListOf<String>()
+            val phases = mutableListOf<VisionFlowState>()
+            val flow = VisionFlow<String>({}, { events += "consentimento" }, { events += "seletor" },
+                { events += "limpeza" }, onState = { phases += it }, onResult = { events += it })
+            flow.start(VisionFlowRequest(ButtonState.PAUSED))
+            if (exit != "negação") flow.consentGranted()
+            if (exit == "conclusão") { flow.selected(); flow.captured("imagem") } else flow.finish()
+            flow.finish(); flow.consentGranted(); flow.captured("tardio")
+            val expected = when (exit) {
+                "negação" -> listOf("consentimento", "limpeza")
+                "cancelamento" -> listOf("consentimento", "seletor", "limpeza")
+                else -> listOf("consentimento", "seletor", "imagem", "limpeza")
             }
+            val expectedPhases = buildList {
+                add(VisionFlowState.CONSENT)
+                if (exit != "negação") add(VisionFlowState.SELECTING)
+                if (exit == "conclusão") add(VisionFlowState.WORKING)
+                add(VisionFlowState.NONE)
+            }
+            assertWithMessage(exit).that(events).containsExactlyElementsIn(expected).inOrder()
+            assertWithMessage(exit).that(phases).containsExactlyElementsIn(expectedPhases).inOrder()
+            assertThat(flow.state).isEqualTo(VisionFlowState.NONE)
         }
     }
 

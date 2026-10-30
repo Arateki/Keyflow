@@ -149,7 +149,7 @@ Entram agora no catálogo, lado a lado: o Supertonic 3 (D2; pesos OpenRAIL-M, c�
 | FENG-01..06 | FAL-T1, FAL-T4 | Implemented |
 | FLOC-01..02 | FAL-T8, FAL-T10 | Done (2026-10-29) — pins no catálogo |
 | FLOC-03 | FAL-T2, FAL-T9, FAL-T11 | Implemented — caracteres/VITS e Unicode/quatro ONNX Supertonic (`pt`, M1); prova real em FAL-T9 |
-| FLOC-04 | FAL-T3, FAL-T9, FAL-T11 | Implemented — dois motores no `:speech`, ORT única, speed, cancelamento e descarga por ociosidade |
+| FLOC-04 | FAL-T3, FAL-T9, FAL-T11 | Implemented — dois motores no `:speech`, ORT única, speed, cancelamento e descarga por ociosidade; cliente Binder retoma todas as falas pendentes uma única vez (revisão P3) |
 | FLOC-05..06 | FAL-T3, FAL-T9 | Implemented — local sem socket, guarda de arquivos/aceite e RAM; medição Supertonic no emulador |
 | FCLD-01..07 | FAL-T5 | Implemented (JVM + servidor falso; sem chamada real) |
 | FSYS-01..05 | FAL-T6 | Implemented (seletor de voz do motor adiado) |

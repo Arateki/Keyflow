@@ -238,7 +238,7 @@ Status: Pending → In Design → In Tasks → Implementing → Verified. As tas
 | BCP-07 | P1-B | BNC-T2, BNC-T7 | Verified |
 | BCP-08 | P1-B | BNC-T1, BNC-T20 | In Tasks |
 | BEX-01 | P1-C | BNC-T11 | Verified |
-| BEX-02 | P1-C | BNC-T1, BNC-T8, BNC-T9, BNC-T10 | Verified |
+| BEX-02 | P1-C | BNC-T1, BNC-T8, BNC-T9, BNC-T10 | Verified — Custom mantém o teto ao negociar o nome do campo após rejeição explícita (revisão P3) |
 | BEX-03 | P1-C | BNC-T11 | Verified |
 | BEX-04 | P1-C | BNC-T1, BNC-T9, BNC-T28 | Implementing (T9 implementada; T28 pendente) |
 | BEX-05 | P1-C | BNC-T1, BNC-T10 | Verified |
