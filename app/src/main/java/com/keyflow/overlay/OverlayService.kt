@@ -207,7 +207,7 @@ class OverlayService : Service() {
         observeSettings()
         observeControllerState()
         observeOverlayPosition()
-        instanceForVisionTest = this
+        instance = this
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -606,7 +606,7 @@ class OverlayService : Service() {
         destroying = true
         if (::fluxoHost.isInitialized) fluxoHost.cancelar()
         pendingRunFlow = null
-        instanceForVisionTest = null
+        instance = null
         if (visionFlow.state != VisionFlowState.NONE) visionFlow.finish()
         visionRestartDialog?.dismiss()
         visionRestartDialog = null
@@ -1408,7 +1408,11 @@ class OverlayService : Service() {
     }
 
     companion object {
-        internal var instanceForVisionTest: OverlayService? = null
+        @Volatile private var instance: OverlayService? = null
+        internal val instanceForVisionTest: OverlayService? get() = instance
+
+        /** Cancela inclusive Ditar, sem transformar o pedido em enviar áudio. UI e serviço vivem na main do mesmo processo. */
+        fun cancelarFluxo() { instance?.fluxoHost?.cancelar() }
         internal var portasDeFluxoForTest: (() -> com.keyflow.fluxos.execucao.Portas)? = null
         internal var avisoDeFluxoForTest: ((String, com.keyflow.fluxos.execucao.DestinoAba?) -> Unit)? = null
         internal var errorBannerDurationMsForTest: Long? = null

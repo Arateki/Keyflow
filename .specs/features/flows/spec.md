@@ -399,7 +399,7 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 
 | Requirement | Story | Task | Status |
 | ----------- | ----- | ---- | ------ |
-| FLX-01 | P1-A | FLX-T17, FLX-T23 | Pending |
+| FLX-01 | P1-A | FLX-T17, FLX-T23 | Implementing (T17 feita) |
 | FLX-02 | P1-A | FLX-T17 | Pending |
 | FLX-03 | P1-A | FLX-T17 | Pending |
 | FLX-04 | P1-A | FLX-T17 | Pending |
@@ -439,7 +439,7 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 | FLX-38 | P1-E | FLX-T5, FLX-T20 | Implementing (T5 feita) |
 | FLX-39 | P1-E | FLX-T14, FLX-T15, FLX-T25 | Implementing (T14 e T15 feitas; SPEC_DEVIATION do FGS documentado) |
 | FLX-40 | P1-F | FLX-T3, FLX-T18 | Implementing (T3 feita) |
-| FLX-41 | P1-F | FLX-T3, FLX-T17 | Implementing (T3 feita) |
+| FLX-41 | P1-F | FLX-T3, FLX-T17 | Implementing (T3, T17 feitas) |
 | FLX-42 | P1-F | FLX-T3 | Implementing (T3 feita) |
 | FLX-43 | P1-F | FLX-T3 | Implementing (T3 feita) |
 | FLX-44 | P1-F | FLX-T3 | Implementing (T3 feita) |

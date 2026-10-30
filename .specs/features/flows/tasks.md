@@ -230,7 +230,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 
 ## Fase D — Telas
 
-### FLX-T17 — Lista de cards, "+", vazio e Restaurar — **Status: pendente**
+### FLX-T17 — Lista de cards, "+", vazio e Restaurar — **Status: feita**
 - **What**: `FluxosPanel` reescrito (design §11.1): cards (nome, resumo, selo, chips de atalho, Incompleto, "Em execução · etapa" + Cancelar), "+ Novo fluxo" (nome sem repetir, limite 20 com motivo), estado vazio, "Restaurar fluxos padrão" com a confirmação e a prévia (T3): `PreviaRestaurar.vazia` (nada a mudar **e** nada sem espaço) diz "Os fluxos padrão já estão como no original"; `semEspaco` mostra "Sem espaço (limite de 20): …" e `nadaAGravar` desliga o botão Restaurar.
   Lê `configFluxosFlow()` e as `Settings` (para o selo). Remove o conteúdo antigo (cards fixos, "Gatilhos e atalhos", "Orquestração"). **A aba ainda não sai do "Em breve"** (T22).
 - **Where**: `ui/config/FluxosPanel.kt`, `i18n/{en,es}/Fluxos.kt`; testes `FluxosPanelTest`.
@@ -238,6 +238,8 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 - **Done when**: instrumentado — primeira abertura mostra 3 cards "Sem atalho"; tocar em um chama `onOpen(id)`; "+" cria "Novo fluxo", "Novo fluxo 2"…; com 20 o "+" fica desligado e diz o motivo; vazio mostra o texto e os dois botões; Restaurar mostra a prévia e, ao confirmar, recria o apagado
   sem atalho; selo "100% no aparelho"/"Nuvem · OpenAI" acompanha as `Settings`; estado Incompleto tem ícone e texto; alvos ≥ 48 dp; `TranslationsTest` verde.
 - **Tests**: instrumentado (Compose) + unit (`TranslationsTest`). **Gate**: `quick` + `pool instrumentar com.keyflow.ui.config.FluxosPanelTest`. **Commit**: `feat(fluxos): lista de fluxos na aba`.
+
+- **Registro (Fase D)**: `FluxosPanel(settings, repository, onOpen)` lê `configFluxosFlow()` (não semeia nem abre o cofre) e delega a `FluxosLista` (sem efeitos, usada pelos testes e capturas). `novoFluxo(config, nomeBase)` (puro) escolhe nome e id livres e devolve nulo com 20. `OverlayService.cancelarFluxo()` cancela inclusive o Ditar (o card chama). `ConfigModal(accessibleHeader)` dá alvos de 48 dp ao cabeçalho sem mudar os goldens. A aba continua em "Em breve" (T22): nada chama o painel ainda. Capturas em `.equipe/provas/lista-*.png`.
 
 ### FLX-T18 — Modal do fluxo e editor de etapas — **Status: pendente**
 - **What**: `FluxosModal` (`ConfigModal`) com nome (1..40, vazio volta), lista de etapas (ícone, nome, tipo, campo próprio da Visão/Perguntar até 500), "+ Etapa" (seletor agrupado com itens incompatíveis esmaecidos e o motivo — T1),
