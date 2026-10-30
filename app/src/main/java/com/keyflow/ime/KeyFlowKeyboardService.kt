@@ -45,7 +45,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
-class KeyFlowKeyboardService : InputMethodService() {
+open class KeyFlowKeyboardService : InputMethodService() {
 
     // Origem de voz atual, para pré-carregar o modelo local quando o teclado abre (NM-T9).
     @Volatile
@@ -132,14 +132,20 @@ class KeyFlowKeyboardService : InputMethodService() {
     private var visionEditorToRestore: CaptureEditor? = null
     private val visionKeyboardHider: () -> (() -> Unit)? = ::hideKeyboardForVision
 
+    internal open fun hasActiveInputView(): Boolean = keyboardView != null
+    internal open fun showVisionKeyboardWindow() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) requestShowSelf(0) else showWindow(true)
+    }
+
     /** Fecha a janela de verdade; o retorno só restaura um teclado que estava visível. */
-    private fun hideKeyboardForVision(): (() -> Unit)? {
+    internal fun hideKeyboardForVision(): (() -> Unit)? {
         if (visionKeyboardDestroyed) return null
         if (visionKeyboardHidden) { requestHideSelf(0); return null }
-        if (!KeyFlowController.keyboardVisible.value || keyboardView == null) return null
+        if (!KeyFlowController.keyboardVisible.value || !hasActiveInputView()) return null
         val info = currentInputEditorInfo ?: return null
         val editor = CaptureEditor(info.packageName, info.fieldId, info.inputType)
         visionKeyboardHidden = true
+        visionEditorToRestore = null
         // Usa o pedido ao sistema de entrada, no mesmo protocolo de requestShowSelf da restauração.
         try { requestHideSelf(0) } catch (error: RuntimeException) { visionKeyboardHidden = false; throw error }
         var restored = false
@@ -155,19 +161,19 @@ class KeyFlowKeyboardService : InputMethodService() {
         }
     }
 
-    private fun restoreVisionKeyboardIfReady() {
+    private fun restoreVisionKeyboardIfReady(info: EditorInfo? = currentInputEditorInfo) {
         if (visionKeyboardDestroyed || visionKeyboardHidden) return
         val expected = visionEditorToRestore ?: return
-        val info = currentInputEditorInfo ?: return
-        val actual = CaptureEditor(info.packageName, info.fieldId, info.inputType)
+        val activeInfo = info ?: return
+        val actual = CaptureEditor(activeInfo.packageName, activeInfo.fieldId, activeInfo.inputType)
         if (actual != expected) {
             // O consentimento pode ainda estar fechando; outro editor de verdade encerra a restauração.
-            if (info.inputType != InputType.TYPE_NULL) visionEditorToRestore = null
+            if (activeInfo.inputType != InputType.TYPE_NULL) visionEditorToRestore = null
             return
         }
         if (currentInputConnection == null) return
         // Mantém o pedido até onWindowShown: se a Activity do consentimento ainda tem foco, onStartInput tenta de novo.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) requestShowSelf(0) else showWindow(true)
+        showVisionKeyboardWindow()
     }
 
     override fun onCreate() {
@@ -611,7 +617,7 @@ class KeyFlowKeyboardService : InputMethodService() {
         ) {
             requestShowSelf(0)
         }
-        restoreVisionKeyboardIfReady()
+        restoreVisionKeyboardIfReady(attribute)
     }
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
@@ -659,7 +665,13 @@ class KeyFlowKeyboardService : InputMethodService() {
 
     override fun onFinishInput() {
         Log.d(TAG, "onFinishInput")
-        if (!visionKeyboardHidden) visionEditorToRestore = null
+        if (!visionKeyboardHidden) {
+            val info = currentInputEditorInfo
+            val finishing = info?.let { CaptureEditor(it.packageName, it.fieldId, it.inputType) }
+            if (finishing != null && info.inputType != InputType.TYPE_NULL && finishing != visionEditorToRestore) {
+                visionEditorToRestore = null
+            }
+        }
         KeyFlowController.clearInserter()
         wordTracker.reset()
         cancelSuggestions()

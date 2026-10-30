@@ -1,7 +1,11 @@
 package com.keyflow.ime
 
 import android.text.InputType
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputConnection
 import com.google.common.truth.Truth.assertThat
+import com.keyflow.core.KeyFlowController
+import java.lang.reflect.Proxy
 import org.junit.Test
 
 /**
@@ -123,5 +127,121 @@ class KeyFlowKeyboardServiceTest {
             assertThat(KeyFlowKeyboardService.autoCorrectAllowed(InputType.TYPE_CLASS_TEXT or variation)).isFalse()
         }
         assertThat(KeyFlowKeyboardService.autoCorrectAllowed(InputType.TYPE_CLASS_NUMBER)).isFalse()
+    }
+
+    // ── restauração do teclado após captura da Visão ─────────────────────────
+
+    @Test
+    fun `restores keyboard after vision capture even with a TYPE_NULL window in between`() {
+        val harness = VisionImeHarness()
+        val original = editor("com.arateki.keyflow", fieldId = 10, inputType = InputType.TYPE_CLASS_TEXT)
+        val typeNull = editor("com.android.systemui", fieldId = 0, inputType = InputType.TYPE_NULL)
+        try {
+            harness.bind(original, connected = true)
+            harness.onWindowShown()
+
+            val restore = harness.hideKeyboardForVision()
+            assertThat(restore).isNotNull()
+            assertThat(harness.hideRequests).isEqualTo(1)
+            harness.onWindowHidden()
+
+            // Janela transitória sem campo (ex.: consentimento) abre sessão TYPE_NULL antes do restore.
+            harness.switchInput(typeNull, connected = false)
+            restore!!.invoke()
+            assertThat(harness.showRequests).isEqualTo(0)
+
+            // Ao fechar a janela transitória, o InputMethodService chama onFinishInput → onStartInput.
+            harness.switchInput(original, connected = true)
+            assertThat(harness.showRequests).isEqualTo(1)
+
+            // Depois que a janela realmente reaparece, novos reinícios não voltam a pedir exibição.
+            harness.onWindowShown()
+            harness.switchInput(original, connected = true)
+            assertThat(harness.showRequests).isEqualTo(1)
+        } finally {
+            KeyFlowController.setKeyboardVisible(false)
+        }
+    }
+
+    @Test
+    fun `does not restore keyboard in another app or field after TYPE_NULL and cancels pending restore`() {
+        val original = editor("com.arateki.keyflow", fieldId = 10, inputType = InputType.TYPE_CLASS_TEXT)
+        val typeNull = editor("com.android.systemui", fieldId = 0, inputType = InputType.TYPE_NULL)
+        val otherEditors = listOf(
+            editor("outro.app", fieldId = 10, inputType = InputType.TYPE_CLASS_TEXT),
+            editor("com.arateki.keyflow", fieldId = 99, inputType = InputType.TYPE_CLASS_TEXT),
+            editor("com.arateki.keyflow", fieldId = 10, inputType = InputType.TYPE_CLASS_NUMBER),
+        )
+        for (other in otherEditors) {
+            val harness = VisionImeHarness()
+            try {
+                harness.bind(original, connected = true)
+                harness.onWindowShown()
+                val restore = checkNotNull(harness.hideKeyboardForVision())
+                harness.onWindowHidden()
+                harness.switchInput(typeNull, connected = false)
+                restore.invoke()
+
+                harness.switchInput(other, connected = true)
+                assertThat(harness.showRequests).isEqualTo(0)
+
+                // Outro editor real já encerrou a restauração: voltar ao original depois não reabre sozinho.
+                harness.switchInput(original, connected = true)
+                assertThat(harness.showRequests).isEqualTo(0)
+            } finally {
+                KeyFlowController.setKeyboardVisible(false)
+            }
+        }
+    }
+
+    @Test
+    fun `does not restore keyboard if it was not visible before vision capture`() {
+        val harness = VisionImeHarness()
+        val original = editor("com.arateki.keyflow", fieldId = 10, inputType = InputType.TYPE_CLASS_TEXT)
+        try {
+            KeyFlowController.setKeyboardVisible(false)
+            harness.bind(original, connected = true)
+            assertThat(harness.hideKeyboardForVision()).isNull()
+            assertThat(harness.hideRequests).isEqualTo(0)
+            assertThat(harness.showRequests).isEqualTo(0)
+        } finally {
+            KeyFlowController.setKeyboardVisible(false)
+        }
+    }
+
+    private fun editor(pkg: String?, fieldId: Int, inputType: Int) = EditorInfo().apply {
+        packageName = pkg
+        this.fieldId = fieldId
+        this.inputType = inputType
+    }
+
+    private class VisionImeHarness : KeyFlowKeyboardService() {
+        private val stubConnection: InputConnection = Proxy.newProxyInstance(
+            InputConnection::class.java.classLoader,
+            arrayOf(InputConnection::class.java),
+        ) { _, _, _ -> null } as InputConnection
+        private var activeEditor: EditorInfo? = null
+        private var activeConnection: InputConnection? = null
+        var hideRequests = 0
+        var showRequests = 0
+
+        override fun hasActiveInputView(): Boolean = true
+        override fun getCurrentInputEditorInfo(): EditorInfo? = activeEditor
+        override fun getCurrentInputConnection(): InputConnection? = activeConnection
+        override fun requestHideSelf(flags: Int) { hideRequests++ }
+        override fun showVisionKeyboardWindow() { showRequests++ }
+
+        fun bind(info: EditorInfo, connected: Boolean) {
+            activeEditor = info
+            activeConnection = if (connected) stubConnection else null
+            onStartInput(info, false)
+        }
+
+        fun switchInput(info: EditorInfo, connected: Boolean) {
+            onFinishInput()
+            activeEditor = info
+            activeConnection = if (connected) stubConnection else null
+            onStartInput(info, false)
+        }
     }
 }
