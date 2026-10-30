@@ -191,6 +191,24 @@ class CodecFluxosTest {
     }
 
     @Test
+    fun `um JSON de versao mais nova e lido em modo tolerante e regravado como v1 sem o que esta versao nao conhece`() {
+        // FLX-47: ler uma versão futura nunca falha, mas regravar perde o que não conhecemos — a versão e o conteúdo da etapa
+        // desconhecida. Quem abre o app mais novo depois lê o que esta versão gravou; é o preço de não travar.
+        val futuro = """{"v":2,"novo":true,"flows":[{"id":"a","name":"X","extra":1,"steps":[
+            {"type":"ditar"},{"type":"grafo","payload":{"nos":[1,2,3],"arestas":[[0,1]]}},{"type":"falar","novidade":true}]}]}"""
+        val lido = CodecFluxos.decodificarFluxos(futuro)!!.single()
+        assertThat(lido.etapas).containsExactly(Etapa.Ditar(), Etapa.Desconhecida("grafo"), Etapa.Falar()).inOrder()
+
+        val regravado = CodecFluxos.codificarFluxos(listOf(lido))
+        assertThat(JSONObject(regravado).getInt("v")).isEqualTo(1)
+        for (perdido in listOf("payload", "arestas", "novidade", "extra", "novo")) assertThat(regravado).doesNotContain(perdido)
+        val passos = JSONObject(regravado).getJSONArray("flows").getJSONObject(0).getJSONArray("steps")
+        assertThat(passos.getJSONObject(1).keys().asSequence().toList()).containsExactly("type") // só o tipo sobrevive
+        // e o que foi regravado é estável: lê de volta igual
+        assertThat(CodecFluxos.decodificarFluxos(regravado)).containsExactly(lido)
+    }
+
+    @Test
     fun `etapa que nao e objeto ou sem tipo e descartada`() {
         val json = fluxosJson("""{"id":"a","name":"X","steps":[{"type":"ditar"},"texto",7,null,{"sem":"tipo"},{"type":""},{"type":5},{"type":"falar"}]}""")
         assertThat(CodecFluxos.decodificarFluxos(json)!!.single().etapas).containsExactly(Etapa.Ditar(), Etapa.Falar()).inOrder()
