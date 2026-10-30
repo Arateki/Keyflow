@@ -18,7 +18,7 @@ import com.keyflow.fluxos.execucao.CausaErro
 import com.keyflow.fluxos.execucao.DestinoAba
 import com.keyflow.fluxos.execucao.ResultadoEtapa
 import com.keyflow.fluxos.execucao.Valor
-import com.keyflow.ui.gallery.GalleryActivity
+import com.keyflow.ComposeSmokeActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.first
@@ -41,12 +41,13 @@ class PortasAndroidInstrumentedTest {
 
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context: Context get() = instrumentation.targetContext
-    private lateinit var scenario: ActivityScenario<GalleryActivity>
+    private lateinit var scenario: ActivityScenario<ComposeSmokeActivity>
 
     @Before
     fun setUp() {
-        // Uma Activity em primeiro plano: a leitura da área de transferência exige foco no Android 10+.
-        scenario = ActivityScenario.launch(Intent(context, GalleryActivity::class.java).putExtra("route", "config-visao"))
+        // Janela simples: a galeria imersiva abre ImmersiveModeConfirmation no primeiro uso e perde o foco.
+        // A leitura da área de transferência exige foco no Android 10+.
+        scenario = ActivityScenario.launch(Intent(context, ComposeSmokeActivity::class.java))
         instrumentation.runOnMainSync { KeyFlowController.clearInserter(); KeyFlowController.autoPasteInField = true; KeyFlowController.autoPasteOnFocus = false }
     }
 
