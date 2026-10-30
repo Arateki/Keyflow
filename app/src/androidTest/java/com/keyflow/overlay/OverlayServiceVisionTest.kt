@@ -165,11 +165,19 @@ class OverlayServiceVisionTest {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             val probe = ActivityScenario.launch<com.keyflow.ui.ImeProbeActivity>(intent)
             try {
+                var editorField: android.widget.EditText? = null
+                var typeNullField: android.widget.EditText? = null
                 probe.onActivity { activity ->
                     val field = activity.currentFocus
                     assertTrue("o campo real do probe precisa ter foco", field is android.widget.EditText)
                     assertEquals("ime_probe_field", field?.contentDescription)
-                    assertTrue(field!!.requestFocus())
+                    editorField = field as android.widget.EditText
+                    typeNullField = android.widget.EditText(activity).apply {
+                        id = android.view.View.generateViewId()
+                        inputType = android.text.InputType.TYPE_NULL
+                    }
+                    (editorField!!.parent as android.view.ViewGroup).addView(typeNullField, 1, 1)
+                    assertTrue(editorField!!.requestFocus())
                 }
                 awaitKeyboard(true, "abertura inicial", 15_000)
                 awaitWindow(true, "abertura inicial")
@@ -189,6 +197,19 @@ class OverlayServiceVisionTest {
                     awaitKeyboard(true, "restauração da limpeza $failClose")
                 }
                 OverlayService.visionSessionCloseForTest = null
+                awaitWindow(false, "ocultação antes de TYPE_NULL") {
+                    instrumentation.runOnMainSync { service.hideVisionViews(emptyList()) }
+                }
+                awaitKeyboard(false, "ocultação antes de TYPE_NULL")
+                probe.onActivity { assertTrue(checkNotNull(typeNullField).requestFocus()) }
+                instrumentation.waitForIdleSync()
+                assertTrue("janela transitória deve abrir sessão TYPE_NULL", com.keyflow.ime.KeyFlowKeyboardService.isRawInputFieldForTest)
+                instrumentation.runOnMainSync { service.cleanupVision() }
+                assertEquals(false, KeyFlowController.keyboardVisible.value)
+                awaitWindow(true, "restauração após TYPE_NULL") {
+                    probe.onActivity { assertTrue(checkNotNull(editorField).requestFocus()) }
+                }
+                awaitKeyboard(true, "restauração após TYPE_NULL")
                 awaitWindow(false, "consentimento") {
                     OverlayService.start(context, OverlayService.actionIntent(context, OverlayService.ACTION_VISION))
                 }
