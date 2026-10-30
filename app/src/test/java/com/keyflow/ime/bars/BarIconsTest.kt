@@ -17,6 +17,8 @@ class BarIconsTest {
         assertThat(BarIcons.iconFor(BarButton.Paste, expandedMode = false)).isEqualTo(KfIcons.Paste)
         assertThat(BarIcons.iconFor(BarButton.Joystick, expandedMode = false)).isEqualTo(KfIcons.Joystick)
         assertThat(BarIcons.iconFor(BarButton.GridTrigger("g1"), expandedMode = false)).isEqualTo(KfIcons.Grid)
+        assertThat(BarIcons.iconFor(BarButton.RunFlow("a1b2c3"), expandedMode = false)).isEqualTo(KfIcons.TabFluxos)
+        assertThat(BarIcons.iconFor(BarButton.RunFlow("a1b2c3"), expandedMode = true)).isEqualTo(KfIcons.TabFluxos)
     }
 
     @Test

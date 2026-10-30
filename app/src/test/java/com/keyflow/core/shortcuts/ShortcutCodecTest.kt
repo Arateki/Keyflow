@@ -123,4 +123,40 @@ class ShortcutCodecTest {
         assertThat(only.cells.keys).containsExactly(0)
         assertThat(only.cellAt(0, 0)!!.displayLabel).isEqualTo("Tab")
     }
+
+    // ── botão de fluxo (FLX-36) ──────────────────────────────────────────────
+
+    @Test
+    fun `run flow button roundtrips and is written as type flow`() {
+        val config = BarsConfig(
+            mirrored = false,
+            collapsed = listOf(BarDef(listOf(BarButton.Mic, BarButton.RunFlow("a1b2c3")))),
+            expanded = listOf(BarDef(listOf(BarButton.RunFlow("a1b2c3"), BarButton.Paste))),
+        )
+        val json = ShortcutCodec.encodeBars(config)
+        assertThat(json).contains("\"type\":\"flow\"")
+        assertThat(json).contains("\"botaoId\":\"a1b2c3\"")
+        assertThat(ShortcutCodec.decodeBars(json)).isEqualTo(config)
+    }
+
+    @Test
+    fun `flow button without id is dropped as junk and old json without flow stays identical`() {
+        val junk = """{"mirrored":true,"collapsed":[{"buttons":[{"type":"flow"},{"type":"flow","botaoId":""},{"type":"mic"}]}],"expanded":[]}"""
+        assertThat(ShortcutCodec.decodeBars(junk).collapsed.single().buttons).containsExactly(BarButton.Mic)
+        // O JSON gravado antes dos fluxos (sem nenhum botão "flow") continua lendo e gravando igual.
+        val before = ShortcutCodec.encodeBars(customConfig)
+        assertThat(before).doesNotContain("flow")
+        assertThat(ShortcutCodec.encodeBars(ShortcutCodec.decodeBars(before))).isEqualTo(before)
+    }
+
+    @Test
+    fun `bars config lists the flow button ids of both lists`() {
+        val config = BarsConfig(
+            mirrored = false,
+            collapsed = listOf(BarDef(listOf(BarButton.RunFlow("aaaaaa")))),
+            expanded = listOf(BarDef(listOf(BarButton.RunFlow("aaaaaa"), BarButton.RunFlow("bbbbbb")))),
+        )
+        assertThat(config.botoesDeFluxo()).containsExactly("aaaaaa", "bbbbbb")
+        assertThat(BarsConfig.DEFAULT.botoesDeFluxo()).isEmpty()
+    }
 }

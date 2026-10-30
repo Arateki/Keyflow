@@ -99,4 +99,12 @@ class BarGeometryTest {
 
         assertThat(BarGeometry.scrollAnchors(buttons)).isEmpty()
     }
+
+    @Test
+    fun `flow button weighs one and is a tap button that anchors scrolling`() {
+        val flow = BarButton.RunFlow("a1b2c3")
+        assertThat(BarGeometry.weightFor(flow)).isEqualTo(1f)
+        assertThat(BarGeometry.isDraggable(flow)).isFalse()
+        assertThat(BarGeometry.scrollAnchors(listOf(BarButton.Mic, flow))).containsExactly(flow)
+    }
 }

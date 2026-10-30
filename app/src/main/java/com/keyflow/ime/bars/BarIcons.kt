@@ -23,6 +23,7 @@ object BarIcons {
         BarButton.Paste -> KfIcons.Paste
         BarButton.Joystick -> KfIcons.Joystick
         is BarButton.GridTrigger -> KfIcons.Grid
+        is BarButton.RunFlow -> KfIcons.TabFluxos
         is BarButton.SingleKey -> if (button.key.label == ENTER_LABEL) KfIcons.Return else null
         BarButton.Candidates -> null
     }

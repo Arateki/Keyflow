@@ -93,6 +93,8 @@ fun TecladoPanel(
     onBarsConfigChange: (BarsConfig) -> Unit = {},
     shortcutGrids: List<ShortcutGrid> = emptyList(),
     onShortcutGridsChange: (List<ShortcutGrid>) -> Unit = {},
+    // `botaoId → nome do fluxo` dos botões de fluxo da barra (FLX-36), para o editor de barras.
+    nomesDeFluxo: Map<String, String> = emptyMap(),
     modifier: Modifier = Modifier,
     // Cartão do Modo Teclado, sempre no topo e sempre tocável (a aba Modo saiu — Yan, 2026-09-28).
     modeCard: (@Composable () -> Unit)? = null,
@@ -196,6 +198,7 @@ fun TecladoPanel(
                         barsConfig = barsConfig,
                         onBarsConfigChange = onBarsConfigChange,
                         grids = shortcutGrids,
+                        nomesDeFluxo = nomesDeFluxo,
                         modifier = Modifier.padding(top = 8.dp, bottom = 16.dp),
                     )
                 }

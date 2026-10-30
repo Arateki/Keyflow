@@ -97,6 +97,9 @@ class KeyFlowKeyboardView(
     private val motionEnabled: Boolean = false,
     // Galeria: desenha o quadro congelado neste instante do movimento, sem agendar nada.
     private val motionTimeMs: Float? = null,
+    // Botões de fluxo da barra (FLX-36): `botaoId → fluxoId` dos que têm gatilho válido, e o disparo (o serviço da orbe resolve o fluxo).
+    private val flowButtons: Map<String, String> = emptyMap(),
+    private val onRunFlow: (botaoId: String) -> Unit = {},
 ) : LinearLayout(context) {
 
     private var canvasGrid: KeyboardGridView? = null
@@ -106,6 +109,9 @@ class KeyFlowKeyboardView(
 
     // Barras Canvas (SB-T5): criadas por buildBars() nos dois modos; mic/candidates roteiam pra cá.
     private val barViews = mutableListOf<BarView>()
+
+    // Estado do executor de fluxos vigente; barra recém-criada (recolher/expandir) o herda.
+    private var fluxoState: com.keyflow.fluxos.execucao.EstadoExecucao = com.keyflow.fluxos.execucao.EstadoExecucao.Ocioso
 
     // Sugestões vigentes. `setExpanded` reconstrói a pilha de barras, e sem reaplicar isto uma palavra
     // pela metade perdia as sugestões só por recolher o teclado (achado do Yan, 2026-09-07).
@@ -292,6 +298,12 @@ class KeyFlowKeyboardView(
 
     private fun drawChildrenOnce(canvas: android.graphics.Canvas) = super.dispatchDraw(canvas)
 
+    /** O estado do executor de fluxos, repassado às barras (o botão do fluxo em execução fica aceso). */
+    fun updateFluxo(estado: com.keyflow.fluxos.execucao.EstadoExecucao) {
+        fluxoState = estado
+        barViews.forEach { it.updateFluxo(estado) }
+    }
+
     fun updateMicState(state: ButtonState) {
         micState = state
         // Cada BarView roda o próprio tique de 1s enquanto grava (o tempo vem do KeyFlowController,
@@ -336,6 +348,7 @@ class KeyFlowKeyboardView(
             onPaste = { onKey(KeyAction.Paste) },
             onShortcut = onShortcut,
             onCandidateTap = onCandidateTap,
+            onRunFlow = onRunFlow,
             onGridDragActiveChanged = { active ->
                 gridDragActive = active
                 // Força uma passada de layout pra o service recalcular onComputeInsets AGORA — o próximo
@@ -360,8 +373,10 @@ class KeyFlowKeyboardView(
                 qwertyRowCount = qwertyRowCount,
                 barCount = barCount,
                 fitWidth = barsFitWidth,
+                flowButtons = flowButtons,
             ).also { bar ->
                 barViews += bar
+                bar.updateFluxo(fluxoState)
                 // Barra recém-criada herda o estado vigente (mic e sugestões), senão recolher/expandir
                 // o teclado zera o que estava na tela.
                 bar.updateMicState(micState)

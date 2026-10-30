@@ -55,6 +55,8 @@ class BarCallbacks(
     // Grade efêmera ancorando/soltando (SB-T10/GRD-08): o host expande a região tocável da janela do IME
     // só enquanto o arrasto está ativo (ver KeyFlowKeyboardService.onComputeInsets).
     val onGridDragActiveChanged: (Boolean) -> Unit = {},
+    // Botão de fluxo (FLX-36): o id do botão tocado. O IME não conhece o fluxo — o serviço resolve `botaoId → fluxo`.
+    val onRunFlow: (botaoId: String) -> Unit = {},
 )
 
 /**
@@ -96,6 +98,8 @@ class BarView(
     // Prévia de tamanho (aba Teclado): os botões dividem a largura que houver, sem o mínimo de toque que
     // faria a barra rolar num cartão mais estreito que a tela — as proporções ficam as do teclado real.
     private val fitWidth: Boolean = false,
+    // `botaoId → fluxoId` dos botões de fluxo com gatilho válido. Um [BarButton.RunFlow] fora daqui renderiza desabilitado e não dispara.
+    private val flowButtons: Map<String, String> = emptyMap(),
 ) : ViewGroup(context) {
 
     private val declaredButtons: List<BarButton> = def.buttons
@@ -117,6 +121,9 @@ class BarView(
         get() = declaredButtons
     private val gridsById: Map<String, ShortcutGrid> = grids.associateBy { it.id }
     private val knownGridIds: Set<String> = gridsById.keys
+
+    // O fluxo que está rodando agora (EstadoExecucao.Rodando); o botão dele fica aceso.
+    private var runningFlowId: String? = null
 
     // Paleta Ateliê (mesmos ints da grade Canvas/barra atual).
     private val colors = KeyboardColors.of(skin, dark, pack)
@@ -268,6 +275,14 @@ class BarView(
         handler.removeCallbacks(ticker)
         if (state == ButtonState.RECORDING) handler.post(ticker)
         invalidate()
+    }
+
+    /** O estado do executor de fluxos: o botão do fluxo em execução fica aceso (FLX-32). */
+    fun updateFluxo(estado: com.keyflow.fluxos.execucao.EstadoExecucao) {
+        val rodando = (estado as? com.keyflow.fluxos.execucao.EstadoExecucao.Rodando)?.fluxoId
+        if (rodando == runningFlowId) return
+        runningFlowId = rodando
+        if (declaredButtons.any { it is BarButton.RunFlow }) invalidate()
     }
 
     fun updateCandidates(candidates: List<String>) {
@@ -473,11 +488,20 @@ class BarView(
         is BarButton.SingleKey -> Triple(button.key.label, kbModifier, kbInk)
         BarButton.Joystick -> Triple("", kbModifier, kbInk)
         is BarButton.GridTrigger -> Triple(button.label, kbModifier, kbInk)
+        // Ícone desenhado (BarIcons); aceso, na cor de destaque do mic, enquanto o fluxo do botão roda.
+        is BarButton.RunFlow ->
+            if (isRunning(button)) Triple("", colors.tone(MicVisuals.ACCENT_TEAL), Color.WHITE) else Triple("", kbModifier, kbInk)
         BarButton.Candidates -> Triple("", kbTray, kbInk) // nunca desenhado (child view)
     }
 
     private fun isOrphanTrigger(button: BarButton): Boolean =
-        button is BarButton.GridTrigger && button.gridId !in knownGridIds
+        (button is BarButton.GridTrigger && button.gridId !in knownGridIds) ||
+            (button is BarButton.RunFlow && button.botaoId !in flowButtons)
+
+    private fun isRunning(button: BarButton.RunFlow): Boolean {
+        val fluxo = flowButtons[button.botaoId] ?: return false
+        return fluxo == runningFlowId
+    }
 
     // ── acessibilidade (ExploreByTouchHelper) ────────────────────────────────
 
@@ -485,12 +509,14 @@ class BarView(
     private fun a11yLabel(button: BarButton): String = when (button) {
         BarButton.Joystick -> tr("Alavanca (requer gesto deslizante)")
         is BarButton.GridTrigger -> tr("%s (requer gesto deslizante)", button.label)
+        is BarButton.RunFlow -> if (button.botaoId in flowButtons) tr("Executar fluxo") else tr("Executar fluxo (desativado)")
         else -> visualsFor(button).first
     }
 
     /** Alavanca e gatilho de grade são gestos contínuos — o toque simples já não faz nada neles (`perform`). */
     private fun isA11yClickable(button: BarButton): Boolean = when (button) {
         BarButton.Joystick, is BarButton.GridTrigger, BarButton.Candidates -> false
+        is BarButton.RunFlow -> button.botaoId in flowButtons
         else -> true
     }
 
@@ -649,6 +675,8 @@ class BarView(
             BarButton.ToggleExpand -> callbacks.onToggleExpand()
             BarButton.Paste -> callbacks.onPaste()
             is BarButton.SingleKey -> callbacks.onShortcut(button.key)
+            // Desabilitado (sem gatilho válido) não dispara; o toque num botão aceso também chega ao serviço, que cancela (FLX-29).
+            is BarButton.RunFlow -> if (button.botaoId in flowButtons) callbacks.onRunFlow(button.botaoId)
             // Interações contínuas entram em SB-T6/SB-T7; tap nelas não faz nada.
             BarButton.Joystick, is BarButton.GridTrigger, BarButton.Candidates -> Unit
         }

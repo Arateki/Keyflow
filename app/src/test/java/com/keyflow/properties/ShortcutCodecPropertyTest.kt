@@ -70,6 +70,7 @@ class ShortcutCodecPropertyTest {
             Arb.bind(nonEmpty, key.orNull(), Arb.enum<GridTriggerMode>(), nonEmpty) { id, prefix, mode, text ->
                 BarButton.GridTrigger(id, prefix, mode, text)
             },
+            nonEmpty.map { BarButton.RunFlow(it) },
         )
 
         val barsConfig: Arb<BarsConfig> = Arb.bind(

@@ -67,6 +67,7 @@ object ShortcutCodec {
             put("label", button.label)
             button.prefix?.let { put("prefix", keyJson(it)) }
         }
+        is BarButton.RunFlow -> JSONObject().put("type", "flow").put("botaoId", button.botaoId)
     }
 
     private fun buttonFrom(obj: JSONObject?): BarButton? {
@@ -90,6 +91,7 @@ object ShortcutCodec {
                     label = obj.optString("label").ifEmpty { "⌗" },
                 )
             }
+            "flow" -> obj.optString("botaoId").takeIf { it.isNotEmpty() }?.let { BarButton.RunFlow(it) }
             else -> null // tipo desconhecido: ignora (forward-compat)
         }
     }

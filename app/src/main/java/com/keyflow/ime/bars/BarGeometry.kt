@@ -43,6 +43,7 @@ object BarGeometry {
         is BarButton.SingleKey -> 0.8f
         BarButton.Joystick -> 1.2f
         is BarButton.GridTrigger -> 1f
+        is BarButton.RunFlow -> 1f
     }
 
     /**

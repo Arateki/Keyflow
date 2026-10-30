@@ -216,6 +216,7 @@ class SetupActivity : ComponentActivity() {
     // Barras/grades de atalhos do teclado (SB-T9) — chaves de DataStore próprias, fora de `Settings`.
     private var barsConfig by mutableStateOf(BarsConfig.DEFAULT)
     private var shortcutGrids by mutableStateOf<List<ShortcutGrid>>(emptyList())
+    private var nomesDeFluxo by mutableStateOf<Map<String, String>>(emptyMap())
     // Monetização só é criada/conectada depois que o onboarding terminou; o onboarding não toca Play,
     // Integrity, API nem a camada de ads (MZ-T9/ADS-01).
     private var monetizationApi: KeyFlowApiClient? = null
@@ -319,6 +320,9 @@ class SetupActivity : ComponentActivity() {
         activityScope.launch {
             settingsRepository.shortcutGridsFlow().collectLatest { shortcutGrids = it }
         }
+        activityScope.launch {
+            settingsRepository.configFluxosFlow().collectLatest { nomesDeFluxo = com.keyflow.fluxos.BotoesDeFluxo.nomes(it) }
+        }
 
         setContent {
             // Tema Ateliê app-wide; rota inicial: 1º uso → onboarding, depois → config (T27).
@@ -376,6 +380,7 @@ class SetupActivity : ComponentActivity() {
                             activityScope.launch { settingsRepository.saveBarsConfig(updated) }
                         },
                         shortcutGrids = shortcutGrids,
+                        nomesDeFluxo = nomesDeFluxo,
                         onShortcutGridsChange = { updated ->
                             shortcutGrids = updated
                             activityScope.launch { settingsRepository.saveShortcutGrids(updated) }
