@@ -2,6 +2,9 @@ package com.keyflow.overlay
 
 import android.Manifest
 import android.content.Intent
+import android.os.SystemClock
+import android.view.MotionEvent
+import android.view.WindowManager
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -254,6 +257,60 @@ class OverlayServiceFluxoTest {
         instrumentation.runOnMainSync { assertNull(service.orbeForTest!!.fluxoEtapaForTest) }
         assertTrue("glifo não sumiu ao cancelar", device.wait(Until.gone(By.desc(tr("Perguntar"))), 15_000))
         assertEquals(estadoAntes, KeyFlowController.buttonState.value)
+    }
+
+    @Test fun arrastarOrbeDurantePerguntarNaoCancela() = runBlocking { conferirArrastoDurante(Etapa.Perguntar()) }
+
+    @Test fun arrastarOrbeDuranteFalarNaoCancela() = runBlocking { conferirArrastoDurante(Etapa.Falar()) }
+
+    @Test fun arrastarOrbeDuranteAgenteNaoCancela() = runBlocking { conferirArrastoDurante(Etapa.Agente()) }
+
+    private suspend fun conferirArrastoDurante(etapaBloqueada: Etapa) {
+        val posicaoAnterior = repo.overlayPositionFlow().first()
+        val pronto = CompletableDeferred<Unit>()
+        val fim = CompletableDeferred<Unit>()
+        val cancelou = CompletableDeferred<Unit>()
+        corpo = { etapa, _ ->
+            chamadas += etapa.tipo
+            if (etapa.tipo == etapaBloqueada.tipo) {
+                pronto.complete(Unit)
+                try { fim.await() } finally { if (!fim.isCompleted) cancelou.complete(Unit) }
+            }
+            ResultadoEtapa.Ok(Valor.Texto("texto"))
+        }
+        val config = repo.atualizarFluxos { it.copy(fluxos = listOf(fluxo.copy(
+            etapas = listOf(Etapa.Ditar(), etapaBloqueada, Etapa.Inserir)))) }
+        try {
+            OverlayService.start(context, OverlayService.startOverlayIntent(context))
+            aguardar("orbe não apareceu") { OverlayService.instanceForVisionTest?.orbeForTest != null }
+            val service = checkNotNull(OverlayService.instanceForVisionTest)
+            aguardar("configuração do arrasto não chegou") { service.configFluxosForTest == config }
+            disparar()
+            withTimeout(15_000) { pronto.await() }
+            val estadoAntes = KeyFlowController.buttonState.value
+            instrumentation.runOnMainSync {
+                val view = checkNotNull(service.orbeForTest)
+                val params = view.layoutParams as WindowManager.LayoutParams
+                val xAntes = params.x
+                val yAntes = params.y
+                val agora = SystemClock.uptimeMillis()
+                listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE, MotionEvent.ACTION_UP).forEachIndexed { indice, acao ->
+                    val evento = MotionEvent.obtain(agora, agora + indice * 10, acao,
+                        if (indice == 0) 20f else 52f, if (indice == 0) 20f else 68f, 0)
+                    try { view.onTouchEvent(evento) } finally { evento.recycle() }
+                }
+                assertEquals(xAntes + 32, params.x)
+                assertEquals(yAntes + 48, params.y)
+            }
+            instrumentation.waitForIdleSync()
+            assertFalse("reposicionar cancelou ${etapaBloqueada.tipo}", cancelou.isCompleted)
+            assertTrue("reposicionar encerrou o fluxo", service.fluxoAtivoForTest)
+            assertEquals(etapaBloqueada.tipo, (KeyFlowController.fluxo.value as EstadoExecucao.Rodando).etapa)
+            assertEquals(estadoAntes, KeyFlowController.buttonState.value)
+            assertTrue(avisos.isEmpty())
+            fim.complete(Unit)
+            aguardar("arrasto impediu a conclusão") { chamadas.size == 3 && !service.fluxoAtivoForTest }
+        } finally { repo.saveOverlayPosition(posicaoAnterior) }
     }
 
     @Test fun actionRecordCancelaProcessamentoSemAbrirMicrofone() = runBlocking {

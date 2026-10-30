@@ -984,6 +984,7 @@ class OverlayService : Service() {
      */
     internal fun handleOrbIntent(intent: GestureIntent) {
         if (intent == GestureIntent.NONE) return
+        if (intent == GestureIntent.REPOSITION_ONLY && ::fluxoHost.isInitialized && fluxoHost.ativo) return
         if (cancelarFluxoForaDoDitar()) return
         if (visionFlow.state != VisionFlowState.NONE) visionFlow.finish() else coordinator.onIntent(intent)
     }
