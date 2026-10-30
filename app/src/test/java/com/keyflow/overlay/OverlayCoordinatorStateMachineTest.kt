@@ -5,6 +5,7 @@ import com.keyflow.core.ErrorKind
 import com.keyflow.core.InsertOutcome
 import com.keyflow.core.TranscriptionResult
 import com.keyflow.data.Config
+import com.keyflow.fluxos.execucao.DestinoFluxo
 import io.kotest.property.Arb
 import io.kotest.property.arbitrary.bind
 import io.kotest.property.arbitrary.boolean
@@ -36,7 +37,7 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class OverlayCoordinatorStateMachineTest {
 
-    enum class Action { TAP, HOLD, RELEASE, START, STOP, PAUSE, RESUME, CANCEL_INTENT, CANCEL_COMMIT_INTENT, CANCEL, UNDO, COMMIT, TARGET_ON, TARGET_OFF, LIMIT_SEND, LIMIT_DISCARD }
+    enum class Action { TAP, HOLD, RELEASE, START, STOP, PAUSE, RESUME, CANCEL_INTENT, CANCEL_COMMIT_INTENT, CANCEL, UNDO, COMMIT, TARGET_ON, TARGET_OFF, LIMIT_SEND, LIMIT_DISCARD, FLOW_START }
 
     data class Step(val action: Action, val waitMs: Long)
 
@@ -111,12 +112,17 @@ class OverlayCoordinatorStateMachineTest {
         var lastShownMs = 0L
         // Teto do que pode aparecer: todo o tempo virtual passado em RECORDING desde o último zero (envio, repouso).
         var recordedSinceResetMs = 0L
+        // Ditado de fluxo (FLX-18): cada destino aceito conta quantas vezes foi avisado. Valem, depois de CADA passo, "no máximo uma"
+        // e, no fim, "exatamente uma" — e o texto de uma sessão com destino nunca vai ao campo.
+        val destinos = mutableListOf<IntArray>()
+        var coordinatorRef: OverlayCoordinator? = null
+        var inseridoComDestino = false
         val coordinator = OverlayCoordinator(
             scope = scope,
             configProvider = { Config(endpointUrl = "https://example.test/v1/audio/transcriptions", authHeaderValue = "Bearer t") },
             recorder = recorder,
             transcriber = SlowTranscriber(s.transcribeMs, s.transcriptionFails),
-            insertOrHold = { if (target) InsertOutcome.Inserted else InsertOutcome.Held },
+            insertOrHold = { if (coordinatorRef?.ditadoDeFluxo == true) inseridoComDestino = true; if (target) InsertOutcome.Inserted else InsertOutcome.Held },
             flushPending = { false },
             targetAvailable = { target },
             render = { rendered += it },
@@ -128,6 +134,7 @@ class OverlayCoordinatorStateMachineTest {
             concatAudioSegments = { segments, _ -> segments.first() },
             partialOnPause = { s.partialOnPause },
         )
+        coordinatorRef = coordinator
 
         fun check(where: String) {
             val state = coordinator.currentState()
@@ -137,6 +144,9 @@ class OverlayCoordinatorStateMachineTest {
                 if (state == ButtonState.RECORDING && !recorder.capturing) add("RECORDING sem o microfone captar")
                 if (state != ButtonState.RECORDING && recorder.capturing) add("microfone captando em $state")
                 if (state in IDLE && recorder.recording) add("em repouso ($state) com uma gravação aberta")
+                if (inseridoComDestino) add("o texto de uma sessão de fluxo foi inserido no campo")
+                destinos.forEachIndexed { i, calls -> if (calls[0] > 1) add("o destino #$i foi avisado ${calls[0]} vezes") }
+                if (destinos.size > 0 && coordinator.ditadoDeFluxo && destinos.last()[0] > 0) add("destino já avisado, mas ainda ativo")
                 if (rendered.isNotEmpty() && rendered.last() != state) add("a tela mostra ${rendered.last()} mas o estado é $state")
                 if (bannerShown - bannerHidden !in 0..1) add("aviso de desfazer mostrado $bannerShown e escondido $bannerHidden vezes")
                 // O cronômetro só zera ao enviar ou voltar ao repouso; gravando, pausado ou no desfazer, nunca anda para trás nem
@@ -173,6 +183,10 @@ class OverlayCoordinatorStateMachineTest {
                     Action.TARGET_OFF -> { target = false; coordinator.onTargetChanged(false) }
                     Action.LIMIT_SEND -> coordinator.onLimitSend()
                     Action.LIMIT_DISCARD -> coordinator.onLimitDiscard()
+                    Action.FLOW_START -> {
+                        val calls = intArrayOf(0)
+                        if (coordinator.iniciarDitadoDeFluxo(DestinoFluxo(null) { calls[0]++ })) destinos += calls
+                    }
                 }
                 scheduler.runCurrent()
                 if (st.waitMs > 0) {
@@ -196,6 +210,9 @@ class OverlayCoordinatorStateMachineTest {
         check("no fim")
         val end = coordinator.currentState()
         if (end !in IDLE) fail("não voltou ao repouso: ficou em $end\npassos: $history\ncenário: $s")
+        destinos.forEachIndexed { i, calls ->
+            if (calls[0] != 1) fail("o destino #$i foi avisado ${calls[0]} vezes (devia ser uma)\npassos: $history\ncenário: $s")
+        }
     }
 
     companion object {

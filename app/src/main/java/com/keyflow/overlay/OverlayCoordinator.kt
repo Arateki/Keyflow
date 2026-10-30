@@ -11,6 +11,11 @@ import com.keyflow.core.ErrorNavTarget
 import com.keyflow.core.InsertOutcome
 import com.keyflow.core.TranscriptionResult
 import com.keyflow.data.Config
+import com.keyflow.fluxos.execucao.CausaErro
+import com.keyflow.fluxos.execucao.DestinoFluxo
+import com.keyflow.fluxos.execucao.ErroEtapa
+import com.keyflow.fluxos.execucao.ErrosDeFluxo
+import com.keyflow.fluxos.execucao.ResultadoDitado
 import com.keyflow.transcription.partial.PartialSession
 import com.keyflow.transcription.partial.PartialSnapshot
 import kotlinx.coroutines.CoroutineScope
@@ -91,6 +96,47 @@ class OverlayCoordinator(
     private val onPartial: (PartialSnapshot?) -> Unit = {},
 ) {
     private val machine = ButtonStateMachine(targetAvailable = targetAvailable)
+
+    // Quem recebe o resultado desta sessão quando ela foi iniciada por um fluxo (FLX-18). Nulo = o caminho de sempre.
+    private var destinoFluxo: DestinoFluxo? = null
+
+    /** Há uma sessão de ditado de fluxo em curso: o toque na orbe envia mesmo no modo Push-to-talk (A5). */
+    val ditadoDeFluxo: Boolean get() = destinoFluxo != null
+
+    /**
+     * Inicia uma gravação para um fluxo: o mesmo que [onTap] em repouso, mas o texto vai para [destino] e não para o campo.
+     * Recusa (devolve `false`, sem tocar em nada) fora de IDLE_READY/IDLE_NO_FIELD, com outro destino ativo, ou se a gravação não
+     * começou (termo de uso pendente). Se a gravação falha ao abrir o microfone, devolve `true` e o destino já recebeu a falha.
+     */
+    fun iniciarDitadoDeFluxo(destino: DestinoFluxo): Boolean {
+        if (destinoFluxo != null) return false
+        if (machine.state != ButtonState.IDLE_READY && machine.state != ButtonState.IDLE_NO_FIELD) return false
+        destinoFluxo = destino
+        onTap()
+        if (destinoFluxo === destino && machine.state != ButtonState.RECORDING) {
+            destinoFluxo = null
+            return false
+        }
+        return true
+    }
+
+    /**
+     * O fluxo desistiu da etapa (foi cancelado, o serviço vai morrer): larga o destino **sem avisá-lo** e descarta a gravação já — sem
+     * janela de desfazer, nada fica retido. Sem destino, não faz nada.
+     */
+    fun abandonarDitadoDeFluxo() {
+        if (destinoFluxo == null) return
+        destinoFluxo = null
+        onCancel()
+        onCommitCancel()
+    }
+
+    /** Solta o destino **uma vez** e só depois o avisa (ele pode começar a próxima etapa e olhar o estado de volta ao repouso). */
+    private fun liberarDestino(resultado: ResultadoDitado) {
+        val destino = destinoFluxo ?: return
+        destinoFluxo = null
+        destino.aoTerminar(resultado)
+    }
     private var recordingStartMs = 0L
     private var cancelJob: kotlinx.coroutines.Job? = null
     private var limitJob: kotlinx.coroutines.Job? = null
@@ -312,6 +358,12 @@ class OverlayCoordinator(
         timeReset()
         render(machine.onCancelExpired())
         onHideCancelUndo()
+        liberarDestino(ResultadoDitado.Cancelado)
+    }
+
+    /** Com um fluxo no comando o aviso de falha é dele; sem fluxo, o aviso de sempre. */
+    private fun avisarErroDeSessao(mensagem: String) {
+        if (destinoFluxo == null) onError(mensagem, ErrorNavTarget.NONE)
     }
 
     /** Estado atual da única [ButtonStateMachine] — lido pelo [RecordingGestureController]. */
@@ -462,6 +514,7 @@ class OverlayCoordinator(
         if (!microphoneGranted()) {
             onError(tr("Conceda permissão de microfone para usar essa função."), ErrorNavTarget.MIC)
             handleState(machine.onTranscriptionError())
+            liberarDestino(ResultadoDitado.Falha(ErroEtapa(CausaErro.INDISPONIVEL, tr("Conceda permissão de microfone para usar essa função."))))
             return
         }
         recordingStartMs = recordingClockMs()
@@ -483,6 +536,7 @@ class OverlayCoordinator(
                 val target = if (!microphoneGranted()) ErrorNavTarget.MIC else ErrorNavTarget.NONE
                 onError(tr("Falha ao iniciar a gravação."), target)
                 handleState(machine.onTranscriptionError())
+                liberarDestino(ResultadoDitado.Falha(ErroEtapa(CausaErro.MOTOR, tr("Falha ao iniciar a gravação."))))
             }
     }
 
@@ -537,16 +591,18 @@ class OverlayCoordinator(
                 if (duration < MIN_RECORDING_MS) {
                     Log.d(TAG, "recording too short (${duration}ms), cancelling")
                     runCatching { recorder.stop()?.delete() }
-                    onError(tr("Gravação muito curta."), ErrorNavTarget.NONE)
+                    avisarErroDeSessao(tr("Gravação muito curta."))
                     render(machine.onErrorDismissed())
+                    liberarDestino(ResultadoDitado.Falha(ErrosDeFluxo.deTranscricao(ErrorKind.EMPTY_AUDIO, "")))
                     return
                 }
                 runCatching { recorder.stop() }.getOrNull()
             }
         }
         if (audio == null) {
-            onError(tr("Não foi possível gravar o áudio."), ErrorNavTarget.NONE)
+            avisarErroDeSessao(tr("Não foi possível gravar o áudio."))
             handleState(machine.onTranscriptionError())
+            liberarDestino(ResultadoDitado.Falha(ErroEtapa(CausaErro.MOTOR, tr("Não foi possível gravar o áudio."))))
             return
         }
         pendingAudioFile = audio
@@ -577,7 +633,7 @@ class OverlayCoordinator(
      * OverlayTranscriber). Usado também por trecho da sessão parcial.
      */
     private suspend fun transcribeWithTimeout(audio: File): TranscriptionResult {
-        val cfg = configProvider()
+        val cfg = destinoFluxo?.config?.invoke() ?: configProvider()
         return runCatching {
             // "∞": a pessoa escolheu esperar o quanto for preciso — cancelar durante o envio segue valendo.
             if (cfg.waitsForever) {
@@ -600,6 +656,12 @@ class OverlayCoordinator(
     private fun deliver(result: TranscriptionResult) {
         when (result) {
             is TranscriptionResult.Success -> {
+                if (destinoFluxo != null) {
+                    // O texto é do fluxo: nada de insertOrHold nem de área de transferência (FLX-18).
+                    render(machine.onTranscriptionSuccess())
+                    liberarDestino(ResultadoDitado.Texto(result.text))
+                    return
+                }
                 if (insertOrHold(result.text) == InsertOutcome.Held) {
                     if (BuildConfig.DEBUG) Log.d(TAG, "transcription held → clipboard: '${result.text.take(30)}'")
                     onClipboard(result.text)
@@ -608,6 +670,12 @@ class OverlayCoordinator(
             }
             is TranscriptionResult.Error -> {
                 if (BuildConfig.DEBUG) Log.d(TAG, "transcription error: ${result.kind} ${result.message}")
+                if (destinoFluxo != null) {
+                    // O aviso é do fluxo ("O fluxo parou em …"), não do coordenador.
+                    handleState(machine.onTranscriptionError())
+                    liberarDestino(ResultadoDitado.Falha(ErrosDeFluxo.deTranscricao(result.kind, result.message)))
+                    return
+                }
                 onError(errorMessage(result), errorNavTarget(result.kind))
                 handleState(machine.onTranscriptionError())
             }
@@ -629,8 +697,9 @@ class OverlayCoordinator(
         }
         if (session.isEmpty && recordingClockMs() - recordingStartMs < MIN_RECORDING_MS) {
             endPartial()
-            onError(tr("Gravação muito curta."), ErrorNavTarget.NONE)
+            avisarErroDeSessao(tr("Gravação muito curta."))
             render(machine.onErrorDismissed())
+            liberarDestino(ResultadoDitado.Falha(ErrosDeFluxo.deTranscricao(ErrorKind.EMPTY_AUDIO, "")))
             return
         }
         priorSegmentsMs += segmentMs

@@ -1,8 +1,10 @@
 package com.keyflow.overlay
 
 import com.keyflow.i18n.tr
+import com.keyflow.fluxos.execucao.DestinoFluxo
 import com.keyflow.vision.VisionConsentActivity
 import com.keyflow.vision.VisionProjectionSession
+import com.keyflow.vision.DestinoCaptura
 import com.keyflow.vision.VisionFlow
 import com.keyflow.vision.VisionFlowRequest
 import com.keyflow.vision.VisionFlowState
@@ -649,9 +651,31 @@ class OverlayService : Service() {
         )
     }
 
+    /**
+     * O modo de gravação do gesto agora. Durante um ditado de fluxo o toque na orbe **envia** mesmo com Push-to-talk configurado
+     * (A5, design §7.1): a gravação que o fluxo abriu não tem "segurar", então o modo é alternar.
+     */
+    private fun recordingModeNow(): RecordingMode =
+        if (::coordinator.isInitialized && coordinator.ditadoDeFluxo) RecordingMode.TOGGLE else cachedSettings.overlayRecordingMode
+
+    internal val gestureControllerForTest: RecordingGestureController get() = gestureController
+    internal val coordinatorForTest: OverlayCoordinator get() = coordinator
+
+    /** Inicia a gravação de uma etapa Ditar. `false` fora de IDLE_* (design §7.1). A T14 liga isto ao `FluxoHost`. */
+    internal fun ditarParaFluxo(destino: DestinoFluxo): Boolean =
+        ::coordinator.isInitialized && coordinator.iniciarDitadoDeFluxo(destino)
+
+    /** Abre a captura de uma etapa Capturar; `entrega` recebe o bitmap (que passa a ser dela) ou `null` (design §7.2). */
+    internal fun capturarParaFluxo(entrega: (Bitmap?) -> Unit): Boolean =
+        ::coordinator.isInitialized &&
+            visionFlow.start(VisionFlowRequest(coordinator.currentState(), DestinoCaptura.Fluxo(entrega)))
+
+    /** Encerra a captura em curso (cancelar a etapa); a entrega recebe `null`. */
+    internal fun cancelarCapturaDeFluxo() = visionFlow.finish()
+
     private fun createGestureController() {
         gestureController = RecordingGestureController(
-            mode = { cachedSettings.overlayRecordingMode },
+            mode = ::recordingModeNow,
             currentState = { coordinator.currentState() },
             // Janela de re-segurar = "Tempo de reação" (mesmo limiar do toque, ajustável ao vivo).
             pttReleaseWindowMs = { cachedSettings.tapBurstWindowMs.toLong() },
@@ -746,7 +770,7 @@ class OverlayService : Service() {
         val button = OrbButtonView(
             context = this,
             controller = gestureController,
-            mode = { cachedSettings.overlayRecordingMode },
+            mode = ::recordingModeNow,
             side = { cachedSettings.overlaySide },
             onIntent = { intent -> if (visionFlow.state != VisionFlowState.NONE) visionFlow.finish() else coordinator.onIntent(intent) },
             orbSizePx = cachedSettings.orbSizePx,
