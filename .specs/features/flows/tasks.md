@@ -121,13 +121,14 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(fluxos): executor de etapas com portas`.
 - **Registro (Fase A)**: Em `fluxos/execucao/{Portas,EstadoExecucao,Limites,ExecutorFluxo}.kt`. `PortaEtapa.executar(etapa, entrada)` recebe a etapa inteira (modelo, instrução, sistema) e `Portas.para(tipo)` devolve a porta (nulo = esta versão não executa o tipo). `executar` devolve `ResultadoExecucao` (`Recusado` | `Terminou(estado)`); `Concluido` volta a `Ocioso`, mas `Falhou` e `Cancelado` ficam visíveis até a próxima execução. Cancelar é `cancelar()` ou cancelar a coroutine de quem executa (a porta coopera). O executor guarda os tipos (entrada e saída de cada etapa) e libera a imagem exatamente uma vez. Sem `Relogio`: o prazo é o `withTimeout` da coroutine, virtual nos testes. `KeyFlowController.fluxo` + `updateFluxo(estado)` (o `FluxoHost` da T14 publica o estado do executor). Mensagens de tempo, memória e motor genérico em `tr`.
 
-### FLX-T7 — Modelo da etapa sem copiar segredo + selo de privacidade — **Status: pendente**
+### FLX-T7 — Modelo da etapa sem copiar segredo + selo de privacidade — **Status: feita**
 - **What**: `ModeloPorEtapa.aplicar(settings, etapa) → Settings` (tabela do design §8) e `efetivo(settings, etapa) → Efetivo` (origem, modelo, `NoAparelho | Nuvem(provedor)`), mais `seloDoFluxo(...)` ("100% no aparelho" / lista de provedores).
 - **Where**: `fluxos/ModeloPorEtapa.kt`; teste `ModeloPorEtapaTest`.
 - **Depends on**: T1. **Requirement**: FLX-26, FLX-30.
 - **Done when**: unit — `ModeloRef` nulo devolve o **mesmo** `Settings`; preenchido troca só os campos da tabela e deixa o original intacto; Custom troca só a origem; `CREDITS` ou nome inexistente → sinaliza inválido (a porta vira `INDISPONIVEL`);
   nenhum campo de segredo é lido/escrito; selo: LOCAL e SYSTEM = no aparelho, Capturar/Inserir = no aparelho, OpenAI/Anthropic/Google/Groq/ElevenLabs/Custom = nuvem com o nome.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(fluxos): modelo por etapa e selo de privacidade`.
+- **Registro (Fase A)**: `ModeloPorEtapa.aplicar(settings, etapa)` devolve `ModeloAplicado` (`Ok(settings)` | `Invalido(origem)`) em vez de só `Settings`: a porta precisa saber que a origem não existe para falhar com `INDISPONIVEL`. Sem `ModeloRef` devolve a mesma instância. `ModeloRef.modelo` nulo ou em branco troca só a origem. `efetivo` devolve `Efetivo(origem, modelo, Onde)` com `Onde` = `NoAparelho` | `Nuvem(ProvedorNuvem)` | `Indisponivel` (origem inválida ou `CREDITS` na aba); `seloDoFluxo` devolve `SeloDoFluxo(provedores, indisponivel)` e `noAparelho`. O texto do selo ("100% no aparelho", "Nuvem · OpenAI") é da T17.
 
 ### FLX-T8 — Divisor de texto para a Voz `[P]` — **Status: pendente**
 - **What**: `DivisorDeFala.dividir(texto, max = 800)`: trechos por frase (`.`, `!`, `?`, quebra de linha), sem cortar palavra quando dá, sem perder nem repetir caractere; trecho único maior que o limite é cortado no limite.
