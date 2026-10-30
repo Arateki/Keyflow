@@ -11,7 +11,7 @@
 | JDK default do sistema | 21.0.11 (também funciona com AGP 9.x) | ✅ |
 | Gradle (bootstrap) | **9.6.1** em `~/.local/gradle/current` | ✅ |
 | Android SDK | `~/Android/Sdk` (`$ANDROID_HOME`) | ✅ |
-| build-tools | 33.0.1, **34.0.0** | ✅ |
+| build-tools de compilação | **36.0.0** | ✅ |
 | platforms de compilação | **android-37**; android-34 continua sendo a imagem do emulador | servidor instalado; Deck requer instalação pelo Yan |
 | platform-tools (adb) | 36.0.2 | ✅ |
 | cmdline-tools | `latest` (sdkmanager/avdmanager) | ✅ |
