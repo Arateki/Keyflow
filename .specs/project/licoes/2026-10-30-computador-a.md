@@ -117,3 +117,16 @@ Os links imutáveis e os hashes nesta lição permitem revisão mesmo sem a past
 O coordenador confirmou a autorização do Yan para a CMP-T3 e pediu prosseguir, depois do PR deste diagnóstico,
 na ordem CMP-T3 → retomada da CMP-T1 → CMP-T4, na mesma branch e no mesmo relatório. O resultado estático
 acima registra o ponto de partida; não encerra o trabalho autorizado.
+
+## CMP-T3 — Implementação em andamento
+
+A base passou também no pool: `assembleDebug testDebugUnitTest :app:lintDebug assembleDebugAndroidTest`,
+22min39s, **2.699/2.699 testes JVM**, 260 classes, zero falhas/erros/ignorados.
+O fork parte do SHA upstream acima, preservando os arquivos originais e um manifesto de hashes anteriores
+aos patches. A auditoria identificou também o wcwidth permissivo de Markus Kuhn dentro do libvterm,
+além dos runtimes LLVM com suas exceções e avisos históricos preservados.
+
+A publicação nativa precisa de um commit de bootstrap do workflow para o CI produzir o binário; o hash
+real desse artefato será fixado num commit de integração posterior. **SPEC_DEVIATION:** dois commits
+para CMP-T3, pois o SHA do binário do CI não existe antes de enviar o workflow, e não se reescreve a branch
+publicada com `--force`. A task permanece em andamento até os gates do módulo e do artefato passarem.

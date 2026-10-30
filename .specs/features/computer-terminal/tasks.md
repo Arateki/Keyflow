@@ -102,7 +102,10 @@ Medições dinâmicas e auditoria completa de transitivas continuam pendentes.
 - **Done when**: a tabela existe com o nível de proteção (hardware/TEE/StrongBox/software) e o nome do algoritmo de assinatura **medidos**; a lição diz a partir de qual API/aparelho o Keystore serve e confirma (ou corrige) a premissa P1 da spec; o plano de fallback do `design.md` §4 é ajustado ao medido.
 - **Tests**: manual/instrumentado de sonda. **Gate**: `pool instrumentar` (emulador) + A32/Tab/Vaio manuais com `--confirmo-a32`. **Commit**: `spike(computador): sonda do Ed25519 no Keystore` (só o debug).
 
-### CMP-T3 — Fork do termlib com JNI compilado no CI e SHA fixado — **Status: necessária; autorizada para execução em 2026-10-30**
+### CMP-T3 — Fork do termlib com JNI compilado no CI e SHA fixado — **Status: em andamento (2026-10-30)**
+
+Bootstrap do workflow primeiro; integração com SHA real depois do binário publicado. **SPEC_DEVIATION:** dois commits
+para permitir essa verificação sem reescrever a branch; detalhes na [lição](../../project/licoes/2026-10-30-computador-a.md).
 - **What**: **só se a CMP-T1 medir que mouse reporting ou scrollback maior não saem na borda, ou se o plano B valer.** O Yan já aceitou o fork nesse caso (D12). O sixel não é motivo para manter esta task aberta. Código do termlib vendorizado em `third_party/termlib/` (Apache-2.0 + libvterm MIT; `UPSTREAM.md` com o commit-base e os patches), módulo Gradle `:termlib` compilado
   com o toolchain do app; o C++ vira `libtermlib.so` por ABI num workflow `.github/workflows/termlib-jni.yml` (NDK do runner, actions fixadas por SHA, padrão `sherpa-sem-tts.yml`) que publica um release com `.sha256`;
   o `app/build.gradle.kts` baixa e **confere o SHA-256** como faz com o sherpa (sem NDK nos nós do pool). Patches (conforme a T1 medir): **mouse reporting** (`vterm_mouse_*` + modo) e **scrollback** configurável. O DCS sixel e o atributo 4 do DA1 **não** entram no C++: ficam no app (D12).
