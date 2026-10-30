@@ -173,7 +173,7 @@ para permitir essa verificação sem reescrever a branch; detalhes na [lição](
   a passphrase e o texto colado não ficam em nenhum campo depois de `importar()`; o `SecretFilter` recebe os valores guardados.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(computador): modelo de chaves, importação e assinatura abstrata`.
 
-### CMP-T8 — Chaves no Android: Keystore, envelope e biometria — **Status: implementada em 2026-10-30; instrumentado conforme a lição**
+### CMP-T8 — Chaves no Android: Keystore, envelope e biometria — **Status: concluída em 2026-10-30 (T2 pendente; ver a lição)**
 - **What**: `ProvedorDeChavesAndroid` sobre o resultado da T2. `gerar(nome, tipo, exigeBiometria)`: **Ed25519** no Keystore (API 33+ e sonda aprovada) com `ProbeEd25519` de produção, ou **fallback** — Ed25519 em software (a semente de 32 bytes gerada pelo Tink do cbssh) guardada **cifrada** por uma chave AES-256-GCM do Keystore (API 24+) no cofre do app, zerada da memória logo após assinar; **ECDSA P-256** (`secp256r1`, `DIGEST_SHA256`) sempre no Keystore, sem envelope (D13).
   Importadas entram no envelope. Biometria opcional por chave, janela de **5 minutos** (D14): API 24–29 `setUserAuthenticationValidityDurationSeconds(300)`; API 30+ `setUserAuthenticationParameters(300, AUTH_BIOMETRIC_STRONG)`; duração > 0 **não** usa `CryptoObject`. `setUserAuthenticationRequired(true)`, `setInvalidatedByBiometricEnrollment(true)` com aviso antes de ligar; sem biometria cadastrada a opção fica desligada com o motivo. O prompt autentica o usuário; dentro dos 300 s a assinatura segue sem novo prompt.
   Exclusão apaga Keystore e cofre. Fora do backup (`data_extraction_rules.xml`/`backup_rules`).

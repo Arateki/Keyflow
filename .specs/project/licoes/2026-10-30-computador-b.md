@@ -29,3 +29,9 @@ Branch `equipe/computador-b` (base: `equipe/computador-a`, depois `origin/main` 
   testável; a escolha de parâmetros por API é função pura (`PlanoDeAutenticacao`). Cifrar com chave AES que exige autenticação também pede
   a janela aberta: criar chave em envelope com biometria pede o prompt antes.
 - `pool compilar` sincroniza a árvore no momento em que o nó é obtido: editar arquivos durante a espera entra na execução.
+
+## Gates
+Unitários **2.853/2.853** (284 classes), `:app:lintDebug` e `assembleDebugAndroidTest` verdes; instrumentado `ChavesAndroidTest` **16/16** no emulador API 34
+(sonda do Ed25519 no Keystore: **Aprovada**, então ed25519 nasceu nativo; o envelope foi forçado por flag). Mutações (uma por task, vermelho confirmado):
+`RegraAgente` (Perguntar liberado), `PoliticaDeConfianca` (Mudou→Nova), `ImportadorDeChave` (RSA fraca aceita), `JanelaDeBiometria` (janela que nunca vence).
+Os testes foram escritos junto do código; o "vermelho antes" foi substituído pela mutação.

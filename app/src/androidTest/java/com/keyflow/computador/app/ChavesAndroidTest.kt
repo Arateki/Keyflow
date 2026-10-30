@@ -316,7 +316,7 @@ class ChavesAndroidTest {
     }
 
     @Test fun importadaEntraNoEnvelopeEAssina() {
-        val pem = String(ctx.assets.open("computador/chaves/ed25519").use { it.readBytes() })
+        val pem = String(InstrumentationRegistry.getInstrumentation().context.assets.open("computador/chaves/ed25519").use { it.readBytes() })
         val p = provedor()
         val r = runBlocking { p.importar(pem.toCharArray(), null, "importada", exigeBiometria = false) }
         val chave = (r as Resultado.Ok).valor
