@@ -159,13 +159,13 @@ class ArchitectureRulesTest {
 
     /**
      * `com.keyflow.fluxos` (modelo, validação, codec, restaurar, roteamento) e `fluxos/execucao` são JVM puro, para testar na
-     * JVM e rodar o executor com portas falsas (FLX-52): nada de `android.*`, Compose, do downloader de modelos nem do cofre. Só
+     * JVM e rodar o executor com portas falsas (FLX-52): nada de `android.*` nem `androidx.*` (Compose, DataStore…), do downloader de modelos nem do cofre. Só
      * `fluxos/app/` enxerga os dois lados. [fluxosViolations] é a regra; o primeiro teste a aplica ao fonte e o segundo prova que
      * ela pega o que deve e deixa passar `fluxos/app/`.
      */
     private val fluxosForbidden = listOf(
         Regex("""^\s*import\s+android\."""),
-        Regex("""^\s*import\s+androidx\.compose\."""),
+        Regex("""^\s*import\s+androidx\."""), // Compose, DataStore, lifecycle, core-ktx… tudo o que é Android
         Regex("""^\s*import\s+com\.keyflow\.data\.models\.(ModelDownloader|DownloadGateway|ModelDownloadService)\b"""),
         Regex("""^\s*import\s+com\.keyflow\.auth\."""),
     )
@@ -194,9 +194,44 @@ class ArchitectureRulesTest {
         assertEquals(emptyList<Int>(), fluxosViolations("com/keyflow/fluxos/app/FluxoHost.kt", bad))
         assertEquals(emptyList<Int>(), fluxosViolations("com/keyflow/ime/KeyFlowKeyboardService.kt", bad))
         assertEquals(listOf(1), fluxosViolations("com/keyflow/fluxos/X.kt", listOf("import androidx.compose.runtime.Composable")))
+        // qualquer androidx (não só Compose): DataStore, core-ktx, lifecycle… são Android
+        assertEquals(listOf(1), fluxosViolations("com/keyflow/fluxos/X.kt", listOf("import androidx.datastore.preferences.core.Preferences")))
+        assertEquals(listOf(1), fluxosViolations("com/keyflow/fluxos/execucao/X.kt", listOf("import androidx.lifecycle.ViewModel")))
+        assertEquals(emptyList<Int>(), fluxosViolations("com/keyflow/fluxos/app/X.kt", listOf("import androidx.datastore.preferences.core.Preferences")))
         assertEquals(listOf(1), fluxosViolations("com/keyflow/fluxos/execucao/X.kt", listOf("import com.keyflow.data.models.ModelDownloader")))
         assertEquals(listOf(1), fluxosViolations("com/keyflow/fluxos/X.kt", listOf("import com.keyflow.auth.SecureCredentialStore")))
         assertEquals(emptyList<Int>(), fluxosViolations("com/keyflow/fluxos/X.kt", listOf("import com.keyflow.data.Settings", "import com.keyflow.i18n.tr")))
+    }
+
+    /**
+     * `optString` não se usa em `fluxos/`: o do Android devolve "null" para um `null` do JSON e o do Maven (a JVM dos testes)
+     * devolve "" — o teste de unidade passa e o aparelho lê outra coisa. O codec lê texto só com `opt(...) as? String`
+     * (lição de 2026-10-30, `licoes/2026-10-30-fluxos-fase-a.md`). Vale também para `fluxos/app`.
+     */
+    private val fluxosOptString = Regex("""\boptString\s*\(""")
+
+    /** Linhas (1-based) de [code] que usam `optString`, para o arquivo em [relPath]; só `com/keyflow/fluxos/` conta. */
+    private fun fluxosOptStringViolations(relPath: String, code: List<String>): List<Int> {
+        if (!relPath.replace('\\', '/').startsWith("com/keyflow/fluxos/")) return emptyList()
+        return code.mapIndexedNotNull { i, line -> if (fluxosOptString.containsMatchIn(line)) i + 1 else null }
+    }
+
+    @Test
+    fun fluxosNeverUseOptString() {
+        val offenders = kotlinFiles(main).flatMap { file ->
+            fluxosOptStringViolations(file.rel(main), codeLines(file)).map { "${file.rel(main)}:$it" }
+        }
+        assertEquals("use opt(nome) as? String em fluxos/ (optString diverge entre Android e JVM)", emptyList<String>(), offenders)
+    }
+
+    @Test
+    fun fluxosOptStringRuleCatchesTheCallAnywhereUnderFluxos() {
+        val chamada = listOf("val x = obj.optString(\"id\")", "val y = obj.opt(\"id\") as? String")
+        assertEquals(listOf(1), fluxosOptStringViolations("com/keyflow/fluxos/CodecFluxos.kt", chamada))
+        assertEquals(listOf(1), fluxosOptStringViolations("com/keyflow/fluxos/app/Algo.kt", chamada))
+        assertEquals(listOf(1), fluxosOptStringViolations("com/keyflow/fluxos/execucao/X.kt", listOf("json.optString ( \"a\", \"b\")")))
+        assertEquals(emptyList<Int>(), fluxosOptStringViolations("com/keyflow/core/shortcuts/ShortcutCodec.kt", chamada)) // fora de fluxos/: não é desta regra
+        assertEquals(emptyList<Int>(), fluxosOptStringViolations("com/keyflow/fluxos/X.kt", listOf("val optStringy = 1", "fun myoptString() = 2")))
     }
 
     /** O texto de uma string Kotlin entre aspas como o programa o vê (`\\` vira `\`, `\"` vira `"`). */
