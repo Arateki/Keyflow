@@ -320,9 +320,9 @@ Respondidas por ele em 29/10, 22:20 (viraram decisões): **Q1** (pausar/cancelar
 | NTF-13 | P1-B | NTF-T9 | Pending |
 | NTF-14 | P1-B | NTF-T10 | Pending |
 | NTF-15 | P1-C | NTF-T3, NTF-T13 | Implementing (feitas: T3) |
-| NTF-16 | P1-C | NTF-T5, NTF-T10, NTF-T14 | Pending |
+| NTF-16 | P1-C | NTF-T5, NTF-T10, NTF-T14 | Implementing (feitas: T5) |
 | NTF-17 | P1-C | NTF-T9, NTF-T14 | Pending |
-| NTF-18 | P1-D | NTF-T5, NTF-T11, NTF-T14 | Pending |
+| NTF-18 | P1-D | NTF-T5, NTF-T11, NTF-T14 | Implementing (feitas: T5) |
 | NTF-19 | P1-D | NTF-T11, NTF-T13 | Pending |
 | NTF-20 | P1-D | NTF-T9, NTF-T14 | Pending |
 | NTF-21 | P1-D | NTF-T9, NTF-T11 | Pending |
@@ -345,7 +345,7 @@ Respondidas por ele em 29/10, 22:20 (viraram decisões): **Q1** (pausar/cancelar
 | NTF-38 | P1-G | NTF-T3, NTF-T10 | Implementing (feitas: T3) |
 | NTF-39 | P1-H | NTF-T2, NTF-T3, NTF-T20 | Implementing (feitas: T3) |
 | NTF-40 | P2-I | NTF-T12, NTF-T13 (cada uma traz os seus textos) | Pending |
-| NTF-41 | P2-I | NTF-T2, NTF-T4, NTF-T5 | Implementing (feitas: T4) |
+| NTF-41 | P2-I | NTF-T2, NTF-T4, NTF-T5 | Implementing (feitas: T5) |
 | NTF-42 | P2-I | NTF-T11 | Pending |
 | NTF-43 | P2-I | NTF-T1, NTF-T14, NTF-T18 | Implementing (T1: emulador medido, cabe; aparelhos pendentes) |
 | NTF-44 | P2-I | NTF-T15 | Pending |
@@ -353,7 +353,7 @@ Respondidas por ele em 29/10, 22:20 (viraram decisões): **Q1** (pausar/cancelar
 | NTF-46 | P2-I | NTF-T16 | Pending |
 | NTF-47 | P2-I | NTF-T19 | Pending |
 | NTF-48 | P1-I | NTF-T4, NTF-T9, NTF-T10 | Implementing (feitas: T4) |
-| NTF-49 | P1-I | NTF-T5, NTF-T10, NTF-T14 | Pending |
+| NTF-49 | P1-I | NTF-T5, NTF-T10, NTF-T14 | Implementing (feitas: T5) |
 | NTF-50 | P1-I | NTF-T1, NTF-T9, NTF-T14 | Implementing (T1: emulador medido, cabe; aparelhos pendentes) |
 
 **Coverage:** 50 requisitos, 50 mapeados em tasks, 0 sem task.

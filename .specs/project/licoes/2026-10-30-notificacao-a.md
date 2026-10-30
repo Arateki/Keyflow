@@ -72,3 +72,18 @@ tela ou agrupada) — o Yan confere nos aparelhos como a notificação convive c
   entra se algum toque grava (`iniciaGravacao`), nunca prometendo o que o toque não faz. Teste nos três idiomas.
 - **Fica para a integração (T9/T10)**: `ArrastosDaOrbeConformidadeTest` (instrumentado, arrasta a `OrbButtonView` real e compara com a tabela).
 - **Mutação**: tirar o portão da Visão do `resolver` (`if (false)`) derruba "com a Visão ativa só GravarEnviar age".
+
+## NTF-T5 — Visibilidade ("dispensada") e portão da tela bloqueada
+
+- `VisibilidadeDaNotificacao` (`PARADA/VISIVEL/DISPENSADA`): a tabela do design §9 inteira, um teste por linha, mais uma propriedade (3 000 sequências de até 30
+  eventos): entra-se em `DISPENSADA` só por `Dispensou` (vindo de `VISIVEL`), sai-se só por `Necessaria`/`AbaAberta` (e então posta), `SessaoTerminou` sempre leva a `PARADA`.
+  **Decisões onde o design era omisso**: `PARADA` + `Necessaria` → `VISIVEL` e posta (uma entrada que exige o primeiro plano); `PARADA` + `AbaAberta` não posta (a aba nunca inicia
+  o serviço); `DISPENSADA` + `SessaoIniciou` fica `DISPENSADA`. Nada toca o DataStore: dispensar não muda configuração.
+- `PortaoDeToque.avaliar(bloqueada, permitir, precisaDeActivity)`: os quatro casos do design §10; `bloqueada` vem do `KeyguardManager` a cada toque (a T10 injeta).
+- **Mutação**: inverter `bloqueada && !permitir` para `bloqueada && permitir` derruba os três testes do portão.
+
+## Fechamento (T1..T5)
+
+- Gates: `testDebugUnitTest` (notificacao, orbe, `ArchitectureRulesTest`, i18n) verde; `NotificacaoRepositoryTest` 5/5 no emulador; a T1 mede no emulador.
+  Goldens e telas intactos (nada visual mudou). Uma mutação por task, as quatro derrubaram testes e foram revertidas.
+- **Fila do pool**: a T1 esperou 32 min a trava do Gradle do servidor (a AWS automática chegou a 30/30 no dia); os unitários passaram entre uma tentativa e outra.

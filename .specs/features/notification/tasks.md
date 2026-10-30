@@ -89,7 +89,7 @@ T8 depende de T7 (a interface da fonte de orbe).
   **arrastos**: a tabela de `ArrastosDaOrbe` por estado (design §3.1); `BotoesDaNotificacao`: gravando → Pausar·Descartar, pausado → Retomar·Descartar, transcrevendo → só Descartar, cancelando → só Desfazer, Visão → só Encerrar, ocioso/erro/pendente → nenhum; `ABRIR_APP` não gera botão; **o teste falha se um efeito da tabela (exceto `ABRIR_APP`) não produzir botão**.
 - **Tests**: unit (relógio virtual). **Gate**: `quick`. **Commit**: `feat(notificação): contagem de toques e resolução das interações da orbe`.
 
-### NTF-T5 — Visibilidade ("dispensada") e portão da tela bloqueada — **Status: pendente**
+### NTF-T5 — Visibilidade ("dispensada") e portão da tela bloqueada — **Status: concluída (2026-10-30)**
 - **What**: `VisibilidadeDaNotificacao` (`PARADA/VISIVEL/DISPENSADA`, eventos, design §9) e `PortaoDeToque.avaliar(bloqueada, permitir, precisaDeActivity)` (design §10).
 - **Where**: `notificacao/{VisibilidadeDaNotificacao,PortaoDeToque}.kt`; testes homônimos (inclui propriedade).
 - **Depends on**: T2. **Requirement**: NTF-16 (regra, vale para a orbe e para os botões), NTF-18 (regra), NTF-41, NTF-49 (portão dos botões).
