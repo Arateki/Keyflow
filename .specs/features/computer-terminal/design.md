@@ -54,10 +54,10 @@ Requisitos (CMP-NN) e decisões em `spec.md`; tarefas em `tasks.md`. Feature irm
 
 | Peça | Hoje no app | Pede o termlib | Pede o cbssh | Registrado pela CMP-T0 |
 | ---- | ----------- | -------------- | ------------ | ---------------------- |
-| Kotlin | 2.2.10 (embutido no AGP 9.2) | 2.4.21 (0.3.14) | 2.4.21; metadados 2.4.0 de 0.4.0 em diante (2.3.0 até 0.3.1) | _a preencher_ |
-| Compose | BOM 2024.09.03 (Compose 1.7) | BOM 2026.09.00 (runtime 1.11.4, foundation 1.11.2) | — | _a preencher_ |
-| coroutines | 1.8.1 | — | 1.11.0 | _a preencher_ |
-| AGP / Gradle | 9.2.0 / 9.6 (nós) | AGP 9.4.1 | — | _a preencher_ |
+| Kotlin | 2.4.21 (AGP com versão mínima elevada) | 2.4.21 (0.3.14) | 2.4.21; metadados 2.4.0 de 0.4.0 em diante (2.3.0 até 0.3.1) | 2.4.21, incluindo compilador Compose |
+| Compose | BOM 2026.09.00 (UI/runtime/foundation 1.12.1; Material3 1.4.0) | BOM 2026.09.00 (runtime 1.11.4, foundation 1.11.2) | — | BOM 2026.09.00; Activity Compose 1.13.0 |
+| coroutines | 1.11.0 | — | 1.11.0 | 1.11.0 no app e nos testes |
+| AGP / Gradle | 9.2.0 / 9.6.1 | AGP 9.4.1 no projeto upstream (consumo do AAR a validar na T1) | — | 9.2.0 / 9.6.1; JDK 17; compileSdk 37, targetSdk 36 |
 | `minSdk` | 24 | 24 | JVM 17 (+ conserto de Android ≤ 12 na 0.6.5) | 24 (mantido, D4) |
 | Transitivas relevantes | — | slf4j, androidx.core | Ktor 3.6.0, Tink 1.24.0, kstatemachine 0.38.1, kyber 2.1.0, keccak 2.5.1, jbcrypt 1.0.2, slf4j | licenças: a conferir (CMP-T1) |
 

@@ -1,7 +1,7 @@
 # Computador (terminal SSH) — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md`
-**Status**: spec e design em rascunho (2026-10-29), tasks **todas pendentes**. **Fora da v1** (só `main`, release seguinte). Não toma a vez de frente aberta.
+**Status**: spec e design em rascunho (2026-10-29), CMP-T0 verificada; demais tasks pendentes. **Fora da v1** (só `main`, release seguinte). Não toma a vez de frente aberta.
 
 > **Para o agente executor**: leia `spec.md` + `design.md` + este arquivo e `.specs/codebase/TESTING.md`. Uma task por vez, na ordem do plano,
 > testes primeiro, gate verde antes de avançar. Cada task é verificável sozinha. Os textos de UI que ela criar vão com ela (`tr("…")` +
@@ -55,7 +55,13 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
 
 ## Fase 0 — Pré-requisito e spikes
 
-### CMP-T0 — Pré-requisito: o toolchain subiu (frente separada) — **Status: pendente**
+### CMP-T0 — Pré-requisito: o toolchain subiu (frente separada) — **Status: verificada em 2026-10-30**
+
+Portão conferido na base `c1480992`: versões no design §2.1 e [lição](../../project/licoes/2026-10-30-computador-a.md).
+Gates completos do mesmo SHA: [Checks 41073156978](https://github.com/Arateki/Keyflow/actions/runs/41073156978), sete jobs verdes.
+**SPEC_DEVIATION:** as capturas desse CI substituem `pool telas` local, que perdeu o emulador no ADB; 246 PNGs idênticos e
+26 diferenças pequenas já aceitas pelo comparador da base, sem alterar goldens nem limiar. Não é uma afirmação de 272 PNGs bit-idênticos.
+
 - **What**: **não é implementação desta spec.** O Yan decidiu (29/10) atualizar Kotlin/Compose/coroutines em vez de fixar um fork velho; isso é uma frente própria (spike de atualização do toolchain), que também
   destrava o LiteRT-LM. Esta task é o **portão**: confere que a `main` já compila com o que o termlib e o cbssh exigem e registra as versões. Hoje: Kotlin 2.2.10 (embutido no AGP 9.2), Compose BOM 2024.09.03, coroutines 1.8.1;
   o termlib ≥ 0.2.0 pede Compose 1.11 (BOM 2026.05–.09) e Kotlin 2.3.21–2.4.21, o cbssh ≥ 0.4.0 pede metadados Kotlin 2.4.0 e coroutines 1.11.
