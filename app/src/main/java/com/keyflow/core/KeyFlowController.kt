@@ -2,6 +2,7 @@ package com.keyflow.core
 
 import android.util.Log
 import com.keyflow.BuildConfig
+import com.keyflow.fluxos.execucao.EstadoExecucao
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -26,6 +27,14 @@ object KeyFlowController {
     // Estado do botão observado pelo teclado e pelo overlay
     private val _buttonState = MutableStateFlow<ButtonState>(ButtonState.IDLE_NO_FIELD)
     val buttonState: StateFlow<ButtonState> = _buttonState.asStateFlow()
+
+    // Estado do fluxo em execução (FLX-17): o FluxoHost publica o do ExecutorFluxo; a orbe, o teclado e o card leem daqui.
+    private val _fluxo = MutableStateFlow<EstadoExecucao>(EstadoExecucao.Ocioso)
+    val fluxo: StateFlow<EstadoExecucao> = _fluxo.asStateFlow()
+
+    fun updateFluxo(estado: EstadoExecucao) {
+        _fluxo.value = estado
+    }
 
     // Tempo autoritativo de gravação (acumulado + início do segmento, em SystemClock.elapsedRealtime),
     // publicado pelo OverlayCoordinator. O teclado lê daqui ao vivo p/ não dessincronizar com a orbe.

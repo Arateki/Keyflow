@@ -412,7 +412,7 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 | FLX-14 | P1-C | FLX-T1, FLX-T18 | Implementing (T1 feita) |
 | FLX-15 | P1-C | FLX-T1, FLX-T18 | Implementing (T1 feita) |
 | FLX-16 | P1-C | FLX-T18 | Pending |
-| FLX-17 | P1-D | FLX-T6, FLX-T14, FLX-T25 | Pending |
+| FLX-17 | P1-D | FLX-T6, FLX-T14, FLX-T25 | Implementing (T6 feita) |
 | FLX-18 | P1-D | FLX-T11 | Pending |
 | FLX-19 | P1-D | FLX-T12, FLX-T14, FLX-T25 | Pending |
 | FLX-20 | P1-D | FLX-T10 | Pending |
@@ -422,11 +422,11 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 | FLX-24 | P1-D | FLX-T13, FLX-T25 | Pending |
 | FLX-25 | P1-D | FLX-T13 | Pending |
 | FLX-26 | P1-D | FLX-T7, FLX-T9 | Pending |
-| FLX-27 | P1-D | FLX-T6, FLX-T14, FLX-T25 | Pending |
-| FLX-28 | P1-D | FLX-T6, FLX-T14 | Pending |
-| FLX-29 | P1-D | FLX-T6, FLX-T14, FLX-T25 | Pending |
+| FLX-27 | P1-D | FLX-T6, FLX-T14, FLX-T25 | Implementing (T6 feita) |
+| FLX-28 | P1-D | FLX-T6, FLX-T14 | Implementing (T6 feita) |
+| FLX-29 | P1-D | FLX-T6, FLX-T14, FLX-T25 | Implementing (T6 feita) |
 | FLX-30 | P1-D | FLX-T7, FLX-T17 | Pending |
-| FLX-31 | P1-D | FLX-T6 | Pending |
+| FLX-31 | P1-D | FLX-T6 | Implementing (T6 feita) |
 | FLX-32 | P1-D | FLX-T14, FLX-T16 | Pending |
 | FLX-33 | P1-E | FLX-T1, FLX-T2, FLX-T5 | Implementing (T1, T2, T5 feitas) |
 | FLX-34 | P1-E | FLX-T5, FLX-T15, FLX-T25 | Implementing (T5 feita) |
@@ -447,7 +447,7 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 | FLX-49 | P1-G | FLX-T4, FLX-T14 | Implementing (T4 feita) |
 | FLX-50 | P1-G | FLX-T4, FLX-T5 | Implementing (T4, T5 feitas) |
 | FLX-51 | P2-H | FLX-T17..T21 (cada uma traz os seus textos) | Pending |
-| FLX-52 | P2-H | FLX-T1, FLX-T6, FLX-T10 | Implementing (T1 feita) |
+| FLX-52 | P2-H | FLX-T1, FLX-T6, FLX-T10 | Implementing (T1, T6 feitas) |
 | FLX-53 | P2-H | FLX-T23 | Pending |
 | FLX-54 | P2-H | FLX-T17, FLX-T18 | Pending |
 | FLX-55 | P2-H | FLX-T24 | Pending |

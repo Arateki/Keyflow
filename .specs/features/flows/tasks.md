@@ -111,7 +111,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 
 ## Fase B — Executor (JVM puro, portas falsas)
 
-### FLX-T6 — Executor, estados, erros e tempos — **Status: pendente**
+### FLX-T6 — Executor, estados, erros e tempos — **Status: feita**
 - **What**: `Valor`, `ImagemHandle`, `ResultadoEtapa`, `ErroEtapa`/`CausaErro`/`DestinoAba`, `EstadoExecucao`, as interfaces das portas (`Portas`), `Limites` (Perguntar/Visão 180 s; Falar/Agente 10 min) e `ExecutorFluxo`
   (laço, um por vez, falha para sem parcial, cancelar, `finally` que libera imagem/player). `KeyFlowController.fluxo: StateFlow<EstadoExecucao>`.
 - **Where**: `fluxos/execucao/*.kt`, `core/KeyFlowController.kt`; teste `ExecutorFluxoTest` (portas falsas, `TestCoroutineScheduler`). Regra de arquitetura: `fluxos/execucao` sem `android.*`/downloader/cofre (`fluxos/app/**` fora da regra).
@@ -119,6 +119,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 - **Done when**: unit — "Ditar → Perguntar → Falar" passa o texto de uma porta à outra; `Falha` na etapa 2 impede a 3 e deixa `Falhou(indice = 1)` com a causa; `Cancelada` → `Cancelado`; segundo `executar` durante um em curso é recusado e não cancela o
   primeiro; estouro de tempo → `Falha(TEMPO)` com relógio virtual; `Valor.Imagem` é liberada em sucesso, falha e cancelamento; cancelar a `Job` cancela a porta em curso; `Concluido` volta a `Ocioso`.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(fluxos): executor de etapas com portas`.
+- **Registro (Fase A)**: Em `fluxos/execucao/{Portas,EstadoExecucao,Limites,ExecutorFluxo}.kt`. `PortaEtapa.executar(etapa, entrada)` recebe a etapa inteira (modelo, instrução, sistema) e `Portas.para(tipo)` devolve a porta (nulo = esta versão não executa o tipo). `executar` devolve `ResultadoExecucao` (`Recusado` | `Terminou(estado)`); `Concluido` volta a `Ocioso`, mas `Falhou` e `Cancelado` ficam visíveis até a próxima execução. Cancelar é `cancelar()` ou cancelar a coroutine de quem executa (a porta coopera). O executor guarda os tipos (entrada e saída de cada etapa) e libera a imagem exatamente uma vez. Sem `Relogio`: o prazo é o `withTimeout` da coroutine, virtual nos testes. `KeyFlowController.fluxo` + `updateFluxo(estado)` (o `FluxoHost` da T14 publica o estado do executor). Mensagens de tempo, memória e motor genérico em `tr`.
 
 ### FLX-T7 — Modelo da etapa sem copiar segredo + selo de privacidade — **Status: pendente**
 - **What**: `ModeloPorEtapa.aplicar(settings, etapa) → Settings` (tabela do design §8) e `efetivo(settings, etapa) → Efetivo` (origem, modelo, `NoAparelho | Nuvem(provedor)`), mais `seloDoFluxo(...)` ("100% no aparelho" / lista de provedores).

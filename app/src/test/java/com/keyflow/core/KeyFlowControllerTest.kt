@@ -1,6 +1,9 @@
 package com.keyflow.core
 
 import com.google.common.truth.Truth.assertThat
+import com.keyflow.fluxos.TipoEtapa
+import com.keyflow.fluxos.execucao.EstadoExecucao
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
 
@@ -13,6 +16,23 @@ class KeyFlowControllerTest {
         KeyFlowController.registerInserter { true }
         KeyFlowController.flushPending()
         KeyFlowController.clearInserter()
+    }
+
+    @After
+    fun resetFluxo() {
+        KeyFlowController.updateFluxo(EstadoExecucao.Ocioso)
+    }
+
+    @Test
+    fun `fluxo starts idle and follows the state the host publishes`() {
+        assertThat(KeyFlowController.fluxo.value).isEqualTo(EstadoExecucao.Ocioso)
+
+        val rodando = EstadoExecucao.Rodando("f1", 1, TipoEtapa.PERGUNTAR)
+        KeyFlowController.updateFluxo(rodando)
+        assertThat(KeyFlowController.fluxo.value).isEqualTo(rodando)
+
+        KeyFlowController.updateFluxo(EstadoExecucao.Cancelado("f1", 1))
+        assertThat(KeyFlowController.fluxo.value).isEqualTo(EstadoExecucao.Cancelado("f1", 1))
     }
 
     @Test
