@@ -135,12 +135,13 @@ class KeyFlowKeyboardService : InputMethodService() {
     /** Fecha a janela de verdade; o retorno só restaura um teclado que estava visível. */
     private fun hideKeyboardForVision(): (() -> Unit)? {
         if (visionKeyboardDestroyed) return null
-        if (visionKeyboardHidden) { hideWindow(); return null }
+        if (visionKeyboardHidden) { requestHideSelf(0); return null }
         if (!KeyFlowController.keyboardVisible.value || keyboardView == null) return null
         val info = currentInputEditorInfo ?: return null
         val editor = CaptureEditor(info.packageName, info.fieldId, info.inputType)
         visionKeyboardHidden = true
-        try { hideWindow() } catch (error: RuntimeException) { visionKeyboardHidden = false; throw error }
+        // A janela controlada por insets precisa do pedido ao sistema; hideWindow só altera o estado local.
+        try { requestHideSelf(0) } catch (error: RuntimeException) { visionKeyboardHidden = false; throw error }
         var restored = false
         return {
             if (!restored) {
@@ -320,7 +321,7 @@ class KeyFlowKeyboardService : InputMethodService() {
     override fun onWindowShown() {
         super.onWindowShown()
         if (visionKeyboardHidden) {
-            mainHandler.post { if (visionKeyboardHidden) hideWindow() }
+            mainHandler.post { if (visionKeyboardHidden) requestHideSelf(0) }
             return
         }
         visionEditorToRestore = null

@@ -32,3 +32,9 @@ Uma instância AWS nova instalou realmente SDK 37.0 e iniciou com KVM/swangle. A
 A referência anterior é a main `b610bb95`, com o mesmo código de funcionalidades integrado nesta branch: release ARM minificado de **80.250.656 bytes**, build de 14min40s. A comparação final, o smoke e o CI do commit entregue são registrados no [PR #80](https://github.com/Arateki/Keyflow/pull/80) e em `.equipe/relatorios/toolchain-pr.md`, com evidências locais em `.equipe/provas/toolchain-pr/`.
 
 A [matriz oficial de Kotlin/D8/R8](https://developer.android.com/build/kotlin-support) pede R8 9.1.29 ou posterior para Kotlin 2.4. O release no CI valida a combinação mantida com AGP 9.2.0; não foi necessário desativar minificação nem trocar o runtime LiteRT-LM.
+
+## Ocultação real do teclado exposta pela atualização
+
+A rodada verde `40998773093` recuperou um teste por repetição, mas o diagnóstico mostrou defeito real: em `ocultação false`, o controller estava `false` e a view permanecia `window=0, shown=true, attached=true`. `hideWindow()` atualiza a visibilidade interna do InputMethodService; em Android com controle por insets, a visibilidade física depende também do sistema de entrada. O código usa agora [`requestHideSelf(0)`](https://developer.android.com/reference/android/inputmethodservice/InputMethodService#requestHideSelf(int)) nos três caminhos de ocultação para informar o sistema e sincronizar a janela. A restauração continua condicionada ao editor original. Os testes continuam observando a janela real e dois quadros entregues, com os prazos originais.
+
+A galeria local concluiu 272 capturas; uma ficou coberta pelo aviso Android “Data warning — You have used 2.54 GB of data”. Depois de recapturar pelo pool com nova instalação, as 272 são bit a bit idênticas às do CI. O golden original do orbe foi preservado. Capturas e comparador não tiveram limiar relaxado.
