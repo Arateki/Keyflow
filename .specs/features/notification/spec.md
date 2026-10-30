@@ -311,11 +311,11 @@ Respondidas por ele em 29/10, 22:20 (viraram decisões): **Q1** (pausar/cancelar
 | NTF-04 | P1-A | NTF-T13 | Pending |
 | NTF-05 | P1-B | NTF-T1, NTF-T9 | Implementing (T1: emulador medido, cabe; aparelhos pendentes) |
 | NTF-06 | P1-B | NTF-T1, NTF-T9, NTF-T14 | Implementing (T1: emulador medido, cabe; aparelhos pendentes) |
-| NTF-07 | P1-B | NTF-T4, NTF-T9 | Pending |
+| NTF-07 | P1-B | NTF-T4, NTF-T9 | Implementing (feitas: T4) |
 | NTF-08 | P1-B | NTF-T2 | Verified |
-| NTF-09 | P1-B | NTF-T4, NTF-T10 | Pending |
-| NTF-10 | P1-B | NTF-T2, NTF-T3, NTF-T4, NTF-T10, NTF-T12 | Implementing (feitas: T3) |
-| NTF-11 | P1-B | NTF-T4, NTF-T10, NTF-T12, NTF-T20 | Pending |
+| NTF-09 | P1-B | NTF-T4, NTF-T10 | Implementing (feitas: T4) |
+| NTF-10 | P1-B | NTF-T2, NTF-T3, NTF-T4, NTF-T10, NTF-T12 | Implementing (feitas: T4) |
+| NTF-11 | P1-B | NTF-T4, NTF-T10, NTF-T12, NTF-T20 | Implementing (feitas: T4) |
 | NTF-12 | P1-B | NTF-T2, NTF-T12 | Implementing (feitas: T2) |
 | NTF-13 | P1-B | NTF-T9 | Pending |
 | NTF-14 | P1-B | NTF-T10 | Pending |
@@ -345,14 +345,14 @@ Respondidas por ele em 29/10, 22:20 (viraram decisões): **Q1** (pausar/cancelar
 | NTF-38 | P1-G | NTF-T3, NTF-T10 | Implementing (feitas: T3) |
 | NTF-39 | P1-H | NTF-T2, NTF-T3, NTF-T20 | Implementing (feitas: T3) |
 | NTF-40 | P2-I | NTF-T12, NTF-T13 (cada uma traz os seus textos) | Pending |
-| NTF-41 | P2-I | NTF-T2, NTF-T4, NTF-T5 | Implementing (feitas: T2) |
+| NTF-41 | P2-I | NTF-T2, NTF-T4, NTF-T5 | Implementing (feitas: T4) |
 | NTF-42 | P2-I | NTF-T11 | Pending |
 | NTF-43 | P2-I | NTF-T1, NTF-T14, NTF-T18 | Implementing (T1: emulador medido, cabe; aparelhos pendentes) |
 | NTF-44 | P2-I | NTF-T15 | Pending |
 | NTF-45 | P2-I | NTF-T9, NTF-T12 | Pending |
 | NTF-46 | P2-I | NTF-T16 | Pending |
 | NTF-47 | P2-I | NTF-T19 | Pending |
-| NTF-48 | P1-I | NTF-T4, NTF-T9, NTF-T10 | Pending |
+| NTF-48 | P1-I | NTF-T4, NTF-T9, NTF-T10 | Implementing (feitas: T4) |
 | NTF-49 | P1-I | NTF-T5, NTF-T10, NTF-T14 | Pending |
 | NTF-50 | P1-I | NTF-T1, NTF-T9, NTF-T14 | Implementing (T1: emulador medido, cabe; aparelhos pendentes) |
 

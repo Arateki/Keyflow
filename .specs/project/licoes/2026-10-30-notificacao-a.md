@@ -58,3 +58,17 @@ tela ou agrupada) — o Yan confere nos aparelhos como a notificação convive c
   concorrentes ficam ambas; salvar as `Settings` não toca a chave e vice-versa.
 - Unit: 9 exemplos, 2 de propriedade (3 000 round-trips) e 2 de fuzz (10 000 entradas, mutadas e arbitrárias) — nunca lança.
 - **Mutação**: `none` decodificado como `GravarEnviar` derruba 4 testes (exemplos e propriedade).
+
+## NTF-T4 — Rajada, resolução e estado visual
+
+- `orbe/ArrastosDaOrbe.kt` (a tabela dos arrastos da flutuante em Alternar, por estado) e `notificacao/BotoesDaNotificacao.kt` (deriva os botões:
+  cima → esquerda, lado → direita, `ABRIR_APP` sem botão; acréscimos `CANCELLING` → Desfazer e Visão → Encerrar). `BotoesDaNotificacaoTest` percorre
+  todos os `ButtonState` e falha se um efeito da tabela, exceto `ABRIR_APP`, não produzir botão.
+- `RajadaDeToques` da notificação tem relógio injetável (`toque`, `faltaMs`, `assentou`, `fechar`): a janela reinicia a cada toque e a rajada fecha uma vez.
+  (A `RajadaDeToques` de `com.keyflow.orbe` continua a da orbe do teclado; são pacotes diferentes.)
+- `resolver(...)` segue o design §5. **Desvio**: o parâmetro `fluxos` é um gancho `(toques) -> ResolucaoDeFluxo?` e não um valor único, porque no overflow o
+  `n` muda (3 ou 2) e cada um tem o seu gatilho. No overflow, ações inertes (`Nenhuma`, `RodarFluxo`, `Desconhecida`) sem fluxo são puladas.
+- `EstadoVisualDaNotificacao`: aparência, glifo, cronômetro e **chaves** de descrição (`trKey`); a frase de ação ("Toque para gravar/enviar/encerrar") só
+  entra se algum toque grava (`iniciaGravacao`), nunca prometendo o que o toque não faz. Teste nos três idiomas.
+- **Fica para a integração (T9/T10)**: `ArrastosDaOrbeConformidadeTest` (instrumentado, arrasta a `OrbButtonView` real e compara com a tabela).
+- **Mutação**: tirar o portão da Visão do `resolver` (`if (false)`) derruba "com a Visão ativa só GravarEnviar age".

@@ -81,7 +81,7 @@ T8 depende de T7 (a interface da fonte de orbe).
   instrumentado — leitura sem chave **não grava**; primeira alteração grava; duas alterações concorrentes ficam ambas; salvar as `Settings` **não** toca a chave e vice-versa.
 - **Tests**: unit + instrumentado. **Gate**: `quick` + `pool instrumentar com.keyflow.data.NotificacaoRepositoryTest`. **Commit**: `feat(notificação): configuração persistida em JSON tolerante`.
 
-### NTF-T4 — Rajada de toques, resolução da interação e estado visual — **Status: pendente**
+### NTF-T4 — Rajada de toques, resolução da interação e estado visual — **Status: concluída (2026-10-30)**
 - **What**: `RajadaDeToques` (`toque()`, `fechar()`), `ResolvedorDeInteracao.resolver(...) → Comando` (design §5, inclusive overflow e portões de estado), `EstadoVisual` (`ButtonState` + Visão → aparência, centro, glifo, descrição `tr`; design §6) e a **regra dos arrastos** (design §3.1): `orbe/ArrastosDaOrbe.kt` (a tabela por estado em Alternar) e `notificacao/BotoesDaNotificacao.kt` (`Botao`, `Botoes`, `para(estado, visaoAtiva)`).
 - **Where**: `notificacao/{RajadaDeToques,ResolvedorDeInteracao,EstadoVisual,BotoesDaNotificacao}.kt`, `orbe/ArrastosDaOrbe.kt`; testes homônimos (`ArrastosDaOrbeTest`, `BotoesDaNotificacaoTest`).
 - **Depends on**: T2. **Requirement**: NTF-07, NTF-09, NTF-10, NTF-11, NTF-48.
