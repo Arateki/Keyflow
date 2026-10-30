@@ -11,4 +11,6 @@ Aprovada pelo Yan em 30/10/2026: Kotlin e compilador Compose 2.4.21, Compose BOM
 - O Yan autorizou explicitamente esses 16 goldens em 30/10, condicionado à conferência com o APK integrado. A aprovação deve preservar todos os demais SHA-256.
 - SPEC_DEVIATION de documentação: a tarefa pede registrar lição no STATE.md, enquanto a convenção atual guarda lições em arquivos separados. O STATE recebe somente um apontador; os detalhes ficam aqui para evitar conflitos.
 
+O primeiro CI (`40995211406`) falhou no provisionamento antes dos APKs: `sdkmanager` não estava no PATH do runner. Os seis jobs de device pararam por falta do artefato, sem executar testes. A correção chama `$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager` diretamente.
+
 Validação de release, números finais e CI serão registrados após as execuções.
