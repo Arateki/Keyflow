@@ -353,7 +353,7 @@ class PortasAndroidTest {
         val copiados = mutableListOf<String>()
         val inseridos = mutableListOf<String>()
         var resultado: InsertOutcome = InsertOutcome.Held
-        val porta = PortaInserir({ inseridos += it; resultado }, { copiados += it })
+        val porta = PortaInserir({ inseridos += it; resultado }, { copiados += it }, kotlinx.coroutines.Dispatchers.Unconfined)
         assertThat(ok(porta.executar(Etapa.Inserir, texto("abc")))).isEqualTo(texto("abc"))
         assertThat(copiados).containsExactly("abc")
         resultado = InsertOutcome.Inserted

@@ -4,6 +4,8 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.os.Looper
+import android.os.SystemClock
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -17,6 +19,8 @@ import com.keyflow.fluxos.execucao.DestinoAba
 import com.keyflow.fluxos.execucao.ResultadoEtapa
 import com.keyflow.fluxos.execucao.Valor
 import com.keyflow.ui.gallery.GalleryActivity
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -48,11 +52,27 @@ class PortasAndroidInstrumentedTest {
 
     @After
     fun tearDown() {
-        instrumentation.runOnMainSync { KeyFlowController.clearInserter() }
+        instrumentation.runOnMainSync {
+            KeyFlowController.clearInserter()
+            KeyFlowController.autoPasteInField = true
+            KeyFlowController.autoPasteOnFocus = false
+        }
         scenario.close()
     }
 
+    private fun aguardarFoco() {
+        val limite = SystemClock.uptimeMillis() + 15_000
+        do {
+            var focada = false
+            scenario.onActivity { focada = it.hasWindowFocus() }
+            if (focada) return
+            SystemClock.sleep(25)
+        } while (SystemClock.uptimeMillis() < limite)
+        throw AssertionError("A janela da Activity não recebeu foco para ler a área de transferência")
+    }
+
     private fun clip(): String? {
+        aguardarFoco()
         var texto: String? = null
         instrumentation.runOnMainSync {
             texto = context.getSystemService(ClipboardManager::class.java).primaryClip?.getItemAt(0)?.text?.toString()
@@ -65,6 +85,20 @@ class PortasAndroidInstrumentedTest {
     }
 
     private fun portas() = MontagemDasPortas.base(context)
+
+    @Test
+    fun inserirVoltaParaMainQuandoChamadoForaDela() = runBlocking {
+        instrumentation.runOnMainSync {
+            KeyFlowController.registerInserter {
+                assertEquals("insertOrHold deve rodar na main", Looper.getMainLooper(), Looper.myLooper())
+                true
+            }
+        }
+        val resultado = withContext(Dispatchers.Default) {
+            portas().getValue(TipoEtapa.INSERIR).executar(Etapa.Inserir, Valor.Texto("texto"))
+        }
+        assertTrue(resultado is ResultadoEtapa.Ok)
+    }
 
     @Test
     fun theBasePortsCoverTheFourEnginelessSteps() {

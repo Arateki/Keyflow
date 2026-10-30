@@ -29,6 +29,9 @@ import com.keyflow.speech.SpeechRequest
 import com.keyflow.vision.VisionModelEngine
 import com.keyflow.vision.VisionResolution
 import com.keyflow.vision.VisionResult
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.firstOrNull
 
 /** As portas por tipo de etapa. Um tipo ausente do mapa é "esta versão não executa" (o executor falha com `MOTOR`). */
@@ -167,10 +170,13 @@ class PortaFalar(
 class PortaInserir(
     private val inserir: (String) -> InsertOutcome,
     private val copiar: (String) -> Unit,
+    private val main: CoroutineDispatcher = Dispatchers.Main.immediate,
 ) : PortaEtapa {
     override suspend fun executar(etapa: Etapa, entrada: Valor): ResultadoEtapa<Valor> {
         val texto = entrada.textoOuNulo() ?: return ResultadoEtapa.Falha(ErrosDeFluxo.motor())
-        if (inserir(texto) == InsertOutcome.Held) copiar(texto)
+        withContext(main) {
+            if (inserir(texto) == InsertOutcome.Held) copiar(texto)
+        }
         return ResultadoEtapa.Ok(Valor.Texto(texto))
     }
 }
