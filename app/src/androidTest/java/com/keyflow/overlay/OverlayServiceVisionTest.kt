@@ -87,6 +87,20 @@ class OverlayServiceVisionTest {
         val context = instrumentation.targetContext
         val device = UiDevice.getInstance(instrumentation)
         val userSettings = com.keyflow.ime.UserSettingsGuard(context)
+        fun imeState(): String {
+            var state = ""
+            instrumentation.runOnMainSync {
+                val view = com.keyflow.ime.KeyFlowKeyboardService.activeViewForTest
+                state = "controller=${KeyFlowController.keyboardVisible.value}, window=${view?.windowVisibility}, shown=${view?.isShown}, attached=${view?.isAttachedToWindow}"
+            }
+            return state
+        }
+        suspend fun awaitKeyboard(visible: Boolean, stage: String, timeoutMs: Long = 10_000) {
+            try { withTimeout(timeoutMs) { KeyFlowController.keyboardVisible.first { it == visible } } }
+            catch (error: kotlinx.coroutines.TimeoutCancellationException) {
+                throw AssertionError("IME não mudou o controller para $visible em $stage: ${imeState()}", error)
+            }
+        }
         suspend fun awaitWindow(visible: Boolean, stage: String) {
             val ready = kotlinx.coroutines.CompletableDeferred<Unit>()
             var observer: android.view.ViewTreeObserver? = null
@@ -99,7 +113,10 @@ class OverlayServiceVisionTest {
                 observer!!.addOnWindowVisibilityChangeListener(listener)
                 if ((view.windowVisibility == android.view.View.VISIBLE) == visible) ready.complete(Unit)
             }
-            try { withTimeout(10_000) { ready.await() } } finally {
+            try { withTimeout(10_000) { ready.await() } }
+            catch (error: kotlinx.coroutines.TimeoutCancellationException) {
+                throw AssertionError("Janela do IME não mudou para $visible em $stage: ${imeState()}", error)
+            } finally {
                 instrumentation.runOnMainSync {
                     observer?.takeIf { it.isAlive }?.removeOnWindowVisibilityChangeListener(listener)
                 }
@@ -153,7 +170,7 @@ class OverlayServiceVisionTest {
                     assertEquals("ime_probe_field", field?.contentDescription)
                     assertTrue(field!!.requestFocus())
                 }
-                withTimeout(15_000) { KeyFlowController.keyboardVisible.first { it } }
+                awaitKeyboard(true, "abertura inicial", 15_000)
                 awaitWindow(true, "abertura inicial")
                 screenshot("VISIVEL")
                 for (failClose in listOf(false, true)) {
@@ -161,26 +178,26 @@ class OverlayServiceVisionTest {
                         { throw SecurityException("falha ao fechar projeção") }
                     } else null
                     instrumentation.runOnMainSync { service.hideVisionViews(emptyList()) }
-                    withTimeout(10_000) { KeyFlowController.keyboardVisible.first { !it } }
+                    awaitKeyboard(false, "ocultação $failClose")
                     awaitWindow(false, "ocultação $failClose")
                     if (!failClose) screenshot("OCULTO")
                     instrumentation.runOnMainSync { service.cleanupVision() }
-                    withTimeout(10_000) { KeyFlowController.keyboardVisible.first { it } }
+                    awaitKeyboard(true, "restauração da limpeza $failClose")
                     awaitWindow(true, "restauração da limpeza $failClose")
                 }
                 OverlayService.visionSessionCloseForTest = null
                 OverlayService.start(context, OverlayService.actionIntent(context, OverlayService.ACTION_VISION))
                 val deny = device.wait(Until.findObject(By.text(Pattern.compile("(?i)cancel|cancelar"))), 15_000)
                 assertNotNull("consentimento não apareceu com o editor aberto", deny)
-                withTimeout(10_000) { KeyFlowController.keyboardVisible.first { !it } }
+                awaitKeyboard(false, "consentimento")
                 deny!!.click()
                 withTimeout(15_000) { OverlayService.visionFlowStateForTest.first { it == VisionFlowState.NONE } }
-                withTimeout(15_000) { KeyFlowController.keyboardVisible.first { it } }
+                awaitKeyboard(true, "restauração após negação", 15_000)
                 awaitWindow(true, "restauração após negação")
                 screenshot("RESTAURADO")
                 assertEquals(ButtonState.PAUSED, KeyFlowController.buttonState.value)
                 device.pressBack()
-                withTimeout(10_000) { KeyFlowController.keyboardVisible.first { !it } }
+                awaitKeyboard(false, "ocultação por voltar")
                 awaitWindow(false, "ocultação por voltar")
                 instrumentation.runOnMainSync {
                     val restore = KeyFlowController.hideKeyboardForCapture()
