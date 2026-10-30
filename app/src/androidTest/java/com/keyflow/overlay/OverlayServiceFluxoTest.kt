@@ -13,6 +13,9 @@ import com.keyflow.ComposeSmokeActivity
 import com.keyflow.core.ButtonState
 import com.keyflow.core.KeyFlowController
 import com.keyflow.core.RecordingMode
+import com.keyflow.core.OrbShortcutAction
+import com.keyflow.core.ShortcutOverflow
+import com.keyflow.orbe.LugarDaOrbe
 import com.keyflow.data.SettingsRepository
 import com.keyflow.fluxos.ConfigFluxos
 import com.keyflow.fluxos.Etapa
@@ -34,6 +37,10 @@ import com.keyflow.fluxos.execucao.Valor
 import com.keyflow.ui.onboarding.DISCLOSURE_VERSION
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -224,6 +231,7 @@ class OverlayServiceFluxoTest {
             assertNotNull("toque no banner não abriu a configuração", activity)
             assertEquals("RACIOCINIO", activity!!.intent.getStringExtra("com.keyflow.config_tab"))
             instrumentation.runOnMainSync { activity.finish() }
+            aguardar("a configuração aberta pelo banner não fechou") { activity.isDestroyed }
         } finally { instrumentation.removeMonitor(monitor) }
     }
 
@@ -238,10 +246,13 @@ class OverlayServiceFluxoTest {
         val service = checkNotNull(OverlayService.instanceForVisionTest)
         val estadoAntes = KeyFlowController.buttonState.value
         instrumentation.runOnMainSync { assertEquals(TipoEtapa.PERGUNTAR, service.orbeForTest!!.fluxoEtapaForTest) }
+        val device = UiDevice.getInstance(instrumentation)
+        assertTrue("glifo da etapa não ficou acessível na orbe", device.wait(Until.hasObject(By.desc(tr("Perguntar"))), 15_000))
         instrumentation.runOnMainSync { service.handleOrbIntent(GestureIntent.START) }
         withTimeout(15_000) { cancelou.await() }
         aguardar("cancelamento não chegou ao controlador") { KeyFlowController.fluxo.value is EstadoExecucao.Cancelado }
         instrumentation.runOnMainSync { assertNull(service.orbeForTest!!.fluxoEtapaForTest) }
+        assertTrue("glifo não sumiu ao cancelar", device.wait(Until.gone(By.desc(tr("Perguntar"))), 15_000))
         assertEquals(estadoAntes, KeyFlowController.buttonState.value)
     }
 
@@ -286,6 +297,95 @@ class OverlayServiceFluxoTest {
         disparar(manual = true)
         aguardar("novo disparo não usou o fluxo salvo") { chamadas.size == 5 }
         assertEquals(listOf(TipoEtapa.DITAR, TipoEtapa.PERGUNTAR, TipoEtapa.INSERIR, TipoEtapa.DITAR, TipoEtapa.FALAR), chamadas.toList())
+    }
+
+
+    private suspend fun servicoParaGestos(config: ConfigFluxos): OverlayService {
+        repo.saveSettings(settings.copy(overlayModeEnabled = false, overlayRecordingMode = RecordingMode.TOGGLE,
+            shortcut2Tap = OrbShortcutAction.TOGGLE_KEYBOARD, shortcut3Tap = OrbShortcutAction.SWITCH_IME,
+            shortcutOverflow = ShortcutOverflow.NEAREST_DOWN))
+        OverlayService.start(context, OverlayService.startOverlayIntent(context))
+        aguardar("orbe não apareceu") { OverlayService.isRunningForUi }
+        val service = checkNotNull(OverlayService.instanceForVisionTest)
+        aguardar("configuração dos gestos não chegou") {
+            service.configFluxosForTest == config &&
+                service.settingsForTest.shortcut2Tap == OrbShortcutAction.TOGGLE_KEYBOARD &&
+                service.settingsForTest.shortcut3Tap == OrbShortcutAction.SWITCH_IME &&
+                service.settingsForTest.shortcutOverflow == ShortcutOverflow.NEAREST_DOWN
+        }
+        return service
+    }
+
+    private suspend fun comContadorDeExpansao(bloco: suspend (java.util.concurrent.atomic.AtomicInteger) -> Unit) = coroutineScope {
+        val antes = KeyFlowController.keyboardVisible.value
+        instrumentation.runOnMainSync { KeyFlowController.setKeyboardVisible(true) }
+        val contador = java.util.concurrent.atomic.AtomicInteger()
+        val coleta = launch(start = CoroutineStart.UNDISPATCHED) { KeyFlowController.toggleKeyboardExpand.collect { contador.incrementAndGet() } }
+        try { bloco(contador) } finally {
+            coleta.cancel()
+            instrumentation.runOnMainSync { KeyFlowController.setKeyboardVisible(antes) }
+        }
+    }
+
+    @Test fun doisToquesRodamFluxoSemAlternarExpansao() = runBlocking {
+        val config = repo.atualizarFluxos { it.copy(gatilhos = it.gatilhos + Gatilho(Superficie.Orbe(LugarDaOrbe.FLUTUANTE, 2), fluxo.id)) }
+        val service = servicoParaGestos(config)
+        comContadorDeExpansao { contador ->
+            instrumentation.runOnMainSync { service.handleOrbShortcut(2) }
+            aguardar("dois toques não executaram o fluxo") { chamadas.size == 3 }
+            yield()
+            assertEquals(0, contador.get())
+            assertEquals(OrbShortcutAction.TOGGLE_KEYBOARD, repo.settingsFlow().first().shortcut2Tap)
+            val desligada = repo.atualizarFluxos { atual ->
+                atual.copy(gatilhos = atual.gatilhos.filterNot { it.superficie == Superficie.Orbe(LugarDaOrbe.FLUTUANTE, 2) })
+            }
+            aguardar("desligar o gatilho não chegou ao serviço") { service.configFluxosForTest == desligada }
+            instrumentation.runOnMainSync { service.handleOrbShortcut(2) }
+            aguardar("desligar o fluxo não devolveu a ação anterior") { contador.get() == 1 }
+            assertEquals(3, chamadas.size)
+        }
+        assertTrue(avisos.isEmpty())
+    }
+
+    @Test fun tresToquesRodamFluxo() = runBlocking {
+        val config = repo.atualizarFluxos { it.copy(gatilhos = it.gatilhos + Gatilho(Superficie.Orbe(LugarDaOrbe.FLUTUANTE, 3), fluxo.id)) }
+        val service = servicoParaGestos(config)
+        instrumentation.runOnMainSync { service.handleOrbShortcut(3) }
+        aguardar("três toques não executaram o fluxo") { chamadas.size == 3 }
+        assertTrue(avisos.isEmpty())
+    }
+
+    @Test fun semGatilhoDoisToquesPreservamAAcaoAnterior() = runBlocking {
+        val service = servicoParaGestos(repo.configFluxosOnce())
+        comContadorDeExpansao { contador ->
+            instrumentation.runOnMainSync { service.handleOrbShortcut(2) }
+            aguardar("ação de expansão não foi preservada") { contador.get() == 1 }
+            assertTrue(chamadas.isEmpty())
+        }
+    }
+
+    @Test fun quatroToquesComNearestDownRodamOFluxoDoTres() = runBlocking {
+        val terceiro = Fluxo("f-tres", "Três toques", etapas = listOf(Etapa.Ditar(), Etapa.Falar()))
+        val config = repo.atualizarFluxos { it.copy(fluxos = it.fluxos + terceiro, gatilhos = it.gatilhos + listOf(
+            Gatilho(Superficie.Orbe(LugarDaOrbe.FLUTUANTE, 2), fluxo.id),
+            Gatilho(Superficie.Orbe(LugarDaOrbe.FLUTUANTE, 3), terceiro.id))) }
+        val service = servicoParaGestos(config)
+        instrumentation.runOnMainSync { service.handleOrbShortcut(4) }
+        aguardar("overflow não executou o fluxo do três") { chamadas.size == 2 }
+        assertEquals(listOf(TipoEtapa.DITAR, TipoEtapa.FALAR), chamadas.toList())
+    }
+
+    @Test fun fluxoInvalidoAvisaSemRodarAAcaoSombreada() = runBlocking {
+        val config = repo.atualizarFluxos { it.copy(fluxos = listOf(fluxo.copy(etapas = listOf(Etapa.Perguntar()))),
+            gatilhos = it.gatilhos + Gatilho(Superficie.Orbe(LugarDaOrbe.FLUTUANTE, 2), fluxo.id)) }
+        val service = servicoParaGestos(config)
+        comContadorDeExpansao { contador ->
+            instrumentation.runOnMainSync { service.handleOrbShortcut(2) }
+            aguardar("fluxo incompleto não avisou") { avisos.contains(tr("Fluxo incompleto: abra a aba Fluxos")) }
+            yield()
+            assertEquals(0, contador.get())
+            assertTrue(chamadas.isEmpty())
+        }
     }
 
 }

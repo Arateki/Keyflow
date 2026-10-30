@@ -432,12 +432,12 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 | FLX-31 | P1-D | FLX-T6 | Implementing (T6 feita) |
 | FLX-32 | P1-D | FLX-T14, FLX-T16 | Verified (T14 e T16; glifo, cancelamento e botão) |
 | FLX-33 | P1-E | FLX-T1, FLX-T2, FLX-T5 | Implementing (T1, T2, T5 feitas) |
-| FLX-34 | P1-E | FLX-T5, FLX-T15, FLX-T25 | Implementing (T5 feita) |
+| FLX-34 | P1-E | FLX-T5, FLX-T15, FLX-T25 | Implementing (T5 e T15 feitas; 2/3/overflow instrumentados) |
 | FLX-35 | P1-E | FLX-T5, FLX-T20, FLX-T21, FLX-T28 | Implementing (T5 feita) |
 | FLX-36 | P1-E | FLX-T16, FLX-T20 | Implementing (T16 feita; o disparo é da T14) |
 | FLX-37 | P1-E | FLX-T5, FLX-T20 | Implementing (T5 feita) |
 | FLX-38 | P1-E | FLX-T5, FLX-T20 | Implementing (T5 feita) |
-| FLX-39 | P1-E | FLX-T14, FLX-T15, FLX-T25 | Implementing (T14 feita; SPEC_DEVIATION do FGS documentado) |
+| FLX-39 | P1-E | FLX-T14, FLX-T15, FLX-T25 | Implementing (T14 e T15 feitas; SPEC_DEVIATION do FGS documentado) |
 | FLX-40 | P1-F | FLX-T3, FLX-T18 | Implementing (T3 feita) |
 | FLX-41 | P1-F | FLX-T3, FLX-T17 | Implementing (T3 feita) |
 | FLX-42 | P1-F | FLX-T3 | Implementing (T3 feita) |

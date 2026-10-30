@@ -5,6 +5,10 @@ import com.keyflow.fluxos.execucao.DestinoFluxo
 import com.keyflow.fluxos.ConfigFluxos
 import com.keyflow.fluxos.Etapa
 import com.keyflow.fluxos.Fluxo
+import com.keyflow.fluxos.PoliticaDoLugar
+import com.keyflow.fluxos.Resolucao
+import com.keyflow.fluxos.RoteadorGatilhos
+import com.keyflow.orbe.LugarDaOrbe
 import com.keyflow.fluxos.Superficie
 import com.keyflow.fluxos.TipoEtapa
 import com.keyflow.fluxos.app.AmbienteMotores
@@ -181,6 +185,7 @@ class OverlayService : Service() {
     private var cachedFluxos = ConfigFluxos(emptyList(), emptyList())
     private var fluxosReady = false
     private var pendingRunFlow: Intent? = null
+    internal val settingsForTest: Settings get() = cachedSettings
     internal val configFluxosForTest: ConfigFluxos get() = cachedFluxos
     internal val fluxoAtivoForTest: Boolean get() = fluxoHost.ativo
     internal val foregroundForTest: Boolean get() = isForeground
@@ -989,9 +994,17 @@ class OverlayService : Service() {
         return true
     }
 
-    private fun handleOrbShortcut(count: Int) {
+    internal fun handleOrbShortcut(count: Int) {
         if (!::coordinator.isInitialized) return
-        when (cachedSettings.resolveShortcut(count)) {
+        val resolucao = RoteadorGatilhos.resolverToques(LugarDaOrbe.FLUTUANTE, count, cachedFluxos,
+            PoliticaDoLugar.daFlutuante(cachedSettings), cachedSettings)
+        val acao = when (resolucao) {
+            is Resolucao.Rodar -> { fluxoHost.disparar(resolucao.fluxo); return }
+            is Resolucao.Incompleto -> { avisarFluxo(tr("Fluxo incompleto: abra a aba Fluxos"), null); return }
+            is Resolucao.AcaoDoSettings -> resolucao.acao
+            is Resolucao.AcaoDoLugar, Resolucao.Nada -> return
+        }
+        when (acao) {
             OrbShortcutAction.NONE -> Unit
             OrbShortcutAction.SWITCH_IME -> showInputMethodPicker()
             // Só alterna se o teclado estiver realmente aberto na tela; senão não faz nada.

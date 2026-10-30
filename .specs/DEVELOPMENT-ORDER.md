@@ -530,6 +530,8 @@ Spec: `.specs/features/sintese-fala/` (origem Local, Sistema, OpenAI, ElevenLabs
 
 Spec: `.specs/features/flows/` (`spec.md` 60 requisitos FLX-01..FLX-60, `design.md`, `tasks.md` FLX-T1..FLX-T29). Ordem: ver o plano de execução do `tasks.md` (A modelo e dados → B executor → C integração → D telas → E fechamento).
 
+- **Estado (30/10)**: Fases A..C implementadas (FLX-T1..T16); a próxima task é a lista da FLX-T17. Host no serviço, botão do IME e 2/3 toques da orbe ligados; a aba continua "Em breve" até a T22. A limitação do FGS `microphone` (FLX-39) e a exceção temporária do OCR (FLX-30) estão registradas na spec e nas lições.
+
 - **Escopo**: a aba Fluxos deixa o "Em breve": lista de cards, modal por fluxo (modelos de cada etapa + atalhos), editor de etapas em **lista vertical** reordenável (sem grafo), executor que encadeia Ditar, Capturar,
   Visão, Perguntar, Falar, Inserir e Agente com os **motores que as abas já têm**, 3 fluxos padrão e "Restaurar fluxos padrão" (recria/reescreve os padrão **sem atalhos**; não toca os da pessoa nem os gatilhos).
   Gatilhos (D9, 29/10): **2 e 3 toques da orbe em três lugares — flutuante, teclado e notificação** (esta só tem toques) — e **botões da barra do teclado**; ligar um gesto substitui a ação dele com aviso (a ação do `Settings`, ou a da notificação, não é alterada, só sombreada).
