@@ -142,7 +142,7 @@ para permitir essa verificação sem reescrever a branch; detalhes na [lição](
 
 ### Fase 1A — Modelo e dados (JVM puro)
 
-### CMP-T5 — Hosts: modelo, codec, validação e migração do host único `[P]` — **Status: pendente**
+### CMP-T5 — Hosts: modelo, codec, validação e migração do host único `[P]` — **Status: concluída em 2026-10-30**
 - **What**: `Host`, `AutenticacaoHost`, `PoliticaAgente`, `ConfigHosts`, limites (50 hosts, nome 1..40 único, usuário 1..64, porta 1..65535), `ValidadorHost` (endereço: nome DNS, IPv4, IPv6 com colchetes; motivo por campo) e `CodecHosts` (`org.json`, `"v":1`, tolerante: nunca lança,
   item ruim descartado, campo desconhecido ignorado, ids repetidos viram um). `RegraAgente.podeMarcar(host)` (CMP-09: só autenticação resolvida pelo app). `MigracaoHostUnico.migrar(settingsAntigo) → ConfigHosts?` (função pura; a senha e a chave saem em um `SegredosMigrados` à parte, nunca no host).
 - **Where**: `app/src/main/java/com/keyflow/computador/{Modelo,ValidadorHost,CodecHosts,RegraAgente,MigracaoHostUnico}.kt`; testes `CodecHostsTest`, `CodecHostsPropertyTest`, `CodecHostsFuzzTest`, `HostSemSegredoTest`, `MigracaoHostUnicoTest`, `ValidadorHostTest`. Regra no `ArchitectureRulesTest`: `computador/*.kt` (exceto `computador/app/**`) sem `android.*`, compose e `org.connectbot.terminal`.
@@ -152,7 +152,7 @@ para permitir essa verificação sem reescrever a branch; detalhes na [lição](
   IPv6/porta/nome inválidos recusados com o motivo; `podeMarcar` recusa auth "pergunte sempre" e chave com passphrase pedida na hora; migração: `computerSshHost` vazio → nada; preenchido → 1 host "Servidor SSH" com porta, usuário e auth do antigo e **segredos à parte**; idempotente.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(computador): modelo de hosts, codec tolerante e migração do host único`.
 
-### CMP-T6 — known_hosts e política de confiança (TOFU) `[P]` — **Status: pendente**
+### CMP-T6 — known_hosts e política de confiança (TOFU) `[P]` — **Status: concluída em 2026-10-30**
 - **What**: `ImpressaoDigital` (SHA256 base64 sem padding como o OpenSSH, mais a "arte" aleatória opcional), `RepositorioDeConfianca` (interface) e `PoliticaDeConfianca.avaliar(host, porta, chave, repositorio) → Conhecida | Nova(impressao) | Mudou(antiga, nova)`;
   formato do arquivo `known_hosts` compatível com OpenSSH (`[host]:porta algoritmo base64`, sem hash de hostname — limite do cbssh), leitor/escritor tolerante, e `AtualizadorDeChaves` (rotação `hostkeys` só quando a chave autenticada já é conhecida).
 - **Where**: `computador/{ImpressaoDigital,PoliticaDeConfianca,KnownHostsArquivo}.kt`; testes `PoliticaDeConfiancaTest`, `KnownHostsArquivoTest`, `KnownHostsPropertyTest`.
@@ -162,7 +162,7 @@ para permitir essa verificação sem reescrever a branch; detalhes na [lição](
   arquivo com linha malformada preserva as outras; remover por host não toca os demais; rotação sem chave conhecida autenticada é recusada.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(computador): known_hosts e política de confiança no primeiro uso`.
 
-### CMP-T7 — Chaves: modelo, importação e assinatura abstrata `[P]` — **Status: pendente**
+### CMP-T7 — Chaves: modelo, importação e assinatura abstrata `[P]` — **Status: concluída em 2026-10-30**
 - **What**: `ChaveSsh` (id, nome, tipo, impressão, `Protecao {HARDWARE, KEYSTORE_ENVELOPE, SOFTWARE_COFRE}`, `exigeBiometria`, criada em — **sem material secreto**; `toString` mascara), interface `Assinador { chavePublica(): AuthPublicKey; suspend assinar(dados): ByteArray? }` (liga ao `AuthHandler.onSignatureRequest` do cbssh),
   `ImportadorDeChave` (OpenSSH e PEM PKCS#8/PKCS#1 pelo `SshKeys.decodePemPrivateKey`; passphrase pedida na hora, nunca guardada; rejeita DSA e RSA < 2048 com o motivo), formatador da chave pública (`ssh-ed25519 AAAA…` ou `ecdsa-sha2-nistp256 AAAA…`, comentário `keyflow@<aparelho>`), `AgenteSegredos.valores()` ampliado para o `SecretFilter`.
   Tudo sobre portas (`CofreDeSegredos`, `RelogioDeChaves`), com fakes.
@@ -173,7 +173,7 @@ para permitir essa verificação sem reescrever a branch; detalhes na [lição](
   a passphrase e o texto colado não ficam em nenhum campo depois de `importar()`; o `SecretFilter` recebe os valores guardados.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(computador): modelo de chaves, importação e assinatura abstrata`.
 
-### CMP-T8 — Chaves no Android: Keystore, envelope e biometria — **Status: pendente**
+### CMP-T8 — Chaves no Android: Keystore, envelope e biometria — **Status: implementada em 2026-10-30; instrumentado conforme a lição**
 - **What**: `ProvedorDeChavesAndroid` sobre o resultado da T2. `gerar(nome, tipo, exigeBiometria)`: **Ed25519** no Keystore (API 33+ e sonda aprovada) com `ProbeEd25519` de produção, ou **fallback** — Ed25519 em software (a semente de 32 bytes gerada pelo Tink do cbssh) guardada **cifrada** por uma chave AES-256-GCM do Keystore (API 24+) no cofre do app, zerada da memória logo após assinar; **ECDSA P-256** (`secp256r1`, `DIGEST_SHA256`) sempre no Keystore, sem envelope (D13).
   Importadas entram no envelope. Biometria opcional por chave, janela de **5 minutos** (D14): API 24–29 `setUserAuthenticationValidityDurationSeconds(300)`; API 30+ `setUserAuthenticationParameters(300, AUTH_BIOMETRIC_STRONG)`; duração > 0 **não** usa `CryptoObject`. `setUserAuthenticationRequired(true)`, `setInvalidatedByBiometricEnrollment(true)` com aviso antes de ligar; sem biometria cadastrada a opção fica desligada com o motivo. O prompt autentica o usuário; dentro dos 300 s a assinatura segue sem novo prompt.
   Exclusão apaga Keystore e cofre. Fora do backup (`data_extraction_rules.xml`/`backup_rules`).

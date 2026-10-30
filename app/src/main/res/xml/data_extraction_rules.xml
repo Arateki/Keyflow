@@ -16,6 +16,8 @@
         <exclude domain="file" path="agent/actions.jsonl" />
         <!-- Histórico da bancada de modelos: medidas deste aparelho — ver o backup_rules.xml. -->
         <exclude domain="file" path="bancada" />
+        <!-- Aba Computador: chaves SSH e senhas ficam no cofre `keyflow_auth` (excluído acima) e no Keystore; o known_hosts é deste aparelho. -->
+        <exclude domain="file" path="known_hosts" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="keyflow_secure.xml" />
@@ -25,5 +27,6 @@
         <exclude domain="external" path="model-tmp" />
         <exclude domain="file" path="agent/actions.jsonl" />
         <exclude domain="file" path="bancada" />
+        <exclude domain="file" path="known_hosts" />
     </device-transfer>
 </data-extraction-rules>

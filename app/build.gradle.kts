@@ -556,6 +556,10 @@ dependencies {
     // CMP-T1: versões exatas; grafo, hashes e licenças auditados juntos.
     implementation("org.connectbot.sshlib:sshlib:0.6.6")
     implementation("org.connectbot.sshlib:protocol:0.6.6")
+    // CMP-T8: BiometricPrompt (Apache-2.0) para liberar as chaves SSH por 5 minutos. A 1.1.0 é a estável mais recente (as 1.2 são alfa).
+    implementation("androidx.biometric:biometric:1.1.0")
+    // CMP-T7: o assinador de software usa o Ed25519 do Tink direto (a mesma variante que o cbssh e o cofre já trazem; ver a substituição no fim do arquivo).
+    implementation("com.google.crypto.tink:tink-android:1.24.0")
     // UI
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
@@ -740,9 +744,9 @@ val gerarGrafoTerminal = tasks.register("gerarGrafoTerminal") {
             .filterIsInstance<ResolvedDependencyResult>().filter {
                 val id = it.selected.id
                 (id is ProjectComponentIdentifier && id.projectPath == ":termlib") ||
-                    (id is ModuleComponentIdentifier && id.group == "org.connectbot.sshlib")
+                    (id is ModuleComponentIdentifier && (id.group == "org.connectbot.sshlib" || (id.group == "androidx.biometric" && id.module == "biometric")))
             }
-        check(raizes.size >= 2) { "Não achei termlib e cbssh no grafo do release" }
+        check(raizes.size >= 3) { "Não achei termlib, cbssh e biometric no grafo do release" }
         raizes.forEach { visitar(it.selected) }
         val artefatos = config.incoming.artifactView {
             componentFilter { it is ModuleComponentIdentifier }
