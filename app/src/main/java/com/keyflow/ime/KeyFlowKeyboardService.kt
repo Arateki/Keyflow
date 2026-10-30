@@ -565,11 +565,14 @@ class KeyFlowKeyboardService : InputMethodService() {
      */
     /**
      * Toque num botão de fluxo da barra. O IME não conhece o fluxo; quem resolve `botaoId → fluxo` e dispara é o `FluxoHost` do
-     * serviço da orbe, pelo mesmo caminho do mic (`startForegroundService` com `ACTION_RUN_FLOW`). **Ainda não ligado**: isso é
-     * da FLX-T14 — até lá o toque chega aqui e nada acontece (nenhum botão existe antes de o modal da T22 criá-lo).
+     * serviço da orbe, pelo mesmo caminho do mic (`startForegroundService` com `ACTION_RUN_FLOW`).
      */
     private fun runFlow(botaoId: String) {
-        Log.d(TAG, "runFlow: botão $botaoId (disparo ligado na FLX-T14)")
+        try {
+            OverlayService.start(this, OverlayService.runFlowIntent(this, botaoId))
+        } catch (e: Exception) {
+            Log.e(TAG, "Não foi possível iniciar o fluxo", e)
+        }
     }
 
     private fun startMicSession() {

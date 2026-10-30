@@ -134,6 +134,15 @@ class OrbButtonView(
         windowParams?.let { updateWindowLayout?.invoke(it) }
     }
 
+    private var fluxoEtapa by mutableStateOf<com.keyflow.fluxos.TipoEtapa?>(null)
+    private var fluxoDark by mutableStateOf(false)
+    internal val fluxoEtapaForTest: com.keyflow.fluxos.TipoEtapa? get() = fluxoEtapa
+
+    fun updateFluxoEtapa(etapa: com.keyflow.fluxos.TipoEtapa?, dark: Boolean = false) {
+        fluxoEtapa = etapa
+        fluxoDark = dark
+    }
+
     private var visionState by mutableStateOf(VisionFlowState.NONE)
 
     private var visionDark by mutableStateOf(false)
@@ -197,16 +206,21 @@ class OrbButtonView(
             // O ComposeView não trata toque — o gesto é todo do FrameLayout pai.
             setContent {
                 val ui = orbUi
+                val processandoFluxo = fluxoEtapa != null && fluxoEtapa != com.keyflow.fluxos.TipoEtapa.DITAR
                 androidx.compose.runtime.CompositionLocalProvider(LocalOrbPack provides currentOrbPack) {
                     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
                     VoiceOrb(
-                        state = ui.state,
+                        state = if (processandoFluxo) OrbState.Transcribing else ui.state,
                         modifier = Modifier.fillMaxSize(),
-                        center = ui.center,
+                        center = if (processandoFluxo) OrbCenter.None else ui.center,
                         dragHint = ui.dragHint,
                         style = currentOrbStyle,
                     )
-                    com.keyflow.ui.orb.VisionPhaseBadge(visionState, com.keyflow.ui.theme.paletteFor(visionDark))
+                    if (visionState != VisionFlowState.NONE) {
+                        com.keyflow.ui.orb.VisionPhaseBadge(visionState, com.keyflow.ui.theme.paletteFor(visionDark))
+                    } else {
+                        com.keyflow.ui.orb.FluxoEtapaBadge(fluxoEtapa, com.keyflow.ui.theme.paletteFor(fluxoDark))
+                    }
                     }
                 }
             }

@@ -163,6 +163,8 @@ alavanca e grade (`ShortcutModels.kt`). Nada liga a saída de uma capacidade na 
 6. **FLX-38**: **fluxo inválido** (Incompleto) não liga atalho (as linhas de atalho ficam desligadas, com o motivo). Um fluxo ligado que **fica** inválido deixa o atalho sem efeito: disparar mostra "Fluxo incompleto: abra a aba Fluxos" e **não** executa a ação sombreada.
 7. **FLX-39**: **disparo**: antes de rodar, o serviço SHALL conferir (a) nenhum outro fluxo rodando (FLX-17); (b) para **qualquer fluxo**, gravação fora de RECORDING/PAUSED, senão "Termine a gravação atual antes de rodar o fluxo" (D14); Ditar exige ainda estado ocioso (FLX-18); (c) para fluxos que começam com Capturar, as demais guardas do `VisionFlow` (FLX-19); (d) permissão de microfone para Ditar e de sobreposição/consentimento para Capturar, com os mesmos avisos que o app já usa. Falhou a conferência: aviso curto e nada acontece (a ação sombreada **não** roda no lugar).
 
+   **SPEC_DEVIATION (FLX-T14, fase C2)**: nesta fase o `OverlayService` reaproveita seu FGS `microphone`; todos os disparos exigem a permissão de microfone, inclusive Capturar, e avisam sem iniciar o serviço quando ela falta. Capturar sem essa permissão depende de rever o tipo/ciclo de vida do FGS. Decisão e fonte: `licoes/2026-10-30-fluxos-fase-c2-host.md`.
+
 **Independent Test**: 2 toques da orbe flutuante ligado a "Ouvir e responder" → o fluxo roda, o teclado **não** retrai; desligar → 2 toques volta a retrair; ligar a mesma superfície em outro fluxo pede confirmação; o botão do teclado criado pelo modal aparece desabilitado se o fluxo ficar incompleto; 4 toques com `NEAREST_DOWN` cai no 3 toques ligado a fluxo; o 2 toques da **notificação** ligado a um fluxo não muda o 2 toques da flutuante (superfícies diferentes).
 
 ---
@@ -402,7 +404,7 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 | FLX-03 | P1-A | FLX-T17 | Pending |
 | FLX-04 | P1-A | FLX-T17 | Pending |
 | FLX-05 | P1-A | FLX-T17 | Pending |
-| FLX-06 | P1-B | FLX-T18, FLX-T14, FLX-T25 | Pending |
+| FLX-06 | P1-B | FLX-T18, FLX-T14, FLX-T25 | Implementing (T14 feita; modal na T18) |
 | FLX-07 | P1-B | FLX-T18, FLX-T19 | Pending |
 | FLX-08 | P1-B | FLX-T19 | Pending |
 | FLX-09 | P1-B | FLX-T19 | Pending |
@@ -413,9 +415,9 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 | FLX-14 | P1-C | FLX-T1, FLX-T18 | Implementing (T1 feita) |
 | FLX-15 | P1-C | FLX-T1, FLX-T18 | Implementing (T1 feita) |
 | FLX-16 | P1-C | FLX-T18 | Pending |
-| FLX-17 | P1-D | FLX-T6, FLX-T14, FLX-T25 | Implementing (T6 feita) |
+| FLX-17 | P1-D | FLX-T6, FLX-T14, FLX-T25 | Implementing (T6 e T14 feitas) |
 | FLX-18 | P1-D | FLX-T11 | Implementing (T11 feita) |
-| FLX-19 | P1-D | FLX-T12, FLX-T14, FLX-T25 | Implementing (T12 feita) |
+| FLX-19 | P1-D | FLX-T12, FLX-T14, FLX-T25 | Implementing (T12 e T14 feitas) |
 | FLX-20 | P1-D | FLX-T10 | Implementing (T10 feita) |
 | FLX-21 | P1-D | FLX-T10 | Implementing (T10 feita) |
 | FLX-22 | P1-D | FLX-T8, FLX-T10 | Implementing (T8, T10 feitas) |
@@ -423,19 +425,19 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 | FLX-24 | P1-D | FLX-T13, FLX-T25 | Implementing (T13 feita) |
 | FLX-25 | P1-D | FLX-T13 | Implementing (T13 feita) |
 | FLX-26 | P1-D | FLX-T7, FLX-T9 | Implementing (T7, T9 feitas; T10 aplica nas portas) |
-| FLX-27 | P1-D | FLX-T6, FLX-T14, FLX-T25 | Implementing (T6 feita) |
-| FLX-28 | P1-D | FLX-T6, FLX-T14 | Implementing (T6 feita) |
-| FLX-29 | P1-D | FLX-T6, FLX-T14, FLX-T25 | Implementing (T6 feita) |
+| FLX-27 | P1-D | FLX-T6, FLX-T14, FLX-T25 | Implementing (T6 e T14 feitas) |
+| FLX-28 | P1-D | FLX-T6, FLX-T14 | Verified (T6 e T14; cancelamento/limpeza instrumentados) |
+| FLX-29 | P1-D | FLX-T6, FLX-T14, FLX-T25 | Implementing (T6 e T14 feitas) |
 | FLX-30 | P1-D | FLX-T7, FLX-T17 | Implementing (T7 feita) |
 | FLX-31 | P1-D | FLX-T6 | Implementing (T6 feita) |
-| FLX-32 | P1-D | FLX-T14, FLX-T16 | Implementing (T16 feita: botão aceso; falta o serviço, T14) |
+| FLX-32 | P1-D | FLX-T14, FLX-T16 | Verified (T14 e T16; glifo, cancelamento e botão) |
 | FLX-33 | P1-E | FLX-T1, FLX-T2, FLX-T5 | Implementing (T1, T2, T5 feitas) |
 | FLX-34 | P1-E | FLX-T5, FLX-T15, FLX-T25 | Implementing (T5 feita) |
 | FLX-35 | P1-E | FLX-T5, FLX-T20, FLX-T21, FLX-T28 | Implementing (T5 feita) |
 | FLX-36 | P1-E | FLX-T16, FLX-T20 | Implementing (T16 feita; o disparo é da T14) |
 | FLX-37 | P1-E | FLX-T5, FLX-T20 | Implementing (T5 feita) |
 | FLX-38 | P1-E | FLX-T5, FLX-T20 | Implementing (T5 feita) |
-| FLX-39 | P1-E | FLX-T14, FLX-T15, FLX-T25 | Pending |
+| FLX-39 | P1-E | FLX-T14, FLX-T15, FLX-T25 | Implementing (T14 feita; SPEC_DEVIATION do FGS documentado) |
 | FLX-40 | P1-F | FLX-T3, FLX-T18 | Implementing (T3 feita) |
 | FLX-41 | P1-F | FLX-T3, FLX-T17 | Implementing (T3 feita) |
 | FLX-42 | P1-F | FLX-T3 | Implementing (T3 feita) |
@@ -445,7 +447,7 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 | FLX-46 | P1-G | FLX-T2 | Implementing (T2 feita) |
 | FLX-47 | P1-G | FLX-T2 | Implementing (T2 feita) |
 | FLX-48 | P1-G | FLX-T4 | Implementing (T4 feita) |
-| FLX-49 | P1-G | FLX-T4, FLX-T14 | Implementing (T4 feita) |
+| FLX-49 | P1-G | FLX-T4, FLX-T14 | Verified (T4 e T14; observação ao vivo no serviço) |
 | FLX-50 | P1-G | FLX-T4, FLX-T5, FLX-T16 | Implementing (T4, T5, T16 feitas) |
 | FLX-51 | P2-H | FLX-T17..T21 (cada uma traz os seus textos) | Pending |
 | FLX-52 | P2-H | FLX-T1, FLX-T6, FLX-T10 | Implementing (T1, T6, T10 feitas) |
