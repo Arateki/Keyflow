@@ -29,6 +29,8 @@ internal class AgentSecretSource(
     private val clockMs: () -> Long = System::currentTimeMillis,
     private val ttlMs: Long = TTL_MS,
     private val vaultSnapshot: ((SharedPreferences) -> Collection<Any?>)? = null,
+    /** Os segredos da aba Computador (senhas lembradas e material guardado em envelope, CMP-16): vêm de [com.keyflow.computador.chaves.CofreDeSegredos.valores]. */
+    private val computador: () -> Collection<String> = { emptyList() },
 ) : () -> Collection<String> {
 
     private class Snapshot(val atMs: Long, val values: List<String>)
@@ -73,6 +75,7 @@ internal class AgentSecretSource(
         for (key in com.keyflow.data.SettingsCredentialKeys.ALL) {
             credentials.getSecret(key)?.let { if (it.isNotEmpty()) out += it }
         }
+        for (value in computador()) if (value.isNotEmpty()) out += value
         out.remove("")
         return out.toList()
     }
