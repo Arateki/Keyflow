@@ -233,7 +233,7 @@ Respondidas em 29/10 (D5–D10). Nenhuma em aberto.
 | ----------- | ----- | ----- | ------ |
 | KBO-01 | P1-A | KBO-T6 | Pending |
 | KBO-02 | P1-A | KBO-T6 | Pending |
-| KBO-03 | P1-A | KBO-T2, KBO-T6 | Pending |
+| KBO-03 | P1-A | KBO-T2, KBO-T6 | Parcial (padrão no codec/DataStore em KBO-T2; falta KBO-T6) |
 | KBO-04 | P1-A | KBO-T3, KBO-T6 | Pending |
 | KBO-05 | P1-B | KBO-T5 | Pending |
 | KBO-06 | P1-B | KBO-T5, KBO-T6 | Pending |
@@ -247,19 +247,19 @@ Respondidas em 29/10 (D5–D10). Nenhuma em aberto.
 | KBO-14 | P1-C | KBO-T3, KBO-T10 | Pending |
 | KBO-15 | P1-C | KBO-T3, KBO-T6 | Pending |
 | KBO-16 | P1-C | KBO-T3 | Pending |
-| KBO-17 | P1-C | KBO-T2, KBO-T3 | Pending |
+| KBO-17 | P1-C | KBO-T2, KBO-T3 | Parcial (padrões de 2 e 3 toques em KBO-T2; falta KBO-T3) |
 | KBO-18 | P1-C | KBO-T3, KBO-T5, KBO-T10 | Pending |
 | KBO-19 | P1-D | KBO-T3, KBO-T6 | Pending |
-| KBO-20 | P1-D | KBO-T2, KBO-T3 | Pending |
+| KBO-20 | P1-D | KBO-T2, KBO-T3 | Parcial (preservação no codec/DataStore em KBO-T2; falta KBO-T3) |
 | KBO-21 | P1-D | KBO-T5, KBO-T7 | Pending |
 | KBO-22 | P1-E | KBO-T7 | Pending |
 | KBO-23 | P1-E | KBO-T7 | Pending |
 | KBO-24 | P1-E | KBO-T5 | Pending |
 | KBO-25 | P1-F | KBO-T3, KBO-T10 | Pending |
 | KBO-26 | P1-F | KBO-T5 | Pending |
-| KBO-27 | P1-G | KBO-T2 | Pending |
-| KBO-28 | P1-G | KBO-T2 | Pending |
-| KBO-29 | P1-G | KBO-T2, KBO-T5 | Pending |
+| KBO-27 | P1-G | KBO-T2 | Verified |
+| KBO-28 | P1-G | KBO-T2 | Verified |
+| KBO-29 | P1-G | KBO-T2, KBO-T5 | Parcial (leitura leve e flow no DataStore em KBO-T2; falta ligação no IME em KBO-T5) |
 | KBO-30 | P1-H | KBO-T3 | Pending |
 | KBO-31 | P1-H | KBO-T3 | Pending |
 | KBO-32 | P2-I | KBO-T1 | Verified |

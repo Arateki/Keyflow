@@ -39,6 +39,8 @@ import com.keyflow.fluxos.CodecFluxos
 import com.keyflow.fluxos.ConfigFluxos
 import com.keyflow.fluxos.PadroesFluxo
 import com.keyflow.fluxos.PoliticaGatilhos
+import com.keyflow.orbe.CodecOrbeTeclado
+import com.keyflow.orbe.ConfigOrbeTeclado
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -421,6 +423,33 @@ class SettingsRepository(
         this[FLOWS_JSON] = fluxosJson
         this[FLOW_TRIGGERS_JSON] = gatilhosJson
     }
+
+    // ── Orbe do teclado (`keyboard_orb_config_json`, KBO-27..29) ─────────────
+    // Chave própria no DataStore, fora do auto-save de [Settings] e sem tocar nos cofres cifrados.
+
+    private fun Preferences.configOrbeTeclado(): ConfigOrbeTeclado =
+        CodecOrbeTeclado.decodificar(this[KEYBOARD_ORB_CONFIG_JSON])
+
+    /** Observação ao vivo da configuração própria da orbe do teclado (KBO-29). */
+    fun configOrbeTecladoFlow(): Flow<ConfigOrbeTeclado> =
+        dataStore.data.map { it.configOrbeTeclado() }.distinctUntilChanged()
+
+    /** Leitura leve da configuração própria da orbe do teclado (só DataStore, sem o cofre — KBO-29). */
+    suspend fun configOrbeTecladoOnce(): ConfigOrbeTeclado =
+        dataStore.data.first().configOrbeTeclado()
+
+    /**
+     * Escrita atômica sobre o valor atual de `keyboard_orb_config_json` (`dataStore.edit`), para o auto-save das
+     * [Settings] não desfazer a seção da orbe e esta não regravar as [Settings] (KBO-27).
+     */
+    suspend fun atualizarOrbeTeclado(f: (ConfigOrbeTeclado) -> ConfigOrbeTeclado): ConfigOrbeTeclado =
+        dataStore.edit { prefs ->
+            val nova = f(prefs.configOrbeTeclado())
+            val json = CodecOrbeTeclado.codificar(nova)
+            if (prefs[KEYBOARD_ORB_CONFIG_JSON] != json) {
+                prefs[KEYBOARD_ORB_CONFIG_JSON] = json
+            }
+        }.configOrbeTeclado()
 
     /** Onde cada modelo de texto local roda, ao vivo — o seletor "Roda em" do card (chave própria, fora de [Settings]). */
     fun localBackendPrefsFlow(): Flow<LocalBackendPrefs> =
@@ -930,6 +959,8 @@ class SettingsRepository(
         // Fluxos (feature flows): a lista de fluxos e os gatilhos que os disparam, como JSON (CodecFluxos).
         val FLOWS_JSON = stringPreferencesKey("flows_json")
         val FLOW_TRIGGERS_JSON = stringPreferencesKey("flow_triggers_json")
+        // Orbe do teclado (feature keyboard-orb): configuração própria como JSON (CodecOrbeTeclado).
+        val KEYBOARD_ORB_CONFIG_JSON = stringPreferencesKey("keyboard_orb_config_json")
         // Raciocínio local: onde cada modelo roda (CPU/GPU), o aviso de volta para a CPU e a GPU já pronta — ver [LocalBackendPrefs].
         val REASONING_LOCAL_BACKENDS = stringPreferencesKey("reasoning_local_backends")
 

@@ -53,7 +53,7 @@ A Fase A inteira é JVM: pode ser entregue e revisada antes de qualquer pixel.
 - **Done when**: unit — ociosa cabe no encaixe e não intersecta a faixa de 36 dp; sobressalente é disjunta de uma tecla logo abaixo do encaixe e de um botão vizinho na mesma barra; diâmetro nunca passa da largura do encaixe; encaixe estreito sobressai menos que 36 dp; ponto no círculo é da orbe e ponto na tecla não é; `HitDaOrbe` rejeita (1, 1) do contraexemplo (faixa 36, encaixe 64×28, centro (32, 32), raio 32); a regra de arquitetura falha se um arquivo de `orbe/` importar `android.`.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(orbe-teclado): geometria da orbe e lugares`.
 
-### KBO-T2 — Codec e repositório — **Status: pendente**
+### KBO-T2 — Codec e repositório — **Status: concluída**
 - **What**: `CodecOrbeTeclado` e a chave `keyboard_orb_config_json` (`design` §5), com `configOrbeTecladoFlow/Once` e `atualizarOrbeTeclado`. Tolerância da KBO-28. A escrita não passa pelo auto-save das `Settings`.
 - **Where**: `orbe/CodecOrbeTeclado.kt`; `data/SettingsRepository.kt` (só a chave nova); testes `CodecOrbeTecladoTest`.
 - **Depends on**: T1. **Requirement**: KBO-03, KBO-17, KBO-20, KBO-27, KBO-28, KBO-29.
