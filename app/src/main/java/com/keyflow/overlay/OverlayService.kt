@@ -164,6 +164,7 @@ class OverlayService : Service() {
             onState = {
                 floatingButton?.updateVisionState(it, cachedSettings.themeDark)
                 visionFlowStateForTest.value = it
+                KeyFlowController.updateVisionActive(it != VisionFlowState.NONE)
             },
             onResult = { bitmap ->
                 // O consumidor de ações será ligado na VC-T7; a etapa devolve o bitmap ao callback.
@@ -207,7 +208,7 @@ class OverlayService : Service() {
         observeSettings()
         observeControllerState()
         observeOverlayPosition()
-        instanceForVisionTest = this
+        instance = this
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -587,7 +588,7 @@ class OverlayService : Service() {
         coordinator.onCancel()
     }
 
-    /** Tap do mic do teclado: ocioso inicia; gravando/pausado envia (o "modo" é só da orbe). */
+    /** Gravar/enviar da orbe do teclado: ocioso inicia; gravando/pausado envia. */
     private fun handleKeyboardMicTap() {
         if (visionFlow.state != VisionFlowState.NONE) { visionFlow.finish(); return }
         when (coordinator.currentState()) {
@@ -606,7 +607,7 @@ class OverlayService : Service() {
         destroying = true
         if (::fluxoHost.isInitialized) fluxoHost.cancelar()
         pendingRunFlow = null
-        instanceForVisionTest = null
+        instance = null
         if (visionFlow.state != VisionFlowState.NONE) visionFlow.finish()
         visionRestartDialog?.dismiss()
         visionRestartDialog = null
@@ -1018,7 +1019,7 @@ class OverlayService : Service() {
 
     private fun showInputMethodPicker() {
         if (isKeyFlowActiveIme()) {
-            getSystemService(InputMethodManager::class.java)?.showInputMethodPicker()
+            showInputMethodPicker(this)
         } else {
             startActivity(
                 Intent(this, com.keyflow.ui.ImePickerActivity::class.java)
@@ -1410,7 +1411,11 @@ class OverlayService : Service() {
     }
 
     companion object {
-        internal var instanceForVisionTest: OverlayService? = null
+        @Volatile private var instance: OverlayService? = null
+        internal val instanceForVisionTest: OverlayService? get() = instance
+
+        /** Cancela inclusive Ditar, sem transformar o pedido em enviar áudio. UI e serviço vivem na main do mesmo processo. */
+        fun cancelarFluxo() { instance?.fluxoHost?.cancelar() }
         internal var portasDeFluxoForTest: (() -> com.keyflow.fluxos.execucao.Portas)? = null
         internal var avisoDeFluxoForTest: ((String, com.keyflow.fluxos.execucao.DestinoAba?) -> Unit)? = null
         internal var errorBannerDurationMsForTest: Long? = null
@@ -1505,7 +1510,12 @@ class OverlayService : Service() {
         fun startOverlayIntent(context: Context): Intent =
             intent(context).apply { action = ACTION_START_OVERLAY }
 
-        /** Sobe o serviço sob demanda para gravar via teclado (sem orbe). */
+        /** O IME ativo tem permissão de abrir o mesmo seletor usado pela orbe flutuante. */
+        fun showInputMethodPicker(context: Context) {
+            context.getSystemService(InputMethodManager::class.java)?.showInputMethodPicker()
+        }
+
+        /** Sobe o serviço sob demanda para gravar via teclado. */
         fun keyboardMicIntent(context: Context): Intent =
             intent(context).apply { action = ACTION_KEYBOARD_MIC }
 

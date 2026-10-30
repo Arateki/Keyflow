@@ -71,6 +71,7 @@ fun KeyboardScene(frame: TourFrame, modifier: Modifier = Modifier) {
                         // sairia com um valor diferente — adeus golden.
                         frozenSeconds = DEMO_SECONDS,
                         scale = MINIATURE_SCALE,
+                        reservarFaixaDaOrbe = false,
                     )
                 },
                 update = { view ->

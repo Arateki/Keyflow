@@ -1,0 +1,160 @@
+package com.keyflow.fluxos
+
+import com.keyflow.core.FalaSource
+import com.keyflow.core.ReasoningSource
+import com.keyflow.core.TranscriptionSource
+import com.keyflow.core.VisionSource
+import com.keyflow.data.Settings
+
+/** A aba de capacidade de onde a etapa tira o motor: é onde a pessoa conecta um provedor ou baixa um modelo. */
+enum class AbaDaEtapa { TRANSCRICAO, VISAO, RACIOCINIO, VOZ }
+
+/** Um modelo (ou voz) que a aba oferece. [id] é o que o `ModeloRef` grava; [nome] é o que a tela mostra. */
+data class ModeloOferecido(val id: String, val nome: String)
+
+/** Onde a opção roda, para o selo da linha. */
+enum class SeloDeModelo { NO_APARELHO, NUVEM }
+
+/**
+ * Uma linha do seletor de modelo por etapa (design §11.3).
+ * - [DaAba]: não fixa nada; mostra o que a aba usa agora.
+ * - [Escolha]: um [ModeloRef] que dá para usar já (local instalado ou provedor conectado).
+ * - [Conectar]: provedor sem conexão; a tela leva à [aba]. Nunca é selecionável.
+ * - [Indisponivel]: o [ModeloRef] gravado já não existe (modelo apagado, provedor desconectado); fica visível e selecionado,
+ *   sem trocar sozinho.
+ */
+sealed interface OpcaoDeModelo {
+    val selecionada: Boolean
+
+    data class DaAba(val efetivo: Efetivo, override val selecionada: Boolean) : OpcaoDeModelo
+
+    data class Escolha(
+        val ref: ModeloRef,
+        val origemNome: String,
+        val modelo: ModeloOferecido?,
+        val selo: SeloDeModelo,
+        override val selecionada: Boolean,
+    ) : OpcaoDeModelo
+
+    data class Conectar(val origemNome: String, val aba: AbaDaEtapa) : OpcaoDeModelo {
+        override val selecionada: Boolean get() = false
+    }
+
+    data class Indisponivel(val ref: ModeloRef) : OpcaoDeModelo {
+        override val selecionada: Boolean get() = true
+    }
+}
+
+/** A aba que serve esta etapa; nulo nas que não usam modelo. */
+fun abaDaEtapa(etapa: Etapa): AbaDaEtapa? = when (etapa) {
+    is Etapa.Ditar -> AbaDaEtapa.TRANSCRICAO
+    is Etapa.Visao -> AbaDaEtapa.VISAO
+    is Etapa.Perguntar, is Etapa.Agente -> AbaDaEtapa.RACIOCINIO
+    is Etapa.Falar -> AbaDaEtapa.VOZ
+    Etapa.Capturar, Etapa.Inserir, is Etapa.Desconhecida -> null
+}
+
+/**
+ * As opções de modelo da [etapa], na ordem das abas ("Da aba", depois cada origem do enum da aba), **sem nada que dispare
+ * download ou peça chave**: o que está em [instalados] (origem `LOCAL`), os provedores de [conectados] (nomes de origem) com os
+ * modelos de [catalogo] (por nome de origem; Visão só com os que leem imagem — quem monta o catálogo filtra) e, para os
+ * provedores sem conexão, uma linha [OpcaoDeModelo.Conectar]. `SYSTEM` (voz do sistema) e `CUSTOM` conectado entram sem
+ * modelo. Um `ModeloRef` gravado que não está entre as opções entra como [OpcaoDeModelo.Indisponivel]. Puro.
+ */
+fun opcoesDeModelo(
+    etapa: Etapa,
+    settings: Settings,
+    instalados: List<ModeloOferecido>,
+    conectados: Set<String>,
+    catalogo: Map<String, List<ModeloOferecido>>,
+): List<OpcaoDeModelo> {
+    val aba = abaDaEtapa(etapa) ?: return emptyList()
+    val atual = etapa.modelo
+    val opcoes = mutableListOf<OpcaoDeModelo>()
+    opcoes += OpcaoDeModelo.DaAba(ModeloPorEtapa.efetivo(settings, etapa.comModelo(null)), selecionada = atual == null)
+    for (origem in origensDaAba(aba)) {
+        val nome = nomeDaOrigem(origem)
+        when {
+            origem == "LOCAL" -> {
+                if (instalados.isNotEmpty()) opcoes += semModeloSeAtual(origem, nome, SeloDeModelo.NO_APARELHO, atual)
+                instalados.forEach { opcoes += escolha(origem, nome, it, SeloDeModelo.NO_APARELHO, atual) }
+            }
+            origem == "SYSTEM" -> opcoes += escolha(origem, nome, null, SeloDeModelo.NO_APARELHO, atual)
+            origem !in conectados -> opcoes += OpcaoDeModelo.Conectar(nome, aba)
+            else -> {
+                val modelos = catalogo[origem].orEmpty()
+                if (modelos.isEmpty() || origem == "CUSTOM") opcoes += escolha(origem, nome, null, SeloDeModelo.NUVEM, atual)
+                else {
+                    opcoes += semModeloSeAtual(origem, nome, SeloDeModelo.NUVEM, atual)
+                    modelos.forEach { opcoes += escolha(origem, nome, it, SeloDeModelo.NUVEM, atual) }
+                }
+            }
+        }
+    }
+    if (atual != null && opcoes.none { it.selecionada }) opcoes += OpcaoDeModelo.Indisponivel(atual)
+    return opcoes
+}
+
+/**
+ * `ModeloRef(origem, null)` é "o modelo que a aba escolheu daquela origem" e vale se a origem está disponível: quando é o ref
+ * gravado, ele ganha a própria linha (a primeira da origem), selecionada; senão não aparece (a escolha manual é por modelo).
+ */
+private fun semModeloSeAtual(origem: String, nome: String, selo: SeloDeModelo, atual: ModeloRef?): List<OpcaoDeModelo> =
+    if (atual == ModeloRef(origem, null)) listOf(escolha(origem, nome, null, selo, atual)) else emptyList()
+
+/**
+ * O que oferecer quando a tela não sabe o que está instalado nem conectado (sem fiação): "Da aba", calculada com as [settings]
+ * recebidas, e o `ModeloRef` gravado como linha selecionada. Não afirma disponibilidade, então nunca marca Indisponível.
+ */
+fun opcoesSoDaAba(etapa: Etapa, settings: Settings): List<OpcaoDeModelo> {
+    if (abaDaEtapa(etapa) == null) return emptyList()
+    val ref = etapa.modelo
+    val daAba = OpcaoDeModelo.DaAba(ModeloPorEtapa.efetivo(settings, etapa.comModelo(null)), selecionada = ref == null)
+    if (ref == null) return listOf(daAba)
+    val local = ref.origem == "LOCAL" || ref.origem == "SYSTEM"
+    val modelo = ref.modelo?.let { ModeloOferecido(it, it) }
+    return listOf(daAba, OpcaoDeModelo.Escolha(ref, nomeDaOrigem(ref.origem), modelo, if (local) SeloDeModelo.NO_APARELHO else SeloDeModelo.NUVEM, true))
+}
+
+/**
+ * O Agente só usa ferramentas com provedor de nuvem que tenha motor de ferramentas (Anthropic, OpenAI, Google); em modelo local ou
+ * Custom ele só responde em texto. Aqui é só pela origem; a chave de API (e não o login de plano) a T22 confere com a conexão.
+ */
+fun agenteSemFerramentas(etapa: Etapa, settings: Settings): Boolean {
+    if (etapa !is Etapa.Agente) return false
+    val origem = etapa.modelo?.origem ?: ModeloPorEtapa.efetivo(settings, etapa).origem
+    return origem !in setOf("OPENAI", "ANTHROPIC", "GOOGLE")
+}
+
+private fun escolha(origem: String, nome: String, modelo: ModeloOferecido?, selo: SeloDeModelo, atual: ModeloRef?): OpcaoDeModelo.Escolha {
+    val ref = ModeloRef(origem, modelo?.id)
+    return OpcaoDeModelo.Escolha(ref, nome, modelo, selo, selecionada = atual == ref)
+}
+
+/** Os nomes de origem da aba, na ordem do enum e sem `CREDITS`. */
+internal fun origensDaAba(aba: AbaDaEtapa): List<String> = when (aba) {
+    AbaDaEtapa.TRANSCRICAO -> TranscriptionSource.entries.filter { it != TranscriptionSource.CREDITS }.map { it.name }
+    AbaDaEtapa.VISAO -> VisionSource.entries.filter { it != VisionSource.CREDITS }.map { it.name }
+    AbaDaEtapa.RACIOCINIO -> ReasoningSource.entries.filter { it != ReasoningSource.CREDITS }.map { it.name }
+    AbaDaEtapa.VOZ -> FalaSource.entries.filter { it != FalaSource.CREDITS }.map { it.name }
+}
+
+/** Nomes próprios dos provedores; "Local" e "Sistema" são traduzidos pela tela (aqui ficam como chave estável). */
+internal fun nomeDaOrigem(origem: String): String = when (origem) {
+    "LOCAL" -> "Local"
+    "SYSTEM" -> "Sistema"
+    "OPENAI" -> "OpenAI"
+    "ANTHROPIC" -> "Anthropic"
+    "GOOGLE" -> "Google"
+    "GROQ" -> "Groq"
+    "ELEVENLABS" -> "ElevenLabs"
+    "CUSTOM" -> "Custom"
+    else -> origem
+}
+
+/** O nome da origem como a tela mostra: "Local" e "Sistema" traduzidos, o resto é nome próprio. */
+fun nomeDaOrigemNaTela(nome: String): String = when (nome) {
+    "Local" -> com.keyflow.i18n.tr("Local")
+    "Sistema" -> com.keyflow.i18n.tr("Sistema")
+    else -> nome
+}

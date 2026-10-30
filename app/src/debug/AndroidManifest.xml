@@ -4,6 +4,8 @@
     <application>
         <!-- CMP-T1: bancada do terminal real, sem entrada no release ou no launcher. -->
         <activity android:name="com.keyflow.computador.app.TerminalSpikeActivity" android:exported="false" />
+        <!-- Hospedeiro de viewport para a orbe, em processo separado do IME. -->
+        <activity android:name=".ui.OrbeDoTecladoProbeActivity" android:exported="true" android:process=":probe" />
         <activity android:name=".DebugSimulatedPurchaseActivity" android:exported="false" />
         <!-- Smoke de fundação (T1), só em debug, não exportado, sem launcher. -->
         <activity

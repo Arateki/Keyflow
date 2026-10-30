@@ -465,7 +465,7 @@ internal fun OrbState.toPackState(): OrbPackState = when (this) {
     OrbState.Transcribing -> OrbPackState.TRANSCRIBING
 }
 
-private fun DrawScope.drawOrb(t: Float, state: OrbState, style: OrbStyle = OrbStyle.ATELIE, hasCenter: Boolean = false) {
+internal fun DrawScope.drawOrb(t: Float, state: OrbState, style: OrbStyle = OrbStyle.ATELIE, hasCenter: Boolean = false) {
     if (style == OrbStyle.AERO) {
         drawAeroOrb(t, state, hasCenter)
         return

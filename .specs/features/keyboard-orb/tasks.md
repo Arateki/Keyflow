@@ -67,23 +67,25 @@ A Fase A inteira é JVM: pode ser entregue e revisada antes de qualquer pixel.
 - **Done when**: unit — 1 toque espera a janela e 2 toques resolvem em 2; 4 toques com `CANCEL` não viram comando e com `NEAREST_DOWN` caem no 3 se ele tiver ação; fábrica grava no 1 e envia no segundo; config com zero gravar/enviar é aceita no Alternar e no segurar-para-falar (próprio e copiado); substituir um toque, gesto ou botão que já tinha ação avisa o que saiu e não recoloca gravar; copiar ligado no Alternar ignora `shortcut1Tap` no 1 toque (o gesto nativo da flutuante) e usa `shortcut2Tap`; copiar segurar-para-falar mapeia o 1 toque em `shortcut1Tap` (pode ser Nenhuma) e o segurar grava; copiar não recebe a config própria como escrita; ação desconhecida permanece e dispara como Nenhuma, sem reescrever o 1 toque para gravar; Visão ativa só aceita gravar/enviar, e esse comando é "encerrar visão"; 1 toque não chama o gancho de fluxo; gancho nulo deixa a ação do lugar correr; `flow:` guardado vira "Nenhuma" enquanto o gancho for nulo.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(orbe-teclado): resolução dos gestos`.
 
-### KBO-T4 — Plano de insets — **Status: pendente**
+### KBO-T4 — Plano de insets — **Status: concluída**
 - **What**: `PlanoDeInsets` (design §3) e o termo dos 36 dp em `keyboardContentReservePx` — a função de reserva pode ficar no JVM se o cálculo puro for extraído, ou o teste dela fica no unit que já cobre `GridSizing` se a extração não compensar. O contrato testável é o do plano, mais "a reserva cresce 36 dp quando há encaixe".
 - **Where**: `orbe/PlanoDeInsets.kt`; se a reserva continuar em `GridSizing.kt`, o acréscimo é um parâmetro com padrão 0 para quem não é o teclado real, e o IME passa os 36 dp na T5.
 - **Depends on**: T1. **Requirement**: KBO-09, KBO-10.
 - **Done when**: unit — content e visible iguais em todos os casos (necessário; a prova no app de trás é a T5/T10); overscan 0 e sobressair 36 não devolve plano vazio; ociosa → só conteúdo; sobressalente → conteúdo ∪ **disco** do círculo (não o retângulo); o ponto (1, 1) do contraexemplo (faixa 36, encaixe 64×28, centro (32, 32), raio 32) e os cantos do retângulo delimitador fora do disco **e** fora do conteúdo **não** estão na região; um canto fora do disco que caia no conteúdo está; um ponto do disco na faixa está. A exclusão é a `touchableRegion` da janela (`TOUCHABLE_INSETS_REGION`), não um hit-test que devolve falso depois; grade em arrasto → janela inteira; sem encaixe → sobressair 0; a reserva com encaixe é a reserva sem encaixe mais 36 dp, respeitando o teto que já existe.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(orbe-teclado): plano de insets da faixa`.
+- **Evidência (2026-10-30)**: `PlanoDeInsetsTest` cobre faixa sem overscan, disco ∪ conteúdo, recorte à janela, arrasto e reserva antes do teto; gate JVM 2.705/2.705; mutação disco→retângulo morta pelo contraexemplo. Lição: `../../project/licoes/2026-10-30-orbe-teclado-b.md`.
 
 ---
 
 ## Fase B — IME e tela
 
-### KBO-T5 — Orbe na janela do teclado — **Status: pendente**
+### KBO-T5 — Orbe na janela do teclado — **Status: concluída**
 - **What**: espaçador de 36 dp, `onComputeInsets` aplicando `PlanoDeInsets` (sem o early-return que esquece a faixa), hit-test no pai, desenho da orbe no encaixe, estado e tempo (KBO-24), háptica (KBO-26), fim do `drawMic` e dos chips. Gravando/enviar continua em `keyboardMicIntent`. Leitura ao vivo da config (KBO-29). Descrição de acessibilidade (KBO-34).
 - **Where**: `ime/KeyFlowKeyboardView.kt`, `ime/KeyFlowKeyboardService.kt`, `ime/bars/BarView.kt`, `ime/OrbeDoTecladoView.kt`.
 - **Depends on**: T3, T4. **Requirement**: KBO-05, KBO-06, KBO-07, KBO-08, KBO-09, KBO-10, KBO-11, KBO-18, KBO-21, KBO-24, KBO-26, KBO-29, KBO-34.
 - **Done when**: `assembleDebug` verde; no emulador, `OrbeDoTecladoLayoutTest` mostra a orbe ociosa dentro do encaixe e, com o estado forçado para `RECORDING`, o círculo acima da borda sem intersectar a primeira tecla. No mesmo teste, um app hospedeiro com `EditText` em `adjustResize` e outro em `adjustPan`, retrato e paisagem, com e sem overscan de grade: compara o viewport e os insets do **app** antes e depois da faixa de 36 dp — o campo focado continua visível e o conteúdo não perde 36 dp (igualdade de `contentTopInsets` e `visibleTopInsets` no IME não basta). `mic` segue no JSON da fábrica. Nenhum `DragArrowsView` é criado pelo IME.
 - **Tests**: unit do que for extrator + instrumentado curto. **Gate**: `build` e `pool instrumentar com.keyflow.ime.OrbeDoTecladoLayoutTest`. **Commit**: `feat(orbe-teclado): desenha a orbe no IME`.
+- **Evidência (2026-10-30)**: `OrbeDoTecladoLayoutTest` 9/9 (encaixe, círculo acima da borda sem tocar teclas, viewport do app de trás igual antes/depois da faixa em resize e pan, retrato e paisagem, com e sem overscan); `assembleDebug`, `testDebugUnitTest` e `lintDebug` verdes. Lição: `../../project/licoes/2026-10-30-orbe-teclado-b.md`.
 
 ### KBO-T6 — Seção na aba Teclado — **Status: pendente**
 - **What**: seção Orbe no `TecladoPanel` (KBO-01..04, aviso ao substituir uma ação já atribuída na hora de salvar — KBO-15, D9 —, KBO-19 somente leitura quando copia). Rótulo do encaixe no editor de barras vira "Orbe"; não dá para adicionar um segundo. Textos por `tr` + arquivos en/es. A seção só aparece nesta task (antes, a aba fica idêntica).

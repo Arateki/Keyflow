@@ -8,6 +8,7 @@ import com.keyflow.i18n.en.Fluxos
 import com.keyflow.i18n.en.FluxosExecucao
 import com.keyflow.i18n.en.Keyflow
 import com.keyflow.i18n.en.Modelos
+import com.keyflow.i18n.en.OrbeTeclado
 import com.keyflow.i18n.en.Privacidade
 import com.keyflow.i18n.en.Raciocinio
 import com.keyflow.i18n.en.Skins
@@ -31,6 +32,7 @@ internal val TranslationsEn: Map<String, String> = translationMap(
     FluxosExecucao,
     Keyflow,
     Modelos,
+    OrbeTeclado,
     Privacidade,
     Raciocinio,
     Skins,

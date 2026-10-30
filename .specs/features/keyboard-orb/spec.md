@@ -235,36 +235,36 @@ Respondidas em 29/10 (D5–D10). Nenhuma em aberto.
 | KBO-02 | P1-A | KBO-T6 | Pending |
 | KBO-03 | P1-A | KBO-T2, KBO-T6 | Parcial (padrão no codec/DataStore em KBO-T2; falta KBO-T6) |
 | KBO-04 | P1-A | KBO-T3, KBO-T6 | Parcial (derivação/restauração pura em KBO-T3; falta KBO-T6) |
-| KBO-05 | P1-B | KBO-T5 | Pending |
-| KBO-06 | P1-B | KBO-T5, KBO-T6 | Pending |
-| KBO-07 | P1-B | KBO-T1, KBO-T5 | Parcial (geometria JVM em KBO-T1; falta KBO-T5) |
-| KBO-08 | P1-B | KBO-T1, KBO-T5 | Parcial (geometria JVM em KBO-T1; falta KBO-T5) |
-| KBO-09 | P1-B | KBO-T4, KBO-T5, KBO-T10 | Pending |
-| KBO-10 | P1-B | KBO-T4, KBO-T5 | Pending |
-| KBO-11 | P1-B | KBO-T1, KBO-T5 | Parcial (rolagem e hit-test puro em KBO-T1; falta KBO-T5) |
+| KBO-05 | P1-B | KBO-T5 | Implementado (T5) |
+| KBO-06 | P1-B | KBO-T5, KBO-T6 | Parcial (encaixe e mic extra preservado/não desenhado em KBO-T5; falta o editor em KBO-T6) |
+| KBO-07 | P1-B | KBO-T1, KBO-T5 | Implementado (T5) |
+| KBO-08 | P1-B | KBO-T1, KBO-T5 | Implementado (T5) |
+| KBO-09 | P1-B | KBO-T4, KBO-T5, KBO-T10 | Parcial (aplicado no IME e provado no app de trás em KBO-T5; falta KBO-T10) |
+| KBO-10 | P1-B | KBO-T4, KBO-T5 | Implementado (T5) |
+| KBO-11 | P1-B | KBO-T1, KBO-T5 | Implementado (T5) |
 | KBO-12 | P1-C | KBO-T1 | Verified |
 | KBO-13 | P1-C | KBO-T3, KBO-T10 | Parcial (rajada e classificador JVM em KBO-T3; falta KBO-T10) |
 | KBO-14 | P1-C | KBO-T3, KBO-T10 | Parcial (resolvedor JVM em KBO-T3; falta KBO-T10) |
 | KBO-15 | P1-C | KBO-T3, KBO-T6 | Parcial (aviso de substituição e zero gravar/enviar em KBO-T3; falta KBO-T6) |
 | KBO-16 | P1-C | KBO-T3 | Verified |
 | KBO-17 | P1-C | KBO-T2, KBO-T3 | Verified |
-| KBO-18 | P1-C | KBO-T3, KBO-T5, KBO-T10 | Parcial (resolvedor JVM de segurar/arrastar em KBO-T3; falta KBO-T5/T10) |
+| KBO-18 | P1-C | KBO-T3, KBO-T5, KBO-T10 | Parcial (KBO-T5 liga o resolvedor; falta KBO-T10) |
 | KBO-19 | P1-D | KBO-T3, KBO-T6 | Parcial (config efetiva JVM em KBO-T3; falta KBO-T6) |
 | KBO-20 | P1-D | KBO-T2, KBO-T3 | Verified |
-| KBO-21 | P1-D | KBO-T5, KBO-T7 | Pending |
+| KBO-21 | P1-D | KBO-T5, KBO-T7 | Parcial (estado e tempo no IME em KBO-T5; skins em KBO-T7) |
 | KBO-22 | P1-E | KBO-T7 | Pending |
 | KBO-23 | P1-E | KBO-T7 | Pending |
-| KBO-24 | P1-E | KBO-T5 | Pending |
+| KBO-24 | P1-E | KBO-T5 | Implementado (T5) |
 | KBO-25 | P1-F | KBO-T3, KBO-T10 | Parcial (prioridade da Visão no resolvedor JVM em KBO-T3; falta KBO-T10) |
-| KBO-26 | P1-F | KBO-T5 | Pending |
+| KBO-26 | P1-F | KBO-T5 | Implementado (T5) |
 | KBO-27 | P1-G | KBO-T2 | Verified |
 | KBO-28 | P1-G | KBO-T2 | Verified |
-| KBO-29 | P1-G | KBO-T2, KBO-T5 | Parcial (leitura leve e flow no DataStore em KBO-T2; falta ligação no IME em KBO-T5) |
+| KBO-29 | P1-G | KBO-T2, KBO-T5 | Implementado (T5) |
 | KBO-30 | P1-H | KBO-T3 | Verified |
 | KBO-31 | P1-H | KBO-T3 | Verified |
 | KBO-32 | P2-I | KBO-T1 | Verified |
 | KBO-33 | P2-I | KBO-T6, KBO-T8 | Pending |
-| KBO-34 | P2-I | KBO-T5 | Pending |
+| KBO-34 | P2-I | KBO-T5 | Implementado (T5) |
 | KBO-35 | P2-I | KBO-T9 | Pending |
 | KBO-36 | P2-I | KBO-T10 | Pending |
 | KBO-37 | P2-I | KBO-T8 | Pending |

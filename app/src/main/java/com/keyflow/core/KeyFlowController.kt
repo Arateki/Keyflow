@@ -24,6 +24,10 @@ object KeyFlowController {
     private val _pending = MutableStateFlow<String?>(null)
     val pending: StateFlow<String?> = _pending.asStateFlow()
 
+    private val _visionActive = MutableStateFlow(false)
+    val visionActive: StateFlow<Boolean> = _visionActive.asStateFlow()
+    fun updateVisionActive(active: Boolean) { _visionActive.value = active }
+
     // Estado do botão observado pelo teclado e pelo overlay
     private val _buttonState = MutableStateFlow<ButtonState>(ButtonState.IDLE_NO_FIELD)
     val buttonState: StateFlow<ButtonState> = _buttonState.asStateFlow()

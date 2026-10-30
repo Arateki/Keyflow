@@ -234,7 +234,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 
 ## Fase D — Telas
 
-### FLX-T17 — Lista de cards, "+", vazio e Restaurar — **Status: pendente**
+### FLX-T17 — Lista de cards, "+", vazio e Restaurar — **Status: feita**
 - **What**: `FluxosPanel` reescrito (design §11.1): cards (nome, resumo, selo, chips de atalho, Incompleto, "Em execução · etapa" + Cancelar), "+ Novo fluxo" (nome sem repetir, limite 20 com motivo), estado vazio, "Restaurar fluxos padrão" com a confirmação e a prévia (T3): `PreviaRestaurar.vazia` (nada a mudar **e** nada sem espaço) diz "Os fluxos padrão já estão como no original"; `semEspaco` mostra "Sem espaço (limite de 20): …" e `nadaAGravar` desliga o botão Restaurar.
   Lê `configFluxosFlow()` e as `Settings` (para o selo). Remove o conteúdo antigo (cards fixos, "Gatilhos e atalhos", "Orquestração"). **A aba ainda não sai do "Em breve"** (T22).
 - **Where**: `ui/config/FluxosPanel.kt`, `i18n/{en,es}/Fluxos.kt`; testes `FluxosPanelTest`.
@@ -243,7 +243,9 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
   sem atalho; selo "100% no aparelho"/"Nuvem · OpenAI" acompanha as `Settings`; estado Incompleto tem ícone e texto; alvos ≥ 48 dp; `TranslationsTest` verde.
 - **Tests**: instrumentado (Compose) + unit (`TranslationsTest`). **Gate**: `quick` + `pool instrumentar com.keyflow.ui.config.FluxosPanelTest`. **Commit**: `feat(fluxos): lista de fluxos na aba`.
 
-### FLX-T18 — Modal do fluxo e editor de etapas — **Status: pendente**
+- **Registro (Fase D)**: `FluxosPanel(settings, repository, onOpen)` lê `configFluxosFlow()` (não semeia nem abre o cofre) e delega a `FluxosLista` (sem efeitos, usada pelos testes e capturas). `novoFluxo(config, nomeBase)` (puro) escolhe nome e id livres e devolve nulo com 20. `OverlayService.cancelarFluxo()` cancela inclusive o Ditar (o card chama). `ConfigModal(accessibleHeader)` dá alvos de 48 dp ao cabeçalho sem mudar os goldens. A aba continua em "Em breve" (T22): nada chama o painel ainda. Capturas em `.equipe/provas/lista-*.png`.
+
+### FLX-T18 — Modal do fluxo e editor de etapas — **Status: feita**
 - **What**: `FluxosModal` (`ConfigModal`) com nome (1..40, vazio volta), lista de etapas (ícone, nome, tipo, campo próprio da Visão/Perguntar até 500), "+ Etapa" (seletor agrupado com itens incompatíveis esmaecidos e o motivo — T1),
   reordenar por arrastar (`detectDragGesturesAfterLongPress`) **e** por ▲▼, remover, validação ao vivo (Incompleto, aviso "sem saída"), gravação na hora por `atualizarFluxos`; **Rodar agora** pelo host da T14, sem criar atalho (D13); dica de atalho dos padrão sem ligá-la (D15). Função pura `reordenar(etapas, de, para)`.
 - **Where**: `ui/config/{FluxosModal,FluxosEtapas}.kt`; testes `FluxosModalTest`, `ReordenarEtapasTest` (unit).
@@ -252,7 +254,9 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
   8 etapas desligam o "+ Etapa"; nome vazio ao sair volta ao anterior; arrastar reordena (função pura testada na JVM); fechar não perde nada; Rodar agora chama o host uma vez com o fluxo atual e nenhum gatilho é gravado, Incompleto/outro fluxo ativo desabilita com motivo; abrir os três padrão mostra a sugestão correta sem mudar DataStore/Settings/barras; restaurar continua com gatilhos intactos.
 - **Tests**: unit + instrumentado. **Gate**: `quick` + `pool instrumentar com.keyflow.ui.config.FluxosModalTest`. **Commit**: `feat(fluxos): modal e editor de etapas em lista`.
 
-### FLX-T19 — Seletor de modelo por etapa — **Status: pendente**
+- **Registro (Fase D)**: `FluxosModal(fluxoId, repository, settings, …)` grava cada mudança na hora por `atualizarFluxos` (transformação aplicada ao fluxo da transação); `FluxosModalConteudo` é o mesmo modal sem efeitos (testes e capturas). Três telas no mesmo `ConfigModal` (principal, "Nova etapa", "Modelo · etapa"; a seta volta). O arrastar fica no contêiner da lista (não em cada linha) para seguir a etapa enquanto troca de posição: toque longo na alça `≡`, vale 1 gesto contínuo. `reordenar`, `etapaNova`, `comModelo`, `comTexto` são puras em `fluxos/ReordenarEtapas.kt` (fora do pacote `ui`, para a JVM; a spec dizia `FluxosEtapas.kt`). Nome vazio ao sair volta ao anterior; padrão não renomeado grava só se a pessoa mudar o texto. "Rodar agora" chama `onRodar` (padrão: `OverlayService.runFlowNowIntent`), sem gatilho; desligado com motivo se Incompleto ou outro fluxo rodando; com este fluxo rodando mostra a etapa e Cancelar. Atalhos e Excluir ficam para a T20; o modal ainda não é aberto por nenhuma aba (T22 liga `onOpen` ao `FluxosModal`).
+
+### FLX-T19 — Seletor de modelo por etapa — **Status: feita**
 - **What**: `FluxosSeletorModelo` e a função pura `opcoesDeModelo(etapa, settings, instalados, conectados, catalogo)` (design §11.3): "Da aba" + locais instalados + provedores conectados com os modelos que a aba oferece (Visão só com visão), selo No aparelho/Nuvem,
   "Indisponível" para o `ModeloRef` que sumiu (sem trocar sozinho), "Conecte na aba X" com atalho. Nota do Agente (ferramentas só com chave de API). Nota do PaddleOCR na Visão (instrução ignorada).
 - **Where**: `ui/config/FluxosSeletorModelo.kt`, `fluxos/OpcoesDeModelo.kt` (puro); testes `OpcoesDeModeloTest`, `FluxosSeletorModeloTest`.
@@ -260,6 +264,8 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 - **Done when**: unit — `opcoesDeModelo` lista só instalados/conectados, na ordem das abas, sem nenhum item que dispare download; modelo gravado ausente aparece como indisponível; instrumentado — escolher grava `ModeloRef(origem, modelo)`, "Da aba" grava `null`;
   apagar o modelo local escolhido deixa a etapa "Indisponível" sem mudar o JSON; provedor desconectado mostra "Conecte na aba Raciocínio" e o toque abre a aba.
 - **Tests**: unit + instrumentado. **Gate**: `quick` + `pool instrumentar com.keyflow.ui.config.FluxosSeletorModeloTest`. **Commit**: `feat(fluxos): escolha de modelo por etapa`.
+
+- **Registro (Fase D)**: `opcoesDeModelo(etapa, settings, instalados, conectados, catalogo)` é puro e devolve `OpcaoDeModelo`: `DaAba(efetivo)`, `Escolha(ModeloRef)`, `Conectar(aba)` e `Indisponivel(ref)` (o ref gravado que sumiu, selecionado, sem trocar). Ordem do enum da aba, sem `CREDITS`; `LOCAL` só com os `instalados`, `SYSTEM` sempre, nuvem só com a origem em `conectados` (as demais viram "Conecte na aba X" → `onAbrirAba`). Quem monta `instalados`/`catalogo` (a `FonteDeModelos`) é a T22, com o mesmo dado das abas; o modal sem fonte oferece só "Da aba". Visão só com modelos de visão fica por conta de quem monta o catálogo. Notas: Agente (ferramentas só com chave de API) e PaddleOCR (`ocr-paddle-latin`: instrução ignorada).
 
 ### FLX-T20 — Atalhos no modal, botão da barra e excluir — **Status: pendente**
 - **What**: seção Atalhos (design §11.4), **agrupada por lugar** (FLX-57; só os lugares que existem — na entrega desta task, a orbe flutuante e o botão do teclado; os grupos da notificação e do teclado entram na T28/T29): "2 toques", "3 toques" (liga/desliga com o aviso do que era antes — `avisoDeSubstituicao`), confirmação ao tirar de outro fluxo, "Botão do teclado" (adiciona/remove `RunFlow` por `atualizarFluxosEBarras`), linhas desligadas

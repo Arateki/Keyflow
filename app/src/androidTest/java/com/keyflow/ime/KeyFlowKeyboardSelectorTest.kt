@@ -1,288 +1,149 @@
 package com.keyflow.ime
 
 import android.Manifest
-import android.content.Context
 import android.content.Intent
-import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import android.view.InputDevice
 import android.view.MotionEvent
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
-import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
-import androidx.test.uiautomator.Until
-import com.keyflow.core.shortcuts.BarButton
-import com.keyflow.ime.bars.BarView
-import android.graphics.Rect
 import com.keyflow.core.ButtonState
 import com.keyflow.core.KeyFlowController
-import com.keyflow.overlay.OverlayService
 import com.keyflow.data.SettingsRepository
+import com.keyflow.orbe.AcaoDaOrbeDoTeclado
+import com.keyflow.orbe.ConfigOrbeTeclado
+import com.keyflow.overlay.OverlayService
 import com.keyflow.ui.onboarding.DISCLOSURE_VERSION
 import kotlinx.coroutines.runBlocking
 import org.junit.After
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/**
- * Instrumentado do seletor de ações por hold no mic do teclado (KBDCTL-01..04), no IME **real**: hold
- * no mic → seletor (chips conforme o estado) → arrastar+soltar no chip → ação entregue ao
- * [com.keyflow.overlay.OverlayService] → reflete no mesmo [KeyFlowController.buttonState] da orbe.
- *
- * A geometria dos chips é lida diretamente de [KeyFlowKeyboardService.activeViewForTest]
- * (`popupRectsForTest`/`popupActionsForTest`) em vez de consultar a hierarquia via UiAutomator no meio
- * do gesto: fazer um dump de acessibilidade com o dedo sintético ainda "pressionado" interfere no foco
- * do IME real (observado como `HIDE_RESET_SHELL_COMMAND` no logcat, fechando o teclado no meio do teste).
- */
+/** Regressão do antigo seletor: os três cenários agora passam pela orbe, sem chips (KBO-05). */
 @RunWith(AndroidJUnit4::class)
 class KeyFlowKeyboardSelectorTest {
+    @get:Rule val permissions = GrantPermissionRule.grant(Manifest.permission.RECORD_AUDIO)
+    private val instrumentacao = InstrumentationRegistry.getInstrumentation()
+    private val context get() = instrumentacao.targetContext
+    private val device get() = UiDevice.getInstance(instrumentacao)
+    private val guarda = UserSettingsGuard(context)
+    private lateinit var original: ConfigOrbeTeclado
+    private val view get() = KeyFlowKeyboardService.activeViewForTest!!
+    private val repo get() = SettingsRepository(context)
 
-    @get:Rule
-    val permissions: GrantPermissionRule = GrantPermissionRule.grant(Manifest.permission.RECORD_AUDIO)
-
-    private val instrumentation = InstrumentationRegistry.getInstrumentation()
-    private val context: Context get() = instrumentation.targetContext
-    private val device: UiDevice get() = UiDevice.getInstance(instrumentation)
-
-    // Preserva a config real de quem é dono do aparelho — ver [UserSettingsGuard].
-    private val userSettings = UserSettingsGuard(context)
-
-    @Before
-    fun setUp() {
-        userSettings.capture()
-        // Este teste cobre o SELETOR DA BARRA ANTIGA, que deixou de ser o padrão em 2026-09-07 (ROL-02).
-        // Enquanto esse caminho existir no código, o teste força a flag para exercitá-lo; quando a barra
-        // antiga sair, este arquivo migra para o seletor equivalente da BarView (MicSelectorController).
-        context.getSharedPreferences("keyflow_kb_ui", Context.MODE_PRIVATE)
-            .edit().putBoolean("kbd_bars", false).commit()
+    @Before fun preparar() {
+        guarda.capture()
+        guarda.forceExpanded()
         runBlocking {
-            SettingsRepository(context).saveDisclosureConsent(DISCLOSURE_VERSION, declined = false)
+            original = repo.configOrbeTecladoOnce()
+            repo.atualizarOrbeTeclado { ConfigOrbeTeclado(copiarDaOrbePrincipal = false) }
+            repo.saveDisclosureConsent(DISCLOSURE_VERSION, declined = false)
         }
-        shell("pm grant ${context.packageName} ${Manifest.permission.RECORD_AUDIO}")
-        // Em CANCELLING o teste segura o mic duas vezes (confere o seletor, depois arrasta até "desfazer"): no emulador do CI,
-        // com quadros de 1–2 s, isso passava dos 3 s da janela, o cancelamento se concluía sozinho e o "desfazer" sumia
-        // (2 rodadas seguidas em 2026-10-10). O que se confere aqui é o seletor, não o tempo da janela (OverlayCoordinatorTest).
-        OverlayService.cancelWindowMsForTest = 30_000L
-        shell("ime enable $IME")
-        shell("ime set $IME")
-
-        val intent = Intent()
-            .setClassName(context.packageName, "com.keyflow.ui.ImeProbeActivity")
+        OverlayService.cancelWindowMsForTest = 30_000
+        shell("ime enable ${context.packageName}/com.keyflow.ime.KeyFlowKeyboardService")
+        shell("ime set ${context.packageName}/com.keyflow.ime.KeyFlowKeyboardService")
+        val intent = Intent().setClassName(context.packageName, "com.keyflow.ui.ImeProbeActivity")
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         context.startActivity(intent)
-
-        device.wait(Until.hasObject(By.desc("ime_probe_field")), TIMEOUT)
-        device.findObject(By.desc("ime_probe_field"))?.click()
-        // O awaitKeyboardAttached espera a janela do teclado assentar onde a view está (e reabre o teclado se ela não
-        // assenta): substitui os 5 s às cegas do "🎙" que nunca aparecia (o mic é desenhado pela BarView).
         awaitKeyboardAttached(device) { context.startActivity(intent) }
+        esperar("configuração própria não chegou ao teclado") { !view.configOrbeForTest.copiarDaOrbePrincipal && view.circuloDaOrbe != null }
     }
 
-    @After
-    fun tearDown() {
-        runCatching { OverlayService.stop(context) }
+    @After fun restaurar() {
+        OverlayService.stop(context)
         OverlayService.cancelWindowMsForTest = null
-        context.getSharedPreferences("keyflow_kb_ui", Context.MODE_PRIVATE).edit().remove("kbd_bars").commit()
-        userSettings.restore()
+        if (::original.isInitialized) runBlocking { repo.atualizarOrbeTeclado { original } }
+        guarda.restore()
         device.pressHome()
-        // KeyFlowController é um singleton de processo (sobrevive ao fim deste teste, dentro do mesmo
-        // gate): sem isso, o próximo teste herdaria PAUSED/CANCELLING e o mic não mostraria "🎙" ocioso.
         KeyFlowController.clearInserter()
         KeyFlowController.updateButtonState(ButtonState.IDLE_NO_FIELD)
     }
 
-    @Test
-    fun holdWhileRecordingOpensSelectorWithPauseAndCancel() {
-        startRecordingByTappingMic()
-
-        holdMic()
-        // KBDCTL-01: RECORDING oferece pausar/retomar e cancelar.
-        val view = KeyFlowKeyboardService.activeViewForTest!!
-        assertEquals(listOf(MicAction.PAUSE_RESUME, MicAction.CANCEL), view.popupActionsForTest)
-        releaseAtMic() // solta de volta no botão (nenhum chip destacado) → nenhuma ação
-
-        waitUntilButtonState(ButtonState.RECORDING)
+    @Test fun segurarGravandoNaoAbreChipsNemMoveAOrbe() {
+        gravar()
+        val antes = view.circuloDaOrbe
+        val (x, y) = centro()
+        val inicio = SystemClock.uptimeMillis()
+        injetar(MotionEvent.ACTION_DOWN, x, y, inicio)
+        esperar("segurar não entrou no modo de arrasto") { view.arrastoDaOrbeForTest }
+        assertTrue(view.barViewsForTest.none { it.selectorOpenForTest })
+        assertEquals(antes, view.circuloDaOrbe)
+        injetar(MotionEvent.ACTION_UP, x, y, inicio)
+        assertEquals(ButtonState.RECORDING, KeyFlowController.buttonState.value)
     }
 
-    @Test
-    fun dragToCancelChipEntersCancellingThenUndoChipReturnsToPaused() {
-        startRecordingByTappingMic()
-
-        // KBDCTL-02/03: arrasta até o chip e solta → aciona; entrega ao OverlayService (ACTION_CANCEL).
-        selectChipAndWaitFor(MicAction.CANCEL, ButtonState.CANCELLING)
-
-        // KBDCTL-01: em CANCELLING o seletor só oferece desfazer.
-        holdMic()
-        assertEquals(listOf(MicAction.UNDO), KeyFlowKeyboardService.activeViewForTest!!.popupActionsForTest)
-        releaseAtMic()
-        selectChipAndWaitFor(MicAction.UNDO, ButtonState.PAUSED)
+    @Test fun arrastarParaCentroCancelaEToqueConfiguradoDesfaz() {
+        gravar()
+        val (x, y) = centro()
+        val inicio = SystemClock.uptimeMillis()
+        injetar(MotionEvent.ACTION_DOWN, x, y, inicio)
+        esperar("segurar não entrou no modo de arrasto") { view.arrastoDaOrbeForTest }
+        val sinal = if (x < device.displayWidth / 2) 1 else -1
+        val destino = x + sinal * view.circuloDaOrbe!!.diametro
+        injetar(MotionEvent.ACTION_MOVE, destino, y, inicio)
+        injetar(MotionEvent.ACTION_UP, destino, y, inicio)
+        esperar("arrasto lateral não cancelou") { KeyFlowController.buttonState.value == ButtonState.CANCELLING }
+        configurarToque(AcaoDaOrbeDoTeclado.CancelarDesfazer)
+        tocar()
+        esperar("ação configurada não desfez o cancelamento") { KeyFlowController.buttonState.value == ButtonState.PAUSED }
+        assertTrue(view.barViewsForTest.none { it.selectorOpenForTest })
     }
 
-    @Test
-    fun dragToPauseChipPausesThenResumeChipResumesRecording() {
-        startRecordingByTappingMic()
-
-        selectChipAndWaitFor(MicAction.PAUSE_RESUME, ButtonState.PAUSED)
-        // KBDCTL-04: o mic do teclado reflete o mesmo estado/tempo do KeyFlowController (mesmo da orbe).
-        selectChipAndWaitFor(MicAction.PAUSE_RESUME, ButtonState.RECORDING)
+    @Test fun configuracaoAoVivoPausaERetomaSemRecriarTeclado() {
+        gravar()
+        val antes = view
+        configurarToque(AcaoDaOrbeDoTeclado.PausarRetomar)
+        assertSame(antes, view)
+        tocar()
+        esperar("toque remapeado não pausou") { KeyFlowController.buttonState.value == ButtonState.PAUSED }
+        tocar()
+        esperar("toque remapeado não retomou") { KeyFlowController.buttonState.value == ButtonState.RECORDING }
     }
 
-    // ── ações de alto nível ──────────────────────────────────────────────────
-
-    private fun startRecordingByTappingMic() {
-        // O mic é desenhado pela BarView (ROL-02) — quem o expõe é o nó de acessibilidade.
-        (device.findObject(By.desc("🎙")) ?: device.findObject(By.text("🎙")))?.click()
-        device.wait(Until.hasObject(By.textContains("●")), TIMEOUT)
-        waitUntilButtonState(ButtonState.RECORDING)
+    private fun configurarToque(acao: AcaoDaOrbeDoTeclado) {
+        runBlocking { repo.atualizarOrbeTeclado { it.copy(toque1 = acao) } }
+        esperar("ação não chegou ao IME") { view.configOrbeForTest.toque1 == acao }
     }
-
-    private var micDownX = 0
-    private var micDownY = 0
-    private var gestureDownTime = 0L
-
-    private fun holdMic() {
-        val mic = KeyFlowKeyboardService.activeViewForTest!!.micScreenRect()
-        micDownX = mic.centerX()
-        micDownY = mic.centerY()
-        gestureDownTime = SystemClock.uptimeMillis()
-        inject(MotionEvent.ACTION_DOWN, micDownX, micDownY, gestureDownTime)
-        // HOLD_MS = 280ms na produção; folga para o host lento. Lê a geometria real do popup já aberto,
-        // já com TODOS os chips medidos (rects não-vazios) — a 1ª passagem de layout de um LinearLayout
-        // horizontal pode publicar o 1º chip antes do(s) seguinte(s) assentarem.
-        waitUntil("seletor não abriu com a geometria completa (selectorOpenForTest/popupRectsForTest)", timeoutMs = 3000) {
-            val view = KeyFlowKeyboardService.activeViewForTest
-            val rects = view?.popupRectsForTest
-            view?.selectorOpenForTest == true &&
-                rects != null &&
-                rects.size == view.popupActionsForTest.size &&
-                rects.all { it.width() > 0 && it.height() > 0 }
+    private fun gravar() {
+        tocar()
+        esperar("toque não iniciou gravação") { KeyFlowController.buttonState.value == ButtonState.RECORDING && view.micLabelForTest?.startsWith("●") == true }
+    }
+    private fun tocar() {
+        val (x, y) = centro()
+        val inicio = SystemClock.uptimeMillis()
+        injetar(MotionEvent.ACTION_DOWN, x, y, inicio)
+        injetar(MotionEvent.ACTION_UP, x, y, inicio)
+    }
+    private fun centro(): Pair<Int, Int> {
+        var ponto = 0 to 0
+        instrumentacao.runOnMainSync {
+            val posicao = IntArray(2).also { view.getLocationOnScreen(it) }
+            val circulo = view.circuloDaOrbe!!
+            ponto = posicao[0] + circulo.centroX to posicao[1] + circulo.centroY
         }
+        return ponto
     }
-
-    private fun dragAndReleaseOnAction(action: MicAction) {
-        val view = KeyFlowKeyboardService.activeViewForTest!!
-        val index = view.popupActionsForTest.indexOf(action)
-        assertTrue("ação $action não está no seletor atual (${view.popupActionsForTest})", index >= 0)
-        val rect = view.popupRectsForTest[index]
-        val x = rect.centerX()
-        val y = rect.centerY()
-        inject(MotionEvent.ACTION_MOVE, x, y, SystemClock.uptimeMillis())
-        Thread.sleep(80)
-        inject(MotionEvent.ACTION_UP, x, y, SystemClock.uptimeMillis())
+    private fun injetar(acao: Int, x: Int, y: Int, inicio: Long) {
+        val evento = MotionEvent.obtain(inicio, SystemClock.uptimeMillis(), acao, x.toFloat(), y.toFloat(), 0)
+        evento.source = InputDevice.SOURCE_TOUCHSCREEN
+        try { assertTrue(instrumentacao.uiAutomation.injectInputEvent(evento, true)) } finally { evento.recycle() }
     }
-
-    /**
-     * Hold → arrasta até [action] → solta, esperando o estado resultante. O gesto às vezes não surte
-     * efeito mesmo com a geometria correta (`highlightedIndexForTest` confirmado certo antes do UP), daí
-     * as tentativas.
-     *
-     * A explicação antiga — "a entrega do toque via `sendPointerSync` é intermitente sob carga" — foi
-     * medida em `KeyFlowKeyboardSpellCheckerTest` (2026-09-08) e lá era FALSA: o toque chegava e o
-     * `InputConnection` aceitava o texto; a leitura pelo UiAutomator é que estava velha. Aqui a causa
-     * NÃO foi medida — se este teste voltar a incomodar, medir antes de repetir aquela explicação.
-     */
-    private fun selectChipAndWaitFor(action: MicAction, expected: ButtonState, attempts: Int = 3) {
-        var lastError: Throwable? = null
-        val startStates = mutableListOf<ButtonState>()
-        repeat(attempts) { attempt ->
-            startStates += KeyFlowController.buttonState.value
-            try {
-                holdMic()
-                dragAndReleaseOnAction(action)
-                if (waitUntilOrFalse(timeoutMs = 2500) { KeyFlowController.buttonState.value == expected }) return
-                lastError = AssertionError("estado ainda é ${KeyFlowController.buttonState.value}")
-            } catch (e: Throwable) {
-                lastError = e
-            }
-            // Recuperação antes de tentar de novo: encerra o gesto que ficou "pendurado". CANCEL, não UP: um UP no mic com o
-            // seletor fechado é um toque, e o toque muda o estado (em IDLE começava a gravar de novo e escondia a causa).
-            runCatching { cancelGesture() }
-            Thread.sleep(200)
-        }
-        throw AssertionError(
-            "estado não chegou a $expected após $attempts tentativas de \"$action\"; " +
-                "atual: ${KeyFlowController.buttonState.value}; no início de cada tentativa: $startStates",
-            lastError,
-        )
-    }
-
-    private fun releaseAtMic() {
-        inject(MotionEvent.ACTION_UP, micDownX, micDownY, SystemClock.uptimeMillis())
-    }
-
-    private fun cancelGesture() {
-        inject(MotionEvent.ACTION_CANCEL, micDownX, micDownY, SystemClock.uptimeMillis())
-    }
-
-    private fun inject(action: Int, x: Int, y: Int, time: Long) {
-        val event = MotionEvent.obtain(gestureDownTime, time, action, x.toFloat(), y.toFloat(), 0).apply {
-            source = InputDevice.SOURCE_TOUCHSCREEN
-        }
-        instrumentation.sendPointerSync(event)
-        event.recycle()
-    }
-
-    private fun waitUntilButtonState(expected: ButtonState, timeoutMs: Long = TIMEOUT) {
-        waitUntil("esperando $expected, estado atual: ${KeyFlowController.buttonState.value}", timeoutMs) {
-            KeyFlowController.buttonState.value == expected
-        }
-    }
-
-    private fun waitUntil(message: String, timeoutMs: Long = TIMEOUT, condition: () -> Boolean) {
-        if (!waitUntilOrFalse(timeoutMs, condition)) throw AssertionError(message)
-    }
-
-    private fun waitUntilOrFalse(timeoutMs: Long = TIMEOUT, condition: () -> Boolean): Boolean {
-        val deadline = System.currentTimeMillis() + timeoutMs
-        while (System.currentTimeMillis() < deadline) {
-            if (condition()) return true
+    private fun esperar(mensagem: String, condicao: () -> Boolean) {
+        val fim = SystemClock.uptimeMillis() + 15000
+        while (SystemClock.uptimeMillis() < fim) {
+            if (condicao()) return
             Thread.sleep(50)
         }
-        return false
+        throw AssertionError(mensagem)
     }
-
-    private fun shell(command: String) {
-        val fd: ParcelFileDescriptor = instrumentation.uiAutomation.executeShellCommand(command)
-        try {
-            java.io.FileInputStream(fd.fileDescriptor).readBytes()
-        } finally {
-            fd.close()
+    private fun shell(comando: String) {
+        instrumentacao.uiAutomation.executeShellCommand(comando).use { fd ->
+            java.io.FileInputStream(fd.fileDescriptor).use { it.readBytes() }
         }
     }
-
-    private companion object {
-        const val IME = "com.arateki.keyflow/com.keyflow.ime.KeyFlowKeyboardService"
-        const val TIMEOUT = 5000L
-    }
-}
-
-// ── ponte para a BarView ────────────────────────────────────────────────────
-// O mic e o seletor deixaram de ser Views próprias quando as barras Canvas viraram o padrão (ROL-02):
-// hoje o mic é desenhado pela BarView e o seletor é o MicSelectorController. Os acessores abaixo mantêm
-// a leitura que estes testes já faziam, agora apontando para a barra ativa.
-
-/**
- * A barra viva. `barViewsForTest` acumula as barras dos DOIS modos (o `init` constrói o expandido e o
- * colapsado), e `setExpanded` ainda reconstrói a pilha — então quem vale é a que está de fato na tela;
- * a última da lista serve só de rede quando nada foi anexado ainda (view fora de janela, em teste).
- */
-private val KeyFlowKeyboardView.activeBar: BarView
-    get() = barViewsForTest.lastOrNull { it.isShown } ?: barViewsForTest.last()
-private val KeyFlowKeyboardView.selectorOpenForTest: Boolean get() = activeBar.selectorOpenForTest
-private val KeyFlowKeyboardView.popupActionsForTest: List<MicAction> get() = activeBar.popupActionsForTest
-private val KeyFlowKeyboardView.popupRectsForTest: List<Rect> get() = activeBar.popupRectsForTest
-private val KeyFlowKeyboardView.highlightedIndexForTest: Int get() = activeBar.highlightedIndexForTest
-
-/** Retângulo de tela do botão de mic dentro da barra ativa. */
-private fun KeyFlowKeyboardView.micScreenRect(): Rect {
-    val bar = activeBar
-    val index = bar.layoutForTest.buttons.indexOfFirst { it.button == BarButton.Mic }
-    check(index >= 0) { "a barra ativa não tem botão de mic: ${bar.layoutForTest.buttons.map { it.button }}" }
-    return bar.buttonScreenRectForTest(index)
 }
