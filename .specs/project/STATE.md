@@ -6,6 +6,8 @@
 > [`licoes/`](licoes/LEIA-ME.md), `AAAA-MM-DD-assunto.md`, um por assunto. Este arquivo conflitava em quase toda
 > mesclagem de branches paralelas; arquivo novo não conflita. O conteúdo abaixo fica como está, para consulta.
 
+> Atualização aprovada em 2026-10-30: [toolchain Kotlin 2.4.21 / SDK 37](licoes/2026-10-30-toolchain-pr.md). A lição detalhada permanece no arquivo próprio.
+
 ## Decisões (do grill de 2026-06-26)
 
 | # | Decisão | Escolha | Razão |

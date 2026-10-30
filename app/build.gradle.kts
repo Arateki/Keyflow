@@ -487,7 +487,7 @@ dependencies {
     // ExploreByTouchHelper (KC-T8/A11Y-01..02): nós virtuais de acessibilidade na grade Canvas.
     implementation("androidx.customview:customview:1.1.0")
 
-    // Prova da toolchain: BOM estável 2026.09.00 → Compose 1.12.1; exige compileSdk 37.
+    // BOM estável 2026.09.00 → Compose 1.12.1; exige compileSdk 37.
     val composeBom = platform("androidx.compose:compose-bom:2026.09.00")
     implementation(composeBom)
     androidTestImplementation(composeBom)
@@ -538,9 +538,8 @@ dependencies {
     //  - minSdk 24 (igual ao do app); ABIs publicadas: SÓ arm64-v8a e x86_64 (liblitertlm_jni.so ~21,5 MB e ~25,6 MB).
     //    NÃO há armeabi-v7a: num aparelho ARM de 32 bits o load falha com UnsatisfiedLinkError, que o LiteRtBackend
     //    traduz numa mensagem clara. O x86_64 só entra no debug (emulador), como o do sherpa-onnx.
-    //  - FIXADO em 0.16.1: historicamente, as 0.17.x (metadados Kotlin 2.4.0, reflect 2.4.0 e coroutines 1.11.0)
-    //    excediam o Kotlin 2.2.10 do projeto; a 0.16.1 tem metadados 2.3.0 e dependências 2.2.21/1.9.0.
-    //    A análise da toolchain mede a resolução nova numa sonda isolada; este experimento não adota outro runtime.
+    //  - Mantido em 0.16.1 nesta atualização: Kotlin 2.4.21 já compila as versões novas na sonda,
+    //    mas a adoção de outro runtime e sua validação de JNI/modelos pertencem a outra frente.
     //  - API usada (Kotlin, conferida no classes.jar): Engine(EngineConfig(modelPath, backend, cacheDir)).initialize(),
     //    Engine.createConversation(ConversationConfig(systemInstruction)), Conversation.sendMessageAsync(texto,
     //    MessageCallback{onMessage,onDone,onError}), Conversation.cancelProcess(), Message.toString() = o texto.
