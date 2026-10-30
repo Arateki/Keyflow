@@ -53,3 +53,16 @@ contraexemplo de cantos (`PlanoDeInsetsTest`, 1 falha em 6); o fonte correto foi
 - Mutação: `touchableRegion` começando em 0 (faixa tocável) é morta por `regiaoAplicadaNaJanelaExcluiCantosEConservaConteudo`.
 - Goldens: 41 de 272 mudaram (barras, teclados de skin, `config-teclado*`, `config-unlock*`, `tour-keyboard-mic*`), como
   esperado pela troca do mic pela orbe e pela faixa de 36 dp. Nenhum foi aprovado: a KBO-T9 aprova.
+
+### Revisão do PR #86
+
+- P2: as prévias miniatura (cena do tour, 116 dp, e a prévia de tamanho na aba Teclado) têm moldura de altura fixa; a faixa
+  de 36 dp entrava sem escala e empurrava as fileiras. `KeyFlowKeyboardView` ganhou `reservarFaixaDaOrbe` (padrão `true`,
+  só o teclado real e a galeria); as duas prévias passam `false`. A orbe continua desenhada no encaixe. Teste:
+  `KeyboardSceneTest.theMiniatureKeyboardDoesNotReserveTheOrbStrip` (vermelho com a faixa: esperado 0, veio 95 px) e
+  `previaMiniaturaNaoReservaFaixaEMostraTodasAsFileiras` (a faixa é exatamente a diferença de altura). Um limite de altura
+  absoluto não serve: o teste mede a view em largura de tela, não na do cartão.
+- Goldens aprovados (41), conferidos a olho: o único diferença visual é o mic virar orbe; `config-teclado*`, `config-unlock*`
+  e `tour-keyboard-mic*` voltam ao mesmo y das fileiras (3 fileiras visíveis na prévia, como antes).
+- `keyboard-glitch-burst*` (22050 px) e `keyboard-rosegold-shimmer-dark` (4943 px) aceitos: o efeito fatia a altura da view,
+  que agora inclui a faixa; as teclas continuam inteiras e só o frame do efeito se desloca.

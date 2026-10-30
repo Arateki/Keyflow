@@ -84,6 +84,8 @@ class KeyFlowKeyboardView(
     private val frozenSeconds: Int? = null,
     // Escala visual (1f = produção). A demo da aba Modo usa < 1 para um teclado menor, proporcional.
     private val scale: Float = 1f,
+    // Prévias miniatura (tour, tamanho) não reservam a faixa transparente de 36 dp: a moldura delas tem altura fixa e a faixa cortaria a última fileira.
+    private val reservarFaixaDaOrbe: Boolean = true,
     private val clock: () -> Long = { SystemClock.elapsedRealtime() },
     // Prévia de tamanho: barras divididas na largura que houver, sem rolar (ver BarView.fitWidth).
     private val barsFitWidth: Boolean = false,
@@ -125,7 +127,7 @@ class KeyFlowKeyboardView(
 
     private var expandedMode = true
     private var faixaParaTestePx: Int? = null
-    private val reservaDaOrbePx: Int = if ((barsConfig.barsFor(true) + barsConfig.barsFor(false))
+    private val reservaDaOrbePx: Int = if (reservarFaixaDaOrbe && (barsConfig.barsFor(true) + barsConfig.barsFor(false))
         .any { BarButton.Mic in it.buttons }) (GeometriaDaOrbe.FAIXA_SOBRESSALENTE_DP * resources.displayMetrics.density).roundToInt() else 0
     val faixaDaOrbePx: Int get() = if (barsConfig.barsFor(expandedMode).any { BarButton.Mic in it.buttons })
         faixaParaTestePx ?: reservaDaOrbePx else 0
@@ -246,7 +248,7 @@ class KeyFlowKeyboardView(
 
     /** Acessores somente-leitura para testes instrumentados (KBD-01/02; seletor do mic — KBDCTL-01..04). */
     val expandedForTest: Boolean get() = childCount > 0 && getChildAt(childCount - 1) === expandedLayout
-    val micLabelForTest: String? get() = if (faixaDaOrbePx > 0) orbe.rotulo else null
+    val micLabelForTest: String? get() = if (barsConfig.barsFor(expandedMode).any { BarButton.Mic in it.buttons }) orbe.rotulo else null
     val barViewsForTest: List<BarView> get() = barViews.toList()
     val canvasGridForTest: KeyboardGridView? get() = canvasGrid
     /** A faixa de sugestões vive dentro da `BarView` que tem o slot `Candidates` (BAR-01). */

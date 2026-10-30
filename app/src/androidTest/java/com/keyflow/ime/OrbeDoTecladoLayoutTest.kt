@@ -69,6 +69,20 @@ class OrbeDoTecladoLayoutTest {
             assertEquals(faixa, conteudo.top - view.gridOverscanPx)
         }
     }
+    @Test fun previaMiniaturaNaoReservaFaixaEMostraTodasAsFileiras() {
+        instrumentacao.runOnMainSync {
+            fun alturaDe(reservar: Boolean): Int {
+                val view = KeyFlowKeyboardView(context, {}, {}, onHide = {}, frozenSeconds = 12, scale = 0.62f, reservarFaixaDaOrbe = reservar)
+                view.setExpanded(true)
+                view.measure(View.MeasureSpec.makeMeasureSpec(context.resources.displayMetrics.widthPixels, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+                return view.measuredHeight.also { assertEquals(if (reservar) (36 * context.resources.displayMetrics.density).roundToInt() else 0, view.faixaDaOrbePx) }
+            }
+            val faixa = (36 * context.resources.displayMetrics.density).roundToInt()
+            assertEquals(faixa, alturaDe(true) - alturaDe(false))
+        }
+    }
+
     @Test fun ociosaCabeNoEncaixeEGravandoNaoIntersectaTeclas() {
         device.setOrientationNatural()
         abrirHospedeiro(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE, false)
