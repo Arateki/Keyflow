@@ -46,7 +46,7 @@ Fase D  telas:                     (T3, T4, T7) ──► T17 ──► T18 ─�
                                     (T17..T21) ──► T22
 Fase E  fechamento:                (T17..T21) ──► T23       T22 ──► T24
                                     (T14, T15, T16) ──► T25 ──► T26 [YAN] ──► T27
-Fase F  outras orbes (dependentes): (T5, T14, T15, T20, NTF-T13) ──► T28      T29 [bloqueada: orbe do teclado sem spec]
+Fase F  outras orbes (dependentes): (T5, T14, T15, T20, NTF-T13) ──► T28      (T5, T14, T20, KBO-T3, KBO-T5) ──► T29
 ```
 
 `[P]` = pode andar em paralelo com a fase anterior (só unit/refatoração sem comportamento novo). Tudo que usa o emulador serializa (TESTING.md). A Fase A+B
@@ -101,7 +101,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 - **Where**: `fluxos/{RoteadorGatilhos,PoliticaGatilhos}.kt`; testes `RoteadorGatilhosTest`, `PoliticaGatilhosTest`.
 - **Depends on**: T1. **Requirement**: FLX-33, FLX-34, FLX-35, FLX-37, FLX-38, FLX-50, FLX-57 (roteador), FLX-60.
 - **Done when**: unit — 2 e 3 toques ligados rodam e a ação do `Settings` não; sem gatilho a ação roda; 4 toques com `NEAREST_DOWN` cai no 3 ligado a fluxo, e no 2 se o 3 está livre e sem ação; `CANCEL` não faz nada;
-  1 toque nunca é gatilho; fluxo inválido → `Incompleto` (e a ação sombreada **não** roda); `ligar` numa superfície ocupada tira do outro e nunca deixa dois; `excluir` devolve os `botaoId`;
+  1 toque nunca é gatilho na flutuante (e é gatilho em `NOTIFICACAO`, onde é remapeável); fluxo inválido → `Incompleto` (e a ação sombreada **não** roda); `ligar` numa superfície ocupada tira do outro e nunca deixa dois; `excluir` devolve os `botaoId`;
   o mesmo gesto em lugares diferentes são gatilhos diferentes (`Orbe(FLUTUANTE, 2)` ≠ `Orbe(NOTIFICACAO, 2)`); `NOTIFICACAO`/`TECLADO` sem gatilho → `AcaoDoLugar(n)`; com `copiaDaPrincipal` os gatilhos lidos são os da flutuante e a lista de gatilhos **não muda** (propriedade: ligar/desligar "copiar" é só uma consulta);
   `avisoDeSubstituicao` nomeia ação/fluxo efetivo anterior e toque/gesto/botão/lugar para qualquer substituição; não privilegia gravar. `NONE`/mesma ação não gera aviso de perda; fluxo já ligado usa seu nome, não a ação sombreada.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(fluxos): roteamento de gatilhos e política de ligação`.
@@ -318,7 +318,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 ## Fase F — Outras orbes como gatilho (dependentes; não bloqueiam o fechamento da T27)
 
 ### FLX-T28 — Gatilhos da orbe da notificação — **Status: pendente (depende da feature `notification`)**
-- **What**: o lado de Fluxos do FLX-58/FLX-60: `lugaresDisponiveis()` passa a incluir `NOTIFICACAO` quando a aba Notificação está ligada; o modal ganha o grupo **"Orbe da notificação"** (2 e 3 toques, mesmo aviso de substituir nomeando o lugar; com "copiar" ligado vira a linha somente leitura "Copiando da orbe principal" que leva à aba Notificação);
+- **What**: o lado de Fluxos do FLX-58/FLX-60: `lugaresDisponiveis()` passa a incluir `NOTIFICACAO` quando a aba Notificação está ligada; o modal ganha o grupo **"Orbe da notificação"** (1, 2 e 3 toques, mesmo aviso de substituir nomeando o lugar; com "copiar" ligado vira a linha somente leitura "Copiando da orbe principal" que leva à aba Notificação);
   `RoteadorGatilhos` já resolve o lugar (T5) — esta task liga a **consulta real** do `copiaDaPrincipal`/`temAcaoPropria` à `ConfigNotificacao` e o disparo (`fluxoHost.disparar(fluxo, Orbe(NOTIFICACAO, n))`) com as precondições do FLX-39; o toque na orbe da notificação durante o fluxo o cancela (FLX-29).
   O lado da notificação (resolução da rajada, catálogo "Rodar fluxo") é a **NTF-T20**; as duas se entregam juntas.
 - **Where**: `ui/config/FluxosAtalhos.kt`, `fluxos/app/FluxoHost.kt`, `fluxos/app/LugaresDisponiveis.kt`; testes `FluxosAtalhosTest` (estendido), `OverlayServiceFluxoTest` (estendido) e a rota `config-fluxos-atalhos-lugares` (claro/escuro).
@@ -327,9 +327,9 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
   O teste **ponta a ponta** de rodar o fluxo pelo toque na notificação (inclusive a recusa com a tela bloqueada e o cancelar no toque) mora na **NTF-T20**.
 - **Tests**: instrumentado + goldens. **Gate**: `pool instrumentar com.keyflow.ui.config.FluxosAtalhosTest com.keyflow.overlay.OverlayServiceFluxoTest com.keyflow.overlay.OverlayServiceNotificacaoTest` + `pool telas`. **Commit**: `feat(fluxos): orbe da notificação dispara fluxos`.
 
-### FLX-T29 — Gatilhos da orbe do teclado — **Status: pendente (BLOQUEADA: a orbe do teclado não tem spec)**
-- **What**: o mesmo da T28 para `TECLADO` (FLX-59): grupo "Orbe do teclado" no modal, consulta do `copiaDaPrincipal`/`temAcaoPropria` da orbe do teclado, disparo pelo mesmo `FluxoHost`. **Só começa depois** que existir a spec da orbe do teclado (dúvida Q8) e que a orbe do teclado esteja entregue; a spec dela diz quais interações o teclado suporta e se algo além de 2 e 3 toques vira gatilho (nesse caso, nova linha de requisito aqui).
-- **Where**: a definir com a spec da orbe do teclado (`ime/`, `ui/config/FluxosAtalhos.kt`).
-- **Depends on**: T5, T14, T20 e a feature da orbe do teclado. **Requirement**: FLX-59, FLX-60.
-- **Done when**: critérios análogos aos da T28, no teclado real (instrumentado `KeyFlowKeyboard…` da orbe do teclado) e nos goldens do teclado.
-- **Tests**: instrumentado + goldens. **Gate**: a definir. **Commit**: `feat(fluxos): orbe do teclado dispara fluxos`.
+### FLX-T29 — Gatilhos da orbe do teclado — **Status: pendente** (spec: `.specs/features/keyboard-orb/`)
+- **What**: o mesmo da T28 para `TECLADO` (FLX-59). A spec da orbe do teclado responde a Q8: o teclado suporta as sete interações (KBO-12); gatilho de fluxo continua **só 2 e 3 toques** (FLX-57). Segurar e arrastar não viram superfície. "Copiar" é `ConfigOrbeTeclado.copiarDaOrbePrincipal` (KBO-19, KBO-31, FLX-60): com ela ligada, os gatilhos lidos são os da orbe flutuante e os próprios `Orbe(TECLADO, n)` ficam guardados. O grupo "Orbe do teclado" no modal e o disparo `fluxoHost.disparar(fluxo, Orbe(TECLADO, n))` só começam depois que a orbe estiver entregue (KBO-T3 e KBO-T5). O gancho do lado do teclado, até lá, é nulo (KBO-30) — não há ciclo. Não se cria uma segunda T29.
+- **Where**: `ui/config/FluxosAtalhos.kt`, `fluxos/app/FluxoHost.kt`, a orbe em `ime/` chama o roteador. Spec: `.specs/features/keyboard-orb/`.
+- **Depends on**: T5, T14, T20, **KBO-T3**, **KBO-T5**. **Requirement**: FLX-59, FLX-60 (a parte do teclado).
+- **Done when**: critérios análogos aos da T28, no teclado real: ligar o 2 toques do teclado a um fluxo avisa nomeando o lugar e o que foi substituído, e só liga ao confirmar; o 2 toques da flutuante não muda; com "copiar" ligado o grupo some e `resolverToques(TECLADO, …)` devolve o gatilho da flutuante; desligar "copiar" reativa o gatilho próprio (a lista não muda ao copiar); 1 toque não consulta o roteador. Instrumentado com `pool instrumentar` no emulador. **Nunca** `connectedAndroidTest` no A32. Goldens do teclado bit-idênticos, salvo rota nova aprovada de propósito.
+- **Tests**: instrumentado + goldens. **Gate**: `pool instrumentar` das classes de atalho de Fluxos e `com.keyflow.ime.OrbeDoTecladoGestureTest`. **Commit**: `feat(fluxos): orbe do teclado dispara fluxos`.

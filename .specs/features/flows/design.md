@@ -114,7 +114,7 @@ suspend fun atualizarFluxosEBarras(f: (ConfigFluxos, BarsConfig) -> Pair<ConfigF
   Sem `flows_json`, `flow_triggers_json` é ignorado (FLX-40).
 - **Codec tolerante (FLX-47).** `org.json` (como `ShortcutCodec`). Regras: ignora campo desconhecido; descarta o fluxo malformado e
   mantém os outros; etapa de tipo desconhecido → `Etapa.Desconhecida`; corta nome (40), instrução/sistema (500), etapas (8),
-  fluxos (20), gatilhos (64); ids repetidos → o primeiro; gatilho com `surface` ilegível é descartado; `orb:<lugar>:N` com lugar desconhecido ou N fora de {2,3}
+  fluxos (20), gatilhos (64); ids repetidos → o primeiro; gatilho com `surface` ilegível é descartado; `orb:<lugar>:N` com lugar desconhecido ou N fora de {2,3} (ou {1,2,3} em `notificacao`)
   descartado; superfície duplicada → mantém a primeira (D7). Nunca lança.
 - **Sem segredo (FLX-46).** O codec só escreve os campos do esquema; não existe campo para chave/endpoint/header. O teste varre o
   JSON de um fluxo com todas as etapas (ver §10).
@@ -176,7 +176,7 @@ when (val r = RoteadorGatilhos.resolverToques(LugarDaOrbe.FLUTUANTE, count, cach
 
 `resolverToques(lugar, count, config, politica, settings)` (puro; o mesmo para os três lugares, §5.3):
 1. **Lugar efetivo**: `lugarDosGatilhos = if (lugar != FLUTUANTE && politica.copiaDaPrincipal) FLUTUANTE else lugar` (FLX-60). Os gatilhos **próprios** do lugar que copia não são lidos nem apagados.
-2. `n = count` se 2..3; se `count > 3`: `CANCEL` → `Nada`; `NEAREST_DOWN` → o maior `n ∈ {3, 2}` tal que `gatilho(Orbe(lugarDosGatilhos, n)) != null || politica.temAcaoPropria(n)` (um gesto ligado a fluxo — válido ou não — conta como ativo; para a flutuante `temAcaoPropria = { settings.shortcutForTaps(it) != NONE }`); nenhum → `Nada`. `count < 2` → a ação própria (1 toque nunca é gatilho).
+2. `n = count` se 2..3; se `count > 3`: `CANCEL` → `Nada`; `NEAREST_DOWN` → o maior `n ∈ {3, 2}` tal que `gatilho(Orbe(lugarDosGatilhos, n)) != null || politica.temAcaoPropria(n)` (um gesto ligado a fluxo — válido ou não — conta como ativo; para a flutuante `temAcaoPropria = { settings.shortcutForTaps(it) != NONE }`); nenhum → `Nada`. `count == 1` → só `NOTIFICACAO` consulta `gatilho(Orbe(NOTIFICACAO, 1))` (lá o toque simples é remapeável); nos outros lugares é a ação própria (na flutuante o 1 toque é o gesto nativo e nunca é gatilho).
 3. Se `gatilho(Orbe(lugarDosGatilhos, n))` existe: fluxo válido → `Rodar`; inválido ou sumido → `Incompleto`.
 4. Senão → `AcaoDoSettings(settings.shortcutForTaps(n))` para a flutuante e `AcaoDoLugar(n)` para os outros (o lugar executa a ação dele: a notificação, a da config dela).
 
@@ -215,13 +215,12 @@ data class PoliticaDoLugar(
 )
 ```
 
-- **Orbe da notificação** (feature `notification`; só toques — 1/2/3, dos quais 2 e 3 são gatilho): depois que a rajada de toques assenta
+- **Orbe da notificação** (feature `notification`; só toques — 1/2/3, **todos** gatilho, porque na notificação o 1 toque é remapeável): depois que a rajada de toques assenta
   (NTF-09), o `ResolvedorDeInteracao` da notificação chama `resolverToques(NOTIFICACAO, n, cachedFluxos, política)`; `Rodar` →
   `fluxoHost.disparar(fluxo, Superficie.Orbe(NOTIFICACAO, n))`; `Incompleto` → aviso e a ação por baixo **não** roda; `AcaoDoLugar(n)` →
   a ação da notificação. A **tela bloqueada** recusa antes de qualquer coisa (NTF-16) e o disparo passa pelas precondições do FLX-39.
   O toque na orbe durante a execução do fluxo o cancela (FLX-29); a notificação mostra a orbe em `Transcrevendo` (detalhe: NTF-T20).
-- **Orbe do teclado** (feature ainda sem spec, Q8): a mesma chamada com `TECLADO`. Quais interações o teclado suporta decide a spec dela;
-  na V1 de Fluxos só 2 e 3 toques são gatilho.
+- **Orbe do teclado** (spec `.specs/features/keyboard-orb/`; Q8 respondida): a mesma chamada com `TECLADO`. O teclado suporta as sete interações; na V1 de Fluxos só 2 e 3 toques são gatilho. A FLX-T29 espera KBO-T3 e KBO-T5.
 - **"Copiar a configuração da orbe principal"** (FLX-60, A16): com a opção ligada no lugar, `lugarDosGatilhos = FLUTUANTE`. O modal esconde o
   grupo do lugar ("Copiando da orbe principal"); os gatilhos próprios gravados ficam intactos e voltam a valer ao desligar a opção. O estado
   de "copiar" é da feature do lugar (`ConfigNotificacao.copiarDaOrbePrincipal`); o modal o lê, não o grava.
@@ -562,7 +561,7 @@ quando `canAlwaysAllow`). Título pequeno acima: "Fluxo “Pedir ao agente e col
 | Segredo | `FluxoSemSegredoTest` | JSON de um fluxo completo não contém chave/token/endpoint/header; `Settings` com segredos e override → o override não leva nenhum ao fluxo | unit |
 | Padrão | `RestauradorFluxosTest` | recria o apagado sem gatilho; reescreve o editado mantendo id/posição/gatilhos; igual → nada; fluxo da pessoa idêntico e na mesma ordem; idempotência; posição pelo catálogo | unit |
 | Padrão | `RestauradorPropertyTest` | `restaurar(c).gatilhos == c.gatilhos` e `fluxos(padrao == null)` iguais, para qualquer `c` | unit |
-| Roteamento | `RoteadorGatilhosTest` | 2 e 3 toques; overflow com `NEAREST_DOWN`/`CANCEL`; gesto ligado conta como ativo; 1 toque nunca; fluxo inválido → `Incompleto`; sem gatilho → ação do `Settings` (flutuante) ou `AcaoDoLugar`; **por lugar**: o mesmo gesto em lugares diferentes são gatilhos diferentes; com "copiar" os gatilhos vêm da flutuante e os próprios do lugar ficam intactos (propriedade: ligar/desligar "copiar" nunca altera a lista de gatilhos) | unit |
+| Roteamento | `RoteadorGatilhosTest` | 2 e 3 toques; overflow com `NEAREST_DOWN`/`CANCEL`; gesto ligado conta como ativo; 1 toque nunca na flutuante e gatilho na `NOTIFICACAO`; fluxo inválido → `Incompleto`; sem gatilho → ação do `Settings` (flutuante) ou `AcaoDoLugar`; **por lugar**: o mesmo gesto em lugares diferentes são gatilhos diferentes; com "copiar" os gatilhos vêm da flutuante e os próprios do lugar ficam intactos (propriedade: ligar/desligar "copiar" nunca altera a lista de gatilhos) | unit |
 | Roteamento | `PoliticaGatilhosTest` | ligar tira de outro fluxo; desligar devolve; excluir limpa gatilhos e devolve botões; órfãos | unit |
 | Executor | `ExecutorFluxoTest` | ordem e passagem de valor; `Ok/Falha/Cancelada`; falha impede as seguintes; sem parcial; um por vez; tempo máximo com relógio virtual; `liberar()` da imagem em todo fim; cancelar corta a porta | unit (portas falsas) |
 | Modelo da etapa | `ModeloPorEtapaTest` | override só nos campos da tabela; Custom usa a aba; origem inválida → `INDISPONIVEL`; selo no aparelho/nuvem; `settings` original intacto | unit |
@@ -599,7 +598,7 @@ Os goldens existentes ficam bit-idênticos; os de Sobrepor/barra só mudam onde 
 | Conflito com a fase 2 do agente (`equipe/agente-fase2`, AGT-T8..T10) em `AgentController` | o fluxo compõe sessão independente com contratos `send/cancel/respond/state` e `AgentHost.assemble`; não reutiliza conversa/gate da aba |
 | Tipos paralelos à bancada (`Capacidade`, `Etapa`/`Fluxo` do BFL-01) | D16 (Q7 respondida em 29/10): a bancada passa a consumir `com.keyflow.fluxos` quando for mexida; até lá os pacotes seguem distintos (`bancada.fluxo`), sem task ou dependência nova |
 | `release/v1` congelada | tudo só na `main`; sem flag de build (A13) |
-| **Dois lugares da orbe dependem de outras features** (notificação: spec `notification`; teclado: sem spec) | o modelo/codec/roteador aceitam os três desde a FLX-T1/T2/T5 (nenhuma mudança de formato depois); a tela só mostra o lugar que existe (A15); FLX-T28 espera a NTF-T13 e FLX-T29 fica bloqueada até a spec da orbe do teclado (Q8) |
+| **Dois lugares da orbe dependem de outras features** (notificação: spec `notification`, código ainda por implementar; teclado: spec `keyboard-orb`) | o modelo/codec/roteador aceitam os três desde a FLX-T1/T2/T5 (nenhuma mudança de formato depois); a tela só mostra o lugar que existe (A15); FLX-T28 espera a NTF-T13 e FLX-T29 espera KBO-T3 e KBO-T5 (a spec já existe; Q8 respondida) |
 | `OverlayService` mexido por Fluxos (FLX-T11..T15) e pela Notificação (NTF-T9..T11) | cada uma extrai o que precisa em função pequena (`executarAcaoDeAtalho`, `FluxoHost`, `NotificacaoHost`); rebase curto; `LugarDaOrbe` compartilhado |
 
 ## O que NÃO muda
