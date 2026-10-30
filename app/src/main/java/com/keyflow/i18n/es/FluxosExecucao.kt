@@ -1,0 +1,31 @@
+package com.keyflow.i18n.es
+
+/** Execução dos fluxos: portas, erros de etapa, janela de confirmação do agente e botão da barra. Chaves em ordem crescente do português. */
+internal val FluxosExecucao: Map<String, String> = mapOf(
+    "A voz falhou." to "La voz falló.",
+    "A voz não está disponível." to "La voz no está disponible.",
+    "Conecte o provedor." to "Conecta el proveedor.",
+    "Escolha um modelo." to "Elige un modelo.",
+    "Executar fluxo" to "Ejecutar flujo",
+    "Executar fluxo (desativado)" to "Ejecutar flujo (desactivado)",
+    "Falha de autenticação — verifique a conexão do provedor." to "Falló la autenticación — revisa la conexión del proveedor.",
+    "Fluxo" to "Flujo",
+    "Fluxo “%s” pede permissão" to "El flujo “%s” pide permiso",
+    "Informe o ID da voz." to "Indica el ID de la voz.",
+    "Informe o endpoint da voz." to "Indica el endpoint de la voz.",
+    "Limite de uso do provedor atingido." to "Se alcanzó el límite de uso del proveedor.",
+    "Nada foi captado." to "No se captó nada.",
+    "Nenhum modelo local selecionado." to "Ningún modelo local seleccionado.",
+    "Nenhum texto encontrado." to "No se encontró texto.",
+    "Não foi possível iniciar a captura agora." to "No se pudo iniciar la captura ahora.",
+    "Não há texto para falar." to "No hay texto para hablar.",
+    "O agente está ocupado." to "El agente está ocupado.",
+    "O modelo ainda não foi baixado." to "El modelo aún no se ha descargado.",
+    "O modelo escolhido para esta etapa não existe mais." to "El modelo elegido para este paso ya no existe.",
+    "O modelo no aparelho não está disponível." to "El modelo del dispositivo no está disponible.",
+    "O modelo não conseguiu ler a imagem." to "El modelo no pudo leer la imagen.",
+    "O modelo não conseguiu responder." to "El modelo no pudo responder.",
+    "O modelo não respondeu." to "El modelo no respondió.",
+    "Termine a gravação atual antes de rodar o fluxo." to "Termina la grabación actual antes de ejecutar el flujo.",
+    "Um fluxo pede permissão" to "Un flujo pide permiso",
+)

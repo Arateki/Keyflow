@@ -1,0 +1,31 @@
+package com.keyflow.i18n.en
+
+/** Execução dos fluxos: portas, erros de etapa, janela de confirmação do agente e botão da barra. Chaves em ordem crescente do português. */
+internal val FluxosExecucao: Map<String, String> = mapOf(
+    "A voz falhou." to "The voice failed.",
+    "A voz não está disponível." to "The voice is not available.",
+    "Conecte o provedor." to "Connect the provider.",
+    "Escolha um modelo." to "Choose a model.",
+    "Executar fluxo" to "Run flow",
+    "Executar fluxo (desativado)" to "Run flow (disabled)",
+    "Falha de autenticação — verifique a conexão do provedor." to "Authentication failed — check the provider connection.",
+    "Fluxo" to "Flow",
+    "Fluxo “%s” pede permissão" to "Flow “%s” asks for permission",
+    "Informe o ID da voz." to "Enter the voice ID.",
+    "Informe o endpoint da voz." to "Enter the voice endpoint.",
+    "Limite de uso do provedor atingido." to "The provider's usage limit was reached.",
+    "Nada foi captado." to "Nothing was picked up.",
+    "Nenhum modelo local selecionado." to "No local model selected.",
+    "Nenhum texto encontrado." to "No text found.",
+    "Não foi possível iniciar a captura agora." to "Couldn't start the capture right now.",
+    "Não há texto para falar." to "There is no text to speak.",
+    "O agente está ocupado." to "The agent is busy.",
+    "O modelo ainda não foi baixado." to "The model hasn't been downloaded yet.",
+    "O modelo escolhido para esta etapa não existe mais." to "The model chosen for this step no longer exists.",
+    "O modelo no aparelho não está disponível." to "The on-device model is not available.",
+    "O modelo não conseguiu ler a imagem." to "The model couldn't read the image.",
+    "O modelo não conseguiu responder." to "The model couldn't answer.",
+    "O modelo não respondeu." to "The model did not answer.",
+    "Termine a gravação atual antes de rodar o fluxo." to "Finish the current recording before running the flow.",
+    "Um fluxo pede permissão" to "A flow asks for permission",
+)
