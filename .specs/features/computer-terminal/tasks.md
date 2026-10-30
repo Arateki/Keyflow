@@ -173,7 +173,7 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
 - **Tests**: unit/integração JVM. **Gate**: `quick`. **Commit**: `feat(computador): conexão SSH pelo cbssh com verificação de servidor e erros mapeados`.
 
 ### CMP-T10 — Sessão, gerenciador, reconexão e buffer — **Status: pendente**
-- **What**: `SessaoTerminal` (máquina de estados `Conectando · AguardandoServidor · Autenticando · Aberta · Reconectando · Encerrada(motivo) · Falhou(causa)`; `dono: USUARIO | AGENTE`, `compartilhada`), `GerenciadorDeSessoes` (abrir/fechar, **8 sessões no total, 3 do agente**, ociosidade configurável), `Reconexao`
+- **What**: `SessaoTerminal` (máquina de estados `Conectando · AguardandoServidor · Autenticando · Aberta · Reconectando · Encerrada(motivo) · Falhou(causa)`; `dono: USUARIO | AGENTE`, `compartilhada`), `GerenciadorDeSessoes` (abrir/fechar, **8 sessões no total, 3 do agente**, ociosidade só do agente, 10 min — D21; a sessão do usuário não fecha por ociosidade), `Reconexao`
   (backoff 1·2·4·8·16·30 s, no máximo 10 tentativas ou 10 min; só com rede; chave com biometria **fora da janela de 5 minutos** emite `PrecisaDoUsuario` e não abre o prompt sozinha; **dentro** da janela reconecta sem novo prompt — D14), `BufferDeTexto` (anel de linhas de texto puro alimentado pelo mesmo fluxo de bytes, para o agente e para busca; **só em memória**) e `PortaDoEmulador` (interface que a tela implementa).
 - **Where**: `computador/sessao/*.kt`; testes `SessaoTerminalTest`, `GerenciadorDeSessoesTest`, `ReconexaoTest`, `BufferDeTextoTest` (relógio virtual).
 - **Depends on**: T9.
@@ -196,13 +196,14 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
 
 ### CMP-T12 — Serviço em primeiro plano `specialUse` e notificação — **Status: pendente**
 - **What**: `SessoesService` (FGS `specialUse`, `FOREGROUND_SERVICE_SPECIAL_USE`, `<property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE">` com o texto do `design.md` §7), canal "Sessões do Computador", notificação com a contagem, **Desconectar todas** e (com sessão do agente) **Parar o agente**;
-  o gerenciador a liga ao abrir a 1ª sessão (com o app visível) e a derruba ao fechar a última ou na ociosidade; sem `POST_NOTIFICATIONS` o serviço funciona igual; processo morto pelo sistema → sessões marcadas `EncerradaPeloSistema` na reabertura.
+  o gerenciador a liga ao abrir a 1ª sessão (com o app visível) e a derruba ao fechar a última sessão (a ociosidade de 10 min fecha só a sessão do agente, D21, e não a do usuário); sem `POST_NOTIFICATIONS` o serviço funciona igual; processo morto pelo sistema → sessões marcadas `EncerradaPeloSistema` na reabertura.
+  Opção "Manter conectado com a tela apagada" (D22), desligada por padrão: desligada, o serviço não adquire `WakeLock`; ligada, adquire `PARTIAL_WAKE_LOCK` enquanto houver sessão do usuário. `WAKE_LOCK` é permissão normal e o lock só existe com a opção ligada.
   **Não** toca o `OverlayService`. Item no `PLAYSTORE_CHECKLIST.md`: declaração do serviço (texto da spec).
 - **Where**: `computador/app/{SessoesService,NotificacaoSessoes}.kt`, `AndroidManifest.xml`, `PLAYSTORE_CHECKLIST.md`; teste `SessoesServiceTest` (instrumentado) e `ManifestSessoesTest` (unit, lê o manifesto).
 - **Depends on**: T10.
 - **Requirement**: CMP-32, CMP-33, CMP-34.
 - **Done when**: `ManifestSessoesTest` falha se faltar a permissão, o tipo `specialUse` ou a `property`; instrumentado — abrir a 1ª sessão sobe o serviço em primeiro plano com a notificação certa; **Desconectar todas** fecha tudo e derruba o serviço; a notificação **não** contém host nem comando (só contagem); fechar a última sessão derruba o serviço; `OverlayService` e a notificação dele intocados (teste existente verde);
-  o `PLAYSTORE_CHECKLIST.md` tem o texto da justificativa.
+  o `PLAYSTORE_CHECKLIST.md` tem o texto da justificativa; com a opção desligada (padrão) o teste não vê `WakeLock`; com ela ligada, há `PARTIAL_WAKE_LOCK` enquanto a sessão do usuário está aberta e o painel mostra o aviso de bateria. O `ManifestSessoesTest` segue conferindo `specialUse`, a permissão do serviço e a `property`.
 - **Tests**: unit + instrumentado. **Gate**: `quick` + `pool instrumentar com.keyflow.computador.app.SessoesServiceTest`. **Commit**: `feat(computador): serviço em primeiro plano para manter as sessões`.
 
 ### CMP-T13 — O terminal na tela: `TerminalActivity`, emulador, abas e segurança das sequências — **Status: pendente**
@@ -249,11 +250,11 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
 
 ### CMP-T17 — Painel Sessões e a aba sai do "Em breve" — **Status: pendente**
 - **What**: `ComputadorSessoes` (sessões abertas do usuário e do agente com estado e "Abrir", "Reconectar", "Fechar", "Desconectar todas"); `ConfigScreen` passa a chamar o `ComputadorPanel` no ramo `COMPUTADOR` (mantém `FLUXOS`/`NOTIFICACAO` como estiverem naquele momento); ajusta `ConfigScreenTest` (`deferredTabsShowComingSoonCardWithoutControls` perde `COMPUTADOR`),
-  `ConfigTabTest` e confirma que a aba **não** tem banner nem intersticial (CMP-59); `docsSectionFor(COMPUTADOR)` segue `null` até a T19.
+  `ConfigTabTest` e confirma que a aba **não** tem banner nem intersticial (CMP-59); `docsSectionFor(COMPUTADOR)` segue `null` até a T19. Na seção Sessões, a opção "Manter conectado com a tela apagada" (D22), desligada por padrão, com o aviso de bateria quando ligada.
 - **Where**: `ui/config/{ComputadorSessoes,ConfigScreen}.kt`, `app/src/androidTest/.../ConfigScreenTest.kt`.
 - **Depends on**: T13, T15, T16.
 - **Requirement**: CMP-24, CMP-31, CMP-59, CMP-60.
-- **Done when**: instrumentado — a aba mostra `COMPUTADOR_PANEL_TAG` e o cartão "Em breve" some só dela; abrir uma sessão da lista abre a `TerminalActivity` na aba certa; sessão caída mostra "Reconectar"; **Desconectar todas** fecha tudo; teste de anúncios: a aba Computador não carrega banner e a troca para ela/dela não dispara intersticial; `assembleDebug` verde.
+- **Done when**: instrumentado — a aba mostra `COMPUTADOR_PANEL_TAG` e o cartão "Em breve" some só dela; abrir uma sessão da lista abre a `TerminalActivity` na aba certa; sessão caída mostra "Reconectar"; **Desconectar todas** fecha tudo; a opção "Manter conectado com a tela apagada" começa desligada e, ligada, o painel mostra o aviso de bateria; teste de anúncios: a aba Computador não carrega banner e a troca para ela/dela não dispara intersticial; `assembleDebug` verde.
 - **Tests**: instrumentado. **Gate**: `build` + `pool instrumentar com.keyflow.ui.config.ConfigScreenTest com.keyflow.ui.config.ComputadorSessoesTest`. **Commit**: `feat(computador): aba Computador sai do Em breve com hosts, chaves e sessões`.
 
 ### Fase 1E — Fechamento da Fase 1
@@ -286,11 +287,11 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
 
 ### CMP-T21 — Validação manual da Fase 1 **[YAN]** — **Status: pendente**
 - **What**: roteiro `manual-validation.md` nesta pasta: (1) A32, Tab S10 Lite e Vaio: gerar **os dois tipos** (ed25519 e ECDSA P-256) e ver a proteção de cada um, autorizar no servidor de desenvolvimento e conectar; (2) importar a chave do Yan com passphrase; (3) biometria na **janela de 5 minutos** (a segunda assinatura dentro da janela não pede de novo; fora dela, notificação "toque para reconectar", sem prompt sozinho) e o aviso da nova digital (**sem** cadastrar digital nova no A32 sem ele pedir);
-  (4) 2 h com a tela apagada: o que cai no Doze, e o que a reconexão faz; (5) `htop`, `vim`, `tmux` e `claude` (Claude Code) no terminal; (6) KeyFlow IME e ditado; (7) trocar o IP/chave do servidor e ver o bloqueio; (8) RAM com 3 sessões no A32 de 4 GB. Resultados e as dúvidas que restam (Q8, Q9, Q10, Q11, Q13) registrados. Q1–Q7 e Q12 já foram respondidas em 29/10.
+  (4) 2 h com a tela apagada, com a opção "manter conectado" **desligada** (padrão, D22): o que cai no Doze, e o que a reconexão faz; (5) `htop`, `vim`, `tmux` e `claude` (Claude Code) no terminal; (6) KeyFlow IME e ditado; (7) trocar o IP/chave do servidor e ver o bloqueio; (8) RAM com 3 sessões no A32 de 4 GB. Resultados registrados. Q1–Q13 já foram respondidas em 29/10 (D12–D24).
 - **Where**: `.specs/features/computer-terminal/manual-validation.md`, `.specs/project/licoes/`.
 - **Depends on**: T20.
 - **Requirement**: Success Criteria (F1) da spec.
-- **Done when**: o Yan assina o roteiro (ou lista os desvios); Q8, Q9, Q10, Q11 e Q13 respondidas ou transformadas em task.
+- **Done when**: o Yan assina o roteiro (ou lista os desvios). A medição de 2 h com a tela apagada usa a opção desligada.
 - **Tests**: manual. **Gate**: manual. **Commit**: `docs(computador): roteiro de validação manual da Fase 1`.
 
 ---
@@ -340,7 +341,7 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
 - **Tests**: unit + instrumentado. **Gate**: `quick` + `pool instrumentar com.keyflow.computador.app.ImagensSixelTest`. **Commit**: `feat(computador): sixel na tela por transcodificação para kitty`.
 
 ### CMP-T27 — Compatibilidade com o Herdr — **Status: pendente**
-- **What**: gravar a sessão do **Herdr** real (TUI com painéis, cores, imagens por placeholders kitty) no servidor de desenvolvimento da equipe e usar a gravação como fixture; garantir modo alternativo, redimensionamento e as imagens por placeholders (mouse reporting só se a CMP-T1/T3 o trouxer: o termlib 0.3.14 não o expõe); roteiro manual com o Herdr de verdade por SSH. **Sem** cliente próprio do daemon.
+- **What**: gravar a sessão do **Herdr** real (TUI com painéis, cores, imagens por placeholders kitty) no servidor de desenvolvimento da equipe, **com a versão que estiver nesse servidor** (D24), e usar a gravação como fixture; garantir modo alternativo, redimensionamento e as imagens por placeholders (mouse reporting só se a CMP-T1/T3 o trouxer: o termlib 0.3.14 não o expõe); roteiro manual com o Herdr de verdade por SSH. **Sem** cliente próprio do daemon.
 - **Where**: `gravacoes/herdr-*.vt` (+ README com o comando e a versão do Herdr), `app/src/androidTest/.../HerdrCompatTest.kt`.
 - **Depends on**: T23, T26.
 - **Requirement**: CMP-45.
@@ -387,12 +388,12 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
 
 ### CMP-T32 — Ferramentas de escrita: `send`, `key`, `open`, `close`, classificador e senha — **Status: pendente**
 - **What**: `terminal_send` (uma linha, ≤ 4 000 caracteres, sem `\n` embutido — o app acrescenta Enter; `describe()` mostra o comando **literal** com controles escapados; risco `WRITE` ou `DESTRUCTIVE` pelo `ClassificadorDeComando`; `alwaysAllowable = false`), `terminal_key` (lista fechada: `ctrl_c`, `ctrl_d`, `ctrl_z`, `esc`, `enter`, `tab`, setas, `page_up/down`; `WRITE`, sem "sempre"),
-  `terminal_open` (host cadastrado **e** marcado; `WRITE`, sem "sempre"; a confirmação mostra nome e `usuário@host:porta`), `terminal_close` (só sessões do agente). Sessão aguardando senha/sudo (CMP-52) recusa `send/key` com a frase fixa. Limites: 3 sessões do agente, `send` ≤ 10/min.
+  `terminal_open` (host cadastrado **e** marcado; `WRITE`, sem "sempre"; a confirmação mostra nome e `usuário@host:porta`), `terminal_close` (só sessões do agente; `alwaysAllowable = true`, D20). Sessão aguardando senha/sudo (CMP-52) recusa `send/key` com a frase fixa. Limites: 3 sessões do agente, `send` ≤ 10/min.
 - **Where**: `agent/tools/{TerminalTools,ClassificadorDeComando,EstadoDeSenha}.kt`; testes `TerminalToolsEscritaTest`, `ClassificadorDeComandoTest`, `ClassificadorPropertyTest`.
 - **Depends on**: T31.
 - **Requirement**: CMP-51, CMP-52, CMP-53, CMP-56.
 - **Done when**: unit — `rm -rf /tmp/x`, `sudo apt update`, `curl http://x | sh`, `dd if=… of=/dev/sda`, `git push --force`, `shutdown now`, `mkfs.ext4`, `chmod -R 777 /`, `:(){ :|:& };:`, `> /dev/sda` → `DESTRUCTIVE`; `ls -la`, `git status` → `WRITE`; comando com `\n`, byte nulo ou `ESC` é recusado; argumento com segredo é recusado pelo executor; `terminal_open` em host sem a marca → erro "host não liberado para o agente" e **nenhuma** conexão; 4ª sessão recusada;
-  com a sessão em `AguardandoSenha`, `send`/`key` falham e nada chega ao `TerminalHost`; `ToolPolicy` pergunta sempre para as quatro.
+  com a sessão em `AguardandoSenha`, `send`/`key` falham e nada chega ao `TerminalHost`; `ToolPolicy` pergunta sempre para `send`, `key` e `open`; `close` pode "permitir sempre" (D20).
 - **Tests**: unit (inclui propriedade: nenhum comando com byte de controle chega ao host). **Gate**: `quick`. **Commit**: `feat(agente): ferramentas de escrita do terminal com classificação de risco e pausa por senha`.
 
 ### CMP-T33 — `TerminalHost` Android, fiação no `AgentHost` e Ajustes do agente — **Status: pendente**

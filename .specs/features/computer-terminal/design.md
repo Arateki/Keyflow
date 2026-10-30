@@ -212,7 +212,7 @@ sealed interface EstadoSessao {
 class SessaoTerminal(val id: String, val hostId: String, val dono: DonoDaSessao, var compartilhada: Boolean, …)
 ```
 
-- `GerenciadorDeSessoes`: `abrir(host, dono)`, `fechar(id)`, `fecharDoHost`, `fecharDoAgente`, `compartilhar/descompartilhar`, `sessoesVisiveisAoAgente()`; limites 8/3 (CMP-29); ociosidade; `StateFlow<List<SessaoResumo>>` para a UI e a notificação.
+- `GerenciadorDeSessoes`: `abrir(host, dono)`, `fechar(id)`, `fecharDoHost`, `fecharDoAgente`, `compartilhar/descompartilhar`, `sessoesVisiveisAoAgente()`; limites 8/3 (CMP-29); ociosidade só da sessão do agente, 10 min (D21) — a do usuário não fecha por ociosidade; `StateFlow<List<SessaoResumo>>` para a UI e a notificação.
 - `BufferDeTexto`: anel de linhas **de texto puro**, alimentado pelo mesmo fluxo de bytes que o emulador (decodifica UTF-8, remove CSI/OSC/APC/DCS, aplica `\r`, `\b` e apagamentos simples; **não** é um emulador completo: o agente lê "o que está na tela" com boa aproximação, e a fonte da verdade visual continua o termlib).
   Teto de 5 000 linhas × 4 KB; nunca vai a disco (CMP-36). Linhas marcadas **"entrada oculta"** (o usuário digitou num prompt de senha) são omitidas.
 - `PortaDoEmulador` (implementada pelo `LigacaoEmulador`, dono do `TerminalEmulator` da sessão — **não** pela tela): `escreverNaTela(bytes)` e `tamanhoAtual()`. Sessão sem tela (em segundo plano) segue alimentando o emulador e o `BufferDeTexto`.
@@ -222,6 +222,7 @@ class SessaoTerminal(val id: String, val hostId: String, val dono: DonoDaSessao,
 ## 7. Serviço em primeiro plano (CMP-32..34)
 
 ```xml
+<uses-permission android:name="android.permission.WAKE_LOCK" />
 <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 <service android:name=".computador.app.SessoesService" android:exported="false"
          android:foregroundServiceType="specialUse">
@@ -233,7 +234,7 @@ class SessaoTerminal(val id: String, val hostId: String, val dono: DonoDaSessao,
 - Sobe quando `GerenciadorDeSessoes` passa de 0 para 1 sessão **com o app visível**; cai quando volta a 0. Canal próprio "Sessões do Computador" (importância baixa); **não** usa o canal nem o serviço da orbe.
 - Notificação: título "N sessões SSH abertas", ações **Desconectar todas** e (se houver sessão do agente) **Parar o agente**; toque abre a `TerminalActivity`. Nunca host, usuário, comando ou saída (CMP-32).
 - Ciclo de vida: o serviço é dono do `GerenciadorDeSessoes` enquanto vive (escopo `SupervisorJob`); morto o processo, as sessões somem — a reabertura marca `EncerradaPeloSistema` pelo registro leve de "sessões que estavam abertas" (só ids e hosts, em memória persistida no `onTaskRemoved`/`onDestroy` num arquivo mínimo, sem conteúdo).
-- Sem `WakeLock` (A14). O `ManifestSessoesTest` lê o `AndroidManifest` e falha se faltar a permissão, o tipo `specialUse` ou a `property`.
+- Opção "Manter conectado com a tela apagada" (D22, A14), **desligada por padrão**. Ligada, o serviço adquire `PARTIAL_WAKE_LOCK` enquanto houver sessão **do usuário** e o painel mostra o aviso de bateria; desligada, não adquire `WakeLock`. `WAKE_LOCK` é permissão normal, declarada no manifesto, e o lock só existe com a opção ligada. O `ManifestSessoesTest` lê o `AndroidManifest` e falha se faltar a permissão de `specialUse`, o tipo ou a `property` — não trata o `WakeLock` como esse critério. A aba explica que o Doze pode derrubar a conexão com a tela apagada mesmo com o serviço em primeiro plano.
 - A justificativa da Play está em `spec.md` › "Justificativa do serviço em primeiro plano" e é copiada para o `PLAYSTORE_CHECKLIST.md` na CMP-T12/T19.
 
 ## 8. O terminal na tela (CMP-24..31, 35, 36)
@@ -454,9 +455,9 @@ Convenções: `collectAsStateOnMain`, sem `Thread.sleep` (espera por estado), se
 | Sixel transcodificado fica feio ou com cursor errado | imagem/linha deslocada | goldens da CMP-T26 ajustam `C=1` + `CR/LF`; o sixel não volta para o C++ (D12) |
 | RAM no A32 de 4 GB com 3 sessões e imagens | OOM | orçamento 16/64 MB, `onTrimMemory`, medir na CMP-T1/T21 |
 | `specialUse` não aceito pela Play | serviço rejeitado | justificativa redigida; reconexão automática já é parte do produto; plano: `foregroundServiceType` alternativo só com o Yan |
-| Doze derruba a conexão com a tela apagada | sessão cai | reconexão (CMP-22), `tmux` sugerido, `WakeLock` opcional (Q10) |
+| Doze derruba a conexão com a tela apagada | sessão cai | reconexão (CMP-22), `tmux` sugerido, opção de `WakeLock` parcial desligada por padrão (D22); a CMP-T21 mede com a opção desligada |
 | cbssh só testado na JVM; falha em ART antigo | crash em Android ≤ 12 | CMP-T20 roda o cbssh no emulador e a CMP-T21 em aparelho real; atenção ao CHANGELOG |
-| O agente é enganado por saída hostil | comando indevido | moldura + confirmação sempre + `alwaysAllowable=false` + suíte de abuso (CMP-T35) |
+| O agente é enganado por saída hostil | comando indevido | moldura + confirmação sempre + `alwaysAllowable=false` em `send`/`key`/`open` (só `close` pode, D20) + suíte de abuso (CMP-T35) |
 | Conflito com Fluxos/Notificação em `OverlayService`/`DEVELOPMENT-ORDER.md` | merge | esta feature não toca o `OverlayService`; só o `DEVELOPMENT-ORDER.md` (Bloco 16) |
 
 **Coordenação.** `agent/` é do agente: a CMP-T30 vai em commit à parte. `i18n/Fluxos.kt` não muda. A frente de Notificação mexe no serviço da orbe; o `SessoesService` é outro. A frente de toolchain é pré-requisito, não concorrente.
