@@ -314,12 +314,12 @@ Respondidas por ele em 29/10, 22:20 (viraram decisões): **Q1** (pausar/cancelar
 | NTF-07 | P1-B | NTF-T4, NTF-T9 | Pending |
 | NTF-08 | P1-B | NTF-T2 | Verified |
 | NTF-09 | P1-B | NTF-T4, NTF-T10 | Pending |
-| NTF-10 | P1-B | NTF-T2, NTF-T3, NTF-T4, NTF-T10, NTF-T12 | Implementing (feitas: T2) |
+| NTF-10 | P1-B | NTF-T2, NTF-T3, NTF-T4, NTF-T10, NTF-T12 | Implementing (feitas: T3) |
 | NTF-11 | P1-B | NTF-T4, NTF-T10, NTF-T12, NTF-T20 | Pending |
 | NTF-12 | P1-B | NTF-T2, NTF-T12 | Implementing (feitas: T2) |
 | NTF-13 | P1-B | NTF-T9 | Pending |
 | NTF-14 | P1-B | NTF-T10 | Pending |
-| NTF-15 | P1-C | NTF-T3, NTF-T13 | Pending |
+| NTF-15 | P1-C | NTF-T3, NTF-T13 | Implementing (feitas: T3) |
 | NTF-16 | P1-C | NTF-T5, NTF-T10, NTF-T14 | Pending |
 | NTF-17 | P1-C | NTF-T9, NTF-T14 | Pending |
 | NTF-18 | P1-D | NTF-T5, NTF-T11, NTF-T14 | Pending |
@@ -340,10 +340,10 @@ Respondidas por ele em 29/10, 22:20 (viraram decisões): **Q1** (pausar/cancelar
 | NTF-33 | P1-F | NTF-T8 | Pending |
 | NTF-34 | P1-F | NTF-T7, NTF-T8 | Pending |
 | NTF-35 | P1-F | NTF-T8 | Pending |
-| NTF-36 | P1-G | NTF-T3 | Pending |
-| NTF-37 | P1-G | NTF-T3 | Pending |
-| NTF-38 | P1-G | NTF-T3, NTF-T10 | Pending |
-| NTF-39 | P1-H | NTF-T2, NTF-T3, NTF-T20 | Implementing (feitas: T2) |
+| NTF-36 | P1-G | NTF-T3 | Verified |
+| NTF-37 | P1-G | NTF-T3 | Verified |
+| NTF-38 | P1-G | NTF-T3, NTF-T10 | Implementing (feitas: T3) |
+| NTF-39 | P1-H | NTF-T2, NTF-T3, NTF-T20 | Implementing (feitas: T3) |
 | NTF-40 | P2-I | NTF-T12, NTF-T13 (cada uma traz os seus textos) | Pending |
 | NTF-41 | P2-I | NTF-T2, NTF-T4, NTF-T5 | Implementing (feitas: T2) |
 | NTF-42 | P2-I | NTF-T11 | Pending |

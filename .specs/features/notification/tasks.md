@@ -73,7 +73,7 @@ T8 depende de T7 (a interface da fonte de orbe).
   o catálogo é `Nenhuma`/`GravarEnviar`/`RetrairExpandirTeclado`/`TrocarTeclado`/`LerTela` (+ `RodarFluxo`/`Desconhecida` reservadas) — **sem** pausar/cancelar, que são botões; a regra de arquitetura falha se um arquivo de `orbe/` ou `notificacao/` importar `android.` (e não falha em `notificacao/app/`).
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(notificação): modelo de interações da orbe e configuração da notificação`.
 
-### NTF-T3 — Codec e persistência — **Status: pendente**
+### NTF-T3 — Codec e persistência — **Status: concluída (2026-10-30)**
 - **What**: `CodecNotificacao` (`org.json`, `v:1`, design §4) tolerante; chave `notification_config_json` ao lado de `BARS_CONFIG_JSON` (`SettingsRepository.kt:876`); `configNotificacaoFlow()`, `configNotificacaoOnce()` (leitura leve, sem cofre) e `atualizarNotificacao(f)` (um `dataStore.edit`, sobre o valor atual).
 - **Where**: `notificacao/CodecNotificacao.kt`, `data/SettingsRepository.kt`; testes `CodecNotificacaoTest`, `CodecNotificacaoPropertyTest`, `CodecNotificacaoFuzzTest` (unit) e `NotificacaoRepositoryTest` (instrumentado, padrão do `SettingsRepositoryTest`).
 - **Depends on**: T2. **Requirement**: NTF-10 (dados dos três toques), NTF-15 (opção persistida), NTF-36, NTF-37, NTF-38, NTF-39.

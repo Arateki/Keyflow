@@ -46,3 +46,15 @@ tela ou agrupada) — o Yan confere nos aparelhos como a notificação convive c
 - A regra `orbePackageIsPureJvm` do `ArchitectureRulesTest` passou a cobrir também `notificacao/` (menos `notificacao/app/`).
 - Textos novos em `i18n/{en,es}/Notificacao.kt` (as chaves vão por `trKey` no código puro; o `TranslationsTest` as cobra).
 - **Mutação**: o PTT copiando `GravarEnviar` em vez de `shortcut1Tap` derruba "copiar no PTT … sem inventar gravação" e "desligar a cópia".
+
+## NTF-T3 — Codec e persistência
+
+- `CodecNotificacao` (`org.json`, `v: 1`) tolerante, com `opt(chave) as? T` (o `optString` do Android devolve `"null"`). `taps.1` ausente (ou
+  de tipo errado) usa `record_toggle`; `none` e id desconhecido **explícitos** permanecem; ids desconhecidos e `flow:<id>` voltam iguais.
+- A lista de skins válidas é uma constante do codec (JVM puro não importa `OrbStyle`); `CodecNotificacaoTest` confere que ela é igual aos ids do
+  `OrbStyle` (menos `pack`) mais `sistema`, então uma skin nova no `OrbStyle` derruba o teste até entrar no codec.
+- `SettingsRepository`: `NOTIFICATION_CONFIG_JSON`, `configNotificacaoFlow/Once` (sem cofre) e `atualizarNotificacao` (leitura e escrita no
+  mesmo `dataStore.edit`; não regrava se o JSON não mudou). Instrumentado (5 testes, servidor): leitura sem chave não grava; duas alterações
+  concorrentes ficam ambas; salvar as `Settings` não toca a chave e vice-versa.
+- Unit: 9 exemplos, 2 de propriedade (3 000 round-trips) e 2 de fuzz (10 000 entradas, mutadas e arbitrárias) — nunca lança.
+- **Mutação**: `none` decodificado como `GravarEnviar` derruba 4 testes (exemplos e propriedade).
