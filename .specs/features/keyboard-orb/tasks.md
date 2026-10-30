@@ -46,7 +46,7 @@ A Fase A inteira é JVM: pode ser entregue e revisada antes de qualquer pixel.
 
 ## Fase A — Modelo (JVM puro)
 
-### KBO-T1 — Lugares, geometria e hit-test — **Status: pendente**
+### KBO-T1 — Lugares, geometria e hit-test — **Status: concluída**
 - **What**: `LugarDaOrbe`, `Interacao` e `SuporteDeInteracoes` com a tabela do design §7 (`TECLADO` = as sete; `NOTIFICACAO` = três toques; `FLUTUANTE` = as sete). Se o arquivo já existir, só alargar `TECLADO` — não criar um segundo enum. `GeometriaDaOrbe` (ociosa, sobressalente, diâmetro, fundo no fundo do encaixe) e `HitDaOrbe`. Regra no `ArchitectureRulesTest`: `orbe/**` sem `android.*`.
 - **Where**: `app/src/main/java/com/keyflow/orbe/{Interacoes,GeometriaDaOrbe}.kt`; testes em `app/src/test/.../orbe/`.
 - **Depends on**: —. **Requirement**: KBO-07, KBO-08, KBO-11, KBO-12, KBO-32.

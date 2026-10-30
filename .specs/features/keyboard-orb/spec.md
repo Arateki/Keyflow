@@ -237,12 +237,12 @@ Respondidas em 29/10 (D5–D10). Nenhuma em aberto.
 | KBO-04 | P1-A | KBO-T3, KBO-T6 | Pending |
 | KBO-05 | P1-B | KBO-T5 | Pending |
 | KBO-06 | P1-B | KBO-T5, KBO-T6 | Pending |
-| KBO-07 | P1-B | KBO-T1, KBO-T5 | Pending |
-| KBO-08 | P1-B | KBO-T1, KBO-T5 | Pending |
+| KBO-07 | P1-B | KBO-T1, KBO-T5 | Parcial (geometria JVM em KBO-T1; falta KBO-T5) |
+| KBO-08 | P1-B | KBO-T1, KBO-T5 | Parcial (geometria JVM em KBO-T1; falta KBO-T5) |
 | KBO-09 | P1-B | KBO-T4, KBO-T5, KBO-T10 | Pending |
 | KBO-10 | P1-B | KBO-T4, KBO-T5 | Pending |
-| KBO-11 | P1-B | KBO-T1, KBO-T5 | Pending |
-| KBO-12 | P1-C | KBO-T1 | Pending |
+| KBO-11 | P1-B | KBO-T1, KBO-T5 | Parcial (rolagem e hit-test puro em KBO-T1; falta KBO-T5) |
+| KBO-12 | P1-C | KBO-T1 | Verified |
 | KBO-13 | P1-C | KBO-T3, KBO-T10 | Pending |
 | KBO-14 | P1-C | KBO-T3, KBO-T10 | Pending |
 | KBO-15 | P1-C | KBO-T3, KBO-T6 | Pending |
@@ -262,7 +262,7 @@ Respondidas em 29/10 (D5–D10). Nenhuma em aberto.
 | KBO-29 | P1-G | KBO-T2, KBO-T5 | Pending |
 | KBO-30 | P1-H | KBO-T3 | Pending |
 | KBO-31 | P1-H | KBO-T3 | Pending |
-| KBO-32 | P2-I | KBO-T1 | Pending |
+| KBO-32 | P2-I | KBO-T1 | Verified |
 | KBO-33 | P2-I | KBO-T6, KBO-T8 | Pending |
 | KBO-34 | P2-I | KBO-T5 | Pending |
 | KBO-35 | P2-I | KBO-T9 | Pending |
