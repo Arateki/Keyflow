@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -576,9 +577,19 @@ class VisaoPanelTest {
     @OptIn(ExperimentalTestApi::class)
     private fun typeBInsteadOfAInTheEndpoint() {
         val endpoint = node("visao-custom-endpoint")
-        // A seleção precisa ser feita com o campo já focado; o foco adquirido ao digitar pode reposicionar o cursor.
+        // O clique dá o foco ao campo e, algum quadro depois, o foco põe o cursor no fim do texto. Selecionar logo após o clique
+        // perdia a corrida: o cursor voltava para o fim e o "b" saía em `https://a.test/v1b` (medido: TextSelectionRange(18, 18),
+        // 1 de 8 testes por rodada sob carga). Por isso espera o clique assentar e repete a seleção até o campo confirmar que ela
+        // vale (TextSelectionRange), em vez de supor que valeu.
         endpoint.performClick()
-        endpoint.performTextInputSelection(TextRange(8, 9))
+        rule.waitForIdle()
+        val selecao = TextRange(8, 9)
+        rule.waitUntil(5_000) {
+            endpoint.performTextInputSelection(selecao)
+            rule.waitForIdle()
+            val config = endpoint.fetchSemanticsNode().config
+            SemanticsProperties.TextSelectionRange in config && config[SemanticsProperties.TextSelectionRange] == selecao
+        }
         endpoint.performTextInput("b")
         endpoint.assertTextContains("https://b.test/v1")
     }
