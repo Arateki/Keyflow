@@ -130,12 +130,13 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(fluxos): modelo por etapa e selo de privacidade`.
 - **Registro (Fase A)**: `ModeloPorEtapa.aplicar(settings, etapa)` devolve `ModeloAplicado` (`Ok(settings)` | `Invalido(origem)`) em vez de só `Settings`: a porta precisa saber que a origem não existe para falhar com `INDISPONIVEL`. Sem `ModeloRef` devolve a mesma instância. `ModeloRef.modelo` nulo ou em branco troca só a origem. `efetivo` devolve `Efetivo(origem, modelo, Onde)` com `Onde` = `NoAparelho` | `Nuvem(ProvedorNuvem)` | `Indisponivel` (origem inválida ou `CREDITS` na aba); `seloDoFluxo` devolve `SeloDoFluxo(provedores, indisponivel)` e `noAparelho`. O texto do selo ("100% no aparelho", "Nuvem · OpenAI") é da T17.
 
-### FLX-T8 — Divisor de texto para a Voz `[P]` — **Status: pendente**
+### FLX-T8 — Divisor de texto para a Voz `[P]` — **Status: feita**
 - **What**: `DivisorDeFala.dividir(texto, max = 800)`: trechos por frase (`.`, `!`, `?`, quebra de linha), sem cortar palavra quando dá, sem perder nem repetir caractere; trecho único maior que o limite é cortado no limite.
 - **Where**: `fluxos/execucao/DivisorDeFala.kt`; teste `DivisorDeFalaTest` (inclui propriedade).
 - **Depends on**: —. **Requirement**: FLX-22.
 - **Done when**: unit — texto curto = 1 trecho; 5 mil caracteres = trechos ≤ 800 cuja concatenação (sem os separadores) é o texto; texto sem pontuação; só espaços/vazio = lista vazia; acentos e emoji não são quebrados no meio.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(fluxos): divisão do texto longo para a voz`.
+- **Registro (Fase A)**: `DivisorDeFala.dividir(texto, max = 800)` junta frases vizinhas enquanto couberem (texto curto é um trecho só, não um por frase); frase maior que o limite corta no último espaço que cabe e, sem espaço, na última fronteira de caractere (`BreakIterator`, nunca no meio de um par substituto nem entre a letra e o acento combinado). Só o espaço das pontas de cada trecho sai.
 
 ---
 

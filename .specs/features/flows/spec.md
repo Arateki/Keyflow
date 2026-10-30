@@ -417,7 +417,7 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 | FLX-19 | P1-D | FLX-T12, FLX-T14, FLX-T25 | Pending |
 | FLX-20 | P1-D | FLX-T10 | Pending |
 | FLX-21 | P1-D | FLX-T10 | Pending |
-| FLX-22 | P1-D | FLX-T8, FLX-T10 | Pending |
+| FLX-22 | P1-D | FLX-T8, FLX-T10 | Implementing (T8 feita) |
 | FLX-23 | P1-D | FLX-T10 | Pending |
 | FLX-24 | P1-D | FLX-T13, FLX-T25 | Pending |
 | FLX-25 | P1-D | FLX-T13 | Pending |
