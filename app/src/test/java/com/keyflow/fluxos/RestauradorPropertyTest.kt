@@ -39,7 +39,7 @@ class RestauradorPropertyTest {
         checkAll(ITERATIONS, CodecFluxosPropertyTest.config) { c ->
             val uma = RestauradorFluxos.restaurar(c, ::idNovo)
             assertEquals(uma, RestauradorFluxos.restaurar(uma, ::idNovo))
-            assertTrue(RestauradorFluxos.previa(uma).vazia)
+            assertTrue(RestauradorFluxos.previa(uma).nadaAGravar) // restaurado, nada mais a gravar (pode faltar espaço, não vontade)
         }
     }
 

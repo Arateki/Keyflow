@@ -6,8 +6,14 @@ package com.keyflow.fluxos
  * porque a lista já está no limite de [LIMITES.FLUXOS]; o restaurar não os recria nem tira nada da pessoa.
  */
 data class PreviaRestaurar(val recriar: List<String>, val reescrever: List<String>, val semEspaco: List<String>) {
-    /** Nada a gravar: a confirmação diz "Os fluxos padrão já estão como no original" e não grava. */
-    val vazia: Boolean get() = recriar.isEmpty() && reescrever.isEmpty()
+    /** Restaurar não mudaria nada: não há o que recriar nem reescrever. A confirmação não grava (o botão fica desligado). */
+    val nadaAGravar: Boolean get() = recriar.isEmpty() && reescrever.isEmpty()
+
+    /**
+     * Os padrão estão **como no original**: nada a gravar **e** nenhum faltando por falta de espaço. Só então a confirmação diz
+     * "Os fluxos padrão já estão como no original"; com [semEspaco] a tela diz quais não couberam.
+     */
+    val vazia: Boolean get() = nadaAGravar && semEspaco.isEmpty()
 }
 
 /**
