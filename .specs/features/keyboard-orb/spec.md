@@ -239,8 +239,8 @@ Respondidas em 29/10 (D5–D10). Nenhuma em aberto.
 | KBO-06 | P1-B | KBO-T5, KBO-T6 | Pending |
 | KBO-07 | P1-B | KBO-T1, KBO-T5 | Parcial (geometria JVM em KBO-T1; falta KBO-T5) |
 | KBO-08 | P1-B | KBO-T1, KBO-T5 | Parcial (geometria JVM em KBO-T1; falta KBO-T5) |
-| KBO-09 | P1-B | KBO-T4, KBO-T5, KBO-T10 | Pending |
-| KBO-10 | P1-B | KBO-T4, KBO-T5 | Pending |
+| KBO-09 | P1-B | KBO-T4, KBO-T5, KBO-T10 | Parcial (plano JVM verificado em KBO-T4; falta aplicação no IME e prova no app em KBO-T5/T10) |
+| KBO-10 | P1-B | KBO-T4, KBO-T5 | Parcial (reserva com faixa verificada em KBO-T4; falta o IME passar os 36 dp em KBO-T5) |
 | KBO-11 | P1-B | KBO-T1, KBO-T5 | Parcial (rolagem e hit-test puro em KBO-T1; falta KBO-T5) |
 | KBO-12 | P1-C | KBO-T1 | Verified |
 | KBO-13 | P1-C | KBO-T3, KBO-T10 | Parcial (rajada e classificador JVM em KBO-T3; falta KBO-T10) |

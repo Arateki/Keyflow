@@ -42,15 +42,6 @@ object GridSizing {
     private const val BAR_HEIGHT_FRACTION_LANDSCAPE = 0.14f
 
     /**
-     * Teto de segurança da reserva pro resto do teclado — nunca mais que isso da tela, não importa o
-     * slider "Tamanho do teclado". Alto de propósito (raramente deve ser o limitante; quem controla o
-     * equilíbrio grade↔teclado no dia a dia é [keyboardHeightFraction]) — só existe pra nunca zerar a
-     * grade em casos extremos (achado do Yan, 2026-07-07: sem teto nenhum, o scale máximo colapsava a
-     * grade numa linha inutilizável).
-     */
-    private const val MAX_RESERVE_FRACTION = 0.75f
-
-    /**
      * Reserva pro RESTO do teclado (barra + grade QWERTY quando expandido) pra somar ao orçamento de
      * altura da grade efêmera — sem isto, a grade cabia sozinha na tela mas, somada ao resto do teclado
      * que empilha no mesmo overscan da janela do IME, ainda estourava em paisagem (achado do Yan, modo
@@ -64,6 +55,7 @@ object GridSizing {
         scale: Float,
         qwertyRowCount: Int,
         barCount: Int,
+        sobressairPx: Int = 0,
     ): Float {
         // Escala amortecida em paisagem (mesma de `KeyboardGridView.rowHeightPx` — pedido do Yan,
         // 2026-07-07: "como se o slide aumentasse menos quando no horizontal"), aplicada no termo por
@@ -86,7 +78,7 @@ object GridSizing {
         // precisa refletir isso, senão volta a super ou subestimar (achado do Yan, 2026-07-07).
         val barsPx = barHeightPx(metrics, usableHeightPx, scale, barCount) * barCount.coerceAtLeast(1)
         val estimatePx = qwertyPx + barsPx
-        return minOf(estimatePx, usableHeightPx * MAX_RESERVE_FRACTION)
+        return com.keyflow.orbe.reservaComFaixaPx(estimatePx, sobressairPx, usableHeightPx)
     }
 
     // Espelha KeyboardGridView.MIN_ROW_HEIGHT_DP — nunca ajuste um sem o outro.
