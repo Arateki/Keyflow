@@ -1,21 +1,15 @@
 package com.keyflow.ime
 
 import com.keyflow.i18n.tr
+import com.keyflow.orbe.*
+import com.keyflow.core.shortcuts.BarButton
+import com.keyflow.data.Settings
+import kotlin.math.roundToInt
 import android.content.Context
-import android.content.res.ColorStateList
-import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
-import android.graphics.drawable.RippleDrawable
-import android.os.Handler
-import android.os.Looper
 import android.os.SystemClock
-import android.util.Log
-import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.widget.LinearLayout
-import android.widget.PopupWindow
-import android.widget.TextView
 import com.keyflow.core.ButtonState
 import com.keyflow.core.KeyFlowController
 import com.keyflow.core.shortcuts.BarsConfig
@@ -41,7 +35,7 @@ sealed interface KeyAction {
     data object Escape : KeyAction
 }
 
-/** Ações secundárias do mic do teclado, escolhidas no seletor que abre ao segurar (estilo acento). */
+/** Comandos de gravação já executados pelo serviço, usados também pelos arrastos da orbe. */
 enum class MicAction { PAUSE_RESUME, CANCEL, UNDO }
 
 /**
@@ -59,7 +53,7 @@ class KeyFlowKeyboardView(
     private val onMic: () -> Unit,
     // Abre o app do KeyFlow (tecla ⚙ de config).
     private val onConfig: () -> Unit = {},
-    // Ação secundária escolhida no seletor por hold (pausar/retomar, cancelar, desfazer).
+    // Comandos da gravação (pausar/retomar, cancelar, desfazer).
     private val onMicAction: (MicAction) -> Unit = {},
     // Toque num candidato do corretor do sistema (KC-T7).
     private val onCandidateTap: (String) -> Unit = {},
@@ -100,6 +94,8 @@ class KeyFlowKeyboardView(
     // Botões de fluxo da barra (FLX-36): `botaoId → fluxoId` dos que têm gatilho válido, e o disparo (o serviço da orbe resolve o fluxo).
     private val flowButtons: Map<String, String> = emptyMap(),
     private val onRunFlow: (botaoId: String) -> Unit = {},
+    private val onOrbeComando: ((ComandoDaOrbeDoTeclado) -> Unit)? = null,
+    private val onOrbePressionar: () -> Unit = {},
 ) : LinearLayout(context) {
 
     private var canvasGrid: KeyboardGridView? = null
@@ -126,6 +122,30 @@ class KeyFlowKeyboardView(
     // "roubar" espaço demais e escondendo a 1ª fileira do QWERTY (achado do Yan, 2026-07-07).
     private val barCount: Int =
         maxOf(barsConfig.barsFor(true).size, barsConfig.barsFor(false).size).coerceAtLeast(1)
+
+    private var expandedMode = true
+    private var faixaParaTestePx: Int? = null
+    private val reservaDaOrbePx: Int = if ((barsConfig.barsFor(true) + barsConfig.barsFor(false))
+        .any { BarButton.Mic in it.buttons }) (GeometriaDaOrbe.FAIXA_SOBRESSALENTE_DP * resources.displayMetrics.density).roundToInt() else 0
+    val faixaDaOrbePx: Int get() = if (barsConfig.barsFor(expandedMode).any { BarButton.Mic in it.buttons })
+        faixaParaTestePx ?: reservaDaOrbePx else 0
+    private val faixaDaOrbe = View(context).apply { layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, faixaDaOrbePx) }
+    private val orbe = OrbeDoTecladoView(this, dark, frozenSeconds, clock,
+        aoComando = { comando ->
+            onOrbeComando?.invoke(comando) ?: when (comando) {
+                ComandoDaOrbeDoTeclado.IniciarGravacao, ComandoDaOrbeDoTeclado.EnviarGravacao,
+                ComandoDaOrbeDoTeclado.ConcluirCancelamento, ComandoDaOrbeDoTeclado.ColarTextoPendente,
+                ComandoDaOrbeDoTeclado.EncerrarVisao -> onMic()
+                ComandoDaOrbeDoTeclado.DispensarErro -> onErrorTap()
+                ComandoDaOrbeDoTeclado.PausarGravacao, ComandoDaOrbeDoTeclado.RetomarGravacao -> onMicAction(MicAction.PAUSE_RESUME)
+                ComandoDaOrbeDoTeclado.CancelarGravacao -> onMicAction(MicAction.CANCEL)
+                ComandoDaOrbeDoTeclado.DesfazerCancelamento -> onMicAction(MicAction.UNDO)
+                is ComandoDaOrbeDoTeclado.AbrirApp -> onConfig()
+                else -> Unit
+            }
+        }, aoPressionar = onOrbePressionar, aoMudar = { invalidate(); requestLayout() })
+    private var gestoDaOrbe = false
+    private var circuloDoGesto: Circulo? = null
 
     // Overscan da janela do IME (SB-T10/GRD-08): a grade efêmera pode ancorar PRA CIMA e se estender bem
     // acima da barra; a janela do IME por padrão só é alta o bastante pro conteúdo visível, então o
@@ -154,6 +174,7 @@ class KeyFlowKeyboardView(
             scale = scale,
             qwertyRowCount = qwertyRowCount,
             barCount = barCount,
+            sobressairPx = reservaDaOrbePx,
         )
         val slackPx = com.keyflow.ime.bars.GridSizing.overscanSlackPx(metrics, scale)
         // Mesma fórmula de encolhimento do BarView (GridSizing), com a MESMA reserva pro resto do
@@ -197,9 +218,6 @@ class KeyFlowKeyboardView(
     // Paleta Ateliê resolvida por tema (ints Android; o View não usa Compose).
     private val colors = KeyboardColors.of(skin, dark, pack)
     private val kbTray = colors.tray
-    private val kbKeyBorder = colors.keyBorder
-    private val kbModifier = colors.modifier
-    private val kbInk = colors.ink
 
     // O movimento da skin, se ela tem e se está ligado: eventos curtos, sem custo entre eles (ver [KeyboardMotion]).
     private val motion: KeyboardMotion? = when {
@@ -212,32 +230,23 @@ class KeyFlowKeyboardView(
     }
 
     // Estado/tempo do microfone (espelha AudioRecorder/OrbButtonView: conta só em RECORDING).
-    private val handler = Handler(Looper.getMainLooper())
     private var micState: ButtonState = ButtonState.IDLE_NO_FIELD
-
-    // Seletor de ações por hold no mic: PopupWindow flutuante acima do mic, nos dois modos.
-    private var actionPopup: PopupWindow? = null
-    private var selectorAnchor: View? = null
-    private var popupActions: List<MicAction> = emptyList()
-    private var popupChips: List<TextView> = emptyList()
-    private var popupRects: List<android.graphics.Rect> = emptyList() // retângulo (tela) de cada chip
-    private var highlightedIndex = -1
-    private var holdRunnable: Runnable? = null
 
     private val expandedLayout = buildExpanded()
     private val collapsedBar = buildCollapsed()
 
     init {
         orientation = VERTICAL
-        // Raiz transparente de propósito: a barra/teclado expandido têm seu próprio fundo. Assim a faixa
-        // do seletor (inserida acima da barra) só "tampa" onde estão os chips; o resto mostra o app atrás.
+        // Os espaçadores transparentes deixam o app visível atrás da orbe e do overscan da grade.
+        addView(orbe.acessibilidade)
         gridOverscanSpacer?.let { addView(it) }
+        addView(faixaDaOrbe)
         addView(expandedLayout)
     }
 
     /** Acessores somente-leitura para testes instrumentados (KBD-01/02; seletor do mic — KBDCTL-01..04). */
     val expandedForTest: Boolean get() = childCount > 0 && getChildAt(childCount - 1) === expandedLayout
-    val micLabelForTest: String? get() = barViews.firstNotNullOfOrNull { it.micLabelForTest }
+    val micLabelForTest: String? get() = if (faixaDaOrbePx > 0) orbe.rotulo else null
     val barViewsForTest: List<BarView> get() = barViews.toList()
     val canvasGridForTest: KeyboardGridView? get() = canvasGrid
     /** A faixa de sugestões vive dentro da `BarView` que tem o slot `Candidates` (BAR-01). */
@@ -256,8 +265,12 @@ class KeyFlowKeyboardView(
     fun setExpanded(expanded: Boolean) {
         val target = if (expanded) expandedLayout else collapsedBar
         if (childCount > 0 && getChildAt(childCount - 1) === target) return
+        expandedMode = expanded
         removeAllViews()
+        addView(orbe.acessibilidade)
         gridOverscanSpacer?.let { addView(it) }
+        faixaDaOrbe.layoutParams.height = faixaDaOrbePx
+        addView(faixaDaOrbe)
         addView(target)
     }
 
@@ -270,20 +283,40 @@ class KeyFlowKeyboardView(
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         motion?.start()
+        orbe.anexar()
     }
 
     override fun onDetachedFromWindow() {
         motion?.stop()
+        orbe.desanexar()
+        gestoDaOrbe = false
         super.onDetachedFromWindow()
     }
 
     override fun onWindowVisibilityChanged(visibility: Int) {
         super.onWindowVisibilityChanged(visibility)
-        if (visibility == VISIBLE) motion?.start() else motion?.stop()
+        if (visibility == VISIBLE) {
+            motion?.start()
+            orbe.anexar()
+        } else {
+            motion?.stop()
+            orbe.desanexar()
+        }
     }
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         if (ev.actionMasked == MotionEvent.ACTION_DOWN) motion?.onTouchDown()
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
+            val circulo = circuloDaOrbe
+            gestoDaOrbe = circulo != null && HitDaOrbe.contem(ev.x.toInt(), ev.y.toInt(), circulo,
+                encaixeDaOrbe, GeometriaDaOrbe.ehOciosa(orbe.estado, orbe.visaoAtiva), width)
+            circuloDoGesto = circulo.takeIf { gestoDaOrbe }
+        }
+        if (gestoDaOrbe) {
+            circuloDoGesto?.let { orbe.toque(ev, it) }
+            if (ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL) gestoDaOrbe = false
+            return true
+        }
         return super.dispatchTouchEvent(ev)
     }
 
@@ -294,6 +327,7 @@ class KeyFlowKeyboardView(
         } else {
             m.draw(canvas, width, height, ::drawChildrenOnce)
         }
+        circuloDaOrbe?.let { orbe.desenhar(canvas, it, gridOverscanPx, gridOverscanPx + faixaDaOrbePx) }
     }
 
     private fun drawChildrenOnce(canvas: android.graphics.Canvas) = super.dispatchDraw(canvas)
@@ -306,15 +340,46 @@ class KeyFlowKeyboardView(
 
     fun updateMicState(state: ButtonState) {
         micState = state
+        orbe.atualizarEstado(state)
         // Cada BarView roda o próprio tique de 1s enquanto grava (o tempo vem do KeyFlowController,
         // autoritativo) — a view host só repassa o estado.
         barViews.forEach { it.updateMicState(state) }
     }
 
-    private fun elapsedSeconds(): Int {
-        frozenSeconds?.let { return it }
-        val active = if (micState == ButtonState.RECORDING) clock() - KeyFlowController.recordingSegmentStartMs else 0L
-        return ((KeyFlowController.recordingAccumulatedMs + active) / 1000L).toInt()
+    val arrastoDaOrbeForTest: Boolean get() = orbe.arrastoAtivo
+    val configOrbeForTest: ConfigOrbeTeclado get() = orbe.config
+
+    fun updateOrbeConfig(config: ConfigOrbeTeclado, settings: Settings) = orbe.atualizarConfig(config, settings)
+    fun updateVisionState(ativa: Boolean) = orbe.atualizarEstado(micState, ativa)
+
+    val encaixeDaOrbe: Retangulo? get() {
+        val coluna = if (expandedMode) expandedLayout else collapsedBar
+        val bar = barViews.firstOrNull { it.parent === coluna && it.encaixeDaOrbe != null } ?: return null
+        val local = bar.encaixeDaOrbe ?: return null
+        val rect = android.graphics.Rect(local.esquerda, local.topo, local.direita, local.fundo)
+        offsetDescendantRectToMyCoords(bar, rect)
+        if (rect.right <= 0 || rect.left >= width) return null
+        return Retangulo(rect.left, rect.top, rect.right, rect.bottom)
+    }
+    val circuloDaOrbe: Circulo? get() = encaixeDaOrbe?.let {
+        GeometriaDaOrbe.calcular(it, micState, faixaDaOrbePx, orbe.visaoAtiva,
+            margemHorizontalPx = dp(3), margemVerticalPx = dp(2))
+    }
+    val planoDeInsets: PlanoDeInsets get() = PlanoDeInsets.calcular(gridOverscanPx, faixaDaOrbePx,
+        faixaDaOrbePx > 0, circuloDaOrbe?.takeIf { GeometriaDaOrbe.ehSobressalente(micState, orbe.visaoAtiva) }, gridDragActive)
+
+    internal fun definirFaixaParaTeste(px: Int?) {
+        faixaParaTestePx = px
+        faixaDaOrbe.layoutParams.height = faixaDaOrbePx
+        requestLayout()
+    }
+
+    override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
+        super.onLayout(changed, l, t, r, b)
+        val alvo = if (GeometriaDaOrbe.ehOciosa(micState, orbe.visaoAtiva)) encaixeDaOrbe
+            else circuloDaOrbe?.retanguloDelimitador
+        orbe.acessibilidade.visibility = if (alvo != null) VISIBLE else GONE
+        alvo?.let { orbe.acessibilidade.layout(it.esquerda, it.topo, it.direita, it.fundo) }
     }
 
     // ── builders ─────────────────────────────────────────────────────────────
@@ -333,7 +398,7 @@ class KeyFlowKeyboardView(
      */
     private fun buildBars(expandedMode: Boolean): List<BarView> {
         val callbacks = BarCallbacks(
-            onMic = onMic,
+            onMic = { orbe.clicarAcessivel() },
             onMicAction = onMicAction,
             onErrorTap = onErrorTap,
             onConfig = onConfig,
@@ -349,6 +414,8 @@ class KeyFlowKeyboardView(
             onShortcut = onShortcut,
             onCandidateTap = onCandidateTap,
             onRunFlow = onRunFlow,
+            onGeometryChanged = { invalidate(); requestLayout() },
+            onMicLabel = { orbe.rotulo },
             onGridDragActiveChanged = { active ->
                 gridDragActive = active
                 // Força uma passada de layout pra o service recalcular onComputeInsets AGORA — o próximo
@@ -356,7 +423,9 @@ class KeyFlowKeyboardView(
                 requestLayout()
             },
         )
-        return barsConfig.barsFor(expandedMode).map { def ->
+        val defs = barsConfig.barsFor(expandedMode)
+        val donaDoEncaixe = defs.indexOfLast { BarButton.Mic in it.buttons }
+        return defs.mapIndexed { indice, def ->
             BarView(
                 context = context,
                 def = def,
@@ -372,6 +441,8 @@ class KeyFlowKeyboardView(
                 clock = clock,
                 qwertyRowCount = qwertyRowCount,
                 barCount = barCount,
+                sobressairPx = reservaDaOrbePx,
+                indiceDaOrbe = if (indice == donaDoEncaixe) def.buttons.indexOf(BarButton.Mic) else -1,
                 fitWidth = barsFitWidth,
                 flowButtons = flowButtons,
             ).also { bar ->
@@ -448,35 +519,6 @@ class KeyFlowKeyboardView(
 
     // ── utils ────────────────────────────────────────────────────────────────
 
-    private fun micVisuals(state: ButtonState): Pair<String, Int> = when (state) {
-        ButtonState.IDLE_READY     -> "🎙" to MIC_READY
-        ButtonState.IDLE_NO_FIELD  -> "🎙" to MIC_NO_FIELD
-        ButtonState.RECORDING      -> "● ${formatTime(elapsedSeconds())}" to ACCENT_RECORD
-        ButtonState.PAUSED         -> "⏸ ${formatTime(elapsedSeconds())}" to ACCENT_RECORD
-        ButtonState.SENDING        -> "···" to ACCENT_TEAL
-        ButtonState.ERROR          -> "✖" to ACCENT_TERRACOTTA
-        ButtonState.CANCELLING     -> tr("🗑 cancelado") to ACCENT_TERRACOTTA
-        ButtonState.PENDING_PASTE  -> tr("📋 colar") to ACCENT_TERRACOTTA
-    }
-
-    private fun formatTime(totalSeconds: Int): String {
-        val s = totalSeconds.coerceAtLeast(0)
-        return "${s / 60}:${(s % 60).toString().padStart(2, '0')}"
-    }
-
-    private fun rippleDrawable(bgColor: Int, borderColor: Int): RippleDrawable {
-        val bg = GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            cornerRadius = dp(7).toFloat()
-            setColor(bgColor)
-            setStroke(dp(1), borderColor)
-        }
-        return RippleDrawable(
-            ColorStateList.valueOf(Color.argb(50, 0, 0, 0)),
-            bg, null,
-        )
-    }
-
     /** Barras + grade: fundo liso [kbTray], ou a paisagem inteira atrás das duas (Aero). */
     private fun column(): LinearLayout = LinearLayout(context).apply {
         orientation = VERTICAL
@@ -490,17 +532,4 @@ class KeyFlowKeyboardView(
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density * scale).toInt()
 
-    companion object {
-        private const val TAG = "KeyFlow.KeyboardView"
-        private const val TICK_MS = 500L
-        // Limiar para o hold abrir o seletor de ações (≈ long-press; abaixo disso é tap).
-        private const val HOLD_MS = 280L
-
-        // Acentos Ateliê (fixos entre claro/escuro).
-        private val ACCENT_TEAL = 0xFF4E9683.toInt()
-        private val ACCENT_RECORD = 0xFFC6873F.toInt()
-        private val ACCENT_TERRACOTTA = 0xFFD9694B.toInt()
-        private val MIC_READY = 0xFF4E9683.toInt()
-        private val MIC_NO_FIELD = 0xFF9C9072.toInt()
-    }
 }

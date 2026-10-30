@@ -57,6 +57,8 @@ class BarCallbacks(
     val onGridDragActiveChanged: (Boolean) -> Unit = {},
     // Botão de fluxo (FLX-36): o id do botão tocado. O IME não conhece o fluxo — o serviço resolve `botaoId → fluxo`.
     val onRunFlow: (botaoId: String) -> Unit = {},
+    val onGeometryChanged: () -> Unit = {},
+    val onMicLabel: (() -> String)? = null,
 )
 
 /**
@@ -100,6 +102,8 @@ class BarView(
     private val fitWidth: Boolean = false,
     // `botaoId → fluxoId` dos botões de fluxo com gatilho válido. Um [BarButton.RunFlow] fora daqui renderiza desabilitado e não dispara.
     private val flowButtons: Map<String, String> = emptyMap(),
+    private val sobressairPx: Int = 0,
+    private val indiceDaOrbe: Int = def.buttons.indexOf(BarButton.Mic),
 ) : ViewGroup(context) {
 
     private val declaredButtons: List<BarButton> = def.buttons
@@ -167,17 +171,6 @@ class BarView(
     // Estado do mic (espelha a barra antiga: tempo autoritativo do KeyFlowController; ticker só RECORDING).
     private var micState: ButtonState = ButtonState.IDLE_NO_FIELD
     private val handler = Handler(Looper.getMainLooper())
-    private val ticker = object : Runnable {
-        override fun run() {
-            if (micState == ButtonState.RECORDING) {
-                invalidate()
-                handler.postDelayed(this, TICK_MS)
-            }
-        }
-    }
-    private val micSelector = MicSelectorController(context, dark, scale, skin, pack)
-    private var holdRunnable: Runnable? = null
-
     // Grade efêmera (SB-T6/GRD-01..07): sessão pura + popup de lente; vivem só enquanto o dedo pressiona.
     private var gridSession: GridSession? = null
     private var gridPopup: GridOverlayPopup? = null
@@ -248,13 +241,13 @@ class BarView(
     // Depende da CONFIG, não da geometria medida: uma view construída em teste e ainda não medida
     // continua sabendo o rótulo do mic (a barra antiga expunha isso pelo texto do TextView).
     val micLabelForTest: String?
-        get() = if (buttons.contains(BarButton.Mic)) MicVisuals.visuals(micState, elapsedSeconds()).first else null
+        get() = if (indiceDaOrbe >= 0) callbacks.onMicLabel?.invoke() ?: MicVisuals.visuals(micState, elapsedSeconds()).first else null
     val layoutForTest: BarGeometry.BarLayout get() = barLayout
     val scrollOffsetForTest: Float get() = scrollOffset
-    val selectorOpenForTest: Boolean get() = micSelector.isOpen
-    val popupActionsForTest: List<MicAction> get() = micSelector.actionsForTest
-    val popupRectsForTest: List<Rect> get() = micSelector.rectsForTest
-    val highlightedIndexForTest: Int get() = micSelector.highlightedIndexForTest
+    val selectorOpenForTest: Boolean get() = false
+    val popupActionsForTest: List<MicAction> get() = emptyList()
+    val popupRectsForTest: List<Rect> get() = emptyList()
+    val highlightedIndexForTest: Int get() = -1
     val candidatesViewForTest: CandidatesView? get() = candidatesView
     val gridFrameForTest: GridFrame?
         get() = (gridSession?.snapshot(SystemClock.uptimeMillis())?.state as? GridSession.State.Active)?.frame
@@ -272,8 +265,6 @@ class BarView(
 
     fun updateMicState(state: ButtonState) {
         micState = state
-        handler.removeCallbacks(ticker)
-        if (state == ButtonState.RECORDING) handler.post(ticker)
         invalidate()
     }
 
@@ -329,8 +320,10 @@ class BarView(
     private fun candidatesPlaced(): BarGeometry.PlacedButton? =
         barLayout.buttons.firstOrNull { it.button == BarButton.Candidates }
 
-    private fun micPlaced(): BarGeometry.PlacedButton? =
-        barLayout.buttons.firstOrNull { it.button == BarButton.Mic }
+    val encaixeDaOrbe: com.keyflow.orbe.Retangulo? get() = barLayout.buttons
+        .firstOrNull { it.index == indiceDaOrbe && it.button == BarButton.Mic }?.let {
+            com.keyflow.orbe.Retangulo((it.left - scrollOffset).toInt(), 0, (it.right - scrollOffset).toInt(), height)
+        }
 
     // ── desenho ──────────────────────────────────────────────────────────────
 
@@ -343,7 +336,7 @@ class BarView(
         barLayout.buttons.forEach { placed ->
             // A faixa é uma View filha (CandidatesView) e pinta a si mesma, inclusive a marcação de
             // área vazia — desenhar aqui seria coberto por ela.
-            if (placed.button != BarButton.Candidates) drawButton(canvas, placed)
+            if (placed.button != BarButton.Candidates && placed.button != BarButton.Mic) drawButton(canvas, placed)
         }
         canvas.restore()
     }
@@ -384,10 +377,6 @@ class BarView(
             return
         }
         val alpha = if (isOrphanTrigger(button)) 100 else 255
-        if (button == BarButton.Mic) {
-            drawMic(canvas, bounds, ink)
-            return
-        }
         val icon = BarIcons.iconFor(button, expandedMode)
         if (icon != null) {
             drawIcon(canvas, icon, bounds.centerX(), bounds.centerY(), fittedIconSizePx(bounds), ink, alpha)
@@ -418,31 +407,6 @@ class BarView(
 
     private fun drawIcon(canvas: Canvas, icon: KfIconSpec, cx: Float, cy: Float, size: Float, ink: Int, alpha: Int = 255) =
         iconDrawer.draw(canvas, icon, cx, cy, size, ink, alpha, strokeWidth = icon.strokeWidth * ICON_STROKE_BOOST * colors.iconStrokeScale)
-
-    /**
-     * Mic: o ícone do estado (cápsula, ponto de gravação, pausa…) e, quando o estado tem, o texto ao lado
-     * (cronômetro, "cancelado"). O conjunto é centralizado no botão como uma coisa só.
-     */
-    private fun drawMic(canvas: Canvas, bounds: RectF, ink: Int) {
-        val glyph = BarIcons.micGlyph(micState, elapsedSeconds())
-        val iconSize = fittedIconSizePx(bounds)
-        val text = glyph.text
-        if (text == null) {
-            drawIcon(canvas, glyph.icon, bounds.centerX(), bounds.centerY(), iconSize, ink)
-            return
-        }
-        textPaint.color = ink
-        textPaint.textSize = fittedTextSizePx(bounds) * MIC_TEXT_RATIO
-        val small = iconSize * MIC_TEXT_ICON_RATIO
-        val gap = small * 0.18f
-        val total = small + gap + textPaint.measureText(text)
-        val left = bounds.centerX() - total / 2f
-        drawIcon(canvas, glyph.icon, left + small / 2f, bounds.centerY(), small, ink)
-        textPaint.textAlign = Paint.Align.LEFT
-        val textY = bounds.centerY() - (textPaint.descent() + textPaint.ascent()) / 2
-        canvas.drawText(text, left + small + gap, textY, textPaint)
-        textPaint.textAlign = Paint.Align.CENTER
-    }
 
     /**
      * Manche de fliperama no traço dos ícones ([KfIcons.Joystick]): base circular + bola deslocada na
@@ -529,19 +493,18 @@ class BarView(
     private inner class BarAccessibilityHelper(host: View) : ExploreByTouchHelper(host) {
 
         private fun allButtons(): List<BarGeometry.PlacedButton> =
-            barLayout.buttons.filter { it.button != BarButton.Candidates }
+            barLayout.buttons.filter { it.button != BarButton.Candidates && it.button != BarButton.Mic }
 
         override fun getVirtualViewAt(x: Float, y: Float): Int {
-            val index = allButtons().indexOfFirst { it.contains(x + scrollOffset) }
-            return if (index >= 0) index else HOST_ID
+            return allButtons().firstOrNull { it.contains(x + scrollOffset) }?.index ?: HOST_ID
         }
 
         override fun getVisibleVirtualViews(virtualViewIds: MutableList<Int>) {
-            virtualViewIds.addAll(allButtons().indices)
+            virtualViewIds.addAll(allButtons().map { it.index })
         }
 
         override fun onPopulateNodeForVirtualView(virtualViewId: Int, node: AccessibilityNodeInfoCompat) {
-            val placed = allButtons().getOrNull(virtualViewId)
+            val placed = allButtons().firstOrNull { it.index == virtualViewId }
             if (placed == null) {
                 // Nó "morto" (layout mudou entre o hover e a consulta) — vazio em vez de crashar.
                 node.contentDescription = ""
@@ -565,7 +528,7 @@ class BarView(
 
         override fun onPerformActionForVirtualView(virtualViewId: Int, action: Int, arguments: Bundle?): Boolean {
             if (action != AccessibilityNodeInfoCompat.ACTION_CLICK) return false
-            val placed = allButtons().getOrNull(virtualViewId) ?: return false
+            val placed = allButtons().firstOrNull { it.index == virtualViewId } ?: return false
             if (!isA11yClickable(placed.button)) return false
             perform(placed.button)
             return true
@@ -589,10 +552,10 @@ class BarView(
                 lastX = event.x
                 scrolling = false
                 val placed = barLayout.buttonAt(event.x + scrollOffset)
+                if (placed?.button == BarButton.Mic) return false
                 activeButton = placed
                 pressedIndex = placed?.index ?: -1
                 when (val button = placed?.button) {
-                    BarButton.Mic -> scheduleHold(placed)
                     is BarButton.GridTrigger -> startGridSession(button, placed, event)
                     BarButton.Joystick -> startJoystick(placed)
                     else -> Unit
@@ -601,10 +564,6 @@ class BarView(
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
-                if (micSelector.isOpen) {
-                    micSelector.updateHighlight(event.rawX.toInt(), event.rawY.toInt(), micTopOnScreen())
-                    return true
-                }
                 gridSession?.let { session ->
                     lastRawX = event.rawX
                     lastRawY = event.rawY
@@ -624,16 +583,14 @@ class BarView(
                 if (scrolling) {
                     scrollOffset = (scrollOffset + (lastX - event.x)).coerceIn(0f, barLayout.maxScroll)
                     layoutCandidates()
+                    callbacks.onGeometryChanged()
                     invalidate()
                 }
                 lastX = event.x
                 return true
             }
             MotionEvent.ACTION_UP -> {
-                cancelHold()
-                if (micSelector.isOpen) {
-                    micSelector.release()?.let { callbacks.onMicAction(it) }
-                } else if (gridSession != null) {
+                if (gridSession != null) {
                     finishGridSession(event.rawX, event.rawY)
                 } else if (joystick != null) {
                     stopJoystick()
@@ -646,8 +603,6 @@ class BarView(
                 return true
             }
             MotionEvent.ACTION_CANCEL -> {
-                cancelHold()
-                micSelector.dismiss()
                 dismissGridSession()
                 stopJoystick()
                 endGesture()
@@ -663,7 +618,6 @@ class BarView(
         val draggable = activeButton?.button?.let { BarGeometry.isDraggable(it) } == true
         if (!draggable && abs(x - downX) > touchSlop) {
             scrolling = true
-            cancelHold()
             pressedIndex = -1
         }
     }
@@ -724,6 +678,7 @@ class BarView(
                 scale = scale,
                 qwertyRowCount = qwertyRowCount,
                 barCount = barCount,
+                sobressairPx = sobressairPx,
             ) + GridSizing.overscanSlackPx(metrics, scale),
         )
         callbacks.onGridDragActiveChanged(true)
@@ -832,29 +787,6 @@ class BarView(
         invalidate()
     }
 
-    private fun scheduleHold(placed: BarGeometry.PlacedButton) {
-        val r = Runnable {
-            micSelector.open(
-                anchor = this,
-                micLeftInAnchor = (placed.left - scrollOffset).toInt(),
-                micWidth = placed.width.toInt(),
-                micState = micState,
-            )
-        }
-        holdRunnable = r
-        handler.postDelayed(r, HOLD_MS)
-    }
-
-    private fun cancelHold() {
-        holdRunnable?.let { handler.removeCallbacks(it) }
-        holdRunnable = null
-    }
-
-    private fun micTopOnScreen(): Int {
-        val loc = IntArray(2).also { getLocationOnScreen(it) }
-        return loc[1] + marginV.toInt()
-    }
-
     private fun endGesture() {
         activeButton = null
         pressedIndex = -1
@@ -863,11 +795,8 @@ class BarView(
     }
 
     override fun onDetachedFromWindow() {
-        cancelHold()
-        micSelector.dismiss()
         dismissGridSession()
         stopJoystick()
-        handler.removeCallbacks(ticker)
         super.onDetachedFromWindow()
     }
 
@@ -875,7 +804,6 @@ class BarView(
 
     companion object {
         private const val TICK_MS = 500L
-        private const val HOLD_MS = 280L // mesmo limiar da barra antiga (tap abaixo, seletor acima)
         private const val MIN_UNIT_DP = 44f // alvo de toque de um botão de peso 1 (gatilho do overflow)
         // Grade efêmera (SB-T6): células generosas pra navegação às cegas; tick re-avalia o reveal.
         // internal: KeyFlowKeyboardView usa pra dimensionar o overscan da janela do IME (SB-T10/GRD-08).

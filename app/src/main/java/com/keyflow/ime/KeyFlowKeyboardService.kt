@@ -14,6 +14,8 @@ import android.view.inputmethod.InputConnection
 import android.inputmethodservice.InputMethodService
 import android.inputmethodservice.InputMethodService.Insets
 import com.keyflow.core.KeyFlowController
+import com.keyflow.orbe.*
+import com.keyflow.core.ButtonState
 import com.keyflow.core.shortcuts.BarsConfig
 import com.keyflow.core.shortcuts.ShortcutGrid
 import com.keyflow.core.shortcuts.ShortcutKey
@@ -53,6 +55,59 @@ open class KeyFlowKeyboardService : InputMethodService() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var keyboardView: KeyFlowKeyboardView? = null
+    private var orbeSnapshot = com.keyflow.data.KeyboardOrbSnapshot()
+    private var envioPttEmMs: Long? = null
+    private val envioPtt = Runnable {
+        if (KeyFlowController.buttonState.value == ButtonState.RECORDING && envioPttEmMs != null) {
+            envioPttEmMs = null
+            startMicSession()
+        }
+    }
+
+    private fun cancelarEnvioPtt() {
+        envioPttEmMs = null
+        mainHandler.removeCallbacks(envioPtt)
+    }
+
+    private fun agendarEnvioPtt() {
+        val prazo = envioPttEmMs ?: return
+        mainHandler.removeCallbacks(envioPtt)
+        mainHandler.postDelayed(envioPtt, (prazo - SystemClock.elapsedRealtime()).coerceAtLeast(0))
+    }
+
+    private fun abrirJanelaEnvioPtt() {
+        envioPttEmMs = SystemClock.elapsedRealtime() + com.keyflow.overlay.RecordingGestureController.DEFAULT_PTT_PAUSE_WINDOW_MS
+        agendarEnvioPtt()
+    }
+
+    private fun executarComandoDaOrbe(comando: ComandoDaOrbeDoTeclado) {
+        when (comando) {
+            ComandoDaOrbeDoTeclado.IniciarGravacao, ComandoDaOrbeDoTeclado.EnviarGravacao,
+            ComandoDaOrbeDoTeclado.ConcluirCancelamento, ComandoDaOrbeDoTeclado.ColarTextoPendente,
+            ComandoDaOrbeDoTeclado.EncerrarVisao -> startMicSession()
+            ComandoDaOrbeDoTeclado.DispensarErro -> { startMicSession(); abrirDestinoDoErro() }
+            ComandoDaOrbeDoTeclado.PausarGravacao, ComandoDaOrbeDoTeclado.RetomarGravacao -> sendMicAction(MicAction.PAUSE_RESUME)
+            ComandoDaOrbeDoTeclado.CancelarGravacao -> sendMicAction(MicAction.CANCEL)
+            ComandoDaOrbeDoTeclado.DesfazerCancelamento -> sendMicAction(MicAction.UNDO)
+            ComandoDaOrbeDoTeclado.RetrairExpandirTeclado -> if (KeyFlowController.keyboardVisible.value) KeyFlowController.requestToggleKeyboardExpand()
+            ComandoDaOrbeDoTeclado.TrocarTeclado -> OverlayService.showInputMethodPicker(this)
+            ComandoDaOrbeDoTeclado.IniciarVisao -> startService(OverlayService.actionIntent(this, OverlayService.ACTION_VISION))
+            ComandoDaOrbeDoTeclado.AbrirJanelaEnvioPtt -> abrirJanelaEnvioPtt()
+            is ComandoDaOrbeDoTeclado.AbrirApp -> {
+                if (comando.manterJanelaEnvioPtt) abrirJanelaEnvioPtt()
+                openKeyFlowApp()
+            }
+            ComandoDaOrbeDoTeclado.EntrarModoArrasto, ComandoDaOrbeDoTeclado.Nenhum -> Unit
+            is ComandoDaOrbeDoTeclado.DispararFluxo, is ComandoDaOrbeDoTeclado.AvisarFluxoInvalido -> Unit
+        }
+    }
+
+    private fun abrirDestinoDoErro() {
+        val intent = if (KeyFlowController.errorNavTarget == com.keyflow.core.ErrorNavTarget.MIC)
+            com.keyflow.ui.SetupActivity.openAtMicIntent(this, com.keyflow.ui.config.ConfigTab.TECLADO)
+        else com.keyflow.ui.SetupActivity.openAtVozIntent(this)
+        startActivity(intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
 
     // Estado expandido/encolhido persistido (SharedPreferences leve, sem cripto) para sobreviver à
     // recriação do processo do IME na troca de teclados — assim o KeyFlow volta como você o deixou.
@@ -180,12 +235,24 @@ open class KeyFlowKeyboardService : InputMethodService() {
     override fun onCreate() {
         super.onCreate()
         KeyFlowController.registerCaptureKeyboardHider(visionKeyboardHider)
+        serviceScope.launch {
+            SettingsRepository(this@KeyFlowKeyboardService).orbeDoTecladoFlow().collect {
+                orbeSnapshot = it
+                keyboardView?.updateOrbeConfig(it.config, it.settings)
+            }
+        }
+        serviceScope.launch {
+            KeyFlowController.visionActive.collect { keyboardView?.updateVisionState(it) }
+        }
         // As preferências do teclado (expandido/encolhido) abertas fora da thread principal: abrir um SharedPreferences lê o
         // disco, e o onStartInputView, que as lê, é o caminho que o Android cronometra (StrictModeKeyboardTest).
         serviceScope.launch(Dispatchers.IO) { uiPrefs.getBoolean(KEY_EXPANDED, true) }
         serviceScope.launch {
             KeyFlowController.buttonState.collect { state ->
                 keyboardView?.updateMicState(state)
+                // A soltura pode anteceder a confirmação assíncrona da partida do microfone.
+                if (state == ButtonState.RECORDING) agendarEnvioPtt()
+                else if (state != ButtonState.IDLE_READY && state != ButtonState.IDLE_NO_FIELD) cancelarEnvioPtt()
             }
         }
         // O botão do fluxo em execução fica aceso (FLX-32).
@@ -359,13 +426,7 @@ open class KeyFlowKeyboardService : InputMethodService() {
     override fun onComputeInsets(outInsets: Insets) {
         super.onComputeInsets(outInsets)
         val view = keyboardView ?: return
-        val overscan = view.gridOverscanPx
-        if (overscan <= 0) return
-        outInsets.contentTopInsets = overscan
-        outInsets.visibleTopInsets = overscan
-        outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_REGION
-        val touchableTop = if (view.gridDragActiveForTest) 0 else overscan
-        outInsets.touchableRegion.set(0, touchableTop, view.width, view.height)
+        aplicarPlanoDeInsets(outInsets, view.planoDeInsets, view.width, view.height)
     }
 
     override fun onDestroy() {
@@ -375,6 +436,7 @@ open class KeyFlowKeyboardService : InputMethodService() {
         KeyFlowController.setKeyboardVisible(false)
         if (activeViewForTest === keyboardView) activeViewForTest = null
         cancelSuggestions()
+        mainHandler.removeCallbacks(envioPtt)
         suggestExecutor.shutdownNow()
         serviceScope.cancel()
         super.onDestroy()
@@ -442,6 +504,7 @@ open class KeyFlowKeyboardService : InputMethodService() {
         val barsConfig = snapshot.bars
         val grids = snapshot.grids
         val vibration = snapshot.vibration
+        orbeSnapshot = snapshot.orbe
         appliedBarsConfig = barsConfig
         appliedGrids = grids
         appliedBotoesDeFluxo = snapshot.botoesDeFluxo
@@ -486,6 +549,8 @@ open class KeyFlowKeyboardService : InputMethodService() {
             motionEnabled = true,
             flowButtons = snapshot.botoesDeFluxo,
             onRunFlow = ::runFlow,
+            onOrbeComando = ::executarComandoDaOrbe,
+            onOrbePressionar = ::cancelarEnvioPtt,
         )
         keyboardView = view
         activeViewForTest = view
@@ -493,7 +558,9 @@ open class KeyFlowKeyboardService : InputMethodService() {
         // Sincroniza o estado atual na criação: o StateFlow só re-emite em mudança, então se a orbe já
         // estava (ex.) pausada quando o teclado abriu, a view nasceria dessincronizada (ex.: trocar de
         // teclado por atalho com o overlay pausado).
+        view.updateOrbeConfig(orbeSnapshot.config, orbeSnapshot.settings)
         view.updateMicState(KeyFlowController.buttonState.value)
+        view.updateVisionState(KeyFlowController.visionActive.value)
         view.updateFluxo(KeyFlowController.fluxo.value)
         Log.d(
             TAG,
@@ -1016,5 +1083,23 @@ open class KeyFlowKeyboardService : InputMethodService() {
                 else -> false
             }
         }
+    }
+}
+
+/** A região da janela inclui o disco recortado; rejeitar o toque depois não o entrega ao app. */
+internal fun aplicarPlanoDeInsets(out: Insets, plano: PlanoDeInsets, largura: Int, altura: Int) {
+    out.contentTopInsets = plano.contentTopPx
+    out.visibleTopInsets = plano.visibleTopPx
+    out.touchableInsets = Insets.TOUCHABLE_INSETS_REGION
+    val topo = if (plano.regiao == RegiaoToque.JanelaInteira) 0 else plano.contentTopPx
+    out.touchableRegion.set(0, topo, largura, altura)
+    (plano.regiao as? RegiaoToque.ConteudoMaisCirculo)?.circulo?.let { circulo ->
+        val path = android.graphics.Path().apply {
+            addCircle(circulo.centroX.toFloat(), circulo.centroY.toFloat(), circulo.raio.toFloat(), android.graphics.Path.Direction.CW)
+        }
+        val disco = android.graphics.Region().apply {
+            setPath(path, android.graphics.Region(0, 0, largura, altura))
+        }
+        out.touchableRegion.op(disco, android.graphics.Region.Op.UNION)
     }
 }

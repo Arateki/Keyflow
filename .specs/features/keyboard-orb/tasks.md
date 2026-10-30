@@ -79,12 +79,13 @@ A Fase A inteira é JVM: pode ser entregue e revisada antes de qualquer pixel.
 
 ## Fase B — IME e tela
 
-### KBO-T5 — Orbe na janela do teclado — **Status: pendente**
+### KBO-T5 — Orbe na janela do teclado — **Status: concluída**
 - **What**: espaçador de 36 dp, `onComputeInsets` aplicando `PlanoDeInsets` (sem o early-return que esquece a faixa), hit-test no pai, desenho da orbe no encaixe, estado e tempo (KBO-24), háptica (KBO-26), fim do `drawMic` e dos chips. Gravando/enviar continua em `keyboardMicIntent`. Leitura ao vivo da config (KBO-29). Descrição de acessibilidade (KBO-34).
 - **Where**: `ime/KeyFlowKeyboardView.kt`, `ime/KeyFlowKeyboardService.kt`, `ime/bars/BarView.kt`, `ime/OrbeDoTecladoView.kt`.
 - **Depends on**: T3, T4. **Requirement**: KBO-05, KBO-06, KBO-07, KBO-08, KBO-09, KBO-10, KBO-11, KBO-18, KBO-21, KBO-24, KBO-26, KBO-29, KBO-34.
 - **Done when**: `assembleDebug` verde; no emulador, `OrbeDoTecladoLayoutTest` mostra a orbe ociosa dentro do encaixe e, com o estado forçado para `RECORDING`, o círculo acima da borda sem intersectar a primeira tecla. No mesmo teste, um app hospedeiro com `EditText` em `adjustResize` e outro em `adjustPan`, retrato e paisagem, com e sem overscan de grade: compara o viewport e os insets do **app** antes e depois da faixa de 36 dp — o campo focado continua visível e o conteúdo não perde 36 dp (igualdade de `contentTopInsets` e `visibleTopInsets` no IME não basta). `mic` segue no JSON da fábrica. Nenhum `DragArrowsView` é criado pelo IME.
 - **Tests**: unit do que for extrator + instrumentado curto. **Gate**: `build` e `pool instrumentar com.keyflow.ime.OrbeDoTecladoLayoutTest`. **Commit**: `feat(orbe-teclado): desenha a orbe no IME`.
+- **Evidência (2026-10-30)**: `OrbeDoTecladoLayoutTest` 9/9 (encaixe, círculo acima da borda sem tocar teclas, viewport do app de trás igual antes/depois da faixa em resize e pan, retrato e paisagem, com e sem overscan); `assembleDebug`, `testDebugUnitTest` e `lintDebug` verdes. Lição: `../../project/licoes/2026-10-30-orbe-teclado-b.md`.
 
 ### KBO-T6 — Seção na aba Teclado — **Status: pendente**
 - **What**: seção Orbe no `TecladoPanel` (KBO-01..04, aviso ao substituir uma ação já atribuída na hora de salvar — KBO-15, D9 —, KBO-19 somente leitura quando copia). Rótulo do encaixe no editor de barras vira "Orbe"; não dá para adicionar um segundo. Textos por `tr` + arquivos en/es. A seção só aparece nesta task (antes, a aba fica idêntica).

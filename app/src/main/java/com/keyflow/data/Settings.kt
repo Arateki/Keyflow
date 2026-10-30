@@ -102,8 +102,7 @@ data class Settings(
     // Modos habilitados (gating das abas; cada modo libera sua aba — CFG-02)
     val overlayModeEnabled: Boolean = false,
     val keyboardModeEnabled: Boolean = false,
-    // Modo de gravação da orbe/overlay (C16; default TOGGLE). O teclado não tem modo:
-    // é toque (começar/enviar) + seletor de ações ao segurar o mic.
+    // Modo da orbe flutuante, copiado ao vivo pelo teclado quando a configuração dele pede (KBO-19).
     val overlayRecordingMode: RecordingMode = RecordingMode.TOGGLE,
     // Colar automaticamente (só vale com o teclado KeyFlow ativo; no overlay com teclado nativo o
     // texto vai para a área de transferência). Dois cenários independentes:
