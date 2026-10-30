@@ -85,7 +85,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(fluxos): fluxos padrão e restaurar sem tocar nos atalhos`.
 - **Registro (Fase A)**: O catálogo traz a dica de atalho de cada padrão como `DicaDeAtalho` (D15: dois toques, três toques, botão do teclado), sem gatilho; o texto "Sugestão: …" é da T18. `PadroesFluxo.nomeExibido` traduz só o padrão não renomeado. O sistema do Perguntar de "Ouvir e responder" fica em português por ser dado do fluxo (o Restaurar o compara). **Decisão que a spec não cobria**: com 20 fluxos o padrão apagado não é recriado (recriar além do limite faria o codec cortar fluxos da pessoa na leitura seguinte); a `PreviaRestaurar.semEspaco` lista os que ficaram de fora e a T17 mostra isso na confirmação. `Ids.fluxo()` gera os 8 hex; `RestauradorFluxos.restaurar` aceita o gerador de id (e nunca repete um id em uso).
 
-### FLX-T4 — Persistência no repositório — **Status: pendente**
+### FLX-T4 — Persistência no repositório — **Status: feita**
 - **What**: chaves `flows_json` e `flow_triggers_json` ao lado de `BARS_CONFIG_JSON` (`SettingsRepository.kt:876`); `configFluxosFlow()`, `configFluxosOnce()` (leitura leve, sem cofre), `atualizarFluxos(f)` e
   `atualizarFluxosEBarras(f)` (um `dataStore.edit`, sobre o valor atual, que também limpa gatilhos órfãos — FLX-50). Chave ausente → semente em memória, sem escrever.
 - **Where**: `data/SettingsRepository.kt` (ou um `FluxosRepositorio` sobre o mesmo DataStore, se o arquivo estiver grande demais); teste instrumentado `FluxosRepositoryTest` (padrão do `SettingsRepositoryTest`).
@@ -93,6 +93,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 - **Done when**: instrumentado — leitura sem chave = semente e **nada gravado**; primeira alteração grava a lista inteira; `[]` persistido lê vazio; duas alterações concorrentes (uma via modal, outra via barra) ficam ambas; `atualizarFluxosEBarras`
   grava barras e gatilho numa só transação; `saveSettings` das `Settings` **não** toca as duas chaves e vice-versa; gatilho de fluxo/botão inexistente some na gravação seguinte.
 - **Tests**: instrumentado. **Gate**: `pool instrumentar com.keyflow.data.FluxosRepositoryTest`. **Commit**: `feat(fluxos): persistência dos fluxos e gatilhos`.
+- **Registro (Fase A)**: Feita **depois** da T5 (usa o `PoliticaGatilhos.limpar`). No `SettingsRepository`, ao lado das barras: `configFluxosOnce`, `configFluxosFlow` (com `distinctUntilChanged`), `atualizarFluxos` e `atualizarFluxosEBarras`, todos sobre o `dataStore.edit` (lê o valor gravado, aplica a função pura, grava os dois JSON; devolve o que ficou gravado). `gravarFluxos` limpa os órfãos e não regrava se o JSON já é igual (um JSON malformado, lido como semente, é consertado na primeira gravação). O teste usa repositório com cofre que explode, para provar leitura leve. Seam de teste: `rawPreferencesFlow()` (interno), para conferir que barras e gatilho nunca aparecem separados. **Pendência para a T16**: o gatilho de botão da barra órfão ainda não é limpo aqui (`botoesDaBarra = null`), porque o `RunFlow` só passa a existir na T16; o `PoliticaGatilhos.limpar` com o conjunto de botões já está testado (FLX-50 fecha na T16).
 
 ### FLX-T5 — Roteador de gatilhos e política de ligação — **Status: feita**
 - **What**: `RoteadorGatilhos.resolverToques(lugar, toques, config, politica, settings) → Resolucao {Rodar, Incompleto, AcaoDoSettings, AcaoDoLugar, Nada}` (design §5.1 e §5.3: por lugar da orbe, inclusive overflow e "copiar" — `PoliticaDoLugar`) e `PoliticaGatilhos`
@@ -209,6 +210,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 - **Done when**: unit — `ShortcutCodecTest`, `ShortcutCodecPropertyTest` (ida e volta) e `BarIconsTest` incluem `RunFlow`; JSON antigo sem `flow` continua igual; instrumentado — o botão desenhado, tocar chama o callback com o id, órfão/inválido fica desabilitado e não dispara;
   o editor de barras lista, move e remove o botão e **não** o oferece para adicionar; goldens de teclado existentes bit-idênticos.
 - **Tests**: unit + instrumentado. **Gate**: `quick` + `pool instrumentar com.keyflow.ime.KeyFlowKeyboardBarsTest com.keyflow.ime.BarViewAccessibilityTest com.keyflow.ui.config.BarsEditorTest` + `pool telas` (0 divergências nos existentes). **Commit**: `feat(fluxos): botão de fluxo na barra do teclado`.
+- **Registro (Fase A)**: (da T4) `SettingsRepository.gravarFluxos` chama `PoliticaGatilhos.limpar(config, botoesDaBarra = null)`; ao criar o `RunFlow`, passe ali os `botaoId` dos `RunFlow` que a barra tem (`atualizarFluxos` lê `bars_config_json` na mesma transação, como `atualizarFluxosEBarras`), senão o gatilho de um botão apagado no editor de barras não some (FLX-50).
 
 ---
 

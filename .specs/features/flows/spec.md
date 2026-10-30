@@ -440,12 +440,12 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 | FLX-42 | P1-F | FLX-T3 | Implementing (T3 feita) |
 | FLX-43 | P1-F | FLX-T3 | Implementing (T3 feita) |
 | FLX-44 | P1-F | FLX-T3 | Implementing (T3 feita) |
-| FLX-45 | P1-G | FLX-T2, FLX-T4 | Implementing (T2 feita) |
+| FLX-45 | P1-G | FLX-T2, FLX-T4 | Implementing (T2, T4 feitas) |
 | FLX-46 | P1-G | FLX-T2 | Implementing (T2 feita) |
 | FLX-47 | P1-G | FLX-T2 | Implementing (T2 feita) |
-| FLX-48 | P1-G | FLX-T4 | Pending |
-| FLX-49 | P1-G | FLX-T4, FLX-T14 | Pending |
-| FLX-50 | P1-G | FLX-T4, FLX-T5 | Implementing (T5 feita) |
+| FLX-48 | P1-G | FLX-T4 | Implementing (T4 feita) |
+| FLX-49 | P1-G | FLX-T4, FLX-T14 | Implementing (T4 feita) |
+| FLX-50 | P1-G | FLX-T4, FLX-T5 | Implementing (T4, T5 feitas) |
 | FLX-51 | P2-H | FLX-T17..T21 (cada uma traz os seus textos) | Pending |
 | FLX-52 | P2-H | FLX-T1, FLX-T6, FLX-T10 | Implementing (T1 feita) |
 | FLX-53 | P2-H | FLX-T23 | Pending |
