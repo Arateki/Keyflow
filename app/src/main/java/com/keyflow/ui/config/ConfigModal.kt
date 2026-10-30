@@ -28,11 +28,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
+import com.keyflow.i18n.tr
 import androidx.compose.ui.window.PopupProperties
 import com.keyflow.ui.icons.KfIcon
 import com.keyflow.ui.icons.KfIcons
@@ -108,7 +112,8 @@ fun ConfigModal(
                                 .size(if (accessibleHeader) 48.dp else 32.dp)
                                 .clip(CircleShape)
                                 .border(1.dp, palette.line, CircleShape)
-                                .clickable(interactionSource = noRipple, indication = null) { onBack() }
+                                .clickable(interactionSource = noRipple, indication = null, role = Role.Button) { onBack() }
+                                .semantics { contentDescription = tr("Voltar") }
                                 .then(if (backTag != null) Modifier.testTag(backTag) else Modifier),
                             contentAlignment = Alignment.Center,
                         ) {
@@ -132,7 +137,8 @@ fun ConfigModal(
                         .size(if (accessibleHeader) 48.dp else 32.dp)
                         .clip(CircleShape)
                         .border(1.dp, palette.line, CircleShape)
-                        .clickable(interactionSource = noRipple, indication = null) { onDismiss() }
+                        .clickable(interactionSource = noRipple, indication = null, role = Role.Button) { onDismiss() }
+                        .semantics { contentDescription = tr("Fechar") }
                         .testTag(closeTag),
                     contentAlignment = Alignment.Center,
                 ) {

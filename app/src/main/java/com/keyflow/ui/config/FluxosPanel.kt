@@ -132,7 +132,7 @@ fun FluxosLista(
             Column(Modifier.padding(top = 18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (previa.vazia) SettingSub(tr("Os fluxos padrão já estão como no original"))
                 if (previa.recriar.isNotEmpty()) SettingSub(tr("Será recriado: %s", previa.recriar.joinToString(", ") { nomePadrao(it) }))
-                if (previa.reescrever.isNotEmpty()) SettingSub(tr("Será reescrito: %s", previa.reescrever.joinToString(", ")))
+                if (previa.reescrever.isNotEmpty()) SettingSub(tr("Será reescrito: %s", previa.reescrever.joinToString(", ") { nomePadrao(it) }))
                 if (previa.semEspaco.isNotEmpty()) Text(tr("Sem espaço (limite de 20): %s", previa.semEspaco.joinToString(", ") { nomePadrao(it) }),
                     color = palette.terracotta, fontFamily = SpaceGrotesk, fontSize = 13.sp, modifier = Modifier.testTag("fluxos-restaurar-sem-espaco"))
                 SettingSub(tr("Não muda: seus fluxos e todos os atalhos"))

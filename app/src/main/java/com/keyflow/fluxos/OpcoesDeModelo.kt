@@ -75,19 +75,55 @@ fun opcoesDeModelo(
     for (origem in origensDaAba(aba)) {
         val nome = nomeDaOrigem(origem)
         when {
-            origem == "LOCAL" -> instalados.forEach { opcoes += escolha(origem, nome, it, SeloDeModelo.NO_APARELHO, atual) }
+            origem == "LOCAL" -> {
+                if (instalados.isNotEmpty()) opcoes += semModeloSeAtual(origem, nome, SeloDeModelo.NO_APARELHO, atual)
+                instalados.forEach { opcoes += escolha(origem, nome, it, SeloDeModelo.NO_APARELHO, atual) }
+            }
             origem == "SYSTEM" -> opcoes += escolha(origem, nome, null, SeloDeModelo.NO_APARELHO, atual)
             origem !in conectados -> opcoes += OpcaoDeModelo.Conectar(nome, aba)
             else -> {
                 val modelos = catalogo[origem].orEmpty()
                 if (modelos.isEmpty() || origem == "CUSTOM") opcoes += escolha(origem, nome, null, SeloDeModelo.NUVEM, atual)
-                else modelos.forEach { opcoes += escolha(origem, nome, it, SeloDeModelo.NUVEM, atual) }
+                else {
+                    opcoes += semModeloSeAtual(origem, nome, SeloDeModelo.NUVEM, atual)
+                    modelos.forEach { opcoes += escolha(origem, nome, it, SeloDeModelo.NUVEM, atual) }
+                }
             }
         }
     }
     if (atual != null && opcoes.none { it.selecionada }) opcoes += OpcaoDeModelo.Indisponivel(atual)
-    // Um ModeloRef sem modelo de um provedor conectado vale "o modelo da aba daquela origem": a linha dele é a primeira da origem.
     return opcoes
+}
+
+/**
+ * `ModeloRef(origem, null)` é "o modelo que a aba escolheu daquela origem" e vale se a origem está disponível: quando é o ref
+ * gravado, ele ganha a própria linha (a primeira da origem), selecionada; senão não aparece (a escolha manual é por modelo).
+ */
+private fun semModeloSeAtual(origem: String, nome: String, selo: SeloDeModelo, atual: ModeloRef?): List<OpcaoDeModelo> =
+    if (atual == ModeloRef(origem, null)) listOf(escolha(origem, nome, null, selo, atual)) else emptyList()
+
+/**
+ * O que oferecer quando a tela não sabe o que está instalado nem conectado (sem fiação): "Da aba", calculada com as [settings]
+ * recebidas, e o `ModeloRef` gravado como linha selecionada. Não afirma disponibilidade, então nunca marca Indisponível.
+ */
+fun opcoesSoDaAba(etapa: Etapa, settings: Settings): List<OpcaoDeModelo> {
+    if (abaDaEtapa(etapa) == null) return emptyList()
+    val ref = etapa.modelo
+    val daAba = OpcaoDeModelo.DaAba(ModeloPorEtapa.efetivo(settings, etapa.comModelo(null)), selecionada = ref == null)
+    if (ref == null) return listOf(daAba)
+    val local = ref.origem == "LOCAL" || ref.origem == "SYSTEM"
+    val modelo = ref.modelo?.let { ModeloOferecido(it, it) }
+    return listOf(daAba, OpcaoDeModelo.Escolha(ref, nomeDaOrigem(ref.origem), modelo, if (local) SeloDeModelo.NO_APARELHO else SeloDeModelo.NUVEM, true))
+}
+
+/**
+ * O Agente só usa ferramentas com provedor de nuvem que tenha motor de ferramentas (Anthropic, OpenAI, Google); em modelo local ou
+ * Custom ele só responde em texto. Aqui é só pela origem; a chave de API (e não o login de plano) a T22 confere com a conexão.
+ */
+fun agenteSemFerramentas(etapa: Etapa, settings: Settings): Boolean {
+    if (etapa !is Etapa.Agente) return false
+    val origem = etapa.modelo?.origem ?: ModeloPorEtapa.efetivo(settings, etapa).origem
+    return origem !in setOf("OPENAI", "ANTHROPIC", "GOOGLE")
 }
 
 private fun escolha(origem: String, nome: String, modelo: ModeloOferecido?, selo: SeloDeModelo, atual: ModeloRef?): OpcaoDeModelo.Escolha {

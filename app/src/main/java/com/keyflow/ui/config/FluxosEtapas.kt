@@ -33,7 +33,10 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -58,6 +61,9 @@ import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
 import com.keyflow.ui.theme.SpaceMono
 
+/** O que a etapa entrega na tela: Falar passa o texto adiante, mas o que a pessoa recebe é áudio. */
+internal fun saidaNaTela(etapa: Etapa): String = if (etapa is Etapa.Falar) tr("áudio") else tipoNaTela(etapa.saida)
+
 internal fun tipoNaTela(tipo: Tipo): String = when (tipo) {
     Tipo.NADA -> tr("nada")
     Tipo.TEXTO -> tr("texto")
@@ -74,6 +80,7 @@ internal fun EtapasLista(
     fluxo: Fluxo,
     problemas: List<Problema>,
     opcoesDe: (Etapa) -> List<OpcaoDeModelo>,
+    indisponiveis: Set<Int>,
     onMover: (de: Int, para: Int) -> Unit,
     onRemover: (Int) -> Unit,
     onTexto: (Int, String) -> Unit,
@@ -108,7 +115,7 @@ internal fun EtapasLista(
         fluxo.etapas.forEachIndexed { i, etapa ->
             EtapaCard(
                 i, etapa, fluxo.etapas.size, problemas.firstOrNull { it.indice == i },
-                resumoDoModelo(opcoesDe(etapa)), arrastado == i,
+                resumoDoModelo(opcoesDe(etapa)), i in indisponiveis, arrastado == i,
                 onMover = onMover, onRemover = { onRemover(i) }, onTexto = { onTexto(i, it) }, onModelo = { onModelo(i) },
                 Modifier.onGloballyPositioned { topos[i] = it.positionInParent().y to it.size.height.toFloat() },
             )
@@ -123,6 +130,7 @@ private fun EtapaCard(
     total: Int,
     problema: Problema?,
     modelo: String,
+    indisponivel: Boolean,
     arrastando: Boolean,
     onMover: (Int, Int) -> Unit,
     onRemover: () -> Unit,
@@ -132,24 +140,31 @@ private fun EtapaCard(
 ) {
     val palette = LocalKeyFlowPalette.current
     val forma = RoundedCornerShape(16.dp)
-    val borda = when { problema != null -> palette.terracotta; arrastando -> palette.teal; else -> palette.line2 }
+    val borda = when { problema != null || indisponivel -> palette.terracotta; arrastando -> palette.teal; else -> palette.line2 }
     Column(
-        modifier.fillMaxWidth().clip(forma).background(palette.card).border(if (problema != null) 2.dp else 1.dp, borda, forma)
+        modifier.fillMaxWidth().clip(forma).background(palette.card).border(if (problema != null || indisponivel) 2.dp else 1.dp, borda, forma)
             .testTag("fluxos-etapa-$i").padding(horizontal = 8.dp, vertical = 6.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(48.dp).testTag("fluxos-etapa-$i-alca").semantics { contentDescription = tr("Segure e arraste para reordenar") },
-                contentAlignment = Alignment.Center) {
-                Text("≡", color = palette.muted, fontFamily = SpaceGrotesk, fontSize = 20.sp)
+            val nome = etapa.tipo.nomeExibido()
+            Box(Modifier.size(48.dp).testTag("fluxos-etapa-$i-alca").semantics(mergeDescendants = false) {
+                contentDescription = tr("Reordenar a etapa %d, %s. Segure e arraste, ou use as ações", i + 1, nome)
+                customActions = listOfNotNull(
+                    if (i > 0) CustomAccessibilityAction(tr("Mover para cima")) { onMover(i, i - 1); true } else null,
+                    if (i < total - 1) CustomAccessibilityAction(tr("Mover para baixo")) { onMover(i, i + 1); true } else null,
+                )
+            }, contentAlignment = Alignment.Center) {
+                Text("≡", color = palette.muted, fontFamily = SpaceGrotesk, fontSize = 20.sp, modifier = Modifier.clearAndSetSemantics { })
             }
             Column(Modifier.weight(1f)) {
                 Text("${i + 1}  " + etapa.tipo.nomeExibido(), color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                Text(tipoNaTela(etapa.entrada) + " → " + tipoNaTela(etapa.saida), color = palette.muted, fontFamily = SpaceMono, fontSize = 10.sp)
+                Text(tipoNaTela(etapa.entrada) + " → " + saidaNaTela(etapa), color = palette.muted, fontFamily = SpaceMono, fontSize = 10.sp,
+                    modifier = Modifier.testTag("fluxos-etapa-$i-io"))
             }
-            BotaoIcone(KfIcons.ChevronUp, tr("Mover para cima"), "fluxos-etapa-$i-subir", i > 0) { onMover(i, i - 1) }
-            BotaoIcone(KfIcons.ChevronDown, tr("Mover para baixo"), "fluxos-etapa-$i-descer", i < total - 1) { onMover(i, i + 1) }
-            BotaoIcone(KfIcons.Close, tr("Remover etapa"), "fluxos-etapa-$i-remover", true, onRemover)
+            BotaoIcone(KfIcons.ChevronUp, tr("Mover a etapa %d, %s, para cima", i + 1, nome), "fluxos-etapa-$i-subir", i > 0) { onMover(i, i - 1) }
+            BotaoIcone(KfIcons.ChevronDown, tr("Mover a etapa %d, %s, para baixo", i + 1, nome), "fluxos-etapa-$i-descer", i < total - 1) { onMover(i, i + 1) }
+            BotaoIcone(KfIcons.Close, tr("Remover a etapa %d, %s", i + 1, nome), "fluxos-etapa-$i-remover", true, onRemover)
         }
         if (etapa.usaModelo) {
             Row(
@@ -171,6 +186,10 @@ private fun EtapaCard(
                 limite = LIMITES.TEXTO_DA_ETAPA,
                 onCommit = onTexto,
             )
+        }
+        if (indisponivel) {
+            Text("⚠ " + tr("Modelo indisponível"), color = palette.terracotta, fontFamily = SpaceGrotesk, fontSize = 12.sp,
+                modifier = Modifier.padding(start = 8.dp).testTag("fluxos-etapa-$i-indisponivel"))
         }
         if (problema != null) {
             Text("⚠ " + problema.motivo.texto, color = palette.terracotta, fontFamily = SpaceGrotesk, fontSize = 12.sp,

@@ -44,6 +44,8 @@ import com.keyflow.fluxos.Fluxo
 import com.keyflow.fluxos.LIMITES
 import com.keyflow.fluxos.ModeloRef
 import com.keyflow.fluxos.OpcaoDeModelo
+import com.keyflow.fluxos.agenteSemFerramentas
+import com.keyflow.fluxos.opcoesSoDaAba
 import com.keyflow.fluxos.PadroesFluxo
 import com.keyflow.fluxos.TipoEtapa
 import com.keyflow.fluxos.ValidadorFluxo
@@ -65,13 +67,19 @@ import kotlinx.coroutines.launch
 const val FLUXOS_MODAL_FECHAR_TAG = "fluxos-modal-fechar"
 const val FLUXOS_RODAR_TAG = "fluxos-rodar-agora"
 
-/** De onde vêm as opções do seletor de modelo: o mesmo dado que as abas das capacidades usam (design §11.3). */
+/** De onde vêm as opções do seletor de modelo por etapa: o mesmo dado que as abas das capacidades usam (design §11.3). */
 fun interface FonteDeModelos {
     fun opcoes(etapa: Etapa): List<OpcaoDeModelo>
 
+    /** O Agente desta etapa só responde em texto? Liga a nota "só usa ferramentas com chave de API". */
+    fun semFerramentas(etapa: Etapa): Boolean = true
+
     companion object {
-        /** Sem fiação (galeria, testes): só "Da aba". */
-        val SoDaAba = FonteDeModelos { etapa -> com.keyflow.fluxos.opcoesDeModelo(etapa, Settings(), emptyList(), emptySet(), emptyMap()) }
+        /** Sem fiação (testes, galeria): só "Da aba" das [settings] recebidas, sem afirmar o que está instalado ou conectado. */
+        fun daAba(settings: Settings): FonteDeModelos = object : FonteDeModelos {
+            override fun opcoes(etapa: Etapa) = opcoesSoDaAba(etapa, settings)
+            override fun semFerramentas(etapa: Etapa) = agenteSemFerramentas(etapa, settings)
+        }
     }
 }
 
@@ -86,7 +94,7 @@ fun FluxosModal(
     settings: Settings,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
-    fonte: FonteDeModelos = FonteDeModelos.SoDaAba,
+    fonte: FonteDeModelos? = null,
     onAbrirAba: (ConfigTab) -> Unit = {},
     onCancelar: () -> Unit = OverlayService::cancelarFluxo,
     onRodar: (Context, String) -> Unit = { contexto, id -> OverlayService.start(contexto, OverlayService.runFlowNowIntent(contexto, id)) },
@@ -132,13 +140,14 @@ fun FluxosModalConteudo(
     onDismiss: () -> Unit,
     onAlterar: ((Fluxo) -> Fluxo) -> Unit,
     modifier: Modifier = Modifier,
-    fonte: FonteDeModelos = FonteDeModelos.SoDaAba,
+    fonte: FonteDeModelos? = null,
     onAbrirAba: (ConfigTab) -> Unit = {},
     onCancelar: () -> Unit = {},
     onRodar: () -> Unit = {},
     erroAoSalvar: Boolean = false,
 ) {
     var tela by remember { mutableStateOf<Tela>(Tela.Principal) }
+    val fonteDeModelos = fonte ?: remember(settings) { FonteDeModelos.daAba(settings) }
     val nomeNaTela = PadroesFluxo.nomeExibido(fluxo)
     val etapaDoModelo = (tela as? Tela.Modelo)?.let { fluxo.etapas.getOrNull(it.indice) }
     if (tela is Tela.Modelo && etapaDoModelo == null) tela = Tela.Principal
@@ -153,14 +162,14 @@ fun FluxosModalConteudo(
         accessibleHeader = true,
     ) {
         when (val atual = tela) {
-            Tela.Principal -> Principal(fluxo, estado, settings, fonte, onAlterar, onCancelar, onRodar, erroAoSalvar,
+            Tela.Principal -> Principal(fluxo, estado, settings, fonteDeModelos, onAlterar, onCancelar, onRodar, erroAoSalvar,
                 onNovaEtapa = { tela = Tela.NovaEtapa }, onModelo = { tela = Tela.Modelo(it) })
             Tela.NovaEtapa -> SeletorDeEtapa(fluxo, onEscolher = { tipo ->
                 etapaNova(tipo)?.let { nova -> onAlterar { f -> if (f.etapas.size < LIMITES.ETAPAS) f.copy(etapas = f.etapas + nova) else f } }
                 tela = Tela.Principal
             })
             is Tela.Modelo -> etapaDoModelo?.let { etapa ->
-                FluxosSeletorModeloConteudo(etapa, fonte.opcoes(etapa),
+                FluxosSeletorModeloConteudo(etapa, fonteDeModelos.opcoes(etapa), notaDoAgente = fonteDeModelos.semFerramentas(etapa),
                     onEscolher = { ref -> trocarEtapa(onAlterar, atual.indice, etapa) { it.comModelo(ref) }; tela = Tela.Principal },
                     onConectar = { aba -> onAbrirAba(abaDe(aba)) })
             }
@@ -192,6 +201,8 @@ private fun Principal(
     val validacao = ValidadorFluxo.validar(fluxo)
     val rodando = estado as? EstadoExecucao.Rodando
     val esteRodando = rodando?.takeIf { it.fluxoId == fluxo.id }
+    // Um ModeloRef que sumiu marca a etapa e tira o fluxo do "100% no aparelho": o selo diz Indisponível.
+    val indisponiveis = fluxo.etapas.indices.filter { i -> fonte.opcoes(fluxo.etapas[i]).any { it is OpcaoDeModelo.Indisponivel } }.toSet()
     Column(Modifier.fillMaxWidth().padding(top = 14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         if (erroAoSalvar) SettingSub(tr("Não foi possível salvar o fluxo."))
         CampoDeTexto(
@@ -199,7 +210,8 @@ private fun Principal(
             vazioVolta = true,
             onCommit = { novo -> onAlterar { f -> if (f.nome == novo || PadroesFluxo.nomeExibido(f) == novo) f else f.copy(nome = novo.take(LIMITES.NOME)) } },
         )
-        Text(seloDoFluxo(settings, fluxo), color = palette.teal, fontFamily = SpaceMono, fontSize = 10.sp,
+        Text(if (indisponiveis.isNotEmpty()) tr("Indisponível") else seloDoFluxo(settings, fluxo),
+            color = if (indisponiveis.isNotEmpty()) palette.terracotta else palette.teal, fontFamily = SpaceMono, fontSize = 10.sp,
             modifier = Modifier.testTag("fluxos-modal-selo"))
         PadroesFluxo.dicaDe(fluxo)?.let { dica ->
             SettingSub(tr("Sugestão: %s", when (dica) {
@@ -211,7 +223,7 @@ private fun Principal(
         Eyebrow(tr("Etapas"))
         if (fluxo.etapas.isEmpty()) InfoNote(tr("Toque em “+ Etapa” para começar. Ditar e Capturar abrem o fluxo."), "fluxos-modal-guia")
         EtapasLista(
-            fluxo, validacao.problemas, fonte::opcoes,
+            fluxo, validacao.problemas, fonte::opcoes, indisponiveis,
             onMover = { de, para -> onAlterar { f -> f.copy(etapas = reordenar(f.etapas, de, para)) } },
             onRemover = { i -> onAlterar { f -> f.copy(etapas = f.etapas.filterIndexed { j, _ -> j != i }) } },
             onTexto = { i, texto -> onAlterar { f -> f.copy(etapas = f.etapas.mapIndexed { j, e -> if (j == i) e.comTexto(texto) else e }) } },

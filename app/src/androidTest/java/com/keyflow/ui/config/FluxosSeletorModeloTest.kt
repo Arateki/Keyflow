@@ -106,6 +106,34 @@ class FluxosSeletorModeloTest {
         assertNull(tela.fluxo.etapas[1].modelo)
     }
 
+    @Test fun semanticaDasLinhasENuvemComProvedor() {
+        val tela = Tela(fluxo(Etapa.Perguntar(modelo = ModeloRef("OPENAI", "gpt-4o")))); tela.abrir()
+        rule.onNodeWithTag("fluxos-etapa-1-modelo").performScrollTo().performClick()
+        rule.onNodeWithTag("fluxos-modelo-openai-gpt-4o").assertIsSelected()
+        rule.onNodeWithTag("fluxos-modelo-da-aba").assertIsNotSelected()
+        rule.onNodeWithTag("fluxos-modelo-openai-gpt-4o").assertTextContains("Nuvem · OpenAI", substring = true)
+        rule.onNodeWithTag("fluxos-modelo-conectar-raciocinio-anthropic").performScrollTo()
+            .assert(SemanticsMatcher.keyNotDefined(androidx.compose.ui.semantics.SemanticsProperties.Selected))
+    }
+
+    @Test fun indisponivelNaoTemRadioENotaDoAgenteDependeDaOrigem() {
+        val tela = Tela(fluxo(Etapa.Agente(modelo = ModeloRef("LOCAL", "apagado")))); tela.abrir()
+        rule.onNodeWithTag("fluxos-etapa-1-modelo").performScrollTo().performClick()
+        rule.onNodeWithTag("fluxos-modelo-indisponivel").assert(SemanticsMatcher.keyNotDefined(androidx.compose.ui.semantics.SemanticsProperties.Role))
+        rule.onNodeWithText("O Agente só usa ferramentas com chave de API", substring = true).assertIsDisplayed()
+    }
+
+    @Test fun notaDoAgenteSomeQuandoAOrigemTemFerramentas() {
+        val nuvem = local.copy(reasoningSource = ReasoningSource.ANTHROPIC)
+        rule.setContent {
+            FluxosCena {
+                FluxosModalConteudo(fluxo(Etapa.Agente()), EstadoExecucao.Ocioso, nuvem, onDismiss = {}, onAlterar = {})
+            }
+        }
+        rule.onNodeWithTag("fluxos-etapa-1-modelo").performScrollTo().performClick()
+        rule.onNodeWithText("O Agente só usa ferramentas com chave de API", substring = true).assertDoesNotExist()
+    }
+
     @Test fun notasDoAgenteEDoPaddleOcr() {
         val agente = Tela(fluxo(Etapa.Agente())); agente.abrir()
         rule.onNodeWithTag("fluxos-etapa-1-modelo").performScrollTo().performClick()

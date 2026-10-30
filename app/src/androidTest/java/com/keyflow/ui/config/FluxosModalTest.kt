@@ -51,13 +51,14 @@ class FluxosModalTest {
     private inner class Tela(inicial: Fluxo) {
         var fluxo by mutableStateOf(inicial)
         var estado by mutableStateOf<EstadoExecucao>(EstadoExecucao.Ocioso)
+        var settings by mutableStateOf(local)
         var visivel by mutableStateOf(true)
         var escuro by mutableStateOf(false)
         var rodou = 0
         var view: View? = null
         fun abrir() = rule.setContent {
             FluxosCena(escuro, { view = it }) {
-                if (visivel) FluxosModalConteudo(fluxo, estado, local, onDismiss = {}, onAlterar = { fluxo = it(fluxo) }, onRodar = { rodou++ })
+                if (visivel) FluxosModalConteudo(fluxo, estado, settings, onDismiss = {}, onAlterar = { fluxo = it(fluxo) }, onRodar = { rodou++ })
             }
         }
     }
@@ -174,6 +175,49 @@ class FluxosModalTest {
             rule.onNodeWithTag("fluxos-modal-sugestao", useUnmergedTree = true).assertTextEquals("Sugestão: ${esperado.getValue(padrao.padrao!!)}")
             assertEquals(padrao, tela.fluxo)
         }
+    }
+
+    @Test fun modeloDaEtapaUsaAsSettingsDoModalESeloAcompanha() {
+        val tela = Tela(Fluxo("d", "Ditar", etapas = listOf(Etapa.Ditar(), Etapa.Falar()))); tela.abrir()
+        rule.onNodeWithTag("fluxos-etapa-0-modelo").performScrollTo()
+        rule.onNode(hasTestTag("fluxos-etapa-0-modelo") and hasText("whisper", substring = true)).assertDoesNotExist()
+        rule.onNodeWithTag("fluxos-etapa-1-modelo").performScrollTo().assertTextContains("Da aba · Sistema", substring = true)
+        rule.onNodeWithTag("fluxos-modal-selo", useUnmergedTree = true).assertTextEquals("100% no aparelho")
+        rule.runOnIdle { tela.settings = local.copy(source = TranscriptionSource.OPENAI) }
+        rule.onNodeWithTag("fluxos-modal-selo", useUnmergedTree = true).assertTextEquals("Nuvem · OpenAI")
+        rule.onNodeWithTag("fluxos-etapa-0-modelo").performScrollTo().assertTextContains("Da aba", substring = true)
+    }
+
+    @Test fun modeloGravadoQueSumiuMarcaAEtapaENaoContaComoNoAparelho() {
+        val ref = ModeloRef("OPENAI", "gpt-4o")
+        val fluxo = Fluxo("i", "Indisp", etapas = listOf(Etapa.Ditar(modelo = ref), Etapa.Falar()))
+        rule.setContent {
+            FluxosCena {
+                FluxosModalConteudo(fluxo, EstadoExecucao.Ocioso, local, onDismiss = {}, onAlterar = {},
+                    fonte = { etapa -> opcoesDeModelo(etapa, local, emptyList(), emptySet(), emptyMap()) })
+            }
+        }
+        rule.onNodeWithTag("fluxos-modal-selo", useUnmergedTree = true).assertTextEquals("Indisponível")
+        rule.onNodeWithTag("fluxos-etapa-0-indisponivel", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
+        rule.onNodeWithTag("fluxos-etapa-1-indisponivel", useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @Test fun falarMostraTextoParaAudio() {
+        val tela = Tela(tres()); tela.abrir()
+        rule.onNodeWithTag("fluxos-etapa-2-io", useUnmergedTree = true).performScrollTo().assertTextEquals("texto → áudio")
+        rule.onNodeWithTag("fluxos-etapa-1-io", useUnmergedTree = true).assertTextEquals("texto → texto")
+    }
+
+    @Test fun acessibilidadeDoCabecalhoEDasEtapas() {
+        val tela = Tela(tres()); tela.abrir()
+        rule.onNodeWithTag(FLUXOS_MODAL_FECHAR_TAG).assert(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.Role, androidx.compose.ui.semantics.Role.Button))
+        rule.onNodeWithContentDescription("Fechar").assertExists()
+        rule.onNodeWithTag("fluxos-etapa-1-subir").assert(hasContentDescription("Mover a etapa 2, Perguntar, para cima"))
+        rule.onNodeWithTag("fluxos-etapa-1-remover").assert(hasContentDescription("Remover a etapa 2, Perguntar"))
+        rule.onNodeWithTag("fluxos-etapa-1-alca", useUnmergedTree = true).assert(hasContentDescription("Reordenar a etapa 2, Perguntar", substring = true))
+        rule.onNodeWithTag("fluxos-add-etapa").performScrollTo().performClick()
+        rule.onNodeWithTag("fluxos-modal-voltar").assert(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.Role, androidx.compose.ui.semantics.Role.Button))
+        rule.onNodeWithContentDescription("Voltar").assertExists()
     }
 
     @Test fun persisteNaHoraSemTocarEmGatilhos() = runBlocking {

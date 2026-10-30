@@ -2,6 +2,7 @@ package com.keyflow.ui.config
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,6 +18,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -60,20 +63,23 @@ internal fun resumoDoModelo(opcoes: List<OpcaoDeModelo>): String =
         else -> tr("Da aba")
     }
 
-private fun efetivoNome(efetivo: Efetivo): String? = efetivo.modelo?.takeIf { it.isNotBlank() }
+/** O modelo da aba para a tela; sem submodelo (voz do Sistema, Custom sem nome) vale o nome da origem. */
+private fun efetivoNome(efetivo: Efetivo): String? =
+    efetivo.modelo?.takeIf { it.isNotBlank() } ?: efetivo.origem?.let { nomeDaOrigemNaTela(nomeDaOrigem(it)) }
 
 /** Conteúdo do seletor: sem efeito colateral, quem chama grava o [ModeloRef] (nulo = "Da aba") e abre a aba pedida. */
 @Composable
 fun FluxosSeletorModeloConteudo(
     etapa: Etapa,
     opcoes: List<OpcaoDeModelo>,
+    notaDoAgente: Boolean,
     onEscolher: (ModeloRef?) -> Unit,
     onConectar: (AbaDaEtapa) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val palette = LocalKeyFlowPalette.current
     Column(modifier.fillMaxWidth().padding(top = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (etapa is Etapa.Agente) SettingSub(tr("O Agente só usa ferramentas com chave de API."))
+        if (etapa is Etapa.Agente && notaDoAgente) SettingSub(tr("O Agente só usa ferramentas com chave de API."))
         val paddle = etapa is Etapa.Visao && opcoes.firstOrNull { it.selecionada }.let {
             it is OpcaoDeModelo.Escolha && it.ref.modelo == OCR_PADDLE_ID || it is OpcaoDeModelo.DaAba && it.efetivo.modelo == OCR_PADDLE_ID
         }
@@ -84,20 +90,24 @@ fun FluxosSeletorModeloConteudo(
             Row(
                 Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(forma)
                     .border(1.dp, if (opcao.selecionada) palette.teal else palette.line2, forma)
-                    .clickable(role = Role.RadioButton) {
+                    .then(
                         when (opcao) {
-                            is OpcaoDeModelo.DaAba -> onEscolher(null)
-                            is OpcaoDeModelo.Escolha -> onEscolher(opcao.ref)
-                            is OpcaoDeModelo.Conectar -> onConectar(opcao.aba)
-                            is OpcaoDeModelo.Indisponivel -> Unit
-                        }
-                    }
+                            is OpcaoDeModelo.DaAba -> Modifier.selectable(opcao.selecionada, role = Role.RadioButton) { onEscolher(null) }
+                            is OpcaoDeModelo.Escolha -> Modifier.selectable(opcao.selecionada, role = Role.RadioButton) { onEscolher(opcao.ref) }
+                            is OpcaoDeModelo.Conectar -> Modifier.clickable(role = Role.Button) { onConectar(opcao.aba) }
+                            is OpcaoDeModelo.Indisponivel -> Modifier.semantics(mergeDescendants = true) { selected = true }
+                        },
+                    )
                     .testTag(tagOpcaoDeModelo(opcao)).padding(horizontal = 12.dp, vertical = 8.dp)
                     .alpha(if (opcao is OpcaoDeModelo.Indisponivel) 0.75f else 1f),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                KfRadio(selected = opcao.selecionada)
+                when (opcao) {
+                    is OpcaoDeModelo.DaAba, is OpcaoDeModelo.Escolha -> KfRadio(selected = opcao.selecionada)
+                    is OpcaoDeModelo.Indisponivel -> Text("⚠", color = palette.terracotta, fontSize = 16.sp)
+                    is OpcaoDeModelo.Conectar -> Unit
+                }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(rotulo(opcao), color = palette.fg, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Medium, fontSize = 13.sp)
                     val sub = sub(opcao)
@@ -119,13 +129,13 @@ private fun rotulo(opcao: OpcaoDeModelo): String = when (opcao) {
 
 private fun sub(opcao: OpcaoDeModelo): String? = when (opcao) {
     is OpcaoDeModelo.DaAba -> seloTexto(opcao.efetivo)
-    is OpcaoDeModelo.Escolha -> if (opcao.selo == SeloDeModelo.NO_APARELHO) tr("No aparelho") else tr("Nuvem")
+    is OpcaoDeModelo.Escolha -> if (opcao.selo == SeloDeModelo.NO_APARELHO) tr("No aparelho") else tr("Nuvem · %s", opcao.origemNome)
     is OpcaoDeModelo.Conectar -> tr("Conecte na aba %s", abaDe(opcao.aba).label)
     is OpcaoDeModelo.Indisponivel -> tr("Modelo ausente: escolha outro ou instale de novo")
 }
 
 private fun seloTexto(efetivo: Efetivo): String = when (efetivo.onde) {
     com.keyflow.fluxos.Onde.NoAparelho -> tr("No aparelho")
-    is com.keyflow.fluxos.Onde.Nuvem -> tr("Nuvem")
+    is com.keyflow.fluxos.Onde.Nuvem -> tr("Nuvem · %s", efetivo.onde.provedor.nome)
     com.keyflow.fluxos.Onde.Indisponivel -> tr("Indisponível")
 }

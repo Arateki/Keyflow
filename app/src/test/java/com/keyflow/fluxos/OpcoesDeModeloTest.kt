@@ -69,4 +69,30 @@ class OpcoesDeModeloTest {
         assertTrue(opcoes(Etapa.Capturar).isEmpty()); assertTrue(opcoes(Etapa.Inserir).isEmpty())
         assertNull(abaDaEtapa(Etapa.Desconhecida("x")))
     }
+
+    @Test fun refSemModeloDeProvedorConectadoEhValidaEUmaLinhaSelecionada() {
+        val etapa = Etapa.Perguntar(modelo = ModeloRef("OPENAI", null))
+        val o = opcoes(etapa, listOf(gemma), setOf("OPENAI"), mapOf("OPENAI" to listOf(gpt)))
+        assertTrue(o.none { it is OpcaoDeModelo.Indisponivel })
+        assertEquals(ModeloRef("OPENAI", null), (o.single { it.selecionada } as OpcaoDeModelo.Escolha).ref)
+        val semConexao = opcoes(etapa, listOf(gemma), emptySet(), mapOf("OPENAI" to listOf(gpt)))
+        assertTrue(semConexao.last() is OpcaoDeModelo.Indisponivel)
+    }
+
+    @Test fun soDaAbaNaoInventaDisponibilidadeEUsaAsSettingsPassadas() {
+        val nuvem = settings.copy(reasoningSource = ReasoningSource.OPENAI, reasoningOpenAiModel = "gpt-x")
+        val o = opcoesSoDaAba(Etapa.Perguntar(), nuvem)
+        assertEquals("gpt-x", (o.single() as OpcaoDeModelo.DaAba).efetivo.modelo)
+        assertEquals(Onde.Nuvem(ProvedorNuvem.OPENAI), (o.single() as OpcaoDeModelo.DaAba).efetivo.onde)
+        val comRef = opcoesSoDaAba(Etapa.Perguntar(modelo = ModeloRef("LOCAL", "qwen")), nuvem)
+        assertEquals(1, comRef.count { it.selecionada })
+        assertTrue(comRef.none { it is OpcaoDeModelo.Indisponivel })
+    }
+
+    @Test fun agenteSemFerramentasSoQuandoAOrigemNaoAsTem() {
+        assertTrue(agenteSemFerramentas(Etapa.Agente(), settings))
+        assertFalse(agenteSemFerramentas(Etapa.Agente(), settings.copy(reasoningSource = ReasoningSource.ANTHROPIC)))
+        assertFalse(agenteSemFerramentas(Etapa.Agente(modelo = ModeloRef("GOOGLE")), settings))
+        assertTrue(agenteSemFerramentas(Etapa.Agente(modelo = ModeloRef("LOCAL", "x")), settings.copy(reasoningSource = ReasoningSource.OPENAI)))
+    }
 }
