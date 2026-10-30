@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <application>
+        <!-- Hospedeiro de viewport para a orbe, em processo separado do IME. -->
+        <activity android:name=".ui.OrbeDoTecladoProbeActivity" android:exported="true" android:process=":probe" />
         <activity android:name=".DebugSimulatedPurchaseActivity" android:exported="false" />
         <!-- Smoke de fundação (T1), só em debug, não exportado, sem launcher. -->
         <activity

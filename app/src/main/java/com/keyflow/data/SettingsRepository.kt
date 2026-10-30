@@ -215,8 +215,27 @@ class SettingsRepository(
             grids = ShortcutCodec.decodeGrids(prefs[SHORTCUT_GRIDS_JSON]),
             vibration = prefs[VIBRATION_INTENSITY] ?: (if (prefs[HAPTIC_FEEDBACK] == false) 0 else 60),
             botoesDeFluxo = prefs.botoesDeFluxoDe(barras),
+            orbe = prefs.orbeDoTeclado(),
         )
     }
+
+    /** Só DataStore: copiar gestos não abre o cofre de credenciais (KBO-29). */
+    fun orbeDoTecladoFlow(): Flow<KeyboardOrbSnapshot> =
+        dataStore.data.map { it.orbeDoTeclado() }.distinctUntilChanged()
+
+    private fun Preferences.orbeDoTeclado() = KeyboardOrbSnapshot(
+        config = com.keyflow.orbe.CodecOrbeTeclado.decodificar(this[KEYBOARD_ORB_CONFIG_JSON]),
+        settings = Settings(
+            orbSkin = this[ORB_SKIN] ?: "atelie",
+            overlayRecordingMode = this[OVERLAY_RECORDING_MODE].toRecordingMode(),
+            tapBurstWindowMs = this[TAP_BURST_WINDOW_MS] ?: 250,
+            shortcut1Tap = this[SHORTCUT_1_TAP].toShortcutAction(OrbShortcutAction.NONE),
+            shortcut2Tap = this[SHORTCUT_2_TAP].toShortcutAction(OrbShortcutAction.TOGGLE_KEYBOARD),
+            shortcut3Tap = this[SHORTCUT_3_TAP].toShortcutAction(OrbShortcutAction.SWITCH_IME),
+            shortcutOverflow = this[SHORTCUT_OVERFLOW].toShortcutOverflow(),
+            vibrationIntensity = this[VIBRATION_INTENSITY] ?: if (this[HAPTIC_FEEDBACK] == false) 0 else 60,
+        ),
+    )
 
     /** Os botões `RunFlow` da barra com gatilho válido (`botaoId → fluxoId`). Barra sem botão de fluxo: nem decodifica os fluxos. */
     private fun Preferences.botoesDeFluxoDe(barras: BarsConfig): Map<String, String> =
@@ -1023,6 +1042,12 @@ internal class AgentStatusSettings(
     val reasoningModel: String?,
 )
 
+/** Instantâneo leve da configuração própria e dos campos copiados da orbe principal. */
+data class KeyboardOrbSnapshot(
+    val config: com.keyflow.orbe.ConfigOrbeTeclado = com.keyflow.orbe.ConfigOrbeTeclado(),
+    val settings: Settings = Settings(),
+)
+
 /** O que o teclado precisa para ser montado — ver [SettingsRepository.keyboardSnapshotOnce]. */
 data class KeyboardSnapshot(
     val dark: Boolean,
@@ -1036,6 +1061,7 @@ data class KeyboardSnapshot(
     val skinsUnlocked: Boolean = false,
     /** `botaoId → fluxoId` dos botões `RunFlow` da barra com gatilho válido; os demais renderizam desabilitados (FLX-36). */
     val botoesDeFluxo: Map<String, String> = emptyMap(),
+    val orbe: KeyboardOrbSnapshot = KeyboardOrbSnapshot(),
 )
 
 /**

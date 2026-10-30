@@ -319,6 +319,7 @@ private fun KeyboardSizePreview(
                             // A barra de fábrica, com a área das sugestões vazia: mic, ajustes e recolher na
                             // proporção real (sem ela o mic esticava para o cartão todo — Yan, 2026-09-28).
                             barsFitWidth = true,
+                            reservarFaixaDaOrbe = false,
                         ).apply {
                             setExpanded(true)
                             keyboardSizePreviewForTest = this

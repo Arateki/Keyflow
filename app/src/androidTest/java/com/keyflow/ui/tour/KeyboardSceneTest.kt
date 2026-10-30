@@ -91,6 +91,14 @@ class KeyboardSceneTest {
     }
 
     @Test
+    fun theMiniatureKeyboardDoesNotReserveTheOrbStrip() {
+        show(frame(SceneReaction(keyboardExpanded = true)))
+
+        val view = keyboard()
+        assertEquals("a prévia não reserva a faixa da orbe", 0, view.faixaDaOrbePx)
+    }
+
+    @Test
     fun theMicFollowsTheStateTheStepDeclared() {
         show(frame(SceneReaction(micState = ButtonState.RECORDING)))
 

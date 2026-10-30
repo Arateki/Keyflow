@@ -20,6 +20,7 @@ import com.keyflow.ime.bars.BarView
 import com.keyflow.core.ButtonState
 import org.junit.After
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
@@ -79,103 +80,60 @@ class KeyboardMicHoldMotionArtifactTest {
         captureAbortScenario(slug = "mic-hold-abort", initialState = ButtonState.RECORDING)
     }
 
-    /** Segura o mic, desliza até o chip alvo e solta em cima dele — a ação é aplicada (KBDCTL-02/03/04). */
+    /** Os mesmos artefatos agora mostram a orbe e as zonas direcionais, sem seletor de chips. */
     private fun captureHoldScenario(slug: String, initialState: ButtonState, expectedAction: MicAction) {
         val dir = File(outRoot, slug).apply { mkdirs() }
         val chosenActions = mutableListOf<MicAction>()
-
-        launchHarness(initialState = initialState, onMicAction = { chosenActions += it }) { view ->
+        launchHarness(initialState, { chosenActions += it }) { view ->
             var frame = 0
             capture(dir, frame++, "initial")
-
-            val micRect = view.micScreenRect()
-            val micX = micRect.centerX()
-            val micY = micRect.centerY()
-
-            down(micX, micY)
+            val origem = IntArray(2).also { view.getLocationOnScreen(it) }
+            val circulo = view.circuloDaOrbe!!
+            val x = origem[0] + circulo.centroX
+            val y = origem[1] + circulo.centroY
+            down(x, y)
             capture(dir, frame++, "pressed")
-            waitUntil("$slug não abriu o seletor") { view.selectorOpenForTest }
-            waitUntil("$slug sem retângulos do popup") {
-                view.popupRectsForTest.size == view.popupActionsForTest.size && view.popupRectsForTest.isNotEmpty()
+            if (expectedAction == MicAction.UNDO) {
+                up(x, y)
+            } else {
+                waitUntil("$slug não entrou no modo de arrasto") { view.arrastoDaOrbeForTest }
+                assertTrue(view.barViewsForTest.none { it.selectorOpenForTest })
+                capture(dir, frame++, "hold-orb")
+                val alvoX = if (expectedAction == MicAction.CANCEL) x + circulo.diametro else x
+                val alvoY = if (expectedAction == MicAction.PAUSE_RESUME) y - circulo.diametro else y
+                for (step in 1..10) {
+                    move(lerp(x, alvoX, step / 10f), lerp(y, alvoY, step / 10f))
+                    capture(dir, frame++, "approach-%02d".format(step * 10))
+                }
+                up(alvoX, alvoY)
             }
-            capture(dir, frame++, "hold-open")
-
-            val targetIndex = view.popupActionsForTest.indexOf(expectedAction)
-            assertTrue("$slug não oferece $expectedAction (ações: ${view.popupActionsForTest})", targetIndex >= 0)
-            val targetRect = view.popupRectsForTest[targetIndex]
-            val targetX = targetRect.centerX()
-            val targetY = targetRect.centerY()
-
-            for (step in 1..10) {
-                val pct = step / 10f
-                move(lerp(micX, targetX, pct), lerp(micY, targetY, pct))
-                val label = if (step == 10) "target-$expectedAction" else "approach-%02d".format(step * 10)
-                capture(dir, frame++, label)
-            }
-            waitUntil("$slug não destacou $expectedAction") { view.highlightedIndexForTest == targetIndex }
-            capture(dir, frame++, "target-hold-1")
-            capture(dir, frame++, "target-hold-2")
-
-            up(targetX, targetY)
-            waitUntil("$slug não fechou o seletor") { !view.selectorOpenForTest }
+            waitUntil("$slug não emitiu $expectedAction: $chosenActions") { expectedAction in chosenActions }
             capture(dir, frame++, "released")
-            capture(dir, frame++, "released-settled")
         }
-
-        assertTrue("$slug deveria emitir $expectedAction, emitiu $chosenActions", chosenActions.contains(expectedAction))
+        assertEquals(listOf(expectedAction), chosenActions)
         writeScenarioFile(dir, slug, initialState, expectedAction.toString(), chosenActions.map { it.toString() })
     }
 
-    /** Segura, desliza até CANCEL, mas volta o dedo pro mic antes de soltar — cancelamento rápido (Yan, 2026-07-01). */
     private fun captureAbortScenario(slug: String, initialState: ButtonState) {
         val dir = File(outRoot, slug).apply { mkdirs() }
         val chosenActions = mutableListOf<MicAction>()
-
-        launchHarness(initialState = initialState, onMicAction = { chosenActions += it }) { view ->
+        launchHarness(initialState, { chosenActions += it }) { view ->
             var frame = 0
             capture(dir, frame++, "initial")
-
-            val micRect = view.micScreenRect()
-            val micX = micRect.centerX()
-            val micY = micRect.centerY()
-
-            down(micX, micY)
-            capture(dir, frame++, "pressed")
-            waitUntil("$slug não abriu o seletor") { view.selectorOpenForTest }
-            waitUntil("$slug sem retângulos do popup") {
-                view.popupRectsForTest.size == view.popupActionsForTest.size && view.popupRectsForTest.isNotEmpty()
-            }
-            capture(dir, frame++, "hold-open")
-
-            val targetIndex = view.popupActionsForTest.indexOf(MicAction.CANCEL)
-            assertTrue("$slug não oferece CANCEL (ações: ${view.popupActionsForTest})", targetIndex >= 0)
-            val targetRect = view.popupRectsForTest[targetIndex]
-            val targetX = targetRect.centerX()
-            val targetY = targetRect.centerY()
-
-            for (step in 1..5) {
-                val pct = step / 5f
-                move(lerp(micX, targetX, pct), lerp(micY, targetY, pct))
-                capture(dir, frame++, "approach-%02d".format(step * 10))
-            }
-            waitUntil("$slug não destacou CANCEL antes de recuar") { view.highlightedIndexForTest == targetIndex }
+            val origem = IntArray(2).also { view.getLocationOnScreen(it) }
+            val circulo = view.circuloDaOrbe!!
+            val x = origem[0] + circulo.centroX
+            val y = origem[1] + circulo.centroY
+            down(x, y)
+            waitUntil("$slug não entrou no modo de arrasto") { view.arrastoDaOrbeForTest }
+            move(x + circulo.diametro, y)
             capture(dir, frame++, "target-hold")
-
-            for (step in 1..5) {
-                val pct = step / 5f
-                move(lerp(targetX, micX, pct), lerp(targetY, micY, pct))
-                capture(dir, frame++, "retreat-%02d".format(step * 10))
-            }
-            waitUntil("$slug não desgrudou o highlight ao voltar pro mic") { view.highlightedIndexForTest == -1 }
+            move(x, y)
             capture(dir, frame++, "aborted")
-
-            up(micX, micY)
-            waitUntil("$slug não fechou o seletor") { !view.selectorOpenForTest }
+            up(x, y)
             capture(dir, frame++, "released-no-action")
-            capture(dir, frame++, "released-settled")
         }
-
-        assertTrue("$slug não deveria emitir nenhuma ação, emitiu $chosenActions", chosenActions.isEmpty())
+        assertTrue("$slug emitiu $chosenActions", chosenActions.isEmpty())
         writeScenarioFile(dir, slug, initialState, "none (abort)", chosenActions.map { it.toString() })
     }
 
@@ -228,10 +186,12 @@ class KeyboardMicHoldMotionArtifactTest {
                     )
                 },
             )
+            view.updateOrbeConfig(com.keyflow.orbe.ConfigOrbeTeclado(copiarDaOrbePrincipal = false,
+                toque1 = com.keyflow.orbe.AcaoDaOrbeDoTeclado.CancelarDesfazer), com.keyflow.data.Settings(vibrationIntensity = 0))
             view.updateMicState(initialState)
         }
         waitUntil("barra do mic não foi medida") {
-            view.barViewsForTest.isNotEmpty() && view.activeBar.layoutForTest.buttons.isNotEmpty()
+            view.barViewsForTest.isNotEmpty() && view.activeBar.layoutForTest.buttons.isNotEmpty() && view.circuloDaOrbe != null
         }
         block(view)
         launched.close()

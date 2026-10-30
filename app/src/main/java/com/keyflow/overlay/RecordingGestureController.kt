@@ -110,8 +110,8 @@ class RecordingGestureController(
         TouchSignal.HOLD -> GestureIntent.NONE
     }
 
-    private companion object {
-        const val DEFAULT_PTT_PAUSE_WINDOW_MS = 350L
+    companion object {
+        internal const val DEFAULT_PTT_PAUSE_WINDOW_MS = 350L
     }
 }
 
