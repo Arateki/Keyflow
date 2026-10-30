@@ -20,6 +20,7 @@ import java.util.regex.Pattern
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -35,6 +36,58 @@ class OverlayServiceVisionTest {
 
     @Test fun togglePausaAntesDoConsentimentoENegacaoPreservaAudio() = exercise(RecordingMode.TOGGLE)
     @Test fun pttPausaAntesDoConsentimentoENegacaoPreservaAudio() = exercise(RecordingMode.PUSH_TO_TALK)
+
+    /** Capturar de um fluxo (FLX-19): nunca pausa nem mexe numa gravação em curso, e o consentimento negado entrega `null` ao fluxo. */
+    @Test fun capturaDeFluxoRecusaGravacaoEEntregaNullAoNegarOConsentimento() = withReadyService { service ->
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val device = UiDevice.getInstance(instrumentation)
+        val entregas = java.util.Collections.synchronizedList(mutableListOf<android.graphics.Bitmap?>())
+        suspend fun fase(etapa: String, estado: VisionFlowState) {
+            withTimeoutOrNull(15_000) { OverlayService.visionFlowStateForTest.first { it == estado } }
+                ?: throw AssertionError("esperando a Visão em $estado ($etapa); está em ${OverlayService.visionFlowStateForTest.value}, botão ${KeyFlowController.buttonState.value}")
+        }
+        suspend fun botao(etapa: String, vararg estados: ButtonState) {
+            withTimeoutOrNull(15_000) { KeyFlowController.buttonState.first { it in estados } }
+                ?: throw AssertionError("esperando o botão em ${estados.toList()} ($etapa); está em ${KeyFlowController.buttonState.value}")
+        }
+        var aceitou = true
+        // Com a gravação em curso (RECORDING) o fluxo é recusado, sem pausar nada nem abrir o consentimento.
+        instrumentation.runOnMainSync { aceitou = service.capturarParaFluxo { entregas += it } }
+        assertEquals(false, aceitou)
+        assertEquals(VisionFlowState.NONE, OverlayService.visionFlowStateForTest.value)
+        assertEquals(ButtonState.RECORDING, KeyFlowController.buttonState.value)
+        assertTrue(entregas.isEmpty())
+        // Sobe também a orbe: sem ela o serviço do modo só-teclado se encerra ao voltar ao repouso (é a T14 que o segura durante o fluxo).
+        OverlayService.start(context, OverlayService.startOverlayIntent(context))
+        withTimeoutOrNull(15_000) { while (!OverlayService.isRunningForUi) kotlinx.coroutines.delay(50) } ?: throw AssertionError("a orbe não subiu")
+        // As ações vão por startService (como OverlayServiceCancelTest): OverlayService.start marcaria um primeiro plano pendente que nunca chega,
+        // e o stop do fim ficaria só anotado.
+        // Descarta a gravação: em repouso a captura do fluxo começa e pede o consentimento.
+        context.startService(OverlayService.actionIntent(context, RecordingNotification.ACTION_CANCEL))
+        botao("cancelar a gravação", ButtonState.CANCELLING)
+        context.startService(OverlayService.actionIntent(context, OverlayService.ACTION_COMMIT_CANCEL))
+        botao("concluir o cancelamento", ButtonState.IDLE_READY, ButtonState.IDLE_NO_FIELD)
+        instrumentation.runOnMainSync { aceitou = service.capturarParaFluxo { entregas += it } }
+        assertTrue(aceitou)
+        fase("pedido do fluxo", VisionFlowState.CONSENT)
+        val deny = device.wait(Until.findObject(By.text(Pattern.compile("(?i)cancel|cancelar"))), 15_000)
+        assertNotNull("consentimento não apareceu", deny)
+        deny!!.click()
+        fase("negação do consentimento", VisionFlowState.NONE)
+        instrumentation.waitForIdleSync()
+        assertEquals("negar o consentimento entrega null uma vez só", listOf<android.graphics.Bitmap?>(null), entregas.toList())
+        assertTrue(KeyFlowController.buttonState.value in listOf(ButtonState.IDLE_READY, ButtonState.IDLE_NO_FIELD))
+        // O destino de fluxo não vaza para o pedido seguinte: um pedido sem destino segue o caminho de sempre (nada ao fluxo).
+        context.startService(OverlayService.actionIntent(context, OverlayService.ACTION_VISION))
+        fase("pedido de gestos", VisionFlowState.CONSENT)
+        context.startService(OverlayService.actionIntent(context, OverlayService.ACTION_RECORD))
+        fase("fim do pedido de gestos", VisionFlowState.NONE)
+        assertEquals(1, entregas.size)
+        // Desliga a orbe que este teste subiu e espera ela sair: o próximo teste começa com o serviço de fato parado.
+        OverlayService.stop(context)
+        withTimeoutOrNull(15_000) { while (OverlayService.isRunningForUi) kotlinx.coroutines.delay(50) } ?: throw AssertionError("a orbe não desligou")
+    }
 
     @Test fun janelaRecusadaEncerraFluxoSemDerrubarServico() = withReadyService { service ->
         val instrumentation = InstrumentationRegistry.getInstrumentation()

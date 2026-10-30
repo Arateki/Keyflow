@@ -152,4 +152,55 @@ class VisionCaptureDeviceTest {
             scenario.close()
         }
     }
+
+    /** O destino de fluxo entrega o bitmap com o recorte esperado (FLX-19) e a captura de gestos segue como antes. */
+    @Test fun capturaRegiaoDeFluxoNoEmulador() {
+        val args = InstrumentationRegistry.getArguments().getString("class").orEmpty()
+        assumeTrue(args.split(',').any { it.endsWith("VisionCaptureDeviceTest#capturaRegiaoDeFluxoNoEmulador") })
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val device = UiDevice.getInstance(instrumentation)
+        instrumentation.uiAutomation.executeShellCommand("appops set ${context.packageName} SYSTEM_ALERT_WINDOW allow").close()
+        val entregas = java.util.Collections.synchronizedList(mutableListOf<Pair<Int, Int>?>())
+        val entregue = CountDownLatch(1)
+        var gestos = 0
+        OverlayService.visionCaptureResultForTest = { gestos++ }
+        val scenario = ActivityScenario.launch<GalleryActivity>(Intent(context, GalleryActivity::class.java).putExtra("route", "config-visao"))
+        try {
+            OverlayService.start(context, OverlayService.startOverlayIntent(context))
+            val deadline = System.currentTimeMillis() + 15_000
+            while ((OverlayService.instanceForVisionTest == null || !OverlayService.isRunningForUi) && System.currentTimeMillis() < deadline) Thread.sleep(50)
+            val service = checkNotNull(OverlayService.instanceForVisionTest)
+            var aceitou = false
+            instrumentation.runOnMainSync {
+                aceitou = service.capturarParaFluxo { bitmap ->
+                    entregas += bitmap?.let { it.width to it.height }
+                    bitmap?.recycle() // quem recebe é dono do bitmap
+                    entregue.countDown()
+                }
+            }
+            assertTrue("a captura do fluxo não começou", aceitou)
+            val acceptPattern = Pattern.compile("(?i).*start now.*|.*iniciar agora.*")
+            assertNotNull("diálogo de consentimento não apareceu", device.wait(Until.findObject(By.text(acceptPattern)), 15_000))
+            val chooser = device.findObject(By.text(Pattern.compile("(?i).*single app.*|.*um aplicativo.*|.*um app.*")))
+            if (chooser != null) {
+                chooser.click()
+                device.wait(Until.findObject(By.text(Pattern.compile("(?i).*entire screen.*|.*tela inteira.*"))), 5_000)?.click()
+            }
+            device.findObject(By.text(acceptPattern)).click()
+            assertTrue("seletor não apareceu", device.wait(Until.hasObject(By.desc("Selecione a área da tela.")), 15_000))
+            val bounds = device.findObject(By.desc("Selecione a área da tela.")).visibleBounds
+            val left = bounds.width() / 5
+            val top = bounds.height() / 5
+            assertTrue(device.swipe(bounds.left + left, bounds.top + top, bounds.left + left + 40, bounds.top + top + 60, 10))
+            device.click(bounds.centerX(), bounds.bottom - (54 * context.resources.displayMetrics.density).toInt())
+            assertTrue("o bitmap não chegou ao fluxo", entregue.await(30, TimeUnit.SECONDS))
+            assertEquals(listOf(bounds.width() * 4 / 5 - (left + 40) to bounds.height() * 4 / 5 - (top + 60)), entregas.toList())
+            assertEquals("o consumidor de gestos não recebe a captura do fluxo", 0, gestos)
+        } finally {
+            OverlayService.visionCaptureResultForTest = null
+            OverlayService.stop(context)
+            scenario.close()
+        }
+    }
 }

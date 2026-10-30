@@ -77,4 +77,84 @@ class VisionFlowTest {
             assertThat(flow.state).isEqualTo(VisionFlowState.NONE)
         }
     }
+
+    // ── dono do resultado: Capturar de um fluxo (FLX-19) ─────────────────────
+
+    private class Bitmapzinho(val nome: String) {
+        var reciclado = false
+    }
+
+    @Test fun semDestinoExplicitoOResultadoVaiParaOConsumidorDeSempre() {
+        val gestos = mutableListOf<String>()
+        val flow = VisionFlow<String>({}, {}, {}, {}, onResult = { gestos += it })
+        flow.start(VisionFlowRequest(ButtonState.IDLE_READY))
+        flow.consentGranted(); flow.selected(); flow.captured("recorte")
+        assertThat(gestos).containsExactly("recorte")
+    }
+
+    @Test fun comDestinoDeFluxoOValorChegaAoFluxoEONaoAoConsumidorDeGestos() {
+        val gestos = mutableListOf<Bitmapzinho>()
+        val fluxo = mutableListOf<Bitmapzinho?>()
+        val cleanups = mutableListOf<String>()
+        val flow = VisionFlow<Bitmapzinho>({}, {}, {}, { cleanups += "limpeza" }, onResult = { gestos += it; it.reciclado = true })
+        assertThat(flow.start(VisionFlowRequest(ButtonState.IDLE_READY, DestinoCaptura.Fluxo<Bitmapzinho> { fluxo += it }))).isTrue()
+        flow.consentGranted(); flow.selected()
+        val recorte = Bitmapzinho("recorte")
+        flow.captured(recorte)
+        assertThat(fluxo).containsExactly(recorte)
+        assertThat(gestos).isEmpty()
+        // O Bitmap passa a ser do fluxo: o VisionFlow não o recicla, e o fim da etapa não entrega `null` por cima.
+        assertThat(recorte.reciclado).isFalse()
+        assertThat(cleanups).containsExactly("limpeza")
+        assertThat(flow.state).isEqualTo(VisionFlowState.NONE)
+    }
+
+    @Test fun negarCancelarOuTerminarSemCapturaEntregaNullUmaVezSo() {
+        for (saida in listOf("negação", "cancelamento do seletor", "falha da captura")) {
+            val entregas = mutableListOf<String?>()
+            val ordem = mutableListOf<String>()
+            val flow = VisionFlow<String>({}, {}, {}, { ordem += "limpeza" }, onResult = { ordem += "gestos" })
+            flow.start(VisionFlowRequest(ButtonState.IDLE_NO_FIELD, DestinoCaptura.Fluxo<String> { entregas += it; ordem += "entrega" }))
+            if (saida != "negação") flow.consentGranted()
+            if (saida == "falha da captura") flow.selected()
+            flow.finish()
+            flow.finish()
+            assertThat(entregas).containsExactly(null)
+            // O teclado e as views voltam antes de o fluxo seguir adiante.
+            assertThat(ordem).containsExactly("limpeza", "entrega").inOrder()
+        }
+    }
+
+    @Test fun excecaoNoConsentimentoDeUmFluxoEntregaNullAntesDeRelancar() {
+        val entregas = mutableListOf<String?>()
+        val flow = VisionFlow<String>({}, { error("falha simulada") }, {}, {}, onResult = {})
+        assertThrows(IllegalStateException::class.java) {
+            flow.start(VisionFlowRequest(ButtonState.IDLE_READY, DestinoCaptura.Fluxo<String> { entregas += it }))
+        }
+        assertThat(entregas).containsExactly(null)
+    }
+
+    @Test fun envioECancelamentoRecusamEFluxoNuncaPausaGravacaoEmCurso() {
+        for (estado in listOf(ButtonState.SENDING, ButtonState.CANCELLING, ButtonState.RECORDING, ButtonState.PAUSED)) {
+            var pausas = 0
+            val entregas = mutableListOf<String?>()
+            val flow = VisionFlow<String>({ pausas++ }, {}, {}, {}, onResult = {})
+            assertThat(flow.start(VisionFlowRequest(estado, DestinoCaptura.Fluxo<String> { entregas += it }))).isFalse()
+            assertThat(pausas).isEqualTo(0)
+            assertThat(entregas).isEmpty()
+            assertThat(flow.state).isEqualTo(VisionFlowState.NONE)
+        }
+    }
+
+    @Test fun oDestinoDoPedidoAnteriorNaoVazaParaOSeguinte() {
+        val fluxo = mutableListOf<String?>()
+        val gestos = mutableListOf<String>()
+        val flow = VisionFlow<String>({}, {}, {}, {}, onResult = { gestos += it })
+        flow.start(VisionFlowRequest(ButtonState.IDLE_READY, DestinoCaptura.Fluxo<String> { fluxo += it }))
+        flow.consentGranted(); flow.selected(); flow.captured("do fluxo")
+        flow.start(VisionFlowRequest(ButtonState.IDLE_READY)) // gestos, como sempre
+        flow.consentGranted(); flow.selected(); flow.captured("dos gestos")
+        assertThat(fluxo).containsExactly("do fluxo")
+        assertThat(gestos).containsExactly("dos gestos")
+    }
 }
