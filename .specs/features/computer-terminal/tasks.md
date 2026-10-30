@@ -72,7 +72,13 @@ Gates completos do mesmo SHA: [Checks 41073156978](https://github.com/Arateki/Ke
   **Contingência (plano B, só se a frente de toolchain travar ou for adiada)**: ver `design.md` §2.4 — fork preso ao toolchain atual (CMP-T3 deixa de ser condicional). O plano B **não** é o caminho padrão.
 - **Tests**: — (portão). **Gate**: `quick` + `build` + `lint` + `pool telas` na `main` atualizada. **Commit**: nenhum (registro em `licoes/`).
 
-### CMP-T1 — Spike A: termlib + cbssh no toolchain novo, imagens e entrada — **Status: pendente**
+### CMP-T1 — Spike A: termlib + cbssh no toolchain novo, imagens e entrada — **Status: em andamento; diagnóstico estático registrado em 2026-10-30**
+
+A [lição](../../project/licoes/2026-10-30-computador-a.md) registra a ausência de mouse na API/JNI 0.3.14, scrollback privado de 1.000 linhas e
+callbacks nativos adiados. **SPEC_DEVIATION:** inspeção inicial na branch `equipe/computador-a`, sem Activity descartável;
+CMP-T3 necessária. A parada inicial foi revogada pelo coordenador em 30/10: depois do PR do diagnóstico, seguir T3 → T1 → T4.
+Medições dinâmicas e auditoria completa de transitivas continuam pendentes.
+
 - **What**: branch descartável com uma tela só do `debug` (`TerminalSpikeActivity`; não entra no release) ligando `TerminalEmulator` (termlib) a um `SshClient` (cbssh) contra o servidor de teste ou um host real, para **medir**:
   (1) compila no toolchain novo com as versões exatas; delta do APK, de métodos e da memória por sessão (80×24, scrollback 5 000 e 20 000 linhas);
   (2) `.so` do termlib em arm64-v8a, armeabi-v7a e x86_64 com `scripts/check-16kb-alignment.py`; (3) licenças de **todas** as transitivas (Ktor, kstatemachine, Tink, kyber, keccak, jbcrypt, slf4j) — nenhuma GPL/LGPL/AGPL;
@@ -96,7 +102,7 @@ Gates completos do mesmo SHA: [Checks 41073156978](https://github.com/Arateki/Ke
 - **Done when**: a tabela existe com o nível de proteção (hardware/TEE/StrongBox/software) e o nome do algoritmo de assinatura **medidos**; a lição diz a partir de qual API/aparelho o Keystore serve e confirma (ou corrige) a premissa P1 da spec; o plano de fallback do `design.md` §4 é ajustado ao medido.
 - **Tests**: manual/instrumentado de sonda. **Gate**: `pool instrumentar` (emulador) + A32/Tab/Vaio manuais com `--confirmo-a32`. **Commit**: `spike(computador): sonda do Ed25519 no Keystore` (só o debug).
 
-### CMP-T3 — (condicional) Fork do termlib com JNI compilado no CI e SHA fixado — **Status: pendente**
+### CMP-T3 — Fork do termlib com JNI compilado no CI e SHA fixado — **Status: necessária; autorizada para execução em 2026-10-30**
 - **What**: **só se a CMP-T1 medir que mouse reporting ou scrollback maior não saem na borda, ou se o plano B valer.** O Yan já aceitou o fork nesse caso (D12). O sixel não é motivo para manter esta task aberta. Código do termlib vendorizado em `third_party/termlib/` (Apache-2.0 + libvterm MIT; `UPSTREAM.md` com o commit-base e os patches), módulo Gradle `:termlib` compilado
   com o toolchain do app; o C++ vira `libtermlib.so` por ABI num workflow `.github/workflows/termlib-jni.yml` (NDK do runner, actions fixadas por SHA, padrão `sherpa-sem-tts.yml`) que publica um release com `.sha256`;
   o `app/build.gradle.kts` baixa e **confere o SHA-256** como faz com o sherpa (sem NDK nos nós do pool). Patches (conforme a T1 medir): **mouse reporting** (`vterm_mouse_*` + modo) e **scrollback** configurável. O DCS sixel e o atributo 4 do DA1 **não** entram no C++: ficam no app (D12).

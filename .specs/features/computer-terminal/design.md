@@ -76,6 +76,12 @@ Vendoriza `third_party/termlib/` (Apache-2.0 + libvterm MIT, commit-base e patch
 releases com `.sha256`) e o `app/build.gradle.kts` baixa e **confere o SHA-256**, como faz com o sherpa (`sherpaOnnxSha256`). Patches previstos, **só o que a CMP-T1 medir que não sai na borda**: **mouse reporting** (o termlib 0.3.14 não o expõe: ligar `vterm_mouse_move/button` e a propriedade de modo ao Kotlin); **scrollback** configurável (hoje a constante privada `maxScrollbackLines = 1000`, em Kotlin — esta parte nem pede C++). O sixel **não** entra no fork: fica no transcodificador do app (D12). `TermlibNativoTest` reprova `.so` fora do SHA, GPL ou ABI faltando.
 O Yan **já aceitou** este fork se a CMP-T1 mostrar que mouse ou scrollback maior exigem C++ (D12). Se os dois se resolvem na borda, a CMP-T3 fecha como dispensada.
 
+**Resultado da inspeção inicial CMP-T1 (30/10/2026):** termlib 0.3.14, tag `0bd42f06e3ae88e5fc9e2f505a77b443cea26865`,
+sem API de mouse no `TerminalEmulator`/`TerminalNative`, sem export JNI correspondente e sem publicação do modo de mouse.
+O scrollback é privado, limitado a 1.000 linhas e não recebe parâmetro. Logo, **CMP-T3 necessária**, conforme D12;
+a parte de scrollback isoladamente só pede Kotlin. O coordenador autorizou a continuidade depois do PR do diagnóstico.
+Fontes, hashes e limites da evidência na [lição](../../project/licoes/2026-10-30-computador-a.md).
+
 ### 2.4 Plano B (contingência): fork preso ao toolchain atual
 
 Só se a frente de toolchain travar. O Kotlin 2.2.10 lê metadados até 2.3: o **termlib 0.1.0** (metadados 2.3.0) compila, mas **sem imagens**; imagens exigem recompilar o código-fonte do termlib num módulo nosso com `languageVersion`/`apiVersion` baixados, o que só é possível se o fonte não usar construções de Kotlin 2.3/2.4 (**não medido**); o cbssh ≤ 0.3.1 (metadados 2.3.0) ou o fonte do cbssh no mesmo módulo.
@@ -246,7 +252,7 @@ class SessaoTerminal(val id: String, val hostId: String, val dono: DonoDaSessao,
 
 ### 8.2 Entrada, respostas e a lista de permitidos (CMP-35)
 
-O termlib devolve **tudo** (teclas do usuário e respostas do emulador) por `onKeyboardInput`. A CMP-T1 prova se dá para separar as origens (uma flag `dentroDoWriteInput` ligada na thread do `writeInput`; ou a identificação das respostas por padrão).
+O termlib devolve **tudo** (teclas do usuário e respostas do emulador) por `onKeyboardInput`. A inspeção inicial da CMP-T1 mostrou que a saída nativa passa por `handler.postAtTime`: uma flag apenas durante `writeInput` não identifica a origem quando o callback chega. O protocolo de imagens também tem callbacks diretos; a retomada do spike precisa medir cada caminho e provar a separação ou a identificação por padrão.
 `FiltroDeRespostas` fica na saída: se **não** for possível separar, só deixa passar o que **parece** resposta de uma lista fechada — `ESC[?1;2c` (DA1, com o atributo 4 quando permitido), `ESC[>…c` (DA2), `ESC[<n>;<n>R` (CPR), `ESC[0n` (DSR), `ESC[8;r;ct` e `ESC[4;h;w t` (tamanho), `ESC]10/11;rgb:…` (cores), `ESC_G…;OK` (kitty `a=q`) —
 **quando** apareceram dentro de uma janela depois de dado do servidor; tudo que não casa com a lista e **não** é entrada do usuário é descartado. As respostas proibidas (CMP-35) simplesmente não são geradas: o `DECRQSS`, o `CSI 21 t`, o `ENQ` e o `OSC 52 ?` são **consumidos** antes do emulador pelo mesmo filtro de entrada que o transcodificador do sixel usa (§9.3).
 
