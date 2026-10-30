@@ -40,6 +40,8 @@ import com.keyflow.fluxos.BotoesDeFluxo
 import com.keyflow.fluxos.ConfigFluxos
 import com.keyflow.fluxos.PadroesFluxo
 import com.keyflow.fluxos.PoliticaGatilhos
+import com.keyflow.notificacao.CodecNotificacao
+import com.keyflow.notificacao.ConfigNotificacao
 import com.keyflow.orbe.CodecOrbeTeclado
 import com.keyflow.orbe.ConfigOrbeTeclado
 import kotlinx.coroutines.CoroutineScope
@@ -486,6 +488,31 @@ class SettingsRepository(
                 prefs[KEYBOARD_ORB_CONFIG_JSON] = json
             }
         }.configOrbeTeclado()
+
+    // ── Notificação da orbe (`notification_config_json`, NTF-36..38) ─────────
+    // Chave própria no DataStore, fora do auto-save de [Settings] (que regrava as Settings inteiras e jamais encosta aqui) e sem
+    // abrir o cofre. Chave ausente ou JSON malformado = os padrões, só em memória: ler não grava.
+
+    private fun Preferences.configNotificacao(): ConfigNotificacao =
+        CodecNotificacao.decodificar(this[NOTIFICATION_CONFIG_JSON])
+
+    /** Observação ao vivo da configuração da notificação: o painel e o serviço valem no toque seguinte, sem reiniciar. */
+    fun configNotificacaoFlow(): Flow<ConfigNotificacao> =
+        dataStore.data.map { it.configNotificacao() }.distinctUntilChanged()
+
+    /** Leitura leve (só DataStore, sem o cofre) da configuração da notificação. Não grava. */
+    suspend fun configNotificacaoOnce(): ConfigNotificacao = dataStore.data.first().configNotificacao()
+
+    /**
+     * Altera a configuração da notificação **sobre o valor gravado agora**: lê e escreve dentro do mesmo `dataStore.edit` (NTF-36),
+     * então duas alterações concorrentes ficam ambas e o auto-save das [Settings] não a desfaz. Sem mudança, não regrava.
+     * Devolve o que ficou gravado.
+     */
+    suspend fun atualizarNotificacao(f: (ConfigNotificacao) -> ConfigNotificacao): ConfigNotificacao =
+        dataStore.edit { prefs ->
+            val json = CodecNotificacao.codificar(f(prefs.configNotificacao()))
+            if (prefs[NOTIFICATION_CONFIG_JSON] != json) prefs[NOTIFICATION_CONFIG_JSON] = json
+        }.configNotificacao()
 
     /** Onde cada modelo de texto local roda, ao vivo — o seletor "Roda em" do card (chave própria, fora de [Settings]). */
     fun localBackendPrefsFlow(): Flow<LocalBackendPrefs> =
@@ -997,6 +1024,8 @@ class SettingsRepository(
         val FLOW_TRIGGERS_JSON = stringPreferencesKey("flow_triggers_json")
         // Orbe do teclado (feature keyboard-orb): configuração própria como JSON (CodecOrbeTeclado).
         val KEYBOARD_ORB_CONFIG_JSON = stringPreferencesKey("keyboard_orb_config_json")
+        // Notificação da orbe (feature notification): configuração própria como JSON (CodecNotificacao).
+        val NOTIFICATION_CONFIG_JSON = stringPreferencesKey("notification_config_json")
         // Raciocínio local: onde cada modelo roda (CPU/GPU), o aviso de volta para a CPU e a GPU já pronta — ver [LocalBackendPrefs].
         val REASONING_LOCAL_BACKENDS = stringPreferencesKey("reasoning_local_backends")
 
