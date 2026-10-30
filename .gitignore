@@ -34,3 +34,7 @@ google-services.json
 # Arquivos da coordenação dos agentes (tarefas e relatórios locais)
 .equipe/
 __pycache__/
+
+# JNI do termlib: artefato do CI com hash fixado; saída local do módulo vendorizado.
+/app/libs/termlib-jni-*.zip
+/third_party/termlib/build/

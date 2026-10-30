@@ -6,3 +6,6 @@
 # (tasks.md, spec.md, DEVELOPMENT-ORDER.md) nem em código. A lista é travada por scripts/tests/test_mesclagem.py.
 .specs/project/STATE.md   merge=union
 app/licenses/README.md    merge=union
+
+# Gravações byte a byte do terminal: não normalizar nem apresentar controles como texto.
+app/src/test/resources/computador/gravacoes/*.bin binary
