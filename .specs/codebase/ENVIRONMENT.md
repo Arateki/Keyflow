@@ -1,6 +1,6 @@
 # KeyFlow — Ambiente de Desenvolvimento
 
-> Preparado em 2026-06-26. Toolchain Android validada por **smoke build** (APK gerado com sucesso). Tudo instalado no `$HOME` (sem root — `sudo` exige senha neste ambiente).
+> Toolchain atualizada em 2026-10-30. A tabela do ambiente do Yan é histórica onde o caminho difere dos workers; builds usam o pool descrito no AGENTS.md.
 
 ## Estado (pronto para implementar)
 
@@ -11,8 +11,8 @@
 | JDK default do sistema | 21.0.11 (também funciona com AGP 9.x) | ✅ |
 | Gradle (bootstrap) | **9.6.1** em `~/.local/gradle/current` | ✅ |
 | Android SDK | `~/Android/Sdk` (`$ANDROID_HOME`) | ✅ |
-| build-tools | 33.0.1, **34.0.0** | ✅ |
-| platforms | android-31, android-33, **android-34** | ✅ |
+| build-tools de compilação | **36.0.0** | ✅ |
+| platforms de compilação | **android-37**; android-34 continua sendo a imagem do emulador | servidor instalado; Deck requer instalação pelo Yan |
 | platform-tools (adb) | 36.0.2 | ✅ |
 | cmdline-tools | `latest` (sdkmanager/avdmanager) | ✅ |
 | emulator | instalado | ✅ |
@@ -33,8 +33,11 @@ export PATH="$HOME/.local/gradle/current/bin:$PATH"
 
 ## Stack recomendada (validada)
 
-- **AGP 9.2.0** + **Gradle 9.6.1** + **JDK 17** + `compileSdk 34` / `targetSdk 34` / `minSdk 21`.
-- Confirmado: AGP 9.x exige Gradle ≥ 9.1 e JDK ≥ 17 — todos satisfeitos.
+- **AGP 9.2.0** + **Gradle 9.6.1** + **JDK 17** + **Kotlin/compilador Compose 2.4.21**.
+- **Compose BOM 2026.09.00** (UI/runtime/foundation 1.12.1, Material3 1.4.0), **Activity Compose 1.13.0**, **coroutines 1.11.0** no app e nos testes.
+- `compileSdk 37` / `targetSdk 36` / `minSdk 24`. AGP mantém Kotlin embutido; o plugin Kotlin declarado na raiz eleva a versão mínima sem aplicar o plugin legado nos módulos.
+- LiteRT-LM continua **0.16.1**; a atualização do runtime exige validação própria.
+- AGP 9.2.0 exige Gradle ≥ 9.4.1 e JDK 17; KGP 2.4.21 suporta esta combinação (matriz e fontes na lição `2026-10-29-toolchain-analise.md`).
 - Fixe o JDK 17 no projeto via `gradle.properties` → `org.gradle.java.home=/usr/lib/jvm/java-17-openjdk` **ou** um toolchain Kotlin/Java 17, para builds determinísticos (o default do sistema é o 21).
 
 ## Comandos para o agente de implementação
@@ -43,10 +46,10 @@ export PATH="$HOME/.local/gradle/current/bin:$PATH"
 # T1 — gerar o wrapper no projeto recém-criado (usa o Gradle global de bootstrap):
 gradle wrapper --gradle-version 9.6.1
 
-# Build / testes (depois do wrapper existir):
-./gradlew assembleDebug              # compila o APK debug
-./gradlew testDebugUnitTest          # unit tests (JVM) — gate "quick"
-./gradlew connectedDebugAndroidTest  # instrumented — precisa do emulador rodando — gate "full"
+# Build e testes na worktree, com escolha automática de worker:
+/srv/dev/ferramentas/pool/bin/pool compilar assembleDebug testDebugUnitTest :app:lintDebug assembleDebugAndroidTest
+/srv/dev/ferramentas/pool/bin/pool instrumentar ClasseAfetadaTest
+# Release/R8: pool compilar assembleRelease (IDs AdMob no ambiente; ver abaixo).
 
 # Subir o emulador Android 14 (headless, com KVM) no renderizador do CI (os goldens saem dele):
 emulator -avd keyflow_api34 -no-window -no-audio -gpu swangle_indirect &
@@ -154,7 +157,7 @@ o shim próprio do design da Visão (§7 A) volta a ser possível.
 ## Notas / pegadinhas
 
 - **Smoke build**: um app Android trivial compilou e gerou APK (Gradle 9.6.1 + AGP 9.2.0 + JDK 17 + SDK). A fundação está provada; o projeto descartável ficou no scratchpad temporário, fora do repo.
-- **compileSdk**: validado com 34. Se optar por `compileSdk 35/36`, instalar antes: `sdkmanager "platforms;android-35"`.
+- **compileSdk 37**: instalar `sdkmanager "platforms;android-37.0" "build-tools;36.0.0"`. CI instala explicitamente; a imagem AWS inclui a plataforma, e o arranque de imagens antigas instala só o pacote ausente. O Deck monta o SDK do Yan somente para leitura: até ele instalar a plataforma e atualizar o instalador que anuncia `sdk_37=sim`, o pool recusa builds desta branch com **falta SDK 37**. APKs prontos continuam aceitos com `--sem-build`.
 - **Warning XML v4** no `avdmanager`/`sdkmanager` é benigno (cmdline-tools ligeiramente atrás do repositório). Para silenciar: `sdkmanager --install "cmdline-tools;latest"`.
 - **Disco**: ~14 GB livres após o setup (partição em 91%). Atenção ao crescimento de `~/.gradle` e snapshots do emulador.
 - **adb duplicado**: há `/usr/bin/adb` (sistema) e o do SDK (`platform-tools/adb`, 36.0.2). Prefira o do SDK e evite servers concorrentes (`adb kill-server` se houver conflito).
@@ -170,7 +173,7 @@ container é reciclado; refazer a cada sessão nova (~10 min + boot do emulador)
 apt-get install -y openjdk-17-jdk-headless
 ln -sfn /usr/lib/jvm/java-17-openjdk-amd64 /usr/lib/jvm/java-17-openjdk
 # SDK: cmdline-tools de dl.google.com em /root/Android/Sdk/cmdline-tools/latest, depois
-sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "emulator" \
+sdkmanager "platform-tools" "platforms;android-37.0" "build-tools;36.0.0" "emulator" \
   "system-images;android-34;google_apis;x86_64"
 avdmanager create avd -n keyflow_api34 -k "system-images;android-34;google_apis;x86_64" -d pixel_6
 # libs do emulador + ImageMagick (diff-screens.sh)

@@ -141,9 +141,9 @@ class WordList private constructor(
             starts[count] = text.length
             foldedStarts[count] = foldedText.length
             return build(
-                text = CharArray(text.length).also { text.getChars(0, text.length, it, 0) },
+                text = CharArray(text.length) { text[it] },
                 starts = starts.copyOf(count + 1),
-                folded = CharArray(foldedText.length).also { foldedText.getChars(0, foldedText.length, it, 0) },
+                folded = CharArray(foldedText.length) { foldedText[it] },
                 fStarts = foldedStarts.copyOf(count + 1),
                 freqs = freqs.copyOf(count),
                 offensive = offensive,
