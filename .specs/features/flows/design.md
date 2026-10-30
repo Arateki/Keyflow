@@ -512,7 +512,7 @@ da capacidade usa (catálogo local instalado, `VisionModelCatalog`, modelos da c
  │            [ Cancelar ]  [ Ligar ]      │
  └─────────────────────────────────────────┘
  ┌ (superfície ocupada por outro fluxo) ───┐
- │ Isto substitui “Fluxo: Ler a tela e colar” neste atalho.
+ │ Isto substitui “Fluxo: Ler a tela e colar” neste gesto da orbe flutuante.
  └─────────────────────────────────────────┘
 ```
 

@@ -458,15 +458,7 @@ class SettingsRepository(
             openaiToken = credentials.getApiKey(ProviderIds.OPENAI)?.value.orEmpty(),
             groqToken = credentials.getApiKey(ProviderIds.GROQ)?.value.orEmpty(),
         )
-        when (val eff = settings.effectiveConfigFor(credentials = values)) {
-            is EffectiveConfig.Ready -> eff.config
-            // Sem endpoint nem token: o RoutingTranscriber manda para o :inference (NM-T9, PRV-01).
-            is EffectiveConfig.Local -> Config(
-                timeoutMs = Config.localTimeoutMs(settings.transcriptionTimeoutMs.toLong()),
-                local = eff,
-            )
-            EffectiveConfig.Unavailable -> Config()
-        }
+        configDe(settings, values)
     }.flowOn(Dispatchers.IO)
 
     /**
@@ -995,3 +987,19 @@ data class KeyboardSnapshot(
     val vibration: Int,
     val skinsUnlocked: Boolean = false,
 )
+
+/**
+ * A [Config] do transcritor para estas [settings] e [credenciais]: a que o `SettingsRepository.flow()` publica, extraída para o
+ * coordinator da orbe e a porta de Ditar dos fluxos usarem a mesma função sobre o instantâneo da etapa (FLX-26) — mesma `Settings`,
+ * mesma `Config`. Pura: as credenciais vêm de quem chama (o cofre, na hora da chamada).
+ */
+internal fun configDe(settings: Settings, credenciais: SettingsCredentialValues = SettingsCredentialValues()): Config =
+    when (val eff = settings.effectiveConfigFor(credentials = credenciais)) {
+        is EffectiveConfig.Ready -> eff.config
+        // Sem endpoint nem token: o RoutingTranscriber manda para o :inference (NM-T9, PRV-01).
+        is EffectiveConfig.Local -> Config(
+            timeoutMs = Config.localTimeoutMs(settings.transcriptionTimeoutMs.toLong()),
+            local = eff,
+        )
+        EffectiveConfig.Unavailable -> Config()
+    }
