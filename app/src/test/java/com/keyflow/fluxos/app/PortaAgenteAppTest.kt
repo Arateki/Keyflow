@@ -326,13 +326,14 @@ class PortaAgenteAppTest {
     }
 
     @Test
-    fun `a new session shares the catalog and the policy but never the controller, the gate or the executor`() = runTest {
+    fun `a new session shares the tool names and the policy but never the controller, the gate or the executor`() = runTest {
         val leitura = FakeTool("le")
         val policy = InMemoryPolicyConfigStore()
         val log = InMemoryActionLog()
         val chat = AgentHost.assemble(escopo(), listOf(leitura), policy, log, secrets = { emptyList() })
         val sessao = chat.novaSessao(escopo())
-        assertThat(sessao.registry).isSameInstanceAs(chat.registry)
+        assertThat(sessao.registry).isNotSameInstanceAs(chat.registry)
+        assertThat(sessao.registry.all().map { it.name }).containsExactlyElementsIn(chat.registry.all().map { it.name })
         assertThat(sessao.policy).isSameInstanceAs(chat.policy)
         assertThat(sessao.actionLog).isSameInstanceAs(chat.actionLog)
         assertThat(sessao.secretFilter).isSameInstanceAs(chat.secretFilter)
