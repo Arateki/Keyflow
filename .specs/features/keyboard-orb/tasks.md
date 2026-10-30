@@ -1,7 +1,7 @@
 # Orbe do teclado — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md`
-**Status**: spec e design em rascunho (2026-10-29), tasks **todas pendentes**. **Fora da v1** (só `main`, release seguinte). Não toma a vez de frente aberta.
+**Status**: spec e design em rascunho (2026-10-29), **KBO-T1..T3 feitas (2026-10-30)**, o resto pendente. **Fora da v1** (só `main`, release seguinte). Não toma a vez de frente aberta.
 
 > **Para o agente executor**: leia `spec.md` + `design.md` + este arquivo e `.specs/codebase/TESTING.md`. Uma task por vez, na ordem do plano,
 > testes primeiro, gate verde antes de avançar. Cada task é verificável sozinha. Os textos de UI que ela criar vão com ela (`tr("…")` +
