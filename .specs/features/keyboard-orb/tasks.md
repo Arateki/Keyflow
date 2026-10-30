@@ -60,7 +60,7 @@ A Fase A inteira é JVM: pode ser entregue e revisada antes de qualquer pixel.
 - **Done when**: unit — round-trip com pacote, modo `ptt` e `flow:abc`; JSON ausente, malformado e com campo desconhecido; ação desconhecida volta igual no `codificar` e **não** é reescrita para gravar/enviar no 1 toque; ligar/desligar `copy` não muda `taps`; um JSON completo não contém `key`, `token`, `endpoint` nem texto de ditado; gravar `Settings` no mesmo DataStore não altera a chave.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(orbe-teclado): config da orbe no DataStore`.
 
-### KBO-T3 — Rajada, classificador e resolvedor — **Status: pendente**
+### KBO-T3 — Rajada, classificador e resolvedor — **Status: concluída**
 - **What**: `RajadaDeToques` e `ClassificadorDeGesto` com relógio injetado e os limiares da KBO-13. `ResolvedorDaOrbeDoTeclado`: config efetiva (KBO-19), aviso ao substituir ação já atribuída e zero gravar/enviar válido nos dois modos (KBO-15, D9), catálogo (KBO-16), Visão (KBO-25), gancho de fluxo que por padrão devolve nulo (KBO-30, KBO-31). Sem chamada a Fluxos e sem `android.*`. Ação desconhecida dispara como Nenhuma e não introduz gravar.
 - **Where**: `orbe/{RajadaDeToques,ResolvedorDaOrbeDoTeclado}.kt`; testes `ResolvedorDaOrbeDoTecladoTest`.
 - **Depends on**: T1. **Requirement**: KBO-04, KBO-13, KBO-14, KBO-15, KBO-16, KBO-17, KBO-18, KBO-19, KBO-20, KBO-25, KBO-30, KBO-31.
