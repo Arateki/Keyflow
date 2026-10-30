@@ -82,6 +82,14 @@ O scrollback é privado, limitado a 1.000 linhas e não recebe parâmetro. Logo,
 a parte de scrollback isoladamente só pede Kotlin. O coordenador autorizou a continuidade depois do PR do diagnóstico.
 Fontes, hashes e limites da evidência na [lição](../../project/licoes/2026-10-30-computador-a.md).
 
+**CMP-T3 implementada (30/10):** módulo `:termlib` em `third_party/termlib`, JNI do release
+`termlib-jni-0.3.14-keyflow.1`, SHA-256 do pacote `2f0c6f11215f4bd2e86c5f2f3f7a763e2824d78898432b2cf5817c22f7142b2e`.
+A fábrica aceita `maxScrollbackLines` (0..100.000, padrão 1.000), há contador `retainedScrollbackLines`,
+`mouseMode: StateFlow<Int>` e métodos `dispatchMouseMove/Button`. O modo é publicado depois de sair do callback JNI.
+Os gestos da tela ainda dependem da CMP-T13. Nenhuma alteração de sixel/DA1 entrou no nativo.
+`TermlibNativoTest` confere o pacote e mutações; `verificar-termlib-apk.py` confere os mesmos hashes no APK,
+que preserva `libtermlib.so` sem nova remoção de símbolos. O pool não compila C++.
+
 ### 2.4 Plano B (contingência): fork preso ao toolchain atual
 
 Só se a frente de toolchain travar. O Kotlin 2.2.10 lê metadados até 2.3: o **termlib 0.1.0** (metadados 2.3.0) compila, mas **sem imagens**; imagens exigem recompilar o código-fonte do termlib num módulo nosso com `languageVersion`/`apiVersion` baixados, o que só é possível se o fonte não usar construções de Kotlin 2.3/2.4 (**não medido**); o cbssh ≤ 0.3.1 (metadados 2.3.0) ou o fonte do cbssh no mesmo módulo.

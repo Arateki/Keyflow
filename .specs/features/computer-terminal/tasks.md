@@ -102,7 +102,12 @@ Medições dinâmicas e auditoria completa de transitivas continuam pendentes.
 - **Done when**: a tabela existe com o nível de proteção (hardware/TEE/StrongBox/software) e o nome do algoritmo de assinatura **medidos**; a lição diz a partir de qual API/aparelho o Keystore serve e confirma (ou corrige) a premissa P1 da spec; o plano de fallback do `design.md` §4 é ajustado ao medido.
 - **Tests**: manual/instrumentado de sonda. **Gate**: `pool instrumentar` (emulador) + A32/Tab/Vaio manuais com `--confirmo-a32`. **Commit**: `spike(computador): sonda do Ed25519 no Keystore` (só o debug).
 
-### CMP-T3 — Fork do termlib com JNI compilado no CI e SHA fixado — **Status: em andamento (2026-10-30)**
+### CMP-T3 — Fork do termlib com JNI compilado no CI e SHA fixado — **Status: concluída em 2026-10-30**
+
+Gates requeridos verdes: build no pool sem NDK, 2.705/2.705 JVM (6/6 `TermlibNativoTest`),
+workflows [41111156115](https://github.com/Arateki/Keyflow/actions/runs/41111156115) e
+[41111164906](https://github.com/Arateki/Keyflow/actions/runs/41111164906) verdes; três ABIs do APK com ELF/ZIP 16 KB
+ e hashes iguais ao release `termlib-jni-0.3.14-keyflow.1`. Auditoria das partes nativas e provas na lição.
 
 Bootstrap do workflow primeiro; integração com SHA real depois do binário publicado. **SPEC_DEVIATION:** dois commits
 para permitir essa verificação sem reescrever a branch; detalhes na [lição](../../project/licoes/2026-10-30-computador-a.md).

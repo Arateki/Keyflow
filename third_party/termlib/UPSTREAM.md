@@ -18,6 +18,7 @@
    contador público de linhas retidas para medir orçamento sem refletir estado privado.
 2. Modo de mouse publicado como `StateFlow` a partir de `VTERM_PROP_MOUSE`; métodos de movimento
    e botão usam `vterm_mouse_move/button` no mesmo contrato de locks/callbacks do teclado.
+   A publicação do modo escapa do callback JNI pelo Handler antes de avisar observadores.
    Não se duplicam o parser de modos nem a codificação de eventos no Kotlin.
 3. Nome nativo `libtermlib.so`. O CMake só roda no CI; o módulo Android consome os binários
    de três ABIs, com SHA-256 fixado, preparados pelo build do app.
@@ -39,3 +40,9 @@ o CI guarda `clang_source_info.md` do NDK realmente usado. A referência a GPLv2
 é uma cláusula de compatibilidade, não muda a licença desses runtimes para GPL.
 Fontes: https://developer.android.com/ndk/guides/cpp-support e
 https://github.com/android/ndk/wiki/Changelog-r29.
+
+Auditoria do NDK efetivamente usado: `clang_source_info.md` do CI registra LLVM base
+`386af4a5c64ab75eaee2448dc38f2e34a40bfed0` e os patches Android de
+`toolchain/llvm_android@1dab3288f660d43a6cb2479107e2b54b3ab0a2a1`. Os quatro `LICENSE.TXT`
+dessa base foram baixados e são **bit-idênticos** aos textos preservados neste diretório.
+Prova e hashes: `.equipe/provas/computador-a/t3-licencas-ndk-real.json` (fora do git).

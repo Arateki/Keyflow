@@ -3,6 +3,8 @@ import com.keyflow.onnxbuild.ElfVersionTags
 import com.android.build.api.variant.ResValue
 import java.io.File
 import java.net.URI
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.Properties
 import java.util.zip.ZipFile
@@ -225,6 +227,8 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+    // O SHA aprovado vale também dentro do APK: não remover mais símbolos do binário do CI.
+    packaging { jniLibs.keepDebugSymbols.add("**/libtermlib.so") }
     testOptions {
         unitTests {
             isReturnDefaultValues = true
@@ -367,6 +371,65 @@ if (!sherpaOnnxAar.isFile || sha256Of(sherpaOnnxAar) != sherpaOnnxSha256) {
 }
 
 
+// CMP-T3: o CI compila o JNI; o pool só baixa e verifica o artefato imutável.
+val termlibNativoVersion = "0.3.14-keyflow.1"
+val termlibNativoSha256 = "2f0c6f11215f4bd2e86c5f2f3f7a763e2824d78898432b2cf5817c22f7142b2e"
+val termlibNativoUrl = "https://github.com/Arateki/Keyflow/releases/download/termlib-jni-$termlibNativoVersion/termlib-jni-$termlibNativoVersion.zip"
+
+abstract class PrepareTermlibJni : DefaultTask() {
+    @get:Input abstract val artifactUrl: Property<String>
+    @get:Input abstract val expectedSha256: Property<String>
+    @get:OutputFile abstract val archive: RegularFileProperty
+    @get:OutputDirectory abstract val destination: DirectoryProperty
+
+    private fun digest(file: File): String = MessageDigest.getInstance("SHA-256")
+        .digest(file.readBytes()).joinToString("") { "%02x".format(it) }
+
+    @TaskAction
+    fun prepare() {
+        val expected = expectedSha256.get()
+        check(expected.matches(Regex("[a-f0-9]{64}"))) { "O SHA-256 do JNI do termlib precisa estar fixado" }
+        val zip = archive.get().asFile
+        if (!zip.isFile || digest(zip) != expected) {
+            zip.parentFile.mkdirs()
+            val partial = File(zip.path + ".part")
+            try {
+                val connection = URI(artifactUrl.get()).toURL().openConnection().apply {
+                    connectTimeout = 15_000
+                    readTimeout = 120_000
+                }
+                connection.getInputStream().use { input -> partial.outputStream().use { input.copyTo(it) } }
+                check(digest(partial) == expected) { "SHA-256 do JNI do termlib divergente" }
+                Files.move(partial.toPath(), zip.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            } finally {
+                partial.delete()
+            }
+        }
+        check(digest(zip) == expected) { "JNI do termlib corrompido" }
+        val output = destination.get().asFile
+        val names = setOf("arm64-v8a", "armeabi-v7a", "x86_64").map { "jni/$it/libtermlib.so" }.toSet()
+        ZipFile(zip).use { input ->
+            val actual = input.entries().asSequence().filter { it.name.endsWith(".so") }.map { it.name }.toSet()
+            check(actual == names) { "ABIs inesperadas no JNI do termlib: $actual" }
+            output.deleteRecursively()
+            for (name in names + "manifest.json") {
+                val entry = input.getEntry(name) ?: error("O JNI do termlib não contém $name")
+                val target = File(output, name)
+                target.parentFile.mkdirs()
+                input.getInputStream(entry).use { source -> target.outputStream().use { source.copyTo(it) } }
+            }
+        }
+    }
+}
+
+val prepareTermlibJni = tasks.register<PrepareTermlibJni>("prepareTermlibJni") {
+    artifactUrl.set(termlibNativoUrl)
+    expectedSha256.set(termlibNativoSha256)
+    archive.set(layout.projectDirectory.file("libs/termlib-jni-$termlibNativoVersion.zip"))
+    destination.set(layout.buildDirectory.dir("termlib-jni"))
+}
+tasks.named("preBuild") { dependsOn(prepareTermlibJni) }
+
 // ONNX Runtime Java (vision-capture VC-T2b): o PaddleOCR roda na MESMA `libonnxruntime.so` do sherpa-onnx (uma só ORT por ABI —
 // a transcrição local é o núcleo do produto e não pode depender de qual `.so` ganha um `pickFirst`). Contingência do design §7:
 // não há NDK/CMake nos nós do pool (servidor, Deck, AWS; medido em 2026-10-27, "NDK not configured"), então a ponte JNI vem pronta
@@ -481,6 +544,7 @@ tasks.withType<Test>().configureEach {
 }
 
 dependencies {
+    implementation(project(":termlib"))
     // UI
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")

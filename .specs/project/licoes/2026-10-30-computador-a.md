@@ -130,3 +130,25 @@ A publicação nativa precisa de um commit de bootstrap do workflow para o CI pr
 real desse artefato será fixado num commit de integração posterior. **SPEC_DEVIATION:** dois commits
 para CMP-T3, pois o SHA do binário do CI não existe antes de enviar o workflow, e não se reescreve a branch
 publicada com `--force`. A task permanece em andamento até os gates do módulo e do artefato passarem.
+
+## CMP-T3 — Resultado dos gates requeridos
+
+- Release: [termlib-jni-0.3.14-keyflow.1](https://github.com/Arateki/Keyflow/releases/tag/termlib-jni-0.3.14-keyflow.1).
+  ZIP SHA-256 `2f0c6f11215f4bd2e86c5f2f3f7a763e2824d78898432b2cf5817c22f7142b2e`; hashes individuais e
+  hash do fonte nativo em `third_party/termlib/native-manifest.json`.
+- Workflows `41111156115` e `41111164906` verdes nas três ABIs; no segundo, o download de um artefato
+  falhou após cinco tentativas e passou ao repetir somente o job de empacotamento, sem alterar o código.
+- Pool: `assembleDebug` e `assembleDebugAndroidTest` passaram sem NDK, unitários **2.705/2.705**,
+  zero falhas/erros/ignorados, 261 classes; **6/6** em `TermlibNativoTest`. ABI removida, bit alterado,
+  pacote reempacotado e cabeçalhos GNU GPL/LGPL/AGPL inseridos são recusados pelos testes.
+- APK: `check-16kb-alignment.py` verde (ELF e offsets ZIP) e `verificar-termlib-apk.py` com hashes
+  idênticos ao CI em arm64-v8a, armeabi-v7a e x86_64. `keepDebugSymbols` preserva os mesmos bytes
+  também quando o worker tem NDK. O Checks ganhou essa verificação, mantendo os sete jobs existentes.
+- Auditoria efetiva do NDK: LLVM base `386af4a5c64ab75eaee2448dc38f2e34a40bfed0`; os quatro textos
+  de licença dos runtimes preservados são bit-idênticos aos dessa revisão. Detalhes e fontes em `UPSTREAM.md`.
+- O AGP 9.2 gerou um accessor legado de `AndroidLibrarySourceSet` incompatível com a implementação;
+  configurar `com.android.build.api.dsl.LibraryExtension` evita o cast, confirmado no JAR real do AGP.
+- A primeira catraca do fonte encontrou ordens diferentes (caminho inteiro versus componentes). A ordem
+  canônica por componentes foi alinhada ao empacotador, sem mudar o hash nem o binário aprovado.
+- O lint adicional do módulo estava habilitando regras não triadas. Foi alinhado ao `NewApi` do app;
+  a análise anterior foi interrompida depois dos gates requeridos e a repetição está registrada separadamente.

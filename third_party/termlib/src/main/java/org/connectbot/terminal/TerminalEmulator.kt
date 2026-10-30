@@ -922,7 +922,7 @@ internal class TerminalEmulatorImpl(
 
                 is TerminalProperty.IntValue -> {
                     // VTERM_PROP_MOUSE do libvterm; a negociação permanece no parser nativo.
-                    if (prop == 8) _mouseMode.value = value.value
+                    if (prop == 8) postCallback { _mouseMode.value = value.value }
                     // Property 7 is VTERM_PROP_CURSORSHAPE.
                     if (prop == 7) {
                         cursorShape = when (value.value) {

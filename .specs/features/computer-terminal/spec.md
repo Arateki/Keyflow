@@ -384,7 +384,7 @@ Nenhuma. Q1–Q13 foram respondidas em 29/10 (D12–D24). Q8, Q9, Q10, Q11 e Q13
 | ----------- | ----- | ---- | ------ |
 | CMP-01 | P0 | CMP-T0 | Verified — base `c1480992`, Checks 41073156978; [evidências e desvio do pool](../../project/licoes/2026-10-30-computador-a.md) |
 | CMP-02 | P0 | CMP-T1 | Pending — inspeção inicial e hashes na [lição](../../project/licoes/2026-10-30-computador-a.md); falta medição integrada e grafo completo |
-| CMP-03 | P0 | CMP-T1, CMP-T3 | Pending — ELF 16 KB nas três ABIs do AAR confirmado; CMP-T3 necessária, APK integrado ainda não medido |
+| CMP-03 | P0 | CMP-T1, CMP-T3 | Verified — JNI do CI com SHA fixado; 3 ABIs no APK, ELF/ZIP 16 KB e hashes conferidos, 6/6 catracas; [lição](../../project/licoes/2026-10-30-computador-a.md) |
 | CMP-04 | P0 | CMP-T4 | Pending |
 | CMP-05 | P1-A | CMP-T5, CMP-T11, CMP-T15 | Pending |
 | CMP-06 | P1-A | CMP-T5, CMP-T11 | Pending |
