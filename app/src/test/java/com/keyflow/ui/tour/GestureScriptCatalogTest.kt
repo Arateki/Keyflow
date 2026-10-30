@@ -8,6 +8,7 @@ import com.keyflow.ui.config.recordingHintParts
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import com.keyflow.core.ButtonState
 import org.junit.Test
 
 /**
@@ -161,13 +162,18 @@ class GestureScriptCatalogTest {
     }
 
     @Test
-    fun keyboardMicHoldOpensTheActionSelector() {
+    fun keyboardOrbHoldDragsUpToPauseWithoutTheOldChipSelector() {
         val hold = buildKeyboardScripts(settings()).first { it.id == "kbd-mic-hold" }
 
+        assertTrue("segurar a orbe", hold.steps.any { it.action == FingerAction.PRESS })
+        val drag = hold.steps.first { it.action == FingerAction.DRAG }
+        assertTrue("arrasta para cima (y diminui)", drag.dragPath.last().y < drag.dragPath.first().y)
+        assertEquals(ButtonState.PAUSED, hold.steps.last().reaction.micState)
         assertTrue(
-            "segurar o mic deveria mostrar o seletor de ações",
-            hold.steps.any { it.reaction.overlayHint == TourOverlayHint.MIC_ACTION_SELECTOR },
+            "o seletor de chips do mic saiu do app: o roteiro não o desenha mais",
+            hold.steps.none { it.reaction.overlayHint == TourOverlayHint.MIC_ACTION_SELECTOR },
         )
+        assertTrue("o texto não fala mais em seletor", !hold.description.contains("seletor"))
     }
 
     // ── Fonte textual única ──────────────────────────────────────────────────
