@@ -126,17 +126,21 @@ class OverlayService : Service() {
     private var visionRestartDialog: android.app.AlertDialog? = null
     private val visionGrabber = ScreenFrameGrabber()
     private val visionHiddenViews = mutableMapOf<View, Int>()
+    private var visionRestoreKeyboard: (() -> Unit)? = null
     private val visionFlow: VisionFlow<Bitmap> by lazy {
         VisionFlow<Bitmap>(
             pause = { coordinator.onIntent(GestureIntent.PAUSE) },
-            requestConsent = { requestVisionProjection({ projection ->
-                visionMediaProjection = projection
-                visionFlow.consentGranted()
-                visionProjectionStartedForTest?.invoke(projection)
-            }, {
-                Toast.makeText(this, tr("Captura de tela cancelada."), Toast.LENGTH_SHORT).show()
-                visionFlow.finish()
-            }) },
+            requestConsent = {
+                hideVisionKeyboard()
+                requestVisionProjection({ projection ->
+                    visionMediaProjection = projection
+                    visionFlow.consentGranted()
+                    visionProjectionStartedForTest?.invoke(projection)
+                }, {
+                    Toast.makeText(this, tr("Captura de tela cancelada."), Toast.LENGTH_SHORT).show()
+                    visionFlow.finish()
+                })
+            },
             showSelector = ::showVisionSelector,
             cleanup = ::cleanupVision,
             onState = {
@@ -411,7 +415,14 @@ class OverlayService : Service() {
         } }
     }
 
+    private fun hideVisionKeyboard() {
+        val restore = KeyFlowController.hideKeyboardForCapture() ?: return
+        val previous = visionRestoreKeyboard
+        visionRestoreKeyboard = { try { previous?.invoke() } finally { restore() } }
+    }
+
     internal fun hideVisionViews(views: List<View>) {
+        hideVisionKeyboard()
         views.forEach {
             visionHiddenViews[it] = it.visibility
             it.visibility = View.INVISIBLE
@@ -436,9 +447,13 @@ class OverlayService : Service() {
                 android.util.Log.w("KeyFlowVision", "Falha ao encerrar a projeção", error)
             } finally {
                 try { releaseVisionResource { VisionCache.clear(this) } } finally {
-                    visionHiddenViews.forEach { (view, visibility) -> view.visibility = visibility }
-                    visionHiddenViews.clear()
-                    if (!destroying) releaseVisionResource { refreshPartialUi() }
+                    try { visionHiddenViews.forEach { (view, visibility) -> view.visibility = visibility } } finally {
+                        visionHiddenViews.clear()
+                        val restoreKeyboard = visionRestoreKeyboard
+                        visionRestoreKeyboard = null
+                        releaseVisionResource { restoreKeyboard?.invoke() }
+                        if (!destroying) releaseVisionResource { refreshPartialUi() }
+                    }
                 }
             }
         }

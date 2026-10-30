@@ -477,3 +477,11 @@ imagem, copia o texto (PaddleOCR, Gemma 4 no aparelho ou modelo de visão de um 
 responde sobre a tela (⚠️) — com estado de "cópia" manipulável. **Sem tradução.** Modelos locais baixados pela aba Visão (aviso que
 leva a ela quando faltam), cada card com as suas capacidades; provedores e Custom opcionais (a imagem só sai por eles); nada embutido
 no APK além do shim do runtime; estado da orbe sempre restaurado.
+
+### Revisão P3 — Teclado durante a captura e prova do fluxo (2026-10-29)
+- **Status**: concluída em `equipe/p3-pendencias`; 4/4 unitários de fluxo e 6/6 instrumentados do serviço verdes; gate completo de 2.349 testes e lint verdes pelo pool.
+- Ocultar o IME KeyFlow antes do consentimento, mantê-lo fora da captura e restaurar apenas o teclado antes visível no mesmo editor; epílogo tolera erro ao fechar a projeção.
+- Substituir a asserção tautológica de estado por ações e fases exatas. Mutação com pausa duplicada passa no teste antigo e falha no novo; sem a mutação, 4/4 unitários passam.
+- Prova Android antes da correção: o caminho de ocultação da captura deixava a janela real do IME visível.
+- **Testes**: `VisionFlowTest` (JVM), `OverlayServiceVisionTest` (janela real, negação e limpeza com falha), via pool.
+- Lição: `../../project/licoes/2026-10-29-p3-visao-teclado.md`.

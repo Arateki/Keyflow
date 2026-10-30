@@ -3,7 +3,8 @@
 Arquitetura da aba Fluxos: modelo de dados, persistência, executor, portas para os motores que já existem, roteamento
 gatilho → fluxo e as telas. Requisitos (FLX-NN) e decisões em `spec.md`; tarefas em `tasks.md`. Feature irmã de
 `vision-capture` (a etapa Capturar é o `VisionFlow`), `sintese-fala` (Falar é o `SpeechEngine`), `reasoning-models`
-(Perguntar), `agent-harness` (Agente), `shortcut-bars` (botão da barra) e `orb-gestures` (2 e 3 toques). Aparelhos, gates e
+(Perguntar), `agent-harness` (Agente), `shortcut-bars` (botão da barra), `orb-gestures` (2 e 3 toques da orbe flutuante) e `notification` (a orbe da notificação
+como gatilho; `LugarDaOrbe` é compartilhado). Aparelhos, gates e
 convenções: `AGENTS.md` e `.specs/codebase/TESTING.md`.
 
 ## Princípio condutor
@@ -28,27 +29,29 @@ saída de uma na entrada da seguinte. Por isso:
 ```
  Gatilhos                       Roteamento                 Executor (JVM puro)               Portas (Android)            Motores que já existem
  ───────                        ──────────                 ───────────────────               ───────────────             ──────────────────────
- orbe: 2 / 3 toques ─┐                                     ExecutorFluxo.executar(fluxo)     PortaDitar     ──────────►  OverlayCoordinator (gravador, orbe,
+ orbe flutuante 2/3 ─┐                                     ExecutorFluxo.executar(fluxo)     PortaDitar     ──────────►  OverlayCoordinator (gravador, orbe,
  botão da barra ─────┼─► OverlayService ─► RoteadorGatilhos   para cada etapa:                                              RoutingTranscriber)
- (notificação*)      │   ACTION_RUN_FLOW      (puro)           entrada ─► porta ─► saída      PortaCapturar  ──────────►  VisionFlow<Bitmap> (consent, seletor)
+ orbe da notif. 2/3* ┤   ACTION_RUN_FLOW      (puro)           entrada ─► porta ─► saída      PortaCapturar  ──────────►  VisionFlow<Bitmap> (consent, seletor)
+ orbe do teclado 2/3*┤   (lugar + toques)
                      │                           │             estado ─► KeyFlowController   PortaVisao     ──────────►  VisionModelEngine / OCR local
                      │                           ▼             falha/cancela ─► encerra      PortaPerguntar ──────────►  ReasoningEngine
                      │                    FluxoHost (serviço)                                PortaFalar     ──────────►  SpeechEngine + AudioTrackPlayer
                      │                    precondições, FGS,                                 PortaInserir   ──────────►  KeyFlowController.insertOrHold
                      │                    orbe, avisos                                       PortaAgente    ──────────►  AgentController (+ janela de confirmação)
-                     └─ * superfície reservada: lida e gravada, sem efeito na V1
+                     └─ * lugares da orbe entregues por FLX-T28 (notificação) e FLX-T29 (teclado); o modelo já os traz
 ```
 
 ## 1. Pacotes e arquivos
 
 | Pacote / arquivo | Conteúdo | Puro? |
 | ---------------- | -------- | ----- |
-| `com.keyflow.fluxos` — `Modelo.kt` | `Tipo`, `ModeloRef`, `Etapa`, `Fluxo`, `Superficie`, `Gatilho`, `ConfigFluxos`, limites (`LIMITES`) | JVM |
+| `com.keyflow.fluxos` — `Modelo.kt` | `Tipo`, `ModeloRef`, `Etapa`, `Fluxo`, `Superficie` (`Orbe(lugar, toques)` e `Barra`), `Gatilho`, `ConfigFluxos`, limites (`LIMITES`) | JVM |
+| `com.keyflow.orbe` — `Interacoes.kt` | `LugarDaOrbe { FLUTUANTE, TECLADO, NOTIFICACAO }` (D9), compartilhado com a feature `notification` (que acrescenta `Interacao` e `SuporteDeInteracoes`); quem chegar primeiro cria o arquivo | JVM |
 | `fluxos/ValidadorFluxo.kt` | `validar(fluxo) → Validacao { valido, problemas[etapa, motivo], avisos }`, `compativeis(ultimaSaida)` para o seletor de etapa | JVM |
 | `fluxos/CodecFluxos.kt` | `decodificarFluxos(json)`, `codificarFluxos`, `decodificarGatilhos`, `codificarGatilhos` (org.json) | JVM |
 | `fluxos/PadroesFluxo.kt` | catálogo dos 3 padrão (`trKey`), `semear()`, `PADROES_VERSAO` | JVM |
 | `fluxos/RestauradorFluxos.kt` | `restaurar(config) → config`, `previa(config) → PreviaRestaurar` | JVM |
-| `fluxos/RoteadorGatilhos.kt` | `resolverToques(toques, config, settings) → Resolucao`; `PoliticaGatilhos` (ligar, desligar, tirar de outro, excluir fluxo, limpar órfãos) | JVM |
+| `fluxos/RoteadorGatilhos.kt` | `resolverToques(lugar, toques, config, politica, settings) → Resolucao` (por lugar da orbe, com "copiar"); `PoliticaGatilhos` (ligar, desligar, tirar de outro, excluir fluxo, limpar órfãos) | JVM |
 | `fluxos/ModeloPorEtapa.kt` | `aplicar(settings, etapa) → Settings` (cópia em memória), `efetivo(settings, etapa) → Efetivo(origem, modelo, nuvem?, provedor?)` para o selo | JVM |
 | `fluxos/execucao/ExecutorFluxo.kt` | o laço; `EstadoExecucao`; `ResultadoEtapa`; `ErroEtapa`/`CausaErro`; tempos | JVM |
 | `fluxos/execucao/Portas.kt` | as interfaces das portas e `Valor` (`Nada`/`Texto`/`Imagem(handle)`) | JVM |
@@ -111,7 +114,7 @@ suspend fun atualizarFluxosEBarras(f: (ConfigFluxos, BarsConfig) -> Pair<ConfigF
   Sem `flows_json`, `flow_triggers_json` é ignorado (FLX-40).
 - **Codec tolerante (FLX-47).** `org.json` (como `ShortcutCodec`). Regras: ignora campo desconhecido; descarta o fluxo malformado e
   mantém os outros; etapa de tipo desconhecido → `Etapa.Desconhecida`; corta nome (40), instrução/sistema (500), etapas (8),
-  fluxos (20), gatilhos (64); ids repetidos → o primeiro; gatilho com `surface` ilegível é descartado; `orb:N` fora de {2,3}
+  fluxos (20), gatilhos (64); ids repetidos → o primeiro; gatilho com `surface` ilegível é descartado; `orb:<lugar>:N` com lugar desconhecido ou N fora de {2,3} (ou {1,2,3} em `notificacao`)
   descartado; superfície duplicada → mantém a primeira (D7). Nunca lança.
 - **Sem segredo (FLX-46).** O codec só escreve os campos do esquema; não existe campo para chave/endpoint/header. O teste varre o
   JSON de um fluxo com todas as etapas (ver §10).
@@ -154,7 +157,7 @@ return config.copy(fluxos = resultado)          // gatilhos: a MESMA lista, sem 
 
 ## 5. Gatilhos e roteamento (`FLX-33..39`)
 
-### 5.1 Orbe: 2 e 3 toques
+### 5.1 Orbe flutuante: 2 e 3 toques
 
 Hoje: `OverlayService.handleOrbShortcut(count)` (`OverlayService.kt:829`) faz `when (cachedSettings.resolveShortcut(count))`. A
 `Settings.resolveShortcut` (`Settings.kt:270`) aplica o overflow (>3 toques: `CANCEL` ou o ativo mais próximo de 3 para 2).
@@ -162,18 +165,20 @@ Hoje: `OverlayService.handleOrbShortcut(count)` (`OverlayService.kt:829`) faz `w
 Novo, **antes** do `when`:
 
 ```kotlin
-when (val r = RoteadorGatilhos.resolverToques(count, cachedFluxos, cachedSettings)) {
-    is Resolucao.Rodar    -> fluxoHost.disparar(r.fluxo, Superficie.Orbe(r.toques))
+when (val r = RoteadorGatilhos.resolverToques(LugarDaOrbe.FLUTUANTE, count, cachedFluxos, PoliticaDoLugar.daFlutuante(cachedSettings), cachedSettings)) {
+    is Resolucao.Rodar    -> fluxoHost.disparar(r.fluxo, Superficie.Orbe(LugarDaOrbe.FLUTUANTE, r.toques))
     is Resolucao.Incompleto -> avisar(tr("Fluxo incompleto: abra a aba Fluxos"))      // não roda a ação sombreada
     is Resolucao.AcaoDoSettings -> /* o when de hoje, com r.acao */
+    is Resolucao.AcaoDoLugar -> Unit        // só TECLADO e NOTIFICACAO (§5.3); a flutuante nunca recebe
     Resolucao.Nada -> Unit
 }
 ```
 
-`resolverToques(count, config, settings)`:
-1. `n = count` se 2..3; se `count > 3`: `CANCEL` → `Nada`; `NEAREST_DOWN` → o maior `n ∈ {3, 2}` tal que `gatilho(Orbe(n)) != null || settings.shortcutForTaps(n) != NONE` (um gesto ligado a fluxo — válido ou não — conta como ativo); nenhum → `Nada`. `count < 2` → `AcaoDoSettings(shortcutForTaps(count))` (1 toque nunca é gatilho).
-2. Se `gatilho(Orbe(n))` existe: fluxo válido → `Rodar`; inválido ou sumido → `Incompleto`.
-3. Senão → `AcaoDoSettings(settings.shortcutForTaps(n))`.
+`resolverToques(lugar, count, config, politica, settings)` (puro; o mesmo para os três lugares, §5.3):
+1. **Lugar efetivo**: `lugarDosGatilhos = if (lugar != FLUTUANTE && politica.copiaDaPrincipal) FLUTUANTE else lugar` (FLX-60). Os gatilhos **próprios** do lugar que copia não são lidos nem apagados.
+2. `n = count` se 2..3; se `count > 3`: `CANCEL` → `Nada`; `NEAREST_DOWN` → o maior `n ∈ {3, 2}` tal que `gatilho(Orbe(lugarDosGatilhos, n)) != null || politica.temAcaoPropria(n)` (um gesto ligado a fluxo — válido ou não — conta como ativo; para a flutuante `temAcaoPropria = { settings.shortcutForTaps(it) != NONE }`); nenhum → `Nada`. `count == 1` → só `NOTIFICACAO` consulta `gatilho(Orbe(NOTIFICACAO, 1))` (lá o toque simples é remapeável); nos outros lugares é a ação própria (na flutuante o 1 toque é o gesto nativo e nunca é gatilho).
+3. Se `gatilho(Orbe(lugarDosGatilhos, n))` existe: fluxo válido → `Rodar`; inválido ou sumido → `Incompleto`.
+4. Senão → `AcaoDoSettings(settings.shortcutForTaps(n))` para a flutuante e `AcaoDoLugar(n)` para os outros (o lugar executa a ação dele: a notificação, a da config dela).
 
 **O gatilho sombreia, não sobrescreve (A3).** `Settings.shortcut2Tap/3Tap` ficam como estão; é por isso que desligar/excluir devolve a ação de graça e
 que o auto-save da tela não desfaz nada. Custo: dois lugares dizem o que o gesto faz; mitigado por (a) `OverlayPanel.ShortcutRow`
@@ -197,21 +202,41 @@ que o auto-save da tela não desfaz nada. Custo: dois lugares dizem o que o gest
   `BarsEditor` (`:575-577`) **não** ganha o caso (A4); mover/remover funcionam como em qualquer botão; remover desliga o gatilho
   no próximo `atualizarFluxos*` (limpeza de órfãos).
 
-### 5.3 Notificação (reservada, D3)
+### 5.3 Orbe da notificação e orbe do teclado (D9, FLX-57..60)
 
-`Superficie.Notificacao(acaoId)` existe no modelo e no codec (`notif:<id>`): lida, regravada, ignorada por `resolver*` e invisível na
-UI. Quando a aba Notificação tiver levantamento, o gatilho entra como mais um caso de `resolver*` e uma linha em "Atalhos" do modal;
-`RecordingNotification` (`:165-166`) ganha a ação — nada do formato muda.
+A orbe é a interface única (D9): os gatilhos de gesto são **`Orbe(lugar, toques)`**, e o roteador do §5.1 atende os três lugares com a
+mesma função pura. Nada do formato muda quando um lugar passa a existir — o modelo e o codec já os têm desde a FLX-T1/T2.
+
+```kotlin
+data class PoliticaDoLugar(
+    val overflow: ShortcutOverflow,                 // sempre o Settings.shortcutOverflow da orbe principal
+    val copiaDaPrincipal: Boolean,                  // false para a flutuante
+    val temAcaoPropria: (Int) -> Boolean,           // a ação do lugar para n toques é diferente de "Nenhuma"
+)
+```
+
+- **Orbe da notificação** (feature `notification`; só toques — 1/2/3, **todos** gatilho, porque na notificação o 1 toque é remapeável): depois que a rajada de toques assenta
+  (NTF-09), o `ResolvedorDeInteracao` da notificação chama `resolverToques(NOTIFICACAO, n, cachedFluxos, política)`; `Rodar` →
+  `fluxoHost.disparar(fluxo, Superficie.Orbe(NOTIFICACAO, n))`; `Incompleto` → aviso e a ação por baixo **não** roda; `AcaoDoLugar(n)` →
+  a ação da notificação. A **tela bloqueada** recusa antes de qualquer coisa (NTF-16) e o disparo passa pelas precondições do FLX-39.
+  O toque na orbe durante a execução do fluxo o cancela (FLX-29); a notificação mostra a orbe em `Transcrevendo` (detalhe: NTF-T20).
+- **Orbe do teclado** (spec `.specs/features/keyboard-orb/`; Q8 respondida): a mesma chamada com `TECLADO`. O teclado suporta as sete interações; na V1 de Fluxos só 2 e 3 toques são gatilho. A FLX-T29 espera KBO-T3 e KBO-T5.
+- **"Copiar a configuração da orbe principal"** (FLX-60, A16): com a opção ligada no lugar, `lugarDosGatilhos = FLUTUANTE`. O modal esconde o
+  grupo do lugar ("Copiando da orbe principal"); os gatilhos próprios gravados ficam intactos e voltam a valer ao desligar a opção. O estado
+  de "copiar" é da feature do lugar (`ConfigNotificacao.copiarDaOrbePrincipal`); o modal o lê, não o grava.
+- **Disponibilidade do lugar** (A15): `lugaresDisponiveis(): Set<LugarDaOrbe>` (camada Android) devolve `FLUTUANTE` sempre, `NOTIFICACAO` quando a aba
+  Notificação está ligada e `TECLADO` quando a orbe do teclado existir. Só o modal e a Sobrepor/aba do lugar a consultam; o roteador, o codec e a
+  política de ligação **não** (eles aceitam os três lugares sempre).
 
 ### 5.4 Política de ligação (`PoliticaGatilhos`, puro)
 
 | Operação | Efeito |
 | -------- | ------ |
 | `ligar(config, fluxoId, superficie)` | só se o fluxo é válido; se a superfície já tem outro fluxo → remove esse gatilho (a UI já confirmou, FLX-37); grava o novo |
-| `desligar(config, superficie)` | remove o gatilho; o gesto volta à ação do `Settings` |
+| `desligar(config, superficie)` | remove o gatilho; o gesto volta à ação do lugar (do `Settings` na flutuante; da config da aba no lugar) |
 | `excluir(config, fluxoId)` | remove o fluxo e **todos** os gatilhos dele; devolve os `botaoId` para a UI/barra removerem os botões |
 | `limpar(config, botoesDaBarra)` | tira gatilhos órfãos (FLX-50) |
-| `avisoDeSubstituicao(superficie, settings)` | texto "Isto substitui “<ação>” neste gesto." (ou "Este gesto não tinha ação.") — a ação vem de `shortcutActionLabel` |
+| `avisoDeSubstituicao(superficie, settings, configDoLugar)` | compara ação efetiva anterior e proposta: se diferentes e anterior atribuída, pede confirmação nomeando ação/fluxo anterior e toque/gesto/botão e lugar; cancelar não grava. Se livre ou igual, não há perda a confirmar. Usa rótulo da ação ou "Fluxo: <nome>" quando já sombreada, sem aviso especial de gravação (D17) |
 
 ## 6. Executor (`FLX-17`, `FLX-26..32`)
 
@@ -313,16 +338,15 @@ hoje vai para um callback de teste e, na VC-T7, para a fase de gestos. Para o fl
   serviço roteia pelo destino do **pedido corrente**; consentimento negado, ✕ do seletor e `finish()` sem captura entregam `null`
   (→ `Cancelada`). **Quem escreve o consumidor de gestos (VC-T7) não muda**: o destino `Gestos` é o caminho de hoje.
 - A porta devolve `ImagemHandle` embrulhando o `Bitmap`; o executor chama `liberar()` (→ `recycle()`) em todo fim.
-- Guardas já existentes: `SENDING/CANCELLING` ignoram; `RECORDING` pausa (e a orbe volta a PAUSED no epílogo).
+- O host recusa RECORDING/PAUSED antes de abrir a captura do fluxo (D14); SENDING/CANCELLING seguem as guardas existentes. Captura por gesto fora de Fluxos continua pausando/restaurando como hoje.
 
 ### 7.3 Agente e a janela de confirmação
 
-- `PortaAgenteApp`: `AgentController.send(texto, backends.resolve(settingsDoPasso))` (`AgentController.kt:166`). `false` (ocupado ou
+- `PortaAgenteApp` mantém uma **sessão exclusiva por execução** (D10), montada com `AgentHost.assemble` ou composição equivalente: novo `AgentController`, `ConfirmationGate` e `ToolExecutor` ligados ao mesmo gate, com scope cancelável. Reusa catálogo, filtro de segredos, política e registro de ações; não usa o controlador/gate do singleton `AgentHost.of` da aba. O registro compartilhado continua sanitizado e não é histórico de conversa. A sessão começa vazia, atende as etapas Agente da execução e é descartada em todo fim; não lê/limpa/escreve o chat da aba. A porta chama `controller.send(texto, backends.resolve(settingsDoPasso))` (`AgentController.kt:166`). `false` (ocupado ou
   texto vazio) → `Falha(MOTOR, "O agente está ocupado")`. Depois observa `controller.state` até `activity == IDLE` e pega a **última
   `ChatItem.AssistantMessage`**; um `Notice` (limite de passos, recusa, resposta cortada) vira `Falha(MOTOR)` com a frase do aviso.
-  Cancelar → `controller.cancel()`.
-- **Confirmação como hoje (D5).** O `ConfirmationGate` é único por processo; o painel da aba KeyFlow mostra `gate.pending` e o
-  `AgentController.panelHidden()` **nega** se a aba some. Com o fluxo rodando sobre outro app não há aba: o host abre a
+  Cancelar → `controller.cancel()` **só da sessão do fluxo**, seguido da liberação do scope/observadores ao encerrar a execução.
+- **Confirmação como hoje (D5), no gate da sessão (D10).** O painel da aba observa só seu próprio gate; a confirmação do fluxo observa o gate da sessão. Esconder a aba não nega o pedido do fluxo. O host abre a
   `FluxoConfirmacaoActivity` (translúcida, `exported=false`, `taskAffinity=""`, `excludeFromRecents`, o molde de
   `VisionConsentActivity`/`ImePickerActivity`) quando `gate.pending` fica não nulo durante uma etapa Agente. Ela desenha o
   `AgentConfirmationPanel` (`AgentCards.kt:238`) e chama `controller.respond(callId, decisão)`. **Falha fechada**: voltar, tocar fora
@@ -365,10 +389,9 @@ Hoje `reasoningEngines`, `visionEngines`, `speechTester`/`SpeechDeps` e o `Agent
 
 `OverlayService` ganha:
 
-- `ACTION_RUN_FLOW` + `EXTRA_BOTAO_ID` (teclado) e a chamada direta do roteador (orbe). Ambos caem em `FluxoHost.disparar(fluxo, superficie)`.
+- `ACTION_RUN_FLOW` + `EXTRA_BOTAO_ID` (teclado), chamada do roteador (orbe) e **Rodar agora** com id do fluxo (origem manual, sem `Gatilho` ou `Superficie` persistida). Todos resolvem o fluxo atual e caem no mesmo host/precondições; a origem manual é contexto de execução, não um novo atalho. Não aceita dois disparos concorrentes.
 - **Precondições** (em ordem; falhou → `Toast`/banner e nada acontece, a ação sombreada **não** roda): `executor.estado == Ocioso` ("Já há um
-  fluxo em andamento"); fluxo válido; se a 1ª etapa é Ditar: microfone concedido (aviso do app) e `coordinator.currentState() ∈ IDLE_*`
-  ("Termine a gravação atual antes de rodar o fluxo"); se Capturar: sobreposição concedida e as guardas do `VisionFlow`.
+  fluxo em andamento"); fluxo válido; para qualquer fluxo `currentState() ∉ {RECORDING, PAUSED}`, senão "Termine a gravação atual antes de rodar o fluxo" (D14), preservando a gravação; se a 1ª etapa é Ditar: microfone concedido (aviso do app) e `coordinator.currentState() ∈ IDLE_*`; se Capturar: sobreposição concedida e as guardas do `VisionFlow`.
 - `ensureForeground()` antes de rodar (como `ACTION_KEYBOARD_MIC`); `maybeStopWhenIdle` ganha `|| fluxoHost.ativo` (`OverlayService.kt:501`)
   para não encerrar o serviço entre Ditar e Perguntar quando o modo é só-teclado.
 - **Orbe**: `floatingButton.updateFluxoEtapa(TipoEtapa?)` (o glifo da etapa; o mesmo caminho de `updateVisionState`, `OrbButtonView.kt:141`).
@@ -437,10 +460,13 @@ leitura por etapa (futuro "melhor medido neste aparelho", BFL-05) — **sem** co
  │  3 toques       [ Ligar ]  hoje: Trocar teclado do sistema
  │  Botão do teclado [ Adicionar à barra ]  │
  │                                          │
+ │ [ Rodar agora ]                          │
  │ [ Excluir fluxo ]                        │
  └──────────────────────────────────────────┘
 ```
 
+- **Rodar agora (D13)**: usa o id do fluxo atual no host (§10), sem ligar atalho; desligado com motivo se Incompleto/outro fluxo ativo. Capturar atua no app que estiver em foco (inclusive configuração); Inserir usa o campo disponível ou guarda para colar. O modal mostra o estado/recusa devolvido pelo host, sem executor próprio.
+- **Dica dos padrão (D15)**: linha "Sugestão: …" no modal, obtida do catálogo por `padrao`: 2 toques / 3 toques / botão do teclado. Abrir, fechar ou restaurar nunca aplica a sugestão.
 - **Reordenar**: alça `≡` + `detectDragGesturesAfterLongPress` (o padrão do `BarsEditor.kt:494`; função pura `reordenar(etapas, de, para)` ao estilo
   de `reorderedButtons`, `:162`) e os botões ▲ ▼ por etapa (FLX-12/54). Sem biblioteca nova.
 - **Seletor de etapa** (`+ Etapa`): `ConfigModal` empilhado (usa o `onBack`), com Entrada / Processar / Saída; itens incompatíveis
@@ -481,17 +507,32 @@ da capacidade usa (catálogo local instalado, `VisionModelCatalog`, modelos da c
 ```
  ┌── Ligar “Ouvir e responder” ────── ✕ ┐
  │ Gesto: 2 toques                        │
- │ Isto substitui “Retrair / expandir teclado” neste gesto.
+ │ Isto substitui “Retrair / expandir teclado” neste gesto da orbe flutuante.
  │ Desligue o atalho e a ação volta.       │
  │            [ Cancelar ]  [ Ligar ]      │
  └─────────────────────────────────────────┘
  ┌ (superfície ocupada por outro fluxo) ───┐
- │ Isto tira este atalho de “Ler a tela e colar”.
+ │ Isto substitui “Fluxo: Ler a tela e colar” neste atalho.
  └─────────────────────────────────────────┘
 ```
 
 Linhas de atalho ficam desligadas quando o fluxo é Incompleto ("Complete o fluxo para ligar atalhos"). "Botão do teclado": "Adicionar à
 barra" (cria `RunFlow` + gatilho) / "Na barra · Remover". Vários botões do mesmo fluxo aparecem em lista.
+
+A seção **Atalhos** é agrupada por lugar (FLX-57), só com os lugares que existem (`lugaresDisponiveis()`, §5.3):
+
+```
+ ATALHOS
+  Orbe flutuante          2 toques [ Ligar ]  hoje: Retrair / expandir teclado
+                          3 toques [ Ligar ]  hoje: Trocar teclado do sistema
+  Orbe da notificação     2 toques [ Ligar ]  hoje: Nenhuma          ← só com a aba Notificação ligada e "copiar" desligado
+                          3 toques [ Ligar ]  hoje: Nenhuma             (com "copiar": "Copiando da orbe principal")
+  Orbe do teclado         …                                          ← só quando a orbe do teclado existir
+  Botão do teclado        [ Adicionar à barra ]
+```
+
+O aviso de substituir sempre nomeia a superfície e o lugar ("Isto substitui “…” neste gesto da orbe da notificação."). Vale para qualquer ação, sem tratamento especial de gravação; superfície livre ou ação idêntica não gera aviso de perda. A mesma comparação é usada ao reatribuir botão ocupado. O grupo de um lugar com
+"copiar" ligado vira uma linha de texto somente leitura que leva à aba do lugar.
 
 ### 11.5 Restaurar e excluir
 
@@ -514,13 +555,13 @@ quando `canAlwaysAllow`). Título pequeno acima: "Fluxo “Pedir ao agente e col
 | Camada | Teste | O que prova | Tipo |
 | ------ | ----- | ----------- | ---- |
 | Modelo | `ValidadorFluxoTest` | cadeia de tipos, entrada só na posição 0, limites, `compativeis` com motivo, aviso "sem saída" | unit |
-| Codec | `CodecFluxosTest` | round-trip com todas as etapas, os 3 tipos de superfície (inclusive `notif:`), acentos e aspas; ausente → semente; `[]` → vazio; malformado → semente; fluxo ruim descartado; etapa desconhecida; cortes; duplicatas | unit |
+| Codec | `CodecFluxosTest` | round-trip com todas as etapas, as superfícies (`orb:<lugar>:N` com lugar flutuante, teclado ou notificacao e `bar:<id>`), acentos e aspas; lugar desconhecido e `orb:flutuante:4` descartados; ausente → semente; `[]` → vazio; malformado → semente; fluxo ruim descartado; etapa desconhecida; cortes; duplicatas | unit |
 | Codec | `CodecFluxosPropertyTest` (kotest-property) | `decodificar(codificar(c)) == c` para qualquer config gerada (respeitando as normalizações) | unit |
 | Codec | `CodecFluxosFuzzTest` | entrada hostil/mutada nunca lança e sempre devolve uma `ConfigFluxos` válida | unit |
 | Segredo | `FluxoSemSegredoTest` | JSON de um fluxo completo não contém chave/token/endpoint/header; `Settings` com segredos e override → o override não leva nenhum ao fluxo | unit |
 | Padrão | `RestauradorFluxosTest` | recria o apagado sem gatilho; reescreve o editado mantendo id/posição/gatilhos; igual → nada; fluxo da pessoa idêntico e na mesma ordem; idempotência; posição pelo catálogo | unit |
 | Padrão | `RestauradorPropertyTest` | `restaurar(c).gatilhos == c.gatilhos` e `fluxos(padrao == null)` iguais, para qualquer `c` | unit |
-| Roteamento | `RoteadorGatilhosTest` | 2 e 3 toques; overflow com `NEAREST_DOWN`/`CANCEL`; gesto ligado conta como ativo; 1 toque nunca; fluxo inválido → `Incompleto`; sem gatilho → ação do `Settings` | unit |
+| Roteamento | `RoteadorGatilhosTest` | 2 e 3 toques; overflow com `NEAREST_DOWN`/`CANCEL`; gesto ligado conta como ativo; 1 toque nunca na flutuante e gatilho na `NOTIFICACAO`; fluxo inválido → `Incompleto`; sem gatilho → ação do `Settings` (flutuante) ou `AcaoDoLugar`; **por lugar**: o mesmo gesto em lugares diferentes são gatilhos diferentes; com "copiar" os gatilhos vêm da flutuante e os próprios do lugar ficam intactos (propriedade: ligar/desligar "copiar" nunca altera a lista de gatilhos) | unit |
 | Roteamento | `PoliticaGatilhosTest` | ligar tira de outro fluxo; desligar devolve; excluir limpa gatilhos e devolve botões; órfãos | unit |
 | Executor | `ExecutorFluxoTest` | ordem e passagem de valor; `Ok/Falha/Cancelada`; falha impede as seguintes; sem parcial; um por vez; tempo máximo com relógio virtual; `liberar()` da imagem em todo fim; cancelar corta a porta | unit (portas falsas) |
 | Modelo da etapa | `ModeloPorEtapaTest` | override só nos campos da tabela; Custom usa a aba; origem inválida → `INDISPONIVEL`; selo no aparelho/nuvem; `settings` original intacto | unit |
@@ -530,9 +571,10 @@ quando `canAlwaysAllow`). Título pequeno acima: "Fluxo “Pedir ao agente e col
 | Barras | `KeyFlowKeyboardBarsTest`, `BarViewAccessibilityTest`, `BarsEditorTest` (estendidos) | botão desenhado e tocável; desabilitado quando órfão; o editor lista/move/remove e não oferece para adicionar | instrumentado |
 | Arquitetura | `ArchitectureRulesTest` | `fluxos/*.kt` e `fluxos/execucao/**` (excluindo `fluxos/app/**`) sem `android.*`/compose/downloader/cofre; `collectAsStateOnMain` nas telas novas; sem `runBlocking` novo | unit |
 | Persistência | `FluxosRepositoryTest` | semeadura sem escrever; `atualizarFluxos` atômico e sobre o valor atual (duas edições concorrentes); `atualizarFluxosEBarras` numa transação; não regrava as `Settings` | instrumentado |
-| Serviço | `OverlayServiceFluxoTest` | com portas falsas: gesto 2 toques roda o fluxo e **não** a ação sombreada; sem gatilho a ação roda; `ACTION_RUN_FLOW` do botão; precondições; `maybeStopWhenIdle` não encerra; cancelar pela orbe; falha → banner com destino | instrumentado |
+| Agente | `PortaAgenteAppTest`, `FluxoConfirmacaoActivityTest` | chat com mensagens/geração/pendência intacto; sessão nova por execução, gate separado; cancelar fluxo não cancela chat; confirmação responde só à sessão do fluxo | unit + instrumentado |
+| Serviço | `OverlayServiceFluxoTest` | com portas falsas: gesto 2 toques roda o fluxo e **não** a ação sombreada; sem gatilho a ação roda; `ACTION_RUN_FLOW` do botão e Rodar agora; recusa RECORDING/PAUSED para Ditar e Capturar sem efeitos; precondições; `maybeStopWhenIdle` não encerra; cancelar pela orbe; falha → banner com destino | instrumentado |
 | Ditar | `FluxoDitadoTest` | com o gravador falso do `OverlayServiceVisionTest`: o texto não é inserido, vai à porta; PTT forçado a alternar; cancelar → `Cancelada` | instrumentado |
-| UI | `FluxosPanelTest`, `FluxosModalTest` | cards, vazio, "+" e limite, etapas (adicionar/ordenar por ▲▼/remover), incompleto, seletor de modelo e "Indisponível", atalhos (aviso de substituir, tirar de outro), excluir, restaurar com prévia | instrumentado (Compose) |
+| UI | `FluxosPanelTest`, `FluxosModalTest` | Rodar agora pelo host sem criar gatilho, Incompleto desabilitado, recusa em gravação ativa; dica dos padrão sem efeito de escrita; cards, vazio, "+" e limite, etapas (adicionar/ordenar por ▲▼/remover), incompleto, seletor de modelo e "Indisponível", atalhos (substituir qualquer ação/fluxo em gesto ou botão; cancelar preserva; livre/igual sem aviso de perda), excluir, restaurar com prévia | instrumentado (Compose) |
 | Aba | `ConfigScreenTest` (ajustado) | `deferredTabsShowComingSoonCardWithoutControls` sem `FLUXOS`; a aba mostra `FLUXOS_PANEL_TAG` | instrumentado |
 | Goldens | rotas abaixo × claro/escuro | `scripts/verify-screens.sh` → `diff-screens.sh`; `--approve` só destas | screenshot |
 | Manual [YAN] | `manual-validation.md` (FLX-T26) | os 3 padrão no A32/Vaio, RAM do fluxo 1 com modelos locais no A32 (4 GB), confirmação do agente sobre outro app, 2 toques com a orbe em PTT | manual |
@@ -540,7 +582,7 @@ quando `canAlwaysAllow`). Título pequeno acima: "Fluxo “Pedir ao agente e col
 **Rotas de galeria** (`RouteCatalog`): `config-fluxos` (3 padrão, sem atalho); `config-fluxos-atalhos` (chips ligados, selo de nuvem e um card
 Incompleto); `config-fluxos-vazio`; `config-fluxos-restaurar`; `config-fluxos-modal`; `config-fluxos-modal-etapa-nova`; `config-fluxos-modal-modelo`;
 `config-fluxos-modal-incompleto`; `config-fluxos-atalho-substitui`; `config-fluxos-atalho-ocupado`; `config-fluxos-excluir`;
-`keyboard-barra-fluxo` (botão ligado e botão desligado); `config-sobrepor-atalho-fluxo`. Nenhuma rota de execução (estado "rodando" não é golden).
+`keyboard-barra-fluxo` (botão ligado e botão desligado); `config-sobrepor-atalho-fluxo`; `config-fluxos-atalhos-lugares` (a seção Atalhos agrupada por lugar, com o grupo da notificação — fixture da FLX-T28). Nenhuma rota de execução (estado "rodando" não é golden).
 Os goldens existentes ficam bit-idênticos; os de Sobrepor/barra só mudam onde há um gesto/botão de fluxo no fixture.
 
 ## 13. Riscos e coordenação
@@ -552,14 +594,16 @@ Os goldens existentes ficam bit-idênticos; os de Sobrepor/barra só mudam onde 
 | Estado velho da tela sobrescrevendo gatilho | gatilhos em chave própria, escrita com `edit` sobre o valor atual; `Settings` do gesto nunca alterada (sombreamento) |
 | `OverlayService` encerra ocioso no modo só-teclado no meio do fluxo | `fluxoHost.ativo` em `maybeStopWhenIdle`; teste instrumentado |
 | Injeção por conteúdo de tela no Agente (Capturar → Visão → Agente) | o texto lido é dado; ferramentas que escrevem continuam pedindo confirmação (D5); "Permitir sempre" segue só para `WRITE` e não vale para chamadas sem janela visível |
-| `ConfirmationGate` é único e nega o segundo pedido | só um fluxo e uma execução do agente por vez (FLX-17, FLX-24) |
-| Conflito com a fase 2 do agente (`equipe/agente-fase2`, AGT-T8..T10) em `AgentController` | o fluxo só **chama** `send/cancel/respond/state`; nenhuma mudança no módulo do agente |
-| Tipos paralelos à bancada (`Capacidade`, `Etapa`/`Fluxo` do BFL-01) | Q7: a bancada passaria a consumir `com.keyflow.fluxos`; até lá os nomes `Etapa`/`Fluxo` coincidem de propósito e os pacotes são distintos (`bancada.fluxo`) |
+| Confirmações de sessões se misturarem | gate/executor/controlador próprios do fluxo; activity responde só ao gate da execução corrente; callbacks de sessão encerrada são ignorados; testes com chat e fluxo simultâneos (FLX-24/25) |
+| Conflito com a fase 2 do agente (`equipe/agente-fase2`, AGT-T8..T10) em `AgentController` | o fluxo compõe sessão independente com contratos `send/cancel/respond/state` e `AgentHost.assemble`; não reutiliza conversa/gate da aba |
+| Tipos paralelos à bancada (`Capacidade`, `Etapa`/`Fluxo` do BFL-01) | D16 (Q7 respondida em 29/10): a bancada passa a consumir `com.keyflow.fluxos` quando for mexida; até lá os pacotes seguem distintos (`bancada.fluxo`), sem task ou dependência nova |
 | `release/v1` congelada | tudo só na `main`; sem flag de build (A13) |
+| **Dois lugares da orbe dependem de outras features** (notificação: spec `notification`, código ainda por implementar; teclado: spec `keyboard-orb`) | o modelo/codec/roteador aceitam os três desde a FLX-T1/T2/T5 (nenhuma mudança de formato depois); a tela só mostra o lugar que existe (A15); FLX-T28 espera a NTF-T13 e FLX-T29 espera KBO-T3 e KBO-T5 (a spec já existe; Q8 respondida) |
+| `OverlayService` mexido por Fluxos (FLX-T11..T15) e pela Notificação (NTF-T9..T11) | cada uma extrai o que precisa em função pequena (`executarAcaoDeAtalho`, `FluxoHost`, `NotificacaoHost`); rebase curto; `LugarDaOrbe` compartilhado |
 
 ## O que NÃO muda
 
-`ButtonStateMachine`; gravação/transcrição/pendência da voz; mic do teclado e notificação; `Settings.shortcut1Tap/2Tap/3Tap` e a política de overflow
+`ButtonStateMachine`; gravação/transcrição/pendência da voz; mic do teclado e a notificação (que a feature `notification` redesenha por conta própria); `Settings.shortcut1Tap/2Tap/3Tap` e a política de overflow
 (o gatilho só **antecede**); o módulo do agente (`agent/`); `VisionFlow` além do destino do pedido; `SpeechEngine`, `ReasoningEngine` e
 `VisionModelEngine`; o downloader e o catálogo de modelos; as abas Transcrição, Visão, Raciocínio e Voz; as barras existentes e o catálogo de
 adicionar do editor; o formato do `bars_config_json` (o caso `flow` é só mais um `type`).

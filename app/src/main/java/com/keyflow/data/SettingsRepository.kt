@@ -35,6 +35,10 @@ import com.keyflow.core.shortcuts.ShortcutGrid
 import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.ModelKind
 import com.keyflow.data.models.ModelProvisioning
+import com.keyflow.fluxos.CodecFluxos
+import com.keyflow.fluxos.ConfigFluxos
+import com.keyflow.fluxos.PadroesFluxo
+import com.keyflow.fluxos.PoliticaGatilhos
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -346,6 +350,12 @@ class SettingsRepository(
         return dataStore.data.first()
     }
 
+    /**
+     * Cada estado do DataStore como é emitido, sem tocar no cofre. Existe para o teste de instrumentado conferir que duas
+     * chaves gravadas "numa só transação" nunca aparecem separadas (`FluxosRepositoryTest`) — nenhuma tela usa isto.
+     */
+    internal fun rawPreferencesFlow(): Flow<Preferences> = dataStore.data
+
     /** Troca o DataStore inteiro por [prefs]; vazio = estado de fábrica. Par de [rawPreferencesOnce]. */
     internal suspend fun replaceRawPreferences(prefs: Preferences) {
         dataStore.edit { current ->
@@ -360,6 +370,56 @@ class SettingsRepository(
 
     suspend fun saveShortcutGrids(grids: List<ShortcutGrid>) {
         dataStore.edit { it[SHORTCUT_GRIDS_JSON] = ShortcutCodec.encodeGrids(grids) }
+    }
+
+    // ── Fluxos (aba Fluxos): `flows_json` e `flow_triggers_json` ─────────────
+    // Duas chaves próprias, fora de [Settings]: o auto-save da tela regrava as Settings inteiras e nunca encosta nestas, e estas
+    // nunca encostam nas Settings (o gatilho sombreia a ação do gesto, não a sobrescreve — D12). Nada aqui é segredo e nada
+    // abre o cofre (FLX-46, FLX-49). Chave ausente ou JSON malformado = os fluxos padrão, só em memória.
+
+    private fun Preferences.configFluxos(): ConfigFluxos =
+        CodecFluxos.decodificarConfig(this[FLOWS_JSON], this[FLOW_TRIGGERS_JSON], PadroesFluxo::semear)
+
+    /** Leitura leve para o serviço da orbe e o IME (só DataStore, como [barsConfigOnce]). Não grava a semente. */
+    suspend fun configFluxosOnce(): ConfigFluxos = dataStore.data.first().configFluxos()
+
+    /** Observação ao vivo: trocar um gatilho vale no gesto seguinte, sem reiniciar o serviço (FLX-49). */
+    fun configFluxosFlow(): Flow<ConfigFluxos> = dataStore.data.map { it.configFluxos() }.distinctUntilChanged()
+
+    /**
+     * Altera os fluxos e os gatilhos **sobre o valor gravado agora** (FLX-48): lê, aplica [alterar] (pura) e grava os dois JSON
+     * dentro do mesmo `dataStore.edit`, então duas telas (o modal e o editor de barras) não se atropelam, mesmo com estado velho
+     * na mão. A primeira alteração grava a lista inteira (a semente passa a ser da pessoa). Tira os gatilhos órfãos (FLX-50);
+     * sem mudança nenhuma, não regrava. Devolve o que ficou gravado.
+     */
+    suspend fun atualizarFluxos(alterar: (ConfigFluxos) -> ConfigFluxos): ConfigFluxos =
+        dataStore.edit { prefs -> prefs.gravarFluxos(alterar(prefs.configFluxos())) }.configFluxos()
+
+    /**
+     * Como [atualizarFluxos], mais as barras do teclado **na mesma transação** (criar ou remover o botão do fluxo e o gatilho
+     * dele juntos): quem lê nunca vê um sem o outro. Devolve a config de fluxos que ficou gravada.
+     */
+    suspend fun atualizarFluxosEBarras(alterar: (ConfigFluxos, BarsConfig) -> Pair<ConfigFluxos, BarsConfig>): ConfigFluxos =
+        dataStore.edit { prefs ->
+            val (fluxos, barras) = alterar(prefs.configFluxos(), ShortcutCodec.decodeBars(prefs[BARS_CONFIG_JSON]))
+            prefs.gravarFluxos(fluxos)
+            prefs[BARS_CONFIG_JSON] = ShortcutCodec.encodeBars(barras)
+        }.configFluxos()
+
+    /**
+     * Grava os dois JSON de [nova] depois de tirar os gatilhos órfãos; se o que está gravado já é exatamente isso, não regrava
+     * (um JSON malformado, que a leitura trata como a semente, é consertado na primeira gravação).
+     *
+     * Os gatilhos de botão da barra ainda não são conferidos contra a barra (`botoesDaBarra = null`): o botão `RunFlow` só passa a
+     * existir na FLX-T16, que então passa aqui os ids dos botões que a barra tem (FLX-50).
+     */
+    private fun MutablePreferences.gravarFluxos(nova: ConfigFluxos) {
+        val limpa = PoliticaGatilhos.limpar(nova, botoesDaBarra = null)
+        val fluxosJson = CodecFluxos.codificarFluxos(limpa.fluxos)
+        val gatilhosJson = CodecFluxos.codificarGatilhos(limpa.gatilhos)
+        if (this[FLOWS_JSON] == fluxosJson && this[FLOW_TRIGGERS_JSON] == gatilhosJson) return
+        this[FLOWS_JSON] = fluxosJson
+        this[FLOW_TRIGGERS_JSON] = gatilhosJson
     }
 
     /** Onde cada modelo de texto local roda, ao vivo — o seletor "Roda em" do card (chave própria, fora de [Settings]). */
@@ -875,6 +935,9 @@ class SettingsRepository(
         // Trabalho 3 (shortcut-bars): barras personalizáveis + teclados de atalhos, como JSON.
         val BARS_CONFIG_JSON = stringPreferencesKey("bars_config_json")
         val SHORTCUT_GRIDS_JSON = stringPreferencesKey("shortcut_grids_json")
+        // Fluxos (feature flows): a lista de fluxos e os gatilhos que os disparam, como JSON (CodecFluxos).
+        val FLOWS_JSON = stringPreferencesKey("flows_json")
+        val FLOW_TRIGGERS_JSON = stringPreferencesKey("flow_triggers_json")
         // Raciocínio local: onde cada modelo roda (CPU/GPU), o aviso de volta para a CPU e a GPU já pronta — ver [LocalBackendPrefs].
         val REASONING_LOCAL_BACKENDS = stringPreferencesKey("reasoning_local_backends")
 

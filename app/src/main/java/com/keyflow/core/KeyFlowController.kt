@@ -48,6 +48,15 @@ object KeyFlowController {
         _keyboardVisible.value = visible
     }
 
+    // A captura pede ao próprio IME uma ocultação temporária. Registro e uso na thread principal.
+    private var captureKeyboardHider: (() -> (() -> Unit)?)? = null
+
+    fun registerCaptureKeyboardHider(hider: () -> (() -> Unit)?) { captureKeyboardHider = hider }
+    fun unregisterCaptureKeyboardHider(hider: () -> (() -> Unit)?) {
+        if (captureKeyboardHider === hider) captureKeyboardHider = null
+    }
+    fun hideKeyboardForCapture(): (() -> Unit)? = captureKeyboardHider?.invoke()
+
     // Sinal de tap vindo do teclado → processado pelo OverlayService
     private val _tapRequest = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val tapRequest: SharedFlow<Unit> = _tapRequest.asSharedFlow()

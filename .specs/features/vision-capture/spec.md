@@ -72,7 +72,7 @@ ao estado em que estava.
 
 1. **CAP-01**: WHEN o fluxo inicia THEN uma Activity transparente SHALL pedir o consentimento do sistema (`createScreenCaptureIntent`) **a cada acionamento** (modo efêmero; Android 15 não permite cachear o token); concedido → o serviço SHALL somar o FGS type `mediaProjection` (**após** o consent — ordem do Android 14+; guardas p/ minSdk 24) apenas **durante o fluxo**, removendo-o ao final (o indicador de captura do sistema some).
 2. **CAP-02**: WHEN consentido THEN um **seletor de área** SHALL abrir sobre a **tela viva**: retângulo ajustável (handles) + "tela inteira" + cancelar. A UI do próprio KeyFlow não entra na área útil.
-3. **CAP-03**: WHEN a área é confirmada THEN o sistema SHALL capturar 1 frame (`VirtualDisplay` + `ImageReader`) com o seletor/orbe ocultos e recortá-lo à área selecionada.
+3. **CAP-03**: WHEN a área é confirmada THEN o sistema SHALL capturar 1 frame (`VirtualDisplay` + `ImageReader`) com o seletor/orbe e o teclado KeyFlow ocultos e recortá-lo à área selecionada. O teclado é ocultado antes do consentimento e restaurado ao fim apenas se estava visível, sem abrir outro editor.
 4. **CAP-04**: capturas NUNCA vão a storage permanente sem ação do usuário; temporários (clipboard de imagem e o recorte que segue para o OCR) vivem no cache e são limpos ao fim do fluxo.
 
 **Independent Test**: acionar atalho → conceder → retângulo sobre a tela real → ajustar pelos handles → confirmar → fase de gestos abre com a miniatura/indicação da captura; cancelar no seletor aborta e restaura o estado.
@@ -174,7 +174,7 @@ promessa de privacidade e o APK enxuto.
 | MODE-06 | P1-A | VC-T3, VC-T4 | Implemented (VC-T3/T4/T5; gates e prova no relatório do PR #63) |
 | CAP-01 | P1-B | VC-T3 | Implemented (VC-T3/T4/T5; gates e prova no relatório do PR #63) |
 | CAP-02 | P1-B | VC-T5 | Implemented (VC-T3/T4/T5; gates e prova no relatório do PR #63) |
-| CAP-03 | P1-B | VC-T4, VC-T5 | Implemented (VC-T3/T4/T5; gates e prova no relatório do PR #63) |
+| CAP-03 | P1-B | VC-T4, VC-T5 | Implemented (VC-T3/T4/T5; revisão P3 oculta/restaura o IME, com prova Android e teste de fluxo por mutação) |
 | CAP-04 | P1-B | VC-T4, VC-T6, VC-T8 | Parcial: `VisionCache.clear` ligado ao epílogo e captura efêmera (VC-T4/T6); arquivos das ações em VC-T8 |
 | ACT-01 | P1-C | VC-T7, VC-T16 | In Tasks |
 | ACT-02 | P1-C | VC-T7, VC-T15 | Motor implementado na VC-T15; fluxo depende da VC-T7 |

@@ -106,3 +106,10 @@ T4, T5 e T6 dependem só de T1. T3 depende de T1. T2 não trava T3 nem T9. T11 d
 - **Where**: `com.keyflow.speech.local`.
 - **Done when**: o normalizador + frontend da T2 alimentam a sessão; arquivo ausente emite `MODEL_MISSING` sem socket; velocidade 1,0 usa `length_scale` 1. O modelo de 71 MB não entra no teste de JVM. Gate `quick`.
 - **Gate**: `pool compilar testDebugUnitTest`.
+
+### Revisão P3 — Concorrência no cliente Binder (2026-10-29)
+- **Status**: concluída em `equipe/p3-pendencias`: 4 unitários, lint e 2 instrumentados via pool verdes.
+- Registro de todas as continuações pendentes e conclusão atômica em terminais, morte, erro de transporte e bind.
+- Prova vermelha: duas falas deixavam a primeira pendurada; conclusão entre `isActive`/`resume` lançava `Already resumed`.
+- **Testes**: `SpeechConnectionConcurrencyTest`, `SpeechClientFaultTest` e `SpeechProcessTest`; gate pelo pool.
+- Lição: `../../project/licoes/2026-10-29-p3-fala-concorrencia.md`.
