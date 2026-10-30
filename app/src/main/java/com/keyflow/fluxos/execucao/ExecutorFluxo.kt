@@ -25,10 +25,16 @@ import kotlinx.coroutines.withTimeout
  *   rodar outro.
  * - **Cancelar** ([cancelar] ou cancelar a coroutine de quem executa) corta a porta em curso pela própria cooperação da coroutine; a
  *   execução termina [EstadoExecucao.Cancelado], sem aviso de falha (FLX-29).
- * - **Nada derruba o app** (FLX-28): `OutOfMemoryError` e exceção da porta viram [EstadoExecucao.Falhou] (`MEMORIA`/`MOTOR`).
+ * - **Nada derruba o app** (FLX-28): `OutOfMemoryError` vira [EstadoExecucao.Falhou] `MEMORIA`; **qualquer outro `Throwable`** da porta
+ *   — exceção do motor, `UnsatisfiedLinkError`/`NoClassDefFoundError` de uma biblioteca nativa que não carregou, até um
+ *   `StackOverflowError` — vira `MOTOR`, sem a mensagem (pode trazer corpo cru de resposta). Decisão: a porta é a fronteira de falha
+ *   do fluxo; o executor roda no serviço da orbe, e um `Error` não capturado derrubaria o processo, a gravação e a orbe por causa de
+ *   uma etapa. O custo é que um `AssertionError` dentro de uma porta falsa de teste vira `Falhou`, não um crash: o teste confere o
+ *   resultado. Só `CancellationException` passa (é cancelamento, não falha).
  * - **Tempo** (FLX-31): [Limites] por tipo de etapa; estouro vira `TEMPO`. O relógio é o da coroutine (virtual nos testes).
  * - **Imagem** (FLX-19, FLX-28): o [Valor.Imagem] é liberado uma única vez depois que a etapa seguinte o consome — em sucesso,
- *   falha, exceção ou cancelamento — ou ao fim do fluxo, se ninguém o consumiu.
+ *   falha, exceção ou cancelamento — ou ao fim do fluxo, se ninguém o consumiu. Se `liberar()` lança, o erro é engolido: já não há
+ *   o que fazer com a imagem, e ele não pode trocar o resultado do fluxo (nem virar um `Cancelado` falso) nem escapar de [executar].
  * - O executor guarda os tipos: não entrega à porta uma entrada que não é a da etapa, nem aceita dela uma saída que não é a da
  *   etapa (um fluxo inválido que escapou da validação falha com `MOTOR` em vez de quebrar uma porta).
  */
@@ -60,7 +66,7 @@ class ExecutorFluxo(private val portas: Portas) {
             _estado.value = EstadoExecucao.Rodando(fluxo.id, 0, primeira.tipo)
         }
 
-        var final: EstadoExecucao = EstadoExecucao.Cancelado(fluxo.id, 0)
+        var final: EstadoExecucao = EstadoExecucao.Falhou(fluxo.id, 0, fluxo.etapas.first().tipo, erroDoMotor()) // só vale se algo inesperado escapar
         var recomecar: CancellationException? = null
         try {
             final = withContext(job) { rodar(fluxo) }
@@ -112,20 +118,20 @@ class ExecutorFluxo(private val portas: Portas) {
 
     private suspend fun executarEtapa(etapa: Etapa, entrada: Valor): ResultadoEtapa<Valor> {
         if (etapa is Etapa.Desconhecida) return ResultadoEtapa.Falha(ErroEtapa(CausaErro.MOTOR, tr("Esta etapa não existe nesta versão do app.")))
-        val porta = portas.para(etapa.tipo) ?: return ResultadoEtapa.Falha(erroDoMotor())
         if (entrada.tipo != etapa.entrada) return ResultadoEtapa.Falha(erroDoMotor())
 
         val limite = Limites.de(etapa.tipo)
         val resultado = try {
+            val porta = portas.para(etapa.tipo) ?: return ResultadoEtapa.Falha(erroDoMotor())
             if (limite == null) porta.executar(etapa, entrada) else withTimeout(limite) { porta.executar(etapa, entrada) }
         } catch (_: TimeoutCancellationException) {
             return ResultadoEtapa.Falha(ErroEtapa(CausaErro.TEMPO, tr("Tempo esgotado.")))
         } catch (e: CancellationException) {
-            throw e
+            throw e // cancelar (de fora ou o motor desistindo) não é falha
         } catch (_: OutOfMemoryError) {
             return ResultadoEtapa.Falha(ErroEtapa(CausaErro.MEMORIA, tr("Memória insuficiente para este modelo. Tente um menor."), etapa.tipo.aba()))
-        } catch (_: Exception) {
-            return ResultadoEtapa.Falha(erroDoMotor()) // sem a mensagem da exceção: pode trazer corpo cru de resposta
+        } catch (_: Throwable) {
+            return ResultadoEtapa.Falha(erroDoMotor()) // sem a mensagem: pode trazer corpo cru de resposta (ver o KDoc da classe sobre Error)
         }
 
         if (resultado is ResultadoEtapa.Ok && resultado.valor.tipo != etapa.saida) {
@@ -138,7 +144,7 @@ class ExecutorFluxo(private val portas: Portas) {
     private fun erroDoMotor() = ErroEtapa(CausaErro.MOTOR, tr("Algo deu errado nesta etapa."))
 
     private fun liberar(valor: Valor) {
-        if (valor is Valor.Imagem) valor.handle.liberar()
+        if (valor is Valor.Imagem) runCatching { valor.handle.liberar() }
     }
 }
 

@@ -14,6 +14,7 @@ import com.keyflow.fluxos.execucao.ResultadoEtapa.Falha
 import com.keyflow.fluxos.execucao.ResultadoEtapa.Ok
 import com.keyflow.fluxos.execucao.ResultadoExecucao.Recusado
 import com.keyflow.fluxos.execucao.ResultadoExecucao.Terminou
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
@@ -264,6 +265,150 @@ class ExecutorFluxoTest {
 
         assertThat(cortada).isTrue()
         assertThat(executor.estado.value).isEqualTo(Cancelado("f1", 0))
+    }
+
+    @Test
+    fun `porta que lanca CancellationException sem ninguem cancelar termina Cancelado, nao Falhou`() = runTest {
+        // O motor desistiu sozinho (ex.: o processo :reasoning cancelou a geração): é cancelamento, não falha do motor.
+        val executor = executor(
+            TipoEtapa.DITAR to porta { _, _ -> Ok(Valor.Texto("oi")) },
+            TipoEtapa.PERGUNTAR to porta { _, _ -> throw CancellationException("o motor desistiu") },
+            TipoEtapa.FALAR to porta { _, e -> Ok(e) },
+        )
+
+        val r = executor.executar(ouvirResponderFalar)
+
+        assertThat(r).isEqualTo(Terminou(Cancelado("f1", 1)))
+        assertThat(executor.estado.value).isEqualTo(Cancelado("f1", 1))
+    }
+
+    @Test
+    fun `cancelar a coroutine de quem executa nao deixa o codigo seguinte ao executar rodar`() = runTest {
+        val comecou = CompletableDeferred<Unit>()
+        var seguiu = false
+        val executor = executor(TipoEtapa.DITAR to porta { _, _ -> comecou.complete(Unit); awaitCancellation() })
+        val job = launch {
+            executor.executar(fluxo(Etapa.Ditar()))
+            seguiu = true // quem foi cancelado não pode continuar como se nada fosse
+        }
+        comecou.await()
+
+        job.cancel()
+        job.join()
+
+        assertThat(job.isCancelled).isTrue()
+        assertThat(seguiu).isFalse()
+        assertThat(executor.estado.value).isEqualTo(Cancelado("f1", 0))
+    }
+
+    @Test
+    fun `cancelar de fora nao cancela quem executa e o codigo seguinte roda`() = runTest {
+        val comecou = CompletableDeferred<Unit>()
+        var seguiu = false
+        val executor = executor(TipoEtapa.DITAR to porta { _, _ -> comecou.complete(Unit); awaitCancellation() })
+        val job = launch {
+            executor.executar(fluxo(Etapa.Ditar()))
+            seguiu = true
+        }
+        comecou.await()
+
+        executor.cancelar()
+        job.join()
+
+        assertThat(job.isCancelled).isFalse()
+        assertThat(seguiu).isTrue()
+    }
+
+    // ── Error e liberar() que lanca ──
+
+    @Test
+    fun `UnsatisfiedLinkError da porta (biblioteca nativa do motor) vira Falhou MOTOR`() = runTest {
+        val executor = executor(TipoEtapa.DITAR to porta { _, _ -> throw UnsatisfiedLinkError("libsherpa.so nao carregou") })
+        val falhou = (executor.executar(fluxo(Etapa.Ditar())) as Terminou).estado as Falhou
+        assertThat(falhou.erro.causa).isEqualTo(CausaErro.MOTOR)
+        assertThat(falhou.erro.mensagem).doesNotContain("libsherpa")
+        assertThat(executor.estado.value).isEqualTo(falhou)
+    }
+
+    @Test
+    fun `qualquer Error da porta vira Falhou e nao derruba o executor`() = runTest {
+        for (erro in listOf<Throwable>(NoClassDefFoundError("X"), StackOverflowError(), InternalError("jni"), AssertionError("bug do motor"))) {
+            val executor = executor(TipoEtapa.DITAR to porta { _, _ -> throw erro })
+            val falhou = (executor.executar(fluxo(Etapa.Ditar())) as Terminou).estado as Falhou
+            assertThat(falhou.erro.causa).isEqualTo(CausaErro.MOTOR)
+            assertThat(executor.executar(fluxo(Etapa.Ditar(), id = "f2"))).isNotEqualTo(Recusado) // continua utilizável
+        }
+    }
+
+    @Test
+    fun `Portas que lanca ao procurar a porta tambem vira Falhou MOTOR`() = runTest {
+        val executor = ExecutorFluxo(object : Portas {
+            override fun para(tipo: TipoEtapa): PortaEtapa = throw IllegalStateException("registro quebrado")
+        })
+        val falhou = (executor.executar(fluxo(Etapa.Ditar())) as Terminou).estado as Falhou
+        assertThat(falhou.erro.causa).isEqualTo(CausaErro.MOTOR)
+    }
+
+    private class ImagemQueLanca(private val erro: Throwable = IllegalStateException("bitmap ja reciclado")) : ImagemHandle {
+        var tentativas = 0
+        override fun liberar() {
+            tentativas++
+            throw erro
+        }
+    }
+
+    @Test
+    fun `liberar que lanca nao muda o resultado do fluxo nem propaga`() = runTest {
+        val img = ImagemQueLanca()
+        val executor = executor(
+            TipoEtapa.CAPTURAR to porta { _, _ -> Ok(Valor.Imagem(img)) },
+            TipoEtapa.VISAO to porta { _, _ -> Ok(Valor.Texto("texto lido")) },
+            TipoEtapa.INSERIR to porta { _, e -> Ok(e) },
+        )
+
+        val r = executor.executar(lerEColar)
+
+        assertThat(r).isEqualTo(Terminou(Concluido("f1")))
+        assertThat(executor.estado.value).isEqualTo(Ocioso)
+        assertThat(img.tentativas).isEqualTo(1) // tentou uma vez e seguiu
+    }
+
+    @Test
+    fun `liberar que lanca na falha mantem a falha da etapa, nao a do liberar`() = runTest {
+        val img = ImagemQueLanca(OutOfMemoryError("sem memoria"))
+        val e = erro(CausaErro.VAZIO)
+        val executor = executor(
+            TipoEtapa.CAPTURAR to porta { _, _ -> Ok(Valor.Imagem(img)) },
+            TipoEtapa.VISAO to porta { _, _ -> Falha(e) },
+        )
+
+        val r = executor.executar(lerEColar)
+
+        assertThat(r).isEqualTo(Terminou(Falhou("f1", 1, TipoEtapa.VISAO, e)))
+        assertThat(img.tentativas).isEqualTo(1)
+    }
+
+    @Test
+    fun `liberar que lanca no fim de um fluxo que acaba numa imagem nao propaga`() = runTest {
+        val img = ImagemQueLanca()
+        val executor = executor(TipoEtapa.CAPTURAR to porta { _, _ -> Ok(Valor.Imagem(img)) })
+        assertThat(executor.executar(fluxo(Etapa.Capturar))).isEqualTo(Terminou(Concluido("f1")))
+        assertThat(img.tentativas).isEqualTo(1)
+    }
+
+    @Test
+    fun `liberar que lanca no cancelamento deixa o fluxo Cancelado`() = runTest {
+        val img = ImagemQueLanca()
+        val comecou = CompletableDeferred<Unit>()
+        val executor = executor(
+            TipoEtapa.CAPTURAR to porta { _, _ -> Ok(Valor.Imagem(img)) },
+            TipoEtapa.VISAO to porta { _, _ -> comecou.complete(Unit); awaitCancellation() },
+        )
+        val r = async { executor.executar(lerEColar) }
+        comecou.await()
+        executor.cancelar()
+        assertThat(r.await()).isEqualTo(Terminou(Cancelado("f1", 1)))
+        assertThat(img.tentativas).isEqualTo(1)
     }
 
     // ── um por vez ──────────────────────────────────────────────────────────
