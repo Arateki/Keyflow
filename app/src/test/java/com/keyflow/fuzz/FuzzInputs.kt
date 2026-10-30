@@ -15,7 +15,12 @@ internal object FuzzInputs {
         0 -> JSONObject.quote(text(random))
         1 -> listOf("0", "-1", "1e309", "3.14", Long.MAX_VALUE.toString(), "-0", "1e-400", random.nextInt().toString()).random(random)
         2 -> listOf("true", "false", "null").random(random)
-        3 -> JSONObject.quote(listOf("mic", "key", "grid", "oauth", "api_key", "orb", "idle", "").random(random))
+        3 -> JSONObject.quote(
+            listOf(
+                "mic", "key", "grid", "oauth", "api_key", "orb", "idle", "",
+                "ditar", "capturar", "visao", "perguntar", "falar", "inserir", "agente", "orb:flutuante:2", "orb:teclado:3", "bar:b1",
+            ).random(random),
+        )
         4 -> (0 until random.nextInt(5)).joinToString(",", "{", "}") { "${JSONObject.quote(key(random))}:${json(random, depth - 1)}" }
         else -> (0 until random.nextInt(5)).joinToString(",", "[", "]") { json(random, depth - 1) }
     }
@@ -25,6 +30,8 @@ internal object FuzzInputs {
         "type", "value", "mirrored", "collapsed", "expanded", "buttons", "key", "keyCode", "label", "gridId", "mode", "prefix",
         "id", "name", "rows", "cols", "cells", "accessToken", "refreshToken", "expiresAtMs", "scopes", "schemaVersion", "orb",
         "keyboard", "fps", "states", "text", "x", "", "\u0000",
+        // fluxos (flows_json e flow_triggers_json)
+        "v", "flows", "triggers", "steps", "builtin", "instruction", "system", "model", "source", "surface", "flow",
     ).random(random)
 
     private fun text(random: Random): String = buildString {

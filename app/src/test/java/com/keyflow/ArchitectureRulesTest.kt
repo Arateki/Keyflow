@@ -25,12 +25,12 @@ class ArchitectureRulesTest {
     private fun File.rel(root: File) = relativeTo(root).path
 
     /**
-     * Linhas de [file] (1-based) cujo CÓDIGO casa [predicate]: comentários `//` e `/* … */` (KDoc inclusive, que atravessa
-     * linhas) ficam de fora — a documentação pode citar o que a regra proíbe.
+     * O CÓDIGO de cada linha de [file] (mesma numeração, 0-based na lista): comentários `//` e `/* … */` (KDoc inclusive, que
+     * atravessa linhas) ficam de fora — a documentação pode citar o que a regra proíbe.
      */
-    private fun matches(file: File, predicate: (String) -> Boolean): List<Int> {
+    private fun codeLines(file: File): List<String> {
         var inBlock = false
-        return file.readLines().mapIndexedNotNull { i, line ->
+        return file.readLines().map { line ->
             val code = StringBuilder()
             var j = 0
             while (j < line.length) {
@@ -42,9 +42,13 @@ class ArchitectureRulesTest {
                     else -> { code.append(line[j]); j++ }
                 }
             }
-            if (predicate(code.toString())) i + 1 else null
+            code.toString()
         }
     }
+
+    /** Linhas de [file] (1-based) cujo CÓDIGO (sem comentários, ver [codeLines]) casa [predicate]. */
+    private fun matches(file: File, predicate: (String) -> Boolean): List<Int> =
+        codeLines(file).mapIndexedNotNull { i, code -> if (predicate(code)) i + 1 else null }
 
     /**
      * Tela coleta fluxo por `collectAsStateOnMain` (ui/common/CollectOnMain.kt), nunca `collectAsState` direto: no
@@ -151,6 +155,48 @@ class ArchitectureRulesTest {
             }
         }
         assertEquals("escape o } (\\\\}) ou troque a Regex por contains()", emptyList<String>(), offenders)
+    }
+
+    /**
+     * `com.keyflow.fluxos` (modelo, validação, codec, restaurar, roteamento) e `fluxos/execucao` são JVM puro, para testar na
+     * JVM e rodar o executor com portas falsas (FLX-52): nada de `android.*`, Compose, do downloader de modelos nem do cofre. Só
+     * `fluxos/app/` enxerga os dois lados. [fluxosViolations] é a regra; o primeiro teste a aplica ao fonte e o segundo prova que
+     * ela pega o que deve e deixa passar `fluxos/app/`.
+     */
+    private val fluxosForbidden = listOf(
+        Regex("""^\s*import\s+android\."""),
+        Regex("""^\s*import\s+androidx\.compose\."""),
+        Regex("""^\s*import\s+com\.keyflow\.data\.models\.(ModelDownloader|DownloadGateway|ModelDownloadService)\b"""),
+        Regex("""^\s*import\s+com\.keyflow\.auth\."""),
+    )
+
+    /** Linhas (1-based) de [code] que a regra de `fluxos/` proíbe, para o arquivo em [relPath] (relativo a `src/main/java`). */
+    private fun fluxosViolations(relPath: String, code: List<String>): List<Int> {
+        val norm = relPath.replace('\\', '/')
+        val inScope = norm.startsWith("com/keyflow/fluxos/") && !norm.startsWith("com/keyflow/fluxos/app/")
+        if (!inScope) return emptyList()
+        return code.mapIndexedNotNull { i, line -> if (fluxosForbidden.any { it.containsMatchIn(line) }) i + 1 else null }
+    }
+
+    @Test
+    fun fluxosPackageIsPureJvm() {
+        val offenders = kotlinFiles(main).flatMap { file ->
+            fluxosViolations(file.rel(main), codeLines(file)).map { "${file.rel(main)}:$it" }
+        }
+        assertEquals("com.keyflow.fluxos (fora de fluxos/app) é JVM puro: sem android.*, Compose, downloader nem cofre", emptyList<String>(), offenders)
+    }
+
+    @Test
+    fun fluxosRuleCatchesAndroidOutsideAppButNotInsideIt() {
+        val bad = listOf("package x", "import android.os.Bundle")
+        assertEquals(listOf(2), fluxosViolations("com/keyflow/fluxos/Modelo.kt", bad))
+        assertEquals(listOf(2), fluxosViolations("com/keyflow/fluxos/execucao/ExecutorFluxo.kt", bad))
+        assertEquals(emptyList<Int>(), fluxosViolations("com/keyflow/fluxos/app/FluxoHost.kt", bad))
+        assertEquals(emptyList<Int>(), fluxosViolations("com/keyflow/ime/KeyFlowKeyboardService.kt", bad))
+        assertEquals(listOf(1), fluxosViolations("com/keyflow/fluxos/X.kt", listOf("import androidx.compose.runtime.Composable")))
+        assertEquals(listOf(1), fluxosViolations("com/keyflow/fluxos/execucao/X.kt", listOf("import com.keyflow.data.models.ModelDownloader")))
+        assertEquals(listOf(1), fluxosViolations("com/keyflow/fluxos/X.kt", listOf("import com.keyflow.auth.SecureCredentialStore")))
+        assertEquals(emptyList<Int>(), fluxosViolations("com/keyflow/fluxos/X.kt", listOf("import com.keyflow.data.Settings", "import com.keyflow.i18n.tr")))
     }
 
     /** O texto de uma string Kotlin entre aspas como o programa o vê (`\\` vira `\`, `\"` vira `"`). */

@@ -1,7 +1,7 @@
 # Fluxos (aba Fluxos) — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md`
-**Status**: spec e design em rascunho (2026-10-29), tasks **todas pendentes**. **Fora da v1** (só `main`, release seguinte). Não toma a vez de frente aberta.
+**Status**: spec e design em rascunho (2026-10-29); **Fase A feita (T1..T5, 2026-10-30)**, o resto pendente. **Fora da v1** (só `main`, release seguinte). Não toma a vez de frente aberta.
 **Revisão de 29/10 (D9)**: os gatilhos de gesto passam a ser `Orbe(lugar, toques)` nos três lugares da orbe (flutuante, teclado, notificação). A T1/T2/T5 já os modelam; a tela e o disparo da notificação e do teclado são as tasks **T28** e **T29** (dependentes). As T1..T27 seguem como estavam, exceto onde o texto abaixo cita o lugar.
 
 > **Para o agente executor**: leia `spec.md` + `design.md` + este arquivo e `.specs/codebase/TESTING.md`. Uma task por vez, na ordem do plano,
@@ -56,7 +56,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 
 ## Fase A — Modelo e dados (JVM puro)
 
-### FLX-T1 — Modelo de domínio, limites e validação `[P]` — **Status: pendente**
+### FLX-T1 — Modelo de domínio, limites e validação `[P]` — **Status: feita (commit ebce061b)**
 - **What**: `Tipo`, `ModeloRef`, `Etapa` (sealed, com `entrada`/`saida`/`usaModelo`), `Fluxo`, `Superficie` (`Orbe(lugar, toques)` e `Barra`, com `LugarDaOrbe { FLUTUANTE, TECLADO, NOTIFICACAO }` em `com.keyflow.orbe` — D9), `Gatilho`, `ConfigFluxos`, `LIMITES` (20/8/40/500/64) e
   `ValidadorFluxo` (`validar`, `compativeis(ultimaSaida)` com motivo, aviso "sem saída"). Regra no `ArchitectureRulesTest`: `fluxos/*.kt` e `fluxos/execucao/**`, **excluindo `fluxos/app/**`**, sem `android.*`/compose/downloader/cofre.
 - **Where**: `app/src/main/java/com/keyflow/fluxos/{Modelo,ValidadorFluxo}.kt`, `app/src/main/java/com/keyflow/orbe/Interacoes.kt` (só o `LugarDaOrbe`; a `notification` o completa); testes em `app/src/test/.../fluxos/`.
@@ -65,7 +65,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
   `Desconhecida` invalida; `compativeis(null/TEXTO/IMAGEM)` devolve os conjuntos e motivos da spec; fluxo que termina em Perguntar é válido **com aviso**; `Orbe(FLUTUANTE, 2)` e `Orbe(NOTIFICACAO, 2)` são superfícies diferentes (igualdade); a regra de arquitetura falha se um arquivo de `fluxos/` ou `fluxos/execucao/` importar `android.` (e não falha com `fluxos/app/`).
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(fluxos): modelo de dados e validação`.
 
-### FLX-T2 — Codec JSON de fluxos e gatilhos — **Status: pendente**
+### FLX-T2 — Codec JSON de fluxos e gatilhos — **Status: feita (commit ff808d7b)**
 - **What**: `CodecFluxos` (`org.json`): `decodificarFluxos/codificarFluxos`, `decodificarGatilhos/codificarGatilhos`, esquema `v:1` (spec › Modelo de dados), `ModeloRef` como `{source, model}`,
   superfícies `orb:<lugar>:N` (`flutuante`, `teclado`, `notificacao`; N em {2, 3}) e `bar:<id>`; tolerância do FLX-47 (ausente → semente é da T3/T4; malformado → semente; item ruim descartado; desconhecido ignorado/`Desconhecida`; cortes; duplicatas; nunca lança).
 - **Where**: `fluxos/CodecFluxos.kt`; testes `CodecFluxosTest`, `CodecFluxosPropertyTest` (kotest-property), `CodecFluxosFuzzTest`, `FluxoSemSegredoTest`.
@@ -73,8 +73,9 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 - **Done when**: round-trip com todas as etapas, as superfícies (a orbe nos **três lugares** e a barra), acentos/aspas/quebra de linha nas instruções; propriedade `decodificar(codificar(c)) == c` com gerador que respeita as normalizações;
   fuzz (JSON mutado, aninhamento fundo, ~10 mil entradas) nunca lança; `FluxoSemSegredoTest` falha se o JSON de um fluxo completo contiver `key`, `token`, `endpoint`, `header`, `secret` ou o valor de um segredo plantado nas `Settings`.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(fluxos): codec JSON tolerante`.
+- **Registro (Fase A)**: `CodecFluxos.decodificarFluxos` devolve `null` para chave ausente, em branco ou malformada (e `[]` é vazia de verdade); `decodificarConfig(flowsJson, triggersJson, semente)` aplica a semente (T4 passa `PadroesFluxo::semear`) e ignora gatilho solto sem `flows_json` (FLX-40). Campos de texto só valem se forem `String` no JSON (o `optString` do Android e o do Maven divergem em `null`). Etapa sem `type` legível é descartada; `type` desconhecido vira `Desconhecida`. A Visão grava `instruction` (a spec só nomeia `system`). Gatilho órfão é lido como está: a limpeza (FLX-50) é da gravação.
 
-### FLX-T3 — Fluxos padrão e restaurar — **Status: pendente**
+### FLX-T3 — Fluxos padrão e restaurar — **Status: feita (commit 40254ab2)**
 - **What**: `PadroesFluxo` (catálogo dos 3, dica informativa de atalho por `builtinId` — D15, sem gatilho automático, `trKey`, `PADROES_VERSAO`, `semear()` com ids `s-<builtinId>`), `RestauradorFluxos.restaurar(config)` e `previa(config)` (design §4); `idNovo()` injetável.
 - **Where**: `fluxos/{PadroesFluxo,RestauradorFluxos}.kt`; testes `RestauradorFluxosTest`, `RestauradorPropertyTest`.
 - **Depends on**: T1 (T2 para o gerador de propriedade). **Requirement**: FLX-40, FLX-41 (prévia), FLX-42, FLX-43, FLX-44.
@@ -82,8 +83,9 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
   fluxo da pessoa idêntico e na mesma ordem relativa; idempotência (`restaurar(restaurar(c)) == restaurar(c)`); propriedade: `restaurar(c).gatilhos == c.gatilhos` para qualquer `c`; a semente tem 3 fluxos válidos, 0 gatilhos
   e `previa(semente)` vazia; os três padrão passam no `ValidadorFluxo`.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(fluxos): fluxos padrão e restaurar sem tocar nos atalhos`.
+- **Registro (Fase A)**: O catálogo traz a dica de atalho de cada padrão como `DicaDeAtalho` (D15: dois toques, três toques, botão do teclado), sem gatilho; o texto "Sugestão: …" é da T18. `PadroesFluxo.nomeExibido` traduz só o padrão não renomeado. O sistema do Perguntar de "Ouvir e responder" fica em português por ser dado do fluxo (o Restaurar o compara). **Decisão que a spec não cobria**: com 20 fluxos o padrão apagado não é recriado (recriar além do limite faria o codec cortar fluxos da pessoa na leitura seguinte); a `PreviaRestaurar.semEspaco` lista os que ficaram de fora e a T17 mostra isso na confirmação. `Ids.fluxo()` gera os 8 hex; `RestauradorFluxos.restaurar` aceita o gerador de id (e nunca repete um id em uso).
 
-### FLX-T4 — Persistência no repositório — **Status: pendente**
+### FLX-T4 — Persistência no repositório — **Status: feita (commit 60671bce)**
 - **What**: chaves `flows_json` e `flow_triggers_json` ao lado de `BARS_CONFIG_JSON` (`SettingsRepository.kt:876`); `configFluxosFlow()`, `configFluxosOnce()` (leitura leve, sem cofre), `atualizarFluxos(f)` e
   `atualizarFluxosEBarras(f)` (um `dataStore.edit`, sobre o valor atual, que também limpa gatilhos órfãos — FLX-50). Chave ausente → semente em memória, sem escrever.
 - **Where**: `data/SettingsRepository.kt` (ou um `FluxosRepositorio` sobre o mesmo DataStore, se o arquivo estiver grande demais); teste instrumentado `FluxosRepositoryTest` (padrão do `SettingsRepositoryTest`).
@@ -91,8 +93,9 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 - **Done when**: instrumentado — leitura sem chave = semente e **nada gravado**; primeira alteração grava a lista inteira; `[]` persistido lê vazio; duas alterações concorrentes (uma via modal, outra via barra) ficam ambas; `atualizarFluxosEBarras`
   grava barras e gatilho numa só transação; `saveSettings` das `Settings` **não** toca as duas chaves e vice-versa; gatilho de fluxo/botão inexistente some na gravação seguinte.
 - **Tests**: instrumentado. **Gate**: `pool instrumentar com.keyflow.data.FluxosRepositoryTest`. **Commit**: `feat(fluxos): persistência dos fluxos e gatilhos`.
+- **Registro (Fase A)**: Feita **depois** da T5 (usa o `PoliticaGatilhos.limpar`). No `SettingsRepository`, ao lado das barras: `configFluxosOnce`, `configFluxosFlow` (com `distinctUntilChanged`), `atualizarFluxos` e `atualizarFluxosEBarras`, todos sobre o `dataStore.edit` (lê o valor gravado, aplica a função pura, grava os dois JSON; devolve o que ficou gravado). `gravarFluxos` limpa os órfãos e não regrava se o JSON já é igual (um JSON malformado, lido como semente, é consertado na primeira gravação). O teste usa repositório com cofre que explode, para provar leitura leve. Seam de teste: `rawPreferencesFlow()` (interno), para conferir que barras e gatilho nunca aparecem separados. **Pendência para a T16**: o gatilho de botão da barra órfão ainda não é limpo aqui (`botoesDaBarra = null`), porque o `RunFlow` só passa a existir na T16; o `PoliticaGatilhos.limpar` com o conjunto de botões já está testado (FLX-50 fecha na T16).
 
-### FLX-T5 — Roteador de gatilhos e política de ligação — **Status: pendente**
+### FLX-T5 — Roteador de gatilhos e política de ligação — **Status: feita (commit 69caeee2)**
 - **What**: `RoteadorGatilhos.resolverToques(lugar, toques, config, politica, settings) → Resolucao {Rodar, Incompleto, AcaoDoSettings, AcaoDoLugar, Nada}` (design §5.1 e §5.3: por lugar da orbe, inclusive overflow e "copiar" — `PoliticaDoLugar`) e `PoliticaGatilhos`
   (`ligar`, `desligar`, `excluir`, `limpar`, `avisoDeSubstituicao` com o nome do lugar). Helper `acaoEfetivaDoGesto(toques, settings, config)` para Sobrepor/Tour (orbe flutuante).
 - **Where**: `fluxos/{RoteadorGatilhos,PoliticaGatilhos}.kt`; testes `RoteadorGatilhosTest`, `PoliticaGatilhosTest`.
@@ -102,6 +105,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
   o mesmo gesto em lugares diferentes são gatilhos diferentes (`Orbe(FLUTUANTE, 2)` ≠ `Orbe(NOTIFICACAO, 2)`); `NOTIFICACAO`/`TECLADO` sem gatilho → `AcaoDoLugar(n)`; com `copiaDaPrincipal` os gatilhos lidos são os da flutuante e a lista de gatilhos **não muda** (propriedade: ligar/desligar "copiar" é só uma consulta);
   `avisoDeSubstituicao` nomeia ação/fluxo efetivo anterior e toque/gesto/botão/lugar para qualquer substituição; não privilegia gravar. `NONE`/mesma ação não gera aviso de perda; fluxo já ligado usa seu nome, não a ação sombreada.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(fluxos): roteamento de gatilhos e política de ligação`.
+- **Registro (Fase A)**: Feita **antes** da T4 (a T4 usa o `PoliticaGatilhos.limpar`). `PoliticaDoLugar` ganhou `rotuloDaAcaoPropria` (o nome da ação do lugar para n toques, para o aviso) e `daFlutuante(settings, rotuloDaAcao)` recebe o rótulo da tela (`shortcutActionLabel`): o pacote não conhece a interface. `acaoEfetivaDoGesto` mora no `RoteadorGatilhos` e devolve `DaConfig`/`DeFluxo`. `ligar` recusa fluxo inexistente, incompleto ou além de 64 gatilhos (`recusaDe` diz por quê). `limpar(config, botoesDaBarra: Set<String>?)`: `null` = não sei quais botões a barra tem e os gatilhos de barra ficam (a T16 passa os ids dos `RunFlow`). O aviso (D17) é `avisoDeSubstituicao(config, superficie, fluxoNovoId, politica): String?`: nulo para superfície livre ou o mesmo fluxo; nomeia o fluxo anterior ("Fluxo: <nome>", que sombreia a ação) ou a ação do lugar, e sempre a superfície: "neste gesto da orbe flutuante|do teclado|da notificação" ou "neste botão do teclado" — mesma frase para qualquer ação, gravar inclusive. O texto da spec para superfície ocupada era "neste atalho"; ficou o da superfície, como o resto da D17 pede.
 
 ---
 
@@ -206,6 +210,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 - **Done when**: unit — `ShortcutCodecTest`, `ShortcutCodecPropertyTest` (ida e volta) e `BarIconsTest` incluem `RunFlow`; JSON antigo sem `flow` continua igual; instrumentado — o botão desenhado, tocar chama o callback com o id, órfão/inválido fica desabilitado e não dispara;
   o editor de barras lista, move e remove o botão e **não** o oferece para adicionar; goldens de teclado existentes bit-idênticos.
 - **Tests**: unit + instrumentado. **Gate**: `quick` + `pool instrumentar com.keyflow.ime.KeyFlowKeyboardBarsTest com.keyflow.ime.BarViewAccessibilityTest com.keyflow.ui.config.BarsEditorTest` + `pool telas` (0 divergências nos existentes). **Commit**: `feat(fluxos): botão de fluxo na barra do teclado`.
+- **Registro (Fase A)**: (da T4) `SettingsRepository.gravarFluxos` chama `PoliticaGatilhos.limpar(config, botoesDaBarra = null)`; ao criar o `RunFlow`, passe ali os `botaoId` dos `RunFlow` que a barra tem (`atualizarFluxos` lê `bars_config_json` na mesma transação, como `atualizarFluxosEBarras`), senão o gatilho de um botão apagado no editor de barras não some (FLX-50).
 
 ---
 
