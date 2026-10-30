@@ -135,11 +135,15 @@ class CustomReasoningEngine(
         val code = error.optString("code").lowercase(Locale.ROOT)
         if (code in setOf("invalid_value", "invalid_type")) return false
         val message = error.optString("message").lowercase(Locale.ROOT)
-        val unknown = code in setOf("unsupported_parameter", "unknown_parameter", "unrecognized_parameter", "extra_forbidden") ||
-            listOf("unknown parameter", "unknown argument", "unrecognized parameter", "unrecognized argument",
-                "unrecognized request argument", "unsupported parameter", "unsupported argument").any { it in message }
-        val namesLimit = param == MODERN_LIMIT || MODERN_LIMIT in message.split(Regex("[^a-z0-9_]+"))
-        return unknown && namesLimit
+        val unknownCode = code in setOf("unsupported_parameter", "unknown_parameter", "unrecognized_parameter", "extra_forbidden")
+        // Com `param` explícito, ele já amarra a rejeição ao campo exato.
+        if (param == MODERN_LIMIT) return unknownCode || REJECTION_MARKERS.any { it in message }
+        // Sem `param`, a rejeição e o nome do campo precisam estar na mesma frase: "Unknown parameter: temperature.
+        // Supported fields include max_completion_tokens." rejeita `temperature`, não o teto.
+        return message.split(Regex("[.;!?\\n]+(\\s|$)")).any { sentence ->
+            MODERN_LIMIT in sentence.split(Regex("[^a-z0-9_]+")) &&
+                (REJECTION_MARKERS.any { it in sentence } || NEGATED_SUPPORT.any { it in sentence })
+        }
     }
 
     private fun bodyOf(request: ReasoningRequest, supported: Set<String>, limitField: String = MODERN_LIMIT): String = JSONObject().apply {
@@ -160,6 +164,9 @@ class CustomReasoningEngine(
     private companion object {
         const val MODERN_LIMIT = "max_completion_tokens"
         const val LEGACY_LIMIT = "max_tokens"
+        val REJECTION_MARKERS = listOf("unknown parameter", "unknown argument", "unrecognized parameter", "unrecognized argument",
+            "unrecognized request argument", "unsupported parameter", "unsupported argument")
+        val NEGATED_SUPPORT = listOf("not supported", "unsupported", "not allowed", "not permitted", "unknown", "unrecognized")
     }
 
 }

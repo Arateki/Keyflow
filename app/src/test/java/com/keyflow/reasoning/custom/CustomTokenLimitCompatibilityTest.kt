@@ -105,6 +105,19 @@ class CustomTokenLimitCompatibilityTest {
         assertThat(events.toString()).doesNotContain("credencial-falsa")
     }
 
+    @Test fun rejeicaoSemParamDeTemperatureNaoRepeteAoListarLimiteComoPermitido() = runTest {
+        server.enqueue(MockResponse().setResponseCode(400).setBody(
+            """{"error":{"code":"unknown_parameter","message":"Unknown parameter: temperature. Supported fields include max_completion_tokens."}}""",
+        ))
+        server.enqueue(success())
+        val events = generate()
+        assertThat(server.requestCount).isEqualTo(1)
+        assertThat(events).containsExactly(ReasoningEvent.Error(ReasoningError.ENGINE, "Custom: HTTP 400"))
+        val body = JSONObject(server.takeRequest().body.readUtf8())
+        assertThat(body.getInt("max_completion_tokens")).isEqualTo(32)
+        assertThat(body.has("max_tokens")).isFalse()
+    }
+
     @Test fun valorInvalidoNaoEConfundidoComCampoNaoSuportado() = runTest {
         server.enqueue(MockResponse().setResponseCode(400).setBody(
             """{"error":{"code":"invalid_value","param":"max_completion_tokens","message":"must be positive"}}""",

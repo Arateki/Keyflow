@@ -13,11 +13,12 @@ import com.keyflow.speech.SpeechEvent
 import com.keyflow.speech.SpeechRequest
 import java.io.File
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.InternalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -30,18 +31,14 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 
-// A reserva atômica do resultado evita a janela entre isActive e resume em callbacks Binder concorrentes.
-// Opt-in isolado: o projeto fixa kotlinx.coroutines 1.8.1 e testa morte, cancelamento e terminais atrasados.
-@OptIn(InternalCoroutinesApi::class)
+// Callbacks Binder concorrentes: o monitor da continuação torna "já concluída?" e "retomar" atômicos entre os helpers
+// (API pública; retomar uma continuação já cancelada é descartado pelo kotlinx.coroutines).
 private fun <T> CancellableContinuation<T>.completeOnce(value: T) {
-    val token = tryResume(value) ?: return
-    completeResume(token)
+    synchronized(this) { if (!isCompleted) resume(value) }
 }
 
-@OptIn(InternalCoroutinesApi::class)
 private fun <T> CancellableContinuation<T>.failOnce(error: Throwable) {
-    val token = tryResumeWithException(error) ?: return
-    completeResume(token)
+    synchronized(this) { if (!isCompleted) resumeWithException(error) }
 }
 
 /**
