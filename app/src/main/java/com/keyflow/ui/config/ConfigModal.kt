@@ -28,10 +28,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
+import com.keyflow.i18n.tr
 import androidx.compose.ui.window.PopupProperties
 import com.keyflow.ui.icons.KfIcon
 import com.keyflow.ui.icons.KfIcons
@@ -60,6 +65,7 @@ fun ConfigModal(
     cardTag: String? = null,
     onBack: (() -> Unit)? = null,
     backTag: String? = null,
+    accessibleHeader: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val palette = LocalKeyFlowPalette.current
@@ -99,14 +105,15 @@ fun ConfigModal(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(modifier = if (accessibleHeader) Modifier.weight(1f) else Modifier, verticalAlignment = Alignment.CenterVertically) {
                     if (onBack != null) {
                         Box(
                             Modifier
-                                .size(32.dp)
+                                .size(if (accessibleHeader) 48.dp else 32.dp)
                                 .clip(CircleShape)
                                 .border(1.dp, palette.line, CircleShape)
-                                .clickable(interactionSource = noRipple, indication = null) { onBack() }
+                                .clickable(interactionSource = noRipple, indication = null, role = Role.Button) { onBack() }
+                                .semantics { contentDescription = tr("Voltar") }
                                 .then(if (backTag != null) Modifier.testTag(backTag) else Modifier),
                             contentAlignment = Alignment.Center,
                         ) {
@@ -120,15 +127,18 @@ fun ConfigModal(
                         fontWeight = FontWeight.Normal,
                         fontSize = 16.sp,
                         letterSpacing = (-0.3).sp,
+                        maxLines = if (accessibleHeader) 1 else Int.MAX_VALUE,
+                        overflow = if (accessibleHeader) TextOverflow.Ellipsis else TextOverflow.Clip,
                         modifier = Modifier.padding(start = if (onBack != null) 10.dp else 0.dp),
                     )
                 }
                 Box(
                     Modifier
-                        .size(32.dp)
+                        .size(if (accessibleHeader) 48.dp else 32.dp)
                         .clip(CircleShape)
                         .border(1.dp, palette.line, CircleShape)
-                        .clickable(interactionSource = noRipple, indication = null) { onDismiss() }
+                        .clickable(interactionSource = noRipple, indication = null, role = Role.Button) { onDismiss() }
+                        .semantics { contentDescription = tr("Fechar") }
                         .testTag(closeTag),
                     contentAlignment = Alignment.Center,
                 ) {
