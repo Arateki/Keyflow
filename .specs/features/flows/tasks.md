@@ -220,7 +220,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 ## Fase D — Telas
 
 ### FLX-T17 — Lista de cards, "+", vazio e Restaurar — **Status: pendente**
-- **What**: `FluxosPanel` reescrito (design §11.1): cards (nome, resumo, selo, chips de atalho, Incompleto, "Em execução · etapa" + Cancelar), "+ Novo fluxo" (nome sem repetir, limite 20 com motivo), estado vazio, "Restaurar fluxos padrão" com a confirmação e a prévia (T3).
+- **What**: `FluxosPanel` reescrito (design §11.1): cards (nome, resumo, selo, chips de atalho, Incompleto, "Em execução · etapa" + Cancelar), "+ Novo fluxo" (nome sem repetir, limite 20 com motivo), estado vazio, "Restaurar fluxos padrão" com a confirmação e a prévia (T3): `PreviaRestaurar.vazia` (nada a mudar **e** nada sem espaço) diz "Os fluxos padrão já estão como no original"; `semEspaco` mostra "Sem espaço (limite de 20): …" e `nadaAGravar` desliga o botão Restaurar.
   Lê `configFluxosFlow()` e as `Settings` (para o selo). Remove o conteúdo antigo (cards fixos, "Gatilhos e atalhos", "Orquestração"). **A aba ainda não sai do "Em breve"** (T22).
 - **Where**: `ui/config/FluxosPanel.kt`, `i18n/{en,es}/Fluxos.kt`; testes `FluxosPanelTest`.
 - **Depends on**: T3, T4, T7. **Requirement**: FLX-01..05, FLX-30, FLX-41, FLX-51, FLX-54.
