@@ -140,7 +140,7 @@ class KeyFlowKeyboardService : InputMethodService() {
         val info = currentInputEditorInfo ?: return null
         val editor = CaptureEditor(info.packageName, info.fieldId, info.inputType)
         visionKeyboardHidden = true
-        // A janela controlada por insets precisa do pedido ao sistema; hideWindow só altera o estado local.
+        // Usa o pedido ao sistema de entrada, no mesmo protocolo de requestShowSelf da restauração.
         try { requestHideSelf(0) } catch (error: RuntimeException) { visionKeyboardHidden = false; throw error }
         var restored = false
         return {
