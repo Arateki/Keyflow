@@ -18,6 +18,6 @@ FLX-T1..T5, tudo JVM puro exceto a persistência (T4). Nenhuma tela. O pacote `c
 
 ## Lições
 
-- **`optString` diverge entre o `org.json` do Android e o do Maven**: um `null` do JSON vira "null" no Android e "" na JVM dos testes. O codec só aceita campo de texto que seja de fato `String` (`opt(...) as? String`). Quem escrever outro codec com `org.json` faz o mesmo, ou o teste de unidade passa e o aparelho lê "null".
+- **`optString` diverge entre o `org.json` do Android e o do Maven** (pelo código de cada um, não medido aqui): um `null` do JSON vira "null" no Android e "" na JVM dos testes. O codec só aceita campo de texto que seja de fato `String` (`opt(...) as? String`). Quem escrever outro codec com `org.json` faz o mesmo, ou o teste de unidade passa e o aparelho lê "null".
 - **`pool compilar` no servidor compila a worktree no lugar**: editar arquivo enquanto ele roda vaza para a compilação (o teste novo compilou sem o `main` novo: "Unresolved reference"). No Deck a árvore é copiada antes. Não mexa na worktree até o pool terminar.
 - **O `private companion object` do `SettingsRepository` esconde as chaves**: teste instrumentado define a própria `stringPreferencesKey("…")` e lê o DataStore por `rawPreferencesOnce`/`rawPreferencesFlow` (este último, sem cofre, é de propósito para provar que duas chaves saíram numa só transação).
