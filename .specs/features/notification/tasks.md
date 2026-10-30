@@ -51,7 +51,7 @@ T8 depende de T7 (a interface da fonte de orbe).
 
 ## Fase 0 — Prova
 
-### NTF-T1 — Prova de altura e de toque (descartável, primeiro) — **Status: pendente**
+### NTF-T1 — Prova de altura e de toque (descartável, primeiro) — **Status: emulador medido (cabe); aparelhos do Yan pendentes**
 - **What**: protótipo mínimo, só em `androidTest`/debug: o `notif_orb.xml` do design §6 — a linha **`[botão][orbe][botão]`** de 48 dp — com uma orbe Ateliê **desenhada à mão** (círculo teal em `Bitmap`, 40 dp) e dois `ImageButton` de 48×48 dp com glifo vetorial, num `DecoratedCustomViewStyle`, `setCustomContentView` sem `BigContentView`,
   um clique por `PendingIntent.getService` na orbe e um em cada botão. Cobre as **quatro variações** de §6 (sem botão, só direito, esquerdo + direito, e o botão ausente `INVISIBLE` que mantém a orbe no centro). Posta com o serviço de primeiro plano de teste e mede, recolhida e expandida, em **emulador (API 34), Vaio TL10 (Android 13), Tab S10 Lite (Android 16) e A32** (a versão do Android dele: `adb shell getprop ro.build.version.release`):
   `visibleBounds` da orbe e de **cada botão**, captura do trecho, os quatro extremos do círculo, os alvos de toque (48×48 dp), a ausência de sobreposição entre orbe e botões, a largura em tela estreita (320 dp) e o tempo do clique ao serviço.

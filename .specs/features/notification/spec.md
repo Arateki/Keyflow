@@ -309,8 +309,8 @@ Respondidas por ele em 29/10, 22:20 (viraram decisões): **Q1** (pausar/cancelar
 | NTF-02 | P1-A | NTF-T12 | Pending |
 | NTF-03 | P1-A | NTF-T13 | Pending |
 | NTF-04 | P1-A | NTF-T13 | Pending |
-| NTF-05 | P1-B | NTF-T1, NTF-T9 | Pending |
-| NTF-06 | P1-B | NTF-T1, NTF-T9, NTF-T14 | Pending |
+| NTF-05 | P1-B | NTF-T1, NTF-T9 | Implementing (T1: emulador medido, cabe; aparelhos pendentes) |
+| NTF-06 | P1-B | NTF-T1, NTF-T9, NTF-T14 | Implementing (T1: emulador medido, cabe; aparelhos pendentes) |
 | NTF-07 | P1-B | NTF-T4, NTF-T9 | Pending |
 | NTF-08 | P1-B | NTF-T2 | Pending |
 | NTF-09 | P1-B | NTF-T4, NTF-T10 | Pending |
@@ -347,14 +347,14 @@ Respondidas por ele em 29/10, 22:20 (viraram decisões): **Q1** (pausar/cancelar
 | NTF-40 | P2-I | NTF-T12, NTF-T13 (cada uma traz os seus textos) | Pending |
 | NTF-41 | P2-I | NTF-T2, NTF-T4, NTF-T5 | Pending |
 | NTF-42 | P2-I | NTF-T11 | Pending |
-| NTF-43 | P2-I | NTF-T1, NTF-T14, NTF-T18 | Pending |
+| NTF-43 | P2-I | NTF-T1, NTF-T14, NTF-T18 | Implementing (T1: emulador medido, cabe; aparelhos pendentes) |
 | NTF-44 | P2-I | NTF-T15 | Pending |
 | NTF-45 | P2-I | NTF-T9, NTF-T12 | Pending |
 | NTF-46 | P2-I | NTF-T16 | Pending |
 | NTF-47 | P2-I | NTF-T19 | Pending |
 | NTF-48 | P1-I | NTF-T4, NTF-T9, NTF-T10 | Pending |
 | NTF-49 | P1-I | NTF-T5, NTF-T10, NTF-T14 | Pending |
-| NTF-50 | P1-I | NTF-T1, NTF-T9, NTF-T14 | Pending |
+| NTF-50 | P1-I | NTF-T1, NTF-T9, NTF-T14 | Implementing (T1: emulador medido, cabe; aparelhos pendentes) |
 
 **Coverage:** 50 requisitos, 50 mapeados em tasks, 0 sem task.
 **Status values:** Pending → In Design → In Tasks → Implementing → Verified.
