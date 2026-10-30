@@ -1,7 +1,7 @@
 # Fluxos (aba Fluxos) — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md`
-**Status**: spec e design em rascunho (2026-10-29); **Fase A feita (T1..T5, 2026-10-30)**, o resto pendente. **Fora da v1** (só `main`, release seguinte). Não toma a vez de frente aberta.
+**Status**: spec e design em rascunho (2026-10-29); **Fase A feita (T1..T5) e Fase B feita (T6..T9), 2026-10-30**, o resto pendente. **Fora da v1** (só `main`, release seguinte). Não toma a vez de frente aberta.
 **Revisão de 29/10 (D9)**: os gatilhos de gesto passam a ser `Orbe(lugar, toques)` nos três lugares da orbe (flutuante, teclado, notificação). A T1/T2/T5 já os modelam; a tela e o disparo da notificação e do teclado são as tasks **T28** e **T29** (dependentes). As T1..T27 seguem como estavam, exceto onde o texto abaixo cita o lugar.
 
 > **Para o agente executor**: leia `spec.md` + `design.md` + este arquivo e `.specs/codebase/TESTING.md`. Uma task por vez, na ordem do plano,
@@ -111,7 +111,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 
 ## Fase B — Executor (JVM puro, portas falsas)
 
-### FLX-T6 — Executor, estados, erros e tempos — **Status: pendente**
+### FLX-T6 — Executor, estados, erros e tempos — **Status: feita (commit c0167026)**
 - **What**: `Valor`, `ImagemHandle`, `ResultadoEtapa`, `ErroEtapa`/`CausaErro`/`DestinoAba`, `EstadoExecucao`, as interfaces das portas (`Portas`), `Limites` (Perguntar/Visão 180 s; Falar/Agente 10 min) e `ExecutorFluxo`
   (laço, um por vez, falha para sem parcial, cancelar, `finally` que libera imagem/player). `KeyFlowController.fluxo: StateFlow<EstadoExecucao>`.
 - **Where**: `fluxos/execucao/*.kt`, `core/KeyFlowController.kt`; teste `ExecutorFluxoTest` (portas falsas, `TestCoroutineScheduler`). Regra de arquitetura: `fluxos/execucao` sem `android.*`/downloader/cofre (`fluxos/app/**` fora da regra).
@@ -119,27 +119,30 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 - **Done when**: unit — "Ditar → Perguntar → Falar" passa o texto de uma porta à outra; `Falha` na etapa 2 impede a 3 e deixa `Falhou(indice = 1)` com a causa; `Cancelada` → `Cancelado`; segundo `executar` durante um em curso é recusado e não cancela o
   primeiro; estouro de tempo → `Falha(TEMPO)` com relógio virtual; `Valor.Imagem` é liberada em sucesso, falha e cancelamento; cancelar a `Job` cancela a porta em curso; `Concluido` volta a `Ocioso`.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(fluxos): executor de etapas com portas`.
+- **Registro (Fase B)**: Em `fluxos/execucao/{Portas,EstadoExecucao,Limites,ExecutorFluxo}.kt`. `PortaEtapa.executar(etapa, entrada)` recebe a etapa inteira (modelo, instrução, sistema) e `Portas.para(tipo)` devolve a porta (nulo = esta versão não executa o tipo). `executar` devolve `ResultadoExecucao` (`Recusado` | `Terminou(estado)`); `Concluido` volta a `Ocioso`, mas `Falhou` e `Cancelado` ficam visíveis até a próxima execução. Cancelar é `cancelar()` ou cancelar a coroutine de quem executa (a porta coopera). O executor guarda os tipos (entrada e saída de cada etapa) e libera a imagem exatamente uma vez. Sem `Relogio`: o prazo é o `withTimeout` da coroutine, virtual nos testes. `KeyFlowController.fluxo` + `updateFluxo(estado)` (o `FluxoHost` da T14 publica o estado do executor). Mensagens de tempo, memória e motor genérico em `tr`. Qualquer `Throwable` da porta (menos `CancellationException`) vira `Falhou`: `OutOfMemoryError` → `MEMORIA`, o resto (`UnsatisfiedLinkError` inclusive) → `MOTOR`; `ImagemHandle.liberar()` que lança é engolido.
 
-### FLX-T7 — Modelo da etapa sem copiar segredo + selo de privacidade — **Status: pendente**
+### FLX-T7 — Modelo da etapa sem copiar segredo + selo de privacidade — **Status: feita (commit 2963b53d)**
 - **What**: `ModeloPorEtapa.aplicar(settings, etapa) → Settings` (tabela do design §8) e `efetivo(settings, etapa) → Efetivo` (origem, modelo, `NoAparelho | Nuvem(provedor)`), mais `seloDoFluxo(...)` ("100% no aparelho" / lista de provedores).
 - **Where**: `fluxos/ModeloPorEtapa.kt`; teste `ModeloPorEtapaTest`.
 - **Depends on**: T1. **Requirement**: FLX-26, FLX-30.
 - **Done when**: unit — `ModeloRef` nulo devolve o **mesmo** `Settings`; preenchido troca só os campos da tabela e deixa o original intacto; Custom troca só a origem; `CREDITS` ou nome inexistente → sinaliza inválido (a porta vira `INDISPONIVEL`);
   nenhum campo de segredo é lido/escrito; selo: LOCAL e SYSTEM = no aparelho, Capturar/Inserir = no aparelho, OpenAI/Anthropic/Google/Groq/ElevenLabs/Custom = nuvem com o nome.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(fluxos): modelo por etapa e selo de privacidade`.
+- **Registro (Fase B)**: `ModeloPorEtapa.aplicar(settings, etapa)` devolve `ModeloAplicado` (`Ok(settings)` | `Invalido(origem)`) em vez de só `Settings`: a porta precisa saber que a origem não existe para falhar com `INDISPONIVEL`. Sem `ModeloRef` devolve a mesma instância. `ModeloRef.modelo` nulo ou em branco troca só a origem. `efetivo` devolve `Efetivo(origem, modelo, Onde)` com `Onde` = `NoAparelho` | `Nuvem(ProvedorNuvem)` | `Indisponivel` (origem inválida ou `CREDITS` na aba); `seloDoFluxo` devolve `SeloDoFluxo(provedores, indisponivel)` e `noAparelho`. O texto do selo ("100% no aparelho", "Nuvem · OpenAI") é da T17.
 
-### FLX-T8 — Divisor de texto para a Voz `[P]` — **Status: pendente**
+### FLX-T8 — Divisor de texto para a Voz `[P]` — **Status: feita (commit 6b7ff8a5)**
 - **What**: `DivisorDeFala.dividir(texto, max = 800)`: trechos por frase (`.`, `!`, `?`, quebra de linha), sem cortar palavra quando dá, sem perder nem repetir caractere; trecho único maior que o limite é cortado no limite.
 - **Where**: `fluxos/execucao/DivisorDeFala.kt`; teste `DivisorDeFalaTest` (inclui propriedade).
 - **Depends on**: —. **Requirement**: FLX-22.
 - **Done when**: unit — texto curto = 1 trecho; 5 mil caracteres = trechos ≤ 800 cuja concatenação (sem os separadores) é o texto; texto sem pontuação; só espaços/vazio = lista vazia; acentos e emoji não são quebrados no meio.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(fluxos): divisão do texto longo para a voz`.
+- **Registro (Fase B)**: `DivisorDeFala.dividir(texto, max = 800)` junta frases vizinhas enquanto couberem (texto curto é um trecho só, não um por frase); frase maior que o limite corta no último espaço que cabe e, sem espaço, na última fronteira de caractere (`BreakIterator`, nunca no meio de um par substituto nem entre a letra e o acento combinado). Só o espaço das pontas de cada trecho sai.
 
 ---
 
 ## Fase C — Integração com o app
 
-### FLX-T9 — Composição dos motores por processo (refatoração) `[P]` — **Status: pendente**
+### FLX-T9 — Composição dos motores por processo (refatoração) `[P]` — **Status: feita (commit da5e4ec4)**
 - **What**: extrair de `SetupActivity` (`:187`, `:269`, `:288`, `:322`) a montagem de `ReasoningEngines`, `VisionModelEngines`, `SpeechDeps` e `AgentBackends` para `AmbienteMotores.of(context)` (singleton preguiçoso, como `AgentHost.of`),
   e extrair `configDe(settings)` do `SettingsRepository.flow()` (`:396`). A `SetupActivity` passa a usá-los; **sem mudança de comportamento ou de tela**.
 - **Where**: `fluxos/app/AmbienteMotores.kt`, `ui/SetupActivity.kt`, `data/SettingsRepository.kt`.
@@ -147,6 +150,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 - **Done when**: `assembleDebug` + `testDebugUnitTest` verdes; `ConfigScreenTest`, `VozPanelTest`, `VisaoPanelTest`, `FalaPanelTest` e `ReasoningPanelTest` verdes; `scripts/verify-screens.sh` → `diff-screens.sh` com **0 divergências**;
   `configDe(settings)` tem teste unitário (mesmo `Config` que o `flow()` para o mesmo `Settings`).
 - **Tests**: unit + instrumentado das telas afetadas + goldens. **Gate**: `build` + `quick` + `pool instrumentar` das classes citadas + `pool telas`. **Commit**: `refactor: motores compostos por processo em vez de dentro da SetupActivity`.
+- **Registro (Fase B)**: `fluxos/app/AmbienteMotores.of(context)` (singleton por processo, como o `AgentHost.of`, tudo `lazy`): `reasoning`, `vision`, `speechDeps` e `agentBackends`, movidos da `SetupActivity` sem mudar o corpo (só `this` → contexto da aplicação). A tela continua montando o `SpeechTester` (abrir a instalação dos dados do TTS é da Activity), o `VisionModelTester` e o `agentRuntime`. `agentBackends` é `null` quando o agente está desligado no build: a condição `BuildConfig.AGENT_ENABLED` fica dentro do `lazy` (o R8 alcança o inicializador). `configDe(settings, credenciais)` saiu do `SettingsRepository.flow()` (que o chama): mesma `Settings`, mesma `Config`, testado por origem em `ConfigDeSettingsTest`. O `AmbienteMotores.settings` do desenho ficou para a T10 (nada o usa ainda).
 
 ### FLX-T10 — Portas Perguntar, Visão, Falar e Inserir — **Status: pendente**
 - **What**: as quatro portas reais (design §7): `PortaPerguntar` (acumula `Delta`, só `Done` entrega), `PortaVisao` (`VisionImage.encode`, `VisionModelEngines`/OCR local, `Empty → VAZIO`), `PortaFalar` (`SpeechEngines`, `DivisorDeFala`,
@@ -217,7 +221,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 ## Fase D — Telas
 
 ### FLX-T17 — Lista de cards, "+", vazio e Restaurar — **Status: pendente**
-- **What**: `FluxosPanel` reescrito (design §11.1): cards (nome, resumo, selo, chips de atalho, Incompleto, "Em execução · etapa" + Cancelar), "+ Novo fluxo" (nome sem repetir, limite 20 com motivo), estado vazio, "Restaurar fluxos padrão" com a confirmação e a prévia (T3).
+- **What**: `FluxosPanel` reescrito (design §11.1): cards (nome, resumo, selo, chips de atalho, Incompleto, "Em execução · etapa" + Cancelar), "+ Novo fluxo" (nome sem repetir, limite 20 com motivo), estado vazio, "Restaurar fluxos padrão" com a confirmação e a prévia (T3): `PreviaRestaurar.vazia` (nada a mudar **e** nada sem espaço) diz "Os fluxos padrão já estão como no original"; `semEspaco` mostra "Sem espaço (limite de 20): …" e `nadaAGravar` desliga o botão Restaurar.
   Lê `configFluxosFlow()` e as `Settings` (para o selo). Remove o conteúdo antigo (cards fixos, "Gatilhos e atalhos", "Orquestração"). **A aba ainda não sai do "Em breve"** (T22).
 - **Where**: `ui/config/FluxosPanel.kt`, `i18n/{en,es}/Fluxos.kt`; testes `FluxosPanelTest`.
 - **Depends on**: T3, T4, T7. **Requirement**: FLX-01..05, FLX-30, FLX-41, FLX-51, FLX-54.

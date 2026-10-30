@@ -71,6 +71,7 @@ class RestauradorFluxosTest {
         assertThat(config.gatilhos).isEmpty()
         val previa = RestauradorFluxos.previa(config)
         assertThat(previa.vazia).isTrue()
+        assertThat(previa.nadaAGravar).isTrue()
         assertThat(previa).isEqualTo(PreviaRestaurar(emptyList(), emptyList(), emptyList()))
     }
 
@@ -195,7 +196,8 @@ class RestauradorFluxosTest {
         val uma = restaurar(inicial)
         val duas = restaurar(uma)
         assertThat(duas).isEqualTo(uma)
-        assertThat(RestauradorFluxos.previa(uma).vazia).isTrue()
+        assertThat(RestauradorFluxos.previa(uma).nadaAGravar).isTrue()
+        assertThat(RestauradorFluxos.previa(uma).vazia).isTrue() // aqui cabia tudo: já estão como no original
     }
 
     @Test
@@ -231,7 +233,9 @@ class RestauradorFluxosTest {
         val previa = RestauradorFluxos.previa(config)
         assertThat(previa.semEspaco).containsExactly(ouvir.nome, ler.nome, agente.nome).inOrder()
         assertThat(previa.recriar).isEmpty()
-        assertThat(previa.vazia).isTrue()
+        // Nada a gravar, mas os padrão NÃO "já estão como no original": faltam três. A confirmação não pode dizer o contrário.
+        assertThat(previa.nadaAGravar).isTrue()
+        assertThat(previa.vazia).isFalse()
     }
 
     @Test
@@ -241,6 +245,8 @@ class RestauradorFluxosTest {
         assertThat(restaurado.fluxos).hasSize(LIMITES.FLUXOS)
         assertThat(restaurado.fluxos.mapNotNull { it.padrao }).containsExactly("ouvir-responder", "ler-tela-colar").inOrder()
         assertThat(RestauradorFluxos.previa(config).semEspaco).containsExactly(agente.nome)
+        assertThat(RestauradorFluxos.previa(config).vazia).isFalse()
+        assertThat(RestauradorFluxos.previa(config).nadaAGravar).isFalse() // recria dois
     }
 
     @Test

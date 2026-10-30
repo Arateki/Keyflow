@@ -19,6 +19,10 @@ import org.json.JSONObject
  *   superfície repetidos ficam com o primeiro (D7);
  * - nunca lança.
  *
+ * **Versão mais nova**: um JSON com `v` > 1 (campos e etapas que esta versão não conhece) é lido em modo tolerante — o que se
+ * conhece fica, o resto é ignorado —, mas **regravar o perde**: sai como `v:1` e a [Etapa.Desconhecida] guarda só o tipo, sem o
+ * conteúdo (FLX-47; coberto por `CodecFluxosTest`). É o preço de não travar nem recusar o arquivo.
+ *
  * Os campos de texto só valem se forem de fato `String` no JSON: `optString` diverge entre o `org.json` do Android (`null`
  * vira "null") e o do Maven (vira ""), então todo acesso passa por [str].
  *
