@@ -66,3 +66,7 @@ contraexemplo de cantos (`PlanoDeInsetsTest`, 1 falha em 6); o fonte correto foi
   e `tour-keyboard-mic*` voltam ao mesmo y das fileiras (3 fileiras visíveis na prévia, como antes).
 - `keyboard-glitch-burst*` (22050 px) e `keyboard-rosegold-shimmer-dark` (4943 px) aceitos: o efeito fatia a altura da view,
   que agora inclui a faixa; as teclas continuam inteiras e só o frame do efeito se desloca.
+- CI do #86 (rodada 1): `SettingsRepositoryTest.keyboardSnapshotMatchesTheSingleReads` comparava o snapshot sem o novo campo `orbe`
+  (agora esperado via `orbeDoTecladoFlow()`); `bar-custom-overflow-dark` e `config-ajuda-teclado*` ficaram sob o limiar de 0,02%
+  no diff local mas acima dele no CI (10013 e ~1070 px) — o golden claro/escuro de uma mesma rota precisa ser aprovado junto,
+  e a aprovação deve olhar o diff do CI, não só o local. Aprovados a partir das capturas do CI.

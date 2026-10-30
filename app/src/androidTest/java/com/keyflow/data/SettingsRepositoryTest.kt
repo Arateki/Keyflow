@@ -641,7 +641,7 @@ class SettingsRepositoryTest {
         assertEquals(repository.barsConfigOnce(), snapshot.bars)
         assertEquals(repository.shortcutGridsOnce(), snapshot.grids)
         assertEquals(repository.vibrationIntensityOnce(), snapshot.vibration)
-        assertEquals(KeyboardSnapshot(true, 85, "en", true, "glitch", snapshot.bars, snapshot.grids, 30), snapshot)
+        assertEquals(KeyboardSnapshot(true, 85, "en", true, "glitch", snapshot.bars, snapshot.grids, 30, orbe = repository.orbeDoTecladoFlow().first()), snapshot)
     }
 
     @Test
