@@ -23,8 +23,23 @@ import com.keyflow.core.shortcuts.GridTriggerMode
 import com.keyflow.core.shortcuts.PhysicalKeyMap
 import com.keyflow.core.shortcuts.ShortcutGrid
 import com.keyflow.data.SettingsRepository
+import com.keyflow.fluxos.ConfigFluxos
+import com.keyflow.fluxos.Etapa
+import com.keyflow.fluxos.Fluxo
+import com.keyflow.fluxos.Gatilho
+import com.keyflow.fluxos.Superficie
+import com.keyflow.fluxos.TipoEtapa
+import com.keyflow.fluxos.app.PortasPorTipo
+import com.keyflow.fluxos.execucao.EstadoExecucao
+import com.keyflow.fluxos.execucao.PortaEtapa
+import com.keyflow.fluxos.execucao.ResultadoEtapa
+import com.keyflow.fluxos.execucao.Valor
+import com.keyflow.overlay.OverlayService
 import android.view.KeyEvent
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.first
 import org.junit.After
 import org.junit.Before
 import org.junit.Assert.assertEquals
@@ -116,6 +131,68 @@ class KeyFlowKeyboardBarsTest {
         // EMT-02 fim-a-fim: o EditText do probe interpreta KEYCODE_B físico como o caractere "b".
         waitUntil("o campo não recebeu o KeyEvent físico da tecla avulsa") {
             device.findObject(By.desc("ime_probe_field"))?.text?.contains("b") == true
+        }
+    }
+
+    @Test
+    fun botaoDeFluxoDoImeChegaAoServicoECancelaAoRetocar() {
+        val repo = SettingsRepository(context)
+        val configAntes = runBlocking { repo.configFluxosOnce() }
+        val barrasAntes = runBlocking { repo.barsConfigOnce() }
+        val settingsAntes = runBlocking { repo.settingsFlow().first() }
+        val etapas = java.util.concurrent.CopyOnWriteArrayList<TipoEtapa>()
+        val cancelou = CompletableDeferred<Unit>()
+        val fluxo = Fluxo("f-ime", "Fluxo do IME", etapas = listOf(Etapa.Ditar(), Etapa.Perguntar(), Etapa.Inserir))
+        val botao = BarButton.RunFlow("b-ime")
+        val barras = BarsConfig(true, listOf(BarDef(listOf(BarButton.Mic, botao, BarButton.ToggleExpand))), emptyList())
+        OverlayService.portasDeFluxoForTest = {
+            PortasPorTipo(TipoEtapa.entries.associateWith {
+                object : PortaEtapa {
+                    override suspend fun executar(etapa: Etapa, entrada: Valor): ResultadoEtapa<Valor> {
+                        etapas += etapa.tipo
+                        if (etapa is Etapa.Perguntar) {
+                            try { awaitCancellation() } finally { cancelou.complete(Unit) }
+                        }
+                        return ResultadoEtapa.Ok(Valor.Texto("teste do IME"))
+                    }
+                }
+            })
+        }
+        try {
+            runBlocking {
+                repo.saveSettings(settingsAntes.copy(overlayModeEnabled = false))
+                repo.atualizarFluxosEBarras { _, _ ->
+                    ConfigFluxos(listOf(fluxo), listOf(Gatilho(Superficie.Barra(botao.botaoId), fluxo.id))) to barras
+                }
+            }
+            launchProbe(bars = true)
+            val view = KeyFlowKeyboardService.activeViewForTest!!
+            val bar = view.barViewsForTest.first { it.isShown }
+            waitUntil("botão de fluxo não foi medido") { bar.layoutForTest.buttons.any { it.button == botao } }
+            awaitImeWindowSettled(device)
+            val geometria = bar.layoutForTest.buttons.first { it.button == botao }
+            val rect = bar.buttonScreenRectForTest(geometria.index)
+            val time = SystemClock.uptimeMillis()
+            inject(MotionEvent.ACTION_DOWN, rect.centerX(), rect.centerY(), time)
+            inject(MotionEvent.ACTION_UP, rect.centerX(), rect.centerY(), SystemClock.uptimeMillis())
+            waitUntil("o toque no IME não chegou ao host do serviço", timeoutMs = 15_000) {
+                etapas.size == 2 && (KeyFlowController.fluxo.value as? EstadoExecucao.Rodando)?.etapa == TipoEtapa.PERGUNTAR
+            }
+            val retocar = SystemClock.uptimeMillis()
+            inject(MotionEvent.ACTION_DOWN, rect.centerX(), rect.centerY(), retocar)
+            inject(MotionEvent.ACTION_UP, rect.centerX(), rect.centerY(), SystemClock.uptimeMillis())
+            waitUntil("retocar o botão aceso do IME não cancelou o processamento", timeoutMs = 15_000) {
+                cancelou.isCompleted && KeyFlowController.fluxo.value is EstadoExecucao.Cancelado
+            }
+            assertEquals(listOf(TipoEtapa.DITAR, TipoEtapa.PERGUNTAR), etapas.toList())
+        } finally {
+            instrumentation.runOnMainSync { OverlayService.stop(context) }
+            waitUntil("serviço de fluxo não encerrou", timeoutMs = 15_000) { OverlayService.instanceForVisionTest == null }
+            OverlayService.portasDeFluxoForTest = null
+            runBlocking {
+                repo.saveSettings(settingsAntes)
+                repo.atualizarFluxosEBarras { _, _ -> configAntes to barrasAntes }
+            }
         }
     }
 

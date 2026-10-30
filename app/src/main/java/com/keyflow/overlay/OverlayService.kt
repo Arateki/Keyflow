@@ -2,6 +2,22 @@ package com.keyflow.overlay
 
 import com.keyflow.i18n.tr
 import com.keyflow.fluxos.execucao.DestinoFluxo
+import com.keyflow.fluxos.ConfigFluxos
+import com.keyflow.fluxos.Etapa
+import com.keyflow.fluxos.Fluxo
+import com.keyflow.fluxos.PoliticaDoLugar
+import com.keyflow.fluxos.Resolucao
+import com.keyflow.fluxos.RoteadorGatilhos
+import com.keyflow.orbe.LugarDaOrbe
+import com.keyflow.fluxos.Superficie
+import com.keyflow.fluxos.TipoEtapa
+import com.keyflow.fluxos.app.AmbienteMotores
+import com.keyflow.fluxos.app.FluxoHost
+import com.keyflow.fluxos.app.MontagemDasPortas
+import com.keyflow.fluxos.app.PortaCapturarOverlay
+import com.keyflow.fluxos.app.PortaDitarOverlay
+import com.keyflow.fluxos.execucao.DestinoAba
+import com.keyflow.fluxos.execucao.EstadoExecucao
 import com.keyflow.vision.VisionConsentActivity
 import com.keyflow.vision.VisionProjectionSession
 import com.keyflow.vision.DestinoCaptura
@@ -165,6 +181,15 @@ class OverlayService : Service() {
     private var pendingOverlayStart = false
     private var pendingKeyboardMic = false
     private var pendingRecord = false
+    private lateinit var fluxoHost: FluxoHost
+    private var cachedFluxos = ConfigFluxos(emptyList(), emptyList())
+    private var fluxosReady = false
+    private var pendingRunFlow: Intent? = null
+    internal val settingsForTest: Settings get() = cachedSettings
+    internal val configFluxosForTest: ConfigFluxos get() = cachedFluxos
+    internal val fluxoAtivoForTest: Boolean get() = fluxoHost.ativo
+    internal val foregroundForTest: Boolean get() = isForeground
+    internal val orbeForTest: OrbButtonView? get() = floatingButton
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -177,6 +202,8 @@ class OverlayService : Service() {
 
         createCoordinator()
         createGestureController()
+        createFluxoHost()
+        observeFluxos()
         observeSettings()
         observeControllerState()
         observeOverlayPosition()
@@ -185,6 +212,13 @@ class OverlayService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
+            ACTION_RUN_FLOW -> {
+                // Mesmo um pedido inválido precisa concluir o protocolo de startForegroundService.
+                if (ensureForeground()) {
+                    if (pendingRunFlow != null) avisarFluxo(tr("Já há um fluxo em andamento"), null)
+                    else { pendingRunFlow = Intent(intent); executarFluxoPendente() }
+                }
+            }
             ACTION_START_OVERLAY -> if (settingsReady) startOverlay() else pendingOverlayStart = true
             ACTION_KEYBOARD_MIC -> {
                 if (settingsReady) {
@@ -199,7 +233,9 @@ class OverlayService : Service() {
             ACTION_UNDO_CANCEL -> { if (::coordinator.isInitialized) coordinator.onUndoCancel() }
             ACTION_COMMIT_CANCEL -> { if (::coordinator.isInitialized) coordinator.onCommitCancel() }
             ACTION_RECORD -> {
-                if (visionFlow.state != VisionFlowState.NONE) {
+                if (cancelarFluxoForaDoDitar()) {
+                    // O toque cancela a etapa de processamento; durante Ditar continua enviando a gravação.
+                } else if (visionFlow.state != VisionFlowState.NONE) {
                     visionFlow.finish()
                 } else if (settingsReady) {
                     if (ensureForeground() && ::coordinator.isInitialized) coordinator.onTap() // ocioso → inicia (inclui tela de bloqueio)
@@ -515,7 +551,8 @@ class OverlayService : Service() {
      * serviço — assim não fica notificação de FGS quando ocioso no modo só-teclado.
      */
     private fun maybeStopWhenIdle(state: ButtonState) {
-        if (overlayActive || !isForeground || visionFlow.state != VisionFlowState.NONE || visionRestartDialog != null) return
+        if (destroying || overlayActive || !isForeground || (::fluxoHost.isInitialized && fluxoHost.ativo) ||
+            visionFlow.state != VisionFlowState.NONE || visionRestartDialog != null || errorBanner != null) return
         val idle = state == ButtonState.IDLE_READY || state == ButtonState.IDLE_NO_FIELD
         if (idle) {
             stopForeground(STOP_FOREGROUND_REMOVE)
@@ -567,6 +604,8 @@ class OverlayService : Service() {
 
     override fun onDestroy() {
         destroying = true
+        if (::fluxoHost.isInitialized) fluxoHost.cancelar()
+        pendingRunFlow = null
         instanceForVisionTest = null
         if (visionFlow.state != VisionFlowState.NONE) visionFlow.finish()
         visionRestartDialog?.dismiss()
@@ -656,7 +695,7 @@ class OverlayService : Service() {
      * (A5, design §7.1): a gravação que o fluxo abriu não tem "segurar", então o modo é alternar.
      */
     private fun recordingModeNow(): RecordingMode =
-        if (::coordinator.isInitialized && coordinator.ditadoDeFluxo) RecordingMode.TOGGLE else cachedSettings.overlayRecordingMode
+        if ((::coordinator.isInitialized && coordinator.ditadoDeFluxo) || (::fluxoHost.isInitialized && fluxoHost.ativo)) RecordingMode.TOGGLE else cachedSettings.overlayRecordingMode
 
     internal val gestureControllerForTest: RecordingGestureController get() = gestureController
     internal val coordinatorForTest: OverlayCoordinator get() = coordinator
@@ -672,6 +711,83 @@ class OverlayService : Service() {
 
     /** Encerra a captura em curso (cancelar a etapa); a entrega recebe `null`. */
     internal fun cancelarCapturaDeFluxo() = visionFlow.finish()
+
+    private fun createFluxoHost() {
+        val portas = portasDeFluxoForTest?.invoke() ?: run {
+            val ambiente = AmbienteMotores.of(this)
+            val mapa = MontagemDasPortas.base(this).toMutableMap()
+            mapa[TipoEtapa.DITAR] = PortaDitarOverlay(ambiente::settingsAgora, ambiente::configDaTranscricao,
+                ::ditarParaFluxo, coordinator::abandonarDitadoDeFluxo)
+            mapa[TipoEtapa.CAPTURAR] = PortaCapturarOverlay(::capturarParaFluxo, ::cancelarCapturaDeFluxo, MontagemDasPortas::embrulhar)
+            MontagemDasPortas.agente(this) { fluxoHost.nomeDoFluxo }?.let { mapa[TipoEtapa.AGENTE] = it }
+            MontagemDasPortas.comoPortas(mapa)
+        }
+        fluxoHost = FluxoHost(serviceScope, portas, coordinator::currentState, ::prepararFluxo, ::ensureForeground,
+            publicar = { estado ->
+                KeyFlowController.updateFluxo(estado)
+                floatingButton?.updateFluxoEtapa((estado as? EstadoExecucao.Rodando)?.etapa, cachedSettings.themeDark)
+            }, avisar = ::avisarFluxo, aoTerminar = { maybeStopWhenIdle(coordinator.currentState()) })
+    }
+
+    private fun prepararFluxo(fluxo: Fluxo): Boolean {
+        if (fluxo.etapas.first() is Etapa.Ditar) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                showErrorBanner(tr("Conceda permissão de microfone para usar essa função."), ::openOverlayMic)
+                return false
+            }
+            if (coordinator.currentState() !in listOf(ButtonState.IDLE_READY, ButtonState.IDLE_NO_FIELD)) {
+                avisarFluxo(tr("Termine a gravação atual antes de rodar o fluxo."), null)
+                return false
+            }
+        } else if (fluxo.etapas.first() == Etapa.Capturar) {
+            if (!OverlayPermission.canDrawOverlays(this)) {
+                avisarFluxo(tr("Conceda permissão de sobreposição para capturar a tela."), null)
+                return false
+            }
+            if (visionFlow.state != VisionFlowState.NONE || coordinator.currentState() in listOf(ButtonState.SENDING, ButtonState.CANCELLING)) {
+                avisarFluxo(tr("Não foi possível iniciar a captura agora."), null)
+                return false
+            }
+        }
+        return true
+    }
+
+    private fun observeFluxos() {
+        serviceScope.launch {
+            settingsRepository.configFluxosFlow().collect {
+                cachedFluxos = it
+                fluxosReady = true
+                executarFluxoPendente()
+            }
+        }
+    }
+
+    private fun executarFluxoPendente() {
+        if (!settingsReady || !fluxosReady || destroying) return
+        val pedido = pendingRunFlow ?: return
+        pendingRunFlow = null
+        val idManual = pedido.getStringExtra(EXTRA_FLUXO_ID)
+        val botaoId = pedido.getStringExtra(EXTRA_BOTAO_ID)
+        val id = idManual ?: botaoId?.let { cachedFluxos.gatilho(Superficie.Barra(it))?.fluxoId }
+        val cancelou = idManual == null && botaoId != null && fluxoHost.cancelarPeloBotao(id)
+        if (!cancelou) fluxoHost.disparar(cachedFluxos.fluxos.firstOrNull { it.id == id })
+        maybeStopWhenIdle(coordinator.currentState())
+    }
+
+    private fun avisarFluxo(mensagem: String, destino: DestinoAba?) {
+        avisoDeFluxoForTest?.invoke(mensagem, destino)
+        if (destroying) return
+        val aba = when (destino) {
+            DestinoAba.TRANSCRICAO -> com.keyflow.ui.config.ConfigTab.VOZ
+            DestinoAba.VISAO -> com.keyflow.ui.config.ConfigTab.VISAO
+            DestinoAba.RACIOCINIO -> com.keyflow.ui.config.ConfigTab.RACIOCINIO
+            DestinoAba.VOZ -> com.keyflow.ui.config.ConfigTab.FALA
+            null -> com.keyflow.ui.config.ConfigTab.FLUXOS
+        }
+        if (OverlayPermission.canDrawOverlays(this)) showErrorBanner(mensagem) {
+            startActivity(SetupActivity.openAtTabIntent(this, aba).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } else Toast.makeText(this, mensagem, Toast.LENGTH_LONG).show()
+    }
 
     private fun createGestureController() {
         gestureController = RecordingGestureController(
@@ -736,6 +852,7 @@ class OverlayService : Service() {
                 if (it.overlaySide != prevSide) snapOrbToSide(it.overlaySide)
                 if (!settingsReady) {
                     settingsReady = true
+                    executarFluxoPendente()
                     if (pendingOverlayStart || (it.overlayModeEnabled && OverlayPermission.canDrawOverlays(this@OverlayService))) {
                         pendingOverlayStart = false
                         startOverlay()
@@ -772,7 +889,7 @@ class OverlayService : Service() {
             controller = gestureController,
             mode = ::recordingModeNow,
             side = { cachedSettings.overlaySide },
-            onIntent = { intent -> if (visionFlow.state != VisionFlowState.NONE) visionFlow.finish() else coordinator.onIntent(intent) },
+            onIntent = ::handleOrbIntent,
             orbSizePx = cachedSettings.orbSizePx,
             orbStyle = com.keyflow.ui.orb.orbStyleFor(cachedSettings.orbSkin, skinsUnlocked),
             orbPack = openOrbPack(cachedSettings.orbSkin),
@@ -787,6 +904,7 @@ class OverlayService : Service() {
             onOpenConfig = ::openKeyFlowApp,
         )
 
+        button.updateFluxoEtapa((KeyFlowController.fluxo.value as? EstadoExecucao.Rodando)?.etapa, cachedSettings.themeDark)
         button.bindWindowLayout(params) { updatedParams ->
             windowManager.updateViewLayout(button, updatedParams)
         }
@@ -865,9 +983,30 @@ class OverlayService : Service() {
      * de 1 toque só chega aqui na janela de release do PTT, por decisão da OrbButtonView.) Reusa os
      * mecanismos existentes (o "trocar teclado" mantém a técnica do showInputMethodPicker).
      */
-    private fun handleOrbShortcut(count: Int) {
+    internal fun handleOrbIntent(intent: GestureIntent) {
+        if (intent == GestureIntent.NONE) return
+        if (intent == GestureIntent.REPOSITION_ONLY && ::fluxoHost.isInitialized && fluxoHost.ativo) return
+        if (cancelarFluxoForaDoDitar()) return
+        if (visionFlow.state != VisionFlowState.NONE) visionFlow.finish() else coordinator.onIntent(intent)
+    }
+
+    private fun cancelarFluxoForaDoDitar(): Boolean {
+        if (!::fluxoHost.isInitialized || !fluxoHost.ativo || fluxoHost.etapaAtual == TipoEtapa.DITAR) return false
+        fluxoHost.cancelar()
+        return true
+    }
+
+    internal fun handleOrbShortcut(count: Int) {
         if (!::coordinator.isInitialized) return
-        when (cachedSettings.resolveShortcut(count)) {
+        val resolucao = RoteadorGatilhos.resolverToques(LugarDaOrbe.FLUTUANTE, count, cachedFluxos,
+            PoliticaDoLugar.daFlutuante(cachedSettings), cachedSettings)
+        val acao = when (resolucao) {
+            is Resolucao.Rodar -> { fluxoHost.disparar(resolucao.fluxo); return }
+            is Resolucao.Incompleto -> { avisarFluxo(tr("Fluxo incompleto: abra a aba Fluxos"), null); return }
+            is Resolucao.AcaoDoSettings -> resolucao.acao
+            is Resolucao.AcaoDoLugar, Resolucao.Nada -> return
+        }
+        when (acao) {
             OrbShortcutAction.NONE -> Unit
             OrbShortcutAction.SWITCH_IME -> showInputMethodPicker()
             // Só alterna se o teclado estiver realmente aberto na tela; senão não faz nada.
@@ -917,15 +1056,21 @@ class OverlayService : Service() {
     /** Banner sobreposto, clicável, para erros com destino de navegação (Transcrição ou Sobrepor). Some em 2 s. */
     private fun showErrorBanner(message: String, onTap: () -> Unit) {
         removeErrorBanner()
-        val banner = bannerView("⚠  $message", com.keyflow.ui.theme.OrbAccentArgb, 2000L) {
+        val prazo = errorBannerDurationMsForTest ?: 2000L
+        val banner = bannerView("⚠  $message", com.keyflow.ui.theme.OrbAccentArgb, prazo) {
             onTap()
             removeErrorBanner()
+            if (::coordinator.isInitialized) maybeStopWhenIdle(coordinator.currentState())
         }
-        runCatching { windowManager.addView(banner, bannerParams()) }
+        if (runCatching { windowManager.addView(banner, bannerParams()) }.isFailure) {
+            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+            return
+        }
         errorBanner = banner
         errorBannerJob = serviceScope.launch {
-            delay(2000)
+            delay(prazo)
             removeErrorBanner()
+            if (::coordinator.isInitialized) maybeStopWhenIdle(coordinator.currentState())
         }
     }
 
@@ -1266,6 +1411,9 @@ class OverlayService : Service() {
 
     companion object {
         internal var instanceForVisionTest: OverlayService? = null
+        internal var portasDeFluxoForTest: (() -> com.keyflow.fluxos.execucao.Portas)? = null
+        internal var avisoDeFluxoForTest: ((String, com.keyflow.fluxos.execucao.DestinoAba?) -> Unit)? = null
+        internal var errorBannerDurationMsForTest: Long? = null
         internal var visionRestartShowForTest: ((android.app.AlertDialog) -> Unit)? = null
         internal var visionSessionCloseForTest: ((Boolean) -> Unit)? = null
         internal val visionFlowStateForTest = kotlinx.coroutines.flow.MutableStateFlow(VisionFlowState.NONE)
@@ -1275,6 +1423,10 @@ class OverlayService : Service() {
 
         private const val NOTIFICATION_CHANNEL_ID = "keyflow_overlay"
         private const val NOTIFICATION_ID = 1001
+
+        const val ACTION_RUN_FLOW = "com.keyflow.overlay.RUN_FLOW"
+        const val EXTRA_BOTAO_ID = "botao_id"
+        const val EXTRA_FLUXO_ID = "fluxo_id"
 
         const val ACTION_START_OVERLAY = "com.keyflow.overlay.START_OVERLAY"
         const val ACTION_KEYBOARD_MIC = "com.keyflow.overlay.KEYBOARD_MIC"
@@ -1313,6 +1465,13 @@ class OverlayService : Service() {
          * saber que o primeiro plano ainda não chegou.
          */
         fun start(context: Context, intent: Intent) {
+            // O FGS existente é microphone: até Capturar precisa dessa permissão para subir o serviço.
+            // SPEC_DEVIATION: licoes/2026-10-30-fluxos-fase-c2-host.md (FLX-39).
+            if (intent.action == ACTION_RUN_FLOW &&
+                ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(context, tr("Conceda permissão de microfone para usar essa função."), Toast.LENGTH_LONG).show()
+                return
+            }
             foregroundPending = true
             stopRequested = false
             try {
@@ -1333,6 +1492,14 @@ class OverlayService : Service() {
         fun stop(context: Context) {
             if (foregroundPending) stopRequested = true else context.stopService(intent(context))
         }
+
+        /** Botão da barra: resolve o gatilho atual no serviço, sem transportar uma cópia do fluxo. */
+        fun runFlowIntent(context: Context, botaoId: String): Intent =
+            actionIntent(context, ACTION_RUN_FLOW).putExtra(EXTRA_BOTAO_ID, botaoId)
+
+        /** Rodar agora: usa o id do fluxo sem criar ou gravar atalho. */
+        fun runFlowNowIntent(context: Context, fluxoId: String): Intent =
+            actionIntent(context, ACTION_RUN_FLOW).putExtra(EXTRA_FLUXO_ID, fluxoId)
 
         /** Inicia/garante o Modo Sobrepor (serviço persistente + orbe). */
         fun startOverlayIntent(context: Context): Intent =
