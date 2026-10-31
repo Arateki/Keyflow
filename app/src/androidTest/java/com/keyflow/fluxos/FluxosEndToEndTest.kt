@@ -90,7 +90,7 @@ class FluxosEndToEndTest {
         catch (erro: kotlinx.coroutines.TimeoutCancellationException) { throw AssertionError(motivo, erro) }
     }
 
-    @Before fun preparar() = runBlocking {
+    @Before fun preparar() = runBlocking<Unit> {
         scenario = ActivityScenario.launch(Intent(context, ComposeSmokeActivity::class.java))
         instrumentation.uiAutomation.executeShellCommand("appops set ${context.packageName} SYSTEM_ALERT_WINDOW allow").close()
         instrumentation.runOnMainSync { OverlayService.stop(context) }
@@ -116,7 +116,7 @@ class FluxosEndToEndTest {
         observador.launch { KeyFlowController.fluxo.collect { if (it.fluxoIdOuNulo() != null) finais += it } }
     }
 
-    @After fun limpar() = runBlocking {
+    @After fun limpar() = runBlocking<Unit> {
         observador.coroutineContext[kotlinx.coroutines.Job]?.cancel()
         try {
             if (KeyFlowController.buttonState.value in listOf(ButtonState.RECORDING, ButtonState.PAUSED)) {
@@ -166,7 +166,7 @@ class FluxosEndToEndTest {
     private fun tipos() = chamadas.map { it.first }
     private fun entradaDe(tipo: TipoEtapa) = chamadas.first { it.first == tipo }.second
 
-    @Test fun ouvirEResponderPeloBotaoPassaOTextoDeEtapaEmEtapa() = runBlocking {
+    @Test fun ouvirEResponderPeloBotaoPassaOTextoDeEtapaEmEtapa() = runBlocking<Unit> {
         semear(listOf(ouvir), listOf(Gatilho(Superficie.Barra("b-ouvir"), ouvir.id)), listOf("b-ouvir"))
         botao("b-ouvir")
         assertEquals(EstadoExecucao.Concluido(ouvir.id), terminou(ouvir.id))
@@ -176,7 +176,7 @@ class FluxosEndToEndTest {
         assertTrue(avisos.isEmpty())
     }
 
-    @Test fun lerATelaEColarLiberaAImagemUmaVezEEntregaOTextoAoInserir() = runBlocking {
+    @Test fun lerATelaEColarLiberaAImagemUmaVezEEntregaOTextoAoInserir() = runBlocking<Unit> {
         semear(listOf(lerTela), emptyList())
         rodarAgora(lerTela.id)
         assertEquals(EstadoExecucao.Concluido(lerTela.id), terminou(lerTela.id))
@@ -185,7 +185,7 @@ class FluxosEndToEndTest {
         assertEquals("a imagem sai da memória exatamente uma vez", 1, liberadas.get())
     }
 
-    @Test fun pedirAoAgenteEColarRodaOAgenteComOTextoDitado() = runBlocking {
+    @Test fun pedirAoAgenteEColarRodaOAgenteComOTextoDitado() = runBlocking<Unit> {
         semear(listOf(agente), emptyList())
         rodarAgora(agente.id)
         assertEquals(EstadoExecucao.Concluido(agente.id), terminou(agente.id))
@@ -194,7 +194,7 @@ class FluxosEndToEndTest {
         assertEquals(Valor.Texto("agente fez oi"), entradaDe(TipoEtapa.INSERIR))
     }
 
-    @Test fun falhaNoMeioParaOFluxoAvisaELiberaAImagem() = runBlocking {
+    @Test fun falhaNoMeioParaOFluxoAvisaELiberaAImagem() = runBlocking<Unit> {
         motor = { etapa, entrada ->
             if (etapa is Etapa.Visao) ResultadoEtapa.Falha(ErroEtapa(CausaErro.REDE, "sem rede", DestinoAba.VISAO)) else respostaPadrao(etapa, entrada)
         }
@@ -228,7 +228,7 @@ class FluxosEndToEndTest {
         assertTrue("cancelar não é erro: sem aviso", avisos.isEmpty())
     }
 
-    @Test fun cancelarEmCadaEtapaPara() = runBlocking {
+    @Test fun cancelarEmCadaEtapaPara() = runBlocking<Unit> {
         val todas = Fluxo("todas", "Todas", etapas = listOf(Etapa.Ditar(), Etapa.Perguntar(), Etapa.Falar(), Etapa.Inserir))
         listOf(TipoEtapa.PERGUNTAR, TipoEtapa.FALAR).forEach { alvo ->
             chamadas.clear(); finais.clear(); avisos.clear()
@@ -245,7 +245,7 @@ class FluxosEndToEndTest {
         assertEquals("cancelar na Visão também libera a imagem", 1, liberadas.get())
     }
 
-    @Test fun doisTouquesLigadosRodamOFluxoSemAlterarAsSettings() = runBlocking {
+    @Test fun doisTouquesLigadosRodamOFluxoSemAlterarAsSettings() = runBlocking<Unit> {
         val config = semear(listOf(ouvir), listOf(Gatilho(Superficie.Orbe(LugarDaOrbe.FLUTUANTE, 2), ouvir.id)))
         OverlayService.start(context, OverlayService.startOverlayIntent(context))
         aguardar("orbe não apareceu") { OverlayService.isRunningForUi }
@@ -257,7 +257,7 @@ class FluxosEndToEndTest {
         assertEquals(OrbShortcutAction.TOGGLE_KEYBOARD, repo.settingsFlow().first().shortcut2Tap)
     }
 
-    @Test fun restaurarNaoMexeNosGatilhosNemReligaAtalhos() = runBlocking {
+    @Test fun restaurarNaoMexeNosGatilhosNemReligaAtalhos() = runBlocking<Unit> {
         val gatilhos = listOf(Gatilho(Superficie.Orbe(LugarDaOrbe.FLUTUANTE, 2), ouvir.id), Gatilho(Superficie.Barra("b-ouvir"), ouvir.id))
         semear(listOf(ouvir.copy(etapas = listOf(Etapa.Ditar(), Etapa.Inserir)), lerTela), gatilhos, listOf("b-ouvir"))
         val depois = repo.atualizarFluxos(RestauradorFluxos::restaurar)
@@ -268,7 +268,7 @@ class FluxosEndToEndTest {
         assertTrue("restaurar não liga atalho ao fluxo recriado", depois.gatilhosDe(depois.fluxos.first { it.padrao == agente.padrao }.id).isEmpty())
     }
 
-    @Test fun execucoesSeguidasNaoVazamValorNemEstado() = runBlocking {
+    @Test fun execucoesSeguidasNaoVazamValorNemEstado() = runBlocking<Unit> {
         semear(listOf(ouvir), emptyList())
         repeat(2) { vez ->
             chamadas.clear(); finais.clear()
