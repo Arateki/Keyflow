@@ -411,7 +411,7 @@ Nenhuma. Q1–Q13 foram respondidas em 29/10 (D12–D24). Q8, Q9, Q10, Q11 e Q13
 | CMP-27 | P1-D | CMP-T14 | Verificada com o KeyFlow IME como teclado atual via `InputConnection`; Gboard e toque real: T21 (manual) |
 | CMP-28 | P1-D | CMP-T13 | Verificada (colar e ditado com quebra de linha pedem confirmação; `ESC[201~` removido até não sobrar) |
 | CMP-29 | P1-D | CMP-T10, CMP-T13 | Verificada (9ª sessão mostra o motivo; `onTrimMemory` não perde o texto) |
-| CMP-30 | P1-D | CMP-T13 | Verificada (sem `FLAG_SECURE`, teste de código e de janela; fonte JetBrains Mono Nerd, OFL; tamanho de fonte não persiste) |
+| CMP-30 | P1-D | CMP-T13 | Sem `FLAG_SECURE` verificado; fonte JetBrains Mono Nerd mantida pelo Yan. Revisão #96: copyrights e avisos completos dos 14 conjuntos, Nerd Fonts e base, com OFL/MIT/Apache-2.0/CC BY 4.0/Unlicense e aviso Bitstream da origem. Tamanho da fonte ainda não persiste |
 | CMP-31 | P1-D | CMP-T14, CMP-T17 | Parcial — alvos de 48 dp e `contentDescription` nas abas e teclas extras, estado por texto (T13/T14); falta T17 |
 | CMP-32 | P1-E | CMP-T12, CMP-T20 | Parcial — serviço `specialUse`, notificação só com contagem (CMP-T12) verificados |
 | CMP-33 | P1-E | CMP-T12, CMP-T19 | Parcial — manifesto, `property` e checklist da Play (CMP-T12); declaração no Console é [YAN] |

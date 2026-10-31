@@ -25,3 +25,11 @@ Os nove instrumentados de entrada foram preparados (inclusive o componente corre
 Depois da validação, a fase segredo → confirmação do DataStore → limpeza é protegida contra cancelamento do modal. Um teste reproduziu o ator que confirma a configuração antes de entregar uma resposta cancelada: desfazer apenas a senha nessa janela deixava permissão sem credencial. O teste ficou vermelho, a fase foi protegida com `NonCancellable` e os nove testes do gravador passaram.
 
 O modal consulta só a existência da senha (IO), acompanha a presença do rascunho para habilitar a marca e desabilita Chave quando não há chaves. Estado de tela após IO volta a Main. Os testes de persistência/regra/validação/codec e traduções passaram; a mutação que ignorou a disponibilidade da senha derrubou `lembrarNaoEProvaDeSegredoGuardado`, foi revertida e a rodada final passou. Os instrumentados novos compilaram; a execução continua suspensa pelo ANR observado antes da instalação.
+
+## CMP-30: avisos de todos os conjuntos incorporados
+
+A decisão do Yan mantém JetBrains Mono Nerd Font Mono 3.5.1. A OFL da JetBrains Mono 2.304 foi complementada com o LICENSE completo do Nerd Fonts (Ryan L McIntyre, 2014), os avisos MIT de Devicons, Font Awesome Extension, Octicons, Seti, Powerline/Extra e IEC, os textos OFL de Pomicons/Weather/Font Awesome, CC BY 4.0 de Codicons/ícones Font Awesome e Apache-2.0 de Material Design. O aviso do extraglyphs/Hack conserva também a origem Bitstream. Espaços finais/fins de linha foram normalizados sem alterar as palavras das licenças.
+
+O inventário de `src/glyphs/README.md` na tag 3.5.1 traz Pomicons como OFL 1.1 com RFN. Font Logos 1.3.0 possui Unlicense no upstream; a tabela do Nerd Fonts ainda o chama de “unlicensed”. O texto Unlicense e o copyright 2014–2026 de Lukas W presente na fonte foram preservados. README e arquivo de avisos apontam as fontes exatas; fontes sem data publicada não receberam datas inventadas.
+
+O asset permaneceu inalterado, SHA-256 `f2a5ea6cfab397445ffab00c0370927b66d61e560a05db5db271b42006381c1a`. A conferência verificou 16 atribuições (base, Nerd Fonts e 14 conjuntos) e os textos integrais; nenhum teste foi acrescentado para comparar texto de licença com ele mesmo.
