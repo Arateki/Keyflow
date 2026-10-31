@@ -218,6 +218,7 @@ class SetupActivity : ComponentActivity() {
     private var orbeConfig by mutableStateOf(com.keyflow.orbe.ConfigOrbeTeclado())
     private var shortcutGrids by mutableStateOf<List<ShortcutGrid>>(emptyList())
     private var nomesDeFluxo by mutableStateOf<Map<String, String>>(emptyMap())
+    private var configFluxos by mutableStateOf(com.keyflow.fluxos.ConfigFluxos(emptyList(), emptyList()))
     // Monetização só é criada/conectada depois que o onboarding terminou; o onboarding não toca Play,
     // Integrity, API nem a camada de ads (MZ-T9/ADS-01).
     private var monetizationApi: KeyFlowApiClient? = null
@@ -325,7 +326,7 @@ class SetupActivity : ComponentActivity() {
             settingsRepository.shortcutGridsFlow().collectLatest { shortcutGrids = it }
         }
         activityScope.launch {
-            settingsRepository.configFluxosFlow().collectLatest { nomesDeFluxo = com.keyflow.fluxos.BotoesDeFluxo.nomes(it) }
+            settingsRepository.configFluxosFlow().collectLatest { configFluxos = it; nomesDeFluxo = com.keyflow.fluxos.BotoesDeFluxo.nomes(it) }
         }
 
         setContent {
@@ -390,6 +391,8 @@ class SetupActivity : ComponentActivity() {
                         },
                         shortcutGrids = shortcutGrids,
                         nomesDeFluxo = nomesDeFluxo,
+                        configFluxos = configFluxos,
+                        fluxosRepository = settingsRepository,
                         onShortcutGridsChange = { updated ->
                             shortcutGrids = updated
                             activityScope.launch { settingsRepository.saveShortcutGrids(updated) }

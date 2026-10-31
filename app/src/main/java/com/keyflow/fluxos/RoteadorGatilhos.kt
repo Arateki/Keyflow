@@ -56,7 +56,7 @@ sealed interface AcaoEfetiva {
     /** O gesto faz a ação configurada no `Settings`. */
     data class DaConfig(val acao: OrbShortcutAction) : AcaoEfetiva
 
-    /** O gesto está ligado a um fluxo; [nome] é nulo se o fluxo sumiu. A ação do `Settings` está sombreada. */
+    /** O gesto está ligado a um fluxo; [nome] (já traduzido, se for um padrão) é nulo se o fluxo sumiu. A ação do `Settings` está sombreada. */
     data class DeFluxo(val fluxoId: String, val nome: String?, val valido: Boolean) : AcaoEfetiva
 }
 
@@ -108,7 +108,7 @@ object RoteadorGatilhos {
         val ligado = (if (toques in Superficie.Orbe.TOQUES) config.gatilho(Superficie.Orbe(LugarDaOrbe.FLUTUANTE, toques)) else null)
             ?: return AcaoEfetiva.DaConfig(settings.shortcutForTaps(toques))
         val fluxo = config.fluxo(ligado.fluxoId)
-        return AcaoEfetiva.DeFluxo(ligado.fluxoId, fluxo?.nome, valido = fluxo != null && ValidadorFluxo.validar(fluxo).valido)
+        return AcaoEfetiva.DeFluxo(ligado.fluxoId, fluxo?.let { PadroesFluxo.nomeExibido(it) }, valido = fluxo != null && ValidadorFluxo.validar(fluxo).valido)
     }
 
     private fun acaoDoLugar(lugar: LugarDaOrbe, toques: Int, settings: Settings): Resolucao = when (lugar) {

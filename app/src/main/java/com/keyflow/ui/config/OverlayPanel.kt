@@ -1,6 +1,9 @@
 package com.keyflow.ui.config
 
 import com.keyflow.i18n.tr
+import com.keyflow.fluxos.AcaoEfetiva
+import com.keyflow.fluxos.ConfigFluxos
+import com.keyflow.fluxos.RoteadorGatilhos
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -84,6 +87,9 @@ fun OverlayPanel(
     modifier: Modifier = Modifier,
     onOpenShortcutSheet: (Int) -> Unit = {},
     onShortcut1Blocked: () -> Unit = {},
+    // Gestos ligados a um fluxo (aba Fluxos): a linha mostra "Fluxo: <nome>" e o toque explica e leva à aba (FLX-35, FLX-51).
+    configFluxos: ConfigFluxos = ConfigFluxos(emptyList(), emptyList()),
+    onOpenFluxos: () -> Unit = {},
     recordingModeHighlightKey: Int = 0,
     keyboardShortcutAvailable: Boolean = true,
     // Cartão do Modo Sobrepor, sempre no topo e sempre tocável (a aba Modo saiu — Yan, 2026-09-28).
@@ -251,8 +257,14 @@ fun OverlayPanel(
                                 enabled = pttMode,
                                 disabledNote = tr("Disponível apenas no modo Push-to-talk"),
                             ) { if (pttMode) onOpenShortcutSheet(1) else onShortcut1Blocked() }
-                            ShortcutRow(2, settings.shortcut2Tap, keyboardShortcutAvailable) { onOpenShortcutSheet(2) }
-                            ShortcutRow(3, settings.shortcut3Tap, keyboardShortcutAvailable) { onOpenShortcutSheet(3) }
+                            for (taps in 2..3) {
+                                val efetiva = RoteadorGatilhos.acaoEfetivaDoGesto(taps, settings, configFluxos)
+                                if (efetiva is AcaoEfetiva.DeFluxo) {
+                                    ShortcutRow(taps, OrbShortcutAction.NONE, keyboardShortcutAvailable, fluxo = efetiva, onClick = onOpenFluxos)
+                                } else {
+                                    ShortcutRow(taps, settings.shortcutForTaps(taps), keyboardShortcutAvailable) { onOpenShortcutSheet(taps) }
+                                }
+                            }
                         }
                     }
                     GroupDivider()
@@ -310,10 +322,11 @@ private fun ShortcutRow(
     keyboardAvailable: Boolean,
     enabled: Boolean = true,
     disabledNote: String? = null,
+    fluxo: AcaoEfetiva.DeFluxo? = null,
     onClick: () -> Unit,
 ) {
     val palette = LocalKeyFlowPalette.current
-    val unavailable = enabled && action == OrbShortcutAction.TOGGLE_KEYBOARD && !keyboardAvailable
+    val unavailable = fluxo == null && enabled && action == OrbShortcutAction.TOGGLE_KEYBOARD && !keyboardAvailable
     Row(
         Modifier
             .fillMaxWidth()
@@ -331,11 +344,25 @@ private fun ShortcutRow(
             Eyebrow(if (taps == 1) tr("1 toque") else tr("%d toques", taps), color = palette.muted)
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 3.dp)) {
                 Text(
-                    if (enabled) shortcutActionLabel(action) else (disabledNote ?: shortcutActionLabel(action)),
+                    when {
+                        fluxo != null -> tr("Fluxo: %s", fluxo.nome ?: tr("indisponível"))
+                        enabled -> shortcutActionLabel(action)
+                        else -> disabledNote ?: shortcutActionLabel(action)
+                    },
                     color = palette.fg,
                     fontFamily = SpaceGrotesk,
                     fontSize = 12.sp,
                 )
+                if (fluxo != null && !fluxo.valido) {
+                    Text(
+                        tr(" / incompleto"),
+                        color = palette.terracotta,
+                        fontFamily = SpaceGrotesk,
+                        fontWeight = FontWeight.Light,
+                        fontSize = 10.sp,
+                        modifier = Modifier.padding(start = 4.dp),
+                    )
+                }
                 if (unavailable) {
                     Text(
                         tr(" / indisponível"),

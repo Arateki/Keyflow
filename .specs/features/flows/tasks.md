@@ -267,7 +267,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 
 - **Registro (Fase D)**: `opcoesDeModelo(etapa, settings, instalados, conectados, catalogo)` é puro e devolve `OpcaoDeModelo`: `DaAba(efetivo)`, `Escolha(ModeloRef)`, `Conectar(aba)` e `Indisponivel(ref)` (o ref gravado que sumiu, selecionado, sem trocar). Ordem do enum da aba, sem `CREDITS`; `LOCAL` só com os `instalados`, `SYSTEM` sempre, nuvem só com a origem em `conectados` (as demais viram "Conecte na aba X" → `onAbrirAba`). Quem monta `instalados`/`catalogo` (a `FonteDeModelos`) é a T22, com o mesmo dado das abas; o modal sem fonte oferece só "Da aba". Visão só com modelos de visão fica por conta de quem monta o catálogo. Notas: Agente (ferramentas só com chave de API) e PaddleOCR (`ocr-paddle-latin`: instrução ignorada).
 
-### FLX-T20 — Atalhos no modal, botão da barra e excluir — **Status: pendente**
+### FLX-T20 — Atalhos no modal, botão da barra e excluir — **Status: feito (fase E, equipe/fluxos-fase-e)**
 - **What**: seção Atalhos (design §11.4), **agrupada por lugar** (FLX-57; só os lugares que existem — na entrega desta task, a orbe flutuante e o botão do teclado; os grupos da notificação e do teclado entram na T28/T29): "2 toques", "3 toques" (liga/desliga com o aviso do que era antes — `avisoDeSubstituicao`), confirmação ao tirar de outro fluxo, "Botão do teclado" (adiciona/remove `RunFlow` por `atualizarFluxosEBarras`), linhas desligadas
   quando o fluxo é Incompleto; **Excluir fluxo** com confirmação (remove fluxo, gatilhos e botões criados, cancela se estiver rodando).
 - **Where**: `ui/config/FluxosAtalhos.kt`, `ui/config/FluxosModal.kt`; testes `FluxosAtalhosTest`.
@@ -276,7 +276,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
   "Adicionar à barra" cria o botão no fim da barra principal (nos dois modos se não espelhadas) e o gatilho numa transação; excluir remove tudo e a lista atrás atualiza; fluxo Incompleto não liga; `lugaresDisponiveis()` só devolve `FLUTUANTE` e a modal **não** mostra os grupos da notificação nem do teclado.
 - **Tests**: instrumentado (Compose + repositório). **Gate**: `pool instrumentar com.keyflow.ui.config.FluxosAtalhosTest`. **Commit**: `feat(fluxos): atalhos, botão do teclado e exclusão no modal`.
 
-### FLX-T21 — Sobrepor e Tour mostram o gesto ligado a fluxo — **Status: pendente**
+### FLX-T21 — Sobrepor e Tour mostram o gesto ligado a fluxo — **Status: feito (fase E, equipe/fluxos-fase-e)**
 - **What**: `OverlayPanel.ShortcutRow` (`:254-255`) e `ModeCards` (`:128`) mostram "Fluxo: <nome>" quando há gatilho (somente leitura; tocar explica e leva à aba Fluxos); `GestureScriptCatalog` (`:194`) descreve o fluxo; tudo via
   `acaoEfetivaDoGesto` (T5). `ConfigScreen` passa `ConfigFluxos` a esses painéis.
 - **Where**: `ui/config/{OverlayPanel,ModeCards,ConfigScreen}.kt`, `ui/tour/GestureScriptCatalog.kt`; testes `OverlayPanelTest`, `GestureScriptCatalogTest` (ajustados).
@@ -284,7 +284,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 - **Done when**: instrumentado/unit — com 2 toques ligado, a linha mostra o nome do fluxo e o toque abre a aba Fluxos; sem gatilho as telas e o tour são **idênticos** aos de hoje (goldens existentes bit-idênticos); o tour descreve o fluxo quando ligado.
 - **Tests**: unit + instrumentado + goldens. **Gate**: `quick` + `pool instrumentar com.keyflow.ui.config.OverlayPanelTest` + `pool telas`. **Commit**: `feat(fluxos): sobrepor e tour mostram o gesto ligado a fluxo`.
 
-### FLX-T22 — Ligar a aba (sai do "Em breve") — **Status: pendente**
+### FLX-T22 — Ligar a aba (sai do "Em breve") — **Status: feito (fase E, equipe/fluxos-fase-e)**
 - **What**: `ConfigScreen` (`:512-514`) passa a chamar `FluxosPanel` no ramo `FLUXOS` (e mantém `COMPUTADOR`/`NOTIFICACAO` no cartão); abrir o modal pelo estado da tela; ajustar `ConfigScreenTest.deferredTabsShowComingSoonCardWithoutControls` (sem `FLUXOS`),
   o teste de banner (`:183`) e `ConfigTabTest` se preciso. `docsSectionFor` continua `null` até a T24.
 - **Where**: `ui/config/ConfigScreen.kt`, `app/src/androidTest/.../ConfigScreenTest.kt`.
