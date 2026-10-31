@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.sp
 import com.keyflow.core.ButtonState
 import com.keyflow.core.RecordingMode
 import com.keyflow.data.Settings
+import com.keyflow.fluxos.ConfigFluxos
 import com.keyflow.ime.KeyFlowKeyboardView
 import com.keyflow.ui.PermissionStatus
 import com.keyflow.ui.orb.OrbCenter
@@ -94,6 +95,7 @@ fun OverlayModeCard(
     onRequestMicPermission: () -> Unit,
     onRequestNotificationPermission: () -> Unit,
     highlightKey: Int = 0,
+    configFluxos: ConfigFluxos = ConfigFluxos(emptyList(), emptyList()),
 ) {
     ModeCard(
         title = tr("Modo Sobrepor"),
@@ -127,8 +129,10 @@ fun OverlayModeCard(
             settings.shortcut1Tap,
             settings.shortcut2Tap,
             settings.shortcut3Tap,
+            configFluxos.gatilhos, // gesto ligado a fluxo: o tour descreve o fluxo
+            configFluxos.fluxos,
             AppLocale.current, // os títulos dos gestos são texto traduzido
-        ) { buildOrbScripts(settings) },
+        ) { buildOrbScripts(settings, configFluxos) },
         tourScene = { frame -> OrbScene(frame, Modifier.fillMaxWidth()) },
     )
 }

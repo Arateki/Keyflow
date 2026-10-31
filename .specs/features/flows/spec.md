@@ -408,7 +408,7 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 | FLX-07 | P1-B | FLX-T18, FLX-T19 | Implementing (T18, T19 feitas) |
 | FLX-08 | P1-B | FLX-T19 | Implementing (T19 feita) |
 | FLX-09 | P1-B | FLX-T19 | Implementing (T19 feita) |
-| FLX-10 | P1-B | FLX-T20 | Pending |
+| FLX-10 | P1-B | FLX-T20 | Verified (T20: FluxosAtalhosTest) |
 | FLX-11 | P1-C | FLX-T18 | Implementing (T18 feita) |
 | FLX-12 | P1-C | FLX-T18 | Implementing (T18 feita) |
 | FLX-13 | P1-C | FLX-T1 | Implementing (T1 feita) |
@@ -433,10 +433,10 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 | FLX-32 | P1-D | FLX-T14, FLX-T16 | Verified (T14 e T16; glifo, cancelamento e botão) |
 | FLX-33 | P1-E | FLX-T1, FLX-T2, FLX-T5 | Implementing (T1, T2, T5 feitas) |
 | FLX-34 | P1-E | FLX-T5, FLX-T15, FLX-T25 | Implementing (T5 e T15 feitas; 2/3/overflow instrumentados) |
-| FLX-35 | P1-E | FLX-T5, FLX-T20, FLX-T21, FLX-T28 | Implementing (T5 feita) |
-| FLX-36 | P1-E | FLX-T16, FLX-T20 | Implementing (T16 feita; o disparo é da T14) |
-| FLX-37 | P1-E | FLX-T5, FLX-T20 | Implementing (T5 feita) |
-| FLX-38 | P1-E | FLX-T5, FLX-T20 | Implementing (T5 feita) |
+| FLX-35 | P1-E | FLX-T5, FLX-T20, FLX-T21, FLX-T28 | Implementing (T5, T20, T21 feitas; falta a notificação, T28) |
+| FLX-36 | P1-E | FLX-T16, FLX-T20 | Verified (T16, T20) |
+| FLX-37 | P1-E | FLX-T5, FLX-T20 | Verified (T5, T20) |
+| FLX-38 | P1-E | FLX-T5, FLX-T20 | Verified (T5, T20) |
 | FLX-39 | P1-E | FLX-T14, FLX-T15, FLX-T25 | Implementing (T14 e T15 feitas; SPEC_DEVIATION do FGS documentado) |
 | FLX-40 | P1-F | FLX-T3, FLX-T18 | Implementing (T3, T18 feitas) |
 | FLX-41 | P1-F | FLX-T3, FLX-T17 | Implementing (T3, T17 feitas) |
@@ -454,8 +454,8 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 | FLX-53 | P2-H | FLX-T23 | Pending |
 | FLX-54 | P2-H | FLX-T17, FLX-T18 | Implementing (T17, T18 feitas) |
 | FLX-55 | P2-H | FLX-T24 | Pending |
-| FLX-56 | P2-H | FLX-T22 | Pending |
-| FLX-57 | P2-I | FLX-T1, FLX-T2, FLX-T5, FLX-T20 | Implementing (T1, T2, T5 feitas) |
+| FLX-56 | P2-H | FLX-T22 | Verified (ConfigScreenTest) |
+| FLX-57 | P2-I | FLX-T1, FLX-T2, FLX-T5, FLX-T20 | Implementing (T1, T2, T5, T20 feitas: só a flutuante e o botão; notificação/teclado nas T28/T29) |
 | FLX-58 | P2-I | FLX-T28, NTF-T20 | Pending (depende da feature `notification`) |
 | FLX-59 | P2-I | FLX-T29 | Pending (spec em `keyboard-orb`; espera KBO-T3 e KBO-T5) |
 | FLX-60 | P2-I | FLX-T5, FLX-T28, FLX-T29 | Implementing (T5 feita); a parte do teclado, FLX-T29, espera KBO-T3 e KBO-T5 |
