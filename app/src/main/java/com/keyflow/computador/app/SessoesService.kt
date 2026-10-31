@@ -38,6 +38,7 @@ class SessoesService : Service() {
     private var escopo: CoroutineScope? = null
     private var observacao: Job? = null
     private var wakeLock: PowerManager.WakeLock? = null
+    @Volatile private var ultimoStartId = 0
 
     /** Visível aos testes: há um `WakeLock` segurado agora? */
     val temWakeLock: Boolean get() = wakeLock?.isHeld == true
@@ -45,6 +46,7 @@ class SessoesService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        ultimoStartId = startId
         val gerenciador = ServicosDoComputador.gerenciador
         if (gerenciador == null) { encerrar(); return START_NOT_STICKY }
         val resumos = gerenciador.resumos.value
@@ -113,10 +115,16 @@ class SessoesService : Service() {
         wakeLock = null
     }
 
+    /**
+     * Derruba o serviço **se ainda não há sessão viva**. Uma sessão nova pode ter pedido o serviço entre o fim da anterior e este ponto (um
+     * `startForegroundService` a caminho): `stopSelf(startId)` ignora o pedido quando chegou um comando mais novo, e a verificação evita
+     * remover a notificação de quem acabou de abrir.
+     */
     private fun encerrar() {
+        if (ServicosDoComputador.gerenciador?.resumos?.value?.vivas()?.isNotEmpty() == true) return
         soltarWakeLock()
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
-        stopSelf()
+        stopSelf(ultimoStartId)
     }
 
     companion object {
