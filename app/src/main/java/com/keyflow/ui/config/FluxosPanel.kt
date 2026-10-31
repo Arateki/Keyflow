@@ -107,10 +107,12 @@ fun FluxosLista(
     onRestaurar: () -> Unit,
     onCancelar: () -> Unit = {},
     modifier: Modifier = Modifier,
+    /** A galeria abre já com a confirmação de restaurar. */
+    restaurarAberto: Boolean = false,
 ) {
     val palette = LocalKeyFlowPalette.current
     val scroll = rememberScrollState()
-    var restaurar by remember { mutableStateOf(false) }
+    var restaurar by remember { mutableStateOf(restaurarAberto) }
     Column(modifier.fillMaxWidth().testTag(FLUXOS_PANEL_TAG)
         .verticalScrollbar(scroll, palette.muted.copy(alpha = 0.35f), rightBleed = 9.dp)
         .verticalScroll(scroll).padding(top = 20.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {

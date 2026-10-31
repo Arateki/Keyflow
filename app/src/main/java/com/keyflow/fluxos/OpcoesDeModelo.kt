@@ -118,12 +118,14 @@ fun opcoesSoDaAba(etapa: Etapa, settings: Settings): List<OpcaoDeModelo> {
 
 /**
  * O Agente só usa ferramentas com provedor de nuvem que tenha motor de ferramentas (Anthropic, OpenAI, Google); em modelo local ou
- * Custom ele só responde em texto. Aqui é só pela origem; a chave de API (e não o login de plano) a T22 confere com a conexão.
+ * Custom ele só responde em texto. Aqui é só pela origem; com [comChaveDeApi] a tela confere também a chave de API (e não o login de plano).
  */
-fun agenteSemFerramentas(etapa: Etapa, settings: Settings): Boolean {
+fun agenteSemFerramentas(etapa: Etapa, settings: Settings, comChaveDeApi: Set<String>? = null): Boolean {
     if (etapa !is Etapa.Agente) return false
     val origem = etapa.modelo?.origem ?: ModeloPorEtapa.efetivo(settings, etapa).origem
-    return origem !in setOf("OPENAI", "ANTHROPIC", "GOOGLE")
+    if (origem !in setOf("OPENAI", "ANTHROPIC", "GOOGLE")) return true
+    // Com a chave de API conhecida, o login por assinatura (OAuth) também só responde em texto.
+    return comChaveDeApi != null && origem !in comChaveDeApi
 }
 
 private fun escolha(origem: String, nome: String, modelo: ModeloOferecido?, selo: SeloDeModelo, atual: ModeloRef?): OpcaoDeModelo.Escolha {

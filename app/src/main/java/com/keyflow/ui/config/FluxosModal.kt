@@ -17,6 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,7 +47,11 @@ import com.keyflow.fluxos.ModeloRef
 import com.keyflow.fluxos.OpcaoDeModelo
 import com.keyflow.fluxos.agenteSemFerramentas
 import com.keyflow.fluxos.opcoesSoDaAba
+import com.keyflow.fluxos.BotoesDeFluxo
+import com.keyflow.fluxos.Ids
 import com.keyflow.fluxos.PadroesFluxo
+import com.keyflow.fluxos.PoliticaGatilhos
+import com.keyflow.fluxos.Superficie
 import com.keyflow.fluxos.TipoEtapa
 import com.keyflow.fluxos.ValidadorFluxo
 import com.keyflow.fluxos.app.nomeExibido
@@ -62,6 +67,8 @@ import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
 import com.keyflow.ui.theme.SpaceMono
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 
 const val FLUXOS_MODAL_FECHAR_TAG = "fluxos-modal-fechar"
@@ -105,10 +112,50 @@ fun FluxosModal(
     val contexto = LocalContext.current
     val scope = rememberCoroutineScope()
     var erro by remember { mutableStateOf(false) }
-    val fluxo = config?.fluxo(fluxoId) ?: return
+    val atual = config
+    val fluxo = atual?.fluxo(fluxoId)
+    // O fluxo sumiu do armazenamento (excluído aqui ou em outro lugar): só então o modal fecha, nunca antes de persistir.
+    if (atual != null && fluxo == null) { LaunchedEffect(fluxoId) { onDismiss() }; return }
+    if (fluxo == null || atual == null) return
+    fun gravar(acao: suspend () -> Unit) {
+        scope.launch {
+            try { acao(); erro = false } catch (e: CancellationException) { throw e } catch (_: Exception) { erro = true }
+        }
+    }
+    val atalhos = AtalhosDoModal(
+        config = atual,
+        onLigar = { s -> gravar { repository.atualizarFluxos { PoliticaGatilhos.ligar(it, fluxoId, s) } } },
+        onDesligar = { s -> gravar { repository.atualizarFluxos { PoliticaGatilhos.desligar(it, s) } } },
+        onAdicionarBotao = {
+            gravar {
+                repository.atualizarFluxosEBarras { c, b ->
+                    val id = Ids.botao()
+                    val ligada = PoliticaGatilhos.ligar(c, fluxoId, Superficie.Barra(id))
+                    // Recusada (fluxo incompleto, limite): nem o botão nasce, os dois andam juntos.
+                    if (ligada == c) c to b else ligada to BotoesDeFluxo.comBotao(b, id)
+                }
+            }
+        },
+        onRemoverBotao = { id ->
+            gravar { repository.atualizarFluxosEBarras { c, b -> PoliticaGatilhos.desligar(c, Superficie.Barra(id)) to BotoesDeFluxo.semBotoes(b, setOf(id)) } }
+        },
+    )
     Column(modifier) {
         FluxosModalConteudo(
-            fluxo = fluxo, estado = estado, settings = settings, fonte = fonte, onDismiss = onDismiss,
+            fluxo = fluxo, estado = estado, settings = settings, fonte = fonte, onDismiss = onDismiss, atalhos = atalhos,
+            onExcluir = {
+                // Cancela o que estava rodando deste fluxo; os botões do teclado saem na mesma transação. A gravação não depende do
+                // escopo do modal (que sai da tela junto): termina mesmo assim, e o modal só fecha depois de persistir.
+                if ((estado as? EstadoExecucao.Rodando)?.fluxoId == fluxoId) onCancelar()
+                gravar {
+                    withContext(NonCancellable) {
+                        repository.atualizarFluxosEBarras { c, b ->
+                            val exclusao = PoliticaGatilhos.excluir(c, fluxoId)
+                            exclusao.config to BotoesDeFluxo.semBotoes(b, exclusao.botoes.toSet())
+                        }
+                    }
+                }
+            },
             onAlterar = { alterar ->
                 scope.launch {
                     try {
@@ -122,10 +169,12 @@ fun FluxosModal(
     }
 }
 
-private sealed interface Tela {
+sealed interface Tela {
     data object Principal : Tela
     data object NovaEtapa : Tela
     data class Modelo(val indice: Int) : Tela
+    data class Ligar(val superficie: Superficie.Orbe, val aviso: String) : Tela
+    data object Excluir : Tela
 }
 
 /**
@@ -145,8 +194,14 @@ fun FluxosModalConteudo(
     onCancelar: () -> Unit = {},
     onRodar: () -> Unit = {},
     erroAoSalvar: Boolean = false,
+    /** Seção Atalhos; `null` (galeria, testes de etapas) não a mostra. */
+    atalhos: AtalhosDoModal? = null,
+    /** Excluir o fluxo (depois da confirmação); `null` não mostra o botão. */
+    onExcluir: (() -> Unit)? = null,
+    /** Tela com que o modal abre (a galeria mostra cada uma); o uso normal abre na principal. */
+    telaInicial: Tela = Tela.Principal,
 ) {
-    var tela by remember { mutableStateOf<Tela>(Tela.Principal) }
+    var tela by remember { mutableStateOf<Tela>(telaInicial) }
     val fonteDeModelos = fonte ?: remember(settings) { FonteDeModelos.daAba(settings) }
     val nomeNaTela = PadroesFluxo.nomeExibido(fluxo)
     val etapaDoModelo = (tela as? Tela.Modelo)?.let { fluxo.etapas.getOrNull(it.indice) }
@@ -155,6 +210,8 @@ fun FluxosModalConteudo(
         Tela.Principal -> nomeNaTela
         Tela.NovaEtapa -> tr("Nova etapa")
         is Tela.Modelo -> tr("Modelo · %s", etapaDoModelo?.tipo?.nomeExibido().orEmpty())
+        is Tela.Ligar -> tr("Ligar “%s”", nomeNaTela)
+        Tela.Excluir -> tr("Excluir fluxo")
     }
     ConfigModal(
         titulo, onDismiss, FLUXOS_MODAL_FECHAR_TAG, modifier, cardTag = "fluxos-modal",
@@ -163,7 +220,21 @@ fun FluxosModalConteudo(
     ) {
         when (val atual = tela) {
             Tela.Principal -> Principal(fluxo, estado, settings, fonteDeModelos, onAlterar, onCancelar, onRodar, erroAoSalvar,
-                onNovaEtapa = { tela = Tela.NovaEtapa }, onModelo = { tela = Tela.Modelo(it) })
+                atalhos, onExcluir?.let { { tela = Tela.Excluir } },
+                onNovaEtapa = { tela = Tela.NovaEtapa }, onModelo = { tela = Tela.Modelo(it) },
+                onConfirmarLigar = { sup, aviso -> tela = Tela.Ligar(sup, aviso) })
+            is Tela.Ligar -> ConfirmacaoDoModal(
+                linhas = listOf(tr("Gesto: %d toques", atual.superficie.toques), atual.aviso, tr("Desligue o atalho e a ação volta.")),
+                textoConfirmar = tr("Ligar"), tagConfirmar = "fluxos-confirmacao-ligar",
+                onCancelar = { tela = Tela.Principal },
+                onConfirmar = { atalhos?.onLigar(atual.superficie); tela = Tela.Principal },
+            )
+            Tela.Excluir -> ConfirmacaoDoModal(
+                linhas = listOf(tr("Excluir “%s”? Os atalhos e os botões do teclado ligados a ele também saem.", nomeNaTela)),
+                textoConfirmar = tr("Excluir"), tagConfirmar = "fluxos-excluir-confirmar",
+                onCancelar = { tela = Tela.Principal },
+                onConfirmar = { onExcluir?.invoke() },
+            )
             Tela.NovaEtapa -> SeletorDeEtapa(fluxo, onEscolher = { tipo ->
                 etapaNova(tipo)?.let { nova -> onAlterar { f -> if (f.etapas.size < LIMITES.ETAPAS) f.copy(etapas = f.etapas + nova) else f } }
                 tela = Tela.Principal
@@ -194,8 +265,11 @@ private fun Principal(
     onCancelar: () -> Unit,
     onRodar: () -> Unit,
     erroAoSalvar: Boolean,
+    atalhos: AtalhosDoModal?,
+    onExcluir: (() -> Unit)?,
     onNovaEtapa: () -> Unit,
     onModelo: (Int) -> Unit,
+    onConfirmarLigar: (Superficie.Orbe, String) -> Unit,
 ) {
     val palette = LocalKeyFlowPalette.current
     val validacao = ValidadorFluxo.validar(fluxo)
@@ -248,6 +322,8 @@ private fun Principal(
             PrimaryButton(tr("Rodar agora"), FLUXOS_RODAR_TAG, onRodar, Modifier.heightIn(min = 48.dp), enabled = motivo == null && validacao.valido)
             if (motivo != null) SettingSub(motivo, Modifier.testTag("fluxos-rodar-motivo"))
         }
+        if (atalhos != null) FluxosAtalhosSecao(fluxo, atalhos, settings, onConfirmarLigar)
+        if (onExcluir != null) SecondaryButton(tr("Excluir fluxo"), "fluxos-excluir", onExcluir, Modifier.heightIn(min = 48.dp), accent = palette.terracotta)
     }
 }
 

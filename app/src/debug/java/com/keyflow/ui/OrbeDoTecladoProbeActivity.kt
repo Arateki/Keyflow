@@ -15,6 +15,8 @@ class OrbeDoTecladoProbeActivity : Activity() {
     private lateinit var campo: EditText
     private lateinit var raiz: FrameLayout
     private var insetIme = 0
+    private lateinit var marcador: android.view.View
+    private var toques = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,8 +38,22 @@ class OrbeDoTecladoProbeActivity : Activity() {
                 insets
             }
         }
+        // Toques que o app de trás recebe (coordenadas na tela): o teste da orbe prova que a região tocável do IME deixa os cantos passarem.
+        marcador = android.view.View(this).apply {
+            contentDescription = "orbe_toques:0:0:0"
+            importantForAccessibility = android.view.View.IMPORTANT_FOR_ACCESSIBILITY_YES
+        }
+        raiz.addView(marcador, FrameLayout.LayoutParams(1, 1, Gravity.TOP))
         setContentView(raiz)
         campo.requestFocus()
+    }
+
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        if (ev.actionMasked == android.view.MotionEvent.ACTION_DOWN) {
+            toques++
+            marcador.contentDescription = "orbe_toques:$toques:${ev.rawX.toInt()}:${ev.rawY.toInt()}"
+        }
+        return super.dispatchTouchEvent(ev)
     }
 
     private fun publicar() {
