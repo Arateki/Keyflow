@@ -62,7 +62,7 @@ fun orbeToqueLeituraTag(toques: Int) = "teclado-orbe-toque-leitura-$toques"
 
 /** Instante congelado da prévia (KBO-02): a pele não anda, como no golden. */
 private const val PREVIA_TEMPO_MS = 1234f
-private val PREVIA_LADO = 44.dp
+private val PREVIA_LADO = 52.dp
 
 /** Nome da ação no catálogo dos toques (KBO-16). Fluxo e ação desconhecida só aparecem se já estavam guardados. */
 internal fun acaoDaOrbeLabel(acao: AcaoDaOrbeDoTeclado): String = when (acao) {
@@ -175,31 +175,33 @@ private fun OrbePrevia(skinId: String, skinsUnlocked: Boolean) {
         Triple(tr("Erro"), OrbState.Idle, OrbCenter.ErrorGlyph),
     )
     CompositionLocalProvider(LocalOrbPack provides pack) {
-        Row(
-            Modifier.fillMaxWidth().padding(vertical = 16.dp).testTag(TECLADO_ORBE_PREVIA_TAG),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            estados.forEach { (nome, estado, centro) ->
-                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(Modifier.size(PREVIA_LADO), contentAlignment = Alignment.Center) {
-                        VoiceOrb(
-                            state = estado,
-                            modifier = Modifier.requiredSize(PREVIA_LADO),
-                            center = centro,
-                            timeProvider = { PREVIA_TEMPO_MS },
-                            style = if (style == OrbStyle.PACK && pack == null) OrbStyle.ATELIE else style,
-                        )
+        // Duas fileiras de três: os nomes longos (Transcrevendo, Cancelando) cabem inteiros.
+        Column(Modifier.fillMaxWidth().padding(vertical = 16.dp).testTag(TECLADO_ORBE_PREVIA_TAG), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            estados.chunked(3).forEach { fileira ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    fileira.forEach { (nome, estado, centro) ->
+                        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Box(Modifier.size(PREVIA_LADO), contentAlignment = Alignment.Center) {
+                                VoiceOrb(
+                                    state = estado,
+                                    modifier = Modifier.requiredSize(PREVIA_LADO),
+                                    center = centro,
+                                    timeProvider = { PREVIA_TEMPO_MS },
+                                    style = if (style == OrbStyle.PACK && pack == null) OrbStyle.ATELIE else style,
+                                )
+                            }
+                            Text(
+                                nome,
+                                color = palette.muted,
+                                fontFamily = SpaceGrotesk,
+                                fontWeight = FontWeight.Light,
+                                fontSize = 10.sp,
+                                textAlign = TextAlign.Center,
+                                maxLines = 1,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                        }
                     }
-                    Text(
-                        nome,
-                        color = palette.muted,
-                        fontFamily = SpaceGrotesk,
-                        fontWeight = FontWeight.Light,
-                        fontSize = 8.5.sp,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
                 }
             }
         }

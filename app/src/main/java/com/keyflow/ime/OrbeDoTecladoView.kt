@@ -305,7 +305,8 @@ internal class OrbeDoTecladoView(
             else -> ""
         }
         paint.color = orbCenterInk(estilo, pacoteAtivo).toArgb()
-        paint.textSize = circulo.diametro * 0.18f
+        // O tempo com glifo ("⏸ 0:12") é mais largo que o círculo: letra menor para caber dentro dele.
+        paint.textSize = circulo.diametro * if (centro.length > 4) 0.12f else 0.18f
         canvas.drawText(centro, circulo.centroX.toFloat(), circulo.centroY - (paint.ascent() + paint.descent()) / 2, paint)
         if (segurou && fundoFaixa > topoFaixa) {
             canvas.save()

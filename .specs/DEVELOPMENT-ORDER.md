@@ -573,7 +573,7 @@ Spec: `.specs/features/computer-terminal/` (`spec.md` 66 requisitos CMP-01..CMP-
 - **Emenda ao `agent-harness`**: o texto (AGT-E1..E6) já está no `agent-harness/spec.md`, aprovado pelo Yan em 29/10 **só para SSH**; o código (`alwaysAllowable`, retenção por ferramenta, grupo não exportável) é a CMP-T30, em commit à parte.
 - **[YAN]**: (1) Q1..Q13 respondidas em 29/10 (D12–D24); (2) declarar o serviço `specialUse` no Console (**Policy > App content**) e aprovar os textos de privacidade/Data Safety (CMP-T19); (3) CMP-T21, T29 e T37: rodar os roteiros no A32, Tab S10 Lite e Vaio (nunca `connectedAndroidTest` no A32) e, na Fase 3, com a chave de API real do agente (junto da AGT-T10).
 
-## Bloco 17 — `keyboard-orb` (orbe dentro do teclado) — rascunho, main, fora da v1
+## Bloco 17 — `keyboard-orb` (orbe dentro do teclado) — implementado (31/10), main, fora da v1
 
 Spec: `.specs/features/keyboard-orb/` (`spec.md` 37 requisitos KBO-01..KBO-37, `design.md`, `tasks.md` KBO-T1..KBO-T11). Ordem: o plano de execução do `tasks.md` (A modelo JVM → B IME e aba Teclado → C goldens e gestos no emulador).
 
@@ -582,6 +582,7 @@ A notificação (Bloco 15) está na `main`. Esta frente não espera o código de
 - **Escopo**: a orbe no encaixe do microfone da barra. Ociosa, cabe no botão. Gravando (e nos outros estados que mostram tempo ou glifo), sobressai **36 dp acima** do teclado (provisório até ver no aparelho, D5), na janela do IME, sem cobrir tecla e sem o app de trás contar esses 36 dp como teclado. A região tocável sobressalente é o conteúdo unido ao **disco** do círculo, não ao retângulo que o circunscreve. Gestos iguais aos da orbe flutuante. "Copiar a configuração da orbe principal" vem ligado e inclui o segurar-para-falar. Gravar é uma ação como as outras: substituir uma ação já atribuída só avisa. O seletor de chips do mic sai.
 - **Prioridade**: **depois** de Fluxos no que for gatilho (a FLX-T29 depende da orbe entregue, KBO-T3 e KBO-T5; a orbe em si não depende de Fluxos) e **fora** do recorte da v1. Não toma a vez de nada.
 - **Depende de** (na `main`): `shortcut-bars` (o encaixe `Mic`, que continua no JSON) e `orb-gestures` (os limiares e o mapa visual). **Convive com**: `flows` (gatilho `Orbe(TECLADO, 2|3)` na FLX-T29, já desbloqueada quanto à spec; esta frente só deixa o gancho) e `notification` (o mesmo `LugarDaOrbe`).
+- **Estado (31/10)**: KBO-T1..T11 entregues (modelo JVM, orbe no IME, seção na aba Teclado, skins, Docs e tour, goldens e gestos no emulador). Resta, em `flows`, a FLX-T29 (gatilhos 2 e 3 toques) e, fora desta frente, ver a faixa de 36 dp no aparelho (D5, provisória).
 - **[YAN]**: Q1..Q6 respondidas em 29/10 (D5..D10 do `spec.md`). Nada em aberto nesta frente.
 
 ---
