@@ -172,7 +172,7 @@ class FluxosAtalhosTest {
         assertEquals(listOf(Gatilho(toque(3), "b")), config().gatilhos)
         assertTrue(barras().botoesDeFluxo().isEmpty())
         assertEquals("cancela o que estava rodando", 1, cancelou)
-        assertEquals(1, fechou)
+        esperar { fechou == 1 }
     }
 
     @Test fun excluirTerminaMesmoSeOModalSaiDaTelaEComOutraEscritaEmAndamento() {
