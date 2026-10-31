@@ -64,7 +64,7 @@ class ExampleSkinPackImportTest {
         assertEquals("erros: ${result.report.errors}", emptyList<String>(), result.report.errors)
         assertEquals("avisos: ${result.report.warnings}", emptyList<String>(), result.report.warnings)
         assertTrue(result.installed)
-        assertEquals(listOf("orbe: 4 estados, 45 frames", "teclado: tray + 4 faces"), result.report.installed)
+        assertEquals(listOf("orbe: 4 estados, 45 frames", "teclado: tray + 4 faces", "notificação: 4 estados"), result.report.installed)
         assertEquals("neon-noturno", result.packId!!.substringBeforeLast('-'))
     }
 
