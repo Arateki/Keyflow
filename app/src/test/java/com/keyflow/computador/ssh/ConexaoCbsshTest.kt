@@ -155,6 +155,7 @@ class ConexaoCbsshTest {
             override suspend fun read(count: Int): ByteArray = awaitCancellation()
             override suspend fun write(data: ByteArray) = Unit
             override suspend fun close() = Unit
+            override val isConnected: Boolean = true
         }
         val c = ConexaoCbssh(RepositorioKnownHostsEmMemoria(), Interacao(), backgroundScope) { it.transportFactory = TransportFactory { transporte } }
         val r = async { c.conectar(DestinoSsh(Host("a1b2c3d4", "x", "10.255.255.1", 22, "u")), pty) }
