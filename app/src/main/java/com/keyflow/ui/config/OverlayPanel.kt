@@ -90,6 +90,8 @@ fun OverlayPanel(
     // Gestos ligados a um fluxo (aba Fluxos): a linha mostra "Fluxo: <nome>" e o toque explica e leva à aba (FLX-35, FLX-51).
     configFluxos: ConfigFluxos = ConfigFluxos(emptyList(), emptyList()),
     onOpenFluxos: () -> Unit = {},
+    // Galeria: abre a aba já rolada até o fim, onde ficam os atalhos.
+    rolarAoFim: Boolean = false,
     recordingModeHighlightKey: Int = 0,
     keyboardShortcutAvailable: Boolean = true,
     // Cartão do Modo Sobrepor, sempre no topo e sempre tocável (a aba Modo saiu — Yan, 2026-09-28).
@@ -102,6 +104,7 @@ fun OverlayPanel(
     val palette = LocalKeyFlowPalette.current
     val scroll = rememberScrollState()
     LaunchedEffect(modeCardFocusKey) { if (modeCardFocusKey > 0) scroll.animateScrollTo(0) }
+    LaunchedEffect(rolarAoFim) { if (rolarAoFim) { androidx.compose.runtime.withFrameNanos { }; scroll.scrollTo(Int.MAX_VALUE) } }
     val context = LocalContext.current
     // Preview tátil do slider de Vibração: última intensidade já "tocada" ao arrastar (evita floodar).
     val lastVibValue = remember { mutableStateOf(-100) }

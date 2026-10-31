@@ -161,7 +161,7 @@ fun FluxosModal(
     }
 }
 
-private sealed interface Tela {
+sealed interface Tela {
     data object Principal : Tela
     data object NovaEtapa : Tela
     data class Modelo(val indice: Int) : Tela
@@ -190,8 +190,10 @@ fun FluxosModalConteudo(
     atalhos: AtalhosDoModal? = null,
     /** Excluir o fluxo (depois da confirmação); `null` não mostra o botão. */
     onExcluir: (() -> Unit)? = null,
+    /** Tela com que o modal abre (a galeria mostra cada uma); o uso normal abre na principal. */
+    telaInicial: Tela = Tela.Principal,
 ) {
-    var tela by remember { mutableStateOf<Tela>(Tela.Principal) }
+    var tela by remember { mutableStateOf<Tela>(telaInicial) }
     val fonteDeModelos = fonte ?: remember(settings) { FonteDeModelos.daAba(settings) }
     val nomeNaTela = PadroesFluxo.nomeExibido(fluxo)
     val etapaDoModelo = (tela as? Tela.Modelo)?.let { fluxo.etapas.getOrNull(it.indice) }

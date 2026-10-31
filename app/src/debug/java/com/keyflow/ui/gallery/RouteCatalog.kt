@@ -625,7 +625,7 @@ object RouteCatalog {
                 }
             }
         },
-    )
+    ) + FluxosRoutes.rotas
 
     private val byKey: Map<String, Route> = routes.associateBy { it.key }
 
