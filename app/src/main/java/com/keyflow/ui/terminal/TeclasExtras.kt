@@ -57,7 +57,7 @@ fun teclasExtras(): List<TeclaExtra> = listOf(
     TeclaExtra("dir", "→", tr("Seta para a direita"), { it.teclaExtra(Tecla.Direita) }),
     TeclaExtra("pipe", "|", tr("Barra vertical"), { it.caractereExtra('|') }),
     TeclaExtra("til", "~", tr("Til"), { it.caractereExtra('~') }),
-    TeclaExtra("barra", "/", tr("Barra"), { it.caractereExtra('/') }),
+    TeclaExtra("barra", "/", tr("Tecla barra"), { it.caractereExtra('/') }),
     TeclaExtra("hifen", "-", tr("Hífen"), { it.caractereExtra('-') }),
 )
 
