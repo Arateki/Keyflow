@@ -28,7 +28,6 @@ import com.keyflow.ime.keyboard.dictionary.Suggestions
 import com.keyflow.ime.keyboard.isNumericInputType
 import com.keyflow.ime.keys.PhysicalKeyEmitter
 import com.keyflow.overlay.OverlayService
-import com.keyflow.overlay.RecordingNotification
 import com.keyflow.skins.PackKeyboard
 import com.keyflow.skins.SkinIds
 import com.keyflow.skins.SkinPackStore
@@ -671,8 +670,8 @@ open class KeyFlowKeyboardService : InputMethodService() {
 
     private fun sendMicAction(action: MicAction) {
         val intentAction = when (action) {
-            MicAction.PAUSE_RESUME -> RecordingNotification.ACTION_PAUSE_RESUME
-            MicAction.CANCEL -> RecordingNotification.ACTION_CANCEL
+            MicAction.PAUSE_RESUME -> OverlayService.ACTION_PAUSE_RESUME
+            MicAction.CANCEL -> OverlayService.ACTION_CANCEL
             MicAction.UNDO -> OverlayService.ACTION_UNDO_CANCEL
         }
         runCatching { startService(OverlayService.actionIntent(this, intentAction)) }

@@ -14,7 +14,13 @@ import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import com.keyflow.overlay.OverlayService
-import com.keyflow.overlay.RecordingNotification
+import com.keyflow.data.Settings
+import com.keyflow.notificacao.ConfigNotificacao
+import com.keyflow.notificacao.EstadoVisualDaNotificacao
+import com.keyflow.notificacao.OrcamentoDeBitmaps
+import com.keyflow.notificacao.efetiva
+import com.keyflow.notificacao.app.NotificacaoDaOrbe
+import com.keyflow.notificacao.app.ProvedorDeAparencia
 import com.keyflow.core.ButtonState
 import com.keyflow.data.SettingsRepository
 import com.keyflow.ime.UserSettingsGuard
@@ -79,12 +85,22 @@ class SystemSurfacesScreenshotTest {
     fun sysNotification() {
         shell("pm grant ${context.packageName} ${Manifest.permission.POST_NOTIFICATIONS}")
         createChannel()
-        val notification = RecordingNotification(context, CHANNEL).build(ButtonState.RECORDING)
+        val config = ConfigNotificacao()
+        val efetiva = efetiva(config, Settings())
+        val visual = EstadoVisualDaNotificacao.para(ButtonState.RECORDING, false, efetiva)
+        val lado = OrcamentoDeBitmaps.ladoPx(context.resources.displayMetrics.density)
+        val provedor = ProvedorDeAparencia(context, { true })
+        val notification = NotificacaoDaOrbe(context, CHANNEL).construir(
+            ButtonState.RECORDING, false,
+            provedor.obterAgora("atelie", visual.aparencia, visual.glifo, lado, false),
+            provedor.obterAgora("atelie", com.keyflow.notificacao.AparenciaDaOrbe.IDLE, null, lado, false),
+            config, efetiva, escuro = false,
+        )
         val manager = context.getSystemService(NotificationManager::class.java)
         try {
             manager.notify(NOTIF_ID, notification)
             device.openNotification()
-            device.wait(Until.hasObject(By.textContains("Gravando")), TIMEOUT)
+            device.wait(Until.hasObject(By.descContains("KeyFlow gravando")), TIMEOUT)
             Thread.sleep(800)
             capture("sys-notification")
         } finally {

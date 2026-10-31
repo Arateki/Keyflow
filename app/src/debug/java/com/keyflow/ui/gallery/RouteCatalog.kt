@@ -29,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.ui.viewinterop.AndroidView
 import com.keyflow.core.ButtonState
-import com.keyflow.data.Settings
 import com.keyflow.ui.tour.FingerPuppet
 import com.keyflow.ui.tour.GestureTourPlayer
 import com.keyflow.ui.tour.LocalTourClock
@@ -55,7 +54,13 @@ import com.keyflow.ime.GlitchTimeline
 import com.keyflow.ime.ShimmerTimeline
 import com.keyflow.ime.KeyFlowKeyboardView
 import com.keyflow.ime.KeyboardSkin
-import com.keyflow.overlay.RecordingNotification
+import com.keyflow.data.Settings
+import com.keyflow.notificacao.ConfigNotificacao
+import com.keyflow.notificacao.EstadoVisualDaNotificacao
+import com.keyflow.notificacao.OrcamentoDeBitmaps
+import com.keyflow.notificacao.efetiva
+import com.keyflow.notificacao.app.NotificacaoDaOrbe
+import com.keyflow.notificacao.app.ProvedorDeAparencia
 import com.keyflow.ui.PermissionStatus
 import com.keyflow.ui.common.SaveController
 import com.keyflow.ui.config.BarsEditor
@@ -1286,8 +1291,12 @@ object RouteCatalog {
             AndroidView(
                 modifier = Modifier.fillMaxSize().wrapContentHeight(Alignment.Top),
                 factory = { ctx ->
-                    RecordingNotification(ctx, "gallery")
-                        .galleryRemoteViews(state, frozenSeconds = 12)
+                    val efetiva = efetiva(ConfigNotificacao(), Settings())
+                    val visual = EstadoVisualDaNotificacao.para(state, false, efetiva)
+                    val lado = OrcamentoDeBitmaps.ladoPx(ctx.resources.displayMetrics.density)
+                    val aparencia = ProvedorDeAparencia(ctx, { true }).obterAgora("atelie", visual.aparencia, visual.glifo, lado, true)
+                    NotificacaoDaOrbe(ctx, "gallery")
+                        .galeria(state, false, aparencia, efetiva, escuro = true, segundos = 12)
                         .apply(ctx, FrameLayout(ctx))
                 },
             )

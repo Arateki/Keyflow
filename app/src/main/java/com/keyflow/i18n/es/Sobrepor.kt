@@ -33,9 +33,7 @@ internal val Sobrepor: Map<String, String> = mapOf(
     "Não fazer nada" to "No hacer nada",
     "Não foi possível capturar esta tela." to "No se pudo capturar esta pantalla.",
     "Não foi possível gravar o áudio." to "No se pudo grabar el audio.",
-    "Pausar" to "Pausar",
     "Recomeçar" to "Reiniciar",
-    "Retomar" to "Reanudar",
     "Sem conexão de rede." to "Sin conexión de red.",
     "Tempo de reação" to "Tiempo de reacción",
     "Tempo esgotado ao transcrever." to "Se agotó el tiempo al transcribir.",
@@ -47,8 +45,4 @@ internal val Sobrepor: Map<String, String> = mapOf(
     "ms = milissegundos" to "ms = milisegundos",
     "toque %d ms  ·  segurar %d ms" to "toque %d ms  ·  mantener %d ms",
     "Áudio muito longo para transcrever." to "Audio demasiado largo para transcribir.",
-    "⏳ Transcrevendo" to "⏳ Transcribiendo",
-    "⏸ Pausado" to "⏸ En pausa",
-    "● Gravando" to "● Grabando",
-    "🗑 Cancelado · desfazer" to "🗑 Cancelado · deshacer",
 )

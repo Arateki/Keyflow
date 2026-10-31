@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A notificação da orbe (NTF-05, NTF-06): a linha [botão][orbe][botão] de 48 dp, provada na NTF-T1. O botão ausente fica INVISIBLE
+     (e não GONE) para a orbe não andar entre os estados. A arte da orbe tem 40 dp (padding de 4 dp deixa o alvo em 48x48). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/notif_root"
+    android:layout_width="match_parent"
+    android:layout_height="48dp"
+    android:gravity="center"
+    android:orientation="horizontal">
+
+    <ImageButton
+        android:id="@+id/notif_btn_esq"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:background="@null"
+        android:padding="12dp"
+        android:scaleType="centerInside"
+        android:visibility="invisible" />
+
+    <FrameLayout
+        android:layout_width="48dp"
+        android:layout_height="48dp">
+
+        <ImageView
+            android:id="@+id/notif_orb"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:padding="4dp"
+            android:scaleType="fitCenter" />
+
+        <!-- Gravando: o tempo corre no centro. -->
+        <Chronometer
+            android:id="@+id/notif_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <!-- Pausado/cancelando: o tempo congelado, miúdo, abaixo do glifo. -->
+        <Chronometer
+            android:id="@+id/notif_time_mini"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal|bottom"
+            android:layout_marginBottom="7dp"
+            android:textSize="8sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <ImageButton
+        android:id="@+id/notif_btn_dir"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:background="@null"
+        android:padding="12dp"
+        android:scaleType="centerInside"
+        android:visibility="invisible" />
+</LinearLayout>

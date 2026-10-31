@@ -77,7 +77,7 @@ class OverlayServiceCancelTest {
     @Test
     fun cancelEntersCancellingAndShowsUndoBanner() {
         // CANCEL-01: grava/pausado + cancelar → CANCELLING (áudio retido, não descartado já).
-        sendAction(RecordingNotification.ACTION_CANCEL)
+        sendAction(OverlayService.ACTION_CANCEL)
         waitUntilState(ButtonState.CANCELLING)
 
         // CANCEL-02: banner "Cancelado" com os botões Desfazer/Concluir visível na tela.
@@ -89,7 +89,7 @@ class OverlayServiceCancelTest {
 
     @Test
     fun undoCancelReturnsToPaused() {
-        sendAction(RecordingNotification.ACTION_CANCEL)
+        sendAction(OverlayService.ACTION_CANCEL)
         waitUntilState(ButtonState.CANCELLING)
 
         // CANCEL-03: desfazer dentro da janela → volta a PAUSED com o áudio preservado.
@@ -100,7 +100,7 @@ class OverlayServiceCancelTest {
     @Test
     fun cancelExpiresAndDiscardsAudio() {
         OverlayService.cancelWindowMsForTest = null // a janela do produto, 3 s: é ela que este teste vê fechar
-        sendAction(RecordingNotification.ACTION_CANCEL)
+        sendAction(OverlayService.ACTION_CANCEL)
         waitUntilState(ButtonState.CANCELLING)
 
         // CANCEL-04: sem ação dentro da janela (cancelWindowMs = 3000ms) → descarta e volta ao idle.
@@ -112,7 +112,7 @@ class OverlayServiceCancelTest {
         // Com a janela em 30 s (setUp), o "concluir" tem que encerrar muito antes dela. Com os 3 s do produto o teste dava 2 s
         // ao "concluir" — e no emulador lento só parar e soltar o gravador passou disso (esteira de instabilidade,
         // 2026-10-10). Assim "concluir funciona" (sai em segundos) e "concluir ignorado" (30 s em CANCELLING) não se confundem.
-        sendAction(RecordingNotification.ACTION_CANCEL)
+        sendAction(OverlayService.ACTION_CANCEL)
         waitUntilState(ButtonState.CANCELLING)
 
         val start = System.currentTimeMillis()
@@ -125,7 +125,7 @@ class OverlayServiceCancelTest {
 
     @Test
     fun targetChangeDuringCancellingPreservesState() {
-        sendAction(RecordingNotification.ACTION_CANCEL)
+        sendAction(OverlayService.ACTION_CANCEL)
         waitUntilState(ButtonState.CANCELLING)
 
         // CANCEL-06: foco de campo muda durante CANCELLING → o estado PERMANECE CANCELLING (não
