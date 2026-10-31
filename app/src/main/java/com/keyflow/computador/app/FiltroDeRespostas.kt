@@ -167,6 +167,10 @@ class FiltroDaSaidaDoServidor(private val aoTitulo: (String) -> Unit = {}) {
     @Volatile var consumidos: Int = 0
         private set
 
+    /** DECCKM (`CSI ? 1 h` / `l`): o servidor ligou o modo de aplicação das setas? O termlib não publica; o mapa do teclado precisa. */
+    @Volatile var modoAplicacaoDasSetas: Boolean = false
+        private set
+
     /** Processa [entrada] e devolve o que segue para o emulador. Não é seguro chamar de duas threads ao mesmo tempo. */
     fun processar(entrada: ByteArray): ByteArray {
         saida = ByteArrayOutputStream(entrada.size)
@@ -174,7 +178,7 @@ class FiltroDaSaidaDoServidor(private val aoTitulo: (String) -> Unit = {}) {
         return saida.toByteArray()
     }
 
-    fun reiniciar() { estado = E.NORMAL; seguro.reset(); titulo.reset(); descartados = 0 }
+    fun reiniciar() { modoAplicacaoDasSetas = false; estado = E.NORMAL; seguro.reset(); titulo.reset(); descartados = 0 }
 
     private fun emitirSegurados() { seguro.writeTo(saida); seguro.reset() }
     private fun passa(b: Int) { saida.write(b) }
@@ -199,7 +203,10 @@ class FiltroDaSaidaDoServidor(private val aoTitulo: (String) -> Unit = {}) {
                 b in 0x20..0x3f -> { seguro.write(b); if (seguro.size() > MAX_CSI) { seguro.reset(); estado = E.CSI_DESCARTA } }
                 b in 0x40..0x7e -> {
                     val corpo = seguro.toByteArray().copyOfRange(2, seguro.size()).toString(Charsets.ISO_8859_1)
-                    if (b == 't'.code && (corpo == "21" || corpo == "20")) { consumidos++; seguro.reset() } else { seguro.write(b); emitirSegurados() }
+                    if (b == 't'.code && (corpo == "21" || corpo == "20")) { consumidos++; seguro.reset() } else {
+                        if ((b == 'h'.code || b == 'l'.code) && corpo.startsWith("?") && "1" in corpo.substring(1).split(';')) modoAplicacaoDasSetas = b == 'h'.code
+                        seguro.write(b); emitirSegurados()
+                    }
                     estado = E.NORMAL
                 }
                 // Byte que não pertence a um CSI (controle, ESC, UTF-8): o pedaço segurado é **descartado**, não emitido. Emitir deixaria o emulador no

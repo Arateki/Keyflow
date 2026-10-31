@@ -46,12 +46,20 @@ class LigacaoEmulador(
     private val destino = CompletableDeferred<DestinoDoEmulador>()
     private val filtroDeSaida = FiltroDeRespostas()
     private val filtroDeEntrada = FiltroDaSaidaDoServidor { _titulo.value = it }
+    private val guarda = GuardaDeLinhas()
+    private val _pedidoDeColar = MutableStateFlow<PoliticaDeColar.Preparado?>(null)
     private val _titulo = MutableStateFlow<String?>(null)
     private val _pedidoDeClipboard = MutableStateFlow<String?>(null)
     @Volatile private var fechada = false
 
     /** O rótulo que o servidor pediu para a aba (já sanitizado), ou `null`. */
     val titulo: StateFlow<String?> = _titulo
+
+    /** Texto com quebra de linha (colado, ditado) esperando a confirmação (CMP-28). */
+    val pedidoDeColar: StateFlow<PoliticaDeColar.Preparado?> = _pedidoDeColar
+
+    /** O servidor ligou o modo de aplicação das setas (DECCKM)? */
+    val modoAplicacaoDasSetas: Boolean get() = filtroDeEntrada.modoAplicacaoDasSetas
 
     /** Texto que o servidor quer copiar (`OSC 52` de escrita) e que espera o consentimento da pessoa. Padrão: negar. */
     val pedidoDeClipboard: StateFlow<String?> = _pedidoDeClipboard
@@ -63,7 +71,13 @@ class LigacaoEmulador(
         defaultBackground = corFundo,
         onKeyboardInput = { bytes ->
             val ok = filtroDeSaida.filtrar(bytes)
-            if (ok.isNotEmpty() && !fechada) fila.trySend(Saida.Bytes(ok.copyOf()))
+            if (ok.isNotEmpty() && !fechada) {
+                when (val d = guarda.avaliar(ok, System.currentTimeMillis())) {
+                    GuardaDeLinhas.Decisao.Enviar -> fila.trySend(Saida.Bytes(ok.copyOf()))
+                    // Ditado ou colagem do teclado com quebra de linha: pede confirmação em vez de executar.
+                    is GuardaDeLinhas.Decisao.Segurar -> _pedidoDeColar.value = PoliticaDeColar.preparar(d.texto)
+                }
+            }
         },
         onResize = { dim -> if (!fechada) fila.trySend(Saida.Tamanho(PtyInfo(dim.columns, dim.rows, dim.widthPixels, dim.heightPixels))) },
         onClipboardCopy = { texto -> if (!fechada) _pedidoDeClipboard.value = texto },
@@ -118,7 +132,35 @@ class LigacaoEmulador(
     }
 
     /** Cola [texto] já preparado por [PoliticaDeColar] (o emulador respeita o bracketed paste). */
-    fun colar(texto: String) { if (!fechada && texto.isNotEmpty()) emulador.pasteText(texto) }
+    fun colar(texto: String) {
+        if (fechada || texto.isEmpty()) return
+        guarda.liberar(System.currentTimeMillis())
+        emulador.pasteText(texto)
+    }
+
+    /** Pede para colar [original]: uma linha só vai direto; com quebra de linha espera [confirmarColar]. */
+    fun pedirColar(original: String) {
+        val p = PoliticaDeColar.preparar(original)
+        if (p.texto.isEmpty()) return
+        if (p.precisaConfirmar) _pedidoDeColar.value = p else colar(p.texto)
+    }
+
+    fun confirmarColar() { val p = _pedidoDeColar.value; _pedidoDeColar.value = null; if (p != null) colar(p.texto) }
+    fun cancelarColar() { _pedidoDeColar.value = null }
+
+    /** Bytes de teclas que o app mesmo mapeou (teclas extras, teclado físico): passam pelo mesmo filtro e pela mesma fila, na ordem. */
+    fun enviar(bytes: ByteArray) {
+        val ok = filtroDeSaida.filtrar(bytes)
+        if (ok.isEmpty() || fechada) return
+        // O texto digitado ou ditado sai do termlib por um callback **postado** no looper principal (`postAtTime`); uma tecla mapeada que fosse direto
+        // para a fila passaria à frente dele (medido: Enter chegando antes de `ls -la`). O termlib processa o texto numa thread própria e posta o callback depois; um atraso curto (e igual para todas as teclas mapeadas, que
+        // seguem em ordem) deixa o texto sair primeiro. Limite conhecido: duas entradas dos dois caminhos no mesmo instante podem trocar de ordem.
+        principal.postDelayed({ if (!fechada) fila.trySend(Saida.Bytes(ok.copyOf())) }, ATRASO_DE_ORDEM_MS)
+    }
+
+    private val principal = android.os.Handler(android.os.Looper.getMainLooper())
+
+    private companion object { const val ATRASO_DE_ORDEM_MS = 40L }
 
     /** Visível aos testes: quantos pedaços o filtro de saída descartou. */
     val descartesDeSaida: Int get() = filtroDeSaida.descartes

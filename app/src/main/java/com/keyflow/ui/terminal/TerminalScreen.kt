@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.keyflow.computador.Host
+import com.keyflow.computador.app.EntradaDoTerminal
 import com.keyflow.computador.app.LigacaoEmulador
 import com.keyflow.computador.app.PoliticaDeColar
 import com.keyflow.computador.app.PoliticaDeLinks
@@ -73,16 +74,15 @@ fun TerminalScreen(
     onCopiar: (String) -> Unit,
     lerAreaDeTransferencia: () -> String?,
     modifier: Modifier = Modifier,
-    barraDeEntrada: @Composable (LigacaoEmulador) -> Unit = {},
-    entradaDoTerminal: EntradaParaTerminal = EntradaParaTerminal.Padrao,
 ) {
     val palette = LocalKeyFlowPalette.current
     val contexto = LocalContext.current
     val tipo = remember { fonteDoTerminal(contexto) }
     val ativa = sessoes.firstOrNull { it.id == ativaId } ?: sessoes.firstOrNull()
     val ligacao = ativa?.let { ligacaoDe(it.id) }
+    val entrada = remember(ligacao) { ligacao?.let { EntradaDoTerminal(it) } }
+    val pedidoDeColar by (ligacao?.pedidoDeColar ?: remember { kotlinx.coroutines.flow.MutableStateFlow<PoliticaDeColar.Preparado?>(null) }).collectAsStateOnMain()
     val titulos = sessoes.associate { it.id to ligacaoDe(it.id)?.titulo?.value }
-    var colar by remember { mutableStateOf<PoliticaDeColar.Preparado?>(null) }
     var link by remember { mutableStateOf<String?>(null) }
     var linkBloqueado by remember { mutableStateOf(false) }
 
@@ -111,15 +111,9 @@ fun TerminalScreen(
                         keyboardEnabled = true,
                         showSoftKeyboard = true,
                         onHyperlinkClick = { url -> if (PoliticaDeLinks.aceitar(url) != null) link = url.trim() else linkBloqueado = true },
-                        onPasteRequest = {
-                            val texto = lerAreaDeTransferencia()
-                            if (!texto.isNullOrEmpty()) {
-                                val p = PoliticaDeColar.preparar(texto)
-                                if (p.texto.isNotEmpty()) { if (p.precisaConfirmar) colar = p else ligacao.colar(p.texto) }
-                            }
-                        },
-                        onInterceptKey = entradaDoTerminal.interceptar,
-                        modifierManager = entradaDoTerminal.modificadores,
+                        onPasteRequest = { lerAreaDeTransferencia()?.takeIf { it.isNotEmpty() }?.let(ligacao::pedirColar) },
+                        onInterceptKey = entrada!!.interceptar,
+                        modifierManager = entrada.modificadores,
                     )
                     pedidoOsc52?.let { texto ->
                         AlertDialog(
@@ -138,20 +132,20 @@ fun TerminalScreen(
                 }
             }
         }
-        if (ligacao != null) barraDeEntrada(ligacao)
+        if (entrada != null) TeclasExtras(entrada)
         AbasDeSessao(sessoes, ativa?.id, hosts, titulos, onSelecionar, onFecharAba, onNovaSessao)
     }
 
-    colar?.let { p ->
+    pedidoDeColar?.let { p ->
         AlertDialog(
             modifier = Modifier.testTag(TERMINAL_COLAR_DIALOGO_TAG),
-            onDismissRequest = { colar = null },
+            onDismissRequest = { ligacao?.cancelarColar() },
             title = { Text(tr("Colar %d linhas?", p.linhas)) },
             text = { Text(tr("Elas podem ser executadas.")) },
             confirmButton = {
-                TextButton(onClick = { ligacao?.colar(p.texto); colar = null }, modifier = Modifier.testTag(TERMINAL_COLAR_CONFIRMAR_TAG)) { Text(tr("Colar")) }
+                TextButton(onClick = { ligacao?.confirmarColar() }, modifier = Modifier.testTag(TERMINAL_COLAR_CONFIRMAR_TAG)) { Text(tr("Colar")) }
             },
-            dismissButton = { TextButton(onClick = { colar = null }, modifier = Modifier.testTag(TERMINAL_COLAR_CANCELAR_TAG)) { Text(tr("Cancelar")) } },
+            dismissButton = { TextButton(onClick = { ligacao?.cancelarColar() }, modifier = Modifier.testTag(TERMINAL_COLAR_CANCELAR_TAG)) { Text(tr("Cancelar")) } },
         )
     }
     link?.let { url ->
