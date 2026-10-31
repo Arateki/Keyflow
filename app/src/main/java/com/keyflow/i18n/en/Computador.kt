@@ -62,7 +62,6 @@ internal val Computador: Map<String, String> = mapOf(
     "Já existe um servidor com esse nome." to "A server with that name already exists.",
     "Lembrar a senha" to "Remember the password",
     "Liberar este servidor para o agente?" to "Allow the agent to use this server?",
-    "Ligado" to "On",
     "Link bloqueado" to "Link blocked",
     "Mostrar ou esconder as teclas F1 a F12" to "Show or hide the F1 to F12 keys",
     "Mudar o endereço ou a porta pede uma nova confirmação da impressão digital na próxima conexão." to "Changing the address or port asks for a new fingerprint confirmation on the next connection.",
