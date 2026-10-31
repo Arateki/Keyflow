@@ -31,6 +31,19 @@ object PackPreview {
         }
     }
 
+    /** A orbe da notificação em `idle` num quadrado de [sidePx] (a miniatura do cartão da aba Notificação), ou `null`. */
+    fun notification(pack: SkinPack, sidePx: Int): Bitmap? {
+        if (!pack.hasNotification || sidePx <= 0) return null
+        return try {
+            val file = pack.notificationFile(OrbPackState.IDLE) ?: return null
+            val image = SvgRender.parse(pack.readSvg(file) ?: return null)
+            SvgRender.toBitmap(image, sidePx, sidePx, SvgFit.MEET)
+        } catch (e: Exception) {
+            Log.w(TAG, "${pack.id}: a miniatura da notificação não desenhou (${e.message})")
+            null
+        }
+    }
+
     /**
      * A bandeja do teclado (o SVG esticado, ou a cor lisa `keyboard.trayColor`) com a face da tecla normal por cima, com a mesma margem das
      * amostras das skins nativas, em [widthPx]×[heightPx]. A face usa o `keyboard.slice` do manifest, como no teclado de verdade. `null` se o

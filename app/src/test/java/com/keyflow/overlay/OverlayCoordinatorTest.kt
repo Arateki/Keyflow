@@ -3,6 +3,7 @@ package com.keyflow.overlay
 import com.google.common.truth.Truth.assertThat
 import com.keyflow.core.ButtonState
 import com.keyflow.core.InsertOutcome
+import com.keyflow.core.KeyFlowController
 import com.keyflow.core.TranscriptionResult
 import com.keyflow.data.Config
 import kotlinx.coroutines.CoroutineScope
@@ -21,6 +22,36 @@ class OverlayCoordinatorTest {
 
     @get:Rule
     val temporaryFolder = TemporaryFolder()
+
+    @Test
+    fun `RECORDING herdado não comprova que o novo coordenador já grava`() = runTest {
+        val anterior = KeyFlowController.buttonState.value
+        val recorder = FakeRecorder(null)
+        try {
+            KeyFlowController.updateButtonState(ButtonState.RECORDING)
+            // Esta era toda a condição do setUp, antes da entrega assíncrona de ACTION_RECORD.
+            assertThat(KeyFlowController.buttonState.value).isEqualTo(ButtonState.RECORDING)
+            assertThat(recorder.started).isEqualTo(0)
+
+            val novo = coordinator(
+                scope = this,
+                recorder = recorder,
+                targetAvailable = { false },
+                render = KeyFlowController::updateButtonState,
+            )
+            assertThat(novo.currentState()).isEqualTo(ButtonState.IDLE_NO_FIELD)
+            assertThat(KeyFlowController.buttonState.value).isEqualTo(ButtonState.IDLE_NO_FIELD)
+            assertThat(recorder.started).isEqualTo(0)
+
+            novo.onTap()
+            runCurrent()
+            assertThat(KeyFlowController.buttonState.value).isEqualTo(ButtonState.RECORDING)
+            assertThat(recorder.started).isEqualTo(1)
+            println("NTF_CORRIDA_JVM herdado=RECORDING inicio=IDLE_NO_FIELD gravadorAntes=0 depoisDoToque=RECORDING gravadorDepois=1")
+        } finally {
+            KeyFlowController.updateButtonState(anterior)
+        }
+    }
 
     @Test
     fun `toggle tap records then transcribes and inserts into active target`() = runTest {

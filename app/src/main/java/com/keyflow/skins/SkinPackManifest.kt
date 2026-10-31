@@ -39,6 +39,14 @@ data class KeyboardManifest(
     }
 }
 
+/** A parte da notificação do manifest (FORMAT.md §3, NTF-33). */
+data class NotificationManifest(
+    /** Cor do tempo e dos glifos no centro da orbe na notificação. */
+    val ink: Int = 0xFFFFFFFF.toInt(),
+    /** Fundo do conteúdo da notificação: sempre opaco, igual nos modos claro e escuro; `null` = o fundo do sistema. */
+    val background: Int? = null,
+)
+
 /** O `manifest.json` de um pacote, já validado: campos com padrão preenchidos e cores como `Int` ARGB. */
 data class SkinPackManifest(
     val schemaVersion: Int,
@@ -46,6 +54,7 @@ data class SkinPackManifest(
     val author: String? = null,
     val orb: OrbManifest = OrbManifest(),
     val keyboard: KeyboardManifest = KeyboardManifest(),
+    val notification: NotificationManifest = NotificationManifest(),
 ) {
     companion object {
         /** A versão do formato que este app entende (FORMAT.md). Pacote com versão maior é recusado. */
@@ -77,7 +86,7 @@ class ManifestParse(
     val manifest: SkinPackManifest?,
     val errors: List<String>,
     val warnings: List<String>,
-    /** Quais das seções `orb`/`keyboard` o JSON escreveu — o leitor avisa quando a seção existe e o pacote não tem os arquivos. */
+    /** Quais das seções `orb`/`keyboard`/`notification` o JSON escreveu — o leitor avisa quando a seção existe e o pacote não tem os arquivos. */
     val declaredSections: Set<String> = emptySet(),
 )
 
@@ -92,7 +101,7 @@ private class ManifestParser(private val json: String) {
 
     fun run(): ManifestParse {
         val root = parseRoot() ?: return ManifestParse(null, errors, warnings)
-        val knownTop = setOf("schemaVersion", "name", "author", "orb", "keyboard")
+        val knownTop = setOf("schemaVersion", "name", "author", "orb", "keyboard", "notification")
         warnUnknown(root, knownTop, prefix = "")
 
         val schemaVersion = readSchemaVersion(root)
@@ -101,9 +110,15 @@ private class ManifestParser(private val json: String) {
         val orb = root.opt("orb")?.let { objectAt(it, "orb") }?.let(::readOrb) ?: OrbManifest()
         val keyboard = root.opt("keyboard")?.let { objectAt(it, "keyboard") }?.let(::readKeyboard) ?: KeyboardManifest()
 
-        val declared = setOfNotNull("orb".takeIf { root.has("orb") }, "keyboard".takeIf { root.has("keyboard") })
+        val notification = root.opt("notification")?.let { objectAt(it, "notification") }?.let(::readNotification) ?: NotificationManifest()
+
+        val declared = setOfNotNull(
+            "orb".takeIf { root.has("orb") },
+            "keyboard".takeIf { root.has("keyboard") },
+            "notification".takeIf { root.has("notification") },
+        )
         if (errors.isNotEmpty() || schemaVersion == null || name == null) return ManifestParse(null, errors, warnings, declared)
-        return ManifestParse(SkinPackManifest(schemaVersion, name, author, orb, keyboard), errors, warnings, declared)
+        return ManifestParse(SkinPackManifest(schemaVersion, name, author, orb, keyboard, notification), errors, warnings, declared)
     }
 
     private fun parseRoot(): JSONObject? {
@@ -209,6 +224,15 @@ private class ManifestParser(private val json: String) {
             centerInk = orb.opt("centerInk")?.let { colorAt(it, "orb.centerInk", opaque = false) } ?: defaults.centerInk,
             fps = fps,
             stateFps = stateFps,
+        )
+    }
+
+    private fun readNotification(n: JSONObject): NotificationManifest {
+        warnUnknown(n, setOf("ink", "background"), prefix = "notification.")
+        val defaults = NotificationManifest()
+        return NotificationManifest(
+            ink = n.opt("ink")?.let { colorAt(it, "notification.ink", opaque = false) } ?: defaults.ink,
+            background = n.opt("background")?.let { colorAt(it, "notification.background", opaque = true) },
         )
     }
 

@@ -120,7 +120,7 @@ class FluxosEndToEndTest {
         observador.coroutineContext[kotlinx.coroutines.Job]?.cancel()
         try {
             if (KeyFlowController.buttonState.value in listOf(ButtonState.RECORDING, ButtonState.PAUSED)) {
-                context.startService(OverlayService.actionIntent(context, com.keyflow.overlay.RecordingNotification.ACTION_CANCEL))
+                context.startService(OverlayService.actionIntent(context, OverlayService.ACTION_CANCEL))
                 aguardar("gravação não cancelou") { KeyFlowController.buttonState.value == ButtonState.CANCELLING }
                 context.startService(OverlayService.actionIntent(context, OverlayService.ACTION_COMMIT_CANCEL))
             }

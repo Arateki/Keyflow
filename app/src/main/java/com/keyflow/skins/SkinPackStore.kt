@@ -96,6 +96,7 @@ class SkinPackStore(
             File(staging, SkinPackNames.MANIFEST).writeBytes(content.manifestBytes)
             for (frames in content.orbFrames.values) for (svg in frames) File(staging, svg.fileName).writeBytes(svg.bytes)
             for (svg in content.keyboardFaces.values) File(staging, svg.fileName).writeBytes(svg.bytes)
+            for (svg in content.notificationFaces.values) File(staging, svg.fileName).writeBytes(svg.bytes)
 
             val replaced = target.exists()
             old.deleteRecursively()
@@ -153,19 +154,22 @@ class SkinPackStore(
 
             val orb = sortedMapOf<OrbPackState, MutableList<Pair<Int, File>>>()
             val keyboard = linkedMapOf<KeyboardPart, File>()
+            val notification = linkedMapOf<OrbPackState, File>()
             for (file in dir.listFiles().orEmpty()) {
                 if (!file.isFile) continue
                 when (val kind = SkinPackNames.classify(file.name)) {
                     is PackFileKind.OrbFrame -> orb.getOrPut(kind.state) { mutableListOf() } += kind.frame to file
                     is PackFileKind.KeyboardFace -> keyboard[kind.part] = file
+                    is PackFileKind.NotificationFace -> notification[kind.state] = file
                     else -> Unit
                 }
             }
             // O mesmo mínimo que o import exige: sem `idle` não há orbe, sem `key_normal` não há teclado, e sem nenhum dos dois não há skin.
             if (orb.isNotEmpty() && OrbPackState.IDLE !in orb) return null
             if (keyboard.isNotEmpty() && KeyboardPart.KEY_NORMAL !in keyboard) return null
-            if (orb.isEmpty() && keyboard.isEmpty()) return null
-            SkinPack(id, manifest, dir, orb.mapValues { (_, frames) -> frames.sortedBy { it.first }.map { it.second } }, keyboard)
+            if (notification.isNotEmpty() && OrbPackState.IDLE !in notification) return null
+            if (orb.isEmpty() && keyboard.isEmpty() && notification.isEmpty()) return null
+            SkinPack(id, manifest, dir, orb.mapValues { (_, frames) -> frames.sortedBy { it.first }.map { it.second } }, keyboard, notification)
         } catch (_: Exception) {
             null
         }
@@ -196,6 +200,7 @@ class SkinPackStore(
         fun run(): ImportReport {
             val slice = content.manifest.keyboard.slice
             for (frames in content.orbFrames.values) for (svg in frames) check(svg, ORB_TEST_PX, ORB_TEST_PX, SvgFit.MEET, null, isOrb = true)
+            for (svg in content.notificationFaces.values) check(svg, ORB_TEST_PX, ORB_TEST_PX, SvgFit.MEET, null, isOrb = true)
             for ((part, svg) in content.keyboardFaces) {
                 val face = part != KeyboardPart.TRAY
                 check(svg, if (face) FACE_TEST_PX else TRAY_TEST_W, if (face) FACE_TEST_PX else TRAY_TEST_H, SvgFit.STRETCH, if (face) slice else null, isOrb = false)

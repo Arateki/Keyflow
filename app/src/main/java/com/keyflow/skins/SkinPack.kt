@@ -16,6 +16,7 @@ class SkinPack internal constructor(
     private val dir: File,
     private val orbFiles: Map<OrbPackState, List<File>>,
     private val keyboardFiles: Map<KeyboardPart, File>,
+    private val notificationFiles: Map<OrbPackState, File> = emptyMap(),
 ) {
     /** O id guardado em `Settings.keyboardSkin`/`orbSkin`. */
     val skinId: String get() = SkinIds.forPack(id)
@@ -23,6 +24,10 @@ class SkinPack internal constructor(
     val name: String get() = manifest.name
     val hasOrb: Boolean get() = orbFiles.isNotEmpty()
     val hasKeyboard: Boolean get() = keyboardFiles.isNotEmpty()
+    val hasNotification: Boolean get() = notificationFiles.isNotEmpty()
+
+    /** O SVG da orbe da notificação em [state]; estado ausente usa `idle` (NTF-31). `null` se o pacote não tem notificação. */
+    fun notificationFile(state: OrbPackState): File? = notificationFiles[state] ?: notificationFiles[OrbPackState.IDLE]
 
     /** Os arquivos dos frames de [state], em ordem; estado sem frames usa os de `idle` (SKP-ORB-02). Vazio se o pacote não tem orbe. */
     fun framesOf(state: OrbPackState): List<File> = orbFiles[state] ?: orbFiles[OrbPackState.IDLE].orEmpty()
@@ -44,5 +49,5 @@ class SkinPack internal constructor(
     }
 
     /** Uma linha curta para o log: o que o pacote traz. */
-    override fun toString(): String = "SkinPack($id, orb=${orbFiles.mapValues { it.value.size }}, teclado=${keyboardFiles.keys}, dir=${dir.name})"
+    override fun toString(): String = "SkinPack($id, orb=${orbFiles.mapValues { it.value.size }}, teclado=${keyboardFiles.keys}, notificação=${notificationFiles.keys}, dir=${dir.name})"
 }

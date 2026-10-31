@@ -100,7 +100,7 @@ T8 depende de T7 (a interface da fonte de orbe).
 
 ## Fase B — Aparência
 
-### NTF-T6 — Renderizar a orbe em bitmap (Ateliê e as pagas) `[P]` — **Status: pendente**
+### NTF-T6 — Renderizar a orbe em bitmap (Ateliê e as pagas) `[P]` — **Status: concluída (2026-10-30)**
 - **What**: **spike primeiro**: confirmar que `drawOrb` (Ateliê, Aero, Glitch, Rose Gold) e `drawMascotOrb` (Ouvi) desenham sobre `CanvasDrawScope` de um `Bitmap` ARGB transparente (inclusive o `BlendMode.Plus` do Glitch). Depois: tornar esses desenhos `internal`, expor
   `renderOrbBitmap(style, state, ladoPx, centro)` com **tempo fixo e pose fixa** por estado, e extrair o traçado dos glifos (pausa, lixeira, X) para `DrawScope` compartilhados, mais o **olho** (a partir do `KfIcons.TabVisao`). A orbe flutuante continua usando os mesmos desenhos.
 - **Where**: `ui/orb/VoiceOrb.kt`, `ui/orb/MascotOrb.kt`, `notificacao/app/RenderizadorDeOrbe.kt`; testes `RenderizadorDeOrbeTest`.
@@ -108,7 +108,7 @@ T8 depende de T7 (a interface da fonte de orbe).
 - **Done when**: instrumentado — cada skin × estado (4 + glifos) gera bitmap não vazio, determinístico (duas chamadas iguais) e com o tamanho pedido; o Glitch não "soma com o fundo"; **todos os goldens da orbe/Sobrepor/onboarding/tour existentes bit-idênticos** (`pool telas`, 0 divergências); a extração dos glifos não muda um pixel da orbe flutuante.
 - **Tests**: instrumentado + goldens. **Gate**: `build` + `pool instrumentar com.keyflow.notificacao.RenderizadorDeOrbeTest` + `pool telas`. **Commit**: `refactor(orbe): desenho da orbe e dos glifos utilizável fora do Compose`.
 
-### NTF-T7 — Provedor de aparência: Sistema, cache, orçamento, claro/escuro e fallback — **Status: pendente**
+### NTF-T7 — Provedor de aparência: Sistema, cache, orçamento, claro/escuro e fallback — **Status: concluída (2026-10-30)**
 - **What**: `AparenciaDaNotificacao`/`ProvedorDeAparencia` (design §7): resolve `SkinEfetiva` (`orbStyleFor(id, skinsUnlocked)`, Sistema, pacote), skin **Sistema** (círculo liso na cor de destaque do sistema), cache `LruCache` por bytes com a chave e as invalidações do design §7, `OrcamentoDeBitmaps`
   (lado ≤ 192 px, soma ≤ 1 MB, alvo 256 KB), modo noturno do sistema (`Configuration.uiMode`), fallback Ateliê → mínima, tudo fora da thread principal. Define a interface `FonteDeOrbe` que o pacote implementa (T8).
 - **Where**: `notificacao/OrcamentoDeBitmaps.kt` (puro), `notificacao/app/{AparenciaDaNotificacao,ProvedorDeAparencia}.kt`; testes `OrcamentoDeBitmapsTest` (unit), `ProvedorDeAparenciaTest` (instrumentado).
@@ -117,7 +117,7 @@ T8 depende de T7 (a interface da fonte de orbe).
   Sistema muda de cor com o modo noturno; Ateliê pinta fundo escuro/claro; as pagas não pintam fundo; skin inexistente e falha de render caem no Ateliê; a chave do cache muda com skin/estado/lado/modo; `SkinPackStore.changes` e `skinsUnlockedFlow` invalidam.
 - **Tests**: unit + instrumentado. **Gate**: `quick` + `pool instrumentar com.keyflow.notificacao.ProvedorDeAparenciaTest`. **Commit**: `feat(notificação): aparência da notificação por skin com cache e orçamento de bitmaps`.
 
-### NTF-T8 — Pacote com a seção `notification` — **Status: pendente**
+### NTF-T8 — Pacote com a seção `notification` — **Status: concluída (2026-10-30)**
 - **What**: o contrato do design §8: `PackFileKind.NotificationFace(state)` em `SkinPackNames`; seção `notification` (`ink`, `background` opaco) em `SkinPackManifest` (conhecida em `knownTop`); `SkinPackReader` (validação, relatório "notificação: N estados", erro "não tem orbe, teclado nem notificação", aviso se a seção não tem arquivos);
   `SkinPack` (`hasNotification`, `notificationFiles`); `SkinPackStore` (instala/lista/abre); `PackPreview` (miniatura); `OrbeDePacote` (a `FonteDeOrbe` da T7, incluindo o **primeiro quadro** da orbe para "copiar" de pacote só de orbe, NTF-34).
   **Em lockstep**: o `FORMAT.md` (§1, §2, §3, §6, §7) com o texto do design §8, o `SkinPackFormatDocTest` e o `SkinFormatAssetTest` verdes, e o pacote de exemplo (`skin-packs/exemplo-neon/` + `scripts/build-skin-pack.sh`) com as 4 peças, importando **sem avisos**. A seção "Pacote de skin" da aba Docs ganha a nota.
@@ -132,7 +132,8 @@ T8 depende de T7 (a interface da fonte de orbe).
 
 ## Fase C — Integração com o app
 
-### NTF-T9 — Layout e construtor da notificação (substitui `RecordingNotification`) — **Status: pendente**
+### NTF-T9 — Layout e construtor da notificação (substitui `RecordingNotification`) — **Status: concluída (2026-10-30)**
+- **Correção de alfa (2026-10-31): implementada; validação JVM 8/8 e instrumentados pendentes por ANR.** `legivel` compõe a tinta sobre o fundo e devolve cor opaca; regressões permanentes para botões e tempo miúdo. Ver `.specs/project/licoes/2026-10-31-notificacao-contraste-alfa.md`.
 - **What**: `res/layout/notif_orb.xml` (design §6) e `NotificacaoDaOrbe.construir(...)`: `RemoteViews` com a linha `[botão][orbe][botão]` (design §6): a orbe e o `Chronometer` (base deslocada na retomada: REC-06), **os botões do estado** (`BotoesDaNotificacao`, glifos vetoriais tingidos pela skin, `INVISIBLE` quando ausentes), o clique da orbe e **um `PendingIntent` por botão** (`ACTION_NOTIF_PAUSE_RESUME`/`CANCEL`/`UNDO`, `requestCode` próprio), `contentIntent` (`getActivity`), `deleteIntent`, `VISIBILITY_PRIVATE` + `publicVersion` (orbe em repouso e **sem botões** / estado real com botões, conforme a opção),
   descrição de acessibilidade por estado, `setForegroundServiceBehavior(IMMEDIATE)` (confirmar o texto da doc, L12), **sem** `setCustomBigContentView` e **sem parâmetro de texto**. Remove `RecordingNotification.kt`, `notif_recording.xml` e os drawables dos chips que ficarem sem uso; `VisionProjectionSession` recebe o novo construtor pela mesma lambda.
 - **Where**: `notificacao/app/NotificacaoDaOrbe.kt`, `res/layout/notif_orb.xml`, `overlay/OverlayService.kt` (pontos que chamam `recordingNotification`), `vision/VisionProjectionSession.kt` (só a lambda), `app/src/androidTest/.../RecordingNotificationTest.kt` (reescrito como `NotificacaoDaOrbeTest`).
@@ -141,7 +142,8 @@ T8 depende de T7 (a interface da fonte de orbe).
   o `Chronometer` conta no `RECORDING`, congela em `PAUSED`/`CANCELLING`; a mínima tem canal `keyflow_overlay_min`, sem ação e `SECRET`. `OverlayServiceCancelTest`/`OverlayServiceStopTest`/`OverlayServiceVisionTest` verdes. `assembleDebug` e `lintDebug` verdes.
 - **Tests**: instrumentado. **Gate**: `build` + `lint` + `pool instrumentar com.keyflow.notificacao.NotificacaoDaOrbeTest com.keyflow.overlay.OverlayServiceCancelTest com.keyflow.overlay.OverlayServiceStopTest com.keyflow.overlay.OverlayServiceVisionTest`. **Commit**: `feat(notificação): a notificação passa a ser a orbe e os botões dos arrastos`.
 
-### NTF-T10 — Serviço: toques e ações — **Status: pendente**
+### NTF-T10 — Serviço: toques e ações — **Status: concluída (2026-10-30)**
+- **Correção de prontidão (2026-10-31): implementada; contraprova JVM 1/1 e instrumentados pendentes por ANR.** A preparação aguarda destruição/criação do serviço e gravação da nova instância, sem aceitar `RECORDING` herdado. Ver `.specs/project/licoes/2026-10-31-notificacao-prontidao-servico.md`.
 - **What**: `ACTION_NOTIF_ORB_TAP` e as ações **dedicadas dos botões** (`ACTION_NOTIF_PAUSE_RESUME`, `ACTION_NOTIF_CANCEL`, `ACTION_NOTIF_UNDO`) em `onStartCommand`; `NotificacaoHost.aoTocarNaOrbe()` e `aoTocarNoBotao(botao)` (design §5; o botão passa pelo **mesmo portão**, **não** entra na rajada, confere o estado e ignora o botão atrasado): `PortaoDeToque` com `KeyguardManager` injetável, `RajadaDeToques` no `serviceScope` (janela `tapBurstWindowMs`, gancho `…ForTest`), `ResolvedorDeInteracao`, execução reaproveitando
   `handleKeyboardMicTap`/`handlePauseResume`/`handleCancel`/`onUndoCancel`/`visionFlow`; extração de `executarAcaoDeAtalho(acao)` de `handleOrbShortcut` (a orbe flutuante usa a mesma função); checagem da permissão de sobreposição nas ações de Activity (L10); `Haptics.tick`; leitura leve e ao vivo de `configNotificacaoFlow()`.
 - **Where**: `overlay/OverlayService.kt`, `notificacao/app/NotificacaoHost.kt`; teste `OverlayServiceNotificacaoTest`.

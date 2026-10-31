@@ -105,7 +105,7 @@ internal class SkinDraft(private val limits: SkinLimits, private val classify: (
         if (name.isEmpty() || name.length > limits.maxNameChars) return "Nome de arquivo inválido (vazio ou com mais de ${limits.maxNameChars} caracteres): «${shown(name)}»."
         if (name.any { it == '/' || it == '\\' || it.code < 0x20 }) return "O nome «${shown(name)}» tem pasta ou caractere de controle; use só o nome do arquivo, na raiz."
         return when (classify(name)) {
-            SkinFileKind.REJECTED -> "O nome «${shown(name)}» não é do formato. Os nomes aceitos: manifest.json; orb_<estado>_<número>.svg com estado idle, listening, paused ou transcribing (ex.: orb_idle_01.svg); e keyboard_key_normal.svg, keyboard_key_pressed.svg, keyboard_modifier_normal.svg, keyboard_modifier_pressed.svg e keyboard_tray.svg. Tudo em minúsculas."
+            SkinFileKind.REJECTED -> "O nome «${shown(name)}» não é do formato. Os nomes aceitos: manifest.json; orb_<estado>_<número>.svg com estado idle, listening, paused ou transcribing (ex.: orb_idle_01.svg); e keyboard_key_normal.svg, keyboard_key_pressed.svg, keyboard_modifier_normal.svg, keyboard_modifier_pressed.svg e keyboard_tray.svg; e notification_idle.svg, notification_listening.svg, notification_paused.svg e notification_transcribing.svg. Tudo em minúsculas."
             else -> null
         }
     }

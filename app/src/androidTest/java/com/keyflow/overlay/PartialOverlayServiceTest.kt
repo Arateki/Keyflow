@@ -112,7 +112,7 @@ class PartialOverlayServiceTest {
         input!!.text = "Primeira parte, editada"
 
         // Retoma com o input aberto e pausa de novo: o trecho novo entra depois da edição (PAR-06).
-        sendAction(RecordingNotification.ACTION_PAUSE_RESUME)
+        sendAction(OverlayService.ACTION_PAUSE_RESUME)
         waitUntilState(ButtonState.RECORDING)
         speakThenPause()
         assertNotNull(
@@ -127,7 +127,7 @@ class PartialOverlayServiceTest {
         // Envio: o texto inteiro, com a edição, sai uma vez pelo fluxo normal e as janelas somem (PAR-07).
         var delivered: String? = null
         instrumentation.runOnMainSync { KeyFlowController.registerInserter { delivered = it; true } }
-        sendAction(RecordingNotification.ACTION_STOP_PASTE)
+        sendAction(OverlayService.ACTION_STOP_PASTE)
         waitUntil("texto não foi entregue", TIMEOUT) { delivered != null }
         assertEquals("Primeira parte, editada segunda parte", delivered)
         assertTrue(device.wait(Until.gone(By.textContains("parcial ·")), TIMEOUT))
@@ -146,7 +146,7 @@ class PartialOverlayServiceTest {
         speakThenPause()
         assertNotNull(device.wait(Until.findObject(By.textContains("parcial · 2 palavras")), TIMEOUT))
 
-        sendAction(RecordingNotification.ACTION_CANCEL)
+        sendAction(OverlayService.ACTION_CANCEL)
         waitUntilState(ButtonState.CANCELLING)
         assertTrue(device.wait(Until.gone(By.textContains("parcial ·")), TIMEOUT))
 
@@ -161,7 +161,7 @@ class PartialOverlayServiceTest {
         speakThenPause()
         assertNotNull(device.wait(Until.findObject(By.textContains("parcial · 2 palavras")), TIMEOUT))
 
-        sendAction(RecordingNotification.ACTION_CANCEL)
+        sendAction(OverlayService.ACTION_CANCEL)
         waitUntilState(ButtonState.IDLE_NO_FIELD, ButtonState.IDLE_READY, timeoutMs = 8_000)
 
         assertTrue(device.wait(Until.gone(By.textContains("parcial ·")), TIMEOUT))
@@ -172,7 +172,7 @@ class PartialOverlayServiceTest {
     /** Grava um trecho acima do mínimo e pausa — o trecho fechado vai ao servidor. */
     private fun speakThenPause() {
         Thread.sleep(1_200)
-        sendAction(RecordingNotification.ACTION_PAUSE_RESUME)
+        sendAction(OverlayService.ACTION_PAUSE_RESUME)
         waitUntilState(ButtonState.PAUSED)
     }
 

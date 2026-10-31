@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+<defs>
+<radialGradient id="halo" cx="128" cy="128" r="128" gradientUnits="userSpaceOnUse"><stop offset="0.58" stop-color="#8A8FC9" stop-opacity="0.25"/><stop offset="0.74" stop-color="#8A8FC9" stop-opacity="0.09"/><stop offset="1" stop-color="#8A8FC9" stop-opacity="0"/></radialGradient>
+<radialGradient id="corpo" cx="104" cy="96" r="104" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#2E3274"/><stop offset="0.6" stop-color="#15173F"/><stop offset="1" stop-color="#090A22"/></radialGradient>
+<linearGradient id="aro" x1="52" y1="52" x2="204" y2="204" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#8A8FC9"/><stop offset="1" stop-color="#5F6399"/></linearGradient>
+<linearGradient id="brilho" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity="0.22"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
+</defs>
+<circle cx="128" cy="128" r="128" fill="url(#halo)"/>
+<circle cx="128" cy="128" r="78" fill="url(#corpo)"/><circle cx="128" cy="128" r="79" fill="none" stroke="url(#aro)" stroke-opacity="0.24" stroke-width="11"/><circle cx="128" cy="128" r="78" fill="none" stroke="url(#aro)" stroke-opacity="0.85" stroke-width="4" stroke-dasharray="9 7"/><circle cx="128" cy="128" r="71" fill="none" stroke="#FFFFFF" stroke-opacity="0.1" stroke-width="1.5"/><ellipse cx="124" cy="86" rx="46" ry="21" fill="url(#brilho)"/>
+</svg>

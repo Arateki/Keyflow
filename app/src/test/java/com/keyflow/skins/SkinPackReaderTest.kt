@@ -199,7 +199,7 @@ class SkinPackReaderTest {
     @Test
     fun `a pack with neither orb nor keyboard is an error`() {
         val result = failed(zip(listOf("manifest.json" to MANIFEST.toByteArray(), "leia-me.txt" to byteArrayOf(65))))
-        assertThat(result.report.errors.single()).contains("não tem orbe nem teclado")
+        assertThat(result.report.errors.single()).contains("não tem orbe, teclado nem notificação")
     }
 
     @Test
