@@ -18,7 +18,6 @@ import com.keyflow.core.ButtonState
 import com.keyflow.ime.KeyFlowKeyboardView
 import com.keyflow.ui.theme.KeyFlowTheme
 import com.keyflow.ui.tour.scenes.KeyboardScene
-import com.keyflow.ui.tour.scenes.TOUR_HINT_MIC_SELECTOR_TAG
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -125,21 +124,5 @@ class KeyboardSceneTest {
 
         update(frame(SceneReaction(keyboardExpanded = true)))
         assertTrue("e voltado", keyboard().expandedForTest)
-    }
-
-    @Test
-    fun theMicSelectorHintOnlyShowsWhenTheStepDeclaresIt() {
-        show(frame(SceneReaction(micState = ButtonState.RECORDING)))
-        rule.onNodeWithTag(TOUR_HINT_MIC_SELECTOR_TAG).assertDoesNotExist()
-
-        update(
-            frame(
-                SceneReaction(
-                    micState = ButtonState.RECORDING,
-                    overlayHint = TourOverlayHint.MIC_ACTION_SELECTOR,
-                ),
-            ),
-        )
-        rule.onNodeWithTag(TOUR_HINT_MIC_SELECTOR_TAG).assertIsDisplayed()
     }
 }

@@ -169,10 +169,6 @@ class GestureScriptCatalogTest {
         val drag = hold.steps.first { it.action == FingerAction.DRAG }
         assertTrue("arrasta para cima (y diminui)", drag.dragPath.last().y < drag.dragPath.first().y)
         assertEquals(ButtonState.PAUSED, hold.steps.last().reaction.micState)
-        assertTrue(
-            "o seletor de chips do mic saiu do app: o roteiro não o desenha mais",
-            hold.steps.none { it.reaction.overlayHint == TourOverlayHint.MIC_ACTION_SELECTOR },
-        )
         assertTrue("o texto não fala mais em seletor", !hold.description.contains("seletor"))
     }
 
