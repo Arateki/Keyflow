@@ -22,11 +22,16 @@ minha-skin.zip
 ├── keyboard_key_normal.svg
 ├── keyboard_key_pressed.svg
 ├── keyboard_modifier_normal.svg
-└── keyboard_modifier_pressed.svg
+├── keyboard_modifier_pressed.svg
+├── notification_idle.svg
+├── notification_listening.svg
+├── notification_paused.svg
+└── notification_transcribing.svg
 ```
 
-Um pacote pode ter só a **orbe**, só o **teclado**, ou os dois. Ele aparece na aba **Sobrepor** se tiver orbe e na aba
-**Teclado** se tiver teclado. Um pacote pronto para copiar e o passo a passo de criar e empacotar a sua skin estão em
+Um pacote pode ter só a **orbe**, só o **teclado**, só a **notificação** ou qualquer combinação deles. Ele aparece na aba **Sobrepor**
+se tiver orbe, na aba **Teclado** se tiver teclado e na aba **Notificação** se tiver notificação. A árvore ganha
+`notification_idle.svg`, `notification_listening.svg`, `notification_paused.svg` e `notification_transcribing.svg`. Um pacote pronto para copiar e o passo a passo de criar e empacotar a sua skin estão em
 [`skin-packs/`](../../../skin-packs/README.md) (`exemplo-neon/`, `scripts/build-skin-pack.sh`).
 
 ## 2. Nome dos arquivos = estado do app + frame
@@ -82,6 +87,22 @@ Tudo minúsculo, `_` entre as partes, extensão `.svg`.
   função pressionada é a `modifier_normal` escurecida (ou, sem `modifier_normal`, a `key_pressed`/`key_normal`).
 - `keyboard_tray.svg` é esticado no teclado todo (largura × altura), com `preserveAspectRatio="none"`.
 
+### Notificação — `notification_<estado>.svg`
+
+| Arquivo                          | O que é                                                    | Obrigatório |
+| -------------------------------- | ---------------------------------------------------------- | ----------- |
+| `notification_idle.svg`          | A orbe em repouso                                          | **sim** (se há notificação); estados que faltarem usam este |
+| `notification_listening.svg`     | Gravando                                                   | não |
+| `notification_paused.svg`        | Pausada (e durante a janela de desfazer o cancelamento)    | não |
+| `notification_transcribing.svg`  | Enviando/transcrevendo                                     | não |
+
+- Cada SVG é a orbe **inteira**, num quadrado (`viewBox` quadrado), fundo transparente, e **estático** (um arquivo por estado; a
+  notificação não anima). Ela é desenhada com **40 dp** de lado: prefira formas simples e deixe margem para sombra e brilho dentro do
+  `viewBox`.
+- O **tempo** e os **glifos do centro** (pausa, lixeira, X, olho) **não** fazem parte do SVG: o app desenha por cima, na cor `notification.ink`.
+- Um bitmap por estado: o app guarda só o do estado atual (< 100 KB).
+- Um pacote só de **orbe** também veste a notificação (a opção "copiar" da aba Notificação): o app usa o primeiro quadro de cada estado da orbe.
+
 ## 3. `manifest.json`
 
 Só `schemaVersion` e `name` são obrigatórios. Tudo mais tem padrão.
@@ -105,6 +126,10 @@ Só `schemaVersion` e `name` são obrigatórios. Tudo mais tem padrão.
     "trayColor": "#0B0B10",
     "navigationBarColor": "#0B0B10",
     "slice": { "left": 24, "top": 24, "right": 24, "bottom": 24 }
+  },
+  "notification": {
+    "ink": "#FFFFFF",
+    "background": "#2B2720"
   }
 }
 ```
@@ -122,14 +147,16 @@ Só `schemaVersion` e `name` são obrigatórios. Tudo mais tem padrão.
 | `keyboard.trayColor`          | cor, `#00000000`                      | Fundo liso, usado quando não há `keyboard_tray.svg` (e de fallback)         |
 | `keyboard.navigationBarColor` | cor opaca, = `trayColor` opaca        | Faixa do sistema sob o teclado                                              |
 | `keyboard.slice`              | `{left,top,right,bottom}` em unidades do `viewBox`, sem padrão (= estica tudo) | Margens do fatiamento 3×3 das faces de tecla |
+| `notification.ink`            | cor, `#FFFFFF`                        | Cor do tempo e dos glifos no centro da orbe na notificação                  |
+| `notification.background`     | cor **opaca**, sem padrão (= o fundo do sistema) | Fundo do conteúdo da notificação; igual nos modos claro e escuro |
 
 Um `fps` acima de **90** é aceito (até 120), mas o import **avisa**: telas de 60/90 Hz (as de quase todos os aparelhos; o Galaxy A32 alterna entre
 as duas) não mostram os quadros a mais, só ajuda em telas de 120 Hz. Para a maioria das telas, 60 ou 90 é o que se vê.
 
 Campos desconhecidos são ignorados com aviso (permite o formato crescer sem quebrar pacotes antigos). Um campo **conhecido** com
 valor inválido (cor mal escrita, `fps` fora de 1–120, `popup` translúcido, `slice` incompleto) é **erro** com o caminho do campo —
-nunca um padrão aplicado em silêncio. O `manifest.json` é UTF-8, tem até 64 KB e até 16 níveis de `{`/`[`. As seções `orb` e
-`keyboard` sem os arquivos correspondentes no pacote são ignoradas, com aviso; `orb.states.error` e `orb.states.cancelling` são
+nunca um padrão aplicado em silêncio. O `manifest.json` é UTF-8, tem até 64 KB e até 16 níveis de `{`/`[`. As seções `orb`,
+`keyboard` e `notification` sem os arquivos correspondentes no pacote são ignoradas, com aviso; `orb.states.error` e `orb.states.cancelling` são
 reservados (ignorados, com aviso).
 
 ## 4. O que o renderizador aceita (SVG)
@@ -187,7 +214,7 @@ numa tela de 60 Hz, um estado de 240 frames a 120 fps ocupa metade; a 90 Hz, tr�
 ## 6. Resultado do import
 
 O app mostra um relatório com três listas — **Instalado** (o que entrou: "orbe: 4 estados, 46 frames · teclado:
-tray + 4 faces"), **Avisos** (ignorado, `filter` sem efeito, buraco na numeração, estado ausente usando `idle`…) e
+tray + 4 faces · notificação: 4 estados"), **Avisos** (ignorado, `filter` sem efeito, buraco na numeração, estado ausente usando `idle`…) e
 **Erros** (o que impediu a instalação, com o nome do arquivo). Com algum erro, **nada** é instalado. Os avisos de ritmo e de memória (`fps` acima de 90 e
 estado que passa de 16 MB a 280 px: §2, §3 e §5) dizem o número que o autor precisa para decidir.
 
@@ -203,5 +230,5 @@ aparece na hora. Remover um pacote selecionado devolve a skin da superfície ao 
 ## 7. Fora da v1 (reservado)
 
 Variantes escuras (`*_dark`), animação do teclado em eventos (frames sobrepostos ao toque/ao gravar), skin do
-botão de mic e das barras, estados `error`/`cancelling` próprios da orbe, setas do arrasto, notificação. Nomes
+botão de mic e das barras, estados `error`/`cancelling` próprios da orbe, setas do arrasto. Nomes
 `keyboard_fx_*`, `orb_error_*`, `orb_cancelling_*` ficam **reservados**: hoje são ignorados com aviso.

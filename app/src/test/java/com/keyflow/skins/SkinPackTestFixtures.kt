@@ -63,6 +63,10 @@ internal object SkinPackTestFixtures {
     fun keyboardOnly(manifest: String = MANIFEST): List<Pair<String, ByteArray>> =
         listOf("manifest.json" to manifest.toByteArray(), "keyboard_key_normal.svg" to svg().toByteArray())
 
+    /** Um pacote só de notificação, válido: os [estados] pedidos (o `idle` é obrigatório). */
+    fun notificationOnly(manifest: String = MANIFEST, estados: List<String> = listOf("idle")): List<Pair<String, ByteArray>> =
+        listOf("manifest.json" to manifest.toByteArray()) + estados.map { "notification_$it.svg" to svg().toByteArray() }
+
     /**
      * A parte dos cabeçalhos locais de um `.zip` (tudo antes do diretório central): o `ZipInputStream` lê só isso, então juntar
      * duas destas fabrica um zip com a mesma entrada duas vezes — coisa que o `ZipOutputStream` se recusa a escrever.

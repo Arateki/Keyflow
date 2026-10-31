@@ -26,9 +26,12 @@ class SkinPackContent(
     val keyboardFaces: Map<KeyboardPart, PackSvg>,
     /** O `manifest.json` como veio no `.zip` (já validado): é ele que o store grava, para reabrir o pacote com o mesmo parser. */
     val manifestBytes: ByteArray,
+    /** As orbes estáticas da notificação, por estado (`notification_<estado>.svg`). */
+    val notificationFaces: Map<OrbPackState, PackSvg> = emptyMap(),
 ) {
     val hasOrb: Boolean get() = orbFrames.isNotEmpty()
     val hasKeyboard: Boolean get() = keyboardFaces.isNotEmpty()
+    val hasNotification: Boolean get() = notificationFaces.isNotEmpty()
     val frameCount: Int get() = orbFrames.values.sumOf { it.size }
 }
 
@@ -133,7 +136,7 @@ object SkinPackReader {
                 val cap = when {
                     junk -> null
                     kind is PackFileKind.Manifest -> MAX_MANIFEST_BYTES
-                    kind is PackFileKind.OrbFrame || kind is PackFileKind.KeyboardFace -> MAX_SVG_BYTES
+                    kind is PackFileKind.OrbFrame || kind is PackFileKind.KeyboardFace || kind is PackFileKind.NotificationFace -> MAX_SVG_BYTES
                     else -> null
                 }
                 val buffer = if (cap != null) ByteArrayOutputStream() else null
@@ -274,6 +277,7 @@ object SkinPackReader {
 
             val frames = sortedMapOf<OrbPackState, MutableMap<Int, Pair<Entry, PackSvg>>>()
             val faces = linkedMapOf<KeyboardPart, PackSvg>()
+            val notificationFaces = sortedMapOf<OrbPackState, PackSvg>()
             val svgWarnings = linkedMapOf<SvgWarning, MutableList<String>>()
             val ignored = mutableListOf<String>()
             val reserved = mutableListOf<String>()
@@ -293,6 +297,8 @@ object SkinPackReader {
                         }
                     }
                     is PackFileKind.KeyboardFace -> checkedSvg(file, kind.part.fileName, svgWarnings)?.let { faces[kind.part] = it }
+                    is PackFileKind.NotificationFace ->
+                        checkedSvg(file, SkinPackNames.notificationFileName(kind.state), svgWarnings)?.let { notificationFaces[kind.state] = it }
                     is PackFileKind.InvalidOrbFrame -> errors += if (kind.tooLarge) {
                         tr("%s: o número do frame é grande demais.", file.name)
                     } else {
@@ -308,10 +314,13 @@ object SkinPackReader {
 
             val orbFrames = assembleOrb(frames)
             assembleKeyboard(faces)
-            if (orbFrames.isEmpty() && faces.isEmpty() && errors.isEmpty()) {
-                errors += tr("O pacote não tem orbe nem teclado — coloque pelo menos orb_idle_01.svg ou keyboard_key_normal.svg.")
+            if (notificationFaces.isNotEmpty() && OrbPackState.IDLE !in notificationFaces) {
+                errors += tr("notificação: falta notification_idle.svg, que é obrigatório quando o pacote tem notificação.")
             }
-            warnManifestSections(parsed, orbFrames, hasKeyboard = faces.isNotEmpty(), hasTrayFile = KeyboardPart.TRAY in faces)
+            if (orbFrames.isEmpty() && faces.isEmpty() && notificationFaces.isEmpty() && errors.isEmpty()) {
+                errors += tr("O pacote não tem orbe, teclado nem notificação — coloque pelo menos orb_idle_01.svg, keyboard_key_normal.svg ou notification_idle.svg.")
+            }
+            warnManifestSections(parsed, orbFrames, hasKeyboard = faces.isNotEmpty(), hasTrayFile = KeyboardPart.TRAY in faces, hasNotification = notificationFaces.isNotEmpty())
             for ((kind, files) in svgWarnings) warnings += tr("%s: %s", ReportText.names(files), svgWarningText(kind))
 
             val manifest = parsed?.manifest
@@ -319,8 +328,12 @@ object SkinPackReader {
             val installed = buildList {
                 if (orbFrames.isNotEmpty()) add(orbSummary(orbFrames))
                 if (faces.isNotEmpty()) add(keyboardSummary(faces))
+                if (notificationFaces.isNotEmpty()) add(notificationSummary(notificationFaces.size))
             }
-            return SkinPackReadResult.Ok(SkinPackContent(manifest, orbFrames, faces, manifestEntry!!.bytes!!), ImportReport(installed, warnings, errors))
+            return SkinPackReadResult.Ok(
+                SkinPackContent(manifest, orbFrames, faces, manifestEntry!!.bytes!!, notificationFaces),
+                ImportReport(installed, warnings, errors),
+            )
         }
 
         /** Se TODOS os arquivos moram numa mesma pasta de primeiro nível, essa pasta é só a embalagem (o "comprimir pasta"): sai. */
@@ -423,7 +436,7 @@ object SkinPackReader {
             }
         }
 
-        private fun warnManifestSections(parsed: ManifestParse?, orbFrames: Map<OrbPackState, List<PackSvg>>, hasKeyboard: Boolean, hasTrayFile: Boolean) {
+        private fun warnManifestSections(parsed: ManifestParse?, orbFrames: Map<OrbPackState, List<PackSvg>>, hasKeyboard: Boolean, hasTrayFile: Boolean, hasNotification: Boolean) {
             val manifest = parsed?.manifest ?: return
             if ("orb" in parsed.declaredSections && orbFrames.isEmpty()) {
                 warnings += tr("manifest.json: a seção orb foi ignorada — o pacote não tem frames de orbe.")
@@ -436,6 +449,9 @@ object SkinPackReader {
             }
             if ("keyboard" in parsed.declaredSections && !hasKeyboard) {
                 warnings += tr("manifest.json: a seção keyboard foi ignorada — o pacote não tem arquivos de teclado.")
+            }
+            if ("notification" in parsed.declaredSections && !hasNotification) {
+                warnings += tr("manifest.json: a seção notification foi ignorada — o pacote não tem arquivos de notificação.")
             }
             val keyboard = manifest.keyboard
             if (hasTrayFile && !keyboard.declaresTrayColor && !keyboard.declaresNavigationBarColor) {
@@ -452,6 +468,9 @@ object SkinPackReader {
                 else -> tr("orbe: %d estados, %d frames", states, count)
             }
         }
+
+        private fun notificationSummary(states: Int): String =
+            if (states == 1) tr("notificação: 1 estado") else tr("notificação: %d estados", states)
 
         private fun keyboardSummary(faces: Map<KeyboardPart, PackSvg>): String {
             val tray = KeyboardPart.TRAY in faces

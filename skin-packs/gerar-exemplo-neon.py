@@ -41,6 +41,10 @@ MANIFEST = """{
     "trayColor": "#0B0B1A",
     "navigationBarColor": "#0B0B1A",
     "slice": { "left": 24, "top": 24, "right": 24, "bottom": 24 }
+  },
+  "notification": {
+    "ink": "#FFFFFF",
+    "background": "#0B0B1A"
   }
 }
 """
@@ -228,6 +232,11 @@ def main():
         "keyboard_modifier_pressed.svg",
         face("#6A2670", "#3A1448", MAGENTA, MAGENTA, 0.07, deslocamento=1.5, luz=0.4, luz_borda=1.0),
     )
+    # A notificação: a orbe inteira, estática, um arquivo por estado (o primeiro quadro de cada estado da orbe).
+    escreve("notification_idle.svg", frame_idle(0))
+    escreve("notification_listening.svg", frame_listening(0))
+    escreve("notification_paused.svg", frame_paused())
+    escreve("notification_transcribing.svg", frame_transcribing(0))
     total = len([n for n in os.listdir(PASTA) if n.endswith(".svg")])
     print(f"{total} SVGs e o manifest.json em {PASTA}")
 

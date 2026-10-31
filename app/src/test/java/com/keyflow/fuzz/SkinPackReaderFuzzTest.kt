@@ -26,7 +26,7 @@ class SkinPackReaderFuzzTest {
         throw t
     }
 
-    private val validPack: ByteArray = SkinPackTestFixtures.zip(SkinPackTestFixtures.fullOrb() + SkinPackTestFixtures.keyboardOnly().drop(1))
+    private val validPack: ByteArray = SkinPackTestFixtures.zip(SkinPackTestFixtures.fullOrb() + SkinPackTestFixtures.keyboardOnly().drop(1) + SkinPackTestFixtures.notificationOnly(estados = listOf("idle", "listening", "paused", "transcribing")).drop(1))
 
     @Test(timeout = 180_000)
     fun randomBytesAreRefusedNotThrown() = runBlocking<Unit> {

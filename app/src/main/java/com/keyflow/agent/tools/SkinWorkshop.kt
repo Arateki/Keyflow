@@ -44,7 +44,7 @@ interface SkinWorkshop {
 }
 
 /** O que o formato diz de um nome de arquivo. */
-enum class SkinFileKind { MANIFEST, ORB_FRAME, KEYBOARD_FACE, REJECTED }
+enum class SkinFileKind { MANIFEST, ORB_FRAME, KEYBOARD_FACE, NOTIFICATION_FACE, REJECTED }
 
 /** Os três textos de um relatório de import (já no idioma do app, vêm do próprio leitor). */
 class SkinReport(val installed: List<String>, val warnings: List<String>, val errors: List<String>) {
