@@ -74,8 +74,8 @@ object CodecHosts {
             imagens = imagens,
         )
         if (ValidadorHost.validar(host).any { it.campo != CampoHost.LIMITE }) return null
-        // Defesa em profundidade (CMP-09): arquivo editado à mão não liga o agente num host que o app não resolve sozinho.
-        if (host.agentePodeUsar && RegraAgente.podeMarcar(host) !is PodeMarcar.Sim) host = host.copy(agente = PoliticaAgente.PROIBIDO)
+        // Aqui só há metadados: a disponibilidade real é conferida no cofre/registro antes de gravar ou marcar no modal.
+        if (host.agentePodeUsar && RegraAgente.podeMarcar(host, credencialDisponivel = host.lembrarSenha || host.autenticacao is AutenticacaoHost.Chave) !is PodeMarcar.Sim) host = host.copy(agente = PoliticaAgente.PROIBIDO)
         return host
     }
 

@@ -45,7 +45,7 @@ class CodecHostsFuzzTest {
             assertEquals(config.hosts.size, config.hosts.map { it.id }.distinct().size)
             for (h in config.hosts) {
                 assertTrue("host inválido sobreviveu: $h de $entrada", ValidadorHost.validar(h).none { it.campo != CampoHost.LIMITE })
-                if (h.agentePodeUsar) assertTrue(RegraAgente.podeMarcar(h) is PodeMarcar.Sim)
+                if (h.agentePodeUsar) assertTrue(RegraAgente.podeMarcar(h, credencialDisponivel = true) is PodeMarcar.Sim)
             }
         }
     }

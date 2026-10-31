@@ -799,6 +799,7 @@ internal fun AutoSaveField(
     keyboardType: KeyboardType = KeyboardType.Text,
     masked: Boolean = false,
     pending: PendingEdits? = null,
+    onDraftChange: ((String) -> Unit)? = null,
 ) {
     val palette = LocalKeyFlowPalette.current
     val focusManager = LocalFocusManager.current
@@ -840,6 +841,7 @@ internal fun AutoSaveField(
                 // desfoque/Done/descarte.
                 val pasted = new.length - text.length > 1
                 text = new
+                onDraftChange?.invoke(new)
                 if (masked) maskedEditDirty = true
                 if (pasted) commitIfChanged()
             },

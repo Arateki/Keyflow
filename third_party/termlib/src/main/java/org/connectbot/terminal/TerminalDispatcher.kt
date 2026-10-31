@@ -23,6 +23,12 @@ internal class TerminalDispatcher {
         schedule()
     }
 
+    /** Bytes mapeados entram antes da produção do callback, na mesma fila do texto/IME. */
+    fun keyboardInput(data: ByteArray, output: (ByteArray) -> Unit) {
+        val copia = data.copyOf()
+        execute { output(copia) }
+    }
+
     fun executeAfter(delayMillis: Long, action: () -> Unit) {
         workers.schedule({ execute(action) }, delayMillis, TimeUnit.MILLISECONDS)
     }

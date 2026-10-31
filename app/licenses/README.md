@@ -4,6 +4,7 @@
 |---|---|---|
 | Space Grotesk (fonte) | SIL OFL 1.1 | `OFL_SpaceGrotesk.txt` |
 | Space Mono (fonte) | SIL OFL 1.1 | `OFL_SpaceMono.txt` |
+| JetBrains Mono Nerd Font Mono Regular v3.5.1 (fonte do terminal; JetBrains Mono 2.304 + ícones Nerd Fonts) | OFL 1.1; conjuntos incorporados MIT, Apache-2.0, CC BY 4.0, OFL e Unlicense; aviso Bitstream da origem Hack preservado | `OFL_JetBrainsMonoNerdFont.txt` (copyright e textos completos de cada conjunto) |
 | sherpa-onnx 1.13.8 (AAR recompilado sem TTS, reconhecimento de voz no aparelho) | Apache-2.0 | `Apache-2.0_sherpa-onnx.txt` |
 | ONNX Runtime (`libonnxruntime.so`, dentro do AAR do sherpa-onnx) | MIT | `MIT_onnxruntime.txt` |
 | Whisper base/small (OpenAI) — modelos baixados sob demanda | MIT (código e pesos, repositório oficial) | `MIT_whisper.txt` |
@@ -112,3 +113,34 @@ Os avisos recebidos nos AARs/JARs estão em `computador/`, sem remover copyright
 Aviso embutido adicional: o cbssh conserva trechos Bouncy Castle sob MIT
 (`MIT_bouncycastle-cbssh.txt`). Textos completos das licenças não Apache também em
 `MIT_kaitai.txt`, `ISC_jbcrypt.txt`, `BSL-1.0_kstatemachine.txt` e `BSD-3-Clause_protobuf.txt`.
+
+## Fonte do terminal — Nerd Fonts 3.5.1 (revisão #96)
+
+A fonte permanece por decisão do Yan. O asset é o original do release, sem alterações pelo KeyFlow.
+As versões dos glifos vêm do [inventário do Nerd Fonts 3.5.1](https://github.com/ryanoasis/nerd-fonts/blob/v3.5.1/src/glyphs/README.md);
+o [README](https://github.com/ryanoasis/nerd-fonts/blob/v3.5.1/readme.md) e o
+[LICENSE](https://github.com/ryanoasis/nerd-fonts/blob/v3.5.1/LICENSE) registram o trabalho de Ryan L McIntyre (copyright 2014, MIT/OFL).
+`OFL_JetBrainsMonoNerdFont.txt` preserva a OFL da base e reúne os copyrights, RFNs e textos completos abaixo.
+
+| Conjunto | Autor/atribuição | Licença dos glifos/fontes e avisos preservados |
+| --- | --- | --- |
+| JetBrains Mono 2.304 | The JetBrains Mono Project Authors (2020) | OFL 1.1 |
+| Nerd Fonts 3.5.1 / glifos originais | Ryan L McIntyre (2014) | OFL 1.1 / MIT |
+| Codicons 0.0.45 | Microsoft Corporation e contribuidores | CC BY 4.0 |
+| Devicons 2.17.0.custom | konpa (2015) / projeto Devicon | MIT |
+| Extraglyphs (Hack 3.003) | Source Foundry Authors (2018), Bitstream Inc. (2003) | MIT; aviso Bitstream da origem preservado |
+| Font Awesome Free 6.5.1 | Fonticons, Inc. (copyright/RFN do aviso recebido) | OFL 1.1 nas fontes; CC BY 4.0 nos ícones SVG/JS |
+| Font Awesome Extension 0.0.3 | André Luiz Gava (2017) | MIT |
+| Font Logos 1.3.0 | Lukas W (2014–2026, metadado da fonte) | Unlicense |
+| Material Design Icons (06/10/2022) | Pictogrammers / Templarian | Apache-2.0 (texto completo e aviso recebidos) |
+| Octicons 18.3.0 | GitHub Inc. (2023) | MIT |
+| Seti UI 0.8.1 | Jesse Weed (2014) | MIT |
+| Pomicons 1.001 | Gabriele Lana (2021), RFN Pomicons | OFL 1.1 |
+| Powerline Symbols 1.000 | Kim Silkebækken e contribuidores (2013) | MIT |
+| Powerline Extra 1.200 | Ryan L McIntyre (2016) | MIT |
+| IEC Power Symbols | Joe Loughry (2013) | MIT |
+| Weather Icons 2.0.10 | Erik Flowers | OFL 1.1, texto original preservado sem inventar datas |
+
+Font Logos é rotulado como “unlicensed” na tabela do Nerd Fonts; o [LICENSE do upstream v1.3.0](https://github.com/lukas-w/font-logos/blob/v1.3.0/LICENSE)
+contém Unlicense. Os glifos foram incorporados/remapeados pelo Nerd Fonts para a variante Mono; o KeyFlow não alterou a fonte.
+As marcas representadas pertencem aos respectivos titulares e não indicam endosso.

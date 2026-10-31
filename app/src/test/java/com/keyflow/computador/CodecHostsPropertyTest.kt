@@ -26,7 +26,7 @@ class CodecHostsPropertyTest {
     ) { id, nome, endereco, porta, usuario, auth, lembrar, agente, imagens ->
         val h = Host(id, nome, endereco, porta, usuario, auth, lembrar, if (agente) PoliticaAgente.PERMITIDO else PoliticaAgente.PROIBIDO, imagens)
         // O codec aplica a regra do agente; o gerador só produz o que o app produziria.
-        if (h.agentePodeUsar && RegraAgente.podeMarcar(h) !is PodeMarcar.Sim) h.copy(agente = PoliticaAgente.PROIBIDO) else h
+        if (h.agentePodeUsar && RegraAgente.podeMarcar(h, credencialDisponivel = true) !is PodeMarcar.Sim) h.copy(agente = PoliticaAgente.PROIBIDO) else h
     }
 
     private val configs = Arb.list(hostsArb, 0..12).map { lista ->

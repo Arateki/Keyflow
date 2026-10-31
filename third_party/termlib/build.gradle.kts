@@ -28,6 +28,7 @@ extensions.configure<com.android.build.api.dsl.LibraryExtension>("android") {
 tasks.named("preBuild") { dependsOn(":app:prepareTermlibJni") }
 
 dependencies {
+    testImplementation("junit:junit:4.13.2")
     // Apenas APIs usadas no fonte: sem AppCompat/Material Views ou plugins de publicação upstream.
     implementation("org.slf4j:slf4j-api:2.0.20")
     implementation("androidx.core:core-ktx:1.13.1")

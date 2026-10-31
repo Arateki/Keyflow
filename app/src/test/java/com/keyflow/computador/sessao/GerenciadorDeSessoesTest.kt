@@ -149,4 +149,20 @@ class GerenciadorDeSessoesTest {
             escopo.cancel()
         }
     }
+
+    @Test fun desligarOAgenteNoHostFechaSoAsSessoesDoAgenteNeleEDesfazOCompartilhamento() = runTest {
+        val g = gerenciador(DependenciasFalsas { currentTime })
+        val agenteNoHost = aberta(g.abrir(h(1), DonoDaSessao.AGENTE))
+        val agenteOutro = aberta(g.abrir(h(2), DonoDaSessao.AGENTE))
+        val usuario = aberta(g.abrir(h(1), DonoDaSessao.USUARIO))
+        runCurrent()
+        g.compartilhar(usuario.id, true)
+        g.fecharDoAgenteNoHost(h(1).id)
+        runCurrent()
+        assertEquals(EstadoSessao.Encerrada(MotivoEncerramento.AGENTE_PARADO), agenteNoHost.estado.value)
+        assertEquals(EstadoSessao.Aberta, agenteOutro.estado.value)
+        assertEquals(EstadoSessao.Aberta, usuario.estado.value)
+        assertEquals(false, usuario.compartilhada)
+        assertTrue(g.sessoesVisiveisAoAgente().map { it.id } == listOf(agenteOutro.id))
+    }
 }

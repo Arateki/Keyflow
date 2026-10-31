@@ -4,6 +4,7 @@ import com.keyflow.computador.sessao.EventoGerenciador
 import com.keyflow.computador.sessao.GerenciadorDeSessoes
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.launch
 
 /**
@@ -13,7 +14,9 @@ import kotlinx.coroutines.launch
  */
 internal fun observarPrimeiraSessao(gerenciador: GerenciadorDeSessoes, escopo: CoroutineScope, iniciar: () -> Unit) {
     escopo.launch(start = CoroutineStart.UNDISPATCHED) {
-        if (gerenciador.resumos.value.any { !it.estado.terminal }) iniciar()
-        gerenciador.eventos.collect { if (it == EventoGerenciador.PrimeiraSessao) iniciar() }
+        // `onSubscription` roda **depois** de a inscrição existir: uma sessão que abre entre conferir as vivas e assinar não se perde.
+        gerenciador.eventos
+            .onSubscription { if (gerenciador.resumos.value.any { !it.estado.terminal }) iniciar() }
+            .collect { if (it == EventoGerenciador.PrimeiraSessao) iniciar() }
     }
 }
