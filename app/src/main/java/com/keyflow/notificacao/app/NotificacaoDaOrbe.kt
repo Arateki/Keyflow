@@ -146,7 +146,8 @@ class NotificacaoDaOrbe(
             rv.setViewVisibility(id, if (aparece) View.VISIBLE else View.GONE)
             if (aparece) {
                 rv.setChronometer(id, tempoBase, null, correndo && modo == CronometroDaNotificacao.CORRENDO_NO_CENTRO)
-                rv.setTextColor(id, aparencia.tinta)
+                // O tempo no centro fica sobre a orbe (tinta da skin); o miúdo, abaixo do glifo, cai no fundo da linha: precisa contrastar com ele.
+                rv.setTextColor(id, if (modo == CronometroDaNotificacao.PARADO_MIUDO) tintaDosBotoes else aparencia.tinta)
             }
         }
         return rv
