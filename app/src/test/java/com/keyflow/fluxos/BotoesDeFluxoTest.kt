@@ -29,4 +29,39 @@ class BotoesDeFluxoTest {
     fun `no triggers means no enabled buttons`() {
         assertThat(BotoesDeFluxo.validos(ConfigFluxos(listOf(valido), emptyList()))).isEmpty()
     }
+
+    private fun botoes(barras: com.keyflow.core.shortcuts.BarsConfig, expandido: Boolean) =
+        barras.barsFor(expandido).first().buttons.filterIsInstance<com.keyflow.core.shortcuts.BarButton.RunFlow>().map { it.botaoId }
+
+    @Test
+    fun `adiciona o botao ao fim da barra principal dos dois modos quando nao espelhadas`() {
+        val base = com.keyflow.core.shortcuts.BarsConfig.DEFAULT.copy(mirrored = false)
+        val novo = BotoesDeFluxo.comBotao(base, "abc123")
+        assertThat(botoes(novo, false)).containsExactly("abc123")
+        assertThat(botoes(novo, true)).containsExactly("abc123")
+        assertThat(novo.collapsed.first().buttons.last()).isEqualTo(com.keyflow.core.shortcuts.BarButton.RunFlow("abc123"))
+        // só a barra principal ([0]) ganha o botão
+        assertThat(novo.collapsed.drop(1)).isEqualTo(base.collapsed.drop(1))
+    }
+
+    @Test
+    fun `espelhadas so a lista do retraido recebe o botao`() {
+        val base = com.keyflow.core.shortcuts.BarsConfig.DEFAULT.copy(mirrored = true)
+        val novo = BotoesDeFluxo.comBotao(base, "abc123")
+        assertThat(novo.expanded).isEqualTo(base.expanded)
+        assertThat(botoes(novo, true)).containsExactly("abc123") // o espelhamento faz o expandido ler o retraído
+    }
+
+    @Test
+    fun `semBotoes tira so os ids pedidos dos dois modos`() {
+        val base = BotoesDeFluxo.comBotao(BotoesDeFluxo.comBotao(com.keyflow.core.shortcuts.BarsConfig.DEFAULT.copy(mirrored = false), "aaaaaa"), "bbbbbb")
+        val sem = BotoesDeFluxo.semBotoes(base, setOf("aaaaaa"))
+        assertThat(sem.botoesDeFluxo()).containsExactly("bbbbbb")
+        assertThat(BotoesDeFluxo.semBotoes(base, emptySet())).isSameInstanceAs(base)
+    }
+
+    @Test
+    fun `id de botao tem seis hexadecimais`() {
+        repeat(20) { assertThat(Ids.botao()).matches("[0-9a-f]{6}") }
+    }
 }
