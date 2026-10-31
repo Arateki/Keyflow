@@ -55,6 +55,8 @@ import com.keyflow.core.OrbShortcutAction
 import com.keyflow.core.shortcuts.BarsConfig
 import com.keyflow.core.shortcuts.ShortcutGrid
 import com.keyflow.data.Settings
+import com.keyflow.fluxos.ConfigFluxos
+import com.keyflow.data.SettingsRepository
 import com.keyflow.reasoning.ReasoningResolution
 import com.keyflow.reasoning.UnavailableReason
 import com.keyflow.ui.PermissionStatus
@@ -124,6 +126,10 @@ fun ConfigScreen(
     onBarsConfigChange: (BarsConfig) -> Unit = {},
     shortcutGrids: List<ShortcutGrid> = emptyList(),
     nomesDeFluxo: Map<String, String> = emptyMap(),
+    // A aba Fluxos: os gatilhos e fluxos para a Sobrepor e o tour descreverem o gesto ligado; o repositório alimenta a aba e o modal.
+    // Sem repositório (galeria, testes sem fiação) a aba segue como "Em breve".
+    configFluxos: ConfigFluxos = ConfigFluxos(emptyList(), emptyList()),
+    fluxosRepository: SettingsRepository? = null,
     onShortcutGridsChange: (List<ShortcutGrid>) -> Unit = {},
     modifier: Modifier = Modifier,
     initialTab: ConfigTab = ConfigTab.VOZ,
@@ -191,6 +197,10 @@ fun ConfigScreen(
     var docsFocusKey by remember { mutableStateOf(if (initialDocsSection == null) 0 else 1) }
     // Atalho da orbe com o bottom sheet aberto (2 ou 3 toques); null = fechado.
     var shortcutSheetTaps by remember { mutableStateOf<Int?>(null) }
+    // O fluxo aberto no modal da aba Fluxos; null = fechado. Fica no estado da tela (sobrevive a girar o aparelho).
+    var fluxoAberto by rememberSaveable { mutableStateOf<String?>(null) }
+    val fonteDeModelos = rememberFonteDeModelos(settings, localModels, reasoningModels, visionModels, falaModels,
+        reasoningAuth, reasoningAnthropicAuth, reasoningGoogleAuth, transcriptionOpenAiAuth, transcriptionGroqAuth, falaElevenLabsAuth)
 
     LaunchedEffect(skinsUnlocked) {
         if (skinsUnlocked) unlockOpen = false
@@ -450,6 +460,10 @@ fun ConfigScreen(
                             adsOff = adsSuppressed,
                             entitlementsLoaded = adsEntitlementsLoaded,
                             onOpenShortcutSheet = { shortcutSheetTaps = it },
+                            configFluxos = configFluxos,
+                            onOpenFluxos = {
+                                showToast(tr("Este gesto roda um fluxo. Mude ou desligue na aba Fluxos."), 2500, action = { selectTab(ConfigTab.FLUXOS) })
+                            },
                             onShortcut1Blocked = {
                                 showToast(
                                     tr("O atalho de 1 toque vale apenas no modo Push-to-talk."),
@@ -468,6 +482,7 @@ fun ConfigScreen(
                                     onRequestMicPermission = onRequestMicPermission,
                                     onRequestNotificationPermission = onRequestNotificationPermission,
                                     highlightKey = overlayHighlightKey,
+                                    configFluxos = configFluxos,
                                 )
                             },
                             locked = !enabled(ConfigTab.OVERLAY),
@@ -511,7 +526,11 @@ fun ConfigScreen(
                             googleAuth = reasoningGoogleAuth,
                             elevenLabsAuth = falaElevenLabsAuth,
                         )
-                        ConfigTab.FLUXOS,
+                        ConfigTab.FLUXOS -> if (fluxosRepository != null) {
+                            FluxosPanel(settings = settings, repository = fluxosRepository, onOpen = { fluxoAberto = it })
+                        } else {
+                            ComingSoonPanel()
+                        }
                         ConfigTab.COMPUTADOR,
                         ConfigTab.NOTIFICACAO -> ComingSoonPanel()
                         ConfigTab.PRIVACIDADE -> PrivacyPanel(
@@ -567,6 +586,13 @@ fun ConfigScreen(
                     modifier = Modifier.padding(top = 18.dp),
                 )
             }
+        }
+        val abrirFluxo = fluxoAberto
+        if (abrirFluxo != null && fluxosRepository != null) {
+            FluxosModal(
+                fluxoId = abrirFluxo, repository = fluxosRepository, settings = settings, onDismiss = { fluxoAberto = null },
+                fonte = fonteDeModelos, onAbrirAba = { aba -> fluxoAberto = null; selectTab(aba) },
+            )
         }
         SaveToast(saveController, Modifier.fillMaxSize().systemBarsPadding())
         MessageToast(
