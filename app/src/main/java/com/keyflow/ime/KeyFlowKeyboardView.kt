@@ -98,6 +98,8 @@ class KeyFlowKeyboardView(
     private val onRunFlow: (botaoId: String) -> Unit = {},
     private val onOrbeComando: ((ComandoDaOrbeDoTeclado) -> Unit)? = null,
     private val onOrbePressionar: () -> Unit = {},
+    // Direito às skins pagas: sem ele a orbe veste o Ateliê (KBO-22). Só o teclado real sabe; prévia e galeria ficam em falso.
+    private val orbeSkinsUnlocked: Boolean = false,
 ) : LinearLayout(context) {
 
     private var canvasGrid: KeyboardGridView? = null
@@ -145,7 +147,8 @@ class KeyFlowKeyboardView(
                 is ComandoDaOrbeDoTeclado.AbrirApp -> onConfig()
                 else -> Unit
             }
-        }, aoPressionar = onOrbePressionar, aoMudar = { invalidate(); requestLayout() })
+        }, aoPressionar = onOrbePressionar, aoMudar = { invalidate(); requestLayout() },
+        skinsUnlocked = orbeSkinsUnlocked, motionEnabled = motionEnabled, motionTimeMs = motionTimeMs)
     private var gestoDaOrbe = false
     private var circuloDoGesto: Circulo? = null
 
@@ -239,6 +242,8 @@ class KeyFlowKeyboardView(
 
     init {
         orientation = VERTICAL
+        // O vidro e o halo da pele da orbe atravessam a cor lisa do teclado (a do tema, claro ou escuro); teclado de vidro não tem.
+        orbe.fundo = if (android.graphics.Color.alpha(kbTray) == 255) kbTray else 0
         // Os espaçadores transparentes deixam o app visível atrás da orbe e do overscan da grade.
         addView(orbe.acessibilidade)
         gridOverscanSpacer?.let { addView(it) }

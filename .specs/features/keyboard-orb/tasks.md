@@ -1,7 +1,7 @@
 # Orbe do teclado — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md`
-**Status**: spec e design em rascunho (2026-10-29), **KBO-T1..T3 feitas (2026-10-30)**, o resto pendente. **Fora da v1** (só `main`, release seguinte). Não toma a vez de frente aberta.
+**Status**: spec e design em rascunho (2026-10-29), **KBO-T1..T8 feitas (2026-10-30)**, T9..T11 pendentes (goldens, gestos no emulador, fechamento). **Fora da v1** (só `main`, release seguinte). Não toma a vez de frente aberta.
 
 > **Para o agente executor**: leia `spec.md` + `design.md` + este arquivo e `.specs/codebase/TESTING.md`. Uma task por vez, na ordem do plano,
 > testes primeiro, gate verde antes de avançar. Cada task é verificável sozinha. Os textos de UI que ela criar vão com ela (`tr("…")` +
@@ -87,21 +87,21 @@ A Fase A inteira é JVM: pode ser entregue e revisada antes de qualquer pixel.
 - **Tests**: unit do que for extrator + instrumentado curto. **Gate**: `build` e `pool instrumentar com.keyflow.ime.OrbeDoTecladoLayoutTest`. **Commit**: `feat(orbe-teclado): desenha a orbe no IME`.
 - **Evidência (2026-10-30)**: `OrbeDoTecladoLayoutTest` 9/9 (encaixe, círculo acima da borda sem tocar teclas, viewport do app de trás igual antes/depois da faixa em resize e pan, retrato e paisagem, com e sem overscan); `assembleDebug`, `testDebugUnitTest` e `lintDebug` verdes. Lição: `../../project/licoes/2026-10-30-orbe-teclado-b.md`.
 
-### KBO-T6 — Seção na aba Teclado — **Status: pendente**
+### KBO-T6 — Seção na aba Teclado — **Status: concluída**
 - **What**: seção Orbe no `TecladoPanel` (KBO-01..04, aviso ao substituir uma ação já atribuída na hora de salvar — KBO-15, D9 —, KBO-19 somente leitura quando copia). Rótulo do encaixe no editor de barras vira "Orbe"; não dá para adicionar um segundo. Textos por `tr` + arquivos en/es. A seção só aparece nesta task (antes, a aba fica idêntica).
 - **Where**: `ui/config/TecladoPanel.kt`, `ui/config/BarsEditor.kt`, `i18n/en/OrbeTeclado.kt`, `i18n/es/OrbeTeclado.kt`.
 - **Depends on**: T2. **Requirement**: KBO-01, KBO-02, KBO-03, KBO-04, KBO-06, KBO-15, KBO-19, KBO-33.
 - **Done when**: instrumentado — copiar ligado reflete `orbSkin` e não escreve a chave ao abrir a aba; desligar restaura a config própria plantada; salvar com zero gravar/enviar grava, no Alternar e no segurar-para-falar; substituir um toque que já tinha ação mostra o aviso do que saiu antes de gravar; `TranslationsTest` verde; a rota da aba Teclado ainda não muda pixel até a T9 aprovar.
 - **Tests**: instrumentado. **Gate**: `pool instrumentar com.keyflow.ui.config.TecladoPanelTest` (a classe já existe; estender, não duplicar) + `quick`. **Commit**: `feat(orbe-teclado): seção Orbe na aba Teclado`.
 
-### KBO-T7 — Skins da orbe no Canvas — **Status: pendente**
+### KBO-T7 — Skins da orbe no Canvas — **Status: concluída**
 - **What**: bitmap em cache via `orbStyleFor(id, skinsUnlocked)`, queda para Ateliê sem direito ou sem quadro de orbe, `dark` do teclado. No teclado real a pele animada corre (`KeyboardMotion` / `motionEnabled`, D10). Prévia e golden passam `motionTimeMs` e ficam parados. Não editar `FORMAT.md`.
 - **Where**: `ime/OrbeDoTecladoPele.kt` (ou ao lado da view da T5); teste de escolha da pele em JVM se a decisão for pura, e um instrumentado curto da queda para Ateliê.
 - **Depends on**: T5. **Requirement**: KBO-21, KBO-22, KBO-23.
 - **Done when**: unit ou instrumentado — sem `skinsUnlocked`, id `aero` desenha Ateliê e o JSON continua `aero`; pacote sem orbe desenha Ateliê; `dark = true` e `dark = false` não produzem o mesmo bitmap no Ateliê; com `motionTimeMs` preenchido o bitmap não muda entre dois runs; sem esse gancho o teclado real pode avançar o quadro; nenhum arquivo de `orbe/` ganhou import Android para "facilitar" o Canvas.
 - **Tests**: unit + instrumentado se o bitmap precisar de `Canvas`. **Gate**: `quick` e, se houver classe Android, `pool instrumentar com.keyflow.ime.OrbeDoTecladoPeleTest`. **Commit**: `feat(orbe-teclado): skins da orbe no teclado`.
 
-### KBO-T8 — Docs e tour — **Status: pendente**
+### KBO-T8 — Docs e tour — **Status: concluída**
 - **What**: a seção da Docs que ensina o mic do teclado e o tour `tour-keyboard-mic` passam a descrever a orbe (toques, segurar, arrastar, sobressair). Regenerar `website/_fonte/doc.json` uma vez (`KEYFLOW_REGERAR_DOC_SITE=1`).
 - **Where**: a seção existente em Docs (não criar uma aba), o roteiro do tour, `i18n`.
 - **Depends on**: T5. **Requirement**: KBO-33, KBO-37.

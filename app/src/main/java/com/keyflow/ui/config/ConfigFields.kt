@@ -936,6 +936,7 @@ internal fun Dropdown(
                             onSelect(option)
                             expanded = false
                         },
+                        modifier = Modifier.testTag("$tag-$option"),
                         colors = MenuDefaults.itemColors(),
                     )
                 }

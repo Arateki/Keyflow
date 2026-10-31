@@ -45,7 +45,6 @@ internal val Teclado: Map<String, String> = mapOf(
     "Grade alvo" to "Target grid",
     "Grade em uso por um atalho — toque de novo pra remover mesmo assim" to "Grid used by a shortcut — tap again to remove it anyway",
     "Grades de atalhos que os gatilhos da barra podem abrir." to "Shortcut grids the bar triggers can open.",
-    "Grava sua voz e cola a transcrição. Toque para gravar e parar; segure para pausar, retomar ou cancelar." to "Records your voice and pastes the transcription. Tap to record and stop; hold to pause, resume or cancel.",
     "Guarda o texto e cola quando você foca um campo." to "Keeps the text and pastes it when you focus a field.",
     "Indisponível" to "Unavailable",
     "Layout do teclado" to "Keyboard layout",
