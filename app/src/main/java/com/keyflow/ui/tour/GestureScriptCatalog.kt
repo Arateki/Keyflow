@@ -6,6 +6,9 @@ import com.keyflow.core.ButtonState
 import com.keyflow.core.OrbShortcutAction
 import com.keyflow.core.RecordingMode
 import com.keyflow.data.Settings
+import com.keyflow.fluxos.AcaoEfetiva
+import com.keyflow.fluxos.ConfigFluxos
+import com.keyflow.fluxos.RoteadorGatilhos
 import com.keyflow.ui.config.recordingHintParts
 import com.keyflow.ui.config.shortcutActionLabel
 import com.keyflow.ui.config.shortcutActionSub
@@ -43,7 +46,7 @@ private const val HOLD = 900
  * Roteiros da orbe, na ordem pedagógica do SCR-06: básicos de gravação → pausa → cancelar/desfazer →
  * reposicionar → atalhos de rajada.
  */
-fun buildOrbScripts(settings: Settings): List<GestureScript> {
+fun buildOrbScripts(settings: Settings, fluxos: ConfigFluxos = ConfigFluxos(emptyList(), emptyList())): List<GestureScript> {
     val mode = settings.overlayRecordingMode
     val parts = recordingHintParts(mode)
     val pushToTalk = mode == RecordingMode.PUSH_TO_TALK
@@ -58,7 +61,7 @@ fun buildOrbScripts(settings: Settings): List<GestureScript> {
         }
         add(cancelAndUndo())
         add(reposition())
-        addAll(shortcutScripts(settings, pushToTalk))
+        addAll(shortcutScripts(settings, pushToTalk, fluxos))
     }
 }
 
@@ -180,18 +183,25 @@ private fun reposition() = GestureScript(
  * `NONE` não vira roteiro, e o de 1 toque só existe no Push-to-talk — no modo Alternar o toque já é
  * da gravação e não sobra para atalho.
  */
-private fun shortcutScripts(settings: Settings, pushToTalk: Boolean): List<GestureScript> =
+private fun shortcutScripts(settings: Settings, pushToTalk: Boolean, fluxos: ConfigFluxos): List<GestureScript> =
     (1..3).mapNotNull { taps ->
         if (taps == 1 && !pushToTalk) return@mapNotNull null
-        val action = settings.shortcutForTaps(taps)
-        if (action == OrbShortcutAction.NONE) return@mapNotNull null
-        shortcutScript(taps, action)
+        // O gesto ligado a um fluxo vale no lugar da ação do Settings (FLX-35, FLX-51): o tour descreve o que de fato acontece.
+        when (val efetiva = RoteadorGatilhos.acaoEfetivaDoGesto(taps, settings, fluxos)) {
+            is AcaoEfetiva.DeFluxo -> shortcutScript(taps, tr("Fluxo: %s", efetiva.nome ?: tr("indisponível")),
+                if (efetiva.valido) tr("Roda o fluxo da aba Fluxos neste gesto, no lugar da ação de sempre.")
+                else tr("Este gesto está ligado a um fluxo incompleto: nada roda até você completá-lo na aba Fluxos."))
+            is AcaoEfetiva.DaConfig -> {
+                if (efetiva.acao == OrbShortcutAction.NONE) return@mapNotNull null
+                shortcutScript(taps, shortcutActionLabel(efetiva.acao), shortcutActionSub(efetiva.acao))
+            }
+        }
     }
 
-private fun shortcutScript(taps: Int, action: OrbShortcutAction) = GestureScript(
+private fun shortcutScript(taps: Int, label: String, sub: String) = GestureScript(
     id = "orb-shortcut-${taps}tap",
-    title = "${if (taps == 1) tr("1 toque") else tr("%d toques", taps)} · ${shortcutActionLabel(action)}",
-    description = shortcutActionSub(action),
+    title = "${if (taps == 1) tr("1 toque") else tr("%d toques", taps)} · $label",
+    description = sub,
     scene = TourScene.ORB,
     steps = listOf(
         GestureStep(ORB_CENTER, FingerAction.MOVE, SHORT, SceneReaction(orbState = OrbState.Idle)),
