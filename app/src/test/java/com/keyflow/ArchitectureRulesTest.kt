@@ -261,7 +261,9 @@ class ArchitectureRulesTest {
     /** Linhas (1-based) de [code] que a regra de `orbe/` proíbe, para o arquivo em [relPath] (relativo a `src/main/java`). */
     private fun orbeViolations(relPath: String, code: List<String>): List<Int> {
         val norm = relPath.replace('\\', '/')
-        if (!norm.startsWith("com/keyflow/orbe/")) return emptyList()
+        val pura = norm.startsWith("com/keyflow/orbe/") ||
+            (norm.startsWith("com/keyflow/notificacao/") && !norm.startsWith("com/keyflow/notificacao/app/"))
+        if (!pura) return emptyList()
         return code.mapIndexedNotNull { i, line -> if (orbeForbidden.any { it.containsMatchIn(line) }) i + 1 else null }
     }
 
@@ -270,7 +272,7 @@ class ArchitectureRulesTest {
         val offenders = kotlinFiles(main).flatMap { file ->
             orbeViolations(file.rel(main), codeLines(file)).map { "${file.rel(main)}:$it" }
         }
-        assertEquals("com.keyflow.orbe é JVM puro: sem android.*, androidx.* nem cofre", emptyList<String>(), offenders)
+        assertEquals("com.keyflow.orbe e com.keyflow.notificacao (fora de notificacao/app) são JVM puro: sem android.*, androidx.* nem cofre", emptyList<String>(), offenders)
     }
 
     @Test
@@ -281,6 +283,12 @@ class ArchitectureRulesTest {
         assertEquals(listOf(1), orbeViolations("com/keyflow/orbe/X.kt", listOf("import androidx.compose.runtime.Composable")))
         assertEquals(listOf(1), orbeViolations("com/keyflow/orbe/X.kt", listOf("import com.keyflow.auth.SecureCredentialStore")))
         assertEquals(emptyList<Int>(), orbeViolations("com/keyflow/ime/OrbeDoTecladoView.kt", bad))
+        // NTF-41: a notificação segue a mesma regra, menos o `notificacao/app/`, que é o lado Android.
+        assertEquals(listOf(1), orbeViolations("com/keyflow/notificacao/Modelo.kt", listOf("import android.content.Context")))
+        assertEquals(listOf(1), orbeViolations("com/keyflow/notificacao/Modelo.kt", listOf("import androidx.compose.ui.Modifier")))
+        assertEquals(listOf(1), orbeViolations("com/keyflow/notificacao/CodecNotificacao.kt", listOf("import com.keyflow.auth.SecureCredentialStore")))
+        assertEquals(emptyList<Int>(), orbeViolations("com/keyflow/notificacao/app/NotificacaoDaOrbe.kt", bad))
+        assertEquals(emptyList<Int>(), orbeViolations("com/keyflow/notificacao/Modelo.kt", listOf("import org.json.JSONObject")))
         assertEquals(emptyList<Int>(), orbeViolations("com/keyflow/orbe/X.kt", listOf("import com.keyflow.data.Settings")))
     }
 

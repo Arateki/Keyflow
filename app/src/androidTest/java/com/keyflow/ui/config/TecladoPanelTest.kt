@@ -21,6 +21,11 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.keyflow.core.RecordingMode
 import com.keyflow.data.Settings
+import com.keyflow.orbe.AcaoDaOrbeDoTeclado
+import com.keyflow.orbe.ConfigOrbeTeclado
+import com.keyflow.orbe.ModoDaOrbe
+import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.onNodeWithText
 import com.keyflow.ui.theme.KeyFlowTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -38,8 +43,14 @@ class TecladoPanelTest {
     @get:Rule
     val rule = createComposeRule()
 
-    private inner class Harness(initial: Settings, val skinsUnlocked: Boolean = false) {
+    private inner class Harness(
+        initial: Settings,
+        val skinsUnlocked: Boolean = false,
+        orbe: ConfigOrbeTeclado = ConfigOrbeTeclado(),
+    ) {
         var settings by mutableStateOf(initial)
+        var orbe by mutableStateOf(orbe)
+        var orbeWrites = 0
         var unlockClicks = 0
 
         @Composable
@@ -50,6 +61,8 @@ class TecladoPanelTest {
                     onSettingsChange = { settings = it },
                     onUnlockSkins = { unlockClicks++ },
                     skinsUnlocked = skinsUnlocked,
+                    orbeConfig = orbe,
+                    onOrbeConfigChange = { orbe = it; orbeWrites++ },
                 )
             }
         }
@@ -226,5 +239,89 @@ class TecladoPanelTest {
         val mic = layout.buttons.first { it.button == com.keyflow.core.shortcuts.BarButton.Mic }
         assertTrue("o mic não deveria passar de 1/3 da barra (${mic.width} de ${layout.viewWidth})", mic.width < layout.viewWidth / 3f)
         rule.onNodeWithTag(TECLADO_SIZE_PREVIEW_NOTE_TAG).performScrollTo().assertIsDisplayed()
+    }
+
+    private fun escolherToque(toques: Int, acao: AcaoDaOrbeDoTeclado) {
+        rule.onNodeWithTag(orbeToqueTag(toques)).performScrollTo().performClick()
+        rule.onNodeWithTag("${orbeToqueTag(toques)}-${acao.id}").performClick()
+    }
+
+    @Test
+    fun orbeCopiadaRefleteOrbSkinENaoEscreveAoAbrirAAba() {
+        val h = Harness(Settings(orbSkin = "glitch"), skinsUnlocked = true)
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(TECLADO_ORBE_COPIAR_TAG).performScrollTo().assertIsDisplayed()
+        rule.onNodeWithTag(TECLADO_ORBE_COPIA_SKIN_TAG).performScrollTo().assertTextContains("Glitch", substring = true)
+        rule.onNodeWithText("Copiado da orbe principal", substring = true).assertExists()
+        rule.onNodeWithTag(orbeToqueTag(1)).assertDoesNotExist()
+        rule.onNodeWithTag(TECLADO_ORBE_SKIN_TAG).assertDoesNotExist()
+        rule.onNodeWithTag(TECLADO_ORBE_PREVIA_TAG).performScrollTo().assertIsDisplayed()
+        rule.runOnIdle { assertEquals(0, h.orbeWrites) }
+    }
+
+    @Test
+    fun desligarCopiarRestauraAConfigPropriaPlantada() {
+        val propria = ConfigOrbeTeclado(
+            copiarDaOrbePrincipal = true,
+            skin = "aero",
+            modo = ModoDaOrbe.SEGURAR_PARA_FALAR,
+            toque1 = AcaoDaOrbeDoTeclado.Nenhuma,
+            toque2 = AcaoDaOrbeDoTeclado.PausarRetomar,
+            toque3 = AcaoDaOrbeDoTeclado.LerTela,
+        )
+        val h = Harness(Settings(orbSkin = "atelie"), skinsUnlocked = true, orbe = propria)
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(TECLADO_ORBE_COPIAR_TAG).performScrollTo().performClick()
+
+        rule.runOnIdle { assertEquals(propria.copy(copiarDaOrbePrincipal = false), h.orbe) }
+        rule.onNodeWithTag(orbeToqueTag(2)).performScrollTo().assertTextContains("Pausar", substring = true)
+        rule.onNodeWithTag(TECLADO_ORBE_SKIN_TAG).assertTextContains("Aero", substring = true)
+
+        rule.onNodeWithTag(TECLADO_ORBE_COPIAR_TAG).performScrollTo().performClick()
+        rule.runOnIdle { assertEquals(propria, h.orbe) }
+    }
+
+    private fun salvarSemGravarEnviar(modo: ModoDaOrbe) {
+        val h = Harness(Settings(), orbe = ConfigOrbeTeclado.padraoParaModo(modo).copy(copiarDaOrbePrincipal = false))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(orbeModoTag(modo.id)).performScrollTo().performClick()
+        for (toques in 1..3) escolherToque(toques, AcaoDaOrbeDoTeclado.Nenhuma)
+
+        rule.runOnIdle {
+            assertEquals(modo, h.orbe.modo)
+            assertEquals(AcaoDaOrbeDoTeclado.Nenhuma, h.orbe.toque1)
+            assertEquals(AcaoDaOrbeDoTeclado.Nenhuma, h.orbe.toque2)
+            assertEquals(AcaoDaOrbeDoTeclado.Nenhuma, h.orbe.toque3)
+        }
+    }
+
+    @Test
+    fun salvarSemGravarEnviarGravaNoAlternar() = salvarSemGravarEnviar(ModoDaOrbe.ALTERNAR)
+
+    @Test
+    fun salvarSemGravarEnviarGravaNoSegurarParaFalar() = salvarSemGravarEnviar(ModoDaOrbe.SEGURAR_PARA_FALAR)
+
+    @Test
+    fun substituirToqueQueJaTinhaAcaoMostraOAvisoDoQueSaiu() {
+        val h = Harness(Settings(), orbe = ConfigOrbeTeclado(copiarDaOrbePrincipal = false))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(TECLADO_ORBE_AVISO_TAG).assertDoesNotExist()
+        escolherToque(1, AcaoDaOrbeDoTeclado.LerTela)
+
+        rule.runOnIdle { assertEquals(AcaoDaOrbeDoTeclado.LerTela, h.orbe.toque1) }
+        rule.onNodeWithTag(TECLADO_ORBE_AVISO_TAG).performScrollTo().assertTextContains("Gravar e enviar", substring = true)
+        rule.onNodeWithTag(TECLADO_ORBE_AVISO_TAG).assertTextContains("1 toque", substring = true)
+    }
+
+    @Test
+    fun segurarEArrastarSaoTextoFixoSemLinhasEditaveis() {
+        val h = Harness(Settings(), orbe = ConfigOrbeTeclado(copiarDaOrbePrincipal = false))
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(TECLADO_ORBE_FIXOS_TAG).performScrollTo().assertIsDisplayed()
     }
 }

@@ -22,12 +22,11 @@ enum class FingerAction { MOVE, TAP, MULTI_TAP, PRESS, RELEASE, DRAG }
 
 /**
  * Elementos que a cena mostra além da orbe/teclado em si — representações, não as views reais: o alvo
- * de cancelamento e o banner de desfazer vivem no `OverlayService`, e o seletor do mic no IME.
+ * de cancelamento e o banner de desfazer vivem no `OverlayService`, e a orbe do teclado no IME.
  */
 enum class TourOverlayHint {
     CANCEL_TARGET,
     UNDO_BANNER,
-    MIC_ACTION_SELECTOR,
 
     /** Apaga o que estiver na tela. Existe porque `null` já significa "não mexe" (ver [SceneReaction]). */
     NONE,

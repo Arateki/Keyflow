@@ -30,10 +30,8 @@ private val ORB_PARKED = Offset(0.85f, 0.22f)
 // Na cena do teclado, o mic e o botão de retrair ficam na barra de cima (mesma posição da BarView).
 private val KBD_MIC = Offset(0.11f, 0.14f)
 private val KBD_COLLAPSE = Offset(0.92f, 0.14f)
-// Centro do chip "pausar" do seletor, que a cena ancora em `SELECTOR_START_FRACTION`. Apontar para o
-// lugar errado faria o tour soltar em "cancelar" enquanto o passo declara PAUSED — ensinando o gesto
-// trocado (visto na tira de frames de 2026-09-09).
-private val KBD_MIC_PAUSE_CHIP = Offset(0.27f, 0.13f)
+// Para onde o dedo vai ao arrastar a orbe para cima (o gesto fixo que pausa): reto acima do encaixe, na faixa que ela ocupa ao sobressair.
+private val KBD_MIC_DRAG_UP = Offset(0.11f, 0.02f)
 
 private const val SHORT = 420
 private const val BEAT = 700
@@ -220,8 +218,8 @@ private fun collapseAndExpand() = GestureScript(
 
 private fun micTap() = GestureScript(
     id = "kbd-mic-tap",
-    title = tr("Mic: gravar e enviar"),
-    description = tr("Toque no mic para começar a gravar · toque de novo para enviar e o texto cai no campo."),
+    title = tr("Orbe: gravar e enviar"),
+    description = tr("Toque na orbe para começar a gravar · toque de novo para enviar e o texto cai no campo · 2 e 3 toques fazem os atalhos que você escolheu."),
     scene = TourScene.KEYBOARD,
     steps = listOf(
         GestureStep(KBD_MIC, FingerAction.MOVE, SHORT, SceneReaction(micState = ButtonState.IDLE_READY)),
@@ -232,29 +230,23 @@ private fun micTap() = GestureScript(
 
 private fun micHold() = GestureScript(
     id = "kbd-mic-hold",
-    title = tr("Mic: seletor de ações"),
-    description = tr("Segure o mic durante a gravação para abrir o seletor · arraste até pausar ou cancelar e solte."),
+    title = tr("Orbe: segurar e arrastar"),
+    description = tr("Gravando, a orbe sobressai acima do teclado · segure e arraste para cima para pausar, para o lado para cancelar, para baixo para abrir o app."),
     scene = TourScene.KEYBOARD,
     steps = listOf(
         GestureStep(KBD_MIC, FingerAction.MOVE, SHORT, SceneReaction(micState = ButtonState.RECORDING)),
+        GestureStep(at = KBD_MIC, action = FingerAction.PRESS, durationMs = HOLD),
         GestureStep(
-            at = KBD_MIC,
-            action = FingerAction.PRESS,
-            durationMs = HOLD,
-            reaction = SceneReaction(overlayHint = TourOverlayHint.MIC_ACTION_SELECTOR),
-        ),
-        GestureStep(
-            at = KBD_MIC_PAUSE_CHIP,
+            at = KBD_MIC_DRAG_UP,
             action = FingerAction.DRAG,
             durationMs = BEAT,
-            reaction = SceneReaction(overlayHint = TourOverlayHint.MIC_ACTION_SELECTOR),
-            dragPath = listOf(KBD_MIC, KBD_MIC_PAUSE_CHIP),
+            dragPath = listOf(KBD_MIC, KBD_MIC_DRAG_UP),
         ),
         GestureStep(
-            at = KBD_MIC_PAUSE_CHIP,
+            at = KBD_MIC_DRAG_UP,
             action = FingerAction.RELEASE,
             durationMs = BEAT,
-            reaction = SceneReaction(micState = ButtonState.PAUSED, overlayHint = TourOverlayHint.NONE),
+            reaction = SceneReaction(micState = ButtonState.PAUSED),
         ),
     ),
 )

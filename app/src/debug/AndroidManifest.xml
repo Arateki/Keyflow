@@ -26,5 +26,8 @@
             android:name=".ui.ImeProbeRemoteActivity"
             android:exported="true"
             android:process=":probe" />
+
+        <!-- Prova de altura da notificação (NTF-T1), só em debug e descartável. -->
+        <service android:name=".notificacao.SpikeCliqueService" android:exported="false" />
     </application>
 </manifest>

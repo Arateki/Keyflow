@@ -7,10 +7,11 @@ import android.os.Handler
 import android.os.Looper
 import android.view.MotionEvent
 import android.view.View
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
-import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.LayoutDirection
+import android.os.SystemClock
+import androidx.compose.ui.graphics.toArgb
+import com.keyflow.skins.PackOrb
+import com.keyflow.skins.SkinIds
+import com.keyflow.skins.SkinPackStore
 import com.keyflow.core.ButtonState
 import com.keyflow.core.KeyFlowController
 import com.keyflow.data.Settings
@@ -18,7 +19,12 @@ import com.keyflow.i18n.tr
 import com.keyflow.orbe.*
 import com.keyflow.overlay.Haptics
 import com.keyflow.ui.orb.OrbState
-import com.keyflow.ui.orb.drawOrb
+import com.keyflow.ui.orb.OrbStyle
+import com.keyflow.ui.orb.orbCenterInk
+import com.keyflow.ui.orb.toPackState
+
+/** Passo da pele que anda (~15 quadros por segundo) e do pacote que ainda não entregou o quadro. */
+private const val QUADRO_DA_PELE_MS = 66L
 
 /** Desenho e gesto locais; o pai decide o alvo antes de despachar aos filhos. Sem janela de overlay. */
 internal class OrbeDoTecladoView(
@@ -29,6 +35,11 @@ internal class OrbeDoTecladoView(
     private val aoComando: (ComandoDaOrbeDoTeclado) -> Unit,
     private val aoPressionar: () -> Unit,
     private val aoMudar: () -> Unit,
+    // Pele da orbe (KBO-22, KBO-23): o direito às skins pagas e se a pele anda. `motionTimeMs` congela (prévia e golden); no teclado real
+    // (`motionEnabled`) ela corre, a não ser com "reduzir animações" ou economia de bateria (`MotionPolicy`).
+    private val skinsUnlocked: Boolean = false,
+    private val motionEnabled: Boolean = false,
+    private val motionTimeMs: Float? = null,
 ) {
     var estado = ButtonState.IDLE_NO_FIELD
         private set
@@ -48,7 +59,6 @@ internal class OrbeDoTecladoView(
     }
     private val handler = Handler(Looper.getMainLooper())
     private val classificador = ClassificadorDeGesto(clock) { settings.tapBurstWindowMs.toLong() }
-    private val scope = CanvasDrawScope()
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
     private var segurou = false
     val arrastoAtivo: Boolean get() = segurou
@@ -73,31 +83,89 @@ internal class OrbeDoTecladoView(
             else classificador.rajada.tempoRestanteMs()?.let { handler.postDelayed(this, it.coerceAtLeast(1)) }
         }
     }
+    private val pele = OrbeDoTecladoPele(host.resources.displayMetrics.density)
+    private var pacote: PackOrb? = null
+    private var idDoPacote: String? = null
+    private var inicioDoMovimentoMs = SystemClock.uptimeMillis()
+    private var ultimoCirculo: Circulo? = null
+    private var pacotePreparado: Pair<OrbState, Int>? = null
+
+    /** Cor lisa do teclado atrás da orbe (0 = teclado de vidro, sem fundo): o halo e o vidro da pele a atravessam. */
+    var fundo = 0
+        set(valor) {
+            field = valor
+            host.invalidate()
+        }
+
+    private val animada: Boolean get() = motionTimeMs == null && motionEnabled && MotionPolicy.allowed(host.context)
+    private fun tempoMs(): Float = motionTimeMs
+        ?: if (animada) (SystemClock.uptimeMillis() - inicioDoMovimentoMs).toFloat() else TEMPO_CONGELADO_DA_ORBE_MS
+
+    private fun precisaDeTique() = host.isShown &&
+        (animada || pele.aguardandoPacote || (estado == ButtonState.RECORDING && frozenSeconds == null))
+
     private val ticker = object : Runnable {
         override fun run() {
-            host.invalidate()
-            if (estado == ButtonState.RECORDING && frozenSeconds == null) handler.postDelayed(this, 1000)
+            ultimoCirculo?.let { host.invalidate(it.esquerda, it.topo, it.direita, it.fundo) } ?: host.invalidate()
+            if (precisaDeTique()) handler.postDelayed(this, if (animada || pele.aguardandoPacote) QUADRO_DA_PELE_MS else 1000)
         }
+    }
+
+    private fun agendarTique() {
+        handler.removeCallbacks(ticker)
+        if (precisaDeTique()) handler.post(ticker)
     }
 
     fun atualizarConfig(config: ConfigOrbeTeclado, settings: Settings) {
         this.config = config
         this.settings = settings
+        sincronizarPacote()
+        agendarTique()
         host.invalidate()
+    }
+
+    private fun skinEfetiva(): String = ResolvedorDaOrbeDoTeclado.efetiva(config, settings).skin
+
+    /** O pacote da skin escolhida, aberto fora da main; até ele chegar a orbe veste o Ateliê (KBO-23). */
+    private fun sincronizarPacote() {
+        val id = skinEfetiva().takeIf { SkinIds.isPack(it) }
+        if (id == idDoPacote) return
+        idDoPacote = id
+        pacote?.close()
+        pacote = null
+        pacotePreparado = null
+        if (id == null) return
+        val contexto = host.context.applicationContext
+        Thread {
+            val aberto = try { PackOrb.open(SkinPackStore.of(contexto), id) } catch (_: Exception) { null }
+            handler.post {
+                if (idDoPacote == id && pacote == null) {
+                    pacote = aberto
+                    agendarTique()
+                    host.invalidate()
+                } else aberto?.close()
+            }
+        }.start()
     }
 
     fun atualizarEstado(estado: ButtonState, visaoAtiva: Boolean = this.visaoAtiva) {
         this.estado = estado
         this.visaoAtiva = visaoAtiva
-        handler.removeCallbacks(ticker)
-        if (estado == ButtonState.RECORDING && frozenSeconds == null && host.isShown) handler.post(ticker)
+        agendarTique()
         acessibilidade.contentDescription = descricao
         aoMudar()
     }
 
-    fun anexar() { atualizarEstado(estado) }
+    fun anexar() {
+        inicioDoMovimentoMs = SystemClock.uptimeMillis()
+        sincronizarPacote()
+        atualizarEstado(estado)
+    }
     fun desanexar() {
         handler.removeCallbacksAndMessages(null)
+        pacote?.close()
+        pacote = null
+        idDoPacote = null
         classificador.aoCancelar()
         classificador.rajada.cancelar()
         segurou = false
@@ -207,20 +275,25 @@ internal class OrbeDoTecladoView(
 
     fun desenhar(canvas: Canvas, circulo: Circulo, topoFaixa: Int, fundoFaixa: Int) {
         if (circulo.vazio) return
-        canvas.save()
-        val recorte = Path().apply { addCircle(circulo.centroX.toFloat(), circulo.centroY.toFloat(), circulo.raio.toFloat(), Path.Direction.CW) }
-        canvas.clipPath(recorte)
-        canvas.translate(circulo.esquerda.toFloat(), circulo.topo.toFloat())
+        ultimoCirculo = circulo
         val state = when (estado) {
             ButtonState.RECORDING -> OrbState.Listening
             ButtonState.PAUSED, ButtonState.CANCELLING -> OrbState.Paused
             ButtonState.SENDING -> OrbState.Transcribing
             else -> OrbState.Idle
         }
-        scope.draw(Density(host.resources.displayMetrics.density), LayoutDirection.Ltr,
-            androidx.compose.ui.graphics.Canvas(canvas), Size(circulo.diametro.toFloat(), circulo.diametro.toFloat())) {
-            drawOrb(1234f, state, hasCenter = GeometriaDaOrbe.ehSobressalente(estado, visaoAtiva))
-        }
+        val estilo = EscolhaDaPeleDaOrbe.estilo(skinEfetiva(), skinsUnlocked, pacote != null)
+        val pacoteAtivo = pacote.takeIf { estilo == OrbStyle.PACK }
+        pacoteAtivo?.let { if (pacotePreparado != state to circulo.diametro) { it.prepare(state.toPackState(), circulo.diametro); pacotePreparado = state to circulo.diametro } }
+        val quadro = pele.quadro(
+            estilo, pacoteAtivo, state, circulo.diametro, fundo, GeometriaDaOrbe.ehSobressalente(estado, visaoAtiva), tempoMs(),
+            deterministico = !animada,
+        )
+        if (pele.aguardandoPacote) agendarTique()
+        canvas.save()
+        val recorte = Path().apply { addCircle(circulo.centroX.toFloat(), circulo.centroY.toFloat(), circulo.raio.toFloat(), Path.Direction.CW) }
+        canvas.clipPath(recorte)
+        canvas.drawBitmap(quadro, circulo.esquerda.toFloat(), circulo.topo.toFloat(), null)
         canvas.restore()
         val centro = when {
             visaoAtiva -> "◉"
@@ -231,7 +304,7 @@ internal class OrbeDoTecladoView(
             estado == ButtonState.SENDING -> "···"
             else -> ""
         }
-        paint.color = if (dark) 0xFFF4ECCF.toInt() else 0xFF2B2720.toInt()
+        paint.color = orbCenterInk(estilo, pacoteAtivo).toArgb()
         paint.textSize = circulo.diametro * 0.18f
         canvas.drawText(centro, circulo.centroX.toFloat(), circulo.centroY - (paint.ascent() + paint.descent()) / 2, paint)
         if (segurou && fundoFaixa > topoFaixa) {
