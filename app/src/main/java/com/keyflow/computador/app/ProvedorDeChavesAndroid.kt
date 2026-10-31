@@ -68,7 +68,8 @@ class ProvedorDeChavesAndroid(
     private fun alias(id: String) = "$PREFIXO_ALIAS$id"
     // O estado INVALIDADA é **persistente** (no cofre): sobrevive a reinício do processo e a OTA, e uma chave invalidada não volta a funcionar.
     private fun marcaInvalidada(id: String) = "$PREFIXO_INVALIDADA$id"
-    private fun jaInvalidada(id: String) = cofre.ler(marcaInvalidada(id)) != null
+    /** Leitura incerta = bloqueado (fail-closed): se o cofre não responde, a chave conta como invalidada e não assina. */
+    private fun jaInvalidada(id: String): Boolean = try { cofre.ler(marcaInvalidada(id)) != null } catch (e: Exception) { true }
     private fun invalidar(id: String) = cofre.gravar(marcaInvalidada(id), "1")
 
     private fun novoId() = UUID.randomUUID().toString().replace("-", "").take(8)

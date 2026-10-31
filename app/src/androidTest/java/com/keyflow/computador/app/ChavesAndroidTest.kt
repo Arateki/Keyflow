@@ -373,6 +373,23 @@ class ChavesAndroidTest {
         assertTrue("excluir limpa a marca", cofre.chaves().none { it.startsWith("ssh_inv.") })
     }
 
+    @Test fun cofreQueLancaNaLeituraDaMarcaBloqueiaAChave() {
+        val d = DetectorFalso()
+        val aut = AutenticadorFalso()
+        val p = provedor(autenticador = aut, aplicarBio = false, detector = d)
+        val chave = gerar(p, TipoDeChave.ECDSA_P256, bio = true)
+        val quebrado = object : CofreDeSegredos by cofre {
+            override fun ler(chave: String): String? = throw SecurityException("cofre indisponível")
+        }
+        val bloqueado = ProvedorDeChavesAndroid(quebrado, aut, RelogioFalso(), aplicarBiometriaNoKeystore = false, detector = d)
+        val promptsAntes = aut.prompts
+        assertEquals(EstadoChave.INVALIDADA, bloqueado.estado(chave))
+        val a = bloqueado.assinador(chave)
+        assertTrue(a.invalidada)
+        assertNull(runBlocking { a.assinar(dados) })
+        assertEquals("sem prompt", promptsAntes, aut.prompts)
+    }
+
     @Test fun excluirApagaASentinela() {
         val d = DetectorFalso()
         val p = provedor(aplicarBio = false, detector = d)
