@@ -296,7 +296,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 
 ## Fase E — Fechamento
 
-### FLX-T23 — Rotas de galeria e goldens — **Status: pendente**
+### FLX-T23 — Rotas de galeria e goldens — **Status: rotas prontas; goldens pendentes (emulador do servidor travado, `pool telas` não capturou)**
 - **What**: rotas do design §12 (`config-fluxos`, `-atalhos`, `-vazio`, `-restaurar`, `-modal`, `-modal-etapa-nova`, `-modal-modelo`, `-modal-incompleto`, `-atalho-substitui`, `-atalho-ocupado`, `-excluir`, `keyboard-barra-fluxo`, `config-sobrepor-atalho-fluxo`)
   com fixtures determinísticos (ids e nomes fixos, sem relógio), claro e escuro.
 - **Where**: `app/src/debug/java/com/keyflow/ui/gallery/RouteCatalog.kt`, `verification/golden/`.
@@ -304,14 +304,14 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 - **Done when**: `pool telas` gera as 13 rotas × 2 temas; `--approve` e depois `git checkout -- verification/golden/…` do que não é desta task; os existentes ficam bit-idênticos; revisão visual das 26 imagens (sem texto cortado em 360 dp).
 - **Tests**: screenshot. **Gate**: `pool telas`. **Commit**: `test(fluxos): rotas de galeria e goldens`.
 
-### FLX-T24 — Docs e site — **Status: pendente**
+### FLX-T24 — Docs e site — **Status: feito (fase F)**
 - **What**: seção `aba-fluxos` na `DocsPanel` (o que é um fluxo, etapas e tipos, os 3 padrão, atalhos e o aviso de substituição, restaurar, o que sai do aparelho — selo), `docsSectionFor(FLUXOS)` aponta para ela, traduções, `website/_fonte/doc.json` regenerado.
 - **Where**: `ui/config/DocsPanel.kt` (+ o arquivo de seções), `i18n/{en,es}/Docs.kt`, `website/_fonte/doc.json`.
 - **Depends on**: T22. **Requirement**: FLX-55.
 - **Done when**: `DocsSectionsTest`, `DocsSiteExportTest` (com `KEYFLOW_REGERAR_DOC_SITE=1` uma vez) e `TranslationsTest` verdes; o "?" do cabeçalho da aba Fluxos abre a seção; o texto não promete notificação, grafo nem Computador.
 - **Tests**: unit + instrumentado leve. **Gate**: `quick`. **Commit**: `docs(fluxos): seção da aba Fluxos na Docs e no site`.
 
-### FLX-T25 — Instrumentados ponta a ponta com motores falsos — **Status: pendente**
+### FLX-T25 — Instrumentados ponta a ponta com motores falsos — **Status: feito (fase F; motores falsos no gancho de portas do serviço)**
 - **What**: `FluxosEndToEndTest` no serviço real (não nas portas): "Ouvir e responder" com gravador/STT/LLM/voz falsos, "Ler a tela e colar" com o `VisionFlow` de prova do `OverlayServiceVisionTest`, "Pedir ao agente e colar" com agente falso e a janela de confirmação;
   falha no meio, cancelar em cada etapa, 2 toques, botão do teclado e **Rodar agora**, restaurar não mexendo nos gatilhos (com o DataStore real); chat separado intacto e sessão nova na execução seguinte; recusa de Ditar/Capturar em RECORDING/PAUSED sem efeitos na gravação.
 - **Where**: `app/src/androidTest/.../fluxos/FluxosEndToEndTest.kt`.

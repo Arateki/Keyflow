@@ -453,7 +453,7 @@ catálogo numa release nova só aparece para quem usar "Restaurar fluxos padrão
 | FLX-52 | P2-H | FLX-T1, FLX-T6, FLX-T10 | Implementing (T1, T6, T10 feitas) |
 | FLX-53 | P2-H | FLX-T23 | Pending |
 | FLX-54 | P2-H | FLX-T17, FLX-T18 | Implementing (T17, T18 feitas) |
-| FLX-55 | P2-H | FLX-T24 | Pending |
+| FLX-55 | P2-H | FLX-T24 | Verified (DocsSectionsTest, DocsSiteExportTest) |
 | FLX-56 | P2-H | FLX-T22 | Verified (ConfigScreenTest) |
 | FLX-57 | P2-I | FLX-T1, FLX-T2, FLX-T5, FLX-T20 | Implementing (T1, T2, T5, T20 feitas: só a flutuante e o botão; notificação/teclado nas T28/T29) |
 | FLX-58 | P2-I | FLX-T28, NTF-T20 | Pending (depende da feature `notification`) |
