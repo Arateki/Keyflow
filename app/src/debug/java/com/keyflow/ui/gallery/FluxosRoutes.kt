@@ -61,6 +61,10 @@ internal object FluxosRoutes {
 
     @Composable
     private fun Cena(content: @Composable () -> Unit) {
+        // Nenhuma rota abre o teclado, mas o emulador da fila já mostrou o card 95 px acima do golden (a janela do Popup centra no que
+        // sobra da tela): esconder o IME na entrada tira essa variável.
+        val teclado = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+        androidx.compose.runtime.LaunchedEffect(Unit) { teclado?.hide() }
         Box(Modifier.fillMaxSize().background(LocalKeyFlowPalette.current.bg).padding(horizontal = 16.dp)) { content() }
     }
 
@@ -70,7 +74,7 @@ internal object FluxosRoutes {
 
     /** O modal com o [fluxo] e as [config] de gatilhos (as linhas de atalho leem delas); [inicial] é a tela com que abre. */
     private fun modal(key: String, fluxo: Fluxo, config: ConfigFluxos, inicial: Tela = Tela.Principal, escondeAtalhos: Boolean = false) =
-        Route(key, minDelayMs = 1000L) {
+        Route(key, minDelayMs = 1500L) {
             Cena {
                 FluxosModalConteudo(
                     fluxo = fluxo, estado = EstadoExecucao.Ocioso, settings = settings, onDismiss = {}, onAlterar = {}, fonte = fonte,
