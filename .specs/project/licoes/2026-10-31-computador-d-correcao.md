@@ -33,3 +33,7 @@ A decisão do Yan mantém JetBrains Mono Nerd Font Mono 3.5.1. A OFL da JetBrain
 O inventário de `src/glyphs/README.md` na tag 3.5.1 traz Pomicons como OFL 1.1 com RFN. Font Logos 1.3.0 possui Unlicense no upstream; a tabela do Nerd Fonts ainda o chama de “unlicensed”. O texto Unlicense e o copyright 2014–2026 de Lukas W presente na fonte foram preservados. README e arquivo de avisos apontam as fontes exatas; fontes sem data publicada não receberam datas inventadas.
 
 O asset permaneceu inalterado, SHA-256 `f2a5ea6cfab397445ffab00c0370927b66d61e560a05db5db271b42006381c1a`. A conferência verificou 16 atribuições (base, Nerd Fonts e 14 conjuntos) e os textos integrais; nenhum teste foi acrescentado para comparar texto de licença com ele mesmo.
+
+## Condição redundante e mouse
+
+`TerminalScreen` verifica só a ligação nula: uma ligação não nula já implica sessão ativa. O compilador apontava a segunda condição como sempre falsa. Mouse SGR na tela permanece pendente em CMP-25/T27.

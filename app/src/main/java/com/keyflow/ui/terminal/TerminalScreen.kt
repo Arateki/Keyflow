@@ -95,7 +95,7 @@ fun TerminalScreen(
             Text(it, color = palette.terracotta, fontSize = 12.sp, modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).testTag(TERMINAL_AVISO_TAG))
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
-            if (ligacao == null || ativa == null) {
+            if (ligacao == null) {
                 Text(tr("Nenhuma sessão aberta. Toque em + para abrir uma."), color = palette.muted, fontSize = 14.sp, modifier = Modifier.padding(20.dp).testTag(TERMINAL_VAZIO_TAG))
             } else {
                 key(ativa.id) {
