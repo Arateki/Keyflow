@@ -2,6 +2,7 @@ package com.keyflow.computador.sessao
 
 import com.keyflow.computador.Host
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -117,5 +118,35 @@ class GerenciadorDeSessoesTest {
         assertTrue(s.estado.value is EstadoSessao.Falhou)
         assertEquals(1, g.resumos.value.size)
         assertEquals(listOf(EventoGerenciador.PrimeiraSessao, EventoGerenciador.SemSessoes), vistos)
+    }
+
+    @Test fun abrirEFecharAoMesmoTempoDeixaOResumoIgualAoEstadoReal() {
+        // Threads de verdade: o `runTest` seria sequencial e esconderia a corrida.
+        val relogio = System::currentTimeMillis
+        val escopo = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
+        try {
+            val g = GerenciadorDeSessoes(escopo, DependenciasFalsas { relogio() }, maxTotal = 1_000)
+            val pool = java.util.concurrent.Executors.newFixedThreadPool(8)
+            val abertas = java.util.concurrent.ConcurrentLinkedQueue<String>()
+            val tarefas = (0 until 8).map { t ->
+                pool.submit {
+                    repeat(150) { i ->
+                        val r = g.abrir(Host("%08x".format(t * 1000 + i), "h", "x.org", 22, "u"), DonoDaSessao.USUARIO)
+                        if (r is ResultadoAbertura.Aberta) {
+                            if (i % 2 == 0) kotlinx.coroutines.runBlocking { g.fechar(r.sessao.id) } else abertas += r.sessao.id
+                        }
+                    }
+                }
+            }
+            tarefas.forEach { it.get(60, java.util.concurrent.TimeUnit.SECONDS) }
+            pool.shutdown()
+            Thread.sleep(300)
+            g.compartilhar(abertas.first(), true) // uma última publicação, já sem concorrência
+            val esperado = abertas.toSet()
+            assertEquals(esperado, g.resumos.value.map { it.id }.toSet())
+            assertEquals(esperado.size, g.resumos.value.size)
+        } finally {
+            escopo.cancel()
+        }
     }
 }

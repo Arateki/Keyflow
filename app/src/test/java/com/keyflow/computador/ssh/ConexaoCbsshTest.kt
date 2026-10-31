@@ -57,7 +57,7 @@ class ConexaoCbsshTest {
     private val escopo = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private fun conexao(repo: RepositorioKnownHostsEmMemoria, i: Interacao, tempo: Long = 30_000, ajustar: (SshClientConfig.Builder) -> Unit = {}) =
-        ConexaoCbssh(repo, i, escopo, tempoMs = tempo, ajustar = ajustar)
+        ConexaoCbssh(repo, i, escopo, tempoTrocaDeChavesMs = tempo, ajustar = ajustar)
 
     private val pty = PtyInfo(100, 30, 800, 480)
 
@@ -141,11 +141,26 @@ class ConexaoCbsshTest {
     }
 
     @Test fun nadaRespondeEmTempoComRelogioVirtual() = runTest {
-        val c = ConexaoCbssh(RepositorioKnownHostsEmMemoria(), Interacao(), backgroundScope, tempoMs = 15_000) { it.transportFactory = TransportFactory { awaitCancellation() } }
+        val c = ConexaoCbssh(RepositorioKnownHostsEmMemoria(), Interacao(), backgroundScope, tempoTcpMs = 15_000) { it.transportFactory = TransportFactory { awaitCancellation() } }
         val r = async { c.conectar(DestinoSsh(Host("a1b2c3d4", "x", "10.255.255.1", 22, "u")), pty) }
         delay(14_000)
         assertFalse(r.isCompleted)
         delay(2_000)
+        assertEquals(ResultadoConexao.Falhou(CausaSsh.TEMPO), r.await())
+    }
+
+    @Test fun tcpTemQuinzeSegundosEATrocaDeChavesTrinta() = runTest {
+        // TCP que conecta (transporte falso de leitura eterna) e depois silêncio na troca de chaves: estoura aos 15 + 30 s, não aos 15.
+        val transporte = object : org.connectbot.sshlib.transport.Transport {
+            override suspend fun read(count: Int): ByteArray = awaitCancellation()
+            override suspend fun write(data: ByteArray) = Unit
+            override suspend fun close() = Unit
+        }
+        val c = ConexaoCbssh(RepositorioKnownHostsEmMemoria(), Interacao(), backgroundScope) { it.transportFactory = TransportFactory { transporte } }
+        val r = async { c.conectar(DestinoSsh(Host("a1b2c3d4", "x", "10.255.255.1", 22, "u")), pty) }
+        delay(16_000)
+        assertFalse("o TCP já conectou: 15 s não vale para a troca de chaves", r.isCompleted)
+        delay(30_000)
         assertEquals(ResultadoConexao.Falhou(CausaSsh.TEMPO), r.await())
     }
 

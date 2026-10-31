@@ -15,6 +15,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -34,19 +35,26 @@ import org.connectbot.sshlib.PublicKey
 import org.connectbot.sshlib.SshClient
 import org.connectbot.sshlib.SshClientConfig
 import org.connectbot.sshlib.SshSession
+import org.connectbot.sshlib.transport.IpVersion
+import org.connectbot.sshlib.transport.KtorTcpTransportFactory
+import org.connectbot.sshlib.transport.TransportFactory
+import kotlinx.coroutines.withTimeout
 
 /**
  * O adaptador do cbssh: o **único** arquivo de `ssh/` que o importa (CMP-17). Um [SshClient] por conexão, política criptográfica padrão
  * da biblioteca (nada de algoritmo legado), verificação do servidor pela [PoliticaDeConfianca] (suspende até o usuário decidir),
  * autenticação por [AuthHandler] ligado ao `Assinador`/senha/código, e erros traduzidos para [CausaSsh] sem ler mensagem de exceção.
  *
- * O limite de [tempoMs] vale para TCP + troca de chaves e **para de contar enquanto o usuário decide** a impressão digital.
+ * Dois limites separados (tabela de erros): o **TCP** tem [tempoTcpMs] (15 s, no próprio `TransportFactory`) e a **troca de chaves** tem [tempoTrocaDeChavesMs]
+ * (30 s). O `handshakeTimeoutMs` do cbssh fica desligado (0) porque ele contaria o tempo em que o usuário decide a impressão digital; quem vigia a troca é
+ * o relógio daqui, que **para de contar enquanto o usuário decide**.
  */
 class ConexaoCbssh(
     private val confianca: RepositorioDeConfianca,
     private val interacao: InteracaoComUsuario,
     private val escopo: CoroutineScope,
-    private val tempoMs: Long = 30_000,
+    private val tempoTcpMs: Long = 15_000,
+    private val tempoTrocaDeChavesMs: Long = 30_000,
     private val intervaloVigiaMs: Long = 30_000,
     private val agoraMs: () -> Long = System::currentTimeMillis,
     /** Gancho de teste: ajusta o `SshClientConfig` (por exemplo, o transporte). Em produção não há. */
@@ -176,7 +184,11 @@ class ConexaoCbssh(
             this.keepAliveIntervalMs = intervaloVigiaMs
             // Com senha (ou "perguntar"), o cbssh tenta `password` em vez de `keyboard-interactive` quando o servidor oferece os dois.
             this.preferPasswordAuth = h.autenticacao !is AutenticacaoHost.Chave
+            this.handshakeTimeoutMs = 0
             ajustar(this)
+            // O limite do TCP vai por cima do transporte escolhido (o padrão do cbssh, ou o do teste): conectar o socket tem 15 s.
+            val base = this.transportFactory ?: KtorTcpTransportFactory(endereco, h.porta, IpVersion.AUTO)
+            this.transportFactory = TransportFactory { withTimeout(tempoTcpMs) { base.create() } }
         }
         val c = SshClient(config)
         val resultado = try {
@@ -213,19 +225,20 @@ class ConexaoCbssh(
         return Preparada(c, estado.chaveDoServidor?.algoritmo ?: "", estado.chaveDoServidor ?: ChaveDoServidor("", ByteArray(0)), estado.metodoFinal ?: "")
     }
 
-    /** `connect()` com o limite de [tempoMs] que **não conta** o tempo em que o usuário decide a impressão digital. */
+    /** `connect()` com os limites de TCP e de troca de chaves que **não conta** o tempo em que o usuário decide a impressão digital. */
     private suspend fun conectarComLimite(c: SshClient, estado: EstadoDaConexao): ConnectResult = coroutineScope {
         val tarefa = async { c.connect() }
         val relogio = launch {
             while (isActive) {
-                delay(tempoMs)
+                delay(tempoTcpMs + tempoTrocaDeChavesMs)
                 if (!estado.aguardandoUsuario.get()) { estado.estourou = true; tarefa.cancel(); return@launch }
             }
         }
         try {
             tarefa.await()
         } catch (e: CancellationException) {
-            if (estado.estourou) ConnectResult.TransportError(java.net.SocketTimeoutException()) else throw e
+            // Estouro do relógio da troca de chaves, ou do limite do TCP (que o `withTimeout` do transporte lança como cancelamento): é tempo, não cancelamento de fora.
+            if (estado.estourou || (e is kotlinx.coroutines.TimeoutCancellationException && currentCoroutineContext().isActive)) ConnectResult.TransportError(java.net.SocketTimeoutException()) else throw e
         } finally {
             relogio.cancel()
         }

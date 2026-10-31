@@ -106,9 +106,11 @@ class GerenciadorDeSessoes(
 
     /** Publica a lista e emite `PrimeiraSessao`/`SemSessoes` quando o número de sessões **vivas** (não terminais) passa por zero. */
     private fun publicar() {
-        val lista = copia()
-        _resumos.value = lista.map { SessaoResumo(it.id, it.host.id, it.dono, it.compartilhada, it.estado.value) }
-        val evento = synchronized(trava) {
+        // Tudo sob a trava: o resumo gravado é sempre o do instante em que a lista foi lida (duas publicações simultâneas não se cruzam, e
+        // o último `_resumos.value` nunca é de uma lista mais velha). `tryEmit` não suspende, então segurar a trava aqui é seguro.
+        synchronized(trava) {
+            val lista = sessoes.values.toList()
+            _resumos.value = lista.map { SessaoResumo(it.id, it.host.id, it.dono, it.compartilhada, it.estado.value) }
             val vivas = lista.count { !it.estado.value.terminal }
             val e = when {
                 vivasAntes == 0 && vivas > 0 -> EventoGerenciador.PrimeiraSessao
@@ -116,8 +118,7 @@ class GerenciadorDeSessoes(
                 else -> null
             }
             vivasAntes = vivas
-            e
+            if (e != null) _eventos.tryEmit(e)
         }
-        if (evento != null) _eventos.tryEmit(evento)
     }
 }

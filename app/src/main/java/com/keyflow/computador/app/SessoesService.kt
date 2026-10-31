@@ -141,7 +141,7 @@ class SessoesService : Service() {
             ServicosDoComputador.gerenciador = gerenciador
             opcaoManterConectado?.let { f -> escopo.launch { f.collect { ServicosDoComputador.manterConectado.value = it } } }
             val app = contexto.applicationContext
-            escopo.launch { gerenciador.eventos.collect { if (it == EventoGerenciador.PrimeiraSessao) runCatching { iniciar(app) } } }
+            com.keyflow.computador.app.observarPrimeiraSessao(gerenciador, escopo) { runCatching { iniciar(app) } }
         }
     }
 }
