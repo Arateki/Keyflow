@@ -358,6 +358,21 @@ class ChavesAndroidTest {
         }
     }
 
+    @Test fun estadoInvalidadaSobreviveAReinicioEOtaEChaveNaoVoltaAFuncionar() {
+        val d = DetectorFalso()
+        val p = provedor(aplicarBio = false, detector = d)
+        val chave = gerar(p, TipoDeChave.ECDSA_P256, bio = true)
+        d.invalida = true
+        assertNull(runBlocking { p.assinador(chave).assinar(dados) })
+        // "Reinício + OTA": provedor novo, sem memória, e o detector não acusa mais nada.
+        val novo = provedor(aplicarBio = false, detector = DetectorFalso())
+        assertEquals(EstadoChave.INVALIDADA, novo.estado(chave))
+        assertNull("a chave invalidada não volta a assinar", runBlocking { novo.assinador(chave).assinar(dados) })
+        assertTrue(novo.assinador(chave).invalidada)
+        novo.excluir(chave)
+        assertTrue("excluir limpa a marca", cofre.chaves().none { it.startsWith("ssh_inv.") })
+    }
+
     @Test fun excluirApagaASentinela() {
         val d = DetectorFalso()
         val p = provedor(aplicarBio = false, detector = d)

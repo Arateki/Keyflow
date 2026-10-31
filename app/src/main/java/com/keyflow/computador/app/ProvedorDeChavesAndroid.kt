@@ -63,10 +63,14 @@ class ProvedorDeChavesAndroid(
 ) {
     private val envelope = EnvelopeDeChave(cofre, api, aplicarBiometriaNoKeystore)
     private val janelas = HashMap<String, JanelaDeBiometria>()
-    private val invalidadas = HashSet<String>()
 
     private fun ks(): KeyStore = KeyStore.getInstance(EnvelopeDeChave.PROVEDOR).apply { load(null) }
     private fun alias(id: String) = "$PREFIXO_ALIAS$id"
+    // O estado INVALIDADA é **persistente** (no cofre): sobrevive a reinício do processo e a OTA, e uma chave invalidada não volta a funcionar.
+    private fun marcaInvalidada(id: String) = "$PREFIXO_INVALIDADA$id"
+    private fun jaInvalidada(id: String) = cofre.ler(marcaInvalidada(id)) != null
+    private fun invalidar(id: String) = cofre.gravar(marcaInvalidada(id), "1")
+
     private fun novoId() = UUID.randomUUID().toString().replace("-", "").take(8)
 
     /** Veredito da sonda do Ed25519 neste aparelho (para a tela explicar por que a chave caiu no envelope). */
@@ -133,14 +137,14 @@ class ProvedorDeChavesAndroid(
 
     /** `INVALIDADA` quando o Keystore invalidou a chave (biometria cadastrada mudou); a tela mostra a mensagem. */
     fun estado(chave: ChaveSsh): EstadoChave {
-        if (chave.id in invalidadas) return EstadoChave.INVALIDADA
+        if (jaInvalidada(chave.id)) return EstadoChave.INVALIDADA
         val invalida = try {
             (chave.exigeBiometria && detector.invalidada(chave.id)) ||
             if (chave.protecao == Protecao.KEYSTORE_ENVELOPE) envelope.invalidada(chave.id) else nativaInvalidada(chave.id, chave.tipo)
         } catch (e: Exception) {
             false
         }
-        if (invalida) invalidadas += chave.id
+        if (invalida) invalidar(chave.id)
         return if (invalida) EstadoChave.INVALIDADA else EstadoChave.ATIVA
     }
 
@@ -153,7 +157,7 @@ class ProvedorDeChavesAndroid(
         envelope.apagar(id)
         cofre.apagar("$PREFIXO_PUBLICA$id")
         janelas.remove(id)
-        invalidadas.remove(id)
+        cofre.apagar(marcaInvalidada(id))
     }
 
     /**
@@ -277,14 +281,14 @@ class ProvedorDeChavesAndroid(
     private inner class AssinadorAndroid(private val chave: ChaveSsh) : Assinador {
         private val janela get() = janelas.getOrPut(chave.id) { JanelaDeBiometria(relogio) }
 
-        override val invalidada: Boolean get() = chave.id in invalidadas
+        override val invalidada: Boolean get() = jaInvalidada(chave.id)
 
         override fun chavePublica(): ChavePublicaSsh = this@ProvedorDeChavesAndroid.chavePublica(chave) ?: error("chave ausente: ${chave.id}")
 
         override suspend fun assinar(dados: ByteArray): ByteArray? {
-            if (chave.id in invalidadas) return null
+            if (jaInvalidada(chave.id)) return null
             // APIs 24–29: o Keystore pode não invalidar a chave ao cadastrar outra digital; a sentinela diz.
-            if (chave.exigeBiometria && detector.invalidada(chave.id)) { invalidadas += chave.id; return null }
+            if (chave.exigeBiometria && detector.invalidada(chave.id)) { invalidar(chave.id); return null }
             if (chave.exigeBiometria && !janela.valida() && !pedirBiometria()) return null
             return try {
                 assinarAgora(dados)
@@ -294,7 +298,7 @@ class ProvedorDeChavesAndroid(
                 if (!pedirBiometria()) return null
                 try { assinarAgora(dados) } catch (e2: UserNotAuthenticatedException) { null } catch (e2: EnvelopeIndisponivel) { marcarInvalidada(e2) }
             } catch (e: KeyPermanentlyInvalidatedException) {
-                invalidadas += chave.id
+                invalidar(chave.id)
                 null
             } catch (e: EnvelopeIndisponivel) {
                 marcarInvalidada(e)
@@ -305,7 +309,7 @@ class ProvedorDeChavesAndroid(
         }
 
         private fun marcarInvalidada(e: EnvelopeIndisponivel): ByteArray? {
-            if (e.invalidada) invalidadas += chave.id
+            if (e.invalidada) invalidar(chave.id)
             return null
         }
 
@@ -335,6 +339,7 @@ class ProvedorDeChavesAndroid(
     companion object {
         const val PREFIXO_ALIAS = "keyflow_ssh_"
         const val PREFIXO_PUBLICA = "ssh_pub."
+        const val PREFIXO_INVALIDADA = "ssh_inv."
     }
 }
 
