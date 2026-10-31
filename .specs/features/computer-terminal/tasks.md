@@ -1,7 +1,7 @@
 # Computador (terminal SSH) — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md`
-**Status**: spec e design em rascunho (2026-10-29), tasks **todas pendentes**. **Fora da v1** (só `main`, release seguinte). Não toma a vez de frente aberta.
+**Status**: spec e design em rascunho (2026-10-29), CMP-T0, CMP-T1, CMP-T3 e CMP-T4 verificadas. **Fora da v1** (só `main`, release seguinte). Não toma a vez de frente aberta.
 
 > **Para o agente executor**: leia `spec.md` + `design.md` + este arquivo e `.specs/codebase/TESTING.md`. Uma task por vez, na ordem do plano,
 > testes primeiro, gate verde antes de avançar. Cada task é verificável sozinha. Os textos de UI que ela criar vão com ela (`tr("…")` +
@@ -55,7 +55,13 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
 
 ## Fase 0 — Pré-requisito e spikes
 
-### CMP-T0 — Pré-requisito: o toolchain subiu (frente separada) — **Status: pendente**
+### CMP-T0 — Pré-requisito: o toolchain subiu (frente separada) — **Status: verificada em 2026-10-30**
+
+Portão conferido na base `c1480992`: versões no design §2.1 e [lição](../../project/licoes/2026-10-30-computador-a.md).
+Gates completos do mesmo SHA: [Checks 41073156978](https://github.com/Arateki/Keyflow/actions/runs/41073156978), sete jobs verdes.
+**SPEC_DEVIATION:** as capturas desse CI substituem `pool telas` local, que perdeu o emulador no ADB; 246 PNGs idênticos e
+26 diferenças pequenas já aceitas pelo comparador da base, sem alterar goldens nem limiar. Não é uma afirmação de 272 PNGs bit-idênticos.
+
 - **What**: **não é implementação desta spec.** O Yan decidiu (29/10) atualizar Kotlin/Compose/coroutines em vez de fixar um fork velho; isso é uma frente própria (spike de atualização do toolchain), que também
   destrava o LiteRT-LM. Esta task é o **portão**: confere que a `main` já compila com o que o termlib e o cbssh exigem e registra as versões. Hoje: Kotlin 2.2.10 (embutido no AGP 9.2), Compose BOM 2024.09.03, coroutines 1.8.1;
   o termlib ≥ 0.2.0 pede Compose 1.11 (BOM 2026.05–.09) e Kotlin 2.3.21–2.4.21, o cbssh ≥ 0.4.0 pede metadados Kotlin 2.4.0 e coroutines 1.11.
@@ -66,7 +72,18 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
   **Contingência (plano B, só se a frente de toolchain travar ou for adiada)**: ver `design.md` §2.4 — fork preso ao toolchain atual (CMP-T3 deixa de ser condicional). O plano B **não** é o caminho padrão.
 - **Tests**: — (portão). **Gate**: `quick` + `build` + `lint` + `pool telas` na `main` atualizada. **Commit**: nenhum (registro em `licoes/`).
 
-### CMP-T1 — Spike A: termlib + cbssh no toolchain novo, imagens e entrada — **Status: pendente**
+### CMP-T1 — Spike A: termlib + cbssh no toolchain novo, imagens e entrada — **Status: concluída em 2026-10-30**
+
+Retomada: build/lint verdes, 2.709/2.709 JVM e 20/20 instrumentados. Tabela medida dos sete itens na lição.
+**SPEC_DEVIATION:** bancada nesta branch; Herdr usa a=t/a=p nesta captura e placeholders são testados à parte.
+Duplicação no caminho duplo e composição sem bytes são achados, não entrada de produção aprovada.
+KeyFlow/Gboard/orbe físicos e qualidade do transcodificador sixel permanecem **não medidos**, como permitido no spike.
+
+A [lição](../../project/licoes/2026-10-30-computador-a.md) registra a ausência de mouse na API/JNI 0.3.14, scrollback privado de 1.000 linhas e
+callbacks nativos adiados. **SPEC_DEVIATION:** inspeção inicial na branch `equipe/computador-a`, sem Activity descartável;
+CMP-T3 necessária. A parada inicial foi revogada pelo coordenador em 30/10: depois do PR do diagnóstico, seguir T3 → T1 → T4.
+Medições dinâmicas e auditoria completa de transitivas continuam pendentes.
+
 - **What**: branch descartável com uma tela só do `debug` (`TerminalSpikeActivity`; não entra no release) ligando `TerminalEmulator` (termlib) a um `SshClient` (cbssh) contra o servidor de teste ou um host real, para **medir**:
   (1) compila no toolchain novo com as versões exatas; delta do APK, de métodos e da memória por sessão (80×24, scrollback 5 000 e 20 000 linhas);
   (2) `.so` do termlib em arm64-v8a, armeabi-v7a e x86_64 com `scripts/check-16kb-alignment.py`; (3) licenças de **todas** as transitivas (Ktor, kstatemachine, Tink, kyber, keccak, jbcrypt, slf4j) — nenhuma GPL/LGPL/AGPL;
@@ -90,7 +107,15 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
 - **Done when**: a tabela existe com o nível de proteção (hardware/TEE/StrongBox/software) e o nome do algoritmo de assinatura **medidos**; a lição diz a partir de qual API/aparelho o Keystore serve e confirma (ou corrige) a premissa P1 da spec; o plano de fallback do `design.md` §4 é ajustado ao medido.
 - **Tests**: manual/instrumentado de sonda. **Gate**: `pool instrumentar` (emulador) + A32/Tab/Vaio manuais com `--confirmo-a32`. **Commit**: `spike(computador): sonda do Ed25519 no Keystore` (só o debug).
 
-### CMP-T3 — (condicional) Fork do termlib com JNI compilado no CI e SHA fixado — **Status: pendente**
+### CMP-T3 — Fork do termlib com JNI compilado no CI e SHA fixado — **Status: concluída em 2026-10-30**
+
+Gates requeridos verdes: build no pool sem NDK, 2.705/2.705 JVM (6/6 `TermlibNativoTest`),
+workflows [41111156115](https://github.com/Arateki/Keyflow/actions/runs/41111156115) e
+[41111164906](https://github.com/Arateki/Keyflow/actions/runs/41111164906) verdes; três ABIs do APK com ELF/ZIP 16 KB
+ e hashes iguais ao release `termlib-jni-0.3.14-keyflow.1`. Auditoria das partes nativas e provas na lição.
+
+Bootstrap do workflow primeiro; integração com SHA real depois do binário publicado. **SPEC_DEVIATION:** dois commits
+para permitir essa verificação sem reescrever a branch; detalhes na [lição](../../project/licoes/2026-10-30-computador-a.md).
 - **What**: **só se a CMP-T1 medir que mouse reporting ou scrollback maior não saem na borda, ou se o plano B valer.** O Yan já aceitou o fork nesse caso (D12). O sixel não é motivo para manter esta task aberta. Código do termlib vendorizado em `third_party/termlib/` (Apache-2.0 + libvterm MIT; `UPSTREAM.md` com o commit-base e os patches), módulo Gradle `:termlib` compilado
   com o toolchain do app; o C++ vira `libtermlib.so` por ABI num workflow `.github/workflows/termlib-jni.yml` (NDK do runner, actions fixadas por SHA, padrão `sherpa-sem-tts.yml`) que publica um release com `.sha256`;
   o `app/build.gradle.kts` baixa e **confere o SHA-256** como faz com o sherpa (sem NDK nos nós do pool). Patches (conforme a T1 medir): **mouse reporting** (`vterm_mouse_*` + modo) e **scrollback** configurável. O DCS sixel e o atributo 4 do DA1 **não** entram no C++: ficam no app (D12).
@@ -100,7 +125,7 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
 - **Done when**: o workflow gera as 3 ABIs; `check-16kb-alignment.py` verde; `TermlibNativoTest` falha se o `.so` não bate com o SHA fixado, se alguma lib tiver texto de licença GPL/LGPL ou se faltar uma ABI do app; `assembleDebug` num nó sem NDK verde. Se a decisão for **Maven puro**, esta task fecha como **"dispensada"** com a razão (Status e lição).
 - **Tests**: unit + CI. **Gate**: `quick` + `build` + o workflow. **Commit**: `build(computador): termlib vendorizado com JNI compilado no CI`.
 
-### CMP-T4 — Servidor SSH de teste e gravações de terminal `[P]` — **Status: pendente**
+### CMP-T4 — Servidor SSH de teste e gravações de terminal `[P]` — **Status: concluída em 2026-10-30**
 - **What**: `SshFixtureServer` (Apache MINA SSHD, `testImplementation`, Apache-2.0; versão estável a fixar na T1) com host key fixa de teste, usuários `teste` (chave `ed25519` de teste) e `senha` (senha falsa), um `ShellFactory` que **toca bytes gravados** na abertura do canal
   (prompt, cores, `kitten icat`, `imgcat`, `img2sixel`, `chafa`, placeholders do Herdr) e ecoa a entrada, registra os pedidos `pty-req`/`window-change`/`env`, e um modo "cair no meio" (fecha o socket). `scripts/ssh-fixture.sh` sobe o mesmo servidor fora do processo e faz `adb reverse`
   para o instrumentado. Pasta `app/src/test/resources/computador/gravacoes/` com as saídas de ferramentas **reais** (imagens pequenas, ≤ 64 KB cada, licença livre ou geradas por nós) e um README com o comando que gerou cada uma.

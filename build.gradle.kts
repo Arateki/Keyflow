@@ -1,5 +1,6 @@
 plugins {
     id("com.android.application") version "9.2.0" apply false
+    id("com.android.library") version "9.2.0" apply false
     // AGP 9.2.0 mantém o Kotlin embutido; a declaração abaixo eleva o KGP mínimo 2.2.10 para 2.4.21.
     id("org.jetbrains.kotlin.android") version "2.4.21" apply false
     // Compilador Compose alinhado ao KGP 2.4.21, mantendo AGP 9.2.0 e Gradle 9.6.1.
