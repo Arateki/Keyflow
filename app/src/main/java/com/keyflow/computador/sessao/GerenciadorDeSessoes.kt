@@ -104,7 +104,11 @@ class GerenciadorDeSessoes(
 
     private var vivasAntes = 0
 
-    /** Publica a lista e emite `PrimeiraSessao`/`SemSessoes` quando o número de sessões **vivas** (não terminais) passa por zero. */
+    /**
+     * Publica a lista e emite `PrimeiraSessao`/`SemSessoes` quando o número de sessões **vivas** (não terminais) passa por zero.
+     * Contrato dos coletores de [resumos] e [eventos]: **não podem bloquear** nem chamar o gerenciador de volta de forma síncrona (a publicação
+     * roda sob a trava; um coletor que bloqueia segura todas as sessões, e um que reentra no gerenciador espera por si mesmo).
+     */
     private fun publicar() {
         // Tudo sob a trava: o resumo gravado é sempre o do instante em que a lista foi lida (duas publicações simultâneas não se cruzam, e
         // o último `_resumos.value` nunca é de uma lista mais velha). `tryEmit` não suspende, então segurar a trava aqui é seguro.

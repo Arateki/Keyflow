@@ -69,8 +69,17 @@ class ProvedorDeChavesAndroid(
     // O estado INVALIDADA é **persistente** (no cofre): sobrevive a reinício do processo e a OTA, e uma chave invalidada não volta a funcionar.
     private fun marcaInvalidada(id: String) = "$PREFIXO_INVALIDADA$id"
     /** Leitura incerta = bloqueado (fail-closed): se o cofre não responde, a chave conta como invalidada e não assina. */
-    private fun jaInvalidada(id: String): Boolean = try { cofre.ler(marcaInvalidada(id)) != null } catch (e: Exception) { true }
-    private fun invalidar(id: String) = cofre.gravar(marcaInvalidada(id), "1")
+    private fun jaInvalidada(id: String): Boolean = id in invalidadasNestaExecucao || try { cofre.ler(marcaInvalidada(id)) != null } catch (e: Exception) { true }
+
+    /**
+     * Marca a chave como invalidada. Se o cofre não gravar, a marca vale **em memória** nesta execução (a chave continua bloqueada) e a exceção
+     * não escapa de `estado`/`assinar`: o contrato é "bloqueado, `null`, sem exceção".
+     */
+    private fun invalidar(id: String) {
+        invalidadasNestaExecucao += id
+        try { cofre.gravar(marcaInvalidada(id), "1") } catch (e: Exception) { /* só em memória */ }
+    }
+    private val invalidadasNestaExecucao: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
 
     private fun novoId() = UUID.randomUUID().toString().replace("-", "").take(8)
 
@@ -161,6 +170,7 @@ class ProvedorDeChavesAndroid(
         envelope.apagar(id)
         cofre.apagar("$PREFIXO_PUBLICA$id")
         janelas.remove(id)
+        invalidadasNestaExecucao -= id
         cofre.apagar(marcaInvalidada(id))
     }
 
