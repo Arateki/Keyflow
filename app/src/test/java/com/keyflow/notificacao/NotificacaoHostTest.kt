@@ -163,6 +163,63 @@ class NotificacaoHostTest {
         assertThat(chamadas).containsExactly("gravarEnviar")
     }
 
+    // ── o portao vale no momento de agir ─────────────────────────────────────
+
+    @Test
+    fun `a tela bloqueia dentro da janela da rajada e o GravarEnviar nao executa`() {
+        val h = host()
+        h.aoTocarNaOrbe()
+        escopo.advanceTimeBy(100)
+        bloqueada = true
+        escopo.advanceUntilIdle()
+        assertThat(chamadas).isEmpty()
+        assertThat(avisos).containsExactly(AvisoDaNotificacao.BLOQUEADA)
+        assertThat(h.toquesPendentes).isEqualTo(0)
+    }
+
+    @Test
+    fun `a tela bloqueia dentro da janela e a acao sem Activity tambem nao executa`() {
+        val h = host()
+        h.aoTocarNaOrbe(); escopo.advanceTimeBy(60)
+        h.aoTocarNaOrbe(); escopo.advanceTimeBy(40)
+        bloqueada = true
+        escopo.advanceUntilIdle()
+        assertThat(chamadas).isEmpty() // 2 toques = retrair/expandir o teclado
+        assertThat(avisos).containsExactly(AvisoDaNotificacao.BLOQUEADA)
+    }
+
+    @Test
+    fun `controle - com a opcao ligada, bloquear dentro da janela nao impede`() {
+        config = ConfigNotificacao(permitirComTelaBloqueada = true)
+        val h = host()
+        h.aoTocarNaOrbe()
+        escopo.advanceTimeBy(100)
+        bloqueada = true
+        escopo.advanceUntilIdle()
+        assertThat(chamadas).containsExactly("gravarEnviar")
+        assertThat(avisos).isEmpty()
+    }
+
+    @Test
+    fun `controle - bloqueada antes de tocar ja recusava`() {
+        bloqueada = true
+        val h = host()
+        h.aoTocarNaOrbe()
+        escopo.advanceUntilIdle()
+        assertThat(chamadas).isEmpty()
+    }
+
+    @Test
+    fun `com a opcao ligada, a Activity ainda pede o desbloqueio ao agir`() {
+        config = ConfigNotificacao(permitirComTelaBloqueada = true)
+        val h = host()
+        repeat(3) { h.aoTocarNaOrbe(); escopo.advanceTimeBy(30) }
+        bloqueada = true
+        escopo.advanceUntilIdle()
+        assertThat(chamadas).isEmpty()
+        assertThat(avisos).containsExactly(AvisoDaNotificacao.PRECISA_DESBLOQUEIO)
+    }
+
     // ── os botoes ────────────────────────────────────────────────────────────
 
     @Test

@@ -85,13 +85,18 @@ class NotificacaoHost(
     }
 
     private fun executar(comando: Comando) {
+        // O portão vale no momento de agir, não só quando o toque chegou: a tela pode bloquear dentro da janela da rajada (NTF-16).
+        // As ações de Activity passam por ele com `precisaDeActivity = true`.
+        if (comando != Comando.Nada && comando != Comando.FluxoIncompleto) {
+            val activity = comando is Comando.Executar && comando.acao.abreActivity()
+            if (recusado(precisaDeActivity = activity)) return
+        }
         when (comando) {
             Comando.Nada -> return
             Comando.GravarEnviar -> acoes.gravarEnviar()
             is Comando.Executar -> {
                 if (comando.acao.abreActivity()) {
-                    // A Activity exigiria o desbloqueio de qualquer jeito (L4); sem sobreposição o sistema recusaria o início (L10).
-                    if (recusado(precisaDeActivity = true)) return
+                    // Sem sobreposição o sistema recusaria o início da Activity (L10).
                     if (!podeAbrirActivity()) { aviso(AvisoDaNotificacao.SEM_SOBREPOSICAO); return }
                 }
                 acoes.executar(comando.acao)

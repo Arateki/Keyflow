@@ -601,7 +601,7 @@ class OverlayService : Service() {
         config = { cachedNotificacao },
         settings = { cachedSettings },
         // `isKeyguardLocked` (e não `isDeviceLocked`) cobre também o bloqueio por deslizar; lido a cada toque, nunca guardado (design §10).
-        bloqueada = { getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == true },
+        bloqueada = { bloqueadaParaTeste?.invoke() ?: (getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == true) },
         relogio = { SystemClock.elapsedRealtime() },
         estado = { coordinator.currentState() },
         visaoAtiva = { visionFlow.state != VisionFlowState.NONE },
@@ -700,6 +700,9 @@ class OverlayService : Service() {
             notificacaoDaOrbe.construir(state, visaoAtiva, real, repouso, config, efetiva, escuro)
         } catch (e: Exception) {
             android.util.Log.w("KeyFlow.Overlay", "aparência da notificação falhou: ${e.message}", e)
+            notificacaoDaOrbe.construirMinima()
+        } catch (e: OutOfMemoryError) {
+            android.util.Log.w("KeyFlow.Overlay", "sem memória para a aparência da notificação", e)
             notificacaoDaOrbe.construirMinima()
         }
     }
@@ -1579,6 +1582,10 @@ class OverlayService : Service() {
          */
         @Volatile
         var cancelWindowMsForTest: Long? = null
+
+        /** Só para os testes: no lugar do `KeyguardManager`, diz se a tela está bloqueada (sem mexer no SystemUI do aparelho). */
+        @Volatile
+        var bloqueadaParaTeste: (() -> Boolean)? = null
 
         // Um startForegroundService ainda sem o startForeground do serviço, e um stop() que chegou nesse meio-tempo.
         // Tudo roda na thread principal do mesmo processo (a SetupActivity, o IME e o serviço), então não há corrida

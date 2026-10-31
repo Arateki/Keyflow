@@ -1,7 +1,6 @@
 package com.keyflow.overlay
 
 import android.Manifest
-import android.app.KeyguardManager
 import android.content.Context
 import android.content.Intent
 import android.os.ParcelFileDescriptor
@@ -22,7 +21,6 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
-import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -47,9 +45,7 @@ class OverlayServiceNotificacaoTest {
 
     @Before
     fun setUp() {
-        // Cada teste começa com o aparelho desbloqueado, na ordem que for (o teste do bloqueio deixa a tela apagada e travada).
-        shell("input keyevent KEYCODE_WAKEUP")
-        shell("wm dismiss-keyguard")
+        OverlayService.bloqueadaParaTeste = null
         shell("pm grant ${context.packageName} ${Manifest.permission.RECORD_AUDIO}")
         shell("appops set ${context.packageName} SYSTEM_ALERT_WINDOW allow")
         OverlayService.cancelWindowMsForTest = 30_000L
@@ -67,8 +63,8 @@ class OverlayServiceNotificacaoTest {
     @After
     fun tearDown() {
         OverlayService.cancelWindowMsForTest = null
+        OverlayService.bloqueadaParaTeste = null
         OverlayService.stop(context)
-        device.wakeUp()
         runBlocking {
             repo.atualizarNotificacao { ConfigNotificacao() }
             repo.saveDisclosureConsent(savedVersion, savedDeclined)
@@ -144,36 +140,23 @@ class OverlayServiceNotificacaoTest {
         waitUntilState(ButtonState.SENDING, ButtonState.IDLE_NO_FIELD, ButtonState.IDLE_READY, ButtonState.ERROR, ButtonState.PENDING_PASTE)
     }
 
+    /**
+     * O bloqueio é simulado pelo gancho `bloqueadaParaTeste` (no lugar do `KeyguardManager`): mexer no bloqueio do emulador deixava o SystemUI em ANR e a
+     * prova virava `Assume` quando o AVD não travava. O portão em si é coberto, com relógio virtual, em `NotificacaoHostTest`; aqui vai a fiação do serviço.
+     */
     @Test
     fun comATelaBloqueadaEAOpcaoDesligadaNemAOrbeNemOsBotoesAgem() {
-        // O emulador de teste pode estar com o bloqueio de tela desativado: liga o de deslizar (sem PIN) e devolve o que havia no fim.
-        val antes = shellOut("locksettings get-disabled").trim()
-        shell("locksettings set-disabled false")
-        try {
-            bloqueadaPeloEmulador()
-        } finally {
-            shell("locksettings set-disabled ${if (antes.contains("true")) "true" else "false"}")
-            shell("input keyevent KEYCODE_WAKEUP")
-            shell("wm dismiss-keyguard")
-            Thread.sleep(500)
-        }
-    }
-
-    private fun bloqueadaPeloEmulador() {
-        shell("input keyevent KEYCODE_SLEEP")
-        Thread.sleep(1500)
-        val bloqueada = context.getSystemService(KeyguardManager::class.java).isKeyguardLocked
-        assumeTrue("o emulador não ficou com o bloqueio ativo (sem tela de bloqueio): prova ignorada", bloqueada)
+        OverlayService.bloqueadaParaTeste = { true }
         toqueNaOrbe()
         botao(Botao.PAUSAR)
         botao(Botao.DESCARTAR)
-        Thread.sleep(900)
+        Thread.sleep(1200)
         assertEquals("bloqueada + opção desligada: nada age", ButtonState.RECORDING, KeyFlowController.buttonState.value)
-        // ligada: os botões agem
+        // ligada, na mesma tela bloqueada: o botão age
         config { it.copy(permitirComTelaBloqueada = true) }
-        Thread.sleep(500)
-        botao(Botao.PAUSAR)
-        waitUntilState(ButtonState.PAUSED)
+        waitUntil({ "config não chegou" }) { runBlocking { repo.configNotificacaoOnce().permitirComTelaBloqueada } }
+        Thread.sleep(300)
+        botaoAte(Botao.PAUSAR, ButtonState.PAUSED)
     }
 
     private fun waitUntilState(vararg expected: ButtonState, timeoutMs: Long = 8000) =
