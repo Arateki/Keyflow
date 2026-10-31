@@ -18,13 +18,13 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 
 /** De onde o serviço tira o gerenciador e a opção do WakeLock. O app define isto ao subir; os testes trocam por fakes. */
 object ServicosDoComputador {
     @Volatile var gerenciador: GerenciadorDeSessoes? = null
-    @Volatile var manterConectado: Flow<Boolean> = flowOf(false)
+    /** A opção "Manter conectado com a tela apagada". Um valor só, lido por qualquer instância do serviço (que pode sobreviver à anterior por instantes). */
+    val manterConectado = kotlinx.coroutines.flow.MutableStateFlow(false)
 }
 
 /**
@@ -137,8 +137,9 @@ class SessoesService : Service() {
         }
 
         /** Liga o serviço ao gerenciador: sobe na 1ª sessão viva. O app chama isto ao criar o gerenciador. */
-        fun ligar(contexto: Context, gerenciador: GerenciadorDeSessoes, escopo: CoroutineScope) {
+        fun ligar(contexto: Context, gerenciador: GerenciadorDeSessoes, escopo: CoroutineScope, opcaoManterConectado: Flow<Boolean>? = null) {
             ServicosDoComputador.gerenciador = gerenciador
+            opcaoManterConectado?.let { f -> escopo.launch { f.collect { ServicosDoComputador.manterConectado.value = it } } }
             val app = contexto.applicationContext
             escopo.launch { gerenciador.eventos.collect { if (it == EventoGerenciador.PrimeiraSessao) runCatching { iniciar(app) } } }
         }

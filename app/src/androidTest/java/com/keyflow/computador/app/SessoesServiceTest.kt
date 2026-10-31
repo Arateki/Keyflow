@@ -46,7 +46,7 @@ class SessoesServiceTest {
     private val ctx: Context get() = instr.targetContext
     private val nm get() = ctx.getSystemService(NotificationManager::class.java)
     private val escopo = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val manter = MutableStateFlow(false)
+    private val manter = ServicosDoComputador.manterConectado
     private val enderecoSecreto = "servidor-secreto.example.org"
 
     private class Conn : ConexaoSsh {
@@ -76,7 +76,7 @@ class SessoesServiceTest {
         runCatching { instr.uiAutomation.grantRuntimePermission(ctx.packageName, "android.permission.POST_NOTIFICATIONS") }
         gerenciador = GerenciadorDeSessoes(escopo, dep)
         ServicosDoComputador.gerenciador = gerenciador
-        ServicosDoComputador.manterConectado = manter
+        ServicosDoComputador.manterConectado.value = false
         SessoesService.ligar(ctx, gerenciador, escopo)
     }
 
@@ -84,7 +84,7 @@ class SessoesServiceTest {
         runBlocking { gerenciador.fecharTodas() }
         runBlocking { esperar { notificacao() == null } }
         ServicosDoComputador.gerenciador = null
-        ServicosDoComputador.manterConectado = kotlinx.coroutines.flow.flowOf(false)
+        ServicosDoComputador.manterConectado.value = false
         escopo.cancel()
     }
 
@@ -140,6 +140,7 @@ class SessoesServiceTest {
         esperar { notificacao() != null }
         delay(500)
         assertFalse("padrão: sem WakeLock", dumpsysPower().contains("keyflow:sessoes"))
+        println("CMP_T12 power: " + dumpsysPower().lines().filter { it.contains("keyflow") }.joinToString(" | "))
         manter.value = true
         esperar { dumpsysPower().contains("keyflow:sessoes") }
         manter.value = false
