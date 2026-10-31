@@ -1,6 +1,15 @@
 package com.keyflow.overlay
 
 import android.Manifest
+import android.app.ActivityManager
+import android.os.Bundle
+import java.util.concurrent.CopyOnWriteArrayList
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import android.content.Context
 import android.content.Intent
 import android.os.ParcelFileDescriptor
@@ -17,9 +26,11 @@ import com.keyflow.notificacao.ConfigNotificacao
 import com.keyflow.notificacao.app.NotificacaoDaOrbe
 import com.keyflow.ui.onboarding.DISCLOSURE_VERSION
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -42,9 +53,11 @@ class OverlayServiceNotificacaoTest {
     private val repo get() = SettingsRepository(context)
     private var savedVersion = 0
     private var savedDeclined = false
+    private var consentimentoSalvo = false
 
     @Before
     fun setUp() {
+        pararServicoEEsperar()
         OverlayService.bloqueadaParaTeste = null
         shell("pm grant ${context.packageName} ${Manifest.permission.RECORD_AUDIO}")
         shell("appops set ${context.packageName} SYSTEM_ALERT_WINDOW allow")
@@ -53,23 +66,46 @@ class OverlayServiceNotificacaoTest {
             val s = repo.settingsFlow().first()
             savedVersion = s.disclosureAcceptedVersion
             savedDeclined = s.disclosureDeclined
+            consentimentoSalvo = true
             repo.saveDisclosureConsent(DISCLOSURE_VERSION, declined = false)
             repo.atualizarNotificacao { ConfigNotificacao() }
         }
-        OverlayService.start(context, OverlayService.actionIntent(context, OverlayService.ACTION_RECORD))
-        waitUntilState(ButtonState.RECORDING)
+        instrumentation.runOnMainSync {
+            OverlayService.start(context, OverlayService.actionIntent(context, OverlayService.ACTION_RECORD))
+        }
+        esperarGravacaoNova()
     }
 
     @After
     fun tearDown() {
-        OverlayService.cancelWindowMsForTest = null
-        OverlayService.bloqueadaParaTeste = null
-        OverlayService.stop(context)
-        runBlocking {
-            repo.atualizarNotificacao { ConfigNotificacao() }
-            repo.saveDisclosureConsent(savedVersion, savedDeclined)
+        try {
+            pararServicoEEsperar()
+        } finally {
+            OverlayService.cancelWindowMsForTest = null
+            OverlayService.bloqueadaParaTeste = null
+            if (consentimentoSalvo) runBlocking {
+                repo.atualizarNotificacao { ConfigNotificacao() }
+                repo.saveDisclosureConsent(savedVersion, savedDeclined)
+            }
         }
     }
+
+    /** Estado global pode sobrar do teste anterior; só vale RECORDING de uma instância já criada. */
+    private fun esperarGravacaoNova() = waitUntil({ "a nova instância não iniciou a gravação: ${KeyFlowController.buttonState.value}" }) {
+        OverlayService.instanceForVisionTest != null && KeyFlowController.buttonState.value == ButtonState.RECORDING
+    }
+
+    private fun pararServicoEEsperar() {
+        instrumentation.runOnMainSync { OverlayService.stop(context) }
+        waitUntil({ "a instância anterior ainda não foi destruída" }) {
+            OverlayService.instanceForVisionTest == null && !servicoRegistrado()
+        }
+        instrumentation.waitForIdleSync()
+    }
+
+    @Suppress("DEPRECATION") // getRunningServices ainda lista os serviços do próprio app, inclusive antes de onCreate.
+    private fun servicoRegistrado(): Boolean = context.getSystemService(ActivityManager::class.java)
+        .getRunningServices(Int.MAX_VALUE).any { it.service.className == OverlayService::class.java.name }
 
     private fun toqueNaOrbe() = context.startService(OverlayService.actionIntent(context, OverlayService.ACTION_NOTIF_ORB_TAP))
 
@@ -83,8 +119,8 @@ class OverlayServiceNotificacaoTest {
     }
 
     /**
-     * Manda o botão até o estado chegar. O `KeyFlowController.buttonState` é global e o do teste anterior pode ficar nele até o serviço novo subir, então
-     * o primeiro clique pode cair antes de o serviço estar pronto (o `ACTION_RECORD` do `setUp` ainda não foi tratado): repetir é idempotente para estes botões.
+     * Manda o botão até o estado chegar: a configuração do DataStore chega ao serviço de forma assíncrona.
+     * Repetir estes botões é idempotente, pois o host ignora o botão quando ele não pertence mais ao estado atual.
      */
     private fun botaoAte(b: Botao, vararg estados: ButtonState) {
         val fim = System.currentTimeMillis() + 12_000
@@ -100,6 +136,36 @@ class OverlayServiceNotificacaoTest {
     }
 
     private fun config(f: (ConfigNotificacao) -> ConfigNotificacao) = runBlocking { repo.atualizarNotificacao(f) }
+
+    /** Provoca a falsa prontidão antiga na mesma tarefa da main, antes de o Android poder criar o serviço. */
+    @Test
+    fun recordingHerdadoNaoDispensaEsperarANovaInstancia() {
+        pararServicoEEsperar()
+        val estados = CopyOnWriteArrayList<ButtonState>()
+        val observador = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            instrumentation.runOnMainSync {
+                KeyFlowController.updateButtonState(ButtonState.RECORDING)
+                observador.launch(start = CoroutineStart.UNDISPATCHED) {
+                    KeyFlowController.buttonState.collect { estados += it }
+                }
+                OverlayService.start(context, OverlayService.actionIntent(context, OverlayService.ACTION_RECORD))
+                assertEquals("a espera antiga aceitaria o valor herdado", ButtonState.RECORDING, KeyFlowController.buttonState.value)
+                assertNull("o serviço ainda não pode ter sido criado na mesma tarefa da main", OverlayService.instanceForVisionTest)
+                instrumentation.sendStatus(0, Bundle().apply { putString("stream", "NTF_CORRIDA esperaAntiga=aceita instancia=null\n") })
+            }
+            esperarGravacaoNova()
+            instrumentation.runOnMainSync {
+                assertTrue("onCreate precisa publicar o estado ocioso antes da gravação nova: $estados", estados.any {
+                    it == ButtonState.IDLE_NO_FIELD || it == ButtonState.IDLE_READY
+                })
+                assertEquals(ButtonState.RECORDING, estados.last())
+                instrumentation.sendStatus(0, Bundle().apply { putString("stream", "NTF_CORRIDA transicoes=$estados instanciaNova=true\n") })
+            }
+        } finally {
+            observador.cancel()
+        }
+    }
 
     @Test
     fun umToqueNaOrbeEnviaAGravacao() {

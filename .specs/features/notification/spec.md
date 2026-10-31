@@ -320,7 +320,7 @@ Respondidas por ele em 29/10, 22:20 (viraram decisões): **Q1** (pausar/cancelar
 | NTF-13 | P1-B | NTF-T9 | Verified |
 | NTF-14 | P1-B | NTF-T10 | Verified |
 | NTF-15 | P1-C | NTF-T3, NTF-T13 | Implementing (feitas: T3) |
-| NTF-16 | P1-C | NTF-T5, NTF-T10, NTF-T14 | Implementing (feitas: T10) |
+| NTF-16 | P1-C | NTF-T5, NTF-T10, NTF-T14 | Implementing (feita: T10); prontidão corrigida com contraprova JVM, execução Android pendente por ANR — `.specs/project/licoes/2026-10-31-notificacao-prontidao-servico.md` |
 | NTF-17 | P1-C | NTF-T9, NTF-T14 | Implementing (feitas: T9) |
 | NTF-18 | P1-D | NTF-T5, NTF-T11, NTF-T14 | Implementing (feitas: T5) |
 | NTF-19 | P1-D | NTF-T11, NTF-T13 | Pending |
