@@ -2,6 +2,7 @@ package com.keyflow.computador.app
 
 import com.keyflow.computador.AutenticacaoHost
 import com.keyflow.computador.ConfigHosts
+import com.keyflow.computador.DadosDaEdicaoDeHost
 import com.keyflow.computador.Host
 import com.keyflow.computador.MigracaoHostUnico
 import com.keyflow.computador.PoliticaAgente
@@ -21,19 +22,19 @@ class RepositorioComputador(
     private val settings: SettingsRepository,
     private val cofre: CofreDeSegredos,
     arquivoKnownHosts: File,
-) {
+) : DadosDaEdicaoDeHost {
     val confianca: RepositorioDeConfianca = RepositorioKnownHostsArquivo(arquivoKnownHosts)
 
     fun hostsFlow(): Flow<ConfigHosts> = settings.hostsFlow()
-    suspend fun hostsOnce(): ConfigHosts = settings.hostsOnce()
-    suspend fun atualizarHosts(f: (ConfigHosts) -> ConfigHosts): ConfigHosts = settings.atualizarHosts(f)
+    override suspend fun hostsOnce(): ConfigHosts = settings.hostsOnce()
+    override suspend fun atualizarHosts(f: (ConfigHosts) -> ConfigHosts): ConfigHosts = settings.atualizarHosts(f)
     fun chavesFlow(): Flow<List<ChaveSsh>> = settings.chavesFlow()
-    suspend fun chavesOnce(): List<ChaveSsh> = settings.chavesOnce()
+    override suspend fun chavesOnce(): List<ChaveSsh> = settings.chavesOnce()
     suspend fun atualizarChaves(f: (List<ChaveSsh>) -> List<ChaveSsh>): List<ChaveSsh> = settings.atualizarChaves(f)
 
-    fun senhaLembrada(hostId: String): String? = cofre.ler("$PREFIXO_SENHA$hostId")
-    fun lembrarSenha(hostId: String, senha: String) = cofre.gravar("$PREFIXO_SENHA$hostId", senha)
-    fun esquecerSenha(hostId: String) = cofre.apagar("$PREFIXO_SENHA$hostId")
+    override fun senhaLembrada(hostId: String): String? = cofre.ler("$PREFIXO_SENHA$hostId")
+    override fun lembrarSenha(hostId: String, senha: String) = cofre.gravar("$PREFIXO_SENHA$hostId", senha)
+    override fun esquecerSenha(hostId: String) = cofre.apagar("$PREFIXO_SENHA$hostId")
 
     /**
      * CMP-07: fecha as sessões do host, apaga a entrada do `known_hosts`, a senha lembrada, e tira o host da lista (a marca do agente vai

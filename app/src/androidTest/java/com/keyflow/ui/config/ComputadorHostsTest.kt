@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -42,12 +43,13 @@ class ComputadorHostsTest {
         val agenteDesligadoEm = mutableListOf<String>()
         var resultadoDoTeste: ResultadoTeste = ResultadoTeste.Falhou(CausaSsh.RECUSADA)
         val testados = mutableListOf<Pair<Host, String?>>()
-        val senhas = mutableMapOf<String, String>()
+        val senhas = inicial.filter { it.autenticacao == AutenticacaoHost.Senha && it.lembrarSenha }.associate { it.id to "senha-falsa" }.toMutableMap()
 
-        override suspend fun salvar(host: Host, senha: String?): List<ErroHost> = when (val r = EdicaoDeHost.aplicar(hosts, host)) {
+        override suspend fun salvar(host: Host, senha: String?): List<ErroHost> = when (val r = EdicaoDeHost.aplicar(hosts, host, credencialDisponivel = !senha.isNullOrEmpty() || !senhas[host.id].isNullOrEmpty())) {
             is ResultadoEdicao.Erros -> r.erros
             is ResultadoEdicao.Ok -> { hosts = r.config; senha?.let { senhas[r.host.id] = it }; emptyList() }
         }
+        override suspend fun temSenhaGuardada(host: Host) = !senhas[host.id].isNullOrEmpty()
         override suspend fun excluir(host: Host) { excluidos += host.id; hosts = ConfigHosts(hosts.hosts.filter { it.id != host.id }) }
         override suspend fun testar(host: Host, senha: String?): ResultadoTeste { testados += host to senha; return resultadoDoTeste }
         override fun impressoesConhecidas(host: Host): List<ChaveDoServidor> = emptyList()
@@ -189,5 +191,42 @@ class ComputadorHostsTest {
         regra.waitForIdle()
         assertEquals(listOf("00000001"), a.excluidos)
         assertFalse(a.hosts.hosts.any())
+    }
+    @Test fun semChavesNaoCriaChaveComReferenciaVazia() {
+        val a = Acoes(); mostrar(a)
+        clicar(COMPUTADOR_NOVO_HOST_TAG); preencher("dev")
+        nt(COMPUTADOR_HOST_AUTH_CHAVE_TAG).performScrollTo().assertIsNotEnabled()
+        clicar(COMPUTADOR_HOST_SALVAR_TAG); regra.waitForIdle()
+        assertEquals(AutenticacaoHost.Perguntar, a.hosts.hosts.single().autenticacao)
+    }
+
+    @Test fun lembrarSemSenhaNaoLiberaAgenteNemGrava() {
+        val a = Acoes(); mostrar(a)
+        clicar(COMPUTADOR_NOVO_HOST_TAG); preencher("dev")
+        clicar(COMPUTADOR_HOST_AUTH_SENHA_TAG); clicar(COMPUTADOR_HOST_LEMBRAR_TAG)
+        nt(COMPUTADOR_HOST_AGENTE_TAG).performScrollTo().assertIsNotEnabled()
+        clicar(COMPUTADOR_HOST_SALVAR_TAG)
+        nt(computadorErroTag(com.keyflow.computador.CampoHost.AUTENTICACAO)).performScrollTo().assertIsDisplayed()
+        assertTrue(a.hosts.hosts.isEmpty()); assertTrue(a.senhas.isEmpty())
+    }
+
+    @Test fun preferenciaAntigaSemSegredoNaoPermiteMarcar() {
+        val a = Acoes(listOf(senhaLembrada())); a.senhas.clear(); mostrar(a)
+        clicar(computadorHostCardTag("00000001"))
+        nt(COMPUTADOR_HOST_AGENTE_TAG).performScrollTo().assertIsNotEnabled()
+        clicar(COMPUTADOR_HOST_SALVAR_TAG)
+        nt(computadorErroTag(com.keyflow.computador.CampoHost.AUTENTICACAO)).performScrollTo().assertIsDisplayed()
+        assertFalse(a.hosts.hosts.single().agentePodeUsar)
+    }
+
+    @Test fun senhaDigitadaPermiteConfirmarEGravarAgente() {
+        val a = Acoes(); mostrar(a)
+        clicar(COMPUTADOR_NOVO_HOST_TAG); preencher("dev")
+        clicar(COMPUTADOR_HOST_AUTH_SENHA_TAG); digitar(COMPUTADOR_HOST_SENHA_TAG, "senha-falsa")
+        clicar(COMPUTADOR_HOST_LEMBRAR_TAG); clicar(COMPUTADOR_HOST_AGENTE_TAG)
+        nt(COMPUTADOR_AGENTE_AVISO_CONFIRMAR_TAG).performClick()
+        clicar(COMPUTADOR_HOST_SALVAR_TAG); regra.waitForIdle()
+        val h = a.hosts.hosts.single()
+        assertTrue(h.agentePodeUsar); assertEquals("senha-falsa", a.senhas[h.id])
     }
 }

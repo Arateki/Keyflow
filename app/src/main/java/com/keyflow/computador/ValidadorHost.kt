@@ -1,7 +1,7 @@
 package com.keyflow.computador
 
 /** Campo de um host que a validação sabe julgar. */
-enum class CampoHost { NOME, ENDERECO, PORTA, USUARIO, LIMITE }
+enum class CampoHost { NOME, ENDERECO, PORTA, USUARIO, AUTENTICACAO, LIMITE }
 
 /** Motivo da recusa, por campo. O texto da interface sai de `tr(…)` na tela; aqui só o código e uma frase em português. */
 enum class MotivoHost(val frase: String) {
@@ -16,6 +16,9 @@ enum class MotivoHost(val frase: String) {
     USUARIO_VAZIO("Informe o usuário."),
     USUARIO_LONGO("O usuário pode ter no máximo 64 caracteres."),
     USUARIO_INVALIDO("O usuário não pode ter espaços nem caracteres de controle."),
+    CHAVE_NAO_GUARDADA("Escolha uma chave guardada."),
+    SENHA_NAO_INFORMADA("Informe uma senha para guardá-la neste aparelho."),
+    SENHA_NAO_GUARDADA("Não foi possível guardar a senha neste aparelho."),
     LISTA_CHEIA("O limite é de 50 servidores."),
 }
 
@@ -25,8 +28,11 @@ object ValidadorHost {
     private val rotuloDns = Regex("^[A-Za-z0-9_]([A-Za-z0-9_-]{0,61}[A-Za-z0-9_])?$")
     private val ipv4 = Regex("^(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})$")
 
-    /** Valida [host] contra os [outros] já cadastrados (o próprio id é ignorado ao conferir o nome único). Lista vazia = válido. */
-    fun validar(host: Host, outros: List<Host> = emptyList()): List<ErroHost> {
+    /**
+     * Valida [host] contra [outros]. [credencialDisponivel] é obrigatório na gravação; `null` só valida
+     * estrutura ao ler JSON, que não contém segredos e não autoriza acesso ao cofre.
+     */
+    fun validar(host: Host, outros: List<Host> = emptyList(), credencialDisponivel: Boolean? = null): List<ErroHost> {
         val erros = mutableListOf<ErroHost>()
         val nome = host.nome.trim()
         when {
@@ -43,6 +49,9 @@ object ValidadorHost {
             host.usuario.any { it.isWhitespace() || it.isISOControl() } -> erros += ErroHost(CampoHost.USUARIO, MotivoHost.USUARIO_INVALIDO)
         }
         if (outros.none { it.id == host.id } && outros.size >= LimitesHost.MAX_HOSTS) erros += ErroHost(CampoHost.LIMITE, MotivoHost.LISTA_CHEIA)
+        val chave = host.autenticacao as? AutenticacaoHost.Chave
+        if (chave != null && (chave.keyId.isBlank() || credencialDisponivel == false)) erros += ErroHost(CampoHost.AUTENTICACAO, MotivoHost.CHAVE_NAO_GUARDADA)
+        if (host.autenticacao == AutenticacaoHost.Senha && host.lembrarSenha && credencialDisponivel == false) erros += ErroHost(CampoHost.AUTENTICACAO, MotivoHost.SENHA_NAO_INFORMADA)
         return erros
     }
 

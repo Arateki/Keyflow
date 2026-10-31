@@ -48,6 +48,9 @@ interface AcoesDeHost {
     /** Valida e grava [host] (novo ou editado), com a [senha] digitada se houver. Devolve os erros por campo ou a lista vazia. */
     suspend fun salvar(host: Host, senha: String?): List<ErroHost>
 
+    /** Consulta só a existência do segredo, sem entregá-lo à interface. */
+    suspend fun temSenhaGuardada(host: Host): Boolean = false
+
     /** CMP-07: fecha as sessões do host, apaga `known_hosts`, a senha e o host. A chave fica. */
     suspend fun excluir(host: Host)
 

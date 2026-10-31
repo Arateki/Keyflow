@@ -44,11 +44,16 @@ fun MotivoHost.texto(): String = when (this) {
     MotivoHost.USUARIO_VAZIO -> tr("Informe o usuário.")
     MotivoHost.USUARIO_LONGO -> tr("O usuário pode ter no máximo 64 caracteres.")
     MotivoHost.USUARIO_INVALIDO -> tr("O usuário não pode ter espaços nem caracteres de controle.")
+    MotivoHost.CHAVE_NAO_GUARDADA -> tr("Escolha uma chave guardada.")
+    MotivoHost.SENHA_NAO_INFORMADA -> tr("Informe uma senha para guardá-la neste aparelho.")
+    MotivoHost.SENHA_NAO_GUARDADA -> tr("Não foi possível guardar a senha neste aparelho.")
     MotivoHost.LISTA_CHEIA -> tr("O limite é de 50 servidores.")
 }
 
 fun MotivoAgente.texto(): String = when (this) {
     MotivoAgente.PERGUNTA_SEMPRE -> tr("Este servidor pede a autenticação na hora; o agente não tem como digitá-la. Guarde uma chave ou a senha.")
     MotivoAgente.SENHA_NAO_LEMBRADA -> tr("A senha não está guardada. Ligue \"lembrar senha\" para o agente poder usar este servidor.")
+    MotivoAgente.CHAVE_NAO_GUARDADA -> tr("Escolha uma chave guardada.")
+    MotivoAgente.SENHA_INDISPONIVEL -> tr("Informe uma senha para guardá-la neste aparelho.")
     MotivoAgente.CHAVE_COM_PASSPHRASE -> tr("Esta chave pede a senha dela na hora; o agente não pode usá-la.")
 }

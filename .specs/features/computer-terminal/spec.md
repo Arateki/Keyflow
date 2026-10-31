@@ -390,7 +390,7 @@ Nenhuma. Q1–Q13 foram respondidas em 29/10 (D12–D24). Q8, Q9, Q10, Q11 e Q13
 | CMP-06 | P1-A | CMP-T5, CMP-T11 | Parcial — migração pura (CMP-T5) verificada; falta T11 |
 | CMP-07 | P1-A | CMP-T11, CMP-T15 | Verificada (T11 e T15: exclusão com confirmação, aviso de nova impressão ao mudar endereço/porta) |
 | CMP-08 | P1-A | CMP-T9, CMP-T15 | Verificada (T9 + `TestadorDeConexao` contra o `SshFixtureServer`; modal mostra impressão, método e latência; sem `delay`) |
-| CMP-09 | P1-A | CMP-T5, CMP-T15 | Verificada (regra T5 + aviso e confirmação no modal, motivo quando bloqueado, desligar fecha sessões do agente) |
+| CMP-09 | P1-A | CMP-T5, CMP-T15 | Revisão #96: disponibilidade real de credencial, chave vazia recusada e segredo confirmado antes da permissão (`RegraAgenteTest`, `ValidadorHostTest`, `GravadorDeHostsTest`); aviso/confirmar mantidos. Novos instrumentados compilados e pendentes por ANR do SystemUI |
 | CMP-10 | P1-B | CMP-T7, CMP-T8, CMP-T16 | Parcial — geração no Keystore/envelope (CMP-T8) implementada; falta T16 |
 | CMP-11 | P1-B | CMP-T2, CMP-T8, CMP-T16 | Parcial — sonda e envelope (CMP-T8); falta T2 e T16 |
 | CMP-12 | P1-B | CMP-T7, CMP-T16 | Parcial — importação (CMP-T7) verificada; falta T16 |

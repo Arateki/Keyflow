@@ -58,4 +58,10 @@ class ValidadorHostTest {
         assertEquals(listOf(CampoHost.LIMITE to MotivoHost.LISTA_CHEIA), motivos(host(nome = "novo", id = "ffffffff"), cheios))
         assertTrue(motivos(cheios[3], cheios).isEmpty())
     }
+    @Test fun autenticacaoExigeReferenciaValidaEFatoSobreOSegredo() {
+        assertTrue(ValidadorHost.validar(host().copy(autenticacao = AutenticacaoHost.Chave(""))).any { it.motivo == MotivoHost.CHAVE_NAO_GUARDADA })
+        val senha = host().copy(autenticacao = AutenticacaoHost.Senha, lembrarSenha = true)
+        assertTrue(ValidadorHost.validar(senha, credencialDisponivel = false).any { it.motivo == MotivoHost.SENHA_NAO_INFORMADA })
+        assertTrue(ValidadorHost.validar(senha, credencialDisponivel = true).isEmpty())
+    }
 }

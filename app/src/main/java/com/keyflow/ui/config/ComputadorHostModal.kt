@@ -10,6 +10,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,6 +39,8 @@ import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 
 const val COMPUTADOR_MODAL_FECHAR_TAG = "computador-modal-fechar"
@@ -102,6 +105,12 @@ internal fun ComputadorHostModal(host: Host?, hosts: List<Host>, chaves: List<Ch
     val inicial = remember(host?.id) { host ?: Host(id = acoes.novoId(hosts.map { it.id }), nome = "", endereco = "", usuario = "", autenticacao = AutenticacaoHost.Perguntar) }
     var rascunho by remember(inicial.id) { mutableStateOf(inicial) }
     var senha by remember(inicial.id) { mutableStateOf("") }
+    var senhaDigitada by remember(inicial.id) { mutableStateOf(false) }
+    var senhaGuardada by remember(inicial.id) { mutableStateOf(false) }
+    LaunchedEffect(inicial.id) {
+        val guardada = host?.let { acoes.temSenhaGuardada(it) } == true
+        withContext(Dispatchers.Main.immediate) { senhaGuardada = guardada }
+    }
     var erros by remember { mutableStateOf<List<ErroHost>>(emptyList()) }
     var teste by remember { mutableStateOf<Teste?>(null) }
     var testeJob by remember { mutableStateOf<Job?>(null) }
@@ -114,7 +123,15 @@ internal fun ComputadorHostModal(host: Host?, hosts: List<Host>, chaves: List<Ch
     fun mudar(f: (Host) -> Host) { vivo[0] = f(vivo[0]); rascunho = vivo[0] }
     fun erro(c: CampoHost) = erros.firstOrNull { it.campo == c }?.motivo?.texto()
     val tipo = when (rascunho.autenticacao) { is AutenticacaoHost.Chave -> TipoAuth.CHAVE; AutenticacaoHost.Senha -> TipoAuth.SENHA; AutenticacaoHost.Perguntar -> TipoAuth.PERGUNTAR }
-    val podeAgente = RegraAgente.podeMarcar(rascunho)
+    fun podeMarcar(h: Host): PodeMarcar {
+        val disponivel = when (val a = h.autenticacao) {
+            AutenticacaoHost.Senha -> senhaDigitada || senhaGuardada
+            is AutenticacaoHost.Chave -> chaves.any { it.id == a.keyId }
+            AutenticacaoHost.Perguntar -> false
+        }
+        return RegraAgente.podeMarcar(h, credencialDisponivel = disponivel)
+    }
+    val podeAgente = podeMarcar(rascunho)
 
     ConfigModal(if (host == null) tr("Novo host") else rascunho.nome.ifBlank { tr("Host") }, onDismiss, COMPUTADOR_MODAL_FECHAR_TAG, accessibleHeader = true) {
         Column(Modifier.padding(top = 14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -140,23 +157,23 @@ internal fun ComputadorHostModal(host: Host?, hosts: List<Host>, chaves: List<Ch
             Eyebrow(tr("Autenticação"))
             Segmented(
                 options = TipoAuth.entries, selected = tipo, label = { it.rotulo },
+                disabled = { it == TipoAuth.CHAVE && chaves.isEmpty() },
                 tag = { when (it) { TipoAuth.CHAVE -> COMPUTADOR_HOST_AUTH_CHAVE_TAG; TipoAuth.SENHA -> COMPUTADOR_HOST_AUTH_SENHA_TAG; TipoAuth.PERGUNTAR -> COMPUTADOR_HOST_AUTH_PERGUNTAR_TAG } },
                 onSelect = { novo ->
                     mudar { h ->
                         when (novo) {
-                            TipoAuth.CHAVE -> h.copy(autenticacao = AutenticacaoHost.Chave(chaves.firstOrNull()?.id ?: ""), lembrarSenha = false)
+                            TipoAuth.CHAVE -> chaves.firstOrNull()?.let { h.copy(autenticacao = AutenticacaoHost.Chave(it.id), lembrarSenha = false) } ?: h
                             TipoAuth.SENHA -> h.copy(autenticacao = AutenticacaoHost.Senha)
                             TipoAuth.PERGUNTAR -> h.copy(autenticacao = AutenticacaoHost.Perguntar, lembrarSenha = false)
                         }
                     }
                     // Mudar o jeito de autenticar pode tirar a base da marca do agente (CMP-09).
-                    if (RegraAgente.podeMarcar(vivo[0]) !is PodeMarcar.Sim && vivo[0].agente == PoliticaAgente.PERMITIDO) mudar { it.copy(agente = PoliticaAgente.PROIBIDO) }
+                    if (podeMarcar(vivo[0]) !is PodeMarcar.Sim && vivo[0].agente == PoliticaAgente.PERMITIDO) mudar { it.copy(agente = PoliticaAgente.PROIBIDO) }
                 },
             )
+            if (chaves.isEmpty()) InfoNote(tr("Nenhuma chave guardada. Gere ou importe uma na seção Chaves."), "computador-host-sem-chaves")
             when (tipo) {
-                TipoAuth.CHAVE -> if (chaves.isEmpty()) {
-                    InfoNote(tr("Nenhuma chave guardada. Gere ou importe uma na seção Chaves."), "computador-host-sem-chaves")
-                } else {
+                TipoAuth.CHAVE -> if (chaves.isNotEmpty()) {
                     val atual = (rascunho.autenticacao as? AutenticacaoHost.Chave)?.keyId.orEmpty()
                     Dropdown(
                         label = tr("Chave"), options = chaves.map { it.id }, selected = atual.takeIf { id -> chaves.any { it.id == id } } ?: chaves.first().id,
@@ -165,16 +182,18 @@ internal fun ComputadorHostModal(host: Host?, hosts: List<Host>, chaves: List<Ch
                     )
                 }
                 TipoAuth.SENHA -> {
-                    AutoSaveField(tr("Senha"), senha, { senha = it }, COMPUTADOR_HOST_SENHA_TAG, keyboardType = KeyboardType.Password, pending = pending)
+                    AutoSaveField(tr("Senha"), senha, { senha = it }, COMPUTADOR_HOST_SENHA_TAG, keyboardType = KeyboardType.Password, pending = pending, onDraftChange = { senhaDigitada = it.isNotEmpty() })
                     ToggleRow(tr("Lembrar a senha"), tr("Guarda a senha cifrada neste aparelho. Sem isso, o agente não pode usar este servidor."), rascunho.lembrarSenha,
                         { v -> mudar { h -> h.copy(lembrarSenha = v) }; if (!v && vivo[0].agente == PoliticaAgente.PERMITIDO) mudar { it.copy(agente = PoliticaAgente.PROIBIDO) } }, COMPUTADOR_HOST_LEMBRAR_TAG)
                 }
                 TipoAuth.PERGUNTAR -> SettingSub(tr("A senha é pedida a cada conexão."))
             }
 
+            erro(CampoHost.AUTENTICACAO)?.let { MensagemDeErro(it, computadorErroTag(CampoHost.AUTENTICACAO)) }
+
             ToggleRow(
                 tr("Pode ser usado pelo agente"), tr("O agente só age em servidores marcados e em sessões dele."), rascunho.agentePodeUsar,
-                { v -> if (v) avisoAgente = true else mudar { it.copy(agente = PoliticaAgente.PROIBIDO) } },
+                { v -> pending.confirm(); if (v && podeMarcar(vivo[0]) is PodeMarcar.Sim) avisoAgente = true else mudar { it.copy(agente = PoliticaAgente.PROIBIDO) } },
                 COMPUTADOR_HOST_AGENTE_TAG, enabled = podeAgente is PodeMarcar.Sim || rascunho.agentePodeUsar,
             )
             (podeAgente as? PodeMarcar.Nao)?.let { if (!rascunho.agentePodeUsar) MensagemDeErro(it.motivo.texto(), COMPUTADOR_HOST_AGENTE_MOTIVO_TAG) }
@@ -217,10 +236,12 @@ internal fun ComputadorHostModal(host: Host?, hosts: List<Host>, chaves: List<Ch
                 val h = vivo[0]
                 scope.launch {
                     val e = acoes.salvar(h, senha.takeIf { it.isNotEmpty() && h.autenticacao == AutenticacaoHost.Senha })
-                    erros = e
-                    if (e.isEmpty()) {
-                        if (host?.agentePodeUsar == true && !h.agentePodeUsar) acoes.desligarAgente(h)
-                        onDismiss()
+                    withContext(Dispatchers.Main.immediate) {
+                        erros = e
+                        if (e.isEmpty()) {
+                            if (host?.agentePodeUsar == true && !h.agentePodeUsar) acoes.desligarAgente(h)
+                            onDismiss()
+                        }
                     }
                 }
             }, Modifier.heightIn(min = 48.dp))
@@ -234,7 +255,7 @@ internal fun ComputadorHostModal(host: Host?, hosts: List<Host>, chaves: List<Ch
             onDismissRequest = { avisoAgente = false },
             title = { Text(tr("Liberar este servidor para o agente?")) },
             text = { Text(tr("O agente poderá abrir terminais neste servidor e ler o texto da tela; esse texto é enviado ao provedor do modelo.")) },
-            confirmButton = { TextButton(onClick = { avisoAgente = false; mudar { it.copy(agente = PoliticaAgente.PERMITIDO) } }, modifier = Modifier.testTag(COMPUTADOR_AGENTE_AVISO_CONFIRMAR_TAG)) { Text(tr("Permitir")) } },
+            confirmButton = { TextButton(onClick = { avisoAgente = false; if (podeMarcar(vivo[0]) is PodeMarcar.Sim) mudar { it.copy(agente = PoliticaAgente.PERMITIDO) } }, modifier = Modifier.testTag(COMPUTADOR_AGENTE_AVISO_CONFIRMAR_TAG)) { Text(tr("Permitir")) } },
             dismissButton = { TextButton(onClick = { avisoAgente = false }, modifier = Modifier.testTag(COMPUTADOR_AGENTE_AVISO_CANCELAR_TAG)) { Text(tr("Cancelar")) } },
         )
     }

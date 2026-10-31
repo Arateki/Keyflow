@@ -12,12 +12,12 @@ sealed interface ResultadoEdicao {
  * acrescenta o host na lista. Não mexe em segredo.
  */
 object EdicaoDeHost {
-    fun aplicar(config: ConfigHosts, editado: Host, chavePedePassphrase: (String) -> Boolean = { false }): ResultadoEdicao {
+    fun aplicar(config: ConfigHosts, editado: Host, credencialDisponivel: Boolean = false, chavePedePassphrase: (String) -> Boolean = { false }): ResultadoEdicao {
         var host = editado.copy(nome = editado.nome.trim(), endereco = editado.endereco.trim(), usuario = editado.usuario.trim())
         if (host.autenticacao !is AutenticacaoHost.Senha) host = host.copy(lembrarSenha = false)
-        if (host.agente == PoliticaAgente.PERMITIDO && RegraAgente.podeMarcar(host, chavePedePassphrase) !is PodeMarcar.Sim) host = host.copy(agente = PoliticaAgente.PROIBIDO)
+        if (host.agente == PoliticaAgente.PERMITIDO && RegraAgente.podeMarcar(host, credencialDisponivel, chavePedePassphrase) !is PodeMarcar.Sim) host = host.copy(agente = PoliticaAgente.PROIBIDO)
         val outros = config.hosts.filter { it.id != host.id }
-        val erros = ValidadorHost.validar(host, config.hosts)
+        val erros = ValidadorHost.validar(host, config.hosts, credencialDisponivel)
         if (erros.isNotEmpty()) return ResultadoEdicao.Erros(erros)
         val novos = if (config.hosts.any { it.id == host.id }) config.hosts.map { if (it.id == host.id) host else it } else outros + host
         return ResultadoEdicao.Ok(ConfigHosts(novos), host)
