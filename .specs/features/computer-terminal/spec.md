@@ -416,7 +416,7 @@ Nenhuma. Q1–Q13 foram respondidas em 29/10 (D12–D24). Q8, Q9, Q10, Q11 e Q13
 | CMP-32 | P1-E | CMP-T12, CMP-T20 | Parcial — serviço `specialUse`, notificação só com contagem (CMP-T12) verificados |
 | CMP-33 | P1-E | CMP-T12, CMP-T19 | Parcial — manifesto, `property` e checklist da Play (CMP-T12); declaração no Console é [YAN] |
 | CMP-34 | P1-E | CMP-T10, CMP-T12 | Parcial — serviço sobe com a 1ª sessão e cai com a última (CMP-T12); falta a tela |
-| CMP-35 | P1-F | CMP-T13 | Verificada (`SequenciasHostisTest` com a gravação hostil, `FiltroDaSaidaDoServidorTest`, respostas do emulador real em `LigacaoEmuladorTest`) |
+| CMP-35 | P1-F | CMP-T13 | Verificada; revisão #96: números normalizados, C1/S8C1T, C0/DEL, CAN/SUB e limites sem vazamento (`DivergenciasDoParserTest`, fuzz diferencial com o parser C em `ParserLibvtermTest`, mais gravação hostil/fragmentação e `LigacaoEmuladorTest`) |
 | CMP-36 | P1-F | CMP-T10, CMP-T13 | Verificada (texto e scrollback só em memória; emulador no registro do processo) |
 | CMP-37 | P2-G | CMP-T22 | Pending |
 | CMP-38 | P2-G | CMP-T23 | Pending |
