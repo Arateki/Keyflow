@@ -18,7 +18,7 @@ interface AcoesDaNotificacao {
     fun descartar()
     fun desfazer()
 
-    /** `RetrairExpandirTeclado`, `TrocarTeclado` ou `LerTela` (o mesmo `executarAcaoDeAtalho` da orbe flutuante). */
+    /** `RetrairExpandirTeclado` ou `LerTela` (o mesmo `executarAcaoDeAtalho` da orbe flutuante). */
     fun executar(acao: AcaoDaOrbe)
     fun rodarFluxo(fluxoId: String)
 }
@@ -133,5 +133,5 @@ class NotificacaoHost(
         rajada.fechar()
     }
 
-    private fun AcaoDaOrbe.abreActivity(): Boolean = this == AcaoDaOrbe.TrocarTeclado || this == AcaoDaOrbe.LerTela
+    private fun AcaoDaOrbe.abreActivity(): Boolean = this == AcaoDaOrbe.LerTela
 }

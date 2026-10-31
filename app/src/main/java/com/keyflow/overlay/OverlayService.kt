@@ -615,7 +615,6 @@ class OverlayService : Service() {
             override fun executar(acao: AcaoDaOrbe) = executarAcaoDeAtalho(
                 when (acao) {
                     AcaoDaOrbe.RetrairExpandirTeclado -> OrbShortcutAction.TOGGLE_KEYBOARD
-                    AcaoDaOrbe.TrocarTeclado -> OrbShortcutAction.SWITCH_IME
                     AcaoDaOrbe.LerTela -> OrbShortcutAction.VISION_MODE
                     else -> OrbShortcutAction.NONE
                 },

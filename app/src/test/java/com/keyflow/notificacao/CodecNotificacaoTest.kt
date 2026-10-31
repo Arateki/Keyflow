@@ -3,10 +3,21 @@ package com.keyflow.notificacao
 import com.google.common.truth.Truth.assertThat
 import com.keyflow.ui.orb.OrbStyle
 import org.json.JSONObject
+import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /** NTF-T3: o codec tolerante da configuração da notificação (NTF-36..39). */
 class CodecNotificacaoTest {
+
+    @Test
+    fun `D14 migra switch_ime dos tres toques para Nenhuma e grava o novo id`() {
+        val antigo = """{"v":1,"copy":false,"taps":{"1":"switch_ime","2":"switch_ime","3":"switch_ime"}}"""
+        val c = CodecNotificacao.decodificar(antigo)
+        assertEquals(listOf(AcaoDaOrbe.Nenhuma, AcaoDaOrbe.Nenhuma, AcaoDaOrbe.Nenhuma), (1..3).map(c::acaoParaToques))
+        val novo = CodecNotificacao.codificar(c)
+        org.junit.Assert.assertFalse(novo.contains("switch_ime"))
+        assertEquals(c, CodecNotificacao.decodificar(novo))
+    }
 
     @Test
     fun `chave ausente ou JSON malformado dao os padroes`() {
@@ -30,7 +41,7 @@ class CodecNotificacaoTest {
         val taps = json.getJSONObject("taps")
         assertThat(taps.getString("1")).isEqualTo("record_toggle")
         assertThat(taps.getString("2")).isEqualTo("toggle_keyboard")
-        assertThat(taps.getString("3")).isEqualTo("switch_ime")
+        assertThat(taps.getString("3")).isEqualTo("none")
     }
 
     @Test
