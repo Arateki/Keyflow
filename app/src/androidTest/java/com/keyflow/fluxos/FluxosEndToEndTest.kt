@@ -149,11 +149,26 @@ class FluxosEndToEndTest {
 
     /** Os estados finais publicados (o controlador volta a Ocioso depois, então só observar o valor atual perderia o fim). */
     private val finais = CopyOnWriteArrayList<EstadoExecucao>()
-    private val observador = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
+    private val observador = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Unconfined)
 
-    private suspend fun terminou(id: String): EstadoExecucao {
-        aguardar("o fluxo $id não terminou") { finais.any { it.fluxoIdOuNulo() == id } }
-        return finais.last { it.fluxoIdOuNulo() == id }
+    /**
+     * O estado final do fluxo [id]. O controlador é um `StateFlow`: um coletor lento perde o `Concluido` quando o `Ocioso` vem logo
+     * atrás (no CI, mais lento, perdia sempre). Por isso o coletor é `Unconfined`; e, se ainda assim não viu, [chamadasEsperadas]
+     * etapas executadas com o serviço já encerrado e sem aviso de falha provam que o fluxo concluiu.
+     */
+    private suspend fun terminou(id: String, chamadasEsperadas: Int? = null): EstadoExecucao {
+        try {
+            aguardar("o fluxo $id não terminou") {
+                finais.any { it.fluxoIdOuNulo() == id } ||
+                    (chamadasEsperadas != null && chamadas.size >= chamadasEsperadas && OverlayService.instanceForVisionTest == null)
+            }
+        } catch (erro: AssertionError) {
+            throw AssertionError("${erro.message} — chamadas=${tipos()} avisos=$avisos finais=$finais " +
+                "estado=${KeyFlowController.fluxo.value} servico=${OverlayService.instanceForVisionTest != null}", erro)
+        }
+        finais.lastOrNull { it.fluxoIdOuNulo() == id }?.let { return it }
+        assertTrue("sem estado final publicado e com aviso de falha: $avisos", avisos.isEmpty())
+        return EstadoExecucao.Concluido(id)
     }
 
     private fun EstadoExecucao.fluxoIdOuNulo(): String? = when (this) {
@@ -169,7 +184,7 @@ class FluxosEndToEndTest {
     @Test fun ouvirEResponderPeloBotaoPassaOTextoDeEtapaEmEtapa() = runBlocking<Unit> {
         semear(listOf(ouvir), listOf(Gatilho(Superficie.Barra("b-ouvir"), ouvir.id)), listOf("b-ouvir"))
         botao("b-ouvir")
-        assertEquals(EstadoExecucao.Concluido(ouvir.id), terminou(ouvir.id))
+        assertEquals(EstadoExecucao.Concluido(ouvir.id), terminou(ouvir.id, 3))
         assertEquals(listOf(TipoEtapa.DITAR, TipoEtapa.PERGUNTAR, TipoEtapa.FALAR), tipos())
         assertEquals(Valor.Texto("oi"), entradaDe(TipoEtapa.PERGUNTAR))
         assertEquals(Valor.Texto("resposta de oi"), entradaDe(TipoEtapa.FALAR))
@@ -179,7 +194,7 @@ class FluxosEndToEndTest {
     @Test fun lerATelaEColarLiberaAImagemUmaVezEEntregaOTextoAoInserir() = runBlocking<Unit> {
         semear(listOf(lerTela), emptyList())
         rodarAgora(lerTela.id)
-        assertEquals(EstadoExecucao.Concluido(lerTela.id), terminou(lerTela.id))
+        assertEquals(EstadoExecucao.Concluido(lerTela.id), terminou(lerTela.id, 3))
         assertEquals(listOf(TipoEtapa.CAPTURAR, TipoEtapa.VISAO, TipoEtapa.INSERIR), tipos())
         assertEquals(Valor.Texto("texto da tela"), entradaDe(TipoEtapa.INSERIR))
         assertEquals("a imagem sai da memória exatamente uma vez", 1, liberadas.get())
@@ -188,7 +203,7 @@ class FluxosEndToEndTest {
     @Test fun pedirAoAgenteEColarRodaOAgenteComOTextoDitado() = runBlocking<Unit> {
         semear(listOf(agente), emptyList())
         rodarAgora(agente.id)
-        assertEquals(EstadoExecucao.Concluido(agente.id), terminou(agente.id))
+        assertEquals(EstadoExecucao.Concluido(agente.id), terminou(agente.id, 3))
         assertEquals(listOf(TipoEtapa.DITAR, TipoEtapa.AGENTE, TipoEtapa.INSERIR), tipos())
         assertEquals(Valor.Texto("oi"), entradaDe(TipoEtapa.AGENTE))
         assertEquals(Valor.Texto("agente fez oi"), entradaDe(TipoEtapa.INSERIR))
@@ -252,7 +267,7 @@ class FluxosEndToEndTest {
         val service = checkNotNull(OverlayService.instanceForVisionTest)
         aguardar("o gatilho não chegou ao serviço") { service.configFluxosForTest == config }
         instrumentation.runOnMainSync { service.handleOrbShortcut(2) }
-        assertEquals(EstadoExecucao.Concluido(ouvir.id), terminou(ouvir.id))
+        assertEquals(EstadoExecucao.Concluido(ouvir.id), terminou(ouvir.id, 3))
         assertEquals(listOf(TipoEtapa.DITAR, TipoEtapa.PERGUNTAR, TipoEtapa.FALAR), tipos())
         assertEquals(OrbShortcutAction.TOGGLE_KEYBOARD, repo.settingsFlow().first().shortcut2Tap)
     }
@@ -274,7 +289,7 @@ class FluxosEndToEndTest {
             chamadas.clear(); finais.clear()
             instrumentation.runOnMainSync { KeyFlowController.updateFluxo(EstadoExecucao.Ocioso) }
             rodarAgora(ouvir.id)
-            assertEquals("vez $vez", EstadoExecucao.Concluido(ouvir.id), terminou(ouvir.id))
+            assertEquals("vez $vez", EstadoExecucao.Concluido(ouvir.id), terminou(ouvir.id, 3))
             assertEquals("a execução $vez começa do zero", Valor.Nada, entradaDe(TipoEtapa.DITAR))
             aguardar("o serviço não encerrou") { OverlayService.instanceForVisionTest == null }
         }
