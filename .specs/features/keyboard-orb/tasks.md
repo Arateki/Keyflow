@@ -1,7 +1,7 @@
 # Orbe do teclado — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md`
-**Status**: spec e design em rascunho (2026-10-29), **KBO-T1..T8 feitas (2026-10-30)**, T9..T11 pendentes (goldens, gestos no emulador, fechamento). **Fora da v1** (só `main`, release seguinte). Não toma a vez de frente aberta.
+**Status**: spec e design em rascunho (2026-10-29), **KBO-T1..T11 feitas (2026-10-30/31)**. A FLX-T29 (gatilhos de Fluxos) segue em `flows`. **Fora da v1** (só `main`, release seguinte). Não toma a vez de frente aberta.
 
 > **Para o agente executor**: leia `spec.md` + `design.md` + este arquivo e `.specs/codebase/TESTING.md`. Uma task por vez, na ordem do plano,
 > testes primeiro, gate verde antes de avançar. Cada task é verificável sozinha. Os textos de UI que ela criar vão com ela (`tr("…")` +
@@ -112,21 +112,23 @@ A Fase A inteira é JVM: pode ser entregue e revisada antes de qualquer pixel.
 
 ## Fase C — Prova
 
-### KBO-T9 — Goldens — **Status: pendente**
+### KBO-T9 — Goldens — **Status: concluída**
 - **What**: aprovar só o que a KBO-35 lista (`keyboard-*`, `bar-default-*`, `tour-keyboard-mic`) e as rotas novas `keyboard-orb-gravando` e `keyboard-orb-pausada`, claro e escuro. Conferir no PNG que a faixa aparece na gravando/pausada e que a primeira fileira de teclas está inteira. Restaurar qualquer outro PNG que o `--approve` tenha copiado.
 - **Where**: `verification/golden/`, galeria se precisar de rota nova no `RouteCatalog`.
 - **Depends on**: T5, T6, T7. **Requirement**: KBO-35.
 - **Done when**: `pool telas` com 0 divergência depois do restore; `git diff --stat verification/golden` só mostra os arquivos da KBO-35 e as rotas novas.
 - **Tests**: golden. **Gate**: `pool telas`. **Commit**: `test(orbe-teclado): goldens da orbe no teclado`.
+- **Evidência (2026-10-31)**: rotas novas `keyboard-orb-gravando`/`-pausada` e `config-teclado-orbe`/`-propria` (claro e escuro) aprovadas depois de olhar cada PNG (faixa de 36 dp visível, primeira fileira inteira); `config-ajuda-teclado`, `tour-keyboard-mic` (T8) e `config-teclado`, `config-teclado-travado`, `config-unlock` (pelas capturas do CI) aprovados antes; o resto bit-idêntico. Saiu o código sem uso do seletor de chips do tour. Lição: `../../project/licoes/2026-10-31-orbe-teclado-d.md`.
 
-### KBO-T10 — Gestos no emulador — **Status: pendente**
+### KBO-T10 — Gestos no emulador — **Status: concluída**
 - **What**: `OrbeDoTecladoGestureTest`: 1 toque na fábrica inicia e o seguinte envia (estado do `KeyFlowController`, sem microfone de verdade — o mesmo dublê que os testes do overlay usam); gravando, o círculo não intersecta tecla e os cantos do retângulo delimitador fora do disco **e** fora do conteúdo são **recebidos pelo app de trás** (injeção de toque; a `touchableRegion` é que os exclui — devolver falso no hit-test não conta). A comparação do app hospedeiro antes/depois da faixa (adjustResize e adjustPan, retrato e paisagem, com e sem overscan; campo focado visível; o conteúdo não perde 36 dp) mora na T5 e este teste não a dispensa. Segurar no Alternar não muda a posição do encaixe; 2 toques com a ação retrair/expandir recolhe; Visão ativa (o dublê já usado em `OverlayServiceVisionTest`) é encerrada pelo gravar/enviar e ignorada pelos outros toques. Sem `Thread.sleep`: janela da rajada encurtada por gancho `…ForTest`, como `OrbGestureIntegrationTest`.
 - **Where**: `app/src/androidTest/.../ime/OrbeDoTecladoGestureTest.kt`.
 - **Depends on**: T5. **Requirement**: KBO-09, KBO-13, KBO-14, KBO-18, KBO-25, KBO-36.
 - **Done when**: `pool instrumentar com.keyflow.ime.OrbeDoTecladoGestureTest` verde no emulador. O app hospedeiro recebe o toque dos cantos fora do disco e fora do conteúdo. A comparação de insets do app (T5) continua verde. Nenhum comando desta task usa o serial `RX8T10DERKW`.
 - **Tests**: instrumentado. **Gate**: `pool instrumentar com.keyflow.ime.OrbeDoTecladoGestureTest`. **Commit**: `test(orbe-teclado): gestos da orbe no emulador`.
+- **Evidência (2026-10-31)**: 5/5 no emulador. Desvio: os quatro primeiros testes rodam a view sozinha com `MotionEvent`s e conferem os comandos que saem pelo `onOrbeComando` (o serviço os executa: `executarComandoDaOrbe`), sem o controlador nem o microfone; só o dos cantos usa o IME de verdade. Mutação (região tocável como o retângulo delimitador) morta pelo teste dos cantos.
 
-### KBO-T11 — Fechamento — **Status: pendente**
+### KBO-T11 — Fechamento — **Status: concluída**
 - **What**: Status das tasks, traceability (Pending → Verified, ou Parcial com o motivo), lição em `.specs/project/licoes/` (a faixa de 36 dp, o disco em vez do retângulo e o early-return do overscan), `DEVELOPMENT-ORDER.md` (Bloco 17 → concluído quando for o caso; o 16 fica com Computador). A FLX-T29 **não** fecha aqui.
 - **Where**: `.specs/features/keyboard-orb/*`, `.specs/DEVELOPMENT-ORDER.md`, `.specs/project/licoes/`.
 - **Depends on**: T8, T9, T10. **Requirement**: regra de ouro 6.

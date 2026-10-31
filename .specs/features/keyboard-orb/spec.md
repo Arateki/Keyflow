@@ -231,31 +231,31 @@ Respondidas em 29/10 (D5–D10). Nenhuma em aberto.
 
 | Requirement | Story | Tasks | Status |
 | ----------- | ----- | ----- | ------ |
-| KBO-01 | P1-A | KBO-T6 | Implementado (T6; golden `config-teclado*` na T9) |
-| KBO-02 | P1-A | KBO-T6 | Implementado (T6; prévia com o mesmo pintor `drawOrb`, tempo congelado) |
+| KBO-01 | P1-A | KBO-T6, KBO-T9 | Verified |
+| KBO-02 | P1-A | KBO-T6, KBO-T9 | Verified |
 | KBO-03 | P1-A | KBO-T2, KBO-T6 | Implementado (T6) |
 | KBO-04 | P1-A | KBO-T3, KBO-T6 | Implementado (T6) |
 | KBO-05 | P1-B | KBO-T5 | Implementado (T5) |
 | KBO-06 | P1-B | KBO-T5, KBO-T6 | Implementado (T5, T6: o catálogo diz "Orbe" e não oferece uma segunda) |
 | KBO-07 | P1-B | KBO-T1, KBO-T5 | Implementado (T5) |
 | KBO-08 | P1-B | KBO-T1, KBO-T5 | Implementado (T5) |
-| KBO-09 | P1-B | KBO-T4, KBO-T5, KBO-T10 | Parcial (aplicado no IME e provado no app de trás em KBO-T5; falta KBO-T10) |
+| KBO-09 | P1-B | KBO-T4, KBO-T5, KBO-T10 | Verified |
 | KBO-10 | P1-B | KBO-T4, KBO-T5 | Implementado (T5) |
 | KBO-11 | P1-B | KBO-T1, KBO-T5 | Implementado (T5) |
 | KBO-12 | P1-C | KBO-T1 | Verified |
-| KBO-13 | P1-C | KBO-T3, KBO-T10 | Parcial (rajada e classificador JVM em KBO-T3; falta KBO-T10) |
-| KBO-14 | P1-C | KBO-T3, KBO-T10 | Parcial (resolvedor JVM em KBO-T3; falta KBO-T10) |
+| KBO-13 | P1-C | KBO-T3, KBO-T10 | Verified |
+| KBO-14 | P1-C | KBO-T3, KBO-T10 | Verified |
 | KBO-15 | P1-C | KBO-T3, KBO-T6 | Implementado (T3, T6) |
 | KBO-16 | P1-C | KBO-T3 | Verified |
 | KBO-17 | P1-C | KBO-T2, KBO-T3 | Verified |
-| KBO-18 | P1-C | KBO-T3, KBO-T5, KBO-T10 | Parcial (KBO-T5 liga o resolvedor; falta KBO-T10) |
+| KBO-18 | P1-C | KBO-T3, KBO-T5, KBO-T10 | Verified |
 | KBO-19 | P1-D | KBO-T3, KBO-T6 | Implementado (T3, T6: somente leitura quando copia) |
 | KBO-20 | P1-D | KBO-T2, KBO-T3 | Verified |
 | KBO-21 | P1-D | KBO-T5, KBO-T7 | Implementado (T5, T7: o fundo do bitmap é a cor lisa do teclado, claro ou escuro) |
 | KBO-22 | P1-E | KBO-T7 | Implementado (T7) |
 | KBO-23 | P1-E | KBO-T7 | Implementado (T7) |
 | KBO-24 | P1-E | KBO-T5 | Implementado (T5) |
-| KBO-25 | P1-F | KBO-T3, KBO-T10 | Parcial (prioridade da Visão no resolvedor JVM em KBO-T3; falta KBO-T10) |
+| KBO-25 | P1-F | KBO-T3, KBO-T10 | Verified |
 | KBO-26 | P1-F | KBO-T5 | Implementado (T5) |
 | KBO-27 | P1-G | KBO-T2 | Verified |
 | KBO-28 | P1-G | KBO-T2 | Verified |
@@ -265,8 +265,8 @@ Respondidas em 29/10 (D5–D10). Nenhuma em aberto.
 | KBO-32 | P2-I | KBO-T1 | Verified |
 | KBO-33 | P2-I | KBO-T6, KBO-T8 | Implementado (T6, T8; `TranslationsTest` verde) |
 | KBO-34 | P2-I | KBO-T5 | Implementado (T5) |
-| KBO-35 | P2-I | KBO-T9 | Pending |
-| KBO-36 | P2-I | KBO-T10 | Pending |
+| KBO-35 | P2-I | KBO-T9 | Verified |
+| KBO-36 | P2-I | KBO-T10 | Verified |
 | KBO-37 | P2-I | KBO-T8 | Implementado (T8; `DocsSiteExportTest` verde) |
 
 A FLX-59 e a parte de teclado da FLX-60 **não** estão nesta tabela: continuam na FLX-T29 (texto que substituiu o bloqueado em `flows/tasks.md`), que depende de KBO-T3 e KBO-T5 e não é dependência deles.
