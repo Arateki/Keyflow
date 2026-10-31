@@ -58,6 +58,17 @@
                 android:value="Keeps user-started interactive SSH terminal sessions connected while the app is in the background" />
         </service>
 
+        <!--
+          O terminal (CMP-24): activity própria, sem anúncio, sem FLAG_SECURE (D17: a Visão precisa capturar o terminal). `Voltar` sai sem
+          fechar as sessões (elas vivem no ComputadorApp e no serviço acima). `adjustResize` + `imePadding` na tela; nada exporta.
+        -->
+        <activity
+            android:name=".computador.app.TerminalActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|uiMode" />
+
         <!-- Teclado KeyFlow: QWERTY + botão de microfone integrado -->
         <service
             android:name=".ime.KeyFlowKeyboardService"

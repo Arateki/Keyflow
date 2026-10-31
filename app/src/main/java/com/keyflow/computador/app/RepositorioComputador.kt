@@ -33,6 +33,7 @@ class RepositorioComputador(
 
     fun senhaLembrada(hostId: String): String? = cofre.ler("$PREFIXO_SENHA$hostId")
     fun lembrarSenha(hostId: String, senha: String) = cofre.gravar("$PREFIXO_SENHA$hostId", senha)
+    fun esquecerSenha(hostId: String) = cofre.apagar("$PREFIXO_SENHA$hostId")
 
     /**
      * CMP-07: fecha as sessões do host, apaga a entrada do `known_hosts`, a senha lembrada, e tira o host da lista (a marca do agente vai

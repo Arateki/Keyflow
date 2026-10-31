@@ -69,8 +69,17 @@ class ProvedorDeChavesAndroid(
     // O estado INVALIDADA é **persistente** (no cofre): sobrevive a reinício do processo e a OTA, e uma chave invalidada não volta a funcionar.
     private fun marcaInvalidada(id: String) = "$PREFIXO_INVALIDADA$id"
     /** Leitura incerta = bloqueado (fail-closed): se o cofre não responde, a chave conta como invalidada e não assina. */
-    private fun jaInvalidada(id: String): Boolean = try { cofre.ler(marcaInvalidada(id)) != null } catch (e: Exception) { true }
-    private fun invalidar(id: String) = cofre.gravar(marcaInvalidada(id), "1")
+    private fun jaInvalidada(id: String): Boolean = id in invalidadasNestaExecucao || try { cofre.ler(marcaInvalidada(id)) != null } catch (e: Exception) { true }
+
+    /**
+     * Marca a chave como invalidada. Se o cofre não gravar, a marca vale **em memória** nesta execução (a chave continua bloqueada) e a exceção
+     * não escapa de `estado`/`assinar`: o contrato é "bloqueado, `null`, sem exceção".
+     */
+    private fun invalidar(id: String) {
+        invalidadasNestaExecucao += id
+        try { cofre.gravar(marcaInvalidada(id), "1") } catch (e: Exception) { /* só em memória */ }
+    }
+    private val invalidadasNestaExecucao: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
 
     private fun novoId() = UUID.randomUUID().toString().replace("-", "").take(8)
 
@@ -136,6 +145,9 @@ class ProvedorDeChavesAndroid(
 
     fun assinador(chave: ChaveSsh): Assinador = AssinadorAndroid(chave)
 
+    /** A janela de biometria desta chave está aberta agora? Chave sem biometria sempre está. A reconexão automática usa isto para não abrir prompt sozinha. */
+    fun janelaAberta(chave: ChaveSsh): Boolean = !chave.exigeBiometria || synchronized(janelas) { janelas[chave.id]?.valida() == true }
+
     /** `INVALIDADA` quando o Keystore invalidou a chave (biometria cadastrada mudou); a tela mostra a mensagem. */
     fun estado(chave: ChaveSsh): EstadoChave {
         if (jaInvalidada(chave.id)) return EstadoChave.INVALIDADA
@@ -158,6 +170,7 @@ class ProvedorDeChavesAndroid(
         envelope.apagar(id)
         cofre.apagar("$PREFIXO_PUBLICA$id")
         janelas.remove(id)
+        invalidadasNestaExecucao -= id
         cofre.apagar(marcaInvalidada(id))
     }
 

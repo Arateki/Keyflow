@@ -13,6 +13,7 @@ Os executáveis geradores não são dependências do app, não são copiados par
 | `iterm2.bin` | Script oficial `gnachman/iTerm2-shell-integration`, `utilities/imgcat`: `bash imgcat -W 4 -H 2 keyflow-fixture.png` |
 | `img2sixel.bin` | libsixel 1.10.3: `img2sixel keyflow-fixture.png` |
 | `chafa.bin` | Chafa 1.12.4: `chafa --format=sixels --size=4x2 --animate=off keyflow-fixture.png` |
+| `hostil.bin` | **Escrita à mão**, não de uma ferramenta: uma sequência de cada ataque da CMP-35 (OSC 52 de leitura e de escrita, `CSI 20/21 t`, `OSC 21`, DECRQSS, ENQ, título, links `javascript:`, `file:` e `https:`) mais as consultas permitidas (DA1, DA2, DSR, CPR, cores, kitty `a=q`). Os trechos estão em `SequenciasHostisTest` e o teste confere que a concatenação é este arquivo. |
 | `herdr.bin` | Herdr 0.9.5 real, sessão isolada `keyflow-cmp`, PTY 80×24/640×384; no pane, o comando de kitty acima. Captura até o primeiro placement completo da imagem. |
 
 Herdr: `HERDR_CONFIG_PATH` e todos os `XDG_*_HOME` apontaram para uma área de teste em `/tmp`;

@@ -35,7 +35,6 @@ import org.connectbot.sshlib.PublicKey
 import org.connectbot.sshlib.SshClient
 import org.connectbot.sshlib.SshClientConfig
 import org.connectbot.sshlib.SshSession
-import org.connectbot.sshlib.transport.IpVersion
 import org.connectbot.sshlib.transport.KtorTcpTransportFactory
 import org.connectbot.sshlib.transport.TransportFactory
 import kotlinx.coroutines.withTimeout
@@ -187,7 +186,7 @@ class ConexaoCbssh(
             this.handshakeTimeoutMs = 0
             ajustar(this)
             // O limite do TCP vai por cima do transporte escolhido (o padrão do cbssh, ou o do teste): conectar o socket tem 15 s.
-            val base = this.transportFactory ?: KtorTcpTransportFactory(endereco, h.porta, IpVersion.AUTO)
+            val base = this.transportFactory ?: KtorTcpTransportFactory(endereco, h.porta, this.ipVersion)
             this.transportFactory = TransportFactory { withTimeout(tempoTcpMs) { base.create() } }
         }
         val c = SshClient(config)
@@ -229,9 +228,13 @@ class ConexaoCbssh(
     private suspend fun conectarComLimite(c: SshClient, estado: EstadoDaConexao): ConnectResult = coroutineScope {
         val tarefa = async { c.connect() }
         val relogio = launch {
+            // O relógio de 45 s (TCP + troca de chaves) só conta enquanto o usuário **não** está decidindo a impressão digital.
+            val passo = 250L
+            var contado = 0L
             while (isActive) {
-                delay(tempoTcpMs + tempoTrocaDeChavesMs)
-                if (!estado.aguardandoUsuario.get()) { estado.estourou = true; tarefa.cancel(); return@launch }
+                delay(passo)
+                if (!estado.aguardandoUsuario.get()) contado += passo
+                if (contado >= tempoTcpMs + tempoTrocaDeChavesMs) { estado.estourou = true; tarefa.cancel(); return@launch }
             }
         }
         try {

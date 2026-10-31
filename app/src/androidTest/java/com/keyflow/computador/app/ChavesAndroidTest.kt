@@ -390,6 +390,27 @@ class ChavesAndroidTest {
         assertEquals("sem prompt", promptsAntes, aut.prompts)
     }
 
+    @Test fun cofreQueLancaNaGravacaoDaMarcaBloqueiaSemExcecao() {
+        val d = DetectorFalso()
+        val aut = AutenticadorFalso()
+        val p = provedor(autenticador = aut, aplicarBio = false, detector = d)
+        val chave = gerar(p, TipoDeChave.ECDSA_P256, bio = true)
+        val quebrado = object : CofreDeSegredos by cofre {
+            override fun gravar(chave: String, valor: String) { if (chave.startsWith("ssh_inv.")) throw SecurityException("cofre cheio") else cofre.gravar(chave, valor) }
+        }
+        val q = ProvedorDeChavesAndroid(quebrado, aut, RelogioFalso(), aplicarBiometriaNoKeystore = false, detector = d)
+        d.invalida = true // outra digital cadastrada
+        val a = q.assinador(chave)
+        // `assinar` descobre a invalidação, a gravação da marca falha, e mesmo assim: null, sem exceção, e a chave segue bloqueada.
+        assertNull(runBlocking { a.assinar(dados) })
+        assertTrue(a.invalidada)
+        assertEquals(EstadoChave.INVALIDADA, q.estado(chave))
+        assertNull(runBlocking { a.assinar(dados) })
+        // `estado()` também não deixa a exceção escapar.
+        val e = ProvedorDeChavesAndroid(quebrado, aut, RelogioFalso(), aplicarBiometriaNoKeystore = false, detector = d)
+        assertEquals(EstadoChave.INVALIDADA, e.estado(chave))
+    }
+
     @Test fun excluirApagaASentinela() {
         val d = DetectorFalso()
         val p = provedor(aplicarBio = false, detector = d)
