@@ -113,6 +113,8 @@ object AgentHost {
             credentials = auth.store,
             // A fonte antiga pode ser migrada por outro processo enquanto o filtro roda; a leitura do snapshot espera só a cópia síncrona.
             vaultSnapshot = { vault -> CredentialVaultLock.withLock(app) { vault.all.values.toList() } },
+            // Senhas lembradas e material de chave da aba Computador (CMP-16).
+            computador = com.keyflow.computador.app.CofreDoApp(auth.store)::valores,
         )
         // O DataStore da configuração e o arquivo do registro: do agente, fora das Settings, e nenhum guarda segredo (o registro ainda passa pelo filtro).
         val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
