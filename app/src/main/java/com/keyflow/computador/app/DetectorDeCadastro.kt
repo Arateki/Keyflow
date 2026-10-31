@@ -26,13 +26,38 @@ interface DetectorDeCadastro {
     fun apagar(id: String)
 }
 
-class DetectorDeCadastroKeystore(private val api: Int = Build.VERSION.SDK_INT) : DetectorDeCadastro {
-    private fun precisa() = api < 30
+/** O Keystore por trás da sentinela; separado para o teste simular "criada na API 29, usada na 30+" sem aparelho com biometria. */
+interface SentinelaKeystore {
+    fun existe(id: String): Boolean
+    fun criar(id: String)
+
+    /** `true` se a cifra da sentinela não inicializa por `KeyPermanentlyInvalidatedException`. */
+    fun invalidada(id: String): Boolean
+    fun apagar(id: String)
+}
+
+/**
+ * Sentinelas **novas** só nascem na API ≤ 29; as que **já existem** são consultadas em qualquer API. Depois de um OTA de 29 para 30+, a
+ * chave antiga continua com a janela de 300 s presa ao root SID e só a sentinela sabe que o cadastro mudou.
+ */
+class DetectorDeCadastroKeystore(
+    private val api: Int = Build.VERSION.SDK_INT,
+    private val sentinelas: SentinelaKeystore = SentinelaReal,
+) : DetectorDeCadastro {
+    override fun criar(id: String) { if (api < 30) sentinelas.criar(id) }
+
+    override fun invalidada(id: String): Boolean = sentinelas.existe(id) && sentinelas.invalidada(id)
+
+    override fun apagar(id: String) = sentinelas.apagar(id)
+}
+
+object SentinelaReal : SentinelaKeystore {
     private fun alias(id: String) = "keyflow_ssh_sent_$id"
     private fun ks(): KeyStore = KeyStore.getInstance(EnvelopeDeChave.PROVEDOR).apply { load(null) }
 
+    override fun existe(id: String): Boolean = try { ks().containsAlias(alias(id)) } catch (e: Exception) { false }
+
     override fun criar(id: String) {
-        if (!precisa()) return
         val spec = KeyGenParameterSpec.Builder(alias(id), KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
             .setBlockModes(KeyProperties.BLOCK_MODE_CBC)
             .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_PKCS7)
@@ -42,20 +67,15 @@ class DetectorDeCadastroKeystore(private val api: Int = Build.VERSION.SDK_INT) :
         KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, EnvelopeDeChave.PROVEDOR).apply { init(spec.build()) }.generateKey()
     }
 
-    override fun invalidada(id: String): Boolean {
-        if (!precisa()) return false
-        return try {
-            val k = ks().getKey(alias(id), null) as? SecretKey ?: return false
-            Cipher.getInstance("AES/CBC/PKCS7Padding").init(Cipher.ENCRYPT_MODE, k)
-            false
-        } catch (e: KeyPermanentlyInvalidatedException) {
-            true
-        } catch (e: Exception) {
-            false
-        }
+    override fun invalidada(id: String): Boolean = try {
+        val k = ks().getKey(alias(id), null) as? SecretKey ?: return false
+        Cipher.getInstance("AES/CBC/PKCS7Padding").init(Cipher.ENCRYPT_MODE, k)
+        false
+    } catch (e: KeyPermanentlyInvalidatedException) {
+        true
+    } catch (e: Exception) {
+        false
     }
 
-    override fun apagar(id: String) {
-        runCatching { ks().deleteEntry(alias(id)) }
-    }
+    override fun apagar(id: String) { runCatching { ks().deleteEntry(alias(id)) } }
 }
