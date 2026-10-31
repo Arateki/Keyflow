@@ -82,7 +82,7 @@ class SessoesServiceTest {
 
     @After fun limpar() {
         runBlocking { gerenciador.fecharTodas() }
-        runBlocking { esperar { notificacao() == null } }
+        runBlocking { esperar("notificação some") { notificacao() == null } }
         ServicosDoComputador.gerenciador = null
         ServicosDoComputador.manterConectado.value = false
         escopo.cancel()
@@ -91,7 +91,14 @@ class SessoesServiceTest {
     private fun host(n: Int) = Host("%08x".format(n), "nome-secreto-$n", enderecoSecreto, 22, "usuario-secreto")
     private fun notificacao(): Notification? = nm.activeNotifications.firstOrNull { it.id == NotificacaoSessoes.ID }?.notification
 
-    private suspend fun esperar(limiteMs: Long = 15_000, condicao: () -> Boolean) = withTimeout(limiteMs) { while (!condicao()) delay(100) }
+    private suspend fun esperar(etapa: String = "?", limiteMs: Long = 15_000, condicao: () -> Boolean) {
+        try {
+            withTimeout(limiteMs) { while (!condicao()) delay(100) }
+        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+            val power = runCatching { dumpsysPower().lines().filter { it.contains("keyflow") || it.contains("WAKE_LOCK") }.joinToString(" | ") }.getOrDefault("?")
+            throw AssertionError("tempo esgotado em: $etapa; notificação=${notificacao() != null}; resumos=${gerenciador.resumos.value.size}; power=$power")
+        }
+    }
 
     private fun abrir(n: Int, dono: DonoDaSessao = DonoDaSessao.USUARIO) = (gerenciador.abrir(host(n), dono) as ResultadoAbertura.Aberta).sessao
 
@@ -102,7 +109,7 @@ class SessoesServiceTest {
 
     @Test fun primeiraSessaoSobeOServicoEmPrimeiroPlanoSoComAContagem() = runBlocking {
         abrir(1)
-        esperar { notificacao() != null }
+        esperar("notificação aparece") { notificacao() != null }
         val n = notificacao()!!
         assertTrue("é a notificação do primeiro plano", n.flags and Notification.FLAG_FOREGROUND_SERVICE != 0)
         assertEquals("1 sessão SSH aberta", n.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
@@ -122,34 +129,34 @@ class SessoesServiceTest {
 
     @Test fun desconectarTodasFechaTudoEDerrubaOServico() = runBlocking {
         abrir(1); abrir(2)
-        esperar { notificacao() != null }
+        esperar("notificação aparece") { notificacao() != null }
         notificacao()!!.actions.first { it.title.toString() == "Desconectar todas" }.actionIntent.send()
         esperar { gerenciador.resumos.value.isEmpty() }
-        esperar { notificacao() == null }
+        esperar("notificação some") { notificacao() == null }
     }
 
     @Test fun fecharAUltimaDerrubaOServico() = runBlocking {
         val a = abrir(1)
-        esperar { notificacao() != null }
+        esperar("notificação aparece") { notificacao() != null }
         gerenciador.fechar(a.id)
-        esperar { notificacao() == null }
+        esperar("notificação some") { notificacao() == null }
     }
 
     @Test fun semAOpcaoNaoHaWakeLockEComAOpcaoHaSoComSessaoDoUsuario() = runBlocking {
         val u = abrir(1)
-        esperar { notificacao() != null }
+        esperar("notificação aparece") { notificacao() != null }
         delay(500)
         assertFalse("padrão: sem WakeLock", dumpsysPower().contains("keyflow:sessoes"))
         println("CMP_T12 power: " + dumpsysPower().lines().filter { it.contains("keyflow") }.joinToString(" | "))
         manter.value = true
-        esperar { dumpsysPower().contains("keyflow:sessoes") }
+        esperar("wakelock ligado") { dumpsysPower().contains("keyflow:sessoes") }
         manter.value = false
-        esperar { !dumpsysPower().contains("keyflow:sessoes") }
+        esperar("wakelock solto") { !dumpsysPower().contains("keyflow:sessoes") }
         manter.value = true
-        esperar { dumpsysPower().contains("keyflow:sessoes") }
+        esperar("wakelock ligado") { dumpsysPower().contains("keyflow:sessoes") }
         gerenciador.fechar(u.id)
-        esperar { notificacao() == null }
-        esperar { !dumpsysPower().contains("keyflow:sessoes") }
+        esperar("notificação some") { notificacao() == null }
+        esperar("wakelock solto") { !dumpsysPower().contains("keyflow:sessoes") }
     }
 
 }
