@@ -234,7 +234,7 @@ class FluxosEndToEndTest {
             chamadas.clear(); finais.clear(); avisos.clear()
             instrumentation.runOnMainSync { KeyFlowController.updateFluxo(EstadoExecucao.Ocioso) }; finais.clear()
             cancelarNaEtapa(todas, alvo)
-            aguardar("o serviço não ficou livre") { OverlayService.instanceForVisionTest?.fluxoAtivoForTest != true }
+            aguardar("o serviço não encerrou") { OverlayService.instanceForVisionTest == null }
         }
         chamadas.clear(); finais.clear(); avisos.clear()
         instrumentation.runOnMainSync { KeyFlowController.updateFluxo(EstadoExecucao.Ocioso) }
@@ -276,7 +276,7 @@ class FluxosEndToEndTest {
             rodarAgora(ouvir.id)
             assertEquals("vez $vez", EstadoExecucao.Concluido(ouvir.id), terminou(ouvir.id))
             assertEquals("a execução $vez começa do zero", Valor.Nada, entradaDe(TipoEtapa.DITAR))
-            aguardar("o serviço não ficou livre") { OverlayService.instanceForVisionTest?.fluxoAtivoForTest != true }
+            aguardar("o serviço não encerrou") { OverlayService.instanceForVisionTest == null }
         }
         assertFalse(avisos.any())
     }

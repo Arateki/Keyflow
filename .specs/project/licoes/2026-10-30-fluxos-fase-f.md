@@ -1,4 +1,4 @@
-# 2026-10-31 — Fluxos: rotas, docs e ponta a ponta (equipe/fluxos-fase-f, FLX-T23..T25)
+# 2026-10-30 — Fluxos: rotas, docs e ponta a ponta (equipe/fluxos-fase-f, FLX-T23..T25)
 
 - Método de teste JUnit4 com `= runBlocking { … }` devolve o último valor do bloco: se a última linha é um `launch`, o método devolve `Job` e o runner falha com "Failed to instantiate test runner class" (uma única `initializationError`). Escreva `runBlocking<Unit>`.
 - O controlador de fluxo volta a Ocioso depois do estado final: um teste que espera `KeyFlowController.fluxo.value` ser `Concluido` perde o fim. Observe os estados publicados (coletor) e compare por `fluxoId`.
