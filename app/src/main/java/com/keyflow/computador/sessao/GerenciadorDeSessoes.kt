@@ -83,6 +83,13 @@ class GerenciadorDeSessoes(
 
     suspend fun fecharDoHost(hostId: String) = copia().filter { it.host.id == hostId }.forEach { fechar(it.id, MotivoEncerramento.HOST_REMOVIDO) }
 
+    /** CMP-09: o agente deixou de poder usar o host. Fecha as sessões **do agente** nele e desfaz o compartilhamento das do usuário. */
+    suspend fun fecharDoAgenteNoHost(hostId: String) {
+        copia().filter { it.host.id == hostId && it.compartilhada && it.dono == DonoDaSessao.USUARIO }.forEach { it.compartilhada = false }
+        copia().filter { it.host.id == hostId && it.dono == DonoDaSessao.AGENTE }.forEach { fechar(it.id, MotivoEncerramento.AGENTE_PARADO) }
+        publicar()
+    }
+
     suspend fun fecharDoAgente() = copia().filter { it.dono == DonoDaSessao.AGENTE }.forEach { fechar(it.id, MotivoEncerramento.AGENTE_PARADO) }
 
     suspend fun fecharTodas() = copia().forEach { fechar(it.id) }

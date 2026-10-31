@@ -4,6 +4,7 @@
 |---|---|---|
 | Space Grotesk (fonte) | SIL OFL 1.1 | `OFL_SpaceGrotesk.txt` |
 | Space Mono (fonte) | SIL OFL 1.1 | `OFL_SpaceMono.txt` |
+| JetBrains Mono Nerd Font Mono Regular v3.5.1 (fonte do terminal; JetBrains Mono 2.304 + ícones Nerd Fonts) | SIL OFL 1.1 (ícones: MIT, Apache-2.0, CC BY 4.0, OFL; ver README do Nerd Fonts) | `OFL_JetBrainsMonoNerdFont.txt` |
 | sherpa-onnx 1.13.8 (AAR recompilado sem TTS, reconhecimento de voz no aparelho) | Apache-2.0 | `Apache-2.0_sherpa-onnx.txt` |
 | ONNX Runtime (`libonnxruntime.so`, dentro do AAR do sherpa-onnx) | MIT | `MIT_onnxruntime.txt` |
 | Whisper base/small (OpenAI) — modelos baixados sob demanda | MIT (código e pesos, repositório oficial) | `MIT_whisper.txt` |
