@@ -35,6 +35,7 @@ import com.keyflow.core.shortcuts.BarsConfig
 import com.keyflow.core.shortcuts.ShortcutGrid
 import com.keyflow.data.Settings
 import com.keyflow.ime.KeyFlowKeyboardView
+import com.keyflow.orbe.ConfigOrbeTeclado
 import com.keyflow.skins.SkinIds
 import com.keyflow.ui.common.verticalScrollbar
 import com.keyflow.ui.icons.KfIcon
@@ -95,6 +96,9 @@ fun TecladoPanel(
     onShortcutGridsChange: (List<ShortcutGrid>) -> Unit = {},
     // `botaoId → nome do fluxo` dos botões de fluxo da barra (FLX-36), para o editor de barras.
     nomesDeFluxo: Map<String, String> = emptyMap(),
+    // Configuração própria da orbe do teclado (KBO-27) e a escrita dela — fora do auto-save das `Settings`.
+    orbeConfig: ConfigOrbeTeclado = ConfigOrbeTeclado(),
+    onOrbeConfigChange: (ConfigOrbeTeclado) -> Unit = {},
     modifier: Modifier = Modifier,
     // Cartão do Modo Teclado, sempre no topo e sempre tocável (a aba Modo saiu — Yan, 2026-09-28).
     modeCard: (@Composable () -> Unit)? = null,
@@ -202,6 +206,14 @@ fun TecladoPanel(
                         modifier = Modifier.padding(top = 8.dp, bottom = 16.dp),
                     )
                 }
+
+                // Orbe do teclado (KBO-01): abaixo das barras: a orbe no encaixe do mic; prévia, cópia da orbe principal, aparência, modo e toques.
+                OrbeTecladoSecao(
+                    settings = settings,
+                    config = orbeConfig,
+                    skinsUnlocked = skinsUnlocked,
+                    onConfigChange = onOrbeConfigChange,
+                )
 
                 // Teclados de atalhos (CFG-04): grades que os gatilhos da barra acima podem abrir.
                 SettingsGroup(

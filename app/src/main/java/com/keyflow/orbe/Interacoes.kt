@@ -1,5 +1,7 @@
 package com.keyflow.orbe
 
+import com.keyflow.i18n.trKey
+
 /**
  * Onde há uma orbe (D9 da feature Fluxos): a flutuante, a do teclado e a da notificação. Um gesto da orbe é sempre "em algum
  * lugar" — `Orbe(FLUTUANTE, 2)` e `Orbe(NOTIFICACAO, 2)` são gatilhos diferentes. Compartilhado com a feature `notification` e
@@ -49,4 +51,14 @@ object SuporteDeInteracoes {
 
     fun naoSuportadas(lugar: LugarDaOrbe): List<Interacao> =
         Interacao.entries.filterNot { suporta(lugar, it) }
+
+    /**
+     * Por que o [lugar] não tem a [interacao] (chave de `tr()`), ou `null` se tem. A tela lista as não suportadas com este
+     * texto (NTF-12).
+     */
+    fun motivo(lugar: LugarDaOrbe, interacao: Interacao): String? = when {
+        suporta(lugar, interacao) -> null
+        lugar == LugarDaOrbe.NOTIFICACAO -> trKey("Uma notificação só recebe toques")
+        else -> trKey("Este lugar da orbe não tem esta interação")
+    }
 }

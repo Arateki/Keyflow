@@ -51,7 +51,7 @@ T8 depende de T7 (a interface da fonte de orbe).
 
 ## Fase 0 — Prova
 
-### NTF-T1 — Prova de altura e de toque (descartável, primeiro) — **Status: pendente**
+### NTF-T1 — Prova de altura e de toque (descartável, primeiro) — **Status: emulador medido (cabe); aparelhos do Yan pendentes**
 - **What**: protótipo mínimo, só em `androidTest`/debug: o `notif_orb.xml` do design §6 — a linha **`[botão][orbe][botão]`** de 48 dp — com uma orbe Ateliê **desenhada à mão** (círculo teal em `Bitmap`, 40 dp) e dois `ImageButton` de 48×48 dp com glifo vetorial, num `DecoratedCustomViewStyle`, `setCustomContentView` sem `BigContentView`,
   um clique por `PendingIntent.getService` na orbe e um em cada botão. Cobre as **quatro variações** de §6 (sem botão, só direito, esquerdo + direito, e o botão ausente `INVISIBLE` que mantém a orbe no centro). Posta com o serviço de primeiro plano de teste e mede, recolhida e expandida, em **emulador (API 34), Vaio TL10 (Android 13), Tab S10 Lite (Android 16) e A32** (a versão do Android dele: `adb shell getprop ro.build.version.release`):
   `visibleBounds` da orbe e de **cada botão**, captura do trecho, os quatro extremos do círculo, os alvos de toque (48×48 dp), a ausência de sobreposição entre orbe e botões, a largura em tela estreita (320 dp) e o tempo do clique ao serviço.
@@ -64,7 +64,7 @@ T8 depende de T7 (a interface da fonte de orbe).
 
 ## Fase A — Modelo e dados (JVM puro)
 
-### NTF-T2 — Interações da orbe, configuração e "copiar" `[P]` — **Status: pendente**
+### NTF-T2 — Interações da orbe, configuração e "copiar" `[P]` — **Status: concluída (2026-10-30)**
 - **What**: `com.keyflow.orbe` (`LugarDaOrbe`, `Interacao`, `SuporteDeInteracoes` com `suporta`/`naoSuportadas`/`motivo`); `com.keyflow.notificacao.Modelo.kt` (`AcaoDaOrbe` com `GravarEnviar`, `ConfigNotificacao` com `acao1Toque/2Toques/3Toques`, `ConfigEfetiva` com `iniciaGravacao`, `efetiva(config, settings)`, mapa `OrbShortcutAction → AcaoDaOrbe`).
   Regra no `ArchitectureRulesTest`: `orbe/` e `notificacao/` (menos `notificacao/app/**`) sem `android.*`/compose/cofre.
 - **Where**: `app/src/main/java/com/keyflow/orbe/Interacoes.kt`, `app/src/main/java/com/keyflow/notificacao/Modelo.kt`; testes em `app/src/test/.../orbe/` e `.../notificacao/`.
@@ -73,7 +73,7 @@ T8 depende de T7 (a interface da fonte de orbe).
   o catálogo é `Nenhuma`/`GravarEnviar`/`RetrairExpandirTeclado`/`TrocarTeclado`/`LerTela` (+ `RodarFluxo`/`Desconhecida` reservadas) — **sem** pausar/cancelar, que são botões; a regra de arquitetura falha se um arquivo de `orbe/` ou `notificacao/` importar `android.` (e não falha em `notificacao/app/`).
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(notificação): modelo de interações da orbe e configuração da notificação`.
 
-### NTF-T3 — Codec e persistência — **Status: pendente**
+### NTF-T3 — Codec e persistência — **Status: concluída (2026-10-30)**
 - **What**: `CodecNotificacao` (`org.json`, `v:1`, design §4) tolerante; chave `notification_config_json` ao lado de `BARS_CONFIG_JSON` (`SettingsRepository.kt:876`); `configNotificacaoFlow()`, `configNotificacaoOnce()` (leitura leve, sem cofre) e `atualizarNotificacao(f)` (um `dataStore.edit`, sobre o valor atual).
 - **Where**: `notificacao/CodecNotificacao.kt`, `data/SettingsRepository.kt`; testes `CodecNotificacaoTest`, `CodecNotificacaoPropertyTest`, `CodecNotificacaoFuzzTest` (unit) e `NotificacaoRepositoryTest` (instrumentado, padrão do `SettingsRepositoryTest`).
 - **Depends on**: T2. **Requirement**: NTF-10 (dados dos três toques), NTF-15 (opção persistida), NTF-36, NTF-37, NTF-38, NTF-39.
@@ -81,7 +81,7 @@ T8 depende de T7 (a interface da fonte de orbe).
   instrumentado — leitura sem chave **não grava**; primeira alteração grava; duas alterações concorrentes ficam ambas; salvar as `Settings` **não** toca a chave e vice-versa.
 - **Tests**: unit + instrumentado. **Gate**: `quick` + `pool instrumentar com.keyflow.data.NotificacaoRepositoryTest`. **Commit**: `feat(notificação): configuração persistida em JSON tolerante`.
 
-### NTF-T4 — Rajada de toques, resolução da interação e estado visual — **Status: pendente**
+### NTF-T4 — Rajada de toques, resolução da interação e estado visual — **Status: concluída (2026-10-30)**
 - **What**: `RajadaDeToques` (`toque()`, `fechar()`), `ResolvedorDeInteracao.resolver(...) → Comando` (design §5, inclusive overflow e portões de estado), `EstadoVisual` (`ButtonState` + Visão → aparência, centro, glifo, descrição `tr`; design §6) e a **regra dos arrastos** (design §3.1): `orbe/ArrastosDaOrbe.kt` (a tabela por estado em Alternar) e `notificacao/BotoesDaNotificacao.kt` (`Botao`, `Botoes`, `para(estado, visaoAtiva)`).
 - **Where**: `notificacao/{RajadaDeToques,ResolvedorDeInteracao,EstadoVisual,BotoesDaNotificacao}.kt`, `orbe/ArrastosDaOrbe.kt`; testes homônimos (`ArrastosDaOrbeTest`, `BotoesDaNotificacaoTest`).
 - **Depends on**: T2. **Requirement**: NTF-07, NTF-09, NTF-10, NTF-11, NTF-48.
@@ -89,7 +89,7 @@ T8 depende de T7 (a interface da fonte de orbe).
   **arrastos**: a tabela de `ArrastosDaOrbe` por estado (design §3.1); `BotoesDaNotificacao`: gravando → Pausar·Descartar, pausado → Retomar·Descartar, transcrevendo → só Descartar, cancelando → só Desfazer, Visão → só Encerrar, ocioso/erro/pendente → nenhum; `ABRIR_APP` não gera botão; **o teste falha se um efeito da tabela (exceto `ABRIR_APP`) não produzir botão**.
 - **Tests**: unit (relógio virtual). **Gate**: `quick`. **Commit**: `feat(notificação): contagem de toques e resolução das interações da orbe`.
 
-### NTF-T5 — Visibilidade ("dispensada") e portão da tela bloqueada — **Status: pendente**
+### NTF-T5 — Visibilidade ("dispensada") e portão da tela bloqueada — **Status: concluída (2026-10-30)**
 - **What**: `VisibilidadeDaNotificacao` (`PARADA/VISIVEL/DISPENSADA`, eventos, design §9) e `PortaoDeToque.avaliar(bloqueada, permitir, precisaDeActivity)` (design §10).
 - **Where**: `notificacao/{VisibilidadeDaNotificacao,PortaoDeToque}.kt`; testes homônimos (inclui propriedade).
 - **Depends on**: T2. **Requirement**: NTF-16 (regra, vale para a orbe e para os botões), NTF-18 (regra), NTF-41, NTF-49 (portão dos botões).

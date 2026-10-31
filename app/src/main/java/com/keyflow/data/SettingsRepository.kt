@@ -35,11 +35,17 @@ import com.keyflow.core.shortcuts.ShortcutGrid
 import com.keyflow.data.models.ModelCatalog
 import com.keyflow.data.models.ModelKind
 import com.keyflow.data.models.ModelProvisioning
+import com.keyflow.computador.CodecHosts
+import com.keyflow.computador.ConfigHosts
+import com.keyflow.computador.chaves.ChaveSsh
+import com.keyflow.computador.chaves.CodecChaves
 import com.keyflow.fluxos.CodecFluxos
 import com.keyflow.fluxos.BotoesDeFluxo
 import com.keyflow.fluxos.ConfigFluxos
 import com.keyflow.fluxos.PadroesFluxo
 import com.keyflow.fluxos.PoliticaGatilhos
+import com.keyflow.notificacao.CodecNotificacao
+import com.keyflow.notificacao.ConfigNotificacao
 import com.keyflow.orbe.CodecOrbeTeclado
 import com.keyflow.orbe.ConfigOrbeTeclado
 import kotlinx.coroutines.CoroutineScope
@@ -410,6 +416,68 @@ class SettingsRepository(
         dataStore.edit { it[SHORTCUT_GRIDS_JSON] = ShortcutCodec.encodeGrids(grids) }
     }
 
+    // ── Computador (aba Computador): `computer_hosts_json` e `computer_keys_json` ─────────────
+    // Chaves próprias, fora de [Settings]: o auto-save da tela regrava as Settings inteiras e nunca encosta nestas. Nada aqui é segredo
+    // (a lista de hosts não tem campo de senha; os metadados de chave não têm material) e nada abre o cofre. Leitura sem a chave = lista
+    // vazia, **sem gravar nada**. Escrita sempre sobre o valor atual, dentro do `dataStore.edit`.
+
+    suspend fun hostsOnce(): ConfigHosts = CodecHosts.decodificar(dataStore.data.first()[COMPUTER_HOSTS_JSON])
+
+    fun hostsFlow(): Flow<ConfigHosts> = dataStore.data.map { CodecHosts.decodificar(it[COMPUTER_HOSTS_JSON]) }.distinctUntilChanged()
+
+    /** Altera os hosts **sobre o valor gravado agora**: duas alterações concorrentes ficam ambas. Devolve o que ficou. */
+    suspend fun atualizarHosts(alterar: (ConfigHosts) -> ConfigHosts): ConfigHosts {
+        var resultado = ConfigHosts()
+        dataStore.edit { prefs ->
+            resultado = alterar(CodecHosts.decodificar(prefs[COMPUTER_HOSTS_JSON]))
+            prefs[COMPUTER_HOSTS_JSON] = CodecHosts.codificar(resultado)
+        }
+        return resultado
+    }
+
+    suspend fun chavesOnce(): List<ChaveSsh> = CodecChaves.decodificar(dataStore.data.first()[COMPUTER_KEYS_JSON])
+
+    fun chavesFlow(): Flow<List<ChaveSsh>> = dataStore.data.map { CodecChaves.decodificar(it[COMPUTER_KEYS_JSON]) }.distinctUntilChanged()
+
+    suspend fun atualizarChaves(alterar: (List<ChaveSsh>) -> List<ChaveSsh>): List<ChaveSsh> {
+        var resultado = emptyList<ChaveSsh>()
+        dataStore.edit { prefs ->
+            resultado = alterar(CodecChaves.decodificar(prefs[COMPUTER_KEYS_JSON]))
+            prefs[COMPUTER_KEYS_JSON] = CodecChaves.codificar(resultado)
+        }
+        return resultado
+    }
+
+    /** "Manter conectado com a tela apagada" (D22): desligado por padrão. Ligado, o serviço das sessões segura um `PARTIAL_WAKE_LOCK`. */
+    fun manterConectadoFlow(): Flow<Boolean> = dataStore.data.map { it[COMPUTER_KEEP_AWAKE] ?: false }.distinctUntilChanged()
+
+    suspend fun salvarManterConectado(ligado: Boolean) { dataStore.edit { it[COMPUTER_KEEP_AWAKE] = ligado } }
+
+    suspend fun migracaoComputadorFeita(): Boolean = dataStore.data.first()[COMPUTER_MIGRATED] == true
+
+    /** Grava hosts, chaves e a marca de migração **na mesma transação** (CMP-06): ou os três, ou nenhum. */
+    suspend fun gravarMigracaoComputador(hosts: ConfigHosts, chaves: List<ChaveSsh>) {
+        dataStore.edit { prefs ->
+            prefs[COMPUTER_HOSTS_JSON] = CodecHosts.codificar(hosts)
+            prefs[COMPUTER_KEYS_JSON] = CodecChaves.codificar(chaves)
+            prefs[COMPUTER_MIGRATED] = true
+        }
+    }
+
+    suspend fun marcarMigracaoComputador() { dataStore.edit { it[COMPUTER_MIGRATED] = true } }
+
+    /** O host único legado (`computerSsh*`), com os segredos lidos do cofre. Só a migração usa. */
+    suspend fun hostUnicoLegado(): com.keyflow.computador.HostUnicoLegado {
+        val s = settingsFlow().first()
+        return com.keyflow.computador.HostUnicoLegado(s.computerSshHost, s.computerSshPort, s.computerSshUser, s.computerSshAuthType, s.computerSshPassword, s.computerSshKey)
+    }
+
+    /** Apaga os dois segredos legados do cofre (`computer_ssh_password` e `computer_ssh_key`). */
+    suspend fun apagarSegredosDoHostUnicoLegado() {
+        saveSecret(SettingsCredentialKeys.COMPUTER_SSH_PASSWORD, "")
+        saveSecret(SettingsCredentialKeys.COMPUTER_SSH_KEY, "")
+    }
+
     // ── Fluxos (aba Fluxos): `flows_json` e `flow_triggers_json` ─────────────
     // Duas chaves próprias, fora de [Settings]: o auto-save da tela regrava as Settings inteiras e nunca encosta nestas, e estas
     // nunca encostam nas Settings (o gatilho sombreia a ação do gesto, não a sobrescreve — D12). Nada aqui é segredo e nada
@@ -486,6 +554,31 @@ class SettingsRepository(
                 prefs[KEYBOARD_ORB_CONFIG_JSON] = json
             }
         }.configOrbeTeclado()
+
+    // ── Notificação da orbe (`notification_config_json`, NTF-36..38) ─────────
+    // Chave própria no DataStore, fora do auto-save de [Settings] (que regrava as Settings inteiras e jamais encosta aqui) e sem
+    // abrir o cofre. Chave ausente ou JSON malformado = os padrões, só em memória: ler não grava.
+
+    private fun Preferences.configNotificacao(): ConfigNotificacao =
+        CodecNotificacao.decodificar(this[NOTIFICATION_CONFIG_JSON])
+
+    /** Observação ao vivo da configuração da notificação: o painel e o serviço valem no toque seguinte, sem reiniciar. */
+    fun configNotificacaoFlow(): Flow<ConfigNotificacao> =
+        dataStore.data.map { it.configNotificacao() }.distinctUntilChanged()
+
+    /** Leitura leve (só DataStore, sem o cofre) da configuração da notificação. Não grava. */
+    suspend fun configNotificacaoOnce(): ConfigNotificacao = dataStore.data.first().configNotificacao()
+
+    /**
+     * Altera a configuração da notificação **sobre o valor gravado agora**: lê e escreve dentro do mesmo `dataStore.edit` (NTF-36),
+     * então duas alterações concorrentes ficam ambas e o auto-save das [Settings] não a desfaz. Sem mudança, não regrava.
+     * Devolve o que ficou gravado.
+     */
+    suspend fun atualizarNotificacao(f: (ConfigNotificacao) -> ConfigNotificacao): ConfigNotificacao =
+        dataStore.edit { prefs ->
+            val json = CodecNotificacao.codificar(f(prefs.configNotificacao()))
+            if (prefs[NOTIFICATION_CONFIG_JSON] != json) prefs[NOTIFICATION_CONFIG_JSON] = json
+        }.configNotificacao()
 
     /** Onde cada modelo de texto local roda, ao vivo — o seletor "Roda em" do card (chave própria, fora de [Settings]). */
     fun localBackendPrefsFlow(): Flow<LocalBackendPrefs> =
@@ -943,6 +1036,10 @@ class SettingsRepository(
         val FALA_CUSTOM_VOICE = stringPreferencesKey("fala_custom_voice")
         val FALA_CUSTOM_FORMAT = stringPreferencesKey("fala_custom_format")
         val COMPUTER_MODE = stringPreferencesKey("computer_mode")
+        val COMPUTER_HOSTS_JSON = stringPreferencesKey("computer_hosts_json")
+        val COMPUTER_KEYS_JSON = stringPreferencesKey("computer_keys_json")
+        val COMPUTER_KEEP_AWAKE = booleanPreferencesKey("computer_keep_awake")
+        val COMPUTER_MIGRATED = booleanPreferencesKey("computer_migrated")
         val COMPUTER_SSH_HOST = stringPreferencesKey("computer_ssh_host")
         val COMPUTER_SSH_PORT = intPreferencesKey("computer_ssh_port")
         val COMPUTER_SSH_USER = stringPreferencesKey("computer_ssh_user")
@@ -997,6 +1094,8 @@ class SettingsRepository(
         val FLOW_TRIGGERS_JSON = stringPreferencesKey("flow_triggers_json")
         // Orbe do teclado (feature keyboard-orb): configuração própria como JSON (CodecOrbeTeclado).
         val KEYBOARD_ORB_CONFIG_JSON = stringPreferencesKey("keyboard_orb_config_json")
+        // Notificação da orbe (feature notification): configuração própria como JSON (CodecNotificacao).
+        val NOTIFICATION_CONFIG_JSON = stringPreferencesKey("notification_config_json")
         // Raciocínio local: onde cada modelo roda (CPU/GPU), o aviso de volta para a CPU e a GPU já pronta — ver [LocalBackendPrefs].
         val REASONING_LOCAL_BACKENDS = stringPreferencesKey("reasoning_local_backends")
 

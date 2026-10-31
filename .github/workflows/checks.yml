@@ -79,7 +79,9 @@ jobs:
       # STO-02: código nativo pronto para páginas de 16 KB (requisito do Play). Os .so do release são os
       # mesmos do debug (só menos ABIs).
       - name: 16 KB alignment of native libraries
-        run: python3 scripts/check-16kb-alignment.py app/build/outputs/apk/debug/app-debug.apk
+        run: |
+          python3 scripts/check-16kb-alignment.py app/build/outputs/apk/debug/app-debug.apk
+          python3 scripts/verificar-termlib-apk.py app/build/outputs/apk/debug/app-debug.apk
       # Cobertura (JaCoCo do AGP, ligada por -Pcoverage): mapa do que nenhum teste de unidade toca, no resumo do job e no
       # artefato unit-evidence (HTML). Não é meta de número.
       - name: Unit tests and coverage

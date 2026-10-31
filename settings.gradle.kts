@@ -16,3 +16,6 @@ dependencyResolutionManagement {
 rootProject.name = "keyflow"
 include(":app")
 include(":baselineprofile")
+
+include(":termlib")
+project(":termlib").projectDir = file("third_party/termlib")

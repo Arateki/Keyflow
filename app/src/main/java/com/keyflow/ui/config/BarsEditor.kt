@@ -110,7 +110,7 @@ fun gridModeHint(mode: GridTriggerMode): String = when (mode) {
 
 /** Nome por extenso do botão, para as frases dos avisos (o glifo não se lê em texto corrido). */
 internal fun barButtonName(button: BarButton, nomesDeFluxo: Map<String, String> = emptyMap()): String = when (button) {
-    BarButton.Mic -> "microfone"
+    BarButton.Mic -> "orbe"
     BarButton.ConfigBtn -> "config"
     BarButton.ToggleExpand -> "colapsar/expandir"
     BarButton.Paste -> "colar"
@@ -377,6 +377,7 @@ fun BarsEditor(
         when (val current = sheet) {
             is BarsEditorSheet.Catalog -> CatalogSheet(
                 grids = grids,
+                hasOrb = activeList.any { BarButton.Mic in it.buttons },
                 onDismiss = { sheet = null },
                 onAddSimple = { button ->
                     addButton(current.barIndex, button)
@@ -574,9 +575,13 @@ private fun CatalogSheet(
     onAddSimple: (BarButton) -> Unit,
     onAddSingleKey: () -> Unit,
     onAddGrid: () -> Unit,
+    hasOrb: Boolean = false,
 ) {
     val options = buildList {
-        add(CatalogOption(trKey("Microfone"), BARS_EDITOR_CATALOG_MIC_TAG, tr("Grava sua voz e cola a transcrição. Toque para gravar e parar; segure para pausar, retomar ou cancelar.")) { onAddSimple(BarButton.Mic) })
+        // A orbe é uma só (KBO-06): com uma na barra, o catálogo não oferece outra.
+        if (!hasOrb) {
+            add(CatalogOption(trKey("Orbe"), BARS_EDITOR_CATALOG_MIC_TAG, tr("A orbe do KeyFlow no teclado: toques, segurar e arrastar, como a orbe flutuante. Só cabe uma na barra.")) { onAddSimple(BarButton.Mic) })
+        }
         add(CatalogOption(trKey("Config"), BARS_EDITOR_CATALOG_CONFIG_TAG, tr("Abre as configurações do KeyFlow.")) { onAddSimple(BarButton.ConfigBtn) })
         add(CatalogOption(trKey("Colapsar/expandir"), BARS_EDITOR_CATALOG_TOGGLE_EXPAND_TAG, tr("Recolhe o teclado até a barra, ou traz as teclas de volta.")) { onAddSimple(BarButton.ToggleExpand) })
         add(CatalogOption(trKey("Colar"), BARS_EDITOR_CATALOG_PASTE_TAG, tr("Cola o que está na área de transferência.")) { onAddSimple(BarButton.Paste) })

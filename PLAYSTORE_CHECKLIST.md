@@ -103,6 +103,27 @@ Ao criar o app listing, preencher a seção **"Data safety"** declarando:
 
 ---
 
+## Aba Computador: serviço em primeiro plano `specialUse` (CMP-33)
+
+O manifesto declara `FOREGROUND_SERVICE_SPECIAL_USE` e o `SessoesService` (`foregroundServiceType="specialUse"`) com a `property`
+`android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE` = `Keeps user-started interactive SSH terminal sessions connected while the app is in the background`
+(o `ManifestSessoesTest` falha se faltar a permissão, o tipo ou a `property`). `WAKE_LOCK` (permissão normal) só é usada com a opção
+"Manter conectado com a tela apagada", desligada por padrão. **Pendência do Yan**: declarar o tipo em *Policy > App content* com o texto abaixo.
+
+**Texto da declaração (inglês, para o Console)**
+
+> KeyFlow's *Computer* tab is an SSH terminal client. The user adds servers they own and opens interactive terminal sessions to them. While at least one session is open, KeyFlow runs a foreground service of type `specialUse` with a persistent notification ("N SSH sessions open — Disconnect all") so that the TCP connections and the state of the remote shell (a running build, a coding agent running on the server) do not drop when the user switches apps.
+> The service only keeps the user's own sockets open and sends the SSH keep-alive; it does not use the microphone, camera, location or media, downloads nothing and runs no code received from the network. It starts only after the user opens a session and stops when the last session is closed. A user session stays open until the user closes it; an agent session also closes after 10 minutes idle.
+> No other foreground-service type fits: `dataSync` is for finite transfers and is limited to 6 hours per 24 on Android 15, while a terminal session is interactive and open-ended; `connectedDevice`, `mediaPlayback` and the others do not describe it. If the service were interrupted, the connection would drop and anything running in the remote session would be terminated, losing the user's work.
+
+**Texto em português (Docs, política e checklist)**
+
+> O KeyFlow abre sessões SSH, a pedido do usuário, em servidores dele. Enquanto houver uma sessão aberta o app mantém um serviço em primeiro plano, com uma notificação permanente ("N sessões SSH abertas — Desconectar todas"), para que a conexão e o que roda no servidor (um build, um agente de código) não caiam quando o usuário troca de app. A notificação mostra só a contagem, nunca servidor, usuário nem saída. O serviço não usa microfone, câmera, localização nem mídia e para quando a última sessão fecha.
+
+Roteiro do vídeo, se a Play pedir: abrir uma sessão, ver a notificação, trocar de app, voltar, tocar em "Desconectar todas".
+
+---
+
 ## Pontos sem problema (não precisa de ação)
 
 - **SYSTEM_ALERT_WINDOW (overlay)**: classificado como "special permission" — o Android já direciona o usuário às configurações do sistema para aprovação. Nenhuma declaração adicional na Play Store é necessária.

@@ -261,7 +261,9 @@ class ArchitectureRulesTest {
     /** Linhas (1-based) de [code] que a regra de `orbe/` proíbe, para o arquivo em [relPath] (relativo a `src/main/java`). */
     private fun orbeViolations(relPath: String, code: List<String>): List<Int> {
         val norm = relPath.replace('\\', '/')
-        if (!norm.startsWith("com/keyflow/orbe/")) return emptyList()
+        val pura = norm.startsWith("com/keyflow/orbe/") ||
+            (norm.startsWith("com/keyflow/notificacao/") && !norm.startsWith("com/keyflow/notificacao/app/"))
+        if (!pura) return emptyList()
         return code.mapIndexedNotNull { i, line -> if (orbeForbidden.any { it.containsMatchIn(line) }) i + 1 else null }
     }
 
@@ -270,7 +272,7 @@ class ArchitectureRulesTest {
         val offenders = kotlinFiles(main).flatMap { file ->
             orbeViolations(file.rel(main), codeLines(file)).map { "${file.rel(main)}:$it" }
         }
-        assertEquals("com.keyflow.orbe é JVM puro: sem android.*, androidx.* nem cofre", emptyList<String>(), offenders)
+        assertEquals("com.keyflow.orbe e com.keyflow.notificacao (fora de notificacao/app) são JVM puro: sem android.*, androidx.* nem cofre", emptyList<String>(), offenders)
     }
 
     @Test
@@ -281,7 +283,59 @@ class ArchitectureRulesTest {
         assertEquals(listOf(1), orbeViolations("com/keyflow/orbe/X.kt", listOf("import androidx.compose.runtime.Composable")))
         assertEquals(listOf(1), orbeViolations("com/keyflow/orbe/X.kt", listOf("import com.keyflow.auth.SecureCredentialStore")))
         assertEquals(emptyList<Int>(), orbeViolations("com/keyflow/ime/OrbeDoTecladoView.kt", bad))
+        // NTF-41: a notificação segue a mesma regra, menos o `notificacao/app/`, que é o lado Android.
+        assertEquals(listOf(1), orbeViolations("com/keyflow/notificacao/Modelo.kt", listOf("import android.content.Context")))
+        assertEquals(listOf(1), orbeViolations("com/keyflow/notificacao/Modelo.kt", listOf("import androidx.compose.ui.Modifier")))
+        assertEquals(listOf(1), orbeViolations("com/keyflow/notificacao/CodecNotificacao.kt", listOf("import com.keyflow.auth.SecureCredentialStore")))
+        assertEquals(emptyList<Int>(), orbeViolations("com/keyflow/notificacao/app/NotificacaoDaOrbe.kt", bad))
+        assertEquals(emptyList<Int>(), orbeViolations("com/keyflow/notificacao/Modelo.kt", listOf("import org.json.JSONObject")))
         assertEquals(emptyList<Int>(), orbeViolations("com/keyflow/orbe/X.kt", listOf("import com.keyflow.data.Settings")))
+    }
+
+    /**
+     * `com.keyflow.computador` (modelo, codec, validação, confiança, chaves, conexão, sessão), exceto o subpacote `computador/app`, é JVM puro
+     * (CMP-62): sem `android.*`, `androidx.*` (Compose, DataStore…) nem `org.connectbot.terminal` (o termlib é da tela). O cbssh
+     * (`org.connectbot.sshlib`) só entra pelos arquivos da lista: o adaptador de conexão e, em `chaves/`, quem lê/assina chave com a
+     * biblioteca (SPEC_DEVIATION: o design previa só o `ConexaoCbssh`, mas o importador e o assinador de software usam o `SshKeys`).
+     */
+    private val computadorForbidden = listOf(
+        Regex("""^\s*import\s+android\."""),
+        Regex("""^\s*import\s+androidx\."""),
+        Regex("""^\s*import\s+org\.connectbot\.terminal\b"""),
+    )
+    private val sshlibImport = Regex("""^\s*import\s+org\.connectbot\.sshlib\b""")
+    private val computadorComSshlib = setOf(
+        "com/keyflow/computador/ssh/ConexaoCbssh.kt",
+        "com/keyflow/computador/chaves/ImportadorDeChave.kt",
+        "com/keyflow/computador/chaves/AssinadorSoftware.kt",
+    )
+
+    private fun computadorViolations(relPath: String, code: List<String>): List<Int> {
+        val norm = relPath.replace('\\', '/')
+        if (!norm.startsWith("com/keyflow/computador/") || norm.startsWith("com/keyflow/computador/app/")) return emptyList()
+        val sshlibOk = norm in computadorComSshlib
+        return code.mapIndexedNotNull { i, line ->
+            if (computadorForbidden.any { it.containsMatchIn(line) } || (!sshlibOk && sshlibImport.containsMatchIn(line))) i + 1 else null
+        }
+    }
+
+    @Test
+    fun computadorPackageIsPureJvm() {
+        val offenders = kotlinFiles(main).flatMap { file ->
+            computadorViolations(file.rel(main), codeLines(file)).map { "${file.rel(main)}:$it" }
+        }
+        assertEquals("com.keyflow.computador (fora de computador/app) é JVM puro: sem android.*, androidx.*, termlib nem cbssh fora da lista", emptyList<String>(), offenders)
+    }
+
+    @Test
+    fun computadorRuleCatchesAndroidTermlibAndStraySshlib() {
+        assertEquals(listOf(2), computadorViolations("com/keyflow/computador/Modelo.kt", listOf("package x", "import android.os.Bundle")))
+        assertEquals(listOf(1), computadorViolations("com/keyflow/computador/sessao/X.kt", listOf("import androidx.compose.runtime.Composable")))
+        assertEquals(listOf(1), computadorViolations("com/keyflow/computador/X.kt", listOf("import org.connectbot.terminal.Terminal")))
+        assertEquals(listOf(1), computadorViolations("com/keyflow/computador/CodecHosts.kt", listOf("import org.connectbot.sshlib.SshKeys")))
+        assertEquals(emptyList<Int>(), computadorViolations("com/keyflow/computador/chaves/ImportadorDeChave.kt", listOf("import org.connectbot.sshlib.SshKeys")))
+        assertEquals(emptyList<Int>(), computadorViolations("com/keyflow/computador/app/EnvelopeDeChave.kt", listOf("import android.os.Build", "import org.connectbot.sshlib.SshKeys")))
+        assertEquals(emptyList<Int>(), computadorViolations("com/keyflow/ime/X.kt", listOf("import android.os.Build")))
     }
 
     /** O texto de uma string Kotlin entre aspas como o programa o vê (`\\` vira `\`, `\"` vira `"`). */

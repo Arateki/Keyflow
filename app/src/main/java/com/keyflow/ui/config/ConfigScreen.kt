@@ -124,6 +124,8 @@ fun ConfigScreen(
     onSettingsChange: (Settings) -> Unit,
     barsConfig: BarsConfig = BarsConfig.DEFAULT,
     onBarsConfigChange: (BarsConfig) -> Unit = {},
+    orbeConfig: com.keyflow.orbe.ConfigOrbeTeclado = com.keyflow.orbe.ConfigOrbeTeclado(),
+    onOrbeConfigChange: (com.keyflow.orbe.ConfigOrbeTeclado) -> Unit = {},
     shortcutGrids: List<ShortcutGrid> = emptyList(),
     nomesDeFluxo: Map<String, String> = emptyMap(),
     // A aba Fluxos: os gatilhos e fluxos para a Sobrepor e o tour descreverem o gesto ligado; o repositório alimenta a aba e o modal.
@@ -433,6 +435,8 @@ fun ConfigScreen(
                             onOverlayRequired = onOverlayRequired,
                             barsConfig = barsConfig,
                             onBarsConfigChange = onBarsConfigChange,
+                            orbeConfig = orbeConfig,
+                            onOrbeConfigChange = onOrbeConfigChange,
                             shortcutGrids = shortcutGrids,
                             nomesDeFluxo = nomesDeFluxo,
                             onShortcutGridsChange = onShortcutGridsChange,

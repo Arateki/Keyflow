@@ -1,7 +1,7 @@
 # Computador (terminal SSH) — Tasks
 
 **Spec**: `spec.md` · **Design**: `design.md`
-**Status**: spec e design em rascunho (2026-10-29), tasks **todas pendentes**. **Fora da v1** (só `main`, release seguinte). Não toma a vez de frente aberta.
+**Status**: spec e design em rascunho (2026-10-29), CMP-T0, CMP-T1, CMP-T3 e CMP-T4 verificadas. **Fora da v1** (só `main`, release seguinte). Não toma a vez de frente aberta.
 
 > **Para o agente executor**: leia `spec.md` + `design.md` + este arquivo e `.specs/codebase/TESTING.md`. Uma task por vez, na ordem do plano,
 > testes primeiro, gate verde antes de avançar. Cada task é verificável sozinha. Os textos de UI que ela criar vão com ela (`tr("…")` +
@@ -55,7 +55,13 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
 
 ## Fase 0 — Pré-requisito e spikes
 
-### CMP-T0 — Pré-requisito: o toolchain subiu (frente separada) — **Status: pendente**
+### CMP-T0 — Pré-requisito: o toolchain subiu (frente separada) — **Status: verificada em 2026-10-30**
+
+Portão conferido na base `c1480992`: versões no design §2.1 e [lição](../../project/licoes/2026-10-30-computador-a.md).
+Gates completos do mesmo SHA: [Checks 41073156978](https://github.com/Arateki/Keyflow/actions/runs/41073156978), sete jobs verdes.
+**SPEC_DEVIATION:** as capturas desse CI substituem `pool telas` local, que perdeu o emulador no ADB; 246 PNGs idênticos e
+26 diferenças pequenas já aceitas pelo comparador da base, sem alterar goldens nem limiar. Não é uma afirmação de 272 PNGs bit-idênticos.
+
 - **What**: **não é implementação desta spec.** O Yan decidiu (29/10) atualizar Kotlin/Compose/coroutines em vez de fixar um fork velho; isso é uma frente própria (spike de atualização do toolchain), que também
   destrava o LiteRT-LM. Esta task é o **portão**: confere que a `main` já compila com o que o termlib e o cbssh exigem e registra as versões. Hoje: Kotlin 2.2.10 (embutido no AGP 9.2), Compose BOM 2024.09.03, coroutines 1.8.1;
   o termlib ≥ 0.2.0 pede Compose 1.11 (BOM 2026.05–.09) e Kotlin 2.3.21–2.4.21, o cbssh ≥ 0.4.0 pede metadados Kotlin 2.4.0 e coroutines 1.11.
@@ -66,7 +72,18 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
   **Contingência (plano B, só se a frente de toolchain travar ou for adiada)**: ver `design.md` §2.4 — fork preso ao toolchain atual (CMP-T3 deixa de ser condicional). O plano B **não** é o caminho padrão.
 - **Tests**: — (portão). **Gate**: `quick` + `build` + `lint` + `pool telas` na `main` atualizada. **Commit**: nenhum (registro em `licoes/`).
 
-### CMP-T1 — Spike A: termlib + cbssh no toolchain novo, imagens e entrada — **Status: pendente**
+### CMP-T1 — Spike A: termlib + cbssh no toolchain novo, imagens e entrada — **Status: concluída em 2026-10-30**
+
+Retomada: build/lint verdes, 2.709/2.709 JVM e 20/20 instrumentados. Tabela medida dos sete itens na lição.
+**SPEC_DEVIATION:** bancada nesta branch; Herdr usa a=t/a=p nesta captura e placeholders são testados à parte.
+Duplicação no caminho duplo e composição sem bytes são achados, não entrada de produção aprovada.
+KeyFlow/Gboard/orbe físicos e qualidade do transcodificador sixel permanecem **não medidos**, como permitido no spike.
+
+A [lição](../../project/licoes/2026-10-30-computador-a.md) registra a ausência de mouse na API/JNI 0.3.14, scrollback privado de 1.000 linhas e
+callbacks nativos adiados. **SPEC_DEVIATION:** inspeção inicial na branch `equipe/computador-a`, sem Activity descartável;
+CMP-T3 necessária. A parada inicial foi revogada pelo coordenador em 30/10: depois do PR do diagnóstico, seguir T3 → T1 → T4.
+Medições dinâmicas e auditoria completa de transitivas continuam pendentes.
+
 - **What**: branch descartável com uma tela só do `debug` (`TerminalSpikeActivity`; não entra no release) ligando `TerminalEmulator` (termlib) a um `SshClient` (cbssh) contra o servidor de teste ou um host real, para **medir**:
   (1) compila no toolchain novo com as versões exatas; delta do APK, de métodos e da memória por sessão (80×24, scrollback 5 000 e 20 000 linhas);
   (2) `.so` do termlib em arm64-v8a, armeabi-v7a e x86_64 com `scripts/check-16kb-alignment.py`; (3) licenças de **todas** as transitivas (Ktor, kstatemachine, Tink, kyber, keccak, jbcrypt, slf4j) — nenhuma GPL/LGPL/AGPL;
@@ -90,7 +107,15 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
 - **Done when**: a tabela existe com o nível de proteção (hardware/TEE/StrongBox/software) e o nome do algoritmo de assinatura **medidos**; a lição diz a partir de qual API/aparelho o Keystore serve e confirma (ou corrige) a premissa P1 da spec; o plano de fallback do `design.md` §4 é ajustado ao medido.
 - **Tests**: manual/instrumentado de sonda. **Gate**: `pool instrumentar` (emulador) + A32/Tab/Vaio manuais com `--confirmo-a32`. **Commit**: `spike(computador): sonda do Ed25519 no Keystore` (só o debug).
 
-### CMP-T3 — (condicional) Fork do termlib com JNI compilado no CI e SHA fixado — **Status: pendente**
+### CMP-T3 — Fork do termlib com JNI compilado no CI e SHA fixado — **Status: concluída em 2026-10-30**
+
+Gates requeridos verdes: build no pool sem NDK, 2.705/2.705 JVM (6/6 `TermlibNativoTest`),
+workflows [41111156115](https://github.com/Arateki/Keyflow/actions/runs/41111156115) e
+[41111164906](https://github.com/Arateki/Keyflow/actions/runs/41111164906) verdes; três ABIs do APK com ELF/ZIP 16 KB
+ e hashes iguais ao release `termlib-jni-0.3.14-keyflow.1`. Auditoria das partes nativas e provas na lição.
+
+Bootstrap do workflow primeiro; integração com SHA real depois do binário publicado. **SPEC_DEVIATION:** dois commits
+para permitir essa verificação sem reescrever a branch; detalhes na [lição](../../project/licoes/2026-10-30-computador-a.md).
 - **What**: **só se a CMP-T1 medir que mouse reporting ou scrollback maior não saem na borda, ou se o plano B valer.** O Yan já aceitou o fork nesse caso (D12). O sixel não é motivo para manter esta task aberta. Código do termlib vendorizado em `third_party/termlib/` (Apache-2.0 + libvterm MIT; `UPSTREAM.md` com o commit-base e os patches), módulo Gradle `:termlib` compilado
   com o toolchain do app; o C++ vira `libtermlib.so` por ABI num workflow `.github/workflows/termlib-jni.yml` (NDK do runner, actions fixadas por SHA, padrão `sherpa-sem-tts.yml`) que publica um release com `.sha256`;
   o `app/build.gradle.kts` baixa e **confere o SHA-256** como faz com o sherpa (sem NDK nos nós do pool). Patches (conforme a T1 medir): **mouse reporting** (`vterm_mouse_*` + modo) e **scrollback** configurável. O DCS sixel e o atributo 4 do DA1 **não** entram no C++: ficam no app (D12).
@@ -100,7 +125,7 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
 - **Done when**: o workflow gera as 3 ABIs; `check-16kb-alignment.py` verde; `TermlibNativoTest` falha se o `.so` não bate com o SHA fixado, se alguma lib tiver texto de licença GPL/LGPL ou se faltar uma ABI do app; `assembleDebug` num nó sem NDK verde. Se a decisão for **Maven puro**, esta task fecha como **"dispensada"** com a razão (Status e lição).
 - **Tests**: unit + CI. **Gate**: `quick` + `build` + o workflow. **Commit**: `build(computador): termlib vendorizado com JNI compilado no CI`.
 
-### CMP-T4 — Servidor SSH de teste e gravações de terminal `[P]` — **Status: pendente**
+### CMP-T4 — Servidor SSH de teste e gravações de terminal `[P]` — **Status: concluída em 2026-10-30**
 - **What**: `SshFixtureServer` (Apache MINA SSHD, `testImplementation`, Apache-2.0; versão estável a fixar na T1) com host key fixa de teste, usuários `teste` (chave `ed25519` de teste) e `senha` (senha falsa), um `ShellFactory` que **toca bytes gravados** na abertura do canal
   (prompt, cores, `kitten icat`, `imgcat`, `img2sixel`, `chafa`, placeholders do Herdr) e ecoa a entrada, registra os pedidos `pty-req`/`window-change`/`env`, e um modo "cair no meio" (fecha o socket). `scripts/ssh-fixture.sh` sobe o mesmo servidor fora do processo e faz `adb reverse`
   para o instrumentado. Pasta `app/src/test/resources/computador/gravacoes/` com as saídas de ferramentas **reais** (imagens pequenas, ≤ 64 KB cada, licença livre ou geradas por nós) e um README com o comando que gerou cada uma.
@@ -117,7 +142,7 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
 
 ### Fase 1A — Modelo e dados (JVM puro)
 
-### CMP-T5 — Hosts: modelo, codec, validação e migração do host único `[P]` — **Status: pendente**
+### CMP-T5 — Hosts: modelo, codec, validação e migração do host único `[P]` — **Status: concluída em 2026-10-30**
 - **What**: `Host`, `AutenticacaoHost`, `PoliticaAgente`, `ConfigHosts`, limites (50 hosts, nome 1..40 único, usuário 1..64, porta 1..65535), `ValidadorHost` (endereço: nome DNS, IPv4, IPv6 com colchetes; motivo por campo) e `CodecHosts` (`org.json`, `"v":1`, tolerante: nunca lança,
   item ruim descartado, campo desconhecido ignorado, ids repetidos viram um). `RegraAgente.podeMarcar(host)` (CMP-09: só autenticação resolvida pelo app). `MigracaoHostUnico.migrar(settingsAntigo) → ConfigHosts?` (função pura; a senha e a chave saem em um `SegredosMigrados` à parte, nunca no host).
 - **Where**: `app/src/main/java/com/keyflow/computador/{Modelo,ValidadorHost,CodecHosts,RegraAgente,MigracaoHostUnico}.kt`; testes `CodecHostsTest`, `CodecHostsPropertyTest`, `CodecHostsFuzzTest`, `HostSemSegredoTest`, `MigracaoHostUnicoTest`, `ValidadorHostTest`. Regra no `ArchitectureRulesTest`: `computador/*.kt` (exceto `computador/app/**`) sem `android.*`, compose e `org.connectbot.terminal`.
@@ -127,7 +152,7 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
   IPv6/porta/nome inválidos recusados com o motivo; `podeMarcar` recusa auth "pergunte sempre" e chave com passphrase pedida na hora; migração: `computerSshHost` vazio → nada; preenchido → 1 host "Servidor SSH" com porta, usuário e auth do antigo e **segredos à parte**; idempotente.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(computador): modelo de hosts, codec tolerante e migração do host único`.
 
-### CMP-T6 — known_hosts e política de confiança (TOFU) `[P]` — **Status: pendente**
+### CMP-T6 — known_hosts e política de confiança (TOFU) `[P]` — **Status: concluída em 2026-10-30**
 - **What**: `ImpressaoDigital` (SHA256 base64 sem padding como o OpenSSH, mais a "arte" aleatória opcional), `RepositorioDeConfianca` (interface) e `PoliticaDeConfianca.avaliar(host, porta, chave, repositorio) → Conhecida | Nova(impressao) | Mudou(antiga, nova)`;
   formato do arquivo `known_hosts` compatível com OpenSSH (`[host]:porta algoritmo base64`, sem hash de hostname — limite do cbssh), leitor/escritor tolerante, e `AtualizadorDeChaves` (rotação `hostkeys` só quando a chave autenticada já é conhecida).
 - **Where**: `computador/{ImpressaoDigital,PoliticaDeConfianca,KnownHostsArquivo}.kt`; testes `PoliticaDeConfiancaTest`, `KnownHostsArquivoTest`, `KnownHostsPropertyTest`.
@@ -137,7 +162,7 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
   arquivo com linha malformada preserva as outras; remover por host não toca os demais; rotação sem chave conhecida autenticada é recusada.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(computador): known_hosts e política de confiança no primeiro uso`.
 
-### CMP-T7 — Chaves: modelo, importação e assinatura abstrata `[P]` — **Status: pendente**
+### CMP-T7 — Chaves: modelo, importação e assinatura abstrata `[P]` — **Status: concluída em 2026-10-30**
 - **What**: `ChaveSsh` (id, nome, tipo, impressão, `Protecao {HARDWARE, KEYSTORE_ENVELOPE, SOFTWARE_COFRE}`, `exigeBiometria`, criada em — **sem material secreto**; `toString` mascara), interface `Assinador { chavePublica(): AuthPublicKey; suspend assinar(dados): ByteArray? }` (liga ao `AuthHandler.onSignatureRequest` do cbssh),
   `ImportadorDeChave` (OpenSSH e PEM PKCS#8/PKCS#1 pelo `SshKeys.decodePemPrivateKey`; passphrase pedida na hora, nunca guardada; rejeita DSA e RSA < 2048 com o motivo), formatador da chave pública (`ssh-ed25519 AAAA…` ou `ecdsa-sha2-nistp256 AAAA…`, comentário `keyflow@<aparelho>`), `AgenteSegredos.valores()` ampliado para o `SecretFilter`.
   Tudo sobre portas (`CofreDeSegredos`, `RelogioDeChaves`), com fakes.
@@ -148,7 +173,7 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
   a passphrase e o texto colado não ficam em nenhum campo depois de `importar()`; o `SecretFilter` recebe os valores guardados.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(computador): modelo de chaves, importação e assinatura abstrata`.
 
-### CMP-T8 — Chaves no Android: Keystore, envelope e biometria — **Status: pendente**
+### CMP-T8 — Chaves no Android: Keystore, envelope e biometria — **Status: concluída em 2026-10-30 (T2 pendente; ver a lição)**
 - **What**: `ProvedorDeChavesAndroid` sobre o resultado da T2. `gerar(nome, tipo, exigeBiometria)`: **Ed25519** no Keystore (API 33+ e sonda aprovada) com `ProbeEd25519` de produção, ou **fallback** — Ed25519 em software (a semente de 32 bytes gerada pelo Tink do cbssh) guardada **cifrada** por uma chave AES-256-GCM do Keystore (API 24+) no cofre do app, zerada da memória logo após assinar; **ECDSA P-256** (`secp256r1`, `DIGEST_SHA256`) sempre no Keystore, sem envelope (D13).
   Importadas entram no envelope. Biometria opcional por chave, janela de **5 minutos** (D14): API 24–29 `setUserAuthenticationValidityDurationSeconds(300)`; API 30+ `setUserAuthenticationParameters(300, AUTH_BIOMETRIC_STRONG)`; duração > 0 **não** usa `CryptoObject`. `setUserAuthenticationRequired(true)`, `setInvalidatedByBiometricEnrollment(true)` com aviso antes de ligar; sem biometria cadastrada a opção fica desligada com o motivo. O prompt autentica o usuário; dentro dos 300 s a assinatura segue sem novo prompt.
   Exclusão apaga Keystore e cofre. Fora do backup (`data_extraction_rules.xml`/`backup_rules`).
@@ -161,7 +186,7 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
 
 ### Fase 1B — Conexão e sessão
 
-### CMP-T9 — Camada SSH: a porta `ConexaoSsh` e o adaptador cbssh — **Status: pendente**
+### CMP-T9 — Camada SSH: a porta `ConexaoSsh` e o adaptador cbssh — **Status: concluída em 2026-10-31**
 - **What**: interface `ConexaoSsh` (`conectar`, `verificarServidor`, `autenticar`, `abrirShell(pty)`, `redimensionar`, `escrever`, `saida: Flow<ByteArray>`, `fechar`, `eventos`) e `ConexaoCbssh`: `SshClient` com `HostKeyVerifier` (usa a `PoliticaDeConfianca` e **suspende** até o usuário decidir),
   `AuthHandler` (`onPublicKeysNeeded` → `Assinador.chavePublica`, `onSignatureRequest` → `Assinador.assinar`, `onKeyboardInteractivePrompt` → ponte para a UI, `password` → ponte), política criptográfica **padrão** do cbssh (sem algoritmos legados), `keepAliveIntervalMs`, `requestPty(TERM=xterm-256color, cols, rows, px)`, `resizeTerminal`.
   `MapaDeErros`: exceções do cbssh → `CausaSsh` (tabela do `spec.md` › Erros). **Modo teste de conexão** (`testar()`): conecta, verifica, autentica e fecha **sem** abrir shell.
@@ -172,7 +197,7 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
   `Mudou` encerra com `CHAVE_DO_SERVIDOR_MUDOU` sem chamar o `AuthHandler`; `resize` chega ao servidor como `window-change`; keepalive: servidor que para de responder derruba em ≤ 3 intervalos; `testar()` não pede o shell; nenhum segredo em mensagem de exceção (sentinela); cancelar a coroutine fecha o socket.
 - **Tests**: unit/integração JVM. **Gate**: `quick`. **Commit**: `feat(computador): conexão SSH pelo cbssh com verificação de servidor e erros mapeados`.
 
-### CMP-T10 — Sessão, gerenciador, reconexão e buffer — **Status: pendente**
+### CMP-T10 — Sessão, gerenciador, reconexão e buffer — **Status: concluída em 2026-10-31**
 - **What**: `SessaoTerminal` (máquina de estados `Conectando · AguardandoServidor · Autenticando · Aberta · Reconectando · Encerrada(motivo) · Falhou(causa)`; `dono: USUARIO | AGENTE`, `compartilhada`), `GerenciadorDeSessoes` (abrir/fechar, **8 sessões no total, 3 do agente**, ociosidade só do agente, 10 min — D21; a sessão do usuário não fecha por ociosidade), `Reconexao`
   (backoff 1·2·4·8·16·30 s, no máximo 10 tentativas ou 10 min; só com rede; chave com biometria **fora da janela de 5 minutos** emite `PrecisaDoUsuario` e não abre o prompt sozinha; **dentro** da janela reconecta sem novo prompt — D14), `BufferDeTexto` (anel de linhas de texto puro alimentado pelo mesmo fluxo de bytes, para o agente e para busca; **só em memória**) e `PortaDoEmulador` (interface que a tela implementa).
 - **Where**: `computador/sessao/*.kt`; testes `SessaoTerminalTest`, `GerenciadorDeSessoesTest`, `ReconexaoTest`, `BufferDeTextoTest` (relógio virtual).
@@ -184,7 +209,7 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
 
 ### Fase 1C — Integração Android
 
-### CMP-T11 — Persistência: hosts, confiança, chaves e a migração — **Status: pendente**
+### CMP-T11 — Persistência: hosts, confiança, chaves e a migração — **Status: concluída em 2026-10-31**
 - **What**: chave `computer_hosts_json` no DataStore `keyflow_settings` (padrão `bars_config_json`), `computer_keys_json` (metadados de chave, sem segredo), arquivo `known_hosts` em `filesDir` (fora do backup); `hostsFlow()`, `hostsOnce()` (leitura leve, sem cofre), `atualizarHosts(f)` atômico sobre o valor atual;
   **migração** do host único no primeiro uso (T5): cria o host, move senha → segredo do host e chave privada → `ChaveSsh` importada, **apaga** `COMPUTER_SSH_PASSWORD`/`COMPUTER_SSH_KEY` do cofre e deixa `computerSsh*` ignorados no `Settings` (campos mantidos só para ler o legado; removidos numa task futura). Excluir host/chave com os efeitos em cascata (CMP-07, CMP-15).
 - **Where**: `data/SettingsRepository.kt` (ou `computador/app/RepositorioComputador.kt` sobre o mesmo DataStore), `data/SettingsCredentialKeys.kt`, `res/xml/` regras de backup; teste instrumentado `RepositorioComputadorTest`.
@@ -194,7 +219,7 @@ revisadas antes de qualquer tela. A Fase 2 (imagens) e a 3 (agente) só começam
   excluir host fecha as sessões dele (via fake do gerenciador), apaga a entrada do `known_hosts` e a senha lembrada e **mantém** a chave; excluir chave em uso pede a lista de hosts afetados e os deixa "sem chave"; `data_extraction_rules` exclui `known_hosts` e os segredos.
 - **Tests**: instrumentado. **Gate**: `pool instrumentar com.keyflow.computador.app.RepositorioComputadorTest`. **Commit**: `feat(computador): persistência de hosts, chaves e known_hosts e migração do host único`.
 
-### CMP-T12 — Serviço em primeiro plano `specialUse` e notificação — **Status: pendente**
+### CMP-T12 — Serviço em primeiro plano `specialUse` e notificação — **Status: concluída em 2026-10-31**
 - **What**: `SessoesService` (FGS `specialUse`, `FOREGROUND_SERVICE_SPECIAL_USE`, `<property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE">` com o texto do `design.md` §7), canal "Sessões do Computador", notificação com a contagem, **Desconectar todas** e (com sessão do agente) **Parar o agente**;
   o gerenciador a liga ao abrir a 1ª sessão (com o app visível) e a derruba ao fechar a última sessão (a ociosidade de 10 min fecha só a sessão do agente, D21, e não a do usuário); sem `POST_NOTIFICATIONS` o serviço funciona igual; processo morto pelo sistema → sessões marcadas `EncerradaPeloSistema` na reabertura.
   Opção "Manter conectado com a tela apagada" (D22), desligada por padrão: desligada, o serviço não adquire `WakeLock`; ligada, adquire `PARTIAL_WAKE_LOCK` enquanto houver sessão do usuário. `WAKE_LOCK` é permissão normal e o lock só existe com a opção ligada.
