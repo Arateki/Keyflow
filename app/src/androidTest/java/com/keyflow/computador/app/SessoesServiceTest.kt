@@ -102,6 +102,9 @@ class SessoesServiceTest {
 
     private fun abrir(n: Int, dono: DonoDaSessao = DonoDaSessao.USUARIO) = (gerenciador.abrir(host(n), dono) as ResultadoAbertura.Aberta).sessao
 
+    /** Só a seção de wake locks **ativos** (`PARTIAL_WAKE_LOCK '...'`); o histórico do `dumpsys` cita ACQ/REL mesmo depois de soltar. */
+    private fun wakeLockAtivo(): Boolean = dumpsysPower().lines().any { it.trim().startsWith("PARTIAL_WAKE_LOCK") && it.contains("keyflow:sessoes") }
+
     private fun dumpsysPower(): String {
         val pfd = instr.uiAutomation.executeShellCommand("dumpsys power")
         return android.os.ParcelFileDescriptor.AutoCloseInputStream(pfd).bufferedReader().use { it.readText() }
@@ -146,17 +149,16 @@ class SessoesServiceTest {
         val u = abrir(1)
         esperar("notificação aparece") { notificacao() != null }
         delay(500)
-        assertFalse("padrão: sem WakeLock", dumpsysPower().contains("keyflow:sessoes"))
-        println("CMP_T12 power: " + dumpsysPower().lines().filter { it.contains("keyflow") }.joinToString(" | "))
+        assertFalse("padrão: sem WakeLock", wakeLockAtivo())
         manter.value = true
-        esperar("wakelock ligado") { dumpsysPower().contains("keyflow:sessoes") }
+        esperar("wakelock ligado") { wakeLockAtivo() }
         manter.value = false
-        esperar("wakelock solto") { !dumpsysPower().contains("keyflow:sessoes") }
+        esperar("wakelock solto") { !wakeLockAtivo() }
         manter.value = true
-        esperar("wakelock ligado") { dumpsysPower().contains("keyflow:sessoes") }
+        esperar("wakelock ligado") { wakeLockAtivo() }
         gerenciador.fechar(u.id)
         esperar("notificação some") { notificacao() == null }
-        esperar("wakelock solto") { !dumpsysPower().contains("keyflow:sessoes") }
+        esperar("wakelock solto") { !wakeLockAtivo() }
     }
 
 }
