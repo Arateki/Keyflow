@@ -80,6 +80,7 @@ class FluxosEndToEndTest {
         is Etapa.Visao -> Valor.Texto("texto da tela")
         is Etapa.Perguntar -> Valor.Texto("resposta de " + (entrada as Valor.Texto).texto)
         is Etapa.Agente -> Valor.Texto("agente fez " + (entrada as Valor.Texto).texto)
+        is Etapa.Falar, Etapa.Inserir -> entrada // terminam o fluxo entregando o texto que recebem
         else -> Valor.Nada
     })
 
