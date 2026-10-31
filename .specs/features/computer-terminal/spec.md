@@ -398,26 +398,26 @@ Nenhuma. Q1–Q13 foram respondidas em 29/10 (D12–D24). Q8, Q9, Q10, Q11 e Q13
 | CMP-14 | P1-B | CMP-T2, CMP-T8, CMP-T10, CMP-T16 | Parcial — janela de 300 s (CMP-T8); falta T2, T10, T16 |
 | CMP-15 | P1-B | CMP-T11, CMP-T16 | Pending |
 | CMP-16 | P1-B | CMP-T7, CMP-T8 | Parcial — sentinelas e `SecretFilter` (CMP-T7/T8) verificados |
-| CMP-17 | P1-C | CMP-T9 | Pending |
-| CMP-18 | P1-C | CMP-T6, CMP-T16 | Parcial — política TOFU (CMP-T6) verificada; falta T16 |
-| CMP-19 | P1-C | CMP-T6, CMP-T11 | Parcial — `known_hosts` e rotação (CMP-T6) verificados; falta T11 |
+| CMP-17 | P1-C | CMP-T9 | Parcial — adaptador cbssh (CMP-T9) verificado contra o servidor de teste; falta a tela |
+| CMP-18 | P1-C | CMP-T6, CMP-T16 | Parcial — política TOFU (T6) e verificação suspensa na conexão (T9); falta a tela (T16) |
+| CMP-19 | P1-C | CMP-T6, CMP-T11 | Parcial — `known_hosts` em arquivo atômico e rotação (T6, T11); exclusão em cascata verificada |
 | CMP-20 | P1-C | CMP-T9, CMP-T16 | Pending |
 | CMP-21 | P1-C | CMP-T9, CMP-T16 | Pending |
-| CMP-22 | P1-C | CMP-T10, CMP-T20 | Pending |
+| CMP-22 | P1-C | CMP-T10, CMP-T20 | Parcial — reconexão, backoff, biometria e buffer (CMP-T10) verificados; falta a tela |
 | CMP-23 | P1-C | CMP-T9, CMP-T13 | Pending |
 | CMP-24 | P1-D | CMP-T13, CMP-T17 | Pending |
 | CMP-25 | P1-D | CMP-T13 | Pending |
 | CMP-26 | P1-D | CMP-T14 | Pending |
 | CMP-27 | P1-D | CMP-T14 | Pending |
 | CMP-28 | P1-D | CMP-T13 | Pending |
-| CMP-29 | P1-D | CMP-T10, CMP-T13 | Pending |
+| CMP-29 | P1-D | CMP-T10, CMP-T13 | Parcial — limites 8/3 e ociosidade do agente (CMP-T10) verificados |
 | CMP-30 | P1-D | CMP-T13 | Pending |
 | CMP-31 | P1-D | CMP-T14, CMP-T17 | Pending |
-| CMP-32 | P1-E | CMP-T12, CMP-T20 | Pending |
-| CMP-33 | P1-E | CMP-T12, CMP-T19 | Pending |
-| CMP-34 | P1-E | CMP-T10, CMP-T12 | Pending |
+| CMP-32 | P1-E | CMP-T12, CMP-T20 | Parcial — serviço `specialUse`, notificação só com contagem (CMP-T12) verificados |
+| CMP-33 | P1-E | CMP-T12, CMP-T19 | Parcial — manifesto, `property` e checklist da Play (CMP-T12); declaração no Console é [YAN] |
+| CMP-34 | P1-E | CMP-T10, CMP-T12 | Parcial — serviço sobe com a 1ª sessão e cai com a última (CMP-T12); falta a tela |
 | CMP-35 | P1-F | CMP-T13 | Pending |
-| CMP-36 | P1-F | CMP-T10, CMP-T13 | Pending |
+| CMP-36 | P1-F | CMP-T10, CMP-T13 | Parcial — buffer só em memória (CMP-T10) verificado; falta o emulador (T13) |
 | CMP-37 | P2-G | CMP-T22 | Pending |
 | CMP-38 | P2-G | CMP-T23 | Pending |
 | CMP-39 | P2-G | CMP-T23 | Pending |
