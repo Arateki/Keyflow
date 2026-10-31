@@ -2,6 +2,7 @@ package com.keyflow.i18n
 
 import com.keyflow.i18n.es.Bancada
 import com.keyflow.i18n.es.Comum
+import com.keyflow.i18n.es.Computador
 import com.keyflow.i18n.es.Conta
 import com.keyflow.i18n.es.Docs
 import com.keyflow.i18n.es.Fluxos
@@ -26,6 +27,7 @@ import com.keyflow.i18n.es.Voz
 internal val TranslationsEs: Map<String, String> = translationMap(
     Bancada,
     Comum,
+    Computador,
     Conta,
     Docs,
     Fluxos,
