@@ -35,3 +35,13 @@ Unitários **2.853/2.853** (284 classes), `:app:lintDebug` e `assembleDebugAndro
 (sonda do Ed25519 no Keystore: **Aprovada**, então ed25519 nasceu nativo; o envelope foi forçado por flag). Mutações (uma por task, vermelho confirmado):
 `RegraAgente` (Perguntar liberado), `PoliticaDeConfianca` (Mudou→Nova), `ImportadorDeChave` (RSA fraca aceita), `JanelaDeBiometria` (janela que nunca vence).
 Os testes foram escritos junto do código; o "vermelho antes" foi substituído pela mutação.
+
+## Correções da revisão do #89 (2 P2)
+- **Cofre**: o índice de `CofreDoApp` mora no `CredentialStore` compartilhado, mas a trava era por instância: duas instâncias perdiam uma entrada e o
+  `SecretFilter` deixava de remover o segredo. Agora a trava é do processo; `CofreDoAppTest` (duas instâncias, gravação lenta do índice) ficou vermelho
+  com a trava antiga e verde com a nova.
+- **Biometria nas APIs 24–29**: duração positiva (300 s) prende a chave ao root SID e `setInvalidatedByBiometricEnrollment(true)` não garante a invalidação ao
+  cadastrar outra digital. `DetectorDeCadastro` cria uma chave sentinela (AES, duração -1) por chave com biometria; `KeyPermanentlyInvalidatedException` ao
+  inicializar a cifra = cadastro mudou. A chave vira `INVALIDADA`, `assinar` devolve `null` (`Assinador.invalidada = true`) sem abrir prompt; o material do envelope não é
+  regenerável (estava cifrado pela chave invalidada), então a pessoa gera/importa outra. Testado com um detector falso (`ChavesAndroidTest`, 19/19).
+  **Pendente (T21)**: o cadastro real de biometria e a sentinela real em API 24–29 em aparelho físico (o emulador API 34 não cria chave com autenticação sem tela de bloqueio).
