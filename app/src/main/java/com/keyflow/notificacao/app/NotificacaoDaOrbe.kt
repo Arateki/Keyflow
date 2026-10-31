@@ -15,6 +15,7 @@ import com.keyflow.notificacao.Botao
 import com.keyflow.notificacao.Botoes
 import com.keyflow.notificacao.BotoesDaNotificacao
 import com.keyflow.notificacao.ConfigEfetiva
+import com.keyflow.notificacao.Contraste
 import com.keyflow.notificacao.ConfigNotificacao
 import com.keyflow.notificacao.CronometroDaNotificacao
 import com.keyflow.notificacao.EstadoVisual
@@ -126,7 +127,7 @@ class NotificacaoDaOrbe(
         rv.setOnClickPendingIntent(R.id.notif_orb, servico(OverlayService.ACTION_NOTIF_ORB_TAP, REQ_ORBE))
 
         // Os glifos dos botões são vetoriais, tingidos: a tinta da skin quando ela pinta fundo, senão a cor primária do sistema no modo atual.
-        val tintaDosBotoes = if (aparencia.fundo != null) aparencia.tinta else if (escuro) COR_CLARA else COR_ESCURA
+        val tintaDosBotoes = if (aparencia.fundo != null) Contraste.legivel(aparencia.tinta, aparencia.fundo) else if (escuro) COR_CLARA else COR_ESCURA
         botao(rv, R.id.notif_btn_esq, botoes.esquerda, tintaDosBotoes)
         botao(rv, R.id.notif_btn_dir, botoes.direita, tintaDosBotoes)
 

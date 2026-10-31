@@ -167,13 +167,34 @@ class NotificacaoDaOrbeTest {
         }
     }
 
+    /** Desenha o botão como o sistema o desenharia e devolve a cor média dos pixels opacos do glifo. */
+    private fun corDoGlifo(btn: ImageButton): Int {
+        val px = (48 * context.resources.displayMetrics.density).toInt()
+        btn.measure(View.MeasureSpec.makeMeasureSpec(px, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(px, View.MeasureSpec.EXACTLY))
+        btn.layout(0, 0, px, px)
+        val bmp = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
+        btn.draw(android.graphics.Canvas(bmp))
+        var r = 0L; var g = 0L; var b = 0L; var n = 0
+        val pixels = IntArray(px * px).also { bmp.getPixels(it, 0, px, 0, 0, px, px) }
+        for (p in pixels) if (android.graphics.Color.alpha(p) > 200) {
+            r += android.graphics.Color.red(p); g += android.graphics.Color.green(p); b += android.graphics.Color.blue(p); n++
+        }
+        assertTrue("o glifo do botão não desenhou", n > 0)
+        return android.graphics.Color.rgb((r / n).toInt(), (g / n).toInt(), (b / n).toInt())
+    }
+
     @Test
-    fun oContrasteDosGlifosELegivelEmClaroEEscuroNasSeteSkins() {
+    fun oContrasteDosGlifosELegivelEmClaroEEscuroNasSkins() {
+        val fundoDoSistema = mapOf(false to 0xFFF2F0F8.toInt(), true to 0xFF1C1B20.toInt())
         for (skin in listOf("atelie", "sistema", "aero", "glitch", "rosegold", "mascot")) {
             for (escuro in listOf(false, true)) {
-                val n = construir(ButtonState.RECORDING, skin = skin, escuro = escuro)
-                val btn = conteudo(n).v(R.id.notif_btn_esq) as ImageButton
-                assertNotNull("$skin/$escuro", btn.colorFilter)
+                val efetiva = efetiva(ConfigNotificacao(), Settings())
+                val visual = EstadoVisualDaNotificacao.para(ButtonState.RECORDING, false, efetiva)
+                val fundo = provedor.obterAgora(skin, visual.aparencia, visual.glifo, lado, escuro).fundo ?: fundoDoSistema.getValue(escuro)
+                val btn = conteudo(construir(ButtonState.RECORDING, skin = skin, escuro = escuro)).v(R.id.notif_btn_esq) as ImageButton
+                val cor = corDoGlifo(btn)
+                val razao = Contraste.razao(cor, fundo)
+                assertTrue("$skin escuro=$escuro: glifo #%06X sobre #%06X tem contraste %.2f (< 3)".format(cor and 0xFFFFFF, fundo and 0xFFFFFF, razao), razao >= Contraste.MINIMO)
             }
         }
     }

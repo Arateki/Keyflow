@@ -1282,6 +1282,7 @@ object RouteCatalog {
 
     /** Notificação de gravação (RemoteViews inflada) sobre uma "persiana" simulada (KBD screenshots). */
     private fun notificationRoute(key: String, state: ButtonState): Route = Route(key) {
+        val escuro = LocalKeyFlowPalette.current.isDark
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -1294,9 +1295,9 @@ object RouteCatalog {
                     val efetiva = efetiva(ConfigNotificacao(), Settings())
                     val visual = EstadoVisualDaNotificacao.para(state, false, efetiva)
                     val lado = OrcamentoDeBitmaps.ladoPx(ctx.resources.displayMetrics.density)
-                    val aparencia = ProvedorDeAparencia(ctx, { true }).obterAgora("atelie", visual.aparencia, visual.glifo, lado, true)
+                    val aparencia = ProvedorDeAparencia(ctx, { true }).obterAgora("atelie", visual.aparencia, visual.glifo, lado, escuro)
                     NotificacaoDaOrbe(ctx, "gallery")
-                        .galeria(state, false, aparencia, efetiva, escuro = true, segundos = 12)
+                        .galeria(state, false, aparencia, efetiva, escuro = escuro, segundos = 12)
                         .apply(ctx, FrameLayout(ctx))
                 },
             )
