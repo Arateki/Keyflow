@@ -73,6 +73,10 @@ import com.keyflow.ui.config.SkinImportReportDialog
 import com.keyflow.ui.config.SkinPackSurface
 import com.keyflow.ui.config.SkinPacksContent
 import com.keyflow.ui.config.SkinsSection
+import com.keyflow.ui.config.OrbeTecladoSecao
+import com.keyflow.orbe.AcaoDaOrbeDoTeclado
+import com.keyflow.orbe.ConfigOrbeTeclado
+import com.keyflow.orbe.ModoDaOrbe
 import com.keyflow.ui.config.loadSkinPackCards
 import com.keyflow.skins.SkinIds
 import com.keyflow.ui.onboarding.OnboardingPermission
@@ -181,6 +185,9 @@ object RouteCatalog {
         // via AndroidView, ancorado ao rodapé.
         keyboardRoute("keyboard-canvas-expanded", expanded = true, recording = false),
         keyboardRoute("keyboard-canvas-collapsed", expanded = false, recording = false),
+        // A orbe do teclado gravando e pausada: a faixa de 36 dp aparece acima da barra, sem cobrir nenhuma tecla (KBO-35).
+        keyboardRoute("keyboard-orb-gravando", expanded = true, recording = true),
+        keyboardRoute("keyboard-orb-pausada", expanded = true, recording = false, micState = ButtonState.PAUSED),
         keyboardCanvasSymbolsRoute("keyboard-canvas-symbols"),
         keyboardCanvasCandidatesRoute("keyboard-canvas-candidates"),
         // Protótipo Aero (2026-09-28): paisagem própria + teclas de vidro, com sugestões na faixa.
@@ -307,6 +314,10 @@ object RouteCatalog {
         // A mesma seção com o Mascote escolhido: o anel no cartão novo.
         Route("config-overlay-skins-mascote") { SkinsRoute(orb = true, selectedOrb = "mascot") },
         Route("config-teclado-skins") { SkinsRoute(orb = false) },
+        // A seção Orbe da aba Teclado (KBO-01), sozinha num cartão (fica abaixo da dobra na aba): copiando a orbe principal (Glitch) e
+        // editável (config própria no Segurar para falar, com um toque sem ação).
+        Route("config-teclado-orbe") { OrbeSecaoRoute(copiar = true) },
+        Route("config-teclado-orbe-propria") { OrbeSecaoRoute(copiar = false) },
         // Com pacotes importados (SKP-T6): a seção "Suas skins" com os cartões — um selecionado —, a pergunta de remoção aberta e os dois
         // relatórios do import (instalado com avisos; recusado com erros). Os pacotes são instalados de verdade, por `SkinPackStore.import`.
         Route("config-overlay-skins-importadas") { SkinsRoute(orb = true, imported = true) },
@@ -630,7 +641,7 @@ object RouteCatalog {
                 }
             }
         },
-    )
+    ) + FluxosRoutes.rotas
 
     private val byKey: Map<String, Route> = routes.associateBy { it.key }
 
@@ -963,6 +974,7 @@ object RouteCatalog {
         expanded: Boolean,
         recording: Boolean,
         skin: KeyboardSkin = KeyboardSkin.DEFAULT,
+        micState: ButtonState? = null,
     ): Route = Route(key) {
         val dark = LocalKeyFlowPalette.current.isDark
         Box(
@@ -987,8 +999,33 @@ object RouteCatalog {
                     ).apply {
                         setExpanded(expanded)
                         if (recording) updateMicState(ButtonState.RECORDING)
+                        micState?.let { updateMicState(it) }
                     }
                 },
+            )
+        }
+    }
+
+    @Composable
+    private fun OrbeSecaoRoute(copiar: Boolean) {
+        val config = if (copiar) {
+            ConfigOrbeTeclado()
+        } else {
+            ConfigOrbeTeclado(
+                copiarDaOrbePrincipal = false,
+                skin = "glitch",
+                modo = ModoDaOrbe.SEGURAR_PARA_FALAR,
+                toque1 = AcaoDaOrbeDoTeclado.Nenhuma,
+                toque2 = AcaoDaOrbeDoTeclado.PausarRetomar,
+                toque3 = AcaoDaOrbeDoTeclado.LerTela,
+            )
+        }
+        Box(Modifier.fillMaxSize().background(LocalKeyFlowPalette.current.bg).padding(16.dp)) {
+            OrbeTecladoSecao(
+                settings = Settings(orbSkin = "mascot"),
+                config = config,
+                skinsUnlocked = true,
+                onConfigChange = {},
             )
         }
     }

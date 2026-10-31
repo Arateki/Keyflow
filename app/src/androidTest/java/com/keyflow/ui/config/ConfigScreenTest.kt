@@ -60,6 +60,24 @@ class ConfigScreenTest {
     @get:Rule
     val rule = createComposeRule()
 
+    private val fluxosScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
+    private val fluxosArquivos = mutableListOf<java.io.File>()
+
+    @org.junit.After
+    fun limparFluxos() {
+        fluxosScope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+        fluxosArquivos.forEach { it.delete() }
+    }
+
+    /** Repositório isolado (DataStore próprio) para a aba Fluxos: lê a semente sem gravar nada. */
+    private fun fluxosRepo(): com.keyflow.data.SettingsRepository {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val arquivo = java.io.File(context.filesDir, "test-datastore/config-fluxos-${java.util.UUID.randomUUID()}.preferences_pb")
+        fluxosArquivos += arquivo
+        return com.keyflow.data.SettingsRepository(context, arquivo, "config-fluxos-${java.util.UUID.randomUUID()}", fluxosScope,
+            securePrefsFactory = { _, _ -> error("a aba Fluxos abriu o cofre") }, credentialStoreFactory = { _, _ -> error("a aba Fluxos abriu o cofre") })
+    }
+
     private val allGranted = PermissionStatus(
         microphoneGranted = true,
         overlayGranted = true,
@@ -88,6 +106,7 @@ class ConfigScreenTest {
         var interstitialPolicy: InterstitialPolicy? = null
         var interstitialPolicyChanges = 0
         var reasoningAuth: AuthActions = AuthActions.None
+        var fluxosRepository: com.keyflow.data.SettingsRepository? = null
 
         @Composable
         fun Content() {
@@ -125,6 +144,7 @@ class ConfigScreenTest {
                     monetizationDisabled = monetizationDisabled,
                     agentEnabled = agentEnabled,
                     reasoningAuth = reasoningAuth,
+                    fluxosRepository = fluxosRepository,
                     interstitialPolicy = interstitialPolicy,
                     onInterstitialPolicyChanged = { interstitialPolicyChanges++ },
                     modifier = Modifier.fillMaxSize(),
@@ -258,12 +278,11 @@ class ConfigScreenTest {
 
     @Test
     fun deferredTabsShowComingSoonCardWithoutControls() {
-        // Estas abas continuam na navegação, mas não expõem controles antes da entrega do recurso.
+        // Estas abas continuam na navegação, mas não expõem controles antes da entrega do recurso (a Fluxos saiu: FLX-T22).
         val h = Harness()
         rule.setContent { h.Content() }
 
         val tabs = listOf(
-            ConfigTab.FLUXOS to "Fluxos",
             ConfigTab.COMPUTADOR to "Computador",
             ConfigTab.NOTIFICACAO to "Notificação",
         )
@@ -276,6 +295,26 @@ class ConfigScreenTest {
             rule.onAllNodes(hasAnyAncestor(hasTestTag(panelTag(tab))) and hasClickAction()).assertCountEquals(0)
             rule.onAllNodes(hasAnyAncestor(hasTestTag(panelTag(tab))) and hasSetTextAction()).assertCountEquals(0)
         }
+    }
+
+    @Test
+    fun fluxosTabShowsItsPanelInsteadOfComingSoonAndCardsOpenTheModal() {
+        val h = Harness().also { it.fluxosRepository = fluxosRepo() }
+        rule.setContent { h.Content() }
+
+        rule.onNodeWithTag(tabTag(ConfigTab.FLUXOS)).performClick()
+        rule.waitUntil(15_000) { rule.onAllNodesWithTag(FLUXOS_PANEL_TAG).fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithTag(HEADER_TAB_TITLE_TAG).assertTextEquals("Fluxos")
+        rule.onAllNodesWithTag(COMING_SOON_LABEL_TAG).assertCountEquals(0)
+        rule.onAllNodesWithTag("fluxos-modal").assertCountEquals(0)
+        rule.onNodeWithTag("fluxos-card-s-ouvir-responder").performScrollTo().performClick()
+        rule.waitUntil(15_000) { rule.onAllNodesWithTag("fluxos-modal").fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithTag(FLUXOS_MODAL_FECHAR_TAG).performClick()
+        rule.onAllNodesWithTag("fluxos-modal").assertCountEquals(0)
+
+        // Computador e Notificação seguem "Em breve".
+        rule.onNodeWithTag(tabTag(ConfigTab.COMPUTADOR)).performClick()
+        rule.onNodeWithTag(COMING_SOON_LABEL_TAG).assertTextEquals("Em breve")
     }
 
     @Test

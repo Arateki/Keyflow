@@ -386,38 +386,38 @@ Nenhuma. Q1–Q13 foram respondidas em 29/10 (D12–D24). Q8, Q9, Q10, Q11 e Q13
 | CMP-02 | P0 | CMP-T1 | Verified — termlib 0.3.14/fork e cbssh 0.6.6; 126 componentes com POMs/hashes/licenças e 4/4 catracas; build/lint, 2.709 JVM e 20 instrumentados verdes; limites e riscos na [lição](../../project/licoes/2026-10-30-computador-a.md) |
 | CMP-03 | P0 | CMP-T1, CMP-T3 | Verified — JNI do CI com SHA fixado; 3 ABIs no APK, ELF/ZIP 16 KB e hashes conferidos, 6/6 catracas; [lição](../../project/licoes/2026-10-30-computador-a.md) |
 | CMP-04 | P0 | CMP-T4 | Verified (2026-10-30) |
-| CMP-05 | P1-A | CMP-T5, CMP-T11, CMP-T15 | Pending |
-| CMP-06 | P1-A | CMP-T5, CMP-T11 | Pending |
+| CMP-05 | P1-A | CMP-T5, CMP-T11, CMP-T15 | Parcial — modelo/codec (CMP-T5) verificados; faltam T11 e T15 |
+| CMP-06 | P1-A | CMP-T5, CMP-T11 | Parcial — migração pura (CMP-T5) verificada; falta T11 |
 | CMP-07 | P1-A | CMP-T11, CMP-T15 | Pending |
 | CMP-08 | P1-A | CMP-T9, CMP-T15 | Pending |
-| CMP-09 | P1-A | CMP-T5, CMP-T15 | Pending |
-| CMP-10 | P1-B | CMP-T7, CMP-T8, CMP-T16 | Pending |
-| CMP-11 | P1-B | CMP-T2, CMP-T8, CMP-T16 | Pending |
-| CMP-12 | P1-B | CMP-T7, CMP-T16 | Pending |
-| CMP-13 | P1-B | CMP-T7, CMP-T8, CMP-T16 | Pending |
-| CMP-14 | P1-B | CMP-T2, CMP-T8, CMP-T10, CMP-T16 | Pending |
+| CMP-09 | P1-A | CMP-T5, CMP-T15 | Parcial — regra `podeMarcar` (CMP-T5) verificada; falta T15 |
+| CMP-10 | P1-B | CMP-T7, CMP-T8, CMP-T16 | Parcial — geração no Keystore/envelope (CMP-T8) implementada; falta T16 |
+| CMP-11 | P1-B | CMP-T2, CMP-T8, CMP-T16 | Parcial — sonda e envelope (CMP-T8); falta T2 e T16 |
+| CMP-12 | P1-B | CMP-T7, CMP-T16 | Parcial — importação (CMP-T7) verificada; falta T16 |
+| CMP-13 | P1-B | CMP-T7, CMP-T8, CMP-T16 | Parcial — pública (CMP-T7/T8); falta T16 |
+| CMP-14 | P1-B | CMP-T2, CMP-T8, CMP-T10, CMP-T16 | Parcial — janela de 300 s (CMP-T8); falta T2, T10, T16 |
 | CMP-15 | P1-B | CMP-T11, CMP-T16 | Pending |
-| CMP-16 | P1-B | CMP-T7, CMP-T8 | Pending |
-| CMP-17 | P1-C | CMP-T9 | Pending |
-| CMP-18 | P1-C | CMP-T6, CMP-T16 | Pending |
-| CMP-19 | P1-C | CMP-T6, CMP-T11 | Pending |
+| CMP-16 | P1-B | CMP-T7, CMP-T8 | Parcial — sentinelas e `SecretFilter` (CMP-T7/T8) verificados |
+| CMP-17 | P1-C | CMP-T9 | Parcial — adaptador cbssh (CMP-T9) verificado contra o servidor de teste; falta a tela |
+| CMP-18 | P1-C | CMP-T6, CMP-T16 | Parcial — política TOFU (T6) e verificação suspensa na conexão (T9); falta a tela (T16) |
+| CMP-19 | P1-C | CMP-T6, CMP-T11 | Parcial — `known_hosts` em arquivo atômico e rotação (T6, T11); exclusão em cascata verificada |
 | CMP-20 | P1-C | CMP-T9, CMP-T16 | Pending |
 | CMP-21 | P1-C | CMP-T9, CMP-T16 | Pending |
-| CMP-22 | P1-C | CMP-T10, CMP-T20 | Pending |
+| CMP-22 | P1-C | CMP-T10, CMP-T20 | Parcial — reconexão, backoff, biometria e buffer (CMP-T10) verificados; falta a tela |
 | CMP-23 | P1-C | CMP-T9, CMP-T13 | Pending |
 | CMP-24 | P1-D | CMP-T13, CMP-T17 | Pending |
 | CMP-25 | P1-D | CMP-T13 | Pending |
 | CMP-26 | P1-D | CMP-T14 | Pending |
 | CMP-27 | P1-D | CMP-T14 | Pending |
 | CMP-28 | P1-D | CMP-T13 | Pending |
-| CMP-29 | P1-D | CMP-T10, CMP-T13 | Pending |
+| CMP-29 | P1-D | CMP-T10, CMP-T13 | Parcial — limites 8/3 e ociosidade do agente (CMP-T10) verificados |
 | CMP-30 | P1-D | CMP-T13 | Pending |
 | CMP-31 | P1-D | CMP-T14, CMP-T17 | Pending |
-| CMP-32 | P1-E | CMP-T12, CMP-T20 | Pending |
-| CMP-33 | P1-E | CMP-T12, CMP-T19 | Pending |
-| CMP-34 | P1-E | CMP-T10, CMP-T12 | Pending |
+| CMP-32 | P1-E | CMP-T12, CMP-T20 | Parcial — serviço `specialUse`, notificação só com contagem (CMP-T12) verificados |
+| CMP-33 | P1-E | CMP-T12, CMP-T19 | Parcial — manifesto, `property` e checklist da Play (CMP-T12); declaração no Console é [YAN] |
+| CMP-34 | P1-E | CMP-T10, CMP-T12 | Parcial — serviço sobe com a 1ª sessão e cai com a última (CMP-T12); falta a tela |
 | CMP-35 | P1-F | CMP-T13 | Pending |
-| CMP-36 | P1-F | CMP-T10, CMP-T13 | Pending |
+| CMP-36 | P1-F | CMP-T10, CMP-T13 | Parcial — buffer só em memória (CMP-T10) verificado; falta o emulador (T13) |
 | CMP-37 | P2-G | CMP-T22 | Pending |
 | CMP-38 | P2-G | CMP-T23 | Pending |
 | CMP-39 | P2-G | CMP-T23 | Pending |
@@ -443,7 +443,7 @@ Nenhuma. Q1–Q13 foram respondidas em 29/10 (D12–D24). Q8, Q9, Q10, Q11 e Q13
 | CMP-59 | P2-I | CMP-T15, CMP-T17 | Pending |
 | CMP-60 | P2-I | CMP-T17 | Pending |
 | CMP-61 | P2-I | CMP-T15, CMP-T16, CMP-T33 | Pending |
-| CMP-62 | P2-I | CMP-T5, CMP-T31 | Pending |
+| CMP-62 | P2-I | CMP-T5, CMP-T31 | Parcial — regra de arquitetura `computador/` (CMP-T5) ativa; falta T31 |
 | CMP-63 | P2-I | CMP-T4, CMP-T20 | Partial (T4 verificada; T20 pendente) |
 | CMP-64 | P2-I | CMP-T18, CMP-T28, CMP-T36 | Pending |
 | CMP-65 | P2-I | CMP-T19, CMP-T28, CMP-T36 | Pending |

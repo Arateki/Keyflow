@@ -6,6 +6,9 @@ import com.keyflow.core.ButtonState
 import com.keyflow.core.OrbShortcutAction
 import com.keyflow.core.RecordingMode
 import com.keyflow.data.Settings
+import com.keyflow.fluxos.AcaoEfetiva
+import com.keyflow.fluxos.ConfigFluxos
+import com.keyflow.fluxos.RoteadorGatilhos
 import com.keyflow.ui.config.recordingHintParts
 import com.keyflow.ui.config.shortcutActionLabel
 import com.keyflow.ui.config.shortcutActionSub
@@ -30,10 +33,8 @@ private val ORB_PARKED = Offset(0.85f, 0.22f)
 // Na cena do teclado, o mic e o botão de retrair ficam na barra de cima (mesma posição da BarView).
 private val KBD_MIC = Offset(0.11f, 0.14f)
 private val KBD_COLLAPSE = Offset(0.92f, 0.14f)
-// Centro do chip "pausar" do seletor, que a cena ancora em `SELECTOR_START_FRACTION`. Apontar para o
-// lugar errado faria o tour soltar em "cancelar" enquanto o passo declara PAUSED — ensinando o gesto
-// trocado (visto na tira de frames de 2026-09-09).
-private val KBD_MIC_PAUSE_CHIP = Offset(0.27f, 0.13f)
+// Para onde o dedo vai ao arrastar a orbe para cima (o gesto fixo que pausa): reto acima do encaixe, na faixa que ela ocupa ao sobressair.
+private val KBD_MIC_DRAG_UP = Offset(0.11f, 0.02f)
 
 private const val SHORT = 420
 private const val BEAT = 700
@@ -43,7 +44,7 @@ private const val HOLD = 900
  * Roteiros da orbe, na ordem pedagógica do SCR-06: básicos de gravação → pausa → cancelar/desfazer →
  * reposicionar → atalhos de rajada.
  */
-fun buildOrbScripts(settings: Settings): List<GestureScript> {
+fun buildOrbScripts(settings: Settings, fluxos: ConfigFluxos = ConfigFluxos(emptyList(), emptyList())): List<GestureScript> {
     val mode = settings.overlayRecordingMode
     val parts = recordingHintParts(mode)
     val pushToTalk = mode == RecordingMode.PUSH_TO_TALK
@@ -58,7 +59,7 @@ fun buildOrbScripts(settings: Settings): List<GestureScript> {
         }
         add(cancelAndUndo())
         add(reposition())
-        addAll(shortcutScripts(settings, pushToTalk))
+        addAll(shortcutScripts(settings, pushToTalk, fluxos))
     }
 }
 
@@ -180,18 +181,25 @@ private fun reposition() = GestureScript(
  * `NONE` não vira roteiro, e o de 1 toque só existe no Push-to-talk — no modo Alternar o toque já é
  * da gravação e não sobra para atalho.
  */
-private fun shortcutScripts(settings: Settings, pushToTalk: Boolean): List<GestureScript> =
+private fun shortcutScripts(settings: Settings, pushToTalk: Boolean, fluxos: ConfigFluxos): List<GestureScript> =
     (1..3).mapNotNull { taps ->
         if (taps == 1 && !pushToTalk) return@mapNotNull null
-        val action = settings.shortcutForTaps(taps)
-        if (action == OrbShortcutAction.NONE) return@mapNotNull null
-        shortcutScript(taps, action)
+        // O gesto ligado a um fluxo vale no lugar da ação do Settings (FLX-35, FLX-51): o tour descreve o que de fato acontece.
+        when (val efetiva = RoteadorGatilhos.acaoEfetivaDoGesto(taps, settings, fluxos)) {
+            is AcaoEfetiva.DeFluxo -> shortcutScript(taps, tr("Fluxo: %s", efetiva.nome ?: tr("indisponível")),
+                if (efetiva.valido) tr("Roda o fluxo da aba Fluxos neste gesto, no lugar da ação de sempre.")
+                else tr("Este gesto está ligado a um fluxo incompleto: nada roda até você completá-lo na aba Fluxos."))
+            is AcaoEfetiva.DaConfig -> {
+                if (efetiva.acao == OrbShortcutAction.NONE) return@mapNotNull null
+                shortcutScript(taps, shortcutActionLabel(efetiva.acao), shortcutActionSub(efetiva.acao))
+            }
+        }
     }
 
-private fun shortcutScript(taps: Int, action: OrbShortcutAction) = GestureScript(
+private fun shortcutScript(taps: Int, label: String, sub: String) = GestureScript(
     id = "orb-shortcut-${taps}tap",
-    title = "${if (taps == 1) tr("1 toque") else tr("%d toques", taps)} · ${shortcutActionLabel(action)}",
-    description = shortcutActionSub(action),
+    title = "${if (taps == 1) tr("1 toque") else tr("%d toques", taps)} · $label",
+    description = sub,
     scene = TourScene.ORB,
     steps = listOf(
         GestureStep(ORB_CENTER, FingerAction.MOVE, SHORT, SceneReaction(orbState = OrbState.Idle)),
@@ -220,8 +228,8 @@ private fun collapseAndExpand() = GestureScript(
 
 private fun micTap() = GestureScript(
     id = "kbd-mic-tap",
-    title = tr("Mic: gravar e enviar"),
-    description = tr("Toque no mic para começar a gravar · toque de novo para enviar e o texto cai no campo."),
+    title = tr("Orbe: gravar e enviar"),
+    description = tr("Toque na orbe para começar a gravar · toque de novo para enviar e o texto cai no campo · 2 e 3 toques fazem os atalhos que você escolheu."),
     scene = TourScene.KEYBOARD,
     steps = listOf(
         GestureStep(KBD_MIC, FingerAction.MOVE, SHORT, SceneReaction(micState = ButtonState.IDLE_READY)),
@@ -232,29 +240,23 @@ private fun micTap() = GestureScript(
 
 private fun micHold() = GestureScript(
     id = "kbd-mic-hold",
-    title = tr("Mic: seletor de ações"),
-    description = tr("Segure o mic durante a gravação para abrir o seletor · arraste até pausar ou cancelar e solte."),
+    title = tr("Orbe: segurar e arrastar"),
+    description = tr("Gravando, a orbe sobressai acima do teclado · segure e arraste para cima para pausar, para o lado para cancelar, para baixo para abrir o app."),
     scene = TourScene.KEYBOARD,
     steps = listOf(
         GestureStep(KBD_MIC, FingerAction.MOVE, SHORT, SceneReaction(micState = ButtonState.RECORDING)),
+        GestureStep(at = KBD_MIC, action = FingerAction.PRESS, durationMs = HOLD),
         GestureStep(
-            at = KBD_MIC,
-            action = FingerAction.PRESS,
-            durationMs = HOLD,
-            reaction = SceneReaction(overlayHint = TourOverlayHint.MIC_ACTION_SELECTOR),
-        ),
-        GestureStep(
-            at = KBD_MIC_PAUSE_CHIP,
+            at = KBD_MIC_DRAG_UP,
             action = FingerAction.DRAG,
             durationMs = BEAT,
-            reaction = SceneReaction(overlayHint = TourOverlayHint.MIC_ACTION_SELECTOR),
-            dragPath = listOf(KBD_MIC, KBD_MIC_PAUSE_CHIP),
+            dragPath = listOf(KBD_MIC, KBD_MIC_DRAG_UP),
         ),
         GestureStep(
-            at = KBD_MIC_PAUSE_CHIP,
+            at = KBD_MIC_DRAG_UP,
             action = FingerAction.RELEASE,
             durationMs = BEAT,
-            reaction = SceneReaction(micState = ButtonState.PAUSED, overlayHint = TourOverlayHint.NONE),
+            reaction = SceneReaction(micState = ButtonState.PAUSED),
         ),
     ),
 )

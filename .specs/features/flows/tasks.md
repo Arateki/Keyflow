@@ -267,7 +267,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 
 - **Registro (Fase D)**: `opcoesDeModelo(etapa, settings, instalados, conectados, catalogo)` é puro e devolve `OpcaoDeModelo`: `DaAba(efetivo)`, `Escolha(ModeloRef)`, `Conectar(aba)` e `Indisponivel(ref)` (o ref gravado que sumiu, selecionado, sem trocar). Ordem do enum da aba, sem `CREDITS`; `LOCAL` só com os `instalados`, `SYSTEM` sempre, nuvem só com a origem em `conectados` (as demais viram "Conecte na aba X" → `onAbrirAba`). Quem monta `instalados`/`catalogo` (a `FonteDeModelos`) é a T22, com o mesmo dado das abas; o modal sem fonte oferece só "Da aba". Visão só com modelos de visão fica por conta de quem monta o catálogo. Notas: Agente (ferramentas só com chave de API) e PaddleOCR (`ocr-paddle-latin`: instrução ignorada).
 
-### FLX-T20 — Atalhos no modal, botão da barra e excluir — **Status: pendente**
+### FLX-T20 — Atalhos no modal, botão da barra e excluir — **Status: feito (fase E, equipe/fluxos-fase-e)**
 - **What**: seção Atalhos (design §11.4), **agrupada por lugar** (FLX-57; só os lugares que existem — na entrega desta task, a orbe flutuante e o botão do teclado; os grupos da notificação e do teclado entram na T28/T29): "2 toques", "3 toques" (liga/desliga com o aviso do que era antes — `avisoDeSubstituicao`), confirmação ao tirar de outro fluxo, "Botão do teclado" (adiciona/remove `RunFlow` por `atualizarFluxosEBarras`), linhas desligadas
   quando o fluxo é Incompleto; **Excluir fluxo** com confirmação (remove fluxo, gatilhos e botões criados, cancela se estiver rodando).
 - **Where**: `ui/config/FluxosAtalhos.kt`, `ui/config/FluxosModal.kt`; testes `FluxosAtalhosTest`.
@@ -276,7 +276,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
   "Adicionar à barra" cria o botão no fim da barra principal (nos dois modos se não espelhadas) e o gatilho numa transação; excluir remove tudo e a lista atrás atualiza; fluxo Incompleto não liga; `lugaresDisponiveis()` só devolve `FLUTUANTE` e a modal **não** mostra os grupos da notificação nem do teclado.
 - **Tests**: instrumentado (Compose + repositório). **Gate**: `pool instrumentar com.keyflow.ui.config.FluxosAtalhosTest`. **Commit**: `feat(fluxos): atalhos, botão do teclado e exclusão no modal`.
 
-### FLX-T21 — Sobrepor e Tour mostram o gesto ligado a fluxo — **Status: pendente**
+### FLX-T21 — Sobrepor e Tour mostram o gesto ligado a fluxo — **Status: feito (fase E, equipe/fluxos-fase-e)**
 - **What**: `OverlayPanel.ShortcutRow` (`:254-255`) e `ModeCards` (`:128`) mostram "Fluxo: <nome>" quando há gatilho (somente leitura; tocar explica e leva à aba Fluxos); `GestureScriptCatalog` (`:194`) descreve o fluxo; tudo via
   `acaoEfetivaDoGesto` (T5). `ConfigScreen` passa `ConfigFluxos` a esses painéis.
 - **Where**: `ui/config/{OverlayPanel,ModeCards,ConfigScreen}.kt`, `ui/tour/GestureScriptCatalog.kt`; testes `OverlayPanelTest`, `GestureScriptCatalogTest` (ajustados).
@@ -284,7 +284,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 - **Done when**: instrumentado/unit — com 2 toques ligado, a linha mostra o nome do fluxo e o toque abre a aba Fluxos; sem gatilho as telas e o tour são **idênticos** aos de hoje (goldens existentes bit-idênticos); o tour descreve o fluxo quando ligado.
 - **Tests**: unit + instrumentado + goldens. **Gate**: `quick` + `pool instrumentar com.keyflow.ui.config.OverlayPanelTest` + `pool telas`. **Commit**: `feat(fluxos): sobrepor e tour mostram o gesto ligado a fluxo`.
 
-### FLX-T22 — Ligar a aba (sai do "Em breve") — **Status: pendente**
+### FLX-T22 — Ligar a aba (sai do "Em breve") — **Status: feito (fase E, equipe/fluxos-fase-e)**
 - **What**: `ConfigScreen` (`:512-514`) passa a chamar `FluxosPanel` no ramo `FLUXOS` (e mantém `COMPUTADOR`/`NOTIFICACAO` no cartão); abrir o modal pelo estado da tela; ajustar `ConfigScreenTest.deferredTabsShowComingSoonCardWithoutControls` (sem `FLUXOS`),
   o teste de banner (`:183`) e `ConfigTabTest` se preciso. `docsSectionFor` continua `null` até a T24.
 - **Where**: `ui/config/ConfigScreen.kt`, `app/src/androidTest/.../ConfigScreenTest.kt`.
@@ -296,7 +296,7 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 
 ## Fase E — Fechamento
 
-### FLX-T23 — Rotas de galeria e goldens — **Status: pendente**
+### FLX-T23 — Rotas de galeria e goldens — **Status: rotas prontas; goldens pendentes (emulador do servidor travado, `pool telas` não capturou)**
 - **What**: rotas do design §12 (`config-fluxos`, `-atalhos`, `-vazio`, `-restaurar`, `-modal`, `-modal-etapa-nova`, `-modal-modelo`, `-modal-incompleto`, `-atalho-substitui`, `-atalho-ocupado`, `-excluir`, `keyboard-barra-fluxo`, `config-sobrepor-atalho-fluxo`)
   com fixtures determinísticos (ids e nomes fixos, sem relógio), claro e escuro.
 - **Where**: `app/src/debug/java/com/keyflow/ui/gallery/RouteCatalog.kt`, `verification/golden/`.
@@ -304,14 +304,14 @@ inteira é JVM: pode ser entregue e revisada antes de qualquer tela.
 - **Done when**: `pool telas` gera as 13 rotas × 2 temas; `--approve` e depois `git checkout -- verification/golden/…` do que não é desta task; os existentes ficam bit-idênticos; revisão visual das 26 imagens (sem texto cortado em 360 dp).
 - **Tests**: screenshot. **Gate**: `pool telas`. **Commit**: `test(fluxos): rotas de galeria e goldens`.
 
-### FLX-T24 — Docs e site — **Status: pendente**
+### FLX-T24 — Docs e site — **Status: feito (fase F)**
 - **What**: seção `aba-fluxos` na `DocsPanel` (o que é um fluxo, etapas e tipos, os 3 padrão, atalhos e o aviso de substituição, restaurar, o que sai do aparelho — selo), `docsSectionFor(FLUXOS)` aponta para ela, traduções, `website/_fonte/doc.json` regenerado.
 - **Where**: `ui/config/DocsPanel.kt` (+ o arquivo de seções), `i18n/{en,es}/Docs.kt`, `website/_fonte/doc.json`.
 - **Depends on**: T22. **Requirement**: FLX-55.
 - **Done when**: `DocsSectionsTest`, `DocsSiteExportTest` (com `KEYFLOW_REGERAR_DOC_SITE=1` uma vez) e `TranslationsTest` verdes; o "?" do cabeçalho da aba Fluxos abre a seção; o texto não promete notificação, grafo nem Computador.
 - **Tests**: unit + instrumentado leve. **Gate**: `quick`. **Commit**: `docs(fluxos): seção da aba Fluxos na Docs e no site`.
 
-### FLX-T25 — Instrumentados ponta a ponta com motores falsos — **Status: pendente**
+### FLX-T25 — Instrumentados ponta a ponta com motores falsos — **Status: feito (fase F; motores falsos no gancho de portas do serviço)**
 - **What**: `FluxosEndToEndTest` no serviço real (não nas portas): "Ouvir e responder" com gravador/STT/LLM/voz falsos, "Ler a tela e colar" com o `VisionFlow` de prova do `OverlayServiceVisionTest`, "Pedir ao agente e colar" com agente falso e a janela de confirmação;
   falha no meio, cancelar em cada etapa, 2 toques, botão do teclado e **Rodar agora**, restaurar não mexendo nos gatilhos (com o DataStore real); chat separado intacto e sessão nova na execução seguinte; recusa de Ditar/Capturar em RECORDING/PAUSED sem efeitos na gravação.
 - **Where**: `app/src/androidTest/.../fluxos/FluxosEndToEndTest.kt`.

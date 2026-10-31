@@ -550,6 +550,7 @@ open class KeyFlowKeyboardService : InputMethodService() {
             onRunFlow = ::runFlow,
             onOrbeComando = ::executarComandoDaOrbe,
             onOrbePressionar = ::cancelarEnvioPtt,
+            orbeSkinsUnlocked = snapshot.skinsUnlocked,
         )
         keyboardView = view
         activeViewForTest = view

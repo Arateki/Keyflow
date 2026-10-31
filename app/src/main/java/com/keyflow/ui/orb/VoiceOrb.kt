@@ -147,6 +147,9 @@ fun orbStyleFor(orbSkinId: String, skinsUnlocked: Boolean): OrbStyle {
     return if (style.paid && !skinsUnlocked) OrbStyle.ATELIE else style
 }
 
+/** Tinta do tempo e dos glifos do centro: a do estilo da orbe (a do pacote, se for pacote com orbe). Também a orbe do teclado a usa. */
+internal fun orbCenterInk(style: OrbStyle, pack: PackOrb?): Color = centerInkOf(style, pack?.centerInk)
+
 /** Conteúdo desenhado no centro do orbe (ORB-04). */
 sealed interface OrbCenter {
     data object None : OrbCenter
@@ -473,7 +476,7 @@ internal fun DrawScope.drawCancelGlyph(cor: Color = CancelAmber) {
  * não fazem parte do desenho — o Compose os põe por cima, na `orb.centerInk`. Só copia um bitmap já pronto ([PackOrb.frameFor]): nunca
  * espera render, a não ser que o relógio seja injetado ([deterministic]: prévias, galeria, testes), onde o pixel precisa ser sempre o mesmo.
  */
-private fun DrawScope.drawPackOrb(t: Float, state: OrbState, pack: PackOrb, deterministic: Boolean) {
+internal fun DrawScope.drawPackOrb(t: Float, state: OrbState, pack: PackOrb, deterministic: Boolean) {
     // Ler a versão no desenho faz o Compose redesenhar quando um frame novo chega do fundo (com o relógio parado, ninguém mais pediria).
     pack.version
     val side = min(size.width, size.height).roundToInt()

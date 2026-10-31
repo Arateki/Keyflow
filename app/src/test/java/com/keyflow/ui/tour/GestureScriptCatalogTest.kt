@@ -8,6 +8,7 @@ import com.keyflow.ui.config.recordingHintParts
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import com.keyflow.core.ButtonState
 import org.junit.Test
 
 /**
@@ -161,13 +162,14 @@ class GestureScriptCatalogTest {
     }
 
     @Test
-    fun keyboardMicHoldOpensTheActionSelector() {
+    fun keyboardOrbHoldDragsUpToPauseWithoutTheOldChipSelector() {
         val hold = buildKeyboardScripts(settings()).first { it.id == "kbd-mic-hold" }
 
-        assertTrue(
-            "segurar o mic deveria mostrar o seletor de ações",
-            hold.steps.any { it.reaction.overlayHint == TourOverlayHint.MIC_ACTION_SELECTOR },
-        )
+        assertTrue("segurar a orbe", hold.steps.any { it.action == FingerAction.PRESS })
+        val drag = hold.steps.first { it.action == FingerAction.DRAG }
+        assertTrue("arrasta para cima (y diminui)", drag.dragPath.last().y < drag.dragPath.first().y)
+        assertEquals(ButtonState.PAUSED, hold.steps.last().reaction.micState)
+        assertTrue("o texto não fala mais em seletor", !hold.description.contains("seletor"))
     }
 
     // ── Fonte textual única ──────────────────────────────────────────────────
@@ -209,5 +211,37 @@ class GestureScriptCatalogTest {
         // features futuras entrarem como dados, e comparação por valor nos testes do player.
         assertEquals(script, script.copy())
         assertEquals(script.steps, script.steps.map { it.copy() })
+    }
+}
+
+/** FLX-35, FLX-51: o tour descreve o fluxo quando o gesto está ligado a um; sem gatilho é idêntico ao de hoje. */
+class GestureScriptCatalogFluxosTest {
+    private val settings = Settings(overlayRecordingMode = RecordingMode.TOGGLE, shortcut2Tap = OrbShortcutAction.TOGGLE_KEYBOARD, shortcut3Tap = OrbShortcutAction.NONE)
+    private val valido = com.keyflow.fluxos.Fluxo("f1", "Meu fluxo", etapas = listOf(com.keyflow.fluxos.Etapa.Ditar(), com.keyflow.fluxos.Etapa.Inserir))
+    private val incompleto = com.keyflow.fluxos.Fluxo("f2", "Pela metade", etapas = listOf(com.keyflow.fluxos.Etapa.Inserir))
+    private fun gatilho(n: Int, f: com.keyflow.fluxos.Fluxo) = com.keyflow.fluxos.Gatilho(
+        com.keyflow.fluxos.Superficie.Orbe(com.keyflow.orbe.LugarDaOrbe.FLUTUANTE, n), f.id)
+
+    @Test
+    fun semGatilhoIdenticoAoDeHoje() {
+        val vazio = com.keyflow.fluxos.ConfigFluxos(listOf(valido), emptyList())
+        assertEquals(buildOrbScripts(settings), buildOrbScripts(settings, vazio))
+    }
+
+    @Test
+    fun gestoLigadoDescreveOFluxoEEscondeAAcaoSombreada() {
+        val config = com.keyflow.fluxos.ConfigFluxos(listOf(valido), listOf(gatilho(2, valido), gatilho(3, valido)))
+        val scripts = buildOrbScripts(settings, config).filter { it.id.startsWith("orb-shortcut-") }
+        assertEquals(listOf("orb-shortcut-2tap", "orb-shortcut-3tap"), scripts.map { it.id })
+        assertTrue(scripts[0].title, scripts[0].title.endsWith("Fluxo: Meu fluxo"))
+        assertFalse(scripts[0].title.contains("Retrair"))
+        assertFalse(scripts[0].description.contains("Encolhe"))
+    }
+
+    @Test
+    fun fluxoIncompletoAvisaQueNadaRoda() {
+        val config = com.keyflow.fluxos.ConfigFluxos(listOf(incompleto), listOf(gatilho(2, incompleto)))
+        val s = buildOrbScripts(settings, config).first { it.id == "orb-shortcut-2tap" }
+        assertTrue(s.description, s.description.contains("incompleto"))
     }
 }

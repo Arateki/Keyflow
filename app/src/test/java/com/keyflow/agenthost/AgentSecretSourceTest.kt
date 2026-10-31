@@ -51,6 +51,22 @@ class AgentSecretSourceTest {
     }
 
     @Test
+    fun `the secrets of the Computador tab reach the filter and are redacted`() {
+        val cofre = com.keyflow.computador.chaves.CofreFalso().also {
+            it.gravar("ssh_pw.a1b2c3d4", "senha-ssh-sentinela-7731")
+            it.gravar("ssh_key.k0000001", "semente-sentinela-4402")
+        }
+        val source = AgentSecretSource({ vaultWith() }, FakeCredentialStore(), computador = cofre::valores)
+        assertThat(source()).containsAtLeast("senha-ssh-sentinela-7731", "semente-sentinela-4402")
+        val filtered = SecretFilter(source).redact("o servidor respondeu senha-ssh-sentinela-7731 e semente-sentinela-4402")
+        assertThat(filtered).doesNotContain("sentinela")
+        // Apagar do cofre tira o valor do filtro na leitura seguinte (a fonte lê a cada uso).
+        cofre.apagar("ssh_pw.a1b2c3d4")
+        source.invalidate()
+        assertThat(source()).doesNotContain("senha-ssh-sentinela-7731")
+    }
+
+    @Test
     fun `identifiers that are not secrets and the empty skeleton of a login are not collected`() {
         val store = FakeCredentialStore()
         store.put(ProviderIds.OPENAI, Credential.OAuth("", null, 0, null, emptySet(), null, "client-id-publico", "sub", "yan@exemplo.com"))

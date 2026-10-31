@@ -142,7 +142,7 @@ para permitir essa verificação sem reescrever a branch; detalhes na [lição](
 
 ### Fase 1A — Modelo e dados (JVM puro)
 
-### CMP-T5 — Hosts: modelo, codec, validação e migração do host único `[P]` — **Status: pendente**
+### CMP-T5 — Hosts: modelo, codec, validação e migração do host único `[P]` — **Status: concluída em 2026-10-30**
 - **What**: `Host`, `AutenticacaoHost`, `PoliticaAgente`, `ConfigHosts`, limites (50 hosts, nome 1..40 único, usuário 1..64, porta 1..65535), `ValidadorHost` (endereço: nome DNS, IPv4, IPv6 com colchetes; motivo por campo) e `CodecHosts` (`org.json`, `"v":1`, tolerante: nunca lança,
   item ruim descartado, campo desconhecido ignorado, ids repetidos viram um). `RegraAgente.podeMarcar(host)` (CMP-09: só autenticação resolvida pelo app). `MigracaoHostUnico.migrar(settingsAntigo) → ConfigHosts?` (função pura; a senha e a chave saem em um `SegredosMigrados` à parte, nunca no host).
 - **Where**: `app/src/main/java/com/keyflow/computador/{Modelo,ValidadorHost,CodecHosts,RegraAgente,MigracaoHostUnico}.kt`; testes `CodecHostsTest`, `CodecHostsPropertyTest`, `CodecHostsFuzzTest`, `HostSemSegredoTest`, `MigracaoHostUnicoTest`, `ValidadorHostTest`. Regra no `ArchitectureRulesTest`: `computador/*.kt` (exceto `computador/app/**`) sem `android.*`, compose e `org.connectbot.terminal`.
@@ -152,7 +152,7 @@ para permitir essa verificação sem reescrever a branch; detalhes na [lição](
   IPv6/porta/nome inválidos recusados com o motivo; `podeMarcar` recusa auth "pergunte sempre" e chave com passphrase pedida na hora; migração: `computerSshHost` vazio → nada; preenchido → 1 host "Servidor SSH" com porta, usuário e auth do antigo e **segredos à parte**; idempotente.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(computador): modelo de hosts, codec tolerante e migração do host único`.
 
-### CMP-T6 — known_hosts e política de confiança (TOFU) `[P]` — **Status: pendente**
+### CMP-T6 — known_hosts e política de confiança (TOFU) `[P]` — **Status: concluída em 2026-10-30**
 - **What**: `ImpressaoDigital` (SHA256 base64 sem padding como o OpenSSH, mais a "arte" aleatória opcional), `RepositorioDeConfianca` (interface) e `PoliticaDeConfianca.avaliar(host, porta, chave, repositorio) → Conhecida | Nova(impressao) | Mudou(antiga, nova)`;
   formato do arquivo `known_hosts` compatível com OpenSSH (`[host]:porta algoritmo base64`, sem hash de hostname — limite do cbssh), leitor/escritor tolerante, e `AtualizadorDeChaves` (rotação `hostkeys` só quando a chave autenticada já é conhecida).
 - **Where**: `computador/{ImpressaoDigital,PoliticaDeConfianca,KnownHostsArquivo}.kt`; testes `PoliticaDeConfiancaTest`, `KnownHostsArquivoTest`, `KnownHostsPropertyTest`.
@@ -162,7 +162,7 @@ para permitir essa verificação sem reescrever a branch; detalhes na [lição](
   arquivo com linha malformada preserva as outras; remover por host não toca os demais; rotação sem chave conhecida autenticada é recusada.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(computador): known_hosts e política de confiança no primeiro uso`.
 
-### CMP-T7 — Chaves: modelo, importação e assinatura abstrata `[P]` — **Status: pendente**
+### CMP-T7 — Chaves: modelo, importação e assinatura abstrata `[P]` — **Status: concluída em 2026-10-30**
 - **What**: `ChaveSsh` (id, nome, tipo, impressão, `Protecao {HARDWARE, KEYSTORE_ENVELOPE, SOFTWARE_COFRE}`, `exigeBiometria`, criada em — **sem material secreto**; `toString` mascara), interface `Assinador { chavePublica(): AuthPublicKey; suspend assinar(dados): ByteArray? }` (liga ao `AuthHandler.onSignatureRequest` do cbssh),
   `ImportadorDeChave` (OpenSSH e PEM PKCS#8/PKCS#1 pelo `SshKeys.decodePemPrivateKey`; passphrase pedida na hora, nunca guardada; rejeita DSA e RSA < 2048 com o motivo), formatador da chave pública (`ssh-ed25519 AAAA…` ou `ecdsa-sha2-nistp256 AAAA…`, comentário `keyflow@<aparelho>`), `AgenteSegredos.valores()` ampliado para o `SecretFilter`.
   Tudo sobre portas (`CofreDeSegredos`, `RelogioDeChaves`), com fakes.
@@ -173,7 +173,7 @@ para permitir essa verificação sem reescrever a branch; detalhes na [lição](
   a passphrase e o texto colado não ficam em nenhum campo depois de `importar()`; o `SecretFilter` recebe os valores guardados.
 - **Tests**: unit. **Gate**: `quick`. **Commit**: `feat(computador): modelo de chaves, importação e assinatura abstrata`.
 
-### CMP-T8 — Chaves no Android: Keystore, envelope e biometria — **Status: pendente**
+### CMP-T8 — Chaves no Android: Keystore, envelope e biometria — **Status: concluída em 2026-10-30 (T2 pendente; ver a lição)**
 - **What**: `ProvedorDeChavesAndroid` sobre o resultado da T2. `gerar(nome, tipo, exigeBiometria)`: **Ed25519** no Keystore (API 33+ e sonda aprovada) com `ProbeEd25519` de produção, ou **fallback** — Ed25519 em software (a semente de 32 bytes gerada pelo Tink do cbssh) guardada **cifrada** por uma chave AES-256-GCM do Keystore (API 24+) no cofre do app, zerada da memória logo após assinar; **ECDSA P-256** (`secp256r1`, `DIGEST_SHA256`) sempre no Keystore, sem envelope (D13).
   Importadas entram no envelope. Biometria opcional por chave, janela de **5 minutos** (D14): API 24–29 `setUserAuthenticationValidityDurationSeconds(300)`; API 30+ `setUserAuthenticationParameters(300, AUTH_BIOMETRIC_STRONG)`; duração > 0 **não** usa `CryptoObject`. `setUserAuthenticationRequired(true)`, `setInvalidatedByBiometricEnrollment(true)` com aviso antes de ligar; sem biometria cadastrada a opção fica desligada com o motivo. O prompt autentica o usuário; dentro dos 300 s a assinatura segue sem novo prompt.
   Exclusão apaga Keystore e cofre. Fora do backup (`data_extraction_rules.xml`/`backup_rules`).
@@ -186,7 +186,7 @@ para permitir essa verificação sem reescrever a branch; detalhes na [lição](
 
 ### Fase 1B — Conexão e sessão
 
-### CMP-T9 — Camada SSH: a porta `ConexaoSsh` e o adaptador cbssh — **Status: pendente**
+### CMP-T9 — Camada SSH: a porta `ConexaoSsh` e o adaptador cbssh — **Status: concluída em 2026-10-31**
 - **What**: interface `ConexaoSsh` (`conectar`, `verificarServidor`, `autenticar`, `abrirShell(pty)`, `redimensionar`, `escrever`, `saida: Flow<ByteArray>`, `fechar`, `eventos`) e `ConexaoCbssh`: `SshClient` com `HostKeyVerifier` (usa a `PoliticaDeConfianca` e **suspende** até o usuário decidir),
   `AuthHandler` (`onPublicKeysNeeded` → `Assinador.chavePublica`, `onSignatureRequest` → `Assinador.assinar`, `onKeyboardInteractivePrompt` → ponte para a UI, `password` → ponte), política criptográfica **padrão** do cbssh (sem algoritmos legados), `keepAliveIntervalMs`, `requestPty(TERM=xterm-256color, cols, rows, px)`, `resizeTerminal`.
   `MapaDeErros`: exceções do cbssh → `CausaSsh` (tabela do `spec.md` › Erros). **Modo teste de conexão** (`testar()`): conecta, verifica, autentica e fecha **sem** abrir shell.
@@ -197,7 +197,7 @@ para permitir essa verificação sem reescrever a branch; detalhes na [lição](
   `Mudou` encerra com `CHAVE_DO_SERVIDOR_MUDOU` sem chamar o `AuthHandler`; `resize` chega ao servidor como `window-change`; keepalive: servidor que para de responder derruba em ≤ 3 intervalos; `testar()` não pede o shell; nenhum segredo em mensagem de exceção (sentinela); cancelar a coroutine fecha o socket.
 - **Tests**: unit/integração JVM. **Gate**: `quick`. **Commit**: `feat(computador): conexão SSH pelo cbssh com verificação de servidor e erros mapeados`.
 
-### CMP-T10 — Sessão, gerenciador, reconexão e buffer — **Status: pendente**
+### CMP-T10 — Sessão, gerenciador, reconexão e buffer — **Status: concluída em 2026-10-31**
 - **What**: `SessaoTerminal` (máquina de estados `Conectando · AguardandoServidor · Autenticando · Aberta · Reconectando · Encerrada(motivo) · Falhou(causa)`; `dono: USUARIO | AGENTE`, `compartilhada`), `GerenciadorDeSessoes` (abrir/fechar, **8 sessões no total, 3 do agente**, ociosidade só do agente, 10 min — D21; a sessão do usuário não fecha por ociosidade), `Reconexao`
   (backoff 1·2·4·8·16·30 s, no máximo 10 tentativas ou 10 min; só com rede; chave com biometria **fora da janela de 5 minutos** emite `PrecisaDoUsuario` e não abre o prompt sozinha; **dentro** da janela reconecta sem novo prompt — D14), `BufferDeTexto` (anel de linhas de texto puro alimentado pelo mesmo fluxo de bytes, para o agente e para busca; **só em memória**) e `PortaDoEmulador` (interface que a tela implementa).
 - **Where**: `computador/sessao/*.kt`; testes `SessaoTerminalTest`, `GerenciadorDeSessoesTest`, `ReconexaoTest`, `BufferDeTextoTest` (relógio virtual).
@@ -209,7 +209,7 @@ para permitir essa verificação sem reescrever a branch; detalhes na [lição](
 
 ### Fase 1C — Integração Android
 
-### CMP-T11 — Persistência: hosts, confiança, chaves e a migração — **Status: pendente**
+### CMP-T11 — Persistência: hosts, confiança, chaves e a migração — **Status: concluída em 2026-10-31**
 - **What**: chave `computer_hosts_json` no DataStore `keyflow_settings` (padrão `bars_config_json`), `computer_keys_json` (metadados de chave, sem segredo), arquivo `known_hosts` em `filesDir` (fora do backup); `hostsFlow()`, `hostsOnce()` (leitura leve, sem cofre), `atualizarHosts(f)` atômico sobre o valor atual;
   **migração** do host único no primeiro uso (T5): cria o host, move senha → segredo do host e chave privada → `ChaveSsh` importada, **apaga** `COMPUTER_SSH_PASSWORD`/`COMPUTER_SSH_KEY` do cofre e deixa `computerSsh*` ignorados no `Settings` (campos mantidos só para ler o legado; removidos numa task futura). Excluir host/chave com os efeitos em cascata (CMP-07, CMP-15).
 - **Where**: `data/SettingsRepository.kt` (ou `computador/app/RepositorioComputador.kt` sobre o mesmo DataStore), `data/SettingsCredentialKeys.kt`, `res/xml/` regras de backup; teste instrumentado `RepositorioComputadorTest`.
@@ -219,7 +219,7 @@ para permitir essa verificação sem reescrever a branch; detalhes na [lição](
   excluir host fecha as sessões dele (via fake do gerenciador), apaga a entrada do `known_hosts` e a senha lembrada e **mantém** a chave; excluir chave em uso pede a lista de hosts afetados e os deixa "sem chave"; `data_extraction_rules` exclui `known_hosts` e os segredos.
 - **Tests**: instrumentado. **Gate**: `pool instrumentar com.keyflow.computador.app.RepositorioComputadorTest`. **Commit**: `feat(computador): persistência de hosts, chaves e known_hosts e migração do host único`.
 
-### CMP-T12 — Serviço em primeiro plano `specialUse` e notificação — **Status: pendente**
+### CMP-T12 — Serviço em primeiro plano `specialUse` e notificação — **Status: concluída em 2026-10-31**
 - **What**: `SessoesService` (FGS `specialUse`, `FOREGROUND_SERVICE_SPECIAL_USE`, `<property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE">` com o texto do `design.md` §7), canal "Sessões do Computador", notificação com a contagem, **Desconectar todas** e (com sessão do agente) **Parar o agente**;
   o gerenciador a liga ao abrir a 1ª sessão (com o app visível) e a derruba ao fechar a última sessão (a ociosidade de 10 min fecha só a sessão do agente, D21, e não a do usuário); sem `POST_NOTIFICATIONS` o serviço funciona igual; processo morto pelo sistema → sessões marcadas `EncerradaPeloSistema` na reabertura.
   Opção "Manter conectado com a tela apagada" (D22), desligada por padrão: desligada, o serviço não adquire `WakeLock`; ligada, adquire `PARTIAL_WAKE_LOCK` enquanto houver sessão do usuário. `WAKE_LOCK` é permissão normal e o lock só existe com a opção ligada.
