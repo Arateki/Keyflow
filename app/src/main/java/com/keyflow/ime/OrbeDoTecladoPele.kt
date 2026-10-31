@@ -77,6 +77,7 @@ internal class OrbeDoTecladoPele(private val densidade: Float) {
         val nova = Chave(estilo, pacote, pacote?.version ?: 0, estado, lado, fundo, miolo, tempoMs)
         var atual = bitmap
         if (atual == null || atual.width != lado || atual.height != lado) {
+            atual?.recycle()
             atual = Bitmap.createBitmap(lado.coerceAtLeast(1), lado.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
             bitmap = atual
             canvas = Canvas(atual)
