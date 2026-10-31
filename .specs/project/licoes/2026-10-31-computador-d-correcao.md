@@ -11,3 +11,9 @@ O filtro de respostas reconhece C1 bruto sem confundi-lo com continuação UTF-8
 `ParserLibvtermTest` compila o C original com o compilador do host dentro dos unitários do pool (sem NDK/JNI), consulta os callbacks do parser e compara 500 fluxos fragmentados e 300 fluxos de bytes arbitrários: consultas proibidas ausentes, DECCKM igual e texto posterior visível. Testes do filtro: 25/25. A mutação que liberou S8C1T derrubou três testes (incluindo o fuzz); revertida e 25/25 novamente.
 
 Mouse SGR na tela continua para CMP-25/T27; esta correção não o conecta.
+
+## CMP-26/27: ordem depende de uma fila, não de um atraso
+
+O texto do Compose passa por `QueuedTerminal` e pela `TerminalDispatcher`; as teclas do app agora entram na mesma FIFO com `dispatchKeyboardInput`. O callback continua único e aplica o filtro antes do consumidor SSH. O atraso de 40 ms saiu. Três testes JVM retêm o worker e conferem Esc+i, Backspace+letra e texto+Enter sem relógio: 3/3; mutação emitindo fora da fila: 3/3 vermelhos, revertida, 3/3 verdes.
+
+Os nove instrumentados de entrada foram preparados (inclusive o componente correto do IME), mas não executados. Antes da instalação, a verificação sob Gradle → emulador encontrou `Application Not Responding: com.android.systemui`, com lastanr `executing service ...SystemUIAuxiliaryDumpService`. Conforme a tarefa, os instrumentados foram suspensos; sem fechar diálogo, esconder erro, reiniciar ou mudar o AVD. A compilação dos APKs passou; após as correções restantes, a compilação final também confere os testes novos.

@@ -407,7 +407,7 @@ Nenhuma. Q1–Q13 foram respondidas em 29/10 (D12–D24). Q8, Q9, Q10, Q11 e Q13
 | CMP-23 | P1-C | CMP-T9, CMP-T13 | Verificada (`window-change` com colunas, linhas e pixels ao girar, `TerminalActivityTest`) |
 | CMP-24 | P1-D | CMP-T13, CMP-T17 | Parcial — `TerminalActivity`, abas, barra de estado e Voltar sem fechar sessões verificados (T13); falta a lista de sessões na aba (T17) |
 | CMP-25 | P1-D | CMP-T13 | Verificada, salvo mouse (fica para a Fase 2/T27) e tamanho de fonte persistido (termlib sem retorno) |
-| CMP-26 | P1-D | CMP-T14 | Verificada (`MapaTecladoFisicoTest`, `TeclasExtrasTest`) |
+| CMP-26 | P1-D | CMP-T14 | Mapeamento verificado; revisão #96: FIFO única com texto/IME e `KeyboardOrderingTest` 3/3, mutação revertida. Novos casos de ordem no IME pendentes por ANR do SystemUI antes da instalação |
 | CMP-27 | P1-D | CMP-T14 | Verificada com o KeyFlow IME como teclado atual via `InputConnection`; Gboard e toque real: T21 (manual) |
 | CMP-28 | P1-D | CMP-T13 | Verificada (colar e ditado com quebra de linha pedem confirmação; `ESC[201~` removido até não sobrar) |
 | CMP-29 | P1-D | CMP-T10, CMP-T13 | Verificada (9ª sessão mostra o motivo; `onTrimMemory` não perde o texto) |

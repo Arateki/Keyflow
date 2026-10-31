@@ -101,6 +101,9 @@ sealed interface TerminalEmulator : AutoCloseable {
     /** Queue pasted text in the same FIFO as keyboard/IME input, honoring bracketed paste. */
     fun pasteText(text: String)
 
+    /** Bytes já mapeados pelo app, na mesma FIFO de texto/IME e com o mesmo callback de saída. */
+    fun dispatchKeyboardInput(data: ByteArray)
+
     /** Policy controlling whether incoming inline image commands are accepted. */
     val inlineImages: InlineImages
 
@@ -725,6 +728,13 @@ internal class TerminalEmulatorImpl(
                 checkNotClosed()
                 terminalNative.dispatchMouseButton(button, pressed, modifiers)
             }
+        }
+    }
+
+    override fun dispatchKeyboardInput(data: ByteArray) {
+        checkNotClosed()
+        commands.keyboardInput(data) { copia ->
+            synchronized(damageLock) { if (!closed) postCallback { onKeyboardInput.invoke(copia) } }
         }
     }
 

@@ -253,6 +253,8 @@ para permitir essa verificação sem reescrever a branch; detalhes na [lição](
   com o Gboard (se instalado no emulador) o mesmo resultado; alvos ≥ 48 dp; `contentDescription` em toda tecla extra.
 - **Tests**: unit + instrumentado. **Gate**: `quick` + `pool instrumentar com.keyflow.computador.app.EntradaTerminalImeTest`. **Commit**: `feat(computador): teclas extras, teclado físico e ditado no terminal`.
 
+**Correção da revisão #96 (2026-10-31):** teclas mapeadas usam `dispatchKeyboardInput` na mesma FIFO do texto/IME, sem atraso de 40 ms. Os três unitários da fila real passaram; mutação emitindo fora da fila derrubou 3/3 e foi revertida. `EntradaTerminalImeTest` agora inclui Esc+i, Backspace+letra e texto+Enter rápidos. Instrumentados pendentes: a verificação prévia detectou ANR ativo do SystemUI e a execução foi suspensa, sem instalar ou reiniciar para contornar.
+
 ### Fase 1D — Telas
 
 ### CMP-T15 — Painel Hosts: lista, modal, "Testar conexão" real e "pode ser usado pelo agente" — **Status: concluída em 2026-10-31**

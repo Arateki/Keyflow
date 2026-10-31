@@ -150,17 +150,11 @@ class LigacaoEmulador(
 
     /** Bytes de teclas que o app mesmo mapeou (teclas extras, teclado físico): passam pelo mesmo filtro e pela mesma fila, na ordem. */
     fun enviar(bytes: ByteArray) {
-        val ok = filtroDeSaida.filtrar(bytes)
-        if (ok.isEmpty() || fechada) return
-        // O texto digitado ou ditado sai do termlib por um callback **postado** no looper principal (`postAtTime`); uma tecla mapeada que fosse direto
-        // para a fila passaria à frente dele (medido: Enter chegando antes de `ls -la`). O termlib processa o texto numa thread própria e posta o callback depois; um atraso curto (e igual para todas as teclas mapeadas, que
-        // seguem em ordem) deixa o texto sair primeiro. Limite conhecido: duas entradas dos dois caminhos no mesmo instante podem trocar de ordem.
-        principal.postDelayed({ if (!fechada) fila.trySend(Saida.Bytes(ok.copyOf())) }, ATRASO_DE_ORDEM_MS)
+        if (bytes.isEmpty() || fechada) return
+        // A mesma FIFO do QueuedTerminal serializa texto/IME e teclas mapeadas antes de postar callbacks.
+        // O único onKeyboardInput acima aplica o filtro e entrega ao consumidor SSH, sem depender de milissegundos.
+        try { emulador.dispatchKeyboardInput(bytes) } catch (_: IllegalStateException) { /* fechou durante o envio */ }
     }
-
-    private val principal = android.os.Handler(android.os.Looper.getMainLooper())
-
-    private companion object { const val ATRASO_DE_ORDEM_MS = 40L }
 
     /** Visível aos testes: quantos pedaços o filtro de saída descartou. */
     val descartesDeSaida: Int get() = filtroDeSaida.descartes

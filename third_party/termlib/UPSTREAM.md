@@ -46,3 +46,9 @@ Auditoria do NDK efetivamente usado: `clang_source_info.md` do CI registra LLVM 
 `toolchain/llvm_android@1dab3288f660d43a6cb2479107e2b54b3ab0a2a1`. Os quatro `LICENSE.TXT`
 dessa base foram baixados e são **bit-idênticos** aos textos preservados neste diretório.
 Prova e hashes: `.equipe/provas/computador-a/t3-licencas-ndk-real.json` (fora do git).
+
+## Entrada ordenada do app (revisão #96)
+
+`dispatchKeyboardInput` enfileira os bytes já mapeados na mesma `TerminalDispatcher` usada pelo
+`QueuedTerminal` do Compose. A produção e a postagem dos callbacks seguem essa FIFO, sem atrasos arbitrários.
+É uma alteração Kotlin; não muda o JNI nem os binários fixados.

@@ -33,7 +33,7 @@ class EntradaTerminalImeTest {
     private val host = Host(id = "h1", nome = "dev-server", endereco = "dev.example.org", usuario = "yan", autenticacao = AutenticacaoHost.Senha)
     private val deps = DependenciasFalsas()
     private var imeAnterior: String? = null
-    private val imeKeyFlow = "com.keyflow/.ime.KeyFlowKeyboardService"
+    private val imeKeyFlow get() = "${ctx.packageName}/com.keyflow.ime.KeyFlowKeyboardService"
 
     private fun shell(cmd: String): String = instr.uiAutomation.executeShellCommand(cmd).use { f -> java.io.FileInputStream(f.fileDescriptor).bufferedReader().readText() }
 
@@ -41,6 +41,7 @@ class EntradaTerminalImeTest {
         imeAnterior = shell("settings get secure default_input_method").trim().takeIf { it.isNotEmpty() && it != "null" }
         shell("ime enable $imeKeyFlow")
         shell("ime set $imeKeyFlow")
+        assertEquals(imeKeyFlow, shell("settings get secure default_input_method").trim())
     }
 
     @After fun restaurarIme() { imeAnterior?.let { shell("ime set $it") } }
@@ -85,10 +86,8 @@ class EntradaTerminalImeTest {
     @Test fun digitarLsLaEEnterChegaExatamenteUmaVez() = comTerminal { _, view ->
         val enter = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER)
         val soltar = KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER)
-        conexao(view) { ic -> ic.commitText("ls -la", 1) }
-        // O termlib solta texto de vários caracteres numa thread própria, um instante depois; uma pessoa não aperta Enter no mesmo milissegundo.
-        esperar { escrito() == "ls -la" }
         conexao(view) { ic ->
+            ic.commitText("ls -la", 1)
             // O mesmo evento por dois caminhos (o `aa` da T1): só um chega.
             ic.sendKeyEvent(enter); view.dispatchKeyEvent(enter)
             ic.sendKeyEvent(soltar); view.dispatchKeyEvent(soltar)
@@ -96,6 +95,43 @@ class EntradaTerminalImeTest {
         esperar { escrito().contains("\r") }
         Thread.sleep(300)
         assertEquals(hex("ls -la\r"), hex(escrito()))
+    }
+
+    private fun tecla(view: View, ic: android.view.inputmethod.InputConnection, codigo: Int) {
+        for (acao in listOf(KeyEvent.ACTION_DOWN, KeyEvent.ACTION_UP)) {
+            val evento = KeyEvent(acao, codigo)
+            ic.sendKeyEvent(evento); view.dispatchKeyEvent(evento)
+        }
+    }
+
+    @Test fun escEImeNaMesmaChamadaNaoInvertemAOrdem() = comTerminal { _, view ->
+        conexao(view) { ic -> tecla(view, ic, KeyEvent.KEYCODE_ESCAPE); ic.commitText("i", 1) }
+        esperar { escrito().length >= 2 }
+        assertEquals(hex("\u001bi"), hex(escrito()))
+    }
+
+    @Test fun escEILetrasFisicasNaoInvertemAOrdem() = comTerminal { _, view ->
+        conexao(view) { _ ->
+            for (codigo in listOf(KeyEvent.KEYCODE_ESCAPE, KeyEvent.KEYCODE_I)) {
+                view.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, codigo))
+                view.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, codigo))
+            }
+        }
+        esperar { escrito().length >= 2 }
+        assertEquals(hex("\u001bi"), hex(escrito()))
+    }
+
+    @Test fun backspaceETextoRapidosNaoInvertemAOrdem() = comTerminal { _, view ->
+        conexao(view) { ic -> tecla(view, ic, KeyEvent.KEYCODE_DEL); ic.commitText("a", 1) }
+        esperar { escrito().length >= 2 }
+        assertEquals(hex("\u007fa"), hex(escrito()))
+    }
+
+    @Test fun enterEsperaTodoOTextoEnfileiradoSemAtrasoArbitrario() = comTerminal { _, view ->
+        val texto = "x".repeat(10_000)
+        conexao(view) { ic -> ic.commitText(texto, 1); tecla(view, ic, KeyEvent.KEYCODE_ENTER) }
+        esperar { escrito().endsWith("\r") }
+        assertEquals(texto+"\r", escrito())
     }
 
     @Test fun acentosChegamEmUtf8EBackspaceApagaUmCaractere() = comTerminal { _, view ->
