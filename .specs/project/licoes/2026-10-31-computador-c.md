@@ -25,3 +25,12 @@ Branch `equipe/computador-c` (base `equipe/computador-b`, com as correções da 
   (o serviço só sobe quando alguém chama `SessoesService.ligar`, o que a T13 fará).
 - O registro "sessões que estavam abertas" para `EncerradaPeloSistema` (design §7) fica para a T13 (precisa da `TerminalActivity`); `onTaskRemoved` fecha as sessões.
 - O "toque para reconectar" da notificação depende da tela; o estado `PrecisaDoUsuario` já existe.
+
+## Rodada de revisão do #92
+- **Instabilidade do `SessoesServiceTest` (1 em 15)**: causa medida, e era do **serviço/ligação**, não do teste. `SessoesService.ligar` assinava os eventos do gerenciador com `launch` comum; o `SharedFlow` não tem replay, então uma
+  sessão aberta logo depois de `ligar` publicava `PrimeiraSessao` antes de haver ouvinte e o serviço nunca subia. `LigacaoSessoesTest` mede a ligação antiga: **270 de 400 rodadas** receberam o aviso (130 perdidos);
+  a nova (`observarPrimeiraSessao`, inscrição `UNDISPATCHED` + sessões já vivas contam) recebe 400 de 400.
+- **`GerenciadorDeSessoes.publicar`** passou a ler a lista, gravar o resumo e emitir os eventos tudo sob a `trava` (antes o `_resumos.value` era gravado fora dela e uma publicação mais velha podia ganhar da mais nova).
+  `abrirEFecharAoMesmoTempoDeixaOResumoIgualAoEstadoReal` (8 threads) cobre; não consegui provar vermelho antes da correção nesta máquina (a janela é estreita), então ele vale como guarda, não como prova da corrida.
+- **Tempos da conexão** (CMP-21): agora separados. O **TCP** tem 15 s, no próprio `TransportFactory` (`withTimeout` sobre o transporte padrão do cbssh); a **troca de chaves** tem 30 s, vigiados pelo relógio do `ConexaoCbssh`,
+  que continua parando enquanto o usuário decide a impressão digital. O `handshakeTimeoutMs` do cbssh fica em 0 (ele contaria a decisão do usuário). `tcpTemQuinzeSegundosEATrocaDeChavesTrinta` prova a separação com relógio virtual.
