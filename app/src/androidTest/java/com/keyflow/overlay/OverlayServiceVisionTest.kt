@@ -64,7 +64,7 @@ class OverlayServiceVisionTest {
         // As ações vão por startService (como OverlayServiceCancelTest): OverlayService.start marcaria um primeiro plano pendente que nunca chega,
         // e o stop do fim ficaria só anotado.
         // Descarta a gravação: em repouso a captura do fluxo começa e pede o consentimento.
-        context.startService(OverlayService.actionIntent(context, RecordingNotification.ACTION_CANCEL))
+        context.startService(OverlayService.actionIntent(context, OverlayService.ACTION_CANCEL))
         botao("cancelar a gravação", ButtonState.CANCELLING)
         context.startService(OverlayService.actionIntent(context, OverlayService.ACTION_COMMIT_CANCEL))
         botao("concluir o cancelamento", ButtonState.IDLE_READY, ButtonState.IDLE_NO_FIELD)
@@ -306,11 +306,11 @@ class OverlayServiceVisionTest {
             block(checkNotNull(OverlayService.instanceForVisionTest))
         } finally {
             if (OverlayService.visionFlowStateForTest.value != VisionFlowState.NONE) {
-                OverlayService.start(context, OverlayService.actionIntent(context, RecordingNotification.ACTION_CANCEL))
+                OverlayService.start(context, OverlayService.actionIntent(context, OverlayService.ACTION_CANCEL))
                 withTimeout(15_000) { OverlayService.visionFlowStateForTest.first { it == VisionFlowState.NONE } }
             }
             if (KeyFlowController.buttonState.value in listOf(ButtonState.PAUSED, ButtonState.RECORDING)) {
-                OverlayService.start(context, OverlayService.actionIntent(context, RecordingNotification.ACTION_CANCEL))
+                OverlayService.start(context, OverlayService.actionIntent(context, OverlayService.ACTION_CANCEL))
                 withTimeout(15_000) { KeyFlowController.buttonState.first { it == ButtonState.CANCELLING } }
             }
             if (KeyFlowController.buttonState.value == ButtonState.CANCELLING) {
@@ -349,7 +349,7 @@ class OverlayServiceVisionTest {
             // Nova chamada pede consentimento de novo; gesto de voz cancela só a Visão e mantém PAUSED.
             OverlayService.start(context, OverlayService.actionIntent(context, OverlayService.ACTION_VISION))
             assertNotNull(device.wait(Until.findObject(By.text(Pattern.compile("(?i)cancel|cancelar"))), 15_000))
-            val voiceAction = if (mode == RecordingMode.TOGGLE) OverlayService.ACTION_RECORD else RecordingNotification.ACTION_CANCEL
+            val voiceAction = if (mode == RecordingMode.TOGGLE) OverlayService.ACTION_RECORD else OverlayService.ACTION_CANCEL
             OverlayService.start(context, OverlayService.actionIntent(context, voiceAction))
             withTimeout(15_000) { OverlayService.visionFlowStateForTest.first { it == VisionFlowState.NONE } }
             instrumentation.waitForIdleSync()
@@ -360,11 +360,11 @@ class OverlayServiceVisionTest {
         } finally {
             // Encerra o fluxo e descarta a gravação de teste pelo caminho público antes de parar o serviço.
             if (OverlayService.visionFlowStateForTest.value != VisionFlowState.NONE) {
-                OverlayService.start(context, OverlayService.actionIntent(context, RecordingNotification.ACTION_CANCEL))
+                OverlayService.start(context, OverlayService.actionIntent(context, OverlayService.ACTION_CANCEL))
                 withTimeout(15_000) { OverlayService.visionFlowStateForTest.first { it == VisionFlowState.NONE } }
             }
             if (KeyFlowController.buttonState.value in listOf(ButtonState.PAUSED, ButtonState.RECORDING)) {
-                OverlayService.start(context, OverlayService.actionIntent(context, RecordingNotification.ACTION_CANCEL))
+                OverlayService.start(context, OverlayService.actionIntent(context, OverlayService.ACTION_CANCEL))
                 withTimeout(15_000) { KeyFlowController.buttonState.first { it == ButtonState.CANCELLING } }
             }
             if (KeyFlowController.buttonState.value == ButtonState.CANCELLING) {

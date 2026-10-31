@@ -46,6 +46,9 @@ sealed interface PackFileKind {
 
     data class KeyboardFace(val part: KeyboardPart) : PackFileKind
 
+    /** `notification_<estado>.svg`: a orbe estática da notificação (NTF-31); um arquivo por estado. */
+    data class NotificationFace(val state: OrbPackState) : PackFileKind
+
     /** Nomes reservados para versões futuras (FORMAT.md §7): hoje são ignorados com aviso. */
     data object Reserved : PackFileKind
 
@@ -67,6 +70,7 @@ object SkinPackNames {
     private const val MAX_FRAME_DIGITS = 9
 
     private val ORB_FRAME = Regex("""orb_([a-z]+)_([0-9]+)\.svg""")
+    private val NOTIFICATION_FACE = Regex("""notification_([a-z]+)\.svg""")
     private val RESERVED = Regex("""(?:keyboard_fx_.*|orb_error_.*|orb_cancelling_.*)""")
 
     /** Classifica o NOME DO ARQUIVO (sem pasta). */
@@ -74,6 +78,9 @@ object SkinPackNames {
         if (fileName == MANIFEST) return PackFileKind.Manifest
         KeyboardPart.ofFileName(fileName)?.let { return PackFileKind.KeyboardFace(it) }
         if (RESERVED.matches(fileName)) return PackFileKind.Reserved
+        NOTIFICATION_FACE.matchEntire(fileName)?.let { m ->
+            OrbPackState.ofKey(m.groupValues[1])?.let { return PackFileKind.NotificationFace(it) }
+        }
         val orb = ORB_FRAME.matchEntire(fileName)
         if (orb != null) {
             val state = OrbPackState.ofKey(orb.groupValues[1])
@@ -88,6 +95,9 @@ object SkinPackNames {
         val lower = fileName.lowercase()
         return PackFileKind.Unknown(lowercaseWouldMatch = lower != fileName && classify(lower) !is PackFileKind.Unknown)
     }
+
+    /** O nome do arquivo da orbe da notificação no [state]. */
+    fun notificationFileName(state: OrbPackState): String = "notification_${state.key}.svg"
 
     /** Nome com o qual o frame é instalado: o número sem ambiguidade, com quatro dígitos (`orb_idle_0007.svg`). */
     fun frameFileName(state: OrbPackState, frame: Int): String = "orb_${state.key}_${frame.toString().padStart(4, '0')}.svg"

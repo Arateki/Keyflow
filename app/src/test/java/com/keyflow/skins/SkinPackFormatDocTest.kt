@@ -77,7 +77,7 @@ class SkinPackFormatDocTest {
         val result = read(zip(entries))
         assertThat(result.report.errors).isEmpty()
         assertThat(result.report.warnings).isEmpty()
-        assertThat(result.report.installed).containsExactly("orbe: 4 estados, 45 frames", "teclado: tray + 4 faces").inOrder()
+        assertThat(result.report.installed).containsExactly("orbe: 4 estados, 45 frames", "teclado: tray + 4 faces", "notificação: 4 estados").inOrder()
     }
 
     @Test
@@ -85,6 +85,7 @@ class SkinPackFormatDocTest {
         val files = section(2)
         for (state in OrbPackState.entries) assertThat(files).contains("| `${state.key}`")
         for (part in KeyboardPart.entries) assertThat(files).contains("`${part.fileName}`")
+        for (state in OrbPackState.entries) assertThat(files).contains("`${SkinPackNames.notificationFileName(state)}`")
         assertThat(files).contains("`orb_<estado>_<frame>.svg`")
     }
 
@@ -132,6 +133,10 @@ class SkinPackFormatDocTest {
         assertThat(table).contains("| `orb.fps` | ${SkinPackManifest.MIN_FPS}–${SkinPackManifest.MAX_FPS}, `$d`")
         assertThat(table).contains("| `orb.states.<estado>.fps` | ${SkinPackManifest.MIN_FPS}–${SkinPackManifest.MAX_FPS}, herda `orb.fps`")
         assertThat(table).contains("Um `fps` acima de **${SkinPackManifest.MAX_SHOWN_FPS}** é aceito (até ${SkinPackManifest.MAX_FPS}), mas o import **avisa**")
+        val notification = NotificationManifest()
+        assertThat(table).contains("`notification.ink` | cor, `${hex(notification.ink)}`")
+        assertThat(table).contains("`notification.background` | cor **opaca**, sem padrão (= o fundo do sistema)")
+        assertThat(notification.background).isNull()
         assertThat(table).contains("texto 1–${SkinPackManifest.MAX_NAME}, **obrigatório**")
         assertThat(table).contains("texto ≤ ${SkinPackManifest.MAX_AUTHOR}, opcional")
         assertThat(table).contains("`schemaVersion` | inteiro, **obrigatório** (`${SkinPackManifest.SCHEMA_VERSION}`)")

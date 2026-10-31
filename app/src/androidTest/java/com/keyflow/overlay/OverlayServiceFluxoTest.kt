@@ -111,7 +111,7 @@ class OverlayServiceFluxoTest {
     @After fun limpar() = runBlocking {
         try {
             if (KeyFlowController.buttonState.value in listOf(ButtonState.RECORDING, ButtonState.PAUSED)) {
-                context.startService(OverlayService.actionIntent(context, RecordingNotification.ACTION_CANCEL))
+                context.startService(OverlayService.actionIntent(context, OverlayService.ACTION_CANCEL))
                 aguardar("gravação não cancelou") { KeyFlowController.buttonState.value == ButtonState.CANCELLING }
             }
             if (KeyFlowController.buttonState.value == ButtonState.CANCELLING) {
@@ -268,7 +268,7 @@ class OverlayServiceFluxoTest {
                 assertTrue(chamadas.isEmpty())
             }
             if (estado == ButtonState.RECORDING) {
-                context.startService(OverlayService.actionIntent(context, RecordingNotification.ACTION_PAUSE_RESUME))
+                context.startService(OverlayService.actionIntent(context, OverlayService.ACTION_PAUSE_RESUME))
                 aguardar("gravação não pausou") { KeyFlowController.buttonState.value == ButtonState.PAUSED }
             }
         }

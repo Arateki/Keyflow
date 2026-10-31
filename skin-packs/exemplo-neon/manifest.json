@@ -16,5 +16,9 @@
     "trayColor": "#0B0B1A",
     "navigationBarColor": "#0B0B1A",
     "slice": { "left": 24, "top": 24, "right": 24, "bottom": 24 }
+  },
+  "notification": {
+    "ink": "#FFFFFF",
+    "background": "#0B0B1A"
   }
 }

@@ -94,6 +94,7 @@ internal class AndroidSkinWorkshop(
         PackFileKind.Manifest -> SkinFileKind.MANIFEST
         is PackFileKind.OrbFrame -> SkinFileKind.ORB_FRAME
         is PackFileKind.KeyboardFace -> SkinFileKind.KEYBOARD_FACE
+        is PackFileKind.NotificationFace -> SkinFileKind.NOTIFICATION_FACE
         else -> SkinFileKind.REJECTED // fora do vocabulário, reservado ou número de frame inválido
     }
 

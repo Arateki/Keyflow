@@ -241,7 +241,8 @@ sealed interface Comando {
 
 fun resolver(
     toques: Int, visaoAtiva: Boolean, tecladoVisivel: Boolean,
-    efetiva: ConfigEfetiva, overflow: ShortcutOverflow, fluxos: ResolucaoDeFluxo? = null,
+    efetiva: ConfigEfetiva, overflow: ShortcutOverflow,
+    fluxos: (toques: Int) -> ResolucaoDeFluxo? = { null },   // gancho por contagem: no overflow o `n` muda (3 ou 2) e cada um tem o seu gatilho
 ): Comando
 ```
 

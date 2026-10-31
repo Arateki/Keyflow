@@ -118,6 +118,16 @@ enum class OrbStyle(
     PACK("pack", paid = false),
 }
 
+/** A tinta do tempo e dos glifos do centro de cada estilo (o `LocalCenterInk` da orbe e a notificação, NTF-T6). */
+internal fun centerInkOf(style: OrbStyle, packInk: Int? = null): Color = when (style) {
+    OrbStyle.AERO -> AeroInk
+    OrbStyle.GLITCH -> Color.White
+    OrbStyle.ROSE_GOLD -> RoseInk
+    OrbStyle.MASCOT -> MascotInk
+    OrbStyle.ATELIE -> CenterInk
+    OrbStyle.PACK -> packInk?.let { Color(it) } ?: CenterInk
+}
+
 /** Estilo do orbe para a árvore abaixo — a overlay e as prévias das abas seguem a skin escolhida. */
 val LocalOrbStyle = staticCompositionLocalOf { OrbStyle.ATELIE }
 
@@ -220,14 +230,7 @@ fun VoiceOrb(
 
     // Tempo e glifos do centro na tinta do estilo (marrom no Ateliê, marinho no vidro do Aero).
     androidx.compose.runtime.CompositionLocalProvider(
-        LocalCenterInk provides when (style) {
-            OrbStyle.AERO -> AeroInk
-            OrbStyle.GLITCH -> Color.White
-            OrbStyle.ROSE_GOLD -> RoseInk
-            OrbStyle.MASCOT -> MascotInk
-            OrbStyle.ATELIE -> CenterInk
-            OrbStyle.PACK -> pack?.let { Color(it.centerInk) } ?: CenterInk
-        },
+        LocalCenterInk provides centerInkOf(style, pack?.centerInk),
         LocalCenterGlow provides if (style == OrbStyle.AERO) AeroInkGlow else null,
     ) {
         BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
@@ -389,15 +392,18 @@ private fun GearGlyph(glyphSize: Dp) {
 @Composable
 private fun PauseGlyph(glyphSize: Dp) {
     val ink = LocalCenterInk.current
-    Canvas(Modifier.size(glyphSize)) {
-        // Folga vertical (0.16..0.84) para ocupar a mesma área de play/lixeira.
-        val barW = size.width * 0.26f
-        val gap = size.width * 0.18f
-        val top = size.height * 0.16f
-        val barH = size.height * 0.68f
-        drawRect(ink, topLeft = Offset(size.width / 2f - gap / 2f - barW, top), size = Size(barW, barH))
-        drawRect(ink, topLeft = Offset(size.width / 2f + gap / 2f, top), size = Size(barW, barH))
-    }
+    Canvas(Modifier.size(glyphSize)) { drawPauseGlyph(ink) }
+}
+
+/** O traçado do glifo de pause (duas barras), compartilhado com a notificação (NTF-T6): o mesmo desenho da orbe flutuante. */
+internal fun DrawScope.drawPauseGlyph(ink: Color) {
+    // Folga vertical (0.16..0.84) para ocupar a mesma área de play/lixeira.
+    val barW = size.width * 0.26f
+    val gap = size.width * 0.18f
+    val top = size.height * 0.16f
+    val barH = size.height * 0.68f
+    drawRect(ink, topLeft = Offset(size.width / 2f - gap / 2f - barW, top), size = Size(barW, barH))
+    drawRect(ink, topLeft = Offset(size.width / 2f + gap / 2f, top), size = Size(barW, barH))
 }
 
 
@@ -405,39 +411,60 @@ private fun PauseGlyph(glyphSize: Dp) {
 /** Glifo de erro (X vermelho) — exibido brevemente quando a transcrição falha. */
 @Composable
 private fun ErrorGlyph(glyphSize: Dp) {
-    Canvas(Modifier.size(glyphSize)) {
-        val pad = size.width * 0.16f
-        val sw = size.width * 0.26f // traço mais pesado (como as barras largas do pause), sem aumentar o X
-        drawLine(ErrorRed, Offset(pad, pad), Offset(size.width - pad, size.height - pad), strokeWidth = sw, cap = StrokeCap.Round)
-        drawLine(ErrorRed, Offset(size.width - pad, pad), Offset(pad, size.height - pad), strokeWidth = sw, cap = StrokeCap.Round)
+    Canvas(Modifier.size(glyphSize)) { drawErrorGlyph() }
+}
+
+/** O traçado do X de erro, compartilhado com a notificação (NTF-T6). */
+internal fun DrawScope.drawErrorGlyph() {
+    val pad = size.width * 0.16f
+    val sw = size.width * 0.26f // traço mais pesado (como as barras largas do pause), sem aumentar o X
+    drawLine(ErrorRed, Offset(pad, pad), Offset(size.width - pad, size.height - pad), strokeWidth = sw, cap = StrokeCap.Round)
+    drawLine(ErrorRed, Offset(size.width - pad, pad), Offset(pad, size.height - pad), strokeWidth = sw, cap = StrokeCap.Round)
+}
+
+/** O olho da Visão (lente com a pupila), só para a notificação (NTF-T6): a orbe flutuante não tem este glifo. */
+internal fun DrawScope.drawEyeGlyph(ink: Color) {
+    val w = size.width
+    val h = size.height
+    val sw = w * 0.09f
+    val lens = Path().apply {
+        moveTo(w * 0.08f, h * 0.5f)
+        quadraticTo(w * 0.5f, h * 0.08f, w * 0.92f, h * 0.5f)
+        quadraticTo(w * 0.5f, h * 0.92f, w * 0.08f, h * 0.5f)
+        close()
     }
+    drawPath(lens, ink, style = Stroke(width = sw, cap = StrokeCap.Round))
+    drawCircle(ink, radius = w * 0.15f, center = Offset(w * 0.5f, h * 0.5f))
 }
 
 /** Glifo de lixeira (descarte do áudio) — exibido no estado de cancelamento (Fase 2). */
 @Composable
 private fun CancelGlyph(glyphSize: Dp) {
-    Canvas(Modifier.size(glyphSize)) {
-        val w = size.width
-        val h = size.height
-        val sw = w * 0.085f
-        val left = w * 0.24f
-        val right = w * 0.76f
-        val lidY = h * 0.28f
-        // Tampa + alça
-        drawLine(CancelAmber, Offset(left - w * 0.04f, lidY), Offset(right + w * 0.04f, lidY), strokeWidth = sw, cap = StrokeCap.Round)
-        drawLine(CancelAmber, Offset(w * 0.40f, lidY), Offset(w * 0.40f, h * 0.18f), strokeWidth = sw, cap = StrokeCap.Round)
-        drawLine(CancelAmber, Offset(w * 0.60f, lidY), Offset(w * 0.60f, h * 0.18f), strokeWidth = sw, cap = StrokeCap.Round)
-        drawLine(CancelAmber, Offset(w * 0.40f, h * 0.18f), Offset(w * 0.60f, h * 0.18f), strokeWidth = sw, cap = StrokeCap.Round)
-        // Corpo (balde) — laterais ligeiramente afuniladas + base
-        val bodyTop = lidY + h * 0.04f
-        val bodyBottom = h * 0.80f
-        drawLine(CancelAmber, Offset(left, bodyTop), Offset(left + w * 0.04f, bodyBottom), strokeWidth = sw, cap = StrokeCap.Round)
-        drawLine(CancelAmber, Offset(right, bodyTop), Offset(right - w * 0.04f, bodyBottom), strokeWidth = sw, cap = StrokeCap.Round)
-        drawLine(CancelAmber, Offset(left + w * 0.04f, bodyBottom), Offset(right - w * 0.04f, bodyBottom), strokeWidth = sw, cap = StrokeCap.Round)
-        // Ranhuras verticais
-        listOf(0.42f, 0.5f, 0.58f).forEach { fx ->
-            drawLine(CancelAmber, Offset(w * fx, bodyTop + h * 0.07f), Offset(w * fx, bodyBottom - h * 0.07f), strokeWidth = sw * 0.7f, cap = StrokeCap.Round)
-        }
+    Canvas(Modifier.size(glyphSize)) { drawCancelGlyph() }
+}
+
+/** O traçado da lixeira de descarte, compartilhado com a notificação (NTF-T6). */
+internal fun DrawScope.drawCancelGlyph() {
+    val w = size.width
+    val h = size.height
+    val sw = w * 0.085f
+    val left = w * 0.24f
+    val right = w * 0.76f
+    val lidY = h * 0.28f
+    // Tampa + alça
+    drawLine(CancelAmber, Offset(left - w * 0.04f, lidY), Offset(right + w * 0.04f, lidY), strokeWidth = sw, cap = StrokeCap.Round)
+    drawLine(CancelAmber, Offset(w * 0.40f, lidY), Offset(w * 0.40f, h * 0.18f), strokeWidth = sw, cap = StrokeCap.Round)
+    drawLine(CancelAmber, Offset(w * 0.60f, lidY), Offset(w * 0.60f, h * 0.18f), strokeWidth = sw, cap = StrokeCap.Round)
+    drawLine(CancelAmber, Offset(w * 0.40f, h * 0.18f), Offset(w * 0.60f, h * 0.18f), strokeWidth = sw, cap = StrokeCap.Round)
+    // Corpo (balde) — laterais ligeiramente afuniladas + base
+    val bodyTop = lidY + h * 0.04f
+    val bodyBottom = h * 0.80f
+    drawLine(CancelAmber, Offset(left, bodyTop), Offset(left + w * 0.04f, bodyBottom), strokeWidth = sw, cap = StrokeCap.Round)
+    drawLine(CancelAmber, Offset(right, bodyTop), Offset(right - w * 0.04f, bodyBottom), strokeWidth = sw, cap = StrokeCap.Round)
+    drawLine(CancelAmber, Offset(left + w * 0.04f, bodyBottom), Offset(right - w * 0.04f, bodyBottom), strokeWidth = sw, cap = StrokeCap.Round)
+    // Ranhuras verticais
+    listOf(0.42f, 0.5f, 0.58f).forEach { fx ->
+        drawLine(CancelAmber, Offset(w * fx, bodyTop + h * 0.07f), Offset(w * fx, bodyBottom - h * 0.07f), strokeWidth = sw * 0.7f, cap = StrokeCap.Round)
     }
 }
 

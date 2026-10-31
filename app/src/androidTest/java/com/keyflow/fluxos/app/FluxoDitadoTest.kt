@@ -15,7 +15,6 @@ import com.keyflow.fluxos.execucao.DestinoFluxo
 import com.keyflow.fluxos.execucao.ResultadoDitado
 import com.keyflow.overlay.GestureIntent
 import com.keyflow.overlay.OverlayService
-import com.keyflow.overlay.RecordingNotification
 import com.keyflow.overlay.TouchSignal
 import com.keyflow.ui.onboarding.DISCLOSURE_VERSION
 import java.util.Collections
@@ -69,7 +68,7 @@ class FluxoDitadoTest {
     fun tearDown() = runBlocking {
         instrumentation.runOnMainSync { KeyFlowController.clearInserter() }
         if (KeyFlowController.buttonState.value in listOf(ButtonState.RECORDING, ButtonState.PAUSED)) {
-            context.startService(OverlayService.actionIntent(context, RecordingNotification.ACTION_CANCEL))
+            context.startService(OverlayService.actionIntent(context, OverlayService.ACTION_CANCEL))
             waitUntil("cancelamento não começou") { KeyFlowController.buttonState.value == ButtonState.CANCELLING }
         }
         if (KeyFlowController.buttonState.value == ButtonState.CANCELLING) {
@@ -129,7 +128,7 @@ class FluxoDitadoTest {
     fun aFinishedCancellationReturnsCancelledToTheFlowOnce() {
         assertTrue(iniciar())
         waitUntil("não chegou a RECORDING") { KeyFlowController.buttonState.value == ButtonState.RECORDING }
-        context.startService(OverlayService.actionIntent(context, RecordingNotification.ACTION_CANCEL))
+        context.startService(OverlayService.actionIntent(context, OverlayService.ACTION_CANCEL))
         waitUntil("o cancelamento não começou") { KeyFlowController.buttonState.value == ButtonState.CANCELLING }
         assertTrue("desfazer não libera o destino", resultados.isEmpty())
         context.startService(OverlayService.actionIntent(context, OverlayService.ACTION_COMMIT_CANCEL))

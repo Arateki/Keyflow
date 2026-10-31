@@ -43,7 +43,7 @@ class ExampleSkinPackTest {
     private fun assertCleanImport(result: SkinPackReadResult) {
         assertThat(result.report.errors).isEmpty()
         assertThat(result.report.warnings).isEmpty()
-        assertThat(result.report.installed).containsExactly("orbe: 4 estados, 45 frames", "teclado: tray + 4 faces").inOrder()
+        assertThat(result.report.installed).containsExactly("orbe: 4 estados, 45 frames", "teclado: tray + 4 faces", "notificação: 4 estados").inOrder()
     }
 
     @Test
