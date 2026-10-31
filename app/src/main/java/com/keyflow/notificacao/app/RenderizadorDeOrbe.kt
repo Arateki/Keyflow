@@ -57,7 +57,7 @@ object RenderizadorDeOrbe {
             if (quadro != null) {
                 val saida = Bitmap.createBitmap(ladoPx, ladoPx, Bitmap.Config.ARGB_8888)
                 android.graphics.Canvas(saida).drawBitmap(quadro, 0f, 0f, null)
-                desenharGlifo(saida, glifo, centerInkOf(style, pack.centerInk))
+                desenharGlifo(saida, glifo, centerInkOf(style, pack.centerInk), cores = false)
                 return saida
             }
         }
@@ -68,22 +68,26 @@ object RenderizadorDeOrbe {
             drawOrb(TEMPO_FIXO_MS, estado, estilo, hasCenter = glifo != null)
         }
         val copia = imagem.asAndroidBitmap().copy(Bitmap.Config.ARGB_8888, true)
-        desenharGlifo(copia, glifo, centerInkOf(estilo))
+        desenharGlifo(copia, glifo, centerInkOf(estilo), cores = true)
         return copia
     }
 
     /** Desenha o [glifo] no centro de um bitmap já pronto (a skin Sistema) na [tinta] ARGB. */
-    fun glifoSobre(bitmap: Bitmap, glifo: GlifoDaOrbe, tinta: Int) = desenharGlifo(bitmap, glifo, Color(tinta))
+    fun glifoSobre(bitmap: Bitmap, glifo: GlifoDaOrbe, tinta: Int) = desenharGlifo(bitmap, glifo, Color(tinta), cores = false)
 
-    private fun desenharGlifo(bitmap: Bitmap, glifo: GlifoDaOrbe?, tinta: Color) {
+    /**
+     * @param cores `true` nas skins nativas: a lixeira e o X levam as cores próprias da orbe flutuante (âmbar e vermelho); `false` em pacote e no
+     * Sistema, onde **todos** os glifos usam a tinta da skin (`notification.ink`, FORMAT §3, NTF-31).
+     */
+    private fun desenharGlifo(bitmap: Bitmap, glifo: GlifoDaOrbe?, tinta: Color, cores: Boolean) {
         if (glifo == null) return
         val g = (bitmap.width * 0.5f).toInt().coerceAtLeast(1)
         val imagem = ImageBitmap(g, g)
         CanvasDrawScope().draw(Density(1f), LayoutDirection.Ltr, Canvas(imagem), Size(g.toFloat(), g.toFloat())) {
             when (glifo) {
                 GlifoDaOrbe.PAUSA -> drawPauseGlyph(tinta)
-                GlifoDaOrbe.LIXEIRA -> drawCancelGlyph()
-                GlifoDaOrbe.X -> drawErrorGlyph()
+                GlifoDaOrbe.LIXEIRA -> if (cores) drawCancelGlyph() else drawCancelGlyph(tinta)
+                GlifoDaOrbe.X -> if (cores) drawErrorGlyph() else drawErrorGlyph(tinta)
                 GlifoDaOrbe.OLHO -> drawEyeGlyph(tinta)
             }
         }

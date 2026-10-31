@@ -62,6 +62,30 @@ class RenderizadorDeOrbeTest {
         assertNotEquals(idle.toList(), listening.toList())
     }
 
+    private fun corDominante(b: Bitmap): Int {
+        val opacos = pixels(b).filter { Color.alpha(it) > 200 }
+        require(opacos.isNotEmpty()) { "glifo não desenhou" }
+        return opacos.groupingBy { it }.eachCount().maxByOrNull { it.value }!!.key
+    }
+
+    @Test
+    fun osGlifosDePacoteESistemaUsamATintaDaSkinTodos() {
+        val verde = Color.rgb(0, 200, 0)
+        for (g in GlifoDaOrbe.entries) {
+            val b = Bitmap.createBitmap(lado, lado, Bitmap.Config.ARGB_8888)
+            RenderizadorDeOrbe.glifoSobre(b, g, verde)
+            val c = corDominante(b)
+            assertEquals("glifo $g", verde, c)
+        }
+    }
+
+    @Test
+    fun asSkinsNativasMantemAsCoresProprias() {
+        val atelie = RenderizadorDeOrbe.renderizar(OrbStyle.ATELIE, AparenciaDaOrbe.PAUSED, lado, GlifoDaOrbe.LIXEIRA)
+        val ambar = Color.rgb(0xC9, 0x77, 0x2F)
+        assertTrue(pixels(atelie).any { Color.alpha(it) > 200 && Math.abs(Color.red(it) - Color.red(ambar)) < 12 && Math.abs(Color.green(it) - Color.green(ambar)) < 12 })
+    }
+
     @Test
     fun oEstiloDePacoteSemPacoteCaiNoAtelie() {
         val pacote = RenderizadorDeOrbe.renderizar(OrbStyle.PACK, AparenciaDaOrbe.IDLE, lado)

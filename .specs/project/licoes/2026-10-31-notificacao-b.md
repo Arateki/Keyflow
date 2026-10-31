@@ -79,3 +79,15 @@ NTF-T6..T10 da feature `notification`, mais os 2 P3 da revisão da etapa A e a r
   T10 botão sem passar pelo portão.
 - **Goldens**: só mudam de propósito os `notification-*` (a notificação deixou de ser a barra de chips). Orbe, Sobrepor, onboarding e tour devem ficar bit-idênticos (ver o relatório).
 - **Pendente (fora desta etapa)**: coalescência, dispensar e re-posts (T11); desenho da aparência fora da thread principal (T11); gancho real de Fluxos (T20).
+
+## Correções da revisão do #93
+
+- **Contraste dos botões**: no Ateliê escuro a tinta e o fundo são ambos `#2B2720`, então os glifos sumiam (e nos 4 goldens aprovados). `Contraste.legivel(tinta, fundo)` garante 3:1 (WCAG) e cai em branco ou quase preto;
+  `NotificacaoDaOrbeTest` agora **desenha o botão** e mede a cor do glifo contra o fundo da skin (ou do sistema) nas skins e nos dois modos, em vez de só `assertNotNull(colorFilter)`.
+  A galeria forçava `escuro = true` (as variantes "claras" tinham fundo escuro); passa a seguir a paleta da rota.
+- **Portão no momento de agir**: `NotificacaoHost.executar` revalida o `PortaoDeToque` depois da janela da rajada (a tela pode bloquear aos 100 ms de 250); testes virtuais para GravarEnviar e para a ação sem Activity,
+  mais os controles (opção ligada; bloqueada antes; Activity com a opção ligada pede o desbloqueio).
+- **Falta de memória**: `ProvedorDeAparencia` e `notificacaoDoEstado` também pegam `OutOfMemoryError` (skin → Ateliê → mínima), com teste.
+- **Glifos de pacote e Sistema**: lixeira e X usam a tinta da skin (`notification.ink`, FORMAT §3, NTF-31); as skins nativas mantêm âmbar e vermelho da orbe flutuante. Testes de pixel nos dois casos.
+- **Bloqueio**: o teste do serviço deixou de mexer no bloqueio do emulador (`locksettings`/`KEYCODE_SLEEP`), que se auto-ignorava e podia deixar o SystemUI em ANR. O serviço ganhou o gancho `bloqueadaParaTeste` no lugar do
+  `KeyguardManager`; o portão em si segue coberto no host com relógio virtual.

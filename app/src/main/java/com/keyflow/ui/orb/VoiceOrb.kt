@@ -415,11 +415,11 @@ private fun ErrorGlyph(glyphSize: Dp) {
 }
 
 /** O traçado do X de erro, compartilhado com a notificação (NTF-T6). */
-internal fun DrawScope.drawErrorGlyph() {
+internal fun DrawScope.drawErrorGlyph(cor: Color = ErrorRed) {
     val pad = size.width * 0.16f
     val sw = size.width * 0.26f // traço mais pesado (como as barras largas do pause), sem aumentar o X
-    drawLine(ErrorRed, Offset(pad, pad), Offset(size.width - pad, size.height - pad), strokeWidth = sw, cap = StrokeCap.Round)
-    drawLine(ErrorRed, Offset(size.width - pad, pad), Offset(pad, size.height - pad), strokeWidth = sw, cap = StrokeCap.Round)
+    drawLine(cor, Offset(pad, pad), Offset(size.width - pad, size.height - pad), strokeWidth = sw, cap = StrokeCap.Round)
+    drawLine(cor, Offset(size.width - pad, pad), Offset(pad, size.height - pad), strokeWidth = sw, cap = StrokeCap.Round)
 }
 
 /** O olho da Visão (lente com a pupila), só para a notificação (NTF-T6): a orbe flutuante não tem este glifo. */
@@ -444,7 +444,7 @@ private fun CancelGlyph(glyphSize: Dp) {
 }
 
 /** O traçado da lixeira de descarte, compartilhado com a notificação (NTF-T6). */
-internal fun DrawScope.drawCancelGlyph() {
+internal fun DrawScope.drawCancelGlyph(cor: Color = CancelAmber) {
     val w = size.width
     val h = size.height
     val sw = w * 0.085f
@@ -452,19 +452,19 @@ internal fun DrawScope.drawCancelGlyph() {
     val right = w * 0.76f
     val lidY = h * 0.28f
     // Tampa + alça
-    drawLine(CancelAmber, Offset(left - w * 0.04f, lidY), Offset(right + w * 0.04f, lidY), strokeWidth = sw, cap = StrokeCap.Round)
-    drawLine(CancelAmber, Offset(w * 0.40f, lidY), Offset(w * 0.40f, h * 0.18f), strokeWidth = sw, cap = StrokeCap.Round)
-    drawLine(CancelAmber, Offset(w * 0.60f, lidY), Offset(w * 0.60f, h * 0.18f), strokeWidth = sw, cap = StrokeCap.Round)
-    drawLine(CancelAmber, Offset(w * 0.40f, h * 0.18f), Offset(w * 0.60f, h * 0.18f), strokeWidth = sw, cap = StrokeCap.Round)
+    drawLine(cor, Offset(left - w * 0.04f, lidY), Offset(right + w * 0.04f, lidY), strokeWidth = sw, cap = StrokeCap.Round)
+    drawLine(cor, Offset(w * 0.40f, lidY), Offset(w * 0.40f, h * 0.18f), strokeWidth = sw, cap = StrokeCap.Round)
+    drawLine(cor, Offset(w * 0.60f, lidY), Offset(w * 0.60f, h * 0.18f), strokeWidth = sw, cap = StrokeCap.Round)
+    drawLine(cor, Offset(w * 0.40f, h * 0.18f), Offset(w * 0.60f, h * 0.18f), strokeWidth = sw, cap = StrokeCap.Round)
     // Corpo (balde) — laterais ligeiramente afuniladas + base
     val bodyTop = lidY + h * 0.04f
     val bodyBottom = h * 0.80f
-    drawLine(CancelAmber, Offset(left, bodyTop), Offset(left + w * 0.04f, bodyBottom), strokeWidth = sw, cap = StrokeCap.Round)
-    drawLine(CancelAmber, Offset(right, bodyTop), Offset(right - w * 0.04f, bodyBottom), strokeWidth = sw, cap = StrokeCap.Round)
-    drawLine(CancelAmber, Offset(left + w * 0.04f, bodyBottom), Offset(right - w * 0.04f, bodyBottom), strokeWidth = sw, cap = StrokeCap.Round)
+    drawLine(cor, Offset(left, bodyTop), Offset(left + w * 0.04f, bodyBottom), strokeWidth = sw, cap = StrokeCap.Round)
+    drawLine(cor, Offset(right, bodyTop), Offset(right - w * 0.04f, bodyBottom), strokeWidth = sw, cap = StrokeCap.Round)
+    drawLine(cor, Offset(left + w * 0.04f, bodyBottom), Offset(right - w * 0.04f, bodyBottom), strokeWidth = sw, cap = StrokeCap.Round)
     // Ranhuras verticais
     listOf(0.42f, 0.5f, 0.58f).forEach { fx ->
-        drawLine(CancelAmber, Offset(w * fx, bodyTop + h * 0.07f), Offset(w * fx, bodyBottom - h * 0.07f), strokeWidth = sw * 0.7f, cap = StrokeCap.Round)
+        drawLine(cor, Offset(w * fx, bodyTop + h * 0.07f), Offset(w * fx, bodyBottom - h * 0.07f), strokeWidth = sw * 0.7f, cap = StrokeCap.Round)
     }
 }
 

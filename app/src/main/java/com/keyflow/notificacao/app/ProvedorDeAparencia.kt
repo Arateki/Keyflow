@@ -67,6 +67,8 @@ class ProvedorDeAparencia(
             desenhar(skin, aparencia, glifo, ladoPx, escuro)
         } catch (_: Exception) {
             null
+        } catch (_: OutOfMemoryError) {
+            null // falta de memória ao desenhar a skin: cai no Ateliê, não derruba o serviço
         } ?: atelie(aparencia, glifo, ladoPx, escuro)
         desenhos++
         cache.put(chave, feita)
@@ -97,6 +99,8 @@ class ProvedorDeAparencia(
     private fun atelie(aparencia: AparenciaDaOrbe, glifo: GlifoDaOrbe?, lado: Int, escuro: Boolean): AparenciaDaNotificacao = try {
         desenhar(OrbStyle.ATELIE.id, aparencia, glifo, lado, escuro)!!
     } catch (e: Exception) {
+        throw AparenciaIndisponivel(e)
+    } catch (e: OutOfMemoryError) {
         throw AparenciaIndisponivel(e)
     }
 

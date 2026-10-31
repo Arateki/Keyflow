@@ -94,6 +94,20 @@ class ProvedorDeAparenciaTest {
     }
 
     @Test
+    fun faltaDeMemoriaAoDesenharASkinCaiNoAtelieENaoDerrubaOServico() {
+        val oom = provedor(render = { s, _, l, _ ->
+            if (s == OrbStyle.GLITCH) throw OutOfMemoryError("simulado") else Bitmap.createBitmap(l, l, Bitmap.Config.ARGB_8888)
+        })
+        assertNotNull(oom.obterAgora("glitch", AparenciaDaOrbe.IDLE, null, lado, false))
+        val tudo = provedor(render = { _, _, _, _ -> throw OutOfMemoryError("simulado") })
+        try {
+            tudo.obterAgora("glitch", AparenciaDaOrbe.IDLE, null, lado, false)
+            fail("era para virar AparenciaIndisponivel")
+        } catch (_: AparenciaIndisponivel) {
+        }
+    }
+
+    @Test
     fun aChaveDoCacheMudaComSkinEstadoLadoEModo() {
         val p = provedor()
         p.obterAgora("atelie", AparenciaDaOrbe.IDLE, null, lado, false)
