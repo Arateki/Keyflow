@@ -10,23 +10,22 @@ import org.json.JSONArray
  * (`ssh_pub.*`) não é segredo e **não** entra em [valores] (senão um `cat id.pub` no terminal sairia mutilado para o agente).
  */
 class CofreDoApp(private val store: CredentialStore) : CofreDeSegredos {
-    private val trava = Any()
 
     override fun ler(chave: String): String? = store.getSecret(chave)
 
-    override fun gravar(chave: String, valor: String) = synchronized(trava) {
+    override fun gravar(chave: String, valor: String) = synchronized(TRAVA) {
         store.putSecret(chave, valor)
         val indice = indice()
         if (chave !in indice) gravarIndice(indice + chave)
     }
 
-    override fun apagar(chave: String) = synchronized(trava) {
+    override fun apagar(chave: String) = synchronized(TRAVA) {
         store.clearSecret(chave)
         val indice = indice()
         if (chave in indice) gravarIndice(indice - chave)
     }
 
-    override fun valores(): Collection<String> = synchronized(trava) {
+    override fun valores(): Collection<String> = synchronized(TRAVA) {
         indice().filter { !it.startsWith("ssh_pub.") }.mapNotNull { store.getSecret(it)?.takeIf(String::isNotEmpty) }
     }
 
@@ -43,6 +42,12 @@ class CofreDoApp(private val store: CredentialStore) : CofreDeSegredos {
     private fun gravarIndice(chaves: Set<String>) = store.putSecret(INDICE, JSONArray(chaves.toList()).toString())
 
     companion object {
+        /**
+         * Uma trava **do processo**, não da instância: o índice mora no `CredentialStore`, que é compartilhado, e duas instâncias de
+         * [CofreDoApp] atualizando o índice ao mesmo tempo perderiam uma das entradas (e o `SecretFilter` deixaria de remover o segredo).
+         */
+        private val TRAVA = Any()
+
         const val INDICE = "computador_indice"
     }
 }

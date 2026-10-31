@@ -60,6 +60,9 @@ class ChavePublicaSsh(val algoritmo: String, val blob: ByteArray) {
 interface Assinador {
     fun chavePublica(): ChavePublicaSsh
 
+    /** `true` quando `assinar` devolveu `null` porque a chave foi **invalidada** (a biometria cadastrada mudou), não porque o usuário cancelou. */
+    val invalidada: Boolean get() = false
+
     /** A assinatura no formato de fio do SSH (`string algoritmo` + `string assinatura`), ou `null` se o usuário cancelou (o cbssh pula a chave). */
     suspend fun assinar(dados: ByteArray): ByteArray?
 }

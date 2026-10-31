@@ -57,6 +57,7 @@ class ProvedorDeChavesAndroid(
     private val sonda: SondaEd25519 = SondaEd25519(api),
     private val forcarEnvelopeEd25519: Boolean = false,
     private val aplicarBiometriaNoKeystore: Boolean = true,
+    private val detector: DetectorDeCadastro = DetectorDeCadastroKeystore(api),
     private val gerarEd25519Software: () -> ChavesSoftware.Ed25519Gerada = ChavesSoftware::gerarEd25519,
     private val importador: ImportadorDeChave = ImportadorDeChave(),
 ) {
@@ -103,6 +104,7 @@ class ProvedorDeChavesAndroid(
                 try {
                     if (exigeBiometria && !autenticarParaCriar(id)) return Resultado.Falha(ErroChave.CANCELADA)
                     envelope.cifrar(id, m, exigeBiometria)
+                    if (exigeBiometria && aplicarBiometriaNoKeystore) detector.criar(id)
                     cofre.gravar("$PREFIXO_PUBLICA$id", Base64Puro.codificar(r.valor.publica.blob))
                     Resultado.Ok(ChaveSsh(id, nome, r.valor.tipo, r.valor.impressao, Protecao.KEYSTORE_ENVELOPE, exigeBiometria, relogio.agoraMs()))
                 } catch (e: Exception) {
@@ -133,6 +135,7 @@ class ProvedorDeChavesAndroid(
     fun estado(chave: ChaveSsh): EstadoChave {
         if (chave.id in invalidadas) return EstadoChave.INVALIDADA
         val invalida = try {
+            (chave.exigeBiometria && detector.invalidada(chave.id)) ||
             if (chave.protecao == Protecao.KEYSTORE_ENVELOPE) envelope.invalidada(chave.id) else nativaInvalidada(chave.id, chave.tipo)
         } catch (e: Exception) {
             false
@@ -146,6 +149,7 @@ class ProvedorDeChavesAndroid(
 
     private fun excluirArtefatos(id: String) {
         runCatching { ks().deleteEntry(alias(id)) }
+        runCatching { detector.apagar(id) }
         envelope.apagar(id)
         cofre.apagar("$PREFIXO_PUBLICA$id")
         janelas.remove(id)
@@ -173,6 +177,7 @@ class ProvedorDeChavesAndroid(
         val gerador = KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_EC, EnvelopeDeChave.PROVEDOR)
         gerador.initialize(spec.build())
         gerador.generateKeyPair()
+        if (exigeBiometria && aplicarBiometriaNoKeystore) detector.criar(id)
         val publica = publicaDoKeystore(id, tipo) ?: error("pública ausente")
         val protecao = nivelDeProtecao(id)
         return Resultado.Ok(ChaveSsh(id, nome, tipo, publica.impressao, protecao, exigeBiometria, relogio.agoraMs()))
@@ -183,6 +188,7 @@ class ProvedorDeChavesAndroid(
         val g = gerarEd25519Software()
         try {
             envelope.cifrar(id, g.material, exigeBiometria)
+            if (exigeBiometria && aplicarBiometriaNoKeystore) detector.criar(id)
             // O envelope guarda a pública junto da semente: o Keystore não a conhece.
             cofre.gravar("$PREFIXO_PUBLICA$id", Base64Puro.codificar(g.publica.blob))
             return Resultado.Ok(ChaveSsh(id, nome, TipoDeChave.ED25519, g.publica.impressao, Protecao.KEYSTORE_ENVELOPE, exigeBiometria, relogio.agoraMs()))
@@ -271,10 +277,14 @@ class ProvedorDeChavesAndroid(
     private inner class AssinadorAndroid(private val chave: ChaveSsh) : Assinador {
         private val janela get() = janelas.getOrPut(chave.id) { JanelaDeBiometria(relogio) }
 
+        override val invalidada: Boolean get() = chave.id in invalidadas
+
         override fun chavePublica(): ChavePublicaSsh = this@ProvedorDeChavesAndroid.chavePublica(chave) ?: error("chave ausente: ${chave.id}")
 
         override suspend fun assinar(dados: ByteArray): ByteArray? {
             if (chave.id in invalidadas) return null
+            // APIs 24–29: o Keystore pode não invalidar a chave ao cadastrar outra digital; a sentinela diz.
+            if (chave.exigeBiometria && detector.invalidada(chave.id)) { invalidadas += chave.id; return null }
             if (chave.exigeBiometria && !janela.valida() && !pedirBiometria()) return null
             return try {
                 assinarAgora(dados)

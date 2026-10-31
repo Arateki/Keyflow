@@ -80,9 +80,11 @@ class ChavesAndroidTest {
         aplicarBio: Boolean = true,
         sonda: SondaEd25519 = SondaEd25519(),
         semente: (() -> ChavesSoftware.Ed25519Gerada)? = null,
+        detector: DetectorDeCadastro? = null,
     ) = ProvedorDeChavesAndroid(
         cofre, autenticador, relogio, sonda = sonda, forcarEnvelopeEd25519 = forcarEnvelope, aplicarBiometriaNoKeystore = aplicarBio,
         gerarEd25519Software = semente ?: ChavesSoftware::gerarEd25519,
+        detector = detector ?: DetectorDeCadastroKeystore(),
     )
 
     private fun gerar(p: ProvedorDeChavesAndroid, tipo: TipoDeChave, bio: Boolean = false): ChaveSsh {
@@ -323,5 +325,51 @@ class ChavesAndroidTest {
         criadas += p to chave
         assertEquals(Protecao.KEYSTORE_ENVELOPE, chave.protecao)
         verificaEd25519(p.assinador(chave), runBlocking { p.assinador(chave).assinar(dados) }!!)
+    }
+
+    // ---- biometria cadastrada mudou (APIs 24–29: sentinela; aqui um fake, o cadastro real fica para a T21) ----------------------
+
+    private class DetectorFalso : DetectorDeCadastro {
+        val criadas = mutableListOf<String>()
+        val apagadas = mutableListOf<String>()
+        @Volatile var invalida = false
+        override fun criar(id: String) { criadas += id }
+        override fun invalidada(id: String) = invalida
+        override fun apagar(id: String) { apagadas += id }
+    }
+
+    @Test fun cadastroNovoInvalidaAChaveEAssinarDevolveNullSemExcecao() {
+        for ((tipo, envelope) in listOf(TipoDeChave.ECDSA_P256 to false, TipoDeChave.ED25519 to true)) {
+            val d = DetectorFalso()
+            val aut = AutenticadorFalso()
+            val p = provedor(autenticador = aut, aplicarBio = false, forcarEnvelope = envelope, detector = d)
+            val chave = gerar(p, tipo, bio = true)
+            assertEquals(EstadoChave.ATIVA, p.estado(chave))
+            val a = p.assinador(chave)
+            assertNotNull("$tipo: antes da troca assina", runBlocking { a.assinar(dados) })
+            val promptsAntes = aut.prompts
+            d.invalida = true // o usuário cadastrou outra digital
+            assertNull("$tipo: invalidada não assina", runBlocking { a.assinar(dados) })
+            assertTrue(a.invalidada)
+            assertEquals(EstadoChave.INVALIDADA, p.estado(chave))
+            assertEquals("não abre prompt para chave invalidada", promptsAntes, aut.prompts)
+            // E continua invalidada, sem exceção, nas tentativas seguintes.
+            assertNull(runBlocking { a.assinar(dados) })
+        }
+    }
+
+    @Test fun excluirApagaASentinela() {
+        val d = DetectorFalso()
+        val p = provedor(aplicarBio = false, detector = d)
+        val chave = gerar(p, TipoDeChave.ECDSA_P256, bio = true)
+        p.excluir(chave)
+        assertTrue(chave.id in d.apagadas)
+    }
+
+    @Test fun detectorRealNaApi30OuMaisNaoFazNadaENuncaInvalida() {
+        val real = DetectorDeCadastroKeystore(api = 34)
+        real.criar("x1")
+        assertFalse(real.invalidada("x1"))
+        real.apagar("x1")
     }
 }
