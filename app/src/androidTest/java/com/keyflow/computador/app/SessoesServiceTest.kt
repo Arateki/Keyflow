@@ -72,6 +72,8 @@ class SessoesServiceTest {
     private lateinit var gerenciador: GerenciadorDeSessoes
 
     @Before fun preparar() {
+        // Na API 33+ sem POST_NOTIFICATIONS a notificação do primeiro plano não aparece em `activeNotifications` (o serviço roda igual).
+        runCatching { instr.uiAutomation.grantRuntimePermission(ctx.packageName, "android.permission.POST_NOTIFICATIONS") }
         gerenciador = GerenciadorDeSessoes(escopo, dep)
         ServicosDoComputador.gerenciador = gerenciador
         ServicosDoComputador.manterConectado = manter
