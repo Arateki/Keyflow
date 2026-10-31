@@ -136,6 +136,9 @@ class ProvedorDeChavesAndroid(
 
     fun assinador(chave: ChaveSsh): Assinador = AssinadorAndroid(chave)
 
+    /** A janela de biometria desta chave está aberta agora? Chave sem biometria sempre está. A reconexão automática usa isto para não abrir prompt sozinha. */
+    fun janelaAberta(chave: ChaveSsh): Boolean = !chave.exigeBiometria || synchronized(janelas) { janelas[chave.id]?.valida() == true }
+
     /** `INVALIDADA` quando o Keystore invalidou a chave (biometria cadastrada mudou); a tela mostra a mensagem. */
     fun estado(chave: ChaveSsh): EstadoChave {
         if (jaInvalidada(chave.id)) return EstadoChave.INVALIDADA
