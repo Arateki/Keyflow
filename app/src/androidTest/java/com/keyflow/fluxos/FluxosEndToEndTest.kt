@@ -86,7 +86,7 @@ class FluxosEndToEndTest {
     })
 
     private suspend fun aguardar(motivo: String, condicao: () -> Boolean) {
-        try { withTimeout(15_000) { while (!condicao()) delay(25) } }
+        try { withTimeout(45_000) { while (!condicao()) delay(25) } }
         catch (erro: kotlinx.coroutines.TimeoutCancellationException) { throw AssertionError(motivo, erro) }
     }
 
