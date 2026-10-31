@@ -137,7 +137,7 @@ private fun sourceLabel(source: TranscriptionSource): String = when (source) {
 }
 
 // Modelos de transcrição por provedor (docs OpenAI/Groq, 2026). O 1º é o padrão (Whisper).
-private val OPENAI_MODELS = listOf("whisper-1", "gpt-4o-transcribe", "gpt-4o-mini-transcribe")
+internal val OPENAI_MODELS = listOf("whisper-1", "gpt-4o-transcribe", "gpt-4o-mini-transcribe")
 private val GROQ_MODELS = listOf("whisper-large-v3", "whisper-large-v3-turbo", "distil-whisper-large-v3-en")
 private val CUSTOM_MODELS = listOf("whisper-1", "whisper-large-v3", "whisper-large-v3-turbo")
 
