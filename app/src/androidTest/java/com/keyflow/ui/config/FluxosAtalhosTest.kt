@@ -25,6 +25,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.*
@@ -47,6 +48,7 @@ class FluxosAtalhosTest {
     private val b = Fluxo("b", "Ler a tela", etapas = listOf(Etapa.Capturar, Etapa.Inserir))
     private val incompleto = Fluxo("i", "Pela metade", etapas = listOf(Etapa.Inserir))
     private var fechou = 0
+    private var visivel by mutableStateOf(true)
     private var cancelou = 0
     private var view: View? = null
     private var escuro by mutableStateOf(false)
@@ -69,7 +71,7 @@ class FluxosAtalhosTest {
     }
     private fun abrir(id: String) = rule.setContent {
         FluxosCena(escuro, { view = it }) {
-            FluxosModal(id, repo, s, onDismiss = { fechou++ }, onCancelar = { cancelou++ })
+            if (visivel) FluxosModal(id, repo, s, onDismiss = { fechou++ }, onCancelar = { cancelou++ })
         }
     }
     private fun config() = runBlocking { repo.configFluxosOnce() }
@@ -170,7 +172,36 @@ class FluxosAtalhosTest {
         assertEquals(listOf(Gatilho(toque(3), "b")), config().gatilhos)
         assertTrue(barras().botoesDeFluxo().isEmpty())
         assertEquals("cancela o que estava rodando", 1, cancelou)
-        assertEquals(1, fechou)
+        esperar { fechou == 1 }
+    }
+
+    @Test fun excluirTerminaMesmoSeOModalSaiDaTelaEComOutraEscritaEmAndamento() {
+        runBlocking {
+            repo.atualizarFluxosEBarras { _, bs ->
+                ConfigFluxos(listOf(a, b), listOf(Gatilho(toque(2), "a"), Gatilho(Superficie.Barra("abc123"), "a"), Gatilho(toque(3), "b"))) to
+                    BotoesDeFluxo.comBotao(bs, "abc123")
+            }
+        }
+        abrir("a")
+        rule.waitUntil(15_000) { rule.onAllNodesWithTag("fluxos-excluir").fetchSemanticsNodes().isNotEmpty() }
+        tocar("fluxos-excluir")
+        // Outra escrita concorrente, e o modal sai da composição logo depois de confirmar (o que o ConfigScreen faz ao fechar).
+        val outra = scope.launch { repo.atualizarFluxos { c -> c.copy(fluxos = c.fluxos.map { if (it.id == "b") it.copy(nome = "Renomeado") else it }) } }
+        tocar("fluxos-excluir-confirmar")
+        rule.runOnIdle { visivel = false }
+        esperar { config().fluxo("a") == null }
+        runBlocking { outra.join() }
+        assertEquals(listOf(Gatilho(toque(3), "b")), config().gatilhos)
+        assertEquals("Renomeado", config().fluxo("b")?.nome)
+        assertTrue("o botão do teclado saiu na mesma transação", barras().botoesDeFluxo().isEmpty())
+    }
+
+    @Test fun excluirSoFechaOModalDepoisDePersistir() {
+        semear(a); abrir("a")
+        rule.waitUntil(15_000) { rule.onAllNodesWithTag("fluxos-excluir").fetchSemanticsNodes().isNotEmpty() }
+        tocar("fluxos-excluir"); tocar("fluxos-excluir-confirmar")
+        esperar { config().fluxo("a") == null }
+        esperar { fechou == 1 }
     }
 
     @Test fun soAOrbeFlutuanteEOBotaoExistemNaEntregaDestaTask() {

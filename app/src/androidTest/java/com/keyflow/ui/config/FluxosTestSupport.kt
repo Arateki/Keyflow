@@ -23,7 +23,18 @@ internal fun capturaFluxos(nome: String, view: View) {
         view.invalidate()
     }
     check(quadro.await(15, TimeUnit.SECONDS)) { "A tela não entregou o quadro da captura $nome" }
-    val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
+    // `takeScreenshot` devolve null enquanto a janela (principalmente a de um Popup) ainda não estabilizou: espera e tenta de novo; sem
+    // sucesso, desenha a própria View (não pega Popups, mas nunca deixa o teste cair por causa da captura).
+    var captura: Bitmap? = null
+    repeat(10) {
+        if (captura == null) {
+            captura = instrumentation.uiAutomation.takeScreenshot()
+            if (captura == null) { instrumentation.waitForIdleSync(); Thread.sleep(300) }
+        }
+    }
+    val bitmap = captura ?: Bitmap.createBitmap(view.width.coerceAtLeast(1), view.height.coerceAtLeast(1), Bitmap.Config.ARGB_8888).also {
+        instrumentation.runOnMainSync { view.draw(android.graphics.Canvas(it)) }
+    }
     val png = ByteArrayOutputStream()
     try { bitmap.compress(Bitmap.CompressFormat.PNG, 100, png) } finally { bitmap.recycle() }
     val partes = Base64.encodeToString(png.toByteArray(), Base64.NO_WRAP).chunked(4000)

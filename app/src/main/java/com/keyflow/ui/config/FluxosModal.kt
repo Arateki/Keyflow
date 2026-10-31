@@ -17,6 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -66,6 +67,8 @@ import com.keyflow.ui.theme.LocalKeyFlowPalette
 import com.keyflow.ui.theme.SpaceGrotesk
 import com.keyflow.ui.theme.SpaceMono
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 
 const val FLUXOS_MODAL_FECHAR_TAG = "fluxos-modal-fechar"
@@ -110,7 +113,10 @@ fun FluxosModal(
     val scope = rememberCoroutineScope()
     var erro by remember { mutableStateOf(false) }
     val atual = config
-    val fluxo = atual?.fluxo(fluxoId) ?: return
+    val fluxo = atual?.fluxo(fluxoId)
+    // O fluxo sumiu do armazenamento (excluído aqui ou em outro lugar): só então o modal fecha, nunca antes de persistir.
+    if (atual != null && fluxo == null) { LaunchedEffect(fluxoId) { onDismiss() }; return }
+    if (fluxo == null || atual == null) return
     fun gravar(acao: suspend () -> Unit) {
         scope.launch {
             try { acao(); erro = false } catch (e: CancellationException) { throw e } catch (_: Exception) { erro = true }
@@ -138,15 +144,17 @@ fun FluxosModal(
         FluxosModalConteudo(
             fluxo = fluxo, estado = estado, settings = settings, fonte = fonte, onDismiss = onDismiss, atalhos = atalhos,
             onExcluir = {
-                // Cancela a execução deste fluxo antes de apagá-lo; os botões do teclado saem na mesma transação.
+                // Cancela o que estava rodando deste fluxo; os botões do teclado saem na mesma transação. A gravação não depende do
+                // escopo do modal (que sai da tela junto): termina mesmo assim, e o modal só fecha depois de persistir.
                 if ((estado as? EstadoExecucao.Rodando)?.fluxoId == fluxoId) onCancelar()
                 gravar {
-                    repository.atualizarFluxosEBarras { c, b ->
-                        val exclusao = PoliticaGatilhos.excluir(c, fluxoId)
-                        exclusao.config to BotoesDeFluxo.semBotoes(b, exclusao.botoes.toSet())
+                    withContext(NonCancellable) {
+                        repository.atualizarFluxosEBarras { c, b ->
+                            val exclusao = PoliticaGatilhos.excluir(c, fluxoId)
+                            exclusao.config to BotoesDeFluxo.semBotoes(b, exclusao.botoes.toSet())
+                        }
                     }
                 }
-                onDismiss()
             },
             onAlterar = { alterar ->
                 scope.launch {
