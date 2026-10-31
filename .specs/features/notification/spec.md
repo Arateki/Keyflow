@@ -335,7 +335,7 @@ Respondidas por ele em 29/10, 22:20 (viraram decisões): **Q1** (pausar/cancelar
 | NTF-28 | P1-E | NTF-T7, NTF-T11 | Implementing (feitas: T7) |
 | NTF-29 | P1-E | NTF-T6, NTF-T9 | Verified |
 | NTF-30 | P1-E | NTF-T7 | Verified |
-| NTF-31 | P1-F | NTF-T8 | Verified |
+| NTF-31 | P1-F | NTF-T8, NTF-T9 | Verified (T8); correção de alfa em T9 implementada, execução Android pendente por ANR — `.specs/project/licoes/2026-10-31-notificacao-contraste-alfa.md` |
 | NTF-32 | P1-F | NTF-T8 | Verified |
 | NTF-33 | P1-F | NTF-T8 | Verified |
 | NTF-34 | P1-F | NTF-T7, NTF-T8 | Verified |

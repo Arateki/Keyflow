@@ -25,9 +25,17 @@ object Contraste {
         return (maxOf(la, lb) + 0.05) / (minOf(la, lb) + 0.05)
     }
 
-    /** A [tinta] da skin se ela se lê sobre o [fundo]; senão, branco ou quase preto, o que contrastar mais. */
+    /**
+     * Compõe a [tinta] sobre o [fundo] opaco da linha e devolve uma cor opaca com contraste mínimo.
+     * Se a composição não se lê, usa branco ou quase preto, o que contrastar mais.
+     * Assim o filtro do botão e o tempo miúdo recebem a mesma cor, sem outra composição de alfa pelo Android.
+     */
     fun legivel(tinta: Int, fundo: Int): Int {
-        if (razao(tinta, fundo) >= MINIMO) return tinta
+        val alfa = tinta ushr 24
+        fun componente(deslocamento: Int): Int =
+            (((tinta ushr deslocamento) and 0xFF) * alfa + ((fundo ushr deslocamento) and 0xFF) * (255 - alfa)) / 255
+        val composta = (0xFF shl 24) or (componente(16) shl 16) or (componente(8) shl 8) or componente(0)
+        if (razao(composta, fundo) >= MINIMO) return composta
         return if (razao(BRANCO, fundo) >= razao(ESCURO, fundo)) BRANCO else ESCURO
     }
 }

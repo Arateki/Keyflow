@@ -31,6 +31,31 @@ class ContrasteTest {
     @Test
     fun `qualquer par resulta em contraste minimo`() {
         val cores = listOf(0xFF000000.toInt(), 0xFFFFFFFF.toInt(), 0xFF808080.toInt(), 0xFF7A7A7A.toInt(), 0xFF2B2720.toInt(), 0xFFFF0000.toInt(), 0xFF00FF00.toInt())
-        for (t in cores) for (f in cores) assertThat(Contraste.razao(Contraste.legivel(t, f), f)).isAtLeast(Contraste.MINIMO)
+        for (alfa in 0..255) for (t in cores) for (f in cores) {
+            val legivel = Contraste.legivel((alfa shl 24) or (t and 0xFFFFFF), f)
+            assertThat(legivel ushr 24).isEqualTo(255)
+            assertThat(Contraste.razao(legivel, f)).isAtLeast(Contraste.MINIMO)
+        }
+    }
+
+    @Test
+    fun `tinta escura transparente sobre creme vira fallback opaco`() {
+        assertThat(Contraste.legivel(0x001B1B1B, atelieClaro)).isEqualTo(0xFF1B1B1B.toInt())
+    }
+
+    @Test
+    fun `tinta clara transparente sobre escuro vira fallback opaco`() {
+        assertThat(Contraste.legivel(0x00FFFFFF, atelieEscuro)).isEqualTo(0xFFFFFFFF.toInt())
+    }
+
+    @Test
+    fun `tinta semitransparente legível preserva a composição e fica opaca`() {
+        assertThat(Contraste.legivel(0x80000000.toInt(), 0xFFFFFFFF.toInt())).isEqualTo(0xFF7F7F7F.toInt())
+        assertThat(Contraste.legivel(0x80FFFFFF.toInt(), 0xFF000000.toInt())).isEqualTo(0xFF808080.toInt())
+    }
+
+    @Test
+    fun `tinta de baixa opacidade cai no fallback mesmo com RGB contrastante`() {
+        assertThat(Contraste.legivel(0x10000000, 0xFFFFFFFF.toInt())).isEqualTo(0xFF1B1B1B.toInt())
     }
 }

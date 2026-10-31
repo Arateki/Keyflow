@@ -3,6 +3,8 @@ package com.keyflow.notificacao
 import android.app.Notification
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.drawable.ColorDrawable
+import androidx.core.graphics.ColorUtils
 import android.os.Parcel
 import android.view.View
 import android.view.ViewGroup
@@ -54,14 +56,15 @@ class NotificacaoDaOrbeTest {
         config: ConfigNotificacao = ConfigNotificacao(),
         skin: String = "atelie",
         escuro: Boolean = false,
+        tinta: Int? = null,
     ): Notification {
         val efetiva = efetiva(config, Settings())
         val visual = EstadoVisualDaNotificacao.para(estado, visao, efetiva)
         val p = provedor
         return NotificacaoDaOrbe(context, "keyflow_overlay").construir(
             estado, visao,
-            p.obterAgora(skin, visual.aparencia, visual.glifo, lado, escuro),
-            p.obterAgora(skin, AparenciaDaOrbe.IDLE, null, lado, escuro),
+            p.obterAgora(skin, visual.aparencia, visual.glifo, lado, escuro).let { if (tinta != null) it.copy(tinta = tinta) else it },
+            p.obterAgora(skin, AparenciaDaOrbe.IDLE, null, lado, escuro).let { if (tinta != null) it.copy(tinta = tinta) else it },
             config, efetiva, escuro,
         )
     }
@@ -198,6 +201,33 @@ class NotificacaoDaOrbeTest {
             }
         }
     }
+
+    // notification.ink aceita alfa: mede a cor desenhada, não só o RGB solicitado ao filtro.
+    @Test
+    fun osBotoesComTintaTransparenteESemitransparenteContinuamLegiveis() {
+        for (escuro in listOf(false, true)) for (tinta in tintasComAlfa) {
+            val v = conteudo(construir(ButtonState.RECORDING, escuro = escuro, tinta = tinta))
+            val fundo = (v.background as ColorDrawable).color
+            for (id in listOf(R.id.notif_btn_esq, R.id.notif_btn_dir)) {
+                val cor = corDoGlifo(v.v(id) as ImageButton)
+                assertTrue("botão com alfa: tinta=$tinta escuro=$escuro", ColorUtils.calculateContrast(cor, fundo) >= Contraste.MINIMO)
+            }
+        }
+    }
+
+    @Test
+    fun oTempoMiudoComTintaTransparenteESemitransparenteFicaOpacoELegivel() {
+        for (escuro in listOf(false, true)) for (tinta in tintasComAlfa) {
+            val v = conteudo(construir(ButtonState.PAUSED, escuro = escuro, tinta = tinta))
+            val fundo = (v.background as ColorDrawable).color
+            val mini = v.v(R.id.notif_time_mini) as TextView
+            assertEquals(View.VISIBLE, mini.visibility)
+            assertEquals("tempo miúdo opaco", 255, mini.currentTextColor ushr 24)
+            assertTrue("tempo miúdo com alfa: tinta=$tinta escuro=$escuro", ColorUtils.calculateContrast(mini.currentTextColor, fundo) >= Contraste.MINIMO)
+        }
+    }
+
+    private val tintasComAlfa = listOf(0x001B1B1B, 0x00FFFFFF, 0x10000000, 0x80000000.toInt(), 0x80FFFFFF.toInt())
 
     @Test
     fun aSomaDosBitmapsFicaAbaixoDe1MBEOParcelDaNotificacaoEMedido() {
