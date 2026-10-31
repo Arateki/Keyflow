@@ -212,7 +212,11 @@ val docsSections: List<DocSection> get() = listOf(
             ),
             DocBlock.Labeled(
                 tr("Layout"),
-                tr("os botões da barra do teclado — mic, colar, alavanca, teclas avulsas, gatilhos de grade. O \"?\" de cada opção explica o que ela faz."),
+                tr("os botões da barra do teclado — a orbe, colar, alavanca, teclas avulsas, gatilhos de grade. O \"?\" de cada opção explica o que ela faz."),
+            ),
+            DocBlock.Labeled(
+                tr("Orbe"),
+                tr("a orbe do encaixe do mic: prévia, copiar a configuração da orbe principal e, com a cópia desligada, aparência, modo e os três toques. Segurar e arrastar são fixos."),
             ),
             DocBlock.Labeled(tr("Teclados de atalhos"), tr("as grades que os gatilhos da barra abrem ao segurar e arrastar.")),
             DocBlock.Labeled(
@@ -360,7 +364,7 @@ val docsSections: List<DocSection> get() = listOf(
                 tr("Pausar congela o cronômetro e guarda o que já foi gravado; retomar continua a mesma gravação, e o envio sai num texto só."),
             ),
             DocBlock.Labeled(tr("Orbe"), tr("segure (Alternar) ou toque rápido logo após soltar (Push-to-talk).")),
-            DocBlock.Labeled(tr("Teclado"), tr("segure o mic durante a gravação e solte em pausar.")),
+            DocBlock.Labeled(tr("Teclado"), tr("no teclado, segure a orbe durante a gravação e arraste para cima.")),
             DocBlock.Labeled(tr("Notificação"), tr("botão pausar e retomar.")),
             DocBlock.Paragraph(
                 tr("Ao atingir a duração máxima de gravação (aba Transcrição), a gravação pausa sozinha e pergunta se você quer enviar ou descartar."),
@@ -377,8 +381,8 @@ val docsSections: List<DocSection> get() = listOf(
         listOf(
             DocBlock.Labeled(tr("Retrair"), tr("a seta encolhe o teclado até a barra; tocar de novo traz as teclas de volta.")),
             DocBlock.Labeled(
-                tr("Mic"),
-                tr("toque para gravar e de novo para enviar. Segure durante a gravação para abrir o seletor — arraste até pausar ou cancelar e solte."),
+                tr("Orbe"),
+                tr("fica no encaixe do mic da barra e faz o mesmo que a orbe flutuante: toque para gravar e de novo para enviar. Gravando, ela sobressai um pouco acima do teclado, sem cobrir tecla, e mostra o tempo. 2 e 3 toques seguem os atalhos que você escolheu na aba Teclado. Segure para arrastar sem mover a orbe — para cima pausa, para o lado cancela e para baixo abre o KeyFlow. No modo Segurar para falar, segurar grava e soltar envia."),
             ),
             DocBlock.Labeled(tr("Acentos"), tr("segure uma letra para ver as variantes (á, ã, ç…) e deslize até a que quiser.")),
             DocBlock.Labeled(tr("Idioma"), tr("o globo alterna layout, acentos e corretor entre português, inglês e espanhol.")),
@@ -409,7 +413,7 @@ val docsSections: List<DocSection> get() = listOf(
         tr("Erros & tempo limite"),
         listOf(
             DocBlock.Paragraph(
-                tr("Quando algo falha, a orbe e o mic do teclado mostram ✖ por 2 segundos, junto com o motivo. Aquela gravação não é reenviada — é só gravar de novo."),
+                tr("Quando algo falha, a orbe (a flutuante e a do teclado) mostra ✖ por 2 segundos, junto com o motivo. Aquela gravação não é reenviada — é só gravar de novo."),
             ),
             DocBlock.Labeled(tr("Token ou origem"), tr("tocar no ✖ (ou no aviso) abre a aba Transcrição para corrigir.")),
             DocBlock.Labeled(tr("Microfone"), tr("tocar leva à aba da interface que avisou (Sobrepor ou Teclado), onde a permissão pendente pisca no cartão do modo.")),

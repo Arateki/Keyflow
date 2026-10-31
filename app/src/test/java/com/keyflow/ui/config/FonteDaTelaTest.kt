@@ -55,4 +55,15 @@ class FonteDaTelaTest {
         assertThat(origens).contains("OPENAI")
         assertThat(FalaSource.entries).isNotEmpty() // a aba Voz segue a sua própria regra, testada acima
     }
+
+    @Test
+    fun `Groq e a Voz tambem oferecem os modelos e vozes das abas`() {
+        val grq = Provedor(conectado = true, chave = true, modelos = emptyList())
+        val f = fonteDaTela(settings, emptyMap(), comChave, Provedor.AUSENTE, comChave, Provedor.AUSENTE, grq, Provedor.AUSENTE)
+        val groq = f.opcoes(Etapa.Ditar()).filterIsInstance<OpcaoDeModelo.Escolha>().filter { it.ref.origem == "GROQ" }
+        assertThat(groq.map { it.ref.modelo }).contains("whisper-large-v3")
+        val voz = f.opcoes(Etapa.Falar()).filterIsInstance<OpcaoDeModelo.Escolha>()
+        assertThat(voz.filter { it.ref.origem == "OPENAI" }.map { it.ref.modelo }).contains("alloy")
+        assertThat(voz.filter { it.ref.origem == "GOOGLE" }.map { it.ref.modelo }).contains("pt-BR-Neural2-A")
+    }
 }

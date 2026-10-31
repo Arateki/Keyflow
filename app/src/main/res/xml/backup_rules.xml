@@ -23,4 +23,10 @@
     <exclude domain="file" path="agent/actions.jsonl" />
     <!-- O histórico da bancada de modelos (bancada/execucoes): medidas deste aparelho; de outro, não valem — como `models/`. -->
     <exclude domain="file" path="bancada" />
+    <!--
+      Aba Computador (CMP-T8/T11): o envelope das chaves SSH (`ssh_key.*`) e as senhas lembradas moram no cofre `keyflow_auth`, já excluído
+      acima; a chave AES do envelope e as chaves nativas moram no Keystore, que não é exportável. O `known_hosts` é a confiança deste
+      aparelho nos servidores: não viaja para outro.
+    -->
+    <exclude domain="file" path="known_hosts" />
 </full-backup-content>

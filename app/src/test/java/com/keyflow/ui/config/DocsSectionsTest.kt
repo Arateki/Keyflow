@@ -88,6 +88,23 @@ class DocsSectionsTest {
         assertTrue(pauseHintFor(RecordingMode.PUSH_TO_TALK) in texts)
     }
 
+    /** KBO-37: a Docs do teclado ensina a orbe (toques, segurar, arrastar, sobressair) e não o seletor de chips do mic, que saiu. */
+    @Test
+    fun keyboardDocsTeachTheOrbAndNotTheOldMicChips() {
+        fun text(block: DocBlock) = when (block) {
+            is DocBlock.Paragraph -> block.text
+            is DocBlock.Labeled -> "${block.label}: ${block.text}"
+        }
+        val orb = docsSections.single { it.id == "teclado" }.blocks.filterIsInstance<DocBlock.Labeled>().single { it.label == "Orbe" }.text
+        for (word in listOf("toque", "Segure", "arrastar", "sobressai", "Segurar para falar", "pausa", "cancela")) {
+            assertTrue("a seção do teclado deveria dizer \"$word\"", orb.contains(word))
+        }
+        val all = docsSections.flatMap { it.blocks }.joinToString("\n", transform = ::text)
+        for (old in listOf("abrir o seletor", "segure o mic", "Segure o mic", "o mic do teclado", "arraste até pausar ou cancelar")) {
+            assertTrue("a Docs ainda fala do mic antigo: \"$old\"", !all.contains(old))
+        }
+    }
+
     @Test
     fun bugAndSuggestionHaveDistinctSubjects() {
         assertNotEquals(FeedbackKind.BUG.subject, FeedbackKind.SUGGESTION.subject)

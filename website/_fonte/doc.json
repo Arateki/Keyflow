@@ -37,7 +37,8 @@
             {"tipo": "paragrafo", "texto": "Tudo do teclado KeyFlow. No topo, o cartão do Modo Teclado liga o KeyFlow como teclado e mostra as permissões; sem ele pronto, o resto da aba fica só para leitura."},
             {"tipo": "rotulado", "rotulo": "Colar", "texto": "cola a transcrição direto no campo aberto, ou guarda e cola quando você tocar num campo depois de gravar fora dele (esta, só com o Modo Sobrepor)."},
             {"tipo": "rotulado", "rotulo": "Digitação", "texto": "idioma (o mesmo que o globo alterna), correção automática, fileira de números e manter o teclado com um teclado físico conectado."},
-            {"tipo": "rotulado", "rotulo": "Layout", "texto": "os botões da barra do teclado — mic, colar, alavanca, teclas avulsas, gatilhos de grade. O \"?\" de cada opção explica o que ela faz."},
+            {"tipo": "rotulado", "rotulo": "Layout", "texto": "os botões da barra do teclado — a orbe, colar, alavanca, teclas avulsas, gatilhos de grade. O \"?\" de cada opção explica o que ela faz."},
+            {"tipo": "rotulado", "rotulo": "Orbe", "texto": "a orbe do encaixe do mic: prévia, copiar a configuração da orbe principal e, com a cópia desligada, aparência, modo e os três toques. Segurar e arrastar são fixos."},
             {"tipo": "rotulado", "rotulo": "Teclados de atalhos", "texto": "as grades que os gatilhos da barra abrem ao segurar e arrastar."},
             {"tipo": "rotulado", "rotulo": "Tamanho e skins", "texto": "o tamanho vale para teclas, barra e sugestões (a prévia mostra a altura real); as skins mudam a cara do teclado, e dá para importar a sua, em .zip de SVGs, em “Suas skins”."}
           ]
@@ -117,7 +118,7 @@
           "blocos": [
             {"tipo": "paragrafo", "texto": "Pausar congela o cronômetro e guarda o que já foi gravado; retomar continua a mesma gravação, e o envio sai num texto só."},
             {"tipo": "rotulado", "rotulo": "Orbe", "texto": "segure (Alternar) ou toque rápido logo após soltar (Push-to-talk)."},
-            {"tipo": "rotulado", "rotulo": "Teclado", "texto": "segure o mic durante a gravação e solte em pausar."},
+            {"tipo": "rotulado", "rotulo": "Teclado", "texto": "no teclado, segure a orbe durante a gravação e arraste para cima."},
             {"tipo": "rotulado", "rotulo": "Notificação", "texto": "botão pausar e retomar."},
             {"tipo": "paragrafo", "texto": "Ao atingir a duração máxima de gravação (aba Transcrição), a gravação pausa sozinha e pergunta se você quer enviar ou descartar."},
             {"tipo": "rotulado", "rotulo": "Parcial", "texto": "com \"Transcrever parcialmente ao pausar\" ligado (aba Transcrição), cada pausa já transcreve o trecho gravado e um aviso aparece junto à orbe. Com a visualização ligada, toque no aviso para ler e toque de novo para editar; o texto novo entra depois das suas edições, e o envio entrega tudo junto."}
@@ -128,7 +129,7 @@
           "titulo": "Teclado KeyFlow",
           "blocos": [
             {"tipo": "rotulado", "rotulo": "Retrair", "texto": "a seta encolhe o teclado até a barra; tocar de novo traz as teclas de volta."},
-            {"tipo": "rotulado", "rotulo": "Mic", "texto": "toque para gravar e de novo para enviar. Segure durante a gravação para abrir o seletor — arraste até pausar ou cancelar e solte."},
+            {"tipo": "rotulado", "rotulo": "Orbe", "texto": "fica no encaixe do mic da barra e faz o mesmo que a orbe flutuante: toque para gravar e de novo para enviar. Gravando, ela sobressai um pouco acima do teclado, sem cobrir tecla, e mostra o tempo. 2 e 3 toques seguem os atalhos que você escolheu na aba Teclado. Segure para arrastar sem mover a orbe — para cima pausa, para o lado cancela e para baixo abre o KeyFlow. No modo Segurar para falar, segurar grava e soltar envia."},
             {"tipo": "rotulado", "rotulo": "Acentos", "texto": "segure uma letra para ver as variantes (á, ã, ç…) e deslize até a que quiser."},
             {"tipo": "rotulado", "rotulo": "Idioma", "texto": "o globo alterna layout, acentos e corretor entre português, inglês e espanhol."},
             {"tipo": "rotulado", "rotulo": "Números", "texto": "campos numéricos e de telefone já abrem na grade numérica; nos outros, ?\u2060123 troca para números e símbolos."},
@@ -147,7 +148,7 @@
           "id": "erros",
           "titulo": "Erros & tempo limite",
           "blocos": [
-            {"tipo": "paragrafo", "texto": "Quando algo falha, a orbe e o mic do teclado mostram ✖ por 2 segundos, junto com o motivo. Aquela gravação não é reenviada — é só gravar de novo."},
+            {"tipo": "paragrafo", "texto": "Quando algo falha, a orbe (a flutuante e a do teclado) mostra ✖ por 2 segundos, junto com o motivo. Aquela gravação não é reenviada — é só gravar de novo."},
             {"tipo": "rotulado", "rotulo": "Token ou origem", "texto": "tocar no ✖ (ou no aviso) abre a aba Transcrição para corrigir."},
             {"tipo": "rotulado", "rotulo": "Microfone", "texto": "tocar leva à aba da interface que avisou (Sobrepor ou Teclado), onde a permissão pendente pisca no cartão do modo."},
             {"tipo": "rotulado", "rotulo": "Tempo esgotado", "texto": "a origem de voz não respondeu dentro do tempo limite de resposta (aba Transcrição, 15s de fábrica). Em rede lenta ou áudios longos, aumente o prazo."},
@@ -245,7 +246,8 @@
             {"tipo": "paragrafo", "texto": "Everything about the KeyFlow keyboard. At the top, the Keyboard mode card turns KeyFlow on as your keyboard and shows the permissions; until it's ready, the rest of the tab is read-only."},
             {"tipo": "rotulado", "rotulo": "Paste", "texto": "pastes the transcription straight into the open field, or keeps it and pastes when you tap a field after recording outside one (this one only with Overlay mode)."},
             {"tipo": "rotulado", "rotulo": "Typing", "texto": "language (the same one the globe switches), autocorrect, number row and keeping the keyboard with a physical keyboard connected."},
-            {"tipo": "rotulado", "rotulo": "Layout", "texto": "the keyboard bar buttons — mic, paste, joystick, single keys, grid triggers. The \"?\" next to each option explains what it does."},
+            {"tipo": "rotulado", "rotulo": "Layout", "texto": "the keyboard bar buttons — the orb, paste, joystick, single keys, grid triggers. The \"?\" on each option explains what it does."},
+            {"tipo": "rotulado", "rotulo": "Orb", "texto": "the orb in the mic slot: preview, copy the main orb's settings and, with the copy off, appearance, mode and the three taps. Hold and drag are fixed."},
             {"tipo": "rotulado", "rotulo": "Shortcut keyboards", "texto": "the grids the bar triggers open when you hold and drag."},
             {"tipo": "rotulado", "rotulo": "Size and skins", "texto": "the size applies to keys, bar and suggestions (the preview shows the real height); skins change how the keyboard looks, and you can import your own, as a .zip of SVGs, under “Your skins”."}
           ]
@@ -325,7 +327,7 @@
           "blocos": [
             {"tipo": "paragrafo", "texto": "Pausing freezes the timer and keeps what's been recorded; resuming continues the same recording, and it's sent as a single text."},
             {"tipo": "rotulado", "rotulo": "Orb", "texto": "hold (Toggle) or tap quickly right after releasing (Push-to-talk)."},
-            {"tipo": "rotulado", "rotulo": "Keyboard", "texto": "hold the mic while recording and release on pause."},
+            {"tipo": "rotulado", "rotulo": "Keyboard", "texto": "on the keyboard, hold the orb while recording and drag up."},
             {"tipo": "rotulado", "rotulo": "Notification", "texto": "pause and resume button."},
             {"tipo": "paragrafo", "texto": "When the maximum recording length is reached (Transcription tab), recording pauses on its own and asks whether you want to send or discard."},
             {"tipo": "rotulado", "rotulo": "Partial", "texto": "with \"Transcribe partially on pause\" on (Transcription tab), each pause already transcribes the recorded stretch and a notice shows up next to the orb. With the preview on, tap the notice to read it and tap again to edit; new text goes after your edits, and sending delivers it all together."}
@@ -336,7 +338,7 @@
           "titulo": "KeyFlow keyboard",
           "blocos": [
             {"tipo": "rotulado", "rotulo": "Collapse", "texto": "the arrow shrinks the keyboard down to the bar; tapping again brings the keys back."},
-            {"tipo": "rotulado", "rotulo": "Mic", "texto": "tap to record and again to send. Hold while recording to open the picker — drag to pause or cancel and release."},
+            {"tipo": "rotulado", "rotulo": "Orb", "texto": "it sits in the bar's mic slot and does what the floating orb does: tap to record and again to send. While recording it rises a little above the keyboard, without covering any key, and shows the time. 2 and 3 taps follow the shortcuts you chose in the Keyboard tab. Hold to drag without moving the orb — up pauses, sideways cancels and down opens KeyFlow. In Hold to talk mode, holding records and releasing sends."},
             {"tipo": "rotulado", "rotulo": "Accents", "texto": "hold a letter to see its variants (á, ã, ç…) and slide to the one you want."},
             {"tipo": "rotulado", "rotulo": "Language", "texto": "the globe switches layout, accents and spell checker between Portuguese, English and Spanish."},
             {"tipo": "rotulado", "rotulo": "Numbers", "texto": "number and phone fields open on the number pad; in the others, ?\u2060123 switches to numbers and symbols."},
@@ -355,7 +357,7 @@
           "id": "erros",
           "titulo": "Errors & timeout",
           "blocos": [
-            {"tipo": "paragrafo", "texto": "When something fails, the orb and the keyboard mic show ✖ for 2 seconds, along with the reason. That recording isn't resent — just record again."},
+            {"tipo": "paragrafo", "texto": "When something fails, the orb (the floating one and the keyboard's) shows ✖ for 2 seconds, along with the reason. That recording isn't resent — just record again."},
             {"tipo": "rotulado", "rotulo": "Token or source", "texto": "tapping the ✖ (or the notice) opens the Transcription tab to fix it."},
             {"tipo": "rotulado", "rotulo": "Microphone", "texto": "tapping takes you to the tab of the interface that warned you (Overlay or Keyboard), where the pending permission blinks on the mode card."},
             {"tipo": "rotulado", "rotulo": "Timed out", "texto": "the voice source didn't answer within the response timeout (Transcription tab, 15s by default). On slow networks or long audio, raise the limit."},

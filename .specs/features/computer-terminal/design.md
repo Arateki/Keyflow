@@ -54,27 +54,43 @@ Requisitos (CMP-NN) e decisões em `spec.md`; tarefas em `tasks.md`. Feature irm
 
 | Peça | Hoje no app | Pede o termlib | Pede o cbssh | Registrado pela CMP-T0 |
 | ---- | ----------- | -------------- | ------------ | ---------------------- |
-| Kotlin | 2.2.10 (embutido no AGP 9.2) | 2.4.21 (0.3.14) | 2.4.21; metadados 2.4.0 de 0.4.0 em diante (2.3.0 até 0.3.1) | _a preencher_ |
-| Compose | BOM 2024.09.03 (Compose 1.7) | BOM 2026.09.00 (runtime 1.11.4, foundation 1.11.2) | — | _a preencher_ |
-| coroutines | 1.8.1 | — | 1.11.0 | _a preencher_ |
-| AGP / Gradle | 9.2.0 / 9.6 (nós) | AGP 9.4.1 | — | _a preencher_ |
+| Kotlin | 2.4.21 (AGP com versão mínima elevada) | 2.4.21 (0.3.14) | 2.4.21; metadados 2.4.0 de 0.4.0 em diante (2.3.0 até 0.3.1) | 2.4.21, incluindo compilador Compose |
+| Compose | BOM 2026.09.00 (UI/runtime/foundation 1.12.1; Material3 1.4.0) | BOM 2026.09.00 (runtime 1.11.4, foundation 1.11.2) | — | BOM 2026.09.00; Activity Compose 1.13.0 |
+| coroutines | 1.11.0 | — | 1.11.0 | 1.11.0 no app e nos testes |
+| AGP / Gradle | 9.2.0 / 9.6.1 | AGP 9.4.1 no projeto upstream (consumo do AAR a validar na T1) | — | 9.2.0 / 9.6.1; JDK 17; compileSdk 37, targetSdk 36 |
 | `minSdk` | 24 | 24 | JVM 17 (+ conserto de Android ≤ 12 na 0.6.5) | 24 (mantido, D4) |
-| Transitivas relevantes | — | slf4j, androidx.core | Ktor 3.6.0, Tink 1.24.0, kstatemachine 0.38.1, kyber 2.1.0, keccak 2.5.1, jbcrypt 1.0.2, slf4j | licenças: a conferir (CMP-T1) |
+| Transitivas relevantes | — | slf4j, androidx.core | Ktor 3.6.0, Tink 1.24.0, kstatemachine 0.38.1, kyber 2.1.0, keccak 2.5.1, jbcrypt 1.0.2, slf4j | 126 componentes auditados; inventário em app/licenses/ (CMP-T1) |
 
-Versões publicadas medidas no levantamento: termlib **0.3.14** (Maven, 21/10/2026), cbssh **0.6.6** (Maven, 27/10/2026). O README do cbssh ainda cita 0.5.0: **não usar o README como fonte de versão**. A CMP-T1 fixa a versão exata.
+Versões publicadas medidas no levantamento: termlib **0.3.14** (Maven, 21/10/2026), cbssh **0.6.6** (Maven, 27/10/2026). O README do cbssh ainda cita 0.5.0: **não usar o README como fonte de versão**. A CMP-T1 fixa sshlib e protocol em 0.6.6. O termlib usa o fork da §2.3, com JNI imutável.
+Tink JVM é substituído por **tink-android 1.24.0** para evitar duplicação com AndroidX Security;
+licenças, hashes e avisos incorporados no inventário de `app/licenses/Computador-transitivas.md`.
 
-### 2.2 Plano A (padrão): artefatos Maven, sem fork
+### 2.2 Plano A original: artefatos Maven, sem fork (substituído pela §2.3)
 
 - `org.connectbot:termlib:<exata>` e `org.connectbot.sshlib:sshlib:<exata>` (+ `protocol`), com verificação de integridade das dependências. Os `.so` do termlib já vêm no AAR (ABIs `armeabi-v7a`, `arm64-v8a`, `x86`, `x86_64`; o app filtra para as suas).
   **Sem NDK, sem JNI nosso, sem workflow de nativo.**
 - **Sixel sem tocar no C++:** o libvterm do termlib ignora DCS (`.dcs = nullptr`). O `TranscodificadorDeFluxo` fica entre o cbssh e o `writeInput` (§9.3): retém `ESC P … q … ST`, decodifica com o `DecodificadorSixel` (Kotlin JVM puro), reencoda como imagem **kitty** (PNG em `m=1`) e deixa o termlib desenhar. No sentido contrário reescreve o DA1.
 - O que o termlib não faz e queremos (anunciar sixel, separar tecla de resposta, limites) é resolvido **na borda**, não no termlib.
 
-### 2.3 Plano A2: fork com JNI no CI (só se a CMP-T1 medir que mouse ou scrollback pedem C++)
+### 2.3 Plano A2 adotado: fork com JNI no CI, necessário para mouse
 
 Vendoriza `third_party/termlib/` (Apache-2.0 + libvterm MIT, commit-base e patches em `UPSTREAM.md`), módulo Gradle `:termlib` compilado com o toolchain do app; o C++ sai de um workflow (`termlib-jni.yml`: NDK do runner, actions fixadas por SHA,
 releases com `.sha256`) e o `app/build.gradle.kts` baixa e **confere o SHA-256**, como faz com o sherpa (`sherpaOnnxSha256`). Patches previstos, **só o que a CMP-T1 medir que não sai na borda**: **mouse reporting** (o termlib 0.3.14 não o expõe: ligar `vterm_mouse_move/button` e a propriedade de modo ao Kotlin); **scrollback** configurável (hoje a constante privada `maxScrollbackLines = 1000`, em Kotlin — esta parte nem pede C++). O sixel **não** entra no fork: fica no transcodificador do app (D12). `TermlibNativoTest` reprova `.so` fora do SHA, GPL ou ABI faltando.
 O Yan **já aceitou** este fork se a CMP-T1 mostrar que mouse ou scrollback maior exigem C++ (D12). Se os dois se resolvem na borda, a CMP-T3 fecha como dispensada.
+
+**Resultado da inspeção inicial CMP-T1 (30/10/2026):** termlib 0.3.14, tag `0bd42f06e3ae88e5fc9e2f505a77b443cea26865`,
+sem API de mouse no `TerminalEmulator`/`TerminalNative`, sem export JNI correspondente e sem publicação do modo de mouse.
+O scrollback é privado, limitado a 1.000 linhas e não recebe parâmetro. Logo, **CMP-T3 necessária**, conforme D12;
+a parte de scrollback isoladamente só pede Kotlin. O coordenador autorizou a continuidade depois do PR do diagnóstico.
+Fontes, hashes e limites da evidência na [lição](../../project/licoes/2026-10-30-computador-a.md).
+
+**CMP-T3 implementada (30/10):** módulo `:termlib` em `third_party/termlib`, JNI do release
+`termlib-jni-0.3.14-keyflow.1`, SHA-256 do pacote `2f0c6f11215f4bd2e86c5f2f3f7a763e2824d78898432b2cf5817c22f7142b2e`.
+A fábrica aceita `maxScrollbackLines` (0..100.000, padrão 1.000), há contador `retainedScrollbackLines`,
+`mouseMode: StateFlow<Int>` e métodos `dispatchMouseMove/Button`. O modo é publicado depois de sair do callback JNI.
+Os gestos da tela ainda dependem da CMP-T13. Nenhuma alteração de sixel/DA1 entrou no nativo.
+`TermlibNativoTest` confere o pacote e mutações; `verificar-termlib-apk.py` confere os mesmos hashes no APK,
+que preserva `libtermlib.so` sem nova remoção de símbolos. O pool não compila C++.
 
 ### 2.4 Plano B (contingência): fork preso ao toolchain atual
 
@@ -241,19 +257,19 @@ class SessaoTerminal(val id: String, val hostId: String, val dono: DonoDaSessao,
 
 ### 8.1 Ligação com o termlib
 
-`TerminalEmulator.create(...)` com (nomes da API lida no 0.3.14): `initialRows/Cols` da área, `defaultForeground/Background` do tema, `onKeyboardInput = { bytes -> filtro.encaminhar(bytes) }`, `onResize = { dim -> conexao.redimensionar(…) }`, `onClipboardCopy` (OSC 52 de escrita → consentimento),
+`TerminalEmulatorFactory.create(...)` com (nomes da API lida no 0.3.14): `initialRows/Cols` da área, `defaultForeground/Background` do tema, `onKeyboardInput = { bytes -> filtro.encaminhar(bytes) }`, `onResize = { dim -> conexao.redimensionar(…) }`, `onClipboardCopy` (OSC 52 de escrita → consentimento),
 `onBell` (vibração curta opcional), `inlineImages` conforme a política do host (§9), `autoDetectUrls = false` (links só por OSC 8). Dados do servidor: `conexao.saida.collect { transcodificador.processar(it) → emulador.writeInput(it); buffer.alimentar(it) }`.
 
 ### 8.2 Entrada, respostas e a lista de permitidos (CMP-35)
 
-O termlib devolve **tudo** (teclas do usuário e respostas do emulador) por `onKeyboardInput`. A CMP-T1 prova se dá para separar as origens (uma flag `dentroDoWriteInput` ligada na thread do `writeInput`; ou a identificação das respostas por padrão).
+O termlib devolve **tudo** (teclas do usuário e respostas do emulador) por `onKeyboardInput`. A inspeção inicial da CMP-T1 mostrou que a saída nativa passa por `handler.postAtTime`: uma flag apenas durante `writeInput` não identifica a origem quando o callback chega. O protocolo de imagens também tem callbacks diretos; a retomada mediu DA1, DSR, CPR, kitty `a=q` e recusas `t=f/t=t/t=s`, todos com a flag já desligada. Consultas de cores 10/11 e título não produziram bytes nesse lote. A flag não identifica a origem; CMP-T13 ainda precisa implementar e testar o filtro por padrões/janela, sem descartar entrada legítima.
 `FiltroDeRespostas` fica na saída: se **não** for possível separar, só deixa passar o que **parece** resposta de uma lista fechada — `ESC[?1;2c` (DA1, com o atributo 4 quando permitido), `ESC[>…c` (DA2), `ESC[<n>;<n>R` (CPR), `ESC[0n` (DSR), `ESC[8;r;ct` e `ESC[4;h;w t` (tamanho), `ESC]10/11;rgb:…` (cores), `ESC_G…;OK` (kitty `a=q`) —
 **quando** apareceram dentro de uma janela depois de dado do servidor; tudo que não casa com a lista e **não** é entrada do usuário é descartado. As respostas proibidas (CMP-35) simplesmente não são geradas: o `DECRQSS`, o `CSI 21 t`, o `ENQ` e o `OSC 52 ?` são **consumidos** antes do emulador pelo mesmo filtro de entrada que o transcodificador do sixel usa (§9.3).
 
 ### 8.3 Entrada do usuário (CMP-26..28)
 
 - O `Terminal` do termlib hospeda o `ImeInputView`/`ImeShortcutInputMode`; o app só liga `keyboardEnabled = true` na aba com o teclado liberado e **não** cria um `EditText` à parte.
-  O **KeyFlow IME** recebe `EditorInfo` desse campo (o conserto do "bug do Termius" trata `TYPE_NULL`: `commitText` letra a letra, sem composição); a CMP-T1/T14 prova que não duplica nem prende composição. Se provar defeito, o ajuste é mínimo em `KeyFlowKeyboardService` e vira `SPEC_DEVIATION`.
+  O **KeyFlow IME** recebe `EditorInfo` desse campo (o conserto do "bug do Termius" trata `TYPE_NULL`: `commitText` letra a letra, sem composição); a CMP-T1 mediu commit UTF-8 sem Enter. Entregar o mesmo KeyEvent por InputConnection e View produziu `aa`; isso não mede Gboard físico. CMP-T13/T14 devem escolher/deduplicar a origem e verificar os IMEs reais, ainda não medidos. Se provar defeito, o ajuste é mínimo em `KeyFlowKeyboardService` e vira `SPEC_DEVIATION`.
 - **Ditado da orbe:** `KeyFlowController.insertOrHold` já faz `commitText` no campo focado; no terminal isso vira bytes UTF-8 pelo caminho normal do IME. A regra "nunca Enter" vale porque o ditado não envia `\n`; **quebras de linha** no texto ditado caem na regra de colar (CMP-28).
 - **Teclas extras:** `ModifierManager` do termlib para Ctrl/Alt pegajosos; F-keys numa segunda linha. **Teclado físico:** `onInterceptKey` do `Terminal` para o mapeamento (Ctrl+letra, Alt, setas em DECCKM).
 - **Colar:** `ClipboardManager` → `PoliticaDeColar.preparar(texto)`: remove `ESC[201~`; se há `\n`, abre o diálogo de confirmação (o termlib não expõe o modo 2004; se a CMP-T1 achar como ler, a confirmação some quando o bracketed paste está ligado); depois `TerminalEmulator.pasteText(texto)`, que **respeita** o bracketed paste (lido no código).

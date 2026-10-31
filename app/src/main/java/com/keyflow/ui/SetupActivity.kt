@@ -215,6 +215,7 @@ class SetupActivity : ComponentActivity() {
     private var settingsLoaded by mutableStateOf(false)
     // Barras/grades de atalhos do teclado (SB-T9) — chaves de DataStore próprias, fora de `Settings`.
     private var barsConfig by mutableStateOf(BarsConfig.DEFAULT)
+    private var orbeConfig by mutableStateOf(com.keyflow.orbe.ConfigOrbeTeclado())
     private var shortcutGrids by mutableStateOf<List<ShortcutGrid>>(emptyList())
     private var nomesDeFluxo by mutableStateOf<Map<String, String>>(emptyMap())
     private var configFluxos by mutableStateOf(com.keyflow.fluxos.ConfigFluxos(emptyList(), emptyList()))
@@ -319,6 +320,9 @@ class SetupActivity : ComponentActivity() {
             settingsRepository.barsConfigFlow().collectLatest { barsConfig = it }
         }
         activityScope.launch {
+            settingsRepository.configOrbeTecladoFlow().collectLatest { orbeConfig = it }
+        }
+        activityScope.launch {
             settingsRepository.shortcutGridsFlow().collectLatest { shortcutGrids = it }
         }
         activityScope.launch {
@@ -379,6 +383,11 @@ class SetupActivity : ComponentActivity() {
                         onBarsConfigChange = { updated ->
                             barsConfig = updated
                             activityScope.launch { settingsRepository.saveBarsConfig(updated) }
+                        },
+                        orbeConfig = orbeConfig,
+                        onOrbeConfigChange = { updated ->
+                            orbeConfig = updated
+                            activityScope.launch { settingsRepository.atualizarOrbeTeclado { updated } }
                         },
                         shortcutGrids = shortcutGrids,
                         nomesDeFluxo = nomesDeFluxo,

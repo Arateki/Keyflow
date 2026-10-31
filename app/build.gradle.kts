@@ -1,8 +1,17 @@
 import com.keyflow.admob.AdMobIds
 import com.keyflow.onnxbuild.ElfVersionTags
 import com.android.build.api.variant.ResValue
+import groovy.json.JsonOutput
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+import org.gradle.api.artifacts.component.ProjectComponentIdentifier
+import org.gradle.api.artifacts.result.ResolvedComponentResult
+import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import java.io.File
 import java.net.URI
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.Properties
 import java.util.zip.ZipFile
@@ -225,6 +234,8 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+    // O SHA aprovado vale também dentro do APK: não remover mais símbolos do binário do CI.
+    packaging { jniLibs.keepDebugSymbols.add("**/libtermlib.so") }
     testOptions {
         unitTests {
             isReturnDefaultValues = true
@@ -236,6 +247,7 @@ android {
         getByName("test") { java.srcDir("../buildSrc/src/main/java") }
         getByName("androidTest") {
             assets.srcDir("../skin-packs")
+            assets.srcDir("src/test/resources")
         }
     }
 }
@@ -367,6 +379,65 @@ if (!sherpaOnnxAar.isFile || sha256Of(sherpaOnnxAar) != sherpaOnnxSha256) {
 }
 
 
+// CMP-T3: o CI compila o JNI; o pool só baixa e verifica o artefato imutável.
+val termlibNativoVersion = "0.3.14-keyflow.1"
+val termlibNativoSha256 = "2f0c6f11215f4bd2e86c5f2f3f7a763e2824d78898432b2cf5817c22f7142b2e"
+val termlibNativoUrl = "https://github.com/Arateki/Keyflow/releases/download/termlib-jni-$termlibNativoVersion/termlib-jni-$termlibNativoVersion.zip"
+
+abstract class PrepareTermlibJni : DefaultTask() {
+    @get:Input abstract val artifactUrl: Property<String>
+    @get:Input abstract val expectedSha256: Property<String>
+    @get:OutputFile abstract val archive: RegularFileProperty
+    @get:OutputDirectory abstract val destination: DirectoryProperty
+
+    private fun digest(file: File): String = MessageDigest.getInstance("SHA-256")
+        .digest(file.readBytes()).joinToString("") { "%02x".format(it) }
+
+    @TaskAction
+    fun prepare() {
+        val expected = expectedSha256.get()
+        check(expected.matches(Regex("[a-f0-9]{64}"))) { "O SHA-256 do JNI do termlib precisa estar fixado" }
+        val zip = archive.get().asFile
+        if (!zip.isFile || digest(zip) != expected) {
+            zip.parentFile.mkdirs()
+            val partial = File(zip.path + ".part")
+            try {
+                val connection = URI(artifactUrl.get()).toURL().openConnection().apply {
+                    connectTimeout = 15_000
+                    readTimeout = 120_000
+                }
+                connection.getInputStream().use { input -> partial.outputStream().use { input.copyTo(it) } }
+                check(digest(partial) == expected) { "SHA-256 do JNI do termlib divergente" }
+                Files.move(partial.toPath(), zip.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            } finally {
+                partial.delete()
+            }
+        }
+        check(digest(zip) == expected) { "JNI do termlib corrompido" }
+        val output = destination.get().asFile
+        val names = setOf("arm64-v8a", "armeabi-v7a", "x86_64").map { "jni/$it/libtermlib.so" }.toSet()
+        ZipFile(zip).use { input ->
+            val actual = input.entries().asSequence().filter { it.name.endsWith(".so") }.map { it.name }.toSet()
+            check(actual == names) { "ABIs inesperadas no JNI do termlib: $actual" }
+            output.deleteRecursively()
+            for (name in names + "manifest.json") {
+                val entry = input.getEntry(name) ?: error("O JNI do termlib não contém $name")
+                val target = File(output, name)
+                target.parentFile.mkdirs()
+                input.getInputStream(entry).use { source -> target.outputStream().use { source.copyTo(it) } }
+            }
+        }
+    }
+}
+
+val prepareTermlibJni = tasks.register<PrepareTermlibJni>("prepareTermlibJni") {
+    artifactUrl.set(termlibNativoUrl)
+    expectedSha256.set(termlibNativoSha256)
+    archive.set(layout.projectDirectory.file("libs/termlib-jni-$termlibNativoVersion.zip"))
+    destination.set(layout.buildDirectory.dir("termlib-jni"))
+}
+tasks.named("preBuild") { dependsOn(prepareTermlibJni) }
+
 // ONNX Runtime Java (vision-capture VC-T2b): o PaddleOCR roda na MESMA `libonnxruntime.so` do sherpa-onnx (uma só ORT por ABI —
 // a transcrição local é o núcleo do produto e não pode depender de qual `.so` ganha um `pickFirst`). Contingência do design §7:
 // não há NDK/CMake nos nós do pool (servidor, Deck, AWS; medido em 2026-10-27, "NDK not configured"), então a ponte JNI vem pronta
@@ -481,6 +552,14 @@ tasks.withType<Test>().configureEach {
 }
 
 dependencies {
+    implementation(project(":termlib"))
+    // CMP-T1: versões exatas; grafo, hashes e licenças auditados juntos.
+    implementation("org.connectbot.sshlib:sshlib:0.6.6")
+    implementation("org.connectbot.sshlib:protocol:0.6.6")
+    // CMP-T8: BiometricPrompt (Apache-2.0) para liberar as chaves SSH por 5 minutos. A 1.1.0 é a estável mais recente (as 1.2 são alfa).
+    implementation("androidx.biometric:biometric:1.1.0")
+    // CMP-T7: o assinador de software usa o Ed25519 do Tink direto (a mesma variante que o cbssh e o cofre já trazem; ver a substituição no fim do arquivo).
+    implementation("com.google.crypto.tink:tink-android:1.24.0")
     // UI
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
@@ -560,6 +639,9 @@ dependencies {
     // --- Testes ---
     // Unit
     testImplementation("junit:junit:4.13.2")
+    // CMP-T4: somente JVM de teste, nunca empacotados no APK.
+    testImplementation("org.apache.sshd:sshd-core:2.20.1")
+    testImplementation("net.i2p.crypto:eddsa:0.3.0")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     testImplementation("com.google.truth:truth:1.4.4")
@@ -640,4 +722,121 @@ tasks.register<JavaExec>("pitest") {
             "--timeoutConst=8000",
         )
     })
+}
+
+// A auditoria parte do grafo realmente selecionado pelo release, inclusive overrides do BOM do app.
+val grafoTerminal = layout.buildDirectory.file("reports/computador/dependencias-terminal.json")
+val gerarGrafoTerminal = tasks.register("gerarGrafoTerminal") {
+    outputs.file(grafoTerminal)
+    // Uma mudança no grafo precisa ser observada mesmo com o relatório antigo presente.
+    outputs.upToDateWhen { false }
+    doLast {
+        val config = configurations.getByName("releaseRuntimeClasspath")
+        val componentes = linkedMapOf<String, ResolvedComponentResult>()
+        val visitados = mutableSetOf<String>()
+        fun visitar(componente: ResolvedComponentResult) {
+            if (!visitados.add(componente.id.displayName)) return
+            val id = componente.id
+            if (id is ModuleComponentIdentifier) componentes["${id.group}:${id.module}:${id.version}"] = componente
+            componente.dependencies.filterIsInstance<ResolvedDependencyResult>().filter { !it.isConstraint }.forEach { visitar(it.selected) }
+        }
+        val raizes = config.incoming.resolutionResult.rootComponent.get().dependencies
+            .filterIsInstance<ResolvedDependencyResult>().filter {
+                val id = it.selected.id
+                (id is ProjectComponentIdentifier && id.projectPath == ":termlib") ||
+                    (id is ModuleComponentIdentifier && (id.group == "org.connectbot.sshlib" || (id.group == "androidx.biometric" && id.module == "biometric")))
+            }
+        check(raizes.size >= 3) { "Não achei termlib, cbssh e biometric no grafo do release" }
+        raizes.forEach { visitar(it.selected) }
+        val artefatos = config.incoming.artifactView {
+            componentFilter { it is ModuleComponentIdentifier }
+        }.artifacts.artifacts.groupBy { it.id.componentIdentifier.displayName }
+        val dados = componentes.keys.sorted().map { id ->
+            mapOf("coordinate" to id, "artifacts" to artefatos[id].orEmpty().sortedBy { it.file.name }.map {
+                mapOf("name" to it.file.name, "sha256" to sha256Of(it.file), "file" to it.file.absolutePath)
+            })
+        }
+        val alvo = grafoTerminal.get().asFile
+        alvo.parentFile.mkdirs()
+        alvo.writeText(JsonOutput.prettyPrint(JsonOutput.toJson(dados)) + "\n")
+        logger.lifecycle("Terminal: ${dados.size} componentes resolvidos para auditoria")
+    }
+}
+tasks.withType<Test>().configureEach {
+    dependsOn(gerarGrafoTerminal)
+    inputs.file(grafoTerminal)
+    inputs.file(layout.projectDirectory.file("licenses/computador-dependencias.json"))
+    inputs.file(rootProject.file("third_party/termlib/native-manifest.json"))
+    inputs.dir(rootProject.file("third_party/termlib/src/main/cpp"))
+    inputs.file(layout.projectDirectory.file("libs/termlib-jni-$termlibNativoVersion.zip"))
+}
+
+// CMP-T1: devolve as medidas mesmo se o pool descartar o worker e não transportar o APK.
+val medirApkTerminal = tasks.register("medirApkTerminal") {
+    doLast {
+        val apk = layout.buildDirectory.file("outputs/apk/debug/app-debug.apk").get().asFile
+        check(apk.isFile) { "APK debug ausente para medição" }
+        val dex = linkedMapOf<String, Int>()
+        ZipFile(apk).use { zip ->
+            zip.entries().asSequence().filter { Regex("""classes\d*\.dex""").matches(it.name) }.forEach { entrada ->
+                val header = zip.getInputStream(entrada).use { it.readNBytes(112) }
+                check(header.size == 112 && String(header, 0, 3, Charsets.US_ASCII) == "dex")
+                dex[entrada.name] = ByteBuffer.wrap(header).order(ByteOrder.LITTLE_ENDIAN).getInt(0x58)
+            }
+        }
+        val dados = mapOf("bytes" to apk.length(), "sha256" to sha256Of(apk), "metodos_dex_referencias" to dex.values.sum(), "dex" to dex)
+        val alvo = layout.buildDirectory.file("reports/computador/apk-debug.json").get().asFile
+        alvo.parentFile.mkdirs()
+        alvo.writeText(JsonOutput.prettyPrint(JsonOutput.toJson(dados)) + "\n")
+        logger.lifecycle("Terminal: APK ${apk.length()} bytes, ${dex.values.sum()} referências de métodos DEX")
+    }
+}
+tasks.matching { it.name == "assembleDebug" }.configureEach { finalizedBy(medirApkTerminal) }
+
+// AndroidX Security já traz tink-android. O core JVM do cbssh duplicaria as mesmas classes.
+configurations.configureEach {
+    resolutionStrategy.dependencySubstitution {
+        substitute(module("com.google.crypto.tink:tink"))
+            .using(module("com.google.crypto.tink:tink-android:1.24.0"))
+            .because("Uma única variante Tink no APK, incluindo a integração Android usada pelo cofre")
+    }
+}
+
+
+// JAR portátil da fixture: o pool também o devolve no diretório de relatórios.
+val sshFixtureRuntime = configurations.create("sshFixtureRuntime") {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    attributes {
+        attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage.JAVA_RUNTIME))
+        attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category.LIBRARY))
+        attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.JAR))
+    }
+}
+dependencies {
+    add(sshFixtureRuntime.name, "org.apache.sshd:sshd-core:2.20.1")
+    add(sshFixtureRuntime.name, "net.i2p.crypto:eddsa:0.3.0")
+    add(sshFixtureRuntime.name, "org.slf4j:slf4j-simple:2.0.20")
+    add(sshFixtureRuntime.name, "org.jetbrains.kotlin:kotlin-stdlib:2.4.21")
+}
+tasks.register<Jar>("prepararFixtureSsh") {
+    dependsOn("compileDebugUnitTestKotlin", "compileDebugUnitTestJavaWithJavac", "processDebugUnitTestJavaRes")
+    archiveFileName.set("ssh-fixture.jar")
+    destinationDirectory.set(layout.buildDirectory.dir("reports/computador"))
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    manifest { attributes["Main-Class"] = "com.keyflow.computador.fixture.SshFixtureMainKt" }
+    from(provider { tasks.named<Test>("testDebugUnitTest").get().testClassesDirs.files }) {
+        include("com/keyflow/computador/fixture/**")
+        exclude("**/*Test*")
+    }
+    from("src/test/resources") { include("computador/gravacoes/**") }
+    from(provider { sshFixtureRuntime.files.map { zipTree(it) } }) {
+        exclude("META-INF/MANIFEST.MF", "META-INF/*.SF", "META-INF/*.RSA", "META-INF/*.DSA", "**/module-info.class")
+        eachFile {
+            if (name.matches(Regex("(?i)(LICENSE|LICENCE|NOTICE|COPYING)([._-].*)?"))) {
+                // Nenhum aviso de um JAR pode sobrescrever o aviso de outro.
+                path = "META-INF/fixture-licencas/" + file.parentFile.parentFile.name + "/" + path
+            }
+        }
+    }
 }

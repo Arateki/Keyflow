@@ -33,8 +33,6 @@ import com.keyflow.ui.theme.SpaceGrotesk
 import com.keyflow.ui.tour.TourFrame
 import com.keyflow.ui.tour.TourOverlayHint
 
-const val TOUR_HINT_MIC_SELECTOR_TAG = "tour-hint-mic-selector"
-
 /**
  * Cena do teclado (TOUR-03): o [KeyFlowKeyboardView] **real** em miniatura, dirigido pelo passo.
  *
@@ -42,8 +40,7 @@ const val TOUR_HINT_MIC_SELECTOR_TAG = "tour-hint-mic-selector"
  * antiga da aba Modo mostrava a grade PRÉ-Canvas e ficou mentindo por meses — é literalmente o defeito
  * que originou esta feature.
  *
- * O seletor de ações do mic entra como representação leve: o real é montado pelo IME em cima da janela
- * do teclado, fora do alcance de um Composable.
+ * A orbe do teclado já é desenhada pela própria view; o gesto de segurar e arrastar é só o dedo do roteiro.
  */
 @Composable
 fun KeyboardScene(frame: TourFrame, modifier: Modifier = Modifier) {
@@ -80,65 +77,8 @@ fun KeyboardScene(frame: TourFrame, modifier: Modifier = Modifier) {
                 },
             )
         }
-
-        if (frame.reaction.overlayHint == TourOverlayHint.MIC_ACTION_SELECTOR) {
-            BoxWithConstraints(Modifier.matchParentSize()) {
-                // Ancorado à DIREITA do mic: encostado nele, o chip "pausar" ficaria em cima do próprio
-                // botão e o arrasto do roteiro não teria para onde ir. A fração casa com
-                // `KBD_MIC_PAUSE_CHIP` do catálogo — se um mudar, o outro muda junto.
-                MicActionSelector(
-                    Modifier
-                        .align(Alignment.TopStart)
-                        .padding(start = maxWidth * SELECTOR_START_FRACTION, top = 6.dp)
-                        .testTag(TOUR_HINT_MIC_SELECTOR_TAG),
-                )
-            }
-        }
     }
 }
-
-/** Chips de pausar/cancelar, como o seletor que aparece ao segurar o mic. */
-@Composable
-private fun MicActionSelector(modifier: Modifier = Modifier) {
-    val palette = LocalKeyFlowPalette.current
-    Row(
-        modifier
-            .background(palette.card, RoundedCornerShape(50))
-            .border(1.dp, palette.line2, RoundedCornerShape(50))
-            .padding(horizontal = 6.dp, vertical = 3.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Chip(KfIcons.Pause, tr("pausar"))
-        Chip(KfIcons.Close, tr("cancelar"))
-    }
-}
-
-@Composable
-private fun Chip(icon: KfIconSpec, label: String) {
-    val palette = LocalKeyFlowPalette.current
-    Row(
-        Modifier
-            .background(palette.panel, RoundedCornerShape(50))
-            .padding(horizontal = 6.dp, vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
-    ) {
-        KfIcon(icon, palette.fg2, Modifier.size(9.dp), strokeWidth = 2.2f)
-        Text(
-            label,
-            color = palette.fg2,
-            fontFamily = SpaceGrotesk,
-            fontWeight = FontWeight.Medium,
-            fontSize = 8.sp,
-        )
-    }
-}
-
-/**
- * Onde a fileira de chips começa, em fração da largura da cena. O roteiro aponta o arrasto para o chip
- * "pausar" usando este mesmo referencial (`KBD_MIC_PAUSE_CHIP`).
- */
-internal const val SELECTOR_START_FRACTION = 0.20f
 
 /** Segundos fixos no cronômetro do mic — determinismo, não um valor com significado. */
 private const val DEMO_SECONDS = 12

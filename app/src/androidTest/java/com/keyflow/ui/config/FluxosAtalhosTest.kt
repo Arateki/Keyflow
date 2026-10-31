@@ -175,6 +175,21 @@ class FluxosAtalhosTest {
         esperar { fechou == 1 }
     }
 
+    /** Segura uma escrita no DataStore (o bloco roda dentro da transação) até [liberar]: a exclusão fica pendente atrás dela. */
+    private class EscritaSegura(private val repo: SettingsRepository, scope: CoroutineScope) {
+        private val entrou = java.util.concurrent.CountDownLatch(1)
+        private val seguro = java.util.concurrent.CountDownLatch(1)
+        val job = scope.launch(Dispatchers.IO) {
+            repo.atualizarFluxos { c ->
+                entrou.countDown()
+                seguro.await()
+                c.copy(fluxos = c.fluxos.map { if (it.id == "b") it.copy(nome = "Renomeado") else it })
+            }
+        }
+        fun esperarEntrar() = assertTrue("a escrita concorrente não começou", entrou.await(15, java.util.concurrent.TimeUnit.SECONDS))
+        fun liberar() = seguro.countDown()
+    }
+
     @Test fun excluirTerminaMesmoSeOModalSaiDaTelaEComOutraEscritaEmAndamento() {
         runBlocking {
             repo.atualizarFluxosEBarras { _, bs ->
@@ -185,23 +200,33 @@ class FluxosAtalhosTest {
         abrir("a")
         rule.waitUntil(15_000) { rule.onAllNodesWithTag("fluxos-excluir").fetchSemanticsNodes().isNotEmpty() }
         tocar("fluxos-excluir")
-        // Outra escrita concorrente, e o modal sai da composição logo depois de confirmar (o que o ConfigScreen faz ao fechar).
-        val outra = scope.launch { repo.atualizarFluxos { c -> c.copy(fluxos = c.fluxos.map { if (it.id == "b") it.copy(nome = "Renomeado") else it }) } }
+        val outra = EscritaSegura(repo, scope); outra.esperarEntrar()
         tocar("fluxos-excluir-confirmar")
+        // A exclusão está na fila atrás da outra escrita: nada persistiu e o modal ainda não fechou.
+        rule.runOnIdle { assertEquals("fechou antes de persistir", 0, fechou) }
+        assertNotNull("o fluxo já sumiu com a escrita pendente", config().fluxo("a"))
+        // O modal sai da composição (o que o ConfigScreen faz ao fechar) e só então a escrita concorrente termina.
         rule.runOnIdle { visivel = false }
+        outra.liberar()
+        runBlocking { outra.job.join() }
         esperar { config().fluxo("a") == null }
-        runBlocking { outra.join() }
         assertEquals(listOf(Gatilho(toque(3), "b")), config().gatilhos)
         assertEquals("Renomeado", config().fluxo("b")?.nome)
         assertTrue("o botão do teclado saiu na mesma transação", barras().botoesDeFluxo().isEmpty())
     }
 
     @Test fun excluirSoFechaOModalDepoisDePersistir() {
-        semear(a); abrir("a")
+        semear(a, b); abrir("a")
         rule.waitUntil(15_000) { rule.onAllNodesWithTag("fluxos-excluir").fetchSemanticsNodes().isNotEmpty() }
-        tocar("fluxos-excluir"); tocar("fluxos-excluir-confirmar")
+        tocar("fluxos-excluir")
+        val outra = EscritaSegura(repo, scope); outra.esperarEntrar()
+        tocar("fluxos-excluir-confirmar")
+        rule.runOnIdle { assertEquals("fechou antes de persistir", 0, fechou) }
+        assertNotNull(config().fluxo("a"))
+        outra.liberar()
         esperar { config().fluxo("a") == null }
         esperar { fechou == 1 }
+        assertEquals("Renomeado", config().fluxo("b")?.nome)
     }
 
     @Test fun soAOrbeFlutuanteEOBotaoExistemNaEntregaDestaTask() {
