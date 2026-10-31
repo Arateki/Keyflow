@@ -207,6 +207,7 @@ class FluxosAtalhosTest {
         assertNotNull("o fluxo já sumiu com a escrita pendente", config().fluxo("a"))
         // O modal sai da composição (o que o ConfigScreen faz ao fechar) e só então a escrita concorrente termina.
         rule.runOnIdle { visivel = false }
+        rule.waitForIdle() // a recomposição tira o modal (e cancela o escopo dele) antes de soltar a escrita
         outra.liberar()
         runBlocking { outra.job.join() }
         esperar { config().fluxo("a") == null }
