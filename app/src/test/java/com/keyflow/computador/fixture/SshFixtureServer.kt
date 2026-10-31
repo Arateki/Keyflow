@@ -34,6 +34,8 @@ class SshFixtureServer(private val cairNoMeio: Boolean = false) : AutoCloseable 
     val tamanhos = LinkedBlockingQueue<Tamanho>()
     val ambientes = LinkedBlockingQueue<Pair<String, String>>()
     val quedas = LinkedBlockingQueue<Boolean>()
+    /** Quantas vezes o servidor viu um pedido de senha ou de chave (um cliente que cancela antes de autenticar deixa isto em zero). */
+    val tentativasDeLogin = java.util.concurrent.atomic.AtomicInteger()
     private val executor = Executors.newCachedThreadPool { tarefa -> Thread(tarefa, "ssh-fixture-eco").apply { isDaemon = true } }
     private val chaveHost = KeyPairGenerator.getInstance("EC").apply {
         initialize(ECGenParameterSpec("secp256r1"), SecureRandom.getInstance("SHA1PRNG").apply { setSeed("KeyFlow host SOMENTE TESTE 2026".toByteArray()) })
@@ -56,8 +58,8 @@ class SshFixtureServer(private val cairNoMeio: Boolean = false) : AutoCloseable 
         host = "127.0.0.1"
         port = 0
         keyPairProvider = KeyPairProvider.wrap(this@SshFixtureServer.chaveHost)
-        passwordAuthenticator = org.apache.sshd.server.auth.password.PasswordAuthenticator { nome, senha, _ -> nome == "senha" && senha == SENHA_FALSA }
-        publickeyAuthenticator = org.apache.sshd.server.auth.pubkey.PublickeyAuthenticator { nome, chave, _ -> nome == "teste" && chave.encoded.contentEquals(usuario.public.encoded) }
+        passwordAuthenticator = org.apache.sshd.server.auth.password.PasswordAuthenticator { nome, senha, _ -> tentativasDeLogin.incrementAndGet(); nome == "senha" && senha == SENHA_FALSA }
+        publickeyAuthenticator = org.apache.sshd.server.auth.pubkey.PublickeyAuthenticator { nome, chave, _ -> tentativasDeLogin.incrementAndGet(); nome == "teste" && chave.encoded.contentEquals(usuario.public.encoded) }
         channelFactories = listOf(object : org.apache.sshd.common.channel.ChannelFactory {
             override fun getName() = "session"
             override fun createChannel(session: org.apache.sshd.common.session.Session): Channel = object : ChannelSession() {
@@ -79,6 +81,7 @@ class SshFixtureServer(private val cairNoMeio: Boolean = false) : AutoCloseable 
         start()
     }
     val porta: Int get() = servidor.port
+    val sessoesAbertas: Int get() = servidor.activeSessions.size
 
     private inner class EcoGravado : Command {
         private lateinit var entrada: InputStream
