@@ -62,5 +62,12 @@ class ImpressaoDigital private constructor(val sha256: ByteArray) {
 
     companion object {
         fun de(blob: ByteArray) = ImpressaoDigital(MessageDigest.getInstance("SHA-256").digest(blob))
+
+        /** Lê de volta o texto `SHA256:…` (metadados de chave). `null` se não for uma impressão válida. */
+        fun deTexto(texto: String): ImpressaoDigital? {
+            if (!texto.startsWith("SHA256:")) return null
+            val bytes = Base64Puro.decodificar(texto.removePrefix("SHA256:")) ?: return null
+            return if (bytes.size == 32) ImpressaoDigital(bytes) else null
+        }
     }
 }
