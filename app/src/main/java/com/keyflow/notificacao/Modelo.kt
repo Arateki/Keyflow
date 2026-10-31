@@ -137,7 +137,9 @@ fun efetiva(config: ConfigNotificacao, settings: Settings): ConfigEfetiva {
  * Mostrar e tela bloqueada ficam como estão.
  */
 fun desligarCopia(config: ConfigNotificacao, settings: Settings): ConfigNotificacao {
-    val e = efetiva(config.copy(copiarDaOrbePrincipal = true), settings)
+    // Idempotente: com a cópia já desligada os valores próprios valem e nada se regrava (a orbe flutuante pode ter mudado desde então).
+    if (!config.copiarDaOrbePrincipal) return config
+    val e = efetiva(config, settings)
     return config.copy(
         copiarDaOrbePrincipal = false,
         skin = e.skin,

@@ -114,6 +114,17 @@ class ModeloTest {
     }
 
     @Test
+    fun `desligar a copia e idempotente e nao regrava as acoes da flutuante`() {
+        val uma = desligarCopia(ConfigNotificacao(), ptt)
+        val outraOrbe = ptt.copy(shortcut1Tap = OrbShortcutAction.NONE, shortcut2Tap = OrbShortcutAction.NONE, orbSkin = "glitch")
+        assertThat(desligarCopia(uma, outraOrbe)).isEqualTo(uma)
+        assertThat(desligarCopia(uma, ptt)).isEqualTo(uma)
+        // e uma config já própria (com GravarEnviar remapeado) não é sobrescrita pelas Settings
+        val propria = ConfigNotificacao(copiarDaOrbePrincipal = false, acao2Toques = AcaoDaOrbe.GravarEnviar)
+        assertThat(desligarCopia(propria, alternar)).isEqualTo(propria)
+    }
+
+    @Test
     fun `mapa dos atalhos`() {
         assertThat(acaoDoAtalho(OrbShortcutAction.NONE)).isEqualTo(AcaoDaOrbe.Nenhuma)
         assertThat(acaoDoAtalho(OrbShortcutAction.TOGGLE_KEYBOARD)).isEqualTo(AcaoDaOrbe.RetrairExpandirTeclado)
