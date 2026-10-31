@@ -244,16 +244,22 @@ class FluxosAtalhosTest {
         semear(a, b, gatilhos = listOf(Gatilho(toque(3), "b"))); abrir("a")
         rule.waitUntil(15_000) { rule.onAllNodesWithTag(tagLigarAtalho(2)).fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithTag("fluxos-atalho-estado-2", useUnmergedTree = true).performScrollTo()
+        rule.waitForIdle()
         capturaFluxos("modal-atalhos-claro", checkNotNull(view))
         rule.runOnIdle { escuro = true }; rule.waitForIdle()
         capturaFluxos("modal-atalhos-escuro", checkNotNull(view))
-        rule.runOnIdle { escuro = false }
+        rule.runOnIdle { escuro = false }; rule.waitForIdle()
         tocar(tagLigarAtalho(3))
-        texto(1).assertIsDisplayed()
+        rule.waitUntil(15_000) { rule.onAllNodesWithTag("fluxos-confirmacao-ligar").fetchSemanticsNodes().isNotEmpty() }
+        rule.waitForIdle()
         capturaFluxos("modal-atalho-ocupado", checkNotNull(view))
         tocar("fluxos-confirmacao-cancelar"); tocar(tagLigarAtalho(2))
+        rule.waitUntil(15_000) { rule.onAllNodesWithTag("fluxos-confirmacao-ligar").fetchSemanticsNodes().isNotEmpty() }
+        rule.waitForIdle()
         capturaFluxos("modal-atalho-substitui", checkNotNull(view))
         tocar("fluxos-confirmacao-cancelar"); tocar("fluxos-excluir")
+        rule.waitUntil(15_000) { rule.onAllNodesWithTag("fluxos-excluir-confirmar").fetchSemanticsNodes().isNotEmpty() }
+        rule.waitForIdle()
         capturaFluxos("modal-excluir", checkNotNull(view))
     }
 }
