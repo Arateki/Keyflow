@@ -32,8 +32,16 @@ internal fun capturaFluxos(nome: String, view: View) {
             if (captura == null) { instrumentation.waitForIdleSync(); Thread.sleep(300) }
         }
     }
-    val bitmap = captura ?: Bitmap.createBitmap(view.width.coerceAtLeast(1), view.height.coerceAtLeast(1), Bitmap.Config.ARGB_8888).also {
-        instrumentation.runOnMainSync { view.draw(android.graphics.Canvas(it)) }
+    // O fallback não enxerga Popups: se há uma janela de popup na tela, falha em vez de gravar uma captura sem a modal (o teste achava
+    // que tinha provado a tela). Sem popup, a View basta e fica o aviso no log.
+    val bitmap = captura ?: run {
+        val popup = androidx.test.uiautomator.UiDevice.getInstance(instrumentation)
+            .findObjects(androidx.test.uiautomator.By.clazz("android.widget.PopupWindow\$PopupDecorView")).isNotEmpty()
+        check(!popup) { "A captura $nome não saiu (takeScreenshot nulo) e há um popup aberto: o fallback da View não o mostraria" }
+        android.util.Log.w("FluxosCaptura", "takeScreenshot nulo em $nome: usando view.draw (sem popups)")
+        Bitmap.createBitmap(view.width.coerceAtLeast(1), view.height.coerceAtLeast(1), Bitmap.Config.ARGB_8888).also {
+            instrumentation.runOnMainSync { view.draw(android.graphics.Canvas(it)) }
+        }
     }
     val png = ByteArrayOutputStream()
     try { bitmap.compress(Bitmap.CompressFormat.PNG, 100, png) } finally { bitmap.recycle() }

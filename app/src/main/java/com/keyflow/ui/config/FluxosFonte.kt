@@ -118,7 +118,14 @@ internal fun fonteDaTela(
             catalogo = mapOf(
                 AbaDaEtapa.RACIOCINIO to nuvem,
                 AbaDaEtapa.VISAO to nuvem,
-                AbaDaEtapa.TRANSCRICAO to mapOf("OPENAI" to OPENAI_MODELS.map { ModeloOferecido(it, it) }),
+                AbaDaEtapa.TRANSCRICAO to mapOf(
+                    "OPENAI" to OPENAI_MODELS.map { ModeloOferecido(it, it) }, "GROQ" to GROQ_MODELS.map { ModeloOferecido(it, it) },
+                ),
+                // Na Voz o que se escolhe é a voz (OpenAI e Google) ou o modelo (ElevenLabs), os mesmos catálogos da aba.
+                AbaDaEtapa.VOZ to mapOf(
+                    "OPENAI" to FALA_CLOUD_VOICES.map { ModeloOferecido(it, it) }, "GOOGLE" to FALA_GOOGLE_VOICES.map { ModeloOferecido(it, it) },
+                    "ELEVENLABS" to FALA_ELEVENLABS_MODELS.map { ModeloOferecido(it, it) },
+                ),
             ),
             comChaveDeApi = buildSet {
                 if (oai.chave) add("OPENAI"); if (ant.chave) add("ANTHROPIC"); if (goo.chave) add("GOOGLE")
