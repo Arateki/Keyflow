@@ -133,9 +133,25 @@ class DocsSectionsTest {
         assertEquals("aba-raciocinio", rSection!!.id)
         assertTrue(rSection.blocks.isNotEmpty())
 
-        listOf(ConfigTab.KEYFLOW, ConfigTab.VISAO, ConfigTab.FALA, ConfigTab.NOTIFICACAO, ConfigTab.DOCS, ConfigTab.FLUXOS, ConfigTab.COMPUTADOR).forEach {
+        listOf(ConfigTab.KEYFLOW, ConfigTab.VISAO, ConfigTab.FALA, ConfigTab.NOTIFICACAO, ConfigTab.DOCS, ConfigTab.COMPUTADOR).forEach {
             assertEquals("$it não deveria ter seção ainda", null, docsSectionFor(it))
         }
+    }
+
+    /** FLX-55: a aba Fluxos tem a seção própria, e ela não promete o que a aba não faz (notificação, grafo, Computador). */
+    @Test
+    fun fluxosTabHasItsSectionAndDoesNotPromiseWhatItLacks() {
+        val secao = docsSectionFor(ConfigTab.FLUXOS)
+        assertEquals("aba-fluxos", secao?.id)
+        val texto = secao!!.blocks.joinToString(" ") { b ->
+            when (b) {
+                is DocBlock.Paragraph -> b.text
+                is DocBlock.Labeled -> b.label + " " + b.text
+                else -> ""
+            }
+        }.lowercase()
+        listOf("ouvir e responder", "restaurar", "atalho", "substitui", "etapa").forEach { assertTrue("falta $it", it in texto) }
+        listOf("notificação", "grafo", "computador").forEach { assertTrue("promete $it", it !in texto) }
     }
 
     @Test

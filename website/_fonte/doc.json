@@ -68,6 +68,19 @@
           ]
         },
         {
+          "id": "aba-fluxos",
+          "titulo": "Aba Fluxos",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "Um fluxo é uma sequência de etapas que você dispara com um atalho: por exemplo, ouvir você, perguntar a um modelo e falar a resposta. Cada etapa recebe o resultado da anterior; o app só deixa encaixar etapas que combinam."},
+            {"tipo": "rotulado", "rotulo": "Etapas", "texto": "Ditar (fala para texto), Capturar (a tela vira imagem), Visão (lê a imagem), Perguntar (texto para resposta), Agente (pede e usa ferramentas, com confirmação), Falar (lê o texto em voz alta) e Inserir (cola o texto no campo). Ditar e Capturar abrem o fluxo; um fluxo sem as etapas certas fica marcado como Incompleto e não roda."},
+            {"tipo": "rotulado", "rotulo": "Fluxos padrão", "texto": "Ouvir e responder, Ler a tela e colar e Pedir ao agente e colar vêm prontos. Você pode editá-los, renomeá-los ou excluí-los, e criar os seus com “Novo fluxo” (até 20)."},
+            {"tipo": "rotulado", "rotulo": "Modelo por etapa", "texto": "cada etapa usa o modelo da aba da capacidade, ou um modelo que você escolher só para ela. O selo do fluxo diz se tudo roda no aparelho ou quais provedores de nuvem entram."},
+            {"tipo": "rotulado", "rotulo": "Atalhos", "texto": "no modal do fluxo, ligue 2 ou 3 toques da orbe flutuante, ou adicione um botão à barra do teclado. Um gesto liga a um só fluxo. Ligar um gesto substitui a ação dele, e o app avisa o que será substituído antes de confirmar; a ação original só fica por baixo e volta quando você desliga o atalho ou exclui o fluxo."},
+            {"tipo": "rotulado", "rotulo": "Restaurar fluxos padrão", "texto": "recria os padrão que você apagou e reescreve os que editou. Não mexe nos seus fluxos nem em nenhum atalho."},
+            {"tipo": "rotulado", "rotulo": "O que sai do aparelho", "texto": "só o que a etapa de nuvem precisa para responder (o texto, a imagem ou o áudio daquela etapa), para o provedor que o selo do fluxo mostra. Fluxos com todos os modelos no aparelho não enviam nada."}
+          ]
+        },
+        {
           "id": "texto",
           "titulo": "Onde o texto aparece",
           "blocos": [
@@ -260,6 +273,19 @@
             {"tipo": "rotulado", "rotulo": "History", "texto": "each run is kept on this device, up to 20 per model. The change only compares runs with the same corpus, options and backend; an incomplete run is marked and is left out of the comparison. The result can be exported as JSON."},
             {"tipo": "rotulado", "rotulo": "Run the full battery", "texto": "runs every test the model supports, one after another. Stop keeps what was already measured, and a hot device or a low battery pauses the run."},
             {"tipo": "rotulado", "rotulo": "Cloud model", "texto": "before any call the app shows how many will be made and the token cap, and only runs after you confirm. With a subscription login the reduced run (2 cases per test) comes first and it uses your plan’s limit."}
+          ]
+        },
+        {
+          "id": "aba-fluxos",
+          "titulo": "Flows tab",
+          "blocos": [
+            {"tipo": "paragrafo", "texto": "A flow is a sequence of steps you trigger with a shortcut: for example, listen to you, ask a model and speak the answer. Each step receives the result of the previous one; the app only lets you chain steps that fit."},
+            {"tipo": "rotulado", "rotulo": "Steps", "texto": "Dictate (speech to text), Capture (the screen becomes an image), Vision (reads the image), Ask (text to answer), Agent (asks for and uses tools, with confirmation), Speak (reads the text aloud) and Insert (pastes the text into the field). Dictate and Capture open a flow; a flow without the right steps is marked Incomplete and does not run."},
+            {"tipo": "rotulado", "rotulo": "Default flows", "texto": "Listen and answer, Read the screen and paste, and Ask the agent and paste come ready. You can edit, rename or delete them, and create your own with “New flow” (up to 20)."},
+            {"tipo": "rotulado", "rotulo": "Model per step", "texto": "each step uses the model from the capability tab, or a model you pick just for it. The flow badge says whether everything runs on the device or which cloud providers are involved."},
+            {"tipo": "rotulado", "rotulo": "Shortcuts", "texto": "in the flow dialog, turn on 2 or 3 taps of the floating orb, or add a button to the keyboard bar. A gesture links to a single flow. Turning on a gesture replaces its action, and the app tells you what will be replaced before you confirm; the original action just stays underneath and comes back when you turn the shortcut off or delete the flow."},
+            {"tipo": "rotulado", "rotulo": "Restore default flows", "texto": "recreates the defaults you deleted and rewrites the ones you edited. It does not touch your flows or any shortcut."},
+            {"tipo": "rotulado", "rotulo": "What leaves the device", "texto": "only what the cloud step needs to answer (that step's text, image or audio), to the provider shown on the flow badge. Flows with every model on the device send nothing."}
           ]
         },
         {

@@ -281,6 +281,39 @@ val docsSections: List<DocSection> get() = listOf(
         ),
     ),
     DocSection(
+        "aba-fluxos",
+        tr("Aba Fluxos"),
+        listOf(
+            DocBlock.Paragraph(
+                tr("Um fluxo é uma sequência de etapas que você dispara com um atalho: por exemplo, ouvir você, perguntar a um modelo e falar a resposta. Cada etapa recebe o resultado da anterior; o app só deixa encaixar etapas que combinam."),
+            ),
+            DocBlock.Labeled(
+                tr("Etapas"),
+                tr("Ditar (fala para texto), Capturar (a tela vira imagem), Visão (lê a imagem), Perguntar (texto para resposta), Agente (pede e usa ferramentas, com confirmação), Falar (lê o texto em voz alta) e Inserir (cola o texto no campo). Ditar e Capturar abrem o fluxo; um fluxo sem as etapas certas fica marcado como Incompleto e não roda."),
+            ),
+            DocBlock.Labeled(
+                tr("Fluxos padrão"),
+                tr("Ouvir e responder, Ler a tela e colar e Pedir ao agente e colar vêm prontos. Você pode editá-los, renomeá-los ou excluí-los, e criar os seus com “Novo fluxo” (até 20)."),
+            ),
+            DocBlock.Labeled(
+                tr("Modelo por etapa"),
+                tr("cada etapa usa o modelo da aba da capacidade, ou um modelo que você escolher só para ela. O selo do fluxo diz se tudo roda no aparelho ou quais provedores de nuvem entram."),
+            ),
+            DocBlock.Labeled(
+                tr("Atalhos"),
+                tr("no modal do fluxo, ligue 2 ou 3 toques da orbe flutuante, ou adicione um botão à barra do teclado. Um gesto liga a um só fluxo. Ligar um gesto substitui a ação dele, e o app avisa o que será substituído antes de confirmar; a ação original só fica por baixo e volta quando você desliga o atalho ou exclui o fluxo."),
+            ),
+            DocBlock.Labeled(
+                tr("Restaurar fluxos padrão"),
+                tr("recria os padrão que você apagou e reescreve os que editou. Não mexe nos seus fluxos nem em nenhum atalho."),
+            ),
+            DocBlock.Labeled(
+                tr("O que sai do aparelho"),
+                tr("só o que a etapa de nuvem precisa para responder (o texto, a imagem ou o áudio daquela etapa), para o provedor que o selo do fluxo mostra. Fluxos com todos os modelos no aparelho não enviam nada."),
+            ),
+        ),
+    ),
+    DocSection(
         "texto",
         tr("Onde o texto aparece"),
         listOf(
@@ -714,6 +747,7 @@ fun docsSectionFor(tab: ConfigTab): DocSection? {
         ConfigTab.TECLADO -> "aba-teclado"
         ConfigTab.OVERLAY -> "aba-sobrepor"
         ConfigTab.RACIOCINIO -> "aba-raciocinio"
+        ConfigTab.FLUXOS -> "aba-fluxos"
         // As abas ainda não entregues ficam apenas com o cartão "Em breve", sem ajuda que prometa
         // controles inexistentes.
         ConfigTab.KEYFLOW,
@@ -721,7 +755,6 @@ fun docsSectionFor(tab: ConfigTab): DocSection? {
         ConfigTab.FALA,
         ConfigTab.NOTIFICACAO,
         ConfigTab.DOCS,
-        ConfigTab.FLUXOS,
         ConfigTab.COMPUTADOR -> return null
     }
     return docsSections.first { it.id == id }
