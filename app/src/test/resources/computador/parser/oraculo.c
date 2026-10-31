@@ -28,8 +28,6 @@ static int controle(unsigned char c, void *user) {
 static int escape(const char *s, size_t n, void *user) {
     Observacao *o = user;
     if (n == 2 && !memcmp(s, " G", 2)) o->proibidos |= 2;
-    if (n == 2 && !memcmp(s, "%@", 2)) vterm_set_utf8(o->vt, 0);
-    if (n == 2 && !memcmp(s, "%G", 2)) vterm_set_utf8(o->vt, 1);
     return 1;
 }
 static int csi(const char *lider, const long args[], int n, const char *inter, char final, void *user) {

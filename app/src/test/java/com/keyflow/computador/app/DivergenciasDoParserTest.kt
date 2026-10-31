@@ -25,6 +25,24 @@ class DivergenciasDoParserTest {
         assertArrayEquals(utf8, FiltroDeRespostas().filtrar(utf8))
     }
 
+    /** A libvterm do app fica sempre em UTF-8 (Terminal.cpp) e ignora `ESC % @`: 0x9c não fecha a string depois dele. */
+    @Test fun escPercentArrobaNaoDesligaUtf8() {
+        assertArrayEquals(bytes("\u001b%@"), filtrar("\u001b%@\u001b]52;c\u009c;?\u0007"))
+        val titulos = mutableListOf<String>()
+        FiltroDaSaidaDoServidor { titulos += it }.processar(bytes("\u001b%@\u001b]0;\u009cTITULO\u0007"))
+        assertTrue(titulos.toString(), titulos.any { "TITULO" in it })
+    }
+
+    @Test fun risEDecstrVoltamAsSetasAoModoNormal() {
+        for (reset in listOf("\u001bc", "\u001b[!p")) {
+            val f = FiltroDaSaidaDoServidor()
+            f.processar(bytes("\u001b[?1h"))
+            assertTrue(f.modoAplicacaoDasSetas)
+            f.processar(bytes(reset))
+            assertFalse(reset, f.modoAplicacaoDasSetas)
+        }
+    }
+
     @Test fun parametrosNumericosSaoNormalizados() {
         for (s in listOf("\u001b[021t", "\u001b[00020t", "\u001b]052;c;?\u0007", "\u001b]021;?\u0007")) {
             assertEquals(s.toList().toString(), 0, filtrar(s).size)

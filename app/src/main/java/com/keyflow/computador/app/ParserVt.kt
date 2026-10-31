@@ -47,10 +47,6 @@ internal class ParserVt(
     private fun concluir() {
         if (excedeu) descarte() else {
             val conteudo = semControles.toByteArray()
-            if (tipo == Tipo.ESC) {
-                if (conteudo.contentEquals(byteArrayOf('%'.code.toByte(), '@'.code.toByte()))) utf8 = false
-                if (conteudo.contentEquals(byteArrayOf('%'.code.toByte(), 'G'.code.toByte()))) utf8 = true
-            }
             sequencia(tipo, bruto.toByteArray(), conteudo)
         }
         limpar()

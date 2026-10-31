@@ -75,11 +75,15 @@ class FiltroDaSaidaDoServidor(private val aoTitulo: (String) -> Unit = {}) {
     private fun sequencia(tipo: ParserVt.Tipo, bruto: ByteArray, corpo: ByteArray) {
         val t = corpo.toString(Charsets.ISO_8859_1)
         when (tipo) {
-            ParserVt.Tipo.ESC -> if (t == " G") { consumidos++; return }
+            ParserVt.Tipo.ESC -> {
+                if (t == " G") { consumidos++; return }
+                if (t == "c") modoAplicacaoDasSetas = false // RIS: a libvterm volta as setas ao modo normal
+            }
             ParserVt.Tipo.CSI -> {
                 val c = CsiVt.ler(t) ?: run { consumidos++; return }
                 if (c.lider.isEmpty() && c.intermediarios.isEmpty() && c.final == 't' && c.argumentos.first() in setOf(20, 21)) { consumidos++; return }
                 if (c.lider == "?" && c.intermediarios.isEmpty() && c.final in "hl" && 1 in c.argumentos) modoAplicacaoDasSetas = c.final == 'h'
+                if (c.lider.isEmpty() && c.intermediarios == "!" && c.final == 'p') modoAplicacaoDasSetas = false // DECSTR
             }
             ParserVt.Tipo.OSC -> {
                 val osc = OscVt.ler(t) ?: run { consumidos++; return }
